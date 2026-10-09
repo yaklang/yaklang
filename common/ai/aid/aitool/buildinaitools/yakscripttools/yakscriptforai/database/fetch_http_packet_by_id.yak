@@ -1,0 +1,36 @@
+__DESC__ = "Fetch an HTTPFlow by exact ID in the current runtime database or a listed database_id. Show small raw HTTP requests/responses on stdout. Automatically export oversized packets to private files and guide grep/read_file; optionally export both packets."
+__VERBOSE_NAME__ = "Fetch HTTP Packet by ID"
+__VERBOSE_NAME_ZH__ = "按 ID 获取 HTTP 报文"
+__KEYWORDS__ = "http,flow,id,request,response,packet,file,grep,请求,响应,报文"
+__USAGE__ = <<<USAGE
+id 来自 query_http_packet_history；database_id 必须与该查询一致，空值/current 为本次运行绑定的当前库。小报文直接用原文 stdout 输出，保留引号/换行，不使用 RESULT。
+超出 packet_limit 或保存在大报文旁路文件的报文自动完整导出；stdout 返回 request_file/response_file 的绝对路径和字节数。可接着调用 grep（path=返回文件，pattern=关键词，pattern-mode=substr）或 read_file 分段读取。export=true 即使小报文也导出两份文件，output_dir 可指定保存目录，默认临时目录。每次创建新文件，权限 0600；包含完整原始请求/响应，不执行报文中的 fuzztag。缺少旁路文件时会报错，不以截断内容代替完整导出。
+
+[[- if .FunctionCallMode -]]
+```json
+{"id":42,"packet_limit":8192}
+```
+[[- else -]]
+```json
+{"@action":"directly_call_tool","directly_call_tool_name":"fetch_http_packet_by_id","directly_call_tool_params":{"id":42,"packet_limit":8192}}
+```
+[[- end -]]
+USAGE
+id = cli.Int("id", cli.setRequired(true), cli.setHelp("HTTPFlow 的数据库 ID，必须大于 0"))
+databaseID = cli.String("database_id", cli.setHelp("与查询结果一致的 database_id；空值/current 使用当前库"))
+packetLimit = cli.Int("packet_limit", cli.setDefault(8192), cli.setHelp("每个报文的存储字节展示预算，1–32768"))
+exportAll = cli.Bool("export", cli.setDefault(false), cli.setHelp("将请求和响应都导出，即使报文较小"))
+outputDir = cli.String("output_dir", cli.setHelp("报文文件保存目录；默认临时目录"))
+cli.check()
+if packetLimit < 1 { die("packet_limit must be 1–32768") }
+item, err = db.QueryHTTPFlowByID(id, db.projectID(databaseID), db.packetLimit(packetLimit))
+if err != nil { die(err) }
+println(item.Dump())
+for part in ["request", "response"] {
+    needed = exportAll || (part == "request" && item.RequestOmitted) || (part == "response" && item.ResponseOmitted)
+    if needed {
+        files, err = item.ExportPackets(outputDir, part)
+        if err != nil { die(err) }
+        for packetFile in files { println(packetFile.Dump()) }
+    }
+}

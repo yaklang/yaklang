@@ -1,0 +1,28 @@
+__DESC__ = "List Yaklang projects registered by the engine, Yakit and Memfit. Show database_id, project name, source, current database, size and last operation date on stdout. Use returned database_id with HTTP history tools."
+__VERBOSE_NAME__ = "List Yak Projects"
+__VERBOSE_NAME_ZH__ = "列出 Yaklang 项目"
+__KEYWORDS__ = "project,database,yakit,memfit,http,项目,数据库"
+__USAGE__ = <<<USAGE
+默认列出引擎当前项目以及 Yakit、Memfit 已登记的项目；从环境和应用配置自动发现工作目录。query 匹配项目名称/描述，limit/offset 分页。
+stdout 展示 database_id、项目名称、来源、路径、是否当前库、可用性、类型、数据库大小和上次操作日期。size_bytes 包含 SQLite 主文件与 WAL；last_operation_at 取登记更新时间与数据库/WAL 修改时间的较新值，不代表最后读取时间。
+只查询 available=true 且 supports_http=true 的 database_id。其他工具不传 database_id 时查询本次 AI 运行绑定的当前库；不能用原始文件路径或数字项目 ID 代替 database_id。不会切换当前项目。
+
+[[- if .FunctionCallMode -]]
+arguments 示例：
+```json
+{"query":"认证调查","limit":10}
+```
+[[- else -]]
+```json
+{"@action":"directly_call_tool","directly_call_tool_name":"list_yak_projects","directly_call_tool_params":{"query":"认证调查","limit":10}}
+```
+[[- end -]]
+USAGE
+query = cli.String("query", cli.setHelp("项目名称或描述的子串；空值浏览全部"))
+limit = cli.Int("limit", cli.setDefault(10), cli.setHelp("返回项目数，1–100"))
+offset = cli.Int("offset", cli.setDefault(0), cli.setHelp("项目偏移，0–1000000；满页可用 offset+limit 续查"))
+cli.check()
+items, err = db.ListYakProjects(db.keyword(query), db.limit(limit), db.offset(offset))
+if err != nil { die(err) }
+printf("projects=%d offset=%d\n", len(items), offset)
+for item in items { println(item.Dump()); println("") }

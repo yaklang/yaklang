@@ -780,45 +780,6 @@ func queryHTTPFlowsByID(id ...int64) chan *schema.HTTPFlow {
 	return ch
 }
 
-// queryHTTPFlowByID 按数据库自增 ID 精确查询单条 HTTP 流量（导出名为 db.QueryHTTPFlowByID）
-//
-// 当你已经知道某条流量的 ID（例如从列表/表格中选中、或从其他查询里拿到 flow.ID）时，用它直接取回完整对象。
-// 批量按多个 ID 取用 db.QueryHTTPFlowsByID。
-//
-// 参数:
-//   - id: HTTPFlow 的数据库 ID
-//
-// 返回值:
-//   - HTTPFlow 对象
-//   - 错误信息（数据库不可用或该 ID 不存在时返回）
-//
-// Example:
-// ```
-// // 先落一条流量，从遍历结果拿到它的 ID，再按 ID 精确取回（保存->拿ID->按ID查 联动）
-// host = "doc-demo-byid.example.com"
-// db.SaveHTTPFlowFromRaw("http://"+host+"/", []byte(f"GET / HTTP/1.1\r\nHost: ${host}\r\n\r\n"), []byte("HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nok"))~
-//
-// id = 0
-// for flow in db.QueryHTTPFlowsByKeyword(host) { id = flow.ID; break }
-// if id > 0 {
-//     one = db.QueryHTTPFlowByID(id)~
-//     println(one.Url)
-//     assert one.ID == id, "QueryHTTPFlowByID should return the same record"
-// }
-// ```
-func queryHTTPFlowByID(id int64) (*schema.HTTPFlow, error) {
-	db := consts.GetGormProjectDatabase()
-	if db == nil {
-		return nil, utils.Errorf("Query HTTPFlow By ID Failed: cannot found database")
-	}
-	var flow schema.HTTPFlow
-	db.Model(&schema.HTTPFlow{}).Where("id = ?", id).First(&flow)
-	if db.Error != nil {
-		return nil, utils.Errorf("Query HTTPFlow By ID Failed: %s", db.Error)
-	}
-	return &flow, nil
-}
-
 // queryAllUrls 查询全部 URL 资产（导出名为 db.QueryUrlsAll）
 // 参数:
 //   - 无

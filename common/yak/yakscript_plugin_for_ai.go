@@ -219,6 +219,7 @@ func executeNativeYakPlugin(ctx context.Context, script *schema.YakScript, param
 		)
 		bindMemorySearchToEngine(ae, ctx, runtimeConfig)
 		bindAIHistoryToEngine(ae, ctx, runtimeConfig)
+		bindDBHistoryToEngine(ae, ctx, runtimeConfig)
 		return nil
 	})
 

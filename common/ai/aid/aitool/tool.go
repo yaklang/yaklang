@@ -25,6 +25,8 @@ type ToolRuntimeConfig struct {
 	FeedBacker      func(result *ypb.ExecResult) error
 	RuntimeID       string
 	ProjectDatabase *gorm.DB
+	// ProfileDatabase optionally binds the engine project registry for data tools.
+	ProfileDatabase *gorm.DB
 	// TimelineHistorySnapshot captures independent live items for archive/search exclusion.
 	TimelineHistorySnapshot func() ([]schema.AITimelineHistory, error)
 	PersistentSessionID     string

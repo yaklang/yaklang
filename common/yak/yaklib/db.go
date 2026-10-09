@@ -256,7 +256,7 @@ var DatabaseExports = map[string]interface{}{
 	"QueryPortsByTaskName":        queryPortsByTaskName,
 	"QueryPortsByRuntimeId":       queryPortsByRuntimeId,
 	"QueryHTTPFlowsByID":          queryHTTPFlowsByID,
-	"QueryHTTPFlowByID":           queryHTTPFlowByID,
+	"QueryHTTPFlowByID":           QueryHTTPFlowByID,
 	"QueryHostPortByNetwork":      queryHostPortByNetwork,
 	"QueryHostPortByKeyword":      queryHostAssetByNetwork,
 	"QueryHostsByDomain":          queryHostAssetByDomainKeyword,
