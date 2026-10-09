@@ -353,7 +353,10 @@ func (b *FunctionBuilder) AssignVariable(variable *Variable, value Value) {
 			globalID int
 		}
 
-		targets := make(map[pointerTarget]struct{})
+		// Pointers only reach a handful of targets in practice, so a slice with a
+		// linear duplicate check is cheaper than a map here -- and it keeps the
+		// emit order deterministic (a map would scramble CopyValue id allocation).
+		targets := make([]pointerTarget, 0, 4)
 		var collectTargets func(Value)
 		collectTargets = func(pointer Value) {
 			if pointer == nil {
@@ -373,7 +376,12 @@ func (b *FunctionBuilder) AssignVariable(variable *Variable, value Value) {
 			if originName == "" || originGlobalId == 0 {
 				return
 			}
-			targets[pointerTarget{name: originName, globalID: originGlobalId}] = struct{}{}
+			for _, existing := range targets {
+				if existing.name == originName && existing.globalID == originGlobalId {
+					return
+				}
+			}
+			targets = append(targets, pointerTarget{name: originName, globalID: originGlobalId})
 		}
 
 		collectTargets(variable.GetValue())
@@ -394,7 +402,7 @@ func (b *FunctionBuilder) AssignVariable(variable *Variable, value Value) {
 			return b.EmitUndefined(originName)
 		}
 
-		for target := range targets {
+		for _, target := range targets {
 			newValue := b.CopyValue(value)
 			newValue.SetName(target.name)
 			newValue.SetVerboseName(target.name)
