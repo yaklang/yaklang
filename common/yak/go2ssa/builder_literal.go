@@ -931,9 +931,7 @@ func coverType(ityp, iwantTyp ssa.Type) {
 	case ssa.StructTypeKind:
 		typ.FieldType = wantTyp.FieldType
 		typ.KeyTyp = wantTyp.KeyTyp
-		wantTyp.RangeMethod(func(s string, f *ssa.Function) {
-			typ.AddMethod(s, f)
-		})
+		typ.AddMethods(wantTyp.GetMethod())
 	}
 	for n, a := range wantTyp.AnonymousField {
 		typ.AnonymousField[n] = a

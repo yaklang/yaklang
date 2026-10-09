@@ -320,6 +320,12 @@ func marshalExtraInformation(raw Instruction) map[string]any {
 		params["undefined_kind"] = ret.Kind
 	case *ConstInst:
 		params["const_value"] = ret.Const.GetRawValue()
+		if ret.Unary != 0 {
+			params["const_unary"] = ret.Unary
+		}
+		if ret.isIdentify {
+			params["const_identify"] = true
+		}
 		if ret.Origin > 0 {
 			params["const_origin"] = ret.Origin
 		}
@@ -468,6 +474,12 @@ func unmarshalExtraInformation(cache *ProgramCache, inst Instruction, ir *ssadb.
 			c = newConstCreate(i)
 		}
 		ret.Const = c
+		ret.ConstType = ConstType(ir.ConstType)
+		if ret.ConstType == "" {
+			ret.ConstType = ConstTypeNormal
+		}
+		ret.Unary = utils.MapGetInt(params, "const_unary")
+		ret.isIdentify = utils.MapGetBool(params, "const_identify")
 		ret.Origin = utils.MapGetInt64(params, "const_origin")
 	case *If:
 		ret.Cond = utils.MapGetInt64(params, "if_cond")

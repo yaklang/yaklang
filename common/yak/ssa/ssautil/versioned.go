@@ -95,7 +95,8 @@ type Versioned[T versionedValue] struct {
 	// the version of variable in current scope
 	scope ScopedVersionedTableIF[T]
 
-	isAssigned *utils.AtomicBool
+	// Embedded to avoid one separate allocation per variable version.
+	isAssigned utils.AtomicBool
 	Value      T
 
 	kind         VariableKind
@@ -199,7 +200,6 @@ func NewVersioned[T versionedValue](globalIndex int, name string, local bool, sc
 		lexicalName:     name,
 		local:           local,
 		scope:           scope,
-		isAssigned:      utils.NewAtomicBool(),
 	}
 	ret.captureVariable = ret
 	return ret

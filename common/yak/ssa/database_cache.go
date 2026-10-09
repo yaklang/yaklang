@@ -126,6 +126,11 @@ func (c *ProgramCache) CloseWithoutSave() {
 	c.types = nil
 	c.indexes = nil
 	c.sources = nil
+	if c.program != nil {
+		c.program.variableRangeMu.Lock()
+		c.program.variableRanges = nil
+		c.program.variableRangeMu.Unlock()
+	}
 }
 
 func (c *ProgramCache) SetInstruction(inst Instruction) {

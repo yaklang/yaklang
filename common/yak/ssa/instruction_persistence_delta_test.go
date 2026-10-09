@@ -46,7 +46,13 @@ func TestFastPathFinalFlushSkipsUnchangedInstructions(t *testing.T) {
 	require.NoError(t, store.Close(nil))
 	require.Equal(t, before.WriteOperations, store.PersistenceStats().WriteOperations,
 		"unchanged snapshots must not issue any additional database writes")
-	require.Same(t, inst, prog.Cache.GetInstruction(inst.GetId()))
+	require.False(t, prog.Cache.hasResidentInstruction(inst.GetId()), "saved anonymous values should be released")
+	loaded := prog.Cache.GetInstruction(inst.GetId())
+	require.NotNil(t, loaded)
+	require.Equal(t, inst.GetId(), loaded.GetId())
+	require.Equal(t, inst.GetOpcode(), loaded.GetOpcode())
+	require.Equal(t, inst.GetName(), loaded.GetName())
+	require.Equal(t, before.WriteOperations, store.PersistenceStats().WriteOperations, "clean reload must not requeue a database write")
 }
 
 func TestFastPathFinalFlushPersistsChangedAndNewInstructions(t *testing.T) {

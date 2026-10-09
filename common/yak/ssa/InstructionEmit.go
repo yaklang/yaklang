@@ -528,7 +528,7 @@ func (f *FunctionBuilder) GetOriginValue(obj Value) Value {
 func (f *FunctionBuilder) EmitConstInstWithUnary(i any, un int) *ConstInst {
 	ci := f.EmitConstInst(i)
 	ci.Unary = un
-	f.emit(ci)
+	ci.markPersistenceDirty()
 	return ci
 }
 
@@ -543,6 +543,13 @@ func (f *FunctionBuilder) EmitConstInst(i any) *ConstInst {
 }
 
 func (f *FunctionBuilder) emitConstInst(i any, isPlaceholder bool) *ConstInst {
+	if isPlaceholder {
+		return f.emitSharedPlaceholder(i)
+	}
+	return f.emitFreshConst(i, false)
+}
+
+func (f *FunctionBuilder) emitFreshConst(i any, isPlaceholder bool) *ConstInst {
 	ci := NewConst(i, isPlaceholder)
 	f.emit(ci)
 	if ci.IsNormalConst() {
