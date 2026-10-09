@@ -183,7 +183,10 @@ func (c *Controller) SubmitPlan(ctx context.Context) error {
 		err = validateDocument(approved)
 	}
 	c.mu.Lock()
-	if err == nil {
+	// Detached publication has already persisted the pending review and sent
+	// its card. Cancellation during the subsequent Timeline archive only stops
+	// planning; it must not revoke that independently recoverable approval.
+	if err == nil && !detached {
 		err = c.checkLocked()
 	}
 	c.reviewing = false
