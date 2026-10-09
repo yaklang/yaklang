@@ -385,14 +385,18 @@ func QueryWithStruct(unit *ssa.CompileUnit) QueryOption {
 		if c.program != nil {
 			ssaProg = c.program.Program
 		}
-		bound := newStructBound(unit, ssaProg)
+		queryWithStructBound(newStructBound(unit, ssaProg))(c)
+	}
+}
+
+// A loaded overlay queries a visible unit in its owning IR layer, while the
+// result belongs to the top program. Keep the query boundary independent of
+// that output identity.
+func queryWithStructBound(bound *structBound) QueryOption {
+	return func(c *queryConfig) {
 		c.structBound = bound
 		if len(c.value) == 0 && c.program != nil {
-			c.value = sfvm.ValuesOf(NewStructQueryTarget(c.program, unit, bound))
-		}
-		if c.program != nil {
-			c.program.structBound = bound
-			c.program.structScanActive = true
+			c.value = sfvm.ValuesOf(NewStructQueryTarget(c.program, bound.compileUnit(), bound))
 		}
 		c.opts = append(c.opts,
 			sfvm.WithRuntimeOption(bound),

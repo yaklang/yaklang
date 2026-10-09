@@ -21,7 +21,7 @@ var DistYakCommand = cli.Command{
 	Action: func(c *cli.Context) error {
 		ctx, stop := newDistYakContext()
 		defer stop()
-		if err := applySSADatabaseFromEnv(); err != nil {
+		if err := applyDistYakDatabaseFromEnv(); err != nil {
 			return err
 		}
 		runtimeID := os.Getenv("YAK_RUNTIME_ID")
@@ -49,6 +49,15 @@ var DistYakCommand = cli.Command{
 
 func newDistYakContext() (context.Context, context.CancelFunc) {
 	return signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+}
+
+// Apply the trusted child's local paths before any script can lazily open a
+// database. InitializeYakitDatabase would eagerly open all databases; keep the
+// company SSA binding and migration checks ahead of that work instead.
+func applyDistYakDatabaseFromEnv() error {
+	consts.SetDefaultYakitProjectDatabaseName(consts.GetProjectDatabaseNameFromEnv())
+	consts.SetDefaultYakitProfileDatabaseName(consts.GetProfileDatabaseNameFromEnv())
+	return applySSADatabaseFromEnv()
 }
 
 // applySSADatabaseFromEnv reads the SSA IR DB DSN from the process
