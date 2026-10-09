@@ -5,6 +5,7 @@
 - 键值存储：`db.SetKey` / `db.GetKey` / `db.DelKey` 在 Profile 库里跨脚本、跨运行共享配置与中间结果；`db.SetKeyWithTTL` 写入带过期时间的缓存；`db.SetProjectKey` / `db.GetProjectKey` 则隔离在当前项目库中。
 - 资产入库：`db.SaveHTTPFlowFromRaw` / `db.SaveHTTPFlowFromRawWithOption` 把原始 HTTP 请求/响应入库，配合 `db.saveHTTPFlowWithTags` 等选项打标签；`db.SavePayload` / `db.SavePayloadByFile` 管理字典。
 - 数据检索：`db.QueryHTTPFlowsAll` / `db.QueryHTTPFlowsByKeyword` / `db.QueryPortsByTaskName` 等 `Query*` 家族按条件查询资产；`db.YieldPayload` / `db.YieldYakScriptAll` 以流式游标遍历大数据集。
+- 项目与 HTTP 历史：`db.ListYakProjects` 列出引擎、Yakit、Memfit 可识别的项目；`db.QueryHTTPFlows` 配合过滤、分页与报文预算查询当前或指定项目；历史条目提供 `Dump` 原文展示及 `ExportPackets` 完整文件导出；已有 `db.QueryHTTPFlowByID(id)` 保留 HTTPFlow 返回类型与完整存储字段，可继续与保存接口联动。
 - 临时插件与原始库：`db.CreateTemporaryYakScript` 创建临时插件供 `hook` 库加载（记得 `db.DeleteYakScriptByName` 清理）；`db.OpenSqliteDatabase` / `db.OpenTempSqliteDatabase` / `db.ScanResult` 直接操作自定义数据库。
 
 与相邻库的关系：`db` 负责"把数据持久化与查询"，`yakit` 负责"把结果展示给人"，`risk` 负责"漏洞对象"，`hook` 通过 `db.CreateTemporaryYakScript` 装载临时插件。它们在扫描类脚本中常协同：发现结果 → `risk` 记录 → `db` 入库 → `yakit` 实时展示。

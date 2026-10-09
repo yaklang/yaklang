@@ -23,8 +23,14 @@ exportAll = cli.Bool("export", cli.setDefault(false), cli.setHelp("将请求和�
 outputDir = cli.String("output_dir", cli.setHelp("报文文件保存目录；默认临时目录"))
 cli.check()
 if packetLimit < 1 { die("packet_limit must be 1–32768") }
-item, err = db.QueryHTTPFlowByID(id, db.projectID(databaseID), db.packetLimit(packetLimit))
+if id < 1 { die("HTTP flow ID must be positive") }
+// Query a single ID with a bounded projection; retain the existing exact-ID API's HTTPFlow return type.
+upperID = 0
+if id < 9223372036854775807 { upperID = id + 1 }
+page, err = db.QueryHTTPFlows(db.projectID(databaseID), db.afterID(id-1), db.beforeID(upperID), db.limit(1), db.packetLimit(packetLimit))
 if err != nil { die(err) }
+if len(page.Items) != 1 || page.Items[0].ID != id { die(f"HTTP flow not found: ${id}") }
+item = page.Items[0]
 println(item.Dump())
 for part in ["request", "response"] {
     needed = exportAll || (part == "request" && item.RequestOmitted) || (part == "response" && item.ResponseOmitted)

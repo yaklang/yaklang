@@ -31,8 +31,11 @@ page, err = db.QueryHTTPFlows(db.url("/api/orders"), db.methods("POST"), db.stat
 if err != nil { die(err) }
 println(page.Dump())
 
-item, err = db.QueryHTTPFlowByID(42, db.packetLimit(8192))
+// 按 ID 42 取得带展示预算的历史条目；使用工具时直接传 id=42。
+page, err = db.QueryHTTPFlows(db.afterID(41), db.beforeID(43), db.limit(1), db.packetLimit(8192))
 if err != nil { die(err) }
+if len(page.Items) == 0 { die("HTTP flow 42 not found") }
+item = page.Items[0]
 println(item.Dump())
 files, err = item.ExportPackets("", "both")
 if err != nil { die(err) }
@@ -40,3 +43,5 @@ for packetFile in files { println(packetFile.Dump()) }
 ```
 
 SQL 中原有 quoted 存储由 API 解码；直接使用 dump 文本和导出文件核验证据。超限时遵循文件路径提示，避免将整个大报文搬入对话。
+
+已有 `db.QueryHTTPFlowByID(id)` 保留原 HTTPFlow 类型和完整存储字段，可以继续传给 `db.SaveHTTPFlowInstance`；有限展示与文件导出使用上述历史条目 API。
