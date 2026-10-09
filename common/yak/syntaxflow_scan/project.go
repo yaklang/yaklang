@@ -309,6 +309,12 @@ func ScanProject(ctx context.Context, opts ...ssaconfig.Option) (result ProjectR
 				recorder.mu.Unlock()
 			}
 		}
+		if wantReview && err == nil && prog != nil && prog.IsIncrementalCompile() {
+			// Diff compilation cannot review unchanged base units. Review the
+			// persisted overlay before publishing a successful semantic stage.
+			prog = reloadCompiledProgram(prog)
+			err = scanLoadedProgramStruct(cfg, prog)
+		}
 		if wantReview && err == nil {
 			emitStructResults(cfg, prog)
 			recorder.observeStruct(prog)
@@ -835,6 +841,17 @@ func reloadCompiledProgram(prog *ssaapi.Program) *ssaapi.Program {
 		return prog
 	}
 	return ssaapi.ReloadProgramFromDatabase(prog)
+}
+
+func scanLoadedProgramStruct(cfg *Config, prog *ssaapi.Program) error {
+	if prog == nil {
+		return nil
+	}
+	opts := structCompileOptions(cfg)
+	if len(opts) == 0 {
+		return nil
+	}
+	return prog.ScanProgramStruct(opts...)
 }
 
 func loadNamedPrograms(cfg *Config) error {

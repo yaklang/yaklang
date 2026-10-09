@@ -123,17 +123,11 @@ func (s *ScanNode) executeScriptTask(
 	if pluginBundlePath != "" {
 		keyValues["plugin_bundle_path"] = pluginBundlePath
 	}
-	reporter.ssaUploadCfg = extractSSAArtifactUploadConfig(internalParams)
-	if session, ok := s.node.GetSessionState(); ok && strings.TrimSpace(session.CompanyID) != "" {
-		codec := "zstd"
-		if reporter.ssaUploadCfg != nil && strings.TrimSpace(reporter.ssaUploadCfg.Codec) != "" {
-			codec = reporter.ssaUploadCfg.Codec
-		}
-		// Company nodes never consume scheduler-injected object keys or storage
-		// credentials. The node-session ticket endpoint derives both from the
-		// assigned attempt and returns short-lived STS material.
-		reporter.ssaUploadCfg = &SSAArtifactUploadConfig{Codec: codec}
+	companyID := ""
+	if session, ok := s.node.GetSessionState(); ok {
+		companyID = session.CompanyID
 	}
+	reporter.ssaUploadCfg = scriptSSAArtifactUploadConfig(companyID, internalParams)
 	reporter.ssaCollector = NewSSAArtifactCollectorWithContext(taskCtx, input.TaskID, input.RuntimeID, input.SubTaskID)
 	if reporter.ssaCollector != nil {
 		defer reporter.ssaCollector.Cleanup()
@@ -225,7 +219,7 @@ func (s *ScanNode) executeScriptTask(
 	}
 	defer ssaDBCleanup()
 	if preparedSnapshot != nil {
-		ssaDBEnv = append(ssaDBEnv, "YAKIT_HOME="+preparedSnapshot.taskYakitHome)
+		ssaDBEnv = append(ssaDBEnv, ruleSnapshotDatabaseEnv(preparedSnapshot.taskYakitHome)...)
 	}
 
 	// Register a defer to finalize debug artifacts (analysis + zip) on both
@@ -1242,6 +1236,25 @@ func redactSSAUploadErrorMessage(err error, cfg *SSAArtifactUploadConfig) string
 	return message
 }
 
+// Called only after validateCompanyDispatchParams authenticates the scheduler's
+// company/job/attempt tuple. Company storage credentials come from node tickets.
+func scriptSSAArtifactUploadConfig(companyID string, params map[string]interface{}) *SSAArtifactUploadConfig {
+	cfg := extractSSAArtifactUploadConfig(params)
+	if strings.TrimSpace(companyID) != "" {
+		// Generic Scan Center scripts have no SSA artifact intent. An empty
+		// SSA upload config would still request a ticket on finalization.
+		if !toBool(params[scannodeSSATicketRequiredParamKey]) {
+			return nil
+		}
+		codec := "zstd"
+		if cfg != nil && strings.TrimSpace(cfg.Codec) != "" {
+			codec = cfg.Codec
+		}
+		return &SSAArtifactUploadConfig{Codec: codec}
+	}
+	return cfg
+}
+
 func (s *ScanNode) finalizeSSAArtifactUpload(
 	ctx context.Context,
 	reporter *ScannerAgentReporter,
@@ -1517,6 +1530,12 @@ func buildSSAArtifactMetricsPayload(event *SSAArtifactReadyEvent) ([]byte, error
 	// Start with the upload metrics from the collector (upload_ms, ticket_fetch_ms, etc.)
 	if len(event.Metrics) > 0 {
 		_ = json.Unmarshal(event.Metrics, &merged)
+	}
+	// Preserve the engine's compiled program even when no finding was streamed.
+	// This is current-attempt artifact evidence, not a launch/client label.
+	delete(merged, "program_name")
+	if program := strings.TrimSpace(event.ProgramName); program != "" {
+		merged["program_name"] = program
 	}
 	// Add risk/file/flow counts
 	if len(event.SourceStatistics) > 0 && json.Valid(event.SourceStatistics) {

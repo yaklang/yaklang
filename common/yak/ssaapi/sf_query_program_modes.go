@@ -22,7 +22,10 @@ func (p *Program) queryProgramStructRule(base *queryConfig, rule *schema.SyntaxF
 	if rule == nil {
 		return nil, utils.Error("struct rule: nil rule")
 	}
-	units := programStructUnits(p)
+	units, err := programStructUnits(p)
+	if err != nil {
+		return nil, err
+	}
 	if len(units) == 0 {
 		return nil, utils.Errorf(
 			"struct rule %s: program %s has no application/library unit",
