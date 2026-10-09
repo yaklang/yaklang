@@ -23403,6 +23403,590 @@
         "common/pcapx/pcaputil/closure-core/validation/expected.json": "validation/expected.json",
         "scripts/protocol-tests/required-tests-v31.json": "required-tests-v31.json"
       }
+    },
+    {
+      "id": "validation-dlms-get-list-6dda739ef29",
+      "kind": "validation",
+      "source_sha": "6dda739ef291f56356e041b4070a3fdede1bb219",
+      "file": "validation-dlms-get-list-6dda739ef29.zip",
+      "sha256": "de52d9d07044d63cfbf8c9288da82d71424070d3ba8767a18be10a11fc250671",
+      "password": "bin-parser",
+      "members": {
+        "LICENSE": {
+          "sha256": "b9a35eea40d6c460b4998327db8c51c58c6b8b764fa5fa4be97971ad605be5d2",
+          "bytes": 255
+        },
+        "README.md": {
+          "sha256": "f5636db005ce851f0401800ecbb96b895abdb7028714f6a41e25a544adeaf278",
+          "bytes": 3094
+        },
+        "answers/list-access-parameter-overrun.json": {
+          "sha256": "58ee01d238dd40e238eec02b3711adf2f26cb6a5349b8556664a777940c1f91e",
+          "bytes": 2033
+        },
+        "answers/list-access-selector-missing.json": {
+          "sha256": "0927ac9215a3ff9b270b483378e91b83dd53a83b22477dbd9b743abb83477548",
+          "bytes": 1857
+        },
+        "answers/list-all-selected-scalars.json": {
+          "sha256": "009c593c1435647e68f2b959c14fb39315937da6803bda7ddbd93dad47084228",
+          "bytes": 12253
+        },
+        "answers/list-boolean-nonzero-receiver-compat.json": {
+          "sha256": "30736c387dd3244d30e017070b873d09616fd3bfb48fe465ad984ac7a917dd89",
+          "bytes": 3958
+        },
+        "answers/list-count-budget-preflight.json": {
+          "sha256": "895b64d35076ff6572b379cb721265b9aec7fe88d34f6228e556b3a22d32a7c5",
+          "bytes": 3792
+        },
+        "answers/list-count-literal80-uncertain.json": {
+          "sha256": "1cfa0e74d675b706df9e63e3a1c7f77d4624d03c85c589f9383a03de6d1d3713",
+          "bytes": 1920
+        },
+        "answers/list-count-long-truncated.json": {
+          "sha256": "c68aad766f13247cf797e95708038ce155edb36efac350ab5a84f1961b7c7e02",
+          "bytes": 1782
+        },
+        "answers/list-count-width1.json": {
+          "sha256": "a80de0a4f21b5dc7fa548d7e09bf5b85b767835d528170202a7cda09a468b4d7",
+          "bytes": 7979
+        },
+        "answers/list-count-width2.json": {
+          "sha256": "12b3685b71ea38b20fce91c47999f917fa0228f59c87cc6dd26a2909a175fa78",
+          "bytes": 8013
+        },
+        "answers/list-count-width3.json": {
+          "sha256": "17c9cc53c8b37ffd3846b28be2db773c676b5c204fff2a5534dc30eac947b868",
+          "bytes": 8045
+        },
+        "answers/list-count-width4.json": {
+          "sha256": "2c2c15abf3def79062cea8b25ef109cedd2344de1980c24576f0dc2f1a550d16",
+          "bytes": 8079
+        },
+        "answers/list-count-width5-unselected.json": {
+          "sha256": "baac80dad34c70001b9e538a98bbd3c532e1818377defd3f447a20ba57241498",
+          "bytes": 1888
+        },
+        "answers/list-data-structure-open.json": {
+          "sha256": "ad745e324139fe2fc855ed758fabba9a7e121e1a8270801d30bd74842d24c752",
+          "bytes": 1937
+        },
+        "answers/list-descriptor-count-overrun.json": {
+          "sha256": "a8e428e37432190c569e27990d8e32a041d3c16d53cb729b165a4a7bcd566667",
+          "bytes": 1935
+        },
+        "answers/list-descriptor-last-selection-missing.json": {
+          "sha256": "f6675acc87fde00015a4d1a8e8d219aa4cbcc7fb85cb111b12b76da886f078c0",
+          "bytes": 1892
+        },
+        "answers/list-empty-selected-boundary.json": {
+          "sha256": "fdbb2c1763280bca7961358359358d0673eca28e019b4ed30de05829ee313c52",
+          "bytes": 1984
+        },
+        "answers/list-error-other-reason.json": {
+          "sha256": "dc076b93deaccc2d6d7a2b72ba5c3defa3bbdbb4eee4e82f33f1bf2bb71c391c",
+          "bytes": 4202
+        },
+        "answers/list-fixed-scalar-short.json": {
+          "sha256": "f1492395d4389a617e437985986107d4e0ca4842aa4a413a59faca98e2ab061b",
+          "bytes": 1795
+        },
+        "answers/list-frame-budget-late-response.json": {
+          "sha256": "444a23d218ce21ae77e2efb0d73f0c32cd46bea3b8e0e1b22f71b03665006867",
+          "bytes": 8866
+        },
+        "answers/list-header-budget-only.json": {
+          "sha256": "45560528543622edbe54bb2759c5ade2a00ae05f486c1dbc7cbdc240d5ce2533",
+          "bytes": 2086
+        },
+        "answers/list-invoke-reuse-ambiguous.json": {
+          "sha256": "7d79fea4c54bc81a4c83989047be40577e4a044b619f7636b0c26ba8bc09746e",
+          "bytes": 11755
+        },
+        "answers/list-invoke-unused-bits-unverified.json": {
+          "sha256": "e9d7dd88eab2af08878e5f87c5a1af90c7b6c991d120d2b838b0c99c3db6c2d9",
+          "bytes": 1993
+        },
+        "answers/list-mixed-data-error.json": {
+          "sha256": "64a4fa587597c2da674e38bfacad91bfc01a46327de1044f83d6ba96a1c81d4f",
+          "bytes": 8170
+        },
+        "answers/list-octet-borrows-next-result.json": {
+          "sha256": "ae12238cab312887f2a25593262a10dc4d2fd2607d2198f9ebc678c4252aa855",
+          "bytes": 1887
+        },
+        "answers/list-octet-budget-preflight.json": {
+          "sha256": "de0fd3caf3038a6677cd3586e4c577fd85b264756d08fc886cebff0d4959b17a",
+          "bytes": 3292
+        },
+        "answers/list-octet-width3-cursor.json": {
+          "sha256": "06c0a575f768d490f299addffcb183ee2eb6112f4b656b2c76692caad6c98afa",
+          "bytes": 4772
+        },
+        "answers/list-priority-normal-confirmed.json": {
+          "sha256": "fa56268af080b2b77c7b60f14c69d68aacb20580941ac06eba01a6b8a081051a",
+          "bytes": 6523
+        },
+        "answers/list-repeat-descriptor-order.json": {
+          "sha256": "a1c79335b6cfd4ea68ece108a7da3355f74ffdbc6a2a8cb7f4a11eb108f8b71b",
+          "bytes": 4695
+        },
+        "answers/list-response-only.json": {
+          "sha256": "3eca78f88d2c4e08be2a3a3f2c46a5e6a885f2890010045770cc2e53c3fe3693",
+          "bytes": 4493
+        },
+        "answers/list-result-choice-noncanonical.json": {
+          "sha256": "8fd0648cdb44583c920a0b95b574f6c9999e27dfb84d62c98661d116117fbd71",
+          "bytes": 1911
+        },
+        "answers/list-result-count-overrun.json": {
+          "sha256": "ed1adfc18c0908fbdcbbb88c74f67e1ff3b33c73c7ade3e0c51351a9ba2ebf72",
+          "bytes": 1778
+        },
+        "answers/list-result-error-byte-missing.json": {
+          "sha256": "f2036d3ffee2a6a4edc5c0b56e0e0b5bb65ce3bb24d8ec241b1505bcbeb5edf3",
+          "bytes": 1783
+        },
+        "answers/list-selected-count-64.json": {
+          "sha256": "e04996783a71815f40adc9ce09d2066f4d90716cacf8dc91b91add7e08a4e10c",
+          "bytes": 104489
+        },
+        "answers/list-selected-count-65-refusal.json": {
+          "sha256": "46ae0244b9536798c2e6738b6d80a2f0b13591112989e53246e7f6cbe0d798cb",
+          "bytes": 7117
+        },
+        "answers/list-selected-octets-1024.json": {
+          "sha256": "2ec636a02d02ff8eacc5fff2bdf65f948f1f0bcef401198160ffddd3ef1da9da",
+          "bytes": 28619
+        },
+        "answers/list-selected-octets-1025.json": {
+          "sha256": "a20f6b95332ffacd279eb17d256b9d040bfcaacf2da00a9b0f7d28a8519f5985",
+          "bytes": 10079
+        },
+        "answers/list-selection-noncanonical.json": {
+          "sha256": "a39efef593768b176446b2e4d203fe3a9cf459ec6e7d053804a8fd6596b9a581",
+          "bytes": 2031
+        },
+        "answers/list-selective-access-cursor.json": {
+          "sha256": "d189817608e9c7df325110defb0e44c5a39ef3e042898767b1aac9689de0160c",
+          "bytes": 5419
+        },
+        "answers/list-tcp-coalesced.json": {
+          "sha256": "222da2427c74d0fa31e091ac2a074de0c63d3853dc0a5d517f54b756c13341c2",
+          "bytes": 13183
+        },
+        "answers/list-tcp-incomplete-close.json": {
+          "sha256": "4a7e4bcb35dedf12fe347c791cc59e1c205d99c1000123ebb7c1634b25450047",
+          "bytes": 2042
+        },
+        "answers/list-tcp-split.json": {
+          "sha256": "81a9b9a371250e4551860d64958f157e635dbe90b0e099e17b56b69b1704fb7b",
+          "bytes": 8901
+        },
+        "answers/list-trailing-byte.json": {
+          "sha256": "251434ae5f49c1a116e45a17d62a8e457adfdb7ec255deca5a6744c5f2be92cd",
+          "bytes": 1961
+        },
+        "answers/list-udp-complete.json": {
+          "sha256": "fe6c3aba2816ae8a3de65d008eb9a796bfa225d747e2db38aa6300e06f0f64c9",
+          "bytes": 7668
+        },
+        "answers/list-udp-never-stitch.json": {
+          "sha256": "45af5f18d656a706a65033aa3883a447294f449eb2cd188a25c4398c4668fd45",
+          "bytes": 1681
+        },
+        "answers/list-udp-refusal-blocks-pending.json": {
+          "sha256": "6845bf1fbde97c4f6deb22ff16ec437a4830bddb67a595d3edd0a0681db86118",
+          "bytes": 11350
+        },
+        "answers/list-unconfirmed-observation.json": {
+          "sha256": "5b1386f055f0d684a9caf4cf851ebf96c1d5ce88ef58ddb06eecdf0841ff3f17",
+          "bytes": 6532
+        },
+        "answers/list-wrong-count-no-pair.json": {
+          "sha256": "43f8550a707221455afb4b7b12ce5ccf0bbae9fff5aa998b81f0ba504d68e71d",
+          "bytes": 7420
+        },
+        "answers/list-wrong-direction-no-pair.json": {
+          "sha256": "af6b6fb5c56f56bdf5bd513670863366631461549675d25c72174d217060a58b",
+          "bytes": 8090
+        },
+        "answers/list-wrong-full-flags-no-pair.json": {
+          "sha256": "23c01e1a3e4f3608f54d9d76702481bb2f80b402b5f15efb08023625c4d3ba21",
+          "bytes": 7935
+        },
+        "answers/list-wrong-invoke-no-pair.json": {
+          "sha256": "8248478f5982cf5a950c3f41279a9c7d08ae3ceaf4cabb45a7256e6d5f343711",
+          "bytes": 7890
+        },
+        "answers/list-wrong-wport-no-pair.json": {
+          "sha256": "b71fb552e3f5ac5bb8752a3d004ba22a7b12794c0b27e35ea6a944066eeea34c",
+          "bytes": 8060
+        },
+        "build-controls.py": {
+          "sha256": "b44828e9ba31291643aa48566645dd1ebf21cbc8ccc7d392bb475af99ffe318a",
+          "bytes": 12836
+        },
+        "build-native-controls.py": {
+          "sha256": "0c7268218fcaf0e8eafd57325be1b1197d758a07d9fd5eeb09e8b3c6906b72d2",
+          "bytes": 2679
+        },
+        "cases/list-access-parameter-overrun.pcap": {
+          "sha256": "4b2fdf0e607a942c7e3ca014c5672de2842a55633c0d2319722077ce62e9849f",
+          "bytes": 340
+        },
+        "cases/list-access-selector-missing.pcap": {
+          "sha256": "21a0b9a9608d773819b0f6bca6bc41350b24bc20730519a9d195d6cafaf55e93",
+          "bytes": 326
+        },
+        "cases/list-all-selected-scalars.pcap": {
+          "sha256": "50d89abee770df2862179720c06e1b9ca64a64944c8e45b37e7e932fa02759f0",
+          "bytes": 376
+        },
+        "cases/list-boolean-nonzero-receiver-compat.pcap": {
+          "sha256": "fb9e90e244418dcb4931f7e46aee865cde002012a1c6b07557ecca2320891eb5",
+          "bytes": 319
+        },
+        "cases/list-count-budget-preflight.pcap": {
+          "sha256": "ae6b12a5c5cd94043267ccac7385b33710a2d3235c2236cd2a0fe17daed686fa",
+          "bytes": 336
+        },
+        "cases/list-count-literal80-uncertain.pcap": {
+          "sha256": "019e10bb4ceb8d6d9e1fdc762e8f90f7c8e88772c76f18f1351e4c0511cd4705",
+          "bytes": 316
+        },
+        "cases/list-count-long-truncated.pcap": {
+          "sha256": "aded0a5a0a4a49b1041b7384a9c84eef4d27396bd4cecb2544a35d633458bb9e",
+          "bytes": 317
+        },
+        "cases/list-count-width1.pcap": {
+          "sha256": "f1ea262fdf9c8ba5903833fee4085f5d5bc01844bac60653d6c70203bc008407",
+          "bytes": 424
+        },
+        "cases/list-count-width2.pcap": {
+          "sha256": "551f919e229715883c9c2428130648ce44b801df89ff7fbc3ba663cc2715171e",
+          "bytes": 426
+        },
+        "cases/list-count-width3.pcap": {
+          "sha256": "7a3f0d4a89b00d140b9cc92a18a7403347ef897b48be2c2ebab937fde4b75a21",
+          "bytes": 428
+        },
+        "cases/list-count-width4.pcap": {
+          "sha256": "ebddeb6fbccf32b6c0cb05caa51d3c1df195832f287dc3ff7edebadfea727a1f",
+          "bytes": 430
+        },
+        "cases/list-count-width5-unselected.pcap": {
+          "sha256": "61862f4aa37389528f7a47ff2eb8b9afff72dfa3f40a1edfb7e1325af69b52f6",
+          "bytes": 321
+        },
+        "cases/list-data-structure-open.pcap": {
+          "sha256": "41237f77828ffdeec845afd87af433f98fbf1eb0bb0d8f154b9478a9e96c1d68",
+          "bytes": 325
+        },
+        "cases/list-descriptor-count-overrun.pcap": {
+          "sha256": "89e269e84423e5fd6d2296540b452e55d454d07f6e914b4a6fedd12d0e4e4b49",
+          "bytes": 336
+        },
+        "cases/list-descriptor-last-selection-missing.pcap": {
+          "sha256": "a0ab652ec77ea3084b860acc5b5f021114ab89d1894abbfb292f2fa07d4a552b",
+          "bytes": 325
+        },
+        "cases/list-empty-selected-boundary.pcap": {
+          "sha256": "86780363a6f00499c82f349dc6ef7ebc682f691df2b17bda2382f5ee758c0978",
+          "bytes": 316
+        },
+        "cases/list-error-other-reason.pcap": {
+          "sha256": "784b1e6ef5a13e306b3b12d9bb5c7c9b607afadf61edce60ecd10fab5c12780e",
+          "bytes": 320
+        },
+        "cases/list-fixed-scalar-short.pcap": {
+          "sha256": "11267ddc5d721402790662f3e5df6fff78645109d1e3a93a450d8b2dacc27e3e",
+          "bytes": 321
+        },
+        "cases/list-header-budget-only.pcap": {
+          "sha256": "9263e58f6b20009b931fcdf530ec0c6f7b978f7b6d6cef653b16571a79067cbf",
+          "bytes": 312
+        },
+        "cases/list-invoke-reuse-ambiguous.pcap": {
+          "sha256": "7acf79dca9e1e0a2add26db7d39c18b646218979c3701394c225283d836d897a",
+          "bytes": 525
+        },
+        "cases/list-invoke-unused-bits-unverified.pcap": {
+          "sha256": "714233b7512673b1cdf0d073bb698ba2e625c74dbf3ae312596934f8b2d27e80",
+          "bytes": 326
+        },
+        "cases/list-mixed-data-error.pcap": {
+          "sha256": "78f2da44c3ed30f8a9e728ccd96190a55030672e3087d07cfe3f87033f274b6d",
+          "bytes": 423
+        },
+        "cases/list-octet-borrows-next-result.pcap": {
+          "sha256": "18ef1ff120ad39b542532fdc6f560580459d2727a225adb303234ba78288acc7",
+          "bytes": 322
+        },
+        "cases/list-octet-budget-preflight.pcap": {
+          "sha256": "9a6ec4504d21eb1856af480c814862ffd045521e0266dccdf446414f270e1d07",
+          "bytes": 322
+        },
+        "cases/list-octet-width3-cursor.pcap": {
+          "sha256": "ebbd86f2f97636100af6ca592e72b93c333de5698f65f3400c46536eaf6803f5",
+          "bytes": 327
+        },
+        "cases/list-priority-normal-confirmed.pcap": {
+          "sha256": "4598dd2cca2b9c79d78ba8c0c77cbde63431c452f75e96825f3f5f21ef2faf5c",
+          "bytes": 410
+        },
+        "cases/list-repeat-descriptor-order.pcap": {
+          "sha256": "ca127c5e382316ce1ca1295d326184c0fc8535d95669c2fd5332422c61537e96",
+          "bytes": 336
+        },
+        "cases/list-response-only.pcap": {
+          "sha256": "136d42b14a49d00c552e9c357253dd173354d65015a3bc5fc473574120c6149c",
+          "bytes": 321
+        },
+        "cases/list-result-choice-noncanonical.pcap": {
+          "sha256": "59ee3262daa2723b91f306648f1ba613ae84ff9ddb408333ad312a29a6c64556",
+          "bytes": 318
+        },
+        "cases/list-result-count-overrun.pcap": {
+          "sha256": "a0928ac298409c6ec6f90ecf0213d38920b30d259debbad9404ae18487585d2a",
+          "bytes": 318
+        },
+        "cases/list-result-error-byte-missing.pcap": {
+          "sha256": "841774273e260a2d4136f14842524cea0b3654537748d748976852854e4f92c8",
+          "bytes": 317
+        },
+        "cases/list-selected-count-64.pcap": {
+          "sha256": "5f430d91ba2b8bded4e70c004ed4803084693e67e96337ee747f2dcdc14c5482",
+          "bytes": 1166
+        },
+        "cases/list-selected-count-65-refusal.pcap": {
+          "sha256": "795e6099931d2364861707e2f478b7af97ee7907983d1d2f64f907afe2bc2fba",
+          "bytes": 966
+        },
+        "cases/list-selected-octets-1024.pcap": {
+          "sha256": "4dba1f61f08a382772c21a220ca785cc1320415a11b2048571154da740baff0a",
+          "bytes": 1345
+        },
+        "cases/list-selected-octets-1025.pcap": {
+          "sha256": "84aaba200f81e971c595aac7892817879d37e27e74486a9e15a3071352a4b2e9",
+          "bytes": 1346
+        },
+        "cases/list-selection-noncanonical.pcap": {
+          "sha256": "cd21f0afe80c4480c6e5f247b961d11db31bbfe363fd0d6caac33c124c017ad0",
+          "bytes": 328
+        },
+        "cases/list-selective-access-cursor.pcap": {
+          "sha256": "fd29753e68dedb9a89e111af0f1eb645851d1568da4e2570e6cf169f1e2263f1",
+          "bytes": 341
+        },
+        "cases/list-tcp-coalesced.pcap": {
+          "sha256": "b780a930c2e0f3c58ac56d6357941b2705dea2c57e147aa5e18d51d996a7dd52",
+          "bytes": 459
+        },
+        "cases/list-tcp-incomplete-close.pcap": {
+          "sha256": "d6576c64eaa90b144c0fc1b1e8ac018e8b3b72130d3a49269a8aeb529143fbe1",
+          "bytes": 335
+        },
+        "cases/list-tcp-split.pcap": {
+          "sha256": "4b54993d003e5f8970f418cac89ab10cba318f02e1427b7dc365c230fcdef142",
+          "bytes": 703
+        },
+        "cases/list-trailing-byte.pcap": {
+          "sha256": "afffa3871401ddec71dd1a3e4796a4e6cfb1de5a21b501658ec25af02bb08f10",
+          "bytes": 337
+        },
+        "cases/list-udp-complete.pcap": {
+          "sha256": "0cd28fc01a53f9994640e44777b61bfd42f08bcc47140063c5f42937c37e45d3",
+          "bytes": 189
+        },
+        "cases/list-udp-never-stitch.pcap": {
+          "sha256": "f74e75a7ace71daed3cd57ac70cc969b00c92cffeaa1850a6f9320192d38d64a",
+          "bytes": 172
+        },
+        "cases/list-udp-refusal-blocks-pending.pcap": {
+          "sha256": "bfe881f655c00b6e1fc9a2d5acbe96bc9f825412a0ead2ac093438ae7052e3b8",
+          "bytes": 266
+        },
+        "cases/list-unconfirmed-observation.pcap": {
+          "sha256": "99db4a4ea2afc648a43c6991f4c70580af09afdb4857cbaeec3d6a4950be806f",
+          "bytes": 410
+        },
+        "cases/list-wrong-count-no-pair.pcap": {
+          "sha256": "8e5513fc4b12c81157e6355f818f7227bf8e81b910175f66efe23f05a658b80f",
+          "bytes": 420
+        },
+        "cases/list-wrong-direction-no-pair.pcap": {
+          "sha256": "c5ffbd453ba866598f1a714e5087e8afee9bc170c87ca980dc9bc63403ff35d6",
+          "bytes": 423
+        },
+        "cases/list-wrong-full-flags-no-pair.pcap": {
+          "sha256": "289865d04747a06bbdddc5e8db9d26d316f501b8189b2e679a3219f9e3680240",
+          "bytes": 422
+        },
+        "cases/list-wrong-invoke-no-pair.pcap": {
+          "sha256": "aecc7868414d9a066c92ed986831288ca598464d5437949f0532c4e34176b715",
+          "bytes": 422
+        },
+        "cases/list-wrong-wport-no-pair.pcap": {
+          "sha256": "c35cb334883235e3c9d9edf8c1bf6f85f0bd374cafdccfc52e3eb07add6cdcd0",
+          "bytes": 423
+        },
+        "controls.json": {
+          "sha256": "c8706a35966bceb7f232176fee94c57eef1514e23cc550082f126f5863172198",
+          "bytes": 435492
+        },
+        "mvp-contract.json": {
+          "sha256": "22ae58544f887bda9a8ff3f9ed8fe2dc1ffc3fea8fdc4da7a4d06a0d6add68ba",
+          "bytes": 3749
+        },
+        "oracle.py": {
+          "sha256": "c5883132622add17431e3b0c850567a4ba3a3383ce895d852da6efd3bcf41af5",
+          "bytes": 5350
+        },
+        "required-tests-v32.json": {
+          "sha256": "4cea950411ea43c780f246d3aaf3f68265ad01844296ff1255d5554f10901875",
+          "bytes": 98726
+        },
+        "seal.py": {
+          "sha256": "46499020de8d1b69c0096048ae0c6f65600dd6c5d4505a8ed654aaa7690eb955",
+          "bytes": 5531
+        },
+        "source-facts.json": {
+          "sha256": "d90bfb1d741ed77a7f4616919962169fe4c92dae975a7fed9057d9f11bb7e3e9",
+          "bytes": 3845
+        },
+        "source-pin.json": {
+          "sha256": "a6c6c596cd12c061e61b421fbbc5ee5724d0eb57d75dde0f7b3a1eb8568e8ab3",
+          "bytes": 10595
+        },
+        "validation/expected.json": {
+          "sha256": "ed759d8daa3efcda6630a523e87c95ee7d73041423854ab83bcd84278fbf7712",
+          "bytes": 56904
+        },
+        "verify-controls.py": {
+          "sha256": "292ef8d360657484c8f54b84dfc835cfc39ddefaaba464417a0c558bb3fee5f8",
+          "bytes": 4203
+        }
+      },
+      "aliases": {
+        "common/pcapx/pcaputil/dlms-get-list/cases/list-mixed-data-error.pcap": "cases/list-mixed-data-error.pcap",
+        "common/pcapx/pcaputil/dlms-get-list/cases/list-all-selected-scalars.pcap": "cases/list-all-selected-scalars.pcap",
+        "common/pcapx/pcaputil/dlms-get-list/cases/list-selective-access-cursor.pcap": "cases/list-selective-access-cursor.pcap",
+        "common/pcapx/pcaputil/dlms-get-list/cases/list-repeat-descriptor-order.pcap": "cases/list-repeat-descriptor-order.pcap",
+        "common/pcapx/pcaputil/dlms-get-list/cases/list-count-width1.pcap": "cases/list-count-width1.pcap",
+        "common/pcapx/pcaputil/dlms-get-list/cases/list-count-width2.pcap": "cases/list-count-width2.pcap",
+        "common/pcapx/pcaputil/dlms-get-list/cases/list-count-width3.pcap": "cases/list-count-width3.pcap",
+        "common/pcapx/pcaputil/dlms-get-list/cases/list-count-width4.pcap": "cases/list-count-width4.pcap",
+        "common/pcapx/pcaputil/dlms-get-list/cases/list-priority-normal-confirmed.pcap": "cases/list-priority-normal-confirmed.pcap",
+        "common/pcapx/pcaputil/dlms-get-list/cases/list-unconfirmed-observation.pcap": "cases/list-unconfirmed-observation.pcap",
+        "common/pcapx/pcaputil/dlms-get-list/cases/list-boolean-nonzero-receiver-compat.pcap": "cases/list-boolean-nonzero-receiver-compat.pcap",
+        "common/pcapx/pcaputil/dlms-get-list/cases/list-error-other-reason.pcap": "cases/list-error-other-reason.pcap",
+        "common/pcapx/pcaputil/dlms-get-list/cases/list-octet-width3-cursor.pcap": "cases/list-octet-width3-cursor.pcap",
+        "common/pcapx/pcaputil/dlms-get-list/cases/list-response-only.pcap": "cases/list-response-only.pcap",
+        "common/pcapx/pcaputil/dlms-get-list/cases/list-empty-selected-boundary.pcap": "cases/list-empty-selected-boundary.pcap",
+        "common/pcapx/pcaputil/dlms-get-list/cases/list-count-literal80-uncertain.pcap": "cases/list-count-literal80-uncertain.pcap",
+        "common/pcapx/pcaputil/dlms-get-list/cases/list-count-width5-unselected.pcap": "cases/list-count-width5-unselected.pcap",
+        "common/pcapx/pcaputil/dlms-get-list/cases/list-count-long-truncated.pcap": "cases/list-count-long-truncated.pcap",
+        "common/pcapx/pcaputil/dlms-get-list/cases/list-descriptor-count-overrun.pcap": "cases/list-descriptor-count-overrun.pcap",
+        "common/pcapx/pcaputil/dlms-get-list/cases/list-descriptor-last-selection-missing.pcap": "cases/list-descriptor-last-selection-missing.pcap",
+        "common/pcapx/pcaputil/dlms-get-list/cases/list-access-parameter-overrun.pcap": "cases/list-access-parameter-overrun.pcap",
+        "common/pcapx/pcaputil/dlms-get-list/cases/list-access-selector-missing.pcap": "cases/list-access-selector-missing.pcap",
+        "common/pcapx/pcaputil/dlms-get-list/cases/list-result-count-overrun.pcap": "cases/list-result-count-overrun.pcap",
+        "common/pcapx/pcaputil/dlms-get-list/cases/list-result-error-byte-missing.pcap": "cases/list-result-error-byte-missing.pcap",
+        "common/pcapx/pcaputil/dlms-get-list/cases/list-fixed-scalar-short.pcap": "cases/list-fixed-scalar-short.pcap",
+        "common/pcapx/pcaputil/dlms-get-list/cases/list-octet-borrows-next-result.pcap": "cases/list-octet-borrows-next-result.pcap",
+        "common/pcapx/pcaputil/dlms-get-list/cases/list-trailing-byte.pcap": "cases/list-trailing-byte.pcap",
+        "common/pcapx/pcaputil/dlms-get-list/cases/list-selection-noncanonical.pcap": "cases/list-selection-noncanonical.pcap",
+        "common/pcapx/pcaputil/dlms-get-list/cases/list-result-choice-noncanonical.pcap": "cases/list-result-choice-noncanonical.pcap",
+        "common/pcapx/pcaputil/dlms-get-list/cases/list-data-structure-open.pcap": "cases/list-data-structure-open.pcap",
+        "common/pcapx/pcaputil/dlms-get-list/cases/list-invoke-unused-bits-unverified.pcap": "cases/list-invoke-unused-bits-unverified.pcap",
+        "common/pcapx/pcaputil/dlms-get-list/cases/list-tcp-split.pcap": "cases/list-tcp-split.pcap",
+        "common/pcapx/pcaputil/dlms-get-list/cases/list-tcp-coalesced.pcap": "cases/list-tcp-coalesced.pcap",
+        "common/pcapx/pcaputil/dlms-get-list/cases/list-udp-complete.pcap": "cases/list-udp-complete.pcap",
+        "common/pcapx/pcaputil/dlms-get-list/cases/list-udp-never-stitch.pcap": "cases/list-udp-never-stitch.pcap",
+        "common/pcapx/pcaputil/dlms-get-list/cases/list-tcp-incomplete-close.pcap": "cases/list-tcp-incomplete-close.pcap",
+        "common/pcapx/pcaputil/dlms-get-list/cases/list-wrong-count-no-pair.pcap": "cases/list-wrong-count-no-pair.pcap",
+        "common/pcapx/pcaputil/dlms-get-list/cases/list-wrong-invoke-no-pair.pcap": "cases/list-wrong-invoke-no-pair.pcap",
+        "common/pcapx/pcaputil/dlms-get-list/cases/list-wrong-full-flags-no-pair.pcap": "cases/list-wrong-full-flags-no-pair.pcap",
+        "common/pcapx/pcaputil/dlms-get-list/cases/list-wrong-wport-no-pair.pcap": "cases/list-wrong-wport-no-pair.pcap",
+        "common/pcapx/pcaputil/dlms-get-list/cases/list-wrong-direction-no-pair.pcap": "cases/list-wrong-direction-no-pair.pcap",
+        "common/pcapx/pcaputil/dlms-get-list/cases/list-invoke-reuse-ambiguous.pcap": "cases/list-invoke-reuse-ambiguous.pcap",
+        "common/pcapx/pcaputil/dlms-get-list/cases/list-count-budget-preflight.pcap": "cases/list-count-budget-preflight.pcap",
+        "common/pcapx/pcaputil/dlms-get-list/cases/list-octet-budget-preflight.pcap": "cases/list-octet-budget-preflight.pcap",
+        "common/pcapx/pcaputil/dlms-get-list/cases/list-frame-budget-late-response.pcap": "cases/list-mixed-data-error.pcap",
+        "common/pcapx/pcaputil/dlms-get-list/cases/list-header-budget-only.pcap": "cases/list-header-budget-only.pcap",
+        "common/pcapx/pcaputil/dlms-get-list/cases/list-selected-count-64.pcap": "cases/list-selected-count-64.pcap",
+        "common/pcapx/pcaputil/dlms-get-list/cases/list-selected-count-65-refusal.pcap": "cases/list-selected-count-65-refusal.pcap",
+        "common/pcapx/pcaputil/dlms-get-list/cases/list-selected-octets-1024.pcap": "cases/list-selected-octets-1024.pcap",
+        "common/pcapx/pcaputil/dlms-get-list/cases/list-selected-octets-1025.pcap": "cases/list-selected-octets-1025.pcap",
+        "common/pcapx/pcaputil/dlms-get-list/cases/list-udp-refusal-blocks-pending.pcap": "cases/list-udp-refusal-blocks-pending.pcap",
+        "common/pcapx/pcaputil/dlms-get-list/LICENSE": "LICENSE",
+        "common/pcapx/pcaputil/dlms-get-list/README.md": "README.md",
+        "common/pcapx/pcaputil/dlms-get-list/answers/list-access-parameter-overrun.json": "answers/list-access-parameter-overrun.json",
+        "common/pcapx/pcaputil/dlms-get-list/answers/list-access-selector-missing.json": "answers/list-access-selector-missing.json",
+        "common/pcapx/pcaputil/dlms-get-list/answers/list-all-selected-scalars.json": "answers/list-all-selected-scalars.json",
+        "common/pcapx/pcaputil/dlms-get-list/answers/list-boolean-nonzero-receiver-compat.json": "answers/list-boolean-nonzero-receiver-compat.json",
+        "common/pcapx/pcaputil/dlms-get-list/answers/list-count-budget-preflight.json": "answers/list-count-budget-preflight.json",
+        "common/pcapx/pcaputil/dlms-get-list/answers/list-count-literal80-uncertain.json": "answers/list-count-literal80-uncertain.json",
+        "common/pcapx/pcaputil/dlms-get-list/answers/list-count-long-truncated.json": "answers/list-count-long-truncated.json",
+        "common/pcapx/pcaputil/dlms-get-list/answers/list-count-width1.json": "answers/list-count-width1.json",
+        "common/pcapx/pcaputil/dlms-get-list/answers/list-count-width2.json": "answers/list-count-width2.json",
+        "common/pcapx/pcaputil/dlms-get-list/answers/list-count-width3.json": "answers/list-count-width3.json",
+        "common/pcapx/pcaputil/dlms-get-list/answers/list-count-width4.json": "answers/list-count-width4.json",
+        "common/pcapx/pcaputil/dlms-get-list/answers/list-count-width5-unselected.json": "answers/list-count-width5-unselected.json",
+        "common/pcapx/pcaputil/dlms-get-list/answers/list-data-structure-open.json": "answers/list-data-structure-open.json",
+        "common/pcapx/pcaputil/dlms-get-list/answers/list-descriptor-count-overrun.json": "answers/list-descriptor-count-overrun.json",
+        "common/pcapx/pcaputil/dlms-get-list/answers/list-descriptor-last-selection-missing.json": "answers/list-descriptor-last-selection-missing.json",
+        "common/pcapx/pcaputil/dlms-get-list/answers/list-empty-selected-boundary.json": "answers/list-empty-selected-boundary.json",
+        "common/pcapx/pcaputil/dlms-get-list/answers/list-error-other-reason.json": "answers/list-error-other-reason.json",
+        "common/pcapx/pcaputil/dlms-get-list/answers/list-fixed-scalar-short.json": "answers/list-fixed-scalar-short.json",
+        "common/pcapx/pcaputil/dlms-get-list/answers/list-frame-budget-late-response.json": "answers/list-frame-budget-late-response.json",
+        "common/pcapx/pcaputil/dlms-get-list/answers/list-header-budget-only.json": "answers/list-header-budget-only.json",
+        "common/pcapx/pcaputil/dlms-get-list/answers/list-invoke-reuse-ambiguous.json": "answers/list-invoke-reuse-ambiguous.json",
+        "common/pcapx/pcaputil/dlms-get-list/answers/list-invoke-unused-bits-unverified.json": "answers/list-invoke-unused-bits-unverified.json",
+        "common/pcapx/pcaputil/dlms-get-list/answers/list-mixed-data-error.json": "answers/list-mixed-data-error.json",
+        "common/pcapx/pcaputil/dlms-get-list/answers/list-octet-borrows-next-result.json": "answers/list-octet-borrows-next-result.json",
+        "common/pcapx/pcaputil/dlms-get-list/answers/list-octet-budget-preflight.json": "answers/list-octet-budget-preflight.json",
+        "common/pcapx/pcaputil/dlms-get-list/answers/list-octet-width3-cursor.json": "answers/list-octet-width3-cursor.json",
+        "common/pcapx/pcaputil/dlms-get-list/answers/list-priority-normal-confirmed.json": "answers/list-priority-normal-confirmed.json",
+        "common/pcapx/pcaputil/dlms-get-list/answers/list-repeat-descriptor-order.json": "answers/list-repeat-descriptor-order.json",
+        "common/pcapx/pcaputil/dlms-get-list/answers/list-response-only.json": "answers/list-response-only.json",
+        "common/pcapx/pcaputil/dlms-get-list/answers/list-result-choice-noncanonical.json": "answers/list-result-choice-noncanonical.json",
+        "common/pcapx/pcaputil/dlms-get-list/answers/list-result-count-overrun.json": "answers/list-result-count-overrun.json",
+        "common/pcapx/pcaputil/dlms-get-list/answers/list-result-error-byte-missing.json": "answers/list-result-error-byte-missing.json",
+        "common/pcapx/pcaputil/dlms-get-list/answers/list-selected-count-64.json": "answers/list-selected-count-64.json",
+        "common/pcapx/pcaputil/dlms-get-list/answers/list-selected-count-65-refusal.json": "answers/list-selected-count-65-refusal.json",
+        "common/pcapx/pcaputil/dlms-get-list/answers/list-selected-octets-1024.json": "answers/list-selected-octets-1024.json",
+        "common/pcapx/pcaputil/dlms-get-list/answers/list-selected-octets-1025.json": "answers/list-selected-octets-1025.json",
+        "common/pcapx/pcaputil/dlms-get-list/answers/list-selection-noncanonical.json": "answers/list-selection-noncanonical.json",
+        "common/pcapx/pcaputil/dlms-get-list/answers/list-selective-access-cursor.json": "answers/list-selective-access-cursor.json",
+        "common/pcapx/pcaputil/dlms-get-list/answers/list-tcp-coalesced.json": "answers/list-tcp-coalesced.json",
+        "common/pcapx/pcaputil/dlms-get-list/answers/list-tcp-incomplete-close.json": "answers/list-tcp-incomplete-close.json",
+        "common/pcapx/pcaputil/dlms-get-list/answers/list-tcp-split.json": "answers/list-tcp-split.json",
+        "common/pcapx/pcaputil/dlms-get-list/answers/list-trailing-byte.json": "answers/list-trailing-byte.json",
+        "common/pcapx/pcaputil/dlms-get-list/answers/list-udp-complete.json": "answers/list-udp-complete.json",
+        "common/pcapx/pcaputil/dlms-get-list/answers/list-udp-never-stitch.json": "answers/list-udp-never-stitch.json",
+        "common/pcapx/pcaputil/dlms-get-list/answers/list-udp-refusal-blocks-pending.json": "answers/list-udp-refusal-blocks-pending.json",
+        "common/pcapx/pcaputil/dlms-get-list/answers/list-unconfirmed-observation.json": "answers/list-unconfirmed-observation.json",
+        "common/pcapx/pcaputil/dlms-get-list/answers/list-wrong-count-no-pair.json": "answers/list-wrong-count-no-pair.json",
+        "common/pcapx/pcaputil/dlms-get-list/answers/list-wrong-direction-no-pair.json": "answers/list-wrong-direction-no-pair.json",
+        "common/pcapx/pcaputil/dlms-get-list/answers/list-wrong-full-flags-no-pair.json": "answers/list-wrong-full-flags-no-pair.json",
+        "common/pcapx/pcaputil/dlms-get-list/answers/list-wrong-invoke-no-pair.json": "answers/list-wrong-invoke-no-pair.json",
+        "common/pcapx/pcaputil/dlms-get-list/answers/list-wrong-wport-no-pair.json": "answers/list-wrong-wport-no-pair.json",
+        "common/pcapx/pcaputil/dlms-get-list/build-controls.py": "build-controls.py",
+        "common/pcapx/pcaputil/dlms-get-list/build-native-controls.py": "build-native-controls.py",
+        "common/pcapx/pcaputil/dlms-get-list/controls.json": "controls.json",
+        "common/pcapx/pcaputil/dlms-get-list/mvp-contract.json": "mvp-contract.json",
+        "common/pcapx/pcaputil/dlms-get-list/oracle.py": "oracle.py",
+        "common/pcapx/pcaputil/dlms-get-list/required-tests-v32.json": "required-tests-v32.json",
+        "common/pcapx/pcaputil/dlms-get-list/seal.py": "seal.py",
+        "common/pcapx/pcaputil/dlms-get-list/source-facts.json": "source-facts.json",
+        "common/pcapx/pcaputil/dlms-get-list/source-pin.json": "source-pin.json",
+        "common/pcapx/pcaputil/dlms-get-list/validation/expected.json": "validation/expected.json",
+        "common/pcapx/pcaputil/dlms-get-list/verify-controls.py": "verify-controls.py",
+        "scripts/protocol-tests/required-tests-v32.json": "required-tests-v32.json"
+      }
     }
   ],
   "schema_version": 1,

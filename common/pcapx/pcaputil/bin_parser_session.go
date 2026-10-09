@@ -580,7 +580,7 @@ func (f *binFlow) consumeSession(dir int, e *ProtocolEvent, result map[string]an
 		if e.ID == 0 {
 			e.ID = f.a.ids.Add(1)
 		}
-		e.Profile, e.Completeness = "dlms-wrapper-v1-get-normal", "message"
+		e.Profile, e.Completeness = wrapperProfile(e.Raw), "message"
 		err = f.consumeWrapper(dir, e.Raw, e)
 	case "dlms":
 		if e.ID == 0 {

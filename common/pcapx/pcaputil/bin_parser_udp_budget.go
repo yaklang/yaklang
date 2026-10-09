@@ -15,7 +15,7 @@ func (a *binParser) refuseUDPOversizeAssociation(e *ProtocolEvent, w []byte, src
 	case explicit == "slmp" || explicit == "" && slmpStart(w):
 		prefix, protocol, profile = "slmp/", "slmp", "slmp-binary-self-test"
 	case explicit == "dlms-wrapper" || explicit == "" && len(w) >= 8 && w[0] == 0 && w[1] == 1:
-		prefix, protocol, profile = "wrapper/", "dlms-wrapper", "dlms-wrapper-v1-get-normal"
+		prefix, protocol, profile = "wrapper/", "dlms-wrapper", wrapperProfile(w)
 		ttl = wrapperIdleTTL
 	default:
 		return false

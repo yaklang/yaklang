@@ -147,7 +147,7 @@ func (f *binFlow) frameDirection(dir int, w []byte) (int, *binSpec, error) {
 			if err == nil && n > 0 {
 				// Charge the complete owned event/projection before event() copies
 				// raw bytes, in addition to any retained invoke context.
-				err = f.reserveSession(f.wrapper.storage() + wrapperProjectionBytes + 256 + 128*int64(n))
+				err = f.reserveSession(f.wrapper.storage() + wrapperProjection(w, n) + 256)
 				var typed *ProtocolError
 				if errors.As(err, &typed) {
 					err = typed
