@@ -718,24 +718,24 @@ var _ fi.FileSystem = (*mockWindowsFS)(nil)
 
 func TestExcludeFunction(t *testing.T) {
 	t.Run("simple", func(t *testing.T) {
-		exclude := newExcludeFunc([]string{"vendor"}, "")
+		exclude := newExcludeFunc([]string{"vendor"}, "", true)
 		require.True(t, exclude("vendor"))
 	})
 
 	t.Run("absolute", func(t *testing.T) {
-		exclude := newExcludeFunc([]string{"/tmp/vendor/a"}, "/tmp/vendor")
+		exclude := newExcludeFunc([]string{"/tmp/vendor/a"}, "/tmp/vendor", true)
 		require.True(t, exclude("a"))
 		require.False(t, exclude("a.php"))
 	})
 
 	t.Run("glob", func(t *testing.T) {
-		exclude := newExcludeFunc([]string{"vendor/*"}, "")
+		exclude := newExcludeFunc([]string{"vendor/*"}, "", true)
 		require.True(t, exclude("vendor/a.php"))
 		require.True(t, exclude("vendor/a"))
 	})
 
 	t.Run("folder", func(t *testing.T) {
-		exclude := newExcludeFunc([]string{"vendor/"}, "")
+		exclude := newExcludeFunc([]string{"vendor/"}, "", true)
 		require.True(t, exclude("vendor/a.php"))
 	})
 }

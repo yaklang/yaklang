@@ -84,8 +84,9 @@ var WithConfigInfo = ssaconfig.WithCodeSourceMap
 
 type ExcludeFunc = ssaconfig.CompileExcludeFunc
 
-func newExcludeFunc(patterns []string, basePath string) ExcludeFunc {
-	return ssaconfig.BuildCompileExcludeFunc(patterns, basePath, true)
+// newExcludeFunc is a test helper over ssaconfig.BuildCompileExcludeFunc.
+func newExcludeFunc(patterns []string, basePath string, includeDefaults bool) ExcludeFunc {
+	return ssaconfig.BuildCompileExcludeFunc(patterns, basePath, includeDefaults)
 }
 
 // CompileExcludeFunc returns a matcher that merges user patterns with built-in compile excludes.
