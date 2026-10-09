@@ -393,9 +393,13 @@ func (s *structScanRuntime) keepResults(found []*SyntaxFlowResult) {
 				s.addErr(err)
 				continue
 			}
-			res.memResult = nil
-			res.symbol = make(map[string]Values)
-			res.unName = nil
+			// NoSaveRisk creates in-memory risks without a database result.
+			// Their values must remain available for streaming files/dataflows.
+			if res.IsDatabase() {
+				res.memResult = nil
+				res.symbol = make(map[string]Values)
+				res.unName = nil
+			}
 		}
 		s.mu.Lock()
 		s.results = append(s.results, found...)
