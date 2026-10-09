@@ -81,9 +81,6 @@ var WithConfigInfo = ssaconfig.WithCodeSourceMap
 
 type ExcludeFunc = ssaconfig.CompileExcludeFunc
 
-// DefaultExcludeFiles is kept for backward compatibility.
-var DefaultExcludeFiles = ssaconfig.DefaultCompileExcludeGlobs
-
 func newExcludeFunc(patterns []string, basePath string) ExcludeFunc {
 	return ssaconfig.BuildCompileExcludeFunc(patterns, basePath, true)
 }
