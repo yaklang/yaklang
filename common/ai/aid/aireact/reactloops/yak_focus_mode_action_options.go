@@ -1,6 +1,8 @@
 package reactloops
 
 import (
+	"reflect"
+
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -95,10 +97,10 @@ func ParseFocusModeActionOptions(items []any) []aitool.ToolOption {
 			}
 		case "integer", "int", "number", "float":
 			if raw, exists := entry["max"]; exists && !utils.IsNil(raw) {
-				propOpts = append(propOpts, aitool.WithParam_Max(utils.MapGetFloat64(entry, "max")))
+				propOpts = append(propOpts, aitool.WithParam_Max(focusModeNumericBound(raw)))
 			}
 			if raw, exists := entry["min"]; exists && !utils.IsNil(raw) {
-				propOpts = append(propOpts, aitool.WithParam_Min(utils.MapGetFloat64(entry, "min")))
+				propOpts = append(propOpts, aitool.WithParam_Min(focusModeNumericBound(raw)))
 			}
 		}
 
@@ -119,4 +121,21 @@ func ParseFocusModeActionOptions(items []any) []aitool.ToolOption {
 		}
 	}
 	return opts
+}
+
+// Yak integer literals retain integer types instead of becoming float64 values.
+// Convert numeric kinds directly to avoid narrowing unsigned values through int.
+func focusModeNumericBound(raw any) float64 {
+	value := reflect.ValueOf(raw)
+	switch value.Kind() {
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		return float64(value.Int())
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+		return float64(value.Uint())
+	case reflect.Float32, reflect.Float64:
+		return value.Float()
+	default:
+		// Preserve the previous fallback for nonnumeric declarations.
+		return 0
+	}
 }
