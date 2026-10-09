@@ -537,8 +537,13 @@ func (p *Program) PopEditor(save bool) {
 		if owner.FileList == nil {
 			owner.FileList = make(map[string]string)
 		}
+		if owner.fileLineCounts == nil {
+			owner.fileLineCounts = utils.NewSafeMapWithKey[string, int]()
+		}
+		previous, _ := owner.fileLineCounts.Get(e.GetUrl())
 		owner.FileList[e.GetUrl()] = e.GetIrSourceHash()
-		owner.LineCount += e.GetLineCount()
+		owner.LineCount += e.GetLineCount() - previous
+		owner.fileLineCounts.Set(e.GetUrl(), e.GetLineCount())
 		owner.fileListMu.Unlock()
 	}
 }

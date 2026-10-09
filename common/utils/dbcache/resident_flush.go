@@ -73,9 +73,25 @@ func (c *ResidentFlushCache[K, T, D]) Set(key K, value T) {
 // save from clearing a mutation published while that save was in progress.
 func (c *ResidentFlushCache[K, T, D]) MarkDirty(key K) {
 	c.mu.Lock()
+	if c.dirty == nil {
+		c.dirty = make(map[K]uint64)
+	}
 	c.version++
 	c.dirty[key] = c.version
 	c.mu.Unlock()
+}
+
+// Discard releases resident objects and snapshot bookkeeping without saving.
+// Like Flush, it requires exclusive ownership of the persistence lifecycle.
+func (c *ResidentFlushCache[K, T, D]) Discard() {
+	if c == nil {
+		return
+	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.data.Clear()
+	c.dirty = nil
+	c.persisted = nil
 }
 
 func (c *ResidentFlushCache[K, T, D]) DirtyCount() int {

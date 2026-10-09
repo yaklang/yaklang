@@ -92,6 +92,8 @@ type FunctionBuilder struct {
 	// this function. Later assignments of those names are marked so const
 	// folding does not drop the callback's update.
 	capturedNames map[string]struct{}
+
+	placeholderConstants *utils.SafeMapWithKey[placeholderConstantKey, placeholderConstant]
 }
 
 func NewBuilder(editor *memedit.MemEditor, f *Function, parent *FunctionBuilder) *FunctionBuilder {

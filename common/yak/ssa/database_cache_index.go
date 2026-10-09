@@ -2,7 +2,6 @@ package ssa
 
 import (
 	"github.com/yaklang/gorm"
-	"strconv"
 
 	"github.com/yaklang/yaklang/common/utils"
 	"sync"
@@ -22,35 +21,39 @@ type indexStore struct {
 	program *Program
 	db      *gorm.DB
 
-	variable *utils.SafeMapWithKey[string, []int64]
-	member   *utils.SafeMapWithKey[string, []int64]
-	class    *utils.SafeMapWithKey[string, []int64]
-	consts   *utils.SafeMapWithKey[string, []int64]
+	variable     *utils.SafeMapWithKey[string, []int64]
+	member       *utils.SafeMapWithKey[string, []int64]
+	class        *utils.SafeMapWithKey[string, []int64]
+	consts       *utils.SafeMapWithKey[string, []int64]
+	residentKeys *utils.SafeMapWithKey[residentIndexKey, struct{}]
+	residentMu   sync.Mutex
+	indexSaved   *utils.SafeMapWithKey[indexRelationshipKey, struct{}]
 
 	indexSaver  *dbcache.Save[*ssadb.IrIndex]
 	offsetSaver *dbcache.Save[*ssadb.IrOffset]
 
 	// offsetSaved deduplicates offset rows by composite key
-	// (value_id + file_hash + start_offset + end_offset). Without this,
+	// (value_id + file_hash + start_offset + end_offset + variable_name). Without this,
 	// compile-unit split cross-unit resolution visits the same instruction
 	// from the same file editor multiple times, creating truly identical
 	// offset rows. Different ranges for the same value_id (e.g. instruction
 	// appearing in different files) are legitimate and are NOT deduped.
-	offsetSavedMu sync.Mutex
-	offsetSaved   map[string]struct{}
+	offsetSaved *utils.SafeMapWithKey[offsetLocationKey, struct{}]
 }
 
 func newIndexStore(cfg *ssaconfig.Config, prog *Program, mode ProgramCacheKind, db *gorm.DB, saveSize int) *indexStore {
 	saveSize = resolveAuxiliarySaveSize(cfg, saveSize)
 	store := &indexStore{
-		mode:        mode,
-		program:     prog,
-		db:          db,
-		variable:    utils.NewSafeMapWithKey[string, []int64](),
-		member:      utils.NewSafeMapWithKey[string, []int64](),
-		class:       utils.NewSafeMapWithKey[string, []int64](),
-		consts:      utils.NewSafeMapWithKey[string, []int64](),
-		offsetSaved: make(map[string]struct{}),
+		mode:         mode,
+		program:      prog,
+		db:           db,
+		variable:     utils.NewSafeMapWithKey[string, []int64](),
+		member:       utils.NewSafeMapWithKey[string, []int64](),
+		class:        utils.NewSafeMapWithKey[string, []int64](),
+		consts:       utils.NewSafeMapWithKey[string, []int64](),
+		residentKeys: utils.NewSafeMapWithKey[residentIndexKey, struct{}](),
+		indexSaved:   utils.NewSafeMapWithKey[indexRelationshipKey, struct{}](),
+		offsetSaved:  utils.NewSafeMapWithKey[offsetLocationKey, struct{}](),
 	}
 	if mode != ProgramCacheDBWrite || db == nil {
 		return store
@@ -65,8 +68,7 @@ func newIndexStore(cfg *ssaconfig.Config, prog *Program, mode ProgramCacheKind, 
 						batch = append(batch, index)
 					}
 				}
-				ssadb.SaveIrIndexBatch(tx, batch)
-				return nil
+				return ssadb.SaveIrIndexBatch(tx, batch)
 			})
 		}
 		return store.diagnosticsTrackErr("ssa.Database.SaveIrIndexBatch", saveStep)
@@ -139,7 +141,7 @@ func (s *indexStore) AddConst(inst Instruction) {
 	if s == nil || utils.IsNil(inst) {
 		return
 	}
-	appendResidentIndex(s.consts, inst.GetName(), inst.GetId())
+	s.appendIndex(s.consts, inst.GetName(), inst.GetId())
 }
 
 func (s *indexStore) AddVariable(name string, inst Instruction) {
@@ -148,16 +150,16 @@ func (s *indexStore) AddVariable(name string, inst Instruction) {
 	}
 	name, member := normalizeVariableName(name)
 	if member != "" {
-		appendResidentIndex(s.member, member, inst.GetId())
+		s.appendIndex(s.member, member, inst.GetId())
 		if s.indexSaver != nil {
-			s.indexSaver.Save(CreateVariableIndexByMember(member, inst))
+			s.saveIndexDedup(CreateVariableIndexByMember(member, inst))
 		}
 		return
 	}
 
-	appendResidentIndex(s.variable, name, inst.GetId())
+	s.appendIndex(s.variable, name, inst.GetId())
 	if s.indexSaver != nil {
-		s.indexSaver.Save(CreateVariableIndexByName(name, inst))
+		s.saveIndexDedup(CreateVariableIndexByName(name, inst))
 	}
 }
 
@@ -166,21 +168,87 @@ func (s *indexStore) RemoveVariable(name string, inst Instruction) {
 		return
 	}
 	name, member := normalizeVariableName(name)
+	s.residentMu.Lock()
+	defer s.residentMu.Unlock()
 	if member != "" {
 		removeResidentIndex(s.member, member, inst.GetId())
+		s.residentKeys.Delete(residentIndexKey{s.member, member, inst.GetId()})
 		return
 	}
 	removeResidentIndex(s.variable, name, inst.GetId())
+	s.residentKeys.Delete(residentIndexKey{s.variable, name, inst.GetId()})
 }
 
 func (s *indexStore) AddClassInstance(name string, inst Instruction) {
 	if s == nil || utils.IsNil(inst) {
 		return
 	}
-	appendResidentIndex(s.class, name, inst.GetId())
+	s.appendIndex(s.class, name, inst.GetId())
 	if s.indexSaver != nil {
-		s.indexSaver.Save(CreateClassIndex(name, inst))
+		s.saveIndexDedup(CreateClassIndex(name, inst))
 	}
+}
+
+func (s *indexStore) saveIndexDedup(index *ssadb.IrIndex) {
+	if s != nil && s.indexSaver != nil && index != nil {
+		fresh := false
+		s.indexSaved.Update(indexRelationship(index), func(_ struct{}, exists bool) struct{} {
+			fresh = !exists
+			return struct{}{}
+		})
+		if fresh {
+			s.indexSaver.Save(index)
+		}
+	}
+}
+
+// A key owns scalar IDs, never pointers into the GORM row that the saver edits.
+// The presence bits distinguish SQL NULL from an explicit zero in every ID.
+type indexRelationshipKey struct {
+	program, scope                                string
+	value, variable, class, field, owner, version int64
+	present                                       uint8
+}
+
+func indexRelationship(row *ssadb.IrIndex) indexRelationshipKey {
+	k := indexRelationshipKey{program: row.ProgramName, scope: row.ScopeName, value: row.ValueID, version: row.VersionID}
+	for i, id := range []*int64{row.VariableID, row.ClassID, row.FieldID, row.OwnerValueID} {
+		if id != nil {
+			k.present |= 1 << i
+			switch i {
+			case 0:
+				k.variable = *id
+			case 1:
+				k.class = *id
+			case 2:
+				k.field = *id
+			case 3:
+				k.owner = *id
+			}
+		}
+	}
+	return k
+}
+
+type residentIndexKey struct {
+	index *utils.SafeMapWithKey[string, []int64]
+	name  string
+	id    int64
+}
+
+func (s *indexStore) appendIndex(index *utils.SafeMapWithKey[string, []int64], name string, id int64) {
+	if id <= 0 {
+		return
+	}
+	s.residentMu.Lock()
+	defer s.residentMu.Unlock()
+	// Appending and publishing membership share one lock, including removal.
+	s.residentKeys.Update(residentIndexKey{index, name, id}, func(_ struct{}, exists bool) struct{} {
+		if !exists {
+			appendResidentIndex(index, name, id)
+		}
+		return struct{}{}
+	})
 }
 
 // checkValue is a pure exact/glob/regexp predicate. Key filtering can run under
@@ -271,7 +339,7 @@ func (s *indexStore) SaveVariableOffset(variable *Variable, rng *memedit.Range) 
 }
 
 // saveOffsetDedup saves an offset only if an identical row
-// (same value_id + file_hash + start_offset + end_offset) has not already
+// (same value_id + file_hash + start_offset + end_offset + variable_name) has not already
 // been saved. This prevents truly duplicate offset rows from compile-unit
 // split cross-unit resolution visiting the same instruction from the same
 // file editor multiple times. Different ranges for the same value_id are
@@ -280,21 +348,34 @@ func (s *indexStore) saveOffsetDedup(offset *ssadb.IrOffset) {
 	if offset == nil {
 		return
 	}
-	key := offsetDedupKey(offset.ValueID, offset.FileHash, offset.StartOffset, offset.EndOffset)
-	s.offsetSavedMu.Lock()
-	if _, ok := s.offsetSaved[key]; ok {
-		s.offsetSavedMu.Unlock()
-		return
+	if s.program != nil && s.program.NameCache != nil {
+		offset.FileHash = s.program.NameCache.Intern(offset.FileHash)
+		offset.VariableName = s.program.NameCache.Intern(offset.VariableName)
 	}
-	s.offsetSaved[key] = struct{}{}
-	s.offsetSavedMu.Unlock()
-	s.offsetSaver.Save(offset)
+	key := offsetDedupKey(offset.ValueID, offset.FileHash, offset.StartOffset, offset.EndOffset, offset.VariableName)
+	fresh := false
+	s.offsetSaved.Update(key, func(_ struct{}, exists bool) struct{} {
+		fresh = !exists
+		return struct{}{}
+	})
+	if fresh {
+		s.offsetSaver.Save(offset)
+	}
 }
 
-// offsetDedupKey creates a composite key for offset deduplication.
-func offsetDedupKey(valueID int64, fileHash string, start, end int64) string {
-	return strconv.FormatInt(valueID, 10) + "|" + fileHash + "|" +
-		strconv.FormatInt(start, 10) + "|" + strconv.FormatInt(end, 10)
+type offsetLocationKey struct {
+	value, start, end int64
+	file, variable    string
+}
+
+// Match the existing DB unique key, including the variable name. IDs are
+// scalars so the common duplicate lookup allocates no formatted strings.
+func offsetDedupKey(valueID int64, fileHash string, start, end int64, variable ...string) offsetLocationKey {
+	k := offsetLocationKey{value: valueID, file: fileHash, start: start, end: end}
+	if len(variable) != 0 {
+		k.variable = variable[0]
+	}
+	return k
 }
 
 func appendResidentIndex(index *utils.SafeMapWithKey[string, []int64], key string, id int64) {

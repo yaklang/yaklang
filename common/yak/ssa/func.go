@@ -276,9 +276,9 @@ func (f *Function) IsMethod() bool {
 	if ft == nil {
 		return false
 	}
-	ft.methodLock.RLock()
+	ft.receiverMu.RLock()
 	is := ft.IsMethod
-	ft.methodLock.RUnlock()
+	ft.receiverMu.RUnlock()
 	return is
 }
 
@@ -293,10 +293,10 @@ func (f *Function) SetMethod(is bool, objType Type) {
 	}
 	ft := f.Type
 	f.typeMu.Unlock()
-	ft.methodLock.Lock()
+	ft.receiverMu.Lock()
 	ft.IsMethod = is
 	ft.ObjectType = objType
-	ft.methodLock.Unlock()
+	ft.receiverMu.Unlock()
 }
 
 func (f *Function) SetVerboseName(name string) {

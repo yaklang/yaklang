@@ -306,14 +306,15 @@ func TestPerBatchFlushNoFeedBlockPanic(t *testing.T) {
 	defer prog.Cache.CloseWithoutSave()
 
 	// Unit A: create and flush.
-	builderA := prog.GetAndCreateFunctionBuilder("funcA", string(MainFunctionName))
+	builderA := prog.GetAndCreateFunctionBuilder("", "funcA")
 	instA := builderA.EmitUndefined("instA")
 	builderA.Finish()
 	prog.Cache.FlushCompileUnit("unit-a")
 
 	// Unit B: create new instructions AFTER flush — must not panic.
 	require.NotPanics(t, func() {
-		builderB := prog.GetAndCreateFunctionBuilder("funcB", string(MainFunctionName))
+		builderB := prog.GetAndCreateFunctionBuilder("", "funcB")
+		require.NotEqual(t, builderA.Function.GetId(), builderB.Function.GetId(), "compile units must own different functions")
 		instB := builderB.EmitUndefined("instB")
 		_ = instB
 		builderB.Finish()
