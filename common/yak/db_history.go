@@ -33,13 +33,11 @@ func bindDBHistoryToEngine(engine *antlr4yak.Engine, ctx context.Context, runtim
 		return yaklib.QueryHTTPFlowByID(id, options(opts)...)
 	}
 	engine.SetVars(map[string]any{"db": exports})
-	// Keep the public risk exports, wrapping only the query's runtime DB/context.
-	riskExports := make(map[string]any, len(yaklib.RiskExports))
-	for name, fn := range yaklib.RiskExports {
-		riskExports[name] = fn
-	}
-	riskExports["QueryRiskInDatabase"] = func(filter map[string]any, opts ...yaklib.DBHistoryOption) (*yaklib.RiskDatabasePage, error) {
-		return yaklib.QueryRiskInDatabase(filter, options(opts)...)
-	}
-	engine.SetVars(map[string]any{"risk": riskExports})
+	// Module overrides merge with the engine's existing exports. Override only
+	// the query so Save/NewRisk retain this invocation's Yakit client binding.
+	engine.SetVars(map[string]any{"risk": map[string]any{
+		"QueryRiskInDatabase": func(filter map[string]any, opts ...yaklib.DBHistoryOption) (*yaklib.RiskDatabasePage, error) {
+			return yaklib.QueryRiskInDatabase(filter, options(opts)...)
+		},
+	}})
 }
