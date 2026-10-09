@@ -82,6 +82,12 @@ func (y *YakLogger) SetEngine(engine *antlr4yak.Engine) {
 	})
 }
 
+// CreateYakLoggerForEngine keeps VM metadata local to an execution, even for the same file.
+func CreateYakLoggerForEngine(yakFile string) *YakLogger {
+	logger := log.NewLogger(_fixYakModName(yakFile))
+	return &YakLogger{Logger: logger, SetLevel: logger.Logger.SetLevel}
+}
+
 // Info 以 info(信息)级别格式化输出一条日志，日志内容应使用英文
 // 参数:
 //   - format: 格式化字符串

@@ -15,10 +15,7 @@ func bindAIHistoryToEngine(engine *antlr4yak.Engine, ctx context.Context, runtim
 		defaults = append(defaults, aihistory.WithDatabase(runtime.ProjectDatabase), aihistory.WithAISession(session),
 			aihistory.WithLiveTimeline(session, runtime.TimelineHistorySnapshot))
 	}
-	exports := make(map[string]any, len(aihistory.Exports))
-	for name, value := range aihistory.Exports {
-		exports[name] = value
-	}
+	exports := make(map[string]any)
 	exports["CurrentSession"] = func() string { return session }
 	exports["Query"] = func(query string, opts ...aihistory.Option) ([]*aihistory.Item, error) {
 		return aihistory.Query(query, append(append([]aihistory.Option{}, defaults...), opts...)...)

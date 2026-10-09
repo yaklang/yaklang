@@ -35,7 +35,7 @@ type YakitFeature struct {
 // yakit.EnableWebsiteTrees("example.com")
 // ```
 func yakitEnableCrawlerViewer(targets string) {
-	GetYakitClientInstance().Output(&YakitFeature{
+	yakitOutputHelper(&YakitFeature{
 		Feature: "website-trees",
 		Params: map[string]interface{}{
 			"targets":          targets,
@@ -58,7 +58,7 @@ func yakitEnableCrawlerViewer(targets string) {
 // yakit.TableData("Result", {"name": "a", "value": "1"})
 // ```
 func yakitEnableFixedTable(tableName string, columns []string) {
-	GetYakitClientInstance().Output(&YakitFeature{
+	yakitOutputHelper(&YakitFeature{
 		Feature: "fixed-table",
 		Params: map[string]interface{}{
 			"table_name": tableName,
@@ -80,7 +80,7 @@ func yakitEnableFixedTable(tableName string, columns []string) {
 // yakit.OutputDotGraph("Graph", "digraph G { a -> b }")
 // ```
 func yakitEnableDotGraphTab(tabName string) {
-	GetYakitClientInstance().Output(&YakitFeature{
+	yakitOutputHelper(&YakitFeature{
 		Feature: "dot-graph-tab",
 		Params: map[string]interface{}{
 			"tab_name": tabName,
@@ -101,7 +101,7 @@ func yakitEnableDotGraphTab(tabName string) {
 // yakit.TextTabData("Log", "hello yak")
 // ```
 func yakitEnableText(tabName string) {
-	GetYakitClientInstance().Output(&YakitFeature{
+	yakitOutputHelper(&YakitFeature{
 		Feature: "text",
 		Params: map[string]interface{}{
 			"tab_name": tabName,
@@ -221,7 +221,9 @@ type YakitStatusCard struct {
 // yakit.StatusCard("Open Ports", 12, "scan")
 // ```
 func yakitStatusCard(id string, data interface{}, tags ...string) {
-	GetYakitClientInstance().StatusCard(id, data, tags...)
+	if client := GetYakitClientInstance(); client != nil {
+		client.StatusCard(id, data, tags...)
+	}
 }
 
 // StatusCard 在 Yakit UI 中输出/更新一个状态卡片（导出名为 yakit.StatusCard）

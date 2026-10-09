@@ -10,6 +10,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/yaklang/gorm"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools/yakscripttools"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools/yakscripttools/metadata"
@@ -161,6 +162,7 @@ func convertNativeYakPluginToAITool(script *schema.YakScript) (*aitool.Tool, err
 }
 
 func executeNativeYakPlugin(ctx context.Context, script *schema.YakScript, params aitool.InvokeParams, runtimeConfig *aitool.ToolRuntimeConfig, stdout io.Writer, stderr io.Writer) (any, error) {
+	stdout, stderr = aiToolOutputWriters(stdout, stderr)
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
@@ -209,14 +211,13 @@ func executeNativeYakPlugin(ctx context.Context, script *schema.YakScript, param
 
 	cliApp := GetHookCliApp(args)
 	engine.RegisterEngineHooks(func(ae *antlr4yak.Engine) error {
-		BindYakitPluginContextToEngine(
-			ae,
-			CreateYakitPluginContext(runtimeId).
-				WithContext(ctx).
-				WithContextCancel(cancel).
-				WithCliApp(cliApp).
-				WithYakitClient(yakitClient),
-		)
+		pluginContext := CreateYakitPluginContext(runtimeId).
+			WithContext(ctx).
+			WithContextCancel(cancel).
+			WithCliApp(cliApp).
+			WithYakitClient(yakitClient)
+		pluginContext.WithRiskSaveHandler(aiToolRiskSaveHandler(runtimeConfig))
+		BindYakitPluginContextToEngine(ae, pluginContext)
 		bindMemorySearchToEngine(ae, ctx, runtimeConfig)
 		bindAIHistoryToEngine(ae, ctx, runtimeConfig)
 		bindDBHistoryToEngine(ae, ctx, runtimeConfig)
@@ -235,7 +236,7 @@ func executeNativeYakPlugin(ctx context.Context, script *schema.YakScript, param
 		return nil, err
 	}
 
-	return collectNativePluginResult(runtimeId, script.ScriptName, stdout), nil
+	return collectNativePluginResult(runtimeId, script.ScriptName, stdout, runtimeConfig), nil
 }
 
 // nativeYakPluginArgString preserves structured parameters when they cross
@@ -254,7 +255,7 @@ func nativeYakPluginArgString(v any) string {
 	return fmt.Sprint(v)
 }
 
-func collectNativePluginResult(runtimeId string, pluginName string, stdout io.Writer) string {
+func collectNativePluginResult(runtimeId string, pluginName string, stdout io.Writer, runtimeConfig *aitool.ToolRuntimeConfig) string {
 	var result strings.Builder
 	result.WriteString(fmt.Sprintf("Native yak plugin execution completed: %s\n", pluginName))
 
@@ -262,7 +263,17 @@ func collectNativePluginResult(runtimeId string, pluginName string, stdout io.Wr
 		return result.String()
 	}
 
-	db := consts.GetGormProjectDatabase()
+	if runtimeConfig != nil && runtimeConfig.RiskSaveHandler != nil {
+		result.WriteString("Risk records are delivered through the runtime risk sink and structured feedback.\n")
+		return result.String()
+	}
+
+	var db *gorm.DB
+	if runtimeConfig != nil && runtimeConfig.ProjectDatabase != nil {
+		db = runtimeConfig.ProjectDatabase
+	} else {
+		db = consts.GetGormProjectDatabase()
+	}
 	if db == nil {
 		return result.String()
 	}
@@ -370,6 +381,7 @@ func convertMitmPluginToAITool(script *schema.YakScript) (*aitool.Tool, error) {
 }
 
 func executeMitmPlugins(ctx context.Context, scripts []*schema.YakScript, params aitool.InvokeParams, runtimeConfig *aitool.ToolRuntimeConfig, stdout io.Writer, stderr io.Writer) (any, error) {
+	stdout, stderr = aiToolOutputWriters(stdout, stderr)
 	urlStr, _ := params["url"].(string)
 	reqPacket, _ := params["requestPacket"].(string)
 	isHttpsStr, _ := params["isHttps"].(string)
@@ -401,7 +413,7 @@ func executeMitmPlugins(ctx context.Context, scripts []*schema.YakScript, params
 		manager.SetRuntimeId(runtimeId)
 	}
 
-	manager.SetFeedback(func(result *ypb.ExecResult) error {
+	feedback := func(result *ypb.ExecResult) error {
 		if ret := yaklib.ConvertExecResultIntoAIToolCallStdoutLog(result); ret != "" {
 			stdout.Write([]byte(ret))
 			stdout.Write([]byte("\n"))
@@ -410,18 +422,23 @@ func executeMitmPlugins(ctx context.Context, scripts []*schema.YakScript, params
 			return runtimeConfig.FeedBacker(result)
 		}
 		return nil
-	})
+	}
+	manager.SetFeedback(feedback)
+	riskFailures := bindAIToolPluginRuntime(manager.GetNativeCaller(), ctx, runtimeConfig, feedback)
 
 	var pluginNames []string
 	var loadWg sync.WaitGroup
 	var loadErrs []string
+	var loadErrMu sync.Mutex
 	for _, script := range scripts {
 		pluginNames = append(pluginNames, script.ScriptName)
 		loadWg.Add(1)
 		go func(s *schema.YakScript) {
 			defer loadWg.Done()
 			if loadErr := manager.LoadPluginEx(ctx, s); loadErr != nil {
+				loadErrMu.Lock()
 				loadErrs = append(loadErrs, fmt.Sprintf("load plugin %q failed: %v", s.ScriptName, loadErr))
+				loadErrMu.Unlock()
 				log.Warnf("load mitm plugin %q for AI failed: %v", s.ScriptName, loadErr)
 			}
 		}(script)
@@ -458,11 +475,16 @@ func executeMitmPlugins(ctx context.Context, scripts []*schema.YakScript, params
 
 	manager.MirrorHTTPFlow(isHttps, urlForMirror, reqBytes, rspBytes, body)
 	manager.GetNativeCaller().Wait()
+	select {
+	case err := <-riskFailures:
+		return nil, utils.Errorf("save plugin risk failed: %w", err)
+	default:
+	}
 
-	return collectMitmPluginResult(runtimeId, pluginNames, urlForMirror, stdout), nil
+	return collectMitmPluginResult(runtimeId, pluginNames, urlForMirror, stdout, runtimeConfig), nil
 }
 
-func collectMitmPluginResult(runtimeId string, pluginNames []string, targetURL string, stdout io.Writer) string {
+func collectMitmPluginResult(runtimeId string, pluginNames []string, targetURL string, stdout io.Writer, runtimeConfig *aitool.ToolRuntimeConfig) string {
 	var result strings.Builder
 	result.WriteString(fmt.Sprintf("MITM plugin execution completed for target: %s\n", targetURL))
 	result.WriteString(fmt.Sprintf("Plugins executed: %s\n", strings.Join(pluginNames, ", ")))
@@ -472,7 +494,17 @@ func collectMitmPluginResult(runtimeId string, pluginNames []string, targetURL s
 		return result.String()
 	}
 
-	db := consts.GetGormProjectDatabase()
+	if runtimeConfig != nil && runtimeConfig.RiskSaveHandler != nil {
+		result.WriteString("Risk records are delivered through the runtime risk sink and structured feedback.\n")
+		return result.String()
+	}
+
+	var db *gorm.DB
+	if runtimeConfig != nil && runtimeConfig.ProjectDatabase != nil {
+		db = runtimeConfig.ProjectDatabase
+	} else {
+		db = consts.GetGormProjectDatabase()
+	}
 	if db == nil {
 		result.WriteString("No risks collected (database unavailable)\n")
 		return result.String()
@@ -577,6 +609,7 @@ func convertPortScanPluginToAITool(script *schema.YakScript) (*aitool.Tool, erro
 }
 
 func executePortScanPlugins(ctx context.Context, scripts []*schema.YakScript, params aitool.InvokeParams, runtimeConfig *aitool.ToolRuntimeConfig, stdout io.Writer, stderr io.Writer) (any, error) {
+	stdout, stderr = aiToolOutputWriters(stdout, stderr)
 	target, _ := params["target"].(string)
 	portStr, _ := params["port"].(string)
 
@@ -602,7 +635,7 @@ func executePortScanPlugins(ctx context.Context, scripts []*schema.YakScript, pa
 		manager.SetRuntimeId(runtimeId)
 	}
 
-	manager.SetFeedback(func(result *ypb.ExecResult) error {
+	feedback := func(result *ypb.ExecResult) error {
 		if ret := yaklib.ConvertExecResultIntoAIToolCallStdoutLog(result); ret != "" {
 			stdout.Write([]byte(ret))
 			stdout.Write([]byte("\n"))
@@ -611,18 +644,23 @@ func executePortScanPlugins(ctx context.Context, scripts []*schema.YakScript, pa
 			return runtimeConfig.FeedBacker(result)
 		}
 		return nil
-	})
+	}
+	manager.SetFeedback(feedback)
+	riskFailures := bindAIToolPluginRuntime(manager.GetNativeCaller(), ctx, runtimeConfig, feedback)
 
 	var pluginNames []string
 	var loadWg sync.WaitGroup
 	var loadErrs []string
+	var loadErrMu sync.Mutex
 	for _, script := range scripts {
 		pluginNames = append(pluginNames, script.ScriptName)
 		loadWg.Add(1)
 		go func(s *schema.YakScript) {
 			defer loadWg.Done()
 			if loadErr := manager.LoadPluginEx(ctx, s); loadErr != nil {
+				loadErrMu.Lock()
 				loadErrs = append(loadErrs, fmt.Sprintf("load plugin %q failed: %v", s.ScriptName, loadErr))
+				loadErrMu.Unlock()
 				log.Warnf("load port-scan plugin %q for AI failed: %v", s.ScriptName, loadErr)
 			}
 		}(script)
@@ -644,11 +682,16 @@ func executePortScanPlugins(ctx context.Context, scripts []*schema.YakScript, pa
 
 	manager.HandleServiceScanResult(matchResult)
 	manager.GetNativeCaller().Wait()
+	select {
+	case err := <-riskFailures:
+		return nil, utils.Errorf("save plugin risk failed: %w", err)
+	default:
+	}
 
-	return collectPortScanPluginResult(runtimeId, pluginNames, target, port, stdout), nil
+	return collectPortScanPluginResult(runtimeId, pluginNames, target, port, stdout, runtimeConfig), nil
 }
 
-func collectPortScanPluginResult(runtimeId string, pluginNames []string, target string, port int, stdout io.Writer) string {
+func collectPortScanPluginResult(runtimeId string, pluginNames []string, target string, port int, stdout io.Writer, runtimeConfig *aitool.ToolRuntimeConfig) string {
 	var result strings.Builder
 	result.WriteString(fmt.Sprintf("Port-scan plugin execution completed for target: %s:%d\n", target, port))
 	result.WriteString(fmt.Sprintf("Plugins executed: %s\n", strings.Join(pluginNames, ", ")))
@@ -658,7 +701,17 @@ func collectPortScanPluginResult(runtimeId string, pluginNames []string, target 
 		return result.String()
 	}
 
-	db := consts.GetGormProjectDatabase()
+	if runtimeConfig != nil && runtimeConfig.RiskSaveHandler != nil {
+		result.WriteString("Risk records are delivered through the runtime risk sink and structured feedback.\n")
+		return result.String()
+	}
+
+	var db *gorm.DB
+	if runtimeConfig != nil && runtimeConfig.ProjectDatabase != nil {
+		db = runtimeConfig.ProjectDatabase
+	} else {
+		db = consts.GetGormProjectDatabase()
+	}
 	if db == nil {
 		result.WriteString("No risks collected (database unavailable)\n")
 		return result.String()
