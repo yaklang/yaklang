@@ -504,7 +504,7 @@ func ScanProjectFiles(cfg ScanConfig) (*ScanResult, error) {
 		HandlerFilesMap: make(map[string]struct{}),
 		Folders:         make([][]string, 0),
 	}
-	exclude := ssaconfig.ResolveCompileExcludeFuncInContext(cfg.Context, cfg.ExcludeFunc)
+	exclude := ssaconfig.ResolveCompileExcludeFunc(cfg.ExcludeFunc)
 
 	err := filesys.Recursive(cfg.ProgramPath,
 		filesys.WithFileSystem(cfg.FileSystem),
