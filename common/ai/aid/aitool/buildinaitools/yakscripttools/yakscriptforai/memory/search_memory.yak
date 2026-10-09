@@ -36,6 +36,6 @@ hits = []
 for memory in memories {
     tags = []
     if len(memory.Tags) > 0 { tags = memory.Tags }
-    hits = append(hits, {"memory_id":memory.MemoryID,"content":memory.Content,"tags":tags,"created_at":memory.CreatedAt.Format("2006-01-02 15:04:05")})
+    hits = append(hits, {"memory_id":memory.MemoryID,"content":memory.Content,"tags":tags,"created_at":memory.AIMemoryEntity.CreatedAt.Format("2006-01-02 15:04:05")})
 }
 RESULT = {"namespace":namespace,"search_mode":mode,"hits":hits}
