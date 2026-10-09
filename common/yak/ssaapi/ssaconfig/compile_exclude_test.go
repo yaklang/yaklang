@@ -149,14 +149,14 @@ func TestBuildCompileExcludeFunc(t *testing.T) {
 	})
 }
 
-func TestShouldSkipCompileDirName(t *testing.T) {
-	require.True(t, ShouldSkipCompileDirName("testdata"))
-	require.True(t, ShouldSkipCompileDirName("test"))
-	require.True(t, ShouldSkipCompileDirName(".git"))
-	require.True(t, ShouldSkipCompileDirName("node_modules"))
-	require.True(t, ShouldSkipCompileDirName("target"))
-	require.True(t, ShouldSkipCompileDirName("tests"))
-	require.True(t, ShouldSkipCompileDirName("__pycache__"))
-	require.True(t, ShouldSkipCompileDirName("testing"))
-	require.False(t, ShouldSkipCompileDirName("contest"))
+func TestIsDefaultCompileExcludeDirName(t *testing.T) {
+	require.True(t, IsDefaultCompileExcludeDirName("testdata"))
+	require.True(t, IsDefaultCompileExcludeDirName("test"))
+	require.True(t, IsDefaultCompileExcludeDirName(".git"))
+	require.True(t, IsDefaultCompileExcludeDirName("node_modules"))
+	require.True(t, IsDefaultCompileExcludeDirName("target"))
+	require.True(t, IsDefaultCompileExcludeDirName("tests"))
+	require.True(t, IsDefaultCompileExcludeDirName("__pycache__"))
+	require.True(t, IsDefaultCompileExcludeDirName("testing"))
+	require.False(t, IsDefaultCompileExcludeDirName("contest"))
 }

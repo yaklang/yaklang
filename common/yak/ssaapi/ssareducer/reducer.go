@@ -94,7 +94,10 @@ func ReducerCompile(base string, opts ...Option) error {
 			return nil
 		}
 		folder, name := c.fs.PathSplit(path)
-		if ssaconfig.ShouldSkipCompileDirName(name) {
+		// built-in default exclude dirs only; user patterns and the
+		// WithDisableDefaultCompileExcludes escape hatch are enforced by the
+		// ScanProjectFiles matcher and do not reach this reducer fast-path
+		if ssaconfig.IsDefaultCompileExcludeDirName(name) {
 			return filesys.SkipDir
 		}
 		// if have Database, save folder

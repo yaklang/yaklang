@@ -178,8 +178,11 @@ var Exports = map[string]any{
 	"withStrictMode":                    WithStrictMode,
 	"withContext":                       WithContext,
 	"withPeepholeSize":                  WithPeepholeSize,
-	"withExcludeFile":                   WithExcludeFunc,
-	"withDefaultExcludeFunc":            WithExcludeFunc, // deprecated, use withExcludeFile instead
+	"withExcludeFile":                   WithUserExcludePatterns,
+	// withDefaultExcludeFunc is deprecated, use withExcludeFile instead.
+	// Note the misleading name: it sets USER exclude patterns, not the built-in
+	// default excludes (which are controlled by withDisableDefaultCompileExcludes).
+	"withDefaultExcludeFunc":            WithExcludeFunc,
 	"withDisableDefaultCompileExcludes": WithDisableDefaultCompileExcludes,
 	"withMemory":                        WithMemory,
 	"withFilePerformanceLog":            WithFilePerformanceLog,

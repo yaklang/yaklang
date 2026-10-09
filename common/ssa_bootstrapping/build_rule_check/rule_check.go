@@ -172,18 +172,22 @@ func (s *RuleChecker) run() error {
 			log.Infof("process: %v", process)
 		}),
 	}
-	var defaultExclude []string
+	// ruleCheckExcludes are rule-check-scoped user exclude patterns, NOT built-in
+	// defaults (the built-in list lives in ssaconfig.DefaultCompileExclude* and
+	// cannot be moved here): "**lib**" would drop legitimate lib/ source code from
+	// normal Yakit scans, so it stays specific to this speed-over-recall check.
+	var ruleCheckExcludes []string
 	if s.ExcludeFile != "" {
-		defaultExclude = strings.Split(s.ExcludeFile, ",")
+		ruleCheckExcludes = strings.Split(s.ExcludeFile, ",")
 	} else if s.RequiredExclude {
 		switch strings.ToLower(s.Language) {
 		case string(ssaconfig.PHP):
-			defaultExclude = strings.Split("**vendor**,vendor**,lib**,**lib**", ",")
+			ruleCheckExcludes = strings.Split("**vendor**,vendor**,lib**,**lib**", ",")
 		case string(ssaconfig.JAVA):
-			defaultExclude = strings.Split("**/target/**", ",")
+			ruleCheckExcludes = strings.Split("**/target/**", ",")
 		}
 	}
-	opts = append(opts, ssaapi.WithExcludeFunc(defaultExclude...))
+	opts = append(opts, ssaapi.WithUserExcludePatterns(ruleCheckExcludes...))
 	_, err = ssaapi.ParseProject(opts...)
 	if err != nil {
 		return err
