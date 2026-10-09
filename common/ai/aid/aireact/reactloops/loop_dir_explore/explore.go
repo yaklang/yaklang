@@ -353,7 +353,7 @@ func BuildDirExploreLoop(r aicommon.AIInvokeRuntime, opts ...reactloops.ReActLoo
 			summary := buildExploreSummary(state)
 			loop.Set("result_summary", summary)
 			loop.GetCurrentTask().SetResult(summary + "\n\n报告文件：" + reportPath)
-			if err := loop_report_generating.EmitReportFinish(loop, reportPath, projectName+" 项目探索报告", summary); err != nil {
+			if err := loop_report_generating.EmitReportFinish(loop, reportPath, projectName+" 项目探索报告"); err != nil {
 				failExploreReport(loop, state, err, op)
 				return
 			}

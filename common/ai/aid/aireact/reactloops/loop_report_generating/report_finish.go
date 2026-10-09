@@ -16,7 +16,7 @@ import (
 const reportFinishEventNode = "report-finish"
 
 // SummaryMarkdown is the existing frontend card body field. It contains the
-// saved Markdown or a caller's overview, bounded for inline display.
+// saved Markdown, bounded for inline display.
 type reportFinishEvent struct {
 	ReportPath      string `json:"report_path"`
 	Title           string `json:"title,omitempty"`
@@ -95,7 +95,7 @@ func emitReportFinish(loop *reactloops.ReActLoop) {
 	// Read the final artifact, then bound display copies only. GEN_REPORT bodies
 	// and the complete saved report remain intact, including after later edits.
 	markdown := reportDisplayMarkdown(content)
-	if err := EmitReportFinish(loop, reportPath, title, markdown); err != nil {
+	if err := EmitReportFinish(loop, reportPath, title); err != nil {
 		log.Warnf("report_generating: emit report_finish failed: %v", err)
 		return
 	}
@@ -109,9 +109,9 @@ func emitReportFinish(loop *reactloops.ReActLoop) {
 }
 
 // EmitReportFinish is also used by a parent focus mode after its report child
-// succeeds. Apply the display budget to both standalone reports and parent
-// overviews. The complete report remains accessible through the saved file.
-func EmitReportFinish(loop *reactloops.ReActLoop, reportPath, title, markdown string) error {
+// succeeds. Always read its card body from the saved artifact, so an independently
+// generated exploration overview cannot replace the report. Bound display only.
+func EmitReportFinish(loop *reactloops.ReActLoop, reportPath, title string) error {
 	content, err := os.ReadFile(reportPath)
 	if err != nil {
 		return err
@@ -123,7 +123,7 @@ func EmitReportFinish(loop *reactloops.ReActLoop, reportPath, title, markdown st
 	if emitter == nil {
 		return utils.Error("report emitter is nil")
 	}
-	markdown = reportDisplayMarkdown(markdown)
+	markdown := reportDisplayMarkdown(string(content))
 	title = reportDisplayTitle(title)
 	if _, err := emitter.EmitPinFilename(reportPath); err != nil {
 		return err
@@ -133,8 +133,7 @@ func EmitReportFinish(loop *reactloops.ReActLoop, reportPath, title, markdown st
 	}); err != nil {
 		return err
 	}
-	// The generic report card's open button currently only works in code-audit
-	// pages. Preserve the entire saved report in the existing reference viewer:
+	// Also preserve the entire saved report in the existing reference viewer:
 	// it loads on click as plain text, rather than inline Markdown in the chat.
 	reactloops.EmitActionLog(loop, reportFinishEventNode, "完整报告已保存: "+reportPath, string(content))
 	if invoker := loop.GetInvoker(); invoker != nil {

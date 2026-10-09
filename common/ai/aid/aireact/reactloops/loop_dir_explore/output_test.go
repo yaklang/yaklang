@@ -41,7 +41,7 @@ func TestDirExploreOutputLifecycle(t *testing.T) {
 			}
 			notePath := filepath.Join(workdir, "dir_structure.md")
 			projectOverview := "这是一个用于提供账户服务的 Go 项目。"
-			report := "# demo 项目探索报告\n\n" + projectOverview + "\n\n## 目录结构\n\n```text\ndemo/\n  cmd/\n  internal/\n```\n\n## 技术栈\n\nGo, SQLite\n\n## 入口\n\ncmd/server/main.go\n"
+			report := "# demo 项目探索报告\n\n" + projectOverview + "\n\n## 目录结构\n\n```text\ndemo/\n  cmd/\n  internal/\n```\n\n## 技术栈\n\nGo, SQLite\n\n## 入口\n\ncmd/server/main.go\n\n## 阅读建议\n\n阅读 `x{NNN}_*_test.go`。\n"
 			noteJSON, err := json.Marshal(map[string]any{
 				"@action": "write_file", "identifier": "write_dirs", "human_readable_thought": "内部：写探索笔记", "file": notePath,
 				"content": "# 目录结构\n\ndemo/\n  cmd/\n  internal/\n", "force": true,
@@ -51,7 +51,7 @@ func TestDirExploreOutputLifecycle(t *testing.T) {
 				"@action": "complete_explore", "identifier": "complete_project", "human_readable_thought": "内部：启动报告子流程",
 				"project_name": "demo", "project_overview": projectOverview, "tech_stack": "Go, SQLite",
 				"entry_points": "cmd/server/main.go（账户服务）", "modules_summary": "internal/accounts（账户逻辑）",
-				"reading_guide": "先读 cmd/server/main.go，再读 internal/accounts。",
+				"reading_guide": "独立概览：先读 cmd/server/main.go，再读 x{NNN}_*_test.go。",
 			})
 			require.NoError(t, err)
 			referenceJSON, err := json.Marshal(map[string]any{"@action": "read_reference_file", "identifier": "read_dirs", "file_path": notePath})
@@ -164,9 +164,10 @@ func TestDirExploreOutputLifecycle(t *testing.T) {
 				if e.Type == schema.EVENT_TYPE_REPORT_FINISH {
 					finishes++
 					finishIndex = i
-					require.Contains(t, e.GetContentJSONPath("$.summary_markdown"), projectOverview)
-					require.Contains(t, e.GetContentJSONPath("$.summary_markdown"), "建议从这里开始阅读")
-					require.NotContains(t, e.GetContentJSONPath("$.summary_markdown"), "```text")
+					saved, readErr := os.ReadFile(reportPath)
+					require.NoError(t, readErr)
+					require.Equal(t, string(saved), e.GetContentJSONPath("$.summary_markdown"), "the completed card must match the saved report, including Markdown formatting")
+					require.NotContains(t, e.GetContentJSONPath("$.summary_markdown"), "独立概览")
 				}
 				if e.Type == schema.EVENT_TYPE_REFERENCE_MATERIAL && strings.TrimSpace(e.GetContentJSONPath("$.payload")) == strings.TrimSpace(report) {
 					fullReference = true
