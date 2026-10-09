@@ -306,11 +306,3 @@ func normalizeCompileExcludePath(path string) string {
 	path = strings.TrimPrefix(path, "./")
 	return path
 }
-
-// ResolveCompileExcludeFunc returns exclude when set, otherwise the built-in default matcher.
-func ResolveCompileExcludeFunc(exclude CompileExcludeFunc) CompileExcludeFunc {
-	if exclude != nil {
-		return exclude
-	}
-	return BuildCompileExcludeFunc(nil, "", true)
-}

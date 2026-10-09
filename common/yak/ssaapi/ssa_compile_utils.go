@@ -365,7 +365,7 @@ func (p *antlrASTParseWorker) parseFileAST(path string, source string, store *ut
 func (c *Config) GetFileHandler(
 	filesystem filesys_interface.FileSystem,
 	preHandlerFiles []string,
-	handlerFilesMap map[string]struct{},
+	preHandlerFileSet map[string]struct{},
 ) <-chan *ssareducer.FileContent {
 	parser := newAntlrASTParseWorker(c)
 	parse := func(path string, content []byte, store *utils.SafeMap[any]) (ssa.FrontAST, error) {
@@ -380,7 +380,7 @@ func (c *Config) GetFileHandler(
 				utils.PrintCurrentGoroutineRuntimeStack()
 			}
 		}()
-		if _, needBuild := handlerFilesMap[path]; !needBuild {
+		if _, needBuild := preHandlerFileSet[path]; !needBuild {
 			// don't need parse ast
 			return nil, nil
 		}
@@ -473,12 +473,13 @@ func Size(size int) string {
 
 type ScanResult struct {
 	HandlerFiles    []string
-	HandlerFileSet  map[string]struct{}
 	PreHandlerFiles []string
-	HandlerFilesMap map[string]struct{}
-	Folders         [][]string
-	HandlerTotal    int
-	PreHandlerTotal int
+	// PreHandlerFileSet is the set form of PreHandlerFiles; consumers use it to
+	// decide whether a file's AST needs to be built (needBuild).
+	PreHandlerFileSet map[string]struct{}
+	Folders           [][]string
+	HandlerTotal      int
+	PreHandlerTotal   int
 	// HandlerBytes is the total source byte size of files that enter the compile
 	// stage. It is used to choose adaptive IR cache defaults for small vs large
 	// projects; it is not persisted as part of user-facing project metadata.
@@ -498,27 +499,22 @@ type ScanConfig struct {
 // ScanProjectFiles scans the project directory and returns the files to be processed
 func ScanProjectFiles(cfg ScanConfig) (*ScanResult, error) {
 	result := &ScanResult{
-		HandlerFiles:    make([]string, 0),
-		HandlerFileSet:  make(map[string]struct{}),
-		PreHandlerFiles: make([]string, 0),
-		HandlerFilesMap: make(map[string]struct{}),
-		Folders:         make([][]string, 0),
+		HandlerFiles:     make([]string, 0),
+		PreHandlerFiles:  make([]string, 0),
+		PreHandlerFileSet: make(map[string]struct{}),
+		Folders:          make([][]string, 0),
 	}
-	exclude := ssaconfig.ResolveCompileExcludeFunc(cfg.ExcludeFunc)
+	exclude := cfg.ExcludeFunc
 
 	err := filesys.Recursive(cfg.ProgramPath,
 		filesys.WithFileSystem(cfg.FileSystem),
 		filesys.WithContext(cfg.Context),
 		filesys.WithDirStat(func(fullPath string, fi fs.FileInfo) error {
-			if exclude(fullPath) {
+			if exclude != nil && exclude(fullPath) {
 				return filesys.SkipDir
 			}
 
 			folders := []string{cfg.ProgramName}
-			// Use the filesystem's separator to split the path
-			// Note: In the original code, this used c.fs.GetSeparators().
-			// We should use cfg.FileSystem.GetSeparators() if it matches, or pass it in.
-			// Assuming cfg.FileSystem is the one to use.
 			sep := string(cfg.FileSystem.GetSeparators())
 			folders = append(folders,
 				strings.Split(fullPath, sep)...,
@@ -530,19 +526,18 @@ func ScanProjectFiles(cfg ScanConfig) (*ScanResult, error) {
 			if fi.Size() == 0 {
 				return nil
 			}
-			if exclude(path) {
+			if exclude != nil && exclude(path) {
 				return nil
 			}
 			if cfg.CheckLanguage != nil && cfg.CheckLanguage(path) == nil {
 				result.HandlerTotal++
 				result.HandlerBytes += fi.Size()
 				result.HandlerFiles = append(result.HandlerFiles, path)
-				result.HandlerFileSet[path] = struct{}{}
 			}
 			if cfg.CheckPreHandler != nil && cfg.CheckPreHandler(path) == nil {
 				result.PreHandlerTotal++
 				result.PreHandlerFiles = append(result.PreHandlerFiles, path)
-				result.HandlerFilesMap[path] = struct{}{}
+				result.PreHandlerFileSet[path] = struct{}{}
 			}
 			return nil
 		}),
