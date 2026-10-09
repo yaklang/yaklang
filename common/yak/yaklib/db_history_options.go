@@ -9,7 +9,7 @@ import (
 	"github.com/yaklang/gorm"
 )
 
-// DBHistoryOption 是 ListYakProjects、QueryHTTPFlows 和 QueryHTTPFlowByID 的查询配置项，具体支持的选项以各函数说明为准。
+// DBHistoryOption 是 ListYakProjects、QueryHTTPFlows、QueryHTTPFlowByID 和 QueryRiskInDatabase 的查询配置项，具体支持的选项以各函数说明为准。
 type DBHistoryOption func(*dbHistoryConfig)
 type dbHistoryConfig struct {
 	ctx                                              context.Context
@@ -46,7 +46,7 @@ func dbHistoryProjectID(id string) DBHistoryOption {
 
 // dbHistoryKeyword 设置查询关键字（导出名为 db.keyword）。
 //
-// ListYakProjects 中按名称/描述做不区分大小写的子串匹配；QueryHTTPFlows 中复用引擎 HTTPFlow 数据库关键字过滤，不扫描旁路文件正文。默认空值不过滤，最多 1024 字节。
+// ListYakProjects 中按名称/描述做不区分大小写的子串匹配；QueryHTTPFlows 中复用引擎 HTTPFlow 数据库关键字过滤，不扫描旁路文件正文；QueryRiskInDatabase 中搜索风险目标、标题、类型、参数、payload、details、描述和修复建议。默认空值不过滤，最多 1024 字节。
 //
 // 参数:
 //   - s: 查询关键字
@@ -63,7 +63,7 @@ func dbHistoryKeyword(s string) DBHistoryOption { return func(c *dbHistoryConfig
 
 // dbHistoryURL 设置 HTTP URL 子串（导出名为 db.url）。
 //
-// 用于 QueryHTTPFlows 的 URL 模糊匹配，默认空值不过滤，最多 2048 字节。
+// 用于 QueryHTTPFlows 和 QueryRiskInDatabase 的 URL 模糊匹配，默认空值不过滤，最多 2048 字节。
 //
 // 参数:
 //   - s: HTTP URL 子串
@@ -131,7 +131,7 @@ func dbHistorySource(s string) DBHistoryOption { return func(c *dbHistoryConfig)
 
 // dbHistoryLimit 设置每页结果数量（导出名为 db.limit）。
 //
-// 用于 ListYakProjects 和 QueryHTTPFlows，默认 10，范围 1–100；HTTP 查询还要求 limit*packetLimit*2 不超过 128 KiB。
+// 用于 ListYakProjects、QueryHTTPFlows 和 QueryRiskInDatabase，默认 10，范围 1–100；HTTP 查询还要求 limit*packetLimit*2 不超过 128 KiB，风险查询随条数调整每个文本字段的摘要预算。
 //
 // 参数:
 //   - n: 每页结果数量
@@ -148,7 +148,7 @@ func dbHistoryLimit(n int) DBHistoryOption { return func(c *dbHistoryConfig) { c
 
 // dbHistoryOffset 设置查询结果偏移（导出名为 db.offset）。
 //
-// 用于 ListYakProjects 和 QueryHTTPFlows，默认 0，范围 0–1000000；HTTP 查询使用上一页的 NextOffset 续查，偏移按过滤后的结果计算。
+// 用于 ListYakProjects、QueryHTTPFlows 和 QueryRiskInDatabase，默认 0，范围 0–1000000；HTTP 与风险查询使用上一页的 NextOffset 续查，偏移按过滤后的结果计算。
 //
 // 参数:
 //   - n: 查询结果偏移
@@ -182,12 +182,12 @@ func dbHistoryPacketLimit(n int) DBHistoryOption {
 	return func(c *dbHistoryConfig) { c.packetLimit = n }
 }
 
-// dbHistoryAfterID 设置 HTTPFlow ID 下界（导出名为 db.afterID）。
+// dbHistoryAfterID 设置记录 ID 下界（导出名为 db.afterID）。
 //
-// 用于 QueryHTTPFlows，只返回 ID 大于 n 的记录，不包含等于 n 的记录；默认 0 不限制，n 不得为负数，ID 只在选定数据库内有效。
+// 用于 QueryHTTPFlows 和 QueryRiskInDatabase，只返回 ID 大于 n 的记录，不包含等于 n 的记录；默认 0 不限制，n 不得为负数，ID 只在选定数据库内有效。
 //
 // 参数:
-//   - n: HTTPFlow ID 下界
+//   - n: HTTPFlow 或 Risk 记录 ID 下界
 //
 // 返回值:
 //   - option: DBHistoryOption 配置项，传给相应的 db 查询函数生效；无效值在查询时返回错误
@@ -199,12 +199,12 @@ func dbHistoryPacketLimit(n int) DBHistoryOption {
 // ```
 func dbHistoryAfterID(n int64) DBHistoryOption { return func(c *dbHistoryConfig) { c.afterID = n } }
 
-// dbHistoryBeforeID 设置 HTTPFlow ID 上界（导出名为 db.beforeID）。
+// dbHistoryBeforeID 设置记录 ID 上界（导出名为 db.beforeID）。
 //
-// 用于 QueryHTTPFlows，只返回 ID 小于 n 的记录，不包含等于 n 的记录；默认 0 不限制，n 不得为负数，ID 只在选定数据库内有效。
+// 用于 QueryHTTPFlows 和 QueryRiskInDatabase，只返回 ID 小于 n 的记录，不包含等于 n 的记录；默认 0 不限制，n 不得为负数，ID 只在选定数据库内有效。
 //
 // 参数:
-//   - n: HTTPFlow ID 上界
+//   - n: HTTPFlow 或 Risk 记录 ID 上界
 //
 // 返回值:
 //   - option: DBHistoryOption 配置项，传给相应的 db 查询函数生效；无效值在查询时返回错误
@@ -255,7 +255,7 @@ func historyConfig(packetLimit int, opts []DBHistoryOption) (*dbHistoryConfig, e
 		}
 	}
 	if c.afterID < 0 || c.beforeID < 0 {
-		return nil, fmt.Errorf("flow IDs must be nonnegative")
+		return nil, fmt.Errorf("record IDs must be nonnegative")
 	}
 	return c, nil
 }
