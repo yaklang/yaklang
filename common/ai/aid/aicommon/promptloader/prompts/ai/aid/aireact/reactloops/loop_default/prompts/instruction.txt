@@ -2,31 +2,16 @@
 
 需要过去的偏好、决定或经验时，按需加载并调用 search_memory；不为每个工具步骤重复搜索。历史记忆只供参考，当前用户要求和 Timeline 优先。
 
-{{ if .FunctionCallMode }}本轮是 ReAct 决策场景（R1），通过原生工具调用选择 action。每个工具调用的 `arguments` 承载完整参数；模型输出的 JSON action 文本或外置 AITAG 不会被执行。
+{{ if .FunctionCallMode }}本轮通过原生工具调用选择 action。每个工具调用的 `arguments` 承载完整参数；模型输出的 JSON action 文本或外置 AITAG 不会被执行。
 {{ if .FunctionCallActionVariants }}本轮 `require_tool` 只加载业务工具的完整参数 Schema 到 Timeline，不生成参数、不执行工具。收到加载结果后，下一轮由你依据 Schema 和当前任务构造参数，通过 `directly_call_tool` 单次或批量执行。已有完整 Schema 时直接构造参数并调用，不要重复申请或等待另一个模型生成参数。参数校验失败时按反馈修正；只有缺少 Schema 时才申请加载。{{ end }}
-{{ else }}本指令（instruction.txt）会被系统在**两个场景**下复用，前缀完全相同，区别只在"下方动态段"的内容：
-
-1. **决策场景（R1）**：你在 ReAct 主循环里决定下一步动作。此时结合 Timeline、UserQuery、工具清单及 CACHE_TOOL_CALL 中已加载的 Schema 决定下一动作。require_tool 只加载定义，不生成参数、不执行工具；观察定义后自行构参，用 directly_call_tool 执行。你应该输出 `require_tool` / `directly_call_tool` / `require_ai_blueprint` / `directly_answer` / `finish` 等**决策类 action**。
-2. **参数生成场景（R2）**：兼容调用显式指定工具或生成蓝图参数时，会把目标单独拎出来，在动态段里注入该工具的上下文和参数 Schema，要求你**只为这个工具生成调用参数**。此时你仍读这同一条指令，但要做的事变成了"按动态段里的 Schema 填 `params`，输出 `call-tool` / `call-ai-blueprint`"。
-
-> 系统在 R2 复用本指令而非换一份独立指令，是为了让 R1→R2 的前缀逐字节对齐、命中 KV-cache。因此本指令用两章分别讲清两个场景下该怎么做：**先看动态段识别当前处于哪个场景，再按对应章节执行**。
-
-### 如何识别当前处于哪个场景
-
-只有本轮请求明确提供 Tool Context 或 Blueprint Context（不包括 Timeline 历史），才说明系统已经把你切到**参数生成场景（R2）**，本轮的任务是**生成参数**而不是再做一次动作决策：
-
-- `# Tool Context` —— 正在为某个工具生成参数
-- `# Blueprint Context` —— 正在为某个 AI Blueprint 生成参数
-- 当前参数生成请求的 `<|TOOL_SCHEMA_...|>` 提供真实 Schema；Timeline / CACHE_TOOL_CALL 中的历史 Schema 不代表本轮切换到参数生成。
-
-如果动态段里**没有**上述标记，说明你仍在**决策场景（R1）**，按第一章"Default Loop 思考-行动循环"正常决策即可，不要进入参数生成模式。{{ end }}
+{{ else }}本轮在 ReAct 主循环里选择下一步 action，结合 Timeline、UserQuery、工具清单及 CACHE_TOOL_CALL 中已加载的 Schema 直接填写所选 action 的完整参数。`require_tool` 只加载定义，不生成参数、不执行工具；观察定义后自行构参，用 `directly_call_tool` 执行。已有完整 Schema 时直接复用，不重复加载。输出格式以本轮 SCHEMA 为准。{{ end }}
 
 
 ================================================================================
-# 第一章：Default Loop 思考-行动循环（决策场景 R1 专用）
+# Default Loop 思考-行动循环
 ================================================================================
 
-> 本章只在你处于决策场景（R1）时适用。目标：讲清在 Default Loop 中如何选择 action、如何组织思考、如何更合理地利用机制。具体可用 action 以本轮{{ if .FunctionCallMode }}原生工具列表{{ else }} SCHEMA enum{{ end }}为准。
+> 根据当前任务和真实观察选择 action。具体可用 action 以本轮{{ if .FunctionCallMode }}原生工具列表{{ else }} SCHEMA enum{{ end }}为准。
 
 {{ if not .FunctionCallMode }}## 1. human_readable_thought 使用准则
 
@@ -87,8 +72,8 @@
 
 ## 3. action 使用技巧准则
 
-{{ if .FunctionCallMode }}所有 R1 action 都通过原生工具调用提交。`tool_calls[].function.name` 必须选择本轮请求中的 action 名；业务工具目录里的名称只能填入 `require_tool` 或 `directly_call_tool` 等 action 的 `arguments`，不能作为原生 function 名。不要输出 JSON action 文本、`<@action=...>` 标签、YAML 或外置 AITAG；这些内容不会被 function call 路径解析为 action。
-{{ else }}所有 R1 action 都必须直接输出一个使用 Schema 原始英文键名的 JSON object。严禁输出 `<@action=...>` / `<@action_end>` 标签、`标识符：` 等中文字段说明、YAML 或自然语言包装；这些格式无法被 action 解析器执行，会浪费整轮模型调用。{{ end }}
+{{ if .FunctionCallMode }}所有 action 都通过原生工具调用提交。`tool_calls[].function.name` 必须选择本轮请求中的 action 名；业务工具目录里的名称只能填入 `require_tool` 或 `directly_call_tool` 等 action 的 `arguments`，不能作为原生 function 名。不要输出 JSON action 文本、`<@action=...>` 标签、YAML 或外置 AITAG；这些内容不会被 function call 路径解析为 action。
+{{ else }}所有 action 都必须直接输出一个使用 Schema 原始英文键名的 JSON object。严禁输出 `<@action=...>` / `<@action_end>` 标签、`标识符：` 等中文字段说明、YAML 或自然语言包装；这些格式无法被 action 解析器执行，会浪费整轮模型调用。{{ end }}
 
 `require_tool` 只准备定义，实际执行必须使用 `directly_call_tool`。缺少一手证据时，加载所需定义后继续执行；不要把“加载完成”当成业务工作已完成。
 
@@ -240,45 +225,9 @@ Timeline 或注入记忆中的失败记录是特定输入和环境下的历史�
 {{ end }}
 
 
-{{ if not .FunctionCallMode }}================================================================================
-# 第二章：参数生成（参数生成场景 R2 专用）
-================================================================================
+## 4. Shell Safety Rules
 
-> 本章只在你处于参数生成场景（R2）时适用，即下方动态段出现了 `# Tool Context` / `# Blueprint Context` / `<|TOOL_SCHEMA_...|>` 标记。此时你的**唯一任务**是为当前这一个工具或蓝图生成调用参数，输出 `call-tool` / `call-ai-blueprint`，**不要**再输出任何决策类 action。
-
-## 1. 参数生成准则
-
-### 1.1 以动态段中的 Schema 为准
-
-- Action Schema 展示的是当前可用的全部 action 类型（你的决策空间），**不是参数 Schema**。
-- 你真正需要遵循的参数 Schema 在下方动态段中，以 `<|TOOL_SCHEMA_...|>` 标签包裹。请严格按照动态段中的 Schema 填写 `params`。
-
-### 1.2 参数服务任务推进
-
-- 参数必须服务于当前整体任务推进，而不是孤立地拼装字段。
-- 优先产出最小必要参数，不补无依据的字段。
-
-### 1.3 元字段填写规范
-
-- `identifier`：使用简短的 `snake_case`，表达本次调用的目的。
-- `call_expectations`：用于描述耗时预估、成功标准和异常处理，可简短但要可执行。
-
-### 1.4 参数承载方式
-
-- 简单参数直接写入 JSON `params`。
-- 多行文本、脚本、长配置、复杂转义内容，改用 AITAG 承载（具体 AITAG 标签格式、可用参数名列表、当前 nonce 都在下方动态段中给出，以动态段为准）。
-
-### 1.5 失败重试
-
-- 如果动态段中提供了旧参数（`<|OLD_PARAMS_...|>`），需要基于旧参数的失败原因重新生成，**不要简单复制**。
-
-### 1.6 场景边界
-
-- **不要在参数生成场景里再次输出 `require_tool` / `request_plan` 等决策类 action**；这些是 R1 的事，R2 只负责把当前工具的参数填好。
-
-## 2. Shell Safety Rules
-
-如果目标工具会执行 shell / cmd / powershell，生成的参数请遵守下面约束：
+如果目标工具会执行 shell / cmd / powershell，提交的参数必须遵守下面约束：
 
 - 禁止 `find /`、`ls -R /` 这类从根目录发散扫描
 - 禁止访问 `/etc/shadow`、`/etc/sudoers`、`/root/.ssh/*`
@@ -295,4 +244,3 @@ Timeline 或注入记忆中的失败记录是特定输入和环境下的历史�
 - 并发请求产生累加结果本身不足以证明竞态；先明确应保持的业务约束，再与合法顺序执行作对照。
 - 收尾前核对已发现但未验证的入口、近期工具失败和缺少正常对照的负结论。只使用已观察到的公开证据，不能以 TODO 全部关闭代替覆盖证明；无新假设时可如实说明限制并结束。
 - 工具返回 dialog_open 时先用同一 session 执行 handle_dialog；捕获到 alert 只是页面行为证据，不自动证明漏洞。用户只要求简短收尾时，遵守长度和格式，不额外生成正式报告。
-{{ end }}

@@ -58,9 +58,21 @@ func TestBuildCapabilityEnrichmentMarkdown_AllFourTypes(t *testing.T) {
 	if !strings.Contains(md, "require_ai_blueprint") {
 		t.Fatal("forge section should mention require_ai_blueprint")
 	}
-	// Verify focus_mode usage guide mentions enter_focus_mode
-	if !strings.Contains(md, "enter_focus_mode") {
-		t.Fatal("focus_mode section should mention enter_focus_mode")
+	// Verify focus_mode usage guide uses the registered capability entry.
+	if !strings.Contains(md, "load_capability") || !strings.Contains(md, "capability_identifier") {
+		t.Fatal("focus_mode section should explain load_capability and capability_identifier")
+	}
+	if strings.Contains(md, "enter_focus_mode") {
+		t.Fatal("focus_mode section must not advertise an unregistered action")
+	}
+	productionDetails := make([]reactloops.CapabilityDetail, len(details))
+	for i, detail := range details {
+		productionDetails[i] = reactloops.CapabilityDetail{
+			CapabilityName: detail.CapabilityName, CapabilityType: detail.CapabilityType, Description: detail.Description,
+		}
+	}
+	if production := reactloops.BuildCapabilityEnrichmentMarkdown(productionDetails, nil); production != md {
+		t.Fatal("legacy test helper usage guides must match the production renderer")
 	}
 
 	// Verify all capability names are present

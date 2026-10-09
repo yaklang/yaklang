@@ -30,7 +30,7 @@ func buildFastContextAction(
 			aitool.WithStringParam("query",
 				aitool.WithParam_Description("What to locate; defaults to category name + sink hints")),
 			aitool.WithStringParam("reference_material",
-				aitool.WithParam_Description("Optional override; default is lean context + optional-read catalog (recon_report path). Sub-agent reads files on demand via require_tool.")),
+				aitool.WithParam_Description("Optional override; default is lean inline context plus reference pointers (recon_report path). FastContext locates candidate files using its advertised search actions; the parent reads report and candidate-file contents.")),
 		},
 		ActionHandler: func(loop *reactloops.ReActLoop, action *aicommon.Action, op *reactloops.LoopActionHandlerOperator) {
 			scan.mu.Lock()
