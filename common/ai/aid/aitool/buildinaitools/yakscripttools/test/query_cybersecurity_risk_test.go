@@ -16,6 +16,8 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools/yakscripttools"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/yak"
+	"github.com/yaklang/yaklang/common/yak/yaklang"
 	"github.com/yaklang/yaklang/common/yak/yaklib"
 )
 
@@ -55,6 +57,51 @@ func TestQueryCybersecurityRiskTool(t *testing.T) {
 	require.True(t, aicommon.IsFixedInventoryTool("query_cybersecurity_risk"))
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
+	t.Run("ordinary_script_exports", func(t *testing.T) {
+		// Bind only the ordinary global databases. Do not inject a risk/db module,
+		// register AI engine hooks, or supply a ToolRuntimeConfig to these engines.
+		previous := consts.CaptureProjectDatabaseBinding()
+		previousProfile := consts.GetGormProfileDatabase()
+		previousProfilePath := consts.GetCurrentProfileDatabasePath()
+		consts.BindProjectDatabaseWithReader(db, nil, filepath.Join(home, "current.db"))
+		consts.BindProfileDatabase(profile, filepath.Join(home, consts.YAK_PROFILE_PLUGIN_DB_NAME))
+		defer func() {
+			consts.BindProjectDatabaseWithReader(previous.Database, previous.ReadDatabase, previous.Path)
+			consts.BindProfileDatabase(previousProfile, previousProfilePath)
+		}()
+		flow := &schema.HTTPFlow{Model: gorm.Model{ID: 11}, Hash: "ordinary-script-flow", Url: "https://example.test/login", Method: "POST", StatusCode: 403}
+		flow.SetRequest("POST /login HTTP/1.1\r\nHost: example.test\r\n\r\n")
+		flow.SetResponse("HTTP/1.1 403 Forbidden\r\n\r\nordinary-script-evidence")
+		require.NoError(t, db.Create(flow).Error)
+		code := `
+page = risk.QueryRiskInDatabase({"type":"sqli", "severity":"high,critical"}, db.keyword("认证被绕过"), db.url("/login"), db.limit(1))~
+assert page.Total == 2 && page.HasMore
+assert page.Items[0].ID == 2
+next = risk.QueryRiskInDatabase({"type":"sqli"}, db.offset(page.NextOffset), db.limit(1))~
+assert next.Items[0].ID == 1 && !next.HasMore
+assert str.Contains(next.Dump(), "SQL injection first")
+bounded = risk.QueryRiskInDatabase({}, db.afterID(1), db.beforeID(3))~
+assert bounded.Total == 1 && bounded.Items[0].ID == 2
+all = risk.QueryRiskInDatabase(nil)~
+assert all.Total == 3
+projects = db.ListYakProjects()~
+assert len(projects) >= 1
+foreignID = ""
+for project in projects {
+    if project.Name == "risk fixture" { foreignID = project.DatabaseID }
+}
+assert foreignID != ""
+foreignRisk = risk.QueryRiskInDatabase({"ids":[1]}, db.projectID(foreignID))~
+assert foreignRisk.Items[0].Title == "Foreign project risk"
+history = db.QueryHTTPFlows(db.methods("POST"), db.statusCode("403"), db.packetLimit(128))~
+assert history.Total == 1 && history.Items[0].ID == 11
+exact = db.QueryHTTPFlowByID(11)~
+assert str.Contains(exact.GetResponse(), "ordinary-script-evidence")
+`
+		require.NoError(t, yaklang.New().Eval(ctx, code), "plain Yak engine must expose the public risk and db libraries")
+		_, err := yak.NewScriptEngine(1).ExecuteExWithContext(ctx, code, nil)
+		require.NoError(t, err, "ordinary scripts must work without AI runtime bindings")
+	})
 	execute := func(ctx context.Context, params map[string]any) (*aitool.ToolExecutionResult, error) {
 		cfg := aitool.NewToolInvokeConfig()
 		aitool.WithRuntimeConfig(&aitool.ToolRuntimeConfig{ProjectDatabase: db, ProfileDatabase: profile})(cfg)
