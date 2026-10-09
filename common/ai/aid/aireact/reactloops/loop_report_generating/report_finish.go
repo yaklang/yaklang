@@ -15,8 +15,8 @@ import (
 
 const reportFinishEventNode = "report-finish"
 
-// SummaryMarkdown is the existing frontend card body field. Standalone report
-// generation fills it with the complete saved Markdown; a parent may supply an overview.
+// SummaryMarkdown is the existing frontend card body field. It contains the
+// saved Markdown or a caller's overview, bounded for inline display.
 type reportFinishEvent struct {
 	ReportPath      string `json:"report_path"`
 	Title           string `json:"title,omitempty"`
@@ -92,24 +92,25 @@ func emitReportFinish(loop *reactloops.ReActLoop) {
 		title = strings.TrimSuffix(filepath.Base(reportPath), filepath.Ext(reportPath))
 	}
 
-	// The standalone mode's deliverable is the report itself. Draft streams
-	// remain hidden, and the final card renders the complete saved artifact once.
-	if err := EmitReportFinish(loop, reportPath, title, content); err != nil {
+	// Read the final artifact, then bound display copies only. GEN_REPORT bodies
+	// and the complete saved report remain intact, including after later edits.
+	markdown := reportDisplayMarkdown(content)
+	if err := EmitReportFinish(loop, reportPath, title, markdown); err != nil {
 		log.Warnf("report_generating: emit report_finish failed: %v", err)
 		return
 	}
 	loop.Set("result_report_path", reportPath)
-	loop.Set("result_summary", content)
+	loop.Set("result_summary", markdown)
 	if task := loop.GetCurrentTask(); task != nil {
-		result := content + "\n\n报告文件：" + reportPath
+		result := markdown + "\n\n报告文件：" + reportPath
 		task.SetResult(result)
 		_, _ = loop.GetEmitter().EmitResultAfterStream("result", result, true)
 	}
 }
 
 // EmitReportFinish is also used by a parent focus mode after its report child
-// succeeds. The card body is the full report for standalone generation, or a
-// caller-supplied overview for directory exploration. Never splice Markdown.
+// succeeds. Apply the display budget to both standalone reports and parent
+// overviews. The complete report remains accessible through the saved file.
 func EmitReportFinish(loop *reactloops.ReActLoop, reportPath, title, markdown string) error {
 	content, err := os.ReadFile(reportPath)
 	if err != nil {
@@ -122,6 +123,8 @@ func EmitReportFinish(loop *reactloops.ReActLoop, reportPath, title, markdown st
 	if emitter == nil {
 		return utils.Error("report emitter is nil")
 	}
+	markdown = reportDisplayMarkdown(markdown)
+	title = reportDisplayTitle(title)
 	if _, err := emitter.EmitPinFilename(reportPath); err != nil {
 		return err
 	}
@@ -131,7 +134,8 @@ func EmitReportFinish(loop *reactloops.ReActLoop, reportPath, title, markdown st
 		return err
 	}
 	// The generic report card's open button currently only works in code-audit
-	// pages. Preserve the existing reference viewer with the entire saved report.
+	// pages. Preserve the entire saved report in the existing reference viewer:
+	// it loads on click as plain text, rather than inline Markdown in the chat.
 	reactloops.EmitActionLog(loop, reportFinishEventNode, "完整报告已保存: "+reportPath, string(content))
 	if invoker := loop.GetInvoker(); invoker != nil {
 		invoker.AddToTimeline("report_finish", fmt.Sprintf(

@@ -151,13 +151,17 @@ func TestReportOutputFilterPreservesAITagEdits(t *testing.T) {
 }
 
 func TestReportGeneratingOutputLifecycle(t *testing.T) {
-	for _, internal := range []bool{false, true} {
+	for _, testCase := range []struct{ internal, large bool }{{false, false}, {true, false}, {false, true}, {true, true}} {
+		internal := testCase.internal
 		name := "standalone"
 		if internal {
 			name = "internal"
 		}
+		if testCase.large {
+			name += "/1MiB"
+		}
 		t.Run(name, func(t *testing.T) {
-			ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+			ctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
 			defer cancel()
 			workdir := t.TempDir()
 			referencePath := filepath.Join(workdir, "reference.md")
@@ -166,6 +170,10 @@ func TestReportGeneratingOutputLifecycle(t *testing.T) {
 			report := "\n# 项目探索报告\n\n> 探索对象：`/workspace/project`\n> 版本：1.0\n\n## 项目概览\n\n" + overview +
 				"\n\n## 目录结构\n\n```text\n" + strings.Repeat("internal/module/\n", 200) +
 				"```\n\n## 关键配置\n\n| 文件 | 说明 |\n| --- | --- |\n| go.mod | 依赖声明 |\n"
+			if testCase.large {
+				report += strings.Repeat("\n项目资料："+strings.Repeat("中文 😀 / ", 32)+"\n", 3000) + "\n报告末尾完整性标记\n"
+				require.GreaterOrEqual(t, len(report), 1024*1024)
+			}
 			require.NoError(t, os.WriteFile(referencePath, []byte("# 参考资料\n项目使用 Go。"), 0o600))
 			responses := []string{
 				`{"@action":"read_reference_file","identifier":"read_reference","file_path":"` + filepath.ToSlash(referencePath) + `"}` +
@@ -176,6 +184,7 @@ func TestReportGeneratingOutputLifecycle(t *testing.T) {
 					"\n<|GEN_REPORT_CURRENT_NONCE|>placeholder<|GEN_REPORT_END_CURRENT_NONCE|>",
 			}
 			var calls int
+			var loop *reactloops.ReActLoop
 			var mu sync.Mutex
 			var events []*schema.AiOutputEvent
 			cfg := aicommon.NewConfig(ctx,
@@ -183,6 +192,12 @@ func TestReportGeneratingOutputLifecycle(t *testing.T) {
 				aicommon.WithAICallback(func(c aicommon.AICallerConfigIf, _ *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 					if calls >= len(responses) {
 						return nil, context.Canceled
+					}
+					if calls == 1 {
+						require.Equal(t, "placeholder", loop.Get("report_content"), "read_reference_file must still consume its unexpected AI Tag")
+					}
+					if calls == 2 {
+						require.Equal(t, report, loop.Get("report_content"), "the complete edit body must reach the field callback before finish")
 					}
 					raw := responses[calls]
 					calls++
@@ -219,7 +234,8 @@ func TestReportGeneratingOutputLifecycle(t *testing.T) {
 			if internal {
 				opts = append(opts, WithInternalReportOutput())
 			}
-			loop, err := reactloops.CreateLoopByName(schema.AI_REACT_LOOP_NAME_REPORT_GENERATING, inv, opts...)
+			var err error
+			loop, err = reactloops.CreateLoopByName(schema.AI_REACT_LOOP_NAME_REPORT_GENERATING, inv, opts...)
 			require.NoError(t, err)
 			task := aicommon.NewStatefulTaskBase("report-task", "生成项目探索报告", ctx, cfg.GetEmitter(), true)
 			inv.SetCurrentTask(task)
@@ -229,14 +245,25 @@ func TestReportGeneratingOutputLifecycle(t *testing.T) {
 			written, err := os.ReadFile(reportPath)
 			require.NoError(t, err)
 			require.Equal(t, report, string(written))
+			require.Equal(t, report, loop.Get("full_report_code"))
+			require.Equal(t, "placeholder", loop.Get("report_content"), "finish must still consume its unexpected AI Tag without overwriting the report")
 			require.Equal(t, "true", loop.Get("report_finished"))
 			mu.Lock()
 			defer mu.Unlock()
 			var finished []reportFinishEvent
 			var pins int
+			var completeReference bool
 			for _, e := range events {
 				require.NotEqual(t, "report-content", e.NodeId, "edit payloads and placeholders must not become chat cards")
 				require.NotEqual(t, "infra-code-verify", e.NodeId, "Markdown reports are not code verification")
+				if e.Type == schema.EVENT_TYPE_STREAM && !e.IsSystem && !e.IsReason {
+					// Match Yakit's body-stream route. Raw model system/debug streams
+					// deliberately retain the response for diagnostics.
+					require.NotContains(t, string(e.Content)+string(e.StreamDelta), "placeholder", "no placeholder body should reach a GUI chat card")
+				}
+				if e.Type == schema.EVENT_TYPE_REFERENCE_MATERIAL && e.GetContentJSONPath("$.payload") == report {
+					completeReference = true
+				}
 				if e.Type == schema.EVENT_TYPE_REPORT_FINISH {
 					var payload reportFinishEvent
 					require.NoError(t, json.Unmarshal(e.Content, &payload))
@@ -258,11 +285,26 @@ func TestReportGeneratingOutputLifecycle(t *testing.T) {
 			} else {
 				require.Len(t, finished, 1)
 				require.Equal(t, 1, pins)
-				require.Equal(t, report, finished[0].SummaryMarkdown, "the final card must render the entire saved report, including tables and code blocks")
+				markdown := finished[0].SummaryMarkdown
+				if testCase.large {
+					require.LessOrEqual(t, len(markdown), maxReportDisplayBytes)
+					require.LessOrEqual(t, reportMarkdownLines(markdown), maxReportDisplayLines)
+					require.Contains(t, markdown, "仅展示开头预览")
+					require.Contains(t, markdown, "# 项目探索报告")
+					require.NotContains(t, markdown, "报告末尾完整性标记", "never splice a distant tail onto the preview")
+				} else {
+					require.Equal(t, report, markdown, "small reports must preserve the entire saved Markdown")
+				}
+				require.True(t, completeReference, "the full artifact must remain available on demand")
 				require.Equal(t, "项目探索报告", finished[0].Title)
 				require.Equal(t, reportPath, finished[0].ReportPath)
-				require.Equal(t, report, loop.Get("result_summary"))
-				require.Equal(t, report+"\n\n报告文件："+reportPath, task.GetResult())
+				require.Equal(t, markdown, loop.Get("result_summary"))
+				require.Equal(t, markdown+"\n\n报告文件："+reportPath, task.GetResult())
+				for _, event := range events {
+					if event.Type == schema.EVENT_TYPE_RESULT {
+						require.Equal(t, task.GetResult(), event.GetContentJSONPath("$.result"))
+					}
+				}
 			}
 		})
 	}
