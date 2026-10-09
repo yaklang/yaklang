@@ -14,7 +14,14 @@ import (
 func screenshotTestClient(t *testing.T, send func(*ypb.DuplexConnectionResponse) error) string {
 	t.Helper()
 	id := uuid.NewString()
-	registerServerPushCallback(id, context.Background(), 8, send)
+	// Duplex connections also receive general broadcasts. This fixture models
+	// the frontend screenshot dispatcher without changing production routing.
+	registerServerPushCallback(id, context.Background(), 8, func(message *ypb.DuplexConnectionResponse) error {
+		if message.MessageType != ScreenshotRequest {
+			return nil
+		}
+		return send(message)
+	})
 	require.True(t, SetServerPushSubscription(id, ScreenshotRequest, true))
 	t.Cleanup(func() { UnRegisterServerPushCallback(id) })
 	return id
@@ -31,6 +38,30 @@ func TestYakitScreenshotRoundTrip(t *testing.T) {
 		data, _ := json.Marshal(YakitScreenshot{RequestID: request.RequestID, Data: "png", CapturedAt: "2026-09-08 12:34:56 +08:00"})
 		return DeliverYakitScreenshot(clientID, data)
 	})
+	// The general consumer must still receive its broadcast while the screenshot
+	// fixture dispatches only its own message type.
+	generalID := uuid.NewString()
+	noise, err := json.Marshal(map[string]string{"testID": generalID})
+	require.NoError(t, err)
+	general := make(chan *ypb.DuplexConnectionResponse, 1)
+	registerServerPushCallback(generalID, context.Background(), 8, func(message *ypb.DuplexConnectionResponse) error {
+		if message.MessageType == ServerPushType_HttpFlow && string(message.Data) == string(noise) {
+			select {
+			case general <- message:
+			default:
+			}
+		}
+		return nil
+	})
+	t.Cleanup(func() { UnRegisterServerPushCallback(generalID) })
+	broadcastRaw(&ypb.DuplexConnectionResponse{MessageType: ServerPushType_HttpFlow, Data: noise})
+	select {
+	case message := <-general:
+		require.Equal(t, ServerPushType_HttpFlow, message.MessageType)
+		require.Equal(t, noise, message.Data)
+	case <-time.After(time.Second):
+		t.Fatal("general duplex broadcast was lost")
+	}
 	result, err := RequestYakitScreenshot(context.Background())
 	require.NoError(t, err)
 	require.Equal(t, "png", result.Data)
