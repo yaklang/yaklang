@@ -9,7 +9,6 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/utils/lowhttp"
 )
 
 var modifyHTTPRequestAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOption {
@@ -56,7 +55,7 @@ var modifyHTTPRequestAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActL
 				return
 			}
 
-			fixedPacket := lowhttp.FixHTTPRequest([]byte(modifiedPacket))
+			fixedPacket := normalizeLoopHTTPFuzzRequestPacket(modifiedPacket)
 			isHTTPS := inferGeneratedPacketHTTPS(loop, string(fixedPacket))
 			reviewDecision := "auto_applied"
 
