@@ -133,47 +133,58 @@ func formatter(l *golog.Log, name string, line int) bool {
 	return false
 }
 
-// GetLogger Return New Logger
+// GetLogger returns the cached logger for a name.
 func GetLogger(name string) *Logger {
 	lock.Lock()
 	defer lock.Unlock()
-	logger, exists := loggers[name]
-	if exists {
-		return logger
-	} else {
-		logger = &Logger{
-			Logger: newGologLogger(),
-			name:   name,
-		}
-		logger.output.target.Store(logCurrentOutput)
-		logger.Printer.SetOutput(&logger.output)
-		logger.Printer.Hijack(logger.output.hijack)
-		if IsMCPStdioLogging() {
-			logger.SetOutput(os.Stderr)
-		}
-		logger.Handle(func(l *golog.Log) bool {
-			line := -1
-			if logger.vmRuntimeInfoGetter != nil {
-				l, err := logger.vmRuntimeInfoGetter("line")
-				if err != nil {
-					return false
-				}
-				line = l.(int)
-			}
-			return formatter(l, name, line)
-		})
-		//logger.SetTimeFormat("2006-01-02 15:04:05 -0700")
-		logger.SetTimeFormat("2006-01-02 15:04:05")
-		logger.SetLevel(GetConfig().Level)
-		if strings.HasSuffix(strings.ToLower(name), ".yak") {
-			logger.SetTerminal(true)
-			if defaultLogger, exists := loggers["default"]; exists {
-				logger.Level = defaultLogger.Level
-			}
-		}
-		loggers[name] = logger
+	if logger, exists := loggers[name]; exists {
 		return logger
 	}
+	logger := newLogger(name)
+	loggers[name] = logger
+	return logger
+}
+
+// NewLogger creates an uncached logger for invocation-specific runtime metadata.
+func NewLogger(name string) *Logger {
+	lock.Lock()
+	defer lock.Unlock()
+	return newLogger(name)
+}
+
+// Both callers hold lock while reading the default logger configuration.
+func newLogger(name string) *Logger {
+	logger := &Logger{
+		Logger: newGologLogger(),
+		name:   name,
+	}
+	logger.output.target.Store(logCurrentOutput)
+	logger.Printer.SetOutput(&logger.output)
+	logger.Printer.Hijack(logger.output.hijack)
+	if IsMCPStdioLogging() {
+		logger.SetOutput(os.Stderr)
+	}
+	logger.Handle(func(l *golog.Log) bool {
+		line := -1
+		if logger.vmRuntimeInfoGetter != nil {
+			l, err := logger.vmRuntimeInfoGetter("line")
+			if err != nil {
+				return false
+			}
+			line = l.(int)
+		}
+		return formatter(l, name, line)
+	})
+	//logger.SetTimeFormat("2006-01-02 15:04:05 -0700")
+	logger.SetTimeFormat("2006-01-02 15:04:05")
+	logger.SetLevel(GetConfig().Level)
+	if strings.HasSuffix(strings.ToLower(name), ".yak") {
+		logger.SetTerminal(true)
+		if defaultLogger, exists := loggers["default"]; exists {
+			logger.Level = defaultLogger.Level
+		}
+	}
+	return logger
 }
 func (l *Logger) SetName(name string) {
 	l.name = name

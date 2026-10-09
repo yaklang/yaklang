@@ -15,6 +15,7 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"github.com/yaklang/gorm"
 	"github.com/yaklang/yaklang/common/schema"
 
 	"github.com/samber/lo"
@@ -786,6 +787,11 @@ func SaveRisk(r *schema.Risk) error {
 	return _saveRisk(r)
 }
 
+// SaveRiskWithDatabase saves a runtime-scoped risk without changing the process database.
+func SaveRiskWithDatabase(db *gorm.DB, r *schema.Risk) error {
+	return _saveRisk(r, db)
+}
+
 // NewUnverifiedRisk 创建一条"待验证"风险记录并保存，常用于反连(reverse)类漏洞先记录、后由回连验证
 // 在 yak 中通过 risk.NewUnverifiedRisk 调用，配合反连 token 使用
 // 参数:
@@ -843,7 +849,10 @@ func RegisterBeforeRiskSave(f func(*schema.Risk)) {
 	})
 }
 
-func _saveRisk(r *schema.Risk) error {
+func _saveRisk(r *schema.Risk, projectDB ...*gorm.DB) error {
+	if r == nil {
+		return utils.Error("risk is required")
+	}
 	if r.Ignore {
 		log.Infof("ignore risk: %v", r.Title)
 		return nil
@@ -862,7 +871,12 @@ func _saveRisk(r *schema.Risk) error {
 	riskSaveMutex.Lock()
 	defer riskSaveMutex.Unlock()
 
-	db := consts.GetGormProjectDatabase()
+	var db *gorm.DB
+	if len(projectDB) > 0 {
+		db = projectDB[0]
+	} else {
+		db = consts.GetGormProjectDatabase()
+	}
 	if db == nil {
 		log.Error("empty database")
 		return utils.Errorf("no database connection")

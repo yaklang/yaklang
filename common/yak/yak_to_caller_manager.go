@@ -10,6 +10,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/fuzztag"
 
 	"github.com/samber/lo"
@@ -320,6 +321,10 @@ type YakToCallerManager struct {
 	ContextCancelFuncs *sync.Map
 	Err                error
 
+	aiRuntimeConfig          *aitool.ToolRuntimeConfig
+	aiRuntimeClient          *yaklib.YakitClient
+	aiRuntimeRiskSaveHandler func(context.Context, *schema.Risk) error
+
 	// 插件执行跟踪器
 	executionTracker *PluginExecutionTracker
 	enableTracing    bool
@@ -515,7 +520,11 @@ func (y *YakToCallerManager) getYakitPluginContext(ctx ...context.Context) *Yaki
 		finalCtx = context.WithValue(finalCtx, "cancel", canFunc) // 维护一个 cancel
 	}
 
-	return CreateYakitPluginContext(y.runtimeId).WithProxy(y.proxy).WithContext(finalCtx).WithVulFilter(y.getVulFilter()).WithContextCancel(canFunc)
+	pluginContext := CreateYakitPluginContext(y.runtimeId).WithProxy(y.proxy).WithContext(finalCtx).WithVulFilter(y.getVulFilter()).WithContextCancel(canFunc)
+	if y.aiRuntimeClient != nil {
+		pluginContext.WithYakitClient(y.aiRuntimeClient).WithRiskSaveHandler(y.aiRuntimeRiskSaveHandler)
+	}
+	return pluginContext
 }
 
 func (y *YakToCallerManager) Set(ctx context.Context, code string, paramMap map[string]any, hook func(engine *antlr4yak.Engine) error, funcName ...string) (retError error) {
@@ -1263,6 +1272,12 @@ func (y *YakToCallerManager) fetchFunctionFromSourceCode(pluginContext *YakitPlu
 			pluginContext.PluginUUID = script.Uuid
 		}
 		BindYakitPluginContextToEngine(engine, pluginContext)
+		if y.aiRuntimeClient != nil {
+			yaklib.BindEngineClient(engine, y.aiRuntimeClient)
+			bindMemorySearchToEngine(engine, pluginContext.Ctx, y.aiRuntimeConfig)
+			bindAIHistoryToEngine(engine, pluginContext.Ctx, y.aiRuntimeConfig)
+			bindDBHistoryToEngine(engine, pluginContext.Ctx, y.aiRuntimeConfig)
+		}
 		return nil
 	})
 	// engine.HookOsExit()

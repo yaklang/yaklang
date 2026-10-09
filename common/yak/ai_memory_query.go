@@ -18,10 +18,7 @@ func bindMemorySearchToEngine(engine *antlr4yak.Engine, ctx context.Context, run
 		}
 	}
 	defaults = append(defaults, aimemory.WithMemoryNamespace(id))
-	exports := make(map[string]any, len(aimemory.Exports))
-	for name, value := range aimemory.Exports {
-		exports[name] = value
-	}
+	exports := make(map[string]any)
 	exports["CurrentNamespace"] = func() string { return id }
 	exports["Search"] = func(query string, opts ...aimemory.Option) ([]*aimemory.Item, error) {
 		return aimemory.Search(query, append(append([]aimemory.Option{}, defaults...), opts...)...)

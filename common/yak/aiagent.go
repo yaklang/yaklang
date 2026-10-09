@@ -140,9 +140,7 @@ func yakTool2AITool(aitools []*schema.AIYakTool, invokeForgeHandle bool) []*aito
 			aitool.WithCallback(func(ctx context.Context, params aitool.InvokeParams, runtimeConfig *aitool.ToolRuntimeConfig, stdout io.Writer, stderr io.Writer) (any, error) {
 				ctx, cancel := context.WithCancel(ctx)
 				defer cancel()
-				outputMu := new(sync.Mutex)
-				stdout = &aiToolOutputWriter{mu: outputMu, writer: stdout}
-				stderr = &aiToolOutputWriter{mu: outputMu, writer: stderr}
+				stdout, stderr = aiToolOutputWriters(stdout, stderr)
 				params, normalizationNotes := normalizeEmptyObjectParams(tool, params)
 				for _, note := range normalizationNotes {
 					fmt.Fprintf(stdout, "[warning] input compatibility: %s. Execution will continue.\n", note)
@@ -150,11 +148,10 @@ func yakTool2AITool(aitools []*schema.AIYakTool, invokeForgeHandle bool) []*aito
 
 				var runtimeId string
 				var runtimeFeedBacker func(result *ypb.ExecResult) error
-				var riskSaveHandler func(context.Context, *schema.Risk) error
+				riskSaveHandler := aiToolRiskSaveHandler(runtimeConfig)
 				if runtimeConfig != nil {
 					runtimeId = runtimeConfig.RuntimeID
 					runtimeFeedBacker = runtimeConfig.FeedBacker
-					riskSaveHandler = runtimeConfig.RiskSaveHandler
 				}
 
 				yakitClient := yaklib.NewVirtualYakitClientWithRuntimeID(func(result *ypb.ExecResult) error {

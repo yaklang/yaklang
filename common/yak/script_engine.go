@@ -525,7 +525,7 @@ func (e *ScriptEngine) SetYakitClient(client *yaklib.YakitClient) {
 	e.RegisterEngineHooks(func(engine *antlr4yak.Engine) error {
 		client.SetYakLog(*e.logger)
 		log.Debugf("set yakit client: %v", client)
-		yaklib.SetEngineClient(engine, client)
+		yaklib.BindEngineClient(engine, client)
 		vm := engine.GetVM()
 		if vm != nil {
 			vm.RegisterMapMemberCallHandler("hook", "NewMixPluginCaller", func(i interface{}) interface{} {
@@ -653,7 +653,7 @@ func (e *ScriptEngine) exec(ctx context.Context, id string, code string, params 
 	if yakAbsFile != nil {
 		yakFileAbsPath = fmt.Sprint(yakAbsFile)
 	}
-	*e.logger = yaklib.CreateYakLogger(yakFileAbsPath)
+	*e.logger = yaklib.CreateYakLoggerForEngine(yakFileAbsPath)
 	logger := *e.logger
 	vars["log"] = map[string]interface{}{
 		"info":     logger.Infof,
@@ -674,11 +674,12 @@ func (e *ScriptEngine) exec(ctx context.Context, id string, code string, params 
 	if e.client != nil {
 		client = e.client
 	} else {
+		yaklib.AutoInitYakit()
 		clientIns := *yaklib.GetYakitClientInstance()
 		client = &clientIns // 设置全局 client 的 log
 	}
 	client.SetYakLog(*e.logger)
-	yaklib.SetEngineClient(engine, client)
+	yaklib.BindEngineClient(engine, client)
 	vars["yakit"] = yaklib.GetExtYakitLibByClient(client)
 	engine.SetVars(vars)
 	if iaiLib, ok := engine.GetVar("ai"); ok {

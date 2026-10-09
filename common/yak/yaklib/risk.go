@@ -34,6 +34,9 @@ import (
 // // 写入后可用 risk.YieldRiskByTarget 等查询（示意性示例）
 // ```
 func YakitNewRiskBuilder(client *YakitClient) func(target string, opts ...yakit.RiskParamsOpt) {
+	if client == nil {
+		client = emptyVirtualClient
+	}
 	return func(target string, opts ...yakit.RiskParamsOpt) {
 		risk, _ := yakit.NewRisk(target, opts...)
 		if risk != nil {
@@ -78,6 +81,9 @@ func YakitNewRiskBuilder(client *YakitClient) func(target string, opts ...yakit.
 // risk.Save(r)~
 // ```
 func YakitSaveRiskBuilder(client *YakitClient) func(r *schema.Risk) error {
+	if client == nil {
+		client = emptyVirtualClient
+	}
 	return func(risk *schema.Risk) error {
 		err := yakit.SaveRisk(risk)
 		if err != nil {

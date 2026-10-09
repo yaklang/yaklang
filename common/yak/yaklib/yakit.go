@@ -262,12 +262,22 @@ func GetExtYakitLibByOutput(Output func(d any) error) map[string]interface{} {
 			Id: id, Data: fmt.Sprint(data), Tags: tags,
 		})
 	}
+	exports["EnableText"] = func(tabName string) {
+		Output(&YakitFeature{Feature: "text", Params: map[string]interface{}{"tab_name": tabName}})
+	}
+	exports["TextTabData"] = func(tabName, data string) {
+		Output(&YakitTextTabData{TableName: tabName, Data: data})
+	}
 	return exports
 }
 
 func GetExtYakitLibByClient(client *YakitClient) map[string]interface{} {
+	if client == nil {
+		client = emptyVirtualClient
+	}
 	YakitExports := map[string]interface{}{
 		"Info":                client.YakitInfo,
+		"Debug":               client.YakitDebug,
 		"Warn":                client.YakitWarn,
 		"Error":               client.YakitError,
 		"Text":                client.YakitTextBlock,

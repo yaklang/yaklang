@@ -16,10 +16,7 @@ func bindDBHistoryToEngine(engine *antlr4yak.Engine, ctx context.Context, runtim
 	} else {
 		defaults = []yaklib.DBHistoryOption{yaklib.WithDBHistoryRuntime(ctx, nil, nil)}
 	}
-	exports := make(map[string]any, len(yaklib.DatabaseExports))
-	for name, fn := range yaklib.DatabaseExports {
-		exports[name] = fn
-	}
+	exports := make(map[string]any)
 	options := func(opts []yaklib.DBHistoryOption) []yaklib.DBHistoryOption {
 		return append(append([]yaklib.DBHistoryOption{}, defaults...), opts...)
 	}

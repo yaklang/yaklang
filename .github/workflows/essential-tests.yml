@@ -780,6 +780,7 @@ jobs:
               [
                 {"package": "./common/ai/aid/...", "timeout": "12m", "parallel": 1, "exclude_packages": ["./common/ai/aid/aireact/..."], "retry": 1, "retry_delay": 5},
                 {"package": "./common/ai/aimemory", "timeout": "1m", "parallel": 1},
+                {"package": "./common/yak", "timeout": "1m", "run": "^(TestAITool|TestYakTool|TestForgeTool)", "parallel": 1, "race": true},
                 {"package": "./common/browser", "timeout": "10s", "run": "^TestWaitFunction", "parallel": 1}
               ]
 
