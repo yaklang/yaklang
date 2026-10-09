@@ -327,18 +327,34 @@ func TestCoordinatorLoopAllWaitRequiresEverySelectedAttempt(t *testing.T) {
 }
 
 func TestCoordinatorLoopDetachedSubmitDoesNotApproveExecution(t *testing.T) {
-	h := &testHost{plan: testPlan(), approve: func(context.Context, *Plan) (*Plan, error) { return nil, ErrDetachedPlanPublished }}
-	c := New(context.Background(), h, 1)
-	defer c.Close()
-	_, err := c.CreatePlan(context.Background(), "draft", "document")
-	require.NoError(t, err)
-	require.NoError(t, c.SubmitPlan(context.Background()))
-	require.Equal(t, PhasePlan, c.Snapshot().Phase)
-	_, err = c.StartTasks(nil)
-	require.Error(t, err)
-	require.Error(t, c.CanFinish())
-	require.NoError(t, c.CanFinishPlanning())
-	require.Contains(t, c.PromptStatus(), "等待审核：true")
+	for _, cancelAfterPublication := range []bool{false, true} {
+		t.Run(fmt.Sprintf("cancel_after_publication=%t", cancelAfterPublication), func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			h := &testHost{plan: testPlan(), approve: func(context.Context, *Plan) (*Plan, error) {
+				// The UI can cancel as soon as the review card is emitted, while
+				// its Timeline item is still being archived before Approve returns.
+				if cancelAfterPublication {
+					cancel()
+				}
+				return nil, ErrDetachedPlanPublished
+			}}
+			c := New(ctx, h, 1)
+			defer c.Close()
+			_, err := c.CreatePlan(ctx, "draft", "document")
+			require.NoError(t, err)
+			require.NoError(t, c.SubmitPlan(ctx))
+			require.Equal(t, PhasePlan, c.Snapshot().Phase)
+			require.True(t, c.Snapshot().ReviewPending, "published approval must survive planning cancellation")
+			_, err = c.StartTasks(nil)
+			require.Error(t, err)
+			require.Error(t, c.CanFinish())
+			if !cancelAfterPublication {
+				require.NoError(t, c.CanFinishPlanning())
+			}
+			require.Contains(t, c.PromptStatus(), "等待审核：true")
+		})
+	}
 }
 
 // Retrying an upstream result invalidates downstream inputs, but cannot expand
