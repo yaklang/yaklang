@@ -12,8 +12,9 @@ import (
 
 // Selected unciphered LN Get-normal and HDLC link controls, carried as complete
 // HDLC frames through a TCP/UDP tunnel, plus bounded LN Get-with-list.
-// Selected response information segmentation is assembled only with observed
-// request context. ACSE, authentication, ciphering, request segmentation and GBT remain
+// Selected response information segmentation requires observed request context;
+// initial normal/list request information may establish it only after assembly.
+// ACSE, authentication, ciphering, link-negotiation segmentation and GBT remain
 // explicit unsupported boundaries. Values and link identities are unverified.
 func dlmsError(k ProtocolErrorKind, why string) error { return protocolError(k, "DLMS HDLC %s", why) }
 func dlmsCRC(w []byte) uint16 {
@@ -146,7 +147,7 @@ func decodeDLMSFrameBudget(w []byte, maxElements, depth int, linkOnly bool) (*dl
 	}
 	m.information, m.segmented = info, format&0x800 != 0
 	if m.segmented && (!linkOnly || cf&1 != 0) {
-		return unsupported("segmented information requires observed response context")
+		return unsupported("segmented information requires native conversation assembly")
 	}
 	if cf&3 == 3 {
 		names := map[byte]string{0x83: "SNRM", 0x63: "UA", 0x43: "DISC", 0x0f: "DM"}
@@ -185,9 +186,8 @@ func decodeDLMSFrameBudget(w []byte, maxElements, depth int, linkOnly bool) (*dl
 	f["Receive Sequence"] = m.nr
 	if linkOnly {
 		m.kind = "I"
-		// Preserve literal initial request direction for explicit UDP decoding,
-		// including the still-unsupported segmented-request boundary. Never
-		// infer an endpoint role from continuation bytes in an existing chain.
+		// Preserve literal initial request direction for native session decoding.
+		// Never infer an endpoint role from continuation bytes in an existing chain.
 		m.request = len(info) >= 4 && bytes.Equal(info[:4], []byte{0xe6, 0xe6, 0, 0xc0})
 		return m, nil
 	}
@@ -446,6 +446,13 @@ func probeDLMS(w []byte, limit int) ProbeResult {
 	if n == 0 {
 		return probeNeed("dlms", "hdlc-get-normal", len(w), max(3, len(w)+1))
 	}
+	if w[1]&8 != 0 {
+		m, err := decodeDLMSFrameBudget(w[:n], 0, 0, true)
+		if err == nil && m.kind == "I" && m.request && len(m.information) >= 6 && (m.information[4] == 1 || m.information[4] == 3) && m.information[5]&0x30 == 0 {
+			return probeAccept("dlms", "hdlc-get-normal", 98)
+		}
+		return ProbeResult{Verdict: ProbeReject}
+	}
 	elements := 4096
 	list := dlmsListAPDU(w[:n])
 	apdu := dlmsAPDU(w[:n])
@@ -657,6 +664,26 @@ func dlmsRecoverableMessageError(err error) bool {
 
 const dlmsIdleTTL = 30 * time.Second
 
+// Admission for an oversized initial UDP request examines only the bounded
+// format/address/control/HCS/LLC/service header, never its APDU body or FCS.
+// This is a refusal hint on the DLMS port, not successful semantic validation.
+func dlmsUDPRefusalHint(w []byte) bool {
+	if len(w) < 17 || w[0] != 0x7e || w[len(w)-1] != 0x7e || binary.BigEndian.Uint16(w[1:3])>>12 != 0xa || int(binary.BigEndian.Uint16(w[1:3])&0x7ff)+2 != len(w) {
+		return false
+	}
+	at, end := 3, len(w)-3
+	for i := 0; i < 2; i++ {
+		if _, _, err := dlmsAddress(w[:end], &at); err != nil {
+			return false
+		}
+	}
+	if end-at < 9 || w[at]&1 != 0 || dlmsCRC(w[1:at+1]) != binary.LittleEndian.Uint16(w[at+1:at+3]) {
+		return false
+	}
+	p := w[at+3:]
+	return bytes.Equal(p[:4], []byte{0xe6, 0xe6, 0, 0xc0}) && (p[4] == 1 || p[4] == 2 || p[4] == 3) && p[5]&0x30 == 0
+}
+
 func (a *binParser) decodeDLMSDatagram(e *ProtocolEvent, w []byte, explicit bool) bool {
 	key := binUDPKey{"dlms/" + e.Source, "dlms/" + e.Destination, e.Domain}
 	if key.a > key.b {
@@ -693,7 +720,7 @@ func (a *binParser) decodeDLMSDatagram(e *ProtocolEvent, w []byte, explicit bool
 	}
 	el := store.entries[key]
 	created := el == nil
-	f := &binFlow{a: a, dlms: &binDLMS{}, endpoints: [2]string{e.Source, e.Destination}}
+	f := &binFlow{a: a, dlms: &binDLMS{ambiguous: a.dlmsUntrackedRefusal}, endpoints: [2]string{e.Source, e.Destination}}
 	if el != nil {
 		v := el.Value.(*binUDPEntry)
 		f = v.flow
@@ -748,6 +775,13 @@ func (a *binParser) decodeDLMSDatagram(e *ProtocolEvent, w []byte, explicit bool
 		}
 	}
 	if created {
+		var pe *ProtocolError
+		if errors.As(err, &pe) && pe.Kind == ErrResourceExceeded {
+			// No charged endpoint marker was retained. A retry/late reply cannot
+			// prove a new HDLC generation. Keep a constant-size capture marker;
+			// already retained independent keys keep their observed context.
+			a.dlmsUntrackedRefusal = true
+		}
 		f.closeSession()
 	}
 	a.udpMu.Unlock()
@@ -756,6 +790,9 @@ func (a *binParser) decodeDLMSDatagram(e *ProtocolEvent, w []byte, explicit bool
 	}
 	var resource *ProtocolError
 	if oversize || dlmsListAPDU(w) != nil && errors.As(err, &resource) && resource.Kind == ErrResourceExceeded {
+		// finishProtocolDatagram only sees retained Raw. Denied input still
+		// belongs in the byte ledger even when copying it is disallowed.
+		a.limited.Add(uint64(len(w)))
 		w = nil
 	}
 	a.finishProtocolDatagram(e, w, nil, err)

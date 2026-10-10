@@ -35692,6 +35692,468 @@
         "common/pcapx/pcaputil/pfcp-idle-legacy-budget/LICENSE.txt": "LICENSE.txt",
         "common/pcapx/pcaputil/pfcp-idle-legacy-budget/verify-budget.py": "verify-budget.py"
       }
+    },
+    {
+      "id": "validation-dlms-request-segments",
+      "kind": "validation",
+      "source_sha": "6e06f895ccebb0873f96d0fc2983b56f0f0e493e",
+      "file": "validation-dlms-request-segments.zip",
+      "sha256": "ce5152d13c98b787c7371a7cc700e0adcad9e9a9ff9ae2683dad4637c6112a75",
+      "password": "bin-parser",
+      "members": {
+        "build.py": {
+          "sha256": "c9c67c52ba2c027fdcd262c6901aa8b00d40121d17bbbfbfc3793bdf12b91952",
+          "bytes": 8490
+        },
+        "verify-controls.py": {
+          "sha256": "c712e9fd37ee5e8020001697589e07b5677605df4561536f7056f700ed57a8d4",
+          "bytes": 5935
+        },
+        "reference-check.py": {
+          "sha256": "f78e472eac758720506b299dbfce3b35584a98e9242a75854bb40654ca2c0c14",
+          "bytes": 3092
+        },
+        "seal.py": {
+          "sha256": "0036f20824d45a4c5d37a13880733d8e66fc9ac54c81bd51d838bba283447ae7",
+          "bytes": 3990
+        },
+        "source-pin.json": {
+          "sha256": "3d2efecdd4243ae0565bdf08b1bb81931061eab533d6a017e877ff90bae06a8a",
+          "bytes": 14073
+        },
+        "framer.py": {
+          "sha256": "d1f9c1dbd2971190df6bea768af9f150f2b6d50907ce4e0baae803afb2ab6055",
+          "bytes": 3390
+        },
+        "carrier.py": {
+          "sha256": "adce1cb3f2e08bd83a75111553096394f9cbbd04947297e9320eddb79e19d635",
+          "bytes": 1888
+        },
+        "oracle.py": {
+          "sha256": "e2d101d3c22b91fbc9d51e054af820b449e5eadf40a1bedab90d97bf997b63a1",
+          "bytes": 5962
+        },
+        "axdr.py": {
+          "sha256": "a9678dc82261aa2ef5d1c734062ce0c7c4ad104d678d3d0c4ba851f88442bb17",
+          "bytes": 7446
+        },
+        "calendar_oracle.py": {
+          "sha256": "dd2f9ba3852b7fceae7b408f404c2e9c2f7f30180442175f4d78d74517a60630",
+          "bytes": 1515
+        },
+        "compact_oracle.py": {
+          "sha256": "1dd0e54fc783a0e663ef25f8f26a3263b8f9bdaf04d405e8ab3fb5080c7f45f7",
+          "bytes": 2782
+        },
+        "LICENSE.txt": {
+          "sha256": "e6278556c1dc857098b00fe430c648f1a052da10ed5b7d6373d2e3da78a36f76",
+          "bytes": 294
+        },
+        "historical-segmented-source.json": {
+          "sha256": "f9c7d617f2d1436fd121b4a029aea34e2078a6e059c9fa946ec0a5101b62e55d",
+          "bytes": 608
+        },
+        "historical-segmented-upgrade.json": {
+          "sha256": "bf665f714b91a48e30f7ec4eb75abcdfdf825326f3ccb55c93ce94ccfd626c52",
+          "bytes": 1048
+        },
+        "cases/normal-two-tcp.pcap": {
+          "sha256": "f969b043fb1ff3d461aa3ba829f92632ed969c3dc5af1e2562c9127b5379cbe6",
+          "bytes": 503
+        },
+        "answers/normal-two-tcp.json": {
+          "sha256": "82c8e6d4037cbaf956a95b3b231e6597f344af58d3e0c93b5561537c9109cfc3",
+          "bytes": 3867
+        },
+        "cases/exact-first-retry-tcp.pcap": {
+          "sha256": "75503ebac6f29346d2a4a0964085ab7d990c7803d970f905c1ce4bfd0707895a",
+          "bytes": 591
+        },
+        "answers/exact-first-retry-tcp.json": {
+          "sha256": "212831273ae0c48649306d5c77848ab774456102930c8e4651a15d9da4f05047",
+          "bytes": 4857
+        },
+        "cases/following-exchange-tcp.pcap": {
+          "sha256": "a79544118c24c90c2c921560cd6121224ae435ef3fd745409cba4a21bc9e9235",
+          "bytes": 691
+        },
+        "answers/following-exchange-tcp.json": {
+          "sha256": "69aef5dadf2d2acae3cad574e5cc14cee66e4ef5d3c6699d1e76a2d5bec8c9cd",
+          "bytes": 5985
+        },
+        "cases/wrap-seven-zero-tcp.pcap": {
+          "sha256": "4a9d63e9a5e5e35a0c7b01e2718f579434b5e6b8f58ea25fc9d52a1320e42a8e",
+          "bytes": 503
+        },
+        "answers/wrap-seven-zero-tcp.json": {
+          "sha256": "22eb57088ccc7914e35ef28d44122d2d7b4c2f1e2e9a66dfb5cd46d46e15acd9",
+          "bytes": 3886
+        },
+        "cases/list-two-tcp.pcap": {
+          "sha256": "4888390838eed7e4dfe475a5e9204362d07f5e0dffc51bfb4a4762e568f92824",
+          "bytes": 505
+        },
+        "answers/list-two-tcp.json": {
+          "sha256": "932539ffe9007c0fd5d1465950ae580d5427cee74ab6a05d58ceee15644a9f63",
+          "bytes": 4909
+        },
+        "cases/wrong-direction-preserves-tcp.pcap": {
+          "sha256": "23a280f10a4d4f304ff829357f6026fa78aef3d9657e9cc3fb7b01de45439161",
+          "bytes": 593
+        },
+        "answers/wrong-direction-preserves-tcp.json": {
+          "sha256": "36b4dd9a656d251020786a7aef17045366bd49d48acc0964b0394552c8294859",
+          "bytes": 4215
+        },
+        "cases/wrong-ack-preserves-tcp.pcap": {
+          "sha256": "511d7d1d5e4f0032a5a167c67d76343e443377aaf54afd994090ecc21ca1be04",
+          "bytes": 593
+        },
+        "answers/wrong-ack-preserves-tcp.json": {
+          "sha256": "2273cf56e9ae80e17fee541efa69e5b7912ecbab71fa7dedafbe6600cf814cf1",
+          "bytes": 4191
+        },
+        "cases/wrong-address-preserves-tcp.pcap": {
+          "sha256": "aaeb128584a21da17e7fe6c22ed541cdc9c9970ece9bca005805d2dcd73da51c",
+          "bytes": 593
+        },
+        "answers/wrong-address-preserves-tcp.json": {
+          "sha256": "98c55f16426c0b6fcda368ad0c06f9347cdb9aa6e20bbf935234996665ff89ce",
+          "bytes": 4207
+        },
+        "cases/sequence-gap-retires-tcp.pcap": {
+          "sha256": "7a4094b23016cb6747ddaf1f4ae5354887553bb1dad2610634ac072ddd7070a2",
+          "bytes": 593
+        },
+        "answers/sequence-gap-retires-tcp.json": {
+          "sha256": "12865edc1f76a916920f619fd7afc00fe284950c981a36fae5e4b438f33bf7e0",
+          "bytes": 2451
+        },
+        "cases/crc-refusal-retires-tcp.pcap": {
+          "sha256": "eabb7e2d1ac7bebfeb79a015e8670c8dc30b14e274cce384fb5107767047d2d1",
+          "bytes": 593
+        },
+        "answers/crc-refusal-retires-tcp.json": {
+          "sha256": "f4fbb29c07c7fbd5175cd4e2e88105978feba53f74e47066b54dfef0a0e006f1",
+          "bytes": 2448
+        },
+        "cases/descriptor-truncated-tcp.pcap": {
+          "sha256": "7b8a0e5e27f017a7c635844038d5fdacb099beb1115a5392942944ad4e7faf67",
+          "bytes": 502
+        },
+        "answers/descriptor-truncated-tcp.json": {
+          "sha256": "f06d2bf8586b3691b8b8fbcc64f3d1c8555dc6886391cc893f9011af1c13704f",
+          "bytes": 2161
+        },
+        "cases/conflicting-first-tcp.pcap": {
+          "sha256": "b0db9d888e8c22228b65e3ddabb5c475971e3ef8d9cb5aa68f4322f8dd6745fa",
+          "bytes": 501
+        },
+        "answers/conflicting-first-tcp.json": {
+          "sha256": "90a1a0c74755873f1e32dd81ffd15ae7c7767d70b7ddb135b968ee1f2f1676c8",
+          "bytes": 2147
+        },
+        "cases/rr-preserves-tcp.pcap": {
+          "sha256": "515fffda6fbbedf1b8b08309090dfec07033b5d16d485e2cd8a475fed2036576",
+          "bytes": 582
+        },
+        "answers/rr-preserves-tcp.json": {
+          "sha256": "9dbdd85401ecb294be2006f9d448018cb89555bcb175ea268ab555d0030668cb",
+          "bytes": 4622
+        },
+        "cases/rr-future-retires-tcp.pcap": {
+          "sha256": "b00b6086c5308f7e4fd7fa5da79146544072412c09e8a732fbebc99e9f7a75fb",
+          "bytes": 491
+        },
+        "answers/rr-future-retires-tcp.json": {
+          "sha256": "f7f0701fc237f39eb66f3e6101302b5c0547cc0b053d9405427f993621f8ad65",
+          "bytes": 2127
+        },
+        "cases/information-bytes-1027-tcp.pcap": {
+          "sha256": "8d785906eb739bf95442053a468f1912daff391f5a7a1a9a398bb4c6d3ecce28",
+          "bytes": 1514
+        },
+        "answers/information-bytes-1027-tcp.json": {
+          "sha256": "618c202e0b81f8ac97d8ad3274e846c37d655b9315b0efc809d55945a5289d9d",
+          "bytes": 14308
+        },
+        "cases/information-bytes-1028-tcp.pcap": {
+          "sha256": "ecb01a663e31b2c47c46a5a4891d76f74d10b035edf49f3a98587538448487e5",
+          "bytes": 1515
+        },
+        "answers/information-bytes-1028-tcp.json": {
+          "sha256": "935c465e63ad19ba3a5fb208b41d103053e6797f7c7d858daaf9bf36734fa7e8",
+          "bytes": 5244
+        },
+        "cases/frame-count-64-tcp.pcap": {
+          "sha256": "9e4faa27f339868168d1be8871e0c878e09bb6a5665abf1009057c61b86bed01",
+          "bytes": 5579
+        },
+        "answers/frame-count-64-tcp.json": {
+          "sha256": "88359ed1fdf79ed4754acf12e7589a3769ade61c222734497ec2cb5f47641b80",
+          "bytes": 62391
+        },
+        "cases/frame-count-65-tcp.pcap": {
+          "sha256": "5f6f2cc055c23f9fd60067809d056e9a8ea23d13fa8a4e7f2e3ca5bb43d3e3c7",
+          "bytes": 5660
+        },
+        "answers/frame-count-65-tcp.json": {
+          "sha256": "e6700eee2419c8e861fcefee14fa26cae0566aa30e6d98e32688765573f92c46",
+          "bytes": 61051
+        },
+        "cases/normal-two-udp.pcap": {
+          "sha256": "935c749d000520741a05856146031ea95e8cf1709dee68acb8a65d4f0460b1b7",
+          "bytes": 257
+        },
+        "answers/normal-two-udp.json": {
+          "sha256": "5bc2bd0bfbcd7d1b1b0ddf0c9da4176071d14281bbab13c2d816e542495f5fd5",
+          "bytes": 3867
+        },
+        "cases/exact-first-retry-udp.pcap": {
+          "sha256": "ed55ba124b11f2760a37ee4119a5e3cfa1f9aa0cd10e5d2897eb652462985d45",
+          "bytes": 333
+        },
+        "answers/exact-first-retry-udp.json": {
+          "sha256": "03bb1adc4e9e71a2a0ab32b5ac9b2330400c4642a5b55af1b68ac0f1a5dcc755",
+          "bytes": 4857
+        },
+        "cases/following-exchange-udp.pcap": {
+          "sha256": "08fc0959869316ddb6a15e68ee5c5a1afefaf40fce94167be5539dada11c3327",
+          "bytes": 421
+        },
+        "answers/following-exchange-udp.json": {
+          "sha256": "9aebdf42e11863853f94dde377eb669313a0f27b310b4c727102a80c30abae0b",
+          "bytes": 5985
+        },
+        "cases/wrap-seven-zero-udp.pcap": {
+          "sha256": "26df58bc1725cdd82ea06f480088d512f9090c80f68a4b3c641ccf809674faac",
+          "bytes": 257
+        },
+        "answers/wrap-seven-zero-udp.json": {
+          "sha256": "f779249353333545695208efd3cf1b40aeb4494ae64959764448e85936b37869",
+          "bytes": 3886
+        },
+        "cases/list-two-udp.pcap": {
+          "sha256": "74c9870eaf77d35eeebeff26486d5df3ba7713792cccb444632d420cd5f75564",
+          "bytes": 259
+        },
+        "answers/list-two-udp.json": {
+          "sha256": "d5c577615da96a747398f0949ffaf8b97ca5007ebd06b23d209b1e8029f44d36",
+          "bytes": 4909
+        },
+        "cases/wrong-direction-preserves-udp.pcap": {
+          "sha256": "fe2267ab9a8785a3ec02b80a1a41c7353c20c3a6524e9e9f2717b2f8ad031228",
+          "bytes": 335
+        },
+        "answers/wrong-direction-preserves-udp.json": {
+          "sha256": "5d34f9128b4ffd686cf86df498301964b7fbbed451081d3d74aa2885ff6ecb2c",
+          "bytes": 4215
+        },
+        "cases/wrong-ack-preserves-udp.pcap": {
+          "sha256": "86df75b15453785d801956a23932f976a7ae310bdc583a0ee5272a5f29ba96f4",
+          "bytes": 335
+        },
+        "answers/wrong-ack-preserves-udp.json": {
+          "sha256": "4544a925473b3076539b335d3df41ed17cb27da11893663070e17a71eaf28c0f",
+          "bytes": 4191
+        },
+        "cases/wrong-address-preserves-udp.pcap": {
+          "sha256": "761defa150921f869a10c5e94bb05b14b6fd83774dd241153f3743dc099ed793",
+          "bytes": 335
+        },
+        "answers/wrong-address-preserves-udp.json": {
+          "sha256": "58fa90593d9f72241abf00596abd773340894412aeba8cc397255a19fbce3c1b",
+          "bytes": 4207
+        },
+        "cases/sequence-gap-retires-udp.pcap": {
+          "sha256": "eaf6b89c0b9a856995c485e712aee026a37a379d7c145ba688a693840d41b680",
+          "bytes": 335
+        },
+        "answers/sequence-gap-retires-udp.json": {
+          "sha256": "381e14a454c3d6e25a7263df0102113bf8166c0f505deac24a121a45138df05b",
+          "bytes": 2451
+        },
+        "cases/crc-refusal-retires-udp.pcap": {
+          "sha256": "c341c55b3fa1ced42f070359ab7bcc84b2620ac08239356e3e1f124f3e4d0851",
+          "bytes": 335
+        },
+        "answers/crc-refusal-retires-udp.json": {
+          "sha256": "9a4db2ae63f6db16cbd97e88f8acfebf67f547f74d6e98012a21c00a8da58121",
+          "bytes": 2448
+        },
+        "cases/descriptor-truncated-udp.pcap": {
+          "sha256": "43b4ad244b82aaef7a3a2128cbfaee3b4441d099f3564b14492cddbca1812b99",
+          "bytes": 256
+        },
+        "answers/descriptor-truncated-udp.json": {
+          "sha256": "d1104a31e30776976179a7a85fe942fc4d21d4e01cb484fedbd55a19b3b5c5dd",
+          "bytes": 2161
+        },
+        "cases/conflicting-first-udp.pcap": {
+          "sha256": "d0817cddcf84418d8f057db540667493c6fe079c67ff92139fc0603f1879640d",
+          "bytes": 255
+        },
+        "answers/conflicting-first-udp.json": {
+          "sha256": "d1eef57a5fd2bfa9e42b56a528c41ec3f95480d99ec0fb480208d976705961ce",
+          "bytes": 2147
+        },
+        "cases/rr-preserves-udp.pcap": {
+          "sha256": "db3ab86c88428351659bac74d94294c9bb2033282d4f26876da3e89961020f06",
+          "bytes": 324
+        },
+        "answers/rr-preserves-udp.json": {
+          "sha256": "05ecbe3879fc79072edb8ea7c9d60ba69e9f59d71e6a246dbdf1c5b2c5ab847c",
+          "bytes": 4622
+        },
+        "cases/rr-future-retires-udp.pcap": {
+          "sha256": "036e54f5e830e8a1805a42b17eeb96ead97245b9129edc253dcf9699dfdd61e1",
+          "bytes": 245
+        },
+        "answers/rr-future-retires-udp.json": {
+          "sha256": "3b9648433d161571c95d00855400264676443dd70d0fdcd9e8cd5720e36aa98c",
+          "bytes": 2127
+        },
+        "cases/information-bytes-1027-udp.pcap": {
+          "sha256": "3cd744304f0d7ef4228ac5166bfa788f6c5e47f2ed2a09c71a06b0878fd9209b",
+          "bytes": 1268
+        },
+        "answers/information-bytes-1027-udp.json": {
+          "sha256": "e57041adbd0fd1e15cb93654cdeb3482bf36a39b4ebcc83264de5accb05789b6",
+          "bytes": 14308
+        },
+        "cases/information-bytes-1028-udp.pcap": {
+          "sha256": "e34df292b37759fffe2d7d7b993a71f864ca725ab93e2315916c37ee201bdcc2",
+          "bytes": 1269
+        },
+        "answers/information-bytes-1028-udp.json": {
+          "sha256": "3f0fb96f32038e8906b9701b6675d49e0101418ab5fdaae179e3c89a85f71da6",
+          "bytes": 5182
+        },
+        "cases/frame-count-64-udp.pcap": {
+          "sha256": "6ec960b34acb5e52c7668743a59fb9e10efee45e4a3c7208fab2eda23d9d2274",
+          "bytes": 4589
+        },
+        "answers/frame-count-64-udp.json": {
+          "sha256": "3e65000f9054a34a9a17c967edacadf0bea8c5200db878d000c4254c73050da6",
+          "bytes": 62388
+        },
+        "cases/frame-count-65-udp.pcap": {
+          "sha256": "1f2772e6201765af4ebdc2536e13d0748ff444aca9a0e723061e26071cd0074e",
+          "bytes": 4658
+        },
+        "answers/frame-count-65-udp.json": {
+          "sha256": "cfc27df567fa94f84b95812b6e0151f6dd08e014d7dbbac1f364f25d619b0ed3",
+          "bytes": 60986
+        },
+        "cases/first-ingress-refusal-udp.pcap": {
+          "sha256": "88586ca940fb890a7c7cfa31741d4969347322a22d42eb6c9b291d7aeea3917a",
+          "bytes": 336
+        },
+        "answers/first-ingress-refusal-udp.json": {
+          "sha256": "d3b671e290fe7df46573460f5b8924bacbae6dfbcbce3b7ddfcc948c9d718068",
+          "bytes": 1701
+        },
+        "controls.json": {
+          "sha256": "f156d374c8e8770d1e4bf44ef89ad66c0b828f9b90bfa9895117688837c2615e",
+          "bytes": 449632
+        },
+        "validation/expected.json": {
+          "sha256": "068386c794166d86c93210c8b76bb7c19b3a2f8eea949828936a13b5d4d96ca2",
+          "bytes": 47395
+        }
+      },
+      "aliases": {
+        "common/pcapx/pcaputil/dlms-request-segments/build.py": "build.py",
+        "common/pcapx/pcaputil/dlms-request-segments/verify-controls.py": "verify-controls.py",
+        "common/pcapx/pcaputil/dlms-request-segments/reference-check.py": "reference-check.py",
+        "common/pcapx/pcaputil/dlms-request-segments/seal.py": "seal.py",
+        "common/pcapx/pcaputil/dlms-request-segments/source-pin.json": "source-pin.json",
+        "common/pcapx/pcaputil/dlms-request-segments/framer.py": "framer.py",
+        "common/pcapx/pcaputil/dlms-request-segments/carrier.py": "carrier.py",
+        "common/pcapx/pcaputil/dlms-request-segments/oracle.py": "oracle.py",
+        "common/pcapx/pcaputil/dlms-request-segments/axdr.py": "axdr.py",
+        "common/pcapx/pcaputil/dlms-request-segments/calendar_oracle.py": "calendar_oracle.py",
+        "common/pcapx/pcaputil/dlms-request-segments/compact_oracle.py": "compact_oracle.py",
+        "common/pcapx/pcaputil/dlms-request-segments/LICENSE.txt": "LICENSE.txt",
+        "common/pcapx/pcaputil/dlms-request-segments/historical-segmented-source.json": "historical-segmented-source.json",
+        "common/pcapx/pcaputil/dlms-request-segments/historical-segmented-upgrade.json": "historical-segmented-upgrade.json",
+        "common/pcapx/pcaputil/dlms-request-segments/cases/normal-two-tcp.pcap": "cases/normal-two-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-request-segments/answers/normal-two-tcp.json": "answers/normal-two-tcp.json",
+        "common/pcapx/pcaputil/dlms-request-segments/cases/exact-first-retry-tcp.pcap": "cases/exact-first-retry-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-request-segments/answers/exact-first-retry-tcp.json": "answers/exact-first-retry-tcp.json",
+        "common/pcapx/pcaputil/dlms-request-segments/cases/following-exchange-tcp.pcap": "cases/following-exchange-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-request-segments/answers/following-exchange-tcp.json": "answers/following-exchange-tcp.json",
+        "common/pcapx/pcaputil/dlms-request-segments/cases/wrap-seven-zero-tcp.pcap": "cases/wrap-seven-zero-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-request-segments/answers/wrap-seven-zero-tcp.json": "answers/wrap-seven-zero-tcp.json",
+        "common/pcapx/pcaputil/dlms-request-segments/cases/list-two-tcp.pcap": "cases/list-two-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-request-segments/answers/list-two-tcp.json": "answers/list-two-tcp.json",
+        "common/pcapx/pcaputil/dlms-request-segments/cases/wrong-direction-preserves-tcp.pcap": "cases/wrong-direction-preserves-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-request-segments/answers/wrong-direction-preserves-tcp.json": "answers/wrong-direction-preserves-tcp.json",
+        "common/pcapx/pcaputil/dlms-request-segments/cases/wrong-ack-preserves-tcp.pcap": "cases/wrong-ack-preserves-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-request-segments/answers/wrong-ack-preserves-tcp.json": "answers/wrong-ack-preserves-tcp.json",
+        "common/pcapx/pcaputil/dlms-request-segments/cases/wrong-address-preserves-tcp.pcap": "cases/wrong-address-preserves-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-request-segments/answers/wrong-address-preserves-tcp.json": "answers/wrong-address-preserves-tcp.json",
+        "common/pcapx/pcaputil/dlms-request-segments/cases/sequence-gap-retires-tcp.pcap": "cases/sequence-gap-retires-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-request-segments/answers/sequence-gap-retires-tcp.json": "answers/sequence-gap-retires-tcp.json",
+        "common/pcapx/pcaputil/dlms-request-segments/cases/crc-refusal-retires-tcp.pcap": "cases/crc-refusal-retires-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-request-segments/answers/crc-refusal-retires-tcp.json": "answers/crc-refusal-retires-tcp.json",
+        "common/pcapx/pcaputil/dlms-request-segments/cases/descriptor-truncated-tcp.pcap": "cases/descriptor-truncated-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-request-segments/answers/descriptor-truncated-tcp.json": "answers/descriptor-truncated-tcp.json",
+        "common/pcapx/pcaputil/dlms-request-segments/cases/conflicting-first-tcp.pcap": "cases/conflicting-first-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-request-segments/answers/conflicting-first-tcp.json": "answers/conflicting-first-tcp.json",
+        "common/pcapx/pcaputil/dlms-request-segments/cases/rr-preserves-tcp.pcap": "cases/rr-preserves-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-request-segments/answers/rr-preserves-tcp.json": "answers/rr-preserves-tcp.json",
+        "common/pcapx/pcaputil/dlms-request-segments/cases/rr-future-retires-tcp.pcap": "cases/rr-future-retires-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-request-segments/answers/rr-future-retires-tcp.json": "answers/rr-future-retires-tcp.json",
+        "common/pcapx/pcaputil/dlms-request-segments/cases/information-bytes-1027-tcp.pcap": "cases/information-bytes-1027-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-request-segments/answers/information-bytes-1027-tcp.json": "answers/information-bytes-1027-tcp.json",
+        "common/pcapx/pcaputil/dlms-request-segments/cases/information-bytes-1028-tcp.pcap": "cases/information-bytes-1028-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-request-segments/answers/information-bytes-1028-tcp.json": "answers/information-bytes-1028-tcp.json",
+        "common/pcapx/pcaputil/dlms-request-segments/cases/frame-count-64-tcp.pcap": "cases/frame-count-64-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-request-segments/answers/frame-count-64-tcp.json": "answers/frame-count-64-tcp.json",
+        "common/pcapx/pcaputil/dlms-request-segments/cases/frame-count-65-tcp.pcap": "cases/frame-count-65-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-request-segments/answers/frame-count-65-tcp.json": "answers/frame-count-65-tcp.json",
+        "common/pcapx/pcaputil/dlms-request-segments/cases/normal-two-udp.pcap": "cases/normal-two-udp.pcap",
+        "common/pcapx/pcaputil/dlms-request-segments/answers/normal-two-udp.json": "answers/normal-two-udp.json",
+        "common/pcapx/pcaputil/dlms-request-segments/cases/exact-first-retry-udp.pcap": "cases/exact-first-retry-udp.pcap",
+        "common/pcapx/pcaputil/dlms-request-segments/answers/exact-first-retry-udp.json": "answers/exact-first-retry-udp.json",
+        "common/pcapx/pcaputil/dlms-request-segments/cases/following-exchange-udp.pcap": "cases/following-exchange-udp.pcap",
+        "common/pcapx/pcaputil/dlms-request-segments/answers/following-exchange-udp.json": "answers/following-exchange-udp.json",
+        "common/pcapx/pcaputil/dlms-request-segments/cases/wrap-seven-zero-udp.pcap": "cases/wrap-seven-zero-udp.pcap",
+        "common/pcapx/pcaputil/dlms-request-segments/answers/wrap-seven-zero-udp.json": "answers/wrap-seven-zero-udp.json",
+        "common/pcapx/pcaputil/dlms-request-segments/cases/list-two-udp.pcap": "cases/list-two-udp.pcap",
+        "common/pcapx/pcaputil/dlms-request-segments/answers/list-two-udp.json": "answers/list-two-udp.json",
+        "common/pcapx/pcaputil/dlms-request-segments/cases/wrong-direction-preserves-udp.pcap": "cases/wrong-direction-preserves-udp.pcap",
+        "common/pcapx/pcaputil/dlms-request-segments/answers/wrong-direction-preserves-udp.json": "answers/wrong-direction-preserves-udp.json",
+        "common/pcapx/pcaputil/dlms-request-segments/cases/wrong-ack-preserves-udp.pcap": "cases/wrong-ack-preserves-udp.pcap",
+        "common/pcapx/pcaputil/dlms-request-segments/answers/wrong-ack-preserves-udp.json": "answers/wrong-ack-preserves-udp.json",
+        "common/pcapx/pcaputil/dlms-request-segments/cases/wrong-address-preserves-udp.pcap": "cases/wrong-address-preserves-udp.pcap",
+        "common/pcapx/pcaputil/dlms-request-segments/answers/wrong-address-preserves-udp.json": "answers/wrong-address-preserves-udp.json",
+        "common/pcapx/pcaputil/dlms-request-segments/cases/sequence-gap-retires-udp.pcap": "cases/sequence-gap-retires-udp.pcap",
+        "common/pcapx/pcaputil/dlms-request-segments/answers/sequence-gap-retires-udp.json": "answers/sequence-gap-retires-udp.json",
+        "common/pcapx/pcaputil/dlms-request-segments/cases/crc-refusal-retires-udp.pcap": "cases/crc-refusal-retires-udp.pcap",
+        "common/pcapx/pcaputil/dlms-request-segments/answers/crc-refusal-retires-udp.json": "answers/crc-refusal-retires-udp.json",
+        "common/pcapx/pcaputil/dlms-request-segments/cases/descriptor-truncated-udp.pcap": "cases/descriptor-truncated-udp.pcap",
+        "common/pcapx/pcaputil/dlms-request-segments/answers/descriptor-truncated-udp.json": "answers/descriptor-truncated-udp.json",
+        "common/pcapx/pcaputil/dlms-request-segments/cases/conflicting-first-udp.pcap": "cases/conflicting-first-udp.pcap",
+        "common/pcapx/pcaputil/dlms-request-segments/answers/conflicting-first-udp.json": "answers/conflicting-first-udp.json",
+        "common/pcapx/pcaputil/dlms-request-segments/cases/rr-preserves-udp.pcap": "cases/rr-preserves-udp.pcap",
+        "common/pcapx/pcaputil/dlms-request-segments/answers/rr-preserves-udp.json": "answers/rr-preserves-udp.json",
+        "common/pcapx/pcaputil/dlms-request-segments/cases/rr-future-retires-udp.pcap": "cases/rr-future-retires-udp.pcap",
+        "common/pcapx/pcaputil/dlms-request-segments/answers/rr-future-retires-udp.json": "answers/rr-future-retires-udp.json",
+        "common/pcapx/pcaputil/dlms-request-segments/cases/information-bytes-1027-udp.pcap": "cases/information-bytes-1027-udp.pcap",
+        "common/pcapx/pcaputil/dlms-request-segments/answers/information-bytes-1027-udp.json": "answers/information-bytes-1027-udp.json",
+        "common/pcapx/pcaputil/dlms-request-segments/cases/information-bytes-1028-udp.pcap": "cases/information-bytes-1028-udp.pcap",
+        "common/pcapx/pcaputil/dlms-request-segments/answers/information-bytes-1028-udp.json": "answers/information-bytes-1028-udp.json",
+        "common/pcapx/pcaputil/dlms-request-segments/cases/frame-count-64-udp.pcap": "cases/frame-count-64-udp.pcap",
+        "common/pcapx/pcaputil/dlms-request-segments/answers/frame-count-64-udp.json": "answers/frame-count-64-udp.json",
+        "common/pcapx/pcaputil/dlms-request-segments/cases/frame-count-65-udp.pcap": "cases/frame-count-65-udp.pcap",
+        "common/pcapx/pcaputil/dlms-request-segments/answers/frame-count-65-udp.json": "answers/frame-count-65-udp.json",
+        "common/pcapx/pcaputil/dlms-request-segments/cases/first-ingress-refusal-udp.pcap": "cases/first-ingress-refusal-udp.pcap",
+        "common/pcapx/pcaputil/dlms-request-segments/answers/first-ingress-refusal-udp.json": "answers/first-ingress-refusal-udp.json",
+        "common/pcapx/pcaputil/dlms-request-segments/controls.json": "controls.json",
+        "common/pcapx/pcaputil/dlms-request-segments/validation/expected.json": "validation/expected.json"
+      }
     }
   ],
   "schema_version": 1,

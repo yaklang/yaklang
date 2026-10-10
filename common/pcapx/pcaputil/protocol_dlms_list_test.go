@@ -19,7 +19,9 @@ type dlmsListControl struct {
 	AnswerSHA                              string `json:"answer_sha256"`
 	InputAlias                             string `json:"input_alias"`
 	Packets                                int
-	MaxMessageBytes                        int `json:"max_message_bytes"`
+	MaxMessageBytes                        int     `json:"max_message_bytes"`
+	UnclassifiedBytes                      *uint64 `json:"unclassified_bytes"`
+	LimitedBytes                           *uint64 `json:"limited_bytes"`
 	Events                                 []dlmsListAnswer
 }
 type dlmsListAnswer struct {
@@ -186,6 +188,12 @@ func dlmsSealedMatrix(t *testing.T, controls []dlmsListControl) {
 				events, stats := discoveryReplay(t, raw, workers, deferred, observe, extra...)
 				dlmsListAssert(t, c, events)
 				require.Zero(t, stats.BufferedBytes)
+				if c.LimitedBytes != nil {
+					require.Equal(t, *c.LimitedBytes, stats.LimitedBytes, "all refused wire bytes must remain accounted for without retaining Raw")
+				}
+				if c.UnclassifiedBytes != nil {
+					require.Equal(t, *c.UnclassifiedBytes, stats.UnclassifiedBytes, "terminal TCP resource refusal must account for later unclassified input")
+				}
 				for i, e := range events {
 					require.Equal(t, c.Transport, e.Transport)
 					src, dst := "192.0.2.1:40000", "192.0.2.2:4059"

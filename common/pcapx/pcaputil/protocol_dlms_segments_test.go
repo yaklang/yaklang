@@ -11,6 +11,8 @@ import (
 // These independently constructed type3 frames split LLC+GET-normal response
 // before its uint16 Data. No new API is needed to demonstrate missing behavior.
 func TestDLMSHDLCSegmentsExistingAPI(t *testing.T) {
+	t.Run("initial-request", TestDLMSHDLCRequestSegmentsExistingAPI)
+	t.Run("untracked-refusal", TestDLMSUntrackedRefusalExistingAPI)
 	for _, transport := range []string{"tcp", "udp"} {
 		t.Run(transport, func(t *testing.T) {
 			s, err := NewProtocolSessionWithOptions(DefaultParserBudget(), WithSessionTransport(transport), WithSessionPorts(40000, 4059))
@@ -45,8 +47,12 @@ func dlmsSegmentControls(t *testing.T) []dlmsListControl {
 	return dlmsNamedBlockControls(t, "dlms-hdlc-segments", "owned-dlms-hdlc-segments/v1", 56)
 }
 
-func TestDLMSHDLCSegmentsSealedMatrix(t *testing.T) { dlmsSealedMatrix(t, dlmsSegmentControls(t)) }
+func TestDLMSHDLCSegmentsSealedMatrix(t *testing.T) {
+	dlmsSealedMatrix(t, dlmsSegmentControls(t))
+	t.Run("initial-request", func(t *testing.T) { dlmsSealedMatrix(t, dlmsRequestSegmentControls(t)) })
+}
 func TestDLMSHDLCSegmentsOwnershipAndChunks(t *testing.T) {
+	t.Run("initial-request", func(t *testing.T) { dlmsOwnershipAndChunks(t, dlmsRequestSegmentControls(t)) })
 	controls := dlmsSegmentControls(t)
 	dlmsOwnershipAndChunks(t, controls)
 	for _, c := range controls {
@@ -77,6 +83,9 @@ func TestDLMSHDLCSegmentsOwnershipAndChunks(t *testing.T) {
 }
 
 func TestDLMSHDLCSegmentsCloseAndBudget(t *testing.T) {
+	t.Run("initial-request", testDLMSRequestSegmentsCloseAndBudget)
+	t.Run("untracked-refusal-isolation", testDLMSUntrackedRefusalIsolation)
+	t.Run("refusal-hint-neighbors", testDLMSRefusalHintNeighbors)
 	var normal, large dlmsListControl
 	for _, c := range dlmsSegmentControls(t) {
 		if c.ID == "normal-two-udp" {
@@ -194,6 +203,7 @@ func TestDLMSHDLCSegmentsCloseAndBudget(t *testing.T) {
 }
 
 func TestDLMSHDLCSegmentsDomainIsolation(t *testing.T) {
+	t.Run("initial-request", testDLMSRequestSegmentsDomainsAndBytes)
 	var normal, bad dlmsListControl
 	for _, c := range dlmsSegmentControls(t) {
 		if c.ID == "normal-two-udp" {

@@ -128,6 +128,10 @@ func TestDLMSSealedReplay(t *testing.T) {
 	for _, c := range dlmsControls(t) {
 		t.Run(c.ID, func(t *testing.T) {
 			raw, want := dlmsInput(t, c)
+			if c.ID == "segmented" {
+				testDLMSHistoricalInitialSegment(t, c, raw, want)
+				return
+			}
 			for _, workers := range []int{1, 2, 4} {
 				for _, deferred := range []bool{false, true} {
 					for _, observe := range []bool{false, true} {

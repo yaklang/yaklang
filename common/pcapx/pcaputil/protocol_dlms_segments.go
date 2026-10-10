@@ -5,16 +5,26 @@ import (
 	"encoding/hex"
 )
 
-// One selected response information field, not APDU data-blocks or GBT.
+// One selected normal/list request or GET response information field, not GBT.
 // Every complete carrier frame is independently length/HCS/FCS validated.
 // The first frame must include LLC and the complete LN GET service header.
-// A partial response never consumes the observed request's identity.
+// A partial request does not install pending context; a partial response never
+// consumes the observed request's identity.
 type dlmsFragments struct {
 	info, wire          []byte
 	dir                 int
 	source, destination uint32
 	first, last, nr     byte
 	count               int
+	request             bool
+	invoke, sequenceSet byte
+}
+
+func (s *binDLMS) fragmentCloseDirection() int {
+	if s.pending != nil {
+		return s.pending.dir
+	}
+	return s.fragments.dir
 }
 
 func (s *binDLMS) fragmentCloseFields() map[string]any {
@@ -72,9 +82,8 @@ func (f *binFlow) consumeDLMSSegments(dir int, wire []byte, id uint64, m *dlmsMe
 		return ctx("link control interrupts segmented response", false)
 	}
 	p := s.pending
-	if t == nil && m.segmented && len(m.information) >= 4 && bytes.Equal(m.information[:3], []byte{0xe6, 0xe6, 0}) && m.information[3] == 0xc0 {
-		s.invalidate()
-		return nil, 0, dlmsError(ErrUnsupportedFeature, "segmented requests require a separate initial-request profile")
+	if t != nil && t.request || t == nil && m.segmented && m.request {
+		return f.consumeDLMSRequestSegments(dir, wire, id, m)
 	}
 	if p == nil || p.kind != "GET" || dir == p.dir || m.source != p.destination || m.destination != p.source {
 		interrupt := p != nil && dir == p.dir && m.source == p.source && m.destination == p.destination

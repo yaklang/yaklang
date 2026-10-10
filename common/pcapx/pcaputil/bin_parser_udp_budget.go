@@ -69,9 +69,14 @@ func (a *binParser) refuseUDPOversizeAssociation(e *ProtocolEvent, w []byte, src
 		}
 	}
 	existing := store != nil && store.entries[key] != nil
-	if explicit == "" && !existing && protocol != "stun" && !(protocol == "dlms-wrapper" && (src == 4059 || dst == 4059)) {
+	if explicit == "" && !existing && protocol != "stun" && !(protocol == "dlms-wrapper" && (src == 4059 || dst == 4059)) && !(protocol == "dlms" && (src == 4059 || dst == 4059) && dlmsUDPRefusalHint(w)) {
 		a.udpMu.Unlock()
 		return false
+	}
+	if protocol == "dlms" && !existing {
+		// Explicit admission or a bounded port/header hint identified HDLC,
+		// but its identities cannot be stored within the rejected budget.
+		a.dlmsUntrackedRefusal = true
 	}
 	if protocol == "stun" && !existing {
 		if store == nil {

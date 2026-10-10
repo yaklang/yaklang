@@ -1027,7 +1027,7 @@ func (f *binFlow) finishSession(reason TrafficFlowCloseReason) {
 	}
 	if d := f.dlms; d != nil {
 		if d.fragments != nil {
-			emit(d.pending.dir, d.fragmentCloseFields(), "DLMS HDLC exchange ended with an incomplete segmented response")
+			emit(d.fragmentCloseDirection(), d.fragmentCloseFields(), "DLMS HDLC exchange ended with incomplete segmented information")
 		} else if d.transfer != nil {
 			emit(d.transfer.initial.dir, map[string]any{"Outstanding": 1, "ObservedBlocks": d.transfer.blocks, "EncodedBytes": len(d.transfer.data)}, "DLMS HDLC exchange ended with an incomplete data-block transfer")
 		} else if d.pending != nil {

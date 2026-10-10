@@ -613,8 +613,12 @@ func (a *binParser) closeUDPSessions() {
 			v := el.Value.(*binUDPEntry)
 			f := v.flow
 			if d := f.dlms; d != nil && d.fragments != nil {
-				dir := d.pending.dir
-				incomplete = append(incomplete, &ProtocolEvent{FlowID: f.id, Timestamp: v.touched, Domain: v.key.domain, Transport: "udp", Source: f.endpoints[dir], Destination: f.endpoints[1-dir], Direction: dir, Protocol: "dlms", Profile: "dlms-hdlc-segmented-response", Status: "incomplete", Completeness: "incomplete", Summary: "DLMS HDLC exchange ended with an incomplete segmented response", Session: d.fragmentCloseFields()})
+				dir := d.fragmentCloseDirection()
+				profile, summary := "dlms-hdlc-segmented-response", "DLMS HDLC exchange ended with an incomplete segmented response"
+				if d.fragments.request {
+					profile, summary = "dlms-hdlc-segmented-request", "DLMS HDLC exchange ended with an incomplete segmented request"
+				}
+				incomplete = append(incomplete, &ProtocolEvent{FlowID: f.id, Timestamp: v.touched, Domain: v.key.domain, Transport: "udp", Source: f.endpoints[dir], Destination: f.endpoints[1-dir], Direction: dir, Protocol: "dlms", Profile: profile, Status: "incomplete", Completeness: "incomplete", Summary: summary, Session: d.fragmentCloseFields()})
 				a.incomplete.Add(1)
 			} else if d != nil && d.transfer != nil {
 				t := d.transfer
