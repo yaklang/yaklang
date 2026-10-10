@@ -59,6 +59,7 @@ func mavlinkTestPayload(id uint32) []byte {
 }
 
 func TestMAVLinkCompleteFields(t *testing.T) {
+	t.Run("attitude", testMAVLinkAttitudeMatrix)
 	for _, version := range []int{1, 2} {
 		for _, id := range []uint32{0, 1, 33} {
 			def, _ := mavlinkDefinitionFor(id)
@@ -155,6 +156,7 @@ func TestMAVLinkV2ZeroTailAndOpaqueSignature(t *testing.T) {
 }
 
 func TestMAVLinkFailsClosedAndDatagramBoundaries(t *testing.T) {
+	t.Run("attitude-budgets", testMAVLinkAttitudeBudgets)
 	valid := mavlinkTestFrame(2, 0, mavlinkTestPayload(0), 0, 50)
 	controls := map[string][]byte{
 		"bad-crc":                    append(bytes.Clone(valid[:len(valid)-1]), valid[len(valid)-1]^1),
@@ -202,6 +204,7 @@ func TestMAVLinkFailsClosedAndDatagramBoundaries(t *testing.T) {
 }
 
 func TestMAVLinkCopackedEvidenceOwnership(t *testing.T) {
+	t.Run("existing-field-queries", testMAVLinkExistingQueries)
 	wire, err := trafficfixture.ReadFile("incremental-mvp/mavlink/captures/copacked-heartbeat-position.pcap")
 	require.NoError(t, err)
 	for _, deferred := range []bool{false, true} {

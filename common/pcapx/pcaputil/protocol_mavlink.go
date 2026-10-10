@@ -3,13 +3,15 @@ package pcaputil
 import (
 	"bytes"
 	"encoding/binary"
+	"encoding/hex"
 	"fmt"
+	"math"
 )
 
 // The common-field profile is pinned to mavlink/c_library_v2 commit
 // 28eae47457249ab6c8c1cadd104fcbe25eacd7a3 and mavlink/mavlink XML commit
 // dccd82c4ba56a721aa5bd760498cbf5f2338012b. It admits only HEARTBEAT,
-// SYS_STATUS and GLOBAL_POSITION_INT; a checksum cannot identify a dialect or
+// SYS_STATUS, ATTITUDE and GLOBAL_POSITION_INT; a checksum cannot identify a dialect or
 // authenticate the sender. A v2 signature is retained as opaque observed bytes.
 // https://mavlink.io/en/guide/serialization.html
 type mavlinkMessage struct {
@@ -30,6 +32,8 @@ func mavlinkDefinitionFor(id uint32) (mavlinkDefinition, bool) {
 		return mavlinkDefinition{"HEARTBEAT", 9, 9, 50}, true
 	case 1:
 		return mavlinkDefinition{"SYS_STATUS", 31, 43, 124}, true
+	case 30:
+		return mavlinkDefinition{"ATTITUDE", 28, 28, 39}, true
 	case 33:
 		return mavlinkDefinition{"GLOBAL_POSITION_INT", 28, 28, 104}, true
 	default:
@@ -104,6 +108,13 @@ func mavlinkFrameSize(w []byte, maxMessage int) (int, mavlinkDefinition, error) 
 	return n, def, nil
 }
 
+func mavlinkProfile(w []byte) string {
+	if len(w) >= 6 && w[0] == 0xfe && w[5] == 30 || len(w) >= 10 && w[0] == 0xfd && w[7] == 30 && w[8] == 0 && w[9] == 0 {
+		return "mavlink-common-attitude"
+	}
+	return "mavlink-common-three-messages"
+}
+
 func probeMAVLink(w []byte, limit int) ProbeResult {
 	if len(w) == 0 || w[0] != 0xfe && w[0] != 0xfd {
 		return ProbeResult{Verdict: ProbeReject}
@@ -117,17 +128,28 @@ func probeMAVLink(w []byte, limit int) ProbeResult {
 					n = 10
 				}
 			}
-			return probeNeed("mavlink", "v1/v2-common-three-messages", len(w), n)
+			return probeNeed("mavlink", mavlinkProbeProfile(w), len(w), n)
 		}
 		return ProbeResult{Verdict: ProbeReject}
 	}
-	return probeAccept("mavlink", "v1/v2-common-three-messages", 99)
+	return probeAccept("mavlink", mavlinkProbeProfile(w), 99)
+}
+
+func mavlinkProbeProfile(w []byte) string {
+	if mavlinkProfile(w) == "mavlink-common-attitude" {
+		return "v1/v2-common-attitude"
+	}
+	return "v1/v2-common-three-messages"
 }
 
 // Each call validates one UDP datagram. An incomplete message is never joined
 // to the next datagram, and an invalid co-packed tail yields no decoded prefix.
 // Validate before allocating owned message bytes or field maps.
 func decodeMAVLinkDatagram(w []byte, maxMessage, maxMessages int) ([]mavlinkMessage, error) {
+	return decodeMAVLinkDatagramBudget(w, maxMessage, maxMessages, DefaultParserBudget().MaxRecursionDepth)
+}
+
+func decodeMAVLinkDatagramBudget(w []byte, maxMessage, maxMessages, maxDepth int) ([]mavlinkMessage, error) {
 	if len(w) == 0 {
 		return nil, protocolError(ErrNeedMore, "MAVLink datagram is empty")
 	}
@@ -142,6 +164,11 @@ func decodeMAVLinkDatagram(w []byte, maxMessage, maxMessages int) ([]mavlinkMess
 		n, _, err := mavlinkFrameSize(w[at:], maxMessage)
 		if err != nil {
 			return nil, err
+		}
+		// ATTITUDE adds one bounded map for each of six binary32 fields. Check
+		// the complete datagram before expanding any projection or prefix.
+		if mavlinkProfile(w[at:]) == "mavlink-common-attitude" && maxDepth < 3 {
+			return nil, protocolError(ErrResourceExceeded, "MAVLink ATTITUDE field projection exceeds configured depth")
 		}
 		at += n
 		count++
@@ -202,8 +229,44 @@ func mavlinkFields(raw []byte, def mavlinkDefinition) map[string]any {
 		}
 	case 33:
 		message = map[string]any{"time_boot_ms": u32(0), "lat": int32(u32(4)), "lon": int32(u32(8)), "alt": int32(u32(12)), "relative_alt": int32(u32(16)), "vx": int16(u16(20)), "vy": int16(u16(22)), "vz": int16(u16(24)), "hdg": u16(26)}
+	case 30:
+		message["time_boot_ms"] = u32(0)
+		fields["Payload Zero Fill Bytes"] = 28 - payloadLength
+		payload := raw[header : header+payloadLength]
+		for i, key := range []string{"roll", "pitch", "yaw", "rollspeed", "pitchspeed", "yawspeed"} {
+			at := 4 + 4*i
+			message[key] = mavlinkFloatField(payload[min(at, payloadLength):min(at+4, payloadLength)])
+		}
 	}
 	fields["Message Fields"] = message
 	fields["Summary"] = fmt.Sprintf("MAVLink v%d %s system %d component %d", version, def.name, raw[sequenceAt+1], raw[sequenceAt+2])
 	return fields
+}
+
+// MAVLink v2's omitted zero tail is inferred, never reported as captured wire.
+// Preserve all IEEE bits including NaN payloads and signed zero. Non-finite
+// values use JSON-safe text; physical attitude and source authenticity are not
+// inferred from these literal telemetry fields.
+func mavlinkFloatField(wire []byte) map[string]any {
+	var padded [4]byte
+	copy(padded[:], wire)
+	bits := binary.LittleEndian.Uint32(padded[:])
+	exponent, fraction := bits>>23&255, bits&0x7fffff
+	kind := "normal"
+	var value any = float64(math.Float32frombits(bits))
+	if exponent == 255 {
+		kind, value = "infinite", "Infinity"
+		if bits>>31 != 0 {
+			value = "-Infinity"
+		}
+		if fraction != 0 {
+			kind, value = "nan", "NaN"
+		}
+	} else if exponent == 0 {
+		kind = "zero"
+		if fraction != 0 {
+			kind = "subnormal"
+		}
+	}
+	return map[string]any{"ieee754_bits": bits, "wire_hex": hex.EncodeToString(wire), "zero_fill_bytes": 4 - len(wire), "float_class": kind, "negative": bits>>31 != 0, "value": value}
 }

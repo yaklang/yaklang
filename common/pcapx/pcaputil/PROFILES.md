@@ -280,3 +280,7 @@ HDLC request header and port4059 hint; it does not decode the rejected body or c
 FCS/semantic success. Explicit DecodeAs has the same quarantine boundary. Refused
 bytes are counted even when Raw cannot be retained. A new capture has independent
 state; UDP idle time and local budget recovery do not authenticate a peer reset.
+
+### MAVLink ATTITUDE literal telemetry
+
+The `mavlink-common-attitude` UDP profile adds common message30 ATTITUDE for v1 (exact28-byte payload) and v2 (1..28 transmitted bytes with explicit zero-tail fill), pinned to generated C commit `28eae47457249ab6c8c1cadd104fcbe25eacd7a3` and XML commit `dccd82c4ba56a721aa5bd760498cbf5f2338012b`. Fields retain `time_boot_ms`, six binary32 bit patterns, actual per-field transmitted bytes, zero-fill counts, class, sign and JSON-safe numeric/nonfinite projections. Roll/pitch/yaw are literal radians and angular speeds radians/second per that definition; no physical truth or authenticated source is inferred. CRC_EXTRA39, v1/v2 length, incompatibility and signature completeness are strict. Co-packed datagrams validate atomically; adjacent UDP datagrams are never joined. Caller frame/collection budgets apply before projection; ATTITUDE adds bounded float maps and requires depth3. Existing HEARTBEAT/SYS_STATUS/GLOBAL_POSITION_INT profiles and fields stay unchanged. Signed frames expose only an opaque unverified13-byte signature. No dialect inference, signature verification, peer/session correlation, device success, other message IDs or transport extension is delivered by this profile.

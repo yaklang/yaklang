@@ -36934,6 +36934,238 @@
         "common/pcapx/pcaputil/dlms-idle-flags/controls.json": "controls.json",
         "common/pcapx/pcaputil/dlms-idle-flags/validation/expected.json": "validation/expected.json"
       }
+    },
+    {
+      "id": "validation-mavlink-attitude",
+      "kind": "validation",
+      "source_sha": "039a925db57f697719c842258626111418b1fb66",
+      "file": "validation-mavlink-attitude.zip",
+      "sha256": "d768ed3224032433ed19e4626fce04bf09f383989e5ce5d18462644507c0d7ce",
+      "password": "bin-parser",
+      "members": {
+        "build.py": {
+          "sha256": "8a778f3563a7d6fe30b25a70e72721d2fe4f450cf804c166f18b5e93d2157597",
+          "bytes": 4464
+        },
+        "verify-controls.py": {
+          "sha256": "aea6fa224d1370bec67f2f8346ea6aee45933d0e7297b23cba4198024d4afc82",
+          "bytes": 2208
+        },
+        "seal.py": {
+          "sha256": "165d9c5e34cef01718ce2903a1f5b7f70ad60e85db473d7fa896bbff404b596f",
+          "bytes": 3725
+        },
+        "reference-check.py": {
+          "sha256": "7e11b82760661199fc168e5fb5f56b7b3c2aaab71ba36282547697052d712bd1",
+          "bytes": 865
+        },
+        "LICENSE.txt": {
+          "sha256": "d8065a668213ba13137ee702e89d696cbfb6fc93c0c5415f36035d5b555dcbe4",
+          "bytes": 292
+        },
+        "source-pin.json": {
+          "sha256": "ee6e686c9e5be536e507bdf47dcd68eb7534354e67507386627d6720d43c240d",
+          "bytes": 3469
+        },
+        "reference-encode.c": {
+          "sha256": "da019bc0ece3b2d3bdc2c0a2b8bb4294e645f5bf281e980c29b0f6b21ca2f9b0",
+          "bytes": 1365
+        },
+        "reference-encoded.jsonl": {
+          "sha256": "2418a67c94c7568fcd6727dbe4aab53ba526971f78678693f6231bd945255e20",
+          "bytes": 1090
+        },
+        "cases/v1-finite.pcap": {
+          "sha256": "a1597bf37bdf41bdb4310feb1e6faf13b33b43902acd0ba7785c18991ddfdea2",
+          "bytes": 118
+        },
+        "answers/v1-finite.json": {
+          "sha256": "e2001f019f0d5886ccd9fcf65f207236fe0b6ec078171b65d4808fa0572eca24",
+          "bytes": 2822
+        },
+        "cases/v2-finite.pcap": {
+          "sha256": "4f7bb0e94942e2b9c573e0a65d2ae23fa9d16f0bbadd275db8f817312d49944c",
+          "bytes": 122
+        },
+        "answers/v2-finite.json": {
+          "sha256": "7bd12a030b55db23dcfef7cc45460d19878be049ce7f044b3f1cbd9de84f87bc",
+          "bytes": 2908
+        },
+        "cases/v1-ieee-edge.pcap": {
+          "sha256": "f2488f9b7616596ffa0f38674d9c454693bc6e1643cc58e8941adbc3f4ebdbd6",
+          "bytes": 118
+        },
+        "answers/v1-ieee-edge.json": {
+          "sha256": "3329fb39b7b00383ed716bbac7cfdab1bc2aa8c97a29b05c554efdcd59b9336a",
+          "bytes": 2882
+        },
+        "cases/v2-ieee-edge.pcap": {
+          "sha256": "8e96ffca7baae4fd33baec19100e7e3a204ab3c7fd10643281f1231a65585dde",
+          "bytes": 122
+        },
+        "answers/v2-ieee-edge.json": {
+          "sha256": "922a0155b715fc74ac2f9925f47ddc3aad522578befb666b4450f064ed127077",
+          "bytes": 2968
+        },
+        "cases/v1-zero-tail.pcap": {
+          "sha256": "689af75f67592081975459226d1737b81223d5623912b397e6cc20348058462c",
+          "bytes": 118
+        },
+        "answers/v1-zero-tail.json": {
+          "sha256": "f033be5f406fc8eb7d83aeaf7e29625dbd7fc0fbe0a5ac61fd69ff5a6c45b0f4",
+          "bytes": 2766
+        },
+        "cases/v2-zero-tail.pcap": {
+          "sha256": "1d389c88a3dbfdf98f1c07b95da83165208b48b9d61bb8d7808f3a6abb7efe1b",
+          "bytes": 95
+        },
+        "answers/v2-zero-tail.json": {
+          "sha256": "d8a83f95d70e16b6e0f992215254e5ce8e4bf0be14160a7a502285cc0d588913",
+          "bytes": 2696
+        },
+        "cases/v2-opaque-signature.pcap": {
+          "sha256": "4a87f035c0d0e37275e13f678dd6ef11fb424020efaeddec333c68d53775fa64",
+          "bytes": 135
+        },
+        "answers/v2-opaque-signature.json": {
+          "sha256": "27e719b6e98628f6b45365f1d24d42171f2e5bf1643c2b38bcc4e6dbedefc936",
+          "bytes": 3056
+        },
+        "cases/copacked-v1-v2.pcap": {
+          "sha256": "79297668ba70824b9630a7f67195c57d0106009ae0482f3711d6ecc10de3673a",
+          "bytes": 158
+        },
+        "answers/copacked-v1-v2.json": {
+          "sha256": "54789d84199b1c9d98b79cf57110cd6602594633568ad11a279e8d065ca41e5f",
+          "bytes": 5110
+        },
+        "cases/bad-crc.pcap": {
+          "sha256": "cfbecc57b5bb7084d7928649986b2b526520730db50c387313b4db037b71c132",
+          "bytes": 122
+        },
+        "answers/bad-crc.json": {
+          "sha256": "418e0391fe49939934a0eb908a11ed4c0cd19ed56f774cabf16f56b5669b5e53",
+          "bytes": 727
+        },
+        "cases/wrong-crc-extra.pcap": {
+          "sha256": "47aec2d983d0e86ee046e70c5dbf3c5db18ebb4c30e0ba25b0f405bc9ba7dda1",
+          "bytes": 122
+        },
+        "answers/wrong-crc-extra.json": {
+          "sha256": "29311d480ad40b2d51d7150f6b1a60f24e9b61b885753a77e2658cc8cd75ed19",
+          "bytes": 759
+        },
+        "cases/v1-short-definition.pcap": {
+          "sha256": "44794d105a1539510f7d93ccae9fea91b6dade1410accd8f1104b3a328233be4",
+          "bytes": 117
+        },
+        "answers/v1-short-definition.json": {
+          "sha256": "2c897d735318a8e98af63596aec11d3a613b09f87559b75ec14ccac81b7c3f3b",
+          "bytes": 765
+        },
+        "cases/v2-empty-payload.pcap": {
+          "sha256": "85a3510d6a43851bf36f743b56751ebeb59d430f4be72eb0cef28d9bfcbc0230",
+          "bytes": 94
+        },
+        "answers/v2-empty-payload.json": {
+          "sha256": "c1ddfe16b32b7b6cd2015a49b584bc6148fced99d55b35a8c5dc83c572c7a2a9",
+          "bytes": 707
+        },
+        "cases/v2-over-definition.pcap": {
+          "sha256": "3321bcedba563c18aaac021338cd51df93a4999337ec0eff03fb203f732df79a",
+          "bytes": 123
+        },
+        "answers/v2-over-definition.json": {
+          "sha256": "f17d33b2d225e7be719c2be7d9a78544fbe3cb4bb93a754460315dd0d5bac351",
+          "bytes": 773
+        },
+        "cases/unknown-incompatibility.pcap": {
+          "sha256": "2f5b1c7a1e315e4807c1220304e0cc779ca240cc49a4977050e41ac5c21c8359",
+          "bytes": 122
+        },
+        "answers/unknown-incompatibility.json": {
+          "sha256": "39e7be4dac938f6f8e81f64d3f461e3d3f3a592714aa39621c95178a0fdc09da",
+          "bytes": 793
+        },
+        "cases/short-signature.pcap": {
+          "sha256": "3d104571fef83c0e283dfdafe4586ed1abb16757087d685cc9c671a7a20ed1d6",
+          "bytes": 134
+        },
+        "answers/short-signature.json": {
+          "sha256": "7838927c1abbf1b6a53961e66191e999e3600293c132ad4db27419338f8bd4a1",
+          "bytes": 775
+        },
+        "cases/bad-copacked-tail.pcap": {
+          "sha256": "8cac4424acd34b3656d1dec49293830663f6cfd2c9462b15664864ee3a1ad18e",
+          "bytes": 162
+        },
+        "answers/bad-copacked-tail.json": {
+          "sha256": "15defcecfec8ab40806d3666efe674331811261108ba5580c597375a2118c5e6",
+          "bytes": 847
+        },
+        "cases/truncated-datagram.pcap": {
+          "sha256": "f09eac1e781e6b15f7186369ae1ce760530bd9412135db621b0d60bdb408f73d",
+          "bytes": 121
+        },
+        "answers/truncated-datagram.json": {
+          "sha256": "c61765f343503d2152bf9087c52b4c9f667de32e0a3b5f6281a37956a64dfd4a",
+          "bytes": 761
+        },
+        "controls.json": {
+          "sha256": "e390949ddfc69dc5f8311cea5e2f683ccaef98a27746c3a7a7b7518b2baa84f7",
+          "bytes": 37324
+        },
+        "validation/expected.json": {
+          "sha256": "7d4b58759b0c4989188528f272ed06bb5771dd0888b87be36f653ee460f2b370",
+          "bytes": 18922
+        }
+      },
+      "aliases": {
+        "common/pcapx/pcaputil/mavlink-attitude/build.py": "build.py",
+        "common/pcapx/pcaputil/mavlink-attitude/verify-controls.py": "verify-controls.py",
+        "common/pcapx/pcaputil/mavlink-attitude/seal.py": "seal.py",
+        "common/pcapx/pcaputil/mavlink-attitude/reference-check.py": "reference-check.py",
+        "common/pcapx/pcaputil/mavlink-attitude/LICENSE.txt": "LICENSE.txt",
+        "common/pcapx/pcaputil/mavlink-attitude/source-pin.json": "source-pin.json",
+        "common/pcapx/pcaputil/mavlink-attitude/reference-encode.c": "reference-encode.c",
+        "common/pcapx/pcaputil/mavlink-attitude/reference-encoded.jsonl": "reference-encoded.jsonl",
+        "common/pcapx/pcaputil/mavlink-attitude/cases/v1-finite.pcap": "cases/v1-finite.pcap",
+        "common/pcapx/pcaputil/mavlink-attitude/answers/v1-finite.json": "answers/v1-finite.json",
+        "common/pcapx/pcaputil/mavlink-attitude/cases/v2-finite.pcap": "cases/v2-finite.pcap",
+        "common/pcapx/pcaputil/mavlink-attitude/answers/v2-finite.json": "answers/v2-finite.json",
+        "common/pcapx/pcaputil/mavlink-attitude/cases/v1-ieee-edge.pcap": "cases/v1-ieee-edge.pcap",
+        "common/pcapx/pcaputil/mavlink-attitude/answers/v1-ieee-edge.json": "answers/v1-ieee-edge.json",
+        "common/pcapx/pcaputil/mavlink-attitude/cases/v2-ieee-edge.pcap": "cases/v2-ieee-edge.pcap",
+        "common/pcapx/pcaputil/mavlink-attitude/answers/v2-ieee-edge.json": "answers/v2-ieee-edge.json",
+        "common/pcapx/pcaputil/mavlink-attitude/cases/v1-zero-tail.pcap": "cases/v1-zero-tail.pcap",
+        "common/pcapx/pcaputil/mavlink-attitude/answers/v1-zero-tail.json": "answers/v1-zero-tail.json",
+        "common/pcapx/pcaputil/mavlink-attitude/cases/v2-zero-tail.pcap": "cases/v2-zero-tail.pcap",
+        "common/pcapx/pcaputil/mavlink-attitude/answers/v2-zero-tail.json": "answers/v2-zero-tail.json",
+        "common/pcapx/pcaputil/mavlink-attitude/cases/v2-opaque-signature.pcap": "cases/v2-opaque-signature.pcap",
+        "common/pcapx/pcaputil/mavlink-attitude/answers/v2-opaque-signature.json": "answers/v2-opaque-signature.json",
+        "common/pcapx/pcaputil/mavlink-attitude/cases/copacked-v1-v2.pcap": "cases/copacked-v1-v2.pcap",
+        "common/pcapx/pcaputil/mavlink-attitude/answers/copacked-v1-v2.json": "answers/copacked-v1-v2.json",
+        "common/pcapx/pcaputil/mavlink-attitude/cases/bad-crc.pcap": "cases/bad-crc.pcap",
+        "common/pcapx/pcaputil/mavlink-attitude/answers/bad-crc.json": "answers/bad-crc.json",
+        "common/pcapx/pcaputil/mavlink-attitude/cases/wrong-crc-extra.pcap": "cases/wrong-crc-extra.pcap",
+        "common/pcapx/pcaputil/mavlink-attitude/answers/wrong-crc-extra.json": "answers/wrong-crc-extra.json",
+        "common/pcapx/pcaputil/mavlink-attitude/cases/v1-short-definition.pcap": "cases/v1-short-definition.pcap",
+        "common/pcapx/pcaputil/mavlink-attitude/answers/v1-short-definition.json": "answers/v1-short-definition.json",
+        "common/pcapx/pcaputil/mavlink-attitude/cases/v2-empty-payload.pcap": "cases/v2-empty-payload.pcap",
+        "common/pcapx/pcaputil/mavlink-attitude/answers/v2-empty-payload.json": "answers/v2-empty-payload.json",
+        "common/pcapx/pcaputil/mavlink-attitude/cases/v2-over-definition.pcap": "cases/v2-over-definition.pcap",
+        "common/pcapx/pcaputil/mavlink-attitude/answers/v2-over-definition.json": "answers/v2-over-definition.json",
+        "common/pcapx/pcaputil/mavlink-attitude/cases/unknown-incompatibility.pcap": "cases/unknown-incompatibility.pcap",
+        "common/pcapx/pcaputil/mavlink-attitude/answers/unknown-incompatibility.json": "answers/unknown-incompatibility.json",
+        "common/pcapx/pcaputil/mavlink-attitude/cases/short-signature.pcap": "cases/short-signature.pcap",
+        "common/pcapx/pcaputil/mavlink-attitude/answers/short-signature.json": "answers/short-signature.json",
+        "common/pcapx/pcaputil/mavlink-attitude/cases/bad-copacked-tail.pcap": "cases/bad-copacked-tail.pcap",
+        "common/pcapx/pcaputil/mavlink-attitude/answers/bad-copacked-tail.json": "answers/bad-copacked-tail.json",
+        "common/pcapx/pcaputil/mavlink-attitude/cases/truncated-datagram.pcap": "cases/truncated-datagram.pcap",
+        "common/pcapx/pcaputil/mavlink-attitude/answers/truncated-datagram.json": "answers/truncated-datagram.json",
+        "common/pcapx/pcaputil/mavlink-attitude/controls.json": "controls.json",
+        "common/pcapx/pcaputil/mavlink-attitude/validation/expected.json": "validation/expected.json"
+      }
     }
   ],
   "schema_version": 1,

@@ -15,7 +15,7 @@ func (a *binParser) decodeMAVLinkDatagram(base *ProtocolEvent, w []byte, src, ds
 	if !magic || explicit == "" && !hint && probeMAVLink(w, a.budget.MaxFrameBytes).Verdict != ProbeAccept {
 		return nil, false
 	}
-	base.Protocol, base.Profile, base.Completeness = "mavlink", "mavlink-common-three-messages", "message"
+	base.Protocol, base.Profile, base.Completeness = "mavlink", mavlinkProfile(w), "message"
 	base.Admission = "wire-signature"
 	if hint {
 		base.Admission = "wire-and-port-hint"
@@ -23,7 +23,7 @@ func (a *binParser) decodeMAVLinkDatagram(base *ProtocolEvent, w []byte, src, ds
 	if explicit != "" {
 		base.Admission = "explicit-decode-as"
 	}
-	messages, err := decodeMAVLinkDatagram(w, a.budget.MaxFrameBytes, a.budget.MaxCollectionElements)
+	messages, err := decodeMAVLinkDatagramBudget(w, a.budget.MaxFrameBytes, a.budget.MaxCollectionElements, a.budget.MaxRecursionDepth)
 	if err != nil {
 		a.finishProtocolDatagram(base, w, nil, err)
 		return []*ProtocolEvent{base}, true
@@ -31,6 +31,7 @@ func (a *binParser) decodeMAVLinkDatagram(base *ProtocolEvent, w []byte, src, ds
 	events := make([]*ProtocolEvent, 0, len(messages))
 	for _, message := range messages {
 		e := *base
+		e.Profile = mavlinkProfile(message.Raw)
 		cloneEvidence(&e)
 		e.Offset, e.Length = uint64(message.Offset), len(message.Raw)
 		e.Session, e.semanticFields = message.Fields, cloneSession(message.Fields)
