@@ -287,9 +287,9 @@ func (a *binParser) decodeNativeDatagram(e *ProtocolEvent, w []byte, src, dst ui
 		} else {
 			fields, err = p.decode(w, a.budget.MaxCollectionElements)
 		}
-		if p.name == "dns" || p.name == "mdns" || p.name == "llmnr" {
+		if p.name == "dns" || p.name == "mdns" || p.name == "llmnr" || p.name == "dhcp" || p.name == "dhcpv6" {
 			// The canonical codec also has ordinary structural errors (e.g.
-			// a truncated QCLASS). A complete UDP datagram cannot acquire more
+			// a truncated QCLASS or missing DHCP END). A UDP datagram cannot acquire more
 			// bytes later; retain the refusal for deferred/native field queries.
 			if err != nil {
 				var typed *ProtocolError

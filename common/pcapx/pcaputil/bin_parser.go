@@ -154,6 +154,11 @@ func (e *ProtocolEvent) ownsNativeFields() bool {
 	if e.Transport == "udp" && e.Profile == e.Protocol+"-native" && (e.Protocol == "dns" || e.Protocol == "mdns" || e.Protocol == "llmnr") {
 		return true
 	}
+	// DHCP's native UDP projection is a bounded observation, separate from
+	// the legacy stream/rule envelope. Its queries own both fields and errors.
+	if e.Transport == "udp" && (e.Protocol == "dhcp" || e.Protocol == "dhcpv6") && e.Profile == e.Protocol+"-native" {
+		return true
+	}
 	if e.Profile == "quic-v1-native" || e.Profile == "http3-native" || e.Profile == "doq-native" {
 		return true
 	}
