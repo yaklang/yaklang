@@ -10,6 +10,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/sfreport"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
@@ -24,6 +25,16 @@ type countingProjectReport struct {
 func (r *countingProjectReport) Save() error {
 	r.saves++
 	return r.IReport.Save()
+}
+
+// ApplyRiskUpdate forwards the scan's decision to the wrapped report. The
+// wrapper exists only to count saves, so it must not hide that handler.
+func (r *countingProjectReport) ApplyRiskUpdate(item schema.RiskUpdateItem) error {
+	handler, ok := r.IReport.(schema.RiskUpdateHandler)
+	if !ok || handler == nil {
+		return nil
+	}
+	return handler.ApplyRiskUpdate(item)
 }
 
 func TestScanProjectReportIncludesAllStages(t *testing.T) {

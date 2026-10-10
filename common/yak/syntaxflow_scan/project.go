@@ -19,8 +19,13 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 )
 
-// CompileProject is registered by ssa_compile init so this package does not
-// import ssa_compile (ssa_compile -> yakscript -> yak -> syntaxflow_scan).
+// CompileProject optionally overrides how a project scan compiles its source.
+//
+// ssa_compile registers the production compiler in its init. That compiler
+// calls ParseProjectWithConfig, which auto-detects the project. syntaxflow_scan
+// cannot import ssa_compile (the import cycle runs the other way), so the
+// registration is the link. Tests may replace it. When it is nil, this package
+// was built without ssa_compile and falls back to CompileProjectDefault.
 var CompileProject func(ctx context.Context, cfg *ssaconfig.Config, extra ...ssaconfig.Option) (*ssaapi.Program, error)
 
 // CollectCodeSourceDir clones or opens the project tree without compiling SSA.
@@ -64,9 +69,17 @@ func ScanProject(ctx context.Context, opts ...ssaconfig.Option) (result ProjectR
 	}
 	defer cfg.Cleanup()
 	ssaconfig.ApplyExtraOptions(cfg, cfg.Config)
-	cfg.SetSyntaxFlowResultSaveMemory()
+	// A project scan defaults to keeping findings in memory: the callbacks
+	// stream them and no database consumer is registered. A caller that
+	// explicitly asks for database results gets the scan's database saver
+	// instead, the same consumer the gRPC scan uses.
+	persistResults := cfg.GetSyntaxFlowResultKind() == ssaconfig.SFResultSaveDatabase &&
+		!cfg.GetSyntaxFlowMemory()
+	if !persistResults {
+		cfg.SetSyntaxFlowResultSaveMemory()
+	}
 	if cfg.SyntaxFlow != nil {
-		cfg.SyntaxFlow.Memory = true
+		cfg.SyntaxFlow.Memory = !persistResults
 	}
 	// In-process ScanProject compile (process callbacks force ExtraInfo) skips
 	// the SSA compile plugin that stamps projectName(timestamp). Without a
@@ -81,6 +94,20 @@ func ScanProject(ctx context.Context, opts ...ssaconfig.Option) (result ProjectR
 
 	recorder := newStageOutcomeRecorder()
 	report := func(stage ProductStage, err error) { recorder.record(stage, err) }
+	// One runtime for the whole project scan. This call created it, or the
+	// caller supplied it; either way the report is registered here, once.
+	// Nested stage scans share the runtime and do not register again.
+	rt := ensureScanRuntime(cfg)
+	registerReport(rt, cfg.Reporter)
+	if persistResults && rt != nil && !cfg.IsNoSaveRisk() {
+		if saver := attachDBSaver(rt, schema.SFResultKindScan, rt.ID, false); saver != nil {
+			defer func() {
+				if err := saver.Close(); err != nil {
+					log.Errorf("flush risk batch failed: %v", err)
+				}
+			}()
+		}
+	}
 	// programName is published through ProjectResult so compile-only runs can
 	// hand the persisted IR name back to the platform.
 	programName := strings.TrimSpace(cfg.GetProgramName())
@@ -180,7 +207,9 @@ func ScanProject(ctx context.Context, opts ...ssaconfig.Option) (result ProjectR
 		report(StageCollect, nil)
 	}
 
-	inspectedLive := false
+	// Source stage: a live source path is scanned on its own. Without a path
+	// the source rules have no stage and run with the program below.
+	ranSourceStage := false
 	if wantSource && localDir != "" && !hasProgram {
 		if err := attachLiveSourceTarget(cfg, localDir); err != nil {
 			return finishScanProject(cfg, recorder, programName, err)
@@ -193,9 +222,13 @@ func ScanProject(ctx context.Context, opts ...ssaconfig.Option) (result ProjectR
 			return finishScanProject(cfg, recorder, programName, err)
 		}
 		emit(StageInspect, 1, nil)
-		inspectedLive = true
+		ranSourceStage = true
 	}
 
+	// Struct stage: the compile-time struct scan runs with the compile. When
+	// nothing is compiled the struct rules have no stage and run with the
+	// program below.
+	ranStructStage := false
 	if needCompile {
 		// A compile serves whichever product stage asked for it. Compile-only
 		// runs report StageCompile; review runs own it because struct rules run
@@ -284,6 +317,7 @@ func ScanProject(ctx context.Context, opts ...ssaconfig.Option) (result ProjectR
 			emitStructResults(cfg, prog)
 			recorder.observeStruct(prog)
 			emit(StageReview, 1, mergeStageInfo(scaleInfoFromRecorder(recorder), structRuleProcessInfo(prog)))
+			ranStructStage = true
 		}
 		if compileStage != "" {
 			report(compileStage, err)
@@ -303,46 +337,37 @@ func ScanProject(ctx context.Context, opts ...ssaconfig.Option) (result ProjectR
 			emit(StageCompile, 1, scaleInfoFromRecorder(recorder))
 		}
 		hasProgram = true
-	} else if wantReview && hasLoaded {
-		emit(StageReview, 0, nil)
-		var reviewErr error
-		for _, prog := range cfg.Programs {
-			if err := scanLoadedProgramStruct(cfg, prog); err != nil {
-				reviewErr = err
-				break
-			}
-			emitStructResults(cfg, prog)
-			recorder.observeStruct(prog)
-		}
-		report(StageReview, reviewErr)
-		if reviewErr != nil {
-			return finishScanProject(cfg, recorder, programName, reviewErr)
-		}
-		emit(StageReview, 1, mergeStageInfo(scaleInfoFromRecorder(recorder), structRuleProcessInfoAll(cfg.Programs)))
 	}
 
-	// After a live inspect, only SSA remains. Inspect and analyze run as
-	// separate StartScan calls so each stage keeps its own rule/risk counts.
-	if hasProgram && (wantAnalyze || (wantSource && !inspectedLive)) {
-		runSource := wantSource && !inspectedLive
-		if runSource {
-			emit(StageInspect, 0, nil)
-			err := StartScan(ctx, inspectCompiledSourceOptions(cfg, emit)...)
-			recorder.ensureMinRuleCount(StageInspect, countSourceRules(cfg))
-			report(StageInspect, err)
-			if err == nil {
-				emit(StageInspect, 1, nil)
-			}
+	// The program stage runs every rule that still needs a target: the SSA
+	// rules always, plus the source rules when no source path was scanned and
+	// the struct rules when nothing was compiled. Program.Query dispatches a
+	// rule by its own mode, so this one stage covers all three modes.
+	programModes := make([]string, 0, 3)
+	if wantAnalyze {
+		programModes = append(programModes, string(schema.SFR_MODE_SSA))
+	}
+	if wantSource && !ranSourceStage {
+		programModes = append(programModes, string(schema.SFR_MODE_SOURCE))
+	}
+	if wantReview && !ranStructStage {
+		programModes = append(programModes, string(schema.SFR_MODE_STRUCT))
+	}
+	if hasProgram && len(programModes) > 0 {
+		stage := StageAnalyze
+		switch {
+		case !wantAnalyze && wantSource && !ranSourceStage:
+			stage = StageInspect
+		case !wantAnalyze && wantReview && !ranStructStage:
+			stage = StageReview
 		}
-		if wantAnalyze {
-			emit(StageAnalyze, 0, nil)
-			err := StartScan(ctx, analyzeOptions(cfg, emit)...)
-			report(StageAnalyze, err)
-			if err != nil {
-				return finishScanProject(cfg, recorder, programName, err)
-			}
-			emit(StageAnalyze, 1, nil)
+		emit(stage, 0, nil)
+		err := StartScan(ctx, programStageOptions(cfg, emit, stage, programModes)...)
+		report(stage, err)
+		if err != nil {
+			return finishScanProject(cfg, recorder, programName, err)
 		}
+		emit(stage, 1, nil)
 	}
 
 	// No product stage selected and not a compile-only run: fall back to a
@@ -594,12 +619,8 @@ func emitStructResults(cfg *Config, prog *ssaapi.Program) {
 		if res == nil {
 			continue
 		}
-		// Struct rules run inside compile, not StartScan, so they never reach
-		// notifyResult. Fold them into the shared report here; source and SSA
-		// results are added by the stage scan that owns the same reporter.
-		if cfg.Reporter != nil {
-			cfg.Reporter.AddSyntaxFlowResult(res)
-		}
+		// Struct rules run inside compile. Their risks already went to the scan
+		// callback. This only keeps the stage metrics.
 		cfg.resultCallback(&ScanResult{Status: "executing", Result: res})
 	}
 }
@@ -715,30 +736,6 @@ func structRuleProcessInfo(prog *ssaapi.Program) *RuleProcessInfoList {
 	return info
 }
 
-func structRuleProcessInfoAll(progs []*ssaapi.Program) *RuleProcessInfoList {
-	var info *RuleProcessInfoList
-	for _, prog := range progs {
-		part := structRuleProcessInfo(prog)
-		if part == nil {
-			continue
-		}
-		if info == nil {
-			copied := *part
-			copied.Rules = append([]*RuleProcessInfo(nil), part.Rules...)
-			info = &copied
-			continue
-		}
-		info.Rules = append(info.Rules, part.Rules...)
-		info.TotalQuery += part.TotalQuery
-		info.FinishedQuery += part.FinishedQuery
-		info.FailedQuery += part.FailedQuery
-		info.SuccessQuery += part.SuccessQuery
-		info.SkippedQuery += part.SkippedQuery
-		info.RiskCount += part.RiskCount
-	}
-	return info
-}
-
 // saveProjectReport writes the report the stages of this project scan have
 // streamed into. Every stage saves its own snapshot as it ends; this call
 // supersedes those with the finished document.
@@ -778,10 +775,57 @@ func captureProgramEvidence(recorder *stageOutcomeRecorder, prog *ssaapi.Program
 }
 
 func compileProductProject(ctx context.Context, cfg *ssaconfig.Config, extra ...ssaconfig.Option) (*ssaapi.Program, error) {
-	if CompileProject == nil {
-		return nil, utils.Errorf("ScanProject: compiler is not registered")
+	if cfg == nil {
+		return nil, utils.Errorf("ScanProject: compile config is nil")
 	}
-	return CompileProject(ctx, cfg, extra...)
+	if CompileProject != nil {
+		return CompileProject(ctx, cfg, extra...)
+	}
+	return CompileProjectDefault(ctx, cfg, extra...)
+}
+
+// CompileProjectDefault compiles a project through ssaapi.ParseProject.
+//
+// It is the fallback when ssa_compile is not linked, so it does not auto-detect
+// the project. The production path is the compiler ssa_compile registers.
+func CompileProjectDefault(ctx context.Context, cfg *ssaconfig.Config, extra ...ssaconfig.Option) (*ssaapi.Program, error) {
+	if cfg == nil {
+		return nil, utils.Errorf("ScanProject: compile config is nil")
+	}
+	raw, err := cfg.ToJSONString()
+	if err != nil {
+		return nil, utils.Wrapf(err, "ScanProject: serialize compile config failed")
+	}
+	opts := []ssaconfig.Option{
+		ssaconfig.WithConfigJson(raw),
+		ssaconfig.WithContext(ctx),
+		copyExtraInfoOption(cfg),
+	}
+	opts = append(opts, extra...)
+	progs, err := ssaapi.ParseProject(opts...)
+	if err != nil {
+		return nil, err
+	}
+	if len(progs) == 0 || progs[0] == nil {
+		return nil, utils.Errorf("ScanProject: compile result is empty")
+	}
+	return progs[0], nil
+}
+
+// copyExtraInfoOption forwards options that must stay in-process (struct
+// rules, process callbacks) onto the compile config.
+func copyExtraInfoOption(src *ssaconfig.Config) ssaconfig.Option {
+	return func(dst *ssaconfig.Config) error {
+		if src == nil || dst == nil {
+			return nil
+		}
+		for key, values := range src.ExtraInfo {
+			for _, value := range values {
+				dst.SetExtraInfo(key, value)
+			}
+		}
+		return nil
+	}
 }
 
 func reloadCompiledProgram(prog *ssaapi.Program) *ssaapi.Program {
@@ -795,17 +839,6 @@ func reloadCompiledProgram(prog *ssaapi.Program) *ssaapi.Program {
 		return prog
 	}
 	return ssaapi.ReloadProgramFromDatabase(prog)
-}
-
-func scanLoadedProgramStruct(cfg *Config, prog *ssaapi.Program) error {
-	if prog == nil {
-		return nil
-	}
-	opts := structCompileOptions(cfg)
-	if len(opts) == 0 {
-		return nil
-	}
-	return prog.ScanProgramStruct(opts...)
 }
 
 func loadNamedPrograms(cfg *Config) error {
@@ -833,6 +866,14 @@ func loadNamedPrograms(cfg *Config) error {
 
 func structCompileOptions(cfg *Config) []ssaconfig.Option {
 	var opts []ssaconfig.Option
+	// Compile-time struct rules hand each risk to the scan. The compile does
+	// not receive the runtime; the callback submits into its collect.
+	if cfg != nil && cfg.scanRuntime != nil {
+		rt := cfg.scanRuntime
+		opts = append(opts, ssaapi.WithOnRisk(func(risk *schema.SSARisk) {
+			rt.SubmitRisk(risk)
+		}))
+	}
 	// Struct rules use the same final SyntaxFlow result-save guard as SSA rules.
 	if cfg != nil && cfg.IsNoSaveRisk() {
 		opts = append(opts, ssaconfig.WithNoSaveRisk(true))
@@ -906,53 +947,6 @@ func inspectLiveSourceOptions(cfg *Config, emit func(ProductStage, float64, *Rul
 	return opts
 }
 
-func inspectCompiledSourceOptions(cfg *Config, emit func(ProductStage, float64, *RuleProcessInfoList)) []ssaconfig.Option {
-	return compiledProgramScanOptions(cfg, emit, true, false)
-}
-
-func analyzeOptions(cfg *Config, emit func(ProductStage, float64, *RuleProcessInfoList)) []ssaconfig.Option {
-	return compiledProgramScanOptions(cfg, emit, false, true)
-}
-
-func compiledProgramScanOptions(cfg *Config, emit func(ProductStage, float64, *RuleProcessInfoList), wantSource, wantAnalyze bool) []ssaconfig.Option {
-	opts := sharedScanCallbackOptions(cfg)
-	if cfg != nil {
-		if len(cfg.Programs) > 0 {
-			opts = append(opts, WithPrograms(cfg.Programs...))
-		}
-		if names := cfg.GetProgramNames(); len(names) > 0 {
-			opts = append(opts, ssaconfig.WithProgramNames(names...))
-		}
-	}
-	if wantSource {
-		opts = append(opts, WithCompiledSource(true))
-	}
-	switch {
-	case wantSource && !wantAnalyze:
-		opts = append(opts, ssaconfig.WithRuleFilterMode(string(schema.SFR_MODE_SOURCE)))
-	case wantAnalyze && !wantSource:
-		opts = append(opts, ssaconfig.WithRuleFilterMode(string(schema.SFR_MODE_SSA)))
-	}
-	opts = append(opts, WithProcessCallback(func(taskID, status string, progress float64, info *RuleProcessInfoList) {
-		switch {
-		case wantSource && wantAnalyze:
-			if progress < 0.5 {
-				emit(StageInspect, progress*2, info)
-			} else {
-				emit(StageAnalyze, (progress-0.5)*2, info)
-			}
-		case wantSource:
-			emit(StageInspect, progress, info)
-		case wantAnalyze:
-			emit(StageAnalyze, progress, info)
-		}
-		if cfg != nil && cfg.ProcessCallback != nil {
-			cfg.ProcessCallback(taskID, status, progress, info)
-		}
-	}))
-	return opts
-}
-
 func sharedScanCallbackOptions(cfg *Config) []ssaconfig.Option {
 	opts := []ssaconfig.Option{}
 	if cfg == nil {
@@ -997,6 +991,12 @@ func sharedScanCallbackOptions(cfg *Config) []ssaconfig.Option {
 	if cfg.IsNoSaveRisk() {
 		opts = append(opts, ssaconfig.WithNoSaveRisk(true))
 	}
+	// Nested stage scans rebuild their config from these options only; without
+	// the runtime they would start a second collect and could not cover an
+	// earlier mode's finding.
+	if cfg.scanRuntime != nil {
+		opts = append(opts, WithScanRuntime(cfg.scanRuntime))
+	}
 	return opts
 }
 
@@ -1008,17 +1008,51 @@ func copySyntaxFlowRuleOptions(cfg *Config) []ssaconfig.Option {
 	if cfg == nil || cfg.Config == nil || cfg.SyntaxFlowRule == nil {
 		return nil
 	}
+	kind := cfg.GetSyntaxFlowResultKind()
+	if kind == "" {
+		kind = ssaconfig.SFResultSaveMemory
+	}
 	raw, err := json.Marshal(map[string]any{
 		"SyntaxFlowRule": cfg.SyntaxFlowRule,
 		"SyntaxFlow": map[string]any{
-			"result_save_kind": string(ssaconfig.SFResultSaveMemory),
-			"memory":           true,
+			"result_save_kind": string(kind),
+			"memory":           cfg.GetSyntaxFlowMemory(),
 		},
 	})
 	if err != nil {
 		return nil
 	}
 	return []ssaconfig.Option{ssaconfig.WithJsonRawConfig(raw)}
+}
+
+// programStageOptions runs the program stage: one rule set over the loaded
+// programs, filtered to the modes whose own stage did not run. Program.Query
+// executes each rule by the mode it declares.
+func programStageOptions(
+	cfg *Config,
+	emit func(ProductStage, float64, *RuleProcessInfoList),
+	stage ProductStage,
+	modes []string,
+) []ssaconfig.Option {
+	opts := sharedScanCallbackOptions(cfg)
+	if cfg != nil {
+		if len(cfg.Programs) > 0 {
+			opts = append(opts, WithPrograms(cfg.Programs...))
+		}
+		if names := cfg.GetProgramNames(); len(names) > 0 {
+			opts = append(opts, ssaconfig.WithProgramNames(names...))
+		}
+	}
+	if len(modes) > 0 {
+		opts = append(opts, ssaconfig.WithRuleFilterMode(modes...))
+	}
+	opts = append(opts, WithProcessCallback(func(taskID, status string, progress float64, info *RuleProcessInfoList) {
+		emit(stage, progress, info)
+		if cfg != nil && cfg.ProcessCallback != nil {
+			cfg.ProcessCallback(taskID, status, progress, info)
+		}
+	}))
+	return opts
 }
 
 func programScanOptions(cfg *Config) []ssaconfig.Option {

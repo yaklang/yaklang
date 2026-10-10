@@ -146,17 +146,17 @@ func buildSSARisk(
 		}
 	}
 
+	// The rule name, title and alert variable are deliberately omitted: a
+	// source, struct and SSA rule that report the same value of the same risk
+	// type share one feature hash, which is what lets a later scan mode cover
+	// an earlier finding. The reported position is added by the scan collect,
+	// so two sibling statements with identical value text stay distinct.
 	newSSARisk.RiskFeatureHash = utils.CalcSha1(
-		// SSA Feature
 		newSSARisk.FunctionName,
 		value.String(),
-		// SyntaxFlow Rule Feature
-		newSSARisk.FromRule,
-		newSSARisk.Variable,
-		string(newSSARisk.Severity),
 		newSSARisk.RiskType,
 		newSSARisk.Language,
-		newSSARisk.Title,
+		string(newSSARisk.Severity),
 	)
 	newSSARisk.Hash = newSSARisk.CalcHash()
 	return newSSARisk
@@ -182,6 +182,10 @@ func stableRiskFunctionName(value *Value) string {
 	return utils.EscapeInvalidUTF8Byte([]byte(rawName))
 }
 
+// ssaRiskName is the slot of one alert inside a single result: the alert
+// variable plus its index. GetRiskByValue and the stored RiskHashs map use it
+// to find that slot again. It is not the cover key. Covering the same finding
+// across scan modes uses RiskFeatureHash.
 func ssaRiskName(variable string, index int) string {
 	return fmt.Sprintf("%s-%d", variable, index)
 }
@@ -209,6 +213,12 @@ func (r *SyntaxFlowResult) SaveRisk(
 	if !ok {
 		return ""
 	}
+	name := ssaRiskName(variable, index)
+	// Building a risk is idempotent per alert slot: the same result may persist
+	// its values after the streaming path already materialized them.
+	if prev, exist := r.riskMap[name]; exist && prev != nil {
+		return prev.Hash
+	}
 	ssaRisk := buildSSARisk(r, variable, index, value)
 	if ssaRisk == nil {
 		return ""
@@ -217,6 +227,20 @@ func (r *SyntaxFlowResult) SaveRisk(
 	ssaRisk.SSAProjectID = r.GetProjectID()
 	ssaRisk.RuntimeId = r.TaskID
 	ssaRisk.ResultID = uint64(r.GetResultID())
+	ssaRisk.ResultUUID = r.GetResultUUID()
+	// The row hash covers the result identity, so it must be computed after
+	// those fields are set: the same finding reported by two results is two
+	// rows, and the unique index on hash must not collapse them.
+	ssaRisk.Hash = ssaRisk.CalcHash()
+	r.riskMap[name] = ssaRisk
+
+	// A scan registers a callback and decides there whether this finding is
+	// created or rewrites an earlier mode. Only a result with no callback
+	// writes the row here.
+	if r.onRisk != nil {
+		r.onRisk(ssaRisk)
+		return ssaRisk.Hash
+	}
 	if save {
 		err := yakit.CreateSSARisk(consts.GetGormSSAProjectDataBase(), ssaRisk)
 		if err != nil {
@@ -226,11 +250,9 @@ func (r *SyntaxFlowResult) SaveRisk(
 			// read-only (e.g. missing a newly added column). The platform
 			// stores its own copy from the stream.
 			log.Errorf("save risk failed: %s", err)
-			r.riskMap[ssaRiskName(variable, index)] = ssaRisk
 			return ""
 		}
 	}
-	r.riskMap[ssaRiskName(variable, index)] = ssaRisk
 	return ssaRisk.Hash
 }
 

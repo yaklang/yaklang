@@ -21,11 +21,13 @@ func TestRuleMatchesQueryTarget(t *testing.T) {
 	ssaRule := &schema.SyntaxFlowRule{Mode: schema.SFR_MODE_SSA}
 
 	require.True(t, ruleMatchesQueryTarget(sourceRule, sourceTarget))
-	require.False(t, ruleMatchesQueryTarget(sourceRule, prog))
-	require.False(t, ruleMatchesQueryTarget(structRule, prog))
 	require.False(t, ruleMatchesQueryTarget(structRule, sourceTarget))
-	require.True(t, ruleMatchesQueryTarget(ssaRule, prog))
 	require.False(t, ruleMatchesQueryTarget(ssaRule, sourceTarget))
+	// A Program is a multi-mode target: Program.Query dispatches a rule by the
+	// mode it declares, so every mode is accepted there.
+	require.True(t, ruleMatchesQueryTarget(sourceRule, prog))
+	require.True(t, ruleMatchesQueryTarget(structRule, prog))
+	require.True(t, ruleMatchesQueryTarget(ssaRule, prog))
 }
 
 func TestStartScan_SkipsSourceRuleOnSSAProgram(t *testing.T) {

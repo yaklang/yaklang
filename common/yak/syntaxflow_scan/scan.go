@@ -25,6 +25,27 @@ func Scan(ctx context.Context, option ...ssaconfig.Option) (retErr error) {
 		return err
 	}
 
+	// The call that creates the runtime owns its consumers. A nested stage
+	// receives the runtime already and must not register a second report or
+	// database saver.
+	ownsRuntime := config.scanRuntime == nil
+	rt := ensureScanRuntime(config)
+	memory := config.GetSyntaxFlowMemory() ||
+		config.GetSyntaxFlowResultKind() == ssaconfig.SFResultSaveMemory
+	if memory && rt != nil {
+		rt.SetNoRiskDB(true)
+	}
+	if ownsRuntime {
+		registerReport(rt, config.Reporter)
+	}
+	var dbSaver *dbSaver
+	attachSaver := func(taskID string) {
+		if !ownsRuntime || memory || config.IsNoSaveRisk() || dbSaver != nil {
+			return
+		}
+		dbSaver = attachDBSaver(rt, schema.SFResultKindScan, taskID, false)
+	}
+
 	// Wire up debug/pprof output when debug_dir is set.
 	// Keep the shared Postgres SSA IR DB (redirectSSADB=false) for platform
 	// two-job compile -> scan reuse; CLI --debug redirects SSADB separately.
@@ -48,6 +69,14 @@ func Scan(ctx context.Context, option ...ssaconfig.Option) (retErr error) {
 		}
 		m.StatusTask()
 		m.Stop(runningID)
+		// Stop waited for every queued risk callback, so the pending batch is
+		// complete. Write it before the task row so a caller that sees the
+		// finished task can also read every finding.
+		if dbSaver != nil {
+			if err := dbSaver.Close(); err != nil {
+				log.Errorf("flush risk batch failed: %v", err)
+			}
+		}
 		// Stop waits for queued result callbacks, so the final task row includes
 		// the complete in-memory risk count even when risks are not persisted.
 		if err := m.SaveTask(); err != nil {
@@ -58,9 +87,8 @@ func Scan(ctx context.Context, option ...ssaconfig.Option) (retErr error) {
 		if success && m.status == schema.SYNTAXFLOWSCAN_DONE {
 			m.notifyDone()
 		}
-		// 在 Stop() 之后保存报告，确保所有结果都已被处理
-		// Stop() 会调用 processMonitor.Close()，等待后台 goroutine 完成
-		// 这样可以确保所有 AddSyntaxFlowResult 调用都已完成
+		// Stop waits for the queued risk callbacks, so the report already holds
+		// every finding this task accepted. Saving here publishes that document.
 		m.saveReport()
 	}()
 	errC := make(chan error)
@@ -71,6 +99,7 @@ func Scan(ctx context.Context, option ...ssaconfig.Option) (retErr error) {
 		if err != nil {
 			return err
 		}
+		attachSaver(m.taskID)
 		log.Info("start to create syntaxflow scan")
 		go func() {
 			err := m.ScanNewTask()
@@ -93,6 +122,7 @@ func Scan(ctx context.Context, option ...ssaconfig.Option) (retErr error) {
 		if err != nil {
 			return err
 		}
+		attachSaver(m.taskID)
 		go func() {
 			err := m.ResumeTask()
 			if err != nil {

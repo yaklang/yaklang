@@ -25,19 +25,22 @@ type structScanRuntime struct {
 	extraRaw      []string
 	rules         []*schema.SyntaxFlowRule
 	riskCB        func(*schema.SSARisk)
-	taskID        string
-	timeout       time.Duration
-	workLimit     int64
-	errs          []error
-	mu            sync.Mutex
-	results       []*SyntaxFlowResult
-	saveReady     bool
-	saveToDB      bool
-	saves         sync.WaitGroup
-	ranHashes     []string
-	ruleStats     map[string]*structRuleStat
-	skipped       bool
-	skipReason    string
+	// onRisk is the scan's callback. When set, each finding is handed to it
+	// and this compile does not write the risk row.
+	onRisk     func(*schema.SSARisk)
+	taskID     string
+	timeout    time.Duration
+	workLimit  int64
+	errs       []error
+	mu         sync.Mutex
+	results    []*SyntaxFlowResult
+	saveReady  bool
+	saveToDB   bool
+	saves      sync.WaitGroup
+	ranHashes  []string
+	ruleStats  map[string]*structRuleStat
+	skipped    bool
+	skipReason string
 }
 
 // structRuleStat aggregates one struct-mode rule across compile units so
@@ -94,6 +97,9 @@ func (c *Config) prepareStructScan(plan *UnitPlan) error {
 		return nil
 	}
 	s := c.structScan
+	if s.onRisk == nil {
+		s.onRisk = c.onRisk
+	}
 	if s.riskCB != nil && !s.wantsScan() {
 		return utils.Errorf("withStructRuleCallback requires withStructRule(true|rule) or withStructRuleDir/Raw")
 	}
@@ -295,6 +301,7 @@ func (s *structScanRuntime) ScanStruct(progAPI *Program, unit *ssa.CompileUnit) 
 			QueryWithStruct(unit),
 			QueryWithFrame(frame),
 			QueryWithMemory(),
+			QueryWithNoFinalize(),
 			QueryWithTaskID(s.taskID),
 			QueryWithContext(ruleCtx),
 			QueryWithWorkBudget(budget),
@@ -312,29 +319,70 @@ func (s *structScanRuntime) ScanStruct(progAPI *Program, unit *ssa.CompileUnit) 
 			continue
 		}
 		if res != nil {
+			s.publish(res)
 			found = append(found, res)
 			s.ranHashes = append(s.ranHashes, ruleContentHash(rule))
 			s.noteRule(rule, programName, start, end, int64(res.RiskCount()), nil)
-			if s.riskCB != nil {
-				risks := res.GetRisks()
-				if len(risks) == 0 {
-					for _, name := range res.GetAlertVariables() {
-						for index, val := range res.GetValues(name) {
-							if risk := buildSSARisk(res, name, index, val); risk != nil {
-								risks = append(risks, risk)
-							}
-						}
-					}
-				}
-				for _, risk := range risks {
-					s.riskCB(risk)
-				}
-			}
 			log.Infof("[struct_scan] package=%s rule=%s alerts=%d", unit.Key, rule.RuleName, len(res.GetAlertVariables()))
 		}
 		progAPI.ResetInterRuleState()
 	}
 	s.keepResults(found)
+}
+
+// publish builds this unit result's risks once. A scan callback receives each
+// risk and the compile does not write the row. Without that callback a
+// database compile still saves the result later, and a memory compile only
+// keeps the risks on the result. The user callback fires in both cases.
+func (s *structScanRuntime) publish(res *SyntaxFlowResult) {
+	if s == nil || res == nil {
+		return
+	}
+	if s.onRisk != nil {
+		user := s.riskCB
+		scan := s.onRisk
+		res.onRisk = func(risk *schema.SSARisk) {
+			scan(risk)
+			if user != nil {
+				user(risk)
+			}
+		}
+		_ = res.CreateRisk()
+		return
+	}
+	if s.saveToDB {
+		// keepResults writes the row. Filling riskMap here would make that
+		// save skip the risk rows, because SaveRisk is idempotent per alert
+		// slot. The user callback still sees each finding now.
+		if s.riskCB != nil {
+			s.notifyUnsaved(res)
+		}
+		return
+	}
+	_ = res.CreateRisk()
+	if s.riskCB != nil {
+		for _, risk := range res.GetRisks() {
+			s.riskCB(risk)
+		}
+	}
+}
+
+// notifyUnsaved hands each alert to the user callback without recording it on
+// the result. The later save builds the stored risks itself.
+func (s *structScanRuntime) notifyUnsaved(res *SyntaxFlowResult) {
+	if s == nil || res == nil || s.riskCB == nil {
+		return
+	}
+	res.GetAlertValues().ForEach(func(name string, values Values) bool {
+		for index, value := range values {
+			risk := buildSSARisk(res, name, index, value)
+			if risk == nil {
+				continue
+			}
+			s.riskCB(risk)
+		}
+		return true
+	})
 }
 
 // frameForRule builds an execution frame from the rule. Sync stores compiled
@@ -368,14 +416,14 @@ func (s *structScanRuntime) prepareSave(prog *ssa.Program) {
 	s.saveToDB = prog != nil && prog.DatabaseKind != ssa.ProgramCacheMemory
 }
 
-// keepResults publishes one unit's results. Database compiles save them on
-// the side and drop the value graph; the handle stays so a later report can
-// read the persisted alerts.
+// keepResults stores one unit's results. A scan already received the risks
+// through its callback, so nothing is written here. A database compile that
+// is not part of a scan still saves the result on the side.
 func (s *structScanRuntime) keepResults(found []*SyntaxFlowResult) {
 	if s == nil || len(found) == 0 {
 		return
 	}
-	if !s.saveToDB {
+	if s.onRisk != nil || !s.saveToDB {
 		s.mu.Lock()
 		s.results = append(s.results, found...)
 		s.mu.Unlock()

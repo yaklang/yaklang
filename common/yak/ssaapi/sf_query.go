@@ -67,6 +67,15 @@ type queryConfig struct {
 	kind   schema.SyntaxflowResultKind
 	taskID string
 
+	// onRisk receives each risk this query builds. When it is set the query
+	// does not write the risk row itself.
+	onRisk func(*schema.SSARisk)
+
+	// noFinalize leaves the finished result to the caller: no risk is built
+	// and no consumer is notified. A rule that runs once per unit merges the
+	// unit frames and finalizes the merged result exactly once.
+	noFinalize bool
+
 	// control
 	ctx context.Context
 
@@ -141,6 +150,11 @@ func QuerySyntaxflow(opt ...QueryOption) (*SyntaxFlowResult, error) {
 	}
 	for _, o := range opt {
 		o(config)
+	}
+	// A program carries the risk callback of its scan; an explicit query option
+	// wins so a caller can also drive a standalone program through one scan.
+	if config.onRisk == nil && config.program != nil && config.program.config != nil {
+		config.onRisk = config.program.config.onRisk
 	}
 	process := func(f float64, msg string) {
 		if callBack := config.GetSyntaxFlowProcessCallback(); callBack != nil {
@@ -246,7 +260,20 @@ func QuerySyntaxflow(opt ...QueryOption) (*SyntaxFlowResult, error) {
 		res, err = executeSourceFrameBatches(frame, root, config)
 	} else if sfvm.FrameIsStructMode(frame) {
 		if config.structBound == nil {
-			return nil, utils.Errorf("struct rule requires QueryWithStruct")
+			if config.program == nil {
+				return nil, utils.Errorf("struct rule requires QueryWithStruct")
+			}
+			// A rule-object query and a rule-content query both land here
+			// after the frame is compiled, so the program dispatches the
+			// struct rule to its own units and returns one merged result.
+			merged, merr := config.program.queryProgramStructRule(config, frame.GetRule())
+			if merr != nil {
+				return nil, merr
+			}
+			if ferr := finalizeProgramRuleResult(merged); ferr != nil {
+				return merged, ferr
+			}
+			return merged, nil
 		}
 		res, err = frame.Feed(value, config.opts...)
 	} else if config.structBound != nil {
@@ -266,30 +293,20 @@ func QuerySyntaxflow(opt ...QueryOption) (*SyntaxFlowResult, error) {
 
 	var ret *SyntaxFlowResult
 	ret = CreateResultFromQuery(res, config.Config)
+	ret.onRisk = config.onRisk
+	ret.dbKind = config.kind
 
 	defer process(1, "end query syntaxflow")
 	if config.program != nil {
 		ret.program = config.program
-		switch kind := config.GetSyntaxFlowResultKind(); kind {
-		case ssaconfig.SFResultSaveDatabase:
-			process(float64(total-1)/float64(total), "save result")
-			resultID, err := ret.SaveWithContext(config.ctx, config.kind, config.taskID)
-			_ = resultID
-			if err != nil {
-				return ret, utils.Wrap(err, "SyntaxflowQuery: save to DB failed")
-			}
-			cacheKind := kind
-			if config.IsNoSaveRisk() {
-				cacheKind = ssaconfig.SFResultSaveMemory
-			}
-			setResultToCache(cacheKind, ret)
-		case ssaconfig.SFResultSaveMemory:
-			// save to memory
-			id := getResultCacheId()
-			ret.SetResultID(id)
-			ret.CreateRisk()
+		if config.noFinalize {
+			// The caller merges this frame with its siblings and publishes the
+			// merged result, so nothing is built or delivered here.
 			ret.TaskID = config.taskID
-			setResultToCache(kind, ret)
+			return ret, nil
+		}
+		if err := publishQueryResult(ret, config); err != nil {
+			return ret, err
 		}
 	}
 
@@ -313,6 +330,8 @@ func executeSourceFrameBatches(
 			result := CreateResultFromQuery(batchResult, config.Config)
 			result.program = config.program
 			result.TaskID = config.taskID
+			result.onRisk = config.onRisk
+			result.dbKind = config.kind
 			_ = result.CreateRisk()
 			config.sourceResultCallback(result)
 			_, _, total := root.SourceHitBatch()
@@ -459,6 +478,72 @@ func QueryWithRuleDiagnosticsRecorder(recorder ...*diagnostics.Recorder) QueryOp
 func QueryWithTaskID(taskID string) QueryOption {
 	return func(c *queryConfig) {
 		c.taskID = taskID
+	}
+}
+
+// QueryWithOnRisk registers the callback that receives each risk this query
+// builds. The query does not write those rows; the callback's owner decides
+// whether the finding is created or replaces an earlier one.
+func QueryWithOnRisk(fn func(*schema.SSARisk)) QueryOption {
+	return func(c *queryConfig) {
+		if c == nil || fn == nil {
+			return
+		}
+		prev := c.onRisk
+		c.onRisk = func(risk *schema.SSARisk) {
+			if prev != nil {
+				prev(risk)
+			}
+			fn(risk)
+		}
+	}
+}
+
+// publishQueryResult stores a database result or keeps a memory result, and
+// builds its risks either way. A registered callback receives each risk
+// instead of this function writing the risk row.
+func publishQueryResult(ret *SyntaxFlowResult, config *queryConfig) error {
+	if ret == nil || config == nil {
+		return nil
+	}
+	process := func(f float64, msg string) {
+		if callBack := config.GetSyntaxFlowProcessCallback(); callBack != nil {
+			callBack(f, msg)
+		}
+	}
+	total := 4
+	switch kind := config.GetSyntaxFlowResultKind(); kind {
+	case ssaconfig.SFResultSaveDatabase:
+		process(float64(total-1)/float64(total), "save result")
+		if _, err := ret.SaveWithContext(config.ctx, config.kind, config.taskID); err != nil {
+			return utils.Wrap(err, "SyntaxflowQuery: save to DB failed")
+		}
+		cacheKind := kind
+		if config.IsNoSaveRisk() {
+			cacheKind = ssaconfig.SFResultSaveMemory
+		}
+		setResultToCache(cacheKind, ret)
+	case ssaconfig.SFResultSaveMemory:
+		id := getResultCacheId()
+		ret.SetResultID(id)
+		ret.TaskID = config.taskID
+		if err := ret.CreateRisk(); err != nil {
+			return err
+		}
+		setResultToCache(kind, ret)
+	}
+	return nil
+}
+
+// QueryWithNoFinalize runs the frame and returns its result without building
+// risks or notifying consumers. Callers that merge several executions of one
+// rule (for example one per compile unit) use it and finalize the merged
+// result themselves.
+func QueryWithNoFinalize() QueryOption {
+	return func(c *queryConfig) {
+		if c != nil {
+			c.noFinalize = true
+		}
 	}
 }
 
@@ -714,19 +799,13 @@ func (ps Programs) SyntaxFlowRuleName(ruleName string, opts ...QueryOption) (*Sy
 	return QuerySyntaxflow(opts...)
 }
 
+// SyntaxFlowRule runs one rule against the program, whichever mode the rule
+// declares: QuerySyntaxflow compiles the frame and dispatches it by the mode
+// it carries -- an SSA rule feeds on the program, a source rule runs on the
+// program's source snapshot, and a struct rule runs over the program's
+// application/library units. Everything else (runtime, task, callbacks,
+// budget) travels through opts unchanged.
 func (p *Program) SyntaxFlowRule(rule *schema.SyntaxFlowRule, opts ...QueryOption) (*SyntaxFlowResult, error) {
-	if p != nil && rule.IsSourceMode() {
-		return nil, utils.Errorf(
-			"SSA program target cannot execute source rule %s; source rules require a raw source target",
-			ruleGetRuleName(rule),
-		)
-	}
-	if p != nil && rule.IsStructMode() {
-		return nil, utils.Errorf(
-			"SSA program target cannot execute struct rule %s; struct rules require QueryWithStruct",
-			ruleGetRuleName(rule),
-		)
-	}
 	opts = append(opts, QueryWithProgram(p), QueryWithRule(rule))
 	return QuerySyntaxflow(opts...)
 }

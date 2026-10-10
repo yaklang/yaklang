@@ -39,17 +39,33 @@ func (r *Report) Save() error {
 		if r.writer == nil {
 			return nil
 		}
-		// A scan saves at every stage boundary; rewinding makes each save a
-		// complete snapshot of what has been collected so far instead of
-		// concatenating one document per stage.
-		if err := rewindReportOutput(r.writer); err != nil {
+		// A pending background snapshot would race this final document.
+		if flusher := r.currentFlusher(); flusher != nil {
+			flusher.stopAndWait()
+		}
+		data, err := r.snapshotJSON()
+		if err != nil {
 			return err
 		}
-		return r.PrettyWrite(r.writer)
+		// Every save replaces the previous document instead of appending to it,
+		// and a file destination is replaced atomically.
+		return writeReportSnapshot(r.writer, data)
 	case IRifyReactReportType:
 		return r.SaveForIRify()
 	}
 	return utils.Errorf("unsupported report format: %s", r.ReportType)
+}
+
+// snapshotJSON marshals the report as one complete document. The lock keeps a
+// concurrent finding from racing the marshal.
+func (r *Report) snapshotJSON() ([]byte, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	data, err := json.MarshalIndent(r, "", "  ")
+	if err != nil {
+		return nil, utils.Wrapf(err, "marshal report failed")
+	}
+	return data, nil
 }
 
 func (r *Report) SaveForIRify() error {

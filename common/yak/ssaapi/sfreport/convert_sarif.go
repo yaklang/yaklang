@@ -1,6 +1,7 @@
 package sfreport
 
 import (
+	"bytes"
 	"io"
 	"path"
 	"strings"
@@ -74,6 +75,15 @@ type SarifReport struct {
 	// driver is run.Tool.Driver, kept for O(1) rule registration.
 	driver   *sarif.ToolComponent
 	ruleByID map[string]struct{}
+	// resultByHash remembers where each appended finding sits so a covered
+	// finding is replaced instead of reported twice.
+	resultByHash map[string]int
+	// sinceFlush counts findings appended since the last snapshot, so a long
+	// scan publishes intermediate documents instead of only the final one.
+	sinceFlush int
+	// flusher writes intermediate snapshots in the background; a final Save()
+	// drains and stops it.
+	flusher *reportFlusher
 }
 
 // SarifContext accumulates the SARIF entities one result contributes (files,
@@ -159,10 +169,16 @@ func (r *SarifReport) Save() error {
 	if r.writer == nil {
 		return nil
 	}
-	if err := rewindReportOutput(r.writer); err != nil {
+	// A pending background snapshot would race this final document.
+	if flusher := r.currentFlusher(); flusher != nil {
+		flusher.stopAndWait()
+	}
+	var buf bytes.Buffer
+	if err := r.report.PrettyWrite(&buf); err != nil {
 		return err
 	}
-	return r.report.PrettyWrite(r.writer)
+	// A file destination is replaced atomically; other destinations are rewound.
+	return writeReportSnapshot(r.writer, buf.Bytes())
 }
 
 // Report exposes the accumulated document for callers that want to serialize
@@ -177,6 +193,7 @@ func (r *SarifReport) Report() *sarif.Report {
 func (r *SarifReport) appendResult(result *ssaapi.SyntaxFlowResult) {
 	SFRule := result.GetRule()
 	ruleID := sarifRuleID(SFRule)
+	added := 0
 
 	for risk := range result.YieldRisk() {
 		value, err := result.GetValue(risk.Variable, int(risk.Index))
@@ -208,8 +225,155 @@ func (r *SarifReport) appendResult(result *ssaapi.SyntaxFlowResult) {
 		}
 
 		r.registerRule(ruleID, SFRule, risk)
+		r.rememberResult(risk, res)
 		r.run.Results = append(r.run.Results, res)
+		added++
 	}
+	r.noteFlush(added)
+}
+
+// noteFlush publishes an intermediate document once enough findings piled up.
+func (r *SarifReport) noteFlush(added int) {
+	if r == nil || added <= 0 {
+		return
+	}
+	r.sinceFlush += added
+	if reportFlushEvery <= 0 || r.sinceFlush < reportFlushEvery {
+		return
+	}
+	r.sinceFlush = 0
+	if r.writer == nil {
+		return
+	}
+	var buf bytes.Buffer
+	if err := r.report.PrettyWrite(&buf); err != nil {
+		log.Errorf("serialize sarif snapshot failed: %v", err)
+		return
+	}
+	r.flusherFor().submit(buf.Bytes())
+}
+
+// flusherFor returns the background writer of this report, creating it on
+// first use.
+func (r *SarifReport) flusherFor() *reportFlusher {
+	if r.flusher == nil {
+		r.flusher = newReportFlusher(r.writer)
+	}
+	return r.flusher
+}
+
+// currentFlusher returns the background writer without creating one.
+func (r *SarifReport) currentFlusher() *reportFlusher {
+	if r == nil {
+		return nil
+	}
+	return r.flusher
+}
+
+// rememberResult records the slot of a finding keyed by its feature hash (its
+// SARIF fingerprint) so a later scan mode replaces it.
+func (r *SarifReport) rememberResult(risk *schema.SSARisk, res *sarif.Result) {
+	if r == nil || risk == nil || res == nil {
+		return
+	}
+	key := strings.TrimSpace(risk.RiskFeatureHash)
+	if key == "" {
+		key = strings.TrimSpace(risk.Hash)
+	}
+	if key == "" {
+		return
+	}
+	if r.resultByHash == nil {
+		r.resultByHash = map[string]int{}
+	}
+	r.resultByHash[key] = len(r.run.Results)
+}
+
+// ApplyRiskUpdate creates or replaces one alert. The scan already filtered the
+// finding. OldHash empty adds the alert; any other OldHash drops the alert it
+// names and adds the new one, so the document keeps one alert per finding.
+func (r *SarifReport) ApplyRiskUpdate(item schema.RiskUpdateItem) error {
+	if r == nil || item.Risk == nil {
+		return nil
+	}
+	if item.OldHash != "" {
+		feature := strings.TrimSpace(item.Risk.RiskFeatureHash)
+		if feature == "" {
+			feature = strings.TrimSpace(item.OldHash)
+		}
+		r.removeResultByFeatureHash(feature)
+	}
+	r.appendRisk(item.Risk)
+	return nil
+}
+
+// appendRisk adds one alert from the risk itself. The scan does not hand over
+// the syntaxflow result, so there is no value to walk for a code flow.
+func (r *SarifReport) appendRisk(risk *schema.SSARisk) {
+	if r == nil || risk == nil || r.run == nil {
+		return
+	}
+	ruleName := riskRuleName(risk)
+	rule := &schema.SyntaxFlowRule{
+		RuleName:    ruleName,
+		Title:       risk.Title,
+		Severity:    risk.Severity,
+		Description: risk.Description,
+		Solution:    risk.Solution,
+	}
+	ruleID := sarifRuleID(rule)
+	res := sarif.NewRuleResult(ruleID).
+		WithMessage(sarif.NewTextMessage(sarifRiskMessage(risk))).
+		WithLevel(ToSarifLevel(risk.Severity)).
+		WithKind(sarifResultKind).
+		WithPartialFingerPrints(sarifFingerprint(risk))
+	if loc := locationFromRisk(risk); loc != nil {
+		res.WithLocations([]*sarif.Location{loc})
+	}
+	r.registerRule(ruleID, rule, risk)
+	r.rememberResult(risk, res)
+	r.run.Results = append(r.run.Results, res)
+	r.noteFlush(1)
+}
+
+// locationFromRisk builds a physical location from the risk's file and line.
+// A risk without either still becomes an alert; it just has no region.
+func locationFromRisk(risk *schema.SSARisk) *sarif.Location {
+	if risk == nil {
+		return nil
+	}
+	uri := strings.TrimSpace(risk.CodeSourceUrl)
+	if uri == "" || risk.Line <= 0 {
+		return nil
+	}
+	return sarif.NewLocation().WithPhysicalLocation(
+		sarif.NewPhysicalLocation().
+			WithArtifactLocation(sarif.NewArtifactLocation().WithUri(uri)).
+			WithRegion(sarif.NewRegion().WithStartLine(int(risk.Line))),
+	)
+}
+
+// removeResultByFeatureHash drops the alert of a covered finding, keyed by the
+// same feature hash the fingerprint uses.
+func (r *SarifReport) removeResultByFeatureHash(feature string) {
+	feature = strings.TrimSpace(feature)
+	if feature == "" || r == nil || r.run == nil {
+		return
+	}
+	out := r.run.Results[:0]
+	for _, res := range r.run.Results {
+		if res == nil {
+			continue
+		}
+		if fp, ok := res.PartialFingerprints[SarifFingerprintKey]; ok {
+			if text, ok := fp.(string); ok && text == feature {
+				continue
+			}
+		}
+		out = append(out, res)
+	}
+	r.run.Results = out
+	delete(r.resultByHash, feature)
 }
 
 // registerRule appends the result rule to the driver once per rule ID.

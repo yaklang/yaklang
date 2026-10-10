@@ -3,10 +3,12 @@ package sfreport
 import (
 	"encoding/json"
 	"io"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 )
 
@@ -17,6 +19,12 @@ type Report struct {
 	// fileByHash accelerates FirstOrCreateFile* and allows adding risks to existing files.
 	// It must not be serialized into JSON.
 	fileByHash map[string]*File `json:"-"`
+	// sinceFlush counts findings added since the last snapshot. A long scan
+	// publishes intermediate snapshots instead of writing only at the end.
+	sinceFlush int `json:"-"`
+	// flusher writes intermediate snapshots in the background so a long scan
+	// does not stall on the report file. A final Save() drains and stops it.
+	flusher *reportFlusher `json:"-"`
 	// info
 	ReportType    ReportType `json:"report_type"`
 	EngineVersion string     `json:"engine_version"`
@@ -130,7 +138,6 @@ func (r *Report) GetRule(ruleName string) *Rule {
 
 func (r *Report) AddRisks(risk ...*Risk) {
 	r.mu.Lock()
-	defer r.mu.Unlock()
 
 	if r.Risks == nil {
 		r.Risks = make(map[string]*Risk)
@@ -144,6 +151,133 @@ func (r *Report) AddRisks(risk ...*Risk) {
 
 		r.Risks[risk.GetHash()] = risk
 	}
+	r.sinceFlush++
+	flush := r.shouldFlushLocked()
+	r.mu.Unlock()
+	if flush {
+		// Serializing the document is cheap compared to the write; the write
+		// itself happens on the flusher so a long scan does not stall.
+		if data, err := r.snapshotJSON(); err != nil {
+			log.Errorf("serialize report snapshot failed: %v", err)
+		} else {
+			r.flusherFor().submit(data)
+		}
+	}
+}
+
+// flusherFor returns the background writer of this report, creating it on
+// first use.
+func (r *Report) flusherFor() *reportFlusher {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.flusher == nil {
+		r.flusher = newReportFlusher(r.writer)
+	}
+	return r.flusher
+}
+
+// currentFlusher returns the background writer without creating one.
+func (r *Report) currentFlusher() *reportFlusher {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	return r.flusher
+}
+
+// shouldFlushLocked reports whether enough findings accumulated for another
+// snapshot. The caller releases the lock before writing it.
+func (r *Report) shouldFlushLocked() bool {
+	if r == nil || reportFlushEvery <= 0 {
+		return false
+	}
+	if r.sinceFlush < reportFlushEvery {
+		return false
+	}
+	r.sinceFlush = 0
+	return true
+}
+
+// ApplyRiskUpdate creates or replaces one finding. The scan already decided
+// which mode wins and passes that decision here. OldHash empty means create.
+// Any other OldHash is the row this finding replaces.
+func (r *Report) ApplyRiskUpdate(item schema.RiskUpdateItem) error {
+	if r == nil || item.Risk == nil {
+		return nil
+	}
+	r.mu.Lock()
+	newHash := strings.TrimSpace(item.Risk.Hash)
+	if item.OldHash != "" && item.OldHash != newHash {
+		r.dropRiskLocked(item.OldHash)
+	}
+	r.addSchemaRiskLocked(item.Risk)
+	flush := r.shouldFlushLocked()
+	r.mu.Unlock()
+	if flush {
+		if data, err := r.snapshotJSON(); err != nil {
+			log.Errorf("serialize report snapshot failed: %v", err)
+		} else {
+			r.flusherFor().submit(data)
+		}
+	}
+	return nil
+}
+
+// addSchemaRiskLocked records one risk from its own fields. The scan does not
+// hand over the syntaxflow result, so there is no value graph to walk here.
+func (r *Report) addSchemaRiskLocked(ssarisk *schema.SSARisk) {
+	if r == nil || ssarisk == nil {
+		return
+	}
+	if r.Risks == nil {
+		r.Risks = make(map[string]*Risk)
+	}
+	if r.ProgramName == "" && ssarisk.ProgramName != "" {
+		r.ProgramName = ssarisk.ProgramName
+	}
+	risk, _ := NewRisk(ssarisk, r)
+	r.Risks[risk.GetHash()] = risk
+	if file := r.firstOrCreateFileByPath(ssarisk.CodeSourceUrl); file != nil {
+		file.AddRisk(risk)
+	}
+	ruleName := riskRuleName(ssarisk)
+	rule := r.FirstOrCreateRule(&schema.SyntaxFlowRule{
+		RuleName:    ruleName,
+		Title:       ssarisk.Title,
+		Severity:    ssarisk.Severity,
+		Description: ssarisk.Description,
+		Language:    ssaconfig.Language(ssarisk.Language),
+	})
+	if rule != nil {
+		risk.SetRule(rule)
+		rule.AddRisk(risk)
+	}
+	r.RiskNums = len(r.Risks)
+	r.sinceFlush++
+}
+
+// dropRiskLocked removes a replaced finding from the map and from the file and
+// rule references that were built from the rich result.
+func (r *Report) dropRiskLocked(hash string) {
+	if hash == "" {
+		return
+	}
+	delete(r.Risks, hash)
+	for _, file := range r.File {
+		file.Risks = dropHash(file.Risks, hash)
+	}
+	for _, rule := range r.Rules {
+		rule.Risks = dropHash(rule.Risks, hash)
+	}
+	r.RiskNums = len(r.Risks)
+}
+
+func dropHash(list []string, hash string) []string {
+	out := list[:0]
+	for _, item := range list {
+		if item != hash {
+			out = append(out, item)
+		}
+	}
+	return out
 }
 
 func (r *Report) GetRisk(hash string) *Risk {

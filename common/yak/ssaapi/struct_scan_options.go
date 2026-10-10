@@ -63,6 +63,24 @@ func WithStructRuleCallback(cb func(*schema.SSARisk)) ssaconfig.Option {
 	})(cb)
 }
 
+// WithOnRisk registers the callback that receives each risk this compile's
+// struct rules produce. A scan passes the callback that submits into its
+// collect; the compile does not receive the scan's runtime.
+func WithOnRisk(fn func(*schema.SSARisk)) ssaconfig.Option {
+	return ssaconfig.SetOption("ssa/on_risk", func(c *Config, v func(*schema.SSARisk)) {
+		if v == nil {
+			return
+		}
+		prev := c.onRisk
+		c.onRisk = func(risk *schema.SSARisk) {
+			if prev != nil {
+				prev(risk)
+			}
+			v(risk)
+		}
+	})(fn)
+}
+
 func WithStructRuleTimeout(d time.Duration) ssaconfig.Option {
 	return ssaconfig.SetOption("ssa_compile/struct_rule_timeout", func(c *Config, v time.Duration) {
 		c.ensureStructScan().timeout = v

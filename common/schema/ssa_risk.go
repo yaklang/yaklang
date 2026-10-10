@@ -57,8 +57,12 @@ type SSARisk struct {
 	RuntimeId string `json:"runtime_id" gorm:"index"`
 	// for query result
 	ResultID uint64 `json:"result_id"` // result
-	Variable string `json:"variable"`  // result/variable
-	Index    int64  `json:"index"`     // result/variable/index
+	// ResultUUID identifies the syntaxflow result that produced this risk even
+	// when the result was never persisted (in-memory scans have no row id).
+	// It is part of the row hash so findings of one scan stay distinguishable.
+	ResultUUID string `json:"result_uuid" gorm:"index"`
+	Variable   string `json:"variable"` // result/variable
+	Index      int64  `json:"index"`    // result/variable/index
 
 	// 最新处置状态
 	LatestDisposalStatus string `json:"latest_disposal_status" gorm:"index;default:'not_set'"`
@@ -76,8 +80,8 @@ func (*SSARisk) TableName() string {
 func (s *SSARisk) CalcHash() string {
 	return utils.CalcSha1(
 		s.CodeSourceUrl, s.CodeRange, // source code range
-		s.RuntimeId,                                    // syntaxflow scan task id
-		s.ProgramName, s.ResultID, s.Variable, s.Index, // syntaxflow result index
+		s.RuntimeId,                                                  // syntaxflow scan task id
+		s.ProgramName, s.ResultID, s.ResultUUID, s.Variable, s.Index, // syntaxflow result index
 		s.Title, s.RiskType, // risk info
 	)
 }
@@ -137,7 +141,9 @@ func (s *SSARisk) ToGRPCModel() *ypb.SSARisk {
 	}
 }
 
-func (s *SSARisk) BeforeCreate(tx *gorm.DB) (err error) {
+// prepareForSave normalizes the row the same way for create and update so a
+// rewrite keeps a correct hash.
+func (s *SSARisk) prepareForSave() {
 	if s.RiskType == "" {
 		s.RiskType = "其他"
 	}
@@ -146,7 +152,21 @@ func (s *SSARisk) BeforeCreate(tx *gorm.DB) (err error) {
 	}
 	s.Severity = ValidSeverityType(s.Severity)
 	s.Hash = s.CalcHash()
+}
+
+func (s *SSARisk) BeforeCreate(tx *gorm.DB) (err error) {
+	s.prepareForSave()
 	return nil
+}
+
+func (s *SSARisk) BeforeUpdate(tx *gorm.DB) (err error) {
+	s.prepareForSave()
+	return nil
+}
+
+// PrepareForSave normalizes the row for create or update outside gorm.
+func (s *SSARisk) PrepareForSave() {
+	s.prepareForSave()
 }
 
 func (s *SSARisk) AfterCreate(tx *gorm.DB) (err error) {

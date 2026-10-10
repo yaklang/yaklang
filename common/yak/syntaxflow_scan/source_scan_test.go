@@ -62,9 +62,10 @@ func TestSourceAndSSATargetsRejectMismatchedRuleModes(t *testing.T) {
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "source target cannot execute non-source rule")
 
+	// A Program dispatches every rule mode: a source rule runs against the
+	// program's own source snapshot instead of being rejected.
 	_, err = prog.SyntaxFlowRule(sourceRule)
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "SSA program target cannot execute source rule")
+	require.NoError(t, err)
 
 	_, err = sourceTarget.SyntaxFlowRule(sourceRule)
 	require.NoError(t, err)
