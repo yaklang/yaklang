@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 	yaklang "github.com/yaklang/yaklang/common/yak/antlr4yak"
@@ -238,6 +239,37 @@ func TestProtocolHTTPResponseWithoutRequestKeepsHeader(t *testing.T) {
 	require.Equal(t, uint64(3), events[0].SourceBytes.PacketRefs[1].Number)
 	require.Empty(t, events[0].Error)
 	require.Zero(t, stats.BufferedBytes)
+}
+
+func TestProtocolHTTPFailureReleasesHeaderState(t *testing.T) {
+	session, err := NewProtocolSession(DefaultParserBudget())
+	require.NoError(t, err)
+	request := "GET /socket HTTP/1.1\r\nHost: example.test\r\nConnection: Upgrade\r\nUpgrade: websocket\r\n\r\n"
+	response := "HTTP/1.1 101 Switching Protocols\r\nConnection: Upgrade\r\nUpgrade: websocket\r\n\r\n"
+	requests := session.Feed(0, time.Unix(1, 0), []byte(request)).Events
+	require.Len(t, requests, 1)
+	responses := session.Feed(1, time.Unix(2, 0), []byte(response)).Events
+	require.Len(t, responses, 1)
+	flow := session.(*captureSession).f
+	for _, direction := range flow.directions {
+		require.True(t, direction.stopped)
+		require.Nil(t, direction.http, "stopped directions must release header copies without waiting for TCP eviction")
+	}
+	require.Zero(t, flow.a.buffered.Load())
+	fields, err := responses[0].GetFields()
+	require.NoError(t, err)
+	require.Equal(t, 101, fields["Status Code"], "emitted header evidence must survive flow-state release")
+	require.Equal(t, response, string(responses[0].Raw))
+	require.Equal(t, requests[0].ID, responses[0].ResponseTo)
+
+	// A response seen without its request stops only the observed direction.
+	// Its validated header must likewise move entirely to the emitted event.
+	standalone, err := NewProtocolSession(DefaultParserBudget())
+	require.NoError(t, err)
+	result := standalone.Feed(1, time.Unix(3, 0), []byte("HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n"))
+	require.Len(t, result.Events, 1)
+	require.Nil(t, standalone.(*captureSession).f.directions[1].http)
+	require.Equal(t, 200, result.Events[0].Fields["Status Code"])
 }
 
 func TestProtocolAppleRTSPControlWithoutCSeq(t *testing.T) {

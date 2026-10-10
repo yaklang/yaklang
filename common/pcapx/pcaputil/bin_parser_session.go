@@ -848,6 +848,9 @@ func (f *binFlow) closeSession() {
 	f.httpIDs, f.httpTimes = nil, nil
 	f.httpUpgrades, f.httpDoH, f.httpIPP = nil, nil, nil
 	f.httpUpgradeIssues = nil
+	for dir := range f.directions {
+		f.directions[dir].http = nil
+	}
 	if f.tls != nil && f.tls.child != nil {
 		f.tls.child.close(TrafficFlowCloseReason("TLS carrier closed"))
 	}
