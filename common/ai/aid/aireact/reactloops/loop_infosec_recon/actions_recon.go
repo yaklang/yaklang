@@ -114,9 +114,9 @@ var (
 		"read_file", "read_file",
 		"Read a local text file (e.g. saved crawl or JS).",
 		[]aitool.ToolOption{
-			aitool.WithStringParam("path", aitool.WithParam_Required(true), aitool.WithParam_Description("Absolute file path.")),
+			aitool.WithStringParam("file", aitool.WithParam_Required(true), aitool.WithParam_Description("Absolute file path.")),
 			aitool.WithIntegerParam("offset", aitool.WithParam_Default(0)),
-			aitool.WithIntegerParam("chunk_size", aitool.WithParam_Default(20480)),
+			aitool.WithIntegerParam("chunk-size", aitool.WithParam_Default(0), aitool.WithParam_Description("Chunk bytes to read; 0 uses the tool's automatic sizing.")),
 		},
 	)
 	findFilesAction = makeToolForwardAction(
