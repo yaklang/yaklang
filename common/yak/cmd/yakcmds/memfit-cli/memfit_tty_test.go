@@ -17,7 +17,6 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"github.com/mattn/go-runewidth"
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/schema"
 	gopty "github.com/yaklang/yaklang/common/utils/pty"
@@ -255,7 +254,7 @@ func TestMemfitTTYActivityTimelineExpandsIndividualStreams(t *testing.T) {
 	h.Resize(30, 14)
 	narrow := h.WaitFor("Result:")
 	for _, line := range strings.Split(narrow, "\n") {
-		require.LessOrEqual(t, runewidth.StringWidth(line), 30)
+		require.LessOrEqual(t, memfitStringWidth(line), 30)
 	}
 	require.Contains(t, narrow, "❯")
 	h.AssertSnapshot("activity-narrow-open")
@@ -652,7 +651,7 @@ func (h *memfitTTYHarness) ClickText(text string) {
 		}
 		if byteIndex := strings.Index(line.String(), text); byteIndex >= 0 {
 			targetRow = row + 1
-			targetColumn = runewidth.StringWidth(line.String()[:byteIndex]) + 1
+			targetColumn = memfitStringWidth(line.String()[:byteIndex]) + 1
 			break
 		}
 	}
@@ -816,7 +815,7 @@ func renderMemfitTTYSVG(title, snapshot string) []byte {
 	lines := strings.Split(snapshot, "\n")
 	maxCells := 1
 	for _, line := range lines {
-		maxCells = maxInt(maxCells, runewidth.StringWidth(line))
+		maxCells = maxInt(maxCells, memfitStringWidth(line))
 	}
 	width := maxCells*9 + 40
 	height := len(lines)*20 + 54
@@ -867,6 +866,10 @@ type memfitTestScreen struct {
 	row, col      int
 	cells         [][]string
 	pending       []byte
+	// wrapPending mirrors a real terminal's deferred wrap: after a rune fills
+	// the last column the cursor stays on that row until the next printable
+	// rune or an explicit newline; only then does the wrap actually happen.
+	wrapPending bool
 }
 
 func newMemfitTestScreen(width, height int) *memfitTestScreen {
@@ -894,6 +897,7 @@ func (s *memfitTestScreen) Resize(width, height int) {
 		}
 	}
 	s.width, s.height, s.cells = width, height, next
+	s.wrapPending = false
 	if s.row >= height {
 		s.row = height - 1
 	}
@@ -916,16 +920,19 @@ func (s *memfitTestScreen) Write(input []byte) {
 		switch s.pending[0] {
 		case '\r':
 			s.col = 0
+			s.wrapPending = false
 			s.pending = s.pending[1:]
 			continue
 		case '\n':
 			s.newline()
+			s.wrapPending = false
 			s.pending = s.pending[1:]
 			continue
 		case '\b':
 			if s.col > 0 {
 				s.col--
 			}
+			s.wrapPending = false
 			s.pending = s.pending[1:]
 			continue
 		}
@@ -946,6 +953,18 @@ func (s *memfitTestScreen) consumeEscape(input []byte) (int, bool) {
 	if len(input) < 2 {
 		return 0, false
 	}
+	if input[1] == ']' {
+		// OSC (e.g. the window title ConPTY replays) runs until BEL or ST.
+		for index := 2; index < len(input); index++ {
+			if input[index] == 0x07 {
+				return index + 1, true
+			}
+			if input[index] == 0x1b && index+1 < len(input) && input[index+1] == '\\' {
+				return index + 2, true
+			}
+		}
+		return 0, false
+	}
 	if input[1] != '[' {
 		return 2, true
 	}
@@ -963,31 +982,47 @@ func (s *memfitTestScreen) consumeEscape(input []byte) (int, bool) {
 func (s *memfitTestScreen) applyCSI(params string, final byte) {
 	switch final {
 	case 'A':
+		s.wrapPending = false
 		amount := parseMemfitCSIAmount(params, 1)
 		s.row -= amount
 		if s.row < 0 {
 			s.row = 0
 		}
 	case 'B':
+		s.wrapPending = false
 		amount := parseMemfitCSIAmount(params, 1)
 		s.row += amount
 		if s.row >= s.height {
 			s.row = s.height - 1
 		}
 	case 'C':
+		s.wrapPending = false
 		amount := parseMemfitCSIAmount(params, 1)
 		s.col += amount
 		if s.col >= s.width {
 			s.col = s.width - 1
 		}
 	case 'D':
+		s.wrapPending = false
 		amount := parseMemfitCSIAmount(params, 1)
 		s.col -= amount
 		if s.col < 0 {
 			s.col = 0
 		}
 	case 'K':
-		if params == "2" || params == "" {
+		// EL: "" and "0" erase from the cursor to the end of the line (the
+		// common \r + ESC[K idiom ConPTY emits mid-line), "1" erases from the
+		// start through the cursor, "2" erases the whole line.
+		switch params {
+		case "", "0":
+			for col := s.col; col < s.width; col++ {
+				s.cells[s.row][col] = ""
+			}
+		case "1":
+			for col := 0; col <= s.col && col < s.width; col++ {
+				s.cells[s.row][col] = ""
+			}
+		case "2":
 			for col := range s.cells[s.row] {
 				s.cells[s.row][col] = ""
 			}
@@ -1001,8 +1036,25 @@ func (s *memfitTestScreen) applyCSI(params string, final byte) {
 			}
 		}
 	case 'H', 'f':
-		if params == "" {
-			s.row, s.col = 0, 0
+		s.wrapPending = false
+		// ConPTY positions the cursor with absolute coordinates
+		// (e.g. \x1b[5;1H) before replaying a frame; go-pty never emitted
+		// these, so honoring them keeps the model in sync with the screen.
+		row, col := 1, 1
+		if params != "" {
+			parts := strings.Split(params, ";")
+			row = parseMemfitCSIAmount(parts[0], 1)
+			if len(parts) > 1 {
+				col = parseMemfitCSIAmount(parts[1], 1)
+			}
+		}
+		s.row = minInt(s.height, row) - 1
+		if s.row < 0 {
+			s.row = 0
+		}
+		s.col = minInt(s.width, col) - 1
+		if s.col < 0 {
+			s.col = 0
 		}
 	}
 }
@@ -1019,12 +1071,17 @@ func parseMemfitCSIAmount(value string, fallback int) int {
 }
 
 func (s *memfitTestScreen) putRune(r rune) {
-	width := runewidth.RuneWidth(r)
+	width := memfitRuneWidth(r)
 	if width <= 0 {
 		if s.col > 0 {
 			s.cells[s.row][s.col-1] += string(r)
 		}
 		return
+	}
+	if s.wrapPending {
+		s.col = 0
+		s.newline()
+		s.wrapPending = false
 	}
 	if s.col+width > s.width {
 		s.col = 0
@@ -1036,8 +1093,12 @@ func (s *memfitTestScreen) putRune(r rune) {
 	}
 	s.col += width
 	if s.col >= s.width {
-		s.col = 0
-		s.newline()
+		// Filling the last column leaves the wrap deferred: Memfit pads
+		// borders and footers to the full width, so wrapping eagerly here
+		// would make a following \r\n advance two rows instead of one and
+		// desynchronize every later row.
+		s.col = s.width - 1
+		s.wrapPending = true
 	}
 }
 
