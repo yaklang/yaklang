@@ -216,6 +216,14 @@ func (a *binParser) networkPacket(p gopacket.Packet) (gopacket.Packet, bool) {
 		if n := p.NetworkLayer(); n != nil {
 			event.Source, event.Destination = n.NetworkFlow().Src().String(), n.NetworkFlow().Dst().String()
 		}
+		if protocol == "arp" {
+			arp := p.Layer(layers.LayerTypeARP).(*layers.ARP)
+			if arp.Protocol == layers.EthernetTypeIPv4 && arp.ProtAddressSize == 4 {
+				event.Source, event.Destination = net.IP(arp.SourceProtAddress).String(), net.IP(arp.DstProtAddress).String()
+			} else {
+				event.Source, event.Destination = fmt.Sprintf("%x", arp.SourceProtAddress), fmt.Sprintf("%x", arp.DstProtAddress)
+			}
+		}
 		event.Structured = map[string]any{"fields": fields}
 		a.messages.Add(1)
 		a.decoded.Add(1)

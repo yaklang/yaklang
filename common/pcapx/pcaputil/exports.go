@@ -20,6 +20,7 @@ var Exports = map[string]any{
 	"pcap_onProtocolMessage": WithOnProtocolMessage,
 	"pcap_onProtocolStats":   WithOnProtocolStats,
 	"pcap_protocolDeferred":  WithProtocolDeferred,
+	"pcap_protocolBudget":    WithProtocolBudget,
 	"NewBinParserInspector":  NewBinParserInspector,
 	"pcap_binParser":         WithBinParser,
 	"pcap_binParserDeferred": WithBinParserDeferred,

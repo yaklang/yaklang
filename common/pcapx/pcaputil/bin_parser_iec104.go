@@ -20,6 +20,8 @@ type binIEC104 struct {
 	uPending [2]map[byte]bool
 }
 
+var iec104ObjectSizes = map[byte]int{1: 1, 3: 1, 5: 2, 7: 5, 9: 3, 11: 3, 13: 5, 15: 5, 21: 2, 30: 8, 31: 8, 32: 9, 33: 12, 34: 10, 35: 10, 36: 12, 37: 12, 45: 1, 46: 1, 47: 1, 48: 3, 49: 3, 50: 5, 51: 4, 58: 8, 59: 8, 60: 8, 61: 10, 62: 10, 63: 12, 64: 11, 70: 1, 100: 1, 101: 1, 102: 0, 103: 7, 104: 2, 105: 1, 106: 2, 107: 9}
+
 func probeIEC104(w []byte, _ int) ProbeResult {
 	if len(w) < 2 || w[0] != 0x68 {
 		return ProbeResult{Verdict: ProbeReject}
@@ -40,6 +42,29 @@ func probeIEC104(w []byte, _ int) ProbeResult {
 		}
 		if w[6] == 0 || w[7]&127 == 0 {
 			return ProbeResult{Verdict: ProbeReject}
+		}
+		// Validate the declared ASDU layout before admitting a whole flow.
+		// A random 0x68 prefix and plausible control bits are not sufficient.
+		count, body := int(w[7]&127), n-10
+		sequential := w[7]&128 != 0
+		if size, known := iec104ObjectSizes[w[6]]; known {
+			expected := count * (3 + size)
+			if sequential {
+				expected = 3 + count*size
+			}
+			if body != expected {
+				return ProbeResult{Verdict: ProbeReject}
+			}
+		} else if count > 1 {
+			// Unknown private types remain opaque. A multi-object first ASDU
+			// must still fit a uniform object layout; otherwise prior session
+			// evidence is needed. Established sessions do not use this probe.
+			if sequential {
+				body -= 3
+			}
+			if body < 0 || body%count != 0 || !sequential && body/count < 3 {
+				return ProbeResult{Verdict: ProbeReject}
+			}
 		}
 	} else if n != 4 || !iecControl(w[2:6]) {
 		return ProbeResult{Verdict: ProbeReject}
@@ -86,8 +111,7 @@ func iecObjects(a []byte, max int) (map[string]any, error) {
 		return nil, protocolError(ErrResourceExceeded, "IEC104 object count")
 	}
 	out := map[string]any{"Type ID": kind, "Count": n, "Sequential": sq, "Cause": a[2] & 63, "Test": a[2]&128 != 0, "Negative": a[2]&64 != 0, "Originator": a[3], "Common Address": binary.LittleEndian.Uint16(a[4:])}
-	sizes := map[byte]int{1: 1, 3: 1, 5: 2, 7: 5, 9: 3, 11: 3, 13: 5, 15: 5, 21: 2, 30: 8, 31: 8, 32: 9, 33: 12, 34: 10, 35: 10, 36: 12, 37: 12, 45: 1, 46: 1, 47: 1, 48: 3, 49: 3, 50: 5, 51: 4, 58: 8, 59: 8, 60: 8, 61: 10, 62: 10, 63: 12, 64: 11, 70: 1, 100: 1, 101: 1, 102: 0, 103: 7, 104: 2, 105: 1, 106: 2, 107: 9}
-	size, known := sizes[kind]
+	size, known := iec104ObjectSizes[kind]
 	if !known {
 		out["Semantic Status"] = "unsupported-asdu-type"
 		out["Raw Objects"] = append([]byte(nil), a[6:]...)
