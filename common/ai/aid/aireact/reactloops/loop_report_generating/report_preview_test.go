@@ -20,7 +20,7 @@ func TestReportDisplayBudget(t *testing.T) {
 	// A user-edited file can contain malformed UTF-8; even its title must not panic.
 	require.Equal(t, "…", reportDisplayTitle(strings.Repeat("\x80", maxReportTitleBytes+1)))
 	for _, content := range []string{
-		"\n# 格式报告\r\n\r\n```go\r\n\traw := `中文 😀\\n`  \r\n```\r\n\r\n| 字段 | 值 |\r\n| --- | --- |\r\n| 引号 | \\\" |\r\n",
+		"\n# 格式报告\r\n\r\n```go\r\n\traw := `中文 𠮷\\n`  \r\n```\r\n\r\n| 字段 | 值 |\r\n| --- | --- |\r\n| 引号 | \\\" |\r\n",
 		strings.Repeat("a", maxReportDisplayBytes),
 		strings.Repeat("段落\n", maxReportDisplayLines),
 	} {
@@ -29,9 +29,9 @@ func TestReportDisplayBudget(t *testing.T) {
 	for _, tc := range []struct {
 		name, content, keep, omit string
 	}{
-		{"bytes/UTF8", "# 开头\n\n" + strings.Repeat(strings.Repeat("😀 中文 ", 32)+"\n", 300) + "最后一行", "😀 中文", "最后一行"},
+		{"bytes/UTF8", "# 开头\n\n" + strings.Repeat(strings.Repeat("𠮷 中文 ", 32)+"\n", 300) + "最后一行", "𠮷 中文", "最后一行"},
 		{"lines", "# 开头\n\n" + strings.Repeat("- 项目\n", maxReportDisplayLines) + "最后一行", "- 项目", "最后一行"},
-		{"single-line", strings.Repeat("😀", 1024*1024/4), "开头段落或代码块超过聊天展示上限", "😀"},
+		{"single-line", strings.Repeat("𠮷", 1024*1024/4), "开头段落或代码块超过聊天展示上限", "𠮷"},
 		{"unfinished-mermaid", "# 开头\n\n~~~~mermaid\n" + strings.Repeat("graph TD; A-->B;\n", 5000) + "~~~~\n最后一行", "# 开头", "graph TD"},
 		{"nested-fence", "# 开头\n\n````text\n```\n" + strings.Repeat("字面量代码\n", 5000) + "````\n最后一行", "# 开头", "字面量代码"},
 		{"complete-fence/CRLF", "# 开头\r\n\r\n  ```go\r\n\tfmt.Print(\"中文\")\r\n  ``` \r\n\r\n" + strings.Repeat("项目资料\r\n", 5000) + "最后一行", "  ```go\r\n\tfmt.Print(\"中文\")\r\n  ``` ", "最后一行"},
@@ -75,10 +75,10 @@ func TestParentReportDeliveryBudget(t *testing.T) {
 	})
 	loop := reactloops.NewMinimalReActLoop(cfg, inv)
 	path := filepath.Join(t.TempDir(), "report.md")
-	content := "# 报告\n\n" + strings.Repeat(strings.Repeat("中文 😀 ", 32)+"\n", 4000) + "全文尾部标记"
+	content := "# 报告\n\n" + strings.Repeat(strings.Repeat("中文 𠮷 ", 32)+"\n", 4000) + "全文尾部标记"
 	require.GreaterOrEqual(t, len(content), 1024*1024)
 	require.NoError(t, os.WriteFile(path, []byte(content), 0o600))
-	require.NoError(t, EmitReportFinish(loop, path, strings.Repeat("长标题😀", 10000)))
+	require.NoError(t, EmitReportFinish(loop, path, strings.Repeat("长标题𠮷", 10000)))
 	cfg.GetEmitter().WaitForStream()
 	written, err := os.ReadFile(path)
 	require.NoError(t, err)
