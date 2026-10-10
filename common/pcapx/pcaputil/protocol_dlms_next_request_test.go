@@ -15,6 +15,10 @@ func dlmsNextRequestControls(t *testing.T) []dlmsListControl {
 	return dlmsNamedBlockControls(t, "dlms-next-request-segments", "owned-dlms-next-request-segments/v1", 22)
 }
 
+func dlmsReservedNextFlagControls(t *testing.T) []dlmsListControl {
+	return dlmsNamedBlockControls(t, "dlms-reserved-next-flags", "owned-dlms-reserved-next-flags/v1", 4)
+}
+
 // Original answers remain immutable and fully hash validated by their loader.
 // Only complete, decoded service identity is corrected; no fields/errors/IDs
 // or partial observations may be changed by an upgrade record.

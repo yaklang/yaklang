@@ -36710,6 +36710,93 @@
         "common/pcapx/pcaputil/dlms-next-request-segments/controls.json": "controls.json",
         "common/pcapx/pcaputil/dlms-next-request-segments/validation/expected.json": "validation/expected.json"
       }
+    },
+    {
+      "id": "validation-dlms-reserved-next-flags",
+      "kind": "validation",
+      "source_sha": "3bd45b7726d30a94864b9b23f2efee9eb4aeb3a9",
+      "file": "validation-dlms-reserved-next-flags.zip",
+      "sha256": "5fcc6368fb44252d35101d02a3b0260e6183895d6b877421d57987a43f3759f0",
+      "password": "bin-parser",
+      "members": {
+        "build.py": {
+          "sha256": "75c8e541f38143ef910ce0c79df693fc3876f60c26e817460b25ae6bf8e65871",
+          "bytes": 2129
+        },
+        "verify-controls.py": {
+          "sha256": "3ab6af0d12a6a2801574595f812b8a37de1ce72606bfc836b630e5001e7a16b0",
+          "bytes": 1586
+        },
+        "seal.py": {
+          "sha256": "8dcae5df862db315891c6c02d9501fdca8f267d7bf6d6a526d56c2dcc6c56048",
+          "bytes": 3777
+        },
+        "source-pin.json": {
+          "sha256": "715ba1c10f71d9231c97aa0b6e1c01fd8a003d068dee190bd0133d5475d83b93",
+          "bytes": 1430
+        },
+        "LICENSE.txt": {
+          "sha256": "07692f8b1ff29354517d156f5dd99cf73dec597f754200b3c542fb7e2413b1b6",
+          "bytes": 227
+        },
+        "cases/complete-tcp.pcap": {
+          "sha256": "0465553a3737f07ef9b2f8b2ac393a152f8e17d6b0457c9060912d2c02ca3190",
+          "bytes": 700
+        },
+        "answers/complete-tcp.json": {
+          "sha256": "f7460932f0e99c50d5444be2c6658c8852fefd4a25f4795546f6ac83eb3040f6",
+          "bytes": 3852
+        },
+        "cases/segmented-tcp.pcap": {
+          "sha256": "71c685f9d4e0e4757255177f0b3eb77d3094e6be3577bbdc8cd37b0c57627d73",
+          "bytes": 696
+        },
+        "answers/segmented-tcp.json": {
+          "sha256": "0a7e7993909350116f4fb042b098789e820f65eed38c54e9f2d17d704362f2ef",
+          "bytes": 3848
+        },
+        "cases/complete-udp.pcap": {
+          "sha256": "c7580cc6d3772706a237c04431faf47f5ef362bafbf906195d4d2874a9c906fa",
+          "bytes": 430
+        },
+        "answers/complete-udp.json": {
+          "sha256": "324451fe53ef46ec616c90d2be918764a5509b4851e46d0e5ed6b9f0c38c89b2",
+          "bytes": 3852
+        },
+        "cases/segmented-udp.pcap": {
+          "sha256": "c08ef69961d6671d75abb356948925f6b5c6ab861a5d52933b3de9e8addaf53d",
+          "bytes": 426
+        },
+        "answers/segmented-udp.json": {
+          "sha256": "aa2e06901c477a36bde9f1dd1486beb767028a1c9476817f212eaa15c3a103fc",
+          "bytes": 3848
+        },
+        "controls.json": {
+          "sha256": "39a901107bbe0bf2d349213a04e659463a69b6529e15cbea154e3798c6848728",
+          "bytes": 17917
+        },
+        "validation/expected.json": {
+          "sha256": "cee9a16f9c1f5ef75bb777138e5cd1b397b203fa1d46d2d33c391b88244f3cf9",
+          "bytes": 4927
+        }
+      },
+      "aliases": {
+        "common/pcapx/pcaputil/dlms-reserved-next-flags/build.py": "build.py",
+        "common/pcapx/pcaputil/dlms-reserved-next-flags/verify-controls.py": "verify-controls.py",
+        "common/pcapx/pcaputil/dlms-reserved-next-flags/seal.py": "seal.py",
+        "common/pcapx/pcaputil/dlms-reserved-next-flags/source-pin.json": "source-pin.json",
+        "common/pcapx/pcaputil/dlms-reserved-next-flags/LICENSE.txt": "LICENSE.txt",
+        "common/pcapx/pcaputil/dlms-reserved-next-flags/cases/complete-tcp.pcap": "cases/complete-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-reserved-next-flags/answers/complete-tcp.json": "answers/complete-tcp.json",
+        "common/pcapx/pcaputil/dlms-reserved-next-flags/cases/segmented-tcp.pcap": "cases/segmented-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-reserved-next-flags/answers/segmented-tcp.json": "answers/segmented-tcp.json",
+        "common/pcapx/pcaputil/dlms-reserved-next-flags/cases/complete-udp.pcap": "cases/complete-udp.pcap",
+        "common/pcapx/pcaputil/dlms-reserved-next-flags/answers/complete-udp.json": "answers/complete-udp.json",
+        "common/pcapx/pcaputil/dlms-reserved-next-flags/cases/segmented-udp.pcap": "cases/segmented-udp.pcap",
+        "common/pcapx/pcaputil/dlms-reserved-next-flags/answers/segmented-udp.json": "answers/segmented-udp.json",
+        "common/pcapx/pcaputil/dlms-reserved-next-flags/controls.json": "controls.json",
+        "common/pcapx/pcaputil/dlms-reserved-next-flags/validation/expected.json": "validation/expected.json"
+      }
     }
   ],
   "schema_version": 1,

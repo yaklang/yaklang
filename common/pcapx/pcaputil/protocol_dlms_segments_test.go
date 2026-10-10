@@ -11,6 +11,7 @@ import (
 // These independently constructed type3 frames split LLC+GET-normal response
 // before its uint16 Data. No new API is needed to demonstrate missing behavior.
 func TestDLMSHDLCSegmentsExistingAPI(t *testing.T) {
+	t.Run("reserved-next-flags", func(t *testing.T) { dlmsOwnershipAndChunks(t, dlmsReservedNextFlagControls(t)) })
 	t.Run("next-request", testDLMSNextRequestExistingAPI)
 	t.Run("initial-request", TestDLMSHDLCRequestSegmentsExistingAPI)
 	t.Run("untracked-refusal", TestDLMSUntrackedRefusalExistingAPI)
@@ -49,11 +50,13 @@ func dlmsSegmentControls(t *testing.T) []dlmsListControl {
 }
 
 func TestDLMSHDLCSegmentsSealedMatrix(t *testing.T) {
+	t.Run("reserved-next-flags", func(t *testing.T) { dlmsSealedMatrix(t, dlmsReservedNextFlagControls(t)) })
 	t.Run("next-request", func(t *testing.T) { dlmsSealedMatrix(t, dlmsNextRequestControls(t)) })
 	dlmsSealedMatrix(t, dlmsSegmentControls(t))
 	t.Run("initial-request", func(t *testing.T) { dlmsSealedMatrix(t, dlmsRequestSegmentControls(t)) })
 }
 func TestDLMSHDLCSegmentsOwnershipAndChunks(t *testing.T) {
+	t.Run("reserved-next-flags", func(t *testing.T) { dlmsOwnershipAndChunks(t, dlmsReservedNextFlagControls(t)) })
 	t.Run("next-request", func(t *testing.T) { dlmsOwnershipAndChunks(t, dlmsNextRequestControls(t)) })
 	t.Run("request-retry-ownership", testDLMSRequestRetryOwnership)
 	t.Run("initial-request", func(t *testing.T) { dlmsOwnershipAndChunks(t, dlmsRequestSegmentControls(t)) })
