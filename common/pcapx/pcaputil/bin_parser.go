@@ -65,7 +65,7 @@ func (e *ProtocolEvent) Decode() (result map[string]any, err error) {
 		// the same complete message. Queries must use the private snapshot,
 		// including after a caller edits or replaces the public Session map.
 		if e.Transport == "udp" && e.Profile == e.Protocol+"-native" && e.semanticFields != nil &&
-			(e.Protocol == "dhcp" || e.Protocol == "dhcpv6" || e.Protocol == "mqtt-sn") {
+			(e.Protocol == "dhcp" || e.Protocol == "dhcpv6" || e.Protocol == "mqtt-sn" || e.Protocol == "bittorrent-dht" || e.Protocol == "bjnp") {
 			session = e.semanticFields
 		}
 		if err == nil && result != nil && session != nil {
@@ -171,7 +171,7 @@ func (e *ProtocolEvent) ownsNativeFields() bool {
 	if e.Transport == "udp" && (e.Protocol == "dhcp" || e.Protocol == "dhcpv6") && e.Profile == e.Protocol+"-native" {
 		return true
 	}
-	if e.Transport == "udp" && e.Protocol == "mqtt-sn" && e.Profile == "mqtt-sn-native" {
+	if e.Transport == "udp" && (e.Protocol == "mqtt-sn" || e.Protocol == "bittorrent-dht" || e.Protocol == "bjnp") && e.Profile == e.Protocol+"-native" {
 		return true
 	}
 	if e.Profile == "quic-v1-native" || e.Profile == "http3-native" || e.Profile == "doq-native" {

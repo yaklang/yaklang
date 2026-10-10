@@ -8,6 +8,7 @@ import (
 )
 
 func TestDHTKRPCWireAdmission(t *testing.T) {
+	testDHTBudgetsAndIntegers(t)
 	request := []byte("d1:ad2:id20:winlab-node-5013!!!!e1:q4:ping1:t2:aa1:y1:qe")
 	fields, err := decodeDHTMessage(request, 32)
 	require.NoError(t, err)
@@ -59,6 +60,7 @@ func TestDHTCompactPeersFromBEP5(t *testing.T) {
 }
 
 func TestWinlab5013DHTEightDatagrams(t *testing.T) {
+	testOwnedDatagramMatrix(t, "bittorrent-dht")
 	events := replayWinlab5013Protocols(t, "16-bittorrent-dht.pcapng")
 	require.Len(t, events, 8)
 	for i, event := range events {

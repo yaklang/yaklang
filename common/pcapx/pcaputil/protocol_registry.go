@@ -284,6 +284,8 @@ func (a *binParser) decodeNativeDatagram(e *ProtocolEvent, w []byte, src, dst ui
 		var err error
 		if p.name == "syslog" {
 			fields, err = (&binSyslog{}).consume(w, syslogDatagram, a.config.MaxMessageBytes, a.budget.MaxCollectionElements)
+		} else if p.name == "bittorrent-dht" {
+			fields, err = decodeDHTMessageWithBudget(w, a.budget.MaxCollectionElements, a.budget.MaxRecursionDepth)
 		} else {
 			fields, err = p.decode(w, a.budget.MaxCollectionElements)
 		}

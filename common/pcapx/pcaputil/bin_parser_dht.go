@@ -4,6 +4,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"net"
+	"strconv"
 )
 
 // KRPC is a complete bencoded UDP datagram. A port hint is insufficient: the
@@ -14,12 +15,13 @@ type dhtBencode struct {
 	at       int
 	elements int
 	limit    int
+	maxDepth int
 }
 
 func (p *dhtBencode) count() error {
 	p.elements++
 	if p.elements > p.limit {
-		return fmt.Errorf("dht: collection budget exceeded")
+		return protocolError(ErrResourceExceeded, "dht: collection budget exceeded")
 	}
 	return nil
 }
@@ -50,8 +52,11 @@ func (p *dhtBencode) bytes() ([]byte, error) {
 }
 
 func (p *dhtBencode) value(depth int) (any, error) {
-	if depth > 16 || p.at >= len(p.w) {
-		return nil, fmt.Errorf("dht: truncated or nested beyond budget")
+	if depth > p.maxDepth {
+		return nil, protocolError(ErrResourceExceeded, "dht: recursion budget exceeded")
+	}
+	if p.at >= len(p.w) {
+		return nil, fmt.Errorf("dht: truncated value")
 	}
 	if err := p.count(); err != nil {
 		return nil, err
@@ -66,7 +71,7 @@ func (p *dhtBencode) value(depth int) (any, error) {
 				return nil, err
 			}
 			key, err := p.bytes()
-			if err != nil || len(key) == 0 || len(out) > 0 && string(key) <= previous {
+			if err != nil || len(out) > 0 && string(key) <= previous {
 				return nil, fmt.Errorf("dht: invalid or unordered dictionary key")
 			}
 			previous = string(key)
@@ -107,26 +112,27 @@ func (p *dhtBencode) value(depth int) (any, error) {
 			p.w[p.at] == '0' && (negative || p.at+1 < len(p.w) && p.w[p.at+1] != 'e') {
 			return nil, fmt.Errorf("dht: invalid integer")
 		}
-		var n int64
 		for p.at < len(p.w) && p.w[p.at] >= '0' && p.w[p.at] <= '9' {
-			if n > (1<<63-1)/10-9 {
-				return nil, fmt.Errorf("dht: integer overflow")
-			}
-			n = n*10 + int64(p.w[p.at]-'0')
 			p.at++
 		}
 		if p.at >= len(p.w) || p.w[p.at] != 'e' || p.at == start {
 			return nil, fmt.Errorf("dht: unterminated integer")
 		}
+		literal := string(p.w[start:p.at])
 		p.at++
-		if negative {
-			n = -n
+		if n, err := strconv.ParseInt(literal, 10, 64); err == nil {
+			return n, nil
 		}
-		return n, nil
+		// BEP 3 puts no size limit on integers. Preserve a canonical extension
+		// without arbitrary precision arithmetic; known KRPC scalar fields
+		// still require an int64 and their protocol-specific range below.
+		return dhtIntegerLiteral(literal), nil
 	default:
 		return p.bytes()
 	}
 }
+
+type dhtIntegerLiteral string
 
 func dhtString(fields map[string]any, key string) []byte {
 	value, _ := fields[key].([]byte)
@@ -136,13 +142,20 @@ func dhtString(fields map[string]any, key string) []byte {
 func dhtNodeID(fields map[string]any) bool { return len(dhtString(fields, "id")) == 20 }
 
 func decodeDHTMessage(w []byte, maxElements int) (map[string]any, error) {
+	return decodeDHTMessageWithBudget(w, maxElements, 16)
+}
+
+func decodeDHTMessageWithBudget(w []byte, maxElements, maxDepth int) (map[string]any, error) {
 	if len(w) < 18 || len(w) > 1<<20 || w[0] != 'd' {
 		return nil, fmt.Errorf("dht: invalid datagram length or prefix")
 	}
 	if maxElements <= 0 {
 		maxElements = 4096
 	}
-	p := &dhtBencode{w: w, limit: maxElements}
+	if maxDepth <= 0 || maxDepth > 16 {
+		maxDepth = 16
+	}
+	p := &dhtBencode{w: w, limit: maxElements, maxDepth: maxDepth}
 	value, err := p.value(0)
 	if err != nil {
 		return nil, err
@@ -180,7 +193,8 @@ func decodeDHTMessage(w []byte, maxElements int) (map[string]any, error) {
 			}
 			port, portOK := args["port"].(int64)
 			implied, impliedOK := args["implied_port"].(int64)
-			if !portOK && implied != 1 || portOK && (port < 0 || port > 65535) || impliedOK && implied != 0 && implied != 1 {
+			_, impliedPresent := args["implied_port"]
+			if !portOK && implied != 1 || portOK && (port < 0 || port > 65535) || impliedPresent && (!impliedOK || implied != 0 && implied != 1) {
 				return nil, fmt.Errorf("dht: announce_peer port")
 			}
 			out["Info Hash"] = append([]byte(nil), dhtString(args, "info_hash")...)
@@ -195,8 +209,9 @@ func decodeDHTMessage(w []byte, maxElements int) (map[string]any, error) {
 		if !ok || !dhtNodeID(response) {
 			return nil, fmt.Errorf("dht: response lacks 20-byte node ID")
 		}
-		if nodes := dhtString(response, "nodes"); nodes != nil {
-			if len(nodes)%26 != 0 {
+		if rawNodes, exists := response["nodes"]; exists {
+			nodes, ok := rawNodes.([]byte)
+			if !ok || len(nodes)%26 != 0 {
 				return nil, fmt.Errorf("dht: compact nodes length")
 			}
 			out["Nodes Length"] = len(nodes)
@@ -219,8 +234,9 @@ func decodeDHTMessage(w []byte, maxElements int) (map[string]any, error) {
 			}
 			out["Peer Count"] = len(peers)
 		}
-		if token := dhtString(response, "token"); token != nil {
-			if len(token) == 0 || len(token) > 64 {
+		if rawToken, exists := response["token"]; exists {
+			token, ok := rawToken.([]byte)
+			if !ok || len(token) == 0 || len(token) > 64 {
 				return nil, fmt.Errorf("dht: invalid response token")
 			}
 			out["Token"] = append([]byte(nil), token...)
