@@ -56,31 +56,32 @@ type downloadRiskRequest struct {
 }
 
 type DownloadRiskItem struct {
-	Hash            string  `json:"hash"`
-	Title           string  `json:"title"`
-	TitleVerbose    string  `json:"titleVerbose"`
-	Description     string  `json:"description"`
-	Solution        string  `json:"solution"`
-	RiskType        string  `json:"riskType"`
-	RiskTypeVerbose string  `json:"riskTypeVerbose"`
-	Severity        string  `json:"severity"`
-	Parameter       string  `json:"parameter"`
-	Payload         string  `json:"payload"`
-	Details         string  `json:"details"`
-	Url             string  `json:"url"`
-	Host            string  `json:"host"`
-	Port            int     `json:"port"`
-	IP              string  `json:"ipAddress"`
-	SourceType      string  `json:"sourceType"`
-	FromYakScript   string  `json:"fromYakScript"`
-	Tags            string  `json:"tags"`
-	VerifierUid     string  `json:"verifierUid"`
-	FixTime         int64   `json:"fixTime"`
-	FixSuggestion   string  `json:"fixSuggestion"`
-	TagReason       string  `json:"tagReason"`
-	IsPotential     bool    `json:"isPotential"`
-	CVE             string  `json:"cve"`
-	SeverityScore   float64 `json:"severityScore"`
+	Hash            string `json:"hash"`
+	RiskHash        string `json:"risk_hash"`
+	Title           string `json:"title"`
+	TitleVerbose    string `json:"title_verbose"`
+	Description     string `json:"description"`
+	Solution        string `json:"solution"`
+	RiskType        string `json:"risk_type"`
+	RiskTypeVerbose string `json:"risk_type_verbose"`
+	Severity        string `json:"severity"`
+	Parameter       string `json:"parameter"`
+	Payload         string `json:"payload"`
+	Details         string `json:"details"`
+	Url             string `json:"url"`
+	Host            string `json:"host"`
+	Port            int    `json:"port"`
+	IP              string `json:"ip_integer"`
+	//SourceType      string  `json:"sourceType"`
+	FromYakScript string  `json:"from_yak_script"`
+	Tags          string  `json:"tags"`
+	VerifierUid   string  `json:"verifierUid"`
+	FixTime       int64   `json:"fixTime"`
+	FixSuggestion string  `json:"fixSuggestion"`
+	TagReason     string  `json:"tagReason"`
+	IsPotential   bool    `json:"isPotential"`
+	CVE           string  `json:"cve"`
+	SeverityScore float64 `json:"severityScore"`
 }
 
 type riskDownloadResponse struct {
