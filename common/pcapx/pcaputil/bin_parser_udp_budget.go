@@ -12,6 +12,9 @@ func (a *binParser) refuseUDPOversizeAssociation(e *ProtocolEvent, w []byte, src
 	prefix, protocol, profile := "", "", ""
 	ttl := slmpIdleTTL
 	switch {
+	case explicit == "snmp" || explicit == "" && probeSNMP(w, len(w)).Verdict == ProbeAccept:
+		prefix, protocol, profile = "snmp/", "snmp", "snmp-v"+probeSNMP(w, len(w)).Version+"-native"
+		ttl = snmpPendingTTL
 	case explicit == "slmp" || explicit == "" && slmpStart(w):
 		prefix, protocol, profile = "slmp/", "slmp", "slmp-binary-self-test"
 	case explicit == "dlms-wrapper" || explicit == "" && len(w) >= 8 && w[0] == 0 && w[1] == 1:
@@ -36,9 +39,11 @@ func (a *binParser) refuseUDPOversizeAssociation(e *ProtocolEvent, w []byte, src
 		for el := store.lru.Front(); el != nil; {
 			next := el.Next()
 			v := el.Value.(*binUDPEntry)
-			applicable := protocol == "slmp" && v.flow.slmp != nil || protocol == "dlms-wrapper" && v.flow.wrapper != nil || protocol == "dlms" && v.flow.dlms != nil
+			applicable := protocol == "snmp" && v.flow.snmp != nil || protocol == "slmp" && v.flow.slmp != nil || protocol == "dlms-wrapper" && v.flow.wrapper != nil || protocol == "dlms" && v.flow.dlms != nil
 			if applicable && store.clock.Sub(v.touched) >= ttl {
-				if v.flow.dlms != nil || v.flow.wrapper != nil {
+				if v.flow.snmp != nil {
+					v.flow.retireSNMPUDP()
+				} else if v.flow.dlms != nil || v.flow.wrapper != nil {
 					v.flow.retireDLMSUDP()
 				} else {
 					v.flow.closeSession()
@@ -63,7 +68,10 @@ func (a *binParser) refuseUDPOversizeAssociation(e *ProtocolEvent, w []byte, src
 			e.Direction = 1
 		}
 		var retained int64
-		if f.slmp != nil {
+		if f.snmp != nil {
+			f.snmp.invalidate()
+			retained = f.snmp.storage()
+		} else if f.slmp != nil {
 			f.slmp.pending = nil
 			f.slmp.ambiguous = true
 			retained = 512 + 64*int64(len(f.slmp.seen))

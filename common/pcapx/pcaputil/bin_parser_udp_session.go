@@ -26,6 +26,15 @@ type binUDPStore struct {
 	clock   time.Time
 }
 
+func (f *binFlow) retireSNMPUDP() {
+	f.snmp.retirePending()
+	retained := f.snmp.storage()
+	if retained < f.sessionBytes {
+		f.a.buffered.Add(retained - f.sessionBytes)
+		f.sessionBytes = retained
+	}
+}
+
 // Idle time is not a wire generation boundary for UDP. Keep a bounded,
 // capture-domain/endpoint-scoped identity history while releasing pending wire,
 // fragments and Data. A fully completed exchange may accept a distinct identity
@@ -253,9 +262,9 @@ func (a *binParser) decodeSNMPDatagram(e *ProtocolEvent, w []byte, explicit stri
 		next := el.Next()
 		v := el.Value.(*binUDPEntry)
 		if v.flow.snmp != nil && s.clock.Sub(v.touched) >= 10*time.Minute {
-			v.flow.closeSession()
-			delete(s.entries, v.key)
-			s.lru.Remove(el)
+			// UDP idle is not a new generation. Release live request state,
+			// retain charged scoped identities and allow distinct unused IDs.
+			v.flow.retireSNMPUDP()
 		}
 		el = next
 	}
@@ -290,9 +299,11 @@ func (a *binParser) decodeSNMPDatagram(e *ProtocolEvent, w []byte, explicit stri
 			err = protocolError(ErrContextRequired, "SNMP conversation context was closed")
 		} else {
 			f.snmp.expirePending(s.clock)
-			err = f.reserveSession(256 + int64(len(f.snmp.pending)+1)*128 + int64(len(w))*3)
+			err = f.reserveSession(f.snmp.storage() + 512 + int64(len(w))*3)
 			if err == nil {
 				e.Session, err = f.snmp.consumeAt(w, sessionCollectionLimit(a.budget.MaxCollectionElements), dir, s.clock)
+			} else {
+				f.snmp.invalidate()
 			}
 		}
 		if e.Session != nil {

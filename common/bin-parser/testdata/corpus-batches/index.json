@@ -33896,6 +33896,553 @@
         "common/pcapx/pcaputil/dlms-udp-adjacent/controls.json": "controls.json",
         "common/pcapx/pcaputil/dlms-udp-adjacent/validation/expected.json": "validation/expected.json"
       }
+    },
+    {
+      "id": "validation-snmp-identity",
+      "kind": "validation",
+      "source_sha": "c818d8c4c7ccc7f343dfcada274bcfb8cf7405c4",
+      "file": "validation-snmp-identity.zip",
+      "sha256": "ca107998f7c0a4085a6f8e4baf046ea1897f48cc674d923f12627b3633a9c7d7",
+      "password": "bin-parser",
+      "members": {
+        "build.py": {
+          "sha256": "16740cf48ad6f9ec26e90011d50a3dd17b12ca7fdda542fdab39b87955f67c47",
+          "bytes": 6960
+        },
+        "carrier.py": {
+          "sha256": "ede1ef45e967c0bbf331fbfdeacc80dbfbe4d873532d9df5b50d744d4e293db7",
+          "bytes": 1886
+        },
+        "verify-controls.py": {
+          "sha256": "3a5661c7c304ee1078a703302883a2c711cf3e8078bac5ade19211c30c3ea7a6",
+          "bytes": 5376
+        },
+        "source-pin.json": {
+          "sha256": "a873a3070aeba727fed421dcac9036eb3f95d7902612acde31847709a9eaa912",
+          "bytes": 960
+        },
+        "seal.py": {
+          "sha256": "2b46bcf82054bf07374c661a55ab23ff9693030e50aac77b86d8909fb683df21",
+          "bytes": 3526
+        },
+        "cases/v0-tcp-retry.pcap": {
+          "sha256": "7e3c9bc4efb3f0d839d7e1eeb6551492c77cfeda35c0f06b8d719c1e4e45e497",
+          "bytes": 904
+        },
+        "answers/v0-tcp-retry.json": {
+          "sha256": "03752969b1012b1ba9761b9b52092a97965315bde7f4afd1836f1c96efd64dff",
+          "bytes": 12377
+        },
+        "cases/v0-tcp-conflict.pcap": {
+          "sha256": "621261f9790b4b38bbea28ff31488b3150884e13e50ad729622f5ff028ef4315",
+          "bytes": 796
+        },
+        "answers/v0-tcp-conflict.json": {
+          "sha256": "69d6e7356773f2ceccac287b0a3fd0b2daee9529cb79b47968061e8b38ece4fc",
+          "bytes": 10631
+        },
+        "cases/v0-tcp-changed-binding.pcap": {
+          "sha256": "4e74d2a4195fd56f407da1995c416fc0bbaf1ebedec66e497f2fe85b2a245b73",
+          "bytes": 796
+        },
+        "answers/v0-tcp-changed-binding.json": {
+          "sha256": "61eecd5266b4becb4035a61683aeef5375025e2f1d3911214de1dfc44869d5e3",
+          "bytes": 10659
+        },
+        "cases/v0-tcp-completed.pcap": {
+          "sha256": "1d0e6044543d026268ac263c8f415b72d7f43eeb06497162b42ac58ad1e29fbc",
+          "bytes": 909
+        },
+        "answers/v0-tcp-completed.json": {
+          "sha256": "18cc5b589c55e9e38631fd30a9428333319dcc06541ce123020ad3cec582627f",
+          "bytes": 12625
+        },
+        "cases/v0-tcp-expired.pcap": {
+          "sha256": "35feea6e41b62ecc430fba77c2672ca4d89013d78b2bbcd07a250e3f0854ac53",
+          "bytes": 796
+        },
+        "answers/v0-tcp-expired.json": {
+          "sha256": "cfb4a0ac79ee83b20fd6883de198cd95794f5bb6a88e1b9b616bbd1aff5435b1",
+          "bytes": 10627
+        },
+        "cases/v0-tcp-orphan.pcap": {
+          "sha256": "7d1048a2fb2de9227f1b71fcba597bdde741fb76b006ba36c72060264bde4928",
+          "bytes": 794
+        },
+        "answers/v0-tcp-orphan.json": {
+          "sha256": "c78170e35a6a9abe66e66e9cfeb13501f27c8d7faad89563af3f5395107008a0",
+          "bytes": 10778
+        },
+        "cases/v0-tcp-fresh-after-expiry.pcap": {
+          "sha256": "a1ffba17279375e3119efee1c7e89033327139e093d11c619d96aad8afcad4fa",
+          "bytes": 681
+        },
+        "answers/v0-tcp-fresh-after-expiry.json": {
+          "sha256": "51e535327a772827932f79bd4ffe232daa9a7bcbb3cb300ad15a981798b26127",
+          "bytes": 8511
+        },
+        "cases/v0-udp-retry.pcap": {
+          "sha256": "8a3d4b6d6d4d4182ff0c00db444439707ce4e3a21d5573429bf6bbc8c28b006e",
+          "bytes": 622
+        },
+        "answers/v0-udp-retry.json": {
+          "sha256": "5a20747f79be9ed1d64048eef33f0689923d17f4255d6b1674cfdccd33975214",
+          "bytes": 12447
+        },
+        "cases/v0-udp-conflict.pcap": {
+          "sha256": "8fbd8e2db5bfb9a617ff80093e6bbe3d3dfb0100e3fa570ba95f5afcf1243b5a",
+          "bytes": 526
+        },
+        "answers/v0-udp-conflict.json": {
+          "sha256": "0a4df2f46e27512a9f43f7c95785b320e89e7a19b1944b7d246a76727dd976f6",
+          "bytes": 10691
+        },
+        "cases/v0-udp-changed-binding.pcap": {
+          "sha256": "6df9d8f24d6c28daa2b3c66867ae9a31af69d88d95a2dd70cfdf0b5a1e81edc2",
+          "bytes": 526
+        },
+        "answers/v0-udp-changed-binding.json": {
+          "sha256": "4c8258f4a84353fa949b4edd7426e24bdc3264e161994010feb250f54d074096",
+          "bytes": 10719
+        },
+        "cases/v0-udp-completed.pcap": {
+          "sha256": "3b06aa90389a024331d3172f6f85f8dc30e528e39b6322bb3e3b70b5bb1c8605",
+          "bytes": 627
+        },
+        "answers/v0-udp-completed.json": {
+          "sha256": "9c9fbf1f4e3d41e6199eda2b7cd4202deadd2337349d6ec612cdeab111d04be7",
+          "bytes": 12695
+        },
+        "cases/v0-udp-expired.pcap": {
+          "sha256": "fa4f14bb7d6442c1ba8d16a13b5d3810bf6df7335ce67244b8a4d66c36a0a4c3",
+          "bytes": 526
+        },
+        "answers/v0-udp-expired.json": {
+          "sha256": "0809272dca3587cb5bf660b6fca775fcb82684dfaf20b10739fcda8429030ba7",
+          "bytes": 10687
+        },
+        "cases/v0-udp-orphan.pcap": {
+          "sha256": "590954aacec51ae50625a213c1948c8281b55640017c8469fa47045e95728b70",
+          "bytes": 524
+        },
+        "answers/v0-udp-orphan.json": {
+          "sha256": "407587cfd45f7c744d4670a1ebe1441eeacc8f984bb34beb409e43feffd38e33",
+          "bytes": 10838
+        },
+        "cases/v0-udp-fresh-after-expiry.pcap": {
+          "sha256": "b969e3c86d927014fdd715e252d26649e49b982a2490efdd404f64b2bca9d2af",
+          "bytes": 423
+        },
+        "answers/v0-udp-fresh-after-expiry.json": {
+          "sha256": "f651b0412c7cfc30f2bdc44d7802ccbf37f64152106fe40f73544f02070ccbe7",
+          "bytes": 8561
+        },
+        "cases/v1-tcp-retry.pcap": {
+          "sha256": "34f3e29525bebc8ec416a7f262c68896d79096e40e5d9d53f93724e25c41008d",
+          "bytes": 904
+        },
+        "answers/v1-tcp-retry.json": {
+          "sha256": "99b27b9f596e1951d98381a61fd94329c8b8d972fd52ca06fe648f06d3f9d3f6",
+          "bytes": 12389
+        },
+        "cases/v1-tcp-conflict.pcap": {
+          "sha256": "92db668a367b11d19cfcc3c1cc27559a353062969ae91754546c7eaf86f2e0c0",
+          "bytes": 796
+        },
+        "answers/v1-tcp-conflict.json": {
+          "sha256": "9b9aaaed92ea1c35e278a25c23149a05bfaf60a8017478fb98862dd2f9843b6d",
+          "bytes": 10641
+        },
+        "cases/v1-tcp-changed-binding.pcap": {
+          "sha256": "8d14856319d0ab88c8a625a49217b5a7a0fe19e221247442d248b2f6d77135f9",
+          "bytes": 796
+        },
+        "answers/v1-tcp-changed-binding.json": {
+          "sha256": "7ed51b80d950bc4f80901154b8fc464b3d65a2c186073197a713fd0a8239afa1",
+          "bytes": 10669
+        },
+        "cases/v1-tcp-completed.pcap": {
+          "sha256": "cc263f07efc2c7f9ee85987b91ec33f7321348740adbb325e7d9bcabfe7a2070",
+          "bytes": 909
+        },
+        "answers/v1-tcp-completed.json": {
+          "sha256": "3eb757071284b031e49fb16912b0e80accea61669e9e5ee46fc79cf91c1ba3a2",
+          "bytes": 12637
+        },
+        "cases/v1-tcp-expired.pcap": {
+          "sha256": "722e67187b94adbcc8bec1829ed8741887deec9c52b866285ec7ff5a3a63c0eb",
+          "bytes": 796
+        },
+        "answers/v1-tcp-expired.json": {
+          "sha256": "2cc027418dbfc2a2ed0b6debbb3957787bc34d6099f0bc09d2802ced363c6608",
+          "bytes": 10637
+        },
+        "cases/v1-tcp-orphan.pcap": {
+          "sha256": "2a032ba823f02920dcd90314afc547addac33f1ac0594234543d7302379c4641",
+          "bytes": 794
+        },
+        "answers/v1-tcp-orphan.json": {
+          "sha256": "d232189bd131776dfc1fd23c596fe478edcb0555824ad534bda9a0137db0295e",
+          "bytes": 10788
+        },
+        "cases/v1-tcp-fresh-after-expiry.pcap": {
+          "sha256": "82ac408cdfddfd3fe6f129af3f2b7d1431a5e6752b3261382b9faf892d410ee0",
+          "bytes": 681
+        },
+        "answers/v1-tcp-fresh-after-expiry.json": {
+          "sha256": "c65947aa79b7d8101addb740f71e3c7a9c7d64a400837c7fd4729c109987d806",
+          "bytes": 8519
+        },
+        "cases/v1-udp-retry.pcap": {
+          "sha256": "2bd4daa90811a991de67a9707fd872be83b73d9ee937209d8918e3b50d903713",
+          "bytes": 622
+        },
+        "answers/v1-udp-retry.json": {
+          "sha256": "7b622c673f6860bcecb13c3e1ad5dbe853eb54d8f54ff154a72c5c102b6e09a1",
+          "bytes": 12460
+        },
+        "cases/v1-udp-conflict.pcap": {
+          "sha256": "dac3b6551e37a7fcaca7f023c80f82d0e0f10e9e3fd399710c211d14b16fd6d8",
+          "bytes": 526
+        },
+        "answers/v1-udp-conflict.json": {
+          "sha256": "6362dc8815747e7cbd92a66d70ee0ffccc27109c57482a6d616af16a8f2b3a2a",
+          "bytes": 10702
+        },
+        "cases/v1-udp-changed-binding.pcap": {
+          "sha256": "186c4623da7b75e06bf174c21389a4cbc600a895b64257e229eae10f4086c649",
+          "bytes": 526
+        },
+        "answers/v1-udp-changed-binding.json": {
+          "sha256": "4e2f7b8d59a3b899ad99fa03a89f738a0dfab505a2e5c297fc88386b30bfa572",
+          "bytes": 10730
+        },
+        "cases/v1-udp-completed.pcap": {
+          "sha256": "797301f664d7aaa6048d5084290f3914f0edf0bd3d67a943cfea380214c8f102",
+          "bytes": 627
+        },
+        "answers/v1-udp-completed.json": {
+          "sha256": "1cf9a57f543250f9026b27f3e5c1c488621eeeb7694ed638a597c16e0a08b100",
+          "bytes": 12708
+        },
+        "cases/v1-udp-expired.pcap": {
+          "sha256": "774ba024a0426c2a3b2641787867d2094f9dd8faf65b7166920df14dc2181d27",
+          "bytes": 526
+        },
+        "answers/v1-udp-expired.json": {
+          "sha256": "76655483614edf62760cdc88d86f683248a48e14a3eeb048e72c9083f5af1b04",
+          "bytes": 10698
+        },
+        "cases/v1-udp-orphan.pcap": {
+          "sha256": "6bacfe2359e9e4c5719a517ba2b55a8650ca30ed84189007af542cd496530ff5",
+          "bytes": 524
+        },
+        "answers/v1-udp-orphan.json": {
+          "sha256": "ff2eb4f798aadfe5a33db83677b6321df3724b8fe7c2967052158231597cc4fe",
+          "bytes": 10849
+        },
+        "cases/v1-udp-fresh-after-expiry.pcap": {
+          "sha256": "cba4de81f85befba86078cad16f514832f96761b20ac0a4193e1e60042b6cb82",
+          "bytes": 423
+        },
+        "answers/v1-udp-fresh-after-expiry.json": {
+          "sha256": "9957a8674a6b98355f7bacffc2959a6f5ae2de7f523471a32eafa1071ad66921",
+          "bytes": 8570
+        },
+        "cases/v3-tcp-retry.pcap": {
+          "sha256": "6bb5074dbe76145d2354e2e72ecb9425d1c8230f031e69e1cddf51971f6b660e",
+          "bytes": 1150
+        },
+        "answers/v3-tcp-retry.json": {
+          "sha256": "eb40589430cc5c11fdac2591fd452d3b17f518ecb68a8c929ccb1dc2baf15b37",
+          "bytes": 16911
+        },
+        "cases/v3-tcp-conflict.pcap": {
+          "sha256": "cbb7b034dc27f84f8004eb8ff758cf7756aff120852a6176011b9c2b82cc9f2b",
+          "bytes": 1001
+        },
+        "answers/v3-tcp-conflict.json": {
+          "sha256": "1ae0eca6d3405f65a163d9a48c336ec1aca6a5ee8ed927010b61a2cc7163478f",
+          "bytes": 14323
+        },
+        "cases/v3-tcp-changed-binding.pcap": {
+          "sha256": "23ce8f22db3d48d8f6c7a8ab5b3ddd93e75f5e3613a28c8d81ebe3e1937e85d3",
+          "bytes": 1001
+        },
+        "answers/v3-tcp-changed-binding.json": {
+          "sha256": "93b85921e53fad3ac7bf8e7b519ecc61013c5e124d811c3955ddabce45f91ad3",
+          "bytes": 14351
+        },
+        "cases/v3-tcp-completed.pcap": {
+          "sha256": "20e970ce78aa4a4a55098867f40093a7fb651d99319bc8e1edd51eddd21cd981",
+          "bytes": 1155
+        },
+        "answers/v3-tcp-completed.json": {
+          "sha256": "4afde36bbfb887d12faca5a5684142c5a7aee4b10446a47f1423168be3ee4c15",
+          "bytes": 17085
+        },
+        "cases/v3-tcp-expired.pcap": {
+          "sha256": "707252ddcd8a2c032cc2a008e92679f0ef6431cafdaa47994a47c700cfd8aeea",
+          "bytes": 1001
+        },
+        "answers/v3-tcp-expired.json": {
+          "sha256": "484d5fce3d82e180c21cadd056fac7ff24652aeb588374d1afe2cbbb1131965a",
+          "bytes": 14319
+        },
+        "cases/v3-tcp-orphan.pcap": {
+          "sha256": "1b1100158046f52e23bdfa066ac7905295afd28170aedfd2fd6a95d7253ed3b7",
+          "bytes": 999
+        },
+        "answers/v3-tcp-orphan.json": {
+          "sha256": "a62231592953d72cf3678e745652d7a09a99f54b99f742375240a87b2d5a281c",
+          "bytes": 14396
+        },
+        "cases/v3-tcp-fresh-after-expiry.pcap": {
+          "sha256": "3d145653cb375c3322a3bc049bc10db36c2d99e794d2398d0c1b417458a54fe5",
+          "bytes": 845
+        },
+        "answers/v3-tcp-fresh-after-expiry.json": {
+          "sha256": "b6fc14fa0c2ebf3af3434e77fcdd3b8a87ad89dae68db04b3a7a14c19ac60f62",
+          "bytes": 11509
+        },
+        "cases/v3-udp-retry.pcap": {
+          "sha256": "42264c0b6865e7e50a5e45903cfe2ecf3dedb043043fb545aaafec2e017af489",
+          "bytes": 868
+        },
+        "answers/v3-udp-retry.json": {
+          "sha256": "077eed20e6c9ed531702d34e993026d90875895f05156a3445222a8dab414d65",
+          "bytes": 17461
+        },
+        "cases/v3-udp-conflict.pcap": {
+          "sha256": "d662c2ee860714c94ab2e31101201d060dc79b3c521de66b8b56b888a871de93",
+          "bytes": 731
+        },
+        "answers/v3-udp-conflict.json": {
+          "sha256": "1e62a6ce122c01d82a38581b9810ee1b5e92aaca4184f416c6f748fe7fdd4b10",
+          "bytes": 14783
+        },
+        "cases/v3-udp-changed-binding.pcap": {
+          "sha256": "2575b4abe3da1fd60846bdaafd2650453edbc227b716529d71b2c0c1898d5e67",
+          "bytes": 731
+        },
+        "answers/v3-udp-changed-binding.json": {
+          "sha256": "201f72428d3ddc69c4894b76b4dd587f47655977a5c7a0b0d61c89e467269d72",
+          "bytes": 14811
+        },
+        "cases/v3-udp-completed.pcap": {
+          "sha256": "8d33c6a593b8328609527a3f3551c7d61f6accb2c702b81cae695a0064dcc7f8",
+          "bytes": 873
+        },
+        "answers/v3-udp-completed.json": {
+          "sha256": "11381afb3672e0eac97ecbbff3b5b6f91991e7d0496bf7babe88631f9b14e29d",
+          "bytes": 17635
+        },
+        "cases/v3-udp-expired.pcap": {
+          "sha256": "8c4e4e9f856ec981ccaac4947f372bb6f931277169061c606f4e52193881983e",
+          "bytes": 731
+        },
+        "answers/v3-udp-expired.json": {
+          "sha256": "42d2e068d59ebe08ff2bea36a5528339241ffcf3fe28de81e391b5feccf1a656",
+          "bytes": 14779
+        },
+        "cases/v3-udp-orphan.pcap": {
+          "sha256": "4d11a02bcafd426a573bea94aa071d3f42cad4a8c87be08ce6b2e9b080323009",
+          "bytes": 729
+        },
+        "answers/v3-udp-orphan.json": {
+          "sha256": "74d3a6005fa6a5b7c0aac28abece74a27881ea9eb0b8b079dd8d5ed010a66025",
+          "bytes": 14856
+        },
+        "cases/v3-udp-fresh-after-expiry.pcap": {
+          "sha256": "ab66189d580622e5872ef462b96ac81efee2e41134fc1bd09949fee4aa3ce203",
+          "bytes": 587
+        },
+        "answers/v3-udp-fresh-after-expiry.json": {
+          "sha256": "ec954e15ac6de6c01ad8f4d86bb03232fdd297ded8b69014c796811f97f7de53",
+          "bytes": 11879
+        },
+        "cases/v3-tcp-context-engine.pcap": {
+          "sha256": "ae106dd2cb27f469a2cb6308ed7355f27484eda990b03d61c37ba89e61d6883d",
+          "bytes": 698
+        },
+        "answers/v3-tcp-context-engine.json": {
+          "sha256": "6c1ee372ecdd61a10e2b0701c203120cabf06827ee7d6c777b83ca7aecf39747",
+          "bytes": 8883
+        },
+        "cases/v3-tcp-context-name.pcap": {
+          "sha256": "a6354af469e87db43a0b76fd12c8c9db6abefe48b6ea7734d9937c13c8f59587",
+          "bytes": 702
+        },
+        "answers/v3-tcp-context-name.json": {
+          "sha256": "fc31fc85b453eb2c9eec58ab50492b32d3cf25f7dc5ba46de67050e6f84a844c",
+          "bytes": 8897
+        },
+        "cases/v3-tcp-security-level.pcap": {
+          "sha256": "281cebbc190c85e3bb5f4e091c37ac149c27cbbe7e3101d2e355583de2883cdd",
+          "bytes": 709
+        },
+        "answers/v3-tcp-security-level.json": {
+          "sha256": "1540bb83210f5e123f6c717ebeef2f4c2b88bc2632b02a5b9cd88ed57e5de3fc",
+          "bytes": 8921
+        },
+        "cases/v3-udp-context-engine.pcap": {
+          "sha256": "54f42fb3cb788bbe1d9d8eceed9cadd2674365f5f120e58343dcb03f3f8d2e1e",
+          "bytes": 452
+        },
+        "answers/v3-udp-context-engine.json": {
+          "sha256": "8f7a7defee9cb7e60584b2037de2d97e46c8077924e489b5d0069e4888c13aff",
+          "bytes": 9163
+        },
+        "cases/v3-udp-context-name.pcap": {
+          "sha256": "7bdecb5fd26096d21b1ee57dcba1cc23cdb7d0e1b178485ad4d722130f08e8ec",
+          "bytes": 456
+        },
+        "answers/v3-udp-context-name.json": {
+          "sha256": "7dc142d6a808e3408a5a2bf061fef716c1e9415c46e1f2f1a13091df9f42633a",
+          "bytes": 9177
+        },
+        "cases/v3-udp-security-level.pcap": {
+          "sha256": "a8c26d76e61bfecbf640a0589148a07d0df56aabe151f87a1070a6f989afad84",
+          "bytes": 463
+        },
+        "answers/v3-udp-security-level.json": {
+          "sha256": "769e804b29dd39d529e9d661e9e4de1eba3d512ccbec5f9a47561bb50e694246",
+          "bytes": 9201
+        },
+        "cases/v0-udp-byte-refusal.pcap": {
+          "sha256": "06a752c7c64e2b91e4dc57c7d44c6602ab53ca6d1e6074550b7fea25dc9a8f79",
+          "bytes": 1044
+        },
+        "answers/v0-udp-byte-refusal.json": {
+          "sha256": "273d905dd9c402647152006d17daf92c057b2dc3726acae7e68bd6fea741383a",
+          "bytes": 11710
+        },
+        "cases/v3-udp-byte-refusal.pcap": {
+          "sha256": "faebab236d879fe9ff0e831abac18cab3195cc3ef7cf6f7dadd78d99c6b5f3f2",
+          "bytes": 1251
+        },
+        "answers/v3-udp-byte-refusal.json": {
+          "sha256": "e1ede320c514f6dc0ad1e24a4762f843a27da55e920cc2dd5cb21e3f98066b48",
+          "bytes": 15268
+        },
+        "controls.json": {
+          "sha256": "ffdb9eca228f34edcd355e820a10859f7563a0b3dc267889e8b5b30bf6b89a26",
+          "bytes": 674991
+        },
+        "validation/expected.json": {
+          "sha256": "6b3386d980ddcfe519248859fe3e21992e6178fee60525f876a363a2e3063ec1",
+          "bytes": 56508
+        }
+      },
+      "aliases": {
+        "common/pcapx/pcaputil/snmp-identity/build.py": "build.py",
+        "common/pcapx/pcaputil/snmp-identity/carrier.py": "carrier.py",
+        "common/pcapx/pcaputil/snmp-identity/verify-controls.py": "verify-controls.py",
+        "common/pcapx/pcaputil/snmp-identity/source-pin.json": "source-pin.json",
+        "common/pcapx/pcaputil/snmp-identity/seal.py": "seal.py",
+        "common/pcapx/pcaputil/snmp-identity/cases/v0-tcp-retry.pcap": "cases/v0-tcp-retry.pcap",
+        "common/pcapx/pcaputil/snmp-identity/answers/v0-tcp-retry.json": "answers/v0-tcp-retry.json",
+        "common/pcapx/pcaputil/snmp-identity/cases/v0-tcp-conflict.pcap": "cases/v0-tcp-conflict.pcap",
+        "common/pcapx/pcaputil/snmp-identity/answers/v0-tcp-conflict.json": "answers/v0-tcp-conflict.json",
+        "common/pcapx/pcaputil/snmp-identity/cases/v0-tcp-changed-binding.pcap": "cases/v0-tcp-changed-binding.pcap",
+        "common/pcapx/pcaputil/snmp-identity/answers/v0-tcp-changed-binding.json": "answers/v0-tcp-changed-binding.json",
+        "common/pcapx/pcaputil/snmp-identity/cases/v0-tcp-completed.pcap": "cases/v0-tcp-completed.pcap",
+        "common/pcapx/pcaputil/snmp-identity/answers/v0-tcp-completed.json": "answers/v0-tcp-completed.json",
+        "common/pcapx/pcaputil/snmp-identity/cases/v0-tcp-expired.pcap": "cases/v0-tcp-expired.pcap",
+        "common/pcapx/pcaputil/snmp-identity/answers/v0-tcp-expired.json": "answers/v0-tcp-expired.json",
+        "common/pcapx/pcaputil/snmp-identity/cases/v0-tcp-orphan.pcap": "cases/v0-tcp-orphan.pcap",
+        "common/pcapx/pcaputil/snmp-identity/answers/v0-tcp-orphan.json": "answers/v0-tcp-orphan.json",
+        "common/pcapx/pcaputil/snmp-identity/cases/v0-tcp-fresh-after-expiry.pcap": "cases/v0-tcp-fresh-after-expiry.pcap",
+        "common/pcapx/pcaputil/snmp-identity/answers/v0-tcp-fresh-after-expiry.json": "answers/v0-tcp-fresh-after-expiry.json",
+        "common/pcapx/pcaputil/snmp-identity/cases/v0-udp-retry.pcap": "cases/v0-udp-retry.pcap",
+        "common/pcapx/pcaputil/snmp-identity/answers/v0-udp-retry.json": "answers/v0-udp-retry.json",
+        "common/pcapx/pcaputil/snmp-identity/cases/v0-udp-conflict.pcap": "cases/v0-udp-conflict.pcap",
+        "common/pcapx/pcaputil/snmp-identity/answers/v0-udp-conflict.json": "answers/v0-udp-conflict.json",
+        "common/pcapx/pcaputil/snmp-identity/cases/v0-udp-changed-binding.pcap": "cases/v0-udp-changed-binding.pcap",
+        "common/pcapx/pcaputil/snmp-identity/answers/v0-udp-changed-binding.json": "answers/v0-udp-changed-binding.json",
+        "common/pcapx/pcaputil/snmp-identity/cases/v0-udp-completed.pcap": "cases/v0-udp-completed.pcap",
+        "common/pcapx/pcaputil/snmp-identity/answers/v0-udp-completed.json": "answers/v0-udp-completed.json",
+        "common/pcapx/pcaputil/snmp-identity/cases/v0-udp-expired.pcap": "cases/v0-udp-expired.pcap",
+        "common/pcapx/pcaputil/snmp-identity/answers/v0-udp-expired.json": "answers/v0-udp-expired.json",
+        "common/pcapx/pcaputil/snmp-identity/cases/v0-udp-orphan.pcap": "cases/v0-udp-orphan.pcap",
+        "common/pcapx/pcaputil/snmp-identity/answers/v0-udp-orphan.json": "answers/v0-udp-orphan.json",
+        "common/pcapx/pcaputil/snmp-identity/cases/v0-udp-fresh-after-expiry.pcap": "cases/v0-udp-fresh-after-expiry.pcap",
+        "common/pcapx/pcaputil/snmp-identity/answers/v0-udp-fresh-after-expiry.json": "answers/v0-udp-fresh-after-expiry.json",
+        "common/pcapx/pcaputil/snmp-identity/cases/v1-tcp-retry.pcap": "cases/v1-tcp-retry.pcap",
+        "common/pcapx/pcaputil/snmp-identity/answers/v1-tcp-retry.json": "answers/v1-tcp-retry.json",
+        "common/pcapx/pcaputil/snmp-identity/cases/v1-tcp-conflict.pcap": "cases/v1-tcp-conflict.pcap",
+        "common/pcapx/pcaputil/snmp-identity/answers/v1-tcp-conflict.json": "answers/v1-tcp-conflict.json",
+        "common/pcapx/pcaputil/snmp-identity/cases/v1-tcp-changed-binding.pcap": "cases/v1-tcp-changed-binding.pcap",
+        "common/pcapx/pcaputil/snmp-identity/answers/v1-tcp-changed-binding.json": "answers/v1-tcp-changed-binding.json",
+        "common/pcapx/pcaputil/snmp-identity/cases/v1-tcp-completed.pcap": "cases/v1-tcp-completed.pcap",
+        "common/pcapx/pcaputil/snmp-identity/answers/v1-tcp-completed.json": "answers/v1-tcp-completed.json",
+        "common/pcapx/pcaputil/snmp-identity/cases/v1-tcp-expired.pcap": "cases/v1-tcp-expired.pcap",
+        "common/pcapx/pcaputil/snmp-identity/answers/v1-tcp-expired.json": "answers/v1-tcp-expired.json",
+        "common/pcapx/pcaputil/snmp-identity/cases/v1-tcp-orphan.pcap": "cases/v1-tcp-orphan.pcap",
+        "common/pcapx/pcaputil/snmp-identity/answers/v1-tcp-orphan.json": "answers/v1-tcp-orphan.json",
+        "common/pcapx/pcaputil/snmp-identity/cases/v1-tcp-fresh-after-expiry.pcap": "cases/v1-tcp-fresh-after-expiry.pcap",
+        "common/pcapx/pcaputil/snmp-identity/answers/v1-tcp-fresh-after-expiry.json": "answers/v1-tcp-fresh-after-expiry.json",
+        "common/pcapx/pcaputil/snmp-identity/cases/v1-udp-retry.pcap": "cases/v1-udp-retry.pcap",
+        "common/pcapx/pcaputil/snmp-identity/answers/v1-udp-retry.json": "answers/v1-udp-retry.json",
+        "common/pcapx/pcaputil/snmp-identity/cases/v1-udp-conflict.pcap": "cases/v1-udp-conflict.pcap",
+        "common/pcapx/pcaputil/snmp-identity/answers/v1-udp-conflict.json": "answers/v1-udp-conflict.json",
+        "common/pcapx/pcaputil/snmp-identity/cases/v1-udp-changed-binding.pcap": "cases/v1-udp-changed-binding.pcap",
+        "common/pcapx/pcaputil/snmp-identity/answers/v1-udp-changed-binding.json": "answers/v1-udp-changed-binding.json",
+        "common/pcapx/pcaputil/snmp-identity/cases/v1-udp-completed.pcap": "cases/v1-udp-completed.pcap",
+        "common/pcapx/pcaputil/snmp-identity/answers/v1-udp-completed.json": "answers/v1-udp-completed.json",
+        "common/pcapx/pcaputil/snmp-identity/cases/v1-udp-expired.pcap": "cases/v1-udp-expired.pcap",
+        "common/pcapx/pcaputil/snmp-identity/answers/v1-udp-expired.json": "answers/v1-udp-expired.json",
+        "common/pcapx/pcaputil/snmp-identity/cases/v1-udp-orphan.pcap": "cases/v1-udp-orphan.pcap",
+        "common/pcapx/pcaputil/snmp-identity/answers/v1-udp-orphan.json": "answers/v1-udp-orphan.json",
+        "common/pcapx/pcaputil/snmp-identity/cases/v1-udp-fresh-after-expiry.pcap": "cases/v1-udp-fresh-after-expiry.pcap",
+        "common/pcapx/pcaputil/snmp-identity/answers/v1-udp-fresh-after-expiry.json": "answers/v1-udp-fresh-after-expiry.json",
+        "common/pcapx/pcaputil/snmp-identity/cases/v3-tcp-retry.pcap": "cases/v3-tcp-retry.pcap",
+        "common/pcapx/pcaputil/snmp-identity/answers/v3-tcp-retry.json": "answers/v3-tcp-retry.json",
+        "common/pcapx/pcaputil/snmp-identity/cases/v3-tcp-conflict.pcap": "cases/v3-tcp-conflict.pcap",
+        "common/pcapx/pcaputil/snmp-identity/answers/v3-tcp-conflict.json": "answers/v3-tcp-conflict.json",
+        "common/pcapx/pcaputil/snmp-identity/cases/v3-tcp-changed-binding.pcap": "cases/v3-tcp-changed-binding.pcap",
+        "common/pcapx/pcaputil/snmp-identity/answers/v3-tcp-changed-binding.json": "answers/v3-tcp-changed-binding.json",
+        "common/pcapx/pcaputil/snmp-identity/cases/v3-tcp-completed.pcap": "cases/v3-tcp-completed.pcap",
+        "common/pcapx/pcaputil/snmp-identity/answers/v3-tcp-completed.json": "answers/v3-tcp-completed.json",
+        "common/pcapx/pcaputil/snmp-identity/cases/v3-tcp-expired.pcap": "cases/v3-tcp-expired.pcap",
+        "common/pcapx/pcaputil/snmp-identity/answers/v3-tcp-expired.json": "answers/v3-tcp-expired.json",
+        "common/pcapx/pcaputil/snmp-identity/cases/v3-tcp-orphan.pcap": "cases/v3-tcp-orphan.pcap",
+        "common/pcapx/pcaputil/snmp-identity/answers/v3-tcp-orphan.json": "answers/v3-tcp-orphan.json",
+        "common/pcapx/pcaputil/snmp-identity/cases/v3-tcp-fresh-after-expiry.pcap": "cases/v3-tcp-fresh-after-expiry.pcap",
+        "common/pcapx/pcaputil/snmp-identity/answers/v3-tcp-fresh-after-expiry.json": "answers/v3-tcp-fresh-after-expiry.json",
+        "common/pcapx/pcaputil/snmp-identity/cases/v3-udp-retry.pcap": "cases/v3-udp-retry.pcap",
+        "common/pcapx/pcaputil/snmp-identity/answers/v3-udp-retry.json": "answers/v3-udp-retry.json",
+        "common/pcapx/pcaputil/snmp-identity/cases/v3-udp-conflict.pcap": "cases/v3-udp-conflict.pcap",
+        "common/pcapx/pcaputil/snmp-identity/answers/v3-udp-conflict.json": "answers/v3-udp-conflict.json",
+        "common/pcapx/pcaputil/snmp-identity/cases/v3-udp-changed-binding.pcap": "cases/v3-udp-changed-binding.pcap",
+        "common/pcapx/pcaputil/snmp-identity/answers/v3-udp-changed-binding.json": "answers/v3-udp-changed-binding.json",
+        "common/pcapx/pcaputil/snmp-identity/cases/v3-udp-completed.pcap": "cases/v3-udp-completed.pcap",
+        "common/pcapx/pcaputil/snmp-identity/answers/v3-udp-completed.json": "answers/v3-udp-completed.json",
+        "common/pcapx/pcaputil/snmp-identity/cases/v3-udp-expired.pcap": "cases/v3-udp-expired.pcap",
+        "common/pcapx/pcaputil/snmp-identity/answers/v3-udp-expired.json": "answers/v3-udp-expired.json",
+        "common/pcapx/pcaputil/snmp-identity/cases/v3-udp-orphan.pcap": "cases/v3-udp-orphan.pcap",
+        "common/pcapx/pcaputil/snmp-identity/answers/v3-udp-orphan.json": "answers/v3-udp-orphan.json",
+        "common/pcapx/pcaputil/snmp-identity/cases/v3-udp-fresh-after-expiry.pcap": "cases/v3-udp-fresh-after-expiry.pcap",
+        "common/pcapx/pcaputil/snmp-identity/answers/v3-udp-fresh-after-expiry.json": "answers/v3-udp-fresh-after-expiry.json",
+        "common/pcapx/pcaputil/snmp-identity/cases/v3-tcp-context-engine.pcap": "cases/v3-tcp-context-engine.pcap",
+        "common/pcapx/pcaputil/snmp-identity/answers/v3-tcp-context-engine.json": "answers/v3-tcp-context-engine.json",
+        "common/pcapx/pcaputil/snmp-identity/cases/v3-tcp-context-name.pcap": "cases/v3-tcp-context-name.pcap",
+        "common/pcapx/pcaputil/snmp-identity/answers/v3-tcp-context-name.json": "answers/v3-tcp-context-name.json",
+        "common/pcapx/pcaputil/snmp-identity/cases/v3-tcp-security-level.pcap": "cases/v3-tcp-security-level.pcap",
+        "common/pcapx/pcaputil/snmp-identity/answers/v3-tcp-security-level.json": "answers/v3-tcp-security-level.json",
+        "common/pcapx/pcaputil/snmp-identity/cases/v3-udp-context-engine.pcap": "cases/v3-udp-context-engine.pcap",
+        "common/pcapx/pcaputil/snmp-identity/answers/v3-udp-context-engine.json": "answers/v3-udp-context-engine.json",
+        "common/pcapx/pcaputil/snmp-identity/cases/v3-udp-context-name.pcap": "cases/v3-udp-context-name.pcap",
+        "common/pcapx/pcaputil/snmp-identity/answers/v3-udp-context-name.json": "answers/v3-udp-context-name.json",
+        "common/pcapx/pcaputil/snmp-identity/cases/v3-udp-security-level.pcap": "cases/v3-udp-security-level.pcap",
+        "common/pcapx/pcaputil/snmp-identity/answers/v3-udp-security-level.json": "answers/v3-udp-security-level.json",
+        "common/pcapx/pcaputil/snmp-identity/cases/v0-udp-byte-refusal.pcap": "cases/v0-udp-byte-refusal.pcap",
+        "common/pcapx/pcaputil/snmp-identity/answers/v0-udp-byte-refusal.json": "answers/v0-udp-byte-refusal.json",
+        "common/pcapx/pcaputil/snmp-identity/cases/v3-udp-byte-refusal.pcap": "cases/v3-udp-byte-refusal.pcap",
+        "common/pcapx/pcaputil/snmp-identity/answers/v3-udp-byte-refusal.json": "answers/v3-udp-byte-refusal.json",
+        "common/pcapx/pcaputil/snmp-identity/controls.json": "controls.json",
+        "common/pcapx/pcaputil/snmp-identity/validation/expected.json": "validation/expected.json"
+      }
     }
   ],
   "schema_version": 1,
