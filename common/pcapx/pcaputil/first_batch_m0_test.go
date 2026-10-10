@@ -265,6 +265,10 @@ func TestFirstBatchT12(t *testing.T) {
 	require.Error(t, err)
 }
 func TestFirstBatchT03(t *testing.T) {
+	t.Run("coalescing-existing-API", TestQUICCoalescingExistingAPI)
+	t.Run("coalescing-matrix", testQUICCoalescingMatrix)
+	t.Run("coalescing-collection", testQUICCoalescingCollectionRefusal)
+	t.Run("coalescing-callback-ownership", testQUICCoalescingCallbackOwnership)
 	t.Run("retirement-existing-API", TestQUICRetirementExistingAPI)
 	t.Run("retirement-matrix", testQUICRetirementMatrix)
 	t.Run("retirement-resources-domains", testQUICRetirementResourcesAndDomains)

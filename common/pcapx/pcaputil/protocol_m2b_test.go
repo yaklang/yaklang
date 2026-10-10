@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"github.com/stretchr/testify/require"
 	binparser "github.com/yaklang/yaklang/common/bin-parser"
@@ -37,11 +38,64 @@ func m2bReplay(t testing.TB, name string, deferred bool, workers int, secrets TL
 		require.Equal(t, hex.EncodeToString(sum[:]), e.SourceBytes.SHA256)
 		require.Equal(t, len(e.Raw), e.Length)
 	}
+	if name == "m2b-quic-native.pcap" && secrets != nil {
+		require.Len(t, events, 47)
+		seen := map[uint64]bool{}
+		accepted := 0
+		for _, e := range events {
+			if m2bAssertQUICZeroTail(t, e) {
+				n := e.SourceBytes.PacketRefs[0].Number
+				require.False(t, seen[n])
+				seen[n] = true
+			} else {
+				accepted++
+			}
+		}
+		require.Len(t, seen, 4)
+		require.Equal(t, 43, accepted)
+	}
 	t.Logf("native replay %s workers=%d deferred=%v stats=%+v", name, workers, deferred, stats)
 	require.Zero(t, stats.BufferedBytes, "native replay must release retained state")
 	require.LessOrEqual(t, stats.PeakBufferedBytes, int64(DefaultParserBudget().MaxBufferedBytes))
 	return events
 }
+
+// Fixed historical DLT_NULL capture contains zero bytes outside the QUIC
+// long-header Length at these four packet boundaries (RFC9000 12.2/17.2).
+// These are distinct diagnostics, not authenticated PADDING frames.
+func m2bAssertQUICZeroTail(t testing.TB, e *ProtocolEvent) bool {
+	t.Helper()
+	if e.Error == "" {
+		return false
+	}
+	lengths := map[uint64]int{1: 686, 4: 1103, 17: 685, 20: 1103}
+	require.Len(t, e.SourceBytes.PacketRefs, 1)
+	ref := e.SourceBytes.PacketRefs[0]
+	n, ok := lengths[ref.Number]
+	require.True(t, ok, "unexpected error %s", e.Error)
+	require.Equal(t, "quic", e.Protocol)
+	require.Equal(t, "quic-v1-native", e.Profile)
+	require.Equal(t, "malformed", e.Status)
+	require.Equal(t, "MalformedMessage", e.ExpertCode)
+	require.Contains(t, e.Error, "invalid coalesced QUIC header")
+	require.Equal(t, bytes.Repeat([]byte{0}, n), e.Raw)
+	require.Equal(t, n, e.Length)
+	require.Nil(t, e.Session)
+	require.NotZero(t, e.FlowID)
+	require.Zero(t, e.Direction)
+	require.Zero(t, e.ResponseTo)
+	require.Zero(t, e.TransactionID)
+	require.Equal(t, e.Domain, ref.Domain)
+	require.Equal(t, fmt.Sprintf("%x", sha256.Sum256(e.Raw)), e.SourceBytes.SHA256)
+	fields, err := e.GetFields()
+	var typed *ProtocolError
+	require.Error(t, err)
+	require.True(t, errors.As(err, &typed))
+	require.Equal(t, ErrMalformedMessage, typed.Kind)
+	require.Nil(t, fields)
+	return true
+}
+
 func m2bRows(events []*ProtocolEvent) []string {
 	var rows []string
 	for _, e := range events {
@@ -65,6 +119,9 @@ func TestFirstBatchT16(t *testing.T) {
 				prepared, execute, close, reset := 0, 0, 0, 0
 				clients := map[uint64]bool{}
 				for _, e := range events {
+					if m2bAssertQUICZeroTail(t, e) {
+						continue
+					}
 					require.Contains(t, []string{"decoded", "deferred"}, e.Status, e.Error)
 					if e.Protocol != "mysql" {
 						continue
@@ -187,6 +244,9 @@ func testFirstBatchM2T12(t *testing.T) {
 				phases := map[uint64]bool{}
 				initial, handshake, app := 0, 0, 0
 				for _, e := range events {
+					if m2bAssertQUICZeroTail(t, e) {
+						continue
+					}
 					require.Contains(t, []string{"quic", "http3", "doq"}, e.Protocol)
 					require.Contains(t, []string{"decoded", "deferred"}, e.Status, e.Error)
 					require.Equal(t, true, e.Session["Authentication Verified"])
@@ -259,6 +319,9 @@ func TestFirstBatchT13(t *testing.T) {
 				events := m2bReplay(t, "m2b-quic-native.pcap", deferred, workers, keys)
 				assertM2QUICOracle(t, events)
 				for _, e := range events {
+					if m2bAssertQUICZeroTail(t, e) {
+						continue
+					}
 					require.Contains(t, []string{"decoded", "deferred"}, e.Status, e.Error)
 					frames, _ := e.Session["Frames"].([]map[string]any)
 					for _, fr := range frames {
@@ -496,6 +559,9 @@ func TestM2QUICWireViewParity(t *testing.T) {
 	require.NoError(t, err)
 	events := m2bReplay(t, "m2b-quic-native.pcap", true, 1, keys)
 	for _, e := range events {
+		if m2bAssertQUICZeroTail(t, e) {
+			continue
+		}
 		want, err := binparser.ParseStructured(e.Raw, "application-layer.quic", "QUIC")
 		require.NoError(t, err)
 		got, err := e.GetFields()

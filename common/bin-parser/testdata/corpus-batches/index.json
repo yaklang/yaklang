@@ -35291,6 +35291,163 @@
         "common/pcapx/pcaputil/quic-retirement/controls.json": "controls.json",
         "common/pcapx/pcaputil/quic-retirement/validation/expected.json": "validation/expected.json"
       }
+    },
+    {
+      "id": "validation-quic-coalescing",
+      "kind": "validation",
+      "source_sha": "bf60a5c2eca968fb199c389fef950a03d85fd82a",
+      "file": "validation-quic-coalescing.zip",
+      "sha256": "9f193842a3fb4d85d60336264c1064f6fa76ced2bca99882d08d85043bdf4898",
+      "password": "bin-parser",
+      "members": {
+        "build.py": {
+          "sha256": "796ae51b19688c263df1faa240d79b4a551d13032942a33cae5fd9a2be8a5edf",
+          "bytes": 5817
+        },
+        "carrier.py": {
+          "sha256": "53032c4a1d39af131ac35498af5362423aefc47552d34e06420593262684f037",
+          "bytes": 1945
+        },
+        "crypto_reference.py": {
+          "sha256": "99db13137ae340ab662656d3aae40c0142c4db3c899d997a018984ef788a221f",
+          "bytes": 2612
+        },
+        "verify-controls.py": {
+          "sha256": "ec5feb6bb4653b2dfad2e855c7d4ef3c0aedb22e2dab457538dc15b448cb9ed5",
+          "bytes": 6121
+        },
+        "source-pin.json": {
+          "sha256": "4a41ffda9467eb52e5c4ed41c69271e082d20535f576e1d5bafbb32a9b696059",
+          "bytes": 2274
+        },
+        "seal.py": {
+          "sha256": "17eac43b590ea51f7d2094265a54a7ea8120bf764c80c0862265aa8526eb2146",
+          "bytes": 3732
+        },
+        "LICENSE.txt": {
+          "sha256": "e5556c94f922a641a638272f55edf8d61c4c9434b3283b126b73ec2648f42f2c",
+          "bytes": 495
+        },
+        "cases/adjacent-good.pcap": {
+          "sha256": "097f199392ae80be334c3b95dd62d39a5b66788401557f28e0a22595a710068f",
+          "bytes": 2482
+        },
+        "answers/adjacent-good.json": {
+          "sha256": "bde91ac462ec0e660817e792d0b16f412f437a8fac1f1bbf1331f6aea1359ffe",
+          "bytes": 43616
+        },
+        "cases/bad-first.pcap": {
+          "sha256": "1db33a2fd6654d8a41693394ebe7960f0c73afa640ad860b965e49bbf4adaee5",
+          "bytes": 2482
+        },
+        "answers/bad-first.json": {
+          "sha256": "47c5ba022f3b2e2132ef5ac4eb8d946ed4d5dc2c628d8f024632fb649fe78f48",
+          "bytes": 25432
+        },
+        "cases/bad-middle.pcap": {
+          "sha256": "b18a60e7be08812c46b2c0bb0ea0db4cc78417b9574ad44abb79c9b31e28eb7f",
+          "bytes": 3682
+        },
+        "answers/bad-middle.json": {
+          "sha256": "975852c74b8198040779fcf2477f6c6f6ffa46ff4f05c016a058d914ac978f73",
+          "bytes": 46963
+        },
+        "cases/different-CID.pcap": {
+          "sha256": "7fe50389525fd402597b2ec30343504e3c479fc48f0f9c06fc00ca42e9c5da52",
+          "bytes": 3682
+        },
+        "answers/different-CID.json": {
+          "sha256": "e7f1d2165277fa357579c16c16ea12be159d800230585771294e38e371a6d0e3",
+          "bytes": 46383
+        },
+        "cases/missing-handshake-key.pcap": {
+          "sha256": "a4b77ecd7ba8468b03e112f2f3d440d4e6147c3daa877e31ab5a542489479bc0",
+          "bytes": 3681
+        },
+        "answers/missing-handshake-key.json": {
+          "sha256": "f5b0cbf92864f155a3436326fc5b7dd0115f4d452d5a6e673b57562360879619",
+          "bytes": 46972
+        },
+        "cases/malformed-length.pcap": {
+          "sha256": "afc4469283cf4557bd917f298e0714c54554081e84d5f7f183df2645411116c2",
+          "bytes": 3758
+        },
+        "answers/malformed-length.json": {
+          "sha256": "1bfae55a4cfb747c2764153bd774f624b02367cde61721a5a056d025f79715fa",
+          "bytes": 46434
+        },
+        "cases/zero-tail.pcap": {
+          "sha256": "86c9dfadf2c092c302216c734b27039cc6d21bcfd3399972ce4eddc6fb13a03f",
+          "bytes": 2543
+        },
+        "answers/zero-tail.json": {
+          "sha256": "9dfec411baabdddd0111ab926eb34b2108dfe221857788f02765ca00e68d3658",
+          "bytes": 43976
+        },
+        "cases/short-terminal.pcap": {
+          "sha256": "a221fcc45b89e3b1ac1ef0450a22a730b9ffa0077b6072e37ce81525470fa3e9",
+          "bytes": 3769
+        },
+        "answers/short-terminal.json": {
+          "sha256": "6eea2ecbfd6a07047ac1660132dd1c546c4a4131006fd339d0bfe3edd8547ce8",
+          "bytes": 47008
+        },
+        "cases/unsupported-version.pcap": {
+          "sha256": "6d6536e39aca303a68372f5011c567f5a6b8eb72673237c47d4543249a8c8e35",
+          "bytes": 3758
+        },
+        "answers/unsupported-version.json": {
+          "sha256": "45a9eaea7bd52054952b63c8f99dcf8b1524ee6c04c3cdc7fa77d83d2e340329",
+          "bytes": 46448
+        },
+        "cases/budget-remainder.pcap": {
+          "sha256": "e7c374178ba6f845ec9986b6fdcd23530c3572eea65d0b2c7206766e48db8ef4",
+          "bytes": 5140
+        },
+        "answers/budget-remainder.json": {
+          "sha256": "61545c023524097e264b4a2d4eeac0679155b588bd706cbbaa49c0eb06b64903",
+          "bytes": 30446
+        },
+        "controls.json": {
+          "sha256": "cb51e45d369287889bde763be9091b62152d24cc032f4ffd0dffb1f8b23d13da",
+          "bytes": 516010
+        },
+        "validation/expected.json": {
+          "sha256": "1cb25e6728bebc9ae4f6e44381716fe9b2f5f1524b33953b05fb04c07cf2bf14",
+          "bytes": 12923
+        }
+      },
+      "aliases": {
+        "common/pcapx/pcaputil/quic-coalescing/build.py": "build.py",
+        "common/pcapx/pcaputil/quic-coalescing/carrier.py": "carrier.py",
+        "common/pcapx/pcaputil/quic-coalescing/crypto_reference.py": "crypto_reference.py",
+        "common/pcapx/pcaputil/quic-coalescing/verify-controls.py": "verify-controls.py",
+        "common/pcapx/pcaputil/quic-coalescing/source-pin.json": "source-pin.json",
+        "common/pcapx/pcaputil/quic-coalescing/seal.py": "seal.py",
+        "common/pcapx/pcaputil/quic-coalescing/LICENSE.txt": "LICENSE.txt",
+        "common/pcapx/pcaputil/quic-coalescing/cases/adjacent-good.pcap": "cases/adjacent-good.pcap",
+        "common/pcapx/pcaputil/quic-coalescing/answers/adjacent-good.json": "answers/adjacent-good.json",
+        "common/pcapx/pcaputil/quic-coalescing/cases/bad-first.pcap": "cases/bad-first.pcap",
+        "common/pcapx/pcaputil/quic-coalescing/answers/bad-first.json": "answers/bad-first.json",
+        "common/pcapx/pcaputil/quic-coalescing/cases/bad-middle.pcap": "cases/bad-middle.pcap",
+        "common/pcapx/pcaputil/quic-coalescing/answers/bad-middle.json": "answers/bad-middle.json",
+        "common/pcapx/pcaputil/quic-coalescing/cases/different-CID.pcap": "cases/different-CID.pcap",
+        "common/pcapx/pcaputil/quic-coalescing/answers/different-CID.json": "answers/different-CID.json",
+        "common/pcapx/pcaputil/quic-coalescing/cases/missing-handshake-key.pcap": "cases/missing-handshake-key.pcap",
+        "common/pcapx/pcaputil/quic-coalescing/answers/missing-handshake-key.json": "answers/missing-handshake-key.json",
+        "common/pcapx/pcaputil/quic-coalescing/cases/malformed-length.pcap": "cases/malformed-length.pcap",
+        "common/pcapx/pcaputil/quic-coalescing/answers/malformed-length.json": "answers/malformed-length.json",
+        "common/pcapx/pcaputil/quic-coalescing/cases/zero-tail.pcap": "cases/zero-tail.pcap",
+        "common/pcapx/pcaputil/quic-coalescing/answers/zero-tail.json": "answers/zero-tail.json",
+        "common/pcapx/pcaputil/quic-coalescing/cases/short-terminal.pcap": "cases/short-terminal.pcap",
+        "common/pcapx/pcaputil/quic-coalescing/answers/short-terminal.json": "answers/short-terminal.json",
+        "common/pcapx/pcaputil/quic-coalescing/cases/unsupported-version.pcap": "cases/unsupported-version.pcap",
+        "common/pcapx/pcaputil/quic-coalescing/answers/unsupported-version.json": "answers/unsupported-version.json",
+        "common/pcapx/pcaputil/quic-coalescing/cases/budget-remainder.pcap": "cases/budget-remainder.pcap",
+        "common/pcapx/pcaputil/quic-coalescing/answers/budget-remainder.json": "answers/budget-remainder.json",
+        "common/pcapx/pcaputil/quic-coalescing/controls.json": "controls.json",
+        "common/pcapx/pcaputil/quic-coalescing/validation/expected.json": "validation/expected.json"
+      }
     }
   ],
   "schema_version": 1,

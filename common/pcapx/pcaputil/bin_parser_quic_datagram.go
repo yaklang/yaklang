@@ -125,11 +125,8 @@ func (a *binParser) decodeQUICDatagram(base *ProtocolEvent, wire []byte) ([]*Pro
 		f = &binFlow{a: a, protocol: "quic", quic: &binQUIC{native: true, byteLimit: a.budget.MaxMessageBytes, provider: a.tlsSecrets}, endpoints: [2]string{base.Source, base.Destination}}
 	}
 	var events []*ProtocolEvent
+	var datagramCID []byte
 	for off := 0; off < len(wire); {
-		if off > 0 && bytes.Count(wire[off:], []byte{0}) == len(wire)-off {
-			events[len(events)-1].Session["Unauthenticated Datagram Padding Bytes"] = len(wire) - off
-			break
-		}
 		e := *base
 		e.Protocol = "quic"
 		e.Profile = "quic-v1-native"
@@ -140,17 +137,35 @@ func (a *binParser) decodeQUICDatagram(base *ProtocolEvent, wire []byte) ([]*Pro
 		f.quic.eventID = e.ID
 		e.Direction = dir
 		h, err := f.quic.wireHeader(wire[off:], dir)
+		if err != nil {
+			if _, typed := classifySessionError(err); typed == nil {
+				err = protocolError(ErrMalformedMessage, "invalid coalesced QUIC header: %v", err)
+			}
+		}
 		size := len(wire) - off
 		if err == nil && (h.size <= 0 || h.size > size) {
 			err = protocolError(ErrMalformedMessage, "invalid coalesced QUIC length")
 		}
-		if err == nil {
+		bounded := err == nil
+		if bounded {
 			size = h.size
+			if off == 0 {
+				datagramCID = h.dcid
+			}
 		}
+		// RFC9000 12.2 permits only one destination CID in a datagram.
+		// Preserve mismatched bytes as a diagnostic without consuming them in
+		// the selected connection; later correctly framed packets stay usable.
+		cidMismatch := bounded && off > 0 && !bytes.Equal(datagramCID, h.dcid)
+		rejectedCID := false
 		raw := wire[off : off+size]
 		e.Length = size
 		if err == nil && (len(events) >= a.budget.MaxCollectionElements || el == nil && len(s.entries) >= sessionCollectionLimit(a.budget.MaxCollectionElements)) {
 			err = protocolError(ErrResourceExceeded, "QUIC packet/conversation budget")
+		}
+		if err == nil && cidMismatch {
+			rejectedCID = true
+			err = protocolError(ErrMalformedMessage, "coalesced QUIC destination CID differs from first packet")
 		}
 		if err == nil {
 			err = f.reserveSession(f.quic.initialMemory() + int64(len(raw))*32)
@@ -166,7 +181,7 @@ func (a *binParser) decodeQUICDatagram(base *ProtocolEvent, wire []byte) ([]*Pro
 			el = s.lru.PushBack(&binUDPEntry{key, f, s.clock})
 			s.entries[key] = el
 		}
-		if el != nil {
+		if el != nil && !rejectedCID {
 			v := el.Value.(*binUDPEntry)
 			v.touched = s.clock
 			s.lru.MoveToBack(el)
@@ -213,6 +228,22 @@ func (a *binParser) decodeQUICDatagram(base *ProtocolEvent, wire []byte) ([]*Pro
 				e.Session["DNS"] = d["DNS"]
 			}
 		}
+		// A failed AEAD or unavailable key does not invalidate the long-header
+		// length (RFC9000 12.2). Never scan ciphertext for a guessed boundary.
+		// Other failures, notably resource refusal, stop processing and retain
+		// the entire unprocessed remainder in one bounded diagnostic.
+		_, typed := classifySessionError(err)
+		recoverable := bounded && typed != nil && (typed.Kind == ErrAuthenticationFailed || typed.Kind == ErrEncrypted || rejectedCID && typed.Kind == ErrMalformedMessage)
+		if err != nil && !recoverable {
+			// Keep an existing single-packet error envelope. It cannot describe
+			// an aggregated remainder or a refused resource reservation.
+			if size != len(wire)-off || typed != nil && typed.Kind == ErrResourceExceeded {
+				e.Session = nil
+				e.ResponseTo, e.TransactionID = 0, 0
+			}
+			raw = wire[off:]
+			size, e.Length = len(raw), len(raw)
+		}
 		// The authenticated session already parsed this header. Preserve the wire
 		// field view without executing a YAML operator for every ciphertext octet.
 		e.nativeQUICWire = err == nil
@@ -222,7 +253,7 @@ func (a *binParser) decodeQUICDatagram(base *ProtocolEvent, wire []byte) ([]*Pro
 			f.retireQUICUDP()
 		}
 		off += size
-		if err != nil {
+		if err != nil && !recoverable {
 			break
 		}
 	}
