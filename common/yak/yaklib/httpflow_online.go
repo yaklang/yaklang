@@ -281,33 +281,47 @@ type downloadHTTPFlowRequest struct {
 	OrderBy string `json:"order_by"`
 }
 
+// DownloadHTTPFlowItem 对应 online POST /api/httpflow/download 的 data 元素（HTTPFlowList）。
+// 下载接口使用列表模式，报文和计数字段以 HTTPFlowToModel(full=false) 实际返回的为准。
 type DownloadHTTPFlowItem struct {
-	Hash          string `json:"hash"`
-	URL           string `json:"url"`
-	Path          string `json:"path"`
-	Method        string `json:"method"`
-	IsHTTPS       bool   `json:"isHTTPS"`
-	StatusCode    int64  `json:"statusCode"`
-	ContentType   string `json:"contentType"`
-	SourceType    string `json:"sourceType"`
-	Request       string `json:"request"`
-	Response      string `json:"response"`
-	BodyLength    int64  `json:"bodyLength"`
-	HTMLTitle     string `json:"htmlTitle"`
-	IPAddress     string `json:"ipAddress"`
-	HostPort      string `json:"hostPort"`
-	Host          string `json:"host"`
-	Tags          string `json:"tags"`
-	FromPlugin    string `json:"fromPlugin"`
-	HiddenIndex   string `json:"hiddenIndex"`
-	IsWebsocket   bool   `json:"isWebsocket"`
-	WebsocketHash string `json:"websocketHash"`
-	ProjectName   string `json:"projectName"`
-	UserName      string `json:"userName"`
-	IssueType     string `json:"issueType"`
-	Severity      string `json:"severity"`
-	Status        string `json:"status"`
-	StatusReason  string `json:"statusReason"`
+	Hash                       string `json:"hash"`
+	URL                        string `json:"url"`
+	Path                       string `json:"path"`
+	Method                     string `json:"method"`
+	IsHTTPS                    bool   `json:"isHTTPS"`
+	NoFixContentLength         bool   `json:"noFixContentLength"`
+	StatusCode                 int64  `json:"statusCode"`
+	ContentType                string `json:"contentType"`
+	SourceType                 string `json:"sourceType"`
+	Request                    string `json:"request"`
+	Response                   string `json:"response"`
+	RequestLength              int64  `json:"requestLength"`
+	BodyLength                 int64  `json:"bodyLength"`
+	HTMLTitle                  string `json:"htmlTitle"`
+	GetParamsTotal             int64  `json:"getParamsTotal"`
+	PostParamsTotal            int64  `json:"postParamsTotal"`
+	CookieParamsTotal          int64  `json:"cookieParamsTotal"`
+	IPAddress                  string `json:"ipAddress"`
+	HostPort                   string `json:"hostPort"`
+	Host                       string `json:"host"`
+	Tags                       string `json:"tags"`
+	FromPlugin                 string `json:"fromPlugin"`
+	HiddenIndex                string `json:"hiddenIndex"`
+	IsWebsocket                bool   `json:"isWebsocket"`
+	WebsocketHash              string `json:"websocketHash"`
+	IsTooLargeResponse         bool   `json:"isTooLargeResponse"`
+	TooLargeResponseHeaderFile string `json:"tooLargeResponseHeaderFile"`
+	TooLargeResponseBodyFile   string `json:"tooLargeResponseBodyFile"`
+	ProjectName                string `json:"projectName"`
+	ProjectDescription         string `json:"projectDescription"`
+	ExternalModule             string `json:"externalModule"`
+	ExternalProjectCode        string `json:"externalProjectCode"`
+	Department                 string `json:"department"`
+	UserName                   string `json:"userName"`
+	IssueType                  string `json:"issueType"`
+	Severity                   string `json:"severity"`
+	Status                     string `json:"status"`
+	StatusReason               string `json:"statusReason"`
 }
 
 type downloadHTTPFlowResponse struct {

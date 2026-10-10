@@ -1089,7 +1089,7 @@ func (s *Server) RisksFromOnline(req *ypb.RisksFromOnlineRequest, stream ypb.Yak
 	defer func() {
 		stream.Send(&ypb.RisksFromOnlineProgress{
 			Progress: 1,
-			Log:      fmt.Sprintf("finished, updated: %d, inserted: %d", updatedCount, insertedCount),
+			Log:      fmt.Sprintf("更新: %d条, 新增: %d条", updatedCount, insertedCount),
 		})
 	}()
 
@@ -1103,10 +1103,10 @@ func (s *Server) RisksFromOnline(req *ypb.RisksFromOnlineRequest, stream ypb.Yak
 		count++
 
 		var existing schema.Risk
-		findResult := db.Model(&schema.Risk{}).Where("hash = ?", item.Hash).First(&existing)
+		findResult := db.Model(&schema.Risk{}).Where("hash = ?", item.RiskHash).First(&existing)
 
 		if findResult.Error == nil && existing.ID > 0 {
-			if err := db.Model(&schema.Risk{}).Where("hash = ?", item.Hash).Updates(map[string]interface{}{
+			if err := db.Model(&schema.Risk{}).Where("hash = ?", item.RiskHash).Updates(map[string]interface{}{
 				"tags":              item.Tags,
 				"verifier_uid":      item.VerifierUid,
 				"fix_time":          time.Unix(item.FixTime, 0),
@@ -1118,18 +1118,18 @@ func (s *Server) RisksFromOnline(req *ypb.RisksFromOnlineRequest, stream ypb.Yak
 			}).Error; err != nil {
 				stream.Send(&ypb.RisksFromOnlineProgress{
 					Progress: progress,
-					Log:      fmt.Sprintf("update [%s] failed: %s", item.Hash, err),
+					Log:      fmt.Sprintf("update [%s] failed: %s", item.RiskHash, err),
 				})
 			} else {
 				updatedCount++
 				stream.Send(&ypb.RisksFromOnlineProgress{
 					Progress: progress,
-					Log:      fmt.Sprintf("update [%s] finished", item.Hash),
+					Log:      fmt.Sprintf("update [%s] finished", item.RiskHash),
 				})
 			}
 		} else {
 			risk := &schema.Risk{
-				Hash:            item.Hash,
+				Hash:            item.RiskHash,
 				Title:           item.Title,
 				TitleVerbose:    item.TitleVerbose,
 				Description:     item.Description,
@@ -1157,13 +1157,13 @@ func (s *Server) RisksFromOnline(req *ypb.RisksFromOnlineRequest, stream ypb.Yak
 			if err := yakit.CreateOrUpdateRisk(db, risk.Hash, risk); err != nil {
 				stream.Send(&ypb.RisksFromOnlineProgress{
 					Progress: progress,
-					Log:      fmt.Sprintf("insert [%s] failed: %s", item.Hash, err),
+					Log:      fmt.Sprintf("insert [%s] failed: %s", item.RiskHash, err),
 				})
 			} else {
 				insertedCount++
 				stream.Send(&ypb.RisksFromOnlineProgress{
 					Progress: progress,
-					Log:      fmt.Sprintf("insert [%s] finished", item.Hash),
+					Log:      fmt.Sprintf("insert [%s] finished", item.RiskHash),
 				})
 			}
 		}
@@ -1197,8 +1197,8 @@ func (s *Server) BatchSetRiskTags(ctx context.Context, req *ypb.BatchSetRiskTags
 		// 全量更新
 	}
 
-	// 批量上限校验：与 online 端一致
-	const batchMaxLimit = 100
+	// 批量上限校验
+	const batchMaxLimit = 1000
 	var count int64
 	if err := db.Count(&count).Error; err != nil {
 		return nil, utils.Errorf("count risk for batch limit failed: %s", err)

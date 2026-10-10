@@ -5,6 +5,7 @@ package yakgrpc
 import (
 	"bytes"
 	"context"
+	"database/sql"
 	"encoding/csv"
 	"encoding/json"
 	"fmt"
@@ -952,7 +953,7 @@ func (s *Server) HTTPFlowsFromOnline(req *ypb.HTTPFlowsFromOnlineRequest, stream
 	defer func() {
 		stream.Send(&ypb.HTTPFlowsFromOnlineProgress{
 			Progress: 1,
-			Log:      fmt.Sprintf("finished, updated: %d, inserted: %d", updatedCount, insertedCount),
+			Log:      fmt.Sprintf("更新: %d条, 新增: %d条", updatedCount, insertedCount),
 		})
 	}()
 
@@ -989,30 +990,42 @@ func (s *Server) HTTPFlowsFromOnline(req *ypb.HTTPFlowsFromOnlineRequest, stream
 			}
 		} else {
 			flow := &schema.HTTPFlow{
-				Hash:          item.Hash,
-				Url:           item.URL,
-				Path:          item.Path,
-				Method:        item.Method,
-				IsHTTPS:       item.IsHTTPS,
-				StatusCode:    item.StatusCode,
-				ContentType:   item.ContentType,
-				SourceType:    item.SourceType,
-				BodyLength:    item.BodyLength,
-				IPAddress:     item.IPAddress,
-				RemoteAddr:    item.HostPort,
-				Tags:          item.Tags,
-				FromPlugin:    item.FromPlugin,
-				HiddenIndex:   item.HiddenIndex,
-				IsWebsocket:   item.IsWebsocket,
-				WebsocketHash: item.WebsocketHash,
-				Host:          item.Host,
-				IssueType:     item.IssueType,
-				Severity:      item.Severity,
-				Status:        item.Status,
-				StatusReason:  item.StatusReason,
+				Hash:                       item.Hash,
+				Url:                        item.URL,
+				Path:                       item.Path,
+				Method:                     item.Method,
+				IsHTTPS:                    item.IsHTTPS,
+				NoFixContentLength:         item.NoFixContentLength,
+				StatusCode:                 item.StatusCode,
+				ContentType:                item.ContentType,
+				SourceType:                 item.SourceType,
+				RequestLength:              item.RequestLength,
+				BodyLength:                 item.BodyLength,
+				HtmlTitle:                  sql.NullString{String: item.HTMLTitle, Valid: item.HTMLTitle != ""},
+				GetParamsTotal:             int(item.GetParamsTotal),
+				PostParamsTotal:            int(item.PostParamsTotal),
+				CookieParamsTotal:          int(item.CookieParamsTotal),
+				IPAddress:                  item.IPAddress,
+				RemoteAddr:                 item.HostPort,
+				Tags:                       item.Tags,
+				FromPlugin:                 item.FromPlugin,
+				HiddenIndex:                item.HiddenIndex,
+				IsWebsocket:                item.IsWebsocket,
+				WebsocketHash:              item.WebsocketHash,
+				Host:                       item.Host,
+				IsTooLargeResponse:         item.IsTooLargeResponse,
+				TooLargeResponseHeaderFile: item.TooLargeResponseHeaderFile,
+				TooLargeResponseBodyFile:   item.TooLargeResponseBodyFile,
+				IssueType:                  item.IssueType,
+				Severity:                   item.Severity,
+				Status:                     item.Status,
+				StatusReason:               item.StatusReason,
 			}
 			flow.SetRequest(item.Request)
-			flow.SetResponse(item.Response)
+			// 列表模式通常不带 response；有原文时用原文覆盖标题，否则保留接口返回的 htmlTitle。
+			if item.Response != "" {
+				flow.SetResponse(item.Response)
+			}
 			if flow.Hash == "" {
 				flow.Hash = flow.CalcHash()
 			}
@@ -1070,8 +1083,8 @@ func (s *Server) BatchSetHTTPFlowIssueFields(ctx context.Context, req *ypb.Batch
 		// 全量更新
 	}
 
-	// 批量上限校验：与 online 端一致，超过 100 条直接拒绝。
-	const batchMaxLimit = 100
+	// 批量上限校验
+	const batchMaxLimit = 1000
 	var count int64
 	if err := db.Count(&count).Error; err != nil {
 		return nil, utils.Errorf("count httpflow for batch limit failed: %s", err)
