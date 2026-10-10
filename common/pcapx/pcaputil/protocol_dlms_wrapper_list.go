@@ -310,6 +310,9 @@ func wrapperNormalExtendedData(w []byte) bool {
 func wrapperNormalDataGraph(w []byte) bool {
 	return len(w) > 12 && w[8] == 0xc4 && w[9] == 1 && w[11] == 0 && (w[12] == 1 || w[12] == 2)
 }
+func wrapperNormalAccess(w []byte) bool {
+	return len(w) > 20 && w[8] == 0xc0 && w[9] == 1 && w[20] == 1
+}
 func wrapperProfile(w []byte) string {
 	if wrapperIsBlock(w) {
 		return "dlms-wrapper-v1-get-block"
@@ -332,7 +335,7 @@ func wrapperProjection(w []byte, n int) int64 {
 	if wrapperIsBlock(w) {
 		return 32768 + 512*int64(n+wrapperBlockBytes) + 2048*wrapperDataNodes
 	}
-	if wrapperNormalDataGraph(w) {
+	if wrapperNormalDataGraph(w) || wrapperNormalAccess(w) {
 		// The root and all nested Data nodes share the same bounded counter.
 		return 32768 + 512*int64(n) + 2048*wrapperDataNodes
 	}

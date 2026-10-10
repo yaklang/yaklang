@@ -96,16 +96,33 @@ func decodeDLMSWrapperBudget(w []byte, limit, depth int) (*wrapperMessage, error
 		if len(p) < 13 {
 			return bad("Get-normal descriptor truncated")
 		}
-		if p[12] != 0 {
-			return unsupported("selective access separate work item")
+		if p[12] != 0 && p[12] != 1 {
+			return unsupported("selected optional access selection0/1")
 		}
-		if len(p) != 13 {
+		if p[12] == 0 && len(p) != 13 {
 			return bad("Get-normal descriptor has trailing bytes")
 		}
 		if int8(p[11]) <= 0 {
 			return unsupported("positive signed8 attribute profile")
 		}
-		f["kind"], f["class_id"], f["logical_name_hex"], f["logical_name"], f["attribute_id"], f["selective_access"] = "GetRequestNormal", binary.BigEndian.Uint16(p[3:5]), hex.EncodeToString(p[5:11]), fmt.Sprintf("%d.%d.%d.%d.%d.%d", p[5], p[6], p[7], p[8], p[9], p[10]), int8(p[11]), false
+		f["kind"], f["class_id"], f["logical_name_hex"], f["logical_name"], f["attribute_id"], f["selective_access"] = "GetRequestNormal", binary.BigEndian.Uint16(p[3:5]), hex.EncodeToString(p[5:11]), fmt.Sprintf("%d.%d.%d.%d.%d.%d", p[5], p[6], p[7], p[8], p[9], p[10]), int8(p[11]), p[12] == 1
+		if p[12] == 1 {
+			// Observe selector and one complete bounded Data parameter. Meaning and
+			// permissions depend on the COSEM object/association, not this envelope.
+			c := wrapperListCursor{wire: p, at: 13, maxDepth: depth}
+			selector, err := c.take(1)
+			if err != nil {
+				return nil, err
+			}
+			parameter, err := c.data(limit, 0)
+			if err != nil {
+				return nil, err
+			}
+			if c.at != len(p) {
+				return bad("Get-normal access parameters have trailing bytes")
+			}
+			f["access_selection_raw"], f["access_selector"], f["access_parameters"], f["selector_semantics_verified"] = p[12], selector[0], parameter, false
+		}
 	} else {
 		if len(p) < 5 {
 			return bad("Get-normal result truncated")

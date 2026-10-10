@@ -74,6 +74,13 @@ func wrapperControls(t *testing.T) []wrapperControl {
 			doc.Cases[i].Fields = wrapperBlocksHistoricalFields(t, c)
 			doc.Cases[i].Error = nil
 		}
+		if c.Name == "wrapper-get-selective-access" {
+			// Preserve the hash-bound original refusal; the same input now has
+			// an independent supported answer in the additive selected-access batch.
+			doc.Cases[i].Fields = wrapperNormalAccessHistoricalFields(t, c)
+			doc.Cases[i].Error = nil
+			doc.Cases[i].Session = map[string]any{"outstanding_observed_requests": float64(1)}
+		}
 	}
 	return doc.Cases
 }
