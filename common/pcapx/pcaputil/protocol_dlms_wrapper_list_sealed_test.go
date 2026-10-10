@@ -89,6 +89,15 @@ func wrapperListControls(t *testing.T) []wrapperListControl {
 			}
 		}
 		require.Equal(t, 1, bound, c.Name)
+		// The immutable batch records the previous scalar-only support boundary.
+		// Reuse its exact capture with a new independently validated full answer;
+		// keep the original UnsupportedFeature answer available for historical use.
+		if c.Name == "list-data-structure-open" {
+			require.Len(t, c.Answers, 1)
+			require.Equal(t, "UnsupportedFeature", c.Answers[0].Error.Kind)
+			doc.Cases[i].Answers[0].Fields = wrapperStructuredHistoricalFields(t, c.Answers[0].Wire)
+			doc.Cases[i].Answers[0].Error = nil
+		}
 
 	}
 	return doc.Cases

@@ -6,14 +6,18 @@ import (
 	"fmt"
 )
 
-// These are local selected-profile bounds, not DLMS wire maxima. Structured
-// Data, block transfer, ciphering and object/selector semantics remain separate.
+// These are local selected-profile bounds, not DLMS wire maxima.
+// Data types other than scalar/octet/array/structure, block transfer, ciphering
+// and object/selector semantics remain separate.
 const wrapperListItems = 64
 const wrapperListOctets = 1024
+const wrapperDataNodes = 256
+const wrapperDataLevels = 8
 
 type wrapperListCursor struct {
-	wire []byte
-	at   int
+	wire            []byte
+	at              int
+	nodes, maxDepth int
 }
 
 func (c *wrapperListCursor) take(n int) ([]byte, error) {
@@ -96,8 +100,44 @@ func (c *wrapperListCursor) scalar(limit int) (map[string]any, error) {
 	}
 	return map[string]any{"type": tag, "length": n, "length_encoding_hex": enc, "value_hex": hex.EncodeToString(w), "raw_hex": hex.EncodeToString(c.wire[start:c.at])}, nil
 }
-func decodeWrapperList(m *wrapperMessage, p []byte, limit int) error {
-	c := wrapperListCursor{wire: p, at: 3}
+
+// data consumes exactly one bounded A-XDR value. Its shared node counter spans
+// every result and selection parameter in this APDU, including empty containers.
+// Root Data maps have projection depth4; each elements slice and child map add2.
+func (c *wrapperListCursor) data(limit, level int) (map[string]any, error) {
+	if c.nodes >= min(limit, wrapperDataNodes) || level >= wrapperDataLevels || 4+2*level > c.maxDepth {
+		return nil, wrapperError(ErrResourceExceeded, "aggregate Data node/depth budget exceeded")
+	}
+	c.nodes++
+	if c.at == len(c.wire) || c.wire[c.at] != 1 && c.wire[c.at] != 2 {
+		return c.scalar(limit)
+	}
+	start := c.at
+	tag := c.wire[c.at]
+	c.at++
+	n, enc, err := c.count()
+	if err != nil {
+		return nil, err
+	}
+	// Check unsigned counts before conversion/allocation. Children may themselves
+	// contain descendants, whose cost is checked against the same remaining pool.
+	if n > uint64(min(limit, wrapperDataNodes)-c.nodes) {
+		return nil, wrapperError(ErrResourceExceeded, "announced child count exceeds remaining Data budget")
+	}
+	children := make([]map[string]any, 0, int(n))
+	for i := uint64(0); i < n; i++ {
+		child, err := c.data(limit, level+1)
+		if err != nil {
+			return nil, err
+		}
+		children = append(children, child)
+	}
+	return map[string]any{"type": tag, "length": n, "length_encoding_hex": enc,
+		"elements": children, "raw_hex": hex.EncodeToString(c.wire[start:c.at])}, nil
+}
+
+func decodeWrapperList(m *wrapperMessage, p []byte, limit, depth int) error {
+	c := wrapperListCursor{wire: p, at: 3, maxDepth: depth}
 	n, enc, err := c.count()
 	if err != nil {
 		return err
@@ -133,7 +173,7 @@ func decodeWrapperList(m *wrapperMessage, p []byte, limit int) error {
 				if err != nil {
 					return err
 				}
-				parameter, err := c.scalar(limit)
+				parameter, err := c.data(limit, 0)
 				if err != nil {
 					return err
 				}
@@ -147,7 +187,7 @@ func decodeWrapperList(m *wrapperMessage, p []byte, limit int) error {
 			item["result_choice_raw"] = w[0]
 			switch w[0] {
 			case 0:
-				data, err := c.scalar(limit)
+				data, err := c.data(limit, 0)
 				if err != nil {
 					return err
 				}
@@ -204,5 +244,8 @@ func wrapperProjection(w []byte, n int) int64 {
 	// worst selected list graph and all owned public/native/string projections
 	// before raw bytes, item slices, fields or association state are allocated.
 	items := min(wrapperListItems, max(0, n-12)/2)
-	return 32768 + 512*int64(n) + 8192*int64(items)
+	// The additional pool covers all owned descendant map/slice projections.
+	// A null child consumes at least one byte; no APDU retains more than256 nodes.
+	nodes := min(wrapperDataNodes, max(0, n-12))
+	return 32768 + 512*int64(n) + 8192*int64(items) + 2048*int64(nodes)
 }

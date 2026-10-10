@@ -23987,6 +23987,349 @@
         "common/pcapx/pcaputil/dlms-get-list/verify-controls.py": "verify-controls.py",
         "scripts/protocol-tests/required-tests-v32.json": "required-tests-v32.json"
       }
+    },
+    {
+      "id": "validation-dlms-structured-7aa8f794c69",
+      "kind": "validation",
+      "source_sha": "7aa8f794c693478cb8a7686bb3c203c0e4f84da8",
+      "file": "validation-dlms-structured-7aa8f794c69.zip",
+      "sha256": "f50cacb60e8b277325cf2169730bc78fb6d679c180bb6002f07d4e3de6aee569",
+      "password": "bin-parser",
+      "members": {
+        "answers/aggregate-two-256.json": {
+          "sha256": "ee5921c0a8de677e764296f2dbcdecbb829ff90115366e8959a3526d40265b49",
+          "bytes": 38920
+        },
+        "answers/aggregate-two-258.json": {
+          "sha256": "70fe56f7d7f0413cb7b1821278bb41f61f7de41d1d4f1f3e91a99028b74c65ec",
+          "bytes": 2084
+        },
+        "answers/budget-retires-pending-udp.json": {
+          "sha256": "cd3afb9f0b8a392f4019b98b85aa6d1210088e990b2e4d51bfbd842a9dc701e4",
+          "bytes": 8796
+        },
+        "answers/caller-depth-5.json": {
+          "sha256": "ae2c42578a859fad4ce714331151e4699aac1095df37d3963283f539e6a4b1fe",
+          "bytes": 2594
+        },
+        "answers/caller-depth-6.json": {
+          "sha256": "19b037c88456175dcd55bc7346dcbbc51c0a6ae447ac7caee026e0d41b2f179e",
+          "bytes": 3867
+        },
+        "answers/caller-nodes-4.json": {
+          "sha256": "2f8a024fdd0a0e480e4d6d54deb7973ec6e401c4ce89e342b64b1c7253347183",
+          "bytes": 3294
+        },
+        "answers/child-missing.json": {
+          "sha256": "51e61622aafd0de14d7eed02e7e8136235454e2491d00906e8dea3207fa715a5",
+          "bytes": 1010
+        },
+        "answers/coalesced-structured.json": {
+          "sha256": "35507163091a27a16ce3a474f472690f527374c0988c2c1bfdc6eca427ce5d04",
+          "bytes": 8000
+        },
+        "answers/count-huge.json": {
+          "sha256": "028fea67682c6d3766f1f601ead16fd93a32d90997a8426fd2ca24ef43d6136b",
+          "bytes": 1034
+        },
+        "answers/count-literal80.json": {
+          "sha256": "7b7be6102599baa9586a709e465f3ab99a6b0c6bcf4f56e4d6f2204073af373b",
+          "bytes": 1050
+        },
+        "answers/count-long-short.json": {
+          "sha256": "e38d94a0ef4ef328b27d8ddbcc035daef47afc5749918577a4857bc412ec67b0",
+          "bytes": 988
+        },
+        "answers/count-width3-nested.json": {
+          "sha256": "ed6814c6c6c9a2018b611065f002ea648ba9db44847315f57838b13dcb04b02e",
+          "bytes": 2646
+        },
+        "answers/depth-8.json": {
+          "sha256": "006f98893cfe0ad0a32d919eff240f0d79f648fc7f8018ef616a8a0818ffadf6",
+          "bytes": 4624
+        },
+        "answers/depth-9.json": {
+          "sha256": "7a1f6ecda4c13c27e3ddef568ed1cd6f3c79dd70e8b99f1e6a289d9ba2697348",
+          "bytes": 1095
+        },
+        "answers/empty-containers.json": {
+          "sha256": "b0ea273a18c038712556491a3249d14f431b1cd27365143752424d71a4043ac2",
+          "bytes": 2913
+        },
+        "answers/historical-structure-now-supported.json": {
+          "sha256": "a4e14fcc45234bb56efe17db77940fb45d75f29e9abf142b69069052a47941ed",
+          "bytes": 2554
+        },
+        "answers/nested-fixed-short.json": {
+          "sha256": "9daa8d1278010a31ded6d5eca2c7a7c7ab7a814e2756fee4550163a60282eb1b",
+          "bytes": 1004
+        },
+        "answers/nested-octet-1025.json": {
+          "sha256": "08d24855b9c67576b8553a8a3fc945f863ac86b3ec61fee9c249355d42798011",
+          "bytes": 5134
+        },
+        "answers/nested-trailing.json": {
+          "sha256": "e088edb0640b26bfc96f55bbdedef0da896d7e2ce5b04cd6871f7f988fe99d12",
+          "bytes": 1031
+        },
+        "answers/nested-unselected-type.json": {
+          "sha256": "f039f6e46d5c5f1d234728ad53b04c2608ee8eebd8bd22fb97088a39a871d5c7",
+          "bytes": 1100
+        },
+        "answers/nodes-256.json": {
+          "sha256": "0c101fcb37ab9fdae1d565d677973b0eeff3d3e6423654e4d9799e2fa732b184",
+          "bytes": 38648
+        },
+        "answers/nodes-257.json": {
+          "sha256": "f3fcb1a8390343c81f0379e2abdbec3fbf19e89f7f127d65871c5adf6724b854",
+          "bytes": 2082
+        },
+        "answers/split-structured.json": {
+          "sha256": "24eb9b2a2a29b800a77da434c2c687dc4f24aaa0c50d71fc1a1b2195046736b4",
+          "bytes": 5355
+        },
+        "answers/structured-exchange-tcp.json": {
+          "sha256": "397b13b5130a011f9111cdc8fcc2d27d159289388741d4d4b8777f8fef1b30d4",
+          "bytes": 5184
+        },
+        "answers/structured-exchange-udp.json": {
+          "sha256": "a79ba78efc422a22651cf7113dbbc37419249f21ce54eb7138838bdebf18cd67",
+          "bytes": 5184
+        },
+        "answers/structured-selection-cursor.json": {
+          "sha256": "48ca6d9d443f73af357b73f66ada901710340d031b839fd8e354ec64bfa6f01d",
+          "bytes": 3699
+        },
+        "answers/wrong-count-udp.json": {
+          "sha256": "8a2a6498c80ad39ac85970b6a4955d7ac8288c3a2512dc64f2c207ab7546ef9e",
+          "bytes": 4851
+        },
+        "answers/wrong-flags-udp.json": {
+          "sha256": "6d830a33cad028a5978eb44e602adead0ead0fc4ab1adb0a83288322ec82a90f",
+          "bytes": 5118
+        },
+        "build-structured.py": {
+          "sha256": "18839451faf1c800bceff33cc9ee9e8ddf20d2d762999114f6118eeb915a2d73",
+          "bytes": 5691
+        },
+        "carrier.py": {
+          "sha256": "07db3352defd52e18936a68d327f675a57abc90c59611492c049f102b08843d2",
+          "bytes": 3782
+        },
+        "cases/aggregate-two-256.pcap": {
+          "sha256": "816e86c9bdff126b02f59850a15d7494e7dc9413e69630286317586c8e33bd19",
+          "bytes": 576
+        },
+        "cases/aggregate-two-258.pcap": {
+          "sha256": "69ad5dfdf0d3061a3b7e8f69d289ddf60f33e4c5fcff8c1ecd0085bd854abc45",
+          "bytes": 580
+        },
+        "cases/budget-retires-pending-udp.pcap": {
+          "sha256": "c425a21ca12a2048f39f3fa933bfb9bd88b350080692f5d755beac06233a0e66",
+          "bytes": 257
+        },
+        "cases/caller-depth-6.pcap": {
+          "sha256": "c092e8b4c922aac33eed88e69fcf43fb98555b8f663b39c7213cda5038bbf96c",
+          "bytes": 322
+        },
+        "cases/caller-nodes-4.pcap": {
+          "sha256": "9469677d3fc2ea9e7f75648c28a5e8c6fddc4c33f4618a0599eaf2daf986b54e",
+          "bytes": 327
+        },
+        "cases/child-missing.pcap": {
+          "sha256": "2674738b64ca1730699d48b370285f8fed4173631cc4b4677fbad0c1fd9c29d3",
+          "bytes": 322
+        },
+        "cases/coalesced-structured.pcap": {
+          "sha256": "9f967362f5d751c07dcc82e1a192b0fcf41294c891c7472654fb3bd86060dc05",
+          "bytes": 468
+        },
+        "cases/count-huge.pcap": {
+          "sha256": "88cdb43beb65304f8c88107c9b1860bd58230270e70b5ab02e50de742f00349e",
+          "bytes": 323
+        },
+        "cases/count-literal80.pcap": {
+          "sha256": "06e0520d3c0b3d402ace5311c6e221a7970690772e5c60b93fc0537c73e4bd85",
+          "bytes": 319
+        },
+        "cases/count-long-short.pcap": {
+          "sha256": "fa7a0cbc84fa933c7d984ed1b76ee0eb8521ba331ca6992b6f58a7eebc68d162",
+          "bytes": 320
+        },
+        "cases/count-width3-nested.pcap": {
+          "sha256": "0e9860b06891f3e80a8f777744080ff977fe4a2b17dc90caefc08e08fa963c2e",
+          "bytes": 326
+        },
+        "cases/depth-8.pcap": {
+          "sha256": "9e998ac74604ee4731e879654d0231ba3402eeebaea3ed4a6906d1f80109032d",
+          "bytes": 333
+        },
+        "cases/depth-9.pcap": {
+          "sha256": "c07f95ba0a7c1966d5eea7f5009931d8a7b54c8f2c48d02f7472babbb1f79d19",
+          "bytes": 335
+        },
+        "cases/empty-containers.pcap": {
+          "sha256": "4369e3663f8ba176ae1561c0b6e79cd9196d40360b1fd42f6057840d63f3a1ff",
+          "bytes": 324
+        },
+        "cases/nested-fixed-short.pcap": {
+          "sha256": "274d71e147b294431bd8f7659aa57903a884d5cfbf24122a3e000ba9a81b4e7e",
+          "bytes": 321
+        },
+        "cases/nested-octet-1025.pcap": {
+          "sha256": "21908ae5f3d313276698d78ab3e71aa4eace8402722bbf5d4e044e0b7cbba19a",
+          "bytes": 1348
+        },
+        "cases/nested-trailing.pcap": {
+          "sha256": "ef5f6fa3279de7bb315802ceca2b0c30e6801c42738cd9dcd3a7cce854b4c0fb",
+          "bytes": 320
+        },
+        "cases/nested-unselected-type.pcap": {
+          "sha256": "4d31200cc16a5c07bd32afd27275afa9e30d77b5e66705bac24315c34fd7d46a",
+          "bytes": 322
+        },
+        "cases/nodes-256.pcap": {
+          "sha256": "8dc0653a3103fe906f3d070a5ea94a1ed213447394c2509f0c622ce86c71c1d8",
+          "bytes": 576
+        },
+        "cases/nodes-257.pcap": {
+          "sha256": "a4a33d8e5ccd64a17922f791613259cf4a5446e39cb034e156140769cac32879",
+          "bytes": 577
+        },
+        "cases/split-structured.pcap": {
+          "sha256": "9c73d95a66bd2fe892f45016ae67c46ef0ff559ba2cfd56eaa6d83f4452cc07d",
+          "bytes": 641
+        },
+        "cases/structured-exchange-tcp.pcap": {
+          "sha256": "90026f4b0669ccc5811bc82620ed9b3518f4695e0fce92329913b98237498c0c",
+          "bytes": 431
+        },
+        "cases/structured-exchange-udp.pcap": {
+          "sha256": "f2db6b8227797992d7c9cd2206e382904747adcad6e770ab6ebf3fcb14813ae3",
+          "bytes": 197
+        },
+        "cases/structured-selection-cursor.pcap": {
+          "sha256": "42f62eb9bbe1ae4140956de2b6763aef06a5378e49d2877f6029cbbe4735e8de",
+          "bytes": 347
+        },
+        "cases/wrong-count-udp.pcap": {
+          "sha256": "4d535d415dd2cb8ab5f3c5b0de00db7a75a90a3db5a1ed45677780fea55f4830",
+          "bytes": 195
+        },
+        "cases/wrong-flags-udp.pcap": {
+          "sha256": "dc579c096c64216b7fecb0edfcb130a1f057fa8a45fb622c047aa6b17240149c",
+          "bytes": 197
+        },
+        "controls.json": {
+          "sha256": "07c735433347d0442dee3c792f3954ae81c21bac5d49f7a8ae45373d8d8a6b9d",
+          "bytes": 185214
+        },
+        "idle-endpoint.py": {
+          "sha256": "3c611a4b2024916b86743fb96a1b0426d61e6f4302f5ebb16e6a59ec9fb78312",
+          "bytes": 1492
+        },
+        "oracle.py": {
+          "sha256": "3b6742137efc6e84635214cb73da791ef9d01159f8ebd005a173842e70e5da1e",
+          "bytes": 6021
+        },
+        "reference-check.py": {
+          "sha256": "53a487cb8c519e5a287140420845c965e34e2cde7d75b731a75f395c3349a5bf",
+          "bytes": 5256
+        },
+        "required-tests-v33.json": {
+          "sha256": "ebb9f97b8312d965a13ee47538b2318cbaa3c2a5109a46f9178c0dcb8da2e1f8",
+          "bytes": 100142
+        },
+        "seal.py": {
+          "sha256": "b2a967f1b495fb827f3e9c4b724e15f91cb1bc1bea5877ac303642c4e2412903",
+          "bytes": 5453
+        },
+        "source-facts.json": {
+          "sha256": "d90bfb1d741ed77a7f4616919962169fe4c92dae975a7fed9057d9f11bb7e3e9",
+          "bytes": 3845
+        },
+        "source-pin.json": {
+          "sha256": "a6c6c596cd12c061e61b421fbbc5ee5724d0eb57d75dde0f7b3a1eb8568e8ab3",
+          "bytes": 10595
+        },
+        "validation/expected.json": {
+          "sha256": "73fed06b6336ad3aa4217e98764ddf28ccf91e5196fd450ab3e4124a0e310af2",
+          "bytes": 28304
+        },
+        "verify-controls.py": {
+          "sha256": "812af72293c34a15ed0fddbde89e98428550305beb5137c0085a5ec4a4bfa2a0",
+          "bytes": 1411
+        }
+      },
+      "aliases": {
+        "common/pcapx/pcaputil/dlms-structured/cases/structured-exchange-tcp.pcap": "cases/structured-exchange-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-structured/answers/structured-exchange-tcp.json": "answers/structured-exchange-tcp.json",
+        "common/pcapx/pcaputil/dlms-structured/cases/structured-exchange-udp.pcap": "cases/structured-exchange-udp.pcap",
+        "common/pcapx/pcaputil/dlms-structured/answers/structured-exchange-udp.json": "answers/structured-exchange-udp.json",
+        "common/pcapx/pcaputil/dlms-structured/answers/historical-structure-now-supported.json": "answers/historical-structure-now-supported.json",
+        "common/pcapx/pcaputil/dlms-structured/cases/structured-selection-cursor.pcap": "cases/structured-selection-cursor.pcap",
+        "common/pcapx/pcaputil/dlms-structured/answers/structured-selection-cursor.json": "answers/structured-selection-cursor.json",
+        "common/pcapx/pcaputil/dlms-structured/cases/empty-containers.pcap": "cases/empty-containers.pcap",
+        "common/pcapx/pcaputil/dlms-structured/answers/empty-containers.json": "answers/empty-containers.json",
+        "common/pcapx/pcaputil/dlms-structured/cases/count-width3-nested.pcap": "cases/count-width3-nested.pcap",
+        "common/pcapx/pcaputil/dlms-structured/answers/count-width3-nested.json": "answers/count-width3-nested.json",
+        "common/pcapx/pcaputil/dlms-structured/cases/nodes-256.pcap": "cases/nodes-256.pcap",
+        "common/pcapx/pcaputil/dlms-structured/answers/nodes-256.json": "answers/nodes-256.json",
+        "common/pcapx/pcaputil/dlms-structured/cases/nodes-257.pcap": "cases/nodes-257.pcap",
+        "common/pcapx/pcaputil/dlms-structured/answers/nodes-257.json": "answers/nodes-257.json",
+        "common/pcapx/pcaputil/dlms-structured/cases/aggregate-two-256.pcap": "cases/aggregate-two-256.pcap",
+        "common/pcapx/pcaputil/dlms-structured/answers/aggregate-two-256.json": "answers/aggregate-two-256.json",
+        "common/pcapx/pcaputil/dlms-structured/cases/aggregate-two-258.pcap": "cases/aggregate-two-258.pcap",
+        "common/pcapx/pcaputil/dlms-structured/answers/aggregate-two-258.json": "answers/aggregate-two-258.json",
+        "common/pcapx/pcaputil/dlms-structured/cases/depth-8.pcap": "cases/depth-8.pcap",
+        "common/pcapx/pcaputil/dlms-structured/answers/depth-8.json": "answers/depth-8.json",
+        "common/pcapx/pcaputil/dlms-structured/cases/depth-9.pcap": "cases/depth-9.pcap",
+        "common/pcapx/pcaputil/dlms-structured/answers/depth-9.json": "answers/depth-9.json",
+        "common/pcapx/pcaputil/dlms-structured/cases/caller-depth-6.pcap": "cases/caller-depth-6.pcap",
+        "common/pcapx/pcaputil/dlms-structured/answers/caller-depth-6.json": "answers/caller-depth-6.json",
+        "common/pcapx/pcaputil/dlms-structured/answers/caller-depth-5.json": "answers/caller-depth-5.json",
+        "common/pcapx/pcaputil/dlms-structured/cases/caller-nodes-4.pcap": "cases/caller-nodes-4.pcap",
+        "common/pcapx/pcaputil/dlms-structured/answers/caller-nodes-4.json": "answers/caller-nodes-4.json",
+        "common/pcapx/pcaputil/dlms-structured/cases/child-missing.pcap": "cases/child-missing.pcap",
+        "common/pcapx/pcaputil/dlms-structured/answers/child-missing.json": "answers/child-missing.json",
+        "common/pcapx/pcaputil/dlms-structured/cases/nested-fixed-short.pcap": "cases/nested-fixed-short.pcap",
+        "common/pcapx/pcaputil/dlms-structured/answers/nested-fixed-short.json": "answers/nested-fixed-short.json",
+        "common/pcapx/pcaputil/dlms-structured/cases/count-long-short.pcap": "cases/count-long-short.pcap",
+        "common/pcapx/pcaputil/dlms-structured/answers/count-long-short.json": "answers/count-long-short.json",
+        "common/pcapx/pcaputil/dlms-structured/cases/count-huge.pcap": "cases/count-huge.pcap",
+        "common/pcapx/pcaputil/dlms-structured/answers/count-huge.json": "answers/count-huge.json",
+        "common/pcapx/pcaputil/dlms-structured/cases/count-literal80.pcap": "cases/count-literal80.pcap",
+        "common/pcapx/pcaputil/dlms-structured/answers/count-literal80.json": "answers/count-literal80.json",
+        "common/pcapx/pcaputil/dlms-structured/cases/nested-unselected-type.pcap": "cases/nested-unselected-type.pcap",
+        "common/pcapx/pcaputil/dlms-structured/answers/nested-unselected-type.json": "answers/nested-unselected-type.json",
+        "common/pcapx/pcaputil/dlms-structured/cases/nested-trailing.pcap": "cases/nested-trailing.pcap",
+        "common/pcapx/pcaputil/dlms-structured/answers/nested-trailing.json": "answers/nested-trailing.json",
+        "common/pcapx/pcaputil/dlms-structured/cases/nested-octet-1025.pcap": "cases/nested-octet-1025.pcap",
+        "common/pcapx/pcaputil/dlms-structured/answers/nested-octet-1025.json": "answers/nested-octet-1025.json",
+        "common/pcapx/pcaputil/dlms-structured/cases/split-structured.pcap": "cases/split-structured.pcap",
+        "common/pcapx/pcaputil/dlms-structured/answers/split-structured.json": "answers/split-structured.json",
+        "common/pcapx/pcaputil/dlms-structured/cases/coalesced-structured.pcap": "cases/coalesced-structured.pcap",
+        "common/pcapx/pcaputil/dlms-structured/answers/coalesced-structured.json": "answers/coalesced-structured.json",
+        "common/pcapx/pcaputil/dlms-structured/cases/wrong-count-udp.pcap": "cases/wrong-count-udp.pcap",
+        "common/pcapx/pcaputil/dlms-structured/answers/wrong-count-udp.json": "answers/wrong-count-udp.json",
+        "common/pcapx/pcaputil/dlms-structured/cases/wrong-flags-udp.pcap": "cases/wrong-flags-udp.pcap",
+        "common/pcapx/pcaputil/dlms-structured/answers/wrong-flags-udp.json": "answers/wrong-flags-udp.json",
+        "common/pcapx/pcaputil/dlms-structured/cases/budget-retires-pending-udp.pcap": "cases/budget-retires-pending-udp.pcap",
+        "common/pcapx/pcaputil/dlms-structured/answers/budget-retires-pending-udp.json": "answers/budget-retires-pending-udp.json",
+        "common/pcapx/pcaputil/dlms-structured/build-structured.py": "build-structured.py",
+        "common/pcapx/pcaputil/dlms-structured/carrier.py": "carrier.py",
+        "common/pcapx/pcaputil/dlms-structured/controls.json": "controls.json",
+        "common/pcapx/pcaputil/dlms-structured/idle-endpoint.py": "idle-endpoint.py",
+        "common/pcapx/pcaputil/dlms-structured/oracle.py": "oracle.py",
+        "common/pcapx/pcaputil/dlms-structured/reference-check.py": "reference-check.py",
+        "common/pcapx/pcaputil/dlms-structured/required-tests-v33.json": "required-tests-v33.json",
+        "common/pcapx/pcaputil/dlms-structured/seal.py": "seal.py",
+        "common/pcapx/pcaputil/dlms-structured/source-facts.json": "source-facts.json",
+        "common/pcapx/pcaputil/dlms-structured/source-pin.json": "source-pin.json",
+        "common/pcapx/pcaputil/dlms-structured/validation/expected.json": "validation/expected.json",
+        "common/pcapx/pcaputil/dlms-structured/verify-controls.py": "verify-controls.py",
+        "scripts/protocol-tests/required-tests-v33.json": "required-tests-v33.json"
+      }
     }
   ],
   "schema_version": 1,

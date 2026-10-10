@@ -43,8 +43,8 @@ Run from the repository root:
 
 ```sh
 go run ./internal/trafficfixture/cmd/corpus test
-go test -json -count=1 -timeout=5m ./internal/trafficfixture/... ./common/bin-parser/... ./common/pcapx/... ./common/yak/cmd/yakcmds/shark-cli > traffic.jsonl
-go run ./internal/trafficfixture/cmd/corpus exec -- python3 @scripts/protocol-tests/check_go_test_json.py traffic.jsonl --inventory @scripts/protocol-tests/required-tests-v32.json --tier full
+go test -json -count=1 -timeout=5m ./internal/trafficfixture/... ./common/bin-parser/... ./common/pcapx/... ./common/yak/cmd/yakcmds/shark-cli ./scripts/ci > traffic.jsonl
+go run ./internal/trafficfixture/cmd/corpus exec -- python3 @scripts/protocol-tests/check_go_test_json.py traffic.jsonl --inventory @scripts/protocol-tests/required-tests-v33.json --tier full
 ```
 
 The single `corpus` entry point uses the same bounded Go ZIP loader as tests.
@@ -83,7 +83,7 @@ their semantic coverage. The existing synthetic session keys are test inputs;
 production credentials, user private keys and material without redistribution
 permission belong in an external fixed-source download manifest.
 
-Current test requirements are sealed at `scripts/protocol-tests/required-tests-v32.json`;
+Current test requirements are sealed at `scripts/protocol-tests/required-tests-v33.json`;
 the historical inventories and all earlier batches remain unchanged.
 The supplemental small-corpus batch contains 26 minimal controls, their explicit
 expected facts, an offline generator and the compact pinned source manifest.
@@ -96,7 +96,7 @@ byte-boundary, malformed-length and ownership tests. These are scoped control
 assertions, not a semantic golden for the entire upstream collection. Process
 logs and the original large downloads remain outside the repository.
 
-The current workflow and executable gate use `required-tests-v32.json`. Older
+The current workflow and executable gate use `required-tests-v33.json`. Older
 versioned inventories stay available as historical inputs; they are not the
 current acceptance entry. The DLMS HDLC batch contains owned tunnel/Get-normal
 controls and their independent fields/errors, CRC/byte validator, offline
@@ -135,4 +135,8 @@ generation and independent validation scripts. Native tests bind each answer and
 input hash to the inventory, cover TCP/UDP and all12 worker/deferred/observer
 configurations, and retain resource/context/ownership assertions. These synthetic
 controls do not prove negotiated conformance, authentication, object/selector
-meaning or real meter behavior. Structured Data and other services remain open.
+meaning or real meter behavior. That original batch records the pre-supplement
+structured Data boundary; the supplement below adds bounded array/structure
+Data for GET-with-list. Other services remain open.
+
+The structured GET-with-list supplement seals 28 logical controls with 26 new capture hashes, one historical capture reused and one internal content alias. All positive and refusal answers bind complete input bytes; TCP chunking, ordered response association, aggregate Data limits, atomic refusal and nested ownership are tested. The pinned Gurux source stays external; the archived reference harness verifies its hashes and executes the client, Data codec and list receiver with an existing Python runtime. Python three-byte-count and empty-container receiver differences remain explicit, not passing reference results. A loopback UDP witness demonstrates that byte-identical replies after an idle reset lack an observable generation discriminator; observed matching is not device transaction proof.

@@ -43,6 +43,10 @@ type wrapperMessage struct {
 }
 
 func decodeDLMSWrapper(w []byte, limit int) (*wrapperMessage, error) {
+	return decodeDLMSWrapperBudget(w, limit, DefaultParserBudget().MaxRecursionDepth)
+}
+
+func decodeDLMSWrapperBudget(w []byte, limit, depth int) (*wrapperMessage, error) {
 	bad := func(s string) (*wrapperMessage, error) { return nil, wrapperError(ErrMalformedMessage, s) }
 	unsupported := func(s string) (*wrapperMessage, error) { return nil, wrapperError(ErrUnsupportedFeature, s) }
 	if len(w) < 8 {
@@ -74,7 +78,7 @@ func decodeDLMSWrapper(w []byte, limit int) (*wrapperMessage, error) {
 	f := map[string]any{"wrapper_version": v, "source_wport": src, "destination_wport": dst, "payload_length": n, "wrapper_header_hex": hex.EncodeToString(w[:8]), "apdu_hex": hex.EncodeToString(p), "association_observed": false, "authentication_verified": false, "object_model_verified": false, "command": p[0], "service_choice": p[1], "invoke_id_and_priority": p[2], "invoke_id": p[2] & 15, "high_priority": p[2]&128 != 0, "confirmed_service": p[2]&64 != 0, "unused_flag_bits_raw": p[2] & 0x30}
 	m := &wrapperMessage{fields: f, source: src, destination: dst, invoke: p[2] & 15, flags: p[2], request: p[0] == 0xc0, confirmed: p[2]&64 != 0, choice: p[1], count: 1}
 	if m.choice == 3 {
-		if err := decodeWrapperList(m, p, limit); err != nil {
+		if err := decodeWrapperList(m, p, limit, depth); err != nil {
 			return nil, err
 		}
 		return m, nil
@@ -275,7 +279,7 @@ func (f *binFlow) consumeWrapper(dir int, w []byte, e *ProtocolEvent) error {
 		s.invalidate()
 		return wrapperError(ErrResourceExceeded, "field depth exceeds recursion budget")
 	}
-	m, err := decodeDLMSWrapper(w, f.a.budget.MaxCollectionElements)
+	m, err := decodeDLMSWrapperBudget(w, f.a.budget.MaxCollectionElements, f.a.budget.MaxRecursionDepth)
 	if err != nil {
 		s.invalidate()
 		return err

@@ -136,3 +136,5 @@ and collection limits are checked before allocating their declared sizes.
 Kafka envelopes/expanded record data are limited to 1 MiB, 4096 total collection
 entries/records/headers per corresponding decode scope, and four legacy nested
 compression levels. These are logical parser budgets, not exact Go heap limits.
+
+Wrapper GET-with-list additionally decodes selected nested A-XDR array/structure values and selection parameters. The local limits are 64 top-level items, 256 total Data nodes across the complete APDU, 8 Data levels and 1024 bytes per octet value, further constrained by caller collection/depth/shared-byte budgets. Get-normal retains its scalar/octet boundary; other Data types, blocks, HDLC list, ACSE, authentication and object/selector meaning remain open. UDP observed pairing after idle cannot prove the originating generation of byte-identical delayed replies.
