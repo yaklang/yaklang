@@ -13,8 +13,9 @@ import (
 
 type wrapperStructuredControl struct {
 	wrapperListControl
-	InputAlias string `json:"input_alias"`
-	Depth      int
+	InputAlias               string `json:"input_alias"`
+	Depth                    int
+	ExpectedCloseOutstanding int `json:"expected_close_outstanding"`
 }
 
 func wrapperStructuredInput(t *testing.T, alias string) []byte {
@@ -51,6 +52,9 @@ func wrapperStructuredControls(t *testing.T) []wrapperStructuredControl {
 		require.Equal(t, c.SHA256, fmt.Sprintf("%x", sha256.Sum256(input)))
 		for _, a := range c.Answers {
 			require.Equal(t, a.SHA, fmt.Sprintf("%x", sha256.Sum256(wrapperWire(t, a.Wire))))
+		}
+		if c.Name == "nested-unselected-type" {
+			c.Answers = wrapperStringsHistoricalAnswers(t, c)
 		}
 		cases = append(cases, c)
 	}
@@ -256,7 +260,9 @@ func assertWrapperStructuredClose(t *testing.T, events []*ProtocolEvent) {
 	require.Empty(t, e.Raw)
 	require.Zero(t, e.Length)
 	require.Zero(t, e.ResponseTo)
-	require.EqualValues(t, 1, e.Session["Outstanding"])
+	rocEqualFields(t, map[string]any{"Outstanding": float64(1)}, e.Session)
+	require.Zero(t, e.TransactionID)
+	require.Nil(t, e.Structured)
 	require.Contains(t, e.Summary, "DLMS Wrapper exchange ended with unmatched observed requests")
 	f, err := e.GetFields()
 	require.EqualError(t, err, "protocol parser: event is incomplete, not an exact message")

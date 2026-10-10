@@ -132,8 +132,9 @@ func wrapperScalar(w []byte, limit int) (map[string]any, error) {
 	}
 	tag, v := w[0], w[1:]
 	out := map[string]any{"type": tag, "raw_hex": hex.EncodeToString(w)}
-	sizes := map[byte]int{0: 0, 3: 1, 5: 4, 6: 4, 15: 1, 16: 2, 17: 1, 18: 2, 20: 8, 21: 8, 22: 1}
-	if n, ok := sizes[tag]; ok {
+	// Reuse the static size switch instead of rebuilding a map for every Data
+	// node. Float support is deliberately selected only by the list cursor.
+	if n := wrapperScalarSize(tag); n >= 0 && tag != 23 && tag != 24 {
 		if len(v) != n {
 			return bad("fixed A-XDR scalar size mismatch")
 		}

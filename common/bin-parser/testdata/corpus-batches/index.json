@@ -24653,6 +24653,727 @@
         "common/pcapx/pcaputil/dlms-bits/required-tests-v35.json": "required-tests-v35.json",
         "scripts/protocol-tests/required-tests-v35.json": "required-tests-v35.json"
       }
+    },
+    {
+      "id": "validation-dlms-float-fa70f3e8a90",
+      "kind": "validation",
+      "source_sha": "fa70f3e8a909b7396a786a880295f74792278593",
+      "file": "validation-dlms-float-fa70f3e8a90.zip",
+      "sha256": "a1137fbb083c814c0a387b6c864cf29be9143b7cb5f52348c68c310e5265f2c7",
+      "password": "bin-parser",
+      "members": {
+        "answers/float-23-max-finite.json": {
+          "sha256": "4eceb37264c26c450f069b7cadf1fe0b4e5e1d26cdd6bd258fc2a8a117f28a9e",
+          "bytes": 3011
+        },
+        "answers/float-23-min-subnormal.json": {
+          "sha256": "c9fd3e1527b280e554a0fd8d11cae365be13aa9bf1500b75a73e523799a9c7fa",
+          "bytes": 3022
+        },
+        "answers/float-23-negative-infinity.json": {
+          "sha256": "b7447aa15d1fb09dbc17b0a8b5b9706d16920050cc66a53d709cf52e15d02a57",
+          "bytes": 3022
+        },
+        "answers/float-23-negative-subnormal.json": {
+          "sha256": "4ea555ad70c0e2a54011dc8911cf7b06a50d70eb373e3569638f0c62a044d160",
+          "bytes": 3037
+        },
+        "answers/float-23-negative-zero.json": {
+          "sha256": "7bac0b361e0be17c5a3eed9fdeea08d378ed528f8858834222f2a1bea7f1f69f",
+          "bytes": 2999
+        },
+        "answers/float-23-normal.json": {
+          "sha256": "99543ab59862c7e02857ecab8a791b29161649002fb04eb65053d5bd558fbb08",
+          "bytes": 2980
+        },
+        "answers/float-23-positive-infinity.json": {
+          "sha256": "1f34b1bda6df8f7ab59f96001a805ba498196341df6b9aa5893a174b7c2a9bd8",
+          "bytes": 3022
+        },
+        "answers/float-23-positive-zero.json": {
+          "sha256": "0c9e1000a29645a5a510bbc1910e0fa4358b5d609136c25d89a6db1a745a7f0a",
+          "bytes": 2999
+        },
+        "answers/float-23-quiet-nan-payload.json": {
+          "sha256": "52efbaa09dae559dd435764c30e60d6342554d151b3a8ad43e6b42dcbca0f768",
+          "bytes": 3012
+        },
+        "answers/float-23-signalling-nan-payload.json": {
+          "sha256": "bff37482d5fb46719587ffe3bac4df36635074a61e1a76dd698620381055afbe",
+          "bytes": 3027
+        },
+        "answers/float-23-truncated.json": {
+          "sha256": "43117096f6b7751016caf16efbf3ebe6c9d04a9cd4ef10d7858666efe369404d",
+          "bytes": 1121
+        },
+        "answers/float-24-max-finite.json": {
+          "sha256": "62406dafc041fabeb57445605e19e011b154220324b6480cdf9b955ea89736c3",
+          "bytes": 3061
+        },
+        "answers/float-24-min-subnormal.json": {
+          "sha256": "974f794801fd2099fa23094391b9fb9bfbfee4ca6bf4df65b8b35fc5598bf55a",
+          "bytes": 3056
+        },
+        "answers/float-24-negative-infinity.json": {
+          "sha256": "465db23abe2de32628d0f39909bff4db9977905edf1add0a870574cfd2a9f8ee",
+          "bytes": 3071
+        },
+        "answers/float-24-negative-subnormal.json": {
+          "sha256": "537fc165df4ab5bb43f731c6c5a7299ce2ff9a315718fbe9a84c25fcd4821733",
+          "bytes": 3071
+        },
+        "answers/float-24-negative-zero.json": {
+          "sha256": "4a63b9158b5dd75312e9afde3f6a4654508999449403fcb95f0d3e9247acc972",
+          "bytes": 3048
+        },
+        "answers/float-24-normal.json": {
+          "sha256": "b6d9f7d94f1ce1ca1126527572864e9ed0e82883898d5a9cd49c84aee74b6233",
+          "bytes": 3029
+        },
+        "answers/float-24-positive-infinity.json": {
+          "sha256": "39584272dee315c5587dd973e76111783fdf0ddc9aad5c4eb251dc7787196cdb",
+          "bytes": 3071
+        },
+        "answers/float-24-positive-zero.json": {
+          "sha256": "bbb16fa0027e164c0f32ecea4802c91e9e7a457e1409e284a1c456d0404d85f9",
+          "bytes": 3048
+        },
+        "answers/float-24-quiet-nan-payload.json": {
+          "sha256": "cb158c8d3d5a8e00b06e036aae8b8b99e2c64b6961d3c8a76e3b776a8525ca75",
+          "bytes": 3061
+        },
+        "answers/float-24-signalling-nan-payload.json": {
+          "sha256": "ee5903dd6fa79c8cd9a2332ba15653f92abea69946a3e5321e50900ae52df95d",
+          "bytes": 3076
+        },
+        "answers/float-24-truncated.json": {
+          "sha256": "ca8553436e24db9a0a7bfabb9c343a68511d0d391920816e1735bdbefe7a6603",
+          "bytes": 1137
+        },
+        "answers/float-caller-depth-udp.json": {
+          "sha256": "ac54d2b000a656fff339075f0dd702b1024c3db72e624b72875793294a1ab625",
+          "bytes": 13157
+        },
+        "answers/float-exchange-tcp.json": {
+          "sha256": "51eeb4f2121406f6ab26a2a8cd783301acb134f2681ba899b2275581e19f2131",
+          "bytes": 5416
+        },
+        "answers/float-exchange-udp.json": {
+          "sha256": "189629e70677f6941bb5fa0b31de81cb25757a8c63de0c8cfdb04735da67aa54",
+          "bytes": 5416
+        },
+        "answers/float-nested.json": {
+          "sha256": "f2093c40a34fa579ccf2010b72cdbdbce676d548619f60143dbfa99466097a8c",
+          "bytes": 3808
+        },
+        "answers/float-split.json": {
+          "sha256": "aa96e4f30d9f12428daf9681ebb3f080b031e7c5efecb6d12fdd112092f18313",
+          "bytes": 5456
+        },
+        "answers/float-standalone-unconfirmed-udp.json": {
+          "sha256": "4683449ff1623341afb107c344aff7741a27babc54e6d5988fbe1d92d77111ba",
+          "bytes": 2404
+        },
+        "answers/float-trailing.json": {
+          "sha256": "8d9ac59e57b394b3b91d4ef253fa5fc9e130d6e10564adfe178f873a57a57dea",
+          "bytes": 1103
+        },
+        "build.py": {
+          "sha256": "7c164452e8e3ba55f39b8131f04ed8d3e9dddc870549b05921eaeaa684b62a0c",
+          "bytes": 4229
+        },
+        "carrier.py": {
+          "sha256": "07db3352defd52e18936a68d327f675a57abc90c59611492c049f102b08843d2",
+          "bytes": 3782
+        },
+        "cases/float-23-max-finite.pcap": {
+          "sha256": "7ce323bf0efd0683e2c678f370a59cd470c67ed17dc6d8b31668c240399f78d2",
+          "bytes": 328
+        },
+        "cases/float-23-min-subnormal.pcap": {
+          "sha256": "790536d4574286e3f67a2c6db3c5b2ea1853a9b6aad753983206313546f4c97c",
+          "bytes": 328
+        },
+        "cases/float-23-negative-infinity.pcap": {
+          "sha256": "3d7ccf43e1b11be0ebdeba412b3a30f8d7a6f87c48ebe36065ce491a1b209487",
+          "bytes": 328
+        },
+        "cases/float-23-negative-subnormal.pcap": {
+          "sha256": "d047c46c4e39f59501403799f640000a7c8263c147958cc74af33e713606d488",
+          "bytes": 328
+        },
+        "cases/float-23-negative-zero.pcap": {
+          "sha256": "37fd6765955da6577240f05b136285d07fb7ea30c47b873b4f23fadc026a4a2b",
+          "bytes": 328
+        },
+        "cases/float-23-normal.pcap": {
+          "sha256": "b7e6db1b7fa885c2bf7386729d06367082ba73dcf418c9a5fd4968557a18d84e",
+          "bytes": 328
+        },
+        "cases/float-23-positive-infinity.pcap": {
+          "sha256": "540577cbb1b862b08b70226c82887eb1c0390e4ffc70f18c407b7f63c2f3d2de",
+          "bytes": 328
+        },
+        "cases/float-23-positive-zero.pcap": {
+          "sha256": "93c3caa758eb488a147bb21df8faad47facc9a7ebe729ae21a335d46147b6507",
+          "bytes": 328
+        },
+        "cases/float-23-quiet-nan-payload.pcap": {
+          "sha256": "c835a70556dd06023da4ce646f956ad042eee10af8c505cee50ee385c0f3f473",
+          "bytes": 328
+        },
+        "cases/float-23-signalling-nan-payload.pcap": {
+          "sha256": "61b877d8b492f337c1f2c5ec62a5f47bc4a8528ebf0dc84282036f7065fd65e2",
+          "bytes": 328
+        },
+        "cases/float-23-truncated.pcap": {
+          "sha256": "2acea93146c02d893fbfcbfbc65a4e258a3cc931282b53967dc0a0b371db59fd",
+          "bytes": 321
+        },
+        "cases/float-24-max-finite.pcap": {
+          "sha256": "cd93ca895176b9531cb5174a58b25b878f35c97a04c44b7bbb626149460ceb1d",
+          "bytes": 332
+        },
+        "cases/float-24-min-subnormal.pcap": {
+          "sha256": "bed0aebc54ee38089b32cc202cbc423608579a0eb701933c381f722ddc9e53b7",
+          "bytes": 332
+        },
+        "cases/float-24-negative-infinity.pcap": {
+          "sha256": "374dec0f40852b920018229722d16a9ca148d36e9877442b29b078bb0d9d177a",
+          "bytes": 332
+        },
+        "cases/float-24-negative-subnormal.pcap": {
+          "sha256": "60c48a1839bbc33d5191d1c3260e3b13139f6fc493de716b6731f88ed9dd1c5e",
+          "bytes": 332
+        },
+        "cases/float-24-negative-zero.pcap": {
+          "sha256": "3cac2143da70887a6b208a439de1ceae7288c367d94974fea114cda86cd52821",
+          "bytes": 332
+        },
+        "cases/float-24-normal.pcap": {
+          "sha256": "3321a890f884d4765ed425c91bb2328ef7a3707ba0a1bfeb883b2b5003aa6cd0",
+          "bytes": 332
+        },
+        "cases/float-24-positive-infinity.pcap": {
+          "sha256": "1c271e89ae02e180a60af19b69fe175955a1013339fd17f5b69c9b6020c825af",
+          "bytes": 332
+        },
+        "cases/float-24-positive-zero.pcap": {
+          "sha256": "e20593329dbd3f4bf71a847bf3a483fe2c557dafa93dc3b1251180bcf71dd816",
+          "bytes": 332
+        },
+        "cases/float-24-quiet-nan-payload.pcap": {
+          "sha256": "82c95a3f35cc9d07ca5a57b9d77585f455698c5ed953f871793948dab9a03d84",
+          "bytes": 332
+        },
+        "cases/float-24-signalling-nan-payload.pcap": {
+          "sha256": "bb43bf897755268caf9e8857c54b47eb0e627e00964c4c219f1d7a566c626bd2",
+          "bytes": 332
+        },
+        "cases/float-24-truncated.pcap": {
+          "sha256": "1d384a2cd9a268d29a26ff7747d4fc24ed22a66a3325ce45f7aa444b4f25507d",
+          "bytes": 325
+        },
+        "cases/float-caller-depth-udp.pcap": {
+          "sha256": "fb05a9a52d6b1f979a2eb1263bf4bad4787abaedb2b90675f8af8310144a6b14",
+          "bytes": 302
+        },
+        "cases/float-exchange-tcp.pcap": {
+          "sha256": "ddba5b81a8f0c03a7ee3843595272a3f935c375f469797fbe5e48d2a58785032",
+          "bytes": 440
+        },
+        "cases/float-exchange-udp.pcap": {
+          "sha256": "0484d0d3b42684e708d840920935104269158391f4af422f49ce9ac3b42e47f3",
+          "bytes": 206
+        },
+        "cases/float-nested.pcap": {
+          "sha256": "6bf3e2588defe3ed93384d8194b955a9045ffaf8cc2589d6aaaf82535cfe3e72",
+          "bytes": 342
+        },
+        "cases/float-split.pcap": {
+          "sha256": "37531231fff2eb3449ffd239fff68572ea367a6caf014dd336c6f61d7d7402b6",
+          "bytes": 510
+        },
+        "cases/float-standalone-unconfirmed-udp.pcap": {
+          "sha256": "a30ad592024e576678f9547129b115f612374eccc115a1a97295ae1a93e0723c",
+          "bytes": 104
+        },
+        "cases/float-trailing.pcap": {
+          "sha256": "c6b643b72b0c02da0b97bb2f59b9ee49be003e56761d2ffb4c445d60b72d1ef0",
+          "bytes": 323
+        },
+        "controls.json": {
+          "sha256": "e9ec1eabe6dd6353252797c04bd4edcc7ca1b9a7fd1644f2786a77a5d49d00c5",
+          "bytes": 112970
+        },
+        "oracle.py": {
+          "sha256": "b972b2cc831574284230a8bab5530049a97c7a86cdc1ce4018272365ba4158a1",
+          "bytes": 6820
+        },
+        "reference-check.py": {
+          "sha256": "25c156c5222f5618f2bba8e8fcf6c52288cb583e70418072fd6ba8b3db7e37ab",
+          "bytes": 5470
+        },
+        "required-tests-v36.json": {
+          "sha256": "d6dc17b05fae0940f7b07539088e87ba682c432e7bcc05f5d20e73c3108563b1",
+          "bytes": 102375
+        },
+        "seal.py": {
+          "sha256": "791bdda643d0adb4bea44294a25e74b35f3922ac63502311e782a8dda22b794a",
+          "bytes": 5461
+        },
+        "source-pin.json": {
+          "sha256": "c5ccb45acad40994310c0cfb7cb4c39c1e1e19cdf529ec52f0dfc50c55010f36",
+          "bytes": 12405
+        },
+        "validation/expected.json": {
+          "sha256": "c957b9b85745554eb13a8a1d3ebcb51b088442ba118640f067ab5cfe0598bdae",
+          "bytes": 33122
+        },
+        "verify-controls.py": {
+          "sha256": "812af72293c34a15ed0fddbde89e98428550305beb5137c0085a5ec4a4bfa2a0",
+          "bytes": 1411
+        }
+      },
+      "aliases": {
+        "common/pcapx/pcaputil/dlms-float/cases/float-exchange-tcp.pcap": "cases/float-exchange-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-float/cases/float-exchange-udp.pcap": "cases/float-exchange-udp.pcap",
+        "common/pcapx/pcaputil/dlms-float/cases/float-23-positive-zero.pcap": "cases/float-23-positive-zero.pcap",
+        "common/pcapx/pcaputil/dlms-float/cases/float-23-negative-zero.pcap": "cases/float-23-negative-zero.pcap",
+        "common/pcapx/pcaputil/dlms-float/cases/float-23-normal.pcap": "cases/float-23-normal.pcap",
+        "common/pcapx/pcaputil/dlms-float/cases/float-23-min-subnormal.pcap": "cases/float-23-min-subnormal.pcap",
+        "common/pcapx/pcaputil/dlms-float/cases/float-23-negative-subnormal.pcap": "cases/float-23-negative-subnormal.pcap",
+        "common/pcapx/pcaputil/dlms-float/cases/float-23-max-finite.pcap": "cases/float-23-max-finite.pcap",
+        "common/pcapx/pcaputil/dlms-float/cases/float-23-positive-infinity.pcap": "cases/float-23-positive-infinity.pcap",
+        "common/pcapx/pcaputil/dlms-float/cases/float-23-negative-infinity.pcap": "cases/float-23-negative-infinity.pcap",
+        "common/pcapx/pcaputil/dlms-float/cases/float-23-quiet-nan-payload.pcap": "cases/float-23-quiet-nan-payload.pcap",
+        "common/pcapx/pcaputil/dlms-float/cases/float-23-signalling-nan-payload.pcap": "cases/float-23-signalling-nan-payload.pcap",
+        "common/pcapx/pcaputil/dlms-float/cases/float-24-positive-zero.pcap": "cases/float-24-positive-zero.pcap",
+        "common/pcapx/pcaputil/dlms-float/cases/float-24-negative-zero.pcap": "cases/float-24-negative-zero.pcap",
+        "common/pcapx/pcaputil/dlms-float/cases/float-24-normal.pcap": "cases/float-24-normal.pcap",
+        "common/pcapx/pcaputil/dlms-float/cases/float-24-min-subnormal.pcap": "cases/float-24-min-subnormal.pcap",
+        "common/pcapx/pcaputil/dlms-float/cases/float-24-negative-subnormal.pcap": "cases/float-24-negative-subnormal.pcap",
+        "common/pcapx/pcaputil/dlms-float/cases/float-24-max-finite.pcap": "cases/float-24-max-finite.pcap",
+        "common/pcapx/pcaputil/dlms-float/cases/float-24-positive-infinity.pcap": "cases/float-24-positive-infinity.pcap",
+        "common/pcapx/pcaputil/dlms-float/cases/float-24-negative-infinity.pcap": "cases/float-24-negative-infinity.pcap",
+        "common/pcapx/pcaputil/dlms-float/cases/float-24-quiet-nan-payload.pcap": "cases/float-24-quiet-nan-payload.pcap",
+        "common/pcapx/pcaputil/dlms-float/cases/float-24-signalling-nan-payload.pcap": "cases/float-24-signalling-nan-payload.pcap",
+        "common/pcapx/pcaputil/dlms-float/cases/float-nested.pcap": "cases/float-nested.pcap",
+        "common/pcapx/pcaputil/dlms-float/cases/float-23-truncated.pcap": "cases/float-23-truncated.pcap",
+        "common/pcapx/pcaputil/dlms-float/cases/float-24-truncated.pcap": "cases/float-24-truncated.pcap",
+        "common/pcapx/pcaputil/dlms-float/cases/float-trailing.pcap": "cases/float-trailing.pcap",
+        "common/pcapx/pcaputil/dlms-float/cases/float-caller-depth-udp.pcap": "cases/float-caller-depth-udp.pcap",
+        "common/pcapx/pcaputil/dlms-float/cases/float-standalone-unconfirmed-udp.pcap": "cases/float-standalone-unconfirmed-udp.pcap",
+        "common/pcapx/pcaputil/dlms-float/cases/float-split.pcap": "cases/float-split.pcap",
+        "common/pcapx/pcaputil/dlms-float/build.py": "build.py",
+        "common/pcapx/pcaputil/dlms-float/carrier.py": "carrier.py",
+        "common/pcapx/pcaputil/dlms-float/oracle.py": "oracle.py",
+        "common/pcapx/pcaputil/dlms-float/verify-controls.py": "verify-controls.py",
+        "common/pcapx/pcaputil/dlms-float/reference-check.py": "reference-check.py",
+        "common/pcapx/pcaputil/dlms-float/source-pin.json": "source-pin.json",
+        "common/pcapx/pcaputil/dlms-float/seal.py": "seal.py",
+        "common/pcapx/pcaputil/dlms-float/answers/float-exchange-tcp.json": "answers/float-exchange-tcp.json",
+        "common/pcapx/pcaputil/dlms-float/answers/float-exchange-udp.json": "answers/float-exchange-udp.json",
+        "common/pcapx/pcaputil/dlms-float/answers/float-23-positive-zero.json": "answers/float-23-positive-zero.json",
+        "common/pcapx/pcaputil/dlms-float/answers/float-23-negative-zero.json": "answers/float-23-negative-zero.json",
+        "common/pcapx/pcaputil/dlms-float/answers/float-23-normal.json": "answers/float-23-normal.json",
+        "common/pcapx/pcaputil/dlms-float/answers/float-23-min-subnormal.json": "answers/float-23-min-subnormal.json",
+        "common/pcapx/pcaputil/dlms-float/answers/float-23-negative-subnormal.json": "answers/float-23-negative-subnormal.json",
+        "common/pcapx/pcaputil/dlms-float/answers/float-23-max-finite.json": "answers/float-23-max-finite.json",
+        "common/pcapx/pcaputil/dlms-float/answers/float-23-positive-infinity.json": "answers/float-23-positive-infinity.json",
+        "common/pcapx/pcaputil/dlms-float/answers/float-23-negative-infinity.json": "answers/float-23-negative-infinity.json",
+        "common/pcapx/pcaputil/dlms-float/answers/float-23-quiet-nan-payload.json": "answers/float-23-quiet-nan-payload.json",
+        "common/pcapx/pcaputil/dlms-float/answers/float-23-signalling-nan-payload.json": "answers/float-23-signalling-nan-payload.json",
+        "common/pcapx/pcaputil/dlms-float/answers/float-24-positive-zero.json": "answers/float-24-positive-zero.json",
+        "common/pcapx/pcaputil/dlms-float/answers/float-24-negative-zero.json": "answers/float-24-negative-zero.json",
+        "common/pcapx/pcaputil/dlms-float/answers/float-24-normal.json": "answers/float-24-normal.json",
+        "common/pcapx/pcaputil/dlms-float/answers/float-24-min-subnormal.json": "answers/float-24-min-subnormal.json",
+        "common/pcapx/pcaputil/dlms-float/answers/float-24-negative-subnormal.json": "answers/float-24-negative-subnormal.json",
+        "common/pcapx/pcaputil/dlms-float/answers/float-24-max-finite.json": "answers/float-24-max-finite.json",
+        "common/pcapx/pcaputil/dlms-float/answers/float-24-positive-infinity.json": "answers/float-24-positive-infinity.json",
+        "common/pcapx/pcaputil/dlms-float/answers/float-24-negative-infinity.json": "answers/float-24-negative-infinity.json",
+        "common/pcapx/pcaputil/dlms-float/answers/float-24-quiet-nan-payload.json": "answers/float-24-quiet-nan-payload.json",
+        "common/pcapx/pcaputil/dlms-float/answers/float-24-signalling-nan-payload.json": "answers/float-24-signalling-nan-payload.json",
+        "common/pcapx/pcaputil/dlms-float/answers/float-nested.json": "answers/float-nested.json",
+        "common/pcapx/pcaputil/dlms-float/answers/float-23-truncated.json": "answers/float-23-truncated.json",
+        "common/pcapx/pcaputil/dlms-float/answers/float-24-truncated.json": "answers/float-24-truncated.json",
+        "common/pcapx/pcaputil/dlms-float/answers/float-trailing.json": "answers/float-trailing.json",
+        "common/pcapx/pcaputil/dlms-float/answers/float-caller-depth-udp.json": "answers/float-caller-depth-udp.json",
+        "common/pcapx/pcaputil/dlms-float/answers/float-standalone-unconfirmed-udp.json": "answers/float-standalone-unconfirmed-udp.json",
+        "common/pcapx/pcaputil/dlms-float/answers/float-split.json": "answers/float-split.json",
+        "common/pcapx/pcaputil/dlms-float/controls.json": "controls.json",
+        "common/pcapx/pcaputil/dlms-float/validation/expected.json": "validation/expected.json",
+        "common/pcapx/pcaputil/dlms-float/required-tests-v36.json": "required-tests-v36.json",
+        "scripts/protocol-tests/required-tests-v36.json": "required-tests-v36.json"
+      }
+    },
+    {
+      "id": "validation-dlms-strings-b72a28f88035",
+      "kind": "validation",
+      "source_sha": "b72a28f8803567f2714226ff07011f19f29f0827",
+      "file": "validation-dlms-strings-b72a28f88035.zip",
+      "sha256": "86d22242f68080b9a42d4876bb3513a11870600128a1e23b15d45cd04bee90d5",
+      "password": "bin-parser",
+      "members": {
+        "answers/empty-utf8.json": {
+          "sha256": "8101501b6dd69c58265a0dcc78dfd76b34cdb1934cfe88dc8456f7d09d73332d",
+          "bytes": 2988
+        },
+        "answers/empty-visible.json": {
+          "sha256": "56b3bcdea22a09a7b60d71cd0228226b90be3423a5a18376661461d2b0273bbb",
+          "bytes": 2997
+        },
+        "answers/historical-text-now-supported.json": {
+          "sha256": "a9d07f2da49f58bf1868fb4b86f75f75241c921943990171bba036894475f8af",
+          "bytes": 2688
+        },
+        "answers/text-declared-budget.json": {
+          "sha256": "f79d13d6ddcc710fb46925d5946ebc94fcc206e50acf914efd3340f17357ba2a",
+          "bytes": 1137
+        },
+        "answers/text-declared-truncation.json": {
+          "sha256": "f345d548e7b6dfacdc9badbdb96339c5833598f52d025927bb4e3478ab98845c",
+          "bytes": 1135
+        },
+        "answers/text-exchange-tcp.json": {
+          "sha256": "d43414b703ce765ed1e7d6d8400391374891908149f69fcc0a7a259bfeb3b8a7",
+          "bytes": 5467
+        },
+        "answers/text-exchange-udp.json": {
+          "sha256": "db3e2ef744e13e08ec2423239bef08e2bb6f49d1f1c177f6500911eaea76f928",
+          "bytes": 5467
+        },
+        "answers/text-nested.json": {
+          "sha256": "59a7d61630006716ad51afaef37afae7f75bfc3302cfb2fb689b3181a6b9fb04",
+          "bytes": 3611
+        },
+        "answers/text-resource-late-udp.json": {
+          "sha256": "bd3e76358dc513f471880849c75fa43cd0ec1208790ae7960e95bacf8f50206a",
+          "bytes": 12455
+        },
+        "answers/text-selective-parameter.json": {
+          "sha256": "c5181b564ede5b081d0ad50769f97325e36dd1937ba54f6afeb2948e1e81f82c",
+          "bytes": 2676
+        },
+        "answers/text-split.json": {
+          "sha256": "c1398a6c4d6e6bbf4a20f7d985fc75fe4be68ff6db78937a29187cdbe4486395",
+          "bytes": 5480
+        },
+        "answers/text-trailing.json": {
+          "sha256": "a6f0427cbf1e9a77e3f8c638d53c33f23174d6c16d3547fb753481e0482ac312",
+          "bytes": 1138
+        },
+        "answers/utf8-above-max.json": {
+          "sha256": "6a3b845ba3322410446f441bcd042c4b3b01e51af76375b38ee7e1205f7081af",
+          "bytes": 1181
+        },
+        "answers/utf8-ascii.json": {
+          "sha256": "e3beb241dbf374a2bdbfb580e7bcc11a426998e80c31d971c9f700c2c4f14380",
+          "bytes": 3054
+        },
+        "answers/utf8-bom.json": {
+          "sha256": "f5eeb8037b067118f3e1d19bbea50cb17f866b7ee5ab05c5625e4a463287a021",
+          "bytes": 3038
+        },
+        "answers/utf8-chinese.json": {
+          "sha256": "c36a7a93f021b9fa716b283477b4e1801effe62c6fc0a24ec71a34982e811bc4",
+          "bytes": 3079
+        },
+        "answers/utf8-combining.json": {
+          "sha256": "4ce722994f56213f6aae0499bc636212e04fd805f3dfeb1f27495f767143ce32",
+          "bytes": 3044
+        },
+        "answers/utf8-five-byte.json": {
+          "sha256": "0dd91af3bdc27d0a1f9ee3bd13f4a9c2cb0df12c53d51763ac291c3168bf93f5",
+          "bytes": 1185
+        },
+        "answers/utf8-length1024.json": {
+          "sha256": "ea10218459f6c88328d88935cda9141cf4ae1d83ee27fd2f93727f4066b2065a",
+          "bytes": 16355
+        },
+        "answers/utf8-lone-continuation.json": {
+          "sha256": "7e21b31b454c7d449703ed33c0e4ef13efbe696b63d57b3f0aec4510720e5d44",
+          "bytes": 1193
+        },
+        "answers/utf8-max-scalar.json": {
+          "sha256": "8f54613e84572c3f74e3dbdc3edc72b1ef5f1312027bca358b897dd004bf5ae5",
+          "bytes": 3064
+        },
+        "answers/utf8-noncharacter.json": {
+          "sha256": "3224e6a4c81b964f191e5c860795b4181dd940dad4b56ecf32e47bf0a53fc126",
+          "bytes": 3052
+        },
+        "answers/utf8-nul.json": {
+          "sha256": "acca55c667ee585612d76f42a4ac9aa51977a243336e2729ce99fea2c1376615",
+          "bytes": 3045
+        },
+        "answers/utf8-overlong.json": {
+          "sha256": "b1a6805a0ad5619705160b5e42473c202506f49d57ace940197f69d78b50ac1d",
+          "bytes": 1170
+        },
+        "answers/utf8-sequence-truncated.json": {
+          "sha256": "07c65442049dc5b36b6ebbde44e0324151a08d5d9d859eda9f6ebae560a49450",
+          "bytes": 1200
+        },
+        "answers/utf8-supplementary.json": {
+          "sha256": "31afcf2cb209142bc73824307900b2c02fa39d95f0110d3029b57e2f39b492d1",
+          "bytes": 3073
+        },
+        "answers/utf8-surrogate.json": {
+          "sha256": "ef5546bd5b002e0f085e09941bef1264d71656966eeaa7cbe00da6f7871d18b4",
+          "bytes": 1177
+        },
+        "answers/visible-control.json": {
+          "sha256": "6908d25f50aee4e261f7cd67ea827ae673a6107ebafaa17cb56965651ed69347",
+          "bytes": 1194
+        },
+        "answers/visible-length128.json": {
+          "sha256": "d95ecc55d75010e959e66e6c37dfe4e90688ce04e8f70015eb15cf9a820dd0cf",
+          "bytes": 4695
+        },
+        "answers/visible-nonascii.json": {
+          "sha256": "42c0c5a293f9d68c02fc21d6cdb6da038abdda0da0f48129065101d5e0d30186",
+          "bytes": 1193
+        },
+        "answers/visible-printable.json": {
+          "sha256": "b385ba5521e87ac82ed419731cc38cd262d34828ec888ada6a5da6aff60a50c9",
+          "bytes": 3143
+        },
+        "build.py": {
+          "sha256": "e535cd9cb6e529b6c829cfd34b00b0980f5752306bf9c8d76771df93bf4d6eba",
+          "bytes": 5135
+        },
+        "carrier.py": {
+          "sha256": "07db3352defd52e18936a68d327f675a57abc90c59611492c049f102b08843d2",
+          "bytes": 3782
+        },
+        "cases/empty-utf8.pcap": {
+          "sha256": "56b48f18a4c52cb756314d8dfe2ee51b8c6e666d0f5956336c8693694ee37564",
+          "bytes": 325
+        },
+        "cases/empty-visible.pcap": {
+          "sha256": "3ad5d7496bda16e1f61f85aed6e664e5dd581150a24a4aae9218946e04b8e7b1",
+          "bytes": 325
+        },
+        "cases/text-declared-budget.pcap": {
+          "sha256": "547f09e186718986a48e45ebac32e027fcff23cdc2a46675eac6656ec7c0842a",
+          "bytes": 321
+        },
+        "cases/text-declared-truncation.pcap": {
+          "sha256": "56b5701ac478499e64d52ba9245fd76f734ace7a51f06c994c162754d1165f8f",
+          "bytes": 321
+        },
+        "cases/text-exchange-tcp.pcap": {
+          "sha256": "646e3a99a7b2ec5bbf320bf1493627c61d2192762678670a5e27c2d4785362a5",
+          "bytes": 439
+        },
+        "cases/text-exchange-udp.pcap": {
+          "sha256": "50df8fec59587fd5ece10ac07cc71ef276cdcfe560bfea9735173f2519c43360",
+          "bytes": 205
+        },
+        "cases/text-nested.pcap": {
+          "sha256": "b9b2923ba8ce9e0b4104adf476e7dc1e534821345e71949b3ae469a5a5e8f871",
+          "bytes": 333
+        },
+        "cases/text-resource-late-udp.pcap": {
+          "sha256": "43c081d4dcedbace83e7ff09b313049244b6d2c7690d7cf3eb0323be474835c9",
+          "bytes": 292
+        },
+        "cases/text-selective-parameter.pcap": {
+          "sha256": "ba247f638c43f4aeac60be0d826206127c64174b07c7236088745b5568db7fd0",
+          "bytes": 332
+        },
+        "cases/text-split.pcap": {
+          "sha256": "31bebd569e4d4de47f3aee02218c6491da3f59bf7d7b87f54a1d51fe6c9b81f1",
+          "bytes": 509
+        },
+        "cases/text-trailing.pcap": {
+          "sha256": "14968bb0bce504ea2feef34a84fbb118842a9d5ece656d6fa4cdb1b86d3a5d9e",
+          "bytes": 322
+        },
+        "cases/utf8-above-max.pcap": {
+          "sha256": "2f11f924e574ffd07aef3521e1ba4600f0495c7037f1fa52626870e5c3863d02",
+          "bytes": 329
+        },
+        "cases/utf8-ascii.pcap": {
+          "sha256": "430642acc3e104216cdc9db6343f1424bfad57c3a8766d1ebd19cf94a8fcfa90",
+          "bytes": 330
+        },
+        "cases/utf8-bom.pcap": {
+          "sha256": "172c6d135e53e2e9242b33e2271573587a1bd03616e106d4e8e6a3229be0414b",
+          "bytes": 329
+        },
+        "cases/utf8-chinese.pcap": {
+          "sha256": "087f3e9a20685b13dd97d517a643808756303f532d5ec5d2f55c678d6718d588",
+          "bytes": 331
+        },
+        "cases/utf8-combining.pcap": {
+          "sha256": "5f16df8bfd374394cc97c6411e373ace8c992b9e3bf08def7a055198832ece9f",
+          "bytes": 328
+        },
+        "cases/utf8-five-byte.pcap": {
+          "sha256": "2ca5d4eda79ac386a4d24ed394d7f44072f15293c519cf5266e573ca9d0609b0",
+          "bytes": 330
+        },
+        "cases/utf8-length1024.pcap": {
+          "sha256": "d224cf711e2d1a39f535a38dc415f7d8c32ab38827d6a96721df16f3b89ad0ae",
+          "bytes": 1351
+        },
+        "cases/utf8-lone-continuation.pcap": {
+          "sha256": "f468f0f05fb0b89fff9207fed9a94e3cbe4270d8c5b568b935f716b70511c2a9",
+          "bytes": 326
+        },
+        "cases/utf8-max-scalar.pcap": {
+          "sha256": "9956da4c2970cbc416407c0bc3a19bd6a97969e3c8c0b12e4e0ee827b72ed38d",
+          "bytes": 329
+        },
+        "cases/utf8-noncharacter.pcap": {
+          "sha256": "266b14e69d198920d12e9447fef580bc59cdad5d34018e1869667b49d614344e",
+          "bytes": 328
+        },
+        "cases/utf8-nul.pcap": {
+          "sha256": "47cb62e84aab5332e296aba4d9a1c73e0726bda30248d6ab8a03513f8c1b0eb2",
+          "bytes": 329
+        },
+        "cases/utf8-overlong.pcap": {
+          "sha256": "41733ac89786ce9bbac132fc29a83b6345fde937f6efac689e6ec0d7d3893517",
+          "bytes": 327
+        },
+        "cases/utf8-sequence-truncated.pcap": {
+          "sha256": "de062db2ada795bb77472c3cbc7e4162636e56144d974e7563a4cc6dd6f26c4b",
+          "bytes": 327
+        },
+        "cases/utf8-supplementary.pcap": {
+          "sha256": "0dd54083824d3072cb235e0afb78b13a789845fd23cab387c1ed0fe08245040e",
+          "bytes": 329
+        },
+        "cases/utf8-surrogate.pcap": {
+          "sha256": "6948fd479a2d77fe721c3b8a56d418f7f46cba588241a342b868b3e156d65af7",
+          "bytes": 328
+        },
+        "cases/visible-control.pcap": {
+          "sha256": "aa8845dac66acb0fcc1c02b315f9f3eca76bae9501fab17d305867032e38befc",
+          "bytes": 328
+        },
+        "cases/visible-length128.pcap": {
+          "sha256": "6c2234dd886efc1795763c8dc59df96c23a459fdaf3583584793e83d8062cc09",
+          "bytes": 454
+        },
+        "cases/visible-nonascii.pcap": {
+          "sha256": "92429542bfc05178cdc9769a7359cbe11ce5f90c2884c2b7974dc67e9d9bfe87",
+          "bytes": 327
+        },
+        "cases/visible-printable.pcap": {
+          "sha256": "64e5953c018cc0311a00d3141058e960431f6ebb139fc2c3f36f90c993a4409b",
+          "bytes": 335
+        },
+        "controls.json": {
+          "sha256": "725248ed617d9af0a82af7f26f7be67830f773e16acfd87756f65c39be2f010e",
+          "bytes": 117369
+        },
+        "oracle.py": {
+          "sha256": "5241b8f2df255ff4d3baac5a91ad25129c071ec646fd90fd5d2b8f765644648f",
+          "bytes": 7240
+        },
+        "reference-check.py": {
+          "sha256": "4c8d8fa99f42a412e1c58e9df6cac8c805407e0461670e280fdad58396f77901",
+          "bytes": 6011
+        },
+        "required-tests-v37.json": {
+          "sha256": "bbbccbc60d22a3fb495b1b950431a700cf0e8a8028f0548f85ec1069e25d8b85",
+          "bytes": 103554
+        },
+        "seal.py": {
+          "sha256": "491b31721ef87eedbc77a4264cb9f2c814aa305bd3d2f2cea806be37889139bd",
+          "bytes": 5557
+        },
+        "source-pin.json": {
+          "sha256": "22aeeac02864a3f820f9a00eedf785af2a675c829f8daafbb2b02c6802d6a2f4",
+          "bytes": 12658
+        },
+        "validation/expected.json": {
+          "sha256": "c76d5727f7fd3051c4202ec3caf07f1a350ade3cd6794fe1e2c4076652b2b7ea",
+          "bytes": 34776
+        },
+        "verify-controls.py": {
+          "sha256": "ff8a5d7ad45bc47d1c4503f13f7d3ee5515dba7018bd39c1e433a032bf62a04f",
+          "bytes": 1477
+        }
+      },
+      "aliases": {
+        "common/pcapx/pcaputil/dlms-strings/cases/text-exchange-tcp.pcap": "cases/text-exchange-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-strings/cases/text-exchange-udp.pcap": "cases/text-exchange-udp.pcap",
+        "common/pcapx/pcaputil/dlms-strings/cases/empty-visible.pcap": "cases/empty-visible.pcap",
+        "common/pcapx/pcaputil/dlms-strings/cases/empty-utf8.pcap": "cases/empty-utf8.pcap",
+        "common/pcapx/pcaputil/dlms-strings/cases/visible-printable.pcap": "cases/visible-printable.pcap",
+        "common/pcapx/pcaputil/dlms-strings/cases/utf8-ascii.pcap": "cases/utf8-ascii.pcap",
+        "common/pcapx/pcaputil/dlms-strings/cases/utf8-chinese.pcap": "cases/utf8-chinese.pcap",
+        "common/pcapx/pcaputil/dlms-strings/cases/utf8-combining.pcap": "cases/utf8-combining.pcap",
+        "common/pcapx/pcaputil/dlms-strings/cases/utf8-nul.pcap": "cases/utf8-nul.pcap",
+        "common/pcapx/pcaputil/dlms-strings/cases/utf8-bom.pcap": "cases/utf8-bom.pcap",
+        "common/pcapx/pcaputil/dlms-strings/cases/utf8-max-scalar.pcap": "cases/utf8-max-scalar.pcap",
+        "common/pcapx/pcaputil/dlms-strings/cases/utf8-noncharacter.pcap": "cases/utf8-noncharacter.pcap",
+        "common/pcapx/pcaputil/dlms-strings/cases/utf8-supplementary.pcap": "cases/utf8-supplementary.pcap",
+        "common/pcapx/pcaputil/dlms-strings/cases/visible-length128.pcap": "cases/visible-length128.pcap",
+        "common/pcapx/pcaputil/dlms-strings/cases/utf8-length1024.pcap": "cases/utf8-length1024.pcap",
+        "common/pcapx/pcaputil/dlms-strings/cases/utf8-overlong.pcap": "cases/utf8-overlong.pcap",
+        "common/pcapx/pcaputil/dlms-strings/cases/utf8-surrogate.pcap": "cases/utf8-surrogate.pcap",
+        "common/pcapx/pcaputil/dlms-strings/cases/utf8-above-max.pcap": "cases/utf8-above-max.pcap",
+        "common/pcapx/pcaputil/dlms-strings/cases/utf8-lone-continuation.pcap": "cases/utf8-lone-continuation.pcap",
+        "common/pcapx/pcaputil/dlms-strings/cases/utf8-sequence-truncated.pcap": "cases/utf8-sequence-truncated.pcap",
+        "common/pcapx/pcaputil/dlms-strings/cases/utf8-five-byte.pcap": "cases/utf8-five-byte.pcap",
+        "common/pcapx/pcaputil/dlms-strings/cases/visible-control.pcap": "cases/visible-control.pcap",
+        "common/pcapx/pcaputil/dlms-strings/cases/visible-nonascii.pcap": "cases/visible-nonascii.pcap",
+        "common/pcapx/pcaputil/dlms-strings/cases/text-declared-truncation.pcap": "cases/text-declared-truncation.pcap",
+        "common/pcapx/pcaputil/dlms-strings/cases/text-declared-budget.pcap": "cases/text-declared-budget.pcap",
+        "common/pcapx/pcaputil/dlms-strings/cases/text-trailing.pcap": "cases/text-trailing.pcap",
+        "common/pcapx/pcaputil/dlms-strings/cases/text-selective-parameter.pcap": "cases/text-selective-parameter.pcap",
+        "common/pcapx/pcaputil/dlms-strings/cases/text-nested.pcap": "cases/text-nested.pcap",
+        "common/pcapx/pcaputil/dlms-strings/cases/text-resource-late-udp.pcap": "cases/text-resource-late-udp.pcap",
+        "common/pcapx/pcaputil/dlms-strings/cases/text-split.pcap": "cases/text-split.pcap",
+        "common/pcapx/pcaputil/dlms-strings/build.py": "build.py",
+        "common/pcapx/pcaputil/dlms-strings/carrier.py": "carrier.py",
+        "common/pcapx/pcaputil/dlms-strings/oracle.py": "oracle.py",
+        "common/pcapx/pcaputil/dlms-strings/verify-controls.py": "verify-controls.py",
+        "common/pcapx/pcaputil/dlms-strings/reference-check.py": "reference-check.py",
+        "common/pcapx/pcaputil/dlms-strings/source-pin.json": "source-pin.json",
+        "common/pcapx/pcaputil/dlms-strings/seal.py": "seal.py",
+        "common/pcapx/pcaputil/dlms-strings/answers/text-exchange-tcp.json": "answers/text-exchange-tcp.json",
+        "common/pcapx/pcaputil/dlms-strings/answers/text-exchange-udp.json": "answers/text-exchange-udp.json",
+        "common/pcapx/pcaputil/dlms-strings/answers/empty-visible.json": "answers/empty-visible.json",
+        "common/pcapx/pcaputil/dlms-strings/answers/empty-utf8.json": "answers/empty-utf8.json",
+        "common/pcapx/pcaputil/dlms-strings/answers/visible-printable.json": "answers/visible-printable.json",
+        "common/pcapx/pcaputil/dlms-strings/answers/utf8-ascii.json": "answers/utf8-ascii.json",
+        "common/pcapx/pcaputil/dlms-strings/answers/utf8-chinese.json": "answers/utf8-chinese.json",
+        "common/pcapx/pcaputil/dlms-strings/answers/utf8-combining.json": "answers/utf8-combining.json",
+        "common/pcapx/pcaputil/dlms-strings/answers/utf8-nul.json": "answers/utf8-nul.json",
+        "common/pcapx/pcaputil/dlms-strings/answers/utf8-bom.json": "answers/utf8-bom.json",
+        "common/pcapx/pcaputil/dlms-strings/answers/utf8-max-scalar.json": "answers/utf8-max-scalar.json",
+        "common/pcapx/pcaputil/dlms-strings/answers/utf8-noncharacter.json": "answers/utf8-noncharacter.json",
+        "common/pcapx/pcaputil/dlms-strings/answers/utf8-supplementary.json": "answers/utf8-supplementary.json",
+        "common/pcapx/pcaputil/dlms-strings/answers/visible-length128.json": "answers/visible-length128.json",
+        "common/pcapx/pcaputil/dlms-strings/answers/utf8-length1024.json": "answers/utf8-length1024.json",
+        "common/pcapx/pcaputil/dlms-strings/answers/utf8-overlong.json": "answers/utf8-overlong.json",
+        "common/pcapx/pcaputil/dlms-strings/answers/utf8-surrogate.json": "answers/utf8-surrogate.json",
+        "common/pcapx/pcaputil/dlms-strings/answers/utf8-above-max.json": "answers/utf8-above-max.json",
+        "common/pcapx/pcaputil/dlms-strings/answers/utf8-lone-continuation.json": "answers/utf8-lone-continuation.json",
+        "common/pcapx/pcaputil/dlms-strings/answers/utf8-sequence-truncated.json": "answers/utf8-sequence-truncated.json",
+        "common/pcapx/pcaputil/dlms-strings/answers/utf8-five-byte.json": "answers/utf8-five-byte.json",
+        "common/pcapx/pcaputil/dlms-strings/answers/visible-control.json": "answers/visible-control.json",
+        "common/pcapx/pcaputil/dlms-strings/answers/visible-nonascii.json": "answers/visible-nonascii.json",
+        "common/pcapx/pcaputil/dlms-strings/answers/text-declared-truncation.json": "answers/text-declared-truncation.json",
+        "common/pcapx/pcaputil/dlms-strings/answers/text-declared-budget.json": "answers/text-declared-budget.json",
+        "common/pcapx/pcaputil/dlms-strings/answers/text-trailing.json": "answers/text-trailing.json",
+        "common/pcapx/pcaputil/dlms-strings/answers/text-selective-parameter.json": "answers/text-selective-parameter.json",
+        "common/pcapx/pcaputil/dlms-strings/answers/text-nested.json": "answers/text-nested.json",
+        "common/pcapx/pcaputil/dlms-strings/answers/text-resource-late-udp.json": "answers/text-resource-late-udp.json",
+        "common/pcapx/pcaputil/dlms-strings/answers/text-split.json": "answers/text-split.json",
+        "common/pcapx/pcaputil/dlms-strings/answers/historical-text-now-supported.json": "answers/historical-text-now-supported.json",
+        "common/pcapx/pcaputil/dlms-strings/controls.json": "controls.json",
+        "common/pcapx/pcaputil/dlms-strings/validation/expected.json": "validation/expected.json",
+        "common/pcapx/pcaputil/dlms-strings/required-tests-v37.json": "required-tests-v37.json",
+        "scripts/protocol-tests/required-tests-v37.json": "required-tests-v37.json"
+      }
     }
   ],
   "schema_version": 1,

@@ -37,17 +37,28 @@ type wrapperBitsControl struct {
 }
 
 func wrapperBitsControls(t *testing.T) []wrapperBitsControl {
+	return wrapperOwnedDataControls(t, "dlms-bits", 26)
+}
+
+func wrapperOwnedDataControls(t *testing.T, prefix string, count int) []wrapperBitsControl {
 	t.Helper()
-	raw, err := trafficfixture.ReadFile("dlms-bits/controls.json")
+	raw, err := trafficfixture.ReadFile(prefix + "/controls.json")
 	require.NoError(t, err)
 	var d struct{ Cases []json.RawMessage }
 	require.NoError(t, json.Unmarshal(raw, &d))
-	require.Len(t, d.Cases, 26)
+	require.Len(t, d.Cases, count)
 	cases := make([]wrapperBitsControl, 0, len(d.Cases))
 	for _, row := range d.Cases {
 		var c wrapperBitsControl
 		require.NoError(t, json.Unmarshal(row, &c))
-		a, err := trafficfixture.ReadFile("dlms-bits/answers/" + c.Name + ".json")
+		var limits struct {
+			Limits struct {
+				Depth int `json:"depth_limit"`
+			} `json:"static_limits"`
+		}
+		require.NoError(t, json.Unmarshal(row, &limits))
+		c.Depth = limits.Limits.Depth
+		a, err := trafficfixture.ReadFile(prefix + "/answers/" + c.Name + ".json")
 		require.NoError(t, err)
 		require.JSONEq(t, string(row), string(a))
 		require.Equal(t, c.SHA256, fmt.Sprintf("%x", sha256.Sum256(wrapperStructuredInput(t, c.InputAlias))))
@@ -60,7 +71,11 @@ func wrapperBitsControls(t *testing.T) []wrapperBitsControl {
 }
 
 func TestDLMSWrapperBitStringSealedMatrix(t *testing.T) {
-	for _, c := range wrapperBitsControls(t) {
+	wrapperOwnedDataMatrix(t, wrapperBitsControls(t))
+}
+
+func wrapperOwnedDataMatrix(t *testing.T, cases []wrapperBitsControl) {
+	for _, c := range cases {
 		t.Run(c.Name, func(t *testing.T) {
 			input := wrapperStructuredInput(t, c.InputAlias)
 			discoveryMatrix(t, func(t *testing.T, workers int, deferred, observe bool) {
@@ -70,9 +85,19 @@ func TestDLMSWrapperBitStringSealedMatrix(t *testing.T) {
 				}
 				events, stats := discoveryReplay(t, input, workers, deferred, observe, options...)
 				c.Targets.Pairs = c.DefaultPairs
-				assertWrapperStructuredAnswers(t, c.wrapperStructuredControl, events, false)
-				require.EqualValues(t, len(c.Answers), stats.Messages)
-				for i, e := range events {
+				frameEvents := events
+				expectedEvents := len(c.Answers)
+				if c.ExpectedCloseOutstanding != 0 {
+					require.Equal(t, 1, c.ExpectedCloseOutstanding)
+					require.Len(t, events, expectedEvents+1)
+					assertWrapperStructuredClose(t, events[expectedEvents:])
+					require.Greater(t, events[expectedEvents].ID, events[expectedEvents-1].ID)
+					frameEvents = events[:expectedEvents]
+					require.EqualValues(t, 1, stats.Incomplete)
+				}
+				assertWrapperStructuredAnswers(t, c.wrapperStructuredControl, frameEvents, false)
+				require.EqualValues(t, expectedEvents, stats.Messages)
+				for i, e := range frameEvents {
 					dir := -1
 					for _, step := range c.Steps {
 						if step.Ref == c.Answers[i].Refs[0] {
@@ -95,7 +120,11 @@ func TestDLMSWrapperBitStringSealedMatrix(t *testing.T) {
 }
 
 func TestDLMSWrapperBitStringBudgetsOwnership(t *testing.T) {
-	for _, c := range wrapperBitsControls(t) {
+	wrapperOwnedDataBudgetsOwnership(t, wrapperBitsControls(t))
+}
+
+func wrapperOwnedDataBudgetsOwnership(t *testing.T, cases []wrapperBitsControl) {
+	for _, c := range cases {
 		for _, deferred := range []bool{false, true} {
 			t.Run(c.Name+fmt.Sprint(deferred), func(t *testing.T) {
 				sizes := []int{1, 7, 64, 65543}
@@ -134,7 +163,12 @@ func TestDLMSWrapperBitStringBudgetsOwnership(t *testing.T) {
 						require.NoError(t, err)
 						rocEqualFields(t, c.Answers[i].Fields, f)
 					}
-					require.Empty(t, s.Close("bits"))
+					closed := s.Close("bits")
+					if c.ExpectedCloseOutstanding != 0 {
+						assertWrapperStructuredClose(t, closed)
+					} else {
+						require.Empty(t, closed)
+					}
 					require.Empty(t, s.Close("again"))
 					require.Zero(t, s.Stats().BufferedBytes)
 				}

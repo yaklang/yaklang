@@ -4,10 +4,12 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"fmt"
+	"math"
+	"unicode/utf8"
 )
 
 // These are local selected-profile bounds, not DLMS wire maxima.
-// Data types other than scalar/octet/bit-string/array/structure, block transfer, ciphering
+// Data types other than scalar/float/octet/bit-string/selected-text/array/structure, block transfer, ciphering
 // and object/selector semantics remain separate.
 const wrapperListItems = 64
 const wrapperListOctets = 1024
@@ -63,9 +65,9 @@ func wrapperScalarSize(tag byte) int {
 		return 1
 	case 16, 18:
 		return 2
-	case 5, 6:
+	case 5, 6, 23:
 		return 4
-	case 20, 21:
+	case 20, 21, 24:
 		return 8
 	default:
 		return -1
@@ -82,10 +84,13 @@ func (c *wrapperListCursor) scalar(limit int) (map[string]any, error) {
 		if _, err = c.take(n); err != nil {
 			return nil, err
 		}
+		if tag == 23 || tag == 24 {
+			return wrapperListFloat(c.wire[start:c.at]), nil
+		}
 		return wrapperScalar(c.wire[start:c.at], limit)
 	}
-	if tag != 9 && tag != 4 {
-		return nil, wrapperError(ErrUnsupportedFeature, "Data type outside bounded scalar/octet/bit-string profile")
+	if tag != 9 && tag != 4 && tag != 10 && tag != 12 {
+		return nil, wrapperError(ErrUnsupportedFeature, "Data type outside bounded scalar/octet/bit-string/selected-text profile")
 	}
 	n, enc, err := c.count()
 	if err != nil {
@@ -114,7 +119,63 @@ func (c *wrapperListCursor) scalar(limit int) (map[string]any, error) {
 	} else {
 		out["length"] = n
 	}
+	if tag == 10 || tag == 12 {
+		encoding := "utf-8"
+		if tag == 10 {
+			// This profile selects printable US-ASCII. Other visible-string repertoires
+			// remain unsupported, rather than being labelled universally malformed.
+			for _, b := range w {
+				if b < 0x20 || b > 0x7e {
+					return nil, wrapperError(ErrUnsupportedFeature, "visible-string outside selected printable ASCII repertoire")
+				}
+			}
+			encoding = "ascii"
+		} else if !utf8.Valid(w) {
+			// RFC3629: no overlong sequences, surrogates or scalar values above U+10FFFF.
+			return nil, wrapperError(ErrMalformedMessage, "Data UTF-8 string contains invalid encoding")
+		}
+		out["text_encoding"], out["value"], out["code_points"] = encoding, string(w), utf8.RuneCount(w)
+	}
 	return out, nil
+}
+
+// Float Data retains the exact IEEE value bits. Nonfinite values are legal wire
+// values, represented as strings so every owned projection remains JSON-safe.
+// This does not assign an engineering unit or assert meter measurement validity.
+func wrapperListFloat(w []byte) map[string]any {
+	width, exponentBits, fractionBits := 64, 11, 52
+	bits := uint64(0)
+	var number float64
+	if w[0] == 23 {
+		width, exponentBits, fractionBits = 32, 8, 23
+		bits = uint64(binary.BigEndian.Uint32(w[1:]))
+		number = float64(math.Float32frombits(uint32(bits)))
+	} else {
+		bits = binary.BigEndian.Uint64(w[1:])
+		number = math.Float64frombits(bits)
+	}
+	exponent := (bits >> fractionBits) & ((1 << exponentBits) - 1)
+	fraction := bits & ((1 << fractionBits) - 1)
+	negative := bits>>(width-1) != 0
+	class := "normal"
+	var value any = number
+	if exponent == (1<<exponentBits)-1 {
+		if fraction != 0 {
+			class, value = "nan", "NaN"
+		} else {
+			class, value = "infinite", "Infinity"
+			if negative {
+				value = "-Infinity"
+			}
+		}
+	} else if exponent == 0 {
+		class = "subnormal"
+		if fraction == 0 {
+			class = "zero"
+		}
+	}
+	return map[string]any{"type": w[0], "raw_hex": hex.EncodeToString(w), "value_hex": hex.EncodeToString(w[1:]),
+		"float_width": width, "float_class": class, "negative": negative, "value": value}
 }
 
 // data consumes exactly one bounded A-XDR value. Its shared node counter spans
