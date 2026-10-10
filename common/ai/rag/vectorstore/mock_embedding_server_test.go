@@ -1,15 +1,17 @@
-package vectorstore
+package vectorstore_test
 
 import (
-	"github.com/stretchr/testify/require"
 	"sync"
 	"testing"
+
+	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/ai/rag/ragtest"
 )
 
 // Rapid calls must not share a wall-clock seed: repeated texts collapse
 // independent documents and question indexes into one vector-store entry.
 func TestMUSTPASS_MockEmbeddingRapidConcurrentTextGeneration(t *testing.T) {
-	client := NewDefaultMockEmbedding()
+	client := ragtest.NewDefaultMockEmbedding()
 	const count = 64
 	texts := make(chan string, count)
 	var wg sync.WaitGroup

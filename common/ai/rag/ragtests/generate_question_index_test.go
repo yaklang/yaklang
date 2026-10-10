@@ -5,9 +5,9 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/yaklang/yaklang/common/ai/rag"
-	"github.com/yaklang/yaklang/common/ai/rag/vectorstore"
 	_ "github.com/yaklang/yaklang/common/ai/aiforge"
+	"github.com/yaklang/yaklang/common/ai/rag"
+	"github.com/yaklang/yaklang/common/ai/rag/ragtest"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 )
@@ -16,7 +16,7 @@ func TestMUSTPASS_RAGSystem_GenerateQuestionIndex(t *testing.T) {
 	db, err := rag.NewTemporaryRAGDB()
 	assert.NoError(t, err)
 	exportCollectionName := "test_generate_question_index_" + utils.RandStringBytes(8)
-	mockEmbedding := vectorstore.NewDefaultMockEmbedding()
+	mockEmbedding := ragtest.NewDefaultMockEmbedding()
 
 	// 模拟知识库内容
 	knowledgeDetails := mockEmbedding.GenerateRandomText(20)
@@ -95,7 +95,7 @@ func TestMUSTPASS_RAGSystem_GenerateQuestionIndex_With_Multiple_Inputs(t *testin
 	db, err := rag.NewTemporaryRAGDB()
 	assert.NoError(t, err)
 	exportCollectionName := "test_generate_question_index_multi_" + utils.RandStringBytes(8)
-	mockEmbedding := vectorstore.NewDefaultMockEmbedding()
+	mockEmbedding := ragtest.NewDefaultMockEmbedding()
 
 	input1 := mockEmbedding.GenerateRandomText(20)
 	input2 := mockEmbedding.GenerateRandomText(20)

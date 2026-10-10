@@ -16,7 +16,7 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/ai/rag"
-	"github.com/yaklang/yaklang/common/ai/rag/vectorstore"
+	"github.com/yaklang/yaklang/common/ai/rag/ragtest"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
@@ -394,7 +394,7 @@ func TestReAct_AllContextProviders(t *testing.T) {
 
 	// 2. Setup knowledge base
 	kbName := "test_kb_all_" + ksuid.New().String()
-	mockEmbedding := vectorstore.NewDefaultMockEmbedding()
+	mockEmbedding := ragtest.NewDefaultMockEmbedding()
 	ragSystem, err := rag.Get(kbName, rag.WithEmbeddingClient(mockEmbedding))
 	if err != nil {
 		t.Fatalf("Failed to create rag system: %v", err)

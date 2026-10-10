@@ -5,10 +5,10 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	_ "github.com/yaklang/yaklang/common/ai/aiforge"
 	"github.com/yaklang/yaklang/common/ai/rag"
 	"github.com/yaklang/yaklang/common/ai/rag/knowledgebase"
-	"github.com/yaklang/yaklang/common/ai/rag/vectorstore"
-	_ "github.com/yaklang/yaklang/common/ai/aiforge"
+	"github.com/yaklang/yaklang/common/ai/rag/ragtest"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 )
@@ -17,7 +17,7 @@ func TestMUSTPASS_RAGSystem_AddKnowledgeEntryQuestion(t *testing.T) {
 	db, err := rag.NewTemporaryRAGDB()
 	assert.NoError(t, err)
 	exportCollectionName := "test_add_knowledge_entry_question_" + utils.RandStringBytes(8)
-	mockEmbedding := vectorstore.NewDefaultMockEmbedding()
+	mockEmbedding := ragtest.NewDefaultMockEmbedding()
 
 	question1 := mockEmbedding.GenerateRandomText(5)
 	question2 := mockEmbedding.GenerateRandomText(5)

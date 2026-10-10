@@ -7,11 +7,11 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/samber/lo"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/ai/rag/enhancesearch"
+	"github.com/yaklang/yaklang/common/ai/rag/ragtest"
 	"github.com/yaklang/yaklang/common/ai/rag/vectorstore"
-
-	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/utils"
 )
 
@@ -380,7 +380,7 @@ func TestMUSTPASS_RAGQuery(t *testing.T) {
 		test 2：相似度阈值设置为0.6，确保只有Hypothetical Answer和Generalize Query生成的文本能命中。预期 应得到 两个集合的两个文档
 		test 3：相似度阈值设置为0.8，确保只有Hypothetical Answer生成的文本能命中。预期 应得到 一个集合的一个文档
 	*/
-	mockEmbedding := vectorstore.NewDefaultMockEmbedding()
+	mockEmbedding := ragtest.NewDefaultMockEmbedding()
 	HighSimilarThresh := 0.8
 	MidSimilarThresh := 0.6
 	LowSimilarThresh := 0.4

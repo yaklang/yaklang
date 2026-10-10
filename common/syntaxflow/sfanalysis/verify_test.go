@@ -1,16 +1,18 @@
-package sfanalysis
+package sfanalysis_test
 
 import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/syntaxflow/sfanalysis"
+	"github.com/yaklang/yaklang/common/syntaxflow/sfanalysis/sfanalysistest"
 )
 
 func TestEvaluateVerifyFilesystemWithRule_BlankIsNoop(t *testing.T) {
 	rule := &schema.SyntaxFlowRule{Content: " \n\t "}
-	require.NoError(t, EvaluateVerifyFilesystemWithRule(rule))
-	require.NoError(t, EvaluateVerifyFilesystemWithRule(rule, WithStrictEmbeddedVerify()))
+	require.NoError(t, sfanalysis.EvaluateVerifyFilesystemWithRule(rule))
+	require.NoError(t, sfanalysis.EvaluateVerifyFilesystemWithRule(rule, sfanalysis.WithStrictEmbeddedVerify()))
 }
 
 func TestEvaluateVerifyFilesystemWithRule_DefaultSkipsNegativeFilesystem(t *testing.T) {
@@ -29,8 +31,8 @@ a as $output;
 alert $output;
 `}
 
-	require.NoError(t, EvaluateVerifyFilesystemWithRule(rule))
-	require.ErrorContains(t, EvaluateVerifyFilesystemWithRule(rule, WithStrictEmbeddedVerify()), "alert symbol table not empty")
+	require.NoError(t, sfanalysis.EvaluateVerifyFilesystemWithRule(rule))
+	require.ErrorContains(t, sfanalysis.EvaluateVerifyFilesystemWithRule(rule, sfanalysis.WithStrictEmbeddedVerify()), "alert symbol table not empty")
 }
 
 func TestEvaluateVerifyFilesystemWithRule_DefaultAllowsAlertHighOverflow(t *testing.T) {
@@ -52,8 +54,8 @@ alert $first for {level: "high"};
 alert $second for {level: "high"};
 `}
 
-	require.NoError(t, EvaluateVerifyFilesystemWithRule(rule))
-	require.ErrorContains(t, EvaluateVerifyFilesystemWithRule(rule, WithStrictEmbeddedVerify()), "alert symbol table is less than alert_high config")
+	require.NoError(t, sfanalysis.EvaluateVerifyFilesystemWithRule(rule))
+	require.ErrorContains(t, sfanalysis.EvaluateVerifyFilesystemWithRule(rule, sfanalysis.WithStrictEmbeddedVerify()), "alert symbol table is less than alert_high config")
 }
 
 func TestEvaluateVerifyFilesystemWithRule_StructModeCompilesWithStructRule(t *testing.T) {
@@ -78,7 +80,7 @@ NEG
 Runtime.getRuntime().exec(* as $cmd) as $call
 alert $call for { title: "Runtime.exec" }
 `}
-	require.NoError(t, EvaluateVerifyFilesystemWithRule(rule, WithStrictEmbeddedVerify()))
+	require.NoError(t, sfanalysis.EvaluateVerifyFilesystemWithRule(rule, sfanalysis.WithStrictEmbeddedVerify()))
 }
 
 func TestEvaluateVerifyFilesystemWithRule_SourceModeUsesFileSystem(t *testing.T) {
@@ -97,7 +99,7 @@ NEG
 ${*.py}.pattern_regex(/eval\s*\(/) as $call
 alert $call
 `}
-	require.NoError(t, EvaluateVerifyFilesystemWithRule(rule, WithStrictEmbeddedVerify()))
+	require.NoError(t, sfanalysis.EvaluateVerifyFilesystemWithRule(rule, sfanalysis.WithStrictEmbeddedVerify()))
 }
 
 func TestEvaluateVerifyFilesystemWithRule_SourceModeAlwaysChecksNegative(t *testing.T) {
@@ -116,7 +118,7 @@ NEG
 ${*.py}.pattern_regex(/eval\s*\(/) as $call
 alert $call
 `}
-	require.ErrorContains(t, EvaluateVerifyFilesystemWithRule(rule), "unexpected alert")
+	require.ErrorContains(t, sfanalysis.EvaluateVerifyFilesystemWithRule(rule), "unexpected alert")
 }
 
 func TestEvaluateVerifyFilesystemWithRule_StructModeAlwaysChecksNegative(t *testing.T) {
@@ -143,9 +145,9 @@ NEG
 Runtime.getRuntime().exec(* as $cmd) as $call
 alert $call for { title: "Runtime.exec" }
 `}
-	require.ErrorContains(t, EvaluateVerifyFilesystemWithRule(rule), "alert symbol table not empty")
+	require.ErrorContains(t, sfanalysis.EvaluateVerifyFilesystemWithRule(rule), "alert symbol table not empty")
 }
 
 func TestBuiltinStructRules_VerifyFilesystem(t *testing.T) {
-	RunBuiltinRuleVerify(t, BuiltinVerifyFilter{Struct: true})
+	sfanalysistest.RunBuiltinRuleVerify(t, sfanalysistest.BuiltinVerifyFilter{Struct: true})
 }

@@ -19,6 +19,7 @@ import (
 	aicommon_testutil "github.com/yaklang/yaklang/common/ai/aid/aicommon/testutil"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact"
 	"github.com/yaklang/yaklang/common/ai/rag"
+	"github.com/yaklang/yaklang/common/ai/rag/ragtest"
 	"github.com/yaklang/yaklang/common/ai/rag/vectorstore"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
@@ -549,7 +550,7 @@ func TestFocusMode_RagSystem_Basic(t *testing.T) {
 	assert.Greater(t, docCount, 0)
 	assert.Equal(t, docCount, 17)
 
-	queryText := ragSystem.GetEmbedder().(*vectorstore.MockEmbeddingClient).GenerateRandomText(10)
+	queryText := ragtest.NewDefaultMockEmbedding().GenerateRandomText(10)
 	log.Infof("queryText: %s", queryText)
 	results, err := ragSystem.QueryTopN(queryText, 10)
 	assert.NoError(t, err)

@@ -1,4 +1,4 @@
-package sfanalysis
+package sfanalysis_test
 
 import (
 	"io/fs"
@@ -7,6 +7,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/syntaxflow/sfanalysis"
+	"github.com/yaklang/yaklang/common/syntaxflow/sfanalysis/sfanalysistest"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 )
@@ -14,7 +16,7 @@ import (
 // Dataflow rules are named ssa-*.sf. Source rules for languages without a
 // frontend are checked by the source builtin verify, not here.
 func TestGapSSARules_VerifyFilesystem(t *testing.T) {
-	root := BuiltinRuleRoot(t)
+	root := sfanalysistest.BuiltinRuleRoot(t)
 	local := filesys.NewLocalFs()
 	var paths []string
 	err := filesys.Recursive(root, filesys.WithFileStat(func(path string, info fs.FileInfo) error {
@@ -37,7 +39,7 @@ func TestGapSSARules_VerifyFilesystem(t *testing.T) {
 			frame, err := sfvm.NewSyntaxFlowVirtualMachine().Compile(string(raw))
 			require.NoError(t, err)
 			require.True(t, !sfvm.FrameIsSourceMode(frame) && !sfvm.FrameIsStructMode(frame))
-			require.NoError(t, EvaluateVerifyFilesystemWithFrame(frame, WithStrictEmbeddedVerify()))
+			require.NoError(t, sfanalysis.EvaluateVerifyFilesystemWithFrame(frame, sfanalysis.WithStrictEmbeddedVerify()))
 		})
 	}
 }

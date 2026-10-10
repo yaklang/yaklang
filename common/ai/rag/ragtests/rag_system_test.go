@@ -6,6 +6,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/ai/rag"
+	"github.com/yaklang/yaklang/common/ai/rag/ragtest"
 	"github.com/yaklang/yaklang/common/ai/rag/vectorstore"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
@@ -99,7 +100,7 @@ func TestMUSTPASS_TestRAGSystem_QueryKnowledge(t *testing.T) {
 	assert.NoError(t, err)
 
 	collectionName := "test_query_knowledge_" + utils.RandStringBytes(8)
-	mockEmbedding := vectorstore.NewDefaultMockEmbedding()
+	mockEmbedding := ragtest.NewDefaultMockEmbedding()
 
 	knowledge1 := mockEmbedding.GenerateRandomText(5)
 	knowledge2 := mockEmbedding.GenerateRandomText(5)
@@ -174,7 +175,7 @@ func TestMUSTPASS_TestRAGSystem_QueryWithFilter(t *testing.T) {
 	assert.NoError(t, err)
 
 	collectionName := "test_query_filter_" + utils.RandStringBytes(8)
-	mockEmbedding := vectorstore.NewDefaultMockEmbedding()
+	mockEmbedding := ragtest.NewDefaultMockEmbedding()
 
 	ragSystem, err := rag.NewRAGSystem(
 		rag.WithDB(db),

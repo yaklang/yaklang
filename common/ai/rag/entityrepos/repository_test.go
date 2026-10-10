@@ -7,10 +7,10 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
-	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-
+	"github.com/yaklang/yaklang/common/ai/rag/ragtest"
 	"github.com/yaklang/yaklang/common/ai/rag/vectorstore"
 	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
 func TestEntityRepository_Basic(t *testing.T) {
@@ -18,7 +18,7 @@ func TestEntityRepository_Basic(t *testing.T) {
 
 	repoName := "test_repo"
 	repoDesc := "desc"
-	mockEmbedding := vectorstore.NewDefaultMockEmbedding()
+	mockEmbedding := ragtest.NewDefaultMockEmbedding()
 
 	repo, err := GetOrCreateEntityRepository(db, repoName, repoDesc, WithDisableBulkProcess(), vectorstore.WithEmbeddingClient(mockEmbedding))
 	if err != nil {
@@ -69,7 +69,7 @@ func TestEntityRepository_Basic(t *testing.T) {
 func TestEntityRepository_VectorSearchEntity(t *testing.T) {
 	db := setupTestDB(t)
 
-	mockEmbedding := vectorstore.NewDefaultMockEmbedding()
+	mockEmbedding := ragtest.NewDefaultMockEmbedding()
 
 	repo, err := GetOrCreateEntityRepository(db, "vector_repo", "desc", WithDisableBulkProcess(), vectorstore.WithEmbeddingClient(mockEmbedding))
 	if err != nil {
@@ -105,7 +105,7 @@ func TestEntityRepository_VectorSearchEntity(t *testing.T) {
 func TestEntityRepository_MergeAndSaveEntity(t *testing.T) {
 	db := setupTestDB(t)
 
-	mockEmbedding := vectorstore.NewDefaultMockEmbedding()
+	mockEmbedding := ragtest.NewDefaultMockEmbedding()
 	repo, err := GetOrCreateEntityRepository(db, "merge_repo", "desc", vectorstore.WithEmbeddingClient(mockEmbedding), WithDisableBulkProcess(), WithSimilarityThreshold(0.6))
 	if err != nil {
 		t.Fatalf("failed to create repo: %v", err)

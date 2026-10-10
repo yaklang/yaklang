@@ -1,4 +1,5 @@
-package sfanalysis
+// Package sfanalysistest contains helpers shared by SyntaxFlow tests.
+package sfanalysistest
 
 import (
 	"io/fs"
@@ -8,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/syntaxflow/sfanalysis"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 )
@@ -35,7 +37,7 @@ func BuiltinRuleRoot(t testing.TB) string {
 	t.Helper()
 	_, thisFile, _, ok := runtime.Caller(0)
 	require.True(t, ok)
-	root := filepath.Join(filepath.Dir(thisFile), "..", "sfbuildin", "buildin")
+	root := filepath.Join(filepath.Dir(thisFile), "..", "..", "sfbuildin", "buildin")
 	root, err := filepath.Abs(root)
 	require.NoError(t, err)
 	return root
@@ -89,7 +91,7 @@ func RunBuiltinRuleVerify(t *testing.T, filter BuiltinVerifyFilter) {
 			if len(frame.VerifyFsInfo) == 0 {
 				t.Skip("no embedded verify filesystem")
 			}
-			require.NoError(t, EvaluateVerifyFilesystemWithFrame(frame))
+			require.NoError(t, sfanalysis.EvaluateVerifyFilesystemWithFrame(frame))
 		})
 	}
 }
