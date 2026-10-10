@@ -81,3 +81,69 @@ func TestProtocolHTTPConfiguredBodyBudgetFields(t *testing.T) {
 		})
 	}
 }
+
+func TestProtocolHTTPRetainedHeadersPreserveWireFields(t *testing.T) {
+	body := strings.Repeat("x", 4096)
+	header := "POST /chunks HTTP/1.1\r\nHost: example.test\r\nTransfer-Encoding: chunked\r\nTrailer: X-End, X-Checksum\r\nX-Repeat: first\r\nx-repeat: second\r\n\r\n"
+	request := header + fmt.Sprintf("%x;label=a\r\n%s\r\n0\r\nX-End: yes\r\nX-Checksum: good\r\n\r\n", len(body), body)
+	fixedHeader := "POST /fixed HTTP/1.1\r\nHost: example.test\r\nContent-Length: 4096\r\nContent-Length: 4096\r\nX-Repeat: first\r\nx-repeat: second\r\n\r\n"
+	responseHeader := "HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\nTrailer: X-End\r\nSet-Cookie: a=1\r\nSet-Cookie: b=2\r\n\r\n"
+	response := responseHeader + fmt.Sprintf("%x\r\n%s\r\n0\r\nX-End: yes\r\n\r\n", len(body), body)
+	for _, deferred := range []bool{false, true} {
+		for _, workers := range []int{1, 4} {
+			t.Run(fmt.Sprintf("deferred%v/workers%d", deferred, workers), func(t *testing.T) {
+				steps := []tcpStep{{syn: true}, {syn: true, reverse: true}, {seq: 1, data: request + fixedHeader + body}, {seq: 1, reverse: true, data: response + "HTTP/1.1 204 No Content\r\n\r\n"}}
+				events, stats, err := binReplay(t, binTestPcap(t, steps, 80, false, false), workers, WithProtocolDeferred(deferred), WithProtocolBudget(512, 16384))
+				require.NoError(t, err)
+				require.Len(t, events, 4)
+				require.Zero(t, stats.Malformed)
+				require.Zero(t, stats.Incomplete)
+				require.Zero(t, stats.BufferedBytes)
+				for i, expectedRaw := range []string{header, fixedHeader, responseHeader} {
+					event := events[i]
+					require.Equal(t, "limited", event.Status)
+					require.Equal(t, "headers", event.Completeness)
+					require.Equal(t, expectedRaw, string(event.Raw))
+					fields, err := event.GetFields()
+					require.NoError(t, err)
+					headers := fields["Headers"].(map[string]any)
+					if i < 2 {
+						require.Equal(t, []string{"example.test"}, headers["Host"])
+						require.Equal(t, []string{"first", "second"}, headers["X-Repeat"])
+					}
+					if i == 1 {
+						require.Equal(t, []string{"4096", "4096"}, headers["Content-Length"])
+					} else {
+						require.Equal(t, []string{"chunked"}, headers["Transfer-Encoding"])
+					}
+					if i == 0 {
+						require.Equal(t, []string{"X-End, X-Checksum"}, headers["Trailer"])
+					}
+					if i == 2 {
+						require.Equal(t, []string{"X-End"}, headers["Trailer"])
+						require.Equal(t, []string{"a=1", "b=2"}, headers["Set-Cookie"])
+						require.Equal(t, events[0].ID, event.ResponseTo)
+					}
+					view, err := NewProtocolInspector()
+					require.NoError(t, err)
+					view.OnEvent(event)
+					details, err := view.Details(event.ID)
+					require.NoError(t, err)
+					require.Equal(t, fields, details.Fields)
+				}
+				require.Equal(t, events[1].ID, events[3].ResponseTo)
+			})
+		}
+	}
+	// Context diagnostics have the same complete header projection even without
+	// a queued request; absent framing context must not erase observed headers.
+	events, _, err := binReplay(t, binTestPcap(t, []tcpStep{{syn: true}, {seq: 1, data: responseHeader}}, 80, false, false), 1)
+	require.NoError(t, err)
+	require.Len(t, events, 1)
+	require.Equal(t, "context-required", events[0].Status)
+	fields, err := events[0].GetFields()
+	require.NoError(t, err)
+	headers := fields["Headers"].(map[string]any)
+	require.Equal(t, []string{"chunked"}, headers["Transfer-Encoding"])
+	require.Equal(t, []string{"X-End"}, headers["Trailer"])
+}

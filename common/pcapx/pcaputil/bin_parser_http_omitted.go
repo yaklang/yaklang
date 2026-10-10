@@ -1,9 +1,11 @@
 package pcaputil
 
 import (
+	"bufio"
 	"bytes"
 	"fmt"
 	"net/http"
+	"net/textproto"
 	"strconv"
 	"strings"
 )
@@ -12,6 +14,22 @@ func httpHeaderFields(header http.Header) map[string]any {
 	fields := make(map[string]any, len(header))
 	for name, values := range header {
 		fields[name] = append([]string(nil), values...)
+	}
+	return fields
+}
+
+// net/http extracts Host, Transfer-Encoding and Trailer and coalesces equal
+// Content-Length fields. Diagnostic views must instead project every observed
+// header. Reparse only the already validated, bounded header at emission; this
+// adds no body retention or work to ordinary full/deferred message decoding.
+func (h *binHTTPState) retainedHeaderFields() map[string]any {
+	fields := cloneSession(h.headerFields)
+	if end := bytes.Index(h.rawHeader, []byte("\r\n")); end >= 0 {
+		wire := h.rawHeader[end+2:]
+		reader := textproto.NewReader(bufio.NewReaderSize(bytes.NewReader(wire), min(len(wire), 4096)))
+		if header, err := reader.ReadMIMEHeader(); err == nil {
+			fields["Headers"] = httpHeaderFields(http.Header(header))
+		}
 	}
 	return fields
 }
@@ -60,8 +78,8 @@ func (f *binFlow) omitHTTPPayload(dir int, wire []byte, reason string) bool {
 	e.Session["Declared Body Bytes"] = h.bodyLength
 	e.Session["Max Message Bytes"] = f.a.config.MaxMessageBytes
 	e.Session["Max Buffered Bytes"] = f.a.config.MaxBufferedBytes
-	e.semanticFields = cloneSession(h.headerFields)
-	e.Structured = map[string]any{"fields": cloneSession(h.headerFields)}
+	e.semanticFields = h.retainedHeaderFields()
+	e.Structured = map[string]any{"fields": cloneSession(e.semanticFields)}
 	f.a.messages.Add(1)
 	f.a.emit(e)
 	return true
