@@ -76,9 +76,11 @@ func ConvertAIToolToLoopAction(tool *aitool.Tool) *LoopAction {
 			if !valid {
 				// Combine all validation errors into a single message
 				errMsg := utils.Errorf(
-					"Tool '%s' parameter validation failed: %v",
+					"Tool '%s' parameter validation failed: %v\n"+
+						"参数修正提示：本次未执行工具。请按本轮 action %q 的参数说明和以上错误修正必填字段、字段类型及取值约束；长文本遵循本轮输出格式。修正后在当前可用的 action 中重新提交，不要原样重试或委托其他模型生成参数。无法确定参数时先补充信息，不要猜测。",
 					tool.GetName(),
 					validationErrors,
+					tool.GetName(),
 				)
 
 				// Add error to timeline so AI can learn from it
@@ -92,47 +94,8 @@ func ConvertAIToolToLoopAction(tool *aitool.Tool) *LoopAction {
 			return nil
 		},
 		ActionHandler: func(loop *ReActLoop, action *aicommon.Action, operator *LoopActionHandlerOperator) {
-			// Get parameters using the same strategy as ActionVerifier
-			// Handle both standard and simplified formats
-			invokeParams := action.GetParams()
-
-			if len(invokeParams) == 0 {
-				invokeParams = action.GetInvokeParams(tool.GetName())
-			}
-
-			if len(invokeParams) == 0 {
-				invokeParams = action.GetInvokeParams("next_action").GetObject(tool.GetName())
-			}
-
-			// Handle simplified format: {@action: "tool_name", param1: val1, ...}
-			if len(invokeParams) == 0 && action.ActionType() == tool.GetName() {
-				// Directly extract all parameters from the action
-				invokeParams = make(map[string]any)
-
-				for _, paramName := range tool.Tool.InputSchema.Properties.Keys() {
-					// Use GetInvokeParams to get the value as an object, then extract it
-					paramValue := action.GetInvokeParams(paramName)
-					if len(paramValue) > 0 {
-						invokeParams[paramName] = paramValue
-					} else {
-						// Try to get it as a simple value
-						strVal := action.GetAnyToString(paramName)
-						if strVal != "" {
-							invokeParams[paramName] = strVal
-							continue
-						}
-
-						floatVal := action.GetFloat(paramName)
-						if floatVal != 0 {
-							invokeParams[paramName] = floatVal
-							continue
-						}
-
-						boolVal := action.GetBool(paramName)
-						invokeParams[paramName] = boolVal
-					}
-				}
-			}
+			// Use the same tolerant extractor as ActionVerifier.
+			invokeParams := extractToolParams(action)
 
 			invokeParams = MergeLoopActionToolParams(action, invokeParams, aitagParamNames)
 
