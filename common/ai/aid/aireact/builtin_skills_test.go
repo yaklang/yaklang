@@ -14,6 +14,7 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/mutate"
+	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 )
 
@@ -31,8 +32,9 @@ var allBuiltinSkills = []struct {
 	{"how-to-use-browser", "skills/how-to-use-browser/SKILL.md", []string{"snapshot", "click", "fill", "screenshot", "CDP"}},
 	{"authorization-bypass", "skills/authorization-bypass/SKILL.md", []string{"IDOR", "WSTG-ATHZ-02", "Horizontal", "Vertical", "do_http_request"}},
 	{"java-audit", "skills/java-audit/SKILL.md", []string{"java_project_probe", "java_audit", "RuoYi", "spring_boot", "scope-modules"}},
-	{"http-packet-history", "skills/http-packet-history/SKILL.md", []string{"db.ListYakProjects", "db.QueryHTTPFlows", "db.QueryHTTPFlowByID", "database_id", "response_file"}},
-	{"ai-history-memory", "skills/ai-history-memory/SKILL.md", []string{"aihistory.Query", "aimemory.Search", "item.Dump()", "grep_timeline_history"}},
+	{"http-packet-history", "skills/http-packet-history/SKILL.md", []string{"yaklang-system", "load_skill_resources"}},
+	{"ai-history-memory", "skills/ai-history-memory/SKILL.md", []string{"yaklang-system", "load_skill_resources"}},
+	{"yaklang-system", "skills/yaklang-system/SKILL.md", []string{"Yaklang", "Yakit", "Memfit", "grep_timeline_history", "amend_memory", "fetch_http_packet_by_id"}},
 	{"fuzztag", "skills/fuzztag/SKILL.md", []string{"fuzz.Strings", "笛卡尔积", "同步配对"}},
 	{"fuzztag-reference", "skills/fuzztag-reference/SKILL.md", []string{"exec_fuzztag", "codecflow", "params", "别名"}},
 }
@@ -555,34 +557,80 @@ func TestBuiltinSkills_DisabledDoesNotExtractBuiltinFiles(t *testing.T) {
 	}
 }
 
-func TestBuiltinFuzztagDefaultContext(t *testing.T) {
-	loader, err := aiskillloader.NewAutoSkillLoader(aiskillloader.WithAutoLoad_FileSystem(GetBuiltinSkillsFS()))
+func TestBuiltinSystemSkillsDefaultContext(t *testing.T) {
+	useTempBuiltinSkillReleaseDB(t)
+	targetDir := t.TempDir()
+	currentFS := GetBuiltinSkillsFS()
+	oldFS := filesys.NewVirtualFs()
+
+	// 1. Seed a tracked installation with the two former auto-loaded skills.
+	// Use the real extractor and DB sync so upgrading is not a fresh-install-only check.
+	for _, name := range []string{"ai-history-memory", "http-packet-history"} {
+		path := "skills/" + name + "/SKILL.md"
+		raw, err := currentFS.ReadFile(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		old := strings.Replace(string(raw), `auto_load: "false"`, `auto_load: "true"`, 1)
+		old = strings.Replace(old, "disable-model-invocation: true\n", "", 1)
+		oldFS.AddFile(path, old)
+	}
+	builtinSkillsFS = oldFS
+	t.Cleanup(func() { builtinSkillsFS = currentFS })
+	if err := ExtractBuiltinSkillsToDir(targetDir); err != nil {
+		t.Fatal(err)
+	}
+	builtinSkillsFS = currentFS
+	if err := ExtractBuiltinSkillsToDir(targetDir); err != nil {
+		t.Fatal(err)
+	}
+
+	// 2. The upgraded disk and DB expose one system guide plus unchanged FuzzTag.
+	// Old names remain explicit compatibility entries, without duplicate defaults.
+	loader, err := aiskillloader.NewAutoSkillLoader(aiskillloader.WithAutoLoad_LocalDir(targetDir))
 	if err != nil {
 		t.Fatal(err)
 	}
 	manager := aiskillloader.NewSkillsContextManager(loader)
-	if !manager.IsAutoSkillLoadedAndUnfolded("fuzztag") {
-		t.Fatal("fuzztag must load without a loading_skills round")
+	if len(loader.AllSkillMetas()) != len(allBuiltinSkills) {
+		t.Fatal("upgrade left unexpected skill copies")
 	}
-	if manager.IsSkillLoaded("fuzztag-reference") {
-		t.Fatal("reference must remain on demand")
+	for _, meta := range loader.AllSkillMetas() {
+		expected := meta.Name == "yaklang-system" || meta.Name == "fuzztag"
+		if manager.IsSkillLoaded(meta.Name) != expected || manager.IsAutoSkillLoadedAndUnfolded(meta.Name) != expected || manager.IsForcedSkill(meta.Name) {
+			t.Errorf("unexpected default loading state for %s", meta.Name)
+		}
+		forge, err := yakit.GetAIForgeByName(builtinSkillReleaseDB(), meta.Name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if strings.Contains(forge.Tags, "auto_load:true") != expected {
+			t.Errorf("DB default loading metadata differs for %s", meta.Name)
+		}
 	}
 	rendered := manager.RenderAutoLoadedSkills()
-	for _, text := range []string{"FuzzTag 文本生成", "do_http_request", "{{int(1-10)}}"} {
+	for _, text := range []string{"FuzzTag 文本生成", "grep_timeline_history", "read_memory", "amend_memory", "list_yak_projects", "query_http_packet_history", "fetch_http_packet_by_id", "@yaklang-system/reference.md"} {
 		if !strings.Contains(rendered, text) {
 			t.Errorf("default prompt missing %q", text)
 		}
 	}
-	if !manager.IsAutoSkillLoadedAndUnfolded("ai-history-memory") || manager.IsForcedSkill("ai-history-memory") {
-		t.Fatal("history/memory skill must auto-load without a user-forced skill")
+	if strings.Contains(rendered, "items, err = aihistory.Query") {
+		t.Fatal("detailed examples must remain on demand")
 	}
-	for _, text := range []string{"aihistory.Query", "aimemory.Search", "grep_timeline_history", "amend_memory"} {
-		if !strings.Contains(rendered, text) {
-			t.Errorf("auto-loaded context missing %q", text)
+
+	// 3. Load the merged resource by its advertised path; both original API
+	// examples and HTTPFlow compatibility guidance must still be available.
+	result, err := manager.LoadSkillResource("yaklang-system", "reference.md")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.FuzzyMatched || result.IsTruncated || result.ContentSize == 0 {
+		t.Fatalf("reference must load fully by its exact path: %+v", result)
+	}
+	for _, text := range []string{"items, err = aihistory.Query", "items, err = aimemory.Search", "projects, err = db.ListYakProjects", "files, err = item.ExportPackets", "db.QueryHTTPFlowByID", "db.SaveHTTPFlowInstance"} {
+		if !strings.Contains(manager.RenderStable(), text) {
+			t.Errorf("merged reference missing %q", text)
 		}
-	}
-	if manager.IsForcedSkill("fuzztag") {
-		t.Fatal("default loading must not impersonate a user-forced skill")
 	}
 }
 
