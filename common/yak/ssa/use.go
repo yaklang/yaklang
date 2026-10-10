@@ -286,11 +286,12 @@ func (u *UnOp) ReplaceValue(v Value, to Value) {
 // ----------- Call
 func (c *Call) HasValues() bool { return true }
 func (c *Call) GetValues() Values {
-	ret := make(Values, 0, len(c.Args)+len(c.Binding)+1)
+	ret := make(Values, 0, len(c.Args)+len(c.ArgMember)+len(c.Binding)+1)
 	if method, ok := c.GetValueById(c.Method); ok {
 		ret = append(ret, method)
 	}
 	ret = append(ret, c.GetValuesByIDs(c.Args)...)
+	ret = append(ret, c.GetValuesByIDs(c.ArgMember)...)
 	for _, v := range c.Binding {
 		if val, ok := c.GetValueById(v); ok {
 			ret = append(ret, val)
@@ -300,32 +301,29 @@ func (c *Call) GetValues() Values {
 }
 
 func (c *Call) ReplaceValue(v Value, to Value) {
-	if c.Method == v.GetId() {
-		c.Method = to.GetId()
+	fromID := v.GetId()
+	toID := to.GetId()
+	if c.Method == fromID {
+		c.Method = toID
 		c.handlerObjectMethod()
 		c.handleCalleeFunction()
 		c.handlerReturnType()
 	}
-	lo.ForEach(c.Args, func(id int64, index int) {
-		if id == v.GetId() {
-			c.Args[index] = to.GetId()
+	for index, id := range c.Args {
+		if id == fromID {
+			c.Args[index] = toID
 		}
-		return
-	})
-
-	lo.ForEach(c.Args, func(id int64, index int) {
-		if id == v.GetId() {
-			c.Args[index] = to.GetId()
+	}
+	for index, id := range c.ArgMember {
+		if id == fromID {
+			c.ArgMember[index] = toID
 		}
-		return
-	})
-
-	lo.ForEach(c.ArgMember, func(id int64, index int) {
-		if id == v.GetId() {
-			c.ArgMember[index] = to.GetId()
+	}
+	for name, id := range c.Binding {
+		if id == fromID {
+			c.Binding[name] = toID
 		}
-		return
-	})
+	}
 }
 
 // ------------ SideEffect
