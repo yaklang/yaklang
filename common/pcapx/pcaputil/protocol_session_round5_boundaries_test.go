@@ -135,6 +135,23 @@ func TestRound5UDPExpiryAndBudget(t *testing.T) {
 	require.Empty(t, next.Error)
 	require.NotEqual(t, first.FlowID, next.FlowID)
 	require.Len(t, a.udpSessions.entries, 1)
+	// Reclaiming an idle slot restores bounded literal observation, not proof
+	// that previously unseen or evicted transaction identities are fresh.
+	reply := &ProtocolEvent{Source: next.Destination, Destination: next.Source, Timestamp: time.Unix(603, 0)}
+	require.True(t, a.decodeSTUNDatagram(reply, stunTestMessage(1, 2, 1)))
+	require.Empty(t, reply.Error)
+	require.Equal(t, next.FlowID, reply.FlowID)
+	require.Equal(t, false, reply.Session["Matched"])
+	require.Equal(t, "unverified-after-refusal", reply.Session["Association Status"])
+	evicted := feed("192.0.2.1:1111", 1204)
+	require.Empty(t, evicted.Error)
+	require.NotEqual(t, first.FlowID, evicted.FlowID)
+	late := &ProtocolEvent{Source: evicted.Destination, Destination: evicted.Source, Timestamp: time.Unix(1205, 0)}
+	require.True(t, a.decodeSTUNDatagram(late, stunTestMessage(1, 2, 1)))
+	require.Empty(t, late.Error)
+	require.Equal(t, false, late.Session["Matched"])
+	require.Equal(t, "unverified-after-refusal", late.Session["Association Status"])
+	require.Len(t, a.udpSessions.entries, 1)
 	require.NoError(t, c.finishBinParser())
 	require.Zero(t, a.stats().BufferedBytes)
 }

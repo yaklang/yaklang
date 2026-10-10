@@ -1,5 +1,10 @@
 package pcaputil
 
+import (
+	"container/list"
+	"time"
+)
+
 // The shared UDP byte limit precedes semantic decoding. It must still retire
 // association state for an admitted conversation: the denied on-wire request or
 // reply did not disappear. Admission here examines only bounded headers/ports or
@@ -12,6 +17,9 @@ func (a *binParser) refuseUDPOversizeAssociation(e *ProtocolEvent, w []byte, src
 	prefix, protocol, profile := "", "", ""
 	ttl := slmpIdleTTL
 	switch {
+	case explicit == "stun" || explicit == "turn" || explicit == "" && probeSTUN(w, len(w)).Verdict == ProbeAccept:
+		protocol, profile = "stun", "stun-rfc8489-udp"
+		ttl = 10 * time.Minute
 	case explicit == "snmp" || explicit == "" && probeSNMP(w, len(w)).Verdict == ProbeAccept:
 		prefix, protocol, profile = "snmp/", "snmp", "snmp-v"+probeSNMP(w, len(w)).Version+"-native"
 		ttl = snmpPendingTTL
@@ -39,9 +47,11 @@ func (a *binParser) refuseUDPOversizeAssociation(e *ProtocolEvent, w []byte, src
 		for el := store.lru.Front(); el != nil; {
 			next := el.Next()
 			v := el.Value.(*binUDPEntry)
-			applicable := protocol == "snmp" && v.flow.snmp != nil || protocol == "slmp" && v.flow.slmp != nil || protocol == "dlms-wrapper" && v.flow.wrapper != nil || protocol == "dlms" && v.flow.dlms != nil
+			applicable := protocol == "stun" && v.flow.stun != nil || protocol == "snmp" && v.flow.snmp != nil || protocol == "slmp" && v.flow.slmp != nil || protocol == "dlms-wrapper" && v.flow.wrapper != nil || protocol == "dlms" && v.flow.dlms != nil
 			if applicable && store.clock.Sub(v.touched) >= ttl {
-				if v.flow.snmp != nil {
+				if v.flow.stun != nil {
+					v.flow.retireSTUNUDP(store.clock)
+				} else if v.flow.snmp != nil {
 					v.flow.retireSNMPUDP()
 				} else if v.flow.dlms != nil || v.flow.wrapper != nil {
 					v.flow.retireDLMSUDP()
@@ -55,9 +65,27 @@ func (a *binParser) refuseUDPOversizeAssociation(e *ProtocolEvent, w []byte, src
 		}
 	}
 	existing := store != nil && store.entries[key] != nil
-	if explicit == "" && !existing && !(protocol == "dlms-wrapper" && (src == 4059 || dst == 4059)) {
+	if explicit == "" && !existing && protocol != "stun" && !(protocol == "dlms-wrapper" && (src == 4059 || dst == 4059)) {
 		a.udpMu.Unlock()
 		return false
+	}
+	if protocol == "stun" && !existing {
+		if store == nil {
+			store = &binUDPStore{entries: map[binUDPKey]*list.Element{}, clock: e.Timestamp}
+			a.udpSessions = store
+		}
+		a.reclaimIdleSTUNSlot(store)
+		f := &binFlow{a: a, id: a.flows.Add(1), endpoints: [2]string{e.Source, e.Destination}, protocol: "stun", stun: &binSTUN{blocked: true}}
+		if len(store.entries) < sessionCollectionLimit(a.budget.MaxCollectionElements) && f.reserveSession(f.stun.bytes()) == nil {
+			el := store.lru.PushBack(&binUDPEntry{key, f, store.clock})
+			store.entries[key] = el
+			existing = true
+		} else {
+			// The denied wire is real even if no endpoint history slot fits.
+			// Existing verified keys are preserved; new keys cannot claim a
+			// fully observed generation after an untracked refusal.
+			a.stunUntrackedRefusal = true
+		}
 	}
 	if existing {
 		el := store.entries[key]
@@ -68,7 +96,10 @@ func (a *binParser) refuseUDPOversizeAssociation(e *ProtocolEvent, w []byte, src
 			e.Direction = 1
 		}
 		var retained int64
-		if f.snmp != nil {
+		if f.stun != nil {
+			f.stun.invalidate()
+			retained = f.stun.bytes()
+		} else if f.snmp != nil {
 			f.snmp.invalidate()
 			retained = f.snmp.storage()
 		} else if f.slmp != nil {

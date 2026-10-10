@@ -82,6 +82,14 @@ func (e *ProtocolEvent) Decode() (result map[string]any, err error) {
 	if e.ownsNativeFields() && e.semanticFields != nil {
 		return map[string]any{"fields": cloneSession(e.semanticFields)}, nil
 	}
+	if e.Protocol == "stun" || e.Protocol == "turn" {
+		if e.semanticFields != nil {
+			return map[string]any{"fields": cloneSession(e.semanticFields)}, nil
+		}
+		if e.sessionError != nil {
+			return nil, e.sessionError
+		}
+	}
 	if e.Structured != nil {
 		return e.Structured, nil
 	}
@@ -124,7 +132,7 @@ func (e *ProtocolEvent) Decode() (result map[string]any, err error) {
 // GetFields returns the protocol field tree directly, also for deferred events.
 // Decode remains the compatibility API returning the fields/metadata envelope.
 func (e *ProtocolEvent) GetFields() (map[string]any, error) {
-	if e.Fields != nil && !e.ownsNativeFields() {
+	if e.Fields != nil && !e.ownsNativeFields() && e.Protocol != "stun" && e.Protocol != "turn" {
 		return e.Fields, nil
 	}
 	result, err := e.Decode()
@@ -254,6 +262,7 @@ type binParser struct {
 	tlsSecrets                                                                 TLSSecretProvider
 	udpMu                                                                      sync.Mutex
 	udpSessions                                                                *binUDPStore
+	stunUntrackedRefusal                                                       bool // constant-size quarantine when an admitted UDP key cannot be retained
 	dcpMu                                                                      sync.Mutex
 	dcpClock                                                                   time.Time
 	dcpObservations                                                            map[dcpKey]*dcpObservation
@@ -975,7 +984,7 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 				// decoding and history; retrying a different grammar loses fields
 				// or rejects valid argumentless/multiline messages.
 				e.semanticFields = protocolFields(result)
-				if e.Protocol == "snmp" || e.Protocol == "slmp" || e.Protocol == "dlms-wrapper" || e.Protocol == "dlms" || e.Protocol == "c37118" {
+				if e.Protocol == "stun" || e.Protocol == "turn" || e.Protocol == "snmp" || e.Protocol == "slmp" || e.Protocol == "dlms-wrapper" || e.Protocol == "dlms" || e.Protocol == "c37118" {
 					e.semanticFields = cloneSession(e.semanticFields)
 				}
 			}

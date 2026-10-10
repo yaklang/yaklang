@@ -34443,6 +34443,333 @@
         "common/pcapx/pcaputil/snmp-identity/controls.json": "controls.json",
         "common/pcapx/pcaputil/snmp-identity/validation/expected.json": "validation/expected.json"
       }
+    },
+    {
+      "id": "validation-stun-identity",
+      "kind": "validation",
+      "source_sha": "c818d8c4c7ccc7f343dfcada274bcfb8cf7405c4",
+      "file": "validation-stun-identity.zip",
+      "sha256": "3c8bef635570cb680e53c536519151b2226975295d3fd3d39323ed4c87161ef6",
+      "password": "bin-parser",
+      "members": {
+        "build.py": {
+          "sha256": "bf84064e65e6e5d7e3a3b05da6834e6a19cf65eb63bc12046390de551c64405d",
+          "bytes": 8340
+        },
+        "carrier.py": {
+          "sha256": "edd5cbcb72acd7e5fb289c51f67b1d60afd2ce5dbfc323a65e73942d6dc2dd99",
+          "bytes": 1888
+        },
+        "verify-controls.py": {
+          "sha256": "b159808126f4855724e27625130cca367858b5424db1ce44165f8acfd0022b55",
+          "bytes": 4208
+        },
+        "source-pin.json": {
+          "sha256": "50931746176279df190ee1abf8d080e0de0ea2bd78a8ef07f125b0a61a1b79ce",
+          "bytes": 1236
+        },
+        "seal.py": {
+          "sha256": "e6ba3ffd80d43f2d4a52a251ce044b6106242b0d987c42caf193f3ef4da73969",
+          "bytes": 3465
+        },
+        "cases/tcp-retry.pcap": {
+          "sha256": "080d6bf807e2e12c650f935ed353edf3737b9cb6916d9b3926253aa6777f0313",
+          "bytes": 810
+        },
+        "answers/tcp-retry.json": {
+          "sha256": "4c1f31aa60eef0d1fd0f6763d671ffcf480ac4f8b254ac6f8164207d2afda337",
+          "bytes": 6961
+        },
+        "cases/tcp-completed.pcap": {
+          "sha256": "730ba242988ca04311b4143f619669f95d8016a104e1ab07e6fcb04b38692a23",
+          "bytes": 826
+        },
+        "answers/tcp-completed.json": {
+          "sha256": "16ab71a40c3975d979be7b4a900b207e4dbf3f87650aa3ce8aa285ee245e0093",
+          "bytes": 7411
+        },
+        "cases/tcp-completed-identical.pcap": {
+          "sha256": "dbb853bfa16d15fd1e0888f9d038ae576e6881b6e5abe2e3951657490432df45",
+          "bytes": 810
+        },
+        "answers/tcp-completed-identical.json": {
+          "sha256": "6b90b1f0c6163616a95c70edc187b609ea2891c4dd5189b26c2d87ab5511d571",
+          "bytes": 7076
+        },
+        "cases/tcp-expired.pcap": {
+          "sha256": "6b9dcf26052ea36c57f54fbebd87c97da20f4585602498aa48a6caa81f043392",
+          "bytes": 724
+        },
+        "answers/tcp-expired.json": {
+          "sha256": "634f195760560340f264352460b6f61afb43a12a64c07aaa46dd3950cf1482f1",
+          "bytes": 6057
+        },
+        "cases/tcp-idle.pcap": {
+          "sha256": "cdfaa7ead8c44c3e1109082b1aef9ab77900b352f75f23b1b5f4b8a7e6e85ca0",
+          "bytes": 826
+        },
+        "answers/tcp-idle.json": {
+          "sha256": "87e0852e1f151d88e5944981156cff1769e089df4446fda56ba5c6a2d5bdffaa",
+          "bytes": 7391
+        },
+        "cases/tcp-fresh-after-expiry.pcap": {
+          "sha256": "873ca481835d0beb04151bd0322905b72fe2f48ce5b7f2d94e6ed291724319f9",
+          "bytes": 618
+        },
+        "answers/tcp-fresh-after-expiry.json": {
+          "sha256": "fb3e431ac17c6364fa3f177d44b64dff564784ada8b4568a246856672d6067a8",
+          "bytes": 4795
+        },
+        "cases/tcp-orphan.pcap": {
+          "sha256": "564ad686707f12999e9538eabb70d3584e0629fdd87651d7908964b80153d9da",
+          "bytes": 720
+        },
+        "answers/tcp-orphan.json": {
+          "sha256": "3c039ae32f255995b66b40f282f7e780bc6dea597bb6991d02fb3c9614d8711f",
+          "bytes": 6118
+        },
+        "cases/tcp-wrong-direction.pcap": {
+          "sha256": "b59e04ef207142ff2c69da71441fe67e8ac12e6e567c22d67550e0dcc2be122b",
+          "bytes": 528
+        },
+        "answers/tcp-wrong-direction.json": {
+          "sha256": "310845ebc09abaebae10a4dab3ef6d3bf82e9f5d225400314e41e491ac826212",
+          "bytes": 3910
+        },
+        "cases/tcp-method-mismatch.pcap": {
+          "sha256": "e43a7721dc98e3289b1c73d62a65c119d4788f075dbba88990472fc94b4710ac",
+          "bytes": 524
+        },
+        "answers/tcp-method-mismatch.json": {
+          "sha256": "d2b7088b5d981eaf8cb7eb9a24271cae9a4ee356ef5a438ebcdcfc2d6514d057",
+          "bytes": 3760
+        },
+        "cases/tcp-interleaved.pcap": {
+          "sha256": "8c6ccc67d00a39d7161e1766b3006de82c2d05757e10bfdc8d7bab7ab43e5529",
+          "bytes": 618
+        },
+        "answers/tcp-interleaved.json": {
+          "sha256": "3db5cee9173b9f59ef5731416497680394855c713c49b9716c0496d1ad17c66e",
+          "bytes": 4800
+        },
+        "cases/tcp-client-on-both-sides.pcap": {
+          "sha256": "ac18f0e4ae6bef1e52d1d39e600120e922d6cec2a69ac674e6173a309b2bf442",
+          "bytes": 618
+        },
+        "answers/tcp-client-on-both-sides.json": {
+          "sha256": "7dc1ae1db87ebf78cf705cf37cb802ea27ec450d6a1f7765cc3c7543c6097051",
+          "bytes": 4836
+        },
+        "cases/tcp-indication.pcap": {
+          "sha256": "439a866d3dc0aa2d15d6768d7b3971798601043750920ab2e4f3afb777b79b61",
+          "bytes": 516
+        },
+        "answers/tcp-indication.json": {
+          "sha256": "20b398a653c6dd1db4852192a36b8aa22f3379598b68270e53a60871fdef217b",
+          "bytes": 3419
+        },
+        "cases/udp-retry.pcap": {
+          "sha256": "265c8cce7690223060b174ec6b5724fc4f323c27ca6ef0c189d70575e7797b08",
+          "bytes": 528
+        },
+        "answers/udp-retry.json": {
+          "sha256": "55b5c86cbfd9483d257efccf66972e5927888212a4f561841642f28c8af7835f",
+          "bytes": 7231
+        },
+        "cases/udp-completed.pcap": {
+          "sha256": "0ab1d16dac57a0d436cf85ef1c0eb65720315c9c6eb2b5afa7d5c4a900ce2d03",
+          "bytes": 544
+        },
+        "answers/udp-completed.json": {
+          "sha256": "bab865259b5fe3dab057f23fcd26f306ed76bd8a68849ba930bc79c318190c1d",
+          "bytes": 7681
+        },
+        "cases/udp-completed-identical.pcap": {
+          "sha256": "101389ef9dfa2991d9f8ca8bf3db6fd3f6c6cdb948c1dadc13fc1cc627625342",
+          "bytes": 528
+        },
+        "answers/udp-completed-identical.json": {
+          "sha256": "e3f18cd71649482b206b7a131b13ddf091816dd260bcd04cc7a719d303e59df3",
+          "bytes": 7346
+        },
+        "cases/udp-expired.pcap": {
+          "sha256": "510f250e37935112d3633b39c2208f228b940dcd27f682889ed5ab5d0868323f",
+          "bytes": 454
+        },
+        "answers/udp-expired.json": {
+          "sha256": "16a1c963059ae27b08391be1e32d6b34bddc9ef428c546f5747c7158e63169d6",
+          "bytes": 6282
+        },
+        "cases/udp-idle.pcap": {
+          "sha256": "473e98e7f7860875dbd7b494b7ab6573ab28a25dec060c0a7548d8691d2b2d9d",
+          "bytes": 544
+        },
+        "answers/udp-idle.json": {
+          "sha256": "b7ca1c13c2f09f2a641ec80db1a1c8f0539360ecfe9f85ed1dc2b851d816f742",
+          "bytes": 7661
+        },
+        "cases/udp-fresh-after-expiry.pcap": {
+          "sha256": "a1e547fd54a30d3d3eb3fa848a757e20ca6c4875cf60367937d8c443f1ed7aa2",
+          "bytes": 360
+        },
+        "answers/udp-fresh-after-expiry.json": {
+          "sha256": "0984c010b2c1a32039fa11d6327e3437f3fc26de687e079ad32abdead722c796",
+          "bytes": 4975
+        },
+        "cases/udp-orphan.pcap": {
+          "sha256": "46703a379197cd37ddd2eab3b6cc27e987765895fa4df685233052065f885e43",
+          "bytes": 450
+        },
+        "answers/udp-orphan.json": {
+          "sha256": "e2eadbfb7fe56e43b3ffa55466ef198b36927ae29c12fbb2790bd207ab12b5a8",
+          "bytes": 6343
+        },
+        "cases/udp-wrong-direction.pcap": {
+          "sha256": "28f8390ff7a578191052331b5ec67f7222280e3724652061f7b308fd8ec98b5c",
+          "bytes": 282
+        },
+        "answers/udp-wrong-direction.json": {
+          "sha256": "8fe2797989db8bcf8c8a3b6c78be2b826f99a557cbcc4dc22d57c39445547fd7",
+          "bytes": 4045
+        },
+        "cases/udp-method-mismatch.pcap": {
+          "sha256": "bcd69abaaac2768ef312bfef872be6ab85c77f68a41b1fd50d6eeba3677a0dae",
+          "bytes": 278
+        },
+        "answers/udp-method-mismatch.json": {
+          "sha256": "537c0abee04879a92c18f74f671b0661431120f7950f382b63372189aaaf5c1d",
+          "bytes": 3895
+        },
+        "cases/udp-interleaved.pcap": {
+          "sha256": "2a4b9dc8a78326ac3acb6660a0e7db0273103948b38cf1c12d228cc85af1d9cc",
+          "bytes": 360
+        },
+        "answers/udp-interleaved.json": {
+          "sha256": "f8e7278440a368b7b8a00a72e3fe5d99da6e4854791212d2a96262ab6377e025",
+          "bytes": 4980
+        },
+        "cases/udp-client-on-both-sides.pcap": {
+          "sha256": "5d07a38f33c2d0dbbfa6bec19cbdfe7af686ed2198d08b52944881bf804935ae",
+          "bytes": 360
+        },
+        "answers/udp-client-on-both-sides.json": {
+          "sha256": "2774557e5e46b39831accac507371908ced443c7b718c0803e0355517d6019c7",
+          "bytes": 5016
+        },
+        "cases/udp-indication.pcap": {
+          "sha256": "13d562d5e241fe8c78659750050accbd6eb066acc5fff3e3cfd5f95f8c8e494b",
+          "bytes": 270
+        },
+        "answers/udp-indication.json": {
+          "sha256": "2c456aec54b223d8e24eaed94abdbc384e57c5ab91d6ef9342ba3be339bd1b72",
+          "bytes": 3554
+        },
+        "cases/udp-channel-expired-id.pcap": {
+          "sha256": "bafda2ffef17f54dba912cf1692d67dd5e374a8d6d06688ffc075679fa90df15",
+          "bytes": 600
+        },
+        "answers/udp-channel-expired-id.json": {
+          "sha256": "8a663b5775a6cf4a5af36d0fc66e2b87d8c2fa6557a11bb78fcdec91700acc27",
+          "bytes": 8651
+        },
+        "cases/udp-byte-refusal.pcap": {
+          "sha256": "f4f092f383c894d9f3cfb5044890a5e18321c95ed3c4c005c9e4b6d2935fd8a4",
+          "bytes": 954
+        },
+        "answers/udp-byte-refusal.json": {
+          "sha256": "df0822d33526fd4c48e0e56b579b488539429accc5a5fe2f0e76cfc8a586cf58",
+          "bytes": 6584
+        },
+        "cases/udp-initial-byte-refusal.pcap": {
+          "sha256": "543f46fe583e9970efc5d77be1bd8698e9ad218bd156526b0f5e628ec0c7a5ac",
+          "bytes": 786
+        },
+        "answers/udp-initial-byte-refusal.json": {
+          "sha256": "79a48bc7f0fa60219758bd818cda7494076e9e231b624c7498c23a309040cea0",
+          "bytes": 4282
+        },
+        "cases/udp-live-conflict.pcap": {
+          "sha256": "da40a1cd633addd15e3694e5508e37943d323cb39ad0358d32ca2d5a62944c3a",
+          "bytes": 450
+        },
+        "answers/udp-live-conflict.json": {
+          "sha256": "d4593e68578f0ebe1b4acfc2ec6004a0e2781655e4ccedc56ca1a71cbd7bfe4a",
+          "bytes": 5498
+        },
+        "controls.json": {
+          "sha256": "d49759982b660b10d763a3ed2349e3728c348e61451bc909e1edbc2656eca554",
+          "bytes": 187272
+        },
+        "validation/expected.json": {
+          "sha256": "0e09e78fc4b71422c7b126759806491e3241aad0c873e0531b2499543b89acb2",
+          "bytes": 29859
+        }
+      },
+      "aliases": {
+        "common/pcapx/pcaputil/stun-identity/build.py": "build.py",
+        "common/pcapx/pcaputil/stun-identity/carrier.py": "carrier.py",
+        "common/pcapx/pcaputil/stun-identity/verify-controls.py": "verify-controls.py",
+        "common/pcapx/pcaputil/stun-identity/source-pin.json": "source-pin.json",
+        "common/pcapx/pcaputil/stun-identity/seal.py": "seal.py",
+        "common/pcapx/pcaputil/stun-identity/cases/tcp-retry.pcap": "cases/tcp-retry.pcap",
+        "common/pcapx/pcaputil/stun-identity/answers/tcp-retry.json": "answers/tcp-retry.json",
+        "common/pcapx/pcaputil/stun-identity/cases/tcp-completed.pcap": "cases/tcp-completed.pcap",
+        "common/pcapx/pcaputil/stun-identity/answers/tcp-completed.json": "answers/tcp-completed.json",
+        "common/pcapx/pcaputil/stun-identity/cases/tcp-completed-identical.pcap": "cases/tcp-completed-identical.pcap",
+        "common/pcapx/pcaputil/stun-identity/answers/tcp-completed-identical.json": "answers/tcp-completed-identical.json",
+        "common/pcapx/pcaputil/stun-identity/cases/tcp-expired.pcap": "cases/tcp-expired.pcap",
+        "common/pcapx/pcaputil/stun-identity/answers/tcp-expired.json": "answers/tcp-expired.json",
+        "common/pcapx/pcaputil/stun-identity/cases/tcp-idle.pcap": "cases/tcp-idle.pcap",
+        "common/pcapx/pcaputil/stun-identity/answers/tcp-idle.json": "answers/tcp-idle.json",
+        "common/pcapx/pcaputil/stun-identity/cases/tcp-fresh-after-expiry.pcap": "cases/tcp-fresh-after-expiry.pcap",
+        "common/pcapx/pcaputil/stun-identity/answers/tcp-fresh-after-expiry.json": "answers/tcp-fresh-after-expiry.json",
+        "common/pcapx/pcaputil/stun-identity/cases/tcp-orphan.pcap": "cases/tcp-orphan.pcap",
+        "common/pcapx/pcaputil/stun-identity/answers/tcp-orphan.json": "answers/tcp-orphan.json",
+        "common/pcapx/pcaputil/stun-identity/cases/tcp-wrong-direction.pcap": "cases/tcp-wrong-direction.pcap",
+        "common/pcapx/pcaputil/stun-identity/answers/tcp-wrong-direction.json": "answers/tcp-wrong-direction.json",
+        "common/pcapx/pcaputil/stun-identity/cases/tcp-method-mismatch.pcap": "cases/tcp-method-mismatch.pcap",
+        "common/pcapx/pcaputil/stun-identity/answers/tcp-method-mismatch.json": "answers/tcp-method-mismatch.json",
+        "common/pcapx/pcaputil/stun-identity/cases/tcp-interleaved.pcap": "cases/tcp-interleaved.pcap",
+        "common/pcapx/pcaputil/stun-identity/answers/tcp-interleaved.json": "answers/tcp-interleaved.json",
+        "common/pcapx/pcaputil/stun-identity/cases/tcp-client-on-both-sides.pcap": "cases/tcp-client-on-both-sides.pcap",
+        "common/pcapx/pcaputil/stun-identity/answers/tcp-client-on-both-sides.json": "answers/tcp-client-on-both-sides.json",
+        "common/pcapx/pcaputil/stun-identity/cases/tcp-indication.pcap": "cases/tcp-indication.pcap",
+        "common/pcapx/pcaputil/stun-identity/answers/tcp-indication.json": "answers/tcp-indication.json",
+        "common/pcapx/pcaputil/stun-identity/cases/udp-retry.pcap": "cases/udp-retry.pcap",
+        "common/pcapx/pcaputil/stun-identity/answers/udp-retry.json": "answers/udp-retry.json",
+        "common/pcapx/pcaputil/stun-identity/cases/udp-completed.pcap": "cases/udp-completed.pcap",
+        "common/pcapx/pcaputil/stun-identity/answers/udp-completed.json": "answers/udp-completed.json",
+        "common/pcapx/pcaputil/stun-identity/cases/udp-completed-identical.pcap": "cases/udp-completed-identical.pcap",
+        "common/pcapx/pcaputil/stun-identity/answers/udp-completed-identical.json": "answers/udp-completed-identical.json",
+        "common/pcapx/pcaputil/stun-identity/cases/udp-expired.pcap": "cases/udp-expired.pcap",
+        "common/pcapx/pcaputil/stun-identity/answers/udp-expired.json": "answers/udp-expired.json",
+        "common/pcapx/pcaputil/stun-identity/cases/udp-idle.pcap": "cases/udp-idle.pcap",
+        "common/pcapx/pcaputil/stun-identity/answers/udp-idle.json": "answers/udp-idle.json",
+        "common/pcapx/pcaputil/stun-identity/cases/udp-fresh-after-expiry.pcap": "cases/udp-fresh-after-expiry.pcap",
+        "common/pcapx/pcaputil/stun-identity/answers/udp-fresh-after-expiry.json": "answers/udp-fresh-after-expiry.json",
+        "common/pcapx/pcaputil/stun-identity/cases/udp-orphan.pcap": "cases/udp-orphan.pcap",
+        "common/pcapx/pcaputil/stun-identity/answers/udp-orphan.json": "answers/udp-orphan.json",
+        "common/pcapx/pcaputil/stun-identity/cases/udp-wrong-direction.pcap": "cases/udp-wrong-direction.pcap",
+        "common/pcapx/pcaputil/stun-identity/answers/udp-wrong-direction.json": "answers/udp-wrong-direction.json",
+        "common/pcapx/pcaputil/stun-identity/cases/udp-method-mismatch.pcap": "cases/udp-method-mismatch.pcap",
+        "common/pcapx/pcaputil/stun-identity/answers/udp-method-mismatch.json": "answers/udp-method-mismatch.json",
+        "common/pcapx/pcaputil/stun-identity/cases/udp-interleaved.pcap": "cases/udp-interleaved.pcap",
+        "common/pcapx/pcaputil/stun-identity/answers/udp-interleaved.json": "answers/udp-interleaved.json",
+        "common/pcapx/pcaputil/stun-identity/cases/udp-client-on-both-sides.pcap": "cases/udp-client-on-both-sides.pcap",
+        "common/pcapx/pcaputil/stun-identity/answers/udp-client-on-both-sides.json": "answers/udp-client-on-both-sides.json",
+        "common/pcapx/pcaputil/stun-identity/cases/udp-indication.pcap": "cases/udp-indication.pcap",
+        "common/pcapx/pcaputil/stun-identity/answers/udp-indication.json": "answers/udp-indication.json",
+        "common/pcapx/pcaputil/stun-identity/cases/udp-channel-expired-id.pcap": "cases/udp-channel-expired-id.pcap",
+        "common/pcapx/pcaputil/stun-identity/answers/udp-channel-expired-id.json": "answers/udp-channel-expired-id.json",
+        "common/pcapx/pcaputil/stun-identity/cases/udp-byte-refusal.pcap": "cases/udp-byte-refusal.pcap",
+        "common/pcapx/pcaputil/stun-identity/answers/udp-byte-refusal.json": "answers/udp-byte-refusal.json",
+        "common/pcapx/pcaputil/stun-identity/cases/udp-initial-byte-refusal.pcap": "cases/udp-initial-byte-refusal.pcap",
+        "common/pcapx/pcaputil/stun-identity/answers/udp-initial-byte-refusal.json": "answers/udp-initial-byte-refusal.json",
+        "common/pcapx/pcaputil/stun-identity/cases/udp-live-conflict.pcap": "cases/udp-live-conflict.pcap",
+        "common/pcapx/pcaputil/stun-identity/answers/udp-live-conflict.json": "answers/udp-live-conflict.json",
+        "common/pcapx/pcaputil/stun-identity/controls.json": "controls.json",
+        "common/pcapx/pcaputil/stun-identity/validation/expected.json": "validation/expected.json"
+      }
     }
   ],
   "schema_version": 1,

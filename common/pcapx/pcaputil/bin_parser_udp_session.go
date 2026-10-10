@@ -26,6 +26,35 @@ type binUDPStore struct {
 	clock   time.Time
 }
 
+func (f *binFlow) retireSTUNUDP(ts time.Time) {
+	f.stun.expire(ts)
+	retained := f.stun.bytes()
+	if retained < f.sessionBytes {
+		f.a.buffered.Add(retained - f.sessionBytes)
+		f.sessionBytes = retained
+	}
+}
+
+// Under slot pressure an idle STUN entry may be reclaimed, but its forgotten
+// identities cannot become a new verified generation. A capture-owned marker
+// quarantines subsequently admitted keys; existing retained keys stay usable.
+func (a *binParser) reclaimIdleSTUNSlot(s *binUDPStore) {
+	if len(s.entries) < sessionCollectionLimit(a.budget.MaxCollectionElements) {
+		return
+	}
+	for el := s.lru.Front(); el != nil; el = el.Next() {
+		v := el.Value.(*binUDPEntry)
+		if v.flow.stun == nil || s.clock.Sub(v.touched) < 10*time.Minute {
+			continue
+		}
+		a.stunUntrackedRefusal = true
+		v.flow.closeSession()
+		delete(s.entries, v.key)
+		s.lru.Remove(el)
+		return
+	}
+}
+
 func (f *binFlow) retireSNMPUDP() {
 	f.snmp.retirePending()
 	retained := f.snmp.storage()
@@ -350,9 +379,7 @@ func (a *binParser) decodeSTUNDatagram(e *ProtocolEvent, w []byte, explicitTurn 
 			// This store also contains unrelated application state and quarantine.
 			// STUN's idle policy cannot reset another protocol's identity history.
 			if v.flow.stun != nil {
-				v.flow.closeSession()
-				delete(s.entries, v.key)
-				s.lru.Remove(el)
+				v.flow.retireSTUNUDP(s.clock)
 			}
 			el = next
 		}
@@ -405,15 +432,19 @@ func (a *binParser) decodeSTUNDatagram(e *ProtocolEvent, w []byte, explicitTurn 
 		a.udpSessions = s
 	}
 	if el == nil {
+		a.reclaimIdleSTUNSlot(s)
 		if len(s.entries) >= sessionCollectionLimit(a.budget.MaxCollectionElements) {
 			err = protocolError(ErrResourceExceeded, "UDP conversation budget")
 		} else {
-			f := &binFlow{a: a, id: a.flows.Add(1), endpoints: [2]string{e.Source, e.Destination}, protocol: "stun", stun: &binSTUN{}}
+			f := &binFlow{a: a, id: a.flows.Add(1), endpoints: [2]string{e.Source, e.Destination}, protocol: "stun", stun: &binSTUN{blocked: a.stunUntrackedRefusal}}
 			if err = f.reserveSession(1024); err == nil {
 				el = s.lru.PushBack(&binUDPEntry{key, f, s.clock})
 				s.entries[key] = el
 			}
 		}
+	}
+	if el == nil && err != nil {
+		a.stunUntrackedRefusal = true
 	}
 	if el != nil {
 		v := el.Value.(*binUDPEntry)
@@ -426,6 +457,8 @@ func (a *binParser) decodeSTUNDatagram(e *ProtocolEvent, w []byte, explicitTurn 
 		}
 		if err = f.reserveSession(f.stun.bytes() + int64(len(w))*8 + 512); err == nil {
 			e.Session, err = f.stun.consume(e.Direction, e.Timestamp, w, a.budget.MaxCollectionElements, false)
+		} else {
+			f.stun.invalidate()
 		}
 		if e.Session != nil {
 			e.Session["Observation Scope"] = "conversation"
@@ -480,7 +513,18 @@ func (a *binParser) finishProtocolDatagram(e *ProtocolEvent, w []byte, spec *bin
 	}
 	a.messages.Add(1)
 	a.messageBytes.Add(uint64(len(w)))
-	if err == nil && !a.config.Deferred {
+	if err == nil && (e.Protocol == "stun" || e.Protocol == "turn") {
+		// Keep the accepted structural wire fields separate from editable event
+		// projections; full/deferred queries share identical owned answers.
+		var decoded map[string]any
+		decoded, err = e.Decode()
+		if err == nil {
+			e.semanticFields = cloneSession(protocolFields(decoded))
+			if !a.config.Deferred {
+				e.Structured = decoded
+			}
+		}
+	} else if err == nil && !a.config.Deferred {
 		e.Structured, err = e.Decode()
 	}
 	if err != nil {
