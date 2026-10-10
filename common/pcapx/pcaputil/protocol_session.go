@@ -75,7 +75,8 @@ type ParserBudget struct {
 	ProbeBytes                                       int
 }
 
-// DefaultParserBudget matches the live capture parser defaults.
+// DefaultParserBudget is the conservative standalone session budget.
+// Live captures use larger defaults and can configure WithProtocolBudget.
 func DefaultParserBudget() ParserBudget {
 	return ParserBudget{
 		MaxFrameBytes:         1 << 20,
@@ -246,6 +247,9 @@ func (s *captureSession) Probe(data []byte) ProbeResult {
 		return p
 	}
 	if isHTTPStartLineCandidate(input) {
+		if p := probeRTSP(input, limit); p.Verdict == ProbeAccept {
+			return p
+		}
 		// CONNECT/INFO can be long NATS control lines. Preserve their bounded
 		// exact admission before testing the more general HTTP method syntax.
 		if p := initialProtocolNeedMore(input, s.f.a.budget.MaxFrameBytes); p.Verdict != ProbeReject {

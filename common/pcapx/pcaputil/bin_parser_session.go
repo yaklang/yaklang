@@ -124,6 +124,10 @@ func (f *binFlow) detectDirection(dir int, wire []byte) {
 		}
 		return
 	}
+	if bytes.HasPrefix(wire, []byte("GET ")) && probeRTSP(wire, f.a.config.ProbeBytes).Verdict == ProbeAccept {
+		f.protocol, f.rtsp = "rtsp", &binRTSP{}
+		return
+	}
 	if isHTTPStartLineCandidate(wire) {
 		return
 	}
@@ -374,6 +378,12 @@ func (f *binFlow) consumeSession(dir int, e *ProtocolEvent, result map[string]an
 		e.Session, err = f.opcua.consume(dir, e.Raw, f.a.budget.MaxCollectionElements, f.a.budget.MaxMessageBytes)
 	case "rtsp":
 		e.Session, err = f.rtsp.consume(dir, e.Raw, e.Timestamp, f.a.budget.MaxCollectionElements)
+		if err == nil && e.Session["Profile"] == "apple-control" {
+			e.Profile = "rtsp-apple-control"
+			e.ExpertCode = "RTSPSequenceNotObserved"
+			e.Completeness = "message"
+			e.Summary = fmt.Sprintf("RTSP Apple control %v (CSeq absent; transaction association unavailable)", e.Session["Packet Name"])
+		}
 	case "stun":
 		e.Session, err = f.stun.consume(dir, e.Timestamp, e.Raw, f.a.budget.MaxCollectionElements, true)
 		if e.Session != nil && e.Session["TURN"] == true {
@@ -837,6 +847,10 @@ func (f *binFlow) closeSession() {
 	f.httpMethods, f.httpWSKeys, f.httpWSExtensions = nil, nil, nil
 	f.httpIDs, f.httpTimes = nil, nil
 	f.httpUpgrades, f.httpDoH, f.httpIPP = nil, nil, nil
+	f.httpUpgradeIssues = nil
+	for dir := range f.directions {
+		f.directions[dir].http = nil
+	}
 	if f.tls != nil && f.tls.child != nil {
 		f.tls.child.close(TrafficFlowCloseReason("TLS carrier closed"))
 	}

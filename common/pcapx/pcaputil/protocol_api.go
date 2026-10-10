@@ -175,3 +175,31 @@ func CaptureContext(seconds float64) (context.Context, context.CancelFunc, error
 	ctx, stopTimer := context.WithTimeout(ctx, time.Duration(seconds*float64(time.Second)))
 	return ctx, func() { stopTimer(); stopSignal() }, nil
 }
+
+// pcap_protocolBudget 设置协议解析的单条消息和整次捕获的保留缓冲预算（字节）。
+// 默认单条消息 16 MiB、总缓冲 128 MiB；单条消息支持 64 字节到 64 MiB。
+// 总缓冲必须不小于单条消息。预算按需使用，不会预分配全部空间。
+// 总缓冲包含未完成消息、会话状态及来源记录，不是进程总内存上限；
+// 回调自行保留的 Raw/Fields 和驱动抓包缓冲不计入此预算。
+// HTTP 正文超过预算时仍解析并投递头部元信息，产生 HTTPPayloadOmitted 诊断，
+// 按消息边界流式略过正文后继续解析；pcap_outputFile 保存的原始包不受此预算影响。
+// 其他资源超限仍会产生 limited 诊断，不会无限缓存不完整流量。
+// 此选项可与协议回调以任意顺序组合，本身不启用解析。
+//
+// Example:
+//
+//	pcapx.StartSniff("en1", pcapx.pcap_protocolBudget(32*1024*1024, 256*1024*1024),
+//	    pcapx.pcap_onProtocolMessage(func(message) { println(message.DumpLine()) }))~
+func WithProtocolBudget(maxMessageBytes, maxBufferedBytes int) CaptureOption {
+	return func(c *CaptureConfig) error {
+		if maxMessageBytes < 64 || maxMessageBytes > 64<<20 || maxBufferedBytes < maxMessageBytes {
+			return fmt.Errorf("pcap_protocolBudget requires message bytes in 64..67108864 and buffered bytes >= message bytes")
+		}
+		if c.binParserConfig == nil {
+			c.binParserConfig = &BinParserConfig{}
+		}
+		c.binParserConfig.MaxMessageBytes = maxMessageBytes
+		c.binParserConfig.MaxBufferedBytes = maxBufferedBytes
+		return nil
+	}
+}

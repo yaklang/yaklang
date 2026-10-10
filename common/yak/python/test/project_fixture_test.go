@@ -107,6 +107,10 @@ func TestPythonProjectSyntaxFixturesCompile(t *testing.T) {
 				vf,
 				ssaapi.WithLanguage(ssaconfig.PYTHON),
 				ssaapi.WithMemory(true),
+				// third-party fixture trees contain tests/, test_*.py, setup.py
+				// and other entries matched by built-in default excludes; these
+				// fixtures assert whole-project compile coverage
+				ssaapi.WithDisableDefaultCompileExcludes(true),
 			)
 			require.NoError(t, err)
 			require.NotEmpty(t, progs)

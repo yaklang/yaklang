@@ -41,8 +41,16 @@ func normalizePreHandlerPath(path string) string {
 	return strings.Trim(path, "/")
 }
 
+// preHandlerCompileExclude is built once; compiling the exclude globs per file
+// would re-compile every glob pattern on each FilterPreHandlerFile call.
+//
+// Known limitation: this secondary filter always applies the built-in default
+// excludes and is not affected by WithDisableDefaultCompileExcludes — the escape
+// hatch only controls the ScanProjectFiles matcher.
+var preHandlerCompileExclude = ssaconfig.BuildCompileExcludeFunc(nil, "", true)
+
 func (*SSABuilder) FilterPreHandlerFile(path string) bool {
-	if ssaconfig.BuildCompileExcludeFunc(nil, "")(path) {
+	if preHandlerCompileExclude(path) {
 		return false
 	}
 	return MatchPreHandlerFile(path)

@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"encoding/binary"
 	"fmt"
+	"net/http"
 	"net/textproto"
 	"strconv"
 	"strings"
@@ -173,6 +174,12 @@ func probeRTSP(w []byte, limit int) ProbeResult {
 	if bytes.HasPrefix(w, []byte("RTSP/")) {
 		return probeAccept("rtsp", "1.0", 99)
 	}
+	if bytes.HasPrefix(w, []byte("GET ")) {
+		line, _, _ := bytes.Cut(w, []byte("\r\n"))
+		if bytes.HasSuffix(line, []byte(" RTSP/1.0")) {
+			return probeAccept("rtsp", "1.0", 98)
+		}
+	}
 	for _, m := range rtspMethods {
 		prefix := m + " "
 		if !bytes.HasPrefix(w, []byte(prefix)) {
@@ -315,6 +322,22 @@ func (s *binRTSP) consume(dir int, w []byte, ts time.Time, max int) (map[string]
 		return nil, protocolError(ErrUnsupportedVersion, "RTSP version")
 	}
 	seqs := h.Values("Cseq")
+	if len(seqs) == 0 && rtspAppleControlHeader(h) {
+		// Some Apple control exchanges use RTSP syntax without CSeq. Parse
+		// their observed header/body boundary, but never invent a transaction,
+		// SETUP channel or media association from the missing sequence.
+		out := map[string]any{"Profile": "apple-control", "CSeq Observed": false, "Transaction Association": "unavailable-no-cseq", "Content Length": n, "Content Type": h.Get("Content-Type"), "Headers": httpHeaderFields(http.Header(h))}
+		if response {
+			status, err := strconv.Atoi(parts[1])
+			if err != nil || status < 100 || status > 599 {
+				return nil, fmt.Errorf("rtsp: status")
+			}
+			out["Packet Name"], out["Status"], out["Matched"] = "Response", status, false
+		} else {
+			out["Packet Name"], out["URI"] = parts[0], parts[1]
+		}
+		return out, nil
+	}
 	if len(seqs) != 1 {
 		return nil, fmt.Errorf("rtsp: missing/duplicate CSeq")
 	}
@@ -455,4 +478,18 @@ func (s *binRTSP) consume(dir int, w []byte, ts time.Time, max int) (map[string]
 	out["Phase"] = s.sessions[sid]
 	out["Pending Requests"] = len(s.pending)
 	return out, nil
+}
+
+func rtspAppleControlHeader(h textproto.MIMEHeader) bool {
+	for key := range h {
+		if strings.HasPrefix(strings.ToLower(key), "x-apple-") {
+			return true
+		}
+	}
+	return strings.HasPrefix(h.Get("Server"), "AirTunes/") || h.Get("Content-Type") == "application/x-apple-binary-plist"
+}
+
+func rtspAppleControlWire(wire []byte, max int) bool {
+	_, h, header, _, err := rtspHeader(wire, max)
+	return err == nil && header > 0 && len(h.Values("Cseq")) == 0 && rtspAppleControlHeader(h)
 }

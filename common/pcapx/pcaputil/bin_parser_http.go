@@ -18,7 +18,17 @@ var errBinContext = errors.New("protocol context required")
 type binHTTPState struct {
 	ws                                                             *binWebSocket
 	requestID                                                      uint64
+	declared                                                       int64
+	bodyLength                                                     int64
+	omitted                                                        bool
+	skipPrefix                                                     int
+	skipRemaining                                                  int64
+	skipPhase                                                      string
+	trailerBytes                                                   int
+	rawHeader                                                      []byte
+	headerFields                                                   map[string]any
 	wsKey, wsOffer                                                 string
+	wsIssue                                                        string
 	header, total, cursor, next, search                            int
 	chunked, trailers, closeDelimited, response, tunnel, websocket bool
 	method, summary                                                string
@@ -27,11 +37,15 @@ type binHTTPState struct {
 	responseComplete                                               bool
 }
 
-func (h *binHTTPState) config() map[string]any {
-	if !h.response {
-		return nil
+func (h *binHTTPState) config(bodyLimit int) map[string]any {
+	// Field decoding must use the same limit as the framer, including deferred
+	// events and close-delimited responses emitted during connection teardown.
+	config := map[string]any{"httpBodyLimit": bodyLimit}
+	if h.response {
+		config["httpResponseToMethod"] = h.method
+		config["httpCloseDelimited"] = h.closeDelimited
 	}
-	return map[string]any{"httpResponseToMethod": h.method, "httpCloseDelimited": h.closeDelimited}
+	return config
 }
 
 func (f *binFlow) frameDirection(dir int, w []byte) (int, *binSpec, error) {
@@ -239,10 +253,9 @@ func (f *binFlow) frameDirection(dir int, w []byte) (int, *binSpec, error) {
 		var transfer []string
 		if bytes.HasPrefix(w, []byte("HTTP/")) {
 			h.response = true
-			if len(f.httpMethods) == 0 {
-				return 0, nil, fmt.Errorf("%w: HTTP response has no observed request method", errBinContext)
+			if len(f.httpMethods) > 0 {
+				h.method = f.httpMethods[0]
 			}
-			h.method = f.httpMethods[0]
 			response, err := http.ReadResponse(r, &http.Request{Method: h.method})
 			if err != nil {
 				return 0, nil, err
@@ -251,6 +264,12 @@ func (f *binFlow) frameDirection(dir int, w []byte) (int, *binSpec, error) {
 				return 0, nil, fmt.Errorf("unsupported HTTP version")
 			}
 			h.status = response.StatusCode
+			h.headerFields = map[string]any{"Protocol": response.Proto, "Status Code": response.StatusCode, "Status": response.Status, "Headers": httpHeaderFields(response.Header)}
+			h.rawHeader = bytes.Clone(w[:end])
+			d.http = h
+			if len(f.httpMethods) == 0 {
+				return 0, nil, sessionContext("HTTP response header observed without request framing context (capture may have started midstream or lost request bytes)")
+			}
 			// Interim responses do not complete the queued request and carry
 			// no DNS message. Associate only this request's final response.
 			h.ipp = h.status >= 200 && len(f.httpIPP) > 0 && f.httpIPP[0]
@@ -259,7 +278,11 @@ func (f *binFlow) frameDirection(dir int, w []byte) (int, *binSpec, error) {
 			h.websocket = h.status == 101 && httpHeaderHasToken(response.Header, "Upgrade", "websocket") && httpHeaderHasToken(response.Header, "Connection", "upgrade")
 			if h.websocket {
 				if len(f.httpUpgrades) == 0 || !f.httpUpgrades[0] {
-					return 0, nil, sessionContext("WebSocket response lacks a matching upgrade request")
+					why := "observed request is not a valid WebSocket upgrade"
+					if len(f.httpUpgradeIssues) > 0 {
+						why += ": " + f.httpUpgradeIssues[0]
+					}
+					return 0, nil, sessionContext(why)
 				}
 				if len(f.httpWSKeys) == 0 {
 					return 0, nil, sessionContext("WebSocket key missing")
@@ -290,11 +313,13 @@ func (f *binFlow) frameDirection(dir int, w []byte) (int, *binSpec, error) {
 				return 0, nil, fmt.Errorf("unsupported HTTP version")
 			}
 			h.method = request.Method
+			h.headerFields = map[string]any{"Protocol": request.Proto, "Method": request.Method, "Request URI": request.RequestURI, "Host": request.Host, "Headers": httpHeaderFields(request.Header)}
 			// Reuse the parsed header so ordinary deferred HTTP does not need
 			// a second net/http parse or eager structured field decoding.
 			h.ipp = ippMedia(request.Header.Get("Content-Type"))
 			h.doh = dohHTTP1RequestEvidence(request.Method, request.URL.RequestURI(), request.Header.Get("Content-Type"))
-			h.websocket = request.Method == "GET" && request.Header.Get("Sec-WebSocket-Version") == "13" && httpHeaderHasToken(request.Header, "Upgrade", "websocket") && httpHeaderHasToken(request.Header, "Connection", "upgrade")
+			h.wsIssue = websocketRequestIssue(request)
+			h.websocket = h.wsIssue == ""
 			if h.websocket {
 				h.wsKey = request.Header.Get("Sec-WebSocket-Key")
 				key, err := base64.StdEncoding.DecodeString(h.wsKey)
@@ -313,12 +338,19 @@ func (f *binFlow) frameDirection(dir int, w []byte) (int, *binSpec, error) {
 			return 0, nil, fmt.Errorf("unsupported HTTP transfer encoding")
 		}
 		h.closeDelimited = h.response && length < 0 && !h.chunked
-		if length > int64(f.a.config.MaxMessageBytes-end) {
-			return f.a.config.MaxMessageBytes + 1, nil, nil
-		}
-		if length >= 0 {
+		if length >= 0 && length <= int64(f.a.config.MaxMessageBytes-end) {
 			h.total = end + int(length)
 		}
+		h.bodyLength = length
+		h.declared = length
+		if length >= 0 {
+			if length > int64(^uint64(0)>>1)-int64(end) {
+				h.declared = int64(^uint64(0) >> 1)
+			} else {
+				h.declared += int64(end)
+			}
+		}
+		h.rawHeader = bytes.Clone(w[:end])
 		d.http = h
 		// Expect: 100-continue can produce a response before the request body.
 		// Associate the method as soon as its complete header is validated.
@@ -326,7 +358,7 @@ func (f *binFlow) frameDirection(dir int, w []byte) (int, *binSpec, error) {
 			h.requestID = f.a.ids.Add(1)
 			f.httpIDs = append(f.httpIDs, h.requestID)
 			f.httpTimes = append(f.httpTimes, d.ts)
-			cost := int64(128*(len(f.httpMethods)+1) + len(h.wsKey) + len(h.wsOffer) + len(h.method))
+			cost := int64(3*end + 128*(len(f.httpMethods)+1) + len(h.wsKey) + len(h.wsOffer) + len(h.method))
 			for _, s := range f.httpWSKeys {
 				cost += int64(len(s))
 			}
@@ -338,6 +370,7 @@ func (f *binFlow) frameDirection(dir int, w []byte) (int, *binSpec, error) {
 			}
 			f.httpMethods = append(f.httpMethods, h.method)
 			f.httpUpgrades = append(f.httpUpgrades, h.websocket)
+			f.httpUpgradeIssues = append(f.httpUpgradeIssues, h.wsIssue)
 			f.httpWSKeys = append(f.httpWSKeys, h.wsKey)
 			f.httpWSExtensions = append(f.httpWSExtensions, h.wsOffer)
 			f.httpDoH = append(f.httpDoH, h.doh)
@@ -349,6 +382,9 @@ func (f *binFlow) frameDirection(dir int, w []byte) (int, *binSpec, error) {
 				f.httpIPP = append(f.httpIPP, h.ipp)
 			}
 		}
+	}
+	if h.declared > int64(f.a.config.MaxMessageBytes) {
+		return f.a.config.MaxMessageBytes + 1, nil, nil
 	}
 	if h.closeDelimited {
 		return 0, nil, nil
@@ -400,7 +436,8 @@ func (f *binFlow) frameDirection(dir int, w []byte) (int, *binSpec, error) {
 			h.trailers = true
 			continue
 		}
-		if size > uint64(f.a.config.MaxMessageBytes-h.cursor-2) {
+		if size > uint64(max(0, f.a.config.MaxMessageBytes-h.cursor-2)) {
+			h.skipRemaining = int64(size)
 			return f.a.config.MaxMessageBytes + 1, nil, nil
 		}
 		h.next = h.cursor + int(size)
@@ -420,6 +457,9 @@ func (f *binFlow) finishHTTP(dir int) {
 			f.httpTimes = f.httpTimes[1:]
 			if len(f.httpUpgrades) > 0 {
 				f.httpUpgrades = f.httpUpgrades[1:]
+				if len(f.httpUpgradeIssues) > 0 {
+					f.httpUpgradeIssues = f.httpUpgradeIssues[1:]
+				}
 				f.httpWSKeys = f.httpWSKeys[1:]
 				f.httpWSExtensions = f.httpWSExtensions[1:]
 			}
@@ -443,7 +483,7 @@ func (f *binFlow) finishHTTP(dir int) {
 		if f.ws == nil {
 			f.ws = &binWebSocket{client: client, phase: "frame"}
 		}
-		f.httpUpgrades = nil
+		f.httpUpgrades, f.httpUpgradeIssues = nil, nil
 		f.httpDoH, f.httpIPP = nil, nil
 		f.binding, f.level, f.httpMethods = nil, 0, nil
 		return
@@ -453,7 +493,7 @@ func (f *binFlow) finishHTTP(dir int) {
 		// Re-probe the next ordered bytes once; keep the capture flow identity.
 		f.protocol, f.binding, f.level = "", nil, 0
 		f.httpMethods = nil
-		f.httpUpgrades = nil
+		f.httpUpgrades, f.httpUpgradeIssues = nil, nil
 		f.httpDoH, f.httpIPP = nil, nil
 	}
 }
@@ -510,4 +550,24 @@ func (f *binFlow) httpEvidence(dir int, e *ProtocolEvent) {
 			e.Completeness = "transaction"
 		}
 	}
+}
+
+func websocketRequestIssue(request *http.Request) string {
+	if request.Method != "GET" {
+		return "request method is not GET"
+	}
+	if !httpHeaderHasToken(request.Header, "Upgrade", "websocket") {
+		return "Upgrade header lacks websocket"
+	}
+	if !httpHeaderHasToken(request.Header, "Connection", "upgrade") {
+		return "Connection header lacks upgrade"
+	}
+	if request.Header.Get("Sec-WebSocket-Version") != "13" {
+		return "Sec-WebSocket-Version must be 13"
+	}
+	key, err := base64.StdEncoding.DecodeString(request.Header.Get("Sec-WebSocket-Key"))
+	if err != nil || len(key) != 16 {
+		return "Sec-WebSocket-Key must encode 16 bytes"
+	}
+	return ""
 }

@@ -126,7 +126,7 @@ This command is mainly for rule author testing. It returns non-zero when any rul
 		}))
 		programs, err := ssaapi.ParseProjectWithFS(zipfs,
 			ssaapi.WithRawLanguage(language),
-			ssaapi.WithExcludeFunc(excludeFileStr),
+			ssaapi.WithUserExcludePatterns(excludeFileStr),
 		)
 		if err != nil {
 			return err

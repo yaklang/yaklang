@@ -34,10 +34,13 @@ func TestScanProjectFiles(t *testing.T) {
 
 	t.Run("Basic Scan", func(t *testing.T) {
 		result, err := ScanProjectFiles(ScanConfig{
-			ProgramName:     "test_prog",
-			ProgramPath:     "src",
-			FileSystem:      fs,
-			ExcludeFunc:     nil,
+			ProgramName: "test_prog",
+			ProgramPath: "src",
+			FileSystem:  fs,
+			// ScanProjectFiles applies the matcher as given; merging in the
+			// built-in default excludes is DefaultConfig's job, so tests that
+			// want default behavior pass the default matcher explicitly.
+			ExcludeFunc:     newExcludeFunc(nil, "", true),
 			CheckLanguage:   checkLanguage,
 			CheckPreHandler: nil,
 			Context:         context.Background(),
@@ -53,7 +56,7 @@ func TestScanProjectFiles(t *testing.T) {
 	})
 
 	t.Run("With Exclude", func(t *testing.T) {
-		excludeFunc := newExcludeFunc([]string{"src/vendor/"}, "")
+		excludeFunc := newExcludeFunc([]string{"src/vendor/"}, "", true)
 
 		result, err := ScanProjectFiles(ScanConfig{
 			ProgramName:     "test_prog",
@@ -84,7 +87,7 @@ func TestScanProjectFiles(t *testing.T) {
 			ProgramName:     "test_prog",
 			ProgramPath:     "src",
 			FileSystem:      fs,
-			ExcludeFunc:     nil,
+			ExcludeFunc:     newExcludeFunc(nil, "", true),
 			CheckLanguage:   checkLanguage,
 			CheckPreHandler: checkPreHandler,
 			Context:         context.Background(),
@@ -94,7 +97,7 @@ func TestScanProjectFiles(t *testing.T) {
 		require.Contains(t, result.PreHandlerFiles, "src/utils.go")
 		require.NotContains(t, result.PreHandlerFiles, "src/main.go")
 		require.Equal(t, 1, result.PreHandlerTotal)
-		_, ok := result.HandlerFilesMap["src/utils.go"]
+		_, ok := result.PreHandlerFileSet["src/utils.go"]
 		require.True(t, ok)
 	})
 
@@ -103,7 +106,7 @@ func TestScanProjectFiles(t *testing.T) {
 			ProgramName:     "test_prog",
 			ProgramPath:     "src",
 			FileSystem:      fs,
-			ExcludeFunc:     nil,
+			ExcludeFunc:     newExcludeFunc(nil, "", true),
 			CheckLanguage:   checkLanguage,
 			CheckPreHandler: nil,
 			Context:         context.Background(),
@@ -114,7 +117,7 @@ func TestScanProjectFiles(t *testing.T) {
 	})
 
 	t.Run("Skip testdata directory with explicit exclude", func(t *testing.T) {
-		excludeFunc := newExcludeFunc([]string{"src/testdata/"}, "")
+		excludeFunc := newExcludeFunc([]string{"src/testdata/"}, "", true)
 
 		result, err := ScanProjectFiles(ScanConfig{
 			ProgramName:     "test_prog",
@@ -134,7 +137,7 @@ func TestScanProjectFiles(t *testing.T) {
 			ProgramName:     "test_prog",
 			ProgramPath:     "src",
 			FileSystem:      fs,
-			ExcludeFunc:     nil,
+			ExcludeFunc:     newExcludeFunc(nil, "", true),
 			CheckLanguage:   checkLanguage,
 			CheckPreHandler: nil,
 			Context:         context.Background(),
@@ -156,7 +159,7 @@ func TestScanProjectFiles(t *testing.T) {
 			ProgramName:     "test_prog",
 			ProgramPath:     ".",
 			FileSystem:      rootFS,
-			ExcludeFunc:     nil,
+			ExcludeFunc:     newExcludeFunc(nil, "", true),
 			CheckLanguage:   checkLanguage,
 			CheckPreHandler: nil,
 			Context:         context.Background(),

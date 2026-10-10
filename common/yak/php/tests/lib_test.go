@@ -17,11 +17,14 @@ var composer string
 func TestComposerJson(t *testing.T) {
 	fs := filesys.NewVirtualFs()
 	fs.AddFile("composer.lock", composer)
+	// composer.lock is excluded by built-in default compile excludes (lock files
+	// are not production source); this test asserts dependency parsing on it,
+	// so disable the defaults for the full-tree behavior.
 	ssatest.CheckWithFS(fs, t, func(programs ssaapi.Programs) error {
 		result, err := programs.SyntaxFlowWithError("__dependency__.myclabs*.version as $version", ssaapi.QueryWithEnableDebug())
 		require.NoError(t, err)
 		values := result.GetValues("version")
 		require.True(t, len(values) == 1)
 		return nil
-	}, ssaapi.WithLanguage(ssaconfig.PHP))
+	}, ssaapi.WithLanguage(ssaconfig.PHP), ssaapi.WithDisableDefaultCompileExcludes(true))
 }

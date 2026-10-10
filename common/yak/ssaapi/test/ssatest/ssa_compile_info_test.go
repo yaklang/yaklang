@@ -130,6 +130,9 @@ func TestNestedJar(t *testing.T) {
 			ssaapi.WithLanguage(ssaconfig.JAVA),
 			ssaconfig.WithCodeSourceMap(info),
 			ssaapi.WithProgramName(progName),
+			// test-nested.jar / inner test.jar match built-in test-named archive
+			// excludes; this test asserts nested jar compilation itself
+			ssaapi.WithDisableDefaultCompileExcludes(true),
 		)
 		defer func() {
 			ssadb.DeleteProgram(ssadb.GetDB(), progName)
@@ -169,6 +172,9 @@ func TestNestedJar(t *testing.T) {
 			ssaapi.WithLanguage(ssaconfig.JAVA),
 			ssaconfig.WithCodeSourceMap(info),
 			ssaapi.WithProgramName(progName),
+			// test-nested.jar / inner test.jar match built-in test-named archive
+			// excludes; this test asserts nested jar compilation itself
+			ssaapi.WithDisableDefaultCompileExcludes(true),
 		)
 		defer func() {
 			ssadb.DeleteProgram(ssadb.GetDB(), progName)
@@ -208,6 +214,9 @@ func TestNestedJar(t *testing.T) {
 			ssaapi.WithLanguage(ssaconfig.JAVA),
 			ssaconfig.WithCodeSourceMap(info),
 			ssaapi.WithProgramName(progName),
+			// test-nested.jar / inner test.jar match built-in test-named archive
+			// excludes; this test asserts nested jar compilation itself
+			ssaapi.WithDisableDefaultCompileExcludes(true),
 		)
 		defer func() {
 			ssadb.DeleteProgram(ssadb.GetDB(), progName)
@@ -249,10 +258,14 @@ func TestNestedJar(t *testing.T) {
 }
 func checkFilelist(t *testing.T, language string, info map[string]any) {
 	progName := uuid.NewString()
+	// test.jar / test-with-jar.zip fixtures match the built-in test-named
+	// archive excludes; these tests assert archive compilation itself, so
+	// disable the built-in defaults for the full-scan behavior.
 	res, err := ssaapi.ParseProject(
 		ssaapi.WithRawLanguage(language),
 		ssaconfig.WithCodeSourceMap(info),
 		ssaapi.WithProgramName(progName),
+		ssaapi.WithDisableDefaultCompileExcludes(true),
 	)
 	defer func() {
 		ssadb.DeleteProgram(ssadb.GetDB(), progName)
@@ -430,6 +443,9 @@ func TestExpandedZipFS_JarMarkedAsDirectory_Compile(t *testing.T) {
 			expandedFS,
 			ssaapi.WithLanguage(ssaconfig.JAVA),
 			ssaapi.WithProgramName(progName),
+			// lib/test.jar inside the fixture matches built-in test-named
+			// archive excludes; this test asserts jar-as-directory compilation
+			ssaapi.WithDisableDefaultCompileExcludes(true),
 		)
 		defer func() {
 			ssadb.DeleteProgram(ssadb.GetDB(), progName)

@@ -216,7 +216,7 @@ func (c *Config) parseProjectWithFSUnits(
 		ProgramName:     programName,
 		ProgramPath:     programPath,
 		FileSystem:      filesystem,
-		ExcludeFunc:     c.excludeFile,
+		ExcludeFunc:     c.excludeMatcher,
 		CheckLanguage:   c.checkLanguage,
 		CheckPreHandler: c.checkLanguagePreHandler,
 		Context:         c.ctx,
@@ -226,7 +226,7 @@ func (c *Config) parseProjectWithFSUnits(
 	}
 	folder2Save = append(folder2Save, scanResult.Folders...)
 	handlerTotal := scanResult.HandlerTotal
-	handlerFilesMap := scanResult.HandlerFilesMap
+	preHandlerFileSet := scanResult.PreHandlerFileSet
 	handlerFiles := scanResult.HandlerFiles
 	handlerFileSet := make(map[string]struct{}, len(handlerFiles))
 	for _, handlerFile := range handlerFiles {
@@ -387,7 +387,7 @@ func (c *Config) parseProjectWithFSUnits(
 			}
 			prog.BeginCompileUnit(unit.Key)
 			unitCanceled := false
-			ch := c.GetFileHandler(filesystem, unit.Files, handlerFilesMap)
+			ch := c.GetFileHandler(filesystem, unit.Files, preHandlerFileSet)
 			for fileContent := range ch {
 				if fileContent == nil {
 					continue
@@ -446,7 +446,7 @@ func (c *Config) parseProjectWithFSUnits(
 					if preHandlerBuildsFiles {
 						ssa.ReleaseASTRoot(fileContent.AST)
 					}
-					if _, needBuild := handlerFilesMap[fileContent.Path]; needBuild {
+					if _, needBuild := preHandlerFileSet[fileContent.Path]; needBuild {
 						_, needsCompile := handlerFileSet[fileContent.Path]
 						switch {
 						case needsCompile && fileContent.AST != nil && !preHandlerBuildsFiles:
@@ -724,8 +724,8 @@ func (c *Config) parseProjectWithFSLegacy(
 	preHandlerTotal := 0
 	handlerTotal := 0
 	preHandlerFiles := make([]string, 0)
-	handlerFilesMap := make(map[string]struct{})
 	handlerFiles := make([]string, 0)
+	preHandlerFileSet := make(map[string]struct{})
 	handlerFileSet := make(map[string]struct{})
 	start := time.Now()
 
@@ -745,7 +745,7 @@ func (c *Config) parseProjectWithFSLegacy(
 		ProgramName:     programName,
 		ProgramPath:     programPath,
 		FileSystem:      filesystem,
-		ExcludeFunc:     c.excludeFile,
+		ExcludeFunc:     c.excludeMatcher,
 		CheckLanguage:   c.checkLanguage,
 		CheckPreHandler: c.checkLanguagePreHandler,
 		Context:         c.ctx,
@@ -757,10 +757,13 @@ func (c *Config) parseProjectWithFSLegacy(
 	folder2Save = append(folder2Save, scanResult.Folders...)
 	handlerTotal = scanResult.HandlerTotal
 	handlerFiles = scanResult.HandlerFiles
-	handlerFileSet = scanResult.HandlerFileSet
+	handlerFileSet = make(map[string]struct{}, len(handlerFiles))
+	for _, handlerFile := range handlerFiles {
+		handlerFileSet[handlerFile] = struct{}{}
+	}
 	preHandlerTotal = scanResult.PreHandlerTotal
 	preHandlerFiles = scanResult.PreHandlerFiles
-	handlerFilesMap = scanResult.HandlerFilesMap
+	preHandlerFileSet = scanResult.PreHandlerFileSet
 	calculateTime = time.Since(start)
 	if err != nil {
 		return nil, err
@@ -843,7 +846,7 @@ func (c *Config) parseProjectWithFSLegacy(
 		start = time.Now()
 
 		ch := c.GetFileHandler(
-			filesystem, preHandlerFiles, handlerFilesMap,
+			filesystem, preHandlerFiles, preHandlerFileSet,
 		)
 		for fileContent := range ch {
 			if fileContent == nil {
@@ -902,7 +905,7 @@ func (c *Config) parseProjectWithFSLegacy(
 				if preHandlerBuildsFiles {
 					ssa.ReleaseASTRoot(fileContent.AST)
 				}
-				if _, needBuild := handlerFilesMap[fileContent.Path]; needBuild {
+				if _, needBuild := preHandlerFileSet[fileContent.Path]; needBuild {
 					_, needsCompile := handlerFileSet[fileContent.Path]
 					switch {
 					case needsCompile && fileContent.AST != nil && !preHandlerBuildsFiles:

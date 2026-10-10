@@ -31,7 +31,7 @@ type ProtocolEvent struct {
 	Length                                   int
 	Status, Summary, Rule, Entry, Error      string
 	Raw                                      []byte
-	Fields                                   map[string]any // complete protocol fields; owned by this event
+	Fields                                   map[string]any // owned protocol fields; Completeness identifies header-only views
 	Metadata                                 any
 	Structured                               map[string]any
 	// Session is an owned snapshot of observed connection context. Decoded
@@ -276,16 +276,16 @@ func (c *CaptureConfig) prepareBinParser() error {
 	}
 	config := *c.binParserConfig
 	if config.MaxMessageBytes == 0 {
-		config.MaxMessageBytes = 1 << 20
+		config.MaxMessageBytes = 16 << 20
 	}
 	if config.MaxBufferedBytes == 0 {
-		config.MaxBufferedBytes = 32 << 20
+		config.MaxBufferedBytes = 128 << 20
 	}
 	if config.ProbeBytes == 0 {
 		config.ProbeBytes = 64
 	}
-	if config.MaxMessageBytes < 64 || config.MaxMessageBytes > 16<<20 || config.MaxBufferedBytes < config.MaxMessageBytes || config.ProbeBytes < 16 || config.ProbeBytes > config.MaxMessageBytes {
-		return fmt.Errorf("invalid protocol parser buffer/probe limits")
+	if config.MaxMessageBytes < 64 || config.MaxMessageBytes > 64<<20 || config.MaxBufferedBytes < config.MaxMessageBytes || config.ProbeBytes < 16 || config.ProbeBytes > config.MaxMessageBytes {
+		return fmt.Errorf("invalid protocol parser limits: message=%d (64..67108864), buffered=%d (must cover message), probe=%d (16..message)", config.MaxMessageBytes, config.MaxBufferedBytes, config.ProbeBytes)
 	}
 	a := &binParser{config: config, specs: make(map[string]*binSpec), budget: DefaultParserBudget(), rtspMedia: &rtspMediaRegistry{index: make(map[rtspMediaTuple][]rtspMediaBinding)}}
 	a.budget.MaxMessageBytes, a.budget.MaxFrameBytes = config.MaxMessageBytes, config.MaxMessageBytes
@@ -368,6 +368,7 @@ func (a *binParser) emit(e *BinParserEvent) {
 	}
 	e.setStructured(e.Structured)
 	e.finalizeEvidence()
+	e.summarizeProtocol()
 	defer func() {
 		if p := recover(); p != nil {
 			a.panics.Add(1)
@@ -472,6 +473,7 @@ type binFlow struct {
 	goose             *binGOOSE
 	syslog            *binSyslog
 	httpUpgrades      []bool
+	httpUpgradeIssues []string
 	httpDoH           []bool
 	httpIPP           []bool
 	httpIDs           []uint64
@@ -546,11 +548,55 @@ func (f *binFlow) retain(d *binDirection, data []byte) bool {
 func (f *binFlow) stop(dir int, wire []byte, status, reason string) {
 	d := &f.directions[dir]
 	preview := wire[:min(len(wire), f.a.config.ProbeBytes)]
+	retainedHTTPHeader := f.protocol == "http" && d.http != nil && !d.http.omitted && len(d.http.rawHeader) > 0 && d.http.headerFields != nil
+	if retainedHTTPHeader {
+		// Build provenance over all retained header bytes, not the shorter
+		// diagnostic preview. The header may span several captured packets.
+		preview = d.http.rawHeader
+	}
 	e := f.event(dir, preview, status, reason)
 	e.sessionError, f.lastSessionError = f.lastSessionError, nil
 	d.sshOpaque = f.protocol == "ssh" && e.sessionError != nil && e.sessionError.Kind == ErrEncrypted
 	e.Length = len(wire)
+	if f.protocol == "http" && d.http != nil {
+		f.httpEvidence(dir, e)
+		if d.http.omitted && !d.http.response {
+			e.ID = 0
+		}
+		e.Session = map[string]any{"Method": d.http.method, "Declared Message Bytes": d.http.declared}
+		if d.http.response && d.http.status == 101 {
+			e.ExpertCode = "HTTPUpgradeUnverified"
+			e.Session["Upgrade Validated"] = false
+			if headers, ok := d.http.headerFields["Headers"].(map[string]any); ok {
+				e.Session["Upgrade"] = cloneSessionValue(headers["Upgrade"])
+			}
+		}
+		if retainedHTTPHeader {
+			e.Length = len(e.Raw)
+			e.Completeness = "headers"
+			e.semanticFields = d.http.retainedHeaderFields()
+			e.Structured = map[string]any{"fields": cloneSession(e.semanticFields)}
+		}
+	}
+	if status == "limited" {
+		if e.sessionError == nil {
+			e.ExpertCode = string(ErrResourceExceeded)
+		}
+	}
 	if status == "unrecognized" {
+		e.ExpertCode = "ProtocolNotRecognized"
+		e.Session = map[string]any{
+			"Detection Window Bytes": f.a.config.ProbeBytes,
+			"Observed Bytes":         len(wire),
+			"Detection Stopped":      true,
+		}
+		e.Summary = fmt.Sprintf("%s (%s -> %s, flow %d, %d-byte prefix)", reason, e.Source, e.Destination, e.FlowID, len(preview))
+		if f.captureTCP {
+			e.Session["TCP Initiator Observed"] = f.tcpClientKnown
+			if !f.tcpClientKnown {
+				e.Summary += "; TCP initiator not observed"
+			}
+		}
 		f.a.unknown.Add(1)
 		f.a.unclassified.Add(uint64(len(wire)))
 	} else if status == "limited" {
@@ -583,6 +629,11 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 			f.invalidateSession(1 - dir)
 			f.closeSession()
 		}
+		if d.stopped {
+			// Emitted events own their header evidence. A stopped direction
+			// must not retain another copy until the TCP flow is evicted.
+			d.http = nil
+		}
 	}()
 	a.input.Add(uint64(len(data)))
 	if d.stopped {
@@ -599,6 +650,14 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 		old := len(d.buffer)
 		if old+len(data) > a.config.MaxMessageBytes {
 			room := a.config.MaxMessageBytes - old
+			if room == 0 && f.omitHTTPPayload(dir, d.buffer, "message buffer limit reached") {
+				// Process already buffered bytes first, then this arrival. Neither
+				// is retried through the VM or retained as a large body.
+				a.input.Add(^uint64(len(data) - 1))
+				f.feed(dir, nil, ts)
+				f.feed(dir, data, ts)
+				return
+			}
 			if room == 0 {
 				f.stop(dir, d.buffer, "limited", "message buffer limit reached")
 				a.limited.Add(uint64(len(data)))
@@ -617,6 +676,12 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 			current := a.buffered.Add(delta)
 			if current > int64(a.config.MaxBufferedBytes) {
 				a.buffered.Add(-delta)
+				if f.omitHTTPPayload(dir, d.buffer, "capture buffer limit reached") {
+					a.input.Add(^uint64(len(data) - 1))
+					f.feed(dir, nil, ts)
+					f.feed(dir, data, ts)
+					return
+				}
 				f.stop(dir, d.buffer, "limited", "capture buffer limit reached")
 				a.limited.Add(uint64(len(data)))
 				return
@@ -634,6 +699,25 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 		wire = d.buffer
 	}
 	for len(wire) > 0 {
+		if h := d.http; f.protocol == "http" && h != nil && h.omitted {
+			n, done, err := h.consumeOmitted(wire)
+			d.offset += uint64(n)
+			a.limited.Add(uint64(n))
+			wire = wire[n:]
+			if err != nil {
+				f.stop(dir, wire, "malformed", err.Error())
+				return
+			}
+			if done {
+				f.finishHTTP(dir)
+				d.ts = ts
+				continue
+			}
+			if n == 0 {
+				break
+			}
+			continue
+		}
 		if f.protocol == "" {
 			a.probes.Add(1)
 			f.detectDirection(dir, wire)
@@ -651,7 +735,7 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 					if len(wire) < a.budget.MaxFrameBytes && (probeSLMPTCP(wire, min(a.budget.MaxFrameBytes, a.config.MaxMessageBytes), false).Verdict == ProbeNeedMore || wrapperIncompletePrefix(wire, a.budget.MaxFrameBytes) || f.captureTCP && probeDNSTCP(wire, a.budget.MaxFrameBytes).Verdict == ProbeNeedMore || needsMoreS7Prefix(wire, a.budget.MaxFrameBytes) || f.needsMoreSSHServerPreamble(dir, wire) || initialProtocolNeedMore(wire, a.budget.MaxFrameBytes).Verdict == ProbeNeedMore || needsMoreHTTPStartLine(wire) || f.needsMorePortProtocolPrefix(wire) || f.needsMoreBoundedText(wire) || f.needsMoreOpenWire(wire)) {
 						break
 					}
-					f.stop(dir, wire, "unrecognized", "bounded detection exhausted; subsequent bytes are counted without VM retries")
+					f.stop(dir, wire, "unrecognized", "TCP application protocol not recognized")
 					return
 				}
 				break
@@ -667,6 +751,14 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 			status, typed := classifySessionError(err)
 			f.lastSessionError = typed
 			f.stop(dir, wire, status, err.Error())
+			if h := d.http; f.protocol == "http" && h != nil && h.response && h.status == 101 {
+				// Even an unverified 101 is an explicit HTTP protocol boundary.
+				// Do not misdiagnose the subsequent opaque bytes as HTTP headers.
+				f.directions[1-dir].stopped = true
+				f.release(&f.directions[1-dir])
+				f.closeSession()
+				return
+			}
 			if f.hasSession() && !d.sshOpaque {
 				f.invalidateSession(1 - dir)
 				f.closeSession()
@@ -674,7 +766,14 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 			return
 		}
 		if n < 0 || n > a.config.MaxMessageBytes || f.protocol != "http2" && n > a.budget.MaxFrameBytes {
-			f.stop(dir, wire, "limited", "declared message exceeds limit")
+			reason := fmt.Sprintf("declared message exceeds limit: message_bytes=%d max_message_bytes=%d", n, a.config.MaxMessageBytes)
+			if h := d.http; f.protocol == "http" && h != nil && h.declared > 0 {
+				reason = fmt.Sprintf("HTTP declared message exceeds limit: message_bytes=%d max_message_bytes=%d; increase pcap_protocolBudget to decode the body", h.declared, a.config.MaxMessageBytes)
+			}
+			if f.omitHTTPPayload(dir, wire, reason) {
+				continue
+			}
+			f.stop(dir, wire, "limited", reason)
 			if f.hasSession() {
 				f.invalidateSession(1 - dir)
 				f.closeSession()
@@ -722,7 +821,7 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 		if f.protocol == "http" {
 			httpSession = d.http.doh || d.http.ipp
 			e.ipp = d.http.ipp
-			e.decodeConfig = d.http.config()
+			e.decodeConfig = d.http.config(f.a.config.MaxMessageBytes)
 			e.Summary = d.http.summary
 			f.httpEvidence(dir, e)
 			f.finishHTTP(dir)
@@ -754,6 +853,8 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 				}
 			} else if f.protocol == "slmp" || f.protocol == "redis" || f.protocol == "syslog" || f.protocol == "snmp" || f.protocol == "smb2" || f.protocol == "enip" || f.protocol == "doip" || f.protocol == "genisys" || f.protocol == "dlms-wrapper" || f.protocol == "dlms" || f.protocol == "c37118" || f.protocol == "roc-plus" || f.protocol == "atg" || f.memcached != nil || (e.Entry == "SSHIdentification" || e.Entry == "SSHPreIdentification") || f.protocol == "stratum" || f.protocol == "gearman" || f.protocol == "beanstalkd" || f.protocol == "scgi" || f.protocol == "msgpack-rpc" || f.protocol == "zookeeper" || f.protocol == "clickhouse" || f.protocol == "stomp" || f.protocol == "nats" || f.textInternet != nil || e.Entry == "MySQLPreparedFields" {
 				result = map[string]any{}
+			} else if e.Protocol == "rtsp" && rtspAppleControlWire(e.Raw, a.budget.MaxCollectionElements) {
+				result = map[string]any{}
 			} else if e.Protocol == "websocket" && e.Entry == "WebSocket" && f.ws != nil && f.ws.deflate {
 				result = map[string]any{"fields": map[string]any{}}
 			} else {
@@ -773,6 +874,9 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 					e.Raw = rawCopy
 				}
 				err = f.consumeSession(dir, e, result)
+				if e.Profile == "rtsp-apple-control" {
+					result = map[string]any{"fields": cloneSession(e.Session)}
+				}
 				if f.protocol == "redis" || f.protocol == "syslog" || e.Entry == "MySQLPreparedFields" || e.Entry == "SSHIdentification" || e.Entry == "SSHPreIdentification" {
 					result = map[string]any{"fields": e.Session}
 				}
@@ -952,6 +1056,13 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 	if len(wire) == 0 {
 		f.release(d)
 	} else if !f.retain(d, wire) {
+		if f.omitHTTPPayload(dir, wire, "capture buffer limit reached") {
+			f.release(d)
+			f.feed(dir, wire, ts)
+			// feed accounts input itself; these bytes were already accounted.
+			a.input.Add(^uint64(len(wire) - 1))
+			return
+		}
 		f.stop(dir, wire, "limited", "capture buffer limit reached")
 	}
 	if detected && f.protocol != "" && !f.hasSession() {
@@ -972,10 +1083,26 @@ func (f *binFlow) close(reason TrafficFlowCloseReason) {
 	}()
 	for dir := range f.directions {
 		d := &f.directions[dir]
+		if h := d.http; h != nil && h.omitted {
+			if h.closeDelimited && reason == TrafficFlowCloseReason_FIN {
+				f.finishHTTP(dir)
+			} else {
+				e := f.event(dir, nil, "incomplete", string(reason)+": omitted HTTP body boundary was not reached")
+				e.TransactionID = h.requestID
+				if h.response && len(f.httpIDs) > 0 {
+					e.TransactionID = f.httpIDs[0]
+					e.ResponseTo = f.httpIDs[0]
+				}
+				f.a.incomplete.Add(1)
+				f.a.emit(e)
+			}
+			f.release(d)
+			continue
+		}
 		if len(d.buffer) != 0 {
 			if h := d.http; h != nil && h.closeDelimited && reason == TrafficFlowCloseReason_FIN {
 				e := f.event(dir, d.buffer, "deferred", h.summary)
-				e.Rule, e.Entry, e.decodeConfig = "application-layer.http", "HTTPExact", h.config()
+				e.Rule, e.Entry, e.decodeConfig = "application-layer.http", "HTTPExact", h.config(f.a.config.MaxMessageBytes)
 				e.ipp = h.ipp
 				f.httpEvidence(dir, e)
 				f.a.messages.Add(1)
