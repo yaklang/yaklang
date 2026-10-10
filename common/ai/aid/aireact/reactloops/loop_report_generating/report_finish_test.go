@@ -42,12 +42,12 @@ func TestReportOutputFilterPreservesAITagEdits(t *testing.T) {
 				reportPath := filepath.Join(workdir, "report.md")
 				initial := "# 格式回归报告\n\n原始说明。\n\n" +
 					"```go\nraw := `第一行\n第二行\\n仍是字面量`\nquoted := \"引号\\\"与反斜杠\\\\\"\n```\n\n" +
-					"```php\r\n$text = <<<'TEXT'\r\n\t中文 😀 / 'single' / \"double\" / \\n / \\t\r\nTEXT;\r\n```\n\n" +
+					"```php\r\n$text = <<<'TEXT'\r\n\t中文 𠮷 / 'single' / \"double\" / \\n / \\t\r\nTEXT;\r\n```\n\n" +
 					"| 字段 | 值 |\n| --- | --- |\n| 路径 | C:\\data\\report |\n\n" +
-					strings.Repeat("保留行尾空格与缩进：  \n\t中文 😀、引号\"、反斜杠\\。\n\n", 100) +
+					strings.Repeat("保留行尾空格与缩进：  \n\t中文 𠮷、引号\"、反斜杠\\。\n\n", 100) +
 					"## 结束\n"
-				replacement := "更新说明：保留 `backtick`、\"双引号\"、'单引号'、\\n 字面量。\n\t第二行 😀。"
-				inserted := "## 附加资料\n\n```text\n\t字面量 \\n 与真实换行\n引号 \" 和反斜杠 \\ 😀\n```\n\n"
+				replacement := "更新说明：保留 `backtick`、\"双引号\"、'单引号'、\\n 字面量。\n\t第二行 𠮷。"
+				inserted := "## 附加资料\n\n```text\n\t字面量 \\n 与真实换行\n引号 \" 和反斜杠 \\ 𠮷\n```\n\n"
 				modified := strings.Replace(initial, "原始说明。", replacement, 1)
 				final := "# 格式回归报告\n\n" + inserted + strings.TrimPrefix(modified, "# 格式回归报告\n\n")
 				steps := []struct {
@@ -171,7 +171,7 @@ func TestReportGeneratingOutputLifecycle(t *testing.T) {
 				"\n\n## 目录结构\n\n```text\n" + strings.Repeat("internal/module/\n", 200) +
 				"```\n\n## 关键配置\n\n| 文件 | 说明 |\n| --- | --- |\n| go.mod | 依赖声明 |\n"
 			if testCase.large {
-				report += strings.Repeat("\n项目资料："+strings.Repeat("中文 😀 / ", 32)+"\n", 3000) + "\n报告末尾完整性标记\n"
+				report += strings.Repeat("\n项目资料："+strings.Repeat("中文 𠮷 / ", 32)+"\n", 3000) + "\n报告末尾完整性标记\n"
 				require.GreaterOrEqual(t, len(report), 1024*1024)
 			}
 			require.NoError(t, os.WriteFile(referencePath, []byte("# 参考资料\n项目使用 Go。"), 0o600))
