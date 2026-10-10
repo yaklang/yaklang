@@ -170,6 +170,7 @@ func pfcpSetupCheckMessages(t *testing.T, c pfcpSetupControl, events []*Protocol
 			require.Nil(t, f)
 			require.Empty(t, e.Session)
 			require.Zero(t, e.ResponseTo)
+			require.Zero(t, e.TransactionID)
 			continue
 		}
 		require.NoError(t, err)
@@ -197,23 +198,7 @@ func pfcpSetupCheckMessages(t *testing.T, c pfcpSetupControl, events []*Protocol
 		require.EqualValues(t, n, stats.Decoded)
 	}
 	if c.Target != nil && c.Budget == nil {
-		got := map[int]int{}
-		for i, e := range events {
-			if e.ResponseTo != 0 {
-				for q, r := range events {
-					if r.ID == e.ResponseTo {
-						got[i+1] = q + 1
-						break
-					}
-				}
-				require.Equal(t, e.ResponseTo, e.TransactionID)
-			}
-		}
-		require.Len(t, got, len(c.Target.Pairs))
-		for _, p := range c.Target.Pairs {
-			require.Len(t, p, 2)
-			require.Equal(t, p[0], got[p[1]])
-		}
+		pfcpDeletionPairs(t, c, events)
 		for _, r := range c.Target.Unmatched {
 			require.Zero(t, events[r-1].ResponseTo)
 		}
