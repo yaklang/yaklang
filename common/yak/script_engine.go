@@ -70,6 +70,7 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/mutate"
 	"github.com/yaklang/yaklang/common/pcapx"
+	"github.com/yaklang/yaklang/common/pcapx/pcapdb"
 	"github.com/yaklang/yaklang/common/rpa"
 	"github.com/yaklang/yaklang/common/sca"
 	"github.com/yaklang/yaklang/common/simulator"
@@ -324,6 +325,7 @@ func initYaklangLib() {
 	// suricata
 	yaklang.Import("suricata", chaosmaker.ChaosMakerExports)
 	yaklang.Import("pcapx", pcapx.Exports)
+	yaklang.Import("pcapdb", pcapdb.Exports)
 
 	// ja3
 	yaklang.Import("ja3", ja3.Exports)
@@ -615,6 +617,7 @@ func (e *ScriptEngine) exec(ctx context.Context, id string, code string, params 
 	vars["YAK_FILENAME"] = ""
 	vars["YAK_DIR"] = ""
 	vars["YAK_VERSION"] = consts.GetYakVersion()
+	vars["pcapdb"] = pcapdb.ExportsWithContext(ctx)
 
 	// 设置参数获取函数
 	paramGetter := func(key string) interface{} {

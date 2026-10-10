@@ -1,0 +1,112 @@
+// PCAP library lifecycle smoke test. The harness supplies an isolated module;
+// standalone execution uses the normal profile-backed pcapdb module.
+libraryTools = getParam("PCAPDB_TEST_EXPORTS")
+if libraryTools == nil || libraryTools == "" { libraryTools = pcapdb }
+
+capture = codec.DecodeHex("d4c3b2a1020004000000000000000000ffff00000100000000f1536500000000360000003600000000112233445566778899aabb0800450000280001000040065cbc0a0102030a0908077d7b005000000064000000005002ffff13a0000000f1536501000000360000003600000000112233445566778899aabb0800450000280001000040065cbc0a0908070a01020300507d7b000001f4000000655012ffff119b000000f1536502000000360000003600000000112233445566778899aabb0800450000280001000040065cbc0a0102030a0908077d7b005000000065000001f55010ffff119c000000f1536503000000490000004900000000112233445566778899aabb08004500003b0001000040065ca90a0102030a0908077d7b005000000065000001f55018ffff80be0000474554202f7063617064622d736d6f6b65204800f1536504000000560000005600000000112233445566778899aabb0800450000480001000040065c9c0a0102030a0908077d7b005000000078000001f55018ffff88b300005454502f312e310d0a486f73743a20736d6f6b652e6578616d706c650d0a0d0a00f15365050000005e0000005e00000000112233445566778899aabb0800450000500001000040065c940a0908070a01020300507d7b000001f5000000985018ffff12ed0000485454502f312e3120323030204f4b0d0a436f6e74656e742d4c656e6774683a20320d0a0d0a4f4b00f1536506000000360000003600000000112233445566778899aabb0800450000280001000040065cbc0a0102030a0908077d7b0050000000980000021d5011ffff1140000000f1536507000000360000003600000000112233445566778899aabb0800450000280001000040065cbc0a0908070a01020300507d7b0000021d000000995011ffff113f0000")~
+input = file.TempFileName("pcapdb-smoke-*.pcap")~
+output = input + ".export.pcap"
+defer file.Remove(input)
+defer file.Remove(output)
+file.Save(input, capture)~
+
+library = libraryTools.GetOrCreatePCAPDatabase(input, libraryTools.withProtocols(true), libraryTools.withBatchSize(2))~
+defer library.Close()
+again = libraryTools.GetOrCreatePCAPDatabase(input, libraryTools.withProtocols(true))~
+defer again.Close()
+assert again.ID == library.ID, "exact captures must deduplicate"
+metadata = library.Metadata()~
+assert metadata.State == "ready" && metadata.PacketCount == 8
+assert metadata.StreamsIndexed && metadata.ProtocolsIndexed
+assert len(libraryTools.ListPCAPDatabases()~) >= 1
+assert libraryTools.CountPCAPDatabases()~ >= 1
+assert libraryTools.ValidatePCAPDatabase(library.ID, true)~.Valid
+
+packets = library.QueryPackets(libraryTools.limit(2))~
+assert len(packets) == 2 && packets[0].ID == 1
+assert len(packets[0].Data) == 0, "packet summaries must omit BLOBs"
+nextPackets = library.QueryPackets(libraryTools.after(packets[1].ID), libraryTools.limit(2))~
+assert nextPackets[0].ID == 3
+packetBytes = library.ReadPacket(4)~
+assert len(packetBytes) > 0
+
+sessions = library.QuerySessions(libraryTools.transport("tcp"), libraryTools.limit(2))~
+assert len(sessions) == 1 && sessions[0].Complete
+assert len(library.QueryPackets(libraryTools.session(sessions[0].ID))~) == 8
+assert library.PacketSessions(4)~[0].ID == sessions[0].ID
+streams = library.QueryStreams(libraryTools.session(sessions[0].ID))~
+assert len(streams) == 2
+requestStream = streams[0]
+page = library.ReadStream(requestStream.ID, libraryTools.limit(1), libraryTools.maxBytes(65536))~
+assert len(page.Chunks) == 1 && page.HasMore
+assert page.Bytes <= 65536
+assert len(library.StreamChunkPacketIDs(page.Chunks[0].ID)~) == 1
+rest = library.ReadStream(requestStream.ID, libraryTools.after(page.NextAfter), libraryTools.limit(1))~
+assert len(rest.Chunks) == 1 && !rest.HasMore
+assert string(page.Chunks[0].Data) + string(rest.Chunks[0].Data) == "GET /pcapdb-smoke HTTP/1.1\r\nHost: smoke.example\r\n\r\n"
+
+messages = library.QueryProtocols(libraryTools.protocol("http"), libraryTools.session(sessions[0].ID), libraryTools.limit(2))~
+assert len(messages) == 2
+assert messages[0].SessionID == sessions[0].ID
+assert messages[0].StreamID == requestStream.ID
+assert len(library.ProtocolDetails(messages[0].ID)~.Fields) > 0
+assert len(library.ReadProtocol(messages[0].ID)~) > 0
+assert len(library.ProtocolPacketIDs(messages[0].ID)~) == 2
+searched = library.QueryProtocols(libraryTools.protocol("http"), libraryTools.fieldMissing("$.pcapdb_smoke_absent"))~
+assert len(searched) == 2
+
+// Bounded JSON contract for later AI adapters: real cursors, lookahead and previews.
+result = library.QueryPacketsPage(libraryTools.limit(2), libraryTools.resultBytes(4096))~
+assert result.DatasetID == library.ID && result.State == "ready"
+assert len(result.Items) == 2 && result.HasMore && result.Error == nil
+assert result.NextCursor == result.Items[1].ID
+assert len(json.dumps(result, json.withIndent(""))) <= 4096
+nextResult = library.QueryPacketsPage(libraryTools.after(result.NextCursor), libraryTools.limit(2))~
+assert nextResult.Items[0].ID == 3
+assert len(libraryTools.ListPCAPDatabasesPage(libraryTools.limit(1))~.Items) >= 1
+preview = library.ReadPacketPage(4, libraryTools.previewBytes(4))~
+assert len(preview.Items[0].Data) == 4 && preview.Items[0].Truncated
+assert preview.Items[0].Encoding == "base64"
+streamPreview = library.ReadStreamPage(requestStream.ID, libraryTools.limit(1), libraryTools.previewBytes(4))~
+assert streamPreview.HasMore && streamPreview.Items[0].Truncated
+assert streamPreview.Items[0].StreamID == requestStream.ID
+references = library.ProtocolPacketIDsPage(messages[0].ID, libraryTools.limit(1))~
+assert len(references.Items) == 1 && references.HasMore
+assert len(library.PacketSessionsPage(4)~.Items) == 1
+
+// Discover parser-defined paths instead of guessing schema names.
+discovered = library.DiscoverProtocolFields(libraryTools.protocol("http"), libraryTools.limit(1))~
+assert discovered.Sampled && discovered.Scanned == 1 && discovered.HasMore
+assert len(discovered.Items) > 0
+fieldPath = ""
+for _, candidate = range discovered.Items {
+    if candidate.Searchable && len(candidate.Types) == 1 && candidate.Types[0] == "text" {
+        fieldPath = candidate.Path
+        break
+    }
+}
+assert fieldPath != "", "the real HTTP parser must expose a searchable field"
+assert len(library.QueryProtocols(libraryTools.fieldExists(fieldPath))~) > 0
+
+// Source removal must not affect reads, validation, or byte-exact export.
+file.Remove(input)~
+indexes = libraryTools.EnsureProtocolFieldIndexes(library.ID, fieldPath)~
+assert len(indexes) >= 1
+assert len(library.ProtocolFieldIndexes()~) >= 1
+assert len(library.QueryProtocols(libraryTools.fieldExists(fieldPath))~) > 0
+rebuilt = libraryTools.RebuildPCAPDatabase(library.ID, libraryTools.withBatchSize(2))~
+defer rebuilt.Close()
+assert rebuilt.ID == library.ID
+assert library.ReadPacket(4)~ == packetBytes
+libraryTools.ExportFromPCAPDatabase(library.ID, output)~
+assert codec.Sha256(file.ReadFile(output)~) == codec.Sha256(capture)
+assert libraryTools.ValidatePCAPDatabase(library.ID, true)~.Valid
+library.Close()~
+assert again.ReadPacket(4)~ == packetBytes, "one caller closing its handle must not close another"
+reopened = libraryTools.OpenPCAPDatabase(library.ID)~
+defer reopened.Close()
+assert len(reopened.QuerySessions()~) == 1
+assert reopened.ReadPacket(4)~ == packetBytes
+
+// Release the execution's remaining leases without closing another task's manager.
+libraryTools.ClosePCAPDatabases()~
