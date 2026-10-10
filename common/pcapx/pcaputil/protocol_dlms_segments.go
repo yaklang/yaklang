@@ -5,7 +5,8 @@ import (
 	"encoding/hex"
 )
 
-// One selected normal/list request or GET response information field, not GBT.
+// One selected normal/list or observed-transfer next request, or GET response
+// information field, not GBT.
 // Every complete carrier frame is independently length/HCS/FCS validated.
 // The first frame must include LLC and the complete LN GET service header.
 // A partial request does not install pending context; a partial response never
@@ -17,6 +18,7 @@ type dlmsFragments struct {
 	first, last, nr     byte
 	count               int
 	request             bool
+	nextRequest         bool
 	invoke, sequenceSet byte
 }
 
@@ -37,7 +39,7 @@ func (s *binDLMS) fragmentCloseFields() map[string]any {
 }
 
 func (f *binFlow) dlmsLinkAssembly(w []byte) bool {
-	return f.dlms.fragments != nil || len(w) >= 3 && w[1]&8 != 0
+	return f.dlms.fragments != nil || f.dlms.pending != nil && len(f.dlms.pending.requestInformation) > 0 && bytes.Equal(f.dlms.pending.wire, w) || len(w) >= 3 && w[1]&8 != 0
 }
 
 func (f *binFlow) dlmsProjection(w []byte) int64 {

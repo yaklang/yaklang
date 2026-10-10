@@ -599,6 +599,7 @@ func (f *binFlow) consumeSession(dir int, e *ProtocolEvent, result map[string]an
 		e.Profile, e.Completeness = dlmsProfile(e.Raw), "message"
 		e.Session, e.ResponseTo, err = f.consumeDLMS(dir, e.Raw, e.ID)
 		if err == nil {
+			e.Profile = dlmsObservedProfile(e.Raw, e.Session)
 			e.semanticFields = cloneSession(e.Session)
 		}
 	case "genisys":

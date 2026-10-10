@@ -60,7 +60,9 @@ func dlmsNamedBlockControls(t *testing.T, name, schema string, count int) []dlms
 		}
 		require.Equal(t, 1, bound, c.ID)
 	}
-	return doc.Cases
+	// Validate each original archive/answer before applying the additive,
+	// independently bound correction for complete assembly service profiles.
+	return dlmsCompleteProfileUpgrade(t, name, doc.Cases)
 }
 
 func TestDLMSHDLCBlocksOwnershipAndChunks(t *testing.T) {

@@ -97,6 +97,8 @@ func (f *binFlow) consumeDLMSBlock(dir int, wire []byte, id uint64, m *dlmsMessa
 	if t == nil {
 		initial := *p
 		initial.wire = nil // No duplicate copy of the initial descriptor.
+		initial.requestInformation = nil
+		initial.requestFrames = 0
 		t = &dlmsTransfer{initial: initial}
 	}
 	if t.blocks >= min(f.a.budget.MaxCollectionElements, wrapperBlockCount) || len(b.blockData) > min(f.a.budget.MaxCollectionElements, wrapperBlockBytes)-len(t.data) {

@@ -6,7 +6,8 @@ import (
 	"math/bits"
 )
 
-// Initial normal/list requests are observations, not proof of a negotiated AA.
+// Selected normal/list and observed-transfer GET-next requests are wire
+// observations, not proof of a negotiated AA.
 // Keep every literal frame independent; only a complete APDU installs pending
 // request context. A response must acknowledge the last request frame.
 func (f *binFlow) consumeDLMSRequestSegments(dir int, wire []byte, id uint64, m *dlmsMessage) (map[string]any, uint64, error) {
@@ -19,14 +20,21 @@ func (f *binFlow) consumeDLMSRequestSegments(dir int, wire []byte, id uint64, m 
 	}
 	t := s.fragments
 	if t == nil {
-		// Preserve the existing interruption boundary: an initial segmented
-		// request cannot replace an outstanding request or data-block chain.
-		if s.pending != nil || s.transfer != nil {
-			return fail(ErrUnsupportedFeature, "initial request segmentation cannot interrupt an observed exchange", true)
-		}
 		info := m.information
-		if len(info) < 6 || !bytes.Equal(info[:4], []byte{0xe6, 0xe6, 0, 0xc0}) || info[4] != 1 && info[4] != 3 {
-			return fail(ErrUnsupportedFeature, "first request segment needs complete LLC and normal/list GET header", true)
+		if len(info) < 6 || !bytes.Equal(info[:4], []byte{0xe6, 0xe6, 0, 0xc0}) || info[4] != 1 && info[4] != 2 && info[4] != 3 {
+			return fail(ErrUnsupportedFeature, "first request segment needs complete LLC and selected GET header", true)
+		}
+		nextRequest := info[4] == 2
+		// GET-next belongs to a completely observed block transfer. Partial request
+		// bytes cannot replace a pending hop or create missing initial context.
+		if s.pending != nil || s.transfer != nil && !nextRequest || nextRequest && s.transfer == nil {
+			return fail(ErrUnsupportedFeature, "request segmentation lacks compatible observed exchange context", true)
+		}
+		if nextRequest {
+			p := &s.transfer.initial
+			if dir != p.dir || m.source != p.source || m.destination != p.destination || info[5] != p.flags {
+				return fail(ErrContextRequired, "segmented Get-next direction/address/full flags differ from initial request", false)
+			}
 		}
 		if info[5]&0x30 != 0 {
 			return fail(ErrMalformedMessage, "segmented request invoke flags are reserved", true)
@@ -34,7 +42,7 @@ func (f *binFlow) consumeDLMSRequestSegments(dir int, wire []byte, id uint64, m 
 		if s.clientKnown && dir != s.clientDir || s.seqKnown[dir] && m.ns != s.next[dir] || s.seqKnown[1-dir] && m.nr != s.next[1-dir] {
 			return fail(ErrContextRequired, "initial request direction/sequence differs from observed progression", false)
 		}
-		t = &dlmsFragments{request: true, invoke: info[5] & 15, dir: dir, source: m.source, destination: m.destination, first: m.ns, nr: m.nr}
+		t = &dlmsFragments{request: true, nextRequest: nextRequest, invoke: info[5] & 15, dir: dir, source: m.source, destination: m.destination, first: m.ns, nr: m.nr}
 	} else {
 		if dir != t.dir || m.source != t.source || m.destination != t.destination || m.nr != t.nr {
 			return fail(ErrContextRequired, "request continuation direction/address/acknowledgement differ", false)
@@ -49,7 +57,7 @@ func (f *binFlow) consumeDLMSRequestSegments(dir int, wire []byte, id uint64, m 
 			return fail(ErrContextRequired, "missing/conflicting/repeated request fragment sequence", true)
 		}
 	}
-	if s.seenRequest[t.invoke]&(1<<m.ns) != 0 {
+	if !t.nextRequest && s.seenRequest[t.invoke]&(1<<m.ns) != 0 {
 		return fail(ErrContextRequired, "segmented request reuses captured invoke/sequence identity", true)
 	}
 	if len(m.information) == 0 {
@@ -73,10 +81,11 @@ func (f *binFlow) consumeDLMSRequestSegments(dir int, wire []byte, id uint64, m 
 		return m.fields, 0, nil
 	}
 	// Session progression starts at the first sequence; the complete request
-	// identity is the final event. Retire all fragment sequence identities so
-	// modulo8 wrap cannot let an old acknowledgement verify a later request.
+	// identity is the final event. Initial normal/list requests retire fragment
+	// identities; observed GET-next instead requires the current transfer's block
+	// number and progression, preserving consecutive modulo8 block exchanges.
 	newIdentities := bits.OnesCount8(mask &^ s.seenRequest[t.invoke])
-	if int(s.seenCount)+newIdentities > f.a.budget.MaxCollectionElements {
+	if !t.nextRequest && int(s.seenCount)+newIdentities > f.a.budget.MaxCollectionElements {
 		return fail(ErrResourceExceeded, "segmented request identity history exceeds collection budget", true)
 	}
 	last := m.ns
@@ -90,9 +99,13 @@ func (f *binFlow) consumeDLMSRequestSegments(dir int, wire []byte, id uint64, m 
 	if err != nil {
 		return failDLMSRequestAssembly(s, err)
 	}
-	s.seenRequest[t.invoke] |= mask
-	s.seenCount += uint16(newIdentities - 1) // consume recorded the first identity.
+	if !t.nextRequest {
+		s.seenRequest[t.invoke] |= mask
+		s.seenCount += uint16(newIdentities - 1)
+	} // consume recorded the first initial normal/list identity.
 	s.pending.ns = last
+	s.pending.requestInformation = bytes.Clone(joined)
+	s.pending.requestFrames = count
 	s.next[dir], s.seqKnown[dir] = (last+1)&7, true
 	meta["assembled_information_hex"] = hex.EncodeToString(joined)
 	fields["HDLC Segmentation"] = meta

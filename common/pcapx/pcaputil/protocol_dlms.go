@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"container/list"
 	"encoding/binary"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"strconv"
@@ -479,6 +480,8 @@ func probeDLMS(w []byte, limit int) ProbeResult {
 
 type dlmsPending struct {
 	wire                []byte
+	requestInformation  []byte // bounded owned APDU for an exact final-frame retry
+	requestFrames       int
 	kind                string
 	dir                 int
 	source, destination uint32
@@ -617,7 +620,7 @@ func dlmsRequestEvidence(w []byte) bool {
 func (s *binDLMS) storage() int64 {
 	n := int64(512)
 	if s.pending != nil {
-		n += int64(len(s.pending.wire)) * 2
+		n += int64(len(s.pending.wire)+len(s.pending.requestInformation)) * 2
 	}
 	if s.transfer != nil {
 		n += 128 + 2*int64(len(s.transfer.data))
@@ -644,6 +647,20 @@ func (f *binFlow) consumeDLMS(dir int, w []byte, id uint64) (map[string]any, uin
 }
 func (f *binFlow) consumeDecodedDLMS(dir int, w []byte, id uint64, m *dlmsMessage) (map[string]any, uint64, error) {
 	s := f.dlms
+	if p := s.pending; p != nil && len(p.requestInformation) > 0 && dir == p.dir && bytes.Equal(p.wire, w) {
+		// CRC/header validation and the full request projection were reserved before
+		// this decode. Rebuild private fields from the retained bounded APDU, never
+		// from caller-visible maps. The first complete event keeps reply ownership.
+		var err error
+		m, err = decodeDLMSInformation(m, p.requestInformation, f.a.budget.MaxCollectionElements, f.a.budget.MaxRecursionDepth)
+		if err != nil {
+			s.invalidate()
+			return nil, 0, err
+		}
+		meta := dlmsSegmentFields(m, p.requestFrames, true)
+		meta["assembled_information_hex"] = hex.EncodeToString(p.requestInformation)
+		m.fields["HDLC Segmentation"] = meta
+	}
 	if m.kind == "I" || s.fragments != nil {
 		return f.consumeDLMSSegments(dir, w, id, m)
 	}
@@ -787,6 +804,7 @@ func (a *binParser) decodeDLMSDatagram(e *ProtocolEvent, w []byte, explicit bool
 	a.udpMu.Unlock()
 	if err == nil {
 		e.semanticFields = cloneSession(e.Session)
+		e.Profile = dlmsObservedProfile(w, e.Session)
 	}
 	var resource *ProtocolError
 	if oversize || dlmsListAPDU(w) != nil && errors.As(err, &resource) && resource.Kind == ErrResourceExceeded {

@@ -49,6 +49,22 @@ func dlmsProfile(w []byte) string {
 	}
 	return "dlms-hdlc-get-normal"
 }
+
+// A complete assembled APDU identifies its selected service even when its
+// final carrier contains no LLC/service header. Partial/error envelopes retain
+// the literal-header profile without inventing a completed message.
+func dlmsObservedProfile(w []byte, fields map[string]any) string {
+	if meta, ok := fields["HDLC Segmentation"].(map[string]any); ok && meta["complete"] == true {
+		if fields["Get Block"] != nil {
+			return "dlms-hdlc-get-block"
+		}
+		if fields["Get List"] != nil {
+			return "dlms-hdlc-get-list"
+		}
+	}
+	return dlmsProfile(w)
+}
+
 func dlmsProjection(w []byte) int64 {
 	if p := dlmsAPDU(w); dlmsBlockAPDU(p) && p[0] == 0xc4 {
 		// A final block may complete a previously opaque compact/list body.

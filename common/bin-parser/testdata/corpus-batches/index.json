@@ -36408,6 +36408,308 @@
         "common/pcapx/pcaputil/slmp-idle-history/controls.json": "controls.json",
         "common/pcapx/pcaputil/slmp-idle-history/validation/expected.json": "validation/expected.json"
       }
+    },
+    {
+      "id": "validation-dlms-next-request-segments",
+      "kind": "validation",
+      "source_sha": "8f397e457e13e9f82a386de20621da7c65560144",
+      "file": "validation-dlms-next-request-segments.zip",
+      "sha256": "cf907602709e997b12cda60280c0f9a94843ae78c99add5b4de87856b0f13a84",
+      "password": "bin-parser",
+      "members": {
+        "build.py": {
+          "sha256": "96f104db19c4ed5770af9919b0197b73ff0765b5ae09cd22cd89f6b2a7e52479",
+          "bytes": 6032
+        },
+        "verify-controls.py": {
+          "sha256": "b8768a279e0e6a4633ba8fd4c06e39c0977b98fca3bab4db0ec35161bd78b853",
+          "bytes": 4453
+        },
+        "reference-check.py": {
+          "sha256": "d88a87a0cef4443194f7cf31f66f075c0acf9024562ad1320955130244404e6f",
+          "bytes": 3320
+        },
+        "seal.py": {
+          "sha256": "b20550bc307ab4f60b5bd1da1d621359a766bf9be3dfa002892880a397729d3a",
+          "bytes": 4086
+        },
+        "source-pin.json": {
+          "sha256": "3d2efecdd4243ae0565bdf08b1bb81931061eab533d6a017e877ff90bae06a8a",
+          "bytes": 14073
+        },
+        "framer.py": {
+          "sha256": "d1f9c1dbd2971190df6bea768af9f150f2b6d50907ce4e0baae803afb2ab6055",
+          "bytes": 3390
+        },
+        "carrier.py": {
+          "sha256": "adce1cb3f2e08bd83a75111553096394f9cbbd04947297e9320eddb79e19d635",
+          "bytes": 1888
+        },
+        "oracle.py": {
+          "sha256": "e2d101d3c22b91fbc9d51e054af820b449e5eadf40a1bedab90d97bf997b63a1",
+          "bytes": 5962
+        },
+        "axdr.py": {
+          "sha256": "a9678dc82261aa2ef5d1c734062ce0c7c4ad104d678d3d0c4ba851f88442bb17",
+          "bytes": 7446
+        },
+        "LICENSE.txt": {
+          "sha256": "e6278556c1dc857098b00fe430c648f1a052da10ed5b7d6373d2e3da78a36f76",
+          "bytes": 294
+        },
+        "profile-upgrade.py": {
+          "sha256": "bd0a9ea98dd9747c4b247806061c9f9b1106ba2834300bb31d434475a21d4e0c",
+          "bytes": 1374
+        },
+        "historical-profile-upgrade.json": {
+          "sha256": "de4bbde9608b50e60367dcd099758a5921d4db8d93cd46d76346a0e51f12ec19",
+          "bytes": 2384
+        },
+        "cases/next-two-tcp.pcap": {
+          "sha256": "7726f064a46344f900f13c3b31d4a245923ff8b35d2bf47557a8381bbe3e2df7",
+          "bytes": 694
+        },
+        "answers/next-two-tcp.json": {
+          "sha256": "474a52849e16453352270199c9b914f22321e01c52b7e6981820687a1697ccd7",
+          "bytes": 6770
+        },
+        "cases/next-first-retry-tcp.pcap": {
+          "sha256": "34367eec49514d8fe19e917df10095307f4ab8378a000d5bbf61689f802c8dd6",
+          "bytes": 781
+        },
+        "answers/next-first-retry-tcp.json": {
+          "sha256": "70de9b487f9c2567f8d69b8b47ecef78608c3bde590ebbdb4154e301a65ea8ae",
+          "bytes": 7758
+        },
+        "cases/next-final-retry-tcp.pcap": {
+          "sha256": "11c572533dcca7231539848a6023cb7f29a81407635c2d608fb21c789480c975",
+          "bytes": 779
+        },
+        "answers/next-final-retry-tcp.json": {
+          "sha256": "ad31c8b0b85a504f854a8b5f22308f2907f4230466d0ccf9b4ea108d746310f4",
+          "bytes": 8050
+        },
+        "cases/next-wrong-direction-preserves-tcp.pcap": {
+          "sha256": "06d6b5efc2f5d415ba5066032ffba15e2b3f4e82d3cb138e43643c9077932803",
+          "bytes": 779
+        },
+        "answers/next-wrong-direction-preserves-tcp.json": {
+          "sha256": "34aa6fc6d18fc608e2a0e13a82b680d530a93dccdd3cec3f051799ee3564bc99",
+          "bytes": 7136
+        },
+        "cases/next-wrong-ack-preserves-tcp.pcap": {
+          "sha256": "945d59c9c8e66cdd9cca294321f9b535af8b904bbff9d0ca115972f36501253c",
+          "bytes": 779
+        },
+        "answers/next-wrong-ack-preserves-tcp.json": {
+          "sha256": "0fc09d85d3bf2ea0e279a42f9459f36e723acb245a49350d1cb298094bfa4ddc",
+          "bytes": 7112
+        },
+        "cases/next-wrong-address-preserves-tcp.pcap": {
+          "sha256": "75214fd42004f056b1a592bd80afd2716d26aef09ed843f274fdce0418e5f4a6",
+          "bytes": 779
+        },
+        "answers/next-wrong-address-preserves-tcp.json": {
+          "sha256": "865909c7e7b5880c2e903a1dad6ab9d5425cfd10e1c4e211a7d6247a47fd1375",
+          "bytes": 7128
+        },
+        "cases/next-wrong-flags-preserves-tcp.pcap": {
+          "sha256": "3d64681fa5ea28396d461814b53e54e8fb3188b839f557681d2c8ee04bcd99c8",
+          "bytes": 781
+        },
+        "answers/next-wrong-flags-preserves-tcp.json": {
+          "sha256": "ff0d71c98fca0db812118158fe2080ccee27fdd5d849e57ca5863789271afb53",
+          "bytes": 7123
+        },
+        "cases/next-wrong-number-retires-tcp.pcap": {
+          "sha256": "4a19e6b045230cd219cc64945c055c37baf913761d12a4455ebf0df7273b98f9",
+          "bytes": 694
+        },
+        "answers/next-wrong-number-retires-tcp.json": {
+          "sha256": "8b370d16dbe94b2ba6768a8d8feec8082e0daa472c0a054a0be03c219d969e3e",
+          "bytes": 4649
+        },
+        "cases/next-truncated-retires-tcp.pcap": {
+          "sha256": "7de93ca29ec068c49a2d3087dd53058322550a98a4b2c64fe47fb32bac19c27b",
+          "bytes": 693
+        },
+        "answers/next-truncated-retires-tcp.json": {
+          "sha256": "438b5a7c22a40e489894381bb636e897b844d18a5034020b81cfd16def613edf",
+          "bytes": 4636
+        },
+        "cases/normal-final-retry-tcp.pcap": {
+          "sha256": "e793f6576b6ac53770e090afc361d6503f983a842aeb657ea5ff8178019ee126",
+          "bytes": 593
+        },
+        "answers/normal-final-retry-tcp.json": {
+          "sha256": "0adcd3dc1ce7c6f723aee1e58183afc72f6d44cc28f76a3753f9dc4a046cc9ca",
+          "bytes": 5304
+        },
+        "cases/list-final-retry-tcp.pcap": {
+          "sha256": "088e8684ecd49a92da487a98c9640bcfb9a57b7a832ac5b9902db803f592d2dc",
+          "bytes": 596
+        },
+        "answers/list-final-retry-tcp.json": {
+          "sha256": "7e00eef6e0ab1127dd6250525521cd4413aedb212ce04c87957db84c7a47cade",
+          "bytes": 6816
+        },
+        "cases/next-two-udp.pcap": {
+          "sha256": "63a4ea9b6419f55f1cdf25270254bd9aade3cec752a4419046264a403ce64fb9",
+          "bytes": 424
+        },
+        "answers/next-two-udp.json": {
+          "sha256": "d1f2564f324c74ad0a4d1700e326010f04bd9b8a76dc29bd3a384b0437bdf40d",
+          "bytes": 6770
+        },
+        "cases/next-first-retry-udp.pcap": {
+          "sha256": "724def71a539af172832e319ed8aa1c4284afa4f7378623f9fd42e4dd5a3ff19",
+          "bytes": 499
+        },
+        "answers/next-first-retry-udp.json": {
+          "sha256": "bd9de930c50973a5d5d321469ec10c824ea4268358f2a7402ca9af3948bf4959",
+          "bytes": 7758
+        },
+        "cases/next-final-retry-udp.pcap": {
+          "sha256": "24e73d58991d4aaba0cb758fec4cbf3ef7822bf12f3a6a1c35b3562e89b36a2f",
+          "bytes": 497
+        },
+        "answers/next-final-retry-udp.json": {
+          "sha256": "7b1a432726ca05f80d015dab37fb75e1bd7e0715c8180a803d0a1f8fe86fbb1b",
+          "bytes": 8050
+        },
+        "cases/next-wrong-direction-preserves-udp.pcap": {
+          "sha256": "3184a230a2fff309287e5db4f59a7f0ba0fc80f8b667b6e13daa9ca0d4b0ea2d",
+          "bytes": 497
+        },
+        "answers/next-wrong-direction-preserves-udp.json": {
+          "sha256": "7516efb080dde96ebfc6d01aa066931fc02efda9a28b8542d646df43ac465082",
+          "bytes": 7136
+        },
+        "cases/next-wrong-ack-preserves-udp.pcap": {
+          "sha256": "8a77a7c56215794752ee2d5c60b19f663845426385d4df4fb15e035d23e9e0a3",
+          "bytes": 497
+        },
+        "answers/next-wrong-ack-preserves-udp.json": {
+          "sha256": "b353d6af0a1ca046b7cf73f81c80b928fc9043d427288ad2e6f8fc0ddcbb10df",
+          "bytes": 7112
+        },
+        "cases/next-wrong-address-preserves-udp.pcap": {
+          "sha256": "77446a179b9f3a93324ee9e4b2d87e6023ce8bdafb84c8a9d91e99f5732e1be7",
+          "bytes": 497
+        },
+        "answers/next-wrong-address-preserves-udp.json": {
+          "sha256": "992007d27b0c2874fe437b7257eaa8ee4a44ca7b84e89c7511b4d8ddbedd80d4",
+          "bytes": 7128
+        },
+        "cases/next-wrong-flags-preserves-udp.pcap": {
+          "sha256": "ee3329fbf80c69570a9ed45ec75688d541b9854d84dad7163d18408d70ae6683",
+          "bytes": 499
+        },
+        "answers/next-wrong-flags-preserves-udp.json": {
+          "sha256": "5bd8c443f29d19baf9c1ca8b007a9a68551b8f0f67af48a63a14f163da23ccda",
+          "bytes": 7123
+        },
+        "cases/next-wrong-number-retires-udp.pcap": {
+          "sha256": "0481f570fb96e7e59d09b7c8880b0ae8a7f0a2383fd70b39043506fd017aac12",
+          "bytes": 424
+        },
+        "answers/next-wrong-number-retires-udp.json": {
+          "sha256": "01352c359496659b2ee6f4a027c71dc0aa75ea299988233054926a86f0c93a94",
+          "bytes": 4649
+        },
+        "cases/next-truncated-retires-udp.pcap": {
+          "sha256": "8fc63cae2e867f7644a1923fae1db456d3921fee4f518f52f49698e19c875735",
+          "bytes": 423
+        },
+        "answers/next-truncated-retires-udp.json": {
+          "sha256": "487b8504b9d278a7354c0c6392ad7a9e26981b43d0e10d3dbae92c4e69e179cc",
+          "bytes": 4636
+        },
+        "cases/normal-final-retry-udp.pcap": {
+          "sha256": "98770cb7b3ac4b84a0b3761cba9bf9d3642f27fef4a594f927510d64ef5544a3",
+          "bytes": 335
+        },
+        "answers/normal-final-retry-udp.json": {
+          "sha256": "f30289340563e92316a6cb454076045cbddb5a04dab199bc7821a2275d94979c",
+          "bytes": 5304
+        },
+        "cases/list-final-retry-udp.pcap": {
+          "sha256": "3326b06c8841342cc578b000c1cc6bf0c02f5e237e7b0334fec07732cedd7440",
+          "bytes": 338
+        },
+        "answers/list-final-retry-udp.json": {
+          "sha256": "f2f2c65398700dc703e66204ba2c0d7c97cb7a9e845545a560dfdf7c49a14e7f",
+          "bytes": 6816
+        },
+        "controls.json": {
+          "sha256": "30c63224a42d0a7084c2f22248551b319dc4cc3ae31d45cf03544ea3219d0ac0",
+          "bytes": 166123
+        },
+        "validation/expected.json": {
+          "sha256": "f32af93f80b2fe3bf9f5da58f674379e166e8af0a44545938c5ec603021eadd1",
+          "bytes": 31767
+        }
+      },
+      "aliases": {
+        "common/pcapx/pcaputil/dlms-next-request-segments/build.py": "build.py",
+        "common/pcapx/pcaputil/dlms-next-request-segments/verify-controls.py": "verify-controls.py",
+        "common/pcapx/pcaputil/dlms-next-request-segments/reference-check.py": "reference-check.py",
+        "common/pcapx/pcaputil/dlms-next-request-segments/seal.py": "seal.py",
+        "common/pcapx/pcaputil/dlms-next-request-segments/source-pin.json": "source-pin.json",
+        "common/pcapx/pcaputil/dlms-next-request-segments/framer.py": "framer.py",
+        "common/pcapx/pcaputil/dlms-next-request-segments/carrier.py": "carrier.py",
+        "common/pcapx/pcaputil/dlms-next-request-segments/oracle.py": "oracle.py",
+        "common/pcapx/pcaputil/dlms-next-request-segments/axdr.py": "axdr.py",
+        "common/pcapx/pcaputil/dlms-next-request-segments/LICENSE.txt": "LICENSE.txt",
+        "common/pcapx/pcaputil/dlms-next-request-segments/profile-upgrade.py": "profile-upgrade.py",
+        "common/pcapx/pcaputil/dlms-next-request-segments/historical-profile-upgrade.json": "historical-profile-upgrade.json",
+        "common/pcapx/pcaputil/dlms-next-request-segments/cases/next-two-tcp.pcap": "cases/next-two-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-next-request-segments/answers/next-two-tcp.json": "answers/next-two-tcp.json",
+        "common/pcapx/pcaputil/dlms-next-request-segments/cases/next-first-retry-tcp.pcap": "cases/next-first-retry-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-next-request-segments/answers/next-first-retry-tcp.json": "answers/next-first-retry-tcp.json",
+        "common/pcapx/pcaputil/dlms-next-request-segments/cases/next-final-retry-tcp.pcap": "cases/next-final-retry-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-next-request-segments/answers/next-final-retry-tcp.json": "answers/next-final-retry-tcp.json",
+        "common/pcapx/pcaputil/dlms-next-request-segments/cases/next-wrong-direction-preserves-tcp.pcap": "cases/next-wrong-direction-preserves-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-next-request-segments/answers/next-wrong-direction-preserves-tcp.json": "answers/next-wrong-direction-preserves-tcp.json",
+        "common/pcapx/pcaputil/dlms-next-request-segments/cases/next-wrong-ack-preserves-tcp.pcap": "cases/next-wrong-ack-preserves-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-next-request-segments/answers/next-wrong-ack-preserves-tcp.json": "answers/next-wrong-ack-preserves-tcp.json",
+        "common/pcapx/pcaputil/dlms-next-request-segments/cases/next-wrong-address-preserves-tcp.pcap": "cases/next-wrong-address-preserves-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-next-request-segments/answers/next-wrong-address-preserves-tcp.json": "answers/next-wrong-address-preserves-tcp.json",
+        "common/pcapx/pcaputil/dlms-next-request-segments/cases/next-wrong-flags-preserves-tcp.pcap": "cases/next-wrong-flags-preserves-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-next-request-segments/answers/next-wrong-flags-preserves-tcp.json": "answers/next-wrong-flags-preserves-tcp.json",
+        "common/pcapx/pcaputil/dlms-next-request-segments/cases/next-wrong-number-retires-tcp.pcap": "cases/next-wrong-number-retires-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-next-request-segments/answers/next-wrong-number-retires-tcp.json": "answers/next-wrong-number-retires-tcp.json",
+        "common/pcapx/pcaputil/dlms-next-request-segments/cases/next-truncated-retires-tcp.pcap": "cases/next-truncated-retires-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-next-request-segments/answers/next-truncated-retires-tcp.json": "answers/next-truncated-retires-tcp.json",
+        "common/pcapx/pcaputil/dlms-next-request-segments/cases/normal-final-retry-tcp.pcap": "cases/normal-final-retry-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-next-request-segments/answers/normal-final-retry-tcp.json": "answers/normal-final-retry-tcp.json",
+        "common/pcapx/pcaputil/dlms-next-request-segments/cases/list-final-retry-tcp.pcap": "cases/list-final-retry-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-next-request-segments/answers/list-final-retry-tcp.json": "answers/list-final-retry-tcp.json",
+        "common/pcapx/pcaputil/dlms-next-request-segments/cases/next-two-udp.pcap": "cases/next-two-udp.pcap",
+        "common/pcapx/pcaputil/dlms-next-request-segments/answers/next-two-udp.json": "answers/next-two-udp.json",
+        "common/pcapx/pcaputil/dlms-next-request-segments/cases/next-first-retry-udp.pcap": "cases/next-first-retry-udp.pcap",
+        "common/pcapx/pcaputil/dlms-next-request-segments/answers/next-first-retry-udp.json": "answers/next-first-retry-udp.json",
+        "common/pcapx/pcaputil/dlms-next-request-segments/cases/next-final-retry-udp.pcap": "cases/next-final-retry-udp.pcap",
+        "common/pcapx/pcaputil/dlms-next-request-segments/answers/next-final-retry-udp.json": "answers/next-final-retry-udp.json",
+        "common/pcapx/pcaputil/dlms-next-request-segments/cases/next-wrong-direction-preserves-udp.pcap": "cases/next-wrong-direction-preserves-udp.pcap",
+        "common/pcapx/pcaputil/dlms-next-request-segments/answers/next-wrong-direction-preserves-udp.json": "answers/next-wrong-direction-preserves-udp.json",
+        "common/pcapx/pcaputil/dlms-next-request-segments/cases/next-wrong-ack-preserves-udp.pcap": "cases/next-wrong-ack-preserves-udp.pcap",
+        "common/pcapx/pcaputil/dlms-next-request-segments/answers/next-wrong-ack-preserves-udp.json": "answers/next-wrong-ack-preserves-udp.json",
+        "common/pcapx/pcaputil/dlms-next-request-segments/cases/next-wrong-address-preserves-udp.pcap": "cases/next-wrong-address-preserves-udp.pcap",
+        "common/pcapx/pcaputil/dlms-next-request-segments/answers/next-wrong-address-preserves-udp.json": "answers/next-wrong-address-preserves-udp.json",
+        "common/pcapx/pcaputil/dlms-next-request-segments/cases/next-wrong-flags-preserves-udp.pcap": "cases/next-wrong-flags-preserves-udp.pcap",
+        "common/pcapx/pcaputil/dlms-next-request-segments/answers/next-wrong-flags-preserves-udp.json": "answers/next-wrong-flags-preserves-udp.json",
+        "common/pcapx/pcaputil/dlms-next-request-segments/cases/next-wrong-number-retires-udp.pcap": "cases/next-wrong-number-retires-udp.pcap",
+        "common/pcapx/pcaputil/dlms-next-request-segments/answers/next-wrong-number-retires-udp.json": "answers/next-wrong-number-retires-udp.json",
+        "common/pcapx/pcaputil/dlms-next-request-segments/cases/next-truncated-retires-udp.pcap": "cases/next-truncated-retires-udp.pcap",
+        "common/pcapx/pcaputil/dlms-next-request-segments/answers/next-truncated-retires-udp.json": "answers/next-truncated-retires-udp.json",
+        "common/pcapx/pcaputil/dlms-next-request-segments/cases/normal-final-retry-udp.pcap": "cases/normal-final-retry-udp.pcap",
+        "common/pcapx/pcaputil/dlms-next-request-segments/answers/normal-final-retry-udp.json": "answers/normal-final-retry-udp.json",
+        "common/pcapx/pcaputil/dlms-next-request-segments/cases/list-final-retry-udp.pcap": "cases/list-final-retry-udp.pcap",
+        "common/pcapx/pcaputil/dlms-next-request-segments/answers/list-final-retry-udp.json": "answers/list-final-retry-udp.json",
+        "common/pcapx/pcaputil/dlms-next-request-segments/controls.json": "controls.json",
+        "common/pcapx/pcaputil/dlms-next-request-segments/validation/expected.json": "validation/expected.json"
+      }
     }
   ],
   "schema_version": 1,
