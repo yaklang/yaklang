@@ -430,6 +430,23 @@ func incrementalMVPMessages(t *testing.T, c incrementalMVPCase, a incrementalMVP
 			require.Equal(t, a.NativeRaw[i], hex.EncodeToString(e.Raw))
 		}
 		if c.Group == "nmea" || c.Group == "semtech" {
+			// These are complete independently authored wire answers, not a
+			// snapshot obtained from the implementation under test.
+			rocEqualFields(t, want[i], fields)
+			mutateRTPSQuery(fields)
+			if e.Structured != nil {
+				mutateRTPSQuery(protocolFields(e.Structured))
+			}
+			again, queryErr := e.GetFields()
+			require.NoError(t, queryErr)
+			rocEqualFields(t, want[i], again)
+			tree, queryErr := e.Decode()
+			require.NoError(t, queryErr)
+			rocEqualFields(t, want[i], protocolFields(tree))
+			mutateRTPSQuery(protocolFields(tree))
+			again, queryErr = e.GetFields()
+			require.NoError(t, queryErr)
+			rocEqualFields(t, want[i], again)
 			require.Zero(t, e.ResponseTo, "observed datagrams have no inferred transaction")
 			if c.ID == "semtech-downstream-unsupported" {
 				require.Zero(t, e.TransactionID)

@@ -299,7 +299,13 @@ func (a *binParser) decodeNativeDatagram(e *ProtocolEvent, w []byte, src, dst ui
 		}
 		e.semanticFields = cloneSession(fields)
 		if p.name != "rtps" || err == nil {
-			e.Structured = map[string]any{"fields": e.semanticFields}
+			projection := e.semanticFields
+			if e.ownsNativeFields() {
+				// fields is already the caller-owned Session projection. Keep
+				// the one private clone separate without allocating another tree.
+				projection = fields
+			}
+			e.Structured = map[string]any{"fields": projection}
 		}
 		e.Status = "decoded"
 		e.Summary = p.name

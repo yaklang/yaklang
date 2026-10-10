@@ -165,6 +165,9 @@ func TestRTPSSPDPSealedReplay(t *testing.T) {
 										rocEqualFields(t, answer.Fields, protocolFields(tree))
 										mutateRTPSQuery(protocolFields(tree))
 										mutateRTPSQuery(e.Session)
+										if e.Structured != nil {
+											mutateRTPSQuery(protocolFields(e.Structured))
+										}
 										again, queryErr := e.GetFields()
 										require.NoError(t, queryErr)
 										rocEqualFields(t, answer.Fields, again)

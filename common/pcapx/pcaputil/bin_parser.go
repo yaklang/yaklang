@@ -161,7 +161,7 @@ func (e *ProtocolEvent) ownsNativeFields() bool {
 		return true
 	}
 	switch e.Protocol {
-	case "snmp", "dlms-wrapper", "dlms", "opendroneid", "c37118", "sv", "ethercat", "knx", "pfcp", "profinet-dcp", "mavlink", "rtps":
+	case "snmp", "dlms-wrapper", "dlms", "opendroneid", "c37118", "sv", "ethercat", "knx", "pfcp", "profinet-dcp", "mavlink", "rtps", "nmea", "semtech-udp":
 		return true
 	}
 	return false
