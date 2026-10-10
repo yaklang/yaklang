@@ -127,12 +127,12 @@ func replayWithConfig(input io.Reader, conf *CaptureConfig) (resultErr error) {
 		// gopacket does not invoke a link decoder for an empty record. The
 		// recorded CAN link type still supplies enough context to report the
 		// missing header, including in the observable packet path.
-		if link == 227 && len(raw) == 0 && conf.binParser != nil && len(conf.onEveryPacket) == 0 && conf.Output == nil && !conf.Debug {
+		if link == 227 && len(raw) == 0 && conf.binParser != nil && len(conf.onEveryPacket) == 0 && len(conf.beforeTransportPacket) == 0 && conf.Output == nil && !conf.Debug {
 			conf.binParser.decodeCANRecord(raw, e, ci)
 			continue
 		}
-		if len(conf.onEveryPacket) != 0 || conf.Output != nil || conf.Debug {
-			packet := gopacket.NewPacket(raw, captureLinkDecoder(link), gopacket.DecodeOptions{Lazy: true, NoCopy: false, DecodeStreamsAsDatagrams: conf.binParser == nil})
+		if len(conf.onEveryPacket) != 0 || len(conf.beforeTransportPacket) != 0 || conf.Output != nil || conf.Debug {
+			packet := gopacket.NewPacket(raw, captureLinkDecoder(link), gopacket.DecodeOptions{Lazy: true, NoCopy: false, DecodeStreamsAsDatagrams: conf.binParser == nil && !conf.reassemblyOptions.Stream})
 			packet.Metadata().CaptureInfo = withEvidence(ci, e)
 			conf.packetHandlerWithLink(ctx, packet, link)
 		} else if pool.parallel != nil && !conf.DisableAssembly {

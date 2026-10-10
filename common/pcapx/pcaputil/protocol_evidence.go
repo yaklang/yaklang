@@ -250,3 +250,19 @@ func (v *ProtocolInspector) PacketEventIDs(ref PacketReference, limit int) []uin
 	}
 	return ids
 }
+
+// CapturePacketEvidence includes the packet's observed encapsulation domain.
+// It preserves the original capture-record number through decoding.
+func CapturePacketEvidence(packet gopacket.Packet) PacketReference { return packetEvidence(packet).Ref }
+
+// CapturePacketReferences also includes contributors to network reassembly.
+func CapturePacketReferences(packet gopacket.Packet) []PacketReference {
+	e := packetEvidence(packet)
+	if len(e.refs) > 0 {
+		return append([]PacketReference(nil), e.refs...)
+	}
+	if e.Ref.Number == 0 {
+		return nil
+	}
+	return []PacketReference{e.Ref}
+}

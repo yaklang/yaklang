@@ -174,7 +174,7 @@ func (a *PacketAnalyzer) Feed(raw []byte, ci gopacket.CaptureInfo, link layers.L
 		a.number = e.Ref.Number
 	}
 	a.pool.observeCaptureInfo(len(raw), ci)
-	if len(a.conf.onEveryPacket) > 0 || a.conf.Debug {
+	if len(a.conf.onEveryPacket) > 0 || len(a.conf.beforeTransportPacket) > 0 || a.conf.Debug {
 		packet := gopacket.NewPacket(raw, captureLinkDecoder(link), gopacket.DecodeOptions{Lazy: true, NoCopy: false, DecodeStreamsAsDatagrams: a.conf.binParser == nil})
 		packet.Metadata().CaptureInfo = ci
 		a.conf.packetHandler(a.conf.Context, packet)

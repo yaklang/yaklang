@@ -13,7 +13,7 @@ import (
 // Exclusive bin-parser/worker captures own a finite-timeout native reader. No producer goroutine
 // remains inside libpcap when final device statistics are collected.
 func openLiveWorkers(conf *CaptureConfig, ctx context.Context, h *PcapHandleWrapper) error {
-	private := len(conf.onEveryPacket) == 0 && conf.Output == nil && !conf.Debug
+	private := len(conf.onEveryPacket) == 0 && len(conf.beforeTransportPacket) == 0 && conf.Output == nil && !conf.Debug
 	read := h.ReadPacketData
 	if private {
 		read = h.handle.ZeroCopyReadPacketData

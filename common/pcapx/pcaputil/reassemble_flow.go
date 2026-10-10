@@ -33,6 +33,19 @@ type TrafficFrame struct {
 	Done       bool
 }
 
+// PacketReferences identifies the source packets of an arrived frame. Reassembled
+// aggregate callbacks do not promise per-byte provenance; use arrived frames
+// when persisting ordered chunks with exact contributing packet references.
+func (f *TrafficFrame) PacketReferences() []PacketReference {
+	if len(f.evidence.refs) > 0 {
+		return append([]PacketReference(nil), f.evidence.refs...)
+	}
+	if f.evidence.Ref.Number == 0 {
+		return nil
+	}
+	return []PacketReference{f.evidence.Ref}
+}
+
 // TrafficFlow is a tcp flow
 // lifecycle is created -> data-feeding -> closed(fin/rst/timeout)
 // OnFrame: frame -> flow -> connection
@@ -62,10 +75,21 @@ type TrafficFlow struct {
 	frames                 []*TrafficFrame
 	streamCapacity         int
 	Index                  uint64
+	reassemblyIncomplete   bool
 	IsHalfOpen             bool
 	IsIpv6                 bool
 	IsEthernetLinkLayer    bool
 	IsIpv4                 bool
+}
+
+// CaptureDomain separates equal endpoint tuples on distinct capture interfaces
+// and encapsulations. The returned value does not retain the pooled flow.
+func (t *TrafficFlow) CaptureDomain() CaptureDomain { return t.key.domain }
+
+// HasPendingGaps reports undelivered out-of-order bytes/FIN/RST. Inspect this in
+// the close callback before pooled connections are released.
+func (t *TrafficFlow) HasPendingGaps() bool {
+	return t.reassemblyIncomplete || len(t.ClientConn.waitGroup) > 0 || len(t.ServerConn.waitGroup) > 0 || t.ClientConn.resetPending || t.ServerConn.resetPending
 }
 
 // Context cancellation is shared by the capture; individual flow/direction
@@ -312,6 +336,7 @@ func (t *TrafficFlow) Release() {
 	t.frames = make([]*TrafficFrame, 0)
 	t.Index = 0
 	t.streamCapacity = 0
+	t.reassemblyIncomplete = false
 	t.key = flowKey{}
 	t.httpStarted = sync.Once{}
 	t.IsHalfOpen, t.IsEthernetLinkLayer, t.IsIpv4, t.IsIpv6 = false, false, false, false

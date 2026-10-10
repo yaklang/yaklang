@@ -254,6 +254,15 @@ func (p *TrafficPool) feedEvidence(ethernetLayer *layers.Ethernet, networkLayer 
 		conn = flow.ClientConn
 	}
 	conn.evidence = evidence
+	if p.captureConf != nil {
+		for _, h := range p.captureConf.onFlowPacket {
+			refs := append([]PacketReference(nil), evidence.refs...)
+			if len(refs) == 0 {
+				refs = []PacketReference{evidence.Ref}
+			}
+			h(flow, conn, refs, ts)
+		}
+	}
 	conn.FeedClient(tcp, ts)
 	if flow.ClientConn.IsClosed() {
 		flow.ClientConn.discardPending()

@@ -30,7 +30,7 @@ func _open(conf *CaptureConfig, ctx context.Context, handler *PcapHandleWrapper)
 	if conf.onNetInterfaceCreated != nil {
 		conf.onNetInterfaceCreated(handler)
 	}
-	if conf.Filename != "" && len(conf.onEveryPacket) == 0 && conf.Output == nil && !conf.Debug {
+	if conf.Filename != "" && len(conf.onEveryPacket) == 0 && len(conf.beforeTransportPacket) == 0 && conf.Output == nil && !conf.Debug {
 		return openOfflineFast(conf, innerCtx, handler)
 	}
 	if conf.Filename == "" && conf.requiresExclusiveHandle() {
