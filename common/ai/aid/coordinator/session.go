@@ -429,7 +429,15 @@ func executeLoop(cfg *aicommon.Config, invoker aicommon.AITaskInvokeRuntime, loo
 	if waitErr, ok := loop.GetVariable("coordinator_wait_error").(error); err == nil && ok {
 		err = waitErr
 	}
-	aicommon.FinalizeSessionSnapshotExecutionForTask(cfg, task, time.Now())
+	status := aicommon.SessionSnapshotStatusFromTask(task)
+	if status == "processing" {
+		if err != nil {
+			status = "aborted"
+		} else {
+			status = "completed"
+		}
+	}
+	cfg.FinalizeSessionSnapshotExecution(status, time.Now())
 	reactloops.EmitSessionSnapshot(cfg, loop, task)
 	return err
 }

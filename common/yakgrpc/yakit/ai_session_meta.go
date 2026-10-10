@@ -637,6 +637,45 @@ func AppendAISessionMetaRelatedRuntimeID(db *gorm.DB, sessionID, runtimeID strin
 		UpdateColumn("related_runtime_ids", string(raw)).Error
 }
 
+// UpdateAISessionMetaSnapshot replaces the materialized snapshot document for
+// one session. Snapshot writers serialize updates per session in memory, so the
+// database only needs to persist the latest complete document atomically.
+func UpdateAISessionMetaSnapshot(db *gorm.DB, sessionID, snapshot string) error {
+	if db == nil {
+		return utils.Errorf("database is nil")
+	}
+	sessionID = strings.TrimSpace(sessionID)
+	if sessionID == "" {
+		return utils.Errorf("session_id is empty")
+	}
+	return db.Model(&schema.AISession{}).
+		Where("session_id = ?", sessionID).
+		UpdateColumn("snapshot", snapshot).Error
+}
+
+// GetAISessionMetaSnapshot returns the raw versioned snapshot document. An
+// absent session or an empty document is reported as an empty string.
+func GetAISessionMetaSnapshot(db *gorm.DB, sessionID string) (string, error) {
+	if db == nil {
+		return "", utils.Errorf("database is nil")
+	}
+	sessionID = strings.TrimSpace(sessionID)
+	if sessionID == "" {
+		return "", utils.Errorf("session_id is empty")
+	}
+	var meta schema.AISession
+	if err := db.Model(&schema.AISession{}).
+		Select("snapshot").
+		Where("session_id = ?", sessionID).
+		First(&meta).Error; err != nil {
+		if gorm.IsRecordNotFoundError(err) {
+			return "", nil
+		}
+		return "", err
+	}
+	return meta.Snapshot, nil
+}
+
 // EnsureAISessionMeta creates session meta if missing. Optional source (first
 // variadic arg, trimmed) is written on insert and backfilled when the row
 // exists but source is still empty.
