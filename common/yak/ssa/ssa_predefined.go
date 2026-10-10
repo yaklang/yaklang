@@ -384,6 +384,12 @@ type anValue struct {
 
 	occultation []int64
 
+	// capturedByClosure is set while compiling, when this value is the
+	// current value of a variable a nested function captures. Const folding
+	// reads it so a later callback can still update the variable. It is not
+	// stored: folding happens before the instruction is saved.
+	capturedByClosure bool
+
 	lazySaveType func()
 }
 

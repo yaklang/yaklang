@@ -631,6 +631,7 @@ func handleSideEffectBind(c *Call, funcTyp *FunctionType) {
 			if builder.SupportClosure {
 				if parentValue, ok := builder.getParentFunctionVariable(se.Name); ok && se.Variable != nil {
 					// the ret variable should be FreeValue
+					noteCapturedByClosure(parentValue, se.Name)
 					para := builder.BuildFreeValueByVariable(se.Variable)
 					para.SetDefault(parentValue)
 					para.SetType(parentValue.GetType())

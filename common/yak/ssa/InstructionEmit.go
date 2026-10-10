@@ -253,7 +253,7 @@ func (f *FunctionBuilder) EmitUnOp(op UnaryOpcode, v Value) Value {
 	}
 	u := NewUnOp(op, v)
 	f.emit(u)
-	if f.valueEscapesViaCapture(v) {
+	if valueCapturedByClosure(v) {
 		return u
 	}
 	if c, ok := ToConstInst(HandlerUnOp(u)); ok {
@@ -275,7 +275,7 @@ func (f *FunctionBuilder) EmitBinOp(op BinaryOpcode, x, y Value) Value {
 	// A closure can store into this variable from inside a later call that
 	// has no side-effect edge (an HTTP handler run by poc.Download). The
 	// reaching value is still the const, but the compare is not.
-	if f.valueEscapesViaCapture(x) || f.valueEscapesViaCapture(y) {
+	if valueCapturedByClosure(x) || valueCapturedByClosure(y) {
 		return binOp
 	}
 	if c, ok := ToConstInst(HandlerBinOp(binOp)); ok {
@@ -285,73 +285,43 @@ func (f *FunctionBuilder) EmitBinOp(op BinaryOpcode, x, y Value) Value {
 	return binOp
 }
 
-// valueEscapesViaCapture reports whether v is the current value of a variable
-// that a nested function captures. Reads of that variable stay in the program
-// so a callback can update them after this instruction is built.
-func (f *FunctionBuilder) valueEscapesViaCapture(v Value) bool {
-	if f == nil || f.Function == nil || v == nil || len(f.ChildFuncs) == 0 {
-		return false
+// markCapturedByClosure records that v is the current value of a variable a
+// nested function captures. Const folding checks this bit instead of walking
+// child functions.
+func markCapturedByClosure(v Value) {
+	if utils.IsNil(v) {
+		return
 	}
-	names := make(map[string]struct{})
-	if last := v.GetLastVariable(); last != nil && last.GetName() != "" {
-		names[last.GetName()] = struct{}{}
+	av := v.getAnValue()
+	if av == nil {
+		return
 	}
-	for name := range v.GetAllVariables() {
-		if name != "" {
-			names[name] = struct{}{}
-		}
-	}
-	if len(names) == 0 {
-		return false
-	}
-	return childCapturesName(f.Function, names)
+	av.capturedByClosure = true
 }
 
-func childCapturesName(fn *Function, names map[string]struct{}) bool {
-	if fn == nil {
+// noteCapturedByClosure marks v and remembers name on the function that owns
+// v. Later assignments of name in that function are marked too.
+func noteCapturedByClosure(v Value, name string) {
+	markCapturedByClosure(v)
+	if name == "" || utils.IsNil(v) {
+		return
+	}
+	fn := v.GetFunc()
+	if fn == nil || fn.builder == nil {
+		return
+	}
+	if fn.builder.capturedNames == nil {
+		fn.builder.capturedNames = make(map[string]struct{})
+	}
+	fn.builder.capturedNames[name] = struct{}{}
+}
+
+func valueCapturedByClosure(v Value) bool {
+	if utils.IsNil(v) {
 		return false
 	}
-	seen := make(map[int64]struct{})
-	var walk func(*Function) bool
-	walk = func(cur *Function) bool {
-		if cur == nil || cur.GetId() <= 0 {
-			return false
-		}
-		if _, ok := seen[cur.GetId()]; ok {
-			return false
-		}
-		seen[cur.GetId()] = struct{}{}
-		for variable := range cur.FreeValues {
-			if variable == nil {
-				continue
-			}
-			if _, ok := names[variable.GetName()]; ok {
-				return true
-			}
-		}
-		for _, id := range cur.ChildFuncs {
-			val, ok := cur.GetValueById(id)
-			if !ok || val == nil {
-				continue
-			}
-			child, ok := ToFunction(val)
-			if ok && walk(child) {
-				return true
-			}
-		}
-		return false
-	}
-	for _, id := range fn.ChildFuncs {
-		val, ok := fn.GetValueById(id)
-		if !ok || val == nil {
-			continue
-		}
-		child, ok := ToFunction(val)
-		if ok && walk(child) {
-			return true
-		}
-	}
-	return false
+	av := v.getAnValue()
+	return av != nil && av.capturedByClosure
 }
 
 func (f *FunctionBuilder) EmitIf() *If {

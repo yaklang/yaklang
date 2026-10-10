@@ -184,6 +184,7 @@ func (b *FunctionBuilder) readValueEx(
 	if enableReadParent {
 		if parentValue, ok := b.getParentFunctionVariable(name); ok {
 			// the ret variable should be FreeValue
+			noteCapturedByClosure(parentValue, name)
 			para := b.BuildFreeValue(name)
 			para.SetDefault(parentValue)
 			para.SetType(parentValue.GetType())
@@ -300,6 +301,9 @@ func (b *FunctionBuilder) AssignVariable(variable *Variable, value Value) {
 	if b == nil || b.CurrentBlock == nil {
 		log.Errorf("assign variable %q: current block is nil (%s)", name, b.builderDebugContext())
 		return
+	}
+	if _, captured := b.capturedNames[name]; captured {
+		markCapturedByClosure(value)
 	}
 	scope := b.CurrentBlock.ScopeTable
 	if utils.IsNil(scope) {
@@ -479,6 +483,7 @@ func (b *FunctionBuilder) AssignVariable(variable *Variable, value Value) {
 			// scope.AssignVariable ran before BuildFreeValue installed the
 			// free-value parameter, so the first branch saw no parent and was
 			// left out of the phi. Register again now that the parameter exists.
+			noteCapturedByClosure(parentValue, variable.GetName())
 			scope.RegisterCapturedVariable(variable)
 		}
 	}
