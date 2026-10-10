@@ -377,6 +377,65 @@ func main() { m := Model{ID: 41}; h := History{Model: &m}; items := [...]*Histor
 	}
 }
 
+// These imports intentionally have no loaded source. Their embedded field sets
+// remain unknown, while an ordinary named field never promotes its members.
+func TestGoUnknownExternalEmbeddedFields(t *testing.T) {
+	cases := []struct {
+		name    string
+		code    string
+		context string
+		invalid bool
+	}{
+		{
+			name: "beego embedded members preserve external context",
+			code: `package main
+import "github.com/beego/beego/v2/server/web"
+type Controller struct { web.Controller; ID int }
+func run(c *Controller) { promoted := c.Ctx.ResponseWriter; own := c.ID; println(promoted); println(own) }`,
+			context: "/web/Controller",
+		},
+		{
+			name: "goldmark embedded writer preserves external context",
+			code: `package main
+import "github.com/yuin/goldmark/renderer/html"
+type Renderer struct { html.Config; ID int }
+func run(r *Renderer) { promoted := r.Writer; own := r.ID; println(promoted); println(own) }`,
+			context: "/renderer/html/Config",
+		},
+		{
+			name: "named external field cannot promote members",
+			code: `package main
+import "github.com/beego/beego/v2/server/web"
+type Controller struct { External web.Controller; ID int }
+func run(c *Controller) { promoted := c.Ctx; own := c.ID; println(promoted); println(own) }`,
+			invalid: true,
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			prog, err := ssaapi.Parse(tc.code, ssaapi.WithLanguage(ssaconfig.GO))
+			require.NoError(t, err)
+			var diagnostics []string
+			for _, diagnostic := range prog.GetErrors() {
+				if diagnostic.Kind == ssa.Error {
+					diagnostics = append(diagnostics, diagnostic.Message)
+				}
+			}
+			own := prog.Ref("own")
+			require.Len(t, own, 1)
+			assert.Equal(t, ssa.NumberTypeKind, own[0].GetTypeKind(), "a known field keeps its declared type beside an unknown embedding")
+			if tc.invalid {
+				assert.Contains(t, strings.Join(diagnostics, "\n"), "has no field Ctx")
+				return
+			}
+			assert.Empty(t, diagnostics, "unknown external fields must not be declared missing")
+			promoted := prog.Ref("promoted")
+			require.Len(t, promoted, 1)
+			assert.Contains(t, strings.Join(ssaapi.GetBareType(promoted[0].GetType()).GetFullTypeNames(), "\n"), tc.context, "external members retain the context needed by library rules")
+		})
+	}
+}
+
 func TestGoEmbeddedFieldsAcrossPackages(t *testing.T) {
 	fs := filesys.NewVirtualFs()
 	fs.AddFile("go.mod", "module example.com/embedded\n\ngo 1.22\n")

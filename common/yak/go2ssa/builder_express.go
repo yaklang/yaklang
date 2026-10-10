@@ -323,8 +323,15 @@ func (b *astbuilder) buildPrimaryExpression(exp *gol.PrimaryExprContext, IslValu
 			} else if value, ok := b.GetProgram().ReadImportValueWithPkg(rv.GetName(), text); ok {
 				rightv = value
 			} else {
-				rightv, _ = readMemberCall(owner, b.EmitConstInstPlaceholder(text))
-				rightv.SetType(HandleFullTypeNames(rightv.GetType(), rv.GetType().GetFullTypeNames()))
+				var isValue bool
+				rightv, isValue = readMemberCall(owner, b.EmitConstInstPlaceholder(text))
+				if isValue {
+					// Unknown external members retain their owner's type context.
+					// Known struct fields above keep their declared field types.
+					rightv.SetType(HandleFullTypeNames(rv.GetType(), rv.GetType().GetFullTypeNames()))
+				} else {
+					rightv.SetType(HandleFullTypeNames(rightv.GetType(), rv.GetType().GetFullTypeNames()))
+				}
 			}
 			// log.Infof("rightv = %v", rightv)
 			// log.Infof("rightv type = %v", rightv.GetType())
