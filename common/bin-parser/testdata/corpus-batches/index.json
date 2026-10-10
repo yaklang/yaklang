@@ -37166,6 +37166,343 @@
         "common/pcapx/pcaputil/mavlink-attitude/controls.json": "controls.json",
         "common/pcapx/pcaputil/mavlink-attitude/validation/expected.json": "validation/expected.json"
       }
+    },
+    {
+      "id": "validation-mavlink-gps",
+      "kind": "validation",
+      "source_sha": "9bfa8f37635e0bbef4ab8470a001c0ff69ff4ed6",
+      "file": "validation-mavlink-gps.zip",
+      "sha256": "84dbddb1784313c9e0839dd44143ead09a256dc63b9669395d0c56d71f5619fb",
+      "password": "bin-parser",
+      "members": {
+        "build.py": {
+          "sha256": "cfcaaffd369eec21cf18702d88d426a90c8b4f37c42fbcb7abadb4f325865f15",
+          "bytes": 4630
+        },
+        "verify-controls.py": {
+          "sha256": "c91376e2800219e7e806d6a0b13e0b8b33adcbdcc1112c6e27aadd667e35e610",
+          "bytes": 1985
+        },
+        "seal.py": {
+          "sha256": "40ac68811f89568e5be3b236a3d4215d3f4c25eb0c8baa77fca6ec394d685d50",
+          "bytes": 3709
+        },
+        "LICENSE.txt": {
+          "sha256": "d1d4f28d073aa80b66799e02f32b7618e7d96585d68cf6b5248a3fc6ada731a5",
+          "bytes": 270
+        },
+        "source-pin.json": {
+          "sha256": "e004ec75a59962fd0491c8ad8df0458928379d5aef99dd7301b53966a38babe8",
+          "bytes": 1408
+        },
+        "reference-encode.c": {
+          "sha256": "fa2e72eaa6dd364d9eff950248eda71f8a2feee8ce0526e0d2fc2d8c68345e90",
+          "bytes": 1836
+        },
+        "reference-encoded.jsonl": {
+          "sha256": "d514cf5046bd93d7dcb0a193f3aab80ce78665967ae6fb8e0ea7b9ed8c38f71a",
+          "bytes": 2727
+        },
+        "cases/v1-signed-position.pcap": {
+          "sha256": "6ee1117c333e9e4268692d0781dc54cec799416bf8c497932c7d55490d9ff4d7",
+          "bytes": 120
+        },
+        "answers/v1-signed-position.json": {
+          "sha256": "91a60e989a2cb15287c49b372833e1166a6b47de6675e3c55395585a57d1b8f2",
+          "bytes": 1648
+        },
+        "cases/v2-signed-position.pcap": {
+          "sha256": "5e8ca724301bd00c352cb674cec1748b82ebc498f3336df45e1efe6864064638",
+          "bytes": 146
+        },
+        "answers/v2-signed-position.json": {
+          "sha256": "3ef1be087bf0f5770aff75309016db8e97d3b7f84b8f928d1076e2aae5885d5a",
+          "bytes": 2019
+        },
+        "cases/v1-unknown-sentinels.pcap": {
+          "sha256": "ed461f9808b8767ca67f2caed645b2bd9e858f39b90ec282c9e9b6c35b931fb6",
+          "bytes": 120
+        },
+        "answers/v1-unknown-sentinels.json": {
+          "sha256": "a59e2647f446f1b75dc1bc0a20e93ad7856ab4c525699601e5db53066a60f4e5",
+          "bytes": 1664
+        },
+        "cases/v2-unknown-sentinels.pcap": {
+          "sha256": "97c9b8e44e76f9baa73e4cadd9fa317abb561d9a5c88d142d17dbdfa6fe4689e",
+          "bytes": 146
+        },
+        "answers/v2-unknown-sentinels.json": {
+          "sha256": "3d6ad8e0c8dfe78c79ac6ec2232b66748acd13786af6127fea77269f11e28074",
+          "bytes": 2022
+        },
+        "cases/v1-uint64-exact.pcap": {
+          "sha256": "1a9a546d8664719f77b5e3a298a682b718fb0aa95239c9c061c5d365aa87fbbb",
+          "bytes": 120
+        },
+        "answers/v1-uint64-exact.json": {
+          "sha256": "c63d3392364238c05c219451343b60b39cad74980744cd0da0f3689f512594ba",
+          "bytes": 1614
+        },
+        "cases/v2-uint64-exact.pcap": {
+          "sha256": "2a634f31cf2de683fad47be96decdbaad7f397f40c44cbd666a72f3725d14c8f",
+          "bytes": 124
+        },
+        "answers/v2-uint64-exact.json": {
+          "sha256": "d497d320c427932275760afc67a60aec2b543176cd94825418ddbff6b47dac3e",
+          "bytes": 1881
+        },
+        "cases/v1-zero-tail.pcap": {
+          "sha256": "8199514735426967aad75d7ac9341d118f6914b0f5679a09f743492823ad7624",
+          "bytes": 120
+        },
+        "answers/v1-zero-tail.json": {
+          "sha256": "bd0a1ffeeff8bff7cb157f4685068d6a1137145600ef934c6269c5afa12b0751",
+          "bytes": 1575
+        },
+        "cases/v2-zero-tail.pcap": {
+          "sha256": "1d22858391276b64f222282205e89fc51ee618d7f91ab875c8dc336b2d61d27d",
+          "bytes": 95
+        },
+        "answers/v2-zero-tail.json": {
+          "sha256": "dfb9dd496e578536d83e9bbf3c03aea465df4483458a3113dfbbe48a1d22a4b3",
+          "bytes": 1726
+        },
+        "cases/v2-opaque-signature.pcap": {
+          "sha256": "a8b849465e16a514693eab5c9c3ed3277a00119a83344b31f795bca663c1b126",
+          "bytes": 159
+        },
+        "answers/v2-opaque-signature.json": {
+          "sha256": "badbcd3adfbdcd33c4e8308c032a5b6b4d3dead567861b7b4f6b5b806c65a555",
+          "bytes": 2129
+        },
+        "cases/copacked-v1-v2.pcap": {
+          "sha256": "4e7c74cbb808eff6d4294d787ca889e69e90fb69d6714b0fdd3d9d295385e853",
+          "bytes": 184
+        },
+        "answers/copacked-v1-v2.json": {
+          "sha256": "81cf4521700bc2fe79c9812b75319097e486c2e9187a3b9890514a01c7530b6e",
+          "bytes": 2972
+        },
+        "cases/v2-partial-8.pcap": {
+          "sha256": "cc84e2f93518b7e593a89b0ee5a6d483a0a14e3a57d97dbb796713b321ef5a10",
+          "bytes": 102
+        },
+        "answers/v2-partial-8.json": {
+          "sha256": "e66380cafae9203eb91c1d4a91b4274bf494f676ea2b6d2d9c510aa328f92847",
+          "bytes": 1769
+        },
+        "cases/v2-partial-29.pcap": {
+          "sha256": "cd8a9fcf365e90cf72ce02aaf253dfb7c6ebafd9555a3384fb266f420ab6902f",
+          "bytes": 123
+        },
+        "answers/v2-partial-29.json": {
+          "sha256": "ba98a6161ee7a85ca7d653e7a30aa210b038be1b85f5cc83a5ce1a9524ba32f4",
+          "bytes": 1890
+        },
+        "cases/v2-partial-31.pcap": {
+          "sha256": "a7eb8596daae81797a31c48736e5d8c1e840e0a0bc72239bb5791e2e32baaa03",
+          "bytes": 125
+        },
+        "answers/v2-partial-31.json": {
+          "sha256": "26ba08871325215a98abbc941ebb7f816a6708fabd077772ec20e053b428682c",
+          "bytes": 1900
+        },
+        "cases/v2-partial-35.pcap": {
+          "sha256": "c05feca0f4469b08b66b31077df5071bf6af6f178987e0c9733750cef85b4b61",
+          "bytes": 129
+        },
+        "answers/v2-partial-35.json": {
+          "sha256": "4f7246c74abf76ec40fd3d12c6bd0b39f2eebc08bba9d4d010b9e3cdf032bbc3",
+          "bytes": 1920
+        },
+        "cases/v2-partial-39.pcap": {
+          "sha256": "12a6072aa7df30453ba523179ac5fa83a1446108f27a75e23fb57dfd4f49df0b",
+          "bytes": 133
+        },
+        "answers/v2-partial-39.json": {
+          "sha256": "b2ed8567326f3c12ea6364851e89d47b422f8a875c42e836e731e564a486e5f8",
+          "bytes": 1939
+        },
+        "cases/v2-partial-43.pcap": {
+          "sha256": "f1afb9b8f297f14c31a2d2a9c6d5ce61941a242ce5c5ede984ca07f968d0cf13",
+          "bytes": 137
+        },
+        "answers/v2-partial-43.json": {
+          "sha256": "730a14b8acff53b098279286ca223dd116ed295ff143a89ed741a80b3cf8291d",
+          "bytes": 1957
+        },
+        "cases/v2-partial-47.pcap": {
+          "sha256": "12d503b535aa1f050c0dd631dd0017d740e2e5afc60a4c5dce0dffab8c6987a7",
+          "bytes": 141
+        },
+        "answers/v2-partial-47.json": {
+          "sha256": "ebfa57cc9caca096565752ef0f51d66dd70cda5458b70220acdaa33b3559001b",
+          "bytes": 1974
+        },
+        "cases/v2-partial-51.pcap": {
+          "sha256": "996e05d31e902aaf02aa034368e09495d3c834a207bc690d3a4c173a63ef0cde",
+          "bytes": 145
+        },
+        "answers/v2-partial-51.json": {
+          "sha256": "67fa830994461795a51ecfdd551cfdc6e06f4e6011a271a8bb900e5551b1c709",
+          "bytes": 1993
+        },
+        "cases/bad-crc.pcap": {
+          "sha256": "6533ad1e9468c7669837d3dcdd86640c01995ae66bbcd2775559a1c6c01bde14",
+          "bytes": 146
+        },
+        "answers/bad-crc.json": {
+          "sha256": "1f43f0027410d37cdef58b7b2462035a772402b2a7dac18415a32531c2871677",
+          "bytes": 778
+        },
+        "cases/wrong-crc-extra.pcap": {
+          "sha256": "c33f9d429cc29e8164a14727ef5f18a1a26b9c817b5aa777c12ddff059374b28",
+          "bytes": 146
+        },
+        "answers/wrong-crc-extra.json": {
+          "sha256": "6530d3c2b328d5ee51e12d4b83a82fcc51a9114e1b035ed14380361e83ba4b29",
+          "bytes": 810
+        },
+        "cases/v1-short-definition.pcap": {
+          "sha256": "7ef8112faa4be5c6721fc42ce22d542754fb4f064e0669a9bd772ad21a0f26d4",
+          "bytes": 119
+        },
+        "answers/v1-short-definition.json": {
+          "sha256": "19a13b2ddd303724e508c6aca3d0e0b36f33760b23ff764f2655dc505e56a5c5",
+          "bytes": 772
+        },
+        "cases/v1-extensions.pcap": {
+          "sha256": "435322ca03b627972c714657823bc207d17019e5429d5c1f4ceef8c15d1dc2ca",
+          "bytes": 142
+        },
+        "answers/v1-extensions.json": {
+          "sha256": "893f85e3e63f3491e79a60d89716cbc955b0a7f51becb394abf4bf468d4f01db",
+          "bytes": 794
+        },
+        "cases/v2-empty-payload.pcap": {
+          "sha256": "3d6ee3e31b3ad0a463e21e6bd159c4fb3b6cf8d03a4ea4903da593273b490d45",
+          "bytes": 94
+        },
+        "answers/v2-empty-payload.json": {
+          "sha256": "a905a2f925191e0c3ed9f8cef5776d7d6c5a532527e907b15282930aa9486fc1",
+          "bytes": 710
+        },
+        "cases/v2-over-definition.pcap": {
+          "sha256": "d7578df1fc5355c818ddf591642ac0afd3f35ca07515c9ef21b96b260daebb48",
+          "bytes": 147
+        },
+        "answers/v2-over-definition.json": {
+          "sha256": "737c4e7d8bf78c36cf7ca1fa25c048b4f94c5990a363a77690fd071ac0b60975",
+          "bytes": 824
+        },
+        "cases/unknown-incompatibility.pcap": {
+          "sha256": "6a38d9a3d75deacc86214ef7f0f08f42dcf815a102a3de879001b79bc202d82f",
+          "bytes": 146
+        },
+        "answers/unknown-incompatibility.json": {
+          "sha256": "aa896b75924636bdcddc57d3a45f1c63131a7422bc15340ab8cdf21862744766",
+          "bytes": 844
+        },
+        "cases/short-signature.pcap": {
+          "sha256": "c3d3a8d8208378fcdf369faf5cd0307c4b2c3c1d3e07217bf8fb4f1b3341c745",
+          "bytes": 158
+        },
+        "answers/short-signature.json": {
+          "sha256": "02c0d70bb445981a7998c8cd547173c3e13a07e8a396d27f6d58f4469a85bfc9",
+          "bytes": 826
+        },
+        "cases/bad-copacked-tail.pcap": {
+          "sha256": "b5ebdc8425eb9ab2b8b973a0012f4472ce41e1f80054d8006e9203bc3a711d44",
+          "bytes": 210
+        },
+        "answers/bad-copacked-tail.json": {
+          "sha256": "08e271c9b18ca013948f9a693cf10d1767620466d6452b224d2e1231e6a2cb45",
+          "bytes": 946
+        },
+        "cases/truncated-datagram.pcap": {
+          "sha256": "abfe56fc3ca1618d1bb4039c3e32a3a22ca7f75efa0c732d8290ad221d48095b",
+          "bytes": 145
+        },
+        "answers/truncated-datagram.json": {
+          "sha256": "733f9a66b9ce976ba1aab77c20302ae63ad556390d2d4b0e72c9cb2c6338c97c",
+          "bytes": 812
+        },
+        "controls.json": {
+          "sha256": "ca454b63c05862ec86330c037ed027bbfd631a9c3f69221081249d9770b62873",
+          "bytes": 49844
+        },
+        "validation/expected.json": {
+          "sha256": "a01096f3443b3475ddd3b3a6b4f5f2c692b10c86b5c7a2fd55e8658cccc521e9",
+          "bytes": 31461
+        }
+      },
+      "aliases": {
+        "common/pcapx/pcaputil/mavlink-gps/build.py": "build.py",
+        "common/pcapx/pcaputil/mavlink-gps/verify-controls.py": "verify-controls.py",
+        "common/pcapx/pcaputil/mavlink-gps/seal.py": "seal.py",
+        "common/pcapx/pcaputil/mavlink-gps/LICENSE.txt": "LICENSE.txt",
+        "common/pcapx/pcaputil/mavlink-gps/source-pin.json": "source-pin.json",
+        "common/pcapx/pcaputil/mavlink-gps/reference-encode.c": "reference-encode.c",
+        "common/pcapx/pcaputil/mavlink-gps/reference-encoded.jsonl": "reference-encoded.jsonl",
+        "common/pcapx/pcaputil/mavlink-gps/cases/v1-signed-position.pcap": "cases/v1-signed-position.pcap",
+        "common/pcapx/pcaputil/mavlink-gps/answers/v1-signed-position.json": "answers/v1-signed-position.json",
+        "common/pcapx/pcaputil/mavlink-gps/cases/v2-signed-position.pcap": "cases/v2-signed-position.pcap",
+        "common/pcapx/pcaputil/mavlink-gps/answers/v2-signed-position.json": "answers/v2-signed-position.json",
+        "common/pcapx/pcaputil/mavlink-gps/cases/v1-unknown-sentinels.pcap": "cases/v1-unknown-sentinels.pcap",
+        "common/pcapx/pcaputil/mavlink-gps/answers/v1-unknown-sentinels.json": "answers/v1-unknown-sentinels.json",
+        "common/pcapx/pcaputil/mavlink-gps/cases/v2-unknown-sentinels.pcap": "cases/v2-unknown-sentinels.pcap",
+        "common/pcapx/pcaputil/mavlink-gps/answers/v2-unknown-sentinels.json": "answers/v2-unknown-sentinels.json",
+        "common/pcapx/pcaputil/mavlink-gps/cases/v1-uint64-exact.pcap": "cases/v1-uint64-exact.pcap",
+        "common/pcapx/pcaputil/mavlink-gps/answers/v1-uint64-exact.json": "answers/v1-uint64-exact.json",
+        "common/pcapx/pcaputil/mavlink-gps/cases/v2-uint64-exact.pcap": "cases/v2-uint64-exact.pcap",
+        "common/pcapx/pcaputil/mavlink-gps/answers/v2-uint64-exact.json": "answers/v2-uint64-exact.json",
+        "common/pcapx/pcaputil/mavlink-gps/cases/v1-zero-tail.pcap": "cases/v1-zero-tail.pcap",
+        "common/pcapx/pcaputil/mavlink-gps/answers/v1-zero-tail.json": "answers/v1-zero-tail.json",
+        "common/pcapx/pcaputil/mavlink-gps/cases/v2-zero-tail.pcap": "cases/v2-zero-tail.pcap",
+        "common/pcapx/pcaputil/mavlink-gps/answers/v2-zero-tail.json": "answers/v2-zero-tail.json",
+        "common/pcapx/pcaputil/mavlink-gps/cases/v2-opaque-signature.pcap": "cases/v2-opaque-signature.pcap",
+        "common/pcapx/pcaputil/mavlink-gps/answers/v2-opaque-signature.json": "answers/v2-opaque-signature.json",
+        "common/pcapx/pcaputil/mavlink-gps/cases/copacked-v1-v2.pcap": "cases/copacked-v1-v2.pcap",
+        "common/pcapx/pcaputil/mavlink-gps/answers/copacked-v1-v2.json": "answers/copacked-v1-v2.json",
+        "common/pcapx/pcaputil/mavlink-gps/cases/v2-partial-8.pcap": "cases/v2-partial-8.pcap",
+        "common/pcapx/pcaputil/mavlink-gps/answers/v2-partial-8.json": "answers/v2-partial-8.json",
+        "common/pcapx/pcaputil/mavlink-gps/cases/v2-partial-29.pcap": "cases/v2-partial-29.pcap",
+        "common/pcapx/pcaputil/mavlink-gps/answers/v2-partial-29.json": "answers/v2-partial-29.json",
+        "common/pcapx/pcaputil/mavlink-gps/cases/v2-partial-31.pcap": "cases/v2-partial-31.pcap",
+        "common/pcapx/pcaputil/mavlink-gps/answers/v2-partial-31.json": "answers/v2-partial-31.json",
+        "common/pcapx/pcaputil/mavlink-gps/cases/v2-partial-35.pcap": "cases/v2-partial-35.pcap",
+        "common/pcapx/pcaputil/mavlink-gps/answers/v2-partial-35.json": "answers/v2-partial-35.json",
+        "common/pcapx/pcaputil/mavlink-gps/cases/v2-partial-39.pcap": "cases/v2-partial-39.pcap",
+        "common/pcapx/pcaputil/mavlink-gps/answers/v2-partial-39.json": "answers/v2-partial-39.json",
+        "common/pcapx/pcaputil/mavlink-gps/cases/v2-partial-43.pcap": "cases/v2-partial-43.pcap",
+        "common/pcapx/pcaputil/mavlink-gps/answers/v2-partial-43.json": "answers/v2-partial-43.json",
+        "common/pcapx/pcaputil/mavlink-gps/cases/v2-partial-47.pcap": "cases/v2-partial-47.pcap",
+        "common/pcapx/pcaputil/mavlink-gps/answers/v2-partial-47.json": "answers/v2-partial-47.json",
+        "common/pcapx/pcaputil/mavlink-gps/cases/v2-partial-51.pcap": "cases/v2-partial-51.pcap",
+        "common/pcapx/pcaputil/mavlink-gps/answers/v2-partial-51.json": "answers/v2-partial-51.json",
+        "common/pcapx/pcaputil/mavlink-gps/cases/bad-crc.pcap": "cases/bad-crc.pcap",
+        "common/pcapx/pcaputil/mavlink-gps/answers/bad-crc.json": "answers/bad-crc.json",
+        "common/pcapx/pcaputil/mavlink-gps/cases/wrong-crc-extra.pcap": "cases/wrong-crc-extra.pcap",
+        "common/pcapx/pcaputil/mavlink-gps/answers/wrong-crc-extra.json": "answers/wrong-crc-extra.json",
+        "common/pcapx/pcaputil/mavlink-gps/cases/v1-short-definition.pcap": "cases/v1-short-definition.pcap",
+        "common/pcapx/pcaputil/mavlink-gps/answers/v1-short-definition.json": "answers/v1-short-definition.json",
+        "common/pcapx/pcaputil/mavlink-gps/cases/v1-extensions.pcap": "cases/v1-extensions.pcap",
+        "common/pcapx/pcaputil/mavlink-gps/answers/v1-extensions.json": "answers/v1-extensions.json",
+        "common/pcapx/pcaputil/mavlink-gps/cases/v2-empty-payload.pcap": "cases/v2-empty-payload.pcap",
+        "common/pcapx/pcaputil/mavlink-gps/answers/v2-empty-payload.json": "answers/v2-empty-payload.json",
+        "common/pcapx/pcaputil/mavlink-gps/cases/v2-over-definition.pcap": "cases/v2-over-definition.pcap",
+        "common/pcapx/pcaputil/mavlink-gps/answers/v2-over-definition.json": "answers/v2-over-definition.json",
+        "common/pcapx/pcaputil/mavlink-gps/cases/unknown-incompatibility.pcap": "cases/unknown-incompatibility.pcap",
+        "common/pcapx/pcaputil/mavlink-gps/answers/unknown-incompatibility.json": "answers/unknown-incompatibility.json",
+        "common/pcapx/pcaputil/mavlink-gps/cases/short-signature.pcap": "cases/short-signature.pcap",
+        "common/pcapx/pcaputil/mavlink-gps/answers/short-signature.json": "answers/short-signature.json",
+        "common/pcapx/pcaputil/mavlink-gps/cases/bad-copacked-tail.pcap": "cases/bad-copacked-tail.pcap",
+        "common/pcapx/pcaputil/mavlink-gps/answers/bad-copacked-tail.json": "answers/bad-copacked-tail.json",
+        "common/pcapx/pcaputil/mavlink-gps/cases/truncated-datagram.pcap": "cases/truncated-datagram.pcap",
+        "common/pcapx/pcaputil/mavlink-gps/answers/truncated-datagram.json": "answers/truncated-datagram.json",
+        "common/pcapx/pcaputil/mavlink-gps/controls.json": "controls.json",
+        "common/pcapx/pcaputil/mavlink-gps/validation/expected.json": "validation/expected.json"
+      }
     }
   ],
   "schema_version": 1,

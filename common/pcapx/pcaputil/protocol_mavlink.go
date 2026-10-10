@@ -11,7 +11,7 @@ import (
 // The common-field profile is pinned to mavlink/c_library_v2 commit
 // 28eae47457249ab6c8c1cadd104fcbe25eacd7a3 and mavlink/mavlink XML commit
 // dccd82c4ba56a721aa5bd760498cbf5f2338012b. It admits only HEARTBEAT,
-// SYS_STATUS, ATTITUDE and GLOBAL_POSITION_INT; a checksum cannot identify a dialect or
+// SYS_STATUS, GPS_RAW_INT, ATTITUDE and GLOBAL_POSITION_INT; a checksum cannot identify a dialect or
 // authenticate the sender. A v2 signature is retained as opaque observed bytes.
 // https://mavlink.io/en/guide/serialization.html
 type mavlinkMessage struct {
@@ -32,6 +32,8 @@ func mavlinkDefinitionFor(id uint32) (mavlinkDefinition, bool) {
 		return mavlinkDefinition{"HEARTBEAT", 9, 9, 50}, true
 	case 1:
 		return mavlinkDefinition{"SYS_STATUS", 31, 43, 124}, true
+	case 24:
+		return mavlinkDefinition{"GPS_RAW_INT", 30, 52, 24}, true
 	case 30:
 		return mavlinkDefinition{"ATTITUDE", 28, 28, 39}, true
 	case 33:
@@ -109,6 +111,9 @@ func mavlinkFrameSize(w []byte, maxMessage int) (int, mavlinkDefinition, error) 
 }
 
 func mavlinkProfile(w []byte) string {
+	if len(w) >= 6 && w[0] == 0xfe && w[5] == 24 || len(w) >= 10 && w[0] == 0xfd && w[7] == 24 && w[8] == 0 && w[9] == 0 {
+		return "mavlink-common-gps-raw-int"
+	}
 	if len(w) >= 6 && w[0] == 0xfe && w[5] == 30 || len(w) >= 10 && w[0] == 0xfd && w[7] == 30 && w[8] == 0 && w[9] == 0 {
 		return "mavlink-common-attitude"
 	}
@@ -136,6 +141,9 @@ func probeMAVLink(w []byte, limit int) ProbeResult {
 }
 
 func mavlinkProbeProfile(w []byte) string {
+	if mavlinkProfile(w) == "mavlink-common-gps-raw-int" {
+		return "v1/v2-common-gps-raw-int"
+	}
 	if mavlinkProfile(w) == "mavlink-common-attitude" {
 		return "v1/v2-common-attitude"
 	}
@@ -170,6 +178,9 @@ func decodeMAVLinkDatagramBudget(w []byte, maxMessage, maxMessages, maxDepth int
 		if mavlinkProfile(w[at:]) == "mavlink-common-attitude" && maxDepth < 3 {
 			return nil, protocolError(ErrResourceExceeded, "MAVLink ATTITUDE field projection exceeds configured depth")
 		}
+		if mavlinkProfile(w[at:]) == "mavlink-common-gps-raw-int" && maxDepth < 2 {
+			return nil, protocolError(ErrResourceExceeded, "MAVLink GPS_RAW_INT field projection exceeds configured depth")
+		}
 		at += n
 		count++
 	}
@@ -194,7 +205,7 @@ func mavlinkFields(raw []byte, def mavlinkDefinition) map[string]any {
 		id = uint32(raw[7]) | uint32(raw[8])<<8 | uint32(raw[9])<<16
 	}
 	payloadLength := int(raw[1])
-	var p [43]byte
+	var p [52]byte
 	copy(p[:], raw[header:header+payloadLength])
 	fields := map[string]any{
 		"Version": version, "Payload Length": payloadLength,
@@ -226,6 +237,21 @@ func mavlinkFields(raw []byte, def mavlinkDefinition) map[string]any {
 			message["onboard_control_sensors_present_extended"] = u32(31)
 			message["onboard_control_sensors_enabled_extended"] = u32(35)
 			message["onboard_control_sensors_health_extended"] = u32(39)
+		}
+	case 24:
+		// Literal common-dialect integers, including unknown-value sentinels.
+		// time_usec may be epoch or boot-relative; no time origin, fix quality
+		// or physical position is inferred. v1 has no extension fields.
+		message = map[string]any{
+			"time_usec": binary.LittleEndian.Uint64(p[:8]), "lat": int32(u32(8)), "lon": int32(u32(12)), "alt": int32(u32(16)),
+			"eph": u16(20), "epv": u16(22), "vel": u16(24), "cog": u16(26), "fix_type": p[28], "satellites_visible": p[29],
+		}
+		if version == 2 {
+			message["alt_ellipsoid"] = int32(u32(30))
+			message["h_acc"], message["v_acc"] = u32(34), u32(38)
+			message["vel_acc"], message["hdg_acc"] = u32(42), u32(46)
+			message["yaw"] = u16(50)
+			fields["Payload Zero Fill Bytes"] = 52 - payloadLength
 		}
 	case 33:
 		message = map[string]any{"time_boot_ms": u32(0), "lat": int32(u32(4)), "lon": int32(u32(8)), "alt": int32(u32(12)), "relative_alt": int32(u32(16)), "vx": int16(u16(20)), "vy": int16(u16(22)), "vz": int16(u16(24)), "hdg": u16(26)}

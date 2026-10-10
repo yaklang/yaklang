@@ -60,6 +60,7 @@ func mavlinkTestPayload(id uint32) []byte {
 
 func TestMAVLinkCompleteFields(t *testing.T) {
 	t.Run("attitude", testMAVLinkAttitudeMatrix)
+	t.Run("gps-raw-int", testMAVLinkGPSMatrix)
 	for _, version := range []int{1, 2} {
 		for _, id := range []uint32{0, 1, 33} {
 			def, _ := mavlinkDefinitionFor(id)
@@ -157,6 +158,7 @@ func TestMAVLinkV2ZeroTailAndOpaqueSignature(t *testing.T) {
 
 func TestMAVLinkFailsClosedAndDatagramBoundaries(t *testing.T) {
 	t.Run("attitude-budgets", testMAVLinkAttitudeBudgets)
+	t.Run("gps-budgets", testMAVLinkGPSBudgets)
 	valid := mavlinkTestFrame(2, 0, mavlinkTestPayload(0), 0, 50)
 	controls := map[string][]byte{
 		"bad-crc":                    append(bytes.Clone(valid[:len(valid)-1]), valid[len(valid)-1]^1),
