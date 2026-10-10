@@ -29,6 +29,12 @@ type CaptureReader struct {
 }
 
 func NewCaptureReader(input io.Reader) (*CaptureReader, error) {
+	return NewCaptureReaderWithOptions(input, PcapReaderOptions{})
+}
+
+// NewCaptureReaderWithOptions applies explicit classic PCAP metadata policy.
+// PCAPNG retains its existing strict block/record validation unchanged.
+func NewCaptureReaderWithOptions(input io.Reader, opts PcapReaderOptions) (*CaptureReader, error) {
 	b := bufio.NewReader(input)
 	magic, err := b.Peek(4)
 	if err != nil {
@@ -49,7 +55,7 @@ func NewCaptureReader(input io.Reader) (*CaptureReader, error) {
 			}
 		}
 	} else {
-		r.classic, err = newClassicPcapReader(b)
+		r.classic, err = NewBoundedPcapReaderWithOptions(b, opts)
 		if err == nil {
 			r.link = r.classic.link
 		}
@@ -129,7 +135,7 @@ func NewPacketAnalyzer(options ...CaptureOption) (*PacketAnalyzer, error) {
 			return nil, err
 		}
 	}
-	if c.captureBuffer > 0 || c.BPFFilter != "" || c.Filename != "" || len(c.Device) != 0 || len(c.DeviceAdapter) != 0 || c.deviceAdapter != nil || c.outputFile != "" || c.Output != nil || c.onNetInterfaceCreated != nil || c.mock != nil || c.DisableAssembly || c.EnableCache {
+	if c.normalizePcapLength || c.captureBuffer > 0 || c.BPFFilter != "" || c.Filename != "" || len(c.Device) != 0 || len(c.DeviceAdapter) != 0 || c.deviceAdapter != nil || c.outputFile != "" || c.Output != nil || c.onNetInterfaceCreated != nil || c.mock != nil || c.DisableAssembly || c.EnableCache {
 		return nil, fmt.Errorf("PacketAnalyzer does not support capture-source, BPF, recording, cache, or disabled-reassembly options")
 	}
 	if err := c.prepareBinParser(); err != nil {
