@@ -215,11 +215,14 @@ func decodeDLMSBudget(w []byte, maxElements, depth int) (*dlmsMessage, error) {
 		if info[1] != 0xe6 {
 			return bad("Get request uses response LLC")
 		}
-		if len(p) != 13 {
-			return bad("Get-normal descriptor length differs from complete APDU")
+		if len(p) < 13 {
+			return bad("Get-normal descriptor is truncated")
 		}
-		if p[12] != 0 {
-			return unsupported("selective access is outside this profile")
+		if p[12] != 0 && p[12] != 1 {
+			return unsupported("selected optional access selection0/1")
+		}
+		if p[12] == 0 && len(p) != 13 {
+			return bad("Get-normal descriptor has trailing bytes")
 		}
 		if p[11] == 0 || p[11] > 127 {
 			return unsupported("attribute outside positive signed8 profile")
@@ -228,7 +231,22 @@ func decodeDLMSBudget(w []byte, maxElements, depth int) (*dlmsMessage, error) {
 		f["Class ID"] = binary.BigEndian.Uint16(p[3:5])
 		f["Logical Name"] = fmt.Sprintf("%d.%d.%d.%d.%d.%d", p[5], p[6], p[7], p[8], p[9], p[10])
 		f["Attribute ID"] = int8(p[11])
-		f["Selective Access"] = false
+		f["Selective Access"] = p[12] == 1
+		if p[12] == 1 {
+			if len(p) < 14 {
+				return bad("Get-normal access selector is missing")
+			}
+			parameter, err := dlmsNormalDataAt(p, 14, maxElements, depth)
+			if err != nil {
+				return nil, err
+			}
+			// Only observe the selector and its complete Data parameter. Object
+			// semantics, permissions and negotiated access are not established.
+			f["Access Selection Raw"] = p[12]
+			f["Access Selector"] = p[13]
+			f["Access Parameters"] = parameter
+			f["Selector Semantics Verified"] = false
+		}
 	} else {
 		if info[1] != 0xe7 {
 			return bad("Get response uses request LLC")
@@ -390,15 +408,21 @@ func probeDLMS(w []byte, limit int) ProbeResult {
 	}
 	elements := 4096
 	list := dlmsListAPDU(w[:n])
-	if list != nil || dlmsNormalExtended(dlmsAPDU(w[:n])) {
+	apdu := dlmsAPDU(w[:n])
+	if list != nil || dlmsNormalExtended(apdu) || dlmsNormalAccess(apdu) {
 		// Probe never admits unsolicited responses. Check frame integrity with
-		// a zero Data pool instead of expanding a response before reservation.
+		// a zero Data pool; selected requests expand only after reservation too.
 		elements = 0
 	}
 	m, e := decodeDLMS(w[:n], elements)
 	var pe *ProtocolError
-	if len(list) != 0 && errors.As(e, &pe) && pe.Kind == ErrResourceExceeded && list[0] == 0xc0 {
-		return probeAccept("dlms", "hdlc-get-list", 98)
+	if errors.As(e, &pe) && pe.Kind == ErrResourceExceeded {
+		if len(list) != 0 && list[0] == 0xc0 {
+			return probeAccept("dlms", "hdlc-get-list", 98)
+		}
+		if dlmsNormalAccess(apdu) {
+			return probeAccept("dlms", "hdlc-get-normal", 98)
+		}
 	}
 	if e != nil || !m.request {
 		return ProbeResult{Verdict: ProbeReject}

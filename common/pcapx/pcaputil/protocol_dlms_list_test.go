@@ -119,7 +119,11 @@ func dlmsListAssert(t *testing.T, c dlmsListControl, events []*ProtocolEvent) {
 		require.NoError(t, err)
 		rocEqualFields(t, w.Fields, protocolFields(v))
 		f["Observation"] = "caller-mutated"
-		if data, ok := f["Data Value"].(map[string]any); ok {
+		for _, key := range []string{"Data Value", "Access Parameters"} {
+			data, ok := f[key].(map[string]any)
+			if !ok {
+				continue
+			}
 			data["raw_hex"] = "caller-mutated"
 			for _, key := range []string{"elements", "rows"} {
 				if children, ok := data[key].([]map[string]any); ok && len(children) > 0 {

@@ -37,6 +37,9 @@ func dlmsNormalExtended(p []byte) bool {
 	return len(p) > 4 && p[0] == 0xc4 && p[1] == 1 && p[3] == 0 &&
 		(p[4] == 1 || p[4] == 2 || wrapperExtendedScalarTag(p[4]))
 }
+func dlmsNormalAccess(p []byte) bool {
+	return len(p) >= 13 && p[0] == 0xc0 && p[1] == 1 && p[12] == 1
+}
 func dlmsProfile(w []byte) string {
 	if dlmsListAPDU(w) != nil {
 		return "dlms-hdlc-get-list"
@@ -53,11 +56,15 @@ func dlmsProjection(w []byte) int64 {
 		}
 		return 32768 + 512*int64(len(w)) + 2048*int64(nodes) + 8192*int64(min(wrapperListItems, max(0, len(p)-4)/2))
 	}
-	if p := dlmsAPDU(w); dlmsNormalExtended(p) {
+	if p := dlmsAPDU(w); dlmsNormalExtended(p) || dlmsNormalAccess(p) {
+		at := 4
+		if dlmsNormalAccess(p) {
+			at = 14 // normal descriptor, selection flag and selector
+		}
 		// Every ordinary descendant needs a tag byte. Compact rows reuse their
 		// description, so reserve the entire bounded expansion pool when found.
-		nodes := min(wrapperDataNodes, len(p)-4)
-		probe := wrapperCompactProbe{wire: p, at: 4}
+		nodes := min(wrapperDataNodes, max(0, len(p)-at))
+		probe := wrapperCompactProbe{wire: p, at: at}
 		if compact, _ := probe.data(0); compact {
 			nodes = wrapperDataNodes
 		}
@@ -66,7 +73,10 @@ func dlmsProjection(w []byte) int64 {
 	return int64(len(w)) * 6
 }
 func dlmsNormalData(p []byte, limit, depth int) (map[string]any, error) {
-	c := wrapperListCursor{wire: p, at: 4, maxDepth: depth}
+	return dlmsNormalDataAt(p, 4, limit, depth)
+}
+func dlmsNormalDataAt(p []byte, at, limit, depth int) (map[string]any, error) {
+	c := wrapperListCursor{wire: p, at: at, maxDepth: depth}
 	data, err := c.data(limit, 0)
 	if err == nil && c.at != len(p) {
 		err = dlmsError(ErrMalformedMessage, "Get-normal Data has trailing bytes")

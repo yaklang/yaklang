@@ -30369,6 +30369,469 @@
         "common/pcapx/pcaputil/dlms-hdlc-normal-data/required-tests-traffic-unified-v12.json": "required-tests-traffic-unified-v12.json",
         "scripts/protocol-tests/required-tests-traffic-unified-v12.json": "required-tests-traffic-unified-v12.json"
       }
+    },
+    {
+      "id": "validation-dlms-hdlc-normal-access",
+      "kind": "validation",
+      "source_sha": "e61fff814911919915802805a091893865bf5afb",
+      "file": "validation-dlms-hdlc-normal-access.zip",
+      "sha256": "a2f7366601726c912c688df435f9684aac4de3b9191c8f9491011dee470aa33b",
+      "password": "bin-parser",
+      "members": {
+        "build.py": {
+          "sha256": "41507a179e7443587d37855e24d754afb64cb5d645aa54e74d93dcee5672980d",
+          "bytes": 4014
+        },
+        "framer.py": {
+          "sha256": "d1f9c1dbd2971190df6bea768af9f150f2b6d50907ce4e0baae803afb2ab6055",
+          "bytes": 3390
+        },
+        "carrier.py": {
+          "sha256": "adce1cb3f2e08bd83a75111553096394f9cbbd04947297e9320eddb79e19d635",
+          "bytes": 1888
+        },
+        "oracle.py": {
+          "sha256": "ccdc0916190e167e7f6a0da0492d76184401c5b3c13fcccf0e74c8f488d090c8",
+          "bytes": 3698
+        },
+        "axdr.py": {
+          "sha256": "a9678dc82261aa2ef5d1c734062ce0c7c4ad104d678d3d0c4ba851f88442bb17",
+          "bytes": 7446
+        },
+        "calendar_oracle.py": {
+          "sha256": "dd2f9ba3852b7fceae7b408f404c2e9c2f7f30180442175f4d78d74517a60630",
+          "bytes": 1515
+        },
+        "compact_oracle.py": {
+          "sha256": "1dd0e54fc783a0e663ef25f8f26a3263b8f9bdaf04d405e8ab3fb5080c7f45f7",
+          "bytes": 2782
+        },
+        "verify-controls.py": {
+          "sha256": "b1fc94c4a02f53cca119cc75eba6d6e7afb1a13a84a9a68ec822dcf034186df5",
+          "bytes": 2193
+        },
+        "reference-check.py": {
+          "sha256": "c51b58715f85400b20da1d9f3e02f1e523a7768d6e3ce37242f733b4602374cc",
+          "bytes": 4794
+        },
+        "source-pin.json": {
+          "sha256": "3d2efecdd4243ae0565bdf08b1bb81931061eab533d6a017e877ff90bae06a8a",
+          "bytes": 14073
+        },
+        "seal.py": {
+          "sha256": "6b5dce3d8851a78e133e003fecd997bd5c67851bf19e32c46fcfbe9fcea1ebff",
+          "bytes": 5489
+        },
+        "cases/null-tcp.pcap": {
+          "sha256": "c850e464220869002648734d8b03efe57fc52c20a024adb6cfaad152417d9802",
+          "bytes": 424
+        },
+        "answers/null-tcp.json": {
+          "sha256": "03b3939a6107f69fe22242533c9ce3b30d35878801c7f81f669e19cffa34b1c0",
+          "bytes": 3052
+        },
+        "cases/u16-tcp.pcap": {
+          "sha256": "959e934f42aebb0da06d3db668b543760ccffd4d9d92061e96926ac9cdf64d2e",
+          "bytes": 426
+        },
+        "answers/u16-tcp.json": {
+          "sha256": "4f07479f3d388902ef78af027e9df1c5c5f1001657b322df36b0d0b7b73c6529",
+          "bytes": 3055
+        },
+        "cases/structure-tcp.pcap": {
+          "sha256": "4eac3f7f2fe6c07df4da52495131c520d16e8197af71a186f45be1f62485d32e",
+          "bytes": 431
+        },
+        "answers/structure-tcp.json": {
+          "sha256": "2f7ad599ba705ce67ea121dbd2e173f38463c58d9a2e1bfd45d436c0cc513311",
+          "bytes": 3403
+        },
+        "cases/opaque-selector-tcp.pcap": {
+          "sha256": "4d207627da8b9a077852b435b84ecdff370bbb0826daf98700db6ef4b09595f5",
+          "bytes": 426
+        },
+        "answers/opaque-selector-tcp.json": {
+          "sha256": "b9c952256f6b24653fb8fdaf99c93e0c5e75fad361f7cdad22aeff01ec363898",
+          "bytes": 3204
+        },
+        "cases/utf8-tcp.pcap": {
+          "sha256": "e3b6aae3bd9c2bf8a6090ad4859ee9522666a4390a63ae7eaa2fef4d92758b95",
+          "bytes": 427
+        },
+        "answers/utf8-tcp.json": {
+          "sha256": "243b820a2ee8ab7bd56165f1a669d6a7669770921a39592a127ce5ee11a95096",
+          "bytes": 3226
+        },
+        "cases/nested-tcp.pcap": {
+          "sha256": "6922a64e23584f4ec39c42a7a8f3f31e188cce38e2b2cb85b0a917384e3961f8",
+          "bytes": 433
+        },
+        "answers/nested-tcp.json": {
+          "sha256": "26b5ad33ad3e475b2a5e12b8f5ed50e1c21f30b6c3d699752637f090fce86e98",
+          "bytes": 3650
+        },
+        "cases/empty-array-tcp.pcap": {
+          "sha256": "eda794879c892fc6b16666fd18109ddbf0df5e822a039eb57dc5b58052df3eb7",
+          "bytes": 425
+        },
+        "answers/empty-array-tcp.json": {
+          "sha256": "7b991fdad12979b0eb7d27633ef6dfa25a76362e826f5fc1f52a1d9bc67b6ae0",
+          "bytes": 3147
+        },
+        "cases/compact-tcp.pcap": {
+          "sha256": "4b66271d062a5dc47f41691df6a548993d92e6768a7954ff2ffa3344b5b68d4a",
+          "bytes": 430
+        },
+        "answers/compact-tcp.json": {
+          "sha256": "6460ceeb3b987aa3ad246e559df690b9ec29ab7386d86bbe4ced4fd7c8996626",
+          "bytes": 3820
+        },
+        "cases/nested-compact-tcp.pcap": {
+          "sha256": "6235b60cdd60efcfdf1aac0921f9aa5492cdd60c9868ecae2ea3175c279cf828",
+          "bytes": 434
+        },
+        "answers/nested-compact-tcp.json": {
+          "sha256": "b0cd357fcccd537d0da2faf5fea0023af328935c18ad05e1dca79faf93960864",
+          "bytes": 4495
+        },
+        "cases/null-udp.pcap": {
+          "sha256": "081cc847e065c7dc4832061bb1d265c791571d2aab991894c6e539ad66d1f974",
+          "bytes": 190
+        },
+        "answers/null-udp.json": {
+          "sha256": "043017414b127481062f9a73d616987f08c4a427054372e7a41e4be3096ae8dc",
+          "bytes": 3052
+        },
+        "cases/u16-udp.pcap": {
+          "sha256": "89a17751a911069123c7ac9ab17bfe66a2f6915d444ae6a1d23d0e6d73268bd1",
+          "bytes": 192
+        },
+        "answers/u16-udp.json": {
+          "sha256": "9089042c0f3ce6abbe8ffeab544f1eda46866371b0ed44d7094def07ca91c633",
+          "bytes": 3055
+        },
+        "cases/structure-udp.pcap": {
+          "sha256": "ffd26c24b936ea1322599cd91ee847ffbac470c8883373cd469f885cc8cdece2",
+          "bytes": 197
+        },
+        "answers/structure-udp.json": {
+          "sha256": "25e89d5100450eb7cd0d0b856e052620b7fe58e2c4f2f77028e9bab1d02dae0b",
+          "bytes": 3403
+        },
+        "cases/opaque-selector-udp.pcap": {
+          "sha256": "486fb2efd4d671d49d7fbfa083650dd020e2d612671d11012e370d5e648aed69",
+          "bytes": 192
+        },
+        "answers/opaque-selector-udp.json": {
+          "sha256": "071af42e095d376ea1acea4f7ea3de0c0287a56a3547d33923edba65f33cc499",
+          "bytes": 3204
+        },
+        "cases/utf8-udp.pcap": {
+          "sha256": "116add3e8b7577c65725437879aeb3c5de2d890d0a13699e4a9ce811bc0a4703",
+          "bytes": 193
+        },
+        "answers/utf8-udp.json": {
+          "sha256": "d954935060202cb0ac66d8c32245f3bfa8cce2ac3ce8178ae30bd2354be611e2",
+          "bytes": 3226
+        },
+        "cases/nested-udp.pcap": {
+          "sha256": "61c49ca2c150b3983bddb1a65882f7f35098c6a2cd8d31468a4e2e4982b4defc",
+          "bytes": 199
+        },
+        "answers/nested-udp.json": {
+          "sha256": "7cecceb3286d2e90e4ca9abc3877e9e3fe24692d23316860a4a8582002d9f178",
+          "bytes": 3650
+        },
+        "cases/empty-array-udp.pcap": {
+          "sha256": "ba67cc0831b4ede2d86b4f5fec389bf81bc1dbe1e7e8fa12e1aeddb89edaf743",
+          "bytes": 191
+        },
+        "answers/empty-array-udp.json": {
+          "sha256": "c2cf40cebe5bc25d6a8de8e23d8b5a8b9bf250215edec375cbbef05ca3ee84ec",
+          "bytes": 3147
+        },
+        "cases/compact-udp.pcap": {
+          "sha256": "64c3eecfa4d53c4bd57f96e750c1715a6ab262af9c7d6b5acab5ed51056cb426",
+          "bytes": 196
+        },
+        "answers/compact-udp.json": {
+          "sha256": "99f9cc719fbc250dd033314a85d0afe61d6c22fd62bbba29aa24f6f27ccf7527",
+          "bytes": 3820
+        },
+        "cases/nested-compact-udp.pcap": {
+          "sha256": "4b4bd467305ab3a58d30d4efca8d91005213073243ceed4bbc5371cf69551986",
+          "bytes": 200
+        },
+        "answers/nested-compact-udp.json": {
+          "sha256": "c3b42f037e161ac25f18effea7722a29477b52bec44f4ec84a40991d4f71f697",
+          "bytes": 4495
+        },
+        "cases/nodes256.pcap": {
+          "sha256": "e4b1bfd5a3d3df663aef6d7e8b0db0cc6bec8279624ea32454b444b4b9418320",
+          "bytes": 447
+        },
+        "answers/nodes256.json": {
+          "sha256": "c039b4c16825c3fb5a37eb7ee4421f8cb37e581cfbb2e739904b09df0d0133a8",
+          "bytes": 32973
+        },
+        "cases/depth8.pcap": {
+          "sha256": "fd1d1d30c472e716b6a26518166ecb93cee336936393e4e0cbc8ee2016dc4039",
+          "bytes": 204
+        },
+        "answers/depth8.json": {
+          "sha256": "fe59f645c496fc140410313b2e1d6d93e4270960398c7658fbb49f22f00cd762",
+          "bytes": 5158
+        },
+        "cases/bytes1024.pcap": {
+          "sha256": "4e0e71fd2d0ae114761cac6b3bbabca1e28a839b1776f55165b101b937d4ae9b",
+          "bytes": 1217
+        },
+        "answers/bytes1024.json": {
+          "sha256": "119f64ab3b4478187baafffdf4a5bf2262b220ac7d10ee45058913bfd14ca0ae",
+          "bytes": 9285
+        },
+        "cases/missing-data.pcap": {
+          "sha256": "787524b091b1ce2f78ebc4c7c6ed2d3633dd12a29473bdb88d28033c0c04b6ba",
+          "bytes": 274
+        },
+        "answers/missing-data.json": {
+          "sha256": "cf0b3c8003d7cb658209f981e407ed683ad77c4219edff6802c88402f18f79f9",
+          "bytes": 2240
+        },
+        "cases/missing-child.pcap": {
+          "sha256": "89dccee919e2f07351d16718a7958261d23222c3ad929807e98fc08aeeb2a467",
+          "bytes": 276
+        },
+        "answers/missing-child.json": {
+          "sha256": "6ae8bbd6b13521168706bc98bef073860b506e339a4e7864e155c073b633a897",
+          "bytes": 2248
+        },
+        "cases/trailing.pcap": {
+          "sha256": "6bd61fcb46093970ae9a5dd5ac9a40197d2d44de6260e13094760cfdcfea6ad8",
+          "bytes": 277
+        },
+        "answers/trailing.json": {
+          "sha256": "378b0d031daf821f58b2f5ed241928cd0615aba96b724d931e40999bacc03d8d",
+          "bytes": 2230
+        },
+        "cases/invalid-utf8.pcap": {
+          "sha256": "d31092592debbe38a8fed6a7438274a9c650ad2356e0d4a5b605d766bec923f3",
+          "bytes": 278
+        },
+        "answers/invalid-utf8.json": {
+          "sha256": "e29e6388cc9a892cf64c6659f0d157707891768b71c0cd0edd20e4a3938de882",
+          "bytes": 2248
+        },
+        "cases/nodes257.pcap": {
+          "sha256": "0a0043428910443a5211782c5f002d6125e23a0503c6e678a4f1d0a25b1e1def",
+          "bytes": 534
+        },
+        "answers/nodes257.json": {
+          "sha256": "80ad2b002aaed6feb54f93f3c2fffffe549516bf8a4417bc3f08b06f2da02295",
+          "bytes": 2744
+        },
+        "cases/depth9.pcap": {
+          "sha256": "a99eee9313751d6b1dcbbfc1b9a358d5a0631e7af64ef0cbecd7f7706ce10fab",
+          "bytes": 291
+        },
+        "answers/depth9.json": {
+          "sha256": "82c54df3101b140806e6474e6ddf04132fd38d33c5f9f774909886de509db253",
+          "bytes": 2250
+        },
+        "cases/bytes1025.pcap": {
+          "sha256": "b148890428dbf75a6f2f393e7335f8a8f8fc0d4dde047d9c852d575badf7dd05",
+          "bytes": 1303
+        },
+        "answers/bytes1025.json": {
+          "sha256": "e0edd7bdad202a7fe13ed31ef0eba02b696aada651f88483590550fd4141d40e",
+          "bytes": 4286
+        },
+        "cases/unknown-child.pcap": {
+          "sha256": "d459703180f183e739b2ab37933fff806083140e39fa299f6b85442a141cc429",
+          "bytes": 277
+        },
+        "answers/unknown-child.json": {
+          "sha256": "3c8919694008c13f0a3f1a58b5521cd4c88d0b886d5b1178f7937da9735627db",
+          "bytes": 2252
+        },
+        "cases/compact-short.pcap": {
+          "sha256": "afa495f6eb201922487965b447c3aebc80d4f36aeb7dec531720bd6fc7a8de54",
+          "bytes": 278
+        },
+        "answers/compact-short.json": {
+          "sha256": "d5eb63baefbb396962cfe73966225841c4cbfd7d859ed2f9c0bc5dee26fb3db8",
+          "bytes": 2252
+        },
+        "cases/missing-selector.pcap": {
+          "sha256": "eda0fb052d93467360e416654c0fc276cf583e47bead7de4ceed24e39f80c425",
+          "bytes": 273
+        },
+        "answers/missing-selector.json": {
+          "sha256": "901a2e64ed5c9fcf340c9db93706d6aa2169d16f7a21ad6d26a92497234f7f32",
+          "bytes": 2254
+        },
+        "cases/selection2.pcap": {
+          "sha256": "2c978cf6c61b4ddd3ceb97c826cc31630eeb37e2da9be7f19ea0782696e68c0c",
+          "bytes": 273
+        },
+        "answers/selection2.json": {
+          "sha256": "c54e0b6c4cc70ce191911a4ea555f1931c497cb1b3cc839e68cfdf2fe66171a5",
+          "bytes": 2232
+        },
+        "cases/attribute0.pcap": {
+          "sha256": "2062ac4b2c2bfc4b8706c7d6ac51db1b075d557c376f2b23d7697a3b798d3061",
+          "bytes": 275
+        },
+        "answers/attribute0.json": {
+          "sha256": "b13088c8b63260a0134805d43476af2df8d731fb8396cfb7d644c8b713ab81af",
+          "bytes": 2236
+        },
+        "cases/unselected-adjacent.pcap": {
+          "sha256": "a4ac6f59445dcb8c1c86206e87e29bcc034c37d3d2571b4b80bb8089896d25ad",
+          "bytes": 188
+        },
+        "answers/unselected-adjacent.json": {
+          "sha256": "1c8b5933f87f875465d234a3889929823e6dd1067fc74e27dbd1f9dac7a9a785",
+          "bytes": 2868
+        },
+        "cases/retry.pcap": {
+          "sha256": "ac92859eb64d8b5ef680945bbdba3a9109b7fc7718790b2ae9bfa9f1a98ac2a2",
+          "bytes": 291
+        },
+        "answers/retry.json": {
+          "sha256": "2491f9570413c090750081a5c77bfd0a671e1412bdce38c21a68cbe20f8c9e7f",
+          "bytes": 5005
+        },
+        "cases/wrong-direction.pcap": {
+          "sha256": "fce0d449df1cde3f39161577ec5e2ab78e427f49360a32458c3dddc9b7608621",
+          "bytes": 291
+        },
+        "answers/wrong-direction.json": {
+          "sha256": "fc2fee1c2715df071ee5c361637093375571efec2992f629eb62376dc98e94b5",
+          "bytes": 3731
+        },
+        "cases/changed-parameter.pcap": {
+          "sha256": "a89cd08c3059d0ea2eb4d17aaebba5b37a3d44f7c5302cc2174c9f4a54b0d0d6",
+          "bytes": 291
+        },
+        "answers/changed-parameter.json": {
+          "sha256": "ca23e6f8cf760ec56a71a882fa57931fed5718d348061d5b2607c237b941e6d3",
+          "bytes": 2833
+        },
+        "cases/wrong-full-flags.pcap": {
+          "sha256": "6b9869e0b4a2321d16022ff02ef8bd9d4156bdc2cfd9fa9d1677b2cdbd745473",
+          "bytes": 276
+        },
+        "answers/wrong-full-flags.json": {
+          "sha256": "b96d680f96c4a57f8034560dc3ea226fc781c26f44a24ad8a1ba7057c902987c",
+          "bytes": 3705
+        },
+        "controls.json": {
+          "sha256": "2f8d900336c8f70a8d92df1db09a33a9f3fdd4bca20d35c29c4b05aad2cf1803",
+          "bytes": 181406
+        },
+        "validation/expected.json": {
+          "sha256": "88a2cfe062fd74a8147f7e878e22a24b7eb0ed75bd9de29e65a9ae40043d45b5",
+          "bytes": 48161
+        },
+        "required-tests-traffic-unified-v13.json": {
+          "sha256": "81e2a21039610b0f4de9331778146f7fb8e91647288d16befa9140502570dab2",
+          "bytes": 122594
+        }
+      },
+      "aliases": {
+        "common/pcapx/pcaputil/dlms-hdlc-normal-access/build.py": "build.py",
+        "common/pcapx/pcaputil/dlms-hdlc-normal-access/framer.py": "framer.py",
+        "common/pcapx/pcaputil/dlms-hdlc-normal-access/carrier.py": "carrier.py",
+        "common/pcapx/pcaputil/dlms-hdlc-normal-access/oracle.py": "oracle.py",
+        "common/pcapx/pcaputil/dlms-hdlc-normal-access/axdr.py": "axdr.py",
+        "common/pcapx/pcaputil/dlms-hdlc-normal-access/calendar_oracle.py": "calendar_oracle.py",
+        "common/pcapx/pcaputil/dlms-hdlc-normal-access/compact_oracle.py": "compact_oracle.py",
+        "common/pcapx/pcaputil/dlms-hdlc-normal-access/verify-controls.py": "verify-controls.py",
+        "common/pcapx/pcaputil/dlms-hdlc-normal-access/reference-check.py": "reference-check.py",
+        "common/pcapx/pcaputil/dlms-hdlc-normal-access/source-pin.json": "source-pin.json",
+        "common/pcapx/pcaputil/dlms-hdlc-normal-access/seal.py": "seal.py",
+        "common/pcapx/pcaputil/dlms-hdlc-normal-access/cases/null-tcp.pcap": "cases/null-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-normal-access/answers/null-tcp.json": "answers/null-tcp.json",
+        "common/pcapx/pcaputil/dlms-hdlc-normal-access/cases/u16-tcp.pcap": "cases/u16-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-normal-access/answers/u16-tcp.json": "answers/u16-tcp.json",
+        "common/pcapx/pcaputil/dlms-hdlc-normal-access/cases/structure-tcp.pcap": "cases/structure-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-normal-access/answers/structure-tcp.json": "answers/structure-tcp.json",
+        "common/pcapx/pcaputil/dlms-hdlc-normal-access/cases/opaque-selector-tcp.pcap": "cases/opaque-selector-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-normal-access/answers/opaque-selector-tcp.json": "answers/opaque-selector-tcp.json",
+        "common/pcapx/pcaputil/dlms-hdlc-normal-access/cases/utf8-tcp.pcap": "cases/utf8-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-normal-access/answers/utf8-tcp.json": "answers/utf8-tcp.json",
+        "common/pcapx/pcaputil/dlms-hdlc-normal-access/cases/nested-tcp.pcap": "cases/nested-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-normal-access/answers/nested-tcp.json": "answers/nested-tcp.json",
+        "common/pcapx/pcaputil/dlms-hdlc-normal-access/cases/empty-array-tcp.pcap": "cases/empty-array-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-normal-access/answers/empty-array-tcp.json": "answers/empty-array-tcp.json",
+        "common/pcapx/pcaputil/dlms-hdlc-normal-access/cases/compact-tcp.pcap": "cases/compact-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-normal-access/answers/compact-tcp.json": "answers/compact-tcp.json",
+        "common/pcapx/pcaputil/dlms-hdlc-normal-access/cases/nested-compact-tcp.pcap": "cases/nested-compact-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-normal-access/answers/nested-compact-tcp.json": "answers/nested-compact-tcp.json",
+        "common/pcapx/pcaputil/dlms-hdlc-normal-access/cases/null-udp.pcap": "cases/null-udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-normal-access/answers/null-udp.json": "answers/null-udp.json",
+        "common/pcapx/pcaputil/dlms-hdlc-normal-access/cases/u16-udp.pcap": "cases/u16-udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-normal-access/answers/u16-udp.json": "answers/u16-udp.json",
+        "common/pcapx/pcaputil/dlms-hdlc-normal-access/cases/structure-udp.pcap": "cases/structure-udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-normal-access/answers/structure-udp.json": "answers/structure-udp.json",
+        "common/pcapx/pcaputil/dlms-hdlc-normal-access/cases/opaque-selector-udp.pcap": "cases/opaque-selector-udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-normal-access/answers/opaque-selector-udp.json": "answers/opaque-selector-udp.json",
+        "common/pcapx/pcaputil/dlms-hdlc-normal-access/cases/utf8-udp.pcap": "cases/utf8-udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-normal-access/answers/utf8-udp.json": "answers/utf8-udp.json",
+        "common/pcapx/pcaputil/dlms-hdlc-normal-access/cases/nested-udp.pcap": "cases/nested-udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-normal-access/answers/nested-udp.json": "answers/nested-udp.json",
+        "common/pcapx/pcaputil/dlms-hdlc-normal-access/cases/empty-array-udp.pcap": "cases/empty-array-udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-normal-access/answers/empty-array-udp.json": "answers/empty-array-udp.json",
+        "common/pcapx/pcaputil/dlms-hdlc-normal-access/cases/compact-udp.pcap": "cases/compact-udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-normal-access/answers/compact-udp.json": "answers/compact-udp.json",
+        "common/pcapx/pcaputil/dlms-hdlc-normal-access/cases/nested-compact-udp.pcap": "cases/nested-compact-udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-normal-access/answers/nested-compact-udp.json": "answers/nested-compact-udp.json",
+        "common/pcapx/pcaputil/dlms-hdlc-normal-access/cases/nodes256.pcap": "cases/nodes256.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-normal-access/answers/nodes256.json": "answers/nodes256.json",
+        "common/pcapx/pcaputil/dlms-hdlc-normal-access/cases/depth8.pcap": "cases/depth8.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-normal-access/answers/depth8.json": "answers/depth8.json",
+        "common/pcapx/pcaputil/dlms-hdlc-normal-access/cases/bytes1024.pcap": "cases/bytes1024.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-normal-access/answers/bytes1024.json": "answers/bytes1024.json",
+        "common/pcapx/pcaputil/dlms-hdlc-normal-access/cases/missing-data.pcap": "cases/missing-data.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-normal-access/answers/missing-data.json": "answers/missing-data.json",
+        "common/pcapx/pcaputil/dlms-hdlc-normal-access/cases/missing-child.pcap": "cases/missing-child.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-normal-access/answers/missing-child.json": "answers/missing-child.json",
+        "common/pcapx/pcaputil/dlms-hdlc-normal-access/cases/trailing.pcap": "cases/trailing.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-normal-access/answers/trailing.json": "answers/trailing.json",
+        "common/pcapx/pcaputil/dlms-hdlc-normal-access/cases/invalid-utf8.pcap": "cases/invalid-utf8.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-normal-access/answers/invalid-utf8.json": "answers/invalid-utf8.json",
+        "common/pcapx/pcaputil/dlms-hdlc-normal-access/cases/nodes257.pcap": "cases/nodes257.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-normal-access/answers/nodes257.json": "answers/nodes257.json",
+        "common/pcapx/pcaputil/dlms-hdlc-normal-access/cases/depth9.pcap": "cases/depth9.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-normal-access/answers/depth9.json": "answers/depth9.json",
+        "common/pcapx/pcaputil/dlms-hdlc-normal-access/cases/bytes1025.pcap": "cases/bytes1025.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-normal-access/answers/bytes1025.json": "answers/bytes1025.json",
+        "common/pcapx/pcaputil/dlms-hdlc-normal-access/cases/unknown-child.pcap": "cases/unknown-child.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-normal-access/answers/unknown-child.json": "answers/unknown-child.json",
+        "common/pcapx/pcaputil/dlms-hdlc-normal-access/cases/compact-short.pcap": "cases/compact-short.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-normal-access/answers/compact-short.json": "answers/compact-short.json",
+        "common/pcapx/pcaputil/dlms-hdlc-normal-access/cases/missing-selector.pcap": "cases/missing-selector.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-normal-access/answers/missing-selector.json": "answers/missing-selector.json",
+        "common/pcapx/pcaputil/dlms-hdlc-normal-access/cases/selection2.pcap": "cases/selection2.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-normal-access/answers/selection2.json": "answers/selection2.json",
+        "common/pcapx/pcaputil/dlms-hdlc-normal-access/cases/attribute0.pcap": "cases/attribute0.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-normal-access/answers/attribute0.json": "answers/attribute0.json",
+        "common/pcapx/pcaputil/dlms-hdlc-normal-access/cases/unselected-adjacent.pcap": "cases/unselected-adjacent.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-normal-access/answers/unselected-adjacent.json": "answers/unselected-adjacent.json",
+        "common/pcapx/pcaputil/dlms-hdlc-normal-access/cases/retry.pcap": "cases/retry.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-normal-access/answers/retry.json": "answers/retry.json",
+        "common/pcapx/pcaputil/dlms-hdlc-normal-access/cases/wrong-direction.pcap": "cases/wrong-direction.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-normal-access/answers/wrong-direction.json": "answers/wrong-direction.json",
+        "common/pcapx/pcaputil/dlms-hdlc-normal-access/cases/changed-parameter.pcap": "cases/changed-parameter.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-normal-access/answers/changed-parameter.json": "answers/changed-parameter.json",
+        "common/pcapx/pcaputil/dlms-hdlc-normal-access/cases/wrong-full-flags.pcap": "cases/wrong-full-flags.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-normal-access/answers/wrong-full-flags.json": "answers/wrong-full-flags.json",
+        "common/pcapx/pcaputil/dlms-hdlc-normal-access/controls.json": "controls.json",
+        "common/pcapx/pcaputil/dlms-hdlc-normal-access/validation/expected.json": "validation/expected.json",
+        "common/pcapx/pcaputil/dlms-hdlc-normal-access/required-tests-traffic-unified-v13.json": "required-tests-traffic-unified-v13.json",
+        "scripts/protocol-tests/required-tests-traffic-unified-v13.json": "required-tests-traffic-unified-v13.json"
+      }
     }
   ],
   "schema_version": 1,

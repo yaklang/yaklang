@@ -44,7 +44,7 @@ Run from the repository root:
 ```sh
 go run ./internal/trafficfixture/cmd/corpus test
 go test -json -count=1 -timeout=5m ./internal/trafficfixture/... ./common/bin-parser/... ./common/pcapx/... ./common/yak/cmd/yakcmds/shark-cli ./scripts/ci > traffic.jsonl
-go run ./internal/trafficfixture/cmd/corpus exec -- python3 @scripts/protocol-tests/check_go_test_json.py traffic.jsonl --inventory @scripts/protocol-tests/required-tests-traffic-unified-v12.json --tier full
+go run ./internal/trafficfixture/cmd/corpus exec -- python3 @scripts/protocol-tests/check_go_test_json.py traffic.jsonl --inventory @scripts/protocol-tests/required-tests-traffic-unified-v13.json --tier full
 ```
 
 The single `corpus` entry point uses the same bounded Go ZIP loader as tests.
@@ -83,7 +83,7 @@ their semantic coverage. The existing synthetic session keys are test inputs;
 production credentials, user private keys and material without redistribution
 permission belong in an external fixed-source download manifest.
 
-Current test requirements are sealed at `scripts/protocol-tests/required-tests-traffic-unified-v12.json`;
+Current test requirements are sealed at `scripts/protocol-tests/required-tests-traffic-unified-v13.json`;
 the historical inventories and all earlier batches remain unchanged.
 The supplemental small-corpus batch contains 26 minimal controls, their explicit
 expected facts, an offline generator and the compact pinned source manifest.
@@ -96,7 +96,7 @@ byte-boundary, malformed-length and ownership tests. These are scoped control
 assertions, not a semantic golden for the entire upstream collection. Process
 logs and the original large downloads remain outside the repository.
 
-The current workflow and executable gate use `required-tests-traffic-unified-v12.json`. Older
+The current workflow and executable gate use `required-tests-traffic-unified-v13.json`. Older
 versioned inventories stay available as historical inputs; they are not the
 current acceptance entry. The DLMS HDLC batch contains owned tunnel/Get-normal
 controls and their independent fields/errors, CRC/byte validator, offline
@@ -189,7 +189,7 @@ opaque selector bytes and one bounded Data value over Wrapper v1 TCP/UDP; object
 selector meaning, access permission and device operation are unverified. The
 original one-packet selective-access capture and original refused answer remain
 immutable; its now-supported answer is matched by exact input SHA and frame.
-The active inventory is `scripts/protocol-tests/required-tests-traffic-unified-v12.json`.
+The active inventory is `scripts/protocol-tests/required-tests-traffic-unified-v13.json`.
 
 The small-graph budget batch reuses accepted graph captures/answers and adds one
 249-byte UDP control for child count255 without child bytes. Its standalone proof
@@ -245,6 +245,18 @@ retain the original request ID. Scope excludes authentication, gateway identity
 binding, device execution and RF delivery. Original large captures, upstream
 source and logs are not bundled.
 
-`validation-dlms-hdlc-normal-data.zip` contains31 owned minimal native normal-GET capture cases and72 ordered independent answers (53 complete byte/field observations,19 expected refusals). It covers TCP/UDP full/deferred, workers1/2/4, observer off/on, TCP feed chunks, nested compact, node/depth boundaries, malformed/trailing contents, strict text, full flags and refusal followed by late feedback. The existing native scalar contract and zero TransactionID are retained. Its source pins and executable independent builder/oracle/reference harness stay in the small ZIP; original reference sources and execution logs stay outside Git. Actual fixed reference codec display/calendar differences remain diagnostics rather than device passes. Current mandatory inventory is `scripts/protocol-tests/required-tests-traffic-unified-v12.json`.
+`validation-dlms-hdlc-normal-data.zip` contains31 owned minimal native normal-GET capture cases and72 ordered independent answers (53 complete byte/field observations,19 expected refusals). It covers TCP/UDP full/deferred, workers1/2/4, observer off/on, TCP feed chunks, nested compact, node/depth boundaries, malformed/trailing contents, strict text, full flags and refusal followed by late feedback. The existing native scalar contract and zero TransactionID are retained. Its source pins and executable independent builder/oracle/reference harness stay in the small ZIP; original reference sources and execution logs stay outside Git. Actual fixed reference codec display/calendar differences remain diagnostics rather than device passes. Current mandatory inventory is `scripts/protocol-tests/required-tests-traffic-unified-v13.json`.
 
 The historical `dlms-hdlc/array` capture is reused in place. Its original `UnsupportedFeature` answer remains immutable; `historical-array-upgrade.json` binds the original capture/answer hashes to two current full-message answers for the now-supported legal empty-array response. No historical capture is copied into the new ZIP and other historical refusals retain their assertions.
+
+`validation-dlms-hdlc-normal-access.zip` seals38 minimal captures and92 ordered
+independent answers (64 observations,28 typed refusals) for native normal-GET
+selection parameters. It includes exact byte/CRC/context oracles, owned builders,
+the fixed reference harness and currentv13 inventory. TCP/UDP, retry/collision,
+wrong direction/full flags, truncated/malformed parameters, exact allocation
+boundaries, node/depth limits, ownership, chunks and Close release are asserted.
+The fixed external client produces12 exact selected APDUs; the framer separately
+reproduces29 distinct complete HDLC frames. Eleven distinct parameter values
+agree completely with its codec. UTF-8 display and the reference XML handler's
+UTF-8 error remain explicit diagnostics rather than successful field agreements.
+These are envelope/parameter observations, not selector semantics or meter tests.

@@ -142,3 +142,16 @@ Wrapper GET-with-list additionally decodes selected nested A-XDR array/structure
 Semtech packet-forwarder v2 keeps the `semtech-udp` stateless downstream field observation profile. Explicit UDP DecodeAs `semtech-downlink-session` additionally observes PULL_RESP/TX_ACK pairing by both endpoints, capture domain and the exact two-byte token. Full downstream fields remain literal observations. A pending byte-identical duplicate preserves the original TransactionID; feedback references the original request. Completed, conflicting, expired or refused token identities are quarantined for the capture lifetime; the pending timeout is30seconds. Limits are128 distinct tokens per conversation and the caller conversation/byte budget. History exhaustion fails closed rather than evicting old identities; Close releases all retained state. This opt-in history is independent of unrelated UDP protocol expiry. Feedback errors and a NONE report do not prove gateway identity, authentication, radio transmission, GPS conversion or RF delivery.
 
 Native HDLC `dlms-hdlc-get-normal` complete unsegmented unciphered LN responses also observe the selected bounded Data map for arrays/structures, described compact-array rows, bits, text, float bits and literal calendars. These newly supported tags use `Data Value` as the owned Data map (type/raw bytes/counts/elements or rows and selected components); legacy scalar/octet `Data Value` representations remain unchanged. The node/depth/content/compact-row limits are identical to selected HDLC list Data and additionally constrained by caller budgets. Reserve the full compact expansion pool before decoding even nested compact values. A refused response retires pending association; a later response cannot reuse it. This is byte observation, not object/selector semantics, negotiated AA, authentication, ciphering, native segmentation/block transfer or meter success.
+
+Native HDLC GET-normal requests additionally observe optional access selection1,
+the raw selector and one complete bounded Data parameter in `Access Parameters`.
+Selection0 retains its existing fields. `Selector Semantics Verified` is false:
+the selector does not prove COSEM object meaning or permission. Parameters use
+the same256-node,8-level,1024-byte and compact-row bounds and caller budgets.
+Admission probes do not expand parameters; byte projection is reserved before
+decoding. Exact pending duplicates retain the original request ID; changed
+parameters invalidate the pending exchange. Malformed or budget-refused
+requests retire old context before later replies. Direction, complete invoke
+flags, reversed HDLC addresses and link receive sequence still govern pairing;
+native TransactionID remains zero. No negotiated AA, authentication, ciphering,
+segmentation/block/GBT, object configuration or device success is inferred.
