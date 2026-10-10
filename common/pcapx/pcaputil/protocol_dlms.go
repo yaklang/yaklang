@@ -165,6 +165,7 @@ func decodeDLMSBudget(w []byte, maxElements, depth int) (*dlmsMessage, error) {
 			return bad("supervisory frame has information")
 		}
 		m.kind = "S"
+		m.nr = cf >> 5
 		f["Frame Kind"] = "supervisory"
 		f["Supervisory Function"] = []string{"RR", "RNR", "REJ", "SREJ"}[(cf>>2)&3]
 		f["Receive Sequence"] = cf >> 5
@@ -452,10 +453,11 @@ type binDLMS struct {
 }
 
 func (s *binDLMS) invalidate() {
-	if s.pending != nil {
-		s.pending = nil
-		s.ambiguous = true
-	}
+	// A refused exchange is unobserved even between two completed requests.
+	// Keeping only the old sequence history would let its late response acquire
+	// a subsequent request's ID. Retire the conversation, not just a live slot.
+	s.pending = nil
+	s.ambiguous = true
 }
 func (s *binDLMS) consume(m *dlmsMessage, w []byte, dir int, id uint64) (map[string]any, uint64, error) {
 	ctx := func(why string) (map[string]any, uint64, error) { return nil, 0, dlmsError(ErrContextRequired, why) }
@@ -470,6 +472,15 @@ func (s *binDLMS) consume(m *dlmsMessage, w []byte, dir int, id uint64) (map[str
 		return ctx("ambiguous/reused exchange requires new conversation")
 	}
 	if m.kind == "S" {
+		if s.clientKnown && s.seqKnown[1-dir] {
+			advance := (m.nr - s.next[1-dir]) & 7
+			if advance > 0 && advance <= 4 {
+				// Future (or half-space ambiguous) modulo8 acknowledgements expose
+				// a hidden exchange. Old acknowledgements do not reopen or advance
+				// request identity; preserve their literal link observation.
+				s.invalidate()
+			}
+		}
 		m.fields["Association"] = "unassociated-link-observation"
 		return m.fields, 0, nil
 	}
@@ -514,6 +525,12 @@ func (s *binDLMS) consume(m *dlmsMessage, w []byte, dir int, id uint64) (map[str
 		return m.fields, 0, nil
 	}
 	p := s.pending
+	if p == nil && s.clientKnown && m.kind == "GET" && (!s.seqKnown[dir] || m.ns == s.next[dir]) {
+		// An orphan at the next peer sequence can belong to a missed request.
+		// Repeating that response after a later request cannot establish a new
+		// binding. A prior-sequence duplicate still leaves adjacent traffic usable.
+		s.ambiguous = true
+	}
 	if p == nil || p.dir == dir || p.source != m.destination || p.destination != m.source {
 		return ctx("response lacks reversed observed endpoint/logical-address request")
 	}

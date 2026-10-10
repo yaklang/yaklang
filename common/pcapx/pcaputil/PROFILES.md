@@ -155,3 +155,14 @@ requests retire old context before later replies. Direction, complete invoke
 flags, reversed HDLC addresses and link receive sequence still govern pairing;
 native TransactionID remains zero. No negotiated AA, authentication, ciphering,
 segmentation/block/GBT, object configuration or device success is inferred.
+
+Within one retained native HDLC conversation, a byte/format/resource refusal
+retires observed association even after its preceding request has completed.
+An orphan at the next observed peer send sequence, or a supervisory
+acknowledgement ahead of the opposite observed sequence (including the modulo8
+half-space), also retires request identity. The supervisory frame keeps its
+literal unassociated link fields; subsequent application messages require new
+context. Previous-sequence response duplicates and older acknowledgements do
+not advance or reopen identity and preserve adjacent normal traffic. This is a
+conservative passive-observation policy; it does not prove device origin after
+UDP idle reset, initial missing context, authentication or a new capture.
