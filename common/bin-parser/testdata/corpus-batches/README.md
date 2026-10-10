@@ -44,7 +44,7 @@ Run from the repository root:
 ```sh
 go run ./internal/trafficfixture/cmd/corpus test
 go test -json -count=1 -timeout=5m ./internal/trafficfixture/... ./common/bin-parser/... ./common/pcapx/... ./common/yak/cmd/yakcmds/shark-cli ./scripts/ci > traffic.jsonl
-go run ./internal/trafficfixture/cmd/corpus exec -- python3 @scripts/protocol-tests/check_go_test_json.py traffic.jsonl --inventory @scripts/protocol-tests/required-tests-traffic-unified-v10.json --tier full
+go run ./internal/trafficfixture/cmd/corpus exec -- python3 @scripts/protocol-tests/check_go_test_json.py traffic.jsonl --inventory @scripts/protocol-tests/required-tests-traffic-unified-v11.json --tier full
 ```
 
 The single `corpus` entry point uses the same bounded Go ZIP loader as tests.
@@ -83,7 +83,7 @@ their semantic coverage. The existing synthetic session keys are test inputs;
 production credentials, user private keys and material without redistribution
 permission belong in an external fixed-source download manifest.
 
-Current test requirements are sealed at `scripts/protocol-tests/required-tests-traffic-unified-v10.json`;
+Current test requirements are sealed at `scripts/protocol-tests/required-tests-traffic-unified-v11.json`;
 the historical inventories and all earlier batches remain unchanged.
 The supplemental small-corpus batch contains 26 minimal controls, their explicit
 expected facts, an offline generator and the compact pinned source manifest.
@@ -96,7 +96,7 @@ byte-boundary, malformed-length and ownership tests. These are scoped control
 assertions, not a semantic golden for the entire upstream collection. Process
 logs and the original large downloads remain outside the repository.
 
-The current workflow and executable gate use `required-tests-traffic-unified-v10.json`. Older
+The current workflow and executable gate use `required-tests-traffic-unified-v11.json`. Older
 versioned inventories stay available as historical inputs; they are not the
 current acceptance entry. The DLMS HDLC batch contains owned tunnel/Get-normal
 controls and their independent fields/errors, CRC/byte validator, offline
@@ -189,7 +189,7 @@ opaque selector bytes and one bounded Data value over Wrapper v1 TCP/UDP; object
 selector meaning, access permission and device operation are unverified. The
 original one-packet selective-access capture and original refused answer remain
 immutable; its now-supported answer is matched by exact input SHA and frame.
-The active inventory is `scripts/protocol-tests/required-tests-traffic-unified-v10.json`.
+The active inventory is `scripts/protocol-tests/required-tests-traffic-unified-v11.json`.
 
 The small-graph budget batch reuses accepted graph captures/answers and adds one
 249-byte UDP control for child count255 without child bytes. Its standalone proof
@@ -235,3 +235,12 @@ HDLC, block/GBT, negotiated capabilities and meter object semantics remain open.
 Pinned external Gurux framing/client/list-receiver checks are reproducible using
 the archived harness; reference calendar precision and UTF-8 representation
 diagnostics remain distinct from complete reference value agreements.
+
+The Semtech correlation supplement is an opt-in passive PULL_RESP/TX_ACK profile.
+Thirteen owned minimal captures bind173 full message/field/Session/ID answers,
+including17 expected context/format/resource refusals. Historical downstream
+field observations remain stateless. Tokens are capture-lifetime quarantined
+after completion, collision, timeout or refusal; byte-identical pending duplicates
+retain the original request ID. Scope excludes authentication, gateway identity
+binding, device execution and RF delivery. Original large captures, upstream
+source and logs are not bundled.

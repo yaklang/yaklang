@@ -29783,6 +29783,189 @@
         "common/pcapx/pcaputil/dlms-hdlc-list/cases/normal-byte-adjacent.pcap": "cases/normal-adjacent.pcap",
         "scripts/protocol-tests/required-tests-traffic-unified-v10.json": "required-tests-traffic-unified-v10.json"
       }
+    },
+    {
+      "id": "validation-semtech-correlation",
+      "kind": "validation",
+      "source_sha": "99953ce6fc58ac02b7997c2c81ba9e56e75692f1",
+      "file": "validation-semtech-correlation.zip",
+      "sha256": "d3cf38f4a04c274c1fd6ec6132708ffb293f2bd02c69be4812db6c39b1d05802",
+      "password": "bin-parser",
+      "members": {
+        "build.py": {
+          "sha256": "9ac2886289d71cebf955ac17cbda189cbcd321d616f3e798daba05a94e23aa2d",
+          "bytes": 5647
+        },
+        "oracle.py": {
+          "sha256": "249b33860a4bd467a567c474937fe5dbb3770cb713a482bb54cffcb6258ea9a3",
+          "bytes": 10982
+        },
+        "source-pin.json": {
+          "sha256": "6166200b2a06fb3234e6be669b00ebdd92415ac2789a5350b99e0a3a0649a758",
+          "bytes": 5495
+        },
+        "verify-controls.py": {
+          "sha256": "8a4416ae0ec967c9166b0e1db650c36c711cc6b5bb815a4eca15953ffb309f80",
+          "bytes": 1514
+        },
+        "seal.py": {
+          "sha256": "66925459fc61d18b434c911c6abc78013fef676ae01b6c2ba5f16b2dacff4bb3",
+          "bytes": 4839
+        },
+        "captures/valid.pcap": {
+          "sha256": "1bfb2940f53d2695e343c912e20dd186f5ddb209abc320ccb3fee085fdf7bf8f",
+          "bytes": 290
+        },
+        "answers/valid.json": {
+          "sha256": "474219c7a3ce7ab664460b4994387af350cb09e0a3e7e8126553780f56f5f803",
+          "bytes": 5247
+        },
+        "captures/gateway-rejected.pcap": {
+          "sha256": "9ac7f7b56b9f602b94689bd7d980c78e25b89c174757fa54f94c26aba5dac878",
+          "bytes": 323
+        },
+        "answers/gateway-rejected.json": {
+          "sha256": "3c66fbae214262ff61596b6daf87c254622b1f0b7f4eb18aef207f08892bfb72",
+          "bytes": 5497
+        },
+        "captures/interleaved.pcap": {
+          "sha256": "25b07cba2c82f0f46725719eb9c6bc9da5941475e3fa7124649a5291b7a0ca57",
+          "bytes": 556
+        },
+        "answers/interleaved.json": {
+          "sha256": "fea5e56bd6ff4c472088aa11620f5be116a67db5347ed0e14aaf9a7cc78f2969",
+          "bytes": 10219
+        },
+        "captures/duplicate-request.pcap": {
+          "sha256": "423625822c3554106b01f72faf2050cc83280d02a80a914e0220c68cdd963ed1",
+          "bytes": 556
+        },
+        "answers/duplicate-request.json": {
+          "sha256": "09368090e4c12396d66636ea9353bb7b980034090a4564743b434e56e1c9780b",
+          "bytes": 9191
+        },
+        "captures/wrong-token.pcap": {
+          "sha256": "0a11e6c808c847b8b47941b6396d67b5bbc195c575dda49fd8ba75d7696815ee",
+          "bytes": 360
+        },
+        "answers/wrong-token.json": {
+          "sha256": "0696a646e6bb6242ca6153546e0b50d0707231aa51882fa12b2c2cabf513559c",
+          "bytes": 5577
+        },
+        "captures/wrong-direction.pcap": {
+          "sha256": "a5385a2dfb39b8133350b65f0b64414a9c750b7d3353aa16b2bf428c1267b5b0",
+          "bytes": 360
+        },
+        "answers/wrong-direction.json": {
+          "sha256": "3ab37c4c779551bb8e7e0a386e4f377fd942a38600da4ef5cd93c88204a2ce15",
+          "bytes": 5593
+        },
+        "captures/token-conflict.pcap": {
+          "sha256": "cee76955f263398cf5117b1500bfe425d26a3de84e378381a1726fec246e8ed0",
+          "bytes": 486
+        },
+        "answers/token-conflict.json": {
+          "sha256": "e6b00e148a696008df6cdcc5a10eca52e6d34affb058e37d5263f76baa3784b7",
+          "bytes": 4779
+        },
+        "captures/completed-reuse.pcap": {
+          "sha256": "a2e3cd05249ae2385f493f635619aad69e186936b94f3014570a5755f046869b",
+          "bytes": 556
+        },
+        "answers/completed-reuse.json": {
+          "sha256": "01b57612441502015d9e03dbeebd6a4700017441cf4f1ec62d570a104d381e24",
+          "bytes": 6151
+        },
+        "captures/idle-quarantine.pcap": {
+          "sha256": "45b26639985e426c0dd17b94c1004aa7d2a2b87c797d80e32ac9fd7681eaa7f4",
+          "bytes": 752
+        },
+        "answers/idle-quarantine.json": {
+          "sha256": "2ab67f8bdecef4dcf06822cac28cc41e0a8b0f60bb6d741c9fc284d4614e1a51",
+          "bytes": 9735
+        },
+        "captures/malformed-retirement.pcap": {
+          "sha256": "74482094a1d95a7008820463b9dd62595ab255e329ea0d584c62632e00b838fa",
+          "bytes": 384
+        },
+        "answers/malformed-retirement.json": {
+          "sha256": "8c677113ab224a69bcf7ad9af07edc8db41f71cff63248ed4c924bc4af6545cc",
+          "bytes": 4600
+        },
+        "captures/byte-refusal-retirement.pcap": {
+          "sha256": "1865731b9e593dba53dba0b932db9416fa08432a70bb91bf0ee62403659dec39",
+          "bytes": 926
+        },
+        "answers/byte-refusal-retirement.json": {
+          "sha256": "7b2efa2dac5df8d24a03cc2d5de02a77e650f829d045d334a0e7bb5002202fbc",
+          "bytes": 10110
+        },
+        "captures/backdated-feedback.pcap": {
+          "sha256": "ff9e066e3b7e6afea95598f9c947a3d106d7d4c8998718d651e0f38c74da1c8a",
+          "bytes": 626
+        },
+        "answers/backdated-feedback.json": {
+          "sha256": "11f2ae05322c41193c2a94273d1f88acc02c662f542c17be5c0e2902a59c590b",
+          "bytes": 9491
+        },
+        "captures/history-exhaustion.pcap": {
+          "sha256": "516e556625545d6f0b436628d9ecaec40a7b6c0e301095a3753fab9683a3748e",
+          "bytes": 25378
+        },
+        "answers/history-exhaustion.json": {
+          "sha256": "1426652ab7739a88336b9a6787233096d68d324699680f6d96c48dd034a36dbf",
+          "bytes": 459909
+        },
+        "controls.json": {
+          "sha256": "68f0f9da771d187fecce5b518344156e42cd5d81dbee52ec83f8009c42d5e3d4",
+          "bytes": 610033
+        },
+        "validation/expected.json": {
+          "sha256": "b870b0a29e7b9df962f09f4a800ea455bf870886c5f47b4b12ac10f45cb72b2f",
+          "bytes": 14902
+        },
+        "required-tests-traffic-unified-v11.json": {
+          "sha256": "c4f7aded7a2dcd32dc59a1c734703dd1bf8dcd694ab9970d2ff52a23205dc199",
+          "bytes": 120058
+        }
+      },
+      "aliases": {
+        "common/pcapx/pcaputil/semtech-correlation/build.py": "build.py",
+        "common/pcapx/pcaputil/semtech-correlation/oracle.py": "oracle.py",
+        "common/pcapx/pcaputil/semtech-correlation/source-pin.json": "source-pin.json",
+        "common/pcapx/pcaputil/semtech-correlation/verify-controls.py": "verify-controls.py",
+        "common/pcapx/pcaputil/semtech-correlation/seal.py": "seal.py",
+        "common/pcapx/pcaputil/semtech-correlation/captures/valid.pcap": "captures/valid.pcap",
+        "common/pcapx/pcaputil/semtech-correlation/answers/valid.json": "answers/valid.json",
+        "common/pcapx/pcaputil/semtech-correlation/captures/gateway-rejected.pcap": "captures/gateway-rejected.pcap",
+        "common/pcapx/pcaputil/semtech-correlation/answers/gateway-rejected.json": "answers/gateway-rejected.json",
+        "common/pcapx/pcaputil/semtech-correlation/captures/interleaved.pcap": "captures/interleaved.pcap",
+        "common/pcapx/pcaputil/semtech-correlation/answers/interleaved.json": "answers/interleaved.json",
+        "common/pcapx/pcaputil/semtech-correlation/captures/duplicate-request.pcap": "captures/duplicate-request.pcap",
+        "common/pcapx/pcaputil/semtech-correlation/answers/duplicate-request.json": "answers/duplicate-request.json",
+        "common/pcapx/pcaputil/semtech-correlation/captures/wrong-token.pcap": "captures/wrong-token.pcap",
+        "common/pcapx/pcaputil/semtech-correlation/answers/wrong-token.json": "answers/wrong-token.json",
+        "common/pcapx/pcaputil/semtech-correlation/captures/wrong-direction.pcap": "captures/wrong-direction.pcap",
+        "common/pcapx/pcaputil/semtech-correlation/answers/wrong-direction.json": "answers/wrong-direction.json",
+        "common/pcapx/pcaputil/semtech-correlation/captures/token-conflict.pcap": "captures/token-conflict.pcap",
+        "common/pcapx/pcaputil/semtech-correlation/answers/token-conflict.json": "answers/token-conflict.json",
+        "common/pcapx/pcaputil/semtech-correlation/captures/completed-reuse.pcap": "captures/completed-reuse.pcap",
+        "common/pcapx/pcaputil/semtech-correlation/answers/completed-reuse.json": "answers/completed-reuse.json",
+        "common/pcapx/pcaputil/semtech-correlation/captures/idle-quarantine.pcap": "captures/idle-quarantine.pcap",
+        "common/pcapx/pcaputil/semtech-correlation/answers/idle-quarantine.json": "answers/idle-quarantine.json",
+        "common/pcapx/pcaputil/semtech-correlation/captures/malformed-retirement.pcap": "captures/malformed-retirement.pcap",
+        "common/pcapx/pcaputil/semtech-correlation/answers/malformed-retirement.json": "answers/malformed-retirement.json",
+        "common/pcapx/pcaputil/semtech-correlation/captures/byte-refusal-retirement.pcap": "captures/byte-refusal-retirement.pcap",
+        "common/pcapx/pcaputil/semtech-correlation/answers/byte-refusal-retirement.json": "answers/byte-refusal-retirement.json",
+        "common/pcapx/pcaputil/semtech-correlation/captures/backdated-feedback.pcap": "captures/backdated-feedback.pcap",
+        "common/pcapx/pcaputil/semtech-correlation/answers/backdated-feedback.json": "answers/backdated-feedback.json",
+        "common/pcapx/pcaputil/semtech-correlation/captures/history-exhaustion.pcap": "captures/history-exhaustion.pcap",
+        "common/pcapx/pcaputil/semtech-correlation/answers/history-exhaustion.json": "answers/history-exhaustion.json",
+        "common/pcapx/pcaputil/semtech-correlation/controls.json": "controls.json",
+        "common/pcapx/pcaputil/semtech-correlation/validation/expected.json": "validation/expected.json",
+        "common/pcapx/pcaputil/semtech-correlation/required-tests-traffic-unified-v11.json": "required-tests-traffic-unified-v11.json",
+        "scripts/protocol-tests/required-tests-traffic-unified-v11.json": "required-tests-traffic-unified-v11.json"
+      }
     }
   ],
   "schema_version": 1,

@@ -459,6 +459,13 @@ func (a *binParser) closeUDPSessions() {
 	a.dnsMu.Unlock()
 	a.udpMu.Lock()
 	defer a.udpMu.Unlock()
+	if s := a.semtechSessions; s != nil {
+		for _, el := range s.entries {
+			el.Value.(*binUDPEntry).flow.closeSession()
+		}
+		a.semtechSessions = nil
+	}
+	a.semtechDisabled = false
 	if s := a.udpSessions; s != nil {
 		for _, el := range s.entries {
 			el.Value.(*binUDPEntry).flow.closeSession()

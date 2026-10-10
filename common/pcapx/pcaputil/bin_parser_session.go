@@ -866,6 +866,7 @@ func (f *binFlow) closeSession() {
 	f.rocplus = nil
 	f.bsap = nil
 	f.pfcp = nil
+	f.semtech = nil
 	f.slmp = nil
 	f.slmpTCP = nil
 	f.dlms = nil
