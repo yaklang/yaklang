@@ -8,7 +8,6 @@ import (
 	"strings"
 	"unicode"
 
-	"github.com/mattn/go-runewidth"
 )
 
 const memfitMaxTranscriptBlocks = 200
@@ -291,7 +290,7 @@ func (ui *memfitTUI) completionPanelLines() []memfitLiveLine {
 		if index == ui.completionIndex {
 			prefix, color = "│ › ", memfitColorBold+memfitColorCyan
 		}
-		available := maxInt(8, ui.width-runewidth.StringWidth(prefix)-1)
+		available := maxInt(8, ui.width-memfitStringWidth(prefix)-1)
 		value := completion.value
 		if ui.width >= 52 && completion.description != "" {
 			value += "  " + completion.description
@@ -336,7 +335,7 @@ func layoutMemfitEditor(buffer []rune, cursor, width, maxRows int) memfitEditorL
 		} else if unicode.IsControl(value) {
 			piece = "�"
 		}
-		pieceWidth := maxInt(1, runewidth.StringWidth(piece))
+		pieceWidth := maxInt(1, memfitStringWidth(piece))
 		if column > 0 && column+pieceWidth > innerWidth {
 			row++
 			rows = append(rows, strings.Builder{})
@@ -406,11 +405,11 @@ func (ui *memfitTUI) editorLines() ([]memfitLiveLine, int, int) {
 	} else if ui.busy {
 		prompt = "queue ❯ "
 	}
-	promptWidth := runewidth.StringWidth(prompt)
+	promptWidth := memfitStringWidth(prompt)
 	layout := layoutMemfitEditor(ui.buffer, ui.cursor, ui.width-promptWidth, ui.editorMaxRows())
 	title := ui.editorTitle(layout)
 	top := "╭─ " + title + " "
-	top += strings.Repeat("─", maxInt(0, ui.width-1-runewidth.StringWidth(top)))
+	top += strings.Repeat("─", maxInt(0, ui.width-1-memfitStringWidth(top)))
 	lines := []memfitLiveLine{{text: top, color: memfitColorDim}}
 	for index, line := range layout.lines {
 		color := ""

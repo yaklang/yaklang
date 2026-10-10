@@ -896,7 +896,12 @@ func (ui *memfitTUI) handleEnvelope(envelope memfitEnvelope) error {
 		if ui.lastModel != "" && ui.width >= 58 {
 			detail += " · " + ui.lastModel
 		}
-		fmt.Fprintf(os.Stdout, "%s %s\r\n\r\n", ui.paint(color, marker), ui.paint(memfitColorDim, detail))
+		// ConPTY coalesces the two newlines below into one cursor move, which
+		// corrupts the turn transcript on real terminals; flush them before
+		// the cursor leaves the line so the blanks are emitted literally.
+		fmt.Fprintf(os.Stdout, "%s %s\r\n", ui.paint(color, marker), ui.paint(memfitColorDim, detail))
+		ui.flushSync()
+		fmt.Fprint(os.Stdout, "\r\n")
 		ui.recordTranscript(marker+" "+detail, nil, color)
 		ui.busy = false
 		ui.awaitingInput = false
@@ -1669,7 +1674,7 @@ func hasMemfitProcessDetails(item memfitProcessItem, width int) bool {
 	if item.kind == "Thinking" || strings.Contains(detail, "\n") {
 		return true
 	}
-	return runewidth.StringWidth(firstMemfitProcessLine(detail)) > maxInt(18, width/2)
+	return memfitStringWidth(firstMemfitProcessLine(detail)) > maxInt(18, width/2)
 }
 
 func memfitExpandedProcessDetail(item memfitProcessItem) string {
@@ -1778,7 +1783,7 @@ func (ui *memfitTUI) renderComposer() {
 			pendingHits = append(pendingHits, pendingHit{
 				row: rows,
 				memfitProcessHit: memfitProcessHit{
-					cells:      runewidth.StringWidth(plain),
+					cells:      memfitStringWidth(plain),
 					processKey: line.processKey,
 					showMore:   line.showMore,
 				},
@@ -1874,7 +1879,7 @@ func (ui *memfitTUI) renderFooter(marker, color string) {
 		fmt.Fprint(os.Stdout, ui.paint(color, truncateMemfitCells(left, maxWidth)))
 		return
 	}
-	gap := maxWidth - runewidth.StringWidth(left) - runewidth.StringWidth(right)
+	gap := maxWidth - memfitStringWidth(left) - memfitStringWidth(right)
 	if gap < 1 {
 		fmt.Fprint(os.Stdout, ui.paint(color, truncateMemfitCells(left, maxWidth)))
 		return
@@ -1889,7 +1894,7 @@ func (ui *memfitTUI) footerSegments(marker string) (string, string) {
 	if ui.transcriptScroll > 0 {
 		left := truncateMemfitCells("↑ History · "+memfitHistoryOffsetLabel(ui.transcriptScroll), maxWidth)
 		for _, right := range []string{"PgDn latest · " + strings.ToUpper(ui.config.ReviewPolicy), "PgDn latest", strings.ToUpper(ui.config.ReviewPolicy)} {
-			if runewidth.StringWidth(left)+3+runewidth.StringWidth(right) <= maxWidth {
+			if memfitStringWidth(left)+3+memfitStringWidth(right) <= maxWidth {
 				return left, right
 			}
 		}
@@ -1912,7 +1917,7 @@ func (ui *memfitTUI) footerSegments(marker string) (string, string) {
 		mode,
 	}
 	for _, right := range candidates {
-		if runewidth.StringWidth(left)+3+runewidth.StringWidth(right) <= maxWidth {
+		if memfitStringWidth(left)+3+memfitStringWidth(right) <= maxWidth {
 			return left, right
 		}
 	}
@@ -2026,7 +2031,7 @@ func (ui *memfitTUI) printWrappedText(text, indent string) {
 }
 
 func (ui *memfitTUI) printWrappedWithPrefix(firstPrefix, nextPrefix, text string) {
-	width := maxInt(8, ui.width-runewidth.StringWidth(firstPrefix)-1)
+	width := maxInt(8, ui.width-memfitStringWidth(firstPrefix)-1)
 	lines := wrapMemfitCells(sanitizeMemfitTerminalText(text), width)
 	if len(lines) == 0 {
 		lines = []string{""}
@@ -2144,6 +2149,14 @@ func (ui *memfitTUI) restoreSavedDraft() {
 	}
 	ui.savedDraft = nil
 	ui.savedDraftCursor = 0
+}
+
+// flushSync flushes pending writes and waits for the line to reach the
+// terminal before more control sequences are emitted. ConPTY rewrites
+// adjacent newlines into cursor moves, so blank transcript lines must be
+// committed before the cursor leaves them or they never reach the host.
+func (ui *memfitTUI) flushSync() {
+	_ = os.Stdout.Sync()
 }
 
 func (ui *memfitTUI) paint(code, text string) string {
@@ -2418,7 +2431,7 @@ func memfitInputViewport(buffer []rune, cursor, maxCells int) (string, int) {
 				pieces[i] = string(r)
 			}
 		}
-		widths[i] = maxInt(1, runewidth.StringWidth(pieces[i]))
+		widths[i] = maxInt(1, memfitStringWidth(pieces[i]))
 	}
 
 	start := 0
@@ -2462,7 +2475,7 @@ func memfitInputViewport(buffer []rune, cursor, maxCells int) (string, int) {
 	}
 	var text strings.Builder
 	text.WriteString(prefix)
-	cursorCells := runewidth.StringWidth(prefix)
+	cursorCells := memfitStringWidth(prefix)
 	for i := start; i < end; i++ {
 		if i < cursor {
 			cursorCells += widths[i]
@@ -2895,7 +2908,7 @@ func wrapMemfitCells(input string, maxCells int) []string {
 		for len(remaining) > 0 {
 			used, cut, lastSpace := 0, 0, -1
 			for index, r := range remaining {
-				width := maxInt(1, runewidth.RuneWidth(r))
+				width := maxInt(1, memfitRuneWidth(r))
 				if used > 0 && used+width > maxCells {
 					break
 				}
@@ -3308,6 +3321,30 @@ func extractMemfitInteractiveID(fallback, content string) string {
 	return fallback
 }
 
+// memfitWidth is a fixed runewidth condition with EastAsianWidth disabled.
+// The default condition is locale-sensitive: on CJK consoles (e.g. code page
+// 936) runewidth counts ambiguous-width runes such as box-drawing characters
+// as two cells, which resizes every border and truncation by the user's
+// locale instead of the terminal geometry. Memfit lays out its chrome from
+// those runes, so width measurement must stay deterministic.
+var memfitWidth = func() *runewidth.Condition {
+	condition := runewidth.NewCondition()
+	condition.EastAsianWidth = false
+	return condition
+}()
+
+// memfitStringWidth measures the display width of text in terminal cells,
+// using the locale-independent memfitWidth condition.
+func memfitStringWidth(text string) int {
+	return memfitWidth.StringWidth(text)
+}
+
+// memfitRuneWidth measures the display width of a single rune in terminal
+// cells, using the locale-independent memfitWidth condition.
+func memfitRuneWidth(r rune) int {
+	return memfitWidth.RuneWidth(r)
+}
+
 func normalizeMemfitWidth(width int) int {
 	if width < 20 {
 		return 20
@@ -3326,24 +3363,28 @@ func normalizeMemfitHeight(height int) int {
 }
 
 func compactMemfitPath(path string, maxCells int) string {
-	if runewidth.StringWidth(path) <= maxCells {
+	if memfitStringWidth(path) <= maxCells {
 		return path
 	}
-	parts := strings.Split(strings.TrimRight(path, string(os.PathSeparator)), string(os.PathSeparator))
+	// The header displays a path hint, not a filesystem operation; render it
+	// with forward slashes so the UI (and snapshot goldens) stay identical on
+	// every platform regardless of os.PathSeparator.
+	trimmed := strings.TrimRight(strings.ReplaceAll(path, "\\", "/"), "/")
+	parts := strings.Split(trimmed, "/")
 	if len(parts) > 1 {
-		path = "…" + string(os.PathSeparator) + parts[len(parts)-1]
+		path = "…/" + parts[len(parts)-1]
 	}
 	return truncateMemfitCells(path, maxCells)
 }
 
 func truncateMemfitCells(value string, maxCells int) string {
-	if runewidth.StringWidth(value) <= maxCells {
+	if memfitStringWidth(value) <= maxCells {
 		return value
 	}
 	var output strings.Builder
 	used := 0
 	for _, r := range value {
-		width := maxInt(1, runewidth.RuneWidth(r))
+		width := maxInt(1, memfitRuneWidth(r))
 		if used+width+1 > maxCells {
 			break
 		}
