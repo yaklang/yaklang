@@ -28043,6 +28043,469 @@
         "common/pcapx/pcaputil/dlms-small-graph-budget/validation/expected.json": "validation/expected.json",
         "scripts/protocol-tests/required-tests-traffic-unified-v7.json": "required-tests-traffic-unified-v7.json"
       }
+    },
+    {
+      "id": "validation-dlms-calendar",
+      "kind": "validation",
+      "source_sha": "a06616e739d375592ef3a09f12453efe29ad879b",
+      "file": "validation-dlms-calendar.zip",
+      "sha256": "dc64b9f0e484dff445e85943876ee265e49ea12e5e31dc7b03c912a9ab112093",
+      "password": "bin-parser",
+      "members": {
+        "build.py": {
+          "sha256": "b1aff106625252aba3ebf564bfb0eb90450853f10f4ce38077971c91897d7c44",
+          "bytes": 4954
+        },
+        "historical-calendar.json": {
+          "sha256": "74a07bb29899913247311286ceaa99058153e5540da45e3df162c994201655a6",
+          "bytes": 2431
+        },
+        "carrier.py": {
+          "sha256": "07db3352defd52e18936a68d327f675a57abc90c59611492c049f102b08843d2",
+          "bytes": 3782
+        },
+        "oracle.py": {
+          "sha256": "cdc1b8bca6ed822987205b72b5e5476b79ee83e9758a63a2b244f67fd95a44be",
+          "bytes": 4499
+        },
+        "axdr.py": {
+          "sha256": "b774aa1877e856ab364585ed012f96c64cecdaae72e39ab753775066e4c5bc27",
+          "bytes": 7354
+        },
+        "calendar_oracle.py": {
+          "sha256": "dd2f9ba3852b7fceae7b408f404c2e9c2f7f30180442175f4d78d74517a60630",
+          "bytes": 1515
+        },
+        "reference-check.py": {
+          "sha256": "9ddb5cf93254b34c97963e8919ceff7983a50121191d3c8b732e0cb8ef745b19",
+          "bytes": 4623
+        },
+        "verify-controls.py": {
+          "sha256": "7f27ad012b2a2ae6d8b2df9614a146a77c04a84e3956fb5b4a7a47a8e3bb95ed",
+          "bytes": 1726
+        },
+        "seal.py": {
+          "sha256": "ca155403249e5652166a24a0f96de53b4aeee033f25dc7caaa547b09f01120d1",
+          "bytes": 5461
+        },
+        "source-pin.json": {
+          "sha256": "d59bbcfbaecdfdc083f61928beeeb83e0c44a123ffc5b485566d1ed6715f3447",
+          "bytes": 17133
+        },
+        "required-tests-traffic-unified-v8.json": {
+          "sha256": "a08dc6b4d0bc81e11f972477540f0960adaba61581c119915867bac7e68a0ded",
+          "bytes": 115197
+        },
+        "cases/calendar-date-tcp.pcap": {
+          "sha256": "164b43151a2f3f13badf357f6de429bed8e8841133922d419a39b64ab2d865bd",
+          "bytes": 413
+        },
+        "answers/calendar-date-tcp.json": {
+          "sha256": "5857d0c7d56bd522a2939b33d5e3d51c4131d551ba4f229c2cc7eccb1899e32e",
+          "bytes": 3493
+        },
+        "cases/calendar-date-udp.pcap": {
+          "sha256": "93c49827654a017aba668e6360f4fae4c7e9eae418effc275c04a7ac648daaf3",
+          "bytes": 179
+        },
+        "answers/calendar-date-udp.json": {
+          "sha256": "e0afd1fe776e8e1ee6a1cdfbb28659939ea120ee205cc166179f2cbf5a7e72a8",
+          "bytes": 3493
+        },
+        "cases/calendar-date-list.pcap": {
+          "sha256": "754d5a555580ad0dbd3a8c01b2e2e5037be6f3aa91403cfc125703ed67fec6e2",
+          "bytes": 195
+        },
+        "answers/calendar-date-list.json": {
+          "sha256": "e86f35b00bbaf8e0aba7750280a5a845dfcd8f3dbb36d54d079288c02f51dbd4",
+          "bytes": 5105
+        },
+        "cases/calendar-date-selection.pcap": {
+          "sha256": "44f0c6e80c9a5e7c7d3d5dcb84b50591ed043225de96e44239b64557d3890fb8",
+          "bytes": 183
+        },
+        "answers/calendar-date-selection.json": {
+          "sha256": "ef995f90733d0750c38ca81941029098eb2b0a15d25f95f2390970673282058c",
+          "bytes": 3762
+        },
+        "cases/calendar-time-tcp.pcap": {
+          "sha256": "a37352cbd139a9d92ea367bffe0a39453eef2590cc87298a643092df39b4b043",
+          "bytes": 412
+        },
+        "answers/calendar-time-tcp.json": {
+          "sha256": "737681e4977ed8f2c5be6779bb31bca7d96b98e4aea4661b4d0a3c4bed9e0f9c",
+          "bytes": 3421
+        },
+        "cases/calendar-time-udp.pcap": {
+          "sha256": "3414d0c16de1a1028d6d8f68bb071a6141260974ffaa14df88505f3ae7c322ab",
+          "bytes": 178
+        },
+        "answers/calendar-time-udp.json": {
+          "sha256": "7ed5cb0da281ed495b9038a9cc203b7cbef2714897d57962384dd2637c71155e",
+          "bytes": 3421
+        },
+        "cases/calendar-time-list.pcap": {
+          "sha256": "e945725b2c610330e69b29c1a91e1c13f8a4a4c8c16bfc3e77c14b0aeaff8fcd",
+          "bytes": 194
+        },
+        "answers/calendar-time-list.json": {
+          "sha256": "704026270c47474b4c8a5aab7f515b5f336f29c4f303cee45b83e8897ce5af9f",
+          "bytes": 5028
+        },
+        "cases/calendar-time-selection.pcap": {
+          "sha256": "ff3149f5fce03da8b86e528afcbedb03a2026507b4fe8ee16a67f674d9b7bbf0",
+          "bytes": 182
+        },
+        "answers/calendar-time-selection.json": {
+          "sha256": "a6ac5c06ff55864734cd1248e4a86c8cf4d39b802548164a494c26bca0ae3c65",
+          "bytes": 3691
+        },
+        "cases/calendar-datetime-tcp.pcap": {
+          "sha256": "4fd155882e2b6e411444bb1f091c772e144bf2118de9a046b098db4cec6cde84",
+          "bytes": 420
+        },
+        "answers/calendar-datetime-tcp.json": {
+          "sha256": "d2f46d513519a44fc69590a9861cced24055567ccc62095063a9874b43018cbd",
+          "bytes": 3991
+        },
+        "cases/calendar-datetime-udp.pcap": {
+          "sha256": "dddec88d0be9e37009817e30d78bc5c39cf32e05d0a307ebab049cc2f2e28b7c",
+          "bytes": 186
+        },
+        "answers/calendar-datetime-udp.json": {
+          "sha256": "abe5c2d8733bbc38e2a8ebf305954a6e660711aa707de5e2338f55d631653006",
+          "bytes": 3991
+        },
+        "cases/calendar-datetime-list.pcap": {
+          "sha256": "d9715cc4de5cd92dda0ae1e3a0650c08d1d0c5dcccdce3749a29cbb4b26fcb6e",
+          "bytes": 202
+        },
+        "answers/calendar-datetime-list.json": {
+          "sha256": "7ccf0f59b257ba3881c91b563a4db5f4168c1a059d61369eb2eededa84cb6bc8",
+          "bytes": 5666
+        },
+        "cases/calendar-datetime-selection.pcap": {
+          "sha256": "486324613ae28597b67271ec1981b9babfe792b5d89906a5e342849ab3ba0eaf",
+          "bytes": 190
+        },
+        "answers/calendar-datetime-selection.json": {
+          "sha256": "8466a5381a1695754271054a5b4ebb921cc49fa4d5b42708e9c1b5859ac1e6b5",
+          "bytes": 4260
+        },
+        "cases/calendar-date-unspecified.pcap": {
+          "sha256": "032658b6ecd0296b34b9da3b6e7c34ce836a5c64d5fa968daa52d42fe96b17bd",
+          "bytes": 179
+        },
+        "answers/calendar-date-unspecified.json": {
+          "sha256": "20202da1bc54c441c76815588bbe0ba75ac38ebbfe3b159c731dc2bec3344c99",
+          "bytes": 3529
+        },
+        "cases/calendar-time-unspecified.pcap": {
+          "sha256": "6a89b7afcd3f521b435f2a20b060692addd0231a349c3116fcb975ebd7ecf88c",
+          "bytes": 178
+        },
+        "answers/calendar-time-unspecified.json": {
+          "sha256": "2c55d7831f1a1a18bacbc3830b7abc97b649db06ebd8233da50dadf5694f3c96",
+          "bytes": 3457
+        },
+        "cases/calendar-datetime-unspecified.pcap": {
+          "sha256": "ad39dfba5472a01caeaf06e83e6578f3c098ae0e261bf2c577d2368d818ea285",
+          "bytes": 186
+        },
+        "answers/calendar-datetime-unspecified.json": {
+          "sha256": "d723dcafbb89e46f47c4fe143d2095ca87911ce88f62b9a266e7e318e4b47555",
+          "bytes": 4048
+        },
+        "cases/calendar-date-last-day.pcap": {
+          "sha256": "d02b490c2f9303e9451929c3ce8dd2f0ca05cd264c5f80d3f4280788e1d2edd8",
+          "bytes": 179
+        },
+        "answers/calendar-date-last-day.json": {
+          "sha256": "5619f0b91e455b0b65a2cb2a3275ea1e77f6db36893101e2d1eb53550285a0ac",
+          "bytes": 3510
+        },
+        "cases/calendar-date-second-last-dst-end.pcap": {
+          "sha256": "db574418af0fca6aa89e40de90a8b1ba2c4405e67adc3ea9571c280521eedf63",
+          "bytes": 179
+        },
+        "answers/calendar-date-second-last-dst-end.json": {
+          "sha256": "ce137e14eab7776abe296548a58c03541283488259ac3cc6ef93db6eb81640a6",
+          "bytes": 3562
+        },
+        "cases/calendar-date-dst-begin.pcap": {
+          "sha256": "d45f9fc3beb4abefd0aba9b9f0ed7263a7d9ee0b29aa4bdce156c0b15be40a13",
+          "bytes": 179
+        },
+        "answers/calendar-date-dst-begin.json": {
+          "sha256": "355f3e48abe8400611242ecb3b638a637f179b2a0aef399ee5d914a1c9740aff",
+          "bytes": 3526
+        },
+        "cases/calendar-datetime-positive-deviation.pcap": {
+          "sha256": "3ff5cd3d1b7189783cab7d439bc20948edbb5b6f7d094afbe3203d622d054088",
+          "bytes": 186
+        },
+        "answers/calendar-datetime-positive-deviation.json": {
+          "sha256": "5e502902db715e735282739de12021fb7b96d0d21d40f2fd4b0536373ad4c717",
+          "bytes": 4034
+        },
+        "cases/calendar-datetime-reserved-status.pcap": {
+          "sha256": "8c8031ca48b848ff957a3a293f89e03c6aa8dd1c2450d7c5a63bfa61607289a9",
+          "bytes": 186
+        },
+        "answers/calendar-datetime-reserved-status.json": {
+          "sha256": "143986b75027766e809e7012994cbf4f0219d7f1f026063d7f5bf77a2e62fef5",
+          "bytes": 4030
+        },
+        "cases/calendar-date-century-leap.pcap": {
+          "sha256": "255f4371ac25ae3903c558722245d726541c2a56c5b9eed93b0007e0e7debb35",
+          "bytes": 179
+        },
+        "answers/calendar-date-century-leap.json": {
+          "sha256": "fc9cb3f95d90b56a4dd11ed0659b492f8781fa3e03e19d309ae4fd0a0925487a",
+          "bytes": 3520
+        },
+        "cases/calendar-date-weekday-opaque.pcap": {
+          "sha256": "d5712f5084039e30e2f8c7f97120c34de982deb62098cc7715ffd5826ad9f41b",
+          "bytes": 179
+        },
+        "answers/calendar-date-weekday-opaque.json": {
+          "sha256": "ff92d226db8279cc8b7c1e3ef66bfe11f0680da4fedc79a5a120cb9455e9824e",
+          "bytes": 3526
+        },
+        "cases/calendar-date-year1899.pcap": {
+          "sha256": "cd9ca118af3de58532359bf7d977613cdc42b1b122066199d89d9a0a88d75ef6",
+          "bytes": 179
+        },
+        "answers/calendar-date-year1899.json": {
+          "sha256": "c455561aeccc90bda46ff3ae9d5702e41c3d1cdcdbf237f76b2a5f53b3473bb2",
+          "bytes": 3507
+        },
+        "cases/calendar-graph.pcap": {
+          "sha256": "b9238856f1c767f75ab0de6fb273d04fb0c5a1028d93538d425b3717ccfa99ec",
+          "bytes": 199
+        },
+        "answers/calendar-graph.json": {
+          "sha256": "6222740c913bb70a3886cba49171d957e2af869878ac4167e6df61373206434f",
+          "bytes": 5371
+        },
+        "cases/calendar-date-truncated.pcap": {
+          "sha256": "caafe8d01e2568f50b566ed46468f0ec4ef8f31b1f0f64c0f10c88c59f251e6e",
+          "bytes": 251
+        },
+        "answers/calendar-date-truncated.json": {
+          "sha256": "f560050e4cb861a4bab2dbe88f4eff6cc40bf3333be4b8902748339e2f3fb639",
+          "bytes": 3672
+        },
+        "cases/calendar-time-truncated.pcap": {
+          "sha256": "ea5f7ef44768a3f996f64c717eb3746fab13c807b2a6f50af29f7646a19e3b01",
+          "bytes": 250
+        },
+        "answers/calendar-time-truncated.json": {
+          "sha256": "b6397234a1fa10f794a7dd3c79949c3c631a9665c8003bcacbb3e9e776e9e8f2",
+          "bytes": 3668
+        },
+        "cases/calendar-datetime-truncated.pcap": {
+          "sha256": "3f83f1574b865f47f1cadc5350a9a0bd38cf9df9dccff74c382458d5d74d2cf8",
+          "bytes": 258
+        },
+        "answers/calendar-datetime-truncated.json": {
+          "sha256": "71168c08256e8c23899ec9834247dc1f25cee1ab0b0a56671bb35e985334d879",
+          "bytes": 3712
+        },
+        "cases/calendar-date-trailing.pcap": {
+          "sha256": "3545aa861df829f6b811e0492deb327338292816e8add992dfdf57d60b90d15b",
+          "bytes": 253
+        },
+        "answers/calendar-date-trailing.json": {
+          "sha256": "6c09c41930e5b334e8e98aaa8d62251d66d0afd3a3b42abc60037c3c108e6607",
+          "bytes": 3683
+        },
+        "cases/calendar-date-nonleap.pcap": {
+          "sha256": "1067c30d3aa2e7b3f7998eea9f9c186260e4fb2899bc01a62c342f58db3049ab",
+          "bytes": 252
+        },
+        "answers/calendar-date-nonleap.json": {
+          "sha256": "d01ef61f3a918e2d81079658835fed2aa65a996afcca7b56dd50f2f8dbf20122",
+          "bytes": 3696
+        },
+        "cases/calendar-date-month0.pcap": {
+          "sha256": "165d79cf3dc26f7310180fce8f309d57e27714753f3b6392b8daaa1e30d6b09b",
+          "bytes": 252
+        },
+        "answers/calendar-date-month0.json": {
+          "sha256": "736cff2af867c289a1017443758d25bed260ad94ce3a67f0578d722659890704",
+          "bytes": 3686
+        },
+        "cases/calendar-date-day0.pcap": {
+          "sha256": "d3f87ef6185737f85a06889f7ad7355a76c3d4617f78bffa85fb03e58d3b613a",
+          "bytes": 252
+        },
+        "answers/calendar-date-day0.json": {
+          "sha256": "f9c80eaf748e5ae46a290d445a250e2e88988c9933ddce77fda32d21c8198110",
+          "bytes": 3680
+        },
+        "cases/calendar-date-weekday0.pcap": {
+          "sha256": "8abdf35021273e9e45606df6a182ef3f927f6f50685d02866e49d52098a186b0",
+          "bytes": 252
+        },
+        "answers/calendar-date-weekday0.json": {
+          "sha256": "dc11be55e30587ff7c4a838bcf0b18c26365f56b2f4df30ddfa37d3077499573",
+          "bytes": 3692
+        },
+        "cases/calendar-date-year0.pcap": {
+          "sha256": "74ce01582bf945138fe0c41ee27db001740bb9c8d0043cb746c30bde81f0b658",
+          "bytes": 252
+        },
+        "answers/calendar-date-year0.json": {
+          "sha256": "692bdaf15822df94b5446f74a547aa094030414d16135b0c36943925be388a37",
+          "bytes": 3683
+        },
+        "cases/calendar-time-hour24.pcap": {
+          "sha256": "d7cf60b130cfc485609090ad2dc8a1ea0b2181a239f6f8a0dbf1ab57b9876159",
+          "bytes": 251
+        },
+        "answers/calendar-time-hour24.json": {
+          "sha256": "30042d2e21a7c6f2c546f5cd097b947eb7ba83e253522e9949e772adb2bcad9e",
+          "bytes": 3682
+        },
+        "cases/calendar-time-minute60.pcap": {
+          "sha256": "6412a220ab3993a9faf1ac748a10011a61b1ff1ef7017f5e1a67bbefeaa4f785",
+          "bytes": 251
+        },
+        "answers/calendar-time-minute60.json": {
+          "sha256": "4596f50a8dff8559d5e21721e40905e6ca2b4a3c8c05bc712718c01f6b584226",
+          "bytes": 3688
+        },
+        "cases/calendar-time-second60.pcap": {
+          "sha256": "440e7d097a13bf8cdd1d5470220ba0660ad0c18bdf63cae59dae03b35601a85f",
+          "bytes": 251
+        },
+        "answers/calendar-time-second60.json": {
+          "sha256": "ccc6626bb7bd090da12f09c8bb945083a84a675f3c0b5bfbf4b833dbaf195526",
+          "bytes": 3688
+        },
+        "cases/calendar-time-hundredths100.pcap": {
+          "sha256": "98e97cfeee1deb3a908b88a682632320f6878ec21e7fcfead272475bd879a53f",
+          "bytes": 251
+        },
+        "answers/calendar-time-hundredths100.json": {
+          "sha256": "6634ba762985cf835fbf7bb0cab3f485e9a0e4ca6815350f752708f3cc6c9da3",
+          "bytes": 3703
+        },
+        "cases/calendar-selection-invalid.pcap": {
+          "sha256": "8e06cd79ec0184b4a7134ede50df7aec129c2611868bfda6cb84af5063f84887",
+          "bytes": 261
+        },
+        "answers/calendar-selection-invalid.json": {
+          "sha256": "30222d07e42d80198acb68ea54539a04acc7974f108d7da4a3cdff1381401e32",
+          "bytes": 3740
+        },
+        "answers/historical-calendar-truncated.json": {
+          "sha256": "b90e4465d6f67a7e8c3f24aaf7cd6e1ed3da92be080a14392458a68f7910e335",
+          "bytes": 2416
+        },
+        "controls.json": {
+          "sha256": "8584cafc6a8256a23aa4baf1dcc9d7637bc20e10ab73a9da718147c45a6809e5",
+          "bytes": 168200
+        },
+        "validation/expected.json": {
+          "sha256": "5167c3e2f93d6d129db26d252c29be6a84c1ddf6f56fdf98d841e38431c66bdc",
+          "bytes": 44771
+        }
+      },
+      "aliases": {
+        "common/pcapx/pcaputil/dlms-calendar/build.py": "build.py",
+        "common/pcapx/pcaputil/dlms-calendar/historical-calendar.json": "historical-calendar.json",
+        "common/pcapx/pcaputil/dlms-calendar/carrier.py": "carrier.py",
+        "common/pcapx/pcaputil/dlms-calendar/oracle.py": "oracle.py",
+        "common/pcapx/pcaputil/dlms-calendar/axdr.py": "axdr.py",
+        "common/pcapx/pcaputil/dlms-calendar/calendar_oracle.py": "calendar_oracle.py",
+        "common/pcapx/pcaputil/dlms-calendar/reference-check.py": "reference-check.py",
+        "common/pcapx/pcaputil/dlms-calendar/verify-controls.py": "verify-controls.py",
+        "common/pcapx/pcaputil/dlms-calendar/seal.py": "seal.py",
+        "common/pcapx/pcaputil/dlms-calendar/source-pin.json": "source-pin.json",
+        "common/pcapx/pcaputil/dlms-calendar/required-tests-traffic-unified-v8.json": "required-tests-traffic-unified-v8.json",
+        "common/pcapx/pcaputil/dlms-calendar/cases/calendar-date-tcp.pcap": "cases/calendar-date-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-calendar/answers/calendar-date-tcp.json": "answers/calendar-date-tcp.json",
+        "common/pcapx/pcaputil/dlms-calendar/cases/calendar-date-udp.pcap": "cases/calendar-date-udp.pcap",
+        "common/pcapx/pcaputil/dlms-calendar/answers/calendar-date-udp.json": "answers/calendar-date-udp.json",
+        "common/pcapx/pcaputil/dlms-calendar/cases/calendar-date-list.pcap": "cases/calendar-date-list.pcap",
+        "common/pcapx/pcaputil/dlms-calendar/answers/calendar-date-list.json": "answers/calendar-date-list.json",
+        "common/pcapx/pcaputil/dlms-calendar/cases/calendar-date-selection.pcap": "cases/calendar-date-selection.pcap",
+        "common/pcapx/pcaputil/dlms-calendar/answers/calendar-date-selection.json": "answers/calendar-date-selection.json",
+        "common/pcapx/pcaputil/dlms-calendar/cases/calendar-time-tcp.pcap": "cases/calendar-time-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-calendar/answers/calendar-time-tcp.json": "answers/calendar-time-tcp.json",
+        "common/pcapx/pcaputil/dlms-calendar/cases/calendar-time-udp.pcap": "cases/calendar-time-udp.pcap",
+        "common/pcapx/pcaputil/dlms-calendar/answers/calendar-time-udp.json": "answers/calendar-time-udp.json",
+        "common/pcapx/pcaputil/dlms-calendar/cases/calendar-time-list.pcap": "cases/calendar-time-list.pcap",
+        "common/pcapx/pcaputil/dlms-calendar/answers/calendar-time-list.json": "answers/calendar-time-list.json",
+        "common/pcapx/pcaputil/dlms-calendar/cases/calendar-time-selection.pcap": "cases/calendar-time-selection.pcap",
+        "common/pcapx/pcaputil/dlms-calendar/answers/calendar-time-selection.json": "answers/calendar-time-selection.json",
+        "common/pcapx/pcaputil/dlms-calendar/cases/calendar-datetime-tcp.pcap": "cases/calendar-datetime-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-calendar/answers/calendar-datetime-tcp.json": "answers/calendar-datetime-tcp.json",
+        "common/pcapx/pcaputil/dlms-calendar/cases/calendar-datetime-udp.pcap": "cases/calendar-datetime-udp.pcap",
+        "common/pcapx/pcaputil/dlms-calendar/answers/calendar-datetime-udp.json": "answers/calendar-datetime-udp.json",
+        "common/pcapx/pcaputil/dlms-calendar/cases/calendar-datetime-list.pcap": "cases/calendar-datetime-list.pcap",
+        "common/pcapx/pcaputil/dlms-calendar/answers/calendar-datetime-list.json": "answers/calendar-datetime-list.json",
+        "common/pcapx/pcaputil/dlms-calendar/cases/calendar-datetime-selection.pcap": "cases/calendar-datetime-selection.pcap",
+        "common/pcapx/pcaputil/dlms-calendar/answers/calendar-datetime-selection.json": "answers/calendar-datetime-selection.json",
+        "common/pcapx/pcaputil/dlms-calendar/cases/calendar-date-unspecified.pcap": "cases/calendar-date-unspecified.pcap",
+        "common/pcapx/pcaputil/dlms-calendar/answers/calendar-date-unspecified.json": "answers/calendar-date-unspecified.json",
+        "common/pcapx/pcaputil/dlms-calendar/cases/calendar-time-unspecified.pcap": "cases/calendar-time-unspecified.pcap",
+        "common/pcapx/pcaputil/dlms-calendar/answers/calendar-time-unspecified.json": "answers/calendar-time-unspecified.json",
+        "common/pcapx/pcaputil/dlms-calendar/cases/calendar-datetime-unspecified.pcap": "cases/calendar-datetime-unspecified.pcap",
+        "common/pcapx/pcaputil/dlms-calendar/answers/calendar-datetime-unspecified.json": "answers/calendar-datetime-unspecified.json",
+        "common/pcapx/pcaputil/dlms-calendar/cases/calendar-date-last-day.pcap": "cases/calendar-date-last-day.pcap",
+        "common/pcapx/pcaputil/dlms-calendar/answers/calendar-date-last-day.json": "answers/calendar-date-last-day.json",
+        "common/pcapx/pcaputil/dlms-calendar/cases/calendar-date-second-last-dst-end.pcap": "cases/calendar-date-second-last-dst-end.pcap",
+        "common/pcapx/pcaputil/dlms-calendar/answers/calendar-date-second-last-dst-end.json": "answers/calendar-date-second-last-dst-end.json",
+        "common/pcapx/pcaputil/dlms-calendar/cases/calendar-date-dst-begin.pcap": "cases/calendar-date-dst-begin.pcap",
+        "common/pcapx/pcaputil/dlms-calendar/answers/calendar-date-dst-begin.json": "answers/calendar-date-dst-begin.json",
+        "common/pcapx/pcaputil/dlms-calendar/cases/calendar-datetime-positive-deviation.pcap": "cases/calendar-datetime-positive-deviation.pcap",
+        "common/pcapx/pcaputil/dlms-calendar/answers/calendar-datetime-positive-deviation.json": "answers/calendar-datetime-positive-deviation.json",
+        "common/pcapx/pcaputil/dlms-calendar/cases/calendar-datetime-reserved-status.pcap": "cases/calendar-datetime-reserved-status.pcap",
+        "common/pcapx/pcaputil/dlms-calendar/answers/calendar-datetime-reserved-status.json": "answers/calendar-datetime-reserved-status.json",
+        "common/pcapx/pcaputil/dlms-calendar/cases/calendar-date-century-leap.pcap": "cases/calendar-date-century-leap.pcap",
+        "common/pcapx/pcaputil/dlms-calendar/answers/calendar-date-century-leap.json": "answers/calendar-date-century-leap.json",
+        "common/pcapx/pcaputil/dlms-calendar/cases/calendar-date-weekday-opaque.pcap": "cases/calendar-date-weekday-opaque.pcap",
+        "common/pcapx/pcaputil/dlms-calendar/answers/calendar-date-weekday-opaque.json": "answers/calendar-date-weekday-opaque.json",
+        "common/pcapx/pcaputil/dlms-calendar/cases/calendar-date-year1899.pcap": "cases/calendar-date-year1899.pcap",
+        "common/pcapx/pcaputil/dlms-calendar/answers/calendar-date-year1899.json": "answers/calendar-date-year1899.json",
+        "common/pcapx/pcaputil/dlms-calendar/cases/calendar-graph.pcap": "cases/calendar-graph.pcap",
+        "common/pcapx/pcaputil/dlms-calendar/answers/calendar-graph.json": "answers/calendar-graph.json",
+        "common/pcapx/pcaputil/dlms-calendar/cases/calendar-date-truncated.pcap": "cases/calendar-date-truncated.pcap",
+        "common/pcapx/pcaputil/dlms-calendar/answers/calendar-date-truncated.json": "answers/calendar-date-truncated.json",
+        "common/pcapx/pcaputil/dlms-calendar/cases/calendar-time-truncated.pcap": "cases/calendar-time-truncated.pcap",
+        "common/pcapx/pcaputil/dlms-calendar/answers/calendar-time-truncated.json": "answers/calendar-time-truncated.json",
+        "common/pcapx/pcaputil/dlms-calendar/cases/calendar-datetime-truncated.pcap": "cases/calendar-datetime-truncated.pcap",
+        "common/pcapx/pcaputil/dlms-calendar/answers/calendar-datetime-truncated.json": "answers/calendar-datetime-truncated.json",
+        "common/pcapx/pcaputil/dlms-calendar/cases/calendar-date-trailing.pcap": "cases/calendar-date-trailing.pcap",
+        "common/pcapx/pcaputil/dlms-calendar/answers/calendar-date-trailing.json": "answers/calendar-date-trailing.json",
+        "common/pcapx/pcaputil/dlms-calendar/cases/calendar-date-nonleap.pcap": "cases/calendar-date-nonleap.pcap",
+        "common/pcapx/pcaputil/dlms-calendar/answers/calendar-date-nonleap.json": "answers/calendar-date-nonleap.json",
+        "common/pcapx/pcaputil/dlms-calendar/cases/calendar-date-month0.pcap": "cases/calendar-date-month0.pcap",
+        "common/pcapx/pcaputil/dlms-calendar/answers/calendar-date-month0.json": "answers/calendar-date-month0.json",
+        "common/pcapx/pcaputil/dlms-calendar/cases/calendar-date-day0.pcap": "cases/calendar-date-day0.pcap",
+        "common/pcapx/pcaputil/dlms-calendar/answers/calendar-date-day0.json": "answers/calendar-date-day0.json",
+        "common/pcapx/pcaputil/dlms-calendar/cases/calendar-date-weekday0.pcap": "cases/calendar-date-weekday0.pcap",
+        "common/pcapx/pcaputil/dlms-calendar/answers/calendar-date-weekday0.json": "answers/calendar-date-weekday0.json",
+        "common/pcapx/pcaputil/dlms-calendar/cases/calendar-date-year0.pcap": "cases/calendar-date-year0.pcap",
+        "common/pcapx/pcaputil/dlms-calendar/answers/calendar-date-year0.json": "answers/calendar-date-year0.json",
+        "common/pcapx/pcaputil/dlms-calendar/cases/calendar-time-hour24.pcap": "cases/calendar-time-hour24.pcap",
+        "common/pcapx/pcaputil/dlms-calendar/answers/calendar-time-hour24.json": "answers/calendar-time-hour24.json",
+        "common/pcapx/pcaputil/dlms-calendar/cases/calendar-time-minute60.pcap": "cases/calendar-time-minute60.pcap",
+        "common/pcapx/pcaputil/dlms-calendar/answers/calendar-time-minute60.json": "answers/calendar-time-minute60.json",
+        "common/pcapx/pcaputil/dlms-calendar/cases/calendar-time-second60.pcap": "cases/calendar-time-second60.pcap",
+        "common/pcapx/pcaputil/dlms-calendar/answers/calendar-time-second60.json": "answers/calendar-time-second60.json",
+        "common/pcapx/pcaputil/dlms-calendar/cases/calendar-time-hundredths100.pcap": "cases/calendar-time-hundredths100.pcap",
+        "common/pcapx/pcaputil/dlms-calendar/answers/calendar-time-hundredths100.json": "answers/calendar-time-hundredths100.json",
+        "common/pcapx/pcaputil/dlms-calendar/cases/calendar-selection-invalid.pcap": "cases/calendar-selection-invalid.pcap",
+        "common/pcapx/pcaputil/dlms-calendar/answers/calendar-selection-invalid.json": "answers/calendar-selection-invalid.json",
+        "common/pcapx/pcaputil/dlms-calendar/answers/historical-calendar-truncated.json": "answers/historical-calendar-truncated.json",
+        "common/pcapx/pcaputil/dlms-calendar/controls.json": "controls.json",
+        "common/pcapx/pcaputil/dlms-calendar/validation/expected.json": "validation/expected.json",
+        "scripts/protocol-tests/required-tests-traffic-unified-v8.json": "required-tests-traffic-unified-v8.json"
+      }
     }
   ],
   "schema_version": 1,

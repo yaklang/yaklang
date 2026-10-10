@@ -177,7 +177,7 @@ func wrapperScalar(w []byte, limit int) (map[string]any, error) {
 	out := map[string]any{"type": tag, "raw_hex": hex.EncodeToString(w)}
 	// Reuse the static size switch instead of rebuilding a map for every Data
 	// node. Extended scalar support is selected by the bounded cursor; this path preserves legacy scalar/octet fields.
-	if n := wrapperScalarSize(tag); n >= 0 && tag != 23 && tag != 24 {
+	if n := wrapperScalarSize(tag); n >= 0 && tag != 23 && tag != 24 && tag != 25 && tag != 26 && tag != 27 {
 		if len(v) != n {
 			return bad("fixed A-XDR scalar size mismatch")
 		}

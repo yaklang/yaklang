@@ -9,7 +9,7 @@ import (
 )
 
 // These are local selected-profile bounds, not DLMS wire maxima.
-// Data types other than scalar/float/octet/bit-string/selected-text/array/structure, GBT, ciphering
+// Data types other than scalar/float/octet/bit-string/selected-text/calendar/array/structure, GBT, ciphering
 // and object/selector semantics remain separate.
 const wrapperListItems = 64
 const wrapperListOctets = 1024
@@ -69,6 +69,12 @@ func wrapperScalarSize(tag byte) int {
 		return 4
 	case 20, 21, 24:
 		return 8
+	case 25:
+		return 12
+	case 26:
+		return 5
+	case 27:
+		return 4
 	default:
 		return -1
 	}
@@ -86,6 +92,9 @@ func (c *wrapperListCursor) scalar(limit int) (map[string]any, error) {
 		}
 		if tag == 23 || tag == 24 {
 			return wrapperListFloat(c.wire[start:c.at]), nil
+		}
+		if tag >= 25 && tag <= 27 {
+			return wrapperCalendar(c.wire[start:c.at])
 		}
 		return wrapperScalar(c.wire[start:c.at], limit)
 	}
@@ -305,7 +314,7 @@ func decodeWrapperList(m *wrapperMessage, p []byte, limit, depth int) error {
 }
 func wrapperIsList(w []byte) bool { return len(w) > 9 && w[9] == 3 }
 func wrapperExtendedScalarTag(tag byte) bool {
-	return tag == 4 || tag == 10 || tag == 12 || tag == 23 || tag == 24
+	return tag == 4 || tag == 10 || tag == 12 || tag == 23 || tag == 24 || tag == 25 || tag == 26 || tag == 27
 }
 func wrapperNormalExtendedData(w []byte) bool {
 	return len(w) > 12 && w[8] == 0xc4 && w[9] == 1 && w[11] == 0 && wrapperExtendedScalarTag(w[12])

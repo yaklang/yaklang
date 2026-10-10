@@ -67,11 +67,11 @@ func wrapperNormalExtendedControls(t *testing.T) []wrapperBlockControl {
 }
 
 func TestDLMSWrapperNormalGraphSealedMatrix(t *testing.T) {
-	wrapperBlocksReplay(t, wrapperBlockControlsFrom(t, "dlms-normal-graph", 24))
+	wrapperBlocksReplay(t, wrapperNormalGraphControls(t))
 }
 
 func TestDLMSWrapperNormalGraphBudgetsOwnership(t *testing.T) {
-	wrapperBlocksOwnership(t, wrapperBlockControlsFrom(t, "dlms-normal-graph", 24))
+	wrapperBlocksOwnership(t, wrapperNormalGraphControls(t))
 	for _, depth := range []int{3, 4} {
 		b := DefaultParserBudget()
 		b.MaxRecursionDepth = depth
@@ -152,4 +152,28 @@ func TestDLMSWrapperNormalGraphProjectionBoundary(t *testing.T) {
 			require.Zero(t, s.Stats().BufferedBytes)
 		}
 	}
+}
+
+func wrapperNormalGraphControls(t *testing.T) []wrapperBlockControl {
+	old := wrapperBlockControlsFrom(t, "dlms-normal-graph", 24)
+	updated := 0
+	for i := range old {
+		if old[i].Name != "normal-graph-date-time-pending" {
+			continue
+		}
+		require.Equal(t, "UnsupportedFeature", old[i].Answers[1].Error.Kind)
+		for _, c := range wrapperBlockControlsFrom(t, "dlms-calendar", 39) {
+			if c.Name != "historical-calendar-truncated" {
+				continue
+			}
+			require.Equal(t, old[i].SHA, c.SHA)
+			require.Equal(t, old[i].Steps, c.Steps)
+			require.Equal(t, old[i].Transport, c.Transport)
+			require.Equal(t, "MalformedMessage", c.Answers[1].Error.Kind)
+			old[i].Answers = c.Answers
+			updated++
+		}
+	}
+	require.Equal(t, 1, updated)
+	return old
 }
