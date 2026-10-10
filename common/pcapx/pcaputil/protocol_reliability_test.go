@@ -40,6 +40,7 @@ func TestDNSCanonicalLabels(t *testing.T) {
 	require.Equal(t, a, b)
 }
 func TestDNSCarrierAssociation(t *testing.T) {
+	t.Run("owned-datagram-queries", testDNSOwnedDatagramQueries)
 	c := NewDefaultConfig()
 	require.NoError(t, WithOnProtocolMessage(func(*ProtocolEvent) {})(c))
 	require.NoError(t, c.prepareBinParser())

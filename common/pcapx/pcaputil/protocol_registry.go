@@ -1,6 +1,9 @@
 package pcaputil
 
-import "fmt"
+import (
+	"errors"
+	"fmt"
+)
 
 // ProtocolProfile describes the native ingress implemented by this registry.
 // Probe evidence and user DecodeAs selection are separate event properties.
@@ -26,7 +29,7 @@ func NativeProtocolProfiles() []ProtocolProfile {
 		{"rtps", "udp", "RTPS2.1-2.5 SPDP parameter-list discovery and inline KeyHash/StatusInfo lifecycle DATA, INFO_TS and PAD", "observed GUID, sequence, endpoint set, lease and locators; repeated claims remain ordered and conflicting scalars ambiguous; no topic CDR, DATA_FRAG, reliable-writer or DDS Security inference"},
 		{"semtech-downlink-session", "explicit-udp", "Semtech v2 PULL_RESP/TX_ACK passive association", "opt-in exact endpoints/capture domain/token and full JSON observation; capture-lifetime token quarantine,30second pending expiry and fail-closed bounded state; no authentication, gateway identity binding or RF delivery proof"},
 		{"semtech-udp", "udp", "Semtech packet-forwarder v2 upstream and PULL_RESP/TX_ACK observations", "fixed v4.0.1 sender fields, exact JSON numbers/base64 and unresolved sender defaults; observed gateway/token only, no token association, radio config/GPS validation, RF delivery or LoRaWAN PHY/security"},
-		{"mavlink", "udp", "MAVLink v1/v2 HEARTBEAT, SYS_STATUS and GLOBAL_POSITION_INT", "pinned common-message CRC_EXTRA and complete datagram; v2 signatures opaque and unverified"},
+		{"mavlink", "udp", "MAVLink v1/v2 HEARTBEAT, SYS_STATUS, GPS_RAW_INT, ATTITUDE and GLOBAL_POSITION_INT", "pinned common-message CRC_EXTRA and complete datagram; GPS literal integers/sentinels and v2 extensions, ATTITUDE binary32 wire bits and zero-fill; v2 signatures opaque and unverified, no authenticated source, navigation or physical attitude claim"},
 		{"nmea", "udp", "complete NMEA 0183 GGA/RMC sentences", "XOR checksum, bounded fields and coordinates; position is observed and unauthenticated; no AIS"},
 		{"memcached", "tcp", "text get/gets/set and binary GET/SET", "observed direction, text reply order or binary opaque ID; values bounded by declared length; legacy stats layout remains available"},
 		{"doip", "tcp/udp", "DoIP v2/v3 TCP routing activation/alive/diagnostic and UDP VehicleIdentification0001-0004", "TCP observed routing/logical addresses and UDS DiagnosticSessionControl positive/negative/pending only; UDP exact datagram discovery fields, request-only FF and raw invalidity/unknown values, unassociated unverified observations; no vehicle identity/synchronization verification, TLS, manufacturer policy or v4 claim"},
@@ -283,6 +286,17 @@ func (a *binParser) decodeNativeDatagram(e *ProtocolEvent, w []byte, src, dst ui
 			fields, err = (&binSyslog{}).consume(w, syslogDatagram, a.config.MaxMessageBytes, a.budget.MaxCollectionElements)
 		} else {
 			fields, err = p.decode(w, a.budget.MaxCollectionElements)
+		}
+		if p.name == "dns" || p.name == "mdns" || p.name == "llmnr" {
+			// The canonical codec also has ordinary structural errors (e.g.
+			// a truncated QCLASS). A complete UDP datagram cannot acquire more
+			// bytes later; retain the refusal for deferred/native field queries.
+			if err != nil {
+				var typed *ProtocolError
+				if !errors.As(err, &typed) {
+					err = protocolError(ErrMalformedMessage, "%s", err)
+				}
+			}
 		}
 		e.Session = fields
 		e.Completeness = "message"

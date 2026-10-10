@@ -148,6 +148,12 @@ func (e *ProtocolEvent) GetFields() (map[string]any, error) {
 }
 
 func (e *ProtocolEvent) ownsNativeFields() bool {
+	// UDP DNS-family projections use the canonical native codec; TCP DNS
+	// keeps its length-prefixed rule envelope. Do not expose the native cache
+	// through mutable Fields/Structured aliases or hide its parse refusal.
+	if e.Transport == "udp" && e.Profile == e.Protocol+"-native" && (e.Protocol == "dns" || e.Protocol == "mdns" || e.Protocol == "llmnr") {
+		return true
+	}
 	if e.Profile == "quic-v1-native" || e.Profile == "http3-native" || e.Profile == "doq-native" {
 		return true
 	}

@@ -4,10 +4,12 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
+	"sync/atomic"
 
 	"path/filepath"
 	"testing"
 
+	"github.com/gopacket/gopacket"
 	"github.com/stretchr/testify/require"
 
 	"github.com/yaklang/yaklang/internal/trafficfixture"
@@ -55,54 +57,83 @@ func TestDNSNativeEDNSVariations(t *testing.T) {
 	}
 	capture, err := trafficfixture.ReadFile(filepath.Join(root, "native.pcapng"))
 	require.NoError(t, err)
-	for _, workers := range []int{1, 4} {
+	for _, workers := range []int{1, 2, 4} {
 		for _, deferred := range []bool{false, true} {
-			t.Run(fmt.Sprintf("workers%d/deferred%v", workers, deferred), func(t *testing.T) {
-				events, stats, err := binReplay(t, capture, workers, WithProtocolDecodeAs("udp", 19555, "dns"), WithProtocolDeferred(deferred))
-				require.NoError(t, err)
-				require.Len(t, events, 12)
-				require.Zero(t, stats.BufferedBytes)
-				require.Zero(t, stats.Malformed)
-				seen := map[string]bool{}
-				badvers, additional := 0, 0
-				for _, e := range events {
-					require.Equal(t, "dns", e.Protocol)
-					require.Empty(t, e.Error)
-					dns := e.Session["DNS"].(map[string]any)
-					got := nativeDNSCanonicalize(t, dns)
-					key := fmt.Sprintf("%s/%d/%v", e.Transport, got.ID, got.QR)
-					want, ok := expected[key]
-					require.True(t, ok, key)
-					require.False(t, seen[key], key)
-					seen[key] = true
-					require.Equal(t, want.Flags, dns["Flags"])
-					require.Equal(t, want.RCode, got.RCode)
-					require.Equal(t, want.Question, got.Question)
-					require.Equal(t, want.Answer, got.Answer)
-					require.Equal(t, want.Authority, nativeDNSRecords(t, dns["Authority"].([]map[string]any)))
-					require.Equal(t, want.Additional, got.Additional)
-					require.Equal(t, want.EDNS, got.EDNS)
-					require.Equal(t, uint16(want.EDNSFlags), got.EDNSFlags)
-					if got.QR {
-						require.NotZero(t, e.ResponseTo)
-						if got.RCode == 16 {
-							badvers++
-						}
-						if len(got.Additional) > 0 {
-							additional++
-						}
+			for _, observe := range []bool{false, true} {
+				t.Run(fmt.Sprintf("workers%d/deferred%v/observe%v", workers, deferred, observe), func(t *testing.T) {
+					var observedPackets atomic.Int64
+					opts := []CaptureOption{WithProtocolDecodeAs("udp", 19555, "dns"), WithProtocolDeferred(deferred)}
+					if observe {
+						opts = append(opts, WithEveryPacket(func(gopacket.Packet) { observedPackets.Add(1) }))
 					}
-					if e.Transport == "tcp" {
-						require.Equal(t, "dns-tcp", e.Profile)
-						require.NotContains(t, e.Summary, "DoT")
-					}
-					_, err = e.Decode()
+					events, stats, err := binReplay(t, capture, workers, opts...)
 					require.NoError(t, err)
-				}
-				require.Len(t, seen, len(expected))
-				require.Equal(t, 2, badvers)
-				require.Equal(t, 4, additional)
-			})
+					require.Len(t, events, 12)
+					require.Zero(t, stats.BufferedBytes)
+					require.Zero(t, stats.Malformed)
+					seen := map[string]bool{}
+					badvers, additional := 0, 0
+					for _, e := range events {
+						require.Equal(t, "dns", e.Protocol)
+						require.Empty(t, e.Error)
+						dns := e.Session["DNS"].(map[string]any)
+						got := nativeDNSCanonicalize(t, dns)
+						key := fmt.Sprintf("%s/%d/%v", e.Transport, got.ID, got.QR)
+						want, ok := expected[key]
+						require.True(t, ok, key)
+						require.False(t, seen[key], key)
+						seen[key] = true
+						require.Equal(t, want.Flags, dns["Flags"])
+						require.Equal(t, want.RCode, got.RCode)
+						require.Equal(t, want.Question, got.Question)
+						require.Equal(t, want.Answer, got.Answer)
+						require.Equal(t, want.Authority, nativeDNSRecords(t, dns["Authority"].([]map[string]any)))
+						require.Equal(t, want.Additional, got.Additional)
+						require.Equal(t, want.EDNS, got.EDNS)
+						require.Equal(t, uint16(want.EDNSFlags), got.EDNSFlags)
+						if got.QR {
+							require.NotZero(t, e.ResponseTo)
+							if got.RCode == 16 {
+								badvers++
+							}
+							if len(got.Additional) > 0 {
+								additional++
+							}
+						}
+						if e.Transport == "tcp" {
+							require.Equal(t, "dns-tcp", e.Profile)
+							require.NotContains(t, e.Summary, "DoT")
+						}
+						if e.Transport == "udp" {
+							// This complete tree has just been checked against the fixed
+							// independent native endpoint answer. Retain every byte/map
+							// for the mutation regression, not merely the protocol label.
+							before := cloneSession(dns)
+							f, err := e.GetFields()
+							require.NoError(t, err)
+							require.Equal(t, before, f)
+							mutateRTPSQuery(f)
+							tree, err := e.Decode()
+							require.NoError(t, err)
+							require.Equal(t, before, protocolFields(tree))
+							mutateRTPSQuery(protocolFields(tree))
+							mutateRTPSQuery(e.Fields)
+							mutateRTPSQuery(e.Structured)
+							again, err := e.GetFields()
+							require.NoError(t, err)
+							require.Equal(t, before, again)
+						}
+						_, err = e.Decode()
+						require.NoError(t, err)
+					}
+					require.Len(t, seen, len(expected))
+					require.Equal(t, 2, badvers)
+					require.Equal(t, 4, additional)
+					if observe {
+						require.EqualValues(t, 42, observedPackets.Load())
+					}
+				})
+			}
 		}
 	}
 }
