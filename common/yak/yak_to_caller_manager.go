@@ -35,6 +35,7 @@ import (
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/mutate"
+	"github.com/yaklang/yaklang/common/pcapx/pcapdb"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak"
@@ -1415,6 +1416,7 @@ func BindYakitPluginContextToEngine(nIns *antlr4yak.Engine, pluginContext *Yakit
 	if cancel == nil {
 		streamContext, cancel = context.WithCancel(streamContext)
 	}
+	nIns.SetVars(map[string]any{"pcapdb": pcapdb.ExportsWithContext(streamContext)})
 
 	cliApp := cli.DefaultCliApp
 	if pluginContext.CliApp != nil {

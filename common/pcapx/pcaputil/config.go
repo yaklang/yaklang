@@ -50,6 +50,7 @@ type CaptureConfig struct {
 	onNetInterfaceCreated func(handle *PcapHandleWrapper)
 	onReassemblyStats     func(TCPReassemblyStats)
 	onFlowCreated         func(*TrafficFlow)
+	onFlowPacket          []func(*TrafficFlow, *TrafficConnection, []PacketReference, time.Time)
 	wg                    *sync.WaitGroup
 	Filename              string
 	OverrideCacheId       string
@@ -57,6 +58,7 @@ type CaptureConfig struct {
 	onPoolCreated         []func(*TrafficPool)
 	Device                []string
 	onEveryPacket         []func(packet gopacket.Packet)
+	beforeTransportPacket []func(gopacket.Packet)
 	Debug                 bool // output debug info
 	EnableCache           bool //  cache for handler cache
 	EmptyDeviceStop       bool
@@ -98,6 +100,33 @@ func WithEveryPacket(h func(packet gopacket.Packet)) CaptureOption {
 			c.onEveryPacket = make([]func(packet gopacket.Packet), 0)
 		}
 		c.onEveryPacket = append(c.onEveryPacket, h)
+		return nil
+	}
+}
+
+// WithBeforeTransportPacket observes the decoded network packet before TCP/UDP
+// protocol delivery. When BIN Parser is enabled it follows network reassembly;
+// this permits packet/session associations to exist before message callbacks.
+// The packet is borrowed until this callback returns.
+func WithBeforeTransportPacket(h func(gopacket.Packet)) CaptureOption {
+	return func(c *CaptureConfig) error {
+		if h == nil {
+			return fmt.Errorf("nil transport packet callback")
+		}
+		c.beforeTransportPacket = append(c.beforeTransportPacket, h)
+		return nil
+	}
+}
+
+// WithOnTrafficFlowPacket observes admitted TCP packets before their payload is
+// fed to reassembly, including handshake/control packets and retransmissions.
+// References own their slice. Callbacks must not retain pooled flows/connections.
+func WithOnTrafficFlowPacket(h func(*TrafficFlow, *TrafficConnection, []PacketReference, time.Time)) CaptureOption {
+	return func(c *CaptureConfig) error {
+		if h == nil {
+			return fmt.Errorf("nil TCP packet callback")
+		}
+		c.onFlowPacket = append(c.onFlowPacket, h)
 		return nil
 	}
 }
@@ -529,6 +558,9 @@ func (c *CaptureConfig) packetHandler(ctx context.Context, packet gopacket.Packe
 		if consumed {
 			return
 		}
+	}
+	for _, h := range c.beforeTransportPacket {
+		h(packet)
 	}
 	var matched bool
 	ret, isOk := packet.TransportLayer().(*layers.TCP)

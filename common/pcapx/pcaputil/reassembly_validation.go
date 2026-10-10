@@ -29,6 +29,9 @@ func (p *TrafficPool) malformedPacket(reason string) {
 }
 
 func (p *TrafficPool) reassemblyFailure(reason string) {
+	if p.options.AllowIncomplete {
+		return
+	}
 	err := errors.New(reason)
 	if p.parallel != nil {
 		p.parallel.fail(err)

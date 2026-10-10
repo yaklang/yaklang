@@ -10,6 +10,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/yaklang/gorm"
+	"github.com/yaklang/yaklang/common/pcapx/pcapdb"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 
 	"github.com/yaklang/yaklang/common/consts"
@@ -146,9 +148,34 @@ func TestMustPass(t *testing.T) {
 				"VULINBOX_HOST": utils.ExtractHostPort(vulinboxAddr),
 			}
 
+			var pcapdbManager *pcapdb.InstanceManager
+			if caseName == "pcapdb.yak" {
+				// A private profile/catalog avoids changing global YAKIT_HOME or
+				// retaining captures in the user's library during parallel tests.
+				root := t.TempDir()
+				profile, err := gorm.Open("sqlite3", filepath.Join(root, "profile.sqlite"))
+				if err != nil {
+					t.Fatal(err)
+				}
+				t.Cleanup(func() { profile.Close() })
+				manager, err := pcapdb.NewInstanceManager(profile, filepath.Join(root, "library"))
+				if err != nil {
+					t.Fatal(err)
+				}
+				t.Cleanup(func() { manager.Close() })
+				vars["PCAPDB_TEST_EXPORTS"] = pcapdb.ExportsWithManager(context.Background(), manager)
+				pcapdbManager = manager
+			}
+
 			_, err := yak.Execute(caseContent, vars)
 			if err != nil {
 				t.Fatalf("run script[%s] error: %v", caseName, err)
+			}
+			if pcapdbManager != nil {
+				count, err := pcapdbManager.Count()
+				if err != nil || count != 1 {
+					t.Fatalf("pcapdb smoke did not use its isolated library: count=%d, err=%v", count, err)
+				}
 			}
 		})
 	}

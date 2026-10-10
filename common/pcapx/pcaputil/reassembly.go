@@ -190,6 +190,7 @@ func seqBefore(a, b uint32) bool { return seqnum.Value(a).LessThan(seqnum.Value(
 func (t *TrafficConnection) queueFuture(seq uint32, payload []byte, fin bool, ts time.Time) {
 	if old := t.pendingBySeq[seq]; old != nil {
 		if !bytes.Equal(old.Payload[:min(len(old.Payload), len(payload))], payload[:min(len(old.Payload), len(payload))]) {
+			t.Flow.reassemblyIncomplete = true
 			t.Flow.pool.invalidSegment("conflicting TCP retransmission at the same sequence")
 		}
 		// First-seen bytes win; a longer retransmission may supply a missing suffix.
@@ -285,6 +286,7 @@ func (t *TrafficConnection) consume(seq uint32, payload []byte, fin bool, ts tim
 	}
 	if len(payload) > 0 {
 		if len(t.waitGroup) > 0 && t.pendingConflict(0, seq, payload) {
+			t.Flow.reassemblyIncomplete = true
 			t.Flow.pool.invalidSegment("conflicting TCP overlap with buffered data")
 		}
 		t.currentSeq = seq
@@ -312,6 +314,7 @@ func (t *TrafficConnection) resolvePendingReset() bool {
 		t.Flow.Close()
 		return true
 	}
+	t.Flow.reassemblyIncomplete = true
 	t.Flow.pool.invalidSegment("TCP RST sequence falls inside subsequently captured data")
 	return false
 }
@@ -366,10 +369,12 @@ func (t *TrafficConnection) FeedClient(tcp *layers.TCP, ts time.Time) {
 		return
 	}
 	if uint64(len(tcp.Payload)) > uint64(t.Flow.pool.options.MaxSequenceGap) {
+		t.Flow.reassemblyIncomplete = true
 		t.Flow.pool.invalidSegment("TCP payload exceeds the sequence window")
 		return
 	}
 	if tcp.SYN && (tcp.FIN || tcp.RST) {
+		t.Flow.reassemblyIncomplete = true
 		t.Flow.pool.invalidSegment("TCP SYN combined with FIN or RST")
 		return
 	}
@@ -384,6 +389,7 @@ func (t *TrafficConnection) FeedClient(tcp *layers.TCP, ts time.Time) {
 				t.resetPending, t.resetSeq = true, tcp.Seq
 				return
 			}
+			t.Flow.reassemblyIncomplete = true
 			t.Flow.pool.invalidSegment(fmt.Sprintf("TCP RST does not match the receive cursor: %s seq=%d expected=%d ack=%d pending=%d", t, tcp.Seq, t.nextSeq, tcp.Ack, len(t.waitGroup)))
 			return
 		}
@@ -393,6 +399,7 @@ func (t *TrafficConnection) FeedClient(tcp *layers.TCP, ts time.Time) {
 	seq := tcp.Seq
 	if tcp.SYN {
 		if t.initialed && tcp.Seq != t.isn {
+			t.Flow.reassemblyIncomplete = true
 			t.Flow.pool.invalidSegment("TCP SYN changes an established initial sequence number")
 			return
 		}
@@ -414,12 +421,14 @@ func (t *TrafficConnection) FeedClient(tcp *layers.TCP, ts time.Time) {
 	distance := uint32(seq - t.nextSeq)
 	if distance == 1<<31 ||
 		(distance < 1<<31 && uint64(distance)+uint64(len(tcp.Payload)) > uint64(t.Flow.pool.options.MaxSequenceGap)) {
+		t.Flow.reassemblyIncomplete = true
 		t.Flow.pool.invalidSegment("TCP segment exceeds the unambiguous sequence window")
 		return
 	}
 	end := seq + uint32(len(tcp.Payload))
 	if tcp.FIN && !seqBefore(end, t.nextSeq) {
 		if t.finSeen && end != t.finSeq {
+			t.Flow.reassemblyIncomplete = true
 			t.Flow.pool.invalidSegment("TCP FIN changes an established stream end")
 			return
 		}
@@ -546,6 +555,7 @@ func (c *TrafficConnection) GetBuffer() io.Reader {
 func (t *TrafficConnection) discardPending() {
 	p := t.Flow.pool
 	if t.resetPending {
+		t.Flow.reassemblyIncomplete = true
 		p.invalidSegment(fmt.Sprintf("TCP RST does not match the receive cursor: %s seq=%d; preceding data/FIN was not captured", t, t.resetSeq))
 		t.resetPending = false
 	}
@@ -558,6 +568,7 @@ func (t *TrafficConnection) discardPending() {
 			p.singleUnreassembledSegments.Add(uint64(len(t.waitGroup)))
 		}
 		reason := fmt.Sprintf("TCP stream closed with an unfilled sequence gap (%d buffered bytes)", t.pendingBytes)
+		t.Flow.reassemblyIncomplete = true
 		p.reassemblyFailure(reason)
 		if p.captureConf != nil && p.captureConf.binParser != nil {
 			if t.Flow.binState == nil {
