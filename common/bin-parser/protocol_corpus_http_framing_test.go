@@ -187,3 +187,24 @@ func TestProtocolCorpusLPDEveryCommandField(t *testing.T) {
 	}
 	protocolCorpusRequireBoundedRuleParse(t, []byte("\x01queue-2\n"), "application-layer.lpd", "LPD")
 }
+
+// A representation length is metadata for HEAD/304, independent of the
+// content budget. Reusing a context must not exempt the next request's body.
+func TestProtocolCorpusHTTPBodylessLengthBudget(t *testing.T) {
+	for _, tc := range []struct{ method, status string }{{"HEAD", "200 OK"}, {"GET", "304 Not Modified"}} {
+		t.Run(tc.method+tc.status, func(t *testing.T) {
+			ctx := map[string]any{"httpBodyLimit": 3, "httpResponseToMethod": tc.method}
+			wire := []byte("HTTP/1.1 " + tc.status + "\r\nContent-Length: 9223372036854775807\r\n\r\n")
+			node, err := parser.ParseBinaryWithConfig(newProtocolCorpusBoundedReader(wire), "application-layer.http", ctx, "HTTPExact")
+			require.NoError(t, err)
+			require.Nil(t, protocolCorpusFindNode(node, "Octets"))
+			protocolCorpusRequireValue(t, node, "Status", strings.Split(tc.status, " ")[0])
+			_, err = parser.ParseBinaryWithConfig(newProtocolCorpusBoundedReader([]byte("POST / HTTP/1.1\r\nContent-Length: 4\r\n\r\ndata")), "application-layer.http", ctx, "HTTPExact")
+			require.ErrorContains(t, err, "configured limit")
+		})
+	}
+	for _, length := range []string{"9223372036854775808", "9999999999999999999999", "3x", "-1"} {
+		_, err := parser.ParseBinaryWithConfig(newProtocolCorpusBoundedReader([]byte("HTTP/1.1 304 Not Modified\r\nContent-Length: "+length+"\r\n\r\n")), "application-layer.http", map[string]any{"httpBodyLimit": 3}, "HTTPExact")
+		require.Error(t, err, "invalid lengths are still rejected: %s", length)
+	}
+}
