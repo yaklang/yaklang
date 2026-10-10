@@ -18,6 +18,7 @@ import (
 type ProtocolEvent struct {
 	Admission                                string
 	semanticFields                           map[string]any
+	semanticSession                          map[string]any
 	nativeQUICWire                           bool
 	Domain                                   CaptureDomain
 	SourceBytes                              ByteSource
@@ -56,12 +57,23 @@ type BinParserEvent = ProtocolEvent
 // the caller; no JSON conversion takes place.
 func (e *ProtocolEvent) Decode() (result map[string]any, err error) {
 	defer func() {
-		if err == nil && result != nil && e.Session != nil {
+		session := e.Session
+		if e.semanticSession != nil {
+			session = e.semanticSession
+		}
+		// For these native datagram observations, Session and fields describe
+		// the same complete message. Queries must use the private snapshot,
+		// including after a caller edits or replaces the public Session map.
+		if e.Transport == "udp" && e.Profile == e.Protocol+"-native" && e.semanticFields != nil &&
+			(e.Protocol == "dhcp" || e.Protocol == "dhcpv6" || e.Protocol == "mqtt-sn") {
+			session = e.semanticFields
+		}
+		if err == nil && result != nil && session != nil {
 			owned := make(map[string]any, len(result)+1)
 			for k, v := range result {
 				owned[k] = v
 			}
-			owned["session"] = cloneSession(e.Session)
+			owned["session"] = cloneSession(session)
 			result = owned
 		}
 	}()
@@ -157,6 +169,9 @@ func (e *ProtocolEvent) ownsNativeFields() bool {
 	// DHCP's native UDP projection is a bounded observation, separate from
 	// the legacy stream/rule envelope. Its queries own both fields and errors.
 	if e.Transport == "udp" && (e.Protocol == "dhcp" || e.Protocol == "dhcpv6") && e.Profile == e.Protocol+"-native" {
+		return true
+	}
+	if e.Transport == "udp" && e.Protocol == "mqtt-sn" && e.Profile == "mqtt-sn-native" {
 		return true
 	}
 	if e.Profile == "quic-v1-native" || e.Profile == "http3-native" || e.Profile == "doq-native" {
@@ -1269,6 +1284,7 @@ func (v *BinParserInspector) OnEvent(e *BinParserEvent) {
 	}
 	row := protocolHistoryEntry{BinParserEvent: *e, retainedCost: cost}
 	row.semanticFields = cloneSession(e.semanticFields)
+	row.semanticSession = cloneSession(e.semanticSession)
 	row.Session = cloneSession(e.Session)
 	cloneEvidence(&row.BinParserEvent)
 	row.Structured, row.Fields, row.Metadata = nil, nil, nil
@@ -1300,7 +1316,7 @@ func (v *BinParserInspector) Rows(protocol string, flow uint64) []*BinParserEven
 		if (protocol == "" || protocol == e.Protocol) && (flow == 0 || flow == e.FlowID) {
 			row := *e
 			cloneEvidence(&row)
-			row.Raw, row.Session, row.Structured, row.semanticFields = nil, nil, nil, nil
+			row.Raw, row.Session, row.Structured, row.semanticFields, row.semanticSession = nil, nil, nil, nil, nil
 			rows = append(rows, &row)
 		}
 	}
@@ -1317,6 +1333,7 @@ func (v *BinParserInspector) Details(id uint64) (*BinParserEvent, error) {
 			cloneEvidence(&copyEvent)
 			copyEvent.Structured = cloneSession(e.Structured)
 			copyEvent.semanticFields = cloneSession(e.semanticFields)
+			copyEvent.semanticSession = cloneSession(e.semanticSession)
 			copyEvent.Session = cloneSession(e.Session)
 			copyEvent.Raw = append([]byte(nil), e.Raw...)
 			row = &copyEvent
@@ -1366,7 +1383,7 @@ func (v *BinParserInspector) RowsAfter(after uint64, limit int, protocol string,
 			if len(rows) < limit {
 				row := *e
 				cloneEvidence(&row)
-				row.Raw, row.Structured, row.Session, row.semanticFields = nil, nil, nil, nil
+				row.Raw, row.Structured, row.Session, row.semanticFields, row.semanticSession = nil, nil, nil, nil, nil
 				rows = append(rows, &row)
 			}
 		}

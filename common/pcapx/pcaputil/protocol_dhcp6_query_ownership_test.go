@@ -125,6 +125,9 @@ func dhcp6AssertOwnedQuery(t *testing.T, e *ProtocolEvent, want map[string]any, 
 	again, err := e.GetFields()
 	require.NoError(t, err)
 	require.Equal(t, want, again)
+	tree, err = e.Decode()
+	require.NoError(t, err)
+	require.Equal(t, want, tree["session"])
 	require.Equal(t, wire, e.Raw)
 }
 

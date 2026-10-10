@@ -312,6 +312,11 @@ func (a *binParser) decodeNativeDatagram(e *ProtocolEvent, w []byte, src, dst ui
 			}
 		}
 		e.semanticFields = cloneSession(fields)
+		if p.name == "dns" || p.name == "mdns" || p.name == "llmnr" {
+			// DNS association context is distinct from the canonical message
+			// fields; both query projections need their own private snapshot.
+			e.semanticSession = cloneSession(e.Session)
+		}
 		if p.name != "rtps" || err == nil {
 			projection := e.semanticFields
 			if e.ownsNativeFields() {
