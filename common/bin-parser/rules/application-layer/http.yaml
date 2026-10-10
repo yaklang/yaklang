@@ -39,8 +39,8 @@ HTTPMessage:
         if (octet < 65 || octet > 90) && (octet < 97 || octet > 122) && (octet < 48 || octet > 57) && octet not in []byte("!#$%&'*+-.^_`|~") { panic("http: invalid method token") }
       }
       for _, octet = range []byte(target) { if octet <= 32 || octet == 127 { panic("http: invalid request target") } }
-      this.ProcessSubNode("Headers")
       setCtx("httpNoBody", false)
+      this.ProcessSubNode("Headers")
       setCtx("httpIsResponse", false)
       if getCtx("isChunked") || getCtx("body_length") > 0 { this.ProcessSubNode("Body") }
     FirstLine:
@@ -61,10 +61,10 @@ HTTPMessage:
       status = int(code)
       if status < 100 { panic("http: invalid status code") }
       for _, octet = range []byte(string(getNodeResult("Message").Value)) { if (octet < 32 && octet != 9) || octet == 127 { panic("http: invalid reason phrase") } }
-      this.ProcessSubNode("Headers")
       noBody = status < 200 || status == 204 || status == 304 || getCtx("httpResponseToMethod") == "HEAD"
       if getCtx("httpResponseToMethod") == "CONNECT" && status >= 200 && status < 300 { noBody = true }
       setCtx("httpNoBody", noBody)
+      this.ProcessSubNode("Headers")
       setCtx("httpIsResponse", true)
       closeBody = getCtx("httpCloseDelimited") && !getCtx("httpHasLength") && this.GetSubNode("Body").GetMaxLength() > 0
       if !noBody && (getCtx("isChunked") || getCtx("body_length") > 0 || closeBody) { this.ProcessSubNode("Body") }
@@ -176,7 +176,7 @@ Headers:
         for _, octet = range []byte(value) {
           if octet < 48 || octet > 57 { panic("http: invalid content length") }
           digit = octet-48
-          if length > (limit-digit)/10 { panic("http: body exceeds configured limit") }
+          if length > (9223372036854775807-digit)/10 { panic("http: content length overflows") }
           length = length*10+digit
         }
         if getCtx("httpHasLength") && getCtx("body_length") != length { panic("http: conflicting content lengths") }
@@ -190,5 +190,7 @@ Headers:
       }
     }
     if seenTransfer && getCtx("httpHasLength") { panic("http: ambiguous transfer framing") }
+    # HEAD/304 lengths describe the representation, not an allocated body.
+    if !getCtx("httpNoBody") && getCtx("body_length") > limit { panic("http: body exceeds configured limit") }
   list: true
   Item: "del:\r\n;type:string"

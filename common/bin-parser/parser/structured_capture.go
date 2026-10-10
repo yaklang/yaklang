@@ -20,7 +20,7 @@ import (
 var captureStructuredRules = sync.OnceValue(func() map[string]bool {
 	eligible := make(map[string]bool)
 	for name, want := range map[string]string{
-		"http":      "e356b5b5c242f5d3b29a03a92a37795137036448162223253997d14bce14ea04",
+		"http":      "091a812c4d4a84f3d0d02493df439c9dac4fdd88588d8eeee5bbc702f0f8aabe",
 		"tls":       "be13dbbbb55ff16bd7127c680e4f7cae22a7e826465390051b5a22e55c982bd2",
 		"tls_hello": "f9809596ebeddc2ef3d1c8272aee12fbf202918bc73d46ade66b3df5f92be9d9",
 		"dns":       "9e1938283598174a4e90ee852cf54ff09606a919af539831ab1b13e3ca7b8d95",
@@ -216,7 +216,7 @@ func captureHTTPStructured(data []byte, config map[string]any) (map[string]any, 
 				}
 			}
 			n, err := strconv.ParseUint(value, 10, 63)
-			if err != nil || n > uint64(limit) || (hasLength && int(n) != length) {
+			if err != nil || (!noBody && n > uint64(limit)) || (hasLength && int(n) != length) {
 				return fail()
 			}
 			hasLength, length = true, int(n)

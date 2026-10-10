@@ -37,11 +37,15 @@ type binHTTPState struct {
 	responseComplete                                               bool
 }
 
-func (h *binHTTPState) config() map[string]any {
-	if !h.response {
-		return nil
+func (h *binHTTPState) config(bodyLimit int) map[string]any {
+	// Field decoding must use the same limit as the framer, including deferred
+	// events and close-delimited responses emitted during connection teardown.
+	config := map[string]any{"httpBodyLimit": bodyLimit}
+	if h.response {
+		config["httpResponseToMethod"] = h.method
+		config["httpCloseDelimited"] = h.closeDelimited
 	}
-	return map[string]any{"httpResponseToMethod": h.method, "httpCloseDelimited": h.closeDelimited}
+	return config
 }
 
 func (f *binFlow) frameDirection(dir int, w []byte) (int, *binSpec, error) {
