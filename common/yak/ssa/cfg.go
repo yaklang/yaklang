@@ -265,11 +265,14 @@ func (lb *LoopBuilder) Finish() {
 		}
 		SSABuild.EmitJump(condition)
 	})
-	// Loop merge phis order their edges as [subScopes..., self] while the
-	// exit/latch CFG predecessors are [self/header, break/continue scopes...].
-	// Rotate the trailing self value to the front so phi edges line up with
-	// the block predecessors (a mismatched order silently produces the wrong
-	// merged value, e.g. x = i inside a break body).
+	// Merge puts the loop's own value in the last phi slot and each break
+	// scope before it. loop.exit's predecessors are the other way around:
+	// EmitLoop records the condition block first, then break jumps append.
+	// Move that last value to the front so phi edges line up with Preds.
+	// A mismatched order pairs the wrong value with a predecessor, for
+	// example x = i inside a break body. latch is not rotated: continue
+	// jumps are recorded before the body falls through, which already
+	// matches [continue scopes..., self].
 	rotateSelfLast := func(merge ssautil.MergeHandle[Value]) ssautil.MergeHandle[Value] {
 		return func(name string, vs []Value) Value {
 			if len(vs) > 1 {
