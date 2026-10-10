@@ -180,6 +180,9 @@ func (m *InstanceManager) begin() error {
 }
 
 func (m *InstanceManager) Close() error {
+	// A native owner can be waiting for readers while holding the cache lock.
+	// Cancel before acquiring that lock so shutdown can release those readers.
+	m.cancel()
 	m.mu.Lock()
 	if m.closed {
 		done := m.closeDone
@@ -189,7 +192,6 @@ func (m *InstanceManager) Close() error {
 	}
 	m.closed = true
 	m.mu.Unlock()
-	m.cancel()
 	defer close(m.closeDone)
 	m.ops.Wait()
 	m.mu.Lock()
@@ -700,7 +702,7 @@ func (d *Database) closeIdle() error {
 
 func (d *Database) closePool(force, idleOnly bool) error {
 	d.manager.mu.Lock()
-	if idleOnly && (d.nativeOwner || d.leases > 0) {
+	if idleOnly && (d.manager.closed || d.nativeOwner || d.leases > 0) {
 		d.manager.mu.Unlock()
 		return nil
 	}
@@ -713,6 +715,12 @@ func (d *Database) closePool(force, idleOnly bool) error {
 		d.mu.Unlock()
 		d.manager.mu.Unlock()
 		return nil
+	}
+	// A pool removed from the cache may still be checkpointing. Shutdown must
+	// wait for its cleanup before promising that closed child files are portable.
+	if !d.manager.closed {
+		d.manager.ops.Add(1)
+		defer d.manager.ops.Done()
 	}
 	d.closed = true
 	delete(d.manager.instances, d.ID)

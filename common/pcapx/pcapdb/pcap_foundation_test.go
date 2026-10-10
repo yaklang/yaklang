@@ -446,3 +446,56 @@ func TestPCAPDBLeaseDeadlineAndReaderLock(t *testing.T) {
 	require.Equal(t, "deadline_exceeded", failed.Error.Code)
 	require.EqualValues(t, 7, failed.NextCursor)
 }
+
+func TestPCAPDBShutdownCancelsReaderBeforeCacheLock(t *testing.T) {
+	m := testManager(t)
+	db, err := m.GetOrCreate(writeCapture(t, classicCapture(t, 1)))
+	require.NoError(t, err)
+	var held []*sql.Tx
+	for i := 0; i < 4; i++ {
+		tx, err := db.db.DB().BeginTx(context.Background(), nil)
+		require.NoError(t, err)
+		held = append(held, tx)
+	}
+	defer func() {
+		for _, tx := range held {
+			_ = tx.Rollback()
+		}
+	}()
+	before := db.db.DB().Stats().WaitCount
+	read := make(chan error, 1)
+	go func() { _, err := db.ReadPacket(1); read <- err }()
+	require.Eventually(t, func() bool { return db.db.DB().Stats().WaitCount > before }, time.Second, time.Millisecond)
+	closing := make(chan error, 1)
+	go func() { closing <- db.Close() }()
+	require.Eventually(t, func() bool {
+		if m.mu.TryLock() {
+			m.mu.Unlock()
+			return false
+		}
+		return true
+	}, time.Second, time.Millisecond)
+	stopped := make(chan error, 1)
+	go func() { stopped <- m.Close() }()
+	select {
+	case err := <-read:
+		require.ErrorIs(t, err, context.Canceled)
+	case <-time.After(time.Second):
+		t.Fatal("manager Close cannot cancel a reader while native Close holds the cache lock")
+	}
+	for _, tx := range held {
+		require.NoError(t, tx.Rollback())
+	}
+	select {
+	case err := <-closing:
+		require.NoError(t, err)
+	case <-time.After(3 * time.Second):
+		t.Fatal("native Close did not finish")
+	}
+	select {
+	case err := <-stopped:
+		require.NoError(t, err)
+	case <-time.After(3 * time.Second):
+		t.Fatal("manager did not finish its closing-pool cleanup")
+	}
+}
