@@ -629,6 +629,11 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 			f.invalidateSession(1 - dir)
 			f.closeSession()
 		}
+		if d.stopped {
+			// Emitted events own their header evidence. A stopped direction
+			// must not retain another copy until the TCP flow is evicted.
+			d.http = nil
+		}
 	}()
 	a.input.Add(uint64(len(data)))
 	if d.stopped {
