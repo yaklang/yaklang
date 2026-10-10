@@ -10,6 +10,7 @@ import (
 type goFieldSelector struct {
 	path      []string
 	ambiguous bool
+	unknown   bool
 }
 
 func goPointerType(target ssa.Type) *ssa.ObjectType {
@@ -44,9 +45,17 @@ func resolveGoFieldSelector(root *ssa.ObjectType, name string) goFieldSelector {
 	for len(current) != 0 {
 		var found goFieldSelector
 		matches := 0
+		unknown := false
 		next := make(map[*ssa.ObjectType]entry)
 		for typ, item := range current {
 			visited[typ] = true
+			// An imported embedded type without source has an unknown field
+			// set. Keep the external-member fallback instead of declaring its
+			// promoted fields missing or choosing a deeper known field.
+			if _, ok := typ.FieldType.(*ssa.Blueprint); ok && typ.GetTypeKind() == ssa.ObjectTypeKind {
+				unknown = true
+				continue
+			}
 			if key := typ.GetKeybyName(name); !utils.IsNil(key) {
 				matches += item.count
 				found.path = append(append([]string(nil), item.path...), name)
@@ -65,6 +74,9 @@ func resolveGoFieldSelector(root *ssa.ObjectType, name string) goFieldSelector {
 		}
 		if matches > 1 {
 			return goFieldSelector{ambiguous: true}
+		}
+		if unknown {
+			return goFieldSelector{unknown: true}
 		}
 		if matches == 1 {
 			return found
@@ -124,6 +136,9 @@ func (b *astbuilder) resolveGoSelector(object ssa.Value, name string, wantMethod
 		}
 		b.NewError(ssa.Error, TAG, fmt.Sprintf("ambiguous selector %s.%s", objectName, name))
 		return object, nil, true, false
+	}
+	if selector.unknown {
+		return object, nil, false, false
 	}
 	if len(selector.path) == 0 {
 		if wantMethod || typ.GetMethod()[name] != nil {

@@ -769,7 +769,11 @@ func (b *astbuilder) buildFieldDecl(stmt *gol.FieldDeclContext, structTyp *ssa.O
 			} else if fromAlias, ok := parent.(*ssa.AliasType); ok {
 				structTyp.AddField(b.EmitConstInst(name), fromAlias)
 			} else if fromLib, ok := parent.(*ssa.Blueprint); ok {
-				structTyp.AddField(b.EmitConstInst(fromLib.Name), fromLib)
+				structTyp.AddField(b.EmitConstInst(name), fromLib)
+				unknown := ssa.NewObjectType()
+				unknown.SetName(name)
+				unknown.FieldType = fromLib
+				structTyp.AnonymousField[name] = unknown
 				for _, fn := range fromLib.GetFullTypeNames() {
 					structTyp.AddFullTypeName(fn)
 				}
