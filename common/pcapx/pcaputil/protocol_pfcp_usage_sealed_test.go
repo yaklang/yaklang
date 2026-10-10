@@ -68,6 +68,7 @@ func pfcpUsageCheck(t *testing.T, c pfcpUsageControl, events []*ProtocolEvent, c
 			rocTypedError(t, c.Native[i], err)
 			require.Nil(t, f)
 			require.Zero(t, e.ResponseTo)
+			require.Zero(t, e.TransactionID)
 			require.Empty(t, e.Session)
 			require.Equal(t, "limited", e.Status)
 			continue
@@ -100,6 +101,26 @@ func pfcpUsageCheck(t *testing.T, c pfcpUsageControl, events []*ProtocolEvent, c
 			require.Equal(t, events[0].FlowID, e.FlowID)
 			require.Equal(t, c.Steps[i].Dir, e.Direction)
 		}
+		// Bind every ID, including zeros. A dangling ResponseTo outside this
+		// event set must not disappear from a pairs-only comparison.
+		var responseTo, transactionID uint64
+		for _, pair := range c.Target.Pairs {
+			if pair[1] == i+1 {
+				responseTo = events[pair[0]-1].ID
+			}
+		}
+		switch association {
+		case "request":
+			transactionID = e.ID
+		case "matched-response":
+			require.NotZero(t, responseTo)
+			transactionID = responseTo
+		case "retransmitted-request":
+			require.Contains(t, c.Target.Retry, i+1)
+			transactionID = events[0].ID
+		}
+		require.Equal(t, responseTo, e.ResponseTo)
+		require.Equal(t, transactionID, e.TransactionID)
 		expectedSession := make(map[string]any, len(c.Messages[i].Fields)+2)
 		for k, v := range c.Messages[i].Fields {
 			expectedSession[k] = v
