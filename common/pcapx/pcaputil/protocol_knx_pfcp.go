@@ -274,8 +274,9 @@ type pfcpRequest struct {
 	retransmissions    int
 }
 type binPFCP struct {
-	seen    map[pfcpSequence]*pfcpRequest
-	blocked bool
+	seen      map[pfcpSequence]*pfcpRequest
+	blocked   bool
+	untracked bool
 	// A terminal refusal releases the request bodies, but preserves the first
 	// already ambiguous sequence's public diagnostic in a fixed-size marker.
 	deniedSequence    pfcpSequence
@@ -320,7 +321,9 @@ func (s *binPFCP) associate(f *binFlow, e *ProtocolEvent, w []byte, limit int) e
 		}
 	}
 	association := "unmatched-response"
-	if s.blocked {
+	if s.untracked {
+		association = "unverified-after-refusal"
+	} else if s.blocked {
 		association = "ambiguous-conversation"
 		blockedKey := k
 		if pfcpReplyHeader(w) {
@@ -453,8 +456,12 @@ func (a *binParser) decodeDiscoveryDatagram(e *ProtocolEvent, w []byte, src, dst
 			if s != nil && len(s.entries) >= sessionCollectionLimit(a.budget.MaxCollectionElements) {
 				err = discoveryError(ErrResourceExceeded, "UDP conversation limit")
 			} else {
-				f := &binFlow{a: a, id: a.flows.Add(1), protocol: "pfcp", pfcp: &binPFCP{}, endpoints: [2]string{e.Source, e.Destination}, domain: e.Domain}
-				if err = f.reserveSession(4352 + int64(len(w))); err == nil {
+				f := &binFlow{a: a, id: a.flows.Add(1), protocol: "pfcp", pfcp: a.newPFCPState(e), endpoints: [2]string{e.Source, e.Destination}, domain: e.Domain}
+				charge := int64(4352 + len(w))
+				if f.pfcp.blocked {
+					charge = 512
+				}
+				if err = f.reserveSession(charge); err == nil {
 					if s == nil {
 						s = &binUDPStore{entries: make(map[binUDPKey]*list.Element), clock: e.Timestamp}
 						a.udpSessions = s
@@ -475,7 +482,7 @@ func (a *binParser) decodeDiscoveryDatagram(e *ProtocolEvent, w []byte, src, dst
 				e.Direction = 1
 			}
 			if err == nil {
-				if collision && pfcpRequestHeader(w) {
+				if collision && pfcpRequestHeader(w) && !f.pfcp.blocked {
 					k := pfcpSequence{e.Direction, pfcpSequenceNumber(w)}
 					err = f.pfcp.retainAmbiguous(f, k, w, e.ID, a.budget.MaxCollectionElements)
 				}
@@ -516,6 +523,11 @@ func (a *binParser) decodeDiscoveryDatagram(e *ProtocolEvent, w []byte, src, dst
 		err = typed
 	}
 	a.finishProtocolDatagram(e, raw, nil, err)
+	if typed != nil && typed.Kind == ErrResourceExceeded && len(raw) == 0 {
+		// A failed transient reservation deliberately retains no raw bytes.
+		// The refused input still contributes to the explicit limited ledger.
+		a.limited.Add(uint64(len(w)))
+	}
 	if err != nil {
 		e.Completeness = e.Status
 	}
@@ -584,9 +596,23 @@ func (a *binParser) expirePFCP(stamp time.Time) {
 		next := el.Next()
 		v := el.Value.(*binUDPEntry)
 		if v.flow.pfcp != nil && s.clock.Sub(v.touched) >= pfcpIdleTTL {
-			v.flow.closeSession()
-			delete(s.entries, v.key)
-			s.lru.Remove(el)
+			// Idle is a local resource policy, not an observed peer generation.
+			// Keep charged endpoint/domain/sequence markers so that a delayed
+			// response cannot acquire the ID of a later reused request. Distinct
+			// unused sequences remain usable; terminal refusal stays terminal.
+			f := v.flow
+			for _, r := range f.pfcp.seen {
+				r.pending, r.ambiguous = false, true
+				r.wire = nil
+			}
+			retained := int64(4096 + 256*len(f.pfcp.seen))
+			if f.pfcp.blocked {
+				retained = 512
+			}
+			if retained < f.sessionBytes {
+				a.buffered.Add(retained - f.sessionBytes)
+				f.sessionBytes = retained
+			}
 		}
 		el = next
 	}

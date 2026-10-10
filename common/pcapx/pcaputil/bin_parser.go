@@ -269,6 +269,7 @@ type binParser struct {
 	udpMu                                                                      sync.Mutex
 	udpSessions                                                                *binUDPStore
 	stunUntrackedRefusal                                                       bool // constant-size quarantine when an admitted UDP key cannot be retained
+	pfcpUntrackedRefusal                                                       bool // udpMu; forgotten rejected identity cannot verify a newly admitted PFCP key
 	dcpMu                                                                      sync.Mutex
 	dcpClock                                                                   time.Time
 	dcpObservations                                                            map[dcpKey]*dcpObservation

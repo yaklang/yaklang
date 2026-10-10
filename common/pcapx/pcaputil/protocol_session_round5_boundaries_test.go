@@ -117,6 +117,12 @@ func TestTFTPRolloverAndEmptyFinalBlock(t *testing.T) {
 	require.Equal(t, true, out["Transfer Complete"])
 }
 func TestRound5UDPExpiryAndBudget(t *testing.T) {
+	t.Run("PFCP-idle-existing-API", TestPFCPIdleHistoryExistingAPI)
+	t.Run("PFCP-untracked-refusal", TestPFCPUntrackedRefusalExistingAPI)
+	t.Run("PFCP-profile-switch", TestPFCPRefusalProfileSwitchExistingAPI)
+	t.Run("PFCP-refused-byte-accounting", TestPFCPTransientRefusalBytesExistingAPI)
+	t.Run("PFCP-idle-matrix", testPFCPIdleHistoryMatrix)
+	t.Run("PFCP-retained-budget-and-domain", testPFCPIdleStorageAndScope)
 	c := NewDefaultConfig()
 	require.NoError(t, WithBinParserConfig(BinParserConfig{OnEvent: func(*ProtocolEvent) {}})(c))
 	require.NoError(t, c.prepareBinParser())

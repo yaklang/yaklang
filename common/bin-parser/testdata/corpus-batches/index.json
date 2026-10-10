@@ -35448,6 +35448,250 @@
         "common/pcapx/pcaputil/quic-coalescing/controls.json": "controls.json",
         "common/pcapx/pcaputil/quic-coalescing/validation/expected.json": "validation/expected.json"
       }
+    },
+    {
+      "id": "validation-pfcp-idle-history",
+      "kind": "validation",
+      "source_sha": "aca3f317eeb8db5b4ab95527fd79461e5ec079e7",
+      "file": "validation-pfcp-idle-history.zip",
+      "sha256": "aa1daa42524164b8e8092a7f11cb2b96f99b52c589f4af341d153d06516a37d9",
+      "password": "bin-parser",
+      "members": {
+        "build.py": {
+          "sha256": "b451f63ac1e2f674279e7dced4bbda5bed83beb0c8987b780d8b21897d4ea151",
+          "bytes": 4327
+        },
+        "carrier.py": {
+          "sha256": "53032c4a1d39af131ac35498af5362423aefc47552d34e06420593262684f037",
+          "bytes": 1945
+        },
+        "templates.json": {
+          "sha256": "8c59f70caa6703711780e3789d106de0d79bc42a0d0099193a7cdcc051196193",
+          "bytes": 17793
+        },
+        "verify-controls.py": {
+          "sha256": "4d68f3e36a6b1354834d4087236d440a257033dfc6b0fe2ce7205d7e5e6df9df",
+          "bytes": 4510
+        },
+        "source-pin.json": {
+          "sha256": "c0143eff5fa13243aeecca881a0ecdfe3f15a29bb141c1bab531da32a7fc8cf7",
+          "bytes": 1128
+        },
+        "seal.py": {
+          "sha256": "0a1369fbc5831498c1623cb9b2f3e8615abc3ec99c4a71a28bc7e5aa5215ecfc",
+          "bytes": 3658
+        },
+        "LICENSE.txt": {
+          "sha256": "3f8baa2512a7ff9fe31332322d9c02247afb85d548e3a973524561b74da3b41f",
+          "bytes": 224
+        },
+        "cases/knx-pfcp-pending.pcap": {
+          "sha256": "6db6e4efb4540a29e2a8a3eb947f567fd949bbeabbe5e055d9b845ae5d3f6d9c",
+          "bytes": 394
+        },
+        "answers/knx-pfcp-pending.json": {
+          "sha256": "632a6191fe89cb44ffc68d2d5489ae666fd54262a0b81c78ffcf9d5105311721",
+          "bytes": 8236
+        },
+        "cases/knx-pfcp-completed.pcap": {
+          "sha256": "10b3cb5901c282b8fbcf6cccd2a01209af98e368577ea7a9b8b951f1509781d3",
+          "bytes": 468
+        },
+        "answers/knx-pfcp-completed.json": {
+          "sha256": "6fd178ece879935a45ba72275a7d2c4687fc48b3355c146f2b3cdd76f140cfd1",
+          "bytes": 9819
+        },
+        "cases/knx-pfcp-live-retry.pcap": {
+          "sha256": "be2906c28c611dc37ba8e27c54b204781d172015732fefb6d7415179f41cd0bd",
+          "bytes": 246
+        },
+        "answers/knx-pfcp-live-retry.json": {
+          "sha256": "8550e50655dd794936a6d8c7d5950686a204df8815a52cac7d3d7e37cb500a24",
+          "bytes": 5110
+        },
+        "cases/pfcp-setup-pending.pcap": {
+          "sha256": "3663f6060540bc4b677ad1c67f3936fa0830a5a70cb7041e6fdecc7492ad1544",
+          "bytes": 474
+        },
+        "answers/pfcp-setup-pending.json": {
+          "sha256": "81c4d3338b330ce8861e8489562c9c77e02c82c3aa0f7c56f0e4c05e1ee0896b",
+          "bytes": 27174
+        },
+        "cases/pfcp-setup-completed.pcap": {
+          "sha256": "c2c19f3af6afb7a0ca403d228e4aed758d2d5e9823771a835b619e549d2554f6",
+          "bytes": 567
+        },
+        "answers/pfcp-setup-completed.json": {
+          "sha256": "0d9de7f570a329bbdacc23126993ee5eb6bb5c92e6a7f9d46ad48cda5c94021f",
+          "bytes": 34032
+        },
+        "cases/pfcp-setup-live-retry.pcap": {
+          "sha256": "5f84319932708e4b92dad0f45ec01f64f712ce5ae43f6daa7fba8f0de4d8f538",
+          "bytes": 293
+        },
+        "answers/pfcp-setup-live-retry.json": {
+          "sha256": "67a8f6c055dc701c89fcd4c627d59bb5f2c351f59a67bf9dbbfdbca9899924a9",
+          "bytes": 15984
+        },
+        "cases/pfcp-update-pending.pcap": {
+          "sha256": "21a1e50b33cd62c15a577d656483abab9396153a77b431e9937d324b99e06036",
+          "bytes": 424
+        },
+        "answers/pfcp-update-pending.json": {
+          "sha256": "9d34409ee540dc1cdc0e07ed1993309fc0a53d1ade564e194c5cab3c8d8513ef",
+          "bytes": 19886
+        },
+        "cases/pfcp-update-completed.pcap": {
+          "sha256": "8791842bcbbd0d792077bc57a4577b920ecd89a490d4cf530c521ba927674036",
+          "bytes": 504
+        },
+        "answers/pfcp-update-completed.json": {
+          "sha256": "00d5e42a4426ee9c2d39e08794b52956bcd37a687e71612ac8f601b4e776f1c1",
+          "bytes": 23521
+        },
+        "cases/pfcp-update-live-retry.pcap": {
+          "sha256": "f86969cb54dfa851c9bbc86ce78dc811214a1df3e161dc9ab28cf95beeae0420",
+          "bytes": 264
+        },
+        "answers/pfcp-update-live-retry.json": {
+          "sha256": "4cb24d1a7366549feea1bb60da51d6d30f0cc04189c1588e6f4f8c9a2ed0e8d9",
+          "bytes": 12204
+        },
+        "cases/pfcp-usage-pending.pcap": {
+          "sha256": "f88ecd950df7e85a7273e61e8ac8bf2665c10adfaf5416a98108825e50705575",
+          "bytes": 456
+        },
+        "answers/pfcp-usage-pending.json": {
+          "sha256": "37eb33e59223f1bf2364e59f7543143f599c82beabf1ef82edabe01a54e9af8b",
+          "bytes": 27989
+        },
+        "cases/pfcp-usage-completed.pcap": {
+          "sha256": "bcd8e4ffc19ed839ada28db791deadfc6ac1c874a31ca33b5ab9606b7827d740",
+          "bytes": 561
+        },
+        "answers/pfcp-usage-completed.json": {
+          "sha256": "1e4a020b8e3324fd41dbff3298cd01fe475c9979be77e82fd18827aa2c1ce92e",
+          "bytes": 37968
+        },
+        "cases/pfcp-usage-live-retry.pcap": {
+          "sha256": "d88117a8dcc394ecd3f58e2edfde56444e26e1c4235bfffbc05faeeb879e59af",
+          "bytes": 277
+        },
+        "answers/pfcp-usage-live-retry.json": {
+          "sha256": "3d70e56b4711bc4f5b8dc448197c38f1d4e2d0ed75a91e275406aeb634024945",
+          "bytes": 15489
+        },
+        "cases/heartbeat-refusal-survives-idle.pcap": {
+          "sha256": "51d0f25978e544abb325eadb56d0b30fcd9dd8c7f4326131d5a53a83e91c30e9",
+          "bytes": 524
+        },
+        "answers/heartbeat-refusal-survives-idle.json": {
+          "sha256": "5f5dfe4b3f4ee02af1e41467c438372fdb5891c1eff8a6c6ed7494d237e76205",
+          "bytes": 8707
+        },
+        "cases/heartbeat-untracked-refusal.pcap": {
+          "sha256": "981135524e1ea73c7ffe513681c041f2e99b609e83573f27dbb40ad3c85b8ef3",
+          "bytes": 450
+        },
+        "answers/heartbeat-untracked-refusal.json": {
+          "sha256": "b592f48772bd2ced6f64c06f65a8b9d19e7c95f6efc748284de5dd0b3fc020fc",
+          "bytes": 7143
+        },
+        "cases/heartbeat-exact-boundary-backdated.pcap": {
+          "sha256": "e340910dbc88ad65d08e6e0357ac8928fd6040eab897cba99d55d0b424d80ef8",
+          "bytes": 394
+        },
+        "answers/heartbeat-exact-boundary-backdated.json": {
+          "sha256": "bcf8600270df87ff4e2f4c514518e009744e4d3e7d35aa0f0339186d552f71fc",
+          "bytes": 8308
+        },
+        "cases/heartbeat-refusal-profile-switch.pcap": {
+          "sha256": "50b2a0f149569aa0843b98a81a3b79c985a6ec6c5a5ca2a70189d1512e3f871a",
+          "bytes": 409
+        },
+        "answers/heartbeat-refusal-profile-switch.json": {
+          "sha256": "755ac66329ec7aa67e51cdee207a5c36c0109569397ebcaa35a2372df7b5cdc7",
+          "bytes": 13623
+        },
+        "controls.json": {
+          "sha256": "e8a95f8c31712c0f3abf45ff666e82fcc2f1d944c605ee30b77bb2ede95b877d",
+          "bytes": 313767
+        },
+        "validation/expected.json": {
+          "sha256": "e0b38b55b1a7750d79980d01015df1f44cd363309521a034430ddf3d7b7ad9fe",
+          "bytes": 19963
+        }
+      },
+      "aliases": {
+        "common/pcapx/pcaputil/pfcp-idle-history/build.py": "build.py",
+        "common/pcapx/pcaputil/pfcp-idle-history/carrier.py": "carrier.py",
+        "common/pcapx/pcaputil/pfcp-idle-history/templates.json": "templates.json",
+        "common/pcapx/pcaputil/pfcp-idle-history/verify-controls.py": "verify-controls.py",
+        "common/pcapx/pcaputil/pfcp-idle-history/source-pin.json": "source-pin.json",
+        "common/pcapx/pcaputil/pfcp-idle-history/seal.py": "seal.py",
+        "common/pcapx/pcaputil/pfcp-idle-history/LICENSE.txt": "LICENSE.txt",
+        "common/pcapx/pcaputil/pfcp-idle-history/cases/knx-pfcp-pending.pcap": "cases/knx-pfcp-pending.pcap",
+        "common/pcapx/pcaputil/pfcp-idle-history/answers/knx-pfcp-pending.json": "answers/knx-pfcp-pending.json",
+        "common/pcapx/pcaputil/pfcp-idle-history/cases/knx-pfcp-completed.pcap": "cases/knx-pfcp-completed.pcap",
+        "common/pcapx/pcaputil/pfcp-idle-history/answers/knx-pfcp-completed.json": "answers/knx-pfcp-completed.json",
+        "common/pcapx/pcaputil/pfcp-idle-history/cases/knx-pfcp-live-retry.pcap": "cases/knx-pfcp-live-retry.pcap",
+        "common/pcapx/pcaputil/pfcp-idle-history/answers/knx-pfcp-live-retry.json": "answers/knx-pfcp-live-retry.json",
+        "common/pcapx/pcaputil/pfcp-idle-history/cases/pfcp-setup-pending.pcap": "cases/pfcp-setup-pending.pcap",
+        "common/pcapx/pcaputil/pfcp-idle-history/answers/pfcp-setup-pending.json": "answers/pfcp-setup-pending.json",
+        "common/pcapx/pcaputil/pfcp-idle-history/cases/pfcp-setup-completed.pcap": "cases/pfcp-setup-completed.pcap",
+        "common/pcapx/pcaputil/pfcp-idle-history/answers/pfcp-setup-completed.json": "answers/pfcp-setup-completed.json",
+        "common/pcapx/pcaputil/pfcp-idle-history/cases/pfcp-setup-live-retry.pcap": "cases/pfcp-setup-live-retry.pcap",
+        "common/pcapx/pcaputil/pfcp-idle-history/answers/pfcp-setup-live-retry.json": "answers/pfcp-setup-live-retry.json",
+        "common/pcapx/pcaputil/pfcp-idle-history/cases/pfcp-update-pending.pcap": "cases/pfcp-update-pending.pcap",
+        "common/pcapx/pcaputil/pfcp-idle-history/answers/pfcp-update-pending.json": "answers/pfcp-update-pending.json",
+        "common/pcapx/pcaputil/pfcp-idle-history/cases/pfcp-update-completed.pcap": "cases/pfcp-update-completed.pcap",
+        "common/pcapx/pcaputil/pfcp-idle-history/answers/pfcp-update-completed.json": "answers/pfcp-update-completed.json",
+        "common/pcapx/pcaputil/pfcp-idle-history/cases/pfcp-update-live-retry.pcap": "cases/pfcp-update-live-retry.pcap",
+        "common/pcapx/pcaputil/pfcp-idle-history/answers/pfcp-update-live-retry.json": "answers/pfcp-update-live-retry.json",
+        "common/pcapx/pcaputil/pfcp-idle-history/cases/pfcp-usage-pending.pcap": "cases/pfcp-usage-pending.pcap",
+        "common/pcapx/pcaputil/pfcp-idle-history/answers/pfcp-usage-pending.json": "answers/pfcp-usage-pending.json",
+        "common/pcapx/pcaputil/pfcp-idle-history/cases/pfcp-usage-completed.pcap": "cases/pfcp-usage-completed.pcap",
+        "common/pcapx/pcaputil/pfcp-idle-history/answers/pfcp-usage-completed.json": "answers/pfcp-usage-completed.json",
+        "common/pcapx/pcaputil/pfcp-idle-history/cases/pfcp-usage-live-retry.pcap": "cases/pfcp-usage-live-retry.pcap",
+        "common/pcapx/pcaputil/pfcp-idle-history/answers/pfcp-usage-live-retry.json": "answers/pfcp-usage-live-retry.json",
+        "common/pcapx/pcaputil/pfcp-idle-history/cases/heartbeat-refusal-survives-idle.pcap": "cases/heartbeat-refusal-survives-idle.pcap",
+        "common/pcapx/pcaputil/pfcp-idle-history/answers/heartbeat-refusal-survives-idle.json": "answers/heartbeat-refusal-survives-idle.json",
+        "common/pcapx/pcaputil/pfcp-idle-history/cases/heartbeat-untracked-refusal.pcap": "cases/heartbeat-untracked-refusal.pcap",
+        "common/pcapx/pcaputil/pfcp-idle-history/answers/heartbeat-untracked-refusal.json": "answers/heartbeat-untracked-refusal.json",
+        "common/pcapx/pcaputil/pfcp-idle-history/cases/heartbeat-exact-boundary-backdated.pcap": "cases/heartbeat-exact-boundary-backdated.pcap",
+        "common/pcapx/pcaputil/pfcp-idle-history/answers/heartbeat-exact-boundary-backdated.json": "answers/heartbeat-exact-boundary-backdated.json",
+        "common/pcapx/pcaputil/pfcp-idle-history/cases/heartbeat-refusal-profile-switch.pcap": "cases/heartbeat-refusal-profile-switch.pcap",
+        "common/pcapx/pcaputil/pfcp-idle-history/answers/heartbeat-refusal-profile-switch.json": "answers/heartbeat-refusal-profile-switch.json",
+        "common/pcapx/pcaputil/pfcp-idle-history/controls.json": "controls.json",
+        "common/pcapx/pcaputil/pfcp-idle-history/validation/expected.json": "validation/expected.json"
+      }
+    },
+    {
+      "id": "validation-pfcp-idle-legacy-budget",
+      "kind": "validation",
+      "source_sha": "aca3f317eeb8db5b4ab95527fd79461e5ec079e7",
+      "file": "validation-pfcp-idle-legacy-budget.zip",
+      "sha256": "669923f0317bc528d93666876e2fa411874465cf3c000da97256f6d62f5ab437",
+      "password": "bin-parser",
+      "members": {
+        "overlay.json": {
+          "sha256": "48c14d2c79b729553b4a6c3009378a75b4cfa6e85de33d677e89812b0c0780d5",
+          "bytes": 1486
+        },
+        "LICENSE.txt": {
+          "sha256": "c296f29f885c1959ce57b3f90b27bbf6042eb2e18855f5cf654899a8adee0920",
+          "bytes": 207
+        },
+        "verify-budget.py": {
+          "sha256": "4bd3ec5c7c36dddaafda9fad45eac27f936e92579a5b8f46e23f19125ab785ed",
+          "bytes": 1825
+        }
+      },
+      "aliases": {
+        "common/pcapx/pcaputil/pfcp-idle-legacy-budget/overlay.json": "overlay.json",
+        "common/pcapx/pcaputil/pfcp-idle-legacy-budget/LICENSE.txt": "LICENSE.txt",
+        "common/pcapx/pcaputil/pfcp-idle-legacy-budget/verify-budget.py": "verify-budget.py"
+      }
     }
   ],
   "schema_version": 1,
