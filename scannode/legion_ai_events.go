@@ -3,6 +3,7 @@ package scannode
 import (
 	"context"
 	"fmt"
+	"net"
 	"strings"
 	"sync"
 	"time"
@@ -324,7 +325,8 @@ func (p *aiSessionEventPublisher) publish(
 	if !ok {
 		return ErrNodeSessionNotReady
 	}
-	if err := p.ensureJetStream(session.NATSURL); err != nil {
+	js, err := p.jetStreamForContext(ctx, session.NATSURL)
+	if err != nil {
 		return err
 	}
 
@@ -350,12 +352,6 @@ func (p *aiSessionEventPublisher) publish(
 	msg := nats.NewMsg(jobEventSubject(session.EventSubjectPrefix, eventType))
 	msg.Data = raw
 
-	p.mu.Lock()
-	js := p.js
-	p.mu.Unlock()
-	if js == nil {
-		return fmt.Errorf("jetstream context is not ready")
-	}
 	if _, err := js.PublishMsg(msg, nats.MsgId(eventID), nats.Context(ctx)); err != nil {
 		return fmt.Errorf("publish ai session event %s: %w", eventType, err)
 	}
@@ -3264,7 +3260,12 @@ func (p *aiSessionEventPublisher) ensureJetStream(natsURL string) error {
 	}
 	p.closeLocked()
 
-	conn, err := nats.Connect(natsURL, nats.Name("yak-node-ai-events-"+p.node.CurrentNodeID()))
+	return p.connectJetStreamLocked(natsURL)
+}
+
+func (p *aiSessionEventPublisher) connectJetStreamLocked(natsURL string, options ...nats.Option) error {
+	options = append(options, nats.Name("yak-node-ai-events-"+p.node.CurrentNodeID()))
+	conn, err := nats.Connect(natsURL, options...)
 	if err != nil {
 		return fmt.Errorf("connect ai event nats: %w", err)
 	}
@@ -3277,6 +3278,74 @@ func (p *aiSessionEventPublisher) ensureJetStream(natsURL string) error {
 	p.js = js
 	p.natsURL = natsURL
 	return nil
+}
+
+func (p *aiSessionEventPublisher) jetStreamForContext(ctx context.Context, natsURL string) (nats.JetStreamContext, error) {
+	ticker := time.NewTicker(time.Millisecond)
+	defer ticker.Stop()
+	for !p.mu.TryLock() {
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		case <-ticker.C:
+		}
+	}
+	defer p.mu.Unlock()
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	if p.js != nil && p.conn != nil && !p.conn.IsClosed() && p.natsURL == natsURL {
+		return p.js, nil
+	}
+	p.closeLocked()
+	dialer := &aiEventInitialDialer{ctx: ctx}
+	err := p.connectJetStreamLocked(natsURL, nats.SetCustomDialer(dialer), nats.SkipHostLookup())
+	dialer.detach()
+	if ctx.Err() != nil {
+		p.closeLocked()
+		return nil, ctx.Err()
+	}
+	if err != nil {
+		return nil, err
+	}
+	return p.js, nil
+}
+
+type aiEventInitialDialer struct {
+	mu    sync.Mutex
+	ctx   context.Context
+	stops []func() bool
+}
+
+func (d *aiEventInitialDialer) Dial(network, address string) (net.Conn, error) {
+	d.mu.Lock()
+	ctx := d.ctx
+	d.mu.Unlock()
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	dialer := net.Dialer{Timeout: nats.DefaultTimeout}
+	conn, err := dialer.DialContext(ctx, network, address)
+	if err != nil {
+		return nil, err
+	}
+	d.mu.Lock()
+	if d.ctx != nil {
+		d.stops = append(d.stops, context.AfterFunc(d.ctx, func() { _ = conn.Close() }))
+	}
+	d.mu.Unlock()
+	return conn, nil
+}
+
+func (d *aiEventInitialDialer) detach() {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	// The command deadline covers initial INFO/TLS setup, not future reconnects.
+	d.ctx = nil
+	for _, stop := range d.stops {
+		stop()
+	}
+	d.stops = nil
 }
 
 func (p *aiSessionEventPublisher) closeLocked() {
