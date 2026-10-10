@@ -202,6 +202,10 @@ func TestDLMSWrapperStructuredSealedMatrix(t *testing.T) {
 	}
 }
 func TestDLMSWrapperStructuredBudgetsOwnership(t *testing.T) {
+	t.Run("first-untracked-refusal", TestDLMSWrapperFirstUntrackedRefusalExistingAPI)
+	t.Run("untracked-retained-peers", TestDLMSWrapperUntrackedRefusalRetainedPeers)
+	t.Run("untracked-malformed-neighbors", TestDLMSWrapperRefusalHintMalformedNeighbors)
+	testWrapperFirstRefusalMatrix(t)
 	for _, c := range wrapperStructuredControls(t) {
 		for _, deferred := range []bool{false, true} {
 			t.Run(c.Name+fmt.Sprint(deferred), func(t *testing.T) {

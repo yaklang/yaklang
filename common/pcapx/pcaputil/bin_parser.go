@@ -271,6 +271,7 @@ type binParser struct {
 	stunUntrackedRefusal                                                       bool // constant-size quarantine when an admitted UDP key cannot be retained
 	pfcpUntrackedRefusal                                                       bool // udpMu; forgotten rejected identity cannot verify a newly admitted PFCP key
 	dlmsUntrackedRefusal                                                       bool // udpMu; no fresh HDLC association after an unretained admitted refusal
+	wrapperUntrackedRefusal                                                    bool // udpMu; missing Wrapper history cannot prove a fresh invoke generation
 	dcpMu                                                                      sync.Mutex
 	dcpClock                                                                   time.Time
 	dcpObservations                                                            map[dcpKey]*dcpObservation

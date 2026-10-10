@@ -219,16 +219,21 @@ Initial GET-next/link-negotiation segmentation, GBT, negotiated
 window/capability enforcement, ACSE/security and real meter execution remain
 separate unfinished requirements.
 
-For native HDLC and Wrapper1 UDP, local30second idle time retires the
-endpoint-pair/capture-domain identity until capture Close. It is not a peer
-reset or authenticated association boundary. Retained pending wire, fragments
-and Data graphs are released; a512-byte charged quarantine slot remains within
-the caller's conversation collection/shared-memory limits. Native application
-frames then require context; Wrapper frames retain selected literal fields with
-`ambiguous-conversation`, no TransactionID and no ResponseTo. Backward capture
-timestamps do not revive it. A different endpoint/domain can establish its own
-observed exchange within the remaining budget. Exhausting quarantine slots fails
-closed rather than evicting history. Close is idempotent and releases all slots.
+For native HDLC and Wrapper1 UDP, local30second idle releases pending wire,
+fragments and Data graphs while retaining charged endpoint/domain identity
+history. An unfinished exchange retires the whole key: native frames require
+context and Wrapper frames retain literal fields with `ambiguous-conversation`,
+zero TransactionID and zero ResponseTo. Completed exchanges keep their used
+sequence/invoke identities retired but allow distinct unused identities with
+observed progression. Idle and backward timestamps never prove a peer reset or
+authenticated association boundary. History stays within the caller's
+conversation collection/shared-memory limits; exhausting these limits fails
+closed rather than evicting history. First admitted resource refusal without a
+retained native/Wrapper key sets a constant capture marker. Newly admitted keys
+cannot claim fresh verified context after that lost history; independently
+retained keys remain usable. The shared ingress path examines only a bounded
+port/header hint, not a successful descriptor or Data decode. Close is idempotent
+and releases all charged slots.
 STUN, SNMP and QUIC idle policies prune only their own state in the shared UDP
 store; they cannot erase another application's correlation/quarantine history.
 

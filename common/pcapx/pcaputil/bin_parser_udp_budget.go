@@ -78,6 +78,9 @@ func (a *binParser) refuseUDPOversizeAssociation(e *ProtocolEvent, w []byte, src
 		// but its identities cannot be stored within the rejected budget.
 		a.dlmsUntrackedRefusal = true
 	}
+	if protocol == "dlms-wrapper" && !existing && (explicit != "" || wrapperUDPRefusalHint(w)) {
+		a.wrapperUntrackedRefusal = true
+	}
 	if protocol == "stun" && !existing {
 		if store == nil {
 			store = &binUDPStore{entries: map[binUDPKey]*list.Element{}, clock: e.Timestamp}

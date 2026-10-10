@@ -392,6 +392,14 @@ func (f *binFlow) consumeWrapper(dir int, w []byte, e *ProtocolEvent) error {
 
 const wrapperIdleTTL = 30 * time.Second
 
+// Shared ingress may refuse before parsing or retaining an endpoint key. Only
+// inspect the fixed Wrapper/service header here; this hint is not an accepted
+// descriptor, Data value, association or authenticated peer generation.
+func wrapperUDPRefusalHint(w []byte) bool {
+	return len(w) >= 11 && w[0] == 0 && w[1] == 1 && int(binary.BigEndian.Uint16(w[6:8])) == len(w)-8 &&
+		(w[8] == 0xc0 || w[8] == 0xc4) && (w[9] == 1 || w[9] == 2 || w[9] == 3) && w[10]&0x30 == 0
+}
+
 func (a *binParser) expireWrapper(ts time.Time) {
 	a.udpMu.Lock()
 	defer a.udpMu.Unlock()
@@ -437,7 +445,7 @@ func (a *binParser) decodeWrapperDatagram(e *ProtocolEvent, w []byte, src, dst u
 	if store != nil {
 		el = store.entries[key]
 	}
-	f := &binFlow{a: a, wrapper: &binDLMSWrapper{}, protocol: "dlms-wrapper"}
+	f := &binFlow{a: a, wrapper: &binDLMSWrapper{blocked: a.wrapperUntrackedRefusal}, protocol: "dlms-wrapper"}
 	created := el == nil
 	if el != nil {
 		f = el.Value.(*binUDPEntry).flow
@@ -487,6 +495,13 @@ func (a *binParser) decodeWrapperDatagram(e *ProtocolEvent, w []byte, src, dst u
 		}
 	}
 	if created {
+		var pe *ProtocolError
+		if errors.As(err, &pe) && pe.Kind == ErrResourceExceeded && (explicit || wrapperUDPRefusalHint(w)) {
+			// No charged key survives this refusal. A later request/reply cannot
+			// prove a new generation of its invoke token. Already retained keys
+			// keep their independently observed context.
+			a.wrapperUntrackedRefusal = true
+		}
 		defer f.closeSession()
 	}
 	if err != nil {

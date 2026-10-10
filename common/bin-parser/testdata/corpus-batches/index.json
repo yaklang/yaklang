@@ -36154,6 +36154,93 @@
         "common/pcapx/pcaputil/dlms-request-segments/controls.json": "controls.json",
         "common/pcapx/pcaputil/dlms-request-segments/validation/expected.json": "validation/expected.json"
       }
+    },
+    {
+      "id": "validation-wrapper-first-refusal",
+      "kind": "validation",
+      "source_sha": "6ed3b60e1be5c6b91379099a1c2ced6526c7adec",
+      "file": "validation-wrapper-first-refusal.zip",
+      "sha256": "87c574fb5abcefadef3fbcd888ce02b518f80e4d64bb11a30d84dc9f70e064c8",
+      "password": "bin-parser",
+      "members": {
+        "build.py": {
+          "sha256": "14edf31404dcdba4e777e12f3dd9bda30f00e885697b792addcc7c3e60da5bdf",
+          "bytes": 2601
+        },
+        "verify.py": {
+          "sha256": "07577c0bba23ddc067fe3187210a0c24815546f64fe42efa0d201d385f08c530",
+          "bytes": 1687
+        },
+        "reference-check.py": {
+          "sha256": "48304c1d4a196901bd6d299f6f86b247044db8292fb94a3d339861c7ec534c52",
+          "bytes": 1499
+        },
+        "seal.py": {
+          "sha256": "4f3a09d4a7b1cde9300932f2af2b5de6153a6f3eb3ce1bcb5e84a809f0ba21eb",
+          "bytes": 3971
+        },
+        "source-pin.json": {
+          "sha256": "a6c6c596cd12c061e61b421fbbc5ee5724d0eb57d75dde0f7b3a1eb8568e8ab3",
+          "bytes": 10595
+        },
+        "carrier.py": {
+          "sha256": "adce1cb3f2e08bd83a75111553096394f9cbbd04947297e9320eddb79e19d635",
+          "bytes": 1888
+        },
+        "LICENSE.txt": {
+          "sha256": "f76a7e6c5e154f41e949b61fc728d9ba7aae5182048fff9082ca2debbd2b4bb3",
+          "bytes": 236
+        },
+        "public-baseline_test.go": {
+          "sha256": "a632654a106132f3c6c30e201a95d9b3f529fcbba7f669b3505283b07dc1e9b8",
+          "bytes": 2205
+        },
+        "cases/normal.pcap": {
+          "sha256": "20138b0c3e308a6d0113308811fe16592962762fc5c2f83cfca1534b63da2351",
+          "bytes": 176
+        },
+        "answers/normal.json": {
+          "sha256": "f9dc32a5daf75224ea33eef45d88ecd1f16af5650c7f4d277e042494efd221af",
+          "bytes": 2837
+        },
+        "cases/frame-refusal.pcap": {
+          "sha256": "f20515ea7e4f1fb408b1d4d72bc226f4a09029f30526a742a32cf5984994e841",
+          "bytes": 318
+        },
+        "answers/frame-refusal.json": {
+          "sha256": "daee44cd19752f23b684ba836237d3215af3c79b1b9e8571632685cce5d076bf",
+          "bytes": 3677
+        },
+        "answers/ingress-refusal.json": {
+          "sha256": "aaa0d8827e33e8a0e5b664872e5e50abe98c12714c3938a2b1af635b6b0f00a0",
+          "bytes": 3682
+        },
+        "controls.json": {
+          "sha256": "c4eab6effc7bab991a5b8c9c5f3ff80c0677883233ca36dd7bdfc9a669bdc4e2",
+          "bytes": 11894
+        },
+        "validation/expected.json": {
+          "sha256": "2122322b77f4768790de4a488a1a2c800f9041eb33256f4557b08a13fb73a0aa",
+          "bytes": 2810
+        }
+      },
+      "aliases": {
+        "common/pcapx/pcaputil/wrapper-first-refusal/build.py": "build.py",
+        "common/pcapx/pcaputil/wrapper-first-refusal/verify.py": "verify.py",
+        "common/pcapx/pcaputil/wrapper-first-refusal/reference-check.py": "reference-check.py",
+        "common/pcapx/pcaputil/wrapper-first-refusal/seal.py": "seal.py",
+        "common/pcapx/pcaputil/wrapper-first-refusal/source-pin.json": "source-pin.json",
+        "common/pcapx/pcaputil/wrapper-first-refusal/carrier.py": "carrier.py",
+        "common/pcapx/pcaputil/wrapper-first-refusal/LICENSE.txt": "LICENSE.txt",
+        "common/pcapx/pcaputil/wrapper-first-refusal/public-baseline_test.go": "public-baseline_test.go",
+        "common/pcapx/pcaputil/wrapper-first-refusal/cases/normal.pcap": "cases/normal.pcap",
+        "common/pcapx/pcaputil/wrapper-first-refusal/answers/normal.json": "answers/normal.json",
+        "common/pcapx/pcaputil/wrapper-first-refusal/cases/frame-refusal.pcap": "cases/frame-refusal.pcap",
+        "common/pcapx/pcaputil/wrapper-first-refusal/answers/frame-refusal.json": "answers/frame-refusal.json",
+        "common/pcapx/pcaputil/wrapper-first-refusal/answers/ingress-refusal.json": "answers/ingress-refusal.json",
+        "common/pcapx/pcaputil/wrapper-first-refusal/controls.json": "controls.json",
+        "common/pcapx/pcaputil/wrapper-first-refusal/validation/expected.json": "validation/expected.json"
+      }
     }
   ],
   "schema_version": 1,
