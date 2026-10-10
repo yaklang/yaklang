@@ -12,6 +12,7 @@ import (
 )
 
 const SessionSnapshotNodeID = "session_snapshot"
+const SessionTaskSnapshotNodeID = "task_snapshot"
 
 const (
 	SessionSnapshotSectionExecution           = "execution"
@@ -34,6 +35,8 @@ type SessionSnapshot struct {
 	Perception          *SessionSnapshotPerception         `json:"perception"`
 	Capabilities        []CapabilityInventoryItem          `json:"capabilities"`
 	BackgroundProcesses []SessionSnapshotBackgroundProcess `json:"background_processes"`
+	Tasks               []SessionSnapshotTaskSummary       `json:"tasks"`
+	Todo                *SessionSnapshotTodoSummary        `json:"todo"`
 }
 
 // SessionSnapshotBackgroundProcess describes a long-lived background resource owned by the session.
@@ -53,10 +56,12 @@ type SessionSnapshotExecution struct {
 	EndedAt   int64  `json:"ended_at"`
 	// Legacy wire names retained for frontend compatibility. These count
 	// protocol-completed and protocol-failed calls, not execution outcomes.
-	ToolCallSuccess   int `json:"tool_call_success"`
-	ToolCallFailed    int `json:"tool_call_failed"`
-	ToolCallTotal     int `json:"tool_call_total"`
-	ExecutionMinutes  int `json:"execution_minutes"`
+	ToolCallSuccess  int `json:"tool_call_success"`
+	ToolCallFailed   int `json:"tool_call_failed"`
+	ToolCallTotal    int `json:"tool_call_total"`
+	ExecutionMinutes int `json:"execution_minutes"`
+	// ExecutionRounds is the raw number of ReAct loop iterations executed.
+	ExecutionRounds   int `json:"execution_rounds"`
 	HTTPFlowCount     int `json:"http_flow_count"`
 	RiskCount         int `json:"risk_count"`
 	ModifiedFileCount int `json:"modified_file_count"`
@@ -305,13 +310,15 @@ func (c *Config) AddSessionSnapshotBackgroundProcess(processType, processID, pro
 	if state.backgroundProcesses == nil {
 		state.backgroundProcesses = make(map[string]SessionSnapshotBackgroundProcess)
 	}
-	state.backgroundProcesses[processID] = SessionSnapshotBackgroundProcess{
+	process := SessionSnapshotBackgroundProcess{
 		Type:        processType,
 		ProcessID:   processID,
 		ProcessName: processName,
 		Status:      SessionSnapshotProcessStatusRunning,
 		StartedAt:   time.Now().Unix(),
 	}
+	state.backgroundProcesses[processID] = process
+	c.recordSessionSnapshotBackgroundProcess(process, false)
 }
 
 func (c *Config) RemoveSessionSnapshotBackgroundProcess(processID string) {
@@ -329,6 +336,7 @@ func (c *Config) RemoveSessionSnapshotBackgroundProcess(processID string) {
 		return
 	}
 	delete(state.backgroundProcesses, processID)
+	c.recordSessionSnapshotBackgroundProcess(SessionSnapshotBackgroundProcess{ProcessID: processID}, true)
 }
 
 func (c *Config) BuildSessionSnapshotBackgroundProcesses() []SessionSnapshotBackgroundProcess {
@@ -412,7 +420,9 @@ func (c *Config) FinalizeSessionSnapshotExecution(status string, endedAt time.Ti
 }
 
 func (c *Config) RecordSessionSnapshotToolCall(result *aitool.ToolResult) {
-	c.recordSessionSnapshotToolCallOnce(result)
+	if c.recordSessionSnapshotToolCallOnce(result) {
+		c.recordSessionSnapshotToolAccounting(result)
+	}
 }
 
 // recordSessionSnapshotToolCallOnce updates the execution counters only once
@@ -467,6 +477,7 @@ func (c *Config) RecordSessionSnapshotFileWrite(path string) {
 	state.execution.mu.Lock()
 	defer state.execution.mu.Unlock()
 	state.execution.stats.ModifiedFileCount++
+	c.recordSessionSnapshotFileAccounting(path)
 }
 
 func (c *Config) RefreshSessionSnapshotRuntimeCounts(callToolID string) {
@@ -481,6 +492,7 @@ func (c *Config) RefreshSessionSnapshotRuntimeCounts(callToolID string) {
 	defer state.execution.mu.Unlock()
 	if id := strings.TrimSpace(callToolID); id != "" {
 		state.execution.callToolIDs[id] = struct{}{}
+		c.recordSessionSnapshotRuntimeAccounting(id)
 	}
 	c.refreshSessionSnapshotRuntimeCountsLocked(state)
 	c.refreshSessionSnapshotDurationLocked(state, false)
@@ -509,6 +521,12 @@ func NormalizeSessionSnapshot(snapshot *SessionSnapshot) {
 	}
 	if snapshot.BackgroundProcesses == nil {
 		snapshot.BackgroundProcesses = []SessionSnapshotBackgroundProcess{}
+	}
+	if snapshot.Tasks == nil {
+		snapshot.Tasks = []SessionSnapshotTaskSummary{}
+	}
+	if snapshot.Todo == nil {
+		snapshot.Todo = &SessionSnapshotTodoSummary{ByTask: []SessionSnapshotTodoTaskSummary{}}
 	}
 }
 
@@ -622,6 +640,7 @@ func (c *Config) syncExecutionToolCountsLocked(state *sessionSnapshotState, task
 				state.execution.recordedToolCallIDs = make(map[string]struct{})
 			}
 			state.execution.recordedToolCallIDs[callToolID] = struct{}{}
+			c.recordSessionSnapshotToolAccounting(result)
 		}
 	}
 	state.execution.stats.ToolCallSuccess = success
@@ -669,6 +688,7 @@ func NotifySessionSnapshotToolCall(cfg AICallerConfigIf, result *aitool.ToolResu
 		if !c.recordSessionSnapshotToolCallOnce(result) {
 			return
 		}
+		c.recordSessionSnapshotToolAccounting(result)
 		c.NotifySessionSnapshotEmit()
 		// 命中统计: 任意一次工具调用 (成功/失败, 直接/申请) 都计一次 tool 命中.
 		// 这是「重要反馈点」, 供意图层与工具 inventory 做命中数排序.
@@ -754,6 +774,8 @@ func BeginSessionSnapshotExecutionForTask(c *Config, task AIStatefulTask, starte
 	if taskName == "" {
 		taskName = "task"
 	}
+	c.RestoreSessionSnapshotTodos(task)
+	c.BeginSessionSnapshotTask(task)
 	c.ResetSessionSnapshotExecution(taskName, "processing", startedAt)
 	c.NotifySessionSnapshotEmit(true)
 }

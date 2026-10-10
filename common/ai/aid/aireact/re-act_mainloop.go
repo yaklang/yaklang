@@ -60,7 +60,6 @@ const (
 // updateRuntimeTasks 更新 runtime tasks
 func (r *ReAct) updateRuntimeTasks() {
 	r.UpdateRuntimeTaskMutex.Lock()
-	defer r.UpdateRuntimeTaskMutex.Unlock()
 	newRuntimeTasks := make([]aicommon.AIStatefulTask, 0)
 
 	for _, task := range r.RuntimeTasks {
@@ -69,7 +68,19 @@ func (r *ReAct) updateRuntimeTasks() {
 		}
 		newRuntimeTasks = append(newRuntimeTasks, task)
 	}
+	becameIdle := len(r.RuntimeTasks) > 0 && len(newRuntimeTasks) == 0
 	r.RuntimeTasks = newRuntimeTasks
+	r.UpdateRuntimeTaskMutex.Unlock()
+
+	// Only notify when cleanup drains the runtime list, not on every idle poll.
+	if becameIdle && r.Emitter != nil {
+		_, _ = r.EmitStatusI18n(
+			reactloops.ReActLoadingStatusKey,
+			"本轮任务已结束，等待新指令",
+			"Task ended. Ready for your next instruction.",
+			aicommon.WithStatusState(aicommon.StatusStateWaiting),
+		)
+	}
 }
 
 // getProcessingRuntimeTask returns the queue-owned root task. ReAct sub-loops
@@ -427,7 +438,15 @@ func (r *ReAct) ExecuteLoopTask(taskTypeName string, task aicommon.AIStatefulTas
 	}
 	aicommon.BeginSessionSnapshotExecutionForTask(r.config, task, time.Now())
 	err = mainloop.ExecuteWithExistedTask(task)
-	aicommon.FinalizeSessionSnapshotExecutionForTask(r.config, task, time.Now())
+	snapshotStatus := aicommon.SessionSnapshotStatusFromTask(task)
+	if snapshotStatus == "processing" {
+		if err != nil {
+			snapshotStatus = "aborted"
+		} else if !task.IsAsyncMode() {
+			snapshotStatus = "completed"
+		}
+	}
+	r.config.FinalizeSessionSnapshotExecution(snapshotStatus, time.Now())
 	reactloops.EmitSessionSnapshot(r.config, mainloop, task)
 	if err != nil {
 		return false, err
