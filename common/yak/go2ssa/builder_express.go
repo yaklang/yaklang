@@ -235,7 +235,6 @@ func (b *astbuilder) buildPrimaryExpression(exp *gol.PrimaryExprContext, IslValu
 
 	var leftv *ssa.Variable = nil
 	var rightv ssa.Value = nil
-	var handleObjectType func(ssa.Value, *ssa.ObjectType)
 
 	if IslValue {
 		p := exp.PrimaryExpr()
@@ -253,45 +252,16 @@ func (b *astbuilder) buildPrimaryExpression(exp *gol.PrimaryExprContext, IslValu
 			id := exp.IDENTIFIER()
 			text := id.GetText()
 
-			handleObjectType = func(rv ssa.Value, typ *ssa.ObjectType) {
-				if typ.GetTypeKind() == ssa.PointerKind {
-					rv = b.ReadMemberCallValue(rv, b.EmitConstInstPlaceholder("@value"))
-					if typ, ok := ssa.ToObjectType(rv.GetType()); ok {
-						handleObjectType(rv, typ)
-					}
-					return
-				} else if p, ok := ssa.ToParameter(rv); ok && !p.IsFreeValue {
-					if key := typ.GetKeybyName(text); key != nil {
-						leftv = b.CreateMemberCallVariable(rv, key)
-						b.ReferenceParameter(leftv.GetName(), p.FormalParameterIndex, ssa.PointerSideEffect)
-						// TODO(go2ssa): model embedded-pointer member writes precisely instead of
-						// reusing the generic parameter side-effect fallback.
-						return
-					}
-				}
-
-				if key := typ.GetKeybyName(text); key != nil {
-					leftv = b.CreateMemberCallVariable(rv, key)
-				} else {
-					for n, a := range typ.AnonymousField {
-						rv = b.ReadMemberCallValueByName(rv, n)
-						if rv == nil {
-							b.NewError(ssa.Error, TAG, NotFindAnonymousFieldObject(n))
-							return
-						}
-						if key := a.GetKeybyName(text); key != nil {
-							handleObjectType(rv, a)
-						}
-					}
-				}
+			owner, key, handled, valid := b.resolveGoSelector(rv, text, false)
+			if handled && !valid {
+				return nil, b.CreateVariable("_")
 			}
-
-			if typ, ok := ssa.ToObjectType(rv.GetType()); ok {
-				handleObjectType(rv, typ)
+			if !handled {
+				key = b.EmitConstInstPlaceholder(text)
 			}
-
-			if leftv == nil {
-				leftv = b.CreateMemberCallVariable(rv, b.EmitConstInstPlaceholder(text))
+			leftv = b.CreateMemberCallVariable(owner, key)
+			if p, ok := ssa.ToParameter(owner); ok && !p.IsFreeValue {
+				b.ReferenceParameter(leftv.GetName(), p.FormalParameterIndex, ssa.PointerSideEffect)
 			}
 		}
 	} else {
@@ -343,54 +313,18 @@ func (b *astbuilder) buildPrimaryExpression(exp *gol.PrimaryExprContext, IslValu
 				return b.ReadMemberCallValue(rv, key), true
 			}
 
-			handleObjectType = func(rv ssa.Value, typ *ssa.ObjectType) {
-				if utils.IsNil(rv) || typ == nil {
-					return
+			wantMethod := len(isFunction) > 0 && isFunction[0]
+			owner, key, handled, valid := b.resolveGoSelector(rv, text, wantMethod)
+			if handled {
+				if !valid {
+					return b.EmitUndefined(text), nil
 				}
-				if typ.GetTypeKind() == ssa.PointerKind {
-					rv = b.ReadMemberCallValue(rv, b.EmitConstInstPlaceholder("@value"))
-					if utils.IsNil(rv) {
-						return
-					}
-					if typ, ok := ssa.ToObjectType(rv.GetType()); ok {
-						handleObjectType(rv, typ)
-					}
-					return
-				}
-
-				if key := typ.GetKeybyName(text); key != nil {
-					rightv = b.ReadMemberCallValue(rv, key)
-				} else {
-					for n, a := range typ.AnonymousField {
-						/*
-						 a.A.b
-						*/
-						if key := a.GetKeybyName(text); !utils.IsNil(key) {
-							rightv = b.ReadMemberCallValueByName(rv, n)
-							if rightv == nil {
-								rightv, _ = readMemberCall(rv, b.EmitConstInstPlaceholder(text))
-							}
-							if rightv != nil {
-								handleObjectType(rightv, a)
-							}
-						}
-					}
-				}
-			}
-
-			if typ, ok := ssa.ToObjectType(rv.GetType()); ok {
-				handleObjectType(rv, typ)
+				rightv = b.ReadMemberCallValue(owner, key)
 			} else if value, ok := b.GetProgram().ReadImportValueWithPkg(rv.GetName(), text); ok {
 				rightv = value
-			}
-
-			if rightv == nil {
-				var ok bool
-				if rightv, ok = readMemberCall(rv, b.EmitConstInstPlaceholder(text)); ok {
-					rightv.SetType(HandleFullTypeNames(rv.GetType(), rv.GetType().GetFullTypeNames()))
-				} else {
-					rightv.SetType(HandleFullTypeNames(rightv.GetType(), rv.GetType().GetFullTypeNames()))
-				}
+			} else {
+				rightv, _ = readMemberCall(owner, b.EmitConstInstPlaceholder(text))
+				rightv.SetType(HandleFullTypeNames(rightv.GetType(), rv.GetType().GetFullTypeNames()))
 			}
 			// log.Infof("rightv = %v", rightv)
 			// log.Infof("rightv type = %v", rightv.GetType())
