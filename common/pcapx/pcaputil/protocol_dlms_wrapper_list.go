@@ -5,10 +5,11 @@ import (
 	"encoding/hex"
 	"fmt"
 	"math"
+	"unicode/utf8"
 )
 
 // These are local selected-profile bounds, not DLMS wire maxima.
-// Data types other than scalar/float/octet/bit-string/array/structure, block transfer, ciphering
+// Data types other than scalar/float/octet/bit-string/selected-text/array/structure, block transfer, ciphering
 // and object/selector semantics remain separate.
 const wrapperListItems = 64
 const wrapperListOctets = 1024
@@ -88,8 +89,8 @@ func (c *wrapperListCursor) scalar(limit int) (map[string]any, error) {
 		}
 		return wrapperScalar(c.wire[start:c.at], limit)
 	}
-	if tag != 9 && tag != 4 {
-		return nil, wrapperError(ErrUnsupportedFeature, "Data type outside bounded scalar/octet/bit-string profile")
+	if tag != 9 && tag != 4 && tag != 10 && tag != 12 {
+		return nil, wrapperError(ErrUnsupportedFeature, "Data type outside bounded scalar/octet/bit-string/selected-text profile")
 	}
 	n, enc, err := c.count()
 	if err != nil {
@@ -117,6 +118,23 @@ func (c *wrapperListCursor) scalar(limit int) (map[string]any, error) {
 		out["bit_length"], out["unused_bits"] = n, (8-n%8)%8
 	} else {
 		out["length"] = n
+	}
+	if tag == 10 || tag == 12 {
+		encoding := "utf-8"
+		if tag == 10 {
+			// This profile selects printable US-ASCII. Other visible-string repertoires
+			// remain unsupported, rather than being labelled universally malformed.
+			for _, b := range w {
+				if b < 0x20 || b > 0x7e {
+					return nil, wrapperError(ErrUnsupportedFeature, "visible-string outside selected printable ASCII repertoire")
+				}
+			}
+			encoding = "ascii"
+		} else if !utf8.Valid(w) {
+			// RFC3629: no overlong sequences, surrogates or scalar values above U+10FFFF.
+			return nil, wrapperError(ErrMalformedMessage, "Data UTF-8 string contains invalid encoding")
+		}
+		out["text_encoding"], out["value"], out["code_points"] = encoding, string(w), utf8.RuneCount(w)
 	}
 	return out, nil
 }

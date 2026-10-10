@@ -85,9 +85,19 @@ func wrapperOwnedDataMatrix(t *testing.T, cases []wrapperBitsControl) {
 				}
 				events, stats := discoveryReplay(t, input, workers, deferred, observe, options...)
 				c.Targets.Pairs = c.DefaultPairs
-				assertWrapperStructuredAnswers(t, c.wrapperStructuredControl, events, false)
-				require.EqualValues(t, len(c.Answers), stats.Messages)
-				for i, e := range events {
+				frameEvents := events
+				expectedEvents := len(c.Answers)
+				if c.ExpectedCloseOutstanding != 0 {
+					require.Equal(t, 1, c.ExpectedCloseOutstanding)
+					require.Len(t, events, expectedEvents+1)
+					assertWrapperStructuredClose(t, events[expectedEvents:])
+					require.Greater(t, events[expectedEvents].ID, events[expectedEvents-1].ID)
+					frameEvents = events[:expectedEvents]
+					require.EqualValues(t, 1, stats.Incomplete)
+				}
+				assertWrapperStructuredAnswers(t, c.wrapperStructuredControl, frameEvents, false)
+				require.EqualValues(t, expectedEvents, stats.Messages)
+				for i, e := range frameEvents {
 					dir := -1
 					for _, step := range c.Steps {
 						if step.Ref == c.Answers[i].Refs[0] {
@@ -153,7 +163,12 @@ func wrapperOwnedDataBudgetsOwnership(t *testing.T, cases []wrapperBitsControl) 
 						require.NoError(t, err)
 						rocEqualFields(t, c.Answers[i].Fields, f)
 					}
-					require.Empty(t, s.Close("bits"))
+					closed := s.Close("bits")
+					if c.ExpectedCloseOutstanding != 0 {
+						assertWrapperStructuredClose(t, closed)
+					} else {
+						require.Empty(t, closed)
+					}
 					require.Empty(t, s.Close("again"))
 					require.Zero(t, s.Stats().BufferedBytes)
 				}
