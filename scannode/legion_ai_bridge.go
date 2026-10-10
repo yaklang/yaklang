@@ -101,6 +101,10 @@ type aiSessionRuntimeRefEmitter interface {
 	EmitForRef(aiSessionCommandRef, string, []byte) bool
 }
 
+type aiSessionRuntimeContextRefEmitter interface {
+	EmitForRefContext(context.Context, aiSessionCommandRef, string, []byte) bool
+}
+
 type aiSessionRuntimeTurnCompleter interface {
 	DoneTurn(string, []byte)
 	FailTurn(string, string, string, []byte)
@@ -758,7 +762,7 @@ func (m *aiSessionRuntimeManager) Bind(
 		}()
 	}
 	if collector != nil {
-		collector.emit("ai_traffic_capability", &aiv1.AITrafficCapability{ProtocolVersion: 1, SupportedTransports: []string{"yaklang_lowhttp"}, UnsupportedSources: []string{"external_process", "browser", "uninstrumented_http_client"}})
+		collector.emit(ctx, "ai_traffic_capability", &aiv1.AITrafficCapability{ProtocolVersion: 1, SupportedTransports: []string{"yaklang_lowhttp"}, UnsupportedSources: []string{"external_process", "browser", "uninstrumented_http_client"}})
 	}
 	if err := m.publishWorkspaceReady(ctx, runtime, publisher); err != nil {
 		return ref, err
@@ -2220,7 +2224,7 @@ type managedAISessionRuntimeEmitter struct {
 }
 
 func (e *managedAISessionRuntimeEmitter) Emit(eventType string, payloadJSON []byte) {
-	e.emitForRef(nil, eventType, payloadJSON)
+	e.emitForRef(nil, nil, eventType, payloadJSON)
 }
 
 func (e *managedAISessionRuntimeEmitter) EmitForRef(
@@ -2228,16 +2232,41 @@ func (e *managedAISessionRuntimeEmitter) EmitForRef(
 	eventType string,
 	payloadJSON []byte,
 ) bool {
-	return e.emitForRef(&ref, eventType, payloadJSON)
+	return e.emitForRef(nil, &ref, eventType, payloadJSON)
+}
+
+func (e *managedAISessionRuntimeEmitter) EmitForRefContext(
+	ctx context.Context,
+	ref aiSessionCommandRef,
+	eventType string,
+	payloadJSON []byte,
+) bool {
+	if e == nil {
+		return false
+	}
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	if e.ctx != nil {
+		stop := context.AfterFunc(e.ctx, cancel)
+		defer stop()
+		if e.ctx.Err() != nil {
+			cancel()
+		}
+	}
+	return e.emitForRef(ctx, &ref, eventType, payloadJSON)
 }
 
 func (e *managedAISessionRuntimeEmitter) emitForRef(
+	ctx context.Context,
 	frozenRef *aiSessionCommandRef,
 	eventType string,
 	payloadJSON []byte,
 ) bool {
 	if e == nil || e.runtime == nil || e.publisher == nil {
 		return false
+	}
+	if ctx == nil {
+		ctx = e.ctx
 	}
 	if !e.runtime.beginEmission() {
 		return false
@@ -2270,9 +2299,9 @@ func (e *managedAISessionRuntimeEmitter) emitForRef(
 	}
 	var err error
 	if claimed {
-		err = retryAISessionTerminalPublish(e.ctx, publish)
+		err = retryAISessionTerminalPublish(ctx, publish)
 	} else {
-		err = publish(e.ctx)
+		err = publish(ctx)
 	}
 	if err != nil {
 		logAISessionRuntimePublishError("event", ref.SessionID, err)

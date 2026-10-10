@@ -15,6 +15,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/nats-io/nats.go"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	aiv1 "github.com/yaklang/yaklang/scannode/gen/legionpb/legion/ai/v1"
 	"google.golang.org/protobuf/encoding/protojson"
@@ -30,6 +31,10 @@ func (e *trafficTestEmitter) Emit(_ string, raw []byte) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	e.events = append(e.events, append([]byte(nil), raw...))
+}
+func (e *trafficTestEmitter) EmitForRefContext(_ context.Context, _ aiSessionCommandRef, kind string, raw []byte) bool {
+	e.Emit(kind, raw)
+	return true
 }
 func (*trafficTestEmitter) Done([]byte)                   {}
 func (*trafficTestEmitter) Failed(string, string, []byte) {}
@@ -601,5 +606,260 @@ func TestAITrafficCaptureKeepsStartURLThroughQuotaAndUnavailablePackets(t *testi
 				}
 			}
 		})
+	}
+}
+
+func TestResilienceAITrafficFormalDrainRecoversAfterAutomaticTimeout(t *testing.T) {
+	server := trafficReceiptTestServer(t)
+	defer server.Close()
+	unavailable := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusServiceUnavailable)
+	}))
+	defer unavailable.Close()
+	c := trafficTestCollector(t, unavailable.URL)
+	c.enqueue(&aiv1.AITrafficUpload{Record: &aiv1.AITrafficRecord{ProtocolVersion: 1, FlowId: "flow", SessionId: "session", Phase: "terminal", Outcome: "success"}})
+	c.flush(context.Background())
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	c.finishDrain(ctx)
+	select {
+	case <-c.stop:
+	default:
+		t.Fatal("automatic timeout retained the background worker")
+	}
+	c.policy.UploadBaseUrl = server.URL
+	ctx, cancel = context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	result := c.drain(ctx, "formal-drain")
+	if !result.Complete || result.PendingRecords != 0 || ctx.Err() != nil {
+		t.Fatalf("formal drain did not recover the stopped worker's queue: %+v, %v", result, ctx.Err())
+	}
+}
+
+func TestResilienceAITrafficStoppedDrainHonorsDeadlineDuringConcurrentFlush(t *testing.T) {
+	c := trafficTestCollector(t, "http://unused.invalid")
+	c.enqueue(&aiv1.AITrafficUpload{Record: &aiv1.AITrafficRecord{FlowId: "flow", Phase: "terminal"}})
+	c.stopped.Do(func() { close(c.stop) })
+	c.uploadMu.Lock()
+	defer c.uploadMu.Unlock()
+	ctx, cancel := context.WithTimeout(context.Background(), time.Millisecond)
+	defer cancel()
+	done := make(chan *aiv1.AITrafficDrainResult, 1)
+	go func() { done <- c.drain(ctx, "formal-drain") }()
+	select {
+	case result := <-done:
+		if result.Complete || result.PendingRecords != 1 {
+			t.Fatalf("concurrent uploader incorrectly confirmed evidence: %+v", result)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("formal drain waited on another upload past its deadline")
+	}
+}
+
+type trafficRetryTestEmitter struct {
+	trafficTestEmitter
+	acknowledged bool
+	attempts     int
+}
+
+func (e *trafficRetryTestEmitter) EmitForRefContext(ctx context.Context, ref aiSessionCommandRef, kind string, raw []byte) bool {
+	e.attempts++
+	if !e.acknowledged {
+		return false
+	}
+	return e.trafficTestEmitter.EmitForRefContext(ctx, ref, kind, raw)
+}
+
+func TestResilienceAITrafficMetadataAcknowledgementSurvivesUploadRetryAndRestart(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusServiceUnavailable)
+	}))
+	defer server.Close()
+	c := trafficTestCollector(t, server.URL)
+	emitter := &trafficRetryTestEmitter{}
+	c.emitter = emitter
+	c.enqueue(&aiv1.AITrafficUpload{Record: &aiv1.AITrafficRecord{ProtocolVersion: 1, FlowId: "flow", SessionId: "session", Phase: "terminal"}})
+	c.flush(context.Background())
+	if emitter.attempts != 1 {
+		t.Fatal("metadata was not attempted before packet upload")
+	}
+	marker := filepath.Join(c.dir, "flow.terminal.metadata")
+	if _, err := os.Stat(marker); !os.IsNotExist(err) {
+		t.Fatal("unacknowledged metadata was marked delivered")
+	}
+	emitter.acknowledged = true
+	c.flush(context.Background())
+	c.flush(context.Background())
+	if emitter.attempts != 2 || len(emitter.events) != 1 {
+		t.Fatalf("upload retries republished acknowledged metadata: attempts=%d events=%d", emitter.attempts, len(emitter.events))
+	}
+	restarted := trafficTestCollector(t, server.URL)
+	restarted.dir = c.dir
+	restarted.flush(context.Background())
+	if len(restarted.emitter.(*trafficTestEmitter).events) != 0 {
+		t.Fatal("restart ignored durable metadata acknowledgement")
+	}
+	if err := os.Remove(marker); err != nil {
+		t.Fatal(err)
+	}
+	restarted.flush(context.Background())
+	if len(restarted.emitter.(*trafficTestEmitter).events) != 1 {
+		t.Fatal("restart did not replay an ambiguous metadata acknowledgement")
+	}
+	paths, _ := restarted.pending()
+	if len(paths) != 1 {
+		t.Fatal("metadata acknowledgement discarded unacknowledged packet upload")
+	}
+	recovered := trafficReceiptTestServer(t)
+	defer recovered.Close()
+	restarted.policy.UploadBaseUrl = recovered.URL
+	restarted.flush(context.Background())
+	paths, _ = restarted.pending()
+	if len(paths) != 0 || len(restarted.emitter.(*trafficTestEmitter).events) != 1 {
+		t.Fatal("recovered upload lost its receipt or republished metadata")
+	}
+	if _, err := os.Stat(marker); !os.IsNotExist(err) {
+		t.Fatal("acknowledged upload left its metadata marker behind")
+	}
+}
+
+type trafficBlockingJetStream struct {
+	nats.JetStreamContext
+	entered chan struct{}
+}
+
+func (p *trafficBlockingJetStream) PublishMsg(_ *nats.Msg, options ...nats.PubOpt) (*nats.PubAck, error) {
+	for _, option := range options {
+		if ctx, ok := option.(nats.ContextOpt); ok {
+			select {
+			case p.entered <- struct{}{}:
+			default:
+			}
+			<-ctx.Done()
+			return nil, ctx.Err()
+		}
+	}
+	return nil, fmt.Errorf("publisher did not receive a context")
+}
+
+func trafficBlockedPublisherCollector(t *testing.T, endpoint string) (*aiTrafficCollector, *trafficBlockingJetStream) {
+	t.Helper()
+	bridge, _, driver := newTestAISessionBridge(t)
+	if err := bridge.handleAISessionBind(context.Background(), mustMarshalProto(t, validAISessionBindCommand())); err != nil {
+		t.Fatal(err)
+	}
+	driver.mu.Lock()
+	emitter := driver.emitters[0].(*managedAISessionRuntimeEmitter)
+	driver.mu.Unlock()
+	blocked := &trafficBlockingJetStream{entered: make(chan struct{}, 8)}
+	emitter.publisher.mu.Lock()
+	emitter.publisher.js = blocked
+	emitter.publisher.mu.Unlock()
+	c := trafficTestCollector(t, endpoint)
+	c.binding.Ref = emitter.runtime.ref
+	c.emitter = emitter
+	c.enqueue(&aiv1.AITrafficUpload{Record: &aiv1.AITrafficRecord{ProtocolVersion: 1, FlowId: "flow", SessionId: c.binding.Ref.SessionID, Phase: "terminal"}})
+	return c, blocked
+}
+
+func TestResilienceAITrafficDrainBoundsBlockedPubAck(t *testing.T) {
+	for _, kind := range []string{"stopped_platform_drain", "automatic_finish"} {
+		t.Run(kind, func(t *testing.T) {
+			c, blocked := trafficBlockedPublisherCollector(t, "http://unused.invalid")
+			if kind == "automatic_finish" {
+				flushCtx, stopFlush := context.WithCancel(context.Background())
+				flushed := make(chan struct{})
+				go func() { defer close(flushed); c.flush(flushCtx) }()
+				defer func() {
+					stopFlush()
+					select {
+					case <-flushed:
+					case <-time.After(time.Second):
+						t.Error("cancelled background flush remained blocked")
+					}
+				}()
+				select {
+				case <-blocked.entered:
+				case <-time.After(time.Second):
+					t.Fatal("background upload did not enter the blocking publisher")
+				}
+			}
+			ctx, cancel := context.WithTimeout(context.Background(), 20*time.Millisecond)
+			defer cancel()
+			done := make(chan struct{})
+			go func() {
+				defer close(done)
+				if kind == "automatic_finish" {
+					c.finishDrain(ctx)
+				} else {
+					c.stopped.Do(func() { close(c.stop) })
+					c.drain(ctx, "formal-drain")
+				}
+			}()
+			select {
+			case <-done:
+			case <-time.After(time.Second):
+				t.Fatal("PubAck wait exceeded the drain deadline")
+			}
+		})
+	}
+}
+
+func TestResilienceAITrafficBlockedMetadataDoesNotPreventHTTPReceipt(t *testing.T) {
+	server := trafficReceiptTestServer(t)
+	defer server.Close()
+	c, blocked := trafficBlockedPublisherCollector(t, server.URL)
+	done := make(chan struct{})
+	go func() { defer close(done); c.flush(context.Background()) }()
+	select {
+	case <-blocked.entered:
+	case <-time.After(time.Second):
+		t.Fatal("metadata did not enter the blocking publisher")
+	}
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+		t.Fatal("redundant metadata publication prevented HTTP upload")
+	}
+	paths, _ := c.pending()
+	if len(paths) != 0 {
+		t.Fatal("HTTP receipt did not clear the durable queue")
+	}
+}
+
+func TestResilienceAITrafficPublisherHonorsRuntimeCancellation(t *testing.T) {
+	c, blocked := trafficBlockedPublisherCollector(t, "http://unused.invalid")
+	emitter := c.emitter.(*managedAISessionRuntimeEmitter)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	emitter.ctx = ctx
+	done := make(chan bool, 1)
+	go func() {
+		done <- emitter.EmitForRefContext(context.Background(), c.binding.Ref, "ai_traffic_batch", []byte(`{}`))
+	}()
+	select {
+	case <-blocked.entered:
+	case <-time.After(time.Second):
+		t.Fatal("metadata did not enter the blocking publisher")
+	}
+	cancel()
+	select {
+	case acknowledged := <-done:
+		if acknowledged {
+			t.Fatal("runtime cancellation acknowledged unpublished metadata")
+		}
+	case <-time.After(time.Second):
+		t.Fatal("traffic publication ignored runtime cancellation")
+	}
+}
+
+func TestAITrafficContextEmitterPreservesNilReceiver(t *testing.T) {
+	var emitter *managedAISessionRuntimeEmitter
+	emitter.Emit("event", nil)
+	if emitter.EmitForRef(aiSessionCommandRef{}, "event", nil) {
+		t.Fatal("nil emitter acknowledged an event")
+	}
+	if emitter.EmitForRefContext(context.Background(), aiSessionCommandRef{}, "event", nil) {
+		t.Fatal("nil emitter acknowledged a contextual event")
 	}
 }

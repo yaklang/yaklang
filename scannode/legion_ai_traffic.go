@@ -122,13 +122,26 @@ func (c *aiTrafficCollector) signal() {
 	default:
 	}
 }
-func (c *aiTrafficCollector) emit(kind string, message proto.Message) {
-	if c.emitter != nil {
-		raw, err := (protojson.MarshalOptions{UseProtoNames: true}).Marshal(message)
-		if err == nil {
-			c.emitter.Emit(kind, raw)
-		}
+func (c *aiTrafficCollector) emit(ctx context.Context, kind string, message proto.Message) bool {
+	if c.emitter == nil {
+		return false
 	}
+	raw, err := (protojson.MarshalOptions{UseProtoNames: true}).Marshal(message)
+	if err != nil {
+		return false
+	}
+	if emitter, ok := c.emitter.(aiSessionRuntimeContextRefEmitter); ok {
+		ctx, cancel := context.WithTimeout(ctx, time.Second)
+		defer cancel()
+		ref := c.binding.Ref
+		c.mu.Lock()
+		if c.currentTurn != "" {
+			ref.CommandID = c.currentTurn
+		}
+		c.mu.Unlock()
+		return emitter.EmitForRefContext(ctx, ref, kind, raw)
+	}
+	return false
 }
 func trafficSHA(raw []byte) string { hash := sha256.Sum256(raw); return hex.EncodeToString(hash[:]) }
 
@@ -388,7 +401,7 @@ func (c *aiTrafficCollector) enqueue(upload *aiv1.AITrafficUpload) {
 	if err != nil {
 		failure := proto.Clone(upload.Record).(*aiv1.AITrafficRecord)
 		failure.CaptureError = "spool_write_failed"
-		c.emit("ai_traffic_batch", &aiv1.AITrafficBatch{ProtocolVersion: 1, Records: []*aiv1.AITrafficRecord{failure}})
+		c.emit(context.Background(), "ai_traffic_batch", &aiv1.AITrafficBatch{ProtocolVersion: 1, Records: []*aiv1.AITrafficRecord{failure}})
 	}
 	c.signal()
 }
@@ -450,7 +463,9 @@ func (c *aiTrafficCollector) pending() ([]string, error) {
 	return paths, err
 }
 func (c *aiTrafficCollector) flush(ctx context.Context) {
-	c.uploadMu.Lock()
+	if !c.uploadMu.TryLock() {
+		return
+	}
 	defer c.uploadMu.Unlock()
 	paths, err := c.pending()
 	if err != nil {
@@ -460,7 +475,20 @@ func (c *aiTrafficCollector) flush(ctx context.Context) {
 		paths = paths[:64]
 	}
 	var batch []*aiv1.AITrafficRecord
+	var markers []string
+	var hashes []string
+	emitBatch := func() {
+		if c.emit(ctx, "ai_traffic_batch", &aiv1.AITrafficBatch{ProtocolVersion: 1, Records: batch}) {
+			for i, marker := range markers {
+				_ = trafficAtomicWrite(marker, []byte(hashes[i]))
+			}
+		}
+		batch, markers, hashes = nil, nil, nil
+	}
 	for _, path := range paths {
+		if ctx.Err() != nil {
+			return
+		}
 		raw, readErr := os.ReadFile(path)
 		if readErr != nil {
 			continue
@@ -472,14 +500,20 @@ func (c *aiTrafficCollector) flush(ctx context.Context) {
 			c.mu.Unlock()
 			continue
 		}
+		marker := strings.TrimSuffix(path, ".pb") + ".metadata"
+		hash := trafficSHA(raw)
+		if acknowledged, err := os.ReadFile(marker); err == nil && string(acknowledged) == hash {
+			continue
+		}
 		batch = append(batch, upload.Record)
+		markers = append(markers, marker)
+		hashes = append(hashes, hash)
 		if len(batch) == 32 {
-			c.emit("ai_traffic_batch", &aiv1.AITrafficBatch{ProtocolVersion: 1, Records: batch})
-			batch = nil
+			emitBatch()
 		}
 	}
 	if len(batch) > 0 {
-		c.emit("ai_traffic_batch", &aiv1.AITrafficBatch{ProtocolVersion: 1, Records: batch})
+		emitBatch()
 	}
 	for _, path := range paths {
 		if ctx.Err() != nil {
@@ -516,6 +550,10 @@ func (c *aiTrafficCollector) flush(ctx context.Context) {
 		}
 		// Receipt is fsynced before queue removal; restart replays this step safely.
 		if err = os.Remove(path); err == nil {
+			marker := strings.TrimSuffix(path, ".pb") + ".metadata"
+			if acknowledged, e := os.ReadFile(marker); e == nil && string(acknowledged) == trafficSHA(raw) {
+				_ = os.Remove(marker)
+			}
 			if dir, e := os.Open(c.dir); e == nil {
 				dir.Sync()
 				dir.Close()
@@ -592,10 +630,15 @@ func (c *aiTrafficCollector) drain(ctx context.Context, commandID string) *aiv1.
 		}
 		result := &aiv1.AITrafficDrainResult{ProtocolVersion: 1, Session: &aiv1.AISessionRef{SessionId: c.binding.Ref.SessionID, RunId: c.binding.Ref.RunID, BindEpoch: c.binding.Ref.BindEpoch}, NodeSessionId: c.binding.NodeSessionID, PendingRecords: uint64(len(paths)) + active, Complete: err == nil && len(paths) == 0 && active == 0 && !failed, CommandId: commandID}
 		if (err == nil && len(paths) == 0 && active == 0) || ctx.Err() != nil {
-			c.emit("ai_traffic_drain", result)
+			c.emit(ctx, "ai_traffic_drain", result)
 			return result
 		}
-		c.signal()
+		select {
+		case <-c.stop:
+			c.flush(ctx)
+		default:
+			c.signal()
+		}
 		select {
 		case <-ctx.Done():
 		case <-ticker.C:
@@ -632,9 +675,12 @@ func (c *aiTrafficCollector) finish() {
 	c.finished.Do(func() {
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
-		c.drain(ctx, "")
-		c.stopped.Do(func() { close(c.stop) })
+		c.finishDrain(ctx)
 	})
+}
+func (c *aiTrafficCollector) finishDrain(ctx context.Context) {
+	c.drain(ctx, "")
+	c.stopped.Do(func() { close(c.stop) })
 }
 
 // Automatic terminal events originate inside the engine. Drain evidence without
