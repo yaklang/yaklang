@@ -5,7 +5,7 @@ go 1.22.12
 replace github.com/yaklang/yaklang v0.0.0 => ./
 
 // Use the locally forked go-sqlite3 (FTS5 enabled by default) without rewriting imports.
-replace github.com/mattn/go-sqlite3 => github.com/yaklang/go-sqlite3 v0.0.1
+replace github.com/mattn/go-sqlite3 => github.com/yaklang/go-sqlite3 v0.0.2-0.20261010091851-f640de3cfce5
 
 require (
 	github.com/BurntSushi/toml v1.3.2
