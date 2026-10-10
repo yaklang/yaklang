@@ -139,6 +139,21 @@ func dlmsListAssert(t *testing.T, c dlmsListControl, events []*ProtocolEvent) {
 				}
 			}
 		}
+		if block, ok := f["Get Block"].(map[string]any); ok {
+			block["raw_data_hex"] = "caller-mutated"
+			if data, ok := block["assembled_data"].(map[string]any); ok {
+				data["raw_hex"] = "caller-mutated"
+				if children, ok := data["elements"].([]map[string]any); ok && len(children) > 0 {
+					children[0]["raw_hex"] = "caller-mutated-child"
+				}
+			}
+			if items, ok := block["assembled_results"].([]map[string]any); ok && len(items) > 0 {
+				items[0]["raw_hex"] = "caller-mutated-item"
+				if data, ok := items[0]["data"].(map[string]any); ok {
+					data["raw_hex"] = "caller-mutated-list-data"
+				}
+			}
+		}
 		rocEqualFields(t, w.Fields, e.Session)
 		again, err := e.GetFields()
 		require.NoError(t, err)

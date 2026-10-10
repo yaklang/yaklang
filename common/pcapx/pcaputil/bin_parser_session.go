@@ -1025,8 +1025,12 @@ func (f *binFlow) finishSession(reason TrafficFlowCloseReason) {
 	if w := f.wrapper; w != nil && w.outstanding() > 0 {
 		emit(0, map[string]any{"Outstanding": w.outstanding()}, "DLMS Wrapper exchange ended with unmatched observed requests")
 	}
-	if d := f.dlms; d != nil && d.pending != nil {
-		emit(d.pending.dir, map[string]any{"Outstanding": 1}, "DLMS HDLC exchange ended with an unmatched request")
+	if d := f.dlms; d != nil {
+		if d.transfer != nil {
+			emit(d.transfer.initial.dir, map[string]any{"Outstanding": 1, "ObservedBlocks": d.transfer.blocks, "EncodedBytes": len(d.transfer.data)}, "DLMS HDLC exchange ended with an incomplete data-block transfer")
+		} else if d.pending != nil {
+			emit(d.pending.dir, map[string]any{"Outstanding": 1}, "DLMS HDLC exchange ended with an unmatched request")
+		}
 	}
 	if r := f.rocplus; r != nil && r.pending != nil {
 		emit(r.clientDir, map[string]any{"Outstanding": 1}, "ROC Plus clock exchange ended with an unmatched request")

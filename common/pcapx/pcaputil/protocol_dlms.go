@@ -12,7 +12,7 @@ import (
 
 // Selected unciphered LN Get-normal and HDLC link controls, carried as complete
 // HDLC frames through a TCP/UDP tunnel, plus bounded LN Get-with-list.
-// ACSE, authentication, ciphering, segmentation and block transfer remain
+// ACSE, authentication, ciphering, segmentation and GBT remain
 // explicit unsupported boundaries. Values and link identities are unverified.
 func dlmsError(k ProtocolErrorKind, why string) error { return protocolError(k, "DLMS HDLC %s", why) }
 func dlmsCRC(w []byte) uint16 {
@@ -67,6 +67,7 @@ type dlmsMessage struct {
 	invoke, ns, nr      byte
 	flags, choice       byte
 	count               int
+	block               *wrapperMessage
 }
 
 func dlmsAddress(w []byte, at *int) (uint32, int, error) {
@@ -189,8 +190,8 @@ func decodeDLMSBudget(w []byte, maxElements, depth int) (*dlmsMessage, error) {
 	if len(p) < 3 {
 		return bad("Get service header is truncated")
 	}
-	if p[1] != 1 && p[1] != 3 {
-		return unsupported("Get block form is outside this profile")
+	if p[1] != 1 && p[1] != 2 && p[1] != 3 {
+		return unsupported("Get service choice is outside this profile")
 	}
 	if p[2]&0x30 != 0 {
 		return bad("invoke-id-and-priority reserved bits are nonzero")
@@ -203,6 +204,22 @@ func decodeDLMSBudget(w []byte, maxElements, depth int) (*dlmsMessage, error) {
 	f["Invoke ID"] = m.invoke
 	f["High Priority"] = p[2]&0x80 != 0
 	f["Confirmed Service"] = p[2]&0x40 != 0
+	if p[1] == 2 {
+		if m.request && info[1] != 0xe6 || !m.request && info[1] != 0xe7 {
+			return bad("Get-block LLC direction differs from command")
+		}
+		b := &wrapperMessage{fields: make(map[string]any), request: m.request}
+		if err := decodeWrapperBlock(b, p, maxElements); err != nil {
+			return nil, dlmsBlockError(err)
+		}
+		m.block = b
+		f["Get Block"] = b.fields
+		f["Frame Kind"] = "Get Response With Data Block"
+		if m.request {
+			f["Frame Kind"] = "Get Request Next"
+		}
+		return m, nil
+	}
 	if p[1] == 3 {
 		if m.request && info[1] != 0xe6 || !m.request && info[1] != 0xe7 {
 			return bad("Get-list LLC direction differs from command")
@@ -410,7 +427,7 @@ func probeDLMS(w []byte, limit int) ProbeResult {
 	elements := 4096
 	list := dlmsListAPDU(w[:n])
 	apdu := dlmsAPDU(w[:n])
-	if list != nil || dlmsNormalExtended(apdu) || dlmsNormalAccess(apdu) {
+	if list != nil || dlmsBlockAPDU(apdu) || dlmsNormalExtended(apdu) || dlmsNormalAccess(apdu) {
 		// Probe never admits unsolicited responses. Check frame integrity with
 		// a zero Data pool; selected requests expand only after reservation too.
 		elements = 0
@@ -450,6 +467,7 @@ type binDLMS struct {
 	seenCount           uint16
 	next                [2]byte
 	seqKnown            [2]bool
+	transfer            *dlmsTransfer
 }
 
 func (s *binDLMS) invalidate() {
@@ -457,6 +475,7 @@ func (s *binDLMS) invalidate() {
 	// Keeping only the old sequence history would let its late response acquire
 	// a subsequent request's ID. Retire the conversation, not just a live slot.
 	s.pending = nil
+	s.transfer = nil
 	s.ambiguous = true
 }
 func (s *binDLMS) consume(m *dlmsMessage, w []byte, dir int, id uint64) (map[string]any, uint64, error) {
@@ -464,7 +483,7 @@ func (s *binDLMS) consume(m *dlmsMessage, w []byte, dir int, id uint64) (map[str
 	if m.kind == "DM" {
 		// A disconnect-mode observation ends the association, even though its
 		// wire fields remain useful. Late replies must not reuse the old slot.
-		s.pending, s.ambiguous = nil, true
+		s.invalidate()
 		m.fields["Association"] = "unassociated-link-observation"
 		return m.fields, 0, nil
 	}
@@ -485,6 +504,10 @@ func (s *binDLMS) consume(m *dlmsMessage, w []byte, dir int, id uint64) (map[str
 		return m.fields, 0, nil
 	}
 	if m.request {
+		if s.transfer != nil {
+			s.invalidate()
+			return ctx("distinct request interrupts observed data-block transfer")
+		}
 		if s.clientKnown && dir != s.clientDir {
 			return ctx("request contradicts observed requester direction")
 		}
@@ -529,7 +552,7 @@ func (s *binDLMS) consume(m *dlmsMessage, w []byte, dir int, id uint64) (map[str
 		// An orphan at the next peer sequence can belong to a missed request.
 		// Repeating that response after a later request cannot establish a new
 		// binding. A prior-sequence duplicate still leaves adjacent traffic usable.
-		s.ambiguous = true
+		s.invalidate()
 	}
 	if p == nil || p.dir == dir || p.source != m.destination || p.destination != m.source {
 		return ctx("response lacks reversed observed endpoint/logical-address request")
@@ -565,6 +588,9 @@ func (s *binDLMS) storage() int64 {
 	if s.pending != nil {
 		n += int64(len(s.pending.wire)) * 2
 	}
+	if s.transfer != nil {
+		n += 128 + 2*int64(len(s.transfer.data))
+	}
 	return n
 }
 func (f *binFlow) consumeDLMS(dir int, w []byte, id uint64) (map[string]any, uint64, error) {
@@ -584,6 +610,9 @@ func (f *binFlow) consumeDLMS(dir int, w []byte, id uint64) (map[string]any, uin
 }
 func (f *binFlow) consumeDecodedDLMS(dir int, w []byte, id uint64, m *dlmsMessage) (map[string]any, uint64, error) {
 	s := f.dlms
+	if m.kind == "GET" && m.choice == 2 {
+		return f.consumeDLMSBlock(dir, w, id, m)
+	}
 	if m.request && m.kind == "GET" && s.pending == nil && s.seenRequest[m.invoke]&(1<<m.ns) == 0 && int(s.seenCount) >= f.a.budget.MaxCollectionElements {
 		s.ambiguous = true
 		return nil, 0, dlmsError(ErrResourceExceeded, "retained invoke/sequence token limit")

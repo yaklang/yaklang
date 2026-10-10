@@ -451,6 +451,14 @@ func (a *binParser) finishProtocolDatagram(e *ProtocolEvent, w []byte, spec *bin
 	}
 }
 func (a *binParser) closeUDPSessions() {
+	// Snapshot only the newly supported incomplete native block observation.
+	// Emit after unlocking; user callbacks must not run under udpMu.
+	var incomplete []*ProtocolEvent
+	defer func() {
+		for _, e := range incomplete {
+			a.emit(e)
+		}
+	}()
 	a.dnsMu.Lock()
 	for _, p := range a.dns.pending {
 		a.buffered.Add(-p.cost)
@@ -468,7 +476,15 @@ func (a *binParser) closeUDPSessions() {
 	a.semtechDisabled = false
 	if s := a.udpSessions; s != nil {
 		for _, el := range s.entries {
-			el.Value.(*binUDPEntry).flow.closeSession()
+			v := el.Value.(*binUDPEntry)
+			f := v.flow
+			if d := f.dlms; d != nil && d.transfer != nil {
+				t := d.transfer
+				dir := t.initial.dir
+				incomplete = append(incomplete, &ProtocolEvent{FlowID: f.id, Timestamp: v.touched, Domain: v.key.domain, Transport: "udp", Source: f.endpoints[dir], Destination: f.endpoints[1-dir], Direction: dir, Protocol: "dlms", Profile: "dlms-hdlc-get-block", Status: "incomplete", Completeness: "incomplete", Summary: "DLMS HDLC exchange ended with an incomplete data-block transfer", Session: map[string]any{"Outstanding": 1, "ObservedBlocks": t.blocks, "EncodedBytes": len(t.data)}})
+				a.incomplete.Add(1)
+			}
+			f.closeSession()
 		}
 		a.udpSessions = nil
 	}

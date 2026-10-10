@@ -41,12 +41,21 @@ func dlmsNormalAccess(p []byte) bool {
 	return len(p) >= 13 && p[0] == 0xc0 && p[1] == 1 && p[12] == 1
 }
 func dlmsProfile(w []byte) string {
+	if dlmsBlockAPDU(dlmsAPDU(w)) {
+		return "dlms-hdlc-get-block"
+	}
 	if dlmsListAPDU(w) != nil {
 		return "dlms-hdlc-get-list"
 	}
 	return "dlms-hdlc-get-normal"
 }
 func dlmsProjection(w []byte) int64 {
+	if p := dlmsAPDU(w); dlmsBlockAPDU(p) && p[0] == 0xc4 {
+		// A final block may complete a previously opaque compact/list body.
+		// Reserve the full bounded graph, list projections and joined copy before
+		// retaining or expanding any of those bytes.
+		return 32768 + 512*int64(len(w)+wrapperBlockBytes) + 2048*wrapperDataNodes + 8192*wrapperListItems
+	}
 	if p := dlmsListAPDU(w); p != nil {
 		// One complete APDU has at most 64 list records and 256 Data/schema/
 		// expanded maps. Do not infer node counts from compact payload tag bytes.
