@@ -39,7 +39,7 @@ SQLite JSONB 可以降低重复解析文本的开销，但当前格式的大部�
 
 ## 3. 现在就能使用的 Yak 操作
 
-下面假设目标协议的 Fields 含有 `Method`。实际字段名和大小写以 `ProtocolDetails` 返回的树为准；不同协议规则不共享统一的字段布局。
+下面假设目标协议的 Fields 含有 `Method`。实际字段名和大小写以 `DiscoverProtocolFields` 或 `ProtocolDetails` 返回的树为准；不同协议规则不共享统一的字段布局。
 
 ```yak
 db = pcapdb.GetOrCreatePCAPDatabase("file.pcap",
@@ -60,7 +60,50 @@ if len(rows) > 0 {
 }
 ```
 
-已有解析完成的库可以再次调用 GetOrCreate 并加 `withFieldIndex`。它保持同一个 DatasetID，扫描已保存的 JSON 建索引，随后刷新本管理器的缓存读取连接；无需重新解析 capture。
+已有解析完成的库可以再次调用 GetOrCreate 并加 `withFieldIndex`。也可以直接使用 `pcapdb.EnsureProtocolFieldIndexes(datasetID, path...)`，不依赖原始 PCAP 文件，不重放协议解析。索引定义保存在子库 `sqlite_schema`；全部新增索引在一个事务内提交，重复调用幂等，取消或达到索引上限时回滚本次新增项。提交后的连接刷新若被取消，索引可能已生效，重新调用可安全确认。
+
+先发现实际字段，再选择常用路径：
+
+```yak
+library = pcapdb.OpenPCAPDatabase(datasetID)~
+defer library.Close()
+fields = library.DiscoverProtocolFields(
+    pcapdb.protocol("http"), pcapdb.limit(10), pcapdb.resultBytes(65536))~
+println(json.dumps(fields, json.withIndent("")))
+// 从 fields.Items 选择实际存在且 Searchable=true 的标量路径，避免猜字段名。
+indexes = pcapdb.EnsureProtocolFieldIndexes(datasetID, selectedPath)~
+println(library.ProtocolFieldIndexes()~)
+```
+
+`DiscoverProtocolFields` 返回路径、JSON 类型集合、出现次数、示例消息 ID、可搜索标记和已索引标记；不返回字段值，也不解码完整 JSON 树。返回路径保留 SQLite 的对象转义和固定数组下标，可直接用于 `field/fieldExists/withFieldIndex`。计数只代表当前采样页。`limit` 限制消息数，`next_cursor` 是最后完成采样的消息 ID，配合原来的筛选条件和 `after` 继续采样。一个采样页最多扫描 16 MiB JSONB、展开 4,096 个节点；单消息超过 8 MiB 或 4,096 节点时跳过，记录 `skipped` 和 `truncated`。输出字段集合受 JSON 预算限制，截断时明确标记，不能将采样结果当作全库完整 schema。可减小消息页或按协议、时间、flow 限定范围进一步研究。
+
+### 3.1 有输出预算的结果接口
+
+原有 Go/Yak 查询保持兼容。后续 AI 适配层优先使用以下有明确结果结构的接口：
+
+| 查询 | 新接口 |
+| --- | --- |
+| 库登记摘要 | `pcapdb.ListPCAPDatabasesPage(...)` |
+| 包、协议、会话、方向流摘要 | `QueryPacketsPage / QueryProtocolsPage / QuerySessionsPage / QueryStreamsPage` |
+| 协议/块到包，以及包到会话 | `ProtocolPacketIDsPage / StreamChunkPacketIDsPage / PacketSessionsPage` |
+| 包、协议消息、流块的二进制预览 | `ReadPacketPage / ReadProtocolPage / ReadStreamPage` |
+| 完整协议字段详情 | `ProtocolDetailsPage` |
+
+所有结果使用 `dataset_id, state, items, next_cursor, cursor_kind, has_more, truncated, error`。登记页的 dataset_id 为空，每条 item 自带身份。未能读取有效快照时 state 为 `unknown`。error 为 null 或 `{code, message, retryable}`；原生 Go 同时返回 error，Yak 使用通常的错误处理语法。失败不返回成功的部分结果，也不推进输入游标。
+
+`resultBytes` 默认 64 KiB，范围 4 KiB..1 MiB，按 `encoding/json` 的完整紧凑 JSON 计算，包括转义和 base64 扩张。记录 ID 游标通过一次有界 lookahead 判断 has_more，不用 OFFSET 或整库 COUNT。输出预算耗尽时保留最后返回项的 ID，下一页不会丢记录。单条无法装入预算则返回 `result_too_large`；可降低 previewBytes 或提高 resultBytes。协议摘要有短文本预览，使用 `preview_truncated` 明确标识截断，不携带 fields 或任何 BLOB。
+
+二进制预览默认 512 字节，`previewBytes` 范围 0..64 KiB。Data 在 JSON 中编码为 base64；记录 total_bytes、truncated 和原始 ID。流页以块 ID 翻页，截短的是每个块的预览，不能直接拼接预览作为完整流；关联 API 和完整导出仍能取得原数据。流预览保留 references_complete。完整字段详情超过预算返回错误，不截出不完整的 JSON 树。
+
+大内容使用文件输出：`ExportPacket(id,path)`、`ExportProtocol(id,path)`、`ExportStream(id,path)`、`ExportProtocolFields(id,path)`，返回含路径、字节数、SHA256、dataset ID 和记录 ID 的 artifact。文件通过临时文件、Sync 和独占发布生成，不覆盖已有目标；取消不发布半成品。流导出持有共享实例锁并分块读取，导出的是已经保存的观察字节，不填补捕获缺口；完整性仍应结合 session 的 Complete/HasGaps 判断。
+
+### 3.2 查询 context 与句柄生命周期
+
+Yak 的 `GetOrCreatePCAPDatabase/OpenPCAPDatabase/RebuildPCAPDatabase` 返回每次调用独立的 `DatabaseHandle`。同库句柄共享最多四个只读连接，Close 只取消并释放自己的引用；最后一个管理器拥有的引用释放时关闭读池。普通 Go `*Database` 显式所有者继续保留原行为，仍可使用 `manager.Acquire(ctx,id)` 获得独立引用；有借用句柄时关闭原生共享 Database 返回 Busy，避免跨调用失效。
+
+句柄继承当前 Yak 执行 context。列表、搜索、字段详情、BLOB 读取和输出都绑定它；额外 `queryContext` 可以收紧截止时间，不能用 Background 绕过任务取消。等待连接以及等待读池刷新锁都可取消。取消自动释放该调用的引用，管理器关闭取消全部操作。`ClosePCAPDatabases` 在 context 绑定的 Yak 模块中只释放本执行的句柄；Go 包级函数仍用于关闭默认管理器。使用 Background 的调用者需要显式 Close 或在结束时取消其 context。
+
+这一批仅补齐离线工具的基础接口；AI 工具脚本、skill 和在线抓包任务生命周期另行实现。
 
 Go 对应操作：
 

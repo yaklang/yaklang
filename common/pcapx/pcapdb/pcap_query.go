@@ -7,12 +7,14 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/yaklang/gorm"
 )
 
 type queryConfig struct {
 	ctx                                          context.Context
+	parent                                       context.Context
 	limit                                        int
 	after                                        int64
 	transport, protocol, sourceIP, destinationIP string
@@ -23,8 +25,46 @@ type queryConfig struct {
 	start, end                                   *int64
 	fields                                       []protocolFieldPredicate
 	includeFields                                bool
+	resultBytes, previewBytes                    int
+	bounded                                      bool
+	fieldBytes                                   int
 }
 type QueryOption func(*queryConfig) error
+
+func (c *queryConfig) operationContext(manager *InstanceManager) (context.Context, context.CancelFunc) {
+	ctx, cancel := manager.operationContext(c.ctx)
+	if c.parent == nil {
+		return ctx, cancel
+	}
+	deadlineCancel := func() {}
+	if deadline, ok := c.parent.Deadline(); ok {
+		ctx, deadlineCancel = context.WithDeadline(ctx, deadline)
+	}
+	stop := context.AfterFunc(c.parent, func() {
+		if c.parent.Err() != context.DeadlineExceeded {
+			cancel()
+		}
+	})
+	if c.parent.Err() != nil && c.parent.Err() != context.DeadlineExceeded {
+		cancel()
+	}
+	return ctx, func() { stop(); deadlineCancel(); cancel() }
+}
+
+// A canceled query must also escape the pool refresh/Close lock wait. RLock
+// alone is not cancellable and writer preference can strand a new task here.
+func (d *Database) lockRead(ctx context.Context) error {
+	for !d.mu.TryRLock() {
+		timer := time.NewTimer(10 * time.Millisecond)
+		select {
+		case <-ctx.Done():
+			timer.Stop()
+			return ctx.Err()
+		case <-timer.C:
+		}
+	}
+	return nil
+}
 
 func QueryContext(ctx context.Context) QueryOption {
 	return func(c *queryConfig) error {
@@ -168,7 +208,7 @@ func QueryFieldMissing(path string) QueryOption {
 }
 
 func parseQuery(options []QueryOption, messages bool) (*queryConfig, error) {
-	c := &queryConfig{ctx: context.Background(), limit: 100, maxBytes: 256 << 10}
+	c := &queryConfig{ctx: context.Background(), limit: 100, maxBytes: 256 << 10, resultBytes: 64 << 10, previewBytes: 512}
 	for _, option := range options {
 		if option == nil {
 			return nil, fmt.Errorf("pcapdb: nil query option")
@@ -224,13 +264,15 @@ func (d *Database) QueryPackets(options ...QueryOption) ([]Packet, error) {
 	if err != nil {
 		return nil, err
 	}
-	d.mu.RLock()
+	ctx, cancel := c.operationContext(d.manager)
+	defer cancel()
+	if err := d.lockRead(ctx); err != nil {
+		return nil, err
+	}
 	defer d.mu.RUnlock()
 	if d.closed {
 		return nil, ErrClosed
 	}
-	ctx, cancel := d.manager.operationContext(c.ctx)
-	defer cancel()
 	tx, _, err := d.readSnapshot(ctx, false, c.session != nil || c.stream != nil)
 	if err != nil {
 		return nil, err
@@ -239,7 +281,7 @@ func (d *Database) QueryPackets(options ...QueryOption) ([]Packet, error) {
 	packets := make([]Packet, 0)
 	scoped := indexWithContext(ctx, tx)
 	if c.session == nil && c.stream == nil {
-		err = c.apply(scoped).Select(packetSummaryColumns).Find(&packets).Error
+		err = c.apply(scoped).Select(packetColumns(c, "")).Find(&packets).Error
 		return packets, err
 	}
 	rows, err := packetAssociationQuery(scoped, c).Rows()
@@ -262,11 +304,7 @@ func (d *Database) QueryPackets(options ...QueryOption) ([]Packet, error) {
 // JOIN fixes this order in SQLite; IN(SELECT all packet IDs) can materialize a
 // million-ID stream before applying the page limit. All filters remain in GORM.
 func packetAssociationQuery(db *gorm.DB, c *queryConfig) *gorm.DB {
-	columns := strings.Split(packetSummaryColumns, ",")
-	for i := range columns {
-		columns[i] = "p." + columns[i]
-	}
-	query := db.Table("session_packets AS sp").Joins("CROSS JOIN packets AS p ON p.id=sp.packet_id").Select(strings.Join(columns, ",")).
+	query := db.Table("session_packets AS sp").Joins("CROSS JOIN packets AS p ON p.id=sp.packet_id").Select(packetColumns(c, "p.")).
 		Where("sp.deleted_at IS NULL AND p.deleted_at IS NULL AND sp.packet_id > ?", c.after).Order("sp.packet_id").Limit(c.limit)
 	if c.session != nil {
 		query = query.Where("sp.session_id = ?", *c.session)
@@ -320,17 +358,23 @@ func (d *Database) readSnapshot(ctx context.Context, protocols, streams bool) (*
 }
 
 // ReadPacket materializes one bounded packet BLOB; packet lists never load it.
-func (d *Database) ReadPacket(id uint) ([]byte, error) {
-	return d.readData(id, false)
+func (d *Database) ReadPacket(id uint, options ...QueryOption) ([]byte, error) {
+	return d.readData(id, false, options...)
 }
-func (d *Database) readData(id uint, protocol bool) ([]byte, error) {
-	d.mu.RLock()
+func (d *Database) readData(id uint, protocol bool, options ...QueryOption) ([]byte, error) {
+	c, err := parseDetailQuery(options)
+	if err != nil {
+		return nil, err
+	}
+	ctx, cancel := c.operationContext(d.manager)
+	defer cancel()
+	if err := d.lockRead(ctx); err != nil {
+		return nil, err
+	}
 	defer d.mu.RUnlock()
 	if d.closed {
 		return nil, ErrClosed
 	}
-	ctx, cancel := d.manager.operationContext(context.Background())
-	defer cancel()
 	tx, _, err := d.readSnapshot(ctx, protocol, false)
 	if err != nil {
 		return nil, err
@@ -348,6 +392,9 @@ func (d *Database) readData(id uint, protocol bool) ([]byte, error) {
 		Data   []byte
 	}
 	err = indexWithContext(ctx, tx).Model(model).Select("id,"+lengthColumn+" AS length,CASE WHEN length(data) <= 16777216 THEN data END AS data").Where("id = ?", id).Scan(&row).Error
+	if gorm.IsRecordNotFoundError(err) {
+		err = ErrNotFound
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -370,21 +417,39 @@ func (d *Database) QueryProtocols(options ...QueryOption) ([]ProtocolMessage, er
 	if err != nil {
 		return nil, err
 	}
-	d.mu.RLock()
+	ctx, cancel := c.operationContext(d.manager)
+	defer cancel()
+	if err := d.lockRead(ctx); err != nil {
+		return nil, err
+	}
 	defer d.mu.RUnlock()
 	if d.closed {
 		return nil, ErrClosed
 	}
-	ctx, cancel := d.manager.operationContext(c.ctx)
-	defer cancel()
 	tx, _, err := d.readSnapshot(ctx, true, c.session != nil || c.stream != nil)
 	if err != nil {
 		return nil, err
 	}
 	defer tx.Rollback()
 	projection := protocolSummaryColumns
+	if c.bounded {
+		columns := strings.Split(projection, ",")
+		for i, name := range columns {
+			switch name {
+			case "protocol", "transport", "source", "destination", "status", "error", "decode_error", "profile", "rule", "entry", "completeness", "expert_code", "encapsulation":
+				columns[i] = "substr(" + name + ",1,513) AS " + name
+			case "summary":
+				columns[i] = "substr(summary,1,1025) AS summary"
+			}
+		}
+		projection = strings.Join(columns, ",")
+	}
 	if c.includeFields {
-		projection += ",json(fields) AS fields,json(session) AS session"
+		if c.fieldBytes > 0 {
+			projection += fmt.Sprintf(",CASE WHEN length(fields)+length(session) <= %d THEN json(fields) END AS fields,CASE WHEN length(fields)+length(session) <= %d THEN json(session) END AS session", c.fieldBytes, c.fieldBytes)
+		} else {
+			projection += ",json(fields) AS fields,json(session) AS session"
+		}
 	}
 	scoped := indexWithContext(ctx, tx)
 	query := c.apply(scoped)
@@ -407,6 +472,9 @@ func (d *Database) QueryProtocols(options ...QueryOption) ([]ProtocolMessage, er
 			return nil, err
 		}
 		if c.includeFields {
+			if c.fieldBytes > 0 && (message.FieldsJSON == nil || message.SessionJSON == nil || len(message.FieldsJSON)+len(message.SessionJSON) > c.fieldBytes) {
+				return nil, ErrResultTooLarge
+			}
 			fieldBytes += len(message.FieldsJSON) + len(message.SessionJSON)
 			if fieldBytes > 16<<20 {
 				return nil, fmt.Errorf("pcapdb: field result exceeds 16 MiB; reduce the query limit or omit fields")
@@ -424,17 +492,31 @@ func (d *Database) QueryProtocols(options ...QueryOption) ([]ProtocolMessage, er
 	return messages, rows.Err()
 }
 
+func packetColumns(c *queryConfig, prefix string) string {
+	columns := strings.Split(packetSummaryColumns, ",")
+	for i, name := range columns {
+		columns[i] = prefix + name
+		if c.bounded && name == "decode_error" {
+			columns[i] = "substr(" + prefix + name + ",1,513) AS decode_error"
+		}
+	}
+	return strings.Join(columns, ",")
+}
+
 func decodeProtocolFields(raw []byte, fields *map[string]any) error {
 	decoder := json.NewDecoder(bytes.NewReader(raw))
 	decoder.UseNumber()
 	return decoder.Decode(fields)
 }
 
-func (d *Database) ProtocolDetails(id uint) (*ProtocolMessage, error) {
+func (d *Database) ProtocolDetails(id uint, options ...QueryOption) (*ProtocolMessage, error) {
+	if _, err := parseDetailQuery(options); err != nil {
+		return nil, err
+	}
 	if id < 1 {
 		return nil, ErrNotFound
 	}
-	messages, err := d.QueryProtocols(QueryAfter(int64(id)-1), QueryLimit(1), QueryWithFields(true))
+	messages, err := d.QueryProtocols(append(options, QueryAfter(int64(id)-1), QueryLimit(1), QueryWithFields(true))...)
 	if err != nil {
 		return nil, err
 	}
@@ -444,7 +526,22 @@ func (d *Database) ProtocolDetails(id uint) (*ProtocolMessage, error) {
 	return &messages[0], nil
 }
 
-func (d *Database) ReadProtocol(id uint) ([]byte, error) { return d.readData(id, true) }
+func (d *Database) ReadProtocol(id uint, options ...QueryOption) ([]byte, error) {
+	return d.readData(id, true, options...)
+}
+
+// Detail reads accept cancellation and output options, but never silently
+// ignore search filters or cursors supplied for a different operation.
+func parseDetailQuery(options []QueryOption) (*queryConfig, error) {
+	c, err := parseQuery(options, false)
+	if err != nil {
+		return nil, err
+	}
+	if c.after != 0 || c.transport != "" || c.sourceIP != "" || c.destinationIP != "" || c.sourcePort != nil || c.destinationPort != nil || c.start != nil || c.session != nil || c.stream != nil || c.includeFields {
+		return nil, fmt.Errorf("pcapdb: detail reads accept only context and output options")
+	}
+	return c, nil
+}
 
 // ProtocolPacketIDs is cursor paginated; callers can request the next page
 // using QueryAfter(lastPacketID). At most 1000 associations are returned.
@@ -453,13 +550,15 @@ func (d *Database) ProtocolPacketIDs(id uint, options ...QueryOption) ([]int64, 
 	if err != nil {
 		return nil, err
 	}
-	d.mu.RLock()
+	ctx, cancel := c.operationContext(d.manager)
+	defer cancel()
+	if err := d.lockRead(ctx); err != nil {
+		return nil, err
+	}
 	defer d.mu.RUnlock()
 	if d.closed {
 		return nil, ErrClosed
 	}
-	ctx, cancel := d.manager.operationContext(c.ctx)
-	defer cancel()
 	tx, _, err := d.readSnapshot(ctx, true, false)
 	if err != nil {
 		return nil, err

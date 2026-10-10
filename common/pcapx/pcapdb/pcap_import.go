@@ -29,6 +29,7 @@ type importConfig struct {
 	progress     func(Progress)
 	cancel       context.CancelFunc
 	progressErr  error
+	leased       bool
 }
 type ImportOption func(*importConfig) error
 
@@ -286,7 +287,7 @@ func (m *InstanceManager) useExisting(source *os.File, info os.FileInfo, fp *Fin
 			}
 		}
 		config.notify(meta)
-		return m.openReady(meta)
+		return m.openReady(meta, config.leased)
 	}
 	// Retry starts a fresh packet index, never a TCP replay from an arbitrary
 	// packet offset. Existing committed counts describe only the failed attempt.
@@ -402,7 +403,7 @@ func (m *InstanceManager) buildDatasetLocked(source *os.File, info os.FileInfo, 
 	if err = checkpointIndex(config.ctx, writer); err != nil {
 		return nil, err
 	}
-	return m.openReady(meta)
+	return m.openReady(meta, config.leased)
 }
 
 func (m *InstanceManager) failImport(writer *gorm.DB, meta *PCAPFileDBMetadata, cause error, config *importConfig) error {

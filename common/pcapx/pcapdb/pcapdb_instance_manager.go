@@ -39,6 +39,10 @@ type Database struct {
 	path    string
 	mu      sync.RWMutex
 	closed  bool
+	// Protected by manager.mu. Native Go callers retain their explicit owner;
+	// Yak handles borrow this pool and release it after the final borrower.
+	nativeOwner bool
+	leases      int
 }
 
 func NewInstanceManager(profile *gorm.DB, libraryDir string) (*InstanceManager, error) {
@@ -196,7 +200,7 @@ func (m *InstanceManager) Close() error {
 	m.mu.Unlock()
 	var err error
 	for _, db := range instances {
-		err = errors.Join(err, db.Close())
+		err = errors.Join(err, db.close(true))
 	}
 	return err
 }
@@ -215,36 +219,34 @@ func (m *InstanceManager) StartupValidation() []ValidationResult {
 }
 
 func (m *InstanceManager) List() ([]PCAPFileDBMetadata, error) {
-	if err := m.begin(); err != nil {
-		return nil, err
-	}
-	defer m.ops.Done()
-	var entries []PCAPFileDBMetadata
-	err := m.profile.Order("created_at DESC, dataset_id ASC").Find(&entries).Error
-	return entries, err
+	return m.ListContext(context.Background())
 }
-
 func (m *InstanceManager) Count() (int64, error) {
-	if err := m.begin(); err != nil {
-		return 0, err
-	}
-	defer m.ops.Done()
-	var count int64
-	err := m.profile.Model(&PCAPFileDBMetadata{}).Count(&count).Error
-	return count, err
+	return m.CountContext(context.Background())
 }
 
 func (m *InstanceManager) Metadata(identifier string) (*PCAPFileDBMetadata, error) {
+	return m.MetadataContext(context.Background(), identifier)
+}
+
+func (m *InstanceManager) MetadataContext(ctx context.Context, identifier string) (*PCAPFileDBMetadata, error) {
 	if err := m.begin(); err != nil {
 		return nil, err
 	}
 	defer m.ops.Done()
-	return m.resolve(identifier)
+	ctx, cancel := m.operationContext(ctx)
+	defer cancel()
+	return m.resolveContext(ctx, identifier)
 }
 
 func (m *InstanceManager) resolve(identifier string) (*PCAPFileDBMetadata, error) {
+	return m.resolveContext(m.ctx, identifier)
+}
+
+func (m *InstanceManager) resolveContext(ctx context.Context, identifier string) (*PCAPFileDBMetadata, error) {
+	scoped := indexWithContext(ctx, m.profile)
 	var meta PCAPFileDBMetadata
-	err := m.profile.Where("dataset_id = ?", identifier).First(&meta).Error
+	err := scoped.Where("dataset_id = ?", identifier).First(&meta).Error
 	if err == nil {
 		return &meta, nil
 	}
@@ -256,7 +258,7 @@ func (m *InstanceManager) resolve(identifier string) (*PCAPFileDBMetadata, error
 		return nil, err
 	}
 	var matches []PCAPFileDBMetadata
-	err = m.profile.Where("source_path = ? OR database_path = ? OR EXISTS (SELECT 1 FROM json_each(source_aliases) WHERE value = ?)", path, path, path).Limit(2).Find(&matches).Error
+	err = scoped.Where("source_path = ? OR database_path = ? OR EXISTS (SELECT 1 FROM json_each(source_aliases) WHERE value = ?)", path, path, path).Limit(2).Find(&matches).Error
 	if err != nil {
 		return nil, err
 	}
@@ -307,6 +309,10 @@ func (m *InstanceManager) transition(ctx context.Context, db *gorm.DB, meta *PCA
 // deep mode also hashes all capture/message BLOBs and runs SQLite quick_check. Invalid entries
 // remain registered for inspection. No missing/corrupt file is recreated here.
 func (m *InstanceManager) Validate(ctx context.Context, identifier string, deep bool) (*ValidationResult, error) {
+	return m.validate(ctx, identifier, deep, false)
+}
+
+func (m *InstanceManager) validate(ctx context.Context, identifier string, deep, wait bool) (*ValidationResult, error) {
 	if ctx == nil {
 		return nil, fmt.Errorf("pcapdb: nil validation context")
 	}
@@ -316,7 +322,7 @@ func (m *InstanceManager) Validate(ctx context.Context, identifier string, deep 
 	defer m.ops.Done()
 	ctx, cancel := m.operationContext(ctx)
 	defer cancel()
-	meta, err := m.resolve(identifier)
+	meta, err := m.resolveContext(ctx, identifier)
 	if err != nil {
 		return nil, err
 	}
@@ -327,7 +333,7 @@ func (m *InstanceManager) Validate(ctx context.Context, identifier string, deep 
 		return m.invalidCatalog(meta, fmt.Errorf("pcapdb: unsupported database type or non-absolute dataset paths"))
 	}
 	result := &ValidationResult{Metadata: *meta}
-	lock, err := acquireFileLock(ctx, datasetLockPath(meta), false)
+	lock, err := acquireFileLock(ctx, datasetLockPath(meta), wait)
 	if errors.Is(err, ErrBusy) {
 		result.Busy = true
 		result.Error = err.Error()
@@ -597,11 +603,15 @@ func hashBlobData(ctx context.Context, db *gorm.DB, model interface{}) (string, 
 }
 
 func (m *InstanceManager) Open(ctx context.Context, identifier string) (*Database, error) {
+	return m.open(ctx, identifier, false)
+}
+
+func (m *InstanceManager) open(ctx context.Context, identifier string, leased bool) (*Database, error) {
 	if err := m.begin(); err != nil {
 		return nil, err
 	}
 	defer m.ops.Done()
-	result, err := m.Validate(ctx, identifier, false)
+	result, err := m.validate(ctx, identifier, false, leased)
 	if err != nil {
 		return nil, err
 	}
@@ -611,16 +621,19 @@ func (m *InstanceManager) Open(ctx context.Context, identifier string) (*Databas
 	if !result.Valid {
 		return nil, fmt.Errorf("%w: %s: %s", ErrNotReady, result.Metadata.State, result.Error)
 	}
-	return m.openReady(&result.Metadata)
+	return m.openReady(&result.Metadata, leased)
 }
 
-func (m *InstanceManager) openReady(meta *PCAPFileDBMetadata) (*Database, error) {
+func (m *InstanceManager) openReady(meta *PCAPFileDBMetadata, leased ...bool) (*Database, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if m.closed {
 		return nil, ErrClosed
 	}
 	if instance := m.instances[meta.DatasetID]; instance != nil {
+		if len(leased) == 0 || !leased[0] {
+			instance.nativeOwner = true
+		}
 		return instance, nil
 	}
 	// Handles are explicit resources. Avoid an unbounded pool for AI loops
@@ -633,6 +646,7 @@ func (m *InstanceManager) openReady(meta *PCAPFileDBMetadata) (*Database, error)
 		return nil, err
 	}
 	instance := &Database{ID: meta.DatasetID, manager: m, db: db, path: meta.DatabasePath}
+	instance.nativeOwner = len(leased) == 0 || !leased[0]
 	m.instances[meta.DatasetID] = instance
 	return instance, nil
 }
@@ -673,16 +687,38 @@ func (m *InstanceManager) refreshReader(ctx context.Context, meta *PCAPFileDBMet
 }
 
 func (d *Database) Close() error {
+	return d.close(false)
+}
+
+func (d *Database) close(force bool) error {
+	return d.closePool(force, false)
+}
+
+func (d *Database) closeIdle() error {
+	return d.closePool(false, true)
+}
+
+func (d *Database) closePool(force, idleOnly bool) error {
 	d.manager.mu.Lock()
-	defer d.manager.mu.Unlock()
+	if idleOnly && (d.nativeOwner || d.leases > 0) {
+		d.manager.mu.Unlock()
+		return nil
+	}
+	if d.leases > 0 && !force {
+		d.manager.mu.Unlock()
+		return ErrBusy
+	}
 	d.mu.Lock()
-	defer d.mu.Unlock()
 	if d.closed {
+		d.mu.Unlock()
+		d.manager.mu.Unlock()
 		return nil
 	}
 	d.closed = true
 	delete(d.manager.instances, d.ID)
 	err := d.db.Close()
+	d.mu.Unlock()
+	d.manager.mu.Unlock()
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 	meta := &PCAPFileDBMetadata{DatabasePath: d.path}
