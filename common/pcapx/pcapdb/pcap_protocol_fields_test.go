@@ -219,6 +219,9 @@ func protocolFieldBenchmarkStore(b *testing.B, count int) (*Database, *gorm.DB) 
 			UpdateColumn("fields", gorm.Expr("jsonb(CAST(fields AS TEXT))")).Error)
 	}
 	meta.ProtocolsIndexed, meta.ProtocolCount = true, int64(count)
+	// Synthetic messages have empty payloads; their committed BLOB digest is
+	// SHA-256 of the empty byte stream, as required by the ready checkpoint.
+	meta.ProtocolDataSHA256 = digestBytes(nil)
 	require.NoError(b, writeManifest(context.Background(), tx, meta))
 	require.NoError(b, tx.Commit().Error)
 	return db, writer
