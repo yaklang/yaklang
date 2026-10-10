@@ -132,7 +132,7 @@ func decodeDLMSWrapperBudget(w []byte, limit, depth int) (*wrapperMessage, error
 		case 0:
 			var data map[string]any
 			var err error
-			if p[4] == 1 || p[4] == 2 {
+			if p[4] == 1 || p[4] == 2 || p[4] == 19 {
 				c := wrapperListCursor{wire: p, at: 4, maxDepth: depth}
 				data, err = c.data(limit, 0)
 				if err == nil && c.at != len(p) {

@@ -195,6 +195,11 @@ func (c *wrapperListCursor) data(limit, level int) (map[string]any, error) {
 		return nil, wrapperError(ErrResourceExceeded, "aggregate Data node/depth budget exceeded")
 	}
 	c.nodes++
+	if c.at < len(c.wire) && c.wire[c.at] == 19 {
+		start := c.at
+		c.at++
+		return c.compact(limit, level, start)
+	}
 	if c.at == len(c.wire) || c.wire[c.at] != 1 && c.wire[c.at] != 2 {
 		return c.scalar(limit)
 	}
@@ -314,7 +319,7 @@ func decodeWrapperList(m *wrapperMessage, p []byte, limit, depth int) error {
 }
 func wrapperIsList(w []byte) bool { return len(w) > 9 && w[9] == 3 }
 func wrapperExtendedScalarTag(tag byte) bool {
-	return tag == 4 || tag == 10 || tag == 12 || tag == 23 || tag == 24 || tag == 25 || tag == 26 || tag == 27
+	return tag == 19 || tag == 4 || tag == 10 || tag == 12 || tag == 23 || tag == 24 || tag == 25 || tag == 26 || tag == 27
 }
 func wrapperNormalExtendedData(w []byte) bool {
 	return len(w) > 12 && w[8] == 0xc4 && w[9] == 1 && w[11] == 0 && wrapperExtendedScalarTag(w[12])
@@ -346,6 +351,15 @@ func wrapperProbeVersion(w []byte) string {
 func wrapperProjection(w []byte, n int) int64 {
 	if wrapperIsBlock(w) {
 		return 32768 + 512*int64(n+wrapperBlockBytes) + 2048*wrapperDataNodes
+	}
+	if wrapperContainsCompactData(w) {
+		// A repeated description expands up to the full bounded map pool even
+		// when the capture contains very few per-value bytes.
+		extra := int64(0)
+		if wrapperIsList(w) {
+			extra = 8192 * int64(min(wrapperListItems, max(0, n-12)/2))
+		}
+		return 32768 + 512*int64(n) + 2048*wrapperDataNodes + extra
 	}
 	if wrapperNormalDataGraph(w) || wrapperNormalAccess(w) {
 		// A complete normal response has12 non-Data bytes; a selected request
