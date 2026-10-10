@@ -65,8 +65,8 @@ type Tool struct {
 	Keywords      []string `json:"keywords,omitempty"`
 	VerboseName   string   `json:"verbose_name,omitempty"`    // English string（事件/列表同名字段保持 string）
 	VerboseNameZh string   `json:"verbose_name_zh,omitempty"` // Chinese；对外双语走 verbose_name_i18n / VerboseNameI18n
-	// Usage 工具使用说明，在参数生成阶段(第2阶段)才披露给 AI，
-	// 包含使用原则、参数建议、关联使用等信息，帮助 AI 更好地使用工具参数。
+	// Usage 工具使用说明，包含使用原则、参数建议、关联使用等信息，
+	// 帮助 AI 根据工具定义在当前决策中填写调用参数。
 	Usage    string         `json:"usage,omitempty"`
 	Callback InvokeCallback // 添加回调函数字段
 	// MCPPendingStub marks a placeholder MCP tool loaded from DB cache before the
@@ -143,7 +143,7 @@ func WithVerboseNameZh(verboseNameZh string) ToolOption {
 	}
 }
 
-// WithUsage 设置工具的使用说明（在参数生成阶段披露）
+// WithUsage 设置工具的使用说明，供 AI 结合工具定义填写调用参数。
 func WithUsage(usage string) ToolOption {
 	return func(t *Tool) {
 		t.Usage = usage

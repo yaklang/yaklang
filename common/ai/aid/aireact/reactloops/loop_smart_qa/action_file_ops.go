@@ -77,15 +77,15 @@ var readFileAction = makeToolForwardAction(
 		"Uses mimetype (magic bytes) to detect binary files and recommends appropriate built-in tools instead of outputting garbled data. "+
 		"For Excel use read_excel_info/query_excel_data, for Word/PPT use read_word_structure/parse_office_to_text, for ZIP use zip_viewer, for PCAP use analyze_pcap.",
 	[]aitool.ToolOption{
-		aitool.WithStringParam("path",
+		aitool.WithStringParam("file",
 			aitool.WithParam_Required(true),
 			aitool.WithParam_Description("Absolute path of the file to read.")),
 		aitool.WithIntegerParam("offset",
 			aitool.WithParam_Description("Byte offset to start reading from."),
 			aitool.WithParam_Default(0)),
-		aitool.WithIntegerParam("chunk_size",
-			aitool.WithParam_Description("Maximum bytes to read."),
-			aitool.WithParam_Default(20480)),
+		aitool.WithIntegerParam("chunk-size",
+			aitool.WithParam_Description("Chunk bytes to read; 0 uses the tool's automatic sizing."),
+			aitool.WithParam_Default(0)),
 	},
 )
 

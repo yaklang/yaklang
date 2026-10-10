@@ -36,9 +36,16 @@ func TestDefaultInstructionUsesRequestOutputMode(t *testing.T) {
 	functionInstruction, err := utils.RenderTemplate(instruction, map[string]any{"FunctionCallMode": true})
 	require.NoError(t, err)
 	require.Contains(t, textInstruction, `{"@action":"require_tool"`)
-	require.Contains(t, textInstruction, "# 第二章：参数生成")
 	require.NotContains(t, functionInstruction, `{"@action":"require_tool"`)
-	require.NotContains(t, functionInstruction, "# 第二章：参数生成")
 	require.Contains(t, functionInstruction, "通过原生工具调用选择 action")
 	require.Contains(t, functionInstruction, "正文放在工具参数 `answer_payload`")
+	for _, prompt := range []string{instruction, outputExample, textInstruction, functionInstruction} {
+		for _, forbidden := range []string{"R2", "# Tool Context", "# Blueprint Context", "call-tool", "call-ai-blueprint", "OLD_PARAMS", "参数生成场景", "第二章"} {
+			require.NotContains(t, prompt, forbidden)
+		}
+	}
+	for _, prompt := range []string{textInstruction, functionInstruction} {
+		require.Contains(t, prompt, "Shell Safety Rules")
+		require.Contains(t, prompt, "提交回执与收尾约束")
+	}
 }

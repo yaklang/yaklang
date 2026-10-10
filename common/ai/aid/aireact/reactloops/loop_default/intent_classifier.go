@@ -420,7 +420,7 @@ func buildFastMatchSummary(result *FastMatchResult) string {
 
 	if len(result.MatchedMCPTools) > 0 {
 		sb.WriteString("### Matched MCP Tools\n")
-		sb.WriteString("Call via `require_tool` using the full name `mcp_{server}_{tool}`.\n\n")
+		sb.WriteString("Use `require_tool` with `require_tool_payload` set to the full name `mcp_{server}_{tool}` only to load its Schema; it does not execute. Then submit complete business arguments via `directly_call_tool`. Reuse an already visible Schema.\n\n")
 		for _, t := range result.MatchedMCPTools {
 			fullName := fmt.Sprintf("mcp_%s_%s", t.ServerName, t.ToolName)
 			sb.WriteString(fmt.Sprintf("- **%s** [MCP:%s]: %s\n", fullName, t.ServerName, truncateString(t.Description, 120)))

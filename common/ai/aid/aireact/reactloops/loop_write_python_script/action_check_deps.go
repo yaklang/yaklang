@@ -18,7 +18,7 @@ const maxCheckAttempts = 3
 var checkAndInstallDependencies = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOption {
 	return reactloops.WithRegisterLoopAction(
 		"check_and_install_dependencies",
-		"Check if all imported Python modules are available. If missing packages are found, this action will report them and you MUST use require_tool with tool_require_payload='bash' to install them. Do NOT call this action repeatedly if packages are still missing - use bash to install first, then call this again to verify.",
+		"Check if all imported Python modules are available. If packages are missing, load the bash Schema with require_tool using require_tool_payload='bash' only when the Schema is not already visible; require_tool does not install anything. Execute the install command with directly_call_tool, then call this action again to verify. Do NOT repeat dependency checks before attempting installation.",
 		[]aitool.ToolOption{
 			aitool.WithStringArrayParam("extra_packages",
 				aitool.WithParam_Required(false),
@@ -47,7 +47,7 @@ var checkAndInstallDependencies = func(r aicommon.AIInvokeRuntime) reactloops.Re
 				op.Feedback(fmt.Sprintf(
 					"[WARNING] Dependency check has been called %d times. Maximum attempts (%d) exceeded.\n"+
 						"Stop retrying. Use `directly_answer` to report the dependency issue to the user, "+
-						"or use `require_tool` with `tool_require_payload: \"bash\"` to manually handle installation.",
+						"or load the bash Schema with `require_tool` using `require_tool_payload: \"bash\"` if needed, then execute installation with `directly_call_tool`; loading alone does not install packages.",
 					attemptCount, maxCheckAttempts,
 				))
 				return
@@ -112,7 +112,7 @@ var checkAndInstallDependencies = func(r aicommon.AIInvokeRuntime) reactloops.Re
 			}
 			installHint.WriteString("\n")
 			installHint.WriteString("=== ACTION REQUIRED ===\n")
-			installHint.WriteString("You MUST use `require_tool` to request the `bash` tool, then run the install command.\n")
+			installHint.WriteString("If the bash Schema is missing, load it with `require_tool` using `require_tool_payload: \"bash\"`; this does not execute. Then use `directly_call_tool` with complete bash arguments to run the install command. Reuse an already visible Schema.\n")
 			installHint.WriteString("Do NOT call `check_and_install_dependencies` again until you have installed the packages.\n\n")
 
 			if pkgManager == "uv" {

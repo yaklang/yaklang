@@ -57,15 +57,6 @@ func TestReActLoop_BasicExecution(t *testing.T) {
 	t.Logf("AI called %d times", callCount)
 }
 
-func isRequireToolParamPrompt(prompt string) bool {
-	if aicommon.IsToolParamGenPromptForTool(prompt, "") && strings.Contains(prompt, "call-tool") {
-		return true
-	}
-
-	return strings.Contains(prompt, "# Tool Context") &&
-		strings.Contains(prompt, "call-tool")
-}
-
 // TestReActLoop_MultipleIterations 测试多次迭代
 func TestReActLoop_MultipleIterations(t *testing.T) {
 	iterationCount := 0
@@ -111,13 +102,6 @@ func TestReActLoop_MultipleIterations(t *testing.T) {
 {"@action": "object", "next_action": { "type": "directly_call_tool", "directly_call_tool_name": "` + toolName + `", "directly_call_tool_params":{"seconds":0.01} },
 "human_readable_thought": "mocked thought for tool calling", "cumulative_summary": "..cumulative-mocked for tool calling.."}
 `))
-				rsp.Close()
-				return rsp, nil
-			}
-
-			if isRequireToolParamPrompt(prompt) {
-				rsp := i.NewAIResponse()
-				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "call-tool", "params": { "seconds" : 0.01 }}`))
 				rsp.Close()
 				return rsp, nil
 			}
@@ -193,13 +177,6 @@ func TestReActLoop_MaxIterationsLimit(t *testing.T) {
 {"@action": "object", "next_action": { "type": "directly_call_tool", "directly_call_tool_name": "` + toolName + `", "directly_call_tool_params":{"seconds":0.01} },
 "human_readable_thought": "mocked thought for tool calling", "cumulative_summary": "..cumulative-mocked for tool calling.."}
 `))
-				rsp.Close()
-				return rsp, nil
-			}
-
-			if isRequireToolParamPrompt(prompt) {
-				rsp := i.NewAIResponse()
-				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "call-tool", "params": { "seconds" : 0.01 }}`))
 				rsp.Close()
 				return rsp, nil
 			}

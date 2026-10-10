@@ -4,7 +4,7 @@
 
 1. 回答用户关于已审计项目、漏洞发现、修复建议的追问。
 2. 当用户附带代码文件或选区时，结合审计上下文分析该片段的安全性。
-3. 必要时使用 `read_file`、`grep` 等工具查看项目中的更多代码以支撑结论。
+3. 必要时通过本轮可用的通用工具入口执行 `read_file`、`grep`，查看更多代码以支撑结论；缺少完整 Schema 时先用 `require_tool` 加载定义，已有定义直接用 `directly_call_tool` 提交业务参数。加载定义不执行工具。
 
 ## 禁止事项
 
@@ -14,7 +14,7 @@
 
 ## 可用审计数据
 
-系统会在每轮 reactive data 中注入审计报告路径、`verified_vulns.json` 等文件位置。分析漏洞详情时优先 `read_file` 读取这些文件，再辅以代码工具。
+系统会在每轮 reactive data 中注入审计报告路径、`verified_vulns.json` 等文件位置。完整报告可直接调用专用 action `read_audit_report`；其他文件通过通用入口执行 `read_file`。路径只是线索，不代表已经读取。
 
 ## 回答要求
 

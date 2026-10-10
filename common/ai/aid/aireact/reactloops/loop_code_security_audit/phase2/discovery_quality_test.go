@@ -19,6 +19,12 @@ func TestBuildDiscoveryReferenceCatalog_IncludesReconPath(t *testing.T) {
 	require.GreaterOrEqual(t, len(catalog), 2)
 	require.Equal(t, "recon_report", catalog[0].ID)
 	require.Equal(t, "/proj/audit/recon.md", catalog[0].Path)
+	material := BuildFastContextReferenceMaterial(state, cat)
+	require.Contains(t, material, "/proj/audit/recon.md")
+	require.Contains(t, material, "父循环按需读取")
+	require.Contains(t, material, "使用已内联的背景与搜索结果")
+	require.NotContains(t, material, "`require_tool` + `read_file`")
+	require.NotContains(t, material, "再 `read_file` 打开")
 }
 
 func TestEvaluateDiscoveryQuality_FlowCentricWeak(t *testing.T) {
