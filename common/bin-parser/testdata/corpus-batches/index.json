@@ -36241,6 +36241,173 @@
         "common/pcapx/pcaputil/wrapper-first-refusal/controls.json": "controls.json",
         "common/pcapx/pcaputil/wrapper-first-refusal/validation/expected.json": "validation/expected.json"
       }
+    },
+    {
+      "id": "validation-slmp-idle-history",
+      "kind": "validation",
+      "source_sha": "c52e9af68eec4c02cae10eab83467cb100a20e3d",
+      "file": "validation-slmp-idle-history.zip",
+      "sha256": "be7e75557a009badba26c166253ee970b512cb05989a570a5025ae08d638b2a8",
+      "password": "bin-parser",
+      "members": {
+        "build.py": {
+          "sha256": "4d863e340a8a50f7a07cfd14b5160c30979a01316cb9e7cde98f70871b835718",
+          "bytes": 4061
+        },
+        "verify.py": {
+          "sha256": "6bc53d3ae48650c683284ab1bd6b619ca2f61a5d3c50a66206b29fe3322fe63f",
+          "bytes": 2147
+        },
+        "source-check.py": {
+          "sha256": "9e1226e8ed72a8e78071698476d69c4cb271269673e7c9578e3bb1bacd76f403",
+          "bytes": 638
+        },
+        "seal.py": {
+          "sha256": "7d74b674f62500b2e1f37b3f365b8bd17fa3f980049d65738b06163571d963fb",
+          "bytes": 3964
+        },
+        "source-pin.json": {
+          "sha256": "b7b63771b3f55cede4806d061cd5f8e8cc8d3f00dc61466788fc9d49e275b675",
+          "bytes": 804
+        },
+        "carrier.py": {
+          "sha256": "4661132b11be1a3f51e25e244cc8f57cf7f363e03d18269ac9d5b0488f304b44",
+          "bytes": 1888
+        },
+        "LICENSE.txt": {
+          "sha256": "046b54a3ccba15808d040f63b7bc2e31e5f2842d6ff54bda939ba22b579601d5",
+          "bytes": 246
+        },
+        "public-baseline_test.go": {
+          "sha256": "6358258fe4207000c01763ce9e0fa7c0ca3ceac1b7949a1c02bbadafe24923cd",
+          "bytes": 5717
+        },
+        "historical-idle-upgrade.json": {
+          "sha256": "403fc532ffbf6ef52a68915ba732ecbf24a7948b00da5f3304d9a0400e7e34fc",
+          "bytes": 1100
+        },
+        "historical-ingress-upgrade.json": {
+          "sha256": "d4f69370e2ee385a33da91285a7014eb5d652f9243f11e38b81a3a216413801a",
+          "bytes": 857
+        },
+        "cases/3e-pending-idle.pcap": {
+          "sha256": "45747821bf87d2fb54aa56b8bcd19ac4c77db633f41a8e8fc4e4fc3ff16350a9",
+          "bytes": 251
+        },
+        "answers/3e-pending-idle.json": {
+          "sha256": "8bce535b018b9c30da422fabc71a58a001d0346424ed9755fdf5b978db3e448e",
+          "bytes": 1400
+        },
+        "cases/3e-completed-idle.pcap": {
+          "sha256": "c535d44b93b02ac65b39031ef0698a32acc860fdeebed737d44818c2da084792",
+          "bytes": 324
+        },
+        "answers/3e-completed-idle.json": {
+          "sha256": "42ea8c2c81a1c5d562422aaa6eebd483dde2edf4bdab30539fa83f42ec1762d3",
+          "bytes": 2052
+        },
+        "cases/3e-active-retry.pcap": {
+          "sha256": "45d560c0c2a073f62ec98cc7b5ea9ae986e0140ae8ff79ca7f1a6231321ef996",
+          "bytes": 251
+        },
+        "answers/3e-active-retry.json": {
+          "sha256": "2339aa98dac3396e8d775b75d81d70e5aadbddc0fea4c240c11dd7f9f0adae3f",
+          "bytes": 2330
+        },
+        "cases/4e-pending-idle.pcap": {
+          "sha256": "a07a3eebf4f292975e6dd1d61b9c5109ff158aec5ceb0223e138bb8ef9719704",
+          "bytes": 340
+        },
+        "answers/4e-pending-idle.json": {
+          "sha256": "66a53cf86494a304f41c665e5d624e6ed932058a86d3b31ac2035f37f1613ceb",
+          "bytes": 1651
+        },
+        "cases/4e-completed-reuse-idle.pcap": {
+          "sha256": "ada171d3feb41a68d3b2b35a3c8bef6f43b19e214704be04aadae3176a156fec",
+          "bytes": 498
+        },
+        "answers/4e-completed-reuse-idle.json": {
+          "sha256": "c2803e5bd0fd7ef87d549bba1d475d7fb20bbe6bca4afe489042260a65eb2f56",
+          "bytes": 3544
+        },
+        "cases/4e-fresh-serial-late-neighbors.pcap": {
+          "sha256": "d1606579948e61d11645d7922364130a97cf9ff7a7d392761ef433b9d4612b13",
+          "bytes": 498
+        },
+        "answers/4e-fresh-serial-late-neighbors.json": {
+          "sha256": "ffd2b9836b2178340863dc31af590bc5e1a74033afa3094ade37d5213d6cf939",
+          "bytes": 3572
+        },
+        "cases/4e-idle-ingress-refusal.pcap": {
+          "sha256": "0a8573db8abc90d215231990af7e4d927eab5ee909cec4e31f82156fd5039da5",
+          "bytes": 467
+        },
+        "answers/4e-idle-ingress-refusal.json": {
+          "sha256": "c538bd723809e0bd7f60287ce0c01f4a31d9cc1e3f63d3c294b878eca95eee9d",
+          "bytes": 1980
+        },
+        "cases/3e-first-frame-refusal.pcap": {
+          "sha256": "000b09a818aec4cda476622570f38a2bc282923e1ba75d50d23af8869fc71aa3",
+          "bytes": 297
+        },
+        "answers/3e-first-frame-refusal.json": {
+          "sha256": "ed716ea4e7b64b25998f5456436544b47553884c396e08cad9e5843aef683702",
+          "bytes": 1078
+        },
+        "answers/3e-first-ingress-refusal.json": {
+          "sha256": "962dfa5b7487ae66ff370af3aa193c4f9b092bdfe0c28d4fe08dba25dbe5b7b3",
+          "bytes": 1058
+        },
+        "cases/4e-retired-budget-neighbor.pcap": {
+          "sha256": "a441cc8c7398e427b146b6dec969378ac062667cf0bdedaf6ca6eae886407609",
+          "bytes": 590
+        },
+        "answers/4e-retired-budget-neighbor.json": {
+          "sha256": "9ad5af0b80a3c297f1a4be20a96eed985d6402d9cf40b6537643310c39c51b3f",
+          "bytes": 3739
+        },
+        "controls.json": {
+          "sha256": "8f411c48bd7a575d67f8f1751ee5f5a0ec799112f35ecd9f2c767bb6e6dbe9a9",
+          "bytes": 26542
+        },
+        "validation/expected.json": {
+          "sha256": "01eac2dd53784d47c4d509bf3967286534ffdea254c47923d382ac0806108d17",
+          "bytes": 11194
+        }
+      },
+      "aliases": {
+        "common/pcapx/pcaputil/slmp-idle-history/build.py": "build.py",
+        "common/pcapx/pcaputil/slmp-idle-history/verify.py": "verify.py",
+        "common/pcapx/pcaputil/slmp-idle-history/source-check.py": "source-check.py",
+        "common/pcapx/pcaputil/slmp-idle-history/seal.py": "seal.py",
+        "common/pcapx/pcaputil/slmp-idle-history/source-pin.json": "source-pin.json",
+        "common/pcapx/pcaputil/slmp-idle-history/carrier.py": "carrier.py",
+        "common/pcapx/pcaputil/slmp-idle-history/LICENSE.txt": "LICENSE.txt",
+        "common/pcapx/pcaputil/slmp-idle-history/public-baseline_test.go": "public-baseline_test.go",
+        "common/pcapx/pcaputil/slmp-idle-history/historical-idle-upgrade.json": "historical-idle-upgrade.json",
+        "common/pcapx/pcaputil/slmp-idle-history/historical-ingress-upgrade.json": "historical-ingress-upgrade.json",
+        "common/pcapx/pcaputil/slmp-idle-history/cases/3e-pending-idle.pcap": "cases/3e-pending-idle.pcap",
+        "common/pcapx/pcaputil/slmp-idle-history/answers/3e-pending-idle.json": "answers/3e-pending-idle.json",
+        "common/pcapx/pcaputil/slmp-idle-history/cases/3e-completed-idle.pcap": "cases/3e-completed-idle.pcap",
+        "common/pcapx/pcaputil/slmp-idle-history/answers/3e-completed-idle.json": "answers/3e-completed-idle.json",
+        "common/pcapx/pcaputil/slmp-idle-history/cases/3e-active-retry.pcap": "cases/3e-active-retry.pcap",
+        "common/pcapx/pcaputil/slmp-idle-history/answers/3e-active-retry.json": "answers/3e-active-retry.json",
+        "common/pcapx/pcaputil/slmp-idle-history/cases/4e-pending-idle.pcap": "cases/4e-pending-idle.pcap",
+        "common/pcapx/pcaputil/slmp-idle-history/answers/4e-pending-idle.json": "answers/4e-pending-idle.json",
+        "common/pcapx/pcaputil/slmp-idle-history/cases/4e-completed-reuse-idle.pcap": "cases/4e-completed-reuse-idle.pcap",
+        "common/pcapx/pcaputil/slmp-idle-history/answers/4e-completed-reuse-idle.json": "answers/4e-completed-reuse-idle.json",
+        "common/pcapx/pcaputil/slmp-idle-history/cases/4e-fresh-serial-late-neighbors.pcap": "cases/4e-fresh-serial-late-neighbors.pcap",
+        "common/pcapx/pcaputil/slmp-idle-history/answers/4e-fresh-serial-late-neighbors.json": "answers/4e-fresh-serial-late-neighbors.json",
+        "common/pcapx/pcaputil/slmp-idle-history/cases/4e-idle-ingress-refusal.pcap": "cases/4e-idle-ingress-refusal.pcap",
+        "common/pcapx/pcaputil/slmp-idle-history/answers/4e-idle-ingress-refusal.json": "answers/4e-idle-ingress-refusal.json",
+        "common/pcapx/pcaputil/slmp-idle-history/cases/3e-first-frame-refusal.pcap": "cases/3e-first-frame-refusal.pcap",
+        "common/pcapx/pcaputil/slmp-idle-history/answers/3e-first-frame-refusal.json": "answers/3e-first-frame-refusal.json",
+        "common/pcapx/pcaputil/slmp-idle-history/answers/3e-first-ingress-refusal.json": "answers/3e-first-ingress-refusal.json",
+        "common/pcapx/pcaputil/slmp-idle-history/cases/4e-retired-budget-neighbor.pcap": "cases/4e-retired-budget-neighbor.pcap",
+        "common/pcapx/pcaputil/slmp-idle-history/answers/4e-retired-budget-neighbor.json": "answers/4e-retired-budget-neighbor.json",
+        "common/pcapx/pcaputil/slmp-idle-history/controls.json": "controls.json",
+        "common/pcapx/pcaputil/slmp-idle-history/validation/expected.json": "validation/expected.json"
+      }
     }
   ],
   "schema_version": 1,

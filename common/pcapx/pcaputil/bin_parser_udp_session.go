@@ -99,6 +99,22 @@ func (f *binFlow) retireDLMSUDP() {
 	}
 }
 
+// Idle capture time releases the body, not the on-wire 3E generation or used
+// 4E serials. Incomplete exchanges cannot establish fresh context; completed
+// 4E exchanges may still use distinct never-observed serials within the budget.
+func (f *binFlow) retireSLMPUDP() {
+	s := f.slmp
+	if s.pending != nil {
+		s.pending = nil
+		s.ambiguous = true
+	}
+	retained := int64(512 + 64*len(s.seen))
+	if f.sessionBytes > retained {
+		f.a.buffered.Add(retained - f.sessionBytes)
+		f.sessionBytes = retained
+	}
+}
+
 func (a *binParser) decodeTFTPDatagram(e *ProtocolEvent, w []byte) bool {
 	a.udpMu.Lock()
 	defer a.udpMu.Unlock()

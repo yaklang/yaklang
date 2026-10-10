@@ -77,7 +77,7 @@ func slmpInput(t *testing.T, c bsapControl) ([]byte, bsapAnswer) {
 	}
 	_, _, err = r.ReadPacketData()
 	require.ErrorIs(t, err, io.EOF)
-	return raw, a
+	return raw, slmpIdleHistoricalAnswer(t, c, a)
 }
 func slmpWires(t *testing.T, id string) [][]byte {
 	t.Helper()
@@ -97,6 +97,9 @@ func slmpWires(t *testing.T, id string) [][]byte {
 	return nil
 }
 func TestSLMPSealedReplay(t *testing.T) {
+	t.Run("existing-api-idle-history", TestSLMPIdleHistoryExistingAPI)
+	t.Run("untracked-refusal-isolation", TestSLMPUntrackedRefusalIsolation)
+	testSLMPIdleSealedMatrix(t)
 	for _, c := range slmpControls(t) {
 		t.Run(c.ID, func(t *testing.T) {
 			raw, want := slmpInput(t, c)
@@ -280,17 +283,14 @@ func TestSLMPResourceAndIsolation(t *testing.T) {
 	expired := event(e.Destination, e.Source, d0, ts.Add(slmpIdleTTL))
 	require.True(t, parser.decodeSLMPDatagram(expired, r, true))
 	rocTypedError(t, "ContextRequired", expired.sessionError)
-	require.Zero(t, s.Stats().BufferedBytes)
+	require.EqualValues(t, 576, s.Stats().BufferedBytes) // retained serial history, no request body
 	fresh := event(e.Source, e.Destination, d0, ts.Add(slmpIdleTTL))
-	borrowed := bytes.Clone(q)
-	require.True(t, parser.decodeSLMPDatagram(fresh, borrowed, false))
-	require.Nil(t, fresh.sessionError)
-	clear(borrowed)
-	f, err := fresh.GetFields()
-	require.NoError(t, err)
-	f["Loopback Data"].([]byte)[0] ^= 255
-	require.Equal(t, []byte("ABCDE"), fresh.Session["Loopback Data"])
-	require.NotEqual(t, e.FlowID, fresh.FlowID)
+	require.True(t, parser.decodeSLMPDatagram(fresh, q, false))
+	rocTypedError(t, "ContextRequired", fresh.sessionError)
+	require.Nil(t, fresh.Session)
+	require.Zero(t, fresh.ResponseTo)
+	require.Equal(t, e.FlowID, fresh.FlowID)
+	require.EqualValues(t, 576, s.Stats().BufferedBytes)
 	s.Close("cleanup")
 	require.Zero(t, s.Stats().BufferedBytes)
 	t.Run("resource-denied-overlap", func(t *testing.T) {

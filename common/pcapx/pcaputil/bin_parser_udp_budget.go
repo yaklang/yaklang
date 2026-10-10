@@ -59,6 +59,8 @@ func (a *binParser) refuseUDPOversizeAssociation(e *ProtocolEvent, w []byte, src
 					v.flow.retireSNMPUDP()
 				} else if v.flow.dlms != nil || v.flow.wrapper != nil {
 					v.flow.retireDLMSUDP()
+				} else if v.flow.slmp != nil {
+					v.flow.retireSLMPUDP()
 				} else {
 					v.flow.closeSession()
 					delete(store.entries, v.key)
@@ -69,9 +71,12 @@ func (a *binParser) refuseUDPOversizeAssociation(e *ProtocolEvent, w []byte, src
 		}
 	}
 	existing := store != nil && store.entries[key] != nil
-	if explicit == "" && !existing && protocol != "stun" && !(protocol == "dlms-wrapper" && (src == 4059 || dst == 4059)) && !(protocol == "dlms" && (src == 4059 || dst == 4059) && dlmsUDPRefusalHint(w)) {
+	if explicit == "" && !existing && protocol != "stun" && !(protocol == "slmp" && slmpUDPRefusalHint(w)) && !(protocol == "dlms-wrapper" && (src == 4059 || dst == 4059)) && !(protocol == "dlms" && (src == 4059 || dst == 4059) && dlmsUDPRefusalHint(w)) {
 		a.udpMu.Unlock()
 		return false
+	}
+	if protocol == "slmp" && !existing {
+		a.slmpUntrackedRefusal = true
 	}
 	if protocol == "dlms" && !existing {
 		// Explicit admission or a bounded port/header hint identified HDLC,
@@ -115,9 +120,14 @@ func (a *binParser) refuseUDPOversizeAssociation(e *ProtocolEvent, w []byte, src
 			f.snmp.invalidate()
 			retained = f.snmp.storage()
 		} else if f.slmp != nil {
-			f.slmp.pending = nil
-			f.slmp.ambiguous = true
+			if !f.slmp.retiredWire(w) {
+				f.slmp.pending = nil
+				f.slmp.ambiguous = true
+			}
 			retained = 512 + 64*int64(len(f.slmp.seen))
+			if f.slmp.pending != nil {
+				retained += int64(len(f.slmp.pending.wire)) * 3
+			}
 		} else if f.wrapper != nil {
 			f.wrapper.invalidate()
 			retained = f.wrapper.storage()
