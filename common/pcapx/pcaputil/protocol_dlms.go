@@ -12,7 +12,8 @@ import (
 
 // Selected unciphered LN Get-normal and HDLC link controls, carried as complete
 // HDLC frames through a TCP/UDP tunnel, plus bounded LN Get-with-list.
-// ACSE, authentication, ciphering, segmentation and GBT remain
+// Selected response information segmentation is assembled only with observed
+// request context. ACSE, authentication, ciphering, request segmentation and GBT remain
 // explicit unsupported boundaries. Values and link identities are unverified.
 func dlmsError(k ProtocolErrorKind, why string) error { return protocolError(k, "DLMS HDLC %s", why) }
 func dlmsCRC(w []byte) uint16 {
@@ -68,6 +69,8 @@ type dlmsMessage struct {
 	flags, choice       byte
 	count               int
 	block               *wrapperMessage
+	information         []byte
+	segmented           bool
 }
 
 func dlmsAddress(w []byte, at *int) (uint32, int, error) {
@@ -94,6 +97,9 @@ func decodeDLMS(w []byte, maxElements int) (*dlmsMessage, error) {
 	return decodeDLMSBudget(w, maxElements, DefaultParserBudget().MaxRecursionDepth)
 }
 func decodeDLMSBudget(w []byte, maxElements, depth int) (*dlmsMessage, error) {
+	return decodeDLMSFrameBudget(w, maxElements, depth, false)
+}
+func decodeDLMSFrameBudget(w []byte, maxElements, depth int, linkOnly bool) (*dlmsMessage, error) {
 	bad := func(s string) (*dlmsMessage, error) { return nil, dlmsError(ErrMalformedMessage, s) }
 	unsupported := func(s string) (*dlmsMessage, error) { return nil, dlmsError(ErrUnsupportedFeature, s) }
 	n, err := dlmsFrameSize(w, 2049)
@@ -138,8 +144,9 @@ func decodeDLMSBudget(w []byte, maxElements, depth int) (*dlmsMessage, error) {
 		f["HCS"] = hcs
 		info = w[at+2 : end]
 	}
-	if format&0x800 != 0 {
-		return unsupported("segmented information is outside this profile")
+	m.information, m.segmented = info, format&0x800 != 0
+	if m.segmented && (!linkOnly || cf&1 != 0) {
+		return unsupported("segmented information requires observed response context")
 	}
 	if cf&3 == 3 {
 		names := map[byte]string{0x83: "SNRM", 0x63: "UA", 0x43: "DISC", 0x0f: "DM"}
@@ -176,6 +183,21 @@ func decodeDLMSBudget(w []byte, maxElements, depth int) (*dlmsMessage, error) {
 	m.nr = cf >> 5
 	f["Send Sequence"] = m.ns
 	f["Receive Sequence"] = m.nr
+	if linkOnly {
+		m.kind = "I"
+		// Preserve literal initial request direction for explicit UDP decoding,
+		// including the still-unsupported segmented-request boundary. Never
+		// infer an endpoint role from continuation bytes in an existing chain.
+		m.request = len(info) >= 4 && bytes.Equal(info[:4], []byte{0xe6, 0xe6, 0, 0xc0})
+		return m, nil
+	}
+	return decodeDLMSInformation(m, info, maxElements, depth)
+}
+
+func decodeDLMSInformation(m *dlmsMessage, info []byte, maxElements, depth int) (*dlmsMessage, error) {
+	bad := func(s string) (*dlmsMessage, error) { return nil, dlmsError(ErrMalformedMessage, s) }
+	unsupported := func(s string) (*dlmsMessage, error) { return nil, dlmsError(ErrUnsupportedFeature, s) }
+	f := m.fields
 	if len(info) < 4 {
 		return bad("information frame LLC/APDU is truncated")
 	}
@@ -468,6 +490,7 @@ type binDLMS struct {
 	next                [2]byte
 	seqKnown            [2]bool
 	transfer            *dlmsTransfer
+	fragments           *dlmsFragments
 }
 
 func (s *binDLMS) invalidate() {
@@ -476,6 +499,7 @@ func (s *binDLMS) invalidate() {
 	// a subsequent request's ID. Retire the conversation, not just a live slot.
 	s.pending = nil
 	s.transfer = nil
+	s.fragments = nil
 	s.ambiguous = true
 }
 func (s *binDLMS) consume(m *dlmsMessage, w []byte, dir int, id uint64) (map[string]any, uint64, error) {
@@ -591,17 +615,20 @@ func (s *binDLMS) storage() int64 {
 	if s.transfer != nil {
 		n += 128 + 2*int64(len(s.transfer.data))
 	}
+	if s.fragments != nil {
+		n += 128 + 2*int64(len(s.fragments.info)+len(s.fragments.wire))
+	}
 	return n
 }
 func (f *binFlow) consumeDLMS(dir int, w []byte, id uint64) (map[string]any, uint64, error) {
 	s := f.dlms
-	if err := f.reserveSession(s.storage() + dlmsProjection(w)); err != nil {
+	if err := f.reserveSession(s.storage() + f.dlmsProjection(w)); err != nil {
 		// Refusing memory cannot hide an on-wire exchange from the association
 		// state. Retire the old slot before any later response can use it.
 		s.invalidate()
 		return nil, 0, err
 	}
-	m, err := decodeDLMSBudget(w, f.a.budget.MaxCollectionElements, f.a.budget.MaxRecursionDepth)
+	m, err := decodeDLMSFrameBudget(w, f.a.budget.MaxCollectionElements, f.a.budget.MaxRecursionDepth, f.dlmsLinkAssembly(w))
 	if err != nil {
 		s.invalidate()
 		return nil, 0, err
@@ -610,6 +637,9 @@ func (f *binFlow) consumeDLMS(dir int, w []byte, id uint64) (map[string]any, uin
 }
 func (f *binFlow) consumeDecodedDLMS(dir int, w []byte, id uint64, m *dlmsMessage) (map[string]any, uint64, error) {
 	s := f.dlms
+	if m.kind == "I" || s.fragments != nil {
+		return f.consumeDLMSSegments(dir, w, id, m)
+	}
 	if m.kind == "GET" && m.choice == 2 {
 		return f.consumeDLMSBlock(dir, w, id, m)
 	}
@@ -683,8 +713,8 @@ func (a *binParser) decodeDLMSDatagram(e *ProtocolEvent, w []byte, explicit bool
 	oversize := len(w) > min(a.budget.MaxFrameBytes, a.config.MaxMessageBytes)
 	if oversize {
 		err = dlmsError(ErrResourceExceeded, "frame exceeds byte budget")
-	} else if err = f.reserveSession(f.dlms.storage() + dlmsProjection(w)); err == nil {
-		m, err = decodeDLMSBudget(w, a.budget.MaxCollectionElements, a.budget.MaxRecursionDepth)
+	} else if err = f.reserveSession(f.dlms.storage() + f.dlmsProjection(w)); err == nil {
+		m, err = decodeDLMSFrameBudget(w, a.budget.MaxCollectionElements, a.budget.MaxRecursionDepth, f.dlmsLinkAssembly(w))
 	}
 	if created && m != nil && !m.request && m.kind != "S" {
 		e.Direction = 1

@@ -192,3 +192,22 @@ conversation even if its preceding exchange completed. Its rejection cannot
 leave a later request available to bind a delayed block from the missing initial
 exchange. New capture/idle-reset generations still require independent context;
 byte-identical delayed responses cannot authenticate their originating generation.
+
+Native HDLC additionally assembles selected GET response information segmentation
+after an observed complete request. Each carrier frame independently validates
+its length, addresses, HCS and FCS. The first frame must include the LLC and
+complete unciphered LN GET service header; later continuation frames are not
+interpreted as standalone APDUs. The selected pool permits64 frames and1027
+information bytes including LLC, further bounded by caller collection and
+shared-memory budgets. Full flags, reversed endpoints/logical addresses and
+consecutive modulo8 sequences govern the whole observation. Exact duplicate
+last fragments do not advance it; missing/conflicting fragments and hidden
+peer progression retire request identity. Partial frames expose literal
+`HDLC Segmentation` metadata with no ResponseTo; only a complete assembled APDU
+may consume the request. The final Raw/header/CRC/sequence fields are captured
+values, while assembled information is explicitly labelled separately.
+Normal/list and selected Data-block result decoders retain their existing
+field shapes and limits. Unfinished Close releases bytes and emits one diagnostic
+outside the UDP store lock. Initial-request segmentation, GBT, negotiated
+window/capability enforcement, ACSE/security and real meter execution remain
+separate unfinished requirements.
