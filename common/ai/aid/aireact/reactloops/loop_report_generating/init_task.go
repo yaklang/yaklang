@@ -110,7 +110,12 @@ func buildInitTask(r aicommon.AIInvokeRuntime) func(loop *reactloops.ReActLoop, 
 				strings.Contains(strings.ToLower(userInput), "纯文本") {
 				ext = ".txt"
 			}
-			outputFilename = r.EmitFileArtifactWithExt("report", ext, "")
+			workDir := config.GetOrCreateWorkDir()
+			if workDir == "" {
+				operator.Failed(utils.Error("cannot create report working directory"))
+				return
+			}
+			outputFilename = filepath.Join(workDir, "report_"+utils.DatetimePretty2()+ext)
 			isNewFile = true
 			log.Infof("report_generating: created new output file artifact: %s", outputFilename)
 		}
@@ -123,8 +128,8 @@ func buildInitTask(r aicommon.AIInvokeRuntime) func(loop *reactloops.ReActLoop, 
 			}
 		}
 
-		// Step 5: 保存并 pin 输出文件
-		if err := reactloops.SaveAndPinFile(loop, outputFilename, []byte(existingContent)); err != nil {
+		// Prepare the working file; publish it only after successful completion.
+		if err := os.WriteFile(outputFilename, []byte(existingContent), 0o644); err != nil {
 			log.Errorf("report_generating: failed to save output file: %v", err)
 			operator.Failed(utils.Errorf("cannot save output file: %v", err))
 			return

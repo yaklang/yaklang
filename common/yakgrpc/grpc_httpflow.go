@@ -5,6 +5,7 @@ package yakgrpc
 import (
 	"bytes"
 	"context"
+	"database/sql"
 	"encoding/csv"
 	"encoding/json"
 	"fmt"
@@ -902,6 +903,10 @@ func (s *Server) HTTPFlowsData(ctx context.Context, httpFlow *schema.HTTPFlow) (
 		TooLargeRequestHeaderFile:  httpFlow.TooLargeRequestHeaderFile,
 		TooLargeRequestBodyFile:    httpFlow.TooLargeRequestBodyFile,
 		Host:                       httpFlow.Host,
+		IssueType:                  httpFlow.IssueType,
+		Severity:                   httpFlow.Severity,
+		Status:                     httpFlow.Status,
+		StatusReason:               httpFlow.StatusReason,
 	}
 	projectStoragesWhere := []string{strconv.Quote(strconv.FormatInt(int64(httpFlow.ID), 10) + "_response"), strconv.Quote(strconv.FormatInt(int64(httpFlow.ID), 10) + "_request")}
 	projectStorages, _ := yakit.GetProjectKeyByWhere(s.GetProjectDatabase(), projectStoragesWhere)
@@ -917,6 +922,254 @@ func (s *Server) HTTPFlowsData(ctx context.Context, httpFlow *schema.HTTPFlow) (
 	}
 
 	return httpFlowShare, extractedData, websocketFlowsData, projectGeneralStorage
+}
+
+func (s *Server) HTTPFlowsFromOnline(req *ypb.HTTPFlowsFromOnlineRequest, stream ypb.Yak_HTTPFlowsFromOnlineServer) error {
+	if req.Token == "" {
+		return utils.Errorf("params empty")
+	}
+
+	if err := yaklib.DownloadOnlineAuthProxy(consts.GetOnlineBaseUrl()); err != nil {
+		return utils.Errorf("download failed: %s", err.Error())
+	}
+
+	client := yaklib.NewOnlineClient(consts.GetOnlineBaseUrl())
+	ch, err := client.DownloadHTTPFlows(stream.Context(), req.Token)
+	if err != nil {
+		return utils.Errorf("download  httpflow failed: %s", err)
+	}
+
+	var (
+		progress      float64
+		count         float64
+		updatedCount  int64
+		insertedCount int64
+	)
+
+	stream.Send(&ypb.HTTPFlowsFromOnlineProgress{
+		Progress: 0,
+		Log:      "initializing",
+	})
+	defer func() {
+		stream.Send(&ypb.HTTPFlowsFromOnlineProgress{
+			Progress: 1,
+			Log:      fmt.Sprintf("更新: %d条, 新增: %d条", updatedCount, insertedCount),
+		})
+	}()
+
+	db := s.GetProjectDatabase()
+	for resultIns := range ch {
+		item := resultIns.Flow
+		total := resultIns.Total
+		if total > 0 {
+			progress = count / float64(total)
+		}
+		count++
+
+		var existing schema.HTTPFlow
+		findResult := db.Model(&schema.HTTPFlow{}).Where("hash = ?", item.Hash).First(&existing)
+
+		if findResult.Error == nil && existing.ID > 0 {
+			// 本地已存在：只更新四个标识字段
+			if err := db.Model(&schema.HTTPFlow{}).Where("hash = ?", item.Hash).Update(map[string]interface{}{
+				"issue_type":    item.IssueType,
+				"severity":      item.Severity,
+				"status":        item.Status,
+				"status_reason": item.StatusReason,
+			}).Error; err != nil {
+				stream.Send(&ypb.HTTPFlowsFromOnlineProgress{
+					Progress: progress,
+					Log:      fmt.Sprintf("update [%s] issue fields failed: %s", item.Hash, err),
+				})
+			} else {
+				updatedCount++
+				stream.Send(&ypb.HTTPFlowsFromOnlineProgress{
+					Progress: progress,
+					Log:      fmt.Sprintf("update [%s] issue fields finished", item.Hash),
+				})
+			}
+		} else {
+			flow := &schema.HTTPFlow{
+				Hash:                       item.Hash,
+				Url:                        item.URL,
+				Path:                       item.Path,
+				Method:                     item.Method,
+				IsHTTPS:                    item.IsHTTPS,
+				NoFixContentLength:         item.NoFixContentLength,
+				StatusCode:                 item.StatusCode,
+				ContentType:                item.ContentType,
+				SourceType:                 item.SourceType,
+				RequestLength:              item.RequestLength,
+				BodyLength:                 item.BodyLength,
+				HtmlTitle:                  sql.NullString{String: item.HTMLTitle, Valid: item.HTMLTitle != ""},
+				GetParamsTotal:             int(item.GetParamsTotal),
+				PostParamsTotal:            int(item.PostParamsTotal),
+				CookieParamsTotal:          int(item.CookieParamsTotal),
+				IPAddress:                  item.IPAddress,
+				RemoteAddr:                 item.HostPort,
+				Tags:                       item.Tags,
+				FromPlugin:                 item.FromPlugin,
+				HiddenIndex:                item.HiddenIndex,
+				IsWebsocket:                item.IsWebsocket,
+				WebsocketHash:              item.WebsocketHash,
+				Host:                       item.Host,
+				IsTooLargeResponse:         item.IsTooLargeResponse,
+				TooLargeResponseHeaderFile: item.TooLargeResponseHeaderFile,
+				TooLargeResponseBodyFile:   item.TooLargeResponseBodyFile,
+				IssueType:                  item.IssueType,
+				Severity:                   item.Severity,
+				Status:                     item.Status,
+				StatusReason:               item.StatusReason,
+			}
+			flow.SetRequest(item.Request)
+			// 列表模式通常不带 response；有原文时用原文覆盖标题，否则保留接口返回的 htmlTitle。
+			if item.Response != "" {
+				flow.SetResponse(item.Response)
+			}
+			if flow.Hash == "" {
+				flow.Hash = flow.CalcHash()
+			}
+			if err := yakit.CreateOrUpdateHTTPFlow(db, flow.Hash, flow); err != nil {
+				stream.Send(&ypb.HTTPFlowsFromOnlineProgress{
+					Progress: progress,
+					Log:      fmt.Sprintf("insert [%s] failed: %s", item.Hash, err),
+				})
+			} else {
+				insertedCount++
+				stream.Send(&ypb.HTTPFlowsFromOnlineProgress{
+					Progress: progress,
+					Log:      fmt.Sprintf("insert [%s] finished", item.Hash),
+				})
+			}
+		}
+	}
+
+	return nil
+}
+
+func (s *Server) BatchSetHTTPFlowIssueFields(ctx context.Context, req *ypb.BatchSetHTTPFlowIssueFieldsRequest) (*ypb.BatchSetHTTPFlowIssueFieldsResponse, error) {
+	updates := map[string]interface{}{}
+	if v := strings.TrimSpace(req.SetIssueType); v != "" {
+		updates["issue_type"] = v
+	}
+	if v := strings.TrimSpace(req.SetSeverity); v != "" {
+		updates["severity"] = v
+	}
+	if v := strings.TrimSpace(req.SetStatus); v != "" {
+		updates["status"] = v
+	}
+	if v := strings.TrimSpace(req.StatusReason); v != "" {
+		updates["status_reason"] = v
+	}
+	if len(updates) == 0 {
+		return nil, utils.Errorf("all issue fields are empty")
+	}
+
+	db := s.GetProjectDatabase().Model(&schema.HTTPFlow{})
+
+	// 优先级：Ids > Hashes > Filter，均无则全量更新
+	switch {
+	case len(req.GetIds()) > 0:
+		db = bizhelper.ExactQueryInt64ArrayOr(db, "id", req.GetIds())
+	case len(req.GetHashes()) > 0:
+		db = bizhelper.ExactOrQueryStringArrayOr(db, "hash", req.GetHashes())
+	case req.GetFilter() != nil:
+		// 复用 QueryHTTPFlow 的过滤条件，仅用筛选不取数据
+		queryDB := yakit.BuildHTTPFlowQuery(db, req.Filter)
+		// 禁用分页，避免只更新第一页
+		queryDB = queryDB.Limit(-1).Offset(-1)
+		db = queryDB
+	default:
+		// 全量更新
+	}
+
+	// 批量上限校验
+	const batchMaxLimit = 1000
+	var count int64
+	if err := db.Count(&count).Error; err != nil {
+		return nil, utils.Errorf("count httpflow for batch limit failed: %s", err)
+	}
+	if count == 0 {
+		return nil, utils.Errorf("未匹配到任何数据")
+	}
+	if count > batchMaxLimit {
+		return nil, utils.Errorf("匹配 %d 条，超过批量上限 %d，请缩小筛选条件", count, batchMaxLimit)
+	}
+
+	var affected []*schema.HTTPFlow
+	if err := db.Select("id, hash").Find(&affected).Error; err != nil {
+		return nil, utils.Errorf("collect affected httpflow keys failed: %s", err)
+	}
+
+	result := db.Updates(updates)
+	if result.Error != nil {
+		return nil, utils.Errorf("batch set httpflow issue fields failed: %s", result.Error)
+	}
+
+	for _, flow := range affected {
+		model.DeleteHTTPFlowCacheGRPCModel(flow)
+	}
+
+	if req.GetToken() != "" && len(affected) > 0 {
+		syncHashes := make([]string, 0, len(affected))
+		for _, flow := range affected {
+			syncHashes = append(syncHashes, flow.Hash)
+		}
+		client := yaklib.NewOnlineClient(consts.GetOnlineBaseUrl())
+		if err := client.SetHTTPFlowTagsToOnline(ctx, req.GetToken(), syncHashes,
+			req.SetIssueType, req.SetSeverity, req.SetStatus, req.StatusReason); err != nil {
+			log.Errorf("sync httpflow tags to online failed: %s", err)
+		}
+	}
+
+	return &ypb.BatchSetHTTPFlowIssueFieldsResponse{
+		UpdatedCount: result.RowsAffected,
+	}, nil
+}
+
+func (s *Server) doUpdateHTTPFlowIssueFields(ctx context.Context, db *gorm.DB, items []*yaklib.OnlineHTTPFlowItem) (updated int64, skipped int64) {
+	if len(items) == 0 {
+		return 0, 0
+	}
+	hashes := make([]string, 0, len(items))
+	for _, item := range items {
+		hashes = append(hashes, item.Hash)
+	}
+
+	var localFlows []*schema.HTTPFlow
+	if err := db.Model(&schema.HTTPFlow{}).Where("hash in (?)", hashes).Find(&localFlows).Error; err != nil {
+		log.Errorf("query local httpflow by hash failed: %s", err)
+		return 0, int64(len(items))
+	}
+	existMap := make(map[string]struct{}, len(localFlows))
+	for _, f := range localFlows {
+		existMap[f.Hash] = struct{}{}
+	}
+
+	for _, item := range items {
+		select {
+		case <-ctx.Done():
+			return updated, skipped + int64(len(items)) - updated
+		default:
+		}
+
+		if _, ok := existMap[item.Hash]; !ok {
+			skipped++
+			continue
+		}
+		if err := db.Model(&schema.HTTPFlow{}).Where("hash = ?", item.Hash).Update(map[string]interface{}{
+			"issue_type":    item.IssueType,
+			"severity":      item.Severity,
+			"status":        item.Status,
+			"status_reason": item.StatusReason,
+		}).Error; err != nil {
+			log.Errorf("update httpflow issue fields failed [%s]: %s", item.Hash, err)
+			skipped++
+			continue
+		}
+		updated++
+	}
+	return updated, skipped
 }
 
 func (s *Server) HTTPFlowsToOnline(ctx context.Context, req *ypb.HTTPFlowsToOnlineRequest) (*ypb.Empty, error) {

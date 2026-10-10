@@ -122,6 +122,11 @@ write_file(file="{{ .ExploreWorkDir }}/modules_overview.md", content=<各模块�
 
 ## 输出 Action：complete_explore
 
+面向用户的最终结果应让用户快速理解项目，而不是描述调用了哪些工具或写了哪些中间笔记。
+`complete_explore` 必须提交 `project_overview`（一到两句话说明项目用途）、`tech_stack`、`entry_points`，并尽量提供 `modules_summary` 和 `reading_guide`（建议先阅读的已确认文件或模块及理由）。
+这些字段直接用于最终项目概览，必须与实际代码和文档一致；不确定的内容明确标注，不猜测启动方式或文件路径。
+完整目录树和详细分析写入探索笔记，由报告生成器汇总成文件。调用 complete_explore 只表示开始汇总报告；报告保存成功后系统才向用户展示完成结果。
+
 **必须调用 `complete_explore`，这是本 loop 的强制终止条件。不调用则 loop 永远不会结束。**
 
 在调用 `complete_explore` 前，必须满足以下条件（否则会被系统拒绝）：

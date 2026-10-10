@@ -1610,7 +1610,9 @@ func FilterHTTPFlow(db *gorm.DB, params *ypb.QueryHTTPFlowRequest) *gorm.DB {
 	if len(params.ProcessName) > 0 {
 		db = bizhelper.ExactQueryStringArrayOr(db, "process_name", params.ProcessName)
 	}
-
+	db = bizhelper.ExactQueryString(db, "issue_type", params.IssueType)
+	db = bizhelper.ExactQueryString(db, "severity", params.Severity)
+	db = bizhelper.ExactQueryString(db, "status", params.Status)
 	db = filterHTTPFlowByMITMExtractAggregateRows(db, params.GetMitmExtractAggregateFilterRows())
 
 	return db
@@ -1695,6 +1697,7 @@ ip_address, remote_addr, ip_integer,
 tags, is_websocket, websocket_hash, runtime_id, from_plugin,
 process_name,
 is_read_too_slow_response, html_title,
+issue_type, severity, status, status_reason,
 
 %s
 

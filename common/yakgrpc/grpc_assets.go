@@ -11,6 +11,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/yaklang/yaklang/common/schema"
 
@@ -1057,4 +1058,188 @@ func (s *Server) RiskFeedbackToOnline(ctx context.Context, req *ypb.UploadRiskTo
 	}
 
 	return &ypb.Empty{}, nil
+}
+
+func (s *Server) RisksFromOnline(req *ypb.RisksFromOnlineRequest, stream ypb.Yak_RisksFromOnlineServer) error {
+	if req.Token == "" {
+		return utils.Errorf("params empty")
+	}
+
+	if err := yaklib.DownloadOnlineAuthProxy(consts.GetOnlineBaseUrl()); err != nil {
+		return utils.Errorf("download failed: %s", err.Error())
+	}
+
+	client := yaklib.NewOnlineClient(consts.GetOnlineBaseUrl())
+	ch, err := client.DownloadRisks(stream.Context(), req.Token)
+	if err != nil {
+		return utils.Errorf("download risks failed: %s", err)
+	}
+
+	var (
+		progress      float64
+		count         float64
+		updatedCount  int64
+		insertedCount int64
+	)
+
+	stream.Send(&ypb.RisksFromOnlineProgress{
+		Progress: 0,
+		Log:      "initializing",
+	})
+	defer func() {
+		stream.Send(&ypb.RisksFromOnlineProgress{
+			Progress: 1,
+			Log:      fmt.Sprintf("更新: %d条, 新增: %d条", updatedCount, insertedCount),
+		})
+	}()
+
+	db := s.GetProjectDatabase()
+	for resultIns := range ch {
+		item := resultIns.Risk
+		total := resultIns.Total
+		if total > 0 {
+			progress = count / float64(total)
+		}
+		count++
+
+		var existing schema.Risk
+		findResult := db.Model(&schema.Risk{}).Where("hash = ?", item.RiskHash).First(&existing)
+
+		if findResult.Error == nil && existing.ID > 0 {
+			if err := db.Model(&schema.Risk{}).Where("hash = ?", item.RiskHash).Updates(map[string]interface{}{
+				"tags":              item.Tags,
+				"verifier_uid":      item.VerifierUid,
+				"fix_time":          time.Unix(item.FixTime, 0),
+				"fix_suggestion":    item.FixSuggestion,
+				"tag_reason":        item.TagReason,
+				"risk_type_verbose": item.RiskTypeVerbose,
+				"severity":          item.Severity,
+				"severity_score":    item.SeverityScore,
+			}).Error; err != nil {
+				stream.Send(&ypb.RisksFromOnlineProgress{
+					Progress: progress,
+					Log:      fmt.Sprintf("update [%s] failed: %s", item.RiskHash, err),
+				})
+			} else {
+				updatedCount++
+				stream.Send(&ypb.RisksFromOnlineProgress{
+					Progress: progress,
+					Log:      fmt.Sprintf("update [%s] finished", item.RiskHash),
+				})
+			}
+		} else {
+			risk := &schema.Risk{
+				Hash:            item.RiskHash,
+				Title:           item.Title,
+				TitleVerbose:    item.TitleVerbose,
+				Description:     item.Description,
+				Solution:        item.Solution,
+				RiskType:        item.RiskType,
+				RiskTypeVerbose: item.RiskTypeVerbose,
+				Severity:        item.Severity,
+				Parameter:       item.Parameter,
+				Payload:         item.Payload,
+				Details:         item.Details,
+				Url:             item.Url,
+				Host:            item.Host,
+				Port:            item.Port,
+				IP:              item.IP,
+				FromYakScript:   item.FromYakScript,
+				Tags:            item.Tags,
+				VerifierUid:     item.VerifierUid,
+				FixTime:         time.Unix(item.FixTime, 0),
+				FixSuggestion:   item.FixSuggestion,
+				TagReason:       item.TagReason,
+				IsPotential:     item.IsPotential,
+				CVE:             item.CVE,
+				SeverityScore:   item.SeverityScore,
+			}
+			if err := yakit.CreateOrUpdateRisk(db, risk.Hash, risk); err != nil {
+				stream.Send(&ypb.RisksFromOnlineProgress{
+					Progress: progress,
+					Log:      fmt.Sprintf("insert [%s] failed: %s", item.RiskHash, err),
+				})
+			} else {
+				insertedCount++
+				stream.Send(&ypb.RisksFromOnlineProgress{
+					Progress: progress,
+					Log:      fmt.Sprintf("insert [%s] finished", item.RiskHash),
+				})
+			}
+		}
+	}
+
+	return nil
+}
+
+func (s *Server) BatchSetRiskTags(ctx context.Context, req *ypb.BatchSetRiskTagsRequest) (*ypb.BatchSetRiskTagsResponse, error) {
+	tags := strings.Join(utils.RemoveRepeatStringSlice(req.SetTags), "|")
+	verifierUid := strings.TrimSpace(req.VerifierUid)
+	fixTime := time.Unix(req.FixTime, 0)
+	fixSuggestion := strings.TrimSpace(req.FixSuggestion)
+	tagReason := strings.TrimSpace(req.TagReason)
+	riskTypeVerbose := strings.TrimSpace(req.RiskTypeVerbose)
+	severity := strings.TrimSpace(req.SetSeverity)
+	severityScore := req.SeverityScore
+
+	db := s.GetProjectDatabase().Model(&schema.Risk{})
+
+	switch {
+	case len(req.GetIds()) > 0:
+		db = bizhelper.ExactQueryInt64ArrayOr(db, "id", req.GetIds())
+	case len(req.GetHashes()) > 0:
+		db = bizhelper.ExactOrQueryStringArrayOr(db, "hash", req.GetHashes())
+	case req.GetFilter() != nil:
+		queryDB := yakit.FilterByQueryRisks(db, req.Filter)
+		queryDB = queryDB.Limit(-1).Offset(-1)
+		db = queryDB
+	default:
+		// 全量更新
+	}
+
+	// 批量上限校验
+	const batchMaxLimit = 1000
+	var count int64
+	if err := db.Count(&count).Error; err != nil {
+		return nil, utils.Errorf("count risk for batch limit failed: %s", err)
+	}
+	if count == 0 {
+		return nil, utils.Errorf("未匹配到任何 risk")
+	}
+	if count > batchMaxLimit {
+		return nil, utils.Errorf("匹配 %d 条，超过批量上限 %d，请缩小筛选条件", count, batchMaxLimit)
+	}
+
+	// 查出受影响的 hash，用于同步到 online
+	var syncHashes []string
+	if req.GetToken() != "" {
+		if err := db.Pluck("hash", &syncHashes).Error; err != nil {
+			log.Errorf("pluck risk hashes for online sync failed: %s", err)
+		}
+	}
+
+	result := db.Updates(map[string]interface{}{
+		"tags":              tags,
+		"verifier_uid":      verifierUid,
+		"fix_time":          fixTime,
+		"fix_suggestion":    fixSuggestion,
+		"tag_reason":        tagReason,
+		"risk_type_verbose": riskTypeVerbose,
+		"severity":          severity,
+		"severity_score":    severityScore,
+	})
+	if result.Error != nil {
+		return nil, result.Error
+	}
+
+	if req.GetToken() != "" && len(syncHashes) > 0 {
+		client := yaklib.NewOnlineClient(consts.GetOnlineBaseUrl())
+		if err := client.SetRiskTagsToOnline(ctx, req.GetToken(), syncHashes, tags, req.VerifierUid, req.FixSuggestion, tagReason, req.RiskTypeVerbose, req.SetSeverity, req.FixTime, req.SeverityScore); err != nil {
+			log.Errorf("set risk tags to online failed: %s", err)
+		}
+	}
+
+	return &ypb.BatchSetRiskTagsResponse{
+		UpdatedCount: result.RowsAffected,
+	}, nil
 }

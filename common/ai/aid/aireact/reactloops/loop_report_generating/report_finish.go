@@ -15,26 +15,66 @@ import (
 
 const reportFinishEventNode = "report-finish"
 
-const reportFinishSummaryMaxChars = 480
-
-// reportFinishEvent 供 Yakit 渲染报告文件卡片：路径 + 短 Markdown（正文以磁盘文件为准）。
+// SummaryMarkdown is the existing frontend card body field. It contains the
+// saved Markdown, bounded for inline display.
 type reportFinishEvent struct {
 	ReportPath      string `json:"report_path"`
 	Title           string `json:"title,omitempty"`
 	SummaryMarkdown string `json:"summary_markdown,omitempty"`
 }
 
+func withReportFinishValidation() reactloops.ReActLoopOption {
+	return func(loop *reactloops.ReActLoop) {
+		finish, err := loop.GetActionHandler("finish")
+		if err != nil {
+			return
+		}
+		copy := *finish
+		copy.ActionHandler = func(l *reactloops.ReActLoop, action *aicommon.Action, op *reactloops.LoopActionHandlerOperator) {
+			if _, err := readSavedReport(l); err != nil {
+				op.Fail(err)
+				return
+			}
+			finish.ActionHandler(l, action, op)
+		}
+		reactloops.WithOverrideLoopAction(&copy)(loop)
+	}
+}
+
+func readSavedReport(loop *reactloops.ReActLoop) (string, error) {
+	path := strings.TrimSpace(loop.Get("report_filename"))
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		return "", utils.Errorf("报告文件未保存: %v", err)
+	}
+	content := string(raw)
+	trimmed := strings.TrimSpace(content)
+	if trimmed == "" {
+		return "", utils.Error("报告文件为空")
+	}
+	if expected := strings.TrimSpace(loop.Get("full_report_code")); expected != "" && expected != trimmed {
+		return "", utils.Error("报告内容尚未完整保存")
+	}
+	return content, nil
+}
+
 func buildReportFinishHook() reactloops.ReActLoopOption {
-	return reactloops.WithOnPostIteraction(func(loop *reactloops.ReActLoop, _ int, _ aicommon.AIStatefulTask, isDone bool, _ any, _ *reactloops.OnPostIterationOperator) {
-		if !isDone {
+	return reactloops.WithOnPostIteraction(func(loop *reactloops.ReActLoop, _ int, task aicommon.AIStatefulTask, isDone bool, reason any, _ *reactloops.OnPostIterationOperator) {
+		if !isDone || !utils.IsNil(reason) || task.IsUserCancelled() || task.GetContext().Err() != nil {
+			return
+		}
+		last := loop.GetLastAction()
+		if last == nil || last.ActionType != "finish" {
+			return
+		}
+		loop.Set("report_finished", "true")
+		if loop.Get("internal_report_output") == "true" {
 			return
 		}
 		emitReportFinish(loop)
 	})
 }
 
-// emitReportFinish 在 report_generating 子 loop 收尾时投递终稿标记（与 http_fuzz_request_change 同类 EmitJSON）。
-// 模式同 loop_http_flow_analyze 的 buildPostIterationHook：仅 WithOnPostIteraction + isDone，不改 loopinfra。
 func emitReportFinish(loop *reactloops.ReActLoop) {
 	reportPath := strings.TrimSpace(loop.Get("report_filename"))
 	if reportPath == "" {
@@ -42,56 +82,75 @@ func emitReportFinish(loop *reactloops.ReActLoop) {
 		return
 	}
 
-	content := strings.TrimSpace(loop.Get("full_report_code"))
-	if content == "" {
-		if raw, err := os.ReadFile(reportPath); err == nil {
-			content = strings.TrimSpace(string(raw))
-		}
+	content, err := readSavedReport(loop)
+	if err != nil {
+		log.Warnf("report_generating: skip report_finish (report not saved: %s, %v)", reportPath, err)
+		return
 	}
-	title, summary := buildReportFinishPreview(content)
+	title := buildReportFinishTitle(content)
 	if title == "" {
 		title = strings.TrimSuffix(filepath.Base(reportPath), filepath.Ext(reportPath))
 	}
 
-	emitter := loop.GetEmitter()
-	if emitter == nil {
-		return
-	}
-
-	_, err := emitter.EmitJSON(schema.EVENT_TYPE_REPORT_FINISH, reportFinishEventNode, reportFinishEvent{
-		ReportPath:      reportPath,
-		Title:           title,
-		SummaryMarkdown: summary,
-	})
-	if err != nil {
+	// Read the final artifact, then bound display copies only. GEN_REPORT bodies
+	// and the complete saved report remain intact, including after later edits.
+	markdown := reportDisplayMarkdown(content)
+	if err := EmitReportFinish(loop, reportPath, title); err != nil {
 		log.Warnf("report_generating: emit report_finish failed: %v", err)
 		return
 	}
-
-	reactloops.EmitActionLog(loop, reportFinishEventNode,
-		fmt.Sprintf("报告已完成: %s", reportPath), summary)
-
-	if invoker := loop.GetInvoker(); invoker != nil {
-		invoker.AddToTimeline("report_finish", fmt.Sprintf(
-			"Report finished: %s\nTitle: %s\nSummary:\n%s",
-			reportPath, title, summary,
-		))
+	loop.Set("result_report_path", reportPath)
+	loop.Set("result_summary", markdown)
+	if task := loop.GetCurrentTask(); task != nil {
+		result := markdown + "\n\n报告文件：" + reportPath
+		task.SetResult(result)
+		_, _ = loop.GetEmitter().EmitResultAfterStream("result", result, true)
 	}
-
-	log.Infof("report_generating: emitted report_finish for %s", reportPath)
 }
 
-func buildReportFinishPreview(content string) (title, summary string) {
-	if content == "" {
-		return "", ""
+// EmitReportFinish is also used by a parent focus mode after its report child
+// succeeds. Always read its card body from the saved artifact, so an independently
+// generated exploration overview cannot replace the report. Bound display only.
+func EmitReportFinish(loop *reactloops.ReActLoop, reportPath, title string) error {
+	content, err := os.ReadFile(reportPath)
+	if err != nil {
+		return err
 	}
+	if strings.TrimSpace(string(content)) == "" {
+		return utils.Error("报告文件为空")
+	}
+	emitter := loop.GetEmitter()
+	if emitter == nil {
+		return utils.Error("report emitter is nil")
+	}
+	markdown := reportDisplayMarkdown(string(content))
+	title = reportDisplayTitle(title)
+	if _, err := emitter.EmitPinFilename(reportPath); err != nil {
+		return err
+	}
+	if _, err := emitter.EmitJSON(schema.EVENT_TYPE_REPORT_FINISH, reportFinishEventNode, reportFinishEvent{
+		ReportPath: reportPath, Title: title, SummaryMarkdown: markdown,
+	}); err != nil {
+		return err
+	}
+	// Also preserve the entire saved report in the existing reference viewer:
+	// it loads on click as plain text, rather than inline Markdown in the chat.
+	reactloops.EmitActionLog(loop, reportFinishEventNode, "完整报告已保存: "+reportPath, string(content))
+	if invoker := loop.GetInvoker(); invoker != nil {
+		invoker.AddToTimeline("report_finish", fmt.Sprintf(
+			"Report finished: %s\nTitle: %s\nContent:\n%s",
+			reportPath, title, markdown,
+		))
+	}
+	return nil
+}
+
+func buildReportFinishTitle(content string) string {
 	for _, line := range strings.Split(content, "\n") {
 		trimmed := strings.TrimSpace(line)
 		if strings.HasPrefix(trimmed, "# ") {
-			title = strings.TrimSpace(strings.TrimPrefix(trimmed, "#"))
-			break
+			return strings.TrimSpace(strings.TrimPrefix(trimmed, "#"))
 		}
 	}
-	summary = utils.ShrinkTextBlock(content, reportFinishSummaryMaxChars)
-	return title, summary
+	return ""
 }

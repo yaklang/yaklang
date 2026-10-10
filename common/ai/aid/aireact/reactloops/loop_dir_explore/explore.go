@@ -10,6 +10,7 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon/promptloader"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
+	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/loop_report_generating"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/loopinfra"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/log"
@@ -49,10 +50,12 @@ type ExploreState struct {
 	noteFiles []string
 
 	// complete_explore 提交的摘要信息
-	ProjectName    string
-	TechStack      string
-	EntryPoints    string
-	ModulesSummary string
+	ProjectName     string
+	ProjectOverview string
+	TechStack       string
+	EntryPoints     string
+	ModulesSummary  string
+	ReadingGuide    string
 
 	// 最终报告文件路径
 	ReportFilePath string
@@ -62,13 +65,14 @@ func newExploreState() *ExploreState {
 	return &ExploreState{}
 }
 
-func (s *ExploreState) addNoteFile(path string) {
+func (s *ExploreState) addNoteFile(path string) bool {
 	for _, f := range s.noteFiles {
 		if f == path {
-			return
+			return false
 		}
 	}
 	s.noteFiles = append(s.noteFiles, path)
+	return true
 }
 
 var extractExploreTargetPathOutputs = []aitool.ToolOption{
@@ -93,8 +97,10 @@ func (s *ExploreState) getNoteFiles() []string {
 // 若用户通过 loop var "output_report_path" 指定了输出路径，则最终报告写入该路径。
 func BuildDirExploreLoop(r aicommon.AIInvokeRuntime, opts ...reactloops.ReActLoopOption) (*reactloops.ReActLoop, error) {
 	state := newExploreState()
+	var exploreLoop *reactloops.ReActLoop
 
 	preset := []reactloops.ReActLoopOption{
+		withExploreOutput(),
 		reactloops.WithAllowRAG(false),
 		reactloops.WithAllowAIForge(false),
 		reactloops.WithAllowPlanAndExec(false),
@@ -149,12 +155,11 @@ func BuildDirExploreLoop(r aicommon.AIInvokeRuntime, opts ...reactloops.ReActLoo
 						state.TargetPath = targetPath
 						log.Infof("[DirExplore] Target path confirmed: %s", targetPath)
 						r.AddToTimeline("[EXPLORE_START]", fmt.Sprintf("开始目录探索，目标路径: %s", targetPath))
+						emitExploreStart(loop, targetPath)
 						op.Continue()
 					},
 					aicommon.WithAuxiliaryOutputs(extractExploreTargetPathOutputs...),
-					aicommon.WithAuxiliaryOpts(
-						aicommon.WithGeneralConfigStreamableFieldWithNodeId("intent", "reason"),
-					),
+					aicommon.WithAuxiliaryEmitter(loop.GetEmitter()),
 				)
 
 				// 路径为空 → fail (OnResult 未被调用或未设置 targetPath)
@@ -180,6 +185,7 @@ func BuildDirExploreLoop(r aicommon.AIInvokeRuntime, opts ...reactloops.ReActLoo
 				state.TargetPath = targetPath
 				log.Infof("[DirExplore] Target path confirmed: %s", targetPath)
 				r.AddToTimeline("[EXPLORE_START]", fmt.Sprintf("开始目录探索，目标路径: %s", targetPath))
+				emitExploreStart(loop, targetPath)
 				op.Continue()
 			}
 		}),
@@ -223,8 +229,12 @@ func BuildDirExploreLoop(r aicommon.AIInvokeRuntime, opts ...reactloops.ReActLoo
 	}
 	preset = append(preset, loopinfra.RegisterBuiltinFSToolLoopAction(r, "DirExplore", "write_file", func(action *aicommon.Action) {
 		filePath := action.GetString("file")
-		if filePath != "" {
-			state.addNoteFile(filePath)
+		info, err := os.Stat(filePath)
+		if err != nil || info.IsDir() || info.Size() == 0 {
+			return
+		}
+		if state.addNoteFile(filePath) {
+			emitExploreNoteProgress(exploreLoop, filePath)
 			log.Infof("[DirExplore] Explore note written: %s", filePath)
 		}
 	}))
@@ -232,11 +242,14 @@ func BuildDirExploreLoop(r aicommon.AIInvokeRuntime, opts ...reactloops.ReActLoo
 	// complete_explore：AI 探索完成后调用
 	preset = append(preset, reactloops.WithRegisterLoopAction(
 		"complete_explore",
-		"完成目录探索，提交技术栈摘要、入口点摘要、核心模块概览。调用前必须已通过 write_file 写出探索文件。系统将把这些文件作为参考材料传给报告生成器。",
+		"汇总目录探索结果，提交项目用途、技术栈、入口点、模块职责和阅读建议。调用前必须已通过 write_file 写出探索笔记。系统会生成完整报告，保存成功后再交付项目概览和报告文件。",
 		[]aitool.ToolOption{
 			aitool.WithStringParam("project_name",
 				aitool.WithParam_Required(false),
 				aitool.WithParam_Description("项目名称（可选），默认取目标路径的最后一段目录名")),
+			aitool.WithStringParam("project_overview",
+				aitool.WithParam_Required(true),
+				aitool.WithParam_Description("面向用户，用一到两句话说明项目用途和主要能力。基于已读取的代码与文档，不描述探索过程。")),
 			aitool.WithStringParam("tech_stack",
 				aitool.WithParam_Required(true),
 				aitool.WithParam_Description("技术栈摘要（一行），如 'Go 1.21, gRPC, SQLite' 或 'PHP 7.4, Laravel 8, MySQL 5.7'")),
@@ -246,6 +259,8 @@ func BuildDirExploreLoop(r aicommon.AIInvokeRuntime, opts ...reactloops.ReActLoo
 			aitool.WithStringParam("modules_summary",
 				aitool.WithParam_Required(false),
 				aitool.WithParam_Description("核心模块职责概览（一行），如 'common/yak (引擎), common/ai (AI框架), common/yakgrpc (gRPC层)'")),
+			aitool.WithStringParam("reading_guide",
+				aitool.WithParam_Description("建议用户先读哪些已确认存在的文件或模块，并简述阅读顺序或理由。")),
 		},
 		func(loop *reactloops.ReActLoop, action *aicommon.Action) error {
 			noteFiles := state.getNoteFiles()
@@ -283,66 +298,78 @@ func BuildDirExploreLoop(r aicommon.AIInvokeRuntime, opts ...reactloops.ReActLoo
 			}
 
 			state.ProjectName = projectName
+			state.ProjectOverview = action.GetString("project_overview")
 			state.TechStack = techStack
 			state.EntryPoints = entryPoints
 			state.ModulesSummary = modulesSummary
+			state.ReadingGuide = action.GetString("reading_guide")
 
 			// 将结果写入 loop vars，便于外部调用方在 loop 结束后读取
 			loop.Set("result_project_name", projectName)
+			loop.Set("result_project_overview", state.ProjectOverview)
 			loop.Set("result_tech_stack", techStack)
 			loop.Set("result_entry_points", entryPoints)
 			loop.Set("result_modules_summary", modulesSummary)
 			loop.Set("result_target_path", state.TargetPath)
+			loop.Set("result_reading_guide", state.ReadingGuide)
 
 			noteFiles := state.getNoteFiles()
 			if len(noteFiles) > 0 {
 				loop.Set("result_note_files", strings.Join(noteFiles, "\n"))
 			}
 
-			r.AddToTimeline("[EXPLORE_COMPLETE]",
+			r.AddToTimeline("[EXPLORE_NOTES_READY]",
 				fmt.Sprintf("目录探索完成\n目标路径: %s\n技术栈: %s\n入口点: %s\n模块: %s\n探索文件(%d个): %v",
 					state.TargetPath, techStack, entryPoints, modulesSummary, len(noteFiles), noteFiles))
 			log.Infof("[DirExplore] Explore complete. Tech: %s, note files: %v", techStack, noteFiles)
 
-			// 确定报告输出路径：
-			//   1. 若调用方通过 loop var "output_report_path" 指定了路径，使用该路径
-			//   2. 否则通过 EmitFileArtifactWithExt 写到 aispace（默认行为）
+			emitExplorePhase(loop, "reporting", "项目探索信息已整理，正在生成完整报告。",
+				"Project findings collected; generating the full report.", aicommon.StatusStateRunning)
+			// Reserve a path without publishing an empty file as a finished artifact.
 			reportPath := strings.TrimSpace(loop.Get("output_report_path"))
 			if reportPath == "" {
-				// 使用 aispace 默认行为
-				name := projectName
-				if name == "" {
+				name := filepath.Base(projectName)
+				if name == "" || name == "." {
 					name = "explore"
 				}
-				reportPath = r.EmitFileArtifactWithExt(name+"_explore_report", ".md", "")
-			} else {
-				// 用户指定路径：确保父目录存在，并创建空文件以便 report_generating 写入
-				if err := os.MkdirAll(filepath.Dir(reportPath), 0o755); err != nil {
-					log.Warnf("[DirExplore] Failed to create report dir: %v", err)
-				} else if err := os.WriteFile(reportPath, []byte(""), 0o644); err != nil {
-					log.Warnf("[DirExplore] Failed to create report file: %v", err)
+				workDir := getOrCreateExploreWorkDir(r, loop)
+				if workDir == "" {
+					failExploreReport(loop, state, utils.Error("无法创建报告工作目录"), op)
+					return
 				}
-				_, _ = r.GetConfig().GetEmitter().EmitPinFilename(reportPath)
+				reportPath = filepath.Join(workDir, name+"_explore_report_"+utils.DatetimePretty2()+".md")
 			}
-
-			if reportPath != "" {
-				writePrompt := buildExploreReportPrompt(state, reportPath, noteFiles)
-				if err := generateExploreReport(r, loop, writePrompt, reportPath, noteFiles, state); err != nil {
-					log.Warnf("[DirExplore] Failed to generate explore report: %v", err)
-				} else {
-					state.ReportFilePath = reportPath
-					loop.Set("result_report_path", reportPath)
-					log.Infof("[DirExplore] Explore report written to: %s", reportPath)
-				}
+			if err := os.MkdirAll(filepath.Dir(reportPath), 0o755); err != nil {
+				failExploreReport(loop, state, err, op)
+				return
 			}
-
+			writePrompt := buildExploreReportPrompt(state, reportPath, noteFiles)
+			if err := generateExploreReport(r, loop, writePrompt, reportPath, noteFiles); err != nil {
+				failExploreReport(loop, state, err, op)
+				return
+			}
+			state.ReportFilePath = reportPath
+			loop.Set("result_report_path", reportPath)
+			summary := buildExploreSummary(state)
+			loop.Set("result_summary", summary)
+			loop.GetCurrentTask().SetResult(summary + "\n\n报告文件：" + reportPath)
+			if err := loop_report_generating.EmitReportFinish(loop, reportPath, projectName+" 项目探索报告"); err != nil {
+				failExploreReport(loop, state, err, op)
+				return
+			}
+			r.AddToTimeline("[EXPLORE_COMPLETE]", summary+"\n报告文件: "+reportPath)
+			emitExplorePhase(loop, "completed", "项目探索完成，完整报告已保存。",
+				"Project exploration complete; the full report has been saved.", aicommon.StatusStateSuccess)
+			_, _ = loop.GetEmitter().EmitResultAfterStream("result", loop.GetCurrentTask().GetResult(), true)
 			op.Feedback(fmt.Sprintf("探索完成，报告已生成: %s", reportPath))
 			op.Exit()
 		},
 	))
 
 	preset = append(preset, opts...)
-	return reactloops.NewReActLoop("dir_explore", r, preset...)
+	loop, err := reactloops.NewReActLoop("dir_explore", r, preset...)
+	exploreLoop = loop
+	return loop, err
 }
 
 // getOrCreateExploreWorkDir 返回探索笔记的写出目录（即 aispace workdir）。
@@ -399,6 +426,7 @@ func buildExploreReportPrompt(state *ExploreState, outputPath string, noteFiles 
 
 ## 项目信息
 - **项目名称**: %s
+- **项目用途**: %s
 - **目标路径**: %s
 - **技术栈**: %s
 - **入口点**: %s
@@ -423,6 +451,7 @@ func buildExploreReportPrompt(state *ExploreState, outputPath string, noteFiles 
 
 报告使用 Markdown 格式，用 write_section 写入。`,
 		state.ProjectName,
+		state.ProjectOverview,
 		state.TargetPath,
 		state.TechStack,
 		state.EntryPoints,

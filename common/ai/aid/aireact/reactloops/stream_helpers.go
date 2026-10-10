@@ -73,6 +73,10 @@ func EmitActionLog(loop *ReActLoop, nodeId string, lines string, reference ...st
 		log.Warnf("EmitActionLog: failed to emit stream event for nodeId %s: %v", nodeId, err)
 		return
 	}
+	// A loop-local event processor can intentionally suppress this stream.
+	if streamEvent == nil {
+		return
+	}
 
 	if len(reference) > 0 {
 		streamId := streamEvent.GetStreamEventWriterId()

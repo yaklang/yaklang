@@ -226,7 +226,11 @@ func buildHTTPFlowGRPCModel(f *schema.HTTPFlow, full, useCache, excludeRequestRa
 		Payloads: lo.Map(strings.Split(f.Payload, ","), func(i string, _ int) string {
 			return utf8safe(i)
 		}),
-		Host: f.Host,
+		Host:         f.Host,
+		IssueType:    f.IssueType,
+		Severity:     f.Severity,
+		Status:       f.Status,
+		StatusReason: f.StatusReason,
 	}
 
 	// Fill MultipartFiles for multipart-spilled requests so the frontend can
