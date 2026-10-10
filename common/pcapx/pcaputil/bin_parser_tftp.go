@@ -4,7 +4,9 @@ import (
 	"bytes"
 	"crypto/sha256"
 	"encoding/binary"
+	"errors"
 	"fmt"
+	"sort"
 	"strconv"
 	"strings"
 )
@@ -20,6 +22,8 @@ type binTFTP struct {
 	expected, block                  uint16
 	pending, final, done, negotiated bool
 	hasData                          bool
+	ambiguous                        bool
+	oack                             [32]byte
 	digest                           [32]byte
 	server                           string
 }
@@ -70,11 +74,20 @@ func probeTFTP(w []byte, max int) bool {
 	_, err = tftpOptions(p[2:])
 	return err == nil
 }
-func (s *binTFTP) consume(dir int, w []byte, max int) (map[string]any, error) {
+func (s *binTFTP) consume(dir int, w []byte, max int) (result map[string]any, err error) {
+	defer func() {
+		var typed *ProtocolError
+		if err != nil && !errors.As(err, &typed) {
+			err = protocolError(ErrMalformedMessage, "%s", err)
+		}
+	}()
 	if len(w) < 2 {
 		return nil, fmt.Errorf("tftp: missing opcode")
 	}
 	op := binary.BigEndian.Uint16(w)
+	if s.ambiguous && (op == 3 || op == 4 || op == 6) {
+		return nil, protocolError(ErrContextRequired, "TFTP negotiation is ambiguous")
+	}
 	out := map[string]any{"Opcode": op, "Filename": s.filename, "Mode": s.mode}
 	switch op {
 	case 1, 2:
@@ -126,6 +139,7 @@ func (s *binTFTP) consume(dir int, w []byte, max int) (map[string]any, error) {
 			return nil, err
 		}
 		bs := 512
+		canonical := make([]string, 0, len(opts))
 		for k, v := range opts {
 			asked, ok := s.options[k]
 			if !ok {
@@ -135,6 +149,7 @@ func (s *binTFTP) consume(dir int, w []byte, max int) (map[string]any, error) {
 			if err != nil {
 				return nil, fmt.Errorf("tftp: invalid option value")
 			}
+			canonical = append(canonical, k+"="+strconv.FormatUint(n, 10))
 			switch k {
 			case "blksize":
 				a, e := strconv.ParseUint(asked, 10, 32)
@@ -158,11 +173,26 @@ func (s *binTFTP) consume(dir int, w []byte, max int) (map[string]any, error) {
 				return nil, protocolError(ErrUnsupportedFeature, "TFTP option "+k)
 			}
 		}
-		if s.hasData {
+		sort.Strings(canonical)
+		digest := sha256.Sum256([]byte(strings.Join(canonical, "\x00")))
+		if s.negotiated {
+			if digest != s.oack {
+				s.ambiguous = true
+				return nil, protocolError(ErrDesynchronized, "TFTP OACK changed negotiated options")
+			}
+			// OACK can be retransmitted after ACK0 was captured. Preserve every
+			// observed DATA/ACK transition; negotiation is not restarted.
+			out["Packet Name"] = "OACK"
+			out["Options"] = cloneSessionStringMap(opts)
+			out["Retransmission"] = true
+			return out, nil
+		}
+		if s.hasData || s.done {
 			return nil, fmt.Errorf("tftp: OACK after transfer started")
 		}
 		s.blockSize = bs
 		s.negotiated = true
+		s.oack = digest
 		s.pending = !s.write
 		s.block = 0
 		out["Packet Name"] = "OACK"

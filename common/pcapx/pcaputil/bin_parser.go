@@ -82,7 +82,7 @@ func (e *ProtocolEvent) Decode() (result map[string]any, err error) {
 	if e.ownsNativeFields() && e.semanticFields != nil {
 		return map[string]any{"fields": cloneSession(e.semanticFields)}, nil
 	}
-	if e.Protocol == "stun" || e.Protocol == "turn" {
+	if e.Protocol == "stun" || e.Protocol == "turn" || e.Protocol == "tftp" {
 		if e.semanticFields != nil {
 			return map[string]any{"fields": cloneSession(e.semanticFields)}, nil
 		}
@@ -132,7 +132,7 @@ func (e *ProtocolEvent) Decode() (result map[string]any, err error) {
 // GetFields returns the protocol field tree directly, also for deferred events.
 // Decode remains the compatibility API returning the fields/metadata envelope.
 func (e *ProtocolEvent) GetFields() (map[string]any, error) {
-	if e.Fields != nil && !e.ownsNativeFields() && e.Protocol != "stun" && e.Protocol != "turn" {
+	if e.Fields != nil && !e.ownsNativeFields() && e.Protocol != "stun" && e.Protocol != "turn" && e.Protocol != "tftp" {
 		return e.Fields, nil
 	}
 	result, err := e.Decode()

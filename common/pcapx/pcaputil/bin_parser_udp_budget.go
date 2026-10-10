@@ -2,6 +2,7 @@ package pcaputil
 
 import (
 	"container/list"
+	"net"
 	"time"
 )
 
@@ -10,6 +11,9 @@ import (
 // reply did not disappear. Admission here examines only bounded headers/ports or
 // an already observed exact endpoint/capture-domain key, never an oversized body.
 func (a *binParser) refuseUDPOversizeAssociation(e *ProtocolEvent, w []byte, src, dst uint16) bool {
+	if a.refuseTFTPOversizeAssociation(e, w) {
+		return true
+	}
 	explicit := a.datagramDecodeAs[dst]
 	if explicit == "" {
 		explicit = a.datagramDecodeAs[src]
@@ -133,6 +137,48 @@ func (a *binParser) refuseUDPOversizeAssociation(e *ProtocolEvent, w []byte, src
 		e.ID = a.ids.Add(1)
 	}
 	a.finishProtocolDatagram(e, nil, nil, protocolError(ErrResourceExceeded, "%s UDP datagram exceeds message byte budget", protocol))
+	e.Completeness = e.Status
+	a.limited.Add(uint64(len(w)))
+	return true
+}
+
+// TFTP uses the observed server TID rather than a fixed symmetric port pair.
+// A denied block/negotiation has unknown semantics: preserve the charged
+// bounded transfer, but do not infer progression from later changed bytes.
+func (a *binParser) refuseTFTPOversizeAssociation(e *ProtocolEvent, w []byte) bool {
+	srcIP, _, srcErr := net.SplitHostPort(e.Source)
+	dstIP, _, dstErr := net.SplitHostPort(e.Destination)
+	if srcErr != nil || dstErr != nil {
+		return false
+	}
+	a.udpMu.Lock()
+	defer a.udpMu.Unlock()
+	s := a.udpSessions
+	if s == nil {
+		return false
+	}
+	el := s.entries[binUDPKey{"tftp/" + e.Source, dstIP, e.Domain}]
+	dir := 0
+	if el == nil {
+		el = s.entries[binUDPKey{"tftp/" + e.Destination, srcIP, e.Domain}]
+		dir = 1
+	}
+	if el == nil {
+		return false
+	}
+	v := el.Value.(*binUDPEntry)
+	f := v.flow
+	t := f.tftp
+	if t == nil || t.server != "" && (dir == 1 && t.server != e.Source || dir == 0 && t.server != e.Destination) {
+		return false
+	}
+	t.ambiguous = true
+	e.Protocol, e.FlowID, e.Direction = "tftp", f.id, dir
+	e.Admission, e.Completeness = "observed-conversation", "message"
+	if e.ID == 0 {
+		e.ID = a.ids.Add(1)
+	}
+	a.finishProtocolDatagram(e, nil, nil, protocolError(ErrResourceExceeded, "TFTP UDP datagram exceeds message byte budget"))
 	e.Completeness = e.Status
 	a.limited.Add(uint64(len(w)))
 	return true

@@ -34770,6 +34770,213 @@
         "common/pcapx/pcaputil/stun-identity/controls.json": "controls.json",
         "common/pcapx/pcaputil/stun-identity/validation/expected.json": "validation/expected.json"
       }
+    },
+    {
+      "id": "validation-tftp-negotiation",
+      "kind": "validation",
+      "source_sha": "c818d8c4c7ccc7f343dfcada274bcfb8cf7405c4",
+      "file": "validation-tftp-negotiation.zip",
+      "sha256": "d844f4733d346d07a64f7d4d385bfd4b4826c5c2161ef372dc3f1b0f74852a86",
+      "password": "bin-parser",
+      "members": {
+        "build.py": {
+          "sha256": "8ea25416f1cd91d7de73ff171aef79f074753ce3acc6bce7bd828274cfe5168f",
+          "bytes": 4978
+        },
+        "carrier.py": {
+          "sha256": "53032c4a1d39af131ac35498af5362423aefc47552d34e06420593262684f037",
+          "bytes": 1945
+        },
+        "verify-controls.py": {
+          "sha256": "f031fb8d257c293123b42c3df3ef169e494ce0b55aae6ec77137f36346624078",
+          "bytes": 3006
+        },
+        "source-pin.json": {
+          "sha256": "49d186b4517ccae15ac3a6f91d8be28f5bb231b5d34b7538cedec1c263bd326a",
+          "bytes": 975
+        },
+        "seal.py": {
+          "sha256": "3ba50bc2c4002e130531772f344a35505c05a8a9e0d4f65b38d2b9189c7c118f",
+          "bytes": 3475
+        },
+        "cases/rrq-normal.pcap": {
+          "sha256": "5ff49aabc32f2d83b91d0ad31a31adda94e45b996c5bdc9291e3287f92b0456e",
+          "bytes": 370
+        },
+        "answers/rrq-normal.json": {
+          "sha256": "d1b45c9bbad58bfa31f241c8473ace2a861def936cd677f87d26fae30997bdb9",
+          "bytes": 4028
+        },
+        "cases/rrq-oack-before-ack.pcap": {
+          "sha256": "38a0d69fba5feda3f02175a81502a5237ae1e97f421a96756597bfde1e700a79",
+          "bytes": 442
+        },
+        "answers/rrq-oack-before-ack.json": {
+          "sha256": "61952b6c956b15753b864cdcf5d3001446106ea6a726fe49f62dcbd0ddd7de85",
+          "bytes": 4891
+        },
+        "cases/rrq-oack-after-ack.pcap": {
+          "sha256": "a516ed70f677a522b68e1a5bca55f3d15ec5941606d6462ef4e8dc3ea9242fbd",
+          "bytes": 442
+        },
+        "answers/rrq-oack-after-ack.json": {
+          "sha256": "0d1711acdcaae87f5c48832d5512631b0ef38a202cc2859c4a8a1650eaeec088",
+          "bytes": 4887
+        },
+        "cases/rrq-oack-after-data.pcap": {
+          "sha256": "9d3d9808417eade80147aa64c610a71f2fd3210e0c4d2059a617fec4742a15d1",
+          "bytes": 442
+        },
+        "answers/rrq-oack-after-data.json": {
+          "sha256": "f74f3646f4f9b024ca5dd9b0c2017fbc7f86e28548ab3a7257bbb48856db5f77",
+          "bytes": 4891
+        },
+        "cases/rrq-oack-after-final.pcap": {
+          "sha256": "4b229b6a3058e71a3863abd25557b8e46420f938f11b1127eada8b32355e3d01",
+          "bytes": 504
+        },
+        "answers/rrq-oack-after-final.json": {
+          "sha256": "70c2befbe9c3c0f3fc4f7e7917e44db6c710fe5992544f2b9dccc64532687b50",
+          "bytes": 5583
+        },
+        "cases/wrq-normal.pcap": {
+          "sha256": "120cf67dd4dbbb3aee85819a2c120e98d980f26f51cbe42e5c8650a850a4c9e3",
+          "bytes": 308
+        },
+        "answers/wrq-normal.json": {
+          "sha256": "cf05323ecc9e953c3b12fa120c10be6dadfcd79ba5fc356b2f498cb32b738d51",
+          "bytes": 3371
+        },
+        "cases/wrq-oack-after-data.pcap": {
+          "sha256": "ce1c024d321782d9543bb5125609db0cc19558ec94a16e45e8573e7b8337f410",
+          "bytes": 380
+        },
+        "answers/wrq-oack-after-data.json": {
+          "sha256": "2236a0dcf284021d1dfe377f7cca7ec5ae78126fd5b628261c238721e535b0ed",
+          "bytes": 4234
+        },
+        "cases/rrq-changed-after-ack.pcap": {
+          "sha256": "91b1935e34983b9c84ae39400f42344ff94735cf923994117f83888e0b98eb05",
+          "bytes": 443
+        },
+        "answers/rrq-changed-after-ack.json": {
+          "sha256": "dd59f34425f9d0936406e9176ab6a69e2c6449e888e5d45522c086f21326583c",
+          "bytes": 3854
+        },
+        "cases/rrq-changed-after-data.pcap": {
+          "sha256": "229332c355f525eb222e26befad19a2d96e649db49b537c09d0fb9cd6cee55e8",
+          "bytes": 443
+        },
+        "answers/rrq-changed-after-data.json": {
+          "sha256": "222b6b1ed70614fa93e60219317a146c6b1f17e5c8aaa83f24d440ca93cd0c36",
+          "bytes": 4195
+        },
+        "cases/rrq-option-order-case.pcap": {
+          "sha256": "cc5afb47a72d102c48c24f5779176fd3119863d0fbe522899cc4d7bccefeee59",
+          "bytes": 473
+        },
+        "answers/rrq-option-order-case.json": {
+          "sha256": "27ff7f9df1a123fa69196d97dde7f701e3428afd52fab5c6b232e4ede84048a5",
+          "bytes": 5346
+        },
+        "cases/rrq-option-set-change.pcap": {
+          "sha256": "ba69823b692286096c43abade18a71fcc3e87ebcfbc67ddec3a82515f6bcfb6f",
+          "bytes": 400
+        },
+        "answers/rrq-option-set-change.json": {
+          "sha256": "06535fa058d842e8fd9f59a1647a9ca0e99a79acbbd0ffdce255a6c7e8cdc6b4",
+          "bytes": 3778
+        },
+        "cases/rrq-unrequested-preserves-context.pcap": {
+          "sha256": "a43abf49c76ddac86fa5ad817d8c560217406d55010f0f7d95ad4ea8fa4ba125",
+          "bytes": 438
+        },
+        "answers/rrq-unrequested-preserves-context.json": {
+          "sha256": "6488730b9b22b1104c2efdbc05e611badcea6687dd288ea54ab853168e506d0b",
+          "bytes": 4511
+        },
+        "cases/rrq-wrong-tid-preserves-context.pcap": {
+          "sha256": "eee1d3941113d4903b49df3843f03c88eaac13aaeccbff67cc2f037ce9909423",
+          "bytes": 433
+        },
+        "answers/rrq-wrong-tid-preserves-context.json": {
+          "sha256": "3973c00c4733d9946c971e25db6d156e9584301e708e3334f68478fbbaeec768",
+          "bytes": 4482
+        },
+        "cases/rrq-wrong-direction-preserves-context.pcap": {
+          "sha256": "d2ebf3bf33a4e625421735c137febbfc2b5da7adbf1de1d49d79561cf99bce10",
+          "bytes": 433
+        },
+        "answers/rrq-wrong-direction-preserves-context.json": {
+          "sha256": "ff54bb919ef146736bc3444f79d63b126aa73e1554a19619bf32c8662e2493ec",
+          "bytes": 4507
+        },
+        "cases/rrq-size-boundary.pcap": {
+          "sha256": "97c4a32c9f65f7699f6db85ee9be2cbb82fdbccd948ffa9141a6d9097f42d357",
+          "bytes": 945
+        },
+        "answers/rrq-size-boundary.json": {
+          "sha256": "7de4a0819ffac7e32c914a00bdaf84b9bbba619aea25a2775c834965f46c7a0b",
+          "bytes": 6475
+        },
+        "cases/rrq-datagram-no-stitch.pcap": {
+          "sha256": "ea93b388f52d67eb37853b755e42e33c96b22d4e682335bd775295666b384969",
+          "bytes": 500
+        },
+        "answers/rrq-datagram-no-stitch.json": {
+          "sha256": "98328ce58a28677a76ee7b7092f9993d65e22df96afc6a438aa816b00f683f20",
+          "bytes": 4834
+        },
+        "controls.json": {
+          "sha256": "2276645a443d65357050b6d3640cdf54be7bfc7dd6eb9c6625f966a4945d189d",
+          "bytes": 87176
+        },
+        "validation/expected.json": {
+          "sha256": "f5bcd4cb1454651dae9d1169981d2837d27d1bc71faef7be58f87f840fa035cb",
+          "bytes": 17495
+        }
+      },
+      "aliases": {
+        "common/pcapx/pcaputil/tftp-negotiation/build.py": "build.py",
+        "common/pcapx/pcaputil/tftp-negotiation/carrier.py": "carrier.py",
+        "common/pcapx/pcaputil/tftp-negotiation/verify-controls.py": "verify-controls.py",
+        "common/pcapx/pcaputil/tftp-negotiation/source-pin.json": "source-pin.json",
+        "common/pcapx/pcaputil/tftp-negotiation/seal.py": "seal.py",
+        "common/pcapx/pcaputil/tftp-negotiation/cases/rrq-normal.pcap": "cases/rrq-normal.pcap",
+        "common/pcapx/pcaputil/tftp-negotiation/answers/rrq-normal.json": "answers/rrq-normal.json",
+        "common/pcapx/pcaputil/tftp-negotiation/cases/rrq-oack-before-ack.pcap": "cases/rrq-oack-before-ack.pcap",
+        "common/pcapx/pcaputil/tftp-negotiation/answers/rrq-oack-before-ack.json": "answers/rrq-oack-before-ack.json",
+        "common/pcapx/pcaputil/tftp-negotiation/cases/rrq-oack-after-ack.pcap": "cases/rrq-oack-after-ack.pcap",
+        "common/pcapx/pcaputil/tftp-negotiation/answers/rrq-oack-after-ack.json": "answers/rrq-oack-after-ack.json",
+        "common/pcapx/pcaputil/tftp-negotiation/cases/rrq-oack-after-data.pcap": "cases/rrq-oack-after-data.pcap",
+        "common/pcapx/pcaputil/tftp-negotiation/answers/rrq-oack-after-data.json": "answers/rrq-oack-after-data.json",
+        "common/pcapx/pcaputil/tftp-negotiation/cases/rrq-oack-after-final.pcap": "cases/rrq-oack-after-final.pcap",
+        "common/pcapx/pcaputil/tftp-negotiation/answers/rrq-oack-after-final.json": "answers/rrq-oack-after-final.json",
+        "common/pcapx/pcaputil/tftp-negotiation/cases/wrq-normal.pcap": "cases/wrq-normal.pcap",
+        "common/pcapx/pcaputil/tftp-negotiation/answers/wrq-normal.json": "answers/wrq-normal.json",
+        "common/pcapx/pcaputil/tftp-negotiation/cases/wrq-oack-after-data.pcap": "cases/wrq-oack-after-data.pcap",
+        "common/pcapx/pcaputil/tftp-negotiation/answers/wrq-oack-after-data.json": "answers/wrq-oack-after-data.json",
+        "common/pcapx/pcaputil/tftp-negotiation/cases/rrq-changed-after-ack.pcap": "cases/rrq-changed-after-ack.pcap",
+        "common/pcapx/pcaputil/tftp-negotiation/answers/rrq-changed-after-ack.json": "answers/rrq-changed-after-ack.json",
+        "common/pcapx/pcaputil/tftp-negotiation/cases/rrq-changed-after-data.pcap": "cases/rrq-changed-after-data.pcap",
+        "common/pcapx/pcaputil/tftp-negotiation/answers/rrq-changed-after-data.json": "answers/rrq-changed-after-data.json",
+        "common/pcapx/pcaputil/tftp-negotiation/cases/rrq-option-order-case.pcap": "cases/rrq-option-order-case.pcap",
+        "common/pcapx/pcaputil/tftp-negotiation/answers/rrq-option-order-case.json": "answers/rrq-option-order-case.json",
+        "common/pcapx/pcaputil/tftp-negotiation/cases/rrq-option-set-change.pcap": "cases/rrq-option-set-change.pcap",
+        "common/pcapx/pcaputil/tftp-negotiation/answers/rrq-option-set-change.json": "answers/rrq-option-set-change.json",
+        "common/pcapx/pcaputil/tftp-negotiation/cases/rrq-unrequested-preserves-context.pcap": "cases/rrq-unrequested-preserves-context.pcap",
+        "common/pcapx/pcaputil/tftp-negotiation/answers/rrq-unrequested-preserves-context.json": "answers/rrq-unrequested-preserves-context.json",
+        "common/pcapx/pcaputil/tftp-negotiation/cases/rrq-wrong-tid-preserves-context.pcap": "cases/rrq-wrong-tid-preserves-context.pcap",
+        "common/pcapx/pcaputil/tftp-negotiation/answers/rrq-wrong-tid-preserves-context.json": "answers/rrq-wrong-tid-preserves-context.json",
+        "common/pcapx/pcaputil/tftp-negotiation/cases/rrq-wrong-direction-preserves-context.pcap": "cases/rrq-wrong-direction-preserves-context.pcap",
+        "common/pcapx/pcaputil/tftp-negotiation/answers/rrq-wrong-direction-preserves-context.json": "answers/rrq-wrong-direction-preserves-context.json",
+        "common/pcapx/pcaputil/tftp-negotiation/cases/rrq-size-boundary.pcap": "cases/rrq-size-boundary.pcap",
+        "common/pcapx/pcaputil/tftp-negotiation/answers/rrq-size-boundary.json": "answers/rrq-size-boundary.json",
+        "common/pcapx/pcaputil/tftp-negotiation/cases/rrq-datagram-no-stitch.pcap": "cases/rrq-datagram-no-stitch.pcap",
+        "common/pcapx/pcaputil/tftp-negotiation/answers/rrq-datagram-no-stitch.json": "answers/rrq-datagram-no-stitch.json",
+        "common/pcapx/pcaputil/tftp-negotiation/controls.json": "controls.json",
+        "common/pcapx/pcaputil/tftp-negotiation/validation/expected.json": "validation/expected.json"
+      }
     }
   ],
   "schema_version": 1,

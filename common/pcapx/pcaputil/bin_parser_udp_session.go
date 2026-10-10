@@ -513,7 +513,7 @@ func (a *binParser) finishProtocolDatagram(e *ProtocolEvent, w []byte, spec *bin
 	}
 	a.messages.Add(1)
 	a.messageBytes.Add(uint64(len(w)))
-	if err == nil && (e.Protocol == "stun" || e.Protocol == "turn") {
+	if err == nil && (e.Protocol == "stun" || e.Protocol == "turn" || e.Protocol == "tftp") {
 		// Keep the accepted structural wire fields separate from editable event
 		// projections; full/deferred queries share identical owned answers.
 		var decoded map[string]any
