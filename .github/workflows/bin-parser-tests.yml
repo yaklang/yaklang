@@ -61,7 +61,7 @@ jobs:
           set -euo pipefail
           go run ./internal/trafficfixture/cmd/corpus test
           go test -json -count=1 -timeout=5m ./internal/trafficfixture/... ./common/bin-parser/... ./common/pcapx/... ./common/yak/cmd/yakcmds/shark-cli ./scripts/ci > "$RUNNER_TEMP/bin-parser-traffic.jsonl" 2> "$RUNNER_TEMP/bin-parser-build.log"
-          go run ./internal/trafficfixture/cmd/corpus exec -- python3 @scripts/protocol-tests/check_go_test_json.py "$RUNNER_TEMP/bin-parser-traffic.jsonl" --inventory @scripts/protocol-tests/required-tests-v37.json --tier full > "$RUNNER_TEMP/required-tests-result.json"
+          go run ./internal/trafficfixture/cmd/corpus exec -- python3 @scripts/protocol-tests/check_go_test_json.py "$RUNNER_TEMP/bin-parser-traffic.jsonl" --inventory @scripts/protocol-tests/required-tests-traffic-unified-v1.json --tier full > "$RUNNER_TEMP/required-tests-result.json"
 
       - name: Upload test log
         if: always()

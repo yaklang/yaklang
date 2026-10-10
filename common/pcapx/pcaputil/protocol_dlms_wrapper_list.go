@@ -302,18 +302,27 @@ func decodeWrapperList(m *wrapperMessage, p []byte, limit, depth int) error {
 }
 func wrapperIsList(w []byte) bool { return len(w) > 9 && w[9] == 3 }
 func wrapperProfile(w []byte) string {
+	if wrapperIsBlock(w) {
+		return "dlms-wrapper-v1-get-block"
+	}
 	if wrapperIsList(w) {
 		return "dlms-wrapper-v1-get-list"
 	}
 	return "dlms-wrapper-v1-get-normal"
 }
 func wrapperProbeVersion(w []byte) string {
+	if wrapperIsBlock(w) {
+		return "v1-get-block"
+	}
 	if wrapperIsList(w) {
 		return "v1-get-list"
 	}
 	return "v1-get-normal"
 }
 func wrapperProjection(w []byte, n int) int64 {
+	if wrapperIsBlock(w) {
+		return 32768 + 512*int64(n+wrapperBlockBytes) + 2048*wrapperDataNodes
+	}
 	if !wrapperIsList(w) {
 		return wrapperProjectionBytes + 128*int64(n)
 	}

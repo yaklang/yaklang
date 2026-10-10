@@ -26035,6 +26035,399 @@
         "common/pcapx/pcaputil/pcap-legacy/required-tests-core-legacy-v1.json": "required-tests-core-legacy-v1.json",
         "scripts/protocol-tests/required-tests-core-legacy-v1.json": "required-tests-core-legacy-v1.json"
       }
+    },
+    {
+      "id": "validation-dlms-blocks-unified",
+      "kind": "validation",
+      "source_sha": "b69c35a6f8b66557f24598b46212ee59691b92c8",
+      "file": "validation-dlms-blocks-unified.zip",
+      "sha256": "48ce9f811b3eb77f6b65a56ef1ee040013a3efbe71dc0753deb8c8b0fbed3cf9",
+      "password": "bin-parser",
+      "members": {
+        "build.py": {
+          "sha256": "b0272a317a2fb35f9ed701c9c08a511d8c7fbbe75d69b75a1d43d60b9d8c56c7",
+          "bytes": 7915
+        },
+        "carrier.py": {
+          "sha256": "07db3352defd52e18936a68d327f675a57abc90c59611492c049f102b08843d2",
+          "bytes": 3782
+        },
+        "oracle.py": {
+          "sha256": "2c7a114a832c8d8afd2e7cd770425b6c5a0d8e5a613fe81a302e6fef7376dde8",
+          "bytes": 2738
+        },
+        "axdr.py": {
+          "sha256": "5241b8f2df255ff4d3baac5a91ad25129c071ec646fd90fd5d2b8f765644648f",
+          "bytes": 7240
+        },
+        "reference-check.py": {
+          "sha256": "90e2fe68380f0ae2dd040842d75de5b6fad7361e41d20655ef8d46765cd92178",
+          "bytes": 3172
+        },
+        "verify-controls.py": {
+          "sha256": "29109cf8afbe64488d452c29db23b68eff4834c16b633b0f9aac40728e3bedba",
+          "bytes": 1501
+        },
+        "seal.py": {
+          "sha256": "3ab45554762346836a3447361be4169aa5e275bab7e52853951eb234fd142e47",
+          "bytes": 5227
+        },
+        "source-pin.json": {
+          "sha256": "22aeeac02864a3f820f9a00eedf785af2a675c829f8daafbb2b02c6802d6a2f4",
+          "bytes": 12658
+        },
+        "required-tests-traffic-unified-v1.json": {
+          "sha256": "77c4e0419cd2228cccc48e7677b650d746e40f8d3792c6cff5a5a30470f20270",
+          "bytes": 106874
+        },
+        "cases/two-block-tcp.pcap": {
+          "sha256": "5c7a5f14d175d6b4d65e0ba74515452bb5a105ab824db35c257309da930e8dd2",
+          "bytes": 589
+        },
+        "answers/two-block-tcp.json": {
+          "sha256": "28ba41a2ae66ab4cee99d96688437b195098c11f9914b4f2d22eac16ddb365d1",
+          "bytes": 5791
+        },
+        "cases/two-block-udp.pcap": {
+          "sha256": "d7f4f1d9b4a8181e31b6a2dee1513c88e5891da3239436b83ac9a5bd944f1f9e",
+          "bytes": 331
+        },
+        "answers/two-block-udp.json": {
+          "sha256": "e772b90fc0d8c3f09ca7207db6440912ce0515a1923fef66e7d7dd5d654bb1c6",
+          "bytes": 5791
+        },
+        "cases/single-block.pcap": {
+          "sha256": "900d28043f55b367eaa58046e0895bab977d3e4eb6d7c9af6b1052db21e6e70d",
+          "bytes": 416
+        },
+        "answers/single-block.json": {
+          "sha256": "2ffb22b2556f1a1f88d52b8efc02b0a77769e89e7f955af051da6c71fe50513c",
+          "bytes": 3342
+        },
+        "cases/three-block-structure.pcap": {
+          "sha256": "fcd88920bb0f339a82e01c49fd8b5da7213550da0ca3a0fe5717eb856d9da2bc",
+          "bytes": 768
+        },
+        "answers/three-block-structure.json": {
+          "sha256": "90db02b7a36ec427c30530159cd36f407e1f7a84a6c6cf5d1a4ae301818c5b98",
+          "bytes": 8824
+        },
+        "cases/unobserved-request.pcap": {
+          "sha256": "560234a68cd8dc053d31ea8de7abb60d38effd9245a0f110bb3be40c1e326636",
+          "bytes": 325
+        },
+        "answers/unobserved-request.json": {
+          "sha256": "0c5307631040431731acbddc00ce533ae815c56f7d3313575669e8966b64e36b",
+          "bytes": 1905
+        },
+        "cases/unobserved-next.pcap": {
+          "sha256": "85ee9f0b333ecd551859073b89e3501ce06579e715d30eefc0f0fb9d5471ba83",
+          "bytes": 408
+        },
+        "answers/unobserved-next.json": {
+          "sha256": "f8adc3e7af4f5d786c564d9e2f69a74bac0591925e0b519740526ba468b4086e",
+          "bytes": 2971
+        },
+        "cases/missing-next.pcap": {
+          "sha256": "e4e209dd012a24682be3b6917ba6a13f248c748b2c59d2b75bd531902d9d7820",
+          "bytes": 504
+        },
+        "answers/missing-next.json": {
+          "sha256": "d50af1957407d7c48122689c3f33f2fd7808e1e7aedebc346324417466875c4b",
+          "bytes": 4516
+        },
+        "cases/wrong-next-number.pcap": {
+          "sha256": "ba52149ac65163fd56629e37496aa356e7616b2c1faa38c81201c9293ee78985",
+          "bytes": 589
+        },
+        "answers/wrong-next-number.json": {
+          "sha256": "eb15b9804c3bfe3fb6d2b56637cdff4d1a73ccf03712a898597c5b4ff342b8af",
+          "bytes": 5615
+        },
+        "cases/duplicate-next.pcap": {
+          "sha256": "16e6a72362a5e6d6f3e27063e402e0e82e933636038589367cfd02ebd7a1ec1a",
+          "bytes": 674
+        },
+        "answers/duplicate-next.json": {
+          "sha256": "af05511dd9a2ce681b96371ab410344f35a761670ba6d4c772b29aca3c98050a",
+          "bytes": 6696
+        },
+        "cases/duplicate-response.pcap": {
+          "sha256": "cb0e1e2ead1eae17b25b932d88a25821dbe0c88c7f55ec77972f3660fb5b0598",
+          "bytes": 679
+        },
+        "answers/duplicate-response.json": {
+          "sha256": "60feadd99b740e0764128073e5c86bcdd0fc0ad751072604afc7254cd25d5215",
+          "bytes": 6989
+        },
+        "cases/first-block-two.pcap": {
+          "sha256": "30d5f85e1c9a3a5184f2af639e0bd06a650b672eae7575555129c9a34b107a82",
+          "bytes": 414
+        },
+        "answers/first-block-two.json": {
+          "sha256": "cbd3e20e78e56d12b370af98aee13a208413a7c899c0b877ec08421fdef0eae8",
+          "bytes": 3153
+        },
+        "cases/first-block-zero.pcap": {
+          "sha256": "4e4a59e0a18e0da6ff90c1f326db55faad49cccad76cec80e2682c3d308b3b29",
+          "bytes": 414
+        },
+        "answers/first-block-zero.json": {
+          "sha256": "a1961cc07ec096fba34c75245fd7761e163b16085d55410f9e1002c700f30798",
+          "bytes": 3156
+        },
+        "cases/invoke-reuse.pcap": {
+          "sha256": "ae69a56af1749d3a086076e44b492ee20c25bf28551d22fd4ea46612229d53ea",
+          "bytes": 595
+        },
+        "answers/invoke-reuse.json": {
+          "sha256": "39b4344d9c9b38e36e59437d2d74ab7bec55cb51dcf97ffa9510126fecd25414",
+          "bytes": 5775
+        },
+        "cases/wrong-direction.pcap": {
+          "sha256": "95e2cb180e5de22f10ce1a530b21e26bbb9fe977efb427d60d4ec0fa50b9723e",
+          "bytes": 679
+        },
+        "answers/wrong-direction.json": {
+          "sha256": "5d3dd5b81a0871aa519f45c1675fb6019352a49e17959fa7aec7bcd4248e5972",
+          "bytes": 7170
+        },
+        "cases/wrong-wport.pcap": {
+          "sha256": "3c9b434238aabc55952e699f1c9babb44fb69a0f1f40c00d157be26d49edfc2f",
+          "bytes": 678
+        },
+        "answers/wrong-wport.json": {
+          "sha256": "c768389b724cebc8e8dc18baefdb2111d8dc6c186a75207cc08bc0bc62404da5",
+          "bytes": 7150
+        },
+        "cases/wrong-flags.pcap": {
+          "sha256": "05aff57d2c72b78550ff26b1f012c71f861e08d07872ede1902586173c576180",
+          "bytes": 678
+        },
+        "answers/wrong-flags.json": {
+          "sha256": "10fa33a915bee1a696aa965ec3efb0d96fc1802f76ed1fd54372c1c25680e6eb",
+          "bytes": 7150
+        },
+        "cases/unfinished-close.pcap": {
+          "sha256": "79cc7443d6b0da494fbb07e4ecd362a1e554b97cc58d00162aba78573a2825b1",
+          "bytes": 415
+        },
+        "answers/unfinished-close.json": {
+          "sha256": "82ec59c2ceac5ccb686bb4aafe9a9220a3e256483dbe0ddc6156c23b30bfdcd2",
+          "bytes": 3158
+        },
+        "cases/block-access-error.pcap": {
+          "sha256": "7f3e282d9819061a1e08a15d349e118886e286f6b3f44085c9bc4c538b5c5413",
+          "bytes": 413
+        },
+        "answers/block-access-error.json": {
+          "sha256": "26cd9a598c34cc584523d70ebea2746eafdeb9118a1991525c5cafc033d1a8df",
+          "bytes": 3096
+        },
+        "cases/last-flag-two.pcap": {
+          "sha256": "234fda61b9f80e452dcf9715910e5f89ff5d4b385ba7060f882eef52d0badd47",
+          "bytes": 323
+        },
+        "answers/last-flag-two.json": {
+          "sha256": "e40a729ebd99f8011582e9a369899021c4c47c0a36f4be471b4b0f6090bd5a78",
+          "bytes": 1073
+        },
+        "cases/result-two.pcap": {
+          "sha256": "7d96fea19d1500624980ff882fa1a3d3c0c1287cb262e7bec6edc49b81c9009f",
+          "bytes": 322
+        },
+        "answers/result-two.json": {
+          "sha256": "0100009155447469451560178d2399870094f1e721b6cddf89e2afe67e42b99d",
+          "bytes": 1055
+        },
+        "cases/truncated-header.pcap": {
+          "sha256": "8089472a9b7a73130ab526b467ba8dc81f6d6af72f4c597e793c1da27a51c289",
+          "bytes": 318
+        },
+        "answers/truncated-header.json": {
+          "sha256": "7b57dc197a565574f022b615402d7379002eacc95c35dfd7c6be9ade72ebce69",
+          "bytes": 1057
+        },
+        "cases/raw-count-truncated.pcap": {
+          "sha256": "3874b3860628493c3b582c0766049b5cbb4cc3b4f6896d7667e298769cc5cf28",
+          "bytes": 323
+        },
+        "answers/raw-count-truncated.json": {
+          "sha256": "6e9e8dc85c6a5ecb4568e5e0afe7894868da77ab7bbd0602567df6537d82fc3a",
+          "bytes": 1088
+        },
+        "cases/raw-trailing.pcap": {
+          "sha256": "6e659e01ed320774758e7f669668e2863b3e2d220f630f9ed4fee04aeceee663",
+          "bytes": 324
+        },
+        "answers/raw-trailing.json": {
+          "sha256": "59fd6b82dc392d84b605809fbf235b5722ac82162a2171ec528c0f03e32934b0",
+          "bytes": 1065
+        },
+        "cases/raw-announced-1025.pcap": {
+          "sha256": "124550a2fe2379ce2fa8d0cbef520bab63d104bd9bec929fe8071d65043c9fc5",
+          "bytes": 324
+        },
+        "answers/raw-announced-1025.json": {
+          "sha256": "db08018739cad24ef0ff0a56332d1b47a93aa0bb94c558285de741a8554584ac",
+          "bytes": 1085
+        },
+        "cases/next-trailing.pcap": {
+          "sha256": "5b73c5c5b4b5a8aafea7bbe1ab6395900119caae50fb93a14cb348c2c47fdffd",
+          "bytes": 320
+        },
+        "answers/next-trailing.json": {
+          "sha256": "c3ba1054ccc832aba53ec3eb7e0cc4a5aa407adbfed44eb41ba33c767517f9a2",
+          "bytes": 1052
+        },
+        "cases/assembled-trailing.pcap": {
+          "sha256": "a85991df45af08085baf525825f3f8d7f79cd204af789abf980a1dff76c0643f",
+          "bytes": 417
+        },
+        "answers/assembled-trailing.json": {
+          "sha256": "058e8e8d6c561272e02b8463825c9b158e78ccb9fe09835ac241c409b90dd37a",
+          "bytes": 2391
+        },
+        "cases/assembled-truncated.pcap": {
+          "sha256": "4146bb9f1a5caeaf70c3cd68793d9f98c81c259a81644a458fe0d3b476eeb8f4",
+          "bytes": 415
+        },
+        "answers/assembled-truncated.json": {
+          "sha256": "71e268a300beb789a814906b6c9b997eceb61632564baf526b3f99469cbd6711",
+          "bytes": 2386
+        },
+        "answers/aggregate-resource-late.json": {
+          "sha256": "5290fcf7837374d09e4ea1fcc857a1a58152f895b37f69971b8c29fc4f20a21b",
+          "bytes": 9729
+        },
+        "cases/aggregate-over-1024.pcap": {
+          "sha256": "5cfb945ead9f122780622455e35b84f413a5535714776bf662c8937e3bcfa59c",
+          "bytes": 1355
+        },
+        "answers/aggregate-over-1024.json": {
+          "sha256": "9d28b9cbc95652fee6200563e13300e1a51f67545ea7d601e212f489277f7b7f",
+          "bytes": 13041
+        },
+        "cases/resource-late-response.pcap": {
+          "sha256": "c6cc82bd3ddbe940a39019c958de224f3f648f1dc791d345d3e6f430def8d4aa",
+          "bytes": 408
+        },
+        "answers/resource-late-response.json": {
+          "sha256": "72e1f2144854872449cee92c590b9187897c54533d6f7f34ff3733f0ae2cbebd",
+          "bytes": 12362
+        },
+        "cases/interleaved-invokes.pcap": {
+          "sha256": "c647380ef76416e5c2473958f4189f41c4345efa3dea0efc4be42b2b6a44cd27",
+          "bytes": 638
+        },
+        "answers/interleaved-invokes.json": {
+          "sha256": "8321e5e5879a49285707efae0043f2f653a953ca63142d3fe4abebae5a535ac0",
+          "bytes": 11090
+        },
+        "cases/block-count-64.pcap": {
+          "sha256": "9740d25222e20eb0911d390d2ea40e67e5d644cc03c7b64bb5509ebfa0b66002",
+          "bytes": 9630
+        },
+        "answers/block-count-64.json": {
+          "sha256": "90284d27ea47667d297b5cc0cdb3419bf22f55fd7d943e011505aed1a7974dca",
+          "bytes": 158839
+        },
+        "cases/block-count-65.pcap": {
+          "sha256": "0afd363e14be33b4aae02756f30230b025384fb7776dfa38083d7627d9c7ffa6",
+          "bytes": 9780
+        },
+        "answers/block-count-65.json": {
+          "sha256": "3e47262a958aee73048c77fe3673e0c8aafbc67915bd92a96408f9911bb433e5",
+          "bytes": 159903
+        },
+        "controls.json": {
+          "sha256": "1fec7b7cc57ae290e5e48b32a398e83ed181b08752d00056eca158071da837f9",
+          "bytes": 531449
+        },
+        "validation/expected.json": {
+          "sha256": "3205de3c9b1923bbc565cc98516be7611f0ae45655ec1b83b75051312f42b92d",
+          "bytes": 33446
+        }
+      },
+      "aliases": {
+        "common/pcapx/pcaputil/dlms-blocks/build.py": "build.py",
+        "common/pcapx/pcaputil/dlms-blocks/carrier.py": "carrier.py",
+        "common/pcapx/pcaputil/dlms-blocks/oracle.py": "oracle.py",
+        "common/pcapx/pcaputil/dlms-blocks/axdr.py": "axdr.py",
+        "common/pcapx/pcaputil/dlms-blocks/reference-check.py": "reference-check.py",
+        "common/pcapx/pcaputil/dlms-blocks/verify-controls.py": "verify-controls.py",
+        "common/pcapx/pcaputil/dlms-blocks/seal.py": "seal.py",
+        "common/pcapx/pcaputil/dlms-blocks/source-pin.json": "source-pin.json",
+        "common/pcapx/pcaputil/dlms-blocks/required-tests-traffic-unified-v1.json": "required-tests-traffic-unified-v1.json",
+        "common/pcapx/pcaputil/dlms-blocks/cases/two-block-tcp.pcap": "cases/two-block-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-blocks/answers/two-block-tcp.json": "answers/two-block-tcp.json",
+        "common/pcapx/pcaputil/dlms-blocks/cases/two-block-udp.pcap": "cases/two-block-udp.pcap",
+        "common/pcapx/pcaputil/dlms-blocks/answers/two-block-udp.json": "answers/two-block-udp.json",
+        "common/pcapx/pcaputil/dlms-blocks/cases/single-block.pcap": "cases/single-block.pcap",
+        "common/pcapx/pcaputil/dlms-blocks/answers/single-block.json": "answers/single-block.json",
+        "common/pcapx/pcaputil/dlms-blocks/cases/three-block-structure.pcap": "cases/three-block-structure.pcap",
+        "common/pcapx/pcaputil/dlms-blocks/answers/three-block-structure.json": "answers/three-block-structure.json",
+        "common/pcapx/pcaputil/dlms-blocks/cases/unobserved-request.pcap": "cases/unobserved-request.pcap",
+        "common/pcapx/pcaputil/dlms-blocks/answers/unobserved-request.json": "answers/unobserved-request.json",
+        "common/pcapx/pcaputil/dlms-blocks/cases/unobserved-next.pcap": "cases/unobserved-next.pcap",
+        "common/pcapx/pcaputil/dlms-blocks/answers/unobserved-next.json": "answers/unobserved-next.json",
+        "common/pcapx/pcaputil/dlms-blocks/cases/missing-next.pcap": "cases/missing-next.pcap",
+        "common/pcapx/pcaputil/dlms-blocks/answers/missing-next.json": "answers/missing-next.json",
+        "common/pcapx/pcaputil/dlms-blocks/cases/wrong-next-number.pcap": "cases/wrong-next-number.pcap",
+        "common/pcapx/pcaputil/dlms-blocks/answers/wrong-next-number.json": "answers/wrong-next-number.json",
+        "common/pcapx/pcaputil/dlms-blocks/cases/duplicate-next.pcap": "cases/duplicate-next.pcap",
+        "common/pcapx/pcaputil/dlms-blocks/answers/duplicate-next.json": "answers/duplicate-next.json",
+        "common/pcapx/pcaputil/dlms-blocks/cases/duplicate-response.pcap": "cases/duplicate-response.pcap",
+        "common/pcapx/pcaputil/dlms-blocks/answers/duplicate-response.json": "answers/duplicate-response.json",
+        "common/pcapx/pcaputil/dlms-blocks/cases/first-block-two.pcap": "cases/first-block-two.pcap",
+        "common/pcapx/pcaputil/dlms-blocks/answers/first-block-two.json": "answers/first-block-two.json",
+        "common/pcapx/pcaputil/dlms-blocks/cases/first-block-zero.pcap": "cases/first-block-zero.pcap",
+        "common/pcapx/pcaputil/dlms-blocks/answers/first-block-zero.json": "answers/first-block-zero.json",
+        "common/pcapx/pcaputil/dlms-blocks/cases/invoke-reuse.pcap": "cases/invoke-reuse.pcap",
+        "common/pcapx/pcaputil/dlms-blocks/answers/invoke-reuse.json": "answers/invoke-reuse.json",
+        "common/pcapx/pcaputil/dlms-blocks/cases/wrong-direction.pcap": "cases/wrong-direction.pcap",
+        "common/pcapx/pcaputil/dlms-blocks/answers/wrong-direction.json": "answers/wrong-direction.json",
+        "common/pcapx/pcaputil/dlms-blocks/cases/wrong-wport.pcap": "cases/wrong-wport.pcap",
+        "common/pcapx/pcaputil/dlms-blocks/answers/wrong-wport.json": "answers/wrong-wport.json",
+        "common/pcapx/pcaputil/dlms-blocks/cases/wrong-flags.pcap": "cases/wrong-flags.pcap",
+        "common/pcapx/pcaputil/dlms-blocks/answers/wrong-flags.json": "answers/wrong-flags.json",
+        "common/pcapx/pcaputil/dlms-blocks/cases/unfinished-close.pcap": "cases/unfinished-close.pcap",
+        "common/pcapx/pcaputil/dlms-blocks/answers/unfinished-close.json": "answers/unfinished-close.json",
+        "common/pcapx/pcaputil/dlms-blocks/cases/block-access-error.pcap": "cases/block-access-error.pcap",
+        "common/pcapx/pcaputil/dlms-blocks/answers/block-access-error.json": "answers/block-access-error.json",
+        "common/pcapx/pcaputil/dlms-blocks/cases/last-flag-two.pcap": "cases/last-flag-two.pcap",
+        "common/pcapx/pcaputil/dlms-blocks/answers/last-flag-two.json": "answers/last-flag-two.json",
+        "common/pcapx/pcaputil/dlms-blocks/cases/result-two.pcap": "cases/result-two.pcap",
+        "common/pcapx/pcaputil/dlms-blocks/answers/result-two.json": "answers/result-two.json",
+        "common/pcapx/pcaputil/dlms-blocks/cases/truncated-header.pcap": "cases/truncated-header.pcap",
+        "common/pcapx/pcaputil/dlms-blocks/answers/truncated-header.json": "answers/truncated-header.json",
+        "common/pcapx/pcaputil/dlms-blocks/cases/raw-count-truncated.pcap": "cases/raw-count-truncated.pcap",
+        "common/pcapx/pcaputil/dlms-blocks/answers/raw-count-truncated.json": "answers/raw-count-truncated.json",
+        "common/pcapx/pcaputil/dlms-blocks/cases/raw-trailing.pcap": "cases/raw-trailing.pcap",
+        "common/pcapx/pcaputil/dlms-blocks/answers/raw-trailing.json": "answers/raw-trailing.json",
+        "common/pcapx/pcaputil/dlms-blocks/cases/raw-announced-1025.pcap": "cases/raw-announced-1025.pcap",
+        "common/pcapx/pcaputil/dlms-blocks/answers/raw-announced-1025.json": "answers/raw-announced-1025.json",
+        "common/pcapx/pcaputil/dlms-blocks/cases/next-trailing.pcap": "cases/next-trailing.pcap",
+        "common/pcapx/pcaputil/dlms-blocks/answers/next-trailing.json": "answers/next-trailing.json",
+        "common/pcapx/pcaputil/dlms-blocks/cases/assembled-trailing.pcap": "cases/assembled-trailing.pcap",
+        "common/pcapx/pcaputil/dlms-blocks/answers/assembled-trailing.json": "answers/assembled-trailing.json",
+        "common/pcapx/pcaputil/dlms-blocks/cases/assembled-truncated.pcap": "cases/assembled-truncated.pcap",
+        "common/pcapx/pcaputil/dlms-blocks/answers/assembled-truncated.json": "answers/assembled-truncated.json",
+        "common/pcapx/pcaputil/dlms-blocks/answers/aggregate-resource-late.json": "answers/aggregate-resource-late.json",
+        "common/pcapx/pcaputil/dlms-blocks/cases/aggregate-over-1024.pcap": "cases/aggregate-over-1024.pcap",
+        "common/pcapx/pcaputil/dlms-blocks/answers/aggregate-over-1024.json": "answers/aggregate-over-1024.json",
+        "common/pcapx/pcaputil/dlms-blocks/cases/resource-late-response.pcap": "cases/resource-late-response.pcap",
+        "common/pcapx/pcaputil/dlms-blocks/answers/resource-late-response.json": "answers/resource-late-response.json",
+        "common/pcapx/pcaputil/dlms-blocks/cases/interleaved-invokes.pcap": "cases/interleaved-invokes.pcap",
+        "common/pcapx/pcaputil/dlms-blocks/answers/interleaved-invokes.json": "answers/interleaved-invokes.json",
+        "common/pcapx/pcaputil/dlms-blocks/cases/block-count-64.pcap": "cases/block-count-64.pcap",
+        "common/pcapx/pcaputil/dlms-blocks/answers/block-count-64.json": "answers/block-count-64.json",
+        "common/pcapx/pcaputil/dlms-blocks/cases/block-count-65.pcap": "cases/block-count-65.pcap",
+        "common/pcapx/pcaputil/dlms-blocks/answers/block-count-65.json": "answers/block-count-65.json",
+        "common/pcapx/pcaputil/dlms-blocks/controls.json": "controls.json",
+        "common/pcapx/pcaputil/dlms-blocks/validation/expected.json": "validation/expected.json",
+        "scripts/protocol-tests/required-tests-traffic-unified-v1.json": "required-tests-traffic-unified-v1.json"
+      }
     }
   ],
   "schema_version": 1,
