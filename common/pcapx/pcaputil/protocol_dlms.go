@@ -248,7 +248,14 @@ func decodeDLMSBudget(w []byte, maxElements, depth int) (*dlmsMessage, error) {
 			f["Result Choice"] = "data-access-result"
 			f["Data Access Result"] = p[4]
 		} else if p[3] == 0 {
-			v, e := dlmsScalar(p[4:], maxElements)
+			var v any
+			var e error
+			if dlmsNormalExtended(p) {
+				v, e = dlmsNormalData(p, maxElements, depth)
+			} else {
+				// Existing scalar/octet public representations remain unchanged.
+				v, e = dlmsScalar(p[4:], maxElements)
+			}
 			if e != nil {
 				return nil, e
 			}
@@ -382,12 +389,15 @@ func probeDLMS(w []byte, limit int) ProbeResult {
 		return probeNeed("dlms", "hdlc-get-normal", len(w), max(3, len(w)+1))
 	}
 	elements := 4096
-	if dlmsListAPDU(w[:n]) != nil {
+	list := dlmsListAPDU(w[:n])
+	if list != nil || dlmsNormalExtended(dlmsAPDU(w[:n])) {
+		// Probe never admits unsolicited responses. Check frame integrity with
+		// a zero Data pool instead of expanding a response before reservation.
 		elements = 0
 	}
 	m, e := decodeDLMS(w[:n], elements)
 	var pe *ProtocolError
-	if elements == 0 && errors.As(e, &pe) && pe.Kind == ErrResourceExceeded && dlmsListAPDU(w[:n])[0] == 0xc0 {
+	if len(list) != 0 && errors.As(e, &pe) && pe.Kind == ErrResourceExceeded && list[0] == 0xc0 {
 		return probeAccept("dlms", "hdlc-get-list", 98)
 	}
 	if e != nil || !m.request {

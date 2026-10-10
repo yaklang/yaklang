@@ -119,6 +119,14 @@ func dlmsListAssert(t *testing.T, c dlmsListControl, events []*ProtocolEvent) {
 		require.NoError(t, err)
 		rocEqualFields(t, w.Fields, protocolFields(v))
 		f["Observation"] = "caller-mutated"
+		if data, ok := f["Data Value"].(map[string]any); ok {
+			data["raw_hex"] = "caller-mutated"
+			for _, key := range []string{"elements", "rows"} {
+				if children, ok := data[key].([]map[string]any); ok && len(children) > 0 {
+					children[0]["raw_hex"] = "caller-mutated-child"
+				}
+			}
+		}
 		if list, ok := f["Get List"].(map[string]any); ok {
 			list["list_count"] = -1
 			for _, key := range []string{"results", "descriptors"} {
@@ -141,8 +149,9 @@ func dlmsListAssert(t *testing.T, c dlmsListControl, events []*ProtocolEvent) {
 	}
 }
 
-func TestDLMSHDLCListSealedMatrix(t *testing.T) {
-	for _, c := range dlmsListControls(t) {
+func TestDLMSHDLCListSealedMatrix(t *testing.T) { dlmsSealedMatrix(t, dlmsListControls(t)) }
+func dlmsSealedMatrix(t *testing.T, controls []dlmsListControl) {
+	for _, c := range controls {
 		t.Run(c.ID, func(t *testing.T) {
 			raw, err := trafficfixture.ReadFile(strings.TrimPrefix(c.InputAlias, "common/pcapx/pcaputil/"))
 			require.NoError(t, err)
@@ -177,8 +186,9 @@ func TestDLMSHDLCListSealedMatrix(t *testing.T) {
 	}
 }
 
-func TestDLMSHDLCListOwnershipAndChunks(t *testing.T) {
-	for _, c := range dlmsListControls(t) {
+func TestDLMSHDLCListOwnershipAndChunks(t *testing.T) { dlmsOwnershipAndChunks(t, dlmsListControls(t)) }
+func dlmsOwnershipAndChunks(t *testing.T, controls []dlmsListControl) {
+	for _, c := range controls {
 		for _, deferred := range []bool{false, true} {
 			for _, chunk := range []int{1, 7, 64, 2049} {
 				if c.Transport == "udp" && chunk != 2049 {
