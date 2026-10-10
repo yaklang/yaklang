@@ -88,7 +88,7 @@ func TestTrafficWorkflowIsolation(t *testing.T) {
 	if !strings.Contains(run, "go run ./internal/trafficfixture/cmd/corpus test") {
 		t.Fatal("traffic CI must execute the archived tooling and validator regressions")
 	}
-	if !strings.Contains(run, "corpus exec -- python3 @scripts/protocol-tests/check_go_test_json.py") || !strings.Contains(run, "--inventory @scripts/protocol-tests/required-tests-v31.json --tier full") {
+	if !strings.Contains(run, "corpus exec -- python3 @scripts/protocol-tests/check_go_test_json.py") || !strings.Contains(run, "--inventory @scripts/protocol-tests/required-tests-v34.json --tier full") {
 		t.Fatal("traffic test success requires the actual package-qualified test inventory")
 	}
 }

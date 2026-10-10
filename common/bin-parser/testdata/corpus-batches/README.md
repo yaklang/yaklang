@@ -44,7 +44,7 @@ Run from the repository root:
 ```sh
 go run ./internal/trafficfixture/cmd/corpus test
 go test -json -count=1 -timeout=5m ./internal/trafficfixture/... ./common/bin-parser/... ./common/pcapx/... ./common/yak/cmd/yakcmds/shark-cli > traffic.jsonl
-go run ./internal/trafficfixture/cmd/corpus exec -- python3 @scripts/protocol-tests/check_go_test_json.py traffic.jsonl --inventory @scripts/protocol-tests/required-tests-v31.json --tier full
+go run ./internal/trafficfixture/cmd/corpus exec -- python3 @scripts/protocol-tests/check_go_test_json.py traffic.jsonl --inventory @scripts/protocol-tests/required-tests-v34.json --tier full
 ```
 
 The single `corpus` entry point uses the same bounded Go ZIP loader as tests.
@@ -83,7 +83,7 @@ their semantic coverage. The existing synthetic session keys are test inputs;
 production credentials, user private keys and material without redistribution
 permission belong in an external fixed-source download manifest.
 
-Current test requirements are sealed at `scripts/protocol-tests/required-tests-v31.json`;
+Current test requirements are sealed at `scripts/protocol-tests/required-tests-v34.json`;
 the historical inventories and all earlier batches remain unchanged.
 The supplemental small-corpus batch contains 26 minimal controls, their explicit
 expected facts, an offline generator and the compact pinned source manifest.
@@ -96,7 +96,7 @@ byte-boundary, malformed-length and ownership tests. These are scoped control
 assertions, not a semantic golden for the entire upstream collection. Process
 logs and the original large downloads remain outside the repository.
 
-The current workflow and executable gate use `required-tests-v31.json`. Older
+The current workflow and executable gate use `required-tests-v34.json`. Older
 versioned inventories stay available as historical inputs; they are not the
 current acceptance entry. The DLMS HDLC batch contains owned tunnel/Get-normal
 controls and their independent fields/errors, CRC/byte validator, offline
@@ -128,3 +128,17 @@ Pinned pypmu reference failures for nonzero DIGUNIT masks are retained in the
 archive and do not count as passing independent reference runs.
 
 The current industrial link batch includes 61 SV/EtherCAT and TCP generation controls, plus 38 corrected carrier cases sharing 37 additional capture hashes. Historical synthetic ACK=0 carriers and their original application answers remain immutable; current application regressions bind the corrected carriers to those same answers, and separately verify that invalid reverse carriers are discarded. Rebuild and independent verification tools are sealed in that batch.
+
+The PFCP Usage Report batch adds selected IE79 observations to Session Deletion
+Response55, retaining the deletion core profile and all ordered raw IEs. It
+decodes URR ID81, report sequence104, known Rel16 trigger63 bits and raw NTP32
+time75/76 prefixes. These observations cannot establish configured URRs, actual
+measurements, authenticated session identity or successful remote deletion.
+Child syntax diagnostics are explicitly qualified; a resource refusal yields
+no partial parent fields. The selected limits are 64 children per group, 256
+visited children across a datagram and 4096 bytes per group, within caller
+collection/depth/shared byte budgets. `TestPFCPUsageSealedByteOracle`,
+`TestPFCPUsageSealedDatagramMatrix` and `TestPFCPUsageSessionStateOwnership`
+check complete independent fields/errors, observed correlation and ownership.
+Historical deletion answers are immutable; the new ZIP supplies SHA-bound
+additive answers for their two IE79 wires.

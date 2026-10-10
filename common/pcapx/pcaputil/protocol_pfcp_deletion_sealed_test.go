@@ -41,6 +41,28 @@ func pfcpDeletionControls(t *testing.T) []pfcpSetupControl {
 			cs[i].Target.Pending = j.Cases[i].Native.Pending
 		}
 	}
+	// Historical complete answers remain immutable; a source-informed SHA-bound
+	// overlay supplies only the newly interpreted IE79 observation.
+	overlay, err := trafficfixture.ReadFile("pfcp-usage/historical-additive-answers.json")
+	require.NoError(t, err)
+	var additions map[string]struct {
+		Wire   string `json:"wire_hex"`
+		Fields []any  `json:"usage_report_observations"`
+	}
+	decOverlay := json.NewDecoder(bytes.NewReader(overlay))
+	decOverlay.UseNumber()
+	require.NoError(t, decOverlay.Decode(&additions))
+	for i := range cs {
+		for j := range cs[i].Messages {
+			m := &cs[i].Messages[j]
+			wire := doipDiscoveryWire(t, m.Raw)
+			if a, ok := additions[fmt.Sprintf("%x", sha256.Sum256(wire))]; ok {
+				require.Equal(t, m.Raw, a.Wire)
+				m.Fields["usage_report_observations"] = a.Fields
+			}
+		}
+	}
+
 	return cs
 }
 func pfcpDeletionCapture(t *testing.T, c pfcpSetupControl) []byte {

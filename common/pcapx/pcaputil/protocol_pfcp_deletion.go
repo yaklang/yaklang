@@ -28,7 +28,8 @@ func pfcpSequenceNumber(w []byte) uint32 {
 
 // TS29.244 v16.12.1 sections7.2.2.4.2,7.5.6/7 and8.2.91. This
 // observation decodes the unbundled header and selected scalar controls.
-// Report groups remain ordered raw IEs: an acceptance cause proves neither
+// Report groups retain ordered raw IEs; IE79 adds selected scalar observations.
+// An acceptance cause proves neither
 // remote deletion nor completion of the subsequent usage-report procedure.
 func decodePFCPDeletion(w []byte, limit int) (map[string]any, error) {
 	bad := func(s string) (map[string]any, error) { return nil, discoveryError(ErrMalformedMessage, s) }
@@ -213,6 +214,9 @@ func decodePFCPDeletion(w []byte, limit int) (map[string]any, error) {
 	}
 	a := first[126].value
 	out["additional_reports_expected_claim"] = cause < 64 && (cause == 2 || len(a) >= 2 && (a[0]&128 != 0 || binary.BigEndian.Uint16(a[:2])&32767 != 0))
+	if err := pfcpUsageObservations(out, limit); err != nil {
+		return nil, err
+	}
 	return out, nil
 }
 
