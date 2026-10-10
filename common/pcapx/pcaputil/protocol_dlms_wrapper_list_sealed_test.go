@@ -130,6 +130,51 @@ func poisonWrapperListFields(f map[string]any) {
 		}
 	}
 }
+
+// Independent session expectations supplement the immutable wire-field answers.
+// State changes come from the declared control and pairing inventory, never from
+// the implementation's returned Outstanding, Association or transaction IDs.
+func wrapperListObservation(t *testing.T, name string, i int, events []*ProtocolEvent, fields map[string]any, pairs [][]int, blocked bool, outstanding *int) {
+	t.Helper()
+	e := events[i]
+	association := "unmatched-response"
+	var responseTo, transactionID uint64
+	if blocked {
+		association = "ambiguous-conversation"
+		*outstanding = 0
+	} else if name == "list-invoke-reuse-ambiguous" && i > 0 {
+		association = "ambiguous-invoke"
+		*outstanding = 0
+	} else if fields["command"].(float64) == 192 {
+		if fields["confirmed_service"].(bool) {
+			association = "observed-request"
+			transactionID = e.ID
+			*outstanding++
+		} else {
+			association = "unconfirmed-observation"
+		}
+	} else {
+		for _, pair := range pairs {
+			if pair[1] == i+1 {
+				association = "observed-response"
+				responseTo = events[pair[0]-1].ID
+				transactionID = responseTo
+				*outstanding--
+				require.NotEqual(t, events[pair[0]-1].Direction, e.Direction)
+			}
+		}
+	}
+	require.GreaterOrEqual(t, *outstanding, 0)
+	require.Equal(t, responseTo, e.ResponseTo, "event %d ResponseTo", i+1)
+	require.Equal(t, transactionID, e.TransactionID, "event %d TransactionID", i+1)
+	snapshot := make(map[string]any, len(fields)+2)
+	for k, v := range fields {
+		snapshot[k] = v
+	}
+	snapshot["Association"], snapshot["Outstanding"] = association, float64(*outstanding)
+	rocEqualFields(t, snapshot, e.Session)
+}
+
 func TestDLMSWrapperGetListSealedByteOracle(t *testing.T) {
 	for _, c := range wrapperListControls(t) {
 		t.Run(c.Name, func(t *testing.T) {
@@ -245,32 +290,24 @@ func TestDLMSWrapperGetListSealedMatrix(t *testing.T) {
 						require.Nil(t, f)
 						require.Nil(t, e.Session)
 						require.Zero(t, e.ResponseTo)
+						require.Zero(t, e.TransactionID)
+						outstanding = 0
 						invalid = true
 						continue
 					}
 					require.NoError(t, err)
 					require.Empty(t, e.Error)
 					rocEqualFields(t, fields, f)
-					if e.TransactionID == e.ID && fields["command"].(float64) == 192 {
-						outstanding++
+					pairs := c.Targets.Pairs
+					// The archived frame-refusal targets apply to the custom
+					// budget. This capture matrix uses the default budget.
+					if c.Name == "list-udp-refusal-blocks-pending" {
+						pairs = [][]int{{1, 3}}
 					}
-					if e.ResponseTo != 0 {
-						outstanding--
-						require.Equal(t, e.ResponseTo, e.TransactionID)
-						found := false
-						for _, q := range msgs[:i] {
-							if q.ID == e.ResponseTo {
-								found = true
-								require.NotEqual(t, q.Direction, e.Direction)
-							}
-						}
-						require.True(t, found)
+					if c.Name == "list-frame-budget-late-response" {
+						pairs = [][]int{{1, 2}}
 					}
-					if n, ok := e.Session["Outstanding"].(int); ok {
-						outstanding = n
-					} else {
-						require.Fail(t, "missing typed Outstanding")
-					}
+					wrapperListObservation(t, c.Name, i, msgs, fields, pairs, invalid, &outstanding)
 					poisonWrapperListFields(f)
 					poisonWrapperListFields(e.Session)
 					if e.Fields != nil {

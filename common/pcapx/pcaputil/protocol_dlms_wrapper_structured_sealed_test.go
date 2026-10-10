@@ -110,6 +110,8 @@ func assertWrapperStructuredAnswers(t *testing.T, c wrapperStructuredControl, ev
 	t.Helper()
 	require.Len(t, events, len(c.Answers))
 	offsets := [2]uint64{}
+	outstanding := 0
+	blocked := false
 	for i, e := range events {
 		a := c.Answers[i]
 		fields, problem := a.Fields, a.Error
@@ -122,6 +124,8 @@ func assertWrapperStructuredAnswers(t *testing.T, c wrapperStructuredControl, ev
 		require.Equal(t, "dlms-wrapper-v1-get-list", e.Profile)
 		require.Equal(t, len(wire), e.Length)
 		if problem != nil {
+			blocked = true
+			outstanding = 0
 			rocTypedError(t, problem.Kind, err)
 			require.Nil(t, f)
 			require.Nil(t, e.Session)
@@ -153,17 +157,14 @@ func assertWrapperStructuredAnswers(t *testing.T, c wrapperStructuredControl, ev
 		if c.Transport == "tcp" {
 			offsets[e.Direction] += uint64(len(wire))
 		}
-		paired := false
-		for _, pair := range wrapperStructuredPairs(c.Name, custom) {
-			if i == pair[1] {
-				require.Equal(t, events[pair[0]].ID, e.ResponseTo)
-				require.Equal(t, e.ResponseTo, e.TransactionID)
-				require.NotEqual(t, e.Direction, events[pair[0]].Direction)
-				paired = true
+		if problem == nil {
+			pairs := c.Targets.Pairs
+			if pairs == nil {
+				for _, pair := range wrapperStructuredPairs(c.Name, custom) {
+					pairs = append(pairs, []int{pair[0] + 1, pair[1] + 1})
+				}
 			}
-		}
-		if !paired {
-			require.Zero(t, e.ResponseTo)
+			wrapperListObservation(t, c.Name, i, events, fields, pairs, blocked, &outstanding)
 		}
 	}
 }
