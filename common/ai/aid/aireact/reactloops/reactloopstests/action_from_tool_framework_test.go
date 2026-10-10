@@ -4,7 +4,9 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
@@ -88,6 +90,89 @@ func TestActionFromTool_WithFramework(t *testing.T) {
 	}
 
 	t.Logf("Tool callback successfully called with message: %s", receivedMessage)
+}
+
+// Keep the verifier's existing best-effort extraction policy at the real callback boundary.
+func TestActionFromTool_HandlerUsesVerifierExtraction(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		params map[string]interface{}
+		want   string
+	}{
+		{"flat", map[string]interface{}{"message": "flat"}, "flat"},
+		{"wrapped", map[string]interface{}{"params": map[string]interface{}{"message": "wrapped"}}, "wrapped"},
+		{"mixed_prefers_inner", map[string]interface{}{"message": "outer", "params": map[string]interface{}{"message": "inner"}}, "inner"},
+		{"invalid_wrapper_uses_flat", map[string]interface{}{"message": "flat", "params": "not an object"}, "flat"},
+		{"null_wrapper_uses_flat", map[string]interface{}{"message": "flat", "params": nil}, "flat"},
+		{"wrapped_with_metadata", map[string]interface{}{"tool": "tolerant_echo", "identifier": "echo_test", "params": map[string]interface{}{"message": "wrapped"}}, "wrapped"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			calls := 0
+			var received string
+			tool, err := aitool.New("tolerant_echo",
+				aitool.WithStringParam("message", aitool.WithParam_Required(true)),
+				aitool.WithDangerousNoNeedUserReview(true),
+				aitool.WithSimpleCallback(func(params aitool.InvokeParams, _, _ io.Writer) (any, error) {
+					calls++
+					received = params.GetString("message")
+					return received, nil
+				}))
+			if err != nil {
+				t.Fatal(err)
+			}
+			framework := NewActionTestFrameworkEx(t, "tolerant-tool",
+				[]reactloops.ReActLoopOption{reactloops.WithRegisterLoopActionFromTool(tool)},
+				[]aicommon.ConfigOption{aicommon.WithTools(tool), aicommon.WithWorkdir(t.TempDir())})
+			if err := framework.ExecuteActionWithTimeout(tool.GetName(), tc.params, 10*time.Second); err != nil {
+				t.Fatal(err)
+			}
+			if calls != 1 || received != tc.want {
+				t.Fatalf("callback calls=%d, message=%q; want one call with %q", calls, received, tc.want)
+			}
+		})
+	}
+}
+
+// Validation feedback must reach both Timeline and the same transaction's retry error.
+func TestActionFromTool_InvalidParamsLeaveCorrectionInTimeline(t *testing.T) {
+	for _, input := range []map[string]interface{}{
+		{},
+		{"message": []interface{}{"not a string"}},
+	} {
+		t.Run(fmt.Sprint(input), func(t *testing.T) {
+			calls := 0
+			tool, err := aitool.New("timeline_echo",
+				aitool.WithStringParam("message", aitool.WithParam_Required(true)),
+				aitool.WithDangerousNoNeedUserReview(true),
+				aitool.WithSimpleCallback(func(aitool.InvokeParams, io.Writer, io.Writer) (any, error) {
+					calls++
+					return "unexpected", nil
+				}))
+			if err != nil {
+				t.Fatal(err)
+			}
+			framework := NewActionTestFrameworkEx(t, "parameter-feedback",
+				[]reactloops.ReActLoopOption{reactloops.WithRegisterLoopActionFromTool(tool)},
+				[]aicommon.ConfigOption{aicommon.WithTools(tool), aicommon.WithWorkdir(t.TempDir())})
+			handler, err := framework.GetLoop().GetActionHandler(tool.GetName())
+			if err != nil {
+				t.Fatal(err)
+			}
+			err = handler.ActionVerifier(framework.GetLoop(), aicommon.NewSimpleAction(tool.GetName(), input))
+			if err == nil {
+				t.Fatal("expected parameter validation failure")
+			}
+			timeline := framework.GetLoop().GetConfig().(*aicommon.Config).Timeline.String()
+			for _, text := range []string{tool.GetName(), "message", "parameter validation failed", "参数修正提示", "本次未执行工具", "当前可用的 action", "不要原样重试或委托其他模型生成参数"} {
+				if !strings.Contains(timeline, text) || !strings.Contains(err.Error(), text) {
+					t.Errorf("missing %q in parameter feedback: error=%v, timeline=%s", text, err, timeline)
+				}
+			}
+			if strings.Contains(err.Error(), "directly_call_tool") || calls != 0 {
+				t.Fatalf("feedback must stay in this focus action without executing a tool: error=%v, calls=%d", err, calls)
+			}
+		})
+	}
 }
 
 // TestActionFromTool_MultipleParameters tests a tool with multiple parameters
