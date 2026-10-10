@@ -62,6 +62,27 @@ func dlmsFrameSize(w []byte, limit int) (int, error) {
 	return n, nil
 }
 
+// dlmsIdlePrefix removes only consecutive flags at a stream frame boundary,
+// preserving the last flag as the actual opening byte. It never scans past
+// arbitrary bytes, reconstructs a shared flag, or changes datagram framing.
+func dlmsIdlePrefix(w []byte) int {
+	n := 0
+	for n+1 < len(w) && w[n] == 0x7e && w[n+1] == 0x7e {
+		n++
+	}
+	return n
+}
+
+func probeDLMSStream(w []byte, frameLimit, probeLimit int) ProbeResult {
+	// Before identity is established, idle fill is part of the bounded probe
+	// window. Admission still requires a complete CRC-valid supported request.
+	n := dlmsIdlePrefix(w[:min(len(w), probeLimit+1)])
+	if n >= probeLimit {
+		return ProbeResult{Verdict: ProbeReject}
+	}
+	return probeDLMS(w[n:], frameLimit)
+}
+
 type dlmsMessage struct {
 	fields              map[string]any
 	kind                string

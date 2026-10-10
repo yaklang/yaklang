@@ -51,7 +51,7 @@ func (f *binFlow) detectDirection(dir int, wire []byte) {
 	} else if p.Verdict == ProbeNeedMore {
 		return
 	}
-	if p := probeDLMS(wire, f.a.budget.MaxFrameBytes); p.Verdict == ProbeAccept {
+	if p := probeDLMSStream(wire, f.a.budget.MaxFrameBytes, f.a.config.ProbeBytes); p.Verdict == ProbeAccept {
 		f.protocol, f.dlms = "dlms", &binDLMS{clientDir: f.tcpClientDir, clientKnown: f.tcpClientKnown}
 		return
 	} else if p.Verdict == ProbeNeedMore {

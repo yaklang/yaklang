@@ -26,6 +26,8 @@ type dlmsListControl struct {
 }
 type dlmsListAnswer struct {
 	Raw, Error, Profile string
+	FeedRaw             string  `json:"feed_raw,omitempty"` // TCP idle bytes are not message bytes.
+	StreamOffset        *uint64 `json:"stream_offset,omitempty"`
 	Direction           int
 	Fields              map[string]any
 	Reply               *int  `json:"response_to_index"`
@@ -93,6 +95,11 @@ func dlmsListAssert(t *testing.T, c dlmsListControl, events []*ProtocolEvent) {
 		require.Equal(t, w.Profile, e.Profile)
 		require.Equal(t, w.Direction, e.Direction)
 		require.Zero(t, e.TransactionID, "preserve native HDLC public contract")
+		if w.StreamOffset != nil {
+			require.Equal(t, *w.StreamOffset, e.Offset)
+			require.Equal(t, len(w.Raw)/2, e.Length)
+			require.Equal(t, fmt.Sprintf("%x", sha256.Sum256(wrapperWire(t, w.Raw))), e.SourceBytes.SHA256)
+		}
 		if w.Reply == nil {
 			require.Zero(t, e.ResponseTo)
 		} else {
@@ -233,7 +240,11 @@ func dlmsOwnershipAndChunks(t *testing.T, controls []dlmsListControl) {
 				}
 				var events []*ProtocolEvent
 				for _, answer := range c.Events {
-					w := wrapperWire(t, answer.Raw)
+					input := answer.Raw
+					if answer.FeedRaw != "" {
+						input = answer.FeedRaw
+					}
+					w := wrapperWire(t, input)
 					for at := 0; at < len(w); at += chunk {
 						owned := bytes.Clone(w[at:min(len(w), at+chunk)])
 						out := s.Feed(answer.Direction, time.Unix(1, 0), owned)

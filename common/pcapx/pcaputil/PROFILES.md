@@ -224,6 +224,15 @@ continuation. The exact final request frame may be retransmitted while pending:
 its bounded owned assembled APDU reconstructs fields, while the first complete
 request event keeps response ownership. Complete assembly profiles follow the
 decoded service rather than an absent service header in the last carrier.
+TCP native HDLC streams additionally accept consecutive boundary idle flags.
+Initial fill remains bounded by ProbeBytes and a complete CRC-valid supported
+request is required for admission. The actual opening flag/frame bytes, stream
+offset, timestamp and packet contributors are preserved; skipped idle bytes
+count as UnclassifiedBytes rather than MessageBytes. Trailing idle fill alone
+is not a truncated frame, but pending requests still produce Close diagnostics.
+Nonflag garbage is not scanned past; CRC/length/context budgets remain strict.
+UDP still requires one exact frame per datagram. Reconstructing one shared
+closing/opening flag remains unimplemented and is not inferred.
 GET-next without initial context/link-negotiation segmentation, GBT, negotiated
 window/capability enforcement, ACSE/security and real meter execution remain
 separate unfinished requirements.

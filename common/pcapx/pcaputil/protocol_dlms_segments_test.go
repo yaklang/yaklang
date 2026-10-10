@@ -11,6 +11,7 @@ import (
 // These independently constructed type3 frames split LLC+GET-normal response
 // before its uint16 Data. No new API is needed to demonstrate missing behavior.
 func TestDLMSHDLCSegmentsExistingAPI(t *testing.T) {
+	t.Run("idle-fill", testDLMSIdleSession)
 	t.Run("reserved-next-flags", func(t *testing.T) { dlmsOwnershipAndChunks(t, dlmsReservedNextFlagControls(t)) })
 	t.Run("next-request", testDLMSNextRequestExistingAPI)
 	t.Run("initial-request", TestDLMSHDLCRequestSegmentsExistingAPI)
@@ -50,6 +51,7 @@ func dlmsSegmentControls(t *testing.T) []dlmsListControl {
 }
 
 func TestDLMSHDLCSegmentsSealedMatrix(t *testing.T) {
+	t.Run("idle-fill", func(t *testing.T) { dlmsSealedMatrix(t, dlmsTCPIdleControls(t)) })
 	t.Run("reserved-next-flags", func(t *testing.T) { dlmsSealedMatrix(t, dlmsReservedNextFlagControls(t)) })
 	t.Run("next-request", func(t *testing.T) { dlmsSealedMatrix(t, dlmsNextRequestControls(t)) })
 	dlmsSealedMatrix(t, dlmsSegmentControls(t))
@@ -90,6 +92,7 @@ func TestDLMSHDLCSegmentsOwnershipAndChunks(t *testing.T) {
 }
 
 func TestDLMSHDLCSegmentsCloseAndBudget(t *testing.T) {
+	t.Run("idle-fill", testDLMSIdleBoundaries)
 	t.Run("next-request", testDLMSNextRequestCloseAndBudget)
 	t.Run("initial-request", testDLMSRequestSegmentsCloseAndBudget)
 	t.Run("untracked-refusal-isolation", testDLMSUntrackedRefusalIsolation)

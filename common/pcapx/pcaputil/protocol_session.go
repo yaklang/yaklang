@@ -234,7 +234,7 @@ func (s *captureSession) Probe(data []byte) ProbeResult {
 	if p := s.f.a.probeWrapper(input); p.Verdict != ProbeReject {
 		return p
 	}
-	if p := probeDLMS(input, s.f.a.budget.MaxFrameBytes); p.Verdict != ProbeReject {
+	if p := probeDLMSStream(input, s.f.a.budget.MaxFrameBytes, limit); p.Verdict != ProbeReject {
 		return p
 	}
 	if p := probeGenisys(input, s.f.a.budget.MaxFrameBytes); p.Verdict != ProbeReject {

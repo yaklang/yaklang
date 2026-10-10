@@ -673,6 +673,7 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 		d.ts = ts
 	}
 	wire := data
+	bufferedPrefix := len(d.buffer)
 	detected := false
 	if len(d.buffer) != 0 {
 		old := len(d.buffer)
@@ -726,6 +727,18 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 		d.buffer = append(d.buffer, data...)
 		wire = d.buffer
 	}
+	if bufferedPrefix != 0 && (f.protocol == "" || f.dlms != nil && f.binding == nil) {
+		window := wire
+		if f.protocol == "" {
+			window = window[:min(len(window), a.config.ProbeBytes+1)]
+		}
+		if idle := dlmsIdlePrefix(window); idle >= bufferedPrefix {
+			// The surviving opening flag arrived in this Feed, after all
+			// previously retained idle bytes. Keep its timestamp, not the
+			// timestamp of an earlier idle-only arrival.
+			d.ts = ts
+		}
+	}
 	for len(wire) > 0 {
 		if h := d.http; f.protocol == "http" && h != nil && h.omitted {
 			n, done, err := h.consumeOmitted(wire)
@@ -760,6 +773,9 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 			}
 			if f.protocol == "" {
 				if len(wire) >= a.config.ProbeBytes {
+					if len(wire) < a.config.MaxMessageBytes && probeDLMSStream(wire, a.budget.MaxFrameBytes, a.config.ProbeBytes).Verdict == ProbeNeedMore {
+						break
+					}
 					if len(wire) < a.budget.MaxFrameBytes && (probeSLMPTCP(wire, min(a.budget.MaxFrameBytes, a.config.MaxMessageBytes), false).Verdict == ProbeNeedMore || wrapperIncompletePrefix(wire, a.budget.MaxFrameBytes) || f.captureTCP && probeDNSTCP(wire, a.budget.MaxFrameBytes).Verdict == ProbeNeedMore || needsMoreS7Prefix(wire, a.budget.MaxFrameBytes) || f.needsMoreSSHServerPreamble(dir, wire) || initialProtocolNeedMore(wire, a.budget.MaxFrameBytes).Verdict == ProbeNeedMore || needsMoreHTTPStartLine(wire) || f.needsMorePortProtocolPrefix(wire) || f.needsMoreBoundedText(wire) || f.needsMoreOpenWire(wire)) {
 						break
 					}
@@ -767,6 +783,17 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 					return
 				}
 				break
+			}
+		}
+		if f.dlms != nil && f.binding == nil {
+			// TCP-only feed: idle flags are received bytes, but not message
+			// bytes. Advance provenance as well as the unclassified-byte ledger;
+			// the event retains only the actual frame and its packet ranges.
+			if idle := dlmsIdlePrefix(wire); idle != 0 {
+				d.offset += uint64(idle)
+				a.unclassified.Add(uint64(idle))
+				d.pruneContributions(a)
+				wire = wire[idle:]
 			}
 		}
 		if f.protocol == "snmp" && f.snmp != nil {
@@ -1102,6 +1129,21 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 }
 
 func (f *binFlow) close(reason TrafficFlowCloseReason) {
+	if f.dlms != nil && f.binding == nil {
+		for i := range f.directions {
+			d := &f.directions[i]
+			// A proven HDLC stream may finish with idle fill. The last flag
+			// was retained in case a frame followed; it is not a truncated
+			// frame when no format byte ever arrived. Pending APDU context
+			// is still finalized below and cannot be hidden by idle fill.
+			if len(d.buffer) == 1 && d.buffer[0] == 0x7e {
+				f.a.unclassified.Add(1)
+				d.offset++
+				d.pruneContributions(f.a)
+				f.release(d)
+			}
+		}
+	}
 	hadBuffered := len(f.directions[0].buffer) > 0 || len(f.directions[1].buffer) > 0
 	defer func() {
 		if (!hadBuffered || f.rocplus != nil && f.rocplus.pending != nil) && !f.directions[0].stopped && !f.directions[1].stopped {
