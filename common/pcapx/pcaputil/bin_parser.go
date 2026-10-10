@@ -31,7 +31,7 @@ type ProtocolEvent struct {
 	Length                                   int
 	Status, Summary, Rule, Entry, Error      string
 	Raw                                      []byte
-	Fields                                   map[string]any // complete protocol fields; owned by this event
+	Fields                                   map[string]any // owned protocol fields; Completeness identifies header-only views
 	Metadata                                 any
 	Structured                               map[string]any
 	// Session is an owned snapshot of observed connection context. Decoded
@@ -574,8 +574,8 @@ func (f *binFlow) stop(dir int, wire []byte, status, reason string) {
 		if retainedHTTPHeader {
 			e.Length = len(e.Raw)
 			e.Completeness = "headers"
-			e.semanticFields = cloneSession(d.http.headerFields)
-			e.Structured = map[string]any{"fields": cloneSession(d.http.headerFields)}
+			e.semanticFields = d.http.retainedHeaderFields()
+			e.Structured = map[string]any{"fields": cloneSession(e.semanticFields)}
 		}
 	}
 	if status == "limited" {
