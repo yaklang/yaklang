@@ -175,3 +175,5 @@ AA/security/object/device semantics remain pending. The small synthetic batch
 contains whole fields/state/ID answers and an external fixed-reference receiver
 harness. All prior inventories and ZIPs remain immutable; the current unified
 inventory includes DLMS, PFCP usage and core capture controls.
+
+The current whole-field PFCP UsageReport validator is `common/pcapx/pcaputil/pfcp-verifier/verify-controls.py`, run with `corpus exec -- python3 @...`. It reuses the immutable usage inputs and answers, preserves response-only field shape, and validates both historical metadata schemas without dropping any field assertions. The original validator remains archived as historical material.

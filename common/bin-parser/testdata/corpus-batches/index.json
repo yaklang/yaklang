@@ -26521,6 +26521,28 @@
         "common/pcapx/pcaputil/dlms-blocks-conflict/validation/expected.json": "validation/expected.json",
         "scripts/protocol-tests/required-tests-traffic-unified-v2.json": "required-tests-traffic-unified-v2.json"
       }
+    },
+    {
+      "id": "validation-pfcp-verifier",
+      "kind": "validation",
+      "source_sha": "6ddb68afe93421dba596195afc12255babb70d7a",
+      "file": "validation-pfcp-verifier.zip",
+      "sha256": "9ed7e8ea1a74d9ab05e2c1391535ee45bfec210d23dab31fdaa593be72ee67f2",
+      "password": "bin-parser",
+      "members": {
+        "verify-controls.py": {
+          "sha256": "510123d906c11915ad78d5c874b5fdc88c8768119a0992f2011028748c28fe79",
+          "bytes": 4828
+        },
+        "source-pin.json": {
+          "sha256": "fd4ddaf5d5eaf7fe83cdeb5e759c19c8f1693a42cb58e1b3f1983fc459681ace",
+          "bytes": 353
+        }
+      },
+      "aliases": {
+        "common/pcapx/pcaputil/pfcp-verifier/verify-controls.py": "verify-controls.py",
+        "common/pcapx/pcaputil/pfcp-verifier/source-pin.json": "source-pin.json"
+      }
     }
   ],
   "schema_version": 1,
