@@ -41,6 +41,7 @@ func TestDirExploreOutputLifecycle(t *testing.T) {
 			}
 			notePath := filepath.Join(workdir, "dir_structure.md")
 			projectOverview := "这是一个用于提供账户服务的 Go 项目。"
+			exploreReason := "核对目录结构与探索笔记。"
 			report := "# demo 项目探索报告\n\n" + projectOverview + "\n\n## 目录结构\n\n```text\ndemo/\n  cmd/\n  internal/\n```\n\n## 技术栈\n\nGo, SQLite\n\n## 入口\n\ncmd/server/main.go\n\n## 阅读建议\n\n阅读 `x{NNN}_*_test.go`。\n"
 			noteJSON, err := json.Marshal(map[string]any{
 				"@action": "write_file", "identifier": "write_dirs", "human_readable_thought": "内部：写探索笔记", "file": notePath,
@@ -84,6 +85,9 @@ func TestDirExploreOutputLifecycle(t *testing.T) {
 						return nil, context.Canceled
 					}
 					response := c.NewAIResponse()
+					if calls == 0 {
+						response.EmitReasonStream(strings.NewReader(exploreReason))
+					}
 					response.EmitOutputStream(strings.NewReader(responses[calls]))
 					calls++
 					response.Close()
@@ -130,14 +134,21 @@ func TestDirExploreOutputLifecycle(t *testing.T) {
 			var phases []string
 			var finishes, reportPins, noteMilestones int
 			var fullReference, failureResult bool
+			thoughtStreams := make(map[string]string)
+			thoughtFinished := make(map[string]bool)
 			reportingIndex, finishIndex, completedIndex := -1, -1, -1
 			for i, e := range events {
 				require.NotEqual(t, "report-content", e.NodeId)
 				require.NotEqual(t, "report-read-reference", e.NodeId)
-				require.NotEqual(t, "re-act-loop-thought", e.NodeId)
 				require.NotEqual(t, "infra-code-verify", e.NodeId)
 				if e.Type == schema.EVENT_TYPE_STREAM {
 					require.NotContains(t, string(e.StreamDelta), "placeholder")
+					if e.NodeId == "re-act-loop-thought" {
+						thoughtStreams[e.EventUUID] += string(e.Content) + string(e.StreamDelta)
+					}
+				}
+				if e.Type == schema.EVENT_TYPE_STRUCTURED && e.NodeId == "stream-finished" && e.GetContentJSONPath("$.node_id") == "re-act-loop-thought" {
+					thoughtFinished[e.GetContentJSONPath("$.event_writer_id")] = true
 				}
 				if e.NodeId == "status" {
 					var status aicommon.StatusPayload
@@ -177,6 +188,16 @@ func TestDirExploreOutputLifecycle(t *testing.T) {
 					failureResult = true
 				}
 			}
+			var visibleThoughts strings.Builder
+			for id, content := range thoughtStreams {
+				visibleThoughts.WriteString(content + "\n")
+				if strings.Contains(content, exploreReason) || strings.Contains(content, "内部：写探索笔记") {
+					require.True(t, thoughtFinished[id], "exploration thought streams must finish normally")
+				}
+			}
+			require.Contains(t, visibleThoughts.String(), exploreReason)
+			require.Contains(t, visibleThoughts.String(), "内部：写探索笔记")
+			require.NotContains(t, visibleThoughts.String(), "内部：撰写报告", "the parent must still own report generation output")
 			expectedMilestones := 4
 			if outcome == "cancelled" || outcome == "success" {
 				expectedMilestones = 3
