@@ -80,6 +80,9 @@ func (e *ProtocolEvent) Decode() (result map[string]any, err error) {
 	// These native caches are separate from the public event projection. A
 	// caller may edit a returned tree without changing later field queries.
 	if e.ownsNativeFields() && e.semanticFields != nil {
+		if e.nativeQUICWire {
+			return map[string]any{"fields": cloneSession(e.semanticFields), "metadata": nil}, nil
+		}
 		return map[string]any{"fields": cloneSession(e.semanticFields)}, nil
 	}
 	if e.Protocol == "stun" || e.Protocol == "turn" || e.Protocol == "tftp" {
@@ -143,6 +146,9 @@ func (e *ProtocolEvent) GetFields() (map[string]any, error) {
 }
 
 func (e *ProtocolEvent) ownsNativeFields() bool {
+	if e.Profile == "quic-v1-native" || e.Profile == "http3-native" || e.Profile == "doq-native" {
+		return true
+	}
 	if e.Protocol == "semtech-udp" && (e.Profile == semtechDownlinkProfile || e.Profile == semtechCorrelationProfile) {
 		return true
 	}

@@ -505,6 +505,11 @@ func TestM2QUICWireViewParity(t *testing.T) {
 		if payload, ok := got["Protected Payload"].([]any); ok && len(payload) > 0 {
 			payload[0] = byte(255)
 		}
+		e.Raw[0] ^= 255
+		e.Fields = map[string]any{"First Byte": byte(255)}
+		if e.Structured != nil {
+			e.Structured["fields"] = e.Fields
+		}
 		again, err := e.GetFields()
 		require.NoError(t, err)
 		require.Equal(t, want["fields"], again)

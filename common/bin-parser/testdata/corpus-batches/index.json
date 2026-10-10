@@ -35154,6 +35154,143 @@
         "common/pcapx/pcaputil/tftp-generations/controls.json": "controls.json",
         "common/pcapx/pcaputil/tftp-generations/validation/expected.json": "validation/expected.json"
       }
+    },
+    {
+      "id": "validation-quic-retirement",
+      "kind": "validation",
+      "source_sha": "643afdb1d27f5d67c2c44f602cccf75cff424898",
+      "file": "validation-quic-retirement.zip",
+      "sha256": "eb03fd6ad9252165e75269b50f4ff3d894f51b791f47753efd97a70d7c98f212",
+      "password": "bin-parser",
+      "members": {
+        "build.py": {
+          "sha256": "fe2a9521e4724445017132b5b63aad5f3f2378266371fdface3f97df162a1f01",
+          "bytes": 4167
+        },
+        "carrier.py": {
+          "sha256": "53032c4a1d39af131ac35498af5362423aefc47552d34e06420593262684f037",
+          "bytes": 1945
+        },
+        "crypto_reference.py": {
+          "sha256": "bf5d3dd244451e5cb3755626598345ae0c327bbdcc72fe7a40dc36f62f68a00a",
+          "bytes": 2609
+        },
+        "verify-controls.py": {
+          "sha256": "c4264cd419ba3b31cbb04c9e094cc4a64a764e6762ce9811c8897784047187a5",
+          "bytes": 4215
+        },
+        "source-pin.json": {
+          "sha256": "82ec865a6428c413c357a4e774c640d9daaa0d541338504e5402a052eda26721",
+          "bytes": 1722
+        },
+        "seal.py": {
+          "sha256": "6cbb536ab5dd02fbe2dfd6e261e315003ad8aedf7939d1aa5caaba7bcbf07769",
+          "bytes": 3659
+        },
+        "LICENSE.txt": {
+          "sha256": "e5556c94f922a641a638272f55edf8d61c4c9434b3283b126b73ec2648f42f2c",
+          "bytes": 495
+        },
+        "cases/live-retry.pcap": {
+          "sha256": "48f96e18aeb1df2b96d34e0ab9d2bf1d49116cadb91ccf54323c24729a76a59b",
+          "bytes": 2540
+        },
+        "answers/live-retry.json": {
+          "sha256": "3c08c17ba732fc029d044b05ea151d6348b47127e7b992563cba3c82a7177e13",
+          "bytes": 43567
+        },
+        "cases/idle-599.pcap": {
+          "sha256": "97b44c3a472b8f7a4db611081cb8d5a0e892d9cb574b61fc57e5e564c10b21b9",
+          "bytes": 2540
+        },
+        "answers/idle-599.json": {
+          "sha256": "aa23f03ff112a2042902e2b17fc6bd1eec81c045ff134b5c134a3c99f9dd4b4e",
+          "bytes": 43559
+        },
+        "cases/idle-600.pcap": {
+          "sha256": "bbcfeb624a3b648a34beec456b0a0ff4d9bdc7853cd1823f327c8c6a9c149c1f",
+          "bytes": 2540
+        },
+        "answers/idle-600.json": {
+          "sha256": "2297a859053e0b87e87c7f23f88e49ceec8ca6454e1ce109f92d2860a71f94c3",
+          "bytes": 24808
+        },
+        "cases/clock-rewind.pcap": {
+          "sha256": "92a2f82518f1505cf3ec0f9448d55d11fbf0539d901a0cf0b62934d98dfd2966",
+          "bytes": 5056
+        },
+        "answers/clock-rewind.json": {
+          "sha256": "220a5d664a8499921dd2354075c7680ce661f0ae988d49c46751e975b6faa8f2",
+          "bytes": 67824
+        },
+        "cases/budget-retirement.pcap": {
+          "sha256": "b0dd76c7e2b9d2c9031d1ff28e6b62538ff9cfa27013aa045a219fff2af3ed03",
+          "bytes": 3998
+        },
+        "answers/budget-retirement.json": {
+          "sha256": "85450d5c6f0dc6ee121501aa9de6555264f8ffcd57fe225253f213aad93f19c1",
+          "bytes": 27993
+        },
+        "cases/retired-coalesced.pcap": {
+          "sha256": "35f440714969c494377d682b0a4089fb64c39e005ee6a29db1efbda425283e1b",
+          "bytes": 3740
+        },
+        "answers/retired-coalesced.json": {
+          "sha256": "f875e673a58d201f1e8ae5f48ad1f6ed325e2027fbaf02005a68695e2bbfb1af",
+          "bytes": 27244
+        },
+        "cases/fresh-CID-after-idle.pcap": {
+          "sha256": "ed728288da9dccdcca0d59635aa6d346d69b61eb92283eed02a96e9128fcab40",
+          "bytes": 5056
+        },
+        "answers/fresh-CID-after-idle.json": {
+          "sha256": "5d2399d117def0b944a15fab7dbf5b56f32aa1e980fadad5f134c8f105a50dd0",
+          "bytes": 67153
+        },
+        "cases/fresh-CID-after-budget.pcap": {
+          "sha256": "d1dba0e11ee2ef72e70eabab637037f944f82b48f8dd4e07d28f4b893e02d055",
+          "bytes": 6514
+        },
+        "answers/fresh-CID-after-budget.json": {
+          "sha256": "18b49cc2ef9c2236e54856fef5dab0098f1ca61f81636a085eb4ac9f0055973c",
+          "bytes": 70310
+        },
+        "controls.json": {
+          "sha256": "23f898d8b075e63f4d0941bcdb0b197bcb63e3b2c69b619b9293a7bb2428acf1",
+          "bytes": 453934
+        },
+        "validation/expected.json": {
+          "sha256": "c8f454b7c76a30b261a174282387babb4f7b44d881e9142c3962fa06fc4de5d8",
+          "bytes": 9783
+        }
+      },
+      "aliases": {
+        "common/pcapx/pcaputil/quic-retirement/build.py": "build.py",
+        "common/pcapx/pcaputil/quic-retirement/carrier.py": "carrier.py",
+        "common/pcapx/pcaputil/quic-retirement/crypto_reference.py": "crypto_reference.py",
+        "common/pcapx/pcaputil/quic-retirement/verify-controls.py": "verify-controls.py",
+        "common/pcapx/pcaputil/quic-retirement/source-pin.json": "source-pin.json",
+        "common/pcapx/pcaputil/quic-retirement/seal.py": "seal.py",
+        "common/pcapx/pcaputil/quic-retirement/LICENSE.txt": "LICENSE.txt",
+        "common/pcapx/pcaputil/quic-retirement/cases/live-retry.pcap": "cases/live-retry.pcap",
+        "common/pcapx/pcaputil/quic-retirement/answers/live-retry.json": "answers/live-retry.json",
+        "common/pcapx/pcaputil/quic-retirement/cases/idle-599.pcap": "cases/idle-599.pcap",
+        "common/pcapx/pcaputil/quic-retirement/answers/idle-599.json": "answers/idle-599.json",
+        "common/pcapx/pcaputil/quic-retirement/cases/idle-600.pcap": "cases/idle-600.pcap",
+        "common/pcapx/pcaputil/quic-retirement/answers/idle-600.json": "answers/idle-600.json",
+        "common/pcapx/pcaputil/quic-retirement/cases/clock-rewind.pcap": "cases/clock-rewind.pcap",
+        "common/pcapx/pcaputil/quic-retirement/answers/clock-rewind.json": "answers/clock-rewind.json",
+        "common/pcapx/pcaputil/quic-retirement/cases/budget-retirement.pcap": "cases/budget-retirement.pcap",
+        "common/pcapx/pcaputil/quic-retirement/answers/budget-retirement.json": "answers/budget-retirement.json",
+        "common/pcapx/pcaputil/quic-retirement/cases/retired-coalesced.pcap": "cases/retired-coalesced.pcap",
+        "common/pcapx/pcaputil/quic-retirement/answers/retired-coalesced.json": "answers/retired-coalesced.json",
+        "common/pcapx/pcaputil/quic-retirement/cases/fresh-CID-after-idle.pcap": "cases/fresh-CID-after-idle.pcap",
+        "common/pcapx/pcaputil/quic-retirement/answers/fresh-CID-after-idle.json": "answers/fresh-CID-after-idle.json",
+        "common/pcapx/pcaputil/quic-retirement/cases/fresh-CID-after-budget.pcap": "cases/fresh-CID-after-budget.pcap",
+        "common/pcapx/pcaputil/quic-retirement/answers/fresh-CID-after-budget.json": "answers/fresh-CID-after-budget.json",
+        "common/pcapx/pcaputil/quic-retirement/controls.json": "controls.json",
+        "common/pcapx/pcaputil/quic-retirement/validation/expected.json": "validation/expected.json"
+      }
     }
   ],
   "schema_version": 1,
