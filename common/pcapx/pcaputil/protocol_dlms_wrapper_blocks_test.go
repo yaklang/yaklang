@@ -53,11 +53,14 @@ type wrapperBlockControl struct {
 }
 
 func wrapperBlockControls(t *testing.T) []wrapperBlockControl {
-	raw, err := trafficfixture.ReadFile("dlms-blocks/controls.json")
+	return wrapperBlockControlsFrom(t, "dlms-blocks", 33)
+}
+func wrapperBlockControlsFrom(t *testing.T, prefix string, count int) []wrapperBlockControl {
+	raw, err := trafficfixture.ReadFile(prefix + "/controls.json")
 	require.NoError(t, err)
 	var d struct{ Cases []wrapperBlockControl }
 	require.NoError(t, json.Unmarshal(raw, &d))
-	require.Len(t, d.Cases, 33)
+	require.Len(t, d.Cases, count)
 	for _, c := range d.Cases {
 		input := wrapperStructuredInput(t, c.Alias)
 		require.Equal(t, c.SHA, fmt.Sprintf("%x", sha256.Sum256(input)))
@@ -123,8 +126,9 @@ func assertWrapperBlocks(t *testing.T, c wrapperBlockControl, events []*Protocol
 		offsets[a.Dir] += uint64(len(w))
 	}
 }
-func TestDLMSWrapperBlocksSealedMatrix(t *testing.T) {
-	for _, c := range wrapperBlockControls(t) {
+func TestDLMSWrapperBlocksSealedMatrix(t *testing.T) { wrapperBlocksReplay(t, wrapperBlockControls(t)) }
+func wrapperBlocksReplay(t *testing.T, cases []wrapperBlockControl) {
+	for _, c := range cases {
 		t.Run(c.Name, func(t *testing.T) {
 			discoveryMatrix(t, func(t *testing.T, workers int, deferred, observe bool) {
 				var opts []CaptureOption
@@ -159,7 +163,10 @@ func TestDLMSWrapperBlocksSealedMatrix(t *testing.T) {
 	}
 }
 func TestDLMSWrapperBlocksBudgetsOwnership(t *testing.T) {
-	for _, c := range wrapperBlockControls(t) {
+	wrapperBlocksOwnership(t, wrapperBlockControls(t))
+}
+func wrapperBlocksOwnership(t *testing.T, cases []wrapperBlockControl) {
+	for _, c := range cases {
 		for _, deferred := range []bool{false, true} {
 			for _, size := range []int{1, 7, 64, 65543} {
 				if c.Transport == "udp" && size != 65543 {
@@ -214,4 +221,23 @@ func TestDLMSWrapperBlocksBudgetsOwnership(t *testing.T) {
 			}
 		}
 	}
+}
+
+func TestDLMSWrapperBlockConflictSealedMatrix(t *testing.T) {
+	wrapperBlocksReplay(t, wrapperBlockControlsFrom(t, "dlms-blocks-conflict", 3))
+}
+func TestDLMSWrapperBlockConflictBudgetsOwnership(t *testing.T) {
+	wrapperBlocksOwnership(t, wrapperBlockControlsFrom(t, "dlms-blocks-conflict", 3))
+}
+func wrapperBlocksHistoricalFields(t *testing.T, c wrapperControl) []map[string]any {
+	raw, err := trafficfixture.ReadFile("dlms-blocks-conflict/answers/historical-get-next-supported.json")
+	require.NoError(t, err)
+	var a wrapperBlockControl
+	require.NoError(t, json.Unmarshal(raw, &a))
+	require.Equal(t, c.SHA256, a.SHA)
+	require.Len(t, c.CompleteFrames, 1)
+	require.Len(t, a.Answers, 1)
+	require.Equal(t, c.CompleteFrames[0], a.Answers[0].Wire)
+	require.Nil(t, a.Answers[0].Error)
+	return []map[string]any{a.Answers[0].Fields}
 }

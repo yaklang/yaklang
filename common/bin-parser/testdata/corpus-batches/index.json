@@ -26428,6 +26428,99 @@
         "common/pcapx/pcaputil/dlms-blocks/validation/expected.json": "validation/expected.json",
         "scripts/protocol-tests/required-tests-traffic-unified-v1.json": "required-tests-traffic-unified-v1.json"
       }
+    },
+    {
+      "id": "validation-dlms-block-conflict",
+      "kind": "validation",
+      "source_sha": "31c78feca67683b0c5b6367a49ebfa74cb8b87d6",
+      "file": "validation-dlms-block-conflict.zip",
+      "sha256": "21acd86f89ba5cbed215c2a46bc4ed04266bd3daf65fd65031c3e5a3c11b022a",
+      "password": "bin-parser",
+      "members": {
+        "build.py": {
+          "sha256": "0958405fc26c0eb1a055171d31f07f2e8e36ac32ae72137d6755189f42f4c186",
+          "bytes": 3118
+        },
+        "carrier.py": {
+          "sha256": "07db3352defd52e18936a68d327f675a57abc90c59611492c049f102b08843d2",
+          "bytes": 3782
+        },
+        "oracle.py": {
+          "sha256": "243f3164ed2bbc8345114ba51137fd7443347f2d0934fb97f38eccbc5f7177e2",
+          "bytes": 2871
+        },
+        "axdr.py": {
+          "sha256": "5241b8f2df255ff4d3baac5a91ad25129c071ec646fd90fd5d2b8f765644648f",
+          "bytes": 7240
+        },
+        "reference-check.py": {
+          "sha256": "db5bc700cad9a508251d078be6a37605de0e56a11a8ba7928380ad951767c4b6",
+          "bytes": 1458
+        },
+        "verify-controls.py": {
+          "sha256": "29109cf8afbe64488d452c29db23b68eff4834c16b633b0f9aac40728e3bedba",
+          "bytes": 1501
+        },
+        "seal.py": {
+          "sha256": "e90848c08b9fa6f5d2e84816961136c36137fae1a3f0d1a942251fde7ba09182",
+          "bytes": 5008
+        },
+        "source-pin.json": {
+          "sha256": "22aeeac02864a3f820f9a00eedf785af2a675c829f8daafbb2b02c6802d6a2f4",
+          "bytes": 12658
+        },
+        "required-tests-traffic-unified-v2.json": {
+          "sha256": "b48bb0be9b23bee6f8640243286db41a0489c2007f8871a940927f229d983742",
+          "bytes": 107540
+        },
+        "cases/normal-response-adjacent.pcap": {
+          "sha256": "5f609cae586b6c86e4083cc1e5340ebba983fca86a0ac9ae245f211a0d3a5b3d",
+          "bytes": 176
+        },
+        "answers/normal-response-adjacent.json": {
+          "sha256": "a596f54e64de4e77af718997dcea00683c82028dd4b8c0121d9da281f0089f76",
+          "bytes": 3086
+        },
+        "cases/normal-response-conflicts-blocks.pcap": {
+          "sha256": "ddf66a89ed85b1b2eb8f0cb2d37ebd82852a44b09842d52bfde38b1dfccf0f9e",
+          "bytes": 404
+        },
+        "answers/normal-response-conflicts-blocks.json": {
+          "sha256": "17e0209f4ccc79e76222c7d7677ef650625cee9ddca04e183a0cc035661cc3c7",
+          "bytes": 6941
+        },
+        "answers/historical-get-next-supported.json": {
+          "sha256": "a0c2a9a0c6a47bf746356d549836a803171822266d6f6a817376efa51a1eb49d",
+          "bytes": 1650
+        },
+        "controls.json": {
+          "sha256": "091e7d1181bc83ae976ddfffb77bdc32f73b7f60d000ad9c2f45ea2614897692",
+          "bytes": 13274
+        },
+        "validation/expected.json": {
+          "sha256": "01d4297b7f96ab7bbb85a3879581c7ddd0f8400932bf447c4ae09d7a8290d766",
+          "bytes": 2337
+        }
+      },
+      "aliases": {
+        "common/pcapx/pcaputil/dlms-blocks-conflict/build.py": "build.py",
+        "common/pcapx/pcaputil/dlms-blocks-conflict/carrier.py": "carrier.py",
+        "common/pcapx/pcaputil/dlms-blocks-conflict/oracle.py": "oracle.py",
+        "common/pcapx/pcaputil/dlms-blocks-conflict/axdr.py": "axdr.py",
+        "common/pcapx/pcaputil/dlms-blocks-conflict/reference-check.py": "reference-check.py",
+        "common/pcapx/pcaputil/dlms-blocks-conflict/verify-controls.py": "verify-controls.py",
+        "common/pcapx/pcaputil/dlms-blocks-conflict/seal.py": "seal.py",
+        "common/pcapx/pcaputil/dlms-blocks-conflict/source-pin.json": "source-pin.json",
+        "common/pcapx/pcaputil/dlms-blocks-conflict/required-tests-traffic-unified-v2.json": "required-tests-traffic-unified-v2.json",
+        "common/pcapx/pcaputil/dlms-blocks-conflict/cases/normal-response-adjacent.pcap": "cases/normal-response-adjacent.pcap",
+        "common/pcapx/pcaputil/dlms-blocks-conflict/answers/normal-response-adjacent.json": "answers/normal-response-adjacent.json",
+        "common/pcapx/pcaputil/dlms-blocks-conflict/cases/normal-response-conflicts-blocks.pcap": "cases/normal-response-conflicts-blocks.pcap",
+        "common/pcapx/pcaputil/dlms-blocks-conflict/answers/normal-response-conflicts-blocks.json": "answers/normal-response-conflicts-blocks.json",
+        "common/pcapx/pcaputil/dlms-blocks-conflict/answers/historical-get-next-supported.json": "answers/historical-get-next-supported.json",
+        "common/pcapx/pcaputil/dlms-blocks-conflict/controls.json": "controls.json",
+        "common/pcapx/pcaputil/dlms-blocks-conflict/validation/expected.json": "validation/expected.json",
+        "scripts/protocol-tests/required-tests-traffic-unified-v2.json": "required-tests-traffic-unified-v2.json"
+      }
     }
   ],
   "schema_version": 1,

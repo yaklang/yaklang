@@ -70,6 +70,10 @@ func wrapperControls(t *testing.T) []wrapperControl {
 			}
 		}
 		require.Equal(t, 1, bound, c.Name)
+		if c.Name == "wrapper-get-next-block" {
+			doc.Cases[i].Fields = wrapperBlocksHistoricalFields(t, c)
+			doc.Cases[i].Error = nil
+		}
 	}
 	return doc.Cases
 }
@@ -176,7 +180,7 @@ func TestDLMSWrapperSealedReplayMatrix(t *testing.T) {
 				require.EqualValues(t, len(msgs), stats.Messages)
 				for i, e := range msgs {
 					require.Empty(t, e.Error)
-					require.Equal(t, "dlms-wrapper-v1-get-normal", e.Profile)
+					require.Equal(t, wrapperProfile(wrapperWire(t, c.CompleteFrames[i])), e.Profile)
 					require.Equal(t, wrapperWire(t, c.CompleteFrames[i]), e.Raw)
 					f, err := e.GetFields()
 					require.NoError(t, err)

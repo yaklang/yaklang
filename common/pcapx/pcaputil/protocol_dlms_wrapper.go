@@ -340,6 +340,9 @@ func (f *binFlow) consumeWrapper(dir int, w []byte, e *ProtocolEvent) error {
 		p := s.seen[key]
 		if p != nil && p.ambiguous {
 			assoc = "ambiguous-invoke"
+		} else if p != nil && p.pending && p.blockActive && p.flags == m.flags && m.choice == 1 {
+			p.ambiguousBlocks()
+			assoc = "ambiguous-block-transfer"
 		} else if p != nil && p.pending && !p.blockActive && p.flags == m.flags && p.choice == m.choice && p.count == m.count {
 			p.pending = false
 			e.ResponseTo, e.TransactionID = p.id, p.id
