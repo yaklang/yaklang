@@ -120,7 +120,7 @@ scalar equality 只匹配 JSON 标量。对象/数组的文本表示与字符串
 
 新建子库目录先同步；macOS 的每个新 SQLite 连接还设置 `fullfsync=ON`。数据批次和计数在同一个 GORM 事务里提交，重试清空也保持这一规则。启动时由 SQLite 自行恢复 WAL，未提交的 BLOB 与记录原子回滚，再将失去进程锁的活动任务标记为 Interrupted。轻量校验检查版本、状态和完整的提交检查点；深校验检查计数、外键、BLOB 长度、capture/message/stream SHA-256 和流块连续性，损坏则标记 Invalid 并保留数据库。重试从原始捕获重建，不从任意 TCP 偏移恢复。[SQLite 同步设置](https://www.sqlite.org/pragma.html#pragma_synchronous)
 
-当前 `yaklang/go-sqlite3 v0.0.1` 内置 SQLite 3.51.2；官方 WAL-reset 并发缺陷修复始于 3.51.3，并有部分旧版本回移补丁。本实现维持单 writer、不另设并发 checkpointer；SQLite fork 自身仍需补上官方修复，不能用应用测试代替底层补丁。本批没有修改全仓驱动版本。[SQLite WAL-reset 修复说明](https://www.sqlite.org/wal.html#walresetbug)
+仓库将 `yaklang/go-sqlite3` 固定到 `v0.0.2-0.20261010091851-f640de3cfce5`，内置 SQLite 升级为 3.51.3，包含官方 WAL-reset 并发缺陷修复；GORM 版本不变。驱动回归使用官方故障钩子触发 WAL 重置与 checkpoint 的竞争，关闭并重新打开后检查数据库完整性及提交内容，并验证 JSONB 和默认 FTS5 能力。使用 `libsqlite3` 构建标签时链接的是系统 SQLite，需单独确认其包含修复。本实现仍维持单 writer、不另设并发 checkpointer，应用层约束不能代替内核补丁。[SQLite 3.51.3 发布说明](https://www.sqlite.org/releaselog/3_51_3.html)、[SQLite WAL-reset 修复说明](https://www.sqlite.org/wal.html#walresetbug)
 
 任意未建索引的路径仍可搜索，SQLite 根据可用索引选择协议、flow、时间或 ID 候选，然后读取 JSON 做剩余条件过滤。多个字段条件也由优化器选择访问路径；当前没有跨多个独立索引自动构建倒排集合交集。
 
