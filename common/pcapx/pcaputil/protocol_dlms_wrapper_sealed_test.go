@@ -70,6 +70,17 @@ func wrapperControls(t *testing.T) []wrapperControl {
 			}
 		}
 		require.Equal(t, 1, bound, c.Name)
+		if c.Name == "wrapper-get-next-block" {
+			doc.Cases[i].Fields = wrapperBlocksHistoricalFields(t, c)
+			doc.Cases[i].Error = nil
+		}
+		if c.Name == "wrapper-get-selective-access" {
+			// Preserve the hash-bound original refusal; the same input now has
+			// an independent supported answer in the additive selected-access batch.
+			doc.Cases[i].Fields = wrapperNormalAccessHistoricalFields(t, c)
+			doc.Cases[i].Error = nil
+			doc.Cases[i].Session = map[string]any{"outstanding_observed_requests": float64(1)}
+		}
 	}
 	return doc.Cases
 }
@@ -176,7 +187,7 @@ func TestDLMSWrapperSealedReplayMatrix(t *testing.T) {
 				require.EqualValues(t, len(msgs), stats.Messages)
 				for i, e := range msgs {
 					require.Empty(t, e.Error)
-					require.Equal(t, "dlms-wrapper-v1-get-normal", e.Profile)
+					require.Equal(t, wrapperProfile(wrapperWire(t, c.CompleteFrames[i])), e.Profile)
 					require.Equal(t, wrapperWire(t, c.CompleteFrames[i]), e.Raw)
 					f, err := e.GetFields()
 					require.NoError(t, err)
@@ -412,11 +423,13 @@ func TestDLMSWrapperSharedPressureAndLifetime(t *testing.T) {
 					late = s.Feed(1, ts.Add(wrapperIdleTTL), r)
 					require.Nil(t, late.Err)
 					require.Zero(t, late.Events[0].ResponseTo)
-					require.Equal(t, "unmatched-response", late.Events[0].Session["Association"])
-					require.Zero(t, s.Stats().BufferedBytes)
+					require.Equal(t, "ambiguous-conversation", late.Events[0].Session["Association"])
+					require.EqualValues(t, 512, s.Stats().BufferedBytes)
 					fresh := s.Feed(0, ts.Add(wrapperIdleTTL), q)
 					require.Nil(t, fresh.Err)
-					require.NotEqual(t, first.Events[0].FlowID, fresh.Events[0].FlowID)
+					require.Equal(t, first.Events[0].FlowID, fresh.Events[0].FlowID)
+					require.Zero(t, fresh.Events[0].TransactionID)
+					require.Equal(t, "ambiguous-conversation", fresh.Events[0].Session["Association"])
 					s.Close("expired")
 					require.Zero(t, s.Stats().BufferedBytes)
 				}

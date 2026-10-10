@@ -26,6 +26,50 @@ type binUDPStore struct {
 	clock   time.Time
 }
 
+func (f *binFlow) retireSNMPUDP() {
+	f.snmp.retirePending()
+	retained := f.snmp.storage()
+	if retained < f.sessionBytes {
+		f.a.buffered.Add(retained - f.sessionBytes)
+		f.sessionBytes = retained
+	}
+}
+
+// Idle time is not a wire generation boundary for UDP. Keep a bounded,
+// capture-domain/endpoint-scoped identity history while releasing pending wire,
+// fragments and Data. A fully completed exchange may accept a distinct identity
+// using its retained sequence/context history; idle alone must not revoke that
+// history or manufacture a fresh generation. An unfinished exchange still needs
+// quarantine because its peer progression was not completely observed.
+func (f *binFlow) retireDLMSUDP() {
+	if s := f.dlms; s != nil && (s.pending != nil || s.transfer != nil || s.fragments != nil) {
+		f.dlms.invalidate()
+	}
+	retained := int64(512)
+	if f.wrapper != nil {
+		s := f.wrapper
+		complete := !s.blocked && s.outstanding() == 0
+		for _, p := range s.seen {
+			complete = complete && !p.blockActive
+		}
+		if complete {
+			// Keep every used logical-endpoint/invoke token charged and unusable.
+			// A late reply for one token cannot poison another pending token.
+			for _, p := range s.seen {
+				p.ambiguous, p.idleRetired = true, true
+			}
+		} else {
+			s.invalidate()
+			s.seen = nil
+		}
+		retained = s.storage()
+	}
+	if f.sessionBytes > retained {
+		f.a.buffered.Add(retained - f.sessionBytes)
+		f.sessionBytes = retained
+	}
+}
+
 func (a *binParser) decodeTFTPDatagram(e *ProtocolEvent, w []byte) bool {
 	a.udpMu.Lock()
 	defer a.udpMu.Unlock()
@@ -217,10 +261,10 @@ func (a *binParser) decodeSNMPDatagram(e *ProtocolEvent, w []byte, explicit stri
 	for el := s.lru.Front(); el != nil; {
 		next := el.Next()
 		v := el.Value.(*binUDPEntry)
-		if s.clock.Sub(v.touched) >= 10*time.Minute {
-			v.flow.closeSession()
-			delete(s.entries, v.key)
-			s.lru.Remove(el)
+		if v.flow.snmp != nil && s.clock.Sub(v.touched) >= 10*time.Minute {
+			// UDP idle is not a new generation. Release live request state,
+			// retain charged scoped identities and allow distinct unused IDs.
+			v.flow.retireSNMPUDP()
 		}
 		el = next
 	}
@@ -255,9 +299,11 @@ func (a *binParser) decodeSNMPDatagram(e *ProtocolEvent, w []byte, explicit stri
 			err = protocolError(ErrContextRequired, "SNMP conversation context was closed")
 		} else {
 			f.snmp.expirePending(s.clock)
-			err = f.reserveSession(256 + int64(len(f.snmp.pending)+1)*128 + int64(len(w))*3)
+			err = f.reserveSession(f.snmp.storage() + 512 + int64(len(w))*3)
 			if err == nil {
 				e.Session, err = f.snmp.consumeAt(w, sessionCollectionLimit(a.budget.MaxCollectionElements), dir, s.clock)
+			} else {
+				f.snmp.invalidate()
 			}
 		}
 		if e.Session != nil {
@@ -295,14 +341,20 @@ func (a *binParser) decodeSTUNDatagram(e *ProtocolEvent, w []byte, explicitTurn 
 		if e.Timestamp.After(s.clock) {
 			s.clock = e.Timestamp
 		}
-		for el := s.lru.Front(); el != nil; el = s.lru.Front() {
+		for el := s.lru.Front(); el != nil; {
+			next := el.Next()
 			v := el.Value.(*binUDPEntry)
 			if s.clock.Sub(v.touched) < 10*time.Minute {
 				break
 			}
-			v.flow.closeSession()
-			delete(s.entries, v.key)
-			s.lru.Remove(el)
+			// This store also contains unrelated application state and quarantine.
+			// STUN's idle policy cannot reset another protocol's identity history.
+			if v.flow.stun != nil {
+				v.flow.closeSession()
+				delete(s.entries, v.key)
+				s.lru.Remove(el)
+			}
+			el = next
 		}
 	}
 	var el *list.Element
@@ -451,6 +503,14 @@ func (a *binParser) finishProtocolDatagram(e *ProtocolEvent, w []byte, spec *bin
 	}
 }
 func (a *binParser) closeUDPSessions() {
+	// Snapshot incomplete native block and information segmentation observations.
+	// Emit after unlocking; user callbacks must not run under udpMu.
+	var incomplete []*ProtocolEvent
+	defer func() {
+		for _, e := range incomplete {
+			a.emit(e)
+		}
+	}()
 	a.dnsMu.Lock()
 	for _, p := range a.dns.pending {
 		a.buffered.Add(-p.cost)
@@ -459,9 +519,28 @@ func (a *binParser) closeUDPSessions() {
 	a.dnsMu.Unlock()
 	a.udpMu.Lock()
 	defer a.udpMu.Unlock()
-	if s := a.udpSessions; s != nil {
+	if s := a.semtechSessions; s != nil {
 		for _, el := range s.entries {
 			el.Value.(*binUDPEntry).flow.closeSession()
+		}
+		a.semtechSessions = nil
+	}
+	a.semtechDisabled = false
+	if s := a.udpSessions; s != nil {
+		for _, el := range s.entries {
+			v := el.Value.(*binUDPEntry)
+			f := v.flow
+			if d := f.dlms; d != nil && d.fragments != nil {
+				dir := d.pending.dir
+				incomplete = append(incomplete, &ProtocolEvent{FlowID: f.id, Timestamp: v.touched, Domain: v.key.domain, Transport: "udp", Source: f.endpoints[dir], Destination: f.endpoints[1-dir], Direction: dir, Protocol: "dlms", Profile: "dlms-hdlc-segmented-response", Status: "incomplete", Completeness: "incomplete", Summary: "DLMS HDLC exchange ended with an incomplete segmented response", Session: d.fragmentCloseFields()})
+				a.incomplete.Add(1)
+			} else if d != nil && d.transfer != nil {
+				t := d.transfer
+				dir := t.initial.dir
+				incomplete = append(incomplete, &ProtocolEvent{FlowID: f.id, Timestamp: v.touched, Domain: v.key.domain, Transport: "udp", Source: f.endpoints[dir], Destination: f.endpoints[1-dir], Direction: dir, Protocol: "dlms", Profile: "dlms-hdlc-get-block", Status: "incomplete", Completeness: "incomplete", Summary: "DLMS HDLC exchange ended with an incomplete data-block transfer", Session: map[string]any{"Outstanding": 1, "ObservedBlocks": t.blocks, "EncodedBytes": len(t.data)}})
+				a.incomplete.Add(1)
+			}
+			f.closeSession()
 		}
 		a.udpSessions = nil
 	}

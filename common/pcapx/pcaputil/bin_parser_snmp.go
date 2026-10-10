@@ -14,7 +14,34 @@ import (
 // content remains opaque without caller-supplied key material.
 type binSNMP struct {
 	pending map[snmpPendingKey]snmpPendingRequest
+	history map[snmpPendingKey]snmpIdentity
+	blocked bool
 	clock   time.Time
+}
+
+type snmpIdentity struct {
+	digest  [32]byte
+	retired bool
+}
+
+func (s *binSNMP) storage() int64 {
+	// Full v3 scoped/security fingerprints and both bounded map entries are
+	// charged; no caller-owned PDU, community or scoped name is retained.
+	return 512 + 384*int64(len(s.history)) + 128*int64(len(s.pending))
+}
+
+func (s *binSNMP) retirePending() {
+	for key := range s.pending {
+		h := s.history[key]
+		h.retired = true
+		s.history[key] = h
+		delete(s.pending, key)
+	}
+}
+
+func (s *binSNMP) invalidate() {
+	s.retirePending()
+	s.blocked = true
 }
 
 type snmpPendingRequest struct {
@@ -129,13 +156,15 @@ func (f *binFlow) frameSNMP(w []byte) (int, *binSpec, error) {
 	if f.snmp == nil {
 		return 0, nil, sessionContext("SNMP session was not observed")
 	}
-	if err := f.reserveSession(256 + int64(len(f.snmp.pending)+1)*128); err != nil {
+	if err := f.reserveSession(f.snmp.storage() + 512 + int64(len(w))*3); err != nil {
+		f.snmp.invalidate()
 		return 0, nil, err
 	}
 	if len(w) == 0 {
 		return 0, nil, nil
 	}
 	if w[0] != 0x30 {
+		f.snmp.invalidate()
 		return 0, nil, fmt.Errorf("snmp: expected SEQUENCE")
 	}
 	if len(w) < 2 {
@@ -143,6 +172,7 @@ func (f *binFlow) frameSNMP(w []byte) (int, *binSpec, error) {
 	}
 	n, hdr, err := berLength(w[1:])
 	if err != nil {
+		f.snmp.invalidate()
 		return 0, nil, err
 	}
 	if hdr == 0 {
@@ -150,6 +180,7 @@ func (f *binFlow) frameSNMP(w []byte) (int, *binSpec, error) {
 	}
 	total := 1 + hdr + n
 	if total > f.a.config.MaxMessageBytes {
+		f.snmp.invalidate()
 		return f.a.config.MaxMessageBytes + 1, nil, nil
 	}
 	if total > len(w) {
@@ -166,11 +197,21 @@ func (s *binSNMP) consume(raw []byte, max int, direction int) (map[string]any, e
 }
 
 // consumeAt advances observed-time expiry before parsing each message. SNMP
-// UDP/TCP conversations can outlive many request IDs; bounded map cardinality
-// alone would otherwise let completed-in-the-capture stale requests consume
-// the entire matching budget forever. A zero timestamp is used by stateless
-// field decoding and deliberately disables transaction expiry.
-func (s *binSNMP) consumeAt(raw []byte, max int, direction int, observed time.Time) (map[string]any, error) {
+// Expiration releases active matching slots but retains bounded identity
+// tombstones: elapsed time cannot distinguish a late response from ID reuse.
+// A zero timestamp is used by stateless decoding and disables active expiry.
+func (s *binSNMP) consumeAt(raw []byte, max int, direction int, observed time.Time) (out map[string]any, failure error) {
+	defer func() {
+		if failure == nil {
+			return
+		}
+		// A fully parsed new key refused by a full immutable history cannot
+		// later be admitted. Preserve unrelated live keys in that case only.
+		if pe, ok := failure.(*ProtocolError); ok && pe.Kind == ErrResourceExceeded && out != nil && out["Association Status"] == "untracked-resource-refusal" {
+			return
+		}
+		s.invalidate()
+	}()
 	s.expirePending(observed)
 	tag, msg, next, err := snmpReadTLV(raw, 0)
 	if err != nil {
@@ -283,7 +324,8 @@ func (s *binSNMP) consumeAt(raw []byte, max int, direction int, observed time.Ti
 	}
 	info["Message ID"] = msgID
 	info["Security Context"] = "usm-user-unverified"
-	return s.correlate(parsed.name, parsed.requestID, msgID, 3, direction, "v3:"+snmpSecurityFingerprint(engineID, user), info, max)
+	security := fmt.Sprintf("v3:%s:%s:%d", snmpSecurityFingerprint(engineID, user), snmpSecurityFingerprint(ctxEngine, ctxName), flags&(snmpFlagAuth|snmpFlagPriv))
+	return s.correlate(parsed.name, parsed.requestID, msgID, 3, direction, security, sha256.Sum256(pdu), info, max)
 }
 
 func (s *binSNMP) expirePending(observed time.Time) {
@@ -301,6 +343,9 @@ func (s *binSNMP) expirePending(observed time.Time) {
 			continue
 		}
 		if s.clock.Sub(request.lastSeen) >= snmpPendingTTL {
+			h := s.history[key]
+			h.retired = true
+			s.history[key] = h
 			delete(s.pending, key)
 		}
 	}
@@ -346,37 +391,70 @@ func (s *binSNMP) consumeCommunityMessage(msg []byte, at int, version int64, dir
 		info["Error Status"] = parsed.status
 		info["Error Index"] = parsed.index
 	}
-	return s.correlate(parsed.name, parsed.requestID, 0, version, direction, security, info, max)
+	return s.correlate(parsed.name, parsed.requestID, 0, version, direction, security, sha256.Sum256(pdu), info, max)
 }
 
-func (s *binSNMP) correlate(name string, reqID, msgID, version int64, direction int, security string, info map[string]any, max int) (map[string]any, error) {
+func (s *binSNMP) correlate(name string, reqID, msgID, version int64, direction int, security string, digest [32]byte, info map[string]any, max int) (map[string]any, error) {
 	if s.pending == nil {
 		s.pending = map[snmpPendingKey]snmpPendingRequest{}
+	}
+	if s.history == nil {
+		s.history = map[snmpPendingKey]snmpIdentity{}
+	}
+	if max <= 0 {
+		max = 4096
+	}
+	unmatched := func(status string) {
+		info["Unmatched"], info["Association Status"], info["Context Level"] = true, status, "partial"
+	}
+	if s.blocked {
+		unmatched("ambiguous-conversation")
+		return info, nil
 	}
 	key := snmpPendingKey{direction: direction, version: version, requestID: reqID, messageID: msgID, security: security}
 	switch name {
 	case "GetRequest", "GetNextRequest", "SetRequest", "GetBulkRequest", "InformRequest":
-		if max <= 0 {
-			max = 4096
+		if h, used := s.history[key]; used {
+			p, active := s.pending[key]
+			if !h.retired && active && p.name == name && h.digest == digest {
+				p.lastSeen = s.clock
+				s.pending[key] = p
+				info["Retransmission"], info["Outstanding"] = true, true
+				return info, nil
+			}
+			h.retired = true
+			s.history[key] = h
+			delete(s.pending, key)
+			unmatched("ambiguous-request-id")
+			info["Outstanding"] = false
+			return info, nil
 		}
-		if len(s.pending) >= max {
-			return info, protocolError(ErrResourceExceeded, "SNMP outstanding request-ids exceed budget")
+		if len(s.history) >= max {
+			unmatched("untracked-resource-refusal")
+			return info, protocolError(ErrResourceExceeded, "SNMP retained request identities exceed budget")
 		}
-		if _, exists := s.pending[key]; exists {
-			info["Retransmission"] = true
-		}
+		s.history[key] = snmpIdentity{digest: digest}
 		s.pending[key] = snmpPendingRequest{name: name, lastSeen: s.clock}
 		info["Outstanding"] = true
 	case "Response", "Report":
 		key.direction = 1 - direction
-		if request, ok := s.pending[key]; ok {
+		h, used := s.history[key]
+		if request, ok := s.pending[key]; ok && !h.retired {
 			delete(s.pending, key)
+			h.retired = true
+			s.history[key] = h
 			info["Matched Request"] = request.name
 			info["Association Status"] = "matched"
 		} else {
-			info["Unmatched"] = true
-			info["Association Status"] = "missing-request"
-			info["Context Level"] = "partial"
+			status := "missing-request"
+			if used {
+				status = "ambiguous-request-id"
+			} else if len(s.history) < max {
+				// An orphan can be an unseen exchange. Do not let its replay
+				// become a newly observed request's response later in the capture.
+				s.history[key] = snmpIdentity{retired: true}
+			}
+			unmatched(status)
 		}
 	case "TrapV2":
 		info["Unsolicited"] = true

@@ -38,15 +38,20 @@ func (a *binParser) decodeQUICDatagram(base *ProtocolEvent, wire []byte) ([]*Pro
 	if base.Timestamp.After(s.clock) {
 		s.clock = base.Timestamp
 	}
-	for el := s.lru.Front(); el != nil; el = s.lru.Front() {
+	for el := s.lru.Front(); el != nil; {
+		next := el.Next()
 		v := el.Value.(*binUDPEntry)
 		if s.clock.Sub(v.touched) < 10*time.Minute {
 			break
 		}
-		v.flow.closeSession()
-		delete(s.entries, v.key)
-		s.lru.Remove(el)
+		if v.flow.quic != nil {
+			v.flow.closeSession()
+			delete(s.entries, v.key)
+			s.lru.Remove(el)
+		}
+		el = next
 	}
+
 	var el *list.Element
 	dir := 0
 	for _, candidate := range s.entries {

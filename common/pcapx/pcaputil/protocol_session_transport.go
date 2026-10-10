@@ -85,8 +85,8 @@ func probeDatagram(raw []byte, maxBytes int) ProbeResult {
 	if len(raw) > maxBytes {
 		return ProbeResult{Verdict: ProbeReject, Reason: "datagram exceeds configured byte limit"}
 	}
-	if dlmsRequestEvidence(raw) {
-		return probeAccept("dlms", "hdlc-get-normal", 98)
+	if p := probeDLMS(raw, maxBytes); p.Verdict == ProbeAccept {
+		return p
 	}
 	if slmpRequestEvidence(raw) {
 		return probeAccept("slmp", "slmp-binary-self-test", 98)

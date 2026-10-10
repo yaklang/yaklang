@@ -68,6 +68,12 @@ func (e *ProtocolEvent) Decode() (result map[string]any, err error) {
 	if (e.Protocol == "tls" || e.Protocol == "redis" || e.Entry == "MySQLPreparedFields") && e.Session != nil {
 		return map[string]any{"fields": cloneSession(e.Session)}, nil
 	}
+	// SNMP exposes independently observed envelope metadata even when the
+	// scoped PDU is encrypted or association state was refused. Preserve that
+	// established field-query contract; Status/Error still report the refusal.
+	if e.Protocol == "snmp" && e.semanticFields != nil {
+		return map[string]any{"fields": cloneSession(e.semanticFields)}, nil
+	}
 	if e.ownsNativeFields() && e.sessionError != nil {
 		return nil, e.sessionError
 	}
@@ -129,7 +135,7 @@ func (e *ProtocolEvent) GetFields() (map[string]any, error) {
 }
 
 func (e *ProtocolEvent) ownsNativeFields() bool {
-	if e.Protocol == "semtech-udp" && e.Profile == semtechDownlinkProfile {
+	if e.Protocol == "semtech-udp" && (e.Profile == semtechDownlinkProfile || e.Profile == semtechCorrelationProfile) {
 		return true
 	}
 	if e.Protocol == "profinet" && e.Profile == "profinet-carrier-diagnostic" {
@@ -139,7 +145,7 @@ func (e *ProtocolEvent) ownsNativeFields() bool {
 		return true
 	}
 	switch e.Protocol {
-	case "dlms-wrapper", "dlms", "opendroneid", "c37118", "sv", "ethercat", "knx", "pfcp", "profinet-dcp":
+	case "snmp", "dlms-wrapper", "dlms", "opendroneid", "c37118", "sv", "ethercat", "knx", "pfcp", "profinet-dcp":
 		return true
 	}
 	return false
@@ -238,6 +244,8 @@ type binSpec struct {
 }
 type binParser struct {
 	pfcpSessionIdentity                                                        *pfcpSessionIdentity
+	semtechDisabled                                                            bool         // udpMu; bounded opt-in correlation fails closed after global state exhaustion
+	semtechSessions                                                            *binUDPStore // udpMu; token quarantine must survive unrelated UDP expiry
 	datagramDecodeAs                                                           map[uint16]string
 	canDecodeAs                                                                map[int]string
 	fragments                                                                  fragmentStore
@@ -448,6 +456,7 @@ type binFlow struct {
 	rocplus           *binROCPlus
 	bsap              *binBSAP
 	pfcp              *binPFCP
+	semtech           *binSemtechDownlink
 	slmp              *binSLMP
 	slmpTCP           *binSLMPTCP
 	wrapper           *binDLMSWrapper
@@ -886,7 +895,7 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 				}
 				if f.protocol == "snmp" && e.Session != nil {
 					e.semanticFields = cloneSession(e.Session)
-					result = map[string]any{"fields": e.semanticFields}
+					result = map[string]any{"fields": cloneSession(e.semanticFields)}
 				}
 				if (f.protocol == "dlms-wrapper" || f.protocol == "slmp") && e.Session != nil {
 					result = map[string]any{"fields": cloneSession(e.semanticFields)}
@@ -966,7 +975,7 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 				// decoding and history; retrying a different grammar loses fields
 				// or rejects valid argumentless/multiline messages.
 				e.semanticFields = protocolFields(result)
-				if e.Protocol == "slmp" || e.Protocol == "dlms-wrapper" || e.Protocol == "dlms" || e.Protocol == "c37118" {
+				if e.Protocol == "snmp" || e.Protocol == "slmp" || e.Protocol == "dlms-wrapper" || e.Protocol == "dlms" || e.Protocol == "c37118" {
 					e.semanticFields = cloneSession(e.semanticFields)
 				}
 			}

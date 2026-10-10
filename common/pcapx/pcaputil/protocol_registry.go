@@ -12,8 +12,8 @@ func NativeProtocolProfiles() []ProtocolProfile {
 		{"pfcp", "udp", "PFCPv1 Heartbeat, AssociationSetup5/6 Update7/8/Release9/10 and unbundled SessionDeletion54/55 selected core", "TS29.244 v16.12.1, first-wins bounded IEs and exact selected NodeID/FQDN/Cause/features; Heartbeat Recovery is mandatory and Setup Recovery does not drive restart; shared originating-endpoint sequence namespace across peer/message kinds, exact response-type/endpoint/domain observation, ambiguity quarantine and erroneous supported reply retirement; receiver-local uint64 SEIDs, Cause2/AURI follow-on-report claims, priority and ordered raw report groups; optional independent SEID binding on an isolated UDP byte session; observed release flags and graceful timer do not prove authenticated association, live session deletion, negotiated features or restart"},
 		{"c37118", "tcp/udp", "v1/v2 complete CFG-2 and configuration-dependent DATA", "same observed publisher and capture-domain configuration, raw channel encodings and bounded validated replacement; no CFG-3, scaling, authenticated source or measurement quality claim"},
 		{"opendroneid", "explicit-udp", "protocol2 Basic ID/Location and selected message packs", "raw25-byte messages or exact pack; ordered unverified IDs/location, reserved fields preserved; no automatic admission, ODID prefix, BLE/Wi-Fi broadcast, authentication or aircraft/position validity claim"},
-		{"dlms-wrapper", "tcp/udp", "Wrapper v1 selected unciphered LN Get-normal", "exact WPDU/APDU and scalar/octet fields, reversed carrier/wPort/invoke/flags observations; pre-established AA may be unseen; no authentication, negotiated conformance, object model, block/list/cipher/ACSE claim"},
-		{"dlms", "tcp/udp", "complete standalone HDLC type3 tunnel frames", "CRC/address/link controls and selected unciphered LN Get-normal scalars with observed endpoints, invoke and link sequence; ambiguity blocks association; no IP wrapper, ACSE authentication, ciphering, block/list/segmented transfer or meter object semantics"},
+		{"dlms-wrapper", "tcp/udp", "Wrapper v1 selected unciphered LN Get-normal/Get-with-list", "exact WPDU/APDU, ordered normal/list/block descriptors and selected scalar/octet/bits/float/text/calendar/compact/array/structure/error results; list caps64 items/1024 octets, aggregate256 Data nodes/8 levels plus caller budgets; structured selective parameters without selector meaning; reversed carrier/wPort/invoke/full-flags/choice/count observations, invoke reuse ambiguous; pre-established AA may be unseen; no authentication, negotiated conformance, object model, unselected Data, GBT/cipher/ACSE claim"},
+		{"dlms", "tcp/udp", "complete standalone HDLC type3 tunnel frames", "CRC/address/link controls and selected unciphered LN Get-normal scalars with observed endpoints, invoke and link sequence; ambiguity blocks association; ordered bounded GET lists with exact full invoke/choice/count/address/NSNR observations; no IP wrapper, ACSE authentication, ciphering, block/segmented transfer or meter object semantics"},
 		{"slmp", "tcp/udp", "binary3E/4E connected-station Self Test0619/0000", "exact timer/count/loopback/error fields and observed requester; UDP one outstanding route/serial/echo match with ambiguous overlap quarantined; TCP bounded distinct-serial 4E pipeline and sequential distinct-echo 3E success; completed identifier reuse and later unsequenced TCP errors remain context-required; no ASCII, other commands, private MELSOFT or authenticated device claim"},
 		{"dronecan", "can", "explicit-interface v0 single-frame NodeStatus", "standard message type341 complete fields; strict tail and DSDL bit order; reserved Mode/nonzero SubMode preserved; no multi-frame CRC/reassembly, anonymous/services, CAN FD application, Cyphal v1 or authenticated/online node inference"},
 		{"socketcan", "can", "DLT227 controller records", "network-order CAN IDs; classical data/RTR/controller-error details and canonical72-byteFD; opaque padding, no bus CRC/authenticated peer or transaction claim"},
@@ -24,6 +24,7 @@ func NativeProtocolProfiles() []ProtocolProfile {
 		{"bsap", "udp", "Jan-2022 local serial-carried RDB ReadByName", "DLE/CRC validation, endpoint/application sequence and one bounded request; selected type/logical/string values and errors; value-only responses require type context; no analog interpretation, global routing or native BSAP-IP"},
 		{"roc-plus", "tcp", "October 2022 Read/Set Real-time Clock and Error Indicator frames", "observed TCP initiator and reversed logical station addresses with one pending request; overlaps ambiguous until close, Ethernet CRC diagnostic, reported clock unauthenticated; no other opcodes or serial receiver"},
 		{"rtps", "udp", "RTPS2.1-2.5 SPDP parameter-list discovery and inline KeyHash/StatusInfo lifecycle DATA, INFO_TS and PAD", "observed GUID, sequence, endpoint set, lease and locators; repeated claims remain ordered and conflicting scalars ambiguous; no topic CDR, DATA_FRAG, reliable-writer or DDS Security inference"},
+		{"semtech-downlink-session", "explicit-udp", "Semtech v2 PULL_RESP/TX_ACK passive association", "opt-in exact endpoints/capture domain/token and full JSON observation; capture-lifetime token quarantine,30second pending expiry and fail-closed bounded state; no authentication, gateway identity binding or RF delivery proof"},
 		{"semtech-udp", "udp", "Semtech packet-forwarder v2 upstream and PULL_RESP/TX_ACK observations", "fixed v4.0.1 sender fields, exact JSON numbers/base64 and unresolved sender defaults; observed gateway/token only, no token association, radio config/GPS validation, RF delivery or LoRaWAN PHY/security"},
 		{"mavlink", "udp", "MAVLink v1/v2 HEARTBEAT, SYS_STATUS and GLOBAL_POSITION_INT", "pinned common-message CRC_EXTRA and complete datagram; v2 signatures opaque and unverified"},
 		{"nmea", "udp", "complete NMEA 0183 GGA/RMC sentences", "XOR checksum, bounded fields and coordinates; position is observed and unauthenticated; no AIS"},
@@ -69,7 +70,7 @@ func WithProtocolDecodeAs(transport string, port uint16, protocol string) Captur
 			return fmt.Errorf("DecodeAs requires UDP and a nonzero port")
 		}
 		switch protocol {
-		case "dns", "mdns", "llmnr", "dhcp", "dhcpv6", "syslog", "snmp", "mqtt-sn", "bittorrent-dht", "bjnp", "rtp", "sip", "stun", "turn", "dtls", "mavlink", "nmea", "semtech-udp", "rtps", "bsap", "slmp", "dlms", "opendroneid", "c37118", "knx", "pfcp", "dlms-wrapper", "doip":
+		case "dns", "mdns", "llmnr", "dhcp", "dhcpv6", "syslog", "snmp", "mqtt-sn", "bittorrent-dht", "bjnp", "rtp", "sip", "stun", "turn", "dtls", "mavlink", "nmea", "semtech-udp", "semtech-downlink-session", "rtps", "bsap", "slmp", "dlms", "opendroneid", "c37118", "knx", "pfcp", "dlms-wrapper", "doip":
 		default:
 			return fmt.Errorf("unsupported native DecodeAs profile")
 		}
@@ -133,6 +134,9 @@ func (a *binParser) decodeNativeDatagram(e *ProtocolEvent, w []byte, src, dst ui
 	explicit := a.datagramDecodeAs[dst]
 	if explicit == "" {
 		explicit = a.datagramDecodeAs[src]
+	}
+	if explicit == "semtech-downlink-session" {
+		return a.decodeSemtechCorrelatedDatagram(e, w)
 	}
 	if (explicit == "" || explicit == "semtech-udp") && a.decodeSemtechDownlinkDatagram(e, w, src, dst, explicit == "semtech-udp") {
 		return true

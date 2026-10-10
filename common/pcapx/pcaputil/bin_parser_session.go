@@ -590,13 +590,13 @@ func (f *binFlow) consumeSession(dir int, e *ProtocolEvent, result map[string]an
 		if e.ID == 0 {
 			e.ID = f.a.ids.Add(1)
 		}
-		e.Profile, e.Completeness = "dlms-wrapper-v1-get-normal", "message"
+		e.Profile, e.Completeness = wrapperProfile(e.Raw), "message"
 		err = f.consumeWrapper(dir, e.Raw, e)
 	case "dlms":
 		if e.ID == 0 {
 			e.ID = f.a.ids.Add(1)
 		}
-		e.Profile, e.Completeness = "dlms-hdlc-get-normal", "message"
+		e.Profile, e.Completeness = dlmsProfile(e.Raw), "message"
 		e.Session, e.ResponseTo, err = f.consumeDLMS(dir, e.Raw, e.ID)
 		if err == nil {
 			e.semanticFields = cloneSession(e.Session)
@@ -866,6 +866,7 @@ func (f *binFlow) closeSession() {
 	f.rocplus = nil
 	f.bsap = nil
 	f.pfcp = nil
+	f.semtech = nil
 	f.slmp = nil
 	f.slmpTCP = nil
 	f.dlms = nil
@@ -1024,8 +1025,14 @@ func (f *binFlow) finishSession(reason TrafficFlowCloseReason) {
 	if w := f.wrapper; w != nil && w.outstanding() > 0 {
 		emit(0, map[string]any{"Outstanding": w.outstanding()}, "DLMS Wrapper exchange ended with unmatched observed requests")
 	}
-	if d := f.dlms; d != nil && d.pending != nil {
-		emit(d.pending.dir, map[string]any{"Outstanding": 1}, "DLMS HDLC exchange ended with an unmatched request")
+	if d := f.dlms; d != nil {
+		if d.fragments != nil {
+			emit(d.pending.dir, d.fragmentCloseFields(), "DLMS HDLC exchange ended with an incomplete segmented response")
+		} else if d.transfer != nil {
+			emit(d.transfer.initial.dir, map[string]any{"Outstanding": 1, "ObservedBlocks": d.transfer.blocks, "EncodedBytes": len(d.transfer.data)}, "DLMS HDLC exchange ended with an incomplete data-block transfer")
+		} else if d.pending != nil {
+			emit(d.pending.dir, map[string]any{"Outstanding": 1}, "DLMS HDLC exchange ended with an unmatched request")
+		}
 	}
 	if r := f.rocplus; r != nil && r.pending != nil {
 		emit(r.clientDir, map[string]any{"Outstanding": 1}, "ROC Plus clock exchange ended with an unmatched request")

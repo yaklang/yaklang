@@ -64,6 +64,32 @@ func dlmsInput(t *testing.T, c bsapControl) ([]byte, bsapAnswer) {
 	require.Equal(t, c.AnswerSHA, fmt.Sprintf("%x", sha256.Sum256(ans)))
 	var a bsapAnswer
 	require.NoError(t, json.Unmarshal(ans, &a))
+	if c.ID == "array" {
+		// Preserve the original UnsupportedFeature answer; upgrade only this
+		// independently proven legal Data form and bind both immutable hashes.
+		var upgrade struct {
+			CaptureSHA        string     `json:"capture_sha256"`
+			OriginalAnswerSHA string     `json:"historical_answer_sha256"`
+			OriginalError     string     `json:"historical_error"`
+			Answer            bsapAnswer `json:"answer"`
+		}
+		upgraded, err := trafficfixture.ReadFile("dlms-hdlc-normal-data/historical-array-upgrade.json")
+		require.NoError(t, err)
+		require.NoError(t, json.Unmarshal(upgraded, &upgrade))
+		require.Equal(t, c.SHA256, upgrade.CaptureSHA)
+		require.Equal(t, c.AnswerSHA, upgrade.OriginalAnswerSHA)
+		require.Equal(t, "UnsupportedFeature", upgrade.OriginalError)
+		require.Len(t, a.Events, 2)
+		require.Equal(t, upgrade.OriginalError, a.Events[1].Error)
+		require.Len(t, upgrade.Answer.Events, len(a.Events))
+		for i, e := range a.Events {
+			require.Equal(t, e.Raw, upgrade.Answer.Events[i].Raw)
+			require.Equal(t, e.Direction, upgrade.Answer.Events[i].Direction)
+			require.Empty(t, upgrade.Answer.Events[i].Error)
+			require.NotNil(t, upgrade.Answer.Events[i].Fields)
+		}
+		a = upgrade.Answer
+	}
 	require.Equal(t, c.Packets, a.Packets)
 	r, err := NewCaptureReader(bytes.NewReader(raw))
 	require.NoError(t, err)
@@ -411,9 +437,10 @@ func TestDLMSResourceIsolationAndClose(t *testing.T) {
 		expired := makeEvent("b:4059", "a:39200", d0, ts.Add(dlmsIdleTTL))
 		require.True(t, a.decodeDLMSDatagram(expired, r, true))
 		rocTypedError(t, "ContextRequired", expired.sessionError)
-		require.Empty(t, a.udpSessions.entries)
-		require.Zero(t, a.stats().BufferedBytes)
+		require.Len(t, a.udpSessions.entries, 1, "bounded quarantine survives idle time")
+		require.EqualValues(t, 512, a.stats().BufferedBytes)
 		s.Close("domains")
+		require.Zero(t, a.stats().BufferedBytes)
 	})
 	t.Run("unmatched-TCP-close", func(t *testing.T) {
 		s, err := NewProtocolSessionWithOptions(ParserBudget{}, WithSessionTransport("tcp"))

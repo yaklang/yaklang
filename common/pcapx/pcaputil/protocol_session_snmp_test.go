@@ -247,6 +247,12 @@ func TestProtocolSessionSNMPGetBulkSetTrapInform(t *testing.T) {
 	s, err := NewProtocolSession(DefaultParserBudget())
 	require.NoError(t, err)
 	ts := time.Unix(1, 0)
+	// Historical generators retain their exact wire bytes. The adjacent normal
+	// exchange uses the same scoped context on both sides (RFC 3412 7.2.5).
+	emptyContextResponse := func(id int64, value string) []byte {
+		pdu := snmpPDU(0xa2, id, 0, 0, snmpVarBind(snmpSysDescr(), snmpEncOctet([]byte(value))))
+		return snmpV3(id, 65507, 0, snmpPlainUSM(), snmpScoped(nil, nil, pdu))
+	}
 	get := snmpGet(1)
 	p := s.Probe(get)
 	require.Equal(t, ProbeAccept, p.Verdict)
@@ -277,14 +283,14 @@ func TestProtocolSessionSNMPGetBulkSetTrapInform(t *testing.T) {
 	require.Equal(t, int64(0), r.Events[0].Session["Non-Repeaters"])
 	require.Equal(t, int64(10), r.Events[0].Session["Max-Repetitions"])
 
-	r = s.Feed(1, ts, snmpGetResponse(2, "bulk"))
+	r = s.Feed(1, ts, emptyContextResponse(2, "bulk"))
 	require.Nil(t, r.Err, "%v", r.Err)
 	require.Equal(t, "GetBulkRequest", r.Events[0].Session["Matched Request"])
 
 	r = s.Feed(0, ts, snmpSet(3, "name"))
 	require.Nil(t, r.Err, "%v", r.Err)
 	require.Equal(t, "SetRequest", r.Events[0].Session["Packet Name"])
-	r = s.Feed(1, ts, snmpGetResponse(3, "name"))
+	r = s.Feed(1, ts, emptyContextResponse(3, "name"))
 	require.Nil(t, r.Err, "%v", r.Err)
 	require.Equal(t, "SetRequest", r.Events[0].Session["Matched Request"])
 
@@ -299,7 +305,7 @@ func TestProtocolSessionSNMPGetBulkSetTrapInform(t *testing.T) {
 	r = s.Feed(0, ts, snmpInform(4))
 	require.Nil(t, r.Err, "%v", r.Err)
 	require.Equal(t, "InformRequest", r.Events[0].Session["Packet Name"])
-	r = s.Feed(1, ts, snmpGetResponse(4, "ack"))
+	r = s.Feed(1, ts, emptyContextResponse(4, "ack"))
 	require.Nil(t, r.Err, "%v", r.Err)
 	require.Equal(t, "InformRequest", r.Events[0].Session["Matched Request"])
 
@@ -314,6 +320,13 @@ func TestProtocolSessionSNMPGetBulkSetTrapInform(t *testing.T) {
 }
 
 func TestProtocolSessionSNMPResponseFirstDirectionAndPendingExpiry(t *testing.T) {
+	t.Run("identity-existing-api", testSNMPIdentityExistingAPI)
+	t.Run("v3-full-context-existing-api", testSNMPV3FullContextExistingAPI)
+	t.Run("fields-ownership-existing-api", testSNMPFieldsOwnershipExistingAPI)
+	t.Run("sealed", testSNMPIdentitySealedMatrix)
+	t.Run("identity-budget-domains", testSNMPIdentityBudgetAndDomains)
+	t.Run("oversize-existing-api", testSNMPOversizeRefusalExistingAPI)
+	t.Run("identity-chunks", testSNMPIdentityTCPChunks)
 	t0 := time.Unix(1_800_000_000, 0)
 	newParser := func() *binSNMP {
 		return &binSNMP{pending: map[snmpPendingKey]snmpPendingRequest{}}
@@ -342,7 +355,7 @@ func TestProtocolSessionSNMPResponseFirstDirectionAndPendingExpiry(t *testing.T)
 		require.Empty(t, parser.pending)
 	})
 
-	t.Run("expired-id-is-evicted-before-budget-check-and-reuse", func(t *testing.T) {
+	t.Run("expiry-releases-pending-but-retains-charged-identity-budget", func(t *testing.T) {
 		parser := newParser()
 		const maxPending = 16
 		fields, err := parser.consumeAt(snmpV1Get(), maxPending, 0, t0)
@@ -359,19 +372,28 @@ func TestProtocolSessionSNMPResponseFirstDirectionAndPendingExpiry(t *testing.T)
 		require.Equal(t, "GetRequest", fields["Matched Request"], "a retry refreshes the timeout")
 		require.Empty(t, parser.pending)
 
-		for id := int64(1); id <= maxPending; id++ {
+		for id := int64(2); id <= maxPending; id++ {
 			_, err = parser.consumeAt(snmpV1GetWithID(id), maxPending, 0, t0.Add(2*snmpPendingTTL))
 			require.NoError(t, err)
 		}
-		require.Len(t, parser.pending, maxPending)
+		require.Len(t, parser.pending, maxPending-1)
+		require.Len(t, parser.history, maxPending)
 		fields, err = parser.consumeAt(snmpV1GetWithID(maxPending+1), maxPending, 0, t0.Add(3*snmpPendingTTL))
-		require.NoError(t, err, "expired unmatched requests must not permanently consume the pending budget")
+		rocTypedError(t, "ResourceExceeded", err)
+		require.Equal(t, "untracked-resource-refusal", fields["Association Status"])
 		require.NotContains(t, fields, "Retransmission")
-		require.Len(t, parser.pending, 1)
+		require.Empty(t, parser.pending)
+		require.Len(t, parser.history, maxPending, "idle must not erase identities or exceed the retained budget")
 
-		fields, err = parser.consumeAt(snmpV1GetWithID(maxPending+1), maxPending, 0, t0.Add(4*snmpPendingTTL))
+		fields, err = parser.consumeAt(snmpV1GetWithID(2), maxPending, 0, t0.Add(4*snmpPendingTTL))
 		require.NoError(t, err)
-		require.NotContains(t, fields, "Retransmission", "ID reuse after expiry starts a new context")
+		require.NotContains(t, fields, "Retransmission", "an expired identity cannot become a new trustworthy context")
+		require.Equal(t, "ambiguous-request-id", fields["Association Status"])
+		require.Empty(t, parser.pending)
+		fields, err = parser.consumeAt(snmpV1GetWithID(maxPending+1), maxPending+1, 0, t0.Add(4*snmpPendingTTL))
+		require.NoError(t, err, "an unused identity works within a sufficient explicit retained budget")
+		require.Equal(t, true, fields["Outstanding"])
+		require.Len(t, parser.pending, 1)
 	})
 
 	t.Run("v3-message-id-also-requires-authoritative-engine-and-user-context", func(t *testing.T) {
