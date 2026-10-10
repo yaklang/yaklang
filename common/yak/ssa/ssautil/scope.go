@@ -68,6 +68,11 @@ type ScopedVersionedTableIF[T versionedValue] interface {
 	SetCapturedVariable(string, VersionedIF[T])
 	SetCapturedSideEffect(string, VersionedIF[T], VersionedIF[T])
 	ChangeCapturedSideEffect(string, VersionedIF[T])
+	// RegisterCapturedVariable records ver as a capture of its name.
+	// The first assignment of an outer variable runs before the free-value
+	// parameter exists, so the caller registers again once that parameter
+	// is installed.
+	RegisterCapturedVariable(VersionedIF[T])
 
 	// use in phi
 	CoverBy(ScopedVersionedTableIF[T])
