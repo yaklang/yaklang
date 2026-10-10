@@ -821,7 +821,7 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 		if f.protocol == "http" {
 			httpSession = d.http.doh || d.http.ipp
 			e.ipp = d.http.ipp
-			e.decodeConfig = d.http.config()
+			e.decodeConfig = d.http.config(f.a.config.MaxMessageBytes)
 			e.Summary = d.http.summary
 			f.httpEvidence(dir, e)
 			f.finishHTTP(dir)
@@ -1102,7 +1102,7 @@ func (f *binFlow) close(reason TrafficFlowCloseReason) {
 		if len(d.buffer) != 0 {
 			if h := d.http; h != nil && h.closeDelimited && reason == TrafficFlowCloseReason_FIN {
 				e := f.event(dir, d.buffer, "deferred", h.summary)
-				e.Rule, e.Entry, e.decodeConfig = "application-layer.http", "HTTPExact", h.config()
+				e.Rule, e.Entry, e.decodeConfig = "application-layer.http", "HTTPExact", h.config(f.a.config.MaxMessageBytes)
 				e.ipp = h.ipp
 				f.httpEvidence(dir, e)
 				f.a.messages.Add(1)
