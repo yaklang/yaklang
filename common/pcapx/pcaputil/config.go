@@ -41,6 +41,7 @@ type CaptureConfig struct {
 	recorder              *captureWriter
 	outputFile            string
 	captureBuffer         int
+	normalizePcapLength   bool
 	reassemblyOptions     TCPReassemblyOptions
 	requiresFullStream    bool
 	Context               context.Context
@@ -66,6 +67,14 @@ type CaptureConfig struct {
 }
 
 type CaptureOption func(*CaptureConfig) error
+
+// WithLegacyPcapLengthNormalization explicitly normalizes classic PCAP original
+// length metadata during offline replay only. Raw bytes and protocol bounds are
+// unchanged; callbacks can recover PcapOriginalLength from AncillaryData.
+// PCAPNG validation is unchanged. Native/live sources reject this option.
+func WithLegacyPcapLengthNormalization(enabled bool) CaptureOption {
+	return func(c *CaptureConfig) error { c.normalizePcapLength = enabled; return nil }
+}
 
 func emptyOption(_ *CaptureConfig) error {
 	return nil

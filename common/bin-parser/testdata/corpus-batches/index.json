@@ -25872,6 +25872,169 @@
         "common/pcapx/pcaputil/pfcp-usage/verify-integrated.py": "verify-integrated.py",
         "scripts/protocol-tests/required-tests-v34.json": "required-tests-v34.json"
       }
+    },
+    {
+      "id": "validation-pcap-legacy-d5e218e32eea",
+      "kind": "validation",
+      "source_sha": "d5e218e32eea54f5695aede76a8d3003dafea696",
+      "file": "validation-pcap-legacy-d5e218e32eea.zip",
+      "sha256": "f1a610b754b71137b656ef306d585921971c44ef5b58f577c64550495de669c7",
+      "password": "bin-parser",
+      "members": {
+        "answers/allocation-refusal.json": {
+          "bytes": 155,
+          "sha256": "b63651fd8ab1525f3750943fbb4c5c5a855446858c6b48940ff420400c24d537"
+        },
+        "answers/be-ns-legacy.json": {
+          "bytes": 721,
+          "sha256": "70119a76bf3b4d7fe00b315f7e3fed90fa619bba61a2bcec4637db44dd222298"
+        },
+        "answers/be-us-legacy.json": {
+          "bytes": 721,
+          "sha256": "65ea3c789aa938667f292956aef88333280f4b9040db5b6eb48c4be0221ea577"
+        },
+        "answers/le-ns-legacy.json": {
+          "bytes": 721,
+          "sha256": "5fc564a6594f9153b030a8593dff0e99862bcf4c3e256e2345f39f00098fc201"
+        },
+        "answers/le-us-legacy.json": {
+          "bytes": 721,
+          "sha256": "fb15e80bdd89e48ae028370a745c35e06ece6edf654db884154d2f7d0f49b979"
+        },
+        "answers/normal.json": {
+          "bytes": 717,
+          "sha256": "c1bdea5dd32215a5754362df423101cf36a9862e9eb65c53e3bf1ec1fe6d0e75"
+        },
+        "answers/payload-truncation.json": {
+          "bytes": 158,
+          "sha256": "f618bf70ce8316a5520e9d543deee4718c38a0f8daf1427a4bc3132614174967"
+        },
+        "answers/snaplen-boundary.json": {
+          "bytes": 720,
+          "sha256": "040c2cc33d599bd3cdaa9b74cfb92a7bea51f464eff76bb0a8a95b6e052d9636"
+        },
+        "answers/snaplen-refusal.json": {
+          "bytes": 155,
+          "sha256": "88808e4868e31b07cee78e2ac9fbedbca61d9bdf01f0c057892eeb35b8a81443"
+        },
+        "answers/wire-truncated-capture.json": {
+          "bytes": 717,
+          "sha256": "3c3b8a421ab7b4fddfcc606b2cd821c324460e80ab8c7a474f6afbb3667e46b1"
+        },
+        "answers/zero-original.json": {
+          "bytes": 720,
+          "sha256": "a4f4aa3ab568aae5afb5380677765d7bce92110fc496cdfd7dd6d7fbf52c0e0a"
+        },
+        "build.py": {
+          "bytes": 2397,
+          "sha256": "ae82aa76b05478e68856ceee6e0d5a93cdc49fe6149dcf395335696bd33e0e4b"
+        },
+        "cases/allocation-refusal.pcap": {
+          "bytes": 99,
+          "sha256": "335abcb580b4acd1dad3d3a1ee648778b721b204bdd4d064f21f75d42f65a8f3"
+        },
+        "cases/be-ns-legacy.pcap": {
+          "bytes": 174,
+          "sha256": "5ab08cc7fa56132ed94d882ae2bd11142a6f947dea27e38eb295880fe96bb5ee"
+        },
+        "cases/be-us-legacy.pcap": {
+          "bytes": 174,
+          "sha256": "b1fd7ccf829697d6fd2989b070de665bddcbbb01c259d9fe793a600ebf9e4000"
+        },
+        "cases/le-ns-legacy.pcap": {
+          "bytes": 174,
+          "sha256": "e151b7835db069aebbc685455853bc8b3da2d8a23deb7e8a987bb9128091b8ae"
+        },
+        "cases/le-us-legacy.pcap": {
+          "bytes": 174,
+          "sha256": "2863d0ad0df05397737b4aa31081e3e4ce7619ba6018551d251220342b7c4a19"
+        },
+        "cases/normal.pcap": {
+          "bytes": 174,
+          "sha256": "45fbf2729f9ef1b639646531bda4ca3da72eac11ff2162e5f204f7549ddba32e"
+        },
+        "cases/payload-truncation.pcap": {
+          "bytes": 98,
+          "sha256": "c6a750238364656c125c36a1e253cda08a34386a232abbc2b24fc3554fe0147a"
+        },
+        "cases/snaplen-boundary.pcap": {
+          "bytes": 174,
+          "sha256": "93362a30d7ae8ddcfd6b4e70a5549e4f42b44181294aa64af3d2851ad7c14808"
+        },
+        "cases/snaplen-refusal.pcap": {
+          "bytes": 99,
+          "sha256": "de2bd376f9bdf424a588b6eb5c70d8fd3bfb7d9f529667a41331aa8c009c8bb6"
+        },
+        "cases/wire-truncated-capture.pcap": {
+          "bytes": 174,
+          "sha256": "ac68fc1ee801c0d31be5f9e5886aa2dabd051cfad0b6d0e611d806b8e442e55e"
+        },
+        "cases/zero-original.pcap": {
+          "bytes": 174,
+          "sha256": "9a45880d7ab7dd02f2e085ce6de3b3cb87d608bc9d4afdfc5f49827aa5a4d0e5"
+        },
+        "controls.json": {
+          "bytes": 5368,
+          "sha256": "1c2b874c9dd8ac154caf34251f99ceb92e691867bbced1b29fa2de09aab01832"
+        },
+        "reference-check.py": {
+          "bytes": 934,
+          "sha256": "e57224e1ce11df7ba71f2fc14ebc1f42832cd814b21fe068991ed9c45e9ffb05"
+        },
+        "required-tests-core-legacy-v1.json": {
+          "bytes": 98297,
+          "sha256": "a78e3b468baacb79c106d0794993714979154c2c72f9b69e67a9e4a9b89daf62"
+        },
+        "seal.py": {
+          "bytes": 4379,
+          "sha256": "ba0a32f0fb42b5b4798ff150c70266793672be8a2f1f8b5e929748767fa570bc"
+        },
+        "source-pin.json": {
+          "bytes": 751,
+          "sha256": "efdafb37ac52b2f934bd07a6b4f2d9b9366f3b90ec6674ef6dcf5fbf0a0dcc66"
+        },
+        "validation/expected.json": {
+          "bytes": 10463,
+          "sha256": "40b6e5c218be2df517392673cae5b9880e43dff842840ecde60b8daa89abcdd3"
+        },
+        "verify-controls.py": {
+          "bytes": 1084,
+          "sha256": "d3c6ccd48b2ef67970add468d3022df354be6da7c334714539c6b6c9408d285b"
+        }
+      },
+      "aliases": {
+        "common/pcapx/pcaputil/pcap-legacy/build.py": "build.py",
+        "common/pcapx/pcaputil/pcap-legacy/verify-controls.py": "verify-controls.py",
+        "common/pcapx/pcaputil/pcap-legacy/reference-check.py": "reference-check.py",
+        "common/pcapx/pcaputil/pcap-legacy/source-pin.json": "source-pin.json",
+        "common/pcapx/pcaputil/pcap-legacy/seal.py": "seal.py",
+        "common/pcapx/pcaputil/pcap-legacy/controls.json": "controls.json",
+        "common/pcapx/pcaputil/pcap-legacy/cases/le-us-legacy.pcap": "cases/le-us-legacy.pcap",
+        "common/pcapx/pcaputil/pcap-legacy/answers/le-us-legacy.json": "answers/le-us-legacy.json",
+        "common/pcapx/pcaputil/pcap-legacy/cases/le-ns-legacy.pcap": "cases/le-ns-legacy.pcap",
+        "common/pcapx/pcaputil/pcap-legacy/answers/le-ns-legacy.json": "answers/le-ns-legacy.json",
+        "common/pcapx/pcaputil/pcap-legacy/cases/be-us-legacy.pcap": "cases/be-us-legacy.pcap",
+        "common/pcapx/pcaputil/pcap-legacy/answers/be-us-legacy.json": "answers/be-us-legacy.json",
+        "common/pcapx/pcaputil/pcap-legacy/cases/be-ns-legacy.pcap": "cases/be-ns-legacy.pcap",
+        "common/pcapx/pcaputil/pcap-legacy/answers/be-ns-legacy.json": "answers/be-ns-legacy.json",
+        "common/pcapx/pcaputil/pcap-legacy/cases/zero-original.pcap": "cases/zero-original.pcap",
+        "common/pcapx/pcaputil/pcap-legacy/answers/zero-original.json": "answers/zero-original.json",
+        "common/pcapx/pcaputil/pcap-legacy/cases/normal.pcap": "cases/normal.pcap",
+        "common/pcapx/pcaputil/pcap-legacy/answers/normal.json": "answers/normal.json",
+        "common/pcapx/pcaputil/pcap-legacy/cases/snaplen-boundary.pcap": "cases/snaplen-boundary.pcap",
+        "common/pcapx/pcaputil/pcap-legacy/answers/snaplen-boundary.json": "answers/snaplen-boundary.json",
+        "common/pcapx/pcaputil/pcap-legacy/cases/wire-truncated-capture.pcap": "cases/wire-truncated-capture.pcap",
+        "common/pcapx/pcaputil/pcap-legacy/answers/wire-truncated-capture.json": "answers/wire-truncated-capture.json",
+        "common/pcapx/pcaputil/pcap-legacy/cases/snaplen-refusal.pcap": "cases/snaplen-refusal.pcap",
+        "common/pcapx/pcaputil/pcap-legacy/answers/snaplen-refusal.json": "answers/snaplen-refusal.json",
+        "common/pcapx/pcaputil/pcap-legacy/cases/allocation-refusal.pcap": "cases/allocation-refusal.pcap",
+        "common/pcapx/pcaputil/pcap-legacy/answers/allocation-refusal.json": "answers/allocation-refusal.json",
+        "common/pcapx/pcaputil/pcap-legacy/cases/payload-truncation.pcap": "cases/payload-truncation.pcap",
+        "common/pcapx/pcaputil/pcap-legacy/answers/payload-truncation.json": "answers/payload-truncation.json",
+        "common/pcapx/pcaputil/pcap-legacy/validation/expected.json": "validation/expected.json",
+        "common/pcapx/pcaputil/pcap-legacy/required-tests-core-legacy-v1.json": "required-tests-core-legacy-v1.json",
+        "scripts/protocol-tests/required-tests-core-legacy-v1.json": "required-tests-core-legacy-v1.json"
+      }
     }
   ],
   "schema_version": 1,

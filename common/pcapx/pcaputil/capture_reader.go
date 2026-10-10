@@ -55,7 +55,7 @@ func replayWithConfig(input io.Reader, conf *CaptureConfig) (resultErr error) {
 	if conf.reassemblyOptions.Stream && conf.requiresFullStream {
 		return fmt.Errorf("TCP streaming cannot be combined with built-in HTTP/TLS parsers")
 	}
-	r, err := NewCaptureReader(input)
+	r, err := NewCaptureReaderWithOptions(input, PcapReaderOptions{NormalizeLegacyOriginalLength: conf.normalizePcapLength})
 	if err != nil {
 		return err
 	}

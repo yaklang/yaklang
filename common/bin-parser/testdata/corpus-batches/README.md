@@ -159,3 +159,5 @@ complete fields, Session, IDs and refusals, with independent pinned codec/list
 receiver execution. These observations do not assert units or meter validity.
 
 PFCP v1 UDP session-deletion UsageReport observations and strict whole-field/session association controls are preserved in `validation-pfcp-usage-6e3f9ce9481.zip`. Selected usage fields are syntax observations; URR configuration, actual metering and device operation remain unverified. The current integrated inventory includes these controls.
+
+Classic PCAP length metadata remains strict by default. The explicit offline `WithLegacyPcapLengthNormalization(true)` option normalizes original lengths smaller than captured lengths while preserving the original scalar in `PcapOriginalLength`. Snaplen, allocation, actual payload and PCAPNG bounds remain strict; live/native capture and PacketAnalyzer reject this option. Synthetic record metadata controls and the validator are in `validation-pcap-legacy-d5e218e32eea.zip`. This proves container compatibility, not original application/session semantics.

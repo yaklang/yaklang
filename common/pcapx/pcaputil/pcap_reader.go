@@ -17,12 +17,13 @@ import (
 // one reusable, bounded overflow buffer; malformed lengths never drive an
 // unbounded allocation. Other formats remain on the native libpcap path.
 type classicPcapReader struct {
-	input   *bufio.Reader
-	order   binary.ByteOrder
-	scale   int64
-	snaplen uint32
-	link    layers.LinkType
-	large   []byte
+	input                   *bufio.Reader
+	order                   binary.ByteOrder
+	scale                   int64
+	snaplen                 uint32
+	link                    layers.LinkType
+	large                   []byte
+	normalizeOriginalLength bool
 }
 
 func newClassicPcapReader(input io.Reader) (*classicPcapReader, error) {
@@ -71,8 +72,12 @@ func (r *classicPcapReader) read() ([]byte, gopacket.CaptureInfo, error) {
 	ci.Timestamp = time.Unix(int64(r.order.Uint32(header[:4])), int64(r.order.Uint32(header[4:8]))*r.scale)
 	captured, length := r.order.Uint32(header[8:12]), r.order.Uint32(header[12:16])
 	ci.CaptureLength, ci.Length = int(captured), int(length)
-	if captured > r.snaplen || captured > length {
+	if captured > r.snaplen || (captured > length && !r.normalizeOriginalLength) {
 		return nil, ci, fmt.Errorf("invalid pcap record length: captured=%d wire=%d snaplen=%d", captured, length, r.snaplen)
+	}
+	if captured > length {
+		ci.Length = int(captured)
+		ci.AncillaryData = []interface{}{PcapOriginalLength(length)}
 	}
 	r.input.Discard(16)
 	var raw []byte
@@ -92,6 +97,31 @@ func (r *classicPcapReader) read() ([]byte, gopacket.CaptureInfo, error) {
 		err = io.ErrUnexpectedEOF
 	}
 	return raw, ci, err
+}
+
+// PcapReaderOptions controls classic PCAP metadata compatibility only.
+// It never relaxes captured-byte, snapshot, allocation or protocol bounds.
+type PcapReaderOptions struct {
+	// NormalizeLegacyOriginalLength repairs legacy record metadata when the
+	// original length is smaller than the captured length. The original value
+	// is retained as PcapOriginalLength in CaptureInfo.AncillaryData. Default
+	// readers remain strict. PCAP draft-ietf-opsawg-pcap-09 section 5 permits
+	// this conversion; it is not proof of valid on-wire packet contents.
+	NormalizeLegacyOriginalLength bool
+}
+
+// PcapOriginalLength is the unmodified record-header value before an explicitly
+// requested normalization. Its value owns no mutable data.
+type PcapOriginalLength uint32
+
+// NewBoundedPcapReaderWithOptions returns a bounded classic PCAP reader with
+// explicit metadata policy; unsupported formats are still rejected.
+func NewBoundedPcapReaderWithOptions(input io.Reader, opts PcapReaderOptions) (*classicPcapReader, error) {
+	r, err := newClassicPcapReader(input)
+	if err == nil {
+		r.normalizeOriginalLength = opts.NormalizeLegacyOriginalLength
+	}
+	return r, err
 }
 
 // NewBoundedPcapReader shares ReplayPcap's pre-allocation validation with
