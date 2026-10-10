@@ -37,17 +37,28 @@ type wrapperBitsControl struct {
 }
 
 func wrapperBitsControls(t *testing.T) []wrapperBitsControl {
+	return wrapperOwnedDataControls(t, "dlms-bits", 26)
+}
+
+func wrapperOwnedDataControls(t *testing.T, prefix string, count int) []wrapperBitsControl {
 	t.Helper()
-	raw, err := trafficfixture.ReadFile("dlms-bits/controls.json")
+	raw, err := trafficfixture.ReadFile(prefix + "/controls.json")
 	require.NoError(t, err)
 	var d struct{ Cases []json.RawMessage }
 	require.NoError(t, json.Unmarshal(raw, &d))
-	require.Len(t, d.Cases, 26)
+	require.Len(t, d.Cases, count)
 	cases := make([]wrapperBitsControl, 0, len(d.Cases))
 	for _, row := range d.Cases {
 		var c wrapperBitsControl
 		require.NoError(t, json.Unmarshal(row, &c))
-		a, err := trafficfixture.ReadFile("dlms-bits/answers/" + c.Name + ".json")
+		var limits struct {
+			Limits struct {
+				Depth int `json:"depth_limit"`
+			} `json:"static_limits"`
+		}
+		require.NoError(t, json.Unmarshal(row, &limits))
+		c.Depth = limits.Limits.Depth
+		a, err := trafficfixture.ReadFile(prefix + "/answers/" + c.Name + ".json")
 		require.NoError(t, err)
 		require.JSONEq(t, string(row), string(a))
 		require.Equal(t, c.SHA256, fmt.Sprintf("%x", sha256.Sum256(wrapperStructuredInput(t, c.InputAlias))))
@@ -60,7 +71,11 @@ func wrapperBitsControls(t *testing.T) []wrapperBitsControl {
 }
 
 func TestDLMSWrapperBitStringSealedMatrix(t *testing.T) {
-	for _, c := range wrapperBitsControls(t) {
+	wrapperOwnedDataMatrix(t, wrapperBitsControls(t))
+}
+
+func wrapperOwnedDataMatrix(t *testing.T, cases []wrapperBitsControl) {
+	for _, c := range cases {
 		t.Run(c.Name, func(t *testing.T) {
 			input := wrapperStructuredInput(t, c.InputAlias)
 			discoveryMatrix(t, func(t *testing.T, workers int, deferred, observe bool) {
@@ -95,7 +110,11 @@ func TestDLMSWrapperBitStringSealedMatrix(t *testing.T) {
 }
 
 func TestDLMSWrapperBitStringBudgetsOwnership(t *testing.T) {
-	for _, c := range wrapperBitsControls(t) {
+	wrapperOwnedDataBudgetsOwnership(t, wrapperBitsControls(t))
+}
+
+func wrapperOwnedDataBudgetsOwnership(t *testing.T, cases []wrapperBitsControl) {
+	for _, c := range cases {
 		for _, deferred := range []bool{false, true} {
 			t.Run(c.Name+fmt.Sprint(deferred), func(t *testing.T) {
 				sizes := []int{1, 7, 64, 65543}

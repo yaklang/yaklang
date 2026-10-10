@@ -24653,6 +24653,359 @@
         "common/pcapx/pcaputil/dlms-bits/required-tests-v35.json": "required-tests-v35.json",
         "scripts/protocol-tests/required-tests-v35.json": "required-tests-v35.json"
       }
+    },
+    {
+      "id": "validation-dlms-float-fa70f3e8a90",
+      "kind": "validation",
+      "source_sha": "fa70f3e8a909b7396a786a880295f74792278593",
+      "file": "validation-dlms-float-fa70f3e8a90.zip",
+      "sha256": "a1137fbb083c814c0a387b6c864cf29be9143b7cb5f52348c68c310e5265f2c7",
+      "password": "bin-parser",
+      "members": {
+        "answers/float-23-max-finite.json": {
+          "sha256": "4eceb37264c26c450f069b7cadf1fe0b4e5e1d26cdd6bd258fc2a8a117f28a9e",
+          "bytes": 3011
+        },
+        "answers/float-23-min-subnormal.json": {
+          "sha256": "c9fd3e1527b280e554a0fd8d11cae365be13aa9bf1500b75a73e523799a9c7fa",
+          "bytes": 3022
+        },
+        "answers/float-23-negative-infinity.json": {
+          "sha256": "b7447aa15d1fb09dbc17b0a8b5b9706d16920050cc66a53d709cf52e15d02a57",
+          "bytes": 3022
+        },
+        "answers/float-23-negative-subnormal.json": {
+          "sha256": "4ea555ad70c0e2a54011dc8911cf7b06a50d70eb373e3569638f0c62a044d160",
+          "bytes": 3037
+        },
+        "answers/float-23-negative-zero.json": {
+          "sha256": "7bac0b361e0be17c5a3eed9fdeea08d378ed528f8858834222f2a1bea7f1f69f",
+          "bytes": 2999
+        },
+        "answers/float-23-normal.json": {
+          "sha256": "99543ab59862c7e02857ecab8a791b29161649002fb04eb65053d5bd558fbb08",
+          "bytes": 2980
+        },
+        "answers/float-23-positive-infinity.json": {
+          "sha256": "1f34b1bda6df8f7ab59f96001a805ba498196341df6b9aa5893a174b7c2a9bd8",
+          "bytes": 3022
+        },
+        "answers/float-23-positive-zero.json": {
+          "sha256": "0c9e1000a29645a5a510bbc1910e0fa4358b5d609136c25d89a6db1a745a7f0a",
+          "bytes": 2999
+        },
+        "answers/float-23-quiet-nan-payload.json": {
+          "sha256": "52efbaa09dae559dd435764c30e60d6342554d151b3a8ad43e6b42dcbca0f768",
+          "bytes": 3012
+        },
+        "answers/float-23-signalling-nan-payload.json": {
+          "sha256": "bff37482d5fb46719587ffe3bac4df36635074a61e1a76dd698620381055afbe",
+          "bytes": 3027
+        },
+        "answers/float-23-truncated.json": {
+          "sha256": "43117096f6b7751016caf16efbf3ebe6c9d04a9cd4ef10d7858666efe369404d",
+          "bytes": 1121
+        },
+        "answers/float-24-max-finite.json": {
+          "sha256": "62406dafc041fabeb57445605e19e011b154220324b6480cdf9b955ea89736c3",
+          "bytes": 3061
+        },
+        "answers/float-24-min-subnormal.json": {
+          "sha256": "974f794801fd2099fa23094391b9fb9bfbfee4ca6bf4df65b8b35fc5598bf55a",
+          "bytes": 3056
+        },
+        "answers/float-24-negative-infinity.json": {
+          "sha256": "465db23abe2de32628d0f39909bff4db9977905edf1add0a870574cfd2a9f8ee",
+          "bytes": 3071
+        },
+        "answers/float-24-negative-subnormal.json": {
+          "sha256": "537fc165df4ab5bb43f731c6c5a7299ce2ff9a315718fbe9a84c25fcd4821733",
+          "bytes": 3071
+        },
+        "answers/float-24-negative-zero.json": {
+          "sha256": "4a63b9158b5dd75312e9afde3f6a4654508999449403fcb95f0d3e9247acc972",
+          "bytes": 3048
+        },
+        "answers/float-24-normal.json": {
+          "sha256": "b6d9f7d94f1ce1ca1126527572864e9ed0e82883898d5a9cd49c84aee74b6233",
+          "bytes": 3029
+        },
+        "answers/float-24-positive-infinity.json": {
+          "sha256": "39584272dee315c5587dd973e76111783fdf0ddc9aad5c4eb251dc7787196cdb",
+          "bytes": 3071
+        },
+        "answers/float-24-positive-zero.json": {
+          "sha256": "bbb16fa0027e164c0f32ecea4802c91e9e7a457e1409e284a1c456d0404d85f9",
+          "bytes": 3048
+        },
+        "answers/float-24-quiet-nan-payload.json": {
+          "sha256": "cb158c8d3d5a8e00b06e036aae8b8b99e2c64b6961d3c8a76e3b776a8525ca75",
+          "bytes": 3061
+        },
+        "answers/float-24-signalling-nan-payload.json": {
+          "sha256": "ee5903dd6fa79c8cd9a2332ba15653f92abea69946a3e5321e50900ae52df95d",
+          "bytes": 3076
+        },
+        "answers/float-24-truncated.json": {
+          "sha256": "ca8553436e24db9a0a7bfabb9c343a68511d0d391920816e1735bdbefe7a6603",
+          "bytes": 1137
+        },
+        "answers/float-caller-depth-udp.json": {
+          "sha256": "ac54d2b000a656fff339075f0dd702b1024c3db72e624b72875793294a1ab625",
+          "bytes": 13157
+        },
+        "answers/float-exchange-tcp.json": {
+          "sha256": "51eeb4f2121406f6ab26a2a8cd783301acb134f2681ba899b2275581e19f2131",
+          "bytes": 5416
+        },
+        "answers/float-exchange-udp.json": {
+          "sha256": "189629e70677f6941bb5fa0b31de81cb25757a8c63de0c8cfdb04735da67aa54",
+          "bytes": 5416
+        },
+        "answers/float-nested.json": {
+          "sha256": "f2093c40a34fa579ccf2010b72cdbdbce676d548619f60143dbfa99466097a8c",
+          "bytes": 3808
+        },
+        "answers/float-split.json": {
+          "sha256": "aa96e4f30d9f12428daf9681ebb3f080b031e7c5efecb6d12fdd112092f18313",
+          "bytes": 5456
+        },
+        "answers/float-standalone-unconfirmed-udp.json": {
+          "sha256": "4683449ff1623341afb107c344aff7741a27babc54e6d5988fbe1d92d77111ba",
+          "bytes": 2404
+        },
+        "answers/float-trailing.json": {
+          "sha256": "8d9ac59e57b394b3b91d4ef253fa5fc9e130d6e10564adfe178f873a57a57dea",
+          "bytes": 1103
+        },
+        "build.py": {
+          "sha256": "7c164452e8e3ba55f39b8131f04ed8d3e9dddc870549b05921eaeaa684b62a0c",
+          "bytes": 4229
+        },
+        "carrier.py": {
+          "sha256": "07db3352defd52e18936a68d327f675a57abc90c59611492c049f102b08843d2",
+          "bytes": 3782
+        },
+        "cases/float-23-max-finite.pcap": {
+          "sha256": "7ce323bf0efd0683e2c678f370a59cd470c67ed17dc6d8b31668c240399f78d2",
+          "bytes": 328
+        },
+        "cases/float-23-min-subnormal.pcap": {
+          "sha256": "790536d4574286e3f67a2c6db3c5b2ea1853a9b6aad753983206313546f4c97c",
+          "bytes": 328
+        },
+        "cases/float-23-negative-infinity.pcap": {
+          "sha256": "3d7ccf43e1b11be0ebdeba412b3a30f8d7a6f87c48ebe36065ce491a1b209487",
+          "bytes": 328
+        },
+        "cases/float-23-negative-subnormal.pcap": {
+          "sha256": "d047c46c4e39f59501403799f640000a7c8263c147958cc74af33e713606d488",
+          "bytes": 328
+        },
+        "cases/float-23-negative-zero.pcap": {
+          "sha256": "37fd6765955da6577240f05b136285d07fb7ea30c47b873b4f23fadc026a4a2b",
+          "bytes": 328
+        },
+        "cases/float-23-normal.pcap": {
+          "sha256": "b7e6db1b7fa885c2bf7386729d06367082ba73dcf418c9a5fd4968557a18d84e",
+          "bytes": 328
+        },
+        "cases/float-23-positive-infinity.pcap": {
+          "sha256": "540577cbb1b862b08b70226c82887eb1c0390e4ffc70f18c407b7f63c2f3d2de",
+          "bytes": 328
+        },
+        "cases/float-23-positive-zero.pcap": {
+          "sha256": "93c3caa758eb488a147bb21df8faad47facc9a7ebe729ae21a335d46147b6507",
+          "bytes": 328
+        },
+        "cases/float-23-quiet-nan-payload.pcap": {
+          "sha256": "c835a70556dd06023da4ce646f956ad042eee10af8c505cee50ee385c0f3f473",
+          "bytes": 328
+        },
+        "cases/float-23-signalling-nan-payload.pcap": {
+          "sha256": "61b877d8b492f337c1f2c5ec62a5f47bc4a8528ebf0dc84282036f7065fd65e2",
+          "bytes": 328
+        },
+        "cases/float-23-truncated.pcap": {
+          "sha256": "2acea93146c02d893fbfcbfbc65a4e258a3cc931282b53967dc0a0b371db59fd",
+          "bytes": 321
+        },
+        "cases/float-24-max-finite.pcap": {
+          "sha256": "cd93ca895176b9531cb5174a58b25b878f35c97a04c44b7bbb626149460ceb1d",
+          "bytes": 332
+        },
+        "cases/float-24-min-subnormal.pcap": {
+          "sha256": "bed0aebc54ee38089b32cc202cbc423608579a0eb701933c381f722ddc9e53b7",
+          "bytes": 332
+        },
+        "cases/float-24-negative-infinity.pcap": {
+          "sha256": "374dec0f40852b920018229722d16a9ca148d36e9877442b29b078bb0d9d177a",
+          "bytes": 332
+        },
+        "cases/float-24-negative-subnormal.pcap": {
+          "sha256": "60c48a1839bbc33d5191d1c3260e3b13139f6fc493de716b6731f88ed9dd1c5e",
+          "bytes": 332
+        },
+        "cases/float-24-negative-zero.pcap": {
+          "sha256": "3cac2143da70887a6b208a439de1ceae7288c367d94974fea114cda86cd52821",
+          "bytes": 332
+        },
+        "cases/float-24-normal.pcap": {
+          "sha256": "3321a890f884d4765ed425c91bb2328ef7a3707ba0a1bfeb883b2b5003aa6cd0",
+          "bytes": 332
+        },
+        "cases/float-24-positive-infinity.pcap": {
+          "sha256": "1c271e89ae02e180a60af19b69fe175955a1013339fd17f5b69c9b6020c825af",
+          "bytes": 332
+        },
+        "cases/float-24-positive-zero.pcap": {
+          "sha256": "e20593329dbd3f4bf71a847bf3a483fe2c557dafa93dc3b1251180bcf71dd816",
+          "bytes": 332
+        },
+        "cases/float-24-quiet-nan-payload.pcap": {
+          "sha256": "82c95a3f35cc9d07ca5a57b9d77585f455698c5ed953f871793948dab9a03d84",
+          "bytes": 332
+        },
+        "cases/float-24-signalling-nan-payload.pcap": {
+          "sha256": "bb43bf897755268caf9e8857c54b47eb0e627e00964c4c219f1d7a566c626bd2",
+          "bytes": 332
+        },
+        "cases/float-24-truncated.pcap": {
+          "sha256": "1d384a2cd9a268d29a26ff7747d4fc24ed22a66a3325ce45f7aa444b4f25507d",
+          "bytes": 325
+        },
+        "cases/float-caller-depth-udp.pcap": {
+          "sha256": "fb05a9a52d6b1f979a2eb1263bf4bad4787abaedb2b90675f8af8310144a6b14",
+          "bytes": 302
+        },
+        "cases/float-exchange-tcp.pcap": {
+          "sha256": "ddba5b81a8f0c03a7ee3843595272a3f935c375f469797fbe5e48d2a58785032",
+          "bytes": 440
+        },
+        "cases/float-exchange-udp.pcap": {
+          "sha256": "0484d0d3b42684e708d840920935104269158391f4af422f49ce9ac3b42e47f3",
+          "bytes": 206
+        },
+        "cases/float-nested.pcap": {
+          "sha256": "6bf3e2588defe3ed93384d8194b955a9045ffaf8cc2589d6aaaf82535cfe3e72",
+          "bytes": 342
+        },
+        "cases/float-split.pcap": {
+          "sha256": "37531231fff2eb3449ffd239fff68572ea367a6caf014dd336c6f61d7d7402b6",
+          "bytes": 510
+        },
+        "cases/float-standalone-unconfirmed-udp.pcap": {
+          "sha256": "a30ad592024e576678f9547129b115f612374eccc115a1a97295ae1a93e0723c",
+          "bytes": 104
+        },
+        "cases/float-trailing.pcap": {
+          "sha256": "c6b643b72b0c02da0b97bb2f59b9ee49be003e56761d2ffb4c445d60b72d1ef0",
+          "bytes": 323
+        },
+        "controls.json": {
+          "sha256": "e9ec1eabe6dd6353252797c04bd4edcc7ca1b9a7fd1644f2786a77a5d49d00c5",
+          "bytes": 112970
+        },
+        "oracle.py": {
+          "sha256": "b972b2cc831574284230a8bab5530049a97c7a86cdc1ce4018272365ba4158a1",
+          "bytes": 6820
+        },
+        "reference-check.py": {
+          "sha256": "25c156c5222f5618f2bba8e8fcf6c52288cb583e70418072fd6ba8b3db7e37ab",
+          "bytes": 5470
+        },
+        "required-tests-v36.json": {
+          "sha256": "d6dc17b05fae0940f7b07539088e87ba682c432e7bcc05f5d20e73c3108563b1",
+          "bytes": 102375
+        },
+        "seal.py": {
+          "sha256": "791bdda643d0adb4bea44294a25e74b35f3922ac63502311e782a8dda22b794a",
+          "bytes": 5461
+        },
+        "source-pin.json": {
+          "sha256": "c5ccb45acad40994310c0cfb7cb4c39c1e1e19cdf529ec52f0dfc50c55010f36",
+          "bytes": 12405
+        },
+        "validation/expected.json": {
+          "sha256": "c957b9b85745554eb13a8a1d3ebcb51b088442ba118640f067ab5cfe0598bdae",
+          "bytes": 33122
+        },
+        "verify-controls.py": {
+          "sha256": "812af72293c34a15ed0fddbde89e98428550305beb5137c0085a5ec4a4bfa2a0",
+          "bytes": 1411
+        }
+      },
+      "aliases": {
+        "common/pcapx/pcaputil/dlms-float/cases/float-exchange-tcp.pcap": "cases/float-exchange-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-float/cases/float-exchange-udp.pcap": "cases/float-exchange-udp.pcap",
+        "common/pcapx/pcaputil/dlms-float/cases/float-23-positive-zero.pcap": "cases/float-23-positive-zero.pcap",
+        "common/pcapx/pcaputil/dlms-float/cases/float-23-negative-zero.pcap": "cases/float-23-negative-zero.pcap",
+        "common/pcapx/pcaputil/dlms-float/cases/float-23-normal.pcap": "cases/float-23-normal.pcap",
+        "common/pcapx/pcaputil/dlms-float/cases/float-23-min-subnormal.pcap": "cases/float-23-min-subnormal.pcap",
+        "common/pcapx/pcaputil/dlms-float/cases/float-23-negative-subnormal.pcap": "cases/float-23-negative-subnormal.pcap",
+        "common/pcapx/pcaputil/dlms-float/cases/float-23-max-finite.pcap": "cases/float-23-max-finite.pcap",
+        "common/pcapx/pcaputil/dlms-float/cases/float-23-positive-infinity.pcap": "cases/float-23-positive-infinity.pcap",
+        "common/pcapx/pcaputil/dlms-float/cases/float-23-negative-infinity.pcap": "cases/float-23-negative-infinity.pcap",
+        "common/pcapx/pcaputil/dlms-float/cases/float-23-quiet-nan-payload.pcap": "cases/float-23-quiet-nan-payload.pcap",
+        "common/pcapx/pcaputil/dlms-float/cases/float-23-signalling-nan-payload.pcap": "cases/float-23-signalling-nan-payload.pcap",
+        "common/pcapx/pcaputil/dlms-float/cases/float-24-positive-zero.pcap": "cases/float-24-positive-zero.pcap",
+        "common/pcapx/pcaputil/dlms-float/cases/float-24-negative-zero.pcap": "cases/float-24-negative-zero.pcap",
+        "common/pcapx/pcaputil/dlms-float/cases/float-24-normal.pcap": "cases/float-24-normal.pcap",
+        "common/pcapx/pcaputil/dlms-float/cases/float-24-min-subnormal.pcap": "cases/float-24-min-subnormal.pcap",
+        "common/pcapx/pcaputil/dlms-float/cases/float-24-negative-subnormal.pcap": "cases/float-24-negative-subnormal.pcap",
+        "common/pcapx/pcaputil/dlms-float/cases/float-24-max-finite.pcap": "cases/float-24-max-finite.pcap",
+        "common/pcapx/pcaputil/dlms-float/cases/float-24-positive-infinity.pcap": "cases/float-24-positive-infinity.pcap",
+        "common/pcapx/pcaputil/dlms-float/cases/float-24-negative-infinity.pcap": "cases/float-24-negative-infinity.pcap",
+        "common/pcapx/pcaputil/dlms-float/cases/float-24-quiet-nan-payload.pcap": "cases/float-24-quiet-nan-payload.pcap",
+        "common/pcapx/pcaputil/dlms-float/cases/float-24-signalling-nan-payload.pcap": "cases/float-24-signalling-nan-payload.pcap",
+        "common/pcapx/pcaputil/dlms-float/cases/float-nested.pcap": "cases/float-nested.pcap",
+        "common/pcapx/pcaputil/dlms-float/cases/float-23-truncated.pcap": "cases/float-23-truncated.pcap",
+        "common/pcapx/pcaputil/dlms-float/cases/float-24-truncated.pcap": "cases/float-24-truncated.pcap",
+        "common/pcapx/pcaputil/dlms-float/cases/float-trailing.pcap": "cases/float-trailing.pcap",
+        "common/pcapx/pcaputil/dlms-float/cases/float-caller-depth-udp.pcap": "cases/float-caller-depth-udp.pcap",
+        "common/pcapx/pcaputil/dlms-float/cases/float-standalone-unconfirmed-udp.pcap": "cases/float-standalone-unconfirmed-udp.pcap",
+        "common/pcapx/pcaputil/dlms-float/cases/float-split.pcap": "cases/float-split.pcap",
+        "common/pcapx/pcaputil/dlms-float/build.py": "build.py",
+        "common/pcapx/pcaputil/dlms-float/carrier.py": "carrier.py",
+        "common/pcapx/pcaputil/dlms-float/oracle.py": "oracle.py",
+        "common/pcapx/pcaputil/dlms-float/verify-controls.py": "verify-controls.py",
+        "common/pcapx/pcaputil/dlms-float/reference-check.py": "reference-check.py",
+        "common/pcapx/pcaputil/dlms-float/source-pin.json": "source-pin.json",
+        "common/pcapx/pcaputil/dlms-float/seal.py": "seal.py",
+        "common/pcapx/pcaputil/dlms-float/answers/float-exchange-tcp.json": "answers/float-exchange-tcp.json",
+        "common/pcapx/pcaputil/dlms-float/answers/float-exchange-udp.json": "answers/float-exchange-udp.json",
+        "common/pcapx/pcaputil/dlms-float/answers/float-23-positive-zero.json": "answers/float-23-positive-zero.json",
+        "common/pcapx/pcaputil/dlms-float/answers/float-23-negative-zero.json": "answers/float-23-negative-zero.json",
+        "common/pcapx/pcaputil/dlms-float/answers/float-23-normal.json": "answers/float-23-normal.json",
+        "common/pcapx/pcaputil/dlms-float/answers/float-23-min-subnormal.json": "answers/float-23-min-subnormal.json",
+        "common/pcapx/pcaputil/dlms-float/answers/float-23-negative-subnormal.json": "answers/float-23-negative-subnormal.json",
+        "common/pcapx/pcaputil/dlms-float/answers/float-23-max-finite.json": "answers/float-23-max-finite.json",
+        "common/pcapx/pcaputil/dlms-float/answers/float-23-positive-infinity.json": "answers/float-23-positive-infinity.json",
+        "common/pcapx/pcaputil/dlms-float/answers/float-23-negative-infinity.json": "answers/float-23-negative-infinity.json",
+        "common/pcapx/pcaputil/dlms-float/answers/float-23-quiet-nan-payload.json": "answers/float-23-quiet-nan-payload.json",
+        "common/pcapx/pcaputil/dlms-float/answers/float-23-signalling-nan-payload.json": "answers/float-23-signalling-nan-payload.json",
+        "common/pcapx/pcaputil/dlms-float/answers/float-24-positive-zero.json": "answers/float-24-positive-zero.json",
+        "common/pcapx/pcaputil/dlms-float/answers/float-24-negative-zero.json": "answers/float-24-negative-zero.json",
+        "common/pcapx/pcaputil/dlms-float/answers/float-24-normal.json": "answers/float-24-normal.json",
+        "common/pcapx/pcaputil/dlms-float/answers/float-24-min-subnormal.json": "answers/float-24-min-subnormal.json",
+        "common/pcapx/pcaputil/dlms-float/answers/float-24-negative-subnormal.json": "answers/float-24-negative-subnormal.json",
+        "common/pcapx/pcaputil/dlms-float/answers/float-24-max-finite.json": "answers/float-24-max-finite.json",
+        "common/pcapx/pcaputil/dlms-float/answers/float-24-positive-infinity.json": "answers/float-24-positive-infinity.json",
+        "common/pcapx/pcaputil/dlms-float/answers/float-24-negative-infinity.json": "answers/float-24-negative-infinity.json",
+        "common/pcapx/pcaputil/dlms-float/answers/float-24-quiet-nan-payload.json": "answers/float-24-quiet-nan-payload.json",
+        "common/pcapx/pcaputil/dlms-float/answers/float-24-signalling-nan-payload.json": "answers/float-24-signalling-nan-payload.json",
+        "common/pcapx/pcaputil/dlms-float/answers/float-nested.json": "answers/float-nested.json",
+        "common/pcapx/pcaputil/dlms-float/answers/float-23-truncated.json": "answers/float-23-truncated.json",
+        "common/pcapx/pcaputil/dlms-float/answers/float-24-truncated.json": "answers/float-24-truncated.json",
+        "common/pcapx/pcaputil/dlms-float/answers/float-trailing.json": "answers/float-trailing.json",
+        "common/pcapx/pcaputil/dlms-float/answers/float-caller-depth-udp.json": "answers/float-caller-depth-udp.json",
+        "common/pcapx/pcaputil/dlms-float/answers/float-standalone-unconfirmed-udp.json": "answers/float-standalone-unconfirmed-udp.json",
+        "common/pcapx/pcaputil/dlms-float/answers/float-split.json": "answers/float-split.json",
+        "common/pcapx/pcaputil/dlms-float/controls.json": "controls.json",
+        "common/pcapx/pcaputil/dlms-float/validation/expected.json": "validation/expected.json",
+        "common/pcapx/pcaputil/dlms-float/required-tests-v36.json": "required-tests-v36.json",
+        "scripts/protocol-tests/required-tests-v36.json": "required-tests-v36.json"
+      }
     }
   ],
   "schema_version": 1,
