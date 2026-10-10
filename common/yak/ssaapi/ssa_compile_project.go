@@ -1,13 +1,14 @@
 package ssaapi
 
 import (
-	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 
+	"github.com/yaklang/javajive/classparser"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
@@ -15,6 +16,7 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 )
 
 // ParseProjectFromPath compiles a local directory into SSA programs (alias: ssa.ParseLocalProject).
@@ -30,24 +32,6 @@ func ParseProjectWithFS(fs fi.FileSystem, opts ...ssaconfig.Option) (Programs, e
 	return ParseProject(opts...)
 }
 
-// ParseProjectWithIncrementalCompile runs incremental compile when baseProgramName is set.
-// The result program exposes overlay via GetOverlay().
-func ParseProjectWithIncrementalCompile(
-	newFS fi.FileSystem,
-	baseProgramName, diffProgramName string,
-	language ssaconfig.Language,
-	opts ...ssaconfig.Option,
-) (Programs, error) {
-	incrementalOpts := []ssaconfig.Option{
-		WithFileSystem(newFS),
-		WithBaseProgramName(baseProgramName),
-		WithProgramName(diffProgramName),
-		WithLanguage(language),
-	}
-	incrementalOpts = append(incrementalOpts, opts...)
-	return ParseProject(incrementalOpts...)
-}
-
 func PeepholeCompile(fs fi.FileSystem, size int, opts ...ssaconfig.Option) (Programs, error) {
 	opts = append(opts, WithFileSystem(fs), WithPeepholeSize(size))
 	return ParseProject(opts...)
@@ -58,11 +42,15 @@ type DiffProgressReporter func(progress float64, msg string)
 
 // CompileDiffProgramAndSaveToDB compiles a diff FS and persists metadata.
 // Must not re-enable incremental compile here (would recurse into ParseProject).
+// exclude carries the caller's compile exclusion scope (user patterns merged
+// with built-ins, i.e. Config.excludeFile); nil falls back to the built-in
+// defaults — the same resolve rule ScanProjectFiles applies.
 func CompileDiffProgramAndSaveToDB(
 	ctx context.Context,
 	baseFS, newFS fi.FileSystem,
 	baseProgramName, diffProgramName string,
 	language ssaconfig.Language,
+	exclude ExcludeFunc,
 	progressReporter DiffProgressReporter,
 	opts ...ssaconfig.Option,
 ) (*Program, error) {
@@ -74,24 +62,41 @@ func CompileDiffProgramAndSaveToDB(
 			return nil, utils.Wrapf(err, "failed to build file system from base program name: %s", baseProgramName)
 		}
 	}
+	exclude = ssaconfig.ResolveCompileExcludeFunc(exclude)
 
 	var projectID uint64
+	var baseProgramLanguage ssaconfig.Language
 	if baseProgramName != "" {
-		baseIrProgram, err := ssadb.GetProgram(baseProgramName, ssadb.Application)
-		if err == nil && baseIrProgram != nil && baseIrProgram.ProjectID > 0 {
-			projectID = baseIrProgram.ProjectID
+		if baseIrProgram, err := ssadb.GetProgram(baseProgramName, ssadb.Application); err == nil && baseIrProgram != nil {
+			if baseIrProgram.ProjectID > 0 {
+				projectID = baseIrProgram.ProjectID
+			}
+			baseProgramLanguage = baseIrProgram.Language
 		}
 	}
 
 	if progressReporter != nil {
 		progressReporter(0.1, "calculating file system diff...")
 	}
-	diffFS, fileHashMap, err := calculateFileSystemDiff(baseFS, newFS)
+	// The diff owns the 0.1-0.3 window: the two real passes each own half of
+	// it (milestone fractions from calculateFileSystemDiff), keeping the bar
+	// moving without a counting pass.
+	var diffProgress diffProgressFunc
+	if progressReporter != nil {
+		diffProgress = func(f float64, msg string) {
+			p := 0.1 + 0.2*f
+			if p > 0.3 {
+				p = 0.3
+			}
+			progressReporter(p, msg)
+		}
+	}
+	// diff 域 = 编译域：只对比该语言真正会编译/持久化的文件（FilterFile ∪
+	// FilterPreHandlerFile），两侧对称。见 resolveDiffSourceFilter。
+	isSourceFile := resolveDiffSourceFilter(language, baseProgramLanguage)
+	diffFS, fileHashMap, err := calculateFileSystemDiff(baseFS, newFS, exclude, diffProgress, isSourceFile)
 	if err != nil {
 		return nil, utils.Wrap(err, "failed to calculate file system diff")
-	}
-	if progressReporter != nil {
-		progressReporter(0.3, "file system diff calculated")
 	}
 
 	diffOpts := []ssaconfig.Option{
@@ -104,10 +109,10 @@ func CompileDiffProgramAndSaveToDB(
 	if projectID > 0 {
 		diffOpts = append(diffOpts, ssaconfig.WithProjectID(projectID))
 	}
-	if baseProgramName != "" {
-		diffOpts = append(diffOpts, WithBaseProgramName(baseProgramName))
-		diffOpts = append(diffOpts, WithEnableIncrementalCompile(false))
-	}
+	// Diff 编译的 config 只声明"这是增量序列的一层"，不携带 BaseProgramName：
+	// parseProjectWithFS 是独立入口，不会路由回 parseProject，所以 enable=true
+	// 不会递归；base 关联与 FileHashMap 在编译完成后由下面的后置赋值写入产物。
+	diffOpts = append(diffOpts, WithEnableIncrementalCompile(true))
 	if len(fileHashMap) > 0 {
 		diffOpts = append(diffOpts, WithFileHashMap(fileHashMap))
 	}
@@ -145,7 +150,7 @@ func CompileDiffProgramAndSaveToDB(
 		}
 	}
 
-	config.SetEnableIncrementalCompile(true)
+	// config 在构造时已声明 enable=true（见上），SaveConfig 直接据此打 IsOverlay 标
 	SaveConfig(config, diffProgram)
 
 	return diffProgram, nil
@@ -160,6 +165,63 @@ func ParseProject(opts ...ssaconfig.Option) (prog Programs, err error) {
 	return config.parseProject()
 }
 
+// compileMode 在一处判定 config 参与增量编译流程的形态。原始的
+// EnableIncrementalCompile / BaseProgramName 两个标志分工如下：enable 声明
+// "参与增量序列"（SaveConfig 打 IsOverlay 标、FS 层跳过与 overlay 语义冲突的
+// flush）；BaseProgramName 指向差量编译的基座。内部 diff 编译
+// （CompileDiffProgramAndSaveToDB）直接构造 enable=true 且不带 Base 名的
+// config——parseProjectWithFS 是独立入口不会路由回 parseProject，无递归，
+// base 关联在编译完成后后置写入产物。下游请统一读本方法，不要从两个标志
+// 自行拼装状态。
+type compileMode int
+
+const (
+	// compileModeFull：普通全量编译，不参与任何增量编译序列。
+	compileModeFull compileMode = iota
+	// compileModeIncrementalBase：增量序列的首个编译。实际执行的是一次全量编译，
+	// 只是产物会被标记为后续差量编译的 overlay 基座（IsOverlay + OverlayLayers）。
+	compileModeIncrementalBase
+	// compileModeIncrementalDiff：基于 base program 的差量编译，只编译变更文件。
+	compileModeIncrementalDiff
+)
+
+func (c *Config) compileMode() compileMode {
+	if c.GetBaseProgramName() != "" {
+		return compileModeIncrementalDiff
+	}
+	if c.GetEnableIncrementalCompile() {
+		return compileModeIncrementalBase
+	}
+	return compileModeFull
+}
+
+// cleanupProgramBeforeCompile clears programName's old IR rows before a full
+// compile re-inserts under the same name: the UNIQUE indexes on
+// ir_codes/ir_offsets otherwise reject the re-inserted rows (e.g.
+// recompiling the same program twice in the risk-disposal inheritance test;
+// mirrors the delete-then-insert contract documented in SaveIrOffsetBatch).
+// forced (an explicit recompile) always clears; a plain compile only clears
+// when the program already exists in the database.
+func (c *Config) cleanupProgramBeforeCompile(programName string, forced bool) error {
+	stage := "recompile project, delete old data"
+	if !forced {
+		if programName == "" {
+			return nil
+		}
+		if _, err := ssadb.GetProgram(programName, ssadb.Application); err != nil {
+			return nil // program does not exist yet, nothing to clear
+		}
+		stage = "recompile project, delete old data for existing program"
+	}
+	c.Processf(0, "%s...", stage)
+	if err := ssadb.DeleteProgramIrCode(ssadb.GetDB(), programName); err != nil {
+		return utils.Wrap(err, "failed to clear old IR data before compile")
+	}
+	ProgramCache.Remove(programName)
+	c.Processf(0, "%s finish", stage)
+	return nil
+}
+
 func (c *Config) parseProject() (progs Programs, err error) {
 	// Wire up debug/pprof output when debug_dir is set.
 	// Keep the shared Postgres SSA IR DB (redirectSSADB=false) so the
@@ -168,13 +230,19 @@ func (c *Config) parseProject() (progs Programs, err error) {
 	defer debugCleanup()
 
 	programName := c.GetProgramName()
-	isIncrementalCompile := c.GetEnableIncrementalCompile() && c.fs != nil
-	isDiffCompile := isIncrementalCompile && c.GetBaseProgramName() != ""
-	var programNameToDelete string
-	if isDiffCompile {
+	// Routing mode: the incremental paths diff against a filesystem, so a
+	// config without one degrades to a full compile regardless of the flags.
+	mode := c.compileMode()
+	if mode != compileModeFull && c.fs == nil {
+		mode = compileModeFull
+	}
+
+	// Roll back the program this compile produces on failure or panic: a
+	// diff compile writes a fresh program (latest name) and must never take
+	// the base down with it; everything else rolls back its own name.
+	programNameToDelete := programName
+	if mode == compileModeIncrementalDiff {
 		programNameToDelete = c.GetLatestProgramName()
-	} else {
-		programNameToDelete = programName
 	}
 	defer func() {
 		c.Cleanup()
@@ -195,39 +263,21 @@ func (c *Config) parseProject() (progs Programs, err error) {
 		}
 	}()
 
-	if c.GetCompileReCompile() {
-		if !isIncrementalCompile {
-			c.Processf(0, "recompile project, delete old data...")
-			if err := ssadb.DeleteProgramIrCode(ssadb.GetDB(), programName); err != nil {
-				return nil, utils.Wrap(err, "failed to clear old IR data before recompile")
-			}
-			ProgramCache.Remove(programName)
-			c.Processf(0, "recompile project, delete old data finish")
-		} else {
+	// Old IR rows must go before a full compile re-inserts under the same
+	// name; an incremental compile keeps its base program untouched.
+	if mode != compileModeFull {
+		if c.GetCompileReCompile() {
 			c.Processf(0, "recompile incremental project, keep base program...")
 		}
-	} else if !isIncrementalCompile && programName != "" {
-		// A non-incremental full compile of an already-existing program name
-		// must clear the program's old IR rows before re-inserting. The
-		// UNIQUE indexes on ir_codes/ir_offsets otherwise reject the
-		// re-inserted rows (e.g. recompiling the same program twice in the
-		// risk-disposal inheritance test). This mirrors the delete-then-insert
-		// contract documented in SaveIrOffsetBatch.
-		if _, err := ssadb.GetProgram(programName, ssadb.Application); err == nil {
-			c.Processf(0, "recompile project, delete old data for existing program...")
-			if err := ssadb.DeleteProgramIrCode(ssadb.GetDB(), programName); err != nil {
-				return nil, utils.Wrap(err, "failed to clear old IR data before compile")
-			}
-			ProgramCache.Remove(programName)
-			c.Processf(0, "recompile project, delete old data for existing program finish")
-		}
+	} else if err := c.cleanupProgramBeforeCompile(programName, c.GetCompileReCompile()); err != nil {
+		return nil, err
 	}
 
 	c.Processf(0, "recompile project, start compile")
 
-	if isIncrementalCompile {
+	if mode != compileModeFull {
 		var prog *Program
-		if isDiffCompile {
+		if mode == compileModeIncrementalDiff {
 			c.Processf(0.02, "incremental compile detected, base program: %s", c.GetBaseProgramName())
 			prog, err = c.parseProjectWithIncrementalCompile()
 		} else {
@@ -246,7 +296,7 @@ func (c *Config) parseProject() (progs Programs, err error) {
 		if c.structScan != nil && c.structScan.wantsScan() {
 			c.structScan.skipped = true
 			c.structScan.skipReason = "peephole compile"
-			log.Warnf("[struct_scan] skipped: peephole compile")
+			log.Warnf("[struct_scan] skipped: %s", c.structScan.skipReason)
 		}
 		if progs, err = c.peephole(); err != nil {
 			return nil, err
@@ -391,55 +441,24 @@ func overlayAggregatedFSPath(canonical string) string {
 	return p
 }
 
-func overlayPathFromAggregatedFS(vfsPath string) string {
-	if vfsPath == "" || vfsPath == "." {
-		return "/"
-	}
-	return ensureOverlayPathSlash(vfsPath)
-}
-
-func removeProgramNamePrefixFromFS(fs fi.FileSystem, programName string) (fi.FileSystem, error) {
-	if fs == nil {
-		return nil, utils.Errorf("file system is nil")
-	}
-	if programName == "" {
-		return fs, nil
-	}
-
-	vfs := filesys.NewVirtualFs()
-
-	err := filesys.Recursive(".", filesys.WithFileSystem(fs), filesys.WithStat(func(isDir bool, pathname string, info os.FileInfo) error {
-		if isDir {
-			return nil
+// wrapBaseFSWithoutProgramPrefix rewrites leftover "/{programName}/..." path
+// prefixes into program-relative paths on lookup, so the diff engine can walk
+// an aggregated base FS with plain relative paths. Aggregated paths are
+// already stored without the program name; "." is left unchanged so VirtualFS
+// listings still resolve.
+func wrapBaseFSWithoutProgramPrefix(fs fi.FileSystem, programName string) fi.FileSystem {
+	hooked := filesys.NewHookFS(fs)
+	hooked.SetPathHook(func(name string) (string, error) {
+		if name == "" || name == "." || name == "/" {
+			return name, nil
 		}
-		if pathname == "" {
-			return nil
+		cleaned := removeProgramNamePrefix(name, programName)
+		if cleaned == "" || cleaned == "/" {
+			return name, nil
 		}
-
-		content, err := fs.ReadFile(pathname)
-		if err != nil {
-			log.Warnf("failed to read file %s: %v", pathname, err)
-			return nil
-		}
-
-		cleanPath := removeProgramNamePrefix(pathname, programName)
-		if cleanPath == "" || cleanPath == "/" {
-			return nil
-		}
-		vfsPath := overlayAggregatedFSPath(ensureOverlayPathSlash(cleanPath))
-		if vfsPath == "" {
-			return nil
-		}
-
-		vfs.AddFile(vfsPath, string(content))
-		return nil
-	}))
-
-	if err != nil {
-		return nil, utils.Wrap(err, "failed to traverse file system")
-	}
-
-	return vfs, nil
+		return strings.TrimPrefix(cleaned, "/"), nil
+	})
+	return hooked
 }
 
 func buildFileSystemFromProgramName(programName string) (fi.FileSystem, error) {
@@ -497,6 +516,9 @@ func buildFileSystemFromProgramName(programName string) (fi.FileSystem, error) {
 
 var buildFileSystemFromProgramNameForIncremental = buildFileSystemFromProgramName
 
+// parseProjectWithIncrementalCompile 执行差量编译：加载 base program 及其
+// 合并视图（情况4：base 自身是增量产物，视图非 nil；情况3：base 是普通全量，
+// 视图为 nil），只编译变更文件，然后把新差量层接到视图顶端。
 func (c *Config) parseProjectWithIncrementalCompile() (*Program, error) {
 	baseProgramName := c.GetBaseProgramName()
 	c.Processf(0.03, "loading base program from database: %s", baseProgramName)
@@ -506,41 +528,26 @@ func (c *Config) parseProjectWithIncrementalCompile() (*Program, error) {
 	}
 	c.Processf(0.06, "base program loaded: %s", baseProgram.GetProgramName())
 
-	var baseOverlay *ProgramOverLay
-	var baseFSForDiff fi.FileSystem
-
-	baseOverlay = baseProgram.GetOverlay()
-	if baseOverlay != nil && baseOverlay.Base != nil && len(baseOverlay.Diff) > 0 {
-		aggregatedFS := baseOverlay.GetAggregatedFileSystem()
-		if aggregatedFS == nil {
-			return nil, utils.Errorf("base overlay has no aggregated file system")
-		}
-		baseFSForDiff, err = removeProgramNamePrefixFromFS(aggregatedFS, baseProgramName)
-		if err != nil {
-			return nil, utils.Wrapf(err, "failed to remove program name prefix from aggregated file system")
-		}
+	// 情况判定：GetOverlay 非 nil = base 自身是增量产物（情况4），nil = 普通全量（情况3）
+	baseOverlay := baseProgram.GetOverlay()
+	if baseOverlay != nil {
 		c.Processf(0.08, "base program is an overlay with %d layers", baseOverlay.ProgramCount())
 	} else if baseProgram.IsIncrementalCompile() && !baseProgram.IsBaseProgram() {
-		baseProgramName := baseProgram.GetBaseProgramName()
-		baseBaseProgram, err := FromDatabase(baseProgramName)
-		if err != nil {
-			return nil, utils.Wrapf(err, "failed to load base program's base program: %s", baseProgramName)
-		}
-		baseOverlay = NewProgramOverLay(baseBaseProgram, baseProgram)
-		if baseOverlay == nil {
-			return nil, utils.Errorf("failed to create overlay for diff base program")
-		}
+		// 行自称是差量层但视图没还原出来（配方损坏且加载器降级）：按情况3 继续，
+		// diff 基准会缺少更深层的历史层——告警留痕，方便事后追查"增量后结果缺层"。
+		log.Warnf("base program %s claims incremental but overlay is missing; "+
+			"diff base may lose historical layers (damaged OverlayLayers?)", baseProgramName)
+	}
+
+	// diff 的基准文件系统：情况4 直接取 base overlay 的聚合 FS；情况3 从数据库/配置重建
+	var baseFSForDiff fi.FileSystem
+	if baseOverlay != nil {
 		aggregatedFS := baseOverlay.GetAggregatedFileSystem()
 		if aggregatedFS == nil {
 			return nil, utils.Errorf("base overlay has no aggregated file system")
 		}
-		baseFSForDiff, err = removeProgramNamePrefixFromFS(aggregatedFS, baseProgramName)
-		if err != nil {
-			return nil, utils.Wrapf(err, "failed to remove program name prefix from aggregated file system")
-		}
-		c.Processf(0.08, "base program is a diff program, created overlay with 2 layers")
+		baseFSForDiff = wrapBaseFSWithoutProgramPrefix(aggregatedFS, baseProgramName)
 	} else {
-		var err error
 		baseFSForDiff, err = buildFileSystemFromProgramNameForIncremental(baseProgramName)
 		if err == nil && baseFSForDiff != nil {
 			c.Processf(0.08, "base program is a full compilation program, rebuilt file system from program name")
@@ -557,12 +564,21 @@ func (c *Config) parseProjectWithIncrementalCompile() (*Program, error) {
 		}
 	}
 
+	// diff 的两侧必须是同一形态：baseFS 是"编译时"视图（归档已展开、
+	// .class 已映射为 .java），而 c.fs 是裸文件系统。若直接用裸 FS 做
+	// diff，磁盘上的 .jar 会整体判为"新增"、base 的每个展开条目都会判为
+	// "删除"，增量编译退化为全量重编。这里把 newFS 先过一遍与全量编译
+	// 相同的语言预处理，保证与 baseFS 可比。
+	newFSForDiff := c.swapLanguageFs(c.fs)
+	c.Processf(0.09, "diff inputs aligned: new filesystem wrapped with language preprocessing (jar recursive parse: %v)", c.GetCodeSourceJarRecursiveParse())
+
 	diffProgram, err := CompileDiffProgramAndSaveToDB(
 		c.ctx,
-		baseFSForDiff, c.fs,
+		baseFSForDiff, newFSForDiff,
 		baseProgramName,
 		c.GetLatestProgramName(),
 		c.GetLanguage(),
+		c.excludeFile,
 		func(p float64, msg string) { c.Processf(p, "%s", msg) },
 	)
 	if err != nil {
@@ -571,9 +587,9 @@ func (c *Config) parseProjectWithIncrementalCompile() (*Program, error) {
 	c.Processf(0.8, "diff program compiled: %s", diffProgram.GetProgramName())
 
 	c.Processf(0.85, "creating program overlay...")
+	// 情况4：在 base overlay 上追加一层；情况3：与 base 组成两层 overlay
 	var overlay *ProgramOverLay
-
-	if baseOverlay != nil && baseOverlay.Base != nil && len(baseOverlay.Diff) > 0 {
+	if baseOverlay != nil {
 		overlay = extendOverlayWithNewLayer(baseOverlay, diffProgram)
 	} else {
 		overlay = NewProgramOverLay(baseProgram, diffProgram)
@@ -725,60 +741,185 @@ func saveOverlayToDatabase(overlay *ProgramOverLay, diffProgram *Program) error 
 	return nil
 }
 
+// diffProgressFunc receives the normalized progress of the diff window
+// [0,1] plus a message. There is no file-count denominator — a counting
+// pass would walk both sides twice just to smooth the bar — so the
+// fraction advances at phase milestones only (base snapshot done = 0.5,
+// comparison done = 1) while ticks between milestones refresh the message.
+type diffProgressFunc func(f float64, msg string)
+
+// resolveDiffSourceFilter returns the predicate defining the diff domain:
+// only files the language actually compiles or persists reach the comparison
+// (FilterFile ∪ FilterPreHandlerFile — pre-handler files DO build editors and
+// ir_sources rows, so FilterFile alone would phantom-delete them every
+// increment). Applied symmetrically to both sides, it keeps the diff domain
+// equal to the compile domain: raw archives (.jar/.war/…), docs and other
+// non-source files are ignored on both sides instead of generating bookkeeping
+// noise (added-then-rejected entries in fileHashMap, phantom -1 deletions on
+// the raw-disk fallback baseFS).
+//
+// Resolution order (no side effects, the builder instance is throwaway):
+//  1. the diff program's own language (the `language` param — same builder
+//     the diff compile below will use);
+//  2. the base program's persisted Language (covers callers that don't know
+//     the language up front);
+//  3. unresolvable → nil → calculateFileSystemDiff falls back to the raw
+//     archive blacklist (isRawArchiveDiffEntry).
+func resolveDiffSourceFilter(language, baseProgramLanguage ssaconfig.Language) func(string) bool {
+	for _, lang := range []ssaconfig.Language{language, baseProgramLanguage} {
+		if createBuilder, ok := LanguageBuilderCreater[lang]; ok {
+			builder := createBuilder()
+			return func(path string) bool {
+				return builder.FilterFile(path) || builder.FilterPreHandlerFile(path)
+			}
+		}
+	}
+	return nil
+}
+
 // calculateFileSystemDiff builds the incremental compile inputs:
 //   - diffFS: only added/modified file contents (what gets compiled)
 //   - fileHashMap: -1=deleted, 0=modified, 1=added (drives overlay File/ExcludeFile)
 //
-// Walks newFS once against a base snapshot; unchanged files are never copied.
-func calculateFileSystemDiff(baseFS, newFS fi.FileSystem) (*filesys.VirtualFS, map[string]int, error) {
+// The comparison domain is "files the language compiles/persists"
+// (isSourceFile, see resolveDiffSourceFilter), applied symmetrically to both
+// sides. On the NEW side it composes with the same exclusion rules as the
+// compile scan (skipCompileDir / skipCompileFile), so the diff compares
+// against exactly the file set a full compile would scan. On the BASE side
+// only isSourceFile applies — exclude patterns are per-compile policy, not
+// domain; the DB-derived baseFS contains whitelisted files only, so the
+// filter matters just for the raw-disk fallback baseFS, where it also fixes
+// phantom -1 deletions of raw archives.
+//
+// Content is compared by digest, not by retained bytes: the base snapshot
+// keeps only per-path md5s so its memory scales with file count instead of
+// total project bytes. ir_programs.FileList hashes can't be reused here —
+// they mix in the program name, which differs between the two sides.
+// Walks newFS once against the base snapshot; unchanged files are never
+// copied.
+//
+// When isSourceFile is nil (language unresolvable), the new side falls back
+// to skipping raw archives (isRawArchiveDiffEntry): archives are never
+// compiled as opaque source units — either the language preprocessing
+// already expanded them into entries (walk sees no archive files), or
+// archive parsing is disabled and they must stay out of the diff entirely.
+// Letting them through would re-expand inside the diff compile and degrade
+// every incremental compile back to a full one.
+// newSideWalkOptions builds the walk options for the NEW side of the diff:
+// one entry filter answering "is this walk entry inside the diff domain".
+// Directories are pruned whole on exclude matches (SkipDir); files must pass
+// the domain filter — the language whitelist when resolved, the raw-archive
+// blacklist otherwise — and the compile scan rules (skipCompileFile). The
+// per-file hook is appended by the caller: the compare pass installs the
+// digest comparison. Both sides of the diff must apply the same domain
+// filter (isSourceFile), so entries skipped here never reach the comparison
+// hook.
+func newSideWalkOptions(walk fi.FileSystem, exclude ExcludeFunc, isSourceFile func(string) bool, onFile func(pathname string, info os.FileInfo) error) []filesys.Option {
+	return []filesys.Option{
+		filesys.WithFileSystem(walk),
+		filesys.WithStat(func(isDir bool, pathname string, info os.FileInfo) error {
+			if pathname == "" {
+				return nil
+			}
+			if isDir {
+				if skipCompileDir(exclude, pathname) {
+					return filesys.SkipDir
+				}
+				return nil
+			}
+			outOfDomain := isRawArchiveDiffEntry(pathname)
+			if isSourceFile != nil {
+				outOfDomain = !isSourceFile(pathname)
+			}
+			if outOfDomain || skipCompileFile(exclude, pathname, info) {
+				return nil
+			}
+			return onFile(pathname, info)
+		}),
+	}
+}
+
+// diffProgressTick is the per-file interval at which the diff walks refresh
+// their progress message: without a counting pass there is no denominator,
+// so the moving text is what keeps the UI alive between phase milestones.
+const diffProgressTick = 200
+
+func calculateFileSystemDiff(baseFS, newFS fi.FileSystem, exclude ExcludeFunc, progress diffProgressFunc, isSourceFile func(string) bool) (*filesys.VirtualFS, map[string]int, error) {
 	diffFS := filesys.NewVirtualFs()
 	fileHashMap := make(map[string]int)
+	tick := func(f float64, format string, args ...any) {
+		if progress != nil {
+			progress(f, fmt.Sprintf(format, args...))
+		}
+	}
 
-	baseFiles := make(map[string][]byte)
+	// base snapshot: path -> content digest (never retains file bytes)
+	baseDone := 0
+	baseDigests := make(map[string]string)
 	err := filesys.Recursive(".", filesys.WithFileSystem(baseFS), filesys.WithFileStat(func(pathname string, info os.FileInfo) error {
-		if pathname == "" {
+		if pathname == "" || (isSourceFile != nil && !isSourceFile(pathname)) {
 			return nil
+		}
+		baseDone++
+		if baseDone%diffProgressTick == 0 {
+			tick(0, "collecting base snapshot... (%d files)", baseDone)
 		}
 		content, err := baseFS.ReadFile(pathname)
 		if err != nil {
 			return nil
 		}
-		baseFiles[pathname] = content
+		baseDigests[pathname] = codec.Md5(content)
 		return nil
 	}))
 	if err != nil {
 		return nil, nil, utils.Wrap(err, "failed to collect baseFS files")
 	}
+	tick(0.5, "base snapshot collected (%d files)", baseDone)
 
-	err = filesys.Recursive(".", filesys.WithFileSystem(newFS), filesys.WithFileStat(func(pathname string, info os.FileInfo) error {
-		if pathname == "" {
-			return nil
+	newDone := 0
+	err = filesys.Recursive(".", newSideWalkOptions(newFS, exclude, isSourceFile, func(pathname string, _ os.FileInfo) error {
+		newDone++
+		if newDone%diffProgressTick == 0 {
+			tick(0.5, "comparing new filesystem... (%d files)", newDone)
 		}
 		content, err := newFS.ReadFile(pathname)
 		if err != nil {
 			return nil
 		}
-		baseContent, existsInBase := baseFiles[pathname]
-		delete(baseFiles, pathname)
+		baseDigest, existsInBase := baseDigests[pathname]
+		delete(baseDigests, pathname)
 		if !existsInBase {
 			fileHashMap[pathname] = 1
 			diffFS.AddFile(pathname, string(content))
 			return nil
 		}
-		if !bytes.Equal(baseContent, content) {
+		if baseDigest != codec.Md5(content) {
 			fileHashMap[pathname] = 0
 			diffFS.AddFile(pathname, string(content))
 		}
 		return nil
-	}))
+	})...)
 	if err != nil {
 		return nil, nil, utils.Wrap(err, "failed to walk newFS files")
 	}
 
-	for filePath := range baseFiles {
+	for filePath := range baseDigests {
 		fileHashMap[filePath] = -1
 	}
+	tick(1, "file system diff calculated (%d files compared)", newDone)
 	return diffFS, fileHashMap, nil
+}
+
+// isRawArchiveDiffEntry reports whether a diff walk entry is an archive file
+// that no language preprocessing expanded (expanded archives surface as
+// directories, so their file entries never reach this check). It delegates to
+// javaclassparser.IsArchiveFile so the suffix set stays in lockstep with the
+// archives the preprocessor actually expands. Fallback only: used when the
+// diff source filter can't be resolved from a language (see
+// resolveDiffSourceFilter); the language whitelist normally keeps raw
+// archives out of the diff domain without this blacklist.
+func isRawArchiveDiffEntry(pathname string) bool {
+	return javaclassparser.IsArchiveFile(pathname)
 }
 
 func hasDeleteEntries(fileHashMap map[string]int) bool {

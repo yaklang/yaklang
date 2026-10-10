@@ -97,120 +97,31 @@ func projectInfoCallback(params aitool.InvokeParams, stdout io.Writer, stderr io
 		"error":           "",
 	}
 
-	// 方法1: 尝试从 irSourceFS (数据库) 读取
-	irfs := ssadb.NewIrSourceFs()
-	programPath := "/" + programName
-
-	entries, err := irfs.ReadDir(programPath)
-	if err == nil && len(entries) > 0 {
+	lookup := lookupProgram(programName)
+	if src := lookup.Source; src != nil && src.Kind == programSourceDatabase {
 		result["exists"] = true
-		result["source_type"] = "database"
+		result["source_type"] = string(src.Kind)
 		result["has_source_code"] = true
-
-		// 获取项目元数据
-		extraInfo := irfs.ExtraInfo(programPath)
-		if extraInfo != nil {
+		if extraInfo := src.FS.ExtraInfo(src.Root); extraInfo != nil {
 			result["metadata"] = extraInfo
 		}
-
-		// 收集文件列表
-		fileList := []map[string]any{}
-		fileCount := 0
-
-		filesys.Recursive(
-			programPath,
-			filesys.WithFileSystem(irfs),
-			filesys.WithFileStat(func(filepath string, info fs.FileInfo) error {
-				if info.IsDir() {
-					return nil
-				}
-				fileCount++
-				if showFiles && len(fileList) < maxFiles {
-					fileList = append(fileList, map[string]any{
-						"path": filepath,
-						"size": info.Size(),
-					})
-				}
-				return nil
-			}),
-		)
-
-		result["file_count"] = fileCount
-		if showFiles {
-			result["files"] = fileList
-			if fileCount > maxFiles {
-				result["files_truncated"] = true
-				result["files_truncated_message"] = fmt.Sprintf("仅显示前 %d 个文件，共 %d 个文件", maxFiles, fileCount)
-			}
-		}
-
-		stdout.Write([]byte(fmt.Sprintf("成功获取项目 '%s' 信息，共 %d 个文件\n", programName, fileCount)))
+		assignLimitedFiles(result, src, showFiles, maxFiles)
+		stdout.Write([]byte(fmt.Sprintf("成功获取项目 '%s' 信息，共 %d 个文件\n", programName, result["file_count"])))
 		return result, nil
 	}
 
-	// 方法2: 尝试从 IrProgram.ConfigInput 获取本地文件系统路径
-	irProg, err := ssadb.GetProgram(programName, ssadb.Application)
-	if err == nil && irProg != nil {
+	if lookup.Program != nil {
 		result["exists"] = true
-
-		// 获取项目元数据
-		result["metadata"] = map[string]any{
-			"language":     string(irProg.Language),
-			"program_kind": string(irProg.ProgramKind),
-			"description":  irProg.Description,
-			"line_count":   irProg.LineCount,
+		result["metadata"] = programMetadata(lookup.Program)
+		if src := lookup.Source; src != nil && src.Kind == programSourceLocal {
+			result["source_type"] = string(src.Kind)
+			result["has_source_code"] = true
+			result["local_path"] = src.LocalRoot
+			assignLimitedFiles(result, src, showFiles, maxFiles)
+			stdout.Write([]byte(fmt.Sprintf("成功获取项目 '%s' 信息（本地文件系统），共 %d 个文件\n", programName, result["file_count"])))
+			return result, nil
 		}
 
-		// 尝试解析 ConfigInput
-		if irProg.ConfigInput != "" {
-			localPath, ok := tryGetLocalPathFromConfig(irProg.ConfigInput)
-			if ok && localPath != "" {
-				// 检查本地路径是否存在
-				exists, _ := filesys.NewLocalFs().Exists(localPath)
-				if exists {
-					result["source_type"] = "local_fs"
-					result["has_source_code"] = true
-					result["local_path"] = localPath
-
-					// 使用本地文件系统收集文件列表
-					localFs := filesys.NewRelLocalFs(localPath)
-					fileList := []map[string]any{}
-					fileCount := 0
-
-					filesys.Recursive(
-						".",
-						filesys.WithFileSystem(localFs),
-						filesys.WithFileStat(func(filepath string, info fs.FileInfo) error {
-							if info.IsDir() {
-								return nil
-							}
-							fileCount++
-							if showFiles && len(fileList) < maxFiles {
-								fileList = append(fileList, map[string]any{
-									"path": filepath,
-									"size": info.Size(),
-								})
-							}
-							return nil
-						}),
-					)
-
-					result["file_count"] = fileCount
-					if showFiles {
-						result["files"] = fileList
-						if fileCount > maxFiles {
-							result["files_truncated"] = true
-							result["files_truncated_message"] = fmt.Sprintf("仅显示前 %d 个文件，共 %d 个文件", maxFiles, fileCount)
-						}
-					}
-
-					stdout.Write([]byte(fmt.Sprintf("成功获取项目 '%s' 信息（本地文件系统），共 %d 个文件\n", programName, fileCount)))
-					return result, nil
-				}
-			}
-		}
-
-		// 项目存在但源码不可访问
 		result["source_type"] = "none"
 		result["has_source_code"] = false
 		result["error"] = "项目存在但源码不可访问：数据库中无源码，且原始编译路径不可用或非本地类型"
@@ -284,106 +195,23 @@ func listFilesCallback(params aitool.InvokeParams, stdout io.Writer, stderr io.W
 		"error":          "",
 	}
 
-	// 收集文件的辅助函数
-	// stripPrefix 用于从数据库路径中移除 /{programName}/ 前缀
-	collectFiles := func(fsys filesys_interface.FileSystem, basePath string, stripPrefix string) []map[string]any {
-		allFiles := []map[string]any{}
-		filesys.Recursive(
-			basePath,
-			filesys.WithFileSystem(fsys),
-			filesys.WithFileStat(func(filepath string, info fs.FileInfo) error {
-				if info.IsDir() {
-					return nil
-				}
-				// 移除前缀以获得相对路径
-				relPath := filepath
-				if stripPrefix != "" {
-					relPath = strings.TrimPrefix(filepath, stripPrefix)
-					relPath = strings.TrimPrefix(relPath, "/")
-				}
-				// 确保路径不以 / 开头
-				relPath = strings.TrimPrefix(relPath, "/")
-				if pathPrefix != "" && !strings.HasPrefix(relPath, pathPrefix) {
-					return nil
-				}
-				allFiles = append(allFiles, map[string]any{
-					"path": relPath,
-					"size": info.Size(),
-				})
-				return nil
-			}),
-		)
-		return allFiles
-	}
-
-	// 方法1: 尝试从 irSourceFS (数据库) 读取
-	irfs := ssadb.NewIrSourceFs()
-	programPath := "/" + programName
-
-	entries, err := irfs.ReadDir(programPath)
-	if err == nil && len(entries) > 0 {
-		result["source_type"] = "database"
-		// 传入 stripPrefix 以移除 /{programName} 前缀
-		allFiles := collectFiles(irfs, programPath, programPath)
-		result["total_count"] = len(allFiles)
-
-		// 应用分页
-		startIdx := offset
-		endIdx := offset + limit
-		if startIdx >= len(allFiles) {
-			result["files"] = []any{}
-			result["returned_count"] = 0
-			result["has_more"] = false
-		} else {
-			if endIdx > len(allFiles) {
-				endIdx = len(allFiles)
-			}
-			result["files"] = allFiles[startIdx:endIdx]
-			result["returned_count"] = endIdx - startIdx
-			result["has_more"] = endIdx < len(allFiles)
-		}
-
-		stdout.Write([]byte(fmt.Sprintf("列出项目 '%s' 文件，返回 %d/%d 个文件\n", programName, result["returned_count"], result["total_count"])))
+	lookup := lookupProgram(programName)
+	if lookup.Source == nil {
+		result["error"] = fmt.Sprintf("项目 '%s' 源码不可访问：数据库中无源码，且原始编译路径不可用", programName)
+		stderr.Write([]byte(result["error"].(string) + "\n"))
 		return result, nil
 	}
 
-	// 方法2: 尝试从 IrProgram.ConfigInput 获取本地文件系统路径
-	irProg, err := ssadb.GetProgram(programName, ssadb.Application)
-	if err == nil && irProg != nil && irProg.ConfigInput != "" {
-		localPath, ok := tryGetLocalPathFromConfig(irProg.ConfigInput)
-		if ok && localPath != "" {
-			exists, _ := filesys.NewLocalFs().Exists(localPath)
-			if exists {
-				result["source_type"] = "local_fs"
-				localFs := filesys.NewRelLocalFs(localPath)
-				// 本地文件系统不需要 stripPrefix
-				allFiles := collectFiles(localFs, ".", "")
-				result["total_count"] = len(allFiles)
+	src := lookup.Source
+	result["source_type"] = string(src.Kind)
+	allFiles := collectListedFiles(src, pathPrefix)
+	assignFilePage(result, allFiles, offset, limit)
 
-				// 应用分页
-				startIdx := offset
-				endIdx := offset + limit
-				if startIdx >= len(allFiles) {
-					result["files"] = []any{}
-					result["returned_count"] = 0
-					result["has_more"] = false
-				} else {
-					if endIdx > len(allFiles) {
-						endIdx = len(allFiles)
-					}
-					result["files"] = allFiles[startIdx:endIdx]
-					result["returned_count"] = endIdx - startIdx
-					result["has_more"] = endIdx < len(allFiles)
-				}
-
-				stdout.Write([]byte(fmt.Sprintf("列出项目 '%s' 文件（本地），返回 %d/%d 个文件\n", programName, result["returned_count"], result["total_count"])))
-				return result, nil
-			}
-		}
+	msg := "列出项目 '%s' 文件，返回 %d/%d 个文件\n"
+	if src.Kind == programSourceLocal {
+		msg = "列出项目 '%s' 文件（本地），返回 %d/%d 个文件\n"
 	}
-
-	result["error"] = fmt.Sprintf("项目 '%s' 源码不可访问：数据库中无源码，且原始编译路径不可用", programName)
-	stderr.Write([]byte(result["error"].(string) + "\n"))
+	stdout.Write([]byte(fmt.Sprintf(msg, programName, result["returned_count"], result["total_count"])))
 	return result, nil
 }
 
@@ -486,13 +314,9 @@ func readFileCallback(params aitool.InvokeParams, stdout io.Writer, stderr io.Wr
 		return contentBuilder.String(), linesReturned, totalLines, hasMore, ""
 	}
 
-	// 方法1: 尝试从 irSourceFS (数据库) 读取
-	irfs := ssadb.NewIrSourceFs()
-	fullPath := "/" + programName + "/" + filePath
-
-	content, err := irfs.ReadFile(fullPath)
-	if err == nil {
-		result["source_type"] = "database"
+	content, kind, ok := readProgramFile(programName, filePath)
+	if ok {
+		result["source_type"] = string(kind)
 		result["file_size"] = len(content)
 
 		formattedContent, linesReturned, totalLines, hasMore, formatErr := formatContent(string(content))
@@ -504,40 +328,13 @@ func readFileCallback(params aitool.InvokeParams, stdout io.Writer, stderr io.Wr
 			result["lines_returned"] = linesReturned
 			result["total_lines"] = totalLines
 			result["has_more"] = hasMore
-			stdout.Write([]byte(fmt.Sprintf("读取文件 '%s'，返回 %d/%d 行\n", filePath, linesReturned, totalLines)))
+			msg := "读取文件 '%s'，返回 %d/%d 行\n"
+			if kind == programSourceLocal {
+				msg = "读取文件 '%s'（本地），返回 %d/%d 行\n"
+			}
+			stdout.Write([]byte(fmt.Sprintf(msg, filePath, linesReturned, totalLines)))
 		}
 		return result, nil
-	}
-
-	// 方法2: 尝试从 IrProgram.ConfigInput 获取本地文件系统路径
-	irProg, err := ssadb.GetProgram(programName, ssadb.Application)
-	if err == nil && irProg != nil && irProg.ConfigInput != "" {
-		localPath, ok := tryGetLocalPathFromConfig(irProg.ConfigInput)
-		if ok && localPath != "" {
-			localFs := filesys.NewLocalFs()
-			fullLocalPath := localFs.Join(localPath, filePath)
-			exists, _ := localFs.Exists(fullLocalPath)
-			if exists {
-				result["source_type"] = "local_fs"
-				content, err := localFs.ReadFile(fullLocalPath)
-				if err == nil {
-					result["file_size"] = len(content)
-
-					formattedContent, linesReturned, totalLines, hasMore, formatErr := formatContent(string(content))
-					if formatErr != "" {
-						result["error"] = formatErr
-						stderr.Write([]byte(formatErr + "\n"))
-					} else {
-						result["content"] = formattedContent
-						result["lines_returned"] = linesReturned
-						result["total_lines"] = totalLines
-						result["has_more"] = hasMore
-						stdout.Write([]byte(fmt.Sprintf("读取文件 '%s'（本地），返回 %d/%d 行\n", filePath, linesReturned, totalLines)))
-					}
-					return result, nil
-				}
-			}
-		}
 	}
 
 	result["error"] = fmt.Sprintf("文件 '%s' 在项目 '%s' 中不存在或不可访问", filePath, programName)
@@ -708,32 +505,13 @@ func grepCallback(params aitool.InvokeParams, stdout io.Writer, stderr io.Writer
 		}
 	}
 
-	// 方法1: 尝试从 irSourceFS (数据库) 读取
-	irfs := ssadb.NewIrSourceFs()
-	programPath := "/" + programName
-
-	entries, err := irfs.ReadDir(programPath)
-	if err == nil && len(entries) > 0 {
-		result["source_type"] = "database"
-
-		filesys.Recursive(
-			programPath,
-			filesys.WithFileSystem(irfs),
-			filesys.WithFileStat(func(filepath string, info fs.FileInfo) error {
-				if info.IsDir() || len(matches) >= maxResults {
-					return nil
-				}
-				content, err := irfs.ReadFile(filepath)
-				if err != nil {
-					return nil
-				}
-				// 移除 /{programName}/ 前缀以获得相对路径
-				relPath := strings.TrimPrefix(filepath, programPath)
-				relPath = strings.TrimPrefix(relPath, "/")
-				searchInFile(relPath, content)
-				return nil
-			}),
-		)
+	lookup := lookupProgram(programName)
+	if lookup.Source != nil {
+		src := lookup.Source
+		result["source_type"] = string(src.Kind)
+		searchProgramSource(src, func() bool { return len(matches) >= maxResults }, func(relPath string, content []byte) {
+			searchInFile(relPath, content)
+		})
 
 		result["matches"] = matches
 		result["total_matches"] = totalMatches
@@ -741,48 +519,12 @@ func grepCallback(params aitool.InvokeParams, stdout io.Writer, stderr io.Writer
 		result["files_matched"] = filesMatched
 		result["truncated"] = len(matches) >= maxResults
 
-		stdout.Write([]byte(fmt.Sprintf("搜索完成，找到 %d 个匹配（%d 个文件），搜索了 %d 个文件\n", totalMatches, filesMatched, filesSearched)))
-		return result, nil
-	}
-
-	// 方法2: 尝试从 IrProgram.ConfigInput 获取本地文件系统路径
-	irProg, err := ssadb.GetProgram(programName, ssadb.Application)
-	if err == nil && irProg != nil && irProg.ConfigInput != "" {
-		localPath, ok := tryGetLocalPathFromConfig(irProg.ConfigInput)
-		if ok && localPath != "" {
-			localFs := filesys.NewLocalFs()
-			exists, _ := localFs.Exists(localPath)
-			if exists {
-				result["source_type"] = "local_fs"
-				relFs := filesys.NewRelLocalFs(localPath)
-
-				filesys.Recursive(
-					".",
-					filesys.WithFileSystem(relFs),
-					filesys.WithFileStat(func(filepath string, info fs.FileInfo) error {
-						if info.IsDir() || len(matches) >= maxResults {
-							return nil
-						}
-						fullPath := localFs.Join(localPath, filepath)
-						content, err := localFs.ReadFile(fullPath)
-						if err != nil {
-							return nil
-						}
-						searchInFile(filepath, content)
-						return nil
-					}),
-				)
-
-				result["matches"] = matches
-				result["total_matches"] = totalMatches
-				result["files_searched"] = filesSearched
-				result["files_matched"] = filesMatched
-				result["truncated"] = len(matches) >= maxResults
-
-				stdout.Write([]byte(fmt.Sprintf("搜索完成（本地），找到 %d 个匹配（%d 个文件），搜索了 %d 个文件\n", totalMatches, filesMatched, filesSearched)))
-				return result, nil
-			}
+		msg := "搜索完成，找到 %d 个匹配（%d 个文件），搜索了 %d 个文件\n"
+		if src.Kind == programSourceLocal {
+			msg = "搜索完成（本地），找到 %d 个匹配（%d 个文件），搜索了 %d 个文件\n"
 		}
+		stdout.Write([]byte(fmt.Sprintf(msg, totalMatches, filesMatched, filesSearched)))
+		return result, nil
 	}
 
 	result["error"] = fmt.Sprintf("项目 '%s' 源码不可访问：数据库中无源码，且原始编译路径不可用", programName)
@@ -791,6 +533,219 @@ func grepCallback(params aitool.InvokeParams, stdout io.Writer, stderr io.Writer
 }
 
 // ===== 辅助函数 =====
+
+type programSourceKind string
+
+const (
+	programSourceDatabase programSourceKind = "database"
+	programSourceLocal    programSourceKind = "local_fs"
+)
+
+// programSource 是某个 SSA 项目当前可读的源码树。
+// 数据库目录非空时只用数据库；否则回退到编译配置里的本地目录。
+type programSource struct {
+	Kind programSourceKind
+	FS   filesys_interface.FileSystem
+	// Root 是遍历起点。数据库为 "/{program}"，本地为 "."。
+	Root string
+	// RelPrefix 要从数据库路径里去掉的前缀。本地为空。
+	RelPrefix string
+	// LocalRoot 是配置里的本地目录，仅本地源码有值。
+	LocalRoot string
+}
+
+type programLookup struct {
+	Source  *programSource
+	Program *ssadb.IrProgram
+}
+
+// lookupProgram 优先打开数据库中的源码目录，没有再回退到本地编译路径。
+// 项目不存在时 Source 和 Program 都为空；项目在但源码不可读时只有 Program。
+func lookupProgram(programName string) programLookup {
+	irfs := ssadb.NewIrSourceFs()
+	programPath := "/" + programName
+	if entries, err := irfs.ReadDir(programPath); err == nil && len(entries) > 0 {
+		return programLookup{Source: &programSource{
+			Kind:      programSourceDatabase,
+			FS:        irfs,
+			Root:      programPath,
+			RelPrefix: programPath,
+		}}
+	}
+
+	irProg, err := ssadb.GetProgram(programName, ssadb.Application)
+	if err != nil || irProg == nil {
+		return programLookup{}
+	}
+	lookup := programLookup{Program: irProg}
+	localPath, ok := localPathFromProgram(irProg)
+	if !ok {
+		return lookup
+	}
+	if exists, _ := filesys.NewLocalFs().Exists(localPath); !exists {
+		return lookup
+	}
+	lookup.Source = &programSource{
+		Kind:      programSourceLocal,
+		FS:        filesys.NewRelLocalFs(localPath),
+		Root:      ".",
+		LocalRoot: localPath,
+	}
+	return lookup
+}
+
+func localPathFromProgram(irProg *ssadb.IrProgram) (string, bool) {
+	if irProg == nil || irProg.ConfigInput == "" {
+		return "", false
+	}
+	return tryGetLocalPathFromConfig(irProg.ConfigInput)
+}
+
+func programMetadata(irProg *ssadb.IrProgram) map[string]any {
+	return map[string]any{
+		"language":     string(irProg.Language),
+		"program_kind": string(irProg.ProgramKind),
+		"description":  irProg.Description,
+		"line_count":   irProg.LineCount,
+	}
+}
+
+func assignLimitedFiles(result map[string]any, src *programSource, showFiles bool, maxFiles int) {
+	fileList := []map[string]any{}
+	fileCount := 0
+	filesys.Recursive(
+		src.Root,
+		filesys.WithFileSystem(src.FS),
+		filesys.WithFileStat(func(filepath string, info fs.FileInfo) error {
+			if info.IsDir() {
+				return nil
+			}
+			fileCount++
+			if showFiles && len(fileList) < maxFiles {
+				fileList = append(fileList, map[string]any{
+					"path": filepath,
+					"size": info.Size(),
+				})
+			}
+			return nil
+		}),
+	)
+	result["file_count"] = fileCount
+	if !showFiles {
+		return
+	}
+	result["files"] = fileList
+	if fileCount > maxFiles {
+		result["files_truncated"] = true
+		result["files_truncated_message"] = fmt.Sprintf("仅显示前 %d 个文件，共 %d 个文件", maxFiles, fileCount)
+	}
+}
+
+func collectListedFiles(src *programSource, pathPrefix string) []map[string]any {
+	allFiles := []map[string]any{}
+	filesys.Recursive(
+		src.Root,
+		filesys.WithFileSystem(src.FS),
+		filesys.WithFileStat(func(filepath string, info fs.FileInfo) error {
+			if info.IsDir() {
+				return nil
+			}
+			relPath := filepath
+			if src.RelPrefix != "" {
+				relPath = strings.TrimPrefix(filepath, src.RelPrefix)
+				relPath = strings.TrimPrefix(relPath, "/")
+			}
+			relPath = strings.TrimPrefix(relPath, "/")
+			if pathPrefix != "" && !strings.HasPrefix(relPath, pathPrefix) {
+				return nil
+			}
+			allFiles = append(allFiles, map[string]any{
+				"path": relPath,
+				"size": info.Size(),
+			})
+			return nil
+		}),
+	)
+	return allFiles
+}
+
+func assignFilePage(result map[string]any, allFiles []map[string]any, offset, limit int) {
+	result["total_count"] = len(allFiles)
+	startIdx := offset
+	endIdx := offset + limit
+	if startIdx >= len(allFiles) {
+		result["files"] = []any{}
+		result["returned_count"] = 0
+		result["has_more"] = false
+		return
+	}
+	if endIdx > len(allFiles) {
+		endIdx = len(allFiles)
+	}
+	result["files"] = allFiles[startIdx:endIdx]
+	result["returned_count"] = endIdx - startIdx
+	result["has_more"] = endIdx < len(allFiles)
+}
+
+// readProgramFile 按单个文件读取：数据库里有这个文件就用数据库，否则再试本地路径。
+func readProgramFile(programName, relPath string) ([]byte, programSourceKind, bool) {
+	irfs := ssadb.NewIrSourceFs()
+	fullPath := "/" + programName + "/" + relPath
+	if content, err := irfs.ReadFile(fullPath); err == nil {
+		return content, programSourceDatabase, true
+	}
+
+	irProg, err := ssadb.GetProgram(programName, ssadb.Application)
+	if err != nil || irProg == nil {
+		return nil, "", false
+	}
+	localPath, ok := localPathFromProgram(irProg)
+	if !ok {
+		return nil, "", false
+	}
+	localFs := filesys.NewLocalFs()
+	fullLocalPath := localFs.Join(localPath, relPath)
+	exists, _ := localFs.Exists(fullLocalPath)
+	if !exists {
+		return nil, "", false
+	}
+	content, err := localFs.ReadFile(fullLocalPath)
+	if err != nil {
+		return nil, "", false
+	}
+	return content, programSourceLocal, true
+}
+
+func searchProgramSource(src *programSource, stop func() bool, visit func(relPath string, content []byte)) {
+	filesys.Recursive(
+		src.Root,
+		filesys.WithFileSystem(src.FS),
+		filesys.WithFileStat(func(filepath string, info fs.FileInfo) error {
+			if info.IsDir() || stop() {
+				return nil
+			}
+			content, err := readSourceFile(src, filepath)
+			if err != nil {
+				return nil
+			}
+			relPath := filepath
+			if src.RelPrefix != "" {
+				relPath = strings.TrimPrefix(filepath, src.RelPrefix)
+				relPath = strings.TrimPrefix(relPath, "/")
+			}
+			visit(relPath, content)
+			return nil
+		}),
+	)
+}
+
+func readSourceFile(src *programSource, filepath string) ([]byte, error) {
+	if src.Kind == programSourceLocal {
+		localFs := filesys.NewLocalFs()
+		return localFs.ReadFile(localFs.Join(src.LocalRoot, filepath))
+	}
+	return src.FS.ReadFile(filepath)
+}
 
 // tryGetLocalPathFromConfig 尝试从 ConfigInput JSON 中提取本地文件路径
 func tryGetLocalPathFromConfig(configInput string) (string, bool) {

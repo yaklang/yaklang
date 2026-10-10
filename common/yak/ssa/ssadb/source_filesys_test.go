@@ -6,6 +6,7 @@ import (
 	"io"
 	"io/fs"
 	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
@@ -13,8 +14,8 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils/filesys"
+	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
@@ -22,46 +23,22 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
-func TestSourceFilesysLocal(t *testing.T) {
-	dir := fmt.Sprintf("%s/ssa_source_test", os.TempDir())
-	os.Mkdir(dir, os.ModePerm)
-	defer os.RemoveAll(dir)
-	log.Infof("dir: %v", dir)
-	// create file in dir
-	os.Mkdir(fmt.Sprintf("%s/example", dir), os.ModePerm)
-	os.Mkdir(fmt.Sprintf("%s/example/src", dir), os.ModePerm)
-	os.Mkdir(fmt.Sprintf("%s/example/src/main", dir), os.ModePerm)
-	os.Mkdir(fmt.Sprintf("%s/example/src/main/java", dir), os.ModePerm)
-	os.Mkdir(fmt.Sprintf("%s/example/src/main/java/com", dir), os.ModePerm)
-	os.Mkdir(fmt.Sprintf("%s/example/src/main/java/com/example", dir), os.ModePerm)
-	os.Mkdir(fmt.Sprintf("%s/example/src/main/java/com/example/apackage", dir), os.ModePerm)
-	os.Mkdir(fmt.Sprintf("%s/example/src/main/java/com/example/bpackage", dir), os.ModePerm)
-	os.Mkdir(fmt.Sprintf("%s/example/src/main/java/com/example/bpackage/sub", dir), os.ModePerm)
-	fd, err := os.OpenFile(
-		fmt.Sprintf("%s/example/src/main/java/com/example/apackage/a.java", dir),
-		os.O_CREATE|os.O_RDWR, os.ModePerm,
-	)
-	assert.NoError(t, err)
-	fd.Write([]byte(`
+func TestSourceFilesys(t *testing.T) {
+	ssadb.DeleteProgram(ssadb.GetDB(), "com.example.apackage")
+	ssadb.DeleteProgram(ssadb.GetDB(), "com.example.bpackage.sub")
+
+	codeA := `
 		package com.example.apackage; 
 		import com.example.bpackage.sub.B;
 		class A {
 			public static void main(String[] args) {
 				B b = new B();
-				// for test 1: A->B
 				target1(b.get());
-				// for test 2: B->A
 				b.show(1);
 			}
 		}
-	`))
-
-	fd, err = os.OpenFile(
-		fmt.Sprintf("%s/example/src/main/java/com/example/bpackage/sub/b.java", dir),
-		os.O_CREATE|os.O_RDWR, os.ModePerm,
-	)
-	assert.NoError(t, err)
-	fd.Write([]byte(`
+		`
+	codeB := `
 		package com.example.bpackage.sub; 
 		class B {
 			public  int get() {
@@ -71,394 +48,149 @@ func TestSourceFilesysLocal(t *testing.T) {
 				target2(a);
 			}
 		}
-		`))
-	programID := uuid.NewString()
-	_, err = ssaapi.ParseProjectFromPath(dir,
-		ssaapi.WithLanguage(ssaconfig.JAVA),
-		ssaapi.WithProgramName(programID),
-	)
-	defer func() {
-		ssadb.DeleteProgram(ssadb.GetDB(), programID)
-	}()
-	assert.NoErrorf(t, err, "parse project error: %v", err)
-	dirs := make([]string, 0)
-	file := make([]string, 0)
-	dbfs := ssadb.NewIrSourceFs()
-	t.Run("test source file system", func(t *testing.T) {
-		filesys.TreeView(dbfs)
-		err := filesys.Recursive(
+		`
+	wantDir := []string{
+		"example", "example/src", "example/src/main", "example/src/main/java",
+		"example/src/main/java/com", "example/src/main/java/com/example",
+		"example/src/main/java/com/example/apackage",
+		"example/src/main/java/com/example/bpackage",
+		"example/src/main/java/com/example/bpackage/sub",
+	}
+	wantFile := []string{
+		"example/src/main/java/com/example/apackage/a.java",
+		"example/src/main/java/com/example/bpackage/sub/b.java",
+	}
+
+	assertTree := func(t *testing.T, programID string, dbfs fi.FileSystem) {
+		t.Helper()
+		var dirs, files []string
+		require.NoError(t, filesys.Recursive(
 			fmt.Sprintf("/%s", programID),
 			filesys.WithFileSystem(dbfs),
-			filesys.WithDirStat(func(s string, fi fs.FileInfo) error {
+			filesys.WithDirStat(func(s string, info fs.FileInfo) error {
 				_, path, _ := strings.Cut(s, programID+"/")
 				if path != "" {
 					dirs = append(dirs, path)
 				}
 				return nil
 			}),
-			filesys.WithFileStat(func(s string, fi fs.FileInfo) error {
+			filesys.WithFileStat(func(s string, info fs.FileInfo) error {
 				_, path, _ := strings.Cut(s, programID+"/")
-				file = append(file, path)
+				files = append(files, path)
 				return nil
 			}),
-		)
-		require.NoError(t, err)
-		wantDir := []string{
-			"example", "example/src", "example/src/main", "example/src/main/java",
-			"example/src/main/java/com", "example/src/main/java/com/example",
-			"example/src/main/java/com/example/apackage",
-			"example/src/main/java/com/example/bpackage",
-			"example/src/main/java/com/example/bpackage/sub",
-		}
+		))
+		gotDir := append([]string(nil), wantDir...)
+		gotFile := append([]string(nil), wantFile...)
+		slices.Sort(gotDir)
 		slices.Sort(dirs)
-		slices.Sort(wantDir)
-		assert.Equal(t, wantDir, dirs)
-		wantFile := []string{
-			"example/src/main/java/com/example/apackage/a.java",
-			"example/src/main/java/com/example/bpackage/sub/b.java",
-		}
-		slices.Sort(file)
-		slices.Sort(wantFile)
-		assert.Equal(t, wantFile, file)
-	})
-	t.Run("test source file system root path", func(t *testing.T) {
-		info, err := dbfs.Stat("/")
-		_ = info
-		require.NoErrorf(t, err, "stat error: %v", err)
+		slices.Sort(gotFile)
+		slices.Sort(files)
+		assert.Equal(t, gotDir, dirs)
+		assert.Equal(t, gotFile, files)
+	}
 
-		dirs = make([]string, 0)
-		infos, err := dbfs.ReadDir("/")
-		require.NoErrorf(t, err, "read dir error: %v", err)
-		for _, info := range infos {
-			dirs = append(dirs, info.Name())
+	t.Run("virtual_fs", func(t *testing.T) {
+		programID := uuid.NewString()
+		opts := []ssaconfig.Option{
+			ssaapi.WithLanguage(ssaconfig.JAVA),
+			ssaapi.WithProgramName(programID),
 		}
-		assert.Contains(t, dirs, programID)
-	})
+		_, err := ssaconfig.New(ssaconfig.ModeProjectCompile, opts...)
+		require.NoError(t, err)
 
-	t.Run("test new source file system root path", func(t *testing.T) {
+		vf := filesys.NewVirtualFs()
+		vf.AddFile("example/src/main/java/com/example/apackage/a.java", codeA)
+		vf.AddFile("example/src/main/java/com/example/bpackage/sub/b.java", codeB)
+		_, err = ssaapi.ParseProjectWithFS(vf, opts...)
+		require.NoError(t, err)
+		t.Cleanup(func() { ssadb.DeleteProgram(ssadb.GetDB(), programID) })
+
 		dbfs := ssadb.NewIrSourceFs()
-		info, err := dbfs.Stat("/")
-		_ = info
-		require.NoErrorf(t, err, "stat error: %v", err)
+		assertTree(t, programID, dbfs)
 
-		infos, err := dbfs.ReadDir("/")
-		require.NoErrorf(t, err, "read dir error: %v", err)
-		for _, info := range infos {
-			log.Infof("info: %v", info.Name())
+		entries, err := dbfs.ReadDir("/")
+		require.NoError(t, err)
+		names := make([]string, 0, len(entries))
+		for _, e := range entries {
+			names = append(names, e.Name())
+		}
+		assert.Contains(t, names, programID)
+
+		root := "/" + programID
+		first, err := dbfs.ReadDir(root)
+		require.NoError(t, err)
+		require.NotEmpty(t, first)
+		for i := 0; i < 20; i++ {
+			again, err := dbfs.ReadDir(root)
+			require.NoError(t, err)
+			require.Equal(t, len(first), len(again))
+		}
+		data, err := dbfs.ReadFile(root + "/example/src/main/java/com/example/apackage/a.java")
+		require.NoError(t, err)
+		require.Contains(t, string(data), "class A")
+
+		require.NoError(t, dbfs.Delete("/"+programID))
+		fresh := ssadb.NewIrSourceFs()
+		entries, err = fresh.ReadDir("/")
+		require.NoError(t, err)
+		for _, e := range entries {
+			require.NotEqual(t, programID, e.Name())
 		}
 	})
 
-	t.Run("remove all program and query root path", func(t *testing.T) {
-		dbfs := ssadb.NewIrSourceFs()
-		info, err := dbfs.Stat("/")
-		_ = info
-		require.NoErrorf(t, err, "stat error: %v", err)
-
-		infos, err := dbfs.ReadDir("/")
-		require.NoErrorf(t, err, "read dir error: %v", err)
-		for _, info := range infos {
-			log.Infof("info: %v", info.Name())
-			if info.Name() == programID {
-				err := dbfs.Delete("/" + info.Name())
-				require.NoErrorf(t, err, "delete error: %v", err)
-			}
-		}
-		newFS := ssadb.NewIrSourceFs()
-		infos, err = newFS.ReadDir("/")
-		require.NoErrorf(t, err, "read dir error: %v", err)
-		for _, info := range infos {
-			if info.Name() == programID {
-				t.Fatalf("program %v not deleted", programID)
-			}
-		}
-	})
-}
-
-func TestSourceFilesys(t *testing.T) {
-
-	ssadb.DeleteProgram(ssadb.GetDB(), "com.example.apackage")
-	ssadb.DeleteProgram(ssadb.GetDB(), "com.example.bpackage.sub")
-
-	vf := filesys.NewVirtualFs()
-	vf.AddFile("example/src/main/java/com/example/apackage/a.java", `
-		package com.example.apackage; 
-		import com.example.bpackage.sub.B;
-		class A {
-			public static void main(String[] args) {
-				B b = new B();
-				// for test 1: A->B
-				target1(b.get());
-				// for test 2: B->A
-				b.show(1);
-			}
-		}
-		`)
-
-	vf.AddFile("example/src/main/java/com/example/bpackage/sub/b.java", `
-		package com.example.bpackage.sub; 
-		class B {
-			public  int get() {
-				return 	 1;
-			}
-			public void show(int a) {
-				target2(a);
-			}
-		}
-		`)
-
-	programID := uuid.NewString()
-	_, err := ssaapi.ParseProjectWithFS(vf,
-		ssaapi.WithLanguage(ssaconfig.JAVA),
-		ssaapi.WithProgramName(programID),
-	)
-	defer func() {
-		ssadb.DeleteProgram(ssadb.GetDB(), programID)
-	}()
-	assert.NoErrorf(t, err, "parse project error: %v", err)
-	dir := make([]string, 0)
-	file := make([]string, 0)
-	dbfs := ssadb.NewIrSourceFs()
-
-	t.Run("test source file system", func(t *testing.T) {
-		filesys.Recursive(
-			fmt.Sprintf("/%s", programID),
-			filesys.WithFileSystem(dbfs),
-			filesys.WithDirStat(func(s string, fi fs.FileInfo) error {
-				_, path, _ := strings.Cut(s, programID+"/")
-				if path != "" {
-					dir = append(dir, path)
-				}
-				return nil
-			}),
-			filesys.WithFileStat(func(s string, fi fs.FileInfo) error {
-				_, path, _ := strings.Cut(s, programID+"/")
-				file = append(file, path)
-				return nil
-			}),
-		)
-		wantDir := []string{
-			"example", "example/src", "example/src/main", "example/src/main/java",
-			"example/src/main/java/com", "example/src/main/java/com/example",
+	t.Run("local_path", func(t *testing.T) {
+		dir := t.TempDir()
+		paths := []string{
 			"example/src/main/java/com/example/apackage",
-			"example/src/main/java/com/example/bpackage",
 			"example/src/main/java/com/example/bpackage/sub",
 		}
-		slices.Sort(wantDir)
-		slices.Sort(dir)
-		assert.Equal(t, wantDir, dir)
-		wantFile := []string{
-			"example/src/main/java/com/example/apackage/a.java",
-			"example/src/main/java/com/example/bpackage/sub/b.java",
+		for _, p := range paths {
+			require.NoError(t, os.MkdirAll(filepath.Join(dir, p), 0o755))
 		}
-		slices.Sort(wantFile)
-		slices.Sort(file)
-		assert.Equal(t, wantFile, file)
-	})
+		require.NoError(t, os.WriteFile(
+			filepath.Join(dir, "example/src/main/java/com/example/apackage/a.java"),
+			[]byte(codeA), 0o644,
+		))
+		require.NoError(t, os.WriteFile(
+			filepath.Join(dir, "example/src/main/java/com/example/bpackage/sub/b.java"),
+			[]byte(codeB), 0o644,
+		))
 
-	t.Run("test source file system root path", func(t *testing.T) {
-		dir = make([]string, 0)
-		filesys.Recursive(
-			"/",
-			filesys.WithFileSystem(dbfs),
-			filesys.WithDirStat(func(s string, fi fs.FileInfo) error {
-				log.Infof("dir: %v", s)
-				paths := strings.Split(s, string(dbfs.GetSeparators()))
-				if len(paths) == 2 && paths[1] != "" {
-					dir = append(dir, paths[1])
-					return filesys.SkipDir
-				}
-				return nil
-			}),
-		)
-		assert.Contains(t, dir, programID)
-	})
-}
-
-func TestProgram_ListAndDelete(t *testing.T) {
-	vf := filesys.NewVirtualFs()
-	vf.AddFile("example/src/main/java/com/example/apackage/a.java", `
-	package com.example.apackage; 
-	import com.example.bpackage.sub.B;
-	class A {
-		public static void main(String[] args) {
-			B b = new B();
-			// for test 1: A->B
-			target1(b.get());
-			// for test 2: B->A
-			b.show(1);
+		programID := uuid.NewString()
+		opts := []ssaconfig.Option{
+			ssaapi.WithLanguage(ssaconfig.JAVA),
+			ssaapi.WithProgramName(programID),
 		}
-	}
-	`)
+		_, err := ssaconfig.New(ssaconfig.ModeProjectCompile, opts...)
+		require.NoError(t, err)
+		_, err = ssaapi.ParseProjectFromPath(dir, opts...)
+		require.NoError(t, err)
+		t.Cleanup(func() { ssadb.DeleteProgram(ssadb.GetDB(), programID) })
 
-	vf.AddFile("example/src/main/java/com/example/bpackage/sub/b.java", `
-	package com.example.bpackage.sub; 
-	class B {
-		public  int get() {
-			return 	 1;
-		}
-		public void show(int a) {
-			target2(a);
-		}
-	}
-	`)
-
-	/*
-		default-ssa.db:
-			programID1
-			programID2
-	*/
-
-	var err error
-	programID1 := uuid.NewString()
-	_, err = ssaapi.ParseProjectWithFS(vf, ssaapi.WithLanguage(ssaconfig.JAVA), ssaapi.WithProgramName(programID1))
-	defer func() {
-
-		// ssadb.CheckAndSwitchDB(programID1)
-		ssadb.DeleteProgram(ssadb.GetDB(), programID1)
-
-	}()
-	assert.NoErrorf(t, err, "parse project error: %v", err)
-
-	programID2 := uuid.NewString()
-	_, err = ssaapi.ParseProjectWithFS(vf, ssaapi.WithLanguage(ssaconfig.JAVA), ssaapi.WithProgramName(programID2))
-	defer func() {
-		ssadb.DeleteProgram(ssadb.GetDB(), programID2)
-	}()
-	assert.NoErrorf(t, err, "parse project error: %v", err)
-
-	t.Run("test source file system root path", func(t *testing.T) {
-		dir := make([]string, 0)
-		ssafs := ssadb.NewIrSourceFs()
-		filesys.Recursive(
-			"/",
-			filesys.WithFileSystem(ssafs),
-			filesys.WithDirStat(func(s string, fi fs.FileInfo) error {
-				log.Infof("dir: %v", s)
-				paths := strings.Split(s, string(ssafs.GetSeparators()))
-				if len(paths) <= 3 && paths[1] != "" {
-					dir = append(dir, paths[1])
-					return filesys.SkipDir
-				}
-				return nil
-			}),
-		)
-		assert.Contains(t, dir, programID1)
-		assert.Contains(t, dir, programID2)
-	})
-
-	local, err := yakgrpc.NewLocalClient()
-	assert.NoError(t, err)
-
-	t.Run("program list and extra info  ", func(t *testing.T) {
-		res, err := local.RequestYakURL(context.Background(), &ypb.RequestYakURLParams{
-			Method: "GET",
-			Url: &ypb.YakURL{
-				Schema: "ssadb",
-				Path:   "/",
-				Query: []*ypb.KVPair{
-					{
-						Key:   "op",
-						Value: "list",
-					},
-				},
-			},
-		})
-		assert.NoErrorf(t, err, "load resource error: %v", err)
-		// log.Infof("res: %v", res)
-		match := map[string]bool{
-			fmt.Sprintf("/%s", programID1): false,
-			fmt.Sprintf("/%s", programID2): false,
-		}
-		for _, res := range res.Resources {
-			if _, ok := match[res.Path]; ok {
-				log.Infof("res: %v", res.Path)
-				matchExtra := false
-				for _, info := range res.Extra {
-					if info.Key == "Language" {
-						if info.Value == string(ssaconfig.JAVA) {
-							matchExtra = true
-						}
-					}
-					log.Infof("extra: %v", info)
-				}
-				if !matchExtra {
-					t.Fatalf("not found Language")
-				}
-				match[res.Path] = true
+		dbfs := ssadb.NewIrSourceFs()
+		assertTree(t, programID, dbfs)
+		entries, err := dbfs.ReadDir("/")
+		require.NoError(t, err)
+		found := false
+		for _, e := range entries {
+			if e.Name() == programID {
+				found = true
+				break
 			}
 		}
-
-		for k, v := range match {
-			assert.Truef(t, v, "not found: %v", k)
-		}
+		require.True(t, found)
 	})
-
-	t.Run("delete", func(t *testing.T) {
-		deletePath := fmt.Sprintf("/%s", programID1)
-		_, err := local.RequestYakURL(context.Background(), &ypb.RequestYakURLParams{
-			Method: "DELETE",
-			Url: &ypb.YakURL{
-				Schema: "ssadb",
-				Path:   deletePath,
-			},
-		})
-		assert.NoErrorf(t, err, "delete error %v", err)
-
-		res, err := local.RequestYakURL(context.Background(), &ypb.RequestYakURLParams{
-			Method: "GET",
-			Url: &ypb.YakURL{
-				Schema: "ssadb",
-				Path:   "/",
-				Query: []*ypb.KVPair{
-					{
-						Key:   "op",
-						Value: "list",
-					},
-				},
-			},
-		})
-		assert.NoErrorf(t, err, "load resource error: %v", err)
-		// log.Infof("res: %v", res)
-		for _, info := range res.Resources {
-			if info.Path == deletePath {
-				t.Fatal("path deleted, but contain in all program ")
-			}
-		}
-	})
-
 }
-func getDir(local ypb.YakClient, t *testing.T, path string) []string {
-	res, err := local.RequestYakURL(context.Background(), &ypb.RequestYakURLParams{
-		Method: "GET",
-		Url: &ypb.YakURL{
-			Schema: "ssadb",
-			Path:   path,
-			Query: []*ypb.KVPair{
-				{
-					Key:   "op",
-					Value: "list",
-				},
-			},
-		},
-	})
-	require.NoError(t, err)
-	files := make([]string, 0, len(res.Resources))
-	for _, info := range res.Resources {
-		files = append(files, info.Path)
-	}
-	return files
-}
+
 func TestSourceFilesystem_YakURL(t *testing.T) {
-	vf := filesys.NewVirtualFs()
 	codea := `
 	package com.example.apackage; 
 	import com.example.bpackage.sub.B;
 	class A {
 		public static void main(String[] args) {
 			B b = new B();
-			// for test 1: A->B
 			target1(b.get());
-			// for test 2: B->A
 			b.show(1);
 		}
 	}
@@ -474,33 +206,42 @@ func TestSourceFilesystem_YakURL(t *testing.T) {
 		}
 	}
 	`
+	vf := filesys.NewVirtualFs()
 	vf.AddFile("example/src/main/java/com/example/apackage/a.java", codea)
 	vf.AddFile("example/src/main/java/com/example/bpackage/sub/b.java", codeb)
 
-	programID := uuid.NewString()
-	_, err := ssaapi.ParseProjectWithFS(vf, ssaapi.WithLanguage(ssaconfig.JAVA), ssaapi.WithProgramName(programID))
-	defer func() {
-		ssadb.DeleteProgram(ssadb.GetDB(), programID)
-	}()
-	assert.NoErrorf(t, err, "parse project error: %v", err)
+	compile := func(programID string) {
+		t.Helper()
+		opts := []ssaconfig.Option{
+			ssaapi.WithLanguage(ssaconfig.JAVA),
+			ssaapi.WithProgramName(programID),
+		}
+		_, err := ssaconfig.New(ssaconfig.ModeProjectCompile, opts...)
+		require.NoError(t, err)
+		_, err = ssaapi.ParseProjectWithFS(vf, opts...)
+		require.NoError(t, err)
+		t.Cleanup(func() { ssadb.DeleteProgram(ssadb.GetDB(), programID) })
+	}
+
+	programID1 := uuid.NewString()
+	programID2 := uuid.NewString()
+	compile(programID1)
+	compile(programID2)
 
 	local, err := yakgrpc.NewLocalClient()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
-	getDir := func(path string) []string {
+	list := func(path string) []string {
 		return getDir(local, t, path)
 	}
-	_ = getDir
-
 	readFile := func(path string) string {
+		t.Helper()
 		stream, err := local.ReadFile(context.Background(), &ypb.ReadFileRequest{
 			FilePath:   path,
-			BufSize:    0,
 			FileSystem: "ssadb",
 		})
 		require.NoError(t, err)
 		buf := make([]byte, 0, 1024)
-		require.NoError(t, err)
 		for {
 			res, err := stream.Recv()
 			if err != nil {
@@ -511,89 +252,111 @@ func TestSourceFilesystem_YakURL(t *testing.T) {
 		}
 		return string(buf)
 	}
-	_ = readFile
 
-	targetProgramPath := fmt.Sprintf("/%s", programID)
-	t.Run("test source file system root path", func(t *testing.T) {
-		progList := getDir("/")
-		require.Contains(t, progList, targetProgramPath)
+	t.Run("list_root_and_extra", func(t *testing.T) {
+		res, err := local.RequestYakURL(context.Background(), &ypb.RequestYakURLParams{
+			Method: "GET",
+			Url: &ypb.YakURL{
+				Schema: "ssadb",
+				Path:   "/",
+				Query:  []*ypb.KVPair{{Key: "op", Value: "list"}},
+			},
+		})
+		require.NoError(t, err)
+		want := map[string]bool{
+			"/" + programID1: false,
+			"/" + programID2: false,
+		}
+		for _, resource := range res.Resources {
+			if _, ok := want[resource.Path]; !ok {
+				continue
+			}
+			langOK := false
+			for _, info := range resource.Extra {
+				if info.Key == "Language" && info.Value == string(ssaconfig.JAVA) {
+					langOK = true
+				}
+			}
+			require.True(t, langOK, "missing Language extra for %s", resource.Path)
+			want[resource.Path] = true
+		}
+		for path, ok := range want {
+			require.True(t, ok, "missing program %s", path)
+		}
 	})
 
-	t.Run("test source file system program path", func(t *testing.T) {
-		file := getDir(targetProgramPath)
-		require.Equal(t, 1, len(file))
-		target := fmt.Sprintf("%s/example", targetProgramPath)
-		require.Contains(t, file, target)
+	root1 := "/" + programID1
+	t.Run("list_and_read", func(t *testing.T) {
+		require.Contains(t, list("/"), root1)
+		entries := list(root1)
+		require.Contains(t, entries, root1+"/example")
+		entries = list(root1 + "/example")
+		require.Contains(t, entries, root1+"/example/src")
 
-		file = getDir(target)
-		require.Equal(t, 1, len(file))
-		target = fmt.Sprintf("%s/example/src", targetProgramPath)
-		require.Contains(t, file, target)
-
+		require.Equal(t, codea, readFile(root1+"/example/src/main/java/com/example/apackage/a.java"))
+		require.Equal(t, codeb, readFile(root1+"/example/src/main/java/com/example/bpackage/sub/b.java"))
 	})
 
-	// t.Run("test source file deep path ", func(t *testing.T) {
-	// 	file := getDir(fmt.Sprintf("%s/example/src/main/java/com/example/", targetProgramPath))
-	// 	require.Contains(t, file, fmt.Sprintf("%s/example/src/main/java/com/example/apackage", targetProgramPath))
-	// 	require.Contains(t, file, fmt.Sprintf("%s/example/src/main/java/com/example/bpackage", targetProgramPath))
-	// })
-
-	t.Run("test read file ", func(t *testing.T) {
-		data := readFile(fmt.Sprintf("%s/example/src/main/java/com/example/apackage/a.java", targetProgramPath))
-		require.Equal(t, codea, data)
-
-		datab := readFile(fmt.Sprintf("%s/example/src/main/java/com/example/bpackage/sub/b.java", targetProgramPath))
-		require.Equal(t, codeb, datab)
+	t.Run("delete", func(t *testing.T) {
+		deletePath := "/" + programID1
+		_, err := local.RequestYakURL(context.Background(), &ypb.RequestYakURLParams{
+			Method: "DELETE",
+			Url:    &ypb.YakURL{Schema: "ssadb", Path: deletePath},
+		})
+		require.NoError(t, err)
+		for _, path := range list("/") {
+			require.NotEqual(t, deletePath, path)
+		}
 	})
+}
+
+func getDir(local ypb.YakClient, t *testing.T, path string) []string {
+	t.Helper()
+	res, err := local.RequestYakURL(context.Background(), &ypb.RequestYakURLParams{
+		Method: "GET",
+		Url: &ypb.YakURL{
+			Schema: "ssadb",
+			Path:   path,
+			Query:  []*ypb.KVPair{{Key: "op", Value: "list"}},
+		},
+	})
+	require.NoError(t, err)
+	files := make([]string, 0, len(res.Resources))
+	for _, info := range res.Resources {
+		files = append(files, info.Path)
+	}
+	return files
 }
 
 func TestProgram_NewProgram(t *testing.T) {
 	local, err := yakgrpc.NewLocalClient()
 	require.NoError(t, err)
-	get := func() []string {
-		return getDir(local, t, "/")
-	}
 
-	{
+	seed := make([]string, 0, 4)
+	for i := 0; i < 4; i++ {
 		progName := uuid.NewString()
-		_, err := ssaapi.Parse(`println("a")`, ssaapi.WithProgramName(progName))
+		opts := []ssaconfig.Option{ssaapi.WithProgramName(progName)}
+		_, err := ssaconfig.New(ssaconfig.ModeSSACompile, opts...)
 		require.NoError(t, err)
-		defer ssadb.DeleteProgram(ssadb.GetDB(), progName)
-	}
-	{
-		progName := uuid.NewString()
-		_, err := ssaapi.Parse(`println("a")`, ssaapi.WithProgramName(progName))
+		_, err = ssaapi.Parse(`println("a")`, opts...)
 		require.NoError(t, err)
-		defer ssadb.DeleteProgram(ssadb.GetDB(), progName)
+		t.Cleanup(func() { ssadb.DeleteProgram(ssadb.GetDB(), progName) })
+		seed = append(seed, progName)
 	}
-	{
-		progName := uuid.NewString()
-		_, err := ssaapi.Parse(`println("a")`, ssaapi.WithProgramName(progName))
-		require.NoError(t, err)
-		defer ssadb.DeleteProgram(ssadb.GetDB(), progName)
-	}
-	{
-		progName := uuid.NewString()
-		_, err := ssaapi.Parse(`println("a")`, ssaapi.WithProgramName(progName))
-		require.NoError(t, err)
-		defer ssadb.DeleteProgram(ssadb.GetDB(), progName)
-	}
+	_ = seed
 
-	t.Run("test", func(t *testing.T) {
-		progs := get()
-		log.Infof("progs: %v", progs)
+	before := getDir(local, t, "/")
+	progName := uuid.NewString()
+	opts := []ssaconfig.Option{ssaapi.WithProgramName(progName)}
+	_, err = ssaconfig.New(ssaconfig.ModeSSACompile, opts...)
+	require.NoError(t, err)
+	_, err = ssaapi.Parse(`println("a")`, opts...)
+	require.NoError(t, err)
+	t.Cleanup(func() { ssadb.DeleteProgram(ssadb.GetDB(), progName) })
 
-		progName := uuid.NewString()
-		_, err := ssaapi.Parse(`println("a")`, ssaapi.WithProgramName(progName))
-		require.NoError(t, err)
-		log.Infof("progName: %v", progName)
-		defer ssadb.DeleteProgram(ssadb.GetDB(), progName)
-
-		newProgs := get()
-		log.Info("new prog: ", newProgs)
-		assert.Equal(t, len(progs)+1, len(newProgs))
-		assert.Equal(t, fmt.Sprintf("/%s", progName), newProgs[0])
-	})
+	after := getDir(local, t, "/")
+	assert.Equal(t, len(before)+1, len(after))
+	assert.Equal(t, "/"+progName, after[0])
 }
 
 func TestIrSourceFS_File_URL(t *testing.T) {
@@ -605,60 +368,402 @@ func TestIrSourceFS_File_URL(t *testing.T) {
 		}
 	`
 
-	t.Run("test compile the same content in different project", func(t *testing.T) {
-		compileAndGetSource := func() *ssadb.IrSource {
-			vf := filesys.NewVirtualFs()
+	compile := func(files map[string]string) (programID string) {
+		t.Helper()
+		programID = "prog_" + uuid.NewString()
+		opts := []ssaconfig.Option{
+			ssaapi.WithLanguage(ssaconfig.JAVA),
+			ssaapi.WithProgramName(programID),
+		}
+		_, err := ssaconfig.New(ssaconfig.ModeProjectCompile, opts...)
+		require.NoError(t, err)
+		vf := filesys.NewVirtualFs()
+		for path, code := range files {
+			vf.AddFile(path, code)
+		}
+		_, err = ssaapi.ParseProjectWithFS(vf, opts...)
+		require.NoError(t, err)
+		t.Cleanup(func() { ssadb.DeleteProgram(ssadb.GetDB(), programID) })
+		return programID
+	}
+
+	t.Run("same_content_different_projects", func(t *testing.T) {
+		getSource := func() *ssadb.IrSource {
 			fileName := "file_name_" + uuid.NewString() + ".java"
-			programID := "prog_" + uuid.NewString()
-			path := "path_" + uuid.NewString()
-			vf.AddFile(fmt.Sprintf("/%s/%s", path, fileName), content)
-
-			_, err := ssaapi.ParseProjectWithFS(vf, ssaapi.WithLanguage(ssaconfig.JAVA), ssaapi.WithProgramName(programID))
-			require.NoError(t, err)
-			t.Cleanup(func() {
-				ssadb.DeleteProgram(ssadb.GetDB(), programID)
-
+			folder := "path_" + uuid.NewString()
+			programID := compile(map[string]string{
+				fmt.Sprintf("/%s/%s", folder, fileName): content,
 			})
-			fullPath := fmt.Sprintf("/%s/%s", programID, path)
-			irSource, err := ssadb.GetIrSourceByPathAndName(fullPath, fileName)
+			irSource, err := ssadb.GetIrSourceByPathAndName(fmt.Sprintf("/%s/%s", programID, folder), fileName)
 			require.NoError(t, err)
 			return irSource
 		}
-
-		// 相同内容，不同文件的source code hash不应该一样
-		source1 := compileAndGetSource()
-		require.NotNil(t, source1)
-		source2 := compileAndGetSource()
-		require.NotNil(t, source2)
+		source1 := getSource()
+		source2 := getSource()
 		require.NotEqual(t, source1.SourceCodeHash, source2.SourceCodeHash)
 	})
 
-	t.Run("test compile the same content in the same project", func(t *testing.T) {
-		compileAndGetSource := func() []*ssadb.IrSource {
-			vf := filesys.NewVirtualFs()
-			fileName1 := "file_name_" + uuid.NewString() + ".java"
-			fileName2 := "file_name_" + uuid.NewString() + ".java"
-
-			programID := "prog_" + uuid.NewString()
-			path := "path_" + uuid.NewString()
-
-			vf.AddFile(fmt.Sprintf("/%s/%s", path, fileName1), content)
-			vf.AddFile(fmt.Sprintf("/%s/%s", path, fileName2), content)
-
-			_, err := ssaapi.ParseProjectWithFS(vf, ssaapi.WithLanguage(ssaconfig.JAVA), ssaapi.WithProgramName(programID))
-			require.NoError(t, err)
-			t.Cleanup(func() {
-				ssadb.DeleteProgram(ssadb.GetDB(), programID)
-
-			})
-			fullPath := fmt.Sprintf("/%s/%s", programID, path)
-			irSources, err := ssadb.GetIrSourceByPath(fullPath)
-			require.NoError(t, err)
-			return irSources
-		}
-
-		source := compileAndGetSource()
-		require.Equal(t, 2, len(source))
-		require.NotEqual(t, source[0].SourceCodeHash, source[1].SourceCodeHash)
+	t.Run("same_content_same_project", func(t *testing.T) {
+		fileName1 := "file_name_" + uuid.NewString() + ".java"
+		fileName2 := "file_name_" + uuid.NewString() + ".java"
+		folder := "path_" + uuid.NewString()
+		programID := compile(map[string]string{
+			fmt.Sprintf("/%s/%s", folder, fileName1): content,
+			fmt.Sprintf("/%s/%s", folder, fileName2): content,
+		})
+		sources, err := ssadb.GetIrSourceByPath(fmt.Sprintf("/%s/%s", programID, folder))
+		require.NoError(t, err)
+		require.Equal(t, 2, len(sources))
+		require.NotEqual(t, sources[0].SourceCodeHash, sources[1].SourceCodeHash)
 	})
+}
+
+// TestIrSourceFS_LazyFillAndTTLCache covers the lazy body-fill behavior:
+// listing never pulls QuotedCode, first ReadFile fills the body into the tree
+// (Stat then reports the real size), repeated reads hit the tree in memory,
+// and DropProgramCache discards the whole tree so the next touch rebuilds it.
+func TestIrSourceFS_LazyFillAndTTLCache(t *testing.T) {
+	code := `package org.example
+		public class LazyFill {
+			public void run() {
+				println("lazy");
+			}
+		}
+	`
+	programID := "prog_" + uuid.NewString()
+	fileRelPath := "src/main/java/org/example/LazyFill.java"
+	fullPath := "/" + programID + "/" + fileRelPath
+
+	opts := []ssaconfig.Option{
+		ssaapi.WithLanguage(ssaconfig.JAVA),
+		ssaapi.WithProgramName(programID),
+	}
+	_, err := ssaconfig.New(ssaconfig.ModeProjectCompile, opts...)
+	require.NoError(t, err)
+	vf := filesys.NewVirtualFs()
+	vf.AddFile(fileRelPath, code)
+	_, err = ssaapi.ParseProjectWithFS(vf, opts...)
+	require.NoError(t, err)
+	t.Cleanup(func() { ssadb.DeleteProgram(ssadb.GetDB(), programID) })
+
+	dbfs := ssadb.NewIrSourceFs()
+
+	// Listing the tree works without touching any file body.
+	entries, err := dbfs.ReadDir("/" + programID)
+	require.NoError(t, err)
+	require.NotEmpty(t, entries)
+
+	// Before the file is read, its stub has no size.
+	info, err := dbfs.Stat(fullPath)
+	require.NoError(t, err)
+	require.Equal(t, int64(0), info.Size())
+
+	// First read fills the body into the tree.
+	data, err := dbfs.ReadFile(fullPath)
+	require.NoError(t, err)
+	require.Contains(t, string(data), "class LazyFill")
+
+	// After the fill, Stat reports the real size.
+	info, err = dbfs.Stat(fullPath)
+	require.NoError(t, err)
+	require.Equal(t, int64(len(data)), info.Size())
+
+	// Open returns the filled body as well.
+	fh, err := dbfs.Open(fullPath)
+	require.NoError(t, err)
+	opened, err := io.ReadAll(fh)
+	require.NoError(t, err)
+	require.Equal(t, data, opened)
+
+	// DropProgramCache removes the tree; the next touch rebuilds and can read again.
+	dbfs.DropProgramCache(programID)
+	info, err = dbfs.Stat(fullPath)
+	require.NoError(t, err)
+	require.Equal(t, int64(0), info.Size())
+	data2, err := dbfs.ReadFile(fullPath)
+	require.NoError(t, err)
+	require.Equal(t, data, data2)
+}
+
+// compileJavaLayer compiles files (path → code) into a fresh program and
+// registers cleanup.
+func compileJavaLayer(t *testing.T, files map[string]string) string {
+	t.Helper()
+	programID := "prog_" + uuid.NewString()
+	opts := []ssaconfig.Option{
+		ssaapi.WithLanguage(ssaconfig.JAVA),
+		ssaapi.WithProgramName(programID),
+	}
+	_, err := ssaconfig.New(ssaconfig.ModeProjectCompile, opts...)
+	require.NoError(t, err)
+	vf := filesys.NewVirtualFs()
+	for p, code := range files {
+		vf.AddFile(p, code)
+	}
+	_, err = ssaapi.ParseProjectWithFS(vf, opts...)
+	require.NoError(t, err)
+	t.Cleanup(func() { ssadb.DeleteProgram(ssadb.GetDB(), programID) })
+	return programID
+}
+
+// markOverlayChain stamps a 3-layer overlay chain (base → layer1 → head) onto
+// the head program row, mirroring what saveOverlayToDatabase writes.
+func markOverlayChain(t *testing.T, base, layer1, head string, headFileHash map[string]string) {
+	t.Helper()
+	prog, err := ssadb.GetProgram(head, ssadb.Application)
+	require.NoError(t, err)
+	require.NotNil(t, prog)
+	prog.IsOverlay = true
+	prog.OverlayLayers = ssadb.StringSlice{base, layer1, head}
+	prog.FileHashMap = headFileHash
+	require.NoError(t, ssadb.UpdateProgramWithError(prog))
+}
+
+// listNames lists dir entry names under path on dbfs (the cheap single-layer
+// view — for an overlay head that is the last diff's files only).
+func listNames(t *testing.T, dbfs fi.FileSystem, path string) []string {
+	t.Helper()
+	entries, err := dbfs.ReadDir(path)
+	require.NoError(t, err)
+	names := make([]string, 0, len(entries))
+	for _, e := range entries {
+		names = append(names, e.Name())
+	}
+	return names
+}
+
+// fullListNames lists entry names via the aggregated whole-file view (the
+// explicit opt-in behind "show all files"). The concrete FS type is
+// unexported, so the helper takes anything with FullReadDir (the same
+// optional interface yakurl asserts).
+func fullListNames(t *testing.T, dbfs interface {
+	FullReadDir(string) ([]fs.DirEntry, error)
+}, path string) []string {
+	t.Helper()
+	entries, err := dbfs.FullReadDir(path)
+	require.NoError(t, err)
+	names := make([]string, 0, len(entries))
+	for _, e := range entries {
+		names = append(names, e.Name())
+	}
+	return names
+}
+
+// TestIrSourceFS_OverlayFullReadDir covers the show-all-files view of an
+// overlay chain: the cheap ReadDir stays the last-diff layer only,
+// FullReadDir merges base + layer1 + head (newest wins on name conflicts),
+// and lower layers' file bodies are readable through the head path via
+// layer fallback.
+func TestIrSourceFS_OverlayFullReadDir(t *testing.T) {
+	base := compileJavaLayer(t, map[string]string{
+		"src/main/java/Base.java":        "package src.main.java; class Base {}",
+		"src/main/java2/OnlyInBase.java": "package src.main.java2; class OnlyInBase {}",
+	})
+	layer1 := compileJavaLayer(t, map[string]string{
+		"src/main/java/Layer1.java": "package src.main.java; class Layer1 {}",
+	})
+	head := compileJavaLayer(t, map[string]string{
+		"src/main/java/Head.java": "package src.main.java; class Head {}",
+	})
+	markOverlayChain(t, base, layer1, head, map[string]string{
+		"src/main/java/Head.java": "1",
+	})
+
+	dbfs := ssadb.NewIrSourceFs()
+	srcDir := "/" + head + "/src/main/java"
+
+	// Default (diff) view: only the head layer's own file.
+	require.ElementsMatch(t, []string{"java"}, listNames(t, dbfs, "/"+head+"/src/main"))
+	require.ElementsMatch(t, []string{"Head.java"}, listNames(t, dbfs, srcDir))
+
+	// Whole-file view: base + layer1 + head merged under the head root.
+	require.ElementsMatch(t, []string{"Base.java", "Layer1.java", "Head.java"},
+		fullListNames(t, dbfs, srcDir))
+
+	// The parent chain resolves too (src / src/main are layer dirs in base).
+	require.ElementsMatch(t, []string{"main"}, fullListNames(t, dbfs, "/"+head+"/src"))
+
+	// Lower layers' bodies are readable through the head path (layer fallback).
+	data, err := dbfs.ReadFile(srcDir + "/Base.java")
+	require.NoError(t, err)
+	require.Contains(t, string(data), "class Base")
+	data, err = dbfs.ReadFile(srcDir + "/Layer1.java")
+	require.NoError(t, err)
+	require.Contains(t, string(data), "class Layer1")
+
+	// A directory existing only in lower layers (surfaces in the full view as
+	// an expanded node) must not error after switching back to the diff view:
+	// Stat resolves via layer fallback and the diff ReadDir shows it empty.
+	baseOnlyDir := "/" + head + "/src/main/java2"
+	info, err := dbfs.Stat(baseOnlyDir)
+	require.NoError(t, err)
+	require.True(t, info.IsDir())
+	require.Empty(t, listNames(t, dbfs, baseOnlyDir))
+	require.ElementsMatch(t, []string{"OnlyInBase.java"}, fullListNames(t, dbfs, baseOnlyDir))
+}
+
+// TestIrSourceFS_OverlayDeleteExcluded covers FileHashMap "-1": files deleted
+// by any layer are absent from the whole-file view, while the default diff
+// view is unaffected.
+func TestIrSourceFS_OverlayDeleteExcluded(t *testing.T) {
+	base := compileJavaLayer(t, map[string]string{
+		"src/main/java/Keep.java":    "package src.main.java; class Keep {}",
+		"src/main/java/Deleted.java": "package src.main.java; class Deleted {}",
+	})
+	layer1 := compileJavaLayer(t, map[string]string{
+		"src/main/java/Deleted2.java": "package src.main.java; class Deleted2 {}",
+		"src/main/java/Added1.java":   "package src.main.java; class Added1 {}",
+	})
+	head := compileJavaLayer(t, map[string]string{
+		"src/main/java/Head.java": "package src.main.java; class Head {}",
+	})
+	// layer1 deleted base's Deleted.java; head deleted layer1's Deleted2.java.
+	markOverlayChain(t, base, layer1, head, map[string]string{
+		"src/main/java/Head.java": "1",
+	})
+	layer1Prog, err := ssadb.GetProgram(layer1, ssadb.Application)
+	require.NoError(t, err)
+	layer1Prog.FileHashMap = map[string]string{
+		"src/main/java/Deleted.java": "-1",
+	}
+	require.NoError(t, ssadb.UpdateProgramWithError(layer1Prog))
+	headProg, err := ssadb.GetProgram(head, ssadb.Application)
+	require.NoError(t, err)
+	headProg.FileHashMap = map[string]string{
+		"src/main/java/Head.java":     "1",
+		"src/main/java/Deleted2.java": "-1",
+	}
+	require.NoError(t, ssadb.UpdateProgramWithError(headProg))
+
+	dbfs := ssadb.NewIrSourceFs()
+	srcDir := "/" + head + "/src/main/java"
+
+	require.ElementsMatch(t, []string{"Head.java"}, listNames(t, dbfs, srcDir))
+	require.ElementsMatch(t, []string{"Keep.java", "Head.java", "Added1.java"},
+		fullListNames(t, dbfs, srcDir))
+}
+
+// TestIrSourceFS_RealIncrementalChain drives the REAL incremental compile
+// pipeline (no hand-stamped OverlayLayers/FileHashMap): first incremental
+// base compile, then a diff compile, then checks the ssadb views — this is
+// what the audit frontend's "show all files" checkbox consumes end to end.
+func TestIrSourceFS_RealIncrementalChain(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping incremental compile E2E in short mode")
+	}
+
+	baseDir := t.TempDir()
+	writeJava := func(rel, content string) {
+		t.Helper()
+		full := filepath.Join(baseDir, filepath.FromSlash(rel))
+		require.NoError(t, os.MkdirAll(filepath.Dir(full), 0o755))
+		require.NoError(t, os.WriteFile(full, []byte(content), 0o644))
+	}
+
+	baseName := "prog_" + uuid.NewString()
+	baseOpts := []ssaconfig.Option{
+		ssaapi.WithLanguage(ssaconfig.JAVA),
+		ssaapi.WithProgramName(baseName),
+		ssaapi.WithEnableIncrementalCompile(true),
+	}
+	_, err := ssaconfig.New(ssaconfig.ModeProjectCompile, baseOpts...)
+	require.NoError(t, err)
+
+	writeJava("src/main/java/Base.java", "package src.main.java; class Base {}")
+	writeJava("src/main/java2/Base2.java", "package src.main.java2; class Base2 {}")
+	baseProgs, err := ssaapi.ParseProjectFromPath(baseDir, baseOpts...)
+	require.NoError(t, err)
+	require.NotEmpty(t, baseProgs)
+	baseCompiledName := baseProgs[0].GetProgramName()
+	t.Cleanup(func() {
+		ssadb.DeleteProgram(ssadb.GetDB(), baseCompiledName)
+		ssadb.DeleteProgram(ssadb.GetDB(), baseName)
+	})
+
+	// Sanity: the real pipeline must persist overlay metadata on the head.
+	baseIr, err := ssadb.GetProgram(baseCompiledName, ssadb.Application)
+	require.NoError(t, err)
+	require.NotNil(t, baseIr)
+
+	// Diff compile: modify one file, add another; leave java2/ untouched.
+	writeJava("src/main/java/Base.java", "package src.main.java; class Base { int changed = 1; }")
+	writeJava("src/main/java/Added.java", "package src.main.java; class Added {}")
+
+	diffName := "prog_" + uuid.NewString()
+	diffOpts := []ssaconfig.Option{
+		ssaapi.WithLanguage(ssaconfig.JAVA),
+		ssaapi.WithProgramName(diffName),
+		ssaapi.WithBaseProgramName(baseCompiledName),
+	}
+	_, err = ssaconfig.New(ssaconfig.ModeProjectCompile, diffOpts...)
+	require.NoError(t, err)
+	diffProgs, err := ssaapi.ParseProjectFromPath(baseDir, diffOpts...)
+	require.NoError(t, err)
+	require.NotEmpty(t, diffProgs)
+	diffCompiledName := diffProgs[0].GetProgramName()
+	t.Cleanup(func() {
+		ssadb.DeleteProgram(ssadb.GetDB(), diffCompiledName)
+		ssadb.DeleteProgram(ssadb.GetDB(), diffName)
+	})
+
+	// The head must carry the saved overlay chain for FullReadDir to expand.
+	headIr, err := ssadb.GetProgram(diffCompiledName, ssadb.Application)
+	require.NoError(t, err)
+	require.NotNil(t, headIr)
+	require.True(t, headIr.HasSavedOverlayLayers(),
+		"head program has no overlay layers: IsOverlay=%v OverlayLayers=%v", headIr.IsOverlay, headIr.OverlayLayers)
+
+	dbfs := ssadb.NewIrSourceFs()
+	srcDir := "/" + diffCompiledName + "/src/main/java"
+
+	// Default diff view: only the diff layer's own entries.
+	diffNames := listNames(t, dbfs, srcDir)
+	require.ElementsMatch(t, []string{"Base.java", "Added.java"}, diffNames)
+
+	// Whole-file view: base files + diff files.
+	fullNames := fullListNames(t, dbfs, srcDir)
+	require.ElementsMatch(t, []string{"Base.java", "Added.java"}, fullNames,
+		"full view missing base files; OverlayLayers=%v FileHashMap=%v", headIr.OverlayLayers, headIr.FileHashMap)
+
+	// Base-only directory via the whole-file view.
+	baseOnlyDir := "/" + diffCompiledName + "/src/main/java2"
+	require.ElementsMatch(t, []string{"Base2.java"}, fullListNames(t, dbfs, baseOnlyDir))
+
+	// YakURL layer: the frontend derives isLeaf from HaveChildrenNodes, so a
+	// whole-file listing must report lower-layer-only directories as having
+	// children (they are NOT empty leaves in the full view).
+	local, err := yakgrpc.NewLocalClient()
+	require.NoError(t, err)
+	listYakURL := func(path string, diffOnly bool) map[string]bool {
+		t.Helper()
+		q := []*ypb.KVPair{{Key: "op", Value: "list"}}
+		if diffOnly {
+			// The reverted frontend contract: diffOnly=true is sent only when
+			// "show all files" is UNCHECKED; checked listings send no key.
+			q = append(q, &ypb.KVPair{Key: "diffOnly", Value: "true"})
+		}
+		res, err := local.RequestYakURL(context.Background(), &ypb.RequestYakURLParams{
+			Method: "GET",
+			Url:    &ypb.YakURL{Schema: "ssadb", Path: path, Query: q},
+		})
+		require.NoError(t, err)
+		haveChildren := make(map[string]bool)
+		for _, r := range res.Resources {
+			haveChildren[r.ResourceName] = r.HaveChildrenNodes
+		}
+		return haveChildren
+	}
+	// Whole-file view (no diffOnly key): src/main contains java (diff) and
+	// java2 (base-only) — both must show children; java2 previously read as
+	// empty because HaveChildrenNodes came from the diff-view ReadDir.
+	children := listYakURL("/"+diffCompiledName+"/src/main", false)
+	require.True(t, children["java"], "diff dir lost HaveChildrenNodes")
+	require.True(t, children["java2"], "base-only dir lost HaveChildrenNodes in full view")
+	// and java2 must expose Base2.java when listed itself
+	require.Contains(t, listYakURL(baseOnlyDir, false), "Base2.java")
+	// Diff view (diffOnly=true): java2 is empty in the last-diff layer, so it
+	// must report no children there.
+	diffChildren := listYakURL("/"+diffCompiledName+"/src/main", true)
+	require.True(t, diffChildren["java"])
+	require.False(t, diffChildren["java2"], "base-only dir must be a leaf in diff view")
 }

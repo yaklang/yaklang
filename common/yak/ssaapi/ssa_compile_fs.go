@@ -171,6 +171,25 @@ func collectCompileTargets(
 	return targets
 }
 
+// applyIncrementalMetadata 在产物落库前把 config 携带的增量元数据写入 ssa.Program：
+// base 关联、FileHashMap；增量编译但尚无变更记录时补一个空 FileHashMap——
+// 落库层（UpdateToDatabaseWithWG）以 FileHashMap != nil 为打 IsOverlay 标的条件。
+// 两处保存路径（parseProjectWithFSUnits 的 f3 与 legacy 的 f4）共用，勿内联。
+func (c *Config) applyIncrementalMetadata(prog *ssa.Program) {
+	if prog == nil {
+		return
+	}
+	if baseProgramName := c.GetBaseProgramName(); baseProgramName != "" {
+		prog.BaseProgramName = baseProgramName
+	}
+	if len(c.fileHashMap) > 0 {
+		prog.FileHashMap = c.fileHashMap
+	}
+	if c.compileMode() != compileModeFull && prog.FileHashMap == nil {
+		prog.FileHashMap = make(map[string]int)
+	}
+}
+
 func (c *Config) parseProjectWithFSUnits(
 	filesystem filesys_interface.FileSystem,
 	processCallback func(float64, string, ...any),
@@ -503,7 +522,7 @@ func (c *Config) parseProjectWithFSUnits(
 		// paths to preserve its overlay semantics.
 		// Skip both for incremental compile to preserve overlay.
 		flushThreshold := flushCompileUnitThreshold()
-		isIncremental := c.GetEnableIncrementalCompile() || c.GetBaseProgramName() != ""
+		isIncremental := c.compileMode() != compileModeFull
 		flushedUnits := make(map[string]bool)
 		if !prog.RunDeferredBuildsForUnitsWithUnitCallback(unitKeys,
 			func(index int, total int) bool {
@@ -598,15 +617,7 @@ func (c *Config) parseProjectWithFSUnits(
 		return nil, ErrContextCancel
 	}
 	prog.Finish()
-	if baseProgramName := c.GetBaseProgramName(); baseProgramName != "" {
-		prog.BaseProgramName = baseProgramName
-	}
-	if len(c.fileHashMap) > 0 {
-		prog.FileHashMap = c.fileHashMap
-	}
-	if c.GetEnableIncrementalCompile() && prog.FileHashMap == nil {
-		prog.FileHashMap = make(map[string]int)
-	}
+	c.applyIncrementalMetadata(prog)
 	if prog.DatabaseKind != ssa.ProgramCacheMemory {
 		prog.ProcessInfof("[SSA/persist] program %s saving program metadata (ir_program)", prog.Name)
 		metaStart := time.Now()
@@ -628,7 +639,7 @@ func (c *Config) parseProjectWithFSUnits(
 	// boundary instructions (Function/BasicBlock) resident instead of ~2.6M
 	// ordinary instructions that would otherwise be marshaled and GC-scanned
 	// during the final flush.
-	if !(c.GetEnableIncrementalCompile() || c.GetBaseProgramName() != "") &&
+	if c.compileMode() == compileModeFull &&
 		prog.DatabaseKind != ssa.ProgramCacheMemory && prog.Cache != nil {
 		prog.Cache.FlushCompileUnit("final")
 		prog.Cache.FlushInstructionSaver()
@@ -995,18 +1006,7 @@ func (c *Config) parseProjectWithFSLegacy(
 		process = 0.88
 		prog.Finish()
 		// 在保存到数据库之前，设置增量编译信息（如果存在）
-		if baseProgramName := c.GetBaseProgramName(); baseProgramName != "" {
-			prog.BaseProgramName = baseProgramName
-		}
-		if len(c.fileHashMap) > 0 {
-			prog.FileHashMap = c.fileHashMap
-		}
-		// 如果启用了增量编译，确保 IsOverlay 被设置
-		// 即使没有 baseProgramName 和 fileHashMap（第一次增量编译），也设置一个空的 FileHashMap 作为标记
-		// 这样 UpdateToDatabaseWithWG 会设置 IsOverlay = true
-		if c.GetEnableIncrementalCompile() && prog.FileHashMap == nil {
-			prog.FileHashMap = make(map[string]int)
-		}
+		c.applyIncrementalMetadata(prog)
 		if prog.DatabaseKind != ssa.ProgramCacheMemory { // save program
 			prog.ProcessInfof("[SSA/persist] program %s saving program metadata (ir_program)", prog.Name)
 			metaStart := time.Now()

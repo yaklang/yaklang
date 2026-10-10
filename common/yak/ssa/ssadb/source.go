@@ -1,6 +1,7 @@
 package ssadb
 
 import (
+	"path"
 	"strconv"
 	"strings"
 
@@ -58,6 +59,32 @@ func GetIrSourceByPathAndName(path, name string) (*IrSource, error) {
 	}
 	return nil, utils.Wrapf(err, "query source via path: %v failed", path)
 
+}
+
+// IrSourceTreeEntry is a directory listing row without QuotedCode.
+// Folder rows use empty quoted_code in DB; IsDir is computed in SQL so tree
+// refreshes do not pull source blobs.
+type IrSourceTreeEntry struct {
+	FolderPath string
+	FileName   string
+	IsDir      bool
+}
+
+// GetIrSourceTreeByProgram lists every tree entry for a program without QuotedCode.
+func GetIrSourceTreeByProgram(programName string) ([]IrSourceTreeEntry, error) {
+	if programName == "" {
+		return nil, utils.Error("empty program name")
+	}
+	db := GetDB()
+	var entries []IrSourceTreeEntry
+	err := db.Model(&IrSource{}).
+		Select("folder_path, file_name, CASE WHEN quoted_code IS NULL OR quoted_code = '' THEN 1 ELSE 0 END AS is_dir").
+		Where("program_name = ?", programName).
+		Scan(&entries).Error
+	if err != nil {
+		return nil, utils.Wrapf(err, "query source tree via program: %v failed", programName)
+	}
+	return entries, nil
 }
 
 func GetEditorByFileName(fileName string) (*memedit.MemEditor, error) {
@@ -164,7 +191,7 @@ func MarshalFolder(folderPaths []string) *IrSource {
 		return nil
 	}
 	folderName := folderPaths[len(folderPaths)-1]
-	folderPath := irSourceJoin(folderPaths[:len(folderPaths)-1]...)
+	folderPath := path.Join(folderPaths[:len(folderPaths)-1]...)
 	if !strings.HasSuffix(folderPath, "/") {
 		folderPath = folderPath + "/"
 	}

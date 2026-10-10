@@ -495,6 +495,25 @@ type ScanConfig struct {
 	Context         context.Context
 }
 
+// skipCompileDir reports whether a directory is pruned (SkipDir) during a
+// compile walk: it matched a compile exclude pattern. Shared by
+// ScanProjectFiles and the incremental diff walks so a diff sees exactly the
+// directory tree a full compile scans.
+func skipCompileDir(exclude ssaconfig.CompileExcludeFunc, path string) bool {
+	return exclude != nil && exclude(path)
+}
+
+// skipCompileFile reports whether a file never enters compilation: empty
+// files and exclude-pattern matches are ignored by the compile scan. Shared
+// by ScanProjectFiles and the incremental diff walks so a diff never reports
+// such files as added/modified.
+func skipCompileFile(exclude ssaconfig.CompileExcludeFunc, path string, info fs.FileInfo) bool {
+	if info.Size() == 0 {
+		return true
+	}
+	return exclude != nil && exclude(path)
+}
+
 // ScanProjectFiles scans the project directory and returns the files to be processed
 func ScanProjectFiles(cfg ScanConfig) (*ScanResult, error) {
 	result := &ScanResult{
@@ -510,7 +529,7 @@ func ScanProjectFiles(cfg ScanConfig) (*ScanResult, error) {
 		filesys.WithFileSystem(cfg.FileSystem),
 		filesys.WithContext(cfg.Context),
 		filesys.WithDirStat(func(fullPath string, fi fs.FileInfo) error {
-			if exclude(fullPath) {
+			if skipCompileDir(exclude, fullPath) {
 				return filesys.SkipDir
 			}
 
@@ -527,10 +546,7 @@ func ScanProjectFiles(cfg ScanConfig) (*ScanResult, error) {
 			return nil
 		}),
 		filesys.WithFileStat(func(path string, fi fs.FileInfo) error {
-			if fi.Size() == 0 {
-				return nil
-			}
-			if exclude(path) {
+			if skipCompileFile(exclude, path, fi) {
 				return nil
 			}
 			if cfg.CheckLanguage != nil && cfg.CheckLanguage(path) == nil {
