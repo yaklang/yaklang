@@ -26,6 +26,14 @@ type binTFTP struct {
 	oack                             [32]byte
 	digest                           [32]byte
 	server                           string
+	// A passive capture cannot distinguish a reused server TID from old wire.
+	// Keep a budgeted history until this captured conversation is closed.
+	retired map[string]struct{}
+}
+
+func (s *binTFTP) retiredTID(peer string) bool {
+	_, used := s.retired[peer]
+	return used
 }
 
 func tftpStrings(w []byte, max int) ([]string, error) {

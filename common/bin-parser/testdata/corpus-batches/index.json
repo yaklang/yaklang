@@ -34977,6 +34977,183 @@
         "common/pcapx/pcaputil/tftp-negotiation/controls.json": "controls.json",
         "common/pcapx/pcaputil/tftp-negotiation/validation/expected.json": "validation/expected.json"
       }
+    },
+    {
+      "id": "validation-tftp-generations",
+      "kind": "validation",
+      "source_sha": "022abb8859edf350bb10f5743c8d68ac1c2efe17",
+      "file": "validation-tftp-generations.zip",
+      "sha256": "ec72ca87650604f7db5cedb6fa986f2d8d792e53a4b78c109a3471f7ccd166a3",
+      "password": "bin-parser",
+      "members": {
+        "build.py": {
+          "sha256": "2bf0b37896f8730f59a0c066800e461d4b6ddadb97bc9504c268b89c42817ee3",
+          "bytes": 5140
+        },
+        "carrier.py": {
+          "sha256": "53032c4a1d39af131ac35498af5362423aefc47552d34e06420593262684f037",
+          "bytes": 1945
+        },
+        "verify-controls.py": {
+          "sha256": "28c998bf12b0d479542d51ac035bfc971238a04ed1e9275a78f8119858529e8c",
+          "bytes": 3203
+        },
+        "source-pin.json": {
+          "sha256": "40714c2866a6d19f80a282a86b6f3eb0d72ad67c17876380cddb2a99e12c58f6",
+          "bytes": 1755
+        },
+        "seal.py": {
+          "sha256": "f43b33c36891fd7ded866e6f9a06b945978a0111b95c3f20c6ca03b2ecb3ecbf",
+          "bytes": 3589
+        },
+        "cases/rrq-old-oack.pcap": {
+          "sha256": "9d070fcf6eacc20669dba7abf44e4e1f78188d75bc384d3fea3ef1d9b4c8ff23",
+          "bytes": 785
+        },
+        "answers/rrq-old-oack.json": {
+          "sha256": "450a4a4dc0186869841bb9a55fc3ceee1338059e55b00372aa2e8ec946923262",
+          "bytes": 8355
+        },
+        "cases/rrq-old-data.pcap": {
+          "sha256": "3be876c7f8161fb7abba1c4c3a2acc4fdae7aa804dde63bec8f055caeee55c93",
+          "bytes": 776
+        },
+        "answers/rrq-old-data.json": {
+          "sha256": "6d126e3d74a582c7f18098f18ab693002449909c9d671a71b0b65b8a22e4cd7b",
+          "bytes": 8319
+        },
+        "cases/rrq-old-error.pcap": {
+          "sha256": "7b0c5998370b8e8f45a84a5732d295e8b8822f8b1dab90f95c410500b03e27d7",
+          "bytes": 783
+        },
+        "answers/rrq-old-error.json": {
+          "sha256": "7a404fd086412cd62346611203b4b5221644db2cb380143566de45cbfc7c7c9f",
+          "bytes": 8351
+        },
+        "cases/wrq-old-ack0.pcap": {
+          "sha256": "a864f7c69508dc051bea6274915e16c17754c8150d94b5538aaab73c3bdae518",
+          "bytes": 651
+        },
+        "answers/wrq-old-ack0.json": {
+          "sha256": "795914837e56d13446d04575fc28732acc6d55f3c122e06a78b290421b6abab1",
+          "bytes": 6955
+        },
+        "cases/rrq-fresh-tid-normal.pcap": {
+          "sha256": "4214b3e3934ff128feff0aa5b9592bd990bec29bd8f5421e45700364179ca9c2",
+          "bytes": 713
+        },
+        "answers/rrq-fresh-tid-normal.json": {
+          "sha256": "941d3e31bda38778ebd05a5c52d23bb41095326035c6fe0695ef99b329f02001",
+          "bytes": 7957
+        },
+        "cases/client-old-ack0.pcap": {
+          "sha256": "c99bfc1292d06c682e6669b5bcc52c248b18dbfca503b92868aa84c8829a557f",
+          "bytes": 775
+        },
+        "answers/client-old-ack0.json": {
+          "sha256": "7770fee96493b6b4b7eef7175876b573e1262dabf2eb39451859bcaa924fd05c",
+          "bytes": 8327
+        },
+        "cases/client-old-error.pcap": {
+          "sha256": "55204b9da1745c616cc9810110f82c231e9bc514477e983cc72b2111076a2604",
+          "bytes": 783
+        },
+        "answers/client-old-error.json": {
+          "sha256": "e37adc1f9c5c22adb4fddfbb57ebc914ee5b5b3f0c2dcfb59b6879c52da6f366",
+          "bytes": 8363
+        },
+        "cases/client-old-data.pcap": {
+          "sha256": "1d76c5cb57385b04f7dc153fca993bfdcbfc256395f9dbf493cfae580f682870",
+          "bytes": 776
+        },
+        "answers/client-old-data.json": {
+          "sha256": "3249331111b106685a562cc9259b282e43299731aa452ddcb00fb49b55245934",
+          "bytes": 8331
+        },
+        "cases/retired-oversize-data.pcap": {
+          "sha256": "fa44219a69e609f3912391d0a13ae63a79e6f2fa786a9c424daa91975b03fa54",
+          "bytes": 1288
+        },
+        "answers/retired-oversize-data.json": {
+          "sha256": "5c18085c548f6cf1419f898a418b112edf106741f132b48132a019ece5a5378a",
+          "bytes": 10403
+        },
+        "cases/same-request-new-generation.pcap": {
+          "sha256": "27d0dc1a5c2567d898d3c63814ec3e25633cd7bb3f891ae45a50b43f19625631",
+          "bytes": 784
+        },
+        "answers/same-request-new-generation.json": {
+          "sha256": "ac6a2531795664dce03eac939f03e8a3dbccde5fd28e6cf2c6e73a7299097b71",
+          "bytes": 8405
+        },
+        "cases/active-exact-retries.pcap": {
+          "sha256": "05b44036548aaebcd61a6e47c29f788b173d2f9b05466e4ca47097a3862140d9",
+          "bytes": 650
+        },
+        "answers/active-exact-retries.json": {
+          "sha256": "18b431036701b0830d843f8ef2045ddfff35fe78fbc7c857e18a263940b47097",
+          "bytes": 7395
+        },
+        "cases/three-generations.pcap": {
+          "sha256": "50440871e7be02892ede7a7ad7790f4be341d2694a8f03398baae43bbe369f8f",
+          "bytes": 1192
+        },
+        "answers/three-generations.json": {
+          "sha256": "01ea2c1171d446723048d29567d85966d533077205370d5b1fc582f8c74591b1",
+          "bytes": 12578
+        },
+        "cases/error-closed-generation.pcap": {
+          "sha256": "a3a15229fd973e14172dc505e8fc18b43c7cb2cbd8b76d6dd6151a30378a5473",
+          "bytes": 594
+        },
+        "answers/error-closed-generation.json": {
+          "sha256": "9fb305efdb66ca2b8211afaefef3a4d5058f8c7bf27654b1d91e260a04ce7308",
+          "bytes": 6247
+        },
+        "controls.json": {
+          "sha256": "a0aca455cabaae5581419f353e072fcc6165a23f9ecca5078b00c8ba23290659",
+          "bytes": 129259
+        },
+        "validation/expected.json": {
+          "sha256": "dcc439d382fa9d92252b7d10e014834713db2f13f941cfea1fe6d62d9e4ed81e",
+          "bytes": 15525
+        }
+      },
+      "aliases": {
+        "common/pcapx/pcaputil/tftp-generations/build.py": "build.py",
+        "common/pcapx/pcaputil/tftp-generations/carrier.py": "carrier.py",
+        "common/pcapx/pcaputil/tftp-generations/verify-controls.py": "verify-controls.py",
+        "common/pcapx/pcaputil/tftp-generations/source-pin.json": "source-pin.json",
+        "common/pcapx/pcaputil/tftp-generations/seal.py": "seal.py",
+        "common/pcapx/pcaputil/tftp-generations/cases/rrq-old-oack.pcap": "cases/rrq-old-oack.pcap",
+        "common/pcapx/pcaputil/tftp-generations/answers/rrq-old-oack.json": "answers/rrq-old-oack.json",
+        "common/pcapx/pcaputil/tftp-generations/cases/rrq-old-data.pcap": "cases/rrq-old-data.pcap",
+        "common/pcapx/pcaputil/tftp-generations/answers/rrq-old-data.json": "answers/rrq-old-data.json",
+        "common/pcapx/pcaputil/tftp-generations/cases/rrq-old-error.pcap": "cases/rrq-old-error.pcap",
+        "common/pcapx/pcaputil/tftp-generations/answers/rrq-old-error.json": "answers/rrq-old-error.json",
+        "common/pcapx/pcaputil/tftp-generations/cases/wrq-old-ack0.pcap": "cases/wrq-old-ack0.pcap",
+        "common/pcapx/pcaputil/tftp-generations/answers/wrq-old-ack0.json": "answers/wrq-old-ack0.json",
+        "common/pcapx/pcaputil/tftp-generations/cases/rrq-fresh-tid-normal.pcap": "cases/rrq-fresh-tid-normal.pcap",
+        "common/pcapx/pcaputil/tftp-generations/answers/rrq-fresh-tid-normal.json": "answers/rrq-fresh-tid-normal.json",
+        "common/pcapx/pcaputil/tftp-generations/cases/client-old-ack0.pcap": "cases/client-old-ack0.pcap",
+        "common/pcapx/pcaputil/tftp-generations/answers/client-old-ack0.json": "answers/client-old-ack0.json",
+        "common/pcapx/pcaputil/tftp-generations/cases/client-old-error.pcap": "cases/client-old-error.pcap",
+        "common/pcapx/pcaputil/tftp-generations/answers/client-old-error.json": "answers/client-old-error.json",
+        "common/pcapx/pcaputil/tftp-generations/cases/client-old-data.pcap": "cases/client-old-data.pcap",
+        "common/pcapx/pcaputil/tftp-generations/answers/client-old-data.json": "answers/client-old-data.json",
+        "common/pcapx/pcaputil/tftp-generations/cases/retired-oversize-data.pcap": "cases/retired-oversize-data.pcap",
+        "common/pcapx/pcaputil/tftp-generations/answers/retired-oversize-data.json": "answers/retired-oversize-data.json",
+        "common/pcapx/pcaputil/tftp-generations/cases/same-request-new-generation.pcap": "cases/same-request-new-generation.pcap",
+        "common/pcapx/pcaputil/tftp-generations/answers/same-request-new-generation.json": "answers/same-request-new-generation.json",
+        "common/pcapx/pcaputil/tftp-generations/cases/active-exact-retries.pcap": "cases/active-exact-retries.pcap",
+        "common/pcapx/pcaputil/tftp-generations/answers/active-exact-retries.json": "answers/active-exact-retries.json",
+        "common/pcapx/pcaputil/tftp-generations/cases/three-generations.pcap": "cases/three-generations.pcap",
+        "common/pcapx/pcaputil/tftp-generations/answers/three-generations.json": "answers/three-generations.json",
+        "common/pcapx/pcaputil/tftp-generations/cases/error-closed-generation.pcap": "cases/error-closed-generation.pcap",
+        "common/pcapx/pcaputil/tftp-generations/answers/error-closed-generation.json": "answers/error-closed-generation.json",
+        "common/pcapx/pcaputil/tftp-generations/controls.json": "controls.json",
+        "common/pcapx/pcaputil/tftp-generations/validation/expected.json": "validation/expected.json"
+      }
     }
   ],
   "schema_version": 1,

@@ -131,13 +131,41 @@ func (a *binParser) decodeTFTPDatagram(e *ProtocolEvent, w []byte) bool {
 	if e.Timestamp.After(s.clock) {
 		s.clock = e.Timestamp
 	}
-	if el != nil && request && el.Value.(*binUDPEntry).flow.tftp.done {
-		el.Value.(*binUDPEntry).flow.closeSession()
-		s.lru.Remove(el)
-		delete(s.entries, key)
-		el = nil
-	}
 	var err error
+	if el != nil && request && el.Value.(*binUDPEntry).flow.tftp.done {
+		f := el.Value.(*binUDPEntry).flow
+		t := f.tftp
+		count := len(t.retired)
+		if t.server != "" && !t.retiredTID(t.server) {
+			count++
+		}
+		target := int64(512 + len(w)*3 + count*128)
+		if count > min(128, sessionCollectionLimit(a.budget.MaxCollectionElements)) {
+			err = protocolError(ErrResourceExceeded, "TFTP retired transfer ID budget")
+		} else {
+			// Reserve only the delta on the existing charged slot before moving
+			// ownership. A completed transfer must not need two live reservations.
+			err = f.reserveSession(target)
+		}
+		if err != nil {
+			t.ambiguous = true
+		} else {
+			history := t.retired
+			if history == nil && t.server != "" {
+				history = make(map[string]struct{}, count)
+			}
+			if t.server != "" {
+				history[t.server] = struct{}{}
+			}
+			f.tftp = &binTFTP{retired: history}
+			f.id = a.flows.Add(1)
+			f.endpoints = [2]string{e.Source, e.Destination}
+			if target < f.sessionBytes {
+				a.buffered.Add(target - f.sessionBytes)
+				f.sessionBytes = target
+			}
+		}
+	}
 	if el == nil {
 		if len(s.entries) >= sessionCollectionLimit(a.budget.MaxCollectionElements) {
 			err = protocolError(ErrResourceExceeded, "UDP conversation budget")
@@ -157,12 +185,22 @@ func (a *binParser) decodeTFTPDatagram(e *ProtocolEvent, w []byte) bool {
 		t := f.tftp
 		e.FlowID = f.id
 		e.Direction = dir
-		if dir == 1 && t.server != "" && t.server != e.Source || dir == 0 && !request && t.server != "" && t.server != e.Destination {
-			err = protocolError(ErrContextRequired, "TFTP packet from unexpected transfer ID")
-		} else {
-			e.Session, err = t.consume(dir, w, sessionCollectionLimit(a.budget.MaxCollectionElements))
-			if err == nil && dir == 1 && t.server == "" {
-				t.server = e.Source
+		peer := e.Source
+		if dir == 0 {
+			peer = e.Destination
+		}
+		// Only consume after admission succeeds: a budget refusal must preserve
+		// the completed generation and cannot quietly replace its history.
+		if err == nil {
+			if !request && t.retiredTID(peer) {
+				err = protocolError(ErrContextRequired, "TFTP packet uses a retired transfer ID")
+			} else if dir == 1 && t.server != "" && t.server != e.Source || dir == 0 && !request && t.server != "" && t.server != e.Destination {
+				err = protocolError(ErrContextRequired, "TFTP packet from unexpected transfer ID")
+			} else {
+				e.Session, err = t.consume(dir, w, sessionCollectionLimit(a.budget.MaxCollectionElements))
+				if err == nil && dir == 1 && t.server == "" {
+					t.server = e.Source
+				}
 			}
 		}
 		if e.Session != nil {

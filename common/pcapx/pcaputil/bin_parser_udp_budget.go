@@ -172,7 +172,15 @@ func (a *binParser) refuseTFTPOversizeAssociation(e *ProtocolEvent, w []byte) bo
 	if t == nil || t.server != "" && (dir == 1 && t.server != e.Source || dir == 0 && t.server != e.Destination) {
 		return false
 	}
-	t.ambiguous = true
+	peer := e.Source
+	if dir == 0 {
+		peer = e.Destination
+	}
+	// Oversized packets on an already retired TID still hit the byte limit,
+	// but their old generation cannot poison a fresh observed candidate.
+	if !t.retiredTID(peer) {
+		t.ambiguous = true
+	}
 	e.Protocol, e.FlowID, e.Direction = "tftp", f.id, dir
 	e.Admission, e.Completeness = "observed-conversation", "message"
 	if e.ID == 0 {
