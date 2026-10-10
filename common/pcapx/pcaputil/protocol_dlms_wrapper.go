@@ -313,7 +313,7 @@ func (f *binFlow) consumeWrapper(dir int, w []byte, e *ProtocolEvent) error {
 	if s.blocked {
 		assoc = "ambiguous-conversation"
 	} else if m.choice == 2 {
-		assoc, err = f.consumeWrapperBlock(s, m, dir, e)
+		assoc, err = f.consumeWrapperBlock(s, m, dir, e, w)
 		if err != nil {
 			return err
 		}
@@ -340,7 +340,7 @@ func (f *binFlow) consumeWrapper(dir int, w []byte, e *ProtocolEvent) error {
 		p := s.seen[key]
 		if p != nil && p.ambiguous {
 			assoc = "ambiguous-invoke"
-		} else if p != nil && p.pending && p.blockActive && p.flags == m.flags && m.choice == 1 {
+		} else if p != nil && p.pending && p.blockActive && p.flags == m.flags && (m.choice == 1 || m.choice == 3) {
 			p.ambiguousBlocks()
 			assoc = "ambiguous-block-transfer"
 		} else if p != nil && p.pending && !p.blockActive && p.flags == m.flags && p.choice == m.choice && p.count == m.count {

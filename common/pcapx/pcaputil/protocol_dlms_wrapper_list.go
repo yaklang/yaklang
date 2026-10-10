@@ -9,7 +9,7 @@ import (
 )
 
 // These are local selected-profile bounds, not DLMS wire maxima.
-// Data types other than scalar/float/octet/bit-string/selected-text/array/structure, block transfer, ciphering
+// Data types other than scalar/float/octet/bit-string/selected-text/array/structure, GBT, ciphering
 // and object/selector semantics remain separate.
 const wrapperListItems = 64
 const wrapperListOctets = 1024
