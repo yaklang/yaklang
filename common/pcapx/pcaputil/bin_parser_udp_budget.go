@@ -17,6 +17,9 @@ func (a *binParser) refuseUDPOversizeAssociation(e *ProtocolEvent, w []byte, src
 	case explicit == "dlms-wrapper" || explicit == "" && len(w) >= 8 && w[0] == 0 && w[1] == 1:
 		prefix, protocol, profile = "wrapper/", "dlms-wrapper", wrapperProfile(w)
 		ttl = wrapperIdleTTL
+	case explicit == "dlms" || explicit == "" && len(w) > 0 && w[0] == 0x7e:
+		prefix, protocol, profile = "dlms/", "dlms", dlmsProfile(w)
+		ttl = dlmsIdleTTL
 	default:
 		return false
 	}
@@ -33,7 +36,7 @@ func (a *binParser) refuseUDPOversizeAssociation(e *ProtocolEvent, w []byte, src
 		for el := store.lru.Front(); el != nil; {
 			next := el.Next()
 			v := el.Value.(*binUDPEntry)
-			applicable := protocol == "slmp" && v.flow.slmp != nil || protocol == "dlms-wrapper" && v.flow.wrapper != nil
+			applicable := protocol == "slmp" && v.flow.slmp != nil || protocol == "dlms-wrapper" && v.flow.wrapper != nil || protocol == "dlms" && v.flow.dlms != nil
 			if applicable && store.clock.Sub(v.touched) >= ttl {
 				v.flow.closeSession()
 				delete(store.entries, v.key)
@@ -63,6 +66,9 @@ func (a *binParser) refuseUDPOversizeAssociation(e *ProtocolEvent, w []byte, src
 		} else if f.wrapper != nil {
 			f.wrapper.invalidate()
 			retained = f.wrapper.storage()
+		} else if f.dlms != nil {
+			f.dlms.invalidate()
+			retained = f.dlms.storage()
 		}
 		// reserveSession is a high-water allocator. Removed wire/projection graphs
 		// must release their ledger charge while bounded ambiguity markers remain.

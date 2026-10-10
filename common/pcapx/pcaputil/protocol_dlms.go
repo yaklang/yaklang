@@ -4,14 +4,15 @@ import (
 	"bytes"
 	"container/list"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"strconv"
 	"time"
 )
 
 // Selected unciphered LN Get-normal and HDLC link controls, carried as complete
-// HDLC frames through a TCP/UDP tunnel. This is not the IEC IP wrapper profile.
-// ACSE, authentication, ciphering, segmentation, lists and block transfer remain
+// HDLC frames through a TCP/UDP tunnel, plus bounded LN Get-with-list.
+// ACSE, authentication, ciphering, segmentation and block transfer remain
 // explicit unsupported boundaries. Values and link identities are unverified.
 func dlmsError(k ProtocolErrorKind, why string) error { return protocolError(k, "DLMS HDLC %s", why) }
 func dlmsCRC(w []byte) uint16 {
@@ -64,6 +65,8 @@ type dlmsMessage struct {
 	request             bool
 	source, destination uint32
 	invoke, ns, nr      byte
+	flags, choice       byte
+	count               int
 }
 
 func dlmsAddress(w []byte, at *int) (uint32, int, error) {
@@ -87,6 +90,9 @@ func dlmsAddress(w []byte, at *int) (uint32, int, error) {
 	return 0, 0, dlmsError(ErrMalformedMessage, "address exceeds four octets or lacks terminator")
 }
 func decodeDLMS(w []byte, maxElements int) (*dlmsMessage, error) {
+	return decodeDLMSBudget(w, maxElements, DefaultParserBudget().MaxRecursionDepth)
+}
+func decodeDLMSBudget(w []byte, maxElements, depth int) (*dlmsMessage, error) {
 	bad := func(s string) (*dlmsMessage, error) { return nil, dlmsError(ErrMalformedMessage, s) }
 	unsupported := func(s string) (*dlmsMessage, error) { return nil, dlmsError(ErrUnsupportedFeature, s) }
 	n, err := dlmsFrameSize(w, 2049)
@@ -116,7 +122,7 @@ func decodeDLMS(w []byte, maxElements int) (*dlmsMessage, error) {
 	}
 	cf := w[at]
 	at++
-	m := &dlmsMessage{source: src, destination: dest}
+	m := &dlmsMessage{source: src, destination: dest, count: 1, choice: 1}
 	f := map[string]any{"Observation": "unverified-dlms-hdlc-wire-values", "Frame Format": format, "Frame Length": len(w) - 2, "Destination Address": dest, "Source Address": src, "Destination Address Octets": ds, "Source Address Octets": ss, "Control": cf, "Poll/Final": cf&0x10 != 0, "FCS": fcs}
 	m.fields = f
 	var info []byte
@@ -182,19 +188,29 @@ func decodeDLMS(w []byte, maxElements int) (*dlmsMessage, error) {
 	if len(p) < 3 {
 		return bad("Get service header is truncated")
 	}
-	if p[1] != 1 {
-		return unsupported("Get list/block form is outside this profile")
+	if p[1] != 1 && p[1] != 3 {
+		return unsupported("Get block form is outside this profile")
 	}
 	if p[2]&0x30 != 0 {
 		return bad("invoke-id-and-priority reserved bits are nonzero")
 	}
 	m.invoke = p[2] & 15
+	m.flags, m.choice = p[2], p[1]
 	m.request = p[0] == 0xc0
 	m.kind = "GET"
 	f["Invoke ID and Priority"] = p[2]
 	f["Invoke ID"] = m.invoke
 	f["High Priority"] = p[2]&0x80 != 0
 	f["Confirmed Service"] = p[2]&0x40 != 0
+	if p[1] == 3 {
+		if m.request && info[1] != 0xe6 || !m.request && info[1] != 0xe7 {
+			return bad("Get-list LLC direction differs from command")
+		}
+		if err := dlmsListFields(m, p, maxElements, depth); err != nil {
+			return nil, err
+		}
+		return m, nil
+	}
 	if m.request {
 		if info[1] != 0xe6 {
 			return bad("Get request uses response LLC")
@@ -365,7 +381,15 @@ func probeDLMS(w []byte, limit int) ProbeResult {
 	if n == 0 {
 		return probeNeed("dlms", "hdlc-get-normal", len(w), max(3, len(w)+1))
 	}
-	m, e := decodeDLMS(w[:n], 4096)
+	elements := 4096
+	if dlmsListAPDU(w[:n]) != nil {
+		elements = 0
+	}
+	m, e := decodeDLMS(w[:n], elements)
+	var pe *ProtocolError
+	if elements == 0 && errors.As(e, &pe) && pe.Kind == ErrResourceExceeded && dlmsListAPDU(w[:n])[0] == 0xc0 {
+		return probeAccept("dlms", "hdlc-get-list", 98)
+	}
 	if e != nil || !m.request {
 		return ProbeResult{Verdict: ProbeReject}
 	}
@@ -379,6 +403,8 @@ type dlmsPending struct {
 	source, destination uint32
 	id                  uint64
 	invoke, ns          byte
+	flags, choice       byte
+	count               int
 }
 type binDLMS struct {
 	pending             *dlmsPending
@@ -449,7 +475,7 @@ func (s *binDLMS) consume(m *dlmsMessage, w []byte, dir int, id uint64) (map[str
 			}
 			s.usedLink = true
 		}
-		s.pending = &dlmsPending{bytes.Clone(w), m.kind, dir, m.source, m.destination, id, m.invoke, m.ns}
+		s.pending = &dlmsPending{wire: bytes.Clone(w), kind: m.kind, dir: dir, source: m.source, destination: m.destination, id: id, invoke: m.invoke, ns: m.ns, flags: m.flags, choice: m.choice, count: m.count}
 		m.fields["Association"] = "observed-request"
 		return m.fields, 0, nil
 	}
@@ -458,7 +484,7 @@ func (s *binDLMS) consume(m *dlmsMessage, w []byte, dir int, id uint64) (map[str
 		return ctx("response lacks reversed observed endpoint/logical-address request")
 	}
 	if m.kind == "GET" {
-		if p.kind != "GET" || p.invoke != m.invoke || m.nr != (p.ns+1)&7 {
+		if p.kind != "GET" || p.invoke != m.invoke || p.flags != m.flags || p.choice != m.choice || p.count != m.count || m.nr != (p.ns+1)&7 {
 			return ctx("response service/invoke/acknowledgement differs from pending request")
 		}
 		if s.seqKnown[dir] && m.ns != s.next[dir] {
@@ -478,8 +504,7 @@ func (s *binDLMS) consume(m *dlmsMessage, w []byte, dir int, id uint64) (map[str
 }
 
 func dlmsRequestEvidence(w []byte) bool {
-	m, err := decodeDLMS(w, 4096)
-	return err == nil && m.request
+	return probeDLMS(w, 2049).Verdict == ProbeAccept
 }
 
 // Fixed direction/sequence/ID state plus an owned pending wire copy. Parsing
@@ -493,17 +518,21 @@ func (s *binDLMS) storage() int64 {
 }
 func (f *binFlow) consumeDLMS(dir int, w []byte, id uint64) (map[string]any, uint64, error) {
 	s := f.dlms
-	if err := f.reserveSession(s.storage() + int64(len(w))*6); err != nil {
+	if err := f.reserveSession(s.storage() + dlmsProjection(w)); err != nil {
 		// Refusing memory cannot hide an on-wire exchange from the association
 		// state. Retire the old slot before any later response can use it.
 		s.invalidate()
 		return nil, 0, err
 	}
-	m, err := decodeDLMS(w, f.a.budget.MaxCollectionElements)
+	m, err := decodeDLMSBudget(w, f.a.budget.MaxCollectionElements, f.a.budget.MaxRecursionDepth)
 	if err != nil {
 		s.invalidate()
 		return nil, 0, err
 	}
+	return f.consumeDecodedDLMS(dir, w, id, m)
+}
+func (f *binFlow) consumeDecodedDLMS(dir int, w []byte, id uint64, m *dlmsMessage) (map[string]any, uint64, error) {
+	s := f.dlms
 	if m.request && m.kind == "GET" && s.pending == nil && s.seenRequest[m.invoke]&(1<<m.ns) == 0 && int(s.seenCount) >= f.a.budget.MaxCollectionElements {
 		s.ambiguous = true
 		return nil, 0, dlmsError(ErrResourceExceeded, "retained invoke/sequence token limit")
@@ -530,7 +559,7 @@ func (a *binParser) decodeDLMSDatagram(e *ProtocolEvent, w []byte, explicit bool
 		a.udpMu.Unlock()
 		return false
 	}
-	e.Protocol, e.Profile, e.Admission, e.Completeness = "dlms", "dlms-hdlc-get-normal", "wire-signature", "message"
+	e.Protocol, e.Profile, e.Admission, e.Completeness = "dlms", dlmsProfile(w), "wire-signature", "message"
 	if explicit {
 		e.Admission = "explicit-decode-as"
 	}
@@ -555,53 +584,70 @@ func (a *binParser) decodeDLMSDatagram(e *ProtocolEvent, w []byte, explicit bool
 		el = next
 	}
 	el := store.entries[key]
+	created := el == nil
+	f := &binFlow{a: a, dlms: &binDLMS{}, endpoints: [2]string{e.Source, e.Destination}}
+	if el != nil {
+		v := el.Value.(*binUDPEntry)
+		f = v.flow
+		e.FlowID = f.id
+		if e.Source != f.endpoints[0] {
+			e.Direction = 1
+		} else {
+			e.Direction = 0
+		}
+		v.touched = store.clock
+		store.lru.MoveToBack(el)
+	}
 	var m *dlmsMessage
 	var err error
-	oversize := len(w) > a.budget.MaxFrameBytes
+	oversize := len(w) > min(a.budget.MaxFrameBytes, a.config.MaxMessageBytes)
 	if oversize {
 		err = dlmsError(ErrResourceExceeded, "frame exceeds byte budget")
-	} else {
-		m, err = decodeDLMS(w, a.budget.MaxCollectionElements)
+	} else if err = f.reserveSession(f.dlms.storage() + dlmsProjection(w)); err == nil {
+		m, err = decodeDLMSBudget(w, a.budget.MaxCollectionElements, a.budget.MaxRecursionDepth)
 	}
-	if m != nil && !m.request && m.kind != "S" {
+	if created && m != nil && !m.request && m.kind != "S" {
 		e.Direction = 1
 	}
-	if err == nil && el == nil {
-		if m.kind == "S" || m.kind == "DM" {
-			e.Session, e.ResponseTo, err = (&binDLMS{}).consume(m, w, e.Direction, e.ID)
-		} else if !m.request {
+	if err == nil {
+		if created && (m.kind == "S" || m.kind == "DM") {
+			e.Session, e.ResponseTo, err = f.dlms.consume(m, w, e.Direction, e.ID)
+		} else if created && !m.request {
 			err = dlmsError(ErrContextRequired, "response lacks observed request context")
-		} else if len(store.entries) >= sessionCollectionLimit(a.budget.MaxCollectionElements) {
+		} else if created && len(store.entries) >= sessionCollectionLimit(a.budget.MaxCollectionElements) {
 			err = dlmsError(ErrResourceExceeded, "UDP conversation limit")
 		} else {
-			f := &binFlow{a: a, id: a.flows.Add(1), protocol: "dlms", dlms: &binDLMS{}, endpoints: [2]string{e.Source, e.Destination}}
-			if err = f.reserveSession(512 + int64(len(w))*6); err == nil {
-				el = store.lru.PushBack(&binUDPEntry{key, f, store.clock})
-				store.entries[key] = el
+			e.Session, e.ResponseTo, err = f.consumeDecodedDLMS(e.Direction, w, e.ID, m)
+			if err == nil && created {
+				f.id = a.flows.Add(1)
+				store.entries[key] = store.lru.PushBack(&binUDPEntry{key, f, store.clock})
+				e.FlowID = f.id
+				created = false
 			}
 		}
 	}
-	if el != nil {
-		v := el.Value.(*binUDPEntry)
-		v.touched = store.clock
-		store.lru.MoveToBack(el)
-		f := v.flow
-		e.FlowID = f.id
-		e.Direction = 0
-		if e.Source != f.endpoints[0] {
-			e.Direction = 1
-		}
-		if err != nil {
+	if err != nil {
+		var pe *ProtocolError
+		// Byte/semantic refusals hide an exchange from observation: retire its old
+		// pending wire. Context mismatch preserves the adjacent exact reply behavior.
+		if m == nil || errors.As(err, &pe) && pe.Kind == ErrResourceExceeded {
 			f.dlms.invalidate()
-		} else {
-			e.Session, e.ResponseTo, err = f.consumeDLMS(e.Direction, w, e.ID)
 		}
+		e.Session, e.ResponseTo = nil, 0
+		if f.dlms.storage() < f.sessionBytes {
+			a.buffered.Add(f.dlms.storage() - f.sessionBytes)
+			f.sessionBytes = f.dlms.storage()
+		}
+	}
+	if created {
+		f.closeSession()
 	}
 	a.udpMu.Unlock()
 	if err == nil {
 		e.semanticFields = cloneSession(e.Session)
 	}
-	if oversize {
+	var resource *ProtocolError
+	if oversize || dlmsListAPDU(w) != nil && errors.As(err, &resource) && resource.Kind == ErrResourceExceeded {
 		w = nil
 	}
 	a.finishProtocolDatagram(e, w, nil, err)

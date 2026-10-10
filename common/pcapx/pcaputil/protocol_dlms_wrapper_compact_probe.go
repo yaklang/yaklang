@@ -102,13 +102,19 @@ func wrapperContainsCompactData(w []byte) bool {
 	if !wrapperIsList(w) {
 		return false
 	}
-	p.at = 11
+	return wrapperListContainsCompact(w[8:])
+}
+func wrapperListContainsCompact(w []byte) bool {
+	if len(w) < 4 || w[1] != 3 {
+		return false
+	}
+	p := wrapperCompactProbe{wire: w, at: 3}
 	n, ok := p.count()
 	if !ok || n > wrapperListItems {
 		return false
 	}
 	for i := uint64(0); i < n; i++ {
-		if w[8] == 0xc0 {
+		if w[0] == 0xc0 {
 			if !p.skip(10) {
 				return false
 			}
@@ -119,7 +125,7 @@ func wrapperContainsCompactData(w []byte) bool {
 			if selection != 1 || !p.skip(1) {
 				return false
 			}
-		} else if w[8] == 0xc4 {
+		} else if w[0] == 0xc4 {
 			if !p.skip(1) {
 				return false
 			}

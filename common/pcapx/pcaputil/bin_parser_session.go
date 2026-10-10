@@ -596,7 +596,7 @@ func (f *binFlow) consumeSession(dir int, e *ProtocolEvent, result map[string]an
 		if e.ID == 0 {
 			e.ID = f.a.ids.Add(1)
 		}
-		e.Profile, e.Completeness = "dlms-hdlc-get-normal", "message"
+		e.Profile, e.Completeness = dlmsProfile(e.Raw), "message"
 		e.Session, e.ResponseTo, err = f.consumeDLMS(dir, e.Raw, e.ID)
 		if err == nil {
 			e.semanticFields = cloneSession(e.Session)
