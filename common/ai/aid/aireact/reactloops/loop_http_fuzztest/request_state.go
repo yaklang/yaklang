@@ -70,6 +70,19 @@ type loopHTTPFuzzRequestChangeEventPacket struct {
 	Version int    `json:"version"`
 }
 
+// normalizeLoopHTTPFuzzRequestPacket 归一化 AI 生成的原始 HTTP 请求包：
+// 把字面 "\n"/"\r\n" 转义序列转成真实换行，再做 FixHTTPRequest 修复。
+// LLM 经常把多行请求包写成单行字面转义序列，不归一化会导致
+// 请求行、头、body 粘在一行里，请求包直接不可用。
+func normalizeLoopHTTPFuzzRequestPacket(rawRequest string) []byte {
+	if strings.Contains(rawRequest, `\n`) || strings.Contains(rawRequest, `\r`) {
+		rawRequest = strings.ReplaceAll(rawRequest, `\r\n`, "\n")
+		rawRequest = strings.ReplaceAll(rawRequest, `\n`, "\n")
+		rawRequest = strings.ReplaceAll(rawRequest, `\r`, "\n")
+	}
+	return lowhttp.FixHTTPRequest([]byte(rawRequest))
+}
+
 func cloneLoopHTTPFuzzRequestState(state *loopHTTPFuzzRequestState) *loopHTTPFuzzRequestState {
 	if state == nil {
 		return nil
@@ -135,7 +148,7 @@ func applyLoopHTTPFuzzRequestChange(loop *reactloops.ReActLoop, runtime aicommon
 		return nil, fmt.Errorf("unsupported request event op: %s", eventOp)
 	}
 
-	fixedPacket := lowhttp.FixHTTPRequest([]byte(input.RawRequest))
+	fixedPacket := normalizeLoopHTTPFuzzRequestPacket(input.RawRequest)
 	if len(bytes.TrimSpace(fixedPacket)) == 0 {
 		return nil, fmt.Errorf("fixed HTTP request is empty")
 	}
