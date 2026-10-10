@@ -25374,6 +25374,504 @@
         "common/pcapx/pcaputil/dlms-strings/required-tests-v37.json": "required-tests-v37.json",
         "scripts/protocol-tests/required-tests-v37.json": "required-tests-v37.json"
       }
+    },
+    {
+      "id": "validation-pfcp-usage-6e3f9ce9481",
+      "kind": "validation",
+      "source_sha": "6e3f9ce9481b0111a5aff6ec703b6a2a9212906e",
+      "file": "validation-pfcp-usage-6e3f9ce9481.zip",
+      "sha256": "3dbc0feb4aea83526ed25ccf0c681be2a99eb05450125a6fbdf0af9e8f04c72e",
+      "password": "bin-parser",
+      "members": {
+        "LICENSE": {
+          "sha256": "1085cd871c63b367ea22aa4035dc06f89e52cb30b9d53737691c1ad7312d2131",
+          "bytes": 1226
+        },
+        "answers/usage-aggregate256-exact.json": {
+          "sha256": "e814e7773423ae0632227bbbf870b532fb3d340458928e5b073a7a23dc5d452c",
+          "bytes": 91239
+        },
+        "answers/usage-aggregate257-refused.json": {
+          "sha256": "85ed852b36a567940ae5597d0b3394c82377a98d55dbe6ccf60f921ed4fd8fd3",
+          "bytes": 92433
+        },
+        "answers/usage-all-known-flags.json": {
+          "sha256": "8c73c5bd7dc6e06cb9c26f644d99a65d05e2c5384cd52fc2feee81df95261647",
+          "bytes": 5757
+        },
+        "answers/usage-byte-budget.json": {
+          "sha256": "9838b0558114facd8803a5cc3e222d007f91bd8a0a997c620f7b35a15eb57a1e",
+          "bytes": 10847
+        },
+        "answers/usage-child-budget.json": {
+          "sha256": "ad536897d647244e86aea34f9f6ef7aef410e8c44de6b291d7f9f6ef3cec0b40",
+          "bytes": 9247
+        },
+        "answers/usage-child-header-truncated.json": {
+          "sha256": "34aac11771cdff941cadb4caadf9aaa0c6969d3db05423d43ca53d55c7b787f1",
+          "bytes": 5319
+        },
+        "answers/usage-child-length-overrun.json": {
+          "sha256": "0c0b132ce801f53d39ccde18fbd5c32316f3b96958b43abe1e02ba10ec050af1",
+          "bytes": 5348
+        },
+        "answers/usage-child64-exact.json": {
+          "sha256": "87568a28bdd1dfa23173f6559b8af82bba311c98b2379d941748746beb1fcb50",
+          "bytes": 24618
+        },
+        "answers/usage-child65-refused.json": {
+          "sha256": "bc275aa47f51d3a1db150dfab6e8369c0855be66635ce6ee1416ae9a9261b4f6",
+          "bytes": 6241
+        },
+        "answers/usage-duplicate-id-first-wins.json": {
+          "sha256": "ea3526c74649d6b00724305967e48d6b6bde9ceb7a1de1d7b874aa580b0ee6df",
+          "bytes": 11612
+        },
+        "answers/usage-exact-request-retry.json": {
+          "sha256": "f163e8efcc11ae355f9d5dc5829f2bfa1c4a42d4eee900e477b2215cd2e42685",
+          "bytes": 8746
+        },
+        "answers/usage-first-invalid-id-not-rescued.json": {
+          "sha256": "33a771dadc2d0cbf6939a56416e34db3426673ddc0e95f047fda8024ecd25eef",
+          "bytes": 5340
+        },
+        "answers/usage-group4096-exact.json": {
+          "sha256": "ceccbfba3b8d444e49f7f26a29f6a5a8b9169110e87b4ea47dfbc31a711631c4",
+          "bytes": 63059
+        },
+        "answers/usage-group4097-refused.json": {
+          "sha256": "a5815c6045f8ebfb145c49adcd86effdf3bc8460c196b450dc41f7442129fae1",
+          "bytes": 44494
+        },
+        "answers/usage-id-reuse-quarantined.json": {
+          "sha256": "47009a00db3a2c9e46fc9df8841c8a6bb6da4372c154326a2dd45f445cf6058b",
+          "bytes": 9304
+        },
+        "answers/usage-interleaved-sequences.json": {
+          "sha256": "3bb571141e126f6db885e87708b4d5b3e0fd1e58c8a235fd60c4f859bfe81ecb",
+          "bytes": 13996
+        },
+        "answers/usage-invalid-groups-charge-pool.json": {
+          "sha256": "7317a7c50fe9186df93370794a269ca5f64c4683946dcdda7ac12f752c4da982",
+          "bytes": 113823
+        },
+        "answers/usage-invalid-nonrequired-time-ignored.json": {
+          "sha256": "ca04dd3cb4817c1bb0175f677621e512659e97b7e1365e5745850e23d765ebea",
+          "bytes": 12438
+        },
+        "answers/usage-known-trigger-spares-ignored.json": {
+          "sha256": "0985579c766d3f1bbaf4be909e5596d71bf9860bb49f46d4488b06401d34bb1a",
+          "bytes": 10944
+        },
+        "answers/usage-missing-id.json": {
+          "sha256": "029d984c36d070fbff68abc5be3bb57a97fee3236bd4e90dea24682a85a2f6fc",
+          "bytes": 5186
+        },
+        "answers/usage-missing-sequence.json": {
+          "sha256": "532be00e43cbb7b1185e15041c97e09ebc61fdd3a862a8f5a4303081aa424195",
+          "bytes": 5173
+        },
+        "answers/usage-missing-trigger.json": {
+          "sha256": "83866eb63cae9337198aa2e8c90a48bb799abb6fa031e064f92cde2e89c12225",
+          "bytes": 5194
+        },
+        "answers/usage-refusal-retires-pending.json": {
+          "sha256": "586a7506564e75f84c8587ad52b52edd84853f833ede0027b62bfb4b09da7b6c",
+          "bytes": 12973
+        },
+        "answers/usage-rejection-ignores-malformed-group.json": {
+          "sha256": "8f95906ec208ab8f60e4e1baf4c8c21f0197a68626bcc89bbad256cf430b0610",
+          "bytes": 4877
+        },
+        "answers/usage-repeated-reports.json": {
+          "sha256": "8012545665a493d2331c2a6e99a9e778a8dda34e0699cff2f3d26ea077b150f8",
+          "bytes": 18363
+        },
+        "answers/usage-sequence-fixed-size.json": {
+          "sha256": "f441dd474b32c9f6480de418aab0afcd959fcf57c728c32287820e7c338f5bf1",
+          "bytes": 5237
+        },
+        "answers/usage-sequence-zero-max.json": {
+          "sha256": "2c1da32fe8103caa770a94f2a28896d3bb264d78b60db724375c0bdc246054a5",
+          "bytes": 9169
+        },
+        "answers/usage-start-and-termr-time-exception.json": {
+          "sha256": "9a5387fd22f13a37605949f42885c12349609a397f1f207f74234b8bf6b07632",
+          "bytes": 10915
+        },
+        "answers/usage-start-minimal.json": {
+          "sha256": "8c03a6c0c115d7d93a7966965d8a0da3be2a3c4a00adaa0352394f44c4b232be",
+          "bytes": 12352
+        },
+        "answers/usage-stopt-minimal.json": {
+          "sha256": "ee21358dc9e3b13152fc46a8e09c9c8394e027f3523039cbd2024c2bce451543",
+          "bytes": 10839
+        },
+        "answers/usage-termr-missing-end.json": {
+          "sha256": "33c7b35ca2ee78bfbc9a3a967767511b6f794ede38f1d3965531003ae22f0853",
+          "bytes": 5409
+        },
+        "answers/usage-termr-missing-start.json": {
+          "sha256": "71f17901f6da3023fc0f0fbad272f803e3db0e1f6082b2004a7fe212b094a051",
+          "bytes": 5415
+        },
+        "answers/usage-termr-with-times.json": {
+          "sha256": "1838882d0ced9e69c6b8a3bf445a00e56d048ca208d23af11bdc4f671c0367e7",
+          "bytes": 14641
+        },
+        "answers/usage-time-era-not-inferred.json": {
+          "sha256": "a345a68eb02f90ff047b8237676aea18ec5a7a4a4cc98413b69f6778a4150c0a",
+          "bytes": 13143
+        },
+        "answers/usage-time-extensions.json": {
+          "sha256": "9b05af110939ec588ccc9d32d289451be01fe47378d1d39eab9677660b4e080a",
+          "bytes": 13200
+        },
+        "answers/usage-trigger-short.json": {
+          "sha256": "459f4710ee4cb9b1811a2c98ccc8192b4e43f8fe614b4b161008d223437b225c",
+          "bytes": 5210
+        },
+        "answers/usage-unknown-only-future-trigger.json": {
+          "sha256": "2e6366ffed95cdde9f6b2b50e273b8c37bda4c8ea8c91d72cbe0ddd0471f8be9",
+          "bytes": 5464
+        },
+        "answers/usage-unknown-vendor-child.json": {
+          "sha256": "0b0b5ab2a1ec420fc844f6d821772160b15ba3d9c34d4f31b3c91c4c12d0ec27",
+          "bytes": 11773
+        },
+        "answers/usage-urr-id-extension.json": {
+          "sha256": "916a7f25dee5caec33db14aac1f955d0e4db3b6e2e133a1d4f6b457785d09489",
+          "bytes": 10933
+        },
+        "answers/usage-wrong-direction.json": {
+          "sha256": "f7cc309ad73ee0449fac5c7fe545b251e1d6291cb134be4157eea81bcb5b307e",
+          "bytes": 12524
+        },
+        "answers/usage-zero-trigger.json": {
+          "sha256": "926f19c0b92099ff5f63845b3a589d93364d9e412b6a518d6983731e3ff738f6",
+          "bytes": 5400
+        },
+        "build-controls.py": {
+          "sha256": "d3c0de721908c98991307f8222151ce593386c3ab36f675e3a00c2ec02618e1b",
+          "bytes": 8351
+        },
+        "cases/usage-aggregate256-exact.pcap": {
+          "sha256": "617bef0e0490fdff33a772890a0edbe02d10aafcbd4468fec34ae6b2eaca5d4e",
+          "bytes": 1183
+        },
+        "cases/usage-aggregate257-refused.pcap": {
+          "sha256": "26942af50889efd308a1c5ef776f699b802356f9e49645d2125a4223bcfc810a",
+          "bytes": 1191
+        },
+        "cases/usage-all-known-flags.pcap": {
+          "sha256": "2b47a1bbb9fe391abdebd8f9c4036e11648fc6e2992130fdbb8421150554b033",
+          "bytes": 130
+        },
+        "cases/usage-byte-budget.pcap": {
+          "sha256": "60484bcdae214c5843e4dff61261d0144f146b2c05fa70bf8c0e6f246d20dd0d",
+          "bytes": 145
+        },
+        "cases/usage-child-budget.pcap": {
+          "sha256": "a5adef66e434dec440cc9a9eb80902cd03b4a812835ccacff7050adc13af6fda",
+          "bytes": 129
+        },
+        "cases/usage-child-header-truncated.pcap": {
+          "sha256": "399777c9cd9389f747fc9bf9a3bf71986cc314048d7c316c75362dec2fd7412f",
+          "bytes": 132
+        },
+        "cases/usage-child-length-overrun.pcap": {
+          "sha256": "eddf5af9e1d3b645b316a7f4b9aeb87560505dea03ef1c5b8ca93a328fada64a",
+          "bytes": 135
+        },
+        "cases/usage-child64-exact.pcap": {
+          "sha256": "c246a4e9939a68ebe34a7a87f19777aa1ecefc854f15b1bba100f42367fea2ed",
+          "bytes": 373
+        },
+        "cases/usage-child65-refused.pcap": {
+          "sha256": "bce8f590d14a9b7b15c8f2aa34ab2daec6f8ced8d0de8f30a0ba6c5f1ee3ca6d",
+          "bytes": 377
+        },
+        "cases/usage-duplicate-id-first-wins.pcap": {
+          "sha256": "d950543144991231a2327a4a9ff1bfad8c0cce22504f35974bfa1efa9e228846",
+          "bytes": 134
+        },
+        "cases/usage-exact-request-retry.pcap": {
+          "sha256": "6c42182d4c210dfe895fc7cc2bdf5fc74fa972a2498019d4dfdb3dac6eaaa971",
+          "bytes": 277
+        },
+        "cases/usage-first-invalid-id-not-rescued.pcap": {
+          "sha256": "2e0b0ccb1c2e3799f50550dba02f273d1d0ca597b57a2fe6a2d1ce5f6689899e",
+          "bytes": 134
+        },
+        "cases/usage-group4096-exact.pcap": {
+          "sha256": "c31547d542944b9d8d2a0c3d28bca36e256168b8d87f80c00c3da4c2ba4562c5",
+          "bytes": 4203
+        },
+        "cases/usage-group4097-refused.pcap": {
+          "sha256": "f7a0d8a4042878f4fba743b76f3552c9868256d6ae1dbd111820511f97f81de1",
+          "bytes": 4204
+        },
+        "cases/usage-id-reuse-quarantined.pcap": {
+          "sha256": "4ecb330698df2b26c9db4ec77f033f5c10550b9bce959d3e50abc74d406b2482",
+          "bytes": 282
+        },
+        "cases/usage-interleaved-sequences.pcap": {
+          "sha256": "0588835936230cf89492f7ff9e8d121c5183646f4a376acb18281680cc48720e",
+          "bytes": 382
+        },
+        "cases/usage-invalid-groups-charge-pool.pcap": {
+          "sha256": "7ea4c4a020c3aacb06b8b6bdb3afd2b5e938541d3d4e164205fe7e9718d5e1d9",
+          "bytes": 2081
+        },
+        "cases/usage-invalid-nonrequired-time-ignored.pcap": {
+          "sha256": "8207d6c9b4d03d9ac49a4dc2b684082758fb3dd2e46840737f64639d7747457b",
+          "bytes": 139
+        },
+        "cases/usage-known-trigger-spares-ignored.pcap": {
+          "sha256": "19544ce90aa74f8ddafc555658ff810e21f42c11e73963952f98fe6339bd2a66",
+          "bytes": 130
+        },
+        "cases/usage-missing-id.pcap": {
+          "sha256": "596198449869d8cb5bb0a3f94b6b26923a3d1c72d7e78cecc97ce3a5d73922d8",
+          "bytes": 121
+        },
+        "cases/usage-missing-sequence.pcap": {
+          "sha256": "7d9693c88a5971fab55317f4e73e13b65e28842589e18fb7b337fff32fe1bb76",
+          "bytes": 121
+        },
+        "cases/usage-missing-trigger.pcap": {
+          "sha256": "3b02710cdff8907e8d5041024dd2f788ccc3b0ecb962d6ba7e6c56e1ccfe21ea",
+          "bytes": 123
+        },
+        "cases/usage-refusal-retires-pending.pcap": {
+          "sha256": "bed12a93248fb82fd739b733e18680e85e3acf792b6af791fca2b57c2ae8811b",
+          "bytes": 556
+        },
+        "cases/usage-rejection-ignores-malformed-group.pcap": {
+          "sha256": "ee19fb18bfea6ee8624e26a719c73e962925306a8a359fb7cadafb232e051be1",
+          "bytes": 110
+        },
+        "cases/usage-repeated-reports.pcap": {
+          "sha256": "e6f6c39c83ec8628bb1cdb17f986e187131b30a290ec3ddfd2e5f831299dd686",
+          "bytes": 155
+        },
+        "cases/usage-sequence-fixed-size.pcap": {
+          "sha256": "cc89a6ca71a5ce14bb40e6c1eeff4bbdc91a94e63c00ddadd6bedbafae13d6b6",
+          "bytes": 130
+        },
+        "cases/usage-sequence-zero-max.pcap": {
+          "sha256": "93c6a8e88f003bc61542e9a9954cf11d4c2db0d2741766e9925d3c801e0659ab",
+          "bytes": 155
+        },
+        "cases/usage-start-and-termr-time-exception.pcap": {
+          "sha256": "973a3c8d00ce6c20f3810c5e198609991604928f02647bed17b2761beeb0c65b",
+          "bytes": 129
+        },
+        "cases/usage-start-minimal.pcap": {
+          "sha256": "6a4df15d066a015d2be6fa2d5791a9abd0d317bca8dc6b53db32fd44d9b3a78b",
+          "bytes": 203
+        },
+        "cases/usage-stopt-minimal.pcap": {
+          "sha256": "e96def21e183fafa3cce5e5ba102e618d300d8ae39f2c44834ed48ef650b3f04",
+          "bytes": 129
+        },
+        "cases/usage-termr-missing-end.pcap": {
+          "sha256": "23d2480a2f1a3d253e44b03b01ad9b3aa8129c385263dda9df7be0d89a3af5ed",
+          "bytes": 137
+        },
+        "cases/usage-termr-missing-start.pcap": {
+          "sha256": "b62bc68d273d76c625bc20ca320a5adee736ddb6f19f60fede83d7f4ca7d8b4d",
+          "bytes": 137
+        },
+        "cases/usage-termr-with-times.pcap": {
+          "sha256": "6e7d5760bcb93e85c212023d42fd422f8c01ba8ecfb35e4ad8da4086f0b9ddbf",
+          "bytes": 219
+        },
+        "cases/usage-time-era-not-inferred.pcap": {
+          "sha256": "1f63b581360c8bee331c9bff20cdf858165ccc8127babb72b504807a2432eea2",
+          "bytes": 145
+        },
+        "cases/usage-time-extensions.pcap": {
+          "sha256": "d35f7890ecc9bf1068a8f9bb180f1317bae9e0960bff47de32a763b165f67d31",
+          "bytes": 148
+        },
+        "cases/usage-trigger-short.pcap": {
+          "sha256": "da2a2c2d0a2eddbae517fc0e521a4ddd258362df242d89f8a24ef3a3d12c3270",
+          "bytes": 128
+        },
+        "cases/usage-unknown-only-future-trigger.pcap": {
+          "sha256": "dcddc379d7302bf0ebba07ab433584a4f2d6df80680ad41c8ac52d28c264f126",
+          "bytes": 131
+        },
+        "cases/usage-unknown-vendor-child.pcap": {
+          "sha256": "bcd8b24e2e41c97f50b2ca7d91fae5138e23a02bcec3e1b6946f6f4596055674",
+          "bytes": 137
+        },
+        "cases/usage-urr-id-extension.pcap": {
+          "sha256": "35dea427243cc35d7b4e7771584d28205e09ee18471466714c7ec4ceabc3dfcf",
+          "bytes": 131
+        },
+        "cases/usage-wrong-direction.pcap": {
+          "sha256": "3d5dfe71e46b6f9ba597dfeca7c375c46449c6b6cf5059ff99c519fbc4abd04c",
+          "bytes": 308
+        },
+        "cases/usage-zero-trigger.pcap": {
+          "sha256": "e0a30093fbc716d12b79b11a7f29f601bf50027b6fae6193c08dd0574e270c66",
+          "bytes": 129
+        },
+        "controls.json": {
+          "sha256": "9dae4dc685b045d0e65e2ae01637f70c0da0046fe3c328689831b9d609a793d4",
+          "bytes": 818059
+        },
+        "deletion_core_oracle.py": {
+          "sha256": "b51873b663ac970e00fd1b90a7fa667cd43699c1718b18065ee2e60e0fef118e",
+          "bytes": 9611
+        },
+        "extend-controls.py": {
+          "sha256": "b40470c80c401921c22e786aaf163b8c8a15f572b1085b66bcb0c2884fecea6b",
+          "bytes": 4041
+        },
+        "historical-additive-answers.json": {
+          "sha256": "c642a6980bfe15d34111772beefe8264ad3a8644416c66f62480d643e5ebd4bd",
+          "bytes": 5844
+        },
+        "prepare.py": {
+          "sha256": "071d71c3235c426b516a804d2f3190f3836e88d677722150f7d1e6322e5446b2",
+          "bytes": 2243
+        },
+        "required-tests-v34.json": {
+          "sha256": "81b8aa505da2c99c9c73033431da3c8aac0299ac0fceb13766b6a97e00dc68c3",
+          "bytes": 98579
+        },
+        "seal.py": {
+          "sha256": "e1a6830719a18101d0ccafbc71fcbf3330f08494a656ad15e30acb1fcf65d3a8",
+          "bytes": 5348
+        },
+        "source-facts.json": {
+          "sha256": "a6673119d619729234cbc298321c21a70f5f7bde1bb3915227d2a183dc624374",
+          "bytes": 4756
+        },
+        "source-pin.json": {
+          "sha256": "0525cab8a52689d48097d1ab66669b3ef105a1fb0167967f5c3d00af6be79cc4",
+          "bytes": 553
+        },
+        "usage_oracle.py": {
+          "sha256": "25d4bce34514671e78fd4ac53a289f007e3319cb2614e13f7fbea9b49839ae20",
+          "bytes": 4918
+        },
+        "validation/expected.json": {
+          "sha256": "e7043c28917944ea085d54298b39c8f20edc6054e94654c935d6ed054abf9fc6",
+          "bytes": 45381
+        },
+        "verify-controls.py": {
+          "sha256": "4168095488ff39a55cf37b431401e722a20f0fac2a6033ade08be1562de82bef",
+          "bytes": 4400
+        },
+        "verify-integrated.py": {
+          "sha256": "01dc33449a4d3d16ea588ee9334da8acfdfae469c04144bc4a5e7b84b6da5999",
+          "bytes": 2379
+        }
+      },
+      "aliases": {
+        "common/pcapx/pcaputil/pfcp-usage/cases/usage-start-minimal.pcap": "cases/usage-start-minimal.pcap",
+        "common/pcapx/pcaputil/pfcp-usage/answers/usage-start-minimal.json": "answers/usage-start-minimal.json",
+        "common/pcapx/pcaputil/pfcp-usage/cases/usage-start-and-termr-time-exception.pcap": "cases/usage-start-and-termr-time-exception.pcap",
+        "common/pcapx/pcaputil/pfcp-usage/answers/usage-start-and-termr-time-exception.json": "answers/usage-start-and-termr-time-exception.json",
+        "common/pcapx/pcaputil/pfcp-usage/cases/usage-stopt-minimal.pcap": "cases/usage-stopt-minimal.pcap",
+        "common/pcapx/pcaputil/pfcp-usage/answers/usage-stopt-minimal.json": "answers/usage-stopt-minimal.json",
+        "common/pcapx/pcaputil/pfcp-usage/cases/usage-termr-with-times.pcap": "cases/usage-termr-with-times.pcap",
+        "common/pcapx/pcaputil/pfcp-usage/answers/usage-termr-with-times.json": "answers/usage-termr-with-times.json",
+        "common/pcapx/pcaputil/pfcp-usage/cases/usage-time-era-not-inferred.pcap": "cases/usage-time-era-not-inferred.pcap",
+        "common/pcapx/pcaputil/pfcp-usage/answers/usage-time-era-not-inferred.json": "answers/usage-time-era-not-inferred.json",
+        "common/pcapx/pcaputil/pfcp-usage/cases/usage-repeated-reports.pcap": "cases/usage-repeated-reports.pcap",
+        "common/pcapx/pcaputil/pfcp-usage/answers/usage-repeated-reports.json": "answers/usage-repeated-reports.json",
+        "common/pcapx/pcaputil/pfcp-usage/cases/usage-urr-id-extension.pcap": "cases/usage-urr-id-extension.pcap",
+        "common/pcapx/pcaputil/pfcp-usage/answers/usage-urr-id-extension.json": "answers/usage-urr-id-extension.json",
+        "common/pcapx/pcaputil/pfcp-usage/cases/usage-time-extensions.pcap": "cases/usage-time-extensions.pcap",
+        "common/pcapx/pcaputil/pfcp-usage/answers/usage-time-extensions.json": "answers/usage-time-extensions.json",
+        "common/pcapx/pcaputil/pfcp-usage/cases/usage-duplicate-id-first-wins.pcap": "cases/usage-duplicate-id-first-wins.pcap",
+        "common/pcapx/pcaputil/pfcp-usage/answers/usage-duplicate-id-first-wins.json": "answers/usage-duplicate-id-first-wins.json",
+        "common/pcapx/pcaputil/pfcp-usage/cases/usage-first-invalid-id-not-rescued.pcap": "cases/usage-first-invalid-id-not-rescued.pcap",
+        "common/pcapx/pcaputil/pfcp-usage/answers/usage-first-invalid-id-not-rescued.json": "answers/usage-first-invalid-id-not-rescued.json",
+        "common/pcapx/pcaputil/pfcp-usage/cases/usage-missing-id.pcap": "cases/usage-missing-id.pcap",
+        "common/pcapx/pcaputil/pfcp-usage/answers/usage-missing-id.json": "answers/usage-missing-id.json",
+        "common/pcapx/pcaputil/pfcp-usage/cases/usage-missing-sequence.pcap": "cases/usage-missing-sequence.pcap",
+        "common/pcapx/pcaputil/pfcp-usage/answers/usage-missing-sequence.json": "answers/usage-missing-sequence.json",
+        "common/pcapx/pcaputil/pfcp-usage/cases/usage-missing-trigger.pcap": "cases/usage-missing-trigger.pcap",
+        "common/pcapx/pcaputil/pfcp-usage/answers/usage-missing-trigger.json": "answers/usage-missing-trigger.json",
+        "common/pcapx/pcaputil/pfcp-usage/cases/usage-termr-missing-start.pcap": "cases/usage-termr-missing-start.pcap",
+        "common/pcapx/pcaputil/pfcp-usage/answers/usage-termr-missing-start.json": "answers/usage-termr-missing-start.json",
+        "common/pcapx/pcaputil/pfcp-usage/cases/usage-termr-missing-end.pcap": "cases/usage-termr-missing-end.pcap",
+        "common/pcapx/pcaputil/pfcp-usage/answers/usage-termr-missing-end.json": "answers/usage-termr-missing-end.json",
+        "common/pcapx/pcaputil/pfcp-usage/cases/usage-zero-trigger.pcap": "cases/usage-zero-trigger.pcap",
+        "common/pcapx/pcaputil/pfcp-usage/answers/usage-zero-trigger.json": "answers/usage-zero-trigger.json",
+        "common/pcapx/pcaputil/pfcp-usage/cases/usage-trigger-short.pcap": "cases/usage-trigger-short.pcap",
+        "common/pcapx/pcaputil/pfcp-usage/answers/usage-trigger-short.json": "answers/usage-trigger-short.json",
+        "common/pcapx/pcaputil/pfcp-usage/cases/usage-sequence-fixed-size.pcap": "cases/usage-sequence-fixed-size.pcap",
+        "common/pcapx/pcaputil/pfcp-usage/answers/usage-sequence-fixed-size.json": "answers/usage-sequence-fixed-size.json",
+        "common/pcapx/pcaputil/pfcp-usage/cases/usage-unknown-vendor-child.pcap": "cases/usage-unknown-vendor-child.pcap",
+        "common/pcapx/pcaputil/pfcp-usage/answers/usage-unknown-vendor-child.json": "answers/usage-unknown-vendor-child.json",
+        "common/pcapx/pcaputil/pfcp-usage/cases/usage-child-header-truncated.pcap": "cases/usage-child-header-truncated.pcap",
+        "common/pcapx/pcaputil/pfcp-usage/answers/usage-child-header-truncated.json": "answers/usage-child-header-truncated.json",
+        "common/pcapx/pcaputil/pfcp-usage/cases/usage-child-length-overrun.pcap": "cases/usage-child-length-overrun.pcap",
+        "common/pcapx/pcaputil/pfcp-usage/answers/usage-child-length-overrun.json": "answers/usage-child-length-overrun.json",
+        "common/pcapx/pcaputil/pfcp-usage/cases/usage-invalid-nonrequired-time-ignored.pcap": "cases/usage-invalid-nonrequired-time-ignored.pcap",
+        "common/pcapx/pcaputil/pfcp-usage/answers/usage-invalid-nonrequired-time-ignored.json": "answers/usage-invalid-nonrequired-time-ignored.json",
+        "common/pcapx/pcaputil/pfcp-usage/cases/usage-known-trigger-spares-ignored.pcap": "cases/usage-known-trigger-spares-ignored.pcap",
+        "common/pcapx/pcaputil/pfcp-usage/answers/usage-known-trigger-spares-ignored.json": "answers/usage-known-trigger-spares-ignored.json",
+        "common/pcapx/pcaputil/pfcp-usage/cases/usage-unknown-only-future-trigger.pcap": "cases/usage-unknown-only-future-trigger.pcap",
+        "common/pcapx/pcaputil/pfcp-usage/answers/usage-unknown-only-future-trigger.json": "answers/usage-unknown-only-future-trigger.json",
+        "common/pcapx/pcaputil/pfcp-usage/cases/usage-rejection-ignores-malformed-group.pcap": "cases/usage-rejection-ignores-malformed-group.pcap",
+        "common/pcapx/pcaputil/pfcp-usage/answers/usage-rejection-ignores-malformed-group.json": "answers/usage-rejection-ignores-malformed-group.json",
+        "common/pcapx/pcaputil/pfcp-usage/cases/usage-child-budget.pcap": "cases/usage-child-budget.pcap",
+        "common/pcapx/pcaputil/pfcp-usage/answers/usage-child-budget.json": "answers/usage-child-budget.json",
+        "common/pcapx/pcaputil/pfcp-usage/cases/usage-byte-budget.pcap": "cases/usage-byte-budget.pcap",
+        "common/pcapx/pcaputil/pfcp-usage/answers/usage-byte-budget.json": "answers/usage-byte-budget.json",
+        "common/pcapx/pcaputil/pfcp-usage/cases/usage-child64-exact.pcap": "cases/usage-child64-exact.pcap",
+        "common/pcapx/pcaputil/pfcp-usage/answers/usage-child64-exact.json": "answers/usage-child64-exact.json",
+        "common/pcapx/pcaputil/pfcp-usage/cases/usage-child65-refused.pcap": "cases/usage-child65-refused.pcap",
+        "common/pcapx/pcaputil/pfcp-usage/answers/usage-child65-refused.json": "answers/usage-child65-refused.json",
+        "common/pcapx/pcaputil/pfcp-usage/cases/usage-group4096-exact.pcap": "cases/usage-group4096-exact.pcap",
+        "common/pcapx/pcaputil/pfcp-usage/answers/usage-group4096-exact.json": "answers/usage-group4096-exact.json",
+        "common/pcapx/pcaputil/pfcp-usage/cases/usage-group4097-refused.pcap": "cases/usage-group4097-refused.pcap",
+        "common/pcapx/pcaputil/pfcp-usage/answers/usage-group4097-refused.json": "answers/usage-group4097-refused.json",
+        "common/pcapx/pcaputil/pfcp-usage/cases/usage-aggregate256-exact.pcap": "cases/usage-aggregate256-exact.pcap",
+        "common/pcapx/pcaputil/pfcp-usage/answers/usage-aggregate256-exact.json": "answers/usage-aggregate256-exact.json",
+        "common/pcapx/pcaputil/pfcp-usage/cases/usage-aggregate257-refused.pcap": "cases/usage-aggregate257-refused.pcap",
+        "common/pcapx/pcaputil/pfcp-usage/answers/usage-aggregate257-refused.json": "answers/usage-aggregate257-refused.json",
+        "common/pcapx/pcaputil/pfcp-usage/cases/usage-invalid-groups-charge-pool.pcap": "cases/usage-invalid-groups-charge-pool.pcap",
+        "common/pcapx/pcaputil/pfcp-usage/answers/usage-invalid-groups-charge-pool.json": "answers/usage-invalid-groups-charge-pool.json",
+        "common/pcapx/pcaputil/pfcp-usage/cases/usage-sequence-zero-max.pcap": "cases/usage-sequence-zero-max.pcap",
+        "common/pcapx/pcaputil/pfcp-usage/answers/usage-sequence-zero-max.json": "answers/usage-sequence-zero-max.json",
+        "common/pcapx/pcaputil/pfcp-usage/cases/usage-all-known-flags.pcap": "cases/usage-all-known-flags.pcap",
+        "common/pcapx/pcaputil/pfcp-usage/answers/usage-all-known-flags.json": "answers/usage-all-known-flags.json",
+        "common/pcapx/pcaputil/pfcp-usage/cases/usage-interleaved-sequences.pcap": "cases/usage-interleaved-sequences.pcap",
+        "common/pcapx/pcaputil/pfcp-usage/answers/usage-interleaved-sequences.json": "answers/usage-interleaved-sequences.json",
+        "common/pcapx/pcaputil/pfcp-usage/cases/usage-exact-request-retry.pcap": "cases/usage-exact-request-retry.pcap",
+        "common/pcapx/pcaputil/pfcp-usage/answers/usage-exact-request-retry.json": "answers/usage-exact-request-retry.json",
+        "common/pcapx/pcaputil/pfcp-usage/cases/usage-id-reuse-quarantined.pcap": "cases/usage-id-reuse-quarantined.pcap",
+        "common/pcapx/pcaputil/pfcp-usage/answers/usage-id-reuse-quarantined.json": "answers/usage-id-reuse-quarantined.json",
+        "common/pcapx/pcaputil/pfcp-usage/cases/usage-wrong-direction.pcap": "cases/usage-wrong-direction.pcap",
+        "common/pcapx/pcaputil/pfcp-usage/answers/usage-wrong-direction.json": "answers/usage-wrong-direction.json",
+        "common/pcapx/pcaputil/pfcp-usage/cases/usage-refusal-retires-pending.pcap": "cases/usage-refusal-retires-pending.pcap",
+        "common/pcapx/pcaputil/pfcp-usage/answers/usage-refusal-retires-pending.json": "answers/usage-refusal-retires-pending.json",
+        "common/pcapx/pcaputil/pfcp-usage/LICENSE": "LICENSE",
+        "common/pcapx/pcaputil/pfcp-usage/build-controls.py": "build-controls.py",
+        "common/pcapx/pcaputil/pfcp-usage/controls.json": "controls.json",
+        "common/pcapx/pcaputil/pfcp-usage/deletion_core_oracle.py": "deletion_core_oracle.py",
+        "common/pcapx/pcaputil/pfcp-usage/extend-controls.py": "extend-controls.py",
+        "common/pcapx/pcaputil/pfcp-usage/historical-additive-answers.json": "historical-additive-answers.json",
+        "common/pcapx/pcaputil/pfcp-usage/prepare.py": "prepare.py",
+        "common/pcapx/pcaputil/pfcp-usage/required-tests-v34.json": "required-tests-v34.json",
+        "common/pcapx/pcaputil/pfcp-usage/seal.py": "seal.py",
+        "common/pcapx/pcaputil/pfcp-usage/source-facts.json": "source-facts.json",
+        "common/pcapx/pcaputil/pfcp-usage/source-pin.json": "source-pin.json",
+        "common/pcapx/pcaputil/pfcp-usage/usage_oracle.py": "usage_oracle.py",
+        "common/pcapx/pcaputil/pfcp-usage/validation/expected.json": "validation/expected.json",
+        "common/pcapx/pcaputil/pfcp-usage/verify-controls.py": "verify-controls.py",
+        "common/pcapx/pcaputil/pfcp-usage/verify-integrated.py": "verify-integrated.py",
+        "scripts/protocol-tests/required-tests-v34.json": "required-tests-v34.json"
+      }
     }
   ],
   "schema_version": 1,

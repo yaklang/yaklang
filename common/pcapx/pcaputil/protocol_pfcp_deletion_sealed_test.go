@@ -41,6 +41,28 @@ func pfcpDeletionControls(t *testing.T) []pfcpSetupControl {
 			cs[i].Target.Pending = j.Cases[i].Native.Pending
 		}
 	}
+	// Historical complete answers remain immutable; a source-informed SHA-bound
+	// overlay supplies only the newly interpreted IE79 observation.
+	overlay, err := trafficfixture.ReadFile("pfcp-usage/historical-additive-answers.json")
+	require.NoError(t, err)
+	var additions map[string]struct {
+		Wire   string `json:"wire_hex"`
+		Fields []any  `json:"usage_report_observations"`
+	}
+	decOverlay := json.NewDecoder(bytes.NewReader(overlay))
+	decOverlay.UseNumber()
+	require.NoError(t, decOverlay.Decode(&additions))
+	for i := range cs {
+		for j := range cs[i].Messages {
+			m := &cs[i].Messages[j]
+			wire := doipDiscoveryWire(t, m.Raw)
+			if a, ok := additions[fmt.Sprintf("%x", sha256.Sum256(wire))]; ok {
+				require.Equal(t, m.Raw, a.Wire)
+				m.Fields["usage_report_observations"] = a.Fields
+			}
+		}
+	}
+
 	return cs
 }
 func pfcpDeletionCapture(t *testing.T, c pfcpSetupControl) []byte {
@@ -76,23 +98,27 @@ func TestPFCPDeletionSealedByteOracle(t *testing.T) {
 }
 func pfcpDeletionPairs(t *testing.T, c pfcpSetupControl, events []*ProtocolEvent) {
 	t.Helper()
-	got := map[int]int{}
-	for i, e := range events {
-		if e.ResponseTo == 0 {
-			continue
-		}
-		for k, q := range events {
-			if e.ResponseTo == q.ID {
-				got[i+1] = k + 1
-				require.Equal(t, e.ResponseTo, e.TransactionID)
-			}
-		}
+	expected := make(map[int]uint64, len(c.Target.Pairs))
+	for _, pair := range c.Target.Pairs {
+		require.Len(t, pair, 2)
+		require.Greater(t, pair[0], 0)
+		require.Greater(t, pair[1], 0)
+		require.LessOrEqual(t, pair[0], len(events))
+		require.LessOrEqual(t, pair[1], len(events))
+		expected[pair[1]-1] = events[pair[0]-1].ID
+		require.Equal(t, events[pair[0]-1].ID, events[pair[0]-1].TransactionID)
 	}
-	require.Len(t, got, len(c.Target.Pairs))
-	for _, p := range c.Target.Pairs {
-		require.Equal(t, p[0], got[p[1]])
+	for i, e := range events {
+		// The sealed pair inventory includes the expected zero for every other
+		// event. A dangling ID must not disappear from an observed-pairs map.
+		require.Equal(t, expected[i], e.ResponseTo, "event %d ResponseTo", i+1)
+		wire := doipDiscoveryWire(t, c.Steps[i].Hex)
+		if expected[i] != 0 || len(wire) > 1 && (wire[1] == 2 || wire[1] == 6 || wire[1] == 8 || wire[1] == 10 || wire[1] == 55) {
+			require.Equal(t, expected[i], e.TransactionID, "event %d response TransactionID", i+1)
+		}
 	}
 }
+
 func TestPFCPDeletionSealedDatagramMatrix(t *testing.T) {
 	for _, c := range pfcpDeletionControls(t) {
 		t.Run(c.Name, func(t *testing.T) {
@@ -461,6 +487,7 @@ func pfcpDeletionCheckMessages(t *testing.T, c pfcpSetupControl, events []*Proto
 			require.Nil(t, f)
 			require.Empty(t, e.Session)
 			require.Zero(t, e.ResponseTo)
+			require.Zero(t, e.TransactionID)
 			continue
 		}
 		require.NoError(t, err)
@@ -488,23 +515,7 @@ func pfcpDeletionCheckMessages(t *testing.T, c pfcpSetupControl, events []*Proto
 		require.EqualValues(t, n, stats.Decoded)
 	}
 	if c.Target != nil && c.Budget == nil {
-		got := map[int]int{}
-		for i, e := range events {
-			if e.ResponseTo != 0 {
-				for q, r := range events {
-					if r.ID == e.ResponseTo {
-						got[i+1] = q + 1
-						break
-					}
-				}
-				require.Equal(t, e.ResponseTo, e.TransactionID)
-			}
-		}
-		require.Len(t, got, len(c.Target.Pairs))
-		for _, p := range c.Target.Pairs {
-			require.Len(t, p, 2)
-			require.Equal(t, p[0], got[p[1]])
-		}
+		pfcpDeletionPairs(t, c, events)
 		for _, r := range c.Target.Unmatched {
 			require.Zero(t, events[r-1].ResponseTo)
 		}

@@ -524,6 +524,9 @@ func (a *binParser) decodeDiscoveryDatagram(e *ProtocolEvent, w []byte, src, dst
 
 func discoveryFieldDepth(protocol string, w []byte) int {
 	if protocol == "pfcp" {
+		if pfcpHasUsage(w) {
+			return 6
+		}
 		return 4
 	}
 	if knxExtendedType(w) {
@@ -611,7 +614,11 @@ func discoveryProfile(protocol string, w []byte) string {
 func discoveryProjectionBytes(protocol string, w []byte) int64 {
 	base := int64(512)
 	if protocol == "pfcp" && (pfcpSetupType(w) || pfcpUpdateType(w) || pfcpDeletionType(w)) {
-		return pfcpSetupProjectionBytes + 256*int64(len(w))
+		reserved := pfcpSetupProjectionBytes + 256*int64(len(w))
+		if pfcpHasUsage(w) {
+			reserved += 4096 + 2048*int64(min(pfcpUsageNodes, len(w)/4))
+		}
+		return reserved
 	}
 	if protocol == "knx" && knxExtendedType(w) {
 		// Include nested SRP maps, byte lists and private/public field snapshots.

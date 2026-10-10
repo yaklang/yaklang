@@ -157,3 +157,5 @@ nonfinite values use `NaN`, `Infinity` or `-Infinity` strings for JSON-safe outp
 Raw bytes retain NaN payloads and negative zero. The 29 original controls bind
 complete fields, Session, IDs and refusals, with independent pinned codec/list
 receiver execution. These observations do not assert units or meter validity.
+
+PFCP v1 UDP session-deletion UsageReport observations and strict whole-field/session association controls are preserved in `validation-pfcp-usage-6e3f9ce9481.zip`. Selected usage fields are syntax observations; URR configuration, actual metering and device operation remain unverified. The current integrated inventory includes these controls.
