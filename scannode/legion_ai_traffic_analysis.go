@@ -19,7 +19,7 @@ func validateTrafficAnalysisBinding(binding aiSessionBinding, options yakRuntime
 	if !analysis.ReadOnly || analysis.SourceSessionId == "" || analysis.SourceSessionId == binding.Ref.SessionID || len(analysis.FlowIds) == 0 || len(analysis.FlowIds) > 50 {
 		return fmt.Errorf("traffic analysis requires an independent session and bounded evidence references")
 	}
-	if options.SourceWorkspace != nil || binding.InputWorkspace != nil || binding.LegionResultRuntime != nil || binding.AuthorizedFocusReleaseID != "" || options.ForgeName != "" || options.Focus != "" || options.FocusModeLoop != "" || options.FocusReleaseID != "" || len(options.SessionMCPServers) > 0 || len(binding.Attachments) > 0 || len(binding.CredentialRefs) > 0 {
+	if options.Workdir != "" || options.SourceWorkspace != nil || binding.InputWorkspace != nil || binding.LegionResultRuntime != nil || binding.AuthorizedFocusReleaseID != "" || options.ForgeName != "" || options.Focus != "" || options.FocusModeLoop != "" || options.FocusReleaseID != "" || options.SkillForgeID != "" || options.InputManifestID != "" || len(options.EnabledCapabilities) > 0 || len(options.SessionMCPServers) > 0 || len(binding.Attachments) > 0 || len(binding.CredentialRefs) > 0 {
 		return fmt.Errorf("traffic evidence analysis forbids executable resources and external capabilities")
 	}
 	return nil
@@ -46,12 +46,21 @@ func trafficAnalysisEnginePolicy() aiengine.AIEngineConfigOption {
 	}
 }
 func validateTrafficAnalysisInput(binding aiSessionBinding, input aiSessionInput) error {
-	if strings.EqualFold(input.InputType, "hotpatch") || isSyncAISessionInput(input.InputType) || isInteractiveAISessionInput(input.InputType) {
+	if strings.EqualFold(strings.TrimSpace(input.InputType), "hotpatch") || isSyncAISessionInput(input.InputType) || isInteractiveAISessionInput(input.InputType) {
 		return fmt.Errorf("traffic analysis permits evidence-backed message turns only")
 	}
 	analysis := input.ContextPackage.GetTrafficAnalysis()
-	if analysis == nil || !analysis.ReadOnly || analysis.SourceSessionId != binding.TrafficAnalysis.SourceSessionId || analysis.EvidenceText == "" || len(analysis.EvidenceText) > aiTrafficAnalysisMaxEvidenceBytes || input.ContextPackage.GetFocusRelease() != nil || len(input.ContextPackage.Tools) > 0 {
+	if analysis == nil || !analysis.ReadOnly || analysis.SourceSessionId != binding.TrafficAnalysis.SourceSessionId || analysis.EvidenceText == "" || len(analysis.EvidenceText) > aiTrafficAnalysisMaxEvidenceBytes || input.ContextPackage.GetFocusRelease() != nil || input.ContextPackage.GetForgeRelease() != nil || len(input.ContextPackage.GetSkillBundles()) > 0 || len(input.ContextPackage.GetTools()) > 0 {
 		return fmt.Errorf("traffic analysis requires server-assembled read-only evidence context")
+	}
+	for i, raw := range [][]byte{input.ContextPackage.GetRuntimeOptionSnapshotJson(), input.ContextPackage.GetProviderPolicySnapshotJson()} {
+		options, err := decodeYakRuntimeOptions(raw, i == 0)
+		if err != nil {
+			return fmt.Errorf("traffic analysis options: %w", err)
+		}
+		if err := validateTrafficAnalysisBinding(binding, options); err != nil {
+			return err
+		}
 	}
 	allowed := make(map[string]bool, len(binding.TrafficAnalysis.FlowIds))
 	for _, id := range binding.TrafficAnalysis.FlowIds {

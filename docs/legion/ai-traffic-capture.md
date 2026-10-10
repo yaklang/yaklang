@@ -71,6 +71,15 @@ uses `storage_status=quota_dropped`, preserving metadata and ending retries.
 it also ends retries without claiming that a packet object exists.
 The runtime persists this receipt before removing the upload. A process restart
 with the same binding identity reuses queued bytes and receipts; ambiguous acknowledgement never deletes data.
+Metadata publication uses the runtime's confirmed event publisher. A successful
+acknowledgement is fsynced beside the queued upload, bound to its SHA-256, so
+packet upload retries and restarts do not publish the same metadata again.
+An absent or ambiguous acknowledgement is replayed while the upload remains
+queued. Each broker acknowledgement wait is bounded to one second and the
+calling drain deadline, and also observes runtime cancellation. HTTP ingest
+receipts confirm the authoritative durable metadata as well as admitted bytes.
+After that receipt the queue and matching broker marker are removed; the node
+does not continue retrying redundant broker events.
 Upload failure retains the queue and retries in subsequent worker cycles.
 
 ## Drain and failure boundary
@@ -84,7 +93,12 @@ The dedicated acknowledgement is published even if the engine has retired.
 Normal runtime Close/Cancel closes the engine then attempts the same bounded
 drain. Automatic completion and failure drain before publishing the terminal
 event; manager cleanup also drains before removing the runtime or workspace.
-The drain is idempotent and does not close the engine from its own callback.
+The automatic drain stops its background worker after the bounded attempt.
+A subsequent platform drain retries remaining uploads within its own deadline,
+even when that worker has stopped. Broker metadata failure does not block
+HTTP recovery. It never waits for an unrelated uploader's
+lock past the command deadline. The drain is idempotent and does not close the
+engine from its own callback.
 Unacknowledged local data is retained. Forced process/container loss
 cannot manufacture a receipt; the platform must retain an incomplete state.
 Capture errors and terminal metadata-only/quota receipts persist an incomplete
@@ -97,7 +111,7 @@ The `ai.traffic.analysis.readonly.v1` capability is advertised only by the
 stateless runtime. A separate analysis session binds server-owned
 `traffic_analysis` with source session and flow IDs. Every later input must carry
 server-assembled read-only evidence for those references. Hotpatches, sync and
-interactive overrides, executable Focus/Forge, MCP, managed workspaces,
+interactive overrides, executable Focus/Forge/Skill context or runtime options, MCP, working directories, managed workspaces,
 attachments and credentials are rejected. Engine setup disables tools, search,
 planning, perception and automatic skills. An immutable config flag additionally
 rejects the tool invocation entry point and propagates to child agents. User

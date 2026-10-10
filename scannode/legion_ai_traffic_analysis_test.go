@@ -24,6 +24,7 @@ func TestAITrafficAnalysisPolicyRejectsExecutableBinding(t *testing.T) {
 		{"forge", yakRuntimeOptions{ForgeName: "shell"}},
 		{"focus", yakRuntimeOptions{Focus: "arbitrary"}},
 		{"workspace", yakRuntimeOptions{SourceWorkspace: &legionCodeWorkspaceSpec{}}},
+		{"workdir", yakRuntimeOptions{Workdir: "/tmp/executable"}},
 	}
 	for _, test := range cases {
 		t.Run(test.name, func(t *testing.T) {
@@ -41,7 +42,7 @@ func TestAITrafficAnalysisRejectsMissingEvidenceAndControlOverrides(t *testing.T
 	if err := validateTrafficAnalysisInput(binding, trafficAnalysisTestInput()); err != nil {
 		t.Fatal(err)
 	}
-	for _, kind := range []string{"hotpatch", "sync_event", "interactive_response"} {
+	for _, kind := range []string{"hotpatch", " HOTPATCH ", "sync_event", "interactive_response"} {
 		input := trafficAnalysisTestInput()
 		input.InputType = kind
 		if err := validateTrafficAnalysisInput(binding, input); err == nil {
@@ -88,5 +89,40 @@ func TestAITrafficAnalysisEvidenceByteLimit(t *testing.T) {
 				t.Fatalf("evidence bytes=%d: err=%v, wantError=%v", test.size, err, test.wantError)
 			}
 		})
+	}
+}
+
+func TestResilienceAITrafficAnalysisRejectsExecutableTurnContext(t *testing.T) {
+	cases := []struct {
+		name   string
+		change func(*aiv1.ContextPackage)
+	}{
+		{"focus", func(c *aiv1.ContextPackage) { c.FocusRelease = &aiv1.ContextFocusRelease{} }},
+		{"forge", func(c *aiv1.ContextPackage) { c.ForgeRelease = &aiv1.ContextForgeRelease{} }},
+		{"skill", func(c *aiv1.ContextPackage) { c.SkillBundles = []*aiv1.ContextSkillBundle{{}} }},
+		{"tool", func(c *aiv1.ContextPackage) { c.Tools = []*aiv1.ContextTool{{}} }},
+		{"runtime_workdir", func(c *aiv1.ContextPackage) { c.RuntimeOptionSnapshotJson = []byte(`{"workdir":"/tmp/executable"}`) }},
+		{"provider_workdir", func(c *aiv1.ContextPackage) { c.ProviderPolicySnapshotJson = []byte(`{"workdir":"/tmp/executable"}`) }},
+		{"runtime_forge", func(c *aiv1.ContextPackage) { c.RuntimeOptionSnapshotJson = []byte(`{"forge_name":"network"}`) }},
+		{"runtime_skill", func(c *aiv1.ContextPackage) { c.RuntimeOptionSnapshotJson = []byte(`{"skill_forge_id":"skill"}`) }},
+		{"runtime_workspace", func(c *aiv1.ContextPackage) { c.RuntimeOptionSnapshotJson = []byte(`{"source_workspace":{}}`) }},
+		{"provider_forge", func(c *aiv1.ContextPackage) { c.ProviderPolicySnapshotJson = []byte(`{"forge_name":"network"}`) }},
+	}
+	for _, test := range cases {
+		t.Run(test.name, func(t *testing.T) {
+			input := trafficAnalysisTestInput()
+			test.change(input.ContextPackage)
+			if err := validateTrafficAnalysisInput(trafficAnalysisTestBinding(), input); err == nil {
+				t.Fatal("evidence analysis accepted executable turn context")
+			}
+		})
+	}
+}
+
+func TestAITrafficAnalysisAcceptsProviderPolicyMetadata(t *testing.T) {
+	input := trafficAnalysisTestInput()
+	input.ContextPackage.ProviderPolicySnapshotJson = []byte(`{"policy_id":"provider-policy","ai_model_name":"model"}`)
+	if err := validateTrafficAnalysisInput(trafficAnalysisTestBinding(), input); err != nil {
+		t.Fatalf("provider metadata broke evidence-only context: %v", err)
 	}
 }
