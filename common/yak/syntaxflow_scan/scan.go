@@ -25,6 +25,10 @@ func Scan(ctx context.Context, option ...ssaconfig.Option) (retErr error) {
 		return err
 	}
 
+	if config.IsNoSaveTask() && (config.GetScanControlMode() == ssaconfig.ControlModeResume || config.GetScanControlMode() == ssaconfig.ControlModeStatus) {
+		return utils.Error("no_save_task does not support persisted task resume or status")
+	}
+
 	// Wire up debug/pprof output when debug_dir is set.
 	// Keep the shared Postgres SSA IR DB (redirectSSADB=false) for platform
 	// two-job compile -> scan reuse; CLI --debug redirects SSADB separately.
@@ -53,8 +57,8 @@ func Scan(ctx context.Context, option ...ssaconfig.Option) (retErr error) {
 		if err := m.SaveTask(); err != nil {
 			log.Errorf("save syntaxflow task failed: %v", err)
 		}
-		// Publish the terminal callback after the task row is durable so callers
-		// can immediately load the final status and counters by task ID.
+		// Publish terminal counters after saving task state, unless the caller
+		// explicitly owns persistence through no_save_task.
 		if success && m.status == schema.SYNTAXFLOWSCAN_DONE {
 			m.notifyDone()
 		}

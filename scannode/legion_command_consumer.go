@@ -10,6 +10,7 @@ import (
 
 	"github.com/nats-io/nats.go"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/node"
 )
 
 const commandPollInterval = time.Second
@@ -98,6 +99,7 @@ func (s *unsupportedCommandWarnState) warn(subject string) {
 
 type commandConsumer struct {
 	sessionID                string
+	connectionKey            string
 	cancel                   context.CancelFunc
 	conn                     *nats.Conn
 	sub                      *nats.Subscription
@@ -221,7 +223,11 @@ func (b *legionJobBridge) syncConsumer(parent context.Context) {
 		return
 	}
 	if !b.agent.node.IsRegistered() {
-		b.stopConsumer()
+		if b.companyBound.Load() {
+			b.invalidateCompanyExecution()
+		} else {
+			b.stopConsumer()
+		}
 		return
 	}
 	session, ok := b.agent.node.GetSessionState()
@@ -232,34 +238,54 @@ func (b *legionJobBridge) syncConsumer(parent context.Context) {
 		return
 	}
 
+	if session.CompanyID != "" {
+		b.companyBound.Store(true)
+	}
+	if err := validateCompanyNATSSession(session, time.Now()); err != nil {
+		b.invalidateCompanyExecution()
+		return
+	}
 	b.mu.Lock()
 	current := b.consumer
 	b.mu.Unlock()
-	if current != nil && current.sessionID == session.SessionID {
+	connectionKey := natsSessionConnectionKey(session)
+	if current != nil && current.conn != nil && !current.conn.IsClosed() &&
+		current.sessionID == session.SessionID && current.connectionKey == connectionKey {
 		return
 	}
 
 	b.stopConsumer()
 	b.switchDispatchSession(session.SessionID)
-	consumer, err := b.startConsumer(parent, session.NATSURL, session.SessionID, session.CommandSubject)
+	_, err := b.startConsumer(parent, session)
 	if err != nil {
+		if session.CompanyID != "" {
+			b.invalidateCompanyExecution()
+		}
 		log.Errorf("start legion command consumer failed: %v", err)
 		return
 	}
 
-	b.mu.Lock()
-	b.consumer = consumer
-	b.mu.Unlock()
 }
 
 func (b *legionJobBridge) startConsumer(
 	parent context.Context,
-	natsURL string,
-	sessionID string,
-	commandSubject string,
+	session node.SessionState,
 ) (*commandConsumer, error) {
 	currentNodeID := b.agent.node.CurrentNodeID()
-	conn, err := nats.Connect(natsURL, nats.Name("yak-node-commands-"+currentNodeID))
+	var options []nats.Option
+	if session.CompanyID != "" {
+		onLost := func(conn *nats.Conn) {
+			b.mu.Lock()
+			current := b.consumer
+			owned := current != nil && current.conn == conn
+			b.mu.Unlock()
+			if owned {
+				b.invalidateCompanyExecution()
+			}
+		}
+		options = append(options, nats.NoReconnect(), nats.DisconnectErrHandler(func(conn *nats.Conn, _ error) { onLost(conn) }), nats.ClosedHandler(onLost))
+	}
+	conn, err := connectNATSForSession(session, "yak-node-commands-"+currentNodeID, options...)
 	if err != nil {
 		return nil, fmt.Errorf("connect command nats: %w", err)
 	}
@@ -269,14 +295,28 @@ func (b *legionJobBridge) startConsumer(
 		return nil, fmt.Errorf("build command jetstream context: %w", err)
 	}
 
-	subscription, err := js.PullSubscribe(
-		commandSubjectWildcard(commandSubject),
-		consumerNameForNode(currentNodeID),
-		nats.BindStream(legionCommandStream),
-		nats.ManualAck(),
-		nats.AckExplicit(),
-		nats.MaxAckPending(64),
-	)
+	var subscription *nats.Subscription
+	if strings.TrimSpace(session.CompanyID) != "" {
+		if strings.TrimSpace(session.CommandStream) == "" || strings.TrimSpace(session.CommandConsumer) == "" {
+			conn.Close()
+			return nil, fmt.Errorf("company command stream and consumer are required")
+		}
+		subscription, err = js.PullSubscribe(
+			commandSubjectWildcard(session.CommandSubject),
+			session.CommandConsumer,
+			nats.Bind(session.CommandStream, session.CommandConsumer),
+			nats.ManualAck(),
+		)
+	} else {
+		subscription, err = js.PullSubscribe(
+			commandSubjectWildcard(session.CommandSubject),
+			consumerNameForNode(currentNodeID),
+			nats.BindStream(legionCommandStream),
+			nats.ManualAck(),
+			nats.AckExplicit(),
+			nats.MaxAckPending(64),
+		)
+	}
 	if err != nil {
 		conn.Close()
 		return nil, fmt.Errorf("pull subscribe commands: %w", err)
@@ -291,7 +331,8 @@ func (b *legionJobBridge) startConsumer(
 
 	ctx, cancel := context.WithCancel(parent)
 	consumer := &commandConsumer{
-		sessionID:                sessionID,
+		sessionID:                session.SessionID,
+		connectionKey:            natsSessionConnectionKey(session),
 		cancel:                   cancel,
 		conn:                     conn,
 		sub:                      subscription,
@@ -300,8 +341,25 @@ func (b *legionJobBridge) startConsumer(
 		irMaintenanceSlots:       make(chan struct{}, maxConcurrentSSAIRMaintenances),
 		irMaintenanceAckInterval: aiSessionBindAckInterval(info.Config),
 	}
+	b.mu.Lock()
+	b.consumer = consumer
+	if session.CompanyID != "" {
+		b.companyBound.Store(true)
+		if b.companyExecutionSession != session.SessionID || b.companyExecutionCtx == nil || b.companyExecutionCtx.Err() != nil {
+			if b.companyExecutionCancel != nil {
+				b.companyExecutionCancel()
+			}
+			b.companyExecutionCtx, b.companyExecutionCancel = context.WithCancel(b.rootContext())
+			b.companyExecutionSession = session.SessionID
+		}
+	}
+	b.mu.Unlock()
+	if conn.IsClosed() {
+		b.stopConsumer()
+		return nil, fmt.Errorf("command transport closed during registration")
+	}
 	go b.consumeLoop(ctx, consumer)
-	log.Infof("started legion command consumer: node_id=%s session_id=%s", currentNodeID, sessionID)
+	log.Infof("started legion command consumer: node_id=%s session_id=%s", currentNodeID, session.SessionID)
 	return consumer, nil
 }
 
@@ -523,6 +581,23 @@ func (b *legionJobBridge) handleMessageWithDisposition(
 	sessionID string,
 	message *nats.Msg,
 ) (messageDisposition, error) {
+	if b.agent != nil && b.agent.node != nil {
+		session, ok := b.agent.node.GetSessionState()
+		if b.companyBound.Load() && (!ok || session.CompanyID == "") {
+			return termMessage(), fmt.Errorf("authenticated company session is unavailable")
+		}
+		if ok && session.CompanyID != "" {
+			if sessionID != "" && sessionID != session.SessionID {
+				return termMessage(), fmt.Errorf("command consumer session was replaced")
+			}
+			if err := validateCompanyCommand(session, message.Subject, message.Data, time.Now()); err != nil {
+				return termMessage(), err
+			}
+			// Credential renewal replaces the consumer within this session. Work
+			// belongs to the authenticated session and is canceled on its loss.
+			ctx = b.companyExecutionContext(ctx)
+		}
+	}
 	if strings.HasSuffix(message.Subject, "."+legionCommandDispatch) {
 		return b.handleDispatch(ctx, sessionID, message.Data)
 	}

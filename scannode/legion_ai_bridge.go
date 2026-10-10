@@ -158,7 +158,8 @@ type aiSessionCredentialRef struct {
 }
 
 type aiSessionRuntimeBindOptions struct {
-	// PreparationContext belongs to the transport consumer, not an installed runtime.
+	// PreparationContext follows the authenticated company session, or the
+	// legacy transport consumer. Installed runtimes use their parent lifetime.
 	PreparationContext  context.Context
 	InputResolver       *inputresolver.Resolver
 	PlatformBearerToken string
@@ -1441,7 +1442,7 @@ func (b *legionJobBridge) handleAISessionBind(ctx context.Context, raw []byte) e
 		return b.publishAISessionCommandFailure(ctx, ref, "invalid_ai_focus_result_context", err)
 	}
 	ref, err = b.ensureAIRuntime().Bind(
-		ctx,
+		b.companyExecutionContext(ctx),
 		&command,
 		b.ensureAIPublisher(),
 		aiSessionRuntimeBindOptions{

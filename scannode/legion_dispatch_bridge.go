@@ -39,7 +39,13 @@ func (b *legionJobBridge) handleDispatch(
 	}
 
 	ref := jobExecutionRefFromCommand(&command)
-	if err := validateDispatchCommand(b.currentNodeID(), &command); err != nil {
+	companyID := ""
+	if b.agent != nil && b.agent.node != nil {
+		if session, ok := b.agent.node.GetSessionState(); ok {
+			companyID = session.CompanyID
+		}
+	}
+	if err := validateDispatchCommandForSession(b.currentNodeID(), companyID, &command); err != nil {
 		return termMessage(), b.publishDispatchFailure(
 			ctx,
 			ref,
@@ -595,11 +601,23 @@ func validateDispatchCommand(
 	nodeID string,
 	command *jobv1.DispatchJobCommand,
 ) error {
+	return validateDispatchCommandForSession(nodeID, "", command)
+}
+
+func validateDispatchCommandForSession(
+	nodeID string,
+	companyID string,
+	command *jobv1.DispatchJobCommand,
+) error {
 	switch {
 	case command.GetMetadata() == nil:
 		return fmt.Errorf("dispatch metadata is required")
 	case strings.TrimSpace(command.GetMetadata().GetCommandId()) == "":
 		return fmt.Errorf("dispatch command_id is required")
+	case strings.TrimSpace(companyID) != "" && strings.TrimSpace(command.GetMetadata().GetCompanyId()) != strings.TrimSpace(companyID):
+		return fmt.Errorf("dispatch company_id does not match the node session")
+	case strings.TrimSpace(companyID) == "" && strings.TrimSpace(command.GetMetadata().GetCompanyId()) != "":
+		return fmt.Errorf("company dispatch requires a company-bound node session")
 	case strings.TrimSpace(command.GetTargetNodeId()) == "":
 		return fmt.Errorf("dispatch target_node_id is required")
 	case strings.TrimSpace(command.GetTargetNodeId()) != nodeID:

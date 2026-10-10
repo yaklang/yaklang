@@ -43,6 +43,10 @@ const (
 )
 
 type SyntaxFlowScanConfig struct {
+	// NoSaveTask keeps task state in memory for callers that own lifecycle
+	// persistence outside the SSA database. Such tasks cannot be resumed from
+	// the database. Risk/audit persistence is controlled separately by NoSaveRisk.
+	NoSaveTask     bool       `json:"no_save_task"`
 	IgnoreLanguage bool       `json:"ignore_language"`
 	Language       []Language `json:"language"`
 	Concurrency    uint32     `json:"concurrency"`
@@ -144,6 +148,11 @@ func (c *Config) GetSyntaxFlowMemory() bool {
 		c.SyntaxFlow = defaultSyntaxFlowConfig()
 	}
 	return c.SyntaxFlow.Memory
+}
+
+// IsNoSaveTask reports whether scan task state is kept in memory only.
+func (c *Config) IsNoSaveTask() bool {
+	return c != nil && c.SyntaxFlowScan != nil && c.SyntaxFlowScan.NoSaveTask
 }
 
 // GetScanMemory is a compatibility wrapper used by tests and callers.
@@ -249,6 +258,18 @@ func WithNoSaveRisk(noSaveRisk bool) Option {
 			c.SyntaxFlow = defaultSyntaxFlowConfig()
 		}
 		c.SyntaxFlow.NoSaveRisk = noSaveRisk
+		return nil
+	}
+}
+
+// WithNoSaveTask disables task-state persistence without changing risk/result
+// persistence. The default remains false for ordinary scans and resumable tasks.
+func WithNoSaveTask(noSaveTask bool) Option {
+	return func(c *Config) error {
+		if err := c.ensureSyntaxFlowScan("No Save Task"); err != nil {
+			return err
+		}
+		c.SyntaxFlowScan.NoSaveTask = noSaveTask
 		return nil
 	}
 }

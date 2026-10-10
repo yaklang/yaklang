@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -53,7 +54,8 @@ type eventPublisherRecoveryCase struct {
 	conn      **nats.Conn
 	js        *nats.JetStreamContext
 	url       *string
-	ensure    func(string) error
+	key       *string
+	ensure    func(node.SessionState) error
 	close     func()
 	publish   func(string) error
 	eventType string
@@ -67,7 +69,7 @@ func eventPublisherRecoveryCases(base *node.NodeBase) []eventPublisherRecoveryCa
 	rules := newSSARuleSyncEventPublisher(base)
 	return []eventPublisherRecoveryCase{
 		{
-			name: "capability", conn: &capability.conn, js: &capability.js, url: &capability.natsURL,
+			name: "capability", conn: &capability.conn, js: &capability.js, url: &capability.natsURL, key: &capability.sessionKey,
 			ensure: capability.ensureJetStream, close: capability.Close,
 			publish: func(id string) error {
 				return capability.PublishStatus(context.Background(), capabilityCommandRef{
@@ -79,7 +81,7 @@ func eventPublisherRecoveryCases(base *node.NodeBase) []eventPublisherRecoveryCa
 			eventType: legionEventCapabilityStatus, newEvent: func() recoveryEvent { return &capabilityv1.CapabilityStatus{} },
 		},
 		{
-			name: "job", conn: &job.conn, js: &job.js, url: &job.natsURL,
+			name: "job", conn: &job.conn, js: &job.js, url: &job.natsURL, key: &job.sessionKey,
 			ensure: job.ensureJetStream, close: job.Close,
 			publish: func(id string) error {
 				return job.PublishClaimed(context.Background(), jobExecutionRef{
@@ -89,7 +91,7 @@ func eventPublisherRecoveryCases(base *node.NodeBase) []eventPublisherRecoveryCa
 			eventType: legionEventClaimed, newEvent: func() recoveryEvent { return &jobv1.JobClaimed{} },
 		},
 		{
-			name: "ai", conn: &ai.conn, js: &ai.js, url: &ai.natsURL,
+			name: "ai", conn: &ai.conn, js: &ai.js, url: &ai.natsURL, key: &ai.sessionKey,
 			ensure: ai.ensureJetStream, close: ai.Close,
 			publish: func(id string) error {
 				return ai.PublishReady(context.Background(), aiSessionCommandRef{
@@ -99,7 +101,7 @@ func eventPublisherRecoveryCases(base *node.NodeBase) []eventPublisherRecoveryCa
 			eventType: legionEventAISessionReady, newEvent: func() recoveryEvent { return &aiv1.AISessionReady{} },
 		},
 		{
-			name: "ssa_rules", conn: &rules.conn, js: &rules.js, url: &rules.natsURL,
+			name: "ssa_rules", conn: &rules.conn, js: &rules.js, url: &rules.natsURL, key: &rules.sessionKey,
 			ensure: rules.ensureJetStream, close: rules.Close,
 			publish: func(id string) error {
 				return rules.PublishFailed(context.Background(), ssaRuleSyncCommandRef{
@@ -121,7 +123,7 @@ func TestResilienceEventPublishersRejectClosedConnection(t *testing.T) {
 			// A cached context must not bypass a new connection attempt. The
 			// invalid URL makes that attempt fail immediately without network I/O.
 			for attempt := 0; attempt < 2; attempt++ {
-				if err := tc.ensure("nats://[invalid"); err == nil {
+				if err := tc.ensure(node.SessionState{NATSURL: "nats://[invalid"}); err == nil {
 					t.Fatal("closed connection was reused instead of attempting recovery")
 				}
 			}
@@ -136,11 +138,59 @@ func TestResilienceEventPublishersPreserveReconnectingConnection(t *testing.T) {
 			conn := newReconnectingEventTestConn(t)
 			js := &fakeJetStreamContext{}
 			*tc.conn, *tc.js, *tc.url = conn, js, "nats://[invalid"
-			if err := tc.ensure("nats://[invalid"); err != nil {
+			if err := tc.ensure(node.SessionState{NATSURL: "nats://[invalid"}); err != nil {
 				t.Fatalf("NATS-managed reconnect was interrupted: %v", err)
 			}
 			if *tc.conn != conn || *tc.js != js || !conn.IsReconnecting() {
 				t.Fatal("reconnecting transport was replaced or closed")
+			}
+		})
+	}
+}
+
+func TestResilienceEventPublishersFenceCompanyCredentialChanges(t *testing.T) {
+	for _, tc := range eventPublisherRecoveryCases(&node.NodeBase{}) {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Cleanup(tc.close)
+			session := node.SessionState{
+				CompanyID: "company-1", SessionID: "session-1", NATSURL: "tls://127.0.0.1:1",
+				NATSCredentials: "cached-test-credentials", NATSCredentialsExpiresAt: time.Now().Add(time.Hour),
+				ExpiresAt: time.Now().Add(time.Hour), InboxPrefix: "_INBOX.node.session-1",
+			}
+			conn := newReconnectingEventTestConn(t)
+			*tc.conn, *tc.js, *tc.url, *tc.key = conn, &fakeJetStreamContext{}, session.NATSURL, natsSessionConnectionKey(session)
+			if err := tc.ensure(session); err != nil {
+				t.Fatalf("unchanged company session lost its reconnecting transport: %v", err)
+			}
+
+			rotated := session
+			rotated.NATSCredentials = "rotated-invalid-test-credentials"
+			// Invalid credentials fail parsing before any dial; the old cached
+			// transport must never hide a changed credential identity.
+			if err := tc.ensure(rotated); err == nil || !strings.Contains(err.Error(), "parse company nats user") {
+				t.Fatalf("rotated credentials bypassed the connection fence: %v", err)
+			}
+			if !conn.IsClosed() {
+				t.Fatal("old credential transport remained open")
+			}
+
+			for _, expiry := range []string{"session", "credentials"} {
+				t.Run(expiry, func(t *testing.T) {
+					expired := session
+					if expiry == "session" {
+						expired.ExpiresAt = time.Now().Add(-time.Second)
+					} else {
+						expired.NATSCredentialsExpiresAt = time.Now().Add(-time.Second)
+					}
+					conn := newReconnectingEventTestConn(t)
+					*tc.conn, *tc.js, *tc.url, *tc.key = conn, &fakeJetStreamContext{}, expired.NATSURL, natsSessionConnectionKey(expired)
+					if err := tc.ensure(expired); err == nil || !strings.Contains(err.Error(), "expired") {
+						t.Fatalf("expired company identity reused the cached transport: %v", err)
+					}
+					if !conn.IsClosed() || *tc.js != nil {
+						t.Fatal("expired company transport was not retired")
+					}
+				})
 			}
 		})
 	}

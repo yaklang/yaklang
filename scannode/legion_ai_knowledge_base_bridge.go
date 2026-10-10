@@ -269,7 +269,7 @@ func (b *legionJobBridge) handleAIKnowledgeBaseQueryByAI(ctx context.Context, ra
 	}
 
 	queryCommandID := strings.TrimSpace(command.GetMetadata().GetCommandId())
-	queryCtx, cancel := context.WithCancel(ctx)
+	queryCtx, cancel := context.WithCancel(b.companyExecutionContext(ctx))
 	b.aiKnowledgeBaseQueries.Store(queryCommandID, cancel)
 	go func() {
 		defer cancel()
@@ -368,7 +368,7 @@ func (b *legionJobBridge) handleAIKnowledgeBaseQuestionIndexGenerate(ctx context
 	}
 
 	requestCommandID := strings.TrimSpace(command.GetMetadata().GetCommandId())
-	jobCtx, cancel := context.WithCancel(ctx)
+	jobCtx, cancel := context.WithCancel(b.companyExecutionContext(ctx))
 	b.aiKnowledgeBaseQuestionIndexes.Store(requestCommandID, cancel)
 	go func() {
 		defer cancel()

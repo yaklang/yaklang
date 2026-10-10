@@ -10,19 +10,21 @@ import (
 func TestSourceStatisticsMetricsWithZeroRisks(t *testing.T) {
 	stats := map[string]any{"schema_version": "ssa-source-statistics.v1", "scope": "compiled_sources", "line_count_kind": "physical", "analyzed_file_count": 3, "analyzed_line_count": 12}
 	meta := parseSSAResultMeta(&ScriptExecutionResult{Data: map[string]any{"program_name": "zero-risks", "risk_count": 0, "source_statistics": stats}})
-	metrics, err := buildSSAArtifactMetricsPayload(&SSAArtifactReadyEvent{SourceStatistics: meta.SourceStatistics, Metrics: json.RawMessage(`{"upload_ms":7}`)})
+	metrics, err := buildSSAArtifactMetricsPayload(&SSAArtifactReadyEvent{ProgramName: meta.ProgramName, SourceStatistics: meta.SourceStatistics, Metrics: json.RawMessage(`{"upload_ms":7,"program_name":"stale-upload-metric"}`)})
 	require.NoError(t, err)
 	var payload map[string]any
 	require.NoError(t, json.Unmarshal(metrics, &payload))
+	require.Equal(t, "zero-risks", payload["program_name"])
 	require.EqualValues(t, 0, payload["risk_count"])
 	require.EqualValues(t, 0, payload["file_count"], "risk-file count is independent")
 	require.EqualValues(t, 3, payload["source_statistics"].(map[string]any)["analyzed_file_count"])
 	require.EqualValues(t, 7, payload["upload_ms"])
 	legacy := parseSSAResultMeta(&ScriptExecutionResult{Data: map[string]any{"total_lines": 12}})
 	require.Empty(t, legacy.SourceStatistics)
-	metrics, err = buildSSAArtifactMetricsPayload(&SSAArtifactReadyEvent{})
+	metrics, err = buildSSAArtifactMetricsPayload(&SSAArtifactReadyEvent{Metrics: json.RawMessage(`{"program_name":"unproven"}`)})
 	require.NoError(t, err)
 	require.NotContains(t, string(metrics), "source_statistics")
+	require.NotContains(t, string(metrics), "program_name")
 }
 
 func TestCompileScaleReachesArtifactMetrics(t *testing.T) {

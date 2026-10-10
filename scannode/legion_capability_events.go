@@ -25,10 +25,11 @@ var ErrNodeSessionNotReady = errors.New("node session is not ready")
 type capabilityEventPublisher struct {
 	node *node.NodeBase
 
-	mu      sync.Mutex
-	natsURL string
-	conn    *nats.Conn
-	js      nats.JetStreamContext
+	mu         sync.Mutex
+	natsURL    string
+	sessionKey string
+	conn       *nats.Conn
+	js         nats.JetStreamContext
 }
 
 func newCapabilityEventPublisher(base *node.NodeBase) *capabilityEventPublisher {
@@ -175,7 +176,11 @@ func (p *capabilityEventPublisher) PublishRaw(ctx context.Context, subject strin
 	if !ok {
 		return ErrNodeSessionNotReady
 	}
-	if err := p.ensureJetStream(session.NATSURL); err != nil {
+	if err := p.ensureJetStream(session); err != nil {
+		return err
+	}
+	subject, err := sessionScopedOutboundSubject(session, subject)
+	if err != nil {
 		return err
 	}
 
@@ -205,7 +210,7 @@ func (p *capabilityEventPublisher) PublishDesiredSpecDryRunResult(
 	if !ok {
 		return ErrNodeSessionNotReady
 	}
-	if err := p.ensureJetStream(session.NATSURL); err != nil {
+	if err := p.ensureJetStream(session); err != nil {
 		return err
 	}
 
@@ -225,10 +230,7 @@ func (p *capabilityEventPublisher) PublishDesiredSpecDryRunResult(
 			CausationId:   ref.CommandID,
 			CorrelationId: capabilityCorrelationID(ref.NodeID, ref.CapabilityKey),
 			EmittedAt:     timestamppb.New(time.Now().UTC()),
-			Node: &nodev1.NodeRef{
-				NodeId:        p.node.CurrentNodeID(),
-				NodeSessionId: session.SessionID,
-			},
+			Node:          nodeRefForSession(p.node.CurrentNodeID(), session),
 		},
 		Capability: &capabilityv1.CapabilityRef{
 			CapabilityKey: result.CapabilityKey,
@@ -252,7 +254,10 @@ func (p *capabilityEventPublisher) PublishDesiredSpecDryRunResult(
 	if conn == nil {
 		return fmt.Errorf("capability event nats connection is not ready")
 	}
-	subject := hidsDesiredSpecDryRunResultSubject(ref.CommandID)
+	subject, err := sessionScopedOutboundSubject(session, hidsDesiredSpecDryRunResultSubject(ref.CommandID))
+	if err != nil {
+		return err
+	}
 	if err := conn.Publish(subject, raw); err != nil {
 		return fmt.Errorf("publish hids desired spec dry-run result: %w", err)
 	}
@@ -276,7 +281,7 @@ func (p *capabilityEventPublisher) publish(
 	if !ok {
 		return ErrNodeSessionNotReady
 	}
-	if err := p.ensureJetStream(session.NATSURL); err != nil {
+	if err := p.ensureJetStream(session); err != nil {
 		return err
 	}
 
@@ -286,10 +291,7 @@ func (p *capabilityEventPublisher) publish(
 		CausationId:   ref.CommandID,
 		CorrelationId: capabilityCorrelationID(ref.NodeID, ref.CapabilityKey),
 		EmittedAt:     timestamppb.New(time.Now().UTC()),
-		Node: &nodev1.NodeRef{
-			NodeId:        p.node.CurrentNodeID(),
-			NodeSessionId: session.SessionID,
-		},
+		Node:          nodeRefForSession(p.node.CurrentNodeID(), session),
 	}
 	if err := attachCapabilityEventMetadata(message, metadata); err != nil {
 		return err
@@ -299,7 +301,11 @@ func (p *capabilityEventPublisher) publish(
 	if err != nil {
 		return fmt.Errorf("marshal capability event: %w", err)
 	}
-	msg := nats.NewMsg(capabilityEventSubject(session.EventSubjectPrefix, eventType))
+	subject, err := sessionScopedOutboundSubject(session, capabilityEventSubject(session.EventSubjectPrefix, eventType))
+	if err != nil {
+		return err
+	}
+	msg := nats.NewMsg(subject)
 	msg.Data = raw
 
 	p.mu.Lock()
@@ -323,17 +329,23 @@ func (p *capabilityEventPublisher) publish(
 	return nil
 }
 
-func (p *capabilityEventPublisher) ensureJetStream(natsURL string) error {
+func (p *capabilityEventPublisher) ensureJetStream(session node.SessionState) error {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
+	if err := validateCompanyNATSSession(session, time.Now()); err != nil {
+		p.closeLocked()
+		return err
+	}
+	key := natsSessionConnectionKey(session)
 	// Let NATS manage transient reconnects; replace only a terminal connection.
-	if p.js != nil && p.conn != nil && !p.conn.IsClosed() && p.natsURL == natsURL {
+	if p.js != nil && p.conn != nil && !p.conn.IsClosed() && ((p.sessionKey != "" && p.sessionKey == key) ||
+		(p.sessionKey == "" && session.CompanyID == "" && p.natsURL == session.NATSURL)) {
 		return nil
 	}
 	p.closeLocked()
 
-	conn, err := nats.Connect(natsURL, nats.Name("yak-node-capability-events-"+p.node.CurrentNodeID()))
+	conn, err := connectNATSForSession(session, "yak-node-capability-events-"+p.node.CurrentNodeID())
 	if err != nil {
 		return fmt.Errorf("connect capability event nats: %w", err)
 	}
@@ -344,7 +356,8 @@ func (p *capabilityEventPublisher) ensureJetStream(natsURL string) error {
 	}
 	p.conn = conn
 	p.js = js
-	p.natsURL = natsURL
+	p.natsURL = session.NATSURL
+	p.sessionKey = key
 	return nil
 }
 
@@ -355,6 +368,7 @@ func (p *capabilityEventPublisher) closeLocked() {
 	p.conn = nil
 	p.js = nil
 	p.natsURL = ""
+	p.sessionKey = ""
 }
 
 func attachCapabilityEventMetadata(

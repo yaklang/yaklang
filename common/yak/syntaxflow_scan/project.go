@@ -280,6 +280,12 @@ func ScanProject(ctx context.Context, opts ...ssaconfig.Option) (result ProjectR
 				recorder.mu.Unlock()
 			}
 		}
+		if wantReview && err == nil && prog != nil && prog.IsIncrementalCompile() {
+			// Diff compilation cannot review unchanged base units. Review the
+			// persisted overlay before publishing a successful semantic stage.
+			prog = reloadCompiledProgram(prog)
+			err = scanLoadedProgramStruct(cfg, prog)
+		}
 		if wantReview && err == nil {
 			emitStructResults(cfg, prog)
 			recorder.observeStruct(prog)
@@ -993,9 +999,12 @@ func sharedScanCallbackOptions(cfg *Config) []ssaconfig.Option {
 		ssaconfig.WithScanRuleTimeout(cfg.GetScanRuleTimeout()),
 		ssaconfig.WithScanRuleWorkLimit(cfg.GetScanRuleWorkLimit()),
 	)
-	// Propagate the risk-persistence setting to nested scan stages.
+	// Propagate the independent result/task persistence settings to nested stages.
 	if cfg.IsNoSaveRisk() {
 		opts = append(opts, ssaconfig.WithNoSaveRisk(true))
+	}
+	if cfg.IsNoSaveTask() {
+		opts = append(opts, ssaconfig.WithNoSaveTask(true))
 	}
 	return opts
 }

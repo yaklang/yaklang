@@ -65,6 +65,9 @@ func WithRuleSnapshotCacheDir(cacheDir string) ScanNodeOption {
 }
 
 func NewScanNode(cfg node.BaseConfig, options ...ScanNodeOption) (*ScanNode, error) {
+	if err := ValidateNodeDatabaseEnvironment(); err != nil {
+		return nil, err
+	}
 	if cfg.HeartbeatInterval <= 0 {
 		cfg.HeartbeatInterval = node.DefaultHeartbeatInterval
 	}

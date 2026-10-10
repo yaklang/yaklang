@@ -2,6 +2,7 @@ package scannode
 
 import (
 	"context"
+	"github.com/yaklang/yaklang/common/node"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -49,9 +50,14 @@ type legionJobBridge struct {
 	aiKnowledgeBaseQueries         *aiKnowledgeBaseQueryManager
 	aiKnowledgeBaseQuestionIndexes *aiKnowledgeBaseQueryManager
 
-	mu           sync.Mutex
-	consumer     *commandConsumer
-	shuttingDown atomic.Bool
+	mu                      sync.Mutex
+	consumer                *commandConsumer
+	shuttingDown            atomic.Bool
+	companyBound            atomic.Bool
+	companyCleanupMu        sync.Mutex
+	companyExecutionCtx     context.Context
+	companyExecutionCancel  context.CancelFunc
+	companyExecutionSession string
 
 	// unsupportedWarn rate-limits warnings for legion command subjects this
 	// node binary does not implement (see unsupportedCommandWarnState).
@@ -81,6 +87,11 @@ func newLegionJobBridge(agent *ScanNode) *legionJobBridge {
 	bridge.dispatchExecutor = agent.executeScriptTask
 	bridge.nodeIDProvider = agent.node.CurrentNodeID
 	bridge.rootContextProvider = agent.node.GetRootContext
+	agent.node.SetSessionInvalidatedHook(func(session node.SessionState) {
+		if session.CompanyID != "" {
+			bridge.invalidateCompanyExecution()
+		}
+	})
 	return bridge
 }
 

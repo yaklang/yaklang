@@ -2,6 +2,7 @@ package ssaapi
 
 import (
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"sort"
@@ -253,7 +254,11 @@ func compileStructRuleContent(raw string) (*schema.SyntaxFlowRule, error) {
 }
 
 func (s *structScanRuntime) ScanStruct(progAPI *Program, unit *ssa.CompileUnit) {
-	if s == nil || !s.enabled() || progAPI == nil || unit == nil {
+	s.scanStruct(progAPI, progAPI, unit, nil)
+}
+
+func (s *structScanRuntime) scanStruct(source, progAPI *Program, unit *ssa.CompileUnit, bound *structBound) {
+	if s == nil || !s.enabled() || source == nil || progAPI == nil || unit == nil {
 		return
 	}
 	defer func() {
@@ -268,7 +273,14 @@ func (s *structScanRuntime) ScanStruct(progAPI *Program, unit *ssa.CompileUnit) 
 	if progAPI.config != nil && progAPI.config.ctx != nil {
 		compileCtx = progAPI.config.ctx
 	}
-	target := NewStructQueryTarget(progAPI, unit, nil)
+	target := NewStructQueryTarget(source, unit, bound)
+	// Graph values keep their source Program even when the result belongs to
+	// an overlay's top layer. Bound every hop on that source for this query.
+	previousBound, previousActive := source.structBound, source.structScanActive
+	source.structBound, source.structScanActive = target.bound, true
+	defer func() {
+		source.structBound, source.structScanActive = previousBound, previousActive
+	}()
 	var found []*SyntaxFlowResult
 	for _, rule := range s.rules {
 		if rule == nil {
@@ -292,7 +304,7 @@ func (s *structScanRuntime) ScanStruct(progAPI *Program, unit *ssa.CompileUnit) 
 			QueryWithValue(target),
 			QueryWithResultProgram(progAPI),
 			QueryWithSSAConfig(progAPI.config.Config),
-			QueryWithStruct(unit),
+			queryWithStructBound(target.bound),
 			QueryWithFrame(frame),
 			QueryWithMemory(),
 			QueryWithTaskID(s.taskID),
@@ -332,7 +344,7 @@ func (s *structScanRuntime) ScanStruct(progAPI *Program, unit *ssa.CompileUnit) 
 			}
 			log.Infof("[struct_scan] package=%s rule=%s alerts=%d", unit.Key, rule.RuleName, len(res.GetAlertVariables()))
 		}
-		progAPI.ResetInterRuleState()
+		source.ResetInterRuleState()
 	}
 	s.keepResults(found)
 }
@@ -393,9 +405,13 @@ func (s *structScanRuntime) keepResults(found []*SyntaxFlowResult) {
 				s.addErr(err)
 				continue
 			}
-			res.memResult = nil
-			res.symbol = make(map[string]Values)
-			res.unName = nil
+			// NoSaveRisk creates in-memory risks without a database result.
+			// Their values must remain available for streaming files/dataflows.
+			if res.IsDatabase() {
+				res.memResult = nil
+				res.symbol = make(map[string]Values)
+				res.unName = nil
+			}
 		}
 		s.mu.Lock()
 		s.results = append(s.results, found...)
@@ -554,6 +570,9 @@ func (p *Program) ScanProgramStruct(opts ...ssaconfig.Option) error {
 	if p == nil || p.Program == nil {
 		return utils.Error("nil program")
 	}
+	if p.IsIncrementalCompile() && !p.IsBaseProgram() && p.GetOverlay() == nil {
+		return utils.Error("incremental program overlay unavailable for struct review")
+	}
 	cfg := p.config
 	if cfg == nil {
 		cfg = &Config{}
@@ -577,6 +596,7 @@ func (p *Program) ScanProgramStruct(opts ...ssaconfig.Option) error {
 	ssaconfig.ApplyExtraOptions(cfg, cfg.Config)
 	s := cfg.ensureStructScan()
 	s.prepareSave(p.Program)
+	defer s.WaitSaves()
 	if !s.wantsScan() {
 		return nil
 	}
@@ -588,7 +608,21 @@ func (p *Program) ScanProgramStruct(opts ...ssaconfig.Option) error {
 		log.Warnf("[struct_scan] no struct rules loaded for program %s", p.GetProgramName())
 		return nil
 	}
-	units := programStructUnits(p)
+	if overlay := p.GetOverlay(); overlay != nil && overlay.IsTopLayerProgram(p) {
+		// The compile-time review is intentionally unavailable for diff IR.
+		// Once persisted, review every currently visible unit without merging
+		// separate applications/libraries or reviving overridden base files.
+		s.skipped = false
+		if err := s.scanOverlayStruct(p, overlay); err != nil {
+			return err
+		}
+		s.WaitSaves()
+		return errors.Join(p.StructScanErrors()...)
+	}
+	units, err := programStructUnits(p)
+	if err != nil {
+		return err
+	}
 	if len(units) == 0 {
 		log.Warnf("[struct_scan] program %s has no application/library unit", p.GetProgramName())
 		return nil
@@ -599,20 +633,96 @@ func (p *Program) ScanProgramStruct(opts ...ssaconfig.Option) error {
 		}
 		s.ScanStruct(p, unit)
 	}
-	s.WaitSaves()
 	return nil
 }
 
-func programStructUnits(prog *Program) []*ssa.CompileUnit {
-	if prog == nil || prog.Program == nil {
+// scanOverlayStruct follows the same file ownership as overlay SSA queries:
+// unchanged base files plus each diff's final owned paths, excluding deletions.
+func (s *structScanRuntime) scanOverlayStruct(result *Program, overlay *ProgramOverLay) error {
+	scan := func(source *Program, visible func(string) bool) error {
+		if source == nil || source.Program == nil {
+			return nil
+		}
+		units, err := programStructUnits(source)
+		if err != nil {
+			return err
+		}
+		for _, unit := range units {
+			if unit == nil {
+				continue
+			}
+			copyUnit := *unit
+			copyUnit.Files = nil
+			for _, path := range unit.Files {
+				if visible(normalizeOverlayFilePath(path, source.GetProgramName())) {
+					copyUnit.Files = append(copyUnit.Files, path)
+				}
+			}
+			if len(copyUnit.Files) == 0 {
+				continue
+			}
+			bound := newStructBound(&copyUnit, source.Program)
+			// A partial library cannot use the whole-library fallback: its old
+			// definitions may include files now owned by another diff or deleted.
+			bound.lib = nil
+			s.scanStruct(source, result, &copyUnit, bound)
+		}
 		return nil
+	}
+	excluded := overlayPathSet(overlay.ExcludeFile)
+	if err := scan(overlay.Base, func(path string) bool { _, found := excluded[path]; return !found }); err != nil {
+		return err
+	}
+	for _, layer := range overlay.Diff {
+		if layer == nil {
+			continue
+		}
+		owned := overlayPathSet(layer.File)
+		if err := scan(layer.Program, func(path string) bool { _, found := owned[path]; return found }); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func programStructUnits(prog *Program) ([]*ssa.CompileUnit, error) {
+	if prog == nil || prog.Program == nil {
+		return nil, nil
 	}
 	app := prog.Program.GetApplication()
 	if app == nil {
 		app = prog.Program
 	}
 	if len(app.CompileUnits) > 0 {
-		return app.CompileUnits
+		return app.CompileUnits, nil
+	}
+	if prog.IsFromDatabase() {
+		// CompileUnits and UpStream are not restored by the IR loader. Recover
+		// the same language-owned partition from persisted source; treating the
+		// whole application as one unit would permit cross-package traversal.
+		files := fileListKeys(app)
+		if len(files) == 0 {
+			return nil, nil // An empty incremental layer owns no source units.
+		}
+		createBuilder, ok := LanguageBuilderCreater[app.Language]
+		if !ok {
+			return nil, utils.Errorf("restore struct compile units: unsupported language %s", app.Language)
+		}
+		fs, err := buildFileSystemFromProgramName(app.GetProgramName())
+		if err != nil {
+			return nil, utils.Wrap(err, "restore struct compile units")
+		}
+		for i, path := range files {
+			files[i] = overlayAggregatedFSPath(normalizeOverlayFilePath(path, app.GetProgramName()))
+			if _, err := fs.ReadFile(files[i]); err != nil {
+				return nil, utils.Wrapf(err, "restore struct compile units: source %s unavailable", path)
+			}
+		}
+		units := flattenCompileUnits(buildCompileUnitPlan(createBuilder(), app.Language, fs, files))
+		if len(units) == 0 {
+			return nil, utils.Errorf("restore struct compile units: no units for program %s", app.GetProgramName())
+		}
+		return units, nil
 	}
 	var units []*ssa.CompileUnit
 	if app.UpStream != nil {
@@ -633,17 +743,17 @@ func programStructUnits(prog *Program) []*ssa.CompileUnit {
 		})
 	}
 	if len(units) > 0 {
-		return units
+		return units, nil
 	}
 	files := fileListKeys(app)
 	if len(files) == 0 {
-		return nil
+		return nil, nil
 	}
 	return []*ssa.CompileUnit{{
 		Key:      "application:" + app.GetProgramName(),
 		Files:    files,
 		Language: app.Language,
-	}}
+	}}, nil
 }
 
 func libraryUnitFiles(app *ssa.Program, name string, lib *ssa.Program) []string {

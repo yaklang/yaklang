@@ -270,10 +270,11 @@ func TestMemfitTTYPreservesDraftWhileResponseUpdatesSnapshot(t *testing.T) {
 	h.WaitFor("Memfit › answer starts")
 	h.Write("draft 中文 stays")
 	h.WaitFor("Memfit › answer starts and continues")
-	h.WaitFor("Completed")
-	snapshot := h.WaitFor("❯ draft 中文 stays")
+	// PTY reads can split the final repaint between the draft and footer.
+	// Match the complete frame on screen, then assert that same capture.
+	snapshot := h.WaitForScreen("Completed", "❯ draft 中文 stays", "○ Ready", "click/Ctrl+O details · /help")
 	require.Contains(t, snapshot, "answer starts and continues while typing")
-	h.AssertSnapshot("typing-during-response")
+	assertMemfitTTYGolden(t, "typing-during-response", snapshot)
 }
 
 func TestMemfitTTYComposerCompletionPasteAndHistorySnapshot(t *testing.T) {
@@ -735,7 +736,7 @@ func (h *memfitTTYHarness) WaitFor(want string) string {
 	return ""
 }
 
-func (h *memfitTTYHarness) WaitForScreen(want string) string {
+func (h *memfitTTYHarness) WaitForScreen(want ...string) string {
 	h.t.Helper()
 	deadline := time.Now().Add(4 * time.Second)
 	for time.Now().Before(deadline) {
@@ -743,7 +744,11 @@ func (h *memfitTTYHarness) WaitForScreen(want string) string {
 		snapshot := h.screen.Snapshot()
 		raw := h.raw.String()
 		h.mu.Unlock()
-		if strings.Contains(snapshot, want) {
+		matched := true
+		for _, text := range want {
+			matched = matched && strings.Contains(snapshot, text)
+		}
+		if matched {
 			return snapshot
 		}
 		select {

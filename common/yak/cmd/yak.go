@@ -281,6 +281,9 @@ func init() {
 	/* 初始化数据库: 在 grpc 模式下，数据库应该不在 init 中使用 */
 	ignoreInitDatabase := []string{"grpc", "check-secret-local-grpc", "fixup-database", "ai-http-gateway"}
 	switch {
+	case len(os.Args) > 1 && slices.Contains([]string{"node", "distyak", "ssa-ir-schema"}, os.Args[1]):
+		// Distributed execution consumes its per-process database policy before
+		// opening any SSA database. The long-lived node never holds its DSN.
 	case len(os.Args) > 1 && os.Args[1] == "mcp" && log.IsMCPStdioCommand(os.Args) && !stdio.IsWorker():
 		// The stdio supervisor owns only the client transport. Its worker
 		// initializes databases; this branch must not print the grpc banner.

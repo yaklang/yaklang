@@ -23,6 +23,13 @@ type ssaIRProgramDeletePublishFunc func(context.Context, string, *ssav1.DeleteIR
 
 func (b *legionJobBridge) handleSSAIRProgramDelete(ctx context.Context, raw []byte) error {
 	deleteProgram := deleteSSAIRProgramForLifecycle
+	if b != nil && b.agent != nil && b.agent.node != nil {
+		if session, ok := b.agent.node.GetSessionState(); ok && session.CompanyID != "" {
+			return handleSSAIRProgramDeleteWith(ctx, raw, func(context.Context, string, string) (bool, bool, string, error) {
+				return false, false, "", errors.New("company IR deletion must use the platform company database binding")
+			}, b.publishSSAIRProgramDeleteResponse)
+		}
+	}
 	if b != nil && b.agent != nil && b.agent.manager != nil {
 		deleteProgram = func(
 			ctx context.Context,

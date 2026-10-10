@@ -13,6 +13,7 @@ import (
 const runtimeHostJournalVersion = 1
 
 type runtimeHostOperationRecord struct {
+	CompanyID   string    `json:"company_id,omitempty"`
 	CleanupKey  string    `json:"cleanup_key"`
 	LeaseToken  string    `json:"lease_token"`
 	SessionID   string    `json:"session_id"`
@@ -112,6 +113,9 @@ func (e *runtimeHostExecutor) recoverOwnedContainers(ctx context.Context) error 
 		}
 		container, found, err := e.docker.FindContainer(ctx, cleanupKey)
 		if err != nil {
+			if record.CompanyID != "" {
+				return err
+			}
 			// Docker may be temporarily stopped. Keep the durable intent so a
 			// later command can discover and adopt the container after recovery.
 			continue
@@ -125,6 +129,16 @@ func (e *runtimeHostExecutor) recoverOwnedContainers(ctx context.Context) error 
 		}
 		if err := validateRuntimeContainerRecord(container, record, e.agentInstallationID); err != nil {
 			return err
+		}
+		if record.CompanyID != "" {
+			if err := e.docker.StopAndRemove(ctx, container.ID); err != nil {
+				return err
+			}
+			record.State = "stopped"
+			record.UpdatedAt = time.Now().UTC()
+			e.operations[cleanupKey] = record
+			changed = true
+			continue
 		}
 		record.ContainerID = container.ID
 		if container.Running {

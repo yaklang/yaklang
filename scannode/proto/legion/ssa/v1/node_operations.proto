@@ -3,12 +3,14 @@ syntax = "proto3";
 package legion.ssa.v1;
 
 import "google/protobuf/timestamp.proto";
+import "legion/node/v1/node.proto";
 
 option go_package = "github.com/yaklang/yaklang/scannode/gen/legionpb/legion/ssa/v1;ssav1";
 
 // These commands and results are protobuf payloads on versioned NATS subjects.
 // An unversioned/v1 subject carried JSON and must not be decoded as protobuf.
 message DeleteIRProgramCommand {
+  legion.node.v1.CommandMetadata metadata = 10;
   string request_id = 1;
   string program_name = 2;
   string store_identity = 3;
@@ -25,6 +27,7 @@ message DeleteIRProgramResult {
 }
 
 message DebugQueryCommand {
+  legion.node.v1.CommandMetadata metadata = 10;
   string query_id = 1;
   string job_id = 2;
   string attempt_id = 3;
@@ -39,6 +42,7 @@ message DebugQueryResult {
 }
 
 message LogTailCommand {
+  legion.node.v1.CommandMetadata metadata = 10;
   string query_id = 1;
   string job_id = 2;
   string attempt_id = 3;
