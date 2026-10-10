@@ -27985,6 +27985,64 @@
         "common/pcapx/pcaputil/dlms-normal-access/validation/expected.json": "validation/expected.json",
         "scripts/protocol-tests/required-tests-traffic-unified-v6.json": "required-tests-traffic-unified-v6.json"
       }
+    },
+    {
+      "id": "validation-dlms-small-graph-budget",
+      "kind": "validation",
+      "source_sha": "d0ebf3d1bd8ed4035ccaaec1e903d727c57f9755",
+      "file": "validation-dlms-small-graph-budget.zip",
+      "sha256": "9cd1b30ce4fc071cafde042bf3d45a74730a0c7a2c8e6b20a66503e05b265cd8",
+      "password": "bin-parser",
+      "members": {
+        "build.py": {
+          "sha256": "cbeb795aa6b4fabea5740e3d31dffcb2630245fb76afaf27dd73668fcfd459ca",
+          "bytes": 1917
+        },
+        "projection-proof.py": {
+          "sha256": "946987a87962b3dc23dbab8720729266441fdc91ba73f5dcfb3ee48355862f2b",
+          "bytes": 1397
+        },
+        "verify-controls.py": {
+          "sha256": "a8c9c89291a9212ff04c6659105ae26e034adc1b6a217287873e041cbb5a1c67",
+          "bytes": 1867
+        },
+        "seal.py": {
+          "sha256": "ed3904fd17a423fc1912a8c1f3ffdf2c3afc62419a06bfe931e3293480af4f2d",
+          "bytes": 4352
+        },
+        "required-tests-traffic-unified-v7.json": {
+          "sha256": "6840b8151855e91cc1e164d1aad3e0571a495bdf275c6b24a69bf919c4a61b62",
+          "bytes": 113871
+        },
+        "controls.json": {
+          "sha256": "c76d966527d6752aff19ab6d23b5e5d6297aba84a18af5bf2a7bae1dea4176c1",
+          "bytes": 4251
+        },
+        "answers/graph-announced255-truncated.json": {
+          "sha256": "875aa78d2f02a11c1e2fdb3857af47f8c8828ddd3009cf51099a51233ed1a138",
+          "bytes": 3690
+        },
+        "cases/graph-announced255-truncated.pcap": {
+          "sha256": "1f9575df97caa1a90773abd964d80b4c45411ddca9cb1e4606702837709d9c94",
+          "bytes": 249
+        },
+        "validation/expected.json": {
+          "sha256": "67d48b1c1b78e55d513f7a4b924d22858b4c6405bfca70b81658ab1396e51253",
+          "bytes": 1192
+        }
+      },
+      "aliases": {
+        "common/pcapx/pcaputil/dlms-small-graph-budget/build.py": "build.py",
+        "common/pcapx/pcaputil/dlms-small-graph-budget/projection-proof.py": "projection-proof.py",
+        "common/pcapx/pcaputil/dlms-small-graph-budget/verify-controls.py": "verify-controls.py",
+        "common/pcapx/pcaputil/dlms-small-graph-budget/seal.py": "seal.py",
+        "common/pcapx/pcaputil/dlms-small-graph-budget/required-tests-traffic-unified-v7.json": "required-tests-traffic-unified-v7.json",
+        "common/pcapx/pcaputil/dlms-small-graph-budget/controls.json": "controls.json",
+        "common/pcapx/pcaputil/dlms-small-graph-budget/answers/graph-announced255-truncated.json": "answers/graph-announced255-truncated.json",
+        "common/pcapx/pcaputil/dlms-small-graph-budget/cases/graph-announced255-truncated.pcap": "cases/graph-announced255-truncated.pcap",
+        "common/pcapx/pcaputil/dlms-small-graph-budget/validation/expected.json": "validation/expected.json",
+        "scripts/protocol-tests/required-tests-traffic-unified-v7.json": "required-tests-traffic-unified-v7.json"
+      }
     }
   ],
   "schema_version": 1,

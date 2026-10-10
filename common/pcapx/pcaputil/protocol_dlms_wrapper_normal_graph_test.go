@@ -106,9 +106,9 @@ func TestDLMSWrapperNormalGraphProjectionBoundary(t *testing.T) {
 	q := wrapperWire(t, "000100100001000dc001c1000100002a0000ff0200")
 	w := wrapperWire(t, "000100010010000cc401c10001021201000901ff")
 	// Conversation, live invoke, owned graph and reservation slack. The selected
-	// graph has a fixed node cap256 and wire byte projections, independent of
-	// how many children happen to be present in this one valid response.
-	need := 512 + 256 + 32768 + 512*len(w) + 2048*256 + 256
+	// graph retains the node cap256; each node also needs a tag byte after the
+	//12-byte envelope/service prefix. The bound never trusts declared counts.
+	need := 512 + 256 + 32768 + 512*len(w) + 2048*min(256, max(0, len(w)-12)) + 256
 	for _, delta := range []int{-1, 0} {
 		for _, deferred := range []bool{false, true} {
 			b := DefaultParserBudget()

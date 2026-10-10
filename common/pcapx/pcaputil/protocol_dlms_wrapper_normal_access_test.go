@@ -80,7 +80,7 @@ func TestDLMSWrapperNormalAccessBudgetsOwnership(t *testing.T) {
 func TestDLMSWrapperNormalAccessProjectionBoundary(t *testing.T) {
 	q := wrapperWire(t, "000100100001000dc001c1000100002a0000ff0200")
 	selected := wrapperWire(t, "0001001000010016c001c1000100002a0000ff0201020202120001120002")
-	need := 512 + 256 + 32768 + 512*len(selected) + 2048*256 + 256
+	need := 512 + 256 + 32768 + 512*len(selected) + 2048*min(256, max(0, len(selected)-22)) + 256
 	for _, delta := range []int{-1, 0} {
 		for _, deferred := range []bool{false, true} {
 			b := DefaultParserBudget()

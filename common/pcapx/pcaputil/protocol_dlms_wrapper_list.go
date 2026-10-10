@@ -201,7 +201,10 @@ func (c *wrapperListCursor) data(limit, level int) (map[string]any, error) {
 	if n > uint64(min(limit, wrapperDataNodes)-c.nodes) {
 		return nil, wrapperError(ErrResourceExceeded, "announced child count exceeds remaining Data budget")
 	}
-	children := make([]map[string]any, 0, int(n))
+	// Each child needs at least its Data tag. A declared count may fit the node
+	// budget but exceed all remaining wire bytes on a truncated frame; do not
+	// preallocate that unproven capacity before the first child can be read.
+	children := make([]map[string]any, 0, min(int(n), len(c.wire)-c.at))
 	for i := uint64(0); i < n; i++ {
 		child, err := c.data(limit, level+1)
 		if err != nil {
@@ -336,8 +339,17 @@ func wrapperProjection(w []byte, n int) int64 {
 		return 32768 + 512*int64(n+wrapperBlockBytes) + 2048*wrapperDataNodes
 	}
 	if wrapperNormalDataGraph(w) || wrapperNormalAccess(w) {
-		// The root and all nested Data nodes share the same bounded counter.
-		return 32768 + 512*int64(n) + 2048*wrapperDataNodes
+		// A complete normal response has12 non-Data bytes; a selected request
+		// has22 (envelope, service, descriptor and selector). Every materialized
+		// Data node consumes a tag byte. This bound includes all descendants and
+		// empty containers, and announced counts cannot preallocate more children
+		// than the remaining bytes. Keep the absolute node/depth caps unchanged.
+		prefix := 12
+		if wrapperNormalAccess(w) {
+			prefix = 22
+		}
+		nodes := min(wrapperDataNodes, max(0, n-prefix))
+		return 32768 + 512*int64(n) + 2048*int64(nodes)
 	}
 	if wrapperNormalExtendedData(w) {
 		// One bounded scalar: owned field/session/native projections and text/hex.
