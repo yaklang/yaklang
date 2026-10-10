@@ -301,6 +301,12 @@ func decodeWrapperList(m *wrapperMessage, p []byte, limit, depth int) error {
 	return nil
 }
 func wrapperIsList(w []byte) bool { return len(w) > 9 && w[9] == 3 }
+func wrapperExtendedScalarTag(tag byte) bool {
+	return tag == 4 || tag == 10 || tag == 12 || tag == 23 || tag == 24
+}
+func wrapperNormalExtendedData(w []byte) bool {
+	return len(w) > 12 && w[8] == 0xc4 && w[9] == 1 && w[11] == 0 && wrapperExtendedScalarTag(w[12])
+}
 func wrapperProfile(w []byte) string {
 	if wrapperIsBlock(w) {
 		return "dlms-wrapper-v1-get-block"
@@ -322,6 +328,11 @@ func wrapperProbeVersion(w []byte) string {
 func wrapperProjection(w []byte, n int) int64 {
 	if wrapperIsBlock(w) {
 		return 32768 + 512*int64(n+wrapperBlockBytes) + 2048*wrapperDataNodes
+	}
+	if wrapperNormalExtendedData(w) {
+		// One bounded scalar: owned field/session/native projections and text/hex.
+		// Container Data remains a separate normal-GET requirement.
+		return 32768 + 512*int64(n)
 	}
 	if !wrapperIsList(w) {
 		return wrapperProjectionBytes + 128*int64(n)

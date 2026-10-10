@@ -1,6 +1,7 @@
 package pcaputil
 
 import (
+	"encoding/json"
 	"github.com/stretchr/testify/require"
 	"testing"
 	"time"
@@ -28,12 +29,16 @@ func assertWrapperFloatNormalBoundary(t *testing.T) {
 	s, err := NewProtocolSessionWithOptions(DefaultParserBudget(), WithSessionTransport("udp"), WithSessionPorts(40000, 4059))
 	require.NoError(t, err)
 	o := s.Feed(1, time.Unix(1, 0), wrapperWire(t, "0001000100100009c401c100173fc00000"))
-	require.NotNil(t, o.Err)
-	require.Equal(t, ErrUnsupportedFeature, o.Err.Kind)
+	require.Nil(t, o.Err)
 	require.Len(t, o.Events, 1)
 	f, err := o.Events[0].GetFields()
-	rocTypedError(t, "UnsupportedFeature", err)
-	require.Nil(t, f)
+	require.NoError(t, err)
+	var expected map[string]any
+	require.NoError(t, json.Unmarshal([]byte(`{"wrapper_version":1,"source_wport":1,"destination_wport":16,"payload_length":9,"wrapper_header_hex":"0001000100100009","apdu_hex":"c401c100173fc00000","association_observed":false,"authentication_verified":false,"object_model_verified":false,"command":196,"service_choice":1,"invoke_id_and_priority":193,"invoke_id":1,"high_priority":true,"confirmed_service":true,"unused_flag_bits_raw":0,"kind":"GetResponseNormal","result_choice":"data","data":{"type":23,"value":1.5,"value_hex":"3fc00000","float_width":32,"float_class":"normal","negative":false,"raw_hex":"173fc00000"}}`), &expected))
+	rocEqualFields(t, expected, f)
+	state := cloneSession(expected)
+	state["Association"], state["Outstanding"] = "unmatched-response", float64(0)
+	rocEqualFields(t, state, o.Events[0].Session)
 	require.Zero(t, o.Events[0].ResponseTo)
 	require.Zero(t, o.Events[0].TransactionID)
 	require.Empty(t, s.Close("normal-boundary"))

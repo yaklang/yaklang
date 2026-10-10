@@ -113,7 +113,18 @@ func decodeDLMSWrapperBudget(w []byte, limit, depth int) (*wrapperMessage, error
 		f["kind"] = "GetResponseNormal"
 		switch p[3] {
 		case 0:
-			data, err := wrapperScalar(p[4:], limit)
+			var data map[string]any
+			var err error
+			if wrapperExtendedScalarTag(p[4]) {
+				c := wrapperListCursor{wire: p, at: 4}
+				data, err = c.scalar(limit)
+				if err == nil && c.at != len(p) {
+					err = wrapperError(ErrMalformedMessage, "Get-normal Data has trailing bytes")
+				}
+			} else {
+				// Preserve the existing scalar/octet representation and budget.
+				data, err = wrapperScalar(p[4:], limit)
+			}
 			if err != nil {
 				return nil, err
 			}
@@ -142,7 +153,7 @@ func wrapperScalar(w []byte, limit int) (map[string]any, error) {
 	tag, v := w[0], w[1:]
 	out := map[string]any{"type": tag, "raw_hex": hex.EncodeToString(w)}
 	// Reuse the static size switch instead of rebuilding a map for every Data
-	// node. Float support is deliberately selected only by the list cursor.
+	// node. Extended scalar support is selected by the bounded cursor; this path preserves legacy scalar/octet fields.
 	if n := wrapperScalarSize(tag); n >= 0 && tag != 23 && tag != 24 {
 		if len(v) != n {
 			return bad("fixed A-XDR scalar size mismatch")

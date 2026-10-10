@@ -11,8 +11,10 @@ import (
 const wrapperBlockBytes = 1024
 const wrapperBlockCount = 64
 
-func wrapperIsBlock(w []byte) bool       { return len(w) > 9 && w[9] == 2 }
-func wrapperUsesDataGraph(w []byte) bool { return wrapperIsList(w) || wrapperIsBlock(w) }
+func wrapperIsBlock(w []byte) bool { return len(w) > 9 && w[9] == 2 }
+func wrapperUsesDataGraph(w []byte) bool {
+	return wrapperIsList(w) || wrapperIsBlock(w) || wrapperNormalExtendedData(w)
+}
 
 func decodeWrapperBlock(m *wrapperMessage, p []byte, limit int) error {
 	f := m.fields
