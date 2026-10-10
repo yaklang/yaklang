@@ -264,6 +264,7 @@ func testMAVLinkExistingQueries(t *testing.T) {
 			rocTypedError(t, "MalformedMessage", err)
 			require.Nil(t, f)
 			rocTypedError(t, "MalformedMessage", out.Err)
+			assertOwnedProtocolRefusal(t, out.Events[0], "MalformedMessage", err)
 			require.Zero(t, out.Events[0].TransactionID)
 			require.Zero(t, out.Events[0].ResponseTo)
 			require.Empty(t, s.Close("complete"))

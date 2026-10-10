@@ -80,6 +80,7 @@ func testTFTPRejectedQueryExistingAPI(t *testing.T) {
 	require.NotEmpty(t, r.Events[0].Error)
 	f, e := r.Events[0].GetFields()
 	require.Error(t, e, "semantic refusal cannot become successful field decoding")
+	assertOwnedProtocolRefusal(t, r.Events[0], "MalformedMessage", e)
 	require.Nil(t, f)
 }
 

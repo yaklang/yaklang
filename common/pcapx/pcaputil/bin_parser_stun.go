@@ -4,6 +4,7 @@ import (
 	"crypto/sha256"
 	"encoding/binary"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"hash/crc32"
 	"net/netip"
@@ -220,6 +221,12 @@ func stunAddress(v, w []byte, xor bool) (netip.AddrPort, error) {
 func (s *binSTUN) consume(dir int, ts time.Time, w []byte, max int, stream bool) (_ map[string]any, consumeErr error) {
 	keepContext := false
 	defer func() {
+		var typed *ProtocolError
+		if consumeErr != nil && !errors.As(consumeErr, &typed) {
+			// Keep a semantic refusal typed through event queries; an unchecked
+			// structural rule must not turn a failed fingerprint into success.
+			consumeErr = protocolError(ErrMalformedMessage, "%s", consumeErr)
+		}
 		if consumeErr != nil && !keepContext {
 			s.invalidate()
 		}

@@ -159,11 +159,26 @@ func TestRTPSSPDPSealedReplay(t *testing.T) {
 										require.JSONEq(t, string(b), string(session))
 										f["Observation"] = "caller-mutated"
 										require.Equal(t, "unverified-participant", e.Session["Observation"])
+										mutateRTPSQuery(f)
+										tree, queryErr := e.Decode()
+										require.NoError(t, queryErr)
+										rocEqualFields(t, answer.Fields, protocolFields(tree))
+										mutateRTPSQuery(protocolFields(tree))
+										mutateRTPSQuery(e.Session)
+										again, queryErr := e.GetFields()
+										require.NoError(t, queryErr)
+										rocEqualFields(t, answer.Fields, again)
 									} else if answer.Error != "" {
 										var pe *ProtocolError
 										require.Error(t, e.sessionError)
 										require.True(t, errors.As(e.sessionError, &pe))
 										require.Equal(t, answer.Error, string(pe.Kind))
+										fields, queryErr := e.GetFields()
+										require.Nil(t, fields)
+										assertOwnedProtocolRefusal(t, e, answer.Error, queryErr)
+										tree, decodeErr := e.Decode()
+										require.Nil(t, tree)
+										assertOwnedProtocolRefusal(t, e, answer.Error, decodeErr)
 										require.NotEmpty(t, e.Error)
 										require.Nil(t, e.Structured)
 										require.Nil(t, e.Fields)
@@ -284,4 +299,46 @@ func TestRTPSSPDPProbeBudgetAndLifetime(t *testing.T) {
 			}
 		})
 	}
+}
+
+// Edit every nested projection, not just an independent top-level Session copy.
+func mutateRTPSQuery(value any) {
+	switch v := value.(type) {
+	case map[string]any:
+		for k, child := range v {
+			switch child.(type) {
+			case map[string]any, []map[string]any, []any, []byte:
+				mutateRTPSQuery(child)
+			default:
+				v[k] = "caller-mutated"
+			}
+		}
+	case []map[string]any:
+		for _, child := range v {
+			mutateRTPSQuery(child)
+		}
+	case []any:
+		for i, child := range v {
+			mutateRTPSQuery(child)
+			v[i] = "caller-mutated"
+		}
+	case []byte:
+		clear(v)
+	}
+}
+func assertOwnedProtocolRefusal(t *testing.T, event *ProtocolEvent, kind string, err error) {
+	t.Helper()
+	var caller *ProtocolError
+	require.ErrorAs(t, err, &caller)
+	require.Equal(t, kind, string(caller.Kind))
+	message := caller.Message
+	caller.Kind, caller.Message = ErrEncrypted, "caller-mutated"
+	fields, again := event.GetFields()
+	require.Nil(t, fields)
+	var original *ProtocolError
+	require.ErrorAs(t, again, &original)
+	require.Equal(t, kind, string(original.Kind))
+	require.Equal(t, message, original.Message)
+	require.Equal(t, kind, string(event.sessionError.Kind))
+	require.Equal(t, message, event.sessionError.Message)
 }

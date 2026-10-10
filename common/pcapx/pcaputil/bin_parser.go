@@ -75,7 +75,8 @@ func (e *ProtocolEvent) Decode() (result map[string]any, err error) {
 		return map[string]any{"fields": cloneSession(e.semanticFields)}, nil
 	}
 	if e.ownsNativeFields() && e.sessionError != nil {
-		return nil, e.sessionError
+		owned := *e.sessionError
+		return nil, &owned
 	}
 	// These native caches are separate from the public event projection. A
 	// caller may edit a returned tree without changing later field queries.
@@ -90,7 +91,8 @@ func (e *ProtocolEvent) Decode() (result map[string]any, err error) {
 			return map[string]any{"fields": cloneSession(e.semanticFields)}, nil
 		}
 		if e.sessionError != nil {
-			return nil, e.sessionError
+			owned := *e.sessionError
+			return nil, &owned
 		}
 	}
 	if e.Structured != nil {
@@ -159,7 +161,7 @@ func (e *ProtocolEvent) ownsNativeFields() bool {
 		return true
 	}
 	switch e.Protocol {
-	case "snmp", "dlms-wrapper", "dlms", "opendroneid", "c37118", "sv", "ethercat", "knx", "pfcp", "profinet-dcp", "mavlink":
+	case "snmp", "dlms-wrapper", "dlms", "opendroneid", "c37118", "sv", "ethercat", "knx", "pfcp", "profinet-dcp", "mavlink", "rtps":
 		return true
 	}
 	return false

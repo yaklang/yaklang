@@ -258,6 +258,7 @@ func testSTUNIdentityMatrix(t *testing.T) {
 						if w.Fields == nil {
 							f, err := e.GetFields()
 							rocTypedError(t, w.Error, err)
+							assertOwnedProtocolRefusal(t, e, w.Error, err)
 							require.Nil(t, f)
 							require.Nil(t, e.Session)
 							continue
