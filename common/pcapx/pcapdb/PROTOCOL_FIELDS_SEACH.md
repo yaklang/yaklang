@@ -101,7 +101,7 @@ println(library.ProtocolFieldIndexes()~)
 
 Yak 的 `GetOrCreatePCAPDatabase/OpenPCAPDatabase/RebuildPCAPDatabase` 返回每次调用独立的 `DatabaseHandle`。同库句柄共享最多四个只读连接，Close 只取消并释放自己的引用；最后一个管理器拥有的引用释放时关闭读池。普通 Go `*Database` 显式所有者继续保留原行为，仍可使用 `manager.Acquire(ctx,id)` 获得独立引用；有借用句柄时关闭原生共享 Database 返回 Busy，避免跨调用失效。
 
-句柄继承当前 Yak 执行 context。列表、搜索、字段详情、BLOB 读取和输出都绑定它；额外 `queryContext` 可以收紧截止时间，不能用 Background 绕过任务取消。等待连接以及等待读池刷新锁都可取消。取消自动释放该调用的引用，管理器关闭取消全部操作。`ClosePCAPDatabases` 在 context 绑定的 Yak 模块中只释放本执行的句柄；Go 包级函数仍用于关闭默认管理器。使用 Background 的调用者需要显式 Close 或在结束时取消其 context。
+句柄继承当前 Yak 执行 context。列表、搜索、字段详情、BLOB 读取和输出都绑定它；额外 `queryContext` 可以收紧截止时间，不能用 Background 绕过任务取消。等待连接以及等待读池刷新锁都可取消。取消自动释放该调用的引用。管理器关闭先取消读操作，再等待操作及已从缓存移除的读池完成 checkpoint 清理，避免并发关闭卡住或在清理结束前返回。`ClosePCAPDatabases` 在 context 绑定的 Yak 模块中只释放本执行的句柄；Go 包级函数仍用于关闭默认管理器。使用 Background 的调用者需要显式 Close 或在结束时取消其 context。
 
 这一批仅补齐离线工具的基础接口；AI 工具脚本、skill 和在线抓包任务生命周期另行实现。
 
