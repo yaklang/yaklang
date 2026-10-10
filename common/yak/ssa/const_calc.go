@@ -277,31 +277,42 @@ func CalcConstBinary(x, y *ConstInst, op BinaryOpcode) *ConstInst {
 			return NewConst(x.Number() <= y.Number())
 		}
 	case OpEq:
-		// Compare by value, not by the raw interface word: the same literal
-		// reaches the fold as different Go types (int from the parser,
-		// int64 from a previous fold such as 2*3), and interface equality
-		// would report 6 == 6 as false.
-		if x.IsNumber() && y.IsNumber() {
-			return NewConst(x.Number() == y.Number())
-		}
-		if x.IsFloat() && y.IsFloat() {
-			return NewConst(x.Float() == y.Float())
-		}
-		if x.IsString() && y.IsString() {
-			return NewConst(x.VarString() == y.VarString())
-		}
-		if x.IsBoolean() && y.IsBoolean() {
-			return NewConst(x.Boolean() == y.Boolean())
-		}
-		if x.GetTypeKind() == y.GetTypeKind() {
-			return NewConst(x.value == y.value)
+		if equal, ok := constValuesEqual(x, y); ok {
+			return NewConst(equal)
 		}
 	case OpNotEq:
-		if x.IsNumber() && y.IsNumber() {
-			return NewConst(x.Number() != y.Number())
+		if equal, ok := constValuesEqual(x, y); ok {
+			return NewConst(!equal)
 		}
 	}
 	return nil
+}
+
+// constValuesEqual compares constants by their numeric, string, or boolean
+// value. The same literal reaches the fold as different Go types (int from
+// the parser, int64 from a previous fold such as 2*3). Interface equality
+// would report 6 == 6 as false. ok is false when the two constants have no
+// common comparison.
+func constValuesEqual(x, y *ConstInst) (equal bool, ok bool) {
+	if x == nil || y == nil {
+		return false, false
+	}
+	if x.IsNumber() && y.IsNumber() {
+		return x.Number() == y.Number(), true
+	}
+	if x.IsFloat() && y.IsFloat() {
+		return x.Float() == y.Float(), true
+	}
+	if x.IsString() && y.IsString() {
+		return x.VarString() == y.VarString(), true
+	}
+	if x.IsBoolean() && y.IsBoolean() {
+		return x.Boolean() == y.Boolean(), true
+	}
+	if x.GetTypeKind() == y.GetTypeKind() {
+		return x.value == y.value, true
+	}
+	return false, false
 }
 
 // OpNone UnaryOpcode = iota
