@@ -51,13 +51,15 @@ func (d *Database) querySessions(packetID uint, options ...QueryOption) ([]PCAPS
 	if err != nil {
 		return nil, err
 	}
-	d.mu.RLock()
+	ctx, cancel := c.operationContext(d.manager)
+	defer cancel()
+	if err := d.lockRead(ctx); err != nil {
+		return nil, err
+	}
 	defer d.mu.RUnlock()
 	if d.closed {
 		return nil, ErrClosed
 	}
-	ctx, cancel := d.manager.operationContext(c.ctx)
-	defer cancel()
 	tx, _, err := d.readSnapshot(ctx, false, true)
 	if err != nil {
 		return nil, err
@@ -90,13 +92,15 @@ func (d *Database) QueryStreams(options ...QueryOption) ([]PCAPStream, error) {
 	if c.transport != "" || c.sourceIP != "" || c.destinationIP != "" || c.sourcePort != nil || c.destinationPort != nil || c.start != nil {
 		return nil, fmt.Errorf("pcapdb: endpoint/time filters apply to session/packet queries")
 	}
-	d.mu.RLock()
+	ctx, cancel := c.operationContext(d.manager)
+	defer cancel()
+	if err := d.lockRead(ctx); err != nil {
+		return nil, err
+	}
 	defer d.mu.RUnlock()
 	if d.closed {
 		return nil, ErrClosed
 	}
-	ctx, cancel := d.manager.operationContext(c.ctx)
-	defer cancel()
 	tx, _, err := d.readSnapshot(ctx, false, true)
 	if err != nil {
 		return nil, err
@@ -128,13 +132,15 @@ func (d *Database) ReadStream(streamID uint, options ...QueryOption) (*StreamPag
 	if c.transport != "" || c.sourceIP != "" || c.destinationIP != "" || c.sourcePort != nil || c.destinationPort != nil || c.start != nil || c.session != nil || c.stream != nil {
 		return nil, fmt.Errorf("pcapdb: ReadStream accepts only context/after/limit/maxBytes options")
 	}
-	d.mu.RLock()
+	ctx, cancel := c.operationContext(d.manager)
+	defer cancel()
+	if err := d.lockRead(ctx); err != nil {
+		return nil, err
+	}
 	defer d.mu.RUnlock()
 	if d.closed {
 		return nil, ErrClosed
 	}
-	ctx, cancel := d.manager.operationContext(c.ctx)
-	defer cancel()
 	tx, _, err := d.readSnapshot(ctx, false, true)
 	if err != nil {
 		return nil, err
@@ -181,13 +187,15 @@ func (d *Database) StreamChunkPacketIDs(chunkID uint, options ...QueryOption) ([
 	if err != nil {
 		return nil, err
 	}
-	d.mu.RLock()
+	ctx, cancel := c.operationContext(d.manager)
+	defer cancel()
+	if err := d.lockRead(ctx); err != nil {
+		return nil, err
+	}
 	defer d.mu.RUnlock()
 	if d.closed {
 		return nil, ErrClosed
 	}
-	ctx, cancel := d.manager.operationContext(c.ctx)
-	defer cancel()
 	tx, _, err := d.readSnapshot(ctx, false, true)
 	if err != nil {
 		return nil, err

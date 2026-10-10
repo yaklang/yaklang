@@ -108,7 +108,7 @@ func (m *InstanceManager) RebuildAnalysis(identifier string, options ...ImportOp
 		}
 	}
 	config.notify(meta)
-	return m.openReady(meta)
+	return m.openReady(meta, config.leased)
 }
 
 func (d *Database) RebuildAnalysis(options ...ImportOption) (*Database, error) {
