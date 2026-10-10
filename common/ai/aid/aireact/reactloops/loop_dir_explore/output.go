@@ -20,13 +20,6 @@ func withExploreOutput() reactloops.ReActLoopOption {
 			if e.Type == schema.EVENT_TYPE_FILESYSTEM_PIN_FILENAME && e.GetContentJSONPath("$.path") != loop.Get("result_report_path") {
 				return nil
 			}
-			node := e.NodeId
-			if e.Type == schema.EVENT_TYPE_STRUCTURED && node == "stream-finished" {
-				node = e.GetContentJSONPath("$.node_id")
-			}
-			if node == "re-act-loop-thought" || e.IsReason {
-				return nil
-			}
 			// Once the target is confirmed, model/tool bookkeeping must not
 			// overwrite the user-facing exploration or report-generation phase.
 			if e.Type == schema.EVENT_TYPE_STRUCTURED && e.NodeId == "status" && loop.Get("explore_phase") != "" {
