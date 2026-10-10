@@ -33659,6 +33659,243 @@
         "common/pcapx/pcaputil/dlms-udp-idle/required-tests-traffic-unified-v18.json": "required-tests-traffic-unified-v18.json",
         "scripts/protocol-tests/required-tests-traffic-unified-v18.json": "required-tests-traffic-unified-v18.json"
       }
+    },
+    {
+      "id": "validation-dlms-udp-adjacent",
+      "kind": "validation",
+      "source_sha": "78c3d72fd84802b79960a84ef485ab764d052eb7",
+      "file": "validation-dlms-udp-adjacent.zip",
+      "sha256": "b3662762095ce30f888520d561ed87242b7167ae4a165de6532c184cd48dde57",
+      "password": "bin-parser",
+      "members": {
+        "build.py": {
+          "sha256": "83e6477d73cfdf7fca1f6cda7951ebe227a9e73c403c44c0ac105cb7be703695",
+          "bytes": 5055
+        },
+        "framer.py": {
+          "sha256": "d1f9c1dbd2971190df6bea768af9f150f2b6d50907ce4e0baae803afb2ab6055",
+          "bytes": 3390
+        },
+        "carrier.py": {
+          "sha256": "adce1cb3f2e08bd83a75111553096394f9cbbd04947297e9320eddb79e19d635",
+          "bytes": 1888
+        },
+        "verify-controls.py": {
+          "sha256": "7dfe554dfebb5e4c118f724543693e09454ed856682a3003df5e363b2db4171d",
+          "bytes": 2931
+        },
+        "reference-check.py": {
+          "sha256": "d474f702bb2d9e284a4eb4dbfa743eae8c6d150fb6df72ffee2938e6de4e7d3b",
+          "bytes": 1451
+        },
+        "source-pin.json": {
+          "sha256": "fa37274178137ec6ce25ec077142983ffb0fa4d15210e276a758e1e0cc376860",
+          "bytes": 14614
+        },
+        "seal.py": {
+          "sha256": "984c1568bcda52dc1035053247a89a045f660de67d828d3aa42d3d21bdfa75cd",
+          "bytes": 3527
+        },
+        "cases/native-new-invoke-30.pcap": {
+          "sha256": "31139f6dbe03863e2933f3e03968600c6cbf6d33ae50b384b1730967486cfbde",
+          "bytes": 350
+        },
+        "answers/native-new-invoke-30.json": {
+          "sha256": "d9ee2c6ed7ecb78926390ff4488b2ea5a90d16072f3ceb6246419578b587474c",
+          "bytes": 7956
+        },
+        "cases/native-new-invoke-31.pcap": {
+          "sha256": "23995f53fb6cf916b2638db6f4937d4d6fe6b3943e4fdcc2f2371b224519c13c",
+          "bytes": 350
+        },
+        "answers/native-new-invoke-31.json": {
+          "sha256": "b776e650f2d72b4fc7acebd2708d42dc95240e6095f6be0e9f3c177df7680f3e",
+          "bytes": 7956
+        },
+        "cases/native-progression-or-logical-port.pcap": {
+          "sha256": "8119f9da0170f8b7f20ee83f53b0914013d88de1c86506ec04e7c48d6b85633e",
+          "bytes": 350
+        },
+        "answers/native-progression-or-logical-port.json": {
+          "sha256": "cc23b3b574489c3d2de0a02d7f15e8c6e9548cfb1562884a2d21841e0867d443",
+          "bytes": 8012
+        },
+        "cases/native-old-late-before.pcap": {
+          "sha256": "426a7b0b29f8bf11e439a9fa7509c26bd98b6e46f1c265ac06eb461a9172faa0",
+          "bytes": 428
+        },
+        "answers/native-old-late-before.json": {
+          "sha256": "aef090b3dffb00c8575a934ddea1ab72ec9115d79bdaa82c2103a0015e3af5c2",
+          "bytes": 8270
+        },
+        "cases/native-old-late-after.pcap": {
+          "sha256": "f2037fa1656d2874180b5497f37c5a9a8067145984d202cf784e7bae16b957af",
+          "bytes": 428
+        },
+        "answers/native-old-late-after.json": {
+          "sha256": "5e260b0e48eb4b5c2e38263c869fd713a28f22d257432b7bfc54f9a0c7e22359",
+          "bytes": 8266
+        },
+        "cases/native-old-request-during.pcap": {
+          "sha256": "f1763f6a20b134d41091f4c1010612739fef21e75f6e51681e7b7c63e39f5e01",
+          "bytes": 513
+        },
+        "answers/native-old-request-during.json": {
+          "sha256": "c7dfca057f11368a9f41ed3d2228f0cd6b0a7639e807a590f9b7201cbaea39f5",
+          "bytes": 7136
+        },
+        "cases/native-wrong-direction.pcap": {
+          "sha256": "dbea243a56a5f13867417065773a00c0451cd2560626b78026127b1cc53d6cac",
+          "bytes": 428
+        },
+        "answers/native-wrong-direction.json": {
+          "sha256": "30a3ab1650da3144869cd8b14b26b652521874a55291316443a15c9136e4220f",
+          "bytes": 8270
+        },
+        "cases/native-flags-mismatch.pcap": {
+          "sha256": "b6711872e05e52b7214161b60fa7a778905430f24ab06926ad0565ee9ac21aa8",
+          "bytes": 428
+        },
+        "answers/native-flags-mismatch.json": {
+          "sha256": "5d6900ba21536f358311fd8d0a240f7a2bbee71045deae42c1c754dcac1fc4d8",
+          "bytes": 8266
+        },
+        "cases/native-retrograde-old.pcap": {
+          "sha256": "f00fc8a2d23bb7bc2d1aaaf5d6c81b69c698527dda9c01c2c8e9c6bb191f83a2",
+          "bytes": 428
+        },
+        "answers/native-retrograde-old.json": {
+          "sha256": "366803c9c27385746fb99fe30587d919ec7263a48e449d05a3b647e487d82775",
+          "bytes": 8266
+        },
+        "cases/wrapper-new-invoke-30.pcap": {
+          "sha256": "a246b468110f8387a5b12859e71ff0676f7e1453b5e4b14d4d02a0b3052ce3ed",
+          "bytes": 326
+        },
+        "answers/wrapper-new-invoke-30.json": {
+          "sha256": "7ac111de5397af0cdf7caf9fb33c698c16a44f52da6a388804f0547cfdec89ed",
+          "bytes": 8044
+        },
+        "cases/wrapper-new-invoke-31.pcap": {
+          "sha256": "6147e4ede145683c1f0a5a1d02253ffc81fb2b25381c705722a83ae31f5b0089",
+          "bytes": 326
+        },
+        "answers/wrapper-new-invoke-31.json": {
+          "sha256": "c17c21c4a3d7ea6f7c5af63254f1fbe86ea0e60027f6f1cd9c693c444411dfe5",
+          "bytes": 8044
+        },
+        "cases/wrapper-progression-or-logical-port.pcap": {
+          "sha256": "ca262a30082096daa104f085696e06828560011e6c95bfb83fa1715c4716a363",
+          "bytes": 326
+        },
+        "answers/wrapper-progression-or-logical-port.json": {
+          "sha256": "8a360e81c9e26de71c91821d8e338894f87e2a4e5b36f65f2dff1e722d2178eb",
+          "bytes": 8100
+        },
+        "cases/wrapper-old-late-before.pcap": {
+          "sha256": "c5f9f877b84db44e09a0223d4911e34fe1381d631b4e6d69a591cfef167110a6",
+          "bytes": 398
+        },
+        "answers/wrapper-old-late-before.json": {
+          "sha256": "4c4cdd6ccd2e95fd82ed0ce6d07a143977d1e800f0424c5bd14676e4da62843b",
+          "bytes": 9844
+        },
+        "cases/wrapper-old-late-after.pcap": {
+          "sha256": "ea886b3f0ee8fe6af3f26cd751ae59aad469cecd40039f6d792468b2626816fc",
+          "bytes": 398
+        },
+        "answers/wrapper-old-late-after.json": {
+          "sha256": "ee86a8457e742da40eb3dfad67d71b84b93808cbafa4dbd45cd47f9e6c554301",
+          "bytes": 9840
+        },
+        "cases/wrapper-old-request-during.pcap": {
+          "sha256": "9790a578c762ebe43d54c1223e330e367b2928cfa2de1521b1d831344cb3738f",
+          "bytes": 477
+        },
+        "answers/wrapper-old-request-during.json": {
+          "sha256": "ca68eaac9b77dbe340ee12a94013b3233d7a61c06dc4b920ba94517c4b0317fe",
+          "bytes": 11764
+        },
+        "cases/wrapper-wrong-direction.pcap": {
+          "sha256": "f2f7b22b3172b56e9b44e02a5725dbe7903bc5dcf530fe008e24be80f7fc5d28",
+          "bytes": 398
+        },
+        "answers/wrapper-wrong-direction.json": {
+          "sha256": "f0a94daac33c5eb7f12d4879ad9d556f150aae8c22ff3a3f1123a593c98d1283",
+          "bytes": 9840
+        },
+        "cases/wrapper-flags-mismatch.pcap": {
+          "sha256": "8bde41900fe12e906e145f645ec2818edccea397ccb7493c19b6e48ded760bf6",
+          "bytes": 398
+        },
+        "answers/wrapper-flags-mismatch.json": {
+          "sha256": "0580d55e1bad4bb3381bffa45f94e50665619feaedc36f2e543f9de4fae786f5",
+          "bytes": 9836
+        },
+        "cases/wrapper-retrograde-old.pcap": {
+          "sha256": "9402b1bc71450dd8a94ca3ea4bf6f441703c2807dd9840f70c1a7df731dd207d",
+          "bytes": 398
+        },
+        "answers/wrapper-retrograde-old.json": {
+          "sha256": "2182b778674b97ec2cafa66c7d383e6751a7bfa1dda2500d1a97af983d9afde7",
+          "bytes": 9840
+        },
+        "controls.json": {
+          "sha256": "9fa2b52c814513a832cbd682e42b6304e3fe4b1b102169902757b2a42f5ceedd",
+          "bytes": 180060
+        },
+        "validation/expected.json": {
+          "sha256": "6203a031b3d810276bd8a5c165c740b0373e8a17a9890db6458add0248f85e63",
+          "bytes": 20129
+        }
+      },
+      "aliases": {
+        "common/pcapx/pcaputil/dlms-udp-adjacent/build.py": "build.py",
+        "common/pcapx/pcaputil/dlms-udp-adjacent/framer.py": "framer.py",
+        "common/pcapx/pcaputil/dlms-udp-adjacent/carrier.py": "carrier.py",
+        "common/pcapx/pcaputil/dlms-udp-adjacent/verify-controls.py": "verify-controls.py",
+        "common/pcapx/pcaputil/dlms-udp-adjacent/reference-check.py": "reference-check.py",
+        "common/pcapx/pcaputil/dlms-udp-adjacent/source-pin.json": "source-pin.json",
+        "common/pcapx/pcaputil/dlms-udp-adjacent/seal.py": "seal.py",
+        "common/pcapx/pcaputil/dlms-udp-adjacent/cases/native-new-invoke-30.pcap": "cases/native-new-invoke-30.pcap",
+        "common/pcapx/pcaputil/dlms-udp-adjacent/answers/native-new-invoke-30.json": "answers/native-new-invoke-30.json",
+        "common/pcapx/pcaputil/dlms-udp-adjacent/cases/native-new-invoke-31.pcap": "cases/native-new-invoke-31.pcap",
+        "common/pcapx/pcaputil/dlms-udp-adjacent/answers/native-new-invoke-31.json": "answers/native-new-invoke-31.json",
+        "common/pcapx/pcaputil/dlms-udp-adjacent/cases/native-progression-or-logical-port.pcap": "cases/native-progression-or-logical-port.pcap",
+        "common/pcapx/pcaputil/dlms-udp-adjacent/answers/native-progression-or-logical-port.json": "answers/native-progression-or-logical-port.json",
+        "common/pcapx/pcaputil/dlms-udp-adjacent/cases/native-old-late-before.pcap": "cases/native-old-late-before.pcap",
+        "common/pcapx/pcaputil/dlms-udp-adjacent/answers/native-old-late-before.json": "answers/native-old-late-before.json",
+        "common/pcapx/pcaputil/dlms-udp-adjacent/cases/native-old-late-after.pcap": "cases/native-old-late-after.pcap",
+        "common/pcapx/pcaputil/dlms-udp-adjacent/answers/native-old-late-after.json": "answers/native-old-late-after.json",
+        "common/pcapx/pcaputil/dlms-udp-adjacent/cases/native-old-request-during.pcap": "cases/native-old-request-during.pcap",
+        "common/pcapx/pcaputil/dlms-udp-adjacent/answers/native-old-request-during.json": "answers/native-old-request-during.json",
+        "common/pcapx/pcaputil/dlms-udp-adjacent/cases/native-wrong-direction.pcap": "cases/native-wrong-direction.pcap",
+        "common/pcapx/pcaputil/dlms-udp-adjacent/answers/native-wrong-direction.json": "answers/native-wrong-direction.json",
+        "common/pcapx/pcaputil/dlms-udp-adjacent/cases/native-flags-mismatch.pcap": "cases/native-flags-mismatch.pcap",
+        "common/pcapx/pcaputil/dlms-udp-adjacent/answers/native-flags-mismatch.json": "answers/native-flags-mismatch.json",
+        "common/pcapx/pcaputil/dlms-udp-adjacent/cases/native-retrograde-old.pcap": "cases/native-retrograde-old.pcap",
+        "common/pcapx/pcaputil/dlms-udp-adjacent/answers/native-retrograde-old.json": "answers/native-retrograde-old.json",
+        "common/pcapx/pcaputil/dlms-udp-adjacent/cases/wrapper-new-invoke-30.pcap": "cases/wrapper-new-invoke-30.pcap",
+        "common/pcapx/pcaputil/dlms-udp-adjacent/answers/wrapper-new-invoke-30.json": "answers/wrapper-new-invoke-30.json",
+        "common/pcapx/pcaputil/dlms-udp-adjacent/cases/wrapper-new-invoke-31.pcap": "cases/wrapper-new-invoke-31.pcap",
+        "common/pcapx/pcaputil/dlms-udp-adjacent/answers/wrapper-new-invoke-31.json": "answers/wrapper-new-invoke-31.json",
+        "common/pcapx/pcaputil/dlms-udp-adjacent/cases/wrapper-progression-or-logical-port.pcap": "cases/wrapper-progression-or-logical-port.pcap",
+        "common/pcapx/pcaputil/dlms-udp-adjacent/answers/wrapper-progression-or-logical-port.json": "answers/wrapper-progression-or-logical-port.json",
+        "common/pcapx/pcaputil/dlms-udp-adjacent/cases/wrapper-old-late-before.pcap": "cases/wrapper-old-late-before.pcap",
+        "common/pcapx/pcaputil/dlms-udp-adjacent/answers/wrapper-old-late-before.json": "answers/wrapper-old-late-before.json",
+        "common/pcapx/pcaputil/dlms-udp-adjacent/cases/wrapper-old-late-after.pcap": "cases/wrapper-old-late-after.pcap",
+        "common/pcapx/pcaputil/dlms-udp-adjacent/answers/wrapper-old-late-after.json": "answers/wrapper-old-late-after.json",
+        "common/pcapx/pcaputil/dlms-udp-adjacent/cases/wrapper-old-request-during.pcap": "cases/wrapper-old-request-during.pcap",
+        "common/pcapx/pcaputil/dlms-udp-adjacent/answers/wrapper-old-request-during.json": "answers/wrapper-old-request-during.json",
+        "common/pcapx/pcaputil/dlms-udp-adjacent/cases/wrapper-wrong-direction.pcap": "cases/wrapper-wrong-direction.pcap",
+        "common/pcapx/pcaputil/dlms-udp-adjacent/answers/wrapper-wrong-direction.json": "answers/wrapper-wrong-direction.json",
+        "common/pcapx/pcaputil/dlms-udp-adjacent/cases/wrapper-flags-mismatch.pcap": "cases/wrapper-flags-mismatch.pcap",
+        "common/pcapx/pcaputil/dlms-udp-adjacent/answers/wrapper-flags-mismatch.json": "answers/wrapper-flags-mismatch.json",
+        "common/pcapx/pcaputil/dlms-udp-adjacent/cases/wrapper-retrograde-old.pcap": "cases/wrapper-retrograde-old.pcap",
+        "common/pcapx/pcaputil/dlms-udp-adjacent/answers/wrapper-retrograde-old.json": "answers/wrapper-retrograde-old.json",
+        "common/pcapx/pcaputil/dlms-udp-adjacent/controls.json": "controls.json",
+        "common/pcapx/pcaputil/dlms-udp-adjacent/validation/expected.json": "validation/expected.json"
+      }
     }
   ],
   "schema_version": 1,

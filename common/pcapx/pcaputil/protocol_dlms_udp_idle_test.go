@@ -15,6 +15,7 @@ import (
 // the next reply was emitted for the expired request or its later reuse.
 // Expiration must not manufacture a fresh trustworthy exchange identity.
 func TestDLMSUDPIdleReuseExistingAPI(t *testing.T) {
+	t.Run("completed-fresh", testDLMSUDPIdleFreshIdentityExistingAPI)
 	native := dlmsWires(t, "get-u8")
 	var wrapper [][]byte
 	for _, c := range wrapperStructuredControls(t) {
@@ -104,20 +105,23 @@ type dlmsIdleControl struct {
 }
 
 func dlmsIdleControls(t *testing.T) []dlmsIdleControl {
+	return dlmsIdleControlsFrom(t, "dlms-udp-idle", "owned-dlms-udp-idle/v1", 12)
+}
+func dlmsIdleControlsFrom(t *testing.T, folder, schema string, count int) []dlmsIdleControl {
 	t.Helper()
-	b, err := trafficfixture.ReadFile("dlms-udp-idle/controls.json")
+	b, err := trafficfixture.ReadFile(folder + "/controls.json")
 	require.NoError(t, err)
 	var d struct {
 		Schema string
 		Cases  []dlmsIdleControl
 	}
 	require.NoError(t, json.Unmarshal(b, &d))
-	require.Equal(t, "owned-dlms-udp-idle/v1", d.Schema)
-	require.Len(t, d.Cases, 12)
+	require.Equal(t, schema, d.Schema)
+	require.Len(t, d.Cases, count)
 	all, err := trafficfixture.AllExpectations()
 	require.NoError(t, err)
 	for _, c := range d.Cases {
-		ab, err := trafficfixture.ReadFile("dlms-udp-idle/" + c.Answer)
+		ab, err := trafficfixture.ReadFile(folder + "/" + c.Answer)
 		require.NoError(t, err)
 		require.Equal(t, c.AnswerSHA, fmt.Sprintf("%x", sha256.Sum256(ab)))
 		var a dlmsIdleControl
@@ -126,7 +130,7 @@ func dlmsIdleControls(t *testing.T) []dlmsIdleControl {
 		bound := 0
 		for _, batch := range all {
 			for _, row := range batch.Cases {
-				if row.ID != "dlms-udp-idle/"+c.ID {
+				if row.ID != folder+"/"+c.ID {
 					continue
 				}
 				require.Equal(t, c.SHA256, row.Input.SHA256)
@@ -140,9 +144,13 @@ func dlmsIdleControls(t *testing.T) []dlmsIdleControl {
 	return d.Cases
 }
 func TestDLMSUDPIdleSealedMatrix(t *testing.T) {
-	for _, c := range dlmsIdleControls(t) {
+	runDLMSUDPIdleMatrix(t, "dlms-udp-idle", dlmsIdleControls(t))
+	runDLMSUDPIdleMatrix(t, "dlms-udp-adjacent", dlmsIdleControlsFrom(t, "dlms-udp-adjacent", "owned-dlms-udp-adjacent/v1", 18))
+}
+func runDLMSUDPIdleMatrix(t *testing.T, folder string, controls []dlmsIdleControl) {
+	for _, c := range controls {
 		t.Run(c.ID, func(t *testing.T) {
-			raw, err := trafficfixture.ReadFile("dlms-udp-idle/" + c.Capture)
+			raw, err := trafficfixture.ReadFile(folder + "/" + c.Capture)
 			require.NoError(t, err)
 			require.Equal(t, c.SHA256, fmt.Sprintf("%x", sha256.Sum256(raw)))
 			discoveryMatrix(t, func(t *testing.T, workers int, deferred, observe bool) {
@@ -205,6 +213,7 @@ func TestDLMSUDPIdleSealedMatrix(t *testing.T) {
 	}
 }
 func TestDLMSUDPIdleQuarantineBudgetAndDomains(t *testing.T) {
+	t.Run("completed-history", testDLMSUDPIdleCompletedHistoryBudget)
 	native := dlmsWires(t, "get-u8")
 	q, r := native[0], native[1]
 	b := DefaultParserBudget()

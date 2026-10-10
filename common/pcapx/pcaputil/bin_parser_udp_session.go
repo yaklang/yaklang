@@ -27,18 +27,34 @@ type binUDPStore struct {
 }
 
 // Idle time is not a wire generation boundary for UDP. Keep a bounded,
-// capture-domain/endpoint-scoped quarantine slot while releasing the pending
-// wire, fragments and Data graph. Removing the slot would allow a delayed
-// response to acquire an identical request's newly allocated identity.
+// capture-domain/endpoint-scoped identity history while releasing pending wire,
+// fragments and Data. A fully completed exchange may accept a distinct identity
+// using its retained sequence/context history; idle alone must not revoke that
+// history or manufacture a fresh generation. An unfinished exchange still needs
+// quarantine because its peer progression was not completely observed.
 func (f *binFlow) retireDLMSUDP() {
-	if f.dlms != nil {
+	if s := f.dlms; s != nil && (s.pending != nil || s.transfer != nil || s.fragments != nil) {
 		f.dlms.invalidate()
 	}
+	retained := int64(512)
 	if f.wrapper != nil {
-		f.wrapper.invalidate()
-		f.wrapper.seen = nil
+		s := f.wrapper
+		complete := !s.blocked && s.outstanding() == 0
+		for _, p := range s.seen {
+			complete = complete && !p.blockActive
+		}
+		if complete {
+			// Keep every used logical-endpoint/invoke token charged and unusable.
+			// A late reply for one token cannot poison another pending token.
+			for _, p := range s.seen {
+				p.ambiguous, p.idleRetired = true, true
+			}
+		} else {
+			s.invalidate()
+			s.seen = nil
+		}
+		retained = s.storage()
 	}
-	const retained = int64(512)
 	if f.sessionBytes > retained {
 		f.a.buffered.Add(retained - f.sessionBytes)
 		f.sessionBytes = retained

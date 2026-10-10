@@ -75,6 +75,13 @@ func decodeWrapperBlock(m *wrapperMessage, p []byte, limit int) error {
 func (p *wrapperPending) retireBlocks()    { p.blockData = nil; p.blockActive = false; p.awaiting = false }
 func (p *wrapperPending) ambiguousBlocks() { p.pending = false; p.ambiguous = true; p.retireBlocks() }
 
+func (p *wrapperPending) ambiguousAssociation() string {
+	if p.idleRetired {
+		return "ambiguous-conversation"
+	}
+	return "ambiguous-invoke"
+}
+
 // The original request owns TransactionID. Each GET-next owns the following
 // ResponseTo. A repeated request/response or missing observed hop makes the
 // transfer ambiguous; never stitch bytes based on an invoke ID alone.
@@ -85,7 +92,7 @@ func (f *binFlow) consumeWrapperBlock(s *binDLMSWrapper, m *wrapperMessage, dir 
 			return "unmatched-block-request", nil
 		}
 		if p.ambiguous {
-			return "ambiguous-invoke", nil
+			return p.ambiguousAssociation(), nil
 		}
 		if !p.pending || !p.blockActive || p.awaiting || p.flags != m.flags || p.blockNumber != m.blockNumber || m.blockNumber == ^uint32(0) {
 			p.ambiguousBlocks()
@@ -101,7 +108,7 @@ func (f *binFlow) consumeWrapperBlock(s *binDLMSWrapper, m *wrapperMessage, dir 
 		return "unmatched-response", nil
 	}
 	if p.ambiguous {
-		return "ambiguous-invoke", nil
+		return p.ambiguousAssociation(), nil
 	}
 	if !p.pending || p.flags != m.flags || p.choice != 1 && p.choice != 3 {
 		return "unmatched-response", nil

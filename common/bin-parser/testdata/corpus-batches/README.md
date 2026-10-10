@@ -320,7 +320,8 @@ receiver succeeds on8 chains;4 list/block executions expose its premature
 partial-service decode errors and remain explicit reference diagnostics, not
 semantic agreement. Owner byte/state answers cover all56 controls. Segmented
 initial requests, GBT, negotiated link/AA/security and meter success remain
-unfinished requirements. Current inventory is the archived unifiedv17 entry.
+unfinished requirements. This batch preserves its archived unifiedv17 inventory;
+the current executable entry is identified below.
 
 `validation-dlms-udp-idle.zip` contains12 owned minimal UDP captures and34 ordered
 whole-message answers:26 literal field observations and8 typed context refusals.
@@ -335,3 +336,22 @@ modified. Shared-protocol expiry, collection limits, domain isolation, byte
 ownership and Close release also have regressions. Current executable inventory
 is `scripts/protocol-tests/required-tests-traffic-unified-v18.json`; earlier
 versioned inventories remain archived.
+
+
+`validation-dlms-udp-adjacent.zip` adds18 content-unique minimal UDP captures
+and86 whole byte/field/context answers (78 observations,8 typed refusals).
+A fully completed exchange retains bounded identity history after idle: selected
+native HDLC continues only observed NS/NR progression without reusing an
+invoke/sequence pair; Wrapper v1 permits only an unused logical-endpoint/invoke
+token. Used Wrapper tokens stay retired and charged at256 bytes each plus the
+512-byte conversation slot. A delayed response, wrong direction/flags or old
+request cannot acquire the new request identity. An unfinished request, response
+segment or Data-block expiry still needs capture-lifetime quarantine. No timed
+expiry establishes a new authenticated/negotiated peer generation.
+The existing mandatory public-API, budget and matrix roots include these cases;
+the409-root unifiedv18 inventory remains the current executable entry. These
+18 captures run216 full/deferred, worker1/2/4 and observer-off/on combinations,
+in addition to the immutable12-capture idle matrix. Owner byte/CRC/context
+answers and actual self-owned loopback ordering are separate from the fixed
+Gurux codec's three actual APDU values; neither claims device or authentication
+success. All60 preceding ZIPs and original answers remain unchanged.

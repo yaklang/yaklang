@@ -275,6 +275,7 @@ type wrapperPending struct {
 	flags, choice         byte
 	count                 int
 	pending, ambiguous    bool
+	idleRetired           bool
 	blockNumber           uint32
 	blockData             []byte
 	blockActive, awaiting bool
@@ -357,7 +358,7 @@ func (f *binFlow) consumeWrapper(dir int, w []byte, e *ProtocolEvent) error {
 			assoc = "unconfirmed-observation"
 		} else if old := s.seen[key]; old != nil {
 			old.ambiguousBlocks()
-			assoc = "ambiguous-invoke"
+			assoc = old.ambiguousAssociation()
 		} else if len(s.seen) >= f.a.budget.MaxCollectionElements {
 			s.invalidate()
 			return wrapperError(ErrResourceExceeded, "retained invoke context exceeds collection budget")
@@ -373,7 +374,7 @@ func (f *binFlow) consumeWrapper(dir int, w []byte, e *ProtocolEvent) error {
 		key := wrapperToken{1 - dir, m.destination, m.source, m.invoke}
 		p := s.seen[key]
 		if p != nil && p.ambiguous {
-			assoc = "ambiguous-invoke"
+			assoc = p.ambiguousAssociation()
 		} else if p != nil && p.pending && p.blockActive && p.flags == m.flags && (m.choice == 1 || m.choice == 3) {
 			p.ambiguousBlocks()
 			assoc = "ambiguous-block-transfer"
