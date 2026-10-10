@@ -115,7 +115,13 @@ func decodeDLMSWrapperBudget(w []byte, limit, depth int) (*wrapperMessage, error
 		case 0:
 			var data map[string]any
 			var err error
-			if wrapperExtendedScalarTag(p[4]) {
+			if p[4] == 1 || p[4] == 2 {
+				c := wrapperListCursor{wire: p, at: 4, maxDepth: depth}
+				data, err = c.data(limit, 0)
+				if err == nil && c.at != len(p) {
+					err = wrapperError(ErrMalformedMessage, "Get-normal Data has trailing bytes")
+				}
+			} else if wrapperExtendedScalarTag(p[4]) {
 				c := wrapperListCursor{wire: p, at: 4}
 				data, err = c.scalar(limit)
 				if err == nil && c.at != len(p) {

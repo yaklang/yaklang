@@ -41,11 +41,11 @@ func TestDLMSWrapperNormalDataExistingAPIBaseline(t *testing.T) {
 }
 
 func TestDLMSWrapperNormalExtendedSealedMatrix(t *testing.T) {
-	wrapperBlocksReplay(t, wrapperBlockControlsFrom(t, "dlms-normal-data", 29))
+	wrapperBlocksReplay(t, wrapperNormalExtendedControls(t))
 }
 
 func TestDLMSWrapperNormalExtendedBudgetsOwnership(t *testing.T) {
-	wrapperBlocksOwnership(t, wrapperBlockControlsFrom(t, "dlms-normal-data", 29))
+	wrapperBlocksOwnership(t, wrapperNormalExtendedControls(t))
 }
 
 func TestDLMSWrapperNormalExtendedProjectionBoundary(t *testing.T) {

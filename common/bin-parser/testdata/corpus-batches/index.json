@@ -27319,6 +27319,304 @@
         "common/pcapx/pcaputil/dlms-normal-data/validation/expected.json": "validation/expected.json",
         "scripts/protocol-tests/required-tests-traffic-unified-v4.json": "required-tests-traffic-unified-v4.json"
       }
+    },
+    {
+      "id": "validation-dlms-normal-graph",
+      "kind": "validation",
+      "source_sha": "37e673245989337ab43f472cb03d758b1cdef837",
+      "file": "validation-dlms-normal-graph.zip",
+      "sha256": "e6e0caa7fefd4dbf11471cd4a771a5de50df9857fc6de986e5360fd0a375b164",
+      "password": "bin-parser",
+      "members": {
+        "build.py": {
+          "sha256": "864539001bd8d768ecb3fceae68f6d2e0104bfc682f11b0302045a5970481418",
+          "bytes": 4375
+        },
+        "carrier.py": {
+          "sha256": "07db3352defd52e18936a68d327f675a57abc90c59611492c049f102b08843d2",
+          "bytes": 3782
+        },
+        "oracle.py": {
+          "sha256": "b9ba57b64780efe479d28f0f172ad3b2da5dc8df3ab0c01daf5602a524f61819",
+          "bytes": 4076
+        },
+        "axdr.py": {
+          "sha256": "5241b8f2df255ff4d3baac5a91ad25129c071ec646fd90fd5d2b8f765644648f",
+          "bytes": 7240
+        },
+        "reference-check.py": {
+          "sha256": "7a66ba7d17dcc8e706634edfeb20cfed13a2e1372f723d4427a7d6d8ea3cb3d7",
+          "bytes": 4212
+        },
+        "verify-controls.py": {
+          "sha256": "7f27ad012b2a2ae6d8b2df9614a146a77c04a84e3956fb5b4a7a47a8e3bb95ed",
+          "bytes": 1726
+        },
+        "seal.py": {
+          "sha256": "3d0c9d3fec307c67425028a16ba54b4a388b86b8a430d9534da0a93f53736e9a",
+          "bytes": 5407
+        },
+        "source-pin.json": {
+          "sha256": "22aeeac02864a3f820f9a00eedf785af2a675c829f8daafbb2b02c6802d6a2f4",
+          "bytes": 12658
+        },
+        "required-tests-traffic-unified-v5.json": {
+          "sha256": "20867d6393ee51a685052f7a097f92a21b925165c9b1952290f305d35679caa6",
+          "bytes": 111758
+        },
+        "cases/normal-graph-basic-tcp.pcap": {
+          "sha256": "f641a2b48ad01f0bf921551047846ecd0cfadb505e04ac9b6b0efa628f488e0b",
+          "bytes": 415
+        },
+        "answers/normal-graph-basic-tcp.json": {
+          "sha256": "282e582d2912af446cd8b405b95c604abb88521e0ba05045be3d2796f2ffe661",
+          "bytes": 3453
+        },
+        "cases/normal-graph-struct-tcp.pcap": {
+          "sha256": "67b1164d185fc954c4f5d5ab3cbf87ec3677d04a053401b78f0df109da6a7fbd",
+          "bytes": 423
+        },
+        "answers/normal-graph-struct-tcp.json": {
+          "sha256": "e4cfc45f2169649f791c37a7f72d383652e446fb21c4e956b1b7880a4d4f8a6d",
+          "bytes": 4091
+        },
+        "cases/normal-graph-basic-udp.pcap": {
+          "sha256": "6f480d52e51adc6469d27e65924bbefa0df68e444f57a82b8cbd10cbe5ddf693",
+          "bytes": 181
+        },
+        "answers/normal-graph-basic-udp.json": {
+          "sha256": "d585f792ef779d8bbccfca18e2c01750f99145e5582d29271da4f5001f57ed93",
+          "bytes": 3453
+        },
+        "cases/normal-graph-struct-udp.pcap": {
+          "sha256": "ce79104aaa8928b241b06103244beb406a7ec88ac8c9dd04714b4b156b7cd3c6",
+          "bytes": 189
+        },
+        "answers/normal-graph-struct-udp.json": {
+          "sha256": "079010c210bbc5383764995bbfb6a6271424557a294343e1ec4165b62c3be416",
+          "bytes": 4091
+        },
+        "answers/normal-graph-empty-array.json": {
+          "sha256": "cc931d5e875b67d83779233de2fcd934d08e134be09fb9d52e8197032628eddd",
+          "bytes": 3088
+        },
+        "cases/normal-graph-empty-struct.pcap": {
+          "sha256": "b6cc8b0ec918b8da70d05cf15a7b0d7d8d44b1cce8aac219e31b1ec590e95931",
+          "bytes": 409
+        },
+        "answers/normal-graph-empty-struct.json": {
+          "sha256": "0305d249ca7fdc7f5a6a0fdc42fc25db1cb413b78d17919c5516a754e2791920",
+          "bytes": 3095
+        },
+        "cases/normal-graph-legacy-scalars.pcap": {
+          "sha256": "a3ef5481d66665fce6d45aac2ec69a2489426e56a447e8a10e6ad484ace08550",
+          "bytes": 452
+        },
+        "answers/normal-graph-legacy-scalars.json": {
+          "sha256": "8918c77f393f5ad624a38a2920d1abcb6659fffca7716b2823ccf50a3e35ff3a",
+          "bytes": 4818
+        },
+        "cases/normal-graph-bits-padding.pcap": {
+          "sha256": "70903b66fea6d616dd9e43354c2f331f1835efe155bff15c605f6ffb17d19395",
+          "bytes": 412
+        },
+        "answers/normal-graph-bits-padding.json": {
+          "sha256": "966a58abb22cbd1db6f8176ea913f3e0d3480bc1c714e6e5c8cfa9aa7c4f4797",
+          "bytes": 3356
+        },
+        "cases/normal-graph-bits0.pcap": {
+          "sha256": "1fe4138f933737c742835e84bbb28b5e67c58d71d2c4382eecc8602b010ef028",
+          "bytes": 411
+        },
+        "answers/normal-graph-bits0.json": {
+          "sha256": "92181381d3f722ebcddb0234a522f4edf06100a40e6c48d34f1dea775dbb3afe",
+          "bytes": 3323
+        },
+        "cases/normal-graph-node256.pcap": {
+          "sha256": "cc532b7691e6c0b6575d6af8aaddbee233532609a10bc4cdc7f18b39e2342a10",
+          "bytes": 665
+        },
+        "answers/normal-graph-node256.json": {
+          "sha256": "461c0436a91308caf5ccd8e61aa0295bfc189586a3edcb7dd3728e68352d3f44",
+          "bytes": 33959
+        },
+        "cases/normal-graph-depth8.pcap": {
+          "sha256": "a9368df1a9e69d90fe60176bcdefc3fd1098c445f48afec412f5738c292e06ad",
+          "bytes": 424
+        },
+        "answers/normal-graph-depth8.json": {
+          "sha256": "110fef7b28231370c3ff11af0562d3f489fb41f753b2b31840bebd740f7a338b",
+          "bytes": 5221
+        },
+        "cases/normal-graph-depth9.pcap": {
+          "sha256": "b92f16d44a02ef5ec0437e4073d983302a73cd23dffffb03cee12d00f3d62176",
+          "bytes": 426
+        },
+        "answers/normal-graph-depth9.json": {
+          "sha256": "de4a5cfa38c4db177c69d827f2e401b7d332b99a3c1b062594adbc60f7697288",
+          "bytes": 2448
+        },
+        "cases/normal-graph-octet1024.pcap": {
+          "sha256": "99bc4370f66f40f6f073f0d5cdb6b614ff0584e9cc47fe7b40130d8bdafc84c0",
+          "bytes": 1437
+        },
+        "answers/normal-graph-octet1024.json": {
+          "sha256": "78b951aaf1c10e5605cf34e72c3850a2ad9837ca4084321876d661783dedb02b",
+          "bytes": 15617
+        },
+        "cases/normal-graph-octet1025.pcap": {
+          "sha256": "8294bd1ea5a69b655de507990ff1675d7bd87c88b795718148136037260dbaf6",
+          "bytes": 1438
+        },
+        "answers/normal-graph-octet1025.json": {
+          "sha256": "ec1b3d4a1d4ca93a199b6801960a1bd3d910d75d35039248268ef89a046a591b",
+          "bytes": 6503
+        },
+        "cases/normal-graph-node257.pcap": {
+          "sha256": "d44515b2ca09fa2bc976b79bede29b105c01e76b8ba43cb0da0692005010745f",
+          "bytes": 667
+        },
+        "answers/normal-graph-node257.json": {
+          "sha256": "4a41cc3859ba8c4293ff3071b9ade5ca2d1c4dfdff012cf82762e5bc8735bd10",
+          "bytes": 3425
+        },
+        "cases/normal-graph-node257-udp.pcap": {
+          "sha256": "c0ce899a235549c5f0846503e4ed603cfa30ea02f32f0c65dc8ab50acd655327",
+          "bytes": 506
+        },
+        "answers/normal-graph-node257-udp.json": {
+          "sha256": "8a08bb8c64bc85869659addfb3dc1962508ef9ebf74324679b025e2afd36b4fe",
+          "bytes": 4739
+        },
+        "cases/normal-graph-count-truncated.pcap": {
+          "sha256": "03124573c3a6746a4a3dcea12e2da5b5a42a64a4bf86287cee037dbb9c0611f4",
+          "bytes": 408
+        },
+        "answers/normal-graph-count-truncated.json": {
+          "sha256": "7841b5064c914a9e653d6968f2ff78af2d1931968238b133ee19f3c9b067c1c0",
+          "bytes": 2386
+        },
+        "cases/normal-graph-children-missing.pcap": {
+          "sha256": "a42aae152407ad5eaa6c324d358ce80ecc0bbd020d1e6ea1178f5510089be71c",
+          "bytes": 412
+        },
+        "answers/normal-graph-children-missing.json": {
+          "sha256": "e5cf6c18920085d709daa7cf95d261c1ab278e3a7fca2467f5bb0c4ef3b606ba",
+          "bytes": 2405
+        },
+        "cases/normal-graph-trailing.pcap": {
+          "sha256": "5e6c0d59c22761c1c1953387eca53ef4d5578865da97068b10666728c27ae024",
+          "bytes": 413
+        },
+        "answers/normal-graph-trailing.json": {
+          "sha256": "edb20b56a50fef984a5029685ca323d0b9fce7814b759f55f3cbb2425d6027ae",
+          "bytes": 2391
+        },
+        "cases/normal-graph-invalid-utf8.pcap": {
+          "sha256": "bdcc9369ee657b2a2d4d2baff21b58b299881f967c7f6a2e16249e4d643ae714",
+          "bytes": 413
+        },
+        "answers/normal-graph-invalid-utf8.json": {
+          "sha256": "31779d6c34d99dca457b3840e11ddc39cf6ab5c706d249532f0ebdc9f63a0f86",
+          "bytes": 2432
+        },
+        "cases/normal-graph-date-time-pending.pcap": {
+          "sha256": "fb4b4d455c1dbd9809afc6d1adad3317d740135d9c7c38d0824b598abb1dee27",
+          "bytes": 410
+        },
+        "answers/normal-graph-date-time-pending.json": {
+          "sha256": "74a07bb29899913247311286ceaa99058153e5540da45e3df162c994201655a6",
+          "bytes": 2431
+        },
+        "cases/normal-graph-literal80-pending.pcap": {
+          "sha256": "4c269e942ec75d1f1a2cea38d0e093b4946ddae990b61e49a8fe73266e3e8c19",
+          "bytes": 409
+        },
+        "answers/normal-graph-literal80-pending.json": {
+          "sha256": "e12e41ab1a5060980f66bd059dc486fff1bb850708303fe4fb3bfb14516a6aed",
+          "bytes": 2447
+        },
+        "answers/normal-graph-collection3.json": {
+          "sha256": "1c8f1b278c39d6e4343686c4eef0df29d5f3375c23f0896abfb25dfb6957e3fa",
+          "bytes": 6151
+        },
+        "cases/normal-graph-collection2.pcap": {
+          "sha256": "48518e5699245943979a93001731793b0d1edac6fb2e9d1c5f68d42939a5b4f0",
+          "bytes": 254
+        },
+        "answers/normal-graph-collection2.json": {
+          "sha256": "2941994e6e63f9e23ff0020ef1cf13fd6685be0612e2cfe1224d232623eee5ea",
+          "bytes": 7625
+        },
+        "controls.json": {
+          "sha256": "b10d3d70dac39ea26ca4e1ac5a314e3185b02ac106cfec20da3edf5fcc092bac",
+          "bytes": 149242
+        },
+        "validation/expected.json": {
+          "sha256": "4409b858cb99a9c861be72dc1da6bd13aee2ff66ff3fd0b10ed3f6f95ff6c872",
+          "bytes": 25321
+        }
+      },
+      "aliases": {
+        "common/pcapx/pcaputil/dlms-normal-graph/build.py": "build.py",
+        "common/pcapx/pcaputil/dlms-normal-graph/carrier.py": "carrier.py",
+        "common/pcapx/pcaputil/dlms-normal-graph/oracle.py": "oracle.py",
+        "common/pcapx/pcaputil/dlms-normal-graph/axdr.py": "axdr.py",
+        "common/pcapx/pcaputil/dlms-normal-graph/reference-check.py": "reference-check.py",
+        "common/pcapx/pcaputil/dlms-normal-graph/verify-controls.py": "verify-controls.py",
+        "common/pcapx/pcaputil/dlms-normal-graph/seal.py": "seal.py",
+        "common/pcapx/pcaputil/dlms-normal-graph/source-pin.json": "source-pin.json",
+        "common/pcapx/pcaputil/dlms-normal-graph/required-tests-traffic-unified-v5.json": "required-tests-traffic-unified-v5.json",
+        "common/pcapx/pcaputil/dlms-normal-graph/cases/normal-graph-basic-tcp.pcap": "cases/normal-graph-basic-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-normal-graph/answers/normal-graph-basic-tcp.json": "answers/normal-graph-basic-tcp.json",
+        "common/pcapx/pcaputil/dlms-normal-graph/cases/normal-graph-struct-tcp.pcap": "cases/normal-graph-struct-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-normal-graph/answers/normal-graph-struct-tcp.json": "answers/normal-graph-struct-tcp.json",
+        "common/pcapx/pcaputil/dlms-normal-graph/cases/normal-graph-basic-udp.pcap": "cases/normal-graph-basic-udp.pcap",
+        "common/pcapx/pcaputil/dlms-normal-graph/answers/normal-graph-basic-udp.json": "answers/normal-graph-basic-udp.json",
+        "common/pcapx/pcaputil/dlms-normal-graph/cases/normal-graph-struct-udp.pcap": "cases/normal-graph-struct-udp.pcap",
+        "common/pcapx/pcaputil/dlms-normal-graph/answers/normal-graph-struct-udp.json": "answers/normal-graph-struct-udp.json",
+        "common/pcapx/pcaputil/dlms-normal-graph/answers/normal-graph-empty-array.json": "answers/normal-graph-empty-array.json",
+        "common/pcapx/pcaputil/dlms-normal-graph/cases/normal-graph-empty-struct.pcap": "cases/normal-graph-empty-struct.pcap",
+        "common/pcapx/pcaputil/dlms-normal-graph/answers/normal-graph-empty-struct.json": "answers/normal-graph-empty-struct.json",
+        "common/pcapx/pcaputil/dlms-normal-graph/cases/normal-graph-legacy-scalars.pcap": "cases/normal-graph-legacy-scalars.pcap",
+        "common/pcapx/pcaputil/dlms-normal-graph/answers/normal-graph-legacy-scalars.json": "answers/normal-graph-legacy-scalars.json",
+        "common/pcapx/pcaputil/dlms-normal-graph/cases/normal-graph-bits-padding.pcap": "cases/normal-graph-bits-padding.pcap",
+        "common/pcapx/pcaputil/dlms-normal-graph/answers/normal-graph-bits-padding.json": "answers/normal-graph-bits-padding.json",
+        "common/pcapx/pcaputil/dlms-normal-graph/cases/normal-graph-bits0.pcap": "cases/normal-graph-bits0.pcap",
+        "common/pcapx/pcaputil/dlms-normal-graph/answers/normal-graph-bits0.json": "answers/normal-graph-bits0.json",
+        "common/pcapx/pcaputil/dlms-normal-graph/cases/normal-graph-node256.pcap": "cases/normal-graph-node256.pcap",
+        "common/pcapx/pcaputil/dlms-normal-graph/answers/normal-graph-node256.json": "answers/normal-graph-node256.json",
+        "common/pcapx/pcaputil/dlms-normal-graph/cases/normal-graph-depth8.pcap": "cases/normal-graph-depth8.pcap",
+        "common/pcapx/pcaputil/dlms-normal-graph/answers/normal-graph-depth8.json": "answers/normal-graph-depth8.json",
+        "common/pcapx/pcaputil/dlms-normal-graph/cases/normal-graph-depth9.pcap": "cases/normal-graph-depth9.pcap",
+        "common/pcapx/pcaputil/dlms-normal-graph/answers/normal-graph-depth9.json": "answers/normal-graph-depth9.json",
+        "common/pcapx/pcaputil/dlms-normal-graph/cases/normal-graph-octet1024.pcap": "cases/normal-graph-octet1024.pcap",
+        "common/pcapx/pcaputil/dlms-normal-graph/answers/normal-graph-octet1024.json": "answers/normal-graph-octet1024.json",
+        "common/pcapx/pcaputil/dlms-normal-graph/cases/normal-graph-octet1025.pcap": "cases/normal-graph-octet1025.pcap",
+        "common/pcapx/pcaputil/dlms-normal-graph/answers/normal-graph-octet1025.json": "answers/normal-graph-octet1025.json",
+        "common/pcapx/pcaputil/dlms-normal-graph/cases/normal-graph-node257.pcap": "cases/normal-graph-node257.pcap",
+        "common/pcapx/pcaputil/dlms-normal-graph/answers/normal-graph-node257.json": "answers/normal-graph-node257.json",
+        "common/pcapx/pcaputil/dlms-normal-graph/cases/normal-graph-node257-udp.pcap": "cases/normal-graph-node257-udp.pcap",
+        "common/pcapx/pcaputil/dlms-normal-graph/answers/normal-graph-node257-udp.json": "answers/normal-graph-node257-udp.json",
+        "common/pcapx/pcaputil/dlms-normal-graph/cases/normal-graph-count-truncated.pcap": "cases/normal-graph-count-truncated.pcap",
+        "common/pcapx/pcaputil/dlms-normal-graph/answers/normal-graph-count-truncated.json": "answers/normal-graph-count-truncated.json",
+        "common/pcapx/pcaputil/dlms-normal-graph/cases/normal-graph-children-missing.pcap": "cases/normal-graph-children-missing.pcap",
+        "common/pcapx/pcaputil/dlms-normal-graph/answers/normal-graph-children-missing.json": "answers/normal-graph-children-missing.json",
+        "common/pcapx/pcaputil/dlms-normal-graph/cases/normal-graph-trailing.pcap": "cases/normal-graph-trailing.pcap",
+        "common/pcapx/pcaputil/dlms-normal-graph/answers/normal-graph-trailing.json": "answers/normal-graph-trailing.json",
+        "common/pcapx/pcaputil/dlms-normal-graph/cases/normal-graph-invalid-utf8.pcap": "cases/normal-graph-invalid-utf8.pcap",
+        "common/pcapx/pcaputil/dlms-normal-graph/answers/normal-graph-invalid-utf8.json": "answers/normal-graph-invalid-utf8.json",
+        "common/pcapx/pcaputil/dlms-normal-graph/cases/normal-graph-date-time-pending.pcap": "cases/normal-graph-date-time-pending.pcap",
+        "common/pcapx/pcaputil/dlms-normal-graph/answers/normal-graph-date-time-pending.json": "answers/normal-graph-date-time-pending.json",
+        "common/pcapx/pcaputil/dlms-normal-graph/cases/normal-graph-literal80-pending.pcap": "cases/normal-graph-literal80-pending.pcap",
+        "common/pcapx/pcaputil/dlms-normal-graph/answers/normal-graph-literal80-pending.json": "answers/normal-graph-literal80-pending.json",
+        "common/pcapx/pcaputil/dlms-normal-graph/answers/normal-graph-collection3.json": "answers/normal-graph-collection3.json",
+        "common/pcapx/pcaputil/dlms-normal-graph/cases/normal-graph-collection2.pcap": "cases/normal-graph-collection2.pcap",
+        "common/pcapx/pcaputil/dlms-normal-graph/answers/normal-graph-collection2.json": "answers/normal-graph-collection2.json",
+        "common/pcapx/pcaputil/dlms-normal-graph/controls.json": "controls.json",
+        "common/pcapx/pcaputil/dlms-normal-graph/validation/expected.json": "validation/expected.json",
+        "scripts/protocol-tests/required-tests-traffic-unified-v5.json": "required-tests-traffic-unified-v5.json"
+      }
     }
   ],
   "schema_version": 1,
