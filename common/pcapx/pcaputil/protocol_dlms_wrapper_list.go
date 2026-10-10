@@ -7,7 +7,7 @@ import (
 )
 
 // These are local selected-profile bounds, not DLMS wire maxima.
-// Data types other than scalar/octet/array/structure, block transfer, ciphering
+// Data types other than scalar/octet/bit-string/array/structure, block transfer, ciphering
 // and object/selector semantics remain separate.
 const wrapperListItems = 64
 const wrapperListOctets = 1024
@@ -84,21 +84,37 @@ func (c *wrapperListCursor) scalar(limit int) (map[string]any, error) {
 		}
 		return wrapperScalar(c.wire[start:c.at], limit)
 	}
-	if tag != 9 {
-		return nil, wrapperError(ErrUnsupportedFeature, "Data type outside bounded scalar/octet-string profile")
+	if tag != 9 && tag != 4 {
+		return nil, wrapperError(ErrUnsupportedFeature, "Data type outside bounded scalar/octet/bit-string profile")
 	}
 	n, enc, err := c.count()
 	if err != nil {
 		return nil, err
 	}
-	if n > uint64(min(limit, wrapperListOctets)) {
+	bytes := n
+	if tag == 4 {
+		// A-XDR bit-string counts bits, MSB first, rather than value bytes.
+		// Bound the unsigned determinant before conversion or value allocation.
+		// Preserve unused low bits in value_hex; they are not semantic bits and
+		// their nonzero value alone is not an invalid-message assertion.
+		if n > uint64(min(limit, wrapperListOctets))*8 {
+			return nil, wrapperError(ErrResourceExceeded, "list bit-string exceeds selected byte/collection budget")
+		}
+		bytes = (n + 7) / 8
+	} else if bytes > uint64(min(limit, wrapperListOctets)) {
 		return nil, wrapperError(ErrResourceExceeded, "list octet value exceeds selected byte/collection budget")
 	}
-	w, err = c.take(int(n))
+	w, err = c.take(int(bytes))
 	if err != nil {
 		return nil, err
 	}
-	return map[string]any{"type": tag, "length": n, "length_encoding_hex": enc, "value_hex": hex.EncodeToString(w), "raw_hex": hex.EncodeToString(c.wire[start:c.at])}, nil
+	out := map[string]any{"type": tag, "length_encoding_hex": enc, "value_hex": hex.EncodeToString(w), "raw_hex": hex.EncodeToString(c.wire[start:c.at])}
+	if tag == 4 {
+		out["bit_length"], out["unused_bits"] = n, (8-n%8)%8
+	} else {
+		out["length"] = n
+	}
+	return out, nil
 }
 
 // data consumes exactly one bounded A-XDR value. Its shared node counter spans

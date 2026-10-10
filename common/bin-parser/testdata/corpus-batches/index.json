@@ -24330,6 +24330,329 @@
         "common/pcapx/pcaputil/dlms-structured/verify-controls.py": "verify-controls.py",
         "scripts/protocol-tests/required-tests-v33.json": "required-tests-v33.json"
       }
+    },
+    {
+      "id": "validation-dlms-bits-c25dc72aad3",
+      "kind": "validation",
+      "source_sha": "c25dc72aad3eb1c8fa157106084d84b2914e7506",
+      "file": "validation-dlms-bits-c25dc72aad3.zip",
+      "sha256": "076a607bc10adfd02356c1b7f1c9e480bc839fc6bf97c4904c09f70acec0030e",
+      "password": "bin-parser",
+      "members": {
+        "answers/bits-aligned.json": {
+          "sha256": "9c39575d4ddb0f95c57d29bc0f2bd5292f72c6d0b4b2350d63e9adb5c3c5364a",
+          "bytes": 2921
+        },
+        "answers/bits-caller-bytes-udp.json": {
+          "sha256": "ff59f2e2f11235b57d3b74a9c185adac0ba456c4ad8f748869a7bebbf79b157f",
+          "bytes": 12165
+        },
+        "answers/bits-cap-8192.json": {
+          "sha256": "be2c26b364cb1c3e15c1993ce406b0814cef85fcc9fbb6e3f334955184183ede",
+          "bytes": 15200
+        },
+        "answers/bits-cap-8193.json": {
+          "sha256": "18ec56e6ce8e1f79f8a122e2dade762e6a1506c5fcbee604f0153049a751445a",
+          "bytes": 5221
+        },
+        "answers/bits-count-short.json": {
+          "sha256": "2224bec5aa4a3d697fedc51d755c98132a6dfd686af3e04224cc7569afdb135b",
+          "bytes": 1188
+        },
+        "answers/bits-count81.json": {
+          "sha256": "ba5692627fbbffa953fbd07c50bf935900f332860fcb8f127dbbce6453a78689",
+          "bytes": 2946
+        },
+        "answers/bits-count82.json": {
+          "sha256": "4440f74fd4baed196631b71695cfdf254bd3219843b3684cdbd97ca40e6b6fb8",
+          "bytes": 2958
+        },
+        "answers/bits-count83.json": {
+          "sha256": "cfd22b518c45a0fd0fefe46eee0c114664687b50788200a24e62621f9fabe5ba",
+          "bytes": 2970
+        },
+        "answers/bits-count84.json": {
+          "sha256": "22df3ee03b4ed3062764823a06911d937ff3a285579a198f68b47c9780a53052",
+          "bytes": 2982
+        },
+        "answers/bits-empty.json": {
+          "sha256": "c47dd626343a1ccaa8c0fcb83e75fbfa4116decb915c421096ef34f04f522643",
+          "bytes": 2903
+        },
+        "answers/bits-exchange-tcp.json": {
+          "sha256": "0eee30845a21cb67e9c01a7cfd1aa065a943f4024bca96334035413ffa0b057e",
+          "bytes": 5382
+        },
+        "answers/bits-exchange-udp.json": {
+          "sha256": "395b6084908801f01ae69d0011a677156a5f721bbe818c3a8732eb3bd0768dc7",
+          "bytes": 5382
+        },
+        "answers/bits-fifteen.json": {
+          "sha256": "249e5a01889cc086c92d1878468e984079c188c36797667120d45d058ffd6202",
+          "bytes": 2934
+        },
+        "answers/bits-huge.json": {
+          "sha256": "f7b607528cdec2e90e8642fa4016fed24dba3c8f79160e01bb5fd657c4571fd5",
+          "bytes": 1157
+        },
+        "answers/bits-literal80.json": {
+          "sha256": "f191f8d9fe9b2d2012a8171c3aa819c93ba7f6b830e5558d16ef19d5913fbef1",
+          "bytes": 1192
+        },
+        "answers/bits-missing.json": {
+          "sha256": "72d0e7ef8f1e2f7288abfb914b4312cc95c0968cf6888bdeaf8a4917060968b1",
+          "bytes": 1172
+        },
+        "answers/bits-nested.json": {
+          "sha256": "fa42f52d53935f0c91c117d5f449696432bec9e7f04f47f5617e130f8e79f62a",
+          "bytes": 3920
+        },
+        "answers/bits-nonzero-unused.json": {
+          "sha256": "e0251a1ecdfe3c917ae16c7078e34b8f947faa5c23a075ee9c5ac7f3aa1f8c99",
+          "bytes": 2942
+        },
+        "answers/bits-one.json": {
+          "sha256": "898cec1dacf74bb538989b612d3786dd0d0f2e397eb14d225dce0d5c214a61ac",
+          "bytes": 2909
+        },
+        "answers/bits-selection-udp.json": {
+          "sha256": "8127ffd3712327ac0a727b2b061785947574f2112e9326a1079b43163512d255",
+          "bytes": 5725
+        },
+        "answers/bits-short.json": {
+          "sha256": "74c10e36df40e6d6e68e142488615da3e344a6b048f139482379db2032bdf5a3",
+          "bytes": 1170
+        },
+        "answers/bits-split.json": {
+          "sha256": "badfa3843505f0b0f05a0185b5b2f9eebed61844d32a88ea4b0c2d91b1d365b0",
+          "bytes": 5490
+        },
+        "answers/bits-tail-short.json": {
+          "sha256": "9542a3863e8e22554602f7a9b9d290afc105593dc3a9336e9f8d825609d61d0d",
+          "bytes": 1089
+        },
+        "answers/bits-trailing.json": {
+          "sha256": "5b8262eed2daea66b12924ce1c0b195018b18068e091fa21bea4325e73691d05",
+          "bytes": 1097
+        },
+        "answers/bits-width5.json": {
+          "sha256": "3af6955a312e8f614aeabc5b09842d3303c75b60bcad83fd31471d00c7384c7d",
+          "bytes": 1175
+        },
+        "answers/bits-wrong-flags-udp.json": {
+          "sha256": "d10be176e069ad5518fb31e85b9da3ac0d8035f92c41aa62bb32dba6b210694e",
+          "bytes": 3177
+        },
+        "build.py": {
+          "sha256": "59bb29ee00710399b431fe465b5c78515f5c33da49b2c841d830936d377a18fb",
+          "bytes": 4416
+        },
+        "carrier.py": {
+          "sha256": "07db3352defd52e18936a68d327f675a57abc90c59611492c049f102b08843d2",
+          "bytes": 3782
+        },
+        "cases/bits-aligned.pcap": {
+          "sha256": "3dcb8ed2b58b0e3f4443f8ae0ce3ce0ad0415988176594913c75e94cd22e4b4d",
+          "bytes": 326
+        },
+        "cases/bits-caller-bytes-udp.pcap": {
+          "sha256": "d20c48257a2beb3abc02690463c1bc94671354181aeae8ba533c3e5efd0e8dfd",
+          "bytes": 287
+        },
+        "cases/bits-cap-8192.pcap": {
+          "sha256": "c89c67406102d12a1cefa942d3ec4ef8a803de38b5e6ef47bc2de96902ad09db",
+          "bytes": 1351
+        },
+        "cases/bits-cap-8193.pcap": {
+          "sha256": "6861d69f755aa99daf65623fc5790d93715556704f69ed951af0a052358fda23",
+          "bytes": 1352
+        },
+        "cases/bits-count-short.pcap": {
+          "sha256": "5591c8c7fafd0109a4f7b04a6586440f40cfa5d821a6f692b451c06303dbaf99",
+          "bytes": 326
+        },
+        "cases/bits-count81.pcap": {
+          "sha256": "b54e1a21e8c60f946a50c99b828776b05715574019da373571125b5fa60ea19c",
+          "bytes": 328
+        },
+        "cases/bits-count82.pcap": {
+          "sha256": "98ae90cbb02868c58f5e10f0b20e329c3368c453ca076ef64db022a437676d7f",
+          "bytes": 329
+        },
+        "cases/bits-count83.pcap": {
+          "sha256": "042b13f9e55aa2469357437836c2c17f9e491a907f59d06d9ff21302d34b3636",
+          "bytes": 330
+        },
+        "cases/bits-count84.pcap": {
+          "sha256": "ce15900aa7c758c5b0c8e21644135270d6fd066fe1c3ec7c6a6f407a87f2acc7",
+          "bytes": 331
+        },
+        "cases/bits-empty.pcap": {
+          "sha256": "efa92577b9ab28561445d73547d5e906a13c4f097e6488fdd07ab63270e7f8ea",
+          "bytes": 325
+        },
+        "cases/bits-exchange-tcp.pcap": {
+          "sha256": "1f694e1f3858419717d6ab59d24266a1bda10950ae8bd92bea53ce1c4da301ed",
+          "bytes": 439
+        },
+        "cases/bits-exchange-udp.pcap": {
+          "sha256": "d0eec06681e4bf98ad5c0df943217e762f9dcf1567605294cc2214a0f58878ed",
+          "bytes": 205
+        },
+        "cases/bits-fifteen.pcap": {
+          "sha256": "46e9df49781eb00b869ec645971b8d73262bf25b4b2a4eeebf8b6048dca42638",
+          "bytes": 327
+        },
+        "cases/bits-huge.pcap": {
+          "sha256": "559662149578cb9e15d21d0fd4c8498b0727aeed8a2caa9ab8f3e587b9ce5c91",
+          "bytes": 329
+        },
+        "cases/bits-literal80.pcap": {
+          "sha256": "e617bd971cb43b69402f7a820aec920ee1581aaf6cc0d0755dee416f60dd5aab",
+          "bytes": 325
+        },
+        "cases/bits-missing.pcap": {
+          "sha256": "ca13144d75d43bca2665762e09fb8085d6a2b16522a8d09092f9b2602aa2bc19",
+          "bytes": 325
+        },
+        "cases/bits-nested.pcap": {
+          "sha256": "a4aba64fd7fdfc737b9b8f2292ee152877aa585ee5cca9a9b92351a576078e21",
+          "bytes": 336
+        },
+        "cases/bits-nonzero-unused.pcap": {
+          "sha256": "4ced40d107de0794529f4c89f31b17d695ab1415c31d3a7318a906a6dda684b1",
+          "bytes": 326
+        },
+        "cases/bits-one.pcap": {
+          "sha256": "f077e92203516b48a48c048a597b2b01420c5d53fdfe257a7c9ad11a359eef91",
+          "bytes": 326
+        },
+        "cases/bits-selection-udp.pcap": {
+          "sha256": "6328b892f2a69cc95d6bbf63467e310b748e3645f52d70dbee3eec391cd3809d",
+          "bytes": 210
+        },
+        "cases/bits-short.pcap": {
+          "sha256": "7fdc1559b5b1af0623eae2ba3e29acf3d97b81e8697e4888568f887faf196439",
+          "bytes": 326
+        },
+        "cases/bits-split.pcap": {
+          "sha256": "c8811a443dc0e660eec8eb7ed4715502b7cb78bc5a5e9868b0fe0bccba37a8dc",
+          "bytes": 579
+        },
+        "cases/bits-tail-short.pcap": {
+          "sha256": "ab7fb294b7f70a9e4e870b8af11b271f05c18bee82b1edb20ed6b9fa60ecd01a",
+          "bytes": 320
+        },
+        "cases/bits-trailing.pcap": {
+          "sha256": "3d311d4754399eaa714dbf28d00574a0a4b6dc66114ca8515f66bff617740f94",
+          "bytes": 320
+        },
+        "cases/bits-width5.pcap": {
+          "sha256": "804dcb33ceb3987b13644f5411d0510b72d31987a63cd38f47d5ad7bf85b1ff2",
+          "bytes": 330
+        },
+        "cases/bits-wrong-flags-udp.pcap": {
+          "sha256": "1eb5a4523e23629af272f44081d1501d1085a8400316d078601d44928a3a07b2",
+          "bytes": 103
+        },
+        "controls.json": {
+          "sha256": "73bcafbae86b314e39491756f7e33385d0faa1dc3e48c443a2b716e75d8d1b9e",
+          "bytes": 108392
+        },
+        "oracle.py": {
+          "sha256": "93446f85fb7b55639cc084cd25c1fdc945c4f91b0678e86592b7566aa96ecd78",
+          "bytes": 6197
+        },
+        "reference-check.py": {
+          "sha256": "fd16ae18a00e5b772d5605756f002b48c367a45da15d068c6a0245d400ffefae",
+          "bytes": 5357
+        },
+        "required-tests-v35.json": {
+          "sha256": "1fdede58d97bf43e3066df7910fa8f02b76270b886b5f143af0fcd09ad3ab9f6",
+          "bytes": 101244
+        },
+        "seal.py": {
+          "sha256": "fd8c39f1a7dbf3dbef56ef08e583ee4f1a56001166644c4bd55c0a2e66221dbe",
+          "bytes": 5389
+        },
+        "source-pin.json": {
+          "sha256": "38ddb5ae85492146d959ba368fd8cafa4064a16f916aa53f4246c168c5ba8986",
+          "bytes": 11048
+        },
+        "validation/expected.json": {
+          "sha256": "56370495f1abfd75997d2465450ea233798ea32aefc94fa88a06220c134196c8",
+          "bytes": 27761
+        },
+        "verify-controls.py": {
+          "sha256": "812af72293c34a15ed0fddbde89e98428550305beb5137c0085a5ec4a4bfa2a0",
+          "bytes": 1411
+        }
+      },
+      "aliases": {
+        "common/pcapx/pcaputil/dlms-bits/cases/bits-exchange-tcp.pcap": "cases/bits-exchange-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-bits/cases/bits-exchange-udp.pcap": "cases/bits-exchange-udp.pcap",
+        "common/pcapx/pcaputil/dlms-bits/cases/bits-empty.pcap": "cases/bits-empty.pcap",
+        "common/pcapx/pcaputil/dlms-bits/cases/bits-one.pcap": "cases/bits-one.pcap",
+        "common/pcapx/pcaputil/dlms-bits/cases/bits-nonzero-unused.pcap": "cases/bits-nonzero-unused.pcap",
+        "common/pcapx/pcaputil/dlms-bits/cases/bits-aligned.pcap": "cases/bits-aligned.pcap",
+        "common/pcapx/pcaputil/dlms-bits/cases/bits-fifteen.pcap": "cases/bits-fifteen.pcap",
+        "common/pcapx/pcaputil/dlms-bits/cases/bits-count81.pcap": "cases/bits-count81.pcap",
+        "common/pcapx/pcaputil/dlms-bits/cases/bits-count82.pcap": "cases/bits-count82.pcap",
+        "common/pcapx/pcaputil/dlms-bits/cases/bits-count84.pcap": "cases/bits-count84.pcap",
+        "common/pcapx/pcaputil/dlms-bits/cases/bits-count83.pcap": "cases/bits-count83.pcap",
+        "common/pcapx/pcaputil/dlms-bits/cases/bits-nested.pcap": "cases/bits-nested.pcap",
+        "common/pcapx/pcaputil/dlms-bits/cases/bits-selection-udp.pcap": "cases/bits-selection-udp.pcap",
+        "common/pcapx/pcaputil/dlms-bits/cases/bits-cap-8192.pcap": "cases/bits-cap-8192.pcap",
+        "common/pcapx/pcaputil/dlms-bits/cases/bits-cap-8193.pcap": "cases/bits-cap-8193.pcap",
+        "common/pcapx/pcaputil/dlms-bits/cases/bits-short.pcap": "cases/bits-short.pcap",
+        "common/pcapx/pcaputil/dlms-bits/cases/bits-missing.pcap": "cases/bits-missing.pcap",
+        "common/pcapx/pcaputil/dlms-bits/cases/bits-count-short.pcap": "cases/bits-count-short.pcap",
+        "common/pcapx/pcaputil/dlms-bits/cases/bits-huge.pcap": "cases/bits-huge.pcap",
+        "common/pcapx/pcaputil/dlms-bits/cases/bits-literal80.pcap": "cases/bits-literal80.pcap",
+        "common/pcapx/pcaputil/dlms-bits/cases/bits-width5.pcap": "cases/bits-width5.pcap",
+        "common/pcapx/pcaputil/dlms-bits/cases/bits-tail-short.pcap": "cases/bits-tail-short.pcap",
+        "common/pcapx/pcaputil/dlms-bits/cases/bits-trailing.pcap": "cases/bits-trailing.pcap",
+        "common/pcapx/pcaputil/dlms-bits/cases/bits-caller-bytes-udp.pcap": "cases/bits-caller-bytes-udp.pcap",
+        "common/pcapx/pcaputil/dlms-bits/cases/bits-split.pcap": "cases/bits-split.pcap",
+        "common/pcapx/pcaputil/dlms-bits/cases/bits-wrong-flags-udp.pcap": "cases/bits-wrong-flags-udp.pcap",
+        "common/pcapx/pcaputil/dlms-bits/build.py": "build.py",
+        "common/pcapx/pcaputil/dlms-bits/carrier.py": "carrier.py",
+        "common/pcapx/pcaputil/dlms-bits/oracle.py": "oracle.py",
+        "common/pcapx/pcaputil/dlms-bits/verify-controls.py": "verify-controls.py",
+        "common/pcapx/pcaputil/dlms-bits/reference-check.py": "reference-check.py",
+        "common/pcapx/pcaputil/dlms-bits/source-pin.json": "source-pin.json",
+        "common/pcapx/pcaputil/dlms-bits/seal.py": "seal.py",
+        "common/pcapx/pcaputil/dlms-bits/answers/bits-exchange-tcp.json": "answers/bits-exchange-tcp.json",
+        "common/pcapx/pcaputil/dlms-bits/answers/bits-exchange-udp.json": "answers/bits-exchange-udp.json",
+        "common/pcapx/pcaputil/dlms-bits/answers/bits-empty.json": "answers/bits-empty.json",
+        "common/pcapx/pcaputil/dlms-bits/answers/bits-one.json": "answers/bits-one.json",
+        "common/pcapx/pcaputil/dlms-bits/answers/bits-nonzero-unused.json": "answers/bits-nonzero-unused.json",
+        "common/pcapx/pcaputil/dlms-bits/answers/bits-aligned.json": "answers/bits-aligned.json",
+        "common/pcapx/pcaputil/dlms-bits/answers/bits-fifteen.json": "answers/bits-fifteen.json",
+        "common/pcapx/pcaputil/dlms-bits/answers/bits-count81.json": "answers/bits-count81.json",
+        "common/pcapx/pcaputil/dlms-bits/answers/bits-count82.json": "answers/bits-count82.json",
+        "common/pcapx/pcaputil/dlms-bits/answers/bits-count84.json": "answers/bits-count84.json",
+        "common/pcapx/pcaputil/dlms-bits/answers/bits-count83.json": "answers/bits-count83.json",
+        "common/pcapx/pcaputil/dlms-bits/answers/bits-nested.json": "answers/bits-nested.json",
+        "common/pcapx/pcaputil/dlms-bits/answers/bits-selection-udp.json": "answers/bits-selection-udp.json",
+        "common/pcapx/pcaputil/dlms-bits/answers/bits-cap-8192.json": "answers/bits-cap-8192.json",
+        "common/pcapx/pcaputil/dlms-bits/answers/bits-cap-8193.json": "answers/bits-cap-8193.json",
+        "common/pcapx/pcaputil/dlms-bits/answers/bits-short.json": "answers/bits-short.json",
+        "common/pcapx/pcaputil/dlms-bits/answers/bits-missing.json": "answers/bits-missing.json",
+        "common/pcapx/pcaputil/dlms-bits/answers/bits-count-short.json": "answers/bits-count-short.json",
+        "common/pcapx/pcaputil/dlms-bits/answers/bits-huge.json": "answers/bits-huge.json",
+        "common/pcapx/pcaputil/dlms-bits/answers/bits-literal80.json": "answers/bits-literal80.json",
+        "common/pcapx/pcaputil/dlms-bits/answers/bits-width5.json": "answers/bits-width5.json",
+        "common/pcapx/pcaputil/dlms-bits/answers/bits-tail-short.json": "answers/bits-tail-short.json",
+        "common/pcapx/pcaputil/dlms-bits/answers/bits-trailing.json": "answers/bits-trailing.json",
+        "common/pcapx/pcaputil/dlms-bits/answers/bits-caller-bytes-udp.json": "answers/bits-caller-bytes-udp.json",
+        "common/pcapx/pcaputil/dlms-bits/answers/bits-split.json": "answers/bits-split.json",
+        "common/pcapx/pcaputil/dlms-bits/answers/bits-wrong-flags-udp.json": "answers/bits-wrong-flags-udp.json",
+        "common/pcapx/pcaputil/dlms-bits/controls.json": "controls.json",
+        "common/pcapx/pcaputil/dlms-bits/validation/expected.json": "validation/expected.json",
+        "common/pcapx/pcaputil/dlms-bits/required-tests-v35.json": "required-tests-v35.json",
+        "scripts/protocol-tests/required-tests-v35.json": "required-tests-v35.json"
+      }
     }
   ],
   "schema_version": 1,
