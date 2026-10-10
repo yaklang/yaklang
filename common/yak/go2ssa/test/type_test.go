@@ -290,7 +290,6 @@ func TestType_nesting(t *testing.T) {
 
 func TestType_struct(t *testing.T) {
 
-	// TODO: 缺少指针类型,没法识别指针
 	t.Run("struct inheritance", func(t *testing.T) {
 		test.CheckPrintlnValue(`package main
 
@@ -445,8 +444,6 @@ func TestType_struct(t *testing.T) {
 	})
 
 	t.Run("struct inheritance pointer", func(t *testing.T) {
-		// todo
-		t.Skip()
 		test.CheckPrintlnValue(`package main
 
 		type A struct {
@@ -471,8 +468,6 @@ func TestType_struct(t *testing.T) {
 	})
 
 	t.Run("struct inheritance pointer extend", func(t *testing.T) {
-		// todo
-		t.Skip()
 		test.CheckPrintlnValue(`package main
 
 		type A struct {

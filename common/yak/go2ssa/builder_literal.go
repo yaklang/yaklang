@@ -203,7 +203,7 @@ func (b *astbuilder) buildCompositeLit(exp *gol.CompositeLitContext) ssa.Value {
 		}
 
 		if len(kvs) == 0 {
-			return getUndefinedObj()
+			return b.GetDefaultValue(typ)
 		}
 		switch typ.GetTypeKind() {
 		case ssa.SliceTypeKind, ssa.BytesTypeKind:
@@ -304,7 +304,11 @@ func (b *astbuilder) buildCompositeLit(exp *gol.CompositeLitContext) ssa.Value {
 			}
 
 			if kvs[0].value != nil {
-				// todo: 只有指针才会复用object，目前默认非指针
+				// A pointer field keeps its target identity. Only struct values
+				// are copied when initializing an embedded value field.
+				if kvs[0].value.GetType().GetTypeKind() == ssa.PointerKind {
+					return kvs[0].value
+				}
 				if m, ok := kvs[0].value.(*ssa.Make); ok {
 					var mkeys, mmembers []ssa.Value
 					for _, pair := range ssa.GetLastWinsMemberPairs(m) {
@@ -316,8 +320,13 @@ func (b *astbuilder) buildCompositeLit(exp *gol.CompositeLitContext) ssa.Value {
 							return mkeys[i]
 						},
 						func(i int) ssa.Value {
+							fieldType := objt.GetField(mkeys[i])
+							if fieldType != nil && fieldType.GetTypeKind() == ssa.StructTypeKind {
+								return typeHandler(fieldType, []keyValue{{value: mmembers[i]}})
+							}
 							return mmembers[i]
 						})
+					newObject.SetType(typ)
 					return newObject
 				}
 				return kvs[0].value
@@ -327,18 +336,6 @@ func (b *astbuilder) buildCompositeLit(exp *gol.CompositeLitContext) ssa.Value {
 				fullInit()
 			} else { // 部分初始化
 				partInit()
-				for _, kv := range kvs {
-					if kv.key == nil || obj == nil {
-						continue
-					}
-					if a, ok := objt.AnonymousField[kv.key.String()]; ok {
-						newObject := typeHandler(a, kv.kv)
-						variable := b.CreateMemberCallVariable(obj, b.EmitConstInst(kv.key.String()))
-						if variable != nil && newObject != nil {
-							b.AssignVariable(variable, newObject)
-						}
-					}
-				}
 			}
 		case ssa.InterfaceTypeKind:
 			// TODO
@@ -357,6 +354,11 @@ func (b *astbuilder) buildCompositeLit(exp *gol.CompositeLitContext) ssa.Value {
 			return kvs[0].value
 		case ssa.ClassBluePrintTypeKind:
 			obj = getUndefinedObj()
+		case ssa.PointerKind:
+			if kvs[0].value != nil {
+				return kvs[0].value
+			}
+			return b.GetDefaultValue(typ)
 		default:
 			if kvs[0].value != nil {
 				return kvs[0].value
@@ -370,27 +372,6 @@ func (b *astbuilder) buildCompositeLit(exp *gol.CompositeLitContext) ssa.Value {
 
 	rvalue := typeHandler(typ, kvs)
 	if o, ok := ssa.ToObjectType(typ); ok {
-		// 非指针匿名结构体，需要创建对象
-		for n, a := range o.AnonymousField {
-			if rvalue == nil {
-				continue
-			}
-			isFind := false
-			for _, pair := range ssa.GetLastWinsMemberPairs(rvalue) {
-				if pair.KeyString() == n {
-					isFind = true
-					break
-				}
-			}
-			if !isFind {
-				newObject := typeHandler(a, nil)
-				variable := b.CreateMemberCallVariable(rvalue, b.EmitConstInst(n))
-				if variable != nil && newObject != nil {
-					b.AssignVariable(variable, newObject)
-				}
-			}
-		}
-
 		bp := b.CreateBlueprint(o.VerboseName)
 		// b.AssignVariable(b.CreateVariable(o.VerboseName), rvalue)
 		for n, f := range typ.GetMethod() {
@@ -688,6 +669,9 @@ func (b *astbuilder) buildSliceTypeLiteral(stmt *gol.SliceTypeContext) ssa.Type 
 	}
 	if s, ok := stmt.ElementType().(*gol.ElementTypeContext); ok {
 		if eleTyp := b.buildType(s.Type_().(*gol.Type_Context)); eleTyp != nil {
+			if strings.HasPrefix(s.GetText(), "*") {
+				eleTyp = goPointerType(eleTyp)
+			}
 			ssatyp = ssa.NewSliceType(eleTyp)
 		}
 	}
@@ -701,6 +685,9 @@ func (b *astbuilder) buildSliceTypeELiteral(stmt *gol.LiteralTypeContext) ssa.Ty
 	var ssatyp ssa.Type
 	if s, ok := stmt.ElementType().(*gol.ElementTypeContext); ok {
 		if eleTyp := b.buildType(s.Type_().(*gol.Type_Context)); eleTyp != nil {
+			if strings.HasPrefix(s.GetText(), "*") {
+				eleTyp = goPointerType(eleTyp)
+			}
 			ssatyp = ssa.NewSliceType(eleTyp)
 		}
 	}
@@ -722,6 +709,9 @@ func (b *astbuilder) buildArrayTypeLiteral(stmt *gol.ArrayTypeContext) ssa.Type 
 
 	if s, ok := stmt.ElementType().(*gol.ElementTypeContext); ok {
 		if eleTyp := b.buildType(s.Type_().(*gol.Type_Context)); eleTyp != nil {
+			if strings.HasPrefix(s.GetText(), "*") {
+				eleTyp = goPointerType(eleTyp)
+			}
 			ssatyp = ssa.NewSliceType(eleTyp)
 		}
 	}
@@ -761,19 +751,23 @@ func (b *astbuilder) buildFieldDecl(stmt *gol.FieldDeclContext, structTyp *ssa.O
 	if em := stmt.EmbeddedField(); em != nil {
 		if typ, ok := em.(*gol.EmbeddedFieldContext); ok {
 			parent := b.buildTypeName(typ.TypeName().(*gol.TypeNameContext))
+			name := typ.TypeName().GetText()
+			if dot := strings.LastIndex(name, "."); dot >= 0 {
+				name = name[dot+1:]
+			}
 			if a := typ.TypeArgs(); a != nil {
 				b.tpHandler[b.Function.GetName()] = b.buildTypeArgs(a.(*gol.TypeArgsContext))
 			}
 
-			if fromUser, ok := parent.(*ssa.ObjectType); ok {
-				structTyp.AnonymousField[typ.TypeName().GetText()] = fromUser
-				structTyp.AddField(b.EmitConstInst(typ.TypeName().GetText()), fromUser)
-			} else if fromAlias, ok := parent.(*ssa.AliasType); ok {
-				if fromUser, ok := ssa.ToObjectType(fromAlias.GetType()); ok {
-					structTyp.AnonymousField[typ.TypeName().GetText()] = fromUser
-					structTyp.AddField(b.EmitConstInst(typ.TypeName().GetText()), fromUser)
+			if fromUser := goSelectorObjectType(parent); fromUser != nil {
+				structTyp.AnonymousField[name] = fromUser
+				fieldType := parent
+				if strings.HasPrefix(typ.GetText(), "*") {
+					fieldType = goPointerType(parent)
 				}
-				structTyp.AddField(b.EmitConstInst(fromAlias.Name), fromAlias.GetType())
+				structTyp.AddField(b.EmitConstInst(name), fieldType)
+			} else if fromAlias, ok := parent.(*ssa.AliasType); ok {
+				structTyp.AddField(b.EmitConstInst(name), fromAlias)
 			} else if fromLib, ok := parent.(*ssa.Blueprint); ok {
 				structTyp.AddField(b.EmitConstInst(fromLib.Name), fromLib)
 				for _, fn := range fromLib.GetFullTypeNames() {
@@ -781,7 +775,7 @@ func (b *astbuilder) buildFieldDecl(stmt *gol.FieldDeclContext, structTyp *ssa.O
 				}
 			} else if notUse, ok := parent.(*ssa.BasicType); ok {
 				// b.NewError(ssa.Warn, TAG, Unreachable())
-				structTyp.AddField(b.EmitConstInst(notUse.GetName()), notUse)
+				structTyp.AddField(b.EmitConstInst(name), notUse)
 			}
 		}
 	}
@@ -938,8 +932,6 @@ func coverType(ityp, iwantTyp ssa.Type) {
 		})
 	}
 	for n, a := range wantTyp.AnonymousField {
-		// TODO(go2ssa): if the embedded anonymous field is a pointer, propagate the
-		// updated object graph back to the parent instead of copying only the child metadata.
 		typ.AnonymousField[n] = a
 	}
 	ityp.SetFullTypeNames(iwantTyp.GetFullTypeNames())
@@ -961,7 +953,18 @@ func (b *astbuilder) GetDefaultValue(ityp ssa.Type) ssa.Value {
 	case ssa.AliasTypeKind:
 		alias, _ := ssa.ToAliasType(ityp)
 		return b.GetDefaultValue(alias.GetType())
-	case ssa.StructTypeKind, ssa.ObjectTypeKind, ssa.InterfaceTypeKind, ssa.SliceTypeKind, ssa.MapTypeKind:
+	case ssa.StructTypeKind:
+		typ := goSelectorObjectType(ityp)
+		obj := b.InterfaceAddFieldBuild(len(typ.Keys), func(i int) ssa.Value {
+			return typ.Keys[i]
+		}, func(i int) ssa.Value {
+			return b.GetDefaultValue(typ.FieldTypes[i])
+		})
+		obj.SetType(ityp)
+		return obj
+	case ssa.PointerKind:
+		return b.EmitConstInstNil()
+	case ssa.ObjectTypeKind, ssa.InterfaceTypeKind, ssa.SliceTypeKind, ssa.MapTypeKind:
 		return b.EmitMakeBuildWithType(ityp, nil, nil)
 	case ssa.ClassBluePrintTypeKind:
 		// TODO
