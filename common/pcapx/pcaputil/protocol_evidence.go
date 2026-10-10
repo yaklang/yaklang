@@ -97,7 +97,7 @@ func (e *ProtocolEvent) finalizeEvidence() {
 		e.Completeness = "envelope"
 		switch e.Status {
 		case "unrecognized":
-			e.Completeness = "identified"
+			e.Completeness = "unrecognized"
 		case "incomplete", "limited", "context-required", "malformed":
 			e.Completeness = e.Status
 		}
@@ -107,7 +107,9 @@ func (e *ProtocolEvent) finalizeEvidence() {
 	}
 	switch e.Status {
 	case "incomplete", "limited", "context-required", "malformed":
-		e.Completeness = e.Status
+		if e.Completeness != "headers" {
+			e.Completeness = e.Status
+		}
 	}
 	if e.SourceBytes.Kind == "" {
 		e.SourceBytes.Kind = "captured"
