@@ -26,7 +26,7 @@ type YakScriptMetadata struct {
 	VerboseNameZh string // Chinese display (__VERBOSE_NAME_ZH__)
 	Description   string
 	Keywords      []string
-	// Usage 工具使用说明，在参数生成阶段(第2阶段)披露给 AI
+	// Usage 工具使用说明，包含使用原则、参数建议和调用示例，供 AI 结合工具定义使用。
 	Usage            string
 	EnableForAI      bool
 	InputConstraints string // __INPUT_CONSTRAINTS__: JSON Schema applied in addition to CLI properties
