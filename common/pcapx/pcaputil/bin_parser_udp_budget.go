@@ -38,9 +38,13 @@ func (a *binParser) refuseUDPOversizeAssociation(e *ProtocolEvent, w []byte, src
 			v := el.Value.(*binUDPEntry)
 			applicable := protocol == "slmp" && v.flow.slmp != nil || protocol == "dlms-wrapper" && v.flow.wrapper != nil || protocol == "dlms" && v.flow.dlms != nil
 			if applicable && store.clock.Sub(v.touched) >= ttl {
-				v.flow.closeSession()
-				delete(store.entries, v.key)
-				store.lru.Remove(el)
+				if v.flow.dlms != nil || v.flow.wrapper != nil {
+					v.flow.retireDLMSUDP()
+				} else {
+					v.flow.closeSession()
+					delete(store.entries, v.key)
+					store.lru.Remove(el)
+				}
 			}
 			el = next
 		}

@@ -33476,6 +33476,189 @@
         "common/pcapx/pcaputil/dlms-hdlc-segments/required-tests-traffic-unified-v17.json": "required-tests-traffic-unified-v17.json",
         "scripts/protocol-tests/required-tests-traffic-unified-v17.json": "required-tests-traffic-unified-v17.json"
       }
+    },
+    {
+      "id": "validation-dlms-udp-idle",
+      "kind": "validation",
+      "source_sha": "314bfe95a30d5f14fb053852f70eabd348f16a86",
+      "file": "validation-dlms-udp-idle.zip",
+      "sha256": "b5fee943008d3f00e8b5d161b8cea0049afc94e1bbbe8d37c0f1aef8c6867a37",
+      "password": "bin-parser",
+      "members": {
+        "build.py": {
+          "sha256": "ed12e99675f166ab2bf13bf06e585494cd591161a41f0f53186faa27100e1e22",
+          "bytes": 3853
+        },
+        "framer.py": {
+          "sha256": "d1f9c1dbd2971190df6bea768af9f150f2b6d50907ce4e0baae803afb2ab6055",
+          "bytes": 3390
+        },
+        "carrier.py": {
+          "sha256": "adce1cb3f2e08bd83a75111553096394f9cbbd04947297e9320eddb79e19d635",
+          "bytes": 1888
+        },
+        "verify-controls.py": {
+          "sha256": "a889b5de545500b6aee9d537f1f6af2bd95d9a313abd00a70149c5b1b1bf1049",
+          "bytes": 2500
+        },
+        "source-pin.json": {
+          "sha256": "6219f2a1917696307b2b096347250fd337595bfb916a3e4bfa737bba6e891949",
+          "bytes": 706
+        },
+        "historical-expiry-upgrade.json": {
+          "sha256": "32487d97d45a9082d19ba8d9d2dacac42d4ca9a9c9b20aeec07d6990f3b4bce4",
+          "bytes": 439
+        },
+        "seal.py": {
+          "sha256": "721d5eab515f62b6e4bc95cc8e70e6cf98c3c5560fc93821e40fe25ab9cf6317",
+          "bytes": 5192
+        },
+        "cases/native-normal-zero.pcap": {
+          "sha256": "aa7b36559cde19811402f10002361c1fb34087c3cccea11f1d48ce464506c6ed",
+          "bytes": 187
+        },
+        "answers/native-normal-zero.json": {
+          "sha256": "cdd3ba2e0f4bf26cfbdf288cf3a67cd3f3cadbdf49a2b3e935f704bfface5680",
+          "bytes": 4255
+        },
+        "cases/native-normal-29.pcap": {
+          "sha256": "157b8e867b6973eb4028f3c85dd351e6834dc45f945bc3c57f90d7ecd47ca71d",
+          "bytes": 187
+        },
+        "answers/native-normal-29.json": {
+          "sha256": "2aee7e351eb9d337dbf0a3b7630553d4000ae61959fd73bbba1fdb648b9ee8b6",
+          "bytes": 4247
+        },
+        "cases/native-expiry-30.pcap": {
+          "sha256": "57a92071e4d4f00ae84667691040c16b8cdf4589478d692c0c94977620195c26",
+          "bytes": 187
+        },
+        "answers/native-expiry-30.json": {
+          "sha256": "c88e09dfadf477977ecbc5e21ffdeb396e7ca923ba65023379d31c8d0e44c956",
+          "bytes": 2781
+        },
+        "cases/native-reuse-31.pcap": {
+          "sha256": "ba74bf2b32c7e6b8aff619260dc61fd6e8eafcbb2a83e9967da73aa83c75a80f",
+          "bytes": 350
+        },
+        "answers/native-reuse-31.json": {
+          "sha256": "172dee3026d507500a4a3aba3e3fe7739f6e10b26360d7cdbcd2bd7a83d915dc",
+          "bytes": 3403
+        },
+        "cases/native-completed-reuse.pcap": {
+          "sha256": "d5ff81998c5039864214b6067fb5ccfd702dc51b6e104351cbb44df24e19297c",
+          "bytes": 350
+        },
+        "answers/native-completed-reuse.json": {
+          "sha256": "189c0d98e0e376317d5e4a79b90eae6990600db83655c23e0c3a594286845dce",
+          "bytes": 4897
+        },
+        "cases/native-retrograde-late.pcap": {
+          "sha256": "c71cf72ce0830a0bd569105c04c1c3ce2d8ad7ec58cf38e22f7c61c2c4448033",
+          "bytes": 272
+        },
+        "answers/native-retrograde-late.json": {
+          "sha256": "8a0aedaef604399cc026fc5ed195e4e6a2e483799c6480651c25ae2a9bd78e77",
+          "bytes": 3125
+        },
+        "cases/wrapper-normal-zero.pcap": {
+          "sha256": "6e94fc018636824452a58acec31030fa6b468940f9c4f30c2870e61080841295",
+          "bytes": 175
+        },
+        "answers/wrapper-normal-zero.json": {
+          "sha256": "77a0acd7034b04c579dbb81da7431a64ad6176c268522f686981a7ef22bf31b3",
+          "bytes": 4308
+        },
+        "cases/wrapper-normal-29.pcap": {
+          "sha256": "0dc2102d2aa2e86df6e2a096e6c5c71824b4a134639f51c317e471b70b1ed472",
+          "bytes": 175
+        },
+        "answers/wrapper-normal-29.json": {
+          "sha256": "c3c200dc927212372164c0c7adcc8c668a26c5852f11d9353d37b8ea68610478",
+          "bytes": 4300
+        },
+        "cases/wrapper-expiry-30.pcap": {
+          "sha256": "ad696cdc64ebf012fd747f64d0748e9fb3197cb8a65b5bc94303aead1f30561b",
+          "bytes": 175
+        },
+        "answers/wrapper-expiry-30.json": {
+          "sha256": "9ede53a93efdf01d90337a7846adee78c5f60f4de64f5a1bb7e80ec56fd47038",
+          "bytes": 4311
+        },
+        "cases/wrapper-reuse-31.pcap": {
+          "sha256": "f517cb81cfa135644d1e8cec0c74ea6ad0f6135c17615dd68bb543892c0dec0d",
+          "bytes": 326
+        },
+        "answers/wrapper-reuse-31.json": {
+          "sha256": "5da1e0488c45d83a26446d8a8cd931ecb9680e367466fff3dfe7340dc53591af",
+          "bytes": 8007
+        },
+        "cases/wrapper-completed-reuse.pcap": {
+          "sha256": "84a3f1763c577357dda7543337c2c3fdc5d4e12b44728c625dd36e7f3acb9450",
+          "bytes": 326
+        },
+        "answers/wrapper-completed-reuse.json": {
+          "sha256": "40572b26f1d75ecfe061c786c5169f77d351ca640ed88582197c9fb0e2bc7950",
+          "bytes": 8024
+        },
+        "cases/wrapper-retrograde-late.pcap": {
+          "sha256": "f791ff8d1109e2de2d3c1065d39a57d06dfa0ee33fc77a221b32541f7cba75b6",
+          "bytes": 254
+        },
+        "answers/wrapper-retrograde-late.json": {
+          "sha256": "8cea988bc866988185a76c96ff0e41f4f6eab5a153fbc0371c22b49f593f0fd1",
+          "bytes": 6243
+        },
+        "controls.json": {
+          "sha256": "ee2c48b4ad24f647ef7ee5dd3bbffa95a72557cd4b4e0142d3fc7f3121bafd29",
+          "bytes": 66607
+        },
+        "validation/expected.json": {
+          "sha256": "98bf97fcdc04980feeb802a69f2263c176ccf95609e2c2679dadc979018d9fd0",
+          "bytes": 13563
+        },
+        "required-tests-traffic-unified-v18.json": {
+          "sha256": "4b4251970dabc6dbf1f9c921ae60e33e1e59d530aa8b1769cc518d9c4889879c",
+          "bytes": 130948
+        }
+      },
+      "aliases": {
+        "common/pcapx/pcaputil/dlms-udp-idle/build.py": "build.py",
+        "common/pcapx/pcaputil/dlms-udp-idle/framer.py": "framer.py",
+        "common/pcapx/pcaputil/dlms-udp-idle/carrier.py": "carrier.py",
+        "common/pcapx/pcaputil/dlms-udp-idle/verify-controls.py": "verify-controls.py",
+        "common/pcapx/pcaputil/dlms-udp-idle/source-pin.json": "source-pin.json",
+        "common/pcapx/pcaputil/dlms-udp-idle/historical-expiry-upgrade.json": "historical-expiry-upgrade.json",
+        "common/pcapx/pcaputil/dlms-udp-idle/seal.py": "seal.py",
+        "common/pcapx/pcaputil/dlms-udp-idle/cases/native-normal-zero.pcap": "cases/native-normal-zero.pcap",
+        "common/pcapx/pcaputil/dlms-udp-idle/answers/native-normal-zero.json": "answers/native-normal-zero.json",
+        "common/pcapx/pcaputil/dlms-udp-idle/cases/native-normal-29.pcap": "cases/native-normal-29.pcap",
+        "common/pcapx/pcaputil/dlms-udp-idle/answers/native-normal-29.json": "answers/native-normal-29.json",
+        "common/pcapx/pcaputil/dlms-udp-idle/cases/native-expiry-30.pcap": "cases/native-expiry-30.pcap",
+        "common/pcapx/pcaputil/dlms-udp-idle/answers/native-expiry-30.json": "answers/native-expiry-30.json",
+        "common/pcapx/pcaputil/dlms-udp-idle/cases/native-reuse-31.pcap": "cases/native-reuse-31.pcap",
+        "common/pcapx/pcaputil/dlms-udp-idle/answers/native-reuse-31.json": "answers/native-reuse-31.json",
+        "common/pcapx/pcaputil/dlms-udp-idle/cases/native-completed-reuse.pcap": "cases/native-completed-reuse.pcap",
+        "common/pcapx/pcaputil/dlms-udp-idle/answers/native-completed-reuse.json": "answers/native-completed-reuse.json",
+        "common/pcapx/pcaputil/dlms-udp-idle/cases/native-retrograde-late.pcap": "cases/native-retrograde-late.pcap",
+        "common/pcapx/pcaputil/dlms-udp-idle/answers/native-retrograde-late.json": "answers/native-retrograde-late.json",
+        "common/pcapx/pcaputil/dlms-udp-idle/cases/wrapper-normal-zero.pcap": "cases/wrapper-normal-zero.pcap",
+        "common/pcapx/pcaputil/dlms-udp-idle/answers/wrapper-normal-zero.json": "answers/wrapper-normal-zero.json",
+        "common/pcapx/pcaputil/dlms-udp-idle/cases/wrapper-normal-29.pcap": "cases/wrapper-normal-29.pcap",
+        "common/pcapx/pcaputil/dlms-udp-idle/answers/wrapper-normal-29.json": "answers/wrapper-normal-29.json",
+        "common/pcapx/pcaputil/dlms-udp-idle/cases/wrapper-expiry-30.pcap": "cases/wrapper-expiry-30.pcap",
+        "common/pcapx/pcaputil/dlms-udp-idle/answers/wrapper-expiry-30.json": "answers/wrapper-expiry-30.json",
+        "common/pcapx/pcaputil/dlms-udp-idle/cases/wrapper-reuse-31.pcap": "cases/wrapper-reuse-31.pcap",
+        "common/pcapx/pcaputil/dlms-udp-idle/answers/wrapper-reuse-31.json": "answers/wrapper-reuse-31.json",
+        "common/pcapx/pcaputil/dlms-udp-idle/cases/wrapper-completed-reuse.pcap": "cases/wrapper-completed-reuse.pcap",
+        "common/pcapx/pcaputil/dlms-udp-idle/answers/wrapper-completed-reuse.json": "answers/wrapper-completed-reuse.json",
+        "common/pcapx/pcaputil/dlms-udp-idle/cases/wrapper-retrograde-late.pcap": "cases/wrapper-retrograde-late.pcap",
+        "common/pcapx/pcaputil/dlms-udp-idle/answers/wrapper-retrograde-late.json": "answers/wrapper-retrograde-late.json",
+        "common/pcapx/pcaputil/dlms-udp-idle/controls.json": "controls.json",
+        "common/pcapx/pcaputil/dlms-udp-idle/validation/expected.json": "validation/expected.json",
+        "common/pcapx/pcaputil/dlms-udp-idle/required-tests-traffic-unified-v18.json": "required-tests-traffic-unified-v18.json",
+        "scripts/protocol-tests/required-tests-traffic-unified-v18.json": "required-tests-traffic-unified-v18.json"
+      }
     }
   ],
   "schema_version": 1,

@@ -687,9 +687,7 @@ func (a *binParser) decodeDLMSDatagram(e *ProtocolEvent, w []byte, explicit bool
 		next := el.Next()
 		v := el.Value.(*binUDPEntry)
 		if v.flow.dlms != nil && store.clock.Sub(v.touched) >= dlmsIdleTTL {
-			v.flow.closeSession()
-			delete(store.entries, v.key)
-			store.lru.Remove(el)
+			v.flow.retireDLMSUDP()
 		}
 		el = next
 	}

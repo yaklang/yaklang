@@ -437,9 +437,10 @@ func TestDLMSResourceIsolationAndClose(t *testing.T) {
 		expired := makeEvent("b:4059", "a:39200", d0, ts.Add(dlmsIdleTTL))
 		require.True(t, a.decodeDLMSDatagram(expired, r, true))
 		rocTypedError(t, "ContextRequired", expired.sessionError)
-		require.Empty(t, a.udpSessions.entries)
-		require.Zero(t, a.stats().BufferedBytes)
+		require.Len(t, a.udpSessions.entries, 1, "bounded quarantine survives idle time")
+		require.EqualValues(t, 512, a.stats().BufferedBytes)
 		s.Close("domains")
+		require.Zero(t, a.stats().BufferedBytes)
 	})
 	t.Run("unmatched-TCP-close", func(t *testing.T) {
 		s, err := NewProtocolSessionWithOptions(ParserBudget{}, WithSessionTransport("tcp"))

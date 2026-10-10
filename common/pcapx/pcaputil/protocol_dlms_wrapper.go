@@ -405,9 +405,7 @@ func (a *binParser) expireWrapper(ts time.Time) {
 		next := el.Next()
 		v := el.Value.(*binUDPEntry)
 		if v.flow.wrapper != nil && s.clock.Sub(v.touched) >= wrapperIdleTTL {
-			v.flow.closeSession()
-			delete(s.entries, v.key)
-			s.lru.Remove(el)
+			v.flow.retireDLMSUDP()
 		}
 		el = next
 	}
@@ -463,6 +461,15 @@ func (a *binParser) decodeWrapperDatagram(e *ProtocolEvent, w []byte, src, dst u
 		err = wrapperError(ErrResourceExceeded, "datagram exceeds frame byte budget")
 	} else {
 		err = f.consumeWrapper(e.Direction, w, e)
+		if f.wrapper.blocked {
+			// Projection reservation preceded parsing; no parsed graph belongs
+			// to the retired conversation once the event owns its fields.
+			retained := f.wrapper.storage()
+			if retained < f.sessionBytes {
+				a.buffered.Add(retained - f.sessionBytes)
+				f.sessionBytes = retained
+			}
+		}
 	}
 	if err == nil && created && f.wrapper.outstanding() > 0 {
 		if store != nil && len(store.entries) >= sessionCollectionLimit(a.budget.MaxCollectionElements) {

@@ -270,7 +270,8 @@ func assertWrapperStructuredClose(t *testing.T, events []*ProtocolEvent) {
 }
 func TestDLMSWrapperUDPIdleObservationBoundary(t *testing.T) {
 	// The independently executed loopback peer labels the first identical reply
-	// as requestA's. Wire bytes cannot expose that label after requestB's new epoch.
+	// as requestA's. Idle time cannot establish a new wire generation; retained
+	// quarantine forbids binding that late reply to requestB.
 	var c wrapperStructuredControl
 	for _, v := range wrapperStructuredControls(t) {
 		if v.Name == "structured-exchange-udp" {
@@ -300,21 +301,22 @@ func TestDLMSWrapperUDPIdleObservationBoundary(t *testing.T) {
 			a := feed(s, 0, 100, q)
 			b := feed(s, 0, 131, q)
 			late := feed(s, 1, 131, r)
-			require.NotEqual(t, a.FlowID, b.FlowID)
-			require.Equal(t, b.ID, late.ResponseTo)
-			require.NotEqual(t, a.ID, late.ResponseTo)
-			require.Equal(t, "observed-response", late.Session["Association"])
+			require.Equal(t, a.FlowID, b.FlowID)
+			require.Zero(t, b.TransactionID)
+			require.Zero(t, late.ResponseTo)
+			require.Zero(t, late.TransactionID)
+			require.Equal(t, "ambiguous-conversation", late.Session["Association"])
 			duplicate := feed(s, 1, 131, r)
 			require.Zero(t, duplicate.ResponseTo)
-			require.Equal(t, "unmatched-response", duplicate.Session["Association"])
+			require.Equal(t, "ambiguous-conversation", duplicate.Session["Association"])
 			require.Empty(t, s.Close("ambiguous-origin"))
 			require.Zero(t, s.Stats().BufferedBytes)
 			s = fresh()
 			feed(s, 0, 100, q)
 			expired := feed(s, 1, 130, r)
 			require.Zero(t, expired.ResponseTo)
-			require.Equal(t, "unmatched-response", expired.Session["Association"])
-			require.Zero(t, s.Stats().BufferedBytes)
+			require.Equal(t, "ambiguous-conversation", expired.Session["Association"])
+			require.EqualValues(t, 512, s.Stats().BufferedBytes)
 			s.Close("expired")
 			s = fresh()
 			normal := feed(s, 0, 100, q)

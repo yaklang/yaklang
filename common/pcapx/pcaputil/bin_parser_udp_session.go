@@ -26,6 +26,25 @@ type binUDPStore struct {
 	clock   time.Time
 }
 
+// Idle time is not a wire generation boundary for UDP. Keep a bounded,
+// capture-domain/endpoint-scoped quarantine slot while releasing the pending
+// wire, fragments and Data graph. Removing the slot would allow a delayed
+// response to acquire an identical request's newly allocated identity.
+func (f *binFlow) retireDLMSUDP() {
+	if f.dlms != nil {
+		f.dlms.invalidate()
+	}
+	if f.wrapper != nil {
+		f.wrapper.invalidate()
+		f.wrapper.seen = nil
+	}
+	const retained = int64(512)
+	if f.sessionBytes > retained {
+		f.a.buffered.Add(retained - f.sessionBytes)
+		f.sessionBytes = retained
+	}
+}
+
 func (a *binParser) decodeTFTPDatagram(e *ProtocolEvent, w []byte) bool {
 	a.udpMu.Lock()
 	defer a.udpMu.Unlock()
@@ -217,7 +236,7 @@ func (a *binParser) decodeSNMPDatagram(e *ProtocolEvent, w []byte, explicit stri
 	for el := s.lru.Front(); el != nil; {
 		next := el.Next()
 		v := el.Value.(*binUDPEntry)
-		if s.clock.Sub(v.touched) >= 10*time.Minute {
+		if v.flow.snmp != nil && s.clock.Sub(v.touched) >= 10*time.Minute {
 			v.flow.closeSession()
 			delete(s.entries, v.key)
 			s.lru.Remove(el)
@@ -295,14 +314,20 @@ func (a *binParser) decodeSTUNDatagram(e *ProtocolEvent, w []byte, explicitTurn 
 		if e.Timestamp.After(s.clock) {
 			s.clock = e.Timestamp
 		}
-		for el := s.lru.Front(); el != nil; el = s.lru.Front() {
+		for el := s.lru.Front(); el != nil; {
+			next := el.Next()
 			v := el.Value.(*binUDPEntry)
 			if s.clock.Sub(v.touched) < 10*time.Minute {
 				break
 			}
-			v.flow.closeSession()
-			delete(s.entries, v.key)
-			s.lru.Remove(el)
+			// This store also contains unrelated application state and quarantine.
+			// STUN's idle policy cannot reset another protocol's identity history.
+			if v.flow.stun != nil {
+				v.flow.closeSession()
+				delete(s.entries, v.key)
+				s.lru.Remove(el)
+			}
+			el = next
 		}
 	}
 	var el *list.Element
