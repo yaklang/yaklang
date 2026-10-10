@@ -48,6 +48,9 @@ message BindAISessionCommand {
   uint64 bind_epoch = 12;
   // Requires the ai.input.managed_attachment.v1 node capability.
   InputManifest input_manifest = 13;
+  AITrafficCapturePolicy traffic_capture = 14;
+  // Server-owned policy; retained for every turn and never read from user options.
+  AITrafficAnalysisContext traffic_analysis = 15;
 }
 
 message PushAISessionInputCommand {
@@ -80,6 +83,7 @@ message ContextPackage {
   string user_input = 6;                      // this turn's user input text
   bytes provider_policy_snapshot_json = 7;    // model provider config (API key, base URL, headers)
   bytes runtime_option_snapshot_json = 8;     // temperature, max_tokens, etc.
+  AITrafficAnalysisContext traffic_analysis = 12;
   ContextFocusRelease focus_release = 9;      // immutable server-published Yak Focus release selected for this Turn
   ContextForgeRelease forge_release = 10;     // immutable server-published config Forge release selected for this Turn
   repeated ContextSkillBundle skill_bundles = 11; // authorized SkillMD ZIPs for this Turn; at most one
@@ -2172,4 +2176,96 @@ message ContextSkillBundle {
   string name = 3;
   bytes archive_zip = 4;
   string sha256 = 5; // lowercase SHA-256 of archive_zip
+
+}
+
+// Version 1 captures Yaklang-instrumented HTTP transport attempts only.
+message AITrafficCapturePolicy {
+  uint32 protocol_version = 1;
+  string upload_base_url = 2;
+  uint64 packet_limit_bytes = 3;
+  uint64 session_limit_bytes = 4;
+}
+
+message AITrafficAnalysisContext {
+  string source_session_id = 1;
+  repeated string flow_ids = 2;
+  string evidence_text = 3;
+  bool read_only = 4;
+}
+
+// Metadata contains only sanitized URL context, never raw headers, bodies,
+// sensitive URL values or target error text. Raw evidence uses authenticated HTTP.
+message AITrafficRecord {
+  uint32 protocol_version = 1;
+  string flow_id = 2;
+  string session_id = 3;
+  string turn_id = 4;
+  string tool_call_id = 5;
+  string agent_id = 6;
+  string node_id = 7;
+  string node_session_id = 8;
+  uint64 bind_epoch = 9;
+  string phase = 10; // started | terminal
+  string outcome = 11; // pending | success | network_failed | cancelled
+  int64 started_at_ms = 12;
+  int64 finished_at_ms = 13;
+  string method = 14;
+  string scheme = 15;
+  string host = 16;
+  int32 status_code = 17;
+  uint64 request_size_bytes = 18;
+  uint64 response_size_bytes = 19;
+  string request_sha256 = 20;
+  string response_sha256 = 21;
+  bool request_truncated = 22;
+  bool response_truncated = 23;
+  string capture_error = 24; // fixed code only
+  // Optional in protocol v1. Absolute same-origin URL, at most 16 KiB UTF-8.
+  // Strip userinfo/fragment; redact sensitive path segments and query values.
+  // Captured before packet quotas apply. Absent legacy records use scheme/host.
+  optional string redacted_url = 25;
+}
+
+message AITrafficBatch {
+  uint32 protocol_version = 1;
+  repeated AITrafficRecord records = 2;
+}
+
+message AITrafficUpload {
+  AITrafficRecord record = 1;
+  bytes raw_request = 2;
+  bytes raw_response = 3;
+}
+
+// Receipt is sent only after both metadata and admitted packet bytes are durable.
+message AITrafficReceipt {
+  uint32 protocol_version = 1;
+  string flow_id = 2;
+  string phase = 3;
+  string upload_sha256 = 4;
+  bool durable = 5;
+  string storage_status = 6; // stored | quota_dropped | metadata_only (durable metadata, no packet bytes)
+}
+
+message DrainAITrafficCommand {
+  legion.node.v1.CommandMetadata metadata = 1;
+  AISessionRef session = 2;
+  string expected_node_session_id = 3;
+  uint32 timeout_ms = 4; // capped by the runtime at 30000
+}
+
+message AITrafficDrainResult {
+  uint32 protocol_version = 1;
+  AISessionRef session = 2;
+  string node_session_id = 3;
+  uint64 pending_records = 4;
+  bool complete = 5;
+  string command_id = 6;
+}
+
+message AITrafficCapability {
+  uint32 protocol_version = 1;
+  repeated string supported_transports = 2;
+  repeated string unsupported_sources = 3;
 }

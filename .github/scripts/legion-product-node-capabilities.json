@@ -8,6 +8,8 @@
   "ai.session.turn_lifecycle.v1",
   "ai.skill_bundle.v1",
   "ai.tools.builtin.v1",
+  "ai.traffic.analysis.readonly.v1",
+  "ai.traffic.capture.v1",
   "hids",
   "plugin.bundle.v1",
   "ssa.rule_snapshot.execution.v2",
