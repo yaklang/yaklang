@@ -154,6 +154,12 @@ func (f *binFlow) consumeC37118(dir int, raw []byte) (map[string]any, error) {
 	m, err := stream_parser.DecodeC37118Message(raw, cfg, f.a.budget.MaxCollectionElements)
 	if err != nil {
 		if errors.Is(err, stream_parser.ErrC37118CollectionLimit) {
+			// The envelope passed validation, but this replacement's PMU or
+			// channel layout could not be admitted. As with a byte-budget
+			// refusal, retaining the previous layout would misinterpret DATA.
+			if raw[1]>>4 == 3 {
+				s.configuration[dir] = nil
+			}
 			return nil, protocolError(ErrResourceExceeded, err.Error())
 		}
 		return nil, protocolError(ErrMalformedMessage, err.Error())

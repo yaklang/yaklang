@@ -31,22 +31,27 @@ func (a *binParser) decodeC37118Datagram(e *ProtocolEvent, w []byte, explicit bo
 	if e.Timestamp.After(store.clock) {
 		store.clock = e.Timestamp
 	}
-	for el := store.lru.Front(); el != nil; {
-		next := el.Next()
+	// The 30-second capture idle policy belongs to this conversation. A
+	// different interface, tunnel, or publisher may have an unrelated clock.
+	// Lazy expiry keeps their configurations intact while collection and byte
+	// budgets still bound retained state. Backdated packets never extend TTL.
+	el := store.entries[key]
+	if el != nil {
 		v := el.Value.(*binUDPEntry)
-		if v.flow.c37118 != nil && store.clock.Sub(v.touched) >= c37118IdleTTL {
+		if e.Timestamp.Sub(v.touched) >= c37118IdleTTL {
 			v.flow.closeSession()
 			delete(store.entries, v.key)
 			store.lru.Remove(el)
+			el = nil
 		}
-		el = next
 	}
-	el := store.entries[key]
 	var f *binFlow
 	if el != nil {
 		v := el.Value.(*binUDPEntry)
 		f = v.flow
-		v.touched = store.clock
+		if e.Timestamp.After(v.touched) {
+			v.touched = e.Timestamp
+		}
 		store.lru.MoveToBack(el)
 		e.FlowID = f.id
 		if e.Source != f.endpoints[0] {
@@ -71,7 +76,7 @@ func (a *binParser) decodeC37118Datagram(e *ProtocolEvent, w []byte, explicit bo
 			} else {
 				f.id = a.flows.Add(1)
 				e.FlowID = f.id
-				el = store.lru.PushBack(&binUDPEntry{key, f, store.clock})
+				el = store.lru.PushBack(&binUDPEntry{key, f, e.Timestamp})
 				store.entries[key] = el
 			}
 		}

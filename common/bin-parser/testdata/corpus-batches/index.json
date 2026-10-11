@@ -43869,6 +43869,129 @@
         "common/pcapx/pcaputil/nmea-ais-longrange/validation/source-pins.json": "validation/source-pins.json",
         "scripts/protocol-tests/required-tests-traffic-unified-v20.json": "scripts/required-tests-traffic-unified-v20.json"
       }
+    },
+    {
+      "id": "c37118-context",
+      "kind": "validation",
+      "source_sha": "edea0da14e70b5d16dbf2da4e1ac635236752ea9",
+      "file": "validation-c37118-context.zip",
+      "sha256": "f9603d4dce6846ed821677158a7e7d9fdc5c31c352cfc5a628b9ea3ed8afefa7",
+      "password": "bin-parser",
+      "members": {
+        "answers/tcp-channel-count-refusal-recovery.json": {
+          "bytes": 6683,
+          "sha256": "85fa27ca6805eb0f280f78eea745320a24e5b898a36b3fb958cd1f24fbb39a0b"
+        },
+        "answers/tcp-pmu-count-refusal-recovery.json": {
+          "bytes": 6723,
+          "sha256": "9b5b895bf2aef9b33cb205b9e9d0707efc076ed839398dc5848b6162887dbddf"
+        },
+        "answers/udp-channel-count-refusal-recovery.json": {
+          "bytes": 6683,
+          "sha256": "3cc1a3f4f8c321bd926fd09b63f9b18d8d50e3984c822629707a31200fd430e7"
+        },
+        "answers/udp-interface-clock-isolation.json": {
+          "bytes": 10709,
+          "sha256": "fe479e163747f03cc808e2d307dfb1bac9660ee51394a091d07f7a6376cddeeb"
+        },
+        "answers/udp-peer-clock-isolation.json": {
+          "bytes": 10709,
+          "sha256": "c91f92f6609f938cafd2ef0948d2abdb404e94bf6b8eb29b0b4e685d192ed981"
+        },
+        "answers/udp-pmu-count-refusal-recovery.json": {
+          "bytes": 6723,
+          "sha256": "d9c2f9d2a8956e063aab00e6844ea3ca335c0bc40659ac53f9a023bf839801e1"
+        },
+        "answers/udp-v2-directed-owned-observations.json": {
+          "bytes": 6190,
+          "sha256": "e3b0a6f5be6d6aa4e0ecf4c88e12487b05dcbb54e3638097c29522d9919fe3bb"
+        },
+        "captures/tcp-channel-count-refusal-recovery.pcap": {
+          "bytes": 902,
+          "sha256": "6c00bea1e36902092907caf0c40646667c194c546a547c726b3e5ff9cf766a26"
+        },
+        "captures/tcp-pmu-count-refusal-recovery.pcap": {
+          "bytes": 912,
+          "sha256": "bbf40649f2be7741ea876b262122eb0ee377acd795ecdc730b53bfd3d0a91f39"
+        },
+        "captures/udp-channel-count-refusal-recovery.pcap": {
+          "bytes": 620,
+          "sha256": "0fbda70ad8ee8a3cfcb0fb717d969bcc56fad3f067a04c8a12aa9d902c1d6344"
+        },
+        "captures/udp-interface-clock-isolation.pcapng": {
+          "bytes": 1028,
+          "sha256": "4b88884998ddb2b875f1d012dd60c7894ae7e58e38442d9157440d8c688fff1b"
+        },
+        "captures/udp-peer-clock-isolation.pcapng": {
+          "bytes": 1028,
+          "sha256": "5edad74bb3be986a871d2d039c59c7c79bce98cb5c36a5e4f09be90f3f53ec2a"
+        },
+        "captures/udp-pmu-count-refusal-recovery.pcap": {
+          "bytes": 630,
+          "sha256": "f9527117928749197437e6ea094ee0e088df0d2ce9a571e177f5c196f09401cd"
+        },
+        "captures/udp-v2-directed-owned-observations.pcap": {
+          "bytes": 488,
+          "sha256": "d73929117ff14f4f9c6b84f5348a5d66416597e517ef137b43a32a24b4a46887"
+        },
+        "controls.json": {
+          "bytes": 3119,
+          "sha256": "4e341776af2518478abc7eb9e03e718cbb7fdcd09ac107d812672f7a967c7ad8"
+        },
+        "scripts/__pycache__/reference_codec.cpython-313.pyc": {
+          "bytes": 17618,
+          "sha256": "d17af536584e4d8142867e84f62aea06d57a22b518e4028249dc3d9e143e18a8"
+        },
+        "scripts/build_fixture.py": {
+          "bytes": 6445,
+          "sha256": "16755aa8f67723df39361b753d2d42f3ebaf1f009a2591949cc2cc8ba877197a"
+        },
+        "scripts/reference_codec.py": {
+          "bytes": 6452,
+          "sha256": "6a191571a934f7143e764a39322beffe1a02f96279bf04ac8948e79606f921f2"
+        },
+        "scripts/required-tests-traffic-unified-v21.json": {
+          "bytes": 135073,
+          "sha256": "21b2f98ff95ddf3898308be13e3e85eb8559d2c0a8e39f0cfd4d903a6d82aa6c"
+        },
+        "scripts/verify_fixture.py": {
+          "bytes": 3239,
+          "sha256": "34469abd686025b5ea1003e5f4f3ff4c5e3d475b7d058a4250fbbe4371eb74a8"
+        },
+        "validation/expected.json": {
+          "bytes": 8528,
+          "sha256": "c70616712844656b8bc05df07d8ebbe3a94b15f3e8035684512a69b1c534fcb0"
+        },
+        "validation/source-pins.json": {
+          "bytes": 5737,
+          "sha256": "87d396f62baf1486c0e9d564beefee6e97702e6662dfcc09e118e391139add4b"
+        }
+      },
+      "aliases": {
+        "common/pcapx/pcaputil/c37118-context/answers/tcp-channel-count-refusal-recovery.json": "answers/tcp-channel-count-refusal-recovery.json",
+        "common/pcapx/pcaputil/c37118-context/answers/tcp-pmu-count-refusal-recovery.json": "answers/tcp-pmu-count-refusal-recovery.json",
+        "common/pcapx/pcaputil/c37118-context/answers/udp-channel-count-refusal-recovery.json": "answers/udp-channel-count-refusal-recovery.json",
+        "common/pcapx/pcaputil/c37118-context/answers/udp-interface-clock-isolation.json": "answers/udp-interface-clock-isolation.json",
+        "common/pcapx/pcaputil/c37118-context/answers/udp-peer-clock-isolation.json": "answers/udp-peer-clock-isolation.json",
+        "common/pcapx/pcaputil/c37118-context/answers/udp-pmu-count-refusal-recovery.json": "answers/udp-pmu-count-refusal-recovery.json",
+        "common/pcapx/pcaputil/c37118-context/answers/udp-v2-directed-owned-observations.json": "answers/udp-v2-directed-owned-observations.json",
+        "common/pcapx/pcaputil/c37118-context/captures/tcp-channel-count-refusal-recovery.pcap": "captures/tcp-channel-count-refusal-recovery.pcap",
+        "common/pcapx/pcaputil/c37118-context/captures/tcp-pmu-count-refusal-recovery.pcap": "captures/tcp-pmu-count-refusal-recovery.pcap",
+        "common/pcapx/pcaputil/c37118-context/captures/udp-channel-count-refusal-recovery.pcap": "captures/udp-channel-count-refusal-recovery.pcap",
+        "common/pcapx/pcaputil/c37118-context/captures/udp-interface-clock-isolation.pcapng": "captures/udp-interface-clock-isolation.pcapng",
+        "common/pcapx/pcaputil/c37118-context/captures/udp-peer-clock-isolation.pcapng": "captures/udp-peer-clock-isolation.pcapng",
+        "common/pcapx/pcaputil/c37118-context/captures/udp-pmu-count-refusal-recovery.pcap": "captures/udp-pmu-count-refusal-recovery.pcap",
+        "common/pcapx/pcaputil/c37118-context/captures/udp-v2-directed-owned-observations.pcap": "captures/udp-v2-directed-owned-observations.pcap",
+        "common/pcapx/pcaputil/c37118-context/controls.json": "controls.json",
+        "common/pcapx/pcaputil/c37118-context/scripts/__pycache__/reference_codec.cpython-313.pyc": "scripts/__pycache__/reference_codec.cpython-313.pyc",
+        "common/pcapx/pcaputil/c37118-context/scripts/build_fixture.py": "scripts/build_fixture.py",
+        "common/pcapx/pcaputil/c37118-context/scripts/reference_codec.py": "scripts/reference_codec.py",
+        "common/pcapx/pcaputil/c37118-context/scripts/required-tests-traffic-unified-v21.json": "scripts/required-tests-traffic-unified-v21.json",
+        "common/pcapx/pcaputil/c37118-context/scripts/verify_fixture.py": "scripts/verify_fixture.py",
+        "common/pcapx/pcaputil/c37118-context/validation/expected.json": "validation/expected.json",
+        "common/pcapx/pcaputil/c37118-context/validation/source-pins.json": "validation/source-pins.json",
+        "scripts/protocol-tests/required-tests-traffic-unified-v21.json": "scripts/required-tests-traffic-unified-v21.json"
+      }
     }
   ],
   "schema_version": 1,

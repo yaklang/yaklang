@@ -76,6 +76,11 @@ func (e *ProtocolEvent) Decode() (result map[string]any, err error) {
 		if e.Transport == "udp" && ownedObservation && e.semanticFields != nil {
 			session = e.semanticFields
 		}
+		// C37.118 exposes its complete accepted observation in both views
+		// on TCP and UDP. The public map is caller-owned, not query authority.
+		if e.Protocol == "c37118" && e.Profile == "c37118-v1-v2-cfg2-data" && e.semanticFields != nil {
+			session = e.semanticFields
+		}
 		if err == nil && result != nil && session != nil {
 			owned := make(map[string]any, len(result)+1)
 			for k, v := range result {
