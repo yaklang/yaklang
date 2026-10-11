@@ -1181,3 +1181,201 @@ func testMQTTSubscriptionAcknowledgmentContext(t *testing.T) {
 		}
 	}
 }
+
+// MQTT3.1.1 OS4.3.3-1 / MQTT5 OS4.3.3-6 forbid sending PUBLISH
+// after PUBREL. DUP must not reset an observed PUBCOMP wait to PUBREC.
+func testMQTTQoS2PublishAfterRelease(t *testing.T) {
+	for _, level := range []byte{4, 5} {
+		for _, deferred := range []bool{false, true} {
+			for _, sender := range []int{0, 1} {
+				t.Run(fmt.Sprintf("level%d/d%v/sender%d", level, deferred, sender), func(t *testing.T) {
+					connect := mqtt311Wire(t, "connect")
+					publish := mqtt311Wire(t, "client")
+					topic := "client"
+					if level == 5 {
+						connect = mqttContextWire(t, "connect")
+						publish = mqttContextWire(t, "client-qos2")
+						topic = "client"
+					}
+					publish[0] = 0x34
+					fresh := func() ProtocolSession {
+						s, err := NewProtocolSession(DefaultParserBudget())
+						require.NoError(t, err)
+						s.(*captureSession).f.a.config.Deferred = deferred
+						a := s.Feed(0, time.Unix(1, 0), connect)
+						require.Nil(t, a.Err)
+						require.Len(t, a.Events, 1)
+						a = s.Feed(sender, time.Unix(2, 0), publish)
+						require.Nil(t, a.Err)
+						require.Len(t, a.Events, 1)
+						want := map[string]any{"Packet Type": uint64(3), "Packet Name": "PUBLISH", "QoS": uint64(2), "DUP": false, "Context Level": "observed", "Topic Name": topic, "Packet Identifier": uint64(7), "Outstanding": "PUBREC"}
+						require.Equal(t, want, a.Events[0].Session)
+						require.Equal(t, publish, a.Events[0].Raw)
+						for _, step := range []struct {
+							dir  int
+							name string
+						}{{1 - sender, "pubrec"}, {sender, "pubrel"}} {
+							raw := mqttContextWire(t, step.name)
+							a = s.Feed(step.dir, time.Unix(3, 0), raw)
+							require.Nil(t, a.Err)
+							require.Len(t, a.Events, 1)
+							require.Equal(t, raw, a.Events[0].Raw)
+							require.Equal(t, step.dir, a.Events[0].Direction)
+							require.Equal(t, true, a.Events[0].Session["Matched Request"])
+							require.Equal(t, uint64(7), a.Events[0].Session["Packet Identifier"])
+						}
+						return s
+					}
+					// The adjacent valid completion releases the identifier for reuse.
+					good := fresh()
+					a := good.Feed(1-sender, time.Unix(4, 0), mqttContextWire(t, "pubcomp"))
+					require.Nil(t, a.Err)
+					require.Len(t, a.Events, 1)
+					require.Equal(t, true, a.Events[0].Session["Matched Request"])
+					a = good.Feed(sender, time.Unix(5, 0), publish)
+					require.Nil(t, a.Err)
+					require.Equal(t, "PUBREC", a.Events[0].Session["Outstanding"])
+					for _, step := range []struct {
+						dir  int
+						name string
+					}{{1 - sender, "pubrec"}, {sender, "pubrel"}, {1 - sender, "pubcomp"}} {
+						require.Nil(t, good.Feed(step.dir, time.Unix(6, 0), mqttContextWire(t, step.name)).Err)
+					}
+					require.Empty(t, good.Close("complete"))
+					require.Nil(t, good.Close("again"))
+					require.Zero(t, good.Stats().BufferedBytes)
+					s := fresh()
+					defer s.Close("done")
+					retry := append([]byte(nil), publish...)
+					retry[0] |= 8
+					a = s.Feed(sender, time.Unix(7, 0), retry)
+					require.NotNil(t, a.Err, "DUP PUBLISH after PUBREL must not rewind an observed QoS2 exchange")
+					require.Equal(t, ErrMalformedMessage, a.Err.Kind)
+					require.Equal(t, "mqtt: PUBLISH after PUBREL for packet identifier 7", a.Err.Message)
+					require.Len(t, a.Events, 1)
+					require.Nil(t, a.Events[0].Session)
+					require.Equal(t, retry, a.Events[0].Raw)
+					require.Zero(t, a.Events[0].ResponseTo)
+					require.Zero(t, a.Events[0].TransactionID)
+					_, err := a.Events[0].GetFields()
+					var typed *ProtocolError
+					require.ErrorAs(t, err, &typed)
+					require.Equal(t, a.Err.Kind, typed.Kind)
+					require.Equal(t, a.Err.Message, typed.Message)
+					late := s.Feed(1-sender, time.Unix(8, 0), mqttContextWire(t, "pubcomp"))
+					require.Empty(t, late.Events)
+					require.NotNil(t, late.Err)
+					require.Equal(t, ErrFatalSessionError, late.Err.Kind)
+					require.Empty(t, s.Close("refused"))
+					require.Nil(t, s.Close("again"))
+					require.Zero(t, s.Stats().BufferedBytes)
+				})
+			}
+		}
+	}
+}
+
+// MQTT3.1.1 OS4.3.3-1/2: repeated PUBREC prompts PUBREL, repeated
+// PUBREL prompts PUBCOMP. Passive observations preserve the latest phase.
+func testMQTT311QoS2RepeatedControls(t *testing.T) {
+	for _, deferred := range []bool{false, true} {
+		for _, sender := range []int{0, 1} {
+			for _, repeated := range []string{"pubrec", "pubrel", "late-pubrec"} {
+				t.Run(fmt.Sprintf("d%v/sender%d/%s", deferred, sender, repeated), func(t *testing.T) {
+					s, err := NewProtocolSession(DefaultParserBudget())
+					require.NoError(t, err)
+					defer s.Close("done")
+					s.(*captureSession).f.a.config.Deferred = deferred
+					publish := mqtt311Wire(t, "client")
+					publish[0] = 0x34
+					steps := []struct {
+						dir     int
+						raw     []byte
+						name    string
+						matched bool
+					}{
+						{0, mqtt311Wire(t, "connect"), "CONNECT", false},
+						{sender, publish, "PUBLISH", false},
+						{1 - sender, mqttContextWire(t, "pubrec"), "PUBREC", true},
+					}
+					if repeated != "pubrec" {
+						steps = append(steps, struct {
+							dir     int
+							raw     []byte
+							name    string
+							matched bool
+						}{sender, mqttContextWire(t, "pubrel"), "PUBREL", true})
+					}
+					dir := 1 - sender
+					name := "PUBREC"
+					if repeated == "pubrel" {
+						dir = sender
+						name = "PUBREL"
+					}
+					wireName := repeated
+					if repeated == "late-pubrec" {
+						wireName = "pubrec"
+					}
+					steps = append(steps, struct {
+						dir     int
+						raw     []byte
+						name    string
+						matched bool
+					}{dir, mqttContextWire(t, wireName), name, true})
+					steps = append(steps, struct {
+						dir     int
+						raw     []byte
+						name    string
+						matched bool
+					}{sender, mqttContextWire(t, "pubrel"), "PUBREL", true}, struct {
+						dir     int
+						raw     []byte
+						name    string
+						matched bool
+					}{1 - sender, mqttContextWire(t, "pubcomp"), "PUBCOMP", true})
+					for i, step := range steps {
+						a := s.Feed(step.dir, time.Unix(int64(i+1), 0), step.raw)
+						require.Nil(t, a.Err, "repeated QoS2 controls must not invalidate an observed MQTT3.1.1 exchange")
+						require.Len(t, a.Events, 1)
+						e := a.Events[0]
+						want := map[string]any{"Packet Type": uint64(step.raw[0] >> 4), "Packet Name": step.name, "QoS": uint64((step.raw[0] >> 1) & 3), "DUP": false, "Context Level": "observed"}
+						if step.name != "CONNECT" {
+							want["Packet Identifier"] = uint64(7)
+						}
+						if step.name == "PUBLISH" {
+							want["Topic Name"] = "client"
+							want["Outstanding"] = "PUBREC"
+						}
+						if step.matched {
+							want["Matched Request"] = true
+						}
+						require.Equal(t, want, e.Session)
+						require.Equal(t, step.raw, e.Raw)
+						require.Equal(t, step.dir, e.Direction)
+						require.Equal(t, uint64(i+1), e.ID)
+						require.Zero(t, e.ResponseTo)
+						require.Zero(t, e.TransactionID)
+						_, err = e.GetFields()
+						require.NoError(t, err)
+					}
+					// Completion releases the identifier for an ordinary fresh publication.
+					a := s.Feed(sender, time.Unix(20, 0), publish)
+					require.Nil(t, a.Err)
+					require.Equal(t, "PUBREC", a.Events[0].Session["Outstanding"])
+					for _, completion := range []struct {
+						dir  int
+						name string
+					}{{1 - sender, "pubrec"}, {sender, "pubrel"}, {1 - sender, "pubcomp"}} {
+						result := s.Feed(completion.dir, time.Unix(21, 0), mqttContextWire(t, completion.name))
+						require.Nil(t, result.Err)
+						require.Len(t, result.Events, 1)
+						require.Equal(t, true, result.Events[0].Session["Matched Request"])
+					}
+					require.Empty(t, s.Close("complete"))
+					require.Nil(t, s.Close("again"))
+					require.Zero(t, s.Stats().BufferedBytes)
+				})
+			}
+		}
+	}
+}

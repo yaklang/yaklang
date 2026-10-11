@@ -182,6 +182,11 @@ func (m *binMQTT) consume(dir int, raw []byte, result map[string]any, maxElement
 		if got := m.pending[dir][pid].next; qos > 0 && got != "" && (flags&8 == 0 || got == "SUBACK" || got == "UNSUBACK") {
 			return nil, fmt.Errorf("mqtt: packet identifier %d is already in use", pid)
 		}
+		// Once PUBREL was observed, even a DUP publication must not rewind
+		// the exchange or update its topic aliases before PUBCOMP.
+		if qos > 0 && flags&8 != 0 && m.pending[dir][pid].next == "PUBCOMP" {
+			return nil, fmt.Errorf("mqtt: PUBLISH after PUBREL for packet identifier %d", pid)
+		}
 		pendingNew, aliasNew := 0, 0
 		aliasDelta := int64(0)
 		storeAlias := alias != 0 && topic != ""
@@ -234,7 +239,10 @@ func (m *binMQTT) consume(dir int, raw []byte, result map[string]any, maxElement
 			owner = dir
 		}
 		prior := m.pending[owner][pid]
-		if prior.next != "" && prior.next != want {
+		// MQTT3.1.1 repeats QoS2 acknowledgment controls until the exchange
+		// completes. Observe them without rolling the latest phase backward.
+		repeated := m.level == 4 && ((typ == 5 && (prior.next == "PUBREL" || prior.next == "PUBCOMP")) || (typ == 6 && prior.next == "PUBCOMP"))
+		if prior.next != "" && prior.next != want && !repeated {
 			return nil, fmt.Errorf("mqtt: packet identifier %d expected %s, got %s", pid, prior.next, want)
 		}
 		// Subscription ACK result codes follow properties in MQTT5 and are
@@ -268,7 +276,9 @@ func (m *binMQTT) consume(dir int, raw []byte, result map[string]any, maxElement
 		} else if len(body) > 2 {
 			info["Reason Code"] = uint64(body[2])
 		}
-		if prior.next == want {
+		if repeated {
+			info["Matched Request"] = true
+		} else if prior.next == want {
 			delete(m.pending[owner], pid)
 			info["Matched Request"] = true
 			if typ == 5 && (len(body) <= 2 || body[2] < 0x80) {
