@@ -438,6 +438,9 @@ func (f *binFlow) consumeSession(dir int, e *ProtocolEvent, result map[string]an
 	case "mysql":
 		if e.Entry == "MySQLPreparedFields" {
 			e.Session, err = f.consumeMySQLPrepared(dir, e)
+			// Columns/row names can reference retained statement metadata.
+			// The event is caller-owned and must not expose that live state.
+			e.Session = cloneSession(e.Session)
 		} else {
 			e.Session, err = f.mysql.consume(dir, e.Raw, e.Entry, result)
 		}

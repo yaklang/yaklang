@@ -252,6 +252,7 @@ func TestProtocolSessionWebSocketUpgradeAndFrames(t *testing.T) {
 }
 
 func TestProtocolSessionRedisRESP2RESP3AndPipeline(t *testing.T) {
+	redisOwnedQueries(t)
 	s, err := NewProtocolSession(DefaultParserBudget())
 	require.NoError(t, err)
 	ts := time.Unix(1, 0)

@@ -144,6 +144,9 @@ func TestFirstBatchT16(t *testing.T) {
 						if e.Direction == 1 {
 							require.NotZero(t, e.ResponseTo)
 						}
+						// Native-client answers above prove result values. This
+						// separately checks complete query snapshot ownership.
+						testPreparedQueryOwnership(t, e)
 					}
 				}
 				require.Equal(t, 2, prepared)

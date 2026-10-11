@@ -285,7 +285,9 @@ func (f *binFlow) consumeMySQLPrepared(dir int, e *ProtocolEvent) (map[string]an
 			}
 			info["Column"] = c
 			if p.stage != "params" {
-				p.active.result = append(p.active.result, c)
+				// The decoder's column byte spans may alias this event's Raw.
+				// Retained metadata must survive edits to caller-owned packets.
+				p.active.result = append(p.active.result, cloneSession(c))
 			}
 			p.left--
 			if p.left == 0 {

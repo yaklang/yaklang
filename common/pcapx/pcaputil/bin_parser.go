@@ -95,11 +95,13 @@ func (e *ProtocolEvent) Decode() (result map[string]any, err error) {
 		if ownedIndustrial && e.semanticFields != nil {
 			session = e.semanticFields
 		}
-		// SNMP retains the accepted wire and passive association together;
-		// a public edit must not manufacture a matched request in queries.
-		if e.Protocol == "tls" && e.semanticFields != nil {
+		// TLS and Redis keep the accepted observation and its passive context
+		// together. Public projections cannot rewrite subsequent queries.
+		if (e.Protocol == "tls" || e.Protocol == "redis" || e.Entry == "MySQLPreparedFields") && e.semanticFields != nil {
 			session = e.semanticFields
 		}
+		// SNMP retains the accepted wire and passive association together;
+		// a public edit must not manufacture a matched request in queries.
 		if e.Protocol == "snmp" && e.semanticFields != nil {
 			session = e.semanticFields
 		}
@@ -122,13 +124,13 @@ func (e *ProtocolEvent) Decode() (result map[string]any, err error) {
 			result = owned
 		}
 	}()
-	// TLS queries must preserve the accepted observation or its private refusal;
+	// Native contextual queries preserve the accepted observation or its refusal;
 	// the public Session may be edited or removed by the callback consumer.
-	if e.Protocol == "tls" && e.sessionError != nil {
+	if (e.Protocol == "tls" || e.Protocol == "redis" || e.Protocol == "mysql") && e.sessionError != nil {
 		owned := *e.sessionError
 		return nil, &owned
 	}
-	if e.Protocol == "tls" && e.semanticFields != nil {
+	if (e.Protocol == "tls" || e.Protocol == "redis" || e.Entry == "MySQLPreparedFields") && e.semanticFields != nil {
 		return map[string]any{"fields": cloneSession(e.semanticFields)}, nil
 	}
 	if (e.Protocol == "tls" || e.Protocol == "redis" || e.Entry == "MySQLPreparedFields") && e.Session != nil {
@@ -231,7 +233,12 @@ func (e *ProtocolEvent) retainRuleEnvelope(result map[string]any) {
 }
 
 func (e *ProtocolEvent) ownsNativeFields() bool {
-	if e.Protocol == "tls" && (e.semanticFields != nil || e.sessionError != nil) {
+	// A MySQL framing refusal may have no prepared entry at all. Its typed
+	// private error remains authoritative instead of public cache/status edits.
+	if e.Protocol == "mysql" && e.sessionError != nil {
+		return true
+	}
+	if (e.Protocol == "tls" || e.Protocol == "redis" || e.Entry == "MySQLPreparedFields") && (e.semanticFields != nil || e.sessionError != nil) {
 		return true
 	}
 	// The selected UDP media decoder owns its field tree and typed refusals;
@@ -1139,6 +1146,16 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 					err = protocolError(ErrUnsupportedFeature, err.Error())
 				}
 				e.Status, e.sessionError = classifySessionError(err)
+				if e.Entry == "MySQLPreparedFields" && e.sessionError == nil {
+					// The legacy prepared codec also returns wrapped context or
+					// grammar errors. Preserve their status/message privately so
+					// later queries cannot use a caller-supplied successful cache.
+					kind := ErrMalformedMessage
+					if errors.Is(err, errBinContext) {
+						kind = ErrContextRequired
+					}
+					e.sessionError = &ProtocolError{Kind: kind, Message: err.Error()}
+				}
 				e.Error = err.Error()
 			} else if a.config.Deferred {
 				if e.Protocol == "tls" || e.Protocol == "enip" || e.Protocol == "doip" || e.Protocol == "genisys" || e.Protocol == "dlms-wrapper" || e.Protocol == "dlms" || e.Protocol == "c37118" || e.Protocol == "roc-plus" || e.Protocol == "atg" || e.Protocol == "stratum" || e.Protocol == "gearman" || e.Protocol == "beanstalkd" || e.Protocol == "scgi" || e.Protocol == "msgpack-rpc" {
@@ -1156,7 +1173,7 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 				if e.Protocol == "goose" || e.Protocol == "rtp" && e.Transport != "udp" {
 					e.retainRuleEnvelope(result)
 				}
-				if e.Protocol == "tls" || e.Protocol == "stun" || e.Protocol == "turn" || e.Protocol == "snmp" || e.Protocol == "slmp" || e.Protocol == "dlms-wrapper" || e.Protocol == "dlms" || e.Protocol == "c37118" {
+				if e.Protocol == "tls" || e.Protocol == "redis" || e.Entry == "MySQLPreparedFields" || e.Protocol == "stun" || e.Protocol == "turn" || e.Protocol == "snmp" || e.Protocol == "slmp" || e.Protocol == "dlms-wrapper" || e.Protocol == "dlms" || e.Protocol == "c37118" {
 					e.semanticFields = cloneSession(e.semanticFields)
 				}
 			}

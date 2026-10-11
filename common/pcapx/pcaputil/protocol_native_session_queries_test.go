@@ -340,3 +340,202 @@ func tlsAlertOwnedQueries(t *testing.T) {
 }
 
 func TestTLSAlertOwnedQueries(t *testing.T) { tlsAlertOwnedQueries(t) }
+
+// RESP2 array/bulk and simple-string bytes have fixed wire meanings. Role,
+// association and latency below are the parser's passive-observation contract,
+// not proof that a server executed a command. No endpoint is contacted here.
+func redisOwnedQueries(t *testing.T) {
+	answerRaw, err := trafficfixture.ReadFile("testdata/native-owned-queries/answers.json")
+	require.NoError(t, err)
+	var answers struct {
+		Cases map[string]struct {
+			Fields    map[string]any `json:"fields"`
+			Error     string         `json:"second_error"`
+			LateError string         `json:"late_error"`
+		} `json:"cases"`
+	}
+	require.NoError(t, json.Unmarshal(answerRaw, &answers))
+	require.Len(t, answers.Cases, 3)
+	for _, deferred := range []bool{false, true} {
+		t.Run(fmt.Sprintf("redis-query-deferred-%v", deferred), func(t *testing.T) {
+			s, err := NewProtocolSession(DefaultParserBudget())
+			require.NoError(t, err)
+			defer s.Close("done")
+			s.(*captureSession).f.a.config.Deferred = deferred
+			ts := time.Unix(1, 0)
+			wire, err := trafficfixture.ReadFile("testdata/native-owned-queries/records/ping.bin")
+			require.NoError(t, err)
+			r := s.Feed(0, ts, wire)
+			clear(wire)
+			require.Nil(t, r.Err)
+			require.Len(t, r.Events, 1)
+			q := r.Events[0]
+			wantRequest := map[string]any{"RESP Type": "Array", "Version": "RESP2", "Version Negotiated": false, "Context Level": "observed", "Direction Value Index": uint64(1), "Value": map[string]any{"Type": "Array", "Items": []any{map[string]any{"Type": "Bulk", "Value": []byte("PING")}}}, "Role Evidence": "command-shape", "Command": "PING", "Outstanding": true}
+			rocEqualFields(t, answers.Cases["request"].Fields, wantRequest)
+			require.Equal(t, wantRequest, q.Session)
+			require.Equal(t, q.ID, q.TransactionID)
+			require.Zero(t, q.ResponseTo)
+			check := func(e *ProtocolEvent, want map[string]any) {
+				t.Helper()
+				id, flow, response, transaction := e.ID, e.FlowID, e.ResponseTo, e.TransactionID
+				query := func() {
+					tree, err := e.Decode()
+					require.NoError(t, err)
+					require.Equal(t, want, protocolFields(tree))
+					require.Equal(t, want, tree["session"])
+					mutateRTPSQuery(protocolFields(tree))
+					mutateRTPSQuery(tree["session"])
+					fields, err := e.GetFields()
+					require.NoError(t, err)
+					require.Equal(t, want, fields)
+					mutateRTPSQuery(fields)
+					require.Equal(t, id, e.ID)
+					require.Equal(t, flow, e.FlowID)
+					require.Equal(t, response, e.ResponseTo)
+					require.Equal(t, transaction, e.TransactionID)
+				}
+				history, err := NewBinParserInspector(1, e.RetainedBytes())
+				require.NoError(t, err)
+				history.OnEvent(e)
+				query()
+				mutateRTPSQuery(e.Session)
+				mutateRTPSQuery(e.Fields)
+				mutateRTPSQuery(e.Structured)
+				query()
+				e.Session = map[string]any{"Matched Request": true, "Command": "caller-forged"}
+				e.Fields = map[string]any{"caller-forged": true}
+				e.Structured = map[string]any{"fields": e.Fields}
+				query()
+				e.Session = nil
+				query()
+				for i := 0; i < 2; i++ {
+					detail, err := history.Details(id)
+					require.NoError(t, err)
+					tree, err := detail.Decode()
+					require.NoError(t, err)
+					require.Equal(t, want, protocolFields(tree))
+					require.Equal(t, want, tree["session"])
+					mutateRTPSQuery(detail.Session)
+					mutateRTPSQuery(detail.Fields)
+				}
+			}
+			check(q, wantRequest)
+			wire, err = trafficfixture.ReadFile("testdata/native-owned-queries/records/pong.bin")
+			require.NoError(t, err)
+			r = s.Feed(1, ts.Add(time.Millisecond), wire)
+			clear(wire)
+			require.Nil(t, r.Err)
+			require.Len(t, r.Events, 1)
+			e := r.Events[0]
+			wantResponse := map[string]any{"RESP Type": "Simple", "Version": "RESP2", "Version Negotiated": false, "Context Level": "observed", "Direction Value Index": uint64(1), "Value": map[string]any{"Type": "Simple", "Value": "PONG"}, "Matched Request": true, "Command": "PING", "Latency NS": int64(time.Millisecond)}
+			rocEqualFields(t, answers.Cases["response"].Fields, wantResponse)
+			require.Equal(t, wantResponse, e.Session)
+			require.Equal(t, q.ID, e.ResponseTo)
+			require.Equal(t, q.ID, e.TransactionID)
+			require.Equal(t, q.FlowID, e.FlowID)
+			check(e, wantResponse)
+			s.Close("done")
+			s.Close("again")
+			require.Zero(t, s.Stats().BufferedBytes)
+		})
+		t.Run(fmt.Sprintf("redis-resource-query-deferred-%v", deferred), func(t *testing.T) {
+			budget := DefaultParserBudget()
+			budget.MaxCollectionElements = 1
+			s, err := NewProtocolSession(budget)
+			require.NoError(t, err)
+			defer s.Close("done")
+			s.(*captureSession).f.a.config.Deferred = deferred
+			wire := []byte("*1\r\n$4\r\nPING\r\n")
+			r := s.Feed(0, time.Unix(1, 0), wire)
+			require.Nil(t, r.Err)
+			require.Len(t, r.Events, 1)
+			q := r.Events[0]
+			require.NotZero(t, q.ID)
+			r = s.Feed(0, time.Unix(2, 0), wire)
+			require.NotNil(t, r.Err)
+			require.Equal(t, ErrResourceExceeded, r.Err.Kind)
+			require.Equal(t, string(r.Err.Kind), answers.Cases["pending-refusal"].Error)
+			require.Len(t, r.Events, 1)
+			e := r.Events[0]
+			require.Equal(t, q.FlowID, e.FlowID)
+			require.Zero(t, e.ResponseTo)
+			require.Zero(t, e.TransactionID)
+			id, flow := e.ID, e.FlowID
+			e.Status, e.Error = "decoded", ""
+			e.Session = map[string]any{"Matched Request": true, "Command": "PING"}
+			e.Fields, e.Structured = e.Session, map[string]any{"fields": e.Session}
+			for i := 0; i < 2; i++ {
+				tree, err := e.Decode()
+				require.Nil(t, tree)
+				var pe *ProtocolError
+				require.ErrorAs(t, err, &pe)
+				require.Equal(t, ErrResourceExceeded, pe.Kind)
+				require.Equal(t, "Redis pending requests", pe.Message)
+				pe.Kind, pe.Message = ErrMalformedMessage, "caller-forged"
+				fields, err := e.GetFields()
+				require.Nil(t, fields)
+				require.ErrorAs(t, err, &pe)
+				require.Equal(t, ErrResourceExceeded, pe.Kind)
+				require.Equal(t, "Redis pending requests", pe.Message)
+				require.Equal(t, id, e.ID)
+				require.Equal(t, flow, e.FlowID)
+				require.Zero(t, e.ResponseTo)
+				require.Zero(t, e.TransactionID)
+			}
+			// Resource refusal stops this standalone session. Late input must
+			// not emit a reply or recover either request's association state.
+			r = s.Feed(1, time.Unix(3, 0), []byte("+PONG\r\n"))
+			require.NotNil(t, r.Err)
+			require.Equal(t, ErrFatalSessionError, r.Err.Kind)
+			require.Equal(t, string(r.Err.Kind), answers.Cases["pending-refusal"].LateError)
+			require.Empty(t, r.Events)
+			s.Close("done")
+			s.Close("again")
+			require.Zero(t, s.Stats().BufferedBytes)
+		})
+	}
+	manual := &ProtocolEvent{Protocol: "redis", Fields: map[string]any{"manual": true}}
+	fields, err := manual.GetFields()
+	require.NoError(t, err)
+	require.Equal(t, manual.Fields, fields)
+}
+
+func TestRedisOwnedQueries(t *testing.T) { redisOwnedQueries(t) }
+
+// Complete snapshot stability is an ownership oracle, not an independent
+// grammar oracle. The caller verifies native-client result answers first and
+// preserves the original capture's full handshake and statement context.
+func testPreparedQueryOwnership(t *testing.T, e *ProtocolEvent) {
+	t.Helper()
+	require.Equal(t, "MySQLPreparedFields", e.Entry)
+	want := cloneSession(e.Session)
+	savedFields, savedStructured := cloneSession(e.Fields), cloneSession(e.Structured)
+	defer func() { e.Session, e.Fields, e.Structured = want, savedFields, savedStructured }()
+	id, flow, response, transaction := e.ID, e.FlowID, e.ResponseTo, e.TransactionID
+	query := func() {
+		tree, err := e.Decode()
+		require.NoError(t, err)
+		require.Equal(t, want, protocolFields(tree))
+		require.Equal(t, want, tree["session"])
+		mutateRTPSQuery(protocolFields(tree))
+		mutateRTPSQuery(tree["session"])
+		fields, err := e.GetFields()
+		require.NoError(t, err)
+		require.Equal(t, want, fields)
+		mutateRTPSQuery(fields)
+		require.Equal(t, id, e.ID)
+		require.Equal(t, flow, e.FlowID)
+		require.Equal(t, response, e.ResponseTo)
+		require.Equal(t, transaction, e.TransactionID)
+	}
+	query()
+	mutateRTPSQuery(e.Session)
+	mutateRTPSQuery(e.Fields)
+	mutateRTPSQuery(e.Structured)
+	query()
+	e.Session = map[string]any{"Statement ID": uint32(999999), "Session State Validated": true}
+	e.Fields, e.Structured = e.Session, map[string]any{"fields": e.Session}
+	query()
+	e.Session = nil
+	query()
+}
