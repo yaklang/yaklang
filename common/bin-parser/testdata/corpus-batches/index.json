@@ -50598,6 +50598,267 @@
         "common/pcapx/pcaputil/opcua-read-scalar/SOURCE-asyncua.json": "SOURCE-asyncua.json",
         "common/pcapx/pcaputil/opcua-read-scalar/SOURCE-primary.json": "SOURCE-primary.json"
       }
+    },
+    {
+      "id": "validation-opcua-browse",
+      "kind": "validation",
+      "source_sha": "4c31a237e225929e9da852d786ee01ff85318baa",
+      "file": "validation-opcua-browse.zip",
+      "sha256": "1f08834f2c33348fd53329d7e47afb5ef2c1cd7dcf5f5ea1493a98a8717ea10f",
+      "password": "bin-parser",
+      "members": {
+        "material/cases.json": {
+          "sha256": "94ce6259a7de87627eac0cb6d77603bc509930a348ac947facb35702a8120da6",
+          "bytes": 301438
+        },
+        "manifest.json": {
+          "sha256": "9bb52f6d087a47d324008998b0bba14ac444067b130f14914441c3ad1abf0d3a",
+          "bytes": 9251
+        },
+        "material/one-reference.pcap": {
+          "sha256": "f551874703f96078b49d09dcb04cd3097041f48f41d824bb1a5f5fd8fa65282c",
+          "bytes": 999
+        },
+        "material/continuation-point-literal.pcap": {
+          "sha256": "b6d2fe861b29251ed4df30ea01438d917f6417045fdbc0a896c8bf04393962bb",
+          "bytes": 1002
+        },
+        "material/per-node-error-empty-references.pcap": {
+          "sha256": "3fc408c3e57d8c6fe21918c839477aa2ca74a171b8e82055612d7742ea5e582a",
+          "bytes": 956
+        },
+        "material/reference-order-direction.pcap": {
+          "sha256": "f7c425cf1ae9a40c43b7d2863dc7b31134fff4ecd8878881b041218587822b49",
+          "bytes": 1048
+        },
+        "material/expanded-uri.pcap": {
+          "sha256": "6eef18b67cef071a951b1e25b3709eb299dcd71be4786997af34e4bd876af67f",
+          "bytes": 1020
+        },
+        "material/expanded-server.pcap": {
+          "sha256": "0bbae4ecb1adcb87f17df92faad735fa6628f84d1f05d1686018c0c42418798e",
+          "bytes": 1003
+        },
+        "material/expanded-both.pcap": {
+          "sha256": "c0908b2b8bd4773e9aaa7b4dbeb407562a600a03d73082a5d3d4c04d8d00d091",
+          "bytes": 1032
+        },
+        "material/guid-node.pcap": {
+          "sha256": "ea54a845b6b67240a34caa3aac1acd86e4ec6fb4ce17c31cf0e94f5314859675",
+          "bytes": 1014
+        },
+        "material/byte-node.pcap": {
+          "sha256": "12a1bd517c88e3c8b5578cb6482549c2bb575ebe5bf7c5ab66bd86a670d28411",
+          "bytes": 1004
+        },
+        "material/display-empty.pcap": {
+          "sha256": "bc8f3320b24bcad18a29024cf37f9f35e7758ca4a8c74166de375c0fde5c0280",
+          "bytes": 989
+        },
+        "material/display-text-only.pcap": {
+          "sha256": "df76e72326715987332caf326c099b1011f5af007a184799ed24373eaa4c103f",
+          "bytes": 991
+        },
+        "material/display-locale-only.pcap": {
+          "sha256": "878afd8a35b0b890651fcb66a68d1d16230138614e9e4eb9e893682425c407d9",
+          "bytes": 990
+        },
+        "material/display-absent.pcap": {
+          "sha256": "16cad0b4bb0ae639f9eacace0c53bd3192f4306b7ef5519a3cd119db61c22af7",
+          "bytes": 981
+        },
+        "material/multi-node-order.pcap": {
+          "sha256": "a900fe666854eb0325daeb251fd691575dd19c32b373f468750b4550febbf0a5",
+          "bytes": 1071
+        },
+        "material/handle-mismatch.pcap": {
+          "sha256": "ff850a09c541d23da27e1f9c18b2c21f5ebb8cfbe7f88b8b691f36a615d4674a",
+          "bytes": 999
+        },
+        "material/result-count-mismatch.pcap": {
+          "sha256": "95776c364c3d259ea51458e28327be240b5d3531e14bcaf7d02f99c1ed87ffcc",
+          "bytes": 1016
+        },
+        "material/empty-diagnostic-entry.pcap": {
+          "sha256": "f933ae1e7e0f60e0446d476f87ee3523ca4e348065a07ceea55a770f1ee32f0f",
+          "bytes": 1000
+        },
+        "material/diagnostic-count-mismatch.pcap": {
+          "sha256": "da023ee787b7573fd525bec52d268940ad55185a084a12e45cd3a04814667151",
+          "bytes": 1001
+        },
+        "material/unpaired-diagnostic-count-mismatch.pcap": {
+          "sha256": "a63d84f1ad999317b5f07021e3abae09788ea04f32108adfce4e6a11ae445c6d",
+          "bytes": 833
+        },
+        "material/unobserved-request.pcap": {
+          "sha256": "32efc9279a61f45df8f652e9354f21e75cd57725b4c0c4b424c95ca4fbe792d7",
+          "bytes": 831
+        },
+        "material/trailing-octet.pcap": {
+          "sha256": "a67f01d9304a615bc722a799ea6f70a294d3930e52637a199b78dc1f3d7ba53c",
+          "bytes": 1000
+        },
+        "material/truncated-diagnostics.pcap": {
+          "sha256": "9d3d1e4d6cb0c81d90a61687b667fa7787ecbabea3569af58c23f8f0a6988317",
+          "bytes": 998
+        },
+        "material/reference-count-budget.pcap": {
+          "sha256": "4d6476eb65b0ec5b293102f2e6cfdbbb4f552c237cfc586e51b23ae527e8e15a",
+          "bytes": 999
+        },
+        "material/negative-reference-count.pcap": {
+          "sha256": "081a7d427d32a30bbcf4288bfb57634542aad28f5d8e8cb27b11486b585d14e1",
+          "bytes": 999
+        },
+        "material/reserved-reference-node.pcap": {
+          "sha256": "f06b38df9a7b90eb7c2123c59abc28c06f9946b70b550e153610ce1e4b8f1908",
+          "bytes": 999
+        },
+        "material/reserved-localized-mask.pcap": {
+          "sha256": "d22284da9935646deb5c1a540663835e4ab307827476e710625456947cb81288",
+          "bytes": 999
+        },
+        "material/oversized-expanded-uri.pcap": {
+          "sha256": "cc2fa482ff887da1d3b469e5b8d7488487ae242f7be82f568f971913263f0129",
+          "bytes": 1020
+        },
+        "material/bad-service-empty-results.pcap": {
+          "sha256": "0b2fcace72a77bd47b312baffc31498bc2394e13d644d2ad4230aa6478f2854d",
+          "bytes": 944
+        },
+        "material/active-request-id-reuse.pcap": {
+          "sha256": "7e39ce04d5185cacbfd9d68e9f5ca21067ed174b4022df8c813d3cf11c545b91",
+          "bytes": 982
+        },
+        "material/interleaved-browse-requests.pcap": {
+          "sha256": "1a88f3c3559921a40fad370a4aff464b06e61f78e5c34fd0a044444fe77c0526",
+          "bytes": 1352
+        },
+        "material/response-ua-chunks.pcap": {
+          "sha256": "7644d5b50a8f76c0090dbec35bf5686ed4a2bb797d2df3005dc6f5cfdaeef212",
+          "bytes": 1093
+        },
+        "material/partial-browse-chunk-close.pcap": {
+          "sha256": "8792b7df16b98d940a39bf8ac848d5119129543c90150962dc336e31980505be",
+          "bytes": 760
+        },
+        "material/requested-reference-limit-exact.pcap": {
+          "sha256": "f62fe244a94fb620a28bc564485961ae36150d1be95f67caf1b184c996651372",
+          "bytes": 999
+        },
+        "material/requested-reference-limit-exceeded.pcap": {
+          "sha256": "0b8bf680cf30300cf12d9360a7fec9a4c31b064608819c80ec6ef7af669ba05e",
+          "bytes": 1042
+        },
+        "material/late-response-after-resource-refusal.pcap": {
+          "sha256": "fbc2f4b91ceeee6a6486822e647ba5fe7cdf3e2bfa0ddcab9f221ec6255b67f3",
+          "bytes": 1184
+        },
+        "material/outstanding-browse-close.pcap": {
+          "sha256": "5cdc8faceaab1ebeb63d294391c43674dc5467a62d92d90401eb9609f5578b3a",
+          "bytes": 814
+        },
+        "material/completed-request-id-reuse.pcap": {
+          "sha256": "f0436ceb61df7f6839b4dfdf04056443a31b7270464316a0a4e1796423e48924",
+          "bytes": 1352
+        },
+        "material/request-ua-chunks.pcap": {
+          "sha256": "7340f5a01d5cf1071204d8e035b985b84193bc993ca33866c82e151ae2d6eb4a",
+          "bytes": 1093
+        },
+        "material/wrong-direction-unmatched.pcap": {
+          "sha256": "8c32b1d959fae6aba2500f215645b8ec7ff806938641544e280513a7dc828cd7",
+          "bytes": 999
+        },
+        "material/abort-clears-request.pcap": {
+          "sha256": "5d5c144740c54aa9d83a5995e186f4cf3a0b957d8f88de2cfe6800b8d133f2d1",
+          "bytes": 925
+        },
+        "generate.py": {
+          "sha256": "17d6aa25d8b47e700fbcf68e71b41e41f9fccba0ad67f72d37a92be928c862d1",
+          "bytes": 12856
+        },
+        "emit.py": {
+          "sha256": "748622dccdee57b96f6cb79e232eea7e497d27decd81d504439a1d8404b0bdeb",
+          "bytes": 595
+        },
+        "verify.py": {
+          "sha256": "09eca71793c864f52e93f54340ca8079b56b55ee365c9b92c3a51684418a0313",
+          "bytes": 1523
+        },
+        "seal.py": {
+          "sha256": "a926acf74fa34a227c5fd3ffadae3aa4efdc9af02d02ecf86f27acc7db99e4f3",
+          "bytes": 3505
+        },
+        "SOURCE.json": {
+          "sha256": "9552b2aeaf2a3fceef430a4c544f1bcaa332b6b0a62f81f6c7de428b77190cef",
+          "bytes": 2805
+        },
+        "dependencies.json": {
+          "sha256": "907df3a9f9c78de6d5bf013fac65472ffad16e1de78bd174de11c810b9d6b65f",
+          "bytes": 746
+        },
+        "SOURCE-primary.json": {
+          "sha256": "64fe300ccb45cc10a74220cee46b740f2b66abd41e0f51baa1a2590344d50c48",
+          "bytes": 1619
+        },
+        "validation/expected.json": {
+          "bytes": 45404,
+          "sha256": "a852c59de50b42b381e9ef75f55d01bc8a67c900261e86efb4fd28d44d9396f7"
+        }
+      },
+      "aliases": {
+        "common/pcapx/pcaputil/opcua-browse/material/cases.json": "material/cases.json",
+        "common/pcapx/pcaputil/opcua-browse/manifest.json": "manifest.json",
+        "common/pcapx/pcaputil/opcua-browse/material/one-reference.pcap": "material/one-reference.pcap",
+        "common/pcapx/pcaputil/opcua-browse/material/continuation-point-literal.pcap": "material/continuation-point-literal.pcap",
+        "common/pcapx/pcaputil/opcua-browse/material/per-node-error-empty-references.pcap": "material/per-node-error-empty-references.pcap",
+        "common/pcapx/pcaputil/opcua-browse/material/reference-order-direction.pcap": "material/reference-order-direction.pcap",
+        "common/pcapx/pcaputil/opcua-browse/material/expanded-uri.pcap": "material/expanded-uri.pcap",
+        "common/pcapx/pcaputil/opcua-browse/material/expanded-server.pcap": "material/expanded-server.pcap",
+        "common/pcapx/pcaputil/opcua-browse/material/expanded-both.pcap": "material/expanded-both.pcap",
+        "common/pcapx/pcaputil/opcua-browse/material/guid-node.pcap": "material/guid-node.pcap",
+        "common/pcapx/pcaputil/opcua-browse/material/byte-node.pcap": "material/byte-node.pcap",
+        "common/pcapx/pcaputil/opcua-browse/material/display-empty.pcap": "material/display-empty.pcap",
+        "common/pcapx/pcaputil/opcua-browse/material/display-text-only.pcap": "material/display-text-only.pcap",
+        "common/pcapx/pcaputil/opcua-browse/material/display-locale-only.pcap": "material/display-locale-only.pcap",
+        "common/pcapx/pcaputil/opcua-browse/material/display-absent.pcap": "material/display-absent.pcap",
+        "common/pcapx/pcaputil/opcua-browse/material/multi-node-order.pcap": "material/multi-node-order.pcap",
+        "common/pcapx/pcaputil/opcua-browse/material/handle-mismatch.pcap": "material/handle-mismatch.pcap",
+        "common/pcapx/pcaputil/opcua-browse/material/result-count-mismatch.pcap": "material/result-count-mismatch.pcap",
+        "common/pcapx/pcaputil/opcua-browse/material/empty-diagnostic-entry.pcap": "material/empty-diagnostic-entry.pcap",
+        "common/pcapx/pcaputil/opcua-browse/material/diagnostic-count-mismatch.pcap": "material/diagnostic-count-mismatch.pcap",
+        "common/pcapx/pcaputil/opcua-browse/material/unpaired-diagnostic-count-mismatch.pcap": "material/unpaired-diagnostic-count-mismatch.pcap",
+        "common/pcapx/pcaputil/opcua-browse/material/unobserved-request.pcap": "material/unobserved-request.pcap",
+        "common/pcapx/pcaputil/opcua-browse/material/trailing-octet.pcap": "material/trailing-octet.pcap",
+        "common/pcapx/pcaputil/opcua-browse/material/truncated-diagnostics.pcap": "material/truncated-diagnostics.pcap",
+        "common/pcapx/pcaputil/opcua-browse/material/reference-count-budget.pcap": "material/reference-count-budget.pcap",
+        "common/pcapx/pcaputil/opcua-browse/material/negative-reference-count.pcap": "material/negative-reference-count.pcap",
+        "common/pcapx/pcaputil/opcua-browse/material/reserved-reference-node.pcap": "material/reserved-reference-node.pcap",
+        "common/pcapx/pcaputil/opcua-browse/material/reserved-localized-mask.pcap": "material/reserved-localized-mask.pcap",
+        "common/pcapx/pcaputil/opcua-browse/material/oversized-expanded-uri.pcap": "material/oversized-expanded-uri.pcap",
+        "common/pcapx/pcaputil/opcua-browse/material/bad-service-empty-results.pcap": "material/bad-service-empty-results.pcap",
+        "common/pcapx/pcaputil/opcua-browse/material/active-request-id-reuse.pcap": "material/active-request-id-reuse.pcap",
+        "common/pcapx/pcaputil/opcua-browse/material/interleaved-browse-requests.pcap": "material/interleaved-browse-requests.pcap",
+        "common/pcapx/pcaputil/opcua-browse/material/response-ua-chunks.pcap": "material/response-ua-chunks.pcap",
+        "common/pcapx/pcaputil/opcua-browse/material/partial-browse-chunk-close.pcap": "material/partial-browse-chunk-close.pcap",
+        "common/pcapx/pcaputil/opcua-browse/material/requested-reference-limit-exact.pcap": "material/requested-reference-limit-exact.pcap",
+        "common/pcapx/pcaputil/opcua-browse/material/requested-reference-limit-exceeded.pcap": "material/requested-reference-limit-exceeded.pcap",
+        "common/pcapx/pcaputil/opcua-browse/material/late-response-after-resource-refusal.pcap": "material/late-response-after-resource-refusal.pcap",
+        "common/pcapx/pcaputil/opcua-browse/material/outstanding-browse-close.pcap": "material/outstanding-browse-close.pcap",
+        "common/pcapx/pcaputil/opcua-browse/material/completed-request-id-reuse.pcap": "material/completed-request-id-reuse.pcap",
+        "common/pcapx/pcaputil/opcua-browse/material/request-ua-chunks.pcap": "material/request-ua-chunks.pcap",
+        "common/pcapx/pcaputil/opcua-browse/material/wrong-direction-unmatched.pcap": "material/wrong-direction-unmatched.pcap",
+        "common/pcapx/pcaputil/opcua-browse/material/abort-clears-request.pcap": "material/abort-clears-request.pcap",
+        "common/pcapx/pcaputil/opcua-browse/generate.py": "generate.py",
+        "common/pcapx/pcaputil/opcua-browse/emit.py": "emit.py",
+        "common/pcapx/pcaputil/opcua-browse/verify.py": "verify.py",
+        "common/pcapx/pcaputil/opcua-browse/seal.py": "seal.py",
+        "common/pcapx/pcaputil/opcua-browse/SOURCE.json": "SOURCE.json",
+        "common/pcapx/pcaputil/opcua-browse/dependencies.json": "dependencies.json",
+        "common/pcapx/pcaputil/opcua-browse/SOURCE-primary.json": "SOURCE-primary.json"
+      }
     }
   ],
   "schema_version": 1,

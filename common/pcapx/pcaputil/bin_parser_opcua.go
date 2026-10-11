@@ -23,17 +23,18 @@ type uaPeer struct {
 	version                        uint32
 	receive, send, message, chunks uint32
 }
-type uaReadPending struct {
-	handle uint32
-	count  int
+type uaSelectedPending struct {
+	service, handle uint32
+	count           int
+	maxRefs         uint32
 }
 type binOPCUA struct {
 	currentRefs, completedRefs []PacketReference
 	currentID                  uint64
 	completedParents           []uint64
-	read                       bool
-	readPending                map[uaKey]uaReadPending
-	readReserve                func(int64) error
+	read, browse               bool
+	appPending                 map[uaKey]uaSelectedPending
+	appReserve                 func(int64) error
 	transportSeen              bool
 	reverseSeen                bool
 	reverseDir                 int
@@ -66,11 +67,11 @@ func probeOPCUA(w []byte, _ int) ProbeResult {
 }
 func (f *binFlow) frameOPCUA(w []byte) (int, *binSpec, error) {
 	s := f.opcua
-	memory := int64(512 + len(s.reverseEndpoint) + (len(s.plain)+len(s.tokens)+len(s.pending)+len(s.readPending)+len(s.seq[0])+len(s.seq[1]))*128 + 2*len(w))
+	memory := int64(512 + len(s.reverseEndpoint) + (len(s.plain)+len(s.tokens)+len(s.pending)+len(s.appPending)+len(s.seq[0])+len(s.seq[1]))*128 + 2*len(w))
 	for _, c := range s.chunks {
 		memory += 2*int64(cap(c.data)) + int64(cap(c.refs))*80 + int64(cap(c.parents))*8 + 128
 	}
-	s.readReserve = func(extra int64) error { return f.reserveSession(memory + 3*extra) }
+	s.appReserve = func(extra int64) error { return f.reserveSession(memory + 3*extra) }
 	if err := f.reserveSession(memory); err != nil {
 		return 0, nil, err
 	}
@@ -144,7 +145,7 @@ func (s *binOPCUA) consume(dir int, w []byte, max, maxBytes int) (result map[str
 		s.tokens = map[uint32]uint32{}
 		s.chunks = map[uaKey]*uaChunk{}
 		s.pending = map[uaKey]uint32{}
-		s.readPending = map[uaKey]uaReadPending{}
+		s.appPending = map[uaKey]uaSelectedPending{}
 		s.seq = [2]map[uint32]uint32{{}, {}}
 	}
 	if kind == "HEL" || kind == "ACK" {
@@ -341,10 +342,10 @@ func (s *binOPCUA) consume(dir int, w []byte, max, maxBytes int) (result map[str
 			return nil, fmt.Errorf("opcua: abort trailing bytes")
 		}
 		out["Reason"] = string(reason)
-		if s.read {
+		if s.selected() {
 			for _, k := range []uaKey{key, {1 - dir, channel, request}} {
-				if _, ok := s.readPending[k]; ok {
-					delete(s.readPending, k)
+				if _, ok := s.appPending[k]; ok {
+					delete(s.appPending, k)
 					delete(s.pending, k)
 				}
 			}
@@ -363,7 +364,7 @@ func (s *binOPCUA) consume(dir int, w []byte, max, maxBytes int) (result map[str
 	if total > maxBytes || count > max || (peer.message != 0 && uint64(total) > uint64(peer.message)) || (peer.chunks != 0 && uint64(count) > uint64(peer.chunks)) {
 		return nil, protocolError(ErrResourceExceeded, "OPC UA assembled message/chunks")
 	}
-	if s.read && (chunk == 'C' || assembled != nil) {
+	if s.selected() && (chunk == 'C' || assembled != nil) {
 		refs := len(s.currentRefs)
 		parents := 1
 		if assembled != nil {
@@ -373,8 +374,8 @@ func (s *binOPCUA) consume(dir int, w []byte, max, maxBytes int) (result map[str
 		if refs > max || parents > max {
 			return nil, protocolError(ErrResourceExceeded, "OPC UA selected chunk evidence")
 		}
-		if s.readReserve != nil {
-			if err := s.readReserve(int64(2*total + refs*160 + parents*16 + 256)); err != nil {
+		if s.appReserve != nil {
+			if err := s.appReserve(int64(2*total + refs*160 + parents*16 + 256)); err != nil {
 				return nil, err
 			}
 		}
@@ -387,7 +388,7 @@ func (s *binOPCUA) consume(dir int, w []byte, max, maxBytes int) (result map[str
 			assembled = &uaChunk{kind: kind, token: token}
 			s.chunks[key] = assembled
 		}
-		if s.read {
+		if s.selected() {
 			assembled.refs = append(assembled.refs, s.currentRefs...)
 			if s.currentID != 0 {
 				assembled.parents = append(assembled.parents, s.currentID)
@@ -402,7 +403,7 @@ func (s *binOPCUA) consume(dir int, w []byte, max, maxBytes int) (result map[str
 		b = append(assembled.data, b...)
 		delete(s.chunks, key)
 		out["Reassembled"] = true
-		if s.read {
+		if s.selected() {
 			s.completedRefs = uaUniqueRefs(assembled.refs, s.currentRefs)
 			s.completedParents = append([]uint64(nil), assembled.parents...)
 		}
@@ -416,26 +417,36 @@ func (s *binOPCUA) consume(dir int, w []byte, max, maxBytes int) (result map[str
 	out["Semantic Status"] = "service-envelope-only"
 	out["Service Name"] = map[uint32]string{446: "OpenSecureChannelRequest", 449: "OpenSecureChannelResponse", 452: "CloseSecureChannelRequest", 461: "CreateSessionRequest", 464: "CreateSessionResponse", 467: "ActivateSessionRequest", 470: "ActivateSessionResponse", 473: "CloseSessionRequest", 476: "CloseSessionResponse", 527: "BrowseRequest", 530: "BrowseResponse", 631: "ReadRequest", 634: "ReadResponse", 673: "WriteRequest", 676: "WriteResponse"}[service]
 	var readBody map[string]any
-	if s.read && (service == 631 || service == 634) {
+	if s.read && (service == 631 || service == 634) || s.browse && (service == 527 || service == 530) {
 		// Any selected-body refusal invalidates this observed pending exchange.
 		// A later response cannot consume the rejected message's association.
 		defer func() {
 			if err != nil {
 				k := key
-				if service == 634 {
+				if service == 634 || service == 530 {
 					k.dir = 1 - dir
 				}
 				delete(s.pending, k)
-				delete(s.readPending, k)
+				delete(s.appPending, k)
 			}
 		}()
-		readBody, err = decodeOPCUARead(b[serviceBytes:], service == 634, max, s.readReserve)
+		label := "Read"
+		if service == 527 || service == 530 {
+			label = "Browse"
+			readBody, err = decodeOPCUABrowse(b[serviceBytes:], service == 530, max, s.appReserve)
+		} else {
+			readBody, err = decodeOPCUARead(b[serviceBytes:], service == 634, max, s.appReserve)
+		}
 		if err != nil {
 			return nil, err
 		}
-		out["Read"] = readBody
-		out["Semantic Status"] = "read-wire-observation"
-		if service == 634 {
+		out[label] = readBody
+		if label == "Read" {
+			out["Semantic Status"] = "read-wire-observation"
+		} else {
+			out["Semantic Status"] = "browse-wire-observation"
+		}
+		if service == 634 || service == 530 {
 			results, _ := readBody["Results"].([]any)
 			diagnostics, _ := readBody["Diagnostic Infos"].([]any)
 			// Diagnostic entries correspond to result entries even when the
@@ -445,13 +456,21 @@ func (s *binOPCUA) consume(dir int, w []byte, max, maxBytes int) (result map[str
 				return nil, protocolError(ErrDesynchronized, "OPC UA Read diagnostic count")
 			}
 			requestKey := uaKey{1 - dir, channel, request}
-			if pending, ok := s.readPending[requestKey]; ok {
+			if pending, ok := s.appPending[requestKey]; ok {
 				header := readBody["Header"].(map[string]any)
 				if header["Request Handle"] != pending.handle {
 					return nil, protocolError(ErrDesynchronized, "OPC UA Read response handle")
 				}
 				if header["Service Result"].(uint32)&0x80000000 == 0 && len(results) != pending.count {
 					return nil, protocolError(ErrDesynchronized, "OPC UA Read response result count")
+				}
+				if service == 530 && pending.service == 527 && pending.maxRefs != 0 {
+					for _, result := range results {
+						refs, _ := result.(map[string]any)["References"].([]any)
+						if uint64(len(refs)) > uint64(pending.maxRefs) {
+							return nil, protocolError(ErrDesynchronized, "OPC UA Browse exceeds requested references per node")
+						}
+					}
 				}
 			}
 		}
@@ -471,7 +490,7 @@ func (s *binOPCUA) consume(dir int, w []byte, max, maxBytes int) (result map[str
 				return nil, protocolError(ErrDesynchronized, "OPC UA response service")
 			}
 			delete(s.pending, key)
-			delete(s.readPending, key)
+			delete(s.appPending, key)
 		}
 	} else if _, ok := map[uint32]bool{446: true, 461: true, 467: true, 473: true, 527: true, 631: true, 673: true}[service]; ok {
 		if _, exists := s.pending[key]; exists {
@@ -482,8 +501,16 @@ func (s *binOPCUA) consume(dir int, w []byte, max, maxBytes int) (result map[str
 		}
 		s.pending[key] = service
 		if readBody != nil {
-			nodes, _ := readBody["Nodes To Read"].([]any)
-			s.readPending[key] = uaReadPending{readBody["Header"].(map[string]any)["Request Handle"].(uint32), len(nodes)}
+			nodeKey := "Nodes To Read"
+			if service == 527 {
+				nodeKey = "Nodes To Browse"
+			}
+			nodes, _ := readBody[nodeKey].([]any)
+			p := uaSelectedPending{service: service, handle: readBody["Header"].(map[string]any)["Request Handle"].(uint32), count: len(nodes)}
+			if service == 527 {
+				p.maxRefs = readBody["Requested Max References Per Node"].(uint32)
+			}
+			s.appPending[key] = p
 		}
 	}
 	if kind == "CLO" {
@@ -492,7 +519,7 @@ func (s *binOPCUA) consume(dir int, w []byte, max, maxBytes int) (result map[str
 		for k := range s.pending {
 			if k.channel == channel {
 				delete(s.pending, k)
-				delete(s.readPending, k)
+				delete(s.appPending, k)
 			}
 		}
 		for k := range s.chunks {
@@ -514,11 +541,11 @@ func (s *binOPCUA) consumeEvent(dir int, e *ProtocolEvent, max, maxBytes int) (m
 	out, err := s.consume(dir, e.Raw, max, maxBytes)
 	s.currentRefs = nil
 	s.currentID = 0
-	if err != nil && s.read {
-		for k := range s.readPending {
+	if err != nil && s.selected() {
+		for k := range s.appPending {
 			delete(s.pending, k)
 		}
-		clear(s.readPending)
+		clear(s.appPending)
 		clear(s.chunks)
 	}
 	if err == nil && len(s.completedParents) > 0 {
@@ -542,4 +569,15 @@ func uaUniqueRefs(a, b []PacketReference) []PacketReference {
 		}
 	}
 	return out
+}
+
+func (s *binOPCUA) selected() bool { return s.read || s.browse }
+func (s *binOPCUA) observationProfile() string {
+	if s.read && !s.browse {
+		return "opcua-read-scalar"
+	}
+	if s.browse && !s.read {
+		return "opcua-browse"
+	}
+	return "opcua-application"
 }

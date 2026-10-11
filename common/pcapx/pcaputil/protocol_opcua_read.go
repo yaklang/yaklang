@@ -114,13 +114,20 @@ func (c *uaReadCursor) array(minBytes int) (int, bool) {
 	return int(n), false
 }
 func (c *uaReadCursor) node() map[string]any {
-	m := c.object(3)
+	return c.nodeFlags(false)
+}
+func (c *uaReadCursor) nodeFlags(expanded bool) map[string]any {
+	m := c.object(5)
 	enc := byte(c.u(1))
 	if c.err != nil {
 		return nil
 	}
 	m["Encoding"] = enc
-	switch enc {
+	if !expanded && enc&0xc0 != 0 {
+		c.err = fmt.Errorf("opcua: plain NodeId has expanded flags")
+		return m
+	}
+	switch enc & 0x3f {
 	case 0:
 		m["Namespace"] = uint16(0)
 		m["Identifier"] = uint32(c.u(1))
@@ -141,6 +148,14 @@ func (c *uaReadCursor) node() map[string]any {
 		m["Identifier"] = c.blob(false)
 	default:
 		c.err = fmt.Errorf("opcua: Read NodeId encoding")
+	}
+	if expanded {
+		if enc&0x80 != 0 {
+			m["Namespace URI"] = c.blob(true)
+		}
+		if enc&0x40 != 0 {
+			m["Server Index"] = uint32(c.u(4))
+		}
 	}
 	return m
 }

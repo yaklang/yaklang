@@ -16,7 +16,7 @@ import (
 // legacy WithBinParser callbacks may run concurrently for different flows.
 // Messages in one TCP flow are delivered in order.
 type ProtocolEvent struct {
-	nativeOPCUARead                          bool
+	nativeOPCUAObservation                   bool
 	Admission                                string
 	semanticFields                           map[string]any
 	semanticSession                          map[string]any
@@ -236,7 +236,7 @@ func (e *ProtocolEvent) retainRuleEnvelope(result map[string]any) {
 }
 
 func (e *ProtocolEvent) ownsNativeFields() bool {
-	if e.nativeOPCUARead {
+	if e.nativeOPCUAObservation {
 		return true
 	}
 	if e.nativeCANRecord {
@@ -333,7 +333,9 @@ type BinParserBinding struct {
 
 type BinParserConfig struct {
 	// DecodeOPCUARead opts into bounded UA Binary Read scalar observations under an observed None policy.
-	DecodeOPCUARead                               bool
+	DecodeOPCUARead bool
+	// DecodeOPCUABrowse opts into bounded Browse body observations under an observed None policy.
+	DecodeOPCUABrowse                             bool
 	OnEvent                                       func(*BinParserEvent)
 	OnStats                                       func(BinParserStats)
 	Deferred                                      bool // explicit capture-first mode; full Decode() is done by the viewer
@@ -687,9 +689,9 @@ func (a *binParser) newFlow(t *TrafficFlow) *binFlow {
 func (f *binFlow) event(dir int, raw []byte, status, detail string) *BinParserEvent {
 	d := &f.directions[dir]
 	e := &BinParserEvent{FlowID: f.id, Timestamp: d.ts, Transport: "tcp", Source: f.endpoints[dir], Destination: f.endpoints[1-dir], Direction: dir, Offset: d.offset, Length: len(raw), Protocol: f.protocol, Status: status, Summary: detail, Raw: append([]byte(nil), raw...)}
-	if f.protocol == "opcua" && f.a.config.DecodeOPCUARead {
-		e.nativeOPCUARead = true
-		e.Profile = "opcua-read-scalar"
+	if f.protocol == "opcua" && (f.a.config.DecodeOPCUARead || f.a.config.DecodeOPCUABrowse) {
+		e.nativeOPCUAObservation = true
+		e.Profile = (&binOPCUA{read: f.a.config.DecodeOPCUARead, browse: f.a.config.DecodeOPCUABrowse}).observationProfile()
 	}
 	f.eventEvidence(dir, e)
 	if f.slmpTCP != nil {
@@ -749,7 +751,7 @@ func (f *binFlow) stop(dir int, wire []byte, status, reason string) {
 	}
 	e := f.event(dir, preview, status, reason)
 	e.sessionError, f.lastSessionError = f.lastSessionError, nil
-	if e.nativeOPCUARead && e.sessionError == nil {
+	if e.nativeOPCUAObservation && e.sessionError == nil {
 		kind := ErrMalformedMessage
 		switch status {
 		case "limited":
@@ -1184,7 +1186,7 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 					err = protocolError(ErrUnsupportedFeature, err.Error())
 				}
 				e.Status, e.sessionError = classifySessionError(err)
-				if (e.Entry == "MySQLPreparedFields" || e.Protocol == "mqtt" || e.nativeOPCUARead) && e.sessionError == nil {
+				if (e.Entry == "MySQLPreparedFields" || e.Protocol == "mqtt" || e.nativeOPCUAObservation) && e.sessionError == nil {
 					// These legacy codecs also return wrapped context or
 					// grammar errors. Preserve their status/message privately so
 					// later queries cannot use a caller-supplied successful cache.
@@ -1208,7 +1210,7 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 				// decoding and history; retrying a different grammar loses fields
 				// or rejects valid argumentless/multiline messages.
 				e.semanticFields = protocolFields(result)
-				if e.Protocol == "goose" || e.Protocol == "mqtt" || e.nativeOPCUARead || e.Protocol == "websocket" && e.Session["OCPP"] != nil || e.Protocol == "rtp" && e.Transport != "udp" {
+				if e.Protocol == "goose" || e.Protocol == "mqtt" || e.nativeOPCUAObservation || e.Protocol == "websocket" && e.Session["OCPP"] != nil || e.Protocol == "rtp" && e.Transport != "udp" {
 					e.retainRuleEnvelope(result)
 				}
 				if e.Protocol == "tls" || e.Protocol == "redis" || e.Entry == "MySQLPreparedFields" || e.Protocol == "stun" || e.Protocol == "turn" || e.Protocol == "snmp" || e.Protocol == "slmp" || e.Protocol == "dlms-wrapper" || e.Protocol == "dlms" || e.Protocol == "c37118" {

@@ -31,11 +31,15 @@ type uaReadCase struct {
 		Contributors []int          `json:"contributors"`
 		Error        string         `json:"error"`
 		Matched      bool           `json:"matched"`
+		Dropped      bool           `json:"dropped"`
 	} `json:"steps"`
 }
 
 func opcuaReadScalarCodecCases(t *testing.T) {
-	raw, err := opcuaReadInput("material/cases.json")
+	opcuaSelectedCodecCases(t, "opcua-read-scalar", "Read", false)
+}
+func opcuaSelectedCodecCases(t *testing.T, root, field string, browse bool) {
+	raw, err := opcuaSelectedInput(root, "material/cases.json")
 	require.NoError(t, err)
 	var cases []uaReadCase
 	d := json.NewDecoder(bytes.NewReader(raw))
@@ -43,7 +47,7 @@ func opcuaReadScalarCodecCases(t *testing.T) {
 	require.NoError(t, d.Decode(&cases))
 	for _, c := range cases {
 		t.Run(c.Name, func(t *testing.T) {
-			s := &binOPCUA{read: true}
+			s := &binOPCUA{read: !browse, browse: browse}
 			for i, step := range c.Steps {
 				w, err := hex.DecodeString(step.Hex)
 				require.NoError(t, err)
@@ -68,10 +72,14 @@ func opcuaReadScalarCodecCases(t *testing.T) {
 					requireExactProtocolFields(t, step.Session, out)
 				}
 				if step.Read != nil {
-					requireExactProtocolFields(t, step.Read, out["Read"].(map[string]any))
-					require.Equal(t, "read-wire-observation", out["Semantic Status"])
+					requireExactProtocolFields(t, step.Read, out[field].(map[string]any))
+					if browse {
+						require.Equal(t, "browse-wire-observation", out["Semantic Status"])
+					} else {
+						require.Equal(t, "read-wire-observation", out["Semantic Status"])
+					}
 				}
-				if step.Service == 634 {
+				if step.Service == 634 || step.Service == 530 {
 					require.Equal(t, step.Matched, out["Matched"])
 				}
 			}
@@ -179,14 +187,14 @@ func opcuaReadScalarResources(t *testing.T) {
 	require.NoError(t, err)
 	_, err = s.consume(0, request, 1024, 1<<20)
 	require.NoError(t, err)
-	require.Len(t, s.readPending, 1)
+	require.Len(t, s.appPending, 1)
 	// Reject the response during allocation, invalidate its pending exchange,
 	// then admit the adjacent response as an unpaired observation.
-	s.readReserve = func(int64) error { return protocolError(ErrResourceExceeded, "test response allocation") }
+	s.appReserve = func(int64) error { return protocolError(ErrResourceExceeded, "test response allocation") }
 	_, err = s.consume(1, response, 1024, 1<<20)
 	rocTypedError(t, "ResourceExceeded", err)
-	require.Empty(t, s.readPending)
-	s.readReserve = nil
+	require.Empty(t, s.appPending)
+	s.appReserve = nil
 	later := bytes.Clone(response)
 	later[16] = 2
 	out, err := s.consume(1, later, 1024, 1<<20)
@@ -239,7 +247,10 @@ func uaReadBasic() ([]byte, error) {
 	return json.Marshal(m)
 }
 func opcuaReadScalarSealed(t *testing.T) {
-	raw, err := opcuaReadInput("manifest.json")
+	opcuaSelectedSealed(t, "opcua-read-scalar", "Read", 55, false)
+}
+func opcuaSelectedSealed(t *testing.T, root, field string, profiles int, browse bool) {
+	raw, err := opcuaSelectedInput(root, "manifest.json")
 	require.NoError(t, err)
 	var manifest struct {
 		Schema string
@@ -249,9 +260,9 @@ func opcuaReadScalarSealed(t *testing.T) {
 		}
 	}
 	require.NoError(t, json.Unmarshal(raw, &manifest))
-	require.Equal(t, "opcua-read-scalar/v1", manifest.Schema)
-	require.Len(t, manifest.Cases, 55)
-	raw, err = opcuaReadInput("material/cases.json")
+	require.Equal(t, root+"/v1", manifest.Schema)
+	require.Len(t, manifest.Cases, profiles)
+	raw, err = opcuaSelectedInput(root, "material/cases.json")
 	require.NoError(t, err)
 	var cases []uaReadCase
 	d := json.NewDecoder(bytes.NewReader(raw))
@@ -262,7 +273,7 @@ func opcuaReadScalarSealed(t *testing.T) {
 		t.Run(c.Name, func(t *testing.T) {
 			m := manifest.Cases[n]
 			require.Equal(t, c.Name, m.ID)
-			stored, err := opcuaReadInput(strings.TrimPrefix(m.Capture, "common/pcapx/pcaputil/opcua-read-scalar/"))
+			stored, err := opcuaSelectedInput(root, strings.TrimPrefix(m.Capture, "common/pcapx/pcaputil/"+root+"/"))
 			require.NoError(t, err)
 			require.Equal(t, m.SHA256, fmt.Sprintf("%x", sha256.Sum256(stored)))
 			require.Len(t, stored, m.Bytes)
@@ -286,7 +297,7 @@ func opcuaReadScalarSealed(t *testing.T) {
 								var stats ProtocolStats
 								var tcp TCPReassemblyStats
 								seen := 0
-								opts := []CaptureOption{WithBinParserConfig(BinParserConfig{DecodeOPCUARead: true, Deferred: deferred}), WithTCPReassemblyWorkers(workers), WithOnProtocolMessage(func(e *ProtocolEvent) { mu.Lock(); events = append(events, e); mu.Unlock() }), WithOnProtocolStats(func(s ProtocolStats) { stats = s }), WithOnTCPReassemblyStats(func(s TCPReassemblyStats) { tcp = s })}
+								opts := []CaptureOption{WithBinParserConfig(BinParserConfig{DecodeOPCUARead: !browse, DecodeOPCUABrowse: browse, Deferred: deferred}), WithTCPReassemblyWorkers(workers), WithOnProtocolMessage(func(e *ProtocolEvent) { mu.Lock(); events = append(events, e); mu.Unlock() }), WithOnProtocolStats(func(s ProtocolStats) { stats = s }), WithOnTCPReassemblyStats(func(s TCPReassemblyStats) { tcp = s })}
 								if observe {
 									opts = append(opts, WithEveryPacket(func(p gopacket.Packet) { seen++; require.Nil(t, p.ErrorLayer()) }))
 								}
@@ -295,6 +306,14 @@ func opcuaReadScalarSealed(t *testing.T) {
 								clear(input)
 								wantClose := c.Close != nil
 								count := len(c.Steps)
+								inputBytes, droppedBytes := 0, 0
+								for _, step := range c.Steps {
+									inputBytes += len(step.Hex) / 2
+									if step.Dropped {
+										count--
+										droppedBytes += len(step.Hex) / 2
+									}
+								}
 								if wantClose {
 									count++
 								}
@@ -314,9 +333,14 @@ func opcuaReadScalarSealed(t *testing.T) {
 									stepRefs = append(stepRefs, list)
 									packet += uint64(refs)
 								}
-								decoded, malformed, context := 0, 0, 0
+								decoded, malformed, context, limited := 0, 0, 0, 0
+								eventIndex := 0
 								for i, step := range c.Steps {
-									e := events[i]
+									if step.Dropped {
+										continue
+									}
+									e := events[eventIndex]
+									eventIndex++
 									wire, err := hex.DecodeString(step.Hex)
 									require.NoError(t, err)
 									require.EqualValues(t, i+1, e.ID)
@@ -325,7 +349,7 @@ func opcuaReadScalarSealed(t *testing.T) {
 									require.Zero(t, e.TransactionID)
 									require.Equal(t, "opcua", e.Protocol)
 									require.Equal(t, "tcp", e.Transport)
-									require.Equal(t, "opcua-read-scalar", e.Profile)
+									require.Equal(t, root, e.Profile)
 									require.Equal(t, step.Dir, e.Direction)
 									require.Equal(t, wire, e.Raw)
 									require.Equal(t, fmt.Sprintf("%x", sha256.Sum256(wire)), e.SourceBytes.SHA256)
@@ -352,6 +376,8 @@ func opcuaReadScalarSealed(t *testing.T) {
 										rocTypedError(t, step.Error, e.sessionError)
 										if step.Error == "UnsupportedFeature" {
 											context++
+										} else if step.Error == "ResourceExceeded" {
+											limited += len(wire)
 										} else {
 											malformed++
 										}
@@ -379,16 +405,16 @@ func opcuaReadScalarSealed(t *testing.T) {
 										requireExactProtocolFields(t, step.Session, e.Session)
 									}
 									if step.Read != nil {
-										requireExactProtocolFields(t, step.Read, e.Session["Read"].(map[string]any))
+										requireExactProtocolFields(t, step.Read, e.Session[field].(map[string]any))
 									}
-									if step.Service == 634 {
+									if step.Service == 634 || step.Service == 530 {
 										require.Equal(t, step.Matched, e.Session["Matched"])
 									}
 									fields, err := e.GetFields()
 									require.NoError(t, err)
 									requireExactProtocolFields(t, e.Session, fields)
 									expected := cloneSession(fields)
-									fields["Read"] = "forged"
+									fields[field] = "forged"
 									e.Fields = map[string]any{"forged": true}
 									e.Structured = map[string]any{"fields": e.Fields}
 									e.Session = map[string]any{"forged": true}
@@ -410,12 +436,15 @@ func opcuaReadScalarSealed(t *testing.T) {
 								}
 								require.EqualValues(t, malformed, stats.Malformed)
 								require.EqualValues(t, context, stats.ContextRequired)
+								require.EqualValues(t, limited, stats.LimitedBytes)
 								if deferred {
 									require.EqualValues(t, decoded, stats.Deferred)
 								} else {
 									require.EqualValues(t, decoded, stats.Decoded)
 								}
 								require.Zero(t, stats.BufferedBytes)
+								require.EqualValues(t, inputBytes, stats.InputBytes)
+								require.EqualValues(t, droppedBytes, stats.UnclassifiedBytes)
 								require.Zero(t, tcp.UnreassembledSegments)
 								require.Zero(t, tcp.UnreassembledBytes)
 								require.Zero(t, tcp.DecodeErrors)
@@ -437,11 +466,19 @@ func opcuaReadScalarSealed(t *testing.T) {
 }
 
 func opcuaReadInput(name string) ([]byte, error) {
-	if root := os.Getenv("OPCUA_TEST_MATERIAL_ROOT"); root != "" {
-		return os.ReadFile(filepath.Join(root, name))
-	}
-	return trafficfixture.ReadFile("opcua-read-scalar/" + name)
+	return opcuaSelectedInput("opcua-read-scalar", name)
 }
+func opcuaSelectedInput(root, name string) ([]byte, error) {
+	env := "OPCUA_TEST_MATERIAL_ROOT"
+	if root == "opcua-browse" {
+		env = "OPCUA_BROWSE_TEST_MATERIAL_ROOT"
+	}
+	if override := os.Getenv(env); override != "" {
+		return os.ReadFile(filepath.Join(override, name))
+	}
+	return trafficfixture.ReadFile(root + "/" + name)
+}
+
 func opcuaReadScalarAll(t *testing.T) {
 	t.Run("Codec", opcuaReadScalarCodecCases)
 	t.Run("Session", opcuaReadScalarSelectedSession)

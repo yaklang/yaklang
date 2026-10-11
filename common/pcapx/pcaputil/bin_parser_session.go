@@ -221,7 +221,7 @@ func (f *binFlow) detectDirection(dir int, wire []byte) {
 	case "s7comm":
 		f.protocol, f.s7 = "s7comm", &binS7{}
 	case "opcua":
-		f.protocol, f.opcua = "opcua", &binOPCUA{read: f.a.config.DecodeOPCUARead}
+		f.protocol, f.opcua = "opcua", &binOPCUA{read: f.a.config.DecodeOPCUARead, browse: f.a.config.DecodeOPCUABrowse}
 	case "rtsp":
 		f.protocol, f.rtsp = "rtsp", &binRTSP{}
 	case "stun":
@@ -386,13 +386,18 @@ func (f *binFlow) consumeSession(dir int, e *ProtocolEvent, result map[string]an
 	case "s7comm":
 		e.Session, err = f.s7.consume(dir, e.Raw, f.a.budget.MaxCollectionElements, f.a.budget.MaxMessageBytes)
 	case "opcua":
-		e.nativeOPCUARead = f.opcua.read
-		if f.opcua.read && e.ID == 0 {
+		e.nativeOPCUAObservation = f.opcua.selected()
+		if f.opcua.selected() && e.ID == 0 {
 			e.ID = f.a.ids.Add(1)
 		}
 		e.Session, err = f.opcua.consumeEvent(dir, e, f.a.budget.MaxCollectionElements, f.a.budget.MaxMessageBytes)
-		if f.opcua.read {
-			e.Profile = "opcua-read-scalar"
+		if f.opcua.selected() {
+			e.Profile = f.opcua.observationProfile()
+			if e.Session["Read"] != nil {
+				e.Profile = "opcua-read-scalar"
+			} else if e.Session["Browse"] != nil {
+				e.Profile = "opcua-browse"
+			}
 			if err == nil {
 				e.semanticFields = cloneSession(e.Session)
 				if result != nil {
@@ -949,12 +954,26 @@ func (f *binFlow) finishSession(reason TrafficFlowCloseReason) {
 		f.a.incomplete.Add(1)
 		f.a.emit(e)
 	}
-	if u := f.opcua; u != nil && u.read && (len(u.readPending) > 0 || len(u.chunks) > 0) {
+	if u := f.opcua; u != nil && u.selected() && (len(u.appPending) > 0 || len(u.chunks) > 0) {
 		e := f.event(0, nil, "incomplete", string(reason)+": OPC UA selected observation ended with outstanding requests/chunks")
-		e.Profile = "opcua-read-scalar"
-		e.nativeOPCUARead = true
+		e.Profile = u.observationProfile()
+		e.nativeOPCUAObservation = true
 		e.sessionError = &ProtocolError{Kind: ErrNeedMore, Message: e.Summary}
-		e.Session = map[string]any{"Outstanding Read Requests": len(u.readPending), "Buffered Secure Messages": len(u.chunks)}
+		e.Session = map[string]any{"Buffered Secure Messages": len(u.chunks)}
+		reads, browses := 0, 0
+		for _, p := range u.appPending {
+			if p.service == 631 {
+				reads++
+			} else if p.service == 527 {
+				browses++
+			}
+		}
+		if u.read {
+			e.Session["Outstanding Read Requests"] = reads
+		}
+		if u.browse {
+			e.Session["Outstanding Browse Requests"] = browses
+		}
 		f.a.incomplete.Add(1)
 		f.a.emit(e)
 	}
