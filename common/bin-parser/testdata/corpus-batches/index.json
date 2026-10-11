@@ -39800,6 +39800,573 @@
         "common/pcapx/pcaputil/opendroneid-auth-pages/validation/reused-inputs.json": "validation/reused-inputs.json",
         "common/pcapx/pcaputil/opendroneid-auth-pages/verify.py": "verify.py"
       }
+    },
+    {
+      "id": "validation-nmea-vtg-5ccf60",
+      "kind": "validation",
+      "source_sha": "5ccf608270060f0cb87c59a4badd2157e5a2aa8b",
+      "file": "validation-nmea-vtg-5ccf60.zip",
+      "sha256": "2ee150826c441e0d95dde0deaf818ae4c90d1f9eeef92159a76fc54d25a6683e",
+      "password": "bin-parser",
+      "members": {
+        "answers/all-empty.json": {
+          "sha256": "f28b7a0f7ccb9b9239f5ffca2805a8083142b32c0eb66c51ace9ae71029df716",
+          "bytes": 644
+        },
+        "answers/bad-checksum.json": {
+          "sha256": "b0af9e10afbb91aad5286ae5d2d5a29177a841e1c220898f546a10c51e71807a",
+          "bytes": 263
+        },
+        "answers/blank-mode-space.json": {
+          "sha256": "1004bc81a0b6ba18858466f5b2a568ea4f0cdf3a5bfdbd2babe3b845b074f2dc",
+          "bytes": 271
+        },
+        "answers/cut-crlf.json": {
+          "sha256": "ba6a04fb9aed116a749c6935f6be04036fc25b83f0f35c5710fd61d7cf2bfc7f",
+          "bytes": 257
+        },
+        "answers/differential.json": {
+          "sha256": "2fa25d3cd2188a99c4eb858ff069675ae46ac87edf4287277406f91a6ad26a43",
+          "bytes": 817
+        },
+        "answers/empty-magnetic.json": {
+          "sha256": "5b1c96a652474743e9825ad86eebc61bd62ea6a9b7782314506bfa6af9f4625f",
+          "bytes": 781
+        },
+        "answers/empty-mode.json": {
+          "sha256": "0287cd46a7a40a27932432411baaae81911495608447e7f0d9b334a7615009c7",
+          "bytes": 813
+        },
+        "answers/exponent.json": {
+          "sha256": "7bcbe35ea0e96b3587a7e513dc7235112c5ddba1bba7c9d1f30d0f4990a01cb6",
+          "bytes": 257
+        },
+        "answers/extra-field.json": {
+          "sha256": "ee1ef0339f7469a282f6478dd0a1339df74ee55f54a1faca63cad47de5f9534c",
+          "bytes": 272
+        },
+        "answers/future-rtk-mode.json": {
+          "sha256": "ba28d428f153888a3d78fd5420ab3d9d3395373dc2976a36c497444f2cb35473",
+          "bytes": 272
+        },
+        "answers/inf.json": {
+          "sha256": "f7dc3cb0f3113168e52c111d9ef796c81afff5e40513a54493be683b4c2f5d49",
+          "bytes": 252
+        },
+        "answers/late-bad-checksum.json": {
+          "sha256": "b277bbcbd5be9a90567cc98e48f917a2a07ea142c9832a3b8182c31ace206862",
+          "bytes": 346
+        },
+        "answers/leading-dot.json": {
+          "sha256": "7a60fa355c38215505da4946759ea02d45d03a5f90a6bb8d310063491b72d1e4",
+          "bytes": 258
+        },
+        "answers/legacy-units.json": {
+          "sha256": "798ae34b6b3783f412d77b8cdca285eedae92b3a507db1a212e2e828bc19200e",
+          "bytes": 795
+        },
+        "answers/magnetic-360.json": {
+          "sha256": "5253de9c4b317cdc3518faad64d2ab95fca605783c99fe94481c00864c48e354",
+          "bytes": 263
+        },
+        "answers/missing-unit.json": {
+          "sha256": "cd2947e14be03da926e594d9d75b3a5f7c0c023424acf44e6f5785b4f92b6964",
+          "bytes": 261
+        },
+        "answers/mode-A.json": {
+          "sha256": "2c8933edf5bde0e72a1c3b8473c6c3e7226c315b8e5261b2ded39bd3a5aa43ce",
+          "bytes": 811
+        },
+        "answers/mode-E.json": {
+          "sha256": "18295293120765811eadcd7ee507f027108a6a63c87f7c28e57ec4c79ac70b4c",
+          "bytes": 811
+        },
+        "answers/mode-M.json": {
+          "sha256": "2b0777ab48a4297bfff2e73091b9e5ce989cb51a9e84af0e0c75379d2b8c6560",
+          "bytes": 811
+        },
+        "answers/mode-N.json": {
+          "sha256": "c29607fdf6d14c84989d23fd91778f3143782e6609333d14fba9fcef9c87600e",
+          "bytes": 811
+        },
+        "answers/mode-S.json": {
+          "sha256": "1b22c19bfa33d5565cf133d4aba7473f2614c56bc9b81063d5165f080557082a",
+          "bytes": 811
+        },
+        "answers/multi-mode.json": {
+          "sha256": "129c190da61b66784214ab9c6e21a36810f2552462f9751b338e18e583028acb",
+          "bytes": 267
+        },
+        "answers/nan.json": {
+          "sha256": "1f532b4b39eed5e3144865269d9ae2c95213bda7ac4dee43fe0ac1de0712bfde",
+          "bytes": 252
+        },
+        "answers/negative-course.json": {
+          "sha256": "08f42a45bf3bf84cfb52df1ada2118705097ca1a51bd9ca61c43afb83634decf",
+          "bytes": 262
+        },
+        "answers/negative-speed.json": {
+          "sha256": "e99715760bdb2cac0b90578c4c4553ed752c55f025f9af3fbdc44d89a3920541",
+          "bytes": 267
+        },
+        "answers/no-cr.json": {
+          "sha256": "5e6f02fcdd14f0420ac194da310be507dd64b4066cef0db448e492a6ef940624",
+          "bytes": 254
+        },
+        "answers/old-five-field.json": {
+          "sha256": "8e0789ced37de07f16bc49524e80a4058b06fee0494e6ae4df2e23f5ddccc42c",
+          "bytes": 251
+        },
+        "answers/overlong.json": {
+          "sha256": "2bea123c0398ed0c55c2da6a65bfaca140c6cdd98aa5eb856328a7ced0045cf1",
+          "bytes": 391
+        },
+        "answers/plus.json": {
+          "sha256": "5d636526417cdba6dd79e08d1efc05530c3182d08c36d2098f5f7186fa9db7f6",
+          "bytes": 251
+        },
+        "answers/proprietary-talker.json": {
+          "sha256": "90c987e0e94c8a3fe5ccab2b099b48f7ad309d9805157ae0a353ff76995408f4",
+          "bytes": 271
+        },
+        "answers/reported-rounding.json": {
+          "sha256": "d358d99a34016de22f11e6f4fe1b9130af67c9df4ce645ad531915d49a3f7f8f",
+          "bytes": 811
+        },
+        "answers/short.json": {
+          "sha256": "f2fd03834b4601f32ddc48499b232181ef98d9b489b0e4463e4ca442f54d94fa",
+          "bytes": 214
+        },
+        "answers/split-datagram.json": {
+          "sha256": "f5e11222751e04a6ac7effe1f679bd43e3d0ad10d9f0aaa5ae119baaf937909a",
+          "bytes": 273
+        },
+        "answers/tail-byte.json": {
+          "sha256": "fe374e81a114af64e3db5da4ebf8d96572cc8821d846dc15bf6ba9e166b89ec4",
+          "bytes": 262
+        },
+        "answers/talker-BD.json": {
+          "sha256": "f7252302d7e777340afc28dcc41dacbabc6d190eaf4b6b768296ef5024fd91ba",
+          "bytes": 814
+        },
+        "answers/talker-GA.json": {
+          "sha256": "a3bcaead1e8372434325d3ff66cbe05586c5071018c6a9bc7fdecf085c7a93d6",
+          "bytes": 814
+        },
+        "answers/talker-GB.json": {
+          "sha256": "53618cea4a72d2f46b2e843eb30fb49cc3402de8f229ef228513f579cb78cfcc",
+          "bytes": 814
+        },
+        "answers/talker-GI.json": {
+          "sha256": "598930b70d1ad5ab1ffe08b5b5512cc955702f4926e3d12eaf34c707394b818c",
+          "bytes": 814
+        },
+        "answers/talker-GL.json": {
+          "sha256": "ad9dd6f0628daa242f6de6c6494095c17843f1bd951c7271923a102372e4ca22",
+          "bytes": 814
+        },
+        "answers/talker-GN.json": {
+          "sha256": "43e69ca6af4ada2ee20a0ebc3d69a5b86ba448b5c92a08b9b97d85c5c5c470d8",
+          "bytes": 814
+        },
+        "answers/talker-GQ.json": {
+          "sha256": "3ec5de13df58b117f02c6930f2b05fcafaafde1990d853f598d3e89b4a44ad3a",
+          "bytes": 814
+        },
+        "answers/trailing-dot.json": {
+          "sha256": "6da8016ae962e13ae7f8e0612e4fa541c1739d32d14d8468fc738bfb91c9b2b9",
+          "bytes": 259
+        },
+        "answers/true-360.json": {
+          "sha256": "f377955ad551a6bc78b54ca08bf9586c9e3cd03f3d0c8539fe32c826e08b3eaf",
+          "bytes": 257
+        },
+        "answers/two-independent-sentences.json": {
+          "sha256": "58f2185d54191bebb5a1581373eefce968e49244118ed093732457dbf9baf674",
+          "bytes": 1691
+        },
+        "answers/unknown-mode.json": {
+          "sha256": "7a9506a4080184343cd5d58a68a610529a1bd3fe78be7e6235925e0f46bafb42",
+          "bytes": 269
+        },
+        "answers/upper-course.json": {
+          "sha256": "e4109a8fcb537f330c2627b41130069efbc49935fe071272bb78eadc17b51cca",
+          "bytes": 831
+        },
+        "answers/wrong-K.json": {
+          "sha256": "805a6d293df5b70c8474b7327adb31e328046226caa66053f81fe051e9753530",
+          "bytes": 258
+        },
+        "answers/wrong-M.json": {
+          "sha256": "f7b8714ce2f346a22d6de71c1a4c376ad8feba1ef3e664458a4e4d75f3fb1400",
+          "bytes": 258
+        },
+        "answers/wrong-N.json": {
+          "sha256": "74452da81df8a2e9543021aa6299bfdea2409c97b3a1b5cc6e284fc8b7695e66",
+          "bytes": 258
+        },
+        "answers/wrong-T.json": {
+          "sha256": "65f396e7bbbeec9c1b4f808ec597d5919fbfdeb9ec8c71788b14474791a74b79",
+          "bytes": 258
+        },
+        "answers/zero.json": {
+          "sha256": "727a7ef48ac71b6f5b8c6eac9f5c69785e7617c3fe2781a2fbd5be8cf4a01495",
+          "bytes": 781
+        },
+        "build.py": {
+          "sha256": "930389e9591677a1c83158625648ce2a90bd306d2f705a2242faed2b42cf9d59",
+          "bytes": 6717
+        },
+        "captures/all-empty.pcap": {
+          "sha256": "b639c97a09b9d482136e09cd2ec9b5f841f6d9c6a4f06aee5834fc78839f78e2",
+          "bytes": 107
+        },
+        "captures/bad-checksum.pcap": {
+          "sha256": "5cce5123956f4c054f455cfbcce5bd4b1ecc486280b359438080134713456e32",
+          "bytes": 121
+        },
+        "captures/blank-mode-space.pcap": {
+          "sha256": "58d42464d09f5bbaef54bc0f4b84b448e7dd0b99f1aa2f00174d1700e5fb9c98",
+          "bytes": 123
+        },
+        "captures/cut-crlf.pcap": {
+          "sha256": "6f0a9943122fb2c10aa59b4dabf7a6cf749c67ac0ff2eccb5516f7255c50263b",
+          "bytes": 120
+        },
+        "captures/differential.pcap": {
+          "sha256": "ac7c14c55289700c4aa6144d6da17419e1ae0f62f974fc8a0a4a1030153ab745",
+          "bytes": 123
+        },
+        "captures/empty-magnetic.pcap": {
+          "sha256": "bfbd0909c83a7fe7a5516b27182a8e361ab2f77839dace9fadb7665d8a0692e9",
+          "bytes": 122
+        },
+        "captures/empty-mode.pcap": {
+          "sha256": "118cca187b0a7c84eed5c382135c7499fa624b7e8381c34297c0181378cb2c66",
+          "bytes": 122
+        },
+        "captures/exponent.pcap": {
+          "sha256": "1c6490b5ca845d01cab17ecc990926088ea441b84b8562ef6d7213b32b2f94ac",
+          "bytes": 120
+        },
+        "captures/extra-field.pcap": {
+          "sha256": "5a7c159037c99a8b5c0ea88700af9d9fb5a05a76cd939f4b8e010e649e622066",
+          "bytes": 125
+        },
+        "captures/future-rtk-mode.pcap": {
+          "sha256": "a99be8470b850c9fbd85e6cf03c8176e4947da8e350b03807f04d34dba50e4b4",
+          "bytes": 123
+        },
+        "captures/inf.pcap": {
+          "sha256": "0dc91b95def95d969bf4ba477945a1a4ab2ec29c29d9f18d37faba7fcce193e1",
+          "bytes": 120
+        },
+        "captures/late-bad-checksum.pcap": {
+          "sha256": "bda09ac2b8f2f1a9952c5014ced631a77cd1da66c4b44d16ab0ce82b7f5652e9",
+          "bytes": 160
+        },
+        "captures/leading-dot.pcap": {
+          "sha256": "c9af468319b806dfd808b473d9bbeab4328bdb7ed154858017b14b129959c6d1",
+          "bytes": 119
+        },
+        "captures/legacy-units.pcap": {
+          "sha256": "b45ed1b1921939d48d25ca232599db0e45b9b7edcf78776214fc13f95ef1e37a",
+          "bytes": 121
+        },
+        "captures/magnetic-360.pcap": {
+          "sha256": "7587b046518822bc5ea48fe4cd9371e33ca5c6fe46fb28c9f43c9afe5e712211",
+          "bytes": 121
+        },
+        "captures/missing-unit.pcap": {
+          "sha256": "70fa3584a027548072180fed53ab57e58ac662365b4787bbb232e60cbc1d4bc0",
+          "bytes": 120
+        },
+        "captures/mode-A.pcap": {
+          "sha256": "6dc00286a28b3452f4404113bfff94c33aecb8a8884ff9a42af09b67493383b0",
+          "bytes": 123
+        },
+        "captures/mode-E.pcap": {
+          "sha256": "a379b614c5ded4110f311ef4d534b09a778f528804a5ccbb9ae4f9728365cb36",
+          "bytes": 123
+        },
+        "captures/mode-M.pcap": {
+          "sha256": "f5cf10c2ccd9378f2680801e84beaa529a37846e5417afdebed457bff86c2415",
+          "bytes": 123
+        },
+        "captures/mode-N.pcap": {
+          "sha256": "7dc22e1afff76fcc4991584aed3dd21204c39bf8ff0118781a0a0a6464174d22",
+          "bytes": 123
+        },
+        "captures/mode-S.pcap": {
+          "sha256": "d2b23ce72c618e8649ac7ba413e9fdc8b026d06452f93b9425c25acae044c1bd",
+          "bytes": 123
+        },
+        "captures/multi-mode.pcap": {
+          "sha256": "c793060992daa489900b16424b3f39ab27c6f3016ec9d226797bea2f7b283a07",
+          "bytes": 124
+        },
+        "captures/nan.pcap": {
+          "sha256": "7bcae433276eaa3c0a3b08784a75def7829543e537dc1c6b69fe39066710d097",
+          "bytes": 120
+        },
+        "captures/negative-course.pcap": {
+          "sha256": "3f557880839c618de3f42a0e37cd32fe2b0e1570fe0c39a8bdd625659746375c",
+          "bytes": 119
+        },
+        "captures/negative-speed.pcap": {
+          "sha256": "028d9ef765368505701eec8b67af714b24f5248bcdd0b92aa7bc24e56284ddd1",
+          "bytes": 122
+        },
+        "captures/no-cr.pcap": {
+          "sha256": "10f80f53c800d6ecf7731cdc1a15f64e4bb78976f54feb74a25aecf283f36024",
+          "bytes": 120
+        },
+        "captures/old-five-field.pcap": {
+          "sha256": "fdd0c5fb3737f14ee70952b0829fab600055f552841204c1ecfc7526943b10ed",
+          "bytes": 113
+        },
+        "captures/overlong.pcap": {
+          "sha256": "8c1883695b16d288c479245659eace9078b1d592c5bb73fb89de9f6d64dba932",
+          "bytes": 187
+        },
+        "captures/plus.pcap": {
+          "sha256": "2348945bc0ba3c1037032e267e0ef01a955dfc5f6aa02e9cef4c7bc55b3360d4",
+          "bytes": 119
+        },
+        "captures/proprietary-talker.pcap": {
+          "sha256": "fa2286cd00fa761b4ee3a2d125fe8cc8b81013ba5939bfbd55f52069212d20b6",
+          "bytes": 121
+        },
+        "captures/reported-rounding.pcap": {
+          "sha256": "7f4bc359904e1f9b872c100e609eb681e3798ce79a9c8741b712e2d86f453428",
+          "bytes": 118
+        },
+        "captures/short.pcap": {
+          "sha256": "c3001f29976718cf17efaf1cd5fb8ae56bb14c502da0485b61ebf75bce2c9d3f",
+          "bytes": 100
+        },
+        "captures/split-datagram.pcap": {
+          "sha256": "77dfe75c0190d2f12d841d9fdffe1c89cdfbf4e31478b32a8d01b84135f63bf6",
+          "bytes": 179
+        },
+        "captures/tail-byte.pcap": {
+          "sha256": "a988ea30350d01f9d3ad300d36dd2146d3af2a09900b75547c22822e732e106e",
+          "bytes": 122
+        },
+        "captures/talker-BD.pcap": {
+          "sha256": "ef1a3a650bd538d98e58f93e49b74734e6a6d5568aad21ff0e1c677583ab4b0a",
+          "bytes": 123
+        },
+        "captures/talker-GA.pcap": {
+          "sha256": "9ab5901acc5111cb2e779d39f9fe6e54b1fd8282982cc9204fdcefab064234f8",
+          "bytes": 123
+        },
+        "captures/talker-GB.pcap": {
+          "sha256": "f02a7601d8a204ad46b435a252fe74f7c69b52b0494bbd6cbcf0c332fd08deb5",
+          "bytes": 123
+        },
+        "captures/talker-GI.pcap": {
+          "sha256": "fff1909fe7c1ce61473f21279ef80e9665ec8d5b965366a6ddfbfc4b745adb96",
+          "bytes": 123
+        },
+        "captures/talker-GL.pcap": {
+          "sha256": "b725ec633b2e9096d64f83e99c4d2c994990503f1f4e6c2a85e579255a2178e7",
+          "bytes": 123
+        },
+        "captures/talker-GN.pcap": {
+          "sha256": "43e96a977b572ef5d465c5b2c82361168e85ba9beeb88cf18756a1542ad60a2b",
+          "bytes": 123
+        },
+        "captures/talker-GQ.pcap": {
+          "sha256": "fdb0c89291ab6a5dfcae0cabfa3a046e47beed45dc212e5bc24e29adabf0d9d6",
+          "bytes": 123
+        },
+        "captures/trailing-dot.pcap": {
+          "sha256": "c5f219254ec09f401e9158a3681235ccf35f5c1123741999ecc96759f006f58b",
+          "bytes": 119
+        },
+        "captures/true-360.pcap": {
+          "sha256": "08bfee58f3671be26e20e798b7e32ea29c862113c77f358a07dac8b3270b458f",
+          "bytes": 120
+        },
+        "captures/two-independent-sentences.pcap": {
+          "sha256": "3757700a0010a2e8c2140548894be7f80eacc40b70a509ce7dfa796c9e2f5f86",
+          "bytes": 162
+        },
+        "captures/unknown-mode.pcap": {
+          "sha256": "9e59bb31f1735901f145e04cd158375a1cf14eb88b11581c460c0d8e7443e81e",
+          "bytes": 123
+        },
+        "captures/upper-course.pcap": {
+          "sha256": "67d323b3ec453ddbed14e67516cc12b46869a3504131b687b9218331ffdadbe8",
+          "bytes": 127
+        },
+        "captures/wrong-K.pcap": {
+          "sha256": "538e58a4d92cc584098050c851000ab0348b2bba7f5329bdd638978a0625ace0",
+          "bytes": 121
+        },
+        "captures/wrong-M.pcap": {
+          "sha256": "43f86d87fe9066879eb0cb5370705314b23fd81915fc8cbe4b9880f87449d515",
+          "bytes": 121
+        },
+        "captures/wrong-N.pcap": {
+          "sha256": "4ae54063690fd3ec3dea7b3e2b12ea8b0ec0c8cd540fc5816d76d37405712d2a",
+          "bytes": 121
+        },
+        "captures/wrong-T.pcap": {
+          "sha256": "caba2e9827ad3b9d054758fc8a571c1b8db8a9302f4b358441938049f33e2afb",
+          "bytes": 121
+        },
+        "captures/zero.pcap": {
+          "sha256": "3de2f2cc7d4d8913ba5ad1b8cbbf29857affd5e3197c94a0bc0b5637ab2b9704",
+          "bytes": 111
+        },
+        "controls.json": {
+          "sha256": "c773d04abff12ed90daa3173a208c493dbdb4381792c02049271b0cf4065c121",
+          "bytes": 16430
+        },
+        "gpsd-vtg-reference.jsonl": {
+          "sha256": "bceac56d904a2389a4126e89ff9bcb9bb7b5ea8aaa8ea5d9bcf6788751b411d7",
+          "bytes": 2347
+        },
+        "reproduce-reference.py": {
+          "sha256": "f872a5461bddfb35551dd0193c76cbc932f00e8b3ad95997bc7cf23964c3234f",
+          "bytes": 3214
+        },
+        "seal.py": {
+          "sha256": "f105a8538e6c36c8fde11dd935962e2929cdf18bac15a6cda137ef94045b222a",
+          "bytes": 709
+        },
+        "source-pin.json": {
+          "sha256": "7b57dd0c6a22e5962cf4113b0e1a057156689844fc177246d0c889e49372d864",
+          "bytes": 672
+        },
+        "validation/expected.json": {
+          "sha256": "f64e299d9500036307b58b6ee9003c376f62c58f7e6b8c96ebcd893597d6e21e",
+          "bytes": 53253
+        },
+        "validation/provenance.json": {
+          "sha256": "822992d634569546a48d6121ef04134bdb4f03ab54f85f9dfdbf107f60db3a25",
+          "bytes": 404
+        },
+        "verify.py": {
+          "sha256": "b4ef4bb040a84d4a331ace0ca8407ec21622bb71b5e84dd631a094df71ad032a",
+          "bytes": 3737
+        }
+      },
+      "aliases": {
+        "common/pcapx/pcaputil/nmea-vtg/answers/all-empty.json": "answers/all-empty.json",
+        "common/pcapx/pcaputil/nmea-vtg/answers/bad-checksum.json": "answers/bad-checksum.json",
+        "common/pcapx/pcaputil/nmea-vtg/answers/blank-mode-space.json": "answers/blank-mode-space.json",
+        "common/pcapx/pcaputil/nmea-vtg/answers/cut-crlf.json": "answers/cut-crlf.json",
+        "common/pcapx/pcaputil/nmea-vtg/answers/differential.json": "answers/differential.json",
+        "common/pcapx/pcaputil/nmea-vtg/answers/empty-magnetic.json": "answers/empty-magnetic.json",
+        "common/pcapx/pcaputil/nmea-vtg/answers/empty-mode.json": "answers/empty-mode.json",
+        "common/pcapx/pcaputil/nmea-vtg/answers/exponent.json": "answers/exponent.json",
+        "common/pcapx/pcaputil/nmea-vtg/answers/extra-field.json": "answers/extra-field.json",
+        "common/pcapx/pcaputil/nmea-vtg/answers/future-rtk-mode.json": "answers/future-rtk-mode.json",
+        "common/pcapx/pcaputil/nmea-vtg/answers/inf.json": "answers/inf.json",
+        "common/pcapx/pcaputil/nmea-vtg/answers/late-bad-checksum.json": "answers/late-bad-checksum.json",
+        "common/pcapx/pcaputil/nmea-vtg/answers/leading-dot.json": "answers/leading-dot.json",
+        "common/pcapx/pcaputil/nmea-vtg/answers/legacy-units.json": "answers/legacy-units.json",
+        "common/pcapx/pcaputil/nmea-vtg/answers/magnetic-360.json": "answers/magnetic-360.json",
+        "common/pcapx/pcaputil/nmea-vtg/answers/missing-unit.json": "answers/missing-unit.json",
+        "common/pcapx/pcaputil/nmea-vtg/answers/mode-A.json": "answers/mode-A.json",
+        "common/pcapx/pcaputil/nmea-vtg/answers/mode-E.json": "answers/mode-E.json",
+        "common/pcapx/pcaputil/nmea-vtg/answers/mode-M.json": "answers/mode-M.json",
+        "common/pcapx/pcaputil/nmea-vtg/answers/mode-N.json": "answers/mode-N.json",
+        "common/pcapx/pcaputil/nmea-vtg/answers/mode-S.json": "answers/mode-S.json",
+        "common/pcapx/pcaputil/nmea-vtg/answers/multi-mode.json": "answers/multi-mode.json",
+        "common/pcapx/pcaputil/nmea-vtg/answers/nan.json": "answers/nan.json",
+        "common/pcapx/pcaputil/nmea-vtg/answers/negative-course.json": "answers/negative-course.json",
+        "common/pcapx/pcaputil/nmea-vtg/answers/negative-speed.json": "answers/negative-speed.json",
+        "common/pcapx/pcaputil/nmea-vtg/answers/no-cr.json": "answers/no-cr.json",
+        "common/pcapx/pcaputil/nmea-vtg/answers/old-five-field.json": "answers/old-five-field.json",
+        "common/pcapx/pcaputil/nmea-vtg/answers/overlong.json": "answers/overlong.json",
+        "common/pcapx/pcaputil/nmea-vtg/answers/plus.json": "answers/plus.json",
+        "common/pcapx/pcaputil/nmea-vtg/answers/proprietary-talker.json": "answers/proprietary-talker.json",
+        "common/pcapx/pcaputil/nmea-vtg/answers/reported-rounding.json": "answers/reported-rounding.json",
+        "common/pcapx/pcaputil/nmea-vtg/answers/short.json": "answers/short.json",
+        "common/pcapx/pcaputil/nmea-vtg/answers/split-datagram.json": "answers/split-datagram.json",
+        "common/pcapx/pcaputil/nmea-vtg/answers/tail-byte.json": "answers/tail-byte.json",
+        "common/pcapx/pcaputil/nmea-vtg/answers/talker-BD.json": "answers/talker-BD.json",
+        "common/pcapx/pcaputil/nmea-vtg/answers/talker-GA.json": "answers/talker-GA.json",
+        "common/pcapx/pcaputil/nmea-vtg/answers/talker-GB.json": "answers/talker-GB.json",
+        "common/pcapx/pcaputil/nmea-vtg/answers/talker-GI.json": "answers/talker-GI.json",
+        "common/pcapx/pcaputil/nmea-vtg/answers/talker-GL.json": "answers/talker-GL.json",
+        "common/pcapx/pcaputil/nmea-vtg/answers/talker-GN.json": "answers/talker-GN.json",
+        "common/pcapx/pcaputil/nmea-vtg/answers/talker-GQ.json": "answers/talker-GQ.json",
+        "common/pcapx/pcaputil/nmea-vtg/answers/trailing-dot.json": "answers/trailing-dot.json",
+        "common/pcapx/pcaputil/nmea-vtg/answers/true-360.json": "answers/true-360.json",
+        "common/pcapx/pcaputil/nmea-vtg/answers/two-independent-sentences.json": "answers/two-independent-sentences.json",
+        "common/pcapx/pcaputil/nmea-vtg/answers/unknown-mode.json": "answers/unknown-mode.json",
+        "common/pcapx/pcaputil/nmea-vtg/answers/upper-course.json": "answers/upper-course.json",
+        "common/pcapx/pcaputil/nmea-vtg/answers/wrong-K.json": "answers/wrong-K.json",
+        "common/pcapx/pcaputil/nmea-vtg/answers/wrong-M.json": "answers/wrong-M.json",
+        "common/pcapx/pcaputil/nmea-vtg/answers/wrong-N.json": "answers/wrong-N.json",
+        "common/pcapx/pcaputil/nmea-vtg/answers/wrong-T.json": "answers/wrong-T.json",
+        "common/pcapx/pcaputil/nmea-vtg/answers/zero.json": "answers/zero.json",
+        "common/pcapx/pcaputil/nmea-vtg/build.py": "build.py",
+        "common/pcapx/pcaputil/nmea-vtg/captures/all-empty.pcap": "captures/all-empty.pcap",
+        "common/pcapx/pcaputil/nmea-vtg/captures/bad-checksum.pcap": "captures/bad-checksum.pcap",
+        "common/pcapx/pcaputil/nmea-vtg/captures/blank-mode-space.pcap": "captures/blank-mode-space.pcap",
+        "common/pcapx/pcaputil/nmea-vtg/captures/cut-crlf.pcap": "captures/cut-crlf.pcap",
+        "common/pcapx/pcaputil/nmea-vtg/captures/differential.pcap": "captures/differential.pcap",
+        "common/pcapx/pcaputil/nmea-vtg/captures/empty-magnetic.pcap": "captures/empty-magnetic.pcap",
+        "common/pcapx/pcaputil/nmea-vtg/captures/empty-mode.pcap": "captures/empty-mode.pcap",
+        "common/pcapx/pcaputil/nmea-vtg/captures/exponent.pcap": "captures/exponent.pcap",
+        "common/pcapx/pcaputil/nmea-vtg/captures/extra-field.pcap": "captures/extra-field.pcap",
+        "common/pcapx/pcaputil/nmea-vtg/captures/future-rtk-mode.pcap": "captures/future-rtk-mode.pcap",
+        "common/pcapx/pcaputil/nmea-vtg/captures/inf.pcap": "captures/inf.pcap",
+        "common/pcapx/pcaputil/nmea-vtg/captures/late-bad-checksum.pcap": "captures/late-bad-checksum.pcap",
+        "common/pcapx/pcaputil/nmea-vtg/captures/leading-dot.pcap": "captures/leading-dot.pcap",
+        "common/pcapx/pcaputil/nmea-vtg/captures/legacy-units.pcap": "captures/legacy-units.pcap",
+        "common/pcapx/pcaputil/nmea-vtg/captures/magnetic-360.pcap": "captures/magnetic-360.pcap",
+        "common/pcapx/pcaputil/nmea-vtg/captures/missing-unit.pcap": "captures/missing-unit.pcap",
+        "common/pcapx/pcaputil/nmea-vtg/captures/mode-A.pcap": "captures/mode-A.pcap",
+        "common/pcapx/pcaputil/nmea-vtg/captures/mode-E.pcap": "captures/mode-E.pcap",
+        "common/pcapx/pcaputil/nmea-vtg/captures/mode-M.pcap": "captures/mode-M.pcap",
+        "common/pcapx/pcaputil/nmea-vtg/captures/mode-N.pcap": "captures/mode-N.pcap",
+        "common/pcapx/pcaputil/nmea-vtg/captures/mode-S.pcap": "captures/mode-S.pcap",
+        "common/pcapx/pcaputil/nmea-vtg/captures/multi-mode.pcap": "captures/multi-mode.pcap",
+        "common/pcapx/pcaputil/nmea-vtg/captures/nan.pcap": "captures/nan.pcap",
+        "common/pcapx/pcaputil/nmea-vtg/captures/negative-course.pcap": "captures/negative-course.pcap",
+        "common/pcapx/pcaputil/nmea-vtg/captures/negative-speed.pcap": "captures/negative-speed.pcap",
+        "common/pcapx/pcaputil/nmea-vtg/captures/no-cr.pcap": "captures/no-cr.pcap",
+        "common/pcapx/pcaputil/nmea-vtg/captures/old-five-field.pcap": "captures/old-five-field.pcap",
+        "common/pcapx/pcaputil/nmea-vtg/captures/overlong.pcap": "captures/overlong.pcap",
+        "common/pcapx/pcaputil/nmea-vtg/captures/plus.pcap": "captures/plus.pcap",
+        "common/pcapx/pcaputil/nmea-vtg/captures/proprietary-talker.pcap": "captures/proprietary-talker.pcap",
+        "common/pcapx/pcaputil/nmea-vtg/captures/reported-rounding.pcap": "captures/reported-rounding.pcap",
+        "common/pcapx/pcaputil/nmea-vtg/captures/short.pcap": "captures/short.pcap",
+        "common/pcapx/pcaputil/nmea-vtg/captures/split-datagram.pcap": "captures/split-datagram.pcap",
+        "common/pcapx/pcaputil/nmea-vtg/captures/tail-byte.pcap": "captures/tail-byte.pcap",
+        "common/pcapx/pcaputil/nmea-vtg/captures/talker-BD.pcap": "captures/talker-BD.pcap",
+        "common/pcapx/pcaputil/nmea-vtg/captures/talker-GA.pcap": "captures/talker-GA.pcap",
+        "common/pcapx/pcaputil/nmea-vtg/captures/talker-GB.pcap": "captures/talker-GB.pcap",
+        "common/pcapx/pcaputil/nmea-vtg/captures/talker-GI.pcap": "captures/talker-GI.pcap",
+        "common/pcapx/pcaputil/nmea-vtg/captures/talker-GL.pcap": "captures/talker-GL.pcap",
+        "common/pcapx/pcaputil/nmea-vtg/captures/talker-GN.pcap": "captures/talker-GN.pcap",
+        "common/pcapx/pcaputil/nmea-vtg/captures/talker-GQ.pcap": "captures/talker-GQ.pcap",
+        "common/pcapx/pcaputil/nmea-vtg/captures/trailing-dot.pcap": "captures/trailing-dot.pcap",
+        "common/pcapx/pcaputil/nmea-vtg/captures/true-360.pcap": "captures/true-360.pcap",
+        "common/pcapx/pcaputil/nmea-vtg/captures/two-independent-sentences.pcap": "captures/two-independent-sentences.pcap",
+        "common/pcapx/pcaputil/nmea-vtg/captures/unknown-mode.pcap": "captures/unknown-mode.pcap",
+        "common/pcapx/pcaputil/nmea-vtg/captures/upper-course.pcap": "captures/upper-course.pcap",
+        "common/pcapx/pcaputil/nmea-vtg/captures/wrong-K.pcap": "captures/wrong-K.pcap",
+        "common/pcapx/pcaputil/nmea-vtg/captures/wrong-M.pcap": "captures/wrong-M.pcap",
+        "common/pcapx/pcaputil/nmea-vtg/captures/wrong-N.pcap": "captures/wrong-N.pcap",
+        "common/pcapx/pcaputil/nmea-vtg/captures/wrong-T.pcap": "captures/wrong-T.pcap",
+        "common/pcapx/pcaputil/nmea-vtg/captures/zero.pcap": "captures/zero.pcap",
+        "common/pcapx/pcaputil/nmea-vtg/controls.json": "controls.json",
+        "common/pcapx/pcaputil/nmea-vtg/gpsd-vtg-reference.jsonl": "gpsd-vtg-reference.jsonl",
+        "common/pcapx/pcaputil/nmea-vtg/reproduce-reference.py": "reproduce-reference.py",
+        "common/pcapx/pcaputil/nmea-vtg/seal.py": "seal.py",
+        "common/pcapx/pcaputil/nmea-vtg/source-pin.json": "source-pin.json",
+        "common/pcapx/pcaputil/nmea-vtg/validation/expected.json": "validation/expected.json",
+        "common/pcapx/pcaputil/nmea-vtg/validation/provenance.json": "validation/provenance.json",
+        "common/pcapx/pcaputil/nmea-vtg/verify.py": "verify.py"
+      }
     }
   ],
   "schema_version": 1,

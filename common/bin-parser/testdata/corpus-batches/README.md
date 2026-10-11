@@ -379,3 +379,16 @@ assembly or standard BLE/WiFi transport is inferred. The existing mandatory
 cover44 controls with independent fixed official C codec fields and typed
 refusals;41 captures are new and three reuse immutable System inputs. The ZIP
 contains answers, source pins and generation/reference-build/verify/seal scripts.
+
+`nmea` also observes complete unit-labelled VTG sentences with optional
+A/D/E/M/N/S or empty FAA mode. Both courses and both reported speed units are
+literal fields; rounding, missing data or mode N cannot establish a valid GNSS
+fix. The older unlabelled form, later mode extensions and AIS remain separate
+open work. `TestNMEAMultipleSentencesBudgetAndOwnership/vtg-profile` loads51
+sealed controls (21 positives/30 refusals) in all12 worker/deferred/observer
+configurations, with complete fields/Session and immutable queries. Historical
+GGA depth-one refusal, depth-two normal, recovery and Close use the original
+input/answer; no historical ZIP is rewritten. Primary receiver grammar and
+pinned GPSD3.25 `processVTG` source-function execution are distinct from real
+receiver validation. Authored captures, answers and required generation,
+reference-build, byte-verification and seal scripts reside in the small ZIP.

@@ -8,7 +8,7 @@ import (
 	"strings"
 )
 
-// GGA and RMC are observed navigation statements. Checksums validate their
+// GGA, RMC and unit-labelled VTG are observed navigation statements. Checksums validate their
 // wire representation, not the sender's identity or the accuracy of a fix.
 // AIS, proprietary sentences, tag blocks and other sentence types are outside
 // this profile. A datagram must contain complete independent CRLF sentences.
@@ -18,6 +18,10 @@ func validNMEADatagram(w []byte) bool {
 }
 
 func decodeNMEADatagram(w []byte, maxElements int) (map[string]any, error) {
+	return decodeNMEADatagramBudget(w, maxElements, DefaultParserBudget().MaxRecursionDepth)
+}
+
+func decodeNMEADatagramBudget(w []byte, maxElements, maxDepth int) (map[string]any, error) {
 	if len(w) == 0 {
 		return nil, protocolError(ErrMalformedMessage, "NMEA datagram is empty")
 	}
@@ -25,6 +29,11 @@ func decodeNMEADatagram(w []byte, maxElements int) (map[string]any, error) {
 	for len(w) > 0 {
 		if len(messages) >= maxElements {
 			return nil, protocolError(ErrResourceExceeded, "NMEA sentence count exceeds budget")
+		}
+		// A single sentence is a flat field map. Multiple sentences add the
+		// outer Messages projection; reject before allocating a second map.
+		if maxDepth < 1 || len(messages) > 0 && maxDepth < 2 {
+			return nil, protocolError(ErrResourceExceeded, "NMEA sentence projection exceeds depth budget")
 		}
 		i := bytes.IndexByte(w, '\n')
 		if i < 0 {
@@ -73,8 +82,10 @@ func decodeNMEADatagram(w []byte, maxElements int) (map[string]any, error) {
 			err = nmeaGGA(parts, fields)
 		case "RMC":
 			err = nmeaRMC(parts, fields)
+		case "VTG":
+			err = nmeaVTG(parts, fields)
 		default:
-			err = protocolError(ErrUnsupportedFeature, "NMEA sentence type is outside GGA/RMC profile")
+			err = protocolError(ErrUnsupportedFeature, "NMEA sentence type is outside GGA/RMC/VTG profile")
 		}
 		if err != nil {
 			return nil, err
@@ -86,6 +97,63 @@ func decodeNMEADatagram(w []byte, maxElements int) (map[string]any, error) {
 		return messages[0], nil
 	}
 	return map[string]any{"Packet Name": "NMEA 0183 sentences", "Message Count": len(messages), "Messages": messages, "Context Level": "observed"}, nil
+}
+
+// VTG's unit-labelled form has eight fields, optionally followed by the FAA
+// mode. Observe both reported speeds independently: rounded knots and km/h
+// need not have exact conversion equality. Empty fields and mode N never
+// manufacture a course, speed or fix. The older unlabelled four-value form
+// and later mode extensions require their own explicit reference profiles.
+func nmeaVTG(p []string, out map[string]any) error {
+	if len(p) == 5 {
+		return protocolError(ErrUnsupportedFeature, "NMEA VTG unlabelled legacy form is unsupported")
+	}
+	if len(p) < 9 {
+		return protocolError(ErrMalformedMessage, "NMEA VTG fields are truncated")
+	}
+	if len(p) != 9 && len(p) != 10 {
+		return protocolError(ErrUnsupportedFeature, "NMEA VTG requires unit-labelled fields with optional mode")
+	}
+	for _, unit := range []struct {
+		index int
+		value string
+	}{{2, "T"}, {4, "M"}, {6, "N"}, {8, "K"}} {
+		if p[unit.index] != unit.value {
+			return protocolError(ErrMalformedMessage, "NMEA VTG unit must be %s", unit.value)
+		}
+	}
+	for _, field := range []struct {
+		index  int
+		key    string
+		course bool
+	}{
+		{1, "Course Degrees True", true}, {3, "Course Degrees Magnetic", true},
+		{5, "Speed Knots", false}, {7, "Speed Kilometers Per Hour", false},
+	} {
+		out[field.key+" Present"] = p[field.index] != ""
+		if p[field.index] == "" {
+			continue
+		}
+		x, err := nmeaNumber(p[field.index], false)
+		if err != nil || field.course && x >= 360 {
+			return protocolError(ErrMalformedMessage, "NMEA VTG %s is invalid", field.key)
+		}
+		out[field.key] = x
+	}
+	out["Mode Present"] = len(p) == 10
+	if len(p) == 10 {
+		mode := p[9]
+		if len(mode) > 1 || mode == " " {
+			return protocolError(ErrMalformedMessage, "NMEA VTG mode must be a single indicator or empty")
+		}
+		switch mode {
+		case "", "A", "D", "E", "M", "N", "S":
+			out["Mode"] = mode
+		default:
+			return protocolError(ErrUnsupportedFeature, "NMEA VTG mode is outside selected FAA profile")
+		}
+	}
+	return nil
 }
 
 func nmeaHex(b byte) int {
