@@ -1,6 +1,7 @@
 package pq
 
 import (
+	"fmt"
 	"math"
 	"math/rand"
 	"testing"
@@ -172,17 +173,17 @@ func TestKMeans(t *testing.T) {
 		{5.0, 5.0}, {5.1, 5.1}, {5.0, 5.1}, {5.1, 5.0}, // 聚类2
 	}
 
-	// Random initialization can converge to a local optimum on this symmetric
-	// fixture. Use a known seed for the expected-center regression, independent
-	// of random draws made by earlier tests.
-	const seed int64 = 42
-	rand.Seed(seed)
-	centroids, err := kMeans(data, 2, 50, 1e-6)
-	if err != nil {
-		t.Fatalf("K-Means failed (seed=%d): %v", seed, err)
+	// These seeds reproduced poor local optima with uniform random initialization.
+	for _, seed := range []int64{0, 5, 20, 26, 31, 41, 42, 59, 68, 72, 83, 95} {
+		t.Run(fmt.Sprintf("seed_%d", seed), func(t *testing.T) {
+			rng := rand.New(rand.NewSource(seed))
+			centroids, err := kMeansWithRand(data, 2, 50, 1e-6, 1, rng)
+			if err != nil {
+				t.Fatalf("K-Means failed (seed=%d): %v", seed, err)
+			}
+			assertKMeansClusterCenters(t, centroids, seed)
+		})
 	}
-
-	assertKMeansClusterCenters(t, centroids, seed)
 }
 
 func assertKMeansClusterCenters(t *testing.T, centroids [][]float64, seed int64) {
