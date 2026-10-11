@@ -64,6 +64,9 @@ func decodeDCPServices(w []byte, limit int) (map[string]any, error) {
 		return nil, dcpServicesError(ErrUnsupportedFeature, "selected Get/Set request/successresponse and Hello request only")
 	}
 	fid := binary.BigEndian.Uint16(w)
+	if fid < 0xfefc || fid > 0xfeff {
+		return nil, dcpServicesError(ErrUnsupportedFeature, "FrameID outside DCP carrier range")
+	}
 	want := uint16(0xfefd)
 	if service == 6 {
 		want = 0xfefc

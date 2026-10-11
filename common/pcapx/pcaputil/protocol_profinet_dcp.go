@@ -405,7 +405,7 @@ func (a *binParser) decodeDCPEthernet(frame []byte, evidence captureEvidence, ci
 		e.Source = link["source_mac"].(string)
 		e.Destination = link["destination_mac"].(string)
 	}
-	if len(w) >= 3 && (w[2] == 3 || w[2] == 4 || w[2] == 6) {
+	if len(w) >= 3 && binary.BigEndian.Uint16(w) >= 0xfefc && binary.BigEndian.Uint16(w) <= 0xfeff && (w[2] == 3 || w[2] == 4 || w[2] == 6) {
 		e.Profile, e.Admission = dcpServicesProfile, "ether-type-and-selected-service-profile"
 	}
 	a.input.Add(uint64(len(w)))

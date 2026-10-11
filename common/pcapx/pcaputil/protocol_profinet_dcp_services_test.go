@@ -3,12 +3,15 @@ package pcaputil
 import (
 	"bytes"
 	"crypto/sha256"
+	"encoding/binary"
 	"encoding/json"
 	"fmt"
 	"testing"
 	"time"
 
 	"github.com/gopacket/gopacket"
+	"github.com/gopacket/gopacket/layers"
+	"github.com/gopacket/gopacket/pcapgo"
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/internal/trafficfixture"
 )
@@ -114,6 +117,7 @@ func checkDCPServiceEvent(t *testing.T, c dcpServiceControl, e *ProtocolEvent) {
 	rocEqualFields(t, c.Fields, f)
 }
 func testDCPServicesMatrix(t *testing.T) {
+	testDCPServiceCarrierBoundary(t)
 	testDCPHistoricalSet(t)
 	for _, c := range dcpServiceControls(t) {
 		for _, workers := range []int{1, 2, 4} {
@@ -354,4 +358,81 @@ func testDCPServicesBudgetMatrix(t *testing.T) {
 			}
 		}
 	}
+}
+
+// PN-DCP is admitted by its FrameID namespace before service bytes are used.
+// Reuse the sealed Get capture: only FrameID/service bytes change, preserving
+// the original direction, packet metadata and payload length.
+func testDCPServiceCarrierBoundary(t *testing.T) {
+	var seed dcpServiceControl
+	for _, c := range dcpServiceControls(t) {
+		if c.ID == "get-ordered-selectors" {
+			seed = c
+			break
+		}
+	}
+	require.NotEmpty(t, seed.ID)
+	original := dcpServiceBytes(t, seed)
+	reader, err := pcapgo.NewReader(bytes.NewReader(original))
+	require.NoError(t, err)
+	frame, ci, err := reader.ReadPacketData()
+	require.NoError(t, err)
+	require.Equal(t, layers.LinkTypeEthernet, reader.LinkType())
+	require.Equal(t, uint16(0x8892), binary.BigEndian.Uint16(frame[12:14]))
+	for _, fid := range []uint16{0x8000, 0xfefb, 0xff00} {
+		for _, service := range []byte{3, 4, 6} {
+			t.Run(fmt.Sprintf("services/carrier-boundary/%04x-service%d", fid, service), func(t *testing.T) {
+				changed := bytes.Clone(frame)
+				binary.BigEndian.PutUint16(changed[14:16], fid)
+				changed[16] = service
+				fields, err := decodeDCPServices(changed[14:], 4096)
+				rocTypedError(t, "UnsupportedFeature", err)
+				require.Nil(t, fields)
+				var capture bytes.Buffer
+				writer := pcapgo.NewWriter(&capture)
+				require.NoError(t, writer.WriteFileHeader(65535, layers.LinkTypeEthernet))
+				require.NoError(t, writer.WritePacket(ci, changed))
+				discoveryMatrix(t, func(t *testing.T, workers int, deferred, observe bool) {
+					var events []*ProtocolEvent
+					var stats ProtocolStats
+					seen := 0
+					opts := []CaptureOption{WithTCPReassemblyWorkers(workers), WithProtocolDeferred(deferred), WithOnProtocolMessage(func(e *ProtocolEvent) { events = append(events, e) }), WithOnProtocolStats(func(s ProtocolStats) { stats = s })}
+					if observe {
+						opts = append(opts, WithEveryPacket(func(p gopacket.Packet) { require.NotEmpty(t, p.Data()); seen++ }))
+					}
+					require.NoError(t, ReplayPcap(bytes.NewReader(capture.Bytes()), opts...))
+					require.Len(t, events, 1)
+					e := events[0]
+					require.Equal(t, "profinet", e.Protocol)
+					require.Equal(t, "profinet-carrier-diagnostic", e.Profile)
+					require.Equal(t, "ether-type", e.Admission)
+					require.Equal(t, "02:00:00:00:00:01", e.Source)
+					require.Equal(t, "02:00:00:00:00:02", e.Destination)
+					require.Zero(t, e.ResponseTo)
+					require.Zero(t, e.TransactionID)
+					require.Empty(t, e.Session)
+					require.Empty(t, e.semanticSession)
+					require.Equal(t, changed[14:], e.Raw)
+					require.Len(t, e.SourceBytes.PacketRefs, 1)
+					require.EqualValues(t, 1, e.SourceBytes.PacketRefs[0].Number)
+					got, err := e.GetFields()
+					rocTypedError(t, "UnsupportedFeature", err)
+					require.Nil(t, got)
+					require.Equal(t, "context-required", e.Status)
+					require.EqualValues(t, 1, stats.Messages)
+					require.Zero(t, stats.BufferedBytes)
+					require.Zero(t, stats.CallbackPanics)
+					if observe {
+						require.Equal(t, 1, seen)
+					}
+				})
+			})
+		}
+	}
+	// Inside the namespace, an invalid service/FrameID pairing stays malformed.
+	adjacent := bytes.Clone(frame[14:])
+	binary.BigEndian.PutUint16(adjacent, 0xfefe)
+	fields, err := decodeDCPServices(adjacent, 4096)
+	rocTypedError(t, "MalformedMessage", err)
+	require.Nil(t, fields)
 }
