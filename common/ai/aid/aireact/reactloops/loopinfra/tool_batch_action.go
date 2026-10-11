@@ -157,7 +157,7 @@ func toolBatchVerifierContext(loop *reactloops.ReActLoop) context.Context {
 // compatibility cache. Nested array members share field names there, so doing
 // so could combine tool_name from one item with params from another.
 func lookupCanonicalActionParam(action *aicommon.Action, key string) (any, bool) {
-	if action == nil {
+	if action == nil || strings.TrimSpace(key) == "" {
 		return nil, false
 	}
 	if value, ok := action.LookupCanonicalParam(key); ok {
@@ -250,6 +250,11 @@ func strictBatchString(item aitool.InvokeParams, field string, required bool) (s
 func rejectUnknownBatchFields(item aitool.InvokeParams, allowed map[string]struct{}) error {
 	unknown := make([]string, 0)
 	for key := range item {
+		// Empty protocol keys are model noise, not misspelled tool fields.
+		// Ignore them without promoting their values into the item's metadata.
+		if strings.TrimSpace(key) == "" {
+			continue
+		}
 		if _, ok := allowed[key]; !ok {
 			unknown = append(unknown, key)
 		}

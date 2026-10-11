@@ -58,6 +58,7 @@ func newAsyncActionTestLoop(t *testing.T) (*reactloops.ReActLoop, *asyncActionTe
 		// These business parameters must never become scheduling flags.
 		aitool.WithBoolParam("async"),
 		aitool.WithBoolParam("async_directly_call_tool"),
+		aitool.WithRawParam("payload", map[string]any{"type": "object", "additionalProperties": true}),
 		aitool.WithSimpleCallback(func(aitool.InvokeParams, io.Writer, io.Writer) (any, error) { return "ok", nil }),
 	)
 	manager := newToolManagerWithTool(tool)
@@ -233,5 +234,90 @@ func TestDirectToolAsyncActionStateIsolation(t *testing.T) {
 			require.Equal(t, false, loop.GetActionExecutionValue(actions[1], actionStateDirectToolAsync))
 			require.Nil(t, loop.GetActionExecutionValue(actions[2], actionStateDirectToolAsync))
 		})
+	}
+}
+
+func TestDirectToolAsyncEmptyProtocolKeys(t *testing.T) {
+	for _, handler := range []*reactloops.LoopAction{loopAction_directlyCallTool, nativeDirectToolAction} {
+		mode := "legacy"
+		if handler == nativeDirectToolAction {
+			mode = "native"
+		}
+		for _, wrapped := range []bool{false, true} {
+			layout := "root"
+			if wrapped {
+				layout = "next_action"
+			}
+			for _, batch := range []bool{false, true} {
+				form := "scalar"
+				if batch {
+					form = "batch"
+				}
+				t.Run(mode+"/"+layout+"/"+form, func(t *testing.T) {
+					loop, invoker, task := newAsyncActionTestLoop(t)
+					// Blank-key contents must not be interpreted as protocol fields.
+					noise := map[string]any{actionStateDirectToolAsync: true, "async": true}
+					business := map[string]any{"": "keep", " ": "also keep", "async": true}
+					params := map[string]any{"file": "/first", "payload": business}
+					fields := map[string]any{"": noise, " \t ": nil}
+					if batch {
+						fields[directlyCallToolBatchField] = []any{
+							map[string]any{"": noise, " \t ": nil, "tool_name": "async_fixture", "params": params},
+							map[string]any{"": "", "\u3000": false, "tool_name": "async_fixture", "params": map[string]any{"file": "/second"}, "async": "true"},
+						}
+					} else {
+						fields["directly_call_tool_name"] = "async_fixture"
+						fields["directly_call_tool_params"] = params
+					}
+					action := parseToolBatchPromptExample(t, asyncActionPayload(t, fields, wrapped), schema.AI_REACT_LOOP_ACTION_DIRECTLY_CALL_TOOL)
+					invoker.action = action
+					require.NoError(t, handler.ActionVerifier(loop, action))
+					op := reactloops.NewActionHandlerOperator(task)
+					handler.ActionHandler(loop, action, op)
+					if batch {
+						require.Len(t, invoker.groups, 1)
+						require.False(t, invoker.groups[0].Calls[0].Async)
+						require.True(t, invoker.groups[0].Calls[1].Async)
+						require.Equal(t, business, map[string]any(invoker.groups[0].Calls[0].Params.GetObject("payload")))
+					} else {
+						require.Equal(t, []any{false}, invoker.scalarStates)
+						require.Equal(t, business, map[string]any(invoker.withoutRequiredParams.GetObject("payload")))
+					}
+					require.True(t, op.IsContinued())
+				})
+			}
+		}
+	}
+}
+
+func TestDirectToolLookupIgnoresEmptyKeys(t *testing.T) {
+	action := aicommon.NewSimpleAction("directly_call_tool", aitool.InvokeParams{
+		"": true, " ": true, "next_action": map[string]any{"": true},
+	})
+	for _, key := range []string{"", " ", "\t\n", "\u3000"} {
+		value, exists := lookupCanonicalActionParam(action, key)
+		require.False(t, exists)
+		require.Nil(t, value)
+	}
+	value, exists := lookupCanonicalActionParam(nil, "async")
+	require.False(t, exists)
+	require.Nil(t, value)
+}
+
+func TestDirectToolEmptyKeyCannotReplaceRequiredField(t *testing.T) {
+	for _, handler := range []*reactloops.LoopAction{loopAction_directlyCallTool, nativeDirectToolAction} {
+		for _, missing := range []string{"tool_name", "params"} {
+			loop, invoker, _ := newAsyncActionTestLoop(t)
+			first := map[string]any{"tool_name": "async_fixture", "params": map[string]any{"file": "/first"}}
+			first[""] = map[string]any{missing: first[missing]}
+			delete(first, missing)
+			fields := map[string]any{directlyCallToolBatchField: []any{
+				first, map[string]any{"tool_name": "async_fixture", "params": map[string]any{"file": "/second"}},
+			}}
+			action := parseToolBatchPromptExample(t, asyncActionPayload(t, fields, false), schema.AI_REACT_LOOP_ACTION_DIRECTLY_CALL_TOOL)
+			require.ErrorContains(t, handler.ActionVerifier(loop, action), missing+" is required")
+			require.Nil(t, loop.GetActionExecutionValue(action, actionStateDirectToolBatch))
+			require.Empty(t, invoker.groups)
+		}
 	}
 }
