@@ -27,11 +27,14 @@ type manageAsyncRequest struct {
 // It controls only the manager owned by this loop, through its existing API.
 var loopAction_ManageAsyncExecutionRuntime = &LoopAction{
 	ActionType: schema.AI_REACT_LOOP_ACTION_MANAGE_ASYNC_EXECUTION_RUNTIME,
-	Description: "管理当前循环所属的后台执行。" +
+	Description: "这是始终可用的顶层 action，用于管理当前循环所属的后台执行。" +
+		"直接选择 manage_async_execution_runtime 并提供 op 等参数；它不是业务工具，不能作为 directly_call_tool 的 tool_name，也不需要 require_tool 加载。" +
+		"异步提交返回 execute_id 只表示已登记，不代表业务成功；状态 Dump 只是元信息，不能代替结果核验。" +
 		"list 列出执行 ID、状态等元信息；inspect 通过资源的观察器读取当前 stdout、stderr、中间结果和最终结果。" +
 		"stop 请求取消指定执行，stop_all 请求取消当前循环的全部执行；stopping 表示已请求取消，需继续 wait 确认执行和清理已结束。" +
 		"wait 等待执行及清理结束并返回元信息，等待超时不会取消后台执行；需要输出时再调用 inspect。" +
-		"stop_all 后仍可提交新的执行；本 action 仅管理已有执行，不启动新工作。",
+		"stop_all 后仍可提交新的执行；本 action 仅管理已有执行，不启动新工作。" +
+		"需要结束任务时，先 wait 确认所需执行结束，再 inspect 核对结果；主任务结束会取消尚未完成的后台执行。避免连续轮询完整输出，状态足够时使用 list 或一次有界 wait。",
 	Options: []aitool.ToolOption{
 		aitool.WithStringParam("op", aitool.WithParam_EnumString("list", "inspect", "stop", "wait", "stop_all"),
 			aitool.WithParam_Default("list"), aitool.WithParam_Description("管理操作：list 列表、inspect 查看输出与结果、stop 请求停止、wait 等待结束、stop_all 请求停止全部执行。默认 list。")),
