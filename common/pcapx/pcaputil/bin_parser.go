@@ -98,6 +98,11 @@ func (e *ProtocolEvent) Decode() (result map[string]any, err error) {
 		if e.Protocol == "snmp" && e.semanticFields != nil {
 			session = e.semanticFields
 		}
+		// Native media fields include the final observed association context.
+		// Public edits cannot manufacture a different media/session identity.
+		if e.Protocol == "rtp" && e.Transport == "udp" && e.Profile == "rtp-udp" && e.semanticFields != nil {
+			session = e.semanticFields
+		}
 		// C37.118 exposes its complete accepted observation in both views
 		// on TCP and UDP. The public map is caller-owned, not query authority.
 		if e.Protocol == "c37118" && (e.Profile == "c37118-v1-v2-cfg2-data" || e.Profile == "c37118-v2-cfg3-complete-data" || e.Profile == "c37118-v2-cfg3-continuation-data" || e.Profile == "c37118-engineering") && e.semanticFields != nil {
@@ -195,6 +200,11 @@ func (e *ProtocolEvent) GetFields() (map[string]any, error) {
 }
 
 func (e *ProtocolEvent) ownsNativeFields() bool {
+	// The selected UDP media decoder owns its field tree and typed refusals;
+	// legacy stream RTP keeps its existing rule envelope and metadata shape.
+	if e.Protocol == "rtp" && e.Transport == "udp" && e.Profile == "rtp-udp" && (e.semanticFields != nil || e.sessionError != nil) {
+		return true
+	}
 	// A datagram refused before admission has no field tree. Keep its private
 	// resource refusal authoritative even if callers populate public caches.
 	if e.Transport == "udp" && e.Protocol == "" && e.sessionError != nil {
@@ -479,6 +489,11 @@ func (a *binParser) emit(e *BinParserEvent) {
 	e.setStructured(e.Structured)
 	e.finalizeEvidence()
 	e.summarizeProtocol()
+	// GOOSE and legacy stream media keep rule fields distinct from observed
+	// session context. Freeze the final context before handing out public maps.
+	if (e.Protocol == "goose" || e.Protocol == "rtp" && e.Transport != "udp") && e.semanticSession == nil && e.Session != nil {
+		e.semanticSession = cloneSession(e.Session)
+	}
 	defer func() {
 		if p := recover(); p != nil {
 			a.panics.Add(1)

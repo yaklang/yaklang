@@ -244,6 +244,7 @@ func gooseHistoryBooleanOwnership(t *testing.T) {
 			require.EqualValues(t, i+1, e.SourceBytes.PacketRefs[0].Number)
 			history.OnEvent(e)
 			e.Session["Boolean"].([]bool)[0] = i != 1
+			testOwnedSessionQueries(t, e, expected)
 			detail, err := history.Details(e.ID)
 			require.NoError(t, err)
 			require.Equal(t, expected, detail.Session)
@@ -314,6 +315,7 @@ func gooseHistoryBitsOwnership(t *testing.T) {
 			bits := e.Session["Bits"].([][]byte)
 			bits[0] = []byte{0xff}
 			bits[1][0] = 0xff
+			testOwnedSessionQueries(t, e, expected)
 			detail, err := history.Details(e.ID)
 			require.NoError(t, err)
 			require.Equal(t, expected, detail.Session)

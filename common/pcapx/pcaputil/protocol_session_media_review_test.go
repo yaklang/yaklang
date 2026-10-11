@@ -1,11 +1,16 @@
 package pcaputil
 
 import (
+	"crypto/sha256"
 	"encoding/binary"
+	"encoding/hex"
+	"encoding/json"
+	"fmt"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/internal/trafficfixture"
 )
 
 func mediaReviewRTCPRR(reportBlocks int) []byte {
@@ -125,6 +130,7 @@ func rtcpBYEHistorySourcesOwnership(t *testing.T) {
 	require.NoError(t, err)
 	history.OnEvent(e)
 	e.Session["Sources"].([]uint32)[0] = 999999
+	testOwnedSessionQueries(t, e, expected)
 	detail, err := history.Details(e.ID)
 	require.NoError(t, err)
 	require.Equal(t, expected, detail.Session)
@@ -163,3 +169,142 @@ func rtcpSourceHistoryBudget(t *testing.T) {
 func TestProtocolInspectorRTCPSourceVectorBudget(t *testing.T) {
 	rtcpSourceHistoryBudget(t)
 }
+
+type mediaOwnedQueryControl struct {
+	ID       string            `json:"id"`
+	Input    string            `json:"input"`
+	SHA256   string            `json:"sha256"`
+	WireHex  string            `json:"wire_hex"`
+	Fields   map[string]any    `json:"expected_fields"`
+	Session  map[string]any    `json:"expected_session"`
+	Error    ProtocolErrorKind `json:"expected_error"`
+	Buffered int               `json:"buffered"`
+}
+
+func mediaOwnedQueryCase(t *testing.T, id string) (mediaOwnedQueryControl, []byte, []byte) {
+	t.Helper()
+	answer, err := trafficfixture.ReadFile("testdata/media-owned-queries/cases.json")
+	require.NoError(t, err)
+	var inventory struct {
+		Version int                      `json:"version"`
+		Cases   []mediaOwnedQueryControl `json:"cases"`
+	}
+	require.NoError(t, json.Unmarshal(answer, &inventory))
+	require.Equal(t, 1, inventory.Version)
+	require.Len(t, inventory.Cases, 3)
+	seen := map[string]bool{}
+	var selected mediaOwnedQueryControl
+	for _, c := range inventory.Cases {
+		require.False(t, seen[c.ID], "duplicate case")
+		seen[c.ID] = true
+		if c.ID == id {
+			selected = c
+		}
+	}
+	require.Equal(t, id, selected.ID)
+	inventories, err := trafficfixture.AllExpectations()
+	require.NoError(t, err, "new captures must remain usable by the shared frozen corpus gates")
+	bound := false
+	for _, inventory := range inventories {
+		for _, c := range inventory.Cases {
+			if c.Input.OriginalPath == "common/pcapx/pcaputil/testdata/media-owned-queries/"+selected.Input {
+				require.False(t, bound)
+				bound = true
+				require.Equal(t, selected.SHA256, c.Input.SHA256)
+				require.Equal(t, 1, c.Facts.PacketCount)
+			}
+		}
+	}
+	require.True(t, bound, "each control capture must have a unified answer binding")
+	raw, err := trafficfixture.ReadFile("testdata/media-owned-queries/" + selected.Input)
+	require.NoError(t, err)
+	require.Equal(t, selected.SHA256, fmt.Sprintf("%x", sha256.Sum256(raw)))
+	wire, err := hex.DecodeString(selected.WireHex)
+	require.NoError(t, err)
+	return selected, raw, wire
+}
+
+func rtcpNativeQueryOwnership(t *testing.T) {
+	t.Helper()
+	// RFC3550 section6.6 BYE SC1 and SSRC11223344; the existing independent
+	// TShark answer validates the eight wire bytes. UDP context remains selected,
+	// not authenticated or associated with an observed SDP exchange.
+	manual := &ProtocolEvent{Protocol: "rtp", Transport: "udp", Profile: "rtp-udp", Fields: map[string]any{"caller": "manual field cache"}}
+	manualFields, err := manual.GetFields()
+	require.NoError(t, err)
+	require.Equal(t, manual.Fields, manualFields, "manually constructed events retain their public field-cache contract")
+	c, raw, wire := mediaOwnedQueryCase(t, "bye")
+	discoveryMatrix(t, func(t *testing.T, workers int, deferred, observe bool) {
+		events, stats := discoveryReplay(t, raw, workers, deferred, observe, WithProtocolDecodeAs("udp", 5005, "rtp"))
+		require.Len(t, events, 1)
+		require.Zero(t, stats.BufferedBytes)
+		e := events[0]
+		want := c.Session
+		rocEqualFields(t, want, e.Session)
+		require.NotZero(t, e.ID)
+		require.Equal(t, wire, e.Raw)
+		require.Zero(t, e.ResponseTo)
+		require.Zero(t, e.TransactionID)
+		require.Equal(t, "192.0.2.1:5005", e.Source)
+		require.Equal(t, "192.0.2.2:6005", e.Destination)
+		testExactObservationSessionQueries(t, e, want)
+		e.Fields = map[string]any{"Packet Name": "caller-forged"}
+		e.Structured = map[string]any{"fields": e.Fields}
+		fields, err := e.GetFields()
+		require.NoError(t, err)
+		rocEqualFields(t, c.Fields, fields)
+	})
+}
+
+func rtcpNativeRefusalQueries(t *testing.T) {
+	t.Helper()
+	for _, id := range []string{"count-width-mismatch", "media-flow-budget"} {
+		t.Run(id, func(t *testing.T) {
+			c, raw, wire := mediaOwnedQueryCase(t, id)
+			discoveryMatrix(t, func(t *testing.T, workers int, deferred, observe bool) {
+				events, stats := discoveryReplay(t, raw, workers, deferred, observe, WithProtocolDecodeAs("udp", 5005, "rtp"), WithProtocolBudget(64, c.Buffered))
+				require.Len(t, events, 1)
+				require.Zero(t, stats.BufferedBytes)
+				e := events[0]
+				require.Equal(t, wire, e.Raw)
+				require.Nil(t, e.Session)
+				require.Equal(t, string(c.Error), e.ExpertCode)
+				initial, err := e.Decode()
+				require.Nil(t, initial)
+				var original *ProtocolError
+				require.ErrorAs(t, err, &original)
+				require.Equal(t, c.Error, original.Kind)
+				message := original.Message
+				require.NotEmpty(t, message)
+				id, flow, response, transaction := e.ID, e.FlowID, e.ResponseTo, e.TransactionID
+				require.Zero(t, response)
+				require.Zero(t, transaction)
+				e.Status, e.Error = "decoded", ""
+				e.Session = map[string]any{"Association Status": "verified"}
+				e.Fields = map[string]any{"caller-forged": true}
+				e.Structured = map[string]any{"fields": e.Fields}
+				for i := 0; i < 2; i++ {
+					result, err := e.Decode()
+					require.Nil(t, result)
+					var typed *ProtocolError
+					require.ErrorAs(t, err, &typed)
+					require.Equal(t, c.Error, typed.Kind)
+					require.Equal(t, message, typed.Message)
+					typed.Kind, typed.Message = ErrFatalSessionError, "caller-forged"
+					fields, err := e.GetFields()
+					require.Nil(t, fields)
+					require.ErrorAs(t, err, &typed)
+					require.Equal(t, c.Error, typed.Kind)
+					require.Equal(t, message, typed.Message)
+					require.Equal(t, id, e.ID)
+					require.Equal(t, flow, e.FlowID)
+					require.Equal(t, response, e.ResponseTo)
+					require.Equal(t, transaction, e.TransactionID)
+				}
+			})
+		})
+	}
+}
+
+func TestRTCPNativeOwnedQueries(t *testing.T)  { rtcpNativeQueryOwnership(t) }
+func TestRTCPNativeOwnedRefusals(t *testing.T) { rtcpNativeRefusalQueries(t) }

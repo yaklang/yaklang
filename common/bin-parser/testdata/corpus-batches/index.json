@@ -45053,6 +45053,48 @@
         "common/pcapx/pcaputil/c37118-engineering/validation/source-pins.json": "validation/source-pins.json",
         "scripts/protocol-tests/required-tests-traffic-unified-v24.json": "scripts/required-tests-traffic-unified-v24.json"
       }
+    },
+    {
+      "id": "media-owned-queries",
+      "kind": "validation",
+      "source_sha": "dcff60ae656fb9fd002bffac818e06c0ee5a1e1d",
+      "file": "validation-media-owned-queries.zip",
+      "sha256": "1b8eb9d5b8677f86db2edae38ab53dcdf6af6243e6f5094820eef8d639748025",
+      "password": "bin-parser",
+      "members": {
+        "captures/bye.pcap": {
+          "bytes": 100,
+          "sha256": "2491f186fbcc9bb5b258a1e8bdd7484f377b4ef37459c882e9baa3b8b6017d6f"
+        },
+        "captures/count-mismatch.pcap": {
+          "bytes": 100,
+          "sha256": "6a1958ea98bba67776593ca2b690e798b53d3871489db56ef83de7245786a74c"
+        },
+        "cases.json": {
+          "bytes": 2468,
+          "sha256": "98356d832deeed6ea92aa5e61b1244f827bbb866ec714641a7126efdf0e3a419"
+        },
+        "generate.py": {
+          "bytes": 3897,
+          "sha256": "1e03194d228c1f9fcc412abd3a6c5fb1dc22ae7346c970dbebd74cf6f58c534c"
+        },
+        "verify.py": {
+          "bytes": 1538,
+          "sha256": "57ceba32b365bba188e56d580b751dc6b44afe8afd076c682a799c3e926621e3"
+        },
+        "validation/expected.json": {
+          "bytes": 2690,
+          "sha256": "e12ff2143344cfee10eb8d8227042bf48b8eee8baa6c396f1309e76163364620"
+        }
+      },
+      "aliases": {
+        "common/pcapx/pcaputil/testdata/media-owned-queries/captures/bye.pcap": "captures/bye.pcap",
+        "common/pcapx/pcaputil/testdata/media-owned-queries/captures/count-mismatch.pcap": "captures/count-mismatch.pcap",
+        "common/pcapx/pcaputil/testdata/media-owned-queries/cases.json": "cases.json",
+        "common/pcapx/pcaputil/testdata/media-owned-queries/generate.py": "generate.py",
+        "common/pcapx/pcaputil/testdata/media-owned-queries/verify.py": "verify.py",
+        "common/pcapx/pcaputil/testdata/media-owned-queries/validation/expected.json": "validation/expected.json"
+      }
     }
   ],
   "schema_version": 1,

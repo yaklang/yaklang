@@ -1138,6 +1138,8 @@ func cloneSessionValue(v any) any {
 		return cloneScalarValues(x)
 	case []uint32:
 		return cloneScalarValues(x)
+	case []PacketReference:
+		return cloneScalarValues(x)
 	case []uint64:
 		return cloneScalarValues(x)
 	case []string:
@@ -1211,6 +1213,12 @@ func sessionSnapshotSize(v any, byteCapacity bool) int {
 		return 24 + len(x)*2
 	case []uint32:
 		return 24 + len(x)*4
+	case []PacketReference:
+		n := 24 + len(x)*64
+		for _, ref := range x {
+			n += len(ref.Domain.Encapsulation)
+		}
+		return n
 	case []uint64:
 		return 24 + len(x)*8
 	case []string:

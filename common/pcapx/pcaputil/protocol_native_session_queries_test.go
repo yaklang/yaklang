@@ -82,3 +82,25 @@ func testExactObservationSessionQueries(t *testing.T, e *ProtocolEvent, want map
 	e.Session = nil
 	query()
 }
+
+// Rule fields and observed session context need not have the same schema.
+// The caller supplies the independently answered complete session projection.
+func testOwnedSessionQueries(t *testing.T, e *ProtocolEvent, want map[string]any) {
+	t.Helper()
+	saved := e.Session
+	defer func() { e.Session = saved }()
+	id, flow, response, transaction := e.ID, e.FlowID, e.ResponseTo, e.TransactionID
+	for _, public := range []map[string]any{e.Session, {"Packet Name": "forged", "Association Status": "verified"}, nil} {
+		e.Session = public
+		for repeat := 0; repeat < 2; repeat++ {
+			result, err := e.Decode()
+			require.NoError(t, err)
+			require.Equal(t, want, result["session"])
+			result["session"].(map[string]any)["Association Status"] = "caller-forged"
+			require.Equal(t, id, e.ID)
+			require.Equal(t, flow, e.FlowID)
+			require.Equal(t, response, e.ResponseTo)
+			require.Equal(t, transaction, e.TransactionID)
+		}
+	}
+}

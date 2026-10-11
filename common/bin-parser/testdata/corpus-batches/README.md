@@ -637,3 +637,15 @@ on/off. Raw fields and structural values compare exactly; finite derived
 quantities permit eight representable floating-point values of cross-runtime
 rounding, without an absolute tolerance near zero. The current mandatory entry
 is unifiedv24 (434 unique full-tier roots).
+
+The media-owned-queries supplement contains three selected UDP RTCP BYE controls
+using two unique 100-byte PCAPs: one-source observation, inconsistent two-source
+count, and the same valid wire under a refused retention budget. Complete accepted
+fields/session and typed refusal answers are sealed with original offline scripts.
+Wireshark 4.2.5 independently decoded the positive wire and reported the count
+mismatch malformed. Association and resource answers assert this library's passive
+observation contract, not device authentication or complete compound-RTCP compliance.
+`TestRTSPMediaFinalSemanticCacheParity` includes all 12 worker/deferred/observer
+combinations and verifies that caller edits cannot rewrite accepted queries or
+private refusals; packet-reference ownership and exact logical history-budget
+boundaries are also mandatory. Historical ZIPs remain unchanged.
