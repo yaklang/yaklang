@@ -93,6 +93,11 @@ func (e *ProtocolEvent) Decode() (result map[string]any, err error) {
 		if ownedIndustrial && e.semanticFields != nil {
 			session = e.semanticFields
 		}
+		// SNMP retains the accepted wire and passive association together;
+		// a public edit must not manufacture a matched request in queries.
+		if e.Protocol == "snmp" && e.semanticFields != nil {
+			session = e.semanticFields
+		}
 		// C37.118 exposes its complete accepted observation in both views
 		// on TCP and UDP. The public map is caller-owned, not query authority.
 		if e.Protocol == "c37118" && (e.Profile == "c37118-v1-v2-cfg2-data" || e.Profile == "c37118-v2-cfg3-complete-data" || e.Profile == "c37118-v2-cfg3-continuation-data" || e.Profile == "c37118-engineering") && e.semanticFields != nil {

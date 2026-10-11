@@ -293,6 +293,17 @@ func testSNMPIdentitySealedMatrix(t *testing.T) {
 					again, err := e.GetFields()
 					require.NoError(t, err)
 					rocEqualFields(t, w.Fields, again)
+					decoded, decodeErr := e.Decode()
+					require.NoError(t, decodeErr)
+					rocEqualFields(t, w.Fields, protocolFields(decoded))
+					rocEqualFields(t, w.Session, decoded["session"].(map[string]any))
+					mutateRTPSQuery(decoded["session"])
+					e.Session = nil
+					decoded, decodeErr = e.Decode()
+					require.NoError(t, decodeErr)
+					rocEqualFields(t, w.Fields, protocolFields(decoded))
+					rocEqualFields(t, w.Session, decoded["session"].(map[string]any))
+					e.Session = cloneSession(w.Session)
 				}
 				require.Zero(t, stats.BufferedBytes)
 				require.Zero(t, stats.CallbackPanics)
