@@ -111,39 +111,49 @@ func TestProtocolSessionRTPAddsSDPMapsWithinRetainedMemoryBudget(t *testing.T) {
 func rtcpBYEHistorySourcesOwnership(t *testing.T) {
 	t.Helper()
 	rtcpSourceHistoryBudget(t)
-	s, err := NewProtocolSession(DefaultParserBudget())
-	require.NoError(t, err)
-	defer s.Close("test")
-	wire := mediaReviewRTCPBYE(1)
-	binary.BigEndian.PutUint32(wire[4:8], 0x11223344)
-	r := s.Feed(0, time.Unix(1, 0), wire)
-	clear(wire)
-	require.Nil(t, r.Err)
-	require.Len(t, r.Events, 1)
-	e := r.Events[0]
-	expected := map[string]any{"Packet Name": "BYE", "Version": 2, "Packet Type": byte(203), "SSRC": uint32(0x11223344), "Report Count": 1, "Context Level": "observed", "Network Loss": false, "Loss Kind": "none", "Sources": []uint32{0x11223344}}
-	require.Equal(t, expected, e.Session)
-	require.Zero(t, e.ResponseTo)
-	require.Zero(t, e.TransactionID)
-	require.Equal(t, []byte{0x81, 0xcb, 0, 1, 0x11, 0x22, 0x33, 0x44}, e.Raw)
-	history, err := NewBinParserInspector(1, 1<<20)
-	require.NoError(t, err)
-	history.OnEvent(e)
-	e.Session["Sources"].([]uint32)[0] = 999999
-	testOwnedSessionQueries(t, e, expected)
-	detail, err := history.Details(e.ID)
-	require.NoError(t, err)
-	require.Equal(t, expected, detail.Session)
-	detail.Session["Sources"].([]uint32)[0] = 999999
-	decoded, err := detail.Decode()
-	require.NoError(t, err)
-	decoded["session"].(map[string]any)["Sources"].([]uint32)[0] = 999999
-	again, err := history.Details(e.ID)
-	require.NoError(t, err)
-	require.Equal(t, expected, again.Session)
-	s.Close("test")
-	s.Close("again")
-	require.Zero(t, s.Stats().BufferedBytes)
+	testLegacyRuleMetadataOwnership(t)
+	for _, deferred := range []bool{false, true} {
+		t.Run(fmt.Sprintf("rule-envelope-deferred-%v", deferred), func(t *testing.T) {
+			s, err := NewProtocolSession(DefaultParserBudget())
+			require.NoError(t, err)
+			defer s.Close("test")
+			s.(*captureSession).f.a.config.Deferred = deferred
+			wire := mediaReviewRTCPBYE(1)
+			binary.BigEndian.PutUint32(wire[4:8], 0x11223344)
+			r := s.Feed(0, time.Unix(1, 0), wire)
+			clear(wire)
+			require.Nil(t, r.Err)
+			require.Len(t, r.Events, 1)
+			e := r.Events[0]
+			expected := map[string]any{"Packet Name": "BYE", "Version": 2, "Packet Type": byte(203), "SSRC": uint32(0x11223344), "Report Count": 1, "Context Level": "observed", "Network Loss": false, "Loss Kind": "none", "Sources": []uint32{0x11223344}}
+			require.Equal(t, expected, e.Session)
+			fields, err := e.GetFields()
+			require.NoError(t, err)
+			require.Equal(t, map[string]any{"VersionPCount": uint8(0x81), "Packet Type": uint8(203), "Length": uint16(1), "SSRC": uint32(0x11223344)}, fields)
+			testLegacyRuleQueryOwnership(t, e)
+			require.Zero(t, e.ResponseTo)
+			require.Zero(t, e.TransactionID)
+			require.Equal(t, []byte{0x81, 0xcb, 0, 1, 0x11, 0x22, 0x33, 0x44}, e.Raw)
+			history, err := NewBinParserInspector(1, 1<<20)
+			require.NoError(t, err)
+			history.OnEvent(e)
+			e.Session["Sources"].([]uint32)[0] = 999999
+			testOwnedSessionQueries(t, e, expected)
+			detail, err := history.Details(e.ID)
+			require.NoError(t, err)
+			require.Equal(t, expected, detail.Session)
+			detail.Session["Sources"].([]uint32)[0] = 999999
+			decoded, err := detail.Decode()
+			require.NoError(t, err)
+			decoded["session"].(map[string]any)["Sources"].([]uint32)[0] = 999999
+			again, err := history.Details(e.ID)
+			require.NoError(t, err)
+			require.Equal(t, expected, again.Session)
+			s.Close("test")
+			s.Close("again")
+			require.Zero(t, s.Stats().BufferedBytes)
+		})
+	}
 }
 
 func rtcpSourceHistoryBudget(t *testing.T) {

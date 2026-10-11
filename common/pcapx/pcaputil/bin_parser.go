@@ -19,6 +19,8 @@ type ProtocolEvent struct {
 	Admission                                string
 	semanticFields                           map[string]any
 	semanticSession                          map[string]any
+	semanticMetadata                         any
+	ownedRuleEnvelope, hasRuleMetadata       bool
 	nativeQUICWire                           bool
 	Domain                                   CaptureDomain
 	SourceBytes                              ByteSource
@@ -147,6 +149,13 @@ func (e *ProtocolEvent) Decode() (result map[string]any, err error) {
 			return nil, &owned
 		}
 	}
+	if e.ownedRuleEnvelope {
+		result := map[string]any{"fields": cloneSession(e.semanticFields)}
+		if e.hasRuleMetadata {
+			result["metadata"] = cloneSessionValue(e.semanticMetadata)
+		}
+		return result, nil
+	}
 	if e.Structured != nil {
 		return e.Structured, nil
 	}
@@ -189,7 +198,7 @@ func (e *ProtocolEvent) Decode() (result map[string]any, err error) {
 // GetFields returns the protocol field tree directly, also for deferred events.
 // Decode remains the compatibility API returning the fields/metadata envelope.
 func (e *ProtocolEvent) GetFields() (map[string]any, error) {
-	if e.Fields != nil && !e.ownsNativeFields() && e.Protocol != "stun" && e.Protocol != "turn" && e.Protocol != "tftp" {
+	if e.Fields != nil && !e.ownedRuleEnvelope && !e.ownsNativeFields() && e.Protocol != "stun" && e.Protocol != "turn" && e.Protocol != "tftp" {
 		return e.Fields, nil
 	}
 	result, err := e.Decode()
@@ -197,6 +206,16 @@ func (e *ProtocolEvent) GetFields() (map[string]any, error) {
 		return nil, err
 	}
 	return protocolFields(result), nil
+}
+
+// Retain accepted legacy rule fields separately from public projections. Rule
+// metadata is independent of observed session context; preserve its key even
+// when the accepted parser deliberately returns a nil metadata value.
+func (e *ProtocolEvent) retainRuleEnvelope(result map[string]any) {
+	e.semanticFields = cloneSession(protocolFields(result))
+	metadata, present := result["metadata"]
+	e.semanticMetadata = cloneSessionValue(metadata)
+	e.ownedRuleEnvelope, e.hasRuleMetadata = true, present
 }
 
 func (e *ProtocolEvent) ownsNativeFields() bool {
@@ -1119,6 +1138,9 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 				// decoding and history; retrying a different grammar loses fields
 				// or rejects valid argumentless/multiline messages.
 				e.semanticFields = protocolFields(result)
+				if e.Protocol == "goose" || e.Protocol == "rtp" && e.Transport != "udp" {
+					e.retainRuleEnvelope(result)
+				}
 				if e.Protocol == "stun" || e.Protocol == "turn" || e.Protocol == "snmp" || e.Protocol == "slmp" || e.Protocol == "dlms-wrapper" || e.Protocol == "dlms" || e.Protocol == "c37118" {
 					e.semanticFields = cloneSession(e.semanticFields)
 				}
@@ -1355,6 +1377,7 @@ func (v *BinParserInspector) OnEvent(e *BinParserEvent) {
 	row := protocolHistoryEntry{BinParserEvent: *e, retainedCost: cost}
 	row.semanticFields = cloneSession(e.semanticFields)
 	row.semanticSession = cloneSession(e.semanticSession)
+	row.semanticMetadata = cloneSessionValue(e.semanticMetadata)
 	row.Session = cloneSession(e.Session)
 	cloneEvidence(&row.BinParserEvent)
 	row.Structured, row.Fields, row.Metadata = nil, nil, nil
@@ -1386,7 +1409,8 @@ func (v *BinParserInspector) Rows(protocol string, flow uint64) []*BinParserEven
 		if (protocol == "" || protocol == e.Protocol) && (flow == 0 || flow == e.FlowID) {
 			row := *e
 			cloneEvidence(&row)
-			row.Raw, row.Session, row.Structured, row.semanticFields, row.semanticSession = nil, nil, nil, nil, nil
+			row.Raw, row.Session, row.Structured, row.semanticFields, row.semanticSession, row.semanticMetadata = nil, nil, nil, nil, nil, nil
+			row.ownedRuleEnvelope, row.hasRuleMetadata = false, false
 			rows = append(rows, &row)
 		}
 	}
@@ -1404,6 +1428,7 @@ func (v *BinParserInspector) Details(id uint64) (*BinParserEvent, error) {
 			copyEvent.Structured = cloneSession(e.Structured)
 			copyEvent.semanticFields = cloneSession(e.semanticFields)
 			copyEvent.semanticSession = cloneSession(e.semanticSession)
+			copyEvent.semanticMetadata = cloneSessionValue(e.semanticMetadata)
 			copyEvent.Session = cloneSession(e.Session)
 			copyEvent.Raw = append([]byte(nil), e.Raw...)
 			row = &copyEvent
@@ -1453,7 +1478,8 @@ func (v *BinParserInspector) RowsAfter(after uint64, limit int, protocol string,
 			if len(rows) < limit {
 				row := *e
 				cloneEvidence(&row)
-				row.Raw, row.Structured, row.Session, row.semanticFields, row.semanticSession = nil, nil, nil, nil, nil
+				row.Raw, row.Structured, row.Session, row.semanticFields, row.semanticSession, row.semanticMetadata = nil, nil, nil, nil, nil, nil
+				row.ownedRuleEnvelope, row.hasRuleMetadata = false, false
 				rows = append(rows, &row)
 			}
 		}

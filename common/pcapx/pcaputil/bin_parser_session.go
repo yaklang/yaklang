@@ -1248,5 +1248,5 @@ func sessionSnapshotSize(v any, byteCapacity bool) int {
 }
 
 func protocolHistoryBytes(e *ProtocolEvent) int {
-	return len(e.Raw) + sessionSnapshotSize(e.Session, false) + sessionSnapshotSize(e.semanticFields, false) + sessionSnapshotSize(e.semanticSession, false) + len(e.SourceBytes.PacketRefs)*64 + len(e.SourceBytes.ParentPDUs)*8
+	return len(e.Raw) + sessionSnapshotSize(e.Session, false) + sessionSnapshotSize(e.semanticFields, false) + sessionSnapshotSize(e.semanticSession, false) + sessionSnapshotSize(e.semanticMetadata, false) + len(e.SourceBytes.PacketRefs)*64 + len(e.SourceBytes.ParentPDUs)*8
 }

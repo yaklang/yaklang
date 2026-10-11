@@ -238,6 +238,7 @@ func gooseHistoryBooleanOwnership(t *testing.T) {
 			require.Equal(t, "goose", e.Protocol)
 			require.Equal(t, "decoded", e.Status, e.Error)
 			require.Equal(t, expected, e.Session)
+			testLegacyRuleQueryOwnership(t, e)
 			require.Zero(t, e.ResponseTo)
 			require.Zero(t, e.TransactionID)
 			require.Len(t, e.SourceBytes.PacketRefs, 1)

@@ -350,6 +350,7 @@ func (a *binParser) decodeGOOSEEthernet(eth *layers.Ethernet, payload []byte, ev
 	} else {
 		e.Status, e.Completeness = "decoded", "message"
 		e.Structured = result
+		e.retainRuleEnvelope(result)
 		e.Summary = fmt.Sprintf("GOOSE state %v sequence %v", e.Session["State Number"], e.Session["Sequence Number"])
 		a.messages.Add(1)
 		a.messageBytes.Add(uint64(length))
