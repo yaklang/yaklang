@@ -153,16 +153,43 @@ Forget 接口。较长的 owner 生命周期需要配置适当的记录上限，
 ## 工具调用接入位置
 
 本包已实现独立核心和函数适配器。directly_call_tool 已接入异步标记的解析，
-工具 Inspector、真实完成信号、异步调度与管理 action 仍待接入，当前执行方式不变。
+ToolCaller 已实现 Inspector；异步调度与管理 action 仍待接入，当前 action 执行方式不变。
 接入工具时应复用原调用链路，把原工具执行函数和该次调用的 Inspector 接入
 NewResource。需要在原调用实例上补齐 Inspector 时，应从原实例读取已有状态，
 不能另外订阅 UI/log 事件并创建第二份输出缓存。
 
-当前 [ExecuteToolWithCapture](../../../aitool/tool_result.go) 在 context 取消时可能
-先返回，而内部 callback 还在退出。因此不能仅把这个方法的返回当作真实结束。
-后续工具接入必须在原调用实例上暴露 callback 的完成信号，并由适配器等待清理；
-已有输出缓冲的读取也要在原调用链路提供并发安全快照，不能直接读取运行中的
-`bytes.Buffer`。这些是工具链路需要补齐的能力，本包的函数适配器不会自动生成。
+[ToolCaller Inspector](../../../aicommon/toolcall_inspector.go) 直接读取原调用的
+线程安全有界缓冲。Result 是调用返回时冻结的 ToolResult JSON 信封，参数字段为
+null（默认取消路径中 callback 可能仍在修改参数），运行期间为空；PartialResult
+当前为空。观察调用不会消费输出，终态后仍可观察。
+
+创建异步资源的 ToolCaller 时，需要显式设置
+`WithToolCaller_WaitForCallbackOnCancel(true)`，让底层在取消后等待 callback 退出，
+再关闭输出管道及清理产物。默认关闭，原同步路径保持及时返回取消的行为。
+适配器还需把执行 context 的取消传递给创建 caller 时的 context，例如：
+
+```go
+// caller 用 callCtx 创建，并开启 WaitForCallbackOnCancel；每次执行一个 caller。
+resource, err := asyncexecmanager.NewResource(func(ctx context.Context) error {
+    stop := context.AfterFunc(ctx, cancelCall)
+    defer stop()
+    defer cancelCall()
+    result, directlyAnswer, err := caller.CallToolWithExistedParams(tool, params)
+    if err != nil {
+        return err
+    }
+    if directlyAnswer || result == nil {
+        return errors.New("tool call did not produce a result")
+    }
+    if !result.Success {
+        return errors.New(result.Error)
+    }
+    return nil
+}, caller.Inspect)
+```
+
+完整联动例子见 [唯一的综合测试](../../../aicommon/toolcall_inspector_test.go)：
+正常完成、实时输出、结果快照隔离、取消期间的清理等待和最终输出都在一个测试里。
 
 调用实例要在提交前固定 tool、参数、task、emitter 和 call ID 等信息；后台闭包
 不能在运行时重新读取 ReAct 的 current task。原链路的参数检查、授权审查和输出

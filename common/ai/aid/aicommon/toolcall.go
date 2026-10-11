@@ -2,6 +2,7 @@ package aicommon
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -175,6 +176,15 @@ type ToolCaller struct {
 	batchIndex            int
 	statsSource           string
 	checkpointReplayed    bool
+
+	// Inspector reads these original invocation buffers and the frozen final
+	// result. No event subscription or second output stream is involved.
+	inspectionMu            sync.RWMutex
+	inspectionStdout        *toolOutputBuffer
+	inspectionStderr        *toolOutputBuffer
+	inspectionResult        json.RawMessage
+	inspectionError         error
+	waitForCallbackOnCancel bool
 }
 
 // ToolCallerGate bounds one phase of a tool call. The returned release
@@ -833,6 +843,7 @@ func SanitizeTaskName(name string) string {
 // CallToolWithExistedParams validates, reviews and executes an explicit parameter
 // object. It never asks an auxiliary model to create or repair tool arguments.
 func (t *ToolCaller) CallToolWithExistedParams(tool *aitool.Tool, invokeParams aitool.InvokeParams) (result *aitool.ToolResult, directlyAnswer bool, err error) {
+	defer func() { t.publishInspectionResult(result) }()
 	// Metadata extraction, parameter augmentation and plugins must not mutate
 	// the caller's payload. Preserve nil so missing explicit arguments still fail.
 	if invokeParams != nil {
@@ -1193,6 +1204,7 @@ func (t *ToolCaller) CallToolWithExistedParams(tool *aitool.Tool, invokeParams a
 	// Create buffers to capture stdout and stderr for interval review and file saving.
 	stdoutBuffer := &toolOutputBuffer{}
 	stderrBuffer := &toolOutputBuffer{}
+	t.bindInspectionOutput(stdoutBuffer, stderrBuffer)
 
 	artifactBundle := t.newToolCallArtifactBundle(tool, callToolId, destinationIdentifier)
 	// finalize marks successful and ordinary failed calls as durable bundles.
