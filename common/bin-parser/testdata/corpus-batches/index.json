@@ -45321,6 +45321,93 @@
           "bytes": 2088
         }
       }
+    },
+    {
+      "file": "validation-mqtt311-native.zip",
+      "id": "mqtt311-native-c501b28e1679",
+      "kind": "session-controls",
+      "password": "bin-parser",
+      "source_sha": "c501b28e16799a4585eae4876e1786d876bfed1d",
+      "sha256": "790e49f5bb4c03c2447c878f220f7374ba51f9bbcb40dfd3bef55bf8b3f2e6aa",
+      "aliases": {
+        "common/pcapx/pcaputil/testdata/mqtt311-native/answers.json": "answers.json",
+        "common/pcapx/pcaputil/testdata/mqtt311-native/captures/binary-qos.pcap": "captures/binary-qos.pcap",
+        "common/pcapx/pcaputil/testdata/mqtt311-native/captures/empty-payload.pcap": "captures/empty-payload.pcap",
+        "common/pcapx/pcaputil/testdata/mqtt311-native/captures/second-connect.pcap": "captures/second-connect.pcap",
+        "common/pcapx/pcaputil/testdata/mqtt311-native/captures/wrong-connack-direction.pcap": "captures/wrong-connack-direction.pcap",
+        "common/pcapx/pcaputil/testdata/mqtt311-native/generate.py": "generate.py",
+        "common/pcapx/pcaputil/testdata/mqtt311-native/make-answers.py": "make-answers.py",
+        "common/pcapx/pcaputil/testdata/mqtt311-native/records/binary.bin": "records/binary.bin",
+        "common/pcapx/pcaputil/testdata/mqtt311-native/records/client.bin": "records/client.bin",
+        "common/pcapx/pcaputil/testdata/mqtt311-native/records/connack.bin": "records/connack.bin",
+        "common/pcapx/pcaputil/testdata/mqtt311-native/records/connect.bin": "records/connect.bin",
+        "common/pcapx/pcaputil/testdata/mqtt311-native/records/empty.bin": "records/empty.bin",
+        "common/pcapx/pcaputil/testdata/mqtt311-native/records/server.bin": "records/server.bin",
+        "common/pcapx/pcaputil/testdata/mqtt311-native/validation/expected.json": "validation/expected.json",
+        "common/pcapx/pcaputil/testdata/mqtt311-native/verify.py": "verify.py"
+      },
+      "members": {
+        "answers.json": {
+          "sha256": "7b7d90a985bc9b7bfd7379e220e3c153152cf649fa8fa36cd5ae129d4aa06f02",
+          "bytes": 6245
+        },
+        "captures/binary-qos.pcap": {
+          "sha256": "fc73a71f5e197fde2cc9436364b8eebccfcf0c6ad38b42c1fc03f66e2f84d0d9",
+          "bytes": 859
+        },
+        "captures/empty-payload.pcap": {
+          "sha256": "112099a75fac6a116b7d18edcb38cd7471ff78e05d3d0641a8302b7ffa7452b6",
+          "bytes": 540
+        },
+        "captures/second-connect.pcap": {
+          "sha256": "7ceff04ca46cdee7ef4a2c3a12f30cd7d34109a74948a7ef754e12d3328f3172",
+          "bytes": 552
+        },
+        "captures/wrong-connack-direction.pcap": {
+          "sha256": "5f44af4d82a3eb9557b467774b59f4f25483f54ea2568396a303a8495e1f67ee",
+          "bytes": 539
+        },
+        "generate.py": {
+          "sha256": "9baa11ccee8ef9e0dc374cec8f259772253a6ada33ef679113fbdc3bcc7cf051",
+          "bytes": 2767
+        },
+        "make-answers.py": {
+          "sha256": "04f12fd9543c67bd57b64be635a9850e57ad4c1e19b6307f1f8922fe0eacaa87",
+          "bytes": 2814
+        },
+        "records/binary.bin": {
+          "sha256": "5193e3c724804b6dde0ea74a7d2c6c52f2dcdcbf6e415603840091951a2f42b4",
+          "bytes": 8
+        },
+        "records/client.bin": {
+          "sha256": "cff5363c9cc591e2166993b0fd5d9d1c28c6fc6f7eb41760e5939b7c1531e2eb",
+          "bytes": 15
+        },
+        "records/connack.bin": {
+          "sha256": "b3e0adaf40f19d19ae5846a499ef09653350f3f359d52424cec547a12789b1fe",
+          "bytes": 4
+        },
+        "records/connect.bin": {
+          "sha256": "5fb11e203202666f6dab5b97b679a2e00b2bbdff8fc4be5bae7c43386df42838",
+          "bytes": 17
+        },
+        "records/empty.bin": {
+          "sha256": "ddc610731cc6905cba0a445bcebefcee411c273ffe61d1395ec52392799ddcc8",
+          "bytes": 5
+        },
+        "records/server.bin": {
+          "sha256": "4f9607b52e48276766f5c4bb1604c01f529625af7ee99c1fa0ec67a4e382b6c4",
+          "bytes": 13
+        },
+        "validation/expected.json": {
+          "sha256": "b456dfab1d29223cac8dfaaf95db6c1ce895cb06c61c8f359dbdf8f9ca9a295a",
+          "bytes": 4022
+        },
+        "verify.py": {
+          "sha256": "7900e2d78e286923b63afe19ffa01644ee9aa4d28d32bb2b127771d7899de5e2",
+          "bytes": 1052
+        }
+      }
     }
   ],
   "schema_version": 1,

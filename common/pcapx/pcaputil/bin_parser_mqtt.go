@@ -6,8 +6,9 @@ import (
 )
 
 type binMQTT struct {
-	client int
-	level  byte
+	client      int
+	level       byte
+	seenConnect bool
 	// Indexed by the endpoint that allocated the identifier, not by the
 	// direction of the next ACK: PUBREL travels in the original direction.
 	pending    [2]map[uint16]string
@@ -43,6 +44,9 @@ func probeMQTT(w []byte, limit int) ProbeResult {
 	name, level := string(w[header+2:header+2+nameLen]), w[header+2+nameLen]
 	if name == "MQTT" && level == 5 {
 		return probeAccept("mqtt", "5.0", 95)
+	}
+	if name == "MQTT" && level == 4 {
+		return probeAccept("mqtt", "3.1.1", 95)
 	}
 	_ = n
 	return ProbeResult{Verdict: ProbeReject}
@@ -99,6 +103,9 @@ func (m *binMQTT) consume(dir int, raw []byte, result map[string]any, maxElement
 		return nil, fmt.Errorf("mqtt: truncated packet")
 	}
 	typ, flags := raw[0]>>4, raw[0]&15
+	if typ == 1 && m.seenConnect {
+		return nil, fmt.Errorf("mqtt: second CONNECT on the same network connection")
+	}
 	qos := flags >> 1 & 3
 	info := map[string]any{
 		"Packet Type":   uint64(typ),
@@ -135,7 +142,8 @@ func (m *binMQTT) consume(dir int, raw []byte, result map[string]any, maxElement
 	switch typ {
 	case 1:
 		m.client = dir
-		if max, ok := mqtt5ConnectAliasMax(body); ok {
+		m.seenConnect = true
+		if max, ok := mqtt5ConnectAliasMax(body); m.level == 5 && ok {
 			m.aliasMax[1-dir] = max
 			info["Topic Alias Maximum"] = uint64(max)
 		}
@@ -148,7 +156,7 @@ func (m *binMQTT) consume(dir int, raw []byte, result map[string]any, maxElement
 			info["Session Present"] = body[0]&1 != 0
 		}
 	case 3:
-		topic, pid, alias, err := mqtt5PublishView(body, qos)
+		topic, pid, alias, err := mqttPublishView(body, qos, m.level)
 		if err != nil {
 			return nil, err
 		}
@@ -351,7 +359,7 @@ func mqtt5ConnectAliasMax(body []byte) (uint16, bool) {
 	return 0, false
 }
 
-func mqtt5PublishView(body []byte, qos byte) (topic string, pid uint16, alias uint16, err error) {
+func mqttPublishView(body []byte, qos, level byte) (topic string, pid uint16, alias uint16, err error) {
 	if len(body) < 2 {
 		return "", 0, 0, fmt.Errorf("mqtt: truncated PUBLISH")
 	}
@@ -367,6 +375,11 @@ func mqtt5PublishView(body []byte, qos byte) (topic string, pid uint16, alias ui
 		}
 		pid = binary.BigEndian.Uint16(body[at : at+2])
 		at += 2
+	}
+	// MQTT 3.1.1 payload starts here; it has no MQTT5 property length.
+	// In particular a binary payload prefix is not a property VBI.
+	if level == 4 {
+		return topic, pid, 0, nil
 	}
 	plen, hdr, err := mqtt5SkipVBI(body[at:])
 	if err != nil || at+hdr+plen > len(body) {

@@ -76,6 +76,12 @@ func (f *binFlow) detectDirection(dir int, wire []byte) {
 	}
 	f.detect(wire)
 	if f.binding != nil || f.protocol != "" {
+		// The legacy detector recognizes MQTT 3.1.1 before generic native
+		// probing. Give that validated CONNECT the same bounded session path
+		// while preserving explicit bindings and the legacy MQTT 3.1 profile.
+		if f.binding == nil && f.protocol == "mqtt" && f.level == 4 {
+			f.mqtt = &binMQTT{client: dir, level: 4, pending: [2]map[uint16]string{{}, {}}, aliases: [2]map[uint16]string{{}, {}}}
+		}
 		return
 	}
 	if f.captureTCP && probeDNSTCP(wire, f.a.budget.MaxFrameBytes).Verdict == ProbeAccept {
@@ -237,7 +243,11 @@ func (f *binFlow) detectDirection(dir int, wire []byte) {
 		}
 		f.protocol, f.ws = "websocket", &binWebSocket{client: client, phase: wsPhaseFromProbe(w)}
 	case "mqtt":
-		f.protocol, f.mqtt = "mqtt", &binMQTT{client: dir, level: 5, pending: [2]map[uint16]string{{}, {}}, aliases: [2]map[uint16]string{{}, {}}}
+		level := byte(5)
+		if probeMQTT(w, f.a.config.ProbeBytes).Version == "3.1.1" {
+			level = 4
+		}
+		f.protocol, f.mqtt = "mqtt", &binMQTT{client: dir, level: level, pending: [2]map[uint16]string{{}, {}}, aliases: [2]map[uint16]string{{}, {}}}
 	case "mongodb":
 		f.protocol, f.mongo = "mongodb", &binMongo{pending: map[uint32]string{}}
 	case "kafka":
