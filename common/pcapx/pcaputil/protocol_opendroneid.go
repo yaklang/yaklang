@@ -122,9 +122,19 @@ func decodeOpenDroneIDSelected(w []byte, maxBytes, maxMessages int, systemProfil
 }
 
 func decodeOpenDroneIDProfile(w []byte, maxBytes, maxMessages int, selection openDroneIDSelection) (map[string]any, error) {
+	return decodeOpenDroneIDProfileBudget(w, maxBytes, maxMessages, DefaultParserBudget().MaxRecursionDepth, selection)
+}
+
+func decodeOpenDroneIDProfileBudget(w []byte, maxBytes, maxMessages, maxDepth int, selection openDroneIDSelection) (map[string]any, error) {
 	at, count, err := openDroneIDProfileLayout(w, maxBytes, maxMessages, selection)
 	if err != nil {
 		return nil, err
+	}
+	// The root observation contains one level of per-message field maps.
+	// Match the scalar native projection depth contract before expanding any
+	// complete prefix. Message packs add siblings, not recursive field levels.
+	if maxDepth < 2 {
+		return nil, protocolError(ErrResourceExceeded, "OpenDroneID field projection exceeds configured depth")
 	}
 	messages := make([]map[string]any, 0, count)
 	for i := 0; i < count; i++ {
@@ -219,7 +229,7 @@ func (a *binParser) decodeOpenDroneIDProfileDatagram(e *ProtocolEvent, w []byte,
 	err := f.reserveSession(512 + int64(len(w))*6)
 	defer f.closeSession()
 	if err == nil {
-		e.Session, err = decodeOpenDroneIDProfile(w, min(a.budget.MaxFrameBytes, a.config.MaxMessageBytes), a.budget.MaxCollectionElements, selection)
+		e.Session, err = decodeOpenDroneIDProfileBudget(w, min(a.budget.MaxFrameBytes, a.config.MaxMessageBytes), a.budget.MaxCollectionElements, a.budget.MaxRecursionDepth, selection)
 	}
 	if err == nil {
 		e.semanticFields = cloneSession(e.Session)

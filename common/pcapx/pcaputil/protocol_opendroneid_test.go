@@ -215,6 +215,7 @@ func odidReplayCase(t *testing.T, c bsapControl, raw []byte, want bsapAnswer, po
 	}
 }
 func TestOpenDroneIDBoundsOwnershipAndAdmission(t *testing.T) {
+	t.Run("projection-depth", testOpenDroneIDDepthBudget)
 	t.Run("system-profile", testOpenDroneIDSystemBounds)
 	t.Run("identity-profile", testOpenDroneIDIdentityBounds)
 	var basic, pack []byte
