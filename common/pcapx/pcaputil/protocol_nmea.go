@@ -10,8 +10,9 @@ import (
 
 // GGA, RMC, unit-labelled VTG, fixed-slot GSA and per-sentence GSV are observed navigation statements. Checksums validate their
 // wire representation, not the sender's identity or the accuracy of a fix.
-// AIS, proprietary sentences, tag blocks and other sentence types are outside
-// this profile. A datagram must contain complete independent CRLF sentences.
+// Single-fragment AIS Class A position reports are also observed statements.
+// Proprietary sentences and tag blocks are unsupported. A datagram must contain
+// complete independent CRLF sentences; no AIS multipart association is inferred.
 func validNMEADatagram(w []byte) bool {
 	_, err := decodeNMEADatagram(w, DefaultParserBudget().MaxCollectionElements)
 	return err == nil
@@ -41,7 +42,7 @@ func decodeNMEADatagramBudget(w []byte, maxElements, maxDepth int) (map[string]a
 		}
 		raw := w[:i+1]
 		w = w[i+1:]
-		if len(raw) > 82 || len(raw) < 10 || raw[len(raw)-2] != '\r' || raw[0] != '$' {
+		if len(raw) > 82 || len(raw) < 10 || raw[len(raw)-2] != '\r' || raw[0] != '$' && raw[0] != '!' {
 			return nil, protocolError(ErrMalformedMessage, "NMEA sentence length/start/termination is invalid")
 		}
 		body := raw[1 : len(raw)-2]
@@ -70,14 +71,22 @@ func decodeNMEADatagramBudget(w []byte, maxElements, maxDepth int) (map[string]a
 			return nil, protocolError(ErrUnsupportedFeature, "NMEA sentence identifier is unsupported")
 		}
 		talker, kind := parts[0][:2], parts[0][2:]
-		switch talker {
-		case "GP", "GN", "GL", "GA", "GB", "BD", "GQ", "GI":
-		default:
-			return nil, protocolError(ErrUnsupportedFeature, "NMEA talker is outside the GNSS profile")
+		if raw[0] == '!' {
+			if talker != "AI" || kind != "VDM" && kind != "VDO" {
+				return nil, protocolError(ErrUnsupportedFeature, "NMEA encapsulation is outside AIVDM/AIVDO profile")
+			}
+		} else {
+			switch talker {
+			case "GP", "GN", "GL", "GA", "GB", "BD", "GQ", "GI":
+			default:
+				return nil, protocolError(ErrUnsupportedFeature, "NMEA talker is outside the GNSS profile")
+			}
 		}
 		fields := map[string]any{"Packet Name": kind, "Sentence ID": parts[0], "Talker": talker, "Checksum": int(checksum), "Checksum Valid": true, "Context Level": "observed"}
 		var err error
 		switch kind {
+		case "VDM", "VDO":
+			err = nmeaAIS(parts, fields)
 		case "GGA":
 			err = nmeaGGA(parts, fields)
 		case "RMC":

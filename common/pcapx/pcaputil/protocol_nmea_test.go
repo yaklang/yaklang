@@ -109,6 +109,7 @@ func TestNMEAMultipleSentencesBudgetAndOwnership(t *testing.T) {
 	t.Run("vtg-profile", testNMEAVTGSealedReplay)
 	t.Run("gsa-profile", testNMEAGSASealedReplay)
 	t.Run("gsv-profile", testNMEAGSVSealedReplay)
+	t.Run("ais-profile", testNMEAAISSealedReplay)
 	w := append(nmeaTestSentence(nmeaTestGGA), nmeaTestSentence(nmeaTestRMC)...)
 	fields, err := decodeNMEADatagram(w, 2)
 	require.NoError(t, err)

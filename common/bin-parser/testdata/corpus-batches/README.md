@@ -418,4 +418,18 @@ u-blox F9 HPS1.20 R04 and GPSD3.25; actual GPSD function execution uses explicit
 identity mapping shims. Its decimal Signal ID and complete-picture filtering
 differences are retained in reference records. The original Trimble eighth
 example's bad checksum is a refusal; its repaired variant is separately named.
-Complete-cycle association, receiver validity and AIS remain open work.
+Complete-cycle association and receiver validity remain open work.
+
+The `nmea-ais/controls.json` entry covers complete single-fragment AIVDM/AIVDO
+Class A position reports (types1/2/3), with74 independently answered cases in
+12 replay configurations. Raw 168-bit fields, unavailable sentinels, scaled
+position/rate/course, timestamp status and conditional SOTDMA/ITDMA fields stay
+literal observations. Sequence and channel labels do not establish association
+or authenticated ship identity. Multipart reports and other message types remain
+unsupported in this profile. The small ZIP includes minimal PCAPs, complete
+answers and generation/byte-validation/reference-build scripts. Primary pins
+identify ITU-R M.1371-5 (2014) and framing-reference versions;44 payload vectors
+were executed against unmodified, pinned Apache-2.0 libais sources kept outside
+the archive. That codec validates binary field extraction, not envelope checks,
+native refusal policy, receiver operation or physical accuracy. Resource tests
+also check typed byte/sentence/depth refusal, recovery, Close and query ownership.

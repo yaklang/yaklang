@@ -41691,6 +41691,818 @@
         "common/pcapx/pcaputil/nmea-gsv/validation/provenance.json": "validation/provenance.json",
         "common/pcapx/pcaputil/nmea-gsv/verify.py": "verify.py"
       }
+    },
+    {
+      "aliases": {
+        "common/pcapx/pcaputil/nmea-ais/answers/AIVDM-channel-1.json": "answers/AIVDM-channel-1.json",
+        "common/pcapx/pcaputil/nmea-ais/answers/AIVDM-channel-2.json": "answers/AIVDM-channel-2.json",
+        "common/pcapx/pcaputil/nmea-ais/answers/AIVDM-channel-A.json": "answers/AIVDM-channel-A.json",
+        "common/pcapx/pcaputil/nmea-ais/answers/AIVDM-channel-B.json": "answers/AIVDM-channel-B.json",
+        "common/pcapx/pcaputil/nmea-ais/answers/AIVDM-channel-blank.json": "answers/AIVDM-channel-blank.json",
+        "common/pcapx/pcaputil/nmea-ais/answers/AIVDO-channel-1.json": "answers/AIVDO-channel-1.json",
+        "common/pcapx/pcaputil/nmea-ais/answers/AIVDO-channel-2.json": "answers/AIVDO-channel-2.json",
+        "common/pcapx/pcaputil/nmea-ais/answers/AIVDO-channel-A.json": "answers/AIVDO-channel-A.json",
+        "common/pcapx/pcaputil/nmea-ais/answers/AIVDO-channel-B.json": "answers/AIVDO-channel-B.json",
+        "common/pcapx/pcaputil/nmea-ais/answers/AIVDO-channel-blank.json": "answers/AIVDO-channel-blank.json",
+        "common/pcapx/pcaputil/nmea-ais/answers/bad-checksum.json": "answers/bad-checksum.json",
+        "common/pcapx/pcaputil/nmea-ais/answers/bad-sequence.json": "answers/bad-sequence.json",
+        "common/pcapx/pcaputil/nmea-ais/answers/cog-reserved.json": "answers/cog-reserved.json",
+        "common/pcapx/pcaputil/nmea-ais/answers/cog-unavailable.json": "answers/cog-unavailable.json",
+        "common/pcapx/pcaputil/nmea-ais/answers/cut-crlf.json": "answers/cut-crlf.json",
+        "common/pcapx/pcaputil/nmea-ais/answers/fill-blank.json": "answers/fill-blank.json",
+        "common/pcapx/pcaputil/nmea-ais/answers/fill-one.json": "answers/fill-one.json",
+        "common/pcapx/pcaputil/nmea-ais/answers/fill-six.json": "answers/fill-six.json",
+        "common/pcapx/pcaputil/nmea-ais/answers/fraction-count.json": "answers/fraction-count.json",
+        "common/pcapx/pcaputil/nmea-ais/answers/gap-armoring.json": "answers/gap-armoring.json",
+        "common/pcapx/pcaputil/nmea-ais/answers/heading-reserved.json": "answers/heading-reserved.json",
+        "common/pcapx/pcaputil/nmea-ais/answers/heading-unavailable.json": "answers/heading-unavailable.json",
+        "common/pcapx/pcaputil/nmea-ais/answers/index-after-count.json": "answers/index-after-count.json",
+        "common/pcapx/pcaputil/nmea-ais/answers/invalid-channel.json": "answers/invalid-channel.json",
+        "common/pcapx/pcaputil/nmea-ais/answers/itdma-full.json": "answers/itdma-full.json",
+        "common/pcapx/pcaputil/nmea-ais/answers/lat-negative-sentinel.json": "answers/lat-negative-sentinel.json",
+        "common/pcapx/pcaputil/nmea-ais/answers/lat-over.json": "answers/lat-over.json",
+        "common/pcapx/pcaputil/nmea-ais/answers/late-bad-checksum.json": "answers/late-bad-checksum.json",
+        "common/pcapx/pcaputil/nmea-ais/answers/latitude-unavailable.json": "answers/latitude-unavailable.json",
+        "common/pcapx/pcaputil/nmea-ais/answers/lon-negative-sentinel.json": "answers/lon-negative-sentinel.json",
+        "common/pcapx/pcaputil/nmea-ais/answers/lon-over.json": "answers/lon-over.json",
+        "common/pcapx/pcaputil/nmea-ais/answers/long-payload.json": "answers/long-payload.json",
+        "common/pcapx/pcaputil/nmea-ais/answers/longitude-unavailable.json": "answers/longitude-unavailable.json",
+        "common/pcapx/pcaputil/nmea-ais/answers/lower-armoring.json": "answers/lower-armoring.json",
+        "common/pcapx/pcaputil/nmea-ais/answers/mmsi-literal-max.json": "answers/mmsi-literal-max.json",
+        "common/pcapx/pcaputil/nmea-ais/answers/multipart1.json": "answers/multipart1.json",
+        "common/pcapx/pcaputil/nmea-ais/answers/position-both-unavailable.json": "answers/position-both-unavailable.json",
+        "common/pcapx/pcaputil/nmea-ais/answers/position-negative.json": "answers/position-negative.json",
+        "common/pcapx/pcaputil/nmea-ais/answers/position-upper.json": "answers/position-upper.json",
+        "common/pcapx/pcaputil/nmea-ais/answers/received-type1-payload.json": "answers/received-type1-payload.json",
+        "common/pcapx/pcaputil/nmea-ais/answers/reordered-independent.json": "answers/reordered-independent.json",
+        "common/pcapx/pcaputil/nmea-ais/answers/reserved-observed.json": "answers/reserved-observed.json",
+        "common/pcapx/pcaputil/nmea-ais/answers/rot-left-over.json": "answers/rot-left-over.json",
+        "common/pcapx/pcaputil/nmea-ais/answers/rot-left.json": "answers/rot-left.json",
+        "common/pcapx/pcaputil/nmea-ais/answers/rot-none.json": "answers/rot-none.json",
+        "common/pcapx/pcaputil/nmea-ais/answers/rot-right-over.json": "answers/rot-right-over.json",
+        "common/pcapx/pcaputil/nmea-ais/answers/rot-unavailable.json": "answers/rot-unavailable.json",
+        "common/pcapx/pcaputil/nmea-ais/answers/short-payload.json": "answers/short-payload.json",
+        "common/pcapx/pcaputil/nmea-ais/answers/sog-lower-bound.json": "answers/sog-lower-bound.json",
+        "common/pcapx/pcaputil/nmea-ais/answers/sog-unavailable.json": "answers/sog-unavailable.json",
+        "common/pcapx/pcaputil/nmea-ais/answers/sotdma-0.json": "answers/sotdma-0.json",
+        "common/pcapx/pcaputil/nmea-ais/answers/sotdma-1.json": "answers/sotdma-1.json",
+        "common/pcapx/pcaputil/nmea-ais/answers/sotdma-2.json": "answers/sotdma-2.json",
+        "common/pcapx/pcaputil/nmea-ais/answers/sotdma-3.json": "answers/sotdma-3.json",
+        "common/pcapx/pcaputil/nmea-ais/answers/sotdma-4.json": "answers/sotdma-4.json",
+        "common/pcapx/pcaputil/nmea-ais/answers/sotdma-5.json": "answers/sotdma-5.json",
+        "common/pcapx/pcaputil/nmea-ais/answers/sotdma-6.json": "answers/sotdma-6.json",
+        "common/pcapx/pcaputil/nmea-ais/answers/sotdma-7.json": "answers/sotdma-7.json",
+        "common/pcapx/pcaputil/nmea-ais/answers/split-datagrams.json": "answers/split-datagrams.json",
+        "common/pcapx/pcaputil/nmea-ais/answers/tail-byte.json": "answers/tail-byte.json",
+        "common/pcapx/pcaputil/nmea-ais/answers/time-59.json": "answers/time-59.json",
+        "common/pcapx/pcaputil/nmea-ais/answers/time-60.json": "answers/time-60.json",
+        "common/pcapx/pcaputil/nmea-ais/answers/time-61.json": "answers/time-61.json",
+        "common/pcapx/pcaputil/nmea-ais/answers/time-62.json": "answers/time-62.json",
+        "common/pcapx/pcaputil/nmea-ais/answers/time-63.json": "answers/time-63.json",
+        "common/pcapx/pcaputil/nmea-ais/answers/two-in-one-datagram.json": "answers/two-in-one-datagram.json",
+        "common/pcapx/pcaputil/nmea-ais/answers/type1.json": "answers/type1.json",
+        "common/pcapx/pcaputil/nmea-ais/answers/type2.json": "answers/type2.json",
+        "common/pcapx/pcaputil/nmea-ais/answers/type3.json": "answers/type3.json",
+        "common/pcapx/pcaputil/nmea-ais/answers/unsupported18.json": "answers/unsupported18.json",
+        "common/pcapx/pcaputil/nmea-ais/answers/upper-armoring.json": "answers/upper-armoring.json",
+        "common/pcapx/pcaputil/nmea-ais/answers/wrong-bang-gnss.json": "answers/wrong-bang-gnss.json",
+        "common/pcapx/pcaputil/nmea-ais/answers/wrong-dollar-ai.json": "answers/wrong-dollar-ai.json",
+        "common/pcapx/pcaputil/nmea-ais/answers/zero-fragments.json": "answers/zero-fragments.json",
+        "common/pcapx/pcaputil/nmea-ais/build.py": "build.py",
+        "common/pcapx/pcaputil/nmea-ais/captures/AIVDM-channel-1.pcap": "captures/AIVDM-channel-1.pcap",
+        "common/pcapx/pcaputil/nmea-ais/captures/AIVDM-channel-2.pcap": "captures/AIVDM-channel-2.pcap",
+        "common/pcapx/pcaputil/nmea-ais/captures/AIVDM-channel-A.pcap": "captures/AIVDM-channel-A.pcap",
+        "common/pcapx/pcaputil/nmea-ais/captures/AIVDM-channel-B.pcap": "captures/AIVDM-channel-B.pcap",
+        "common/pcapx/pcaputil/nmea-ais/captures/AIVDM-channel-blank.pcap": "captures/AIVDM-channel-blank.pcap",
+        "common/pcapx/pcaputil/nmea-ais/captures/AIVDO-channel-1.pcap": "captures/AIVDO-channel-1.pcap",
+        "common/pcapx/pcaputil/nmea-ais/captures/AIVDO-channel-2.pcap": "captures/AIVDO-channel-2.pcap",
+        "common/pcapx/pcaputil/nmea-ais/captures/AIVDO-channel-A.pcap": "captures/AIVDO-channel-A.pcap",
+        "common/pcapx/pcaputil/nmea-ais/captures/AIVDO-channel-B.pcap": "captures/AIVDO-channel-B.pcap",
+        "common/pcapx/pcaputil/nmea-ais/captures/AIVDO-channel-blank.pcap": "captures/AIVDO-channel-blank.pcap",
+        "common/pcapx/pcaputil/nmea-ais/captures/bad-checksum.pcap": "captures/bad-checksum.pcap",
+        "common/pcapx/pcaputil/nmea-ais/captures/bad-sequence.pcap": "captures/bad-sequence.pcap",
+        "common/pcapx/pcaputil/nmea-ais/captures/cog-reserved.pcap": "captures/cog-reserved.pcap",
+        "common/pcapx/pcaputil/nmea-ais/captures/cog-unavailable.pcap": "captures/cog-unavailable.pcap",
+        "common/pcapx/pcaputil/nmea-ais/captures/cut-crlf.pcap": "captures/cut-crlf.pcap",
+        "common/pcapx/pcaputil/nmea-ais/captures/fill-blank.pcap": "captures/fill-blank.pcap",
+        "common/pcapx/pcaputil/nmea-ais/captures/fill-one.pcap": "captures/fill-one.pcap",
+        "common/pcapx/pcaputil/nmea-ais/captures/fill-six.pcap": "captures/fill-six.pcap",
+        "common/pcapx/pcaputil/nmea-ais/captures/fraction-count.pcap": "captures/fraction-count.pcap",
+        "common/pcapx/pcaputil/nmea-ais/captures/gap-armoring.pcap": "captures/gap-armoring.pcap",
+        "common/pcapx/pcaputil/nmea-ais/captures/heading-reserved.pcap": "captures/heading-reserved.pcap",
+        "common/pcapx/pcaputil/nmea-ais/captures/heading-unavailable.pcap": "captures/heading-unavailable.pcap",
+        "common/pcapx/pcaputil/nmea-ais/captures/index-after-count.pcap": "captures/index-after-count.pcap",
+        "common/pcapx/pcaputil/nmea-ais/captures/invalid-channel.pcap": "captures/invalid-channel.pcap",
+        "common/pcapx/pcaputil/nmea-ais/captures/itdma-full.pcap": "captures/itdma-full.pcap",
+        "common/pcapx/pcaputil/nmea-ais/captures/lat-negative-sentinel.pcap": "captures/lat-negative-sentinel.pcap",
+        "common/pcapx/pcaputil/nmea-ais/captures/lat-over.pcap": "captures/lat-over.pcap",
+        "common/pcapx/pcaputil/nmea-ais/captures/late-bad-checksum.pcap": "captures/late-bad-checksum.pcap",
+        "common/pcapx/pcaputil/nmea-ais/captures/latitude-unavailable.pcap": "captures/latitude-unavailable.pcap",
+        "common/pcapx/pcaputil/nmea-ais/captures/lon-negative-sentinel.pcap": "captures/lon-negative-sentinel.pcap",
+        "common/pcapx/pcaputil/nmea-ais/captures/lon-over.pcap": "captures/lon-over.pcap",
+        "common/pcapx/pcaputil/nmea-ais/captures/long-payload.pcap": "captures/long-payload.pcap",
+        "common/pcapx/pcaputil/nmea-ais/captures/longitude-unavailable.pcap": "captures/longitude-unavailable.pcap",
+        "common/pcapx/pcaputil/nmea-ais/captures/lower-armoring.pcap": "captures/lower-armoring.pcap",
+        "common/pcapx/pcaputil/nmea-ais/captures/mmsi-literal-max.pcap": "captures/mmsi-literal-max.pcap",
+        "common/pcapx/pcaputil/nmea-ais/captures/multipart1.pcap": "captures/multipart1.pcap",
+        "common/pcapx/pcaputil/nmea-ais/captures/position-both-unavailable.pcap": "captures/position-both-unavailable.pcap",
+        "common/pcapx/pcaputil/nmea-ais/captures/position-negative.pcap": "captures/position-negative.pcap",
+        "common/pcapx/pcaputil/nmea-ais/captures/position-upper.pcap": "captures/position-upper.pcap",
+        "common/pcapx/pcaputil/nmea-ais/captures/received-type1-payload.pcap": "captures/received-type1-payload.pcap",
+        "common/pcapx/pcaputil/nmea-ais/captures/reordered-independent.pcap": "captures/reordered-independent.pcap",
+        "common/pcapx/pcaputil/nmea-ais/captures/reserved-observed.pcap": "captures/reserved-observed.pcap",
+        "common/pcapx/pcaputil/nmea-ais/captures/rot-left-over.pcap": "captures/rot-left-over.pcap",
+        "common/pcapx/pcaputil/nmea-ais/captures/rot-left.pcap": "captures/rot-left.pcap",
+        "common/pcapx/pcaputil/nmea-ais/captures/rot-none.pcap": "captures/rot-none.pcap",
+        "common/pcapx/pcaputil/nmea-ais/captures/rot-right-over.pcap": "captures/rot-right-over.pcap",
+        "common/pcapx/pcaputil/nmea-ais/captures/rot-unavailable.pcap": "captures/rot-unavailable.pcap",
+        "common/pcapx/pcaputil/nmea-ais/captures/short-payload.pcap": "captures/short-payload.pcap",
+        "common/pcapx/pcaputil/nmea-ais/captures/sog-lower-bound.pcap": "captures/sog-lower-bound.pcap",
+        "common/pcapx/pcaputil/nmea-ais/captures/sog-unavailable.pcap": "captures/sog-unavailable.pcap",
+        "common/pcapx/pcaputil/nmea-ais/captures/sotdma-0.pcap": "captures/sotdma-0.pcap",
+        "common/pcapx/pcaputil/nmea-ais/captures/sotdma-1.pcap": "captures/sotdma-1.pcap",
+        "common/pcapx/pcaputil/nmea-ais/captures/sotdma-2.pcap": "captures/sotdma-2.pcap",
+        "common/pcapx/pcaputil/nmea-ais/captures/sotdma-3.pcap": "captures/sotdma-3.pcap",
+        "common/pcapx/pcaputil/nmea-ais/captures/sotdma-4.pcap": "captures/sotdma-4.pcap",
+        "common/pcapx/pcaputil/nmea-ais/captures/sotdma-5.pcap": "captures/sotdma-5.pcap",
+        "common/pcapx/pcaputil/nmea-ais/captures/sotdma-6.pcap": "captures/sotdma-6.pcap",
+        "common/pcapx/pcaputil/nmea-ais/captures/sotdma-7.pcap": "captures/sotdma-7.pcap",
+        "common/pcapx/pcaputil/nmea-ais/captures/split-datagrams.pcap": "captures/split-datagrams.pcap",
+        "common/pcapx/pcaputil/nmea-ais/captures/tail-byte.pcap": "captures/tail-byte.pcap",
+        "common/pcapx/pcaputil/nmea-ais/captures/time-59.pcap": "captures/time-59.pcap",
+        "common/pcapx/pcaputil/nmea-ais/captures/time-60.pcap": "captures/time-60.pcap",
+        "common/pcapx/pcaputil/nmea-ais/captures/time-61.pcap": "captures/time-61.pcap",
+        "common/pcapx/pcaputil/nmea-ais/captures/time-62.pcap": "captures/time-62.pcap",
+        "common/pcapx/pcaputil/nmea-ais/captures/time-63.pcap": "captures/time-63.pcap",
+        "common/pcapx/pcaputil/nmea-ais/captures/two-in-one-datagram.pcap": "captures/two-in-one-datagram.pcap",
+        "common/pcapx/pcaputil/nmea-ais/captures/type1.pcap": "captures/type1.pcap",
+        "common/pcapx/pcaputil/nmea-ais/captures/type2.pcap": "captures/type2.pcap",
+        "common/pcapx/pcaputil/nmea-ais/captures/type3.pcap": "captures/type3.pcap",
+        "common/pcapx/pcaputil/nmea-ais/captures/unsupported18.pcap": "captures/unsupported18.pcap",
+        "common/pcapx/pcaputil/nmea-ais/captures/upper-armoring.pcap": "captures/upper-armoring.pcap",
+        "common/pcapx/pcaputil/nmea-ais/captures/wrong-bang-gnss.pcap": "captures/wrong-bang-gnss.pcap",
+        "common/pcapx/pcaputil/nmea-ais/captures/wrong-dollar-ai.pcap": "captures/wrong-dollar-ai.pcap",
+        "common/pcapx/pcaputil/nmea-ais/captures/zero-fragments.pcap": "captures/zero-fragments.pcap",
+        "common/pcapx/pcaputil/nmea-ais/controls.json": "controls.json",
+        "common/pcapx/pcaputil/nmea-ais/framing.py": "framing.py",
+        "common/pcapx/pcaputil/nmea-ais/libais-reference.jsonl": "libais-reference.jsonl",
+        "common/pcapx/pcaputil/nmea-ais/oracle.py": "oracle.py",
+        "common/pcapx/pcaputil/nmea-ais/primary-download.json": "primary-download.json",
+        "common/pcapx/pcaputil/nmea-ais/reference-check.py": "reference-check.py",
+        "common/pcapx/pcaputil/nmea-ais/seal.py": "seal.py",
+        "common/pcapx/pcaputil/nmea-ais/source-download.json": "source-download.json",
+        "common/pcapx/pcaputil/nmea-ais/validation/expected.json": "validation/expected.json",
+        "common/pcapx/pcaputil/nmea-ais/validation/provenance.json": "validation/provenance.json",
+        "common/pcapx/pcaputil/nmea-ais/verify.py": "verify.py"
+      },
+      "file": "validation-nmea-ais-255cc7.zip",
+      "id": "validation-nmea-ais-255cc7",
+      "kind": "validation",
+      "members": {
+        "answers/AIVDM-channel-1.json": {
+          "bytes": 2150,
+          "sha256": "8b68399499d1182e243ca2b83e7133a31144e571856e47962c5f517b4c2996e5"
+        },
+        "answers/AIVDM-channel-2.json": {
+          "bytes": 2150,
+          "sha256": "34f0dc0341f96a9efff4c45853b4b35ead8c2bcb42c1fcb5ebb0abf14eb8db8e"
+        },
+        "answers/AIVDM-channel-A.json": {
+          "bytes": 2151,
+          "sha256": "e09b1a79f0027ed5ca858879363094b3037f661021d012d8fe59c496500d3853"
+        },
+        "answers/AIVDM-channel-B.json": {
+          "bytes": 2151,
+          "sha256": "7a90371b95b88bb960dc3a196e9f1dae19e43e179fe17f256d1d6e0d9f22fa71"
+        },
+        "answers/AIVDM-channel-blank.json": {
+          "bytes": 2152,
+          "sha256": "12496feb2018a42fe8377f0cacc59a7172c188cd034376ccf73a3c273cb650ba"
+        },
+        "answers/AIVDO-channel-1.json": {
+          "bytes": 2159,
+          "sha256": "faa06000138a5fc527c7aaf86688f70a61b8d7dfd5eac93107ad8c9d6259c38b"
+        },
+        "answers/AIVDO-channel-2.json": {
+          "bytes": 2159,
+          "sha256": "9633d57009dd7085ba0544884ff3d96847a6dc01bb0eeff3694eb742d4051452"
+        },
+        "answers/AIVDO-channel-A.json": {
+          "bytes": 2160,
+          "sha256": "cdc75ebd3d0c3a3bdf3fb34e0b360407045695cd7b723e0626ad49092374a98b"
+        },
+        "answers/AIVDO-channel-B.json": {
+          "bytes": 2160,
+          "sha256": "a6b27e99fbd83c4e3e352274a6e89099bf03a42fb097b604f95f152fb010a237"
+        },
+        "answers/AIVDO-channel-blank.json": {
+          "bytes": 2161,
+          "sha256": "ed1b1caff3b823efd580d3757678c60d5142c66be67b97d4517351d31a7801ac"
+        },
+        "answers/bad-checksum.json": {
+          "bytes": 248,
+          "sha256": "5ccb6408df1ae6e88bad0ffa3e5acb72990a9b4596f6e4fe2923ebdd283963c0"
+        },
+        "answers/bad-sequence.json": {
+          "bytes": 252,
+          "sha256": "c098eb084867c3763f487bb42e8b5d0f652cdf96aab344604ef2a6cfd732a4f4"
+        },
+        "answers/cog-reserved.json": {
+          "bytes": 248,
+          "sha256": "b5f01752216c08d635e07a3da0df6f765a19b0428a54f9b6afb9fbb325a8fd94"
+        },
+        "answers/cog-unavailable.json": {
+          "bytes": 2113,
+          "sha256": "e34b3917efcf94fe42e783613ec70037ceaae791e2d540734971551d840fce17"
+        },
+        "answers/cut-crlf.json": {
+          "bytes": 242,
+          "sha256": "c155cfa68003d2aa99e05c7bbcf345ec2515de4a1b283510173dcb3ca5f04868"
+        },
+        "answers/fill-blank.json": {
+          "bytes": 244,
+          "sha256": "5557ddc877b005e10f3973716a4cc1174fb5258e2cc422d67221084b007768d5"
+        },
+        "answers/fill-one.json": {
+          "bytes": 244,
+          "sha256": "55f54a269eafbf66b88367e710ecef4f73fda5549d0d369a8871f9aed613f36f"
+        },
+        "answers/fill-six.json": {
+          "bytes": 244,
+          "sha256": "f7b4112d3ad25286dbde04031de80a043c77636f7c60cebe2429e218a4bd6856"
+        },
+        "answers/fraction-count.json": {
+          "bytes": 254,
+          "sha256": "0eb8e7128b24a1d0f1720687a2255c096dff4b741dcf069a5310b6694c183cc1"
+        },
+        "answers/gap-armoring.json": {
+          "bytes": 248,
+          "sha256": "52cd81cce9ae9ffcb7353967599288ed625a36978ef1270222ddd3af16f50330"
+        },
+        "answers/heading-reserved.json": {
+          "bytes": 252,
+          "sha256": "94644e9e1664ad9d2b3f5b94f5b03ca191ad6986bdb4cc1562f1008f7f5a2d97"
+        },
+        "answers/heading-unavailable.json": {
+          "bytes": 2119,
+          "sha256": "bba213efe6b046e9059e1c02545ee4e9e2a5eef405dc95d1071dcc0d725d27f4"
+        },
+        "answers/index-after-count.json": {
+          "bytes": 253,
+          "sha256": "1b51d24f765a784a0b2f8bbb03de4be63c1e7aa22a1157438cf5573ea303a1ff"
+        },
+        "answers/invalid-channel.json": {
+          "bytes": 253,
+          "sha256": "0d3515b73cd464e1f9d2cea26ce824c844888742fd9cdfa2a9c5e457c137b5ad"
+        },
+        "answers/itdma-full.json": {
+          "bytes": 2170,
+          "sha256": "cfe9ce2896387dd37bbbb866d13ab36e4c45fa449da33b83bd8f235ea6cfb63f"
+        },
+        "answers/lat-negative-sentinel.json": {
+          "bytes": 257,
+          "sha256": "cc19678e9c42379f533efcc7245c2112057b0f5801d73da3e549569db665305b"
+        },
+        "answers/lat-over.json": {
+          "bytes": 244,
+          "sha256": "5563892924ba3172a5beda7ab0102f6e762acce12d5587e47666aece59dc1dfb"
+        },
+        "answers/late-bad-checksum.json": {
+          "bytes": 351,
+          "sha256": "7ee95a922b51bc4c7e11427e38f1833c1a00e24baccf7a0048002762b7e447a9"
+        },
+        "answers/latitude-unavailable.json": {
+          "bytes": 2116,
+          "sha256": "6bfae136d48d56eed60eb33499f729890c49f822558e010599efc1dcf06d7d73"
+        },
+        "answers/lon-negative-sentinel.json": {
+          "bytes": 257,
+          "sha256": "e3155990e0a3511de6426bca4e2e32c610af9547ac799257ec04c43117fb9c9e"
+        },
+        "answers/lon-over.json": {
+          "bytes": 244,
+          "sha256": "0d0570f15db166ae87e6d461e3960c0ea7ca3861217e259caa72264a0c339639"
+        },
+        "answers/long-payload.json": {
+          "bytes": 250,
+          "sha256": "a0103cd921053f89ed3ccf5f3e718c6d416318990edade3e7fcdb163d472e639"
+        },
+        "answers/longitude-unavailable.json": {
+          "bytes": 2120,
+          "sha256": "52f1f8fd625fb36e939ccc780d0004141886cccfc39f605a6c3ab8b7ca05b2a0"
+        },
+        "answers/lower-armoring.json": {
+          "bytes": 250,
+          "sha256": "68f5c87f204b7029385cfea8221e953a032c23e088f265c2f464e709391dd86e"
+        },
+        "answers/mmsi-literal-max.json": {
+          "bytes": 2150,
+          "sha256": "7df6749d95df2e720584511b6377148cb7c22b6071a533dd3623797de4b33aa6"
+        },
+        "answers/multipart1.json": {
+          "bytes": 248,
+          "sha256": "907bc903bde5be27784964171c995f9afc9767001df45cd876b318e142697fc8"
+        },
+        "answers/position-both-unavailable.json": {
+          "bytes": 2087,
+          "sha256": "0ba8ca86900f0eb4cff88852dce8389c3ba6499abcb4b42cb012d6d12bd11ca3"
+        },
+        "answers/position-negative.json": {
+          "bytes": 2130,
+          "sha256": "18ed361a2baeca19b4ab6b86582744c78f2f792c895091a4607bb8162b360777"
+        },
+        "answers/position-upper.json": {
+          "bytes": 2123,
+          "sha256": "9cf351ae59a234a0d91a34ab93c4e90de4bccec5d4562c41c85a3229d5fc813a"
+        },
+        "answers/received-type1-payload.json": {
+          "bytes": 2060,
+          "sha256": "4c75ca83bfd1605c180d2df4e60b7cdde3d3dca50f675e4fb62da3fd4805522a"
+        },
+        "answers/reordered-independent.json": {
+          "bytes": 8042,
+          "sha256": "ec78937b56448eaab8408e72fd8a9abf6c0f4c45e575e4999e9115a0539c1e43"
+        },
+        "answers/reserved-observed.json": {
+          "bytes": 2150,
+          "sha256": "d40145b8fa7177dd8d29e246779c4a08a4c1e747448c239005c70b81c5b07687"
+        },
+        "answers/rot-left-over.json": {
+          "bytes": 2087,
+          "sha256": "a4fb2e8e2b99c85c4e1efeb8ac22dade1de25175b663d19383cc2ee47469d560"
+        },
+        "answers/rot-left.json": {
+          "bytes": 2143,
+          "sha256": "499c94f71054f4f125f47de0746764d9c9e818013cddc1a7fc709aa042f5fcee"
+        },
+        "answers/rot-none.json": {
+          "bytes": 2126,
+          "sha256": "03cc5ca8959380c6c11e086717c43f5d02f7d5b882f5260aa76788225626fbc5"
+        },
+        "answers/rot-right-over.json": {
+          "bytes": 2087,
+          "sha256": "c40a79fdd0738a43f171465953f350d0e01bc150c6584deb59d437a394abf9b7"
+        },
+        "answers/rot-unavailable.json": {
+          "bytes": 2091,
+          "sha256": "30736e2a72077700b0f347c9d85a8fe67b42521b066fb55ea70917c64696ea5a"
+        },
+        "answers/short-payload.json": {
+          "bytes": 247,
+          "sha256": "c49fdaf25b827e8bb6258dee99e6af78ba4bf829fb94679702a61a3e5b8eb7f1"
+        },
+        "answers/sog-lower-bound.json": {
+          "bytes": 2150,
+          "sha256": "408f4db30c58a668a5666dcea4c69250422d64ac0167ec3b8c6a526e59425e42"
+        },
+        "answers/sog-unavailable.json": {
+          "bytes": 2124,
+          "sha256": "26c25508e1c0c42756e42c552ee697a3abf06d24cbaafb582db51480136a4491"
+        },
+        "answers/sotdma-0.json": {
+          "bytes": 2137,
+          "sha256": "98e758b13f9e84196d7d5c1f3b8d93af141fabdec19780fb752766b67ca6a187"
+        },
+        "answers/sotdma-1.json": {
+          "bytes": 2238,
+          "sha256": "37b106e3e00766edfe9e67ce25e68a24ee660c03c020314b096b87ade924aec1"
+        },
+        "answers/sotdma-2.json": {
+          "bytes": 2137,
+          "sha256": "16a41721b490bbd80d333bbae3a13263ad616255cacd6815f41ab84aa45e037d"
+        },
+        "answers/sotdma-3.json": {
+          "bytes": 2143,
+          "sha256": "1f8c506e50d322fbaf929a0cc51cdf5379580dafae9b0d4ef7e3fe7c7325a366"
+        },
+        "answers/sotdma-4.json": {
+          "bytes": 2136,
+          "sha256": "2e86018ff61a72423fa02e1c55255c6840972103cdd86d771b35f5b779b9f863"
+        },
+        "answers/sotdma-5.json": {
+          "bytes": 2142,
+          "sha256": "cdbfc573d8c327f7ebe68f1aacec8ef3447530b5e28641545da29272c4ca3889"
+        },
+        "answers/sotdma-6.json": {
+          "bytes": 2137,
+          "sha256": "f770a784b6c0a94fef3a73e3c57803457cd6a0aa0046acbb701443ba2fefc8ae"
+        },
+        "answers/sotdma-7.json": {
+          "bytes": 2143,
+          "sha256": "94b1a371cec29b2c60af234ddd195fc53d9c9415e5cfd0b77bea0d8a7294cfca"
+        },
+        "answers/split-datagrams.json": {
+          "bytes": 259,
+          "sha256": "714eeef11e51a4f49de195c74a0730216db23e577c18a9306fe30e2ab553a60f"
+        },
+        "answers/tail-byte.json": {
+          "bytes": 247,
+          "sha256": "55edb59ea496c2aa4d8822b2f4313d0081fc0df8244bddff3e933f89db07fbc2"
+        },
+        "answers/time-59.json": {
+          "bytes": 2141,
+          "sha256": "b9386c1b1aeece54c6b2f65df62bf7fccc42cd05e50a5afbddfe3b35c720cebd"
+        },
+        "answers/time-60.json": {
+          "bytes": 2121,
+          "sha256": "d70206d85fcf7eddd9bd7614bf989f537a59ea2ef5879dd2ef87679e719c5999"
+        },
+        "answers/time-61.json": {
+          "bytes": 2116,
+          "sha256": "93e58d3d0c0eab2d4da0ebfa5d08488808416205c7f751f458d9a00325453155"
+        },
+        "answers/time-62.json": {
+          "bytes": 2124,
+          "sha256": "89eb4457bf0ccf962d844137835d7c7891eb56e0c4dd03d81f71be96e6a32894"
+        },
+        "answers/time-63.json": {
+          "bytes": 2121,
+          "sha256": "fc2267382c15955cc3ddc29dcbabe0337fe584ab70de939294078e05bba1671f"
+        },
+        "answers/two-in-one-datagram.json": {
+          "bytes": 4638,
+          "sha256": "375f911c5758872e5decfcddc98bba0c1986d1d9bc52761b4d28fd6eb4a62553"
+        },
+        "answers/type1.json": {
+          "bytes": 2138,
+          "sha256": "adf951cf6e6bbc288bba63938017a81f0c3cf41f05145a3d0416ecf286a47580"
+        },
+        "answers/type2.json": {
+          "bytes": 2138,
+          "sha256": "8e89f249b71c0ac87db681888999250abfcf2e1bf8cd3e47860c0d5503866b33"
+        },
+        "answers/type3.json": {
+          "bytes": 2165,
+          "sha256": "8cb60f4008f5f6c1842fe565ea2989704eca90e35ca38d82a91e795dbf325da3"
+        },
+        "answers/unsupported18.json": {
+          "bytes": 251,
+          "sha256": "ee3b1cb3d9d803337777003360d936260ddeca2d27c189a063e5287358e30b73"
+        },
+        "answers/upper-armoring.json": {
+          "bytes": 250,
+          "sha256": "4aab032744729066472fcf467f39520ee9cc90331df7eb31a3e04b712e4efc94"
+        },
+        "answers/wrong-bang-gnss.json": {
+          "bytes": 181,
+          "sha256": "ec0d49da07f38947fa65ceb466f90c6da0e1ec7be1cf1b42a29f0712b3402f8a"
+        },
+        "answers/wrong-dollar-ai.json": {
+          "bytes": 253,
+          "sha256": "012760abe5c6509bb4a937cc850b9fdab1cd026ae3f336271af7d00ba8371009"
+        },
+        "answers/zero-fragments.json": {
+          "bytes": 250,
+          "sha256": "8bf6f69076212113b9ee514600017e480f9b3e248d9c7a10f8c191925d6f2803"
+        },
+        "build.py": {
+          "bytes": 6988,
+          "sha256": "312774b7ffb0d8d679fc90117a5d538049a03e2c09318cc8501f9de4e5f3b5cc"
+        },
+        "captures/AIVDM-channel-1.pcap": {
+          "bytes": 132,
+          "sha256": "068db04bc4c36729d591d827cc6d77205eded4572bd2b458f130862fd5b6e790"
+        },
+        "captures/AIVDM-channel-2.pcap": {
+          "bytes": 132,
+          "sha256": "c3b8f18558188579a06f09bb36a8ecb94434ab53c71666372b6a6ab34d19c1da"
+        },
+        "captures/AIVDM-channel-A.pcap": {
+          "bytes": 132,
+          "sha256": "b4d3cc3b9a9f1f82ab740398267989dfaf6b3aedc42370332e733a14dcd61812"
+        },
+        "captures/AIVDM-channel-B.pcap": {
+          "bytes": 132,
+          "sha256": "d644cfd3b6871cf1a2dd3ef00fa128ee9f0f497165f8836bbc35f8ffc6816da1"
+        },
+        "captures/AIVDM-channel-blank.pcap": {
+          "bytes": 131,
+          "sha256": "f893d71dfcbbcfd6375939e3579acd409c44e95073a964812855955a791d59a2"
+        },
+        "captures/AIVDO-channel-1.pcap": {
+          "bytes": 132,
+          "sha256": "1ab10e08087cb15342d83b6eaeb527dbe8e7a7271b0b8b840b5f6333131481ab"
+        },
+        "captures/AIVDO-channel-2.pcap": {
+          "bytes": 132,
+          "sha256": "764c2bbcaddcd7a3c4fa265be80a2dc686401ba66b76c6dd7daa996a8feae2e6"
+        },
+        "captures/AIVDO-channel-A.pcap": {
+          "bytes": 132,
+          "sha256": "ba3b0023a6f63f0526261485926d55de73bdd015ca04e31784c38210b9696b4d"
+        },
+        "captures/AIVDO-channel-B.pcap": {
+          "bytes": 132,
+          "sha256": "0f2ed2b6ad3d5302a4207a4f367925dce0199d4f72e0975bd8c9389a79b3a37b"
+        },
+        "captures/AIVDO-channel-blank.pcap": {
+          "bytes": 131,
+          "sha256": "794ddc93791abc971b927eff2ac246e6c282645b2574df3e58005195094096ee"
+        },
+        "captures/bad-checksum.pcap": {
+          "bytes": 131,
+          "sha256": "4df171eabaf10caad0f0195528d04334ffe1b78c1cd955ddb012a705c7bb7941"
+        },
+        "captures/bad-sequence.pcap": {
+          "bytes": 133,
+          "sha256": "cb33287f39ba730ef669dd63e782b5efa9de16940b742d5567eed9eaf64cf0a6"
+        },
+        "captures/cog-reserved.pcap": {
+          "bytes": 131,
+          "sha256": "838c79c242d1d7ff1ecd3252fe77cdb8072ef34e10b6080904e6cb940f51ae57"
+        },
+        "captures/cog-unavailable.pcap": {
+          "bytes": 131,
+          "sha256": "c91e3ac3808328e24f212a29f13dbf3632c95bab5c09f12e9ac3eb0f5dec1927"
+        },
+        "captures/cut-crlf.pcap": {
+          "bytes": 130,
+          "sha256": "2f6c5ae3f6c631846cd357cc2acde67319db486e33ef8cf46b2e102d067f3ee0"
+        },
+        "captures/fill-blank.pcap": {
+          "bytes": 130,
+          "sha256": "43c4bf31f4e7604821908d47ad2c1bb17e848cf95cbba398c455a36b1d3f3373"
+        },
+        "captures/fill-one.pcap": {
+          "bytes": 131,
+          "sha256": "687ef78ae55002c5336838342a804a30aa9e70dede85fac1fb477bcb81309c91"
+        },
+        "captures/fill-six.pcap": {
+          "bytes": 131,
+          "sha256": "521fbd786b362c8631c90350e1256523d8ca9622312c7518dc80d87aa7e41061"
+        },
+        "captures/fraction-count.pcap": {
+          "bytes": 133,
+          "sha256": "cad4419c857932a2b673ec9c24c2772a325d3390ca52f068df0a0cfd24436b53"
+        },
+        "captures/gap-armoring.pcap": {
+          "bytes": 131,
+          "sha256": "9f2f84a07252a7e9d73587fedf1f9ce586f487b2b147799a940ee8661ba157c2"
+        },
+        "captures/heading-reserved.pcap": {
+          "bytes": 131,
+          "sha256": "3d068567a3a06221672a71ee7b30802fd55a6a917459f72ff87fa76e3215c51a"
+        },
+        "captures/heading-unavailable.pcap": {
+          "bytes": 131,
+          "sha256": "7553c1679222f6c1f72d47533ac08742f570561b1a597af6ffb061fc5ef43b5d"
+        },
+        "captures/index-after-count.pcap": {
+          "bytes": 131,
+          "sha256": "d430c2490ce328c983b88dbbbee5512c7dc6083b2c55a474928db407109f6ed5"
+        },
+        "captures/invalid-channel.pcap": {
+          "bytes": 131,
+          "sha256": "c21e6a10dbbb6aa6f4af732d0a38c538502e713abb7e7466be908bf7f35d3d1f"
+        },
+        "captures/itdma-full.pcap": {
+          "bytes": 131,
+          "sha256": "762188415114b58efdee83c3382578e06451a029bbea1283f8efe8d9092f3ab5"
+        },
+        "captures/lat-negative-sentinel.pcap": {
+          "bytes": 131,
+          "sha256": "f724b3a21d5fa0d7484637fe9065bab4b98aa35b474b209fc26aa87a1a04daca"
+        },
+        "captures/lat-over.pcap": {
+          "bytes": 131,
+          "sha256": "0a3d61f0e0c6c101130b3ce586bc57db3961d8444bb7ea365b5cf62a9fc27c59"
+        },
+        "captures/late-bad-checksum.pcap": {
+          "bytes": 180,
+          "sha256": "6f0e16321a420c17641ac3ae348b60c16f13913bae8289598d761936e186590f"
+        },
+        "captures/latitude-unavailable.pcap": {
+          "bytes": 131,
+          "sha256": "e88d0ce62a14c3f2ac40e7da31efaf56814161713d26322177e69092b2afb592"
+        },
+        "captures/lon-negative-sentinel.pcap": {
+          "bytes": 131,
+          "sha256": "74b2282221bed808db0a9486da4537887f7508b37d57c306be158461ae853818"
+        },
+        "captures/lon-over.pcap": {
+          "bytes": 131,
+          "sha256": "f56e70269911ac0fe9b0e7f73e51c83e8e129c11c5312a84c30ca431f95bfb69"
+        },
+        "captures/long-payload.pcap": {
+          "bytes": 132,
+          "sha256": "416b3a62bc25fdc88c5b31e8d35e8f238f3e17d7dfd9a96887d30131646297b6"
+        },
+        "captures/longitude-unavailable.pcap": {
+          "bytes": 131,
+          "sha256": "8d5eb764e1909648cbddd3a8a70a523869d4f4d60e195803803d2ba9c0497b05"
+        },
+        "captures/lower-armoring.pcap": {
+          "bytes": 131,
+          "sha256": "39a1f2b1ce19915121730ab80edd40ed182b458725d6824144f7813194c9a3cd"
+        },
+        "captures/mmsi-literal-max.pcap": {
+          "bytes": 131,
+          "sha256": "0b2bd6b6d0197da9a9bbe1dbd4ec0610922bcb6bf7f68a42530ec1d53391c6d0"
+        },
+        "captures/multipart1.pcap": {
+          "bytes": 131,
+          "sha256": "db3ffc961ef3eef09edde6b23e08b0f437d84356d8cb4741bd71f40782050a1f"
+        },
+        "captures/position-both-unavailable.pcap": {
+          "bytes": 131,
+          "sha256": "3bbe1200fef884f65720251805d84727c4f1e58f6c748f73ce6dca38fb824a12"
+        },
+        "captures/position-negative.pcap": {
+          "bytes": 131,
+          "sha256": "367c1609aacff3decc90a538d6b16032188a8281d0d32ad424afe13e7f861449"
+        },
+        "captures/position-upper.pcap": {
+          "bytes": 131,
+          "sha256": "aeff7fd012d0dd83b6430bfb369564a4a79e066cabf794cd5af0c9fcd9938144"
+        },
+        "captures/received-type1-payload.pcap": {
+          "bytes": 131,
+          "sha256": "e2ff0bf96bba375086e8a438a879648c7aba5179b18ea502c495d2326d53d005"
+        },
+        "captures/reordered-independent.pcap": {
+          "bytes": 452,
+          "sha256": "62556087378840558141495daa674d4bd8966668a4c752c68f2d2e17424c2d03"
+        },
+        "captures/reserved-observed.pcap": {
+          "bytes": 131,
+          "sha256": "706fb6b77c2c23c4a57db68bd0db6bfbe7094a8529c744c75f1bf88072133d1d"
+        },
+        "captures/rot-left-over.pcap": {
+          "bytes": 131,
+          "sha256": "bec1e0c9d13e789312e7e005043640d6f841f3a7a3a9b1892b68005f1d231268"
+        },
+        "captures/rot-left.pcap": {
+          "bytes": 131,
+          "sha256": "f4705be36b4c9cc26c54bb66236acdf4c7f88224f58f828a8fbaa41dd78b05fe"
+        },
+        "captures/rot-none.pcap": {
+          "bytes": 131,
+          "sha256": "61df45cbdec97d823257382e3b481e47867d85dbe132abd86bf307a6de4df215"
+        },
+        "captures/rot-right-over.pcap": {
+          "bytes": 131,
+          "sha256": "4c4ec49008d94e586a316ae3d0b9100ed5ce724a5f6b5741f4ca2dffa938aac5"
+        },
+        "captures/rot-unavailable.pcap": {
+          "bytes": 131,
+          "sha256": "bc6eb072d3cba38677da4f6ecf9a7f8ca7f82fbf15702308bc6b48b72d4f6898"
+        },
+        "captures/short-payload.pcap": {
+          "bytes": 130,
+          "sha256": "41ce16b40a3024e520e630bbf9e2a3b585d1c519c3c1925e8b0840f2bfcfe28f"
+        },
+        "captures/sog-lower-bound.pcap": {
+          "bytes": 131,
+          "sha256": "81796153523c544c47989c277be5fdd6e66b6d3e1490cdf4a3abb57dc2a9b42e"
+        },
+        "captures/sog-unavailable.pcap": {
+          "bytes": 131,
+          "sha256": "db5c0c0833cb2e5e5114bc556b1de94ea6f776bba844e0750d4d3333055235dd"
+        },
+        "captures/sotdma-0.pcap": {
+          "bytes": 131,
+          "sha256": "df0177d87304d6552c41790da89e801c1f7ddf58b6484cad2b40fffbf8f7d4de"
+        },
+        "captures/sotdma-1.pcap": {
+          "bytes": 131,
+          "sha256": "99e59e06e1a7e3fe4de1c5983e133c164afd610f47e1d5698e5048baed32b79f"
+        },
+        "captures/sotdma-2.pcap": {
+          "bytes": 131,
+          "sha256": "50a565dc4119d6d58a9571b2d960fe7ffa6bf798b9b61ae2ba6851eed2b4181d"
+        },
+        "captures/sotdma-3.pcap": {
+          "bytes": 131,
+          "sha256": "ea2b1247e249bf17f79d90b869a362f02126017875888ce2fea38d8c58da79a3"
+        },
+        "captures/sotdma-4.pcap": {
+          "bytes": 131,
+          "sha256": "c9ee0d9fd22821fb3e49245dea17503f71fc970a6aaa2978604f8e189ef41db5"
+        },
+        "captures/sotdma-5.pcap": {
+          "bytes": 131,
+          "sha256": "ba8a0bceb2dc5722a34813ceaa1f43f63d1b2d7bfa8d19f4511b2edb784476a7"
+        },
+        "captures/sotdma-6.pcap": {
+          "bytes": 131,
+          "sha256": "55381766fbc131b92a4aa8c19f4296fe9432960ef1b7c2dfbf9f317f2936e169"
+        },
+        "captures/sotdma-7.pcap": {
+          "bytes": 131,
+          "sha256": "4f6f473542beac1f2c4ec83fd4ad5876500a9e38e3c3723a1de8819213bef032"
+        },
+        "captures/split-datagrams.pcap": {
+          "bytes": 189,
+          "sha256": "f530c46972c5090a89c0585fa4337045294184bc5b2efc726ca351974c5a1b80"
+        },
+        "captures/tail-byte.pcap": {
+          "bytes": 132,
+          "sha256": "20d3ee7147c23c681f9d3f9027bbfec14f10c06b3c4ceb563f047909a18f2e76"
+        },
+        "captures/time-59.pcap": {
+          "bytes": 131,
+          "sha256": "7fba93fcff42e6b18451fe8b4dee14051ec583bc236a9e09a65fabce1418457c"
+        },
+        "captures/time-60.pcap": {
+          "bytes": 131,
+          "sha256": "7f40379e6624cddb461dbae484f174c7977964fefc9fe3b452acce479542ba61"
+        },
+        "captures/time-61.pcap": {
+          "bytes": 131,
+          "sha256": "c666c5166b459af25fdfbdb36f5c023e80d5281883fea52d199dc84edf8f3dd3"
+        },
+        "captures/time-62.pcap": {
+          "bytes": 131,
+          "sha256": "739f9b7fe8e29b6506b91f0b0227202132e09da5c43b779606cfbe9638f06b1a"
+        },
+        "captures/time-63.pcap": {
+          "bytes": 131,
+          "sha256": "67cf81aa495489a30fb71e172f7bd128d7aba712db8a9e9890a67bffea381a4e"
+        },
+        "captures/two-in-one-datagram.pcap": {
+          "bytes": 180,
+          "sha256": "bc2266b828ed63e4855ce58adf094b5457581f8b1b85dbcaf0c610a8266c1d83"
+        },
+        "captures/type1.pcap": {
+          "bytes": 131,
+          "sha256": "59cf6fc4c96412523c469c2f31ab8f55c2fbcd991781523557a4167b78567ba5"
+        },
+        "captures/type2.pcap": {
+          "bytes": 131,
+          "sha256": "51bd4deee38a61849e1ed7c8d7853031b044a1a960ef2c7fd0012da5f70bc3aa"
+        },
+        "captures/type3.pcap": {
+          "bytes": 131,
+          "sha256": "b075ea469075d486fdcf36be8960ced9c8e2e080ab3201f21b28559fa043bde9"
+        },
+        "captures/unsupported18.pcap": {
+          "bytes": 131,
+          "sha256": "fc2e7e4735054423784d1b8d3115119215847dadf6866bdf193beead607bc410"
+        },
+        "captures/upper-armoring.pcap": {
+          "bytes": 131,
+          "sha256": "19360bc646839d5730cac24322b05f9b81ebd7d1a34eed41717eeea71e13bc63"
+        },
+        "captures/wrong-bang-gnss.pcap": {
+          "bytes": 95,
+          "sha256": "4741364b2eac89c4d7830342b0063e6a88d0300a1b27a38a40eb54d5220b05d9"
+        },
+        "captures/wrong-dollar-ai.pcap": {
+          "bytes": 131,
+          "sha256": "6f31ee129956d73d4fbf5a82b06644b182feb4be995d991019c0d21f63eeb7bf"
+        },
+        "captures/zero-fragments.pcap": {
+          "bytes": 131,
+          "sha256": "34056e8cb2a9c22185037d1b6a7d0492d7ccfbb9d26996fc34dd5c6df1819f50"
+        },
+        "controls.json": {
+          "bytes": 24467,
+          "sha256": "d339b7c48d8ea303f6cb7a7665e0aca6826999c1ac323497ccc7026206a7fdd4"
+        },
+        "framing.py": {
+          "bytes": 951,
+          "sha256": "d07c3bc25d11d4547639d1fdee3a2b6034855c7e42b65bbc4fc10205c54f2f6a"
+        },
+        "libais-reference.jsonl": {
+          "bytes": 48840,
+          "sha256": "771546447165c62581a680e610dd8c339b8082956954131bf582629948f430eb"
+        },
+        "oracle.py": {
+          "bytes": 5074,
+          "sha256": "c0198af4d26fe5bc479c877df349880c7625021c44a7e1450dbcf6d1390ebe96"
+        },
+        "primary-download.json": {
+          "bytes": 784,
+          "sha256": "344e5f4dc6e710d69a0cde321b79cac5b581606c89a5c14ed1f10efa97400adc"
+        },
+        "reference-check.py": {
+          "bytes": 4694,
+          "sha256": "f227ac2b953c464d7d61df9d0ff620e0841f93ca2201b63e0e46c37d8c1c0c14"
+        },
+        "seal.py": {
+          "bytes": 743,
+          "sha256": "bc40c63abff58f2f3cf42e20d7b9a87f6fc9493306bc82f9be2b5320033c0d34"
+        },
+        "source-download.json": {
+          "bytes": 1524,
+          "sha256": "02bf5c6f6f72da831281f270e64bda8964510d535e164ad8e0ebd07842cd43ae"
+        },
+        "validation/expected.json": {
+          "bytes": 79048,
+          "sha256": "20f29d7834edbcb66d85ec60ee9f655f384fc176b32e9f3e84e1b7ed7d04b595"
+        },
+        "validation/provenance.json": {
+          "bytes": 352,
+          "sha256": "e8b424f51c0dac8aa5f6b048f06a1f2ffc2ecf6825800fec173bd3e7f7967bca"
+        },
+        "verify.py": {
+          "bytes": 2208,
+          "sha256": "84082d4eff7e453ed05f0e15bf9916a0fac3ed6c9d0eb54fc78fc9771f9e61bd"
+        }
+      },
+      "password": "bin-parser",
+      "sha256": "14c983d7f420bb1db570368cde7e7219579df1dab1403a7952de05165bef35fe",
+      "source_sha": "255cc79f61807e6284cc1c1294d32e3bcb469dc4"
     }
   ],
   "schema_version": 1,
