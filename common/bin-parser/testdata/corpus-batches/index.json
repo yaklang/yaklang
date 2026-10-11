@@ -48163,6 +48163,245 @@
         "common/pcapx/pcaputil/testdata/sparkplug-device/verify.py": "sparkplug-device/verify.py",
         "common/pcapx/pcaputil/testdata/sparkplug-device/seal.py": "sparkplug-device/seal.py"
       }
+    },
+    {
+      "id": "validation-sparkplug-commands",
+      "kind": "validation",
+      "source_sha": "0a8075840ab4a2a7216d932a3d7f0f3922d00e37",
+      "file": "validation-sparkplug-commands.zip",
+      "sha256": "7f4a275506ab8ef95e1ca8f56e7ff975d495913007849fdccbad1ac197914fd6",
+      "password": "bin-parser",
+      "members": {
+        "sparkplug-commands/records/level4-device-command-1.bin": {
+          "bytes": 35,
+          "sha256": "219d33f1d30fae79aabf7726d352ce9d6d5d344ace6bae8a075f68cd87fbb47a"
+        },
+        "sparkplug-commands/records/level5-device-command-1.bin": {
+          "bytes": 36,
+          "sha256": "680ad6c36cab3d45f52715e1f4e101eea8453d7dd954a1d9cc7598b8fc784e05"
+        },
+        "sparkplug-commands/records/command-name-1.bin": {
+          "bytes": 46,
+          "sha256": "64cf0dc179d78b23dc6a4554d0873a892d3d9de65b55f52c2f5249904f461b41"
+        },
+        "sparkplug-commands/records/command-seq-refusal-1.bin": {
+          "bytes": 37,
+          "sha256": "7628a7366b3fbdbc48774812969283320e92233716a42758ffdb9e6cffe778c3"
+        },
+        "sparkplug-commands/records/command-name-alias-refusal-1.bin": {
+          "bytes": 48,
+          "sha256": "5ab3f15fae20285534d33a5c01e3b93a8a6c8d924073d66046895cf0b50a948c"
+        },
+        "sparkplug-commands/records/command-type-refusal-1.bin": {
+          "bytes": 37,
+          "sha256": "ddd6f5341f8973954d6a42344ab3940b9f0c1bae4938d4b1b976bb86ac5730a5"
+        },
+        "sparkplug-commands/records/command-unknown-alias-1.bin": {
+          "bytes": 35,
+          "sha256": "17687b677dea058e090e49535b0cbe75bcf6970f60edc6db2f1613a1ff37de44"
+        },
+        "sparkplug-commands/records/command-dead-device-3.bin": {
+          "bytes": 43,
+          "sha256": "e42d778801866acf1925367d0cf107bf66d91fd96d5cb9674dc7edd23121c8d2"
+        },
+        "sparkplug-commands/records/command-wrong-device-alias-2.bin": {
+          "bytes": 39,
+          "sha256": "d82cb220b9a9040cad58bf2d32f2c65f25d628f7605acb804ca6174a902c1021"
+        },
+        "sparkplug-commands/records/command-wrong-device-alias-3.bin": {
+          "bytes": 49,
+          "sha256": "9e1c9e23059c13dc4394f2a6f01c88f093b83b099bd9ae658162df21fadfe480"
+        },
+        "sparkplug-commands/records/ncmd-seq-refusal-0.bin": {
+          "bytes": 55,
+          "sha256": "fb0fcdef3050d9ed9ba3c3c02f291bbb64904aeb69f26a034f8c1545a2c11748"
+        },
+        "sparkplug-commands/records/command-qos-1.bin": {
+          "bytes": 37,
+          "sha256": "68c751a8d42e2c3d62e6d76887afe746779277ab4d91554c35be7f1522080be3"
+        },
+        "sparkplug-commands/records/command-retain-1.bin": {
+          "bytes": 35,
+          "sha256": "82012917261cfd2bc87ce7ceec42bdc6ba9fccb93fdcdfc953ad2ce49c8e2ae6"
+        },
+        "sparkplug-commands/records/command-null-1.bin": {
+          "bytes": 35,
+          "sha256": "8e11a8f62904c97c797010b927e26ef950eda273fa44904a9997ac171bcc84c6"
+        },
+        "sparkplug-commands/records/command-timestamp-missing-1.bin": {
+          "bytes": 28,
+          "sha256": "e52fdadc7e7df326b3a0d8b45d1dcba47fa0a17aec50a29cb159ed25a36adad7"
+        },
+        "sparkplug-commands/records/command-multiple-values-1.bin": {
+          "bytes": 41,
+          "sha256": "20cd00746cb4104bc8b96c70deca7ba75393d104ac78b0f3368b69bf35e991da"
+        },
+        "sparkplug-commands/records/node-command-0.bin": {
+          "bytes": 33,
+          "sha256": "f1e5ff1159669dd0d9b1b93ae1ba0d0d0583b745588943856951b4f4320fecd6"
+        },
+        "sparkplug-commands/records/node-command-unknown-0.bin": {
+          "bytes": 33,
+          "sha256": "3d1f1a41891790d09d538ac3b89c86aea48ddeadcec7ff6230dcf3becb1a7a11"
+        },
+        "sparkplug-commands/captures/level4-device-command.pcap": {
+          "bytes": 1120,
+          "sha256": "7baf681fa919d6b49c7ed12c24646910f27432a6fdc27d1820058fddcd08032b"
+        },
+        "sparkplug-commands/captures/level5-device-command.pcap": {
+          "bytes": 1127,
+          "sha256": "11dffafc0b4ce1a4fd3bd132f967df775ff11488cfa7de4e900db717dee760c2"
+        },
+        "sparkplug-commands/captures/command-name.pcap": {
+          "bytes": 1131,
+          "sha256": "873cc337b083c021d606d9a6d22f83a045dc6d5cdc5b0cb20d6a3ce5803caa80"
+        },
+        "sparkplug-commands/captures/command-seq-refusal.pcap": {
+          "bytes": 1122,
+          "sha256": "ea3eb7af6f136b4d573b3536ac31afdecd70eef22e6baaed91db2ecb820bfff9"
+        },
+        "sparkplug-commands/captures/command-name-alias-refusal.pcap": {
+          "bytes": 1133,
+          "sha256": "8a4280db01665fe4967c03322ade2a63fd3c1a7130bd0277d0b42d90a99de112"
+        },
+        "sparkplug-commands/captures/command-type-refusal.pcap": {
+          "bytes": 1122,
+          "sha256": "987fb301fdf4d4a11e7cd00a5a4d819e6b571b9146b87439f74a595096d6eb6d"
+        },
+        "sparkplug-commands/captures/command-unknown-alias.pcap": {
+          "bytes": 1120,
+          "sha256": "0df4f7b9e6b302200cd7001de76bb44d3ad5a4b38bd7268a6ffd6c1a4bf091e5"
+        },
+        "sparkplug-commands/captures/command-dead-device.pcap": {
+          "bytes": 1221,
+          "sha256": "2728778eec55d4a22bd2d1fd44b2336cc8a2fd5f74c145fb43ff3a83ba93e055"
+        },
+        "sparkplug-commands/captures/command-wrong-device-alias.pcap": {
+          "bytes": 1263,
+          "sha256": "175d096ee6968030fa1ae06bb4cf4520d635b328e1a8c00cea9bed7b71a6458a"
+        },
+        "sparkplug-commands/captures/ncmd-seq-refusal.pcap": {
+          "bytes": 1007,
+          "sha256": "7849d16d08f7113329b560a41ad4197b6697e5d2b67c7df6dc53e6db503e157e"
+        },
+        "sparkplug-commands/captures/command-direction.pcap": {
+          "bytes": 1120,
+          "sha256": "9c5c977055ec5e472a154c1aebdc3bea3b2e16fcf6c0661c9fa94cd8c616dcb6"
+        },
+        "sparkplug-commands/captures/command-qos.pcap": {
+          "bytes": 1196,
+          "sha256": "4868c80f6e6bfb7efec3a60e63972445847fdfed658d79b3af6e881f52c3378b"
+        },
+        "sparkplug-commands/captures/command-retain.pcap": {
+          "bytes": 1120,
+          "sha256": "2b0f91e19394c659df242696e13c334b5440e76f8a939e4ce0e195df08fc1e98"
+        },
+        "sparkplug-commands/captures/command-null.pcap": {
+          "bytes": 1120,
+          "sha256": "f3a9c3dcbed18016b93f1da7f63d8580c55c3a902ec169a037b4a534a1966067"
+        },
+        "sparkplug-commands/captures/command-timestamp-missing.pcap": {
+          "bytes": 1113,
+          "sha256": "860f0a3e6eb16ed86174d94a04c6218c465932ff6db6c1dcce46134a08078f65"
+        },
+        "sparkplug-commands/captures/command-before-device.pcap": {
+          "bytes": 987,
+          "sha256": "fa7ac20552def2b1518c0b29c70622197cb0dea2939938a6166c4ca0702191e0"
+        },
+        "sparkplug-commands/captures/command-multiple-values.pcap": {
+          "bytes": 1126,
+          "sha256": "de3e8a472d78db50a4c82aba9b325b1b5668173b03df3363856d4bf5ce6c1e66"
+        },
+        "sparkplug-commands/captures/node-command.pcap": {
+          "bytes": 985,
+          "sha256": "672b9824e3b7f0c7c4b2664254599a9b315142be105a943fd4063658430272e6"
+        },
+        "sparkplug-commands/captures/node-command-unknown.pcap": {
+          "bytes": 985,
+          "sha256": "a1dd09cf14262863b05f3956403a0b9b33a0accbd89e049b6dd423adeae9ac78"
+        },
+        "sparkplug-commands/answers.json": {
+          "bytes": 135764,
+          "sha256": "bd9160ae704294a8d805613ab6a64175abfe92c60ffcfacd130f77bee99f26f3"
+        },
+        "sparkplug-commands/SOURCE.json": {
+          "bytes": 815,
+          "sha256": "9ab3959bdce62c6bed01e21007c2647f235acb98ea08e3cbd69e38ffa81a11c1"
+        },
+        "sparkplug-commands/reference-inputs.json": {
+          "bytes": 8493,
+          "sha256": "3efadda82572002ddb295e5c8568a4d84281513ebf9715090b2bf6dbf03cc023"
+        },
+        "sparkplug-commands/reference-expected.json": {
+          "bytes": 13845,
+          "sha256": "74160166e1ab389063e33653e90f5c4ea5dab64fa5588e4e997621169f04e199"
+        },
+        "sparkplug-commands/generate.py": {
+          "bytes": 12866,
+          "sha256": "3e9fb1492cb1dc8e086137ec8026b12415d7158d0e6a5dacb3807f3849ffb917"
+        },
+        "sparkplug-commands/verify.py": {
+          "bytes": 1322,
+          "sha256": "2637d116c9c4516afb5228ad4e996982094c3564bef39158b6a09413501c8393"
+        },
+        "sparkplug-commands/seal.py": {
+          "bytes": 806,
+          "sha256": "a68e6bb138d6d8fac06606b7c49b801040d5534f497444b127666c4bb40950ea"
+        },
+        "validation/expected.json": {
+          "bytes": 21669,
+          "sha256": "e62fa3a1f9148e747c135615e7be137dc2f4277d674fc53c499c05885da0c75d"
+        }
+      },
+      "aliases": {
+        "common/pcapx/pcaputil/testdata/sparkplug-commands/records/level4-device-command-1.bin": "sparkplug-commands/records/level4-device-command-1.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-commands/records/level5-device-command-1.bin": "sparkplug-commands/records/level5-device-command-1.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-commands/records/command-name-1.bin": "sparkplug-commands/records/command-name-1.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-commands/records/command-seq-refusal-1.bin": "sparkplug-commands/records/command-seq-refusal-1.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-commands/records/command-name-alias-refusal-1.bin": "sparkplug-commands/records/command-name-alias-refusal-1.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-commands/records/command-type-refusal-1.bin": "sparkplug-commands/records/command-type-refusal-1.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-commands/records/command-unknown-alias-1.bin": "sparkplug-commands/records/command-unknown-alias-1.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-commands/records/command-dead-device-2.bin": "sparkplug-commands/records/level4-device-command-1.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-commands/records/command-dead-device-3.bin": "sparkplug-commands/records/command-dead-device-3.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-commands/records/command-wrong-device-alias-2.bin": "sparkplug-commands/records/command-wrong-device-alias-2.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-commands/records/command-wrong-device-alias-3.bin": "sparkplug-commands/records/command-wrong-device-alias-3.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-commands/records/ncmd-seq-refusal-0.bin": "sparkplug-commands/records/ncmd-seq-refusal-0.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-commands/records/command-direction-1.bin": "sparkplug-commands/records/level4-device-command-1.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-commands/records/command-qos-1.bin": "sparkplug-commands/records/command-qos-1.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-commands/records/command-retain-1.bin": "sparkplug-commands/records/command-retain-1.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-commands/records/command-null-1.bin": "sparkplug-commands/records/command-null-1.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-commands/records/command-timestamp-missing-1.bin": "sparkplug-commands/records/command-timestamp-missing-1.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-commands/records/command-before-device-0.bin": "sparkplug-commands/records/level4-device-command-1.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-commands/records/command-multiple-values-1.bin": "sparkplug-commands/records/command-multiple-values-1.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-commands/records/node-command-0.bin": "sparkplug-commands/records/node-command-0.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-commands/records/node-command-unknown-0.bin": "sparkplug-commands/records/node-command-unknown-0.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-commands/captures/level4-device-command.pcap": "sparkplug-commands/captures/level4-device-command.pcap",
+        "common/pcapx/pcaputil/testdata/sparkplug-commands/captures/level5-device-command.pcap": "sparkplug-commands/captures/level5-device-command.pcap",
+        "common/pcapx/pcaputil/testdata/sparkplug-commands/captures/command-name.pcap": "sparkplug-commands/captures/command-name.pcap",
+        "common/pcapx/pcaputil/testdata/sparkplug-commands/captures/command-seq-refusal.pcap": "sparkplug-commands/captures/command-seq-refusal.pcap",
+        "common/pcapx/pcaputil/testdata/sparkplug-commands/captures/command-name-alias-refusal.pcap": "sparkplug-commands/captures/command-name-alias-refusal.pcap",
+        "common/pcapx/pcaputil/testdata/sparkplug-commands/captures/command-type-refusal.pcap": "sparkplug-commands/captures/command-type-refusal.pcap",
+        "common/pcapx/pcaputil/testdata/sparkplug-commands/captures/command-unknown-alias.pcap": "sparkplug-commands/captures/command-unknown-alias.pcap",
+        "common/pcapx/pcaputil/testdata/sparkplug-commands/captures/command-dead-device.pcap": "sparkplug-commands/captures/command-dead-device.pcap",
+        "common/pcapx/pcaputil/testdata/sparkplug-commands/captures/command-wrong-device-alias.pcap": "sparkplug-commands/captures/command-wrong-device-alias.pcap",
+        "common/pcapx/pcaputil/testdata/sparkplug-commands/captures/ncmd-seq-refusal.pcap": "sparkplug-commands/captures/ncmd-seq-refusal.pcap",
+        "common/pcapx/pcaputil/testdata/sparkplug-commands/captures/command-direction.pcap": "sparkplug-commands/captures/command-direction.pcap",
+        "common/pcapx/pcaputil/testdata/sparkplug-commands/captures/command-qos.pcap": "sparkplug-commands/captures/command-qos.pcap",
+        "common/pcapx/pcaputil/testdata/sparkplug-commands/captures/command-retain.pcap": "sparkplug-commands/captures/command-retain.pcap",
+        "common/pcapx/pcaputil/testdata/sparkplug-commands/captures/command-null.pcap": "sparkplug-commands/captures/command-null.pcap",
+        "common/pcapx/pcaputil/testdata/sparkplug-commands/captures/command-timestamp-missing.pcap": "sparkplug-commands/captures/command-timestamp-missing.pcap",
+        "common/pcapx/pcaputil/testdata/sparkplug-commands/captures/command-before-device.pcap": "sparkplug-commands/captures/command-before-device.pcap",
+        "common/pcapx/pcaputil/testdata/sparkplug-commands/captures/command-multiple-values.pcap": "sparkplug-commands/captures/command-multiple-values.pcap",
+        "common/pcapx/pcaputil/testdata/sparkplug-commands/captures/node-command.pcap": "sparkplug-commands/captures/node-command.pcap",
+        "common/pcapx/pcaputil/testdata/sparkplug-commands/captures/node-command-unknown.pcap": "sparkplug-commands/captures/node-command-unknown.pcap",
+        "common/pcapx/pcaputil/testdata/sparkplug-commands/answers.json": "sparkplug-commands/answers.json",
+        "common/pcapx/pcaputil/testdata/sparkplug-commands/SOURCE.json": "sparkplug-commands/SOURCE.json",
+        "common/pcapx/pcaputil/testdata/sparkplug-commands/reference-inputs.json": "sparkplug-commands/reference-inputs.json",
+        "common/pcapx/pcaputil/testdata/sparkplug-commands/reference-expected.json": "sparkplug-commands/reference-expected.json",
+        "common/pcapx/pcaputil/testdata/sparkplug-commands/generate.py": "sparkplug-commands/generate.py",
+        "common/pcapx/pcaputil/testdata/sparkplug-commands/verify.py": "sparkplug-commands/verify.py",
+        "common/pcapx/pcaputil/testdata/sparkplug-commands/seal.py": "sparkplug-commands/seal.py"
+      }
     }
   ],
   "schema_version": 1,

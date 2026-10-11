@@ -163,6 +163,9 @@ func testSparkplugSealedNodeMatrix(t *testing.T) {
 func testSparkplugSealedDeviceMatrix(t *testing.T) {
 	testSparkplugSealedMatrix(t, "sparkplug-device", 23)
 }
+func testSparkplugSealedCommandsMatrix(t *testing.T) {
+	testSparkplugSealedMatrix(t, "sparkplug-commands", 19)
+}
 func testSparkplugSealedMatrix(t *testing.T, directory string, count int) {
 	var answers struct {
 		Profiles map[string]struct {

@@ -404,13 +404,13 @@ func (m *binMQTT) sparkPublish(dir int, topic string, payload []byte, flags byte
 	if !ok {
 		return refuse(fmt.Sprint(v["Reason"]), "refused")
 	}
-	if verb != "NBIRTH" && verb != "NDATA" && verb != "NDEATH" && verb != "NCMD" && verb != "DBIRTH" && verb != "DDATA" && verb != "DDEATH" {
+	if verb != "NBIRTH" && verb != "NDATA" && verb != "NDEATH" && verb != "NCMD" && verb != "DBIRTH" && verb != "DDATA" && verb != "DDEATH" && verb != "DCMD" {
 		return refuse("verb needs its own independent message/lifecycle profile", "unsupported")
 	}
 	if flags&1 != 0 || verb != "NDEATH" && (flags>>1)&3 != 0 || verb == "NDEATH" && (flags>>1)&3 != 1 {
 		return refuse("invalid Sparkplug QoS/retain", "refused")
 	}
-	if m.spark == nil || key != m.spark.key || !m.connack || verb != "NCMD" && dir != m.client {
+	if m.spark == nil || key != m.spark.key || !m.connack || verb != "NCMD" && verb != "DCMD" && dir != m.client {
 		return refuse("producer Will and successful CONNACK were not observed", "context-required")
 	}
 	if p["body"] != nil {
@@ -419,12 +419,24 @@ func (m *binMQTT) sparkPublish(dir int, topic string, payload []byte, flags byte
 	if verb == "DBIRTH" || verb == "DDATA" || verb == "DDEATH" {
 		return m.sparkDevicePublish(v, verb, p, refuse)
 	}
+	if verb == "DCMD" {
+		if dir == m.client {
+			return refuse("DCMD must target the observed producer", "refused")
+		}
+		return m.sparkDeviceCommand(v, p, refuse)
+	}
 	if verb == "NCMD" {
+		if _, present := p["seq"]; present {
+			return refuse("NCMD excludes sequence number", "refused")
+		}
 		if dir == m.client {
 			return refuse("NCMD must target the observed producer", "refused")
 		}
 		metrics, _ := p["metrics"].([]map[string]any)
-		if len(metrics) != 1 || p["timestamp"] == nil {
+		if len(metrics) != 1 || metrics[0]["name"] != "Node Control/Rebirth" {
+			return m.sparkNodeCommand(v, p, refuse)
+		}
+		if p["timestamp"] == nil {
 			return refuse("selected NCMD requires timestamp and one Rebirth metric", "unsupported")
 		}
 		metric := metrics[0]
@@ -667,4 +679,101 @@ func (m *binMQTT) sparkDevicePublish(v map[string]any, verb string, p map[string
 	}
 	v["Context Status"], v["bdSeq"], v["Metrics"] = "matched", next.bdSeq, values
 	return v, next, nil
+}
+
+// A command observation proves only compatible fields against a live observed
+// DBIRTH. It never changes producer sequence, definitions, or measured values,
+// and never claims that an output write succeeded at a device.
+func (m *binMQTT) sparkDeviceCommand(v map[string]any, p map[string]any, refuse func(string, string) (map[string]any, *sparkNode, error)) (map[string]any, *sparkNode, error) {
+	if _, present := p["seq"]; present {
+		return refuse("DCMD excludes sequence number", "refused")
+	}
+	if !m.spark.born {
+		return refuse("NBIRTH metric definitions were not observed", "context-required")
+	}
+	d := m.spark.devices[v["Device ID"].(string)]
+	if d == nil || !d.born {
+		return refuse("DBIRTH metric definitions were not observed", "context-required")
+	}
+	ms, _ := p["metrics"].([]map[string]any)
+	if p["timestamp"] == nil || len(ms) == 0 {
+		return refuse("DCMD requires timestamp and at least one metric", "refused")
+	}
+	values := []map[string]any{}
+	for _, metric := range ms {
+		name, named := metric["name"].(string)
+		alias, aliased := metric["alias"].(uint64)
+		if aliased {
+			if named {
+				return refuse("aliased DCMD excludes metric name", "refused")
+			}
+			name = d.aliases[alias]
+		}
+		def, known := d.metrics[name]
+		if !known {
+			return refuse("DCMD requires this device observed metric definitions", "context-required")
+		}
+		if typ, typed := metric["datatype"].(uint64); typed && typ != def.typ {
+			return refuse("DCMD datatype differs from DBIRTH", "refused")
+		}
+		if metric["is_null"] == true {
+			return refuse("null command values need an independent write profile", "unsupported")
+		}
+		value, reason := sparkValue(metric, def.typ)
+		if reason != "" {
+			status := "refused"
+			if strings.Contains(reason, "independent structured profile") {
+				status = "unsupported"
+			}
+			return refuse(reason, status)
+		}
+		values = append(values, map[string]any{"Name": name, "Datatype": def.typ, "Value": value})
+	}
+	v["Context Status"], v["Operation"], v["bdSeq"], v["Metrics"] = "matched", "command-observed", m.spark.bdSeq, values
+	return v, m.spark, nil
+}
+
+func (m *binMQTT) sparkNodeCommand(v map[string]any, p map[string]any, refuse func(string, string) (map[string]any, *sparkNode, error)) (map[string]any, *sparkNode, error) {
+	if !m.spark.born {
+		return refuse("NBIRTH metric definitions were not observed", "context-required")
+	}
+	ms, _ := p["metrics"].([]map[string]any)
+	if p["timestamp"] == nil || len(ms) == 0 {
+		return refuse("NCMD requires timestamp and at least one metric", "refused")
+	}
+	values := []map[string]any{}
+	for _, metric := range ms {
+		name, named := metric["name"].(string)
+		alias, aliased := metric["alias"].(uint64)
+		if aliased {
+			if named {
+				return refuse("aliased NCMD excludes metric name", "refused")
+			}
+			name = m.spark.aliases[alias]
+		}
+		if name == "Node Control/Rebirth" {
+			return refuse("mixed Rebirth commands need an independent command profile", "unsupported")
+		}
+		def, known := m.spark.metrics[name]
+		if !known {
+			return refuse("NCMD requires this node observed metric definitions", "context-required")
+		}
+		if typ, typed := metric["datatype"].(uint64); typed && typ != def.typ {
+			return refuse("NCMD datatype differs from NBIRTH", "refused")
+		}
+		if metric["is_null"] == true {
+			return refuse("null command values need an independent write profile", "unsupported")
+		}
+		value, reason := sparkValue(metric, def.typ)
+		if reason != "" {
+			status := "refused"
+			if strings.Contains(reason, "independent structured profile") {
+				status = "unsupported"
+			}
+			return refuse(reason, status)
+		}
+		values = append(values, map[string]any{"Name": name, "Datatype": def.typ, "Value": value})
+	}
+	v["Context Status"], v["Operation"], v["bdSeq"], v["Metrics"] = "matched", "command-observed", m.spark.bdSeq, values
+	return v, m.spark, nil
 }
