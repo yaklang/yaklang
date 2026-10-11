@@ -184,6 +184,7 @@ func TestSLMPSealedReplay(t *testing.T) {
 									}
 									rocEqualFields(t, w.Fields, e.Session)
 									rocEqualFields(t, w.Fields, e.semanticFields)
+									testExactObservationSessionQueries(t, e, w.Fields)
 								}
 							}
 						})

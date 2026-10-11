@@ -50,3 +50,35 @@ func testNativeObservationSessionQueries(t testing.TB, e *ProtocolEvent, want ma
 	e.Session = nil
 	query()
 }
+
+// The callers supply independently sealed whole-message answers. Their native
+// session contains that same accepted observation, including association fields.
+func testExactObservationSessionQueries(t *testing.T, e *ProtocolEvent, want map[string]any) {
+	t.Helper()
+	defer func() { e.Session = cloneSession(want) }()
+	id, flow, response, transaction := e.ID, e.FlowID, e.ResponseTo, e.TransactionID
+	query := func() {
+		tree, err := e.Decode()
+		require.NoError(t, err)
+		rocEqualFields(t, want, protocolFields(tree))
+		session, ok := tree["session"].(map[string]any)
+		require.True(t, ok, "accepted private session must remain available")
+		rocEqualFields(t, want, session)
+		mutateRTPSQuery(session)
+		mutateRTPSQuery(protocolFields(tree))
+		fields, err := e.GetFields()
+		require.NoError(t, err)
+		rocEqualFields(t, want, fields)
+		require.Equal(t, id, e.ID)
+		require.Equal(t, flow, e.FlowID)
+		require.Equal(t, response, e.ResponseTo)
+		require.Equal(t, transaction, e.TransactionID)
+	}
+	query()
+	mutateRTPSQuery(e.Session)
+	query()
+	e.Session = map[string]any{"caller": "replacement"}
+	query()
+	e.Session = nil
+	query()
+}

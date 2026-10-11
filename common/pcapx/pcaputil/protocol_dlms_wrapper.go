@@ -387,6 +387,13 @@ func (f *binFlow) consumeWrapper(dir int, w []byte, e *ProtocolEvent) error {
 	e.semanticFields = cloneSession(m.fields)
 	e.Session = cloneSession(m.fields)
 	e.Session["Association"], e.Session["Outstanding"] = assoc, s.outstanding()
+	// Queries own the accepted wire fields and the observed invoke context.
+	// Reuse private nested wire values; only this small root/context is new.
+	e.semanticSession = make(map[string]any, len(e.Session))
+	for k, v := range e.semanticFields {
+		e.semanticSession[k] = v
+	}
+	e.semanticSession["Association"], e.semanticSession["Outstanding"] = assoc, s.outstanding()
 	return nil
 }
 
@@ -505,7 +512,7 @@ func (a *binParser) decodeWrapperDatagram(e *ProtocolEvent, w []byte, src, dst u
 		defer f.closeSession()
 	}
 	if err != nil {
-		e.semanticFields, e.Session = nil, nil
+		e.semanticFields, e.Session, e.semanticSession = nil, nil, nil
 		e.TransactionID, e.ResponseTo = 0, 0
 	}
 	raw := w

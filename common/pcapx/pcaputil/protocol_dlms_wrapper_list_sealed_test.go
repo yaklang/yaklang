@@ -134,7 +134,7 @@ func poisonWrapperListFields(f map[string]any) {
 // Independent session expectations supplement the immutable wire-field answers.
 // State changes come from the declared control and pairing inventory, never from
 // the implementation's returned Outstanding, Association or transaction IDs.
-func wrapperListObservation(t *testing.T, name string, i int, events []*ProtocolEvent, fields map[string]any, pairs [][]int, blocked bool, outstanding *int) {
+func wrapperListObservation(t *testing.T, name string, i int, events []*ProtocolEvent, fields map[string]any, pairs [][]int, blocked bool, outstanding *int) map[string]any {
 	t.Helper()
 	e := events[i]
 	association := "unmatched-response"
@@ -173,6 +173,7 @@ func wrapperListObservation(t *testing.T, name string, i int, events []*Protocol
 	}
 	snapshot["Association"], snapshot["Outstanding"] = association, float64(*outstanding)
 	rocEqualFields(t, snapshot, e.Session)
+	return snapshot
 }
 
 func TestDLMSWrapperGetListSealedByteOracle(t *testing.T) {
@@ -289,10 +290,15 @@ func TestDLMSWrapperGetListSealedMatrix(t *testing.T) {
 						rocTypedError(t, expectedError.Kind, err)
 						require.Nil(t, f)
 						require.Nil(t, e.Session)
+						require.Nil(t, e.semanticSession)
 						require.Zero(t, e.ResponseTo)
 						require.Zero(t, e.TransactionID)
 						outstanding = 0
 						invalid = true
+						e.Session = map[string]any{"Association": "forged-success"}
+						decoded, decodeErr := e.Decode()
+						rocTypedError(t, expectedError.Kind, decodeErr)
+						require.Nil(t, decoded)
 						continue
 					}
 					require.NoError(t, err)
@@ -307,7 +313,7 @@ func TestDLMSWrapperGetListSealedMatrix(t *testing.T) {
 					if c.Name == "list-frame-budget-late-response" {
 						pairs = [][]int{{1, 2}}
 					}
-					wrapperListObservation(t, c.Name, i, msgs, fields, pairs, invalid, &outstanding)
+					expectedSession := wrapperListObservation(t, c.Name, i, msgs, fields, pairs, invalid, &outstanding)
 					poisonWrapperListFields(f)
 					poisonWrapperListFields(e.Session)
 					if e.Fields != nil {
@@ -317,6 +323,17 @@ func TestDLMSWrapperGetListSealedMatrix(t *testing.T) {
 					f, err = e.GetFields()
 					require.NoError(t, err)
 					rocEqualFields(t, fields, f)
+					decoded, err := e.Decode()
+					require.NoError(t, err)
+					rocEqualFields(t, expectedSession, decoded["session"].(map[string]any))
+					poisonWrapperListFields(decoded["session"].(map[string]any))
+					e.Session = nil
+					decoded, err = e.Decode()
+					require.NoError(t, err)
+					rocEqualFields(t, expectedSession, decoded["session"].(map[string]any))
+					// Later pairing checks inspect the public projection; restore
+					// it from the independent answer, never the returned query.
+					e.Session = cloneSession(expectedSession)
 				}
 				if c.Targets.Pairs != nil && c.Limits.Frame == 0 {
 					got := 0

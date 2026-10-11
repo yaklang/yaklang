@@ -168,7 +168,17 @@ func assertWrapperStructuredAnswers(t *testing.T, c wrapperStructuredControl, ev
 					pairs = append(pairs, []int{pair[0] + 1, pair[1] + 1})
 				}
 			}
-			wrapperListObservation(t, c.Name, i, events, fields, pairs, blocked, &outstanding)
+			expectedSession := wrapperListObservation(t, c.Name, i, events, fields, pairs, blocked, &outstanding)
+			poisonWrapperStructured(e.Session)
+			decoded, err := e.Decode()
+			require.NoError(t, err)
+			rocEqualFields(t, expectedSession, decoded["session"].(map[string]any))
+			poisonWrapperStructured(decoded["session"])
+			e.Session = nil
+			decoded, err = e.Decode()
+			require.NoError(t, err)
+			rocEqualFields(t, expectedSession, decoded["session"].(map[string]any))
+			e.Session = cloneSession(expectedSession)
 		}
 	}
 }

@@ -171,9 +171,16 @@ func dlmsListAssert(t *testing.T, c dlmsListControl, events []*ProtocolEvent) {
 		again, err = e.GetFields()
 		require.NoError(t, err)
 		rocEqualFields(t, w.Fields, again)
+		decoded, err := e.Decode()
+		require.NoError(t, err)
+		rocEqualFields(t, w.Fields, decoded["session"].(map[string]any))
+		e.Session = nil
+		decoded, err = e.Decode()
+		require.NoError(t, err)
+		rocEqualFields(t, w.Fields, decoded["session"].(map[string]any))
 		// Restore only the caller's copy for later checks; internal projections
 		// and later messages must never depend on that mutation.
-		e.Session["Observation"] = w.Fields["Observation"]
+		e.Session = cloneSession(w.Fields)
 	}
 }
 

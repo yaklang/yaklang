@@ -81,6 +81,18 @@ func (e *ProtocolEvent) Decode() (result map[string]any, err error) {
 		if e.Protocol == "knx" && e.Transport == "udp" && (e.Profile == "knx-basic-search" || e.Profile == "knx-extended-search") && e.semanticFields != nil {
 			session = e.semanticFields
 		}
+		// Native HDLC includes its observed association and segmentation in
+		// the private field tree already, on both byte-stream and UDP ingress.
+		if e.Protocol == "dlms" && e.semanticFields != nil {
+			session = e.semanticFields
+		}
+		// These native observations already retain their complete session
+		// context in the private field tree. Public projections are not authority.
+		ownedIndustrial := e.Protocol == "slmp" && (e.Profile == slmpTCPProfile || e.Profile == "slmp-binary-self-test") ||
+			e.Transport == "ethernet" && (e.Protocol == "sv" && e.Profile == "iec61850-sv-raw-asdu" || e.Protocol == "ethercat" && e.Profile == "ethercat-datagram-chain")
+		if ownedIndustrial && e.semanticFields != nil {
+			session = e.semanticFields
+		}
 		// C37.118 exposes its complete accepted observation in both views
 		// on TCP and UDP. The public map is caller-owned, not query authority.
 		if e.Protocol == "c37118" && (e.Profile == "c37118-v1-v2-cfg2-data" || e.Profile == "c37118-v2-cfg3-complete-data" || e.Profile == "c37118-v2-cfg3-continuation-data" || e.Profile == "c37118-engineering") && e.semanticFields != nil {
