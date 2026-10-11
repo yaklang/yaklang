@@ -10,6 +10,7 @@ import (
 // carrier, not a standard Remote ID broadcast transport or identity proof.
 const openDroneIDSystemProfile = "opendroneid-v2-basic-location-system"
 const openDroneIDIdentityProfile = "opendroneid-v2-identity-observation"
+const openDroneIDAuthProfile = "opendroneid-v2-auth-pages-observation"
 
 type openDroneIDSelection uint8
 
@@ -17,6 +18,7 @@ const (
 	odidBasicLocation openDroneIDSelection = iota
 	odidSystem
 	odidIdentity
+	odidAuthPages
 )
 
 func odidSelection(systemProfile bool) openDroneIDSelection {
@@ -68,7 +70,7 @@ func openDroneIDProfileLayout(w []byte, maxBytes, maxMessages int, selection ope
 	if len(w) != at+count*25 {
 		return fail(ErrMalformedMessage, "trailing bytes are outside declared message pack")
 	}
-	basic, location, system, selfID, operatorID := 0, 0, 0, 0, 0
+	basic, location, system, selfID, operatorID, auth := 0, 0, 0, 0, 0, 0
 	for i := 0; i < count; i++ {
 		h := w[at+i*25]
 		if h&15 != 2 {
@@ -79,8 +81,21 @@ func openDroneIDProfileLayout(w []byte, maxBytes, maxMessages int, selection ope
 			basic++
 		case 1:
 			location++
+		case 2:
+			if selection != odidAuthPages {
+				return fail(ErrUnsupportedFeature, "message type is outside Basic ID/Location")
+			}
+			auth++
+			p := w[at+i*25 : at+(i+1)*25]
+			// Page zero alone carries the declared whole-auth length. The
+			// pinned 16-page codec limits that length by page capacity. Later
+			// pages contain only opaque bytes; never borrow another page's
+			// metadata or infer an authenticated aircraft/session association.
+			if p[1]&15 == 0 && (p[2] >= 16 || int(p[3]) > 17+23*int(p[2])) {
+				return fail(ErrMalformedMessage, "authentication page zero exceeds declared page capacity")
+			}
 		case 3, 5:
-			if selection != odidIdentity {
+			if selection != odidIdentity && selection != odidAuthPages {
 				return fail(ErrUnsupportedFeature, "message type is outside Basic ID/Location")
 			}
 			if h>>4 == 3 {
@@ -109,6 +124,9 @@ func openDroneIDProfileLayout(w []byte, maxBytes, maxMessages int, selection ope
 	}
 	if selection == odidIdentity && selfID+operatorID == 0 {
 		return fail(ErrUnsupportedFeature, "identity profile requires a Self ID or Operator ID observation")
+	}
+	if selection == odidAuthPages && auth == 0 {
+		return fail(ErrUnsupportedFeature, "authentication profile requires an Authentication page observation")
 	}
 	return at, count, nil
 }
@@ -145,6 +163,16 @@ func decodeOpenDroneIDProfileBudget(w []byte, maxBytes, maxMessages, maxDepth in
 			// IDs may be binary. Reserved enums/bytes are observations, not an
 			// authenticated registration, serial number, or a future-type guess.
 			f["ID"], f["Reserved"] = bytes.Clone(p[2:22]), bytes.Clone(p[22:25])
+		} else if p[0]>>4 == 2 {
+			f["Message Name"], f["Authentication Type"], f["Data Page"] = "Authentication", p[1]>>4, p[1]&15
+			f["Page Zero"] = p[1]&15 == 0
+			if p[1]&15 == 0 {
+				f["Last Page Index"], f["Authentication Length"] = p[2], p[3]
+				f["Timestamp"] = binary.LittleEndian.Uint32(p[4:8])
+				f["Authentication Data"] = bytes.Clone(p[8:25])
+			} else {
+				f["Authentication Data"] = bytes.Clone(p[2:25])
+			}
 		} else if p[0]>>4 == 3 || p[0]>>4 == 5 {
 			// The reference codec uses NUL-terminated byte strings. Preserve
 			// both that decoded observation and every original wire byte;
@@ -222,6 +250,8 @@ func (a *binParser) decodeOpenDroneIDProfileDatagram(e *ProtocolEvent, w []byte,
 		e.Profile = openDroneIDSystemProfile
 	case odidIdentity:
 		e.Profile = openDroneIDIdentityProfile
+	case odidAuthPages:
+		e.Profile = openDroneIDAuthProfile
 	}
 	// Reserve expansion before constructing any field tree. A stateless
 	// message owns no conversation, pending request, or inferred aircraft.

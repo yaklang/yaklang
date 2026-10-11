@@ -39308,6 +39308,498 @@
         "common/pcapx/pcaputil/opendroneid-identity/validation/reused-inputs.json": "validation/reused-inputs.json",
         "common/pcapx/pcaputil/opendroneid-identity/verify.py": "verify.py"
       }
+    },
+    {
+      "id": "validation-opendroneid-auth-pages-51c136",
+      "kind": "validation",
+      "source_sha": "51c13621c3a3d691698436896cd318227f7d1925",
+      "file": "validation-opendroneid-auth-pages-51c136.zip",
+      "sha256": "075786fd3ff3845023745078fc2b5980a89940616edb25b0d651b58e9377a1d1",
+      "password": "bin-parser",
+      "members": {
+        "answers/auth-concatenated-datagrams.json": {
+          "sha256": "240349ae10c197ab2341426f093a1e0b5b9204599ccaa0c2740aab8bcc987235",
+          "bytes": 628
+        },
+        "answers/auth-cut-pack-header-1.json": {
+          "sha256": "52385ff6267b6ed444020968d3926122a0d909a6c84de0070f022da3fd82b255",
+          "bytes": 664
+        },
+        "answers/auth-cut-pack-header-2.json": {
+          "sha256": "56d5fbd69d01028e95a5760f5a26b706c8d7d0636465fd92c9740036c7f5cf28",
+          "bytes": 666
+        },
+        "answers/auth-inner-version.json": {
+          "sha256": "58dfd642aa6023ecdd07258e932857785b563c5dd11b61899081de248320e41e",
+          "bytes": 609
+        },
+        "answers/auth-last-invalid-capacity.json": {
+          "sha256": "5ec742d6a578564ccb6b6dff3e88e12f7297cd21eecb5af3d26ef7b3b870b901",
+          "bytes": 631
+        },
+        "answers/auth-nested-pack.json": {
+          "sha256": "effa823ca4fbace6ddf503f13179e796772b06a8f67590580027bbbfa6023414",
+          "bytes": 551
+        },
+        "answers/auth-pack-count-ten.json": {
+          "sha256": "dff98ff6613980c7a849390096b9a385cb1fce285d93b440b072c6bde5355d13",
+          "bytes": 1010
+        },
+        "answers/auth-pack-count-zero.json": {
+          "sha256": "bc44eafc2a693236fc88222d4e4e63216067eb8199b3b85ed0b659308cf8c3e5",
+          "bytes": 666
+        },
+        "answers/auth-pack-last-cut.json": {
+          "sha256": "d62e532c19aae1c48e239ddcb5f6ae14f00aa68205cbb304f663272e3f077ef1",
+          "bytes": 597
+        },
+        "answers/auth-pack-size-wrong.json": {
+          "sha256": "0ed1a4ae8feac526e2e35bc4aa17af3893280d645707cb9cceaa8679a2afdcf0",
+          "bytes": 563
+        },
+        "answers/auth-page-trailing.json": {
+          "sha256": "611bb385dd50ead1be407039240c86582afd4dc315f3a5ccb2baaf57f3674f21",
+          "bytes": 553
+        },
+        "answers/auth-page-wrong-version.json": {
+          "sha256": "7e516124d8f8cd158c67c05c7060f868fa7772650e72356ff4cf0fdab95026c0",
+          "bytes": 568
+        },
+        "answers/auth-page1-opaque.json": {
+          "sha256": "31ddfd871961115edf093e3ddbf1f63db4bcf4112c1ba1106fbc2026924e5730",
+          "bytes": 1030
+        },
+        "answers/auth-page1-reverse.json": {
+          "sha256": "ef99f4113c9c7661ebb35a403878f36717234b0aa8f76a7253d1e5cedc54aba4",
+          "bytes": 1033
+        },
+        "answers/auth-page15-reserved-type.json": {
+          "sha256": "752921772aecf32dce83de35516c8e0559881907a5ad0b78e4e9e7f76fd657f3",
+          "bytes": 1056
+        },
+        "answers/auth-page7-zero-data.json": {
+          "sha256": "0ea548cdd166026dcd2f4aa5abb670321c33ddf962f8792ce3fc3e9ba862f762",
+          "bytes": 1039
+        },
+        "answers/auth-repeated-cross-direction.json": {
+          "sha256": "b4cd6cbf4521202428d5e6ddfe8cd406a5952064b580c5a19cfbca2f45b6d606",
+          "bytes": 3372
+        },
+        "answers/auth-split-zero.json": {
+          "sha256": "6f75d69f2b938e616b02e999fd6298ff9f2346725d970e75d37a77ac53931b04",
+          "bytes": 581
+        },
+        "answers/auth-zero-capacity-0-18.json": {
+          "sha256": "ff25601e1c417aad0958353639e5b103137fdc04d2bd78486ff035018c026510",
+          "bytes": 566
+        },
+        "answers/auth-zero-capacity-1-41.json": {
+          "sha256": "5192b16597910c123f96f0b7820b087f1696b64b0657c02ecdef9a8f2c6d661b",
+          "bytes": 566
+        },
+        "answers/auth-zero-capacity-16-17.json": {
+          "sha256": "80ad117c8193ee42a2fa7d478cb088c22915e3f3123395e9047debc67c004a0d",
+          "bytes": 569
+        },
+        "answers/auth-zero-capacity-255-17.json": {
+          "sha256": "370ad37f2a9e95ec8ea43a71a05f12d37a4349c41adc5341532c6c33c74ea13d",
+          "bytes": 572
+        },
+        "answers/auth-zero-capacity-9-255.json": {
+          "sha256": "c88467965db317cdac8c22301d93f98baa198ba86e16d10c63764b01ff41ae3d",
+          "bytes": 569
+        },
+        "answers/auth-zero-default.json": {
+          "sha256": "5f89581ae7c10016b717ba2871a7396a037bceb1b16ca42c8fe0da4572afc142",
+          "bytes": 1123
+        },
+        "answers/auth-zero-length0-last15.json": {
+          "sha256": "1627f8756148b8c8300ef0f2cf574f7ba11db66a2b032c3f9b36e827d768e335",
+          "bytes": 1145
+        },
+        "answers/auth-zero-length17.json": {
+          "sha256": "924433a384d36f56827990196ddedff444f55642e432d41bb58dd76b8f384405",
+          "bytes": 1136
+        },
+        "answers/auth-zero-length255-reserved-type.json": {
+          "sha256": "7291865b54f5e978b5d11b33c0a8279440b786e37b86c9b5f1b17f67373fa6a6",
+          "bytes": 1180
+        },
+        "answers/auth-zero-length40.json": {
+          "sha256": "78e7a03ac4092c382794d044252171b0a7aef2331851fc4c9b0df736cd8b3d7b",
+          "bytes": 1132
+        },
+        "answers/auth-zero-trailing.json": {
+          "sha256": "4d29ff945167fe74b9d0d973f6a5c684336757004d7e989736b7af11a82b95e9",
+          "bytes": 553
+        },
+        "answers/auth-zero-wrong-version.json": {
+          "sha256": "673447845c5df1d8a6e1da2c83c8cf047ddda79a3421adc36390274bbba7ee21",
+          "bytes": 568
+        },
+        "answers/cut-auth-page-2.json": {
+          "sha256": "6c49273a04ddb3d51c8dc065ba1595ee5a3804bc4d31be83dce9122c93568df1",
+          "bytes": 487
+        },
+        "answers/cut-auth-page-24.json": {
+          "sha256": "3da03fd6d8d82bc5751a617f15f81b8b4a11eac451df1f390876377eedbc1e8b",
+          "bytes": 535
+        },
+        "answers/cut-auth-page-7.json": {
+          "sha256": "6ebb183cbeddd8ab78a305d3c1587e1d8cb5ef43e2e4ddcde544725fcb56948b",
+          "bytes": 497
+        },
+        "answers/cut-auth-zero-1.json": {
+          "sha256": "8dba9e4cb6600dcbc00dbed78063a91c8dd4b15da3fc7f0963a8cd5d15e44892",
+          "bytes": 485
+        },
+        "answers/cut-auth-zero-2.json": {
+          "sha256": "5bbb85c9b78cea0ab86c126440d7f0891ecce1f37805bbdb092de79c4aaf5157",
+          "bytes": 487
+        },
+        "answers/cut-auth-zero-24.json": {
+          "sha256": "8bded4e5f914dede27125e54ee6500979b09768507d20f5fa6cdbb822d3a0e64",
+          "bytes": 535
+        },
+        "answers/cut-auth-zero-7.json": {
+          "sha256": "0311297424ab606169bb182a70c36322c279693b7de0b411ea48a8931f29e84b",
+          "bytes": 497
+        },
+        "answers/no-authentication.json": {
+          "sha256": "a22dddfe971f778fac016db18e0855560f17a1849ee0816e957b0f58868069a0",
+          "bytes": 550
+        },
+        "answers/pack-auth-eight-mixed.json": {
+          "sha256": "6820518b3001ef605303d2b97ccf38cc83f2762452a53b1fb46f0de7c0c13e00",
+          "bytes": 4684
+        },
+        "answers/pack-auth-nine-pages.json": {
+          "sha256": "91b14777fbe9c5b842febb6683f01eca098afba662ac2fdabc532887261aa532",
+          "bytes": 4451
+        },
+        "answers/pack-auth-repeat-observed.json": {
+          "sha256": "8a4691a21d5f9a9cd6d203cdfbe8fd732e8706d371fefe0957cf715ae6fe46a5",
+          "bytes": 1679
+        },
+        "answers/pack-auth-reversed.json": {
+          "sha256": "23e5a9460b6c3759b4f28b2694428f24cf28936cda49f88cf3ab06e412c4c7c3",
+          "bytes": 1555
+        },
+        "answers/pack-auth-zero-page1.json": {
+          "sha256": "c173809456d9560b54808d7c2c5a0871408e7f9d749b056ab761b03aad5e2a1a",
+          "bytes": 1561
+        },
+        "answers/pack-auth-zero.json": {
+          "sha256": "42294c664b116758c2e3ca1538d92c6621754e7cf707287fed70a8c0545b91cb",
+          "bytes": 1129
+        },
+        "build.py": {
+          "sha256": "8200e474687bc01acc4ffda3de2a1d1cf17868dd95f2f46f3e5242ca2d7fd31c",
+          "bytes": 7702
+        },
+        "captures/auth-concatenated-datagrams.pcap": {
+          "sha256": "4e7da1327740b5a7cdc9371e3c0273debdf5d275c742e157080de28155eb3c5c",
+          "bytes": 132
+        },
+        "captures/auth-inner-version.pcap": {
+          "sha256": "d76c921c04259e78c341cc6c562b1c7c24416831616482bc3050efaa2ca2fc80",
+          "bytes": 135
+        },
+        "captures/auth-last-invalid-capacity.pcap": {
+          "sha256": "4a9e978e8d9565f6abc9cdb90322f5935db3dd79eab0e27a62b33abf2134df79",
+          "bytes": 135
+        },
+        "captures/auth-nested-pack.pcap": {
+          "sha256": "cfebe3899d48077efb5400d50f10111345bf6b7b1e14616dd5df5c78d8c34458",
+          "bytes": 110
+        },
+        "captures/auth-pack-count-ten.pcap": {
+          "sha256": "23ddb6167588dc4a050e7fce6126cd4d360d263404914e06016d792c3c4e30ab",
+          "bytes": 335
+        },
+        "captures/auth-pack-last-cut.pcap": {
+          "sha256": "285f77ca01920e2e2c7a85daf937f79ce2fbcfc53f91168e6657df169595b412",
+          "bytes": 134
+        },
+        "captures/auth-pack-size-wrong.pcap": {
+          "sha256": "8f6b278022e6ab0d842e9f4a97cb0f790f1c58e6f2182b2926fc21d572aa1830",
+          "bytes": 110
+        },
+        "captures/auth-page-trailing.pcap": {
+          "sha256": "4c6dfdac68261633b522805719b5c64684184c302ca9472bc9f4661dd57a508c",
+          "bytes": 108
+        },
+        "captures/auth-page-wrong-version.pcap": {
+          "sha256": "958bbc5e1ad30f748448e418c7065bcf12b0be6f349334f10c2bcafb70b34d3b",
+          "bytes": 107
+        },
+        "captures/auth-page1-opaque.pcap": {
+          "sha256": "6d22887ee719a4d8b7a1074a1bae61606aeef20b798187de12af43c4994c032c",
+          "bytes": 107
+        },
+        "captures/auth-page1-reverse.pcap": {
+          "sha256": "e0d49285a82fbe8417725756dd1edc7c960e5153ea14d5040a73ca98bf1820c4",
+          "bytes": 107
+        },
+        "captures/auth-page15-reserved-type.pcap": {
+          "sha256": "405528da680491a05d20c228f9c2fe1cf494cedbe8d0063575df9ebb6f4c4474",
+          "bytes": 107
+        },
+        "captures/auth-page7-zero-data.pcap": {
+          "sha256": "b6d2b8a289dc4249ccba67482b3df577de4e495edf2bbbc4dd9e6035cec3207c",
+          "bytes": 107
+        },
+        "captures/auth-repeated-cross-direction.pcap": {
+          "sha256": "42cb2615e2f33f90224dfeee468cded487df22b5be983c5d4ecb15041ba26be3",
+          "bytes": 356
+        },
+        "captures/auth-split-zero.pcap": {
+          "sha256": "2f86fe3ac470edec99a608da1e3cd268ba58c9f8b199438c3a71c646256cc6a4",
+          "bytes": 165
+        },
+        "captures/auth-zero-capacity-0-18.pcap": {
+          "sha256": "24c3d63de1a4f57e82f6575968d6b115c6e8b187b06c30f2683eb7d6f4d86610",
+          "bytes": 107
+        },
+        "captures/auth-zero-capacity-1-41.pcap": {
+          "sha256": "a6a4bc2ee9b5a1d4a2775506fa1096683891d6510e2da72e49422ec45dd08845",
+          "bytes": 107
+        },
+        "captures/auth-zero-capacity-16-17.pcap": {
+          "sha256": "68d94a6013edf3575f13684ddc0aeabc95ba1389f300c86fb71af865bf3cbd33",
+          "bytes": 107
+        },
+        "captures/auth-zero-capacity-255-17.pcap": {
+          "sha256": "bad8e90b3336e2c36331d2403d6b9487be16b538f32f2d817bb42312b6e05470",
+          "bytes": 107
+        },
+        "captures/auth-zero-capacity-9-255.pcap": {
+          "sha256": "a1fa38a468c7da430336544b71565ecfda578ec1b261790d736d85c6174029e1",
+          "bytes": 107
+        },
+        "captures/auth-zero-default.pcap": {
+          "sha256": "65f55e82f5ac2e3447ecc4f96cf03c97d00a097a786907a6c623a1ceec49d6f2",
+          "bytes": 107
+        },
+        "captures/auth-zero-length0-last15.pcap": {
+          "sha256": "cf381666cc69946f510cb3855c0882bf1a9b9f8a69423703c5e31ae70f7678b9",
+          "bytes": 107
+        },
+        "captures/auth-zero-length17.pcap": {
+          "sha256": "c6665bf4f9422b5085acd7d4d98a5bcc5d6faa965b3869ffed8e91850140c012",
+          "bytes": 107
+        },
+        "captures/auth-zero-length255-reserved-type.pcap": {
+          "sha256": "62689038710c91671375c9c716506d331c318b4cc083b687083decd32b4c3e57",
+          "bytes": 107
+        },
+        "captures/auth-zero-length40.pcap": {
+          "sha256": "57d49163df3f74872be2853259c3a33c05dd7325ffe71188ed8a3026a056fc7c",
+          "bytes": 107
+        },
+        "captures/auth-zero-trailing.pcap": {
+          "sha256": "a57ac43d7ad0ecfcdf573e98f4ed25c2c44f3ba18318a298b38c4dac3d30fd9e",
+          "bytes": 108
+        },
+        "captures/auth-zero-wrong-version.pcap": {
+          "sha256": "e2a8092040f49870c1bc89ae9ad5a3c05945cb73f48cb37013fa7ec31c847d18",
+          "bytes": 107
+        },
+        "captures/cut-auth-page-2.pcap": {
+          "sha256": "c51f4168ab36ae70b3765d007f50fd0c1c373b18e28cbcf44fa547b50974bdd7",
+          "bytes": 84
+        },
+        "captures/cut-auth-page-24.pcap": {
+          "sha256": "2113b21a4368250a30e220623ff1dd5dcfacc0c92e582fb54fd54ac5b5f54cf5",
+          "bytes": 106
+        },
+        "captures/cut-auth-page-7.pcap": {
+          "sha256": "8878f2b36a17282c971089640550e3410f79adf94adfc0606138332536512c05",
+          "bytes": 89
+        },
+        "captures/cut-auth-zero-1.pcap": {
+          "sha256": "54cde1d97f28dc00b51e891a3f3ff8d8af039efcb74a17f23823c326de05df91",
+          "bytes": 83
+        },
+        "captures/cut-auth-zero-2.pcap": {
+          "sha256": "b89a10f0b8aeb5001bed07dd662ac4f00efe66e474b91b11db70b5b222b6d0bc",
+          "bytes": 84
+        },
+        "captures/cut-auth-zero-24.pcap": {
+          "sha256": "75ea0b1bd856094d3f012d5ec17601cdc8395da9c8758ed3392d36c495d20621",
+          "bytes": 106
+        },
+        "captures/cut-auth-zero-7.pcap": {
+          "sha256": "8ae87392ccb862772f0374e7d586dbd2f7c2f9b7cd32aaeca06ab121be5d3bfd",
+          "bytes": 89
+        },
+        "captures/no-authentication.pcap": {
+          "sha256": "526bba5b7951fc3640959c250f0527c6b64b9437085f0ff4862864b3ed20e816",
+          "bytes": 107
+        },
+        "captures/pack-auth-eight-mixed.pcap": {
+          "sha256": "611a9dd817a4a994eb96c7561e865d8bc5002959ff4a328a6452bf7262a61b80",
+          "bytes": 285
+        },
+        "captures/pack-auth-nine-pages.pcap": {
+          "sha256": "e87d69fd6d97c78f2fffd4e9b45e8c8172f9bdbaf1b0ddbfce1db5583257794d",
+          "bytes": 310
+        },
+        "captures/pack-auth-repeat-observed.pcap": {
+          "sha256": "89324202838d308dff8e82b44f9830e3083b3f0d68f3fd53404228e409956616",
+          "bytes": 135
+        },
+        "captures/pack-auth-reversed.pcap": {
+          "sha256": "1cc32a98531a57186704275556db69e2544a8f3fe3300441259e684e3e4a42e6",
+          "bytes": 135
+        },
+        "captures/pack-auth-zero-page1.pcap": {
+          "sha256": "5278fcea1b4d48a96eb5c77b108b5c1c317933fffe6bb4e68edc59e1e0a7f8bc",
+          "bytes": 135
+        },
+        "captures/pack-auth-zero.pcap": {
+          "sha256": "98fa4ae41387580fb052e91a80c7e5c3c7ea396d8d37dd85e84af721a37b4fd0",
+          "bytes": 110
+        },
+        "controls.json": {
+          "sha256": "1524a2d656794626e36dd0270aa7c647baadae11c70e7d240ac4672ac3c3eb82",
+          "bytes": 54403
+        },
+        "official-auth-vectors.jsonl": {
+          "sha256": "279f6964707dbb6d0a7f2c3db593ecd24583d5d137cb1d238cf59c3dd34ccc22",
+          "bytes": 11582
+        },
+        "reference-auth.c": {
+          "sha256": "a995157a7e3073eef82820c6a288de08835514157531d4fd0a2fa44c38da1708",
+          "bytes": 7594
+        },
+        "reproduce-reference.py": {
+          "sha256": "81e944898ea95ea1ad3770650c6e72582864de19ab7b722fc5066ea215817fde",
+          "bytes": 1449
+        },
+        "seal.py": {
+          "sha256": "3ba91538007ce1609be6d3891a8d18a02a041870aed09905cfd2158144bde303",
+          "bytes": 1029
+        },
+        "source-pin.json": {
+          "sha256": "d3ec1d47b503ae880fa41a19887c2e8ec679cb658ac05e4bc0264d54612f2b4f",
+          "bytes": 1649
+        },
+        "validation/expected.json": {
+          "sha256": "42d5857deda08dcf0f15bef5cc6ca4fbe67f5bc5b8e18859f391071e820e2c4e",
+          "bytes": 44751
+        },
+        "validation/provenance.json": {
+          "sha256": "d37ad2215431a0ad8ac525db2975f0b13290a8df89fa875d1f02bac1897d346b",
+          "bytes": 942
+        },
+        "validation/reused-inputs.json": {
+          "sha256": "12c5404ad079b03b3bcf70aa407d9a923106659efc9d925934f241f0e4177b53",
+          "bytes": 2389
+        },
+        "verify.py": {
+          "sha256": "e5ea0a6e595f803b7f10fc79050b73934b96745af6be7443e51ef856f09ca361",
+          "bytes": 3880
+        }
+      },
+      "aliases": {
+        "common/pcapx/pcaputil/opendroneid-auth-pages/answers/auth-concatenated-datagrams.json": "answers/auth-concatenated-datagrams.json",
+        "common/pcapx/pcaputil/opendroneid-auth-pages/answers/auth-cut-pack-header-1.json": "answers/auth-cut-pack-header-1.json",
+        "common/pcapx/pcaputil/opendroneid-auth-pages/answers/auth-cut-pack-header-2.json": "answers/auth-cut-pack-header-2.json",
+        "common/pcapx/pcaputil/opendroneid-auth-pages/answers/auth-inner-version.json": "answers/auth-inner-version.json",
+        "common/pcapx/pcaputil/opendroneid-auth-pages/answers/auth-last-invalid-capacity.json": "answers/auth-last-invalid-capacity.json",
+        "common/pcapx/pcaputil/opendroneid-auth-pages/answers/auth-nested-pack.json": "answers/auth-nested-pack.json",
+        "common/pcapx/pcaputil/opendroneid-auth-pages/answers/auth-pack-count-ten.json": "answers/auth-pack-count-ten.json",
+        "common/pcapx/pcaputil/opendroneid-auth-pages/answers/auth-pack-count-zero.json": "answers/auth-pack-count-zero.json",
+        "common/pcapx/pcaputil/opendroneid-auth-pages/answers/auth-pack-last-cut.json": "answers/auth-pack-last-cut.json",
+        "common/pcapx/pcaputil/opendroneid-auth-pages/answers/auth-pack-size-wrong.json": "answers/auth-pack-size-wrong.json",
+        "common/pcapx/pcaputil/opendroneid-auth-pages/answers/auth-page-trailing.json": "answers/auth-page-trailing.json",
+        "common/pcapx/pcaputil/opendroneid-auth-pages/answers/auth-page-wrong-version.json": "answers/auth-page-wrong-version.json",
+        "common/pcapx/pcaputil/opendroneid-auth-pages/answers/auth-page1-opaque.json": "answers/auth-page1-opaque.json",
+        "common/pcapx/pcaputil/opendroneid-auth-pages/answers/auth-page1-reverse.json": "answers/auth-page1-reverse.json",
+        "common/pcapx/pcaputil/opendroneid-auth-pages/answers/auth-page15-reserved-type.json": "answers/auth-page15-reserved-type.json",
+        "common/pcapx/pcaputil/opendroneid-auth-pages/answers/auth-page7-zero-data.json": "answers/auth-page7-zero-data.json",
+        "common/pcapx/pcaputil/opendroneid-auth-pages/answers/auth-repeated-cross-direction.json": "answers/auth-repeated-cross-direction.json",
+        "common/pcapx/pcaputil/opendroneid-auth-pages/answers/auth-split-zero.json": "answers/auth-split-zero.json",
+        "common/pcapx/pcaputil/opendroneid-auth-pages/answers/auth-zero-capacity-0-18.json": "answers/auth-zero-capacity-0-18.json",
+        "common/pcapx/pcaputil/opendroneid-auth-pages/answers/auth-zero-capacity-1-41.json": "answers/auth-zero-capacity-1-41.json",
+        "common/pcapx/pcaputil/opendroneid-auth-pages/answers/auth-zero-capacity-16-17.json": "answers/auth-zero-capacity-16-17.json",
+        "common/pcapx/pcaputil/opendroneid-auth-pages/answers/auth-zero-capacity-255-17.json": "answers/auth-zero-capacity-255-17.json",
+        "common/pcapx/pcaputil/opendroneid-auth-pages/answers/auth-zero-capacity-9-255.json": "answers/auth-zero-capacity-9-255.json",
+        "common/pcapx/pcaputil/opendroneid-auth-pages/answers/auth-zero-default.json": "answers/auth-zero-default.json",
+        "common/pcapx/pcaputil/opendroneid-auth-pages/answers/auth-zero-length0-last15.json": "answers/auth-zero-length0-last15.json",
+        "common/pcapx/pcaputil/opendroneid-auth-pages/answers/auth-zero-length17.json": "answers/auth-zero-length17.json",
+        "common/pcapx/pcaputil/opendroneid-auth-pages/answers/auth-zero-length255-reserved-type.json": "answers/auth-zero-length255-reserved-type.json",
+        "common/pcapx/pcaputil/opendroneid-auth-pages/answers/auth-zero-length40.json": "answers/auth-zero-length40.json",
+        "common/pcapx/pcaputil/opendroneid-auth-pages/answers/auth-zero-trailing.json": "answers/auth-zero-trailing.json",
+        "common/pcapx/pcaputil/opendroneid-auth-pages/answers/auth-zero-wrong-version.json": "answers/auth-zero-wrong-version.json",
+        "common/pcapx/pcaputil/opendroneid-auth-pages/answers/cut-auth-page-2.json": "answers/cut-auth-page-2.json",
+        "common/pcapx/pcaputil/opendroneid-auth-pages/answers/cut-auth-page-24.json": "answers/cut-auth-page-24.json",
+        "common/pcapx/pcaputil/opendroneid-auth-pages/answers/cut-auth-page-7.json": "answers/cut-auth-page-7.json",
+        "common/pcapx/pcaputil/opendroneid-auth-pages/answers/cut-auth-zero-1.json": "answers/cut-auth-zero-1.json",
+        "common/pcapx/pcaputil/opendroneid-auth-pages/answers/cut-auth-zero-2.json": "answers/cut-auth-zero-2.json",
+        "common/pcapx/pcaputil/opendroneid-auth-pages/answers/cut-auth-zero-24.json": "answers/cut-auth-zero-24.json",
+        "common/pcapx/pcaputil/opendroneid-auth-pages/answers/cut-auth-zero-7.json": "answers/cut-auth-zero-7.json",
+        "common/pcapx/pcaputil/opendroneid-auth-pages/answers/no-authentication.json": "answers/no-authentication.json",
+        "common/pcapx/pcaputil/opendroneid-auth-pages/answers/pack-auth-eight-mixed.json": "answers/pack-auth-eight-mixed.json",
+        "common/pcapx/pcaputil/opendroneid-auth-pages/answers/pack-auth-nine-pages.json": "answers/pack-auth-nine-pages.json",
+        "common/pcapx/pcaputil/opendroneid-auth-pages/answers/pack-auth-repeat-observed.json": "answers/pack-auth-repeat-observed.json",
+        "common/pcapx/pcaputil/opendroneid-auth-pages/answers/pack-auth-reversed.json": "answers/pack-auth-reversed.json",
+        "common/pcapx/pcaputil/opendroneid-auth-pages/answers/pack-auth-zero-page1.json": "answers/pack-auth-zero-page1.json",
+        "common/pcapx/pcaputil/opendroneid-auth-pages/answers/pack-auth-zero.json": "answers/pack-auth-zero.json",
+        "common/pcapx/pcaputil/opendroneid-auth-pages/build.py": "build.py",
+        "common/pcapx/pcaputil/opendroneid-auth-pages/captures/auth-concatenated-datagrams.pcap": "captures/auth-concatenated-datagrams.pcap",
+        "common/pcapx/pcaputil/opendroneid-auth-pages/captures/auth-inner-version.pcap": "captures/auth-inner-version.pcap",
+        "common/pcapx/pcaputil/opendroneid-auth-pages/captures/auth-last-invalid-capacity.pcap": "captures/auth-last-invalid-capacity.pcap",
+        "common/pcapx/pcaputil/opendroneid-auth-pages/captures/auth-nested-pack.pcap": "captures/auth-nested-pack.pcap",
+        "common/pcapx/pcaputil/opendroneid-auth-pages/captures/auth-pack-count-ten.pcap": "captures/auth-pack-count-ten.pcap",
+        "common/pcapx/pcaputil/opendroneid-auth-pages/captures/auth-pack-last-cut.pcap": "captures/auth-pack-last-cut.pcap",
+        "common/pcapx/pcaputil/opendroneid-auth-pages/captures/auth-pack-size-wrong.pcap": "captures/auth-pack-size-wrong.pcap",
+        "common/pcapx/pcaputil/opendroneid-auth-pages/captures/auth-page-trailing.pcap": "captures/auth-page-trailing.pcap",
+        "common/pcapx/pcaputil/opendroneid-auth-pages/captures/auth-page-wrong-version.pcap": "captures/auth-page-wrong-version.pcap",
+        "common/pcapx/pcaputil/opendroneid-auth-pages/captures/auth-page1-opaque.pcap": "captures/auth-page1-opaque.pcap",
+        "common/pcapx/pcaputil/opendroneid-auth-pages/captures/auth-page1-reverse.pcap": "captures/auth-page1-reverse.pcap",
+        "common/pcapx/pcaputil/opendroneid-auth-pages/captures/auth-page15-reserved-type.pcap": "captures/auth-page15-reserved-type.pcap",
+        "common/pcapx/pcaputil/opendroneid-auth-pages/captures/auth-page7-zero-data.pcap": "captures/auth-page7-zero-data.pcap",
+        "common/pcapx/pcaputil/opendroneid-auth-pages/captures/auth-repeated-cross-direction.pcap": "captures/auth-repeated-cross-direction.pcap",
+        "common/pcapx/pcaputil/opendroneid-auth-pages/captures/auth-split-zero.pcap": "captures/auth-split-zero.pcap",
+        "common/pcapx/pcaputil/opendroneid-auth-pages/captures/auth-zero-capacity-0-18.pcap": "captures/auth-zero-capacity-0-18.pcap",
+        "common/pcapx/pcaputil/opendroneid-auth-pages/captures/auth-zero-capacity-1-41.pcap": "captures/auth-zero-capacity-1-41.pcap",
+        "common/pcapx/pcaputil/opendroneid-auth-pages/captures/auth-zero-capacity-16-17.pcap": "captures/auth-zero-capacity-16-17.pcap",
+        "common/pcapx/pcaputil/opendroneid-auth-pages/captures/auth-zero-capacity-255-17.pcap": "captures/auth-zero-capacity-255-17.pcap",
+        "common/pcapx/pcaputil/opendroneid-auth-pages/captures/auth-zero-capacity-9-255.pcap": "captures/auth-zero-capacity-9-255.pcap",
+        "common/pcapx/pcaputil/opendroneid-auth-pages/captures/auth-zero-default.pcap": "captures/auth-zero-default.pcap",
+        "common/pcapx/pcaputil/opendroneid-auth-pages/captures/auth-zero-length0-last15.pcap": "captures/auth-zero-length0-last15.pcap",
+        "common/pcapx/pcaputil/opendroneid-auth-pages/captures/auth-zero-length17.pcap": "captures/auth-zero-length17.pcap",
+        "common/pcapx/pcaputil/opendroneid-auth-pages/captures/auth-zero-length255-reserved-type.pcap": "captures/auth-zero-length255-reserved-type.pcap",
+        "common/pcapx/pcaputil/opendroneid-auth-pages/captures/auth-zero-length40.pcap": "captures/auth-zero-length40.pcap",
+        "common/pcapx/pcaputil/opendroneid-auth-pages/captures/auth-zero-trailing.pcap": "captures/auth-zero-trailing.pcap",
+        "common/pcapx/pcaputil/opendroneid-auth-pages/captures/auth-zero-wrong-version.pcap": "captures/auth-zero-wrong-version.pcap",
+        "common/pcapx/pcaputil/opendroneid-auth-pages/captures/cut-auth-page-2.pcap": "captures/cut-auth-page-2.pcap",
+        "common/pcapx/pcaputil/opendroneid-auth-pages/captures/cut-auth-page-24.pcap": "captures/cut-auth-page-24.pcap",
+        "common/pcapx/pcaputil/opendroneid-auth-pages/captures/cut-auth-page-7.pcap": "captures/cut-auth-page-7.pcap",
+        "common/pcapx/pcaputil/opendroneid-auth-pages/captures/cut-auth-zero-1.pcap": "captures/cut-auth-zero-1.pcap",
+        "common/pcapx/pcaputil/opendroneid-auth-pages/captures/cut-auth-zero-2.pcap": "captures/cut-auth-zero-2.pcap",
+        "common/pcapx/pcaputil/opendroneid-auth-pages/captures/cut-auth-zero-24.pcap": "captures/cut-auth-zero-24.pcap",
+        "common/pcapx/pcaputil/opendroneid-auth-pages/captures/cut-auth-zero-7.pcap": "captures/cut-auth-zero-7.pcap",
+        "common/pcapx/pcaputil/opendroneid-auth-pages/captures/no-authentication.pcap": "captures/no-authentication.pcap",
+        "common/pcapx/pcaputil/opendroneid-auth-pages/captures/pack-auth-eight-mixed.pcap": "captures/pack-auth-eight-mixed.pcap",
+        "common/pcapx/pcaputil/opendroneid-auth-pages/captures/pack-auth-nine-pages.pcap": "captures/pack-auth-nine-pages.pcap",
+        "common/pcapx/pcaputil/opendroneid-auth-pages/captures/pack-auth-repeat-observed.pcap": "captures/pack-auth-repeat-observed.pcap",
+        "common/pcapx/pcaputil/opendroneid-auth-pages/captures/pack-auth-reversed.pcap": "captures/pack-auth-reversed.pcap",
+        "common/pcapx/pcaputil/opendroneid-auth-pages/captures/pack-auth-zero-page1.pcap": "captures/pack-auth-zero-page1.pcap",
+        "common/pcapx/pcaputil/opendroneid-auth-pages/captures/pack-auth-zero.pcap": "captures/pack-auth-zero.pcap",
+        "common/pcapx/pcaputil/opendroneid-auth-pages/controls.json": "controls.json",
+        "common/pcapx/pcaputil/opendroneid-auth-pages/official-auth-vectors.jsonl": "official-auth-vectors.jsonl",
+        "common/pcapx/pcaputil/opendroneid-auth-pages/reference-auth.c": "reference-auth.c",
+        "common/pcapx/pcaputil/opendroneid-auth-pages/reproduce-reference.py": "reproduce-reference.py",
+        "common/pcapx/pcaputil/opendroneid-auth-pages/seal.py": "seal.py",
+        "common/pcapx/pcaputil/opendroneid-auth-pages/source-pin.json": "source-pin.json",
+        "common/pcapx/pcaputil/opendroneid-auth-pages/validation/expected.json": "validation/expected.json",
+        "common/pcapx/pcaputil/opendroneid-auth-pages/validation/provenance.json": "validation/provenance.json",
+        "common/pcapx/pcaputil/opendroneid-auth-pages/validation/reused-inputs.json": "validation/reused-inputs.json",
+        "common/pcapx/pcaputil/opendroneid-auth-pages/verify.py": "verify.py"
+      }
     }
   ],
   "schema_version": 1,

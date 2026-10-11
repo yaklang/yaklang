@@ -369,3 +369,13 @@ in addition to the immutable12-capture idle matrix. Owner byte/CRC/context
 answers and actual self-owned loopback ordering are separate from the fixed
 Gurux codec's three actual APDU values; neither claims device or authentication
 success. All60 preceding ZIPs and original answers remain unchanged.
+
+`validation-opendroneid-auth-pages-51c136.zip` adds explicit UDP
+`opendroneid-auth-pages`: version2 Authentication page observations, exact page-zero
+capacity/time and full17/23-byte data, ordered repeated and mixed packs. These
+are opaque observations; no signature verification, aircraft identity, page
+assembly or standard BLE/WiFi transport is inferred. The existing mandatory
+`TestOpenDroneIDSealedReplay` and `TestOpenDroneIDBoundsOwnershipAndAdmission`
+cover44 controls with independent fixed official C codec fields and typed
+refusals;41 captures are new and three reuse immutable System inputs. The ZIP
+contains answers, source pins and generation/reference-build/verify/seal scripts.

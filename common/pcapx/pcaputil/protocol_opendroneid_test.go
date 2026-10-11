@@ -106,6 +106,7 @@ func TestOpenDroneIDSealedReplay(t *testing.T) {
 	}
 	t.Run("system-profile", testOpenDroneIDSystemReplay)
 	t.Run("identity-profile", testOpenDroneIDIdentityReplay)
+	t.Run("auth-pages-profile", testOpenDroneIDAuthPagesReplay)
 }
 
 func odidReplayCase(t *testing.T, c bsapControl, raw []byte, want bsapAnswer, port uint16, selection, profile string) {
@@ -138,7 +139,7 @@ func odidReplayCase(t *testing.T, c bsapControl, raw []byte, want bsapAnswer, po
 						w := want.Events[i]
 						require.Greater(t, e.ID, previousID)
 						previousID = e.ID
-						if profile == openDroneIDSystemProfile || profile == openDroneIDIdentityProfile {
+						if profile == openDroneIDSystemProfile || profile == openDroneIDIdentityProfile || profile == openDroneIDAuthProfile {
 							require.Equal(t, time.Unix(int64(i+1), 0).UTC(), e.Timestamp.UTC())
 						}
 						require.Equal(t, "opendroneid", e.Protocol)
@@ -181,13 +182,18 @@ func odidReplayCase(t *testing.T, c bsapControl, raw []byte, want bsapAnswer, po
 							f, err := e.GetFields()
 							require.NoError(t, err)
 							rocEqualFields(t, w.Fields, f)
-							if profile == openDroneIDSystemProfile || profile == openDroneIDIdentityProfile {
+							if profile == openDroneIDSystemProfile || profile == openDroneIDIdentityProfile || profile == openDroneIDAuthProfile {
 								require.Len(t, e.Raw, len(w.Raw)/2)
 								require.Equal(t, fmt.Sprintf("%x", sha256.Sum256(e.Raw)), e.SourceBytes.SHA256)
 								clear(e.Raw)
 							}
 							ms := f["Messages"].([]map[string]any)
 							ms[0]["Raw"].([]byte)[0] ^= 255
+							for _, m := range ms {
+								if data, ok := m["Authentication Data"].([]byte); ok {
+									data[0] ^= 255
+								}
+							}
 							f["Message Count"] = 999
 							d, err := e.Decode()
 							require.NoError(t, err)
@@ -218,6 +224,7 @@ func TestOpenDroneIDBoundsOwnershipAndAdmission(t *testing.T) {
 	t.Run("projection-depth", testOpenDroneIDDepthBudget)
 	t.Run("system-profile", testOpenDroneIDSystemBounds)
 	t.Run("identity-profile", testOpenDroneIDIdentityBounds)
+	t.Run("auth-pages-profile", testOpenDroneIDAuthPagesBounds)
 	var basic, pack []byte
 	for _, c := range odidControls(t) {
 		cap, a := odidInput(t, c)

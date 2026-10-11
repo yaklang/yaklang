@@ -17,6 +17,7 @@ func NativeProtocolProfiles() []ProtocolProfile {
 		{"opendroneid", "explicit-udp", "protocol2 Basic ID/Location and selected message packs", "raw25-byte messages or exact pack; ordered unverified IDs/location, reserved fields preserved; no automatic admission, ODID prefix, BLE/Wi-Fi broadcast, authentication or aircraft/position validity claim"},
 		{"opendroneid-system", "explicit-udp", "protocol2 System with optional Basic ID/Location", "one System and at most two Basic IDs/one Location in an exact ordered pack; operator coordinates/area/classification/time and reserved wire values; no automatic admission, BLE/Wi-Fi, authentication, geographic validity or aircraft association"},
 		{"opendroneid-identity", "explicit-udp", "protocol2 Self ID/Operator ID with optional Basic ID/Location/System", "at least one identity message; <=1 Self ID/Operator ID/System/Location and <=2 Basic IDs; ordered decoded byte strings and original wire bytes; no charset/identity/authentication claim or automatic BLE/Wi-Fi admission"},
+		{"opendroneid-auth-pages", "explicit-udp", "protocol2 Authentication page observations with optional identity/location/System", "exact25-byte pages or bounded ordered packs; page zero capacity and unsigned time, 17-byte page-zero/23-byte later-page opaque data; repeated pages preserved, never assembled or verified; no identity/authentication claim, cross-datagram association or automatic BLE/Wi-Fi admission"},
 		{"dlms-wrapper", "tcp/udp", "Wrapper v1 selected unciphered LN Get-normal/Get-with-list", "exact WPDU/APDU, ordered normal/list/block descriptors and selected scalar/octet/bits/float/text/calendar/compact/array/structure/error results; list caps64 items/1024 octets, aggregate256 Data nodes/8 levels plus caller budgets; structured selective parameters without selector meaning; reversed carrier/wPort/invoke/full-flags/choice/count observations, invoke reuse ambiguous; pre-established AA may be unseen; no authentication, negotiated conformance, object model, unselected Data, GBT/cipher/ACSE claim"},
 		{"dlms", "tcp/udp", "complete standalone HDLC type3 tunnel frames", "CRC/address/link controls and selected unciphered LN Get-normal scalars with observed endpoints, invoke and link sequence; ambiguity blocks association; ordered bounded GET lists with exact full invoke/choice/count/address/NSNR observations; no IP wrapper, ACSE authentication, ciphering, block/segmented transfer or meter object semantics"},
 		{"slmp", "tcp/udp", "binary3E/4E connected-station Self Test0619/0000", "exact timer/count/loopback/error fields and observed requester; UDP one outstanding route/serial/echo match with ambiguous overlap quarantined; TCP bounded distinct-serial 4E pipeline and sequential distinct-echo 3E success; completed identifier reuse and later unsequenced TCP errors remain context-required; no ASCII, other commands, private MELSOFT or authenticated device claim"},
@@ -75,7 +76,7 @@ func WithProtocolDecodeAs(transport string, port uint16, protocol string) Captur
 			return fmt.Errorf("DecodeAs requires UDP and a nonzero port")
 		}
 		switch protocol {
-		case "dns", "mdns", "llmnr", "dhcp", "dhcpv6", "syslog", "snmp", "mqtt-sn", "bittorrent-dht", "bjnp", "rtp", "sip", "stun", "turn", "dtls", "mavlink", "nmea", "semtech-udp", "semtech-downlink-session", "rtps", "bsap", "slmp", "dlms", "opendroneid", "opendroneid-system", "opendroneid-identity", "c37118", "knx", "pfcp", "dlms-wrapper", "doip":
+		case "dns", "mdns", "llmnr", "dhcp", "dhcpv6", "syslog", "snmp", "mqtt-sn", "bittorrent-dht", "bjnp", "rtp", "sip", "stun", "turn", "dtls", "mavlink", "nmea", "semtech-udp", "semtech-downlink-session", "rtps", "bsap", "slmp", "dlms", "opendroneid", "opendroneid-system", "opendroneid-identity", "opendroneid-auth-pages", "c37118", "knx", "pfcp", "dlms-wrapper", "doip":
 		default:
 			return fmt.Errorf("unsupported native DecodeAs profile")
 		}
@@ -154,6 +155,9 @@ func (a *binParser) decodeNativeDatagram(e *ProtocolEvent, w []byte, src, dst ui
 	}
 	if explicit == "c37118" || explicit == "" && c37118DatagramEvidence(w) {
 		return a.decodeC37118Datagram(e, w, explicit == "c37118")
+	}
+	if explicit == "opendroneid-auth-pages" {
+		return a.decodeOpenDroneIDProfileDatagram(e, w, odidAuthPages)
 	}
 	if explicit == "opendroneid-identity" {
 		return a.decodeOpenDroneIDProfileDatagram(e, w, odidIdentity)

@@ -38,7 +38,13 @@ func testOpenDroneIDDepthBudget(t *testing.T) {
 			inputs = append(inputs, input{"opendroneid-identity", c.ID, a})
 		}
 	}
-	require.Len(t, inputs, 6)
+	for _, c := range odidAuthPagesControls(t) {
+		if c.ID == "auth-zero-length17" || c.ID == "pack-auth-nine-pages" {
+			_, a := odidAliasedInput(t, "opendroneid-auth-pages", c.bsapControl, c.CaptureAlias)
+			inputs = append(inputs, input{"opendroneid-auth-pages", c.ID, a})
+		}
+	}
+	require.Len(t, inputs, 8)
 	for _, tc := range inputs {
 		t.Run(tc.profile+"/"+tc.id, func(t *testing.T) {
 			require.Len(t, tc.answer.Events, 1)
@@ -63,9 +69,9 @@ func testOpenDroneIDDepthBudget(t *testing.T) {
 						require.Zero(t, e.ResponseTo)
 						require.Zero(t, e.TransactionID)
 						require.Zero(t, e.FlowID)
-					if depth == 1 {
-						require.NotNil(t, g.Err, "configured projection depth must reject nested message maps")
-						rocTypedError(t, "ResourceExceeded", g.Err)
+						if depth == 1 {
+							require.NotNil(t, g.Err, "configured projection depth must reject nested message maps")
+							rocTypedError(t, "ResourceExceeded", g.Err)
 							require.Nil(t, e.Session)
 							require.Nil(t, e.Fields)
 							require.Nil(t, e.Structured)
@@ -85,8 +91,8 @@ func testOpenDroneIDDepthBudget(t *testing.T) {
 					// Layout diagnostics remain authoritative before projection admission.
 					bad := bytes.Clone(raw)
 					bad[0] = (bad[0] & 0xf0) | 3
-				g := s.Feed(0, time.Unix(3, 0), bad)
-				require.NotNil(t, g.Err)
+					g := s.Feed(0, time.Unix(3, 0), bad)
+					require.NotNil(t, g.Err)
 					rocTypedError(t, "UnsupportedVersion", g.Err)
 					require.Len(t, g.Events, 1)
 					require.Nil(t, g.Events[0].Session)
