@@ -71,7 +71,7 @@ func directlyAnswerSyntaxFlowVerifier(loop *reactloops.ReActLoop, action *aicomm
 	if sfHasCodeSample {
 		sfVerifyMatched := utils.InterfaceToBoolean(loop.Get("sf_verify_matched"))
 		if !sfVerifyMatched {
-			return utils.Error("Cannot directly_answer: 有正例（用户提供的漏洞样例=file://、UNSAFE）时必须先完成正例自检且 sf_verify_matched=true。write_rule/modify_rule 语法通过后系统会自动自检；若失败请按反馈 modify_rule。也可手动 require_tool check-syntaxflow-syntax 并传入 path、sample_code、filename、language 复查。")
+			return utils.Error("Cannot directly_answer: 有正例（用户提供的漏洞样例=file://、UNSAFE）时必须先完成正例自检且 sf_verify_matched=true。write_rule/modify_rule 语法通过后系统会自动自检；若失败请按反馈 modify_rule。手动复查时，若尚无完整 Schema，先用 require_tool 的 require_tool_payload 加载 check-syntaxflow-syntax 定义（仅加载，不执行），再用 directly_call_tool 提交 path、sample_code、filename、language 等 Schema 声明的参数；已有 Schema 直接复用。")
 		}
 	}
 
