@@ -37,7 +37,8 @@ func nmeaAISEnvelope(p []string) error {
 }
 
 // nmeaAIS observes ITU-R M.1371-5's 168-bit Class A (types1/2/3) and Class B
-// (Type18/19) position reports and independent Type24 static report parts.
+// (Type18/19) position reports, independent Type24 static report parts and
+// Type27 long-range positions.
 // Each selected schema validates its own exact payload size.
 // A checksum establishes representation, not ship identity or a physical fix.
 // Sequence/channel labels are literal; this stateless profile never assembles
@@ -61,6 +62,9 @@ func nmeaAIS(p []string, out map[string]any) error {
 	}
 	if first == 24 {
 		return nmeaAISStatic(p, out)
+	}
+	if first == 27 {
+		return nmeaAISLongRange(p, out)
 	}
 	if first < 1 || first > 3 {
 		return protocolError(ErrUnsupportedFeature, "AIS message is outside selected position report profiles")

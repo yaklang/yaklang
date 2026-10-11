@@ -43781,6 +43781,94 @@
         "common/pcapx/pcaputil/nmea-ais-session/validation/source-type5.json": "validation/source-type5.json",
         "scripts/protocol-tests/required-tests-traffic-unified-v19.json": "scripts/required-tests-traffic-unified-v19.json"
       }
+    },
+    {
+      "id": "nmea-ais-longrange",
+      "kind": "validation",
+      "file": "validation-nmea-ais-longrange.zip",
+      "password": "bin-parser",
+      "sha256": "e9e6fbdf0468270203081b6fc2dc90021e59d8f6cc1a8f54b0e061603d7d18a9",
+      "source_sha": "286467961708c387368811dc7718ddd97640b8fd",
+      "members": {
+        "answers/complete-reports.json": {
+          "bytes": 22622,
+          "sha256": "83f580a166ce89831a47693761577e5e93886b80790310390ef3e53b0529404d"
+        },
+        "answers/malformed-refusals.json": {
+          "bytes": 1699,
+          "sha256": "43df5717d6f99e7572f5255410853bb1a3422b06e190b554e45fd1ce8fe3b3c9"
+        },
+        "answers/unsupported-refusals.json": {
+          "bytes": 653,
+          "sha256": "a85bedfda052114589b637136de02ba59745232ded57e10186cde417c5bfd75c"
+        },
+        "captures/complete-reports.pcap": {
+          "bytes": 1392,
+          "sha256": "5a3fef3860e074fa229ada387cfbf658709f54acdf2a3236ff47511732b56a47"
+        },
+        "captures/malformed-refusals.pcap": {
+          "bytes": 1391,
+          "sha256": "0a9eb0a4563936db4227b8001c72b954296027c22c48c7425b871ed8b65602b1"
+        },
+        "captures/unsupported-refusals.pcap": {
+          "bytes": 499,
+          "sha256": "31d674cfd04b270291cea864fac9a0045badb09b5dc9af2e98b5da98ff3c560d"
+        },
+        "controls.json": {
+          "bytes": 1091,
+          "sha256": "4409d44298f908669ba1f2b7a862d92e2f3aa0f0fb5370a4adb38cfba2601204"
+        },
+        "scripts/build_fixture.py": {
+          "bytes": 6855,
+          "sha256": "55c1a3135b10d2315cb0b92ca2d9dc2a9c7d83f9e7dda7d4a8d8ccd80fbbc7f4"
+        },
+        "scripts/build_inputs.py": {
+          "bytes": 1979,
+          "sha256": "03d4a1ec0e3c73c467fee0a501ceeb9609e37f113b36063de0ce85c3ecaee40f"
+        },
+        "scripts/check_reference.py": {
+          "bytes": 1569,
+          "sha256": "865360c74ae86bb20cd0bd69402112f07d462f404735436cb17448bc961fa65e"
+        },
+        "scripts/reference27.cpp": {
+          "bytes": 731,
+          "sha256": "6b4c14e727606313b3f9ce24856bd6db5983964c9de6c8d488d5d8e549315022"
+        },
+        "scripts/required-tests-traffic-unified-v20.json": {
+          "bytes": 133409,
+          "sha256": "6f9703c2d86b1736806cffa13202b1bb1feb6b5eb02df14d847dfa17ec71685f"
+        },
+        "validation/expected.json": {
+          "bytes": 3217,
+          "sha256": "8d2ce21aceb780d973490b9081e5ed206436cd0b6221a04e149929df86c82481"
+        },
+        "validation/reference-inputs.json": {
+          "bytes": 6629,
+          "sha256": "6f0fe03b9a6474548178f151cd17374f0804793cf22175f5916d349ab9b4683c"
+        },
+        "validation/source-pins.json": {
+          "bytes": 833,
+          "sha256": "86e1b2cdddc6326fbcc993cc432f94a1a8ab7f7905c973fa976f958eb5095990"
+        }
+      },
+      "aliases": {
+        "common/pcapx/pcaputil/nmea-ais-longrange/answers/complete-reports.json": "answers/complete-reports.json",
+        "common/pcapx/pcaputil/nmea-ais-longrange/answers/malformed-refusals.json": "answers/malformed-refusals.json",
+        "common/pcapx/pcaputil/nmea-ais-longrange/answers/unsupported-refusals.json": "answers/unsupported-refusals.json",
+        "common/pcapx/pcaputil/nmea-ais-longrange/captures/complete-reports.pcap": "captures/complete-reports.pcap",
+        "common/pcapx/pcaputil/nmea-ais-longrange/captures/malformed-refusals.pcap": "captures/malformed-refusals.pcap",
+        "common/pcapx/pcaputil/nmea-ais-longrange/captures/unsupported-refusals.pcap": "captures/unsupported-refusals.pcap",
+        "common/pcapx/pcaputil/nmea-ais-longrange/controls.json": "controls.json",
+        "common/pcapx/pcaputil/nmea-ais-longrange/scripts/build_fixture.py": "scripts/build_fixture.py",
+        "common/pcapx/pcaputil/nmea-ais-longrange/scripts/build_inputs.py": "scripts/build_inputs.py",
+        "common/pcapx/pcaputil/nmea-ais-longrange/scripts/check_reference.py": "scripts/check_reference.py",
+        "common/pcapx/pcaputil/nmea-ais-longrange/scripts/reference27.cpp": "scripts/reference27.cpp",
+        "common/pcapx/pcaputil/nmea-ais-longrange/scripts/required-tests-traffic-unified-v20.json": "scripts/required-tests-traffic-unified-v20.json",
+        "common/pcapx/pcaputil/nmea-ais-longrange/validation/expected.json": "validation/expected.json",
+        "common/pcapx/pcaputil/nmea-ais-longrange/validation/reference-inputs.json": "validation/reference-inputs.json",
+        "common/pcapx/pcaputil/nmea-ais-longrange/validation/source-pins.json": "validation/source-pins.json",
+        "scripts/protocol-tests/required-tests-traffic-unified-v20.json": "scripts/required-tests-traffic-unified-v20.json"
+      }
     }
   ],
   "schema_version": 1,
