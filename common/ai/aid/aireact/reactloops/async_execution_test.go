@@ -59,6 +59,11 @@ func TestReActLoopAsyncExecutionToolCallerIntegration(t *testing.T) {
 	})
 
 	started := make(chan struct{})
+	cancelled := make(chan struct{})
+	cleanup := make(chan struct{})
+	var cleanupOnce sync.Once
+	releaseCleanup := func() { cleanupOnce.Do(func() { close(cleanup) }) }
+	defer releaseCleanup()
 	tool, err := aitool.New("loop_inspector_fixture",
 		aitool.WithDangerousNoNeedUserReview(true),
 		aitool.WithNoRuntimeCallback(func(ctx context.Context, _ aitool.InvokeParams, stdout, stderr io.Writer) (any, error) {
@@ -66,36 +71,24 @@ func TestReActLoopAsyncExecutionToolCallerIntegration(t *testing.T) {
 			_, _ = fmt.Fprintln(stderr, "warning")
 			close(started)
 			<-ctx.Done()
+			close(cancelled)
+			select {
+			case <-cleanup:
+			case <-owner.Done():
+			}
 			_, _ = fmt.Fprintln(stdout, "cleaned")
 			return nil, ctx.Err()
 		}),
 	)
 	require.NoError(t, err)
-	callCtx, cancelCall := context.WithCancel(cfg.DefaultTask.GetContext())
-	defer cancelCall()
-	caller, err := aicommon.NewToolCaller(callCtx,
+	caller, err := aicommon.NewToolCaller(cfg.DefaultTask.GetContext(),
 		aicommon.WithToolCaller_AICallerConfig(cfg), aicommon.WithToolCaller_Task(cfg.DefaultTask),
 		aicommon.WithToolCaller_Emitter(cfg.Emitter), aicommon.WithToolCaller_Reason("loop integration test"),
-		aicommon.WithToolCaller_WaitForCallbackOnCancel(true),
 	)
 	require.NoError(t, err)
-	resource, err := asyncexecmanager.NewResource(func(ctx context.Context) error {
-		stop := context.AfterFunc(ctx, cancelCall)
-		defer stop()
-		defer cancelCall()
-		result, directlyAnswer, err := caller.CallToolWithExistedParams(tool, aitool.InvokeParams{})
-		if err != nil {
-			return err
-		}
-		if directlyAnswer || result == nil {
-			return errors.New("tool call did not produce a result")
-		}
-		if !result.Success {
-			return errors.New(result.Error)
-		}
-		return nil
-	}, caller.Inspector().Inspect)
+	resource, err := caller.NewAsyncResource(tool, aitool.InvokeParams{})
 	require.NoError(t, err)
+	require.Same(t, caller.Inspector(), resource.Inspector())
 	receipt, err := manager.Start(asyncexecmanager.Request{Resource: resource})
 	require.NoError(t, err)
 	select {
@@ -118,6 +111,17 @@ func TestReActLoopAsyncExecutionToolCallerIntegration(t *testing.T) {
 	loop.Release()
 	loop.Release()
 	require.NoError(t, owner.Err(), "Release must not cancel the owning task itself")
+	select {
+	case <-cancelled:
+	case <-owner.Done():
+		t.Fatal("tool did not receive cancellation")
+	}
+	waitCtx, cancelWait := context.WithTimeout(owner, 20*time.Millisecond)
+	defer cancelWait()
+	stopping, err := manager.Wait(waitCtx, receipt.ID)
+	require.ErrorIs(t, err, context.DeadlineExceeded)
+	require.Equal(t, asyncexecmanager.StateStopping, stopping.State)
+	releaseCleanup()
 	final, err := manager.Wait(owner, receipt.ID)
 	require.NoError(t, err)
 	require.Equal(t, asyncexecmanager.StateCancelled, final.State)

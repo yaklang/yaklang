@@ -185,6 +185,7 @@ type ToolCaller struct {
 	inspectionResult        json.RawMessage
 	inspectionError         error
 	waitForCallbackOnCancel bool
+	asyncResourceBound      bool // guarded by m; one resource owns this caller
 }
 
 // ToolCallerGate bounds one phase of a tool call. The returned release
