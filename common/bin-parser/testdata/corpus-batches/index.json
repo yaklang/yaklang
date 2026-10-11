@@ -50252,6 +50252,352 @@
         "common/pcapx/pcaputil/dronecan-node-info-tail-boundary/SOURCE.json": "SOURCE.json",
         "common/pcapx/pcaputil/dronecan-node-info-tail-boundary/reference_rx.c": "reference_rx.c"
       }
+    },
+    {
+      "id": "validation-opcua-read-scalar",
+      "kind": "validation",
+      "source_sha": "33f4c50c6fc84b577d5e11ce93bd978f6e8a9a35",
+      "file": "validation-opcua-read-scalar.zip",
+      "sha256": "2bba8bf0140be03b3b425d92d665a23d808063c40b7da9632ebc2ac2abf2868c",
+      "password": "bin-parser",
+      "members": {
+        "material/cases.json": {
+          "sha256": "079e813f758545bc898d48f21fcd7a46e012358043b835f2c607b5714676e3bf",
+          "bytes": 354911
+        },
+        "manifest.json": {
+          "sha256": "c051710edff773ed102a6ca9cd2efd52ef84bd2c87aff15c9b042d71483394f6",
+          "bytes": 12020
+        },
+        "material/uint64-exact.pcap": {
+          "sha256": "92a8fe439a0b85b49780a9b3d04ea12cfd25a6a79bd968541b7f679c402512e5",
+          "bytes": 973
+        },
+        "material/uint64-max.pcap": {
+          "sha256": "65cb91e4be83a7dfdd43f9cb887d423b28ffab770a1a038ebbc53a80eb73ac41",
+          "bytes": 973
+        },
+        "material/int64-min.pcap": {
+          "sha256": "bae5421ae3e3dbf505fbd1da3d9b609744c30bb1fbc87b5535de27d0bf03b3e9",
+          "bytes": 973
+        },
+        "material/double.pcap": {
+          "sha256": "a1eb48b5e6440ecd1fc45020439ceb46f54c31907bae6914b2cafb7e4d2950e1",
+          "bytes": 973
+        },
+        "material/float.pcap": {
+          "sha256": "20ec18e96a34f22aad2a498db16c13d9c8ac1823edb90de54a8d3f8564665c62",
+          "bytes": 969
+        },
+        "material/boolean.pcap": {
+          "sha256": "e2d198274cea3ceb6a5e94300054e6d93de0ba4c7e73bcb17613a444d2982661",
+          "bytes": 966
+        },
+        "material/string.pcap": {
+          "sha256": "4b96b12586856ca1272ada84cb50339faba63d1e969d1d98f90171793e9130e9",
+          "bytes": 975
+        },
+        "material/bytes.pcap": {
+          "sha256": "98b8cbae6613e5a2dd5def3731ecc4e6a0d8325991d7f198b7945147f8ba7bf1",
+          "bytes": 971
+        },
+        "material/datetime.pcap": {
+          "sha256": "aa33039195c55a1911880159a812e61569b160d41dddd22f17c80233e6ae4713",
+          "bytes": 973
+        },
+        "material/status.pcap": {
+          "sha256": "a520ca8c92c54d64792c9a8105d89aedf1c79db11bb3fc983931aa4118334930",
+          "bytes": 969
+        },
+        "material/null-string.pcap": {
+          "sha256": "775bbd68f9ad9c53d2b38cae828a6b6f6850fa030262dc4f4162bc7b6617c07b",
+          "bytes": 969
+        },
+        "material/empty-string.pcap": {
+          "sha256": "97662c723115d4c70608fa9ddb76bb83ee96d8edacb14a83baffcf96971c55d0",
+          "bytes": 969
+        },
+        "material/handle-mismatch.pcap": {
+          "sha256": "6dfc60aa967ff4955286b9c83876167ef3f0c8084b30ddcaaaf50d318aad79cb",
+          "bytes": 973
+        },
+        "material/result-count-mismatch.pcap": {
+          "sha256": "067f3fa8141ab3b00ba44579fc4584e41f2c8ea745726ef97ae29fd496aa905f",
+          "bytes": 991
+        },
+        "material/bad-service-empty-results.pcap": {
+          "sha256": "7509cafa72aed536e03dcdcae14eda13b99511d51d719b8ecee9ff258d783831",
+          "bytes": 957
+        },
+        "material/reserved-datavalue-mask.pcap": {
+          "sha256": "a67f74682d0d7b5b0c667b2ebfa82e66dfd2900e517dde464d2cf5417894b71c",
+          "bytes": 973
+        },
+        "material/array-variant-unsupported.pcap": {
+          "sha256": "0f6b28a85e2ef7a4d3175e5dd099dab9092a1abb800f2ce882996bd37729fc05",
+          "bytes": 985
+        },
+        "material/trailing-octet.pcap": {
+          "sha256": "1ceb3714c930ce26c6f3d5dfa889eb81eeff19f0076e96ccb4f63d65282cdc03",
+          "bytes": 974
+        },
+        "material/truncated-diagnostic-array.pcap": {
+          "sha256": "a1d6d17a26c5405411b5c088ce047b9d0d6b34400a889c4189dbdb4f667ab7f6",
+          "bytes": 972
+        },
+        "material/wrong-direction-unmatched.pcap": {
+          "sha256": "7a1c32a452f060b2f289ca74f03f97eb8180491238e10de51364369dd33946a6",
+          "bytes": 973
+        },
+        "material/unobserved-request.pcap": {
+          "sha256": "1353c112a1f617dd80106fd15bb6ac327ad089203a241dd50779b934ee168378",
+          "bytes": 810
+        },
+        "material/node-string.pcap": {
+          "sha256": "4decad5fba671d91da152fd2cd2a6c0ab891fb65914d441c482edcb26cdc20a9",
+          "bytes": 1003
+        },
+        "material/node-guid.pcap": {
+          "sha256": "cf1b804fb2e1bdafdcf572e9538435b0c4cb50e9bdd3432bcfdc7c040d94ca35",
+          "bytes": 1005
+        },
+        "material/node-bytes.pcap": {
+          "sha256": "c0f11249e81a89f9d912c4abdcdc4a8db7fbf5b0beb7064eed08677c4dbfd122",
+          "bytes": 995
+        },
+        "material/node-two-byte.pcap": {
+          "sha256": "f49e4f96c44df20979a30f53932003f30b451f3fe23d41eb2474c5659662c9b6",
+          "bytes": 988
+        },
+        "material/node-four-byte.pcap": {
+          "sha256": "3af733c580d9e766401582bda2ffdd2d7c7a5f8b3d495df714292ffc1ded00a7",
+          "bytes": 990
+        },
+        "material/multi-result-order.pcap": {
+          "sha256": "d1c16dc86061b7e0891774df6f1738ca4e6454a37cf9b658e7786f6afa7cb7ea",
+          "bytes": 1074
+        },
+        "material/null-node-array-server-rejection.pcap": {
+          "sha256": "63e12a551d5b2407f3d8fbeacbc66ab0e6a5cbc0f9894c17c187d4f1e446f3dd",
+          "bytes": 921
+        },
+        "material/negative-maxage-server-rejection.pcap": {
+          "sha256": "2df651962cc7384e4f2c176badd109a3494f98d2cf2ed56ebf4c0919fe5d2e29",
+          "bytes": 939
+        },
+        "material/sbyte.pcap": {
+          "sha256": "86ed306c89ac5c6632d02a0abe44c3fb86a284c6528bc8be7e2320b01fe22a38",
+          "bytes": 966
+        },
+        "material/byte.pcap": {
+          "sha256": "2b258e470b7b02758a746fb69ef7d4089ed1564df9ef187bcc96506a1fc4fc1e",
+          "bytes": 966
+        },
+        "material/int16.pcap": {
+          "sha256": "0ee37c5b0be347d68d0a49216b8e6152162b40715187f714122e382749607ea2",
+          "bytes": 967
+        },
+        "material/uint16.pcap": {
+          "sha256": "6a5cc9e739a078531ca9117990e8190b5b2457b528731f5b4b7c01eea604f383",
+          "bytes": 967
+        },
+        "material/int32.pcap": {
+          "sha256": "8fe326d27246a4ec6dac7aea2bddd581334713e797586acdff35d6587f38f2b2",
+          "bytes": 969
+        },
+        "material/uint32.pcap": {
+          "sha256": "6f40eb3138d5adf59984d202ee1cf19c928ecf0ca4abe910f6a12d33ff620dfe",
+          "bytes": 969
+        },
+        "material/null.pcap": {
+          "sha256": "0cfa9d98a03447d056a6dd10d9b67252bcbd42334032094a3957a05b0b729658",
+          "bytes": 965
+        },
+        "material/guid.pcap": {
+          "sha256": "5d28d8f8cf5a58a71c2348843968f5a534f9b8a7ac03f60577296c3b803d935b",
+          "bytes": 981
+        },
+        "material/variant-nodeid.pcap": {
+          "sha256": "20552c36a8005bc78acfb0790cffa879ee9740227d91122e59b79bcfbfef22df",
+          "bytes": 977
+        },
+        "material/diagnostic-unsupported.pcap": {
+          "sha256": "7dee1820d9de1d34ca4ae65900678891559f6bbe47be3ada541cc180fc6f8a0c",
+          "bytes": 986
+        },
+        "material/double-inf.pcap": {
+          "sha256": "135934dfeffddcf4d3f568cd996b32810ace69d7ec7aef5f0a56116d8d359711",
+          "bytes": 973
+        },
+        "material/double-negative-inf.pcap": {
+          "sha256": "a481f937f1f1177fbeb0c6e36d3305e94f021c91b3cf9f20b18e0e4d52d3bc31",
+          "bytes": 973
+        },
+        "material/double-nan.pcap": {
+          "sha256": "60521c0f33e8c8b4a7c487a209f156ec862ad23b940ae8dae05e02903bf6643a",
+          "bytes": 973
+        },
+        "material/float-nan.pcap": {
+          "sha256": "1d17d4f7de1653ea2d0eda92cfd691500b302bb3451479ecaf6109ccd321542c",
+          "bytes": 969
+        },
+        "material/uncertain-result-count-mismatch.pcap": {
+          "sha256": "a21ac0f604b76727f9c6ed7f7d670405cd2044f6988931c7eddbcfbc5109b4f9",
+          "bytes": 991
+        },
+        "material/request-ua-chunks.pcap": {
+          "sha256": "c735297c0efeab780e1bd69242216c761891206f631659aec61f35ec0f791b83",
+          "bytes": 1067
+        },
+        "material/response-ua-chunks.pcap": {
+          "sha256": "b3eb58fbe865e2c8d206fe09902c6f42d60e41448dacdeb2beac156e72ecda13",
+          "bytes": 1067
+        },
+        "material/partial-ua-chunk-close.pcap": {
+          "sha256": "f4b818ce1e6f32d01fa26feee66bf62688c5cd3463d366a286c9e0862128130c",
+          "bytes": 760
+        },
+        "material/abort-clears-request.pcap": {
+          "sha256": "b99fc04c905ac029d60fa10f931ac810cc944fd10c69874542444ca99763196e",
+          "bytes": 920
+        },
+        "material/request-after-abort.pcap": {
+          "sha256": "5270ab62259ffac02461c6b279d90f45e6b41a0af99aa3726c74fe9d4d9be14d",
+          "bytes": 1247
+        },
+        "material/empty-diagnostic-entry.pcap": {
+          "sha256": "fb22a65c223a2af88e6dcaf506d7f5b7e034d33332ae51bf8eed9b2d9ef8ca18",
+          "bytes": 974
+        },
+        "material/diagnostic-count-mismatch.pcap": {
+          "sha256": "2e6609c6a04f4ba576bf3cd34e5f357c65d5e490264630f6f5769dd835459e05",
+          "bytes": 975
+        },
+        "material/unpaired-diagnostic-count-mismatch.pcap": {
+          "sha256": "f2d48f38800f64332fb30498b8dfe617c6553a157e00d72cb8b37bb227138245",
+          "bytes": 812
+        },
+        "material/active-request-id-reuse.pcap": {
+          "sha256": "5df063e68142e1aa58f66593f1af6cbd9fa39aa702ff4c2d80223ff037711b22",
+          "bytes": 972
+        },
+        "material/completed-request-id-reuse.pcap": {
+          "sha256": "5b9b30bb4ecfd0f5179aad8265f056c347335b2828f6085791344b93c7abed16",
+          "bytes": 1300
+        },
+        "material/interleaved-read-requests.pcap": {
+          "sha256": "737ed6bd27b1b8a4f7daa52b230844ac4c14e9ff1644e59aa6db59e2583f9ed8",
+          "bytes": 1300
+        },
+        "generate.py": {
+          "sha256": "d05bd411afba040602304af8dae85f4e77d7802dc2a2c688e8f4c9c5af0626e5",
+          "bytes": 15216
+        },
+        "emit.py": {
+          "sha256": "82ccf535fdcfd30f60d1fb5a0636d13839b3412fa9129d139f02472f1ced345d",
+          "bytes": 600
+        },
+        "capture.py": {
+          "sha256": "9ed7b48e2a86097ec85545b046c3c5bcbc22ea96396de355de9ad486566fa553",
+          "bytes": 1391
+        },
+        "reference_codec.py": {
+          "sha256": "506573c943d4fcdce03b0934d0acdef471719da65614a283b80f8fc144a7f540",
+          "bytes": 1433
+        },
+        "verify.py": {
+          "sha256": "aec60222d5ea1cc1a8e897d8a2ea8af467a433840d1630bbe8540c3b523b19dd",
+          "bytes": 1317
+        },
+        "seal.py": {
+          "sha256": "820a9a829e7755e74cd1debacb6e9edccf3264480bb42c87dfd26fe708db8910",
+          "bytes": 3560
+        },
+        "SOURCE.json": {
+          "sha256": "0b0a307b597bf605db4b0fb8bd273e146448ed1d8d89fc762ed2302a03dedeea",
+          "bytes": 3065
+        },
+        "SOURCE-asyncua.json": {
+          "sha256": "3d7b974d76610a00ac526cf08c01b172ae5dc7f512df64fab6add1fc892ba905",
+          "bytes": 3319
+        },
+        "SOURCE-primary.json": {
+          "sha256": "e9664bed6273419d25280c0cbc52cd979a79413a3d1f1b060f2677b372132e53",
+          "bytes": 1447
+        },
+        "validation/expected.json": {
+          "bytes": 62083,
+          "sha256": "f73b2467fc403da47a9bc2d45a632e729b21a45a8f5d2f81338032bc72c1ba62"
+        }
+      },
+      "aliases": {
+        "common/pcapx/pcaputil/opcua-read-scalar/material/cases.json": "material/cases.json",
+        "common/pcapx/pcaputil/opcua-read-scalar/manifest.json": "manifest.json",
+        "common/pcapx/pcaputil/opcua-read-scalar/material/uint64-exact.pcap": "material/uint64-exact.pcap",
+        "common/pcapx/pcaputil/opcua-read-scalar/material/uint64-max.pcap": "material/uint64-max.pcap",
+        "common/pcapx/pcaputil/opcua-read-scalar/material/int64-min.pcap": "material/int64-min.pcap",
+        "common/pcapx/pcaputil/opcua-read-scalar/material/double.pcap": "material/double.pcap",
+        "common/pcapx/pcaputil/opcua-read-scalar/material/float.pcap": "material/float.pcap",
+        "common/pcapx/pcaputil/opcua-read-scalar/material/boolean.pcap": "material/boolean.pcap",
+        "common/pcapx/pcaputil/opcua-read-scalar/material/string.pcap": "material/string.pcap",
+        "common/pcapx/pcaputil/opcua-read-scalar/material/bytes.pcap": "material/bytes.pcap",
+        "common/pcapx/pcaputil/opcua-read-scalar/material/datetime.pcap": "material/datetime.pcap",
+        "common/pcapx/pcaputil/opcua-read-scalar/material/status.pcap": "material/status.pcap",
+        "common/pcapx/pcaputil/opcua-read-scalar/material/null-string.pcap": "material/null-string.pcap",
+        "common/pcapx/pcaputil/opcua-read-scalar/material/empty-string.pcap": "material/empty-string.pcap",
+        "common/pcapx/pcaputil/opcua-read-scalar/material/handle-mismatch.pcap": "material/handle-mismatch.pcap",
+        "common/pcapx/pcaputil/opcua-read-scalar/material/result-count-mismatch.pcap": "material/result-count-mismatch.pcap",
+        "common/pcapx/pcaputil/opcua-read-scalar/material/bad-service-empty-results.pcap": "material/bad-service-empty-results.pcap",
+        "common/pcapx/pcaputil/opcua-read-scalar/material/reserved-datavalue-mask.pcap": "material/reserved-datavalue-mask.pcap",
+        "common/pcapx/pcaputil/opcua-read-scalar/material/array-variant-unsupported.pcap": "material/array-variant-unsupported.pcap",
+        "common/pcapx/pcaputil/opcua-read-scalar/material/trailing-octet.pcap": "material/trailing-octet.pcap",
+        "common/pcapx/pcaputil/opcua-read-scalar/material/truncated-diagnostic-array.pcap": "material/truncated-diagnostic-array.pcap",
+        "common/pcapx/pcaputil/opcua-read-scalar/material/wrong-direction-unmatched.pcap": "material/wrong-direction-unmatched.pcap",
+        "common/pcapx/pcaputil/opcua-read-scalar/material/unobserved-request.pcap": "material/unobserved-request.pcap",
+        "common/pcapx/pcaputil/opcua-read-scalar/material/node-string.pcap": "material/node-string.pcap",
+        "common/pcapx/pcaputil/opcua-read-scalar/material/node-guid.pcap": "material/node-guid.pcap",
+        "common/pcapx/pcaputil/opcua-read-scalar/material/node-bytes.pcap": "material/node-bytes.pcap",
+        "common/pcapx/pcaputil/opcua-read-scalar/material/node-two-byte.pcap": "material/node-two-byte.pcap",
+        "common/pcapx/pcaputil/opcua-read-scalar/material/node-four-byte.pcap": "material/node-four-byte.pcap",
+        "common/pcapx/pcaputil/opcua-read-scalar/material/multi-result-order.pcap": "material/multi-result-order.pcap",
+        "common/pcapx/pcaputil/opcua-read-scalar/material/null-node-array-server-rejection.pcap": "material/null-node-array-server-rejection.pcap",
+        "common/pcapx/pcaputil/opcua-read-scalar/material/negative-maxage-server-rejection.pcap": "material/negative-maxage-server-rejection.pcap",
+        "common/pcapx/pcaputil/opcua-read-scalar/material/sbyte.pcap": "material/sbyte.pcap",
+        "common/pcapx/pcaputil/opcua-read-scalar/material/byte.pcap": "material/byte.pcap",
+        "common/pcapx/pcaputil/opcua-read-scalar/material/int16.pcap": "material/int16.pcap",
+        "common/pcapx/pcaputil/opcua-read-scalar/material/uint16.pcap": "material/uint16.pcap",
+        "common/pcapx/pcaputil/opcua-read-scalar/material/int32.pcap": "material/int32.pcap",
+        "common/pcapx/pcaputil/opcua-read-scalar/material/uint32.pcap": "material/uint32.pcap",
+        "common/pcapx/pcaputil/opcua-read-scalar/material/null.pcap": "material/null.pcap",
+        "common/pcapx/pcaputil/opcua-read-scalar/material/guid.pcap": "material/guid.pcap",
+        "common/pcapx/pcaputil/opcua-read-scalar/material/variant-nodeid.pcap": "material/variant-nodeid.pcap",
+        "common/pcapx/pcaputil/opcua-read-scalar/material/diagnostic-unsupported.pcap": "material/diagnostic-unsupported.pcap",
+        "common/pcapx/pcaputil/opcua-read-scalar/material/double-inf.pcap": "material/double-inf.pcap",
+        "common/pcapx/pcaputil/opcua-read-scalar/material/double-negative-inf.pcap": "material/double-negative-inf.pcap",
+        "common/pcapx/pcaputil/opcua-read-scalar/material/double-nan.pcap": "material/double-nan.pcap",
+        "common/pcapx/pcaputil/opcua-read-scalar/material/float-nan.pcap": "material/float-nan.pcap",
+        "common/pcapx/pcaputil/opcua-read-scalar/material/uncertain-result-count-mismatch.pcap": "material/uncertain-result-count-mismatch.pcap",
+        "common/pcapx/pcaputil/opcua-read-scalar/material/request-ua-chunks.pcap": "material/request-ua-chunks.pcap",
+        "common/pcapx/pcaputil/opcua-read-scalar/material/response-ua-chunks.pcap": "material/response-ua-chunks.pcap",
+        "common/pcapx/pcaputil/opcua-read-scalar/material/partial-ua-chunk-close.pcap": "material/partial-ua-chunk-close.pcap",
+        "common/pcapx/pcaputil/opcua-read-scalar/material/abort-clears-request.pcap": "material/abort-clears-request.pcap",
+        "common/pcapx/pcaputil/opcua-read-scalar/material/request-after-abort.pcap": "material/request-after-abort.pcap",
+        "common/pcapx/pcaputil/opcua-read-scalar/material/empty-diagnostic-entry.pcap": "material/empty-diagnostic-entry.pcap",
+        "common/pcapx/pcaputil/opcua-read-scalar/material/diagnostic-count-mismatch.pcap": "material/diagnostic-count-mismatch.pcap",
+        "common/pcapx/pcaputil/opcua-read-scalar/material/unpaired-diagnostic-count-mismatch.pcap": "material/unpaired-diagnostic-count-mismatch.pcap",
+        "common/pcapx/pcaputil/opcua-read-scalar/material/active-request-id-reuse.pcap": "material/active-request-id-reuse.pcap",
+        "common/pcapx/pcaputil/opcua-read-scalar/material/completed-request-id-reuse.pcap": "material/completed-request-id-reuse.pcap",
+        "common/pcapx/pcaputil/opcua-read-scalar/material/interleaved-read-requests.pcap": "material/interleaved-read-requests.pcap",
+        "common/pcapx/pcaputil/opcua-read-scalar/generate.py": "generate.py",
+        "common/pcapx/pcaputil/opcua-read-scalar/emit.py": "emit.py",
+        "common/pcapx/pcaputil/opcua-read-scalar/capture.py": "capture.py",
+        "common/pcapx/pcaputil/opcua-read-scalar/reference_codec.py": "reference_codec.py",
+        "common/pcapx/pcaputil/opcua-read-scalar/verify.py": "verify.py",
+        "common/pcapx/pcaputil/opcua-read-scalar/seal.py": "seal.py",
+        "common/pcapx/pcaputil/opcua-read-scalar/SOURCE.json": "SOURCE.json",
+        "common/pcapx/pcaputil/opcua-read-scalar/SOURCE-asyncua.json": "SOURCE-asyncua.json",
+        "common/pcapx/pcaputil/opcua-read-scalar/SOURCE-primary.json": "SOURCE-primary.json"
+      }
     }
   ],
   "schema_version": 1,

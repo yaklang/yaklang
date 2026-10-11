@@ -11,27 +11,39 @@ type uaKey struct {
 	channel, request uint32
 }
 type uaChunk struct {
-	kind  string
-	token uint32
-	data  []byte
-	count int
+	kind    string
+	token   uint32
+	data    []byte
+	count   int
+	refs    []PacketReference
+	parents []uint64
 }
 type uaPeer struct {
 	seen, hello                    bool
 	version                        uint32
 	receive, send, message, chunks uint32
 }
+type uaReadPending struct {
+	handle uint32
+	count  int
+}
 type binOPCUA struct {
-	transportSeen   bool
-	reverseSeen     bool
-	reverseDir      int
-	reverseEndpoint string
-	peers           [2]uaPeer
-	plain           map[uint32]bool
-	tokens          map[uint32]uint32
-	seq             [2]map[uint32]uint32
-	chunks          map[uaKey]*uaChunk
-	pending         map[uaKey]uint32
+	currentRefs, completedRefs []PacketReference
+	currentID                  uint64
+	completedParents           []uint64
+	read                       bool
+	readPending                map[uaKey]uaReadPending
+	readReserve                func(int64) error
+	transportSeen              bool
+	reverseSeen                bool
+	reverseDir                 int
+	reverseEndpoint            string
+	peers                      [2]uaPeer
+	plain                      map[uint32]bool
+	tokens                     map[uint32]uint32
+	seq                        [2]map[uint32]uint32
+	chunks                     map[uaKey]*uaChunk
+	pending                    map[uaKey]uint32
 }
 
 func probeOPCUA(w []byte, _ int) ProbeResult {
@@ -54,10 +66,11 @@ func probeOPCUA(w []byte, _ int) ProbeResult {
 }
 func (f *binFlow) frameOPCUA(w []byte) (int, *binSpec, error) {
 	s := f.opcua
-	memory := int64(512 + len(s.reverseEndpoint) + (len(s.plain)+len(s.tokens)+len(s.pending)+len(s.seq[0])+len(s.seq[1]))*128 + 2*len(w))
+	memory := int64(512 + len(s.reverseEndpoint) + (len(s.plain)+len(s.tokens)+len(s.pending)+len(s.readPending)+len(s.seq[0])+len(s.seq[1]))*128 + 2*len(w))
 	for _, c := range s.chunks {
-		memory += 2*int64(cap(c.data)) + 128
+		memory += 2*int64(cap(c.data)) + int64(cap(c.refs))*80 + int64(cap(c.parents))*8 + 128
 	}
+	s.readReserve = func(extra int64) error { return f.reserveSession(memory + 3*extra) }
 	if err := f.reserveSession(memory); err != nil {
 		return 0, nil, err
 	}
@@ -116,6 +129,7 @@ func (s *binOPCUA) consume(dir int, w []byte, max, maxBytes int) (result map[str
 	if len(w) < 8 || int(binary.LittleEndian.Uint32(w[4:])) != len(w) {
 		return nil, fmt.Errorf("opcua: header")
 	}
+	s.completedRefs, s.completedParents = nil, nil
 	kind := string(w[:3])
 	defer func() {
 		if err == nil && kind != "RHE" {
@@ -130,6 +144,7 @@ func (s *binOPCUA) consume(dir int, w []byte, max, maxBytes int) (result map[str
 		s.tokens = map[uint32]uint32{}
 		s.chunks = map[uaKey]*uaChunk{}
 		s.pending = map[uaKey]uint32{}
+		s.readPending = map[uaKey]uaReadPending{}
 		s.seq = [2]map[uint32]uint32{{}, {}}
 	}
 	if kind == "HEL" || kind == "ACK" {
@@ -326,6 +341,14 @@ func (s *binOPCUA) consume(dir int, w []byte, max, maxBytes int) (result map[str
 			return nil, fmt.Errorf("opcua: abort trailing bytes")
 		}
 		out["Reason"] = string(reason)
+		if s.read {
+			for _, k := range []uaKey{key, {1 - dir, channel, request}} {
+				if _, ok := s.readPending[k]; ok {
+					delete(s.readPending, k)
+					delete(s.pending, k)
+				}
+			}
+		}
 		return out, nil
 	}
 	assembled := s.chunks[key]
@@ -340,6 +363,22 @@ func (s *binOPCUA) consume(dir int, w []byte, max, maxBytes int) (result map[str
 	if total > maxBytes || count > max || (peer.message != 0 && uint64(total) > uint64(peer.message)) || (peer.chunks != 0 && uint64(count) > uint64(peer.chunks)) {
 		return nil, protocolError(ErrResourceExceeded, "OPC UA assembled message/chunks")
 	}
+	if s.read && (chunk == 'C' || assembled != nil) {
+		refs := len(s.currentRefs)
+		parents := 1
+		if assembled != nil {
+			refs += len(assembled.refs)
+			parents += len(assembled.parents)
+		}
+		if refs > max || parents > max {
+			return nil, protocolError(ErrResourceExceeded, "OPC UA selected chunk evidence")
+		}
+		if s.readReserve != nil {
+			if err := s.readReserve(int64(2*total + refs*160 + parents*16 + 256)); err != nil {
+				return nil, err
+			}
+		}
+	}
 	if chunk == 'C' {
 		if assembled == nil {
 			if len(s.chunks) >= max {
@@ -347,6 +386,12 @@ func (s *binOPCUA) consume(dir int, w []byte, max, maxBytes int) (result map[str
 			}
 			assembled = &uaChunk{kind: kind, token: token}
 			s.chunks[key] = assembled
+		}
+		if s.read {
+			assembled.refs = append(assembled.refs, s.currentRefs...)
+			if s.currentID != 0 {
+				assembled.parents = append(assembled.parents, s.currentID)
+			}
 		}
 		assembled.data = append(assembled.data, b...)
 		assembled.count = count
@@ -357,8 +402,12 @@ func (s *binOPCUA) consume(dir int, w []byte, max, maxBytes int) (result map[str
 		b = append(assembled.data, b...)
 		delete(s.chunks, key)
 		out["Reassembled"] = true
+		if s.read {
+			s.completedRefs = uaUniqueRefs(assembled.refs, s.currentRefs)
+			s.completedParents = append([]uint64(nil), assembled.parents...)
+		}
 	}
-	service, _, err := uaService(b)
+	service, serviceBytes, err := uaService(b)
 	if err != nil {
 		return nil, err
 	}
@@ -366,7 +415,48 @@ func (s *binOPCUA) consume(dir int, w []byte, max, maxBytes int) (result map[str
 	out["Service Payload Bytes"] = len(b)
 	out["Semantic Status"] = "service-envelope-only"
 	out["Service Name"] = map[uint32]string{446: "OpenSecureChannelRequest", 449: "OpenSecureChannelResponse", 452: "CloseSecureChannelRequest", 461: "CreateSessionRequest", 464: "CreateSessionResponse", 467: "ActivateSessionRequest", 470: "ActivateSessionResponse", 473: "CloseSessionRequest", 476: "CloseSessionResponse", 527: "BrowseRequest", 530: "BrowseResponse", 631: "ReadRequest", 634: "ReadResponse", 673: "WriteRequest", 676: "WriteResponse"}[service]
-	// Request ID is scoped by secure channel and direction. Service bodies remain opaque.
+	var readBody map[string]any
+	if s.read && (service == 631 || service == 634) {
+		// Any selected-body refusal invalidates this observed pending exchange.
+		// A later response cannot consume the rejected message's association.
+		defer func() {
+			if err != nil {
+				k := key
+				if service == 634 {
+					k.dir = 1 - dir
+				}
+				delete(s.pending, k)
+				delete(s.readPending, k)
+			}
+		}()
+		readBody, err = decodeOPCUARead(b[serviceBytes:], service == 634, max, s.readReserve)
+		if err != nil {
+			return nil, err
+		}
+		out["Read"] = readBody
+		out["Semantic Status"] = "read-wire-observation"
+		if service == 634 {
+			results, _ := readBody["Results"].([]any)
+			diagnostics, _ := readBody["Diagnostic Infos"].([]any)
+			// Diagnostic entries correspond to result entries even when the
+			// capture did not include the request. An absent request is not
+			// permission to accept an internally inconsistent response.
+			if readBody["Header"].(map[string]any)["Service Result"].(uint32)&0x80000000 == 0 && len(diagnostics) != 0 && len(diagnostics) != len(results) {
+				return nil, protocolError(ErrDesynchronized, "OPC UA Read diagnostic count")
+			}
+			requestKey := uaKey{1 - dir, channel, request}
+			if pending, ok := s.readPending[requestKey]; ok {
+				header := readBody["Header"].(map[string]any)
+				if header["Request Handle"] != pending.handle {
+					return nil, protocolError(ErrDesynchronized, "OPC UA Read response handle")
+				}
+				if header["Service Result"].(uint32)&0x80000000 == 0 && len(results) != pending.count {
+					return nil, protocolError(ErrDesynchronized, "OPC UA Read response result count")
+				}
+			}
+		}
+	}
+	// Request ID is scoped by secure channel and direction. Other service bodies remain opaque.
 	responseTo := map[uint32]uint32{449: 446, 464: 461, 470: 467, 476: 473, 530: 527, 634: 631, 676: 673}
 	if expected, ok := responseTo[service]; ok {
 		key.dir = 1 - dir
@@ -381,6 +471,7 @@ func (s *binOPCUA) consume(dir int, w []byte, max, maxBytes int) (result map[str
 				return nil, protocolError(ErrDesynchronized, "OPC UA response service")
 			}
 			delete(s.pending, key)
+			delete(s.readPending, key)
 		}
 	} else if _, ok := map[uint32]bool{446: true, 461: true, 467: true, 473: true, 527: true, 631: true, 673: true}[service]; ok {
 		if _, exists := s.pending[key]; exists {
@@ -390,6 +481,10 @@ func (s *binOPCUA) consume(dir int, w []byte, max, maxBytes int) (result map[str
 			return nil, protocolError(ErrResourceExceeded, "OPC UA pending requests")
 		}
 		s.pending[key] = service
+		if readBody != nil {
+			nodes, _ := readBody["Nodes To Read"].([]any)
+			s.readPending[key] = uaReadPending{readBody["Header"].(map[string]any)["Request Handle"].(uint32), len(nodes)}
+		}
 	}
 	if kind == "CLO" {
 		delete(s.plain, channel)
@@ -397,6 +492,7 @@ func (s *binOPCUA) consume(dir int, w []byte, max, maxBytes int) (result map[str
 		for k := range s.pending {
 			if k.channel == channel {
 				delete(s.pending, k)
+				delete(s.readPending, k)
 			}
 		}
 		for k := range s.chunks {
@@ -408,4 +504,42 @@ func (s *binOPCUA) consume(dir int, w []byte, max, maxBytes int) (result map[str
 		delete(s.seq[1], channel)
 	}
 	return out, nil
+}
+
+// consumeEvent carries contributor identities across application chunks. Raw and
+// its SHA remain the final captured envelope; parent events expose prior chunks.
+func (s *binOPCUA) consumeEvent(dir int, e *ProtocolEvent, max, maxBytes int) (map[string]any, error) {
+	s.currentRefs = e.SourceBytes.PacketRefs
+	s.currentID = e.ID
+	out, err := s.consume(dir, e.Raw, max, maxBytes)
+	s.currentRefs = nil
+	s.currentID = 0
+	if err != nil && s.read {
+		for k := range s.readPending {
+			delete(s.pending, k)
+		}
+		clear(s.readPending)
+		clear(s.chunks)
+	}
+	if err == nil && len(s.completedParents) > 0 {
+		e.SourceBytes.PacketRefs = append([]PacketReference(nil), s.completedRefs...)
+		e.SourceBytes.ParentPDUs = append([]uint64(nil), s.completedParents...)
+	}
+	s.completedRefs = nil
+	s.completedParents = nil
+	return out, err
+}
+
+func uaUniqueRefs(a, b []PacketReference) []PacketReference {
+	out := make([]PacketReference, 0, len(a)+len(b))
+	seen := make(map[PacketReference]bool, len(a)+len(b))
+	for _, list := range [][]PacketReference{a, b} {
+		for _, ref := range list {
+			if !seen[ref] {
+				out = append(out, ref)
+				seen[ref] = true
+			}
+		}
+	}
+	return out
 }

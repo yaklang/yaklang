@@ -221,7 +221,7 @@ func (f *binFlow) detectDirection(dir int, wire []byte) {
 	case "s7comm":
 		f.protocol, f.s7 = "s7comm", &binS7{}
 	case "opcua":
-		f.protocol, f.opcua = "opcua", &binOPCUA{}
+		f.protocol, f.opcua = "opcua", &binOPCUA{read: f.a.config.DecodeOPCUARead}
 	case "rtsp":
 		f.protocol, f.rtsp = "rtsp", &binRTSP{}
 	case "stun":
@@ -386,7 +386,20 @@ func (f *binFlow) consumeSession(dir int, e *ProtocolEvent, result map[string]an
 	case "s7comm":
 		e.Session, err = f.s7.consume(dir, e.Raw, f.a.budget.MaxCollectionElements, f.a.budget.MaxMessageBytes)
 	case "opcua":
-		e.Session, err = f.opcua.consume(dir, e.Raw, f.a.budget.MaxCollectionElements, f.a.budget.MaxMessageBytes)
+		e.nativeOPCUARead = f.opcua.read
+		if f.opcua.read && e.ID == 0 {
+			e.ID = f.a.ids.Add(1)
+		}
+		e.Session, err = f.opcua.consumeEvent(dir, e, f.a.budget.MaxCollectionElements, f.a.budget.MaxMessageBytes)
+		if f.opcua.read {
+			e.Profile = "opcua-read-scalar"
+			if err == nil {
+				e.semanticFields = cloneSession(e.Session)
+				if result != nil {
+					result["fields"] = e.semanticFields
+				}
+			}
+		}
 	case "rtsp":
 		e.Session, err = f.rtsp.consume(dir, e.Raw, e.Timestamp, f.a.budget.MaxCollectionElements)
 		if err == nil && e.Session["Profile"] == "apple-control" {
@@ -933,6 +946,15 @@ func (f *binFlow) finishSession(reason TrafficFlowCloseReason) {
 	emit := func(dir int, session map[string]any, why string) {
 		e := f.event(dir, nil, "incomplete", string(reason)+": "+why)
 		e.Session = session
+		f.a.incomplete.Add(1)
+		f.a.emit(e)
+	}
+	if u := f.opcua; u != nil && u.read && (len(u.readPending) > 0 || len(u.chunks) > 0) {
+		e := f.event(0, nil, "incomplete", string(reason)+": OPC UA selected observation ended with outstanding requests/chunks")
+		e.Profile = "opcua-read-scalar"
+		e.nativeOPCUARead = true
+		e.sessionError = &ProtocolError{Kind: ErrNeedMore, Message: e.Summary}
+		e.Session = map[string]any{"Outstanding Read Requests": len(u.readPending), "Buffered Secure Messages": len(u.chunks)}
 		f.a.incomplete.Add(1)
 		f.a.emit(e)
 	}
