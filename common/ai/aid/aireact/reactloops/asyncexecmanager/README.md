@@ -152,7 +152,8 @@ Forget 接口。较长的 owner 生命周期需要配置适当的记录上限，
 
 ## 工具调用接入位置
 
-本包已实现独立核心和函数适配器，尚未接入旧的工具调用链路或 actions。
+本包已实现独立核心和函数适配器。directly_call_tool 已接入异步标记的解析，
+工具 Inspector、真实完成信号、异步调度与管理 action 仍待接入，当前执行方式不变。
 接入工具时应复用原调用链路，把原工具执行函数和该次调用的 Inspector 接入
 NewResource。需要在原调用实例上补齐 Inspector 时，应从原实例读取已有状态，
 不能另外订阅 UI/log 事件并创建第二份输出缓存。
@@ -167,8 +168,12 @@ NewResource。需要在原调用实例上补齐 Inspector 时，应从原实例�
 不能在运行时重新读取 ReAct 的 current task。原链路的参数检查、授权审查和输出
 处理仍应生效；异步只是调度方式，pending 回执不代表工具已执行或已获批准。
 
-预期 action 参数保持：单工具 `async_directly_call_tool` 可选 bool；批量
+action Schema：单工具 `async_directly_call_tool` 可选 bool；批量
 `directly_call_tool_params_group` 每项 `async` 可选 bool，默认均为同步。
+解析兼容大小写和前后空白的 true/t/1/yes/on 字符串，以及数字 1；其他值（包括
+缺省、null、无法识别的类型）回退到 false。批量只读取每项 async，多余的顶层
+单调用标记会被忽略。单调用标记保存在该 action 的执行状态中，不进入工具业务参数。
+两套协议和 root/next_action 形式由 action_direct_tool_async_test.go 的 mock 测试覆盖。
 `manage_async_execution_runtime` 将各 OP 映射到上表的方法；OP=wait 应有等待时限，
 需要结果时在等待后显式调用 Inspect。action、AutoContext 和 UI 使用同一个 owner
 Manager 的状态与 Inspector，UI 的持续刷新另由展示层实现。

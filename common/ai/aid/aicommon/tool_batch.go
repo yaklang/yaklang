@@ -70,6 +70,9 @@ type ToolCallGroupCall struct {
 	Expectations string              `json:"expectations,omitempty"`
 	Reason       string              `json:"reason,omitempty"`
 
+	// TBD: dispatch through the async execution manager. Currently runs synchronously.
+	Async bool `json:"async,omitempty"`
+
 	// ExecutionCallID is assigned by the runtime, never by the model. Keeping it
 	// on the request lets events, checkpoints and results identify one child.
 	ExecutionCallID string `json:"execution_call_id,omitempty"`

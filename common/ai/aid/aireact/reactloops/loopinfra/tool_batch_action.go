@@ -136,6 +136,8 @@ func directlyCallToolBatchSchemaOption() aitool.ToolOption {
 			aitool.WithParam_Description("可选。该项 调用的预计耗时和回退策略。")),
 		aitool.WithStringParam("reason",
 			aitool.WithParam_Description("可选。直接展示在该工具卡片上；用简短短语说明这个 child 具体做什么，同名工具的不同调用也要分别描述，不能照搬整批任务的理由。")),
+		aitool.WithBoolParam("async", aitool.WithParam_Default(false),
+			aitool.WithParam_Description("可选的本项异步标记，默认 false。TBD：异步执行尚未启用，true 仍沿用原批量执行并等待结果。")),
 	)
 }
 
@@ -301,6 +303,8 @@ func parseDirectToolBatchActionWithMetadata(loop *reactloops.ReActLoop, action *
 	if err != nil || !hasBatch {
 		return nil, hasBatch, err
 	}
+	// A redundant scalar async hint is harmless on a batch. Each child owns its
+	// flag; never inherit that top-level hint or read flattened sibling fields.
 	if hasAnyCanonicalActionParam(action, "directly_call_tool_name", "directly_call_tool_params") ||
 		(!allowMetadata && hasAnyCanonicalActionParam(action, "directly_call_identifier", "directly_call_expectations", "directly_call_reason")) {
 		return nil, true, utils.Errorf("%s cannot be combined with legacy directly_call_tool_* fields", directlyCallToolBatchField)
@@ -321,7 +325,7 @@ func parseDirectToolBatchActionWithMetadata(loop *reactloops.ReActLoop, action *
 		return nil, true, utils.Error("tool manager is unavailable")
 	}
 	allowed := map[string]struct{}{
-		"tool_name": {}, "params": {}, "identifier": {}, "expectations": {}, "reason": {},
+		"tool_name": {}, "params": {}, "identifier": {}, "expectations": {}, "reason": {}, "async": {},
 	}
 	identifiers := make(map[string]int)
 	request := &aicommon.ToolCallGroupRequest{Calls: make([]aicommon.ToolCallGroupCall, 0, len(items))}
@@ -329,6 +333,7 @@ func parseDirectToolBatchActionWithMetadata(loop *reactloops.ReActLoop, action *
 		if err := rejectUnknownBatchFields(item, allowed); err != nil {
 			return nil, true, utils.Wrapf(err, "%s[%d]", directlyCallToolBatchField, index)
 		}
+		async := normalizeDirectToolAsync(item["async"])
 		toolName, err := strictBatchString(item, "tool_name", true)
 		if err != nil {
 			return nil, true, utils.Wrapf(err, "%s[%d]", directlyCallToolBatchField, index)
@@ -381,6 +386,7 @@ func parseDirectToolBatchActionWithMetadata(loop *reactloops.ReActLoop, action *
 			Identifier:   identifier,
 			Expectations: expectations,
 			Reason:       reason,
+			Async:        async,
 		})
 	}
 	if allowMetadata {
@@ -427,6 +433,7 @@ func executeVerifiedToolBatch(
 	if supported {
 		emitToolsPreparingStatus(loop, toolNames)
 		emitToolBatchRunningStatus(loop, toolNames)
+		// TBD: dispatch calls marked Async through the loop's async execution manager.
 		result, err = batchRuntime.ExecuteToolCallGroup(ctx, task, request)
 	} else {
 		emitToolCallGroupResultStatus(loop, request, nil)

@@ -12,6 +12,7 @@ import (
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon/aiskillloader"
+	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/asyncexecmanager"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/schema"
@@ -111,6 +112,10 @@ type ReActLoop struct {
 	// execution state
 	taskMutex   *sync.Mutex
 	currentTask aicommon.AIStatefulTask
+
+	// TBD: initialize once with the owning task context and close on Release.
+	// Async tool dispatch is not enabled yet; this field remains nil.
+	asyncExecutionManager *asyncexecmanager.Manager
 
 	// memory management
 	memorySizeLimit        int

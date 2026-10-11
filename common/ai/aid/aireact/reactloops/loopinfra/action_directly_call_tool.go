@@ -280,6 +280,9 @@ var loopAction_directlyCallTool = &reactloops.LoopAction{
 		aitool.WithRawParam("directly_call_tool_params", map[string]any{
 			"type": []string{"object", "string"},
 		}, aitool.WithParam_Description(`选择单调用形式时填写；存在 directly_call_tool_params_group 时必须省略。优先使用 JSON object 提供该工具的完整参数；为兼容旧协议仍接受包含 JSON object 的字符串。参数结构必须符合 CACHE_TOOL_CALL 中该工具的 Params Schema。`)),
+		aitool.WithBoolParam("async_directly_call_tool",
+			aitool.WithParam_Default(false),
+			aitool.WithParam_Description("可选的单调用异步标记，默认 false；批量调用时使用每项 async。TBD：异步执行尚未启用，true 仍按原同步路径执行。")),
 		aitool.WithStringParam(
 			"directly_call_identifier",
 			aitool.WithParam_Description(`可选。描述调用目的的简短 snake_case 标识，例如 "scan_port_443"、"query_large_file"；用于报告文件命名。`),
@@ -298,6 +301,7 @@ var loopAction_directlyCallTool = &reactloops.LoopAction{
 	ActionVerifier: func(loop *reactloops.ReActLoop, action *aicommon.Action) error {
 		loop.SetActionExecutionValue(action, actionStateDirectToolBatch, nil)
 		loop.SetActionExecutionValue(action, "directly_call_tool_name", nil)
+		loop.SetActionExecutionValue(action, actionStateDirectToolAsync, nil)
 
 		// Keep the established scalar streaming contract. The legacy discriminator
 		// is readable before the root JSON object closes, so a valid one-call action
@@ -439,6 +443,9 @@ var loopAction_directlyCallTool = &reactloops.LoopAction{
 
 			emitProgress("[开始处理参数]")
 			raw, objParams := getDirectlyCallToolParamPayload(action)
+			// Capture after parameter parsing, preserving the scalar streaming
+			// verifier and the existing loading-card-before-prepare contract.
+			loop.SetActionExecutionValue(action, actionStateDirectToolAsync, directToolActionAsync(action))
 			if hasAnyCanonicalActionParam(action, directlyCallToolBatchField, "directly_call_tool_calls", "tool_require_calls") {
 				return nil, false, tool, directToolParameterError(loop, name, utils.Error("scalar arguments cannot be combined with parameter groups or retired batch fields"))
 			}
@@ -489,6 +496,7 @@ var loopAction_directlyCallTool = &reactloops.LoopAction{
 
 		// DirectlyCallTool emits the card (loading) first, then runs prepare (reads
 		// streaming params), then invokes or reports the validation error.
+		// TBD: route async_directly_call_tool through the loop's async execution manager.
 		result, directly, callErr := invoker.DirectlyCallTool(ctx, toolName, action, prepare)
 		recordSuccessfulToolCache(loop, toolName, result, callErr)
 
