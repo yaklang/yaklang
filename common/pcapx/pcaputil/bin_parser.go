@@ -97,6 +97,9 @@ func (e *ProtocolEvent) Decode() (result map[string]any, err error) {
 		}
 		// SNMP retains the accepted wire and passive association together;
 		// a public edit must not manufacture a matched request in queries.
+		if e.Protocol == "tls" && e.semanticFields != nil {
+			session = e.semanticFields
+		}
 		if e.Protocol == "snmp" && e.semanticFields != nil {
 			session = e.semanticFields
 		}
@@ -119,6 +122,15 @@ func (e *ProtocolEvent) Decode() (result map[string]any, err error) {
 			result = owned
 		}
 	}()
+	// TLS queries must preserve the accepted observation or its private refusal;
+	// the public Session may be edited or removed by the callback consumer.
+	if e.Protocol == "tls" && e.sessionError != nil {
+		owned := *e.sessionError
+		return nil, &owned
+	}
+	if e.Protocol == "tls" && e.semanticFields != nil {
+		return map[string]any{"fields": cloneSession(e.semanticFields)}, nil
+	}
 	if (e.Protocol == "tls" || e.Protocol == "redis" || e.Entry == "MySQLPreparedFields") && e.Session != nil {
 		return map[string]any{"fields": cloneSession(e.Session)}, nil
 	}
@@ -219,6 +231,9 @@ func (e *ProtocolEvent) retainRuleEnvelope(result map[string]any) {
 }
 
 func (e *ProtocolEvent) ownsNativeFields() bool {
+	if e.Protocol == "tls" && (e.semanticFields != nil || e.sessionError != nil) {
+		return true
+	}
 	// The selected UDP media decoder owns its field tree and typed refusals;
 	// legacy stream RTP keeps its existing rule envelope and metadata shape.
 	if e.Protocol == "rtp" && e.Transport == "udp" && e.Profile == "rtp-udp" && (e.semanticFields != nil || e.sessionError != nil) {
@@ -1132,7 +1147,7 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 			} else {
 				e.Status, e.Structured = "decoded", result
 			}
-			if err == nil && stateful {
+			if err == nil && (stateful || e.Protocol == "tls") {
 				// This exact result has already been accepted by the bounded
 				// session codec. Retain its owned field projection for deferred
 				// decoding and history; retrying a different grammar loses fields
@@ -1141,7 +1156,7 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 				if e.Protocol == "goose" || e.Protocol == "rtp" && e.Transport != "udp" {
 					e.retainRuleEnvelope(result)
 				}
-				if e.Protocol == "stun" || e.Protocol == "turn" || e.Protocol == "snmp" || e.Protocol == "slmp" || e.Protocol == "dlms-wrapper" || e.Protocol == "dlms" || e.Protocol == "c37118" {
+				if e.Protocol == "tls" || e.Protocol == "stun" || e.Protocol == "turn" || e.Protocol == "snmp" || e.Protocol == "slmp" || e.Protocol == "dlms-wrapper" || e.Protocol == "dlms" || e.Protocol == "c37118" {
 					e.semanticFields = cloneSession(e.semanticFields)
 				}
 			}

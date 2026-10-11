@@ -45095,6 +45095,43 @@
         "common/pcapx/pcaputil/testdata/media-owned-queries/verify.py": "verify.py",
         "common/pcapx/pcaputil/testdata/media-owned-queries/validation/expected.json": "validation/expected.json"
       }
+    },
+    {
+      "aliases": {
+        "common/pcapx/pcaputil/testdata/tls-owned-queries/answers.json": "answers.json",
+        "common/pcapx/pcaputil/testdata/tls-owned-queries/generate.py": "generate.py",
+        "common/pcapx/pcaputil/testdata/tls-owned-queries/records/alert.bin": "records/alert.bin",
+        "common/pcapx/pcaputil/testdata/tls-owned-queries/records/malformed.bin": "records/malformed.bin",
+        "common/pcapx/pcaputil/testdata/tls-owned-queries/verify.py": "verify.py"
+      },
+      "file": "validation-tls-owned-queries.zip",
+      "id": "tls-owned-queries-03460ce75372",
+      "kind": "unit-controls",
+      "members": {
+        "answers.json": {
+          "bytes": 1368,
+          "sha256": "e3a8359af6e1f74526995195c392619e962085cb507fc6006cc15eed67d64ef5"
+        },
+        "generate.py": {
+          "bytes": 483,
+          "sha256": "68944869bc63a8bf99aca585aa1f9b431719978dce1fb559e2bcceb0a2a1906c"
+        },
+        "records/alert.bin": {
+          "bytes": 7,
+          "sha256": "ef9f0b0f2e4ec6ef302118382b91271ce01fad52a2fce88663dd9508844e6ce9"
+        },
+        "records/malformed.bin": {
+          "bytes": 8,
+          "sha256": "3973c7f15bd6ff56e81b94b3093f85e34b95914838fcf4c37a5c5768928cb90d"
+        },
+        "verify.py": {
+          "bytes": 1164,
+          "sha256": "5ceb25c5306c3e51e3376876d29eb97ec310f5866e19a7d5367b17917e89cc0d"
+        }
+      },
+      "password": "bin-parser",
+      "sha256": "354223958888681b695779528ca3b14f7bd9707eb6f5d7b3ec44748684290a70",
+      "source_sha": "03460ce753721d716aee5c865c9bd27aca6a2216"
     }
   ],
   "schema_version": 1,
