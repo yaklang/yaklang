@@ -50186,6 +50186,72 @@
         "common/pcapx/pcaputil/dronecan-node-info/transport-reference.json": "transport-reference.json",
         "common/pcapx/pcaputil/dronecan-node-info/receiver-reference.json": "receiver-reference.json"
       }
+    },
+    {
+      "id": "validation-dronecan-node-info-tail-boundary",
+      "kind": "validation",
+      "source_sha": "384624fb536a27671bd8efcb3129198e0e941b57",
+      "file": "validation-dronecan-node-info-tail-boundary.zip",
+      "sha256": "2c4320af57c384b606bd0adb9f12add396dc5f0efa132274a5a41bae6080dda0",
+      "password": "bin-parser",
+      "members": {
+        "captures/maximum-empty-final.pcap": {
+          "bytes": 1784,
+          "sha256": "2892810509d69f01c88468cfc26f357ac76c32ba3a44dc411176bad61c8fa961"
+        },
+        "answers/maximum-empty-final.json": {
+          "bytes": 11589,
+          "sha256": "ef291ab74894def485ca065bf3e12eb47bc390584bc93a714cc17e413727cf52"
+        },
+        "captures/wrong-empty-final-toggle.pcap": {
+          "bytes": 1784,
+          "sha256": "bad14ee4b4b8959f5e9842a7f7bb6ce74cc299b30d397d190cc53d961e3e211b"
+        },
+        "answers/wrong-empty-final-toggle.json": {
+          "bytes": 9006,
+          "sha256": "37c2490ecc26d1eb3bd624964132371e4a7efac81229966698d9fb4b497dbeb5"
+        },
+        "manifest.json": {
+          "bytes": 1179,
+          "sha256": "7c7978c75b9bf0968c40109813495f350c9e7aaa8fc60ce63e3d342219c4cb26"
+        },
+        "generate.py": {
+          "bytes": 2066,
+          "sha256": "99d74ddaeb6895ade01868e38fe9c92baff8652ebaa59a28be9dc5973e248129"
+        },
+        "verify.py": {
+          "bytes": 2036,
+          "sha256": "9395db9ad75b6dc8b1ea553428349b64e06049f8f3af11206912dceaadedcd3f"
+        },
+        "seal.py": {
+          "bytes": 3766,
+          "sha256": "84d97206303072e2b9a921148bfe8bba509572f23fee63e8887fb0def33a85ae"
+        },
+        "SOURCE.json": {
+          "bytes": 4051,
+          "sha256": "9c84cb716f36071d96a193bfe7874708522b74237329cf4dc8ec22bc09b14837"
+        },
+        "reference_rx.c": {
+          "bytes": 1452,
+          "sha256": "15f5e800485ef01f1b9e5e0d58e9ff698750b99568dc12c69d495b7e9fcb1f9e"
+        },
+        "validation/expected.json": {
+          "bytes": 2571,
+          "sha256": "7cebd413813a0434f5ce007306795dda80a9d677b60183cd677494a73158c1b9"
+        }
+      },
+      "aliases": {
+        "common/pcapx/pcaputil/dronecan-node-info-tail-boundary/captures/maximum-empty-final.pcap": "captures/maximum-empty-final.pcap",
+        "common/pcapx/pcaputil/dronecan-node-info-tail-boundary/answers/maximum-empty-final.json": "answers/maximum-empty-final.json",
+        "common/pcapx/pcaputil/dronecan-node-info-tail-boundary/captures/wrong-empty-final-toggle.pcap": "captures/wrong-empty-final-toggle.pcap",
+        "common/pcapx/pcaputil/dronecan-node-info-tail-boundary/answers/wrong-empty-final-toggle.json": "answers/wrong-empty-final-toggle.json",
+        "common/pcapx/pcaputil/dronecan-node-info-tail-boundary/manifest.json": "manifest.json",
+        "common/pcapx/pcaputil/dronecan-node-info-tail-boundary/generate.py": "generate.py",
+        "common/pcapx/pcaputil/dronecan-node-info-tail-boundary/verify.py": "verify.py",
+        "common/pcapx/pcaputil/dronecan-node-info-tail-boundary/seal.py": "seal.py",
+        "common/pcapx/pcaputil/dronecan-node-info-tail-boundary/SOURCE.json": "SOURCE.json",
+        "common/pcapx/pcaputil/dronecan-node-info-tail-boundary/reference_rx.c": "reference_rx.c"
+      }
     }
   ],
   "schema_version": 1,

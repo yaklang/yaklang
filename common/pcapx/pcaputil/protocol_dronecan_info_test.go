@@ -144,6 +144,67 @@ func droneCANInfoIsolationAndResources(t *testing.T) {
 			require.Zero(t, a.stats().BufferedBytes)
 		}
 	})
+	t.Run("CertificateBudgetExactBoundary", func(t *testing.T) {
+		f, want := droneCANInfoFrames(t, "maximum-certificate-name")
+		for _, limit := range []int{254, 255} {
+			var events []*ProtocolEvent
+			b := DefaultParserBudget()
+			b.MaxCollectionElements = limit
+			a := parser(&events, b)
+			for i, w := range f {
+				droneCANStatsDeliver(a, w, uint64(i+1), CaptureDomain{}, now)
+			}
+			if limit == 254 {
+				rocTypedError(t, "ResourceExceeded", events[len(f)-1].sessionError)
+				require.Nil(t, events[len(f)-1].Session)
+			} else {
+				requireExactProtocolFields(t, want.Events[len(f)-1].Fields, events[len(f)-1].Session)
+			}
+			a.closeDroneCANStats()
+			require.Len(t, events, len(f))
+			require.Zero(t, a.stats().BufferedBytes)
+		}
+	})
+	t.Run("BudgetRefusalRetiresTransferID", func(t *testing.T) {
+		var events []*ProtocolEvent
+		b := DefaultParserBudget()
+		b.MaxCollectionElements = 15
+		a := parser(&events, b)
+		for i, w := range frames {
+			droneCANStatsDeliver(a, w, uint64(i+1), CaptureDomain{}, now)
+		}
+		rocTypedError(t, "ResourceExceeded", events[len(frames)-1].sessionError)
+		a.budget.MaxCollectionElements = 16
+		for i, w := range frames {
+			droneCANStatsDeliver(a, w, uint64(len(frames)+i+1), CaptureDomain{}, now.Add(time.Second))
+			rocTypedError(t, "ContextRequired", events[len(frames)+i].sessionError)
+			require.Nil(t, events[len(frames)+i].Session)
+		}
+		var next [][]byte
+		for _, w := range frames {
+			v := bytes.Clone(w)
+			v[7+int(v[4])] &= 0xe0
+			next = append(next, v)
+		}
+		for i, w := range next {
+			droneCANStatsDeliver(a, w, uint64(2*len(frames)+i+1), CaptureDomain{}, now.Add(time.Second))
+		}
+		e := events[len(events)-1]
+		want := cloneSession(answer.Events[len(frames)-1].Fields)
+		want["DroneCAN"].(map[string]any)["Transfer ID"] = uint8(0)
+		w := next[len(next)-1]
+		want["Data"] = bytes.Clone(w[8 : 8+int(w[4])])
+		requireExactProtocolFields(t, want, e.Session)
+		require.Zero(t, e.ResponseTo)
+		require.Zero(t, e.TransactionID)
+		require.Zero(t, e.FlowID)
+		for i, ref := range e.SourceBytes.PacketRefs {
+			require.EqualValues(t, 2*len(frames)+i+1, ref.Number)
+		}
+		a.closeDroneCANStats()
+		require.Len(t, events, 3*len(frames))
+		require.Zero(t, a.stats().BufferedBytes)
+	})
 	t.Run("OuterRefusalCannotCompleteLater", func(t *testing.T) {
 		var events []*ProtocolEvent
 		a := parser(&events, DefaultParserBudget())

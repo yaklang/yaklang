@@ -109,7 +109,9 @@ func (a *binParser) decodeDroneCANResponse(id uint32, data []byte, ref PacketRef
 			a.droneCANStats = &droneCANStatsStore{entries: make(map[droneCANStatsKey]*droneCANStatsReceiver), cost: cost}
 		}
 		bodyCapacity := spec.maxBody + 2
-		refCapacity := (bodyCapacity + 6) / 7
+		// An aligned body may end with an empty payload plus the tail byte.
+		// All preceding frames still carry seven payload octets.
+		refCapacity := bodyCapacity/7 + 1
 		cost := int64(unsafe.Sizeof(droneCANStatsReceiver{})+unsafe.Sizeof(key)) + 128 + int64(bodyCapacity) + int64(refCapacity)*int64(unsafe.Sizeof(PacketReference{})) + int64(len(ref.Domain.Encapsulation))*int64(refCapacity+1)
 		if len(a.droneCANStats.entries) >= sessionCollectionLimit(a.budget.MaxCollectionElements) || !a.reserveEvidence(cost) {
 			a.disableDroneCANStatsLocked()

@@ -30,6 +30,9 @@ func droneCANTransportStatsSealed(t *testing.T) {
 }
 func droneCANNodeInfoSealed(t *testing.T) {
 	droneCANResponseSealed(t, "dronecan-node-info", "dronecan-node-info/v1", "dronecan-services", "dronecan-v0-node-info", 30)
+	t.Run("TailBoundary", func(t *testing.T) {
+		droneCANResponseSealed(t, "dronecan-node-info-tail-boundary", "dronecan-node-info-tail-boundary/v1", "dronecan-services", "dronecan-v0-node-info", 2)
+	})
 	t.Run("Resources", droneCANInfoIsolationAndResources)
 	t.Run("ExactIntegerOracle", TestProtocolExactFieldIntegerOracle)
 }
