@@ -140,37 +140,30 @@ func TestParallelKMeans(t *testing.T) {
 		{5.0, 5.0}, {5.1, 5.1}, {5.0, 5.1}, {5.1, 5.0}, // 聚类2
 	}
 
+	// Reset the seed before each implementation so both start with the same
+	// centroids as the expected-center regression in TestKMeans.
+	const seed int64 = 42
+
 	// 串行K-Means
+	rand.Seed(seed)
 	sequentialCentroids, err := kMeans(data, 2, 50, 1e-6)
 	if err != nil {
-		t.Fatalf("Sequential K-Means failed: %v", err)
+		t.Fatalf("Sequential K-Means failed (seed=%d): %v", seed, err)
 	}
 
 	// 并行K-Means
+	rand.Seed(seed)
 	parallelCentroids, err := kMeansParallel(data, 2, 50, 1e-6, 2)
 	if err != nil {
-		t.Fatalf("Parallel K-Means failed: %v", err)
+		t.Fatalf("Parallel K-Means failed (seed=%d): %v", seed, err)
 	}
 
-	// 验证聚类数量
-	if len(sequentialCentroids) != 2 {
-		t.Errorf("Expected 2 sequential centroids, got %d", len(sequentialCentroids))
-	}
-	if len(parallelCentroids) != 2 {
-		t.Errorf("Expected 2 parallel centroids, got %d", len(parallelCentroids))
-	}
-
-	// 验证维度
-	for _, centroid := range sequentialCentroids {
-		if len(centroid) != 2 {
-			t.Errorf("Expected 2D centroid, got %dD", len(centroid))
-		}
-	}
-	for _, centroid := range parallelCentroids {
-		if len(centroid) != 2 {
-			t.Errorf("Expected 2D centroid, got %dD", len(centroid))
-		}
-	}
+	t.Run("sequential", func(t *testing.T) {
+		assertKMeansClusterCenters(t, sequentialCentroids, seed)
+	})
+	t.Run("parallel", func(t *testing.T) {
+		assertKMeansClusterCenters(t, parallelCentroids, seed)
+	})
 }
 
 // TestParallelTrainingWithDifferentWorkerCounts 测试不同worker数量的并行训练
