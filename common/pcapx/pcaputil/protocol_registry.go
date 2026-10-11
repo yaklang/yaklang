@@ -33,6 +33,7 @@ func NativeProtocolProfiles() []ProtocolProfile {
 		{"semtech-downlink-session", "explicit-udp", "Semtech v2 PULL_RESP/TX_ACK passive association", "opt-in exact endpoints/capture domain/token and full JSON observation; capture-lifetime token quarantine,30second pending expiry and fail-closed bounded state; no authentication, gateway identity binding or RF delivery proof"},
 		{"semtech-udp", "udp", "Semtech packet-forwarder v2 upstream and PULL_RESP/TX_ACK observations", "fixed v4.0.1 sender fields, exact JSON numbers/base64 and unresolved sender defaults; observed gateway/token only, no token association, radio config/GPS validation, RF delivery or LoRaWAN PHY/security"},
 		{"mavlink", "udp", "MAVLink v1/v2 HEARTBEAT, SYS_STATUS, GPS_RAW_INT, ATTITUDE and GLOBAL_POSITION_INT", "pinned common-message CRC_EXTRA and complete datagram; GPS literal integers/sentinels and v2 extensions, ATTITUDE binary32 wire bits and zero-fill; v2 signatures opaque by default; opt-in caller-supplied key/clock verifies MAC and capture-domain/system/component/link replay under bounded retained history, no authenticated endpoint identity, navigation or physical attitude claim"},
+		{"nmea-ais-multipart", "explicit-udp", "Type5 across two ordered whole AIVDM/AIVDO sentences", "nonempty digit/channel labels and directed endpoints/capture domain;30second pending observation, capture-lifetime quarantine and bounded history; complete wire fields/private Session/contributors, no verified sender/generation/vessel or generic UDP stream joining"},
 		{"nmea", "udp", "complete NMEA 0183 GGA/RMC, unit-labelled VTG, twelve-slot GSA, per-sentence GSV, single-fragment AIVDM/AIVDO Class A types1/2/3 and Class B Type18/19 and independent Type24 static parts, same-datagram two-fragment Type5", "XOR checksum and bounded literal fields; optional VTG FAA modes A/D/E/M/N/S; GSA ordered PRN slots/DOP and System ID0..6; GSV ordered sparse slots and hexadecimal Signal ID; AIS 168-bit raw/scaled fields with unavailable sentinels, conditional SOTDMA/ITDMA or Type18 CS-fill and literal channel/sequence labels; same-datagram Type5 literal identity/dimensions/ETA/draught with unavailable/lower-bound markers; Type19 complete 312-bit navigation/name/dimensions/raw fix-type/DTE/RAIM reports; Type24 literal Part Number, both 160/168-bit Part A names and 168-bit Part B vendor/model/serial/callsign with dimensions or auxiliary mother-MMSI; no constellation association, GSV cycle or cross-datagram AIS association, ship identity, device capability, unlabelled VTG or authenticated physical fix"},
 		{"memcached", "tcp", "text get/gets/set and binary GET/SET", "observed direction, text reply order or binary opaque ID; values bounded by declared length; legacy stats layout remains available"},
 		{"doip", "tcp/udp", "DoIP v2/v3 TCP routing activation/alive/diagnostic and UDP VehicleIdentification0001-0004", "TCP observed routing/logical addresses and UDS DiagnosticSessionControl positive/negative/pending only; UDP exact datagram discovery fields, request-only FF and raw invalidity/unknown values, unassociated unverified observations; no vehicle identity/synchronization verification, TLS, manufacturer policy or v4 claim"},
@@ -76,7 +77,7 @@ func WithProtocolDecodeAs(transport string, port uint16, protocol string) Captur
 			return fmt.Errorf("DecodeAs requires UDP and a nonzero port")
 		}
 		switch protocol {
-		case "dns", "mdns", "llmnr", "dhcp", "dhcpv6", "syslog", "snmp", "mqtt-sn", "bittorrent-dht", "bjnp", "rtp", "sip", "stun", "turn", "dtls", "mavlink", "nmea", "semtech-udp", "semtech-downlink-session", "rtps", "bsap", "slmp", "dlms", "opendroneid", "opendroneid-system", "opendroneid-identity", "opendroneid-auth-pages", "c37118", "knx", "pfcp", "dlms-wrapper", "doip":
+		case "dns", "mdns", "llmnr", "dhcp", "dhcpv6", "syslog", "snmp", "mqtt-sn", "bittorrent-dht", "bjnp", "rtp", "sip", "stun", "turn", "dtls", "mavlink", "nmea", "nmea-ais-multipart", "semtech-udp", "semtech-downlink-session", "rtps", "bsap", "slmp", "dlms", "opendroneid", "opendroneid-system", "opendroneid-identity", "opendroneid-auth-pages", "c37118", "knx", "pfcp", "dlms-wrapper", "doip":
 		default:
 			return fmt.Errorf("unsupported native DecodeAs profile")
 		}
@@ -143,6 +144,9 @@ func (a *binParser) decodeNativeDatagram(e *ProtocolEvent, w []byte, src, dst ui
 	}
 	if explicit == "semtech-downlink-session" {
 		return a.decodeSemtechCorrelatedDatagram(e, w)
+	}
+	if explicit == "nmea-ais-multipart" {
+		return a.decodeAISMultipartDatagram(e, w, nil)
 	}
 	if (explicit == "" || explicit == "semtech-udp") && a.decodeSemtechDownlinkDatagram(e, w, src, dst, explicit == "semtech-udp") {
 		return true

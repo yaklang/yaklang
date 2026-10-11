@@ -44,7 +44,7 @@ Run from the repository root:
 ```sh
 go run ./internal/trafficfixture/cmd/corpus test
 go test -json -count=1 -timeout=5m ./internal/trafficfixture/... ./common/bin-parser/... ./common/pcapx/... ./common/yak/cmd/yakcmds/shark-cli ./scripts/ci > traffic.jsonl
-go run ./internal/trafficfixture/cmd/corpus exec -- python3 @scripts/protocol-tests/check_go_test_json.py traffic.jsonl --inventory @scripts/protocol-tests/required-tests-traffic-unified-v18.json --tier full
+go run ./internal/trafficfixture/cmd/corpus exec -- python3 @scripts/protocol-tests/check_go_test_json.py traffic.jsonl --inventory @scripts/protocol-tests/required-tests-traffic-unified-v19.json --tier full
 ```
 
 The single `corpus` entry point uses the same bounded Go ZIP loader as tests.
@@ -83,7 +83,7 @@ their semantic coverage. The existing synthetic session keys are test inputs;
 production credentials, user private keys and material without redistribution
 permission belong in an external fixed-source download manifest.
 
-Current test requirements are sealed at `scripts/protocol-tests/required-tests-traffic-unified-v18.json`;
+Current test requirements are sealed at `scripts/protocol-tests/required-tests-traffic-unified-v19.json`;
 the historical inventories and all earlier batches remain unchanged.
 The supplemental small-corpus batch contains 26 minimal controls, their explicit
 expected facts, an offline generator and the compact pinned source manifest.
@@ -96,7 +96,7 @@ byte-boundary, malformed-length and ownership tests. These are scoped control
 assertions, not a semantic golden for the entire upstream collection. Process
 logs and the original large downloads remain outside the repository.
 
-The current workflow and executable gate use `required-tests-traffic-unified-v18.json`. Older
+The current workflow and executable gate use `required-tests-traffic-unified-v19.json`. Older
 versioned inventories stay available as historical inputs; they are not the
 current acceptance entry. The DLMS HDLC batch contains owned tunnel/Get-normal
 controls and their independent fields/errors, CRC/byte validator, offline
@@ -203,7 +203,7 @@ opaque selector bytes and one bounded Data value over Wrapper v1 TCP/UDP; object
 selector meaning, access permission and device operation are unverified. The
 original one-packet selective-access capture and original refused answer remain
 immutable; its now-supported answer is matched by exact input SHA and frame.
-The active inventory is `scripts/protocol-tests/required-tests-traffic-unified-v18.json`.
+The active inventory is `scripts/protocol-tests/required-tests-traffic-unified-v19.json`.
 
 The small-graph budget batch reuses accepted graph captures/answers and adds one
 249-byte UDP control for child count255 without child bytes. Its standalone proof
@@ -259,7 +259,7 @@ retain the original request ID. Scope excludes authentication, gateway identity
 binding, device execution and RF delivery. Original large captures, upstream
 source and logs are not bundled.
 
-`validation-dlms-hdlc-normal-data.zip` contains31 owned minimal native normal-GET capture cases and72 ordered independent answers (53 complete byte/field observations,19 expected refusals). It covers TCP/UDP full/deferred, workers1/2/4, observer off/on, TCP feed chunks, nested compact, node/depth boundaries, malformed/trailing contents, strict text, full flags and refusal followed by late feedback. The existing native scalar contract and zero TransactionID are retained. Its source pins and executable independent builder/oracle/reference harness stay in the small ZIP; original reference sources and execution logs stay outside Git. Actual fixed reference codec display/calendar differences remain diagnostics rather than device passes. Current mandatory inventory is `scripts/protocol-tests/required-tests-traffic-unified-v18.json`.
+`validation-dlms-hdlc-normal-data.zip` contains31 owned minimal native normal-GET capture cases and72 ordered independent answers (53 complete byte/field observations,19 expected refusals). It covers TCP/UDP full/deferred, workers1/2/4, observer off/on, TCP feed chunks, nested compact, node/depth boundaries, malformed/trailing contents, strict text, full flags and refusal followed by late feedback. The existing native scalar contract and zero TransactionID are retained. Its source pins and executable independent builder/oracle/reference harness stay in the small ZIP; original reference sources and execution logs stay outside Git. Actual fixed reference codec display/calendar differences remain diagnostics rather than device passes. Current mandatory inventory is `scripts/protocol-tests/required-tests-traffic-unified-v19.json`.
 
 The historical `dlms-hdlc/array` capture is reused in place. Its original `UnsupportedFeature` answer remains immutable; `historical-array-upgrade.json` binds the original capture/answer hashes to two current full-message answers for the now-supported legal empty-array response. No historical capture is copied into the new ZIP and other historical refusals retain their assertions.
 
@@ -303,7 +303,7 @@ its permissive pairing and last-only list error are not independent proof of our
 selected negative association policy or every item error. Owner byte/state
 oracles supply those explicit expectations. No raw download, upstream source,
 dependency, log or cache is included. All56 preceding ZIPs remain unchanged.
-The current inventory is `scripts/protocol-tests/required-tests-traffic-unified-v18.json`.
+The current inventory is `scripts/protocol-tests/required-tests-traffic-unified-v19.json`.
 
 `validation-dlms-hdlc-unobserved-next.zip` adds12 distinct minimal captures and54
 whole answers (36 observations,18 expected ContextRequired refusals). An already
@@ -348,7 +348,7 @@ not an unrecorded31second network delay or device claim. Historical expiry
 capture/answer hashes bind its corrected association answer; no old ZIP is
 modified. Shared-protocol expiry, collection limits, domain isolation, byte
 ownership and Close release also have regressions. Current executable inventory
-is `scripts/protocol-tests/required-tests-traffic-unified-v18.json`; earlier
+is `scripts/protocol-tests/required-tests-traffic-unified-v19.json`; earlier
 versioned inventories remain archived.
 
 
@@ -363,7 +363,7 @@ request cannot acquire the new request identity. An unfinished request, response
 segment or Data-block expiry still needs capture-lifetime quarantine. No timed
 expiry establishes a new authenticated/negotiated peer generation.
 The existing mandatory public-API, budget and matrix roots include these cases;
-the409-root unifiedv18 inventory remains the current executable entry. These
+the414-root unifiedv19 inventory is the current executable entry. These
 18 captures run216 full/deferred, worker1/2/4 and observer-off/on combinations,
 in addition to the immutable12-capture idle matrix. Owner byte/CRC/context
 answers and actual self-owned loopback ordering are separate from the fixed
@@ -505,3 +505,27 @@ small grouped captures with 34 datagram scenarios: 17 complete observations
 and 17 normative refusals, all in the twelve replay configurations. The sealed
 scripts check 13 complete vectors against fixed libais and build all inputs
 independently of this implementation. Original archives and answers stay intact.
+
+
+`validation-nmea-ais-session.zip` adds explicit `nmea-ais-multipart` UDP
+observation of Type5 across exactly two ordered whole AIVDM/AIVDO sentences.
+Nonempty digit/channel labels, directed endpoints and capture domain delimit
+context. Default `nmea` still never joins separate datagrams. This opt-in profile
+retains complete424-bit Type5 fields, both canonical physical contributors,
+fragment event IDs and private field/Session snapshots. It sets no request/reply
+IDs and never verifies a sender, generation, receiver operation or vessel identity.
+An exact active first-fragment retry does not extend the30second local deadline.
+Expired/completed/conflicting/refused labels remain quarantined for the capture;
+untracked malformed, truncated or budget-denied context fails closed. History,
+projection bytes, element/depth and32-contributor limits stay bounded. Close
+reports an outstanding first fragment and releases all charged storage.
+
+The24 declarative scenarios reuse one capture for different memory budgets:
+23 content-unique PCAPs total7612 bytes, ten complete observations and selected
+pending/refusal/close events. All24 run12 full/deferred, worker1/2/4 and
+observer-off/on combinations with complete fields, Session, event IDs, direction,
+contributors, typed errors and byte accounting. Capture truncation remains an
+expected reader error. The sealed generator reuses the fixed historical Type5
+payload answer; no new reference device/session execution is claimed. Original
+archives remain immutable. Active mandatory inventory is unifiedv19 (414 unique
+full-tier roots); prior v18 and its source materials remain archived.

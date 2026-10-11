@@ -43503,6 +43503,284 @@
       "password": "bin-parser",
       "sha256": "45b8c4a7f19805a0c983ef6c7e61fbe8c3d47b8a0aff1ef51daca19a6ce8cfa9",
       "source_sha": "e2f69214334e0e15ae91c9e8a5bae1fb313947f8"
+    },
+    {
+      "id": "nmea-ais-session",
+      "kind": "validation",
+      "file": "validation-nmea-ais-session.zip",
+      "password": "bin-parser",
+      "sha256": "188560bf82da8960e28553219c5328f89e164061c74311b61e3d4205e032e2ec",
+      "source_sha": "a4b3abb600939f5a008d5d9ddcebcc72d228d55a",
+      "members": {
+        "answers/active-retry.json": {
+          "bytes": 4631,
+          "sha256": "2246497a05a87dac62077e23edf5ebf6c12d4373075a8609ae3be311768f483e"
+        },
+        "answers/assembled-byte-budget.json": {
+          "bytes": 1363,
+          "sha256": "72e4e0cf624e1c541e0ec1f5ca71e218ceb1ebe5cee765ea69aadec33408b717"
+        },
+        "answers/backdated.json": {
+          "bytes": 1684,
+          "sha256": "01741febdc39ef1f3648eb0c17f6199b011a61c8e4168f081cc3d5c4b13d80b8"
+        },
+        "answers/bad-checksum.json": {
+          "bytes": 1317,
+          "sha256": "dbfbb533da4fd046f9d7ae5ec77e8ae2fc354a2b167a0ff7645d85c2e779993b"
+        },
+        "answers/carrier-truncated.json": {
+          "bytes": 1241,
+          "sha256": "e1d7e0a731dfbf0e5151a9dde9faf8ae658a37a54abe092015a93ef8c981e279"
+        },
+        "answers/completed-reuse.json": {
+          "bytes": 4987,
+          "sha256": "53b88973bee84be356e03138c86ead4c443aaefe29b1e38f2e1e76e60054fbb0"
+        },
+        "answers/conflicting-first.json": {
+          "bytes": 1342,
+          "sha256": "51415f7b44cbcf5d87dc30764bae7ff4c27c93e14f7bf553f5e902f33018b0fb"
+        },
+        "answers/copacked-outside-profile.json": {
+          "bytes": 848,
+          "sha256": "f5e25c7b46c2ac6771313dc5c24ebcf52317e1ad555665910c04e4dea92924d0"
+        },
+        "answers/expired.json": {
+          "bytes": 967,
+          "sha256": "001d2d0834ba377009229305b1d2602c4cfa14299542ea3ad95a6cab85e4bb20"
+        },
+        "answers/interleaved.json": {
+          "bytes": 8276,
+          "sha256": "0b2d932e9628eaf8716c3726d6b28cade9a63c88a22ce68d5fc17251275dbd2d"
+        },
+        "answers/literal-channel-one.json": {
+          "bytes": 4263,
+          "sha256": "7857c2d52136c05728f39f6b0e246d0acf2ecf268b480a0c941f9cebde456043"
+        },
+        "answers/missing-channel.json": {
+          "bytes": 1314,
+          "sha256": "2b71b3d21ba650775359c002a9ad1117e153723d0a67f2ddb41489319159740a"
+        },
+        "answers/missing-final.json": {
+          "bytes": 1000,
+          "sha256": "12f866f637d710ccef9cb85e2c2a670fa65c2a74cadb76e3946acbac92eaa2cc"
+        },
+        "answers/missing-sequence.json": {
+          "bytes": 1314,
+          "sha256": "ee8fc4ecc11a9438577568ab1975bb708db50f90a6c3fb53c041f006f530c14f"
+        },
+        "answers/ordered.json": {
+          "bytes": 4263,
+          "sha256": "f0489d1924a649a03f8b4c572104e00ebe8128ebcaf57bdd8b66a711bcb390fe"
+        },
+        "answers/orphan.json": {
+          "bytes": 598,
+          "sha256": "d04fc54e59ed31aca475aef3b04896b1a11fe108f691cb9c106f481ba14cb8a0"
+        },
+        "answers/own-ship-channel-two.json": {
+          "bytes": 4272,
+          "sha256": "341b1374faa7f4d3e889d166b123428ce3af1c827be60d8f4d43d6fd8043a237"
+        },
+        "answers/reordered.json": {
+          "bytes": 1323,
+          "sha256": "ec5d16abcce0285b10d6a518bd672c704de7fc88abb6eea6ad0593ebe34bb6e8"
+        },
+        "answers/retry-not-deadline.json": {
+          "bytes": 1335,
+          "sha256": "e5e665e81345b57380e234759045bdc24bab341ba897ddeeb969fdd09229b77c"
+        },
+        "answers/reverse-direction.json": {
+          "bytes": 4263,
+          "sha256": "fb82154a3494dbe7bd0b6de0f5c6c148b6ddf4ed96c53623efdde9a06ac56b25"
+        },
+        "answers/sentence-truncated.json": {
+          "bytes": 1315,
+          "sha256": "aaa38f24e9eacc38b2584eed4f1c6d626f38f99baf5a2dd18e8cbf73770a1c91"
+        },
+        "answers/state-memory-budget.json": {
+          "bytes": 1021,
+          "sha256": "3224a8a646a682ec740b34ec1c65117956a4528eabd92f67c02db8ce3787870f"
+        },
+        "answers/wrong-channel.json": {
+          "bytes": 4612,
+          "sha256": "f82bd27fcb717ce158bdb66c08b758a140866b62e23e2f7bb519232c9e21ddd0"
+        },
+        "answers/zero-sequence.json": {
+          "bytes": 4263,
+          "sha256": "563993010f929e9b2e8ebf00d012146a0451863196df1a88c28dc19aa21b257e"
+        },
+        "captures/active-retry.pcap": {
+          "bytes": 377,
+          "sha256": "1943bc1a8d46a4492d67b71f365189e467aa580ba5c285f1e3806ff238bff9b0"
+        },
+        "captures/assembled-byte-budget.pcap": {
+          "bytes": 364,
+          "sha256": "8bee37bfc7702a89ba498bf26e0ba40a3647e8e8947dca61bedff0ea4ec13619"
+        },
+        "captures/backdated.pcap": {
+          "bytes": 486,
+          "sha256": "f7954730e7489bfdc84278fef705974abfcc7c7802ed3219b469aa57125b4a73"
+        },
+        "captures/bad-checksum.pcap": {
+          "bytes": 364,
+          "sha256": "cbd4ca5c52902328f366127a8197bd585b6503d99b5e0364bda47f91569e2aaa"
+        },
+        "captures/carrier-truncated.pcap": {
+          "bytes": 363,
+          "sha256": "71232aa1d5eca7b1fe19a034c455d3a4b2d658fce3c7d45b5772608178fcbb8f"
+        },
+        "captures/completed-reuse.pcap": {
+          "bytes": 486,
+          "sha256": "9fc76809b6d913cedf44be50d0bc9f7f8da8d66e4737cd7d0ae3d33ec23f1a1e"
+        },
+        "captures/conflicting-first.pcap": {
+          "bytes": 377,
+          "sha256": "e3d2a5e6a5f854600e67798692b3f8ddb6775d44885e8d4a9bbf8d8d013d2cc9"
+        },
+        "captures/copacked-outside-profile.pcap": {
+          "bytes": 306,
+          "sha256": "f9d8cc20fc8c46b264ab31b45ae9ccd1bd570893c9a86f0288e9b7ab09b01d6b"
+        },
+        "captures/expired.pcap": {
+          "bytes": 255,
+          "sha256": "e7f0df08d876f64df44661438f142cf5758da3711e05a97f51418697e0c7175f"
+        },
+        "captures/interleaved.pcap": {
+          "bytes": 486,
+          "sha256": "9170accf5ce8773e9650e231194d8c30bf801c02e2e498465401fcb956cccc7f"
+        },
+        "captures/literal-channel-one.pcap": {
+          "bytes": 255,
+          "sha256": "daf31165d7f197a0ca4e632ae87ba86f80630208c712aa92907dd3ac6912355d"
+        },
+        "captures/missing-channel.pcap": {
+          "bytes": 363,
+          "sha256": "fd9d6fecbc886824d23870083be8c2c8c82acbede2f440fbd14c8ace8f1ced02"
+        },
+        "captures/missing-final.pcap": {
+          "bytes": 146,
+          "sha256": "08ebf83d5f7cabd344dd89ff8e28b022bf47135c6e7a6bb87ff56ab8af1139fa"
+        },
+        "captures/missing-sequence.pcap": {
+          "bytes": 363,
+          "sha256": "62dae0e2d386e00befd99cf87170f06971a207f4ff479cb49c35d2a683e9e948"
+        },
+        "captures/ordered.pcap": {
+          "bytes": 255,
+          "sha256": "fdd9b6ae94f09138dc48b0a6f96eb6eb220ea63b1dca7871f6a0adc55912a2d4"
+        },
+        "captures/orphan.pcap": {
+          "bytes": 133,
+          "sha256": "aee51b1614296c001f8f9d6bad068d72b52e45dfd0e78c066ce56c71d5bc289e"
+        },
+        "captures/own-ship-channel-two.pcap": {
+          "bytes": 255,
+          "sha256": "c8ab53726268724217cc7f066a54e02297f0fcb1031fa6f26f179680390f096f"
+        },
+        "captures/reordered.pcap": {
+          "bytes": 364,
+          "sha256": "146358bfb919cb2ec98e925cc8ea95d658f44c3be927f23d305e62a67736057c"
+        },
+        "captures/retry-not-deadline.pcap": {
+          "bytes": 377,
+          "sha256": "97fd3d6dff2f717de4ad2140d013c932e7570047958370b702716128bc0c6925"
+        },
+        "captures/reverse-direction.pcap": {
+          "bytes": 255,
+          "sha256": "68ddcd4302c098fa1288f8926396e63dbdeb85c7ce53e305acc0aae7e98e858a"
+        },
+        "captures/sentence-truncated.pcap": {
+          "bytes": 363,
+          "sha256": "cd59265c8b61640b47a7a3230b647a81b73412839d31003345164d41d22e3a0b"
+        },
+        "captures/wrong-channel.pcap": {
+          "bytes": 364,
+          "sha256": "8553857b22fc99829d1bcc53feca57a9d1470b16e1ee212f19f59761d463427a"
+        },
+        "captures/zero-sequence.pcap": {
+          "bytes": 255,
+          "sha256": "9ab4e1493266c27949c71a5282c960e4627e8556e81e2c2cbf5f4c9703c41875"
+        },
+        "controls.json": {
+          "bytes": 8081,
+          "sha256": "96dff3017dab52731574cb7e8060377a174997569b5326623184f7a78f93adcb"
+        },
+        "scripts/build_fixture.py": {
+          "bytes": 8355,
+          "sha256": "c553d65fa79a67c2e73b776196288fda6311f635ea3c4301e23a908765925143"
+        },
+        "scripts/required-tests-traffic-unified-v19.json": {
+          "bytes": 132682,
+          "sha256": "6e7cb76cc3bd96a4ffd85faafdb881186c404a9a326e6626e41d6e1d5a630bae"
+        },
+        "validation/expected.json": {
+          "bytes": 24778,
+          "sha256": "9fdc3350d58b6d98bb6fd61ec1ccff046d0fa10c5bb519bb7f7852194ad9d0ef"
+        },
+        "validation/source-pins.json": {
+          "bytes": 878,
+          "sha256": "72c16cabaae6e1c16728bac922f88d799934551660d7eff5818667f930aaba0d"
+        },
+        "validation/source-type5.json": {
+          "bytes": 3146,
+          "sha256": "d864059201a5ba24355793d85c7d932c3661977c129c4738c808b79d300e9bc5"
+        }
+      },
+      "aliases": {
+        "common/pcapx/pcaputil/nmea-ais-session/answers/active-retry.json": "answers/active-retry.json",
+        "common/pcapx/pcaputil/nmea-ais-session/answers/assembled-byte-budget.json": "answers/assembled-byte-budget.json",
+        "common/pcapx/pcaputil/nmea-ais-session/answers/backdated.json": "answers/backdated.json",
+        "common/pcapx/pcaputil/nmea-ais-session/answers/bad-checksum.json": "answers/bad-checksum.json",
+        "common/pcapx/pcaputil/nmea-ais-session/answers/carrier-truncated.json": "answers/carrier-truncated.json",
+        "common/pcapx/pcaputil/nmea-ais-session/answers/completed-reuse.json": "answers/completed-reuse.json",
+        "common/pcapx/pcaputil/nmea-ais-session/answers/conflicting-first.json": "answers/conflicting-first.json",
+        "common/pcapx/pcaputil/nmea-ais-session/answers/copacked-outside-profile.json": "answers/copacked-outside-profile.json",
+        "common/pcapx/pcaputil/nmea-ais-session/answers/expired.json": "answers/expired.json",
+        "common/pcapx/pcaputil/nmea-ais-session/answers/interleaved.json": "answers/interleaved.json",
+        "common/pcapx/pcaputil/nmea-ais-session/answers/literal-channel-one.json": "answers/literal-channel-one.json",
+        "common/pcapx/pcaputil/nmea-ais-session/answers/missing-channel.json": "answers/missing-channel.json",
+        "common/pcapx/pcaputil/nmea-ais-session/answers/missing-final.json": "answers/missing-final.json",
+        "common/pcapx/pcaputil/nmea-ais-session/answers/missing-sequence.json": "answers/missing-sequence.json",
+        "common/pcapx/pcaputil/nmea-ais-session/answers/ordered.json": "answers/ordered.json",
+        "common/pcapx/pcaputil/nmea-ais-session/answers/orphan.json": "answers/orphan.json",
+        "common/pcapx/pcaputil/nmea-ais-session/answers/own-ship-channel-two.json": "answers/own-ship-channel-two.json",
+        "common/pcapx/pcaputil/nmea-ais-session/answers/reordered.json": "answers/reordered.json",
+        "common/pcapx/pcaputil/nmea-ais-session/answers/retry-not-deadline.json": "answers/retry-not-deadline.json",
+        "common/pcapx/pcaputil/nmea-ais-session/answers/reverse-direction.json": "answers/reverse-direction.json",
+        "common/pcapx/pcaputil/nmea-ais-session/answers/sentence-truncated.json": "answers/sentence-truncated.json",
+        "common/pcapx/pcaputil/nmea-ais-session/answers/state-memory-budget.json": "answers/state-memory-budget.json",
+        "common/pcapx/pcaputil/nmea-ais-session/answers/wrong-channel.json": "answers/wrong-channel.json",
+        "common/pcapx/pcaputil/nmea-ais-session/answers/zero-sequence.json": "answers/zero-sequence.json",
+        "common/pcapx/pcaputil/nmea-ais-session/captures/active-retry.pcap": "captures/active-retry.pcap",
+        "common/pcapx/pcaputil/nmea-ais-session/captures/assembled-byte-budget.pcap": "captures/assembled-byte-budget.pcap",
+        "common/pcapx/pcaputil/nmea-ais-session/captures/backdated.pcap": "captures/backdated.pcap",
+        "common/pcapx/pcaputil/nmea-ais-session/captures/bad-checksum.pcap": "captures/bad-checksum.pcap",
+        "common/pcapx/pcaputil/nmea-ais-session/captures/carrier-truncated.pcap": "captures/carrier-truncated.pcap",
+        "common/pcapx/pcaputil/nmea-ais-session/captures/completed-reuse.pcap": "captures/completed-reuse.pcap",
+        "common/pcapx/pcaputil/nmea-ais-session/captures/conflicting-first.pcap": "captures/conflicting-first.pcap",
+        "common/pcapx/pcaputil/nmea-ais-session/captures/copacked-outside-profile.pcap": "captures/copacked-outside-profile.pcap",
+        "common/pcapx/pcaputil/nmea-ais-session/captures/expired.pcap": "captures/expired.pcap",
+        "common/pcapx/pcaputil/nmea-ais-session/captures/interleaved.pcap": "captures/interleaved.pcap",
+        "common/pcapx/pcaputil/nmea-ais-session/captures/literal-channel-one.pcap": "captures/literal-channel-one.pcap",
+        "common/pcapx/pcaputil/nmea-ais-session/captures/missing-channel.pcap": "captures/missing-channel.pcap",
+        "common/pcapx/pcaputil/nmea-ais-session/captures/missing-final.pcap": "captures/missing-final.pcap",
+        "common/pcapx/pcaputil/nmea-ais-session/captures/missing-sequence.pcap": "captures/missing-sequence.pcap",
+        "common/pcapx/pcaputil/nmea-ais-session/captures/ordered.pcap": "captures/ordered.pcap",
+        "common/pcapx/pcaputil/nmea-ais-session/captures/orphan.pcap": "captures/orphan.pcap",
+        "common/pcapx/pcaputil/nmea-ais-session/captures/own-ship-channel-two.pcap": "captures/own-ship-channel-two.pcap",
+        "common/pcapx/pcaputil/nmea-ais-session/captures/reordered.pcap": "captures/reordered.pcap",
+        "common/pcapx/pcaputil/nmea-ais-session/captures/retry-not-deadline.pcap": "captures/retry-not-deadline.pcap",
+        "common/pcapx/pcaputil/nmea-ais-session/captures/reverse-direction.pcap": "captures/reverse-direction.pcap",
+        "common/pcapx/pcaputil/nmea-ais-session/captures/sentence-truncated.pcap": "captures/sentence-truncated.pcap",
+        "common/pcapx/pcaputil/nmea-ais-session/captures/wrong-channel.pcap": "captures/wrong-channel.pcap",
+        "common/pcapx/pcaputil/nmea-ais-session/captures/zero-sequence.pcap": "captures/zero-sequence.pcap",
+        "common/pcapx/pcaputil/nmea-ais-session/controls.json": "controls.json",
+        "common/pcapx/pcaputil/nmea-ais-session/scripts/build_fixture.py": "scripts/build_fixture.py",
+        "common/pcapx/pcaputil/nmea-ais-session/scripts/required-tests-traffic-unified-v19.json": "scripts/required-tests-traffic-unified-v19.json",
+        "common/pcapx/pcaputil/nmea-ais-session/validation/expected.json": "validation/expected.json",
+        "common/pcapx/pcaputil/nmea-ais-session/validation/source-pins.json": "validation/source-pins.json",
+        "common/pcapx/pcaputil/nmea-ais-session/validation/source-type5.json": "validation/source-type5.json",
+        "scripts/protocol-tests/required-tests-traffic-unified-v19.json": "scripts/required-tests-traffic-unified-v19.json"
+      }
     }
   ],
   "schema_version": 1,
