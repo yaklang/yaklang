@@ -32,6 +32,7 @@ func TestProtocolNetworkSummaryCapturedARP(t *testing.T) {
 }
 
 func TestProtocolNetworkSummaryCapturedICMP(t *testing.T) {
+	testICMPFragmentObservations(t)
 	testNetworkObservationQueryOwnership(t, false)
 	c := NewDefaultConfig()
 	var event *ProtocolEvent

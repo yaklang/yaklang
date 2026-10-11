@@ -113,6 +113,9 @@ func (a *binParser) networkPacket(p gopacket.Packet) (gopacket.Packet, bool) {
 			return nil, true
 		}
 		raw := append(bytes.Clone(inner.LayerContents()), inner.LayerPayload()...)
+		// Fragmentation of an outer carrier does not mean that the inner
+		// IPv6 ND message itself contained a Fragment header.
+		e.ipv6Fragment = false
 		ci.CaptureLength, ci.Length = len(raw), len(raw)
 		ci = withEvidence(ci, e)
 		p = gopacket.NewPacket(raw, protocolPacketDecoder{decoder: layers.LinkTypeRaw}, gopacket.Default)
@@ -145,7 +148,14 @@ func (a *binParser) networkPacket(p gopacket.Packet) (gopacket.Packet, bool) {
 		}
 	}
 	if off >= 0 {
-		return a.fragment(p, e, key, off, more, payload)
+		q, consumed := a.fragment(p, e, key, off, more, payload)
+		// fragment() releases its store mutex before this dispatch. A complete
+		// ICMP datagram must reach the same native observation path as an
+		// unfragmented datagram, rather than disappearing in TCP/UDP dispatch.
+		if !consumed && q != nil && (q.Layer(layers.LayerTypeICMPv4) != nil || q.Layer(layers.LayerTypeICMPv6) != nil) {
+			return a.networkPacket(q)
+		}
+		return q, consumed
 	}
 
 	// Check native observation admission before constructing or cloning field trees,
@@ -162,7 +172,7 @@ func (a *binParser) networkPacket(p gopacket.Packet) (gopacket.Packet, bool) {
 	if nativeProtocol != "" && len(p.Data()) > min(a.budget.MaxFrameBytes, a.config.MaxMessageBytes) {
 		err := protocolError(ErrResourceExceeded, "native network frame exceeds parser message limit")
 		status, typed := classifySessionError(err)
-		event := &ProtocolEvent{Timestamp: ci.Timestamp, Transport: "network", Protocol: nativeProtocol, Domain: e.Ref.Domain, Length: len(p.Data()), Status: status, Completeness: status, ExpertCode: string(typed.Kind), Error: err.Error(), sessionError: typed, SourceBytes: ByteSource{Kind: "captured", PacketRefs: []PacketReference{e.Ref}}}
+		event := &ProtocolEvent{Timestamp: ci.Timestamp, Transport: "network", Protocol: nativeProtocol, Domain: e.Ref.Domain, Length: len(p.Data()), Status: status, Completeness: status, ExpertCode: string(typed.Kind), Error: err.Error(), sessionError: typed, SourceBytes: networkObservationSource(e)}
 		if n := p.NetworkLayer(); n != nil {
 			event.Source, event.Destination = n.NetworkFlow().Src().String(), n.NetworkFlow().Dst().String()
 		}
@@ -185,6 +195,14 @@ func (a *binParser) networkPacket(p gopacket.Packet) (gopacket.Packet, bool) {
 		fields = map[string]any{"Operation": arp.Operation, "Sender MAC": net.HardwareAddr(arp.SourceHwAddress).String(), "Sender IP": net.IP(arp.SourceProtAddress).String(), "Target IP": net.IP(arp.DstProtAddress).String(), "Observation": "unverified-neighbor"}
 	} else if icmp, ok := p.Layer(layers.LayerTypeICMPv6).(*layers.ICMPv6); ok {
 		protocol = "icmpv6"
+		// RFC 6980 section 5 forbids a Fragment header on ND types133..137,
+		// including atomic fragments. Keep a diagnostic, never a valid ND
+		// projection. SEND CPA/message types outside this range are distinct.
+		if e.ipv6Fragment && icmp.TypeCode.Type() >= 133 && icmp.TypeCode.Type() <= 137 {
+			a.malformed.Add(1)
+			a.networkDiagnostic(e, ci, "malformed", "NDFragmentForbidden")
+			return nil, true
+		}
 		fields = map[string]any{"Type": icmp.TypeCode.Type(), "Code": icmp.TypeCode.Code()}
 		typ := icmp.TypeCode.Type()
 		b := icmp.Payload
@@ -243,7 +261,7 @@ func (a *binParser) networkPacket(p gopacket.Packet) (gopacket.Packet, bool) {
 		}
 	}
 	if protocol != "" {
-		event := &ProtocolEvent{Timestamp: ci.Timestamp, Transport: "network", Protocol: protocol, Domain: e.Ref.Domain, Length: len(p.Data()), Raw: bytes.Clone(p.Data()), Status: "decoded", Completeness: "message", Session: cloneSession(fields), SourceBytes: ByteSource{Kind: "captured", PacketRefs: []PacketReference{e.Ref}}, semanticFields: cloneSession(fields), semanticSession: cloneSession(fields)}
+		event := &ProtocolEvent{Timestamp: ci.Timestamp, Transport: "network", Protocol: protocol, Domain: e.Ref.Domain, Length: len(p.Data()), Raw: bytes.Clone(p.Data()), Status: "decoded", Completeness: "message", Session: cloneSession(fields), SourceBytes: networkObservationSource(e), semanticFields: cloneSession(fields), semanticSession: cloneSession(fields)}
 		if n := p.NetworkLayer(); n != nil {
 			event.Source, event.Destination = n.NetworkFlow().Src().String(), n.NetworkFlow().Dst().String()
 		}
@@ -333,8 +351,15 @@ func (a *binParser) decodeGOOSEEthernet(eth *layers.Ethernet, payload []byte, ev
 	a.emit(e)
 }
 
+func networkObservationSource(e captureEvidence) ByteSource {
+	if len(e.refs) != 0 {
+		return ByteSource{Kind: "reassembled", PacketRefs: append([]PacketReference(nil), e.refs...)}
+	}
+	return ByteSource{Kind: "captured", PacketRefs: []PacketReference{e.Ref}}
+}
+
 func (a *binParser) networkDiagnostic(e captureEvidence, ci gopacket.CaptureInfo, status, code string) {
-	a.emit(&ProtocolEvent{Timestamp: ci.Timestamp, Transport: "network", Protocol: "ip", Domain: e.Ref.Domain, Status: status, Completeness: status, ExpertCode: code, Error: code, SourceBytes: ByteSource{Kind: "captured", PacketRefs: []PacketReference{e.Ref}}})
+	a.emit(&ProtocolEvent{Timestamp: ci.Timestamp, Transport: "network", Protocol: "ip", Domain: e.Ref.Domain, Status: status, Completeness: status, ExpertCode: code, Error: code, SourceBytes: networkObservationSource(e)})
 }
 func (a *binParser) fragment(p gopacket.Packet, e captureEvidence, key fragmentKey, off int, more bool, payload []byte) (gopacket.Packet, bool) {
 	ci := p.Metadata().CaptureInfo
@@ -586,6 +611,10 @@ func (a *binParser) reassembledPacket(header, payload []byte, e captureEvidence,
 		binary.BigEndian.PutUint16(raw[10:12], ^uint16(sum))
 	}
 	q := gopacket.NewPacket(raw, protocolPacketDecoder{decoder: layers.LinkTypeRaw}, gopacket.Default)
+	e.ipv6Fragment = v6
+	if len(e.refs) == 0 {
+		e.refs = []PacketReference{e.Ref}
+	}
 	ci.CaptureLength, ci.Length = len(raw), len(raw)
 	ci = withEvidence(ci, e)
 	q.Metadata().CaptureInfo = ci

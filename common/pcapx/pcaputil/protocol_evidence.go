@@ -32,6 +32,8 @@ type ByteSource struct {
 type captureEvidence struct {
 	Ref  PacketReference
 	refs []PacketReference
+	// Applies to the current IP packet, not an outer tunnel carrier.
+	ipv6Fragment bool
 }
 
 func evidenceFrom(ci gopacket.CaptureInfo) captureEvidence {
