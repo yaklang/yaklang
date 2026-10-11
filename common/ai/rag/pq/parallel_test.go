@@ -140,20 +140,17 @@ func TestParallelKMeans(t *testing.T) {
 		{5.0, 5.0}, {5.1, 5.1}, {5.0, 5.1}, {5.1, 5.0}, // 聚类2
 	}
 
-	// Reset the seed before each implementation so both start with the same
-	// centroids as the expected-center regression in TestKMeans.
+	// Each implementation owns an identically seeded random stream.
 	const seed int64 = 42
 
 	// 串行K-Means
-	rand.Seed(seed)
-	sequentialCentroids, err := kMeans(data, 2, 50, 1e-6)
+	sequentialCentroids, err := kMeansWithRand(data, 2, 50, 1e-6, 1, rand.New(rand.NewSource(seed)))
 	if err != nil {
 		t.Fatalf("Sequential K-Means failed (seed=%d): %v", seed, err)
 	}
 
 	// 并行K-Means
-	rand.Seed(seed)
-	parallelCentroids, err := kMeansParallel(data, 2, 50, 1e-6, 2)
+	parallelCentroids, err := kMeansWithRand(data, 2, 50, 1e-6, 2, rand.New(rand.NewSource(seed)))
 	if err != nil {
 		t.Fatalf("Parallel K-Means failed (seed=%d): %v", seed, err)
 	}

@@ -68,7 +68,7 @@ func WithTolerance(tolerance float64) TrainOption {
 	}
 }
 
-// WithRandomSeed 设置随机种子
+// WithRandomSeed 设置随机种子；相同的输入和种子在不同并发配置下产生相同码本。
 func WithRandomSeed(seed int64) TrainOption {
 	return func(opts *TrainOptions) {
 		opts.RandomSeed = seed
@@ -135,6 +135,15 @@ func Train(input <-chan []float64, opts ...TrainOption) (*Codebook, error) {
 	if options.K <= 0 || options.K > 256 {
 		return nil, fmt.Errorf("K (number of centroids) must be between 1 and 256, got %d", options.K)
 	}
+	if options.MaxIters <= 0 {
+		return nil, fmt.Errorf("MaxIters must be positive, got %d", options.MaxIters)
+	}
+	if options.Tolerance < 0 || math.IsNaN(options.Tolerance) || math.IsInf(options.Tolerance, 0) {
+		return nil, fmt.Errorf("Tolerance must be finite and non-negative, got %v", options.Tolerance)
+	}
+	if options.MaxWorkers <= 0 {
+		options.MaxWorkers = 1
+	}
 
 	log.Infof("Starting PQ training with M=%d, K=%d, MaxIters=%d", options.M, options.K, options.MaxIters)
 
@@ -149,6 +158,9 @@ func Train(input <-chan []float64, opts ...TrainOption) (*Codebook, error) {
 
 	if len(vectors) == 0 {
 		return nil, fmt.Errorf("no training data received")
+	}
+	if len(vectors) < options.K {
+		return nil, fmt.Errorf("data size %d is less than k %d", len(vectors), options.K)
 	}
 
 	// 检查向量维度一致性
@@ -166,9 +178,6 @@ func Train(input <-chan []float64, opts ...TrainOption) (*Codebook, error) {
 
 	subVectorDim := dim / options.M
 	log.Infof("Training with %d vectors of dimension %d, sub-vector dimension: %d", len(vectors), dim, subVectorDim)
-
-	// 设置随机种子
-	rand.Seed(options.RandomSeed)
 
 	// 初始化码本
 	codebook := &Codebook{
@@ -208,18 +217,12 @@ func trainSequential(vectors [][]float64, codebook *Codebook, subVectorDim int, 
 		end := start + subVectorDim
 
 		for i, vec := range vectors {
-			subVectors[i] = make([]float64, subVectorDim)
-			copy(subVectors[i], vec[start:end])
+			// K-Means only reads its input; keep a view instead of copying each point.
+			subVectors[i] = vec[start:end]
 		}
 
 		// 运行K-Means算法
-		var centroids [][]float64
-		var err error
-		if options.ParallelDistanceCalc {
-			centroids, err = kMeansParallel(subVectors, options.K, options.MaxIters, options.Tolerance, options.MaxWorkers)
-		} else {
-			centroids, err = kMeans(subVectors, options.K, options.MaxIters, options.Tolerance)
-		}
+		centroids, err := trainSubspace(subVectors, m, options, options.MaxWorkers)
 		if err != nil {
 			return fmt.Errorf("K-Means failed for sub-vector %d: %v", m, err)
 		}
@@ -236,8 +239,6 @@ func trainParallel(vectors [][]float64, codebook *Codebook, subVectorDim int, op
 	type TrainingTask struct {
 		SubVectorIndex int
 		SubVectors     [][]float64
-		Start          int
-		End            int
 	}
 
 	// 结果结构
@@ -256,6 +257,8 @@ func trainParallel(vectors [][]float64, codebook *Codebook, subVectorDim int, op
 	if maxWorkers > options.M {
 		maxWorkers = options.M // 不能超过子向量数量
 	}
+	// Share the worker budget across subspaces and distance calculations.
+	distanceWorkers := options.MaxWorkers / maxWorkers
 
 	log.Infof("Using %d parallel workers for %d sub-vectors", maxWorkers, options.M)
 
@@ -269,13 +272,7 @@ func trainParallel(vectors [][]float64, codebook *Codebook, subVectorDim int, op
 				log.Infof("Worker %d: Training sub-vector %d/%d", workerID, task.SubVectorIndex+1, options.M)
 
 				// 运行K-Means算法
-				var centroids [][]float64
-				var err error
-				if options.ParallelDistanceCalc {
-					centroids, err = kMeansParallel(task.SubVectors, options.K, options.MaxIters, options.Tolerance, runtime.NumCPU())
-				} else {
-					centroids, err = kMeans(task.SubVectors, options.K, options.MaxIters, options.Tolerance)
-				}
+				centroids, err := trainSubspace(task.SubVectors, task.SubVectorIndex, options, distanceWorkers)
 
 				// 发送结果
 				resultChan <- TrainingResult{
@@ -301,15 +298,12 @@ func trainParallel(vectors [][]float64, codebook *Codebook, subVectorDim int, op
 			end := start + subVectorDim
 
 			for i, vec := range vectors {
-				subVectors[i] = make([]float64, subVectorDim)
-				copy(subVectors[i], vec[start:end])
+				subVectors[i] = vec[start:end]
 			}
 
 			taskChan <- TrainingTask{
 				SubVectorIndex: m,
 				SubVectors:     subVectors,
-				Start:          start,
-				End:            end,
 			}
 		}
 	}()
@@ -322,9 +316,13 @@ func trainParallel(vectors [][]float64, codebook *Codebook, subVectorDim int, op
 
 	// 收集结果
 	completedCount := 0
+	var firstErr error
 	for result := range resultChan {
 		if result.Error != nil {
-			return fmt.Errorf("K-Means failed for sub-vector %d: %v", result.SubVectorIndex, result.Error)
+			if firstErr == nil {
+				firstErr = fmt.Errorf("K-Means failed for sub-vector %d: %v", result.SubVectorIndex, result.Error)
+			}
+			continue
 		}
 
 		codebook.Centroids[result.SubVectorIndex] = result.Centroids
@@ -335,11 +333,30 @@ func trainParallel(vectors [][]float64, codebook *Codebook, subVectorDim int, op
 		}
 	}
 
-	return nil
+	return firstErr
+}
+
+func trainSubspace(data [][]float64, index int, options *TrainOptions, workers int) ([][]float64, error) {
+	if !options.ParallelDistanceCalc {
+		workers = 1
+	}
+	// Each subspace owns its random stream, so scheduling and other Train calls
+	// cannot change initialization or empty-cluster recovery.
+	rng := rand.New(rand.NewSource(options.RandomSeed + int64(index)))
+	return kMeansWithRand(data, options.K, options.MaxIters, options.Tolerance, workers, rng)
 }
 
 // kMeans K-Means聚类算法实现
 func kMeans(data [][]float64, k int, maxIters int, tolerance float64) ([][]float64, error) {
+	return kMeansWithRand(data, k, maxIters, tolerance, 1, rand.New(rand.NewSource(rand.Int63())))
+}
+
+// kMeansParallel 并行K-Means聚类算法实现
+func kMeansParallel(data [][]float64, k int, maxIters int, tolerance float64, numWorkers int) ([][]float64, error) {
+	return kMeansWithRand(data, k, maxIters, tolerance, numWorkers, rand.New(rand.NewSource(rand.Int63())))
+}
+
+func kMeansWithRand(data [][]float64, k int, maxIters int, tolerance float64, numWorkers int, rng *rand.Rand) ([][]float64, error) {
 	if len(data) == 0 {
 		return nil, fmt.Errorf("empty data")
 	}
@@ -349,37 +366,68 @@ func kMeans(data [][]float64, k int, maxIters int, tolerance float64) ([][]float
 	if len(data) < k {
 		return nil, fmt.Errorf("data size %d is less than k %d", len(data), k)
 	}
-
-	dim := len(data[0])
-
-	// 初始化聚类中心：从数据中随机选择k个点
-	centroids := make([][]float64, k)
-	perm := rand.Perm(len(data))
-	for i := 0; i < k; i++ {
-		centroids[i] = make([]float64, dim)
-		copy(centroids[i], data[perm[i]])
+	if maxIters <= 0 {
+		return nil, fmt.Errorf("maxIters must be positive")
+	}
+	if tolerance < 0 || math.IsNaN(tolerance) || math.IsInf(tolerance, 0) {
+		return nil, fmt.Errorf("tolerance must be finite and non-negative")
 	}
 
+	dim := len(data[0])
+	if dim == 0 {
+		return nil, fmt.Errorf("empty vector")
+	}
+	for i, point := range data {
+		if len(point) != dim {
+			return nil, fmt.Errorf("vector %d has dimension %d, expected %d", i, len(point), dim)
+		}
+		for _, value := range point {
+			if math.IsNaN(value) || math.IsInf(value, 0) {
+				return nil, fmt.Errorf("vector %d contains a non-finite value", i)
+			}
+		}
+	}
+
+	centroids := initializeKMeansPlusPlus(data, k, rng)
 	assignments := make([]int, len(data))
+	for i := range assignments {
+		// The first assignment must trigger a centroid update, including k=1.
+		assignments[i] = -1
+	}
+	if numWorkers > len(data) {
+		numWorkers = len(data)
+	}
+	if numWorkers <= 0 {
+		numWorkers = 1
+	}
+	newCentroids := make([][]float64, k)
+	counts := make([]int, k)
+	for i := range newCentroids {
+		newCentroids[i] = make([]float64, dim)
+	}
 
 	for iter := 0; iter < maxIters; iter++ {
 		// 分配步骤：将每个数据点分配到最近的聚类中心
 		changed := false
-		for i, point := range data {
-			minDist := math.MaxFloat64
-			bestCluster := 0
+		if numWorkers > 1 {
+			changed = parallelAssignment(data, centroids, assignments, numWorkers)
+		} else {
+			for i, point := range data {
+				minDist := math.MaxFloat64
+				bestCluster := 0
 
-			for j, centroid := range centroids {
-				dist := euclideanDistanceSquared(point, centroid)
-				if dist < minDist {
-					minDist = dist
-					bestCluster = j
+				for j, centroid := range centroids {
+					dist := euclideanDistanceSquared(point, centroid)
+					if dist < minDist {
+						minDist = dist
+						bestCluster = j
+					}
 				}
-			}
 
-			if assignments[i] != bestCluster {
-				assignments[i] = bestCluster
-				changed = true
+				if assignments[i] != bestCluster {
+					assignments[i] = bestCluster
+					changed = true
+				}
 			}
 		}
 
@@ -390,11 +438,9 @@ func kMeans(data [][]float64, k int, maxIters int, tolerance float64) ([][]float
 		}
 
 		// 更新步骤：重新计算聚类中心
-		newCentroids := make([][]float64, k)
-		counts := make([]int, k)
-
 		for i := range newCentroids {
-			newCentroids[i] = make([]float64, dim)
+			clear(newCentroids[i])
+			counts[i] = 0
 		}
 
 		// 累加每个簇中的所有点
@@ -415,7 +461,7 @@ func kMeans(data [][]float64, k int, maxIters int, tolerance float64) ([][]float
 				}
 			} else {
 				// 如果某个簇为空，重新随机选择一个点
-				randomIdx := rand.Intn(len(data))
+				randomIdx := rng.Intn(len(data))
 				copy(newCentroids[i], data[randomIdx])
 			}
 
@@ -426,7 +472,7 @@ func kMeans(data [][]float64, k int, maxIters int, tolerance float64) ([][]float
 			}
 		}
 
-		centroids = newCentroids
+		centroids, newCentroids = newCentroids, centroids
 
 		// 检查收敛性
 		if maxChange < tolerance {
@@ -438,95 +484,53 @@ func kMeans(data [][]float64, k int, maxIters int, tolerance float64) ([][]float
 	return centroids, nil
 }
 
-// kMeansParallel 并行K-Means聚类算法实现
-func kMeansParallel(data [][]float64, k int, maxIters int, tolerance float64, numWorkers int) ([][]float64, error) {
-	if len(data) == 0 {
-		return nil, fmt.Errorf("empty data")
-	}
-	if k <= 0 {
-		return nil, fmt.Errorf("k must be positive")
-	}
-	if len(data) < k {
-		return nil, fmt.Errorf("data size %d is less than k %d", len(data), k)
-	}
-
-	dim := len(data[0])
-
-	// 初始化聚类中心：从数据中随机选择k个点
+// initializeKMeansPlusPlus favors points far from the centers already selected.
+// Scaling weights by their maximum prevents their sum from overflowing.
+func initializeKMeansPlusPlus(data [][]float64, k int, rng *rand.Rand) [][]float64 {
 	centroids := make([][]float64, k)
-	perm := rand.Perm(len(data))
-	for i := 0; i < k; i++ {
-		centroids[i] = make([]float64, dim)
-		copy(centroids[i], data[perm[i]])
+	nearest := make([]float64, len(data))
+	for i := range nearest {
+		nearest[i] = math.MaxFloat64
 	}
-
-	assignments := make([]int, len(data))
-
-	// 限制worker数量
-	if numWorkers > len(data) {
-		numWorkers = len(data)
-	}
-	if numWorkers <= 0 {
-		numWorkers = 1
-	}
-
-	for iter := 0; iter < maxIters; iter++ {
-		// 并行分配步骤：将每个数据点分配到最近的聚类中心
-		changed := parallelAssignment(data, centroids, assignments, numWorkers)
-
-		// 如果没有分配改变，算法收敛
-		if !changed {
-			log.Infof("Parallel K-Means converged after %d iterations", iter+1)
+	selected := rng.Intn(len(data))
+	for c := range centroids {
+		centroids[c] = append([]float64(nil), data[selected]...)
+		if c == k-1 {
 			break
 		}
-
-		// 更新步骤：重新计算聚类中心
-		newCentroids := make([][]float64, k)
-		counts := make([]int, k)
-
-		for i := range newCentroids {
-			newCentroids[i] = make([]float64, dim)
-		}
-
-		// 累加每个簇中的所有点
+		maxDistance := 0.0
 		for i, point := range data {
-			cluster := assignments[i]
-			for j, val := range point {
-				newCentroids[cluster][j] += val
+			distance := euclideanDistanceSquared(point, centroids[c])
+			if distance < nearest[i] {
+				nearest[i] = distance
 			}
-			counts[cluster]++
-		}
-
-		// 计算平均值作为新的聚类中心
-		maxChange := 0.0
-		for i := range newCentroids {
-			if counts[i] > 0 {
-				for j := range newCentroids[i] {
-					newCentroids[i][j] /= float64(counts[i])
-				}
-			} else {
-				// 如果某个簇为空，重新随机选择一个点
-				randomIdx := rand.Intn(len(data))
-				copy(newCentroids[i], data[randomIdx])
-			}
-
-			// 计算聚类中心的变化
-			change := euclideanDistanceSquared(centroids[i], newCentroids[i])
-			if change > maxChange {
-				maxChange = change
+			if nearest[i] > maxDistance {
+				maxDistance = nearest[i]
 			}
 		}
-
-		centroids = newCentroids
-
-		// 检查收敛性
-		if maxChange < tolerance {
-			log.Infof("Parallel K-Means converged after %d iterations (tolerance reached)", iter+1)
-			break
+		if maxDistance == 0 {
+			// All distinct points are represented; duplicate centers are unavoidable.
+			selected = rng.Intn(len(data))
+			continue
+		}
+		total := 0.0
+		for _, distance := range nearest {
+			total += distance / maxDistance
+		}
+		threshold := rng.Float64() * total
+		for i, distance := range nearest {
+			if distance == 0 {
+				continue
+			}
+			// Retain the last positive-weight point as a rounding fallback.
+			selected = i
+			threshold -= distance / maxDistance
+			if threshold < 0 {
+				break
+			}
 		}
 	}
-
-	return centroids, nil
+	return centroids
 }
 
 // parallelAssignment 并行分配数据点到最近的聚类中心
