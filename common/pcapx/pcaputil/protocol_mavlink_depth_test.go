@@ -75,7 +75,7 @@ func testMAVLinkCommonDepthBudget(t *testing.T) {
 									require.Equal(t, raw, e.Raw)
 									require.Equal(t, offset, e.Offset)
 									require.Equal(t, len(raw), e.Length)
-									testNativeObservationSessionQueries(t, e, answer.Fields[i])
+									assertMAVLinkGoldenSession(t, e, answer.Fields[i])
 									offset += uint64(len(raw))
 								}
 							}
@@ -112,7 +112,7 @@ func testMAVLinkCommonDepthBudget(t *testing.T) {
 							require.Nil(t, next.Err)
 							require.Len(t, next.Events, len(answer.Fields))
 							for i, e := range next.Events {
-								testNativeObservationSessionQueries(t, e, answer.Fields[i])
+								assertMAVLinkGoldenSession(t, e, answer.Fields[i])
 								require.Zero(t, e.ResponseTo)
 								require.Zero(t, e.TransactionID)
 							}

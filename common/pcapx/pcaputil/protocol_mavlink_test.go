@@ -271,3 +271,38 @@ func assertMAVLinkOwnedSession(t *testing.T, e *ProtocolEvent) {
 		require.Zero(t, e.TransactionID)
 	}
 }
+
+// Unlike the generic *-native helper, this must execute for every MAVLink
+// profile. Compare the independent complete answer before ownership probes;
+// query equality with itself is not a semantic golden.
+func assertMAVLinkGoldenSession(t *testing.T, e *ProtocolEvent, want map[string]any) {
+	t.Helper()
+	require.Equal(t, "mavlink", e.Protocol)
+	require.Contains(t, []string{"mavlink-common-three-messages", "mavlink-common-gps-raw-int", "mavlink-common-attitude"}, e.Profile)
+	saved := cloneSession(e.Session)
+	defer func() { e.Session = saved }()
+	mavlinkGPSEqual(t, want, e.Session)
+	query := func() {
+		fields, err := e.GetFields()
+		require.NoError(t, err)
+		mavlinkGPSEqual(t, want, fields)
+		tree, err := e.Decode()
+		require.NoError(t, err)
+		mavlinkGPSEqual(t, want, protocolFields(tree))
+		session, ok := tree["session"].(map[string]any)
+		require.True(t, ok)
+		mavlinkGPSEqual(t, want, session)
+		mutateRTPSQuery(fields)
+		mutateRTPSQuery(protocolFields(tree))
+		mutateRTPSQuery(session)
+	}
+	query()
+	mutateRTPSQuery(e.Session)
+	query()
+	e.Session = map[string]any{"caller": "replacement"}
+	query()
+	e.Session = nil
+	query()
+	require.Zero(t, e.ResponseTo)
+	require.Zero(t, e.TransactionID)
+}

@@ -101,6 +101,7 @@ func mavlinkSigningHeartbeatFields(w []byte) map[string]any {
 	return map[string]any{
 		"Version": 2, "Payload Length": 9, "Sequence": 0, "System ID": int(w[5]), "Component ID": int(w[6]),
 		"Message ID": uint32(0), "Message Name": "HEARTBEAT", "CRC Extra": 50,
+		"Summary":  fmt.Sprintf("MAVLink v2 HEARTBEAT system %d component %d", w[5], w[6]),
 		"Checksum": binary.LittleEndian.Uint16(w[19:21]), "Signature Present": true,
 		"Signature Status": "verified-receiver-context", "Observation": "unverified-telemetry",
 		"Incompatibility Flags": 1, "Compatibility Flags": 0, "Signature": bytes.Clone(w[21:]),
@@ -362,7 +363,7 @@ func testMAVLinkSigning(t *testing.T) {
 							p = &v
 						}
 						want["Signature Verification"] = mavlinkSigningObservation(w, r.Before, r.After, p)
-						testNativeObservationSessionQueries(t, out.Events[0], want)
+						assertMAVLinkGoldenSession(t, out.Events[0], want)
 						last[k] = want["Signature Verification"].(map[string]any)["Timestamp"].(uint64)
 					}
 					e := out.Events[0]
@@ -409,7 +410,7 @@ func testMAVLinkSigning(t *testing.T) {
 					require.Len(t, out.Events, 1)
 					want := mavlinkSigningHeartbeatFields(w)
 					want["Signature Verification"] = mavlinkSigningObservation(w, r.Before, r.After, nil)
-					testNativeObservationSessionQueries(t, out.Events[0], want)
+					assertMAVLinkGoldenSession(t, out.Events[0], want)
 				} else {
 					mavlinkSigningAssertRefusal(t, out, w, "AuthenticationFailed")
 				}
@@ -480,7 +481,7 @@ func testMAVLinkSigning(t *testing.T) {
 			}
 			want := mavlinkSigningHeartbeatFields(w)
 			want["Signature Verification"] = mavlinkSigningObservation(w, prev, after, p)
-			testNativeObservationSessionQueries(t, e, want)
+			assertMAVLinkGoldenSession(t, e, want)
 			require.EqualValues(t, i*len(first), e.Offset)
 		}
 		require.EqualValues(t, 384, pair.Stats().BufferedBytes)
@@ -545,7 +546,7 @@ func testMAVLinkSigning(t *testing.T) {
 									p = &v
 								}
 								want["Signature Verification"] = mavlinkSigningObservation(w, r.Before, r.After, p)
-								testNativeObservationSessionQueries(t, e, want)
+								assertMAVLinkGoldenSession(t, e, want)
 								last[k] = want["Signature Verification"].(map[string]any)["Timestamp"].(uint64)
 							} else {
 								f, err := e.GetFields()
