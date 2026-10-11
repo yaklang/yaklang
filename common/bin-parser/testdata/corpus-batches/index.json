@@ -45204,7 +45204,8 @@
         "common/pcapx/pcaputil/testdata/mqtt-owned-context/captures/namespaces.pcap": "captures/namespaces.pcap",
         "common/pcapx/pcaputil/testdata/mqtt-owned-context/captures/negative-pubrec.pcap": "captures/negative-pubrec.pcap",
         "common/pcapx/pcaputil/testdata/mqtt-owned-context/captures/owned.pcap": "captures/owned.pcap",
-        "common/pcapx/pcaputil/testdata/mqtt-owned-context/captures/pending-limit.pcap": "captures/pending-limit.pcap"
+        "common/pcapx/pcaputil/testdata/mqtt-owned-context/captures/pending-limit.pcap": "captures/pending-limit.pcap",
+        "common/pcapx/pcaputil/testdata/mqtt-owned-context/validation/expected.json": "validation/expected.json"
       },
       "members": {
         "answers.json": {
