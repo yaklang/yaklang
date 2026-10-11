@@ -47785,6 +47785,384 @@
         "common/pcapx/pcaputil/testdata/sparkplug-node/verify.py": "sparkplug-node/verify.py",
         "common/pcapx/pcaputil/testdata/sparkplug-node/seal.py": "sparkplug-node/seal.py"
       }
+    },
+    {
+      "id": "validation-sparkplug-device",
+      "kind": "validation",
+      "source_sha": "c28c459b7c3298b30a830ed235fba9c8e842209a",
+      "file": "validation-sparkplug-device.zip",
+      "sha256": "3b78333a4becebb60b00132310794081919bcb1f50d192c244a09e6de6b42606",
+      "password": "bin-parser",
+      "members": {
+        "sparkplug-device/records/level4-device-lifecycle-0.bin": {
+          "bytes": 61,
+          "sha256": "7f109fcb0faf7c67bc04fb15679effc54c1d775e3bf1bb0db4c8386ba2dfc30a"
+        },
+        "sparkplug-device/records/level4-device-lifecycle-1.bin": {
+          "bytes": 45,
+          "sha256": "d603a7f19718e93581aedb498fc3b48b43c7a0eacfc6e0d61d32548eea9fcba5"
+        },
+        "sparkplug-device/records/level4-device-lifecycle-2.bin": {
+          "bytes": 33,
+          "sha256": "ab05e6e183f688cf60324308f46d7561b921de69cdba20559deeabca629a1a46"
+        },
+        "sparkplug-device/records/level4-device-lifecycle-3.bin": {
+          "bytes": 45,
+          "sha256": "e4ba9f7df0552641181fbf8cf9d4562286b847c8318f78e78cd9c19aabc4e5e0"
+        },
+        "sparkplug-device/records/level4-device-lifecycle-4.bin": {
+          "bytes": 43,
+          "sha256": "b935103e5b87b309e6a087f401a596a1cd3c8f4374514cfac0b2822215ffac97"
+        },
+        "sparkplug-device/records/level4-shared-sequence-2.bin": {
+          "bytes": 45,
+          "sha256": "cf0246c0ab4fddbf233d7c36381513659343634ae31b213c77a42da9b04c8b5a"
+        },
+        "sparkplug-device/records/level4-shared-sequence-3.bin": {
+          "bytes": 33,
+          "sha256": "a204791a37aabad1384cea5fa0e4630e570a0432504811205d384f07909c152b"
+        },
+        "sparkplug-device/records/level5-device-lifecycle-0.bin": {
+          "bytes": 62,
+          "sha256": "c511b1cf8efdbfb2460d091a50c1261f896ce56a177e5c7236516b2cbb3dbd10"
+        },
+        "sparkplug-device/records/level5-device-lifecycle-1.bin": {
+          "bytes": 46,
+          "sha256": "4d490ef2b26afb90098c3257e6fa8aa5870aed5d3cc982b29b2199f90a5ad5ad"
+        },
+        "sparkplug-device/records/level5-device-lifecycle-2.bin": {
+          "bytes": 34,
+          "sha256": "16a786616116e6508998cb56d5309b2b2b26870609f228e4189ae7fa117ae18d"
+        },
+        "sparkplug-device/records/level5-device-lifecycle-3.bin": {
+          "bytes": 46,
+          "sha256": "01d386931dfae9f44071488c5e2c665a209ab3ce74b00719bd57e45c085898ac"
+        },
+        "sparkplug-device/records/level5-device-lifecycle-4.bin": {
+          "bytes": 44,
+          "sha256": "3175f716196936817ee9ca861cfcbca7b13533558cb41200c6db6eb75a3081ec"
+        },
+        "sparkplug-device/records/level5-shared-sequence-1.bin": {
+          "bytes": 44,
+          "sha256": "48aa1fa205d947de0a04683cf76eeb5a2ff708af21b3695fccebd1041ca89407"
+        },
+        "sparkplug-device/records/level5-shared-sequence-2.bin": {
+          "bytes": 46,
+          "sha256": "792b93aa266c766163b53f4f55f19a63adbea4b9c5167e617f6dfa3574251f14"
+        },
+        "sparkplug-device/records/level5-shared-sequence-3.bin": {
+          "bytes": 34,
+          "sha256": "91857b20ba1723b1439bd5b24784789f6551c7d454d7df88afc659d01e30d652"
+        },
+        "sparkplug-device/records/two-devices-same-name-1.bin": {
+          "bytes": 65,
+          "sha256": "d1244bd77f5e9b0220d84681fdf4d507a929298095501f1cde5f4db4abb62815"
+        },
+        "sparkplug-device/records/two-devices-same-name-3.bin": {
+          "bytes": 49,
+          "sha256": "0ffd5f3d624bc8390ffe47d7a891354fc5aeff0df0d12e9183d905cf1554d24f"
+        },
+        "sparkplug-device/records/two-devices-same-name-4.bin": {
+          "bytes": 33,
+          "sha256": "a51bdbfc685cbd479304bdfaeefeba50ef7fb3684d5836a21a0de3aeeabf020f"
+        },
+        "sparkplug-device/records/two-devices-same-name-5.bin": {
+          "bytes": 49,
+          "sha256": "4fcda8b7dd81e9cae931da6a3312546243edd0eaaca165bd38bb228d2ae7deb1"
+        },
+        "sparkplug-device/records/alias-node-collision-0.bin": {
+          "bytes": 61,
+          "sha256": "b3d7cb0620c4687e2f96ef7b6e9c8500bfec8c6cc7f8c6c0f1b6566fb6ed986d"
+        },
+        "sparkplug-device/records/alias-device-collision-1.bin": {
+          "bytes": 65,
+          "sha256": "90ed524fb51c066a337ce6abfb755db07513c7b9f6e7495def4e27e827b6b75d"
+        },
+        "sparkplug-device/records/rebirth-replaces-own-alias-1.bin": {
+          "bytes": 61,
+          "sha256": "5fb1146a58d4f8abeef319e979fb48d801beb502d4b87ecf75af2fd2fcd8a4b5"
+        },
+        "sparkplug-device/records/rebirth-replaces-own-alias-2.bin": {
+          "bytes": 45,
+          "sha256": "6fc8d519b127ea8bb124c797d25e940622349020b06a6ffa931fe7ee1d62ff5c"
+        },
+        "sparkplug-device/records/wrong-device-alias-2.bin": {
+          "bytes": 49,
+          "sha256": "8121df462734b2ab1538201fc52edf0f3a2df90a2be292b15623fbdf0ecee735"
+        },
+        "sparkplug-device/records/device-bad-datatype-1.bin": {
+          "bytes": 47,
+          "sha256": "717890fcc5a402de05147075e1db5db6dbbea8a0e7db049cff9982bdc0ee66f4"
+        },
+        "sparkplug-device/records/device-null-scalar-1.bin": {
+          "bytes": 45,
+          "sha256": "b83afc21551b160a44b526008237bba3bc4d5393fe7dbd32b30d44b02a6964de"
+        },
+        "sparkplug-device/records/device-missing-timestamp-0.bin": {
+          "bytes": 54,
+          "sha256": "6b4789595ccbbd23618b51142b3c2d6d418014691982e4837a90c2f7d7bcaa6c"
+        },
+        "sparkplug-device/records/death-isolated-4.bin": {
+          "bytes": 61,
+          "sha256": "b193a56358fa2da581122c1303590c3bca1b1f3116856734ee8d4ed3d7e8d79f"
+        },
+        "sparkplug-device/records/death-isolated-5.bin": {
+          "bytes": 45,
+          "sha256": "d57003c40bcad2c4e9600e46d1b10456db0dfd4070feda5d83c321e8a5ac0a2d"
+        },
+        "sparkplug-device/records/node-rebirth-erases-devices-2.bin": {
+          "bytes": 45,
+          "sha256": "289616f4dc827d6a3d56af0438c848c783c950fc7750b1157e7a1da05a7364c5"
+        },
+        "sparkplug-device/records/foreign-device-node-0.bin": {
+          "bytes": 65,
+          "sha256": "0d489006e09f2ffe645dc60b6cfaa31de0a48a8bb0732ad61c078035a8f44abd"
+        },
+        "sparkplug-device/records/device-name-alias-conflict-1.bin": {
+          "bytes": 58,
+          "sha256": "eb6541de4b184944bbaa70b1fa58ba1f194e81c65174171e44e1b23edbe9112e"
+        },
+        "sparkplug-device/records/device-duplicate-name-0.bin": {
+          "bytes": 89,
+          "sha256": "8be9f8ed5035958c9f625872809553f55292e4e87595ed591a58529da7ce3285"
+        },
+        "sparkplug-device/records/device-qos-refusal-0.bin": {
+          "bytes": 63,
+          "sha256": "c199c533e25fbd36b7bf8cba7177c7e83c61c3c15fd701cd38e396bfdc408f76"
+        },
+        "sparkplug-device/records/device-retain-refusal-0.bin": {
+          "bytes": 61,
+          "sha256": "e04f4b4288a60be133c45a3965f6b8e490906285b7de78ad997f770b21bba126"
+        },
+        "sparkplug-device/records/offline-alias-stays-reserved-1.bin": {
+          "bytes": 33,
+          "sha256": "9e8de4089e88b90332c5495699c5eea63fd672e971716e1feb9c659a2129d11f"
+        },
+        "sparkplug-device/records/offline-alias-stays-reserved-2.bin": {
+          "bytes": 65,
+          "sha256": "b351bf5affb680d9079241adee26f56f996d8b44161e334ff57f133cbc48dcf2"
+        },
+        "sparkplug-device/records/offline-alias-stays-reserved-4.bin": {
+          "bytes": 65,
+          "sha256": "22ac53646aefb9b8b98730995535eeb8f8cdfa45c1ac0bafed4fb6a5f226aeaf"
+        },
+        "sparkplug-device/captures/level4-device-lifecycle.pcap": {
+          "bytes": 1346,
+          "sha256": "8c11bb63e40a6a4ef3385feeb35fe8a67ec845d797a872f974d5713d4aec689e"
+        },
+        "sparkplug-device/captures/level4-shared-sequence.pcap": {
+          "bytes": 1344,
+          "sha256": "9b3c251d93d45acc0c9318b36ccee1de12f7c7902ee5c00a70bdcfa7caa80ead"
+        },
+        "sparkplug-device/captures/level5-device-lifecycle.pcap": {
+          "bytes": 1355,
+          "sha256": "032ab20339d86beed532aca9dc3b0c2945ea701f5b3eedd5f9b16c0c4524d902"
+        },
+        "sparkplug-device/captures/level5-shared-sequence.pcap": {
+          "bytes": 1353,
+          "sha256": "b29824b861e3aa40f421ad54d721959fa7137ec3cb5e07c8341bfc4c6b21e3cb"
+        },
+        "sparkplug-device/captures/two-devices-same-name.pcap": {
+          "bytes": 1491,
+          "sha256": "55f3399a72ec04740665c61be001fb5f7cb41e0d2676055ffab2764ed4584b82"
+        },
+        "sparkplug-device/captures/alias-node-collision.pcap": {
+          "bytes": 1013,
+          "sha256": "460f57a0c2cb34d1307319558bf948c4c00d33aed5ffeb72d8b9f6cbb8d83c0e"
+        },
+        "sparkplug-device/captures/alias-device-collision.pcap": {
+          "bytes": 1150,
+          "sha256": "53fea596d743984148fce11fd9f13df4c2a8c4bf9bd71f2068d595168643a69f"
+        },
+        "sparkplug-device/captures/rebirth-replaces-own-alias.pcap": {
+          "bytes": 1146,
+          "sha256": "bd60073c0c78d2cfe05abf9c505122d43707719b70a0926626ec9b41cca579e6"
+        },
+        "sparkplug-device/captures/wrong-device-alias.pcap": {
+          "bytes": 1154,
+          "sha256": "9660b42ab47f2500d22566d59cc7f1b875784f1438e4a96648d9dd6511d886ef"
+        },
+        "sparkplug-device/captures/device-before-node.pcap": {
+          "bytes": 716,
+          "sha256": "9728ad32605c0f29aadd0d0f555b18fb7868288a8963ae8ca5cce5e578ed7343"
+        },
+        "sparkplug-device/captures/device-sequence-gap.pcap": {
+          "bytes": 1130,
+          "sha256": "5c18ce3242b6b31739f2437c48bde1cf981d47b30a8e2e7be5ab70feaab85ad8"
+        },
+        "sparkplug-device/captures/device-forwarded.pcap": {
+          "bytes": 1031,
+          "sha256": "d34f40cfcdd737917d2887d1f367671bce18e927d662df86adb457d84ca938dc"
+        },
+        "sparkplug-device/captures/device-bad-datatype.pcap": {
+          "bytes": 1017,
+          "sha256": "79b5e37390877234cb55d63512b990e900ba8dd7ab545427f4920927c3fd2025"
+        },
+        "sparkplug-device/captures/device-null-scalar.pcap": {
+          "bytes": 1015,
+          "sha256": "9f6e3c53fe7ecde3e3b4c7514ffbd371389a7d5598b666df61c7667756ed749b"
+        },
+        "sparkplug-device/captures/device-missing-timestamp.pcap": {
+          "bytes": 893,
+          "sha256": "2a1675ded8835033b1e70d5874ce6acba81826e2f08e21bd3db4bd7f24791442"
+        },
+        "sparkplug-device/captures/death-isolated.pcap": {
+          "bytes": 1503,
+          "sha256": "48401effc8dba9e731f750ba44d905885bb1a0096cde68786b4a4462de4fe9b1"
+        },
+        "sparkplug-device/captures/node-rebirth-erases-devices.pcap": {
+          "bytes": 1199,
+          "sha256": "2866ebd6f55be5f71d01480b6cd77ec19d777b535f575cd3770b8b821702b7e2"
+        },
+        "sparkplug-device/captures/foreign-device-node.pcap": {
+          "bytes": 1035,
+          "sha256": "0a34fbd5ed7df1354ec97b5e0764b185fa659081f13eafb5a030760f73937580"
+        },
+        "sparkplug-device/captures/device-name-alias-conflict.pcap": {
+          "bytes": 1028,
+          "sha256": "123bb80753758ce4506a572f1e0fcf125b34fe8bb3fd1a3600a2e733726d0f73"
+        },
+        "sparkplug-device/captures/device-duplicate-name.pcap": {
+          "bytes": 928,
+          "sha256": "993dd6a6f7676c25af8a5cb4fdb8cc9b04cb5e34b6963fc8bc83451bc865386e"
+        },
+        "sparkplug-device/captures/device-qos-refusal.pcap": {
+          "bytes": 976,
+          "sha256": "a34aa50d41ff21a150679b1e66fe4c1c8ec605947d0a7730050fb2372c6eed57"
+        },
+        "sparkplug-device/captures/device-retain-refusal.pcap": {
+          "bytes": 900,
+          "sha256": "a5778ff94013d0f9c47ed4685dd745462bf5e1204fbda55628cbb7026bee7df0"
+        },
+        "sparkplug-device/captures/offline-alias-stays-reserved.pcap": {
+          "bytes": 1457,
+          "sha256": "f2a5dc5842cc4b9c52e26f51ac07bc37fc38d71a6c90375bece7e5cdac0343cc"
+        },
+        "sparkplug-device/answers.json": {
+          "bytes": 166835,
+          "sha256": "f63608cea56b3f2a8f547c616fa37efc658a23a17b8c992143d61de86876ba28"
+        },
+        "sparkplug-device/reference-inputs.json": {
+          "bytes": 11368,
+          "sha256": "3b8f05a11b4cb279a23c25e95dabbb3fe2e0833cb7998aaad4b98cfaa65610e8"
+        },
+        "sparkplug-device/reference-expected.json": {
+          "bytes": 18224,
+          "sha256": "246879b527e3a993220f4384775fc41e53c83ca191c4fa10652301bb1f035d93"
+        },
+        "sparkplug-device/generate.py": {
+          "bytes": 13684,
+          "sha256": "f38130db4d2274f5c2a899d2406986d0390285dc8f48ddc0fe8dcfc082ee4f09"
+        },
+        "sparkplug-device/verify.py": {
+          "bytes": 1263,
+          "sha256": "cb5770154992155f1e1e24a1b54c7a2a9a293d42998a82f355077bae0e911b41"
+        },
+        "sparkplug-device/seal.py": {
+          "bytes": 805,
+          "sha256": "9d4bd7258919dc9d6ba79777bae727a18dfa4dad478afe23d27c80856743a555"
+        },
+        "validation/expected.json": {
+          "bytes": 25423,
+          "sha256": "ff25efb48585450e87f7deb90e0000674755fc5f586e1038d4ef34834319644c"
+        }
+      },
+      "aliases": {
+        "common/pcapx/pcaputil/testdata/sparkplug-device/records/level4-device-lifecycle-0.bin": "sparkplug-device/records/level4-device-lifecycle-0.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-device/records/level4-device-lifecycle-1.bin": "sparkplug-device/records/level4-device-lifecycle-1.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-device/records/level4-device-lifecycle-2.bin": "sparkplug-device/records/level4-device-lifecycle-2.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-device/records/level4-device-lifecycle-3.bin": "sparkplug-device/records/level4-device-lifecycle-3.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-device/records/level4-device-lifecycle-4.bin": "sparkplug-device/records/level4-device-lifecycle-4.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-device/records/level4-shared-sequence-0.bin": "sparkplug-device/records/level4-device-lifecycle-0.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-device/records/level4-shared-sequence-2.bin": "sparkplug-device/records/level4-shared-sequence-2.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-device/records/level4-shared-sequence-3.bin": "sparkplug-device/records/level4-shared-sequence-3.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-device/records/level4-shared-sequence-4.bin": "sparkplug-device/records/level4-device-lifecycle-4.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-device/records/level5-device-lifecycle-0.bin": "sparkplug-device/records/level5-device-lifecycle-0.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-device/records/level5-device-lifecycle-1.bin": "sparkplug-device/records/level5-device-lifecycle-1.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-device/records/level5-device-lifecycle-2.bin": "sparkplug-device/records/level5-device-lifecycle-2.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-device/records/level5-device-lifecycle-3.bin": "sparkplug-device/records/level5-device-lifecycle-3.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-device/records/level5-device-lifecycle-4.bin": "sparkplug-device/records/level5-device-lifecycle-4.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-device/records/level5-shared-sequence-0.bin": "sparkplug-device/records/level5-device-lifecycle-0.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-device/records/level5-shared-sequence-1.bin": "sparkplug-device/records/level5-shared-sequence-1.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-device/records/level5-shared-sequence-2.bin": "sparkplug-device/records/level5-shared-sequence-2.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-device/records/level5-shared-sequence-3.bin": "sparkplug-device/records/level5-shared-sequence-3.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-device/records/level5-shared-sequence-4.bin": "sparkplug-device/records/level5-device-lifecycle-4.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-device/records/two-devices-same-name-0.bin": "sparkplug-device/records/level4-device-lifecycle-0.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-device/records/two-devices-same-name-1.bin": "sparkplug-device/records/two-devices-same-name-1.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-device/records/two-devices-same-name-2.bin": "sparkplug-device/records/level4-shared-sequence-2.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-device/records/two-devices-same-name-3.bin": "sparkplug-device/records/two-devices-same-name-3.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-device/records/two-devices-same-name-4.bin": "sparkplug-device/records/two-devices-same-name-4.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-device/records/two-devices-same-name-5.bin": "sparkplug-device/records/two-devices-same-name-5.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-device/records/alias-node-collision-0.bin": "sparkplug-device/records/alias-node-collision-0.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-device/records/alias-device-collision-0.bin": "sparkplug-device/records/level4-device-lifecycle-0.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-device/records/alias-device-collision-1.bin": "sparkplug-device/records/alias-device-collision-1.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-device/records/alias-device-collision-2.bin": "sparkplug-device/records/level4-shared-sequence-2.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-device/records/rebirth-replaces-own-alias-0.bin": "sparkplug-device/records/level4-device-lifecycle-0.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-device/records/rebirth-replaces-own-alias-1.bin": "sparkplug-device/records/rebirth-replaces-own-alias-1.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-device/records/rebirth-replaces-own-alias-2.bin": "sparkplug-device/records/rebirth-replaces-own-alias-2.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-device/records/wrong-device-alias-0.bin": "sparkplug-device/records/level4-device-lifecycle-0.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-device/records/wrong-device-alias-1.bin": "sparkplug-device/records/two-devices-same-name-1.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-device/records/wrong-device-alias-2.bin": "sparkplug-device/records/wrong-device-alias-2.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-device/records/device-before-node-0.bin": "sparkplug-device/records/level4-device-lifecycle-0.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-device/records/device-sequence-gap-0.bin": "sparkplug-device/records/level4-device-lifecycle-0.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-device/records/device-sequence-gap-1.bin": "sparkplug-device/records/level4-shared-sequence-2.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-device/records/device-sequence-gap-2.bin": "sparkplug-device/records/level4-device-lifecycle-1.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-device/records/device-forwarded-0.bin": "sparkplug-device/records/level4-device-lifecycle-0.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-device/records/device-forwarded-1.bin": "sparkplug-device/records/level4-device-lifecycle-0.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-device/records/device-bad-datatype-0.bin": "sparkplug-device/records/level4-device-lifecycle-0.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-device/records/device-bad-datatype-1.bin": "sparkplug-device/records/device-bad-datatype-1.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-device/records/device-null-scalar-0.bin": "sparkplug-device/records/level4-device-lifecycle-0.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-device/records/device-null-scalar-1.bin": "sparkplug-device/records/device-null-scalar-1.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-device/records/device-missing-timestamp-0.bin": "sparkplug-device/records/device-missing-timestamp-0.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-device/records/death-isolated-0.bin": "sparkplug-device/records/level4-device-lifecycle-0.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-device/records/death-isolated-1.bin": "sparkplug-device/records/two-devices-same-name-1.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-device/records/death-isolated-2.bin": "sparkplug-device/records/level4-device-lifecycle-2.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-device/records/death-isolated-3.bin": "sparkplug-device/records/two-devices-same-name-3.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-device/records/death-isolated-4.bin": "sparkplug-device/records/death-isolated-4.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-device/records/death-isolated-5.bin": "sparkplug-device/records/death-isolated-5.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-device/records/node-rebirth-erases-devices-0.bin": "sparkplug-device/records/level4-device-lifecycle-0.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-device/records/node-rebirth-erases-devices-2.bin": "sparkplug-device/records/node-rebirth-erases-devices-2.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-device/records/foreign-device-node-0.bin": "sparkplug-device/records/foreign-device-node-0.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-device/records/foreign-device-node-1.bin": "sparkplug-device/records/level4-device-lifecycle-0.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-device/records/device-name-alias-conflict-0.bin": "sparkplug-device/records/level4-device-lifecycle-0.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-device/records/device-name-alias-conflict-1.bin": "sparkplug-device/records/device-name-alias-conflict-1.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-device/records/device-duplicate-name-0.bin": "sparkplug-device/records/device-duplicate-name-0.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-device/records/device-qos-refusal-0.bin": "sparkplug-device/records/device-qos-refusal-0.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-device/records/device-retain-refusal-0.bin": "sparkplug-device/records/device-retain-refusal-0.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-device/records/offline-alias-stays-reserved-0.bin": "sparkplug-device/records/level4-device-lifecycle-0.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-device/records/offline-alias-stays-reserved-1.bin": "sparkplug-device/records/offline-alias-stays-reserved-1.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-device/records/offline-alias-stays-reserved-2.bin": "sparkplug-device/records/offline-alias-stays-reserved-2.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-device/records/offline-alias-stays-reserved-4.bin": "sparkplug-device/records/offline-alias-stays-reserved-4.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-device/captures/level4-device-lifecycle.pcap": "sparkplug-device/captures/level4-device-lifecycle.pcap",
+        "common/pcapx/pcaputil/testdata/sparkplug-device/captures/level4-shared-sequence.pcap": "sparkplug-device/captures/level4-shared-sequence.pcap",
+        "common/pcapx/pcaputil/testdata/sparkplug-device/captures/level5-device-lifecycle.pcap": "sparkplug-device/captures/level5-device-lifecycle.pcap",
+        "common/pcapx/pcaputil/testdata/sparkplug-device/captures/level5-shared-sequence.pcap": "sparkplug-device/captures/level5-shared-sequence.pcap",
+        "common/pcapx/pcaputil/testdata/sparkplug-device/captures/two-devices-same-name.pcap": "sparkplug-device/captures/two-devices-same-name.pcap",
+        "common/pcapx/pcaputil/testdata/sparkplug-device/captures/alias-node-collision.pcap": "sparkplug-device/captures/alias-node-collision.pcap",
+        "common/pcapx/pcaputil/testdata/sparkplug-device/captures/alias-device-collision.pcap": "sparkplug-device/captures/alias-device-collision.pcap",
+        "common/pcapx/pcaputil/testdata/sparkplug-device/captures/rebirth-replaces-own-alias.pcap": "sparkplug-device/captures/rebirth-replaces-own-alias.pcap",
+        "common/pcapx/pcaputil/testdata/sparkplug-device/captures/wrong-device-alias.pcap": "sparkplug-device/captures/wrong-device-alias.pcap",
+        "common/pcapx/pcaputil/testdata/sparkplug-device/captures/device-before-node.pcap": "sparkplug-device/captures/device-before-node.pcap",
+        "common/pcapx/pcaputil/testdata/sparkplug-device/captures/device-sequence-gap.pcap": "sparkplug-device/captures/device-sequence-gap.pcap",
+        "common/pcapx/pcaputil/testdata/sparkplug-device/captures/device-forwarded.pcap": "sparkplug-device/captures/device-forwarded.pcap",
+        "common/pcapx/pcaputil/testdata/sparkplug-device/captures/device-bad-datatype.pcap": "sparkplug-device/captures/device-bad-datatype.pcap",
+        "common/pcapx/pcaputil/testdata/sparkplug-device/captures/device-null-scalar.pcap": "sparkplug-device/captures/device-null-scalar.pcap",
+        "common/pcapx/pcaputil/testdata/sparkplug-device/captures/device-missing-timestamp.pcap": "sparkplug-device/captures/device-missing-timestamp.pcap",
+        "common/pcapx/pcaputil/testdata/sparkplug-device/captures/death-isolated.pcap": "sparkplug-device/captures/death-isolated.pcap",
+        "common/pcapx/pcaputil/testdata/sparkplug-device/captures/node-rebirth-erases-devices.pcap": "sparkplug-device/captures/node-rebirth-erases-devices.pcap",
+        "common/pcapx/pcaputil/testdata/sparkplug-device/captures/foreign-device-node.pcap": "sparkplug-device/captures/foreign-device-node.pcap",
+        "common/pcapx/pcaputil/testdata/sparkplug-device/captures/device-name-alias-conflict.pcap": "sparkplug-device/captures/device-name-alias-conflict.pcap",
+        "common/pcapx/pcaputil/testdata/sparkplug-device/captures/device-duplicate-name.pcap": "sparkplug-device/captures/device-duplicate-name.pcap",
+        "common/pcapx/pcaputil/testdata/sparkplug-device/captures/device-qos-refusal.pcap": "sparkplug-device/captures/device-qos-refusal.pcap",
+        "common/pcapx/pcaputil/testdata/sparkplug-device/captures/device-retain-refusal.pcap": "sparkplug-device/captures/device-retain-refusal.pcap",
+        "common/pcapx/pcaputil/testdata/sparkplug-device/captures/offline-alias-stays-reserved.pcap": "sparkplug-device/captures/offline-alias-stays-reserved.pcap",
+        "common/pcapx/pcaputil/testdata/sparkplug-device/answers.json": "sparkplug-device/answers.json",
+        "common/pcapx/pcaputil/testdata/sparkplug-device/reference-inputs.json": "sparkplug-device/reference-inputs.json",
+        "common/pcapx/pcaputil/testdata/sparkplug-device/reference-expected.json": "sparkplug-device/reference-expected.json",
+        "common/pcapx/pcaputil/testdata/sparkplug-device/generate.py": "sparkplug-device/generate.py",
+        "common/pcapx/pcaputil/testdata/sparkplug-device/verify.py": "sparkplug-device/verify.py",
+        "common/pcapx/pcaputil/testdata/sparkplug-device/seal.py": "sparkplug-device/seal.py"
+      }
     }
   ],
   "schema_version": 1,

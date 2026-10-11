@@ -25,6 +25,7 @@ type sparkNode struct {
 	seq     uint64
 	metrics map[string]sparkMetricDef
 	aliases map[uint64]string
+	devices map[string]*sparkDevice
 }
 
 func (s *sparkNode) retainedBytes() int64 {
@@ -34,6 +35,12 @@ func (s *sparkNode) retainedBytes() int64 {
 	n := int64(128 + len(s.key))
 	for name := range s.metrics {
 		n += int64(96 + len(name))
+	}
+	for id, d := range s.devices {
+		n += int64(128 + len(id) + 64*len(d.aliases))
+		for name := range d.metrics {
+			n += int64(96 + len(name))
+		}
 	}
 	return n + int64(64*len(s.aliases))
 }
@@ -319,13 +326,17 @@ func sparkValue(m map[string]any, typ uint64) (any, string) {
 
 func sparkTopic(topic string) (key, verb string, valid bool) {
 	parts := strings.Split(topic, "/")
-	if len(parts) != 4 || parts[0] != "spBv1.0" {
+	if (len(parts) != 4 && len(parts) != 5) || parts[0] != "spBv1.0" {
 		return "", "", false
 	}
 	for _, p := range parts[1:] {
 		if p == "" || strings.ContainsAny(p, "+#\x00") || !utf8.ValidString(p) {
 			return "", "", false
 		}
+	}
+	device := parts[2] == "DBIRTH" || parts[2] == "DDATA" || parts[2] == "DDEATH" || parts[2] == "DCMD"
+	if device != (len(parts) == 5) {
+		return "", "", false
 	}
 	return parts[1] + "/" + parts[3], parts[2], true
 }
@@ -338,6 +349,11 @@ func sparkObservation(topic string, payload []byte, maxDepth, maxFields int) (ma
 		return view, key, verb, nil
 	}
 	view["Node Key"], view["Message Type"] = key, verb
+	parts := strings.Split(topic, "/")
+	if len(parts) == 5 {
+		view["Device ID"] = parts[4]
+		view["Profile"] = "sparkplug-b-device-scalars-3.0"
+	}
 	p, err := sparkDecode(payload, maxDepth, maxFields)
 	if err != nil {
 		var typed *ProtocolError
@@ -379,7 +395,7 @@ func (m *binMQTT) sparkPublish(dir int, topic string, payload []byte, flags byte
 		v["Reason"], v["Context Status"] = reason, status
 		// Only the observed producer's current node can invalidate its own
 		// definitions. Never erase a node's state for a forwarded/foreign topic.
-		if dir == m.client && m.spark != nil && key == m.spark.key && (verb == "NBIRTH" || verb == "NDATA") {
+		if dir == m.client && m.spark != nil && key == m.spark.key && (verb == "NBIRTH" || verb == "NDATA" || verb == "DBIRTH" || verb == "DDATA" || verb == "DDEATH") {
 			next = &sparkNode{key: m.spark.key, bdSeq: m.spark.bdSeq}
 		}
 		return v, next, nil
@@ -388,7 +404,7 @@ func (m *binMQTT) sparkPublish(dir int, topic string, payload []byte, flags byte
 	if !ok {
 		return refuse(fmt.Sprint(v["Reason"]), "refused")
 	}
-	if verb != "NBIRTH" && verb != "NDATA" && verb != "NDEATH" && verb != "NCMD" {
+	if verb != "NBIRTH" && verb != "NDATA" && verb != "NDEATH" && verb != "NCMD" && verb != "DBIRTH" && verb != "DDATA" && verb != "DDEATH" {
 		return refuse("verb needs its own independent message/lifecycle profile", "unsupported")
 	}
 	if flags&1 != 0 || verb != "NDEATH" && (flags>>1)&3 != 0 || verb == "NDEATH" && (flags>>1)&3 != 1 {
@@ -399,6 +415,9 @@ func (m *binMQTT) sparkPublish(dir int, topic string, payload []byte, flags byte
 	}
 	if p["body"] != nil {
 		return refuse("body needs an independent structured profile", "unsupported")
+	}
+	if verb == "DBIRTH" || verb == "DDATA" || verb == "DDEATH" {
+		return m.sparkDevicePublish(v, verb, p, refuse)
 	}
 	if verb == "NCMD" {
 		if dir == m.client {
@@ -516,6 +535,135 @@ func (m *binMQTT) sparkPublish(dir int, topic string, payload []byte, flags byte
 		copy := *m.spark
 		copy.seq = seq
 		next = &copy
+	}
+	v["Context Status"], v["bdSeq"], v["Metrics"] = "matched", next.bdSeq, values
+	return v, next, nil
+}
+
+// Device scalar definitions belong to the observed producer's node, while
+// names are scoped to one device and aliases are unique across the entire node.
+type sparkDevice struct {
+	born    bool
+	metrics map[string]sparkMetricDef
+	aliases map[uint64]string
+}
+
+func (s *sparkNode) withDevices() *sparkNode {
+	n := *s
+	n.devices = make(map[string]*sparkDevice, len(s.devices))
+	for id, d := range s.devices {
+		n.devices[id] = d
+	}
+	return &n
+}
+
+func (m *binMQTT) sparkDevicePublish(v map[string]any, verb string, p map[string]any, refuse func(string, string) (map[string]any, *sparkNode, error)) (map[string]any, *sparkNode, error) {
+	id := v["Device ID"].(string)
+	if !m.spark.born {
+		return refuse("NBIRTH metric definitions were not observed", "context-required")
+	}
+	seq, hasSeq := p["seq"].(uint64)
+	if !hasSeq || seq > 255 || p["timestamp"] == nil {
+		return refuse("device message requires timestamp and seq in 0..255", "refused")
+	}
+	if seq != (m.spark.seq+1)%256 {
+		return refuse("device sequence gap requires a new NBIRTH", "refused")
+	}
+	old := m.spark.devices[id]
+	if verb != "DBIRTH" && (old == nil || !old.born) {
+		return refuse("DBIRTH metric definitions were not observed", "context-required")
+	}
+	ms, _ := p["metrics"].([]map[string]any)
+	copy := *m.spark
+	next := &copy
+	if verb != "DDATA" {
+		next = m.spark.withDevices()
+	}
+	next.seq = seq
+	if verb == "DDEATH" {
+		if len(ms) > 0 {
+			return refuse("DDEATH metrics need an independent message profile", "unsupported")
+		}
+		// Death marks definitions stale, not unknown. Keep their aliases
+		// reserved until this device rebirths or the entire node is reborn.
+		stale := *old
+		stale.born = false
+		next.devices[id] = &stale
+		v["Context Status"], v["bdSeq"] = "matched", next.bdSeq
+		return v, next, nil
+	}
+	definition := old
+	if verb == "DBIRTH" {
+		definition = &sparkDevice{born: true, metrics: map[string]sparkMetricDef{}, aliases: map[uint64]string{}}
+	}
+	values := []map[string]any{}
+	seen := map[string]bool{}
+	var lastTimestamp uint64
+	hasTimestamp := false
+	for _, metric := range ms {
+		name, named := metric["name"].(string)
+		typ, typed := metric["datatype"].(uint64)
+		alias, aliased := metric["alias"].(uint64)
+		if metric["timestamp"] == nil {
+			return refuse("device metric requires timestamp", "refused")
+		}
+		if metric["is_historical"] != true {
+			timestamp := metric["timestamp"].(uint64)
+			if hasTimestamp && timestamp < lastTimestamp {
+				return refuse("current device metrics require chronological order", "refused")
+			}
+			lastTimestamp, hasTimestamp = timestamp, true
+		}
+		if verb == "DBIRTH" {
+			if !named || name == "" || !typed || seen[name] {
+				return refuse("DBIRTH requires unique named typed metrics", "refused")
+			}
+			if aliased {
+				if _, exists := definition.aliases[alias]; exists {
+					return refuse("DBIRTH metric aliases must be unique", "refused")
+				}
+				if _, exists := m.spark.aliases[alias]; exists {
+					return refuse("device alias collides with another node or device metric", "refused")
+				}
+				for other, d := range m.spark.devices {
+					if other != id {
+						if _, exists := d.aliases[alias]; exists {
+							return refuse("device alias collides with another node or device metric", "refused")
+						}
+					}
+				}
+				definition.aliases[alias] = name
+			}
+			definition.metrics[name] = sparkMetricDef{typ: typ}
+		} else {
+			if aliased {
+				if named {
+					return refuse("aliased DDATA excludes metric name", "refused")
+				}
+				name = definition.aliases[alias]
+			}
+			def, known := definition.metrics[name]
+			if !known {
+				return refuse("DDATA requires this device observed metric definitions", "refused")
+			}
+			if typed && typ != def.typ {
+				return refuse("DDATA datatype differs from DBIRTH", "refused")
+			}
+			typ = def.typ
+		}
+		seen[name] = true
+		value, reason := sparkValue(metric, typ)
+		if reason != "" {
+			status := "refused"
+			if strings.Contains(reason, "independent structured profile") {
+				status = "unsupported"
+			}
+			return refuse(reason, status)
+		}
+		values = append(values, map[string]any{"Name": name, "Datatype": typ, "Value": value})
+	}
+	if verb == "DBIRTH" {
+		next.devices[id] = definition
 	}
 	v["Context Status"], v["bdSeq"], v["Metrics"] = "matched", next.bdSeq, values
 	return v, next, nil

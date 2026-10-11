@@ -158,6 +158,12 @@ func spAssertTree(t *testing.T, want, got any) {
 	}
 }
 func testSparkplugSealedNodeMatrix(t *testing.T) {
+	testSparkplugSealedMatrix(t, "sparkplug-node", 41)
+}
+func testSparkplugSealedDeviceMatrix(t *testing.T) {
+	testSparkplugSealedMatrix(t, "sparkplug-device", 23)
+}
+func testSparkplugSealedMatrix(t *testing.T, directory string, count int) {
 	var answers struct {
 		Profiles map[string]struct {
 			Events []struct {
@@ -167,12 +173,12 @@ func testSparkplugSealedNodeMatrix(t *testing.T) {
 			}
 		}
 	}
-	raw, err := trafficfixture.ReadFile("testdata/sparkplug-node/answers.json")
+	raw, err := trafficfixture.ReadFile("testdata/" + directory + "/answers.json")
 	require.NoError(t, err)
 	d := json.NewDecoder(bytes.NewReader(raw))
 	d.UseNumber()
 	require.NoError(t, d.Decode(&answers))
-	require.Len(t, answers.Profiles, 41)
+	require.Len(t, answers.Profiles, count)
 	for name, p := range answers.Profiles {
 		t.Run(name, func(t *testing.T) {
 			check := func(t *testing.T, events []*ProtocolEvent) {
@@ -220,7 +226,7 @@ func testSparkplugSealedNodeMatrix(t *testing.T) {
 					require.Equal(t, original, again)
 				}
 			}
-			capture, err := trafficfixture.ReadFile("testdata/sparkplug-node/captures/" + name + ".pcap")
+			capture, err := trafficfixture.ReadFile("testdata/" + directory + "/captures/" + name + ".pcap")
 			require.NoError(t, err)
 			for _, workers := range []int{1, 2, 4} {
 				for _, deferred := range []bool{false, true} {
@@ -343,6 +349,12 @@ func testSparkplugResourceAtomicity(t *testing.T) {
 }
 
 func testSparkplugInterleavedOwnership(t *testing.T) {
+	testSparkplugInterleavedProfile(t, "sparkplug-node", "level4-lifecycle")
+}
+func testSparkplugDeviceInterleavedOwnership(t *testing.T) {
+	testSparkplugInterleavedProfile(t, "sparkplug-device", "two-devices-same-name")
+}
+func testSparkplugInterleavedProfile(t *testing.T, directory, profile string) {
 	var answers struct {
 		Profiles map[string]struct {
 			Events []struct {
@@ -352,7 +364,7 @@ func testSparkplugInterleavedOwnership(t *testing.T) {
 			}
 		}
 	}
-	b, err := trafficfixture.ReadFile("testdata/sparkplug-node/answers.json")
+	b, err := trafficfixture.ReadFile("testdata/" + directory + "/answers.json")
 	require.NoError(t, err)
 	d := json.NewDecoder(bytes.NewReader(b))
 	d.UseNumber()
@@ -360,7 +372,7 @@ func testSparkplugInterleavedOwnership(t *testing.T) {
 	s, err := NewProtocolSession(DefaultParserBudget())
 	require.NoError(t, err)
 	defer s.Close("done")
-	for i, w := range answers.Profiles["level4-lifecycle"].Events {
+	for i, w := range answers.Profiles[profile].Events {
 		wire, err := trafficfixture.ReadFile(strings.TrimPrefix(w.Record, "common/pcapx/pcaputil/"))
 		require.NoError(t, err)
 		x := s.Feed(w.Direction, time.Unix(int64(i+1), 0), wire)

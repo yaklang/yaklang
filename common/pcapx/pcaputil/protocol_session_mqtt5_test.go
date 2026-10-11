@@ -54,6 +54,9 @@ func mqtt5Connack(aliasMax uint16) []byte {
 
 func TestProtocolSessionMQTT5ConnectPublishAndQoS(t *testing.T) {
 	t.Run("sparkplug-node", testSparkplugSealedNodeMatrix)
+	t.Run("sparkplug-device", testSparkplugSealedDeviceMatrix)
+	t.Run("sparkplug-device-budget", testSparkplugDeviceBudget)
+	t.Run("sparkplug-device-ownership", testSparkplugDeviceInterleavedOwnership)
 	t.Run("sparkplug-resources", testSparkplugResourceAtomicity)
 	t.Run("sparkplug-interleaved-ownership", testSparkplugInterleavedOwnership)
 	t.Run("native-version-connect", testMQTTScopedNativeVersionAndConnect)
