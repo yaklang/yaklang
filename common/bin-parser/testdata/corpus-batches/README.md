@@ -112,7 +112,14 @@ sources, attribution and a local build harness reproduce the recorded Basic ID,
 Location and selected-pack answers using an existing C compiler. This carrier
 is explicitly selected raw UDP, not BLE/Wi-Fi Remote ID or authenticated aircraft
 identity. The received `ODID`-prefixed attachment remains external and is not
-a valid positive. The mandatory gate also checks that a native UDP NeedMore
+a valid positive. The separate `opendroneid-system` UDP selection adds version-2
+System observations, alone or exactly once alongside up to two Basic IDs and
+one Location. Its new batch preserves 37 minimal controls and full scalar
+answers from the same pinned C implementation, including coordinate/height
+quantization, classifications, area and unsigned time. Framing refusals remain
+selected-profile boundaries, without an aircraft, geography or authentication
+claim. The original `opendroneid` selection and all its answers remain unchanged.
+The mandatory gate also checks that a native UDP NeedMore
 event increments Incomplete rather than Malformed, using an earlier ZIP input.
 
 The selected C37.118 v1/v2 batch seals 55 owned TCP/UDP controls (26 positives

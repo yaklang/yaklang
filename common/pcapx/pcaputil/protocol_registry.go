@@ -15,6 +15,7 @@ func NativeProtocolProfiles() []ProtocolProfile {
 		{"pfcp", "udp", "PFCPv1 Heartbeat, AssociationSetup5/6 Update7/8/Release9/10 and unbundled SessionDeletion54/55 selected core", "TS29.244 v16.12.1, first-wins bounded IEs and exact selected NodeID/FQDN/Cause/features; Heartbeat Recovery is mandatory and Setup Recovery does not drive restart; shared originating-endpoint sequence namespace across peer/message kinds, exact response-type/endpoint/domain observation, ambiguity quarantine and erroneous supported reply retirement; receiver-local uint64 SEIDs, Cause2/AURI follow-on-report claims, priority and ordered raw report groups; optional independent SEID binding on an isolated UDP byte session; observed release flags and graceful timer do not prove authenticated association, live session deletion, negotiated features or restart"},
 		{"c37118", "tcp/udp", "v1/v2 complete CFG-2 and configuration-dependent DATA", "same observed publisher and capture-domain configuration, raw channel encodings and bounded validated replacement; no CFG-3, scaling, authenticated source or measurement quality claim"},
 		{"opendroneid", "explicit-udp", "protocol2 Basic ID/Location and selected message packs", "raw25-byte messages or exact pack; ordered unverified IDs/location, reserved fields preserved; no automatic admission, ODID prefix, BLE/Wi-Fi broadcast, authentication or aircraft/position validity claim"},
+		{"opendroneid-system", "explicit-udp", "protocol2 System with optional Basic ID/Location", "one System and at most two Basic IDs/one Location in an exact ordered pack; operator coordinates/area/classification/time and reserved wire values; no automatic admission, BLE/Wi-Fi, authentication, geographic validity or aircraft association"},
 		{"dlms-wrapper", "tcp/udp", "Wrapper v1 selected unciphered LN Get-normal/Get-with-list", "exact WPDU/APDU, ordered normal/list/block descriptors and selected scalar/octet/bits/float/text/calendar/compact/array/structure/error results; list caps64 items/1024 octets, aggregate256 Data nodes/8 levels plus caller budgets; structured selective parameters without selector meaning; reversed carrier/wPort/invoke/full-flags/choice/count observations, invoke reuse ambiguous; pre-established AA may be unseen; no authentication, negotiated conformance, object model, unselected Data, GBT/cipher/ACSE claim"},
 		{"dlms", "tcp/udp", "complete standalone HDLC type3 tunnel frames", "CRC/address/link controls and selected unciphered LN Get-normal scalars with observed endpoints, invoke and link sequence; ambiguity blocks association; ordered bounded GET lists with exact full invoke/choice/count/address/NSNR observations; no IP wrapper, ACSE authentication, ciphering, block/segmented transfer or meter object semantics"},
 		{"slmp", "tcp/udp", "binary3E/4E connected-station Self Test0619/0000", "exact timer/count/loopback/error fields and observed requester; UDP one outstanding route/serial/echo match with ambiguous overlap quarantined; TCP bounded distinct-serial 4E pipeline and sequential distinct-echo 3E success; completed identifier reuse and later unsequenced TCP errors remain context-required; no ASCII, other commands, private MELSOFT or authenticated device claim"},
@@ -73,7 +74,7 @@ func WithProtocolDecodeAs(transport string, port uint16, protocol string) Captur
 			return fmt.Errorf("DecodeAs requires UDP and a nonzero port")
 		}
 		switch protocol {
-		case "dns", "mdns", "llmnr", "dhcp", "dhcpv6", "syslog", "snmp", "mqtt-sn", "bittorrent-dht", "bjnp", "rtp", "sip", "stun", "turn", "dtls", "mavlink", "nmea", "semtech-udp", "semtech-downlink-session", "rtps", "bsap", "slmp", "dlms", "opendroneid", "c37118", "knx", "pfcp", "dlms-wrapper", "doip":
+		case "dns", "mdns", "llmnr", "dhcp", "dhcpv6", "syslog", "snmp", "mqtt-sn", "bittorrent-dht", "bjnp", "rtp", "sip", "stun", "turn", "dtls", "mavlink", "nmea", "semtech-udp", "semtech-downlink-session", "rtps", "bsap", "slmp", "dlms", "opendroneid", "opendroneid-system", "c37118", "knx", "pfcp", "dlms-wrapper", "doip":
 		default:
 			return fmt.Errorf("unsupported native DecodeAs profile")
 		}
@@ -152,6 +153,9 @@ func (a *binParser) decodeNativeDatagram(e *ProtocolEvent, w []byte, src, dst ui
 	}
 	if explicit == "c37118" || explicit == "" && c37118DatagramEvidence(w) {
 		return a.decodeC37118Datagram(e, w, explicit == "c37118")
+	}
+	if explicit == "opendroneid-system" {
+		return a.decodeOpenDroneIDSelectedDatagram(e, w, true)
 	}
 	if explicit == "opendroneid" {
 		return a.decodeOpenDroneIDDatagram(e, w)

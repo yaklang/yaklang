@@ -38389,6 +38389,433 @@
         "common/pcapx/pcaputil/network-query-ownership/controls.json": "controls.json",
         "common/pcapx/pcaputil/network-query-ownership/validation/expected.json": "validation/expected.json"
       }
+    },
+    {
+      "id": "validation-opendroneid-system-760902",
+      "kind": "validation",
+      "source_sha": "76090292c33f07966f2ddabc4a63d5f5555db513",
+      "file": "validation-opendroneid-system-760902.zip",
+      "sha256": "9093d53770bb215975405d04984dde49f9c4d225f609e98fbf7611295891b4eb",
+      "password": "bin-parser",
+      "members": {
+        "answers/concatenated-datagrams.json": {
+          "sha256": "fc50fb4d0c99944fe188753e23fb36ec02476af9ae50c48876f82c038227df82",
+          "bytes": 601
+        },
+        "answers/cut-pack-header-1.json": {
+          "sha256": "39032da5d9ea50d13f0458939156fe507c4a987d2663f7b4e3b39502fd7bed95",
+          "bytes": 479
+        },
+        "answers/cut-pack-header-2.json": {
+          "sha256": "e40b5fc982337e63e501a2d4061e0f830e29eb2ebb51edb840333f41cdc0113e",
+          "bytes": 481
+        },
+        "answers/cut-pack-last.json": {
+          "sha256": "f571428a6a6e90064a14eacfda9006b65ae1e158fbf475a4a4553839e302065d",
+          "bytes": 520
+        },
+        "answers/cut-system-0.json": {
+          "sha256": "602e134733a95330a111531f66783e9c4a9bbe0f7558bc8ead46d2ca48e84acb",
+          "bytes": 462
+        },
+        "answers/cut-system-1.json": {
+          "sha256": "98f8756b4cab1370503983c6d349bf350bf6aa8b5c8d710252d599dc4bff8ee7",
+          "bytes": 464
+        },
+        "answers/cut-system-10.json": {
+          "sha256": "e6d4b6d1ffdc99096e5d7747b765bea14917621720571d310e0ca90691c76649",
+          "bytes": 485
+        },
+        "answers/cut-system-2.json": {
+          "sha256": "129344c6c268eca69659ec7427bd8d946cfcfcdd1942203737ac5f37161194af",
+          "bytes": 466
+        },
+        "answers/cut-system-24.json": {
+          "sha256": "68824c3abac7e8f3728a948e71f04f6dd10266763557ca8f9233439400b46d4e",
+          "bytes": 514
+        },
+        "answers/duplicate-system.json": {
+          "sha256": "46b57f664d8fcec620c1a462032a019665b718f3c2715d360c009472848dc12e",
+          "bytes": 589
+        },
+        "answers/inner-version.json": {
+          "sha256": "46c0fcd767b1a2231feec9c25757ac88fd9b20cca1975de8566e1a86ee038c7f",
+          "bytes": 532
+        },
+        "answers/nested-pack.json": {
+          "sha256": "4c0dd7dee6ce0d12b0ca054e60d9ea72d1c6e019cb7a1ebceb155b5a22f8525e",
+          "bytes": 524
+        },
+        "answers/no-system.json": {
+          "sha256": "2f0d5e7371670a48680111c4c68c2e13c068890c0313f056fd2ab2baf1b31ba9",
+          "bytes": 514
+        },
+        "answers/pack-basic-location-system.json": {
+          "sha256": "470307b6eb9f58e128f017d8f8352498d8515607485490c4ba933ee704d825d0",
+          "bytes": 2610
+        },
+        "answers/pack-count-ten.json": {
+          "sha256": "e7157c63fafd5cd55a87447bc2e3edb58d1590c204722f2beabc9038d4b4172f",
+          "bytes": 983
+        },
+        "answers/pack-count-zero.json": {
+          "sha256": "41f84c50279106d10ed8f613dc74a5f72d66267684ab6f0c18ef9115fdf686ef",
+          "bytes": 485
+        },
+        "answers/pack-size-wrong.json": {
+          "sha256": "282eaf41e6bd66562ac179a5cf6f1426cc96441bf455d88a650f2793b8b33af1",
+          "bytes": 536
+        },
+        "answers/pack-system-basic-location.json": {
+          "sha256": "2fc43c4330e60ead84a7ee032af41c3bd52ceea8b1d2444341418c2a617ae492",
+          "bytes": 2610
+        },
+        "answers/pack-system.json": {
+          "sha256": "f8e16d9625fd7f5cc8fbc5e47c71b487051ce9bd3b1b9d34c47966927449f4b9",
+          "bytes": 1326
+        },
+        "answers/pack-trailing.json": {
+          "sha256": "9d13949198fadf6902ea76c08e49f0480e829a10ec044bb94cc0c1fb6a04813f",
+          "bytes": 532
+        },
+        "answers/pack-two-basic-location-system.json": {
+          "sha256": "c2328c443da8eae06722e84145ffa2e11e06fc44ac40b011bbd64d4b6ac6aa6e",
+          "bytes": 2995
+        },
+        "answers/pack-version.json": {
+          "sha256": "0416435a2e7387c6ec2c422955213fc8b335fab24f0c161728d7099f902f590f",
+          "bytes": 529
+        },
+        "answers/single-trailing.json": {
+          "sha256": "f34e3b3cae13d6de87d6188144acf4790e74196b034b1058ec894d4bbe26a67b",
+          "bytes": 532
+        },
+        "answers/single-wrong-version.json": {
+          "sha256": "48a71a737157cdfc348c0f1682078fb2be2fa61777650265ef4a1871bcc82f92",
+          "bytes": 547
+        },
+        "answers/split-system.json": {
+          "sha256": "97b60b7351b51fbc7cafec157be36e3da3a6442dc2287db31542b0de8b38a85e",
+          "bytes": 593
+        },
+        "answers/system-lower-bounds.json": {
+          "sha256": "784cf5a9562c5fd8e649e04221b295fe7ac637a9f54355abe9eb058ae2cc43ec",
+          "bytes": 1334
+        },
+        "answers/system-nonstandard-port.json": {
+          "sha256": "675c7c74695c104f12618cc957d8f516dfe2bf40a5d2f4042f38291b2843a848",
+          "bytes": 1357
+        },
+        "answers/system-normal.json": {
+          "sha256": "559fcacee8ac94d10369520edf48b8a23a180376cdc325e470051d6d0bfc926b",
+          "bytes": 1327
+        },
+        "answers/system-quantization.json": {
+          "sha256": "d8fb17596803a05d8294d74d3ff74cfa065b2440b3ecf51e25028e993c1881e3",
+          "bytes": 1328
+        },
+        "answers/system-repeat-reverse.json": {
+          "sha256": "b68c125f426a44461b4739bee7cd452e98f9da1fb7f1249af726c9f3a80821f9",
+          "bytes": 3365
+        },
+        "answers/system-reserved.json": {
+          "sha256": "c737d8955bf1a702e05b892c80709d1fb6fc7f31eeb548011afc4fb3ed50b664",
+          "bytes": 1335
+        },
+        "answers/system-reverse.json": {
+          "sha256": "cd77020a6f6e6f8c0561f94813d36835f613cda88c8938541ce9e35ed1648389",
+          "bytes": 1330
+        },
+        "answers/system-unknown.json": {
+          "sha256": "25fb86b7b6338306d990ff14a28a1aec5134f4d7dcf213dba849a797ca7a1698",
+          "bytes": 1310
+        },
+        "answers/system-upper-bounds.json": {
+          "sha256": "aab46fd9d12ded2dbcbeed8f9889d8942ac261a7fb24a575d4a507fcd756b4c8",
+          "bytes": 1350
+        },
+        "answers/unsupported-type-2.json": {
+          "sha256": "b3bde1506a76aeed02d03d5a531803386a7989583565ab4f29151c8efd9552f4",
+          "bytes": 541
+        },
+        "answers/unsupported-type-3.json": {
+          "sha256": "c08ebf87b309551ece0b80b1da42bd367bac476d096a5623b3050f25f9a237c1",
+          "bytes": 541
+        },
+        "answers/unsupported-type-5.json": {
+          "sha256": "24bcf3e8b67ec2fb71c79b0797a2ccaf144e91acf9a17128e2a9eb589b83434a",
+          "bytes": 541
+        },
+        "build.py": {
+          "sha256": "20a62408e5c853734f43910c4cb295abaacae10eaa60c4b375f1514d19a93b92",
+          "bytes": 4736
+        },
+        "captures/concatenated-datagrams.pcap": {
+          "sha256": "b90d2a8d8e7b1d0e7b2ee3424d092e7037b75bf5a132342e7fb59b372eb02147",
+          "bytes": 132
+        },
+        "captures/cut-pack-header-1.pcap": {
+          "sha256": "1116869f3451143c7f15f0c105373ac2b7454802dce85b21c77523588ce04168",
+          "bytes": 83
+        },
+        "captures/cut-pack-header-2.pcap": {
+          "sha256": "f1a81495165cf9d40c036568dee29b2dffe2db8aa590043a9bf75f19a90425bf",
+          "bytes": 84
+        },
+        "captures/cut-pack-last.pcap": {
+          "sha256": "7f6fdbab4049a036dd191561958b4092b1346db72bd9ac044973dfeeb0d09424",
+          "bytes": 109
+        },
+        "captures/cut-system-0.pcap": {
+          "sha256": "129d1dbc8a775231a2b63d1d743b9e7c915dc1ff6846e4294e9257bd6b8a473a",
+          "bytes": 82
+        },
+        "captures/cut-system-1.pcap": {
+          "sha256": "1756acba7c89a5eb3306dbd61d44417f33604a738c7586183ccd39120a3fc7e1",
+          "bytes": 83
+        },
+        "captures/cut-system-10.pcap": {
+          "sha256": "6726c1a24ae51e32ad40e3e3874a2b5987fd045e71fd4824b0b1ab887c5c5010",
+          "bytes": 92
+        },
+        "captures/cut-system-2.pcap": {
+          "sha256": "2869f29fc50fbb1940fbd068d16cc0f81d1c2ed7cdbaf962c5e6d79e25a7efba",
+          "bytes": 84
+        },
+        "captures/cut-system-24.pcap": {
+          "sha256": "5bcd6bead1986cb00b9a7df0cbf0b872b3fbea1d044c8a25183217751eb8f0eb",
+          "bytes": 106
+        },
+        "captures/duplicate-system.pcap": {
+          "sha256": "3aefe8e9f7f6ea3c09c464e4cc8e715c5f3bfed3d2996f4ae55997d4f1db1b79",
+          "bytes": 135
+        },
+        "captures/inner-version.pcap": {
+          "sha256": "179edcc3c5f84820e645afa2d95ea689c30921d786860151e5b5029427cba6a0",
+          "bytes": 110
+        },
+        "captures/nested-pack.pcap": {
+          "sha256": "bf118a470028399f93d1975df8e050848fe138ac6ce415be68bb87eacc5c6ce9",
+          "bytes": 110
+        },
+        "captures/no-system.pcap": {
+          "sha256": "cb794f4469cbfa267ff020d9623d249b63c9bcfb4abadbb8a26905a9a76737b7",
+          "bytes": 107
+        },
+        "captures/pack-basic-location-system.pcap": {
+          "sha256": "93b3d8c182f70a9ba328a54d7ca884f271ceda3f45a8587ab95f234f7524a93e",
+          "bytes": 160
+        },
+        "captures/pack-count-ten.pcap": {
+          "sha256": "65110a2d740b791c77ebec46d968fcab7faa2b92c0ef847549b08b29e31c527a",
+          "bytes": 335
+        },
+        "captures/pack-count-zero.pcap": {
+          "sha256": "df5a5f2bb9fa82877d10a56cc198e13d7f7dc8e904ed55722e9ddc0971fc8fe3",
+          "bytes": 85
+        },
+        "captures/pack-size-wrong.pcap": {
+          "sha256": "523467e23278c797594f1f5cbdd12f9595db7439915e481164d719db4828d98b",
+          "bytes": 110
+        },
+        "captures/pack-system-basic-location.pcap": {
+          "sha256": "c9ef718def777be3995d0f5c62a860a3a797e1beb9b774e22e586738f4cded95",
+          "bytes": 160
+        },
+        "captures/pack-system.pcap": {
+          "sha256": "98dc351f86b751ce9e80006491bfa4c06d7653db896a6a98e3bed9de5e75dcf0",
+          "bytes": 110
+        },
+        "captures/pack-trailing.pcap": {
+          "sha256": "aa1ef0f794b41ad25a1a9f214c89a3ca4f4902f8f1e4a90f07e243274ae879fb",
+          "bytes": 111
+        },
+        "captures/pack-two-basic-location-system.pcap": {
+          "sha256": "41fe8dbe35350ddfaae002b21402cca396a15a1c8df8c79f3229d346e4298934",
+          "bytes": 185
+        },
+        "captures/pack-version.pcap": {
+          "sha256": "9ee9782f543f4e8414513e05d1c7abaa8d4f73dba1388805ffd6d8dda55c6f3f",
+          "bytes": 110
+        },
+        "captures/single-trailing.pcap": {
+          "sha256": "f0c1e2a2d7ef140d9459badcbb10321f3beb628f514288a1e347c10b8f67403b",
+          "bytes": 108
+        },
+        "captures/single-wrong-version.pcap": {
+          "sha256": "7cbcd976ce4b8bb86fa91fefed9793dd09ac4e8c4a4551a0b16922c2725e78f8",
+          "bytes": 107
+        },
+        "captures/split-system.pcap": {
+          "sha256": "be26209dc6831c772697e8f76191d8fdec273efeb00f90023fc1e926e6f7172b",
+          "bytes": 165
+        },
+        "captures/system-lower-bounds.pcap": {
+          "sha256": "b3b953b89dd5a2e4b0ed6d98e4f456c1a55ba6c07c3b92715642e983d74fe2b2",
+          "bytes": 107
+        },
+        "captures/system-nonstandard-port.pcap": {
+          "sha256": "e7a7387d5838c5077b72a2385b194054b80ac898129a37b8217dda5f5e3b98c7",
+          "bytes": 107
+        },
+        "captures/system-normal.pcap": {
+          "sha256": "de530f1d6fbc76fafb98c4bee8468c34055080739fcefef5f895c947bc7a3a5f",
+          "bytes": 107
+        },
+        "captures/system-quantization.pcap": {
+          "sha256": "e4d1a79a7d1558f7fd2e595f10c05ce4b449fa4b5d62b14602ef0ba735d0021b",
+          "bytes": 107
+        },
+        "captures/system-repeat-reverse.pcap": {
+          "sha256": "bab84bfaf0cf9d2b8422d917537a4d93031a97d6e29cb250840a5b0b4fade316",
+          "bytes": 273
+        },
+        "captures/system-reserved.pcap": {
+          "sha256": "711b5df250c52d2564475394dcaf66365c8742cf4645f49a2a292dab3a9274cc",
+          "bytes": 107
+        },
+        "captures/system-reverse.pcap": {
+          "sha256": "94e7bcce2945997ada919d94a629a98ccabe32a94d97076341de1376dd6b3215",
+          "bytes": 107
+        },
+        "captures/system-unknown.pcap": {
+          "sha256": "40b79c72ab547ff0632d5784f9a6a7e6bd6e9d06c0f54f27f378eb61723a4e65",
+          "bytes": 107
+        },
+        "captures/system-upper-bounds.pcap": {
+          "sha256": "e5a27cc97e69415658162f4e2df30720cdf2b8aaf9749b19cb9c6dbeae990b07",
+          "bytes": 107
+        },
+        "captures/unsupported-type-2.pcap": {
+          "sha256": "432f9472a881ce16c9134038d811f266f42ee99d1d6b5e208db17a4b4da1feb0",
+          "bytes": 107
+        },
+        "captures/unsupported-type-3.pcap": {
+          "sha256": "8df69daed90ca57ec660d49f9934eaf5f6f6d1d772a26fd9bdd22ae6d21fe41f",
+          "bytes": 107
+        },
+        "captures/unsupported-type-5.pcap": {
+          "sha256": "fb1e9cead95bde03b825886c625a5efd9bf64cf2c899427b46b2e314a8aa679b",
+          "bytes": 107
+        },
+        "controls.json": {
+          "sha256": "3bc3a252f02cd94da4c9c8faf6a14100b2cd44205180c97b82545c6f77e6799b",
+          "bytes": 44947
+        },
+        "official-system-vectors.jsonl": {
+          "sha256": "afad8a1603911bcc22d2252cc322d9098b65645c68047dfe851f1c872901e61e",
+          "bytes": 8104
+        },
+        "reference-system.c": {
+          "sha256": "18d15ada5fd443ea9f383c4a2e6af23228def8ae932ea808e7329a2dcad72d1e",
+          "bytes": 5494
+        },
+        "reproduce-reference.py": {
+          "sha256": "bb50d0ba65aab094832d7ff50644e39430e52e0c4a14b38485e959a868f86c92",
+          "bytes": 1455
+        },
+        "source-pin.json": {
+          "sha256": "d3ec1d47b503ae880fa41a19887c2e8ec679cb658ac05e4bc0264d54612f2b4f",
+          "bytes": 1649
+        },
+        "validation/expected.json": {
+          "sha256": "8785cff2b7f89c3354b3295d456435d1a76141ff3a082d1d356b2e2b6b6d5fc1",
+          "bytes": 41013
+        },
+        "validation/provenance.json": {
+          "sha256": "ccaa5a0416112de7d10bdffaade58924e749f9627e8b6e0c6477b1aa54917ef1",
+          "bytes": 1069
+        },
+        "verify.py": {
+          "sha256": "ad644259505bc935851de7d78e9caf6362bbc1c0bb8e44d9ed7ad69c9a84a6d5",
+          "bytes": 2835
+        }
+      },
+      "aliases": {
+        "common/pcapx/pcaputil/opendroneid-system/answers/concatenated-datagrams.json": "answers/concatenated-datagrams.json",
+        "common/pcapx/pcaputil/opendroneid-system/answers/cut-pack-header-1.json": "answers/cut-pack-header-1.json",
+        "common/pcapx/pcaputil/opendroneid-system/answers/cut-pack-header-2.json": "answers/cut-pack-header-2.json",
+        "common/pcapx/pcaputil/opendroneid-system/answers/cut-pack-last.json": "answers/cut-pack-last.json",
+        "common/pcapx/pcaputil/opendroneid-system/answers/cut-system-0.json": "answers/cut-system-0.json",
+        "common/pcapx/pcaputil/opendroneid-system/answers/cut-system-1.json": "answers/cut-system-1.json",
+        "common/pcapx/pcaputil/opendroneid-system/answers/cut-system-10.json": "answers/cut-system-10.json",
+        "common/pcapx/pcaputil/opendroneid-system/answers/cut-system-2.json": "answers/cut-system-2.json",
+        "common/pcapx/pcaputil/opendroneid-system/answers/cut-system-24.json": "answers/cut-system-24.json",
+        "common/pcapx/pcaputil/opendroneid-system/answers/duplicate-system.json": "answers/duplicate-system.json",
+        "common/pcapx/pcaputil/opendroneid-system/answers/inner-version.json": "answers/inner-version.json",
+        "common/pcapx/pcaputil/opendroneid-system/answers/nested-pack.json": "answers/nested-pack.json",
+        "common/pcapx/pcaputil/opendroneid-system/answers/no-system.json": "answers/no-system.json",
+        "common/pcapx/pcaputil/opendroneid-system/answers/pack-basic-location-system.json": "answers/pack-basic-location-system.json",
+        "common/pcapx/pcaputil/opendroneid-system/answers/pack-count-ten.json": "answers/pack-count-ten.json",
+        "common/pcapx/pcaputil/opendroneid-system/answers/pack-count-zero.json": "answers/pack-count-zero.json",
+        "common/pcapx/pcaputil/opendroneid-system/answers/pack-size-wrong.json": "answers/pack-size-wrong.json",
+        "common/pcapx/pcaputil/opendroneid-system/answers/pack-system-basic-location.json": "answers/pack-system-basic-location.json",
+        "common/pcapx/pcaputil/opendroneid-system/answers/pack-system.json": "answers/pack-system.json",
+        "common/pcapx/pcaputil/opendroneid-system/answers/pack-trailing.json": "answers/pack-trailing.json",
+        "common/pcapx/pcaputil/opendroneid-system/answers/pack-two-basic-location-system.json": "answers/pack-two-basic-location-system.json",
+        "common/pcapx/pcaputil/opendroneid-system/answers/pack-version.json": "answers/pack-version.json",
+        "common/pcapx/pcaputil/opendroneid-system/answers/single-trailing.json": "answers/single-trailing.json",
+        "common/pcapx/pcaputil/opendroneid-system/answers/single-wrong-version.json": "answers/single-wrong-version.json",
+        "common/pcapx/pcaputil/opendroneid-system/answers/split-system.json": "answers/split-system.json",
+        "common/pcapx/pcaputil/opendroneid-system/answers/system-lower-bounds.json": "answers/system-lower-bounds.json",
+        "common/pcapx/pcaputil/opendroneid-system/answers/system-nonstandard-port.json": "answers/system-nonstandard-port.json",
+        "common/pcapx/pcaputil/opendroneid-system/answers/system-normal.json": "answers/system-normal.json",
+        "common/pcapx/pcaputil/opendroneid-system/answers/system-quantization.json": "answers/system-quantization.json",
+        "common/pcapx/pcaputil/opendroneid-system/answers/system-repeat-reverse.json": "answers/system-repeat-reverse.json",
+        "common/pcapx/pcaputil/opendroneid-system/answers/system-reserved.json": "answers/system-reserved.json",
+        "common/pcapx/pcaputil/opendroneid-system/answers/system-reverse.json": "answers/system-reverse.json",
+        "common/pcapx/pcaputil/opendroneid-system/answers/system-unknown.json": "answers/system-unknown.json",
+        "common/pcapx/pcaputil/opendroneid-system/answers/system-upper-bounds.json": "answers/system-upper-bounds.json",
+        "common/pcapx/pcaputil/opendroneid-system/answers/unsupported-type-2.json": "answers/unsupported-type-2.json",
+        "common/pcapx/pcaputil/opendroneid-system/answers/unsupported-type-3.json": "answers/unsupported-type-3.json",
+        "common/pcapx/pcaputil/opendroneid-system/answers/unsupported-type-5.json": "answers/unsupported-type-5.json",
+        "common/pcapx/pcaputil/opendroneid-system/build.py": "build.py",
+        "common/pcapx/pcaputil/opendroneid-system/captures/concatenated-datagrams.pcap": "captures/concatenated-datagrams.pcap",
+        "common/pcapx/pcaputil/opendroneid-system/captures/cut-pack-header-1.pcap": "captures/cut-pack-header-1.pcap",
+        "common/pcapx/pcaputil/opendroneid-system/captures/cut-pack-header-2.pcap": "captures/cut-pack-header-2.pcap",
+        "common/pcapx/pcaputil/opendroneid-system/captures/cut-pack-last.pcap": "captures/cut-pack-last.pcap",
+        "common/pcapx/pcaputil/opendroneid-system/captures/cut-system-0.pcap": "captures/cut-system-0.pcap",
+        "common/pcapx/pcaputil/opendroneid-system/captures/cut-system-1.pcap": "captures/cut-system-1.pcap",
+        "common/pcapx/pcaputil/opendroneid-system/captures/cut-system-10.pcap": "captures/cut-system-10.pcap",
+        "common/pcapx/pcaputil/opendroneid-system/captures/cut-system-2.pcap": "captures/cut-system-2.pcap",
+        "common/pcapx/pcaputil/opendroneid-system/captures/cut-system-24.pcap": "captures/cut-system-24.pcap",
+        "common/pcapx/pcaputil/opendroneid-system/captures/duplicate-system.pcap": "captures/duplicate-system.pcap",
+        "common/pcapx/pcaputil/opendroneid-system/captures/inner-version.pcap": "captures/inner-version.pcap",
+        "common/pcapx/pcaputil/opendroneid-system/captures/nested-pack.pcap": "captures/nested-pack.pcap",
+        "common/pcapx/pcaputil/opendroneid-system/captures/no-system.pcap": "captures/no-system.pcap",
+        "common/pcapx/pcaputil/opendroneid-system/captures/pack-basic-location-system.pcap": "captures/pack-basic-location-system.pcap",
+        "common/pcapx/pcaputil/opendroneid-system/captures/pack-count-ten.pcap": "captures/pack-count-ten.pcap",
+        "common/pcapx/pcaputil/opendroneid-system/captures/pack-count-zero.pcap": "captures/pack-count-zero.pcap",
+        "common/pcapx/pcaputil/opendroneid-system/captures/pack-size-wrong.pcap": "captures/pack-size-wrong.pcap",
+        "common/pcapx/pcaputil/opendroneid-system/captures/pack-system-basic-location.pcap": "captures/pack-system-basic-location.pcap",
+        "common/pcapx/pcaputil/opendroneid-system/captures/pack-system.pcap": "captures/pack-system.pcap",
+        "common/pcapx/pcaputil/opendroneid-system/captures/pack-trailing.pcap": "captures/pack-trailing.pcap",
+        "common/pcapx/pcaputil/opendroneid-system/captures/pack-two-basic-location-system.pcap": "captures/pack-two-basic-location-system.pcap",
+        "common/pcapx/pcaputil/opendroneid-system/captures/pack-version.pcap": "captures/pack-version.pcap",
+        "common/pcapx/pcaputil/opendroneid-system/captures/single-trailing.pcap": "captures/single-trailing.pcap",
+        "common/pcapx/pcaputil/opendroneid-system/captures/single-wrong-version.pcap": "captures/single-wrong-version.pcap",
+        "common/pcapx/pcaputil/opendroneid-system/captures/split-system.pcap": "captures/split-system.pcap",
+        "common/pcapx/pcaputil/opendroneid-system/captures/system-lower-bounds.pcap": "captures/system-lower-bounds.pcap",
+        "common/pcapx/pcaputil/opendroneid-system/captures/system-nonstandard-port.pcap": "captures/system-nonstandard-port.pcap",
+        "common/pcapx/pcaputil/opendroneid-system/captures/system-normal.pcap": "captures/system-normal.pcap",
+        "common/pcapx/pcaputil/opendroneid-system/captures/system-quantization.pcap": "captures/system-quantization.pcap",
+        "common/pcapx/pcaputil/opendroneid-system/captures/system-repeat-reverse.pcap": "captures/system-repeat-reverse.pcap",
+        "common/pcapx/pcaputil/opendroneid-system/captures/system-reserved.pcap": "captures/system-reserved.pcap",
+        "common/pcapx/pcaputil/opendroneid-system/captures/system-reverse.pcap": "captures/system-reverse.pcap",
+        "common/pcapx/pcaputil/opendroneid-system/captures/system-unknown.pcap": "captures/system-unknown.pcap",
+        "common/pcapx/pcaputil/opendroneid-system/captures/system-upper-bounds.pcap": "captures/system-upper-bounds.pcap",
+        "common/pcapx/pcaputil/opendroneid-system/captures/unsupported-type-2.pcap": "captures/unsupported-type-2.pcap",
+        "common/pcapx/pcaputil/opendroneid-system/captures/unsupported-type-3.pcap": "captures/unsupported-type-3.pcap",
+        "common/pcapx/pcaputil/opendroneid-system/captures/unsupported-type-5.pcap": "captures/unsupported-type-5.pcap",
+        "common/pcapx/pcaputil/opendroneid-system/controls.json": "controls.json",
+        "common/pcapx/pcaputil/opendroneid-system/official-system-vectors.jsonl": "official-system-vectors.jsonl",
+        "common/pcapx/pcaputil/opendroneid-system/reference-system.c": "reference-system.c",
+        "common/pcapx/pcaputil/opendroneid-system/reproduce-reference.py": "reproduce-reference.py",
+        "common/pcapx/pcaputil/opendroneid-system/source-pin.json": "source-pin.json",
+        "common/pcapx/pcaputil/opendroneid-system/validation/expected.json": "validation/expected.json",
+        "common/pcapx/pcaputil/opendroneid-system/validation/provenance.json": "validation/provenance.json",
+        "common/pcapx/pcaputil/opendroneid-system/verify.py": "verify.py"
+      }
     }
   ],
   "schema_version": 1,
