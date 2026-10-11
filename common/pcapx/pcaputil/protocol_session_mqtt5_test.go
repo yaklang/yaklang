@@ -55,6 +55,8 @@ func mqtt5Connack(aliasMax uint16) []byte {
 func TestProtocolSessionMQTT5ConnectPublishAndQoS(t *testing.T) {
 	t.Run("native-version-connect", testMQTTScopedNativeVersionAndConnect)
 	t.Run("mqtt311-native-profiles", testMQTT311SealedNativeProfiles)
+	t.Run("active-identifier", testMQTTActiveIdentifierCannotBeOverwritten)
+	t.Run("sealed-identifier", testMQTTSealedIdentifierReuse)
 	t.Run("sealed-context-matrix", testMQTT5SealedContextMatrix)
 	t.Run("sealed-session-chunks", testMQTT5SealedSessionChunks)
 	t.Run("default-budget-close", testMQTT5DefaultBudgetCloseInvariant)

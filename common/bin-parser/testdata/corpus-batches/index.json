@@ -45408,6 +45408,83 @@
           "bytes": 1052
         }
       }
+    },
+    {
+      "file": "validation-mqtt-identifier.zip",
+      "id": "mqtt-identifier-6574bf96e54",
+      "kind": "session-controls",
+      "password": "bin-parser",
+      "source_sha": "6574bf96e54b7f68458d77864add021ad64247b3",
+      "sha256": "95b2ee6ebe2bc947cd61fa279c3a8a85d10f1e70323cacfa71e2f6f30c98322d",
+      "aliases": {
+        "common/pcapx/pcaputil/testdata/mqtt-identifier/answers.json": "answers.json",
+        "common/pcapx/pcaputil/testdata/mqtt-identifier/captures/level4-qos1-active.pcap": "captures/level4-qos1-active.pcap",
+        "common/pcapx/pcaputil/testdata/mqtt-identifier/captures/level4-qos1-released.pcap": "captures/level4-qos1-released.pcap",
+        "common/pcapx/pcaputil/testdata/mqtt-identifier/captures/level4-qos2-active.pcap": "captures/level4-qos2-active.pcap",
+        "common/pcapx/pcaputil/testdata/mqtt-identifier/captures/level4-qos2-released.pcap": "captures/level4-qos2-released.pcap",
+        "common/pcapx/pcaputil/testdata/mqtt-identifier/captures/level5-qos1-active.pcap": "captures/level5-qos1-active.pcap",
+        "common/pcapx/pcaputil/testdata/mqtt-identifier/captures/level5-qos1-released.pcap": "captures/level5-qos1-released.pcap",
+        "common/pcapx/pcaputil/testdata/mqtt-identifier/captures/level5-qos2-active.pcap": "captures/level5-qos2-active.pcap",
+        "common/pcapx/pcaputil/testdata/mqtt-identifier/captures/level5-qos2-released.pcap": "captures/level5-qos2-released.pcap",
+        "common/pcapx/pcaputil/testdata/mqtt-identifier/generate.py": "generate.py",
+        "common/pcapx/pcaputil/testdata/mqtt-identifier/make-answers.py": "make-answers.py",
+        "common/pcapx/pcaputil/testdata/mqtt-identifier/validation/expected.json": "validation/expected.json",
+        "common/pcapx/pcaputil/testdata/mqtt-identifier/verify.py": "verify.py"
+      },
+      "members": {
+        "answers.json": {
+          "sha256": "d87ca070f06edba34c7560be969c5ccea8b69ccb997b1ce851eaf2f2ffc1e43e",
+          "bytes": 21475
+        },
+        "captures/level4-qos1-active.pcap": {
+          "sha256": "db60ae618bc6e962f36c09d9d22c528ab520edbd1a31b13deea588423e85bf26",
+          "bytes": 635
+        },
+        "captures/level4-qos1-released.pcap": {
+          "sha256": "7e781a5ca27aa307051216f8d940fb296aaa2fc5a3b3708340a5b5f0dbfbad51",
+          "bytes": 783
+        },
+        "captures/level4-qos2-active.pcap": {
+          "sha256": "f570ca490a09aae00c6a32e05cd99c37c7bd7553b66762c850bb43874d024738",
+          "bytes": 783
+        },
+        "captures/level4-qos2-released.pcap": {
+          "sha256": "e6224bb8c1eaf30631959998cd75b219e29ec71779608c7a49c75a9efae3e15c",
+          "bytes": 1079
+        },
+        "captures/level5-qos1-active.pcap": {
+          "sha256": "d11f1edd953ac6b6afe8d1948ff9a8b8c9200394df3606818f5b99972cae2730",
+          "bytes": 633
+        },
+        "captures/level5-qos1-released.pcap": {
+          "sha256": "40235cc331310145b508538bb0a190ff547be1c7632227b516071b91cc93705c",
+          "bytes": 781
+        },
+        "captures/level5-qos2-active.pcap": {
+          "sha256": "c5c2815170bed11fc2971ae08469e532ee1fad82b4005c0bb224776631acb013",
+          "bytes": 781
+        },
+        "captures/level5-qos2-released.pcap": {
+          "sha256": "363556280e8ad701d1d5cff19be0a12b2df552ced028c97bab17e68e807fcc9f",
+          "bytes": 1077
+        },
+        "generate.py": {
+          "sha256": "384e72cff28d1e6f65950fec6aca6bf1001629b6aefae18c7fcc67bfe8f5f6fd",
+          "bytes": 2777
+        },
+        "make-answers.py": {
+          "sha256": "4256a591d3abd9d18f60cfc461f214f847d030844b78a1b267079b14c24282d6",
+          "bytes": 2795
+        },
+        "validation/expected.json": {
+          "sha256": "681250a64f1a996ca525ef835f4922b6ebccc51374040801973ecd3f3c62dbc0",
+          "bytes": 7781
+        },
+        "verify.py": {
+          "sha256": "9ce8f2caa0c8c0ce7eb79bceb7b26583033f6cfc8fafad48c3a6842ccdcdbc71",
+          "bytes": 872
+        }
+      }
     }
   ],
   "schema_version": 1,

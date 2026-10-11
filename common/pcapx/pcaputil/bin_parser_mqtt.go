@@ -160,6 +160,11 @@ func (m *binMQTT) consume(dir int, raw []byte, result map[string]any, maxElement
 		if err != nil {
 			return nil, err
 		}
+		// New QoS>0 publications must allocate an unused identifier. Never
+		// overwrite an observed exchange, including its later QoS2 phases.
+		if qos > 0 && flags&8 == 0 && m.pending[dir][pid] != "" {
+			return nil, fmt.Errorf("mqtt: packet identifier %d is already in use", pid)
+		}
 		pendingNew, aliasNew := 0, 0
 		aliasDelta := int64(0)
 		storeAlias := alias != 0 && topic != ""

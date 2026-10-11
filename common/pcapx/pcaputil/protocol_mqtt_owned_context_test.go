@@ -656,3 +656,225 @@ func testMQTT311SealedNativeProfiles(t *testing.T) {
 		}
 	}
 }
+
+// OASIS MQTT 3.1.1 / 5: new QoS>0 publications allocate an unused
+// identifier. The opposite endpoint owns a separate namespace; a completed
+// exchange releases its identifier, but a fresh DUP=0 PUBLISH cannot erase it.
+func testMQTTActiveIdentifierCannotBeOverwritten(t *testing.T) {
+	for _, level := range []byte{4, 5} {
+		for _, deferred := range []bool{false, true} {
+			for _, qos := range []byte{1, 2} {
+				t.Run(fmt.Sprintf("level%d/d%v/qos%d", level, deferred, qos), func(t *testing.T) {
+					connect := mqtt311Wire(t, "connect")
+					publish := mqtt311Wire(t, "client")
+					if level == 5 {
+						connect = mqttContextWire(t, "connect")
+						publish = mqttContextWire(t, "client-qos2")
+					}
+					publish[0] = 0x30 | qos<<1
+					session := func() ProtocolSession {
+						s, err := NewProtocolSession(DefaultParserBudget())
+						require.NoError(t, err)
+						s.(*captureSession).f.a.config.Deferred = deferred
+						require.Nil(t, s.Feed(0, time.Unix(1, 0), connect).Err)
+						return s
+					}
+					s := session()
+					defer s.Close("done")
+					require.Nil(t, s.Feed(0, time.Unix(2, 0), publish).Err)
+					// QoS2 retains the identifier through PUBCOMP, including after PUBREL.
+					if qos == 2 {
+						require.Nil(t, s.Feed(1, time.Unix(3, 0), mqttContextWire(t, "pubrec")).Err)
+						require.Nil(t, s.Feed(0, time.Unix(4, 0), mqttContextWire(t, "pubrel")).Err)
+					}
+					r := s.Feed(0, time.Unix(5, 0), publish)
+					require.NotNil(t, r.Err, "DUP=0 cannot replace an active exchange")
+					require.Equal(t, ErrMalformedMessage, r.Err.Kind)
+					require.Contains(t, r.Err.Message, "packet identifier 7 is already in use")
+					require.Len(t, r.Events, 1)
+					require.Nil(t, r.Events[0].Session)
+					require.Equal(t, publish, r.Events[0].Raw)
+					require.Zero(t, r.Events[0].ResponseTo)
+					require.Zero(t, r.Events[0].TransactionID)
+					_, err := r.Events[0].GetFields()
+					var typed *ProtocolError
+					require.ErrorAs(t, err, &typed)
+					require.Equal(t, ErrMalformedMessage, typed.Kind)
+					late := s.Feed(1, time.Unix(6, 0), mqttContextWire(t, "puback"))
+					require.NotNil(t, late.Err)
+					require.Equal(t, ErrFatalSessionError, late.Err.Kind)
+					require.Empty(t, late.Events)
+					require.Empty(t, s.Close("bad exchange"))
+					require.Nil(t, s.Close("again"))
+					require.Zero(t, s.Stats().BufferedBytes)
+					// Adjacent valid reuse after terminal acknowledgment must remain accepted.
+					good := session()
+					defer good.Close("done")
+					for repeat := 0; repeat < 2; repeat++ {
+						require.Nil(t, good.Feed(0, time.Unix(7, 0), publish).Err)
+						ack := "puback"
+						if qos == 2 {
+							require.Nil(t, good.Feed(1, time.Unix(8, 0), mqttContextWire(t, "pubrec")).Err)
+							require.Nil(t, good.Feed(0, time.Unix(9, 0), mqttContextWire(t, "pubrel")).Err)
+							ack = "pubcomp"
+						}
+						a := good.Feed(1, time.Unix(10, 0), mqttContextWire(t, ack))
+						require.Nil(t, a.Err)
+						require.Len(t, a.Events, 1)
+						require.Equal(t, true, a.Events[0].Session["Matched Request"])
+						require.Equal(t, uint64(7), a.Events[0].Session["Packet Identifier"])
+					}
+					require.Empty(t, good.Close("complete"))
+					require.Zero(t, good.Stats().BufferedBytes)
+				})
+			}
+		}
+	}
+}
+
+func testMQTTSealedIdentifierReuse(t *testing.T) {
+	var answers struct {
+		Profiles map[string]struct {
+			Events []struct {
+				Wire      string         `json:"wire_hex"`
+				Direction int            `json:"direction"`
+				Session   map[string]any `json:"session"`
+				Error     *struct {
+					Kind    ProtocolErrorKind `json:"kind"`
+					Message string            `json:"message"`
+				} `json:"error"`
+			} `json:"events"`
+		} `json:"profiles"`
+	}
+	b, err := trafficfixture.ReadFile("testdata/mqtt-identifier/answers.json")
+	require.NoError(t, err)
+	require.NoError(t, json.Unmarshal(b, &answers))
+	require.Len(t, answers.Profiles, 8)
+	for name, p := range answers.Profiles {
+		check := func(t *testing.T, i int, e *ProtocolEvent) {
+			t.Helper()
+			want := p.Events[i]
+			wire, err := hex.DecodeString(want.Wire)
+			require.NoError(t, err)
+			require.Equal(t, "mqtt", e.Protocol)
+			require.Equal(t, "tcp", e.Transport)
+			require.Equal(t, want.Direction, e.Direction)
+			require.Equal(t, wire, e.Raw)
+			require.Equal(t, len(wire), e.Length)
+			require.Equal(t, uint64(i+1), e.ID)
+			require.Equal(t, uint64(1), e.FlowID)
+			require.Zero(t, e.ResponseTo)
+			require.Zero(t, e.TransactionID)
+			hash := sha256.Sum256(wire)
+			require.Equal(t, hex.EncodeToString(hash[:]), e.SourceBytes.SHA256)
+			if want.Error != nil {
+				require.Nil(t, e.Session)
+				require.Equal(t, "malformed", e.Status)
+				_, err := e.GetFields()
+				var typed *ProtocolError
+				require.ErrorAs(t, err, &typed)
+				require.Equal(t, want.Error.Kind, typed.Kind)
+				require.Equal(t, want.Error.Message, typed.Message)
+				return
+			}
+			require.Empty(t, e.Error)
+			rocEqualFields(t, want.Session, e.Session)
+			decoded, err := e.Decode()
+			require.NoError(t, err)
+			rocEqualFields(t, want.Session, decoded["session"].(map[string]any))
+			fields, err := e.GetFields()
+			require.NoError(t, err)
+			if wire[0]>>4 >= 3 && wire[0]>>4 <= 7 {
+				require.EqualValues(t, 7, findSessionField(fields, "Packet Identifier"))
+			}
+			if wire[0]>>4 == 3 {
+				topic := "client"
+				payload := []byte{0x80, 0, 1}
+				if name[5] == '5' {
+					topic = "a/b"
+					payload = []byte("pay")
+				}
+				require.Equal(t, topic, findSessionField(fields, "Topic Name"))
+				require.Equal(t, payload, findSessionField(fields, "Application Message"))
+			}
+			mutateRTPSQuery(fields)
+			mutateRTPSQuery(e.Session)
+			again, err := e.Decode()
+			require.NoError(t, err)
+			require.Equal(t, decoded, again)
+		}
+		pcap, err := trafficfixture.ReadFile("testdata/mqtt-identifier/captures/" + name + ".pcap")
+		require.NoError(t, err)
+		for _, workers := range []int{1, 2, 4} {
+			for _, deferred := range []bool{false, true} {
+				for _, observer := range []bool{false, true} {
+					t.Run(fmt.Sprintf("%s/capture/w%d/d%v/o%v", name, workers, deferred, observer), func(t *testing.T) {
+						var events []*ProtocolEvent
+						var stats ProtocolStats
+						var seen atomic.Uint64
+						opts := []CaptureOption{WithTCPReassemblyWorkers(workers), WithProtocolDeferred(deferred), WithOnProtocolMessage(func(e *ProtocolEvent) { events = append(events, e) }), WithOnProtocolStats(func(s ProtocolStats) { stats = s })}
+						if observer {
+							opts = append(opts, WithEveryPacket(func(gopacket.Packet) { seen.Add(1) }))
+						}
+						require.NoError(t, ReplayPcap(bytes.NewReader(pcap), opts...))
+						require.Len(t, events, len(p.Events))
+						for i, e := range events {
+							require.NotEmpty(t, e.SourceBytes.PacketRefs)
+							check(t, i, e)
+						}
+						require.Zero(t, stats.BufferedBytes)
+						if observer {
+							require.EqualValues(t, len(p.Events)+4, seen.Load())
+						} else {
+							require.Zero(t, seen.Load())
+						}
+					})
+				}
+			}
+		}
+		for _, chunk := range []int{0, 1, 7} {
+			for _, deferred := range []bool{false, true} {
+				t.Run(fmt.Sprintf("%s/session/chunk%d/d%v", name, chunk, deferred), func(t *testing.T) {
+					s, err := NewProtocolSession(DefaultParserBudget())
+					require.NoError(t, err)
+					defer s.Close("done")
+					s.(*captureSession).f.a.config.Deferred = deferred
+					offsets := [2]uint64{}
+					for i, want := range p.Events {
+						wire, err := hex.DecodeString(want.Wire)
+						require.NoError(t, err)
+						var events []*ProtocolEvent
+						var last *ProtocolError
+						for at := 0; at < len(wire); {
+							n := len(wire) - at
+							if chunk > 0 {
+								n = min(n, chunk)
+							}
+							r := s.Feed(want.Direction, time.Unix(10, int64(i)*int64(time.Millisecond)), wire[at:at+n])
+							at += n
+							events = append(events, r.Events...)
+							if r.Err != nil && r.Err.Kind != ErrNeedMore {
+								last = r.Err
+							}
+						}
+						require.Len(t, events, 1)
+						require.Equal(t, offsets[want.Direction], events[0].Offset)
+						offsets[want.Direction] += uint64(len(wire))
+						clear(wire)
+						check(t, i, events[0])
+						if want.Error == nil {
+							require.Nil(t, last)
+						} else {
+							require.NotNil(t, last)
+							require.Equal(t, want.Error.Kind, last.Kind)
+							require.Equal(t, want.Error.Message, last.Message)
+						}
+					}
+					require.Empty(t, s.Close("done"))
+					require.Nil(t, s.Close("again"))
+					require.Zero(t, s.Stats().BufferedBytes)
+				})
+			}
+		}
+	}
+}

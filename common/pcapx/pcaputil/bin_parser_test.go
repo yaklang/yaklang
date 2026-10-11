@@ -172,7 +172,10 @@ func TestBinParserHTTPContextAndChunks(t *testing.T) {
 func TestBinParserInspectorAndCallbackFailure(t *testing.T) {
 	wire := append(append([]byte{}, binMQTTConnect...), binMQTTPublish(64)...)
 	pcap := binTestPcap(t, []tcpStep{{seq: 0, syn: true}, {seq: 1, data: string(wire)}}, 1883, false, false)
-	v, err := NewBinParserInspector(1, 1024)
+	// Native MQTT now owns the decoded rule tree as well as its observed
+	// connection context. Keep a bounded capacity for the row-eviction test;
+	// check the exact byte ceiling independently below.
+	v, err := NewBinParserInspector(1, 8192)
 	require.NoError(t, err)
 	err = ReplayPcap(bytes.NewReader(pcap), WithBinParserDeferred(true), WithBinParser(v.OnEvent))
 	require.NoError(t, err)
@@ -183,6 +186,20 @@ func TestBinParserInspectorAndCallbackFailure(t *testing.T) {
 	detail, err := v.Details(rows[0].ID)
 	require.NoError(t, err)
 	require.NotEmpty(t, detail.Structured)
+	cost := detail.RetainedBytes()
+	require.LessOrEqual(t, cost, 8192)
+	for _, limit := range []int{cost - 1, cost} {
+		bounded, err := NewBinParserInspector(1, limit)
+		require.NoError(t, err)
+		bounded.OnEvent(detail)
+		if limit < cost {
+			require.Empty(t, bounded.Rows("mqtt", 0))
+			require.EqualValues(t, 1, bounded.Evicted())
+		} else {
+			require.Len(t, bounded.Rows("mqtt", 0), 1)
+			require.Zero(t, bounded.Evicted())
+		}
+	}
 	detail.Raw[0] = 0
 	again, err := v.Details(rows[0].ID)
 	require.NoError(t, err)
