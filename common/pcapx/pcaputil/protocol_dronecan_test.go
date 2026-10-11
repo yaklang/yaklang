@@ -16,6 +16,7 @@ import (
 )
 
 func TestDroneCANSealedReplay(t *testing.T) {
+	t.Run("RestartNode", droneCANRestartNodeSealed)
 	b, err := trafficfixture.ReadFile("dronecan-node-status/manifest.json")
 	require.NoError(t, err)
 	var m struct {

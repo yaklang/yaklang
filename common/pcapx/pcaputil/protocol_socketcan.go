@@ -172,6 +172,10 @@ func (a *binParser) decodeCANRecord(w []byte, evidence captureEvidence, ci gopac
 			var jf map[string]any
 			if a.canDecodeAs[e.Domain.Interface] == "dronecan" {
 				e.Protocol, e.Profile = "dronecan", "dronecan-v0-node-status"
+				identifier := fields["Identifier"].(uint32)
+				if identifier&128 != 0 && identifier>>16&255 == 5 {
+					e.Profile = "dronecan-v0-restart-node"
+				}
 				jf, err = decodeDroneCANNodeStatus(fields["Identifier"].(uint32), fields["Data"].([]byte))
 			} else {
 				jf, err = decodeJ1939RequestName(fields["Identifier"].(uint32), fields["Data"].([]byte))
