@@ -568,6 +568,7 @@ func (f *binFlow) consumeSession(dir int, e *ProtocolEvent, result map[string]an
 	case "dnp3":
 		e.Session, err = f.dnp3.consume(e.Raw)
 	case "c37118":
+		f.advanceC37118ContinuationClock(dir)
 		e.Profile = f.c37118Profile(dir, e.Raw)
 		var collected bool
 		e.Session, err, collected = f.consumeC37118Continuation(dir, e.Raw)

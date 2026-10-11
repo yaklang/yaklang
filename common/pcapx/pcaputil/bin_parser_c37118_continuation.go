@@ -20,6 +20,20 @@ type c37118Continuation struct {
 	started, latest time.Time
 }
 
+// Every TCP message from this publisher advances its capture watermark, even
+// DATA without usable configuration. An unrelated publisher cannot advance it;
+// backdated arrivals cannot revive an expired series or start a stale one.
+func (f *binFlow) advanceC37118ContinuationClock(dir int) {
+	if s := f.c37118; s != nil {
+		if ts := f.directions[dir].ts; ts.After(s.clock[dir]) {
+			s.clock[dir] = ts
+		}
+		if p := s.continuation[dir]; p != nil && s.clock[dir].Sub(p.started) > 30*time.Second {
+			s.continuation[dir] = nil
+		}
+	}
+}
+
 func (f *binFlow) consumeC37118Continuation(dir int, raw []byte) (map[string]any, error, bool) {
 	s := f.c37118
 	// The producer can split the two-byte cumulative CRC across frames: a
@@ -44,8 +58,11 @@ func (f *binFlow) consumeC37118Continuation(dir int, raw []byte) (map[string]any
 	ts := f.directions[dir].ts
 	if index == 1 {
 		// A new first frame explicitly replaces the previous incomplete series.
-		p = &c37118Continuation{next: 2, started: ts, latest: ts}
+		p = &c37118Continuation{next: 2, started: ts, latest: s.clock[dir]}
 		s.continuation[dir] = nil
+		if p.latest.Sub(p.started) > 30*time.Second {
+			return reject(ErrContextRequired, "C37.118 first continuation predates publisher capture watermark")
+		}
 	} else {
 		if p == nil {
 			return reject(ErrContextRequired, "C37.118 continuation without this publisher's first fragment")

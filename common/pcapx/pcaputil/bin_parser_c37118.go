@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"github.com/yaklang/yaklang/common/bin-parser/parser/stream_parser"
 	"math"
+	"time"
 )
 
 // C37.118 CFG-2/complete CFG-3 context belongs to one observed publisher direction.
@@ -16,6 +17,7 @@ type binC37118 struct {
 	configuration   [2][]byte
 	changeIndicated [2]bool
 	continuation    [2]*c37118Continuation
+	clock           [2]time.Time
 }
 
 func c37118RecoverableMessageError(err *ProtocolError) bool {

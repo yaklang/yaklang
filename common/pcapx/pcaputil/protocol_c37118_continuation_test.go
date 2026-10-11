@@ -2,13 +2,17 @@ package pcaputil
 
 import (
 	"bytes"
+	"encoding/base64"
 	"encoding/binary"
+	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/bin-parser/parser/stream_parser"
+	"github.com/yaklang/yaklang/internal/trafficfixture"
 )
 
 // Owned grammar control: fixed GPA/GSF 22a9aa1 BinaryImageFrames uses a
@@ -128,6 +132,81 @@ func TestC37118ContinuationOwnershipAndClose(t *testing.T) {
 			require.Zero(t, s.Stats().BufferedBytes)
 		})
 	}
+	// Reuse the immutable two-fragment input and independent full answers. The
+	// additional capture-time policy differs, not the on-wire bytes.
+	for _, direction := range []int{0, 1} {
+		t.Run(fmt.Sprintf("capture-clock-%d", direction), func(t *testing.T) {
+			ab, err := trafficfixture.ReadFile("c37118-cfg3-continuation/answers/two-fragments.json")
+			require.NoError(t, err)
+			var answer struct {
+				Events []struct {
+					Raw    string
+					Fields map[string]any
+				}
+			}
+			require.NoError(t, json.Unmarshal(ab, &answer))
+			require.Len(t, answer.Events, 3)
+			wires := make([][]byte, 3)
+			for i, x := range answer.Events {
+				wires[i], err = hex.DecodeString(x.Raw)
+				require.NoError(t, err)
+			}
+			s, err := NewProtocolSessionWithOptions(DefaultParserBudget(), WithSessionTransport("tcp"))
+			require.NoError(t, err)
+			defer s.Close("test")
+			r := s.Feed(0, time.Unix(1, 0), wires[0])
+			require.Equal(t, ErrContextRequired, r.Err.Kind)
+			require.Len(t, r.Events, 1)
+			rocEqualFields(t, answer.Events[0].Fields, r.Events[0].Session)
+			r = s.Feed(direction, time.Unix(100, 0), wires[2])
+			require.Equal(t, ErrContextRequired, r.Err.Kind)
+			require.Len(t, r.Events, 1)
+			wantContext := map[string]any{}
+			for k, v := range answer.Events[2].Fields {
+				wantContext[k] = v
+			}
+			delete(wantContext, "Data")
+			wantContext["Body Decoded"] = false
+			wantContext["Configuration Required"] = true
+			wantContext["Opaque Body"] = base64.StdEncoding.EncodeToString(wires[2][14 : len(wires[2])-2])
+			rocEqualFields(t, wantContext, r.Events[0].Session)
+			_, err = r.Events[0].GetFields()
+			rocTypedError(t, "ContextRequired", err)
+
+			r = s.Feed(0, time.Unix(2, 0), wires[1])
+			require.Len(t, r.Events, 1)
+			if direction == 0 {
+				require.NotNil(t, r.Err, "same-publisher clock advances even without a configuration; a backdated tail cannot revive it")
+				require.Equal(t, ErrContextRequired, r.Err.Kind)
+				require.Nil(t, r.Events[0].Session)
+				_, err = r.Events[0].GetFields()
+				rocTypedError(t, "ContextRequired", err)
+				require.EqualValues(t, 3, s.Stats().ContextRequired)
+				require.Zero(t, s.Stats().Decoded)
+				r = s.Feed(0, time.Unix(3, 0), wires[0])
+				require.Equal(t, ErrContextRequired, r.Err.Kind, "a stale new first fragment cannot replace the publisher watermark")
+				require.Len(t, r.Events, 1)
+				require.Nil(t, r.Events[0].Session)
+				_, err = r.Events[0].GetFields()
+				rocTypedError(t, "ContextRequired", err)
+				require.EqualValues(t, 4, s.Stats().ContextRequired)
+				require.Zero(t, s.Stats().Decoded)
+			} else {
+				require.Nil(t, r.Err, "other publisher's capture clock cannot expire this one")
+				f, err := r.Events[0].GetFields()
+				require.NoError(t, err)
+				rocEqualFields(t, answer.Events[1].Fields, f)
+				r = s.Feed(0, time.Unix(3, 0), wires[2])
+				require.Nil(t, r.Err)
+				f, err = r.Events[0].GetFields()
+				require.NoError(t, err)
+				rocEqualFields(t, answer.Events[2].Fields, f)
+			}
+			require.Empty(t, s.Close("done"))
+			require.Zero(t, s.Stats().BufferedBytes)
+		})
+	}
+
 	for _, dir := range []int{0, 1} {
 		s, err := NewProtocolSessionWithOptions(DefaultParserBudget(), WithSessionTransport("tcp"))
 		require.NoError(t, err)

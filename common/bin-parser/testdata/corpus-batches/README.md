@@ -597,7 +597,10 @@ the original first header for cumulative CRC, including a CRC split across a
 17-byte final frame, and installs DATA configuration only after full validation.
 Publisher directions, capture interfaces, stream IDs and SOC/FRACSEC do not
 borrow configuration. A30-second capture-time lifetime, collection and logical
-byte budgets and conservative memory reservation bound pending state. Denied,
+byte budgets and conservative memory reservation bound pending state. Every TCP
+message advances only its publisher's monotonic capture watermark, including
+DATA without usable configuration; backdated tails and new first fragments
+cannot revive expired state. Denied,
 expired or inconsistent replacements clear the affected publisher context.
 Pending fragments report ContextRequired with Cumulative CRC Validated=false;
 this is an explicit diagnostic, not a successful configuration. The matrix
