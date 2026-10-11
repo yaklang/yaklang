@@ -1,6 +1,7 @@
 package pq
 
 import (
+	"fmt"
 	"math"
 	"math/rand"
 	"testing"
@@ -172,18 +173,29 @@ func TestKMeans(t *testing.T) {
 		{5.0, 5.0}, {5.1, 5.1}, {5.0, 5.1}, {5.1, 5.0}, // 聚类2
 	}
 
-	centroids, err := kMeans(data, 2, 50, 1e-6)
-	if err != nil {
-		t.Fatalf("K-Means failed: %v", err)
+	// These seeds reproduced poor local optima with uniform random initialization.
+	for _, seed := range []int64{0, 5, 20, 26, 31, 41, 42, 59, 68, 72, 83, 95} {
+		t.Run(fmt.Sprintf("seed_%d", seed), func(t *testing.T) {
+			rng := rand.New(rand.NewSource(seed))
+			centroids, err := kMeansWithRand(data, 2, 50, 1e-6, 1, rng)
+			if err != nil {
+				t.Fatalf("K-Means failed (seed=%d): %v", seed, err)
+			}
+			assertKMeansClusterCenters(t, centroids, seed)
+		})
 	}
+}
+
+func assertKMeansClusterCenters(t *testing.T, centroids [][]float64, seed int64) {
+	t.Helper()
 
 	if len(centroids) != 2 {
-		t.Errorf("Expected 2 centroids, got %d", len(centroids))
+		t.Fatalf("Expected 2 centroids, got %d (seed=%d): %v", len(centroids), seed, centroids)
 	}
 
 	for _, centroid := range centroids {
 		if len(centroid) != 2 {
-			t.Errorf("Expected 2D centroid, got %dD", len(centroid))
+			t.Fatalf("Expected 2D centroid, got %dD (seed=%d): %v", len(centroid), seed, centroids)
 		}
 	}
 
@@ -195,16 +207,16 @@ func TestKMeans(t *testing.T) {
 		dist1 := math.Sqrt(math.Pow(centroid[0]-0.05, 2) + math.Pow(centroid[1]-0.05, 2))
 		dist2 := math.Sqrt(math.Pow(centroid[0]-5.05, 2) + math.Pow(centroid[1]-5.05, 2))
 
-		if dist1 < 0.5 {
+		if dist1 < 1e-9 {
 			center1Found = true
 		}
-		if dist2 < 0.5 {
+		if dist2 < 1e-9 {
 			center2Found = true
 		}
 	}
 
 	if !center1Found || !center2Found {
-		t.Errorf("K-Means did not find expected cluster centers")
+		t.Errorf("K-Means did not find expected cluster centers [0.05, 0.05] and [5.05, 5.05] (seed=%d): %v", seed, centroids)
 	}
 }
 
