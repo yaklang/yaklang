@@ -92,11 +92,7 @@ func rocInput(t *testing.T, c rocControl) ([]byte, rocAnswer) {
 }
 func rocEqualFields(t *testing.T, want map[string]any, got map[string]any) {
 	t.Helper()
-	b, err := json.Marshal(got)
-	require.NoError(t, err)
-	var normalized map[string]any
-	require.NoError(t, json.Unmarshal(b, &normalized))
-	require.Equal(t, want, normalized)
+	requireExactProtocolFields(t, want, got)
 }
 func rocTypedError(t *testing.T, kind string, err error) {
 	t.Helper()
