@@ -37,7 +37,7 @@ func nmeaAISEnvelope(p []string) error {
 }
 
 // nmeaAIS observes ITU-R M.1371-5's 168-bit Class A (types1/2/3) and Class B
-// (Type18) position reports and independent Type24 static report parts.
+// (Type18/19) position reports and independent Type24 static report parts.
 // Each selected schema validates its own exact payload size.
 // A checksum establishes representation, not ship identity or a physical fix.
 // Sequence/channel labels are literal; this stateless profile never assembles
@@ -55,6 +55,9 @@ func nmeaAIS(p []string, out map[string]any) error {
 	}
 	if first == 18 {
 		return nmeaAISClassB(p, out)
+	}
+	if first == 19 {
+		return nmeaAISExtendedClassB(p, out)
 	}
 	if first == 24 {
 		return nmeaAISStatic(p, out)

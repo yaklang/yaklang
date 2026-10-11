@@ -43421,6 +43421,88 @@
       "password": "bin-parser",
       "sha256": "4189ce5d4c193fd678fbc2365844e8ec99d07c3cdaa2a6179f6be2d9d12e96ff",
       "source_sha": "fcc675060e7d0a18cccaf56c20082f7065f33d43"
+    },
+    {
+      "aliases": {
+        "common/pcapx/pcaputil/nmea-ais-extended/answers/complete-reports.json": "answers/complete-reports.json",
+        "common/pcapx/pcaputil/nmea-ais-extended/answers/malformed-refusals.json": "answers/malformed-refusals.json",
+        "common/pcapx/pcaputil/nmea-ais-extended/answers/unsupported-refusals.json": "answers/unsupported-refusals.json",
+        "common/pcapx/pcaputil/nmea-ais-extended/captures/complete-reports.pcap": "captures/complete-reports.pcap",
+        "common/pcapx/pcaputil/nmea-ais-extended/captures/malformed-refusals.pcap": "captures/malformed-refusals.pcap",
+        "common/pcapx/pcaputil/nmea-ais-extended/captures/unsupported-refusals.pcap": "captures/unsupported-refusals.pcap",
+        "common/pcapx/pcaputil/nmea-ais-extended/controls.json": "controls.json",
+        "common/pcapx/pcaputil/nmea-ais-extended/scripts/build_fixture.py": "scripts/build_fixture.py",
+        "common/pcapx/pcaputil/nmea-ais-extended/scripts/build_inputs.py": "scripts/build_inputs.py",
+        "common/pcapx/pcaputil/nmea-ais-extended/scripts/check_reference.py": "scripts/check_reference.py",
+        "common/pcapx/pcaputil/nmea-ais-extended/scripts/reference19.cpp": "scripts/reference19.cpp",
+        "common/pcapx/pcaputil/nmea-ais-extended/validation/expected.json": "validation/expected.json",
+        "common/pcapx/pcaputil/nmea-ais-extended/validation/reference-inputs.json": "validation/reference-inputs.json",
+        "common/pcapx/pcaputil/nmea-ais-extended/validation/source-pins.json": "validation/source-pins.json"
+      },
+      "file": "validation-nmea-ais-extended.zip",
+      "id": "nmea-ais-extended",
+      "kind": "validation",
+      "members": {
+        "answers/complete-reports.json": {
+          "bytes": 48933,
+          "sha256": "6bcb5686dce23ab6971759acd2b885599e1c33b24925eb846df28b4972336b99"
+        },
+        "answers/malformed-refusals.json": {
+          "bytes": 1345,
+          "sha256": "4c9c72e201fe2b69d3e9167fb909e7883c65f113285d455165ee84b15bc58be2"
+        },
+        "answers/unsupported-refusals.json": {
+          "bytes": 2072,
+          "sha256": "ab085347c5928eafc29d440d45cd5fd6a9421d82e60003b83e4eec95c89d0503"
+        },
+        "captures/complete-reports.pcap": {
+          "bytes": 2325,
+          "sha256": "6e167f5fedaa71720b9c83fb94a75f5fb890b2fe35efc3e1e7c64b9c4388eded"
+        },
+        "captures/malformed-refusals.pcap": {
+          "bytes": 883,
+          "sha256": "84bd22ff980416305280cb3a464d9acd6db235aabadc73d5a1b92f5445f8162d"
+        },
+        "captures/unsupported-refusals.pcap": {
+          "bytes": 1465,
+          "sha256": "33077c849814c602c4d64ea30d58f364590b000e0a6b7e72502ac83ad75ec390"
+        },
+        "controls.json": {
+          "bytes": 1091,
+          "sha256": "7d7f08539c78b14ac51a07e17c28e76edf34ed7ef2ab55f1fc0af9959f590903"
+        },
+        "scripts/build_fixture.py": {
+          "bytes": 7939,
+          "sha256": "c3ecb14035a5a2a3089b3feaad8d62359102c4f1c5decca36b2d87b9bb8c26eb"
+        },
+        "scripts/build_inputs.py": {
+          "bytes": 3172,
+          "sha256": "6fe1ba3a88aedb0d8e359538260f4fb904bbd1a94fc2b946dabb63d49f23f7c6"
+        },
+        "scripts/check_reference.py": {
+          "bytes": 1501,
+          "sha256": "5efaba1a98f80652ba97d2ff65f29cb794f41e7e0c0cfbf594edf9ab0c566a5d"
+        },
+        "scripts/reference19.cpp": {
+          "bytes": 1095,
+          "sha256": "861cb1973039cb81c5433253674e4e8b18655d34c75f8f7909ee59d355bb9924"
+        },
+        "validation/expected.json": {
+          "bytes": 3280,
+          "sha256": "564c042e1ae64b6c51cd260ce365d2b5868ca6e0308fc5b634778b9e8e5c9d9a"
+        },
+        "validation/reference-inputs.json": {
+          "bytes": 18848,
+          "sha256": "10cbabe4fd3fe7e1e056fbe814df48033eb6fc94905fe393d65ac1a330b31490"
+        },
+        "validation/source-pins.json": {
+          "bytes": 1174,
+          "sha256": "a7ec2492a9aa15e2dc67c0f5ab666d21779d3da839703e751c611de37686d46d"
+        }
+      },
+      "password": "bin-parser",
+      "sha256": "45b8c4a7f19805a0c983ef6c7e61fbe8c3d47b8a0aff1ef51daca19a6ce8cfa9",
+      "source_sha": "e2f69214334e0e15ae91c9e8a5bae1fb313947f8"
     }
   ],
   "schema_version": 1,

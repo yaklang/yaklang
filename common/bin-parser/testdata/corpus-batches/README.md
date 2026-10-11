@@ -471,7 +471,7 @@ The small sealed batch supplies complete field/Session answers and reproducible
 synthetic inputs; its scripts check all fields/branches against fixed libais
 `87dadfaa1b4db0b0e9953680051391f2c4375455` using separately hash-pinned sources.
 No upstream source, large downloads, runtime logs or compiled codecs are stored
-in the ZIP. It does not implement Type19 or cross-datagram assembly.
+in the ZIP. The Type18 batch does not assemble reports across datagrams.
 
 The `nmea-ais-static/controls.json` entry observes Type24 Part A and Part B
 independently. Part A accepts its 160-bit and 168-bit forms; Part B requires
@@ -490,3 +490,18 @@ legacy vendor/dimension interpretation are explicitly distinguished from the
 versioned normative bit-layout answers. Raw physical identity, receiver operation
 and authentication remain unverified. No upstream sources or build outputs are
 included in the sealed ZIP.
+
+The `nmea-ais-extended/controls.json` entry adds exact single-fragment 312-bit
+Type19 extended Class B reports. It preserves raw/scaled navigation fields and
+unavailable markers, name wire text and first-`@` termination, dimensions and
+their unavailable/lower-bound markers, raw ship/fix type, reserved bits and
+literal RAIM/DTE/assigned flags. Type19 has no Class A navigation-status/ROT
+or Type18 radio-state fields. Shapes outside the exact profile remain
+`UnsupportedFeature`, retaining the historical short mutated-Type18 refusal;
+invalid envelopes remain `MalformedMessage`. The selected profile does not
+authenticate name, dimensions, physical fix, receiver operation or ship identity.
+`TestNMEAMultipleSentencesBudgetAndOwnership/ais-extended-profile` loads three
+small grouped captures with 34 datagram scenarios: 17 complete observations
+and 17 normative refusals, all in the twelve replay configurations. The sealed
+scripts check 13 complete vectors against fixed libais and build all inputs
+independently of this implementation. Original archives and answers stay intact.
