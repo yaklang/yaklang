@@ -3,13 +3,14 @@ package pcaputil
 import (
 	"bytes"
 	"encoding/binary"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"github.com/yaklang/yaklang/common/bin-parser/parser/stream_parser"
 	"math"
 )
 
-// C37.118 CFG-2 context belongs to one observed publisher direction.
+// C37.118 CFG-2/complete CFG-3 context belongs to one observed publisher direction.
 // Ports never supply configuration, scaling or measurement-validity claims.
 type binC37118 struct {
 	configuration   [2][]byte
@@ -113,7 +114,7 @@ func (f *binFlow) consumeC37118(dir int, raw []byte) (map[string]any, error) {
 	}
 	retained := len(s.configuration[0]) + len(s.configuration[1])
 	if err := f.reserveSession(512 + int64(retained)*8 + int64(len(raw))*32); err != nil {
-		if len(raw) > 1 && raw[1]>>4 == 3 {
+		if len(raw) > 1 && (raw[1]>>4 == 3 || raw[1]>>4 == 5) {
 			s.configuration[dir] = nil
 		}
 		return nil, err
@@ -127,7 +128,9 @@ func (f *binFlow) consumeC37118(dir int, raw []byte) (map[string]any, error) {
 	if raw[1]&15 != 1 && raw[1]&15 != 2 {
 		return nil, protocolError(ErrUnsupportedVersion, "C37.118 selected v1/v2 profile")
 	}
-	if raw[1]>>4 >= 5 {
+	// Keep the legacy short CFG-3 boundary classified as unsupported: it has
+	// no complete extended header. Native CFG-3 admission requires that header.
+	if raw[1]>>4 > 5 || raw[1]>>4 == 5 && len(raw) < 24 {
 		return nil, protocolError(ErrUnsupportedFeature, "C37.118 unsupported frame type")
 	}
 	if int(binary.BigEndian.Uint16(raw[2:4])) > len(raw) {
@@ -153,11 +156,15 @@ func (f *binFlow) consumeC37118(dir int, raw []byte) (map[string]any, error) {
 	}
 	m, err := stream_parser.DecodeC37118Message(raw, cfg, f.a.budget.MaxCollectionElements)
 	if err != nil {
+		if errors.Is(err, stream_parser.ErrC37118ContinuationRequired) {
+			s.configuration[dir] = nil
+			return nil, protocolError(ErrUnsupportedFeature, err.Error())
+		}
 		if errors.Is(err, stream_parser.ErrC37118CollectionLimit) {
 			// The envelope passed validation, but this replacement's PMU or
 			// channel layout could not be admitted. As with a byte-budget
 			// refusal, retaining the previous layout would misinterpret DATA.
-			if raw[1]>>4 == 3 {
+			if raw[1]>>4 == 3 || raw[1]>>4 == 5 {
 				s.configuration[dir] = nil
 			}
 			return nil, protocolError(ErrResourceExceeded, err.Error())
@@ -184,11 +191,11 @@ func (f *binFlow) consumeC37118(dir int, raw []byte) (map[string]any, error) {
 		out["Configuration Change Indicated"] = true
 	}
 	switch m.FrameType {
-	case 3:
+	case 3, 5:
 		s.configuration[dir] = bytes.Clone(raw)
 	case 0:
 		if m.ConfigurationRequired || contextMismatch {
-			return out, protocolError(ErrContextRequired, "C37.118 DATA without this publisher's observed CFG-2")
+			return out, protocolError(ErrContextRequired, "C37.118 DATA without this publisher's observed CFG-2 or complete CFG-3")
 		}
 	}
 	return out, nil
@@ -198,7 +205,7 @@ func c37118Fields(m *stream_parser.C37118Message) map[string]any {
 	switch m.FrameType {
 	case 0:
 		out["Role"] = "data"
-	case 2, 3:
+	case 2, 3, 5:
 		out["Role"] = "configuration"
 	case 4:
 		out["Role"] = "command"
@@ -214,7 +221,7 @@ func c37118Fields(m *stream_parser.C37118Message) map[string]any {
 		out["Opaque Body"] = bytes.Clone(m.OpaqueBody)
 	}
 	if m.FrameType == 5 {
-		out["Opaque Body"] = bytes.Clone(m.OpaqueBody)
+		out["Continuation Index"] = 0
 	}
 	if c := m.Configuration; c != nil {
 		ps := make([]map[string]any, 0, len(c.PMUs))
@@ -235,36 +242,64 @@ func c37118Fields(m *stream_parser.C37118Message) map[string]any {
 				ds = append(ds, map[string]any{"Normal Mask": u.NormalMask, "Valid Mask": u.ValidMask})
 			}
 			ps = append(ps, map[string]any{"Station Name": p.StationName, "ID Code": p.IDCode, "Format": p.Format, "Phasor Names": cloneScalarValues(p.PhasorNames), "Analog Names": cloneScalarValues(p.AnalogNames), "Digital Names": names, "Phasor Units": units(p.PhasorUnits), "Analog Units": units(p.AnalogUnits), "Digital Units": ds, "Nominal Frequency Flags": p.NominalFrequencyFlags, "Config Count": p.ConfigCount})
+			if x := p.Extended; x != nil {
+				ph := make([]map[string]any, 0, len(x.PhasorConversions))
+				for _, v := range x.PhasorConversions {
+					ph = append(ph, map[string]any{"Data Modifications": v.DataModifications, "Type Indication": v.TypeIndication, "User Flags": v.UserFlags, "Magnitude Multiplier": c37118NumberFields(v.MagnitudeMultiplier), "Angle Adder": c37118NumberFields(v.AngleAdder)})
+				}
+				an := make([]map[string]any, 0, len(x.AnalogConversions))
+				for _, v := range x.AnalogConversions {
+					an = append(an, map[string]any{"Multiplier": c37118NumberFields(v.Multiplier), "Adder": c37118NumberFields(v.Adder)})
+				}
+				ps[len(ps)-1]["Extended"] = map[string]any{"Global ID Bytes": hex.EncodeToString(x.GlobalID[:]), "Phasor Conversions": ph, "Analog Conversions": an, "Latitude": c37118NumberFields(x.Latitude), "Longitude": c37118NumberFields(x.Longitude), "Elevation": c37118NumberFields(x.Elevation), "Service Class": x.ServiceClass, "Window": x.Window, "Group Delay": x.GroupDelay}
+			}
 		}
 		out["Configuration"] = map[string]any{"Time Base Reserved": c.TimeBaseReserved, "Time Base": c.TimeBase, "Data Rate": c.DataRate, "PMUs": ps}
 	}
-	number := func(n stream_parser.C37118Number) map[string]any {
-		var value any = n.Value
-		// Preserve exact raw bits; a non-finite encoding is never replaced by zero
-		// or exported as a JSON-invalid floating point number.
-		if math.IsNaN(n.Value) {
-			value = "NaN"
-		} else if math.IsInf(n.Value, 1) {
-			value = "+Inf"
-		} else if math.IsInf(n.Value, -1) {
-			value = "-Inf"
-		}
-		return map[string]any{"Raw Bits": n.RawBits, "Width": n.Width, "Floating Point": n.FloatingPoint, "Signed": n.Signed, "Value": value}
-	}
+
 	if m.BodyDecoded && m.FrameType == 0 {
 		data := make([]map[string]any, 0, len(m.Data))
 		for _, p := range m.Data {
 			ph := make([]map[string]any, 0, len(p.Phasors))
 			for _, v := range p.Phasors {
-				ph = append(ph, map[string]any{"First": number(v.First), "Second": number(v.Second)})
+				ph = append(ph, map[string]any{"First": c37118NumberFields(v.First), "Second": c37118NumberFields(v.Second)})
 			}
 			an := make([]map[string]any, 0, len(p.Analogs))
 			for _, v := range p.Analogs {
-				an = append(an, number(v))
+				an = append(an, c37118NumberFields(v))
 			}
-			data = append(data, map[string]any{"ID Code": p.IDCode, "Status": p.Status, "Polar": p.Polar, "Phasors": ph, "Frequency": number(p.Frequency), "Frequency Derivative": number(p.FrequencyDerivative), "Analogs": an, "Digitals": cloneScalarValues(p.Digitals)})
+			data = append(data, map[string]any{"ID Code": p.IDCode, "Status": p.Status, "Polar": p.Polar, "Phasors": ph, "Frequency": c37118NumberFields(p.Frequency), "Frequency Derivative": c37118NumberFields(p.FrequencyDerivative), "Analogs": an, "Digitals": cloneScalarValues(p.Digitals)})
 		}
 		out["Data"] = data
 	}
 	return out
+}
+
+func c37118NumberFields(n stream_parser.C37118Number) map[string]any {
+	var value any = n.Value
+	// Preserve exact raw bits; a non-finite encoding is never replaced by zero
+	// or exported as a JSON-invalid floating point number.
+	if math.IsNaN(n.Value) {
+		value = "NaN"
+	} else if math.IsInf(n.Value, 1) {
+		value = "+Inf"
+	} else if math.IsInf(n.Value, -1) {
+		value = "-Inf"
+	}
+	return map[string]any{"Raw Bits": n.RawBits, "Width": n.Width, "Floating Point": n.FloatingPoint, "Signed": n.Signed, "Value": value}
+}
+
+// A profile reports the actual observed configuration grammar. Ports cannot
+// upgrade CFG-2, and opposite publisher directions cannot borrow CFG-3.
+func (f *binFlow) c37118Profile(dir int, raw []byte) string {
+	if len(raw) > 1 && raw[1]>>4 == 5 && len(raw) >= 24 {
+		return "c37118-v2-cfg3-complete-data"
+	}
+	if len(raw) > 1 && raw[1]>>4 == 0 && f.c37118 != nil {
+		cfg := f.c37118.configuration[dir]
+		if len(cfg) > 1 && cfg[1]>>4 == 5 {
+			return "c37118-v2-cfg3-complete-data"
+		}
+	}
+	return "c37118-v1-v2-cfg2-data"
 }

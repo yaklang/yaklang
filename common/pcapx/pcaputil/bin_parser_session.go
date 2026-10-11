@@ -568,7 +568,7 @@ func (f *binFlow) consumeSession(dir int, e *ProtocolEvent, result map[string]an
 	case "dnp3":
 		e.Session, err = f.dnp3.consume(e.Raw)
 	case "c37118":
-		e.Profile = "c37118-v1-v2-cfg2-data"
+		e.Profile = f.c37118Profile(dir, e.Raw)
 		e.Session, err = f.consumeC37118(dir, e.Raw)
 	case "goose":
 		e.Session, err = f.goose.consume(e.Raw)

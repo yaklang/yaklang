@@ -78,7 +78,7 @@ func (e *ProtocolEvent) Decode() (result map[string]any, err error) {
 		}
 		// C37.118 exposes its complete accepted observation in both views
 		// on TCP and UDP. The public map is caller-owned, not query authority.
-		if e.Protocol == "c37118" && e.Profile == "c37118-v1-v2-cfg2-data" && e.semanticFields != nil {
+		if e.Protocol == "c37118" && (e.Profile == "c37118-v1-v2-cfg2-data" || e.Profile == "c37118-v2-cfg3-complete-data") && e.semanticFields != nil {
 			session = e.semanticFields
 		}
 		if err == nil && result != nil && session != nil {

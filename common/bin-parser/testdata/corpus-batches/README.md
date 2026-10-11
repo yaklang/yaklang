@@ -44,7 +44,7 @@ Run from the repository root:
 ```sh
 go run ./internal/trafficfixture/cmd/corpus test
 go test -json -count=1 -timeout=5m ./internal/trafficfixture/... ./common/bin-parser/... ./common/pcapx/... ./common/yak/cmd/yakcmds/shark-cli ./scripts/ci > traffic.jsonl
-go run ./internal/trafficfixture/cmd/corpus exec -- python3 @scripts/protocol-tests/check_go_test_json.py traffic.jsonl --inventory @scripts/protocol-tests/required-tests-traffic-unified-v21.json --tier full
+go run ./internal/trafficfixture/cmd/corpus exec -- python3 @scripts/protocol-tests/check_go_test_json.py traffic.jsonl --inventory @scripts/protocol-tests/required-tests-traffic-unified-v22.json --tier full
 ```
 
 The single `corpus` entry point uses the same bounded Go ZIP loader as tests.
@@ -83,7 +83,7 @@ their semantic coverage. The existing synthetic session keys are test inputs;
 production credentials, user private keys and material without redistribution
 permission belong in an external fixed-source download manifest.
 
-Current test requirements are sealed at `scripts/protocol-tests/required-tests-traffic-unified-v21.json`;
+Current test requirements are sealed at `scripts/protocol-tests/required-tests-traffic-unified-v22.json`;
 the historical inventories and all earlier batches remain unchanged.
 The supplemental small-corpus batch contains 26 minimal controls, their explicit
 expected facts, an offline generator and the compact pinned source manifest.
@@ -96,7 +96,7 @@ byte-boundary, malformed-length and ownership tests. These are scoped control
 assertions, not a semantic golden for the entire upstream collection. Process
 logs and the original large downloads remain outside the repository.
 
-The current workflow and executable gate use `required-tests-traffic-unified-v21.json`. Older
+The current workflow and executable gate use `required-tests-traffic-unified-v22.json`. Older
 versioned inventories stay available as historical inputs; they are not the
 current acceptance entry. The DLMS HDLC batch contains owned tunnel/Get-normal
 controls and their independent fields/errors, CRC/byte validator, offline
@@ -137,7 +137,7 @@ publisher direction and capture domain. It handles configuration changes in any
 PMU, rejects unusable configuration and bounded resource overload, and owns its
 returned fields. Integer/raw IEEE floating-point values are retained; no
 engineering measurement-validity claim is made. CFG-1 does not establish DATA
-context, and CFG-3 remains explicitly unsupported in this native profile.
+context. This historical batch validates CFG-2; the complete CFG-3 profile is described below.
 Pinned pypmu reference failures for nonzero DIGUNIT masks are retained in the
 archive and do not count as passing independent reference runs.
 
@@ -203,7 +203,7 @@ opaque selector bytes and one bounded Data value over Wrapper v1 TCP/UDP; object
 selector meaning, access permission and device operation are unverified. The
 original one-packet selective-access capture and original refused answer remain
 immutable; its now-supported answer is matched by exact input SHA and frame.
-The active inventory is `scripts/protocol-tests/required-tests-traffic-unified-v21.json`.
+The active inventory is `scripts/protocol-tests/required-tests-traffic-unified-v22.json`.
 
 The small-graph budget batch reuses accepted graph captures/answers and adds one
 249-byte UDP control for child count255 without child bytes. Its standalone proof
@@ -259,7 +259,7 @@ retain the original request ID. Scope excludes authentication, gateway identity
 binding, device execution and RF delivery. Original large captures, upstream
 source and logs are not bundled.
 
-`validation-dlms-hdlc-normal-data.zip` contains31 owned minimal native normal-GET capture cases and72 ordered independent answers (53 complete byte/field observations,19 expected refusals). It covers TCP/UDP full/deferred, workers1/2/4, observer off/on, TCP feed chunks, nested compact, node/depth boundaries, malformed/trailing contents, strict text, full flags and refusal followed by late feedback. The existing native scalar contract and zero TransactionID are retained. Its source pins and executable independent builder/oracle/reference harness stay in the small ZIP; original reference sources and execution logs stay outside Git. Actual fixed reference codec display/calendar differences remain diagnostics rather than device passes. Current mandatory inventory is `scripts/protocol-tests/required-tests-traffic-unified-v21.json`.
+`validation-dlms-hdlc-normal-data.zip` contains31 owned minimal native normal-GET capture cases and72 ordered independent answers (53 complete byte/field observations,19 expected refusals). It covers TCP/UDP full/deferred, workers1/2/4, observer off/on, TCP feed chunks, nested compact, node/depth boundaries, malformed/trailing contents, strict text, full flags and refusal followed by late feedback. The existing native scalar contract and zero TransactionID are retained. Its source pins and executable independent builder/oracle/reference harness stay in the small ZIP; original reference sources and execution logs stay outside Git. Actual fixed reference codec display/calendar differences remain diagnostics rather than device passes. Current mandatory inventory is `scripts/protocol-tests/required-tests-traffic-unified-v22.json`.
 
 The historical `dlms-hdlc/array` capture is reused in place. Its original `UnsupportedFeature` answer remains immutable; `historical-array-upgrade.json` binds the original capture/answer hashes to two current full-message answers for the now-supported legal empty-array response. No historical capture is copied into the new ZIP and other historical refusals retain their assertions.
 
@@ -303,7 +303,7 @@ its permissive pairing and last-only list error are not independent proof of our
 selected negative association policy or every item error. Owner byte/state
 oracles supply those explicit expectations. No raw download, upstream source,
 dependency, log or cache is included. All56 preceding ZIPs remain unchanged.
-The current inventory is `scripts/protocol-tests/required-tests-traffic-unified-v21.json`.
+The current inventory is `scripts/protocol-tests/required-tests-traffic-unified-v22.json`.
 
 `validation-dlms-hdlc-unobserved-next.zip` adds12 distinct minimal captures and54
 whole answers (36 observations,18 expected ContextRequired refusals). An already
@@ -348,7 +348,7 @@ not an unrecorded31second network delay or device claim. Historical expiry
 capture/answer hashes bind its corrected association answer; no old ZIP is
 modified. Shared-protocol expiry, collection limits, domain isolation, byte
 ownership and Close release also have regressions. Current executable inventory
-is `scripts/protocol-tests/required-tests-traffic-unified-v21.json`; earlier
+is `scripts/protocol-tests/required-tests-traffic-unified-v22.json`; earlier
 versioned inventories remain archived.
 
 
@@ -566,4 +566,23 @@ The tests cover full/deferred, workers 1/2/4, observer off/on, exact raw fields,
 directions, flow identities, typed errors, packet evidence and Close release.
 These are raw codec and local capture-policy proofs; they do not establish
 engineering-unit accuracy, physical measurement validity, device success or
-native CFG-3 support. Those requirements remain open.
+native CFG-3 support by this historical context-only batch. Complete CFG-3 is covered by the following batch; continuation and physical measurement validation remain open.
+
+
+`validation-c37118-cfg3.zip` contains21 owned minimal captures and47 ordered
+independent answers for C37.118-2011 version2 complete CFG-3 (CONT_IDX=0) and
+DATA from the same observed publisher, stream ID and version. Profile
+`c37118-v2-cfg3-complete-data` retains UTF-8 station/channel names, RFC UUID
+bytes, raw phasor/analog conversion factors, digital masks, coordinate binary32
+bits, service class, signed window/group delay, nominal flags and revision.
+Conversion factors are observations; they are not applied engineering scaling.
+The matrix covers TCP/UDP, full/deferred, workers1/2/4 and observer off/on;
+standalone TCP controls additionally use1/3/14/16/255-byte feeds. It asserts
+complete fields, private Session queries, raw IEEE values including NaN/Inf,
+direction/ID/version isolation, collection-refused replacement/recovery,
+typed malformed UTF-8/length/CRC and Close release. Fragmented CFG-3 is an
+explicit unsupported boundary; cumulative-CRC continuation assembly, reference
+endpoint/device execution and physical measurement quality remain unverified.
+Scripts, independently authored byte codec, fixed GPA/GSF source pins and
+full answers are sealed inside the small ZIP. Original references and logs
+stay outside Git. The active mandatory gate is unifiedv22 (424 unique roots).

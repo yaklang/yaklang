@@ -60,16 +60,17 @@ func (a *binParser) decodeC37118Datagram(e *ProtocolEvent, w []byte, explicit bo
 	} else {
 		f = &binFlow{a: a, protocol: "c37118", c37118: &binC37118{}, endpoints: [2]string{e.Source, e.Destination}}
 	}
+	e.Profile = f.c37118Profile(e.Direction, w)
 	var err error
 	oversized := len(w) > min(a.budget.MaxFrameBytes, a.config.MaxMessageBytes)
 	if oversized {
 		err = protocolError(ErrResourceExceeded, "C37.118 UDP frame exceeds byte budget")
-		if len(w) > 1 && w[1]>>4 == 3 {
+		if len(w) > 1 && (w[1]>>4 == 3 || w[1]>>4 == 5) {
 			f.c37118.configuration[e.Direction] = nil
 		}
 	} else {
 		e.Session, err = f.consumeC37118(e.Direction, w)
-		if err == nil && el == nil && len(w) > 1 && w[1]>>4 == 3 {
+		if err == nil && el == nil && len(w) > 1 && (w[1]>>4 == 3 || w[1]>>4 == 5) {
 			if len(store.entries) >= sessionCollectionLimit(a.budget.MaxCollectionElements) {
 				err = protocolError(ErrResourceExceeded, "C37.118 UDP configuration conversation budget")
 				e.Session = nil
@@ -99,5 +100,5 @@ func (a *binParser) decodeC37118Datagram(e *ProtocolEvent, w []byte, explicit bo
 }
 
 func c37118DatagramEvidence(w []byte) bool {
-	return len(w) >= 16 && probeC37118(w, len(w)).Verdict == ProbeAccept && w[1]>>4 < 5 && int(binary.BigEndian.Uint16(w[2:4])) == len(w) && c37118CRC(w[:len(w)-2]) == binary.BigEndian.Uint16(w[len(w)-2:])
+	return len(w) >= 16 && probeC37118(w, len(w)).Verdict == ProbeAccept && (w[1]>>4 < 5 || w[1] == 0x52 && len(w) >= 24 && binary.BigEndian.Uint16(w[14:16]) == 0) && int(binary.BigEndian.Uint16(w[2:4])) == len(w) && c37118CRC(w[:len(w)-2]) == binary.BigEndian.Uint16(w[len(w)-2:])
 }

@@ -43992,6 +43992,264 @@
         "common/pcapx/pcaputil/c37118-context/validation/source-pins.json": "validation/source-pins.json",
         "scripts/protocol-tests/required-tests-traffic-unified-v21.json": "scripts/required-tests-traffic-unified-v21.json"
       }
+    },
+    {
+      "id": "c37118-cfg3",
+      "kind": "validation",
+      "source_sha": "4e776f022ddbcb88d42c06131a1a64369f51f0a3",
+      "file": "validation-c37118-cfg3.zip",
+      "sha256": "ab82eb8bf78a111b812900725e0b0f8207a3face0060f7a46af89331088169b3",
+      "password": "bin-parser",
+      "members": {
+        "answers/tcp-channel-refusal.json": {
+          "bytes": 8093,
+          "sha256": "9754f58d95f2b1e7ec95915c1260b4c02b0d73b07e137a83a0fe6f33441a2416"
+        },
+        "answers/tcp-collection-refusal.json": {
+          "bytes": 8909,
+          "sha256": "2523f4e65e75ac86ca6e772cdd3ffe0562a4df70428c13f1806a6e8a2ccd37ed"
+        },
+        "answers/tcp-mixed-pmus-format-0.json": {
+          "bytes": 13269,
+          "sha256": "7f7fb90ca7f64ec2cda0416335fd7769b9ea63bf4b5f2785d8cb82c922097107"
+        },
+        "answers/tcp-mixed-pmus-format-15.json": {
+          "bytes": 13375,
+          "sha256": "5a0279249d6cc9039a7b1f22bc82623074d0ae70f257341bd470d123ec55eb77"
+        },
+        "answers/udp-bad-crc.json": {
+          "bytes": 617,
+          "sha256": "7a1cfa672120affca6cb15a32ce1926bbe4edfd921c194cc38f4e71a78ed1cb5"
+        },
+        "answers/udp-channel-refusal.json": {
+          "bytes": 8093,
+          "sha256": "98c11a62271fdf05e3ec60240bc0e4306bf6e9d23e1b4c629bed61a87f20ffc1"
+        },
+        "answers/udp-collection-refusal.json": {
+          "bytes": 8909,
+          "sha256": "c06af38a515f9a5995bda1463ed7d27c90eda1ef942225a24f7c8d229bb8d02c"
+        },
+        "answers/udp-continuation-boundary.json": {
+          "bytes": 619,
+          "sha256": "ac8ca58ffb6ad44f4a4466d4db94ca8caaf447ec37fa3df06384d210818f0a3e"
+        },
+        "answers/udp-direction-context.json": {
+          "bytes": 4564,
+          "sha256": "5bdc72aa9c9abcbe2ecc22b9eebc35fe1faec14308ea84506b725d43946e89b5"
+        },
+        "answers/udp-footer-truncated.json": {
+          "bytes": 615,
+          "sha256": "3e17bc850528944a7264bb0e6715d444b5c150e38732aaae3532ab09bd034e82"
+        },
+        "answers/udp-id-context.json": {
+          "bytes": 4570,
+          "sha256": "c3629e60d6c9923d5e69a6b36caa67ebd776bfbd4bf71d745fceaf324ccc131a"
+        },
+        "answers/udp-mixed-pmus-format-0.json": {
+          "bytes": 13269,
+          "sha256": "92b43cb268228f6947594b1dcdb118aeac1b6b5027ba9d91b5cc362c98292c35"
+        },
+        "answers/udp-mixed-pmus-format-15.json": {
+          "bytes": 13375,
+          "sha256": "bf6a868fe922e0982aaf0939f7f614913a5c68dec8149b74f03bfc2c8811a4ca"
+        },
+        "answers/udp-pmu-zero.json": {
+          "bytes": 617,
+          "sha256": "69cafac9f37e2427ff5e95d20ba5649eb7ecd37c20a5b587408e571b2ae3ee0b"
+        },
+        "answers/udp-rate-zero.json": {
+          "bytes": 617,
+          "sha256": "4f895ed8708cc53a9a1acada721dc23a388631c352e741849db156d152b2faa7"
+        },
+        "answers/udp-station-overrun.json": {
+          "bytes": 617,
+          "sha256": "eacdd16fca8a5f5cd4e84316961d5b1c735a7b581106eae6336438e27ed35775"
+        },
+        "answers/udp-timebase-zero.json": {
+          "bytes": 617,
+          "sha256": "679d018ba5323298284a5ac682457c4362d2844ef8d0b3a027d539b09ebe4166"
+        },
+        "answers/udp-trailing.json": {
+          "bytes": 619,
+          "sha256": "d0334b7a9cbe2332ab3bccf2f87a5c246a6ce5abd0538a544c857f87ef29c21f"
+        },
+        "answers/udp-utf8-invalid.json": {
+          "bytes": 617,
+          "sha256": "aa4284b20045c1b0265934404a0ad7061758ba102553eb3f34bf79bcb1934390"
+        },
+        "answers/udp-version-context.json": {
+          "bytes": 4568,
+          "sha256": "a322b05e13012f1f95ee17845d2b9562087ff77f1320a38d28a493f2ca46a0b3"
+        },
+        "answers/udp-version1-cfg3.json": {
+          "bytes": 617,
+          "sha256": "3a2ef6913fec54608e8ec1e2986898388ad86852643c9be5691d6e389a85b11e"
+        },
+        "captures/tcp-channel-refusal.pcap": {
+          "bytes": 1248,
+          "sha256": "1fa9663958d2ff2394c0e5a4df6488483763d8f7b091e8cbb93f6b3aa49b15e1"
+        },
+        "captures/tcp-collection-refusal.pcap": {
+          "bytes": 1656,
+          "sha256": "d252c49b977879efaef5bf931f791765b926915c5740fb321edc3d0d6ad6be12"
+        },
+        "captures/tcp-mixed-pmus-format-0.pcap": {
+          "bytes": 1270,
+          "sha256": "707c5feaf91cf1dc9dfea80d72677fe91281116dc8a1d4bfd3165faf434c95f2"
+        },
+        "captures/tcp-mixed-pmus-format-15.pcap": {
+          "bytes": 1290,
+          "sha256": "2a63dfa66dab4920db0de3f0aaa08933397b8bf8caf56e7b8729c7e0470d10b8"
+        },
+        "captures/udp-bad-crc.pcap": {
+          "bytes": 170,
+          "sha256": "39824bf2721e97f34683cfb21f7919c53cb65ff028a32bfa9225efb7e190b5fd"
+        },
+        "captures/udp-channel-refusal.pcap": {
+          "bytes": 978,
+          "sha256": "8fc5d65a6067f7f16cefddd75231cfc32250e8be0facae7b8917d60a24bfdf60"
+        },
+        "captures/udp-collection-refusal.pcap": {
+          "bytes": 1386,
+          "sha256": "8aff4d7563f7603815ba426c72b123800471497c439534d4b99a853a6f0cdad0"
+        },
+        "captures/udp-continuation-boundary.pcap": {
+          "bytes": 170,
+          "sha256": "29bdb50ec180e87c41fb0b77647108659fca8dbf5a25045af146b953bec7705b"
+        },
+        "captures/udp-direction-context.pcap": {
+          "bytes": 330,
+          "sha256": "4279bb643cc712ef3395a9c61c0503902c0bb4d1c946caa47d50b82bb6ed003a"
+        },
+        "captures/udp-footer-truncated.pcap": {
+          "bytes": 169,
+          "sha256": "c7f0e7266bc2028d81496a5fe62979e0678de698506b3a27b2044a4827b96950"
+        },
+        "captures/udp-id-context.pcap": {
+          "bytes": 330,
+          "sha256": "71b6c8dc9df9a8861bcfa63538a1d433e38db4adb4fd5fdb601a0d04448f280a"
+        },
+        "captures/udp-mixed-pmus-format-0.pcap": {
+          "bytes": 1036,
+          "sha256": "600ba07defa26d5a50bd3aaed9eb825f0bbc9e02e2103509c0bfb5eb322dd50d"
+        },
+        "captures/udp-mixed-pmus-format-15.pcap": {
+          "bytes": 1056,
+          "sha256": "8fd62e67a494f45e4a6d7aa81b942254630f466bbcaf28208408628ea3e2bd6e"
+        },
+        "captures/udp-pmu-zero.pcap": {
+          "bytes": 170,
+          "sha256": "c65522a2581abcbfddf77d1387bbba02f05550ec5fdf647d0d99e4254857410c"
+        },
+        "captures/udp-rate-zero.pcap": {
+          "bytes": 170,
+          "sha256": "2e1db9ecee1cb9c66c5e5f90713963318f40ec38bed6fe5408e5f955bc69791c"
+        },
+        "captures/udp-station-overrun.pcap": {
+          "bytes": 170,
+          "sha256": "10e33e7077daf4e0ffc3243be7a0e77c9970270f80db0dc9595de14f0fe2964d"
+        },
+        "captures/udp-timebase-zero.pcap": {
+          "bytes": 170,
+          "sha256": "13b6edf3172d24ec1ebda9c2bf2cff7599b827978dedd91415030ee6dd1d86cc"
+        },
+        "captures/udp-trailing.pcap": {
+          "bytes": 171,
+          "sha256": "b63542f8e2ef24a6f21bdfd26d15fea4fac1b4ebaa88c3baf702771a5a0b9c19"
+        },
+        "captures/udp-utf8-invalid.pcap": {
+          "bytes": 170,
+          "sha256": "4e9597f8fe81d8ced1c7063cb2f6a8562c6328ace30124e96e217c19606f33a9"
+        },
+        "captures/udp-version-context.pcap": {
+          "bytes": 330,
+          "sha256": "bc92547ef31967633266f8167dd786222b3ad9810fdb73d250f9a112b592c629"
+        },
+        "captures/udp-version1-cfg3.pcap": {
+          "bytes": 170,
+          "sha256": "9b2cef86efded34466c6ed9a15c1384475b6842ae00bd9123b1a093915ab1935"
+        },
+        "controls.json": {
+          "bytes": 8501,
+          "sha256": "803ddba01876c291461853d63da25f094100ea6f7d0923dca41dee66c358f453"
+        },
+        "scripts/build_fixture.py": {
+          "bytes": 8590,
+          "sha256": "eea0c6e18205216083f3b9d5908dbe25a07fcfd5acbb1502c1db88930eedbbfb"
+        },
+        "scripts/reference_codec.py": {
+          "bytes": 5910,
+          "sha256": "4ad4df74151cd68d3780502226b96616528cd92ad22bd8489806b88220297689"
+        },
+        "scripts/required-tests-traffic-unified-v22.json": {
+          "bytes": 136867,
+          "sha256": "e435f675ee5cb286b16725dd5fe5f43165e6eb056028587211308ec5b71b13e2"
+        },
+        "scripts/verify_fixture.py": {
+          "bytes": 2399,
+          "sha256": "8c34abf18aa29944ab6b9f3a94e2ecb70b5e32f0d08c312eb2b234f7c09b75e2"
+        },
+        "validation/expected.json": {
+          "bytes": 24262,
+          "sha256": "ca92a3fc4d949db7506eac7cd04a41362afd43a5cd55a95a5cf5ec3e271f2ae1"
+        },
+        "validation/source-pins.json": {
+          "bytes": 2827,
+          "sha256": "e1dbdefd2599539cb9a7f872fd3b1bb4ffc04d4aa57c6e86f1e5d5c0e32c209b"
+        }
+      },
+      "aliases": {
+        "common/pcapx/pcaputil/c37118-cfg3/answers/tcp-channel-refusal.json": "answers/tcp-channel-refusal.json",
+        "common/pcapx/pcaputil/c37118-cfg3/answers/tcp-collection-refusal.json": "answers/tcp-collection-refusal.json",
+        "common/pcapx/pcaputil/c37118-cfg3/answers/tcp-mixed-pmus-format-0.json": "answers/tcp-mixed-pmus-format-0.json",
+        "common/pcapx/pcaputil/c37118-cfg3/answers/tcp-mixed-pmus-format-15.json": "answers/tcp-mixed-pmus-format-15.json",
+        "common/pcapx/pcaputil/c37118-cfg3/answers/udp-bad-crc.json": "answers/udp-bad-crc.json",
+        "common/pcapx/pcaputil/c37118-cfg3/answers/udp-channel-refusal.json": "answers/udp-channel-refusal.json",
+        "common/pcapx/pcaputil/c37118-cfg3/answers/udp-collection-refusal.json": "answers/udp-collection-refusal.json",
+        "common/pcapx/pcaputil/c37118-cfg3/answers/udp-continuation-boundary.json": "answers/udp-continuation-boundary.json",
+        "common/pcapx/pcaputil/c37118-cfg3/answers/udp-direction-context.json": "answers/udp-direction-context.json",
+        "common/pcapx/pcaputil/c37118-cfg3/answers/udp-footer-truncated.json": "answers/udp-footer-truncated.json",
+        "common/pcapx/pcaputil/c37118-cfg3/answers/udp-id-context.json": "answers/udp-id-context.json",
+        "common/pcapx/pcaputil/c37118-cfg3/answers/udp-mixed-pmus-format-0.json": "answers/udp-mixed-pmus-format-0.json",
+        "common/pcapx/pcaputil/c37118-cfg3/answers/udp-mixed-pmus-format-15.json": "answers/udp-mixed-pmus-format-15.json",
+        "common/pcapx/pcaputil/c37118-cfg3/answers/udp-pmu-zero.json": "answers/udp-pmu-zero.json",
+        "common/pcapx/pcaputil/c37118-cfg3/answers/udp-rate-zero.json": "answers/udp-rate-zero.json",
+        "common/pcapx/pcaputil/c37118-cfg3/answers/udp-station-overrun.json": "answers/udp-station-overrun.json",
+        "common/pcapx/pcaputil/c37118-cfg3/answers/udp-timebase-zero.json": "answers/udp-timebase-zero.json",
+        "common/pcapx/pcaputil/c37118-cfg3/answers/udp-trailing.json": "answers/udp-trailing.json",
+        "common/pcapx/pcaputil/c37118-cfg3/answers/udp-utf8-invalid.json": "answers/udp-utf8-invalid.json",
+        "common/pcapx/pcaputil/c37118-cfg3/answers/udp-version-context.json": "answers/udp-version-context.json",
+        "common/pcapx/pcaputil/c37118-cfg3/answers/udp-version1-cfg3.json": "answers/udp-version1-cfg3.json",
+        "common/pcapx/pcaputil/c37118-cfg3/captures/tcp-channel-refusal.pcap": "captures/tcp-channel-refusal.pcap",
+        "common/pcapx/pcaputil/c37118-cfg3/captures/tcp-collection-refusal.pcap": "captures/tcp-collection-refusal.pcap",
+        "common/pcapx/pcaputil/c37118-cfg3/captures/tcp-mixed-pmus-format-0.pcap": "captures/tcp-mixed-pmus-format-0.pcap",
+        "common/pcapx/pcaputil/c37118-cfg3/captures/tcp-mixed-pmus-format-15.pcap": "captures/tcp-mixed-pmus-format-15.pcap",
+        "common/pcapx/pcaputil/c37118-cfg3/captures/udp-bad-crc.pcap": "captures/udp-bad-crc.pcap",
+        "common/pcapx/pcaputil/c37118-cfg3/captures/udp-channel-refusal.pcap": "captures/udp-channel-refusal.pcap",
+        "common/pcapx/pcaputil/c37118-cfg3/captures/udp-collection-refusal.pcap": "captures/udp-collection-refusal.pcap",
+        "common/pcapx/pcaputil/c37118-cfg3/captures/udp-continuation-boundary.pcap": "captures/udp-continuation-boundary.pcap",
+        "common/pcapx/pcaputil/c37118-cfg3/captures/udp-direction-context.pcap": "captures/udp-direction-context.pcap",
+        "common/pcapx/pcaputil/c37118-cfg3/captures/udp-footer-truncated.pcap": "captures/udp-footer-truncated.pcap",
+        "common/pcapx/pcaputil/c37118-cfg3/captures/udp-id-context.pcap": "captures/udp-id-context.pcap",
+        "common/pcapx/pcaputil/c37118-cfg3/captures/udp-mixed-pmus-format-0.pcap": "captures/udp-mixed-pmus-format-0.pcap",
+        "common/pcapx/pcaputil/c37118-cfg3/captures/udp-mixed-pmus-format-15.pcap": "captures/udp-mixed-pmus-format-15.pcap",
+        "common/pcapx/pcaputil/c37118-cfg3/captures/udp-pmu-zero.pcap": "captures/udp-pmu-zero.pcap",
+        "common/pcapx/pcaputil/c37118-cfg3/captures/udp-rate-zero.pcap": "captures/udp-rate-zero.pcap",
+        "common/pcapx/pcaputil/c37118-cfg3/captures/udp-station-overrun.pcap": "captures/udp-station-overrun.pcap",
+        "common/pcapx/pcaputil/c37118-cfg3/captures/udp-timebase-zero.pcap": "captures/udp-timebase-zero.pcap",
+        "common/pcapx/pcaputil/c37118-cfg3/captures/udp-trailing.pcap": "captures/udp-trailing.pcap",
+        "common/pcapx/pcaputil/c37118-cfg3/captures/udp-utf8-invalid.pcap": "captures/udp-utf8-invalid.pcap",
+        "common/pcapx/pcaputil/c37118-cfg3/captures/udp-version-context.pcap": "captures/udp-version-context.pcap",
+        "common/pcapx/pcaputil/c37118-cfg3/captures/udp-version1-cfg3.pcap": "captures/udp-version1-cfg3.pcap",
+        "common/pcapx/pcaputil/c37118-cfg3/controls.json": "controls.json",
+        "common/pcapx/pcaputil/c37118-cfg3/scripts/build_fixture.py": "scripts/build_fixture.py",
+        "common/pcapx/pcaputil/c37118-cfg3/scripts/reference_codec.py": "scripts/reference_codec.py",
+        "common/pcapx/pcaputil/c37118-cfg3/scripts/required-tests-traffic-unified-v22.json": "scripts/required-tests-traffic-unified-v22.json",
+        "common/pcapx/pcaputil/c37118-cfg3/scripts/verify_fixture.py": "scripts/verify_fixture.py",
+        "common/pcapx/pcaputil/c37118-cfg3/validation/expected.json": "validation/expected.json",
+        "common/pcapx/pcaputil/c37118-cfg3/validation/source-pins.json": "validation/source-pins.json",
+        "scripts/protocol-tests/required-tests-traffic-unified-v22.json": "scripts/required-tests-traffic-unified-v22.json"
+      }
     }
   ],
   "schema_version": 1,
