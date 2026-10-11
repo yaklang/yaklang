@@ -40367,6 +40367,593 @@
         "common/pcapx/pcaputil/nmea-vtg/validation/provenance.json": "validation/provenance.json",
         "common/pcapx/pcaputil/nmea-vtg/verify.py": "verify.py"
       }
+    },
+    {
+      "id": "validation-nmea-gsa-5d1252",
+      "kind": "validation",
+      "source_sha": "5d1252bcd4078448d9dff8afd9aa4365e688e277",
+      "file": "validation-nmea-gsa-5d1252.zip",
+      "sha256": "48117ceb536690701669748f21f7efc6bf837130d9dadf994fd8001f2b349df2",
+      "password": "bin-parser",
+      "members": {
+        "answers/bad-checksum.json": {
+          "sha256": "c730b4c53e5de5d0a7ed0f1719e959d4424b4ae0d78300fce70d4c5abb883fc6",
+          "bytes": 291
+        },
+        "answers/bad-mode.json": {
+          "sha256": "6e14f2b6547532223fe423dafdfb7426568d6cbe980d1e9a894a875487314b9c",
+          "bytes": 287
+        },
+        "answers/cut-crlf.json": {
+          "sha256": "1d16d67eb8b1c5ae5c49bdd9ce24d6f48eedfeafcb4eacb3118939e4527ae15e",
+          "bytes": 285
+        },
+        "answers/dead-reckoning.json": {
+          "sha256": "edf50ac89c68eb7dedf9caca17fc99c1da3010d87c043ad96b5bcb80aa9ac676",
+          "bytes": 295
+        },
+        "answers/dop-leading-dot.json": {
+          "sha256": "3b8137615c9d08e28060be302328c1b1ca93c2372a91cf1dc718eb03423b1d1c",
+          "bytes": 292
+        },
+        "answers/dop-plus.json": {
+          "sha256": "18baf42ec1429ca9e21ccad717533d4e113ffc0b0a4c27793cbd4250a1df9971",
+          "bytes": 285
+        },
+        "answers/duplicate-slots.json": {
+          "sha256": "fa4e0cc42b09d6fdfdee6505fb0c09905d7fadc26ae03ca48b1d9b32eacb87d4",
+          "bytes": 1894
+        },
+        "answers/empty-system.json": {
+          "sha256": "49752c75118ff3c8db9acf5c4e36f6b5d04ea0091f1e0e9953bed2d2945bb1b2",
+          "bytes": 2146
+        },
+        "answers/extended-slots.json": {
+          "sha256": "513d9f18cbcc9f3839fa3e5f026fff6953be3d8c553c98d75b20bc7dbef3731d",
+          "bytes": 295
+        },
+        "answers/fix-empty.json": {
+          "sha256": "ae4c281e48f7bfec44f60bdb70459cfc4f18624cd6fa3a306e2fc80729ca773d",
+          "bytes": 286
+        },
+        "answers/fix-four.json": {
+          "sha256": "288e7baa2286040cf3e07a3e699be69f7985df42677864b15ed6a8caf7223130",
+          "bytes": 287
+        },
+        "answers/fix-leading-zero.json": {
+          "sha256": "541babbfe7e270364fb958fdea5868c4c25bb25d49cec2ead4ac85f541871c3f",
+          "bytes": 297
+        },
+        "answers/fix-zero.json": {
+          "sha256": "3641eb9fbe34b184a18381e5d65c835c490e9125b15ab347af812d4b1cb67e88",
+          "bytes": 287
+        },
+        "answers/future-system.json": {
+          "sha256": "820b98eb111af560cb61a5f08ef90f53575dc61c041882662f32374ddbf81adf",
+          "bytes": 298
+        },
+        "answers/hdop-nan.json": {
+          "sha256": "7c9d94fbb1eae4abdf3ad3144e3f4ff5180a93afc033f7803b000bb7c7b79f4a",
+          "bytes": 287
+        },
+        "answers/independent-datagrams.json": {
+          "sha256": "306756ecc34598e77d220b3b5a9aa3713fbf7ce1f8e38969d63f064998549346",
+          "bytes": 4161
+        },
+        "answers/late-bad-checksum.json": {
+          "sha256": "22f06c19bfcf71134964eeed4fd8dcd928b04be7d278c8e08d2bb0b5c19eb90d",
+          "bytes": 402
+        },
+        "answers/leading-zero-slots.json": {
+          "sha256": "5c0c2b99eff5ce005b10a44145476998a0a801a22d6616b06ee3d7c5173452b0",
+          "bytes": 1936
+        },
+        "answers/manual-2d.json": {
+          "sha256": "0b92fdbf939bae43eaf67b15d56e6be8885d139321c407f5fff58febbe326a2f",
+          "bytes": 2114
+        },
+        "answers/mode-empty.json": {
+          "sha256": "00953d7a950b48c8050cc71b15cd3aa502126daf34ae1be383c36246c71a5d05",
+          "bytes": 287
+        },
+        "answers/multi-mode.json": {
+          "sha256": "ea529632f219243fecd5ef53b5107bb490a412144e15f5821245f1966aa634be",
+          "bytes": 291
+        },
+        "answers/no-fix.json": {
+          "sha256": "1f757ce8a3ee44c02ff5fb365eccb7034ab265d4ba098a8be8ab8af31db60f91",
+          "bytes": 1726
+        },
+        "answers/official-mixed.json": {
+          "sha256": "8f00f217969b862313ee94c78807bcad65f66e6694704e21d1f329fcbba54206",
+          "bytes": 2119
+        },
+        "answers/overlong.json": {
+          "sha256": "18bb162f6c076d55f4578b740a7ae4ba6ea04f94e605bbe6706d4148cbf00613",
+          "bytes": 413
+        },
+        "answers/pdop-exponent.json": {
+          "sha256": "6e1f528c8b2bf5a6fc58741003bb71cd27a90169a1320056163ebcccb4c1c2c6",
+          "bytes": 292
+        },
+        "answers/pdop-negative.json": {
+          "sha256": "0a1650e5e10d0a22408c9f8d8cb0b9f7170457adc774693ab7d91a8a007b4e45",
+          "bytes": 290
+        },
+        "answers/prn-four-digits.json": {
+          "sha256": "cdb48dedae99bd0916ccb7ac1363f1f747cf0f911d007df99be8cc3328dad6db",
+          "bytes": 298
+        },
+        "answers/prn-fraction.json": {
+          "sha256": "fc40dba96ca21e1ecf7a0504af09a5ebb10c7aa6778c44358b706900170b387b",
+          "bytes": 293
+        },
+        "answers/prn-negative.json": {
+          "sha256": "99254220a833ce009bc4ff9ee91088bbbeff738736723226b5ce64037fddce22",
+          "bytes": 291
+        },
+        "answers/prn-zero.json": {
+          "sha256": "297a501a99f448864e7d770d264308892c525557e3fe04de4096e78b4d8f09a5",
+          "bytes": 285
+        },
+        "answers/proprietary.json": {
+          "sha256": "6cef49f68c7b8fa7af0400fccaed81f2d78e75ae0f5f0aef5ecfc56371cdbb0b",
+          "bytes": 292
+        },
+        "answers/reported-sentinels.json": {
+          "sha256": "4ec424bfd173561d3feb84ee7ec805e8b79150a48e8f8d4bff8029e2721d266e",
+          "bytes": 2135
+        },
+        "answers/short.json": {
+          "sha256": "a0519d4cde0f9875c2595dcd1bb098d756efa573a0fafb0fdb98237435fb15da",
+          "bytes": 216
+        },
+        "answers/sparse-slots.json": {
+          "sha256": "d4b40711416d33adc915b29ba700dee3699569b52997a73e7759fcb71abf4cd9",
+          "bytes": 1883
+        },
+        "answers/split-datagram.json": {
+          "sha256": "b9b2870cd07bdc94278a959ca28681f439f7eb7e995d4a04b39c96ee0c2b891a",
+          "bytes": 301
+        },
+        "answers/system-0.json": {
+          "sha256": "6bd37e3234f8c4808dcc8bb3ffe9187a199bfe846b415fce7ebb0c7154917ee4",
+          "bytes": 2167
+        },
+        "answers/system-1.json": {
+          "sha256": "d872bef52ef143eeb66ed70cf4e2ad57d1ae0cfc425a601dac199198936c4c5b",
+          "bytes": 2167
+        },
+        "answers/system-2.json": {
+          "sha256": "7313f2be83c7d14b834a1c83b41e542f3f41f8622cc16bf9fd4e14ce471ebb14",
+          "bytes": 2167
+        },
+        "answers/system-3.json": {
+          "sha256": "698db2c3500fac4f6806b0a3cc6264b6613f020e84c0b80581e1ed27265b56a7",
+          "bytes": 2167
+        },
+        "answers/system-4.json": {
+          "sha256": "1b990e7a45de3a4ab7807c509f366c4dbcb82eb323fbb9c150262d796be60f3e",
+          "bytes": 2167
+        },
+        "answers/system-5.json": {
+          "sha256": "db92a80521b4a3f7b8cab6cb3567ea7c2675955bfe90288f535ad4401087adf3",
+          "bytes": 2167
+        },
+        "answers/system-6.json": {
+          "sha256": "c7a5161a3121a16bec30653527c4d98408fa9a219aff801be803c8d9f2b1479a",
+          "bytes": 2167
+        },
+        "answers/tail-byte.json": {
+          "sha256": "03e259397022f980e17b50e63c64f6912c5e36e1531c73302f633bd709f34770",
+          "bytes": 290
+        },
+        "answers/talker-BD.json": {
+          "sha256": "4e1fd7d0ba3ac987bbf4a5fb9b30600688be08c58dfb32dda3cc6068722a1a44",
+          "bytes": 2114
+        },
+        "answers/talker-GA.json": {
+          "sha256": "ca9cf57d05e04d5f09e2fc07b570ec2a30e26fbf02812c858cf674cfc8e2f7e1",
+          "bytes": 2114
+        },
+        "answers/talker-GB.json": {
+          "sha256": "1770185ea3a02cac5334cfc738f7ddde0d95227174eb3d355d9ce768c1f472a8",
+          "bytes": 2114
+        },
+        "answers/talker-GI.json": {
+          "sha256": "b1338348638e5683b66b40b7fe1ff94e926d483625159175fe85e2c80c3f43ef",
+          "bytes": 2114
+        },
+        "answers/talker-GL.json": {
+          "sha256": "23d36f3bcf4ebf9b18697bfee282acc59b07088b4953521d24f3630844c2082e",
+          "bytes": 2114
+        },
+        "answers/talker-GQ.json": {
+          "sha256": "2b55d94f8ad6001e1605937aa03100fbd8cf30c8dd8136db402042a871040bd7",
+          "bytes": 2114
+        },
+        "answers/twelve-slots.json": {
+          "sha256": "b7424a2ed257a9d2e14978554482ecc785214a60f30f2cce21f1fd6905439bd4",
+          "bytes": 2248
+        },
+        "answers/two-system-observations.json": {
+          "sha256": "506c3f9b75495664db43d4bd18d8df3b9081d766dccabf1375a5ddd951352a47",
+          "bytes": 4684
+        },
+        "answers/vdop-inf.json": {
+          "sha256": "314bada2b92caf500e02292b80314b8cf191294aa56b8f0ded3e6c9ba134a465",
+          "bytes": 287
+        },
+        "answers/vendor-system-float.json": {
+          "sha256": "a641734e52e6abab2fc9f3684c0f5312650793f823e812b1212f25efd5074604",
+          "bytes": 308
+        },
+        "build.py": {
+          "sha256": "d000284365b3a2f327e5aaa746e509eab14e7c2fc08cd1b0b7bfc108eee2efff",
+          "bytes": 7422
+        },
+        "captures/bad-checksum.pcap": {
+          "sha256": "4418cabfcd4f815415601d6c339d6f4ea5d8ed6fbc0dcd56030a5b4a0e36efae",
+          "bytes": 135
+        },
+        "captures/bad-mode.pcap": {
+          "sha256": "ce547293079eaa4ebb13f57ddb049219ae1a0cc2abd8da33ddc77cdf16ad600f",
+          "bytes": 135
+        },
+        "captures/cut-crlf.pcap": {
+          "sha256": "6606dbd90769e51964865f39b607307bdf8e19170f227aedb58911f63fb7b46b",
+          "bytes": 134
+        },
+        "captures/dead-reckoning.pcap": {
+          "sha256": "55e9d9f9bfbdb7342a4e055bf9920378469431c33306f7878065ce4efa7ce672",
+          "bytes": 135
+        },
+        "captures/dop-leading-dot.pcap": {
+          "sha256": "ee56ba470f3c39711ff0d1270915e15bb82c64264f366ef1cbc375082b2a826e",
+          "bytes": 134
+        },
+        "captures/dop-plus.pcap": {
+          "sha256": "c873f1415dc03676229943be64976c41dfb6065c9b174b4a9982b315becf416b",
+          "bytes": 134
+        },
+        "captures/duplicate-slots.pcap": {
+          "sha256": "56e1dbafb6fbf4762b95d731599befa0339999500ac522f73a3b0cd9886ab0a7",
+          "bytes": 125
+        },
+        "captures/empty-system.pcap": {
+          "sha256": "c4b5d25fbb6810becb2c07e4f4fb0fe9326b084e4e572ce8070a4a09d41e387f",
+          "bytes": 136
+        },
+        "captures/extended-slots.pcap": {
+          "sha256": "9bef0d6c276b03a40b4c4bf831a51606a9faa7f0105ab8ff560aaa19342fee2f",
+          "bytes": 135
+        },
+        "captures/fix-empty.pcap": {
+          "sha256": "4a721d0aff6eec78c55b5b445c5eb8174fbb52df1bbd28c12ec180e1ae43b960",
+          "bytes": 134
+        },
+        "captures/fix-four.pcap": {
+          "sha256": "5d529376f9fc76c36076347e1511e03c61d46e2a00bd3e9f15fc45addf9a590f",
+          "bytes": 135
+        },
+        "captures/fix-leading-zero.pcap": {
+          "sha256": "8f1b5cc71bf7ec20707afb39ba299e1078f37d703fb5de4ccce83aa345a0451e",
+          "bytes": 136
+        },
+        "captures/fix-zero.pcap": {
+          "sha256": "cfcbab86aaf6d22602e4d31d384ba48593a6bf164b6a22dabc5e53929f530d69",
+          "bytes": 135
+        },
+        "captures/future-system.pcap": {
+          "sha256": "b36cd95374ea0597dfb71efec6072210bf317638544c55e5b12da1633c5db542",
+          "bytes": 137
+        },
+        "captures/hdop-nan.pcap": {
+          "sha256": "248a21e5392178a340553870bf034c61335b583aaaa3736b8fc40d4b43d7f6b4",
+          "bytes": 135
+        },
+        "captures/independent-datagrams.pcap": {
+          "sha256": "5232698e1776db8c511be34234a96800b77dd9fee9b46571ce42b69081d80d27",
+          "bytes": 250
+        },
+        "captures/late-bad-checksum.pcap": {
+          "sha256": "0979527e6f1e67490ac5f74672611dacf2948a3c213c843b01c819bed23aa699",
+          "bytes": 188
+        },
+        "captures/leading-zero-slots.pcap": {
+          "sha256": "c06f83a8f85a1d1eb806cca9af3ef2d40d004a490dd5409f5b2d1a76fb719ba3",
+          "bytes": 128
+        },
+        "captures/manual-2d.pcap": {
+          "sha256": "ebfc9a7fd8f4eefaa1241dace8df604e61a5f10d53d25a92fb1de963235a9e2e",
+          "bytes": 135
+        },
+        "captures/mode-empty.pcap": {
+          "sha256": "150cfff7ef00421bb054e81b68b2e485a5ac91723d3f4e95720520ad85c140a4",
+          "bytes": 134
+        },
+        "captures/multi-mode.pcap": {
+          "sha256": "aaa59f4ecb34509686497fec8ea2e2b3806f3db626792306a97a4a85098c502f",
+          "bytes": 136
+        },
+        "captures/no-fix.pcap": {
+          "sha256": "24aec18140341c9f040f3c4d8b281585d260c1643afcf89855637a93f362ee51",
+          "bytes": 112
+        },
+        "captures/official-mixed.pcap": {
+          "sha256": "876fe802d8dab98c2662b9de67565f14a9e2fc4e617d8eb587b357a51c31fa43",
+          "bytes": 135
+        },
+        "captures/overlong.pcap": {
+          "sha256": "1bc639db448c388f74480c4e6041c92c28a19aa8a795967a2900ba20d502039b",
+          "bytes": 198
+        },
+        "captures/pdop-exponent.pcap": {
+          "sha256": "3f394c42cc256c7f540f277a8de69e53f868f7cfd6186959620f014213a81bc5",
+          "bytes": 135
+        },
+        "captures/pdop-negative.pcap": {
+          "sha256": "48745962d79490f611839597d55630960d4db14e2e415d5237921c9646ba6c51",
+          "bytes": 134
+        },
+        "captures/prn-four-digits.pcap": {
+          "sha256": "5cdae0ba4fe3527f4424c3e5e7f510ac65f23261140e6631c11632c013180f03",
+          "bytes": 137
+        },
+        "captures/prn-fraction.pcap": {
+          "sha256": "7c33e5c5076c984380e410158daf36c15ed65d927b7b2b627abe75dfd5627078",
+          "bytes": 136
+        },
+        "captures/prn-negative.pcap": {
+          "sha256": "0fbff3feb90472a3138b2dd77ecf001a37ab068148237a71572e5cb75883c653",
+          "bytes": 135
+        },
+        "captures/prn-zero.pcap": {
+          "sha256": "8248034c3da395da7b9a5581a548dac2da00f99b531f40a1b6a27864232e6100",
+          "bytes": 134
+        },
+        "captures/proprietary.pcap": {
+          "sha256": "63317aaf81842de2b82ec61ce5cbe76558438c9cedbf14364e509f1d9ede7869",
+          "bytes": 135
+        },
+        "captures/reported-sentinels.pcap": {
+          "sha256": "d9f1131ba0b6c2eca9361959a59b59fcc2538c94d629c8162db135d60d5679be",
+          "bytes": 138
+        },
+        "captures/short.pcap": {
+          "sha256": "1ae51e9b425d8aae8f71b27c30db16ec184afb62e78e93f5fd1ee21e9d2be116",
+          "bytes": 101
+        },
+        "captures/sparse-slots.pcap": {
+          "sha256": "9b5f74b6c9ded536020837c06b8e613bca48ba75a9cb46c101de79731177d2e4",
+          "bytes": 123
+        },
+        "captures/split-datagram.pcap": {
+          "sha256": "97994723990bc423f8068844f26f3fdfb361fe5a330ec733cbfffb0a47b0754b",
+          "bytes": 193
+        },
+        "captures/system-0.pcap": {
+          "sha256": "e38082b48b3732d911d172f53ed9e5b1d465c7843fb2842a96a6a1106e4ea10b",
+          "bytes": 137
+        },
+        "captures/system-1.pcap": {
+          "sha256": "75a9636c5d137162db46897a7d1b8ce71141fc82b28bb2a5cf10156d468d5cde",
+          "bytes": 137
+        },
+        "captures/system-2.pcap": {
+          "sha256": "c7ac64019df33f5747d1beab4dd22204d78d99b6b4ea0c747bbc459eb287302a",
+          "bytes": 137
+        },
+        "captures/system-3.pcap": {
+          "sha256": "88434c84e97398bfb501bc6935271adf4949f9ffa0c9e722be444b35706df2fc",
+          "bytes": 137
+        },
+        "captures/system-4.pcap": {
+          "sha256": "5cf698eb302385966115a27dbbc015079293b8316bdf4e77a481224552483f57",
+          "bytes": 137
+        },
+        "captures/system-5.pcap": {
+          "sha256": "7062186d7deb57de1f39abb875bd06f49eb50181a762497d956409db4288179d",
+          "bytes": 137
+        },
+        "captures/system-6.pcap": {
+          "sha256": "a85c3ac4504b5e4cdfffb5e3df4c50e0f4439f380298990a49ddc50d7400269c",
+          "bytes": 137
+        },
+        "captures/tail-byte.pcap": {
+          "sha256": "43fbf6c2e3386dd0f7366bd9163e4bab42c4936ef1089605c05efb42665d28cb",
+          "bytes": 136
+        },
+        "captures/talker-BD.pcap": {
+          "sha256": "33f7a4d8d8fc6907b374e7cad7a7607a63ff54e8ae63000bc643cbd9b0825479",
+          "bytes": 135
+        },
+        "captures/talker-GA.pcap": {
+          "sha256": "b11c9825bd08988ad521a66fb5cd65e110f61a032c36fde4039c1599b1e0302a",
+          "bytes": 135
+        },
+        "captures/talker-GB.pcap": {
+          "sha256": "112cf65a004b68983beb8eecc5e7990271e01efbcbe111ea7edfe95f913fcc95",
+          "bytes": 135
+        },
+        "captures/talker-GI.pcap": {
+          "sha256": "3c007ef78e56a2d824de03194c0df192935f39fbc46b827818942f1e67f429dd",
+          "bytes": 135
+        },
+        "captures/talker-GL.pcap": {
+          "sha256": "312b2ff5c29d923a688101c92019334f33884f3f1e3f16debdfae1787ff994ea",
+          "bytes": 135
+        },
+        "captures/talker-GQ.pcap": {
+          "sha256": "05806ab85a146585cf766cef6bc82ae4514d7b4384b31ce0c66c8407e344356b",
+          "bytes": 135
+        },
+        "captures/twelve-slots.pcap": {
+          "sha256": "b66f2af6edffa6ffacce13a198dfb462d098b16b598dda9a1b3dad4ab5252cd4",
+          "bytes": 136
+        },
+        "captures/two-system-observations.pcap": {
+          "sha256": "8fd32f4631eecef92c80728ea7257feb6f744cba7b49812660a191b416b81d07",
+          "bytes": 192
+        },
+        "captures/vdop-inf.pcap": {
+          "sha256": "8f439d5ef5a58f70bff7527a27c752ec9e1e667595dc1e75469fceb0b0fbe864",
+          "bytes": 135
+        },
+        "captures/vendor-system-float.pcap": {
+          "sha256": "e470276b95cd8a3b190448e1b1831e10a63760505984d9e3e79bf765abd86714",
+          "bytes": 139
+        },
+        "controls.json": {
+          "sha256": "f43d63c78c8604e631e09d4d37ae6047146a1e2e92803836ecf3f72c311f7cd7",
+          "bytes": 17261
+        },
+        "gpsd-gsa-reference.jsonl": {
+          "sha256": "1deebc23d9f3d2dbc692ab2aa546e94e4a3b19ae4c9cf0e8f2e41000c0d4ffc7",
+          "bytes": 6569
+        },
+        "reproduce-reference.py": {
+          "sha256": "4a177e0fc36e3ce2f65e6801ddaf025dfc522f4b63a19bde4a0df4890efda3ff",
+          "bytes": 4170
+        },
+        "seal.py": {
+          "sha256": "89469106f950c1bf439a585ebf991837618179f5689049b90fa1f750cfe73dc2",
+          "bytes": 709
+        },
+        "source-pin.json": {
+          "sha256": "7cbcffa4278a54e339cebe7f35612bf289bdb08c87b1baf448e144da1018242f",
+          "bytes": 909
+        },
+        "validation/expected.json": {
+          "sha256": "11855f67d0b4f681947b12646917a085c5eefd02ea68f5bc5fafe2fc5c48ac5a",
+          "bytes": 56278
+        },
+        "validation/provenance.json": {
+          "sha256": "cecf15fde4868bcd0a22f50efeb2b1e53caafccbaeac2589e3aaaf15880ae649",
+          "bytes": 394
+        },
+        "verify.py": {
+          "sha256": "bb8105665538327c77a3de2052fd7fcb59aa08d12cdd810a998a8479bab6d402",
+          "bytes": 4034
+        }
+      },
+      "aliases": {
+        "common/pcapx/pcaputil/nmea-gsa/answers/bad-checksum.json": "answers/bad-checksum.json",
+        "common/pcapx/pcaputil/nmea-gsa/answers/bad-mode.json": "answers/bad-mode.json",
+        "common/pcapx/pcaputil/nmea-gsa/answers/cut-crlf.json": "answers/cut-crlf.json",
+        "common/pcapx/pcaputil/nmea-gsa/answers/dead-reckoning.json": "answers/dead-reckoning.json",
+        "common/pcapx/pcaputil/nmea-gsa/answers/dop-leading-dot.json": "answers/dop-leading-dot.json",
+        "common/pcapx/pcaputil/nmea-gsa/answers/dop-plus.json": "answers/dop-plus.json",
+        "common/pcapx/pcaputil/nmea-gsa/answers/duplicate-slots.json": "answers/duplicate-slots.json",
+        "common/pcapx/pcaputil/nmea-gsa/answers/empty-system.json": "answers/empty-system.json",
+        "common/pcapx/pcaputil/nmea-gsa/answers/extended-slots.json": "answers/extended-slots.json",
+        "common/pcapx/pcaputil/nmea-gsa/answers/fix-empty.json": "answers/fix-empty.json",
+        "common/pcapx/pcaputil/nmea-gsa/answers/fix-four.json": "answers/fix-four.json",
+        "common/pcapx/pcaputil/nmea-gsa/answers/fix-leading-zero.json": "answers/fix-leading-zero.json",
+        "common/pcapx/pcaputil/nmea-gsa/answers/fix-zero.json": "answers/fix-zero.json",
+        "common/pcapx/pcaputil/nmea-gsa/answers/future-system.json": "answers/future-system.json",
+        "common/pcapx/pcaputil/nmea-gsa/answers/hdop-nan.json": "answers/hdop-nan.json",
+        "common/pcapx/pcaputil/nmea-gsa/answers/independent-datagrams.json": "answers/independent-datagrams.json",
+        "common/pcapx/pcaputil/nmea-gsa/answers/late-bad-checksum.json": "answers/late-bad-checksum.json",
+        "common/pcapx/pcaputil/nmea-gsa/answers/leading-zero-slots.json": "answers/leading-zero-slots.json",
+        "common/pcapx/pcaputil/nmea-gsa/answers/manual-2d.json": "answers/manual-2d.json",
+        "common/pcapx/pcaputil/nmea-gsa/answers/mode-empty.json": "answers/mode-empty.json",
+        "common/pcapx/pcaputil/nmea-gsa/answers/multi-mode.json": "answers/multi-mode.json",
+        "common/pcapx/pcaputil/nmea-gsa/answers/no-fix.json": "answers/no-fix.json",
+        "common/pcapx/pcaputil/nmea-gsa/answers/official-mixed.json": "answers/official-mixed.json",
+        "common/pcapx/pcaputil/nmea-gsa/answers/overlong.json": "answers/overlong.json",
+        "common/pcapx/pcaputil/nmea-gsa/answers/pdop-exponent.json": "answers/pdop-exponent.json",
+        "common/pcapx/pcaputil/nmea-gsa/answers/pdop-negative.json": "answers/pdop-negative.json",
+        "common/pcapx/pcaputil/nmea-gsa/answers/prn-four-digits.json": "answers/prn-four-digits.json",
+        "common/pcapx/pcaputil/nmea-gsa/answers/prn-fraction.json": "answers/prn-fraction.json",
+        "common/pcapx/pcaputil/nmea-gsa/answers/prn-negative.json": "answers/prn-negative.json",
+        "common/pcapx/pcaputil/nmea-gsa/answers/prn-zero.json": "answers/prn-zero.json",
+        "common/pcapx/pcaputil/nmea-gsa/answers/proprietary.json": "answers/proprietary.json",
+        "common/pcapx/pcaputil/nmea-gsa/answers/reported-sentinels.json": "answers/reported-sentinels.json",
+        "common/pcapx/pcaputil/nmea-gsa/answers/short.json": "answers/short.json",
+        "common/pcapx/pcaputil/nmea-gsa/answers/sparse-slots.json": "answers/sparse-slots.json",
+        "common/pcapx/pcaputil/nmea-gsa/answers/split-datagram.json": "answers/split-datagram.json",
+        "common/pcapx/pcaputil/nmea-gsa/answers/system-0.json": "answers/system-0.json",
+        "common/pcapx/pcaputil/nmea-gsa/answers/system-1.json": "answers/system-1.json",
+        "common/pcapx/pcaputil/nmea-gsa/answers/system-2.json": "answers/system-2.json",
+        "common/pcapx/pcaputil/nmea-gsa/answers/system-3.json": "answers/system-3.json",
+        "common/pcapx/pcaputil/nmea-gsa/answers/system-4.json": "answers/system-4.json",
+        "common/pcapx/pcaputil/nmea-gsa/answers/system-5.json": "answers/system-5.json",
+        "common/pcapx/pcaputil/nmea-gsa/answers/system-6.json": "answers/system-6.json",
+        "common/pcapx/pcaputil/nmea-gsa/answers/tail-byte.json": "answers/tail-byte.json",
+        "common/pcapx/pcaputil/nmea-gsa/answers/talker-BD.json": "answers/talker-BD.json",
+        "common/pcapx/pcaputil/nmea-gsa/answers/talker-GA.json": "answers/talker-GA.json",
+        "common/pcapx/pcaputil/nmea-gsa/answers/talker-GB.json": "answers/talker-GB.json",
+        "common/pcapx/pcaputil/nmea-gsa/answers/talker-GI.json": "answers/talker-GI.json",
+        "common/pcapx/pcaputil/nmea-gsa/answers/talker-GL.json": "answers/talker-GL.json",
+        "common/pcapx/pcaputil/nmea-gsa/answers/talker-GQ.json": "answers/talker-GQ.json",
+        "common/pcapx/pcaputil/nmea-gsa/answers/twelve-slots.json": "answers/twelve-slots.json",
+        "common/pcapx/pcaputil/nmea-gsa/answers/two-system-observations.json": "answers/two-system-observations.json",
+        "common/pcapx/pcaputil/nmea-gsa/answers/vdop-inf.json": "answers/vdop-inf.json",
+        "common/pcapx/pcaputil/nmea-gsa/answers/vendor-system-float.json": "answers/vendor-system-float.json",
+        "common/pcapx/pcaputil/nmea-gsa/build.py": "build.py",
+        "common/pcapx/pcaputil/nmea-gsa/captures/bad-checksum.pcap": "captures/bad-checksum.pcap",
+        "common/pcapx/pcaputil/nmea-gsa/captures/bad-mode.pcap": "captures/bad-mode.pcap",
+        "common/pcapx/pcaputil/nmea-gsa/captures/cut-crlf.pcap": "captures/cut-crlf.pcap",
+        "common/pcapx/pcaputil/nmea-gsa/captures/dead-reckoning.pcap": "captures/dead-reckoning.pcap",
+        "common/pcapx/pcaputil/nmea-gsa/captures/dop-leading-dot.pcap": "captures/dop-leading-dot.pcap",
+        "common/pcapx/pcaputil/nmea-gsa/captures/dop-plus.pcap": "captures/dop-plus.pcap",
+        "common/pcapx/pcaputil/nmea-gsa/captures/duplicate-slots.pcap": "captures/duplicate-slots.pcap",
+        "common/pcapx/pcaputil/nmea-gsa/captures/empty-system.pcap": "captures/empty-system.pcap",
+        "common/pcapx/pcaputil/nmea-gsa/captures/extended-slots.pcap": "captures/extended-slots.pcap",
+        "common/pcapx/pcaputil/nmea-gsa/captures/fix-empty.pcap": "captures/fix-empty.pcap",
+        "common/pcapx/pcaputil/nmea-gsa/captures/fix-four.pcap": "captures/fix-four.pcap",
+        "common/pcapx/pcaputil/nmea-gsa/captures/fix-leading-zero.pcap": "captures/fix-leading-zero.pcap",
+        "common/pcapx/pcaputil/nmea-gsa/captures/fix-zero.pcap": "captures/fix-zero.pcap",
+        "common/pcapx/pcaputil/nmea-gsa/captures/future-system.pcap": "captures/future-system.pcap",
+        "common/pcapx/pcaputil/nmea-gsa/captures/hdop-nan.pcap": "captures/hdop-nan.pcap",
+        "common/pcapx/pcaputil/nmea-gsa/captures/independent-datagrams.pcap": "captures/independent-datagrams.pcap",
+        "common/pcapx/pcaputil/nmea-gsa/captures/late-bad-checksum.pcap": "captures/late-bad-checksum.pcap",
+        "common/pcapx/pcaputil/nmea-gsa/captures/leading-zero-slots.pcap": "captures/leading-zero-slots.pcap",
+        "common/pcapx/pcaputil/nmea-gsa/captures/manual-2d.pcap": "captures/manual-2d.pcap",
+        "common/pcapx/pcaputil/nmea-gsa/captures/mode-empty.pcap": "captures/mode-empty.pcap",
+        "common/pcapx/pcaputil/nmea-gsa/captures/multi-mode.pcap": "captures/multi-mode.pcap",
+        "common/pcapx/pcaputil/nmea-gsa/captures/no-fix.pcap": "captures/no-fix.pcap",
+        "common/pcapx/pcaputil/nmea-gsa/captures/official-mixed.pcap": "captures/official-mixed.pcap",
+        "common/pcapx/pcaputil/nmea-gsa/captures/overlong.pcap": "captures/overlong.pcap",
+        "common/pcapx/pcaputil/nmea-gsa/captures/pdop-exponent.pcap": "captures/pdop-exponent.pcap",
+        "common/pcapx/pcaputil/nmea-gsa/captures/pdop-negative.pcap": "captures/pdop-negative.pcap",
+        "common/pcapx/pcaputil/nmea-gsa/captures/prn-four-digits.pcap": "captures/prn-four-digits.pcap",
+        "common/pcapx/pcaputil/nmea-gsa/captures/prn-fraction.pcap": "captures/prn-fraction.pcap",
+        "common/pcapx/pcaputil/nmea-gsa/captures/prn-negative.pcap": "captures/prn-negative.pcap",
+        "common/pcapx/pcaputil/nmea-gsa/captures/prn-zero.pcap": "captures/prn-zero.pcap",
+        "common/pcapx/pcaputil/nmea-gsa/captures/proprietary.pcap": "captures/proprietary.pcap",
+        "common/pcapx/pcaputil/nmea-gsa/captures/reported-sentinels.pcap": "captures/reported-sentinels.pcap",
+        "common/pcapx/pcaputil/nmea-gsa/captures/short.pcap": "captures/short.pcap",
+        "common/pcapx/pcaputil/nmea-gsa/captures/sparse-slots.pcap": "captures/sparse-slots.pcap",
+        "common/pcapx/pcaputil/nmea-gsa/captures/split-datagram.pcap": "captures/split-datagram.pcap",
+        "common/pcapx/pcaputil/nmea-gsa/captures/system-0.pcap": "captures/system-0.pcap",
+        "common/pcapx/pcaputil/nmea-gsa/captures/system-1.pcap": "captures/system-1.pcap",
+        "common/pcapx/pcaputil/nmea-gsa/captures/system-2.pcap": "captures/system-2.pcap",
+        "common/pcapx/pcaputil/nmea-gsa/captures/system-3.pcap": "captures/system-3.pcap",
+        "common/pcapx/pcaputil/nmea-gsa/captures/system-4.pcap": "captures/system-4.pcap",
+        "common/pcapx/pcaputil/nmea-gsa/captures/system-5.pcap": "captures/system-5.pcap",
+        "common/pcapx/pcaputil/nmea-gsa/captures/system-6.pcap": "captures/system-6.pcap",
+        "common/pcapx/pcaputil/nmea-gsa/captures/tail-byte.pcap": "captures/tail-byte.pcap",
+        "common/pcapx/pcaputil/nmea-gsa/captures/talker-BD.pcap": "captures/talker-BD.pcap",
+        "common/pcapx/pcaputil/nmea-gsa/captures/talker-GA.pcap": "captures/talker-GA.pcap",
+        "common/pcapx/pcaputil/nmea-gsa/captures/talker-GB.pcap": "captures/talker-GB.pcap",
+        "common/pcapx/pcaputil/nmea-gsa/captures/talker-GI.pcap": "captures/talker-GI.pcap",
+        "common/pcapx/pcaputil/nmea-gsa/captures/talker-GL.pcap": "captures/talker-GL.pcap",
+        "common/pcapx/pcaputil/nmea-gsa/captures/talker-GQ.pcap": "captures/talker-GQ.pcap",
+        "common/pcapx/pcaputil/nmea-gsa/captures/twelve-slots.pcap": "captures/twelve-slots.pcap",
+        "common/pcapx/pcaputil/nmea-gsa/captures/two-system-observations.pcap": "captures/two-system-observations.pcap",
+        "common/pcapx/pcaputil/nmea-gsa/captures/vdop-inf.pcap": "captures/vdop-inf.pcap",
+        "common/pcapx/pcaputil/nmea-gsa/captures/vendor-system-float.pcap": "captures/vendor-system-float.pcap",
+        "common/pcapx/pcaputil/nmea-gsa/controls.json": "controls.json",
+        "common/pcapx/pcaputil/nmea-gsa/gpsd-gsa-reference.jsonl": "gpsd-gsa-reference.jsonl",
+        "common/pcapx/pcaputil/nmea-gsa/reproduce-reference.py": "reproduce-reference.py",
+        "common/pcapx/pcaputil/nmea-gsa/seal.py": "seal.py",
+        "common/pcapx/pcaputil/nmea-gsa/source-pin.json": "source-pin.json",
+        "common/pcapx/pcaputil/nmea-gsa/validation/expected.json": "validation/expected.json",
+        "common/pcapx/pcaputil/nmea-gsa/validation/provenance.json": "validation/provenance.json",
+        "common/pcapx/pcaputil/nmea-gsa/verify.py": "verify.py"
+      }
     }
   ],
   "schema_version": 1,

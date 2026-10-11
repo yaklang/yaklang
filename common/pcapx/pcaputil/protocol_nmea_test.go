@@ -107,6 +107,7 @@ func TestNMEAEmptyOptionalMode(t *testing.T) {
 
 func TestNMEAMultipleSentencesBudgetAndOwnership(t *testing.T) {
 	t.Run("vtg-profile", testNMEAVTGSealedReplay)
+	t.Run("gsa-profile", testNMEAGSASealedReplay)
 	w := append(nmeaTestSentence(nmeaTestGGA), nmeaTestSentence(nmeaTestRMC)...)
 	fields, err := decodeNMEADatagram(w, 2)
 	require.NoError(t, err)

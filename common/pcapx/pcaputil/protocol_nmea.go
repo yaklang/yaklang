@@ -8,7 +8,7 @@ import (
 	"strings"
 )
 
-// GGA, RMC and unit-labelled VTG are observed navigation statements. Checksums validate their
+// GGA, RMC, unit-labelled VTG and fixed-slot GSA are observed navigation statements. Checksums validate their
 // wire representation, not the sender's identity or the accuracy of a fix.
 // AIS, proprietary sentences, tag blocks and other sentence types are outside
 // this profile. A datagram must contain complete independent CRLF sentences.
@@ -84,8 +84,10 @@ func decodeNMEADatagramBudget(w []byte, maxElements, maxDepth int) (map[string]a
 			err = nmeaRMC(parts, fields)
 		case "VTG":
 			err = nmeaVTG(parts, fields)
+		case "GSA":
+			err = nmeaGSA(parts, fields)
 		default:
-			err = protocolError(ErrUnsupportedFeature, "NMEA sentence type is outside GGA/RMC/VTG profile")
+			err = protocolError(ErrUnsupportedFeature, "NMEA sentence type is outside GGA/RMC/VTG/GSA profile")
 		}
 		if err != nil {
 			return nil, err
@@ -97,6 +99,72 @@ func decodeNMEADatagramBudget(w []byte, maxElements, maxDepth int) (map[string]a
 		return messages[0], nil
 	}
 	return map[string]any{"Packet Name": "NMEA 0183 sentences", "Message Count": len(messages), "Messages": messages, "Context Level": "observed"}, nil
+}
+
+// GSA observes exactly twelve PRN slots, preserving their spelling, order and
+// duplicates. The count is populated slots, not distinct satellites or a
+// verified fix. System ID is literal: Trimble's QZSS value0 differs from the
+// common value5, and talkers/PRNs alone cannot establish receiver context.
+// Reported DOP sentinels remain values, without promoting them to valid quality.
+func nmeaGSA(p []string, out map[string]any) error {
+	if len(p) < 18 {
+		return protocolError(ErrMalformedMessage, "NMEA GSA fields are truncated")
+	}
+	if len(p) != 18 && len(p) != 19 {
+		return protocolError(ErrUnsupportedFeature, "NMEA GSA requires twelve PRN slots with optional System ID")
+	}
+	if p[1] != "A" && p[1] != "M" {
+		return protocolError(ErrMalformedMessage, "NMEA GSA selection mode must be A or M")
+	}
+	if p[2] == "E" {
+		return protocolError(ErrUnsupportedFeature, "NMEA GSA vendor dead-reckoning fix is unsupported")
+	}
+	if p[2] != "1" && p[2] != "2" && p[2] != "3" {
+		return protocolError(ErrMalformedMessage, "NMEA GSA reported fix type must be 1, 2 or 3")
+	}
+	out["Selection Mode"], out["Reported Fix Type"] = p[1], int(p[2][0]-'0')
+	populated := 0
+	for i := 0; i < 12; i++ {
+		key, value := fmt.Sprintf("Satellite Slot %d PRN", i+1), p[i+3]
+		out[key+" Present"], out[key+" Wire"] = value != "", value
+		if value == "" {
+			continue
+		}
+		n, err := nmeaInteger(value, 999)
+		if err != nil || len(value) > 3 || n == 0 {
+			return protocolError(ErrMalformedMessage, "NMEA GSA PRN slot must be an unsigned one-to-three-digit nonzero value")
+		}
+		out[key] = n
+		populated++
+	}
+	out["Reported Satellite Slots"] = populated
+	for _, field := range []struct {
+		index int
+		key   string
+	}{{15, "PDOP"}, {16, "HDOP"}, {17, "VDOP"}} {
+		value := p[field.index]
+		out[field.key+" Present"], out[field.key+" Wire"] = value != "", value
+		if value == "" {
+			continue
+		}
+		x, err := nmeaNumber(value, false)
+		if err != nil {
+			return protocolError(ErrMalformedMessage, "NMEA GSA %s must be a finite unsigned decimal", field.key)
+		}
+		out[field.key] = x
+	}
+	out["System ID Present"] = len(p) == 19
+	if len(p) == 19 {
+		value := p[18]
+		out["System ID Wire"] = value
+		if value != "" {
+			if len(value) != 1 || value[0] < '0' || value[0] > '6' {
+				return protocolError(ErrUnsupportedFeature, "NMEA GSA System ID is outside selected literal0..6 profile")
+			}
+			out["System ID"] = int(value[0] - '0')
+		}
+	}
+	return nil
 }
 
 // VTG's unit-labelled form has eight fields, optionally followed by the FAA

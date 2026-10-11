@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -15,47 +16,47 @@ import (
 	"github.com/yaklang/yaklang/internal/trafficfixture"
 )
 
-type nmeaVTGControl struct {
+type nmeaNavigationControl struct {
 	ID, Capture, Answer, SHA256 string
 	AnswerSHA                   string `json:"answer_sha256"`
 	Packets                     int
 }
-type nmeaVTGAnswer struct {
+type nmeaNavigationAnswer struct {
 	Fields    []map[string]any
 	PureError string   `json:"pure_error"`
 	Wire      []string `json:"wire_hex"`
 }
 
-func testNMEAVTGSealedReplay(t *testing.T) {
-	b, err := trafficfixture.ReadFile("nmea-vtg/controls.json")
+func testNMEANavigationSealedReplay(t *testing.T, root, schema string, count int) {
+	b, err := trafficfixture.ReadFile(root + "/controls.json")
 	require.NoError(t, err)
 	var m struct {
 		Schema string
-		Cases  []nmeaVTGControl
+		Cases  []nmeaNavigationControl
 	}
 	require.NoError(t, json.Unmarshal(b, &m))
-	require.Equal(t, "nmea-vtg-units/v1", m.Schema)
-	require.Len(t, m.Cases, 51)
+	require.Equal(t, schema, m.Schema)
+	require.Len(t, m.Cases, count)
 	all, err := trafficfixture.AllExpectations()
 	require.NoError(t, err)
 	facts := map[string]trafficfixture.FrozenCase{}
 	for _, batch := range all {
 		for _, c := range batch.Cases {
-			if len(c.ID) > 9 && c.ID[:9] == "nmea-vtg/" {
+			if strings.HasPrefix(c.ID, root+"/") {
 				facts[c.ID] = c
 			}
 		}
 	}
-	require.Len(t, facts, 51)
+	require.Len(t, facts, count)
 	for _, c := range m.Cases {
 		t.Run(c.ID, func(t *testing.T) {
-			raw, err := trafficfixture.ReadFile("nmea-vtg/" + c.Capture)
+			raw, err := trafficfixture.ReadFile(root + "/" + c.Capture)
 			require.NoError(t, err)
 			require.Equal(t, c.SHA256, fmt.Sprintf("%x", sha256.Sum256(raw)))
-			b, err := trafficfixture.ReadFile("nmea-vtg/" + c.Answer)
+			b, err := trafficfixture.ReadFile(root + "/" + c.Answer)
 			require.NoError(t, err)
 			require.Equal(t, c.AnswerSHA, fmt.Sprintf("%x", sha256.Sum256(b)))
-			fact, ok := facts["nmea-vtg/"+c.ID]
+			fact, ok := facts[root+"/"+c.ID]
 			require.True(t, ok)
 			require.Equal(t, c.Capture, fact.Input.File)
 			require.Equal(t, c.SHA256, fact.Input.SHA256)
@@ -69,7 +70,7 @@ func testNMEAVTGSealedReplay(t *testing.T) {
 			require.NoError(t, json.Unmarshal(fact.Expectations[0].PayloadConstraints, &binding))
 			require.Equal(t, c.Answer, binding.File)
 			require.Equal(t, c.AnswerSHA, binding.SHA)
-			var a nmeaVTGAnswer
+			var a nmeaNavigationAnswer
 			require.NoError(t, json.Unmarshal(b, &a))
 			for i, s := range a.Wire {
 				w, err := hex.DecodeString(s)
@@ -138,9 +139,13 @@ func testNMEAVTGSealedReplay(t *testing.T) {
 			}
 		})
 	}
+}
+
+func testNMEAVTGSealedReplay(t *testing.T) {
+	testNMEANavigationSealedReplay(t, "nmea-vtg", "nmea-vtg-units/v1", 51)
 	// The complete historical GGA answer supplies the old depth regression,
 	// avoiding a baseline that fails solely because VTG was not implemented.
-	b, err = trafficfixture.ReadFile("incremental-mvp/nmea/controls.json")
+	b, err := trafficfixture.ReadFile("incremental-mvp/nmea/controls.json")
 	require.NoError(t, err)
 	var historical struct {
 		Cases []struct {

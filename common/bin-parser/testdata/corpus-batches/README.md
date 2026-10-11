@@ -392,3 +392,15 @@ input/answer; no historical ZIP is rewritten. Primary receiver grammar and
 pinned GPSD3.25 `processVTG` source-function execution are distinct from real
 receiver validation. Authored captures, answers and required generation,
 reference-build, byte-verification and seal scripts reside in the small ZIP.
+
+The `nmea-gsa/controls.json` entry adds twelve-slot GSA observations with literal
+manual/automatic selection, reported fix type, ordered PRN spelling/presence,
+DOP spelling/presence and optional System ID0..6. Duplicate slots stay duplicate;
+blank fields do not become zero and sentinel DOP is not validated quality.
+`TestNMEAMultipleSentencesBudgetAndOwnership/gsa-profile` checks53 independent
+answers in full/deferred, workers1/2/4 and observer off/on configurations, plus
+collection/depth refusal, recovery and Close. `nmea-gsa/source-pin.json` fixes the
+primary/reference versions; the shipped reference runner takes the fixed GPSD
+source path as its argument and executes mode/DOP assignment only. It does not
+supply constellation mapping, receiver context, vendor extensions, GSV/AIS or
+physical position verification.
