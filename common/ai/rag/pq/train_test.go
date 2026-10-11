@@ -172,18 +172,29 @@ func TestKMeans(t *testing.T) {
 		{5.0, 5.0}, {5.1, 5.1}, {5.0, 5.1}, {5.1, 5.0}, // 聚类2
 	}
 
+	// Random initialization can converge to a local optimum on this symmetric
+	// fixture. Use a known seed for the expected-center regression, independent
+	// of random draws made by earlier tests.
+	const seed int64 = 42
+	rand.Seed(seed)
 	centroids, err := kMeans(data, 2, 50, 1e-6)
 	if err != nil {
-		t.Fatalf("K-Means failed: %v", err)
+		t.Fatalf("K-Means failed (seed=%d): %v", seed, err)
 	}
 
+	assertKMeansClusterCenters(t, centroids, seed)
+}
+
+func assertKMeansClusterCenters(t *testing.T, centroids [][]float64, seed int64) {
+	t.Helper()
+
 	if len(centroids) != 2 {
-		t.Errorf("Expected 2 centroids, got %d", len(centroids))
+		t.Fatalf("Expected 2 centroids, got %d (seed=%d): %v", len(centroids), seed, centroids)
 	}
 
 	for _, centroid := range centroids {
 		if len(centroid) != 2 {
-			t.Errorf("Expected 2D centroid, got %dD", len(centroid))
+			t.Fatalf("Expected 2D centroid, got %dD (seed=%d): %v", len(centroid), seed, centroids)
 		}
 	}
 
@@ -195,16 +206,16 @@ func TestKMeans(t *testing.T) {
 		dist1 := math.Sqrt(math.Pow(centroid[0]-0.05, 2) + math.Pow(centroid[1]-0.05, 2))
 		dist2 := math.Sqrt(math.Pow(centroid[0]-5.05, 2) + math.Pow(centroid[1]-5.05, 2))
 
-		if dist1 < 0.5 {
+		if dist1 < 1e-9 {
 			center1Found = true
 		}
-		if dist2 < 0.5 {
+		if dist2 < 1e-9 {
 			center2Found = true
 		}
 	}
 
 	if !center1Found || !center2Found {
-		t.Errorf("K-Means did not find expected cluster centers")
+		t.Errorf("K-Means did not find expected cluster centers [0.05, 0.05] and [5.05, 5.05] (seed=%d): %v", seed, centroids)
 	}
 }
 
