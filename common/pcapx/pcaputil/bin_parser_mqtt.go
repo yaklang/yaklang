@@ -6,11 +6,14 @@ import (
 )
 
 type binMQTT struct {
-	client   int
-	level    byte
-	pending  [2]map[uint16]string
-	aliases  [2]map[uint16]string
-	aliasMax [2]uint16
+	client int
+	level  byte
+	// Indexed by the endpoint that allocated the identifier, not by the
+	// direction of the next ACK: PUBREL travels in the original direction.
+	pending    [2]map[uint16]string
+	aliases    [2]map[uint16]string
+	aliasMax   [2]uint16
+	aliasBytes int64
 }
 
 func probeMQTT(w []byte, limit int) ProbeResult {
@@ -49,7 +52,7 @@ func (f *binFlow) frameMQTT(w []byte) (int, *binSpec, error) {
 	if f.mqtt == nil {
 		return 0, nil, sessionContext("MQTT session was not observed")
 	}
-	if err := f.reserveSession(256 + int64(len(f.mqtt.pending[0])+len(f.mqtt.pending[1]))*16); err != nil {
+	if err := f.reserveSession(f.mqtt.retainedBytes()); err != nil {
 		return 0, nil, err
 	}
 	n, _, err := mqttLength(w)
@@ -74,7 +77,24 @@ func (f *binFlow) frameMQTT(w []byte) (int, *binSpec, error) {
 	return n, f.spec("mqtt_fields", entry), nil
 }
 
-func (m *binMQTT) consume(dir int, raw []byte, result map[string]any) (map[string]any, error) {
+func (m *binMQTT) retainedBytes() int64 {
+	return 256 + 96*int64(len(m.pending[0])+len(m.pending[1])+len(m.aliases[0])+len(m.aliases[1])) + m.aliasBytes
+}
+
+// Reserve both possible insertions before changing either dictionary. Topic
+// strings are connection state, not merely spans in the current packet.
+func (m *binMQTT) reserveInsert(pendingNew, aliasNew int, aliasBytes int64, maxElements int, reserve func(int64) error) error {
+	limit := sessionCollectionLimit(maxElements)
+	if len(m.pending[0])+len(m.pending[1])+pendingNew > limit {
+		return protocolError(ErrResourceExceeded, "MQTT pending packet identifiers")
+	}
+	if len(m.aliases[0])+len(m.aliases[1])+aliasNew > limit {
+		return protocolError(ErrResourceExceeded, "MQTT topic aliases")
+	}
+	return reserve(m.retainedBytes() + 96*int64(pendingNew+aliasNew) + aliasBytes)
+}
+
+func (m *binMQTT) consume(dir int, raw []byte, result map[string]any, maxElements int, reserve func(int64) error) (map[string]any, error) {
 	if len(raw) < 2 {
 		return nil, fmt.Errorf("mqtt: truncated packet")
 	}
@@ -132,21 +152,35 @@ func (m *binMQTT) consume(dir int, raw []byte, result map[string]any) (map[strin
 		if err != nil {
 			return nil, err
 		}
+		pendingNew, aliasNew := 0, 0
+		aliasDelta := int64(0)
+		storeAlias := alias != 0 && topic != ""
+		if qos > 0 && m.pending[dir][pid] == "" {
+			pendingNew = 1
+		}
 		if alias != 0 {
 			if m.aliasMax[dir] == 0 || alias > m.aliasMax[dir] {
 				return nil, fmt.Errorf("mqtt: Topic Alias %d exceeds maximum %d", alias, m.aliasMax[dir])
 			}
 			if topic != "" {
-				if m.aliases[dir] == nil {
-					m.aliases[dir] = map[uint16]string{}
+				old, present := m.aliases[dir][alias]
+				if !present {
+					aliasNew = 1
 				}
-				m.aliases[dir][alias] = topic
+				aliasDelta = int64(len(topic) - len(old))
 			} else if name, ok := m.aliases[dir][alias]; ok {
 				topic = name
 			} else {
 				return nil, fmt.Errorf("mqtt: unknown Topic Alias %d", alias)
 			}
 			info["Topic Alias"] = uint64(alias)
+		}
+		if err := m.reserveInsert(pendingNew, aliasNew, aliasDelta, maxElements, reserve); err != nil {
+			return nil, err
+		}
+		if storeAlias {
+			m.aliases[dir][alias] = topic
+			m.aliasBytes += aliasDelta
 		}
 		info["Topic Name"] = topic
 		if qos > 0 {
@@ -155,7 +189,7 @@ func (m *binMQTT) consume(dir int, raw []byte, result map[string]any) (map[strin
 			if qos == 2 {
 				next = "PUBREC"
 			}
-			m.pending[1-dir][pid] = next
+			m.pending[dir][pid] = next
 			info["Outstanding"] = next
 		}
 	case 4, 5, 6, 7, 9, 11:
@@ -165,16 +199,20 @@ func (m *binMQTT) consume(dir int, raw []byte, result map[string]any) (map[strin
 		pid := binary.BigEndian.Uint16(body[:2])
 		info["Packet Identifier"] = uint64(pid)
 		want := mqttSessionName(typ)
-		if got := m.pending[dir][pid]; got != "" && got != want {
+		owner := 1 - dir
+		if typ == 6 {
+			owner = dir
+		}
+		if got := m.pending[owner][pid]; got != "" && got != want {
 			return nil, fmt.Errorf("mqtt: packet identifier %d expected %s, got %s", pid, got, want)
 		}
-		if got := m.pending[dir][pid]; got == want {
-			delete(m.pending[dir], pid)
+		if got := m.pending[owner][pid]; got == want {
+			delete(m.pending[owner], pid)
 			info["Matched Request"] = true
-			if typ == 5 {
-				m.pending[1-dir][pid] = "PUBREL"
+			if typ == 5 && (len(body) <= 2 || body[2] < 0x80) {
+				m.pending[owner][pid] = "PUBREL"
 			} else if typ == 6 {
-				m.pending[1-dir][pid] = "PUBCOMP"
+				m.pending[owner][pid] = "PUBCOMP"
 			}
 		}
 		if len(body) > 2 {
@@ -186,10 +224,17 @@ func (m *binMQTT) consume(dir int, raw []byte, result map[string]any) (map[strin
 		}
 		pid := binary.BigEndian.Uint16(body[:2])
 		info["Packet Identifier"] = uint64(pid)
+		pendingNew := 0
+		if m.pending[dir][pid] == "" {
+			pendingNew = 1
+		}
+		if err := m.reserveInsert(pendingNew, 0, 0, maxElements, reserve); err != nil {
+			return nil, err
+		}
 		if typ == 8 {
-			m.pending[1-dir][pid] = "SUBACK"
+			m.pending[dir][pid] = "SUBACK"
 		} else {
-			m.pending[1-dir][pid] = "UNSUBACK"
+			m.pending[dir][pid] = "UNSUBACK"
 		}
 	}
 	return info, nil

@@ -45169,6 +45169,157 @@
           "sha256": "2a7ca8eeb9e8362ee004027e70b470e5fedc2481592de1cde370e5d0c3f47f98"
         }
       }
+    },
+    {
+      "file": "validation-mqtt-retained-context.zip",
+      "id": "mqtt-retained-context-279545c0ac57",
+      "kind": "session-controls",
+      "password": "bin-parser",
+      "source_sha": "279545c0ac570476a45dd8119aac6513bd4099ff",
+      "sha256": "47c57d0249929b1413a0178c4daeddf4caa1fc37ba30317459e26985afde5c31",
+      "aliases": {
+        "common/pcapx/pcaputil/testdata/mqtt-owned-context/answers.json": "answers.json",
+        "common/pcapx/pcaputil/testdata/mqtt-owned-context/generate.py": "generate.py",
+        "common/pcapx/pcaputil/testdata/mqtt-owned-context/make-answers.py": "make-answers.py",
+        "common/pcapx/pcaputil/testdata/mqtt-owned-context/verify.py": "verify.py",
+        "common/pcapx/pcaputil/testdata/mqtt-owned-context/records/alias1.bin": "records/alias1.bin",
+        "common/pcapx/pcaputil/testdata/mqtt-owned-context/records/alias2.bin": "records/alias2.bin",
+        "common/pcapx/pcaputil/testdata/mqtt-owned-context/records/alias3.bin": "records/alias3.bin",
+        "common/pcapx/pcaputil/testdata/mqtt-owned-context/records/client-qos2.bin": "records/client-qos2.bin",
+        "common/pcapx/pcaputil/testdata/mqtt-owned-context/records/connack0.bin": "records/connack0.bin",
+        "common/pcapx/pcaputil/testdata/mqtt-owned-context/records/connack1.bin": "records/connack1.bin",
+        "common/pcapx/pcaputil/testdata/mqtt-owned-context/records/connack3.bin": "records/connack3.bin",
+        "common/pcapx/pcaputil/testdata/mqtt-owned-context/records/connect.bin": "records/connect.bin",
+        "common/pcapx/pcaputil/testdata/mqtt-owned-context/records/owned-publish.bin": "records/owned-publish.bin",
+        "common/pcapx/pcaputil/testdata/mqtt-owned-context/records/pending1.bin": "records/pending1.bin",
+        "common/pcapx/pcaputil/testdata/mqtt-owned-context/records/pending2.bin": "records/pending2.bin",
+        "common/pcapx/pcaputil/testdata/mqtt-owned-context/records/pending3.bin": "records/pending3.bin",
+        "common/pcapx/pcaputil/testdata/mqtt-owned-context/records/puback.bin": "records/puback.bin",
+        "common/pcapx/pcaputil/testdata/mqtt-owned-context/records/pubcomp.bin": "records/pubcomp.bin",
+        "common/pcapx/pcaputil/testdata/mqtt-owned-context/records/pubrec-negative.bin": "records/pubrec-negative.bin",
+        "common/pcapx/pcaputil/testdata/mqtt-owned-context/records/pubrec.bin": "records/pubrec.bin",
+        "common/pcapx/pcaputil/testdata/mqtt-owned-context/records/pubrel.bin": "records/pubrel.bin",
+        "common/pcapx/pcaputil/testdata/mqtt-owned-context/records/server-qos1.bin": "records/server-qos1.bin",
+        "common/pcapx/pcaputil/testdata/mqtt-owned-context/captures/alias-limit.pcap": "captures/alias-limit.pcap",
+        "common/pcapx/pcaputil/testdata/mqtt-owned-context/captures/namespaces.pcap": "captures/namespaces.pcap",
+        "common/pcapx/pcaputil/testdata/mqtt-owned-context/captures/negative-pubrec.pcap": "captures/negative-pubrec.pcap",
+        "common/pcapx/pcaputil/testdata/mqtt-owned-context/captures/owned.pcap": "captures/owned.pcap",
+        "common/pcapx/pcaputil/testdata/mqtt-owned-context/captures/pending-limit.pcap": "captures/pending-limit.pcap"
+      },
+      "members": {
+        "answers.json": {
+          "sha256": "7192eea2407d3612ca6f8a8c874253c026faa5e7c6cbe3767934696fedf5e7c0",
+          "bytes": 11294
+        },
+        "captures/alias-limit.pcap": {
+          "sha256": "f1903d5cf80040f1985ddd203f731b26ceb12757d9307bc628724f65ecac2cc1",
+          "bytes": 713
+        },
+        "captures/namespaces.pcap": {
+          "sha256": "9351c619fce27c6c13c9fa15c885b4aaed86ce67eff3b2aaf8bc3afc062b93a4",
+          "bytes": 931
+        },
+        "captures/negative-pubrec.pcap": {
+          "sha256": "e2b46627ce045325b5062d6d27b7d01e700428c99cb41690a92553c7984e3e5a",
+          "bytes": 700
+        },
+        "captures/owned.pcap": {
+          "sha256": "ae14a8240a810912c2ab0f594cad9585fab94fa83257f0789ccafef510cda875",
+          "bytes": 625
+        },
+        "captures/pending-limit.pcap": {
+          "sha256": "c95f0c68acaa0e0a1c3f48646d28bbcf6741be99110eb1c75aece10a05944b11",
+          "bytes": 704
+        },
+        "generate.py": {
+          "sha256": "7c6fe2d8a1cd0f1abbb0fe24e323ac83f7da1eb79c2391bdcf896f73eac2d4ad",
+          "bytes": 4036
+        },
+        "make-answers.py": {
+          "sha256": "97f8b3b95864e6d72c5ba82e65a3605abcd2e42bb62ecfacf350e4953d35db6e",
+          "bytes": 4704
+        },
+        "records/alias1.bin": {
+          "sha256": "1d356793a9874fc047cd1b6cad44f8e7aefd350a462b2f957477e4dd1e1fd952",
+          "bytes": 11
+        },
+        "records/alias2.bin": {
+          "sha256": "3c25e806201170531b31998c62c3388266dd58c55e61b9171d7a4f7129dc0dc1",
+          "bytes": 11
+        },
+        "records/alias3.bin": {
+          "sha256": "8f31c852599c28d1c0388237f44912103968b0d08d6b8a0a75a08d31ba7141a2",
+          "bytes": 11
+        },
+        "records/client-qos2.bin": {
+          "sha256": "5ca67c53157f7d45a4a77f3691f3373c3cdb3e9f2e9c65618e2b1cebadde1d32",
+          "bytes": 14
+        },
+        "records/connack0.bin": {
+          "sha256": "6e517ac6a66a42bbca69f6dc0504696b566806116850cf4020338f7d0dc3408a",
+          "bytes": 5
+        },
+        "records/connack1.bin": {
+          "sha256": "746a88e07115c642d64f89fd1d0b2dd09386c265a9c84c6c2776762070b83c77",
+          "bytes": 8
+        },
+        "records/connack3.bin": {
+          "sha256": "9a0911980334f0adfcf7c6afaa5aecd445703bbf2182cd0bf0f1e587104c99db",
+          "bytes": 8
+        },
+        "records/connect.bin": {
+          "sha256": "d8d3a06652815d301abfadd7ac44021960cb8f09a4e43ab1090984e869e2d877",
+          "bytes": 18
+        },
+        "records/owned-publish.bin": {
+          "sha256": "6f49d344ae4eef8429118a97b278a35e4dfabb44170ef9e73c3a54f0d5830b95",
+          "bytes": 11
+        },
+        "records/pending1.bin": {
+          "sha256": "e6d7b6c632c6ab9d6de88c605b2801cacd465dc768ad6341df16dc8988cd805e",
+          "bytes": 9
+        },
+        "records/pending2.bin": {
+          "sha256": "906e60ceaa1673b8749fd7bdf7089e0302ac34c8482cb495078070bdec38bdf4",
+          "bytes": 9
+        },
+        "records/pending3.bin": {
+          "sha256": "d64308deea0c345ff3c5866897a2ad5e010e0e25c7efd2d0f02bf44dcac32e73",
+          "bytes": 9
+        },
+        "records/puback.bin": {
+          "sha256": "9b5df75dbe9d4c6a5adecc9ceecc4d6874809ec91fb1d099e62f6e9a7c9b30a3",
+          "bytes": 4
+        },
+        "records/pubcomp.bin": {
+          "sha256": "0937fb5f769add3b9c340916bd7b909d602b1f85d25e5fd2585b0ab3c060a75b",
+          "bytes": 4
+        },
+        "records/pubrec-negative.bin": {
+          "sha256": "b663491a5b45efcc34ce66e652fe9be9ba8165a0ec8b4d82daffae20eb57929c",
+          "bytes": 5
+        },
+        "records/pubrec.bin": {
+          "sha256": "c655334f81d3b56b6fbafc0a107c88f5a1f86b8cb3a02f16bab552bab0de157f",
+          "bytes": 4
+        },
+        "records/pubrel.bin": {
+          "sha256": "c6729717e48716165e1f59903e39e7ebb52d2bcaafde1fdf8e4731abc611ee77",
+          "bytes": 4
+        },
+        "records/server-qos1.bin": {
+          "sha256": "15b89ad9c7c0532ce7ff90dc42ba1cb275536930af74a7279c91720b8968b4c3",
+          "bytes": 14
+        },
+        "validation/expected.json": {
+          "sha256": "9f5012aaece8636bd5d6308f7577d3a87dad72922b7bedf8516496a5283483d7",
+          "bytes": 5377
+        },
+        "verify.py": {
+          "sha256": "3502d4366a0c50ae4353d3e38a46739ecde1509c4a4a441c85b3b69b08ecd142",
+          "bytes": 2088
+        }
+      }
     }
   ],
   "schema_version": 1,

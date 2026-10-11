@@ -481,7 +481,7 @@ func (f *binFlow) consumeSession(dir int, e *ProtocolEvent, result map[string]an
 			}
 		}
 	case "mqtt":
-		e.Session, err = f.mqtt.consume(dir, e.Raw, result)
+		e.Session, err = f.mqtt.consume(dir, e.Raw, result, f.a.budget.MaxCollectionElements, f.reserveSession)
 	case "nats":
 		err = f.consumeNATS(e, dir)
 	case "mongodb":

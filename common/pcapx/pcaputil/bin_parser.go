@@ -126,7 +126,7 @@ func (e *ProtocolEvent) Decode() (result map[string]any, err error) {
 	}()
 	// Native contextual queries preserve the accepted observation or its refusal;
 	// the public Session may be edited or removed by the callback consumer.
-	if (e.Protocol == "tls" || e.Protocol == "redis" || e.Protocol == "mysql") && e.sessionError != nil {
+	if (e.Protocol == "tls" || e.Protocol == "redis" || e.Protocol == "mysql" || e.Protocol == "mqtt") && e.sessionError != nil {
 		owned := *e.sessionError
 		return nil, &owned
 	}
@@ -233,6 +233,9 @@ func (e *ProtocolEvent) retainRuleEnvelope(result map[string]any) {
 }
 
 func (e *ProtocolEvent) ownsNativeFields() bool {
+	if e.Protocol == "mqtt" && e.sessionError != nil {
+		return true
+	}
 	// A MySQL framing refusal may have no prepared entry at all. Its typed
 	// private error remains authoritative instead of public cache/status edits.
 	if e.Protocol == "mysql" && e.sessionError != nil {
@@ -530,9 +533,9 @@ func (a *binParser) emit(e *BinParserEvent) {
 	e.setStructured(e.Structured)
 	e.finalizeEvidence()
 	e.summarizeProtocol()
-	// GOOSE and legacy stream media keep rule fields distinct from observed
+	// GOOSE, MQTT and legacy stream media keep rule fields distinct from observed
 	// session context. Freeze the final context before handing out public maps.
-	if (e.Protocol == "goose" || e.Protocol == "rtp" && e.Transport != "udp") && e.semanticSession == nil && e.Session != nil {
+	if (e.Protocol == "goose" || e.Protocol == "mqtt" || e.Protocol == "rtp" && e.Transport != "udp") && e.semanticSession == nil && e.Session != nil {
 		e.semanticSession = cloneSession(e.Session)
 	}
 	defer func() {
@@ -1146,8 +1149,8 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 					err = protocolError(ErrUnsupportedFeature, err.Error())
 				}
 				e.Status, e.sessionError = classifySessionError(err)
-				if e.Entry == "MySQLPreparedFields" && e.sessionError == nil {
-					// The legacy prepared codec also returns wrapped context or
+				if (e.Entry == "MySQLPreparedFields" || e.Protocol == "mqtt") && e.sessionError == nil {
+					// These legacy codecs also return wrapped context or
 					// grammar errors. Preserve their status/message privately so
 					// later queries cannot use a caller-supplied successful cache.
 					kind := ErrMalformedMessage
@@ -1170,7 +1173,7 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 				// decoding and history; retrying a different grammar loses fields
 				// or rejects valid argumentless/multiline messages.
 				e.semanticFields = protocolFields(result)
-				if e.Protocol == "goose" || e.Protocol == "rtp" && e.Transport != "udp" {
+				if e.Protocol == "goose" || e.Protocol == "mqtt" || e.Protocol == "rtp" && e.Transport != "udp" {
 					e.retainRuleEnvelope(result)
 				}
 				if e.Protocol == "tls" || e.Protocol == "redis" || e.Entry == "MySQLPreparedFields" || e.Protocol == "stun" || e.Protocol == "turn" || e.Protocol == "snmp" || e.Protocol == "slmp" || e.Protocol == "dlms-wrapper" || e.Protocol == "dlms" || e.Protocol == "c37118" {

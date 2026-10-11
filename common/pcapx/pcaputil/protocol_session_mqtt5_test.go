@@ -53,6 +53,12 @@ func mqtt5Connack(aliasMax uint16) []byte {
 }
 
 func TestProtocolSessionMQTT5ConnectPublishAndQoS(t *testing.T) {
+	t.Run("sealed-context-matrix", testMQTT5SealedContextMatrix)
+	t.Run("sealed-session-chunks", testMQTT5SealedSessionChunks)
+	t.Run("default-budget-close", testMQTT5DefaultBudgetCloseInvariant)
+	t.Run("owned-budget-context", TestMQTT5RetainedContextBoundsAndQueries)
+	t.Run("identifier-namespaces", TestMQTT5IndependentPacketIdentifierNamespaces)
+	t.Run("negative-pubrec-context", TestMQTT5NegativePUBRECDoesNotInventPUBRELContext)
 	s, err := NewProtocolSession(DefaultParserBudget())
 	require.NoError(t, err)
 	ts := time.Unix(1, 0)
