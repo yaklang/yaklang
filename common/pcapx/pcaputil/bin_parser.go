@@ -164,7 +164,7 @@ func (e *ProtocolEvent) ownsNativeFields() bool {
 	// A caller editing public Fields, Structured or Session must not rewrite
 	// the captured message used by later queries.
 	// Preserve caller-provided field caches on manually constructed events.
-	if e.Transport == "network" && e.semanticFields != nil && (e.Protocol == "arp" || e.Protocol == "icmp" || e.Protocol == "icmpv6") {
+	if e.Transport == "network" && (e.semanticFields != nil || e.sessionError != nil) && (e.Protocol == "arp" || e.Protocol == "icmp" || e.Protocol == "icmpv6") {
 		return true
 	}
 	// UDP DNS-family projections use the canonical native codec; TCP DNS

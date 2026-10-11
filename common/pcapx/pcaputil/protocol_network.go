@@ -147,6 +147,37 @@ func (a *binParser) networkPacket(p gopacket.Packet) (gopacket.Packet, bool) {
 	if off >= 0 {
 		return a.fragment(p, e, key, off, more, payload)
 	}
+
+	// Check native observation admission before constructing or cloning field trees,
+	// quoted packets, ND options or the captured Raw projection. Capture buffers
+	// retained by the driver/caller are outside this parser's resource contract.
+	nativeProtocol := ""
+	if p.Layer(layers.LayerTypeARP) != nil {
+		nativeProtocol = "arp"
+	} else if p.Layer(layers.LayerTypeICMPv4) != nil {
+		nativeProtocol = "icmp"
+	} else if p.Layer(layers.LayerTypeICMPv6) != nil {
+		nativeProtocol = "icmpv6"
+	}
+	if nativeProtocol != "" && len(p.Data()) > min(a.budget.MaxFrameBytes, a.config.MaxMessageBytes) {
+		err := protocolError(ErrResourceExceeded, "native network frame exceeds parser message limit")
+		status, typed := classifySessionError(err)
+		event := &ProtocolEvent{Timestamp: ci.Timestamp, Transport: "network", Protocol: nativeProtocol, Domain: e.Ref.Domain, Length: len(p.Data()), Status: status, Completeness: status, ExpertCode: string(typed.Kind), Error: err.Error(), sessionError: typed, SourceBytes: ByteSource{Kind: "captured", PacketRefs: []PacketReference{e.Ref}}}
+		if n := p.NetworkLayer(); n != nil {
+			event.Source, event.Destination = n.NetworkFlow().Src().String(), n.NetworkFlow().Dst().String()
+		}
+		if arp, ok := p.Layer(layers.LayerTypeARP).(*layers.ARP); ok {
+			if arp.Protocol == layers.EthernetTypeIPv4 && arp.ProtAddressSize == 4 {
+				event.Source, event.Destination = net.IP(arp.SourceProtAddress).String(), net.IP(arp.DstProtAddress).String()
+			} else {
+				event.Source, event.Destination = fmt.Sprintf("%x", arp.SourceProtAddress), fmt.Sprintf("%x", arp.DstProtAddress)
+			}
+		}
+		a.limited.Add(uint64(len(p.Data())))
+		a.emit(event)
+		return nil, true
+	}
+
 	var protocol string
 	var fields map[string]any
 	if arp, ok := p.Layer(layers.LayerTypeARP).(*layers.ARP); ok {
