@@ -137,7 +137,7 @@ func directlyCallToolBatchSchemaOption() aitool.ToolOption {
 		aitool.WithStringParam("reason",
 			aitool.WithParam_Description("可选。直接展示在该工具卡片上；用简短短语说明这个 child 具体做什么，同名工具的不同调用也要分别描述，不能照搬整批任务的理由。")),
 		aitool.WithBoolParam("async", aitool.WithParam_Default(false),
-			aitool.WithParam_Description("可选的本项异步标记，默认 false。TBD：异步执行尚未启用，true 仍沿用原批量执行并等待结果。")),
+			aitool.WithParam_Description("可选的本项异步标记，默认 false 同步等待；true 提交后台执行并返回本项 execute_id。同一批次可混合同步和异步调用。")),
 	)
 }
 
@@ -438,7 +438,6 @@ func executeVerifiedToolBatch(
 	if supported {
 		emitToolsPreparingStatus(loop, toolNames)
 		emitToolBatchRunningStatus(loop, toolNames)
-		// TBD: dispatch calls marked Async through the loop's async execution manager.
 		result, err = batchRuntime.ExecuteToolCallGroup(ctx, task, request)
 	} else {
 		emitToolCallGroupResultStatus(loop, request, nil)
@@ -501,9 +500,13 @@ func handleToolBatchActionResult(
 
 	outcomes := append([]aicommon.ToolCallOutcome(nil), result.Outcomes...)
 	sort.SliceStable(outcomes, func(i, j int) bool { return outcomes[i].Index < outcomes[j].Index })
-	var executionSucceeded, executionFailed, executionUnknown, protocolFailed, notRun int
+	var executionSucceeded, executionFailed, executionUnknown, protocolFailed, notRun, asyncSubmitted int
 	for i := range outcomes {
 		outcome := &outcomes[i]
+		if outcome.Stage == aicommon.ToolCallStageSubmitted {
+			asyncSubmitted++
+			continue
+		}
 		if outcome.Result == nil {
 			notRun++
 			continue
@@ -528,6 +531,11 @@ func handleToolBatchActionResult(
 		"Tool batch settled: %d calls; execution_succeeded=%d; execution_failed=%d; execution_unknown=%d; protocol_failed=%d; not_run=%d",
 		len(request.Calls), executionSucceeded, executionFailed, executionUnknown, protocolFailed, notRun,
 	)}
+	if asyncSubmitted > 0 {
+		lines[0] = fmt.Sprintf("Tool batch dispatch returned: %d calls; async_submitted=%d; execution_succeeded=%d; execution_failed=%d; execution_unknown=%d; protocol_failed=%d; not_run=%d",
+			len(request.Calls), asyncSubmitted, executionSucceeded, executionFailed, executionUnknown, protocolFailed, notRun)
+		lines = append(lines, "异步项仅返回提交回执；通过 manage_async_execution_runtime 的 inspect/wait/stop 查看、等待或停止，确认所需执行结束后再结束任务。")
+	}
 	executedToolCallCount := 0
 	for _, outcome := range outcomes {
 		// Result is assigned only after the ToolCaller returns from the plugin
@@ -577,6 +585,12 @@ func handleToolBatchActionResult(
 			status += ": " + outcome.Result.Error
 		}
 		lines = append(lines, fmt.Sprintf("%d. %s: %s", outcome.Index+1, toolName, status))
+		if outcome.Stage == aicommon.ToolCallStageSubmitted {
+			lines = append(lines, fmt.Sprintf("   execute_id: %q", outcome.ExecuteID))
+			if outcome.Index >= 0 && outcome.Index < len(request.Calls) {
+				lines = append(lines, fmt.Sprintf("   identifier: %q", request.Calls[outcome.Index].Identifier))
+			}
+		}
 		var reconsider *aicommon.ToolReviewReconsiderError
 		if errors.As(outcome.Err, &reconsider) {
 			lines = append(lines, reconsider.Feedback)

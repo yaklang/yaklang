@@ -9,6 +9,7 @@ import (
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
+	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/asyncexecmanager"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
@@ -378,7 +379,8 @@ func (r *ReAct) newToolCallerForBatchCall(
 // ExecuteToolCallGroup executes an explicit directly_call_tool parameter group. It never
 // reads or swaps ReAct.currentTask and never mutates task.Emitter. Child events
 // use immutable derived emitters, while task/timeline results are committed by
-// this coordinator in model order after every child has settled.
+// this coordinator in model order after synchronous children have settled.
+// Async children return immutable receipts and archive results on their owner.
 func (r *ReAct) ExecuteToolCallGroup(
 	ctx context.Context,
 	task aicommon.AIStatefulTask,
@@ -399,14 +401,42 @@ func (r *ReAct) ExecuteToolCallGroup(
 	if task == nil {
 		return nil, fmt.Errorf("tool batch task is nil")
 	}
+	hasAsync := false
+	for _, call := range request.Calls {
+		hasAsync = hasAsync || call.Async
+	}
+	loop := toolBatchLoop(task)
+	var manager *asyncexecmanager.Manager
+	if hasAsync {
+		if loop == nil || task.GetContext() == nil {
+			return nil, fmt.Errorf("async tool batch requires an owning loop and task context")
+		}
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
+		// Background execution belongs to the task, not a single action request.
+		ctx = task.GetContext()
+		var err error
+		manager, err = loop.GetAsyncExecutionManager()
+		if err != nil {
+			return nil, err
+		}
+	}
+	var releaseContext func()
+	detached := false
+	defer func() {
+		if !detached && releaseContext != nil {
+			releaseContext()
+		}
+	}()
 	if task.GetContext() != nil {
 		var cancel context.CancelFunc
 		ctx, cancel = context.WithCancel(ctx)
 		stopTaskCancel := context.AfterFunc(task.GetContext(), cancel)
-		defer func() {
+		releaseContext = func() {
 			stopTaskCancel()
 			cancel()
-		}()
+		}
 	}
 	select {
 	case <-ctx.Done():
@@ -448,7 +478,6 @@ func (r *ReAct) ExecuteToolCallGroup(
 	}
 	works := make([]toolBatchWork, len(request.Calls))
 	baseArtifactOrdinal := len(task.GetAllToolCallResults())
-	loop := toolBatchLoop(task)
 
 	// Resolve and preflight every child before emitting cards or callbacks.
 	// Calls in a batch are declared mutually independent, so one rejected child
@@ -541,7 +570,11 @@ func (r *ReAct) ExecuteToolCallGroup(
 	// immediately, but ExecuteToolCallGroup still returns the settled batch result
 	// rather than an external context error.
 	workerCtx, cancelWorkers := context.WithCancel(ctx)
-	defer cancelWorkers()
+	defer func() {
+		if !detached {
+			cancelWorkers()
+		}
+	}()
 
 	if r.config != nil {
 		r.config.RunVerificationWatchdogToolBlockingStart()
@@ -549,12 +582,32 @@ func (r *ReAct) ExecuteToolCallGroup(
 	}
 
 	var wg sync.WaitGroup
+	var foreground sync.WaitGroup
+	var syncAdmission sync.WaitGroup
+	for _, work := range works {
+		if !work.call.Async {
+			syncAdmission.Add(1)
+		}
+	}
+	syncAdmitted := make(chan struct{})
+	go func() { syncAdmission.Wait(); close(syncAdmitted) }()
 	for i := range works {
 		i := i
 		work := &works[i]
 		wg.Add(1)
+		foreground.Add(1)
 		go func() {
 			defer wg.Done()
+			var foregroundOnce sync.Once
+			releaseForeground := func() { foregroundOnce.Do(foreground.Done) }
+			defer releaseForeground()
+			var syncAdmissionOnce sync.Once
+			admitSync := func() {
+				if !work.call.Async {
+					syncAdmissionOnce.Do(syncAdmission.Done)
+				}
+			}
+			defer admitSync()
 			defer func() {
 				// Review can terminate through direct_answer before beforeInvoke.
 				// Always release this child's ordered mutator turn on every exit.
@@ -614,7 +667,22 @@ func (r *ReAct) ExecuteToolCallGroup(
 				if err := callCtx.Err(); err != nil {
 					return nil, err
 				}
-				return barrier.wait(callCtx, i, invokeGate)
+				if !work.call.Async {
+					release, err := barrier.wait(callCtx, i, invokeGate)
+					admitSync()
+					return release, err
+				}
+				if _, err := barrier.wait(callCtx, i, nil); err != nil {
+					return nil, err
+				}
+				// Long-lived async tools must not take every invoke slot before
+				// foreground siblings get one, leaving the action unable to return.
+				select {
+				case <-callCtx.Done():
+					return nil, callCtx.Err()
+				case <-syncAdmitted:
+					return invokeGate(callCtx)
+				}
 			}
 			reviewGate := func(callCtx context.Context) (func(), error) {
 				return orderedReviews.wait(callCtx, i)
@@ -631,6 +699,43 @@ func (r *ReAct) ExecuteToolCallGroup(
 			if callerErr != nil {
 				result.Outcomes[i].Stage = aicommon.ToolCallStagePrepareFailed
 				result.Outcomes[i].Err = callerErr
+				return
+			}
+			if work.call.Async {
+				defer caller.Cancel()
+				resource, resourceErr := caller.NewAsyncResource(work.tool, work.params,
+					func(toolResult *aitool.ToolResult, directlyAnswer bool, callErr error) {
+						if directlyAnswer {
+							barrier.arrive(i, true)
+							cancelWorkers()
+						}
+						if callErr == nil && !directlyAnswer && toolResult != nil {
+							_, _, _ = r.finalizeToolCallResult(task, toolResult, false)
+						}
+					})
+				if resourceErr != nil {
+					result.Outcomes[i].Stage = aicommon.ToolCallStagePrepareFailed
+					result.Outcomes[i].Err = resourceErr
+					return
+				}
+				receipt, startErr := manager.Start(asyncexecmanager.Request{Resource: resource,
+					Metadata: asyncexecmanager.Metadata{Name: work.call.ToolName, Attributes: map[string]string{
+						"task_id": task.GetId(), "loop": loop.GetLoopName(), "batch_id": work.batchID,
+						"call_index": fmt.Sprint(i), "identifier": work.call.Identifier, "call_id": work.call.ExecutionCallID,
+					}}})
+				if startErr != nil {
+					result.Outcomes[i].Stage = aicommon.ToolCallStagePrepareFailed
+					result.Outcomes[i].Err = startErr
+					return
+				}
+				result.Outcomes[i].Stage = aicommon.ToolCallStageSubmitted
+				result.Outcomes[i].ExecuteID = receipt.ID
+				// No background worker may mutate the returned outcome or retain an
+				// action operator. The original caller supplies all observations.
+				releaseForeground()
+				// Join the manager even on task cancellation, so shared batch gates
+				// and contexts stay alive until callback cleanup has really finished.
+				_, _ = manager.Wait(context.Background(), receipt.ID)
 				return
 			}
 
@@ -673,10 +778,28 @@ func (r *ReAct) ExecuteToolCallGroup(
 			}
 		}()
 	}
-	wg.Wait()
+	foreground.Wait()
+	if hasAsync {
+		detached = true
+		// Start cleanup only after this method returns. If every async admission
+		// failed, all workers may already be done; cancelling ctx earlier would
+		// incorrectly turn valid sync results into a cancelled batch response.
+		defer func() {
+			go func() {
+				wg.Wait()
+				cancelWorkers()
+				if releaseContext != nil {
+					releaseContext()
+				}
+			}()
+		}()
+	} else {
+		wg.Wait()
+	}
 
 	// Commit shared state once, in input order. Workers only own their indexed
-	// outcome slot and immutable child emitter, avoiding task/timeline races.
+	// outcome slot and immutable child emitter. Async slots stay receipt-only;
+	// their result handler writes task/timeline after the original caller settles.
 	for i := range result.Outcomes {
 		outcome := &result.Outcomes[i]
 		if outcome.DirectlyAnswer {
