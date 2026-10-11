@@ -704,6 +704,7 @@ func NewReActLoop(name string, invoker aicommon.AIInvokeRuntime, options ...ReAc
 		loopAction_DirectlyAnswer,
 		loopAction_Finish,
 		loopAction_SaveEvidence,
+		loopAction_ManageAsyncExecutionRuntime,
 	} {
 		r.actions.Set(action.ActionType, withNativeActionDescription(action))
 	}
