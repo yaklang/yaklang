@@ -174,6 +174,18 @@ func TestKNXExtendedSealedDatagramMatrix(t *testing.T) {
 					}
 					require.Equal(t, status, e.Status)
 					n++
+					// SRP4 returns typed integer vectors. Replacing a map entry
+					// alone does not exercise ownership of their backing arrays.
+					for _, view := range []map[string]any{f, e.Session} {
+						rows, _ := view["srps"].([]map[string]any)
+						for _, row := range rows {
+							for _, key := range []string{"requested_dib_octets", "zero_octet_positions"} {
+								if vector, ok := row[key].([]int); ok && len(vector) > 0 {
+									vector[0] = 999999
+								}
+							}
+						}
+					}
 					f["kind"] = "caller change"
 					e.Session["kind"] = "caller change"
 					if e.Fields != nil {

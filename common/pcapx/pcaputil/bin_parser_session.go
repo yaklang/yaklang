@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"sort"
+	"strconv"
 )
 
 const binH2Preface = "PRI * HTTP/2.0\r\n\r\nSM\r\n\r\n"
@@ -1127,6 +1128,8 @@ func cloneSessionValue(v any) any {
 			out[i] = cloneSessionValue(v)
 		}
 		return out
+	case []int:
+		return cloneScalarValues(x)
 	case []int32:
 		return cloneScalarValues(x)
 	case []uint16:
@@ -1185,6 +1188,8 @@ func sessionSnapshotSize(v any, byteCapacity bool) int {
 			n += sessionSnapshotSize(v, byteCapacity)
 		}
 		return n
+	case []int:
+		return 24 + len(x)*(strconv.IntSize/8)
 	case []int32:
 		return 24 + len(x)*4
 	case []uint16:
