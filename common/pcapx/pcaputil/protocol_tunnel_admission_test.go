@@ -86,6 +86,7 @@ func tunnelAdmissionReplay(t *testing.T, packets ...[]byte) []*ProtocolEvent {
 }
 
 func TestProtocolTunnelAdmission(t *testing.T) {
+	testFragmentedTunnelDNS(t)
 	for _, profile := range []string{"ipip", "6in4", "geneve"} {
 		t.Run(profile, func(t *testing.T) {
 			raw := tunnelAdmissionWire(t, profile, 5013, "198.51.100.1", false, 1, false)
@@ -136,6 +137,7 @@ func TestProtocolTunnelFlowIsolation(t *testing.T) {
 }
 
 func TestProtocolTunnelDepthLimit(t *testing.T) {
+	testNestedFragmentTunnelDepth(t)
 	for _, profile := range []string{"ipip", "6in4", "geneve"} {
 		for _, depth := range []int{4, 5} {
 			t.Run(fmt.Sprintf("%s/%d", profile, depth), func(t *testing.T) {

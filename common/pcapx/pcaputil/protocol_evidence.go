@@ -34,6 +34,8 @@ type captureEvidence struct {
 	refs []PacketReference
 	// Applies to the current IP packet, not an outer tunnel carrier.
 	ipv6Fragment bool
+	// Count normalization across reconstructed outer/inner fragment layers.
+	normalizedTunnels int
 }
 
 func evidenceFrom(ci gopacket.CaptureInfo) captureEvidence {
@@ -75,7 +77,11 @@ func packetEvidence(p gopacket.Packet) captureEvidence {
 		case *layers.Geneve:
 			e.Ref.Domain.Encapsulation += fmt.Sprintf("/geneve:%s:%d", outer, v.VNI)
 		case *layers.IPv4:
-			e.Ref.Domain.Encapsulation += ipEncapsulation(v.Protocol, outer)
+			// A fragmented outer packet has no decoded inner carrier yet. Defer
+			// that domain suffix until reassembly instead of applying it twice.
+			if v.FragOffset == 0 && v.Flags&layers.IPv4MoreFragments == 0 {
+				e.Ref.Domain.Encapsulation += ipEncapsulation(v.Protocol, outer)
+			}
 		}
 	}
 	return e

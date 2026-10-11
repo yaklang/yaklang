@@ -24,7 +24,7 @@ type fragmentKey struct {
 type ipFragment struct {
 	start int
 	data  []byte
-	ref   PacketReference
+	refs  []PacketReference
 }
 type fragmentSet struct {
 	parts    []ipFragment
@@ -102,16 +102,23 @@ func (a *binParser) networkPacket(p gopacket.Packet) (gopacket.Packet, bool) {
 				unsupportedTunnel = true
 			}
 		case *layers.IPv4:
-			if v.Protocol == layers.IPProtocolIPv4 || v.Protocol == layers.IPProtocolIPv6 {
+			if v.FragOffset == 0 && v.Flags&layers.IPv4MoreFragments == 0 && (v.Protocol == layers.IPProtocolIPv4 || v.Protocol == layers.IPProtocolIPv6) {
 				tunnels++
 			}
 		}
 	}
 	if networks > 1 {
-		if unsupportedTunnel || tunnels == 0 || tunnels > 4 || networks != tunnels+1 {
+		// The inner carrier can become visible only after outer reassembly.
+		// Every contributing fragment belongs to that same reconstructed domain.
+		e.refs = append([]PacketReference(nil), e.refs...)
+		for i := range e.refs {
+			e.refs[i].Domain = e.Ref.Domain
+		}
+		if unsupportedTunnel || tunnels == 0 || tunnels+e.normalizedTunnels > 4 || networks != tunnels+1 {
 			a.networkDiagnostic(e, ci, "limited", "EncapsulationDepthOrProfile")
 			return nil, true
 		}
+		e.normalizedTunnels += tunnels
 		raw := append(bytes.Clone(inner.LayerContents()), inner.LayerPayload()...)
 		// Fragmentation of an outer carrier does not mean that the inner
 		// IPv6 ND message itself contained a Fragment header.
@@ -150,9 +157,9 @@ func (a *binParser) networkPacket(p gopacket.Packet) (gopacket.Packet, bool) {
 	if off >= 0 {
 		q, consumed := a.fragment(p, e, key, off, more, payload)
 		// fragment() releases its store mutex before this dispatch. A complete
-		// ICMP datagram must reach the same native observation path as an
-		// unfragmented datagram, rather than disappearing in TCP/UDP dispatch.
-		if !consumed && q != nil && (q.Layer(layers.LayerTypeICMPv4) != nil || q.Layer(layers.LayerTypeICMPv6) != nil) {
+		// datagram must pass through tunnel normalization and native observation
+		// before transport dispatch; the decoded outer IP is not the inner peer.
+		if !consumed && q != nil {
 			return a.networkPacket(q)
 		}
 		return q, consumed
@@ -459,7 +466,20 @@ func (a *binParser) fragment(p gopacket.Packet, e captureEvidence, key fragmentK
 		}
 		v.end = off + len(payload)
 	}
-	cost := int64(len(payload) + 128)
+	refs := e.refs
+	if len(refs) == 0 {
+		refs = []PacketReference{e.Ref}
+	}
+	contributors := len(refs)
+	for _, part := range v.parts {
+		contributors += len(part.refs)
+	}
+	if contributors > min(128, a.budget.MaxCollectionElements) {
+		return invalid("FragmentRangeBudget")
+	}
+	// Reconstructed fragments can themselves contain reconstructed carriers.
+	// Retain and charge every physical contributor, not only the final arrival.
+	cost := int64(len(payload) + 128*len(refs))
 	var header []byte
 	if off == 0 {
 		var err error
@@ -480,7 +500,7 @@ func (a *binParser) fragment(p gopacket.Packet, e captureEvidence, key fragmentK
 	if header != nil {
 		v.header = header
 	}
-	v.parts = append(v.parts, ipFragment{off, bytes.Clone(payload), e.Ref})
+	v.parts = append(v.parts, ipFragment{off, bytes.Clone(payload), append([]PacketReference(nil), refs...)})
 	sort.Slice(v.parts, func(i, j int) bool { return v.parts[i].start < v.parts[j].start })
 	cursor := 0
 	for _, part := range v.parts {
@@ -493,10 +513,10 @@ func (a *binParser) fragment(p gopacket.Packet, e captureEvidence, key fragmentK
 		return nil, true
 	}
 	raw := make([]byte, 0, cursor)
-	refs := make([]PacketReference, 0, len(v.parts))
+	refs = make([]PacketReference, 0, contributors)
 	for _, part := range v.parts {
 		raw = append(raw, part.data...)
-		refs = append(refs, part.ref)
+		refs = append(refs, part.refs...)
 	}
 	length := len(v.header) + len(raw)
 	if key.v6 {
@@ -637,7 +657,7 @@ func (a *binParser) fragmentDiagnostic(v *fragmentSet, code string) {
 	}
 	refs := make([]PacketReference, 0, len(v.parts))
 	for _, p := range v.parts {
-		refs = append(refs, p.ref)
+		refs = append(refs, p.refs...)
 	}
 	a.emit(&ProtocolEvent{Timestamp: v.last, Transport: "network", Protocol: "ip", Domain: refs[0].Domain, Status: "incomplete", Completeness: "incomplete", ExpertCode: code, Error: code, SourceBytes: ByteSource{Kind: "reassembled", PacketRefs: refs}})
 }
