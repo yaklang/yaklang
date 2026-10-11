@@ -45485,6 +45485,133 @@
           "bytes": 872
         }
       }
+    },
+    {
+      "file": "validation-mqtt-control-context.zip",
+      "id": "mqtt-control-context-667dbffd5936",
+      "kind": "session-controls",
+      "password": "bin-parser",
+      "source_sha": "667dbffd5936284a73e4d1b86c0e06ae53b8ae89",
+      "sha256": "9523cbd03f1b415378612ed0f52669381b21653dbd1934d4fbeeea25b97654af",
+      "aliases": {
+        "common/pcapx/pcaputil/testdata/mqtt-controls/answers.json": "answers.json",
+        "common/pcapx/pcaputil/testdata/mqtt-controls/captures/level4-publish-subscribe.pcap": "captures/level4-publish-subscribe.pcap",
+        "common/pcapx/pcaputil/testdata/mqtt-controls/captures/level4-released.pcap": "captures/level4-released.pcap",
+        "common/pcapx/pcaputil/testdata/mqtt-controls/captures/level4-reverse-suback.pcap": "captures/level4-reverse-suback.pcap",
+        "common/pcapx/pcaputil/testdata/mqtt-controls/captures/level4-reverse-subscribe.pcap": "captures/level4-reverse-subscribe.pcap",
+        "common/pcapx/pcaputil/testdata/mqtt-controls/captures/level4-reverse-unsuback.pcap": "captures/level4-reverse-unsuback.pcap",
+        "common/pcapx/pcaputil/testdata/mqtt-controls/captures/level4-reverse-unsubscribe.pcap": "captures/level4-reverse-unsubscribe.pcap",
+        "common/pcapx/pcaputil/testdata/mqtt-controls/captures/level4-subscribe-dup-publish.pcap": "captures/level4-subscribe-dup-publish.pcap",
+        "common/pcapx/pcaputil/testdata/mqtt-controls/captures/level4-subscribe-unsubscribe.pcap": "captures/level4-subscribe-unsubscribe.pcap",
+        "common/pcapx/pcaputil/testdata/mqtt-controls/captures/level4-unsubscribe-subscribe.pcap": "captures/level4-unsubscribe-subscribe.pcap",
+        "common/pcapx/pcaputil/testdata/mqtt-controls/captures/level5-publish-subscribe.pcap": "captures/level5-publish-subscribe.pcap",
+        "common/pcapx/pcaputil/testdata/mqtt-controls/captures/level5-released.pcap": "captures/level5-released.pcap",
+        "common/pcapx/pcaputil/testdata/mqtt-controls/captures/level5-reverse-suback.pcap": "captures/level5-reverse-suback.pcap",
+        "common/pcapx/pcaputil/testdata/mqtt-controls/captures/level5-reverse-subscribe.pcap": "captures/level5-reverse-subscribe.pcap",
+        "common/pcapx/pcaputil/testdata/mqtt-controls/captures/level5-reverse-unsuback.pcap": "captures/level5-reverse-unsuback.pcap",
+        "common/pcapx/pcaputil/testdata/mqtt-controls/captures/level5-reverse-unsubscribe.pcap": "captures/level5-reverse-unsubscribe.pcap",
+        "common/pcapx/pcaputil/testdata/mqtt-controls/captures/level5-subscribe-dup-publish.pcap": "captures/level5-subscribe-dup-publish.pcap",
+        "common/pcapx/pcaputil/testdata/mqtt-controls/captures/level5-subscribe-unsubscribe.pcap": "captures/level5-subscribe-unsubscribe.pcap",
+        "common/pcapx/pcaputil/testdata/mqtt-controls/captures/level5-unsubscribe-subscribe.pcap": "captures/level5-unsubscribe-subscribe.pcap",
+        "common/pcapx/pcaputil/testdata/mqtt-controls/generate.py": "generate.py",
+        "common/pcapx/pcaputil/testdata/mqtt-controls/make-answers.py": "make-answers.py",
+        "common/pcapx/pcaputil/testdata/mqtt-controls/validation/expected.json": "validation/expected.json",
+        "common/pcapx/pcaputil/testdata/mqtt-controls/verify.py": "verify.py"
+      },
+      "members": {
+        "answers.json": {
+          "sha256": "3812a146fd979ef1f99a2742ada6f3a179c5cbcb12860f8fa633e3c80ae8df91",
+          "bytes": 28800
+        },
+        "captures/level4-publish-subscribe.pcap": {
+          "sha256": "e79075446c1684cce377444c3ecb2fe8b38fe22ed2632f4afdb354bf120c6579",
+          "bytes": 630
+        },
+        "captures/level4-released.pcap": {
+          "sha256": "f5887afd8564ff10069309b28b3f42b0651e3b90ede9fc1b65fdaa85e0b097eb",
+          "bytes": 1091
+        },
+        "captures/level4-reverse-suback.pcap": {
+          "sha256": "6836f4718e91a085ad182464883e9c24ea4a43af78336b3a92650da75115e1f6",
+          "bytes": 620
+        },
+        "captures/level4-reverse-subscribe.pcap": {
+          "sha256": "758c44d0342cccbcd98778abfcdaad7c1300a3fb83ba3a2c3b4a364a6704f7de",
+          "bytes": 545
+        },
+        "captures/level4-reverse-unsuback.pcap": {
+          "sha256": "319484aeffb5243f538b54874a8417c079c779dbf8d3bcfe964c039328f0193a",
+          "bytes": 618
+        },
+        "captures/level4-reverse-unsubscribe.pcap": {
+          "sha256": "897736c002e4b3ac9972a4cb9e3c8f5d441cab3c07bb7df03053644da2a5a9c8",
+          "bytes": 544
+        },
+        "captures/level4-subscribe-dup-publish.pcap": {
+          "sha256": "bebc6556bf71aa3b01bb5a161fceef2abc450b3e48ea58343aea57c44a33559c",
+          "bytes": 630
+        },
+        "captures/level4-subscribe-unsubscribe.pcap": {
+          "sha256": "9862e9860d8416587889eba9f16c3db7dd9304a85b7bf30a240175261eac6095",
+          "bytes": 624
+        },
+        "captures/level4-unsubscribe-subscribe.pcap": {
+          "sha256": "05627e17fe834572534caebd6757cbb4a95decf680c1bf7c021662bffe5e99fb",
+          "bytes": 624
+        },
+        "captures/level5-publish-subscribe.pcap": {
+          "sha256": "da37b990f10718d3c8734600fea3439e40f992af98b8f228df88e8717d8b7d72",
+          "bytes": 631
+        },
+        "captures/level5-released.pcap": {
+          "sha256": "1a8e6fdebcab6272fba26cbf947c2691fd90dce01bac0d6f48432788aa111d03",
+          "bytes": 1094
+        },
+        "captures/level5-reverse-suback.pcap": {
+          "sha256": "9adee83a13468d3393dd83c99835fbf6802d76b2e158e61dc59002c9f96a5cde",
+          "bytes": 624
+        },
+        "captures/level5-reverse-subscribe.pcap": {
+          "sha256": "28aeb8435c9caa002888e47a04d80aec8506a033eda87346f1b7ef462018eb19",
+          "bytes": 548
+        },
+        "captures/level5-reverse-unsuback.pcap": {
+          "sha256": "9b3c8bd6678f911037de38971cef568df545d60f9d4543cc1d7bfe4e08359660",
+          "bytes": 623
+        },
+        "captures/level5-reverse-unsubscribe.pcap": {
+          "sha256": "83930a6800a7d16f4ccb953d9a51ddbc41595278c422e8013786d1d754195b32",
+          "bytes": 547
+        },
+        "captures/level5-subscribe-dup-publish.pcap": {
+          "sha256": "6601b85cd67f96c4be2f77d0e70698c21b5973c92faff0875f4872b48ed46dcf",
+          "bytes": 631
+        },
+        "captures/level5-subscribe-unsubscribe.pcap": {
+          "sha256": "1f42e486b3f4f6014f911078913fb20fddb570014ef79f8b9d7785699f775747",
+          "bytes": 628
+        },
+        "captures/level5-unsubscribe-subscribe.pcap": {
+          "sha256": "fe3d2bb745661638be1c00e6b656ec53581b180ec84e76dd8e1101f78d687205",
+          "bytes": 628
+        },
+        "generate.py": {
+          "sha256": "c619b18f96c8c81dfdce42e933b8617788f57746822824ef98016eee3cb87c5e",
+          "bytes": 3360
+        },
+        "make-answers.py": {
+          "sha256": "75779f8c9e1ca00cc96d9cc9ec1a89a2f3e881d5b87819b96b94e986e0897f5b",
+          "bytes": 2785
+        },
+        "validation/expected.json": {
+          "sha256": "2c585b96228919ef014d05beafe98ddbf93b4284daa9a2238a1e13f4d752da4f",
+          "bytes": 17883
+        },
+        "verify.py": {
+          "sha256": "9a9615aba552cb388aea930e4dc1143287e9de402f4d3a84cfa34ed6ad196f8d",
+          "bytes": 892
+        }
+      }
     }
   ],
   "schema_version": 1,

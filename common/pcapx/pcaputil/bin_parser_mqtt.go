@@ -106,6 +106,14 @@ func (m *binMQTT) consume(dir int, raw []byte, result map[string]any, maxElement
 	if typ == 1 && m.seenConnect {
 		return nil, fmt.Errorf("mqtt: second CONNECT on the same network connection")
 	}
+	// These controls have a fixed endpoint role even though PUBLISH and its
+	// acknowledgments use independent identifier spaces in both directions.
+	if (typ == 8 || typ == 10) && dir != m.client {
+		return nil, fmt.Errorf("mqtt: %s on the server direction", mqttSessionName(typ))
+	}
+	if (typ == 9 || typ == 11) && dir == m.client {
+		return nil, fmt.Errorf("mqtt: %s on the client direction", mqttSessionName(typ))
+	}
 	qos := flags >> 1 & 3
 	info := map[string]any{
 		"Packet Type":   uint64(typ),
@@ -162,7 +170,7 @@ func (m *binMQTT) consume(dir int, raw []byte, result map[string]any, maxElement
 		}
 		// New QoS>0 publications must allocate an unused identifier. Never
 		// overwrite an observed exchange, including its later QoS2 phases.
-		if qos > 0 && flags&8 == 0 && m.pending[dir][pid] != "" {
+		if got := m.pending[dir][pid]; qos > 0 && got != "" && (flags&8 == 0 || got == "SUBACK" || got == "UNSUBACK") {
 			return nil, fmt.Errorf("mqtt: packet identifier %d is already in use", pid)
 		}
 		pendingNew, aliasNew := 0, 0
@@ -237,6 +245,15 @@ func (m *binMQTT) consume(dir int, raw []byte, result map[string]any, maxElement
 		}
 		pid := binary.BigEndian.Uint16(body[:2])
 		info["Packet Identifier"] = uint64(pid)
+		want := "SUBACK"
+		if typ == 10 {
+			want = "UNSUBACK"
+		}
+		// A retry of the same control type does not allocate another slot.
+		// It must never replace a different kind of outstanding exchange.
+		if got := m.pending[dir][pid]; got != "" && got != want {
+			return nil, fmt.Errorf("mqtt: packet identifier %d is already in use", pid)
+		}
 		pendingNew := 0
 		if m.pending[dir][pid] == "" {
 			pendingNew = 1

@@ -733,6 +733,14 @@ func testMQTTActiveIdentifierCannotBeOverwritten(t *testing.T) {
 }
 
 func testMQTTSealedIdentifierReuse(t *testing.T) {
+	testMQTTSealedIdentifierCases(t, "mqtt-identifier", 8)
+}
+
+func testMQTTSealedControlContext(t *testing.T) {
+	testMQTTSealedIdentifierCases(t, "mqtt-controls", 18)
+}
+
+func testMQTTSealedIdentifierCases(t *testing.T, fixture string, profileCount int) {
 	var answers struct {
 		Profiles map[string]struct {
 			Events []struct {
@@ -746,10 +754,10 @@ func testMQTTSealedIdentifierReuse(t *testing.T) {
 			} `json:"events"`
 		} `json:"profiles"`
 	}
-	b, err := trafficfixture.ReadFile("testdata/mqtt-identifier/answers.json")
+	b, err := trafficfixture.ReadFile("testdata/" + fixture + "/answers.json")
 	require.NoError(t, err)
 	require.NoError(t, json.Unmarshal(b, &answers))
-	require.Len(t, answers.Profiles, 8)
+	require.Len(t, answers.Profiles, profileCount)
 	for name, p := range answers.Profiles {
 		check := func(t *testing.T, i int, e *ProtocolEvent) {
 			t.Helper()
@@ -797,13 +805,28 @@ func testMQTTSealedIdentifierReuse(t *testing.T) {
 				require.Equal(t, topic, findSessionField(fields, "Topic Name"))
 				require.Equal(t, payload, findSessionField(fields, "Application Message"))
 			}
+			if typ := wire[0] >> 4; typ >= 8 && typ <= 11 {
+				require.EqualValues(t, 7, findSessionField(fields, "Packet Identifier"))
+				if typ == 8 || typ == 10 {
+					require.Equal(t, "a/b", findSessionField(fields, "Topic Filter"))
+					if typ == 8 {
+						key := "Requested QoS"
+						if name[5] == '5' {
+							key = "Subscription Options"
+						}
+						require.EqualValues(t, 1, findSessionField(fields, key))
+					}
+				} else if typ == 9 {
+					require.EqualValues(t, 0, findSessionField(fields, "Granted QoS or Return Code"))
+				}
+			}
 			mutateRTPSQuery(fields)
 			mutateRTPSQuery(e.Session)
 			again, err := e.Decode()
 			require.NoError(t, err)
 			require.Equal(t, decoded, again)
 		}
-		pcap, err := trafficfixture.ReadFile("testdata/mqtt-identifier/captures/" + name + ".pcap")
+		pcap, err := trafficfixture.ReadFile("testdata/" + fixture + "/captures/" + name + ".pcap")
 		require.NoError(t, err)
 		for _, workers := range []int{1, 2, 4} {
 			for _, deferred := range []bool{false, true} {
@@ -873,6 +896,144 @@ func testMQTTSealedIdentifierReuse(t *testing.T) {
 					require.Empty(t, s.Close("done"))
 					require.Nil(t, s.Close("again"))
 					require.Zero(t, s.Stats().BufferedBytes)
+				})
+			}
+		}
+	}
+}
+
+// MQTT3.1.1 OS 2.3.1 and MQTT5 OS 2.2.1 share the allocator's
+// namespace across PUBLISH, SUBSCRIBE and UNSUBSCRIBE. Client-only
+// subscription controls must not manufacture a reverse-direction exchange.
+func testMQTTSubscriptionContextIsolation(t *testing.T) {
+	for _, level := range []byte{4, 5} {
+		for _, deferred := range []bool{false, true} {
+			for _, kind := range []string{"publish-subscribe", "subscribe-unsubscribe", "unsubscribe-subscribe", "subscribe-dup-publish", "reverse-subscribe", "reverse-unsubscribe", "reverse-suback", "reverse-unsuback"} {
+				t.Run(fmt.Sprintf("level%d/d%v/%s", level, deferred, kind), func(t *testing.T) {
+					connect := mqtt311Wire(t, "connect")
+					if level == 5 {
+						connect = mqttContextWire(t, "connect")
+					}
+					request := func(typ byte) []byte {
+						b := []byte{0, 7}
+						if level == 5 {
+							b = append(b, 0)
+						}
+						b = append(b, mqttUTF("a/b")...)
+						if typ == 8 {
+							b = append(b, 1)
+						}
+						return mqttPkt(typ<<4|2, b)
+					}
+					ack := func(typ byte) []byte {
+						b := []byte{0, 7}
+						if level == 5 {
+							b = append(b, 0)
+						}
+						if typ == 9 || level == 5 {
+							b = append(b, 0)
+						}
+						return mqttPkt(typ<<4, b)
+					}
+					publish := mqtt311Wire(t, "client")
+					if level == 5 {
+						publish = mqttContextWire(t, "client-qos2")
+						publish[0] = 0x32
+					}
+					fresh := func() ProtocolSession {
+						s, err := NewProtocolSession(DefaultParserBudget())
+						require.NoError(t, err)
+						s.(*captureSession).f.a.config.Deferred = deferred
+						x := s.Feed(0, time.Unix(1, 0), connect)
+						require.Nil(t, x.Err)
+						require.Len(t, x.Events, 1)
+						return s
+					}
+					s := fresh()
+					defer s.Close("done")
+					dir := 0
+					wire := request(8)
+					message := "mqtt: packet identifier 7 is already in use"
+					switch kind {
+					case "publish-subscribe":
+						require.Nil(t, s.Feed(0, time.Unix(2, 0), publish).Err)
+					case "subscribe-unsubscribe":
+						require.Nil(t, s.Feed(0, time.Unix(2, 0), request(8)).Err)
+						wire = request(10)
+					case "unsubscribe-subscribe":
+						require.Nil(t, s.Feed(0, time.Unix(2, 0), request(10)).Err)
+					case "subscribe-dup-publish":
+						require.Nil(t, s.Feed(0, time.Unix(2, 0), request(8)).Err)
+						wire = append([]byte(nil), publish...)
+						wire[0] |= 8
+					case "reverse-subscribe":
+						dir = 1
+						message = "mqtt: SUBSCRIBE on the server direction"
+					case "reverse-unsubscribe":
+						dir = 1
+						wire = request(10)
+						message = "mqtt: UNSUBSCRIBE on the server direction"
+					case "reverse-suback":
+						require.Nil(t, s.Feed(0, time.Unix(2, 0), request(8)).Err)
+						wire = ack(9)
+						message = "mqtt: SUBACK on the client direction"
+					case "reverse-unsuback":
+						require.Nil(t, s.Feed(0, time.Unix(2, 0), request(10)).Err)
+						wire = ack(11)
+						message = "mqtt: UNSUBACK on the client direction"
+					}
+					x := s.Feed(dir, time.Unix(3, 0), wire)
+					require.NotNil(t, x.Err, "control must not overwrite or invent observed context")
+					require.Equal(t, ErrMalformedMessage, x.Err.Kind)
+					require.Equal(t, message, x.Err.Message)
+					require.Len(t, x.Events, 1)
+					e := x.Events[0]
+					require.Equal(t, wire, e.Raw)
+					require.Equal(t, dir, e.Direction)
+					require.Nil(t, e.Session)
+					require.Zero(t, e.ResponseTo)
+					require.Zero(t, e.TransactionID)
+					_, err := e.GetFields()
+					var typed *ProtocolError
+					require.ErrorAs(t, err, &typed)
+					require.Equal(t, ErrMalformedMessage, typed.Kind)
+					require.Equal(t, message, typed.Message)
+					clear(wire)
+					_, again := e.GetFields()
+					require.ErrorAs(t, again, &typed)
+					require.Equal(t, message, typed.Message)
+					late := s.Feed(1, time.Unix(4, 0), ack(9))
+					require.Empty(t, late.Events)
+					require.NotNil(t, late.Err)
+					require.Equal(t, ErrFatalSessionError, late.Err.Kind)
+					require.Empty(t, s.Close("refused"))
+					require.Nil(t, s.Close("again"))
+					require.Zero(t, s.Stats().BufferedBytes)
+					// Adjacent valid allocation, terminal release and the server's
+					// separate PUBLISH namespace survive both subscription types.
+					good := fresh()
+					defer good.Close("done")
+					for _, typ := range []byte{8, 10} {
+						a := good.Feed(0, time.Unix(5, 0), request(typ))
+						require.Nil(t, a.Err)
+						require.Len(t, a.Events, 1)
+						require.Equal(t, uint64(7), a.Events[0].Session["Packet Identifier"])
+						a = good.Feed(1, time.Unix(6, 0), publish)
+						require.Nil(t, a.Err)
+						require.Len(t, a.Events, 1)
+						require.Equal(t, "PUBACK", a.Events[0].Session["Outstanding"])
+						a = good.Feed(0, time.Unix(7, 0), mqttContextWire(t, "puback"))
+						require.Nil(t, a.Err)
+						require.Equal(t, true, a.Events[0].Session["Matched Request"])
+						a = good.Feed(1, time.Unix(8, 0), ack(typ+1))
+						require.Nil(t, a.Err)
+						require.Len(t, a.Events, 1)
+						require.Equal(t, uint64(7), a.Events[0].Session["Packet Identifier"])
+						require.Equal(t, true, a.Events[0].Session["Matched Request"])
+					}
+					require.Empty(t, good.Close("complete"))
+					require.Nil(t, good.Close("again"))
+					require.Zero(t, good.Stats().BufferedBytes)
 				})
 			}
 		}
