@@ -49489,6 +49489,337 @@
         "common/pcapx/pcaputil/dronecan-restart-node/reference.c": "reference.c",
         "common/pcapx/pcaputil/dronecan-restart-node/reference-executed.txt": "reference-executed.txt"
       }
+    },
+    {
+      "id": "validation-dronecan-transport-stats",
+      "kind": "validation",
+      "source_sha": "6e343f7ac0ef388e008056335bb02ea33088b0f0",
+      "file": "validation-dronecan-transport-stats.zip",
+      "sha256": "47b53cca127fe14e738386e51bc5c5f233222043fba2f5fb30d39195bbb6f2c5",
+      "password": "bin-parser",
+      "members": {
+        "captures/no-interfaces.pcap": {
+          "bytes": 120,
+          "sha256": "d0e3b1a1ebcd5c78be94f692c8a4b05a8ea85a7af438bbf8cb5481f96017676c"
+        },
+        "answers/no-interfaces.json": {
+          "bytes": 1749,
+          "sha256": "a36842de688150480b1bd2171c4e57c0c6ab99c610232a379d9d98dac97a7e35"
+        },
+        "captures/zero-counters.pcap": {
+          "bytes": 120,
+          "sha256": "d1df0baba437cbb795d666313c5f1fed91e2a00425d3c14feec582f17f1b7e62"
+        },
+        "answers/zero-counters.json": {
+          "bytes": 1749,
+          "sha256": "db4b8b62440400c72682533f07f719014d83eaa2dc67242fae0bf60404a3888c"
+        },
+        "captures/maximum-counters.pcap": {
+          "bytes": 120,
+          "sha256": "79ba12821874b31b852fbdf9ade4bee1e1edd916b5dfd6d6ba7ecaf4bf5b0744"
+        },
+        "answers/maximum-counters.json": {
+          "bytes": 1791,
+          "sha256": "bc6ca462c172fb24ce89bf1faca0ab59d423561526441d1adb7e2fcd14abcde5"
+        },
+        "captures/one-interface.pcap": {
+          "bytes": 216,
+          "sha256": "de82d128d6d14da78a7c775365b2059c4a07573741d029b25355bcaca20f4f3f"
+        },
+        "answers/one-interface.json": {
+          "bytes": 2382,
+          "sha256": "9b8656814c0082989c4f8db188766e62384c366b856e1c5edd508b5971f8c931"
+        },
+        "captures/two-interfaces.pcap": {
+          "bytes": 280,
+          "sha256": "33c7e564496802bc6bcde8278ba055951c0c7150dc6685394c4a101504d56425"
+        },
+        "answers/two-interfaces.json": {
+          "bytes": 2823,
+          "sha256": "ac9f6eb0db8e931e300e2918a9de85124c3190dbe3ba4a9ef189053863d4a971"
+        },
+        "captures/three-interfaces.pcap": {
+          "bytes": 376,
+          "sha256": "404a5b8f93a978dad97f0807264466c6ae179df49fc2518ce45b35899e3aa90b"
+        },
+        "answers/three-interfaces.json": {
+          "bytes": 3572,
+          "sha256": "7fc23a1644f7ea746406f58bbe456169af47078aa39e83d98dc9c9a65cb54d57"
+        },
+        "captures/missing-start.pcap": {
+          "bytes": 88,
+          "sha256": "cd70cd6b5a507965e42dbbca7e7d8e42a2fb90a453162b654b4232bb4f63fcaf"
+        },
+        "answers/missing-start.json": {
+          "bytes": 449,
+          "sha256": "4e0ecf8736488be360d9250b9710dfe94b0491e0989c714749b32ee371af62d1"
+        },
+        "captures/missing-middle.pcap": {
+          "bytes": 88,
+          "sha256": "0c9b883d5e59be368e7d27a4fcdb2f84677246d5a1812027ef48123c11e83568"
+        },
+        "answers/missing-middle.json": {
+          "bytes": 577,
+          "sha256": "3399897572c54e234f22d00b5c6a82dea55674e6823b4cb530f7249615b07628"
+        },
+        "captures/out-of-order.pcap": {
+          "bytes": 120,
+          "sha256": "37b5a7c7844f50be347e24261129dd42c7d26de3019d64a796fc2205a55c81fa"
+        },
+        "answers/out-of-order.json": {
+          "bytes": 734,
+          "sha256": "54c099da3a71dac64b1a66e0f03020fddd562b8f92fbeb230fa38514b6132346"
+        },
+        "captures/duplicate-first.pcap": {
+          "bytes": 152,
+          "sha256": "ac84eb1277fceb3a169b9c56e7e27c09cddf453519997ea084c8b268c3a746e9"
+        },
+        "answers/duplicate-first.json": {
+          "bytes": 1902,
+          "sha256": "bfbc1a41f1d3797d307e51e11a9f7866350a06389e30a00420181f644b7900d9"
+        },
+        "captures/bad-crc.pcap": {
+          "bytes": 120,
+          "sha256": "d6dca5b8e13781a4a05985cc0fa0ecf8ad9c4a6a3e58e5daa6f38ac49681d21c"
+        },
+        "answers/bad-crc.json": {
+          "bytes": 589,
+          "sha256": "77a16bd73d99a196c7d70cc8cbabd50f2218997bf234886551dd7d50df89712d"
+        },
+        "captures/bad-toggle.pcap": {
+          "bytes": 120,
+          "sha256": "8e6cd13ae736055f9e5426cedcd03c35c21c6435e64781ebcd93b0a6f9bcd4e8"
+        },
+        "answers/bad-toggle.json": {
+          "bytes": 730,
+          "sha256": "e7863895dd8dcd1f5e2509b9ca36cff6230c77afc797672c2cac94b96c3889a9"
+        },
+        "captures/mixed-priority.pcap": {
+          "bytes": 120,
+          "sha256": "02ec3e306acb4f56ba5c45e7f25746cc21c318e570779aa66d1db1f95355d85f"
+        },
+        "answers/mixed-priority.json": {
+          "bytes": 596,
+          "sha256": "9735996397a3a5bc4511e6cc661b7eb86aea33378eca102a7513e315f4a64cee"
+        },
+        "captures/mixed-source.pcap": {
+          "bytes": 120,
+          "sha256": "6255a88b093b42d2076c795e0c4961b42f48984128ce80f5b6e7640672ba1ab3"
+        },
+        "answers/mixed-source.json": {
+          "bytes": 730,
+          "sha256": "8541eb89c7647426346b4c0aebcb78e738d784c2f86c9a01e6c598826a1ea857"
+        },
+        "captures/mixed-transfer-id.pcap": {
+          "bytes": 120,
+          "sha256": "ec786a7cfaa0782430c3185619c24f18165ae348bf3706ebe37317a46849f81d"
+        },
+        "answers/mixed-transfer-id.json": {
+          "bytes": 730,
+          "sha256": "be2072c93ea028d5f6a93f6f9a4c321e68ef432aaa7f8d358c07d233df1b9f14"
+        },
+        "captures/duplicate-complete.pcap": {
+          "bytes": 216,
+          "sha256": "78d3176e2d103a6875ab77186bb7bab8a6ffde9c90fc956834c2512cb43280cc"
+        },
+        "answers/duplicate-complete.json": {
+          "bytes": 2208,
+          "sha256": "fd776b1e208786f89f2250e348610463b49ef7e06186cb4235832b86b2fb0a68"
+        },
+        "captures/transfer-id-wrap.pcap": {
+          "bytes": 216,
+          "sha256": "eb5874a2c281af1d81ca20ebd2c909b2a5039cfa974ec182b8851f5d0df87c3f"
+        },
+        "answers/transfer-id-wrap.json": {
+          "bytes": 3354,
+          "sha256": "764c78d37b81c0314daed4cf9d5fbf1186f8d1fc6a28f3c6dd78ae4aef2dea05"
+        },
+        "captures/short-dsdl-body.pcap": {
+          "bytes": 120,
+          "sha256": "b4b42f48c0d04a0b276b401ef7d4b7177e5bcb72b4fc50badab137dcc186a68f"
+        },
+        "answers/short-dsdl-body.json": {
+          "bytes": 589,
+          "sha256": "a3601112f4618db4366852444d8f292478f9970818f95813e7f4666a5f944b3f"
+        },
+        "captures/noncanonical-dsdl-body.pcap": {
+          "bytes": 120,
+          "sha256": "dddbd8630bf4ebc0f62fbb60b1b0f6260cf7a3e56455c688dadaf7788f28e310"
+        },
+        "answers/noncanonical-dsdl-body.json": {
+          "bytes": 589,
+          "sha256": "8f7bfc88cedd289a831437a1c994aff9b8118206631f025b4cf92036c5a855ac"
+        },
+        "captures/invalid-tao-array-length.pcap": {
+          "bytes": 376,
+          "sha256": "98d07169aa0ed22cf08ee471f42165835f1e04cba1df3b5b6c921f1e30ea2fc4"
+        },
+        "answers/invalid-tao-array-length.json": {
+          "bytes": 1759,
+          "sha256": "c3a345277f7293410065584cfacc9d55c6cf9d06715cd0ea00311aa7bd0bd528"
+        },
+        "captures/missing-tail.pcap": {
+          "bytes": 56,
+          "sha256": "c2536dfae809cbe15c02209aa00c1bd2a3eb3c003fc1f992458626c28bda3232"
+        },
+        "answers/missing-tail.json": {
+          "bytes": 297,
+          "sha256": "df1be627b3a836ac5a16992714ef36f6f3374ff7f26d49031fd7c17e58c9e02d"
+        },
+        "captures/zero-source.pcap": {
+          "bytes": 56,
+          "sha256": "af5c6f1b3f9f07cabb634d958524ac814a07b6a0835918e640d5ca62c75be174"
+        },
+        "answers/zero-source.json": {
+          "bytes": 297,
+          "sha256": "72f1e73b47137221f66f9f38ffaa1679c2f93c253072a4ab8ec91b567e87a1f6"
+        },
+        "captures/zero-destination.pcap": {
+          "bytes": 56,
+          "sha256": "445e0b397efeda1314bdd6fa69434e18afd0bac85c533d4747d1164b25d459c9"
+        },
+        "answers/zero-destination.json": {
+          "bytes": 297,
+          "sha256": "41f2f26fba94e40b6f5525bc385e57a325936b336e5e2eb1b5959cffcb0c20b3"
+        },
+        "captures/first-toggle.pcap": {
+          "bytes": 56,
+          "sha256": "ff96ea69a95bbd392b4c7ab34086b386022d2049ce2af76b9e2372f4630b6b65"
+        },
+        "answers/first-toggle.json": {
+          "bytes": 297,
+          "sha256": "eb8c76e5a1cff1c834d8fb473da932c0f20055d3e2134301b5abc2901908a322"
+        },
+        "captures/short-nonfinal.pcap": {
+          "bytes": 56,
+          "sha256": "cc94d59492adef8a63de9c1a0c25c39014cbf20c71bdbe67e660704450af6aa0"
+        },
+        "answers/short-nonfinal.json": {
+          "bytes": 297,
+          "sha256": "5bee8e48b0c8301d9ce244000de468ef769f0ab08fb93f0f5c4996370ca08142"
+        },
+        "captures/request-outside-response-profile.pcap": {
+          "bytes": 56,
+          "sha256": "63fadce2fda8380238144c3221aa721d05446b9c6d417a4858e64b174f38ea98"
+        },
+        "answers/request-outside-response-profile.json": {
+          "bytes": 299,
+          "sha256": "3936b40b0be3a5a6d69c1f4cabfa9369e3dbfdde4acee05ab7974dc3bae96553"
+        },
+        "manifest.json": {
+          "bytes": 11539,
+          "sha256": "0bbbbe9751cf17ad722cf3c77056e58def818a94debda74427441072f2a4caf9"
+        },
+        "generate.py": {
+          "bytes": 6350,
+          "sha256": "b137c3d94f714e8a8be6a19df271d0b7a66b22796790ccace63fe1c91a0f2b5f"
+        },
+        "verify.py": {
+          "bytes": 2454,
+          "sha256": "e85c0abcc6883d4f340417a243c811cee513a4108a72070d052ffd3697b6e488"
+        },
+        "seal.py": {
+          "bytes": 3855,
+          "sha256": "6c7e6f18930695159391e829fc522108318187ea89c2433222fb3887e2863e0a"
+        },
+        "SOURCE.json": {
+          "bytes": 3308,
+          "sha256": "240c608a8a316756dddea28d612e6defdadc31e3120146bb99f9d52231e5cf3e"
+        },
+        "reference_transport.c": {
+          "bytes": 2203,
+          "sha256": "fca5b2a44d7b0aec5b808d30598d73b96c63bc28850a3c617d450e22ea5e8ce3"
+        },
+        "reference_rx.c": {
+          "bytes": 1156,
+          "sha256": "e3acf377118234ee612b86f097e9e303d5bfd2f0892cd0dc024b548ba4ec2f97"
+        },
+        "reference_signature.py": {
+          "bytes": 964,
+          "sha256": "4a8f39e84887d67eb93168b52d78ec855460c9939fa2939e83c79f5400edbaea"
+        },
+        "signature-executed.json": {
+          "bytes": 405,
+          "sha256": "bcfb900b045dfd67fdf32990e5571b903b520b923c1be89dfd7f5260498b86bd"
+        },
+        "transport-reference.json": {
+          "bytes": 5088,
+          "sha256": "8de91e7de086ab13e6d60c69351b415963271d91a0e025a9f9b95397955d1b42"
+        },
+        "receiver-reference.json": {
+          "bytes": 2832,
+          "sha256": "a00726f8d23232e83f4e9d790e10ee6e87c5bff84c71d7e6d1c666ab4dcdd88c"
+        },
+        "validation/expected.json": {
+          "bytes": 30419,
+          "sha256": "c4c6bcd3eb7e3ff49a609ca169b45497cbe2588fbf3d9fc9cf5cdda423784a26"
+        }
+      },
+      "aliases": {
+        "common/pcapx/pcaputil/dronecan-transport-stats/captures/no-interfaces.pcap": "captures/no-interfaces.pcap",
+        "common/pcapx/pcaputil/dronecan-transport-stats/answers/no-interfaces.json": "answers/no-interfaces.json",
+        "common/pcapx/pcaputil/dronecan-transport-stats/captures/zero-counters.pcap": "captures/zero-counters.pcap",
+        "common/pcapx/pcaputil/dronecan-transport-stats/answers/zero-counters.json": "answers/zero-counters.json",
+        "common/pcapx/pcaputil/dronecan-transport-stats/captures/maximum-counters.pcap": "captures/maximum-counters.pcap",
+        "common/pcapx/pcaputil/dronecan-transport-stats/answers/maximum-counters.json": "answers/maximum-counters.json",
+        "common/pcapx/pcaputil/dronecan-transport-stats/captures/one-interface.pcap": "captures/one-interface.pcap",
+        "common/pcapx/pcaputil/dronecan-transport-stats/answers/one-interface.json": "answers/one-interface.json",
+        "common/pcapx/pcaputil/dronecan-transport-stats/captures/two-interfaces.pcap": "captures/two-interfaces.pcap",
+        "common/pcapx/pcaputil/dronecan-transport-stats/answers/two-interfaces.json": "answers/two-interfaces.json",
+        "common/pcapx/pcaputil/dronecan-transport-stats/captures/three-interfaces.pcap": "captures/three-interfaces.pcap",
+        "common/pcapx/pcaputil/dronecan-transport-stats/answers/three-interfaces.json": "answers/three-interfaces.json",
+        "common/pcapx/pcaputil/dronecan-transport-stats/captures/missing-start.pcap": "captures/missing-start.pcap",
+        "common/pcapx/pcaputil/dronecan-transport-stats/answers/missing-start.json": "answers/missing-start.json",
+        "common/pcapx/pcaputil/dronecan-transport-stats/captures/missing-middle.pcap": "captures/missing-middle.pcap",
+        "common/pcapx/pcaputil/dronecan-transport-stats/answers/missing-middle.json": "answers/missing-middle.json",
+        "common/pcapx/pcaputil/dronecan-transport-stats/captures/out-of-order.pcap": "captures/out-of-order.pcap",
+        "common/pcapx/pcaputil/dronecan-transport-stats/answers/out-of-order.json": "answers/out-of-order.json",
+        "common/pcapx/pcaputil/dronecan-transport-stats/captures/duplicate-first.pcap": "captures/duplicate-first.pcap",
+        "common/pcapx/pcaputil/dronecan-transport-stats/answers/duplicate-first.json": "answers/duplicate-first.json",
+        "common/pcapx/pcaputil/dronecan-transport-stats/captures/bad-crc.pcap": "captures/bad-crc.pcap",
+        "common/pcapx/pcaputil/dronecan-transport-stats/answers/bad-crc.json": "answers/bad-crc.json",
+        "common/pcapx/pcaputil/dronecan-transport-stats/captures/bad-toggle.pcap": "captures/bad-toggle.pcap",
+        "common/pcapx/pcaputil/dronecan-transport-stats/answers/bad-toggle.json": "answers/bad-toggle.json",
+        "common/pcapx/pcaputil/dronecan-transport-stats/captures/mixed-priority.pcap": "captures/mixed-priority.pcap",
+        "common/pcapx/pcaputil/dronecan-transport-stats/answers/mixed-priority.json": "answers/mixed-priority.json",
+        "common/pcapx/pcaputil/dronecan-transport-stats/captures/mixed-source.pcap": "captures/mixed-source.pcap",
+        "common/pcapx/pcaputil/dronecan-transport-stats/answers/mixed-source.json": "answers/mixed-source.json",
+        "common/pcapx/pcaputil/dronecan-transport-stats/captures/mixed-transfer-id.pcap": "captures/mixed-transfer-id.pcap",
+        "common/pcapx/pcaputil/dronecan-transport-stats/answers/mixed-transfer-id.json": "answers/mixed-transfer-id.json",
+        "common/pcapx/pcaputil/dronecan-transport-stats/captures/duplicate-complete.pcap": "captures/duplicate-complete.pcap",
+        "common/pcapx/pcaputil/dronecan-transport-stats/answers/duplicate-complete.json": "answers/duplicate-complete.json",
+        "common/pcapx/pcaputil/dronecan-transport-stats/captures/transfer-id-wrap.pcap": "captures/transfer-id-wrap.pcap",
+        "common/pcapx/pcaputil/dronecan-transport-stats/answers/transfer-id-wrap.json": "answers/transfer-id-wrap.json",
+        "common/pcapx/pcaputil/dronecan-transport-stats/captures/short-dsdl-body.pcap": "captures/short-dsdl-body.pcap",
+        "common/pcapx/pcaputil/dronecan-transport-stats/answers/short-dsdl-body.json": "answers/short-dsdl-body.json",
+        "common/pcapx/pcaputil/dronecan-transport-stats/captures/noncanonical-dsdl-body.pcap": "captures/noncanonical-dsdl-body.pcap",
+        "common/pcapx/pcaputil/dronecan-transport-stats/answers/noncanonical-dsdl-body.json": "answers/noncanonical-dsdl-body.json",
+        "common/pcapx/pcaputil/dronecan-transport-stats/captures/invalid-tao-array-length.pcap": "captures/invalid-tao-array-length.pcap",
+        "common/pcapx/pcaputil/dronecan-transport-stats/answers/invalid-tao-array-length.json": "answers/invalid-tao-array-length.json",
+        "common/pcapx/pcaputil/dronecan-transport-stats/captures/missing-tail.pcap": "captures/missing-tail.pcap",
+        "common/pcapx/pcaputil/dronecan-transport-stats/answers/missing-tail.json": "answers/missing-tail.json",
+        "common/pcapx/pcaputil/dronecan-transport-stats/captures/zero-source.pcap": "captures/zero-source.pcap",
+        "common/pcapx/pcaputil/dronecan-transport-stats/answers/zero-source.json": "answers/zero-source.json",
+        "common/pcapx/pcaputil/dronecan-transport-stats/captures/zero-destination.pcap": "captures/zero-destination.pcap",
+        "common/pcapx/pcaputil/dronecan-transport-stats/answers/zero-destination.json": "answers/zero-destination.json",
+        "common/pcapx/pcaputil/dronecan-transport-stats/captures/first-toggle.pcap": "captures/first-toggle.pcap",
+        "common/pcapx/pcaputil/dronecan-transport-stats/answers/first-toggle.json": "answers/first-toggle.json",
+        "common/pcapx/pcaputil/dronecan-transport-stats/captures/short-nonfinal.pcap": "captures/short-nonfinal.pcap",
+        "common/pcapx/pcaputil/dronecan-transport-stats/answers/short-nonfinal.json": "answers/short-nonfinal.json",
+        "common/pcapx/pcaputil/dronecan-transport-stats/captures/request-outside-response-profile.pcap": "captures/request-outside-response-profile.pcap",
+        "common/pcapx/pcaputil/dronecan-transport-stats/answers/request-outside-response-profile.json": "answers/request-outside-response-profile.json",
+        "common/pcapx/pcaputil/dronecan-transport-stats/manifest.json": "manifest.json",
+        "common/pcapx/pcaputil/dronecan-transport-stats/generate.py": "generate.py",
+        "common/pcapx/pcaputil/dronecan-transport-stats/verify.py": "verify.py",
+        "common/pcapx/pcaputil/dronecan-transport-stats/seal.py": "seal.py",
+        "common/pcapx/pcaputil/dronecan-transport-stats/SOURCE.json": "SOURCE.json",
+        "common/pcapx/pcaputil/dronecan-transport-stats/reference_transport.c": "reference_transport.c",
+        "common/pcapx/pcaputil/dronecan-transport-stats/reference_rx.c": "reference_rx.c",
+        "common/pcapx/pcaputil/dronecan-transport-stats/reference_signature.py": "reference_signature.py",
+        "common/pcapx/pcaputil/dronecan-transport-stats/signature-executed.json": "signature-executed.json",
+        "common/pcapx/pcaputil/dronecan-transport-stats/transport-reference.json": "transport-reference.json",
+        "common/pcapx/pcaputil/dronecan-transport-stats/receiver-reference.json": "receiver-reference.json"
+      }
     }
   ],
   "schema_version": 1,

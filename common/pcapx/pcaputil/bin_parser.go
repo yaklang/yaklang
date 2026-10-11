@@ -403,6 +403,9 @@ type binParser struct {
 	aisMultipartDisabled                                                       bool               // udpMu; untracked history fails closed
 	datagramDecodeAs                                                           map[uint16]string
 	canDecodeAs                                                                map[int]string
+	droneCANMu                                                                 sync.Mutex
+	droneCANStats                                                              *droneCANStatsStore
+	droneCANStatsDisabled                                                      bool // refused untracked transfer history fails closed
 	fragments                                                                  fragmentStore
 	dnsMu                                                                      sync.Mutex
 	dns                                                                        dnsCorrelation
@@ -508,6 +511,7 @@ func (c *CaptureConfig) finishBinParser() error {
 		return nil
 	}
 	a := c.binParser
+	a.closeDroneCANStats()
 	a.closeUDPSessions()
 	a.closeDCPObservations()
 	a.closeMediaAssociations()

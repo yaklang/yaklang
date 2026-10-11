@@ -158,25 +158,43 @@ func (a *binParser) decodeCANRecord(w []byte, evidence captureEvidence, ci gopac
 	var err error
 	switch {
 	case ci.CaptureLength < ci.Length:
+		if a.canDecodeAs[e.Domain.Interface] == "dronecan-stats" {
+			a.refuseDroneCANStatsRecord()
+		}
 		err = protocolError(ErrNeedMore, "SocketCAN capture record is truncated")
 	case len(w) > min(a.budget.MaxFrameBytes, a.budget.MaxMessageBytes):
+		if a.canDecodeAs[e.Domain.Interface] == "dronecan-stats" {
+			a.refuseDroneCANStatsRecord()
+		}
 		err = protocolError(ErrResourceExceeded, "SocketCAN record exceeds parser byte budget")
 	default:
 		e.Raw = bytes.Clone(w)
 		a.messages.Add(1)
 		a.messageBytes.Add(uint64(len(w)))
 		fields, err = decodeSocketCAN(w)
+		if err != nil && a.canDecodeAs[e.Domain.Interface] == "dronecan-stats" {
+			a.refuseDroneCANStatsRecord()
+		}
 		selection := a.canDecodeAs[e.Domain.Interface]
-		if err == nil && (selection == "j1939" || selection == "dronecan") && fields["Extended"] == true && fields["RTR"] == false && fields["Error Frame"] == false && fields["Frame Format"] == "classic" {
+		if err == nil && (selection == "j1939" || selection == "dronecan" || selection == "dronecan-stats") && fields["Extended"] == true && fields["RTR"] == false && fields["Error Frame"] == false && fields["Frame Format"] == "classic" {
 			e.Protocol, e.Profile, e.Admission = "j1939", "j1939-classic-request-name", "explicit-interface-decode-as"
 			var jf map[string]any
-			if a.canDecodeAs[e.Domain.Interface] == "dronecan" {
+			if selection == "dronecan" || selection == "dronecan-stats" {
 				e.Protocol, e.Profile = "dronecan", "dronecan-v0-node-status"
 				identifier := fields["Identifier"].(uint32)
 				if identifier&128 != 0 && identifier>>16&255 == 5 {
 					e.Profile = "dronecan-v0-restart-node"
 				}
-				jf, err = decodeDroneCANNodeStatus(fields["Identifier"].(uint32), fields["Data"].([]byte))
+				if selection == "dronecan-stats" && identifier&128 != 0 && identifier>>16&255 == 4 {
+					e.Profile = "dronecan-v0-transport-stats"
+					var refs []PacketReference
+					jf, refs, err = a.decodeDroneCANStats(identifier, fields["Data"].([]byte), evidence.Ref, ci.Timestamp)
+					if len(refs) > 1 {
+						e.SourceBytes = ByteSource{Kind: "reassembled", PacketRefs: refs}
+					}
+				} else {
+					jf, err = decodeDroneCANNodeStatus(identifier, fields["Data"].([]byte))
+				}
 			} else {
 				jf, err = decodeJ1939RequestName(fields["Identifier"].(uint32), fields["Data"].([]byte))
 			}
