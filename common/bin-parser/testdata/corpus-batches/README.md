@@ -471,4 +471,22 @@ The small sealed batch supplies complete field/Session answers and reproducible
 synthetic inputs; its scripts check all fields/branches against fixed libais
 `87dadfaa1b4db0b0e9953680051391f2c4375455` using separately hash-pinned sources.
 No upstream source, large downloads, runtime logs or compiled codecs are stored
-in the ZIP. It does not implement Type19/24 or multipart/cross-datagram assembly.
+in the ZIP. It does not implement Type19 or cross-datagram assembly.
+
+The `nmea-ais-static/controls.json` entry observes Type24 Part A and Part B
+independently. Part A accepts its 160-bit and 168-bit forms; Part B requires
+168 bits. A short Part B is rejected without rewriting its literal Part Number.
+Part B preserves both the old seven-character vendor representation and the
+M.1371-4/5 manufacturer/model/serial layout, without inferring equipment version.
+Auxiliary MMSI prefix 98 selects the raw mothership MMSI; other prefixes select
+dimension fields and their unavailable/lower-bound markers. Equal reported MMSIs
+do not establish entity identity or authorize joining parts across datagrams.
+`TestNMEAMultipleSentencesBudgetAndOwnership/ais-static-profile` loads three
+small grouped captures with 32 independently specified datagram scenarios,
+including 15 refusals and a co-packed pair that stays as two independent reports.
+Each scenario runs full/deferred, workers 1/2/4 and callbacks off/on. Fixed libais
+checks the old codec's common fields; its short-Part-B relabel tolerance and
+legacy vendor/dimension interpretation are explicitly distinguished from the
+versioned normative bit-layout answers. Raw physical identity, receiver operation
+and authentication remain unverified. No upstream sources or build outputs are
+included in the sealed ZIP.

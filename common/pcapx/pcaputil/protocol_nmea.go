@@ -10,7 +10,7 @@ import (
 
 // GGA, RMC, unit-labelled VTG, fixed-slot GSA and per-sentence GSV are observed navigation statements. Checksums validate their
 // wire representation, not the sender's identity or the accuracy of a fix.
-// Single-fragment AIS Class A and Type18 Class B position reports are also
+// Single-fragment AIS Class A/Type18 positions and Type24 static parts are also
 // observed statements; flags and radio status do not prove a device capability.
 // Proprietary sentences and tag blocks are unsupported. A datagram must contain
 // complete CRLF sentences; selected Type5 pairs may be assembled only when
