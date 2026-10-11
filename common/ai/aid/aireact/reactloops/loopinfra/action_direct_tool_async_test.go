@@ -9,12 +9,13 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
+	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/asyncexecmanager"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/schema"
 )
 
 // Observe the real verifier/handler boundary while keeping tool execution local.
-// Async remains a parsed hint: every handler still calls the synchronous runtime.
+// Record either synchronous invocation or asynchronous resource preparation.
 type asyncActionTestInvoker struct {
 	*directlyCallTestInvoker
 	loop         *reactloops.ReActLoop
@@ -36,6 +37,16 @@ func (i *asyncActionTestInvoker) DirectlyCallTool(ctx context.Context, name stri
 func (i *asyncActionTestInvoker) ExecuteToolRequiredAndCallWithoutRequired(ctx context.Context, name string, params aitool.InvokeParams, options ...aicommon.ToolCallerOption) (*aitool.ToolResult, bool, error) {
 	i.scalarStates = append(i.scalarStates, i.loop.GetActionExecutionValue(i.action, actionStateDirectToolAsync))
 	return i.directlyCallTestInvoker.ExecuteToolRequiredAndCallWithoutRequired(ctx, name, params, options...)
+}
+
+func (i *asyncActionTestInvoker) PrepareAsyncToolCall(task aicommon.AIStatefulTask, name string, params aitool.InvokeParams, _ ...aicommon.ToolCallerOption) (asyncexecmanager.Resource, func(), error) {
+	i.scalarStates = append(i.scalarStates, i.loop.GetActionExecutionValue(i.action, actionStateDirectToolAsync))
+	i.withoutRequiredName, i.withoutRequiredParams = name, params
+	resource, err := asyncexecmanager.NewResource(func(context.Context) error { return nil },
+		func(context.Context) (asyncexecmanager.Observation, error) {
+			return asyncexecmanager.Observation{}, nil
+		})
+	return resource, func() {}, err
 }
 
 func (i *asyncActionTestInvoker) ExecuteToolCallGroup(ctx context.Context, task aicommon.AIStatefulTask, request *aicommon.ToolCallGroupRequest) (*aicommon.ToolCallGroupResult, error) {

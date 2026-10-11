@@ -21,7 +21,7 @@ var nativeDirectToolAction = &reactloops.LoopAction{
 		aitool.WithStringParam("directly_call_tool_name", aitool.WithParam_Description("单调用的业务工具名称；批次时省略。此名称不能作为原生 function.name。")),
 		aitool.WithRawParam("directly_call_tool_params", map[string]any{"type": "object", "description": "单调用业务参数，字段必须遵循已加载的业务工具 Schema；无参数工具填 {}，批次时省略。长文本写入 JSON 字符串，不输出外置 AITAG。"}),
 		aitool.WithBoolParam("async_directly_call_tool", aitool.WithParam_Default(false),
-			aitool.WithParam_Description("可选的单调用异步标记，默认 false；批量调用时使用每项 async。TBD：异步执行尚未启用，true 仍按原同步路径执行。")),
+			aitool.WithParam_Description("可选的单调用异步标记，默认 false 同步等待；true 提交后台执行并返回 execute_id，通过 manage_async_execution_runtime 查看或等待结果。批量调用使用每项 async，批量异步派发仍为 TBD。")),
 		aitool.WithStringParam("directly_call_reason", aitool.WithParam_Description("可选的单调用目的；批次时省略，各子调用分别填写目的。")),
 		aitool.WithStructArrayParam("directly_call_tool_params_group", []aitool.PropertyOption{
 			aitool.WithParam_Description("执行低风险、独立且互不干扰的调用，每项参数来自完整 Schema；省略单调用名称和参数。各项使用不同 identifier 和明确目的，顶层目的不会复制给子调用。"),
@@ -97,10 +97,15 @@ func executeNativeDirectTool(loop *reactloops.ReActLoop, action *aicommon.Action
 		return
 	}
 	ctx, invoker := toolBatchVerifierContext(loop), loop.GetInvoker()
-	// TBD: route async_directly_call_tool through the loop's async execution manager.
-	result, directly, err := invoker.ExecuteToolRequiredAndCallWithoutRequired(ctx, name, params,
+	opts := []aicommon.ToolCallerOption{
 		aicommon.WithToolCaller_Reason(resolveToolCallReason(action, "directly_call_reason")),
-		aicommon.WithToolCaller_DestinationIdentifier(action.GetString("identifier")))
+		aicommon.WithToolCaller_DestinationIdentifier(action.GetString("identifier")),
+	}
+	if async, _ := loop.GetActionExecutionValue(action, actionStateDirectToolAsync).(bool); async {
+		submitAsyncDirectTool(loop, name, params, operator, opts...)
+		return
+	}
+	result, directly, err := invoker.ExecuteToolRequiredAndCallWithoutRequired(ctx, name, params, opts...)
 	recordSuccessfulToolCache(loop, name, result, err)
 	handleToolCallResult(loop, ctx, invoker, name, result, directly, err, operator)
 }

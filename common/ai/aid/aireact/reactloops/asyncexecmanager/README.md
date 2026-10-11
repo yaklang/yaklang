@@ -154,7 +154,7 @@ Forget 接口。较长的 owner 生命周期需要配置适当的记录上限，
 
 本包已实现独立核心和函数适配器。directly_call_tool 已接入异步标记的解析，
 ToolCaller 已实现 Inspector；工具提交入口和管理 action 已接入，directly_call_tool 的
-异步标记仍为 TBD，当前该 action 的执行方式不变。
+单调用异步标记已生效。批量每项 async 的实际派发仍为 TBD。
 ReActLoop 提供 `GetAsyncExecutionManager()`：首次调用必须已有 current task，
 Manager 绑定该任务 context；后续调用复用同一实例，不随 current task 切换而重建。
 Release 会在其他释放回调前 Close，取消执行并禁止新提交，但不阻塞等待清理；
@@ -245,6 +245,24 @@ action Schema：单工具 `async_directly_call_tool` 可选 bool；批量
 缺省、null、无法识别的类型）回退到 false。批量只读取每项 async，多余的顶层
 单调用标记会被忽略。单调用标记保存在该 action 的执行状态中，不进入工具业务参数。
 两套协议和 root/next_action 形式由 action_direct_tool_async_test.go 的 mock 测试覆盖。
+
+单调用标记为 true 时，文本/native 两条 action 入口都通过 loop.StartAsyncToolCall
+提交到所属 Manager，返回人类可读的 execute_id/tool_name/state 回执并继续主循环。
+缺省或 false 仍同步等待结果。文本 verifier 仍可流式读取工具名；handler 在决定
+调度方式前等待完整 action（含 AITAG），因此调用卡片要等完整解析后才创建，避免
+遗漏晚于参数出现的 async 标记，也不把尚未完整的参数交给后台任务。文本异步路径
+复用原有的归一化、AITAG 合并和校验；native 路径使用 verifier 已校验的参数。
+资源准备继续执行原 owner 的 guard/mutator，工具审批和执行由 ToolCaller 完成。
+
+回执只表示成功注册，不表示工具已执行或已完成；提交失败立即反馈，不降级为同步。
+异步提交不计入已完成工具次数，不触发满意度验证；后台结果仍归档到原 task/timeline，
+状态和输出通过 AutoContext / manage_async_execution_runtime 查看。loop Release 会
+请求取消自身后台执行，因此结束任务前应先 wait 确认所需执行结束。
+
+验证见 [单调用派发综合测试](../../../aireact/invoke_toolcall_async_action_test.go)：
+文本 root/next_action 与 native handler、默认同步、提交立即返回、真实 Inspector
+输出与结果、wait/stop、执行失败、guard 拒绝和参数校验失败；不依赖 AI 服务。
+
 `manage_async_execution_runtime` 是核心 action，始终注册，不依赖工具、MCP 或 forge
 开关；普通 action 过滤和单轮 must-use/disabled 约束不会隐藏它，宿主 runtime action
 policy 仍生效。文本和 native function call 协议共享同一个 verifier/handler。
@@ -297,7 +315,7 @@ omitted: 0
 展示只读取元信息，不调用 Inspector，不复制或缓存 stdout、stderr 或结果；详情由
 manage_async_execution_runtime 的 inspect 按需获取。文本/native 和轻量模式都使用
 同一动态输入，已有 AutoContext provider 内容会保留；摘要也出现在已有上下文成分
-面板的 Auto Context 项中。UI 的实时执行卡片与异步标记的实际派发仍待后续接入。
+面板的 Auto Context 项中。UI 的实时执行卡片与批量异步标记的实际派发仍待后续接入。
 
 验证见 [展示综合测试](../async_execution_context_test.go)：实际主循环 prompt 构造、
 跨轮次状态变化、取消清理、任务隔离、近期终态选择、长度限制、Dump 转义和不读取输出。
