@@ -26,7 +26,15 @@ type droneCANStatsAnswer struct {
 }
 
 func droneCANTransportStatsSealed(t *testing.T) {
-	raw, err := trafficfixture.ReadFile("dronecan-transport-stats/manifest.json")
+	droneCANResponseSealed(t, "dronecan-transport-stats", "dronecan-transport-stats/v1", "dronecan-stats", "dronecan-v0-transport-stats", 26)
+}
+func droneCANNodeInfoSealed(t *testing.T) {
+	droneCANResponseSealed(t, "dronecan-node-info", "dronecan-node-info/v1", "dronecan-services", "dronecan-v0-node-info", 30)
+	t.Run("Resources", droneCANInfoIsolationAndResources)
+	t.Run("ExactIntegerOracle", TestProtocolExactFieldIntegerOracle)
+}
+func droneCANResponseSealed(t *testing.T, directory, schema, selection, profile string, count int) {
+	raw, err := trafficfixture.ReadFile(directory + "/manifest.json")
 	require.NoError(t, err)
 	var m struct {
 		Schema string
@@ -37,8 +45,8 @@ func droneCANTransportStatsSealed(t *testing.T) {
 		}
 	}
 	require.NoError(t, json.Unmarshal(raw, &m))
-	require.Equal(t, "dronecan-transport-stats/v1", m.Schema)
-	require.Len(t, m.Cases, 26)
+	require.Equal(t, schema, m.Schema)
+	require.Len(t, m.Cases, count)
 	frozen, err := trafficfixture.AllExpectations()
 	require.NoError(t, err)
 	bound := map[string]trafficfixture.FrozenCase{}
@@ -49,7 +57,7 @@ func droneCANTransportStatsSealed(t *testing.T) {
 	}
 	for _, c := range m.Cases {
 		t.Run(c.ID, func(t *testing.T) {
-			v, ok := bound["dronecan-transport-stats/"+c.ID]
+			v, ok := bound[directory+"/"+c.ID]
 			require.True(t, ok)
 			require.Equal(t, c.SHA256, v.Input.SHA256)
 			require.Equal(t, c.Capture, v.Input.OriginalPath)
@@ -71,7 +79,7 @@ func droneCANTransportStatsSealed(t *testing.T) {
 			require.Equal(t, c.SHA256, fmt.Sprintf("%x", sha256.Sum256(capture)))
 			require.Equal(t, c.AnswerSHA, fmt.Sprintf("%x", sha256.Sum256(answer)))
 			var a droneCANStatsAnswer
-			require.NoError(t, json.Unmarshal(answer, &a))
+			require.NoError(t, decodeExactProtocolAnswer(answer, &a))
 			for _, workers := range []int{1, 2, 4} {
 				for _, deferred := range []bool{false, true} {
 					for _, observe := range []bool{false, true} {
@@ -80,7 +88,7 @@ func droneCANTransportStatsSealed(t *testing.T) {
 							var ps ProtocolStats
 							var rs TCPReassemblyStats
 							seen := 0
-							opts := []CaptureOption{WithTCPReassemblyWorkers(workers), WithProtocolDeferred(deferred), WithCANDecodeAs(0, "dronecan-stats"), WithOnProtocolMessage(func(e *ProtocolEvent) { events = append(events, e) }), WithOnProtocolStats(func(s ProtocolStats) { ps = s }), WithOnTCPReassemblyStats(func(s TCPReassemblyStats) { rs = s })}
+							opts := []CaptureOption{WithTCPReassemblyWorkers(workers), WithProtocolDeferred(deferred), WithCANDecodeAs(0, selection), WithOnProtocolMessage(func(e *ProtocolEvent) { events = append(events, e) }), WithOnProtocolStats(func(s ProtocolStats) { ps = s }), WithOnTCPReassemblyStats(func(s TCPReassemblyStats) { rs = s })}
 							if observe {
 								opts = append(opts, WithEveryPacket(func(p gopacket.Packet) {
 									w, err := hex.DecodeString(a.Events[seen].Wire)
@@ -99,7 +107,7 @@ func droneCANTransportStatsSealed(t *testing.T) {
 								require.EqualValues(t, i+1, e.ID)
 								require.Equal(t, "can", e.Transport)
 								require.Equal(t, "dronecan", e.Protocol)
-								require.Equal(t, "dronecan-v0-transport-stats", e.Profile)
+								require.Equal(t, profile, e.Profile)
 								require.Zero(t, e.FlowID)
 								require.Zero(t, e.ResponseTo)
 								require.Zero(t, e.TransactionID)

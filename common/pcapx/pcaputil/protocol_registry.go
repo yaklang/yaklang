@@ -98,11 +98,12 @@ func WithProtocolDecodeAs(transport string, port uint16, protocol string) Captur
 // used by other protocols. It does not authenticate an address claim or enable
 // automotive ISO-TP (the existing isotp rule describes RFC1006/COTP).
 // dronecan-stats additionally selects the bounded v0 GetTransportStats response
-// receiver; dronecan preserves stateless NodeStatus/RestartNode observations.
+// receiver; dronecan-services also observes GetNodeInfo responses. Neither
+// selection verifies invocation association or node identity. dronecan preserves stateless NodeStatus/RestartNode observations.
 func WithCANDecodeAs(captureInterface int, protocol string) CaptureOption {
 	return func(c *CaptureConfig) error {
-		if captureInterface < 0 || (protocol != "j1939" && protocol != "dronecan" && protocol != "dronecan-stats") {
-			return fmt.Errorf("CAN DecodeAs requires a nonnegative capture interface and a supported j1939/dronecan/dronecan-stats profile")
+		if captureInterface < 0 || (protocol != "j1939" && protocol != "dronecan" && protocol != "dronecan-stats" && protocol != "dronecan-services") {
+			return fmt.Errorf("CAN DecodeAs requires a nonnegative capture interface and a supported j1939/dronecan/dronecan-stats/dronecan-services profile")
 		}
 		if c.canDecodeAs == nil {
 			c.canDecodeAs = make(map[int]string)
