@@ -266,6 +266,9 @@ type LoopPromptAssemblyInput struct {
 	FunctionCallSchemas string
 	SkillsContext       string
 	ExtraCapabilities   string
+	// AutoContext is a loop-owned, per-request snapshot appended to the runtime's
+	// dynamic context. It must not be reconstructed from a mutable current task.
+	AutoContext string
 	// PlanStatus is the live, read-only plan state displayed between Timeline Open
 	// and TODO. It does not contain task goals, documents, or result summaries.
 	PlanStatus string

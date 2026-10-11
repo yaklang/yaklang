@@ -431,6 +431,7 @@ func (r *ReActLoop) generateLoopPrompt(
 		ForcedSkills:             forcedSkillsBlock,
 		AutoLoadedSkills:         autoSkillsBlock,
 		ExtraCapabilities:        extraCapabilities,
+		AutoContext:              r.renderAsyncExecutionContext(nonce),
 		PlanStatus:               planStatus,
 		TodoSnapshot:             todoSnapshot,
 		ReactiveData:             reactiveData,

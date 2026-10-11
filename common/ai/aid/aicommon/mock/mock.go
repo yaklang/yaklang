@@ -337,6 +337,7 @@ func (m *MockInvoker) AssembleLoopPrompt(tools []*aitool.Tool, input *aicommon.L
 	))
 	timelineOpen := wrapMockPromptSection("timeline-open", timeline.TimelineOpen)
 	dynamic := wrapMockPromptSectionWithNonce("dynamic", joinMockPromptParts(
+		input.AutoContext,
 		renderMockUserQueryBlock(input.Nonce, input.UserQuery),
 		renderMockTaggedBlock("EXTRA_CAPABILITIES", input.Nonce, input.ExtraCapabilities),
 		renderMockTaggedBlock("REACTIVE_DATA", input.Nonce, input.ReactiveData),

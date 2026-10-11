@@ -268,6 +268,45 @@ mock 模型通过真实文本/native 解析链路执行全部 OP，验证始终�
 action、AutoContext 和 UI 使用同一个 owner
 Manager 的状态与 Inspector，UI 的持续刷新另由展示层实现。
 
+## AI 上下文展示
+
+每轮主循环构造 prompt 时，读取该 loop 已有 Manager 的 List，将只读摘要放入
+AutoContext 动态段。没有 Manager 或没有执行记录时不展示，也不会为展示创建 Manager。
+摘要通过本次 prompt 的输入显式传递，组装时不根据 runtime 可变的 current task
+重新查找 Manager；多个 loop 使用同一配置时，仍只展示各自拥有的执行。
+
+摘要使用人类可读的 YAML 风格 Dump，例如：
+
+```yaml
+executions:
+  - execute_id: "exec-demo"
+    name: "抓取流量"
+    state: running
+    elapsed_seconds: 12
+omitted: 0
+```
+
+资源文本使用带引号的字符串，换行、引号及 prompt 分隔符会转义，避免混入新字段。
+摘要优先展示尚未结束的执行，再展示按结束时间排序的最近终态记录：最多 8 条，
+其中终态最多 4 条，整块最多 4096 字节。每条包含 execute_id、名称、状态、耗时秒数
+和简短错误；名称最多 64 字符，错误最多 160 字符，截断时附加省略号。
+超过 256 字节的 ID 不在摘要中截断展示，完整 ID 仍可通过 list 获取。
+`omitted` 表示未展示的记录数。耗时从开始时间计算，尚未开始时使用创建时间，终态
+使用结束时间，避免已结束执行的耗时继续增长。
+
+展示只读取元信息，不调用 Inspector，不复制或缓存 stdout、stderr 或结果；详情由
+manage_async_execution_runtime 的 inspect 按需获取。文本/native 和轻量模式都使用
+同一动态输入，已有 AutoContext provider 内容会保留；摘要也出现在已有上下文成分
+面板的 Auto Context 项中。UI 的实时执行卡片与异步标记的实际派发仍待后续接入。
+
+验证见 [展示综合测试](../async_execution_context_test.go)：实际主循环 prompt 构造、
+跨轮次状态变化、取消清理、任务隔离、近期终态选择、长度限制、Dump 转义和不读取输出。
+
+## 后续待办
+
+- 子 agent 资源协作：保持默认隔离，由主 agent 显式共享指定资源引用，默认只读，
+  控制权限单独授权；AutoContext 只展示自身拥有及被授权共享的资源。本次不实现。
+
 ## 验证
 
 ```sh
