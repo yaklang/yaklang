@@ -416,6 +416,7 @@ func (r *ReActLoop) generateLoopPrompt(
 		Schema:                   schema,
 		FunctionCallSchemas:      functionCallSchemas,
 		ExtraCapabilities:        extraCapabilities,
+		AutoContext:              r.renderAsyncExecutionContext(nonce),
 		PlanStatus:               planStatus,
 		TodoSnapshot:             todoSnapshot,
 		ReactiveData:             reactiveData,
