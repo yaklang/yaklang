@@ -513,6 +513,7 @@ func (a *ToolCaller) invoke(
 		aitool.WithCancelCallback(toolCallCancel),
 		aitool.WithRuntimeConfig(runtimeCfg),
 		aitool.WithOutputCapture(false),
+		aitool.WithWaitForCallbackOnCancel(a.waitForCallbackOnCancel),
 	)
 	invokeCancelled := errors.Is(execErr, context.Canceled) ||
 		errors.Is(execErr, context.DeadlineExceeded) ||

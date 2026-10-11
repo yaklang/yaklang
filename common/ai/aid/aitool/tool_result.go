@@ -153,6 +153,12 @@ func (t *Tool) ExecuteToolWithCapture(ctx context.Context, params map[string]any
 	var err error
 	select {
 	case <-ctx.Done():
+		if config != nil && config.waitForCallbackOnCancel {
+			// Preserve writer ownership until callback work and cleanup really end.
+			// The cancelled result remains a cancellation, even if the callback
+			// returned a value while unwinding.
+			<-finished
+		}
 		// Do not read callback-owned buffers or result variables while a
 		// non-cooperative callback may still be unwinding. Context-aware tools
 		// return promptly; the buffered channel lets that goroutine exit even if

@@ -8,14 +8,15 @@ import (
 type ToolCallCancelCallback func(result *ToolExecutionResult, err error) (*ToolExecutionResult, error)
 
 type ToolInvokeConfig struct {
-	ctx                  context.Context
-	stdout               io.Writer
-	stderr               io.Writer
-	errCallback          func(error) (*ToolResult, error)
-	resCallback          func(result *ToolExecutionResult) (*ToolResult, error)
-	cancelCallback       ToolCallCancelCallback
-	runtimeConfig        *ToolRuntimeConfig
-	disableOutputCapture bool
+	ctx                     context.Context
+	stdout                  io.Writer
+	stderr                  io.Writer
+	errCallback             func(error) (*ToolResult, error)
+	resCallback             func(result *ToolExecutionResult) (*ToolResult, error)
+	cancelCallback          ToolCallCancelCallback
+	runtimeConfig           *ToolRuntimeConfig
+	disableOutputCapture    bool
+	waitForCallbackOnCancel bool
 }
 
 func (i *ToolInvokeConfig) GetErrCallback() func(error) (*ToolResult, error) {
@@ -122,4 +123,11 @@ func WithOutputCapture(enabled bool) ToolInvokeOptions {
 
 func (i *ToolInvokeConfig) ShouldCaptureOutput() bool {
 	return i == nil || !i.disableOutputCapture
+}
+
+// WithWaitForCallbackOnCancel joins callback work before returning cancellation.
+// Use for owned asynchronous resources; a non-cooperative callback may block.
+// Default callers keep the existing prompt-return cancellation behavior.
+func WithWaitForCallbackOnCancel(enabled bool) ToolInvokeOptions {
+	return func(config *ToolInvokeConfig) { config.waitForCallbackOnCancel = enabled }
 }
