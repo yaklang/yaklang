@@ -491,7 +491,14 @@ func (f *binFlow) consumeSession(dir int, e *ProtocolEvent, result map[string]an
 			}
 		}
 	case "mqtt":
-		e.Session, err = f.mqtt.consume(dir, e.Raw, result, f.a.budget.MaxCollectionElements, f.reserveSession)
+		e.Session, err = f.mqtt.consume(dir, e.Raw, result, f.a.budget.MaxCollectionElements, f.a.budget.MaxRecursionDepth, f.reserveSession)
+		if err == nil && e.Session["Sparkplug"] != nil {
+			// Preserve every native MQTT field and its wire span. The carried
+			// application observation is additive and owns its query projection.
+			if fields, ok := result["fields"].(map[string]any); ok {
+				fields["Sparkplug"] = cloneSessionValue(e.Session["Sparkplug"])
+			}
+		}
 	case "nats":
 		err = f.consumeNATS(e, dir)
 	case "mongodb":

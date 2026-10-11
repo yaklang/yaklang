@@ -4,6 +4,7 @@ import (
 	"crypto/sha256"
 	"encoding/binary"
 	"fmt"
+	"strings"
 )
 
 // Fixed-size request context: never retain an unbounded subscription body.
@@ -18,6 +19,8 @@ type binMQTT struct {
 	client      int
 	level       byte
 	seenConnect bool
+	connack     bool
+	spark       *sparkNode
 	// Indexed by the endpoint that allocated the identifier, not by the
 	// direction of the next ACK: PUBREL travels in the original direction.
 	pending    [2]map[uint16]mqttPending
@@ -91,7 +94,7 @@ func (f *binFlow) frameMQTT(w []byte) (int, *binSpec, error) {
 }
 
 func (m *binMQTT) retainedBytes() int64 {
-	return 256 + 128*int64(len(m.pending[0])+len(m.pending[1])) + 96*int64(len(m.aliases[0])+len(m.aliases[1])) + m.aliasBytes
+	return 256 + 128*int64(len(m.pending[0])+len(m.pending[1])) + 96*int64(len(m.aliases[0])+len(m.aliases[1])) + m.aliasBytes + m.spark.retainedBytes()
 }
 
 // Reserve both possible insertions before changing either dictionary. Topic
@@ -107,7 +110,7 @@ func (m *binMQTT) reserveInsert(pendingNew, aliasNew int, aliasBytes int64, maxE
 	return reserve(m.retainedBytes() + 128*int64(pendingNew) + 96*int64(aliasNew) + aliasBytes)
 }
 
-func (m *binMQTT) consume(dir int, raw []byte, result map[string]any, maxElements int, reserve func(int64) error) (map[string]any, error) {
+func (m *binMQTT) consume(dir int, raw []byte, result map[string]any, maxElements, maxDepth int, reserve func(int64) error) (map[string]any, error) {
 	if len(raw) < 2 {
 		return nil, fmt.Errorf("mqtt: truncated packet")
 	}
@@ -158,6 +161,29 @@ func (m *binMQTT) consume(dir int, raw []byte, result map[string]any, maxElement
 	body := raw[header:]
 	switch typ {
 	case 1:
+		willTopic, willBody, willFlags, err := mqttConnectWill(body, m.level)
+		if err != nil {
+			return nil, err
+		}
+		if strings.HasPrefix(willTopic, "spBv1.0/") {
+			v, key, verb, err := sparkObservation(willTopic, willBody, maxDepth, maxElements)
+			if err != nil {
+				return nil, err
+			}
+			p, _ := v["Payload"].(map[string]any)
+			bd, ok := sparkBDSeq(p)
+			if ok && verb == "NDEATH" && p["seq"] == nil && willFlags&0x38 == 8 {
+				next := &sparkNode{key: key, bdSeq: bd}
+				if err = reserve(m.retainedBytes() + next.retainedBytes()); err != nil {
+					return nil, err
+				}
+				m.spark = next
+				v["Context Status"], v["bdSeq"] = "registered-will", bd
+			} else if v["Reason"] == nil {
+				v["Reason"] = "Will requires NDEATH, bdSeq, QoS one, no seq/retain"
+			}
+			info["Sparkplug"] = v
+		}
 		m.client = dir
 		m.seenConnect = true
 		if max, ok := mqtt5ConnectAliasMax(body); m.level == 5 && ok {
@@ -171,6 +197,7 @@ func (m *binMQTT) consume(dir int, raw []byte, result map[string]any, maxElement
 		if len(body) >= 2 {
 			info["Reason Code"] = uint64(body[1])
 			info["Session Present"] = body[0]&1 != 0
+			m.connack = body[1] == 0
 		}
 	case 3:
 		topic, pid, alias, err := mqttPublishView(body, qos, m.level)
@@ -224,8 +251,28 @@ func (m *binMQTT) consume(dir int, raw []byte, result map[string]any, maxElement
 			}
 			info["Topic Alias"] = uint64(alias)
 		}
+		var sparkView map[string]any
+		nextSpark := m.spark
+		if strings.HasPrefix(topic, "spBv1.0/") {
+			payload, err := mqttPublishPayload(body, qos, m.level)
+			if err != nil {
+				return nil, err
+			}
+			sparkView, nextSpark, err = m.sparkPublish(dir, topic, payload, flags, maxDepth, maxElements)
+			if err != nil {
+				return nil, err
+			}
+		}
 		if err := m.reserveInsert(pendingNew, aliasNew, aliasDelta, maxElements, reserve); err != nil {
 			return nil, err
+		}
+		if sparkView != nil {
+			target := m.retainedBytes() + 128*int64(pendingNew) + 96*int64(aliasNew) + aliasDelta + nextSpark.retainedBytes() - m.spark.retainedBytes()
+			if err := reserve(target); err != nil {
+				return nil, err
+			}
+			m.spark = nextSpark
+			info["Sparkplug"] = sparkView
 		}
 		if storeAlias {
 			m.aliases[dir][alias] = topic
@@ -306,6 +353,11 @@ func (m *binMQTT) consume(dir int, raw []byte, result map[string]any, maxElement
 				m.pending[owner][pid] = prior
 			}
 		}
+	case 14:
+		m.connack = false
+		if m.spark != nil {
+			m.spark = &sparkNode{key: m.spark.key, bdSeq: m.spark.bdSeq}
+		}
 	case 8, 10:
 		if len(body) < 2 {
 			return nil, fmt.Errorf("mqtt: missing packet identifier")
@@ -346,6 +398,92 @@ func mqttSessionName(typ byte) string {
 		return names[typ]
 	}
 	return "UNKNOWN"
+}
+
+// These views run after the native MQTT envelope decoder has accepted the
+// packet. They borrow the payload only for this invocation; no Will body is
+// retained as connection state.
+func mqttConnectWill(body []byte, level byte) (topic string, payload []byte, flags byte, err error) {
+	if len(body) < 2 {
+		return "", nil, 0, fmt.Errorf("mqtt: truncated CONNECT")
+	}
+	at := 2 + int(binary.BigEndian.Uint16(body[:2]))
+	if at+4 > len(body) {
+		return "", nil, 0, fmt.Errorf("mqtt: truncated CONNECT header")
+	}
+	flags = body[at+1]
+	at += 4
+	skipProps := func() error {
+		n, h, e := mqtt5SkipVBI(body[at:])
+		if e != nil {
+			return e
+		}
+		if n > len(body)-at-h {
+			return fmt.Errorf("mqtt: truncated properties")
+		}
+		at += h + n
+		return nil
+	}
+	if level == 5 {
+		if e := skipProps(); e != nil {
+			return "", nil, flags, e
+		}
+	}
+	vector := func() ([]byte, error) {
+		if at+2 > len(body) {
+			return nil, fmt.Errorf("mqtt: truncated CONNECT vector")
+		}
+		n := int(binary.BigEndian.Uint16(body[at : at+2]))
+		at += 2
+		if n > len(body)-at {
+			return nil, fmt.Errorf("mqtt: truncated CONNECT vector")
+		}
+		b := body[at : at+n]
+		at += n
+		return b, nil
+	}
+	if _, e := vector(); e != nil {
+		return "", nil, flags, e
+	}
+	if flags&4 == 0 {
+		return "", nil, flags, nil
+	}
+	if level == 5 {
+		if e := skipProps(); e != nil {
+			return "", nil, flags, e
+		}
+	}
+	b, e := vector()
+	if e != nil {
+		return "", nil, flags, e
+	}
+	topic = string(b)
+	payload, e = vector()
+	return topic, payload, flags, e
+}
+
+func mqttPublishPayload(body []byte, qos, level byte) ([]byte, error) {
+	if len(body) < 2 {
+		return nil, fmt.Errorf("mqtt: truncated PUBLISH")
+	}
+	at := 2 + int(binary.BigEndian.Uint16(body[:2]))
+	if qos > 0 {
+		at += 2
+	}
+	if at > len(body) {
+		return nil, fmt.Errorf("mqtt: truncated PUBLISH")
+	}
+	if level == 5 {
+		n, h, e := mqtt5SkipVBI(body[at:])
+		if e != nil {
+			return nil, e
+		}
+		if n > len(body)-at-h {
+			return nil, fmt.Errorf("mqtt: truncated properties")
+		}
+		at += h + n
+	}
+	return body[at:], nil
 }
 
 func uintFrom(v any) (uint64, bool) {

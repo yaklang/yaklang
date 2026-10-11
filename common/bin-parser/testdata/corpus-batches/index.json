@@ -45953,6 +45953,1838 @@
           "sha256": "a078f50e5c50c556d6782a5a19e6eefa5c8e1d39ce7893efd6fa7f94d77d119d"
         }
       }
+    },
+    {
+      "id": "validation-sparkplug-node",
+      "kind": "validation",
+      "source_sha": "f57b75e977cd9828914f49ebdda574b98b59e26c",
+      "file": "validation-sparkplug-node.zip",
+      "sha256": "55e71b5d4a4607b78081ae30cbe811e5af72e8388c17872871cdaf78208bf2fe",
+      "password": "bin-parser",
+      "members": {
+        "sparkplug-node/records/level4-lifecycle-connect.bin": {
+          "bytes": 67,
+          "sha256": "d46778405be6be5ac4031a00817c4194ec8e7865bebbb8a873906439ce6baa09"
+        },
+        "sparkplug-node/records/level4-lifecycle-birth.bin": {
+          "bytes": 114,
+          "sha256": "0555f069de4b4047d3f1a1812be95dc820f776a28736569c91a65f37c72573ee"
+        },
+        "sparkplug-node/records/level4-lifecycle-0.bin": {
+          "bytes": 43,
+          "sha256": "565ef4d7b6983991d720dd80f2f5bbd868c7f164fbb215d581b15bbb051167fe"
+        },
+        "sparkplug-node/records/level4-lifecycle-1.bin": {
+          "bytes": 51,
+          "sha256": "b861c298358c2777451f9198697f2572cea53bc438459c8cd6ba5478f00fcf32"
+        },
+        "sparkplug-node/records/level4-lifecycle-2.bin": {
+          "bytes": 43,
+          "sha256": "fb9c0dfdb58ca877c6ab5dba481eecb8c048705a9b9af7a60d809b0496762a32"
+        },
+        "sparkplug-node/records/level4-missing-will-connect.bin": {
+          "bytes": 18,
+          "sha256": "e308b0874233616327370421805843e1751b9c1375ad6c3f87b480f0827d45b7"
+        },
+        "sparkplug-node/records/level5-lifecycle-connect.bin": {
+          "bytes": 69,
+          "sha256": "995debab82c0f988800a348b548998580a381ff074d7b058359b8ee66e82cc00"
+        },
+        "sparkplug-node/records/level5-lifecycle-birth.bin": {
+          "bytes": 115,
+          "sha256": "d4810f5eb78c592547d6919c670d6f5310939285d5a23fd64740b71919395580"
+        },
+        "sparkplug-node/records/level5-lifecycle-0.bin": {
+          "bytes": 44,
+          "sha256": "8ff2a910b74de706573f57fab97de245a2311030af919c82e0f496f1800192a0"
+        },
+        "sparkplug-node/records/level5-lifecycle-1.bin": {
+          "bytes": 52,
+          "sha256": "6b38368ae184328f501f593dfe81140f5bd73f4ec954f01d79b42082fbaa9f36"
+        },
+        "sparkplug-node/records/level5-lifecycle-2.bin": {
+          "bytes": 44,
+          "sha256": "667038264255fae31b684be98b819b886dc1f772fc1a909040fa53146bbce2a4"
+        },
+        "sparkplug-node/records/level5-missing-will-connect.bin": {
+          "bytes": 19,
+          "sha256": "d4b07adf5ed8d8af0d81d484bdb6c3139b15dbb2bf35e56994a7154d025582ba"
+        },
+        "sparkplug-node/records/scalar-1-0.bin": {
+          "bytes": 115,
+          "sha256": "d1d7189fee1eb4f40084021bbd1c69b1786561990e5b61d59fc80678da57df2a"
+        },
+        "sparkplug-node/records/scalar-2-0.bin": {
+          "bytes": 116,
+          "sha256": "c86bc3b31aa437aaaeb2a533deb65a47cd2d299a76dbc6ee222860e1146faaf5"
+        },
+        "sparkplug-node/records/scalar-3-0.bin": {
+          "bytes": 118,
+          "sha256": "4922751950a88ef1246c7daac6cc5561ae8b9ebad98a41fe3424bb619cd72e96"
+        },
+        "sparkplug-node/records/scalar-4-0.bin": {
+          "bytes": 123,
+          "sha256": "ae0de0ad20ac82eea2c048ad4827116712391ff0f155bb00667f6c59e709874a"
+        },
+        "sparkplug-node/records/scalar-8-0.bin": {
+          "bytes": 123,
+          "sha256": "75442113c51f0411bb9c3ffcd7faa1f87f712f65cc8f5987af2334ccf639b785"
+        },
+        "sparkplug-node/records/scalar-9-0.bin": {
+          "bytes": 117,
+          "sha256": "3112697ef1c67a9d3b580ca545763b002f2095e4af83f467934bd35d5d26c748"
+        },
+        "sparkplug-node/records/scalar-10-0.bin": {
+          "bytes": 121,
+          "sha256": "280f5ca9ca46ab963448420372b696028cbf2f959676fb53a404f94e3ae9f8fe"
+        },
+        "sparkplug-node/records/scalar-11-0.bin": {
+          "bytes": 114,
+          "sha256": "f2159e4e84227e3523423c0eb38e6db3f67897e4e0d4e3cff3ef52b78d70d2e8"
+        },
+        "sparkplug-node/records/scalar-12-0.bin": {
+          "bytes": 117,
+          "sha256": "bc756b722e06a5bbe6114c6f2e825fe15b117dd6db5b1391ccb0d075af03d556"
+        },
+        "sparkplug-node/records/scalar-17-0.bin": {
+          "bytes": 117,
+          "sha256": "d87a55f1f9258d5ecc6b977d844f4ab605a6fb82d01c4fee1dad82575e2980cf"
+        },
+        "sparkplug-node/records/received-timestamp-only-0.bin": {
+          "bytes": 24,
+          "sha256": "02fd34dbc899f6a13d4e727eba828631c6c3d8c3c8028869da7f703bd97211ee"
+        },
+        "sparkplug-node/records/received-wrong-wire-0.bin": {
+          "bytes": 26,
+          "sha256": "99f0f34180cdd51e89e3a771bc043f915bb5891d871d80a3996cf74d7c10bccd"
+        },
+        "sparkplug-node/records/qos-wrong-0.bin": {
+          "bytes": 116,
+          "sha256": "2379a10e0fe4a82e6022e0b9cd369b6f38db694beb22be1fa29a1b6936884a23"
+        },
+        "sparkplug-node/records/retain-wrong-0.bin": {
+          "bytes": 114,
+          "sha256": "13aa5c0ff626c9fd2cad6288180333a8418342d924c5014cb240444346b9e030"
+        },
+        "sparkplug-node/records/bdseq-mismatch-0.bin": {
+          "bytes": 86,
+          "sha256": "c7a607598a6f292b00953994fad4b8671230aaa7b86777d94df36afa7f965a48"
+        },
+        "sparkplug-node/records/metric-timestamp-missing-0.bin": {
+          "bytes": 107,
+          "sha256": "6b4f2f64ee2929c0d370a9e866f3482094e1ce35171df1c09181d9827be7aa9d"
+        },
+        "sparkplug-node/records/alias-collision-0.bin": {
+          "bytes": 116,
+          "sha256": "351fae3400b9967099752ebc4270fa5af04ea98084a7f5255ed4ce1c8255b8d5"
+        },
+        "sparkplug-node/records/datatype-mismatch-0.bin": {
+          "bytes": 114,
+          "sha256": "532a00e8ea87275c1308812a06610c93f8e54e0985729147e2b14229bacdedbc"
+        },
+        "sparkplug-node/records/sequence-gap-0.bin": {
+          "bytes": 43,
+          "sha256": "a229035d253d0fefd4c8ef20ee287d161c546b68a1efae964480cc12f7ce60cc"
+        },
+        "sparkplug-node/records/unknown-alias-0.bin": {
+          "bytes": 43,
+          "sha256": "1c8507ff7eeab3c99b71b1d4bc021865d0f7badf74de46ccf76d1325f347beb9"
+        },
+        "sparkplug-node/records/foreign-node-0.bin": {
+          "bytes": 47,
+          "sha256": "5a69868f53fbdc8b801b55447356f1638c96c3cde3788a240dcbe80cf6a96f9a"
+        },
+        "sparkplug-node/records/late-death-0.bin": {
+          "bytes": 51,
+          "sha256": "533fda8e67fff933ce1d549aea95609e8f984ae357c42ee079843c79df7a39b6"
+        },
+        "sparkplug-node/records/unknown-extension-0.bin": {
+          "bytes": 117,
+          "sha256": "91cdce364999e67055502a751de4dc64d31e836e90824158bba228b9ffba93a7"
+        },
+        "sparkplug-node/records/ncmd-rebirth-0.bin": {
+          "bytes": 53,
+          "sha256": "fe620a98fb688bbc4445fe4d97593aa40e0fb0d8cce2ef040e00f542b235c7c0"
+        },
+        "sparkplug-node/records/ncmd-refusal-0.bin": {
+          "bytes": 55,
+          "sha256": "ae4a063b9e885743b44a5c7fb7db72004a253b5f336fbcb2e38f3478e4b866f6"
+        },
+        "sparkplug-node/records/repeated-metric-0.bin": {
+          "bytes": 56,
+          "sha256": "0e038f6d99f22d5952b8076849943e37741cf9c28a0be6031f8b72d6d62653e8"
+        },
+        "sparkplug-node/records/oneof-last-0.bin": {
+          "bytes": 116,
+          "sha256": "d3011bf252b1c734cc11c2e00f08772648b5cb796fdcd6e703b3647dc03f1a63"
+        },
+        "sparkplug-node/records/metric-wrong-wire-0.bin": {
+          "bytes": 117,
+          "sha256": "27a7ad6f3892bd375375091eb4e9f7e81d0db6ef14bb44fb7b1dde5e2ef9fc79"
+        },
+        "sparkplug-node/records/unknown-noncanonical-0.bin": {
+          "bytes": 118,
+          "sha256": "7b66c63cdfe68d405b4c574c869517e5fd1905d4ac69b48f948a30619e480951"
+        },
+        "sparkplug-node/records/protobuf-truncated-0.bin": {
+          "bytes": 25,
+          "sha256": "db06da090e541fc4301b6c77a184fd6d78cf69caa01023c5fb144aaf488917b3"
+        },
+        "sparkplug-node/records/rebirth-name-refusal-0.bin": {
+          "bytes": 85,
+          "sha256": "392583d255c8050d68fec44d1022634d09964bd701dcb05c275f642936733cdc"
+        },
+        "sparkplug-node/records/sequence-wrap-0.bin": {
+          "bytes": 43,
+          "sha256": "ae19a4b57b64411a883eaa9a491b999a4a39e0ef3ec3179b4ebf32aeff38c17a"
+        },
+        "sparkplug-node/records/sequence-wrap-1.bin": {
+          "bytes": 43,
+          "sha256": "c22580cbf8e29649714245d86ef45da8ad32d4a5669b29d221b08439cabd7972"
+        },
+        "sparkplug-node/records/sequence-wrap-2.bin": {
+          "bytes": 43,
+          "sha256": "958e5dcb00d2d6ce8513bbb791f76011fd955f4850b3067bf73115579fb371c9"
+        },
+        "sparkplug-node/records/sequence-wrap-3.bin": {
+          "bytes": 43,
+          "sha256": "2b2ed4a614a7bafc05f6f311755836f66457ce3c67c93e4c3b4e6d5366985909"
+        },
+        "sparkplug-node/records/sequence-wrap-4.bin": {
+          "bytes": 43,
+          "sha256": "8ba2eb672b9ac210ad1b0a1ed6d3202cb76b3cf951d01ecfc5daa695b4ca7b27"
+        },
+        "sparkplug-node/records/sequence-wrap-5.bin": {
+          "bytes": 43,
+          "sha256": "64478c6b878253ad230a6898075c392907e7577f96562845f9a3567a6b7d27b8"
+        },
+        "sparkplug-node/records/sequence-wrap-6.bin": {
+          "bytes": 43,
+          "sha256": "e71927c87469e496dfbc53eaae740c2d07b2d7bc554ed150ab848e94cc5243b5"
+        },
+        "sparkplug-node/records/sequence-wrap-7.bin": {
+          "bytes": 43,
+          "sha256": "39226e6f23588c3e0bf82e092c790363dfba3ea9cb42af59a4f7da6cb4f056bd"
+        },
+        "sparkplug-node/records/sequence-wrap-8.bin": {
+          "bytes": 43,
+          "sha256": "068b6d4649d2613366b454fe1fb953c1a6ab6772ceafabcca4acda72e6f763d5"
+        },
+        "sparkplug-node/records/sequence-wrap-9.bin": {
+          "bytes": 43,
+          "sha256": "57b09826d7e48adee27976a8cc744c142e9f559a05ebfd426cd7e322455f0259"
+        },
+        "sparkplug-node/records/sequence-wrap-10.bin": {
+          "bytes": 43,
+          "sha256": "6c653a8a202735c8fb433ed17e63e4bf6a564fff3cd81cce2d4732b626d5fded"
+        },
+        "sparkplug-node/records/sequence-wrap-11.bin": {
+          "bytes": 43,
+          "sha256": "17ae24303086a1cd16c3eb42f5d82bdba073e221e220ce5e6a6847334d9832f7"
+        },
+        "sparkplug-node/records/sequence-wrap-12.bin": {
+          "bytes": 43,
+          "sha256": "aeb43e52820f403c097c9386d15d7af065c0fe55e276e0edf0ac252b3f978df9"
+        },
+        "sparkplug-node/records/sequence-wrap-13.bin": {
+          "bytes": 43,
+          "sha256": "7c0268cd68533ecc418113a31bf22976da26ea2afe84fd1c4b95021c51743e57"
+        },
+        "sparkplug-node/records/sequence-wrap-14.bin": {
+          "bytes": 43,
+          "sha256": "85b3d8b40e351daed8dad7f99cb0f17a76eb3787334625291fea36b3446ac8f6"
+        },
+        "sparkplug-node/records/sequence-wrap-15.bin": {
+          "bytes": 43,
+          "sha256": "ae4d8bd38c19982830da209107f7a8f06c0f5294d75cbb5e5e12285f313da659"
+        },
+        "sparkplug-node/records/sequence-wrap-16.bin": {
+          "bytes": 43,
+          "sha256": "74e0c77590e28dd03bf1c3d0df6d666c46957c3cc325c46b3271ff33eb79ab4c"
+        },
+        "sparkplug-node/records/sequence-wrap-17.bin": {
+          "bytes": 43,
+          "sha256": "40b2f206521149d72e6808eebfb3d8fc8dfd83d99b977c3a8e034d1d7ed61485"
+        },
+        "sparkplug-node/records/sequence-wrap-18.bin": {
+          "bytes": 43,
+          "sha256": "a88fc3d8fd811de340ff85edc0a92fb1f9b43ad16be0ca640cc465352345e83c"
+        },
+        "sparkplug-node/records/sequence-wrap-19.bin": {
+          "bytes": 43,
+          "sha256": "691317e4bce557bc41d38d2a53768115857cff757c81672e20b7a4b3a19d8628"
+        },
+        "sparkplug-node/records/sequence-wrap-20.bin": {
+          "bytes": 43,
+          "sha256": "5be9f794f2d9d6b422db5066c4fddc76bc8a5d33d1f30365246a7402a2bfd8b5"
+        },
+        "sparkplug-node/records/sequence-wrap-21.bin": {
+          "bytes": 43,
+          "sha256": "e19c5186484f90f44ce3cfd233ebb7e0474b914b94ccf9507d54383dcf3efbcc"
+        },
+        "sparkplug-node/records/sequence-wrap-22.bin": {
+          "bytes": 43,
+          "sha256": "23dfb90daec4f9d52226894f7309c5f4de126531dcda38f4886f45973813acfb"
+        },
+        "sparkplug-node/records/sequence-wrap-23.bin": {
+          "bytes": 43,
+          "sha256": "79a2a737d91d1ef43547bbcbfa93907a284fe91f1b511401233a2a6667c8bca2"
+        },
+        "sparkplug-node/records/sequence-wrap-24.bin": {
+          "bytes": 43,
+          "sha256": "e3fbf6391daae16361110cc946ad7d008c9c9fdf47aa7d6872d5056ed3694b08"
+        },
+        "sparkplug-node/records/sequence-wrap-25.bin": {
+          "bytes": 43,
+          "sha256": "b65cc6a9dc71e92cd5b045c4f4a3bcc0ebb043f290e95f32404afe54bf0b4a50"
+        },
+        "sparkplug-node/records/sequence-wrap-26.bin": {
+          "bytes": 43,
+          "sha256": "55df962cd095eaf0910c5d7ddfbe92a1237db72b71f07ebd802a03500a92ecf9"
+        },
+        "sparkplug-node/records/sequence-wrap-27.bin": {
+          "bytes": 43,
+          "sha256": "e934130ea4250ec2613fda02d3d820918e4f0646fdd4a38fc905cd2e6cd106fb"
+        },
+        "sparkplug-node/records/sequence-wrap-28.bin": {
+          "bytes": 43,
+          "sha256": "9c4825f7a8f2323b5515c9e952be7454d4e3fb2e4b25f1a6ac3b3480cff9ca6b"
+        },
+        "sparkplug-node/records/sequence-wrap-29.bin": {
+          "bytes": 43,
+          "sha256": "3d4908b7c6f5c49bfb5da0dce6524668056400051184d084989f0316b4064ab9"
+        },
+        "sparkplug-node/records/sequence-wrap-30.bin": {
+          "bytes": 43,
+          "sha256": "f36de6e6b6d9445bf54d200ef895b1ee2fc95afb08de57017f57d2f8cc4c6f76"
+        },
+        "sparkplug-node/records/sequence-wrap-31.bin": {
+          "bytes": 43,
+          "sha256": "7c7bbed8c0eb9aeee81ff9d7cefc57c4c75767dfe5a1a822e0d3c8692253777e"
+        },
+        "sparkplug-node/records/sequence-wrap-32.bin": {
+          "bytes": 43,
+          "sha256": "5dafdcc61170dd2abefdb8438013eb80897473afa90f7fd07faf761583a494ef"
+        },
+        "sparkplug-node/records/sequence-wrap-33.bin": {
+          "bytes": 43,
+          "sha256": "3ea7d61284db6d80944247d41be15d2ae7a2cf22d2ccbae22685c7feb7f44b7f"
+        },
+        "sparkplug-node/records/sequence-wrap-34.bin": {
+          "bytes": 43,
+          "sha256": "734d79ed1ec09003e7c851507bb295bac6d7b2081e5cd12ce12867438d67e689"
+        },
+        "sparkplug-node/records/sequence-wrap-35.bin": {
+          "bytes": 43,
+          "sha256": "a3c2dfc125031c43f4568b05feda5d061723e8463c73fd7df79fce50e0476c52"
+        },
+        "sparkplug-node/records/sequence-wrap-36.bin": {
+          "bytes": 43,
+          "sha256": "69f9e1772855b9c21ad0283e7b84d826cb5f26d9406f75c525c5f2b7561e11e0"
+        },
+        "sparkplug-node/records/sequence-wrap-37.bin": {
+          "bytes": 43,
+          "sha256": "a9a5100c96f1aaf4b9ad06a54fe94b8ce24118f31a65c0e3c807f25b2780291d"
+        },
+        "sparkplug-node/records/sequence-wrap-38.bin": {
+          "bytes": 43,
+          "sha256": "74624322f5bab6055a3ad993100a35b04437fc0e31829169c678c6580845c550"
+        },
+        "sparkplug-node/records/sequence-wrap-39.bin": {
+          "bytes": 43,
+          "sha256": "22461e607e876a2c94ef9da395ffb9310f05417bbebb197945d87ff0e91bc974"
+        },
+        "sparkplug-node/records/sequence-wrap-40.bin": {
+          "bytes": 43,
+          "sha256": "8100831b137942480430b1a64b70ec4342a51bb94c2b68a94c071e86568efc48"
+        },
+        "sparkplug-node/records/sequence-wrap-41.bin": {
+          "bytes": 43,
+          "sha256": "9b598b341711cd67309e69411ccc999905cfd48a3518a066f9a8c8d2ba5e669a"
+        },
+        "sparkplug-node/records/sequence-wrap-42.bin": {
+          "bytes": 43,
+          "sha256": "7354f89eed3f91fba237ddb07dc35ae21225a0ab59678e2a777a76f65f7a62ed"
+        },
+        "sparkplug-node/records/sequence-wrap-43.bin": {
+          "bytes": 43,
+          "sha256": "d4fa187197baea0a39cdb1b7d00544c47253dfa2c933a3884c4bb3134eb5d457"
+        },
+        "sparkplug-node/records/sequence-wrap-44.bin": {
+          "bytes": 43,
+          "sha256": "808b8f837234f198648838393a3961df5675f0682c772c116f2faad62349d9fb"
+        },
+        "sparkplug-node/records/sequence-wrap-45.bin": {
+          "bytes": 43,
+          "sha256": "d3e0e63b80618e90196829e72b443a8c4eea43859b1146fb6aa0f7a3c0d608f9"
+        },
+        "sparkplug-node/records/sequence-wrap-46.bin": {
+          "bytes": 43,
+          "sha256": "938e9f2f67bdcba7b69dd87d6adcb8b68ff23bce911fb6769417fbba50bab7c9"
+        },
+        "sparkplug-node/records/sequence-wrap-47.bin": {
+          "bytes": 43,
+          "sha256": "ca6260d1c3d9330cb6de0fa2af8de59dbfcf981917ea712869b8392aee3cb4bc"
+        },
+        "sparkplug-node/records/sequence-wrap-48.bin": {
+          "bytes": 43,
+          "sha256": "5be3b63c3936ce5ca7964c01d9ef500d41777e3cbb6482563ca54ef56e646a55"
+        },
+        "sparkplug-node/records/sequence-wrap-49.bin": {
+          "bytes": 43,
+          "sha256": "8acdffc93fa3dc3473819e7f0d3df230465bbe5814894047c990cd5c3a131c03"
+        },
+        "sparkplug-node/records/sequence-wrap-50.bin": {
+          "bytes": 43,
+          "sha256": "568dbd34dcdf702ec6fbc66ca0206659164a4638d1aa1aed45477a9f567d588d"
+        },
+        "sparkplug-node/records/sequence-wrap-51.bin": {
+          "bytes": 43,
+          "sha256": "2efa67e6881490bd3957ac5e8d2fc7282701516fa7f8074ea22abb8e7d9b2c10"
+        },
+        "sparkplug-node/records/sequence-wrap-52.bin": {
+          "bytes": 43,
+          "sha256": "9653b27281ec0724d834bc3c581c573b2bc17ac53e9da043b8455e0ed69f917f"
+        },
+        "sparkplug-node/records/sequence-wrap-53.bin": {
+          "bytes": 43,
+          "sha256": "9f47bacf453b31cab3406fabe75b38b75c71ff925fb96f0cc238bbd13e0ab945"
+        },
+        "sparkplug-node/records/sequence-wrap-54.bin": {
+          "bytes": 43,
+          "sha256": "fb6c1c25cf0b929116e297be7814975a8db7cd39efea11c8439a4db90bfece2c"
+        },
+        "sparkplug-node/records/sequence-wrap-55.bin": {
+          "bytes": 43,
+          "sha256": "e4c8229c980ba2051984a0fa69a1a71cab1eb59a53a179301a47709047499530"
+        },
+        "sparkplug-node/records/sequence-wrap-56.bin": {
+          "bytes": 43,
+          "sha256": "67a09e24c42c63add3d1443237c60247bb3d6b5326061fa06540233ec560abdc"
+        },
+        "sparkplug-node/records/sequence-wrap-57.bin": {
+          "bytes": 43,
+          "sha256": "85f1033a73de29cdad60a574b661714847670dbfd29a37e85fb1cdd76e7b94d1"
+        },
+        "sparkplug-node/records/sequence-wrap-58.bin": {
+          "bytes": 43,
+          "sha256": "3911a6e15166ea5a589d96f4d23db67a5d7b51d95f0cade0b68f840c1c8505ec"
+        },
+        "sparkplug-node/records/sequence-wrap-59.bin": {
+          "bytes": 43,
+          "sha256": "f7187367df3eac1ae5e736dca58da77102e1949bbd6f311ac7f67674913eb73d"
+        },
+        "sparkplug-node/records/sequence-wrap-60.bin": {
+          "bytes": 43,
+          "sha256": "34863bbeb88b9e70ceda2fc2bdd3f79bc9cfd73574b059e22d7d82a6d2deb149"
+        },
+        "sparkplug-node/records/sequence-wrap-61.bin": {
+          "bytes": 43,
+          "sha256": "9a1040be0402ca2656fceadcbfca6f5da95e5892560dceb6c9bc06e26a75ea8f"
+        },
+        "sparkplug-node/records/sequence-wrap-62.bin": {
+          "bytes": 43,
+          "sha256": "d5f52eaaf71a88e776f95b84c32271749bb20863d07355a40fca9350433dc180"
+        },
+        "sparkplug-node/records/sequence-wrap-63.bin": {
+          "bytes": 43,
+          "sha256": "0e579e3cf552bbaa210386cff884aee518ddf57df254e6e1b686621f31c763c9"
+        },
+        "sparkplug-node/records/sequence-wrap-64.bin": {
+          "bytes": 43,
+          "sha256": "57e60636f9975431741d8f801ada43ea6123b4c79d7576fb02abdce09d299f4b"
+        },
+        "sparkplug-node/records/sequence-wrap-65.bin": {
+          "bytes": 43,
+          "sha256": "d12260595e345887bb971a87e8bceb38e030c3789ee791a5f627c586b4e9b0a1"
+        },
+        "sparkplug-node/records/sequence-wrap-66.bin": {
+          "bytes": 43,
+          "sha256": "07b1b518fc350e147b11cb341d83efba3ef1bff360912e1b97068b3c9bc887b5"
+        },
+        "sparkplug-node/records/sequence-wrap-67.bin": {
+          "bytes": 43,
+          "sha256": "faaa3f1283494abef296b87d017a9014f14fd871b2efa440abfdcaef02a0b103"
+        },
+        "sparkplug-node/records/sequence-wrap-68.bin": {
+          "bytes": 43,
+          "sha256": "bd4e73bde20f7406157edc7d1c5a76ed3d97e095003ae0ff87827fc86bf8b5a7"
+        },
+        "sparkplug-node/records/sequence-wrap-69.bin": {
+          "bytes": 43,
+          "sha256": "46579df2a6f7e97096533ae6c0cc30454d1ed501039c85d52f79ca03a49e9bbb"
+        },
+        "sparkplug-node/records/sequence-wrap-70.bin": {
+          "bytes": 43,
+          "sha256": "33b89f5cee48bbe8bd983dc56a97f3e6dc24a0ea7f9b0e3c2c85e83a38ac9726"
+        },
+        "sparkplug-node/records/sequence-wrap-71.bin": {
+          "bytes": 43,
+          "sha256": "9b8a166413eb18293a736f649b080a1b9dbe363d5bbd825cde409f55be5de2d9"
+        },
+        "sparkplug-node/records/sequence-wrap-72.bin": {
+          "bytes": 43,
+          "sha256": "5a59f74afc3ef25cdd65d8e72cdc7b2c5961e91380876cd8ddc0a5f1aa2ddb25"
+        },
+        "sparkplug-node/records/sequence-wrap-73.bin": {
+          "bytes": 43,
+          "sha256": "c13f73cf8d98bb4e2601e7c388445101c1fa22667c17d893f1149618b91568c9"
+        },
+        "sparkplug-node/records/sequence-wrap-74.bin": {
+          "bytes": 43,
+          "sha256": "cda212c8c2159851f76a3f632cf86dac766563b8e2b88952f09edba25289143d"
+        },
+        "sparkplug-node/records/sequence-wrap-75.bin": {
+          "bytes": 43,
+          "sha256": "2194d3fab38c06dc4d2927c99e70d5144f863478150fa3a9bed9bcfcf58fcd35"
+        },
+        "sparkplug-node/records/sequence-wrap-76.bin": {
+          "bytes": 43,
+          "sha256": "ac8841918d5093af319939b189b0c342509684392ba6525c7d6628adcec8d58a"
+        },
+        "sparkplug-node/records/sequence-wrap-77.bin": {
+          "bytes": 43,
+          "sha256": "5b654c81c8ccab56c7024bc39f725e5c8b8324715cd19bc2513804edd4d2f8fb"
+        },
+        "sparkplug-node/records/sequence-wrap-78.bin": {
+          "bytes": 43,
+          "sha256": "81f1fc6437b5a9b001f3e6ac28b1caa4ce2ca376501ff96728aa03260d6e050a"
+        },
+        "sparkplug-node/records/sequence-wrap-79.bin": {
+          "bytes": 43,
+          "sha256": "c53649e36395cc18045a3fbfaab6b34dc89aba7328e04e585f2ac278ef24b4a9"
+        },
+        "sparkplug-node/records/sequence-wrap-80.bin": {
+          "bytes": 43,
+          "sha256": "a8a3daa3ea1874f5cdf713ee611bbd991cd5b5fc9a9f1328522d1adc4f619493"
+        },
+        "sparkplug-node/records/sequence-wrap-81.bin": {
+          "bytes": 43,
+          "sha256": "454c011aaf3bb1452ec0cdf1ced80e9706cbe7c1cf9405104775c963d0c059e3"
+        },
+        "sparkplug-node/records/sequence-wrap-82.bin": {
+          "bytes": 43,
+          "sha256": "082327a68115031a1750a242c19e0b1542f5866ddeb0d38934bff5de2003fdc6"
+        },
+        "sparkplug-node/records/sequence-wrap-83.bin": {
+          "bytes": 43,
+          "sha256": "544a60df1a31e5e8e0f45db72952248a58dd34e1bd29821f51a9f0f896dde0da"
+        },
+        "sparkplug-node/records/sequence-wrap-84.bin": {
+          "bytes": 43,
+          "sha256": "56d0d80e6a70b396637a61753ddff22485acb1add30b7e332cfa95f5fea3075a"
+        },
+        "sparkplug-node/records/sequence-wrap-85.bin": {
+          "bytes": 43,
+          "sha256": "642fb167ae9ed4ede34ff96efd9e73dd5cd2da4eca73ea961c1c71ea89292ec1"
+        },
+        "sparkplug-node/records/sequence-wrap-86.bin": {
+          "bytes": 43,
+          "sha256": "fb9c0e0d49eb2701f7345e92d67464ba46769eb47702903ba178359b5070ce8b"
+        },
+        "sparkplug-node/records/sequence-wrap-87.bin": {
+          "bytes": 43,
+          "sha256": "fd8262616dddc4a19063d930456df083525c7432ffe3a4860435ff5d6f24441d"
+        },
+        "sparkplug-node/records/sequence-wrap-88.bin": {
+          "bytes": 43,
+          "sha256": "716a5fb69da71f011c6663c367cb331107e3d8c5adcf861a270afb7223947f67"
+        },
+        "sparkplug-node/records/sequence-wrap-89.bin": {
+          "bytes": 43,
+          "sha256": "0354dfc27ebbd8d403786322789291ddd2cea35b072773dfd82d3c488bbe97a5"
+        },
+        "sparkplug-node/records/sequence-wrap-90.bin": {
+          "bytes": 43,
+          "sha256": "fdfede12e28bc1e42b3cfef175b3a3ce7e9d158aca350bc41698c8d382fbbb84"
+        },
+        "sparkplug-node/records/sequence-wrap-91.bin": {
+          "bytes": 43,
+          "sha256": "bed4385ea6e01f1137a2097d63eca5a32d369efc0b7d318807396a06828a42b0"
+        },
+        "sparkplug-node/records/sequence-wrap-92.bin": {
+          "bytes": 43,
+          "sha256": "7a4acae29b3a9f2dcc93886f01731e78e1691e1979c10b76b7b7846824f0e055"
+        },
+        "sparkplug-node/records/sequence-wrap-93.bin": {
+          "bytes": 43,
+          "sha256": "77eff80d647c8267a71784099fed6fc82315c6c35f2faf47bcd5bb8dbe0a72a1"
+        },
+        "sparkplug-node/records/sequence-wrap-94.bin": {
+          "bytes": 43,
+          "sha256": "1b89e93648719e96269bc685485f3b7bf8b24a28503bc0b12599f487f4b4f487"
+        },
+        "sparkplug-node/records/sequence-wrap-95.bin": {
+          "bytes": 43,
+          "sha256": "272b16fb5dea14b7f1003f4e7062f521c11898e541deb3abd1effe9157820cc2"
+        },
+        "sparkplug-node/records/sequence-wrap-96.bin": {
+          "bytes": 43,
+          "sha256": "be15dfc912a07e07728a4d76c432b11f0807143e4380616809457541073b285e"
+        },
+        "sparkplug-node/records/sequence-wrap-97.bin": {
+          "bytes": 43,
+          "sha256": "a13929079eda918c4e80de81bf373bc2d3e370cff8687f8d4f6e2faecea8d26e"
+        },
+        "sparkplug-node/records/sequence-wrap-98.bin": {
+          "bytes": 43,
+          "sha256": "1d0162584b9acbfab5fc2a80de5f5a68cfa7db5ee454f7575aae2a9b4a609e63"
+        },
+        "sparkplug-node/records/sequence-wrap-99.bin": {
+          "bytes": 43,
+          "sha256": "a61921f202855e312c1136bf4eb705fda65d09ffb478b0fd1341674ecb4963da"
+        },
+        "sparkplug-node/records/sequence-wrap-100.bin": {
+          "bytes": 43,
+          "sha256": "19fe8b226af8d950a9b2d12624d73f142bfaf0ad26bdd5d5afd1416665596e4c"
+        },
+        "sparkplug-node/records/sequence-wrap-101.bin": {
+          "bytes": 43,
+          "sha256": "fdad124c4a354af59bdb0004c93c91fb9778a08c64883987aa6df60f98cb836d"
+        },
+        "sparkplug-node/records/sequence-wrap-102.bin": {
+          "bytes": 43,
+          "sha256": "31c8adcb74bee3b9b5f3d327b95abe9d4f493d06c6d2ec783aab260b6d4bfee4"
+        },
+        "sparkplug-node/records/sequence-wrap-103.bin": {
+          "bytes": 43,
+          "sha256": "ef466d1c3dbd1c8cc70628c30393955890e791498fd54354a822b2b720691ee5"
+        },
+        "sparkplug-node/records/sequence-wrap-104.bin": {
+          "bytes": 43,
+          "sha256": "62f0f021f80c92d6e27e5ff5e194f9c460c51bc35f7286528a9e0537af2c4136"
+        },
+        "sparkplug-node/records/sequence-wrap-105.bin": {
+          "bytes": 43,
+          "sha256": "1a4d38bd5174d9997e5cea642d6411f16501150874a9a254e101df11764ab1de"
+        },
+        "sparkplug-node/records/sequence-wrap-106.bin": {
+          "bytes": 43,
+          "sha256": "0bf1a9cb7568f7408e68fa744e385369626a3aad3ddb2cdbab30d25aba26a800"
+        },
+        "sparkplug-node/records/sequence-wrap-107.bin": {
+          "bytes": 43,
+          "sha256": "a488150b20950e8f00a819b263edc644b6455ccf6b6741b178e08c8a47313ae3"
+        },
+        "sparkplug-node/records/sequence-wrap-108.bin": {
+          "bytes": 43,
+          "sha256": "6c0a8ee17647554532b2aa3a5b59c38c2b9f0baf54a505c8acfc2e9066de698a"
+        },
+        "sparkplug-node/records/sequence-wrap-109.bin": {
+          "bytes": 43,
+          "sha256": "2401dd0cdc241cd65791cbd7e3fbd44e1560a53a1a35c67cf101e865c71683d1"
+        },
+        "sparkplug-node/records/sequence-wrap-110.bin": {
+          "bytes": 43,
+          "sha256": "fee94d14038e4b992a90db0f20a656035705ac9776dbf1177ecbfffda585c9c7"
+        },
+        "sparkplug-node/records/sequence-wrap-111.bin": {
+          "bytes": 43,
+          "sha256": "f1f2b112a11afc8eda4efd80c4c10af8b33f536a857d9a268a846b21a04223ba"
+        },
+        "sparkplug-node/records/sequence-wrap-112.bin": {
+          "bytes": 43,
+          "sha256": "4975cfad56eb9b2aabfed76e14de8298d246aac78575e2a83e3ea95ee255e877"
+        },
+        "sparkplug-node/records/sequence-wrap-113.bin": {
+          "bytes": 43,
+          "sha256": "85b3fbfe6487a9873715d40ba19035ed7f501bff08fac91d073ef1f3e851edcf"
+        },
+        "sparkplug-node/records/sequence-wrap-114.bin": {
+          "bytes": 43,
+          "sha256": "17a8b377bfac4bdc1f6620333416812734afcfc5dcace9098fe7cb2e92e1bc25"
+        },
+        "sparkplug-node/records/sequence-wrap-115.bin": {
+          "bytes": 43,
+          "sha256": "6784eec08969a9f59989573cb93ef5cee492c9e1a16f4e2538a66a0f7eb21233"
+        },
+        "sparkplug-node/records/sequence-wrap-116.bin": {
+          "bytes": 43,
+          "sha256": "80de06e4ebd0bad9d0e85271a56653dcefbc0ff9755b9869dff405226a7a7912"
+        },
+        "sparkplug-node/records/sequence-wrap-117.bin": {
+          "bytes": 43,
+          "sha256": "0c4acd4109afdd2bac4a4a8e6faf1113f210ed846474be077f21acd6410c50fe"
+        },
+        "sparkplug-node/records/sequence-wrap-118.bin": {
+          "bytes": 43,
+          "sha256": "3813e36fd05912a993b531b6d899d698048fa4a419c3b863d20aba9f6db6537c"
+        },
+        "sparkplug-node/records/sequence-wrap-119.bin": {
+          "bytes": 43,
+          "sha256": "d27dd4014a4fbd079af18057c4803c172b46fa9396937ad14e69ba7730d74756"
+        },
+        "sparkplug-node/records/sequence-wrap-120.bin": {
+          "bytes": 43,
+          "sha256": "ae81868402ffd994bc202778b6327042a80bd5e84637b445c2b828a45066da44"
+        },
+        "sparkplug-node/records/sequence-wrap-121.bin": {
+          "bytes": 43,
+          "sha256": "0a7e41551a9562d68614be389277fdbde0cffa92d81e735c6534dacb1cc496d1"
+        },
+        "sparkplug-node/records/sequence-wrap-122.bin": {
+          "bytes": 43,
+          "sha256": "1d1280cdb4850e3bf9a4cb639a2deea3964e05e2abf6bc0e43264ee1903d2a18"
+        },
+        "sparkplug-node/records/sequence-wrap-123.bin": {
+          "bytes": 43,
+          "sha256": "106692c7da4c62dd9875fc20e19693b315c2c4cf5ef7d86c7c165557975435bd"
+        },
+        "sparkplug-node/records/sequence-wrap-124.bin": {
+          "bytes": 43,
+          "sha256": "ac852eb0297472e63342d606173361523ebc805ad22629e09638f4cbd8c13762"
+        },
+        "sparkplug-node/records/sequence-wrap-125.bin": {
+          "bytes": 43,
+          "sha256": "ed7c8ee4540010a333136e17e20cfd8c0fdebb752aef77a21d3b3521f2d05d53"
+        },
+        "sparkplug-node/records/sequence-wrap-126.bin": {
+          "bytes": 43,
+          "sha256": "2b4349dd26d35191b2fcaf3838ab2bea2e658ccd7e47b9e687cebda6db4ba3b7"
+        },
+        "sparkplug-node/records/sequence-wrap-127.bin": {
+          "bytes": 45,
+          "sha256": "6defef188aca27cda7059130e39df4d4e78fdfb58a98c0c5b658d94ce55c54cd"
+        },
+        "sparkplug-node/records/sequence-wrap-128.bin": {
+          "bytes": 45,
+          "sha256": "1a71e2bcb11a4886ada62a261eb65d0528dcf83440a67616b93701b7af2b075d"
+        },
+        "sparkplug-node/records/sequence-wrap-129.bin": {
+          "bytes": 45,
+          "sha256": "6f24cf28900872a3ee1566b43d11ad8b994e26447ff7db06a393fe366f8744dd"
+        },
+        "sparkplug-node/records/sequence-wrap-130.bin": {
+          "bytes": 45,
+          "sha256": "223fe71ae4f9387f7e3076c08068161de6f97ff4e3a21de3437d47dc34e58344"
+        },
+        "sparkplug-node/records/sequence-wrap-131.bin": {
+          "bytes": 45,
+          "sha256": "5f73854518ae84bc017430b66db59fd3a740d051206eb54114b8924d0606898a"
+        },
+        "sparkplug-node/records/sequence-wrap-132.bin": {
+          "bytes": 45,
+          "sha256": "afcc46d6b41ad58a1d12488119eddeae3f77fa04fbb0119ee5ff3b1a5d14d665"
+        },
+        "sparkplug-node/records/sequence-wrap-133.bin": {
+          "bytes": 45,
+          "sha256": "23d7251006a9622a7947ab1c15508f211ff2e7370fdb1fdad4161e75ea3a425b"
+        },
+        "sparkplug-node/records/sequence-wrap-134.bin": {
+          "bytes": 45,
+          "sha256": "fd9427ed25dd0df93c47829d5f46800001d1e1346d2140d2378dd843b84b3dcc"
+        },
+        "sparkplug-node/records/sequence-wrap-135.bin": {
+          "bytes": 45,
+          "sha256": "5ad3897aba48c87a363c907db29570a1c394a4c6d7a30f9433e9b6cdef8d53b2"
+        },
+        "sparkplug-node/records/sequence-wrap-136.bin": {
+          "bytes": 45,
+          "sha256": "46241166e7fd995b9937e7123caec241f80ce2626a82b0eb6aa99265cb128f9d"
+        },
+        "sparkplug-node/records/sequence-wrap-137.bin": {
+          "bytes": 45,
+          "sha256": "bda9ba4c96fd50f6bd9d66dd4ac16539c1087024ced41805fbb75d331f9a9b43"
+        },
+        "sparkplug-node/records/sequence-wrap-138.bin": {
+          "bytes": 45,
+          "sha256": "6d01d013222b02bc09ebca52810645fdaa154fdeebaacc231396fe4c2c427560"
+        },
+        "sparkplug-node/records/sequence-wrap-139.bin": {
+          "bytes": 45,
+          "sha256": "70a169d27b72734e01d27197c30bedfd0308cd6ed6e92741a218463c91a7849f"
+        },
+        "sparkplug-node/records/sequence-wrap-140.bin": {
+          "bytes": 45,
+          "sha256": "541143519cacdf1bd8bbfd84c77bc139af4978ce34952fd76e45bd05b0110a05"
+        },
+        "sparkplug-node/records/sequence-wrap-141.bin": {
+          "bytes": 45,
+          "sha256": "213445f4485244c309a199eef3c0de68f1244aec3732dcfa55b01d1b3e5d5afa"
+        },
+        "sparkplug-node/records/sequence-wrap-142.bin": {
+          "bytes": 45,
+          "sha256": "2e9b32f9b6b1111e7d52b20a817be990907404ad494351c3ab42027d8cffbde7"
+        },
+        "sparkplug-node/records/sequence-wrap-143.bin": {
+          "bytes": 45,
+          "sha256": "47606e5d0a98c8c4d7a0a4dc2ec7bc79b681816c88c370be9d68f13666c2b1e1"
+        },
+        "sparkplug-node/records/sequence-wrap-144.bin": {
+          "bytes": 45,
+          "sha256": "504eb51c17b3db49e3a5da1de467883e9944fc56c5d2f79f309ff40206c38ac1"
+        },
+        "sparkplug-node/records/sequence-wrap-145.bin": {
+          "bytes": 45,
+          "sha256": "8a2555bf713b60637c91484cd5dccc9d8190d20bd735d9530e2d8b1a34fe2196"
+        },
+        "sparkplug-node/records/sequence-wrap-146.bin": {
+          "bytes": 45,
+          "sha256": "14fe8caf860d7ba97dff2c97f6d43c4732e3e441b100504dded082a43850b9ca"
+        },
+        "sparkplug-node/records/sequence-wrap-147.bin": {
+          "bytes": 45,
+          "sha256": "f31e3af13e9c0fa90a1d2cbc20c0466b1c3043e7ca1599303ce29f448b789f34"
+        },
+        "sparkplug-node/records/sequence-wrap-148.bin": {
+          "bytes": 45,
+          "sha256": "66aef5b937c476ad4d282bd9495a81d0b9ae849b86b2ef0ccc1be28b5c623878"
+        },
+        "sparkplug-node/records/sequence-wrap-149.bin": {
+          "bytes": 45,
+          "sha256": "7c361f698564e6a4037358ac5563ffc91863df6fcc346a19ce15a35a79a260fa"
+        },
+        "sparkplug-node/records/sequence-wrap-150.bin": {
+          "bytes": 45,
+          "sha256": "0d35710ece5a833700f209da1617b7c64c886d8d95ef28a74cb9dac648f513ec"
+        },
+        "sparkplug-node/records/sequence-wrap-151.bin": {
+          "bytes": 45,
+          "sha256": "e36881eabe4c3369b1db4e32f72c468459f0c4c5f614749df8dd9110b5daab40"
+        },
+        "sparkplug-node/records/sequence-wrap-152.bin": {
+          "bytes": 45,
+          "sha256": "04eafd176ef7efa851f2f38e32aa60cdb84f22aad9463d67770e1195860143e0"
+        },
+        "sparkplug-node/records/sequence-wrap-153.bin": {
+          "bytes": 45,
+          "sha256": "804d94baf0450d19ce46b1c3cb60938868be2d9930b8420295ab4c5c15710814"
+        },
+        "sparkplug-node/records/sequence-wrap-154.bin": {
+          "bytes": 45,
+          "sha256": "a4f154efd9e208c67b18d8b4eb09fa86ab9fcb8ed5188f59b00d43b491210d5c"
+        },
+        "sparkplug-node/records/sequence-wrap-155.bin": {
+          "bytes": 45,
+          "sha256": "78e13e8bd6db38e4c3baab281d9a52d81f4958071f2dd6c95b48e5cbd115766b"
+        },
+        "sparkplug-node/records/sequence-wrap-156.bin": {
+          "bytes": 45,
+          "sha256": "dcbcc59b539d0684a19e761d531a742714e1ac9359193338e63aaf4996db724f"
+        },
+        "sparkplug-node/records/sequence-wrap-157.bin": {
+          "bytes": 45,
+          "sha256": "a935968d0cd27f3dcddfae93825e4d4c7dee4b3857895b1dedf67ff886cc7e49"
+        },
+        "sparkplug-node/records/sequence-wrap-158.bin": {
+          "bytes": 45,
+          "sha256": "e183f6fe9272bc703528384ca057d82b4afea79b36e72a50c82645310cfea973"
+        },
+        "sparkplug-node/records/sequence-wrap-159.bin": {
+          "bytes": 45,
+          "sha256": "556b1be4a525782b70865fa63f1b4efc3c1fd03c229a71b0b802f1e9f12ca8c6"
+        },
+        "sparkplug-node/records/sequence-wrap-160.bin": {
+          "bytes": 45,
+          "sha256": "761664ba9083a7f6bc12ddf87652dfcc147378e32bd7ba56a0235cdd5005b25d"
+        },
+        "sparkplug-node/records/sequence-wrap-161.bin": {
+          "bytes": 45,
+          "sha256": "acfcecc0fce941cc1a074b9b5d067ce6157816ac57f84a40a0d06b8121f8b26c"
+        },
+        "sparkplug-node/records/sequence-wrap-162.bin": {
+          "bytes": 45,
+          "sha256": "71a7883ce247edf806381943bb3b90daf424088222098aa52bbfe690faa2a1ef"
+        },
+        "sparkplug-node/records/sequence-wrap-163.bin": {
+          "bytes": 45,
+          "sha256": "bdb6830cfc361fdf981b1a147c11b41d663522d6fa344b0fc2ea11623294e7c9"
+        },
+        "sparkplug-node/records/sequence-wrap-164.bin": {
+          "bytes": 45,
+          "sha256": "84a316a25d1eb9ad89f0cd260ee67e83a296858679d88daf15c10e98f287583c"
+        },
+        "sparkplug-node/records/sequence-wrap-165.bin": {
+          "bytes": 45,
+          "sha256": "d8c3b74881041899b7d9d50d079c6b12dcc9cfc091f4f3e798cd0951aa8dd0d8"
+        },
+        "sparkplug-node/records/sequence-wrap-166.bin": {
+          "bytes": 45,
+          "sha256": "fee3c3ea26401c1151935e5dd29f1feabe9318c248d9358093addfc52e628d52"
+        },
+        "sparkplug-node/records/sequence-wrap-167.bin": {
+          "bytes": 45,
+          "sha256": "2a3f0d78c2d5ad01f0610fccde1e07d6ab7288d2eedc6024bdb209c7dd52cf90"
+        },
+        "sparkplug-node/records/sequence-wrap-168.bin": {
+          "bytes": 45,
+          "sha256": "50df3b4576db3b9a33f2c274f407ca6933257c11fb228c47ab01fe71d271de40"
+        },
+        "sparkplug-node/records/sequence-wrap-169.bin": {
+          "bytes": 45,
+          "sha256": "5f16a71a608db51cefe58912144e69a0ce74347e40dd8c1352077f147b6dda69"
+        },
+        "sparkplug-node/records/sequence-wrap-170.bin": {
+          "bytes": 45,
+          "sha256": "067718d253969a1732809895edec674da8a951927ee2d38d6c53d2ff1432151e"
+        },
+        "sparkplug-node/records/sequence-wrap-171.bin": {
+          "bytes": 45,
+          "sha256": "0da6b4eb7dfd32b811726efe9bd57d999e7484bb6aa5b75e7380841c09ead50b"
+        },
+        "sparkplug-node/records/sequence-wrap-172.bin": {
+          "bytes": 45,
+          "sha256": "bc68f54729ec8f0e100ac56da6f2f3e9fa2864fa2f3798a344da8160e0093e26"
+        },
+        "sparkplug-node/records/sequence-wrap-173.bin": {
+          "bytes": 45,
+          "sha256": "5278a78e79cd127e0eda4031d4c5958fedf2eceeb3fd4836369a85f8ce081dee"
+        },
+        "sparkplug-node/records/sequence-wrap-174.bin": {
+          "bytes": 45,
+          "sha256": "6f2c53f40f65bd7d833b0015444bef7c1e1563e096d1850614af5b66e9a8f66e"
+        },
+        "sparkplug-node/records/sequence-wrap-175.bin": {
+          "bytes": 45,
+          "sha256": "427105a8253aa02dff33e94019369352fc78efc8ae1d228accacf1c5449cc4d7"
+        },
+        "sparkplug-node/records/sequence-wrap-176.bin": {
+          "bytes": 45,
+          "sha256": "51637bee7b5cc9633af9d83d840179c8be069cb547ceeb4b34d18766179c8e48"
+        },
+        "sparkplug-node/records/sequence-wrap-177.bin": {
+          "bytes": 45,
+          "sha256": "42624392ff864b42e005e22bffe460375f13e86a43772d04b0830c3f0faccdf4"
+        },
+        "sparkplug-node/records/sequence-wrap-178.bin": {
+          "bytes": 45,
+          "sha256": "1fcfddfc47d34e5204048fa689a016616710156d70d68071ea266b8dcee6ff1d"
+        },
+        "sparkplug-node/records/sequence-wrap-179.bin": {
+          "bytes": 45,
+          "sha256": "6fdfac9bb6d71bdeeec54d4191afc819104344d1f63654d1e9d1e09605bbad89"
+        },
+        "sparkplug-node/records/sequence-wrap-180.bin": {
+          "bytes": 45,
+          "sha256": "7bb8d5692cb0449faa855522b5e869ef56f0a32603698636d36fff417b403885"
+        },
+        "sparkplug-node/records/sequence-wrap-181.bin": {
+          "bytes": 45,
+          "sha256": "3ae1dec33846997967df2b03b5b9403d5076a24c3fda12988bad4a30a1eb3bb2"
+        },
+        "sparkplug-node/records/sequence-wrap-182.bin": {
+          "bytes": 45,
+          "sha256": "e22cfcb65c177b7951fde87c5fe27066a37920a4712255192578a692d6b69ca5"
+        },
+        "sparkplug-node/records/sequence-wrap-183.bin": {
+          "bytes": 45,
+          "sha256": "7fba03df85e617d28929d8a32eb5670f273c9615f406bab019c7a6feb74b8c73"
+        },
+        "sparkplug-node/records/sequence-wrap-184.bin": {
+          "bytes": 45,
+          "sha256": "f04d62bbc5d32c557aad8d830d3ba87749d62ab36baa02c3d13cc8d86a17021c"
+        },
+        "sparkplug-node/records/sequence-wrap-185.bin": {
+          "bytes": 45,
+          "sha256": "d133a64523cd0397725707e91c029756e3182a05e65c3900bd5e3b89b95b5128"
+        },
+        "sparkplug-node/records/sequence-wrap-186.bin": {
+          "bytes": 45,
+          "sha256": "cd482ca59dc70ec9249fded0ff619c55e50ee6f20074ac16f767032f4ee3e0a2"
+        },
+        "sparkplug-node/records/sequence-wrap-187.bin": {
+          "bytes": 45,
+          "sha256": "d40dc558413a27585567558be302b884ce3e574183699a574d44201ca358217b"
+        },
+        "sparkplug-node/records/sequence-wrap-188.bin": {
+          "bytes": 45,
+          "sha256": "052a71b44d287e26239dd2f3fc547e4c0d5e196399acdc8669ddf5a8947e1003"
+        },
+        "sparkplug-node/records/sequence-wrap-189.bin": {
+          "bytes": 45,
+          "sha256": "0cf8917ec1c5499c861244657cec5bc65bdb23cba099d57ee5dd1d4fe60dbe0a"
+        },
+        "sparkplug-node/records/sequence-wrap-190.bin": {
+          "bytes": 45,
+          "sha256": "626a190a91766fc9b78b62b8d349b14ae1f853e511d0266e7b16325a1ba177d6"
+        },
+        "sparkplug-node/records/sequence-wrap-191.bin": {
+          "bytes": 45,
+          "sha256": "943636ec15a9a3c93f34fff8090246cbf0d1b282b1b75d08b140cf12ddf2f0d4"
+        },
+        "sparkplug-node/records/sequence-wrap-192.bin": {
+          "bytes": 45,
+          "sha256": "85da760665b38ed7c5adb6fc098456499e6c5a5568ec776b5451be521e18bcde"
+        },
+        "sparkplug-node/records/sequence-wrap-193.bin": {
+          "bytes": 45,
+          "sha256": "e5109c4a897247820a567b097700f7b8ee63d8f270f0fce9ba8760a5c6355ee1"
+        },
+        "sparkplug-node/records/sequence-wrap-194.bin": {
+          "bytes": 45,
+          "sha256": "79e544a231e754f95851fb024822ee156f1de0c36d26df958ab50440da463a38"
+        },
+        "sparkplug-node/records/sequence-wrap-195.bin": {
+          "bytes": 45,
+          "sha256": "490d02b3c5ede473a7ef5f00503a163d6bedf9dbd5abd68a26729974bf6a4643"
+        },
+        "sparkplug-node/records/sequence-wrap-196.bin": {
+          "bytes": 45,
+          "sha256": "562e6babe7de3ac0e51b89a3792c2fb52b0e951b58b1dfea4b9c73bf8e3c4abc"
+        },
+        "sparkplug-node/records/sequence-wrap-197.bin": {
+          "bytes": 45,
+          "sha256": "17d83e3d95d3320a5c667863b1677e0c3ac215ef08a01e67dbb05f2d65e570e3"
+        },
+        "sparkplug-node/records/sequence-wrap-198.bin": {
+          "bytes": 45,
+          "sha256": "244ce35ce3bfcb0db46c0e1d471390cc4f0fe04c376cf36572511a9995d79ab5"
+        },
+        "sparkplug-node/records/sequence-wrap-199.bin": {
+          "bytes": 45,
+          "sha256": "e9060c0d4a7a6fea53d50b03a8f165576fc2b8db7ae7672811749363e40e3a85"
+        },
+        "sparkplug-node/records/sequence-wrap-200.bin": {
+          "bytes": 45,
+          "sha256": "315b13c49b3bf056146d08f8c57ff72df45cada0598564f1c7fa2bffc393db2f"
+        },
+        "sparkplug-node/records/sequence-wrap-201.bin": {
+          "bytes": 45,
+          "sha256": "8663c4e749d4c2246dc1d0ba11ba8834d3d84736736afc28c6ea602033f66947"
+        },
+        "sparkplug-node/records/sequence-wrap-202.bin": {
+          "bytes": 45,
+          "sha256": "3d298c365bd00e95088a02091b26b69b52f6722baa0ab9825b9bc6ecffd4e470"
+        },
+        "sparkplug-node/records/sequence-wrap-203.bin": {
+          "bytes": 45,
+          "sha256": "67eaadaa8185b218bd2fc3cce849b9ffcd86a4a76a44d10a289bbab9ffb1af28"
+        },
+        "sparkplug-node/records/sequence-wrap-204.bin": {
+          "bytes": 45,
+          "sha256": "6d7699aa878d640792e66c15abca3b84c55f818fe8c0447f93f9e02da113e2c7"
+        },
+        "sparkplug-node/records/sequence-wrap-205.bin": {
+          "bytes": 45,
+          "sha256": "414858d7e1006ab36cc1672f1d390c0e36b6f7dd5dde6fa9175ab488f4b1d18b"
+        },
+        "sparkplug-node/records/sequence-wrap-206.bin": {
+          "bytes": 45,
+          "sha256": "138770a6cc5a6a0007d5de81d1938a9be38a177b0a1902af248f5826228cc7cc"
+        },
+        "sparkplug-node/records/sequence-wrap-207.bin": {
+          "bytes": 45,
+          "sha256": "0f13b8985b3316b702fa06da759572cecdc9f88c848d3fd29bf4c0932644ef45"
+        },
+        "sparkplug-node/records/sequence-wrap-208.bin": {
+          "bytes": 45,
+          "sha256": "8a071b6ec5db0d5b9b1a396c1c63fd942a9eb19e2f05fedfdc86eca3856c0743"
+        },
+        "sparkplug-node/records/sequence-wrap-209.bin": {
+          "bytes": 45,
+          "sha256": "1f90f92f6b17226ce1242159f2ed9ddb0b6c7c7a7ba536a9f8a5296aa18cbbca"
+        },
+        "sparkplug-node/records/sequence-wrap-210.bin": {
+          "bytes": 45,
+          "sha256": "2a238ffdf67b7f34d8bf937be9eac1f57bc96034abc441e68c8ade29cbf47d58"
+        },
+        "sparkplug-node/records/sequence-wrap-211.bin": {
+          "bytes": 45,
+          "sha256": "1d4d16e30cc462f6480bcf4099cc882a16545133d236910d4d1c74c7f06705bb"
+        },
+        "sparkplug-node/records/sequence-wrap-212.bin": {
+          "bytes": 45,
+          "sha256": "97d0392b50b4a02c5cbfb6b65b4aaaf5ecf41ac9bc15e65c097bc3b5a261f7fc"
+        },
+        "sparkplug-node/records/sequence-wrap-213.bin": {
+          "bytes": 45,
+          "sha256": "fcbcd133e2552fec4b996d95bb2bf382b3f55334316aeece85634b3464ee8010"
+        },
+        "sparkplug-node/records/sequence-wrap-214.bin": {
+          "bytes": 45,
+          "sha256": "0ecba9fdb1b64d0df82fb50235b2218d854aa00545355a2faff01ce1bcb817a6"
+        },
+        "sparkplug-node/records/sequence-wrap-215.bin": {
+          "bytes": 45,
+          "sha256": "1eff346a7d31d0c8b74f9bec001b47688a928ce0262e31180e56195934bc84bd"
+        },
+        "sparkplug-node/records/sequence-wrap-216.bin": {
+          "bytes": 45,
+          "sha256": "085a89672cc60b7bba0be25188fb40b50699db3fcb5ce82fa92f6a9b4dfb6f63"
+        },
+        "sparkplug-node/records/sequence-wrap-217.bin": {
+          "bytes": 45,
+          "sha256": "7b6e1478fc3564ce284826c28933c1352edd9ad7096e53669f150ed2e50142c0"
+        },
+        "sparkplug-node/records/sequence-wrap-218.bin": {
+          "bytes": 45,
+          "sha256": "43a9ce8ae6101f49f20eac7d7c606fcf716488b9ac3f72372e214275c5e1cb38"
+        },
+        "sparkplug-node/records/sequence-wrap-219.bin": {
+          "bytes": 45,
+          "sha256": "7da934149d71706e526ee068ea12382c26ece6358d74188ab2cd47c8009b658a"
+        },
+        "sparkplug-node/records/sequence-wrap-220.bin": {
+          "bytes": 45,
+          "sha256": "b4ca1c1ff5bb1e1487c0a646dade6f67330302892dcf9558c41854b39d570a51"
+        },
+        "sparkplug-node/records/sequence-wrap-221.bin": {
+          "bytes": 45,
+          "sha256": "c758c4d7ecbfb3f01a8f32eff643c4f02f0bda9b0cb97bf047c2f7d1a922b070"
+        },
+        "sparkplug-node/records/sequence-wrap-222.bin": {
+          "bytes": 45,
+          "sha256": "a1aec7295961d7ea19756f28ab92892c8b5b5380f06e63fd6641b9af800ca87d"
+        },
+        "sparkplug-node/records/sequence-wrap-223.bin": {
+          "bytes": 45,
+          "sha256": "32ee6b43a9d04645d20af115b0538fd44de615005658b4682e1141bca3cba6f8"
+        },
+        "sparkplug-node/records/sequence-wrap-224.bin": {
+          "bytes": 45,
+          "sha256": "c317cd8bbf16f4945c65109628470eb5e01b263ec0277f26936bd18db90f2b15"
+        },
+        "sparkplug-node/records/sequence-wrap-225.bin": {
+          "bytes": 45,
+          "sha256": "ea3cb04f2389e2e501538b5ab4e95b8b4c58cd6fcfc7112d12c1afa28e4cfa5b"
+        },
+        "sparkplug-node/records/sequence-wrap-226.bin": {
+          "bytes": 45,
+          "sha256": "fee71cb04317a72002ac22476d8a39d75b9021fd9bb971d3293a872dfa73ac1a"
+        },
+        "sparkplug-node/records/sequence-wrap-227.bin": {
+          "bytes": 45,
+          "sha256": "89e31fa17faa391745d08bf0bf5778d2de252ae1039f263b408bd6e247f7d322"
+        },
+        "sparkplug-node/records/sequence-wrap-228.bin": {
+          "bytes": 45,
+          "sha256": "be77c31ed12ce49bfd0874c8f4726acc0a9130f378325b3d856a5b9b85234231"
+        },
+        "sparkplug-node/records/sequence-wrap-229.bin": {
+          "bytes": 45,
+          "sha256": "e000a950ff438d328ca0bd774922fd263d2340f0176a022b9d9477b572e5df58"
+        },
+        "sparkplug-node/records/sequence-wrap-230.bin": {
+          "bytes": 45,
+          "sha256": "e9b3c2e405564e3b2c744f15a489afab35a41e350bcdcd12eef86bb299d2b9cf"
+        },
+        "sparkplug-node/records/sequence-wrap-231.bin": {
+          "bytes": 45,
+          "sha256": "348e8cf33d38eaf8948f6ec5205301752d77c6fea9e5554d1136a0ffaf8c2524"
+        },
+        "sparkplug-node/records/sequence-wrap-232.bin": {
+          "bytes": 45,
+          "sha256": "1dea283bf84b244575551967e5ffa9b7c913090683fb3e548d152d89bb7997e3"
+        },
+        "sparkplug-node/records/sequence-wrap-233.bin": {
+          "bytes": 45,
+          "sha256": "1f0de98fbffb9cb44df7e6bd12d8697d85317e2854425daa32f4056d76df0737"
+        },
+        "sparkplug-node/records/sequence-wrap-234.bin": {
+          "bytes": 45,
+          "sha256": "564f2621aa5037ec7d2e918907e35680f8c99428deda8a8818a828d7b9765799"
+        },
+        "sparkplug-node/records/sequence-wrap-235.bin": {
+          "bytes": 45,
+          "sha256": "a895a4d2155d5be3b820d1d3a7f8cd568cf926e2e0ff48cf84d987a4be0b9931"
+        },
+        "sparkplug-node/records/sequence-wrap-236.bin": {
+          "bytes": 45,
+          "sha256": "56174211bd5d820ab35640d9161d8d6ba53ee77a9fc5d356e345b64050f0560e"
+        },
+        "sparkplug-node/records/sequence-wrap-237.bin": {
+          "bytes": 45,
+          "sha256": "62af88bae42154d920da99115d0107332a38f50d558dd91e0304e194a697c71f"
+        },
+        "sparkplug-node/records/sequence-wrap-238.bin": {
+          "bytes": 45,
+          "sha256": "299fc3090bc6a3a34255e56fef4336838e70a15c70c4364b63c82e8ee44c38b6"
+        },
+        "sparkplug-node/records/sequence-wrap-239.bin": {
+          "bytes": 45,
+          "sha256": "1e4da48b550790bb5cb76fa935c02baa063706f1f669dda319a30326737a81d1"
+        },
+        "sparkplug-node/records/sequence-wrap-240.bin": {
+          "bytes": 45,
+          "sha256": "81b4de0f3c00bb6fd2148d8fbbf8a092a7996bca135754571bd713946831c237"
+        },
+        "sparkplug-node/records/sequence-wrap-241.bin": {
+          "bytes": 45,
+          "sha256": "71d469a2f5b7497e838f1c41d5fcf8b65c12c3b0b236bbd57cec7106eebe64d3"
+        },
+        "sparkplug-node/records/sequence-wrap-242.bin": {
+          "bytes": 45,
+          "sha256": "29b1be8f5625ca74ccafa42238161c4b20938876e747c342b184285317a00ab0"
+        },
+        "sparkplug-node/records/sequence-wrap-243.bin": {
+          "bytes": 45,
+          "sha256": "b3d89a21f593cd3aa28631a3df19023fe45c5a1189b198a575e177071c3b5b84"
+        },
+        "sparkplug-node/records/sequence-wrap-244.bin": {
+          "bytes": 45,
+          "sha256": "8cf725355151db8505b86afb0bf64adc749869ab0d2f77732918e23df486b581"
+        },
+        "sparkplug-node/records/sequence-wrap-245.bin": {
+          "bytes": 45,
+          "sha256": "682315875412daaa0240cf07ed5b5082ec2ce84a685bf3dafb8d0d2c0b931ad5"
+        },
+        "sparkplug-node/records/sequence-wrap-246.bin": {
+          "bytes": 45,
+          "sha256": "1853644d50adc6f5bae733fd7879c04335506ba5df5282e314f41c0cde202c8f"
+        },
+        "sparkplug-node/records/sequence-wrap-247.bin": {
+          "bytes": 45,
+          "sha256": "bc5cedb2f54db4b7308816524f384d7b2898a174d0ba7eac1fb5c08df505b08c"
+        },
+        "sparkplug-node/records/sequence-wrap-248.bin": {
+          "bytes": 45,
+          "sha256": "65c3f7056cc3dee3f2a2dabab67c4c61b4739a32ca1471873987871778567e1f"
+        },
+        "sparkplug-node/records/sequence-wrap-249.bin": {
+          "bytes": 45,
+          "sha256": "9b4122cc832fe472e603947f095e1e0e9b2222e5f2e6e127b126771d34fcf2ce"
+        },
+        "sparkplug-node/records/sequence-wrap-250.bin": {
+          "bytes": 45,
+          "sha256": "ac75fd4562c74c55c9585b18248be48e922a42d61074795e89990e69cb57abe7"
+        },
+        "sparkplug-node/records/sequence-wrap-251.bin": {
+          "bytes": 45,
+          "sha256": "8667e41c415e0de56b1ed6b19756bf6065762264cb1a63faeff99f37517b23ba"
+        },
+        "sparkplug-node/records/sequence-wrap-252.bin": {
+          "bytes": 45,
+          "sha256": "bf20c7fad7bbb79b7a91572aaa99bf613f207728a53dbeac34b06b20826b77c0"
+        },
+        "sparkplug-node/records/sequence-wrap-253.bin": {
+          "bytes": 45,
+          "sha256": "7d808a4082fc645d48d94b6d75c56fd2d1023130a066fddec5b32b16d48c9663"
+        },
+        "sparkplug-node/records/sequence-wrap-254.bin": {
+          "bytes": 45,
+          "sha256": "46403c0c0e088a017b4fe936c573bfa3e60808720dcee07075e715e337827b8e"
+        },
+        "sparkplug-node/records/sequence-wrap-255.bin": {
+          "bytes": 44,
+          "sha256": "543318bd35c952e288d6b34e1ab8f8f0c1530500db09ac388a0904f18bfae89a"
+        },
+        "sparkplug-node/records/opaque-neighbor-opaque.bin": {
+          "bytes": 21,
+          "sha256": "5c9c9803ce873d52074306b3c94469d40f2bce307124df98af9d6780726b284d"
+        },
+        "sparkplug-node/captures/level4-lifecycle.pcap": {
+          "bytes": 1190,
+          "sha256": "740144db5f9b744c8a37d7745e4ebdcff3044bf96c3433f728f36bc946267c92"
+        },
+        "sparkplug-node/captures/level4-rebirth.pcap": {
+          "bytes": 1179,
+          "sha256": "d68d8d7a54ea71084636dbfb59c54e83955f9d8c084ae4748271bbbce981b4e3"
+        },
+        "sparkplug-node/captures/level4-missing-will.pcap": {
+          "bytes": 720,
+          "sha256": "b79af3a10756dc572ba8e820f3b0634bca5f80af245a468cf36da4369f3f75d4"
+        },
+        "sparkplug-node/captures/level5-lifecycle.pcap": {
+          "bytes": 1197,
+          "sha256": "e44a79ffc0189ddcbbdb2e1f0b707b58719c0e5c2f3c93a5bf168e5015d2148a"
+        },
+        "sparkplug-node/captures/level5-rebirth.pcap": {
+          "bytes": 1186,
+          "sha256": "50475b7080fb9e6a9646feb76ea8c74dfab23f2a3e416e88f326eb1d6b33eafc"
+        },
+        "sparkplug-node/captures/level5-missing-will.pcap": {
+          "bytes": 723,
+          "sha256": "50ba1c307f23737e80ba64b930e06516e48282fe035369bd5dc5a61d278d7e2a"
+        },
+        "sparkplug-node/captures/scalar-1.pcap": {
+          "bytes": 770,
+          "sha256": "cd3995667e131eaa309621c17f1747ab4239a92d2ae5a4918ec17fd6063f4e38"
+        },
+        "sparkplug-node/captures/scalar-2.pcap": {
+          "bytes": 771,
+          "sha256": "73667cb8fe3274ff9a32c2185197119bff2202255f286f3c976d6e0a75dc12cb"
+        },
+        "sparkplug-node/captures/scalar-3.pcap": {
+          "bytes": 773,
+          "sha256": "d1fcfbe6715f317e21b5886aad41658ba75668bf0f4d44593e1e3c672ba5870b"
+        },
+        "sparkplug-node/captures/scalar-4.pcap": {
+          "bytes": 778,
+          "sha256": "c23d80cbb9c722e6bef2d191bd37fc9f74162fab37938da567daca26d2f661b2"
+        },
+        "sparkplug-node/captures/scalar-8.pcap": {
+          "bytes": 778,
+          "sha256": "81b508d4f2a9ee4c7c1ed17bddd48884746848f56d5bef82bc42f5d7b01eba8d"
+        },
+        "sparkplug-node/captures/scalar-9.pcap": {
+          "bytes": 772,
+          "sha256": "b44a75dcef11a220d11def041a5fd1811b6b80daf2f54309cc98e8782aeddae5"
+        },
+        "sparkplug-node/captures/scalar-10.pcap": {
+          "bytes": 776,
+          "sha256": "ecf7078deaf512e64e7d8dc1b223ff46279d128a5db21d9d1a278ba8f48e018b"
+        },
+        "sparkplug-node/captures/scalar-11.pcap": {
+          "bytes": 769,
+          "sha256": "8a7ff509a4bbbf4bd5b7818382273a51cb2a5b7c1ddf6949d9fff1cfb91e40a8"
+        },
+        "sparkplug-node/captures/scalar-12.pcap": {
+          "bytes": 772,
+          "sha256": "3c77c9b93b4bc50f165124aed17a2ec4640f47a58b23b39e3c6788a4d68977ba"
+        },
+        "sparkplug-node/captures/scalar-17.pcap": {
+          "bytes": 772,
+          "sha256": "33ca373cefb4a9b272266a7ed6154d807ba6b6698f26cd222e11bf6c9c66451f"
+        },
+        "sparkplug-node/captures/received-timestamp-only.pcap": {
+          "bytes": 679,
+          "sha256": "f16287c48c4f8e3e68288475058b5d340461600455730d2c70630b98c450e59a"
+        },
+        "sparkplug-node/captures/received-wrong-wire.pcap": {
+          "bytes": 681,
+          "sha256": "7051c68137ec51f217adb59c3deee7bed36a50e024e65ad3c1d9ba3cef1ad5cc"
+        },
+        "sparkplug-node/captures/qos-wrong.pcap": {
+          "bytes": 845,
+          "sha256": "71fc1e6d4f90a0a26122ddc9e38b015a651c18848459dc890fd9e68367e2d383"
+        },
+        "sparkplug-node/captures/retain-wrong.pcap": {
+          "bytes": 769,
+          "sha256": "99f57f7c3689c80a43182cc6788cc01294365d2e51858a82f326ddfa7c50bc80"
+        },
+        "sparkplug-node/captures/bdseq-mismatch.pcap": {
+          "bytes": 741,
+          "sha256": "d0fb88be62faced00ffd781f882c58cc166bed4ab56764fba1e2089474d09fae"
+        },
+        "sparkplug-node/captures/metric-timestamp-missing.pcap": {
+          "bytes": 762,
+          "sha256": "c83f19ba7ff7ae5840dd7ebb6d73ce8da006a7706f7fc026b00c8965c6596273"
+        },
+        "sparkplug-node/captures/alias-collision.pcap": {
+          "bytes": 771,
+          "sha256": "26b2b639d822b714ca8fab30ddd7b6f77c624a671967f487f61cd7d7652ae6da"
+        },
+        "sparkplug-node/captures/datatype-mismatch.pcap": {
+          "bytes": 769,
+          "sha256": "209092cb3edfda1efda350bb8a849546e7e1e440707ca4067908c86882a3e126"
+        },
+        "sparkplug-node/captures/sequence-gap.pcap": {
+          "bytes": 1292,
+          "sha256": "5eb026cf3b4c9d3478d335a948a59515be99c92c25f878252f6e0fa2319d418d"
+        },
+        "sparkplug-node/captures/unknown-alias.pcap": {
+          "bytes": 995,
+          "sha256": "1f073f7a7220d7ef95da97352a5d1a2615c27cf4ca5207e1b56afd01994a4072"
+        },
+        "sparkplug-node/captures/foreign-node.pcap": {
+          "bytes": 999,
+          "sha256": "e940074fa26a1026d3588fed0f1582c0a79b6e4101637e54aac0b900568976b6"
+        },
+        "sparkplug-node/captures/forwarded-birth.pcap": {
+          "bytes": 1066,
+          "sha256": "7d70a4c5b62288bd2c5676c5df828182dfc34dd5459ebfcc550437120909d476"
+        },
+        "sparkplug-node/captures/late-death.pcap": {
+          "bytes": 1077,
+          "sha256": "cb0ca9db37cc982998c90e33fbbd1d9c03a373415f0c39ba3e238b14d5bd2b1e"
+        },
+        "sparkplug-node/captures/unknown-extension.pcap": {
+          "bytes": 772,
+          "sha256": "8eae6a2d7f03ae5fc2ace1cc4c1c00b3029028663f6387351a24ad3b5f30275b"
+        },
+        "sparkplug-node/captures/ncmd-rebirth.pcap": {
+          "bytes": 1302,
+          "sha256": "2078e2a2a71b846822f45f88f202894fbb4e8b08013d23ecb37a15443e0a9916"
+        },
+        "sparkplug-node/captures/ncmd-refusal.pcap": {
+          "bytes": 1007,
+          "sha256": "55984b03e4ed113b4c83ff0da49bbc6e82784fc4fdee44dc7363a8932d41a040"
+        },
+        "sparkplug-node/captures/ncmd-direction.pcap": {
+          "bytes": 1005,
+          "sha256": "d89436bfc2e5cf72f6b392346407f1a95b2c343ead75c00464308b6d3a5b2e53"
+        },
+        "sparkplug-node/captures/repeated-metric.pcap": {
+          "bytes": 895,
+          "sha256": "19d8d32232d5a7c9680aeb82cf8e951e182d01c49d9c1326e1d26cd117eeb181"
+        },
+        "sparkplug-node/captures/oneof-last.pcap": {
+          "bytes": 771,
+          "sha256": "ea79f7201ffd9e0cc3f10ac7ec315454896e8eb938726e36759c638a08641b25"
+        },
+        "sparkplug-node/captures/metric-wrong-wire.pcap": {
+          "bytes": 772,
+          "sha256": "76a60686553f20d202c65eea3c61198d479af327e40490ce4d6c1c54ad738f6a"
+        },
+        "sparkplug-node/captures/unknown-noncanonical.pcap": {
+          "bytes": 773,
+          "sha256": "57fa2797a30e5d19e423fd10a077ba152ed19352f830a37123f54b4572fdd7bb"
+        },
+        "sparkplug-node/captures/protobuf-truncated.pcap": {
+          "bytes": 680,
+          "sha256": "e30f79216074320eb79d8ec8000dc7629720e8b04624af755e4df9d5eb385e11"
+        },
+        "sparkplug-node/captures/rebirth-name-refusal.pcap": {
+          "bytes": 740,
+          "sha256": "e4d6250e7626470477d7b5d73a0240ee47b05b167448feb23ea8d97f961b969a"
+        },
+        "sparkplug-node/captures/sequence-wrap.pcap": {
+          "bytes": 29954,
+          "sha256": "cbf2e4dacadb7529331af1c1f1746e875d0fe79c7e12379c7296220f2b63db8e"
+        },
+        "sparkplug-node/captures/opaque-neighbor.pcap": {
+          "bytes": 676,
+          "sha256": "c19ec4b6da2492840b0628a605ba962bbe97d508a2a2acb9cd4fe0c33699f253"
+        },
+        "sparkplug-node/answers.json": {
+          "bytes": 470654,
+          "sha256": "a998ab021eef6e441a79c2cc2bf63d8276cd062648dddd4df1c478ba642815f5"
+        },
+        "sparkplug-node/SOURCE.json": {
+          "bytes": 470,
+          "sha256": "73a5ad5daae392610f0ab40ec65ee4dcc4385e70ec3d6fe6b9fe0dc3e8ed1512"
+        },
+        "sparkplug-node/reference-inputs.json": {
+          "bytes": 29553,
+          "sha256": "d59ca8f1ccb274dc01d7ff7e8085b5bb50ec8d22e2a1279f24af64f428396d47"
+        },
+        "sparkplug-node/reference.go": {
+          "bytes": 3515,
+          "sha256": "d6ada001fa275b8a92102903ee8e0340637ce98703471aa13cea778e36177853"
+        },
+        "sparkplug-node/reference-expected.json": {
+          "bytes": 51933,
+          "sha256": "7c34e7da552819590782f955f483b7b305788f6dbe62593858e25acc3d3bf7c1"
+        },
+        "sparkplug-node/generate.py": {
+          "bytes": 14171,
+          "sha256": "96a66dbbb365f8514d8e19c2fdf3f6aec6fe5a5ecf5a9cd0c98dfdc41bfda1ec"
+        },
+        "sparkplug-node/verify.py": {
+          "bytes": 1221,
+          "sha256": "ad99cca3db5e6a86f459717ab8532fd4dadba6d29a2f4d9279e96aef23a59793"
+        },
+        "sparkplug-node/seal.py": {
+          "bytes": 764,
+          "sha256": "2580a76080b082c05125082296f164902ceae4421f4fca2674dda88af7526e42"
+        },
+        "validation/expected.json": {
+          "bytes": 41622,
+          "sha256": "d72bc70d0d5778f7464c526f45ce93910bf97dc8511dadea6abc98c18864c686"
+        }
+      },
+      "aliases": {
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/level4-lifecycle-connect.bin": "sparkplug-node/records/level4-lifecycle-connect.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/level4-lifecycle-birth.bin": "sparkplug-node/records/level4-lifecycle-birth.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/level4-lifecycle-0.bin": "sparkplug-node/records/level4-lifecycle-0.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/level4-lifecycle-1.bin": "sparkplug-node/records/level4-lifecycle-1.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/level4-lifecycle-2.bin": "sparkplug-node/records/level4-lifecycle-2.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/level4-rebirth-connect.bin": "sparkplug-node/records/level4-lifecycle-connect.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/level4-rebirth-birth.bin": "sparkplug-node/records/level4-lifecycle-birth.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/level4-rebirth-0.bin": "sparkplug-node/records/level4-lifecycle-0.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/level4-rebirth-1.bin": "sparkplug-node/records/level4-lifecycle-birth.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/level4-rebirth-2.bin": "sparkplug-node/records/level4-lifecycle-0.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/level4-missing-will-connect.bin": "sparkplug-node/records/level4-missing-will-connect.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/level4-missing-will-0.bin": "sparkplug-node/records/level4-lifecycle-birth.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/level5-lifecycle-connect.bin": "sparkplug-node/records/level5-lifecycle-connect.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/level5-lifecycle-birth.bin": "sparkplug-node/records/level5-lifecycle-birth.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/level5-lifecycle-0.bin": "sparkplug-node/records/level5-lifecycle-0.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/level5-lifecycle-1.bin": "sparkplug-node/records/level5-lifecycle-1.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/level5-lifecycle-2.bin": "sparkplug-node/records/level5-lifecycle-2.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/level5-rebirth-connect.bin": "sparkplug-node/records/level5-lifecycle-connect.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/level5-rebirth-birth.bin": "sparkplug-node/records/level5-lifecycle-birth.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/level5-rebirth-0.bin": "sparkplug-node/records/level5-lifecycle-0.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/level5-rebirth-1.bin": "sparkplug-node/records/level5-lifecycle-birth.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/level5-rebirth-2.bin": "sparkplug-node/records/level5-lifecycle-0.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/level5-missing-will-connect.bin": "sparkplug-node/records/level5-missing-will-connect.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/level5-missing-will-0.bin": "sparkplug-node/records/level5-lifecycle-birth.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/scalar-1-connect.bin": "sparkplug-node/records/level4-lifecycle-connect.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/scalar-1-0.bin": "sparkplug-node/records/scalar-1-0.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/scalar-2-connect.bin": "sparkplug-node/records/level4-lifecycle-connect.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/scalar-2-0.bin": "sparkplug-node/records/scalar-2-0.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/scalar-3-connect.bin": "sparkplug-node/records/level4-lifecycle-connect.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/scalar-3-0.bin": "sparkplug-node/records/scalar-3-0.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/scalar-4-connect.bin": "sparkplug-node/records/level4-lifecycle-connect.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/scalar-4-0.bin": "sparkplug-node/records/scalar-4-0.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/scalar-8-connect.bin": "sparkplug-node/records/level4-lifecycle-connect.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/scalar-8-0.bin": "sparkplug-node/records/scalar-8-0.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/scalar-9-connect.bin": "sparkplug-node/records/level4-lifecycle-connect.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/scalar-9-0.bin": "sparkplug-node/records/scalar-9-0.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/scalar-10-connect.bin": "sparkplug-node/records/level4-lifecycle-connect.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/scalar-10-0.bin": "sparkplug-node/records/scalar-10-0.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/scalar-11-connect.bin": "sparkplug-node/records/level4-lifecycle-connect.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/scalar-11-0.bin": "sparkplug-node/records/scalar-11-0.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/scalar-12-connect.bin": "sparkplug-node/records/level4-lifecycle-connect.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/scalar-12-0.bin": "sparkplug-node/records/scalar-12-0.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/scalar-17-connect.bin": "sparkplug-node/records/level4-lifecycle-connect.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/scalar-17-0.bin": "sparkplug-node/records/scalar-17-0.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/received-timestamp-only-connect.bin": "sparkplug-node/records/level4-lifecycle-connect.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/received-timestamp-only-0.bin": "sparkplug-node/records/received-timestamp-only-0.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/received-wrong-wire-connect.bin": "sparkplug-node/records/level4-lifecycle-connect.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/received-wrong-wire-0.bin": "sparkplug-node/records/received-wrong-wire-0.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/qos-wrong-connect.bin": "sparkplug-node/records/level4-lifecycle-connect.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/qos-wrong-0.bin": "sparkplug-node/records/qos-wrong-0.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/retain-wrong-connect.bin": "sparkplug-node/records/level4-lifecycle-connect.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/retain-wrong-0.bin": "sparkplug-node/records/retain-wrong-0.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/bdseq-mismatch-connect.bin": "sparkplug-node/records/level4-lifecycle-connect.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/bdseq-mismatch-0.bin": "sparkplug-node/records/bdseq-mismatch-0.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/metric-timestamp-missing-connect.bin": "sparkplug-node/records/level4-lifecycle-connect.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/metric-timestamp-missing-0.bin": "sparkplug-node/records/metric-timestamp-missing-0.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/alias-collision-connect.bin": "sparkplug-node/records/level4-lifecycle-connect.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/alias-collision-0.bin": "sparkplug-node/records/alias-collision-0.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/datatype-mismatch-connect.bin": "sparkplug-node/records/level4-lifecycle-connect.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/datatype-mismatch-0.bin": "sparkplug-node/records/datatype-mismatch-0.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-gap-connect.bin": "sparkplug-node/records/level4-lifecycle-connect.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-gap-birth.bin": "sparkplug-node/records/level4-lifecycle-birth.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-gap-0.bin": "sparkplug-node/records/sequence-gap-0.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-gap-1.bin": "sparkplug-node/records/level4-lifecycle-0.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-gap-2.bin": "sparkplug-node/records/level4-lifecycle-birth.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-gap-3.bin": "sparkplug-node/records/level4-lifecycle-0.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/unknown-alias-connect.bin": "sparkplug-node/records/level4-lifecycle-connect.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/unknown-alias-birth.bin": "sparkplug-node/records/level4-lifecycle-birth.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/unknown-alias-0.bin": "sparkplug-node/records/unknown-alias-0.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/unknown-alias-1.bin": "sparkplug-node/records/level4-lifecycle-0.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/foreign-node-connect.bin": "sparkplug-node/records/level4-lifecycle-connect.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/foreign-node-birth.bin": "sparkplug-node/records/level4-lifecycle-birth.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/foreign-node-0.bin": "sparkplug-node/records/foreign-node-0.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/foreign-node-1.bin": "sparkplug-node/records/level4-lifecycle-0.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/forwarded-birth-connect.bin": "sparkplug-node/records/level4-lifecycle-connect.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/forwarded-birth-birth.bin": "sparkplug-node/records/level4-lifecycle-birth.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/forwarded-birth-0.bin": "sparkplug-node/records/level4-lifecycle-birth.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/forwarded-birth-1.bin": "sparkplug-node/records/level4-lifecycle-0.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/late-death-connect.bin": "sparkplug-node/records/level4-lifecycle-connect.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/late-death-birth.bin": "sparkplug-node/records/level4-lifecycle-birth.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/late-death-0.bin": "sparkplug-node/records/late-death-0.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/late-death-1.bin": "sparkplug-node/records/level4-lifecycle-0.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/unknown-extension-connect.bin": "sparkplug-node/records/level4-lifecycle-connect.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/unknown-extension-0.bin": "sparkplug-node/records/unknown-extension-0.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/ncmd-rebirth-connect.bin": "sparkplug-node/records/level4-lifecycle-connect.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/ncmd-rebirth-birth.bin": "sparkplug-node/records/level4-lifecycle-birth.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/ncmd-rebirth-0.bin": "sparkplug-node/records/ncmd-rebirth-0.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/ncmd-rebirth-1.bin": "sparkplug-node/records/level4-lifecycle-0.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/ncmd-rebirth-2.bin": "sparkplug-node/records/level4-lifecycle-birth.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/ncmd-rebirth-3.bin": "sparkplug-node/records/level4-lifecycle-0.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/ncmd-refusal-connect.bin": "sparkplug-node/records/level4-lifecycle-connect.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/ncmd-refusal-birth.bin": "sparkplug-node/records/level4-lifecycle-birth.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/ncmd-refusal-0.bin": "sparkplug-node/records/ncmd-refusal-0.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/ncmd-refusal-1.bin": "sparkplug-node/records/level4-lifecycle-0.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/ncmd-direction-connect.bin": "sparkplug-node/records/level4-lifecycle-connect.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/ncmd-direction-birth.bin": "sparkplug-node/records/level4-lifecycle-birth.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/ncmd-direction-0.bin": "sparkplug-node/records/ncmd-rebirth-0.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/ncmd-direction-1.bin": "sparkplug-node/records/level4-lifecycle-0.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/repeated-metric-connect.bin": "sparkplug-node/records/level4-lifecycle-connect.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/repeated-metric-birth.bin": "sparkplug-node/records/level4-lifecycle-birth.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/repeated-metric-0.bin": "sparkplug-node/records/repeated-metric-0.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/oneof-last-connect.bin": "sparkplug-node/records/level4-lifecycle-connect.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/oneof-last-0.bin": "sparkplug-node/records/oneof-last-0.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/metric-wrong-wire-connect.bin": "sparkplug-node/records/level4-lifecycle-connect.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/metric-wrong-wire-0.bin": "sparkplug-node/records/metric-wrong-wire-0.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/unknown-noncanonical-connect.bin": "sparkplug-node/records/level4-lifecycle-connect.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/unknown-noncanonical-0.bin": "sparkplug-node/records/unknown-noncanonical-0.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/protobuf-truncated-connect.bin": "sparkplug-node/records/level4-lifecycle-connect.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/protobuf-truncated-0.bin": "sparkplug-node/records/protobuf-truncated-0.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/rebirth-name-refusal-connect.bin": "sparkplug-node/records/level4-lifecycle-connect.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/rebirth-name-refusal-0.bin": "sparkplug-node/records/rebirth-name-refusal-0.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-connect.bin": "sparkplug-node/records/level4-lifecycle-connect.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-birth.bin": "sparkplug-node/records/level4-lifecycle-birth.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-0.bin": "sparkplug-node/records/sequence-wrap-0.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-1.bin": "sparkplug-node/records/sequence-wrap-1.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-2.bin": "sparkplug-node/records/sequence-wrap-2.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-3.bin": "sparkplug-node/records/sequence-wrap-3.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-4.bin": "sparkplug-node/records/sequence-wrap-4.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-5.bin": "sparkplug-node/records/sequence-wrap-5.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-6.bin": "sparkplug-node/records/sequence-wrap-6.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-7.bin": "sparkplug-node/records/sequence-wrap-7.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-8.bin": "sparkplug-node/records/sequence-wrap-8.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-9.bin": "sparkplug-node/records/sequence-wrap-9.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-10.bin": "sparkplug-node/records/sequence-wrap-10.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-11.bin": "sparkplug-node/records/sequence-wrap-11.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-12.bin": "sparkplug-node/records/sequence-wrap-12.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-13.bin": "sparkplug-node/records/sequence-wrap-13.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-14.bin": "sparkplug-node/records/sequence-wrap-14.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-15.bin": "sparkplug-node/records/sequence-wrap-15.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-16.bin": "sparkplug-node/records/sequence-wrap-16.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-17.bin": "sparkplug-node/records/sequence-wrap-17.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-18.bin": "sparkplug-node/records/sequence-wrap-18.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-19.bin": "sparkplug-node/records/sequence-wrap-19.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-20.bin": "sparkplug-node/records/sequence-wrap-20.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-21.bin": "sparkplug-node/records/sequence-wrap-21.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-22.bin": "sparkplug-node/records/sequence-wrap-22.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-23.bin": "sparkplug-node/records/sequence-wrap-23.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-24.bin": "sparkplug-node/records/sequence-wrap-24.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-25.bin": "sparkplug-node/records/sequence-wrap-25.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-26.bin": "sparkplug-node/records/sequence-wrap-26.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-27.bin": "sparkplug-node/records/sequence-wrap-27.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-28.bin": "sparkplug-node/records/sequence-wrap-28.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-29.bin": "sparkplug-node/records/sequence-wrap-29.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-30.bin": "sparkplug-node/records/sequence-wrap-30.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-31.bin": "sparkplug-node/records/sequence-wrap-31.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-32.bin": "sparkplug-node/records/sequence-wrap-32.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-33.bin": "sparkplug-node/records/sequence-wrap-33.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-34.bin": "sparkplug-node/records/sequence-wrap-34.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-35.bin": "sparkplug-node/records/sequence-wrap-35.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-36.bin": "sparkplug-node/records/sequence-wrap-36.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-37.bin": "sparkplug-node/records/sequence-wrap-37.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-38.bin": "sparkplug-node/records/sequence-wrap-38.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-39.bin": "sparkplug-node/records/sequence-wrap-39.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-40.bin": "sparkplug-node/records/sequence-wrap-40.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-41.bin": "sparkplug-node/records/sequence-wrap-41.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-42.bin": "sparkplug-node/records/sequence-wrap-42.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-43.bin": "sparkplug-node/records/sequence-wrap-43.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-44.bin": "sparkplug-node/records/sequence-wrap-44.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-45.bin": "sparkplug-node/records/sequence-wrap-45.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-46.bin": "sparkplug-node/records/sequence-wrap-46.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-47.bin": "sparkplug-node/records/sequence-wrap-47.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-48.bin": "sparkplug-node/records/sequence-wrap-48.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-49.bin": "sparkplug-node/records/sequence-wrap-49.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-50.bin": "sparkplug-node/records/sequence-wrap-50.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-51.bin": "sparkplug-node/records/sequence-wrap-51.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-52.bin": "sparkplug-node/records/sequence-wrap-52.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-53.bin": "sparkplug-node/records/sequence-wrap-53.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-54.bin": "sparkplug-node/records/sequence-wrap-54.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-55.bin": "sparkplug-node/records/sequence-wrap-55.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-56.bin": "sparkplug-node/records/sequence-wrap-56.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-57.bin": "sparkplug-node/records/sequence-wrap-57.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-58.bin": "sparkplug-node/records/sequence-wrap-58.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-59.bin": "sparkplug-node/records/sequence-wrap-59.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-60.bin": "sparkplug-node/records/sequence-wrap-60.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-61.bin": "sparkplug-node/records/sequence-wrap-61.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-62.bin": "sparkplug-node/records/sequence-wrap-62.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-63.bin": "sparkplug-node/records/sequence-wrap-63.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-64.bin": "sparkplug-node/records/sequence-wrap-64.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-65.bin": "sparkplug-node/records/sequence-wrap-65.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-66.bin": "sparkplug-node/records/sequence-wrap-66.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-67.bin": "sparkplug-node/records/sequence-wrap-67.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-68.bin": "sparkplug-node/records/sequence-wrap-68.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-69.bin": "sparkplug-node/records/sequence-wrap-69.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-70.bin": "sparkplug-node/records/sequence-wrap-70.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-71.bin": "sparkplug-node/records/sequence-wrap-71.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-72.bin": "sparkplug-node/records/sequence-wrap-72.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-73.bin": "sparkplug-node/records/sequence-wrap-73.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-74.bin": "sparkplug-node/records/sequence-wrap-74.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-75.bin": "sparkplug-node/records/sequence-wrap-75.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-76.bin": "sparkplug-node/records/sequence-wrap-76.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-77.bin": "sparkplug-node/records/sequence-wrap-77.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-78.bin": "sparkplug-node/records/sequence-wrap-78.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-79.bin": "sparkplug-node/records/sequence-wrap-79.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-80.bin": "sparkplug-node/records/sequence-wrap-80.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-81.bin": "sparkplug-node/records/sequence-wrap-81.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-82.bin": "sparkplug-node/records/sequence-wrap-82.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-83.bin": "sparkplug-node/records/sequence-wrap-83.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-84.bin": "sparkplug-node/records/sequence-wrap-84.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-85.bin": "sparkplug-node/records/sequence-wrap-85.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-86.bin": "sparkplug-node/records/sequence-wrap-86.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-87.bin": "sparkplug-node/records/sequence-wrap-87.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-88.bin": "sparkplug-node/records/sequence-wrap-88.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-89.bin": "sparkplug-node/records/sequence-wrap-89.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-90.bin": "sparkplug-node/records/sequence-wrap-90.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-91.bin": "sparkplug-node/records/sequence-wrap-91.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-92.bin": "sparkplug-node/records/sequence-wrap-92.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-93.bin": "sparkplug-node/records/sequence-wrap-93.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-94.bin": "sparkplug-node/records/sequence-wrap-94.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-95.bin": "sparkplug-node/records/sequence-wrap-95.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-96.bin": "sparkplug-node/records/sequence-wrap-96.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-97.bin": "sparkplug-node/records/sequence-wrap-97.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-98.bin": "sparkplug-node/records/sequence-wrap-98.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-99.bin": "sparkplug-node/records/sequence-wrap-99.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-100.bin": "sparkplug-node/records/sequence-wrap-100.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-101.bin": "sparkplug-node/records/sequence-wrap-101.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-102.bin": "sparkplug-node/records/sequence-wrap-102.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-103.bin": "sparkplug-node/records/sequence-wrap-103.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-104.bin": "sparkplug-node/records/sequence-wrap-104.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-105.bin": "sparkplug-node/records/sequence-wrap-105.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-106.bin": "sparkplug-node/records/sequence-wrap-106.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-107.bin": "sparkplug-node/records/sequence-wrap-107.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-108.bin": "sparkplug-node/records/sequence-wrap-108.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-109.bin": "sparkplug-node/records/sequence-wrap-109.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-110.bin": "sparkplug-node/records/sequence-wrap-110.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-111.bin": "sparkplug-node/records/sequence-wrap-111.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-112.bin": "sparkplug-node/records/sequence-wrap-112.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-113.bin": "sparkplug-node/records/sequence-wrap-113.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-114.bin": "sparkplug-node/records/sequence-wrap-114.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-115.bin": "sparkplug-node/records/sequence-wrap-115.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-116.bin": "sparkplug-node/records/sequence-wrap-116.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-117.bin": "sparkplug-node/records/sequence-wrap-117.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-118.bin": "sparkplug-node/records/sequence-wrap-118.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-119.bin": "sparkplug-node/records/sequence-wrap-119.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-120.bin": "sparkplug-node/records/sequence-wrap-120.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-121.bin": "sparkplug-node/records/sequence-wrap-121.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-122.bin": "sparkplug-node/records/sequence-wrap-122.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-123.bin": "sparkplug-node/records/sequence-wrap-123.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-124.bin": "sparkplug-node/records/sequence-wrap-124.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-125.bin": "sparkplug-node/records/sequence-wrap-125.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-126.bin": "sparkplug-node/records/sequence-wrap-126.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-127.bin": "sparkplug-node/records/sequence-wrap-127.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-128.bin": "sparkplug-node/records/sequence-wrap-128.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-129.bin": "sparkplug-node/records/sequence-wrap-129.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-130.bin": "sparkplug-node/records/sequence-wrap-130.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-131.bin": "sparkplug-node/records/sequence-wrap-131.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-132.bin": "sparkplug-node/records/sequence-wrap-132.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-133.bin": "sparkplug-node/records/sequence-wrap-133.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-134.bin": "sparkplug-node/records/sequence-wrap-134.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-135.bin": "sparkplug-node/records/sequence-wrap-135.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-136.bin": "sparkplug-node/records/sequence-wrap-136.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-137.bin": "sparkplug-node/records/sequence-wrap-137.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-138.bin": "sparkplug-node/records/sequence-wrap-138.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-139.bin": "sparkplug-node/records/sequence-wrap-139.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-140.bin": "sparkplug-node/records/sequence-wrap-140.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-141.bin": "sparkplug-node/records/sequence-wrap-141.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-142.bin": "sparkplug-node/records/sequence-wrap-142.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-143.bin": "sparkplug-node/records/sequence-wrap-143.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-144.bin": "sparkplug-node/records/sequence-wrap-144.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-145.bin": "sparkplug-node/records/sequence-wrap-145.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-146.bin": "sparkplug-node/records/sequence-wrap-146.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-147.bin": "sparkplug-node/records/sequence-wrap-147.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-148.bin": "sparkplug-node/records/sequence-wrap-148.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-149.bin": "sparkplug-node/records/sequence-wrap-149.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-150.bin": "sparkplug-node/records/sequence-wrap-150.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-151.bin": "sparkplug-node/records/sequence-wrap-151.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-152.bin": "sparkplug-node/records/sequence-wrap-152.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-153.bin": "sparkplug-node/records/sequence-wrap-153.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-154.bin": "sparkplug-node/records/sequence-wrap-154.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-155.bin": "sparkplug-node/records/sequence-wrap-155.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-156.bin": "sparkplug-node/records/sequence-wrap-156.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-157.bin": "sparkplug-node/records/sequence-wrap-157.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-158.bin": "sparkplug-node/records/sequence-wrap-158.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-159.bin": "sparkplug-node/records/sequence-wrap-159.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-160.bin": "sparkplug-node/records/sequence-wrap-160.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-161.bin": "sparkplug-node/records/sequence-wrap-161.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-162.bin": "sparkplug-node/records/sequence-wrap-162.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-163.bin": "sparkplug-node/records/sequence-wrap-163.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-164.bin": "sparkplug-node/records/sequence-wrap-164.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-165.bin": "sparkplug-node/records/sequence-wrap-165.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-166.bin": "sparkplug-node/records/sequence-wrap-166.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-167.bin": "sparkplug-node/records/sequence-wrap-167.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-168.bin": "sparkplug-node/records/sequence-wrap-168.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-169.bin": "sparkplug-node/records/sequence-wrap-169.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-170.bin": "sparkplug-node/records/sequence-wrap-170.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-171.bin": "sparkplug-node/records/sequence-wrap-171.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-172.bin": "sparkplug-node/records/sequence-wrap-172.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-173.bin": "sparkplug-node/records/sequence-wrap-173.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-174.bin": "sparkplug-node/records/sequence-wrap-174.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-175.bin": "sparkplug-node/records/sequence-wrap-175.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-176.bin": "sparkplug-node/records/sequence-wrap-176.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-177.bin": "sparkplug-node/records/sequence-wrap-177.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-178.bin": "sparkplug-node/records/sequence-wrap-178.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-179.bin": "sparkplug-node/records/sequence-wrap-179.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-180.bin": "sparkplug-node/records/sequence-wrap-180.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-181.bin": "sparkplug-node/records/sequence-wrap-181.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-182.bin": "sparkplug-node/records/sequence-wrap-182.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-183.bin": "sparkplug-node/records/sequence-wrap-183.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-184.bin": "sparkplug-node/records/sequence-wrap-184.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-185.bin": "sparkplug-node/records/sequence-wrap-185.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-186.bin": "sparkplug-node/records/sequence-wrap-186.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-187.bin": "sparkplug-node/records/sequence-wrap-187.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-188.bin": "sparkplug-node/records/sequence-wrap-188.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-189.bin": "sparkplug-node/records/sequence-wrap-189.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-190.bin": "sparkplug-node/records/sequence-wrap-190.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-191.bin": "sparkplug-node/records/sequence-wrap-191.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-192.bin": "sparkplug-node/records/sequence-wrap-192.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-193.bin": "sparkplug-node/records/sequence-wrap-193.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-194.bin": "sparkplug-node/records/sequence-wrap-194.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-195.bin": "sparkplug-node/records/sequence-wrap-195.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-196.bin": "sparkplug-node/records/sequence-wrap-196.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-197.bin": "sparkplug-node/records/sequence-wrap-197.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-198.bin": "sparkplug-node/records/sequence-wrap-198.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-199.bin": "sparkplug-node/records/sequence-wrap-199.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-200.bin": "sparkplug-node/records/sequence-wrap-200.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-201.bin": "sparkplug-node/records/sequence-wrap-201.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-202.bin": "sparkplug-node/records/sequence-wrap-202.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-203.bin": "sparkplug-node/records/sequence-wrap-203.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-204.bin": "sparkplug-node/records/sequence-wrap-204.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-205.bin": "sparkplug-node/records/sequence-wrap-205.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-206.bin": "sparkplug-node/records/sequence-wrap-206.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-207.bin": "sparkplug-node/records/sequence-wrap-207.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-208.bin": "sparkplug-node/records/sequence-wrap-208.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-209.bin": "sparkplug-node/records/sequence-wrap-209.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-210.bin": "sparkplug-node/records/sequence-wrap-210.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-211.bin": "sparkplug-node/records/sequence-wrap-211.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-212.bin": "sparkplug-node/records/sequence-wrap-212.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-213.bin": "sparkplug-node/records/sequence-wrap-213.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-214.bin": "sparkplug-node/records/sequence-wrap-214.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-215.bin": "sparkplug-node/records/sequence-wrap-215.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-216.bin": "sparkplug-node/records/sequence-wrap-216.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-217.bin": "sparkplug-node/records/sequence-wrap-217.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-218.bin": "sparkplug-node/records/sequence-wrap-218.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-219.bin": "sparkplug-node/records/sequence-wrap-219.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-220.bin": "sparkplug-node/records/sequence-wrap-220.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-221.bin": "sparkplug-node/records/sequence-wrap-221.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-222.bin": "sparkplug-node/records/sequence-wrap-222.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-223.bin": "sparkplug-node/records/sequence-wrap-223.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-224.bin": "sparkplug-node/records/sequence-wrap-224.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-225.bin": "sparkplug-node/records/sequence-wrap-225.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-226.bin": "sparkplug-node/records/sequence-wrap-226.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-227.bin": "sparkplug-node/records/sequence-wrap-227.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-228.bin": "sparkplug-node/records/sequence-wrap-228.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-229.bin": "sparkplug-node/records/sequence-wrap-229.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-230.bin": "sparkplug-node/records/sequence-wrap-230.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-231.bin": "sparkplug-node/records/sequence-wrap-231.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-232.bin": "sparkplug-node/records/sequence-wrap-232.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-233.bin": "sparkplug-node/records/sequence-wrap-233.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-234.bin": "sparkplug-node/records/sequence-wrap-234.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-235.bin": "sparkplug-node/records/sequence-wrap-235.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-236.bin": "sparkplug-node/records/sequence-wrap-236.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-237.bin": "sparkplug-node/records/sequence-wrap-237.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-238.bin": "sparkplug-node/records/sequence-wrap-238.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-239.bin": "sparkplug-node/records/sequence-wrap-239.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-240.bin": "sparkplug-node/records/sequence-wrap-240.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-241.bin": "sparkplug-node/records/sequence-wrap-241.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-242.bin": "sparkplug-node/records/sequence-wrap-242.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-243.bin": "sparkplug-node/records/sequence-wrap-243.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-244.bin": "sparkplug-node/records/sequence-wrap-244.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-245.bin": "sparkplug-node/records/sequence-wrap-245.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-246.bin": "sparkplug-node/records/sequence-wrap-246.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-247.bin": "sparkplug-node/records/sequence-wrap-247.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-248.bin": "sparkplug-node/records/sequence-wrap-248.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-249.bin": "sparkplug-node/records/sequence-wrap-249.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-250.bin": "sparkplug-node/records/sequence-wrap-250.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-251.bin": "sparkplug-node/records/sequence-wrap-251.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-252.bin": "sparkplug-node/records/sequence-wrap-252.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-253.bin": "sparkplug-node/records/sequence-wrap-253.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-254.bin": "sparkplug-node/records/sequence-wrap-254.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/sequence-wrap-255.bin": "sparkplug-node/records/sequence-wrap-255.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/opaque-neighbor-connect.bin": "sparkplug-node/records/level4-lifecycle-connect.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/records/opaque-neighbor-opaque.bin": "sparkplug-node/records/opaque-neighbor-opaque.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/captures/level4-lifecycle.pcap": "sparkplug-node/captures/level4-lifecycle.pcap",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/captures/level4-rebirth.pcap": "sparkplug-node/captures/level4-rebirth.pcap",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/captures/level4-missing-will.pcap": "sparkplug-node/captures/level4-missing-will.pcap",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/captures/level5-lifecycle.pcap": "sparkplug-node/captures/level5-lifecycle.pcap",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/captures/level5-rebirth.pcap": "sparkplug-node/captures/level5-rebirth.pcap",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/captures/level5-missing-will.pcap": "sparkplug-node/captures/level5-missing-will.pcap",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/captures/scalar-1.pcap": "sparkplug-node/captures/scalar-1.pcap",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/captures/scalar-2.pcap": "sparkplug-node/captures/scalar-2.pcap",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/captures/scalar-3.pcap": "sparkplug-node/captures/scalar-3.pcap",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/captures/scalar-4.pcap": "sparkplug-node/captures/scalar-4.pcap",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/captures/scalar-8.pcap": "sparkplug-node/captures/scalar-8.pcap",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/captures/scalar-9.pcap": "sparkplug-node/captures/scalar-9.pcap",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/captures/scalar-10.pcap": "sparkplug-node/captures/scalar-10.pcap",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/captures/scalar-11.pcap": "sparkplug-node/captures/scalar-11.pcap",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/captures/scalar-12.pcap": "sparkplug-node/captures/scalar-12.pcap",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/captures/scalar-17.pcap": "sparkplug-node/captures/scalar-17.pcap",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/captures/received-timestamp-only.pcap": "sparkplug-node/captures/received-timestamp-only.pcap",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/captures/received-wrong-wire.pcap": "sparkplug-node/captures/received-wrong-wire.pcap",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/captures/qos-wrong.pcap": "sparkplug-node/captures/qos-wrong.pcap",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/captures/retain-wrong.pcap": "sparkplug-node/captures/retain-wrong.pcap",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/captures/bdseq-mismatch.pcap": "sparkplug-node/captures/bdseq-mismatch.pcap",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/captures/metric-timestamp-missing.pcap": "sparkplug-node/captures/metric-timestamp-missing.pcap",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/captures/alias-collision.pcap": "sparkplug-node/captures/alias-collision.pcap",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/captures/datatype-mismatch.pcap": "sparkplug-node/captures/datatype-mismatch.pcap",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/captures/sequence-gap.pcap": "sparkplug-node/captures/sequence-gap.pcap",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/captures/unknown-alias.pcap": "sparkplug-node/captures/unknown-alias.pcap",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/captures/foreign-node.pcap": "sparkplug-node/captures/foreign-node.pcap",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/captures/forwarded-birth.pcap": "sparkplug-node/captures/forwarded-birth.pcap",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/captures/late-death.pcap": "sparkplug-node/captures/late-death.pcap",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/captures/unknown-extension.pcap": "sparkplug-node/captures/unknown-extension.pcap",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/captures/ncmd-rebirth.pcap": "sparkplug-node/captures/ncmd-rebirth.pcap",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/captures/ncmd-refusal.pcap": "sparkplug-node/captures/ncmd-refusal.pcap",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/captures/ncmd-direction.pcap": "sparkplug-node/captures/ncmd-direction.pcap",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/captures/repeated-metric.pcap": "sparkplug-node/captures/repeated-metric.pcap",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/captures/oneof-last.pcap": "sparkplug-node/captures/oneof-last.pcap",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/captures/metric-wrong-wire.pcap": "sparkplug-node/captures/metric-wrong-wire.pcap",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/captures/unknown-noncanonical.pcap": "sparkplug-node/captures/unknown-noncanonical.pcap",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/captures/protobuf-truncated.pcap": "sparkplug-node/captures/protobuf-truncated.pcap",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/captures/rebirth-name-refusal.pcap": "sparkplug-node/captures/rebirth-name-refusal.pcap",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/captures/sequence-wrap.pcap": "sparkplug-node/captures/sequence-wrap.pcap",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/captures/opaque-neighbor.pcap": "sparkplug-node/captures/opaque-neighbor.pcap",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/answers.json": "sparkplug-node/answers.json",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/SOURCE.json": "sparkplug-node/SOURCE.json",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/reference-inputs.json": "sparkplug-node/reference-inputs.json",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/reference.go": "sparkplug-node/reference.go",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/reference-expected.json": "sparkplug-node/reference-expected.json",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/generate.py": "sparkplug-node/generate.py",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/verify.py": "sparkplug-node/verify.py",
+        "common/pcapx/pcaputil/testdata/sparkplug-node/seal.py": "sparkplug-node/seal.py"
+      }
     }
   ],
   "schema_version": 1,
