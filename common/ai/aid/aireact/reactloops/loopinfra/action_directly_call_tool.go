@@ -282,7 +282,7 @@ var loopAction_directlyCallTool = &reactloops.LoopAction{
 		}, aitool.WithParam_Description(`选择单调用形式时填写；存在 directly_call_tool_params_group 时必须省略。优先使用 JSON object 提供该工具的完整参数；为兼容旧协议仍接受包含 JSON object 的字符串。参数结构必须符合 CACHE_TOOL_CALL 中该工具的 Params Schema。`)),
 		aitool.WithBoolParam("async_directly_call_tool",
 			aitool.WithParam_Default(false),
-			aitool.WithParam_Description("可选的单调用异步标记，默认 false；批量调用时使用每项 async。TBD：异步执行尚未启用，true 仍按原同步路径执行。")),
+			aitool.WithParam_Description("可选的单调用异步标记，默认 false 同步等待；true 提交后台执行并返回 execute_id，通过 manage_async_execution_runtime 查看或等待结果。批量调用使用每项 async，批量异步派发仍为 TBD。")),
 		aitool.WithStringParam(
 			"directly_call_identifier",
 			aitool.WithParam_Description(`可选。描述调用目的的简短 snake_case 标识，例如 "scan_port_443"、"query_large_file"；用于报告文件命名。`),
@@ -413,10 +413,9 @@ var loopAction_directlyCallTool = &reactloops.LoopAction{
 			return tool, nil
 		}
 
-		// prepare is the loop-layer callback run AFTER the tool-call card has been
-		// created (loading). It reads the streaming action's params (blocking until
-		// they arrive), normalizes/merges/validates them, streams progress, and either
-		// returns finalized params or a validation error; it never generates parameters.
+		// Both scheduling paths use the same normalize/merge/validate callback.
+		// The synchronous caller creates its loading card before running prepare;
+		// async submission fixes the parameters before creating its resource.
 		prepare := func(action *aicommon.Action, name string) (aitool.InvokeParams, bool, *aitool.Tool, error) {
 			emitProgress := func(string) {}
 			finishProgress := func(string) {}
@@ -443,9 +442,6 @@ var loopAction_directlyCallTool = &reactloops.LoopAction{
 
 			emitProgress("[开始处理参数]")
 			raw, objParams := getDirectlyCallToolParamPayload(action)
-			// Capture after parameter parsing, preserving the scalar streaming
-			// verifier and the existing loading-card-before-prepare contract.
-			loop.SetActionExecutionValue(action, actionStateDirectToolAsync, directToolActionAsync(action))
 			if hasAnyCanonicalActionParam(action, directlyCallToolBatchField, "directly_call_tool_calls", "tool_require_calls") {
 				return nil, false, tool, directToolParameterError(loop, name, utils.Error("scalar arguments cannot be combined with parameter groups or retired batch fields"))
 			}
@@ -494,9 +490,27 @@ var loopAction_directlyCallTool = &reactloops.LoopAction{
 			return params, false, tool, nil
 		}
 
-		// DirectlyCallTool emits the card (loading) first, then runs prepare (reads
-		// streaming params), then invokes or reports the validation error.
-		// TBD: route async_directly_call_tool through the loop's async execution manager.
+		// Scheduling must use a complete action: the optional flag may follow
+		// params, and AI-tag bodies may still be streaming after the JSON object.
+		// The scalar verifier remains streaming; no caller starts on a partial action.
+		if err := action.WaitParseResult(ctx); err != nil {
+			handleToolCallResult(loop, ctx, invoker, toolName, nil, false, err, operator)
+			return
+		}
+		async := directToolActionAsync(action)
+		loop.SetActionExecutionValue(action, actionStateDirectToolAsync, async)
+		if async {
+			params, _, _, err := prepare(action, toolName)
+			if err != nil {
+				handleToolCallResult(loop, ctx, invoker, toolName, nil, false, err, operator)
+				return
+			}
+			submitAsyncDirectTool(loop, toolName, params, operator,
+				aicommon.WithToolCaller_Reason(resolveToolCallReason(action, "directly_call_reason")),
+				aicommon.WithToolCaller_OmitResultParamsInTimeline())
+			return
+		}
+		// The synchronous caller still creates one card before prepare/invocation.
 		result, directly, callErr := invoker.DirectlyCallTool(ctx, toolName, action, prepare)
 		recordSuccessfulToolCache(loop, toolName, result, callErr)
 

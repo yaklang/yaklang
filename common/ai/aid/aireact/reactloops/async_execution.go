@@ -13,7 +13,6 @@ import (
 // GetAsyncExecutionManager binds one manager to the current task on first use.
 // Later calls reuse it even if currentTask changes. Release closes admission and
 // requests cancellation; the retained manager remains available for inspection.
-// TBD: actions still execute tools synchronously; this is the integration seam.
 func (r *ReActLoop) GetAsyncExecutionManager() (*asyncexecmanager.Manager, error) {
 	if r == nil {
 		return nil, errors.New("re-act loop is nil")
