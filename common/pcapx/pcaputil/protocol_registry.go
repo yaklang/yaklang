@@ -13,6 +13,7 @@ func NativeProtocolProfiles() []ProtocolProfile {
 	return []ProtocolProfile{
 		{"knx", "udp", "KNXnet/IP v1 basic and selected extended UDP search", "bounded HPAI, basic discovery plus extended SRP1-4 and DIB1/2/6; raw unknown DIBs, per-datagram unverified observations without multicast pairing, filter verification, tunneling, cEMI or secure-session claim"},
 		{"pfcp", "udp", "PFCPv1 Heartbeat, AssociationSetup5/6 Update7/8/Release9/10 and unbundled SessionDeletion54/55 selected core", "TS29.244 v16.12.1, first-wins bounded IEs and exact selected NodeID/FQDN/Cause/features; Heartbeat Recovery is mandatory and Setup Recovery does not drive restart; shared originating-endpoint sequence namespace across peer/message kinds, exact response-type/endpoint/domain observation, ambiguity quarantine and erroneous supported reply retirement; receiver-local uint64 SEIDs, Cause2/AURI follow-on-report claims, priority and ordered raw report groups; optional independent SEID binding on an isolated UDP byte session; observed release flags and graceful timer do not prove authenticated association, live session deletion, negotiated features or restart"},
+		{"c37118-engineering", "tcp/udp", "opt-in v1/v2 CFG-2 or complete/collected CFG-3 DATA conversions", "same native publisher/configuration validation; raw fields preserved; configured phasor/frequency and CFG-3 analog conversion, declared GPA status bits and digital masks; CFG-2 integer analog convention requires independent context; no authenticated source, physical quality or inferred digital-label bit association"},
 		{"c37118", "tcp/udp", "v1/v2 CFG-2, v2 complete CFG-3 and bounded TCP continuation/DATA", "same observed publisher, ID/version and capture-domain configuration; exact raw channel encodings and CFG-3 UTF8/UUID/conversion/coordinate fields with bounded validated replacement; TCP fragments follow fixed GPA/GSF producer framing with cumulative CRC, ordered indices, publisher ID/time equality and 30s capture lifetime; no UDP continuation, applied scaling, authenticated source or measurement quality claim"},
 		{"opendroneid", "explicit-udp", "protocol2 Basic ID/Location and selected message packs", "raw25-byte messages or exact pack; ordered unverified IDs/location, reserved fields preserved; no automatic admission, ODID prefix, BLE/Wi-Fi broadcast, authentication or aircraft/position validity claim"},
 		{"opendroneid-system", "explicit-udp", "protocol2 System with optional Basic ID/Location", "one System and at most two Basic IDs/one Location in an exact ordered pack; operator coordinates/area/classification/time and reserved wire values; no automatic admission, BLE/Wi-Fi, authentication, geographic validity or aircraft association"},
@@ -77,7 +78,7 @@ func WithProtocolDecodeAs(transport string, port uint16, protocol string) Captur
 			return fmt.Errorf("DecodeAs requires UDP and a nonzero port")
 		}
 		switch protocol {
-		case "dns", "mdns", "llmnr", "dhcp", "dhcpv6", "syslog", "snmp", "mqtt-sn", "bittorrent-dht", "bjnp", "rtp", "sip", "stun", "turn", "dtls", "mavlink", "nmea", "nmea-ais-multipart", "semtech-udp", "semtech-downlink-session", "rtps", "bsap", "slmp", "dlms", "opendroneid", "opendroneid-system", "opendroneid-identity", "opendroneid-auth-pages", "c37118", "knx", "pfcp", "dlms-wrapper", "doip":
+		case "dns", "mdns", "llmnr", "dhcp", "dhcpv6", "syslog", "snmp", "mqtt-sn", "bittorrent-dht", "bjnp", "rtp", "sip", "stun", "turn", "dtls", "mavlink", "nmea", "nmea-ais-multipart", "semtech-udp", "semtech-downlink-session", "rtps", "bsap", "slmp", "dlms", "opendroneid", "opendroneid-system", "opendroneid-identity", "opendroneid-auth-pages", "c37118", "c37118-engineering", "knx", "pfcp", "dlms-wrapper", "doip":
 		default:
 			return fmt.Errorf("unsupported native DecodeAs profile")
 		}
@@ -157,8 +158,8 @@ func (a *binParser) decodeNativeDatagram(e *ProtocolEvent, w []byte, src, dst ui
 	if (explicit == "" || explicit == "knx" || explicit == "pfcp") && a.decodeDiscoveryDatagram(e, w, src, dst, explicit) {
 		return true
 	}
-	if explicit == "c37118" || explicit == "" && c37118DatagramEvidence(w) {
-		return a.decodeC37118Datagram(e, w, explicit == "c37118")
+	if explicit == "c37118" || explicit == "c37118-engineering" || explicit == "" && c37118DatagramEvidence(w) {
+		return a.decodeC37118Datagram(e, w, explicit != "", explicit == "c37118-engineering")
 	}
 	if explicit == "opendroneid-auth-pages" {
 		return a.decodeOpenDroneIDProfileDatagram(e, w, odidAuthPages)

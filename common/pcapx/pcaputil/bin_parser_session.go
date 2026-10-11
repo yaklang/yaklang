@@ -573,7 +573,9 @@ func (f *binFlow) consumeSession(dir int, e *ProtocolEvent, result map[string]an
 		var collected bool
 		e.Session, err, collected = f.consumeC37118Continuation(dir, e.Raw)
 		if collected {
-			e.Profile = "c37118-v2-cfg3-continuation-data"
+			if !f.c37118EngineeringEnabled() {
+				e.Profile = "c37118-v2-cfg3-continuation-data"
+			}
 		} else {
 			e.Session, err = f.consumeC37118(dir, e.Raw)
 		}

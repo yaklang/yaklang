@@ -14,6 +14,7 @@ import (
 // C37.118 CFG-2/complete CFG-3 context belongs to one observed publisher direction.
 // Ports never supply configuration, scaling or measurement-validity claims.
 type binC37118 struct {
+	engineering     bool
 	configuration   [2][]byte
 	changeIndicated [2]bool
 	continuation    [2]*c37118Continuation
@@ -127,7 +128,11 @@ func (f *binFlow) consumeC37118(dir int, raw []byte) (map[string]any, error) {
 			pending += len(p.image)
 		}
 	}
-	if err := f.reserveSession(512 + int64(retained)*8 + int64(pending)*32 + int64(len(raw))*32); err != nil {
+	retainedScale, outputScale := int64(8), int64(32)
+	if f.c37118EngineeringEnabled() {
+		retainedScale, outputScale = 64, 64
+	}
+	if err := f.reserveSession(512 + int64(retained)*retainedScale + int64(pending)*32 + int64(len(raw))*outputScale); err != nil {
 		if len(raw) > 1 && (raw[1]>>4 == 3 || raw[1]>>4 == 5) {
 			s.configuration[dir] = nil
 		}
@@ -201,6 +206,24 @@ func (f *binFlow) consumeC37118(dir int, raw []byte) (map[string]any, error) {
 		s.changeIndicated[dir] = changed
 	}
 	out := c37118Fields(m)
+	if f.c37118EngineeringEnabled() && m.FrameType == 0 && m.BodyDecoded {
+		if f.a.budget.MaxRecursionDepth < 8 {
+			return out, protocolError(ErrResourceExceeded, "C37.118 engineering field depth exceeds budget")
+		}
+		var cm *stream_parser.C37118Message
+		if len(cfg) > 65535 {
+			cm, err = stream_parser.DecodeC37118ConfigurationImage(cfg, f.a.budget.MaxCollectionElements, len(cfg))
+		} else {
+			cm, err = stream_parser.DecodeC37118Message(cfg, nil, f.a.budget.MaxCollectionElements)
+		}
+		if err != nil {
+			return nil, protocolError(ErrMalformedMessage, err.Error())
+		}
+		out["Engineering"], err = c37118EngineeringFields(m, cm.Configuration)
+		if err != nil {
+			return out, err
+		}
+	}
 	if changed {
 		out["Configuration Change Indicated"] = true
 	}
@@ -306,6 +329,9 @@ func c37118NumberFields(n stream_parser.C37118Number) map[string]any {
 // A profile reports the actual observed configuration grammar. Ports cannot
 // upgrade CFG-2, and opposite publisher directions cannot borrow CFG-3.
 func (f *binFlow) c37118Profile(dir int, raw []byte) string {
+	if f.c37118EngineeringEnabled() {
+		return "c37118-engineering"
+	}
 	if len(raw) > 1 && raw[1]>>4 == 0 && f.c37118 != nil {
 		if f.c37118.continuation[dir] != nil || len(f.c37118.configuration[dir]) > 65535 {
 			return "c37118-v2-cfg3-continuation-data"

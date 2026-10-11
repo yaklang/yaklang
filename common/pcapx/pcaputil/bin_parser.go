@@ -78,7 +78,7 @@ func (e *ProtocolEvent) Decode() (result map[string]any, err error) {
 		}
 		// C37.118 exposes its complete accepted observation in both views
 		// on TCP and UDP. The public map is caller-owned, not query authority.
-		if e.Protocol == "c37118" && (e.Profile == "c37118-v1-v2-cfg2-data" || e.Profile == "c37118-v2-cfg3-complete-data" || e.Profile == "c37118-v2-cfg3-continuation-data") && e.semanticFields != nil {
+		if e.Protocol == "c37118" && (e.Profile == "c37118-v1-v2-cfg2-data" || e.Profile == "c37118-v2-cfg3-complete-data" || e.Profile == "c37118-v2-cfg3-continuation-data" || e.Profile == "c37118-engineering") && e.semanticFields != nil {
 			session = e.semanticFields
 		}
 		if err == nil && result != nil && session != nil {
@@ -310,6 +310,7 @@ type binSpec struct {
 	plan        *binparser.StructuredPlan
 }
 type binParser struct {
+	c37118Engineering                                                          bool
 	mavlinkSigning                                                             *mavlinkSigningState
 	pfcpSessionIdentity                                                        *pfcpSessionIdentity
 	semtechDisabled                                                            bool               // udpMu; bounded opt-in correlation fails closed after global state exhaustion
@@ -388,6 +389,7 @@ func (c *CaptureConfig) prepareBinParser() error {
 		a.bindings[b.Port] = append(a.bindings[b.Port], b)
 	}
 	a.tlsSecrets = c.tlsSecrets
+	a.c37118Engineering = c.c37118Engineering
 	if c.mavlinkSigning != nil {
 		a.mavlinkSigning = &mavlinkSigningState{options: *c.mavlinkSigning}
 	}

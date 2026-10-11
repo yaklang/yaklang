@@ -10,7 +10,7 @@ const c37118IdleTTL = 30 * time.Second
 
 // Configuration context is bounded and scoped by transport pair, publisher
 // direction and capture domain. UDP payloads are never concatenated.
-func (a *binParser) decodeC37118Datagram(e *ProtocolEvent, w []byte, explicit bool) bool {
+func (a *binParser) decodeC37118Datagram(e *ProtocolEvent, w []byte, explicit bool, engineering ...bool) bool {
 	if !explicit && !c37118DatagramEvidence(w) {
 		return false
 	}
@@ -60,6 +60,7 @@ func (a *binParser) decodeC37118Datagram(e *ProtocolEvent, w []byte, explicit bo
 	} else {
 		f = &binFlow{a: a, protocol: "c37118", c37118: &binC37118{}, endpoints: [2]string{e.Source, e.Destination}}
 	}
+	f.c37118.engineering = len(engineering) > 0 && engineering[0]
 	e.Profile = f.c37118Profile(e.Direction, w)
 	var err error
 	oversized := len(w) > min(a.budget.MaxFrameBytes, a.config.MaxMessageBytes)
