@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"sort"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -740,14 +741,50 @@ func testMQTTSealedControlContext(t *testing.T) {
 	testMQTTSealedIdentifierCases(t, "mqtt-controls", 18)
 }
 
+func testMQTTSealedAcknowledgmentContext(t *testing.T) {
+	testMQTTSealedIdentifierCases(t, "mqtt-ack-context", 14)
+}
+
+// Preserve list order from field trees; scalar projections must not hide a
+// later topic/result. Sorted object keys make diagnostic traversal stable.
+func mqttNamedValues(v any, name string) []any {
+	var values []any
+	switch x := v.(type) {
+	case map[string]any:
+		if v, ok := x[name]; ok {
+			if list, ok := v.([]any); ok {
+				values = append(values, list...)
+			} else {
+				values = append(values, v)
+			}
+		}
+		keys := make([]string, 0, len(x))
+		for key := range x {
+			if key != name {
+				keys = append(keys, key)
+			}
+		}
+		sort.Strings(keys)
+		for _, key := range keys {
+			values = append(values, mqttNamedValues(x[key], name)...)
+		}
+	case []any:
+		for _, v := range x {
+			values = append(values, mqttNamedValues(v, name)...)
+		}
+	}
+	return values
+}
+
 func testMQTTSealedIdentifierCases(t *testing.T, fixture string, profileCount int) {
 	var answers struct {
 		Profiles map[string]struct {
 			Events []struct {
-				Wire      string         `json:"wire_hex"`
-				Direction int            `json:"direction"`
-				Session   map[string]any `json:"session"`
-				Error     *struct {
+				Wire        string         `json:"wire_hex"`
+				Direction   int            `json:"direction"`
+				Session     map[string]any `json:"session"`
+				FieldValues map[string]any `json:"field_values"`
+				Error       *struct {
 					Kind    ProtocolErrorKind `json:"kind"`
 					Message string            `json:"message"`
 				} `json:"error"`
@@ -805,6 +842,9 @@ func testMQTTSealedIdentifierCases(t *testing.T, fixture string, profileCount in
 				require.Equal(t, topic, findSessionField(fields, "Topic Name"))
 				require.Equal(t, payload, findSessionField(fields, "Application Message"))
 			}
+			for key, want := range want.FieldValues {
+				rocEqualFields(t, map[string]any{"values": want}, map[string]any{"values": mqttNamedValues(fields, key)})
+			}
 			if typ := wire[0] >> 4; typ >= 8 && typ <= 11 {
 				require.EqualValues(t, 7, findSessionField(fields, "Packet Identifier"))
 				if typ == 8 || typ == 10 {
@@ -816,7 +856,7 @@ func testMQTTSealedIdentifierCases(t *testing.T, fixture string, profileCount in
 						}
 						require.EqualValues(t, 1, findSessionField(fields, key))
 					}
-				} else if typ == 9 {
+				} else if typ == 9 && want.FieldValues == nil {
 					require.EqualValues(t, 0, findSessionField(fields, "Granted QoS or Return Code"))
 				}
 			}
@@ -1034,6 +1074,108 @@ func testMQTTSubscriptionContextIsolation(t *testing.T) {
 					require.Empty(t, good.Close("complete"))
 					require.Nil(t, good.Close("again"))
 					require.Zero(t, good.Stats().BufferedBytes)
+				})
+			}
+		}
+	}
+}
+
+func testMQTTSubscriptionAcknowledgmentContext(t *testing.T) {
+	for _, level := range []byte{4, 5} {
+		for _, deferred := range []bool{false, true} {
+			for _, mode := range []string{"values", "count", "changed-retry"} {
+				t.Run(fmt.Sprintf("level%d/d%v/%s", level, deferred, mode), func(t *testing.T) {
+					for _, typ := range []byte{8, 10} {
+						// MQTT3.1.1 UNSUBACK has no result list; it is not an
+						// applicable result-values/cardinality case.
+						if level == 4 && typ == 10 && mode != "changed-retry" {
+							continue
+						}
+						t.Run(fmt.Sprintf("type%d", typ), func(t *testing.T) {
+							c := mqtt311Wire(t, "connect")
+							if level == 5 {
+								c = mqttContextWire(t, "connect")
+							}
+							request := func(topic string) []byte {
+								b := []byte{0, 7}
+								if level == 5 {
+									b = append(b, 0)
+								}
+								for _, filter := range []string{topic, "other"} {
+									b = append(b, mqttUTF(filter)...)
+									if typ == 8 {
+										b = append(b, 1)
+									}
+								}
+								return mqttPkt(typ<<4|2, b)
+							}
+							s, err := NewProtocolSession(DefaultParserBudget())
+							require.NoError(t, err)
+							defer s.Close("done")
+							s.(*captureSession).f.a.config.Deferred = deferred
+							require.Nil(t, s.Feed(0, time.Unix(1, 0), c).Err)
+							require.Nil(t, s.Feed(0, time.Unix(2, 0), request("a/b")).Err)
+							wire := request("changed")
+							message := "mqtt: packet identifier 7 is already in use"
+							if mode != "changed-retry" {
+								codes := []byte{1, 128}
+								if typ == 10 {
+									codes = []byte{0, 17}
+								}
+								if mode == "count" {
+									codes = codes[:1]
+									message = fmt.Sprintf("mqtt: %s has 1 results for 2 requested filters", mqttSessionName(typ+1))
+								}
+								b := []byte{0, 7}
+								if level == 5 {
+									b = append(b, 4, 0x1f, 0, 1, 'x')
+								}
+								b = append(b, codes...)
+								wire = mqttPkt((typ+1)<<4, b)
+							}
+							dir := 0
+							if mode != "changed-retry" {
+								dir = 1
+							}
+							x := s.Feed(dir, time.Unix(3, 0), wire)
+							require.Len(t, x.Events, 1)
+							if mode == "values" {
+								require.Nil(t, x.Err)
+								e := x.Events[0]
+								require.Equal(t, wire, e.Raw)
+								codes := []uint64{1, 128}
+								if typ == 10 {
+									codes = []uint64{0, 17}
+								}
+								require.Equal(t, codes[0], e.Session["Reason Code"])
+								require.Equal(t, codes, e.Session["Reason Codes"])
+								require.Equal(t, true, e.Session["Matched Request"])
+								require.Equal(t, uint64(7), e.Session["Packet Identifier"])
+								snapshot, err := e.Decode()
+								require.NoError(t, err)
+								e.Session["Reason Codes"].([]uint64)[0] = 999
+								again, err := e.Decode()
+								require.NoError(t, err)
+								require.Equal(t, snapshot, again)
+								require.Empty(t, s.Close("complete"))
+							} else {
+								require.NotNil(t, x.Err, "different request or wrong ACK cardinality cannot match prior context")
+								require.Equal(t, ErrMalformedMessage, x.Err.Kind)
+								require.Equal(t, message, x.Err.Message)
+								require.Nil(t, x.Events[0].Session)
+								require.Equal(t, wire, x.Events[0].Raw)
+								require.Zero(t, x.Events[0].ResponseTo)
+								require.Zero(t, x.Events[0].TransactionID)
+								_, err := x.Events[0].GetFields()
+								var typed *ProtocolError
+								require.ErrorAs(t, err, &typed)
+								require.Equal(t, message, typed.Message)
+								require.Empty(t, s.Close("refused"))
+							}
+							require.Nil(t, s.Close("again"))
+							require.Zero(t, s.Stats().BufferedBytes)
+						})
+					}
 				})
 			}
 		}

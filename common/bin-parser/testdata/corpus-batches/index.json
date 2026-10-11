@@ -45612,6 +45612,113 @@
           "bytes": 892
         }
       }
+    },
+    {
+      "file": "validation-mqtt-ack-context.zip",
+      "id": "mqtt-ack-context-3496e913efa0",
+      "kind": "session-controls",
+      "password": "bin-parser",
+      "source_sha": "3496e913efa072ec3bacd300202b8ed0e6938e3c",
+      "sha256": "08ca9801bd98ec1e52a0fde3a79dfd60124be0efcbfa6ebda27ddaec160bfc6c",
+      "aliases": {
+        "common/pcapx/pcaputil/testdata/mqtt-ack-context/answers.json": "answers.json",
+        "common/pcapx/pcaputil/testdata/mqtt-ack-context/captures/level4-type10-changed.pcap": "captures/level4-type10-changed.pcap",
+        "common/pcapx/pcaputil/testdata/mqtt-ack-context/captures/level4-type10-exact.pcap": "captures/level4-type10-exact.pcap",
+        "common/pcapx/pcaputil/testdata/mqtt-ack-context/captures/level4-type8-changed.pcap": "captures/level4-type8-changed.pcap",
+        "common/pcapx/pcaputil/testdata/mqtt-ack-context/captures/level4-type8-count.pcap": "captures/level4-type8-count.pcap",
+        "common/pcapx/pcaputil/testdata/mqtt-ack-context/captures/level4-type8-exact.pcap": "captures/level4-type8-exact.pcap",
+        "common/pcapx/pcaputil/testdata/mqtt-ack-context/captures/level4-type8-values.pcap": "captures/level4-type8-values.pcap",
+        "common/pcapx/pcaputil/testdata/mqtt-ack-context/captures/level5-type10-changed.pcap": "captures/level5-type10-changed.pcap",
+        "common/pcapx/pcaputil/testdata/mqtt-ack-context/captures/level5-type10-count.pcap": "captures/level5-type10-count.pcap",
+        "common/pcapx/pcaputil/testdata/mqtt-ack-context/captures/level5-type10-exact.pcap": "captures/level5-type10-exact.pcap",
+        "common/pcapx/pcaputil/testdata/mqtt-ack-context/captures/level5-type10-values.pcap": "captures/level5-type10-values.pcap",
+        "common/pcapx/pcaputil/testdata/mqtt-ack-context/captures/level5-type8-changed.pcap": "captures/level5-type8-changed.pcap",
+        "common/pcapx/pcaputil/testdata/mqtt-ack-context/captures/level5-type8-count.pcap": "captures/level5-type8-count.pcap",
+        "common/pcapx/pcaputil/testdata/mqtt-ack-context/captures/level5-type8-exact.pcap": "captures/level5-type8-exact.pcap",
+        "common/pcapx/pcaputil/testdata/mqtt-ack-context/captures/level5-type8-values.pcap": "captures/level5-type8-values.pcap",
+        "common/pcapx/pcaputil/testdata/mqtt-ack-context/generate.py": "generate.py",
+        "common/pcapx/pcaputil/testdata/mqtt-ack-context/make-answers.py": "make-answers.py",
+        "common/pcapx/pcaputil/testdata/mqtt-ack-context/validation/expected.json": "validation/expected.json",
+        "common/pcapx/pcaputil/testdata/mqtt-ack-context/verify.py": "verify.py"
+      },
+      "members": {
+        "answers.json": {
+          "sha256": "9b394c1cb99689f1a8d1627f19b60bd47c69a1c53594a092e90882482fbdc97b",
+          "bytes": 28149
+        },
+        "captures/level4-type10-changed.pcap": {
+          "sha256": "74c08f42c280c3e36b425e72410d57ffaafba91373452a792fef56b093ece7d6",
+          "bytes": 641
+        },
+        "captures/level4-type10-exact.pcap": {
+          "sha256": "5d23eee18eb10ab0acbfe8e30dd4b2078855344c06e5d5ddca00c8e9ba97c68e",
+          "bytes": 711
+        },
+        "captures/level4-type8-changed.pcap": {
+          "sha256": "6f4c2715373e7e386810becb61a56c45230a4aa1830242f99fb5a230665cead9",
+          "bytes": 645
+        },
+        "captures/level4-type8-count.pcap": {
+          "sha256": "818ff7744d79a75cd9f6a90ba166fb97b967cb502db198f832a5e03bb8eb4598",
+          "bytes": 628
+        },
+        "captures/level4-type8-exact.pcap": {
+          "sha256": "e35483e865a0284c9ab0d6386b5970a8ac3cc4bc48eaa559b3becbeb67174913",
+          "bytes": 717
+        },
+        "captures/level4-type8-values.pcap": {
+          "sha256": "5dd6812b60ef0d0f8537ea4214d854b88cfd7d20046141f055876be7de924abb",
+          "bytes": 629
+        },
+        "captures/level5-type10-changed.pcap": {
+          "sha256": "b6f06aa935cfc5883e8c2eb39716e1f8515956118bd9aab03925900e6fc92c4c",
+          "bytes": 645
+        },
+        "captures/level5-type10-count.pcap": {
+          "sha256": "4112bb4db32e9c485dc81bc1abb8f36c16e7a2b516364469df6175739676da51",
+          "bytes": 634
+        },
+        "captures/level5-type10-exact.pcap": {
+          "sha256": "ea9ae5ce6283ce9b937c3ab160701faa1797536fec039c020fa4bd08dc084b31",
+          "bytes": 722
+        },
+        "captures/level5-type10-values.pcap": {
+          "sha256": "1364e8ea15f8ff3cae6b8e18bd2c8e2856c60f8fa5bec33bb488af651919eb2b",
+          "bytes": 635
+        },
+        "captures/level5-type8-changed.pcap": {
+          "sha256": "1392f96969bef57f8123bce3793e997eea14feca115d4b1c232c70186d1481ba",
+          "bytes": 649
+        },
+        "captures/level5-type8-count.pcap": {
+          "sha256": "e585339d964e512af066fc519e8b0feba34e3e2e227ee64c1fe1a1bc1aeca6c1",
+          "bytes": 636
+        },
+        "captures/level5-type8-exact.pcap": {
+          "sha256": "78153746bfecb84c61c256ced6852874cf1007923847cf6ca679e10456046fe4",
+          "bytes": 726
+        },
+        "captures/level5-type8-values.pcap": {
+          "sha256": "3504754289bfb3193372cfef2fdc6874d22b29f83d89119bd8a227f59c9b9359",
+          "bytes": 637
+        },
+        "generate.py": {
+          "sha256": "5ace554f9af88737266a1068394326bfca56d73ba0302ef421a066693dbca0f3",
+          "bytes": 3147
+        },
+        "make-answers.py": {
+          "sha256": "eb64e6f8d549912156c641a0596ceec32c8fc1895d80371dd8035b5548154133",
+          "bytes": 2928
+        },
+        "validation/expected.json": {
+          "sha256": "6c1c120586d149bdbac4db46985242c851f79588dc945dcf9056f1019c8daa35",
+          "bytes": 13139
+        },
+        "verify.py": {
+          "sha256": "4d7e6c9f82ca67942c84df1f71774af90cbff3bba0842c97633f5321aebd152f",
+          "bytes": 901
+        }
+      }
     }
   ],
   "schema_version": 1,

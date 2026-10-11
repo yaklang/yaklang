@@ -1,9 +1,18 @@
 package pcaputil
 
 import (
+	"crypto/sha256"
 	"encoding/binary"
 	"fmt"
 )
+
+// Fixed-size request context: never retain an unbounded subscription body.
+// The digest identifies an exact wire retry; it is not broker/session identity.
+type mqttPending struct {
+	next   string
+	digest [32]byte
+	items  int
+}
 
 type binMQTT struct {
 	client      int
@@ -11,7 +20,7 @@ type binMQTT struct {
 	seenConnect bool
 	// Indexed by the endpoint that allocated the identifier, not by the
 	// direction of the next ACK: PUBREL travels in the original direction.
-	pending    [2]map[uint16]string
+	pending    [2]map[uint16]mqttPending
 	aliases    [2]map[uint16]string
 	aliasMax   [2]uint16
 	aliasBytes int64
@@ -82,7 +91,7 @@ func (f *binFlow) frameMQTT(w []byte) (int, *binSpec, error) {
 }
 
 func (m *binMQTT) retainedBytes() int64 {
-	return 256 + 96*int64(len(m.pending[0])+len(m.pending[1])+len(m.aliases[0])+len(m.aliases[1])) + m.aliasBytes
+	return 256 + 128*int64(len(m.pending[0])+len(m.pending[1])) + 96*int64(len(m.aliases[0])+len(m.aliases[1])) + m.aliasBytes
 }
 
 // Reserve both possible insertions before changing either dictionary. Topic
@@ -95,7 +104,7 @@ func (m *binMQTT) reserveInsert(pendingNew, aliasNew int, aliasBytes int64, maxE
 	if len(m.aliases[0])+len(m.aliases[1])+aliasNew > limit {
 		return protocolError(ErrResourceExceeded, "MQTT topic aliases")
 	}
-	return reserve(m.retainedBytes() + 96*int64(pendingNew+aliasNew) + aliasBytes)
+	return reserve(m.retainedBytes() + 128*int64(pendingNew) + 96*int64(aliasNew) + aliasBytes)
 }
 
 func (m *binMQTT) consume(dir int, raw []byte, result map[string]any, maxElements int, reserve func(int64) error) (map[string]any, error) {
@@ -170,13 +179,13 @@ func (m *binMQTT) consume(dir int, raw []byte, result map[string]any, maxElement
 		}
 		// New QoS>0 publications must allocate an unused identifier. Never
 		// overwrite an observed exchange, including its later QoS2 phases.
-		if got := m.pending[dir][pid]; qos > 0 && got != "" && (flags&8 == 0 || got == "SUBACK" || got == "UNSUBACK") {
+		if got := m.pending[dir][pid].next; qos > 0 && got != "" && (flags&8 == 0 || got == "SUBACK" || got == "UNSUBACK") {
 			return nil, fmt.Errorf("mqtt: packet identifier %d is already in use", pid)
 		}
 		pendingNew, aliasNew := 0, 0
 		aliasDelta := int64(0)
 		storeAlias := alias != 0 && topic != ""
-		if qos > 0 && m.pending[dir][pid] == "" {
+		if qos > 0 && m.pending[dir][pid].next == "" {
 			pendingNew = 1
 		}
 		if alias != 0 {
@@ -210,7 +219,7 @@ func (m *binMQTT) consume(dir int, raw []byte, result map[string]any, maxElement
 			if qos == 2 {
 				next = "PUBREC"
 			}
-			m.pending[dir][pid] = next
+			m.pending[dir][pid] = mqttPending{next: next}
 			info["Outstanding"] = next
 		}
 	case 4, 5, 6, 7, 9, 11:
@@ -224,20 +233,51 @@ func (m *binMQTT) consume(dir int, raw []byte, result map[string]any, maxElement
 		if typ == 6 {
 			owner = dir
 		}
-		if got := m.pending[owner][pid]; got != "" && got != want {
-			return nil, fmt.Errorf("mqtt: packet identifier %d expected %s, got %s", pid, got, want)
+		prior := m.pending[owner][pid]
+		if prior.next != "" && prior.next != want {
+			return nil, fmt.Errorf("mqtt: packet identifier %d expected %s, got %s", pid, prior.next, want)
 		}
-		if got := m.pending[owner][pid]; got == want {
+		// Subscription ACK result codes follow properties in MQTT5 and are
+		// an ordered payload list, not the first variable-header byte.
+		if typ == 9 || (typ == 11 && m.level == 5) {
+			at := 2
+			if m.level == 5 {
+				plen, hdr, err := mqtt5SkipVBI(body[at:])
+				if err != nil {
+					return nil, err
+				}
+				if plen > len(body)-at-hdr {
+					return nil, fmt.Errorf("mqtt: truncated acknowledgment properties")
+				}
+				at += hdr + plen
+			}
+			codes := body[at:]
+			if prior.next == want && len(codes) != prior.items {
+				return nil, fmt.Errorf("mqtt: %s has %d results for %d requested filters", want, len(codes), prior.items)
+			}
+			if len(codes) > 0 {
+				info["Reason Code"] = uint64(codes[0])
+				if len(codes) > 1 {
+					values := make([]uint64, len(codes))
+					for i, code := range codes {
+						values[i] = uint64(code)
+					}
+					info["Reason Codes"] = values
+				}
+			}
+		} else if len(body) > 2 {
+			info["Reason Code"] = uint64(body[2])
+		}
+		if prior.next == want {
 			delete(m.pending[owner], pid)
 			info["Matched Request"] = true
 			if typ == 5 && (len(body) <= 2 || body[2] < 0x80) {
-				m.pending[owner][pid] = "PUBREL"
+				prior.next = "PUBREL"
+				m.pending[owner][pid] = prior
 			} else if typ == 6 {
-				m.pending[owner][pid] = "PUBCOMP"
+				prior.next = "PUBCOMP"
+				m.pending[owner][pid] = prior
 			}
-		}
-		if len(body) > 2 {
-			info["Reason Code"] = uint64(body[2])
 		}
 	case 8, 10:
 		if len(body) < 2 {
@@ -249,23 +289,26 @@ func (m *binMQTT) consume(dir int, raw []byte, result map[string]any, maxElement
 		if typ == 10 {
 			want = "UNSUBACK"
 		}
-		// A retry of the same control type does not allocate another slot.
-		// It must never replace a different kind of outstanding exchange.
-		if got := m.pending[dir][pid]; got != "" && got != want {
+		digest := sha256.Sum256(raw)
+		// Only byte-identical controls preserve the existing request. A
+		// different filter/options/properties payload is a new allocation.
+		if got := m.pending[dir][pid]; got.next != "" && (got.next != want || got.digest != digest) {
 			return nil, fmt.Errorf("mqtt: packet identifier %d is already in use", pid)
 		}
 		pendingNew := 0
-		if m.pending[dir][pid] == "" {
+		if m.pending[dir][pid].next == "" {
 			pendingNew = 1
 		}
 		if err := m.reserveInsert(pendingNew, 0, 0, maxElements, reserve); err != nil {
 			return nil, err
 		}
-		if typ == 8 {
-			m.pending[dir][pid] = "SUBACK"
-		} else {
-			m.pending[dir][pid] = "UNSUBACK"
+		items := 0
+		if meta, ok := result["metadata"].(map[string]any); ok {
+			if n, ok := uintFrom(meta["List Item Count"]); ok {
+				items = int(n)
+			}
 		}
+		m.pending[dir][pid] = mqttPending{next: want, digest: digest, items: items}
 	}
 	return info, nil
 }

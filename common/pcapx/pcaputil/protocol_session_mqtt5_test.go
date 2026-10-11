@@ -56,6 +56,8 @@ func TestProtocolSessionMQTT5ConnectPublishAndQoS(t *testing.T) {
 	t.Run("native-version-connect", testMQTTScopedNativeVersionAndConnect)
 	t.Run("mqtt311-native-profiles", testMQTT311SealedNativeProfiles)
 	t.Run("sealed-control-context", testMQTTSealedControlContext)
+	t.Run("sealed-ack-context", testMQTTSealedAcknowledgmentContext)
+	t.Run("subscription-ack-context", testMQTTSubscriptionAcknowledgmentContext)
 	t.Run("subscription-context", testMQTTSubscriptionContextIsolation)
 	t.Run("active-identifier", testMQTTActiveIdentifierCannotBeOverwritten)
 	t.Run("sealed-identifier", testMQTTSealedIdentifierReuse)

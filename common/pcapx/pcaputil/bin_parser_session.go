@@ -80,7 +80,7 @@ func (f *binFlow) detectDirection(dir int, wire []byte) {
 		// probing. Give that validated CONNECT the same bounded session path
 		// while preserving explicit bindings and the legacy MQTT 3.1 profile.
 		if f.binding == nil && f.protocol == "mqtt" && f.level == 4 {
-			f.mqtt = &binMQTT{client: dir, level: 4, pending: [2]map[uint16]string{{}, {}}, aliases: [2]map[uint16]string{{}, {}}}
+			f.mqtt = &binMQTT{client: dir, level: 4, pending: [2]map[uint16]mqttPending{{}, {}}, aliases: [2]map[uint16]string{{}, {}}}
 		}
 		return
 	}
@@ -247,7 +247,7 @@ func (f *binFlow) detectDirection(dir int, wire []byte) {
 		if probeMQTT(w, f.a.config.ProbeBytes).Version == "3.1.1" {
 			level = 4
 		}
-		f.protocol, f.mqtt = "mqtt", &binMQTT{client: dir, level: level, pending: [2]map[uint16]string{{}, {}}, aliases: [2]map[uint16]string{{}, {}}}
+		f.protocol, f.mqtt = "mqtt", &binMQTT{client: dir, level: level, pending: [2]map[uint16]mqttPending{{}, {}}, aliases: [2]map[uint16]string{{}, {}}}
 	case "mongodb":
 		f.protocol, f.mongo = "mongodb", &binMongo{pending: map[uint32]string{}}
 	case "kafka":
