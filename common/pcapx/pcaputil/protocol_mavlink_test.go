@@ -157,6 +157,7 @@ func TestMAVLinkV2ZeroTailAndOpaqueSignature(t *testing.T) {
 }
 
 func TestMAVLinkFailsClosedAndDatagramBoundaries(t *testing.T) {
+	t.Run("common-depth", testMAVLinkCommonDepthBudget)
 	t.Run("attitude-budgets", testMAVLinkAttitudeBudgets)
 	t.Run("gps-budgets", testMAVLinkGPSBudgets)
 	valid := mavlinkTestFrame(2, 0, mavlinkTestPayload(0), 0, 50)

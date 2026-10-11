@@ -181,6 +181,12 @@ func decodeMAVLinkDatagramBudget(w []byte, maxMessage, maxMessages, maxDepth int
 		if mavlinkProfile(w[at:]) == "mavlink-common-gps-raw-int" && maxDepth < 2 {
 			return nil, protocolError(ErrResourceExceeded, "MAVLink GPS_RAW_INT field projection exceeds configured depth")
 		}
+		// HEARTBEAT, SYS_STATUS and GLOBAL_POSITION_INT also contain a
+		// nested Message Fields map. Admit no prefix before checking every
+		// co-packed message against this shared projection boundary.
+		if maxDepth < 2 {
+			return nil, protocolError(ErrResourceExceeded, "MAVLink common field projection exceeds configured depth")
+		}
 		at += n
 		count++
 	}
