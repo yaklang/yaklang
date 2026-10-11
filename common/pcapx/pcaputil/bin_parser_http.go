@@ -27,7 +27,7 @@ type binHTTPState struct {
 	trailerBytes                                                   int
 	rawHeader                                                      []byte
 	headerFields                                                   map[string]any
-	wsKey, wsOffer                                                 string
+	wsKey, wsOffer, wsProtocols                                    string
 	wsIssue                                                        string
 	header, total, cursor, next, search                            int
 	chunked, trailers, closeDelimited, response, tunnel, websocket bool
@@ -299,6 +299,13 @@ func (f *binFlow) frameDirection(dir int, w []byte) (int, *binSpec, error) {
 				if err != nil {
 					return 0, nil, err
 				}
+				selected, err := websocketSubprotocol(f.httpWSProtocols[0], response.Header.Values("Sec-WebSocket-Protocol"))
+				if err != nil {
+					return 0, nil, err
+				}
+				if selected == "ocpp1.6" {
+					h.ws.ocpp = &binOCPP{}
+				}
 			}
 			h.tunnel = h.status == 101 || (h.method == "CONNECT" && h.status >= 200 && h.status < 300)
 			if h.method == "HEAD" || h.status < 200 || h.status == 204 || h.status == 304 || h.tunnel {
@@ -327,6 +334,11 @@ func (f *binFlow) frameDirection(dir int, w []byte) (int, *binSpec, error) {
 					h.websocket = false
 				}
 				h.wsOffer = request.Header.Get("Sec-WebSocket-Extensions")
+				h.wsProtocols = strings.Join(request.Header.Values("Sec-WebSocket-Protocol"), ",")
+				if !websocketProtocolOffer(h.wsProtocols) {
+					h.websocket = false
+					h.wsIssue = "invalid WebSocket subprotocol offer"
+				}
 			}
 			length, transfer = request.ContentLength, request.TransferEncoding
 			if len(f.httpMethods) >= 128 {
@@ -358,11 +370,14 @@ func (f *binFlow) frameDirection(dir int, w []byte) (int, *binSpec, error) {
 			h.requestID = f.a.ids.Add(1)
 			f.httpIDs = append(f.httpIDs, h.requestID)
 			f.httpTimes = append(f.httpTimes, d.ts)
-			cost := int64(3*end + 128*(len(f.httpMethods)+1) + len(h.wsKey) + len(h.wsOffer) + len(h.method))
+			cost := int64(3*end + 128*(len(f.httpMethods)+1) + len(h.wsKey) + len(h.wsOffer) + len(h.wsProtocols) + len(h.method))
 			for _, s := range f.httpWSKeys {
 				cost += int64(len(s))
 			}
 			for _, s := range f.httpWSExtensions {
+				cost += int64(len(s))
+			}
+			for _, s := range f.httpWSProtocols {
 				cost += int64(len(s))
 			}
 			if err := f.reserveSession(cost); err != nil {
@@ -373,6 +388,7 @@ func (f *binFlow) frameDirection(dir int, w []byte) (int, *binSpec, error) {
 			f.httpUpgradeIssues = append(f.httpUpgradeIssues, h.wsIssue)
 			f.httpWSKeys = append(f.httpWSKeys, h.wsKey)
 			f.httpWSExtensions = append(f.httpWSExtensions, h.wsOffer)
+			f.httpWSProtocols = append(f.httpWSProtocols, h.wsProtocols)
 			f.httpDoH = append(f.httpDoH, h.doh)
 			// Allocate the sparse IPP marker queue only after an IPP request.
 			if h.ipp || len(f.httpIPP) > 0 {
@@ -462,6 +478,7 @@ func (f *binFlow) finishHTTP(dir int) {
 				}
 				f.httpWSKeys = f.httpWSKeys[1:]
 				f.httpWSExtensions = f.httpWSExtensions[1:]
+				f.httpWSProtocols = f.httpWSProtocols[1:]
 			}
 			if len(f.httpIPP) > 0 {
 				f.httpIPP = f.httpIPP[1:]
@@ -476,6 +493,7 @@ func (f *binFlow) finishHTTP(dir int) {
 	if h.tunnel {
 		f.httpIDs, f.httpTimes = nil, nil
 		f.httpWSKeys, f.httpWSExtensions = nil, nil
+		f.httpWSProtocols = nil
 	}
 	if h.tunnel && h.status == 101 && h.websocket {
 		client := 1 - dir

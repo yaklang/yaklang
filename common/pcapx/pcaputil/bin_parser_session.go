@@ -484,6 +484,14 @@ func (f *binFlow) consumeSession(dir int, e *ProtocolEvent, result map[string]an
 	case "websocket":
 		if e.Entry == "WebSocket" {
 			e.Session, err = f.ws.consume(dir, e.Raw)
+			if err == nil {
+				err = f.consumeOCPP(dir, e)
+			}
+			if err == nil && e.Session["OCPP"] != nil {
+				if fields, ok := result["fields"].(map[string]any); ok {
+					fields["OCPP"] = cloneSessionValue(e.Session["OCPP"])
+				}
+			}
 		} else {
 			e.Session = map[string]any{
 				"Protocol Transition": "http->websocket",
@@ -876,6 +884,7 @@ func (f *binFlow) closeSession() {
 		f.a.closeDNSFlow(f.id)
 	}
 	f.httpMethods, f.httpWSKeys, f.httpWSExtensions = nil, nil, nil
+	f.httpWSProtocols = nil
 	f.httpIDs, f.httpTimes = nil, nil
 	f.httpUpgrades, f.httpDoH, f.httpIPP = nil, nil, nil
 	f.httpUpgradeIssues = nil

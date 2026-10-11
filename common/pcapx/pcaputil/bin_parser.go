@@ -22,6 +22,7 @@ type ProtocolEvent struct {
 	semanticMetadata                         any
 	ownedRuleEnvelope, hasRuleMetadata       bool
 	nativeQUICWire                           bool
+	ocpp                                     bool
 	Domain                                   CaptureDomain
 	SourceBytes                              ByteSource
 	Profile, Completeness, ExpertCode        string
@@ -233,6 +234,9 @@ func (e *ProtocolEvent) retainRuleEnvelope(result map[string]any) {
 }
 
 func (e *ProtocolEvent) ownsNativeFields() bool {
+	if e.ocpp && e.sessionError != nil {
+		return true
+	}
 	if e.Protocol == "mqtt" && e.sessionError != nil {
 		return true
 	}
@@ -535,7 +539,7 @@ func (a *binParser) emit(e *BinParserEvent) {
 	e.summarizeProtocol()
 	// GOOSE, MQTT and legacy stream media keep rule fields distinct from observed
 	// session context. Freeze the final context before handing out public maps.
-	if (e.Protocol == "goose" || e.Protocol == "mqtt" || e.Protocol == "rtp" && e.Transport != "udp") && e.semanticSession == nil && e.Session != nil {
+	if (e.Protocol == "goose" || e.Protocol == "mqtt" || e.ocpp || e.Protocol == "rtp" && e.Transport != "udp") && e.semanticSession == nil && e.Session != nil {
 		e.semanticSession = cloneSession(e.Session)
 	}
 	defer func() {
@@ -650,6 +654,7 @@ type binFlow struct {
 	httpTimes         []time.Time
 	httpWSKeys        []string
 	httpWSExtensions  []string
+	httpWSProtocols   []string
 	httpMethods       []string
 	a                 *binParser
 	id                uint64
@@ -1173,7 +1178,7 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 				// decoding and history; retrying a different grammar loses fields
 				// or rejects valid argumentless/multiline messages.
 				e.semanticFields = protocolFields(result)
-				if e.Protocol == "goose" || e.Protocol == "mqtt" || e.Protocol == "rtp" && e.Transport != "udp" {
+				if e.Protocol == "goose" || e.Protocol == "mqtt" || e.Protocol == "websocket" && e.Session["OCPP"] != nil || e.Protocol == "rtp" && e.Transport != "udp" {
 					e.retainRuleEnvelope(result)
 				}
 				if e.Protocol == "tls" || e.Protocol == "redis" || e.Entry == "MySQLPreparedFields" || e.Protocol == "stun" || e.Protocol == "turn" || e.Protocol == "snmp" || e.Protocol == "slmp" || e.Protocol == "dlms-wrapper" || e.Protocol == "dlms" || e.Protocol == "c37118" {

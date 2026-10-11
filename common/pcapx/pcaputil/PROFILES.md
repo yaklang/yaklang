@@ -16,6 +16,7 @@ Additional native profiles and their exact message/carrier boundaries are regist
 | SocketCAN / selected J1939 | DLT227 classical controller records and canonical 72-byte CAN FD; J1939 requires `WithCANDecodeAs(interface, "j1939")` | Network-order IDs, strict flags/lengths, RTR, controller error details, FD flags, interface domains and owned data; selected classical Request PGN and Address Claim NAME | Bus CRC/authenticated identity, address-claim success, J1939 TP/FD application, automotive ISO-TP/UDS/OBD; other parameter-group payloads remain opaque |
 | PostgreSQL | Protocol 3.0 | Startup, SSLRequest, auth, Query, Parse/Bind/Describe/Execute/Sync, RowDescription/DataRow/CommandComplete/Error/Ready; C/D/E not guessed from port 5432 | GSS/SCRAM crypto; encrypted TLS body |
 | WebSocket | RFC 6455 v13 | Validated HTTP Upgrade, masking, fragmentation, UTF-8 and negotiated permessage-deflate | 15-bit window profile; no unsupported extension guessing |
+| OCPP-J selected RPC | 1.6 edition2 / negotiated `ocpp1.6` WebSocket TCP | CP BootNotification/Heartbeat and opposite-direction CALLRESULT/CALLERROR; exact selected schema fields, string IDs, direction, bounded sender-ID retirement, owned Session/fields, fragmented/compressed text | Other actions, OCPP2, endpoint authorization/execution, reconnect identity and timing compliance remain pending; no ID association inferred without negotiation/context |
 | LDAP | LDAPv3 RFC 4511 | BER LDAPMessage, MessageID, Bind, Search entry/done/reference, Modify/Add/Delete/ModifyDN, Extended, StartTLS | LDAPS decrypt without keys |
 | Redis | RESP2 + RESP3 | nested collections, attributes, pushes, pipeline, binary-safe bulk and bounded context | streamed strings and aggregates |
 | gRPC | HTTP/2 mapping | Cross-DATA framing, unary/bidi, trailers, identity/gzip messages | No protobuf schema names; unsupported compression stays explicit |
@@ -286,3 +287,22 @@ state; UDP idle time and local budget recovery do not authenticate a peer reset.
 ### MAVLink ATTITUDE literal telemetry
 
 The `mavlink-common-attitude` UDP profile adds common message30 ATTITUDE for v1 (exact28-byte payload) and v2 (1..28 transmitted bytes with explicit zero-tail fill), pinned to generated C commit `28eae47457249ab6c8c1cadd104fcbe25eacd7a3` and XML commit `dccd82c4ba56a721aa5bd760498cbf5f2338012b`. Fields retain `time_boot_ms`, six binary32 bit patterns, actual per-field transmitted bytes, zero-fill counts, class, sign and JSON-safe numeric/nonfinite projections. Roll/pitch/yaw are literal radians and angular speeds radians/second per that definition; no physical truth or authenticated source is inferred. CRC_EXTRA39, v1/v2 length, incompatibility and signature completeness are strict. Co-packed datagrams validate atomically; adjacent UDP datagrams are never joined. Caller frame/collection budgets apply before projection; ATTITUDE adds bounded float maps and requires depth3. Existing HEARTBEAT/SYS_STATUS/GLOBAL_POSITION_INT profiles and fields stay unchanged. Signed frames expose only an opaque unverified13-byte signature. No dialect inference, signature verification, peer/session correlation, device success, other message IDs or transport extension is delivered by this profile.
+
+OCPP-J selected RPC observations require a successful HTTP upgrade with exactly
+one offered, valid selected `ocpp1.6` token. Payload schemas pin OCA edition2
+2017-09-28 / urn:OCPP:1.6:2019:12 and OCPP-J errata2025-04. BootNotification
+requires vendor/model strings (20 Unicode characters each); Heartbeat requires
+an empty object. Responses require RFC3339 currentTime; Boot status is
+Accepted/Pending/Rejected with an exact JSON integer interval. Schema validity
+does not prove authorization or interval policy. CALLERROR retains the 1.6
+spellings FormationViolation and OccurenceConstraintViolation. Duplicate keys,
+unpaired surrogate escapes and malformed selected payloads are diagnosed,
+without replacing field/ID bytes. A valid escaped surrogate pair equals its
+literal Unicode string. This interoperable Unicode boundary is narrower than
+the permissive RFC8259 escape grammar; it does not claim generic JSON syntax
+rejection. Duplicate sender IDs invalidate pending association; completed IDs
+remain retired within collection/shared-byte budgets. Invalid responses with a
+known ID retire that request, and an unparseable response conservatively clears
+opposite-direction pending state. Resource refusal is terminal, typed and
+releases all retained WebSocket/application state. Close is idempotent. No
+station-side effects, cross-connection identity or unseen request are inferred.
