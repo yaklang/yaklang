@@ -76,6 +76,11 @@ func (e *ProtocolEvent) Decode() (result map[string]any, err error) {
 		if e.Transport == "udp" && ownedObservation && e.semanticFields != nil {
 			session = e.semanticFields
 		}
+		// KNX search is a stateless observation: the accepted private fields
+		// are also its session view, without request association state.
+		if e.Protocol == "knx" && e.Transport == "udp" && (e.Profile == "knx-basic-search" || e.Profile == "knx-extended-search") && e.semanticFields != nil {
+			session = e.semanticFields
+		}
 		// C37.118 exposes its complete accepted observation in both views
 		// on TCP and UDP. The public map is caller-owned, not query authority.
 		if e.Protocol == "c37118" && (e.Profile == "c37118-v1-v2-cfg2-data" || e.Profile == "c37118-v2-cfg3-complete-data" || e.Profile == "c37118-v2-cfg3-continuation-data" || e.Profile == "c37118-engineering") && e.semanticFields != nil {

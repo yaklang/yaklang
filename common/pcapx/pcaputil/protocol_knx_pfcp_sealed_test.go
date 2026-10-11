@@ -448,6 +448,7 @@ func TestKNXPFCPDatagramBoundariesAndAdmission(t *testing.T) {
 	}
 }
 func TestKNXPFCPResourceBoundariesAndOwnership(t *testing.T) {
+	t.Run("knx-private-session-queries", knxSessionQueriesOwnAcceptedObservation)
 	q, r := discoveryPayload(t, "pfcp-heartbeat-request"), discoveryPayload(t, "pfcp-heartbeat-response")
 	for _, delta := range []int{-1, 0} {
 		t.Run(fmt.Sprintf("shared%d", delta), func(t *testing.T) {

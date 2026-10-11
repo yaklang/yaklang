@@ -436,6 +436,22 @@ func TestPFCPDeletionIndependentReceiverBinding(t *testing.T) {
 				} else {
 					require.NotContains(t, e.Session, "Independent Receiver SEID Matches")
 				}
+				want := make(map[string]any, len(control.Messages[i].Fields)+3)
+				for k, v := range control.Messages[i].Fields {
+					want[k] = v
+				}
+				if bound {
+					want["Independent Receiver SEID Matches"] = i != 1
+					want["Association"] = []string{"request", "receiver-seid-mismatch", "matched-response"}[i]
+					want["Outstanding"] = []int{1, 1, 0}[i]
+				} else {
+					want["Association"] = []string{"request", "matched-response", "unmatched-response"}[i]
+					want["Outstanding"] = []int{1, 0, 0}[i]
+				}
+				e.Session = map[string]any{"Association": "forged-success"}
+				d, err := e.Decode()
+				require.NoError(t, err)
+				pfcpDeletionExactFields(t, want, d["session"].(map[string]any))
 			}
 			if bound {
 				require.Zero(t, events[1].ResponseTo)

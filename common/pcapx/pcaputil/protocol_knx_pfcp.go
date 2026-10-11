@@ -510,7 +510,21 @@ func (a *binParser) decodeDiscoveryDatagram(e *ProtocolEvent, w []byte, src, dst
 		a.udpMu.Unlock()
 	}
 	if err != nil {
-		e.Session, e.semanticFields = nil, nil
+		e.Session, e.semanticFields, e.semanticSession = nil, nil, nil
+	} else if protocol == "pfcp" {
+		// Freeze the accepted observation after association, before delivery.
+		// Wire subtrees can share semanticFields: neither private tree is
+		// exposed without a deep clone. Only the small scalar context is new;
+		// do not make a third deep wire projection or retain conversation state.
+		e.semanticSession = make(map[string]any, len(e.Session))
+		for k, v := range e.semanticFields {
+			e.semanticSession[k] = v
+		}
+		for _, k := range []string{"Association", "Outstanding", "Independent Receiver SEID Matches"} {
+			if v, ok := e.Session[k]; ok {
+				e.semanticSession[k] = v
+			}
+		}
 	}
 	raw := w
 	if len(w) > limit || temp.sessionBytes == 0 {

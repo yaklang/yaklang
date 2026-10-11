@@ -158,6 +158,10 @@ func TestKNXExtendedSealedDatagramMatrix(t *testing.T) {
 						rocTypedError(t, *c.Error, err)
 						require.Nil(t, f)
 						require.Empty(t, e.Session)
+						e.Session = map[string]any{"kind": "forged-success"}
+						decoded, decodeErr := e.Decode()
+						rocTypedError(t, *c.Error, decodeErr)
+						require.Nil(t, decoded)
 						continue
 					}
 					require.NoError(t, err)
@@ -182,6 +186,15 @@ func TestKNXExtendedSealedDatagramMatrix(t *testing.T) {
 					f, err = e.GetFields()
 					require.NoError(t, err)
 					rocEqualFields(t, c.Messages[at].Fields, f)
+					decoded, err := e.Decode()
+					require.NoError(t, err)
+					rocEqualFields(t, c.Messages[at].Fields, decoded["fields"].(map[string]any))
+					rocEqualFields(t, c.Messages[at].Fields, decoded["session"].(map[string]any))
+					clear(decoded["session"].(map[string]any))
+					e.Session = nil
+					decoded, err = e.Decode()
+					require.NoError(t, err)
+					rocEqualFields(t, c.Messages[at].Fields, decoded["session"].(map[string]any))
 				}
 				require.Equal(t, len(c.Messages), n)
 				if d {
