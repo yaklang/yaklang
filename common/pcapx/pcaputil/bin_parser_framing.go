@@ -572,6 +572,8 @@ func (a *binParser) datagramFields(network gopacket.NetworkLayer, udp *layers.UD
 			return
 		}
 		e.Status, e.Summary = "limited", "UDP datagram exceeds message limit"
+		e.sessionError = &ProtocolError{Kind: ErrResourceExceeded, Message: e.Summary}
+		e.Error = e.sessionError.Message
 		a.limited.Add(uint64(len(wire)))
 	} else {
 		if events, ok := a.decodeMAVLinkDatagram(e, wire, uint16(udp.SrcPort), uint16(udp.DstPort)); ok {

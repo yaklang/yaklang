@@ -168,6 +168,11 @@ func (e *ProtocolEvent) GetFields() (map[string]any, error) {
 }
 
 func (e *ProtocolEvent) ownsNativeFields() bool {
+	// A datagram refused before admission has no field tree. Keep its private
+	// resource refusal authoritative even if callers populate public caches.
+	if e.Transport == "udp" && e.Protocol == "" && e.sessionError != nil {
+		return true
+	}
 	// Native network observations own query trees just like native datagrams.
 	// A caller editing public Fields, Structured or Session must not rewrite
 	// the captured message used by later queries.
