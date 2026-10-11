@@ -113,8 +113,8 @@ type ReActLoop struct {
 	taskMutex   *sync.Mutex
 	currentTask aicommon.AIStatefulTask
 
-	// TBD: initialize once with the owning task context and close on Release.
-	// Async tool dispatch is not enabled yet; this field remains nil.
+	// Lazily bound to the owning task; guarded by onReleaseMutex.
+	// TBD: enable async tool dispatch in actions.
 	asyncExecutionManager *asyncexecmanager.Manager
 
 	// memory management
@@ -335,8 +335,12 @@ func (r *ReActLoop) Release() {
 		return
 	}
 	r.released = true
+	manager := r.asyncExecutionManager
 	hooks := append([]func(){}, r.onRelease...)
 	r.onReleaseMutex.Unlock()
+	if manager != nil {
+		manager.Close()
+	}
 	defer func() {
 		r.actionExecutionMu.Lock()
 		defer r.actionExecutionMu.Unlock()
