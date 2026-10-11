@@ -99,3 +99,67 @@ func TestProtocolSessionRTPAddsSDPMapsWithinRetainedMemoryBudget(t *testing.T) {
 	require.EqualValues(t, 1, flow.rtp.sources[ssrc].received, "the rejected configuration does not consume RTP history")
 	require.EqualValues(t, 512+96+128*4, parser.buffered.Load(), "the shared reservation stays at the pre-SDP high-water mark")
 }
+
+// RFC3550 section6.6 supplies the literal BYE source list. This is a byte
+// observation through the existing stream API, not a claim that an isolated
+// BYE is a compliant compound exchange or that a source is an authenticated peer.
+func rtcpBYEHistorySourcesOwnership(t *testing.T) {
+	t.Helper()
+	rtcpSourceHistoryBudget(t)
+	s, err := NewProtocolSession(DefaultParserBudget())
+	require.NoError(t, err)
+	defer s.Close("test")
+	wire := mediaReviewRTCPBYE(1)
+	binary.BigEndian.PutUint32(wire[4:8], 0x11223344)
+	r := s.Feed(0, time.Unix(1, 0), wire)
+	clear(wire)
+	require.Nil(t, r.Err)
+	require.Len(t, r.Events, 1)
+	e := r.Events[0]
+	expected := map[string]any{"Packet Name": "BYE", "Version": 2, "Packet Type": byte(203), "SSRC": uint32(0x11223344), "Report Count": 1, "Context Level": "observed", "Network Loss": false, "Loss Kind": "none", "Sources": []uint32{0x11223344}}
+	require.Equal(t, expected, e.Session)
+	require.Zero(t, e.ResponseTo)
+	require.Zero(t, e.TransactionID)
+	require.Equal(t, []byte{0x81, 0xcb, 0, 1, 0x11, 0x22, 0x33, 0x44}, e.Raw)
+	history, err := NewBinParserInspector(1, 1<<20)
+	require.NoError(t, err)
+	history.OnEvent(e)
+	e.Session["Sources"].([]uint32)[0] = 999999
+	detail, err := history.Details(e.ID)
+	require.NoError(t, err)
+	require.Equal(t, expected, detail.Session)
+	detail.Session["Sources"].([]uint32)[0] = 999999
+	decoded, err := detail.Decode()
+	require.NoError(t, err)
+	decoded["session"].(map[string]any)["Sources"].([]uint32)[0] = 999999
+	again, err := history.Details(e.ID)
+	require.NoError(t, err)
+	require.Equal(t, expected, again.Session)
+	s.Close("test")
+	s.Close("again")
+	require.Zero(t, s.Stats().BufferedBytes)
+}
+
+func rtcpSourceHistoryBudget(t *testing.T) {
+	t.Helper()
+	// Logical charge64 + key7 + slot32 + slice24 + three32-bit sources12 =139.
+	e := &ProtocolEvent{ID: 1, Protocol: "rtp", Session: map[string]any{"Sources": []uint32{1, 2, 3}}}
+	for _, limit := range []int{138, 139} {
+		history, err := NewBinParserInspector(1, limit)
+		require.NoError(t, err)
+		history.OnEvent(e)
+		if limit == 138 {
+			require.Empty(t, history.Rows("rtp", 0))
+			require.EqualValues(t, 1, history.Evicted())
+		} else {
+			require.Len(t, history.Rows("rtp", 0), 1)
+			detail, err := history.Details(1)
+			require.NoError(t, err)
+			require.Equal(t, e.Session, detail.Session)
+			require.Zero(t, history.Evicted())
+		}
+	}
+}
+func TestProtocolInspectorRTCPSourceVectorBudget(t *testing.T) {
+	rtcpSourceHistoryBudget(t)
+}

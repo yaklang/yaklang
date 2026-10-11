@@ -39,6 +39,7 @@ func TestSDPMediaEquivalentSpellingIsDeterministic(t *testing.T) {
 }
 
 func TestRTSPMediaFinalSemanticCacheParity(t *testing.T) {
+	rtcpBYEHistorySourcesOwnership(t)
 	now := time.Unix(1790000000, 0)
 	association := &rtspMediaAssociation{session: "mvp-camera", profile: "RTP/AVP/UDP", clientRTP: "192.0.2.1:5000", clientRTCP: "192.0.2.1:5001", serverRTP: "192.0.2.2:6000", serverRTCP: "192.0.2.2:6001", eventIDs: []uint64{41, 42}, packetRefs: []PacketReference{{Number: 1}, {Number: 2}}}
 	for _, rtcp := range []bool{false, true} {

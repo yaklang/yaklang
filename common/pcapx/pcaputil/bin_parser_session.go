@@ -1128,11 +1128,15 @@ func cloneSessionValue(v any) any {
 			out[i] = cloneSessionValue(v)
 		}
 		return out
+	case []bool:
+		return cloneScalarValues(x)
 	case []int:
 		return cloneScalarValues(x)
 	case []int32:
 		return cloneScalarValues(x)
 	case []uint16:
+		return cloneScalarValues(x)
+	case []uint32:
 		return cloneScalarValues(x)
 	case []uint64:
 		return cloneScalarValues(x)
@@ -1140,6 +1144,15 @@ func cloneSessionValue(v any) any {
 		return cloneScalarValues(x)
 	case []byte:
 		return bytes.Clone(x)
+	case [][]byte:
+		if x == nil {
+			return [][]byte(nil)
+		}
+		out := make([][]byte, len(x))
+		for i, v := range x {
+			out[i] = cloneScalarValues(v)
+		}
+		return out
 	default:
 		return v
 	}
@@ -1188,12 +1201,16 @@ func sessionSnapshotSize(v any, byteCapacity bool) int {
 			n += sessionSnapshotSize(v, byteCapacity)
 		}
 		return n
+	case []bool:
+		return 24 + len(x)
 	case []int:
 		return 24 + len(x)*(strconv.IntSize/8)
 	case []int32:
 		return 24 + len(x)*4
 	case []uint16:
 		return 24 + len(x)*2
+	case []uint32:
+		return 24 + len(x)*4
 	case []uint64:
 		return 24 + len(x)*8
 	case []string:
@@ -1209,6 +1226,12 @@ func sessionSnapshotSize(v any, byteCapacity bool) int {
 			return cap(x) + 24
 		}
 		return len(x) + 24
+	case [][]byte:
+		n := 24
+		for _, v := range x {
+			n += sessionSnapshotSize(v, byteCapacity)
+		}
+		return n
 	case nil:
 		return 0
 	default:
