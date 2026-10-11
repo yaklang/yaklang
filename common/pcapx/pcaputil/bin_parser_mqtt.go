@@ -187,6 +187,20 @@ func (m *binMQTT) consume(dir int, raw []byte, result map[string]any, maxElement
 		if qos > 0 && flags&8 != 0 && m.pending[dir][pid].next == "PUBCOMP" {
 			return nil, fmt.Errorf("mqtt: PUBLISH after PUBREL for packet identifier %d", pid)
 		}
+		prior := m.pending[dir][pid]
+		var publishDigest [32]byte
+		if m.level == 4 && qos > 0 {
+			// 3.1.1 has no Topic Alias/properties rewriting. A wire retry of
+			// the observed publication differs only in DUP. Keep a fixed-size
+			// digest rather than retaining an application payload in session state.
+			h := sha256.New()
+			h.Write([]byte{raw[0] &^ 8})
+			h.Write(raw[1:])
+			copy(publishDigest[:], h.Sum(nil))
+			if prior.next != "" && prior.digest != publishDigest {
+				return nil, fmt.Errorf("mqtt: changed DUP PUBLISH for packet identifier %d", pid)
+			}
+		}
 		pendingNew, aliasNew := 0, 0
 		aliasDelta := int64(0)
 		storeAlias := alias != 0 && topic != ""
@@ -224,7 +238,10 @@ func (m *binMQTT) consume(dir int, raw []byte, result map[string]any, maxElement
 			if qos == 2 {
 				next = "PUBREC"
 			}
-			m.pending[dir][pid] = mqttPending{next: next}
+			if m.level == 4 && prior.next != "" {
+				next = prior.next
+			}
+			m.pending[dir][pid] = mqttPending{next: next, digest: publishDigest}
 			info["Outstanding"] = next
 		}
 	case 4, 5, 6, 7, 9, 11:

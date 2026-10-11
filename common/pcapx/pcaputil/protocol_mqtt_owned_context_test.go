@@ -1379,3 +1379,102 @@ func testMQTT311QoS2RepeatedControls(t *testing.T) {
 		}
 	}
 }
+
+// MQTT3.1.1 OS4.3.3-1/2: a same-message PUBLISH retry before PUBREL
+// does not erase the already observed PUBREC or change the application bytes.
+func testMQTT311DuplicatePublishKeepsPhase(t *testing.T) {
+	for _, deferred := range []bool{false, true} {
+		for _, sender := range []int{0, 1} {
+			t.Run(fmt.Sprintf("d%v/sender%d", deferred, sender), func(t *testing.T) {
+				s, err := NewProtocolSession(DefaultParserBudget())
+				require.NoError(t, err)
+				defer s.Close("done")
+				s.(*captureSession).f.a.config.Deferred = deferred
+				publish := mqtt311Wire(t, "client")
+				publish[0] = 0x34
+				require.Nil(t, s.Feed(0, time.Unix(1, 0), mqtt311Wire(t, "connect")).Err)
+				require.Nil(t, s.Feed(sender, time.Unix(2, 0), publish).Err)
+				require.Nil(t, s.Feed(1-sender, time.Unix(3, 0), mqttContextWire(t, "pubrec")).Err)
+				retry := append([]byte(nil), publish...)
+				retry[0] |= 8
+				a := s.Feed(sender, time.Unix(4, 0), retry)
+				require.Nil(t, a.Err)
+				require.Len(t, a.Events, 1)
+				want := map[string]any{"Packet Type": uint64(3), "Packet Name": "PUBLISH", "QoS": uint64(2), "DUP": true, "Context Level": "observed", "Topic Name": "client", "Packet Identifier": uint64(7), "Outstanding": "PUBREL"}
+				require.Equal(t, want, a.Events[0].Session, "a duplicate must preserve the already observed PUBREC phase")
+				require.Equal(t, retry, a.Events[0].Raw)
+				require.Equal(t, sender, a.Events[0].Direction)
+				require.Zero(t, a.Events[0].ResponseTo)
+				require.Zero(t, a.Events[0].TransactionID)
+				for _, step := range []struct {
+					dir  int
+					name string
+				}{{1 - sender, "pubrec"}, {sender, "pubrel"}, {1 - sender, "pubcomp"}} {
+					a = s.Feed(step.dir, time.Unix(5, 0), mqttContextWire(t, step.name))
+					require.Nil(t, a.Err)
+					require.Len(t, a.Events, 1)
+					require.Equal(t, true, a.Events[0].Session["Matched Request"])
+				}
+				require.Empty(t, s.Close("complete"))
+				require.Nil(t, s.Close("again"))
+				require.Zero(t, s.Stats().BufferedBytes)
+			})
+		}
+	}
+}
+
+func testMQTT311ChangedDuplicatePublishRefused(t *testing.T) {
+	for _, deferred := range []bool{false, true} {
+		for _, sender := range []int{0, 1} {
+			for _, qos := range []byte{1, 2} {
+				for _, changed := range []string{"payload", "topic", "qos"} {
+					t.Run(fmt.Sprintf("d%v/sender%d/qos%d/%s", deferred, sender, qos, changed), func(t *testing.T) {
+						s, err := NewProtocolSession(DefaultParserBudget())
+						require.NoError(t, err)
+						defer s.Close("done")
+						s.(*captureSession).f.a.config.Deferred = deferred
+						publish := mqtt311Wire(t, "client")
+						publish[0] = 0x30 | qos<<1
+						require.Nil(t, s.Feed(0, time.Unix(1, 0), mqtt311Wire(t, "connect")).Err)
+						require.Nil(t, s.Feed(sender, time.Unix(2, 0), publish).Err)
+						if qos == 2 {
+							require.Nil(t, s.Feed(1-sender, time.Unix(3, 0), mqttContextWire(t, "pubrec")).Err)
+						}
+						retry := append([]byte(nil), publish...)
+						retry[0] |= 8
+						switch changed {
+						case "payload":
+							retry[len(retry)-1] ^= 1
+						case "topic":
+							retry[4] = 'd'
+						case "qos":
+							retry[0] ^= 6
+						}
+						a := s.Feed(sender, time.Unix(4, 0), retry)
+						require.NotNil(t, a.Err, "a conflicting DUP cannot replace the observed publication")
+						require.Equal(t, ErrMalformedMessage, a.Err.Kind)
+						require.Equal(t, "mqtt: changed DUP PUBLISH for packet identifier 7", a.Err.Message)
+						require.Len(t, a.Events, 1)
+						e := a.Events[0]
+						require.Nil(t, e.Session)
+						require.Equal(t, retry, e.Raw)
+						require.Zero(t, e.ResponseTo)
+						require.Zero(t, e.TransactionID)
+						_, err = e.GetFields()
+						var typed *ProtocolError
+						require.ErrorAs(t, err, &typed)
+						require.Equal(t, a.Err.Kind, typed.Kind)
+						require.Equal(t, a.Err.Message, typed.Message)
+						late := s.Feed(1-sender, time.Unix(5, 0), mqttContextWire(t, "puback"))
+						require.Empty(t, late.Events)
+						require.NotNil(t, late.Err)
+						require.Equal(t, ErrFatalSessionError, late.Err.Kind)
+						require.Empty(t, s.Close("refused"))
+						require.Nil(t, s.Close("again"))
+						require.Zero(t, s.Stats().BufferedBytes)
+					})
+				}
+			}
+		}
+	}
+}

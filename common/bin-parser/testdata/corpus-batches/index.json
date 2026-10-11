@@ -45821,6 +45821,138 @@
           "sha256": "674e4d15feb2399070e5e6bad9ae7ebd47e77545594b173a52b7e40542ab77af"
         }
       }
+    },
+    {
+      "file": "validation-mqtt-publish-retry.zip",
+      "id": "mqtt-publish-retry-0b546d805607",
+      "kind": "session-controls",
+      "password": "bin-parser",
+      "source_sha": "0b546d80560770588486e123537d7eb25dfd94b9",
+      "sha256": "84a6acce09a93625215b1340a2df209bd685c1b41b110934411aede3115034d2",
+      "aliases": {
+        "common/pcapx/pcaputil/testdata/mqtt-publish-retry/answers.json": "answers.json",
+        "common/pcapx/pcaputil/testdata/mqtt-publish-retry/captures/level4-sender0-qos1-before.pcap": "captures/level4-sender0-qos1-before.pcap",
+        "common/pcapx/pcaputil/testdata/mqtt-publish-retry/captures/level4-sender0-qos1-payload-conflict.pcap": "captures/level4-sender0-qos1-payload-conflict.pcap",
+        "common/pcapx/pcaputil/testdata/mqtt-publish-retry/captures/level4-sender0-qos1-qos-conflict.pcap": "captures/level4-sender0-qos1-qos-conflict.pcap",
+        "common/pcapx/pcaputil/testdata/mqtt-publish-retry/captures/level4-sender0-qos1-topic-conflict.pcap": "captures/level4-sender0-qos1-topic-conflict.pcap",
+        "common/pcapx/pcaputil/testdata/mqtt-publish-retry/captures/level4-sender0-qos2-after-rec.pcap": "captures/level4-sender0-qos2-after-rec.pcap",
+        "common/pcapx/pcaputil/testdata/mqtt-publish-retry/captures/level4-sender0-qos2-before.pcap": "captures/level4-sender0-qos2-before.pcap",
+        "common/pcapx/pcaputil/testdata/mqtt-publish-retry/captures/level4-sender0-qos2-payload-conflict.pcap": "captures/level4-sender0-qos2-payload-conflict.pcap",
+        "common/pcapx/pcaputil/testdata/mqtt-publish-retry/captures/level4-sender0-qos2-qos-conflict.pcap": "captures/level4-sender0-qos2-qos-conflict.pcap",
+        "common/pcapx/pcaputil/testdata/mqtt-publish-retry/captures/level4-sender0-qos2-topic-conflict.pcap": "captures/level4-sender0-qos2-topic-conflict.pcap",
+        "common/pcapx/pcaputil/testdata/mqtt-publish-retry/captures/level4-sender1-qos1-before.pcap": "captures/level4-sender1-qos1-before.pcap",
+        "common/pcapx/pcaputil/testdata/mqtt-publish-retry/captures/level4-sender1-qos1-payload-conflict.pcap": "captures/level4-sender1-qos1-payload-conflict.pcap",
+        "common/pcapx/pcaputil/testdata/mqtt-publish-retry/captures/level4-sender1-qos1-qos-conflict.pcap": "captures/level4-sender1-qos1-qos-conflict.pcap",
+        "common/pcapx/pcaputil/testdata/mqtt-publish-retry/captures/level4-sender1-qos1-topic-conflict.pcap": "captures/level4-sender1-qos1-topic-conflict.pcap",
+        "common/pcapx/pcaputil/testdata/mqtt-publish-retry/captures/level4-sender1-qos2-after-rec.pcap": "captures/level4-sender1-qos2-after-rec.pcap",
+        "common/pcapx/pcaputil/testdata/mqtt-publish-retry/captures/level4-sender1-qos2-before.pcap": "captures/level4-sender1-qos2-before.pcap",
+        "common/pcapx/pcaputil/testdata/mqtt-publish-retry/captures/level4-sender1-qos2-payload-conflict.pcap": "captures/level4-sender1-qos2-payload-conflict.pcap",
+        "common/pcapx/pcaputil/testdata/mqtt-publish-retry/captures/level4-sender1-qos2-qos-conflict.pcap": "captures/level4-sender1-qos2-qos-conflict.pcap",
+        "common/pcapx/pcaputil/testdata/mqtt-publish-retry/captures/level4-sender1-qos2-topic-conflict.pcap": "captures/level4-sender1-qos2-topic-conflict.pcap",
+        "common/pcapx/pcaputil/testdata/mqtt-publish-retry/generate.py": "generate.py",
+        "common/pcapx/pcaputil/testdata/mqtt-publish-retry/make-answers.py": "make-answers.py",
+        "common/pcapx/pcaputil/testdata/mqtt-publish-retry/validation/expected.json": "validation/expected.json",
+        "common/pcapx/pcaputil/testdata/mqtt-publish-retry/verify-reference.py": "verify-reference.py",
+        "common/pcapx/pcaputil/testdata/mqtt-publish-retry/verify.py": "verify.py"
+      },
+      "members": {
+        "answers.json": {
+          "bytes": 35818,
+          "sha256": "9c1bba577d6274ea53acc23b0a832be9875318a13621b5272e8b9eff3243cda0"
+        },
+        "captures/level4-sender0-qos1-before.pcap": {
+          "bytes": 709,
+          "sha256": "58a61f5c4544d1ce41f7efcf1f8f422f24d359d08d8e0043c80d4705dcd1e3cc"
+        },
+        "captures/level4-sender0-qos1-payload-conflict.pcap": {
+          "bytes": 635,
+          "sha256": "18789cb593d35ab30ae82a3aad94a5b6205574fc957f5487d8946bf79b50b6a4"
+        },
+        "captures/level4-sender0-qos1-qos-conflict.pcap": {
+          "bytes": 635,
+          "sha256": "95bd5c952b0164ea584ad75eeee3cf3dc2d51e847664b4bc9e7ba5fa50f0f0ce"
+        },
+        "captures/level4-sender0-qos1-topic-conflict.pcap": {
+          "bytes": 635,
+          "sha256": "2594aeb80b7e3dc9992e259b17eef74a9c4bdffd08aabcf81779bad7ad10f2eb"
+        },
+        "captures/level4-sender0-qos2-after-rec.pcap": {
+          "bytes": 931,
+          "sha256": "ca6bb643cb5a1801b3f41f945167492873d391c890bc06d4e43f8b0280af5065"
+        },
+        "captures/level4-sender0-qos2-before.pcap": {
+          "bytes": 857,
+          "sha256": "bd9f77fab7f715d904b11919cbd2c9f433ee52c4e8dc0c28ed638aec3397b880"
+        },
+        "captures/level4-sender0-qos2-payload-conflict.pcap": {
+          "bytes": 709,
+          "sha256": "ca4178081e2916dc45eec7fce69873f0e372dc025b3b770991e123274dca84a7"
+        },
+        "captures/level4-sender0-qos2-qos-conflict.pcap": {
+          "bytes": 709,
+          "sha256": "96b51371d226a2a5684a1b788678f9c8ff57de6b02982ca73bb8fd53da9a4b53"
+        },
+        "captures/level4-sender0-qos2-topic-conflict.pcap": {
+          "bytes": 709,
+          "sha256": "b23ba7ac80cd3171d156f1de58c59c29df292d7a8db3e3305413bb46388fcc39"
+        },
+        "captures/level4-sender1-qos1-before.pcap": {
+          "bytes": 709,
+          "sha256": "1d187dfab6a8fcba4091caa8b226062bb946fc338e008d2339efab662e4273a1"
+        },
+        "captures/level4-sender1-qos1-payload-conflict.pcap": {
+          "bytes": 635,
+          "sha256": "163d2934f003a3dcba0635c1e79be97e1de7f5cde8ac1c96fe7e81874c30ea05"
+        },
+        "captures/level4-sender1-qos1-qos-conflict.pcap": {
+          "bytes": 635,
+          "sha256": "e1be4b6de1d59b1f20daf03d738d48e7a513be994e9d6cf572442f09bcdca18a"
+        },
+        "captures/level4-sender1-qos1-topic-conflict.pcap": {
+          "bytes": 635,
+          "sha256": "19dbaf1e351575d4b4967a1f4fe48c6d18d7f5307deb0b4d7a1cd82d5ffcef58"
+        },
+        "captures/level4-sender1-qos2-after-rec.pcap": {
+          "bytes": 931,
+          "sha256": "a18cc2821058696aef39e5a1b71aadcd1bd400f5bdc3daa7280addaa82f39f52"
+        },
+        "captures/level4-sender1-qos2-before.pcap": {
+          "bytes": 857,
+          "sha256": "17adc5960c2c5a766579c91600a77e6274d1d959ef8ec22c8a4cc6a2ee662f94"
+        },
+        "captures/level4-sender1-qos2-payload-conflict.pcap": {
+          "bytes": 709,
+          "sha256": "75a492172b9b0ad52f6891c4a805b521107412c1b9a718139ac6ad34ebc64530"
+        },
+        "captures/level4-sender1-qos2-qos-conflict.pcap": {
+          "bytes": 709,
+          "sha256": "596ff232cddb5bb81d2754dc0d5c689d72258facaa80abd9f6d1f9f0d03350c7"
+        },
+        "captures/level4-sender1-qos2-topic-conflict.pcap": {
+          "bytes": 709,
+          "sha256": "0c65232a2800bd69017d2c4e0083af11e2fcea8c06d281c8729d88a908665e06"
+        },
+        "generate.py": {
+          "bytes": 3009,
+          "sha256": "1f738c78908cffacc377499a20f1a47df5c80cc50fa3d7d50d3ea9529211f593"
+        },
+        "make-answers.py": {
+          "bytes": 2422,
+          "sha256": "be72864704361a7b7ab6e3828d5be45243ce49091df0299d9143ccadc5fbb798"
+        },
+        "validation/expected.json": {
+          "bytes": 17897,
+          "sha256": "34f4f1187f1be700b3523cda8b0dd346cbe90d7c57f1dc07d9656cd434366203"
+        },
+        "verify-reference.py": {
+          "bytes": 1676,
+          "sha256": "cb5986f02df38d422d95158eaad68e8b1fb2dafb6e4a839987113ca0d1d06154"
+        },
+        "verify.py": {
+          "bytes": 873,
+          "sha256": "a078f50e5c50c556d6782a5a19e6eefa5c8e1d39ce7893efd6fa7f94d77d119d"
+        }
+      }
     }
   ],
   "schema_version": 1,
