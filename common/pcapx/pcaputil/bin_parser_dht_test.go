@@ -50,6 +50,8 @@ func TestDHTKRPCErrorResponseFromBEP5(t *testing.T) {
 }
 
 func TestDHTCompactPeersFromBEP5(t *testing.T) {
+	testDHTContactMatrix(t)
+	testDHTContactBudgets(t)
 	// A get_peers response may carry a list of six-byte compact IPv4 peers.
 	wire := []byte("d1:rd2:id20:mnopqrstuvwxyz1234566:valuesl6:abcdefee1:t2:aa1:y1:re")
 	fields, err := decodeDHTMessage(wire, 32)

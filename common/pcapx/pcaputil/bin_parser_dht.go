@@ -3,7 +3,7 @@ package pcaputil
 import (
 	"encoding/binary"
 	"fmt"
-	"net"
+	"net/netip"
 	"strconv"
 )
 
@@ -23,6 +23,16 @@ func (p *dhtBencode) count() error {
 	if p.elements > p.limit {
 		return protocolError(ErrResourceExceeded, "dht: collection budget exceeded")
 	}
+	return nil
+}
+
+// Compact contacts are encoded inside a single byte string, so bencode's
+// ordinary element count does not charge their decoded collection entries.
+func (p *dhtBencode) compactEntries(n int) error {
+	if n > p.limit-p.elements {
+		return protocolError(ErrResourceExceeded, "dht: compact contact collection budget exceeded")
+	}
+	p.elements += n
 	return nil
 }
 
@@ -191,17 +201,48 @@ func decodeDHTMessageWithBudget(w []byte, maxElements, maxDepth int) (map[string
 			if len(dhtString(args, "info_hash")) != 20 || len(dhtString(args, "token")) == 0 || len(dhtString(args, "token")) > 64 {
 				return nil, fmt.Errorf("dht: announce_peer fields")
 			}
-			port, portOK := args["port"].(int64)
+			rawPort, portPresent := args["port"]
+			port, portOK := rawPort.(int64)
+			widePort, wideOK := rawPort.(dhtIntegerLiteral)
 			implied, impliedOK := args["implied_port"].(int64)
 			_, impliedPresent := args["implied_port"]
-			if !portOK && implied != 1 || portOK && (port < 0 || port > 65535) || impliedPresent && (!impliedOK || implied != 0 && implied != 1) {
+			if impliedPresent && (!impliedOK || implied != 0 && implied != 1) ||
+				portPresent && !portOK && !wideOK ||
+				implied != 1 && (!portOK || port < 0 || port > 65535) {
 				return nil, fmt.Errorf("dht: announce_peer port")
 			}
 			out["Info Hash"] = append([]byte(nil), dhtString(args, "info_hash")...)
 			out["Token"] = append([]byte(nil), dhtString(args, "token")...)
-			out["Port"] = port
+			out["Port Present"] = portPresent
+			if portOK || !portPresent {
+				out["Port"] = port // Keep the legacy absent-port zero, with explicit presence.
+			} else {
+				out["Port Literal"] = string(widePort)
+			}
+			if impliedPresent {
+				out["Implied Port"] = implied
+			}
 		default:
 			return nil, fmt.Errorf("dht: unsupported query %q", method)
+		}
+		if method == "find_node" || method == "get_peers" {
+			if rawWant, exists := args["want"]; exists {
+				want, ok := rawWant.([]any)
+				if !ok || len(want) == 0 {
+					return nil, fmt.Errorf("dht: invalid want list")
+				}
+				flags := make([]string, len(want))
+				for i, value := range want {
+					flag, ok := value.([]byte)
+					if !ok {
+						return nil, fmt.Errorf("dht: invalid want flag")
+					}
+					// Preserve unknown strings as observations. BEP 32 says
+					// receivers ignore them rather than reject an extension.
+					flags[i] = string(flag)
+				}
+				out["Want"] = flags
+			}
 		}
 		out["Packet Name"], out["Node ID"] = method, append([]byte(nil), dhtString(args, "id")...)
 	case "r":
@@ -214,25 +255,43 @@ func decodeDHTMessageWithBudget(w []byte, maxElements, maxDepth int) (map[string
 			if !ok || len(nodes)%26 != 0 {
 				return nil, fmt.Errorf("dht: compact nodes length")
 			}
+			if err := p.compactEntries(len(nodes) / 26); err != nil {
+				return nil, err
+			}
+			contacts := dhtCompactNodes(nodes, 4)
 			out["Nodes Length"] = len(nodes)
+			out["Nodes"] = contacts
 			if len(nodes) >= 26 {
 				out["First Node ID"] = append([]byte(nil), nodes[:20]...)
-				out["First Node IP"] = net.IP(nodes[20:24]).String()
+				out["First Node IP"] = contacts[0]["IP"]
 				out["First Node Port"] = binary.BigEndian.Uint16(nodes[24:26])
 			}
+		}
+		if rawNodes, exists := response["nodes6"]; exists {
+			nodes, ok := rawNodes.([]byte)
+			if !ok || len(nodes)%38 != 0 {
+				return nil, fmt.Errorf("dht: compact IPv6 nodes length")
+			}
+			if err := p.compactEntries(len(nodes) / 38); err != nil {
+				return nil, err
+			}
+			out["Nodes6 Length"], out["Nodes6"] = len(nodes), dhtCompactNodes(nodes, 16)
 		}
 		if rawPeers, exists := response["values"]; exists {
 			peers, ok := rawPeers.([]any)
 			if !ok || len(peers) == 0 || len(peers) > maxElements {
 				return nil, fmt.Errorf("dht: invalid compact peer list")
 			}
-			for _, rawPeer := range peers {
+			contacts := make([]map[string]any, len(peers))
+			for i, rawPeer := range peers {
 				peer, ok := rawPeer.([]byte)
-				if !ok || len(peer) != 6 {
+				if !ok || len(peer) != 6 && len(peer) != 18 {
 					return nil, fmt.Errorf("dht: invalid compact peer address")
 				}
+				contacts[i] = dhtCompactEndpoint(peer)
 			}
 			out["Peer Count"] = len(peers)
+			out["Peers"] = contacts
 		}
 		if rawToken, exists := response["token"]; exists {
 			token, ok := rawToken.([]byte)
@@ -257,6 +316,47 @@ func decodeDHTMessageWithBudget(w []byte, maxElements, maxDepth int) (map[string
 		return nil, fmt.Errorf("dht: invalid message kind")
 	}
 	return out, nil
+}
+
+func dhtCompactEndpoint(w []byte) map[string]any {
+	ip, _ := netip.AddrFromSlice(w[:len(w)-2])
+	version := byte(4)
+	if ip.Is6() {
+		version = 6
+	}
+	return map[string]any{"IP": ip.String(), "Port": binary.BigEndian.Uint16(w[len(w)-2:]), "IP Version": version}
+}
+
+func dhtCompactNodes(w []byte, ipBytes int) []map[string]any {
+	stride := 20 + ipBytes + 2
+	nodes := make([]map[string]any, 0, len(w)/stride)
+	for at := 0; at < len(w); at += stride {
+		node := dhtCompactEndpoint(w[at+20 : at+stride])
+		node["Node ID"] = append([]byte(nil), w[at:at+20]...)
+		nodes = append(nodes, node)
+	}
+	return nodes
+}
+
+func dhtObservePeerPort(e *ProtocolEvent, fields map[string]any) {
+	if fields["Packet Name"] != "announce_peer" {
+		return
+	}
+	source, err := netip.ParseAddrPort(e.Source)
+	if err == nil {
+		fields["Peer IP"] = source.Addr().String()
+	}
+	if fields["Implied Port"] == int64(1) {
+		if err != nil {
+			fields["Peer Port Source"] = "unavailable-carrier-context"
+			return
+		}
+		fields["Observed Peer Port"], fields["Peer Port Source"] = source.Port(), "udp-source-port"
+	} else {
+		// This branch follows strict port type/range admission. An implied
+		// port never overwrites the captured argument (including a wide integer).
+		fields["Observed Peer Port"], fields["Peer Port Source"] = uint16(fields["Port"].(int64)), "announce-port"
+	}
 }
 
 func validDHTMessage(w []byte) bool {

@@ -289,6 +289,9 @@ func (a *binParser) decodeNativeDatagram(e *ProtocolEvent, w []byte, src, dst ui
 		} else {
 			fields, err = p.decode(w, a.budget.MaxCollectionElements)
 		}
+		if p.name == "bittorrent-dht" && err == nil {
+			dhtObservePeerPort(e, fields)
+		}
 		if p.name == "dns" || p.name == "mdns" || p.name == "llmnr" || p.name == "dhcp" || p.name == "dhcpv6" {
 			// The canonical codec also has ordinary structural errors (e.g.
 			// a truncated QCLASS or missing DHCP END). A UDP datagram cannot acquire more

@@ -31,10 +31,10 @@ func datagramOwnedInputs(t *testing.T, protocol string) ([]byte, [][]byte, []map
 			{"Transaction ID": []byte("aa"), "Packet Name": "ping", "Node ID": node},
 			{"Transaction ID": []byte("aa"), "Packet Name": "response", "Node ID": peer},
 			{"Transaction ID": []byte("ab"), "Packet Name": "find_node", "Node ID": node, "Target": []byte("target-node-5013!!!!")},
-			{"Transaction ID": []byte("ab"), "Packet Name": "response", "Node ID": peer, "Nodes Length": 26, "First Node ID": peer, "First Node IP": "198.51.100.9", "First Node Port": uint16(6881)},
+			{"Transaction ID": []byte("ab"), "Packet Name": "response", "Node ID": peer, "Nodes Length": 26, "First Node ID": peer, "First Node IP": "198.51.100.9", "First Node Port": uint16(6881), "Nodes": []map[string]any{{"Node ID": peer, "IP": "198.51.100.9", "Port": uint16(6881), "IP Version": byte(4)}}},
 			{"Transaction ID": []byte("ac"), "Packet Name": "get_peers", "Node ID": node, "Info Hash": []byte("lab-infohash-5013!!!")},
 			{"Transaction ID": []byte("ac"), "Packet Name": "response", "Node ID": peer, "Token": []byte("lab")},
-			{"Transaction ID": []byte("ad"), "Packet Name": "announce_peer", "Node ID": node, "Info Hash": []byte("lab-infohash-5013!!!"), "Token": []byte("lab"), "Port": int64(6881)},
+			{"Transaction ID": []byte("ad"), "Packet Name": "announce_peer", "Node ID": node, "Info Hash": []byte("lab-infohash-5013!!!"), "Token": []byte("lab"), "Port": int64(6881), "Port Present": true, "Implied Port": int64(0), "Observed Peer Port": uint16(6881), "Peer Port Source": "announce-port", "Peer IP": "192.0.2.10"},
 			{"Transaction ID": []byte("ad"), "Packet Name": "response", "Node ID": peer},
 		}
 	} else {
