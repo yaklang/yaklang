@@ -250,6 +250,7 @@ func assertSemanticReviewDatagrams(t testing.TB, c incrementalMVPCase, a increme
 		want, err := json.Marshal(a.ExpectedMessages[i])
 		require.NoError(t, err)
 		require.JSONEq(t, string(want), string(got), "complete independent observed datagram fields")
+		testNativeObservationSessionQueries(t, e, a.ExpectedMessages[i])
 	}
 }
 

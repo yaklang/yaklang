@@ -171,6 +171,7 @@ func TestRTPSSPDPSealedReplay(t *testing.T) {
 										again, queryErr := e.GetFields()
 										require.NoError(t, queryErr)
 										rocEqualFields(t, answer.Fields, again)
+										testNativeObservationSessionQueries(t, e, answer.Fields)
 									} else if answer.Error != "" {
 										var pe *ProtocolError
 										require.Error(t, e.sessionError)

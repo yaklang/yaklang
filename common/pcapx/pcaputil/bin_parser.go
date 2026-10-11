@@ -65,7 +65,7 @@ func (e *ProtocolEvent) Decode() (result map[string]any, err error) {
 		// the same complete message. Queries must use the private snapshot,
 		// including after a caller edits or replaces the public Session map.
 		if e.Transport == "udp" && e.Profile == e.Protocol+"-native" && e.semanticFields != nil &&
-			(e.Protocol == "dhcp" || e.Protocol == "dhcpv6" || e.Protocol == "mqtt-sn" || e.Protocol == "bittorrent-dht" || e.Protocol == "bjnp") {
+			(e.Protocol == "dhcp" || e.Protocol == "dhcpv6" || e.Protocol == "mqtt-sn" || e.Protocol == "bittorrent-dht" || e.Protocol == "bjnp" || e.Protocol == "nmea" || e.Protocol == "rtps" || e.Protocol == "semtech-udp") {
 			session = e.semanticFields
 		}
 		// These selected stateless observations expose the same accepted
