@@ -159,8 +159,23 @@ Manager 绑定该任务 context；后续调用复用同一实例，不随 curren
 Release 会在其他释放回调前 Close，取消执行并禁止新提交，但不阻塞等待清理；
 释放后仍可获取已有 Manager 来 Inspect / Wait，尚未创建 Manager 的已释放 loop
 不能再创建。需要等待所有清理完成时，显式使用有超时的独立 context 调用 Shutdown。
-接入时先获取 loop 的 Manager，再把下例的 resource 提交给它即可。
-完整例子见 [ReActLoop 接入测试](../async_execution_test.go)。
+工具调用使用 `loop.StartAsyncToolCall(name, params, options...)`，不需要手动创建
+caller 或 resource。它通过可选的 AsyncToolCallRuntime 准备工具，再注册到 loop
+的 Manager；不支持该扩展的 runtime 会明确返回错误，不改动 AIInvokeRuntime 的
+公共接口。工具查找、owner 的守卫/参数修正、原审查与执行链路都会保留。
+准备阶段可能等待 MCP 工具就绪；提交成功后返回 pending 回执，不等待工具结果。
+完成时结果写入准备时捕获的 owner task 和 timeline；Inspector 与任务结果使用同一
+个预先分配的 result ID。后台执行不重新读取 runtime 的 current task。
+
+```go
+receipt, err := loop.StartAsyncToolCall(toolName, params,
+    aicommon.WithToolCaller_Reason("本次调用目的"))
+// 检查 err 后，用 receipt.ID 在 loop 的 Manager 中 Inspect / Wait / Stop。
+```
+
+完整链路见 [入口综合测试](../../invoke_toolcall_async_test.go)：从工具名开始调用，
+验证参数修正、非阻塞回执、实时输出、owner 隔离、结果归档与退出取消。
+基础的 manager 生命周期见 [ReActLoop 接入测试](../async_execution_test.go)。
 接入工具时应复用原调用链路，把原工具执行函数和该次调用的 Inspector 接入
 NewResource。需要在原调用实例上补齐 Inspector 时，应从原实例读取已有状态，
 不能另外订阅 UI/log 事件并创建第二份输出缓存。
@@ -170,32 +185,53 @@ NewResource。需要在原调用实例上补齐 Inspector 时，应从原实例�
 null（默认取消路径中 callback 可能仍在修改参数），运行期间为空；PartialResult
 当前为空。观察调用不会消费输出，终态后仍可观察。
 
-创建异步资源的 ToolCaller 时，需要显式设置
-`WithToolCaller_WaitForCallbackOnCancel(true)`，让底层在取消后等待 callback 退出，
-再关闭输出管道及清理产物。默认关闭，原同步路径保持及时返回取消的行为。
-适配器还需把执行 context 的取消传递给创建 caller 时的 context，例如：
+工具接入使用 `caller.NewAsyncResource(tool, params)`，无需另外实现接口或手写
+取消桥接。caller 必须由 NewToolCaller 创建且尚未调用；创建资源成功后，将它的
+执行权交给该资源，不能再直接调用或修改 caller。task、emitter、review 等选项应
+提前配置好，资源会复用原验证、审查、执行及产物处理链路。
+资源在创建时复制 JSON 参数，工具定义应保持只读；每个 caller 只能绑定一次，
+每个资源只能执行一次。构造失败不会占用 caller；手动提交失败时调用
+`caller.Cancel()` 并丢弃该资源，不要复用为新的调用。loop 的入口会自动处理
+提交失败和 Release 时的 caller 取消。
+
+适配器自动开启 `WithToolCaller_WaitForCallbackOnCancel` 的行为，取消时等待 callback
+退出后再关闭输出管道及清理产物。原同步调用仍默认及时返回取消。
+manager 的执行 context 会联动取消该 caller，执行返回后也会取消 caller 的 context；
+创建 caller 时应使用所属任务的 context，而不是单次 action 的短期 context。例如：
 
 ```go
-// caller 用 callCtx 创建，并开启 WaitForCallbackOnCancel；每次执行一个 caller。
-resource, err := asyncexecmanager.NewResource(func(ctx context.Context) error {
-    stop := context.AfterFunc(ctx, cancelCall)
-    defer stop()
-    defer cancelCall()
-    result, directlyAnswer, err := caller.CallToolWithExistedParams(tool, params)
-    if err != nil {
-        return err
-    }
-    if directlyAnswer || result == nil {
-        return errors.New("tool call did not produce a result")
-    }
-    if !result.Success {
-        return errors.New(result.Error)
-    }
-    return nil
-}, caller.Inspect)
+// caller 通过现有工具调用准备流程创建；每次提交使用一个全新的 caller。
+manager, err := loop.GetAsyncExecutionManager()
+if err != nil {
+    return err
+}
+resource, err := caller.NewAsyncResource(tool, params)
+if err != nil {
+    return err
+}
+receipt, err := manager.Start(asyncexecmanager.Request{
+    Resource: resource,
+    Metadata: asyncexecmanager.Metadata{Name: tool.Name},
+})
+if err != nil {
+    caller.Cancel()
+    return err
+}
+// 后续用 receipt.ID 调用 Inspect / Wait / Stop。
 ```
 
-完整联动例子见 [唯一的综合测试](../../../aicommon/toolcall_inspector_test.go)：
+`NewAsyncResource` 可选接收一个结果处理函数，用于调用返回后的 owner task/timeline
+归档。该函数只在这次外层调用结束后执行一次，不额外缓存观察数据，也不随审批
+修改参数的内部递归重复归档。ReAct 的准备入口会安装原有的 finalizeToolCallResult。
+
+Inspector 直接返回原 caller 的观察器，不增加输出或结果缓存。工具返回错误或
+不成功的 ToolResult 会产生 failed 执行；direct_answer / nil result 也会报告
+未产生工具结果，不能误当作完成了工具调用。context 取消保留取消/超时错误。
+
+适配器验证见 [资源接入综合测试](../../../aicommon/toolcall_resource_test.go)：
+参数固定、真实观察器绑定、执行成功/失败、重复执行保护、执行前取消和原参数验证。
+
+Inspector 联动例子见 [综合测试](../../../aicommon/toolcall_inspector_test.go)：
 正常完成、实时输出、结果快照隔离、取消期间的清理等待和最终输出都在一个测试里。
 
 调用实例要在提交前固定 tool、参数、task、emitter 和 call ID 等信息；后台闭包

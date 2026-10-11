@@ -180,7 +180,7 @@ func (r *ReAct) newToolCallerForCall(ctx context.Context, currentTask aicommon.A
 		toolCallerOptions = append(toolCallerOptions, aicommon.WithToolCaller_Task(r.config.DefaultTask))
 	}
 
-	if currentLoop := r.GetCurrentLoop(); currentLoop != nil {
+	if currentLoop, _ := currentTask.GetReActLoop().(*reactloops.ReActLoop); currentLoop != nil {
 		if allow, guardMsg := reactloops.CheckToolInvokeGuard(currentLoop, toolName, nil); !allow {
 			return nil, utils.Error(guardMsg)
 		}
@@ -188,9 +188,10 @@ func (r *ReAct) newToolCallerForCall(ctx context.Context, currentTask aicommon.A
 	}
 
 	// Add callback handlers
+	baseEmitter := currentTask.GetEmitter()
 	toolCallerOptions = append(toolCallerOptions,
 		aicommon.WithToolCaller_OnStart(func(callToolId string) {
-			toolCaller.SetEmitter(currentTask.GetEmitter().AssociativeAIProcess(&schema.AiProcess{
+			toolCaller.SetEmitter(baseEmitter.AssociativeAIProcess(&schema.AiProcess{
 				ProcessId:   callToolId,
 				ProcessType: schema.AI_Call_Tool,
 			}))
