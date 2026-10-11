@@ -88,6 +88,8 @@ const (
 
 const AI_TIMELINE_ITEM_TYPE_SUB_REACT_AGENT_RESULT = "sub_react_agent_result"
 
+const AI_REACT_LOOP_ACTION_MANAGE_ASYNC_EXECUTION_RUNTIME = "manage_async_execution_runtime"
+
 const (
 	AI_REACT_LOOP_NAME_WRITE_PYTHON_SCRIPT = "write_python_script"
 	AI_REACT_LOOP_NAME_DEFAULT             = "default"

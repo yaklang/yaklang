@@ -153,7 +153,8 @@ Forget 接口。较长的 owner 生命周期需要配置适当的记录上限，
 ## 工具调用接入位置
 
 本包已实现独立核心和函数适配器。directly_call_tool 已接入异步标记的解析，
-ToolCaller 已实现 Inspector；异步调度与管理 action 仍待接入，当前 action 执行方式不变。
+ToolCaller 已实现 Inspector；工具提交入口和管理 action 已接入，directly_call_tool 的
+异步标记仍为 TBD，当前该 action 的执行方式不变。
 ReActLoop 提供 `GetAsyncExecutionManager()`：首次调用必须已有 current task，
 Manager 绑定该任务 context；后续调用复用同一实例，不随 current task 切换而重建。
 Release 会在其他释放回调前 Close，取消执行并禁止新提交，但不阻塞等待清理；
@@ -244,8 +245,27 @@ action Schema：单工具 `async_directly_call_tool` 可选 bool；批量
 缺省、null、无法识别的类型）回退到 false。批量只读取每项 async，多余的顶层
 单调用标记会被忽略。单调用标记保存在该 action 的执行状态中，不进入工具业务参数。
 两套协议和 root/next_action 形式由 action_direct_tool_async_test.go 的 mock 测试覆盖。
-`manage_async_execution_runtime` 将各 OP 映射到上表的方法；OP=wait 应有等待时限，
-需要结果时在等待后显式调用 Inspect。action、AutoContext 和 UI 使用同一个 owner
+`manage_async_execution_runtime` 是核心 action，始终注册，不依赖工具、MCP 或 forge
+开关；普通 action 过滤和单轮 must-use/disabled 约束不会隐藏它，宿主 runtime action
+policy 仍生效。文本和 native function call 协议共享同一个 verifier/handler。
+参数 `op` 支持 `list / inspect / stop / wait / stop_all`，省略时默认为 list；
+inspect、stop、wait 必须提供 `execute_id`。OP 和 ID 会去除前后空白，OP 忽略大小写。
+`timeout_seconds` 仅用于 wait，默认 10 秒，允许 0–60 秒（支持数字字符串）；0 表示
+立即查询。wait 超时返回当前元信息和 `wait_timed_out: true`，不取消执行、不触发重试。
+list/stop_all 返回 `executions` 数组，inspect 返回带 Observation 的 `execution`，
+stop/wait 返回元信息 `execution`。错误放在反馈的 `error` 字段，继续 loop，未知 ID
+不会中止整个任务。stop 只请求取消，需 wait 确认清理结束；需要结果时再显式 inspect。
+这些反馈直接来自 Manager/Inspector，不另建输出缓存；每个 action 的验证参数独立
+保存，避免同一 native batch 内多个管理调用覆盖彼此。
+
+```json
+{"@action":"manage_async_execution_runtime","identifier":"observe_capture","op":"inspect","execute_id":"exec-..."}
+```
+
+接入验证见 [管理 action 综合测试](../action_manage_async_execution_runtime_test.go)：
+mock 模型通过真实文本/native 解析链路执行全部 OP，验证始终可用、实时观察、等待
+超时不取消、正常完成、取消、stop_all 后继续提交以及非法参数保护。
+action、AutoContext 和 UI 使用同一个 owner
 Manager 的状态与 Inspector，UI 的持续刷新另由展示层实现。
 
 ## 验证
