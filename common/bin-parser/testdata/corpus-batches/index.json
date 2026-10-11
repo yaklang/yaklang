@@ -38232,6 +38232,163 @@
         "common/pcapx/pcaputil/dcp-services/controls.json": "controls.json",
         "common/pcapx/pcaputil/dcp-services/validation/expected.json": "validation/expected.json"
       }
+    },
+    {
+      "id": "validation-network-query-ownership",
+      "kind": "validation",
+      "source_sha": "5d6a4696d131ecc7a1237c33155d759989cf297d",
+      "file": "validation-network-query-ownership.zip",
+      "sha256": "c5025592e15f48f42ead866d5b6a3166beed9046b77580b2711b7e5d8075631d",
+      "password": "bin-parser",
+      "members": {
+        "build.py": {
+          "sha256": "7602bb941869a465ac361af70cc99acca26afd72f99cb4be598d588f2d0e173d",
+          "bytes": 3576
+        },
+        "verify-controls.py": {
+          "sha256": "5f534a9a697ad189288a965f7dd817e823345e81886800e9e749ade08e374ca0",
+          "bytes": 3253
+        },
+        "seal.py": {
+          "sha256": "6c786d33f0e4f1f95cfb66504fd3cec31f3bcd757c3eea3d26388e27aeb55ad1",
+          "bytes": 4881
+        },
+        "LICENSE.txt": {
+          "sha256": "1a17e1d4f2030d0d0122b1edda0bb62e316ec26d7d771f1892b08b10e62c632c",
+          "bytes": 154
+        },
+        "source-pin.json": {
+          "sha256": "8010aede586db71f1c6b6918e1082be85e67392721088f5dc7b0ef9699956593",
+          "bytes": 1538
+        },
+        "cases/arp-1.pcap": {
+          "sha256": "a574b7f053398b373956a1d7ec5ae0098c7de9702c8a992ac54cd0a7dc1f9d6f",
+          "bytes": 82
+        },
+        "answers/arp-1.json": {
+          "sha256": "873447652de02de5f6b04054787bd745710b261b22beea839daff205ef381d4a",
+          "bytes": 654
+        },
+        "cases/arp-2.pcap": {
+          "sha256": "470a6023af885bccbccd162a6b4b5952090ed91c1cc59f3dea370b67ab6907c1",
+          "bytes": 82
+        },
+        "answers/arp-2.json": {
+          "sha256": "870016c476552cd4c8232800855dfc52881f310247fc17e4599051d0da9d2d7b",
+          "bytes": 654
+        },
+        "cases/icmp4-echo-8.pcap": {
+          "sha256": "87d127f46e7ee25f5e089391509670c8fcb1fcbbb5ac147fe25fe0dc5293e2aa",
+          "bytes": 85
+        },
+        "answers/icmp4-echo-8.json": {
+          "sha256": "39681522a9e8d13ff2609a032f69dee544a803a7d8ce0c1189376e476fc66144",
+          "bytes": 605
+        },
+        "cases/icmp4-echo-0.pcap": {
+          "sha256": "523a5517d3989d7ea2862b4dfb97af81bb9409bfd8952abafbeba91b66f45871",
+          "bytes": 85
+        },
+        "answers/icmp4-echo-0.json": {
+          "sha256": "fd2b1e4dc2376196a19166dfd02c09c3ea00c1c8dc2c7828d887f851aa985581",
+          "bytes": 605
+        },
+        "cases/icmp4-error-3.pcap": {
+          "sha256": "cbaf0c0a02b1c6847516dd41d3799477b575cbf795756d7dd12bab2c65215f6f",
+          "bytes": 110
+        },
+        "answers/icmp4-error-3.json": {
+          "sha256": "fe1ab91be19f8a4831ad559e0b7fbda1d08c064fe0018243ded6c426053bc038",
+          "bytes": 718
+        },
+        "cases/icmp4-error-11.pcap": {
+          "sha256": "86f764dfe2cc7559ec90f2f18f60291b0a1ec85599b2a27981096672243756de",
+          "bytes": 110
+        },
+        "answers/icmp4-error-11.json": {
+          "sha256": "7f2bd3b8943e33de3f46fa394dabaefe0b67df3ccfed34f98e23bc4017bf37ca",
+          "bytes": 723
+        },
+        "cases/icmp6-echo-128.pcap": {
+          "sha256": "9ac86b5631aaa71db8824f1c08cc92d88a69cae0da70c99261d55ac224125f7f",
+          "bytes": 105
+        },
+        "answers/icmp6-echo-128.json": {
+          "sha256": "5f3a59ab27de6c0f643a975bbc4c880bd66f3c3d7d7f662cb1048b90b1dd5e26",
+          "bytes": 662
+        },
+        "cases/icmp6-echo-129.pcap": {
+          "sha256": "261f86e0762d76054ccc46696a079d89dc9ccebb29f30ee51f7cda570a8b1424",
+          "bytes": 105
+        },
+        "answers/icmp6-echo-129.json": {
+          "sha256": "bfd08df03341d8b586b96cb16dd6a8ba8862b6679aabf5b5ab11f9b2a11f6c12",
+          "bytes": 662
+        },
+        "cases/icmp6-nd-options.pcap": {
+          "sha256": "9af6f7d876fcd2664ddb35798b624bedf59a222fac41f1409742a9d9dea2af83",
+          "bytes": 134
+        },
+        "answers/icmp6-nd-options.json": {
+          "sha256": "e8659cac90449668ca1c1c0a12578ff101cc2215846561c35e92f26105afd638",
+          "bytes": 905
+        },
+        "cases/nd-option-zero.pcap": {
+          "sha256": "09f390cee3cbf6e50c49ffa589c77cbe3c9b7db7d8d3c16d073c9e4cf34e038b",
+          "bytes": 120
+        },
+        "answers/nd-option-zero.json": {
+          "sha256": "0511f744d5431c41c06ca3e5777b096d924c4883137838c9bc2c88b78ab1c191",
+          "bytes": 627
+        },
+        "cases/nd-option-overrun.pcap": {
+          "sha256": "312b5e975a3c61474ca4f74676bae54da34f236d1bfce2862473b52642568c8b",
+          "bytes": 122
+        },
+        "answers/nd-option-overrun.json": {
+          "sha256": "58df2ecf83eb18891ce714b12e4d0bc797f611646f0c90102b5c7236938d4a90",
+          "bytes": 643
+        },
+        "controls.json": {
+          "sha256": "b3db0c5af35dc1590b9359d669176b8cd68e6c9bba65eeb1798f9b117123ff2c",
+          "bytes": 9434
+        },
+        "validation/expected.json": {
+          "sha256": "7130222235ac7537c8b28e977468cfd447e7faea27b100e8e9acb8393200e878",
+          "bytes": 12435
+        }
+      },
+      "aliases": {
+        "common/pcapx/pcaputil/network-query-ownership/build.py": "build.py",
+        "common/pcapx/pcaputil/network-query-ownership/verify-controls.py": "verify-controls.py",
+        "common/pcapx/pcaputil/network-query-ownership/seal.py": "seal.py",
+        "common/pcapx/pcaputil/network-query-ownership/LICENSE.txt": "LICENSE.txt",
+        "common/pcapx/pcaputil/network-query-ownership/source-pin.json": "source-pin.json",
+        "common/pcapx/pcaputil/network-query-ownership/cases/arp-1.pcap": "cases/arp-1.pcap",
+        "common/pcapx/pcaputil/network-query-ownership/answers/arp-1.json": "answers/arp-1.json",
+        "common/pcapx/pcaputil/network-query-ownership/cases/arp-2.pcap": "cases/arp-2.pcap",
+        "common/pcapx/pcaputil/network-query-ownership/answers/arp-2.json": "answers/arp-2.json",
+        "common/pcapx/pcaputil/network-query-ownership/cases/icmp4-echo-8.pcap": "cases/icmp4-echo-8.pcap",
+        "common/pcapx/pcaputil/network-query-ownership/answers/icmp4-echo-8.json": "answers/icmp4-echo-8.json",
+        "common/pcapx/pcaputil/network-query-ownership/cases/icmp4-echo-0.pcap": "cases/icmp4-echo-0.pcap",
+        "common/pcapx/pcaputil/network-query-ownership/answers/icmp4-echo-0.json": "answers/icmp4-echo-0.json",
+        "common/pcapx/pcaputil/network-query-ownership/cases/icmp4-error-3.pcap": "cases/icmp4-error-3.pcap",
+        "common/pcapx/pcaputil/network-query-ownership/answers/icmp4-error-3.json": "answers/icmp4-error-3.json",
+        "common/pcapx/pcaputil/network-query-ownership/cases/icmp4-error-11.pcap": "cases/icmp4-error-11.pcap",
+        "common/pcapx/pcaputil/network-query-ownership/answers/icmp4-error-11.json": "answers/icmp4-error-11.json",
+        "common/pcapx/pcaputil/network-query-ownership/cases/icmp6-echo-128.pcap": "cases/icmp6-echo-128.pcap",
+        "common/pcapx/pcaputil/network-query-ownership/answers/icmp6-echo-128.json": "answers/icmp6-echo-128.json",
+        "common/pcapx/pcaputil/network-query-ownership/cases/icmp6-echo-129.pcap": "cases/icmp6-echo-129.pcap",
+        "common/pcapx/pcaputil/network-query-ownership/answers/icmp6-echo-129.json": "answers/icmp6-echo-129.json",
+        "common/pcapx/pcaputil/network-query-ownership/cases/icmp6-nd-options.pcap": "cases/icmp6-nd-options.pcap",
+        "common/pcapx/pcaputil/network-query-ownership/answers/icmp6-nd-options.json": "answers/icmp6-nd-options.json",
+        "common/pcapx/pcaputil/network-query-ownership/cases/nd-option-zero.pcap": "cases/nd-option-zero.pcap",
+        "common/pcapx/pcaputil/network-query-ownership/answers/nd-option-zero.json": "answers/nd-option-zero.json",
+        "common/pcapx/pcaputil/network-query-ownership/cases/nd-option-overrun.pcap": "cases/nd-option-overrun.pcap",
+        "common/pcapx/pcaputil/network-query-ownership/answers/nd-option-overrun.json": "answers/nd-option-overrun.json",
+        "common/pcapx/pcaputil/network-query-ownership/controls.json": "controls.json",
+        "common/pcapx/pcaputil/network-query-ownership/validation/expected.json": "validation/expected.json"
+      }
     }
   ],
   "schema_version": 1,

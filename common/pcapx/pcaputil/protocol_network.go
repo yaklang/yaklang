@@ -212,7 +212,7 @@ func (a *binParser) networkPacket(p gopacket.Packet) (gopacket.Packet, bool) {
 		}
 	}
 	if protocol != "" {
-		event := &ProtocolEvent{Timestamp: ci.Timestamp, Transport: "network", Protocol: protocol, Domain: e.Ref.Domain, Length: len(p.Data()), Raw: bytes.Clone(p.Data()), Status: "decoded", Completeness: "message", Session: fields, SourceBytes: ByteSource{Kind: "captured", PacketRefs: []PacketReference{e.Ref}}, semanticFields: fields}
+		event := &ProtocolEvent{Timestamp: ci.Timestamp, Transport: "network", Protocol: protocol, Domain: e.Ref.Domain, Length: len(p.Data()), Raw: bytes.Clone(p.Data()), Status: "decoded", Completeness: "message", Session: cloneSession(fields), SourceBytes: ByteSource{Kind: "captured", PacketRefs: []PacketReference{e.Ref}}, semanticFields: cloneSession(fields), semanticSession: cloneSession(fields)}
 		if n := p.NetworkLayer(); n != nil {
 			event.Source, event.Destination = n.NetworkFlow().Src().String(), n.NetworkFlow().Dst().String()
 		}
@@ -224,7 +224,7 @@ func (a *binParser) networkPacket(p gopacket.Packet) (gopacket.Packet, bool) {
 				event.Source, event.Destination = fmt.Sprintf("%x", arp.SourceProtAddress), fmt.Sprintf("%x", arp.DstProtAddress)
 			}
 		}
-		event.Structured = map[string]any{"fields": fields}
+		event.Structured = map[string]any{"fields": cloneSession(fields)}
 		a.messages.Add(1)
 		a.decoded.Add(1)
 		a.emit(event)
