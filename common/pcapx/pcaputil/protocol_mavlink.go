@@ -12,7 +12,8 @@ import (
 // 28eae47457249ab6c8c1cadd104fcbe25eacd7a3 and mavlink/mavlink XML commit
 // dccd82c4ba56a721aa5bd760498cbf5f2338012b. It admits only HEARTBEAT,
 // SYS_STATUS, GPS_RAW_INT, ATTITUDE and GLOBAL_POSITION_INT; a checksum cannot identify a dialect or
-// authenticate the sender. A v2 signature is retained as opaque observed bytes.
+// authenticate the sender. A v2 signature is opaque by default; explicit
+// MAVLinkSigningConfig enables bounded receiver-context signature verification.
 // https://mavlink.io/en/guide/serialization.html
 type mavlinkMessage struct {
 	Raw    []byte
@@ -158,38 +159,51 @@ func decodeMAVLinkDatagram(w []byte, maxMessage, maxMessages int) ([]mavlinkMess
 }
 
 func decodeMAVLinkDatagramBudget(w []byte, maxMessage, maxMessages, maxDepth int) ([]mavlinkMessage, error) {
+	count, err := validateMAVLinkDatagramBudget(w, maxMessage, maxMessages, maxDepth)
+	if err != nil {
+		return nil, err
+	}
+	return projectMAVLinkDatagram(w, maxMessage, count), nil
+}
+
+func validateMAVLinkDatagramBudget(w []byte, maxMessage, maxMessages, maxDepth int) (int, error) {
 	if len(w) == 0 {
-		return nil, protocolError(ErrNeedMore, "MAVLink datagram is empty")
+		return 0, protocolError(ErrNeedMore, "MAVLink datagram is empty")
 	}
 	if maxMessages <= 0 {
-		return nil, protocolError(ErrResourceExceeded, "MAVLink message collection limit")
+		return 0, protocolError(ErrResourceExceeded, "MAVLink message collection limit")
 	}
 	count := 0
 	for at := 0; at < len(w); {
 		if count >= maxMessages {
-			return nil, protocolError(ErrResourceExceeded, "MAVLink message collection limit")
+			return 0, protocolError(ErrResourceExceeded, "MAVLink message collection limit")
 		}
 		n, _, err := mavlinkFrameSize(w[at:], maxMessage)
 		if err != nil {
-			return nil, err
+			return 0, err
 		}
 		// ATTITUDE adds one bounded map for each of six binary32 fields. Check
 		// the complete datagram before expanding any projection or prefix.
 		if mavlinkProfile(w[at:]) == "mavlink-common-attitude" && maxDepth < 3 {
-			return nil, protocolError(ErrResourceExceeded, "MAVLink ATTITUDE field projection exceeds configured depth")
+			return 0, protocolError(ErrResourceExceeded, "MAVLink ATTITUDE field projection exceeds configured depth")
 		}
 		if mavlinkProfile(w[at:]) == "mavlink-common-gps-raw-int" && maxDepth < 2 {
-			return nil, protocolError(ErrResourceExceeded, "MAVLink GPS_RAW_INT field projection exceeds configured depth")
+			return 0, protocolError(ErrResourceExceeded, "MAVLink GPS_RAW_INT field projection exceeds configured depth")
 		}
 		// HEARTBEAT, SYS_STATUS and GLOBAL_POSITION_INT also contain a
 		// nested Message Fields map. Admit no prefix before checking every
 		// co-packed message against this shared projection boundary.
 		if maxDepth < 2 {
-			return nil, protocolError(ErrResourceExceeded, "MAVLink common field projection exceeds configured depth")
+			return 0, protocolError(ErrResourceExceeded, "MAVLink common field projection exceeds configured depth")
 		}
 		at += n
 		count++
 	}
+	return count, nil
+}
+
+// Caller validated the complete datagram before constructing owned fields.
+func projectMAVLinkDatagram(w []byte, maxMessage, count int) []mavlinkMessage {
 	result := make([]mavlinkMessage, 0, count)
 	for at := 0; at < len(w); {
 		n, def, _ := mavlinkFrameSize(w[at:], maxMessage)
@@ -198,7 +212,7 @@ func decodeMAVLinkDatagramBudget(w []byte, maxMessage, maxMessages, maxDepth int
 		result = append(result, mavlinkMessage{Raw: bytes.Clone(raw), Fields: fields, Offset: at})
 		at += n
 	}
-	return result, nil
+	return result
 }
 
 func mavlinkFields(raw []byte, def mavlinkDefinition) map[string]any {

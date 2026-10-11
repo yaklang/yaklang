@@ -121,6 +121,7 @@ func TestMAVLinkCompleteFields(t *testing.T) {
 }
 
 func TestMAVLinkV2ZeroTailAndOpaqueSignature(t *testing.T) {
+	t.Run("signing", testMAVLinkSigning)
 	for _, id := range []uint32{1, 33} {
 		def, _ := mavlinkDefinitionFor(id)
 		messages, err := decodeMAVLinkDatagram(mavlinkTestFrame(2, id, []byte{42}, 0, def.extra), 280, 1)

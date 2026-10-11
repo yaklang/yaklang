@@ -23,13 +23,22 @@ func (a *binParser) decodeMAVLinkDatagram(base *ProtocolEvent, w []byte, src, ds
 	if explicit != "" {
 		base.Admission = "explicit-decode-as"
 	}
-	messages, err := decodeMAVLinkDatagramBudget(w, a.budget.MaxFrameBytes, a.budget.MaxCollectionElements, a.budget.MaxRecursionDepth)
+	count, err := validateMAVLinkDatagramBudget(w, a.budget.MaxFrameBytes, a.budget.MaxCollectionElements, a.budget.MaxRecursionDepth)
+	var verification []map[string]any
+	if err == nil {
+		verification, err = a.verifyMAVLinkDatagram(base.Domain, w, count)
+	}
 	if err != nil {
 		a.finishProtocolDatagram(base, w, nil, err)
 		return []*ProtocolEvent{base}, true
 	}
+	messages := projectMAVLinkDatagram(w, a.budget.MaxFrameBytes, count)
 	events := make([]*ProtocolEvent, 0, len(messages))
-	for _, message := range messages {
+	for i, message := range messages {
+		if verification != nil {
+			message.Fields["Signature Status"] = "verified-receiver-context"
+			message.Fields["Signature Verification"] = verification[i]
+		}
 		e := *base
 		e.Profile = mavlinkProfile(message.Raw)
 		cloneEvidence(&e)

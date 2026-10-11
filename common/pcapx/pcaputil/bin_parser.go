@@ -305,6 +305,7 @@ type binSpec struct {
 	plan        *binparser.StructuredPlan
 }
 type binParser struct {
+	mavlinkSigning                                                             *mavlinkSigningState
 	pfcpSessionIdentity                                                        *pfcpSessionIdentity
 	semtechDisabled                                                            bool         // udpMu; bounded opt-in correlation fails closed after global state exhaustion
 	semtechSessions                                                            *binUDPStore // udpMu; token quarantine must survive unrelated UDP expiry
@@ -380,6 +381,9 @@ func (c *CaptureConfig) prepareBinParser() error {
 		a.bindings[b.Port] = append(a.bindings[b.Port], b)
 	}
 	a.tlsSecrets = c.tlsSecrets
+	if c.mavlinkSigning != nil {
+		a.mavlinkSigning = &mavlinkSigningState{options: *c.mavlinkSigning}
+	}
 	a.datagramDecodeAs = make(map[uint16]string, len(c.datagramDecodeAs))
 	for k, v := range c.datagramDecodeAs {
 		a.datagramDecodeAs[k] = v

@@ -156,6 +156,12 @@ func NewProtocolSessionWithOptions(budget ParserBudget, options ...ProtocolSessi
 		ports:             [2]uint16{40000, 40001},
 		syslogStreamProbe: true,
 	}
+	optionsComplete := false
+	defer func() {
+		if !optionsComplete {
+			s.f.a.closeMAVLinkSigning()
+		}
+	}()
 	for _, option := range options {
 		if option == nil {
 			return nil, fmt.Errorf("nil session option")
@@ -163,6 +169,9 @@ func NewProtocolSessionWithOptions(budget ParserBudget, options ...ProtocolSessi
 		if err := option(s); err != nil {
 			return nil, err
 		}
+	}
+	if s.f.a.mavlinkSigning != nil && s.transport != "udp" {
+		return nil, fmt.Errorf("MAVLink signing requires a UDP session")
 	}
 	if b := s.f.a.pfcpSessionIdentity; b != nil {
 		if s.transport != "udp" {
@@ -173,6 +182,7 @@ func NewProtocolSessionWithOptions(budget ParserBudget, options ...ProtocolSessi
 	if s.transport == "udp" && s.f.tcpClientKnown {
 		return nil, fmt.Errorf("TCP initiator direction cannot be set on a UDP session")
 	}
+	optionsComplete = true
 	return s, nil
 }
 

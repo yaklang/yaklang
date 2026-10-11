@@ -433,3 +433,17 @@ were executed against unmodified, pinned Apache-2.0 libais sources kept outside
 the archive. That codec validates binary field extraction, not envelope checks,
 native refusal policy, receiver operation or physical accuracy. Resource tests
 also check typed byte/sentence/depth refusal, recovery, Close and query ownership.
+
+MAVLink common UDP supports HEARTBEAT, SYS_STATUS, GPS_RAW_INT, ATTITUDE and
+GLOBAL_POSITION_INT. Signatures remain opaque by default. The optional
+`WithProtocolMAVLinkSigning` / `WithSessionMAVLinkSigning` receiver context
+requires a copied 32-byte key and an independent 48-bit receiver clock (10us
+since 2015-01-01 UTC), and refuses unsigned messages, bad digests and replay.
+History is bounded by stream and shared retained-byte limits until Close;
+streams share identity across endpoint pairs within a capture domain, while
+interfaces, sections and tunnels isolate their clocks/history. Entire datagrams
+commit atomically. `TestMAVLinkV2ZeroTailAndOpaqueSignature/signing` consumes the
+small `mavlink-signing` ZIP and official fixed C receiver answers, verifies
+complete fields/Session and ownership, and runs the capture matrix. The public
+synthetic test key is not a device credential. Verified bytes do not establish
+physical telemetry, endpoint identity, provisioning or persistence across captures.

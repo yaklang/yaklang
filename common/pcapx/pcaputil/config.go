@@ -33,6 +33,7 @@ type DeviceAdapter struct {
 }
 
 type CaptureConfig struct {
+	mavlinkSigning        *mavlinkSigningOptions
 	tlsSecrets            TLSSecretProvider
 	datagramDecodeAs      map[uint16]string
 	canDecodeAs           map[int]string

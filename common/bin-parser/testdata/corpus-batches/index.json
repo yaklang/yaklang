@@ -42503,6 +42503,48 @@
       "password": "bin-parser",
       "sha256": "14c983d7f420bb1db570368cde7e7219579df1dab1403a7952de05165bef35fe",
       "source_sha": "255cc79f61807e6284cc1c1294d32e3bcb469dc4"
+    },
+    {
+      "aliases": {
+        "mavlink-signing/captures/signing-replay.pcap": "captures/signing-replay.pcap",
+        "mavlink-signing/scripts/build_fixture.py": "scripts/build_fixture.py",
+        "mavlink-signing/scripts/reference-signing.c": "scripts/reference-signing.c",
+        "mavlink-signing/validation/expected.json": "validation/expected.json",
+        "mavlink-signing/validation/reference-signing.jsonl": "validation/reference-signing.jsonl",
+        "mavlink-signing/validation/source-pins.json": "validation/source-pins.json"
+      },
+      "file": "validation-mavlink-signing.zip",
+      "id": "mavlink-signing",
+      "kind": "validation",
+      "members": {
+        "captures/signing-replay.pcap": {
+          "bytes": 852,
+          "sha256": "b8eff7cd4e8815c25aca2cfb1dc51ebcd7e88f2a28aead011774bd051f069d48"
+        },
+        "scripts/build_fixture.py": {
+          "bytes": 3773,
+          "sha256": "a3225e02c1787c93218d2640e8b0b8fdc381cfc3b9eba65852be7a752770e34f"
+        },
+        "scripts/reference-signing.c": {
+          "bytes": 3361,
+          "sha256": "e29a8769754cd8d00918141a139a6e6f8c19a07605429a73fab879196b22910d"
+        },
+        "validation/expected.json": {
+          "bytes": 1057,
+          "sha256": "7c3a886eeb7a28b153c31ab3cc4fe22b5ed71bcad180a8503c7674b104983e92"
+        },
+        "validation/reference-signing.jsonl": {
+          "bytes": 3478,
+          "sha256": "e95d4397d23d95e815fb7a64ab75bc4c861b7edc10df3580fdd38b3faa55efc5"
+        },
+        "validation/source-pins.json": {
+          "bytes": 4266,
+          "sha256": "e062216568cee136662aedfdeb536a1f781a010bb3e936eb3a6af7e86cc687f7"
+        }
+      },
+      "password": "bin-parser",
+      "sha256": "92caec0d147ae505f519bf4ac861c0471ac5dba8c21f70cf9f1e6b1fee0418bb",
+      "source_sha": "f3cc65c143b261686d6e2c66aa8e5c4d337b47bb"
     }
   ],
   "schema_version": 1,
