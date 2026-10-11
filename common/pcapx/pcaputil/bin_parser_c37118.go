@@ -15,6 +15,7 @@ import (
 type binC37118 struct {
 	configuration   [2][]byte
 	changeIndicated [2]bool
+	continuation    [2]*c37118Continuation
 }
 
 func c37118RecoverableMessageError(err *ProtocolError) bool {
@@ -112,8 +113,19 @@ func (f *binFlow) consumeC37118(dir int, raw []byte) (map[string]any, error) {
 	if s == nil {
 		return nil, sessionContext("C37.118 session was not observed")
 	}
+	// A standalone replacement supersedes an unfinished fragmented CFG-3.
+	// UDP never enters the TCP continuation collector.
+	if len(raw) >= 16 && (raw[1]>>4 == 3 || raw[1]>>4 == 5 && binary.BigEndian.Uint16(raw[14:]) == 0) {
+		s.continuation[dir] = nil
+	}
 	retained := len(s.configuration[0]) + len(s.configuration[1])
-	if err := f.reserveSession(512 + int64(retained)*8 + int64(len(raw))*32); err != nil {
+	pending := 0
+	for _, p := range s.continuation {
+		if p != nil {
+			pending += len(p.image)
+		}
+	}
+	if err := f.reserveSession(512 + int64(retained)*8 + int64(pending)*32 + int64(len(raw))*32); err != nil {
 		if len(raw) > 1 && (raw[1]>>4 == 3 || raw[1]>>4 == 5) {
 			s.configuration[dir] = nil
 		}
@@ -292,6 +304,11 @@ func c37118NumberFields(n stream_parser.C37118Number) map[string]any {
 // A profile reports the actual observed configuration grammar. Ports cannot
 // upgrade CFG-2, and opposite publisher directions cannot borrow CFG-3.
 func (f *binFlow) c37118Profile(dir int, raw []byte) string {
+	if len(raw) > 1 && raw[1]>>4 == 0 && f.c37118 != nil {
+		if f.c37118.continuation[dir] != nil || len(f.c37118.configuration[dir]) > 65535 {
+			return "c37118-v2-cfg3-continuation-data"
+		}
+	}
 	if len(raw) > 1 && raw[1]>>4 == 5 && len(raw) >= 24 {
 		return "c37118-v2-cfg3-complete-data"
 	}

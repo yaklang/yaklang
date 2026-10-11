@@ -44250,6 +44250,301 @@
         "common/pcapx/pcaputil/c37118-cfg3/validation/source-pins.json": "validation/source-pins.json",
         "scripts/protocol-tests/required-tests-traffic-unified-v22.json": "scripts/required-tests-traffic-unified-v22.json"
       }
+    },
+    {
+      "id": "c37118-cfg3-continuation",
+      "kind": "validation",
+      "source_sha": "de381cc7cc71afc6ccd07e207eca33f3a2585b89",
+      "file": "validation-c37118-cfg3-continuation.zip",
+      "sha256": "22c88058be11a3fec6c0789477da8a731fde9941c59f2090d3ef062da8002b79",
+      "password": "bin-parser",
+      "members": {
+        "answers/backdated-no-extension.json": {
+          "bytes": 283576,
+          "sha256": "0e21df24d5701a7796a38f5c9b050a45ef5567105536d70d5a9610fa3f31f905"
+        },
+        "answers/bad-cumulative-crc.json": {
+          "bytes": 140210,
+          "sha256": "6658af9ab3f4aa18fec11fdef54125120af14424880054f6f16bbb5211d01146"
+        },
+        "answers/buffer-refusal.json": {
+          "bytes": 143542,
+          "sha256": "922c6415b3aa0bc24fb4ff243b50fc45b345d12a783ac81861a0cbdcea8cb010"
+        },
+        "answers/capture-interface-isolation.json": {
+          "bytes": 1027165,
+          "sha256": "c2ca57dfa098b955bf11b257741b915b0c38babfba735f7dc9fd0b227b196965"
+        },
+        "answers/channel-refusal.json": {
+          "bytes": 148298,
+          "sha256": "a4dc870ba746d0a90417c0cb85e2301bfc78af1a946ffa46838c14e1125310df"
+        },
+        "answers/complete-physical-size-max.json": {
+          "bytes": 499718,
+          "sha256": "d92e75a51e1e792c1520e80499add4f4f813b75180b22047bbcb916c931ab8fd"
+        },
+        "answers/duplicate-middle.json": {
+          "bytes": 416423,
+          "sha256": "69db36f86fbd449ecfb10993cd8149792fbe911be94859ef974de30fb7304bc5"
+        },
+        "answers/final-payload-1-bytes.json": {
+          "bytes": 500765,
+          "sha256": "6e57f93432b4fb09e5498d3f34e0bcaec6bed212f8698a8ca6fbc2af85113a02"
+        },
+        "answers/final-payload-2-bytes.json": {
+          "bytes": 500768,
+          "sha256": "0936fbe1b4a56d18d041d083575f6c0d15762a7b7a45b93ceed28e0bc985bf2e"
+        },
+        "answers/fragment-count-refusal.json": {
+          "bytes": 143369,
+          "sha256": "b743dc3c4a2143727815cd0022f2682d73e2c6baae1ed8f406b81ba154cf2d84"
+        },
+        "answers/index-gap.json": {
+          "bytes": 283067,
+          "sha256": "d0384938fdd9d34059bfd8a52c4383abc4a844f35641d1d566d4036b528015f8"
+        },
+        "answers/lifetime-30-boundary.json": {
+          "bytes": 510274,
+          "sha256": "8f184fd847251d008f064d8d64be6b844470d9269092ad49ea47a8d3e5eef2ee"
+        },
+        "answers/lifetime-expired.json": {
+          "bytes": 144035,
+          "sha256": "18ef2ec0687e9cc0a6c77a78f6da468721a3b035f3359e2b21ccf64b87a250b2"
+        },
+        "answers/logical-byte-refusal.json": {
+          "bytes": 144036,
+          "sha256": "e8a530980dbe4c7c147c4131df8549c0805fe03b8dcd48e548a9a9f47cd77e87"
+        },
+        "answers/missing-middle.json": {
+          "bytes": 146460,
+          "sha256": "1456d6afa95d34b8c956e4f5b29266f066b826bb3e90a1e13570f329862fb91c"
+        },
+        "answers/orphan-final.json": {
+          "bytes": 10791,
+          "sha256": "194a7182ddf7a4de5195b8bac4ff7526d19c4828fd125b7901e033438529a236"
+        },
+        "answers/payload-corruption.json": {
+          "bytes": 140210,
+          "sha256": "b52c7aa19fba89a19b6416db0b3de72b0c0be5bcaaa2ea8c7c91e17bea89a827"
+        },
+        "answers/publisher-directions.json": {
+          "bytes": 1020388,
+          "sha256": "f2ef88c6863f8761adade31773f49645f37a1d9f1480c849ea8bdfe2d7426bea"
+        },
+        "answers/replacement-quarantine.json": {
+          "bytes": 513580,
+          "sha256": "165d8e59437e209ebab5116bcca67945aea52b5bac5fa6190fe122f494ed66e7"
+        },
+        "answers/restart-first.json": {
+          "bytes": 643556,
+          "sha256": "c2028f06a827a4220bbc5b85d6387d468b812f46d1049370bc1d7dfdc5d66792"
+        },
+        "answers/three-fragments.json": {
+          "bytes": 1016432,
+          "sha256": "e3e7ecd96264ccd3d1bac532b104e4736f4b27f00b4416eeda3d91f945d83b8d"
+        },
+        "answers/two-fragments.json": {
+          "bytes": 510274,
+          "sha256": "433c1c7bb97fde8f9e38f8788cec6222d51054977afae1da70c8b8d6b8af12ef"
+        },
+        "answers/wrong-fracsec.json": {
+          "bytes": 144035,
+          "sha256": "128af0c15a10019dea857229b8a56a4c99bd71926ca05debee288d725b376883"
+        },
+        "answers/wrong-id.json": {
+          "bytes": 144035,
+          "sha256": "79532dabee9d134e6bd79cfd3f9f29e48be18ab10a59a858e4b2ddd2d5a99af6"
+        },
+        "answers/wrong-soc.json": {
+          "bytes": 144035,
+          "sha256": "696c2571f26644d919a5da4023ec1bd96c68a6bacc59858384138c28baa7a4e5"
+        },
+        "captures/backdated-no-extension.pcap": {
+          "bytes": 145926,
+          "sha256": "2e5f305d960b3bec7e408d91724f0ec5ac6df6558a2d583c060e3e17fd35b5e1"
+        },
+        "captures/bad-cumulative-crc.pcap": {
+          "bytes": 72999,
+          "sha256": "443ed54a0be563ebc809d5a1148feecee86ef8bcc525ae176eb770d54620418f"
+        },
+        "captures/capture-interface-isolation.pcapng": {
+          "bytes": 153908,
+          "sha256": "d85976aad7576aa8970a8b364393a9b437a954d16877f6a12f899a6ce81fb5f9"
+        },
+        "captures/channel-refusal.pcap": {
+          "bytes": 74358,
+          "sha256": "d2d94f53f9d25057fb1f0cc6fb3f393a85def71f8699ab66dc513a18a27522e9"
+        },
+        "captures/complete-physical-size-max.pcap": {
+          "bytes": 70735,
+          "sha256": "3469968d23aecf50de971bdc77a66061d33d5fced91562babb712e78aa1fb03d"
+        },
+        "captures/duplicate-middle.pcap": {
+          "bytes": 215311,
+          "sha256": "a373a114d3dcd5afe177788b1854082e78e0480e05bf60db5e47329883753c58"
+        },
+        "captures/final-payload-1-bytes.pcap": {
+          "bytes": 70822,
+          "sha256": "25f1e7c321487604f44d0acd632b0b347341030cc1270b5ae418a7568e587c44"
+        },
+        "captures/final-payload-2-bytes.pcap": {
+          "bytes": 70823,
+          "sha256": "40ca3110b2842f56265bf108541e78d65a41541983cdda3bcbaa75cb4c18c349"
+        },
+        "captures/index-gap.pcap": {
+          "bytes": 145926,
+          "sha256": "878c9d8d49f9816e8f4df61eacc6faac2a33602076667e395b0db548ebd5c5be"
+        },
+        "captures/lifetime-30-boundary.pcap": {
+          "bytes": 74115,
+          "sha256": "85498c327523475cdae81b50a0f4e3013060df54a7da6924b6be9a69208593e2"
+        },
+        "captures/lifetime-expired.pcap": {
+          "bytes": 73242,
+          "sha256": "8651fff66612590c0d911032799c08836c5d6fa67da4b7ba2538cdaf98f283cc"
+        },
+        "captures/logical-byte-refusal.pcap": {
+          "bytes": 73242,
+          "sha256": "ad92bc4f06a9d4ff7c836e33d6703204ababc11994dad1c5f537f870a562f5f6"
+        },
+        "captures/missing-middle.pcap": {
+          "bytes": 76298,
+          "sha256": "0e9602102e9f9634959bedd0e98953efc6fa64f8439763c6ca75abd29241da61"
+        },
+        "captures/orphan-final.pcap": {
+          "bytes": 3857,
+          "sha256": "c600468f06c2dfc342243daf102eb79cf3420d543fbf637655d105c8104d093f"
+        },
+        "captures/payload-corruption.pcap": {
+          "bytes": 72999,
+          "sha256": "9348d59267ad33afeb17bc414a22558cb414225894a65a7427c72fee5d2f4b22"
+        },
+        "captures/publisher-directions.pcap": {
+          "bytes": 147996,
+          "sha256": "650d2925e612602b552de0da6fd65a4dd31a531c36e7f25a598e4d12cf3eb1d9"
+        },
+        "captures/replacement-quarantine.pcap": {
+          "bytes": 74358,
+          "sha256": "0141e6c4f6c79b5e9c4f5e44ed55ddff1233f7ef1b6eda76342419507dbe9ffd"
+        },
+        "captures/restart-first.pcap": {
+          "bytes": 143500,
+          "sha256": "ad7cf4039c91aec920e9d3e4019ade8834df66613a1e9d468719ddea4ab27ae5"
+        },
+        "captures/three-fragments.pcap": {
+          "bytes": 147893,
+          "sha256": "c3aced626b75fe260487249bab6bf0ce42280f0cfc5c3d64c244d792343ab042"
+        },
+        "captures/two-fragments.pcap": {
+          "bytes": 74115,
+          "sha256": "c6f0a586d843fc06b28e2979959e5282aee19dde2b172a2870d58546c4244f0c"
+        },
+        "captures/wrong-fracsec.pcap": {
+          "bytes": 73242,
+          "sha256": "0690e7b8d3ab8a731ea5ad52f9da50088921b62c2fac2f09396979975de0ebe8"
+        },
+        "captures/wrong-id.pcap": {
+          "bytes": 73242,
+          "sha256": "e47aa3354202ea551dc4671a67da4f8dc786bca0180919927636a5f82be783f3"
+        },
+        "captures/wrong-soc.pcap": {
+          "bytes": 73242,
+          "sha256": "1d28abe8f5653583f3d41c9f3f9058334b5291a77bfe3ff213f6dd24295ac8eb"
+        },
+        "controls.json": {
+          "bytes": 11890,
+          "sha256": "d96f10eef1b096d44ad8a2d79c028cd79d7320349e39bc4ffa679cf432da920a"
+        },
+        "scripts/build_fixture.py": {
+          "bytes": 9773,
+          "sha256": "ee40a9f428cf55dcd29f9d4f0dd51873c9ce48ff463fe0a52319d881deee379d"
+        },
+        "scripts/cfg3_reference.py": {
+          "bytes": 5910,
+          "sha256": "4ad4df74151cd68d3780502226b96616528cd92ad22bd8489806b88220297689"
+        },
+        "scripts/primitives.py": {
+          "bytes": 1964,
+          "sha256": "449bfd92d28ac040973f5fd732a6390934e12ee308ee097f293edb9d2018c290"
+        },
+        "scripts/required-tests-traffic-unified-v23.json": {
+          "bytes": 138833,
+          "sha256": "6e960ed3180a47106074b4199d47b1ff598a07a21a3a117d5bf4ba197d8826d3"
+        },
+        "scripts/verify_fixture.py": {
+          "bytes": 4835,
+          "sha256": "9519b756fef0fc5c10f2d608c53817753803af148dc2c15c888f66fb0072dc7b"
+        },
+        "validation/expected.json": {
+          "bytes": 32243,
+          "sha256": "5f04cc57da7119b3a1746a5bbc91854670ea21f8407f2c0eb49f6096fad69d6d"
+        },
+        "validation/source-pins.json": {
+          "bytes": 3795,
+          "sha256": "1f78e3c50387452b34300ca2be7a58255e47fff3bc3f7bcab3809b03c9d43764"
+        }
+      },
+      "aliases": {
+        "common/pcapx/pcaputil/c37118-cfg3-continuation/answers/backdated-no-extension.json": "answers/backdated-no-extension.json",
+        "common/pcapx/pcaputil/c37118-cfg3-continuation/answers/bad-cumulative-crc.json": "answers/bad-cumulative-crc.json",
+        "common/pcapx/pcaputil/c37118-cfg3-continuation/answers/buffer-refusal.json": "answers/buffer-refusal.json",
+        "common/pcapx/pcaputil/c37118-cfg3-continuation/answers/capture-interface-isolation.json": "answers/capture-interface-isolation.json",
+        "common/pcapx/pcaputil/c37118-cfg3-continuation/answers/channel-refusal.json": "answers/channel-refusal.json",
+        "common/pcapx/pcaputil/c37118-cfg3-continuation/answers/complete-physical-size-max.json": "answers/complete-physical-size-max.json",
+        "common/pcapx/pcaputil/c37118-cfg3-continuation/answers/duplicate-middle.json": "answers/duplicate-middle.json",
+        "common/pcapx/pcaputil/c37118-cfg3-continuation/answers/final-payload-1-bytes.json": "answers/final-payload-1-bytes.json",
+        "common/pcapx/pcaputil/c37118-cfg3-continuation/answers/final-payload-2-bytes.json": "answers/final-payload-2-bytes.json",
+        "common/pcapx/pcaputil/c37118-cfg3-continuation/answers/fragment-count-refusal.json": "answers/fragment-count-refusal.json",
+        "common/pcapx/pcaputil/c37118-cfg3-continuation/answers/index-gap.json": "answers/index-gap.json",
+        "common/pcapx/pcaputil/c37118-cfg3-continuation/answers/lifetime-30-boundary.json": "answers/lifetime-30-boundary.json",
+        "common/pcapx/pcaputil/c37118-cfg3-continuation/answers/lifetime-expired.json": "answers/lifetime-expired.json",
+        "common/pcapx/pcaputil/c37118-cfg3-continuation/answers/logical-byte-refusal.json": "answers/logical-byte-refusal.json",
+        "common/pcapx/pcaputil/c37118-cfg3-continuation/answers/missing-middle.json": "answers/missing-middle.json",
+        "common/pcapx/pcaputil/c37118-cfg3-continuation/answers/orphan-final.json": "answers/orphan-final.json",
+        "common/pcapx/pcaputil/c37118-cfg3-continuation/answers/payload-corruption.json": "answers/payload-corruption.json",
+        "common/pcapx/pcaputil/c37118-cfg3-continuation/answers/publisher-directions.json": "answers/publisher-directions.json",
+        "common/pcapx/pcaputil/c37118-cfg3-continuation/answers/replacement-quarantine.json": "answers/replacement-quarantine.json",
+        "common/pcapx/pcaputil/c37118-cfg3-continuation/answers/restart-first.json": "answers/restart-first.json",
+        "common/pcapx/pcaputil/c37118-cfg3-continuation/answers/three-fragments.json": "answers/three-fragments.json",
+        "common/pcapx/pcaputil/c37118-cfg3-continuation/answers/two-fragments.json": "answers/two-fragments.json",
+        "common/pcapx/pcaputil/c37118-cfg3-continuation/answers/wrong-fracsec.json": "answers/wrong-fracsec.json",
+        "common/pcapx/pcaputil/c37118-cfg3-continuation/answers/wrong-id.json": "answers/wrong-id.json",
+        "common/pcapx/pcaputil/c37118-cfg3-continuation/answers/wrong-soc.json": "answers/wrong-soc.json",
+        "common/pcapx/pcaputil/c37118-cfg3-continuation/controls.json": "controls.json",
+        "common/pcapx/pcaputil/c37118-cfg3-continuation/scripts/build_fixture.py": "scripts/build_fixture.py",
+        "common/pcapx/pcaputil/c37118-cfg3-continuation/scripts/cfg3_reference.py": "scripts/cfg3_reference.py",
+        "common/pcapx/pcaputil/c37118-cfg3-continuation/scripts/primitives.py": "scripts/primitives.py",
+        "common/pcapx/pcaputil/c37118-cfg3-continuation/scripts/required-tests-traffic-unified-v23.json": "scripts/required-tests-traffic-unified-v23.json",
+        "common/pcapx/pcaputil/c37118-cfg3-continuation/scripts/verify_fixture.py": "scripts/verify_fixture.py",
+        "common/pcapx/pcaputil/c37118-cfg3-continuation/validation/expected.json": "validation/expected.json",
+        "common/pcapx/pcaputil/c37118-cfg3-continuation/validation/source-pins.json": "validation/source-pins.json",
+        "common/pcapx/pcaputil/c37118-cfg3-continuation/captures/two-fragments.pcap": "captures/two-fragments.pcap",
+        "common/pcapx/pcaputil/c37118-cfg3-continuation/captures/three-fragments.pcap": "captures/three-fragments.pcap",
+        "common/pcapx/pcaputil/c37118-cfg3-continuation/captures/publisher-directions.pcap": "captures/publisher-directions.pcap",
+        "common/pcapx/pcaputil/c37118-cfg3-continuation/captures/replacement-quarantine.pcap": "captures/replacement-quarantine.pcap",
+        "common/pcapx/pcaputil/c37118-cfg3-continuation/captures/orphan-final.pcap": "captures/orphan-final.pcap",
+        "common/pcapx/pcaputil/c37118-cfg3-continuation/captures/wrong-id.pcap": "captures/wrong-id.pcap",
+        "common/pcapx/pcaputil/c37118-cfg3-continuation/captures/wrong-soc.pcap": "captures/wrong-soc.pcap",
+        "common/pcapx/pcaputil/c37118-cfg3-continuation/captures/wrong-fracsec.pcap": "captures/wrong-fracsec.pcap",
+        "common/pcapx/pcaputil/c37118-cfg3-continuation/captures/index-gap.pcap": "captures/index-gap.pcap",
+        "common/pcapx/pcaputil/c37118-cfg3-continuation/captures/duplicate-middle.pcap": "captures/duplicate-middle.pcap",
+        "common/pcapx/pcaputil/c37118-cfg3-continuation/captures/lifetime-30-boundary.pcap": "captures/lifetime-30-boundary.pcap",
+        "common/pcapx/pcaputil/c37118-cfg3-continuation/captures/lifetime-expired.pcap": "captures/lifetime-expired.pcap",
+        "common/pcapx/pcaputil/c37118-cfg3-continuation/captures/backdated-no-extension.pcap": "captures/backdated-no-extension.pcap",
+        "common/pcapx/pcaputil/c37118-cfg3-continuation/captures/logical-byte-refusal.pcap": "captures/logical-byte-refusal.pcap",
+        "common/pcapx/pcaputil/c37118-cfg3-continuation/captures/fragment-count-refusal.pcap": "captures/logical-byte-refusal.pcap",
+        "common/pcapx/pcaputil/c37118-cfg3-continuation/captures/channel-refusal.pcap": "captures/channel-refusal.pcap",
+        "common/pcapx/pcaputil/c37118-cfg3-continuation/captures/buffer-refusal.pcap": "captures/logical-byte-refusal.pcap",
+        "common/pcapx/pcaputil/c37118-cfg3-continuation/captures/bad-cumulative-crc.pcap": "captures/bad-cumulative-crc.pcap",
+        "common/pcapx/pcaputil/c37118-cfg3-continuation/captures/payload-corruption.pcap": "captures/payload-corruption.pcap",
+        "common/pcapx/pcaputil/c37118-cfg3-continuation/captures/restart-first.pcap": "captures/restart-first.pcap",
+        "common/pcapx/pcaputil/c37118-cfg3-continuation/captures/missing-middle.pcap": "captures/missing-middle.pcap",
+        "common/pcapx/pcaputil/c37118-cfg3-continuation/captures/final-payload-1-bytes.pcap": "captures/final-payload-1-bytes.pcap",
+        "common/pcapx/pcaputil/c37118-cfg3-continuation/captures/final-payload-2-bytes.pcap": "captures/final-payload-2-bytes.pcap",
+        "common/pcapx/pcaputil/c37118-cfg3-continuation/captures/complete-physical-size-max.pcap": "captures/complete-physical-size-max.pcap",
+        "common/pcapx/pcaputil/c37118-cfg3-continuation/captures/capture-interface-isolation.pcapng": "captures/capture-interface-isolation.pcapng",
+        "scripts/protocol-tests/required-tests-traffic-unified-v23.json": "scripts/required-tests-traffic-unified-v23.json"
+      }
     }
   ],
   "schema_version": 1,

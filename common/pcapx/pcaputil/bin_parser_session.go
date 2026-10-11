@@ -569,7 +569,13 @@ func (f *binFlow) consumeSession(dir int, e *ProtocolEvent, result map[string]an
 		e.Session, err = f.dnp3.consume(e.Raw)
 	case "c37118":
 		e.Profile = f.c37118Profile(dir, e.Raw)
-		e.Session, err = f.consumeC37118(dir, e.Raw)
+		var collected bool
+		e.Session, err, collected = f.consumeC37118Continuation(dir, e.Raw)
+		if collected {
+			e.Profile = "c37118-v2-cfg3-continuation-data"
+		} else {
+			e.Session, err = f.consumeC37118(dir, e.Raw)
+		}
 	case "goose":
 		e.Session, err = f.goose.consume(e.Raw)
 	case "memcached":
@@ -896,6 +902,14 @@ func (f *binFlow) finishSession(reason TrafficFlowCloseReason) {
 		e.Session = session
 		f.a.incomplete.Add(1)
 		f.a.emit(e)
+	}
+	if c := f.c37118; c != nil {
+		for dir, p := range c.continuation {
+			if p != nil {
+				emit(dir, map[string]any{"Configuration Fragments": p.count, "Configuration Image Bytes": len(p.image), "Cumulative CRC Validated": false}, "C37.118 CFG-3 ended before final continuation")
+				c.continuation[dir] = nil
+			}
+		}
 	}
 	if z := f.zookeeper; z != nil && (len(z.pending) > 0 || z.pingOutstanding) {
 		outstanding := len(z.pending)

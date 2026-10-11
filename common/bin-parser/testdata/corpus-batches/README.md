@@ -44,7 +44,7 @@ Run from the repository root:
 ```sh
 go run ./internal/trafficfixture/cmd/corpus test
 go test -json -count=1 -timeout=5m ./internal/trafficfixture/... ./common/bin-parser/... ./common/pcapx/... ./common/yak/cmd/yakcmds/shark-cli ./scripts/ci > traffic.jsonl
-go run ./internal/trafficfixture/cmd/corpus exec -- python3 @scripts/protocol-tests/check_go_test_json.py traffic.jsonl --inventory @scripts/protocol-tests/required-tests-traffic-unified-v22.json --tier full
+go run ./internal/trafficfixture/cmd/corpus exec -- python3 @scripts/protocol-tests/check_go_test_json.py traffic.jsonl --inventory @scripts/protocol-tests/required-tests-traffic-unified-v23.json --tier full
 ```
 
 The single `corpus` entry point uses the same bounded Go ZIP loader as tests.
@@ -83,7 +83,7 @@ their semantic coverage. The existing synthetic session keys are test inputs;
 production credentials, user private keys and material without redistribution
 permission belong in an external fixed-source download manifest.
 
-Current test requirements are sealed at `scripts/protocol-tests/required-tests-traffic-unified-v22.json`;
+Current test requirements are sealed at `scripts/protocol-tests/required-tests-traffic-unified-v23.json`;
 the historical inventories and all earlier batches remain unchanged.
 The supplemental small-corpus batch contains 26 minimal controls, their explicit
 expected facts, an offline generator and the compact pinned source manifest.
@@ -96,7 +96,7 @@ byte-boundary, malformed-length and ownership tests. These are scoped control
 assertions, not a semantic golden for the entire upstream collection. Process
 logs and the original large downloads remain outside the repository.
 
-The current workflow and executable gate use `required-tests-traffic-unified-v22.json`. Older
+The current workflow and executable gate use `required-tests-traffic-unified-v23.json`. Older
 versioned inventories stay available as historical inputs; they are not the
 current acceptance entry. The DLMS HDLC batch contains owned tunnel/Get-normal
 controls and their independent fields/errors, CRC/byte validator, offline
@@ -203,7 +203,7 @@ opaque selector bytes and one bounded Data value over Wrapper v1 TCP/UDP; object
 selector meaning, access permission and device operation are unverified. The
 original one-packet selective-access capture and original refused answer remain
 immutable; its now-supported answer is matched by exact input SHA and frame.
-The active inventory is `scripts/protocol-tests/required-tests-traffic-unified-v22.json`.
+The active inventory is `scripts/protocol-tests/required-tests-traffic-unified-v23.json`.
 
 The small-graph budget batch reuses accepted graph captures/answers and adds one
 249-byte UDP control for child count255 without child bytes. Its standalone proof
@@ -259,7 +259,7 @@ retain the original request ID. Scope excludes authentication, gateway identity
 binding, device execution and RF delivery. Original large captures, upstream
 source and logs are not bundled.
 
-`validation-dlms-hdlc-normal-data.zip` contains31 owned minimal native normal-GET capture cases and72 ordered independent answers (53 complete byte/field observations,19 expected refusals). It covers TCP/UDP full/deferred, workers1/2/4, observer off/on, TCP feed chunks, nested compact, node/depth boundaries, malformed/trailing contents, strict text, full flags and refusal followed by late feedback. The existing native scalar contract and zero TransactionID are retained. Its source pins and executable independent builder/oracle/reference harness stay in the small ZIP; original reference sources and execution logs stay outside Git. Actual fixed reference codec display/calendar differences remain diagnostics rather than device passes. Current mandatory inventory is `scripts/protocol-tests/required-tests-traffic-unified-v22.json`.
+`validation-dlms-hdlc-normal-data.zip` contains31 owned minimal native normal-GET capture cases and72 ordered independent answers (53 complete byte/field observations,19 expected refusals). It covers TCP/UDP full/deferred, workers1/2/4, observer off/on, TCP feed chunks, nested compact, node/depth boundaries, malformed/trailing contents, strict text, full flags and refusal followed by late feedback. The existing native scalar contract and zero TransactionID are retained. Its source pins and executable independent builder/oracle/reference harness stay in the small ZIP; original reference sources and execution logs stay outside Git. Actual fixed reference codec display/calendar differences remain diagnostics rather than device passes. Current mandatory inventory is `scripts/protocol-tests/required-tests-traffic-unified-v23.json`.
 
 The historical `dlms-hdlc/array` capture is reused in place. Its original `UnsupportedFeature` answer remains immutable; `historical-array-upgrade.json` binds the original capture/answer hashes to two current full-message answers for the now-supported legal empty-array response. No historical capture is copied into the new ZIP and other historical refusals retain their assertions.
 
@@ -303,7 +303,7 @@ its permissive pairing and last-only list error are not independent proof of our
 selected negative association policy or every item error. Owner byte/state
 oracles supply those explicit expectations. No raw download, upstream source,
 dependency, log or cache is included. All56 preceding ZIPs remain unchanged.
-The current inventory is `scripts/protocol-tests/required-tests-traffic-unified-v22.json`.
+The current inventory is `scripts/protocol-tests/required-tests-traffic-unified-v23.json`.
 
 `validation-dlms-hdlc-unobserved-next.zip` adds12 distinct minimal captures and54
 whole answers (36 observations,18 expected ContextRequired refusals). An already
@@ -348,7 +348,7 @@ not an unrecorded31second network delay or device claim. Historical expiry
 capture/answer hashes bind its corrected association answer; no old ZIP is
 modified. Shared-protocol expiry, collection limits, domain isolation, byte
 ownership and Close release also have regressions. Current executable inventory
-is `scripts/protocol-tests/required-tests-traffic-unified-v22.json`; earlier
+is `scripts/protocol-tests/required-tests-traffic-unified-v23.json`; earlier
 versioned inventories remain archived.
 
 
@@ -363,7 +363,7 @@ request cannot acquire the new request identity. An unfinished request, response
 segment or Data-block expiry still needs capture-lifetime quarantine. No timed
 expiry establishes a new authenticated/negotiated peer generation.
 The existing mandatory public-API, budget and matrix roots include these cases;
-the416-root unifiedv20 inventory is the current executable entry. These
+the416-root unifiedv20 inventory was the executable entry for that batch. These
 18 captures run216 full/deferred, worker1/2/4 and observer-off/on combinations,
 in addition to the immutable12-capture idle matrix. Owner byte/CRC/context
 answers and actual self-owned loopback ordering are separate from the fixed
@@ -527,8 +527,8 @@ observer-off/on combinations with complete fields, Session, event IDs, direction
 contributors, typed errors and byte accounting. Capture truncation remains an
 expected reader error. The sealed generator reuses the fixed historical Type5
 payload answer; no new reference device/session execution is claimed. Original
-archives remain immutable. Active mandatory inventory is unifiedv20 (416 unique
-full-tier roots); prior v18 and its source materials remain archived.
+archives remain immutable. That batch used unifiedv20 (416 unique full-tier roots); its inventory and
+prior v18 source materials remain archived.
 
 
 AIS Type27 long-range position observations
@@ -554,7 +554,7 @@ builders and the reference validation adapter. The profile validates full
 fields/Session, all prefixes, unavailable/boundary/reserved values, refusals,
 ownership, projection budgets and12 full/deferred/workers1/2/4/observer
 combinations. This is no physical position, vessel identity or device check.
-All historical archives remain byte-identical; unifiedv20 is the active gate.
+All historical archives remain byte-identical; that batch used unifiedv20.
 
 `validation-c37118-context.zip` adds seven owned minimal captures (5,608 raw
 bytes) and 47 independent ordered event answers for C37.118 v1/v2 CFG-2/DATA.
@@ -566,7 +566,7 @@ The tests cover full/deferred, workers 1/2/4, observer off/on, exact raw fields,
 directions, flow identities, typed errors, packet evidence and Close release.
 These are raw codec and local capture-policy proofs; they do not establish
 engineering-unit accuracy, physical measurement validity, device success or
-native CFG-3 support by this historical context-only batch. Complete CFG-3 is covered by the following batch; continuation and physical measurement validation remain open.
+native CFG-3 support by this historical context-only batch. Complete and TCP-fragmented CFG-3 are covered by the following batches; applied scaling and physical measurement validation remain open.
 
 
 `validation-c37118-cfg3.zip` contains21 owned minimal captures and47 ordered
@@ -580,9 +580,37 @@ The matrix covers TCP/UDP, full/deferred, workers1/2/4 and observer off/on;
 standalone TCP controls additionally use1/3/14/16/255-byte feeds. It asserts
 complete fields, private Session queries, raw IEEE values including NaN/Inf,
 direction/ID/version isolation, collection-refused replacement/recovery,
-typed malformed UTF-8/length/CRC and Close release. Fragmented CFG-3 is an
-explicit unsupported boundary; cumulative-CRC continuation assembly, reference
-endpoint/device execution and physical measurement quality remain unverified.
+typed malformed UTF-8/length/CRC and Close release. That complete-only batch records fragmented CFG-3 as an unsupported boundary.
+The following batch adds bounded TCP continuation assembly. Reference endpoint
+and device execution, applied scaling and physical quality remain unverified.
 Scripts, independently authored byte codec, fixed GPA/GSF source pins and
 full answers are sealed inside the small ZIP. Original references and logs
-stay outside Git. The active mandatory gate is unifiedv22 (424 unique roots).
+stay outside Git. That batch used unifiedv22 (424 unique roots).
+
+
+`validation-c37118-cfg3-continuation.zip` adds25 owned TCP controls (23 unique
+capture byte sequences, with two repeated inputs reused) for version2 CFG-3 in
+fixed GPA/GSF `22a9aa1028c6e53d115c4ea81026055a57b803c2` producer framing.
+Profile `c37118-v2-cfg3-continuation-data` accepts a65535-byte first frame,
+consecutive65535-byte middle frames and a final CONT_IDX=65535 frame. It keeps
+the original first header for cumulative CRC, including a CRC split across a
+17-byte final frame, and installs DATA configuration only after full validation.
+Publisher directions, capture interfaces, stream IDs and SOC/FRACSEC do not
+borrow configuration. A30-second capture-time lifetime, collection and logical
+byte budgets and conservative memory reservation bound pending state. Denied,
+expired or inconsistent replacements clear the affected publisher context.
+Pending fragments report ContextRequired with Cumulative CRC Validated=false;
+this is an explicit diagnostic, not a successful configuration. The matrix
+compares98 ordered independent event answers, full/deferred, workers1/2/4
+and observation off/on, including rejected cases. Standalone feed boundaries,
+caller/query ownership, incomplete Close and idempotent resource release are
+also required. Packet contributor lists respect the configured collection
+ceiling; buffer-state refusals retain their established context-required capture
+status and typed ResourceExceeded error. The executed independent Python codec
+checks cumulative CRC, exact configuration and raw DATA; reading fixed reference
+source is not actual reference endpoint or device execution. UDP continuation,
+engineering scaling, source authentication and physical measurement validity
+remain open. Only owned MVP captures, answers and deterministic scripts are
+sealed; original references, downloads and logs stay outside Git. Current
+mandatory entry is unifiedv23 (428 unique full-tier roots); older inventories
+and ZIPs remain immutable.

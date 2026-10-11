@@ -32,10 +32,14 @@ type C37118AnalogConversion struct{ Multiplier, Adder C37118Number }
 var ErrC37118ContinuationRequired = errors.New("c37118: CFG-3 continuation collection required")
 
 func c37118ReadConfiguration3(body []byte, maxElements int) (*C37118Configuration, error) {
+	return c37118ReadConfiguration3Body(body, maxElements, false)
+}
+
+func c37118ReadConfiguration3Body(body []byte, maxElements int, collected bool) (*C37118Configuration, error) {
 	if len(body) < 10 {
 		return nil, fmt.Errorf("c37118: truncated CFG-3 header")
 	}
-	if binary.BigEndian.Uint16(body) != 0 {
+	if binary.BigEndian.Uint16(body) != 0 && !collected {
 		return nil, ErrC37118ContinuationRequired
 	}
 	c := &C37118Configuration{TimeBaseReserved: body[2], TimeBase: binary.BigEndian.Uint32(body[2:]) & 0xffffff}

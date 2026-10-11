@@ -160,7 +160,15 @@ func decodeC37118Limited(wire, configuration []byte, maxElements int) (*C37118Me
 			m.OpaqueBody = append([]byte(nil), body...)
 			break
 		}
-		cfg, err := decodeC37118Limited(configuration, nil, maxElements)
+		var cfg *C37118Message
+		var err error
+		if len(configuration) > 65535 {
+			// A collected CFG-3 image keeps the original first header, not a
+			// forged physical FRAMESIZE. Only configuration context uses this path.
+			cfg, err = DecodeC37118ConfigurationImage(configuration, maxElements, len(configuration))
+		} else {
+			cfg, err = decodeC37118Limited(configuration, nil, maxElements)
+		}
 		if err != nil {
 			return nil, fmt.Errorf("c37118: invalid configuration context: %w", err)
 		}
