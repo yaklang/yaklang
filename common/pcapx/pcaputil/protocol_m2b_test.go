@@ -7,6 +7,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"sync/atomic"
+
+	"github.com/gopacket/gopacket"
 	"github.com/stretchr/testify/require"
 	binparser "github.com/yaklang/yaklang/common/bin-parser"
 
@@ -23,11 +26,12 @@ func m2bFixture(t testing.TB, name string) []byte {
 	require.NoError(t, e)
 	return b
 }
-func m2bReplay(t testing.TB, name string, deferred bool, workers int, secrets TLSSecretProvider) []*ProtocolEvent {
+func m2bReplay(t testing.TB, name string, deferred bool, workers int, secrets TLSSecretProvider, extra ...CaptureOption) []*ProtocolEvent {
 	t.Helper()
 	var events []*ProtocolEvent
 	var stats ProtocolStats
 	opts := []CaptureOption{WithOnProtocolStats(func(s ProtocolStats) { stats = s }), WithProtocolDeferred(deferred), WithTCPReassemblyWorkers(workers), WithOnProtocolMessage(func(e *ProtocolEvent) { events = append(events, e) })}
+	opts = append(opts, extra...)
 	if secrets != nil {
 		opts = append(opts, WithTLSSecrets(secrets))
 	}
@@ -112,9 +116,18 @@ func m2bRows(events []*ProtocolEvent) []string {
 func TestFirstBatchT16(t *testing.T) {
 	var baseline []string
 	for _, workers := range []int{1, 2, 4} {
-		for _, deferred := range []bool{false, true} {
-			t.Run(fmt.Sprintf("native-workers%d-deferred%v", workers, deferred), func(t *testing.T) {
-				events := m2bReplay(t, "m2b-database-native.pcap", deferred, workers, nil)
+		for _, mode := range []struct{ deferred, observer bool }{{false, false}, {false, true}, {true, false}, {true, true}} {
+			deferred, observer := mode.deferred, mode.observer
+			t.Run(fmt.Sprintf("native-workers%d-deferred%v-observer%v", workers, deferred, observer), func(t *testing.T) {
+				var seen atomic.Uint64
+				var options []CaptureOption
+				if observer {
+					options = append(options, WithEveryPacket(func(gopacket.Packet) { seen.Add(1) }))
+				}
+				events := m2bReplay(t, "m2b-database-native.pcap", deferred, workers, nil, options...)
+				if observer {
+					require.Positive(t, seen.Load())
+				}
 				assertM2DatabaseOracle(t, events)
 				prepared, execute, close, reset := 0, 0, 0, 0
 				clients := map[uint64]bool{}
