@@ -114,7 +114,7 @@ type ReActLoop struct {
 	currentTask aicommon.AIStatefulTask
 
 	// Lazily bound to the owning task; guarded by onReleaseMutex.
-	// Single direct calls can dispatch asynchronously; batch dispatch remains TBD.
+	// Direct calls and individual batch children can dispatch asynchronously.
 	asyncExecutionManager *asyncexecmanager.Manager
 
 	// memory management

@@ -282,7 +282,7 @@ var loopAction_directlyCallTool = &reactloops.LoopAction{
 		}, aitool.WithParam_Description(`选择单调用形式时填写；存在 directly_call_tool_params_group 时必须省略。优先使用 JSON object 提供该工具的完整参数；为兼容旧协议仍接受包含 JSON object 的字符串。参数结构必须符合 CACHE_TOOL_CALL 中该工具的 Params Schema。`)),
 		aitool.WithBoolParam("async_directly_call_tool",
 			aitool.WithParam_Default(false),
-			aitool.WithParam_Description("可选的单调用异步标记，默认 false 同步等待；true 提交后台执行并返回 execute_id，通过 manage_async_execution_runtime 查看或等待结果。批量调用使用每项 async，批量异步派发仍为 TBD。")),
+			aitool.WithParam_Description("可选的单调用异步标记，默认 false 同步等待；true 提交后台执行并返回 execute_id，通过 manage_async_execution_runtime 查看或等待结果。批量调用使用每项 async，可混合同步和异步。")),
 		aitool.WithStringParam(
 			"directly_call_identifier",
 			aitool.WithParam_Description(`可选。描述调用目的的简短 snake_case 标识，例如 "scan_port_443"、"query_large_file"；用于报告文件命名。`),

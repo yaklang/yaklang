@@ -154,6 +154,8 @@ func buildToolCallGroupResultTools(
 				name = outcome.FinalTool
 			}
 			switch {
+			case outcome.Stage == aicommon.ToolCallStageSubmitted:
+				state = aicommon.StatusStateRunning
 			case outcome.Result != nil && outcome.Result.Success:
 				state = aicommon.StatusStateSuccess
 				successful++
@@ -198,6 +200,18 @@ func emitToolCallGroupResultStatus(
 		code = "tool.batch.failed"
 		zh = "这轮调用未完成：" + statusToolNames(tools, false)
 		en = "These calls did not complete: " + statusToolNames(tools, true)
+	}
+	submitted := 0
+	for _, outcome := range outcomes {
+		if outcome.Stage == aicommon.ToolCallStageSubmitted {
+			submitted++
+		}
+	}
+	if submitted > 0 {
+		state = aicommon.StatusStateRunning
+		code = "tool.batch.submitted"
+		zh = fmt.Sprintf("%d 次调用已完成，%d 次后台执行已提交：%s", successful, submitted, statusToolNames(tools, false))
+		en = fmt.Sprintf("%d calls completed, %d background executions submitted: %s", successful, submitted, statusToolNames(tools, true))
 	}
 	reactloops.EmitStatusI18n(
 		loop,

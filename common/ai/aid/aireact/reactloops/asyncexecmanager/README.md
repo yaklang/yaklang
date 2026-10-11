@@ -154,7 +154,7 @@ Forget 接口。较长的 owner 生命周期需要配置适当的记录上限，
 
 本包已实现独立核心和函数适配器。directly_call_tool 已接入异步标记的解析，
 ToolCaller 已实现 Inspector；工具提交入口和管理 action 已接入，directly_call_tool 的
-单调用异步标记已生效。批量每项 async 的实际派发仍为 TBD。
+单调用异步标记和批量每项 async 均已生效，同一批次可混合同步和异步执行。
 ReActLoop 提供 `GetAsyncExecutionManager()`：首次调用必须已有 current task，
 Manager 绑定该任务 context；后续调用复用同一实例，不随 current task 切换而重建。
 Release 会在其他释放回调前 Close，取消执行并禁止新提交，但不阻塞等待清理；
@@ -263,6 +263,27 @@ action Schema：单工具 `async_directly_call_tool` 可选 bool；批量
 文本 root/next_action 与 native handler、默认同步、提交立即返回、真实 Inspector
 输出与结果、wait/stop、执行失败、guard 拒绝和参数校验失败；不依赖 AI 服务。
 
+批量逐项读取 async：缺省/false 的项沿用同步执行，true 的项用原批量 ToolCaller
+构造 Resource，接入同一个 owner Manager。原有 guard、参数 mutator、顺序审批、
+批次执行屏障、并发上限、call ID 和 artifact 元信息均保留；全同步路径不创建 Manager。
+同步项优先取得批次执行名额，避免长期异步项占满名额而使同步项无法启动。
+
+批次返回条件是所有同步项结束，且所有异步项已提交或提交失败。每个提交成功的
+异步项返回 submitted + execute_id，不附加伪造的结果，也不计入已完成工具次数。
+反馈按原数组下标列出调用及 identifier，使用可读的文本/Dump 展示 ID；提交后的
+最终状态、stdout/stderr 和结果通过 Manager/原 Inspector 获取。批量状态展示也
+区分后台已提交与调用已完成，全异步不会误报整批失败。
+
+一项 guard 拒绝或 Manager 容量不足只报告该项失败，其他项继续，不自动降级为同步。
+后台项结束时归档到原 task/timeline，不修改已返回的批次回执；异步结果按完成时间
+归档，同步结果仍按输入顺序归档。批次 context 在全部后台执行和清理结束后释放，
+action 返回不会取消它；owner 取消或 loop Release 会取消后台项。后台审批收到
+direct_answer 时仍通过原屏障取消兄弟调用，避免未审批完就开始执行。
+
+验证见 [批量混合派发综合测试](../../invoke_toolcall_batch_async_test.go)：两套 handler
+与文本 root/next_action、全同步、同步/异步混用、全异步、并发名额优先级、逐项 ID
+与参数、真实 Inspector、部分提交失败、执行失败及 owner 取消后的清理。
+
 `manage_async_execution_runtime` 是核心 action，始终注册，不依赖工具、MCP 或 forge
 开关；普通 action 过滤和单轮 must-use/disabled 约束不会隐藏它，宿主 runtime action
 policy 仍生效。文本和 native function call 协议共享同一个 verifier/handler。
@@ -315,7 +336,7 @@ omitted: 0
 展示只读取元信息，不调用 Inspector，不复制或缓存 stdout、stderr 或结果；详情由
 manage_async_execution_runtime 的 inspect 按需获取。文本/native 和轻量模式都使用
 同一动态输入，已有 AutoContext provider 内容会保留；摘要也出现在已有上下文成分
-面板的 Auto Context 项中。UI 的实时执行卡片与批量异步标记的实际派发仍待后续接入。
+面板的 Auto Context 项中。UI 的实时执行卡片仍待后续接入。
 
 验证见 [展示综合测试](../async_execution_context_test.go)：实际主循环 prompt 构造、
 跨轮次状态变化、取消清理、任务隔离、近期终态选择、长度限制、Dump 转义和不读取输出。
