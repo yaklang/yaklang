@@ -42892,6 +42892,448 @@
       "password": "bin-parser",
       "sha256": "89ab87ce2f99cb837ae88f43bd6c4274a7a9efb16301195f83d939128de2e5b8",
       "source_sha": "42dc2a21803d9318b266e142654c6ba3eb5789b7"
+    },
+    {
+      "aliases": {
+        "common/pcapx/pcaputil/nmea-ais-classb/answers/bad-checksum.json": "answers/bad-checksum.json",
+        "common/pcapx/pcaputil/nmea-ais-classb/answers/bad-sequence.json": "answers/bad-sequence.json",
+        "common/pcapx/pcaputil/nmea-ais-classb/answers/blank-channel.json": "answers/blank-channel.json",
+        "common/pcapx/pcaputil/nmea-ais-classb/answers/boundary-negative.json": "answers/boundary-negative.json",
+        "common/pcapx/pcaputil/nmea-ais-classb/answers/boundary-positive.json": "answers/boundary-positive.json",
+        "common/pcapx/pcaputil/nmea-ais-classb/answers/copacked-observations.json": "answers/copacked-observations.json",
+        "common/pcapx/pcaputil/nmea-ais-classb/answers/course-reserved.json": "answers/course-reserved.json",
+        "common/pcapx/pcaputil/nmea-ais-classb/answers/cs-other-wire-observed.json": "answers/cs-other-wire-observed.json",
+        "common/pcapx/pcaputil/nmea-ais-classb/answers/cs-pattern.json": "answers/cs-pattern.json",
+        "common/pcapx/pcaputil/nmea-ais-classb/answers/heading-reserved.json": "answers/heading-reserved.json",
+        "common/pcapx/pcaputil/nmea-ais-classb/answers/invalid-armor.json": "answers/invalid-armor.json",
+        "common/pcapx/pcaputil/nmea-ais-classb/answers/itdma.json": "answers/itdma.json",
+        "common/pcapx/pcaputil/nmea-ais-classb/answers/latitude-over.json": "answers/latitude-over.json",
+        "common/pcapx/pcaputil/nmea-ais-classb/answers/latitude-under.json": "answers/latitude-under.json",
+        "common/pcapx/pcaputil/nmea-ais-classb/answers/literal-labels.json": "answers/literal-labels.json",
+        "common/pcapx/pcaputil/nmea-ais-classb/answers/long-payload.json": "answers/long-payload.json",
+        "common/pcapx/pcaputil/nmea-ais-classb/answers/longitude-over.json": "answers/longitude-over.json",
+        "common/pcapx/pcaputil/nmea-ais-classb/answers/longitude-under.json": "answers/longitude-under.json",
+        "common/pcapx/pcaputil/nmea-ais-classb/answers/multipart.json": "answers/multipart.json",
+        "common/pcapx/pcaputil/nmea-ais-classb/answers/nonzero-fill.json": "answers/nonzero-fill.json",
+        "common/pcapx/pcaputil/nmea-ais-classb/answers/outside-message.json": "answers/outside-message.json",
+        "common/pcapx/pcaputil/nmea-ais-classb/answers/own-ship.json": "answers/own-ship.json",
+        "common/pcapx/pcaputil/nmea-ais-classb/answers/short-payload.json": "answers/short-payload.json",
+        "common/pcapx/pcaputil/nmea-ais-classb/answers/sotdma-0.json": "answers/sotdma-0.json",
+        "common/pcapx/pcaputil/nmea-ais-classb/answers/sotdma-1.json": "answers/sotdma-1.json",
+        "common/pcapx/pcaputil/nmea-ais-classb/answers/sotdma-2.json": "answers/sotdma-2.json",
+        "common/pcapx/pcaputil/nmea-ais-classb/answers/sotdma-3.json": "answers/sotdma-3.json",
+        "common/pcapx/pcaputil/nmea-ais-classb/answers/sotdma-4.json": "answers/sotdma-4.json",
+        "common/pcapx/pcaputil/nmea-ais-classb/answers/sotdma-5.json": "answers/sotdma-5.json",
+        "common/pcapx/pcaputil/nmea-ais-classb/answers/sotdma-6.json": "answers/sotdma-6.json",
+        "common/pcapx/pcaputil/nmea-ais-classb/answers/sotdma-7.json": "answers/sotdma-7.json",
+        "common/pcapx/pcaputil/nmea-ais-classb/answers/sotdma-utc-reserved-observed.json": "answers/sotdma-utc-reserved-observed.json",
+        "common/pcapx/pcaputil/nmea-ais-classb/answers/timestamp-61.json": "answers/timestamp-61.json",
+        "common/pcapx/pcaputil/nmea-ais-classb/answers/timestamp-62.json": "answers/timestamp-62.json",
+        "common/pcapx/pcaputil/nmea-ais-classb/answers/timestamp-63.json": "answers/timestamp-63.json",
+        "common/pcapx/pcaputil/nmea-ais-classb/answers/truncated.json": "answers/truncated.json",
+        "common/pcapx/pcaputil/nmea-ais-classb/answers/unavailable.json": "answers/unavailable.json",
+        "common/pcapx/pcaputil/nmea-ais-classb/answers/unsupported-channel.json": "answers/unsupported-channel.json",
+        "common/pcapx/pcaputil/nmea-ais-classb/answers/valid-prefix-bad-tail.json": "answers/valid-prefix-bad-tail.json",
+        "common/pcapx/pcaputil/nmea-ais-classb/captures/bad-checksum.pcap": "captures/bad-checksum.pcap",
+        "common/pcapx/pcaputil/nmea-ais-classb/captures/bad-sequence.pcap": "captures/bad-sequence.pcap",
+        "common/pcapx/pcaputil/nmea-ais-classb/captures/blank-channel.pcap": "captures/blank-channel.pcap",
+        "common/pcapx/pcaputil/nmea-ais-classb/captures/boundary-negative.pcap": "captures/boundary-negative.pcap",
+        "common/pcapx/pcaputil/nmea-ais-classb/captures/boundary-positive.pcap": "captures/boundary-positive.pcap",
+        "common/pcapx/pcaputil/nmea-ais-classb/captures/copacked-observations.pcap": "captures/copacked-observations.pcap",
+        "common/pcapx/pcaputil/nmea-ais-classb/captures/course-reserved.pcap": "captures/course-reserved.pcap",
+        "common/pcapx/pcaputil/nmea-ais-classb/captures/cs-other-wire-observed.pcap": "captures/cs-other-wire-observed.pcap",
+        "common/pcapx/pcaputil/nmea-ais-classb/captures/cs-pattern.pcap": "captures/cs-pattern.pcap",
+        "common/pcapx/pcaputil/nmea-ais-classb/captures/heading-reserved.pcap": "captures/heading-reserved.pcap",
+        "common/pcapx/pcaputil/nmea-ais-classb/captures/invalid-armor.pcap": "captures/invalid-armor.pcap",
+        "common/pcapx/pcaputil/nmea-ais-classb/captures/itdma.pcap": "captures/itdma.pcap",
+        "common/pcapx/pcaputil/nmea-ais-classb/captures/latitude-over.pcap": "captures/latitude-over.pcap",
+        "common/pcapx/pcaputil/nmea-ais-classb/captures/latitude-under.pcap": "captures/latitude-under.pcap",
+        "common/pcapx/pcaputil/nmea-ais-classb/captures/literal-labels.pcap": "captures/literal-labels.pcap",
+        "common/pcapx/pcaputil/nmea-ais-classb/captures/long-payload.pcap": "captures/long-payload.pcap",
+        "common/pcapx/pcaputil/nmea-ais-classb/captures/longitude-over.pcap": "captures/longitude-over.pcap",
+        "common/pcapx/pcaputil/nmea-ais-classb/captures/longitude-under.pcap": "captures/longitude-under.pcap",
+        "common/pcapx/pcaputil/nmea-ais-classb/captures/multipart.pcap": "captures/multipart.pcap",
+        "common/pcapx/pcaputil/nmea-ais-classb/captures/nonzero-fill.pcap": "captures/nonzero-fill.pcap",
+        "common/pcapx/pcaputil/nmea-ais-classb/captures/outside-message.pcap": "captures/outside-message.pcap",
+        "common/pcapx/pcaputil/nmea-ais-classb/captures/own-ship.pcap": "captures/own-ship.pcap",
+        "common/pcapx/pcaputil/nmea-ais-classb/captures/short-payload.pcap": "captures/short-payload.pcap",
+        "common/pcapx/pcaputil/nmea-ais-classb/captures/sotdma-0.pcap": "captures/sotdma-0.pcap",
+        "common/pcapx/pcaputil/nmea-ais-classb/captures/sotdma-1.pcap": "captures/sotdma-1.pcap",
+        "common/pcapx/pcaputil/nmea-ais-classb/captures/sotdma-2.pcap": "captures/sotdma-2.pcap",
+        "common/pcapx/pcaputil/nmea-ais-classb/captures/sotdma-3.pcap": "captures/sotdma-3.pcap",
+        "common/pcapx/pcaputil/nmea-ais-classb/captures/sotdma-4.pcap": "captures/sotdma-4.pcap",
+        "common/pcapx/pcaputil/nmea-ais-classb/captures/sotdma-5.pcap": "captures/sotdma-5.pcap",
+        "common/pcapx/pcaputil/nmea-ais-classb/captures/sotdma-6.pcap": "captures/sotdma-6.pcap",
+        "common/pcapx/pcaputil/nmea-ais-classb/captures/sotdma-7.pcap": "captures/sotdma-7.pcap",
+        "common/pcapx/pcaputil/nmea-ais-classb/captures/sotdma-utc-reserved-observed.pcap": "captures/sotdma-utc-reserved-observed.pcap",
+        "common/pcapx/pcaputil/nmea-ais-classb/captures/timestamp-61.pcap": "captures/timestamp-61.pcap",
+        "common/pcapx/pcaputil/nmea-ais-classb/captures/timestamp-62.pcap": "captures/timestamp-62.pcap",
+        "common/pcapx/pcaputil/nmea-ais-classb/captures/timestamp-63.pcap": "captures/timestamp-63.pcap",
+        "common/pcapx/pcaputil/nmea-ais-classb/captures/truncated.pcap": "captures/truncated.pcap",
+        "common/pcapx/pcaputil/nmea-ais-classb/captures/unavailable.pcap": "captures/unavailable.pcap",
+        "common/pcapx/pcaputil/nmea-ais-classb/captures/unsupported-channel.pcap": "captures/unsupported-channel.pcap",
+        "common/pcapx/pcaputil/nmea-ais-classb/captures/valid-prefix-bad-tail.pcap": "captures/valid-prefix-bad-tail.pcap",
+        "common/pcapx/pcaputil/nmea-ais-classb/controls.json": "controls.json",
+        "common/pcapx/pcaputil/nmea-ais-classb/scripts/build_fixture.py": "scripts/build_fixture.py",
+        "common/pcapx/pcaputil/nmea-ais-classb/scripts/build_inputs.py": "scripts/build_inputs.py",
+        "common/pcapx/pcaputil/nmea-ais-classb/scripts/check_reference.py": "scripts/check_reference.py",
+        "common/pcapx/pcaputil/nmea-ais-classb/scripts/reference18.cpp": "scripts/reference18.cpp",
+        "common/pcapx/pcaputil/nmea-ais-classb/validation/expected.json": "validation/expected.json",
+        "common/pcapx/pcaputil/nmea-ais-classb/validation/reference-inputs.json": "validation/reference-inputs.json",
+        "common/pcapx/pcaputil/nmea-ais-classb/validation/source-pins.json": "validation/source-pins.json"
+      },
+      "file": "validation-nmea-ais-classb.zip",
+      "id": "nmea-ais-classb",
+      "kind": "validation",
+      "members": {
+        "answers/bad-checksum.json": {
+          "bytes": 224,
+          "sha256": "d5fdc0e4aaa23069a6f0f520f422417fa4f2b4c6bb6eb73842887ffe878de980"
+        },
+        "answers/bad-sequence.json": {
+          "bytes": 228,
+          "sha256": "8b5ba69fea3332619ffab25200ee7bb8498b088e47c3f34d3fb80305008c17c1"
+        },
+        "answers/blank-channel.json": {
+          "bytes": 2123,
+          "sha256": "b05f56e49c9d042657b5a29e71ca72520e9fe0788f349814e079defa9a38596d"
+        },
+        "answers/boundary-negative.json": {
+          "bytes": 2121,
+          "sha256": "2277ac6768afdad2916b31b3f6e4811d620ad70d325d6de53723f4f0414d6e2f"
+        },
+        "answers/boundary-positive.json": {
+          "bytes": 2115,
+          "sha256": "8b7926a224bcf0c59160a35098eb02e953f78ad8ba2f932fb60fad757db13df7"
+        },
+        "answers/copacked-observations.json": {
+          "bytes": 4736,
+          "sha256": "05010ac842ffe490eab6f7a4c4eb0105a167786de5314605d7198bccc95a4f57"
+        },
+        "answers/course-reserved.json": {
+          "bytes": 226,
+          "sha256": "b4ec87c6f239e6b73c5e165c089d2c556e2a2983896716d9c003399b95d13faa"
+        },
+        "answers/cs-other-wire-observed.json": {
+          "bytes": 2090,
+          "sha256": "2cddac3575325f8f29e222a3ccd1d75a0d66ea48f370db91546f33c9c06b12a3"
+        },
+        "answers/cs-pattern.json": {
+          "bytes": 2089,
+          "sha256": "50796bbcb9d295ebc1d886475a7af098b324f1b020672188e707532b8f7bfeaa"
+        },
+        "answers/heading-reserved.json": {
+          "bytes": 226,
+          "sha256": "a68f42e4171c5e798b0d3ba63b2c8ce71478d11e030d4c90d3c8af681828f239"
+        },
+        "answers/invalid-armor.json": {
+          "bytes": 224,
+          "sha256": "d92f760e77b31b0fc00ed551668fab51b6cd19b51150846d899162969d178c14"
+        },
+        "answers/itdma.json": {
+          "bytes": 2155,
+          "sha256": "b547b157e24bdf5870560eaeb67b16adc4197ce4aee3827082f6bbfee3368551"
+        },
+        "answers/latitude-over.json": {
+          "bytes": 226,
+          "sha256": "a32d7de25381713b9dad0a18155f51548a98589c3586510cf8919741fb88e51e"
+        },
+        "answers/latitude-under.json": {
+          "bytes": 226,
+          "sha256": "256383e5ff3660b5fe1687463a664cf4ac384be5ea398fea9c0fbe7f1487757c"
+        },
+        "answers/literal-labels.json": {
+          "bytes": 2127,
+          "sha256": "6bcfd9ad7ccdd9bc0ac6642f1a98a590dd92d2ff493c295bba25bcbaaf8b1db4"
+        },
+        "answers/long-payload.json": {
+          "bytes": 226,
+          "sha256": "13445f35d73e5ca521c810fb6ba12f10d4c8f25639948d0913fe8cd4570b0aad"
+        },
+        "answers/longitude-over.json": {
+          "bytes": 226,
+          "sha256": "d955f893de0464f29da759eba5efb48de19311edaaf0bdb5293e2a890c1c4de1"
+        },
+        "answers/longitude-under.json": {
+          "bytes": 226,
+          "sha256": "11680a6e2853fe599428cb32604c8fab022e794fb02b4917848a08be46f8f352"
+        },
+        "answers/multipart.json": {
+          "bytes": 226,
+          "sha256": "47976a3ae454ee131f493f4c694523c9519e21dc5437fa890307b56d7200a931"
+        },
+        "answers/nonzero-fill.json": {
+          "bytes": 224,
+          "sha256": "bde52cc4763ffc41929b085c7222d5feae8b258fe96c86303d24403de7ea8508"
+        },
+        "answers/outside-message.json": {
+          "bytes": 226,
+          "sha256": "0706334372033f6890619f858452c0a5934a440d3725157cf6a5ceff8c0abd3a"
+        },
+        "answers/own-ship.json": {
+          "bytes": 2134,
+          "sha256": "3df4a052f95ca5def9485219902d1e3683f3e6836d873ab138aef85d78069ba4"
+        },
+        "answers/short-payload.json": {
+          "bytes": 222,
+          "sha256": "f548401a088e9be2a858bd9594f8ed0d9f7ca681c51e690aa8b92f253688ee36"
+        },
+        "answers/sotdma-0.json": {
+          "bytes": 2124,
+          "sha256": "c8fea5d16a2d00ed81b7426d249d91d5a4ee47167765c92c66b7cb7b07cd4ec2"
+        },
+        "answers/sotdma-1.json": {
+          "bytes": 2224,
+          "sha256": "cd52ba70eb9c3fff25d6d609f4e75b71410d3d12572ed4ede59f49c5746030c5"
+        },
+        "answers/sotdma-2.json": {
+          "bytes": 2124,
+          "sha256": "081337ac75dc5e83700dbc3a3f91bae4e44304ca9a31da3fe3c83983f988daf1"
+        },
+        "answers/sotdma-3.json": {
+          "bytes": 2130,
+          "sha256": "818182bc571e6ee3430c4281ae7232db91e065c9a6f3a455c3d02f0bb0f64529"
+        },
+        "answers/sotdma-4.json": {
+          "bytes": 2124,
+          "sha256": "f4b2dfd8b056de55bb28097989d86a2e153c2d7bf09ff1304a4d93ade7c356a9"
+        },
+        "answers/sotdma-5.json": {
+          "bytes": 2130,
+          "sha256": "ff22e8b98870f615c98d3a530b7c5e04026879b2978d846e998aa5e16428456d"
+        },
+        "answers/sotdma-6.json": {
+          "bytes": 2124,
+          "sha256": "74dd87f776f72c61ec7923353819c4999492764abd91797f9c118bd4662ed3e4"
+        },
+        "answers/sotdma-7.json": {
+          "bytes": 2130,
+          "sha256": "24db07043badcdcc351db24a7921a92572d495f5c70bf930041f8e55f5e71c45"
+        },
+        "answers/sotdma-utc-reserved-observed.json": {
+          "bytes": 2226,
+          "sha256": "819bdaeae2dd273cf602a79a3ab0d079a35c7e450548e7169466c8b83975226d"
+        },
+        "answers/timestamp-61.json": {
+          "bytes": 2091,
+          "sha256": "9c11e1ccfb40c4d31491a8de305fd2be1c5560670f22232ab20c6c83b33f6163"
+        },
+        "answers/timestamp-62.json": {
+          "bytes": 2100,
+          "sha256": "1c464037d90092fde27c1650fb9157813987f4147e985771467498783a326c81"
+        },
+        "answers/timestamp-63.json": {
+          "bytes": 2096,
+          "sha256": "a84a24dffc576df2d97b0bc32ce9cc87dd9ef7afcd7f5262f44de5d1d45fe76d"
+        },
+        "answers/truncated.json": {
+          "bytes": 222,
+          "sha256": "c6bfb73e8cab4a4b7438c76d9db46097061c855789adc28afe22a702c4f58b5e"
+        },
+        "answers/unavailable.json": {
+          "bytes": 1954,
+          "sha256": "5220ec339297e9fb3181555831fe18251c5e53a0aa936d3a66b8112f2deb58aa"
+        },
+        "answers/unsupported-channel.json": {
+          "bytes": 226,
+          "sha256": "9c901cdac2a90239bd0168569c4fd098e893230ce31d72ad4233208910874a62"
+        },
+        "answers/valid-prefix-bad-tail.json": {
+          "bytes": 320,
+          "sha256": "3918e8d6eff4b35ba51394ea35279d071c971fb1025373a149d2df3ac4e0577d"
+        },
+        "captures/bad-checksum.pcap": {
+          "bytes": 131,
+          "sha256": "22ea4f81a557c43b2a7f4a15ce5db67fea2c12cc20af2f0f1205c14cb09902f5"
+        },
+        "captures/bad-sequence.pcap": {
+          "bytes": 133,
+          "sha256": "317eedb9a5c04b386d5a23d01ad2749ad3efd6d83329312ba3e668f830da201e"
+        },
+        "captures/blank-channel.pcap": {
+          "bytes": 130,
+          "sha256": "0c29f8a830b47ab46e0a4cb0e931b8ee4d5710eb63a089e50bff4c03909b6bdb"
+        },
+        "captures/boundary-negative.pcap": {
+          "bytes": 131,
+          "sha256": "a56fda84c4a560f6d7405506a91ed15d23b45fe7f7381a09c77c1640deb8809a"
+        },
+        "captures/boundary-positive.pcap": {
+          "bytes": 131,
+          "sha256": "2cd9eec85061c55edc2b4d18b7cd64918e93395d257e62db823175dca512ccd6"
+        },
+        "captures/copacked-observations.pcap": {
+          "bytes": 180,
+          "sha256": "d1bba3a7ed25c2a1f4006ea6b766a0d16a1ad750d45fb7da679fb6a6eb274d9d"
+        },
+        "captures/course-reserved.pcap": {
+          "bytes": 131,
+          "sha256": "56fef3c5f057536bd8a0c31f0882dee24c9b5bd7196f1428c253060850de3ca1"
+        },
+        "captures/cs-other-wire-observed.pcap": {
+          "bytes": 131,
+          "sha256": "29564a79baa2c8fcbe7191293c53361e1a5ee66057e3dc3361f0dda568593a29"
+        },
+        "captures/cs-pattern.pcap": {
+          "bytes": 131,
+          "sha256": "30d62b546fc9df5461ea3429b9e36b17366a42c2240d1f3cc119eaa07c77bb85"
+        },
+        "captures/heading-reserved.pcap": {
+          "bytes": 131,
+          "sha256": "2a170064a6ee576c81d45e26cc13001e92c731ea2d8c67df47029e83fc7a9500"
+        },
+        "captures/invalid-armor.pcap": {
+          "bytes": 131,
+          "sha256": "f991b850680668d33344b9a229a5c67496974c1afefeb8b2954e5c9f45f11a9a"
+        },
+        "captures/itdma.pcap": {
+          "bytes": 131,
+          "sha256": "51ce61bd44814b8d28a00c675238b8e111b27a5754cb59b0a73a4a91f8fc4eba"
+        },
+        "captures/latitude-over.pcap": {
+          "bytes": 131,
+          "sha256": "727ddbaa805c44aadd3bf41a888be455045b7c711d182dfc099e9de092d29c2e"
+        },
+        "captures/latitude-under.pcap": {
+          "bytes": 131,
+          "sha256": "3fc00d93c818887d7cb885baefb60b958e1842b2a5d2742c2c0c7ebcc3151a88"
+        },
+        "captures/literal-labels.pcap": {
+          "bytes": 132,
+          "sha256": "4415bf395e35adac8deb32d788ee97fc65f015ca2aeb2488215e27ef348ba5de"
+        },
+        "captures/long-payload.pcap": {
+          "bytes": 132,
+          "sha256": "b66314907f0ee9e8ed42615ed6ec33675ee47102c23fd13eef387c8b5f827092"
+        },
+        "captures/longitude-over.pcap": {
+          "bytes": 131,
+          "sha256": "87d46a73ff17ac3b8cc81ac34bdb63e7d2ed878fdcc51ad240ff112842de503e"
+        },
+        "captures/longitude-under.pcap": {
+          "bytes": 131,
+          "sha256": "8ac0250027aeb6d4b4573cb4202916c2ec265428d13b0fd2aaa7aa14c38b3f94"
+        },
+        "captures/multipart.pcap": {
+          "bytes": 131,
+          "sha256": "a8dcdd3e3b30db198c28feadb578ab597bb11283a42b1a283e344f170b354716"
+        },
+        "captures/nonzero-fill.pcap": {
+          "bytes": 131,
+          "sha256": "f71e8c7db25fa5f095460bd1c63a56950e6281b3aa2f132980d38a9babb369e7"
+        },
+        "captures/outside-message.pcap": {
+          "bytes": 131,
+          "sha256": "60012befd22ce455e11e02bc8ad98f2316a9914b0dc102f02aef3d63f02ced0e"
+        },
+        "captures/own-ship.pcap": {
+          "bytes": 132,
+          "sha256": "cf360f56238205c5e17dd0c2fba54a4010611763a174a60a5787454e79c7e32a"
+        },
+        "captures/short-payload.pcap": {
+          "bytes": 130,
+          "sha256": "51782e02cf3bddacc55be7742eafcd63323a0b5945dca55943ae0a9874fbfbd0"
+        },
+        "captures/sotdma-0.pcap": {
+          "bytes": 131,
+          "sha256": "2350fb47890b65d216ff285324410a26ab42935fc088511aa1f9fc2b1febeb19"
+        },
+        "captures/sotdma-1.pcap": {
+          "bytes": 131,
+          "sha256": "1a17cd9f4473d2a81e25f0d7117e187329fbfb71cd890dccfd13f0190d6a5dd7"
+        },
+        "captures/sotdma-2.pcap": {
+          "bytes": 131,
+          "sha256": "a9af706ce03721a3151cfd2326c5c8283d6c4de23622fde6d058e3a3a264fd5c"
+        },
+        "captures/sotdma-3.pcap": {
+          "bytes": 131,
+          "sha256": "08223ec21f6d98116537c7107d824dfa07fc07b4ad01bebcf586aebd306e7f7a"
+        },
+        "captures/sotdma-4.pcap": {
+          "bytes": 131,
+          "sha256": "754602d4aff4d25500de89af84cba2edff888a62d8d75872a76ae02f7702b27a"
+        },
+        "captures/sotdma-5.pcap": {
+          "bytes": 131,
+          "sha256": "fbc4970d8a7c9fa92088e6abee89f4fa60cd1271429606793310b02b641b1490"
+        },
+        "captures/sotdma-6.pcap": {
+          "bytes": 131,
+          "sha256": "82a7b62810c59d8d95784ebf2ef8ee7f2020c7770bf1749718a5ba986e9fb0e7"
+        },
+        "captures/sotdma-7.pcap": {
+          "bytes": 131,
+          "sha256": "fec42cd54e57239a9e62a73d8a755a237f5a0993f5ea7c17ee8dcf6a2253f4e6"
+        },
+        "captures/sotdma-utc-reserved-observed.pcap": {
+          "bytes": 131,
+          "sha256": "69e506248493c26296b03359ab4ee183aa2f314e7eb64ffaf42c50544cd385be"
+        },
+        "captures/timestamp-61.pcap": {
+          "bytes": 131,
+          "sha256": "cd4d02ddbdbcbfe294b7e037e00989e7a5908c62c53a169bb1ab62d680789cbd"
+        },
+        "captures/timestamp-62.pcap": {
+          "bytes": 131,
+          "sha256": "ddd9c12f0e6f3c56794ace8056be997ef701a585f7a8a37301825dfebb353ad3"
+        },
+        "captures/timestamp-63.pcap": {
+          "bytes": 131,
+          "sha256": "28ee3730b1af89f75b01639c013a088652e79fd69435cce07f47fd63c3f7a85f"
+        },
+        "captures/truncated.pcap": {
+          "bytes": 130,
+          "sha256": "21993e9a0a6ff29e3fb0b3e08bf7514fffa82802afb62ba4f6d24dfe5487812c"
+        },
+        "captures/unavailable.pcap": {
+          "bytes": 131,
+          "sha256": "97afef6bc2666c19f348c0ef2a1a89169cd89111b79c62b15d2bcc9fd4cff3ba"
+        },
+        "captures/unsupported-channel.pcap": {
+          "bytes": 131,
+          "sha256": "45c2c0b6820eb017c151afbc717f060ba11f2d30ac3c848db32466ef47f8620c"
+        },
+        "captures/valid-prefix-bad-tail.pcap": {
+          "bytes": 179,
+          "sha256": "24895f5e9f8c287ba15d16174c1f6c0202d1d8d4162bfa0c360e1492cb7ef620"
+        },
+        "controls.json": {
+          "bytes": 12903,
+          "sha256": "ad2ec15367997729a2eda2f5c6a66bcc25f883d62718737be50517e60bfbcc5e"
+        },
+        "scripts/build_fixture.py": {
+          "bytes": 8225,
+          "sha256": "273062a77ef3cd947d69f48f281fee7e5e7bb0f4e9f4cfb244873391a699f927"
+        },
+        "scripts/build_inputs.py": {
+          "bytes": 4140,
+          "sha256": "80d578da814b0bc62b13cb8451e6f3b570fdd49574d628cf5c249d282bd0e566"
+        },
+        "scripts/check_reference.py": {
+          "bytes": 1901,
+          "sha256": "312e7c0d12ff2f45f73a1d7c590dd5dac88cd1937989af5feee5d6e359669bd7"
+        },
+        "scripts/reference18.cpp": {
+          "bytes": 1846,
+          "sha256": "a6a6336c8dafe34e0b9ca2b3616d34a43e73de8e081be8e733f28619075d94a3"
+        },
+        "validation/expected.json": {
+          "bytes": 40518,
+          "sha256": "8d4877bbbb91ff45b79a8072675f7d28abac2b45a763bd10663b83784247a31d"
+        },
+        "validation/reference-inputs.json": {
+          "bytes": 31674,
+          "sha256": "8930b7932986ae81d833c2f78bcdaddf5a94d94a10749dced4e8b0ed5886b499"
+        },
+        "validation/source-pins.json": {
+          "bytes": 1283,
+          "sha256": "64ac5c690421548fe769ff0ee6edf31557c557a27e5ac0ebbd37d17571367f4c"
+        }
+      },
+      "password": "bin-parser",
+      "sha256": "ff19edfc9660af0f823e64e26abd332104326314b72b587c5c4a064064eb6bcf",
+      "source_sha": "188c2dc6632680cdad19e8965618753d88a26cf3"
     }
   ],
   "schema_version": 1,

@@ -458,3 +458,17 @@ the fixed external libais codec checks six payload vectors, including ignored
 armoring fill bits and text termination with nonzero trailing data. Separate UDP
 datagrams are never concatenated. These fields do not prove ship identity,
 voyage, physical dimensions, calendar ETA or successful receiver operation.
+
+The `nmea-ais-classb/controls.json` entry adds single-fragment Type18 Class B
+168-bit reports. It preserves all navigation raw values, unavailable/lower-bound
+markers, reserved bits and literal unit/display/DSC/band/Message22/assigned/RAIM
+flags. For SOTDMA/ITDMA units it exposes only the selected radio-state branch;
+CS units retain the 19-bit fill and its standard-pattern comparison without
+misinterpreting it as a time slot. Undefined navigation values retain the
+historical `UnsupportedFeature` admission boundary. Reported capabilities and
+coordinates are not authenticated or independently established device facts.
+The small sealed batch supplies complete field/Session answers and reproducible
+synthetic inputs; its scripts check all fields/branches against fixed libais
+`87dadfaa1b4db0b0e9953680051391f2c4375455` using separately hash-pinned sources.
+No upstream source, large downloads, runtime logs or compiled codecs are stored
+in the ZIP. It does not implement Type19/24 or multipart/cross-datagram assembly.

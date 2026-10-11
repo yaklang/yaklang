@@ -36,7 +36,8 @@ func nmeaAISEnvelope(p []string) error {
 	return nil
 }
 
-// nmeaAIS observes ITU-R M.1371-5's 168-bit Class A reports (types 1/2/3).
+// nmeaAIS observes ITU-R M.1371-5's 168-bit Class A (types1/2/3) and Class B
+// (Type18) reports. Each selected schema validates its own exact payload size.
 // A checksum establishes representation, not ship identity or a physical fix.
 // Sequence/channel labels are literal; this stateless profile never assembles
 // multipart reports or associates observations across UDP datagrams.
@@ -51,8 +52,11 @@ func nmeaAIS(p []string, out map[string]any) error {
 	if first > 40 {
 		first -= 8
 	}
+	if first == 18 {
+		return nmeaAISClassB(p, out)
+	}
 	if first < 1 || first > 3 {
-		return protocolError(ErrUnsupportedFeature, "AIS message is outside Class A position report profile")
+		return protocolError(ErrUnsupportedFeature, "AIS message is outside selected position report profiles")
 	}
 	if len(p[5]) != 28 || p[6] != "0" {
 		return protocolError(ErrMalformedMessage, "AIS Class A report requires 168 bits and zero fill")
