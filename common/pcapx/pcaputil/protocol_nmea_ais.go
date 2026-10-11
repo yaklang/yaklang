@@ -2,11 +2,11 @@ package pcaputil
 
 import "encoding/hex"
 
-// nmeaAIS observes ITU-R M.1371-5's 168-bit Class A reports (types 1/2/3).
-// A checksum establishes representation, not ship identity or a physical fix.
-// Sequence/channel labels are literal; this stateless profile never assembles
-// multipart reports or associates observations across UDP datagrams.
-func nmeaAIS(p []string, out map[string]any) error {
+// nmeaAISEnvelope validates the shared bounded AIVDM/AIVDO representation.
+func nmeaAISEnvelope(p []string) error {
+	if len(p) == 0 {
+		return protocolError(ErrMalformedMessage, "AIS envelope is empty")
+	}
 	if p[0] != "AIVDM" && p[0] != "AIVDO" {
 		return protocolError(ErrUnsupportedFeature, "AIS requires AIVDM/AIVDO encapsulation")
 	}
@@ -32,6 +32,17 @@ func nmeaAIS(p []string, out map[string]any) error {
 		if !(c >= 48 && c <= 87 || c >= 96 && c <= 119) {
 			return protocolError(ErrMalformedMessage, "AIS payload contains invalid six-bit armoring")
 		}
+	}
+	return nil
+}
+
+// nmeaAIS observes ITU-R M.1371-5's 168-bit Class A reports (types 1/2/3).
+// A checksum establishes representation, not ship identity or a physical fix.
+// Sequence/channel labels are literal; this stateless profile never assembles
+// multipart reports or associates observations across UDP datagrams.
+func nmeaAIS(p []string, out map[string]any) error {
+	if err := nmeaAISEnvelope(p); err != nil {
+		return err
 	}
 	if p[1] != "1" {
 		return protocolError(ErrUnsupportedFeature, "AIS multipart assembly is unsupported")

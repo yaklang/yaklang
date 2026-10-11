@@ -447,3 +447,14 @@ small `mavlink-signing` ZIP and official fixed C receiver answers, verifies
 complete fields/Session and ownership, and runs the capture matrix. The public
 synthetic test key is not a device credential. Verified bytes do not establish
 physical telemetry, endpoint identity, provisioning or persistence across captures.
+
+AIS Type5 static/voyage data supports exactly two ordered AIVDM/AIVDO
+fragments within one UDP datagram, with matching literal sentence/sequence/channel
+labels, both XOR checksums and 424-bit payload validation. Raw text, padding,
+dimensions, ETA, draught and DTE are retained with unavailable/lower-bound
+markers. `TestNMEAMultipleSentencesBudgetAndOwnership/ais-type5-datagram`
+loads the `nmea-ais-type5` ZIP containing minimal complete answers and scripts;
+the fixed external libais codec checks six payload vectors, including ignored
+armoring fill bits and text termination with nonzero trailing data. Separate UDP
+datagrams are never concatenated. These fields do not prove ship identity,
+voyage, physical dimensions, calendar ETA or successful receiver operation.

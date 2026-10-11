@@ -12,7 +12,9 @@ import (
 // wire representation, not the sender's identity or the accuracy of a fix.
 // Single-fragment AIS Class A position reports are also observed statements.
 // Proprietary sentences and tag blocks are unsupported. A datagram must contain
-// complete independent CRLF sentences; no AIS multipart association is inferred.
+// complete CRLF sentences; selected Type5 pairs may be assembled only when
+// both ordered fragments are fully contained in this datagram. No association
+// between datagrams is inferred.
 func validNMEADatagram(w []byte) bool {
 	_, err := decodeNMEADatagram(w, DefaultParserBudget().MaxCollectionElements)
 	return err == nil
@@ -23,6 +25,9 @@ func decodeNMEADatagram(w []byte, maxElements int) (map[string]any, error) {
 }
 
 func decodeNMEADatagramBudget(w []byte, maxElements, maxDepth int) (map[string]any, error) {
+	if nmeaAIS5Candidate(w) {
+		return nmeaAISCompleteType5(w, maxElements, maxDepth)
+	}
 	if len(w) == 0 {
 		return nil, protocolError(ErrMalformedMessage, "NMEA datagram is empty")
 	}
