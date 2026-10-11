@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -58,8 +59,19 @@ func odidInput(t *testing.T, c bsapControl) ([]byte, bsapAnswer) {
 }
 
 func odidSelectedInput(t *testing.T, prefix string, c bsapControl) ([]byte, bsapAnswer) {
+	return odidAliasedInput(t, prefix, c, "")
+}
+
+func odidAliasedInput(t *testing.T, prefix string, c bsapControl, captureAlias string) ([]byte, bsapAnswer) {
 	t.Helper()
-	b, err := trafficfixture.ReadFile(prefix + "/" + c.Capture)
+	if captureAlias == "" {
+		captureAlias = prefix + "/" + c.Capture
+	} else {
+		const packagePrefix = "common/pcapx/pcaputil/"
+		require.True(t, strings.HasPrefix(captureAlias, packagePrefix))
+		captureAlias = strings.TrimPrefix(captureAlias, packagePrefix)
+	}
+	b, err := trafficfixture.ReadFile(captureAlias)
 	require.NoError(t, err)
 	require.Equal(t, c.SHA256, fmt.Sprintf("%x", sha256.Sum256(b)))
 	ab, err := trafficfixture.ReadFile(prefix + "/" + c.Answer)
@@ -93,6 +105,7 @@ func TestOpenDroneIDSealedReplay(t *testing.T) {
 		})
 	}
 	t.Run("system-profile", testOpenDroneIDSystemReplay)
+	t.Run("identity-profile", testOpenDroneIDIdentityReplay)
 }
 
 func odidReplayCase(t *testing.T, c bsapControl, raw []byte, want bsapAnswer, port uint16, selection, profile string) {
@@ -125,7 +138,7 @@ func odidReplayCase(t *testing.T, c bsapControl, raw []byte, want bsapAnswer, po
 						w := want.Events[i]
 						require.Greater(t, e.ID, previousID)
 						previousID = e.ID
-						if profile == openDroneIDSystemProfile {
+						if profile == openDroneIDSystemProfile || profile == openDroneIDIdentityProfile {
 							require.Equal(t, time.Unix(int64(i+1), 0).UTC(), e.Timestamp.UTC())
 						}
 						require.Equal(t, "opendroneid", e.Protocol)
@@ -168,7 +181,7 @@ func odidReplayCase(t *testing.T, c bsapControl, raw []byte, want bsapAnswer, po
 							f, err := e.GetFields()
 							require.NoError(t, err)
 							rocEqualFields(t, w.Fields, f)
-							if profile == openDroneIDSystemProfile {
+							if profile == openDroneIDSystemProfile || profile == openDroneIDIdentityProfile {
 								require.Len(t, e.Raw, len(w.Raw)/2)
 								require.Equal(t, fmt.Sprintf("%x", sha256.Sum256(e.Raw)), e.SourceBytes.SHA256)
 								clear(e.Raw)
@@ -203,6 +216,7 @@ func odidReplayCase(t *testing.T, c bsapControl, raw []byte, want bsapAnswer, po
 }
 func TestOpenDroneIDBoundsOwnershipAndAdmission(t *testing.T) {
 	t.Run("system-profile", testOpenDroneIDSystemBounds)
+	t.Run("identity-profile", testOpenDroneIDIdentityBounds)
 	var basic, pack []byte
 	for _, c := range odidControls(t) {
 		cap, a := odidInput(t, c)

@@ -71,7 +71,7 @@ func (e *ProtocolEvent) Decode() (result map[string]any, err error) {
 		// These selected stateless observations expose the same accepted
 		// message in fields and session. Reuse the private tree so edited or
 		// replaced public Session maps cannot change a later query.
-		ownedObservation := e.Protocol == "opendroneid" && (e.Profile == "opendroneid-v2-basic-location" || e.Profile == openDroneIDSystemProfile) ||
+		ownedObservation := e.Protocol == "opendroneid" && (e.Profile == "opendroneid-v2-basic-location" || e.Profile == openDroneIDSystemProfile || e.Profile == openDroneIDIdentityProfile) ||
 			e.Protocol == "mavlink" && (e.Profile == "mavlink-common-three-messages" || e.Profile == "mavlink-common-gps-raw-int" || e.Profile == "mavlink-common-attitude")
 		if e.Transport == "udp" && ownedObservation && e.semanticFields != nil {
 			session = e.semanticFields

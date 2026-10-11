@@ -119,6 +119,13 @@ answers from the same pinned C implementation, including coordinate/height
 quantization, classifications, area and unsigned time. Framing refusals remain
 selected-profile boundaries, without an aircraft, geography or authentication
 claim. The original `opendroneid` selection and all its answers remain unchanged.
+The `opendroneid-identity` selection adds Self ID and Operator ID wire
+observations, with optional Basic ID/Location/System messages. NUL-terminated
+reference-codec byte content is distinct from complete original wire bytes;
+non-ASCII values, tails after NUL and reserved fields remain visible. Its 45
+controls reuse four captures from the System batch and seal 41 new captures
+with independent answers and reproduction scripts. Identity, charset,
+registration, authentication and broadcast transport are not inferred.
 The mandatory gate also checks that a native UDP NeedMore
 event increments Incomplete rather than Malformed, using an earlier ZIP input.
 

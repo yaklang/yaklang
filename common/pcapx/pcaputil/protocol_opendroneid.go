@@ -9,6 +9,22 @@ import (
 // messages, individually or in a message pack. UDP is an explicit test/tunnel
 // carrier, not a standard Remote ID broadcast transport or identity proof.
 const openDroneIDSystemProfile = "opendroneid-v2-basic-location-system"
+const openDroneIDIdentityProfile = "opendroneid-v2-identity-observation"
+
+type openDroneIDSelection uint8
+
+const (
+	odidBasicLocation openDroneIDSelection = iota
+	odidSystem
+	odidIdentity
+)
+
+func odidSelection(systemProfile bool) openDroneIDSelection {
+	if systemProfile {
+		return odidSystem
+	}
+	return odidBasicLocation
+}
 
 func openDroneIDLayout(w []byte, maxBytes, maxMessages int) (int, int, error) {
 	return openDroneIDSelectedLayout(w, maxBytes, maxMessages, false)
@@ -17,6 +33,10 @@ func openDroneIDLayout(w []byte, maxBytes, maxMessages int) (int, int, error) {
 // The System extension is separately selected. Legacy Basic ID/Location
 // admission and its unsupported-message errors retain their original meaning.
 func openDroneIDSelectedLayout(w []byte, maxBytes, maxMessages int, systemProfile bool) (int, int, error) {
+	return openDroneIDProfileLayout(w, maxBytes, maxMessages, odidSelection(systemProfile))
+}
+
+func openDroneIDProfileLayout(w []byte, maxBytes, maxMessages int, selection openDroneIDSelection) (int, int, error) {
 	fail := func(k ProtocolErrorKind, s string) (int, int, error) {
 		return 0, 0, protocolError(k, "OpenDroneID %s", s)
 	}
@@ -48,7 +68,7 @@ func openDroneIDSelectedLayout(w []byte, maxBytes, maxMessages int, systemProfil
 	if len(w) != at+count*25 {
 		return fail(ErrMalformedMessage, "trailing bytes are outside declared message pack")
 	}
-	basic, location, system := 0, 0, 0
+	basic, location, system, selfID, operatorID := 0, 0, 0, 0, 0
 	for i := 0; i < count; i++ {
 		h := w[at+i*25]
 		if h&15 != 2 {
@@ -59,8 +79,17 @@ func openDroneIDSelectedLayout(w []byte, maxBytes, maxMessages int, systemProfil
 			basic++
 		case 1:
 			location++
+		case 3, 5:
+			if selection != odidIdentity {
+				return fail(ErrUnsupportedFeature, "message type is outside Basic ID/Location")
+			}
+			if h>>4 == 3 {
+				selfID++
+			} else {
+				operatorID++
+			}
 		case 4:
-			if !systemProfile {
+			if selection == odidBasicLocation {
 				return fail(ErrUnsupportedFeature, "message type is outside Basic ID/Location")
 			}
 			system++
@@ -72,11 +101,14 @@ func openDroneIDSelectedLayout(w []byte, maxBytes, maxMessages int, systemProfil
 	}
 	// The pinned reference's default pack contract permits two Basic IDs and
 	// one Location. Preserve their order; never merge conflicting observations.
-	if basic > 2 || location > 1 || system > 1 {
+	if basic > 2 || location > 1 || system > 1 || selfID > 1 || operatorID > 1 {
 		return fail(ErrMalformedMessage, "pack repeats a message beyond selected cardinality")
 	}
-	if systemProfile && system != 1 {
+	if selection == odidSystem && system != 1 {
 		return fail(ErrUnsupportedFeature, "System profile requires one System observation")
+	}
+	if selection == odidIdentity && selfID+operatorID == 0 {
+		return fail(ErrUnsupportedFeature, "identity profile requires a Self ID or Operator ID observation")
 	}
 	return at, count, nil
 }
@@ -86,7 +118,11 @@ func decodeOpenDroneID(w []byte, maxBytes, maxMessages int) (map[string]any, err
 }
 
 func decodeOpenDroneIDSelected(w []byte, maxBytes, maxMessages int, systemProfile bool) (map[string]any, error) {
-	at, count, err := openDroneIDSelectedLayout(w, maxBytes, maxMessages, systemProfile)
+	return decodeOpenDroneIDProfile(w, maxBytes, maxMessages, odidSelection(systemProfile))
+}
+
+func decodeOpenDroneIDProfile(w []byte, maxBytes, maxMessages int, selection openDroneIDSelection) (map[string]any, error) {
+	at, count, err := openDroneIDProfileLayout(w, maxBytes, maxMessages, selection)
 	if err != nil {
 		return nil, err
 	}
@@ -99,6 +135,24 @@ func decodeOpenDroneIDSelected(w []byte, maxBytes, maxMessages int, systemProfil
 			// IDs may be binary. Reserved enums/bytes are observations, not an
 			// authenticated registration, serial number, or a future-type guess.
 			f["ID"], f["Reserved"] = bytes.Clone(p[2:22]), bytes.Clone(p[22:25])
+		} else if p[0]>>4 == 3 || p[0]>>4 == 5 {
+			// The reference codec uses NUL-terminated byte strings. Preserve
+			// both that decoded observation and every original wire byte;
+			// neither charset conversion nor registration validation is implied.
+			text := func(w []byte) []byte {
+				if end := bytes.IndexByte(w, 0); end >= 0 {
+					w = w[:end]
+				}
+				return bytes.Clone(w)
+			}
+			if p[0]>>4 == 3 {
+				f["Message Name"], f["Description Type"] = "Self ID", p[1]
+				f["Description"], f["Description Wire"] = text(p[2:25]), bytes.Clone(p[2:25])
+			} else {
+				f["Message Name"], f["Operator ID Type"] = "Operator ID", p[1]
+				f["Operator ID"], f["Operator ID Wire"] = text(p[2:22]), bytes.Clone(p[2:22])
+				f["Reserved"] = bytes.Clone(p[22:25])
+			}
 		} else if p[0]>>4 == 4 {
 			u16 := func(at int) uint16 { return binary.LittleEndian.Uint16(p[at:]) }
 			// Preserve wire values, reserved classifications and unsigned time.
@@ -148,9 +202,16 @@ func (a *binParser) decodeOpenDroneIDDatagram(e *ProtocolEvent, w []byte) bool {
 }
 
 func (a *binParser) decodeOpenDroneIDSelectedDatagram(e *ProtocolEvent, w []byte, systemProfile bool) bool {
+	return a.decodeOpenDroneIDProfileDatagram(e, w, odidSelection(systemProfile))
+}
+
+func (a *binParser) decodeOpenDroneIDProfileDatagram(e *ProtocolEvent, w []byte, selection openDroneIDSelection) bool {
 	e.Protocol, e.Profile, e.Admission, e.Completeness = "opendroneid", "opendroneid-v2-basic-location", "explicit-decode-as", "message"
-	if systemProfile {
+	switch selection {
+	case odidSystem:
 		e.Profile = openDroneIDSystemProfile
+	case odidIdentity:
+		e.Profile = openDroneIDIdentityProfile
 	}
 	// Reserve expansion before constructing any field tree. A stateless
 	// message owns no conversation, pending request, or inferred aircraft.
@@ -158,7 +219,7 @@ func (a *binParser) decodeOpenDroneIDSelectedDatagram(e *ProtocolEvent, w []byte
 	err := f.reserveSession(512 + int64(len(w))*6)
 	defer f.closeSession()
 	if err == nil {
-		e.Session, err = decodeOpenDroneIDSelected(w, min(a.budget.MaxFrameBytes, a.config.MaxMessageBytes), a.budget.MaxCollectionElements, systemProfile)
+		e.Session, err = decodeOpenDroneIDProfile(w, min(a.budget.MaxFrameBytes, a.config.MaxMessageBytes), a.budget.MaxCollectionElements, selection)
 	}
 	if err == nil {
 		e.semanticFields = cloneSession(e.Session)
