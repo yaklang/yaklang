@@ -22,6 +22,7 @@ type ProtocolEvent struct {
 	semanticMetadata                         any
 	ownedRuleEnvelope, hasRuleMetadata       bool
 	nativeQUICWire                           bool
+	nativeCANRecord                          bool
 	ocpp                                     bool
 	Domain                                   CaptureDomain
 	SourceBytes                              ByteSource
@@ -234,6 +235,9 @@ func (e *ProtocolEvent) retainRuleEnvelope(result map[string]any) {
 }
 
 func (e *ProtocolEvent) ownsNativeFields() bool {
+	if e.nativeCANRecord {
+		return true
+	}
 	if e.ocpp && e.sessionError != nil {
 		return true
 	}

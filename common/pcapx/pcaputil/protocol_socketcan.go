@@ -153,7 +153,7 @@ func decodeJ1939RequestName(identifier uint32, data []byte) (map[string]any, err
 }
 
 func (a *binParser) decodeCANRecord(w []byte, evidence captureEvidence, ci gopacket.CaptureInfo) {
-	e := &ProtocolEvent{Timestamp: ci.Timestamp, Transport: "can", Protocol: "socketcan", Profile: "socketcan-controller-record", Admission: "capture-linktype-and-validated-record", Domain: evidence.Ref.Domain, Length: len(w), SourceBytes: ByteSource{Kind: "captured", PacketRefs: []PacketReference{evidence.Ref}}, Completeness: "message"}
+	e := &ProtocolEvent{nativeCANRecord: true, Timestamp: ci.Timestamp, Transport: "can", Protocol: "socketcan", Profile: "socketcan-controller-record", Admission: "capture-linktype-and-validated-record", Domain: evidence.Ref.Domain, Length: len(w), SourceBytes: ByteSource{Kind: "captured", PacketRefs: []PacketReference{evidence.Ref}}, Completeness: "message"}
 	var fields map[string]any
 	var err error
 	switch {
@@ -202,6 +202,9 @@ func (a *binParser) decodeCANRecord(w []byte, evidence captureEvidence, ci gopac
 		return
 	}
 	e.Session, e.semanticFields = fields, cloneSession(fields)
+	// The complete stateless session is already retained in the private tree.
+	// Reuse it instead of allocating another copy or trusting public maps.
+	e.semanticSession = e.semanticFields
 	e.Structured = map[string]any{"fields": cloneSession(fields)}
 	e.Status = "decoded"
 	if a.config.Deferred {
