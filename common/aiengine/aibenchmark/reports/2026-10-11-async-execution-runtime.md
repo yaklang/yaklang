@@ -146,3 +146,7 @@ YAK_ASYNC_CASES 可指定 single,mixed,capacity_failure,owner_release 子集。�
 最终源码构建与现有四项提示词测试通过：输出模式渲染、答案承载互斥、标量与批量选择、批次失败恢复。新采样及日志共 224 个文件的 Key 格式检查无命中。
 
 上述真实模型采样在创建 PR 前完成。创建 PR 时已合入 main 的最新提示词简化，保留本文的文本工具调用格式说明；合并后的本地回归及 CI 单独验证，不将此前的生产采样当作合并后提示词的再次实测。
+
+PR 首轮完整引擎 CI 暴露旧 `TestCancelCtx` 的问题：原测试只等待五秒，取消时跳过 defer 会让 wg.Add 阻塞，从而掩盖执行未退出；恢复 defer 后，取消错误返回并被测试 helper 转为未捕获 panic。测试现改为明确等待退出并断言 DeadlineExceeded，保持五秒退出上限。修正后的完整 antlr4yak 测试和该用例的 race 检查通过。
+
+扩大本地 common/yak race 回归时，未改动的插件跟踪用例 `TestPluginExecutionCancellation` 在读取可变 trace 时报告数据竞争。使用 main 的原始 VM 文件进行 overlay 对照，同一竞争仍可复现；这是本次改动之外的既有问题，不能将这轮扩大回归写成全量通过。本次 defer 综合用例单独以 race 模式通过。
