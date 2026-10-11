@@ -154,6 +154,13 @@ Forget 接口。较长的 owner 生命周期需要配置适当的记录上限，
 
 本包已实现独立核心和函数适配器。directly_call_tool 已接入异步标记的解析，
 ToolCaller 已实现 Inspector；异步调度与管理 action 仍待接入，当前 action 执行方式不变。
+ReActLoop 提供 `GetAsyncExecutionManager()`：首次调用必须已有 current task，
+Manager 绑定该任务 context；后续调用复用同一实例，不随 current task 切换而重建。
+Release 会在其他释放回调前 Close，取消执行并禁止新提交，但不阻塞等待清理；
+释放后仍可获取已有 Manager 来 Inspect / Wait，尚未创建 Manager 的已释放 loop
+不能再创建。需要等待所有清理完成时，显式使用有超时的独立 context 调用 Shutdown。
+接入时先获取 loop 的 Manager，再把下例的 resource 提交给它即可。
+完整例子见 [ReActLoop 接入测试](../async_execution_test.go)。
 接入工具时应复用原调用链路，把原工具执行函数和该次调用的 Inspector 接入
 NewResource。需要在原调用实例上补齐 Inspector 时，应从原实例读取已有状态，
 不能另外订阅 UI/log 事件并创建第二份输出缓存。
