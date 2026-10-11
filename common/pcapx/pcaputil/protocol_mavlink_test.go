@@ -229,5 +229,43 @@ func TestMAVLinkCopackedEvidenceOwnership(t *testing.T) {
 		after, err := second.GetFields()
 		require.NoError(t, err)
 		require.Equal(t, before, after)
+		assertMAVLinkOwnedSession(t, first)
+		assertMAVLinkOwnedSession(t, second)
+	}
+}
+
+// The enclosing tests validate these fields against independent complete
+// answers first. This helper checks ownership without deriving a wire oracle
+// from the implementation, including nested numeric and opaque signature data.
+func assertMAVLinkOwnedSession(t *testing.T, e *ProtocolEvent) {
+	t.Helper()
+	want, err := e.GetFields()
+	require.NoError(t, err)
+	public := e.Session
+	defer func() { e.Session = public }()
+	for _, session := range []map[string]any{e.Session, {"forged": true}, nil} {
+		e.Session = session
+		if session != nil {
+			session["Message ID"] = uint32(999)
+			if fields, ok := session["Message Fields"].(map[string]any); ok {
+				clear(fields)
+			}
+		}
+		d, err := e.Decode()
+		require.NoError(t, err)
+		require.Equal(t, want, protocolFields(d))
+		got := d["session"].(map[string]any)
+		require.Equal(t, want, got)
+		got["Message ID"] = uint32(998)
+		clear(got["Message Fields"].(map[string]any))
+		if signature, ok := got["Signature"].([]byte); ok {
+			clear(signature)
+		}
+		d, err = e.Decode()
+		require.NoError(t, err)
+		require.Equal(t, want, protocolFields(d))
+		require.Equal(t, want, d["session"])
+		require.Zero(t, e.ResponseTo)
+		require.Zero(t, e.TransactionID)
 	}
 }

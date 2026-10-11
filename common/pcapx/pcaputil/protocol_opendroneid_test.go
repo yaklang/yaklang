@@ -157,6 +157,20 @@ func TestOpenDroneIDSealedReplay(t *testing.T) {
 									require.NoError(t, err)
 									rocEqualFields(t, w.Fields, protocolFields(d))
 									rocEqualFields(t, w.Fields, e.Session)
+									rocEqualFields(t, w.Fields, d["session"].(map[string]any))
+									// Public projections and returned session trees belong to the
+									// caller. None can rewrite the accepted private observation.
+									e.Session["Message Count"] = 999
+									e.Session["Messages"].([]map[string]any)[0]["Raw"].([]byte)[0] ^= 255
+									d["session"].(map[string]any)["Messages"].([]map[string]any)[0]["Raw"].([]byte)[0] ^= 255
+									d["session"].(map[string]any)["Message Count"] = 998
+									for _, session := range []map[string]any{e.Session, {"forged": true}, nil} {
+										e.Session = session
+										d, err = e.Decode()
+										require.NoError(t, err)
+										rocEqualFields(t, w.Fields, protocolFields(d))
+										rocEqualFields(t, w.Fields, d["session"].(map[string]any))
+									}
 								}
 							}
 						})

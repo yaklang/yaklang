@@ -68,6 +68,14 @@ func (e *ProtocolEvent) Decode() (result map[string]any, err error) {
 			(e.Protocol == "dhcp" || e.Protocol == "dhcpv6" || e.Protocol == "mqtt-sn" || e.Protocol == "bittorrent-dht" || e.Protocol == "bjnp") {
 			session = e.semanticFields
 		}
+		// These selected stateless observations expose the same accepted
+		// message in fields and session. Reuse the private tree so edited or
+		// replaced public Session maps cannot change a later query.
+		ownedObservation := e.Protocol == "opendroneid" && e.Profile == "opendroneid-v2-basic-location" ||
+			e.Protocol == "mavlink" && (e.Profile == "mavlink-common-three-messages" || e.Profile == "mavlink-common-gps-raw-int" || e.Profile == "mavlink-common-attitude")
+		if e.Transport == "udp" && ownedObservation && e.semanticFields != nil {
+			session = e.semanticFields
+		}
 		if err == nil && result != nil && session != nil {
 			owned := make(map[string]any, len(result)+1)
 			for k, v := range result {

@@ -132,6 +132,7 @@ func mavlinkAttitudeAssert(t *testing.T, c mavlinkAttitudeControl, events []*Pro
 		again, err := e.GetFields()
 		require.NoError(t, err)
 		rocEqualFields(t, w.Fields, again)
+		assertMAVLinkOwnedSession(t, e)
 	}
 }
 func testMAVLinkAttitudeMatrix(t *testing.T) {
@@ -251,6 +252,7 @@ func testMAVLinkExistingQueries(t *testing.T) {
 			f, err := e.GetFields()
 			require.NoError(t, err)
 			before := cloneSession(f)
+			assertMAVLinkOwnedSession(t, e)
 			f["Message Fields"].(map[string]any)["custom_mode"] = uint32(999)
 			e.Session["Message Fields"].(map[string]any)["custom_mode"] = uint32(888)
 			again, err := e.GetFields()

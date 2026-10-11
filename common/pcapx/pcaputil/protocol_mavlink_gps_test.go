@@ -138,6 +138,7 @@ func mavlinkGPSAssert(t *testing.T, c mavlinkAttitudeControl, events []*Protocol
 		again, err := e.GetFields()
 		require.NoError(t, err)
 		mavlinkGPSEqual(t, w.Fields, again)
+		assertMAVLinkOwnedSession(t, e)
 	}
 }
 
