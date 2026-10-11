@@ -15,7 +15,7 @@
 
 * 再次强调：非空 `answer_payload` 与 `FINAL_ANSWER` AI Tag 严格互斥；任一响应只能出现其中一种答案内容。
 
-*. 所有 action 必须直接输出使用 Schema 原始英文键名的 JSON object；禁止 `<@action=...>` 标签、中文字段说明、YAML 或 JSON 外包装。
+*. 工具调用也用 JSON，例如 `{"@action":"manage_async_execution_runtime","op":"list"}`；按本轮 Schema 填参数。禁止 `<@action=...>` 标签、DSML 或 JSON 外包装；AITAG 仅按本轮要求附加。
 *. 缺少任务所需的一手证据时，本轮工具 action 就是执行机会；立即选择工具，禁止回答“没有工具执行机会”或要求重发任务。
 
 *. 如果你想要使用工具，先枚举本轮可立即执行的真实调用：

@@ -85,7 +85,7 @@ func (r *ReActLoop) renderAsyncExecutionContext(nonce string) string {
 		}
 	}
 	header := fmt.Sprintf("<|ASYNC_EXECUTIONS_%s|>\n当前循环的异步执行状态（只读快照）。\n"+
-		"通过 manage_async_execution_runtime 的 list 查看完整列表，inspect 查看输出和结果，wait 等待结束，stop/stop_all 请求停止。\n", nonce)
+		"直接选择顶层 action manage_async_execution_runtime：list 查看列表，inspect 读取输出和结果，wait 等待结束，stop/stop_all 请求停止。它不是 directly_call_tool 的目标。\n", nonce)
 	footer := fmt.Sprintf("\n<|ASYNC_EXECUTIONS_END_%s|>", nonce)
 	for {
 		payload := dumpAsyncExecutionContext(rows, len(entries)-len(rows))
