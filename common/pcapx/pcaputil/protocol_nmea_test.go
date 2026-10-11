@@ -69,7 +69,7 @@ func TestNMEANegativesAndNoFix(t *testing.T) {
 		strings.Replace(nmeaTestRMC, "123519", "246001", 1),
 		"GPGGA,123519,4807.038,N,01131.000,E,1",
 		"GPRMC,123519,A,4807.038,N",
-		"GPGSV,1,1,04,01,40,083,46,02,17,308,42,03,22,123,45,04,30,234,43",
+		"GPGSV,1,2,04,01,40,083,46,02,17,308,42,03,22,123,45,04,30,234,43",
 	} {
 		w := nmeaTestSentence(body)
 		require.False(t, validNMEADatagram(w), body)
@@ -108,6 +108,7 @@ func TestNMEAEmptyOptionalMode(t *testing.T) {
 func TestNMEAMultipleSentencesBudgetAndOwnership(t *testing.T) {
 	t.Run("vtg-profile", testNMEAVTGSealedReplay)
 	t.Run("gsa-profile", testNMEAGSASealedReplay)
+	t.Run("gsv-profile", testNMEAGSVSealedReplay)
 	w := append(nmeaTestSentence(nmeaTestGGA), nmeaTestSentence(nmeaTestRMC)...)
 	fields, err := decodeNMEADatagram(w, 2)
 	require.NoError(t, err)

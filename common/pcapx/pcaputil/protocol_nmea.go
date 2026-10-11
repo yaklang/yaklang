@@ -8,7 +8,7 @@ import (
 	"strings"
 )
 
-// GGA, RMC, unit-labelled VTG and fixed-slot GSA are observed navigation statements. Checksums validate their
+// GGA, RMC, unit-labelled VTG, fixed-slot GSA and per-sentence GSV are observed navigation statements. Checksums validate their
 // wire representation, not the sender's identity or the accuracy of a fix.
 // AIS, proprietary sentences, tag blocks and other sentence types are outside
 // this profile. A datagram must contain complete independent CRLF sentences.
@@ -86,8 +86,10 @@ func decodeNMEADatagramBudget(w []byte, maxElements, maxDepth int) (map[string]a
 			err = nmeaVTG(parts, fields)
 		case "GSA":
 			err = nmeaGSA(parts, fields)
+		case "GSV":
+			err = nmeaGSV(parts, fields, maxElements)
 		default:
-			err = protocolError(ErrUnsupportedFeature, "NMEA sentence type is outside GGA/RMC/VTG/GSA profile")
+			err = protocolError(ErrUnsupportedFeature, "NMEA sentence type is outside GGA/RMC/VTG/GSA/GSV profile")
 		}
 		if err != nil {
 			return nil, err
@@ -99,6 +101,89 @@ func decodeNMEADatagramBudget(w []byte, maxElements, maxDepth int) (map[string]a
 		return messages[0], nil
 	}
 	return map[string]any{"Packet Name": "NMEA 0183 sentences", "Message Count": len(messages), "Messages": messages, "Context Level": "observed"}, nil
+}
+
+// GSV preserves a single reported picture's slots, including missing values,
+// duplicates and sparse nonfinal parts. Some receivers number mixed talkers
+// in one picture; neither the talker nor numSV establishes a constellation,
+// complete cycle, tracked satellite or relationship with GSA. Signal ID is
+// hexadecimal in the selected 4.10 form. Signal level has no inferred unit:
+// receiver documentation calls it either SNR or C/No.
+func nmeaGSV(p []string, out map[string]any, maxElements int) error {
+	if len(p) < 4 {
+		return protocolError(ErrMalformedMessage, "NMEA GSV header is truncated")
+	}
+	slots, extra := (len(p)-4)/4, (len(p)-4)%4
+	if slots > 4 || extra == 2 {
+		return protocolError(ErrUnsupportedFeature, "NMEA GSV requires at most four slots and optional Signal ID")
+	}
+	if extra == 3 {
+		return protocolError(ErrMalformedMessage, "NMEA GSV satellite slot is truncated")
+	}
+	if len(p[1]) != 1 || p[1][0] < '1' || p[1][0] > '9' || len(p[2]) != 1 || p[2][0] < '1' || p[2][0] > p[1][0] {
+		return protocolError(ErrMalformedMessage, "NMEA GSV message count/index must be 1..9 and index cannot exceed count")
+	}
+	visible, err := nmeaInteger(p[3], 999)
+	if err != nil || len(p[3]) > 3 {
+		return protocolError(ErrMalformedMessage, "NMEA GSV reported count must be one-to-three decimal digits")
+	}
+	if slots > maxElements {
+		return protocolError(ErrResourceExceeded, "NMEA GSV satellite slots exceed collection budget")
+	}
+	out["Cycle Context"] = "unassembled"
+	out["Cycle Message Count"], out["Cycle Message Number"] = int(p[1][0]-'0'), int(p[2][0]-'0')
+	out["Reported Satellites In View"], out["Reported Satellites In View Wire"] = visible, p[3]
+	out["Satellite Slot Count"], out["Signal ID Present"] = slots, extra == 1
+	for i := 0; i < slots; i++ {
+		for j, field := range []struct {
+			key    string
+			max    int
+			digits int
+		}{{"SV ID", 999, 3}, {"Elevation Degrees", 90, 2}, {"Azimuth Degrees", 359, 3}, {"Signal Level", 99, 2}} {
+			key, value := fmt.Sprintf("Satellite Slot %d %s", i+1, field.key), p[4+i*4+j]
+			out[key+" Present"], out[key+" Wire"] = value != "", value
+			if value == "" {
+				continue
+			}
+			number := value
+			negative := j == 1 && value[0] == '-'
+			if negative {
+				number = value[1:]
+			}
+			n, err := nmeaInteger(number, field.max)
+			if err != nil || len(number) > field.digits {
+				return protocolError(ErrMalformedMessage, "NMEA GSV %s is outside selected integer range", field.key)
+			}
+			if j == 1 {
+				x := int(n)
+				if negative {
+					x = -x
+				}
+				out[key] = x
+			} else {
+				out[key] = n
+			}
+		}
+	}
+	if extra == 1 {
+		value := p[len(p)-1]
+		out["Signal ID Wire"] = value
+		if len(value) > 2 {
+			return protocolError(ErrUnsupportedFeature, "NMEA GSV Signal ID exceeds selected two-hex-digit profile")
+		}
+		if value != "" {
+			n := 0
+			for _, b := range []byte(value) {
+				h := nmeaHex(b)
+				if h < 0 {
+					return protocolError(ErrMalformedMessage, "NMEA GSV Signal ID must be hexadecimal")
+				}
+				n = n*16 + h
+			}
+			out["Signal ID"] = n
+		}
+	}
+	return nil
 }
 
 // GSA observes exactly twelve PRN slots, preserving their spelling, order and

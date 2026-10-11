@@ -402,5 +402,20 @@ answers in full/deferred, workers1/2/4 and observer off/on configurations, plus
 collection/depth refusal, recovery and Close. `nmea-gsa/source-pin.json` fixes the
 primary/reference versions; the shipped reference runner takes the fixed GPSD
 source path as its argument and executes mode/DOP assignment only. It does not
-supply constellation mapping, receiver context, vendor extensions, GSV/AIS or
+supply constellation mapping, receiver context, vendor extensions, complete GSV cycles/AIS or
 physical position verification.
+
+The `nmea-gsv/controls.json` entry preserves each GSV sentence's declared count,
+part number, ordered zero-to-four satellite slots, exact spelling and nullable
+SV/elevation/azimuth/signal-level values. Optional Signal ID is literal hexadecimal
+(4.10 form); no constellation or signal-level unit is inferred. Sparse nonfinal
+parts, duplicates and mixed talkers stay separate observations, not an assembled
+sky picture. `TestNMEAMultipleSentencesBudgetAndOwnership/gsv-profile` checks68
+independent answers across12 configurations, plus slot/message/depth budgets,
+recovery, Close and data ownership. The small ZIP contains generation, byte
+verification and reference-build scripts. `nmea-gsv/source-pin.json` pins Trimble,
+u-blox F9 HPS1.20 R04 and GPSD3.25; actual GPSD function execution uses explicit
+identity mapping shims. Its decimal Signal ID and complete-picture filtering
+differences are retained in reference records. The original Trimble eighth
+example's bad checksum is a refusal; its repaired variant is separately named.
+Complete-cycle association, receiver validity and AIS remain open work.

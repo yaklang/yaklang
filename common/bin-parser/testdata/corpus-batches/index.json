@@ -40954,6 +40954,743 @@
         "common/pcapx/pcaputil/nmea-gsa/validation/provenance.json": "validation/provenance.json",
         "common/pcapx/pcaputil/nmea-gsa/verify.py": "verify.py"
       }
+    },
+    {
+      "id": "validation-nmea-gsv-78f2b5",
+      "kind": "validation",
+      "source_sha": "78f2b5ab5dfeacf7b6e4a412da844fd5219b7028",
+      "file": "validation-nmea-gsv-78f2b5.zip",
+      "sha256": "e283b7c5f720ba4fe24d58703a786821dd9ce28c9ccd96464a1b2143f977b067",
+      "password": "bin-parser",
+      "members": {
+        "answers/azimuth-360.json": {
+          "sha256": "94e805e5fcd3d0ccb91032fd8d6597439c7ef248e424e3617fa68dbf8aa03ae6",
+          "bytes": 324
+        },
+        "answers/bad-checksum.json": {
+          "sha256": "0e5134bb15231090077ad10064d834a01d83de90142bf324dac2f85fd0cd4dce",
+          "bytes": 325
+        },
+        "answers/bad-hex-signal.json": {
+          "sha256": "64af61c2cd27d634265c6ae553547be60998cd268f7cbd56c27724732742ba93",
+          "bytes": 331
+        },
+        "answers/blank-index.json": {
+          "sha256": "7f4cd02be1d00ce1b893c6fa9bdfac970e4c49dbb0256ca1c43ed50ae523bf97",
+          "bytes": 322
+        },
+        "answers/blank-signal.json": {
+          "sha256": "c831154d1b7fd1a75c8aa1799e8d60f346e8fa5455c9d5c2c850629c8072a787",
+          "bytes": 3151
+        },
+        "answers/cut-crlf.json": {
+          "sha256": "c69fc41624c9067b59f38cc407d74825c13d3190a48fafdf672c3c9bc7a2ce74",
+          "bytes": 319
+        },
+        "answers/duplicate-and-reordered.json": {
+          "sha256": "faa83e2cf433a045dfa8fc5f2f3ebb9ca2491765894d67bccfa6618ce17ed87d",
+          "bytes": 6608
+        },
+        "answers/elevation-high.json": {
+          "sha256": "64d88eb891bd4349a58762a2a655955c310c322e6e3850ee386cd59a8dcf69b9",
+          "bytes": 327
+        },
+        "answers/elevation-low.json": {
+          "sha256": "524dfddf96e3af3ab48de981b15f8d2f11e98640588a44e0537a085e87aedd66",
+          "bytes": 328
+        },
+        "answers/empty-observation.json": {
+          "sha256": "7747dc8642aa7b57407dc6c0e7c0082e8c5e308d3330417af07961de9340cf34",
+          "bytes": 672
+        },
+        "answers/exponent-visible.json": {
+          "sha256": "0e07e62d48382bbf845ce18daf726cfc07a7f7dcf5579cf1e7294714144e969f",
+          "bytes": 331
+        },
+        "answers/fifth-slot.json": {
+          "sha256": "191c1c7c199336c48a8eaeb7e327fb05a376f4cdf22d91b339f13b6b9d0e4027",
+          "bytes": 301
+        },
+        "answers/fraction-elevation.json": {
+          "sha256": "f8154c75d1f68011b979ad7535dcce7125742fe7b2f1934f112f97e7e16ddabb",
+          "bytes": 333
+        },
+        "answers/fraction-snr.json": {
+          "sha256": "6937b33ca4052572a192309e969d9dd006e6c5a588aba8f50fc595c776856a32",
+          "bytes": 327
+        },
+        "answers/fraction-sv-id.json": {
+          "sha256": "90af58212e5c8bee84602f6307cdb22f170f616539e934a7d09c2ce874effde8",
+          "bytes": 329
+        },
+        "answers/hex-10.json": {
+          "sha256": "2cb494039d90cfbee3a9cbbe1fc8c5f2da142c8b2c23872842d9ec46d524c862",
+          "bytes": 3174
+        },
+        "answers/hex-A.json": {
+          "sha256": "0d5ff7b37ef0ecdd6566b58cce79ff3c44d661f7bc81561374b4a69fc37ac2fa",
+          "bytes": 3170
+        },
+        "answers/hex-f.json": {
+          "sha256": "4f7fc133a32def1af690950dbf51816f7ae9dd63242975cf25c3f180c940f14e",
+          "bytes": 3170
+        },
+        "answers/independent-mixed-cycle-datagrams.json": {
+          "sha256": "f831c140bbaf242ba2548d8563dc1f8d012a52a184f74503a1b47e1fccae23b4",
+          "bytes": 19613
+        },
+        "answers/index-after-total.json": {
+          "sha256": "68ce3155dc90e6b6e39a0fe70733c6a7ee63d6eeda1d1a69cdf4a666b88d2e83",
+          "bytes": 330
+        },
+        "answers/late-bad-checksum.json": {
+          "sha256": "aaf13e23fbf1436c28ff6fd0bffdf405a3b968dcfac1d64b1d97e6d61e59555f",
+          "bytes": 470
+        },
+        "answers/long-hex-signal.json": {
+          "sha256": "36ee903f7d87a609bdf16c5ca0a2ba18108986c87accd9278347fccfbe3fbb1e",
+          "bytes": 338
+        },
+        "answers/lower-elevation.json": {
+          "sha256": "168cc5f46a0fb2a865849ccbf64cb03c648dd1c78bf620c34744fea1a4e777ea",
+          "bytes": 1288
+        },
+        "answers/nan-azimuth.json": {
+          "sha256": "90daf1b2eac74c1d8fa3fad9fc7a38359ae9617731beda42732e0fecbbeaa0b4",
+          "bytes": 324
+        },
+        "answers/negative-azimuth.json": {
+          "sha256": "c4c12d0adafaba8bc61b983038f735638aabecb2614d8781072b453668b68a47",
+          "bytes": 327
+        },
+        "answers/negative-elevation.json": {
+          "sha256": "12f7d092a1cc294c273b3f1aa2fe9a6ada58032e56eb2706616a79538df1c899",
+          "bytes": 1286
+        },
+        "answers/negative-snr.json": {
+          "sha256": "cb6c18417e160017be84ec40ec22c11c9cc2cd88e8f44765b73cf93d1a627d12",
+          "bytes": 325
+        },
+        "answers/negative-sv-id.json": {
+          "sha256": "ad2e02b99c1879416ed6291e64ab237cdb904dd391143d1ac64198d207dbcc21",
+          "bytes": 327
+        },
+        "answers/negative-visible.json": {
+          "sha256": "afc4e7db5d5b3d606776f8bce76a42cb9606c754d00cbebe8560383c67ee308d",
+          "bytes": 329
+        },
+        "answers/noninteger-total.json": {
+          "sha256": "e989ca9585b49153fbd4e481060b247667279d76329915cd9392d61458155244",
+          "bytes": 333
+        },
+        "answers/padded-empty-slot.json": {
+          "sha256": "ecb092025576ea3bf675309ac2b7d1f55e98b0fdb96a72d7d10e6edb30ba6c17",
+          "bytes": 1702
+        },
+        "answers/proprietary.json": {
+          "sha256": "1d5116598121959e15fd9fd2278e8a7f6106185ef3c5877e7b931e154f94b9cd",
+          "bytes": 326
+        },
+        "answers/short.json": {
+          "sha256": "5859606c185fc850aa039a40802ca11eb8605558a42aded91c2cdaafe087cc52",
+          "bytes": 208
+        },
+        "answers/snr-100.json": {
+          "sha256": "d07cf96959de6f2f10667964294433e73c75590d4cbcb52b84e820128e9b637f",
+          "bytes": 322
+        },
+        "answers/split-datagram.json": {
+          "sha256": "687961775651a92d4a0cc452ae41d8943f0c5bcf54d98daf7ce200b37d8a9728",
+          "bytes": 335
+        },
+        "answers/sv-four-digits.json": {
+          "sha256": "5547cf663bf7c557ce453d23c23f50092dfdd70835116ff559e6eab7d75f781c",
+          "bytes": 331
+        },
+        "answers/tail-byte.json": {
+          "sha256": "e9a3b4605364adb75662e4b731b4689f7ef3663c991996043a29ad14055943d0",
+          "bytes": 324
+        },
+        "answers/talker-BD.json": {
+          "sha256": "aef4990417f593af2927a6d7088a41b550e46dd5bc5861ddeecb9fac1d5ab234",
+          "bytes": 3120
+        },
+        "answers/talker-GA.json": {
+          "sha256": "c558ea51e39d460c73f7fe5cd66ee823f2cdce1fd79b5788173c541cc5c91f3c",
+          "bytes": 3120
+        },
+        "answers/talker-GB.json": {
+          "sha256": "8e97869a3ed9eb424ea7f44108512089b85a1c6087eb04745a3ef21cf6fe5651",
+          "bytes": 3120
+        },
+        "answers/talker-GI.json": {
+          "sha256": "f82988dc9eadb9d711f676ee004a5d053209aff65b161567d7d06a6ffa4480ea",
+          "bytes": 3120
+        },
+        "answers/talker-GN.json": {
+          "sha256": "7ceb343145c0fa995da041aa05bacb42e3510567ae2b3ed1e7f5e10fb0a0c312",
+          "bytes": 3120
+        },
+        "answers/talker-GQ.json": {
+          "sha256": "6ed1ccdf705216fb50816bb07ecbf4dc052bb8457af4ddea841694e542419a8c",
+          "bytes": 3120
+        },
+        "answers/trimble-1.json": {
+          "sha256": "a977c5abdf75277ccead209629af8f02e57594f5add449a359cc73337f97bda5",
+          "bytes": 3116
+        },
+        "answers/trimble-2.json": {
+          "sha256": "63e58bb7cf752722a71a05fff4d51ab764e7721fb479b7e43f89e8e5d5aa021b",
+          "bytes": 3123
+        },
+        "answers/trimble-3.json": {
+          "sha256": "e571fb596da8a4e392da612cf89672451816b60bf6b182206ecbc9ffcff1a357",
+          "bytes": 1895
+        },
+        "answers/trimble-4.json": {
+          "sha256": "f60163dfd41057ced931fe58fef475765613509d31fae0a72d10f1d05d15fe31",
+          "bytes": 2509
+        },
+        "answers/trimble-5.json": {
+          "sha256": "12e3631bd7a4cc67ee9036a495ec7b5406ab66f15f57dfacd2b6a70edab335c3",
+          "bytes": 3123
+        },
+        "answers/trimble-6.json": {
+          "sha256": "6ce5c06ac351d9f6eeabba471111c968e56659b634fc08a8b8569ea7864e1376",
+          "bytes": 3119
+        },
+        "answers/trimble-7.json": {
+          "sha256": "7fb83ef3e63d63f5be863c74e9de834e0d1ef5a67c5dbb63f2996c70ecdae368",
+          "bytes": 1279
+        },
+        "answers/trimble8-original-bad-checksum.json": {
+          "sha256": "2aecbf6f9c118468ee86c2d015f6ffe9c7179ef3c4f66a753c32ee1bce9d09a0",
+          "bytes": 321
+        },
+        "answers/trimble8-repaired-checksum.json": {
+          "sha256": "df3e6b13326b09786ca55ee4d51f4bca2bdff157b33916e3999eed81a77e7bcc",
+          "bytes": 2534
+        },
+        "answers/truncated-slot.json": {
+          "sha256": "89f6fa2f623df8630c965f84dfbd8510243797a32dfb8132e49285112b6ce092",
+          "bytes": 243
+        },
+        "answers/two-digit-total.json": {
+          "sha256": "941b04a043d04c25dd97c36fa9ee567587bd88df9ef4ac395259ec273fb3dba0",
+          "bytes": 330
+        },
+        "answers/two-in-one-datagram.json": {
+          "sha256": "6422deaff6a50b16aa3bd5cdec5ad4392478e586fa08d5c7758b4da90cbef502",
+          "bytes": 4093
+        },
+        "answers/two-independent-sentences.json": {
+          "sha256": "8abce622a2461be29617431a9db995609eaa1b29b01ea6681c7275d922ce7e7e",
+          "bytes": 3694
+        },
+        "answers/ublox-1.json": {
+          "sha256": "e44975ab2cd9963b7dec52f94d881ef13a0088173283337bcfeb9908d2d355ea",
+          "bytes": 2743
+        },
+        "answers/ublox-2.json": {
+          "sha256": "62bd6bcdac6044d6b9b2a0fcee37ea6438bbacb5dd85596d5949b6c1d58a9a7d",
+          "bytes": 2744
+        },
+        "answers/ublox-3.json": {
+          "sha256": "83a421fad3145b38d72f08ec9f12306440fe97fb1253c46798c9ac7491029958",
+          "bytes": 1223
+        },
+        "answers/ublox-4.json": {
+          "sha256": "3c6442cdfb690d5525076a278d53de147870bdc3686a3daabd01d9d94fb1c084",
+          "bytes": 2237
+        },
+        "answers/ublox-5.json": {
+          "sha256": "3af62fbc7e807a609c4fc808203664590b17c31577526a3d8a9d3f21d703858d",
+          "bytes": 716
+        },
+        "answers/unknown-sv-id.json": {
+          "sha256": "00fb47ea2e3a641fb4c78a18bb7a623fbbc784227c263831f1fb84577754c244",
+          "bytes": 1240
+        },
+        "answers/upper-fields.json": {
+          "sha256": "550cf00963de803f62d7fdb2d8380658382e567beb550ec1bb650fe1391d6bf7",
+          "bytes": 1286
+        },
+        "answers/vendor-extra-system.json": {
+          "sha256": "cbb7c3a4988735b90949ba450064541e077b490d15154283457acc516cae223f",
+          "bytes": 342
+        },
+        "answers/visible-four-digits.json": {
+          "sha256": "e5704e87bfb1933b7595a059b402ddc08619167e6cf9b71d73a5be26bc24d5e2",
+          "bytes": 336
+        },
+        "answers/zero-fields.json": {
+          "sha256": "c70175e3218d312d3f8bd679a34c3ff2d6a3c498fbf91c0d6f77d200d45ac38a",
+          "bytes": 1279
+        },
+        "answers/zero-index.json": {
+          "sha256": "b65cd6ec75f8b83cfa725d50cbf721783a64cd50ccffab2e271c750a17bf899f",
+          "bytes": 323
+        },
+        "answers/zero-total.json": {
+          "sha256": "53398ccc710e38799af360784021b723bdf5bad0f4265a9a24c7f93e133e8e42",
+          "bytes": 323
+        },
+        "build.py": {
+          "sha256": "75bfd32f3e87190f7d38b91c8d63675a5811015a60b0a01df695cc2e78749744",
+          "bytes": 9153
+        },
+        "captures/azimuth-360.pcap": {
+          "sha256": "5e758d24bd0587a4444655e5229e87c80dd2edd39c79c10e327a4d5370914a82",
+          "bytes": 152
+        },
+        "captures/bad-checksum.pcap": {
+          "sha256": "02397faf06c2cd7852c07e50771ae3196283087e87b8fe6c9f1d7960294fc4b2",
+          "bytes": 152
+        },
+        "captures/bad-hex-signal.pcap": {
+          "sha256": "e76b95866ec592e703c5fe7c0ab2289957dc13e9cd71224e3d81d33b11c86cff",
+          "bytes": 154
+        },
+        "captures/blank-index.pcap": {
+          "sha256": "6e22ede1591eeb948d5a6bd0c579818b787a9f79a2811e5e6cbd50f6335a6766",
+          "bytes": 151
+        },
+        "captures/blank-signal.pcap": {
+          "sha256": "602fc580c694c8142d6a4b3bd67a3f6a15904227f409bcba06a8c974d3896177",
+          "bytes": 153
+        },
+        "captures/cut-crlf.pcap": {
+          "sha256": "9958aa13583d4e7ee1bb36fe4978d531b8b1d37979453637a1fb27e7670d7b54",
+          "bytes": 151
+        },
+        "captures/duplicate-and-reordered.pcap": {
+          "sha256": "48bd69ff8cb6f6a56a2d5251666d0ec7753e45f166d7f9f3178a4f26cd26dfaf",
+          "bytes": 354
+        },
+        "captures/elevation-high.pcap": {
+          "sha256": "b7d11b06e14ffd79dad599d8e052249c1fc0f4ac150def620408f11963cd4b24",
+          "bytes": 152
+        },
+        "captures/elevation-low.pcap": {
+          "sha256": "003b4b4721d9703c15582257f534102a0318642f1897f3851cc8865414914783",
+          "bytes": 153
+        },
+        "captures/empty-observation.pcap": {
+          "sha256": "0ef0d2545158bd5355354aa80457af8bdc4c49a910101cb43ba2da67c0362842",
+          "bytes": 100
+        },
+        "captures/exponent-visible.pcap": {
+          "sha256": "9d5f627649975dc0cdb26d10ebbc2c5bda64106173a3e825f7b84c47073f5a39",
+          "bytes": 153
+        },
+        "captures/fifth-slot.pcap": {
+          "sha256": "9b9fca5ed541a7fa1ced8c82ff4876739fd8a0b5ec29757d4c59e73adc0a69e5",
+          "bytes": 140
+        },
+        "captures/fraction-elevation.pcap": {
+          "sha256": "8204206b3055037b39fc1f6eb26cab4a43f5c13d97ab8c38f73e9cb88afec7ba",
+          "bytes": 153
+        },
+        "captures/fraction-snr.pcap": {
+          "sha256": "482213518be682b27cba37b61ed7639d200609d06fe29902d0fc1cb1772507e1",
+          "bytes": 153
+        },
+        "captures/fraction-sv-id.pcap": {
+          "sha256": "09bf0ab8f8b20badbcc51cd31793170cafca7c64001b6f9ea91ec3803baaf234",
+          "bytes": 153
+        },
+        "captures/hex-10.pcap": {
+          "sha256": "86c8dab0083798501552e5fadc3b40c73179a946c28ae5e928ae72909fe06583",
+          "bytes": 155
+        },
+        "captures/hex-A.pcap": {
+          "sha256": "f6b4af6a33aec8457f402f3f67a09b3bc6d425e1253634376328c07d6c58d06c",
+          "bytes": 154
+        },
+        "captures/hex-f.pcap": {
+          "sha256": "85cf0138322e3b9b243918cdfff8f4cfc645afd0e979429abf199ddd4b8ffb40",
+          "bytes": 154
+        },
+        "captures/independent-mixed-cycle-datagrams.pcap": {
+          "sha256": "73971c7592d2b3ec16e111b54369541dcd849a5f1206f80fa5ab480472180634",
+          "bytes": 956
+        },
+        "captures/index-after-total.pcap": {
+          "sha256": "ea5d1d08a7d004cb8bb3fd8f66f56df51c3d9aaea5856ccbb076fa056d82663a",
+          "bytes": 152
+        },
+        "captures/late-bad-checksum.pcap": {
+          "sha256": "45c7d49ad2ef0ac2c859d58cb699a10fa3a0b7681d6394de2d4f2a3707d9dbdc",
+          "bytes": 222
+        },
+        "captures/long-hex-signal.pcap": {
+          "sha256": "0c69ec0d3b643cdb97e76e50882dc6692b355dfa157cfa52f8ffb5596043825e",
+          "bytes": 156
+        },
+        "captures/lower-elevation.pcap": {
+          "sha256": "f3412c5ec8e8f80ff01031b1cacc8d3bad9f7100242453caa2831649d76103c0",
+          "bytes": 114
+        },
+        "captures/nan-azimuth.pcap": {
+          "sha256": "0a0dafde3f98627660b44157f8226f19fdc23d6eaeea0caf7d0bcfbff6460b22",
+          "bytes": 152
+        },
+        "captures/negative-azimuth.pcap": {
+          "sha256": "cfdcccc3cb770ecde1bac6d32cf20b6cbfad2f8eda718ff18665b717ea76c150",
+          "bytes": 151
+        },
+        "captures/negative-elevation.pcap": {
+          "sha256": "569eddc40a5c343516c69a0e0b559d4646b0f21bfaf7195739b8e5164be834b7",
+          "bytes": 113
+        },
+        "captures/negative-snr.pcap": {
+          "sha256": "863c8f9d23a9dc772d17ca8f130820065395e01fc7f3f03af265a408eb11266f",
+          "bytes": 152
+        },
+        "captures/negative-sv-id.pcap": {
+          "sha256": "ab6e35e825bfad248f621ea3e3e0086517d65f29a9d0255fa88b1e24971793fe",
+          "bytes": 152
+        },
+        "captures/negative-visible.pcap": {
+          "sha256": "cb58de4ea9b69e14c4dfa886e48e51d3aa5a329ae0d074d12b2ff06ea464755b",
+          "bytes": 152
+        },
+        "captures/noninteger-total.pcap": {
+          "sha256": "7b5500da0e2b734e62c64bc79ef4d35092f1ddb3a1a0f828a2f24a8de38a4f50",
+          "bytes": 154
+        },
+        "captures/padded-empty-slot.pcap": {
+          "sha256": "5da19fe358a09e3af202e6af8df064723709898901db2f9f89f49ea97c81dd77",
+          "bytes": 117
+        },
+        "captures/proprietary.pcap": {
+          "sha256": "1f5092e530fc116ca6ec509949d06ba589bfac4d6059432d40e5e7abc0fc37db",
+          "bytes": 152
+        },
+        "captures/short.pcap": {
+          "sha256": "e0770cf846e556036499e5129b95138490c7ebb58df9921cd4911cdd3464b21d",
+          "bytes": 97
+        },
+        "captures/snr-100.pcap": {
+          "sha256": "caee573ba48789ca02b98b6c6a07bb886f4084ac9abc76e706f92fd9f814a130",
+          "bytes": 153
+        },
+        "captures/split-datagram.pcap": {
+          "sha256": "c6597be49aa598ef294b0588e94099f2805a305357110f7743d57b70218dea65",
+          "bytes": 210
+        },
+        "captures/sv-four-digits.pcap": {
+          "sha256": "25c43f980cc7088378b3e5daae59064e82e8244fa32453952a5f1f974c2d7ec9",
+          "bytes": 154
+        },
+        "captures/tail-byte.pcap": {
+          "sha256": "373629d59a19f0c16c8c795f2aaefe9c7f2309bc29e807b65124fa9ba5017f46",
+          "bytes": 153
+        },
+        "captures/talker-BD.pcap": {
+          "sha256": "6b6212c4cdc187a6f5f7444ac448255d1b5da046429f407481116ed2d9940978",
+          "bytes": 152
+        },
+        "captures/talker-GA.pcap": {
+          "sha256": "578232bea2e0d75a7342c06af338d6645e4415c115fcbf32570de6bc0361664b",
+          "bytes": 152
+        },
+        "captures/talker-GB.pcap": {
+          "sha256": "0f6c8c0870235ad77c2b3537d0862556c5f55ca761ddcc3e7865a9cdd46a83f5",
+          "bytes": 152
+        },
+        "captures/talker-GI.pcap": {
+          "sha256": "e60b95fe70c8da5a5f859a0c2c5ef57df19df1d16b5cdfa87071e5c27d3d758a",
+          "bytes": 152
+        },
+        "captures/talker-GN.pcap": {
+          "sha256": "779fa354270e1342bfc49a0502d677aa15be01bbf56a008aa12d43843aad27b0",
+          "bytes": 152
+        },
+        "captures/talker-GQ.pcap": {
+          "sha256": "dba5d541a1abc189dd021a53721ecd088ccc4fc45feb6705ab3d58a07e5865ab",
+          "bytes": 152
+        },
+        "captures/trimble-1.pcap": {
+          "sha256": "e59c8ada5a369a2f4eaaee6de32b5326f40411e9e436da10c94cefb2bcf76c40",
+          "bytes": 150
+        },
+        "captures/trimble-2.pcap": {
+          "sha256": "1b6d7eefab69214e2377c2096f4b39c4d2924fb8d747a4bfe565c67e459654a9",
+          "bytes": 152
+        },
+        "captures/trimble-3.pcap": {
+          "sha256": "7eab9d804209e87da1f7ff9f0143656adfa4d0f3a8ebd898557088dacf294436",
+          "bytes": 126
+        },
+        "captures/trimble-4.pcap": {
+          "sha256": "5cb25d17c9d7b4559cd628fa2f767f2914d1c83a14e802e049a8db5bd2f73590",
+          "bytes": 139
+        },
+        "captures/trimble-5.pcap": {
+          "sha256": "3cecfd49496548925bcdfc364fdf74da0c5a70d09f971e0da5b3914b7d481761",
+          "bytes": 152
+        },
+        "captures/trimble-6.pcap": {
+          "sha256": "946169364c441541119acf2c9618969755caf3a1e4bd26853d1c80955639da05",
+          "bytes": 151
+        },
+        "captures/trimble-7.pcap": {
+          "sha256": "237e6ec392da6411ad665ea7021dfefb08b1b0d02d3087d4a1231b215536edb4",
+          "bytes": 113
+        },
+        "captures/trimble8-original-bad-checksum.pcap": {
+          "sha256": "ac724be2d1e8e455d07feefed0ab568ce792579345b7b46b5e9432aad7e0e776",
+          "bytes": 141
+        },
+        "captures/trimble8-repaired-checksum.pcap": {
+          "sha256": "c7d183c2d63aa669e16d077574f843090d560efa73ae4e29f208c05d66641603",
+          "bytes": 141
+        },
+        "captures/truncated-slot.pcap": {
+          "sha256": "298d3660389a9e81a24ea3e0ea029eb34d810d8887394f5c9684719902967920",
+          "bytes": 110
+        },
+        "captures/two-digit-total.pcap": {
+          "sha256": "926a9ba695dace946082f5afce05432cf302569a4e8233dd73e61e542f98f4a5",
+          "bytes": 153
+        },
+        "captures/two-in-one-datagram.pcap": {
+          "sha256": "cd89ccd01824f60451cde68dffbe2264f38d0496172ff97a973c90e211b103fe",
+          "bytes": 170
+        },
+        "captures/two-independent-sentences.pcap": {
+          "sha256": "5f8e670d65113cce573f74916af3ab66448453446b1ef1c7defa77968802011c",
+          "bytes": 228
+        },
+        "captures/ublox-1.pcap": {
+          "sha256": "c1705c195801f8783272c45a914a751cc1dfb66693320d57dcbdc20e53a09eb2",
+          "bytes": 134
+        },
+        "captures/ublox-2.pcap": {
+          "sha256": "bd8ad65a7ecd4174d02e2c1e733841e2e6b6235fd2a63015a8bdb8c0ff0b587a",
+          "bytes": 134
+        },
+        "captures/ublox-3.pcap": {
+          "sha256": "2d0db0f29115139882f3e30f1a8ccc87fc5b339c8da93244aac4d25f8808b80b",
+          "bytes": 110
+        },
+        "captures/ublox-4.pcap": {
+          "sha256": "3829e20ae5dc731da6204b0a803136ba72b65648071e6bb8b27b24665c00ee10",
+          "bytes": 126
+        },
+        "captures/ublox-5.pcap": {
+          "sha256": "a8c867ce25e6b754447610a540d2b48e1dcb7c2575c806288d290fcbc83bdf5d",
+          "bytes": 102
+        },
+        "captures/unknown-sv-id.pcap": {
+          "sha256": "58411acd7ef6acb93985aa055d8246401a1ff1b482c238e4563c532bc5edf92a",
+          "bytes": 111
+        },
+        "captures/upper-fields.pcap": {
+          "sha256": "63d3cdbf7815a50d28468046891b95b61f2bd9fce5e449347e3d8baf770b7720",
+          "bytes": 114
+        },
+        "captures/vendor-extra-system.pcap": {
+          "sha256": "324c6910a30117568484f7026dd28ff06a5265b0e05750894b72cf853ae61fa8",
+          "bytes": 156
+        },
+        "captures/visible-four-digits.pcap": {
+          "sha256": "0ccc9b33a10ee0b0c3f99a646374e7c9d8047214a0c32e5fa06aca59fa7a97ec",
+          "bytes": 154
+        },
+        "captures/zero-fields.pcap": {
+          "sha256": "e4e49552f0a82261184013283a8d34f258f3da45d5d932568daea9e64e9cf7d8",
+          "bytes": 114
+        },
+        "captures/zero-index.pcap": {
+          "sha256": "6948e6fd272ab57391d98227db122c22c22bfd0d31f3d50e6baa5cced2a4c2cc",
+          "bytes": 152
+        },
+        "captures/zero-total.pcap": {
+          "sha256": "0d4febe2b3174262141c3caed274ed2e66b81407b5653df8096c79dce05a8dfd",
+          "bytes": 152
+        },
+        "controls.json": {
+          "sha256": "9e4649e21118690917fcdab716602e62753b68ba248841207d9b3a0d77cb6656",
+          "bytes": 22460
+        },
+        "gpsd-gsv-reference.jsonl": {
+          "sha256": "e15951d5a160acdf823d5d6fa1fce548c25fed36b46e577bd7d003f9feb85747",
+          "bytes": 12058
+        },
+        "reproduce-reference.py": {
+          "sha256": "b53809d8c70336d82bd1743f7a4861abc79a57b34ef23b4e5bf9249048fa295e",
+          "bytes": 5110
+        },
+        "seal.py": {
+          "sha256": "01891e361a2249ae8b79d4314345d7c70ec07e4f630a5f06741dd9f53e5e615f",
+          "bytes": 709
+        },
+        "source-pin.json": {
+          "sha256": "23cec1801cfeb788a202bcc58013d7bee25082b1103737918c6ed658e32433b8",
+          "bytes": 1464
+        },
+        "validation/expected.json": {
+          "sha256": "7d966b6d59668696f297305002c7594644e8529e21400ea1ae4dc15254b4a6c1",
+          "bytes": 72682
+        },
+        "validation/provenance.json": {
+          "sha256": "8a3e104c8a1e10e0c35365dcd8b412d797858e857d34e500a4aa7a2e7995047a",
+          "bytes": 397
+        },
+        "verify.py": {
+          "sha256": "df5e3e6d451dc77a87773e7d1d59d8f76a1362bb73716cb3407ac8b253483cab",
+          "bytes": 4359
+        }
+      },
+      "aliases": {
+        "common/pcapx/pcaputil/nmea-gsv/answers/azimuth-360.json": "answers/azimuth-360.json",
+        "common/pcapx/pcaputil/nmea-gsv/answers/bad-checksum.json": "answers/bad-checksum.json",
+        "common/pcapx/pcaputil/nmea-gsv/answers/bad-hex-signal.json": "answers/bad-hex-signal.json",
+        "common/pcapx/pcaputil/nmea-gsv/answers/blank-index.json": "answers/blank-index.json",
+        "common/pcapx/pcaputil/nmea-gsv/answers/blank-signal.json": "answers/blank-signal.json",
+        "common/pcapx/pcaputil/nmea-gsv/answers/cut-crlf.json": "answers/cut-crlf.json",
+        "common/pcapx/pcaputil/nmea-gsv/answers/duplicate-and-reordered.json": "answers/duplicate-and-reordered.json",
+        "common/pcapx/pcaputil/nmea-gsv/answers/elevation-high.json": "answers/elevation-high.json",
+        "common/pcapx/pcaputil/nmea-gsv/answers/elevation-low.json": "answers/elevation-low.json",
+        "common/pcapx/pcaputil/nmea-gsv/answers/empty-observation.json": "answers/empty-observation.json",
+        "common/pcapx/pcaputil/nmea-gsv/answers/exponent-visible.json": "answers/exponent-visible.json",
+        "common/pcapx/pcaputil/nmea-gsv/answers/fifth-slot.json": "answers/fifth-slot.json",
+        "common/pcapx/pcaputil/nmea-gsv/answers/fraction-elevation.json": "answers/fraction-elevation.json",
+        "common/pcapx/pcaputil/nmea-gsv/answers/fraction-snr.json": "answers/fraction-snr.json",
+        "common/pcapx/pcaputil/nmea-gsv/answers/fraction-sv-id.json": "answers/fraction-sv-id.json",
+        "common/pcapx/pcaputil/nmea-gsv/answers/hex-10.json": "answers/hex-10.json",
+        "common/pcapx/pcaputil/nmea-gsv/answers/hex-A.json": "answers/hex-A.json",
+        "common/pcapx/pcaputil/nmea-gsv/answers/hex-f.json": "answers/hex-f.json",
+        "common/pcapx/pcaputil/nmea-gsv/answers/independent-mixed-cycle-datagrams.json": "answers/independent-mixed-cycle-datagrams.json",
+        "common/pcapx/pcaputil/nmea-gsv/answers/index-after-total.json": "answers/index-after-total.json",
+        "common/pcapx/pcaputil/nmea-gsv/answers/late-bad-checksum.json": "answers/late-bad-checksum.json",
+        "common/pcapx/pcaputil/nmea-gsv/answers/long-hex-signal.json": "answers/long-hex-signal.json",
+        "common/pcapx/pcaputil/nmea-gsv/answers/lower-elevation.json": "answers/lower-elevation.json",
+        "common/pcapx/pcaputil/nmea-gsv/answers/nan-azimuth.json": "answers/nan-azimuth.json",
+        "common/pcapx/pcaputil/nmea-gsv/answers/negative-azimuth.json": "answers/negative-azimuth.json",
+        "common/pcapx/pcaputil/nmea-gsv/answers/negative-elevation.json": "answers/negative-elevation.json",
+        "common/pcapx/pcaputil/nmea-gsv/answers/negative-snr.json": "answers/negative-snr.json",
+        "common/pcapx/pcaputil/nmea-gsv/answers/negative-sv-id.json": "answers/negative-sv-id.json",
+        "common/pcapx/pcaputil/nmea-gsv/answers/negative-visible.json": "answers/negative-visible.json",
+        "common/pcapx/pcaputil/nmea-gsv/answers/noninteger-total.json": "answers/noninteger-total.json",
+        "common/pcapx/pcaputil/nmea-gsv/answers/padded-empty-slot.json": "answers/padded-empty-slot.json",
+        "common/pcapx/pcaputil/nmea-gsv/answers/proprietary.json": "answers/proprietary.json",
+        "common/pcapx/pcaputil/nmea-gsv/answers/short.json": "answers/short.json",
+        "common/pcapx/pcaputil/nmea-gsv/answers/snr-100.json": "answers/snr-100.json",
+        "common/pcapx/pcaputil/nmea-gsv/answers/split-datagram.json": "answers/split-datagram.json",
+        "common/pcapx/pcaputil/nmea-gsv/answers/sv-four-digits.json": "answers/sv-four-digits.json",
+        "common/pcapx/pcaputil/nmea-gsv/answers/tail-byte.json": "answers/tail-byte.json",
+        "common/pcapx/pcaputil/nmea-gsv/answers/talker-BD.json": "answers/talker-BD.json",
+        "common/pcapx/pcaputil/nmea-gsv/answers/talker-GA.json": "answers/talker-GA.json",
+        "common/pcapx/pcaputil/nmea-gsv/answers/talker-GB.json": "answers/talker-GB.json",
+        "common/pcapx/pcaputil/nmea-gsv/answers/talker-GI.json": "answers/talker-GI.json",
+        "common/pcapx/pcaputil/nmea-gsv/answers/talker-GN.json": "answers/talker-GN.json",
+        "common/pcapx/pcaputil/nmea-gsv/answers/talker-GQ.json": "answers/talker-GQ.json",
+        "common/pcapx/pcaputil/nmea-gsv/answers/trimble-1.json": "answers/trimble-1.json",
+        "common/pcapx/pcaputil/nmea-gsv/answers/trimble-2.json": "answers/trimble-2.json",
+        "common/pcapx/pcaputil/nmea-gsv/answers/trimble-3.json": "answers/trimble-3.json",
+        "common/pcapx/pcaputil/nmea-gsv/answers/trimble-4.json": "answers/trimble-4.json",
+        "common/pcapx/pcaputil/nmea-gsv/answers/trimble-5.json": "answers/trimble-5.json",
+        "common/pcapx/pcaputil/nmea-gsv/answers/trimble-6.json": "answers/trimble-6.json",
+        "common/pcapx/pcaputil/nmea-gsv/answers/trimble-7.json": "answers/trimble-7.json",
+        "common/pcapx/pcaputil/nmea-gsv/answers/trimble8-original-bad-checksum.json": "answers/trimble8-original-bad-checksum.json",
+        "common/pcapx/pcaputil/nmea-gsv/answers/trimble8-repaired-checksum.json": "answers/trimble8-repaired-checksum.json",
+        "common/pcapx/pcaputil/nmea-gsv/answers/truncated-slot.json": "answers/truncated-slot.json",
+        "common/pcapx/pcaputil/nmea-gsv/answers/two-digit-total.json": "answers/two-digit-total.json",
+        "common/pcapx/pcaputil/nmea-gsv/answers/two-in-one-datagram.json": "answers/two-in-one-datagram.json",
+        "common/pcapx/pcaputil/nmea-gsv/answers/two-independent-sentences.json": "answers/two-independent-sentences.json",
+        "common/pcapx/pcaputil/nmea-gsv/answers/ublox-1.json": "answers/ublox-1.json",
+        "common/pcapx/pcaputil/nmea-gsv/answers/ublox-2.json": "answers/ublox-2.json",
+        "common/pcapx/pcaputil/nmea-gsv/answers/ublox-3.json": "answers/ublox-3.json",
+        "common/pcapx/pcaputil/nmea-gsv/answers/ublox-4.json": "answers/ublox-4.json",
+        "common/pcapx/pcaputil/nmea-gsv/answers/ublox-5.json": "answers/ublox-5.json",
+        "common/pcapx/pcaputil/nmea-gsv/answers/unknown-sv-id.json": "answers/unknown-sv-id.json",
+        "common/pcapx/pcaputil/nmea-gsv/answers/upper-fields.json": "answers/upper-fields.json",
+        "common/pcapx/pcaputil/nmea-gsv/answers/vendor-extra-system.json": "answers/vendor-extra-system.json",
+        "common/pcapx/pcaputil/nmea-gsv/answers/visible-four-digits.json": "answers/visible-four-digits.json",
+        "common/pcapx/pcaputil/nmea-gsv/answers/zero-fields.json": "answers/zero-fields.json",
+        "common/pcapx/pcaputil/nmea-gsv/answers/zero-index.json": "answers/zero-index.json",
+        "common/pcapx/pcaputil/nmea-gsv/answers/zero-total.json": "answers/zero-total.json",
+        "common/pcapx/pcaputil/nmea-gsv/build.py": "build.py",
+        "common/pcapx/pcaputil/nmea-gsv/captures/azimuth-360.pcap": "captures/azimuth-360.pcap",
+        "common/pcapx/pcaputil/nmea-gsv/captures/bad-checksum.pcap": "captures/bad-checksum.pcap",
+        "common/pcapx/pcaputil/nmea-gsv/captures/bad-hex-signal.pcap": "captures/bad-hex-signal.pcap",
+        "common/pcapx/pcaputil/nmea-gsv/captures/blank-index.pcap": "captures/blank-index.pcap",
+        "common/pcapx/pcaputil/nmea-gsv/captures/blank-signal.pcap": "captures/blank-signal.pcap",
+        "common/pcapx/pcaputil/nmea-gsv/captures/cut-crlf.pcap": "captures/cut-crlf.pcap",
+        "common/pcapx/pcaputil/nmea-gsv/captures/duplicate-and-reordered.pcap": "captures/duplicate-and-reordered.pcap",
+        "common/pcapx/pcaputil/nmea-gsv/captures/elevation-high.pcap": "captures/elevation-high.pcap",
+        "common/pcapx/pcaputil/nmea-gsv/captures/elevation-low.pcap": "captures/elevation-low.pcap",
+        "common/pcapx/pcaputil/nmea-gsv/captures/empty-observation.pcap": "captures/empty-observation.pcap",
+        "common/pcapx/pcaputil/nmea-gsv/captures/exponent-visible.pcap": "captures/exponent-visible.pcap",
+        "common/pcapx/pcaputil/nmea-gsv/captures/fifth-slot.pcap": "captures/fifth-slot.pcap",
+        "common/pcapx/pcaputil/nmea-gsv/captures/fraction-elevation.pcap": "captures/fraction-elevation.pcap",
+        "common/pcapx/pcaputil/nmea-gsv/captures/fraction-snr.pcap": "captures/fraction-snr.pcap",
+        "common/pcapx/pcaputil/nmea-gsv/captures/fraction-sv-id.pcap": "captures/fraction-sv-id.pcap",
+        "common/pcapx/pcaputil/nmea-gsv/captures/hex-10.pcap": "captures/hex-10.pcap",
+        "common/pcapx/pcaputil/nmea-gsv/captures/hex-A.pcap": "captures/hex-A.pcap",
+        "common/pcapx/pcaputil/nmea-gsv/captures/hex-f.pcap": "captures/hex-f.pcap",
+        "common/pcapx/pcaputil/nmea-gsv/captures/independent-mixed-cycle-datagrams.pcap": "captures/independent-mixed-cycle-datagrams.pcap",
+        "common/pcapx/pcaputil/nmea-gsv/captures/index-after-total.pcap": "captures/index-after-total.pcap",
+        "common/pcapx/pcaputil/nmea-gsv/captures/late-bad-checksum.pcap": "captures/late-bad-checksum.pcap",
+        "common/pcapx/pcaputil/nmea-gsv/captures/long-hex-signal.pcap": "captures/long-hex-signal.pcap",
+        "common/pcapx/pcaputil/nmea-gsv/captures/lower-elevation.pcap": "captures/lower-elevation.pcap",
+        "common/pcapx/pcaputil/nmea-gsv/captures/nan-azimuth.pcap": "captures/nan-azimuth.pcap",
+        "common/pcapx/pcaputil/nmea-gsv/captures/negative-azimuth.pcap": "captures/negative-azimuth.pcap",
+        "common/pcapx/pcaputil/nmea-gsv/captures/negative-elevation.pcap": "captures/negative-elevation.pcap",
+        "common/pcapx/pcaputil/nmea-gsv/captures/negative-snr.pcap": "captures/negative-snr.pcap",
+        "common/pcapx/pcaputil/nmea-gsv/captures/negative-sv-id.pcap": "captures/negative-sv-id.pcap",
+        "common/pcapx/pcaputil/nmea-gsv/captures/negative-visible.pcap": "captures/negative-visible.pcap",
+        "common/pcapx/pcaputil/nmea-gsv/captures/noninteger-total.pcap": "captures/noninteger-total.pcap",
+        "common/pcapx/pcaputil/nmea-gsv/captures/padded-empty-slot.pcap": "captures/padded-empty-slot.pcap",
+        "common/pcapx/pcaputil/nmea-gsv/captures/proprietary.pcap": "captures/proprietary.pcap",
+        "common/pcapx/pcaputil/nmea-gsv/captures/short.pcap": "captures/short.pcap",
+        "common/pcapx/pcaputil/nmea-gsv/captures/snr-100.pcap": "captures/snr-100.pcap",
+        "common/pcapx/pcaputil/nmea-gsv/captures/split-datagram.pcap": "captures/split-datagram.pcap",
+        "common/pcapx/pcaputil/nmea-gsv/captures/sv-four-digits.pcap": "captures/sv-four-digits.pcap",
+        "common/pcapx/pcaputil/nmea-gsv/captures/tail-byte.pcap": "captures/tail-byte.pcap",
+        "common/pcapx/pcaputil/nmea-gsv/captures/talker-BD.pcap": "captures/talker-BD.pcap",
+        "common/pcapx/pcaputil/nmea-gsv/captures/talker-GA.pcap": "captures/talker-GA.pcap",
+        "common/pcapx/pcaputil/nmea-gsv/captures/talker-GB.pcap": "captures/talker-GB.pcap",
+        "common/pcapx/pcaputil/nmea-gsv/captures/talker-GI.pcap": "captures/talker-GI.pcap",
+        "common/pcapx/pcaputil/nmea-gsv/captures/talker-GN.pcap": "captures/talker-GN.pcap",
+        "common/pcapx/pcaputil/nmea-gsv/captures/talker-GQ.pcap": "captures/talker-GQ.pcap",
+        "common/pcapx/pcaputil/nmea-gsv/captures/trimble-1.pcap": "captures/trimble-1.pcap",
+        "common/pcapx/pcaputil/nmea-gsv/captures/trimble-2.pcap": "captures/trimble-2.pcap",
+        "common/pcapx/pcaputil/nmea-gsv/captures/trimble-3.pcap": "captures/trimble-3.pcap",
+        "common/pcapx/pcaputil/nmea-gsv/captures/trimble-4.pcap": "captures/trimble-4.pcap",
+        "common/pcapx/pcaputil/nmea-gsv/captures/trimble-5.pcap": "captures/trimble-5.pcap",
+        "common/pcapx/pcaputil/nmea-gsv/captures/trimble-6.pcap": "captures/trimble-6.pcap",
+        "common/pcapx/pcaputil/nmea-gsv/captures/trimble-7.pcap": "captures/trimble-7.pcap",
+        "common/pcapx/pcaputil/nmea-gsv/captures/trimble8-original-bad-checksum.pcap": "captures/trimble8-original-bad-checksum.pcap",
+        "common/pcapx/pcaputil/nmea-gsv/captures/trimble8-repaired-checksum.pcap": "captures/trimble8-repaired-checksum.pcap",
+        "common/pcapx/pcaputil/nmea-gsv/captures/truncated-slot.pcap": "captures/truncated-slot.pcap",
+        "common/pcapx/pcaputil/nmea-gsv/captures/two-digit-total.pcap": "captures/two-digit-total.pcap",
+        "common/pcapx/pcaputil/nmea-gsv/captures/two-in-one-datagram.pcap": "captures/two-in-one-datagram.pcap",
+        "common/pcapx/pcaputil/nmea-gsv/captures/two-independent-sentences.pcap": "captures/two-independent-sentences.pcap",
+        "common/pcapx/pcaputil/nmea-gsv/captures/ublox-1.pcap": "captures/ublox-1.pcap",
+        "common/pcapx/pcaputil/nmea-gsv/captures/ublox-2.pcap": "captures/ublox-2.pcap",
+        "common/pcapx/pcaputil/nmea-gsv/captures/ublox-3.pcap": "captures/ublox-3.pcap",
+        "common/pcapx/pcaputil/nmea-gsv/captures/ublox-4.pcap": "captures/ublox-4.pcap",
+        "common/pcapx/pcaputil/nmea-gsv/captures/ublox-5.pcap": "captures/ublox-5.pcap",
+        "common/pcapx/pcaputil/nmea-gsv/captures/unknown-sv-id.pcap": "captures/unknown-sv-id.pcap",
+        "common/pcapx/pcaputil/nmea-gsv/captures/upper-fields.pcap": "captures/upper-fields.pcap",
+        "common/pcapx/pcaputil/nmea-gsv/captures/vendor-extra-system.pcap": "captures/vendor-extra-system.pcap",
+        "common/pcapx/pcaputil/nmea-gsv/captures/visible-four-digits.pcap": "captures/visible-four-digits.pcap",
+        "common/pcapx/pcaputil/nmea-gsv/captures/zero-fields.pcap": "captures/zero-fields.pcap",
+        "common/pcapx/pcaputil/nmea-gsv/captures/zero-index.pcap": "captures/zero-index.pcap",
+        "common/pcapx/pcaputil/nmea-gsv/captures/zero-total.pcap": "captures/zero-total.pcap",
+        "common/pcapx/pcaputil/nmea-gsv/controls.json": "controls.json",
+        "common/pcapx/pcaputil/nmea-gsv/gpsd-gsv-reference.jsonl": "gpsd-gsv-reference.jsonl",
+        "common/pcapx/pcaputil/nmea-gsv/reproduce-reference.py": "reproduce-reference.py",
+        "common/pcapx/pcaputil/nmea-gsv/seal.py": "seal.py",
+        "common/pcapx/pcaputil/nmea-gsv/source-pin.json": "source-pin.json",
+        "common/pcapx/pcaputil/nmea-gsv/validation/expected.json": "validation/expected.json",
+        "common/pcapx/pcaputil/nmea-gsv/validation/provenance.json": "validation/provenance.json",
+        "common/pcapx/pcaputil/nmea-gsv/verify.py": "verify.py"
+      }
     }
   ],
   "schema_version": 1,
