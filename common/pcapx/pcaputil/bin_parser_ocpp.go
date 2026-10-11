@@ -12,7 +12,7 @@ import (
 	"unicode/utf8"
 )
 
-// Selected OCPP-J 1.6 BootNotification/Heartbeat observations. Association is
+// Selected OCPP-J 1.6/2.0.1 BootNotification/Heartbeat observations. Association is
 // local to a successfully negotiated WebSocket; no station authorization or
 // reconnect identity is inferred from an HTTP path or a successful response.
 type ocppCall struct {
@@ -20,6 +20,7 @@ type ocppCall struct {
 	event  uint64
 }
 type binOCPP struct {
+	version string
 	seen    [2]map[string]ocppCall
 	pending [2]map[string]ocppCall
 }
@@ -241,7 +242,7 @@ func (f *binFlow) consumeOCPP(dir int, e *ProtocolEvent) error {
 		e.ID = f.a.ids.Add(1)
 	}
 	e.ocpp = true
-	info := map[string]any{"Version": "1.6", "Context Status": "malformed"}
+	info := map[string]any{"Version": ws.ocpp.version, "Context Status": "malformed"}
 	e.Session["OCPP"] = info
 	diagnostic := func(status, reason string) error { info["Context Status"], info["Reason"] = status, reason; return nil }
 	// Reserve bounded transient JSON/projection space before allocating a tree.
@@ -306,7 +307,7 @@ func (f *binFlow) consumeOCPP(dir int, e *ProtocolEvent) error {
 			return diagnostic("malformed", "CALL payload must be an object")
 		}
 		info["Payload"] = p
-		if err := ocppPayload(action, false, p); err != nil {
+		if err := o.payload(action, false, p); err != nil {
 			return diagnostic("malformed", err.Error())
 		}
 		if o.pending[dir] == nil {
@@ -334,7 +335,7 @@ func (f *binFlow) consumeOCPP(dir int, e *ProtocolEvent) error {
 			return diagnostic("malformed", "CALLRESULT payload must be an object")
 		}
 		info["Payload"] = p
-		if err := ocppPayload(call.action, true, p); err != nil {
+		if err := o.payload(call.action, true, p); err != nil {
 			return diagnostic("malformed", err.Error())
 		}
 	} else {
@@ -345,9 +346,7 @@ func (f *binFlow) consumeOCPP(dir int, e *ProtocolEvent) error {
 		if !ok {
 			return diagnostic("malformed", "CALLERROR code type")
 		}
-		switch code {
-		case "NotImplemented", "NotSupported", "InternalError", "ProtocolError", "SecurityError", "FormationViolation", "PropertyConstraintViolation", "OccurenceConstraintViolation", "TypeConstraintViolation", "GenericError":
-		default:
+		if !o.errorCode(code) {
 			return diagnostic("malformed", "CALLERROR unknown code")
 		}
 		description, ok := a[3].(string)
@@ -363,4 +362,23 @@ func (f *binFlow) consumeOCPP(dir int, e *ProtocolEvent) error {
 	e.ResponseTo, e.TransactionID = call.event, call.event
 	info["Context Status"] = "matched"
 	return nil
+}
+
+func (o *binOCPP) payload(action string, response bool, p map[string]any) error {
+	if o.version == "2.0.1" {
+		return ocpp201Payload(action, response, p)
+	}
+	return ocppPayload(action, response, p)
+}
+
+func (o *binOCPP) errorCode(code string) bool {
+	switch code {
+	case "NotImplemented", "NotSupported", "InternalError", "ProtocolError", "SecurityError", "PropertyConstraintViolation", "TypeConstraintViolation", "GenericError":
+		return true
+	case "FormationViolation", "OccurenceConstraintViolation":
+		return o.version == "1.6"
+	case "FormatViolation", "OccurrenceConstraintViolation", "MessageTypeNotSupported", "RpcFrameworkError":
+		return o.version == "2.0.1"
+	}
+	return false
 }

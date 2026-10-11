@@ -48831,6 +48831,323 @@
         "common/pcapx/pcaputil/testdata/ocpp16-rpc/verify.py": "ocpp16-rpc/verify.py",
         "common/pcapx/pcaputil/testdata/ocpp16-rpc/seal.py": "ocpp16-rpc/seal.py"
       }
+    },
+    {
+      "id": "validation-ocpp201-rpc",
+      "kind": "validation",
+      "source_sha": "86343a03d05cc3d7b3d4ebab56edda10801b0f24",
+      "file": "validation-ocpp201-rpc.zip",
+      "sha256": "37c67258d02b758f3ce093381266b846178e39131a9626e16a68ec7d4901bf50",
+      "password": "bin-parser",
+      "members": {
+        "ocpp201-rpc/records/boot-heartbeat-0.bin": {
+          "bytes": 196,
+          "sha256": "5ae0c54350961286d0c5d338a7e454b8824d0773c8245e55210e53eccc916c9e"
+        },
+        "ocpp201-rpc/records/boot-heartbeat-1.bin": {
+          "bytes": 164,
+          "sha256": "57f5cea87038a83c557a150485bd9049c915390b10ab0b24afc3688e9a348065"
+        },
+        "ocpp201-rpc/records/boot-heartbeat-2.bin": {
+          "bytes": 106,
+          "sha256": "ca6c15580fe7eede70bf8e7eec81d8781a97561b5010a2f37e7b67a9f9e6f067"
+        },
+        "ocpp201-rpc/records/compressed-context-takeover-0.bin": {
+          "bytes": 242,
+          "sha256": "704ee3bb5e79c537a48b4ef24e1142c17f3e7aafd02d1c9a897cedc6bc95ee03"
+        },
+        "ocpp201-rpc/records/compressed-context-takeover-1.bin": {
+          "bytes": 210,
+          "sha256": "941923c81e552bebae645b2d62783aed12a956fc68647010e1d127b774539adb"
+        },
+        "ocpp201-rpc/records/compressed-context-takeover-2.bin": {
+          "bytes": 98,
+          "sha256": "180419c856ce5d3dc0640b969d893f079a9ca92e8014abf93d8ea487f5caf822"
+        },
+        "ocpp201-rpc/records/compressed-context-takeover-4.bin": {
+          "bytes": 27,
+          "sha256": "b39d5ce7a5347c03d88a2003e909838e2814f0c454f94b7a68ba7962d34f9566"
+        },
+        "ocpp201-rpc/records/callerror-3.bin": {
+          "bytes": 85,
+          "sha256": "0801562d6b0f9dd6471be6232a1b55172dcdbd416d130d5b7130139d1d6be5ca"
+        },
+        "ocpp201-rpc/records/missing-model-2.bin": {
+          "bytes": 92,
+          "sha256": "b5b00224b4d8fa1ad21ddd641ba9f503c347c012f50bada0fd60fb61a315bca4"
+        },
+        "ocpp201-rpc/records/custom-heartbeat-2.bin": {
+          "bytes": 82,
+          "sha256": "83847692dd6d91e00cd37d2433b6f43d6a443c4c905cc100631e25aaab568a48"
+        },
+        "ocpp201-rpc/records/custom-heartbeat-3.bin": {
+          "bytes": 78,
+          "sha256": "fe218902f4a1a17c1b52dbb02eb545c7296b4911122df2dbe7a92207d12ea7c8"
+        },
+        "ocpp201-rpc/records/custom-missing-vendor-2.bin": {
+          "bytes": 45,
+          "sha256": "9cf67a750ad2b3969b432a1f5bb2eb24deb110876f67332b5f961b70d49500bf"
+        },
+        "ocpp201-rpc/records/version16-payload-2.bin": {
+          "bytes": 87,
+          "sha256": "63f75c6009d48058f192e4e9f37a454e8ee48fbf91008c306303ce90e377c20a"
+        },
+        "ocpp201-rpc/records/format-error-3.bin": {
+          "bytes": 33,
+          "sha256": "32ade6a2acc2dfd2d6e2c6c65388bd38c3c6ac6631a245df070666eb454018f8"
+        },
+        "ocpp201-rpc/records/rpc-framework-error-3.bin": {
+          "bytes": 42,
+          "sha256": "1f662e2e9b106b0de2670d6324cf76e127f56e87e3e73c76f7933c6fcc8896e0"
+        },
+        "ocpp201-rpc/records/version16-error-code-3.bin": {
+          "bytes": 36,
+          "sha256": "3456855a4e83e31bd6772bd9a2b895eea96bc49c816a725a5c756cba2fdb527c"
+        },
+        "ocpp201-rpc/captures/boot-heartbeat.pcap": {
+          "bytes": 1419,
+          "sha256": "07b9c42527f4bc98025d8b25ab6ae7a7b33ef8a418962f657e22a64a149ab8b0"
+        },
+        "ocpp201-rpc/captures/compressed-context-takeover.pcap": {
+          "bytes": 1470,
+          "sha256": "d645ddc80711d31c9e2b1a3312dd1cd6f0f7f150b7f33cedfde1e38d939f8e03"
+        },
+        "ocpp201-rpc/captures/fragmented-heartbeat.pcap": {
+          "bytes": 1238,
+          "sha256": "ea9f7b282bd75196aacd1ae3526737ad6e0439dfbe49c80ffa08fef1828b635f"
+        },
+        "ocpp201-rpc/captures/compressed-fragmented-heartbeat.pcap": {
+          "bytes": 1334,
+          "sha256": "43c67b9275acf496d0a2add0b70e32b5d0cc3ae5201f6e269ff348a0bf6968c1"
+        },
+        "ocpp201-rpc/captures/boot-status-Pending.pcap": {
+          "bytes": 1202,
+          "sha256": "e0808f8246cabbe672d9432f8b1617d2778fb109be86ee14f29f7032eecdb335"
+        },
+        "ocpp201-rpc/captures/boot-status-Rejected.pcap": {
+          "bytes": 1203,
+          "sha256": "da1a9ffa5b1888acb2bf81f47fae8b798283094694d6613f0344c483aaa2ee55"
+        },
+        "ocpp201-rpc/captures/callerror.pcap": {
+          "bytes": 1127,
+          "sha256": "420d31a4a130789a2cf6be858d579dcaed630ca71786a7e9870e0b41b57dcb68"
+        },
+        "ocpp201-rpc/captures/out-of-order-results.pcap": {
+          "bytes": 1306,
+          "sha256": "77ad6f9f9ea5c0d6a34e49db43bda1352b72affda1d1b75ba3bf56fec53c4928"
+        },
+        "ocpp201-rpc/captures/wrong-direction-response.pcap": {
+          "bytes": 1212,
+          "sha256": "cd8a2e72eb4a9f2a9c0455167185d641e7d9024885462dd974dadaf69f0041ba"
+        },
+        "ocpp201-rpc/captures/unknown-id.pcap": {
+          "bytes": 1214,
+          "sha256": "e16cfb1d1f23e5817f43eb7dc2140104e043b4f10b15ec54d7f526f6464bd0b7"
+        },
+        "ocpp201-rpc/captures/pending-id-reuse.pcap": {
+          "bytes": 1188,
+          "sha256": "4ee65d6733e23657d6aa0f5d87ec394f249c4d79a4b20a35d350e410eaf6889f"
+        },
+        "ocpp201-rpc/captures/completed-id-reuse.pcap": {
+          "bytes": 1306,
+          "sha256": "8dc85faeff73a574b21a1f6b4febe56bbb9480f3461bd23ae3329f5673593cc0"
+        },
+        "ocpp201-rpc/captures/bad-response-then-late.pcap": {
+          "bytes": 1208,
+          "sha256": "61aef84eac0b0bdf2f835ffed7de275f0cbc28513d48012e64511a0f642fa126"
+        },
+        "ocpp201-rpc/captures/missing-model.pcap": {
+          "bytes": 1252,
+          "sha256": "8389aa313455da5f2313148640a44fca6a3474845e779d34dc139d01eca8db5b"
+        },
+        "ocpp201-rpc/captures/heartbeat-extra.pcap": {
+          "bytes": 1197,
+          "sha256": "78e28c9a2b55e513624e79f61b4b418df9489583dd312352727b7286ea31e10d"
+        },
+        "ocpp201-rpc/captures/action-case.pcap": {
+          "bytes": 1188,
+          "sha256": "c01402869e3cb97ec278a5becdd1eb8d89d0bce734393934b6bd21de57922641"
+        },
+        "ocpp201-rpc/captures/unknown-action.pcap": {
+          "bytes": 1191,
+          "sha256": "11c724ef4621a051ba60ae496db4a5c4257274faab1a3fb616f00b5608c8af9f"
+        },
+        "ocpp201-rpc/captures/tcp-seg7.pcap": {
+          "bytes": 7369,
+          "sha256": "f3027fbfbd403534f6bc18e9a8b792f916cca1e76e8e3bc6ec29c0f060320b00"
+        },
+        "ocpp201-rpc/captures/custom-heartbeat.pcap": {
+          "bytes": 1174,
+          "sha256": "c614ded62e1aa5568aabcf979da6f0520775f3931405561005511a23bf087706"
+        },
+        "ocpp201-rpc/captures/custom-missing-vendor.pcap": {
+          "bytes": 1205,
+          "sha256": "dc30a7477b261b1e41e1b23dd4e145a6f3102f161b4a10ed00db8e8b63dc6344"
+        },
+        "ocpp201-rpc/captures/version16-payload.pcap": {
+          "bytes": 1247,
+          "sha256": "65f717f95abb87d9101a213cb5a439b099e427690e35072b307cc51fdc4fc206"
+        },
+        "ocpp201-rpc/captures/format-error.pcap": {
+          "bytes": 1075,
+          "sha256": "28cd7509e4afb886a390217519ed17751847ad37663fb2a9ce733a91de722a52"
+        },
+        "ocpp201-rpc/captures/rpc-framework-error.pcap": {
+          "bytes": 1084,
+          "sha256": "29123f022690e8b1b140e4564fb622c91d250c5aca9b08a0ce0373f306fc0e33"
+        },
+        "ocpp201-rpc/captures/version16-error-code.pcap": {
+          "bytes": 1196,
+          "sha256": "93ddd733b644d823e3c397a60e468d4147153b5ef9153bb50ead0c608e305d13"
+        },
+        "ocpp201-rpc/captures/unpaired-unicode-id.pcap": {
+          "bytes": 1193,
+          "sha256": "33baf95159fe509a9eafb668634e875498765ab29c29d3d33924a8dc73143b96"
+        },
+        "ocpp201-rpc/captures/paired-unicode-id.pcap": {
+          "bytes": 1104,
+          "sha256": "b007a592d9930a0bb4ca1182889975839e3cd5cacbef71cf1a65b273bcfe9282"
+        },
+        "ocpp201-rpc/answers.json": {
+          "bytes": 85311,
+          "sha256": "d5b2f29f27b8ba4ff4e737dbaa237b4febb50321bb90fc85dc5efc1871c251b0"
+        },
+        "ocpp201-rpc/SOURCE.json": {
+          "bytes": 1760,
+          "sha256": "8daaca5d86a9ace96decfbd8f3b6ba0e578cef15f339e489aaa4b25cba1f902e"
+        },
+        "ocpp201-rpc/received-input-hashes.json": {
+          "bytes": 193,
+          "sha256": "da21f2f20dc6dc9fb27d2f06c8bbcd22e25f2887a7cd3fb1aacc423469287140"
+        },
+        "ocpp201-rpc/generate.py": {
+          "bytes": 9870,
+          "sha256": "2100ffa1cc2b5b4e81526f7e59f9b5e9aabe467bdf00874cb0600e700ab0c85a"
+        },
+        "ocpp201-rpc/reference.go": {
+          "bytes": 1412,
+          "sha256": "a8457d402737ef30c495bd32a440e2f8482763e9a9fd11b863e4d272130eda84"
+        },
+        "ocpp201-rpc/schema-inputs.json": {
+          "bytes": 13017,
+          "sha256": "b1ff9f6501fd2d6cf671a78274c824936d6c1c1a61ce402ba306523f95e7d2bf"
+        },
+        "ocpp201-rpc/reference-executed.json": {
+          "bytes": 17389,
+          "sha256": "94b6c150e52f8498bbb0de103182a0e6849acd3498d9323e9588132724974e37"
+        },
+        "ocpp201-rpc/verify.py": {
+          "bytes": 1712,
+          "sha256": "4a4539f8e179203df82ea3a28638db6a06620cd041c6e9e92f797c7c72922236"
+        },
+        "validation/expected.json": {
+          "bytes": 27036,
+          "sha256": "95a73be4661069fd204928682887ed8540d7493e62a22a632d4b0f6e6429a01e"
+        }
+      },
+      "aliases": {
+        "common/pcapx/pcaputil/testdata/ocpp201-rpc/records/boot-heartbeat-0.bin": "ocpp201-rpc/records/boot-heartbeat-0.bin",
+        "common/pcapx/pcaputil/testdata/ocpp201-rpc/records/boot-heartbeat-1.bin": "ocpp201-rpc/records/boot-heartbeat-1.bin",
+        "common/pcapx/pcaputil/testdata/ocpp201-rpc/records/boot-heartbeat-2.bin": "ocpp201-rpc/records/boot-heartbeat-2.bin",
+        "common/pcapx/pcaputil/testdata/ocpp201-rpc/records/compressed-context-takeover-0.bin": "ocpp201-rpc/records/compressed-context-takeover-0.bin",
+        "common/pcapx/pcaputil/testdata/ocpp201-rpc/records/compressed-context-takeover-1.bin": "ocpp201-rpc/records/compressed-context-takeover-1.bin",
+        "common/pcapx/pcaputil/testdata/ocpp201-rpc/records/compressed-context-takeover-2.bin": "ocpp201-rpc/records/compressed-context-takeover-2.bin",
+        "common/pcapx/pcaputil/testdata/ocpp201-rpc/records/compressed-context-takeover-4.bin": "ocpp201-rpc/records/compressed-context-takeover-4.bin",
+        "common/pcapx/pcaputil/testdata/ocpp201-rpc/records/fragmented-heartbeat-0.bin": "ocpp201-rpc/records/boot-heartbeat-0.bin",
+        "common/pcapx/pcaputil/testdata/ocpp201-rpc/records/fragmented-heartbeat-1.bin": "ocpp201-rpc/records/boot-heartbeat-1.bin",
+        "common/pcapx/pcaputil/testdata/ocpp201-rpc/records/compressed-fragmented-heartbeat-0.bin": "ocpp201-rpc/records/compressed-context-takeover-0.bin",
+        "common/pcapx/pcaputil/testdata/ocpp201-rpc/records/compressed-fragmented-heartbeat-1.bin": "ocpp201-rpc/records/compressed-context-takeover-1.bin",
+        "common/pcapx/pcaputil/testdata/ocpp201-rpc/records/boot-status-Pending-0.bin": "ocpp201-rpc/records/boot-heartbeat-0.bin",
+        "common/pcapx/pcaputil/testdata/ocpp201-rpc/records/boot-status-Pending-1.bin": "ocpp201-rpc/records/boot-heartbeat-1.bin",
+        "common/pcapx/pcaputil/testdata/ocpp201-rpc/records/boot-status-Pending-2.bin": "ocpp201-rpc/records/boot-heartbeat-2.bin",
+        "common/pcapx/pcaputil/testdata/ocpp201-rpc/records/boot-status-Rejected-0.bin": "ocpp201-rpc/records/boot-heartbeat-0.bin",
+        "common/pcapx/pcaputil/testdata/ocpp201-rpc/records/boot-status-Rejected-1.bin": "ocpp201-rpc/records/boot-heartbeat-1.bin",
+        "common/pcapx/pcaputil/testdata/ocpp201-rpc/records/boot-status-Rejected-2.bin": "ocpp201-rpc/records/boot-heartbeat-2.bin",
+        "common/pcapx/pcaputil/testdata/ocpp201-rpc/records/callerror-0.bin": "ocpp201-rpc/records/boot-heartbeat-0.bin",
+        "common/pcapx/pcaputil/testdata/ocpp201-rpc/records/callerror-1.bin": "ocpp201-rpc/records/boot-heartbeat-1.bin",
+        "common/pcapx/pcaputil/testdata/ocpp201-rpc/records/callerror-3.bin": "ocpp201-rpc/records/callerror-3.bin",
+        "common/pcapx/pcaputil/testdata/ocpp201-rpc/records/out-of-order-results-0.bin": "ocpp201-rpc/records/boot-heartbeat-0.bin",
+        "common/pcapx/pcaputil/testdata/ocpp201-rpc/records/out-of-order-results-1.bin": "ocpp201-rpc/records/boot-heartbeat-1.bin",
+        "common/pcapx/pcaputil/testdata/ocpp201-rpc/records/wrong-direction-response-0.bin": "ocpp201-rpc/records/boot-heartbeat-0.bin",
+        "common/pcapx/pcaputil/testdata/ocpp201-rpc/records/wrong-direction-response-1.bin": "ocpp201-rpc/records/boot-heartbeat-1.bin",
+        "common/pcapx/pcaputil/testdata/ocpp201-rpc/records/unknown-id-0.bin": "ocpp201-rpc/records/boot-heartbeat-0.bin",
+        "common/pcapx/pcaputil/testdata/ocpp201-rpc/records/unknown-id-1.bin": "ocpp201-rpc/records/boot-heartbeat-1.bin",
+        "common/pcapx/pcaputil/testdata/ocpp201-rpc/records/pending-id-reuse-0.bin": "ocpp201-rpc/records/boot-heartbeat-0.bin",
+        "common/pcapx/pcaputil/testdata/ocpp201-rpc/records/pending-id-reuse-1.bin": "ocpp201-rpc/records/boot-heartbeat-1.bin",
+        "common/pcapx/pcaputil/testdata/ocpp201-rpc/records/completed-id-reuse-0.bin": "ocpp201-rpc/records/boot-heartbeat-0.bin",
+        "common/pcapx/pcaputil/testdata/ocpp201-rpc/records/completed-id-reuse-1.bin": "ocpp201-rpc/records/boot-heartbeat-1.bin",
+        "common/pcapx/pcaputil/testdata/ocpp201-rpc/records/bad-response-then-late-0.bin": "ocpp201-rpc/records/boot-heartbeat-0.bin",
+        "common/pcapx/pcaputil/testdata/ocpp201-rpc/records/bad-response-then-late-1.bin": "ocpp201-rpc/records/boot-heartbeat-1.bin",
+        "common/pcapx/pcaputil/testdata/ocpp201-rpc/records/missing-model-0.bin": "ocpp201-rpc/records/boot-heartbeat-0.bin",
+        "common/pcapx/pcaputil/testdata/ocpp201-rpc/records/missing-model-1.bin": "ocpp201-rpc/records/boot-heartbeat-1.bin",
+        "common/pcapx/pcaputil/testdata/ocpp201-rpc/records/missing-model-2.bin": "ocpp201-rpc/records/missing-model-2.bin",
+        "common/pcapx/pcaputil/testdata/ocpp201-rpc/records/heartbeat-extra-0.bin": "ocpp201-rpc/records/boot-heartbeat-0.bin",
+        "common/pcapx/pcaputil/testdata/ocpp201-rpc/records/heartbeat-extra-1.bin": "ocpp201-rpc/records/boot-heartbeat-1.bin",
+        "common/pcapx/pcaputil/testdata/ocpp201-rpc/records/action-case-0.bin": "ocpp201-rpc/records/boot-heartbeat-0.bin",
+        "common/pcapx/pcaputil/testdata/ocpp201-rpc/records/action-case-1.bin": "ocpp201-rpc/records/boot-heartbeat-1.bin",
+        "common/pcapx/pcaputil/testdata/ocpp201-rpc/records/unknown-action-0.bin": "ocpp201-rpc/records/boot-heartbeat-0.bin",
+        "common/pcapx/pcaputil/testdata/ocpp201-rpc/records/unknown-action-1.bin": "ocpp201-rpc/records/boot-heartbeat-1.bin",
+        "common/pcapx/pcaputil/testdata/ocpp201-rpc/records/tcp-seg7-0.bin": "ocpp201-rpc/records/boot-heartbeat-0.bin",
+        "common/pcapx/pcaputil/testdata/ocpp201-rpc/records/tcp-seg7-1.bin": "ocpp201-rpc/records/boot-heartbeat-1.bin",
+        "common/pcapx/pcaputil/testdata/ocpp201-rpc/records/tcp-seg7-2.bin": "ocpp201-rpc/records/boot-heartbeat-2.bin",
+        "common/pcapx/pcaputil/testdata/ocpp201-rpc/records/custom-heartbeat-0.bin": "ocpp201-rpc/records/boot-heartbeat-0.bin",
+        "common/pcapx/pcaputil/testdata/ocpp201-rpc/records/custom-heartbeat-1.bin": "ocpp201-rpc/records/boot-heartbeat-1.bin",
+        "common/pcapx/pcaputil/testdata/ocpp201-rpc/records/custom-heartbeat-2.bin": "ocpp201-rpc/records/custom-heartbeat-2.bin",
+        "common/pcapx/pcaputil/testdata/ocpp201-rpc/records/custom-heartbeat-3.bin": "ocpp201-rpc/records/custom-heartbeat-3.bin",
+        "common/pcapx/pcaputil/testdata/ocpp201-rpc/records/custom-missing-vendor-0.bin": "ocpp201-rpc/records/boot-heartbeat-0.bin",
+        "common/pcapx/pcaputil/testdata/ocpp201-rpc/records/custom-missing-vendor-1.bin": "ocpp201-rpc/records/boot-heartbeat-1.bin",
+        "common/pcapx/pcaputil/testdata/ocpp201-rpc/records/custom-missing-vendor-2.bin": "ocpp201-rpc/records/custom-missing-vendor-2.bin",
+        "common/pcapx/pcaputil/testdata/ocpp201-rpc/records/version16-payload-0.bin": "ocpp201-rpc/records/boot-heartbeat-0.bin",
+        "common/pcapx/pcaputil/testdata/ocpp201-rpc/records/version16-payload-1.bin": "ocpp201-rpc/records/boot-heartbeat-1.bin",
+        "common/pcapx/pcaputil/testdata/ocpp201-rpc/records/version16-payload-2.bin": "ocpp201-rpc/records/version16-payload-2.bin",
+        "common/pcapx/pcaputil/testdata/ocpp201-rpc/records/format-error-0.bin": "ocpp201-rpc/records/boot-heartbeat-0.bin",
+        "common/pcapx/pcaputil/testdata/ocpp201-rpc/records/format-error-1.bin": "ocpp201-rpc/records/boot-heartbeat-1.bin",
+        "common/pcapx/pcaputil/testdata/ocpp201-rpc/records/format-error-3.bin": "ocpp201-rpc/records/format-error-3.bin",
+        "common/pcapx/pcaputil/testdata/ocpp201-rpc/records/rpc-framework-error-0.bin": "ocpp201-rpc/records/boot-heartbeat-0.bin",
+        "common/pcapx/pcaputil/testdata/ocpp201-rpc/records/rpc-framework-error-1.bin": "ocpp201-rpc/records/boot-heartbeat-1.bin",
+        "common/pcapx/pcaputil/testdata/ocpp201-rpc/records/rpc-framework-error-3.bin": "ocpp201-rpc/records/rpc-framework-error-3.bin",
+        "common/pcapx/pcaputil/testdata/ocpp201-rpc/records/version16-error-code-0.bin": "ocpp201-rpc/records/boot-heartbeat-0.bin",
+        "common/pcapx/pcaputil/testdata/ocpp201-rpc/records/version16-error-code-1.bin": "ocpp201-rpc/records/boot-heartbeat-1.bin",
+        "common/pcapx/pcaputil/testdata/ocpp201-rpc/records/version16-error-code-3.bin": "ocpp201-rpc/records/version16-error-code-3.bin",
+        "common/pcapx/pcaputil/testdata/ocpp201-rpc/records/unpaired-unicode-id-0.bin": "ocpp201-rpc/records/boot-heartbeat-0.bin",
+        "common/pcapx/pcaputil/testdata/ocpp201-rpc/records/unpaired-unicode-id-1.bin": "ocpp201-rpc/records/boot-heartbeat-1.bin",
+        "common/pcapx/pcaputil/testdata/ocpp201-rpc/records/paired-unicode-id-0.bin": "ocpp201-rpc/records/boot-heartbeat-0.bin",
+        "common/pcapx/pcaputil/testdata/ocpp201-rpc/records/paired-unicode-id-1.bin": "ocpp201-rpc/records/boot-heartbeat-1.bin",
+        "common/pcapx/pcaputil/testdata/ocpp201-rpc/captures/boot-heartbeat.pcap": "ocpp201-rpc/captures/boot-heartbeat.pcap",
+        "common/pcapx/pcaputil/testdata/ocpp201-rpc/captures/compressed-context-takeover.pcap": "ocpp201-rpc/captures/compressed-context-takeover.pcap",
+        "common/pcapx/pcaputil/testdata/ocpp201-rpc/captures/fragmented-heartbeat.pcap": "ocpp201-rpc/captures/fragmented-heartbeat.pcap",
+        "common/pcapx/pcaputil/testdata/ocpp201-rpc/captures/compressed-fragmented-heartbeat.pcap": "ocpp201-rpc/captures/compressed-fragmented-heartbeat.pcap",
+        "common/pcapx/pcaputil/testdata/ocpp201-rpc/captures/boot-status-Pending.pcap": "ocpp201-rpc/captures/boot-status-Pending.pcap",
+        "common/pcapx/pcaputil/testdata/ocpp201-rpc/captures/boot-status-Rejected.pcap": "ocpp201-rpc/captures/boot-status-Rejected.pcap",
+        "common/pcapx/pcaputil/testdata/ocpp201-rpc/captures/callerror.pcap": "ocpp201-rpc/captures/callerror.pcap",
+        "common/pcapx/pcaputil/testdata/ocpp201-rpc/captures/out-of-order-results.pcap": "ocpp201-rpc/captures/out-of-order-results.pcap",
+        "common/pcapx/pcaputil/testdata/ocpp201-rpc/captures/wrong-direction-response.pcap": "ocpp201-rpc/captures/wrong-direction-response.pcap",
+        "common/pcapx/pcaputil/testdata/ocpp201-rpc/captures/unknown-id.pcap": "ocpp201-rpc/captures/unknown-id.pcap",
+        "common/pcapx/pcaputil/testdata/ocpp201-rpc/captures/pending-id-reuse.pcap": "ocpp201-rpc/captures/pending-id-reuse.pcap",
+        "common/pcapx/pcaputil/testdata/ocpp201-rpc/captures/completed-id-reuse.pcap": "ocpp201-rpc/captures/completed-id-reuse.pcap",
+        "common/pcapx/pcaputil/testdata/ocpp201-rpc/captures/bad-response-then-late.pcap": "ocpp201-rpc/captures/bad-response-then-late.pcap",
+        "common/pcapx/pcaputil/testdata/ocpp201-rpc/captures/missing-model.pcap": "ocpp201-rpc/captures/missing-model.pcap",
+        "common/pcapx/pcaputil/testdata/ocpp201-rpc/captures/heartbeat-extra.pcap": "ocpp201-rpc/captures/heartbeat-extra.pcap",
+        "common/pcapx/pcaputil/testdata/ocpp201-rpc/captures/action-case.pcap": "ocpp201-rpc/captures/action-case.pcap",
+        "common/pcapx/pcaputil/testdata/ocpp201-rpc/captures/unknown-action.pcap": "ocpp201-rpc/captures/unknown-action.pcap",
+        "common/pcapx/pcaputil/testdata/ocpp201-rpc/captures/tcp-seg7.pcap": "ocpp201-rpc/captures/tcp-seg7.pcap",
+        "common/pcapx/pcaputil/testdata/ocpp201-rpc/captures/custom-heartbeat.pcap": "ocpp201-rpc/captures/custom-heartbeat.pcap",
+        "common/pcapx/pcaputil/testdata/ocpp201-rpc/captures/custom-missing-vendor.pcap": "ocpp201-rpc/captures/custom-missing-vendor.pcap",
+        "common/pcapx/pcaputil/testdata/ocpp201-rpc/captures/version16-payload.pcap": "ocpp201-rpc/captures/version16-payload.pcap",
+        "common/pcapx/pcaputil/testdata/ocpp201-rpc/captures/format-error.pcap": "ocpp201-rpc/captures/format-error.pcap",
+        "common/pcapx/pcaputil/testdata/ocpp201-rpc/captures/rpc-framework-error.pcap": "ocpp201-rpc/captures/rpc-framework-error.pcap",
+        "common/pcapx/pcaputil/testdata/ocpp201-rpc/captures/version16-error-code.pcap": "ocpp201-rpc/captures/version16-error-code.pcap",
+        "common/pcapx/pcaputil/testdata/ocpp201-rpc/captures/unpaired-unicode-id.pcap": "ocpp201-rpc/captures/unpaired-unicode-id.pcap",
+        "common/pcapx/pcaputil/testdata/ocpp201-rpc/captures/paired-unicode-id.pcap": "ocpp201-rpc/captures/paired-unicode-id.pcap",
+        "common/pcapx/pcaputil/testdata/ocpp201-rpc/answers.json": "ocpp201-rpc/answers.json",
+        "common/pcapx/pcaputil/testdata/ocpp201-rpc/SOURCE.json": "ocpp201-rpc/SOURCE.json",
+        "common/pcapx/pcaputil/testdata/ocpp201-rpc/received-input-hashes.json": "ocpp201-rpc/received-input-hashes.json",
+        "common/pcapx/pcaputil/testdata/ocpp201-rpc/generate.py": "ocpp201-rpc/generate.py",
+        "common/pcapx/pcaputil/testdata/ocpp201-rpc/reference.go": "ocpp201-rpc/reference.go",
+        "common/pcapx/pcaputil/testdata/ocpp201-rpc/schema-inputs.json": "ocpp201-rpc/schema-inputs.json",
+        "common/pcapx/pcaputil/testdata/ocpp201-rpc/reference-executed.json": "ocpp201-rpc/reference-executed.json",
+        "common/pcapx/pcaputil/testdata/ocpp201-rpc/verify.py": "ocpp201-rpc/verify.py"
+      }
     }
   ],
   "schema_version": 1,

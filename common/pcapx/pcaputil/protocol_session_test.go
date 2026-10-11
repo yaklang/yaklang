@@ -250,6 +250,7 @@ func TestProtocolSessionWebSocketUpgradeAndFrames(t *testing.T) {
 	require.Equal(t, uint64(1000), r.Events[0].Session["Close Code"])
 	require.NotNil(t, s.Feed(1, ts, []byte{0x83, 0x00}).Err)
 	t.Run("OCPP16SealedMatrix", testOCPP16SealedMatrix)
+	t.Run("OCPP201SealedMatrix", testOCPP201SealedMatrix)
 
 }
 

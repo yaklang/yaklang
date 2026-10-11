@@ -242,7 +242,9 @@ func TestProtocolSessionOCPP16InvalidSubprotocolSelection(t *testing.T) {
 	}
 }
 
-func TestProtocolSessionOCPP16ResourceRelease(t *testing.T) {
+func TestProtocolSessionOCPP16ResourceRelease(t *testing.T) { testOCPPResourceRelease(t, "1.6") }
+
+func testOCPPResourceRelease(t *testing.T, version string) {
 	for _, kind := range []string{"elements", "depth", "ids", "bytes"} {
 		t.Run(kind, func(t *testing.T) {
 			budget := DefaultParserBudget()

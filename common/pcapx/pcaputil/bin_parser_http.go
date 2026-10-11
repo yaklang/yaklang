@@ -303,8 +303,8 @@ func (f *binFlow) frameDirection(dir int, w []byte) (int, *binSpec, error) {
 				if err != nil {
 					return 0, nil, err
 				}
-				if selected == "ocpp1.6" {
-					h.ws.ocpp = &binOCPP{}
+				if selected == "ocpp1.6" || selected == "ocpp2.0.1" {
+					h.ws.ocpp = &binOCPP{version: strings.TrimPrefix(selected, "ocpp")}
 				}
 			}
 			h.tunnel = h.status == 101 || (h.method == "CONNECT" && h.status >= 200 && h.status < 300)

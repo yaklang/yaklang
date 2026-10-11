@@ -17,6 +17,7 @@ Additional native profiles and their exact message/carrier boundaries are regist
 | PostgreSQL | Protocol 3.0 | Startup, SSLRequest, auth, Query, Parse/Bind/Describe/Execute/Sync, RowDescription/DataRow/CommandComplete/Error/Ready; C/D/E not guessed from port 5432 | GSS/SCRAM crypto; encrypted TLS body |
 | WebSocket | RFC 6455 v13 | Validated HTTP Upgrade, masking, fragmentation, UTF-8 and negotiated permessage-deflate | 15-bit window profile; no unsupported extension guessing |
 | OCPP-J selected RPC | 1.6 edition2 / negotiated `ocpp1.6` WebSocket TCP | CP BootNotification/Heartbeat and opposite-direction CALLRESULT/CALLERROR; exact selected schema fields, string IDs, direction, bounded sender-ID retirement, owned Session/fields, fragmented/compressed text | Other actions, OCPP2, endpoint authorization/execution, reconnect identity and timing compliance remain pending; no ID association inferred without negotiation/context |
+| OCPP-J2.0.1 selected RPC | Edition4 / negotiated `ocpp2.0.1` WebSocket TCP | BootNotification/Heartbeat, version-specific nested chargingStation/modem/statusInfo/customData fields, literal extension trees, CALLRESULT/CALLERROR association | Other actions, ISO15118 EXI, registration/timing/retry policy and cross-connection station identity remain pending; received1.6 samples do not prove2.0.1 |
 | LDAP | LDAPv3 RFC 4511 | BER LDAPMessage, MessageID, Bind, Search entry/done/reference, Modify/Add/Delete/ModifyDN, Extended, StartTLS | LDAPS decrypt without keys |
 | Redis | RESP2 + RESP3 | nested collections, attributes, pushes, pipeline, binary-safe bulk and bounded context | streamed strings and aggregates |
 | gRPC | HTTP/2 mapping | Cross-DATA framing, unary/bidi, trailers, identity/gzip messages | No protobuf schema names; unsupported compression stays explicit |
@@ -306,3 +307,20 @@ known ID retire that request, and an unparseable response conservatively clears
 opposite-direction pending state. Resource refusal is terminal, typed and
 releases all retained WebSocket/application state. Close is idempotent. No
 station-side effects, cross-connection identity or unseen request are inferred.
+
+The separate OCPP2.0.1 profile pins OCA edition4 (2025-12-03), errata2026-09
+and `urn:OCPP:Cp:2:2020:3` schemas. Version selection requires the observed
+`ocpp2.0.1` handshake token. BootNotification requires reason and chargingStation
+with model/vendorName; selected modem, statusInfo and customData have their own
+exact field/type/length constraints. CustomData requires vendorId (255 characters)
+and permits arbitrary additional literal JSON, charged before projection. No
+extension side effect is inferred. CALLERROR uses FormatViolation and
+OccurrenceConstraintViolation, and adds MessageTypeNotSupported/RpcFrameworkError;
+the 1.6 spellings are not accepted by the2.0.1 profile. The schemas' exact integer
+interval has no minimum; observation does not prove valid registration policy.
+RPC state remains capture-connection-local. Repeated IDs cannot establish a new
+verified association, including permitted retry cases whose endpoint timeout is
+unobserved. The charging-station-wide identity/retry timeout/synchronicity rules
+across connections cannot be proved by a path or passive timestamp and remain
+unverified. Captured literal fields and selected responses do not imply a
+registration-authorized station, charging action, ISO15118 or device success.
