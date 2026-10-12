@@ -13,21 +13,59 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 )
 
 func rtps13ParameterCases(t *testing.T) []rtpsControl {
+	root := "rtps13-parameters"
+	count := 106
 	t.Helper()
-	if root := os.Getenv("RTPS13_PARAMETERS_TEST_ROOT"); root != "" {
-		b, err := os.ReadFile(filepath.Join(root, "manifest.json"))
-		require.NoError(t, err)
-		var m struct{ Cases []rtpsControl }
-		require.NoError(t, json.Unmarshal(b, &m))
-		require.Len(t, m.Cases, 106)
-		return m.Cases
+	var raw []byte
+	var err error
+	if dir := os.Getenv("RTPS13_PARAMETERS_TEST_ROOT"); dir != "" {
+		raw, err = os.ReadFile(filepath.Join(dir, "manifest.json"))
+	} else {
+		raw, err = trafficfixture.ReadFile(root + "/manifest.json")
 	}
-	return rtpsBatchControls(t, "rtps13-parameters", 106)
+	require.NoError(t, err)
+	var m struct {
+		SchemaVersion int `json:"schema_version"`
+		Cases         []rtpsControl
+	}
+	require.NoError(t, json.Unmarshal(raw, &m))
+	require.Equal(t, 1, m.SchemaVersion)
+	require.Len(t, m.Cases, count)
+	all, err := trafficfixture.AllExpectations()
+	require.NoError(t, err)
+	found := map[string]trafficfixture.FrozenCase{}
+	for _, b := range all {
+		for _, c := range b.Cases {
+			found[c.ID] = c
+		}
+	}
+	for i := range m.Cases {
+		c := &m.Cases[i]
+		c.Root = root
+		if strings.HasPrefix(c.Capture, "common/") {
+			continue
+		} // Hash-pinned historical capture reused by this new manifest.
+		v, ok := found[root+"/"+c.ID]
+		require.True(t, ok)
+		require.Equal(t, c.Capture, strings.TrimPrefix(v.Input.File, root+"/"))
+		require.Equal(t, c.SHA256, v.Input.SHA256)
+		require.Equal(t, c.Packets, v.Facts.PacketCount)
+		require.Len(t, v.Expectations, 1)
+		var binding struct {
+			AnswerFile string `json:"answer_file"`
+			AnswerSHA  string `json:"answer_sha256"`
+		}
+		require.NoError(t, json.Unmarshal(v.Expectations[0].PayloadConstraints, &binding))
+		require.Equal(t, c.Answer, binding.AnswerFile)
+		require.Equal(t, c.AnswerSHA, binding.AnswerSHA)
+	}
+	return m.Cases
 }
 func rtps13ParameterInput(t *testing.T, c rtpsControl) ([]byte, rtpsControlAnswer) {
 	t.Helper()
