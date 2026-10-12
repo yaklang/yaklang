@@ -37388,6 +37388,8 @@ type Risk struct {
 	TagReason     string        `protobuf:"bytes,36,opt,name=TagReason,proto3" json:"TagReason,omitempty"`
 	FixTime       int64         `protobuf:"varint,37,opt,name=FixTime,proto3" json:"FixTime,omitempty"`
 	FixSuggestion string        `protobuf:"bytes,38,opt,name=FixSuggestion,proto3" json:"FixSuggestion,omitempty"`
+	// Persistent AI conversation that produced this risk (may span runtimes).
+	AISessionID   string `protobuf:"bytes,39,opt,name=AISessionID,proto3" json:"AISessionID,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -37684,6 +37686,13 @@ func (x *Risk) GetFixTime() int64 {
 func (x *Risk) GetFixSuggestion() string {
 	if x != nil {
 		return x.FixSuggestion
+	}
+	return ""
+}
+
+func (x *Risk) GetAISessionID() string {
+	if x != nil {
+		return x.AISessionID
 	}
 	return ""
 }
@@ -39412,13 +39421,13 @@ type StartBruteParams struct {
 	Concurrent int64 `protobuf:"varint,8,opt,name=Concurrent,proto3" json:"Concurrent,omitempty"`
 	Retry      int64 `protobuf:"varint,9,opt,name=Retry,proto3" json:"Retry,omitempty"`
 	// 目标任务内并发
-	TargetTaskConcurrent int64 `protobuf:"varint,10,opt,name=TargetTaskConcurrent,proto3" json:"TargetTaskConcurrent,omitempty"`
-	OkToStop         bool   `protobuf:"varint,11,opt,name=OkToStop,proto3" json:"OkToStop,omitempty"`
-	DelayMin         int64  `protobuf:"varint,12,opt,name=DelayMin,proto3" json:"DelayMin,omitempty"`
-	DelayMax         int64  `protobuf:"varint,13,opt,name=DelayMax,proto3" json:"DelayMax,omitempty"`
-	PluginScriptName string `protobuf:"bytes,14,opt,name=PluginScriptName,proto3" json:"PluginScriptName,omitempty"`
-	unknownFields    protoimpl.UnknownFields
-	sizeCache        protoimpl.SizeCache
+	TargetTaskConcurrent int64  `protobuf:"varint,10,opt,name=TargetTaskConcurrent,proto3" json:"TargetTaskConcurrent,omitempty"`
+	OkToStop             bool   `protobuf:"varint,11,opt,name=OkToStop,proto3" json:"OkToStop,omitempty"`
+	DelayMin             int64  `protobuf:"varint,12,opt,name=DelayMin,proto3" json:"DelayMin,omitempty"`
+	DelayMax             int64  `protobuf:"varint,13,opt,name=DelayMax,proto3" json:"DelayMax,omitempty"`
+	PluginScriptName     string `protobuf:"bytes,14,opt,name=PluginScriptName,proto3" json:"PluginScriptName,omitempty"`
+	unknownFields        protoimpl.UnknownFields
+	sizeCache            protoimpl.SizeCache
 }
 
 func (x *StartBruteParams) Reset() {
@@ -49052,8 +49061,8 @@ type ExecHistoryRecord struct {
 	// Uid
 	Id string `protobuf:"bytes,9,opt,name=Id,proto3" json:"Id,omitempty"`
 	// 展示界面内容
-	Stdout []byte `protobuf:"bytes,10,opt,name=Stdout,proto3" json:"Stdout,omitempty"`
-	Stderr []byte `protobuf:"bytes,11,opt,name=Stderr,proto3" json:"Stderr,omitempty"`
+	Stdout        []byte `protobuf:"bytes,10,opt,name=Stdout,proto3" json:"Stdout,omitempty"`
+	Stderr        []byte `protobuf:"bytes,11,opt,name=Stderr,proto3" json:"Stderr,omitempty"`
 	RuntimeId     string `protobuf:"bytes,12,opt,name=RuntimeId,proto3" json:"RuntimeId,omitempty"`
 	FromYakModule string `protobuf:"bytes,13,opt,name=FromYakModule,proto3" json:"FromYakModule,omitempty"`
 	StdoutLen     int64  `protobuf:"varint,14,opt,name=StdoutLen,proto3" json:"StdoutLen,omitempty"`
@@ -52903,12 +52912,18 @@ type QueryHTTPFlowRequest struct {
 	ExcludeRequestRaw bool `protobuf:"varint,54,opt,name=ExcludeRequestRaw,proto3" json:"ExcludeRequestRaw,omitempty"`
 	// 显式跳过精确 Total；用于已有游标的实时增量查询。
 	// Data/Pagination 仍正常返回，但 Total 为 0。初始化、历史与周期校准不得开启。
-	SkipTotal     bool   `protobuf:"varint,55,opt,name=SkipTotal,proto3" json:"SkipTotal,omitempty"`
-	IssueType     string `protobuf:"bytes,56,opt,name=IssueType,proto3" json:"IssueType,omitempty"`
-	Severity      string `protobuf:"bytes,57,opt,name=Severity,proto3" json:"Severity,omitempty"`
-	Status        string `protobuf:"bytes,58,opt,name=Status,proto3" json:"Status,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	SkipTotal bool   `protobuf:"varint,55,opt,name=SkipTotal,proto3" json:"SkipTotal,omitempty"`
+	IssueType string `protobuf:"bytes,56,opt,name=IssueType,proto3" json:"IssueType,omitempty"`
+	Severity  string `protobuf:"bytes,57,opt,name=Severity,proto3" json:"Severity,omitempty"`
+	Status    string `protobuf:"bytes,58,opt,name=Status,proto3" json:"Status,omitempty"`
+	// 按字面量查询报文字段。同一字段内多个值 OR，不同字段之间 AND。
+	RequestContains  []string `protobuf:"bytes,59,rep,name=RequestContains,proto3" json:"RequestContains,omitempty"`
+	ResponseContains []string `protobuf:"bytes,60,rep,name=ResponseContains,proto3" json:"ResponseContains,omitempty"`
+	// HTTPFlow 创建时间范围，Unix 秒，边界包含。
+	AfterCreatedAt  int64 `protobuf:"varint,61,opt,name=AfterCreatedAt,proto3" json:"AfterCreatedAt,omitempty"`
+	BeforeCreatedAt int64 `protobuf:"varint,62,opt,name=BeforeCreatedAt,proto3" json:"BeforeCreatedAt,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
 }
 
 func (x *QueryHTTPFlowRequest) Reset() {
@@ -53331,6 +53346,34 @@ func (x *QueryHTTPFlowRequest) GetStatus() string {
 		return x.Status
 	}
 	return ""
+}
+
+func (x *QueryHTTPFlowRequest) GetRequestContains() []string {
+	if x != nil {
+		return x.RequestContains
+	}
+	return nil
+}
+
+func (x *QueryHTTPFlowRequest) GetResponseContains() []string {
+	if x != nil {
+		return x.ResponseContains
+	}
+	return nil
+}
+
+func (x *QueryHTTPFlowRequest) GetAfterCreatedAt() int64 {
+	if x != nil {
+		return x.AfterCreatedAt
+	}
+	return 0
+}
+
+func (x *QueryHTTPFlowRequest) GetBeforeCreatedAt() int64 {
+	if x != nil {
+		return x.BeforeCreatedAt
+	}
+	return 0
 }
 
 type HTTPFlowsToOnlineRequest struct {
@@ -82041,7 +82084,7 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"HttpflowId\x12\x10\n" +
 	"\x03Url\x18\x02 \x01(\tR\x03Url\x12\x18\n" +
 	"\aRequest\x18\x03 \x01(\tR\aRequest\x12\x1a\n" +
-	"\bResponse\x18\x04 \x01(\tR\bResponse\"\xeb\b\n" +
+	"\bResponse\x18\x04 \x01(\tR\bResponse\"\x8d\t\n" +
 	"\x04Risk\x12\x12\n" +
 	"\x04Hash\x18\x01 \x01(\tR\x04Hash\x12\x0e\n" +
 	"\x02IP\x18\x02 \x01(\tR\x02IP\x12\x10\n" +
@@ -82081,7 +82124,8 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\rSeverityScore\x18# \x01(\x01R\rSeverityScore\x12\x1c\n" +
 	"\tTagReason\x18$ \x01(\tR\tTagReason\x12\x18\n" +
 	"\aFixTime\x18% \x01(\x03R\aFixTime\x12$\n" +
-	"\rFixSuggestion\x18& \x01(\tR\rFixSuggestion\"\xc0\x04\n" +
+	"\rFixSuggestion\x18& \x01(\tR\rFixSuggestion\x12 \n" +
+	"\vAISessionID\x18' \x01(\tR\vAISessionID\"\xc0\x04\n" +
 	"\x11QueryRisksRequest\x12+\n" +
 	"\n" +
 	"Pagination\x18\x01 \x01(\v2\v.ypb.PagingR\n" +
@@ -83435,7 +83479,7 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"_PartIndex\"g\n" +
 	"!MITMExtractAggregateFlowFilterRow\x12 \n" +
 	"\vRuleVerbose\x18\x01 \x01(\tR\vRuleVerbose\x12 \n" +
-	"\vDisplayData\x18\x02 \x01(\tR\vDisplayData\"\x89\x10\n" +
+	"\vDisplayData\x18\x02 \x01(\tR\vDisplayData\"\xb1\x11\n" +
 	"\x14QueryHTTPFlowRequest\x12+\n" +
 	"\n" +
 	"Pagination\x18\x01 \x01(\v2\v.ypb.PagingR\n" +
@@ -83503,7 +83547,11 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\tSkipTotal\x187 \x01(\bR\tSkipTotal\x12\x1c\n" +
 	"\tIssueType\x188 \x01(\tR\tIssueType\x12\x1a\n" +
 	"\bSeverity\x189 \x01(\tR\bSeverity\x12\x16\n" +
-	"\x06Status\x18: \x01(\tR\x06Status\"\xdc\x01\n" +
+	"\x06Status\x18: \x01(\tR\x06Status\x12(\n" +
+	"\x0fRequestContains\x18; \x03(\tR\x0fRequestContains\x12*\n" +
+	"\x10ResponseContains\x18< \x03(\tR\x10ResponseContains\x12&\n" +
+	"\x0eAfterCreatedAt\x18= \x01(\x03R\x0eAfterCreatedAt\x12(\n" +
+	"\x0fBeforeCreatedAt\x18> \x01(\x03R\x0fBeforeCreatedAt\"\xdc\x01\n" +
 	"\x18HTTPFlowsToOnlineRequest\x12\x14\n" +
 	"\x05Token\x18\x01 \x01(\tR\x05Token\x12 \n" +
 	"\vProjectName\x18\x02 \x01(\tR\vProjectName\x12.\n" +
