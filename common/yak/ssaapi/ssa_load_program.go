@@ -81,42 +81,54 @@ func fromDatabase(name string) (*Program, error) {
 	return fromDatabaseWithVisited(name, make(map[string]bool))
 }
 
-// attachOverlayIfNeeded 按行上记录的增量类型为刚加载的 program 挂载合并视图：
+// buildOverlayForRow 严格按行上记录的增量类型组装合并视图，失败返回错误：
 //   - 行是 overlay 链头且层名单完整（HasSavedOverlayLayers）：按配方逐层加载，
 //     在内存中聚合为 ProgramOverLay；
 //   - 行是差量层但配方缺失/损坏：加载其 base，重建两层视图兜底；
-//   - 其他（普通全量编译、增量基座层）：无需视图。
-// 任何一步失败都只告警并降级为裸 program（查询范围缩小但不出错）。这与编译
-// 路径 resolveBaseOverlay 的"重建失败即中断"是刻意不同的策略：加载服务查询，
-// 查询可以缩小范围；diff 基准不完整却不能继续编译。
-func attachOverlayIfNeeded(prog *Program, irProg *ssadb.IrProgram, visited map[string]bool) {
-	if prog == nil || irProg == nil || prog.GetOverlay() != nil {
-		return
+//   - 其他（普通全量编译、增量基座层）：返回 nil，无需视图。
+// 这是视图组装的唯一决策点：查询路径（attachOverlayIfNeeded）与编译路径
+// （loadBaseOverlayForDiffCompile）共用本函数，只是失败策略不同。
+func buildOverlayForRow(prog *Program, irProg *ssadb.IrProgram, visited map[string]bool) (*ProgramOverLay, error) {
+	if prog == nil || irProg == nil {
+		return nil, nil
 	}
 	if irProg.HasSavedOverlayLayers() {
 		overlay, err := loadOverlayFromDatabase(irProg.OverlayLayers, visited)
 		if err != nil {
-			log.Warnf("failed to load overlay from database: %v", err)
-			return
+			return nil, utils.Wrapf(err, "failed to load overlay from database: %s", irProg.ProgramName)
 		}
-		prog.overlay = overlay
-		return
+		return overlay, nil
 	}
 	if irProg.IsIncrementalKind() && !irProg.IsBaseProgramKind() {
 		baseProgram, err := fromDatabaseWithVisited(irProg.BaseProgramName, visited)
 		if err != nil {
-			log.Warnf("failed to load base program %s for diff program %s: %v",
-				irProg.BaseProgramName, irProg.ProgramName, err)
-			return
+			return nil, utils.Wrapf(err, "failed to load base program %s for diff program %s",
+				irProg.BaseProgramName, irProg.ProgramName)
 		}
 		overlay := NewProgramOverLay(baseProgram, prog)
 		if overlay == nil {
-			log.Warnf("failed to create overlay for diff program %s with base %s",
+			return nil, utils.Errorf("failed to create overlay for diff program %s with base %s",
 				irProg.ProgramName, irProg.BaseProgramName)
-			return
 		}
-		prog.overlay = overlay
+		return overlay, nil
 	}
+	return nil, nil
+}
+
+// attachOverlayIfNeeded 查询路径的挂载入口：组装失败只告警并降级为裸 program
+// （查询范围缩小但不出错）。编译路径请改用 loadBaseOverlayForDiffCompile，
+// 那里的失败会直接中断编译——两种策略刻意不同：查询可以缩小范围，
+// diff 基准不完整却不能继续编译。
+func attachOverlayIfNeeded(prog *Program, irProg *ssadb.IrProgram, visited map[string]bool) {
+	if prog == nil || irProg == nil || prog.GetOverlay() != nil {
+		return
+	}
+	overlay, err := buildOverlayForRow(prog, irProg, visited)
+	if err != nil {
+		log.Warnf("failed to attach overlay, degraded to bare program: %v", err)
+		return
+	}
+	prog.overlay = overlay
 }
 
 func fromDatabaseWithVisited(name string, visited map[string]bool) (*Program, error) {

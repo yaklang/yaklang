@@ -70,7 +70,9 @@ func recompileProgramLayer(prog *Program, inputOpt ...ssaconfig.Option) error {
 	// 如果当前 program 是增量编译的，重编译时应该自动启用增量编译，使用当前层 program 作为 base program
 	if prog.IsIncrementalCompile() {
 		log.Infof("检测到增量编译 program，自动启用增量编译，base program: %s", layerName)
-		opt = append(opt, WithBaseProgramName(layerName))
+		// 两个标志必须成对出现：enable 声明"参与增量序列"（SaveConfig 据此打
+		// IsOverlay 标、FS 层跳过与 overlay 语义冲突的 flush），base 名指向基座。
+		opt = append(opt, WithEnableIncrementalCompile(true), WithBaseProgramName(layerName))
 		// 增量编译时，不设置 WithProgramName，让调用者通过 inputOpt 传入新的 program name
 		// 这样可以确保每次重新编译都会创建一个新的 diff program，而不是覆盖现有的
 	} else {

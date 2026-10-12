@@ -244,18 +244,13 @@ excludeFile := cli.String(
 filePerformanceLog := cli.Bool("filePerformanceLog", cli.setDefault(false), cli.setVerboseName("文件性能日志"), cli.setHelp("启用文件级别编译性能日志"), cli.setCliGroup("compile"))
 
 // 增量编译选项
+// 基础程序名称不再由用户输入：启用增量后，编译时自动以项目上一次编译的程序作为基础程序
 enableIncrementalCompile := cli.Bool(
-    "incremental-compile", 
-    cli.setDefault(false), 
-    cli.setVerboseName("启用增量编译"), 
-    cli.setHelp("启用增量编译模式。首次编译时作为基础程序；后续编译时基于基础程序进行差量编译，只编译变更的文件，提高编译速度。"), 
-    cli.setCliGroup("compile"), 
-)
-baseProgramName := cli.String(
-    "base-program-name", 
-    cli.setVerboseName("基础程序名称"), 
-    cli.setHelp("增量编译的基础程序名称。必须已存在于数据库中。如果不提供，当前编译将作为基础程序（首次增量编译）。"), 
-    cli.setCliGroup("compile"), 
+    "incremental-compile",
+    cli.setDefault(false),
+    cli.setVerboseName("启用增量编译"),
+    cli.setHelp("启用增量编译模式。首次编译时作为基础程序；后续编译时基于基础程序进行差量编译，只编译变更的文件，提高编译速度。"),
+    cli.setCliGroup("compile"),
 )
 
 jarRecursiveParse := cli.Bool("jar-recursive-parse", cli.setDefault(true), cli.setVerboseName("Jar递归解析"), cli.setHelp("是否递归解析Jar文件中的嵌套Jar。默认开启，项目太大时可关闭以提高性能。"), cli.setCliGroup("compile"))
@@ -773,17 +768,11 @@ if authConfig != nil && authConfig != undefined {
     }
 }
 
-// 添加增量编译配置
+// 添加增量编译配置（基础程序由【SSA 项目编译】自动按上一次编译的程序解析，无需用户指定）
+// re_compile 仅随配置静默透传，不影响增量编译
 if enableIncrementalCompile {
-    // 启用增量编译时，JSON 中勾选重新编译（与 SSA 项目编译 逻辑一致）
-    options = append(options, ssa.withEnableIncrementalCompile(true), ssa.withReCompile(true))
-    // 如果提供了基础程序名称，设置基础程序名称
-    if baseProgramName != "" {
-        options = append(options, ssa.withBaseProgramName(baseProgramName))
-        yakit.Info("已启用增量编译，基础程序: %s", baseProgramName)
-    } else {
-        yakit.Info("已启用增量编译（第一次编译，将作为基础程序）")
-    }
+    options = append(options, ssa.withEnableIncrementalCompile(true))
+    yakit.Info("已启用增量编译")
 }
 
 // 如果项目不存在或获取已有配置失败，创建新配置；否则更新已有配置

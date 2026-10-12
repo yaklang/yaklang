@@ -77,7 +77,7 @@ func GetIrSourceTreeByProgram(programName string) ([]IrSourceTreeEntry, error) {
 	}
 	db := GetDB()
 	var entries []IrSourceTreeEntry
-	err := db.Table(TableIrSources).
+	err := db.Model(&IrSource{}).
 		Select("folder_path, file_name, CASE WHEN quoted_code IS NULL OR quoted_code = '' THEN 1 ELSE 0 END AS is_dir").
 		Where("program_name = ?", programName).
 		Scan(&entries).Error

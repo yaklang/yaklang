@@ -133,6 +133,35 @@ func GetApplicationProgram(name string) (*IrProgram, error) {
 	return GetProgram(name, Application)
 }
 
+// GetApplicationPrograms fetches the Application rows for names in a single
+// query; missing names are simply absent from the result (callers treat
+// absent layers as skippable, same as a per-name GetProgram error).
+func GetApplicationPrograms(names []string) map[string]*IrProgram {
+	ret := make(map[string]*IrProgram, len(names))
+	clean := make([]string, 0, len(names))
+	for _, name := range names {
+		if name != "" {
+			clean = append(clean, name)
+		}
+	}
+	if len(clean) == 0 {
+		return ret
+	}
+	var progs []*IrProgram
+	err := GetDB().Model(&IrProgram{}).
+		Where("program_name IN (?)", clean).
+		Where("program_kind = ?", Application).
+		Find(&progs).Error
+	if err != nil {
+		log.Errorf("get application programs failed: %v", err)
+		return ret
+	}
+	for _, p := range progs {
+		ret[p.ProgramName] = p
+	}
+	return ret
+}
+
 func GetProgram(name string, kind ProgramKind) (*IrProgram, error) {
 	var p IrProgram
 	db := GetDB().Model(&IrProgram{})
