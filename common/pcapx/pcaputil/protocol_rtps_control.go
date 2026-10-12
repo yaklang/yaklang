@@ -15,6 +15,17 @@ func decodeRTPSControl(w []byte, elements int) (map[string]any, error) {
 }
 
 func decodeRTPSControlBudget(w []byte, elements, depth int) (map[string]any, error) {
+	return decodeRTPSMessageBudget(w, elements, depth, false)
+}
+
+func decodeRTPSMessageBudget(w []byte, elements, depth int, withData bool) (map[string]any, error) {
+	return decodeRTPSMessageBudgetRemaining(w, elements, depth, withData, nil)
+}
+
+func decodeRTPSMessageBudgetRemaining(w []byte, elements, depth int, withData bool, remainder *int) (map[string]any, error) {
+	if remainder != nil {
+		defer func() { *remainder = elements }()
+	}
 	if !rtpsDatagramHeader(w) {
 		return nil, rtpsMalformed("control message header is truncated or invalid")
 	}
@@ -27,6 +38,9 @@ func decodeRTPSControlBudget(w []byte, elements, depth int) (map[string]any, err
 	version := fmt.Sprintf("2.%d", w[5])
 	source, vendor, destination := hex.EncodeToString(w[8:20]), hex.EncodeToString(w[6:8]), "000000000000000000000000"
 	out := map[string]any{"Protocol Version": version, "Vendor ID": vendor, "Source GUID Prefix": source, "Observation": "unverified-control-report"}
+	if withData {
+		out["Observation"] = "unverified-wire-message"
+	}
 	var controls []map[string]any
 	var timestamp map[string]any
 	ordinal := uint32(0)
@@ -79,10 +93,33 @@ func decodeRTPSControlBudget(w []byte, elements, depth int) (map[string]any, err
 				return nil, rtpsMalformed("control INFO_DST is truncated")
 			}
 			destination = hex.EncodeToString(body[:12])
-		case 6, 7, 8, 0x12, 0x13:
-			// OMG document2.3 specifies wire version2.4. Older minor versions
-			// retain the common layout and treat group bits as unknown flags.
-			d, err := rtpsControlFields(kind, flags, body, order, &elements, version == "2.4" || version == "2.5", version == "2.5")
+		case 2, 3, 0x15, 6, 7, 8, 0x12, 0x13:
+			var d map[string]any
+			var err error
+			isData := kind == 2 || kind == 3 || kind == 0x15
+			if isData {
+				if !withData {
+					return nil, rtpsUnsupported("submessage needs DATA, security or other receiver-state support")
+				}
+				if kind == 0x15 {
+					if version == "2.0" {
+						return nil, rtpsUnsupported("modern DATA conflicts with logical source2.0")
+					}
+					d, err = rtpsWireData(body, flags, order, &elements, depth)
+				} else {
+					if version != "2.0" {
+						return nil, rtpsUnsupported("legacy DATA conflicts with logical source version")
+					}
+					d, err = rtps20Data(body, kind, flags, order, &elements, depth)
+					if err == nil {
+						d["Sender Role"] = "reported-writer"
+					}
+				}
+			} else {
+				// OMG document2.3 specifies wire version2.4. Older minor versions
+				// retain the common layout and treat group bits as unknown flags.
+				d, err = rtpsControlFields(kind, flags, body, order, &elements, version == "2.4" || version == "2.5", version == "2.5")
+			}
 			if err != nil {
 				return nil, err
 			}
@@ -105,9 +142,16 @@ func decodeRTPSControlBudget(w []byte, elements, depth int) (map[string]any, err
 		}
 	}
 	if len(controls) == 0 {
-		return nil, rtpsUnsupported("no reliability control observed")
+		if !withData {
+			return nil, rtpsUnsupported("no reliability control observed")
+		}
+		return nil, rtpsUnsupported("no selected DATA or reliability control observed")
 	}
-	out["Controls"] = controls
+	if withData {
+		out["Messages"] = controls
+	} else {
+		out["Controls"] = controls
+	}
 	return out, nil
 }
 

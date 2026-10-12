@@ -123,7 +123,7 @@ func TestRTPSReceiverContextReplay(t *testing.T) {
 func testRTPSSealedReplay(t *testing.T, cases []rtpsControl) {
 	testRTPSSealedReplayProfile(t, cases, "")
 }
-func testRTPSSealedReplayProfile(t *testing.T, cases []rtpsControl, profile string) {
+func testRTPSSealedReplayProfile(t *testing.T, cases []rtpsControl, profile string, selections ...CaptureOption) {
 	for _, c := range cases {
 		t.Run(c.ID, func(t *testing.T) {
 			raw, want := rtpsInput(t, c)
@@ -151,6 +151,7 @@ func testRTPSSealedReplayProfile(t *testing.T, cases []rtpsControl, profile stri
 									}
 									opts = append(opts, WithProtocolDecodeAs("udp", 28400, selected))
 								}
+								opts = append(opts, selections...)
 								input := bytes.Clone(raw)
 								require.NoError(t, ReplayPcap(bytes.NewReader(input), opts...))
 								clear(input)

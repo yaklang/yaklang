@@ -37,6 +37,7 @@ type CaptureConfig struct {
 	mavlinkSigning        *mavlinkSigningOptions
 	tlsSecrets            TLSSecretProvider
 	datagramDecodeAs      map[uint16]string
+	rtpsShapeWriters      map[uint16]RTPSShapeWriter
 	canDecodeAs           map[int]string
 	binParserConfig       *BinParserConfig
 	binParser             *binParser

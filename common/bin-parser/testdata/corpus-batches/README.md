@@ -44,7 +44,7 @@ Run from the repository root:
 ```sh
 go run ./internal/trafficfixture/cmd/corpus test
 go test -json -count=1 -timeout=5m ./internal/trafficfixture/... ./common/bin-parser/... ./common/pcapx/... ./common/yak/cmd/yakcmds/shark-cli ./scripts/ci > traffic.jsonl
-go run ./internal/trafficfixture/cmd/corpus exec -- python3 @scripts/protocol-tests/check_go_test_json.py traffic.jsonl --inventory @scripts/protocol-tests/required-tests-traffic-unified-v34.json --tier full
+go run ./internal/trafficfixture/cmd/corpus exec -- python3 @scripts/protocol-tests/check_go_test_json.py traffic.jsonl --inventory @scripts/protocol-tests/required-tests-traffic-unified-v35.json --tier full
 ```
 
 The single `corpus` entry point uses the same bounded Go ZIP loader as tests.
@@ -83,7 +83,7 @@ their semantic coverage. The existing synthetic session keys are test inputs;
 production credentials, user private keys and material without redistribution
 permission belong in an external fixed-source download manifest.
 
-Current test requirements are sealed at `scripts/protocol-tests/required-tests-traffic-unified-v34.json`;
+Current test requirements are sealed at `scripts/protocol-tests/required-tests-traffic-unified-v35.json`;
 the historical inventories and all earlier batches remain unchanged.
 The supplemental small-corpus batch contains 26 minimal controls, their explicit
 expected facts, an offline generator and the compact pinned source manifest.
@@ -96,7 +96,7 @@ byte-boundary, malformed-length and ownership tests. These are scoped control
 assertions, not a semantic golden for the entire upstream collection. Process
 logs and the original large downloads remain outside the repository.
 
-The local acceptance inventory is `required-tests-traffic-unified-v34.json`. The published workflow gate currently references v25; v26 adds Call requirements, v27 adds scalar arrays and v28 adds extended builtin fields and v29 adds bounded value graphs and complete diagnostic wire fields; v30 adds message-local RTPS INFO_SRC/INFO_DST context, v31 bounded SPDP fragments and owned answer-cache requirements, and v32 legacy RTPS2.0 DATA wire, budget, lifecycle and ownership requirements. Older
+The local acceptance inventory is `required-tests-traffic-unified-v35.json`. The published workflow gate currently references v25; v26 adds Call requirements, v27 adds scalar arrays and v28 adds extended builtin fields and v29 adds bounded value graphs and complete diagnostic wire fields; v30 adds message-local RTPS INFO_SRC/INFO_DST context, v31 bounded SPDP fragments and owned answer-cache requirements, and v32 legacy RTPS2.0 DATA wire, budget, lifecycle and ownership requirements. Older
 versioned inventories stay available as historical inputs; they are not the
 current acceptance entry. The DLMS HDLC batch contains owned tunnel/Get-normal
 controls and their independent fields/errors, CRC/byte validator, offline
@@ -203,7 +203,7 @@ opaque selector bytes and one bounded Data value over Wrapper v1 TCP/UDP; object
 selector meaning, access permission and device operation are unverified. The
 original one-packet selective-access capture and original refused answer remain
 immutable; its now-supported answer is matched by exact input SHA and frame.
-The active inventory is `scripts/protocol-tests/required-tests-traffic-unified-v34.json`.
+The active inventory is `scripts/protocol-tests/required-tests-traffic-unified-v35.json`.
 
 The small-graph budget batch reuses accepted graph captures/answers and adds one
 249-byte UDP control for child count255 without child bytes. Its standalone proof
@@ -770,3 +770,24 @@ QoS policy interpretation remain explicit requirements for subsequent work.
 The ZIP includes256 complete field/error scenarios (256 unique captures), independent deterministic generation and verification scripts, source pins and the v33 mandatory inventory. Full/deferred, workers1/2/4 and packet observation on/off require3072 replay configurations; native sessions separately cover probe purity, datagram isolation, byte/count/depth refusal, recovery, Close and owned fields. Fixed-spec wire answers and actual independent Wireshark scalar comparisons are distinct from device or reliability validation. All prior ZIPs remain immutable.
 
 `validation-rtps-control-wire.zip` adds16 independent minimal group HEARTBEAT wire cases and four hash-bound errata for the immutable preceding control answers. The UDP PSM9.4.5.7 layout contains three GSNs after the ordinary HEARTBEAT body (52 body bytes total). The PIM logical writer-set digest attributes have no concrete wire members there: unspecified tail octets remain owned `Extension Bytes`, not fabricated digest fields. Minimum, one-byte truncation, opaque tail and refusal/recovery cases retain complete field/error/session/ownership checks across192 configurations. Input and prior-answer SHA256 must both match before applying an independent correction; historical captures/ZIPs/answers are never overwritten. Current mandatory inventory is v34.
+
+`validation-rtps-wire.zip` adds116 unique authored minimal UDP captures with236
+wire/selected-type answer profiles. `rtps-wire` observes ordered legacy2.0
+DATA/NOKEY_DATA, modern2.1–2.5 DATA, common reliability controls and message-local
+INFO_SRC/INFO_DST/INFO_TS context. Serialized payloads remain owned opaque bytes.
+`WithProtocolRTPSShapeWriter` and `WithSessionRTPSShapeWriter` additionally select
+one exact source GUID prefix/writer entity per port for the final ShapeType in
+DDSI-RTPS2.5 section10.7. The selected wire2.4/2.5 PLAIN_CDR1 data/key projection
+checks64 Char8 UTF8 non-NUL elements, signed32 x/y/size, independent endian and
+XTypes1.3 options/trailing padding. Other writers remain opaque; older selected
+alignment needs context and unsupported representations are typed refusals.
+Selection supplies a schema association, not authenticated writer/topic evidence.
+Mixed messages share one submessage/QoS/bitmap/application budget and fail
+atomically; datagrams do not join and no ResponseTo/TransactionID is invented.
+Fixed sources, complete independent answers, generator and separate CDR verifier
+are in the small batch; original downloads/specification PDFs remain outside Git.
+The12 full/deferred, workers1/2/4 and observer configurations also check complete
+Session, fields, ordered errors, owned snapshots, probe purity and Close/recovery.
+Reliable reader/writer state, arbitrary IDL/CDR2/security and original capture
+qualification remain separate unfinished work. Current local inventory is v35;
+historical ZIPs, answers and inventories stay immutable.

@@ -421,6 +421,7 @@ type binParser struct {
 	rtpsFragments                                                              *rtpsFragmentStore // udpMu; directed domain/sample history
 	aisMultipartDisabled                                                       bool               // udpMu; untracked history fails closed
 	datagramDecodeAs                                                           map[uint16]string
+	rtpsShapeWriters                                                           map[uint16]RTPSShapeWriter
 	canDecodeAs                                                                map[int]string
 	droneCANMu                                                                 sync.Mutex
 	droneCANStats                                                              *droneCANStatsStore
@@ -502,6 +503,10 @@ func (c *CaptureConfig) prepareBinParser() error {
 	a.datagramDecodeAs = make(map[uint16]string, len(c.datagramDecodeAs))
 	for k, v := range c.datagramDecodeAs {
 		a.datagramDecodeAs[k] = v
+	}
+	a.rtpsShapeWriters = make(map[uint16]RTPSShapeWriter, len(c.rtpsShapeWriters))
+	for port, binding := range c.rtpsShapeWriters {
+		a.rtpsShapeWriters[port] = binding
 	}
 	a.canDecodeAs = make(map[int]string, len(c.canDecodeAs))
 	for k, v := range c.canDecodeAs {
