@@ -39,7 +39,7 @@ AnyDesk、DingTalk、DoH、DoQ、DoT、HTTP/3、IMAPS、SMTPS、T.38、WeChat/Mi
 
 <!-- BEGIN GENERATED PROTOCOL INVENTORY -->
 
-路线图共 **616** 项：限定范围 `done` **211**，`partial` **0**，`todo` **405**。目录共 **471** 个入口：`stable` **15**，`partial` **271**，`new` **185**。入口、规则文件和协议家族不是同一个计数。
+路线图共 **616** 项：限定范围 `done` **211**，`partial` **4**，`todo` **401**。目录共 **471** 个入口：`stable` **15**，`partial` **273**，`new` **183**。入口、规则文件和协议家族不是同一个计数。
 
 ### 路线图尚未完成的项目
 
@@ -78,7 +78,7 @@ AnyDesk、DingTalk、DoH、DoQ、DoT、HTTP/3、IMAPS、SMTPS、T.38、WeChat/Mi
 | P2 | Diameter | todo | [new / Diameter](rules/application-layer/extended_protocols.yaml) |
 | P2 | Diameter Cx/Dx | todo | 需核对别名/Fields 入口 |
 | P2 | DoIP | todo | [partial / DoIP](rules/application-layer/doip.yaml) |
-| P2 | DoQ | todo | [partial / DoQQueryStream](rules/application-layer/doq.yaml) |
+| P2 | DoQ | partial | [partial / DoQQueryStream](rules/application-layer/doq.yaml) |
 | P2 | ESXi hostd | todo | 需核对别名/Fields 入口 |
 | P2 | ETCD | todo | [partial / EtcdVersionHTTP](rules/application-layer/etcd.yaml) |
 | P2 | EtherCAT | todo | [partial / EtherCAT](rules/ethercat.yaml) |
@@ -144,7 +144,7 @@ AnyDesk、DingTalk、DoH、DoQ、DoT、HTTP/3、IMAPS、SMTPS、T.38、WeChat/Mi
 | P2 | Modbus RTU/ASCII | todo | 需核对别名/Fields 入口 |
 | P2 | Modbus TCP | todo | [new / ModbusTCP](rules/application-layer/extended_protocols.yaml) |
 | P2 | Mount | todo | [partial / ONCRPC](rules/onc_rpc.yaml) |
-| P2 | NATS | todo | [new / NATS](rules/application-layer/extended_protocols.yaml) |
+| P2 | NATS | partial | [partial / NATS](rules/application-layer/nats.yaml) |
 | P2 | NETCONF | todo | 需核对别名/Fields 入口 |
 | P2 | NFS4.1/4.2 | todo | 需核对别名/Fields 入口 |
 | P2 | NHRP | todo | [partial / NHRP](rules/nhrp.yaml) |
@@ -158,7 +158,7 @@ AnyDesk、DingTalk、DoH、DoQ、DoT、HTTP/3、IMAPS、SMTPS、T.38、WeChat/Mi
 | P2 | OCSP | todo | [new / OCSPRequest](rules/application-layer/ocsp.yaml) |
 | P2 | ONVIF | todo | 需核对别名/Fields 入口 |
 | P2 | OPC DA | todo | 需核对别名/Fields 入口 |
-| P2 | OPC UA | todo | [new / OPCUAHello](rules/application-layer/extended_protocols.yaml) |
+| P2 | OPC UA | partial | [partial / OPCUATCPMessage](rules/application-layer/extended_protocols.yaml) |
 | P2 | OSPFv3 | todo | [partial / OSPFv3](rules/ospfv3.yaml) |
 | P2 | OXABREF/NSPI | todo | 需核对别名/Fields 入口 |
 | P2 | Omron FINS | todo | [new / OmronFINS](rules/application-layer/extended_protocols.yaml) |
@@ -196,7 +196,7 @@ AnyDesk、DingTalk、DoH、DoQ、DoT、HTTP/3、IMAPS、SMTPS、T.38、WeChat/Mi
 | P2 | SRTP | todo | 需核对别名/Fields 入口 |
 | P2 | SRVLOC/SLP | todo | [new / SLPv2](rules/application-layer/extended_protocols.yaml) |
 | P2 | SSTP | todo | 需核对别名/Fields 入口 |
-| P2 | STOMP | todo | [new / STOMP](rules/application-layer/extended_protocols.yaml) |
+| P2 | STOMP | partial | [new / STOMP](rules/application-layer/extended_protocols.yaml) |
 | P2 | SWIFT | todo | 需核对别名/Fields 入口 |
 | P2 | Solr | todo | 需核对别名/Fields 入口 |
 | P2 | Submission | todo | [partial / SMTPCommand](rules/application-layer/smtp.yaml) |
@@ -487,7 +487,7 @@ AnyDesk、DingTalk、DoH、DoQ、DoT、HTTP/3、IMAPS、SMTPS、T.38、WeChat/Mi
 | [application-layer/etcd.yaml](rules/application-layer/etcd.yaml) | ETCD (`EtcdVersionHTTP`, partial) |
 | [application-layer/ether_sbus.yaml](rules/application-layer/ether_sbus.yaml) | Ether-S-Bus (`EtherSBus`, partial) |
 | [application-layer/ether_sio.yaml](rules/application-layer/ether_sio.yaml) | Ether-S-I/O (`EtherSIO`, partial) |
-| [application-layer/extended_protocols.yaml](rules/application-layer/extended_protocols.yaml) | AFP (`AFP`, new)<br>ANSI C12.22 (`C1222Message`, new)<br>ActiveMQ OpenWire (`ActiveMQOpenWire`, new)<br>BACnet (`BACnetIP`, new)<br>BFD (`BFD`, new)<br>Beckhoff ADS (`BeckhoffADS`, new)<br>CAN/ISO-TP (`CANEthernet`, new)<br>Cassandra CQL (`CassandraCQL`, new)<br>Ceph (`CephConnect`, new)<br>Citrix ICA (`CitrixICA`, new)<br>CoAP (`CoAP`, new)<br>Collectd (`Collectd`, new)<br>DB2 DRDA (`DRDA`, new)<br>DLEP (`DLEPSignal`, new)<br>DLMS/COSEM (`DLMSHDLC`, new)<br>DNP3 (`DNP3`, new)<br>Diameter (`Diameter`, new)<br>EtherNet/IP CIP (`EtherNetIPCIPIO`, new)<br>FIX (`FIX`, new)<br>GLBP (`GLBP`, new)<br>GTP Prime (`GTPPrime`, new)<br>GTP-C (`GTPv2`, new)<br>GTP-U (`GTPv1`, new)<br>GTPv2 (`GTPv2`, partial)<br>Git daemon (`GitDaemon`, new)<br>Gnutella (`Gnutella`, new)<br>Hart-IP (`HartIP`, new)<br>IEC 60870-5-104 (`IEC104`, new)<br>IEEE 802.11 Radiotap (`RadioTapHeader`, new)<br>IPP (`IPP`, new)<br>IRC (`IRC`, new)<br>KNX/IP (`KNXIP`, new)<br>LDP (`LDP`, new)<br>MELSEC (`MELSEC`, new)<br>MGCP (`MGCP`, new)<br>MPEG-TS (`MPEGTransportStream`, new)<br>Modbus TCP (`ModbusTCP`, new)<br>NAT-PMP (`NATPMPPublicAddressRequest`, new)<br>NATS (`NATS`, new)<br>NNTP (`NNTP`, new)<br>NetFlow v9 (`NetFlowV9`, new)<br>OPC UA (`OPCUAHello`, new)<br>Omron FINS (`OmronFINS`, new)<br>PFCP (`PFCP`, new)<br>PIM (`PIM`, new)<br>RSH (`RSH`, new)<br>S7comm (`S7comm`, new)<br>S7comm-plus (`S7commPlus`, new)<br>SCCP/Skinny (`Skinny`, new)<br>SMPP (`SMPPBind`, new)<br>SOME/IP (`SOMEIP`, new)<br>SRVLOC/SLP (`SLPv2`, new)<br>STOMP (`STOMP`, new)<br>Teredo (`TeredoAuthentication`, new)<br>USB HID report (`USBHIDReport`, partial)<br>XDMCP (`XDMCP`, new)<br>sFlow (`SFlowV5`, new) |
+| [application-layer/extended_protocols.yaml](rules/application-layer/extended_protocols.yaml) | AFP (`AFP`, new)<br>ANSI C12.22 (`C1222Message`, new)<br>ActiveMQ OpenWire (`ActiveMQOpenWire`, new)<br>BACnet (`BACnetIP`, new)<br>BFD (`BFD`, new)<br>Beckhoff ADS (`BeckhoffADS`, new)<br>CAN/ISO-TP (`CANEthernet`, new)<br>Cassandra CQL (`CassandraCQL`, new)<br>Ceph (`CephConnect`, new)<br>Citrix ICA (`CitrixICA`, new)<br>CoAP (`CoAP`, new)<br>Collectd (`Collectd`, new)<br>DB2 DRDA (`DRDA`, new)<br>DLEP (`DLEPSignal`, new)<br>DLMS/COSEM (`DLMSHDLC`, new)<br>DNP3 (`DNP3`, new)<br>Diameter (`Diameter`, new)<br>EtherNet/IP CIP (`EtherNetIPCIPIO`, new)<br>FIX (`FIX`, new)<br>GLBP (`GLBP`, new)<br>GTP Prime (`GTPPrime`, new)<br>GTP-C (`GTPv2`, new)<br>GTP-U (`GTPv1`, new)<br>GTPv2 (`GTPv2`, partial)<br>Git daemon (`GitDaemon`, new)<br>Gnutella (`Gnutella`, new)<br>Hart-IP (`HartIP`, new)<br>IEC 60870-5-104 (`IEC104`, new)<br>IEEE 802.11 Radiotap (`RadioTapHeader`, new)<br>IPP (`IPP`, new)<br>IRC (`IRC`, new)<br>KNX/IP (`KNXIP`, new)<br>LDP (`LDP`, new)<br>MELSEC (`MELSEC`, new)<br>MGCP (`MGCP`, new)<br>MPEG-TS (`MPEGTransportStream`, new)<br>Modbus TCP (`ModbusTCP`, new)<br>NAT-PMP (`NATPMPPublicAddressRequest`, new)<br>NNTP (`NNTP`, new)<br>NetFlow v9 (`NetFlowV9`, new)<br>OPC UA (`OPCUATCPMessage`, partial)<br>Omron FINS (`OmronFINS`, new)<br>PFCP (`PFCP`, new)<br>PIM (`PIM`, new)<br>RSH (`RSH`, new)<br>S7comm (`S7comm`, new)<br>S7comm-plus (`S7commPlus`, new)<br>SCCP/Skinny (`Skinny`, new)<br>SMPP (`SMPPBind`, new)<br>SOME/IP (`SOMEIP`, new)<br>SRVLOC/SLP (`SLPv2`, new)<br>STOMP (`STOMP`, new)<br>Teredo (`TeredoAuthentication`, new)<br>USB HID report (`USBHIDReport`, partial)<br>XDMCP (`XDMCP`, new)<br>sFlow (`SFlowV5`, new) |
 | [application-layer/ftp.yaml](rules/application-layer/ftp.yaml) | FTP (``, new)<br>FTPS (`FTPAuthTLS`, new) |
 | [application-layer/gquic.yaml](rules/application-layer/gquic.yaml) | GQUIC Q035 (`GQUIC35ClientPacket`, partial) |
 | [application-layer/gssapi.yaml](rules/application-layer/gssapi.yaml) | GSS-API (`GSSAPIHTTP`, partial) |
@@ -521,6 +521,7 @@ AnyDesk、DingTalk、DoH、DoQ、DoT、HTTP/3、IMAPS、SMTPS、T.38、WeChat/Mi
 | [application-layer/msrdp.yaml](rules/application-layer/msrdp.yaml) | MSRdp (``, new)<br>RDP (`RDPConnectionRequest`, new) |
 | [application-layer/mysql.yaml](rules/application-layer/mysql.yaml) | MariaDB (`MySQLPacket`, partial)<br>MySQL (``, partial) |
 | [application-layer/mysql_fields.yaml](rules/application-layer/mysql_fields.yaml) | MariaDB Greeting Fields (`MySQLGreetingFields`, partial)<br>MariaDB Handshake Response Fields (`MariaDBHandshakeResponse41Fields`, partial)<br>MariaDB Text Result Set Fields (`MariaDBTextResultSetFields`, partial)<br>MySQL Auth More Fields (`MySQLAuthMoreFields`, partial)<br>MySQL Auth Response Fields (`MySQLAuthResponseFields`, partial)<br>MySQL Auth Switch Fields (`MySQLAuthSwitchFields`, partial)<br>MySQL Command Fields (`MySQLCommandFields`, partial)<br>MySQL Deprecated EOF Result Fields (`MySQLTextResultSetDeprecatedFields`, partial)<br>MySQL Deprecated EOF Tracked Result Fields (`MySQLTextResultSetDeprecatedTrackFields`, partial)<br>MySQL Greeting Fields (`MySQLGreetingFields`, partial)<br>MySQL OK Session Track Fields (`MySQLOKSessionTrackFields`, partial)<br>MySQL SSL Request Fields (`MySQLSSLRequestFields`, partial) |
+| [application-layer/nats.yaml](rules/application-layer/nats.yaml) | NATS (`NATS`, partial) |
 | [application-layer/nbns.yaml](rules/application-layer/nbns.yaml) | LLMNR (`LLMNR`, partial)<br>LLMNR response (``, new)<br>LLMNR-MDNS collision (`LLMNR`, partial)<br>NBNS (``, new)<br>NBT NS (``, new)<br>NBT-NS response (``, new) |
 | [application-layer/nbss.yaml](rules/application-layer/nbss.yaml) | NBT SS (``, new)<br>NetBIOS (``, new) |
 | [application-layer/ncp.yaml](rules/application-layer/ncp.yaml) | NCP (`NCP`, partial) |
