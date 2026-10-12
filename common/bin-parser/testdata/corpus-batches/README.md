@@ -44,7 +44,7 @@ Run from the repository root:
 ```sh
 go run ./internal/trafficfixture/cmd/corpus test
 go test -json -count=1 -timeout=5m ./internal/trafficfixture/... ./common/bin-parser/... ./common/pcapx/... ./common/yak/cmd/yakcmds/shark-cli ./scripts/ci > traffic.jsonl
-go run ./internal/trafficfixture/cmd/corpus exec -- python3 @scripts/protocol-tests/check_go_test_json.py traffic.jsonl --inventory @scripts/protocol-tests/required-tests-traffic-unified-v37.json --tier full
+go run ./internal/trafficfixture/cmd/corpus exec -- python3 @scripts/protocol-tests/check_go_test_json.py traffic.jsonl --inventory @scripts/protocol-tests/required-tests-traffic-unified-v38.json --tier full
 ```
 
 The single `corpus` entry point uses the same bounded Go ZIP loader as tests.
@@ -83,7 +83,7 @@ their semantic coverage. The existing synthetic session keys are test inputs;
 production credentials, user private keys and material without redistribution
 permission belong in an external fixed-source download manifest.
 
-Current test requirements are sealed at `scripts/protocol-tests/required-tests-traffic-unified-v37.json`;
+Current test requirements are sealed at `scripts/protocol-tests/required-tests-traffic-unified-v38.json`;
 the historical inventories and all earlier batches remain unchanged.
 The supplemental small-corpus batch contains 26 minimal controls, their explicit
 expected facts, an offline generator and the compact pinned source manifest.
@@ -96,7 +96,7 @@ byte-boundary, malformed-length and ownership tests. These are scoped control
 assertions, not a semantic golden for the entire upstream collection. Process
 logs and the original large downloads remain outside the repository.
 
-The local acceptance inventory is `required-tests-traffic-unified-v37.json`. The published workflow gate currently references v25; v26 adds Call requirements, v27 adds scalar arrays and v28 adds extended builtin fields and v29 adds bounded value graphs and complete diagnostic wire fields; v30 adds message-local RTPS INFO_SRC/INFO_DST context, v31 bounded SPDP fragments and owned answer-cache requirements, and v32 legacy RTPS2.0 DATA wire, budget, lifecycle and ownership requirements. Older
+The local acceptance inventory is `required-tests-traffic-unified-v38.json`. The published workflow gate currently references v25; v26 adds Call requirements, v27 adds scalar arrays and v28 adds extended builtin fields and v29 adds bounded value graphs and complete diagnostic wire fields; v30 adds message-local RTPS INFO_SRC/INFO_DST context, v31 bounded SPDP fragments and owned answer-cache requirements, and v32 legacy RTPS2.0 DATA wire, budget, lifecycle and ownership requirements. Older
 versioned inventories stay available as historical inputs; they are not the
 current acceptance entry. The DLMS HDLC batch contains owned tunnel/Get-normal
 controls and their independent fields/errors, CRC/byte validator, offline
@@ -203,7 +203,7 @@ opaque selector bytes and one bounded Data value over Wrapper v1 TCP/UDP; object
 selector meaning, access permission and device operation are unverified. The
 original one-packet selective-access capture and original refused answer remain
 immutable; its now-supported answer is matched by exact input SHA and frame.
-The active inventory is `scripts/protocol-tests/required-tests-traffic-unified-v37.json`.
+The active inventory is `scripts/protocol-tests/required-tests-traffic-unified-v38.json`.
 
 The small-graph budget batch reuses accepted graph captures/answers and adds one
 249-byte UDP control for child count255 without child bytes. Its standalone proof
@@ -867,3 +867,27 @@ Close. Strict offline truncated-record rejection is preserved separately from
 live carrier refusal. Original captures/specifications/reference source remain
 outside Git; historical ZIPs/answers/inventories are unchanged. No rule archive
 is regenerated for this native-only batch.
+
+
+`validation-rtps13-parameters.zip` adds106 authored scenarios (104 distinct
+minimal captures) for explicit `rtps13-parameters` / `WithSessionRTPS13Parameters`.
+On the inherited RTPS1.3 UDP wire layout it interprets inline locator PIDs0x2f-0x33
+as literal signed kind, uint32 port and16 address bytes. Selected UDPv4/v6
+address fields are reported; unknown kinds, IPv4 prefix bytes and extensions
+remain owned observations. A zero or wider-than-UDP port is retained, not promoted
+to an established endpoint. PID0x55 reports ordered bitmap words and at most
+four four-word content-filter records as wire bit patterns. These records are
+not cryptographic signatures or a filter evaluation result. Other parameters
+retain their ordered raw values, including duplicates and PAD.
+
+The additional fields share the datagram collection, recursion and projection
+budgets with wire fields. Truncated lengths/counts are malformed; the selected
+four-record capacity and configured resource limits produce resource errors.
+No association, participant identity, negotiated QoS or reliability is inferred.
+Full fields and Session, original bytes, typed refusal, recovery, caller mutation,
+Close and the worker/deferred/observer matrix are required. Independent rebuild
+and a separate capture/parameter cursor check the sealed inputs and answers;
+70 positive captures also matched210 selected fields in actual TShark4.2.5.
+The source pin, authored generator, verifier and current v38 inventory are in
+the ZIP. Raw received captures, full reference source and process reports stay
+outside the repository; original device/application oracle gaps remain open.

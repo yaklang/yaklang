@@ -171,7 +171,7 @@ func NewProtocolSessionWithOptions(budget ParserBudget, options ...ProtocolSessi
 		}
 	}
 	for _, profile := range s.f.a.datagramDecodeAs {
-		if (profile == "rtps-control" || profile == "rtps-wire" || profile == "rtps13-wire") && s.transport != "udp" {
+		if (profile == "rtps-control" || profile == "rtps-wire" || profile == "rtps13-wire" || profile == "rtps13-parameters") && s.transport != "udp" {
 			return nil, fmt.Errorf("RTPS control observation requires a UDP session")
 		}
 		if (profile == "rtps-spdp-fragments" || profile == "rtps-shape-fragments") && s.transport != "udp" {

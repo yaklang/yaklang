@@ -565,7 +565,7 @@ func (a *binParser) datagramFields(network gopacket.NetworkLayer, udp *layers.UD
 	}
 	if truncated || ci.CaptureLength < ci.Length || udp.Length < 8 || int(udp.Length) != len(wire)+8 {
 		if a.rtps13Selected(uint16(udp.SrcPort), uint16(udp.DstPort)) {
-			a.decodeRTPS13WireInput(e, wire, protocolError(ErrNeedMore, "legacy RTPS carrier is truncated or has invalid UDP length"))
+			a.decodeRTPS13SelectedInput(e, wire, protocolError(ErrNeedMore, "legacy RTPS carrier is truncated or has invalid UDP length"), uint16(udp.SrcPort), uint16(udp.DstPort))
 			a.emit(e)
 			return
 		}
@@ -583,7 +583,7 @@ func (a *binParser) datagramFields(network gopacket.NetworkLayer, udp *layers.UD
 		a.incomplete.Add(1)
 	} else if len(wire) > a.config.MaxMessageBytes {
 		if a.rtps13Selected(uint16(udp.SrcPort), uint16(udp.DstPort)) {
-			a.decodeRTPS13WireInput(e, wire, protocolError(ErrResourceExceeded, "legacy RTPS exceeds UDP message budget"))
+			a.decodeRTPS13SelectedInput(e, wire, protocolError(ErrResourceExceeded, "legacy RTPS exceeds UDP message budget"), uint16(udp.SrcPort), uint16(udp.DstPort))
 			a.emit(e)
 			return
 		}

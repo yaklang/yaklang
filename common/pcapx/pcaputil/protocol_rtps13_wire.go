@@ -11,6 +11,9 @@ import (
 // fixed Wireshark4.2.5 dissector and received1.3 trace. It does not infer DDS
 // types, participant identity, discovery success or reliable endpoint state.
 func decodeRTPS13Wire(w []byte, budget ParserBudget) (map[string]any, error) {
+	return decodeRTPS13Mode(w, budget, false)
+}
+func decodeRTPS13Mode(w []byte, budget ParserBudget, parameters bool) (map[string]any, error) {
 	if len(w) < 16 || !bytes.Equal(w[:4], []byte("RTPS")) {
 		return nil, rtpsMalformed("legacy RTPS header is truncated or invalid")
 	}
@@ -22,6 +25,9 @@ func decodeRTPS13Wire(w []byte, budget ParserBudget) (map[string]any, error) {
 	}
 	source, vendor, destination := hex.EncodeToString(w[8:16]), hex.EncodeToString(w[6:8]), "0000000000000000"
 	out := map[string]any{"Protocol Version": "1.3", "Vendor ID": vendor, "Source GUID Prefix": source, "Observation": "unverified-legacy-wire-message"}
+	if parameters {
+		out["Observation"] = "unverified-legacy-parameter-message"
+	}
 	sourceVersion := "1.3"
 	var messages []map[string]any
 	var ts map[string]any
@@ -124,6 +130,17 @@ func decodeRTPS13Wire(w []byte, budget ParserBudget) (map[string]any, error) {
 				params, used, e := rtps13Parameters(b[pos:], order, &remaining)
 				if e != nil {
 					return nil, e
+				}
+				if parameters {
+					for _, q := range params {
+						typed, e := rtps13ParameterFields(q["ID"].(uint16), q["Value"].([]byte), order, budget, &remaining)
+						if e != nil {
+							return nil, e
+						}
+						if typed != nil {
+							q["Parameter Fields"] = typed
+						}
+					}
 				}
 				f["Inline QoS"] = params
 				pos += used
@@ -286,15 +303,18 @@ func rtps13ControlFields(kind, flags byte, b []byte, o binary.ByteOrder, remaini
 }
 
 func WithSessionRTPS13Wire(port uint16) ProtocolSessionOption {
+	return withSessionRTPS13Profile(port, "rtps13-wire")
+}
+func withSessionRTPS13Profile(port uint16, profile string) ProtocolSessionOption {
 	return func(s *captureSession) error {
 		if port == 0 {
 			return fmt.Errorf("legacy RTPS wire port must be nonzero")
 		}
 		old := s.f.a.datagramDecodeAs[port]
-		if old != "" && old != "rtps13-wire" {
+		if old != "" && old != profile {
 			return fmt.Errorf("conflicting legacy RTPS profile")
 		}
-		s.f.a.datagramDecodeAs[port] = "rtps13-wire"
+		s.f.a.datagramDecodeAs[port] = profile
 		return nil
 	}
 }
@@ -304,7 +324,7 @@ func (s *captureSession) probeRTPS13Wire(data []byte) (ProbeResult, bool) {
 	if p == "" {
 		p = a.datagramDecodeAs[s.f.ports[0]]
 	}
-	if p != "rtps13-wire" {
+	if p != "rtps13-wire" && p != "rtps13-parameters" {
 		return ProbeResult{}, false
 	}
 	reject := func(err error) (ProbeResult, bool) {
@@ -313,23 +333,33 @@ func (s *captureSession) probeRTPS13Wire(data []byte) (ProbeResult, bool) {
 	if len(data) > min(a.budget.MaxFrameBytes, a.config.MaxMessageBytes) || 32768+512*int64(len(data)) > int64(a.config.MaxBufferedBytes)-a.buffered.Load() {
 		return reject(protocolError(ErrResourceExceeded, "legacy wire byte/projection budget"))
 	}
-	if _, err := decodeRTPS13Wire(data, a.budget); err != nil {
+	if _, err := decodeRTPS13Mode(data, a.budget, p == "rtps13-parameters"); err != nil {
 		return reject(err)
 	}
-	return probeAccept("rtps", "rtps13-wire-native", 95), true
+	return probeAccept("rtps", p+"-native", 95), true
 }
 func (a *binParser) decodeRTPS13WireDatagram(e *ProtocolEvent, w []byte) bool {
-	return a.decodeRTPS13WireInput(e, w, nil)
+	return a.decodeRTPS13Input(e, w, nil, false)
 }
 func (a *binParser) rtps13Selected(src, dst uint16) bool {
 	p := a.datagramDecodeAs[dst]
 	if p == "" {
 		p = a.datagramDecodeAs[src]
 	}
-	return p == "rtps13-wire"
+	return p == "rtps13-wire" || p == "rtps13-parameters"
 }
-func (a *binParser) decodeRTPS13WireInput(e *ProtocolEvent, w []byte, inputErr error) bool {
+func (a *binParser) decodeRTPS13SelectedInput(e *ProtocolEvent, w []byte, inputErr error, src, dst uint16) bool {
+	p := a.datagramDecodeAs[dst]
+	if p == "" {
+		p = a.datagramDecodeAs[src]
+	}
+	return a.decodeRTPS13Input(e, w, inputErr, p == "rtps13-parameters")
+}
+func (a *binParser) decodeRTPS13Input(e *ProtocolEvent, w []byte, inputErr error, parameters bool) bool {
 	e.Protocol, e.Profile, e.Admission, e.Completeness = "rtps", "rtps13-wire-native", "explicit-decode-as", "message"
+	if parameters {
+		e.Profile = "rtps13-parameters-native"
+	}
 	raw := w
 	var fields map[string]any
 	var err error
@@ -345,7 +375,7 @@ func (a *binParser) decodeRTPS13WireInput(e *ProtocolEvent, w []byte, inputErr e
 		raw = nil
 	} else {
 		defer a.buffered.Add(-transient)
-		fields, err = decodeRTPS13Wire(w, a.budget)
+		fields, err = decodeRTPS13Mode(w, a.budget, parameters)
 	}
 	if err == nil {
 		e.semanticFields = cloneSession(fields)
