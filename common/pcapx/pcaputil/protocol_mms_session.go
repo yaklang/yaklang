@@ -3,11 +3,12 @@ package pcaputil
 import (
 	"bytes"
 	"fmt"
-	"reflect"
 	"time"
 )
 
 type mmsPending struct {
+	binding       *mmsListBinding
+	control       *mmsListControl
 	query         map[string]any
 	names         []map[string]any
 	specification bool
@@ -22,6 +23,10 @@ type mmsTSDU struct {
 	first  time.Time
 }
 type binMMS struct {
+	listObserved                                    bool
+	listClock                                       uint64
+	lists                                           [2]map[mmsListKey]mmsListEntry
+	listVersions                                    [2]map[mmsListKey]uint64
 	values                                          bool
 	nesting                                         uint32
 	hasNesting                                      bool
@@ -52,28 +57,10 @@ func (m *binMMS) storage() int64 {
 	n := int64(256 + len(m.supported[0]) + len(m.supported[1]) + (len(m.pending[0])+len(m.pending[1]))*96 + (len(m.retired[0])+len(m.retired[1]))*32)
 	for _, pending := range m.pending {
 		for _, p := range pending {
-			if p.query != nil {
-				n += 512
-				if text, ok := p.query["Continue After"].(string); ok {
-					n += int64(len(text))
-				}
-				if scope, ok := p.query["Object Scope"].(map[string]any); ok {
-					if text, ok := scope["Identifier"].(string); ok {
-						n += int64(len(text))
-					}
-				}
-			}
-			for _, row := range p.names {
-				count := int64(256)
-				for _, v := range row {
-					if text, ok := v.(string); ok {
-						count += int64(len(text))
-					}
-				}
-				n += count
-			}
+			n += mmsQueryStorage(p.query) + mmsNamesStorage(p.names)
 		}
 	}
+	n += m.namedStorage()
 	for _, c := range m.offered {
 		n += 192 + int64(len(c.syntax))
 		for _, t := range c.transfers {
@@ -113,6 +100,8 @@ func (m *binMMS) refuse() {
 	m.active = false
 	m.pending = [2]map[uint32]mmsPending{{}, {}}
 	m.fragment = [2]mmsTSDU{}
+	m.lists = [2]map[mmsListKey]mmsListEntry{}
+	m.listVersions = [2]map[mmsListKey]uint64{}
 }
 func (m *binMMS) snapshot() map[string]any {
 	f := map[string]any{"Observation": "unverified-MMS-association", "Transport Connected": m.transport, "Association Active": m.active, "Association Concluded": m.concluded, "Context Refused": m.poison, "Client Direction": m.client, "Max TPDU Bytes": m.tpdu, "Outstanding Direction0": len(m.pending[0]), "Outstanding Direction1": len(m.pending[1]), "Calling Limit": m.limits[0], "Called Limit": m.limits[1]}
@@ -125,6 +114,10 @@ func (m *binMMS) snapshot() map[string]any {
 		if m.hasNesting {
 			f["Data Nesting Limit"] = m.nesting
 		}
+	}
+	if m.listObserved {
+		f["Named List Context Observed"] = true
+		f["Observed Lists Direction0"], f["Observed Lists Direction1"] = len(m.lists[0]), len(m.lists[1])
 	}
 	return f
 }
@@ -288,7 +281,7 @@ func (f *binFlow) consumeMMSISO(dir int, e *ProtocolEvent) (out map[string]any, 
 			}
 			var values *mmsValueContext
 			if m.values {
-				values = &mmsValueContext{left: d.valueElements}
+				values = &mmsValueContext{left: d.valueElements, state: m, dir: dir, reserve: func(extra int64) error { return f.mmsReserve(f.sessionBytes + extra) }}
 			}
 			app, e2 := decodeMMSNode(*d.application, values)
 			if e2 != nil {
@@ -296,7 +289,7 @@ func (f *binFlow) consumeMMSISO(dir int, e *ProtocolEvent) (out map[string]any, 
 			}
 			out["MMS"] = app.fields
 			e.Completeness = "message"
-			if err = m.applyMMS(app, dir, e, f.a.budget.MaxCollectionElements, d); err != nil {
+			if err = m.applyMMS(app, dir, e, f.a.budget.MaxCollectionElements, d, f); err != nil {
 				return nil, err
 			}
 		} else {
@@ -311,7 +304,7 @@ func (f *binFlow) consumeMMSISO(dir int, e *ProtocolEvent) (out map[string]any, 
 	out["Observed Context"] = m.snapshot()
 	return out, nil
 }
-func (m *binMMS) applyMMS(d mmsDecoded, dir int, e *ProtocolEvent, limit int, carrier mmsISOCarrier) error {
+func (m *binMMS) applyMMS(d mmsDecoded, dir int, e *ProtocolEvent, limit int, carrier mmsISOCarrier, flow *binFlow) error {
 	if d.tag != 0xa8 && d.tag != 0xa9 && m.pduLimit[1-dir] != 0 && len(d.fields["Raw PDU"].([]byte)) > int(m.pduLimit[1-dir]) {
 		return protocolError(ErrMalformedMessage, "MMS PDU exceeds observed peer receive limit")
 	}
@@ -409,13 +402,18 @@ func (m *binMMS) applyMMS(d mmsDecoded, dir int, e *ProtocolEvent, limit int, ca
 				p.query["Continue After"] = after
 			}
 		}
-		if m.values && d.service == 5 {
+		if m.values && d.service == 5 && d.binding == nil {
 			p.names = cloneSessionValue(d.fields["Variables"]).([]map[string]any)
 		}
 		if m.values && d.service == 4 {
 			p.specification, _ = d.fields["Specification With Result"].(bool)
-			if p.specification {
+			if p.specification && d.binding == nil {
 				p.names = cloneSessionValue(d.fields["Variables"]).([]map[string]any)
+			}
+		}
+		if m.values {
+			if err := flow.namedMMSRequest(d, &p, dir); err != nil {
+				return err
 			}
 		}
 		m.pending[dir][d.invoke] = p
@@ -439,8 +437,18 @@ func (m *binMMS) applyMMS(d mmsDecoded, dir int, e *ProtocolEvent, limit int, ca
 		}
 		if m.values && d.tag == 0xa1 && p.service == 4 {
 			names, has := d.fields["Variables"]
-			if p.specification != has || has && !reflect.DeepEqual(p.names, names) {
+			list, hasList := d.fields["Variable List"]
+			matches := has && !hasList && mmsNamesEqual(p.names, names.([]map[string]any))
+			if p.binding != nil {
+				matches = matches || hasList && !has && p.binding.key == mmsKey(list.(map[string]any))
+			}
+			if p.specification != (has || hasList) || p.specification && !matches {
 				return protocolError(ErrMalformedMessage, "MMS returned variable specification differs from observed request")
+			}
+		}
+		if m.values {
+			if err := flow.namedMMSResponse(d, p, dir, e); err != nil {
+				return err
 			}
 		}
 		if m.values && p.service == 1 {

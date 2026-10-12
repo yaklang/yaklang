@@ -135,6 +135,8 @@ type mmsDecoded struct {
 	items                    int
 	valueDepth               uint32
 	services                 []byte
+	binding                  *mmsListBinding
+	deleteSpecific           bool
 }
 
 func decodeMMSPDU(w []byte, b ParserBudget) (mmsDecoded, error) {
@@ -220,8 +222,8 @@ func decodeMMSNode(n mmsBER, values *mmsValueContext) (mmsDecoded, error) {
 		if (s.tag != 0xa4 && s.tag != 0xa6) && (values == nil || !mmsSelectedService(n.tag, s.tag)) {
 			return d, protocolError(ErrUnsupportedFeature, "MMS selected Read/GetVariableAccessAttributes service")
 		}
-		d.fields["Invoke ID"], d.fields["Service Tag"], d.fields["Service Name"] = d.invoke, s.tag, map[byte]string{0: "Status", 1: "Get Name List", 2: "Identify", 4: "Read", 5: "Write", 6: "Get Variable Access Attributes"}[d.service]
-		if d.service == 4 && d.tag == 0xa0 {
+		d.fields["Invoke ID"], d.fields["Service Tag"], d.fields["Service Name"] = d.invoke, s.tag, map[byte]string{0: "Status", 1: "Get Name List", 2: "Identify", 4: "Read", 5: "Write", 6: "Get Variable Access Attributes", 11: "Define Named Variable List", 12: "Get Named Variable List Attributes", 13: "Delete Named Variable List"}[d.service]
+		if d.service == 4 && d.tag == 0xa0 && values == nil {
 			va, e := mmsChild(s, 0xa1)
 			if e != nil {
 				return d, e

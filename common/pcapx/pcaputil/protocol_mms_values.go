@@ -13,7 +13,12 @@ import (
 
 const mmsServicesProfile = "mms-iso-services-values"
 
-type mmsValueContext struct{ left int }
+type mmsValueContext struct {
+	left    int
+	state   *binMMS
+	dir     int
+	reserve func(int64) error
+}
 
 func (m *binMMS) profile() string {
 	if m.values {
@@ -47,9 +52,9 @@ func WithSessionMMSServiceValues() ProtocolSessionOption {
 }
 func mmsSelectedService(pdu, tag byte) bool {
 	if pdu == 0xa0 {
-		return tag == 0x80 || tag == 0xa1 || tag == 0x82 || tag == 0xa4 || tag == 0xa5 || tag == 0xa6
+		return tag == 0x80 || tag == 0xa1 || tag == 0x82 || tag == 0xa4 || tag == 0xa5 || tag == 0xa6 || tag == 0xab || tag == 0xac || tag == 0xad
 	}
-	return tag == 0xa0 || tag == 0xa1 || tag == 0xa2 || tag == 0xa4 || tag == 0xa5 || tag == 0xa6
+	return tag == 0xa0 || tag == 0xa1 || tag == 0xa2 || tag == 0xa4 || tag == 0xa5 || tag == 0xa6 || tag == 0x8b || tag == 0xac || tag == 0xad
 }
 func mmsBoolean(n mmsBER) (bool, error) {
 	if len(n.body) != 1 {

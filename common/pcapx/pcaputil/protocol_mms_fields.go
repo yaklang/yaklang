@@ -34,20 +34,63 @@ func mmsSchema(n mmsBER, required, optional []byte) error {
 	}
 	return nil
 }
+
+// X.690 8.23.3 applies OCTET STRING segment tags to constructed character strings.
+func mmsConstructedIdentifier(n mmsBER) ([]byte, error) {
+	var joined []byte
+	var collect func(mmsBER) error
+	collect = func(v mmsBER) error {
+		if v.tag == 4 {
+			if _, err := mmsVisible(v.body); err != nil {
+				return err
+			}
+			joined = append(joined, v.body...)
+			return nil
+		}
+		if v.tag != 0x24 {
+			return protocolError(ErrMalformedMessage, "MMS constructed character string OCTET STRING component tag")
+		}
+		for _, child := range v.children {
+			if err := collect(child); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+	for _, child := range n.children {
+		if err := collect(child); err != nil {
+			return nil, err
+		}
+	}
+	return joined, nil
+}
 func mmsNamed(n mmsBER, extended bool) (map[string]any, error) {
 	f := map[string]any{"Choice Tag": n.tag}
 	text := func(w []byte) (string, error) {
 		if len(w) == 0 {
 			return "", protocolError(ErrMalformedMessage, "MMS empty Identifier")
 		}
-		for _, v := range w {
-			if v < 32 || v > 126 {
+		for _, b := range w {
+			if b < 32 || b > 126 {
 				return "", protocolError(ErrMalformedMessage, "MMS Identifier VisibleString")
 			}
 		}
 		return string(w), nil
 	}
 	switch n.tag {
+	case 0xa0, 0xa2:
+		if !extended {
+			return nil, protocolError(ErrUnsupportedFeature, "MMS constructed Identifier requires extended name profile")
+		}
+		joined, err := mmsConstructedIdentifier(n)
+		if err != nil {
+			return nil, err
+		}
+		v, err := text(joined)
+		if err != nil {
+			return nil, err
+		}
+		f["Identifier"], f["Name Choice Tag"] = v, n.tag&^byte(32)
 	case 0x80, 0x82:
 		if !extended {
 			return nil, protocolError(ErrUnsupportedFeature, "MMS domain-specific name profile selected")
@@ -58,15 +101,29 @@ func mmsNamed(n mmsBER, extended bool) (map[string]any, error) {
 		}
 		f["Identifier"] = v
 	case 0xa1:
-		if len(n.children) != 2 || n.children[0].tag != 0x1a || n.children[1].tag != 0x1a {
+		if len(n.children) != 2 {
 			return nil, protocolError(ErrMalformedMessage, "MMS domain ObjectName")
 		}
 		for i, k := range []string{"Domain ID", "Item ID"} {
-			v, e := text(n.children[i].body)
-			if e != nil {
-				return nil, e
+			child := n.children[i]
+			body := child.body
+			if child.tag == 0x3a && extended {
+				joined, err := mmsConstructedIdentifier(child)
+				if err != nil {
+					return nil, err
+				}
+				body = joined
+			} else if child.tag != 0x1a {
+				return nil, protocolError(ErrMalformedMessage, "MMS domain ObjectName component")
+			}
+			v, err := text(body)
+			if err != nil {
+				return nil, err
 			}
 			f[k] = v
+		}
+		if n.children[0].tag == 0x3a || n.children[1].tag == 0x3a {
+			f["Component Tags"] = []byte{n.children[0].tag, n.children[1].tag}
 		}
 	default:
 		return nil, protocolError(ErrUnsupportedFeature, "MMS selected ObjectName")
@@ -80,6 +137,15 @@ func mmsSingleChild(n mmsBER) (mmsBER, error) {
 	return n.children[0], nil
 }
 func mmsSelectedFields(n mmsBER, d *mmsDecoded, values *mmsValueContext) error {
+	if values != nil && (d.tag == 0xa0 || d.tag == 0xa1) && d.service >= 11 && d.service <= 13 {
+		return values.namedService(n.children[1], d)
+	}
+	if values != nil && d.tag == 0xa0 && d.service == 4 {
+		return values.readAccess(n.children[1], d)
+	}
+	if values != nil && d.tag == 0xa2 {
+		return values.serviceError(n, d)
+	}
 	if values != nil && (d.service == 1 || d.service == 5) && (d.tag == 0xa0 || d.tag == 0xa1) {
 		return values.discoveryWrite(n.children[1], d)
 	}
@@ -198,6 +264,22 @@ func mmsSelectedFields(n mmsBER, d *mmsDecoded, values *mmsValueContext) error {
 		if values != nil {
 			for _, c := range s.children {
 				if c.tag == 0xa0 {
+					choice, err := mmsSingleChild(c)
+					if err != nil {
+						return err
+					}
+					if choice.tag == 0xa1 {
+						name, err := mmsSingleChild(choice)
+						if err != nil {
+							return err
+						}
+						f, err := mmsNamed(name, true)
+						if err != nil {
+							return err
+						}
+						d.fields["Variable List"] = f
+						continue
+					}
 					names, err := mmsVariableNames(c, true)
 					if err != nil {
 						return err

@@ -92,7 +92,7 @@ func (c *mmsValueContext) discoveryWrite(s mmsBER, d *mmsDecoded) error {
 		if len(s.children) != 2 || s.children[1].tag != 0xa0 {
 			return protocolError(ErrMalformedMessage, "MMS Write positional variable/data pair")
 		}
-		names, err := mmsVariableNames(mmsBER{children: []mmsBER{s.children[0]}}, true)
+		names, err := c.variableAccess(s.children[0], d)
 		if err != nil {
 			return err
 		}
@@ -110,7 +110,10 @@ func (c *mmsValueContext) discoveryWrite(s mmsBER, d *mmsDecoded) error {
 			values = append(values, value)
 		}
 		d.items = len(names)
-		d.fields["Variables"], d.fields["Data"] = names, values
+		if d.binding == nil {
+			d.fields["Variables"] = names
+		}
+		d.fields["Data"] = values
 		return nil
 	}
 	results := make([]map[string]any, 0, len(s.children))
