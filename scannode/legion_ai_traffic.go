@@ -20,6 +20,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	aiv1 "github.com/yaklang/yaklang/scannode/gen/legionpb/legion/ai/v1"
 	"google.golang.org/protobuf/encoding/protojson"
@@ -54,7 +55,7 @@ type aiTrafficCollector struct {
 	failed      bool
 }
 
-func newAITrafficCollector(binding aiSessionBinding, emitter aiSessionRuntimeEmitter, directory string) (*aiTrafficCollector, error) {
+func newAITrafficCollector(binding aiSessionBinding, emitter aiSessionRuntimeEmitter) (*aiTrafficCollector, error) {
 	policy := binding.TrafficCapture
 	if policy == nil {
 		return nil, nil
@@ -73,10 +74,15 @@ func newAITrafficCollector(binding aiSessionBinding, emitter aiSessionRuntimeEmi
 	policy = proto.Clone(policy).(*aiv1.AITrafficCapturePolicy)
 	policy.PacketLimitBytes = trafficCaptureLimit(policy.PacketLimitBytes, aiTrafficDefaultPacketLimit, aiTrafficMaxPacketLimit)
 	policy.SessionLimitBytes = trafficCaptureLimit(policy.SessionLimitBytes, aiTrafficDefaultSessionLimit, aiTrafficMaxSessionLimit)
-	if directory == "" {
-		// Neither remote session IDs nor tool IDs are allowed to select local paths.
-		identity := trafficSHA([]byte(fmt.Sprintf("%s/%d/%s", binding.Ref.SessionID, binding.Ref.BindEpoch, binding.NodeSessionID)))
-		directory = filepath.Join(consts.GetDefaultYakitBaseDir(), "legion-ai-traffic", identity)
+	identity := trafficSHA([]byte(fmt.Sprintf("%s/%d/%s", binding.Ref.SessionID, binding.Ref.BindEpoch, binding.NodeSessionID)))
+	root, err := filepath.Abs(consts.GetDefaultYakitBaseDir())
+	if err != nil {
+		return nil, err
+	}
+	directory := filepath.Join(root, "legion-ai-traffic", identity)
+	relative, err := filepath.Rel(root, directory)
+	if err != nil || !filepath.IsLocal(relative) {
+		return nil, fmt.Errorf("traffic spool must remain within the local root")
 	}
 	if err = os.MkdirAll(directory, 0700); err != nil {
 		return nil, err
@@ -88,14 +94,18 @@ func newAITrafficCollector(binding aiSessionBinding, emitter aiSessionRuntimeEmi
 	requestClient := *client
 	requestClient.Timeout = 10 * time.Second
 	requestClient.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
-	c := &aiTrafficCollector{binding: binding, policy: policy, emitter: emitter, dir: directory, client: &requestClient, wake: make(chan struct{}, 1), stop: make(chan struct{}), accepting: true}
 	// Cumulative local admission survives retries/restarts; the platform remains
 	// the authoritative quota and may reject bytes that a concurrent node admitted.
+	var used uint64
 	if raw, readErr := os.ReadFile(filepath.Join(directory, "admitted-bytes")); readErr == nil {
-		fmt.Sscan(string(raw), &c.used)
+		fmt.Sscan(string(raw), &used)
 	}
-	if _, markerErr := os.Stat(filepath.Join(directory, "capture-incomplete")); !errors.Is(markerErr, os.ErrNotExist) {
-		c.failed = true
+	_, markerErr := os.Stat(filepath.Join(directory, "capture-incomplete"))
+	c := &aiTrafficCollector{
+		binding: binding, policy: policy, emitter: emitter,
+		dir: directory, client: &requestClient,
+		wake: make(chan struct{}, 1), stop: make(chan struct{}),
+		accepting: true, used: used, failed: !errors.Is(markerErr, os.ErrNotExist),
 	}
 	aiTrafficCollectors.Store(c.key(), c)
 	go c.run()
@@ -383,7 +393,7 @@ func (c *aiTrafficCollector) enqueue(upload *aiv1.AITrafficUpload) {
 		upload.Record.ResponseSha256 = trafficSHA(nil)
 	} else if bytesCount > 0 {
 		c.used += bytesCount
-		if err := trafficAtomicWrite(filepath.Join(c.dir, "admitted-bytes"), []byte(fmt.Sprint(c.used))); err != nil {
+		if err := trafficAtomicWrite(c.dir, "admitted-bytes", []byte(fmt.Sprint(c.used))); err != nil {
 			c.failed = true
 		}
 	}
@@ -392,7 +402,7 @@ func (c *aiTrafficCollector) enqueue(upload *aiv1.AITrafficUpload) {
 	}
 	raw, err := proto.Marshal(upload)
 	if err == nil {
-		err = trafficAtomicWrite(filepath.Join(c.dir, upload.Record.FlowId+"."+upload.Record.Phase+".pb"), raw)
+		err = trafficAtomicWrite(c.dir, upload.Record.FlowId+"."+upload.Record.Phase+".pb", raw)
 	}
 	if err != nil {
 		c.failed = true
@@ -410,16 +420,32 @@ func (c *aiTrafficCollector) markIncompleteLocked() error {
 	c.failed = true
 	// Keep evidence coverage separate from whether the upload queue is empty.
 	// A durable metadata-only receipt cannot restore missing/truncated packets.
-	return trafficAtomicWrite(filepath.Join(c.dir, "capture-incomplete"), []byte("incomplete\n"))
+	return trafficAtomicWrite(c.dir, "capture-incomplete", []byte("incomplete\n"))
 }
 
-func trafficAtomicWrite(path string, raw []byte) error {
-	file, err := os.CreateTemp(filepath.Dir(path), ".traffic-")
+func trafficAtomicWrite(directory, name string, raw []byte) error {
+	if !filepath.IsAbs(directory) {
+		return fmt.Errorf("traffic spool directory must be absolute")
+	}
+	if !filepath.IsLocal(name) || filepath.Clean(name) != name || filepath.Base(name) != name || strings.ContainsAny(name, `/\`) {
+		return fmt.Errorf("traffic spool file must have a plain basename")
+	}
+	directory = filepath.Clean(directory)
+	path := filepath.Clean(filepath.Join(directory, name))
+	relative, err := filepath.Rel(directory, path)
+	if err != nil || relative != name || relative == "." {
+		return fmt.Errorf("traffic spool file must be a direct child of its directory")
+	}
+	file, err := os.CreateTemp(directory, ".traffic-")
 	if err != nil {
 		return err
 	}
 	temp := file.Name()
-	defer os.Remove(temp)
+	defer func() {
+		if err := os.Remove(temp); err != nil && !errors.Is(err, os.ErrNotExist) {
+			log.Warnf("AI traffic temporary file cleanup failed: %v", err)
+		}
+	}()
 	if err = file.Chmod(0600); err == nil {
 		_, err = file.Write(raw)
 	}
@@ -436,12 +462,12 @@ func trafficAtomicWrite(path string, raw []byte) error {
 	if err = os.Rename(temp, path); err != nil {
 		return err
 	}
-	directory, err := os.Open(filepath.Dir(path))
+	dir, err := os.Open(directory)
 	if err != nil {
 		return err
 	}
-	defer directory.Close()
-	return directory.Sync()
+	defer dir.Close()
+	return dir.Sync()
 }
 
 func (c *aiTrafficCollector) run() {
@@ -480,7 +506,7 @@ func (c *aiTrafficCollector) flush(ctx context.Context) {
 	emitBatch := func() {
 		if c.emit(ctx, "ai_traffic_batch", &aiv1.AITrafficBatch{ProtocolVersion: 1, Records: batch}) {
 			for i, marker := range markers {
-				_ = trafficAtomicWrite(marker, []byte(hashes[i]))
+				_ = trafficAtomicWrite(c.dir, filepath.Base(marker), []byte(hashes[i]))
 			}
 		}
 		batch, markers, hashes = nil, nil, nil
@@ -536,7 +562,7 @@ func (c *aiTrafficCollector) flush(ctx context.Context) {
 				return
 			}
 			receiptRaw, _ = proto.Marshal(receipt)
-			if err = trafficAtomicWrite(receiptPath, receiptRaw); err != nil {
+			if err = trafficAtomicWrite(c.dir, filepath.Base(receiptPath), receiptRaw); err != nil {
 				return
 			}
 		}
@@ -552,7 +578,9 @@ func (c *aiTrafficCollector) flush(ctx context.Context) {
 		if err = os.Remove(path); err == nil {
 			marker := strings.TrimSuffix(path, ".pb") + ".metadata"
 			if acknowledged, e := os.ReadFile(marker); e == nil && string(acknowledged) == trafficSHA(raw) {
-				_ = os.Remove(marker)
+				if removeErr := os.Remove(marker); removeErr != nil && !errors.Is(removeErr, os.ErrNotExist) {
+					log.Warnf("AI traffic metadata acknowledgement cleanup failed: %v", removeErr)
+				}
 			}
 			if dir, e := os.Open(c.dir); e == nil {
 				dir.Sync()

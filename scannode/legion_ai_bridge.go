@@ -649,7 +649,7 @@ func (m *aiSessionRuntimeManager) Bind(
 		AuthorizedFocusReleaseID:   strings.TrimSpace(command.GetResultContext().GetFocusReleaseId()),
 		AuthorizedTargetURL:        strings.TrimSpace(command.GetResultContext().GetTargetUrl()),
 	}
-	collector, err := newAITrafficCollector(binding, managedEmitter, "")
+	collector, err := newAITrafficCollector(binding, managedEmitter)
 	if err != nil {
 		cancel()
 		_ = codeWorkspace.Cleanup()

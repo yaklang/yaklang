@@ -55,6 +55,15 @@ the two headers alone exceed the limit, bounded prefixes are retained with
 quota authority. Oversize local header/body files are read as actual bytes,
 never uploaded as local path placeholders. Size and truncation remain explicit.
 
+The collector accepts no directory override. Its root comes from local operator
+configuration; remote session and node-session identifiers are hashed before
+selecting the per-generation directory. Atomic writes require an absolute
+directory and a plain direct-child basename, reject traversal and absolute file
+names, and verify the final relative path before creating or replacing a file.
+Temporary-file and metadata-acknowledgement cleanup failures are logged. A
+metadata marker cleanup failure does not invalidate an already durable HTTP
+receipt or claim missing packet evidence.
+
 The queue sends sanitized `AITrafficBatch` metadata through existing
 `AISessionEvent` messages (`event_type=ai_traffic_batch`, protobuf JSON with
 original field names). Packet upload is `POST

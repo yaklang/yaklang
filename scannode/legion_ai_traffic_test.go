@@ -150,7 +150,7 @@ func TestAITrafficRejectsForeignUploadOriginAndUnsupportedVersion(t *testing.T) 
 	for _, version := range []uint32{1, 2} {
 		t.Run(fmt.Sprint(version), func(t *testing.T) {
 			binding := aiSessionBinding{Ref: aiSessionCommandRef{SessionID: "session"}, PlatformAPIBaseURL: "https://platform.invalid", PlatformBearerToken: "secret", NodeSessionID: "node", TrafficCapture: &aiv1.AITrafficCapturePolicy{ProtocolVersion: version, UploadBaseUrl: "https://foreign.invalid"}}
-			if _, err := newAITrafficCollector(binding, nil, t.TempDir()); err == nil {
+			if _, err := newAITrafficCollector(binding, nil); err == nil {
 				t.Fatal("unsafe upload policy accepted")
 			}
 		})
@@ -209,23 +209,26 @@ func TestResilienceAITrafficReceiptPreservesIncompleteCoverageAfterRestart(t *te
 				_, _ = w.Write(receipt)
 			}))
 			defer server.Close()
-			c := trafficTestCollector(t, server.URL)
-			c.enqueue(&aiv1.AITrafficUpload{Record: &aiv1.AITrafficRecord{ProtocolVersion: 1, FlowId: "flow", SessionId: "session", Phase: "terminal", CaptureError: test.captureError}})
-			c.flush(context.Background())
-			paths, err := c.pending()
-			if err != nil || len(paths) != 0 {
-				t.Fatalf("durably acknowledged metadata stayed queued: paths=%v err=%v", paths, err)
+			t.Setenv("YAKIT_HOME", t.TempDir())
+			fixture := trafficTestCollector(t, server.URL)
+			binding := fixture.binding
+			binding.PlatformAPIBaseURL = server.URL
+			binding.TrafficCapture = fixture.policy
+			c, err := newAITrafficCollector(binding, &trafficTestEmitter{})
+			if err != nil {
+				t.Fatal(err)
 			}
+			defer c.stopped.Do(func() { close(c.stop) })
+			defer aiTrafficCollectors.Delete(c.key())
+			c.enqueue(&aiv1.AITrafficUpload{Record: &aiv1.AITrafficRecord{ProtocolVersion: 1, FlowId: "flow", SessionId: "session", Phase: "terminal", CaptureError: test.captureError}})
 			ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 			defer cancel()
 			result := c.drain(ctx, "before-restart")
+			c.stopped.Do(func() { close(c.stop) })
 			if ctx.Err() != nil || result.Complete || result.PendingRecords != 0 {
 				t.Fatalf("acknowledgement hid missing evidence or drain waited unnecessarily: %+v", result)
 			}
-			binding := c.binding
-			binding.PlatformAPIBaseURL = server.URL
-			binding.TrafficCapture = c.policy
-			restarted, err := newAITrafficCollector(binding, &trafficTestEmitter{}, c.dir)
+			restarted, err := newAITrafficCollector(binding, &trafficTestEmitter{})
 			if err != nil {
 				t.Fatal(err)
 			}
