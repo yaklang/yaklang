@@ -67595,6 +67595,922 @@
         "scripts/protocol-tests/check_go_test_json_v2.py": "mms-services-values/check_go_test_json_v2.py",
         "scripts/protocol-tests/required-tests-traffic-unified-v41.json": "required-tests-traffic-unified-v41.json"
       }
+    },
+    {
+      "id": "validation-mms-discovery-write",
+      "kind": "validation",
+      "source_sha": "291267ca86f88100cc2d0ff946ce7ac0480565a2",
+      "file": "validation-mms-discovery-write.zip",
+      "sha256": "7681738d7077d262939c4a0afd229d8a42ec115ede40a21a8a00e6c805ca8247",
+      "password": "bin-parser",
+      "members": {
+        "mms-discovery-write/answers/class-0-vmd.json": {
+          "sha256": "5945831581b63c23a6c03e02fa476a2d19a15dc287c941c7fbbd57145f8b4225",
+          "bytes": 55966
+        },
+        "mms-discovery-write/captures/class-0-vmd.pcap": {
+          "sha256": "892e7e36a45d2e62177fc73dbb4b9f6b3b3b3bd9a44dcc6773b9f3e2a4bad499",
+          "bytes": 1640
+        },
+        "mms-discovery-write/answers/class-0-domain.json": {
+          "sha256": "3215d25c9e658d575036e9d1dfc7f190746b278e5719cf4b570d1734cea6ae47",
+          "bytes": 56104
+        },
+        "mms-discovery-write/captures/class-0-domain.pcap": {
+          "sha256": "ab45e332573ba46b8629cc9ab50b7a2801d0fe694a38e8f86382b66c6a27f5c2",
+          "bytes": 1643
+        },
+        "mms-discovery-write/answers/class-0-aa.json": {
+          "sha256": "31b66a1594bf94ccfef9bfc6daa5ae6a60e35f0746768c7d04a0f9f139fe3b50",
+          "bytes": 55982
+        },
+        "mms-discovery-write/captures/class-0-aa.pcap": {
+          "sha256": "7f76cd21d16eec6d3b2e9c1a18f0ac45b8fe08c3da7d3a4bf4d9ee8608fce189",
+          "bytes": 1640
+        },
+        "mms-discovery-write/answers/class-1-vmd.json": {
+          "sha256": "d66e7306a4bfbb68312036567b58f573918341565d99265f8772ed53085b8c72",
+          "bytes": 55968
+        },
+        "mms-discovery-write/captures/class-1-vmd.pcap": {
+          "sha256": "cefedf17dd48f01fdd84407abe07b6dfc42371c5d1ec8e36e77d3100153374a3",
+          "bytes": 1640
+        },
+        "mms-discovery-write/answers/class-1-domain.json": {
+          "sha256": "d4434603d2a9dda3767018c9188405f0573c4c6b55a7c0bb9929ac695a68141a",
+          "bytes": 56106
+        },
+        "mms-discovery-write/captures/class-1-domain.pcap": {
+          "sha256": "48ac891f808860c680fa90754a1ab012a10513789c791285be761d2aaeb1ba7c",
+          "bytes": 1643
+        },
+        "mms-discovery-write/answers/class-1-aa.json": {
+          "sha256": "f3406f435e283a43c093083f186c978909e98e53a16e509c3daea9195752474a",
+          "bytes": 55984
+        },
+        "mms-discovery-write/captures/class-1-aa.pcap": {
+          "sha256": "5c136c878cbc2247b88022e2061983af86899bab8acabe9053e3b6133bd275a2",
+          "bytes": 1640
+        },
+        "mms-discovery-write/answers/class-2-vmd.json": {
+          "sha256": "a029e11c5126caa8c2c86141846c143564a04cfddc844bd2357bec4f593ea65a",
+          "bytes": 55971
+        },
+        "mms-discovery-write/captures/class-2-vmd.pcap": {
+          "sha256": "b9ee3bb8898c044e35602eb3593bc29ad7213151d0ab8c1126e48c8dc7a07c48",
+          "bytes": 1640
+        },
+        "mms-discovery-write/answers/class-2-domain.json": {
+          "sha256": "fe8a6512e29277eed65f8116771846c7cec5047d3369145f7577fc82daa63cd3",
+          "bytes": 56109
+        },
+        "mms-discovery-write/captures/class-2-domain.pcap": {
+          "sha256": "1608b45bdddad525fbda448c76e5cb2fffeb0be58b40353730292cb1370190b5",
+          "bytes": 1643
+        },
+        "mms-discovery-write/answers/class-2-aa.json": {
+          "sha256": "5886b86f9e5eaae51f30848456c6c1c547ffc4bad21f89e3e8f3b66327e473f6",
+          "bytes": 55987
+        },
+        "mms-discovery-write/captures/class-2-aa.pcap": {
+          "sha256": "676dbf21ed36e05ab794b93416af01f17f5d6616b5ad8b256042f41eec00bd90",
+          "bytes": 1640
+        },
+        "mms-discovery-write/answers/class-3-vmd.json": {
+          "sha256": "3fabeb107d87f050d2370ee7205032151de171011399bb2e6689785fda37f1e9",
+          "bytes": 55962
+        },
+        "mms-discovery-write/captures/class-3-vmd.pcap": {
+          "sha256": "0767da1761f5c10a76d1e1ab07bc8ecce39ae2341e17df2bf473e4e67be2f2a2",
+          "bytes": 1640
+        },
+        "mms-discovery-write/answers/class-3-domain.json": {
+          "sha256": "eb42715bd82f2178546108c948b22379f75c3de1291d6f902b62a658514ab625",
+          "bytes": 56100
+        },
+        "mms-discovery-write/captures/class-3-domain.pcap": {
+          "sha256": "36de640b64d025a074bf2a4887400eebb23e32959b3b45fbedaf6cbffd31ba4d",
+          "bytes": 1643
+        },
+        "mms-discovery-write/answers/class-3-aa.json": {
+          "sha256": "18a7d8be3eea9c56e224c97a73be683d275f19000cefb5214b4f4e46e063d05a",
+          "bytes": 55978
+        },
+        "mms-discovery-write/captures/class-3-aa.pcap": {
+          "sha256": "aa0bc7c3f7dd432875659ca6f86cef7d9c4f4ddeb293e2e7adc8cd7115ea7306",
+          "bytes": 1640
+        },
+        "mms-discovery-write/answers/class-4-vmd.json": {
+          "sha256": "539f491f6ad9b1ce8d5a529231099ca634af3c712e26f05ddec2174bfd1b14de",
+          "bytes": 55961
+        },
+        "mms-discovery-write/captures/class-4-vmd.pcap": {
+          "sha256": "bd3a8f220d80906edbb3d108bfc822db801fbb064fa2083b47ae1044c33e45cd",
+          "bytes": 1640
+        },
+        "mms-discovery-write/answers/class-4-domain.json": {
+          "sha256": "6238c5886273784d29f7edcd06b4dbca7fd58a1b35d035304be65551654d5492",
+          "bytes": 56099
+        },
+        "mms-discovery-write/captures/class-4-domain.pcap": {
+          "sha256": "98cbecf8b1a57eae116b956fee553c81afc86f03433c9a9037a226763ac1ce4f",
+          "bytes": 1643
+        },
+        "mms-discovery-write/answers/class-4-aa.json": {
+          "sha256": "c70dd0581b9873637188d3c72d38523e94a1930753ba6cd4c462e782c0a261d1",
+          "bytes": 55977
+        },
+        "mms-discovery-write/captures/class-4-aa.pcap": {
+          "sha256": "d7276aabc9541076696483682c51eb871b8e7c8c7c667afc25df8a653377ecf6",
+          "bytes": 1640
+        },
+        "mms-discovery-write/answers/class-5-vmd.json": {
+          "sha256": "f45080115f7c75d0ef4249bc63cb461b303b6b69142db5b3c73853f67cc25b72",
+          "bytes": 55967
+        },
+        "mms-discovery-write/captures/class-5-vmd.pcap": {
+          "sha256": "7c6c72ab591eca12fe56caf1790b2706b5c2eadb7e0933d22987f88bf6b5d9b0",
+          "bytes": 1640
+        },
+        "mms-discovery-write/answers/class-5-domain.json": {
+          "sha256": "73908686f5a594bdfbabda902041603b4f700f1341e3848332ada50c98bb249c",
+          "bytes": 56105
+        },
+        "mms-discovery-write/captures/class-5-domain.pcap": {
+          "sha256": "dd5ec1406ee18d087a0f3b917a39df4b0560d0032323afc8203cbba32cdb01b0",
+          "bytes": 1643
+        },
+        "mms-discovery-write/answers/class-5-aa.json": {
+          "sha256": "a1dcdc6af25a1173150f50e917a78a59a738c2e2ec7bbf4ab375ad3d953769cb",
+          "bytes": 55983
+        },
+        "mms-discovery-write/captures/class-5-aa.pcap": {
+          "sha256": "93a89016cd91317ba861051769c7578201b132dd4ba2cc5b1deffac2129df6b3",
+          "bytes": 1640
+        },
+        "mms-discovery-write/answers/class-6-vmd.json": {
+          "sha256": "382463ad7f7b5c6b78b2f51ac621b05bb5b728b9bbeb2d20c0e2805473361d76",
+          "bytes": 55964
+        },
+        "mms-discovery-write/captures/class-6-vmd.pcap": {
+          "sha256": "38848d806ca89ea63f86d075d787bae3f30b53c9ccfb7cb4b9c6fe2407566e0e",
+          "bytes": 1640
+        },
+        "mms-discovery-write/answers/class-6-domain.json": {
+          "sha256": "e36a1d8fc6e9cc28a70c76f657555eb0f619fe4bf9bb8e2aa7df84c5a2af7789",
+          "bytes": 56102
+        },
+        "mms-discovery-write/captures/class-6-domain.pcap": {
+          "sha256": "70776319aee612fa2a83cfd33e1fe4ab8e06315f44483f69d7562fdb00b7bde6",
+          "bytes": 1643
+        },
+        "mms-discovery-write/answers/class-6-aa.json": {
+          "sha256": "ed42cffe9525ab62d5ef00d4ba2b1be19645224664197f9a2a9b2937965b733a",
+          "bytes": 55980
+        },
+        "mms-discovery-write/captures/class-6-aa.pcap": {
+          "sha256": "c36f2b0e502371458e799b94cfc15074772ea491b9baf6909d220825fa0eaa1d",
+          "bytes": 1640
+        },
+        "mms-discovery-write/answers/class-7-vmd.json": {
+          "sha256": "a2b72b2c513266ce8e3a542badeb18476aa2b59d5c9e97ffb813fb1dc6bacdd7",
+          "bytes": 55968
+        },
+        "mms-discovery-write/captures/class-7-vmd.pcap": {
+          "sha256": "3fe5557bac391e9610e32a46d3d861a4b44c7a9d82d35f67f3dade4855e02f87",
+          "bytes": 1640
+        },
+        "mms-discovery-write/answers/class-7-domain.json": {
+          "sha256": "3f98013db807a391fab15c68d11bb45b5222053aa6b7bd3777a67bae49c2a543",
+          "bytes": 56106
+        },
+        "mms-discovery-write/captures/class-7-domain.pcap": {
+          "sha256": "5376621f616f2673db7c6e0ac4488b2789a36e1e762de2c5b9d422d48ede3ecf",
+          "bytes": 1643
+        },
+        "mms-discovery-write/answers/class-7-aa.json": {
+          "sha256": "587b97c9ccbaba045d7c65db55761251966ea3c2f37db48bf40cd3dae44bcf6f",
+          "bytes": 55984
+        },
+        "mms-discovery-write/captures/class-7-aa.pcap": {
+          "sha256": "e676232d387c2e9dc7cc78112d79b0d9f3b7f9e38397a353d6b31a441377e765",
+          "bytes": 1640
+        },
+        "mms-discovery-write/answers/class-8-vmd.json": {
+          "sha256": "683b747e670ff51675f8abc8880f282a251d36d633dcc667406cca74513d7b96",
+          "bytes": 55959
+        },
+        "mms-discovery-write/captures/class-8-vmd.pcap": {
+          "sha256": "0250cb4e5cfc1438236809f0de3c2cf1d0f41d505313dda0bee3c2b6ba2c9f69",
+          "bytes": 1640
+        },
+        "mms-discovery-write/answers/class-8-domain.json": {
+          "sha256": "39b8ec93b85b686912e830ad145aba19fa81917e750fdd3c41b8a8dbc17ce9d5",
+          "bytes": 56097
+        },
+        "mms-discovery-write/captures/class-8-domain.pcap": {
+          "sha256": "4ebd8da941927bd9870c0ccddba12dff6c2ca68bebf207f02572f4634c7cdf3a",
+          "bytes": 1643
+        },
+        "mms-discovery-write/answers/class-8-aa.json": {
+          "sha256": "1304af0471be84a48bec83642698839ef6a99f9671859f120f08630bb75d8a5c",
+          "bytes": 55975
+        },
+        "mms-discovery-write/captures/class-8-aa.pcap": {
+          "sha256": "8d8fdb7fcc3cfbd0afb7bf5248a4c8eacab67bdabae433b6510878c94b631817",
+          "bytes": 1640
+        },
+        "mms-discovery-write/answers/class-9-vmd.json": {
+          "sha256": "97b3f73f315df8dee7bfb2453c98db3dce41a51b9ca00cda28bb3c109d6f365c",
+          "bytes": 55958
+        },
+        "mms-discovery-write/captures/class-9-vmd.pcap": {
+          "sha256": "4d3c5a807084140e6450c6e4c8f3256c2d92a1c1929fb2ce919b40504c7643e8",
+          "bytes": 1640
+        },
+        "mms-discovery-write/answers/class-9-domain.json": {
+          "sha256": "091ec70ede8273a50f2dbafb41cac0e476f5a41a11d3f26a36231ebd1707c429",
+          "bytes": 56096
+        },
+        "mms-discovery-write/captures/class-9-domain.pcap": {
+          "sha256": "fb410006cb9a68339914739528fd08c0c310d4644dbf369de2afb26a0d9642ba",
+          "bytes": 1643
+        },
+        "mms-discovery-write/answers/class-9-aa.json": {
+          "sha256": "4420a415e51301aea94b29e8227a6b214c3eced478234fc409720c7234c53247",
+          "bytes": 55974
+        },
+        "mms-discovery-write/captures/class-9-aa.pcap": {
+          "sha256": "33310395701c23d392d7dc048e61a1206c7e1e450720854cb153be001bfdcbe6",
+          "bytes": 1640
+        },
+        "mms-discovery-write/answers/class-10-vmd.json": {
+          "sha256": "28dc5f33c3bcb25d5f0e02a084f11482078d660700854dc7a2de7bbf199a02a0",
+          "bytes": 55972
+        },
+        "mms-discovery-write/captures/class-10-vmd.pcap": {
+          "sha256": "fdb53b8ccbf85951e2b0ac5a2a64959537bb61e2e445ec87051f20ad0001ba19",
+          "bytes": 1640
+        },
+        "mms-discovery-write/answers/class-10-domain.json": {
+          "sha256": "8eb5c50edc3d3cc5b0fdc222e57e2f4812f97acb42bb89c35fbd8644ff7fd97f",
+          "bytes": 56110
+        },
+        "mms-discovery-write/captures/class-10-domain.pcap": {
+          "sha256": "b5477247b0cba5788f04a9df7108171ecc59d3a86e1287b4ae151628be256458",
+          "bytes": 1643
+        },
+        "mms-discovery-write/answers/class-10-aa.json": {
+          "sha256": "9f560b39e30e0ccd28f418b4ea017116d15d5fb8289af4f6593c843e482d22bf",
+          "bytes": 55988
+        },
+        "mms-discovery-write/captures/class-10-aa.pcap": {
+          "sha256": "e259fcdc4bae3743c5afcd48652df4945c9d4d0df6beb096f96ff47dc11ecc46",
+          "bytes": 1640
+        },
+        "mms-discovery-write/answers/class-11-vmd.json": {
+          "sha256": "652bad94d04661f9e89d635e27d619cea539318552d675867533ffc0d7a48390",
+          "bytes": 55970
+        },
+        "mms-discovery-write/captures/class-11-vmd.pcap": {
+          "sha256": "0e7761843e07011bc8e15e04b0255be8908f13d4345542c5c68e8befb1edb41f",
+          "bytes": 1640
+        },
+        "mms-discovery-write/answers/class-11-domain.json": {
+          "sha256": "ecd26ac725a5f07bde02c39c362a32ee496b95abc0cd221788739c0ce54789b3",
+          "bytes": 56108
+        },
+        "mms-discovery-write/captures/class-11-domain.pcap": {
+          "sha256": "068cfbf016d72e26d5aebb2fd47fba5581e1c2433208b1803868483b1b7577e8",
+          "bytes": 1643
+        },
+        "mms-discovery-write/answers/class-11-aa.json": {
+          "sha256": "6738e7d07aad541a26864dd4c340485b0aea03fea4e65bc8f9d9db39a1dc015a",
+          "bytes": 55986
+        },
+        "mms-discovery-write/captures/class-11-aa.pcap": {
+          "sha256": "7ff5d1453021ad64219fe6edff7bd71bfc38bd09e21e8aea5f7dd4de38153f3f",
+          "bytes": 1640
+        },
+        "mms-discovery-write/answers/default-empty.json": {
+          "sha256": "93a2e0995a912baf2b3605d63ec426a8bb224a9cae16d3284378e0d397ba154d",
+          "bytes": 55371
+        },
+        "mms-discovery-write/captures/default-empty.pcap": {
+          "sha256": "647c46016a2926892b9fa21a32f443878f271d044d28dc7424c3b5b132e684d5",
+          "bytes": 1629
+        },
+        "mms-discovery-write/answers/explicit-false.json": {
+          "sha256": "fe0509d72bd7d3c209f92bd15b07a4f19a721c0b93c6f3a8faf870130b154cfc",
+          "bytes": 56855
+        },
+        "mms-discovery-write/captures/explicit-false.pcap": {
+          "sha256": "a621b5df3c7c0aedc9617aab19abe30a2b9eba93c2db12d57de623dd3717a150",
+          "bytes": 1641
+        },
+        "mms-discovery-write/answers/noncanonical-true.json": {
+          "sha256": "7eaa549cda45b70a52097a9f33ed399ffe415edcaec690b2c8dc81e47194c92c",
+          "bytes": 56867
+        },
+        "mms-discovery-write/captures/noncanonical-true.pcap": {
+          "sha256": "bc9d5ae9ed967676a60b81b38eca7d9b96f084f077b952c48a9333ac0738d1c0",
+          "bytes": 1642
+        },
+        "mms-discovery-write/answers/pagination-observed.json": {
+          "sha256": "bad1d2ad1c15586b5654178efc641c645e177ae2f9fed77913f6158067166a54",
+          "bytes": 65825
+        },
+        "mms-discovery-write/captures/pagination-observed.pcap": {
+          "sha256": "f912ede1cee5c0583d55e9ef29e92947dc659fe798a4ee426891ed7ac709a0eb",
+          "bytes": 1857
+        },
+        "mms-discovery-write/answers/write-bool.json": {
+          "sha256": "1c201eb965abb50c02bb76a42cc608a1aa702e17e095f781d9be895e4478e89c",
+          "bytes": 57466
+        },
+        "mms-discovery-write/captures/write-bool.pcap": {
+          "sha256": "e8cdd31134abd8a366551bb4dddd6b2d1a9527f24ebec71d422b6a8e211bde88",
+          "bytes": 1643
+        },
+        "mms-discovery-write/answers/write-wide.json": {
+          "sha256": "20a6615d9393dd225675aee301ddcfa24cb2b1199398255767f9e577a79d27c2",
+          "bytes": 57859
+        },
+        "mms-discovery-write/captures/write-wide.pcap": {
+          "sha256": "4dcd86241136386ca875f046490d9a2f36d290a45b74a3e39aefdfc188a26f91",
+          "bytes": 1659
+        },
+        "mms-discovery-write/answers/write-bytes.json": {
+          "sha256": "5f92fc3fc9aeff56e1e9a5372457d1a31ebde04f40f70b9ccf7d2e6ec5dfb247",
+          "bytes": 57501
+        },
+        "mms-discovery-write/captures/write-bytes.pcap": {
+          "sha256": "07676659e5fb54c5c116a2e8b46adad2c00f1a0553810d75e2fd93bbe050180d",
+          "bytes": 1644
+        },
+        "mms-discovery-write/answers/write-nested.json": {
+          "sha256": "322a3bae2c119201c0df92730da64bfc22cca51f886567c57555c9748f9ad4b4",
+          "bytes": 58892
+        },
+        "mms-discovery-write/captures/write-nested.pcap": {
+          "sha256": "dbe3069fdb3caedf22bd58c4184f5dd749000597f6f3b34b8327a1a4e43b66be",
+          "bytes": 1647
+        },
+        "mms-discovery-write/answers/write-float.json": {
+          "sha256": "003645b7a0e1d46e7594b44e77c797380c150f21f2a36bd17416355f7d05ef7d",
+          "bytes": 57671
+        },
+        "mms-discovery-write/captures/write-float.pcap": {
+          "sha256": "0a977b1ec2fb1ed592e31e03a15a024ddcba80567c101f66257734058b83c1a2",
+          "bytes": 1647
+        },
+        "mms-discovery-write/answers/write-mixed-results.json": {
+          "sha256": "5bad3c776936c430708f2d371fff7228ebc0c202b554d1dbf7073ab095a4a28a",
+          "bytes": 62690
+        },
+        "mms-discovery-write/captures/write-mixed-results.pcap": {
+          "sha256": "ba14b46d6a66ef993c115a8ea930c22acbcdafdfe444565dd96d9b635672fd6c",
+          "bytes": 1678
+        },
+        "mms-discovery-write/answers/query-confirmed-error.json": {
+          "sha256": "ee1cb4e0fb053a5d0775e09792a21bcef4b78ec76cae08c988d720823732f785",
+          "bytes": 55380
+        },
+        "mms-discovery-write/captures/query-confirmed-error.pcap": {
+          "sha256": "e457cd05b6cd8c14fa1d76e29c41b39600f121df1421b69d1dec34c6fcd52ad5",
+          "bytes": 1630
+        },
+        "mms-discovery-write/answers/query-both-directions.json": {
+          "sha256": "95892ec5deca51f47e95c68d8e6998b6f4997af99f0ccfbf7a61e8252cacd84e",
+          "bytes": 65702
+        },
+        "mms-discovery-write/captures/query-both-directions.pcap": {
+          "sha256": "48708b7368847adae81472f33fc34390b8ac881f1672b008a1537b9dae1ba1a5",
+          "bytes": 1858
+        },
+        "mms-discovery-write/answers/write-confirmed-error.json": {
+          "sha256": "e9d241ea4ea7f1727457195bc367dd5c7fdaac423c87f554a996278e2bcabddf",
+          "bytes": 57888
+        },
+        "mms-discovery-write/captures/write-confirmed-error.pcap": {
+          "sha256": "6ac6893598e974690ac9316a7c2dab99f28b7a50fccfad349257639e2c768aed",
+          "bytes": 1646
+        },
+        "mms-discovery-write/answers/write-both-directions.json": {
+          "sha256": "ebf5b49fa89afb9ca08600a92fdb65df666e6ed491febe7ce66ab9bce3c379a7",
+          "bytes": 68702
+        },
+        "mms-discovery-write/captures/write-both-directions.pcap": {
+          "sha256": "fe15a20d8c1e46b5ff5cc9c3d3dbe90fa3cb25c10d58f301451cdda9d147961d",
+          "bytes": 1864
+        },
+        "mms-discovery-write/answers/query-null-payload.json": {
+          "sha256": "192591500006893710045ddf9d20080af391650b927fbcf392fd86719d357b80",
+          "bytes": 36401
+        },
+        "mms-discovery-write/captures/query-null-payload.pcap": {
+          "sha256": "ef767fc4f69841c801234a9baeb663166f3e0bfd7428094dc6ac39cb48a2e2cb",
+          "bytes": 1155
+        },
+        "mms-discovery-write/answers/query-unknown-class.json": {
+          "sha256": "657e51c4f117c61899866e35df9758dd6be2d9a15f7cc663f584e113f1dbb574",
+          "bytes": 36406
+        },
+        "mms-discovery-write/captures/query-unknown-class.pcap": {
+          "sha256": "f5c16988636eea25de0939a28d141a4d57f49d0a3944087f2560c5f99447bbf4",
+          "bytes": 1154
+        },
+        "mms-discovery-write/answers/query-non-visible.json": {
+          "sha256": "744d032762f76177b088926b1c9c7f987957ee558f99013b4881c45d34e8ac11",
+          "bytes": 36401
+        },
+        "mms-discovery-write/captures/query-non-visible.pcap": {
+          "sha256": "4bc1c7512758c80a8aef86f8c1ec37cfd58cd25b864e3fc3ce64c0032c68de3f",
+          "bytes": 1155
+        },
+        "mms-discovery-write/answers/query-missing-scope.json": {
+          "sha256": "efd3723dbe9c0b86d8b7bb5ea60ee80019f67c95523d0bf753136f1f190a6b24",
+          "bytes": 36381
+        },
+        "mms-discovery-write/captures/query-missing-scope.pcap": {
+          "sha256": "ac1f9f5848f05f2a86ccf7c2e9ecb42ed77126c0f11f683650502a30505d6193",
+          "bytes": 1150
+        },
+        "mms-discovery-write/answers/query-duplicate-scope.json": {
+          "sha256": "47fba2944ead3715bd26d951612994671d9addb8f7bf3ca2f3231bc4b0733a82",
+          "bytes": 36413
+        },
+        "mms-discovery-write/captures/query-duplicate-scope.pcap": {
+          "sha256": "8845d7dda3d278d3acba3da6a7256c603f16feff0126a1fb4a92a2dfb6ae3568",
+          "bytes": 1158
+        },
+        "mms-discovery-write/answers/write-data-count.json": {
+          "sha256": "8a280ac3c42f8b20603f3353c6a860f7e2d4b992ad93304a32b3a02a93a8d9de",
+          "bytes": 36473
+        },
+        "mms-discovery-write/captures/write-data-count.pcap": {
+          "sha256": "b2ee98b9856f16924f84d4e1821f0c5078c61b10aef6cb48adbce497b37e6d8b",
+          "bytes": 1173
+        },
+        "mms-discovery-write/answers/write-illegal-data.json": {
+          "sha256": "be3fe860a93915866084361ffdfd61d6813dd15c6285e1b598744b9e9c6a308f",
+          "bytes": 36461
+        },
+        "mms-discovery-write/captures/write-illegal-data.pcap": {
+          "sha256": "8f867b8f19a8a585d9642e494b399d460dfe27c38427a8563cc21fd281c91a16",
+          "bytes": 1170
+        },
+        "mms-discovery-write/answers/write-nonminimal-int.json": {
+          "sha256": "6c18be3a22b6ba5680284aa15dea68e2f6e759bb0f1bf9e0a727cda91b4631d2",
+          "bytes": 36465
+        },
+        "mms-discovery-write/captures/write-nonminimal-int.pcap": {
+          "sha256": "fe33f3e6c8833b1844630c30b0d58186bf2e5ff75b5613429028f5ae35dab85e",
+          "bytes": 1171
+        },
+        "mms-discovery-write/answers/write-missing-data.json": {
+          "sha256": "24099df009958415efed25dd585a94d870aa601128cc74443c46bd3af279b164",
+          "bytes": 36441
+        },
+        "mms-discovery-write/captures/write-missing-data.pcap": {
+          "sha256": "234481d2a1a4bbaaf1f1b51ea1a5562ba91c1ce7c0c4094f599400ea30017808",
+          "bytes": 1165
+        },
+        "mms-discovery-write/answers/write-list-unobserved.json": {
+          "sha256": "58e1e1a267e7bca547a79c2ac99632b846311edd268d9b1c68fee3f07e1ea4b6",
+          "bytes": 36451
+        },
+        "mms-discovery-write/captures/write-list-unobserved.pcap": {
+          "sha256": "77bcd0168add00e933c1605b0863f3829fb03431b4262097146b59544e87bed5",
+          "bytes": 1166
+        },
+        "mms-discovery-write/answers/query-invalid-ident-tag.json": {
+          "sha256": "8074c91007b343caf62be45583ea4bbe3e178a90339a7f10d28dd1e3194b4dfd",
+          "bytes": 41313
+        },
+        "mms-discovery-write/captures/query-invalid-ident-tag.pcap": {
+          "sha256": "bc7b614badf40b2f3db3c62c078d39c1f28f24c67a3040d4e67f580176c760ed",
+          "bytes": 1256
+        },
+        "mms-discovery-write/answers/query-invalid-ident-byte.json": {
+          "sha256": "203420f7b6525a6c5d837280a48373c356e67cb77e11de8c13abfd8f6240e89f",
+          "bytes": 41313
+        },
+        "mms-discovery-write/captures/query-invalid-ident-byte.pcap": {
+          "sha256": "80658ec77f8040d0ba1f1bce0e02dfe2cd49189bc3775bcd412377acbd8b7c96",
+          "bytes": 1256
+        },
+        "mms-discovery-write/answers/query-boolean-empty.json": {
+          "sha256": "4edcbfc4d3c8859f63455ace8c75e921acabe6f2038b22918b071db5066a4d9b",
+          "bytes": 41361
+        },
+        "mms-discovery-write/captures/query-boolean-empty.pcap": {
+          "sha256": "68041b689a9e5bb0abc7cf06fd4e6b7e07d47f6a5f9c3823dca3b599731831f7",
+          "bytes": 1268
+        },
+        "mms-discovery-write/answers/query-boolean-two.json": {
+          "sha256": "6faef90bb82fb66f0b9bc247d9059521f5e7ab8e91ad87df03a6a575e6410db2",
+          "bytes": 41369
+        },
+        "mms-discovery-write/captures/query-boolean-two.pcap": {
+          "sha256": "4a03e355558239897af238d3c89f32ee135e6b074215f2a8e24a31566515a7a6",
+          "bytes": 1270
+        },
+        "mms-discovery-write/answers/write-null-content.json": {
+          "sha256": "83c27ff6d8b444110ea955a46585c4ee2be30ad1ed8fe5c5531ddf1dafb8ea2f",
+          "bytes": 43820
+        },
+        "mms-discovery-write/captures/write-null-content.pcap": {
+          "sha256": "ac84570b31379db896d6ee4f09f2f6f067bab33f5a1a9b3844ac00185d3f5e2c",
+          "bytes": 1270
+        },
+        "mms-discovery-write/answers/write-invalid-result.json": {
+          "sha256": "6bc372d638c6e60e302ea754b76ad5cd5d86e497830c6f5a3de260327ef4fab1",
+          "bytes": 43825
+        },
+        "mms-discovery-write/captures/write-invalid-result.pcap": {
+          "sha256": "88ee0df32b93fcae1a9d912274f459847ddd43626d3f033558e90ce11a06e006",
+          "bytes": 1269
+        },
+        "mms-discovery-write/answers/write-invalid-error.json": {
+          "sha256": "e5b11ddd52c7b6cabf28d165d4721faff0a373d72e49e3ef2676436365545c9b",
+          "bytes": 43820
+        },
+        "mms-discovery-write/captures/write-invalid-error.pcap": {
+          "sha256": "84373b1792fe16d8e7e996441291217b1bf31183ed604625614f33aaef4170a5",
+          "bytes": 1270
+        },
+        "mms-discovery-write/answers/write-empty-results.json": {
+          "sha256": "a48c897170d31ae0297fb1b8af8b896c22435fd6417b93937c2c2fca5fdc1075",
+          "bytes": 43808
+        },
+        "mms-discovery-write/captures/write-empty-results.pcap": {
+          "sha256": "d3834712915354509102e48021f1c41a48d368920dd1635603f3ec4eff755b0a",
+          "bytes": 1267
+        },
+        "mms-discovery-write/answers/write-result-count.json": {
+          "sha256": "fd8f94e30cf31d64e953363b098fcead8c794d5656cfb7a047d9ad0f5fec75f8",
+          "bytes": 43824
+        },
+        "mms-discovery-write/captures/write-result-count.pcap": {
+          "sha256": "130797bcea11dd88cc3b37fac935934f14581666df321d6ec8929f80546addae",
+          "bytes": 1271
+        },
+        "mms-discovery-write/answers/write-wrong-service.json": {
+          "sha256": "116a86ed543025044cd3ddadbacc9f151493bece92af76c2f6e4b62c7f51f541",
+          "bytes": 43868
+        },
+        "mms-discovery-write/captures/write-wrong-service.pcap": {
+          "sha256": "52f2172b58771853ef8562ad9ab14779545ce4cc58d27879fec21fea56e6baf2",
+          "bytes": 1282
+        },
+        "mms-discovery-write/answers/query-wrong-service.json": {
+          "sha256": "fc5556312a0c6d86c631bb3a303063144d763c8d8df662c263fe8b617d69d355",
+          "bytes": 41301
+        },
+        "mms-discovery-write/captures/query-wrong-service.pcap": {
+          "sha256": "813c1036f1ee96660dc86fae8e90d59f85b154527065ab1716096b90266e25be",
+          "bytes": 1253
+        },
+        "mms-discovery-write/answers/query-wrong-direction.json": {
+          "sha256": "62c9a707d40f69add65018086576017359da98bd6c7435f73fa5247ba0931882",
+          "bytes": 41359
+        },
+        "mms-discovery-write/captures/query-wrong-direction.pcap": {
+          "sha256": "4dca005da932ba76e1edbb3ce57b272616b476a414ddaf12d2b937de0c5c2f76",
+          "bytes": 1266
+        },
+        "mms-discovery-write/answers/query-orphan.json": {
+          "sha256": "ff927593f659801bf557d6aa4916ef5c204522f05252a15e12458e3156de22d2",
+          "bytes": 36427
+        },
+        "mms-discovery-write/captures/query-orphan.pcap": {
+          "sha256": "bac940f177a344925cdcddef7ef69c4af8e8e8a7e507921ba7b54ae310946e79",
+          "bytes": 1160
+        },
+        "mms-discovery-write/answers/query-active-reuse.json": {
+          "sha256": "a3f4aa3ebeeb4cd3651f179a69e7a67e33fd7c0e4e4bca798ac949bb8b68c190",
+          "bytes": 41327
+        },
+        "mms-discovery-write/captures/query-active-reuse.pcap": {
+          "sha256": "61e3b1b231f85fbe208741f2eba8ab24120ca559cb6f9f46583b4d69e43f171a",
+          "bytes": 1260
+        },
+        "mms-discovery-write/answers/query-retired-reuse.json": {
+          "sha256": "471f998516bf400dfbf4437aa2255250cab7bd8de6ac077f8b67e5073fdf8a38",
+          "bytes": 46137
+        },
+        "mms-discovery-write/captures/query-retired-reuse.pcap": {
+          "sha256": "2385f5660f0516ddd68de856dc3834cbd91eb7192aae2c6347c0b545a78499d2",
+          "bytes": 1372
+        },
+        "mms-discovery-write/answers/write-wrong-direction.json": {
+          "sha256": "cef7b47c617d69c95b298e7dda08f74e60f3170d46f97c35a7b10ef19faf48f0",
+          "bytes": 43822
+        },
+        "mms-discovery-write/captures/write-wrong-direction.pcap": {
+          "sha256": "56da5048a7906811e6a5b9bc0cc2646a272ddfa3db6a27becd34be34b65c9ff7",
+          "bytes": 1269
+        },
+        "mms-discovery-write/answers/write-orphan.json": {
+          "sha256": "0844eb694cdb0ebbaa219f6249db19a3bed1d9156658d6258376cdc6dfdba269",
+          "bytes": 36375
+        },
+        "mms-discovery-write/captures/write-orphan.pcap": {
+          "sha256": "6fd1651f6b1dd42a9a74f9bfdac1384c38adbc685fbbc956d3e60392f174b201",
+          "bytes": 1147
+        },
+        "mms-discovery-write/answers/write-active-reuse.json": {
+          "sha256": "e90c591466dd281b3c0db67058232a2b217c1939c6d7256e548867aca35ab427",
+          "bytes": 43906
+        },
+        "mms-discovery-write/captures/write-active-reuse.pcap": {
+          "sha256": "b7cea9903217485188cc21f8ee5924ce54c966e7e3cfdea56d03b5da20dc0b22",
+          "bytes": 1292
+        },
+        "mms-discovery-write/answers/write-retired-reuse.json": {
+          "sha256": "4a46850856b8ebd0ecb726e9bcc77fa917e1996dbe8ddc7b25876426c6d6268a",
+          "bytes": 47701
+        },
+        "mms-discovery-write/captures/write-retired-reuse.pcap": {
+          "sha256": "5d257f9110c05bf953f46767da111619d2c6178318cba88e2d14cc7e7d7de6b9",
+          "bytes": 1391
+        },
+        "mms-discovery-write/answers/write-depth-write.json": {
+          "sha256": "9efa03283ccaef31b24f843533093a9692f26ddc88328fc7503e484f7cbc8c8e",
+          "bytes": 36477
+        },
+        "mms-discovery-write/captures/write-depth-write.pcap": {
+          "sha256": "1648ef83bc8ccd6f250e3c42dd750386cc13f4bbc2ff749483fb0ee2768d71c9",
+          "bytes": 1174
+        },
+        "mms-discovery-write/answers/mixed-interleaved.json": {
+          "sha256": "f3139a5baf9d78d352ef5bded0b3c9042b2e80fbea254614ec58aa313c4a81b9",
+          "bytes": 67202
+        },
+        "mms-discovery-write/captures/mixed-interleaved.pcap": {
+          "sha256": "2740c7e406993461ccdda1b9bda0e4492d4b4bc81d950d647a5e1b8aaa8a007c",
+          "bytes": 1861
+        },
+        "mms-discovery-write/answers/query-large-cursor.json": {
+          "sha256": "cf294d507c968b8f98d2c405e3df7440a016f3a8ca10f43f4f59ab4d84b47901",
+          "bytes": 103400
+        },
+        "mms-discovery-write/captures/query-large-cursor.pcap": {
+          "sha256": "b087fd881f20901aee70f9eecb786e619ef2708eeb7b1a3342a22b02e53a8c76",
+          "bytes": 3808
+        },
+        "mms-discovery-write/answers/write-large-bytes.json": {
+          "sha256": "c824e4ec39bc232d788fe18675b57339e685b59b26602183e141c526484d41dd",
+          "bytes": 108579
+        },
+        "mms-discovery-write/captures/write-large-bytes.pcap": {
+          "sha256": "659edd9b5fa32678d8e080177aecd29edf9e58589d7cad2e36a95afcdc3db420",
+          "bytes": 3810
+        },
+        "mms-discovery-write/answers/query-empty-domain.json": {
+          "sha256": "99bfaa2689e13397ffb90161418893cfcf58e6e5428cb6a634d8151ec4782415",
+          "bytes": 55796
+        },
+        "mms-discovery-write/captures/query-empty-domain.pcap": {
+          "sha256": "53384247dfd86bc68fdbf8f69bf0c9634878c4b64f1bd38ee7abed3338f849d0",
+          "bytes": 1632
+        },
+        "mms-discovery-write/answers/query-invoke-max.json": {
+          "sha256": "319c2a4d2216c4a7eac7cf0849a6062f6efb7695afa9a002f0d90626442016d2",
+          "bytes": 56096
+        },
+        "mms-discovery-write/captures/query-invoke-max.pcap": {
+          "sha256": "ee5e1d7868a7ad94716e31a6cfa394b6698667ae5a7f180f898c7c3eb5453525",
+          "bytes": 1648
+        },
+        "mms-discovery-write/answers/write-invoke-max.json": {
+          "sha256": "97ee1ade106908b2b2ecddf28fd487e3af2c98e8fd79cd2f13d4ed90f7216c37",
+          "bytes": 57612
+        },
+        "mms-discovery-write/captures/write-invoke-max.pcap": {
+          "sha256": "f9b0fd7c73e8728dfd9dad718aad142cab835913c4c59e9a5c98110f47388f04",
+          "bytes": 1651
+        },
+        "mms-discovery-write/manifest.json": {
+          "sha256": "47b60a53355e846dc0e69d59bc50d6c73fc0a49a20a3f1da52d435e8a58ff1be",
+          "bytes": 29076
+        },
+        "mms-discovery-write/generate.py": {
+          "sha256": "4fba371d1e83689a58eee86f99dbd47b4f33f06a3fb501795ea7b1ad0b98c0c7",
+          "bytes": 9193
+        },
+        "mms-discovery-write/verify.py": {
+          "sha256": "fe118570485e7519ba3bb4922ceabea4d0c8383b8e80f18d8c82605c1bea0479",
+          "bytes": 1777
+        },
+        "mms-discovery-write/reference.py": {
+          "sha256": "f5295be14cab1ab2a8015a9d0ce83f27e8fdcede61be938661e92ed4e399b0b6",
+          "bytes": 8679
+        },
+        "mms-discovery-write/MODEL-PINS.json": {
+          "sha256": "7d2a2b1b75c5044ad054e53719e0ac0974eb33afaa3216473be3d70a1f6ceddb",
+          "bytes": 270
+        },
+        "mms-discovery-write/SOURCE-PINS.json": {
+          "sha256": "cfe42b2edf82659651d8a4769d7f45350afc4ef94fcf4c63aa87b7dd671e36ed",
+          "bytes": 715
+        },
+        "mms-discovery-write/seal.py": {
+          "sha256": "d210d58c406ad07280c38b5e1991428719358f9be55ac0fdea7bde150d43a894",
+          "bytes": 3935
+        },
+        "required-tests-traffic-unified-v42.json": {
+          "sha256": "8e65104854444d911ca9113a61bea2fa0882c1bf96dc9f85e4d0d1fcc40f421f",
+          "bytes": 6136837
+        },
+        "validation/expected.json": {
+          "sha256": "ebffbcef12c46ad219dbf78420e9a100d74b3c210ec21939a2647d05eda402d1",
+          "bytes": 102184
+        }
+      },
+      "aliases": {
+        "common/pcapx/pcaputil/mms-discovery-write/answers/class-0-vmd.json": "mms-discovery-write/answers/class-0-vmd.json",
+        "common/pcapx/pcaputil/mms-discovery-write/captures/class-0-vmd.pcap": "mms-discovery-write/captures/class-0-vmd.pcap",
+        "common/pcapx/pcaputil/mms-discovery-write/answers/class-0-domain.json": "mms-discovery-write/answers/class-0-domain.json",
+        "common/pcapx/pcaputil/mms-discovery-write/captures/class-0-domain.pcap": "mms-discovery-write/captures/class-0-domain.pcap",
+        "common/pcapx/pcaputil/mms-discovery-write/answers/class-0-aa.json": "mms-discovery-write/answers/class-0-aa.json",
+        "common/pcapx/pcaputil/mms-discovery-write/captures/class-0-aa.pcap": "mms-discovery-write/captures/class-0-aa.pcap",
+        "common/pcapx/pcaputil/mms-discovery-write/answers/class-1-vmd.json": "mms-discovery-write/answers/class-1-vmd.json",
+        "common/pcapx/pcaputil/mms-discovery-write/captures/class-1-vmd.pcap": "mms-discovery-write/captures/class-1-vmd.pcap",
+        "common/pcapx/pcaputil/mms-discovery-write/answers/class-1-domain.json": "mms-discovery-write/answers/class-1-domain.json",
+        "common/pcapx/pcaputil/mms-discovery-write/captures/class-1-domain.pcap": "mms-discovery-write/captures/class-1-domain.pcap",
+        "common/pcapx/pcaputil/mms-discovery-write/answers/class-1-aa.json": "mms-discovery-write/answers/class-1-aa.json",
+        "common/pcapx/pcaputil/mms-discovery-write/captures/class-1-aa.pcap": "mms-discovery-write/captures/class-1-aa.pcap",
+        "common/pcapx/pcaputil/mms-discovery-write/answers/class-2-vmd.json": "mms-discovery-write/answers/class-2-vmd.json",
+        "common/pcapx/pcaputil/mms-discovery-write/captures/class-2-vmd.pcap": "mms-discovery-write/captures/class-2-vmd.pcap",
+        "common/pcapx/pcaputil/mms-discovery-write/answers/class-2-domain.json": "mms-discovery-write/answers/class-2-domain.json",
+        "common/pcapx/pcaputil/mms-discovery-write/captures/class-2-domain.pcap": "mms-discovery-write/captures/class-2-domain.pcap",
+        "common/pcapx/pcaputil/mms-discovery-write/answers/class-2-aa.json": "mms-discovery-write/answers/class-2-aa.json",
+        "common/pcapx/pcaputil/mms-discovery-write/captures/class-2-aa.pcap": "mms-discovery-write/captures/class-2-aa.pcap",
+        "common/pcapx/pcaputil/mms-discovery-write/answers/class-3-vmd.json": "mms-discovery-write/answers/class-3-vmd.json",
+        "common/pcapx/pcaputil/mms-discovery-write/captures/class-3-vmd.pcap": "mms-discovery-write/captures/class-3-vmd.pcap",
+        "common/pcapx/pcaputil/mms-discovery-write/answers/class-3-domain.json": "mms-discovery-write/answers/class-3-domain.json",
+        "common/pcapx/pcaputil/mms-discovery-write/captures/class-3-domain.pcap": "mms-discovery-write/captures/class-3-domain.pcap",
+        "common/pcapx/pcaputil/mms-discovery-write/answers/class-3-aa.json": "mms-discovery-write/answers/class-3-aa.json",
+        "common/pcapx/pcaputil/mms-discovery-write/captures/class-3-aa.pcap": "mms-discovery-write/captures/class-3-aa.pcap",
+        "common/pcapx/pcaputil/mms-discovery-write/answers/class-4-vmd.json": "mms-discovery-write/answers/class-4-vmd.json",
+        "common/pcapx/pcaputil/mms-discovery-write/captures/class-4-vmd.pcap": "mms-discovery-write/captures/class-4-vmd.pcap",
+        "common/pcapx/pcaputil/mms-discovery-write/answers/class-4-domain.json": "mms-discovery-write/answers/class-4-domain.json",
+        "common/pcapx/pcaputil/mms-discovery-write/captures/class-4-domain.pcap": "mms-discovery-write/captures/class-4-domain.pcap",
+        "common/pcapx/pcaputil/mms-discovery-write/answers/class-4-aa.json": "mms-discovery-write/answers/class-4-aa.json",
+        "common/pcapx/pcaputil/mms-discovery-write/captures/class-4-aa.pcap": "mms-discovery-write/captures/class-4-aa.pcap",
+        "common/pcapx/pcaputil/mms-discovery-write/answers/class-5-vmd.json": "mms-discovery-write/answers/class-5-vmd.json",
+        "common/pcapx/pcaputil/mms-discovery-write/captures/class-5-vmd.pcap": "mms-discovery-write/captures/class-5-vmd.pcap",
+        "common/pcapx/pcaputil/mms-discovery-write/answers/class-5-domain.json": "mms-discovery-write/answers/class-5-domain.json",
+        "common/pcapx/pcaputil/mms-discovery-write/captures/class-5-domain.pcap": "mms-discovery-write/captures/class-5-domain.pcap",
+        "common/pcapx/pcaputil/mms-discovery-write/answers/class-5-aa.json": "mms-discovery-write/answers/class-5-aa.json",
+        "common/pcapx/pcaputil/mms-discovery-write/captures/class-5-aa.pcap": "mms-discovery-write/captures/class-5-aa.pcap",
+        "common/pcapx/pcaputil/mms-discovery-write/answers/class-6-vmd.json": "mms-discovery-write/answers/class-6-vmd.json",
+        "common/pcapx/pcaputil/mms-discovery-write/captures/class-6-vmd.pcap": "mms-discovery-write/captures/class-6-vmd.pcap",
+        "common/pcapx/pcaputil/mms-discovery-write/answers/class-6-domain.json": "mms-discovery-write/answers/class-6-domain.json",
+        "common/pcapx/pcaputil/mms-discovery-write/captures/class-6-domain.pcap": "mms-discovery-write/captures/class-6-domain.pcap",
+        "common/pcapx/pcaputil/mms-discovery-write/answers/class-6-aa.json": "mms-discovery-write/answers/class-6-aa.json",
+        "common/pcapx/pcaputil/mms-discovery-write/captures/class-6-aa.pcap": "mms-discovery-write/captures/class-6-aa.pcap",
+        "common/pcapx/pcaputil/mms-discovery-write/answers/class-7-vmd.json": "mms-discovery-write/answers/class-7-vmd.json",
+        "common/pcapx/pcaputil/mms-discovery-write/captures/class-7-vmd.pcap": "mms-discovery-write/captures/class-7-vmd.pcap",
+        "common/pcapx/pcaputil/mms-discovery-write/answers/class-7-domain.json": "mms-discovery-write/answers/class-7-domain.json",
+        "common/pcapx/pcaputil/mms-discovery-write/captures/class-7-domain.pcap": "mms-discovery-write/captures/class-7-domain.pcap",
+        "common/pcapx/pcaputil/mms-discovery-write/answers/class-7-aa.json": "mms-discovery-write/answers/class-7-aa.json",
+        "common/pcapx/pcaputil/mms-discovery-write/captures/class-7-aa.pcap": "mms-discovery-write/captures/class-7-aa.pcap",
+        "common/pcapx/pcaputil/mms-discovery-write/answers/class-8-vmd.json": "mms-discovery-write/answers/class-8-vmd.json",
+        "common/pcapx/pcaputil/mms-discovery-write/captures/class-8-vmd.pcap": "mms-discovery-write/captures/class-8-vmd.pcap",
+        "common/pcapx/pcaputil/mms-discovery-write/answers/class-8-domain.json": "mms-discovery-write/answers/class-8-domain.json",
+        "common/pcapx/pcaputil/mms-discovery-write/captures/class-8-domain.pcap": "mms-discovery-write/captures/class-8-domain.pcap",
+        "common/pcapx/pcaputil/mms-discovery-write/answers/class-8-aa.json": "mms-discovery-write/answers/class-8-aa.json",
+        "common/pcapx/pcaputil/mms-discovery-write/captures/class-8-aa.pcap": "mms-discovery-write/captures/class-8-aa.pcap",
+        "common/pcapx/pcaputil/mms-discovery-write/answers/class-9-vmd.json": "mms-discovery-write/answers/class-9-vmd.json",
+        "common/pcapx/pcaputil/mms-discovery-write/captures/class-9-vmd.pcap": "mms-discovery-write/captures/class-9-vmd.pcap",
+        "common/pcapx/pcaputil/mms-discovery-write/answers/class-9-domain.json": "mms-discovery-write/answers/class-9-domain.json",
+        "common/pcapx/pcaputil/mms-discovery-write/captures/class-9-domain.pcap": "mms-discovery-write/captures/class-9-domain.pcap",
+        "common/pcapx/pcaputil/mms-discovery-write/answers/class-9-aa.json": "mms-discovery-write/answers/class-9-aa.json",
+        "common/pcapx/pcaputil/mms-discovery-write/captures/class-9-aa.pcap": "mms-discovery-write/captures/class-9-aa.pcap",
+        "common/pcapx/pcaputil/mms-discovery-write/answers/class-10-vmd.json": "mms-discovery-write/answers/class-10-vmd.json",
+        "common/pcapx/pcaputil/mms-discovery-write/captures/class-10-vmd.pcap": "mms-discovery-write/captures/class-10-vmd.pcap",
+        "common/pcapx/pcaputil/mms-discovery-write/answers/class-10-domain.json": "mms-discovery-write/answers/class-10-domain.json",
+        "common/pcapx/pcaputil/mms-discovery-write/captures/class-10-domain.pcap": "mms-discovery-write/captures/class-10-domain.pcap",
+        "common/pcapx/pcaputil/mms-discovery-write/answers/class-10-aa.json": "mms-discovery-write/answers/class-10-aa.json",
+        "common/pcapx/pcaputil/mms-discovery-write/captures/class-10-aa.pcap": "mms-discovery-write/captures/class-10-aa.pcap",
+        "common/pcapx/pcaputil/mms-discovery-write/answers/class-11-vmd.json": "mms-discovery-write/answers/class-11-vmd.json",
+        "common/pcapx/pcaputil/mms-discovery-write/captures/class-11-vmd.pcap": "mms-discovery-write/captures/class-11-vmd.pcap",
+        "common/pcapx/pcaputil/mms-discovery-write/answers/class-11-domain.json": "mms-discovery-write/answers/class-11-domain.json",
+        "common/pcapx/pcaputil/mms-discovery-write/captures/class-11-domain.pcap": "mms-discovery-write/captures/class-11-domain.pcap",
+        "common/pcapx/pcaputil/mms-discovery-write/answers/class-11-aa.json": "mms-discovery-write/answers/class-11-aa.json",
+        "common/pcapx/pcaputil/mms-discovery-write/captures/class-11-aa.pcap": "mms-discovery-write/captures/class-11-aa.pcap",
+        "common/pcapx/pcaputil/mms-discovery-write/answers/default-empty.json": "mms-discovery-write/answers/default-empty.json",
+        "common/pcapx/pcaputil/mms-discovery-write/captures/default-empty.pcap": "mms-discovery-write/captures/default-empty.pcap",
+        "common/pcapx/pcaputil/mms-discovery-write/answers/explicit-false.json": "mms-discovery-write/answers/explicit-false.json",
+        "common/pcapx/pcaputil/mms-discovery-write/captures/explicit-false.pcap": "mms-discovery-write/captures/explicit-false.pcap",
+        "common/pcapx/pcaputil/mms-discovery-write/answers/noncanonical-true.json": "mms-discovery-write/answers/noncanonical-true.json",
+        "common/pcapx/pcaputil/mms-discovery-write/captures/noncanonical-true.pcap": "mms-discovery-write/captures/noncanonical-true.pcap",
+        "common/pcapx/pcaputil/mms-discovery-write/answers/pagination-observed.json": "mms-discovery-write/answers/pagination-observed.json",
+        "common/pcapx/pcaputil/mms-discovery-write/captures/pagination-observed.pcap": "mms-discovery-write/captures/pagination-observed.pcap",
+        "common/pcapx/pcaputil/mms-discovery-write/answers/write-bool.json": "mms-discovery-write/answers/write-bool.json",
+        "common/pcapx/pcaputil/mms-discovery-write/captures/write-bool.pcap": "mms-discovery-write/captures/write-bool.pcap",
+        "common/pcapx/pcaputil/mms-discovery-write/answers/write-wide.json": "mms-discovery-write/answers/write-wide.json",
+        "common/pcapx/pcaputil/mms-discovery-write/captures/write-wide.pcap": "mms-discovery-write/captures/write-wide.pcap",
+        "common/pcapx/pcaputil/mms-discovery-write/answers/write-bytes.json": "mms-discovery-write/answers/write-bytes.json",
+        "common/pcapx/pcaputil/mms-discovery-write/captures/write-bytes.pcap": "mms-discovery-write/captures/write-bytes.pcap",
+        "common/pcapx/pcaputil/mms-discovery-write/answers/write-nested.json": "mms-discovery-write/answers/write-nested.json",
+        "common/pcapx/pcaputil/mms-discovery-write/captures/write-nested.pcap": "mms-discovery-write/captures/write-nested.pcap",
+        "common/pcapx/pcaputil/mms-discovery-write/answers/write-float.json": "mms-discovery-write/answers/write-float.json",
+        "common/pcapx/pcaputil/mms-discovery-write/captures/write-float.pcap": "mms-discovery-write/captures/write-float.pcap",
+        "common/pcapx/pcaputil/mms-discovery-write/answers/write-mixed-results.json": "mms-discovery-write/answers/write-mixed-results.json",
+        "common/pcapx/pcaputil/mms-discovery-write/captures/write-mixed-results.pcap": "mms-discovery-write/captures/write-mixed-results.pcap",
+        "common/pcapx/pcaputil/mms-discovery-write/answers/query-confirmed-error.json": "mms-discovery-write/answers/query-confirmed-error.json",
+        "common/pcapx/pcaputil/mms-discovery-write/captures/query-confirmed-error.pcap": "mms-discovery-write/captures/query-confirmed-error.pcap",
+        "common/pcapx/pcaputil/mms-discovery-write/answers/query-both-directions.json": "mms-discovery-write/answers/query-both-directions.json",
+        "common/pcapx/pcaputil/mms-discovery-write/captures/query-both-directions.pcap": "mms-discovery-write/captures/query-both-directions.pcap",
+        "common/pcapx/pcaputil/mms-discovery-write/answers/write-confirmed-error.json": "mms-discovery-write/answers/write-confirmed-error.json",
+        "common/pcapx/pcaputil/mms-discovery-write/captures/write-confirmed-error.pcap": "mms-discovery-write/captures/write-confirmed-error.pcap",
+        "common/pcapx/pcaputil/mms-discovery-write/answers/write-both-directions.json": "mms-discovery-write/answers/write-both-directions.json",
+        "common/pcapx/pcaputil/mms-discovery-write/captures/write-both-directions.pcap": "mms-discovery-write/captures/write-both-directions.pcap",
+        "common/pcapx/pcaputil/mms-discovery-write/answers/query-null-payload.json": "mms-discovery-write/answers/query-null-payload.json",
+        "common/pcapx/pcaputil/mms-discovery-write/captures/query-null-payload.pcap": "mms-discovery-write/captures/query-null-payload.pcap",
+        "common/pcapx/pcaputil/mms-discovery-write/answers/query-unknown-class.json": "mms-discovery-write/answers/query-unknown-class.json",
+        "common/pcapx/pcaputil/mms-discovery-write/captures/query-unknown-class.pcap": "mms-discovery-write/captures/query-unknown-class.pcap",
+        "common/pcapx/pcaputil/mms-discovery-write/answers/query-non-visible.json": "mms-discovery-write/answers/query-non-visible.json",
+        "common/pcapx/pcaputil/mms-discovery-write/captures/query-non-visible.pcap": "mms-discovery-write/captures/query-non-visible.pcap",
+        "common/pcapx/pcaputil/mms-discovery-write/answers/query-missing-scope.json": "mms-discovery-write/answers/query-missing-scope.json",
+        "common/pcapx/pcaputil/mms-discovery-write/captures/query-missing-scope.pcap": "mms-discovery-write/captures/query-missing-scope.pcap",
+        "common/pcapx/pcaputil/mms-discovery-write/answers/query-duplicate-scope.json": "mms-discovery-write/answers/query-duplicate-scope.json",
+        "common/pcapx/pcaputil/mms-discovery-write/captures/query-duplicate-scope.pcap": "mms-discovery-write/captures/query-duplicate-scope.pcap",
+        "common/pcapx/pcaputil/mms-discovery-write/answers/write-data-count.json": "mms-discovery-write/answers/write-data-count.json",
+        "common/pcapx/pcaputil/mms-discovery-write/captures/write-data-count.pcap": "mms-discovery-write/captures/write-data-count.pcap",
+        "common/pcapx/pcaputil/mms-discovery-write/answers/write-illegal-data.json": "mms-discovery-write/answers/write-illegal-data.json",
+        "common/pcapx/pcaputil/mms-discovery-write/captures/write-illegal-data.pcap": "mms-discovery-write/captures/write-illegal-data.pcap",
+        "common/pcapx/pcaputil/mms-discovery-write/answers/write-nonminimal-int.json": "mms-discovery-write/answers/write-nonminimal-int.json",
+        "common/pcapx/pcaputil/mms-discovery-write/captures/write-nonminimal-int.pcap": "mms-discovery-write/captures/write-nonminimal-int.pcap",
+        "common/pcapx/pcaputil/mms-discovery-write/answers/write-missing-data.json": "mms-discovery-write/answers/write-missing-data.json",
+        "common/pcapx/pcaputil/mms-discovery-write/captures/write-missing-data.pcap": "mms-discovery-write/captures/write-missing-data.pcap",
+        "common/pcapx/pcaputil/mms-discovery-write/answers/write-list-unobserved.json": "mms-discovery-write/answers/write-list-unobserved.json",
+        "common/pcapx/pcaputil/mms-discovery-write/captures/write-list-unobserved.pcap": "mms-discovery-write/captures/write-list-unobserved.pcap",
+        "common/pcapx/pcaputil/mms-discovery-write/answers/query-invalid-ident-tag.json": "mms-discovery-write/answers/query-invalid-ident-tag.json",
+        "common/pcapx/pcaputil/mms-discovery-write/captures/query-invalid-ident-tag.pcap": "mms-discovery-write/captures/query-invalid-ident-tag.pcap",
+        "common/pcapx/pcaputil/mms-discovery-write/answers/query-invalid-ident-byte.json": "mms-discovery-write/answers/query-invalid-ident-byte.json",
+        "common/pcapx/pcaputil/mms-discovery-write/captures/query-invalid-ident-byte.pcap": "mms-discovery-write/captures/query-invalid-ident-byte.pcap",
+        "common/pcapx/pcaputil/mms-discovery-write/answers/query-boolean-empty.json": "mms-discovery-write/answers/query-boolean-empty.json",
+        "common/pcapx/pcaputil/mms-discovery-write/captures/query-boolean-empty.pcap": "mms-discovery-write/captures/query-boolean-empty.pcap",
+        "common/pcapx/pcaputil/mms-discovery-write/answers/query-boolean-two.json": "mms-discovery-write/answers/query-boolean-two.json",
+        "common/pcapx/pcaputil/mms-discovery-write/captures/query-boolean-two.pcap": "mms-discovery-write/captures/query-boolean-two.pcap",
+        "common/pcapx/pcaputil/mms-discovery-write/answers/write-null-content.json": "mms-discovery-write/answers/write-null-content.json",
+        "common/pcapx/pcaputil/mms-discovery-write/captures/write-null-content.pcap": "mms-discovery-write/captures/write-null-content.pcap",
+        "common/pcapx/pcaputil/mms-discovery-write/answers/write-invalid-result.json": "mms-discovery-write/answers/write-invalid-result.json",
+        "common/pcapx/pcaputil/mms-discovery-write/captures/write-invalid-result.pcap": "mms-discovery-write/captures/write-invalid-result.pcap",
+        "common/pcapx/pcaputil/mms-discovery-write/answers/write-invalid-error.json": "mms-discovery-write/answers/write-invalid-error.json",
+        "common/pcapx/pcaputil/mms-discovery-write/captures/write-invalid-error.pcap": "mms-discovery-write/captures/write-invalid-error.pcap",
+        "common/pcapx/pcaputil/mms-discovery-write/answers/write-empty-results.json": "mms-discovery-write/answers/write-empty-results.json",
+        "common/pcapx/pcaputil/mms-discovery-write/captures/write-empty-results.pcap": "mms-discovery-write/captures/write-empty-results.pcap",
+        "common/pcapx/pcaputil/mms-discovery-write/answers/write-result-count.json": "mms-discovery-write/answers/write-result-count.json",
+        "common/pcapx/pcaputil/mms-discovery-write/captures/write-result-count.pcap": "mms-discovery-write/captures/write-result-count.pcap",
+        "common/pcapx/pcaputil/mms-discovery-write/answers/write-wrong-service.json": "mms-discovery-write/answers/write-wrong-service.json",
+        "common/pcapx/pcaputil/mms-discovery-write/captures/write-wrong-service.pcap": "mms-discovery-write/captures/write-wrong-service.pcap",
+        "common/pcapx/pcaputil/mms-discovery-write/answers/query-wrong-service.json": "mms-discovery-write/answers/query-wrong-service.json",
+        "common/pcapx/pcaputil/mms-discovery-write/captures/query-wrong-service.pcap": "mms-discovery-write/captures/query-wrong-service.pcap",
+        "common/pcapx/pcaputil/mms-discovery-write/answers/query-wrong-direction.json": "mms-discovery-write/answers/query-wrong-direction.json",
+        "common/pcapx/pcaputil/mms-discovery-write/captures/query-wrong-direction.pcap": "mms-discovery-write/captures/query-wrong-direction.pcap",
+        "common/pcapx/pcaputil/mms-discovery-write/answers/query-orphan.json": "mms-discovery-write/answers/query-orphan.json",
+        "common/pcapx/pcaputil/mms-discovery-write/captures/query-orphan.pcap": "mms-discovery-write/captures/query-orphan.pcap",
+        "common/pcapx/pcaputil/mms-discovery-write/answers/query-active-reuse.json": "mms-discovery-write/answers/query-active-reuse.json",
+        "common/pcapx/pcaputil/mms-discovery-write/captures/query-active-reuse.pcap": "mms-discovery-write/captures/query-active-reuse.pcap",
+        "common/pcapx/pcaputil/mms-discovery-write/answers/query-retired-reuse.json": "mms-discovery-write/answers/query-retired-reuse.json",
+        "common/pcapx/pcaputil/mms-discovery-write/captures/query-retired-reuse.pcap": "mms-discovery-write/captures/query-retired-reuse.pcap",
+        "common/pcapx/pcaputil/mms-discovery-write/answers/write-wrong-direction.json": "mms-discovery-write/answers/write-wrong-direction.json",
+        "common/pcapx/pcaputil/mms-discovery-write/captures/write-wrong-direction.pcap": "mms-discovery-write/captures/write-wrong-direction.pcap",
+        "common/pcapx/pcaputil/mms-discovery-write/answers/write-orphan.json": "mms-discovery-write/answers/write-orphan.json",
+        "common/pcapx/pcaputil/mms-discovery-write/captures/write-orphan.pcap": "mms-discovery-write/captures/write-orphan.pcap",
+        "common/pcapx/pcaputil/mms-discovery-write/answers/write-active-reuse.json": "mms-discovery-write/answers/write-active-reuse.json",
+        "common/pcapx/pcaputil/mms-discovery-write/captures/write-active-reuse.pcap": "mms-discovery-write/captures/write-active-reuse.pcap",
+        "common/pcapx/pcaputil/mms-discovery-write/answers/write-retired-reuse.json": "mms-discovery-write/answers/write-retired-reuse.json",
+        "common/pcapx/pcaputil/mms-discovery-write/captures/write-retired-reuse.pcap": "mms-discovery-write/captures/write-retired-reuse.pcap",
+        "common/pcapx/pcaputil/mms-discovery-write/answers/write-depth-write.json": "mms-discovery-write/answers/write-depth-write.json",
+        "common/pcapx/pcaputil/mms-discovery-write/captures/write-depth-write.pcap": "mms-discovery-write/captures/write-depth-write.pcap",
+        "common/pcapx/pcaputil/mms-discovery-write/answers/mixed-interleaved.json": "mms-discovery-write/answers/mixed-interleaved.json",
+        "common/pcapx/pcaputil/mms-discovery-write/captures/mixed-interleaved.pcap": "mms-discovery-write/captures/mixed-interleaved.pcap",
+        "common/pcapx/pcaputil/mms-discovery-write/answers/query-large-cursor.json": "mms-discovery-write/answers/query-large-cursor.json",
+        "common/pcapx/pcaputil/mms-discovery-write/captures/query-large-cursor.pcap": "mms-discovery-write/captures/query-large-cursor.pcap",
+        "common/pcapx/pcaputil/mms-discovery-write/answers/write-large-bytes.json": "mms-discovery-write/answers/write-large-bytes.json",
+        "common/pcapx/pcaputil/mms-discovery-write/captures/write-large-bytes.pcap": "mms-discovery-write/captures/write-large-bytes.pcap",
+        "common/pcapx/pcaputil/mms-discovery-write/answers/query-empty-domain.json": "mms-discovery-write/answers/query-empty-domain.json",
+        "common/pcapx/pcaputil/mms-discovery-write/captures/query-empty-domain.pcap": "mms-discovery-write/captures/query-empty-domain.pcap",
+        "common/pcapx/pcaputil/mms-discovery-write/answers/query-invoke-max.json": "mms-discovery-write/answers/query-invoke-max.json",
+        "common/pcapx/pcaputil/mms-discovery-write/captures/query-invoke-max.pcap": "mms-discovery-write/captures/query-invoke-max.pcap",
+        "common/pcapx/pcaputil/mms-discovery-write/answers/write-invoke-max.json": "mms-discovery-write/answers/write-invoke-max.json",
+        "common/pcapx/pcaputil/mms-discovery-write/captures/write-invoke-max.pcap": "mms-discovery-write/captures/write-invoke-max.pcap",
+        "common/pcapx/pcaputil/mms-discovery-write/manifest.json": "mms-discovery-write/manifest.json",
+        "common/pcapx/pcaputil/mms-discovery-write/generate.py": "mms-discovery-write/generate.py",
+        "common/pcapx/pcaputil/mms-discovery-write/verify.py": "mms-discovery-write/verify.py",
+        "common/pcapx/pcaputil/mms-discovery-write/reference.py": "mms-discovery-write/reference.py",
+        "common/pcapx/pcaputil/mms-discovery-write/MODEL-PINS.json": "mms-discovery-write/MODEL-PINS.json",
+        "common/pcapx/pcaputil/mms-discovery-write/SOURCE-PINS.json": "mms-discovery-write/SOURCE-PINS.json",
+        "common/pcapx/pcaputil/mms-discovery-write/seal.py": "mms-discovery-write/seal.py",
+        "scripts/protocol-tests/required-tests-traffic-unified-v42.json": "required-tests-traffic-unified-v42.json"
+      }
     }
   ],
   "schema_version": 1,

@@ -8,6 +8,7 @@ import (
 )
 
 type mmsPending struct {
+	query         map[string]any
 	names         []map[string]any
 	specification bool
 	event         uint64
@@ -51,6 +52,17 @@ func (m *binMMS) storage() int64 {
 	n := int64(256 + len(m.supported[0]) + len(m.supported[1]) + (len(m.pending[0])+len(m.pending[1]))*96 + (len(m.retired[0])+len(m.retired[1]))*32)
 	for _, pending := range m.pending {
 		for _, p := range pending {
+			if p.query != nil {
+				n += 512
+				if text, ok := p.query["Continue After"].(string); ok {
+					n += int64(len(text))
+				}
+				if scope, ok := p.query["Object Scope"].(map[string]any); ok {
+					if text, ok := scope["Identifier"].(string); ok {
+						n += int64(len(text))
+					}
+				}
+			}
 			for _, row := range p.names {
 				count := int64(256)
 				for _, v := range row {
@@ -391,6 +403,15 @@ func (m *binMMS) applyMMS(d mmsDecoded, dir int, e *ProtocolEvent, limit int, ca
 			return protocolError(ErrResourceExceeded, "MMS outstanding/history budget")
 		}
 		p := mmsPending{event: e.ID, service: d.service, items: d.items}
+		if m.values && d.service == 1 {
+			p.query = map[string]any{"Object Class": d.fields["Object Class"], "Object Scope": cloneSessionValue(d.fields["Object Scope"])}
+			if after, ok := d.fields["Continue After"]; ok {
+				p.query["Continue After"] = after
+			}
+		}
+		if m.values && d.service == 5 {
+			p.names = cloneSessionValue(d.fields["Variables"]).([]map[string]any)
+		}
 		if m.values && d.service == 4 {
 			p.specification, _ = d.fields["Specification With Result"].(bool)
 			if p.specification {
@@ -410,14 +431,23 @@ func (m *binMMS) applyMMS(d mmsDecoded, dir int, e *ProtocolEvent, limit int, ca
 		if d.tag == 0xa1 && d.service != p.service {
 			return protocolError(ErrMalformedMessage, "MMS response service differs from request")
 		}
-		if d.tag == 0xa1 && p.service == 4 && p.items >= 0 && p.items != d.items {
-			return protocolError(ErrMalformedMessage, "MMS Read result cardinality differs from request")
+		if d.tag == 0xa1 && (p.service == 4 || p.service == 5) && p.items >= 0 && p.items != d.items {
+			if p.service == 4 {
+				return protocolError(ErrMalformedMessage, "MMS Read result cardinality differs from request")
+			}
+			return protocolError(ErrMalformedMessage, "MMS Write result cardinality differs from request")
 		}
 		if m.values && d.tag == 0xa1 && p.service == 4 {
 			names, has := d.fields["Variables"]
 			if p.specification != has || has && !reflect.DeepEqual(p.names, names) {
 				return protocolError(ErrMalformedMessage, "MMS returned variable specification differs from observed request")
 			}
+		}
+		if m.values && p.service == 1 {
+			d.fields["Observed Request Query"] = cloneSession(p.query)
+		}
+		if m.values && p.service == 5 {
+			d.fields["Observed Write Variables"] = cloneSessionValue(p.names)
 		}
 		delete(m.pending[1-dir], d.invoke)
 		m.retired[1-dir][d.invoke] = true

@@ -80,6 +80,9 @@ func mmsSingleChild(n mmsBER) (mmsBER, error) {
 	return n.children[0], nil
 }
 func mmsSelectedFields(n mmsBER, d *mmsDecoded, values *mmsValueContext) error {
+	if values != nil && (d.service == 1 || d.service == 5) && (d.tag == 0xa0 || d.tag == 0xa1) {
+		return values.discoveryWrite(n.children[1], d)
+	}
 	if values != nil && (d.service == 0 || d.service == 2 || d.service == 6 && d.tag == 0xa1) && (d.tag == 0xa0 || d.tag == 0xa1) {
 		return values.service(n, d)
 	}

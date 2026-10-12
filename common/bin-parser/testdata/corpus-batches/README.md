@@ -44,7 +44,7 @@ Run from the repository root:
 ```sh
 go run ./internal/trafficfixture/cmd/corpus test
 go test -json -count=1 -timeout=5m ./internal/trafficfixture/... ./common/bin-parser/... ./common/pcapx/... ./common/yak/cmd/yakcmds/shark-cli ./scripts/ci > traffic.jsonl
-go run ./internal/trafficfixture/cmd/corpus exec -- python3 @scripts/protocol-tests/check_go_test_json_v2.py traffic.jsonl --inventory @scripts/protocol-tests/required-tests-traffic-unified-v41.json --tier full
+go run ./internal/trafficfixture/cmd/corpus exec -- python3 @scripts/protocol-tests/check_go_test_json_v2.py traffic.jsonl --inventory @scripts/protocol-tests/required-tests-traffic-unified-v42.json --tier full
 ```
 
 The single `corpus` entry point uses the same bounded Go ZIP loader as tests.
@@ -83,7 +83,7 @@ their semantic coverage. The existing synthetic session keys are test inputs;
 production credentials, user private keys and material without redistribution
 permission belong in an external fixed-source download manifest.
 
-Current test requirements are sealed at `scripts/protocol-tests/required-tests-traffic-unified-v41.json`;
+Current test requirements are sealed at `scripts/protocol-tests/required-tests-traffic-unified-v42.json`;
 the historical inventories and all earlier batches remain unchanged.
 The supplemental small-corpus batch contains 26 minimal controls, their explicit
 expected facts, an offline generator and the compact pinned source manifest.
@@ -203,7 +203,7 @@ opaque selector bytes and one bounded Data value over Wrapper v1 TCP/UDP; object
 selector meaning, access permission and device operation are unverified. The
 original one-packet selective-access capture and original refused answer remain
 immutable; its now-supported answer is matched by exact input SHA and frame.
-The active inventory is `scripts/protocol-tests/required-tests-traffic-unified-v41.json`.
+The active inventory is `scripts/protocol-tests/required-tests-traffic-unified-v42.json`.
 
 The small-graph budget batch reuses accepted graph captures/answers and adds one
 249-byte UDP control for child count255 without child bytes. Its standalone proof
@@ -993,8 +993,10 @@ the normative answer; a missing numeric reference field is not a codec pass.
 Full/deferred, workers1/2/4, observers off/on, Feed chunks1/7/full, ownership,
 resources and close/refusal boundaries remain required.
 
-Current gate: `required-tests-traffic-unified-v41.json` with
+Current gate: `required-tests-traffic-unified-v42.json` with
 `check_go_test_json_v2.py`. The indexed validator preserves missing/unpassed,
 package invocation completion, descendant skips, failures and non-JSON checks;
 its mutation/differential harness is sealed with the material. Older checkers
 and inventories remain immutable historical artifacts.
+
+The current explicit MMS service-values profile additionally observes selected GetNameList1 and Write5. GetNameList basic classes0–11 and VMD/domain/association scopes preserve identifiers, continuation and the ASN.1 `moreFollows` default true. Reported lists are neither a verified complete catalogue nor a maintained device namespace. Write named variable/Data pairs are parsed positionally because both lists can use tag0; exact ordered values and per-variable success/failure codes are correlated only with a unique opposite-direction observed InvokeID. Request variable names and query context are privately owned and budgeted; reported success does not prove a physical write. Named variable-list definitions, alternate access and wider services remain open. The `mms-discovery-write` ZIP aliases contain the86 minimal authored inputs, complete independent answers, reconstruction/reference scripts and current v42 inventory; historical ZIPs remain immutable.

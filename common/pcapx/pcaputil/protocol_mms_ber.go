@@ -220,7 +220,7 @@ func decodeMMSNode(n mmsBER, values *mmsValueContext) (mmsDecoded, error) {
 		if (s.tag != 0xa4 && s.tag != 0xa6) && (values == nil || !mmsSelectedService(n.tag, s.tag)) {
 			return d, protocolError(ErrUnsupportedFeature, "MMS selected Read/GetVariableAccessAttributes service")
 		}
-		d.fields["Invoke ID"], d.fields["Service Tag"], d.fields["Service Name"] = d.invoke, s.tag, map[byte]string{0: "Status", 2: "Identify", 4: "Read", 6: "Get Variable Access Attributes"}[d.service]
+		d.fields["Invoke ID"], d.fields["Service Tag"], d.fields["Service Name"] = d.invoke, s.tag, map[byte]string{0: "Status", 1: "Get Name List", 2: "Identify", 4: "Read", 5: "Write", 6: "Get Variable Access Attributes"}[d.service]
 		if d.service == 4 && d.tag == 0xa0 {
 			va, e := mmsChild(s, 0xa1)
 			if e != nil {

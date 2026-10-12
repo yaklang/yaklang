@@ -47,9 +47,9 @@ func WithSessionMMSServiceValues() ProtocolSessionOption {
 }
 func mmsSelectedService(pdu, tag byte) bool {
 	if pdu == 0xa0 {
-		return tag == 0x80 || tag == 0x82 || tag == 0xa4 || tag == 0xa6
+		return tag == 0x80 || tag == 0xa1 || tag == 0x82 || tag == 0xa4 || tag == 0xa5 || tag == 0xa6
 	}
-	return tag == 0xa0 || tag == 0xa2 || tag == 0xa4 || tag == 0xa6
+	return tag == 0xa0 || tag == 0xa1 || tag == 0xa2 || tag == 0xa4 || tag == 0xa5 || tag == 0xa6
 }
 func mmsBoolean(n mmsBER) (bool, error) {
 	if len(n.body) != 1 {
