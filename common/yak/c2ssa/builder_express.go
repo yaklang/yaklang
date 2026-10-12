@@ -18,6 +18,59 @@ func (b *astbuilder) ensureValue(v ssa.Value) ssa.Value {
 	return v
 }
 
+// cStructObjectType unwraps alias chains and returns the underlying
+// ObjectType, so struct-kind lookups survive typedef layers.
+func cStructObjectType(typ ssa.Type) *ssa.ObjectType {
+	for {
+		alias, ok := typ.(*ssa.AliasType)
+		if !ok {
+			object, _ := ssa.ToObjectType(typ)
+			return object
+		}
+		typ = alias.GetType()
+	}
+}
+
+// dereferenceMember loads the live origin for a pointer-typed member base,
+// mirroring the read and write member-suffix paths so both deref the same
+// object identity. The star-load heap-slot rule (starLoadPreferStored) is not
+// affected: this only handles p / p->x bases before member access, never
+// explicit *p payloads.
+func (b *astbuilder) dereferenceMember(value ssa.Value, isPointer bool) ssa.Value {
+	if utils.IsNil(value) || !isPointer {
+		return value
+	}
+	if t := value.GetType(); !utils.IsNil(t) && t.GetTypeKind() == ssa.PointerKind {
+		return b.GetOriginValue(value)
+	}
+	return value
+}
+
+// memberRefParameterChecker builds the shared member-store Parameter tracing
+// used by both member-suffix paths. It reads through the member pointer so the
+// dereference done by the caller is visible here, and consumes any pending
+// RefParameter entry recorded for the member.
+func (b *astbuilder) memberRefParameterChecker(member *ssa.Value) func(target string) {
+	return func(target string) {
+		if member == nil || utils.IsNil(*member) {
+			return
+		}
+		refParameterIndex := -1
+		if p, ok := ssa.ToParameter(*member); ok && !p.IsFreeValue {
+			refParameterIndex = p.FormalParameterIndex
+		} else if p, ok := ssa.ToParameterMember(*member); ok {
+			refParameterIndex = p.FormalParameterIndex
+		}
+		if ref, ok := b.RefParameter[(*member).GetName()]; ok {
+			refParameterIndex = ref.Index
+			delete(b.RefParameter, (*member).GetName())
+		}
+		if refParameterIndex != -1 {
+			b.ReferenceParameter(target, refParameterIndex, ssa.PointerSideEffect)
+		}
+	}
+}
+
 func (b *astbuilder) applyBuiltinCast(ast *cparser.BuiltinCastTypeContext, value ssa.Value) ssa.Value {
 	if ast == nil {
 		return b.ensureValue(value)
@@ -722,7 +775,6 @@ func (b *astbuilder) buildPostfixSuffixLvalueFromPostfixSuffix(
 		}
 	}
 	if ast.Dot() != nil || ast.Arrow() != nil {
-		isPointer := ast.Arrow() != nil
 		if id := ast.Identifier(); id != nil {
 			key := id.GetText()
 			memberKey := b.emitMemberKey(key)
@@ -736,28 +788,11 @@ func (b *astbuilder) buildPostfixSuffixLvalueFromPostfixSuffix(
 				member = right
 			}
 
-			checkParameter := func(target string) {
-				if utils.IsNil(member) {
-					return
-				}
-				refParameterIndex := -1
-				if p, ok := ssa.ToParameter(member); ok && !p.IsFreeValue {
-					refParameterIndex = p.FormalParameterIndex
-				} else if p, ok := ssa.ToParameterMember(member); ok {
-					refParameterIndex = p.FormalParameterIndex
-				}
-				if ref, ok := b.RefParameter[member.GetName()]; ok {
-					refParameterIndex = ref.Index
-					delete(b.RefParameter, member.GetName())
-				}
-				if refParameterIndex != -1 {
-					b.ReferenceParameter(target, refParameterIndex, ssa.PointerSideEffect)
-				}
-			}
+			checkParameter := b.memberRefParameterChecker(&member)
 
 			if !utils.IsNil(member) {
-				if t := member.GetType(); isPointer && !utils.IsNil(t) && t.GetTypeKind() == ssa.PointerKind {
-					member = b.GetOriginValue(member)
+				if member.GetType() != nil && member.GetType().GetTypeKind() == ssa.PointerKind {
+					member = b.dereferenceMember(member, true)
 					setReference = true
 				}
 				right = b.ReadMemberCallValue(member, memberKey)
@@ -1045,16 +1080,12 @@ func (b *astbuilder) buildPostfixSuffix(ast *cparser.PostfixSuffixContext, right
 		if id := ast.Identifier(); id != nil {
 			key := id.GetText()
 			if right != nil {
-				if t := right.GetType(); t != nil && t.GetTypeKind() == ssa.PointerKind {
-					right = b.GetOriginValue(right)
-				}
+				right = b.dereferenceMember(right, true)
 				right = b.ReadMemberCallValue(right, b.emitMemberKey(key))
 			}
 			if left != nil {
 				member := b.ReadValue(left.GetName())
-				if t := member.GetType(); t != nil && t.GetTypeKind() == ssa.PointerKind {
-					member = b.GetOriginValue(member)
-				}
+				member = b.dereferenceMember(member, true)
 				left = b.CreateMemberCallVariable(member, b.emitMemberKey(key))
 				if isPointer {
 					if p, ok := ssa.ToParameter(member); ok && !p.IsFreeValue {
@@ -1301,7 +1332,6 @@ func (b *astbuilder) buildPostfixSuffixLvalue(ast *cparser.PostfixSuffixLvalueCo
 
 	// 2. 结构体成员：'.' Identifier 或 '->' Identifier
 	if ast.Dot() != nil || ast.Arrow() != nil {
-		isPointer := ast.Arrow() != nil
 		if id := ast.Identifier(); id != nil {
 			key := id.GetText()
 			memberKey := b.emitMemberKey(key)
@@ -1313,30 +1343,14 @@ func (b *astbuilder) buildPostfixSuffixLvalue(ast *cparser.PostfixSuffixLvalueCo
 				member = right
 			}
 
-			checkParameter := func(target string) {
-				if member == nil {
-					return
-				}
-				RefParameterIndex := -1
-				if p, ok := ssa.ToParameter(member); ok && !p.IsFreeValue {
-					RefParameterIndex = p.FormalParameterIndex
-				} else if p, ok := ssa.ToParameterMember(member); ok {
-					RefParameterIndex = p.FormalParameterIndex
-				}
-
-				if ref, ok := b.RefParameter[member.GetName()]; ok {
-					RefParameterIndex = ref.Index
-					delete(b.RefParameter, member.GetName())
-				}
-
-				if RefParameterIndex != -1 {
-					b.ReferenceParameter(target, RefParameterIndex, ssa.PointerSideEffect)
-				}
-			}
+			// TODO(c2ssa): the write-side suffix path calls this checker for
+			// every lvalue while this path gates on setReference — the drift is
+			// preserved as-is until a regression test pins the intended rule.
+			checkParameter := b.memberRefParameterChecker(&member)
 
 			if member != nil {
-				if t := member.GetType(); isPointer && t != nil && t.GetTypeKind() == ssa.PointerKind {
-					member = b.GetOriginValue(member)
+				if member.GetType() != nil && member.GetType().GetTypeKind() == ssa.PointerKind {
+					member = b.dereferenceMember(member, true)
 					setReference = true
 				}
 

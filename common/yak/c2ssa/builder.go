@@ -240,7 +240,25 @@ func (b *astbuilder) GetDefaultValue(ityp ssa.Type) ssa.Value {
 	case ssa.AliasTypeKind:
 		alias, _ := ssa.ToAliasType(ityp)
 		return b.GetDefaultValue(alias.GetType())
-	case ssa.StructTypeKind, ssa.ObjectTypeKind, ssa.InterfaceTypeKind, ssa.SliceTypeKind, ssa.MapTypeKind:
+	case ssa.StructTypeKind:
+		// Zero-init each declared field instead of an opaque Make, so
+		// pointer members default to NULL and scalar members to 0.
+		if typ := cStructObjectType(ityp); typ != nil {
+			obj := b.InterfaceAddFieldBuild(len(typ.Keys), func(i int) ssa.Value {
+				return typ.Keys[i]
+			}, func(i int) ssa.Value {
+				return b.GetDefaultValue(typ.FieldTypes[i])
+			})
+			if !utils.IsNil(obj) {
+				obj.SetType(ityp)
+				return obj
+			}
+		}
+		return b.EmitMakeBuildWithType(ityp, nil, nil)
+	case ssa.PointerKind:
+		// An uninitialized C pointer is NULL, not the integer 0.
+		return b.EmitConstInstNil()
+	case ssa.ObjectTypeKind, ssa.InterfaceTypeKind, ssa.SliceTypeKind, ssa.MapTypeKind:
 		return b.EmitMakeBuildWithType(ityp, nil, nil)
 	default:
 		return b.EmitConstInst(0)
