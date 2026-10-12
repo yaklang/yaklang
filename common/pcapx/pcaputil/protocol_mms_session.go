@@ -3,13 +3,16 @@ package pcaputil
 import (
 	"bytes"
 	"fmt"
+	"reflect"
 	"time"
 )
 
 type mmsPending struct {
-	event   uint64
-	service byte
-	items   int
+	names         []map[string]any
+	specification bool
+	event         uint64
+	service       byte
+	items         int
 }
 type mmsTSDU struct {
 	wire   []byte
@@ -18,6 +21,11 @@ type mmsTSDU struct {
 	first  time.Time
 }
 type binMMS struct {
+	values                                          bool
+	nesting                                         uint32
+	hasNesting                                      bool
+	proposedNesting                                 uint32
+	hasProposedNesting                              bool
 	pduLimit                                        [2]uint32
 	initAccepted, released                          bool
 	concludeDir, releaseDir                         int
@@ -41,6 +49,19 @@ func newBinMMS() *binMMS {
 }
 func (m *binMMS) storage() int64 {
 	n := int64(256 + len(m.supported[0]) + len(m.supported[1]) + (len(m.pending[0])+len(m.pending[1]))*96 + (len(m.retired[0])+len(m.retired[1]))*32)
+	for _, pending := range m.pending {
+		for _, p := range pending {
+			for _, row := range p.names {
+				count := int64(256)
+				for _, v := range row {
+					if text, ok := v.(string); ok {
+						count += int64(len(text))
+					}
+				}
+				n += count
+			}
+		}
+	}
 	for _, c := range m.offered {
 		n += 192 + int64(len(c.syntax))
 		for _, t := range c.transfers {
@@ -82,11 +103,22 @@ func (m *binMMS) refuse() {
 	m.fragment = [2]mmsTSDU{}
 }
 func (m *binMMS) snapshot() map[string]any {
-	return map[string]any{"Observation": "unverified-MMS-association", "Transport Connected": m.transport, "Association Active": m.active, "Association Concluded": m.concluded, "Context Refused": m.poison, "Client Direction": m.client, "Max TPDU Bytes": m.tpdu, "Outstanding Direction0": len(m.pending[0]), "Outstanding Direction1": len(m.pending[1]), "Calling Limit": m.limits[0], "Called Limit": m.limits[1]}
+	f := map[string]any{"Observation": "unverified-MMS-association", "Transport Connected": m.transport, "Association Active": m.active, "Association Concluded": m.concluded, "Context Refused": m.poison, "Client Direction": m.client, "Max TPDU Bytes": m.tpdu, "Outstanding Direction0": len(m.pending[0]), "Outstanding Direction1": len(m.pending[1]), "Calling Limit": m.limits[0], "Called Limit": m.limits[1]}
+	if m.values {
+		f["Data Services Enabled"] = true
+		f["TPDU Size Negotiated"] = m.transport
+		f["Association Only Start"] = m.crEvent == 0 && m.initEvent != 0
+		f["Data Nesting Negotiated"] = m.hasNesting
+		f["Data Nesting Limit"] = nil
+		if m.hasNesting {
+			f["Data Nesting Limit"] = m.nesting
+		}
+	}
+	return f
 }
 func (f *binFlow) consumeMMSISO(dir int, e *ProtocolEvent) (out map[string]any, err error) {
 	m := f.mms
-	e.Profile = mmsISOProfile
+	e.Profile = m.profile()
 	e.nativeMMSObservation = true
 	if e.ID == 0 {
 		e.ID = f.a.ids.Add(1)
@@ -110,7 +142,7 @@ func (f *binFlow) consumeMMSISO(dir int, e *ProtocolEvent) (out map[string]any, 
 	out = map[string]any{"Carrier": d.fields, "Observation": "unverified-MMS-wire"}
 	switch d.code {
 	case 0xe0:
-		if m.crEvent != 0 || d.dst != 0 || d.src == 0 {
+		if m.crEvent != 0 || m.initEvent != 0 || d.dst != 0 || d.src == 0 {
 			return nil, protocolError(ErrDesynchronized, "MMS COTP connection request identity")
 		}
 		m.client = dir
@@ -127,7 +159,13 @@ func (f *binFlow) consumeMMSISO(dir int, e *ProtocolEvent) (out map[string]any, 
 		e.ResponseTo, e.TransactionID = m.crEvent, m.crEvent
 	case 0xf0:
 		if !m.transport {
-			return nil, protocolError(ErrContextRequired, "MMS DT requires observed COTP connection")
+			// A capture may begin at an actual presentation CONNECT. The selected
+			// extended profile can observe the complete CP/CPA/MMS exchange, while
+			// explicitly retaining that COTP connection/TPDU negotiation was unseen.
+			prefix := len(d.data) > 0 && d.data[0] == 13
+			if !m.values || m.initEvent == 0 && len(m.fragment[dir].events) == 0 && !prefix {
+				return nil, protocolError(ErrContextRequired, "MMS DT requires observed COTP connection or presentation association start")
+			}
 		}
 		if len(e.Raw)-4 > m.tpdu {
 			return nil, protocolError(ErrMalformedMessage, "MMS DT exceeds observed TPDU size")
@@ -171,7 +209,7 @@ func (f *binFlow) consumeMMSISO(dir int, e *ProtocolEvent) (out map[string]any, 
 			out["Observed Context"] = m.snapshot()
 			return out, nil
 		}
-		if err = f.mmsReserve(m.storage() + 32768 + 512*int64(total)); err != nil {
+		if err = f.mmsReserve(m.storage() + 32768 + m.projectionFactor(f.a.budget)*int64(total)); err != nil {
 			return nil, err
 		}
 		data := d.data
@@ -182,7 +220,7 @@ func (f *binFlow) consumeMMSISO(dir int, e *ProtocolEvent) (out map[string]any, 
 			out["Contributor Packet Refs"] = append(cloneScalarValues(frag.refs), e.SourceBytes.PacketRefs...)
 		}
 		m.fragment[dir] = mmsTSDU{}
-		if err = parseMMSSession(data, f.a.budget, &d); err != nil {
+		if err = parseMMSSession(data, f.a.budget, &d, m.values); err != nil {
 			return nil, err
 		}
 		out["Carrier"] = d.fields
@@ -222,6 +260,12 @@ func (f *binFlow) consumeMMSISO(dir int, e *ProtocolEvent) (out map[string]any, 
 			e.ResponseTo, e.TransactionID = m.releaseEvent, m.releaseEvent
 			m.active = false
 		}
+		if m.values && !m.transport && m.initEvent == 0 {
+			if d.session != 13 || d.acse != 0x60 {
+				return nil, protocolError(ErrContextRequired, "MMS unseen COTP requires actual presentation CONNECT/AARQ")
+			}
+			m.client = dir
+		}
 		if len(d.pdu) > 0 {
 			if d.session != 1 {
 				mid := d.fields["MMS Context ID"].(uint32)
@@ -230,7 +274,11 @@ func (f *binFlow) consumeMMSISO(dir int, e *ProtocolEvent) (out map[string]any, 
 					return nil, protocolError(ErrContextRequired, "MMS EXTERNAL indirect reference lacks MMS BER context")
 				}
 			}
-			app, e2 := decodeMMSNode(*d.application)
+			var values *mmsValueContext
+			if m.values {
+				values = &mmsValueContext{left: d.valueElements}
+			}
+			app, e2 := decodeMMSNode(*d.application, values)
 			if e2 != nil {
 				return nil, e2
 			}
@@ -255,6 +303,9 @@ func (m *binMMS) applyMMS(d mmsDecoded, dir int, e *ProtocolEvent, limit int, ca
 	if d.tag != 0xa8 && d.tag != 0xa9 && m.pduLimit[1-dir] != 0 && len(d.fields["Raw PDU"].([]byte)) > int(m.pduLimit[1-dir]) {
 		return protocolError(ErrMalformedMessage, "MMS PDU exceeds observed peer receive limit")
 	}
+	if m.values && m.hasNesting && d.valueDepth > m.nesting {
+		return protocolError(ErrMalformedMessage, "MMS Data/type nesting exceeds observed negotiated limit")
+	}
 	switch d.tag {
 	case 0xa8:
 		if carrier.acse != 0x60 || carrier.session != 0x0d || dir != m.client || m.initEvent != 0 {
@@ -267,6 +318,12 @@ func (m *binMMS) applyMMS(d mmsDecoded, dir int, e *ProtocolEvent, limit int, ca
 		m.offered = carrier.offer
 		m.proposed = [2]uint32{d.calling, d.called}
 		m.supported[dir] = bytes.Clone(d.services)
+		if m.values {
+			if n, ok := d.fields["Nesting Level"].(uint32); ok {
+				m.proposedNesting = n
+				m.hasProposedNesting = true
+			}
+		}
 	case 0xa9:
 		if carrier.acse != 0x61 || carrier.session != 0x0e || dir == m.client || m.initEvent == 0 || m.initAccepted {
 			return protocolError(ErrContextRequired, "MMS Initiate response missing request")
@@ -289,6 +346,15 @@ func (m *binMMS) applyMMS(d mmsDecoded, dir int, e *ProtocolEvent, limit int, ca
 		m.limits = [2]uint32{d.calling, d.called}
 		m.active = true
 		m.initAccepted = true
+		if m.values {
+			if n, ok := d.fields["Nesting Level"].(uint32); ok {
+				if m.hasProposedNesting && n > m.proposedNesting {
+					return protocolError(ErrMalformedMessage, "MMS nesting negotiation exceeds offer")
+				}
+				m.nesting = n
+				m.hasNesting = true
+			}
+		}
 		if n, ok := d.fields["Local Detail"].(uint32); ok {
 			m.pduLimit[dir] = n
 		}
@@ -324,7 +390,14 @@ func (m *binMMS) applyMMS(d mmsDecoded, dir int, e *ProtocolEvent, limit int, ca
 		if len(m.pending[dir]) >= int(max) || len(m.pending[0])+len(m.pending[1])+len(m.retired[0])+len(m.retired[1]) >= limit {
 			return protocolError(ErrResourceExceeded, "MMS outstanding/history budget")
 		}
-		m.pending[dir][d.invoke] = mmsPending{e.ID, d.service, d.items}
+		p := mmsPending{event: e.ID, service: d.service, items: d.items}
+		if m.values && d.service == 4 {
+			p.specification, _ = d.fields["Specification With Result"].(bool)
+			if p.specification {
+				p.names = cloneSessionValue(d.fields["Variables"]).([]map[string]any)
+			}
+		}
+		m.pending[dir][d.invoke] = p
 		e.TransactionID = e.ID
 	case 0xa1, 0xa2:
 		if !m.active {
@@ -339,6 +412,12 @@ func (m *binMMS) applyMMS(d mmsDecoded, dir int, e *ProtocolEvent, limit int, ca
 		}
 		if d.tag == 0xa1 && p.service == 4 && p.items >= 0 && p.items != d.items {
 			return protocolError(ErrMalformedMessage, "MMS Read result cardinality differs from request")
+		}
+		if m.values && d.tag == 0xa1 && p.service == 4 {
+			names, has := d.fields["Variables"]
+			if p.specification != has || has && !reflect.DeepEqual(p.names, names) {
+				return protocolError(ErrMalformedMessage, "MMS returned variable specification differs from observed request")
+			}
 		}
 		delete(m.pending[1-dir], d.invoke)
 		m.retired[1-dir][d.invoke] = true

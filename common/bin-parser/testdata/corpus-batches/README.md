@@ -44,7 +44,7 @@ Run from the repository root:
 ```sh
 go run ./internal/trafficfixture/cmd/corpus test
 go test -json -count=1 -timeout=5m ./internal/trafficfixture/... ./common/bin-parser/... ./common/pcapx/... ./common/yak/cmd/yakcmds/shark-cli ./scripts/ci > traffic.jsonl
-go run ./internal/trafficfixture/cmd/corpus exec -- python3 @scripts/protocol-tests/check_go_test_json.py traffic.jsonl --inventory @scripts/protocol-tests/required-tests-traffic-unified-v40.json --tier full
+go run ./internal/trafficfixture/cmd/corpus exec -- python3 @scripts/protocol-tests/check_go_test_json_v2.py traffic.jsonl --inventory @scripts/protocol-tests/required-tests-traffic-unified-v41.json --tier full
 ```
 
 The single `corpus` entry point uses the same bounded Go ZIP loader as tests.
@@ -83,7 +83,7 @@ their semantic coverage. The existing synthetic session keys are test inputs;
 production credentials, user private keys and material without redistribution
 permission belong in an external fixed-source download manifest.
 
-Current test requirements are sealed at `scripts/protocol-tests/required-tests-traffic-unified-v40.json`;
+Current test requirements are sealed at `scripts/protocol-tests/required-tests-traffic-unified-v41.json`;
 the historical inventories and all earlier batches remain unchanged.
 The supplemental small-corpus batch contains 26 minimal controls, their explicit
 expected facts, an offline generator and the compact pinned source manifest.
@@ -203,7 +203,7 @@ opaque selector bytes and one bounded Data value over Wrapper v1 TCP/UDP; object
 selector meaning, access permission and device operation are unverified. The
 original one-packet selective-access capture and original refused answer remain
 immutable; its now-supported answer is matched by exact input SHA and frame.
-The active inventory is `scripts/protocol-tests/required-tests-traffic-unified-v40.json`.
+The active inventory is `scripts/protocol-tests/required-tests-traffic-unified-v41.json`.
 
 The small-graph budget batch reuses accepted graph captures/answers and adds one
 249-byte UDP control for child count255 without child bytes. Its standalone proof
@@ -956,3 +956,45 @@ authored generator/verifier/reference harness are inside the small ZIP. Raw
 third-party downloads, reference sources and execution logs remain outside Git.
 
 Current mandatory entry: `scripts/protocol-tests/required-tests-traffic-unified-v40.json`.
+
+### Selected MMS service values and type declarations
+
+`WithProtocolMMSServiceValues(port)` and `WithSessionMMSServiceValues()` select
+`mms-iso-services-values`. The historical `mms-iso-ber` profile and its refusal
+answers remain intact. The extended profile adds Status and Identify, named
+Read results with success/failure Data, GetVariableAccessAttributes type/address
+observations, VMD/AA names and returned variable specifications. It checks the
+returned specification against the request, service/cardinality/peer capability,
+negotiated nesting, resources, directional IDs, lifetime and owned queries.
+
+Selected Data includes bounded arrays/structures, BOOLEAN, BIT STRING/boolean
+arrays, exact arbitrary-width INTEGER/unsigned/BCD, IEEE754 binary32/binary64
+with preserved bits, octets, VisibleString, UTF8 MMSString, binary/UTC time and
+bounded uint64 OID subidentifiers. Time bytes/quality are reported observations;
+clock validity, synchronization and application units are not authenticated.
+Out-of-day binary-time contents retain a diagnostic rather than silently losing
+raw values. Declared type arrays are observed without allocating the declared
+number of device elements. Fixed libIEC reference layouts supplement the older
+ASN.1 source for floating, MMSString and UTC type declarations.
+
+For captures starting at an actual CP/CPA/AARQ/AARE/MMS Initiate exchange, the
+profile can derive an observed application association while retaining false
+COTP connection/TPDU-negotiation evidence markers. It does not scan a tail for
+MMS or infer an association from arbitrary DT data. Optional selected BER
+EXTERNAL direct references and opaque descriptors are recorded and checked.
+Authentication/encryption, unselected encoding, named variable lists, alternate
+access, modifiers, other services and retired InvokeID generation reuse remain
+open. Original received captures and reference source remain outside Git.
+
+The new minimal ZIP includes exact independent complete answers, deterministic
+generation/verification and source/helper pins. Wide-number fallback bytes and
+empty-bit-string/text display differences in Wireshark4.2.5 are separate from
+the normative answer; a missing numeric reference field is not a codec pass.
+Full/deferred, workers1/2/4, observers off/on, Feed chunks1/7/full, ownership,
+resources and close/refusal boundaries remain required.
+
+Current gate: `required-tests-traffic-unified-v41.json` with
+`check_go_test_json_v2.py`. The indexed validator preserves missing/unpassed,
+package invocation completion, descendant skips, failures and non-JSON checks;
+its mutation/differential harness is sealed with the material. Older checkers
+and inventories remain immutable historical artifacts.

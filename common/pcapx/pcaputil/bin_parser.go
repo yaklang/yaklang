@@ -337,7 +337,8 @@ type BinParserBinding struct {
 
 type BinParserConfig struct {
 	// MMSISOPorts explicitly selects bounded RFC1006/COTP/presentation/MMS observations.
-	MMSISOPorts []uint16
+	MMSISOPorts            []uint16
+	DecodeMMSServiceValues bool
 	// DecodeOPCUARead opts into bounded UA Binary Read scalar observations under an observed None policy.
 	DecodeOPCUARead bool
 	// DecodeOPCUABrowse opts into bounded Browse body observations under an observed None policy.
@@ -726,7 +727,7 @@ func (f *binFlow) event(dir int, raw []byte, status, detail string) *BinParserEv
 	}
 	if f.mms != nil {
 		e.nativeMMSObservation = true
-		e.Profile = mmsISOProfile
+		e.Profile = f.mms.profile()
 	}
 	f.eventEvidence(dir, e)
 	if f.slmpTCP != nil {

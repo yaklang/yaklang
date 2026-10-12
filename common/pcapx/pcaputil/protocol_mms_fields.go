@@ -34,7 +34,7 @@ func mmsSchema(n mmsBER, required, optional []byte) error {
 	}
 	return nil
 }
-func mmsNamed(n mmsBER) (map[string]any, error) {
+func mmsNamed(n mmsBER, extended bool) (map[string]any, error) {
 	f := map[string]any{"Choice Tag": n.tag}
 	text := func(w []byte) (string, error) {
 		if len(w) == 0 {
@@ -48,6 +48,15 @@ func mmsNamed(n mmsBER) (map[string]any, error) {
 		return string(w), nil
 	}
 	switch n.tag {
+	case 0x80, 0x82:
+		if !extended {
+			return nil, protocolError(ErrUnsupportedFeature, "MMS domain-specific name profile selected")
+		}
+		v, err := text(n.body)
+		if err != nil {
+			return nil, err
+		}
+		f["Identifier"] = v
 	case 0xa1:
 		if len(n.children) != 2 || n.children[0].tag != 0x1a || n.children[1].tag != 0x1a {
 			return nil, protocolError(ErrMalformedMessage, "MMS domain ObjectName")
@@ -70,7 +79,10 @@ func mmsSingleChild(n mmsBER) (mmsBER, error) {
 	}
 	return n.children[0], nil
 }
-func mmsSelectedFields(n mmsBER, d *mmsDecoded) error {
+func mmsSelectedFields(n mmsBER, d *mmsDecoded, values *mmsValueContext) error {
+	if values != nil && (d.service == 0 || d.service == 2 || d.service == 6 && d.tag == 0xa1) && (d.tag == 0xa0 || d.tag == 0xa1) {
+		return values.service(n, d)
+	}
 	switch n.tag {
 	case 0xa8, 0xa9:
 		if e := mmsSchema(n, []byte{0x81, 0x82, 0xa4}, []byte{0x80, 0x83}); e != nil {
@@ -89,7 +101,7 @@ func mmsSelectedFields(n mmsBER, d *mmsDecoded) error {
 				if e != nil {
 					return e
 				}
-				if v == 0 {
+				if v == 0 && (values == nil || c.tag != 0x83) {
 					return protocolError(ErrMalformedMessage, "MMS positive proposed limit")
 				}
 				d.fields[key] = v
@@ -119,7 +131,7 @@ func mmsSelectedFields(n mmsBER, d *mmsDecoded) error {
 			if e != nil {
 				return e
 			}
-			f, e := mmsNamed(v)
+			f, e := mmsNamed(v, values != nil)
 			if e != nil {
 				return e
 			}
@@ -137,7 +149,7 @@ func mmsSelectedFields(n mmsBER, d *mmsDecoded) error {
 					spec = c.body[0] != 0
 				}
 			}
-			if spec {
+			if spec && values == nil {
 				return protocolError(ErrUnsupportedFeature, "MMS specificationWithResult needs returned variable context profile")
 			}
 			va, _ := mmsChild(s, 0xa1)
@@ -157,7 +169,7 @@ func mmsSelectedFields(n mmsBER, d *mmsDecoded) error {
 				if e != nil {
 					return e
 				}
-				f, e := mmsNamed(name)
+				f, e := mmsNamed(name, values != nil)
 				if e != nil {
 					return e
 				}
@@ -173,14 +185,38 @@ func mmsSelectedFields(n mmsBER, d *mmsDecoded) error {
 			return protocolError(ErrUnsupportedFeature, "MMS GetVariableAccessAttributes type response not yet selected")
 		}
 		s := n.children[1]
-		if e := mmsSchema(s, []byte{0xa1}, nil); e != nil {
+		optional := []byte(nil)
+		if values != nil {
+			optional = []byte{0xa0}
+		}
+		if e := mmsSchema(s, []byte{0xa1}, optional); e != nil {
 			return e
+		}
+		if values != nil {
+			for _, c := range s.children {
+				if c.tag == 0xa0 {
+					names, err := mmsVariableNames(c, true)
+					if err != nil {
+						return err
+					}
+					d.fields["Variables"] = names
+				}
+			}
 		}
 		ls, _ := mmsChild(s, 0xa1)
 		results := make([]map[string]any, 0, len(ls.children))
 		for _, v := range ls.children {
 			if v.tag != 0x80 {
-				return protocolError(ErrUnsupportedFeature, "MMS success Data requires its typed service profile")
+				if values == nil {
+					return protocolError(ErrUnsupportedFeature, "MMS success Data requires its typed service profile")
+				}
+				f, depth, err := values.data(v)
+				if err != nil {
+					return err
+				}
+				d.valueDepth = max(d.valueDepth, depth)
+				results = append(results, map[string]any{"Success": f})
+				continue
 			}
 			code, e := mmsUInt(v, 8)
 			if e != nil {

@@ -133,6 +133,7 @@ type mmsDecoded struct {
 	invoke                   uint32
 	calling, called, version uint32
 	items                    int
+	valueDepth               uint32
 	services                 []byte
 }
 
@@ -141,9 +142,9 @@ func decodeMMSPDU(w []byte, b ParserBudget) (mmsDecoded, error) {
 	if err != nil {
 		return mmsDecoded{}, err
 	}
-	return decodeMMSNode(n)
+	return decodeMMSNode(n, nil)
 }
-func decodeMMSNode(n mmsBER) (mmsDecoded, error) {
+func decodeMMSNode(n mmsBER, values *mmsValueContext) (mmsDecoded, error) {
 	w := n.raw
 	var err error
 	name, ok := mmsPDUNames[n.tag]
@@ -216,10 +217,10 @@ func decodeMMSNode(n mmsBER) (mmsDecoded, error) {
 		}
 		s := n.children[1]
 		d.service = s.tag & 31
-		if s.tag != 0xa4 && s.tag != 0xa6 {
+		if (s.tag != 0xa4 && s.tag != 0xa6) && (values == nil || !mmsSelectedService(n.tag, s.tag)) {
 			return d, protocolError(ErrUnsupportedFeature, "MMS selected Read/GetVariableAccessAttributes service")
 		}
-		d.fields["Invoke ID"], d.fields["Service Tag"], d.fields["Service Name"] = d.invoke, s.tag, map[byte]string{4: "Read", 6: "Get Variable Access Attributes"}[d.service]
+		d.fields["Invoke ID"], d.fields["Service Tag"], d.fields["Service Name"] = d.invoke, s.tag, map[byte]string{0: "Status", 2: "Identify", 4: "Read", 6: "Get Variable Access Attributes"}[d.service]
 		if d.service == 4 && d.tag == 0xa0 {
 			va, e := mmsChild(s, 0xa1)
 			if e != nil {
@@ -262,7 +263,7 @@ func decodeMMSNode(n mmsBER) (mmsDecoded, error) {
 		}
 	}
 	d.fields["BER"] = mmsTree(n)
-	if err = mmsSelectedFields(n, &d); err != nil {
+	if err = mmsSelectedFields(n, &d, values); err != nil {
 		return d, err
 	}
 	return d, nil

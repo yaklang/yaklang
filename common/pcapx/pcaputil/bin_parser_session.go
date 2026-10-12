@@ -21,6 +21,7 @@ func (f *binFlow) detectDirection(dir int, wire []byte) {
 	for _, port := range f.a.config.MMSISOPorts {
 		if f.port(port) {
 			f.protocol, f.mms = "mms", newBinMMS()
+			f.mms.values = f.a.config.DecodeMMSServiceValues
 			return
 		}
 	}

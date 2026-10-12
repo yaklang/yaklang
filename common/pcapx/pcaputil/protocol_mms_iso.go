@@ -15,21 +15,22 @@ type mmsPresentationContext struct {
 	transfers [][]byte
 }
 type mmsISOCarrier struct {
-	elements    int
-	application *mmsBER
-	fields      map[string]any
-	code        byte
-	src, dst    uint16
-	tpduSize    int
-	end         bool
-	data        []byte
-	session     byte
-	offer       []mmsPresentationContext
-	results     []bool
-	acse        byte
-	acseResult  uint32
-	hasResult   bool
-	pdu         []byte
+	valueElements int
+	elements      int
+	application   *mmsBER
+	fields        map[string]any
+	code          byte
+	src, dst      uint16
+	tpduSize      int
+	end           bool
+	data          []byte
+	session       byte
+	offer         []mmsPresentationContext
+	results       []bool
+	acse          byte
+	acseResult    uint32
+	hasResult     bool
+	pdu           []byte
 }
 
 func mmsFrameSize(w []byte, max int) (int, error) {
@@ -123,7 +124,7 @@ func parseMMSCOTP(w []byte, b ParserBudget) (mmsISOCarrier, error) {
 	}
 	return d, nil
 }
-func parseMMSSession(w []byte, b ParserBudget, d *mmsISOCarrier) error {
+func parseMMSSession(w []byte, b ParserBudget, d *mmsISOCarrier, extended bool) error {
 	if len(w) < 2 {
 		return protocolError(ErrMalformedMessage, "MMS session SPDU header")
 	}
@@ -190,6 +191,7 @@ func parseMMSSession(w []byte, b ParserBudget, d *mmsISOCarrier) error {
 	}
 	q := mmsBERBudget{remaining, b.MaxRecursionDepth}
 	nodes, err := q.list(user, 1)
+	d.valueElements = q.left
 	if err != nil {
 		return err
 	}
@@ -406,8 +408,37 @@ func parseMMSSession(w []byte, b ParserBudget, d *mmsISOCarrier) error {
 		return protocolError(ErrUnsupportedFeature, "MMS one ACSE EXTERNAL user-data required")
 	}
 	ex := ui.children[0]
-	if len(ex.children) != 2 {
+	if !extended && len(ex.children) != 2 {
 		return protocolError(ErrUnsupportedFeature, "MMS EXTERNAL indirect-reference/single-ASN1 selected")
+	}
+	if extended {
+		seen := map[byte]bool{}
+		last := -1
+		rank := map[byte]int{6: 0, 2: 1, 7: 2, 0xa0: 3}
+		for _, v := range ex.children {
+			order, ok := rank[v.tag]
+			if !ok {
+				return protocolError(ErrUnsupportedFeature, "MMS EXTERNAL selected references/descriptor/single-ASN1")
+			}
+			if seen[v.tag] || order < last {
+				return protocolError(ErrMalformedMessage, "MMS EXTERNAL field order/duplicate")
+			}
+			seen[v.tag] = true
+			last = order
+			if v.tag == 6 {
+				if !bytes.Equal(v.body, []byte{0x51, 1}) {
+					return protocolError(ErrUnsupportedFeature, "MMS EXTERNAL selected BER direct reference")
+				}
+				if d.valueElements < 2 {
+					return protocolError(ErrResourceExceeded, "MMS shared direct reference budget")
+				}
+				d.valueElements -= 2
+				d.fields["EXTERNAL Direct Reference"] = map[string]any{"OID": "2.1.1", "Bytes": bytes.Clone(v.body)}
+			}
+			if v.tag == 7 {
+				d.fields["EXTERNAL Descriptor Bytes"] = bytes.Clone(v.body)
+			}
+		}
 	}
 	ref, err := mmsChild(ex, 2)
 	if err != nil {
@@ -457,7 +488,7 @@ func (f *binFlow) frameMMSISO(w []byte) (int, *binSpec, error) {
 		return 0, nil, err
 	}
 	if n > 0 && n <= len(w) {
-		if err = f.mmsReserve(f.mms.storage() + 32768 + 512*int64(n)); err != nil {
+		if err = f.mmsReserve(f.mms.storage() + 32768 + f.mms.projectionFactor(f.a.budget)*int64(n)); err != nil {
 			return 0, nil, err
 		}
 	}

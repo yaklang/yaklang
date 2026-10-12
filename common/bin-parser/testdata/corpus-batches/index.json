@@ -65868,6 +65868,1733 @@
         "common/pcapx/pcaputil/mms-iso/reference.py": "mms-iso/reference.py",
         "scripts/protocol-tests/required-tests-traffic-unified-v40.json": "required-tests-traffic-unified-v40.json"
       }
+    },
+    {
+      "id": "validation-mms-services-values",
+      "kind": "validation",
+      "source_sha": "d5307815b6b85c8347fd8f29f18ae72d2682924d",
+      "file": "validation-mms-services-values.zip",
+      "sha256": "19d8e820f3103b87d98ae85c20fd26ba00142dfc45646ab1e272fec846cb110d",
+      "password": "bin-parser",
+      "members": {
+        "mms-services-values/answers/boolean-00.json": {
+          "sha256": "f39fde029687b69f0874577c79b8d803408eef876f0feb6adfe76609325ef095",
+          "bytes": 57737
+        },
+        "mms-services-values/captures/boolean-00.pcap": {
+          "sha256": "cc3a428b8cf4c2127a11845ab775978a60461fea079f7887bcf967798e427620",
+          "bytes": 1643
+        },
+        "mms-services-values/answers/boolean-ff.json": {
+          "sha256": "657f1477cd07c9279ace6561455d3da9e995af5f9184a12ceb8d08f77ac64fda",
+          "bytes": 57736
+        },
+        "mms-services-values/captures/boolean-ff.pcap": {
+          "sha256": "c19acf4a6ad08b848611eb1d352dec1817208ab6d31481a3a1628d0e702e9aad",
+          "bytes": 1643
+        },
+        "mms-services-values/answers/boolean-01.json": {
+          "sha256": "eb9f2e39afeb7ff8dbaf9693eb9c25939917697b73c8ee8ea4be4257d265edc6",
+          "bytes": 57736
+        },
+        "mms-services-values/captures/boolean-01.pcap": {
+          "sha256": "f039c520cde69e11090ed035ee709efa8f816b86bbdd105be0ad71c8c41cbc44",
+          "bytes": 1643
+        },
+        "mms-services-values/answers/number-133-0.json": {
+          "sha256": "d082e521d1f6582d011f233ee81e91c57843ea2a06aee96ded1d836c0c46f210",
+          "bytes": 57743
+        },
+        "mms-services-values/captures/number-133-0.pcap": {
+          "sha256": "b40619318923d72979c9608f73d7a870066b93ace5a60b67f6cba3cff6bfb657",
+          "bytes": 1643
+        },
+        "mms-services-values/answers/number-133-127.json": {
+          "sha256": "92b6b389e130cd757450975a893307e78a91afe41df5f1d0831ac2dceda415f2",
+          "bytes": 57745
+        },
+        "mms-services-values/captures/number-133-127.pcap": {
+          "sha256": "891e02748e883ee28f9060cb3e6c6cfd3cd65dbd137db81c9c458702e0922f25",
+          "bytes": 1643
+        },
+        "mms-services-values/answers/number-133-128.json": {
+          "sha256": "05c9aea4b2b4d45620fb092d4b2dccf4955405ad17092da051186d8ca86981f1",
+          "bytes": 57765
+        },
+        "mms-services-values/captures/number-133-128.pcap": {
+          "sha256": "3f35ba0b52790d27acd67f83bfc48487a7bbe15aa1d76bd762e854d15b148e9a",
+          "bytes": 1644
+        },
+        "mms-services-values/answers/number-133-255.json": {
+          "sha256": "bf834e8f62d2c37226012e5072ee364cdd4b12a203ff45f4c7a81f60873ba91d",
+          "bytes": 57765
+        },
+        "mms-services-values/captures/number-133-255.pcap": {
+          "sha256": "4ad69a2f609eccfa29e6f2809b78d1d6a32d13d83cc89ecbc2d57b55a651d912",
+          "bytes": 1644
+        },
+        "mms-services-values/answers/number-133-2147483647.json": {
+          "sha256": "8e3ccb453280c6f628cb17460be6c48db16bdcbf599a386427795838474ab572",
+          "bytes": 57816
+        },
+        "mms-services-values/captures/number-133-2147483647.pcap": {
+          "sha256": "be292f10a42f116fc35d3a8fca642077dc409622af6eb05b7376c61f8cdfc948",
+          "bytes": 1646
+        },
+        "mms-services-values/answers/number-133-4294967295.json": {
+          "sha256": "57994d7a23f0e4e736ec0f11f6e0af09de3f5067dcc4fa77261473e628dccaca",
+          "bytes": 57836
+        },
+        "mms-services-values/captures/number-133-4294967295.pcap": {
+          "sha256": "99181095c31a2abdf1d0b6b0b0615a8eeb84dc0c7976b17e2be4b80defd3aabe",
+          "bytes": 1647
+        },
+        "mms-services-values/answers/number-133-9223372036854775807.json": {
+          "sha256": "33ef4185ac1f1df0a2a7b8291158584d3552841979bbcb775abb57d94a80fc46",
+          "bytes": 57909
+        },
+        "mms-services-values/captures/number-133-9223372036854775807.pcap": {
+          "sha256": "da70a2af843577b293a9b2387ac99ef95d95f3f365f1b41663c4efe892ec38c0",
+          "bytes": 1650
+        },
+        "mms-services-values/answers/number-133-18446744073709551615.json": {
+          "sha256": "6c05657566e3cad2190f8ce45537449e0aa436f55df9a4c8287766e5020d253d",
+          "bytes": 57926
+        },
+        "mms-services-values/captures/number-133-18446744073709551615.pcap": {
+          "sha256": "f2e1cf1fda87783b3eafdf143930c2f721985e2e1ae038e99cc8e692c1d4cc07",
+          "bytes": 1651
+        },
+        "mms-services-values/answers/number-133-170141183460469231731687303715884105735.json": {
+          "sha256": "243012157ebe2bda8c9744b5e86b666cc06a933077c9753dafb47feab2d2c6e6",
+          "bytes": 58121
+        },
+        "mms-services-values/captures/number-133-170141183460469231731687303715884105735.pcap": {
+          "sha256": "c3c04f5c59a763db22196b5ea4a42fe79d7d81f424ed15e308ed999d96bd5460",
+          "bytes": 1659
+        },
+        "mms-services-values/answers/number-133-231584178474632390847141970017375815706539969331281128078915168015826259279875.json": {
+          "sha256": "857a5b134c6d5157713dd690afc599f55f4afe9ab4b6a95260dc25184392331e",
+          "bytes": 58496
+        },
+        "mms-services-values/captures/number-133-231584178474632390847141970017375815706539969331281128078915168015826259279875.pcap": {
+          "sha256": "4e5b460d153e849e82828a64e654863e01c6dfece608962fbbf0308a04683fd4",
+          "bytes": 1675
+        },
+        "mms-services-values/answers/number-133--1.json": {
+          "sha256": "86bfe59efb471b804b363393317da6c4c0639072f7839ac62eaea290e6d1766c",
+          "bytes": 57744
+        },
+        "mms-services-values/captures/number-133--1.pcap": {
+          "sha256": "e8ae0a83987666bbbb71fa7f673e4fe4d027795a418a207247a52ec911672147",
+          "bytes": 1643
+        },
+        "mms-services-values/answers/number-133--128.json": {
+          "sha256": "efa679f9734332735016b17558c67004de1d6df63757adaa378099bcb51498d8",
+          "bytes": 57746
+        },
+        "mms-services-values/captures/number-133--128.pcap": {
+          "sha256": "9e4b7bc1bc1c40c8f78bb4d60f662ff0d0085e48cfc82d83b7e0b7bf01c299b0",
+          "bytes": 1643
+        },
+        "mms-services-values/answers/number-133--129.json": {
+          "sha256": "2fbfc26e97f64ac72f9a143f24129755a07425cb83f4e0d583b59acea770edde",
+          "bytes": 57766
+        },
+        "mms-services-values/captures/number-133--129.pcap": {
+          "sha256": "b92e80f5756342629558ccbed856cf9105abcbad0585eec3f8ca7efda816d6c3",
+          "bytes": 1644
+        },
+        "mms-services-values/answers/number-133--9223372036854775808.json": {
+          "sha256": "052503beccdad98f4f7864504e6754a21fbb6e8931666bb65c0ed5772a4d7c52",
+          "bytes": 57910
+        },
+        "mms-services-values/captures/number-133--9223372036854775808.pcap": {
+          "sha256": "15b9b2a126b19ae7a1b67a9a61043f8d22ced7338a47fbd6677df3fb149a33d6",
+          "bytes": 1650
+        },
+        "mms-services-values/answers/number-133--231584178474632390847141970017375815706539969331281128078915168015826259279872.json": {
+          "sha256": "7cb7aee8a5662b40dee3398185339b704535208dd6cbb7e67b66f18770baeb0e",
+          "bytes": 58497
+        },
+        "mms-services-values/captures/number-133--231584178474632390847141970017375815706539969331281128078915168015826259279872.pcap": {
+          "sha256": "c96c1fd917450094d3688fe2f2b4eb4d20d2c4551827b67880eb33be5967484e",
+          "bytes": 1675
+        },
+        "mms-services-values/answers/number-134-0.json": {
+          "sha256": "b9a41f5e4e17880dda644f04a6c31477476804ad4593cc2e405306ff6da59933",
+          "bytes": 57744
+        },
+        "mms-services-values/captures/number-134-0.pcap": {
+          "sha256": "0a424b41c7c8cf46ace42721b3dd84316d173a9657070321d67daca828911a7c",
+          "bytes": 1643
+        },
+        "mms-services-values/answers/number-134-127.json": {
+          "sha256": "68fe30d3061cdcd362c1f7801280621e7b027b67b05da382b8501e00663731f0",
+          "bytes": 57746
+        },
+        "mms-services-values/captures/number-134-127.pcap": {
+          "sha256": "f4e5442557d08c221e007006360ccf2ee4836a285544f6f706b7a0a75d8b64ea",
+          "bytes": 1643
+        },
+        "mms-services-values/answers/number-134-128.json": {
+          "sha256": "f1af8390d8d267ac52cbab13f02d2327d876bf7d5c74e659b820f480d9bf8b93",
+          "bytes": 57766
+        },
+        "mms-services-values/captures/number-134-128.pcap": {
+          "sha256": "79dbd8776bb7b987c3230fe857b0319f60cf6469651f30f238c6344742f056db",
+          "bytes": 1644
+        },
+        "mms-services-values/answers/number-134-255.json": {
+          "sha256": "bf097dadbab966418f21731865de6e133b9648d6947735f31f03001ff98f186f",
+          "bytes": 57766
+        },
+        "mms-services-values/captures/number-134-255.pcap": {
+          "sha256": "35ebe2ab633792922212a32425993d2c2046a4fb34db1f8777a5de7eb9f311b0",
+          "bytes": 1644
+        },
+        "mms-services-values/answers/number-134-2147483647.json": {
+          "sha256": "0b66af4114d80f0235de9a8e33cd8be028165dc2318b619c94897f7f0c9f9bf7",
+          "bytes": 57817
+        },
+        "mms-services-values/captures/number-134-2147483647.pcap": {
+          "sha256": "edfb6e99a947284c4ab543779198c54262a9eb35d822901bb1c7c541f591e101",
+          "bytes": 1646
+        },
+        "mms-services-values/answers/number-134-4294967295.json": {
+          "sha256": "9e8bc75d7df480b11b320f27f8f467f7d781c18869029c4c4e837d37aa6b0d2a",
+          "bytes": 57837
+        },
+        "mms-services-values/captures/number-134-4294967295.pcap": {
+          "sha256": "7134b6ca35e79d540ed1865f51552e620901b9f74837cf98fef20cf32974fd8a",
+          "bytes": 1647
+        },
+        "mms-services-values/answers/number-134-9223372036854775807.json": {
+          "sha256": "ab094d68820bf3c199c94aae27010e49ced94d46619b8b38e2791ebdaf822482",
+          "bytes": 57910
+        },
+        "mms-services-values/captures/number-134-9223372036854775807.pcap": {
+          "sha256": "25a941fbd0f46183208547d21c150f05eca86c34f99f13611513d1b60e75b2cf",
+          "bytes": 1650
+        },
+        "mms-services-values/answers/number-134-18446744073709551615.json": {
+          "sha256": "5524624d7954c6b01605b246622f408b76f94637d0f33e86721e9bcba433417d",
+          "bytes": 57927
+        },
+        "mms-services-values/captures/number-134-18446744073709551615.pcap": {
+          "sha256": "7ff7024fd43e8ff2add94e87a6830d3b00a625d2ed0369210081fc9fa366b9db",
+          "bytes": 1651
+        },
+        "mms-services-values/answers/number-134-170141183460469231731687303715884105735.json": {
+          "sha256": "74b294aa5f44a9fd7c3e14303f12494f2461136e15b9debc164629c558e417d3",
+          "bytes": 58122
+        },
+        "mms-services-values/captures/number-134-170141183460469231731687303715884105735.pcap": {
+          "sha256": "9b2d147c56ef5f268b11179e3fb35ffa16cb6f0adabab5af66c6966fc26390dd",
+          "bytes": 1659
+        },
+        "mms-services-values/answers/number-134-231584178474632390847141970017375815706539969331281128078915168015826259279875.json": {
+          "sha256": "d070cc75fb9632f604985e012944678c0cfe5abc5ff7868ad93d1cb691afd872",
+          "bytes": 58497
+        },
+        "mms-services-values/captures/number-134-231584178474632390847141970017375815706539969331281128078915168015826259279875.pcap": {
+          "sha256": "09168b3bb5c97ea12277ecc3a0708db90e49b7ab72a482762ffb93034e12c7a2",
+          "bytes": 1675
+        },
+        "mms-services-values/answers/number-141-0.json": {
+          "sha256": "e83b92bc298aa0c4555a6dc555dcd25dc50b42d5989f5300f2a0f16d1f34fe5f",
+          "bytes": 57739
+        },
+        "mms-services-values/captures/number-141-0.pcap": {
+          "sha256": "653f60282bdedcce38c281191b076dc0502ac42306e50b934ea77453cd5e3745",
+          "bytes": 1643
+        },
+        "mms-services-values/answers/number-141-127.json": {
+          "sha256": "fed4e3bc53e7040149c09b069fec0db9c3c9694570a728e852bacc9dfb9765f3",
+          "bytes": 57741
+        },
+        "mms-services-values/captures/number-141-127.pcap": {
+          "sha256": "6a9c119e1aeeee5e996e2d530cdab4e7bd869a71d090a4aa98dca4df5c27f5f4",
+          "bytes": 1643
+        },
+        "mms-services-values/answers/number-141-128.json": {
+          "sha256": "59b0a710cb4fc64d5fa89ff0d45f6d36b731dce4172ce805b3f68187e01b0f51",
+          "bytes": 57761
+        },
+        "mms-services-values/captures/number-141-128.pcap": {
+          "sha256": "c498aa2e4836ed4ecb7b28a7838253ce7d138587931a4d2a2204f247f1ae8a52",
+          "bytes": 1644
+        },
+        "mms-services-values/answers/number-141-255.json": {
+          "sha256": "67196cdfa04e289039fd82747590a4f1b6822f92a7871bc1f6599bf03f9c5b3e",
+          "bytes": 57761
+        },
+        "mms-services-values/captures/number-141-255.pcap": {
+          "sha256": "965b82f52c99a9adc783dad5a8136f44f04ff12e7df372bff13cce60601908fb",
+          "bytes": 1644
+        },
+        "mms-services-values/answers/number-141-2147483647.json": {
+          "sha256": "1102fc6946e4f15d6f472c31e36d1d3795b951a990fbc75ed9a6534c9c7ad6c9",
+          "bytes": 57812
+        },
+        "mms-services-values/captures/number-141-2147483647.pcap": {
+          "sha256": "7e889aa731386b82a4d45beda603113cf05d4cf60f4aadc1094645ff14da0d07",
+          "bytes": 1646
+        },
+        "mms-services-values/answers/number-141-4294967295.json": {
+          "sha256": "c8193b8381415fc9a3b93edfa8be87da86b36bfd2e0ee4869f4af32dbd51c498",
+          "bytes": 57832
+        },
+        "mms-services-values/captures/number-141-4294967295.pcap": {
+          "sha256": "14b0dd91b71c0f98a62e11a1d30b6af63b708366cb87849b45a8fb35c2839250",
+          "bytes": 1647
+        },
+        "mms-services-values/answers/number-141-9223372036854775807.json": {
+          "sha256": "8ee1d0d90e7da9117a899aa037dd4846f3a84d4430dffbe7f81e9286f81be9a3",
+          "bytes": 57905
+        },
+        "mms-services-values/captures/number-141-9223372036854775807.pcap": {
+          "sha256": "e4a5fe18033a36dc16fb3c1dcfdfe81570a8d9a33ac6fb3c99552522c375778c",
+          "bytes": 1650
+        },
+        "mms-services-values/answers/number-141-18446744073709551615.json": {
+          "sha256": "72fd415ade95c861722e05a3a9d53b8bea89fb7a4b71cf2a0b9f9564e2c61754",
+          "bytes": 57922
+        },
+        "mms-services-values/captures/number-141-18446744073709551615.pcap": {
+          "sha256": "fe04e5d5c907b739ebd6d9a0bfc0ef58c5f6ce650d9799fa5cabd8c12f30a8f2",
+          "bytes": 1651
+        },
+        "mms-services-values/answers/number-141-170141183460469231731687303715884105735.json": {
+          "sha256": "c3f8a8398b849da01b8f095a49a97cc342be3c4d8fa6b8d234fcff5892437c88",
+          "bytes": 58117
+        },
+        "mms-services-values/captures/number-141-170141183460469231731687303715884105735.pcap": {
+          "sha256": "c56eee1b9fc65e7fd79c461d27bf52ee20c53f03837a177506ae1376d631f93e",
+          "bytes": 1659
+        },
+        "mms-services-values/answers/number-141-231584178474632390847141970017375815706539969331281128078915168015826259279875.json": {
+          "sha256": "59fe7678b4285346210d9dd8940b00851983ca57d8257f13274d99f447758ec4",
+          "bytes": 58492
+        },
+        "mms-services-values/captures/number-141-231584178474632390847141970017375815706539969331281128078915168015826259279875.pcap": {
+          "sha256": "ad1e03ed25a8c00fdfdc7ae31e657e7c9b81448f8a16d4ddbc9d23971a7aec4b",
+          "bytes": 1675
+        },
+        "mms-services-values/answers/number-141--1.json": {
+          "sha256": "2202faa2770209df8c598c97ba8f4a0f7f4fa3988834874fed60a266c40bc098",
+          "bytes": 57740
+        },
+        "mms-services-values/captures/number-141--1.pcap": {
+          "sha256": "a4aa672d05c55ae042471439d59b22fde5fb7975a71264f69ecb1101abd09726",
+          "bytes": 1643
+        },
+        "mms-services-values/answers/number-141--128.json": {
+          "sha256": "ecfe529fa8f50265425e02de35ebe1ccdacb6715fdf7546e3fdf41495e8a8a49",
+          "bytes": 57742
+        },
+        "mms-services-values/captures/number-141--128.pcap": {
+          "sha256": "369fd4f118513a189fcee22225e250eaf99ece86617d565e1359a42fee8cd813",
+          "bytes": 1643
+        },
+        "mms-services-values/answers/number-141--129.json": {
+          "sha256": "96c34d701cc84e39a6cb8ea258b2092c52289c22da264d655f23d2c121cba46c",
+          "bytes": 57762
+        },
+        "mms-services-values/captures/number-141--129.pcap": {
+          "sha256": "d61ef612237274c7857446fa8f17ad3480490f8b64dcead80465c85b44a6bc85",
+          "bytes": 1644
+        },
+        "mms-services-values/answers/number-141--9223372036854775808.json": {
+          "sha256": "9626547014d65e1f3d6197304beec7783349ec0d1c402a258c94d41413bbfc3f",
+          "bytes": 57906
+        },
+        "mms-services-values/captures/number-141--9223372036854775808.pcap": {
+          "sha256": "61cc1a2b686ac8a1671912646a13a9c937db1fa1db934fb6792cd1dedbb25dc1",
+          "bytes": 1650
+        },
+        "mms-services-values/answers/number-141--231584178474632390847141970017375815706539969331281128078915168015826259279872.json": {
+          "sha256": "0ffa41e5c9d9f489ab4957b2eb28e56fec27de1c1d410cea21743e06f0ce5d29",
+          "bytes": 58493
+        },
+        "mms-services-values/captures/number-141--231584178474632390847141970017375815706539969331281128078915168015826259279872.pcap": {
+          "sha256": "5b3b67307708eddc1840304f499f62eb65e1b10603c36fd9b9b21cbbf05035af",
+          "bytes": 1675
+        },
+        "mms-services-values/answers/float-32-0x0.json": {
+          "sha256": "598f3a3eb2e29a5dc1c12dc5826ded9c2a3a0fd30640725fad588c053657e58c",
+          "bytes": 57937
+        },
+        "mms-services-values/captures/float-32-0x0.pcap": {
+          "sha256": "98768e19865bf8d69db782af2735f5494aa934a50a712791e51c50b723de393b",
+          "bytes": 1647
+        },
+        "mms-services-values/answers/float-32-0x80000000.json": {
+          "sha256": "1319aac384f7703faaed88f8f6d4ec6251f447f8ed75a86cd740a4fd87db2734",
+          "bytes": 57938
+        },
+        "mms-services-values/captures/float-32-0x80000000.pcap": {
+          "sha256": "db7b98102a2c9ef945603a843202a224b0d1920c05d44d33a7dc36269263412f",
+          "bytes": 1647
+        },
+        "mms-services-values/answers/float-32-0x3fc00000.json": {
+          "sha256": "d63a4f35df1eb5fe19b5563a03d6ac442b1e1570f0834de7f3b653e058778a5e",
+          "bytes": 57939
+        },
+        "mms-services-values/captures/float-32-0x3fc00000.pcap": {
+          "sha256": "9201e82bd6a490f8615e7324fc5a249a65091fb90cecb4cee48f504cbb7b31c9",
+          "bytes": 1647
+        },
+        "mms-services-values/answers/float-32-0xc0200000.json": {
+          "sha256": "79001a9bf55ae180ec078899529e88873065662d720eae7800d83edaab21cd8a",
+          "bytes": 57940
+        },
+        "mms-services-values/captures/float-32-0xc0200000.pcap": {
+          "sha256": "3bcf1e2c23b8c39602c2fa44dd3d212625afefa1524a5956d8bd17735c518ffe",
+          "bytes": 1647
+        },
+        "mms-services-values/answers/float-32-0x7f800000.json": {
+          "sha256": "cd412ecd4baaf85738895d26885ca44b23bfcc388cb4b66b83a727aa567b627c",
+          "bytes": 57940
+        },
+        "mms-services-values/captures/float-32-0x7f800000.pcap": {
+          "sha256": "e7a371dce11574a8bf85a25ce752873be21420225477a2c98c0cd3f898b079c5",
+          "bytes": 1647
+        },
+        "mms-services-values/answers/float-32-0xff800000.json": {
+          "sha256": "a408525043f064739ecbcdff0d73ff09ac1d4aeb6d92f756d22c41599e0d8f4b",
+          "bytes": 57940
+        },
+        "mms-services-values/captures/float-32-0xff800000.pcap": {
+          "sha256": "8d364dcd490440456c30d9b315dc0ac2d35c9e64b994ea703d51f3ecf9f70e74",
+          "bytes": 1647
+        },
+        "mms-services-values/answers/float-32-0x7fc00001.json": {
+          "sha256": "f42614c2179daae2a0ec5a709a8fcf05d4bf6d54b8e29e93768a5631bdf158d8",
+          "bytes": 57939
+        },
+        "mms-services-values/captures/float-32-0x7fc00001.pcap": {
+          "sha256": "6841899a6617057147876a6a19931dabd5758f18de4ff94753b961b21e716b45",
+          "bytes": 1647
+        },
+        "mms-services-values/answers/float-32-0xff800001.json": {
+          "sha256": "1445e09e6ee6a949781397a0aab4b0cc3d985a97202142aa4202c1e7de2a6661",
+          "bytes": 57939
+        },
+        "mms-services-values/captures/float-32-0xff800001.pcap": {
+          "sha256": "2865484c28567d096a56d7647d2d2e79acca39d64b45de7c133829f65698f221",
+          "bytes": 1647
+        },
+        "mms-services-values/answers/float-32-0x1.json": {
+          "sha256": "63879fafa8ad779e67ad01514a73fba51927fa236241645a177a84bdc19d8874",
+          "bytes": 57941
+        },
+        "mms-services-values/captures/float-32-0x1.pcap": {
+          "sha256": "b2109ee41590d5be39325cdc3013f3bd17e901dca936405ab731bfb4418192c2",
+          "bytes": 1647
+        },
+        "mms-services-values/answers/float-32-0x7f7fffff.json": {
+          "sha256": "f540c025081cb3aee2f31e7c9e9db8d2e459a52e29983bde76ff711b2b1b08e7",
+          "bytes": 57949
+        },
+        "mms-services-values/captures/float-32-0x7f7fffff.pcap": {
+          "sha256": "1e9ae8f4fdf866d79a5fb26b4ba2dcbff3372a09f3924debfb56c23b3b4b8e56",
+          "bytes": 1647
+        },
+        "mms-services-values/answers/float-64-0x0.json": {
+          "sha256": "93adfd4ab975575290ce0d2114293f22585e1ff35086d2e1affa17f2aa98fb42",
+          "bytes": 58026
+        },
+        "mms-services-values/captures/float-64-0x0.pcap": {
+          "sha256": "8f12d6c09fd50a7ff254357f9c79441badfb1bd1b40cf214c6a4ec5ef3d993a4",
+          "bytes": 1651
+        },
+        "mms-services-values/answers/float-64-0x8000000000000000.json": {
+          "sha256": "2e38f5aeeb273eafd62a1173aa99c22cb06ff7edff109af0a6d6ebe3a212187b",
+          "bytes": 58027
+        },
+        "mms-services-values/captures/float-64-0x8000000000000000.pcap": {
+          "sha256": "3ed77b793f4182650d7a1c9d146eec72d8f7b86ae028df69e64d3755c5922d28",
+          "bytes": 1651
+        },
+        "mms-services-values/answers/float-64-0x3ff8000000000000.json": {
+          "sha256": "fea5022c45e8737c37289ccef442254bec530476fb536144239d189f227fd90d",
+          "bytes": 58028
+        },
+        "mms-services-values/captures/float-64-0x3ff8000000000000.pcap": {
+          "sha256": "0e7f5099247ef398a6f834185f34c46090303412a22565ea2e8c5018cc19bea6",
+          "bytes": 1651
+        },
+        "mms-services-values/answers/float-64-0xc004000000000000.json": {
+          "sha256": "9810f05827faf90583568cd5e47c50f388baa391a80b3e733077784754e5a6f0",
+          "bytes": 58029
+        },
+        "mms-services-values/captures/float-64-0xc004000000000000.pcap": {
+          "sha256": "a2c50be1b4bd15d8a93143e9b94fdcf2ee9f9d3e55a09ee9233c4b967d5d3c2e",
+          "bytes": 1651
+        },
+        "mms-services-values/answers/float-64-0x7ff0000000000000.json": {
+          "sha256": "52c2f145ad8d9f68f826df61b39933a052a78266caeccb13b2e888422a08c18f",
+          "bytes": 58029
+        },
+        "mms-services-values/captures/float-64-0x7ff0000000000000.pcap": {
+          "sha256": "c6c7cc6886b3d10dd9cf1a8affeb05fad152a0d2b3f2930b346ab167b729e927",
+          "bytes": 1651
+        },
+        "mms-services-values/answers/float-64-0xfff0000000000000.json": {
+          "sha256": "af90652d2b13cea9f2411150ce57913819803cd694b145693876a8531d67f290",
+          "bytes": 58029
+        },
+        "mms-services-values/captures/float-64-0xfff0000000000000.pcap": {
+          "sha256": "2e9d6c4730c9cddbce16ca119ce50bf8a605a1b4aac687f54ec15a65fb9867d5",
+          "bytes": 1651
+        },
+        "mms-services-values/answers/float-64-0x7ff8000000000001.json": {
+          "sha256": "2cd848eb76df98bf69823abe1d8ce58923cefbf6be1de0218b213788790304cf",
+          "bytes": 58028
+        },
+        "mms-services-values/captures/float-64-0x7ff8000000000001.pcap": {
+          "sha256": "30cec8beb9e0ad6017945ef6b02567c143f3630c72666594881d111879d41b28",
+          "bytes": 1651
+        },
+        "mms-services-values/answers/float-64-0x1.json": {
+          "sha256": "3e3ca69612082c1f4a1fd9069a31f2002aa6e18d1aca3eda50e3068dbb887d38",
+          "bytes": 58031
+        },
+        "mms-services-values/captures/float-64-0x1.pcap": {
+          "sha256": "6c9a52676994b31d8db7094b72d9864e1a7aba38aa9408e28869053b068926a7",
+          "bytes": 1651
+        },
+        "mms-services-values/answers/float-64-0x7fefffffffffffff.json": {
+          "sha256": "be72e5bc3999e26e26a445f0660ea74643b08ceaea1f6c18fbc99b251faf7887",
+          "bytes": 58048
+        },
+        "mms-services-values/captures/float-64-0x7fefffffffffffff.pcap": {
+          "sha256": "86969a860048f182579844c7219c1eaf4d40f6ecbbb5834559001ecbab73c2c2",
+          "bytes": 1651
+        },
+        "mms-services-values/answers/bits-132-0.json": {
+          "sha256": "492172a80c4f92eb44c77f35524729d888ef26739bca3398d80d8f39e526b846",
+          "bytes": 57802
+        },
+        "mms-services-values/captures/bits-132-0.pcap": {
+          "sha256": "f81c9ad24e13e0a0e0253fb32a9d81d349e4d032e4025d89b21944050e142cd6",
+          "bytes": 1643
+        },
+        "mms-services-values/answers/bits-142-0.json": {
+          "sha256": "0cff697d1edb2c5ca004a538634b6b2de110637f45310586d2bff10c05db7295",
+          "bytes": 57805
+        },
+        "mms-services-values/captures/bits-142-0.pcap": {
+          "sha256": "bbbc2fa450628550ddc36b87e86e0b755b3c15243f47023cb3b8a345ab9b13d5",
+          "bytes": 1643
+        },
+        "mms-services-values/answers/bits-132-1.json": {
+          "sha256": "f423ef2417d876f58bad159281ea5508c889e5cdb95b71d869e625f49d22a44a",
+          "bytes": 57826
+        },
+        "mms-services-values/captures/bits-132-1.pcap": {
+          "sha256": "432b527e0790f26eb6d56e93abced1af88b8722ad25e62acfa8bd928882e53b6",
+          "bytes": 1644
+        },
+        "mms-services-values/answers/bits-142-1.json": {
+          "sha256": "b328686138ee0acf470da8f171af747f8156ce69d7da472453f3e0d3d25b8f48",
+          "bytes": 57829
+        },
+        "mms-services-values/captures/bits-142-1.pcap": {
+          "sha256": "fe7148b1d4cff8ff88546c9fcba13c9e2411519a7a0376c06797769fd897fe2e",
+          "bytes": 1644
+        },
+        "mms-services-values/answers/bits-132-7.json": {
+          "sha256": "48e48d38c054c4b157b873fc6119e1c19a83af95d1b14c6cf8cf101eb634a6c0",
+          "bytes": 57826
+        },
+        "mms-services-values/captures/bits-132-7.pcap": {
+          "sha256": "66741841fadaa3539eed1200a0c9f74fd0a806af9e3755bf5171519539efee4b",
+          "bytes": 1644
+        },
+        "mms-services-values/answers/bits-142-7.json": {
+          "sha256": "63b0175dcde2914f91c611676fe131e6acd5b0babf0eec6e52bbfea7cd599f58",
+          "bytes": 57829
+        },
+        "mms-services-values/captures/bits-142-7.pcap": {
+          "sha256": "d24eafa5c2d2d56a5edd133fdda9fcad116e14fe9184c988930339cb9142655a",
+          "bytes": 1644
+        },
+        "mms-services-values/answers/bits-132-8.json": {
+          "sha256": "04661db6e8cc7dd7f8bb778f304c7f8952c72ff935be85e9d17729fc3b9024c6",
+          "bytes": 57826
+        },
+        "mms-services-values/captures/bits-132-8.pcap": {
+          "sha256": "e93756c67d2c6c7a1bcd0c7b108d30d1026c9609a8841bf14bac3b340b48ae91",
+          "bytes": 1644
+        },
+        "mms-services-values/answers/bits-142-8.json": {
+          "sha256": "6e5261da77104868476f20b4e4a4b4aef7765b53808906747ec84c402e380189",
+          "bytes": 57829
+        },
+        "mms-services-values/captures/bits-142-8.pcap": {
+          "sha256": "39b70cc36269d4a81580a2c8abb09ff53d83c77aa2ea3d1366e29a790708bec3",
+          "bytes": 1644
+        },
+        "mms-services-values/answers/bits-132-9.json": {
+          "sha256": "ff413127909b980b6c1ae477044e014f071d35ff930f540d0ef51d4c757743e7",
+          "bytes": 57842
+        },
+        "mms-services-values/captures/bits-132-9.pcap": {
+          "sha256": "7b4b52fb7093bac560010a95420d223825e4e3455de7763ca6976580165303b1",
+          "bytes": 1645
+        },
+        "mms-services-values/answers/bits-142-9.json": {
+          "sha256": "3862bc55d01aa7c9c1bc8e18e4a09a5678421f35081952069a01371ec28df24e",
+          "bytes": 57845
+        },
+        "mms-services-values/captures/bits-142-9.pcap": {
+          "sha256": "81945926ff151e9235d0f0ad60a07fe871b07365ceaebc5476d655534dc2727a",
+          "bytes": 1645
+        },
+        "mms-services-values/answers/bits-132-16.json": {
+          "sha256": "4db9bd8254a0adcfbfd68431ed66514d096c0fde046adc2282ebd0e3699b4a30",
+          "bytes": 57843
+        },
+        "mms-services-values/captures/bits-132-16.pcap": {
+          "sha256": "c127c477ed921ac5440d68d094118ca48a330f6246c0923d3a97ea68f8da87d8",
+          "bytes": 1645
+        },
+        "mms-services-values/answers/bits-142-16.json": {
+          "sha256": "dc03a75d06983ccd947cf1a44da8eb390509eb58f6f84570a6cbf82ce9dbb39d",
+          "bytes": 57846
+        },
+        "mms-services-values/captures/bits-142-16.pcap": {
+          "sha256": "a42958c10032bff284a2ed7a1ac42ef2988b1f50acc57a4e73575bc6c2e306f2",
+          "bytes": 1645
+        },
+        "mms-services-values/answers/bits-132-128.json": {
+          "sha256": "d755bd980e47f2491a41c0df50c848921023c2458c2292ec9412a978a6089f04",
+          "bytes": 58168
+        },
+        "mms-services-values/captures/bits-132-128.pcap": {
+          "sha256": "f18456cd64508622027ee5fa9577820f90dec34f39cf27ea27977c17dc1e7b4a",
+          "bytes": 1659
+        },
+        "mms-services-values/answers/bits-142-128.json": {
+          "sha256": "aaca4ccce59d06aae3e80836a43d6f73b72033b82306d178de0a8edacfd14482",
+          "bytes": 58171
+        },
+        "mms-services-values/captures/bits-142-128.pcap": {
+          "sha256": "ac075f27cbefb2b128645e916408b5452475dfa2050b37aada86c006ac921d12",
+          "bytes": 1659
+        },
+        "mms-services-values/answers/octets-0.json": {
+          "sha256": "edd86ed079e03eaed51efa72e3ad82baa1cc136c65288ac40937081aad6fa8cc",
+          "bytes": 57711
+        },
+        "mms-services-values/captures/octets-0.pcap": {
+          "sha256": "ec991f6f7ceb4e7eda1553dc9590290b27990a0a381b41433d9935696cf6179f",
+          "bytes": 1642
+        },
+        "mms-services-values/answers/octets-2.json": {
+          "sha256": "2e1bb37e001068566caafbc859b816f968a0b04ce8aee8eb57f238c48e61f39d",
+          "bytes": 57763
+        },
+        "mms-services-values/captures/octets-2.pcap": {
+          "sha256": "53c50083dc6fcc8014d93b4b098182645daf723f05e405021a09a72255a1f355",
+          "bytes": 1644
+        },
+        "mms-services-values/answers/octets-128.json": {
+          "sha256": "ff8aab18b4eecd4bce1c67310c3c5070d5e8bca8a925f7d62215a6dea00ebae7",
+          "bytes": 60696
+        },
+        "mms-services-values/captures/octets-128.pcap": {
+          "sha256": "15dd9103a525b8a2decc4612968ee78c01aae28c08f10dc5d569280a176d1ddd",
+          "bytes": 1777
+        },
+        "mms-services-values/answers/text-138-.json": {
+          "sha256": "e7b10ab8bafe3647886d9f032a70fe3eef876be6e2d1311e4a6ba9721e867559",
+          "bytes": 57712
+        },
+        "mms-services-values/captures/text-138-.pcap": {
+          "sha256": "53010b6a27717d2ff0a47b384bc35caef9f3a8864f9fb05cf5cf4c39ed4a0acc",
+          "bytes": 1642
+        },
+        "mms-services-values/answers/text-138-4c41422076616c75657e.json": {
+          "sha256": "c4853883ffb76b6c1d65e1429bdf8890facb945894c0129665afe78318bfb8e4",
+          "bytes": 57942
+        },
+        "mms-services-values/captures/text-138-4c41422076616c75657e.pcap": {
+          "sha256": "437ea5113f82c652433c49fdb94aa37b5443265a460884f42c2a5b68acf553b6",
+          "bytes": 1652
+        },
+        "mms-services-values/answers/text-144-.json": {
+          "sha256": "d5d768c98bb3f26ab9855c3a723a362da47693a6b77c54213bff2b618801db46",
+          "bytes": 57708
+        },
+        "mms-services-values/captures/text-144-.pcap": {
+          "sha256": "56162a2ed61bf30deeb201fa99ab30a3de6f9a1511bdc88f01512d05e18c345a",
+          "bytes": 1642
+        },
+        "mms-services-values/answers/text-144-00.json": {
+          "sha256": "8e42e84178315a6d8528aeaa1a60d399be47ab2be76c3b75470aaa1824fac65f",
+          "bytes": 57742
+        },
+        "mms-services-values/captures/text-144-00.pcap": {
+          "sha256": "f4940f8ac2880c7d11443216322604f32038981977aa59813a364a02fe85b7c9",
+          "bytes": 1643
+        },
+        "mms-services-values/answers/text-144-e794b5e58a9be29aa1.json": {
+          "sha256": "06c1eb3fa7d2e93a50d927b6cb42022840cb9a66c76855c6efc1d9c6f362a571",
+          "bytes": 57918
+        },
+        "mms-services-values/captures/text-144-e794b5e58a9be29aa1.pcap": {
+          "sha256": "41acfd3dfb5985edd5eb036a445918a56ab86edd5a8693140d74aaec2155f99b",
+          "bytes": 1651
+        },
+        "mms-services-values/answers/binary-time-00000000.json": {
+          "sha256": "c7487acb7428cd9c7bf9b476df8897a8a85234e579d5fb0b10bc2bc57c051a80",
+          "bytes": 57848
+        },
+        "mms-services-values/captures/binary-time-00000000.pcap": {
+          "sha256": "fb475ddf31ad45bfeb81858d7cfd1a0ed9bdc666be71e40f8bf18296576413b4",
+          "bytes": 1646
+        },
+        "mms-services-values/answers/binary-time-05265bff.json": {
+          "sha256": "f9f6f36a1b315760b51e8274663f70df0e325995d4ed40658a3d1a475dd793a0",
+          "bytes": 57855
+        },
+        "mms-services-values/captures/binary-time-05265bff.pcap": {
+          "sha256": "f7b30a21d817f101ebaacae61ab3b8d454b6a8322f45fd86329a82cee9770746",
+          "bytes": 1646
+        },
+        "mms-services-values/answers/binary-time-000000000000.json": {
+          "sha256": "04e920cf57e8f133c7e60e8c936dc20fdb7e14ec0d6582cdd0677a2c32577c07",
+          "bytes": 57973
+        },
+        "mms-services-values/captures/binary-time-000000000000.pcap": {
+          "sha256": "d0bc12de321a700d8140fdb1126b97f393f07e6f86b1a06a8758a9bd41b0833e",
+          "bytes": 1648
+        },
+        "mms-services-values/answers/binary-time-000004d20001.json": {
+          "sha256": "9564a26266479332bccc15a54f8dcb56b4cb30626516cac86d7b5f49b9639400",
+          "bytes": 57976
+        },
+        "mms-services-values/captures/binary-time-000004d20001.pcap": {
+          "sha256": "4464f53c490852bd58c73cfc109d7cc71070dbb4ac8538d6cbf7be08e59a6573",
+          "bytes": 1648
+        },
+        "mms-services-values/answers/binary-time-ffffffffffff.json": {
+          "sha256": "dab5626ed3a2edf3738496b7462b6eabf2389ec4bf6b1532186f34c742e3ca12",
+          "bytes": 57988
+        },
+        "mms-services-values/captures/binary-time-ffffffffffff.pcap": {
+          "sha256": "0cfe22876295b86e4b097ae55b0990db9daddb475f4bd926fd7749b33a1e16ff",
+          "bytes": 1648
+        },
+        "mms-services-values/answers/utc-0000000000000000.json": {
+          "sha256": "707454bf392369bd630be22b7f413f2da596c3ba486091ee659c949dbfe441ad",
+          "bytes": 57986
+        },
+        "mms-services-values/captures/utc-0000000000000000.pcap": {
+          "sha256": "52f22f0081bbcdbc9c2f0d233dd6819c8bfd484ef5256c657d5898a72c969a0a",
+          "bytes": 1650
+        },
+        "mms-services-values/answers/utc-010203048000000a.json": {
+          "sha256": "37317cfd9d51db49c0a8ce450670e7f3b56e162e12bdaff36d43ab3732967ff5",
+          "bytes": 58008
+        },
+        "mms-services-values/captures/utc-010203048000000a.pcap": {
+          "sha256": "d82eab21f31cc5eca9cd9beeb1d0b1df5e7228d396ae74f15c47f11ab650d314",
+          "bytes": 1650
+        },
+        "mms-services-values/answers/utc-ffffffffffffffef.json": {
+          "sha256": "91109361ec784404ba4ecb250094f8ee0a14d747fecde993325df41c0c673530",
+          "bytes": 58012
+        },
+        "mms-services-values/captures/utc-ffffffffffffffef.pcap": {
+          "sha256": "7da76c9c4b823045d80e9c621f879d83bf490eab80e0c9d2cc12dcc6cd45be26",
+          "bytes": 1650
+        },
+        "mms-services-values/answers/oid-00.json": {
+          "sha256": "d3a20f07bf1df8fd9adc90c77d3aecff873ef9f985dc893d0fadf8c3a161991c",
+          "bytes": 57745
+        },
+        "mms-services-values/captures/oid-00.pcap": {
+          "sha256": "ae1160eccd051a05a29fcc86d1a0dd98e013ac95a0f05da3bbf986e63d0a8f70",
+          "bytes": 1643
+        },
+        "mms-services-values/answers/oid-2a030405.json": {
+          "sha256": "81ce07df28e16daf25dffec0680b0bcbc9e0fce7e3dbe1fbd19345d9718dfe0e",
+          "bytes": 57815
+        },
+        "mms-services-values/captures/oid-2a030405.pcap": {
+          "sha256": "fa8901cdfb68a01d76b8e63ed0dc561b3e195c6654bf0c09b3e0491c2fc4b925",
+          "bytes": 1646
+        },
+        "mms-services-values/answers/oid-883703.json": {
+          "sha256": "6a2fae977447f66c5473fa472200424cc794bd7656101b84978f59801500aed9",
+          "bytes": 57785
+        },
+        "mms-services-values/captures/oid-883703.pcap": {
+          "sha256": "e6ca79ef454890d708eb105d57db0ae7c433c325f9d65b139ab10c1c5a92da16",
+          "bytes": 1645
+        },
+        "mms-services-values/answers/oid-2b0601040186a035.json": {
+          "sha256": "ebfa9d8cf39d968b8428e037e69b8f7c94633aaea41228f18543c2439ec09fc1",
+          "bytes": 57908
+        },
+        "mms-services-values/captures/oid-2b0601040186a035.pcap": {
+          "sha256": "df81391453f315506adbf3aef19451c1ea8a1969a74f6dbfb169c16e348a977c",
+          "bytes": 1650
+        },
+        "mms-services-values/answers/mixed-success-failure.json": {
+          "sha256": "c1243242d1e6334175447aa52b200cfa06f481a0ef2e48d49e90908cbd10f93f",
+          "bytes": 62402
+        },
+        "mms-services-values/captures/mixed-success-failure.pcap": {
+          "sha256": "c1c66b971dbd1ae4258c29b8757bd0d552a2c4837f21b5bdc7a02c4aa0dae38d",
+          "bytes": 1676
+        },
+        "mms-services-values/answers/container-161-0.json": {
+          "sha256": "537ea1d4453f6ee02637052c552addfc0853c73080e5fe525a7c47a1b81fc87e",
+          "bytes": 57797
+        },
+        "mms-services-values/captures/container-161-0.pcap": {
+          "sha256": "4b3bee1670c96a44cc20adc0348f4356e4e975ae9982db99cc99940fc086a93c",
+          "bytes": 1642
+        },
+        "mms-services-values/answers/container-161-10.json": {
+          "sha256": "075a46d3ca31d02290aa231029f3acddcb5f2a83f0510003bfe1751b8a740b69",
+          "bytes": 59539
+        },
+        "mms-services-values/captures/container-161-10.pcap": {
+          "sha256": "c289c8e6d67b9fa8c42f5bbdc85f89e1af2385f394942ae639ad4a22959b7bdd",
+          "bytes": 1652
+        },
+        "mms-services-values/answers/container-162-0.json": {
+          "sha256": "c479d030207b0ec9d990e1806e94b8c05ffff31f5444c35e8f6009a6973364c3",
+          "bytes": 57801
+        },
+        "mms-services-values/captures/container-162-0.pcap": {
+          "sha256": "56aa7bfb95518f78d6728d1949ebdcadfcb9a1e15fd6b4dac786f39de21b5f61",
+          "bytes": 1642
+        },
+        "mms-services-values/answers/container-162-10.json": {
+          "sha256": "5959b50c3fbfd7631056648750307d82d24668000b03077e7e96f4cda998acb0",
+          "bytes": 59543
+        },
+        "mms-services-values/captures/container-162-10.pcap": {
+          "sha256": "55c17ac820a8689889af63ca6b887b81ad0f07faf479385d45cdd6eee7b8bb85",
+          "bytes": 1652
+        },
+        "mms-services-values/answers/nested-1.json": {
+          "sha256": "c3ff361d031faad0ef791bfb6fb0c7e5fedfabbe88fa0a498b85f0cc6a183a31",
+          "bytes": 58413
+        },
+        "mms-services-values/captures/nested-1.pcap": {
+          "sha256": "ea3ef582b470fc1c317bb75f1570ac61ea5b01e4c50edf9e1228468f75fa8a9c",
+          "bytes": 1645
+        },
+        "mms-services-values/answers/nested-3.json": {
+          "sha256": "d97383533940f21262def0f822a08b3bf175d0602a4b8c8d3b9eee2ea3767a64",
+          "bytes": 60015
+        },
+        "mms-services-values/captures/nested-3.pcap": {
+          "sha256": "1b69f85a9a77b6fad2cd0411d666402240f5f68976ec210d47099d9ad295e804",
+          "bytes": 1649
+        },
+        "mms-services-values/answers/nested-5.json": {
+          "sha256": "0657622784621871b45514b998317e5eec3a64aa9e667823c5e487d9fdde21e4",
+          "bytes": 61921
+        },
+        "mms-services-values/captures/nested-5.pcap": {
+          "sha256": "23282de9b8d84578e2b24d052439870b6562f9878366ecdf87f90336222870b5",
+          "bytes": 1653
+        },
+        "mms-services-values/answers/returned-spec-domain.json": {
+          "sha256": "c936fb6da23aff912d3aba435eb15661554d05b84478d44f6b68f711fbe3c148",
+          "bytes": 62092
+        },
+        "mms-services-values/captures/returned-spec-domain.pcap": {
+          "sha256": "65016b5b3c4a39aa615922171048a13b0dc9a5e2a044517e5fdefbda04903c63",
+          "bytes": 1668
+        },
+        "mms-services-values/answers/returned-spec-vmd.json": {
+          "sha256": "5ddd1f23074f75c3e53280a40b18cf8239407cc2ec1baef820e90779b337d093",
+          "bytes": 59522
+        },
+        "mms-services-values/captures/returned-spec-vmd.pcap": {
+          "sha256": "8c62d467d68d46bcca826e22ee4e74aa86d6ac4cd538ce607e679bef050ad45d",
+          "bytes": 1654
+        },
+        "mms-services-values/answers/returned-spec-aa.json": {
+          "sha256": "0c662ea53771913273274067ac5ad30a98617aa98c1ca6bbd185638d158a7461",
+          "bytes": 59522
+        },
+        "mms-services-values/captures/returned-spec-aa.pcap": {
+          "sha256": "6354b3e36617c1c7e3d584719e2f1cc7a8a654275010ac3c57de698021da426a",
+          "bytes": 1654
+        },
+        "mms-services-values/answers/status-00.json": {
+          "sha256": "efaac6ff881739de4450869b25cfdda3c1fb9739b1ad4d2385231b30d603924b",
+          "bytes": 54055
+        },
+        "mms-services-values/captures/status-00.pcap": {
+          "sha256": "3d89eab79aeee32f8aa915f1d2554655b210ebe0b3ec3b3b127a6bf13b4f5f6d",
+          "bytes": 1642
+        },
+        "mms-services-values/answers/status-ff.json": {
+          "sha256": "f3c2ff5151f77e09657c58fc1e76d6476f66966933c64562f1d8222c1f5bdd1d",
+          "bytes": 54054
+        },
+        "mms-services-values/captures/status-ff.pcap": {
+          "sha256": "f58edf8ddcbf06de01506b80bd8054a1bda9fef5b485e42b4b732f75c51fb611",
+          "bytes": 1642
+        },
+        "mms-services-values/answers/identify-3.json": {
+          "sha256": "998d8e27a53f1556d6618f548e13dbde62bb0b597ac982af085be51a6aa9fe98",
+          "bytes": 55073
+        },
+        "mms-services-values/captures/identify-3.pcap": {
+          "sha256": "587a75fcf81968d5cc4f7f146aa0c97aab4f7ca486268ae314944ec651dbf9bd",
+          "bytes": 1647
+        },
+        "mms-services-values/answers/identify-0.json": {
+          "sha256": "03cdbc917ebca2617e80f5715105c09c305cba1bbf01da61f3aa86aacbc97e3b",
+          "bytes": 54888
+        },
+        "mms-services-values/captures/identify-0.pcap": {
+          "sha256": "529dc3f598b74efe2f69026109ba65bd033b56a012c1b22f563a24e287311eca",
+          "bytes": 1638
+        },
+        "mms-services-values/answers/type-0.json": {
+          "sha256": "93606678a4a86d6580b1d5b1e541032267fe17ef0e2281a4f34b39190a1136a7",
+          "bytes": 56841
+        },
+        "mms-services-values/captures/type-0.pcap": {
+          "sha256": "d7747964c4f96466634033bc72d856b08d59aa69df311b10b926f815e21e5a77",
+          "bytes": 1648
+        },
+        "mms-services-values/answers/type-1.json": {
+          "sha256": "9f238ef9a2b2f733af5ae5f4f8975708dd2c63e216f09d1dd03ae50ca1816643",
+          "bytes": 56843
+        },
+        "mms-services-values/captures/type-1.pcap": {
+          "sha256": "a883bec7578b0eeac973e1157326bfd875fe129dbc7a3d8fde9d6263114f34e3",
+          "bytes": 1647
+        },
+        "mms-services-values/answers/type-2.json": {
+          "sha256": "819676a294113ea6a7eb835a5580649a466dc2d3d05b67558f1c70499b7bf120",
+          "bytes": 56830
+        },
+        "mms-services-values/captures/type-2.pcap": {
+          "sha256": "124d5c30890553d7d84d7e1f70ebef75fed3f90bb6b47f6e5fec5337148e8537",
+          "bytes": 1646
+        },
+        "mms-services-values/answers/type-3.json": {
+          "sha256": "4f4c27f447541495d8abd165573df4c5e62a831bb92e15bf0fad994d64040b65",
+          "bytes": 56908
+        },
+        "mms-services-values/captures/type-3.pcap": {
+          "sha256": "1f03e46e0dee62f4232ce8f78f31b95a813e61dc8d0179bef2c16cdc3c5bb0b4",
+          "bytes": 1649
+        },
+        "mms-services-values/answers/type-4.json": {
+          "sha256": "ebac66aa86e56ebb3c9d1f27c71e644aad8833158b7b0cee7536253f7296915b",
+          "bytes": 56880
+        },
+        "mms-services-values/captures/type-4.pcap": {
+          "sha256": "077ef29949398cb6e29ffd6e918e07aed94e3a5041f803d2d3951f57a0eedf5c",
+          "bytes": 1648
+        },
+        "mms-services-values/answers/type-5.json": {
+          "sha256": "5d1ea9d8625a73b7bc7f99ae77b096a6a72f9c5660cb9b8dd4e22e2d28c1ff95",
+          "bytes": 56840
+        },
+        "mms-services-values/captures/type-5.pcap": {
+          "sha256": "3221f33f7c5f07ee5b8f3b537e08a13331a8fe13d4612aff30887a92ffdbca15",
+          "bytes": 1646
+        },
+        "mms-services-values/answers/type-6.json": {
+          "sha256": "0a09c69456fc593a372fcdd589cb1027aba565fe12235780a7c9cea1ed59f735",
+          "bytes": 56850
+        },
+        "mms-services-values/captures/type-6.pcap": {
+          "sha256": "0202e3da629a2ec823a416f8b4cd67bb1357f6879eb57c241d3fa164ecf3e7c6",
+          "bytes": 1648
+        },
+        "mms-services-values/answers/type-7.json": {
+          "sha256": "f54230318f8e9229197d03c2e9d56b7f158589be5ed5fbbab48860219b72f334",
+          "bytes": 56851
+        },
+        "mms-services-values/captures/type-7.pcap": {
+          "sha256": "6ee12b4621439e17861ca27142566c2870270b766f652e053554dfb941fa260c",
+          "bytes": 1647
+        },
+        "mms-services-values/answers/type-8.json": {
+          "sha256": "bd95b4cfbde8ea5f43a000067384f52c522700004403c054b58cf8f3581bb2e6",
+          "bytes": 56824
+        },
+        "mms-services-values/captures/type-8.pcap": {
+          "sha256": "486e92e34c1f6ae3879eb0788d56d6a71717ad1d96fba63bd68fb5554a9c3bf3",
+          "bytes": 1646
+        },
+        "mms-services-values/answers/type-9.json": {
+          "sha256": "94311b0835920cb67c8a34927fdecc924a618b3305ba849f982106104e46b5b9",
+          "bytes": 56851
+        },
+        "mms-services-values/captures/type-9.pcap": {
+          "sha256": "4b2d44b07e6be6935c312b4c4b48f03f4d7a458358eb58f034ca466c674292a6",
+          "bytes": 1648
+        },
+        "mms-services-values/answers/type-10.json": {
+          "sha256": "d32a0681d0b3144e94b22c9fe5bee9d0e3dd43933e5a2ebb505d45748fc52491",
+          "bytes": 57540
+        },
+        "mms-services-values/captures/type-10.pcap": {
+          "sha256": "894843cb715b5960d3e4b27a8feb2738c1fe9f2e7eab4933f59ded0dac29c248",
+          "bytes": 1653
+        },
+        "mms-services-values/answers/type-11.json": {
+          "sha256": "0c900f42657a544a8b3c0468ff36c2123f9621833189149499605a533f5dd533",
+          "bytes": 58922
+        },
+        "mms-services-values/captures/type-11.pcap": {
+          "sha256": "711b8504d86cc95ae9021917af5b0b9197f38f6572d4c95e48e226bcc1914e50",
+          "bytes": 1659
+        },
+        "mms-services-values/answers/type-12.json": {
+          "sha256": "76d98c64222ab4e590020364d8015bcf3ecc0e0276d5a428566aaec605b2d20c",
+          "bytes": 62026
+        },
+        "mms-services-values/captures/type-12.pcap": {
+          "sha256": "65981c33fa4ffbf198800b253fbdcae2c384362fcd4075a14dc0e321440413ed",
+          "bytes": 1670
+        },
+        "mms-services-values/answers/extended-type-0.json": {
+          "sha256": "0bd09dc669bc5dfc4e6001a57aeab4f783eef54628bb9f02def2a82ec7b18bf7",
+          "bytes": 56874
+        },
+        "mms-services-values/captures/extended-type-0.pcap": {
+          "sha256": "5ae9af35fb92c124578edf5c6f63001e3651436f36a9ec5bffe53d2ca045f6c9",
+          "bytes": 1645
+        },
+        "mms-services-values/answers/extended-type-1.json": {
+          "sha256": "952a6ff5671ddfcce25319cb1bfc5c5112e86d76ba61fe26cba31324adbf1e4c",
+          "bytes": 56875
+        },
+        "mms-services-values/captures/extended-type-1.pcap": {
+          "sha256": "fbb173e2cacc1c32b5d3a30755221acf4f21a73022111a74b528355cf0c0d3f9",
+          "bytes": 1645
+        },
+        "mms-services-values/answers/extended-type-2.json": {
+          "sha256": "28e24e37b9b342b2f631f93266eed072cf60efd15e5c7498f2846a7a5f8e9958",
+          "bytes": 55939
+        },
+        "mms-services-values/captures/extended-type-2.pcap": {
+          "sha256": "d9b273adb3f38b8468406ec6286657cb7dc91229816978015e9834fa73674618",
+          "bytes": 1640
+        },
+        "mms-services-values/answers/extended-type-3.json": {
+          "sha256": "583517b7fb2c36197bd6ebb5b5701de846daffe1bcb2fee998cedbd70fda66ae",
+          "bytes": 55873
+        },
+        "mms-services-values/captures/extended-type-3.pcap": {
+          "sha256": "8b0d6532f474f16276833301a79178fe3d155afbff881448f0134f28c7fc5aa1",
+          "bytes": 1639
+        },
+        "mms-services-values/answers/zero-nesting-scalar.json": {
+          "sha256": "6329abba79e54a2e20aa28a75019e5f2ebc303da912216566ce11bb7ebc940da",
+          "bytes": 57736
+        },
+        "mms-services-values/captures/zero-nesting-scalar.pcap": {
+          "sha256": "d33d00243de9804917abea18b5c126e2fcff25f062cd0d416c45bc50a8292685",
+          "bytes": 1643
+        },
+        "mms-services-values/answers/association-start-without-cotp.json": {
+          "sha256": "deb92effb5a3178b757b9e1ad378aef84876b8f24e116353b95e35ffb565622b",
+          "bytes": 61827
+        },
+        "mms-services-values/captures/association-start-without-cotp.pcap": {
+          "sha256": "4a83838f1a2b8994a3f52aa06d226378270a5a57279ff08ce60268653caa0b33",
+          "bytes": 1668
+        },
+        "mms-services-values/answers/bool-empty.json": {
+          "sha256": "a14f8f1b267cfd69eb880de48c15e9791a36044a7248cabaad6cb25bbd097533",
+          "bytes": 43788
+        },
+        "mms-services-values/captures/bool-empty.pcap": {
+          "sha256": "ff2d63862087cb5253b9222d0238375021d75f2dc8ecd2429955d87100a291de",
+          "bytes": 1370
+        },
+        "mms-services-values/answers/bool-long.json": {
+          "sha256": "728e12ac2ce956190f75c702c0773ede61f0f9bcea6c36c736eb7f1779801675",
+          "bytes": 43796
+        },
+        "mms-services-values/captures/bool-long.pcap": {
+          "sha256": "3bb590db6e263cc19ca821070776217d28886e128a2d748ced6686773d3eca28",
+          "bytes": 1372
+        },
+        "mms-services-values/answers/int-empty.json": {
+          "sha256": "eb51292eb23779cd688bd9c536f4d434d81dc94ad75775f5a594f24b712b11aa",
+          "bytes": 43788
+        },
+        "mms-services-values/captures/int-empty.pcap": {
+          "sha256": "11f75cd0a4601a10fa13511227b14bb26548a892f54dbf81ae945e839b7cc42a",
+          "bytes": 1370
+        },
+        "mms-services-values/answers/redundant-positive.json": {
+          "sha256": "6bb993427d2792d6c88ff8a15756b983890edc8e4258426c9b7234213c6806a2",
+          "bytes": 43796
+        },
+        "mms-services-values/captures/redundant-positive.pcap": {
+          "sha256": "716d2c5cf69caac8f910873cb1345075cdbb8d96d3bdb5fc96bb3b6aa18993cb",
+          "bytes": 1372
+        },
+        "mms-services-values/answers/redundant-negative.json": {
+          "sha256": "0adfb6ca4c0671ecf1389eaa30c865451ea955af26d96f3e9e809ff44cca0d8f",
+          "bytes": 43796
+        },
+        "mms-services-values/captures/redundant-negative.pcap": {
+          "sha256": "08f3fe3280d9d8c4e0b100901cf33671fa0e87526aedc0bb91e0ccfb2caab16d",
+          "bytes": 1372
+        },
+        "mms-services-values/answers/negative-unsigned.json": {
+          "sha256": "27fdc9148ef4076fc0a1b5c30efaa7c5d1ef4202da6c66c43a96a582d1a4604e",
+          "bytes": 43792
+        },
+        "mms-services-values/captures/negative-unsigned.pcap": {
+          "sha256": "64b4b20751a57fc61e2cd3f9949238b2f05f89d09c6ba94169930001191ccfc4",
+          "bytes": 1371
+        },
+        "mms-services-values/answers/bit-unused8.json": {
+          "sha256": "e1d180acb29828c3dc4d66ef06b81122216d1a41f094ae8beae7f7415000e50d",
+          "bytes": 43796
+        },
+        "mms-services-values/captures/bit-unused8.pcap": {
+          "sha256": "a75f6139df6e318463f19aa4c94d4095bf42d7990a787334a37b5647ac8bc1ad",
+          "bytes": 1372
+        },
+        "mms-services-values/answers/bit-nonzero-padding.json": {
+          "sha256": "78453aad936dc62543228d8d0aa3b92a39a56897a46e99528454802a7926290e",
+          "bytes": 43796
+        },
+        "mms-services-values/captures/bit-nonzero-padding.pcap": {
+          "sha256": "958a860f86353066df424c7c86007d2f4b22f526705b734cfe3d10409852e022",
+          "bytes": 1372
+        },
+        "mms-services-values/answers/bad-visible.json": {
+          "sha256": "34416ae22069eb1c3982f11d5f46ef94e547c4c00ab876114f48b21639b4e8b8",
+          "bytes": 43792
+        },
+        "mms-services-values/captures/bad-visible.pcap": {
+          "sha256": "f09a3054f4a59394c05e5e37ea1d1b1b5670cf9e35e30ed3f66a3aef31629165",
+          "bytes": 1371
+        },
+        "mms-services-values/answers/bad-utf8.json": {
+          "sha256": "cf82b50efa53def629dd69035990e8aed8cb5d73acd74ceccbbefb0f448b8b67",
+          "bytes": 43800
+        },
+        "mms-services-values/captures/bad-utf8.pcap": {
+          "sha256": "fbb48a7666fd76dbdf112c31b5c33fc8e6cf8cc1363a06b572b9f679fddaf85d",
+          "bytes": 1373
+        },
+        "mms-services-values/answers/oid-empty.json": {
+          "sha256": "4d1dbc4c3d7c09c334ccd27221c52dcebde9794f1a5aa9a717b4d137a10f409a",
+          "bytes": 43788
+        },
+        "mms-services-values/captures/oid-empty.pcap": {
+          "sha256": "e77bac83f935404a4adc5ea290b7bebdb2649645f8cab5f52475a1bea4ecd4cf",
+          "bytes": 1370
+        },
+        "mms-services-values/answers/oid-unfinished.json": {
+          "sha256": "0a1b808b0135b80d23b0a063267e354b424afdfdc6dd23dab2f77e0e41d22700",
+          "bytes": 43792
+        },
+        "mms-services-values/captures/oid-unfinished.pcap": {
+          "sha256": "1ea77ee345e9b8053c1b4563bd4605ec39cee58f438d63031938a38f911da90f",
+          "bytes": 1371
+        },
+        "mms-services-values/answers/oid-nonminimal.json": {
+          "sha256": "bcd4a4b5fb38b319a6085b2a67fd209f22928a9a9a8619f029c6e7a9a54b56b3",
+          "bytes": 43796
+        },
+        "mms-services-values/captures/oid-nonminimal.pcap": {
+          "sha256": "cc58791bb79c9942c83c3ede754e03adda87aa242bfcda5bc345bf0711e6134a",
+          "bytes": 1372
+        },
+        "mms-services-values/answers/oid-wide.json": {
+          "sha256": "b037ce4aeb78a7552cf6247b6db7650a7c7879bcc937ca26a9fa3a217178c3fe",
+          "bytes": 43830
+        },
+        "mms-services-values/captures/oid-wide.pcap": {
+          "sha256": "2c4b2227b70510ba3ff2b0793aa2e54894c63e95b7fdb0b956c977b7648a7831",
+          "bytes": 1381
+        },
+        "mms-services-values/answers/time-length.json": {
+          "sha256": "1b12078c1eb22055bee06071b2c32e2e846feb4ccf461e9373f82bbcd96c6f38",
+          "bytes": 43808
+        },
+        "mms-services-values/captures/time-length.pcap": {
+          "sha256": "943886ecddca5b36abbd723bfb0836c29e9a3a37deb67a41d8d5ba408ce49fd1",
+          "bytes": 1375
+        },
+        "mms-services-values/answers/utc-length.json": {
+          "sha256": "a273d5c7e759f66d8b47344d141ef1ffd2477b9226dab742a94a87ab80a39288",
+          "bytes": 43816
+        },
+        "mms-services-values/captures/utc-length.pcap": {
+          "sha256": "718521ff392ef321c39fb72916efa769e4d428c444b910c8cace0f059da5a660",
+          "bytes": 1377
+        },
+        "mms-services-values/answers/unselected-float.json": {
+          "sha256": "b7843ee3376233e72708c388b944f06ca281050e6bd7a96cde6debc0591a1979",
+          "bytes": 43809
+        },
+        "mms-services-values/captures/unselected-float.pcap": {
+          "sha256": "c76e9f247bbc6e2d681ee77662c1050e1144ee64fa093e6e39910f7709e4ef69",
+          "bytes": 1373
+        },
+        "mms-services-values/answers/nested-access-error.json": {
+          "sha256": "a17b8a25a6ebf0f9f8369126b3584e79d177d887bdad3ccc8f2b9c345764cfdf",
+          "bytes": 43800
+        },
+        "mms-services-values/captures/nested-access-error.pcap": {
+          "sha256": "f4e3374a5855abc90415c6b011a26d59c26b5b67ebe1ead20e739cf0da5f7d90",
+          "bytes": 1373
+        },
+        "mms-services-values/answers/nesting-exceeds.json": {
+          "sha256": "1ca20233b4589bc3e5af786833ded206aea1103e14afc4bc99dcd1fd8c27e4ed",
+          "bytes": 43808
+        },
+        "mms-services-values/captures/nesting-exceeds.pcap": {
+          "sha256": "f8764a70669612c92ebf441cf56972f6f7f087370796dcb91301166cd6766d37",
+          "bytes": 1375
+        },
+        "mms-services-values/answers/wrong-cardinality.json": {
+          "sha256": "d4b4e3955c6a743cddd17baefd21ce936e004b0e6baea508835489c3f5a65589",
+          "bytes": 43804
+        },
+        "mms-services-values/captures/wrong-cardinality.pcap": {
+          "sha256": "9c95463443f1ab8235a535a58f2c2a8e0e7a18d0c710e88b379a4135db21e55c",
+          "bytes": 1374
+        },
+        "mms-services-values/answers/spec-missing.json": {
+          "sha256": "35b00fb897bbe2d907631e2627c8428131eafca9562d07d6895607d0ee20c32c",
+          "bytes": 44105
+        },
+        "mms-services-values/captures/spec-missing.pcap": {
+          "sha256": "e8c80109f557766b2881be467917f639a9ffd39981d10d0da54375d095b69504",
+          "bytes": 1374
+        },
+        "mms-services-values/answers/spec-unrequested.json": {
+          "sha256": "a1f02d1c48abd34c762185d066b34d9588c2a74632c8a6891f2ca4e7b5b5c013",
+          "bytes": 43880
+        },
+        "mms-services-values/captures/spec-unrequested.pcap": {
+          "sha256": "b1933fe581ae27770a79d3888e3398f1934dd3a9352377d0e6b10697750a4d6d",
+          "bytes": 1393
+        },
+        "mms-services-values/answers/spec-different.json": {
+          "sha256": "5d60bb31d5f6ba8a93502cb225d1aae90688aefd87898e48a938d1dea6f063fe",
+          "bytes": 44193
+        },
+        "mms-services-values/captures/spec-different.pcap": {
+          "sha256": "bf59b2200cf030bf29bff408a06ce1da992188b4643f2908b172ee38362ae22b",
+          "bytes": 1396
+        },
+        "mms-services-values/answers/identify-missing.json": {
+          "sha256": "b8a4b3774d15a4c5dca75839b244f225bf6affefc6185e1f128b691b68fb6573",
+          "bytes": 39584
+        },
+        "mms-services-values/captures/identify-missing.pcap": {
+          "sha256": "1f6db1fcc72ae48a9507d2b3e09e21ddc7e5e1ac10f6eb87de7cba451ac7f416",
+          "bytes": 1349
+        },
+        "mms-services-values/answers/identify-bad-text.json": {
+          "sha256": "8ef7a723e6391935340a7c934a2ef623940a10e9f0aa473fa721a4d4d930749e",
+          "bytes": 39600
+        },
+        "mms-services-values/captures/identify-bad-text.pcap": {
+          "sha256": "d7c2378abcf0739c090fe44f02f1c06cd2c91e3973e646c3b0f44b401a9b6b25",
+          "bytes": 1353
+        },
+        "mms-services-values/answers/status-localdetail129.json": {
+          "sha256": "e78cdfc88f403cf37edecdc9f0ff98bad693aa990694305039cc9f11d6a0df95",
+          "bytes": 39722
+        },
+        "mms-services-values/captures/status-localdetail129.pcap": {
+          "sha256": "84b48d7caa1b5783e0114c39f8302705fc79320ed11d75fd42a85bda4e3b4b0a",
+          "bytes": 1371
+        },
+        "mms-services-values/answers/status-code-unselected.json": {
+          "sha256": "b4ae4177f825573fc4a6ee36dbd3cf3953770bef98e8764fb0dda2ead9c7b052",
+          "bytes": 39651
+        },
+        "mms-services-values/captures/status-code-unselected.pcap": {
+          "sha256": "8c1c0d426833086d9f975897ef81eda2c392726e019714120d829c5055e52515",
+          "bytes": 1351
+        },
+        "mms-services-values/answers/identify-bad-request.json": {
+          "sha256": "73a52fc2732295076331a6374b41a6fae834cec924abb3ebbc67b628747bbf77",
+          "bytes": 36474
+        },
+        "mms-services-values/captures/identify-bad-request.pcap": {
+          "sha256": "d68bc90ae4076ae307e740c0071b81762566b651a53aa3c949832da2ca88169c",
+          "bytes": 1248
+        },
+        "mms-services-values/answers/status-bad-request.json": {
+          "sha256": "ef091ac6bfcbd58c14b4d2c0c2456e3add76d0b2a38500553ecd980a15cdb81f",
+          "bytes": 36470
+        },
+        "mms-services-values/captures/status-bad-request.pcap": {
+          "sha256": "7b285f5ae3e0c4f5c4176784a07ccb55b2abd222a4821857d01534dc1ba2f2b3",
+          "bytes": 1247
+        },
+        "mms-services-values/answers/calling-limit-zero.json": {
+          "sha256": "f3c2858c2e17166799e376e744278fabc338a4bf4f48fc0adf5d5d7512cd4e56",
+          "bytes": 36553
+        },
+        "mms-services-values/captures/calling-limit-zero.pcap": {
+          "sha256": "1390faf6e7c9a29928268f282978a0a9c2740154598d1974d11ea1bebc10b8e4",
+          "bytes": 1269
+        },
+        "mms-services-values/answers/zero-nesting-array.json": {
+          "sha256": "8b39c46c0e7b120156e23d8e33cca6b7e0ca4fa43f4cbb9045cb4b7f11d6fea8",
+          "bytes": 43788
+        },
+        "mms-services-values/captures/zero-nesting-array.pcap": {
+          "sha256": "a984d04fa06603a1453ce57a3554250cf819a592fcbfddda42b3bd0d03aa11a8",
+          "bytes": 1370
+        },
+        "mms-services-values/answers/malformed-float-type.json": {
+          "sha256": "93a445274dacd8d9a5844c05b3852e9c221f2135037a79ebd4ddcf049a861f85",
+          "bytes": 41708
+        },
+        "mms-services-values/captures/malformed-float-type.pcap": {
+          "sha256": "4821d844b736c7b66a1bf2eb3f8945a4ff5e4dfe57bd369af543179eef3ec770",
+          "bytes": 1370
+        },
+        "mms-services-values/answers/external-ber.json": {
+          "sha256": "3bd870a3784b8e3aef242acad81627f6a5fdee0e4304a13fb243175210ec1571",
+          "bytes": 51283
+        },
+        "mms-services-values/captures/external-ber.pcap": {
+          "sha256": "db4f9e96c50592a044e141d8398b8301127dfe75c4fef0a6c923227cfa47779f",
+          "bytes": 1452
+        },
+        "mms-services-values/answers/external-descriptor.json": {
+          "sha256": "5ec06138a97e4c481d26bf9e0e968c6c1e22421e25cc6d2b163a5cd60333c957",
+          "bytes": 52269
+        },
+        "mms-services-values/captures/external-descriptor.pcap": {
+          "sha256": "395ab4cf9c5fc46e3db13ac682a93144144f3a289246652cd037ee88a760f38a",
+          "bytes": 1463
+        },
+        "mms-services-values/answers/external-unselected-direct.json": {
+          "sha256": "898dd959852f67ba847b4c558544ed163d03ee82323a79d674cbeb54202948b7",
+          "bytes": 4741
+        },
+        "mms-services-values/captures/external-unselected-direct.pcap": {
+          "sha256": "960001cc8eda2cdde3b21d5ef9a5469f87a5c7da9f2e9174b669f91519f050bb",
+          "bytes": 1176
+        },
+        "mms-services-values/answers/external-duplicate-direct.json": {
+          "sha256": "d54aef4c6cac8ef0dfc31e29039267ca4aa4955634e5347f829391a8ea0c5344",
+          "bytes": 4758
+        },
+        "mms-services-values/captures/external-duplicate-direct.pcap": {
+          "sha256": "cfed3e02bb504d537cd5cd50f5a4ebb577488b3d7aa17d35dfe817b64ccd82ab",
+          "bytes": 1185
+        },
+        "mms-services-values/manifest.json": {
+          "sha256": "829f9ca6d366643035cac1729b1d08ea8c10b8d0d1b4c694b372d6930e779f1f",
+          "bytes": 57686
+        },
+        "mms-services-values/generate.py": {
+          "sha256": "386341bbfafa3d0b87fa081766b2e93b251fc4a8ea7be9baa08bc79287554e0b",
+          "bytes": 18072
+        },
+        "mms-services-values/verify.py": {
+          "sha256": "961e2ddd56f70ebb1806ad135f4938caf223406fdd336640bb51cccd693ab1c1",
+          "bytes": 1708
+        },
+        "mms-services-values/reference.py": {
+          "sha256": "c33ff8f68d5211c5877a45780bd6ff4fcb548dc8af2d36a80d708e3613dc26de",
+          "bytes": 7095
+        },
+        "mms-services-values/dependencies.json": {
+          "sha256": "979a6567727ca00b4d07740c7a22d26cfb9e13edc8ac614db4ecb893c4fd9705",
+          "bytes": 618
+        },
+        "mms-services-values/SOURCE-PINS.json": {
+          "sha256": "2930a9781cc812df9b272830d5b63b808ff68461491b0d7a174b714d476a7fba",
+          "bytes": 3142
+        },
+        "mms-services-values/check_go_test_json_v2.py": {
+          "sha256": "4f7cf9773dc4feff3a7e084b52ff92ad8fbb86bf08b4a46eff17a9e2230006b9",
+          "bytes": 5041
+        },
+        "mms-services-values/validator-differential.py": {
+          "sha256": "15cc6e427dbf72e7f321e95a4d4cafe3fe77964a00a605c177f493ab24f0ea86",
+          "bytes": 2328
+        },
+        "mms-services-values/seal.py": {
+          "sha256": "3b991ae91381fc338bba7b67a96900bc12247bef8aa2aceaef215bc2ef8835b5",
+          "bytes": 4212
+        },
+        "required-tests-traffic-unified-v41.json": {
+          "sha256": "5b55fe5cc5cc537cfe41378a0859fadd546dc12cebe637cf44301bd4626161fd",
+          "bytes": 5406032
+        },
+        "validation/expected.json": {
+          "sha256": "52a77e2a371eadaa4f9eac0c6313dc51da0d525cad33990740fa26f10cc2169d",
+          "bytes": 198486
+        }
+      },
+      "aliases": {
+        "common/pcapx/pcaputil/mms-services-values/answers/boolean-00.json": "mms-services-values/answers/boolean-00.json",
+        "common/pcapx/pcaputil/mms-services-values/captures/boolean-00.pcap": "mms-services-values/captures/boolean-00.pcap",
+        "common/pcapx/pcaputil/mms-services-values/answers/boolean-ff.json": "mms-services-values/answers/boolean-ff.json",
+        "common/pcapx/pcaputil/mms-services-values/captures/boolean-ff.pcap": "mms-services-values/captures/boolean-ff.pcap",
+        "common/pcapx/pcaputil/mms-services-values/answers/boolean-01.json": "mms-services-values/answers/boolean-01.json",
+        "common/pcapx/pcaputil/mms-services-values/captures/boolean-01.pcap": "mms-services-values/captures/boolean-01.pcap",
+        "common/pcapx/pcaputil/mms-services-values/answers/number-133-0.json": "mms-services-values/answers/number-133-0.json",
+        "common/pcapx/pcaputil/mms-services-values/captures/number-133-0.pcap": "mms-services-values/captures/number-133-0.pcap",
+        "common/pcapx/pcaputil/mms-services-values/answers/number-133-127.json": "mms-services-values/answers/number-133-127.json",
+        "common/pcapx/pcaputil/mms-services-values/captures/number-133-127.pcap": "mms-services-values/captures/number-133-127.pcap",
+        "common/pcapx/pcaputil/mms-services-values/answers/number-133-128.json": "mms-services-values/answers/number-133-128.json",
+        "common/pcapx/pcaputil/mms-services-values/captures/number-133-128.pcap": "mms-services-values/captures/number-133-128.pcap",
+        "common/pcapx/pcaputil/mms-services-values/answers/number-133-255.json": "mms-services-values/answers/number-133-255.json",
+        "common/pcapx/pcaputil/mms-services-values/captures/number-133-255.pcap": "mms-services-values/captures/number-133-255.pcap",
+        "common/pcapx/pcaputil/mms-services-values/answers/number-133-2147483647.json": "mms-services-values/answers/number-133-2147483647.json",
+        "common/pcapx/pcaputil/mms-services-values/captures/number-133-2147483647.pcap": "mms-services-values/captures/number-133-2147483647.pcap",
+        "common/pcapx/pcaputil/mms-services-values/answers/number-133-4294967295.json": "mms-services-values/answers/number-133-4294967295.json",
+        "common/pcapx/pcaputil/mms-services-values/captures/number-133-4294967295.pcap": "mms-services-values/captures/number-133-4294967295.pcap",
+        "common/pcapx/pcaputil/mms-services-values/answers/number-133-9223372036854775807.json": "mms-services-values/answers/number-133-9223372036854775807.json",
+        "common/pcapx/pcaputil/mms-services-values/captures/number-133-9223372036854775807.pcap": "mms-services-values/captures/number-133-9223372036854775807.pcap",
+        "common/pcapx/pcaputil/mms-services-values/answers/number-133-18446744073709551615.json": "mms-services-values/answers/number-133-18446744073709551615.json",
+        "common/pcapx/pcaputil/mms-services-values/captures/number-133-18446744073709551615.pcap": "mms-services-values/captures/number-133-18446744073709551615.pcap",
+        "common/pcapx/pcaputil/mms-services-values/answers/number-133-170141183460469231731687303715884105735.json": "mms-services-values/answers/number-133-170141183460469231731687303715884105735.json",
+        "common/pcapx/pcaputil/mms-services-values/captures/number-133-170141183460469231731687303715884105735.pcap": "mms-services-values/captures/number-133-170141183460469231731687303715884105735.pcap",
+        "common/pcapx/pcaputil/mms-services-values/answers/number-133-231584178474632390847141970017375815706539969331281128078915168015826259279875.json": "mms-services-values/answers/number-133-231584178474632390847141970017375815706539969331281128078915168015826259279875.json",
+        "common/pcapx/pcaputil/mms-services-values/captures/number-133-231584178474632390847141970017375815706539969331281128078915168015826259279875.pcap": "mms-services-values/captures/number-133-231584178474632390847141970017375815706539969331281128078915168015826259279875.pcap",
+        "common/pcapx/pcaputil/mms-services-values/answers/number-133--1.json": "mms-services-values/answers/number-133--1.json",
+        "common/pcapx/pcaputil/mms-services-values/captures/number-133--1.pcap": "mms-services-values/captures/number-133--1.pcap",
+        "common/pcapx/pcaputil/mms-services-values/answers/number-133--128.json": "mms-services-values/answers/number-133--128.json",
+        "common/pcapx/pcaputil/mms-services-values/captures/number-133--128.pcap": "mms-services-values/captures/number-133--128.pcap",
+        "common/pcapx/pcaputil/mms-services-values/answers/number-133--129.json": "mms-services-values/answers/number-133--129.json",
+        "common/pcapx/pcaputil/mms-services-values/captures/number-133--129.pcap": "mms-services-values/captures/number-133--129.pcap",
+        "common/pcapx/pcaputil/mms-services-values/answers/number-133--9223372036854775808.json": "mms-services-values/answers/number-133--9223372036854775808.json",
+        "common/pcapx/pcaputil/mms-services-values/captures/number-133--9223372036854775808.pcap": "mms-services-values/captures/number-133--9223372036854775808.pcap",
+        "common/pcapx/pcaputil/mms-services-values/answers/number-133--231584178474632390847141970017375815706539969331281128078915168015826259279872.json": "mms-services-values/answers/number-133--231584178474632390847141970017375815706539969331281128078915168015826259279872.json",
+        "common/pcapx/pcaputil/mms-services-values/captures/number-133--231584178474632390847141970017375815706539969331281128078915168015826259279872.pcap": "mms-services-values/captures/number-133--231584178474632390847141970017375815706539969331281128078915168015826259279872.pcap",
+        "common/pcapx/pcaputil/mms-services-values/answers/number-134-0.json": "mms-services-values/answers/number-134-0.json",
+        "common/pcapx/pcaputil/mms-services-values/captures/number-134-0.pcap": "mms-services-values/captures/number-134-0.pcap",
+        "common/pcapx/pcaputil/mms-services-values/answers/number-134-127.json": "mms-services-values/answers/number-134-127.json",
+        "common/pcapx/pcaputil/mms-services-values/captures/number-134-127.pcap": "mms-services-values/captures/number-134-127.pcap",
+        "common/pcapx/pcaputil/mms-services-values/answers/number-134-128.json": "mms-services-values/answers/number-134-128.json",
+        "common/pcapx/pcaputil/mms-services-values/captures/number-134-128.pcap": "mms-services-values/captures/number-134-128.pcap",
+        "common/pcapx/pcaputil/mms-services-values/answers/number-134-255.json": "mms-services-values/answers/number-134-255.json",
+        "common/pcapx/pcaputil/mms-services-values/captures/number-134-255.pcap": "mms-services-values/captures/number-134-255.pcap",
+        "common/pcapx/pcaputil/mms-services-values/answers/number-134-2147483647.json": "mms-services-values/answers/number-134-2147483647.json",
+        "common/pcapx/pcaputil/mms-services-values/captures/number-134-2147483647.pcap": "mms-services-values/captures/number-134-2147483647.pcap",
+        "common/pcapx/pcaputil/mms-services-values/answers/number-134-4294967295.json": "mms-services-values/answers/number-134-4294967295.json",
+        "common/pcapx/pcaputil/mms-services-values/captures/number-134-4294967295.pcap": "mms-services-values/captures/number-134-4294967295.pcap",
+        "common/pcapx/pcaputil/mms-services-values/answers/number-134-9223372036854775807.json": "mms-services-values/answers/number-134-9223372036854775807.json",
+        "common/pcapx/pcaputil/mms-services-values/captures/number-134-9223372036854775807.pcap": "mms-services-values/captures/number-134-9223372036854775807.pcap",
+        "common/pcapx/pcaputil/mms-services-values/answers/number-134-18446744073709551615.json": "mms-services-values/answers/number-134-18446744073709551615.json",
+        "common/pcapx/pcaputil/mms-services-values/captures/number-134-18446744073709551615.pcap": "mms-services-values/captures/number-134-18446744073709551615.pcap",
+        "common/pcapx/pcaputil/mms-services-values/answers/number-134-170141183460469231731687303715884105735.json": "mms-services-values/answers/number-134-170141183460469231731687303715884105735.json",
+        "common/pcapx/pcaputil/mms-services-values/captures/number-134-170141183460469231731687303715884105735.pcap": "mms-services-values/captures/number-134-170141183460469231731687303715884105735.pcap",
+        "common/pcapx/pcaputil/mms-services-values/answers/number-134-231584178474632390847141970017375815706539969331281128078915168015826259279875.json": "mms-services-values/answers/number-134-231584178474632390847141970017375815706539969331281128078915168015826259279875.json",
+        "common/pcapx/pcaputil/mms-services-values/captures/number-134-231584178474632390847141970017375815706539969331281128078915168015826259279875.pcap": "mms-services-values/captures/number-134-231584178474632390847141970017375815706539969331281128078915168015826259279875.pcap",
+        "common/pcapx/pcaputil/mms-services-values/answers/number-141-0.json": "mms-services-values/answers/number-141-0.json",
+        "common/pcapx/pcaputil/mms-services-values/captures/number-141-0.pcap": "mms-services-values/captures/number-141-0.pcap",
+        "common/pcapx/pcaputil/mms-services-values/answers/number-141-127.json": "mms-services-values/answers/number-141-127.json",
+        "common/pcapx/pcaputil/mms-services-values/captures/number-141-127.pcap": "mms-services-values/captures/number-141-127.pcap",
+        "common/pcapx/pcaputil/mms-services-values/answers/number-141-128.json": "mms-services-values/answers/number-141-128.json",
+        "common/pcapx/pcaputil/mms-services-values/captures/number-141-128.pcap": "mms-services-values/captures/number-141-128.pcap",
+        "common/pcapx/pcaputil/mms-services-values/answers/number-141-255.json": "mms-services-values/answers/number-141-255.json",
+        "common/pcapx/pcaputil/mms-services-values/captures/number-141-255.pcap": "mms-services-values/captures/number-141-255.pcap",
+        "common/pcapx/pcaputil/mms-services-values/answers/number-141-2147483647.json": "mms-services-values/answers/number-141-2147483647.json",
+        "common/pcapx/pcaputil/mms-services-values/captures/number-141-2147483647.pcap": "mms-services-values/captures/number-141-2147483647.pcap",
+        "common/pcapx/pcaputil/mms-services-values/answers/number-141-4294967295.json": "mms-services-values/answers/number-141-4294967295.json",
+        "common/pcapx/pcaputil/mms-services-values/captures/number-141-4294967295.pcap": "mms-services-values/captures/number-141-4294967295.pcap",
+        "common/pcapx/pcaputil/mms-services-values/answers/number-141-9223372036854775807.json": "mms-services-values/answers/number-141-9223372036854775807.json",
+        "common/pcapx/pcaputil/mms-services-values/captures/number-141-9223372036854775807.pcap": "mms-services-values/captures/number-141-9223372036854775807.pcap",
+        "common/pcapx/pcaputil/mms-services-values/answers/number-141-18446744073709551615.json": "mms-services-values/answers/number-141-18446744073709551615.json",
+        "common/pcapx/pcaputil/mms-services-values/captures/number-141-18446744073709551615.pcap": "mms-services-values/captures/number-141-18446744073709551615.pcap",
+        "common/pcapx/pcaputil/mms-services-values/answers/number-141-170141183460469231731687303715884105735.json": "mms-services-values/answers/number-141-170141183460469231731687303715884105735.json",
+        "common/pcapx/pcaputil/mms-services-values/captures/number-141-170141183460469231731687303715884105735.pcap": "mms-services-values/captures/number-141-170141183460469231731687303715884105735.pcap",
+        "common/pcapx/pcaputil/mms-services-values/answers/number-141-231584178474632390847141970017375815706539969331281128078915168015826259279875.json": "mms-services-values/answers/number-141-231584178474632390847141970017375815706539969331281128078915168015826259279875.json",
+        "common/pcapx/pcaputil/mms-services-values/captures/number-141-231584178474632390847141970017375815706539969331281128078915168015826259279875.pcap": "mms-services-values/captures/number-141-231584178474632390847141970017375815706539969331281128078915168015826259279875.pcap",
+        "common/pcapx/pcaputil/mms-services-values/answers/number-141--1.json": "mms-services-values/answers/number-141--1.json",
+        "common/pcapx/pcaputil/mms-services-values/captures/number-141--1.pcap": "mms-services-values/captures/number-141--1.pcap",
+        "common/pcapx/pcaputil/mms-services-values/answers/number-141--128.json": "mms-services-values/answers/number-141--128.json",
+        "common/pcapx/pcaputil/mms-services-values/captures/number-141--128.pcap": "mms-services-values/captures/number-141--128.pcap",
+        "common/pcapx/pcaputil/mms-services-values/answers/number-141--129.json": "mms-services-values/answers/number-141--129.json",
+        "common/pcapx/pcaputil/mms-services-values/captures/number-141--129.pcap": "mms-services-values/captures/number-141--129.pcap",
+        "common/pcapx/pcaputil/mms-services-values/answers/number-141--9223372036854775808.json": "mms-services-values/answers/number-141--9223372036854775808.json",
+        "common/pcapx/pcaputil/mms-services-values/captures/number-141--9223372036854775808.pcap": "mms-services-values/captures/number-141--9223372036854775808.pcap",
+        "common/pcapx/pcaputil/mms-services-values/answers/number-141--231584178474632390847141970017375815706539969331281128078915168015826259279872.json": "mms-services-values/answers/number-141--231584178474632390847141970017375815706539969331281128078915168015826259279872.json",
+        "common/pcapx/pcaputil/mms-services-values/captures/number-141--231584178474632390847141970017375815706539969331281128078915168015826259279872.pcap": "mms-services-values/captures/number-141--231584178474632390847141970017375815706539969331281128078915168015826259279872.pcap",
+        "common/pcapx/pcaputil/mms-services-values/answers/float-32-0x0.json": "mms-services-values/answers/float-32-0x0.json",
+        "common/pcapx/pcaputil/mms-services-values/captures/float-32-0x0.pcap": "mms-services-values/captures/float-32-0x0.pcap",
+        "common/pcapx/pcaputil/mms-services-values/answers/float-32-0x80000000.json": "mms-services-values/answers/float-32-0x80000000.json",
+        "common/pcapx/pcaputil/mms-services-values/captures/float-32-0x80000000.pcap": "mms-services-values/captures/float-32-0x80000000.pcap",
+        "common/pcapx/pcaputil/mms-services-values/answers/float-32-0x3fc00000.json": "mms-services-values/answers/float-32-0x3fc00000.json",
+        "common/pcapx/pcaputil/mms-services-values/captures/float-32-0x3fc00000.pcap": "mms-services-values/captures/float-32-0x3fc00000.pcap",
+        "common/pcapx/pcaputil/mms-services-values/answers/float-32-0xc0200000.json": "mms-services-values/answers/float-32-0xc0200000.json",
+        "common/pcapx/pcaputil/mms-services-values/captures/float-32-0xc0200000.pcap": "mms-services-values/captures/float-32-0xc0200000.pcap",
+        "common/pcapx/pcaputil/mms-services-values/answers/float-32-0x7f800000.json": "mms-services-values/answers/float-32-0x7f800000.json",
+        "common/pcapx/pcaputil/mms-services-values/captures/float-32-0x7f800000.pcap": "mms-services-values/captures/float-32-0x7f800000.pcap",
+        "common/pcapx/pcaputil/mms-services-values/answers/float-32-0xff800000.json": "mms-services-values/answers/float-32-0xff800000.json",
+        "common/pcapx/pcaputil/mms-services-values/captures/float-32-0xff800000.pcap": "mms-services-values/captures/float-32-0xff800000.pcap",
+        "common/pcapx/pcaputil/mms-services-values/answers/float-32-0x7fc00001.json": "mms-services-values/answers/float-32-0x7fc00001.json",
+        "common/pcapx/pcaputil/mms-services-values/captures/float-32-0x7fc00001.pcap": "mms-services-values/captures/float-32-0x7fc00001.pcap",
+        "common/pcapx/pcaputil/mms-services-values/answers/float-32-0xff800001.json": "mms-services-values/answers/float-32-0xff800001.json",
+        "common/pcapx/pcaputil/mms-services-values/captures/float-32-0xff800001.pcap": "mms-services-values/captures/float-32-0xff800001.pcap",
+        "common/pcapx/pcaputil/mms-services-values/answers/float-32-0x1.json": "mms-services-values/answers/float-32-0x1.json",
+        "common/pcapx/pcaputil/mms-services-values/captures/float-32-0x1.pcap": "mms-services-values/captures/float-32-0x1.pcap",
+        "common/pcapx/pcaputil/mms-services-values/answers/float-32-0x7f7fffff.json": "mms-services-values/answers/float-32-0x7f7fffff.json",
+        "common/pcapx/pcaputil/mms-services-values/captures/float-32-0x7f7fffff.pcap": "mms-services-values/captures/float-32-0x7f7fffff.pcap",
+        "common/pcapx/pcaputil/mms-services-values/answers/float-64-0x0.json": "mms-services-values/answers/float-64-0x0.json",
+        "common/pcapx/pcaputil/mms-services-values/captures/float-64-0x0.pcap": "mms-services-values/captures/float-64-0x0.pcap",
+        "common/pcapx/pcaputil/mms-services-values/answers/float-64-0x8000000000000000.json": "mms-services-values/answers/float-64-0x8000000000000000.json",
+        "common/pcapx/pcaputil/mms-services-values/captures/float-64-0x8000000000000000.pcap": "mms-services-values/captures/float-64-0x8000000000000000.pcap",
+        "common/pcapx/pcaputil/mms-services-values/answers/float-64-0x3ff8000000000000.json": "mms-services-values/answers/float-64-0x3ff8000000000000.json",
+        "common/pcapx/pcaputil/mms-services-values/captures/float-64-0x3ff8000000000000.pcap": "mms-services-values/captures/float-64-0x3ff8000000000000.pcap",
+        "common/pcapx/pcaputil/mms-services-values/answers/float-64-0xc004000000000000.json": "mms-services-values/answers/float-64-0xc004000000000000.json",
+        "common/pcapx/pcaputil/mms-services-values/captures/float-64-0xc004000000000000.pcap": "mms-services-values/captures/float-64-0xc004000000000000.pcap",
+        "common/pcapx/pcaputil/mms-services-values/answers/float-64-0x7ff0000000000000.json": "mms-services-values/answers/float-64-0x7ff0000000000000.json",
+        "common/pcapx/pcaputil/mms-services-values/captures/float-64-0x7ff0000000000000.pcap": "mms-services-values/captures/float-64-0x7ff0000000000000.pcap",
+        "common/pcapx/pcaputil/mms-services-values/answers/float-64-0xfff0000000000000.json": "mms-services-values/answers/float-64-0xfff0000000000000.json",
+        "common/pcapx/pcaputil/mms-services-values/captures/float-64-0xfff0000000000000.pcap": "mms-services-values/captures/float-64-0xfff0000000000000.pcap",
+        "common/pcapx/pcaputil/mms-services-values/answers/float-64-0x7ff8000000000001.json": "mms-services-values/answers/float-64-0x7ff8000000000001.json",
+        "common/pcapx/pcaputil/mms-services-values/captures/float-64-0x7ff8000000000001.pcap": "mms-services-values/captures/float-64-0x7ff8000000000001.pcap",
+        "common/pcapx/pcaputil/mms-services-values/answers/float-64-0x1.json": "mms-services-values/answers/float-64-0x1.json",
+        "common/pcapx/pcaputil/mms-services-values/captures/float-64-0x1.pcap": "mms-services-values/captures/float-64-0x1.pcap",
+        "common/pcapx/pcaputil/mms-services-values/answers/float-64-0x7fefffffffffffff.json": "mms-services-values/answers/float-64-0x7fefffffffffffff.json",
+        "common/pcapx/pcaputil/mms-services-values/captures/float-64-0x7fefffffffffffff.pcap": "mms-services-values/captures/float-64-0x7fefffffffffffff.pcap",
+        "common/pcapx/pcaputil/mms-services-values/answers/bits-132-0.json": "mms-services-values/answers/bits-132-0.json",
+        "common/pcapx/pcaputil/mms-services-values/captures/bits-132-0.pcap": "mms-services-values/captures/bits-132-0.pcap",
+        "common/pcapx/pcaputil/mms-services-values/answers/bits-142-0.json": "mms-services-values/answers/bits-142-0.json",
+        "common/pcapx/pcaputil/mms-services-values/captures/bits-142-0.pcap": "mms-services-values/captures/bits-142-0.pcap",
+        "common/pcapx/pcaputil/mms-services-values/answers/bits-132-1.json": "mms-services-values/answers/bits-132-1.json",
+        "common/pcapx/pcaputil/mms-services-values/captures/bits-132-1.pcap": "mms-services-values/captures/bits-132-1.pcap",
+        "common/pcapx/pcaputil/mms-services-values/answers/bits-142-1.json": "mms-services-values/answers/bits-142-1.json",
+        "common/pcapx/pcaputil/mms-services-values/captures/bits-142-1.pcap": "mms-services-values/captures/bits-142-1.pcap",
+        "common/pcapx/pcaputil/mms-services-values/answers/bits-132-7.json": "mms-services-values/answers/bits-132-7.json",
+        "common/pcapx/pcaputil/mms-services-values/captures/bits-132-7.pcap": "mms-services-values/captures/bits-132-7.pcap",
+        "common/pcapx/pcaputil/mms-services-values/answers/bits-142-7.json": "mms-services-values/answers/bits-142-7.json",
+        "common/pcapx/pcaputil/mms-services-values/captures/bits-142-7.pcap": "mms-services-values/captures/bits-142-7.pcap",
+        "common/pcapx/pcaputil/mms-services-values/answers/bits-132-8.json": "mms-services-values/answers/bits-132-8.json",
+        "common/pcapx/pcaputil/mms-services-values/captures/bits-132-8.pcap": "mms-services-values/captures/bits-132-8.pcap",
+        "common/pcapx/pcaputil/mms-services-values/answers/bits-142-8.json": "mms-services-values/answers/bits-142-8.json",
+        "common/pcapx/pcaputil/mms-services-values/captures/bits-142-8.pcap": "mms-services-values/captures/bits-142-8.pcap",
+        "common/pcapx/pcaputil/mms-services-values/answers/bits-132-9.json": "mms-services-values/answers/bits-132-9.json",
+        "common/pcapx/pcaputil/mms-services-values/captures/bits-132-9.pcap": "mms-services-values/captures/bits-132-9.pcap",
+        "common/pcapx/pcaputil/mms-services-values/answers/bits-142-9.json": "mms-services-values/answers/bits-142-9.json",
+        "common/pcapx/pcaputil/mms-services-values/captures/bits-142-9.pcap": "mms-services-values/captures/bits-142-9.pcap",
+        "common/pcapx/pcaputil/mms-services-values/answers/bits-132-16.json": "mms-services-values/answers/bits-132-16.json",
+        "common/pcapx/pcaputil/mms-services-values/captures/bits-132-16.pcap": "mms-services-values/captures/bits-132-16.pcap",
+        "common/pcapx/pcaputil/mms-services-values/answers/bits-142-16.json": "mms-services-values/answers/bits-142-16.json",
+        "common/pcapx/pcaputil/mms-services-values/captures/bits-142-16.pcap": "mms-services-values/captures/bits-142-16.pcap",
+        "common/pcapx/pcaputil/mms-services-values/answers/bits-132-128.json": "mms-services-values/answers/bits-132-128.json",
+        "common/pcapx/pcaputil/mms-services-values/captures/bits-132-128.pcap": "mms-services-values/captures/bits-132-128.pcap",
+        "common/pcapx/pcaputil/mms-services-values/answers/bits-142-128.json": "mms-services-values/answers/bits-142-128.json",
+        "common/pcapx/pcaputil/mms-services-values/captures/bits-142-128.pcap": "mms-services-values/captures/bits-142-128.pcap",
+        "common/pcapx/pcaputil/mms-services-values/answers/octets-0.json": "mms-services-values/answers/octets-0.json",
+        "common/pcapx/pcaputil/mms-services-values/captures/octets-0.pcap": "mms-services-values/captures/octets-0.pcap",
+        "common/pcapx/pcaputil/mms-services-values/answers/octets-2.json": "mms-services-values/answers/octets-2.json",
+        "common/pcapx/pcaputil/mms-services-values/captures/octets-2.pcap": "mms-services-values/captures/octets-2.pcap",
+        "common/pcapx/pcaputil/mms-services-values/answers/octets-128.json": "mms-services-values/answers/octets-128.json",
+        "common/pcapx/pcaputil/mms-services-values/captures/octets-128.pcap": "mms-services-values/captures/octets-128.pcap",
+        "common/pcapx/pcaputil/mms-services-values/answers/text-138-.json": "mms-services-values/answers/text-138-.json",
+        "common/pcapx/pcaputil/mms-services-values/captures/text-138-.pcap": "mms-services-values/captures/text-138-.pcap",
+        "common/pcapx/pcaputil/mms-services-values/answers/text-138-4c41422076616c75657e.json": "mms-services-values/answers/text-138-4c41422076616c75657e.json",
+        "common/pcapx/pcaputil/mms-services-values/captures/text-138-4c41422076616c75657e.pcap": "mms-services-values/captures/text-138-4c41422076616c75657e.pcap",
+        "common/pcapx/pcaputil/mms-services-values/answers/text-144-.json": "mms-services-values/answers/text-144-.json",
+        "common/pcapx/pcaputil/mms-services-values/captures/text-144-.pcap": "mms-services-values/captures/text-144-.pcap",
+        "common/pcapx/pcaputil/mms-services-values/answers/text-144-00.json": "mms-services-values/answers/text-144-00.json",
+        "common/pcapx/pcaputil/mms-services-values/captures/text-144-00.pcap": "mms-services-values/captures/text-144-00.pcap",
+        "common/pcapx/pcaputil/mms-services-values/answers/text-144-e794b5e58a9be29aa1.json": "mms-services-values/answers/text-144-e794b5e58a9be29aa1.json",
+        "common/pcapx/pcaputil/mms-services-values/captures/text-144-e794b5e58a9be29aa1.pcap": "mms-services-values/captures/text-144-e794b5e58a9be29aa1.pcap",
+        "common/pcapx/pcaputil/mms-services-values/answers/binary-time-00000000.json": "mms-services-values/answers/binary-time-00000000.json",
+        "common/pcapx/pcaputil/mms-services-values/captures/binary-time-00000000.pcap": "mms-services-values/captures/binary-time-00000000.pcap",
+        "common/pcapx/pcaputil/mms-services-values/answers/binary-time-05265bff.json": "mms-services-values/answers/binary-time-05265bff.json",
+        "common/pcapx/pcaputil/mms-services-values/captures/binary-time-05265bff.pcap": "mms-services-values/captures/binary-time-05265bff.pcap",
+        "common/pcapx/pcaputil/mms-services-values/answers/binary-time-000000000000.json": "mms-services-values/answers/binary-time-000000000000.json",
+        "common/pcapx/pcaputil/mms-services-values/captures/binary-time-000000000000.pcap": "mms-services-values/captures/binary-time-000000000000.pcap",
+        "common/pcapx/pcaputil/mms-services-values/answers/binary-time-000004d20001.json": "mms-services-values/answers/binary-time-000004d20001.json",
+        "common/pcapx/pcaputil/mms-services-values/captures/binary-time-000004d20001.pcap": "mms-services-values/captures/binary-time-000004d20001.pcap",
+        "common/pcapx/pcaputil/mms-services-values/answers/binary-time-ffffffffffff.json": "mms-services-values/answers/binary-time-ffffffffffff.json",
+        "common/pcapx/pcaputil/mms-services-values/captures/binary-time-ffffffffffff.pcap": "mms-services-values/captures/binary-time-ffffffffffff.pcap",
+        "common/pcapx/pcaputil/mms-services-values/answers/utc-0000000000000000.json": "mms-services-values/answers/utc-0000000000000000.json",
+        "common/pcapx/pcaputil/mms-services-values/captures/utc-0000000000000000.pcap": "mms-services-values/captures/utc-0000000000000000.pcap",
+        "common/pcapx/pcaputil/mms-services-values/answers/utc-010203048000000a.json": "mms-services-values/answers/utc-010203048000000a.json",
+        "common/pcapx/pcaputil/mms-services-values/captures/utc-010203048000000a.pcap": "mms-services-values/captures/utc-010203048000000a.pcap",
+        "common/pcapx/pcaputil/mms-services-values/answers/utc-ffffffffffffffef.json": "mms-services-values/answers/utc-ffffffffffffffef.json",
+        "common/pcapx/pcaputil/mms-services-values/captures/utc-ffffffffffffffef.pcap": "mms-services-values/captures/utc-ffffffffffffffef.pcap",
+        "common/pcapx/pcaputil/mms-services-values/answers/oid-00.json": "mms-services-values/answers/oid-00.json",
+        "common/pcapx/pcaputil/mms-services-values/captures/oid-00.pcap": "mms-services-values/captures/oid-00.pcap",
+        "common/pcapx/pcaputil/mms-services-values/answers/oid-2a030405.json": "mms-services-values/answers/oid-2a030405.json",
+        "common/pcapx/pcaputil/mms-services-values/captures/oid-2a030405.pcap": "mms-services-values/captures/oid-2a030405.pcap",
+        "common/pcapx/pcaputil/mms-services-values/answers/oid-883703.json": "mms-services-values/answers/oid-883703.json",
+        "common/pcapx/pcaputil/mms-services-values/captures/oid-883703.pcap": "mms-services-values/captures/oid-883703.pcap",
+        "common/pcapx/pcaputil/mms-services-values/answers/oid-2b0601040186a035.json": "mms-services-values/answers/oid-2b0601040186a035.json",
+        "common/pcapx/pcaputil/mms-services-values/captures/oid-2b0601040186a035.pcap": "mms-services-values/captures/oid-2b0601040186a035.pcap",
+        "common/pcapx/pcaputil/mms-services-values/answers/mixed-success-failure.json": "mms-services-values/answers/mixed-success-failure.json",
+        "common/pcapx/pcaputil/mms-services-values/captures/mixed-success-failure.pcap": "mms-services-values/captures/mixed-success-failure.pcap",
+        "common/pcapx/pcaputil/mms-services-values/answers/container-161-0.json": "mms-services-values/answers/container-161-0.json",
+        "common/pcapx/pcaputil/mms-services-values/captures/container-161-0.pcap": "mms-services-values/captures/container-161-0.pcap",
+        "common/pcapx/pcaputil/mms-services-values/answers/container-161-10.json": "mms-services-values/answers/container-161-10.json",
+        "common/pcapx/pcaputil/mms-services-values/captures/container-161-10.pcap": "mms-services-values/captures/container-161-10.pcap",
+        "common/pcapx/pcaputil/mms-services-values/answers/container-162-0.json": "mms-services-values/answers/container-162-0.json",
+        "common/pcapx/pcaputil/mms-services-values/captures/container-162-0.pcap": "mms-services-values/captures/container-162-0.pcap",
+        "common/pcapx/pcaputil/mms-services-values/answers/container-162-10.json": "mms-services-values/answers/container-162-10.json",
+        "common/pcapx/pcaputil/mms-services-values/captures/container-162-10.pcap": "mms-services-values/captures/container-162-10.pcap",
+        "common/pcapx/pcaputil/mms-services-values/answers/nested-1.json": "mms-services-values/answers/nested-1.json",
+        "common/pcapx/pcaputil/mms-services-values/captures/nested-1.pcap": "mms-services-values/captures/nested-1.pcap",
+        "common/pcapx/pcaputil/mms-services-values/answers/nested-3.json": "mms-services-values/answers/nested-3.json",
+        "common/pcapx/pcaputil/mms-services-values/captures/nested-3.pcap": "mms-services-values/captures/nested-3.pcap",
+        "common/pcapx/pcaputil/mms-services-values/answers/nested-5.json": "mms-services-values/answers/nested-5.json",
+        "common/pcapx/pcaputil/mms-services-values/captures/nested-5.pcap": "mms-services-values/captures/nested-5.pcap",
+        "common/pcapx/pcaputil/mms-services-values/answers/returned-spec-domain.json": "mms-services-values/answers/returned-spec-domain.json",
+        "common/pcapx/pcaputil/mms-services-values/captures/returned-spec-domain.pcap": "mms-services-values/captures/returned-spec-domain.pcap",
+        "common/pcapx/pcaputil/mms-services-values/answers/returned-spec-vmd.json": "mms-services-values/answers/returned-spec-vmd.json",
+        "common/pcapx/pcaputil/mms-services-values/captures/returned-spec-vmd.pcap": "mms-services-values/captures/returned-spec-vmd.pcap",
+        "common/pcapx/pcaputil/mms-services-values/answers/returned-spec-aa.json": "mms-services-values/answers/returned-spec-aa.json",
+        "common/pcapx/pcaputil/mms-services-values/captures/returned-spec-aa.pcap": "mms-services-values/captures/returned-spec-aa.pcap",
+        "common/pcapx/pcaputil/mms-services-values/answers/status-00.json": "mms-services-values/answers/status-00.json",
+        "common/pcapx/pcaputil/mms-services-values/captures/status-00.pcap": "mms-services-values/captures/status-00.pcap",
+        "common/pcapx/pcaputil/mms-services-values/answers/status-ff.json": "mms-services-values/answers/status-ff.json",
+        "common/pcapx/pcaputil/mms-services-values/captures/status-ff.pcap": "mms-services-values/captures/status-ff.pcap",
+        "common/pcapx/pcaputil/mms-services-values/answers/identify-3.json": "mms-services-values/answers/identify-3.json",
+        "common/pcapx/pcaputil/mms-services-values/captures/identify-3.pcap": "mms-services-values/captures/identify-3.pcap",
+        "common/pcapx/pcaputil/mms-services-values/answers/identify-0.json": "mms-services-values/answers/identify-0.json",
+        "common/pcapx/pcaputil/mms-services-values/captures/identify-0.pcap": "mms-services-values/captures/identify-0.pcap",
+        "common/pcapx/pcaputil/mms-services-values/answers/type-0.json": "mms-services-values/answers/type-0.json",
+        "common/pcapx/pcaputil/mms-services-values/captures/type-0.pcap": "mms-services-values/captures/type-0.pcap",
+        "common/pcapx/pcaputil/mms-services-values/answers/type-1.json": "mms-services-values/answers/type-1.json",
+        "common/pcapx/pcaputil/mms-services-values/captures/type-1.pcap": "mms-services-values/captures/type-1.pcap",
+        "common/pcapx/pcaputil/mms-services-values/answers/type-2.json": "mms-services-values/answers/type-2.json",
+        "common/pcapx/pcaputil/mms-services-values/captures/type-2.pcap": "mms-services-values/captures/type-2.pcap",
+        "common/pcapx/pcaputil/mms-services-values/answers/type-3.json": "mms-services-values/answers/type-3.json",
+        "common/pcapx/pcaputil/mms-services-values/captures/type-3.pcap": "mms-services-values/captures/type-3.pcap",
+        "common/pcapx/pcaputil/mms-services-values/answers/type-4.json": "mms-services-values/answers/type-4.json",
+        "common/pcapx/pcaputil/mms-services-values/captures/type-4.pcap": "mms-services-values/captures/type-4.pcap",
+        "common/pcapx/pcaputil/mms-services-values/answers/type-5.json": "mms-services-values/answers/type-5.json",
+        "common/pcapx/pcaputil/mms-services-values/captures/type-5.pcap": "mms-services-values/captures/type-5.pcap",
+        "common/pcapx/pcaputil/mms-services-values/answers/type-6.json": "mms-services-values/answers/type-6.json",
+        "common/pcapx/pcaputil/mms-services-values/captures/type-6.pcap": "mms-services-values/captures/type-6.pcap",
+        "common/pcapx/pcaputil/mms-services-values/answers/type-7.json": "mms-services-values/answers/type-7.json",
+        "common/pcapx/pcaputil/mms-services-values/captures/type-7.pcap": "mms-services-values/captures/type-7.pcap",
+        "common/pcapx/pcaputil/mms-services-values/answers/type-8.json": "mms-services-values/answers/type-8.json",
+        "common/pcapx/pcaputil/mms-services-values/captures/type-8.pcap": "mms-services-values/captures/type-8.pcap",
+        "common/pcapx/pcaputil/mms-services-values/answers/type-9.json": "mms-services-values/answers/type-9.json",
+        "common/pcapx/pcaputil/mms-services-values/captures/type-9.pcap": "mms-services-values/captures/type-9.pcap",
+        "common/pcapx/pcaputil/mms-services-values/answers/type-10.json": "mms-services-values/answers/type-10.json",
+        "common/pcapx/pcaputil/mms-services-values/captures/type-10.pcap": "mms-services-values/captures/type-10.pcap",
+        "common/pcapx/pcaputil/mms-services-values/answers/type-11.json": "mms-services-values/answers/type-11.json",
+        "common/pcapx/pcaputil/mms-services-values/captures/type-11.pcap": "mms-services-values/captures/type-11.pcap",
+        "common/pcapx/pcaputil/mms-services-values/answers/type-12.json": "mms-services-values/answers/type-12.json",
+        "common/pcapx/pcaputil/mms-services-values/captures/type-12.pcap": "mms-services-values/captures/type-12.pcap",
+        "common/pcapx/pcaputil/mms-services-values/answers/extended-type-0.json": "mms-services-values/answers/extended-type-0.json",
+        "common/pcapx/pcaputil/mms-services-values/captures/extended-type-0.pcap": "mms-services-values/captures/extended-type-0.pcap",
+        "common/pcapx/pcaputil/mms-services-values/answers/extended-type-1.json": "mms-services-values/answers/extended-type-1.json",
+        "common/pcapx/pcaputil/mms-services-values/captures/extended-type-1.pcap": "mms-services-values/captures/extended-type-1.pcap",
+        "common/pcapx/pcaputil/mms-services-values/answers/extended-type-2.json": "mms-services-values/answers/extended-type-2.json",
+        "common/pcapx/pcaputil/mms-services-values/captures/extended-type-2.pcap": "mms-services-values/captures/extended-type-2.pcap",
+        "common/pcapx/pcaputil/mms-services-values/answers/extended-type-3.json": "mms-services-values/answers/extended-type-3.json",
+        "common/pcapx/pcaputil/mms-services-values/captures/extended-type-3.pcap": "mms-services-values/captures/extended-type-3.pcap",
+        "common/pcapx/pcaputil/mms-services-values/answers/zero-nesting-scalar.json": "mms-services-values/answers/zero-nesting-scalar.json",
+        "common/pcapx/pcaputil/mms-services-values/captures/zero-nesting-scalar.pcap": "mms-services-values/captures/zero-nesting-scalar.pcap",
+        "common/pcapx/pcaputil/mms-services-values/answers/association-start-without-cotp.json": "mms-services-values/answers/association-start-without-cotp.json",
+        "common/pcapx/pcaputil/mms-services-values/captures/association-start-without-cotp.pcap": "mms-services-values/captures/association-start-without-cotp.pcap",
+        "common/pcapx/pcaputil/mms-services-values/answers/bool-empty.json": "mms-services-values/answers/bool-empty.json",
+        "common/pcapx/pcaputil/mms-services-values/captures/bool-empty.pcap": "mms-services-values/captures/bool-empty.pcap",
+        "common/pcapx/pcaputil/mms-services-values/answers/bool-long.json": "mms-services-values/answers/bool-long.json",
+        "common/pcapx/pcaputil/mms-services-values/captures/bool-long.pcap": "mms-services-values/captures/bool-long.pcap",
+        "common/pcapx/pcaputil/mms-services-values/answers/int-empty.json": "mms-services-values/answers/int-empty.json",
+        "common/pcapx/pcaputil/mms-services-values/captures/int-empty.pcap": "mms-services-values/captures/int-empty.pcap",
+        "common/pcapx/pcaputil/mms-services-values/answers/redundant-positive.json": "mms-services-values/answers/redundant-positive.json",
+        "common/pcapx/pcaputil/mms-services-values/captures/redundant-positive.pcap": "mms-services-values/captures/redundant-positive.pcap",
+        "common/pcapx/pcaputil/mms-services-values/answers/redundant-negative.json": "mms-services-values/answers/redundant-negative.json",
+        "common/pcapx/pcaputil/mms-services-values/captures/redundant-negative.pcap": "mms-services-values/captures/redundant-negative.pcap",
+        "common/pcapx/pcaputil/mms-services-values/answers/negative-unsigned.json": "mms-services-values/answers/negative-unsigned.json",
+        "common/pcapx/pcaputil/mms-services-values/captures/negative-unsigned.pcap": "mms-services-values/captures/negative-unsigned.pcap",
+        "common/pcapx/pcaputil/mms-services-values/answers/bit-unused8.json": "mms-services-values/answers/bit-unused8.json",
+        "common/pcapx/pcaputil/mms-services-values/captures/bit-unused8.pcap": "mms-services-values/captures/bit-unused8.pcap",
+        "common/pcapx/pcaputil/mms-services-values/answers/bit-nonzero-padding.json": "mms-services-values/answers/bit-nonzero-padding.json",
+        "common/pcapx/pcaputil/mms-services-values/captures/bit-nonzero-padding.pcap": "mms-services-values/captures/bit-nonzero-padding.pcap",
+        "common/pcapx/pcaputil/mms-services-values/answers/bad-visible.json": "mms-services-values/answers/bad-visible.json",
+        "common/pcapx/pcaputil/mms-services-values/captures/bad-visible.pcap": "mms-services-values/captures/bad-visible.pcap",
+        "common/pcapx/pcaputil/mms-services-values/answers/bad-utf8.json": "mms-services-values/answers/bad-utf8.json",
+        "common/pcapx/pcaputil/mms-services-values/captures/bad-utf8.pcap": "mms-services-values/captures/bad-utf8.pcap",
+        "common/pcapx/pcaputil/mms-services-values/answers/oid-empty.json": "mms-services-values/answers/oid-empty.json",
+        "common/pcapx/pcaputil/mms-services-values/captures/oid-empty.pcap": "mms-services-values/captures/oid-empty.pcap",
+        "common/pcapx/pcaputil/mms-services-values/answers/oid-unfinished.json": "mms-services-values/answers/oid-unfinished.json",
+        "common/pcapx/pcaputil/mms-services-values/captures/oid-unfinished.pcap": "mms-services-values/captures/oid-unfinished.pcap",
+        "common/pcapx/pcaputil/mms-services-values/answers/oid-nonminimal.json": "mms-services-values/answers/oid-nonminimal.json",
+        "common/pcapx/pcaputil/mms-services-values/captures/oid-nonminimal.pcap": "mms-services-values/captures/oid-nonminimal.pcap",
+        "common/pcapx/pcaputil/mms-services-values/answers/oid-wide.json": "mms-services-values/answers/oid-wide.json",
+        "common/pcapx/pcaputil/mms-services-values/captures/oid-wide.pcap": "mms-services-values/captures/oid-wide.pcap",
+        "common/pcapx/pcaputil/mms-services-values/answers/time-length.json": "mms-services-values/answers/time-length.json",
+        "common/pcapx/pcaputil/mms-services-values/captures/time-length.pcap": "mms-services-values/captures/time-length.pcap",
+        "common/pcapx/pcaputil/mms-services-values/answers/utc-length.json": "mms-services-values/answers/utc-length.json",
+        "common/pcapx/pcaputil/mms-services-values/captures/utc-length.pcap": "mms-services-values/captures/utc-length.pcap",
+        "common/pcapx/pcaputil/mms-services-values/answers/unselected-float.json": "mms-services-values/answers/unselected-float.json",
+        "common/pcapx/pcaputil/mms-services-values/captures/unselected-float.pcap": "mms-services-values/captures/unselected-float.pcap",
+        "common/pcapx/pcaputil/mms-services-values/answers/nested-access-error.json": "mms-services-values/answers/nested-access-error.json",
+        "common/pcapx/pcaputil/mms-services-values/captures/nested-access-error.pcap": "mms-services-values/captures/nested-access-error.pcap",
+        "common/pcapx/pcaputil/mms-services-values/answers/nesting-exceeds.json": "mms-services-values/answers/nesting-exceeds.json",
+        "common/pcapx/pcaputil/mms-services-values/captures/nesting-exceeds.pcap": "mms-services-values/captures/nesting-exceeds.pcap",
+        "common/pcapx/pcaputil/mms-services-values/answers/wrong-cardinality.json": "mms-services-values/answers/wrong-cardinality.json",
+        "common/pcapx/pcaputil/mms-services-values/captures/wrong-cardinality.pcap": "mms-services-values/captures/wrong-cardinality.pcap",
+        "common/pcapx/pcaputil/mms-services-values/answers/spec-missing.json": "mms-services-values/answers/spec-missing.json",
+        "common/pcapx/pcaputil/mms-services-values/captures/spec-missing.pcap": "mms-services-values/captures/spec-missing.pcap",
+        "common/pcapx/pcaputil/mms-services-values/answers/spec-unrequested.json": "mms-services-values/answers/spec-unrequested.json",
+        "common/pcapx/pcaputil/mms-services-values/captures/spec-unrequested.pcap": "mms-services-values/captures/spec-unrequested.pcap",
+        "common/pcapx/pcaputil/mms-services-values/answers/spec-different.json": "mms-services-values/answers/spec-different.json",
+        "common/pcapx/pcaputil/mms-services-values/captures/spec-different.pcap": "mms-services-values/captures/spec-different.pcap",
+        "common/pcapx/pcaputil/mms-services-values/answers/identify-missing.json": "mms-services-values/answers/identify-missing.json",
+        "common/pcapx/pcaputil/mms-services-values/captures/identify-missing.pcap": "mms-services-values/captures/identify-missing.pcap",
+        "common/pcapx/pcaputil/mms-services-values/answers/identify-bad-text.json": "mms-services-values/answers/identify-bad-text.json",
+        "common/pcapx/pcaputil/mms-services-values/captures/identify-bad-text.pcap": "mms-services-values/captures/identify-bad-text.pcap",
+        "common/pcapx/pcaputil/mms-services-values/answers/status-localdetail129.json": "mms-services-values/answers/status-localdetail129.json",
+        "common/pcapx/pcaputil/mms-services-values/captures/status-localdetail129.pcap": "mms-services-values/captures/status-localdetail129.pcap",
+        "common/pcapx/pcaputil/mms-services-values/answers/status-code-unselected.json": "mms-services-values/answers/status-code-unselected.json",
+        "common/pcapx/pcaputil/mms-services-values/captures/status-code-unselected.pcap": "mms-services-values/captures/status-code-unselected.pcap",
+        "common/pcapx/pcaputil/mms-services-values/answers/identify-bad-request.json": "mms-services-values/answers/identify-bad-request.json",
+        "common/pcapx/pcaputil/mms-services-values/captures/identify-bad-request.pcap": "mms-services-values/captures/identify-bad-request.pcap",
+        "common/pcapx/pcaputil/mms-services-values/answers/status-bad-request.json": "mms-services-values/answers/status-bad-request.json",
+        "common/pcapx/pcaputil/mms-services-values/captures/status-bad-request.pcap": "mms-services-values/captures/status-bad-request.pcap",
+        "common/pcapx/pcaputil/mms-services-values/answers/calling-limit-zero.json": "mms-services-values/answers/calling-limit-zero.json",
+        "common/pcapx/pcaputil/mms-services-values/captures/calling-limit-zero.pcap": "mms-services-values/captures/calling-limit-zero.pcap",
+        "common/pcapx/pcaputil/mms-services-values/answers/zero-nesting-array.json": "mms-services-values/answers/zero-nesting-array.json",
+        "common/pcapx/pcaputil/mms-services-values/captures/zero-nesting-array.pcap": "mms-services-values/captures/zero-nesting-array.pcap",
+        "common/pcapx/pcaputil/mms-services-values/answers/malformed-float-type.json": "mms-services-values/answers/malformed-float-type.json",
+        "common/pcapx/pcaputil/mms-services-values/captures/malformed-float-type.pcap": "mms-services-values/captures/malformed-float-type.pcap",
+        "common/pcapx/pcaputil/mms-services-values/answers/external-ber.json": "mms-services-values/answers/external-ber.json",
+        "common/pcapx/pcaputil/mms-services-values/captures/external-ber.pcap": "mms-services-values/captures/external-ber.pcap",
+        "common/pcapx/pcaputil/mms-services-values/answers/external-descriptor.json": "mms-services-values/answers/external-descriptor.json",
+        "common/pcapx/pcaputil/mms-services-values/captures/external-descriptor.pcap": "mms-services-values/captures/external-descriptor.pcap",
+        "common/pcapx/pcaputil/mms-services-values/answers/external-unselected-direct.json": "mms-services-values/answers/external-unselected-direct.json",
+        "common/pcapx/pcaputil/mms-services-values/captures/external-unselected-direct.pcap": "mms-services-values/captures/external-unselected-direct.pcap",
+        "common/pcapx/pcaputil/mms-services-values/answers/external-duplicate-direct.json": "mms-services-values/answers/external-duplicate-direct.json",
+        "common/pcapx/pcaputil/mms-services-values/captures/external-duplicate-direct.pcap": "mms-services-values/captures/external-duplicate-direct.pcap",
+        "common/pcapx/pcaputil/mms-services-values/manifest.json": "mms-services-values/manifest.json",
+        "common/pcapx/pcaputil/mms-services-values/generate.py": "mms-services-values/generate.py",
+        "common/pcapx/pcaputil/mms-services-values/verify.py": "mms-services-values/verify.py",
+        "common/pcapx/pcaputil/mms-services-values/reference.py": "mms-services-values/reference.py",
+        "common/pcapx/pcaputil/mms-services-values/dependencies.json": "mms-services-values/dependencies.json",
+        "common/pcapx/pcaputil/mms-services-values/SOURCE-PINS.json": "mms-services-values/SOURCE-PINS.json",
+        "common/pcapx/pcaputil/mms-services-values/check_go_test_json_v2.py": "mms-services-values/check_go_test_json_v2.py",
+        "common/pcapx/pcaputil/mms-services-values/validator-differential.py": "mms-services-values/validator-differential.py",
+        "common/pcapx/pcaputil/mms-services-values/seal.py": "mms-services-values/seal.py",
+        "scripts/protocol-tests/check_go_test_json_v2.py": "mms-services-values/check_go_test_json_v2.py",
+        "scripts/protocol-tests/required-tests-traffic-unified-v41.json": "required-tests-traffic-unified-v41.json"
+      }
     }
   ],
   "schema_version": 1,

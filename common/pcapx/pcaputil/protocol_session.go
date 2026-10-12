@@ -229,14 +229,14 @@ func (s *captureSession) Probe(data []byte) ProbeResult {
 		if s.closed || s.f.mms.poison {
 			return ProbeResult{Verdict: ProbeReject, Protocol: "mms", Reason: "closed or refused observed context"}
 		}
-		target := s.f.mms.storage() + 32768 + 512*int64(n)
+		target := s.f.mms.storage() + 32768 + s.f.mms.projectionFactor(s.f.a.budget)*int64(n)
 		if s.f.a.buffered.Load()+max(int64(0), target-s.f.sessionBytes) > int64(s.f.a.config.MaxBufferedBytes) {
 			return ProbeResult{Verdict: ProbeReject, Protocol: "mms", Reason: "MMS shared projection budget"}
 		}
 		if _, err = parseMMSCOTP(data[:n], s.f.a.budget); err != nil {
 			return ProbeResult{Verdict: ProbeReject, Protocol: "mms", Reason: err.Error()}
 		}
-		return probeAccept("mms", mmsISOProfile, 95)
+		return probeAccept("mms", s.f.mms.profile(), 95)
 	}
 
 	if s.transport == "udp" {
