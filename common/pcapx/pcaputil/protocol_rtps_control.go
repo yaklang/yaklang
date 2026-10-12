@@ -249,11 +249,13 @@ func rtpsControlFields(kind, flags byte, b []byte, order binary.ByteOrder, remai
 				return nil, err
 			}
 			last, err := seq(44, true, "Last Group Sequence")
-			if err != nil || last < first-1 || current < first || current > last || len(b) < 60 {
-				return nil, rtpsMalformed("heartbeat group range/digests are invalid")
+			if err != nil || last < first-1 || current < first || current > last {
+				return nil, rtpsMalformed("heartbeat group range is invalid")
 			}
-			d["Writer Set Digest"], d["Secure Writer Set Digest"] = hex.EncodeToString(b[52:56]), hex.EncodeToString(b[56:60])
-			used = 60
+			// PSM9.4.5.7 maps only the three GSNs. The PIM's abstract
+			// writer-set digests have no wire members here. Do not invent
+			// their meanings from extension octets, even when eight exist.
+			used = 52
 		}
 	case 8:
 		d["Submessage"], d["Sender Role"] = "GAP", "reported-writer"

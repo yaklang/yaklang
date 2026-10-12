@@ -44,7 +44,7 @@ Run from the repository root:
 ```sh
 go run ./internal/trafficfixture/cmd/corpus test
 go test -json -count=1 -timeout=5m ./internal/trafficfixture/... ./common/bin-parser/... ./common/pcapx/... ./common/yak/cmd/yakcmds/shark-cli ./scripts/ci > traffic.jsonl
-go run ./internal/trafficfixture/cmd/corpus exec -- python3 @scripts/protocol-tests/check_go_test_json.py traffic.jsonl --inventory @scripts/protocol-tests/required-tests-traffic-unified-v33.json --tier full
+go run ./internal/trafficfixture/cmd/corpus exec -- python3 @scripts/protocol-tests/check_go_test_json.py traffic.jsonl --inventory @scripts/protocol-tests/required-tests-traffic-unified-v34.json --tier full
 ```
 
 The single `corpus` entry point uses the same bounded Go ZIP loader as tests.
@@ -83,7 +83,7 @@ their semantic coverage. The existing synthetic session keys are test inputs;
 production credentials, user private keys and material without redistribution
 permission belong in an external fixed-source download manifest.
 
-Current test requirements are sealed at `scripts/protocol-tests/required-tests-traffic-unified-v33.json`;
+Current test requirements are sealed at `scripts/protocol-tests/required-tests-traffic-unified-v34.json`;
 the historical inventories and all earlier batches remain unchanged.
 The supplemental small-corpus batch contains 26 minimal controls, their explicit
 expected facts, an offline generator and the compact pinned source manifest.
@@ -96,7 +96,7 @@ byte-boundary, malformed-length and ownership tests. These are scoped control
 assertions, not a semantic golden for the entire upstream collection. Process
 logs and the original large downloads remain outside the repository.
 
-The local acceptance inventory is `required-tests-traffic-unified-v33.json`. The published workflow gate currently references v25; v26 adds Call requirements, v27 adds scalar arrays and v28 adds extended builtin fields and v29 adds bounded value graphs and complete diagnostic wire fields; v30 adds message-local RTPS INFO_SRC/INFO_DST context, v31 bounded SPDP fragments and owned answer-cache requirements, and v32 legacy RTPS2.0 DATA wire, budget, lifecycle and ownership requirements. Older
+The local acceptance inventory is `required-tests-traffic-unified-v34.json`. The published workflow gate currently references v25; v26 adds Call requirements, v27 adds scalar arrays and v28 adds extended builtin fields and v29 adds bounded value graphs and complete diagnostic wire fields; v30 adds message-local RTPS INFO_SRC/INFO_DST context, v31 bounded SPDP fragments and owned answer-cache requirements, and v32 legacy RTPS2.0 DATA wire, budget, lifecycle and ownership requirements. Older
 versioned inventories stay available as historical inputs; they are not the
 current acceptance entry. The DLMS HDLC batch contains owned tunnel/Get-normal
 controls and their independent fields/errors, CRC/byte validator, offline
@@ -203,7 +203,7 @@ opaque selector bytes and one bounded Data value over Wrapper v1 TCP/UDP; object
 selector meaning, access permission and device operation are unverified. The
 original one-packet selective-access capture and original refused answer remain
 immutable; its now-supported answer is matched by exact input SHA and frame.
-The active inventory is `scripts/protocol-tests/required-tests-traffic-unified-v33.json`.
+The active inventory is `scripts/protocol-tests/required-tests-traffic-unified-v34.json`.
 
 The small-graph budget batch reuses accepted graph captures/answers and adds one
 249-byte UDP control for child count255 without child bytes. Its standalone proof
@@ -259,7 +259,7 @@ retain the original request ID. Scope excludes authentication, gateway identity
 binding, device execution and RF delivery. Original large captures, upstream
 source and logs are not bundled.
 
-`validation-dlms-hdlc-normal-data.zip` contains31 owned minimal native normal-GET capture cases and72 ordered independent answers (53 complete byte/field observations,19 expected refusals). It covers TCP/UDP full/deferred, workers1/2/4, observer off/on, TCP feed chunks, nested compact, node/depth boundaries, malformed/trailing contents, strict text, full flags and refusal followed by late feedback. The existing native scalar contract and zero TransactionID are retained. Its source pins and executable independent builder/oracle/reference harness stay in the small ZIP; original reference sources and execution logs stay outside Git. Actual fixed reference codec display/calendar differences remain diagnostics rather than device passes. Current mandatory inventory is `scripts/protocol-tests/required-tests-traffic-unified-v33.json`.
+`validation-dlms-hdlc-normal-data.zip` contains31 owned minimal native normal-GET capture cases and72 ordered independent answers (53 complete byte/field observations,19 expected refusals). It covers TCP/UDP full/deferred, workers1/2/4, observer off/on, TCP feed chunks, nested compact, node/depth boundaries, malformed/trailing contents, strict text, full flags and refusal followed by late feedback. The existing native scalar contract and zero TransactionID are retained. Its source pins and executable independent builder/oracle/reference harness stay in the small ZIP; original reference sources and execution logs stay outside Git. Actual fixed reference codec display/calendar differences remain diagnostics rather than device passes. Current mandatory inventory is `scripts/protocol-tests/required-tests-traffic-unified-v34.json`.
 
 The historical `dlms-hdlc/array` capture is reused in place. Its original `UnsupportedFeature` answer remains immutable; `historical-array-upgrade.json` binds the original capture/answer hashes to two current full-message answers for the now-supported legal empty-array response. No historical capture is copied into the new ZIP and other historical refusals retain their assertions.
 
@@ -303,7 +303,7 @@ its permissive pairing and last-only list error are not independent proof of our
 selected negative association policy or every item error. Owner byte/state
 oracles supply those explicit expectations. No raw download, upstream source,
 dependency, log or cache is included. All56 preceding ZIPs remain unchanged.
-The current inventory is `scripts/protocol-tests/required-tests-traffic-unified-v33.json`.
+The current inventory is `scripts/protocol-tests/required-tests-traffic-unified-v34.json`.
 
 `validation-dlms-hdlc-unobserved-next.zip` adds12 distinct minimal captures and54
 whole answers (36 observations,18 expected ContextRequired refusals). An already
@@ -348,7 +348,7 @@ not an unrecorded31second network delay or device claim. Historical expiry
 capture/answer hashes bind its corrected association answer; no old ZIP is
 modified. Shared-protocol expiry, collection limits, domain isolation, byte
 ownership and Close release also have regressions. Current executable inventory
-is `scripts/protocol-tests/required-tests-traffic-unified-v33.json`; earlier
+is `scripts/protocol-tests/required-tests-traffic-unified-v34.json`; earlier
 versioned inventories remain archived.
 
 
@@ -768,3 +768,5 @@ QoS policy interpretation remain explicit requirements for subsequent work.
 `validation-rtps-controls.zip` adds authored minimal RTPS control wire cases for the explicit UDP `rtps-control` profile. ACKNACK, GAP, HEARTBEAT, NACK_FRAG and HEARTBEAT_FRAG retain exact sequence words, signed counters, ordered bitmap words and selected offsets, reader/writer source context and unknown destination prefixes. Common layouts are pinned to OMG2.0/2.1/2.2/2.3/2.5 documents; document2.3 specifies wire2.4. Group extensions are decoded for wire2.4/2.5 and filtered count for wire2.5; earlier group flag bits remain uninterpreted extensions. This profile reports wire claims; it does not establish reliable delivery, authenticate endpoints or interpret DATA application types. Unsupported DATA/security/context-changing submessages refuse the entire control observation. The default SPDP/legacy DATA profile retains its prior boundaries.
 
 The ZIP includes256 complete field/error scenarios (256 unique captures), independent deterministic generation and verification scripts, source pins and the v33 mandatory inventory. Full/deferred, workers1/2/4 and packet observation on/off require3072 replay configurations; native sessions separately cover probe purity, datagram isolation, byte/count/depth refusal, recovery, Close and owned fields. Fixed-spec wire answers and actual independent Wireshark scalar comparisons are distinct from device or reliability validation. All prior ZIPs remain immutable.
+
+`validation-rtps-control-wire.zip` adds16 independent minimal group HEARTBEAT wire cases and four hash-bound errata for the immutable preceding control answers. The UDP PSM9.4.5.7 layout contains three GSNs after the ordinary HEARTBEAT body (52 body bytes total). The PIM logical writer-set digest attributes have no concrete wire members there: unspecified tail octets remain owned `Extension Bytes`, not fabricated digest fields. Minimum, one-byte truncation, opaque tail and refusal/recovery cases retain complete field/error/session/ownership checks across192 configurations. Input and prior-answer SHA256 must both match before applying an independent correction; historical captures/ZIPs/answers are never overwritten. Current mandatory inventory is v34.

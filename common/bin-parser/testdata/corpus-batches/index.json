@@ -57861,6 +57861,247 @@
         "common/pcapx/pcaputil/rtps-controls/tshark-compare.py": "rtps-controls/tshark-compare.py",
         "scripts/protocol-tests/required-tests-traffic-unified-v33.json": "required-tests-traffic-unified-v33.json"
       }
+    },
+    {
+      "id": "validation-rtps-control-wire",
+      "kind": "validation",
+      "source_sha": "6fcfbca10c6adb0709fbc561f057ab0d7a8264f5",
+      "file": "validation-rtps-control-wire.zip",
+      "sha256": "f046e65e90a62829e9c7bd5494f1d73100213196b3ddaaefaf4bb7b197b82513",
+      "password": "bin-parser",
+      "members": {
+        "rtps-control-wire/answers/group-minimum-v4-le.json": {
+          "sha256": "7a75063d9e206bde12827b043aeadabbe2af8c2a02a1e60f5092093b5b9f1c6e",
+          "bytes": 2009
+        },
+        "rtps-control-wire/captures/group-minimum-v4-le.pcap": {
+          "sha256": "211c45ce34098bdca95a83e5fcb810a97f87a9ff650dfbeb1d5e77ee64270431",
+          "bytes": 144
+        },
+        "rtps-control-wire/answers/group-truncated-v4-le.json": {
+          "sha256": "52874e366e6bbf7d6840d9128c5eec1fb74bc09aee478408637db83146d6001b",
+          "bytes": 521
+        },
+        "rtps-control-wire/captures/group-truncated-v4-le.pcap": {
+          "sha256": "a05ff0bb38878987ea177687d32512f4fd1fd25c066f7097599552b5b027936a",
+          "bytes": 143
+        },
+        "rtps-control-wire/answers/group-opaque-tail-v4-le.json": {
+          "sha256": "0110d4a22e9747dc73374a0b9dec3d3ef96a33a85a334737414d35657bdc525c",
+          "bytes": 2088
+        },
+        "rtps-control-wire/captures/group-opaque-tail-v4-le.pcap": {
+          "sha256": "4d8d72bd59588069c237b56d4760261f679fd70d0eb5edc75669141eb1ad8ec4",
+          "bytes": 152
+        },
+        "rtps-control-wire/answers/group-refusal-recovery-v4-le.json": {
+          "sha256": "1a7eb1536f44bfe9754baa36fef9d01169a1f6c995a3439cb7a58d96aa0a4de7",
+          "bytes": 2453
+        },
+        "rtps-control-wire/captures/group-refusal-recovery-v4-le.pcap": {
+          "sha256": "d81652ad114138d112848eb77062b4e6601282b55ed022f244830e3de52c757d",
+          "bytes": 263
+        },
+        "rtps-control-wire/answers/group-minimum-v5-le.json": {
+          "sha256": "a29bcb285119ca14859f381996bc41b1e3ca5f5c64d7bda75ef7515b93f14bf9",
+          "bytes": 2009
+        },
+        "rtps-control-wire/captures/group-minimum-v5-le.pcap": {
+          "sha256": "6add46543be57c2fe8d7d16b89b24b673ff9d351e33ee70c6f627d028de216ee",
+          "bytes": 144
+        },
+        "rtps-control-wire/answers/group-truncated-v5-le.json": {
+          "sha256": "3046f546def657f5abcdaf7ffa01e1266eaa9edf0983952e1b99a82517d2a8c7",
+          "bytes": 521
+        },
+        "rtps-control-wire/captures/group-truncated-v5-le.pcap": {
+          "sha256": "7e7155a2165bbf828ce8c1d33d55ad41b3e3fac2b197f0d0b455118791514a27",
+          "bytes": 143
+        },
+        "rtps-control-wire/answers/group-opaque-tail-v5-le.json": {
+          "sha256": "fbd93081ae44c6ef838f30ee789a9032b56746b575e0176c9cb0f70dbb88ff36",
+          "bytes": 2088
+        },
+        "rtps-control-wire/captures/group-opaque-tail-v5-le.pcap": {
+          "sha256": "d8417aceda38ef8b4fcd8872fd1af083b604db626ccd66ba244153f9fe1b8208",
+          "bytes": 152
+        },
+        "rtps-control-wire/answers/group-refusal-recovery-v5-le.json": {
+          "sha256": "7620f05c137ee8d98049bd77b295a9a2cd3546d0f6e2086ca8b8712e620bb707",
+          "bytes": 2453
+        },
+        "rtps-control-wire/captures/group-refusal-recovery-v5-le.pcap": {
+          "sha256": "cadc690fcf7c0da03d18efa67993ec651442296499f93682c01776824269cbc1",
+          "bytes": 263
+        },
+        "rtps-control-wire/answers/group-minimum-v4-be.json": {
+          "sha256": "377b014b2bcd9564e25c46419f4a273c0b77405cd26c5ce06f7d681bb9dce7e5",
+          "bytes": 2009
+        },
+        "rtps-control-wire/captures/group-minimum-v4-be.pcap": {
+          "sha256": "1c2b649cef10f26bc6616c84a7f20476e74497c6f62ebf1d178c381692cc406d",
+          "bytes": 144
+        },
+        "rtps-control-wire/answers/group-truncated-v4-be.json": {
+          "sha256": "f6c2eb864893bbc1fc5252e6f3fbe6be2bf4b92ee3a3dd70fece6236fd0e6f2a",
+          "bytes": 521
+        },
+        "rtps-control-wire/captures/group-truncated-v4-be.pcap": {
+          "sha256": "36cc789b662bb729f4c6f9cf6167fa26870a4902bb885c15b8e719ba7ba318bb",
+          "bytes": 143
+        },
+        "rtps-control-wire/answers/group-opaque-tail-v4-be.json": {
+          "sha256": "bb162e81c030b9a7e6b3f38e90c38cbeb8201a1d098dc3e3d7719abedf277b59",
+          "bytes": 2088
+        },
+        "rtps-control-wire/captures/group-opaque-tail-v4-be.pcap": {
+          "sha256": "e00738b31bb1c1e22f943adc9cc73ce8b8a1066e4b081215d5070b9bd9ae88f5",
+          "bytes": 152
+        },
+        "rtps-control-wire/answers/group-refusal-recovery-v4-be.json": {
+          "sha256": "42844733ee3ece36cf238949231e6a94fae76977fe36b87780890a2c288088c4",
+          "bytes": 2453
+        },
+        "rtps-control-wire/captures/group-refusal-recovery-v4-be.pcap": {
+          "sha256": "835f71c071bee8b6eeefb6cd07b8181a74a5a2dd7106c38053219db6a9f279cd",
+          "bytes": 263
+        },
+        "rtps-control-wire/answers/group-minimum-v5-be.json": {
+          "sha256": "37aa09be8f6f44ad69cbf84e03b55e3ea50ff45bfc9ea0b669908c3e4992058c",
+          "bytes": 2009
+        },
+        "rtps-control-wire/captures/group-minimum-v5-be.pcap": {
+          "sha256": "08301e758111772fec8fa91fdd66f138ea04bb98cfab58e9c1a519c9a11bbc8a",
+          "bytes": 144
+        },
+        "rtps-control-wire/answers/group-truncated-v5-be.json": {
+          "sha256": "e0f43fdd3063f577cf43ec80597f48b524fa5dca564163c626774c40d9f8760c",
+          "bytes": 521
+        },
+        "rtps-control-wire/captures/group-truncated-v5-be.pcap": {
+          "sha256": "39e7b870f987dc92246f1634a0a647f0e6598619a0ca2156a96c9c8b3afb825d",
+          "bytes": 143
+        },
+        "rtps-control-wire/answers/group-opaque-tail-v5-be.json": {
+          "sha256": "5192d584df3e560406dc52b1ed0850499e9b246644f1f504125b952cf80e8290",
+          "bytes": 2088
+        },
+        "rtps-control-wire/captures/group-opaque-tail-v5-be.pcap": {
+          "sha256": "a166c2aa33a8805b9ba085af0a0a14d1ff826e334f28cabe755517eb8f42d0f2",
+          "bytes": 152
+        },
+        "rtps-control-wire/answers/group-refusal-recovery-v5-be.json": {
+          "sha256": "1ac14c4a0abb76f495bb24ceba28777b4a1af2533420682165fc588d358b303f",
+          "bytes": 2453
+        },
+        "rtps-control-wire/captures/group-refusal-recovery-v5-be.pcap": {
+          "sha256": "8f1998e852623ed10d5772556bcd0e33dc96916e715ce378c6c80cb9ee071c80",
+          "bytes": 263
+        },
+        "rtps-control-wire/manifest.json": {
+          "sha256": "fc858f75f23dbe05e1f1000eb8b16b3008ef0b6e904d9527c78df84083fa679b",
+          "bytes": 6336
+        },
+        "rtps-control-wire/generate.py": {
+          "sha256": "8b9e6790b4aea3a9531a34476712240f439484901df666d514229f9d9bb963ca",
+          "bytes": 6572
+        },
+        "rtps-control-wire/verify.py": {
+          "sha256": "080139b0f90359900950eb951755dc827d7b18bc837fb92e5b360ce66d036bc2",
+          "bytes": 908
+        },
+        "rtps-control-wire/seal.py": {
+          "sha256": "2212d3dc58cbf3d99c5007f99c611cb1a1241f35661ae3327aea51247b5d7b94",
+          "bytes": 3735
+        },
+        "rtps-control-wire/SOURCE.json": {
+          "sha256": "225da8b85828723134372b4d7b96c4b17ab7f32122872c1b73212c578dae6450",
+          "bytes": 1829
+        },
+        "rtps-control-wire/historical-zips-before.json": {
+          "sha256": "8c98c63c42eda2f431e879338cc337cdbe544bba7ae85917ccc90aaf2677dd1c",
+          "bytes": 39401
+        },
+        "rtps-control-wire/verify-corrections.py": {
+          "sha256": "36a1bc44d4e837b66a8d561d70574b44adaa7eecb26c1459d7d4c97fb5797f7b",
+          "bytes": 2104
+        },
+        "rtps-control-wire/corrections/heartbeat-group-v4-be.json": {
+          "sha256": "25c82112fc2de02e926add3a88cd9f7106e4e83ea98c38b74bc5005705d868fc",
+          "bytes": 2088
+        },
+        "rtps-control-wire/corrections/heartbeat-group-v4-le.json": {
+          "sha256": "bb0346804c60ebefd41a2c3a57f18778997a0590c1444f0edf284a1babfac360",
+          "bytes": 2088
+        },
+        "rtps-control-wire/corrections/heartbeat-group-v5-be.json": {
+          "sha256": "bf1a209afc1bf1de2b10e6e739759d15ee66844225a49a1c0fd350a414bb90a0",
+          "bytes": 2088
+        },
+        "rtps-control-wire/corrections/heartbeat-group-v5-le.json": {
+          "sha256": "f1b0d35a709e723376346f9f4ad77879f6ce8e0cda5eb61d867ef54a5e030264",
+          "bytes": 2088
+        },
+        "rtps-control-wire/corrections.json": {
+          "sha256": "9b6e78c5f193c84dd9f9acd89b0d174fc8c8a135028d04ef673e84ab80881cc8",
+          "bytes": 2304
+        },
+        "required-tests-traffic-unified-v34.json": {
+          "sha256": "21215de2ae3db8ae8c1806b996df36de2769a95a3491485ea249d3324b0e2496",
+          "bytes": 520143
+        },
+        "validation/expected.json": {
+          "sha256": "d576af5f8d82d079fc3961a7ffac7bc88d633c501a523d078a2b1cee32f26c66",
+          "bytes": 18339
+        }
+      },
+      "aliases": {
+        "common/pcapx/pcaputil/rtps-control-wire/answers/group-minimum-v4-le.json": "rtps-control-wire/answers/group-minimum-v4-le.json",
+        "common/pcapx/pcaputil/rtps-control-wire/captures/group-minimum-v4-le.pcap": "rtps-control-wire/captures/group-minimum-v4-le.pcap",
+        "common/pcapx/pcaputil/rtps-control-wire/answers/group-truncated-v4-le.json": "rtps-control-wire/answers/group-truncated-v4-le.json",
+        "common/pcapx/pcaputil/rtps-control-wire/captures/group-truncated-v4-le.pcap": "rtps-control-wire/captures/group-truncated-v4-le.pcap",
+        "common/pcapx/pcaputil/rtps-control-wire/answers/group-opaque-tail-v4-le.json": "rtps-control-wire/answers/group-opaque-tail-v4-le.json",
+        "common/pcapx/pcaputil/rtps-control-wire/captures/group-opaque-tail-v4-le.pcap": "rtps-control-wire/captures/group-opaque-tail-v4-le.pcap",
+        "common/pcapx/pcaputil/rtps-control-wire/answers/group-refusal-recovery-v4-le.json": "rtps-control-wire/answers/group-refusal-recovery-v4-le.json",
+        "common/pcapx/pcaputil/rtps-control-wire/captures/group-refusal-recovery-v4-le.pcap": "rtps-control-wire/captures/group-refusal-recovery-v4-le.pcap",
+        "common/pcapx/pcaputil/rtps-control-wire/answers/group-minimum-v5-le.json": "rtps-control-wire/answers/group-minimum-v5-le.json",
+        "common/pcapx/pcaputil/rtps-control-wire/captures/group-minimum-v5-le.pcap": "rtps-control-wire/captures/group-minimum-v5-le.pcap",
+        "common/pcapx/pcaputil/rtps-control-wire/answers/group-truncated-v5-le.json": "rtps-control-wire/answers/group-truncated-v5-le.json",
+        "common/pcapx/pcaputil/rtps-control-wire/captures/group-truncated-v5-le.pcap": "rtps-control-wire/captures/group-truncated-v5-le.pcap",
+        "common/pcapx/pcaputil/rtps-control-wire/answers/group-opaque-tail-v5-le.json": "rtps-control-wire/answers/group-opaque-tail-v5-le.json",
+        "common/pcapx/pcaputil/rtps-control-wire/captures/group-opaque-tail-v5-le.pcap": "rtps-control-wire/captures/group-opaque-tail-v5-le.pcap",
+        "common/pcapx/pcaputil/rtps-control-wire/answers/group-refusal-recovery-v5-le.json": "rtps-control-wire/answers/group-refusal-recovery-v5-le.json",
+        "common/pcapx/pcaputil/rtps-control-wire/captures/group-refusal-recovery-v5-le.pcap": "rtps-control-wire/captures/group-refusal-recovery-v5-le.pcap",
+        "common/pcapx/pcaputil/rtps-control-wire/answers/group-minimum-v4-be.json": "rtps-control-wire/answers/group-minimum-v4-be.json",
+        "common/pcapx/pcaputil/rtps-control-wire/captures/group-minimum-v4-be.pcap": "rtps-control-wire/captures/group-minimum-v4-be.pcap",
+        "common/pcapx/pcaputil/rtps-control-wire/answers/group-truncated-v4-be.json": "rtps-control-wire/answers/group-truncated-v4-be.json",
+        "common/pcapx/pcaputil/rtps-control-wire/captures/group-truncated-v4-be.pcap": "rtps-control-wire/captures/group-truncated-v4-be.pcap",
+        "common/pcapx/pcaputil/rtps-control-wire/answers/group-opaque-tail-v4-be.json": "rtps-control-wire/answers/group-opaque-tail-v4-be.json",
+        "common/pcapx/pcaputil/rtps-control-wire/captures/group-opaque-tail-v4-be.pcap": "rtps-control-wire/captures/group-opaque-tail-v4-be.pcap",
+        "common/pcapx/pcaputil/rtps-control-wire/answers/group-refusal-recovery-v4-be.json": "rtps-control-wire/answers/group-refusal-recovery-v4-be.json",
+        "common/pcapx/pcaputil/rtps-control-wire/captures/group-refusal-recovery-v4-be.pcap": "rtps-control-wire/captures/group-refusal-recovery-v4-be.pcap",
+        "common/pcapx/pcaputil/rtps-control-wire/answers/group-minimum-v5-be.json": "rtps-control-wire/answers/group-minimum-v5-be.json",
+        "common/pcapx/pcaputil/rtps-control-wire/captures/group-minimum-v5-be.pcap": "rtps-control-wire/captures/group-minimum-v5-be.pcap",
+        "common/pcapx/pcaputil/rtps-control-wire/answers/group-truncated-v5-be.json": "rtps-control-wire/answers/group-truncated-v5-be.json",
+        "common/pcapx/pcaputil/rtps-control-wire/captures/group-truncated-v5-be.pcap": "rtps-control-wire/captures/group-truncated-v5-be.pcap",
+        "common/pcapx/pcaputil/rtps-control-wire/answers/group-opaque-tail-v5-be.json": "rtps-control-wire/answers/group-opaque-tail-v5-be.json",
+        "common/pcapx/pcaputil/rtps-control-wire/captures/group-opaque-tail-v5-be.pcap": "rtps-control-wire/captures/group-opaque-tail-v5-be.pcap",
+        "common/pcapx/pcaputil/rtps-control-wire/answers/group-refusal-recovery-v5-be.json": "rtps-control-wire/answers/group-refusal-recovery-v5-be.json",
+        "common/pcapx/pcaputil/rtps-control-wire/captures/group-refusal-recovery-v5-be.pcap": "rtps-control-wire/captures/group-refusal-recovery-v5-be.pcap",
+        "common/pcapx/pcaputil/rtps-control-wire/manifest.json": "rtps-control-wire/manifest.json",
+        "common/pcapx/pcaputil/rtps-control-wire/generate.py": "rtps-control-wire/generate.py",
+        "common/pcapx/pcaputil/rtps-control-wire/verify.py": "rtps-control-wire/verify.py",
+        "common/pcapx/pcaputil/rtps-control-wire/seal.py": "rtps-control-wire/seal.py",
+        "common/pcapx/pcaputil/rtps-control-wire/SOURCE.json": "rtps-control-wire/SOURCE.json",
+        "common/pcapx/pcaputil/rtps-control-wire/historical-zips-before.json": "rtps-control-wire/historical-zips-before.json",
+        "common/pcapx/pcaputil/rtps-control-wire/verify-corrections.py": "rtps-control-wire/verify-corrections.py",
+        "common/pcapx/pcaputil/rtps-control-wire/corrections/heartbeat-group-v4-be.json": "rtps-control-wire/corrections/heartbeat-group-v4-be.json",
+        "common/pcapx/pcaputil/rtps-control-wire/corrections/heartbeat-group-v4-le.json": "rtps-control-wire/corrections/heartbeat-group-v4-le.json",
+        "common/pcapx/pcaputil/rtps-control-wire/corrections/heartbeat-group-v5-be.json": "rtps-control-wire/corrections/heartbeat-group-v5-be.json",
+        "common/pcapx/pcaputil/rtps-control-wire/corrections/heartbeat-group-v5-le.json": "rtps-control-wire/corrections/heartbeat-group-v5-le.json",
+        "common/pcapx/pcaputil/rtps-control-wire/corrections.json": "rtps-control-wire/corrections.json",
+        "scripts/protocol-tests/required-tests-traffic-unified-v34.json": "required-tests-traffic-unified-v34.json"
+      }
     }
   ],
   "schema_version": 1,

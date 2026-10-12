@@ -3,14 +3,58 @@ package pcaputil
 import (
 	"bytes"
 	"encoding/hex"
+	"encoding/json"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/internal/trafficfixture"
 )
 
+// Preserve immutable historical wire/answer files while applying the explicit
+// independent PSM correction. Both old input and answer hashes must match;
+// a different input cannot silently inherit this erratum.
+func rtpsControlWireCases(t *testing.T) []rtpsControl {
+	t.Helper()
+	cases := rtpsBatchControls(t, "rtps-controls", 256)
+	raw, err := trafficfixture.ReadFile("rtps-control-wire/corrections.json")
+	require.NoError(t, err)
+	var corrections struct {
+		Schema string
+		Cases  []struct {
+			ID          string `json:"id"`
+			CaptureSHA  string `json:"capture_sha256"`
+			OriginalSHA string `json:"original_answer_sha256"`
+			Answer      string `json:"answer"`
+			AnswerSHA   string `json:"answer_sha256"`
+		} `json:"corrections"`
+	}
+	require.NoError(t, json.Unmarshal(raw, &corrections))
+	require.Equal(t, "rtps-control-wire-errata/v1", corrections.Schema)
+	require.Len(t, corrections.Cases, 4)
+	seen := map[string]bool{}
+	for _, correction := range corrections.Cases {
+		require.False(t, seen[correction.ID])
+		seen[correction.ID] = true
+		found := false
+		for i := range cases {
+			c := &cases[i]
+			if c.ID != correction.ID {
+				continue
+			}
+			found = true
+			require.Equal(t, c.SHA256, correction.CaptureSHA)
+			require.Equal(t, c.AnswerSHA, correction.OriginalSHA)
+			c.Answer = "common/pcapx/pcaputil/rtps-control-wire/" + correction.Answer
+			c.AnswerSHA = correction.AnswerSHA
+		}
+		require.True(t, found)
+	}
+	return cases
+}
+
 func TestRTPSControlSealedReplay(t *testing.T) {
-	testRTPSSealedReplayProfile(t, rtpsBatchControls(t, "rtps-controls", 256), "rtps-control")
+	testRTPSSealedReplayProfile(t, rtpsControlWireCases(t), "rtps-control")
 }
 
 func newRTPSControlTestSession(t *testing.T, b ParserBudget) ProtocolSession {
@@ -21,7 +65,7 @@ func newRTPSControlTestSession(t *testing.T, b ParserBudget) ProtocolSession {
 }
 
 func TestRTPSControlSealedSession(t *testing.T) {
-	for _, c := range rtpsBatchControls(t, "rtps-controls", 256) {
+	for _, c := range rtpsControlWireCases(t) {
 		t.Run(c.ID, func(t *testing.T) {
 			_, a := rtpsInput(t, c)
 			s := newRTPSControlTestSession(t, DefaultParserBudget())
@@ -86,7 +130,7 @@ func TestRTPSControlSealedSession(t *testing.T) {
 
 func rtpsControlCase(t *testing.T, id string) ([]byte, rtpsControlAnswer) {
 	t.Helper()
-	for _, c := range rtpsBatchControls(t, "rtps-controls", 256) {
+	for _, c := range rtpsControlWireCases(t) {
 		if c.ID == id {
 			_, a := rtpsInput(t, c)
 			wire, err := hex.DecodeString(a.Wires[0])
