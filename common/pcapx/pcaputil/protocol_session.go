@@ -171,7 +171,7 @@ func NewProtocolSessionWithOptions(budget ParserBudget, options ...ProtocolSessi
 		}
 	}
 	for _, profile := range s.f.a.datagramDecodeAs {
-		if (profile == "rtps-control" || profile == "rtps-wire" || profile == "rtps13-wire" || profile == "rtps13-parameters") && s.transport != "udp" {
+		if (profile == "rtps-control" || profile == "rtps-wire" || profile == "rtps13-wire" || profile == "rtps13-parameters" || profile == "rtps20-rti-filter") && s.transport != "udp" {
 			return nil, fmt.Errorf("RTPS control observation requires a UDP session")
 		}
 		if (profile == "rtps-spdp-fragments" || profile == "rtps-shape-fragments") && s.transport != "udp" {
@@ -216,6 +216,9 @@ func NewDecryptedQUICSession(budget ParserBudget, source string) (ProtocolSessio
 
 func (s *captureSession) Probe(data []byte) ProbeResult {
 	if s.transport == "udp" {
+		if p, ok := s.probeRTPS20RTIFilter(data); ok {
+			return p
+		}
 		if p, ok := s.probeRTPS13Wire(data); ok {
 			return p
 		}

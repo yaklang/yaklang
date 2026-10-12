@@ -15,6 +15,9 @@ func decodeRTPS20Datagram(w []byte, remaining int) (map[string]any, error) {
 }
 
 func decodeRTPS20DatagramBudget(w []byte, remaining, depth int) (map[string]any, error) {
+	return decodeRTPS20Mode(w, remaining, depth, false)
+}
+func decodeRTPS20Mode(w []byte, remaining, depth int, rtiFilter bool) (map[string]any, error) {
 	if !rtpsDatagramHeader(w) || w[5] != 0 {
 		return nil, rtpsUnsupported("legacy decoder requires version 2.0")
 	}
@@ -24,6 +27,9 @@ func decodeRTPS20DatagramBudget(w []byte, remaining, depth int) (map[string]any,
 	out := map[string]any{
 		"Protocol Version": "2.0", "Vendor ID": hex.EncodeToString(w[6:8]),
 		"Source GUID Prefix": hex.EncodeToString(w[8:20]), "Observation": "unverified-data-object",
+	}
+	if rtiFilter {
+		out["Observation"] = "unverified-rti-filter-parameter-message"
 	}
 	var changes []map[string]any
 	var timestamp map[string]any
@@ -90,7 +96,7 @@ func decodeRTPS20DatagramBudget(w []byte, remaining, depth int) (map[string]any,
 			if contextSeen && depth < 4 {
 				return nil, protocolError(ErrResourceExceeded, "RTPS legacy receiver context exceeds depth budget")
 			}
-			change, err := rtps20Data(body, kind, flags, order, &remaining, depth)
+			change, err := rtps20DataMode(body, kind, flags, order, &remaining, depth, rtiFilter, sourceVendor.(string))
 			if err != nil {
 				return nil, err
 			}
@@ -113,6 +119,9 @@ func decodeRTPS20DatagramBudget(w []byte, remaining, depth int) (map[string]any,
 }
 
 func rtps20Data(body []byte, kind, flags byte, order binary.ByteOrder, remaining *int, depth int) (map[string]any, error) {
+	return rtps20DataMode(body, kind, flags, order, remaining, depth, false, "")
+}
+func rtps20DataMode(body []byte, kind, flags byte, order binary.ByteOrder, remaining *int, depth int, rtiFilter bool, vendor string) (map[string]any, error) {
 	if len(body) < 16 {
 		return nil, rtpsMalformed("legacy DATA fixed body is truncated")
 	}
@@ -157,6 +166,21 @@ func rtps20Data(body []byte, kind, flags byte, order binary.ByteOrder, remaining
 		params, used, err := rtps20Parameters(body[at:], order, remaining, depth, true)
 		if err != nil {
 			return nil, err
+		}
+		if rtiFilter {
+			for _, p := range params {
+				if p["ID"].(uint16) != 0x8006 {
+					continue
+				}
+				if vendor != "0101" {
+					return nil, protocolError(ErrContextRequired, "RTI filter typing requires selected reported logical vendor0101")
+				}
+				f, e := rtps20RTIFilterFields(p["Value"].([]byte), order, remaining, depth)
+				if e != nil {
+					return nil, e
+				}
+				p["Parameter Fields"] = f
+			}
 		}
 		d["Inline QoS"] = params
 		at += used
