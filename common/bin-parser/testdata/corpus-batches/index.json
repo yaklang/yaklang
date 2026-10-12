@@ -65467,6 +65467,407 @@
         "common/pcapx/pcaputil/rtps20-rti-filter/tshark-compare.py": "rtps20-rti-filter/tshark-compare.py",
         "scripts/protocol-tests/required-tests-traffic-unified-v39.json": "required-tests-traffic-unified-v39.json"
       }
+    },
+    {
+      "id": "validation-mms-iso",
+      "kind": "validation",
+      "source_sha": "71970414243b39968141aae293bc81c28865ef70",
+      "file": "validation-mms-iso.zip",
+      "sha256": "4c10255ddd25d36dc872ac35298653a45bc52797760c0bbe9d285ce0f4a0e658",
+      "password": "bin-parser",
+      "members": {
+        "mms-iso/answers/normal-read-error.json": {
+          "sha256": "dd655a8affa8ec3931331333577a9c508da39c607bca07bf0ff43e80b8c550f0",
+          "bytes": 55595
+        },
+        "mms-iso/captures/normal-read-error.pcap": {
+          "sha256": "b865d2024baac1f6e738023f7db580e4ff9a4f64eee1ff0a6ee6e5b9f7b3fc63",
+          "bytes": 1643
+        },
+        "mms-iso/answers/normal-getattrs-error.json": {
+          "sha256": "9983838c85fe0bdfae4301a6146a9d5eac551f8433038af6ea0f284388c82faa",
+          "bytes": 53425
+        },
+        "mms-iso/captures/normal-getattrs-error.pcap": {
+          "sha256": "9894719346ba8bf06d7b10f3a5c966a3461bdc091df00c593c813bfa7cdb829b",
+          "bytes": 1637
+        },
+        "mms-iso/answers/invoke-zero-and-max.json": {
+          "sha256": "1c94f08003b6158932b9d8bc91968a48aa0bcc78d52da348c695a7309995ba33",
+          "bytes": 66735
+        },
+        "mms-iso/captures/invoke-zero-and-max.pcap": {
+          "sha256": "c714132d6c7d5db8e09f2be20e49d875523f5746267a7eb0126cd7b7777c2aad",
+          "bytes": 1872
+        },
+        "mms-iso/answers/interleaved-both-directions.json": {
+          "sha256": "e295b4a857e90d1d897293dd3a86f4b58586915472f992f319868de9d4dbdd97",
+          "bytes": 66589
+        },
+        "mms-iso/captures/interleaved-both-directions.pcap": {
+          "sha256": "85c29acc8b1ec4d90c269a107d1b0bc33a57da519d323bed7bdcf50338abf33c",
+          "bytes": 1864
+        },
+        "mms-iso/answers/two-variable-results.json": {
+          "sha256": "7e1c11042a968ecf65816ef32ff58c71da5e83729541bf9684185885d344fb81",
+          "bytes": 59106
+        },
+        "mms-iso/captures/two-variable-results.pcap": {
+          "sha256": "f58956776d3558680e865a5c56189da756cb1931f88bcbca49a6e80cd4082c0c",
+          "bytes": 1664
+        },
+        "mms-iso/answers/empty-association-close.json": {
+          "sha256": "d91b2315cc6d7776c14d18d753c96e637d9340dac6ee87731b86fa54f034cd8f",
+          "bytes": 44603
+        },
+        "mms-iso/captures/empty-association-close.pcap": {
+          "sha256": "15ca4bdddb60f7a73e632af168e2c627697763a8f850bd3429283f2ef313b570",
+          "bytes": 1422
+        },
+        "mms-iso/answers/server-conclude-release.json": {
+          "sha256": "9199d8a8ac39916db0d279735fe7e4766402185889c28e4965c6420136b1d654",
+          "bytes": 44603
+        },
+        "mms-iso/captures/server-conclude-release.pcap": {
+          "sha256": "fc57b35a3aa2b531a553120334ffbe06014b6abb243f8d7ce53a9815d25bf62e",
+          "bytes": 1422
+        },
+        "mms-iso/answers/cotp-segmented-request.json": {
+          "sha256": "cdaab11a72fb03057af0bf022995afc182c327f6cdcd124662ecfa079253a06f",
+          "bytes": 56953
+        },
+        "mms-iso/captures/cotp-segmented-request.pcap": {
+          "sha256": "c064465a8715fc0c635b050a1571a7d2d37c29c3b5a935c612f1c08d5e19709c",
+          "bytes": 1720
+        },
+        "mms-iso/answers/class0-number-bits.json": {
+          "sha256": "bc594865251edf9fde92e76ca7549e4abd36def29c424a136b6b437a502a9e93",
+          "bytes": 55597
+        },
+        "mms-iso/captures/class0-number-bits.pcap": {
+          "sha256": "ec58ba6a75e117222a7dc588315b5e89be87f94efeef52c5f51f3e3154878b06",
+          "bytes": 1643
+        },
+        "mms-iso/answers/orphan-response.json": {
+          "sha256": "e3a0c40e873165857ed7fd80e8efbe43e12f92dc94c005b39cbcac20cb6e501c",
+          "bytes": 35675
+        },
+        "mms-iso/captures/orphan-response.pcap": {
+          "sha256": "dc8e04e80d94c619d816072e043da4c71a2c0427f3d0ecdcd9d1156b7a7ef407",
+          "bytes": 1252
+        },
+        "mms-iso/answers/wrong-direction-reply.json": {
+          "sha256": "17c131a0215633918cf56f99ed8f2ba85a198916a81f8da2dd41b3a51b94abc3",
+          "bytes": 42775
+        },
+        "mms-iso/captures/wrong-direction-reply.pcap": {
+          "sha256": "05084a0b90d1cda1fa64f361891819c43e9189298f4207c9af1873eb27cf7ae5",
+          "bytes": 1371
+        },
+        "mms-iso/answers/active-invoke-reuse.json": {
+          "sha256": "c667bc806add85192691a32a9978f965d345d76331f1a43d40f02a4dae7b77e0",
+          "bytes": 42835
+        },
+        "mms-iso/captures/active-invoke-reuse.pcap": {
+          "sha256": "8d0ca4dc48c1d280ec41985e90dc7070c3157479e09b1f9badc0c135e943c11b",
+          "bytes": 1388
+        },
+        "mms-iso/answers/retired-invoke-ambiguous.json": {
+          "sha256": "227fd543099f45f5c5c0698b68c28b434b002d6e49704fbbb16f630d9f3f1ca4",
+          "bytes": 46735
+        },
+        "mms-iso/captures/retired-invoke-ambiguous.pcap": {
+          "sha256": "32ef739f4898b47a1ab121c10ec99aa5d6e1a8d534cbb52ec3c0cd62fe06775c",
+          "bytes": 1490
+        },
+        "mms-iso/answers/wrong-result-count.json": {
+          "sha256": "25874883abee915d6a8f8b765c40089ed58efaf40fdf0604ed4ce2b39da8ed09",
+          "bytes": 42781
+        },
+        "mms-iso/captures/wrong-result-count.pcap": {
+          "sha256": "1f488b36aa929ccd38f6741e8737a3d4f6c5fef54630a6bf5ac0862c6dcf52df",
+          "bytes": 1374
+        },
+        "mms-iso/answers/wrong-service-reply.json": {
+          "sha256": "e27f4b038010bf1cc3b7db077bb6af72ea08040298e029a9f82902015fea5e9a",
+          "bytes": 40665
+        },
+        "mms-iso/captures/wrong-service-reply.pcap": {
+          "sha256": "79f94dd562ee14cb7e3d72378336945f4b5147b741da9cb99a994a18fd7c0069",
+          "bytes": 1365
+        },
+        "mms-iso/answers/unknown-presentation-context.json": {
+          "sha256": "6b00da3fea0b26d9ee658de7d19b4d25508699989b15f309fd41a88eb9d53005",
+          "bytes": 35743
+        },
+        "mms-iso/captures/unknown-presentation-context.pcap": {
+          "sha256": "45354e3ce393b6a07aeeb6db49b4d4623fd951963686e4f6302e8e4bd5090451",
+          "bytes": 1269
+        },
+        "mms-iso/answers/acse-context-for-mms.json": {
+          "sha256": "3902148edaac4fe5d3c9c6e1fe27c312ef3ccf3bf9ac0c6888e99dd43d1e194a",
+          "bytes": 35743
+        },
+        "mms-iso/captures/acse-context-for-mms.pcap": {
+          "sha256": "5d45d01f6efe0e7e1c0ba1c62fa45ed4d80d8cb3ad9909472fb734331f5244bb",
+          "bytes": 1269
+        },
+        "mms-iso/answers/conclude-with-pending.json": {
+          "sha256": "d0167f9280aceb0d3effdb3da3efa9c2756d835c9ed78aaeab7834a9ae513f02",
+          "bytes": 42735
+        },
+        "mms-iso/captures/conclude-with-pending.pcap": {
+          "sha256": "19395a1bd9165b48576ce0b92c4ac47b3b63faa1407fd7ea0910b2f92ad0132f",
+          "bytes": 1361
+        },
+        "mms-iso/answers/conclude-wrong-direction.json": {
+          "sha256": "2c12783bacd40c0b91b475174ad8f8cd3b8930ab39f7d836fcb37cfe5682effa",
+          "bytes": 37800
+        },
+        "mms-iso/captures/conclude-wrong-direction.pcap": {
+          "sha256": "f305e4aa4213fcd10950f527e23be259744bbeab1656f448f6fe1e255ca726a9",
+          "bytes": 1334
+        },
+        "mms-iso/answers/request-after-conclude.json": {
+          "sha256": "302395addff644771956317d6c344bd94130ff9993763e1d76879f343ec19204",
+          "bytes": 37908
+        },
+        "mms-iso/captures/request-after-conclude.pcap": {
+          "sha256": "8dd501c533e58a538ffa0b561df24e8f6825666e2471d37745b0920bcf956301",
+          "bytes": 1361
+        },
+        "mms-iso/answers/invalid-access-error.json": {
+          "sha256": "5532c8e3ea78f089c60e07f240bbd2dbd46145c69001cb4ac8b7b46351a21f4a",
+          "bytes": 42769
+        },
+        "mms-iso/captures/invalid-access-error.pcap": {
+          "sha256": "c871659c90351bb525c3a65d5e8d43eabea742c4673ef2efe2579071df7dfc9e",
+          "bytes": 1371
+        },
+        "mms-iso/answers/unknown-pdu.json": {
+          "sha256": "158198936cd50e997b9c795c39704fe8f99ddc24ee80f3aefdcdefe976c67b7a",
+          "bytes": 35638
+        },
+        "mms-iso/captures/unknown-pdu.pcap": {
+          "sha256": "a8f17099b15ce19442b82b1a1ae981dc7164ab3915788ee0290090d59ec0cb06",
+          "bytes": 1242
+        },
+        "mms-iso/answers/indefinite-ber.json": {
+          "sha256": "31ef112e9351d1d169a38592b0bab89258f029e870f9ec216132e81abfd0972f",
+          "bytes": 35646
+        },
+        "mms-iso/captures/indefinite-ber.pcap": {
+          "sha256": "60cd18aa74ccf959d50777c5aaf2ac637599198d5ba24a9622289374749468c4",
+          "bytes": 1244
+        },
+        "mms-iso/answers/truncated-ber.json": {
+          "sha256": "a407002d4d0d9eb463e7e6bdcdfc3cf416d93f16d34cce34132aeae31ca196e1",
+          "bytes": 35633
+        },
+        "mms-iso/captures/truncated-ber.pcap": {
+          "sha256": "6358d5bfc7186d879ab23a818047166e6c9dcf9b453509dbdbd169308e82b52b",
+          "bytes": 1243
+        },
+        "mms-iso/answers/negative-invoke.json": {
+          "sha256": "a12b8e7d9f5e3e5805b52a484b1ded8b0abb144f76236bf9f1d1ed538eb196dc",
+          "bytes": 35665
+        },
+        "mms-iso/captures/negative-invoke.pcap": {
+          "sha256": "a072d7966a2e5718035f5682a089e5add4dae7945bebc03b6fcc07faf585d11b",
+          "bytes": 1251
+        },
+        "mms-iso/answers/redundant-invoke-zero.json": {
+          "sha256": "301b5f1c49f23c38e5774c35ba37f618374bf43447e82d3878f3c7b17c5ca042",
+          "bytes": 35669
+        },
+        "mms-iso/captures/redundant-invoke-zero.pcap": {
+          "sha256": "5083a91b92f12ba80fb7e145255638483831f547ae86faf05db1b6a8e4efa4ad",
+          "bytes": 1252
+        },
+        "mms-iso/answers/primitive-success-unselected.json": {
+          "sha256": "f3314bf461616c4e5b62556b47d4e1c89a70070676e8ec4f06ef7f2e0940fe1f",
+          "bytes": 42778
+        },
+        "mms-iso/captures/primitive-success-unselected.pcap": {
+          "sha256": "86fda48bc88034c7792ed76287cdb939339b36f1007e1593a96eceeb47cdd72f",
+          "bytes": 1371
+        },
+        "mms-iso/answers/rejected-mms-context.json": {
+          "sha256": "6debda6c9e1541c52ba0e5a17ee342942a83a1dad70624c433e92db90786d85c",
+          "bytes": 19533
+        },
+        "mms-iso/captures/rejected-mms-context.pcap": {
+          "sha256": "5d1f6b2a9eea52e9bd66d626ea372e85adf6511d1fc4fb21de1bed6f42369fde",
+          "bytes": 1163
+        },
+        "mms-iso/answers/accepted-nonzero-diagnostic.json": {
+          "sha256": "90f3b6a7e1d6cc1f728dbf2094c083255979918aa49d8e348345663352b33a5a",
+          "bytes": 19543
+        },
+        "mms-iso/captures/accepted-nonzero-diagnostic.pcap": {
+          "sha256": "815d4fbe16b7c3606a65315f3992c99e4c1b1584a34080ed0f1eb5edc2575eb1",
+          "bytes": 1167
+        },
+        "mms-iso/answers/wrong-application-context.json": {
+          "sha256": "2764dd79ebe26c5090b4a7f06baace4da2f28e8ad01393f1834dc00f1b0b7f5a",
+          "bytes": 19545
+        },
+        "mms-iso/captures/wrong-application-context.pcap": {
+          "sha256": "d1046368d2591c5f179d97b3a4fa8426c4402485ab7198f7d6b179684e008431",
+          "bytes": 1166
+        },
+        "mms-iso/answers/negotiated-limit-exceeds-offer.json": {
+          "sha256": "592d2a5ef61f45da9f15b7560521a8831e1f0a76e0778aa0b18c249386577f54",
+          "bytes": 19543
+        },
+        "mms-iso/captures/negotiated-limit-exceeds-offer.pcap": {
+          "sha256": "6c4dd5b1be788500ce5040aeebc9ad502dc5b9b989d19dd4aab139b4fa153f76",
+          "bytes": 1167
+        },
+        "mms-iso/answers/data-without-transport.json": {
+          "sha256": "6ee40fc9717785053b5759105490ca326cb8be3de61e0bf1c2dd5e2fb1c6bef6",
+          "bytes": 598
+        },
+        "mms-iso/captures/data-without-transport.pcap": {
+          "sha256": "71dc22a1c3806411941e8e019df92f3437c8553780f9a12b4aedecfb7dd439d8",
+          "bytes": 665
+        },
+        "mms-iso/answers/cc-without-cr.json": {
+          "sha256": "78230d4279e3dd8c32d7ad4ffaac6f66f05c752245740961b23c662eefa4ab86",
+          "bytes": 524
+        },
+        "mms-iso/captures/cc-without-cr.pcap": {
+          "sha256": "ec64c7ad4aee2a99ec7b370ec9e3dca82e33e263a7a2ae1856abc9ab340fab4f",
+          "bytes": 655
+        },
+        "mms-iso/answers/peer-does-not-advertise-read.json": {
+          "sha256": "318d43b876355d3247554fb11d760bc0929f9a29c1828376a43631b563b3a1a6",
+          "bytes": 35743
+        },
+        "mms-iso/captures/peer-does-not-advertise-read.pcap": {
+          "sha256": "fe021cb3be5b40785537826677226ba7351033ce512360ce829bd6788fd6bb9a",
+          "bytes": 1269
+        },
+        "mms-iso/answers/historical-original.json": {
+          "sha256": "1c50baa6230553f1f82b38a8759be575a67aea46f2ba6c619adaf08ffa08f81e",
+          "bytes": 66513
+        },
+        "mms-iso/manifest.json": {
+          "sha256": "de6848b48226fd7584f025d1e963dfe27c46a8b71158913c0be697dd740d98a5",
+          "bytes": 12488
+        },
+        "mms-iso/generate.py": {
+          "sha256": "fbef44ce838c88b6b4eb8f2323ddf0b09816ea93090fc3ddb1a58815124db62e",
+          "bytes": 15480
+        },
+        "mms-iso/capture.py": {
+          "sha256": "150bc3e83779bad71cc90e81533dfe6c79374bd835e1e6dcf21d1217c09fc5c5",
+          "bytes": 1395
+        },
+        "mms-iso/verify.py": {
+          "sha256": "a8adb7ec34cec345c4eda88552525d72a6ae22ef9ebe26f0672c23c9ed4c51f0",
+          "bytes": 1984
+        },
+        "mms-iso/SOURCE-PINS.json": {
+          "sha256": "1b7703ebe02858fa3f0bd5fa5d173d0ff411c9e0bb6771c73f2782338ceb2aed",
+          "bytes": 1358
+        },
+        "mms-iso/seal.py": {
+          "sha256": "e852cc61dd7428e693ced365ab855c93454f8fc9c5812b0be5cd402c28e3839f",
+          "bytes": 3908
+        },
+        "mms-iso/reference.py": {
+          "sha256": "6c30c691abbfc39f916d8ac449dee93c9604ef9bb7fc55d43eefcbd73566f7a3",
+          "bytes": 3758
+        },
+        "required-tests-traffic-unified-v40.json": {
+          "sha256": "9119f25027c2728e2c0d8b3c26995df5ae2774aa6e01850fdfea2655d0d5262f",
+          "bytes": 4053547
+        },
+        "validation/expected.json": {
+          "sha256": "d913790a328e44d67367a2b3186a53fa6331648484e99ce8181adf89d2e18415",
+          "bytes": 37943
+        }
+      },
+      "aliases": {
+        "common/pcapx/pcaputil/mms-iso/answers/normal-read-error.json": "mms-iso/answers/normal-read-error.json",
+        "common/pcapx/pcaputil/mms-iso/captures/normal-read-error.pcap": "mms-iso/captures/normal-read-error.pcap",
+        "common/pcapx/pcaputil/mms-iso/answers/normal-getattrs-error.json": "mms-iso/answers/normal-getattrs-error.json",
+        "common/pcapx/pcaputil/mms-iso/captures/normal-getattrs-error.pcap": "mms-iso/captures/normal-getattrs-error.pcap",
+        "common/pcapx/pcaputil/mms-iso/answers/invoke-zero-and-max.json": "mms-iso/answers/invoke-zero-and-max.json",
+        "common/pcapx/pcaputil/mms-iso/captures/invoke-zero-and-max.pcap": "mms-iso/captures/invoke-zero-and-max.pcap",
+        "common/pcapx/pcaputil/mms-iso/answers/interleaved-both-directions.json": "mms-iso/answers/interleaved-both-directions.json",
+        "common/pcapx/pcaputil/mms-iso/captures/interleaved-both-directions.pcap": "mms-iso/captures/interleaved-both-directions.pcap",
+        "common/pcapx/pcaputil/mms-iso/answers/two-variable-results.json": "mms-iso/answers/two-variable-results.json",
+        "common/pcapx/pcaputil/mms-iso/captures/two-variable-results.pcap": "mms-iso/captures/two-variable-results.pcap",
+        "common/pcapx/pcaputil/mms-iso/answers/empty-association-close.json": "mms-iso/answers/empty-association-close.json",
+        "common/pcapx/pcaputil/mms-iso/captures/empty-association-close.pcap": "mms-iso/captures/empty-association-close.pcap",
+        "common/pcapx/pcaputil/mms-iso/answers/server-conclude-release.json": "mms-iso/answers/server-conclude-release.json",
+        "common/pcapx/pcaputil/mms-iso/captures/server-conclude-release.pcap": "mms-iso/captures/server-conclude-release.pcap",
+        "common/pcapx/pcaputil/mms-iso/answers/cotp-segmented-request.json": "mms-iso/answers/cotp-segmented-request.json",
+        "common/pcapx/pcaputil/mms-iso/captures/cotp-segmented-request.pcap": "mms-iso/captures/cotp-segmented-request.pcap",
+        "common/pcapx/pcaputil/mms-iso/answers/class0-number-bits.json": "mms-iso/answers/class0-number-bits.json",
+        "common/pcapx/pcaputil/mms-iso/captures/class0-number-bits.pcap": "mms-iso/captures/class0-number-bits.pcap",
+        "common/pcapx/pcaputil/mms-iso/answers/orphan-response.json": "mms-iso/answers/orphan-response.json",
+        "common/pcapx/pcaputil/mms-iso/captures/orphan-response.pcap": "mms-iso/captures/orphan-response.pcap",
+        "common/pcapx/pcaputil/mms-iso/answers/wrong-direction-reply.json": "mms-iso/answers/wrong-direction-reply.json",
+        "common/pcapx/pcaputil/mms-iso/captures/wrong-direction-reply.pcap": "mms-iso/captures/wrong-direction-reply.pcap",
+        "common/pcapx/pcaputil/mms-iso/answers/active-invoke-reuse.json": "mms-iso/answers/active-invoke-reuse.json",
+        "common/pcapx/pcaputil/mms-iso/captures/active-invoke-reuse.pcap": "mms-iso/captures/active-invoke-reuse.pcap",
+        "common/pcapx/pcaputil/mms-iso/answers/retired-invoke-ambiguous.json": "mms-iso/answers/retired-invoke-ambiguous.json",
+        "common/pcapx/pcaputil/mms-iso/captures/retired-invoke-ambiguous.pcap": "mms-iso/captures/retired-invoke-ambiguous.pcap",
+        "common/pcapx/pcaputil/mms-iso/answers/wrong-result-count.json": "mms-iso/answers/wrong-result-count.json",
+        "common/pcapx/pcaputil/mms-iso/captures/wrong-result-count.pcap": "mms-iso/captures/wrong-result-count.pcap",
+        "common/pcapx/pcaputil/mms-iso/answers/wrong-service-reply.json": "mms-iso/answers/wrong-service-reply.json",
+        "common/pcapx/pcaputil/mms-iso/captures/wrong-service-reply.pcap": "mms-iso/captures/wrong-service-reply.pcap",
+        "common/pcapx/pcaputil/mms-iso/answers/unknown-presentation-context.json": "mms-iso/answers/unknown-presentation-context.json",
+        "common/pcapx/pcaputil/mms-iso/captures/unknown-presentation-context.pcap": "mms-iso/captures/unknown-presentation-context.pcap",
+        "common/pcapx/pcaputil/mms-iso/answers/acse-context-for-mms.json": "mms-iso/answers/acse-context-for-mms.json",
+        "common/pcapx/pcaputil/mms-iso/captures/acse-context-for-mms.pcap": "mms-iso/captures/acse-context-for-mms.pcap",
+        "common/pcapx/pcaputil/mms-iso/answers/conclude-with-pending.json": "mms-iso/answers/conclude-with-pending.json",
+        "common/pcapx/pcaputil/mms-iso/captures/conclude-with-pending.pcap": "mms-iso/captures/conclude-with-pending.pcap",
+        "common/pcapx/pcaputil/mms-iso/answers/conclude-wrong-direction.json": "mms-iso/answers/conclude-wrong-direction.json",
+        "common/pcapx/pcaputil/mms-iso/captures/conclude-wrong-direction.pcap": "mms-iso/captures/conclude-wrong-direction.pcap",
+        "common/pcapx/pcaputil/mms-iso/answers/request-after-conclude.json": "mms-iso/answers/request-after-conclude.json",
+        "common/pcapx/pcaputil/mms-iso/captures/request-after-conclude.pcap": "mms-iso/captures/request-after-conclude.pcap",
+        "common/pcapx/pcaputil/mms-iso/answers/invalid-access-error.json": "mms-iso/answers/invalid-access-error.json",
+        "common/pcapx/pcaputil/mms-iso/captures/invalid-access-error.pcap": "mms-iso/captures/invalid-access-error.pcap",
+        "common/pcapx/pcaputil/mms-iso/answers/unknown-pdu.json": "mms-iso/answers/unknown-pdu.json",
+        "common/pcapx/pcaputil/mms-iso/captures/unknown-pdu.pcap": "mms-iso/captures/unknown-pdu.pcap",
+        "common/pcapx/pcaputil/mms-iso/answers/indefinite-ber.json": "mms-iso/answers/indefinite-ber.json",
+        "common/pcapx/pcaputil/mms-iso/captures/indefinite-ber.pcap": "mms-iso/captures/indefinite-ber.pcap",
+        "common/pcapx/pcaputil/mms-iso/answers/truncated-ber.json": "mms-iso/answers/truncated-ber.json",
+        "common/pcapx/pcaputil/mms-iso/captures/truncated-ber.pcap": "mms-iso/captures/truncated-ber.pcap",
+        "common/pcapx/pcaputil/mms-iso/answers/negative-invoke.json": "mms-iso/answers/negative-invoke.json",
+        "common/pcapx/pcaputil/mms-iso/captures/negative-invoke.pcap": "mms-iso/captures/negative-invoke.pcap",
+        "common/pcapx/pcaputil/mms-iso/answers/redundant-invoke-zero.json": "mms-iso/answers/redundant-invoke-zero.json",
+        "common/pcapx/pcaputil/mms-iso/captures/redundant-invoke-zero.pcap": "mms-iso/captures/redundant-invoke-zero.pcap",
+        "common/pcapx/pcaputil/mms-iso/answers/primitive-success-unselected.json": "mms-iso/answers/primitive-success-unselected.json",
+        "common/pcapx/pcaputil/mms-iso/captures/primitive-success-unselected.pcap": "mms-iso/captures/primitive-success-unselected.pcap",
+        "common/pcapx/pcaputil/mms-iso/answers/rejected-mms-context.json": "mms-iso/answers/rejected-mms-context.json",
+        "common/pcapx/pcaputil/mms-iso/captures/rejected-mms-context.pcap": "mms-iso/captures/rejected-mms-context.pcap",
+        "common/pcapx/pcaputil/mms-iso/answers/accepted-nonzero-diagnostic.json": "mms-iso/answers/accepted-nonzero-diagnostic.json",
+        "common/pcapx/pcaputil/mms-iso/captures/accepted-nonzero-diagnostic.pcap": "mms-iso/captures/accepted-nonzero-diagnostic.pcap",
+        "common/pcapx/pcaputil/mms-iso/answers/wrong-application-context.json": "mms-iso/answers/wrong-application-context.json",
+        "common/pcapx/pcaputil/mms-iso/captures/wrong-application-context.pcap": "mms-iso/captures/wrong-application-context.pcap",
+        "common/pcapx/pcaputil/mms-iso/answers/negotiated-limit-exceeds-offer.json": "mms-iso/answers/negotiated-limit-exceeds-offer.json",
+        "common/pcapx/pcaputil/mms-iso/captures/negotiated-limit-exceeds-offer.pcap": "mms-iso/captures/negotiated-limit-exceeds-offer.pcap",
+        "common/pcapx/pcaputil/mms-iso/answers/data-without-transport.json": "mms-iso/answers/data-without-transport.json",
+        "common/pcapx/pcaputil/mms-iso/captures/data-without-transport.pcap": "mms-iso/captures/data-without-transport.pcap",
+        "common/pcapx/pcaputil/mms-iso/answers/cc-without-cr.json": "mms-iso/answers/cc-without-cr.json",
+        "common/pcapx/pcaputil/mms-iso/captures/cc-without-cr.pcap": "mms-iso/captures/cc-without-cr.pcap",
+        "common/pcapx/pcaputil/mms-iso/answers/peer-does-not-advertise-read.json": "mms-iso/answers/peer-does-not-advertise-read.json",
+        "common/pcapx/pcaputil/mms-iso/captures/peer-does-not-advertise-read.pcap": "mms-iso/captures/peer-does-not-advertise-read.pcap",
+        "common/pcapx/pcaputil/mms-iso/answers/historical-original.json": "mms-iso/answers/historical-original.json",
+        "common/pcapx/pcaputil/mms-iso/manifest.json": "mms-iso/manifest.json",
+        "common/pcapx/pcaputil/mms-iso/generate.py": "mms-iso/generate.py",
+        "common/pcapx/pcaputil/mms-iso/capture.py": "mms-iso/capture.py",
+        "common/pcapx/pcaputil/mms-iso/verify.py": "mms-iso/verify.py",
+        "common/pcapx/pcaputil/mms-iso/SOURCE-PINS.json": "mms-iso/SOURCE-PINS.json",
+        "common/pcapx/pcaputil/mms-iso/seal.py": "mms-iso/seal.py",
+        "common/pcapx/pcaputil/mms-iso/reference.py": "mms-iso/reference.py",
+        "scripts/protocol-tests/required-tests-traffic-unified-v40.json": "required-tests-traffic-unified-v40.json"
+      }
     }
   ],
   "schema_version": 1,

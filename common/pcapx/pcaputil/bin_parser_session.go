@@ -18,6 +18,12 @@ func (f *binFlow) detectDirection(dir int, wire []byte) {
 	if f.detectBinding(wire) {
 		return
 	}
+	for _, port := range f.a.config.MMSISOPorts {
+		if f.port(port) {
+			f.protocol, f.mms = "mms", newBinMMS()
+			return
+		}
+	}
 	if p := probeSLMPTCP(wire, min(f.a.budget.MaxFrameBytes, f.a.config.MaxMessageBytes), f.port(5000)); p.Verdict == ProbeAccept {
 		client := dir
 		if f.tcpClientKnown {
@@ -363,6 +369,12 @@ func (f *binFlow) needsMoreOpenWire(wire []byte) bool {
 func (f *binFlow) consumeSession(dir int, e *ProtocolEvent, result map[string]any) error {
 	var err error
 	switch f.protocol {
+	case "mms":
+		e.Session, err = f.consumeMMSISO(dir, e)
+		if err == nil {
+			e.semanticFields = cloneSession(e.Session)
+			e.semanticSession = cloneSession(e.Session)
+		}
 	case "slmp":
 		if e.ID == 0 {
 			e.ID = f.a.ids.Add(1)
@@ -926,6 +938,7 @@ func (f *binFlow) invalidateSession(dir int) {
 }
 
 func (f *binFlow) closeSession() {
+	f.mms = nil
 	f.releaseDoH()
 	if f.protocol == "dns" || f.protocol == "dot" {
 		f.a.closeDNSFlow(f.id)
@@ -977,6 +990,16 @@ func (f *binFlow) closeSession() {
 }
 
 func (f *binFlow) finishSession(reason TrafficFlowCloseReason) {
+	if m := f.mms; m != nil && (len(m.pending[0])+len(m.pending[1])+len(m.fragment[0].events)+len(m.fragment[1].events) > 0) {
+		e := f.event(0, nil, "incomplete", string(reason)+": MMS outstanding requests/TSDU at close")
+		e.Completeness = "incomplete"
+		e.sessionError = &ProtocolError{Kind: ErrNeedMore, Message: e.Summary}
+		e.Session = map[string]any{"Observed Context": m.snapshot()}
+		e.semanticSession = cloneSession(e.Session)
+		f.a.incomplete.Add(1)
+		f.a.emit(e)
+	}
+
 	emit := func(dir int, session map[string]any, why string) {
 		e := f.event(dir, nil, "incomplete", string(reason)+": "+why)
 		e.Session = session

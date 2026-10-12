@@ -193,6 +193,9 @@ func NewProtocolSessionWithOptions(budget ParserBudget, options ...ProtocolSessi
 	if s.transport == "udp" && s.f.tcpClientKnown {
 		return nil, fmt.Errorf("TCP initiator direction cannot be set on a UDP session")
 	}
+	if s.f.mms != nil && s.transport == "udp" {
+		return nil, fmt.Errorf("MMS ISO requires TCP")
+	}
 	optionsComplete = true
 	return s, nil
 }
@@ -215,6 +218,27 @@ func NewDecryptedQUICSession(budget ParserBudget, source string) (ProtocolSessio
 }
 
 func (s *captureSession) Probe(data []byte) ProbeResult {
+	if s.f.mms != nil && s.transport != "udp" {
+		n, err := mmsFrameSize(data, min(s.f.a.budget.MaxFrameBytes, s.f.a.config.MaxMessageBytes))
+		if err != nil {
+			return ProbeResult{Verdict: ProbeReject, Protocol: "mms", Reason: err.Error()}
+		}
+		if n == 0 || n > len(data) {
+			return ProbeResult{Verdict: ProbeNeedMore, Protocol: "mms", NeedBytes: max(n, 4) - len(data)}
+		}
+		if s.closed || s.f.mms.poison {
+			return ProbeResult{Verdict: ProbeReject, Protocol: "mms", Reason: "closed or refused observed context"}
+		}
+		target := s.f.mms.storage() + 32768 + 512*int64(n)
+		if s.f.a.buffered.Load()+max(int64(0), target-s.f.sessionBytes) > int64(s.f.a.config.MaxBufferedBytes) {
+			return ProbeResult{Verdict: ProbeReject, Protocol: "mms", Reason: "MMS shared projection budget"}
+		}
+		if _, err = parseMMSCOTP(data[:n], s.f.a.budget); err != nil {
+			return ProbeResult{Verdict: ProbeReject, Protocol: "mms", Reason: err.Error()}
+		}
+		return probeAccept("mms", mmsISOProfile, 95)
+	}
+
 	if s.transport == "udp" {
 		if p, ok := s.probeRTPS20RTIFilter(data); ok {
 			return p
@@ -413,6 +437,9 @@ func sessionErrorFromEvents(events []*ProtocolEvent) *ProtocolError {
 }
 
 func (f *binFlow) hasSession() bool {
+	if f.mms != nil {
+		return true
+	}
 	if f.protocol == "nats" {
 		return true // NATS allocates its budgeted negotiation state at consumption.
 	}

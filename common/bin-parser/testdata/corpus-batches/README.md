@@ -44,7 +44,7 @@ Run from the repository root:
 ```sh
 go run ./internal/trafficfixture/cmd/corpus test
 go test -json -count=1 -timeout=5m ./internal/trafficfixture/... ./common/bin-parser/... ./common/pcapx/... ./common/yak/cmd/yakcmds/shark-cli ./scripts/ci > traffic.jsonl
-go run ./internal/trafficfixture/cmd/corpus exec -- python3 @scripts/protocol-tests/check_go_test_json.py traffic.jsonl --inventory @scripts/protocol-tests/required-tests-traffic-unified-v39.json --tier full
+go run ./internal/trafficfixture/cmd/corpus exec -- python3 @scripts/protocol-tests/check_go_test_json.py traffic.jsonl --inventory @scripts/protocol-tests/required-tests-traffic-unified-v40.json --tier full
 ```
 
 The single `corpus` entry point uses the same bounded Go ZIP loader as tests.
@@ -83,7 +83,7 @@ their semantic coverage. The existing synthetic session keys are test inputs;
 production credentials, user private keys and material without redistribution
 permission belong in an external fixed-source download manifest.
 
-Current test requirements are sealed at `scripts/protocol-tests/required-tests-traffic-unified-v39.json`;
+Current test requirements are sealed at `scripts/protocol-tests/required-tests-traffic-unified-v40.json`;
 the historical inventories and all earlier batches remain unchanged.
 The supplemental small-corpus batch contains 26 minimal controls, their explicit
 expected facts, an offline generator and the compact pinned source manifest.
@@ -96,7 +96,7 @@ byte-boundary, malformed-length and ownership tests. These are scoped control
 assertions, not a semantic golden for the entire upstream collection. Process
 logs and the original large downloads remain outside the repository.
 
-The local acceptance inventory is `required-tests-traffic-unified-v39.json`. The published workflow gate currently references v25; v26 adds Call requirements, v27 adds scalar arrays and v28 adds extended builtin fields and v29 adds bounded value graphs and complete diagnostic wire fields; v30 adds message-local RTPS INFO_SRC/INFO_DST context, v31 bounded SPDP fragments and owned answer-cache requirements, and v32 legacy RTPS2.0 DATA wire, budget, lifecycle and ownership requirements. Older
+The local acceptance inventory and published workflow gate both use `required-tests-traffic-unified-v40.json`; v26 adds Call requirements, v27 adds scalar arrays and v28 adds extended builtin fields and v29 adds bounded value graphs and complete diagnostic wire fields; v30 adds message-local RTPS INFO_SRC/INFO_DST context, v31 bounded SPDP fragments and owned answer-cache requirements, and v32 legacy RTPS2.0 DATA wire, budget, lifecycle and ownership requirements. Older
 versioned inventories stay available as historical inputs; they are not the
 current acceptance entry. The DLMS HDLC batch contains owned tunnel/Get-normal
 controls and their independent fields/errors, CRC/byte validator, offline
@@ -203,7 +203,7 @@ opaque selector bytes and one bounded Data value over Wrapper v1 TCP/UDP; object
 selector meaning, access permission and device operation are unverified. The
 original one-packet selective-access capture and original refused answer remain
 immutable; its now-supported answer is matched by exact input SHA and frame.
-The active inventory is `scripts/protocol-tests/required-tests-traffic-unified-v39.json`.
+The active inventory is `scripts/protocol-tests/required-tests-traffic-unified-v40.json`.
 
 The small-graph budget batch reuses accepted graph captures/answers and adds one
 249-byte UDP control for child count255 without child bytes. Its standalone proof
@@ -919,3 +919,40 @@ and identical QoS plus valid adjacent DATA is actually compared. Normative
 logical-vendor controls use the independent model rather than a reference claim.
 Source pins, generator/verifier and the current v39 requirements are sealed;
 raw originals, PDFs, full reference source and process outputs stay external.
+
+### MMS ISO TCP association observations
+
+`validation-mms-iso.zip` seals 34 authored minimal captures and 35 complete
+independent answers, reusing the hash-pinned historical nDPI capture without
+copying it. `WithProtocolMMSISO(port)` explicitly selects TCP capture routing;
+`WithSessionMMSISO()` selects the same standalone session path. No default
+port-only or byte-search MMS admission is introduced.
+
+The selected profile is MMS version 1 over RFC1006 TPKT, class0 COTP CR/CC/DT,
+normal presentation mode with observed ACSE and MMS BER context negotiation,
+unprotected AARQ/AARE, Initiate, domain-specific named Read requests with
+failure AccessResults, named GetVariableAccessAttributes requests with access
+ServiceErrors, Conclude, and ACSE release. Complete bounded BER trees and raw
+fields remain visible beside selected typed values. No executable rule graph
+is constructed in this capture path; historical bare-PDU rules remain intact.
+
+Tests assert complete event fields, order, passive Session, both zero and maximum
+InvokeID, opposite-direction request association, service/result cardinality,
+peer serving capability, negotiated outstanding/receive limits, COTP segment
+provenance, refusal, resource release, Close and private output ownership. TCP
+full/deferred, workers1/2/4, observer off/on and Feed chunks1/7/full are covered.
+After fatal refusal the shared stream stops; late data cannot fabricate a
+response association. Retired InvokeID reuse remains an explicit ambiguity
+refusal until a new observed TCP association.
+
+Full MMS success Data/types, named variable lists, other services, VMD/AA names,
+modifiers/extensions, authentication, indefinite BER, application state and
+real device qualification are still pending; this batch does not close those
+requirements. The original capture is not relicensed. Its exact reuse supplies
+wire evidence, not device correctness. Independent reference comparisons record
+Wireshark4.2.5's signed display of maximum Unsigned32 InvokeID separately from
+its correct BER bytes and the normative unsigned answer. Source pins and the
+authored generator/verifier/reference harness are inside the small ZIP. Raw
+third-party downloads, reference sources and execution logs remain outside Git.
+
+Current mandatory entry: `scripts/protocol-tests/required-tests-traffic-unified-v40.json`.

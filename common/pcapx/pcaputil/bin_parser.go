@@ -17,6 +17,7 @@ import (
 // Messages in one TCP flow are delivered in order.
 type ProtocolEvent struct {
 	nativeOPCUAObservation                   bool
+	nativeMMSObservation                     bool
 	Admission                                string
 	semanticFields                           map[string]any
 	semanticSession                          map[string]any
@@ -236,6 +237,9 @@ func (e *ProtocolEvent) retainRuleEnvelope(result map[string]any) {
 }
 
 func (e *ProtocolEvent) ownsNativeFields() bool {
+	if e.nativeMMSObservation {
+		return true
+	}
 	if e.nativeOPCUAObservation {
 		return true
 	}
@@ -332,6 +336,8 @@ type BinParserBinding struct {
 }
 
 type BinParserConfig struct {
+	// MMSISOPorts explicitly selects bounded RFC1006/COTP/presentation/MMS observations.
+	MMSISOPorts []uint16
 	// DecodeOPCUARead opts into bounded UA Binary Read scalar observations under an observed None policy.
 	DecodeOPCUARead bool
 	// DecodeOPCUABrowse opts into bounded Browse body observations under an observed None policy.
@@ -381,6 +387,7 @@ func WithBinParserConfig(config BinParserConfig) CaptureOption {
 	return func(c *CaptureConfig) error {
 		copyConfig := config
 		copyConfig.Bindings = append([]BinParserBinding(nil), config.Bindings...)
+		copyConfig.MMSISOPorts = append([]uint16(nil), config.MMSISOPorts...)
 		c.binParserConfig = &copyConfig
 		return nil
 	}
@@ -467,6 +474,12 @@ func (c *CaptureConfig) prepareBinParser() error {
 		return fmt.Errorf("protocol parser requires exclusive streaming reassembly; disable capture cache and built-in full-stream HTTP/TLS helpers")
 	}
 	config := *c.binParserConfig
+	config.MMSISOPorts = append([]uint16(nil), config.MMSISOPorts...)
+	for _, port := range config.MMSISOPorts {
+		if port == 0 {
+			return fmt.Errorf("MMS ISO requires nonzero ports")
+		}
+	}
 	if config.MaxMessageBytes == 0 {
 		config.MaxMessageBytes = 16 << 20
 	}
@@ -599,6 +612,7 @@ type binDirection struct {
 	sshOpaque bool
 }
 type binFlow struct {
+	mms               *binMMS
 	domain            CaptureDomain
 	tls               *binTLS
 	dtls              *binDTLS
@@ -709,6 +723,10 @@ func (f *binFlow) event(dir int, raw []byte, status, detail string) *BinParserEv
 	if f.protocol == "opcua" && (f.a.config.DecodeOPCUARead || f.a.config.DecodeOPCUABrowse || f.a.config.DecodeOPCUAWrite || f.a.config.DecodeOPCUABrowseNext || f.a.config.DecodeOPCUACall) {
 		e.nativeOPCUAObservation = true
 		e.Profile = (&binOPCUA{read: f.a.config.DecodeOPCUARead, browse: f.a.config.DecodeOPCUABrowse, write: f.a.config.DecodeOPCUAWrite, next: f.a.config.DecodeOPCUABrowseNext, call: f.a.config.DecodeOPCUACall, arrays: f.a.config.DecodeOPCUAVariantArrays || f.a.config.DecodeOPCUAStructuredValues, structured: f.a.config.DecodeOPCUAStructuredValues}).observationProfile()
+	}
+	if f.mms != nil {
+		e.nativeMMSObservation = true
+		e.Profile = mmsISOProfile
 	}
 	f.eventEvidence(dir, e)
 	if f.slmpTCP != nil {
@@ -1102,7 +1120,7 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 				} else {
 					result, err = f.consumeTLS(dir, e)
 				}
-			} else if f.protocol == "slmp" || f.protocol == "redis" || f.protocol == "syslog" || f.protocol == "snmp" || f.protocol == "smb2" || f.protocol == "enip" || f.protocol == "doip" || f.protocol == "genisys" || f.protocol == "dlms-wrapper" || f.protocol == "dlms" || f.protocol == "c37118" || f.protocol == "roc-plus" || f.protocol == "atg" || f.memcached != nil || (e.Entry == "SSHIdentification" || e.Entry == "SSHPreIdentification") || f.protocol == "stratum" || f.protocol == "gearman" || f.protocol == "beanstalkd" || f.protocol == "scgi" || f.protocol == "msgpack-rpc" || f.protocol == "zookeeper" || f.protocol == "clickhouse" || f.protocol == "stomp" || f.protocol == "nats" || f.textInternet != nil || e.Entry == "MySQLPreparedFields" {
+			} else if f.protocol == "mms" || f.protocol == "slmp" || f.protocol == "redis" || f.protocol == "syslog" || f.protocol == "snmp" || f.protocol == "smb2" || f.protocol == "enip" || f.protocol == "doip" || f.protocol == "genisys" || f.protocol == "dlms-wrapper" || f.protocol == "dlms" || f.protocol == "c37118" || f.protocol == "roc-plus" || f.protocol == "atg" || f.memcached != nil || (e.Entry == "SSHIdentification" || e.Entry == "SSHPreIdentification") || f.protocol == "stratum" || f.protocol == "gearman" || f.protocol == "beanstalkd" || f.protocol == "scgi" || f.protocol == "msgpack-rpc" || f.protocol == "zookeeper" || f.protocol == "clickhouse" || f.protocol == "stomp" || f.protocol == "nats" || f.textInternet != nil || e.Entry == "MySQLPreparedFields" {
 				result = map[string]any{}
 			} else if e.Protocol == "rtsp" && rtspAppleControlWire(e.Raw, a.budget.MaxCollectionElements) {
 				result = map[string]any{}
@@ -1139,7 +1157,7 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 					e.semanticFields = cloneSession(e.Session)
 					result = map[string]any{"fields": cloneSession(e.semanticFields)}
 				}
-				if (f.protocol == "dlms-wrapper" || f.protocol == "slmp") && e.Session != nil {
+				if (f.protocol == "mms" || f.protocol == "dlms-wrapper" || f.protocol == "slmp") && e.Session != nil {
 					result = map[string]any{"fields": cloneSession(e.semanticFields)}
 				}
 				if (f.protocol == "enip" || f.protocol == "doip" || f.protocol == "genisys" || f.protocol == "dlms" || f.protocol == "c37118" || f.protocol == "roc-plus" || f.protocol == "atg" || f.memcached != nil) && e.Session != nil {
