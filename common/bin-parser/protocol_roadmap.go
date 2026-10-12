@@ -652,7 +652,7 @@ var ProtocolRoadmap = []RoadmapItem{
 	{Name: "IPv6 RA", Family: "service-tools", Sources: src(srcWireshark), Status: stDone, Priority: priP1},
 
 	// --- 支付 / 金融私有 ---
-	{Name: "ISO 8583", Family: "finance", Sources: src(srcWireshark, srcPrivate), Status: stTodo, Priority: priP2},
+	{Name: "ISO 8583", Family: "finance", Sources: src(srcWireshark, srcPrivate), Status: stPartial, Priority: priP2, Notes: "Native two-byte little-endian carrier with published 1987/1993 element widths, ASCII and packed-BCD field trees and an explicit refusal for MTIs outside the published dimensions; no request/response association, MAC or PIN verification"},
 	{Name: "FIX", Family: "finance", Sources: src(srcWireshark), Status: stTodo, Priority: priP2},
 	{Name: "SWIFT", Family: "finance", Sources: src(srcPrivate), Status: stTodo, Priority: priP2},
 	{Name: "UnionPay CUPS", Family: "finance", Sources: src(srcPrivate), Status: stTodo, Priority: priP3},

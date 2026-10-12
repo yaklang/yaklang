@@ -139,6 +139,8 @@ func (f *binFlow) frameDirection(dir int, w []byte) (int, *binSpec, error) {
 			return f.frameCoAP(w)
 		case "modbus":
 			return f.frameModbus(w)
+		case "iso8583":
+			return f.frameISO8583(w)
 		case "memcached":
 			if f.memcached != nil {
 				if err := f.reserveSession(f.memcached.sessionBytes()); err != nil {

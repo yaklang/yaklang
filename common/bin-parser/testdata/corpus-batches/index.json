@@ -23403,6 +23403,63 @@
         "common/pcapx/pcaputil/closure-core/validation/expected.json": "validation/expected.json",
         "scripts/protocol-tests/required-tests-v31.json": "required-tests-v31.json"
       }
+    },
+    {
+      "id": "validation-iso8583-public-6a1af0a7c22",
+      "kind": "validation",
+      "source_sha": "e22fa7662b89699e1acf0a705ecb6dfa7320c544",
+      "file": "validation-iso8583-public-6a1af0a7c22.zip",
+      "sha256": "3b8dd3d0a95ff25f0e0de7f8b0613b500ac136a6fd25194962e214d96d588501",
+      "password": "bin-parser",
+      "members": {
+        "README.txt": {
+          "sha256": "24854aeb068957a0d97f8b00c6d442fe7356f0ca03dc51eaeaf0a3031e9bee54",
+          "bytes": 2721
+        },
+        "source-pins.json": {
+          "sha256": "b94d8a04f55efda4b3c343e5357930e9243cdbfaa2dd144cd7c00ec6764ffa69",
+          "bytes": 2326
+        },
+        "controls.json": {
+          "sha256": "3bd07b35609a9dd457d113bf76ed5d5a2b30a85f2c63acafc41ff7e33e3ad20e",
+          "bytes": 464
+        },
+        "answers/iso8583-ascii-sample.json": {
+          "sha256": "f16bc19baf398f67ecf5312d1687184970766afb94e3788fbf2ec05464d72b75",
+          "bytes": 32924
+        },
+        "answers/iso8583-binary-sample.json": {
+          "sha256": "cd1d624d8e13d9a4f6487480861e1d2033b50fa9596704b06f979f536e690c5f",
+          "bytes": 32893
+        },
+        "captures/iso8583-ascii-sample.pcapng": {
+          "sha256": "b2d0147f251585cb36a1ff074e0de7b7d996701695591ce128ca06978788e787",
+          "bytes": 7400
+        },
+        "captures/iso8583-binary-sample.pcapng": {
+          "sha256": "b66dc587a8d12da18d8aae1a176f25b1661d32eeabfa467cade6e1efe186352a",
+          "bytes": 6952
+        },
+        "tools/verify.py": {
+          "sha256": "5e3c8666121a16f6b4cf007747269b543293954ccde51cc26dbcbcfc1f3fbbe1",
+          "bytes": 13039
+        },
+        "validation/expected.json": {
+          "sha256": "c0df697511fc9e07d87470207c9bb16803438812b3cb3932584f55ac57b973e9",
+          "bytes": 2549
+        }
+      },
+      "aliases": {
+        "common/pcapx/pcaputil/iso8583-public-samples/README.txt": "README.txt",
+        "common/pcapx/pcaputil/iso8583-public-samples/source-pins.json": "source-pins.json",
+        "common/pcapx/pcaputil/iso8583-public-samples/controls.json": "controls.json",
+        "common/pcapx/pcaputil/iso8583-public-samples/answers/iso8583-ascii-sample.json": "answers/iso8583-ascii-sample.json",
+        "common/pcapx/pcaputil/iso8583-public-samples/answers/iso8583-binary-sample.json": "answers/iso8583-binary-sample.json",
+        "common/pcapx/pcaputil/iso8583-public-samples/captures/iso8583-ascii-sample.pcapng": "captures/iso8583-ascii-sample.pcapng",
+        "common/pcapx/pcaputil/iso8583-public-samples/captures/iso8583-binary-sample.pcapng": "captures/iso8583-binary-sample.pcapng",
+        "common/pcapx/pcaputil/iso8583-public-samples/tools/verify.py": "tools/verify.py",
+        "common/pcapx/pcaputil/iso8583-public-samples/validation/expected.json": "validation/expected.json"
+      }
     }
   ],
   "schema_version": 1,
