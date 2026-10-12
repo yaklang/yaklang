@@ -121,13 +121,20 @@ func TestRTPSReceiverContextReplay(t *testing.T) {
 	testRTPSSealedReplay(t, rtpsBatchControls(t, "rtps-receiver-context", 35))
 }
 func testRTPSSealedReplay(t *testing.T, cases []rtpsControl) {
+	testRTPSSealedReplayProfile(t, cases, "")
+}
+func testRTPSSealedReplayProfile(t *testing.T, cases []rtpsControl, profile string) {
 	for _, c := range cases {
 		t.Run(c.ID, func(t *testing.T) {
 			raw, want := rtpsInput(t, c)
 			for _, workers := range []int{1, 2, 4} {
 				for _, deferred := range []bool{false, true} {
 					for _, observe := range []bool{false, true} {
-						for _, explicit := range []bool{false, true} {
+						explicitModes := []bool{false, true}
+						if profile != "" {
+							explicitModes = []bool{true}
+						}
+						for _, explicit := range explicitModes {
 							t.Run(fmt.Sprintf("w%d/deferred%v/observer%v/explicit%v", workers, deferred, observe, explicit), func(t *testing.T) {
 								var events []*ProtocolEvent
 								var stats ProtocolStats
@@ -138,7 +145,11 @@ func testRTPSSealedReplay(t *testing.T, cases []rtpsControl) {
 									opts = append(opts, WithEveryPacket(func(gopacket.Packet) { seen.Add(1) }))
 								}
 								if explicit {
-									opts = append(opts, WithProtocolDecodeAs("udp", 28400, "rtps"))
+									selected := profile
+									if selected == "" {
+										selected = "rtps"
+									}
+									opts = append(opts, WithProtocolDecodeAs("udp", 28400, selected))
 								}
 								input := bytes.Clone(raw)
 								require.NoError(t, ReplayPcap(bytes.NewReader(input), opts...))
@@ -155,6 +166,9 @@ func testRTPSSealedReplay(t *testing.T, cases []rtpsControl) {
 								for i, e := range events {
 									answer := want.Events[i]
 									require.Equal(t, answer.Protocol, e.Protocol)
+									if profile != "" {
+										require.Equal(t, profile+"-native", e.Profile)
+									}
 									require.Equal(t, answer.Raw, hex.EncodeToString(e.Raw), "complete admitted PDU or the documented 64-byte unknown probe prefix")
 									require.Equal(t, "udp", e.Transport)
 									require.Equal(t, "192.0.2.10:38000", e.Source)
@@ -346,7 +360,7 @@ func mutateRTPSQuery(value any) {
 	case map[string]any:
 		for k, child := range v {
 			switch child.(type) {
-			case map[string]any, []map[string]any, []any, []byte:
+			case map[string]any, []map[string]any, []any, []byte, []uint32:
 				mutateRTPSQuery(child)
 			default:
 				v[k] = "caller-mutated"
@@ -362,6 +376,8 @@ func mutateRTPSQuery(value any) {
 			v[i] = "caller-mutated"
 		}
 	case []byte:
+		clear(v)
+	case []uint32:
 		clear(v)
 	}
 }
