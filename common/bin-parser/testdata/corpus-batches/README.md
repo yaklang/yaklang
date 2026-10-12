@@ -44,7 +44,7 @@ Run from the repository root:
 ```sh
 go run ./internal/trafficfixture/cmd/corpus test
 go test -json -count=1 -timeout=5m ./internal/trafficfixture/... ./common/bin-parser/... ./common/pcapx/... ./common/yak/cmd/yakcmds/shark-cli ./scripts/ci > traffic.jsonl
-go run ./internal/trafficfixture/cmd/corpus exec -- python3 @scripts/protocol-tests/check_go_test_json_v2.py traffic.jsonl --inventory @scripts/protocol-tests/required-tests-traffic-unified-v44.json --tier full
+go run ./internal/trafficfixture/cmd/corpus exec -- python3 @scripts/protocol-tests/check_go_test_json_v2.py traffic.jsonl --inventory @scripts/protocol-tests/required-tests-traffic-unified-v45.json --tier full
 ```
 
 The single `corpus` entry point uses the same bounded Go ZIP loader as tests.
@@ -83,7 +83,7 @@ their semantic coverage. The existing synthetic session keys are test inputs;
 production credentials, user private keys and material without redistribution
 permission belong in an external fixed-source download manifest.
 
-Current test requirements are sealed at `scripts/protocol-tests/required-tests-traffic-unified-v44.json`;
+Current test requirements are sealed at `scripts/protocol-tests/required-tests-traffic-unified-v45.json`;
 the historical inventories and all earlier batches remain unchanged.
 The supplemental small-corpus batch contains 26 minimal controls, their explicit
 expected facts, an offline generator and the compact pinned source manifest.
@@ -203,7 +203,7 @@ opaque selector bytes and one bounded Data value over Wrapper v1 TCP/UDP; object
 selector meaning, access permission and device operation are unverified. The
 original one-packet selective-access capture and original refused answer remain
 immutable; its now-supported answer is matched by exact input SHA and frame.
-The active inventory is `scripts/protocol-tests/required-tests-traffic-unified-v44.json`.
+The active inventory is `scripts/protocol-tests/required-tests-traffic-unified-v45.json`.
 
 The small-graph budget batch reuses accepted graph captures/answers and adds one
 249-byte UDP control for child count255 without child bytes. Its standalone proof
@@ -993,7 +993,7 @@ the normative answer; a missing numeric reference field is not a codec pass.
 Full/deferred, workers1/2/4, observers off/on, Feed chunks1/7/full, ownership,
 resources and close/refusal boundaries remain required.
 
-Current gate: `required-tests-traffic-unified-v44.json` with
+Current gate: `required-tests-traffic-unified-v45.json` with
 `check_go_test_json_v2.py`. The indexed validator preserves missing/unpassed,
 package invocation completion, descendant skips, failures and non-JSON checks;
 its mutation/differential harness is sealed with the material. Older checkers
@@ -1028,4 +1028,28 @@ Independent regeneration checks complete selected fields/Session/order/IDs/raw/e
 semantics. TShark4.2.5 selected-field comparison separately records unsigned displays
 and six missing leaves in four legal empty constructed address cases; absent codec
 leaves are not reported as actual decoded agreement. All139 prior ZIPs remain unchanged.
-The latest mandatory inventory is v44; historical inventories remain available.
+That batch uses inventory v44; historical inventories remain available.
+
+
+`WithProtocolMMSDescriptionValidation(port)` / `WithSessionMMSDescriptionValidation()`
+select `mms-iso-described-data`, retaining literal service observations and adding
+bounded comparisons against directly observed variableDescription schemas.
+Known tag/array/structure/fixed bit/octet/ASCII length/integer width/floating format/
+binary-time date mode mismatches are typed MalformedMessage. Named types, BCD,
+generalized/MMS string size context, negative variable-length parameters and zero
+integer width remain ContextRequired in this selection; no unsupported meaning is
+invented. Reported peer failures remain correlated wire reports, not successful Data.
+Names/addresses without descriptions remain literal observations, not certified schemas.
+Named-list generation checks precede value comparison. Private schema ownership,
+late response retirement, pending Close and default capture/configuration compatibility
+have executed regressions. The original literal profile and old answers stay unchanged.
+
+`validation-mms-described-data.zip` contains67 complete selected answers and66 new
+captures; one capture is reused by hash from the existing access-selector batch.
+The ZIP is468993 bytes, SHA256
+`0e883985b8a0db96356af3bd7cbb30513c2ba6b74cf4e65d22a129b7a9541c13`.
+All140 historical ZIPs remain byte-identical. Full/deferred, workers1/2/4,
+observer-off/on and Feed1/7/full remain required. Actual pinned reference comparisons
+scope type declarations separately from Data where field names collide; modern
+floating/UTC declaration gaps in the pinned decoder are separately qualified.
+The current mandatory inventory is v45; earlier inventories are preserved.

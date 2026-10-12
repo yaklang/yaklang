@@ -71013,6 +71013,727 @@
         "common/pcapx/pcaputil/mms-access-selectors/seal.py": "mms-access-selectors/seal.py",
         "scripts/protocol-tests/required-tests-traffic-unified-v44.json": "required-tests-traffic-unified-v44.json"
       }
+    },
+    {
+      "id": "validation-mms-described-data",
+      "kind": "validation",
+      "source_sha": "5274ac75b6425e6deae5ebec09705f8082fbb570",
+      "file": "validation-mms-described-data.zip",
+      "sha256": "0e883985b8a0db96356af3bd7cbb30513c2ba6b74cf4e65d22a129b7a9541c13",
+      "password": "bin-parser",
+      "members": {
+        "mms-described-data/answers/read-bool.json": {
+          "sha256": "d4940f810e688c711066eef0fd455c7ebfcf865f6a2481cbf4df9314906d40ab",
+          "bytes": 57428
+        },
+        "mms-described-data/captures/read-bool.pcap": {
+          "sha256": "0efab70b92825fb0d070321d9d626c9818ce1996a2135f67cf51b0651dbd206b",
+          "bytes": 1634
+        },
+        "mms-described-data/answers/write-bool.json": {
+          "sha256": "355312539280d3e50780fa50156fda5603eacd289408db0a70966ce5e994686a",
+          "bytes": 57396
+        },
+        "mms-described-data/answers/read-signed-min.json": {
+          "sha256": "c3cfad27a0bfcf2fe06841d05a4c9fe051c3084c1f3bc729d0aea59b25f299bc",
+          "bytes": 57507
+        },
+        "mms-described-data/captures/read-signed-min.pcap": {
+          "sha256": "14286ca01e23d77d2e967f9b9b0910572f8be68b12da5415f7b74e573d3e992a",
+          "bytes": 1635
+        },
+        "mms-described-data/answers/write-signed-min.json": {
+          "sha256": "11ad3d97b847065fc293f6a685d7f1fc4b7e54727d5d36f9a1c812386dfdb1c0",
+          "bytes": 57508
+        },
+        "mms-described-data/captures/write-signed-min.pcap": {
+          "sha256": "59d3de0d96e2a51fa9dff62532063d09126d2936a82b8d9392d61b358995e607",
+          "bytes": 1635
+        },
+        "mms-described-data/answers/read-signed-max.json": {
+          "sha256": "7189505a42e32e425c22c6bd2f44158777cf6107b093541cff1fb9a63b61b677",
+          "bytes": 57506
+        },
+        "mms-described-data/captures/read-signed-max.pcap": {
+          "sha256": "4b139bccedcf7d4610986d4f1543008be4780c3497de7d990c18cac0e2c7854d",
+          "bytes": 1635
+        },
+        "mms-described-data/answers/write-signed-max.json": {
+          "sha256": "dbbc3015988cb0f3a924a459ec295fa0dd1d02529090e90f11f1a8306ee07462",
+          "bytes": 57507
+        },
+        "mms-described-data/captures/write-signed-max.pcap": {
+          "sha256": "430a54f90c33f96a97639d39fd235040f76a50f80d178eb8869ca2d5f2b566a9",
+          "bytes": 1635
+        },
+        "mms-described-data/answers/read-unsigned-max.json": {
+          "sha256": "f2599ec5b87c9536d111ce88161597cd91ab021103cc1a2279e401cab06d9333",
+          "bytes": 57528
+        },
+        "mms-described-data/captures/read-unsigned-max.pcap": {
+          "sha256": "e1f0ca86aefa6d68a3a4eeccfa4f58e4ba7b86d8ae464c0a388301f01947c9d4",
+          "bytes": 1636
+        },
+        "mms-described-data/answers/write-unsigned-max.json": {
+          "sha256": "5fec0c36952e0e72a05773cdf824d8a282132da676816f3a2cb67f0ec3e335f4",
+          "bytes": 57530
+        },
+        "mms-described-data/captures/write-unsigned-max.pcap": {
+          "sha256": "9d87d19d83797fa30420a3ce705385dd0649e0ccd0eceb85dd3624afa2ecb3ad",
+          "bytes": 1636
+        },
+        "mms-described-data/answers/read-bits.json": {
+          "sha256": "852e85021ecf2f7628962d00e9d51c32f89c34485559c402fe026e8201fbe433",
+          "bytes": 57595
+        },
+        "mms-described-data/captures/read-bits.pcap": {
+          "sha256": "567596d0ac73457f2e9b22d21c424e7e240627329161096b5b5f67111ce5b0fe",
+          "bytes": 1636
+        },
+        "mms-described-data/answers/write-bits.json": {
+          "sha256": "447522792d6d8fcf725a468d3b3980f17c7f14b74b66de8b2067d2ebe25f2922",
+          "bytes": 57600
+        },
+        "mms-described-data/captures/write-bits.pcap": {
+          "sha256": "fe1ab72ccebd9c70489fe03a4e6ba85b7f1cf24a5e196fa829bb6b2ad59cd8c3",
+          "bytes": 1636
+        },
+        "mms-described-data/answers/read-octets.json": {
+          "sha256": "5b6033cf6086e1e0549111c65134f9344145db8e4bbc2588c84d04a822af516b",
+          "bytes": 57534
+        },
+        "mms-described-data/captures/read-octets.pcap": {
+          "sha256": "e97584b9ba6fb7ec9a1b897000a76e9b978c225b522bd28bdf5a31412051326c",
+          "bytes": 1636
+        },
+        "mms-described-data/answers/write-octets.json": {
+          "sha256": "c47e951d847d40951b1b2776c2441925bef167b0472149c94e70397731815564",
+          "bytes": 57545
+        },
+        "mms-described-data/captures/write-octets.pcap": {
+          "sha256": "d89c0a6af1dc90fd0c2d0ac7d5673c81c525164a9aa1a308d0486c5ce6881130",
+          "bytes": 1636
+        },
+        "mms-described-data/answers/read-ascii.json": {
+          "sha256": "3091e642c7113b49dbacef777470302bbccd850b1bec3b5cc1fc4ecfb492198d",
+          "bytes": 57535
+        },
+        "mms-described-data/captures/read-ascii.pcap": {
+          "sha256": "c666f7afc8b1e7b5cc13a1453405a32a43e289dccfc3e111cd79408ea1f70e85",
+          "bytes": 1636
+        },
+        "mms-described-data/answers/write-ascii.json": {
+          "sha256": "cdeddf3bfef2fc6a465f6b49947a7d9035aca14b54eb409302871bfefdd1b34e",
+          "bytes": 57548
+        },
+        "mms-described-data/captures/write-ascii.pcap": {
+          "sha256": "4d6e688606c3f8544e216b306b220109f0d9b7acd43687074180c61a7f501b25",
+          "bytes": 1636
+        },
+        "mms-described-data/answers/read-empty-ascii.json": {
+          "sha256": "aac9595f4cb287383356c70eb08f80feb1ec965973646eae83d2ff9d519ab7bc",
+          "bytes": 57485
+        },
+        "mms-described-data/captures/read-empty-ascii.pcap": {
+          "sha256": "07f0463f23bb41296fc048eea4a58821b12b90a6715b95e3fd9d584a6f15ab33",
+          "bytes": 1634
+        },
+        "mms-described-data/answers/write-empty-ascii.json": {
+          "sha256": "f453536a54d42c2a0c4e95540208542544256179d8f375d5859922de932af04e",
+          "bytes": 57498
+        },
+        "mms-described-data/captures/write-empty-ascii.pcap": {
+          "sha256": "095c13c1e422a91020df1136c4a4c3b98820093ebccf6ff6d3aa96229a8e3a3a",
+          "bytes": 1634
+        },
+        "mms-described-data/answers/read-float32.json": {
+          "sha256": "4fb604f7293ad239ff9a79296b013f557dae6e54ec28c823cbd99a9f141f6b03",
+          "bytes": 58929
+        },
+        "mms-described-data/captures/read-float32.pcap": {
+          "sha256": "8f337e8d7415ca094937115e1529f2bee3f139b61ebf48aff583125ad0681511",
+          "bytes": 1644
+        },
+        "mms-described-data/answers/write-float32.json": {
+          "sha256": "99a4b40be67a057eb0ef19c40317b90e95e6b5d9bb06db5649dfa5581a169714",
+          "bytes": 58881
+        },
+        "mms-described-data/captures/write-float32.pcap": {
+          "sha256": "0fd724955d8963297e8d2f417a2bb18a8d24665e9f96bfff6d2cb8896a8a1809",
+          "bytes": 1644
+        },
+        "mms-described-data/answers/read-time-no-date.json": {
+          "sha256": "99e45fae2abedd5bf403d771338bf0138b69b779b52d553045527ab29ae7457b",
+          "bytes": 57619
+        },
+        "mms-described-data/captures/read-time-no-date.pcap": {
+          "sha256": "daf3bcd379d971051c467502fd459d9935629c9f126ae56ec4c7f879aa18ca15",
+          "bytes": 1638
+        },
+        "mms-described-data/answers/write-time-no-date.json": {
+          "sha256": "e9ac6c0a5a704d3bb6388776f324d13243aa9c525081414c5935dd86c35a3a39",
+          "bytes": 57628
+        },
+        "mms-described-data/captures/write-time-no-date.pcap": {
+          "sha256": "9684cdef87c47d8fd2f3ec12ede84a5cdc08520444b3fca4149577ff6a365f37",
+          "bytes": 1638
+        },
+        "mms-described-data/answers/read-time-date.json": {
+          "sha256": "63f843b1e58d7f4caba8740261ce4da9fd7cc0f178b1002292b791d4e65e75cc",
+          "bytes": 57743
+        },
+        "mms-described-data/captures/read-time-date.pcap": {
+          "sha256": "a1c5b8f007f743c1ba03b44447cd008e7cf30086645dec3b1a75ef4f0de1d210",
+          "bytes": 1640
+        },
+        "mms-described-data/answers/write-time-date.json": {
+          "sha256": "def4a7ae0cab796a768e01d7cd9a01f4498d618829bab1bcbc26a920a6153164",
+          "bytes": 57747
+        },
+        "mms-described-data/captures/write-time-date.pcap": {
+          "sha256": "a4a51b4c0e7702b32e93ead5ea8f86e1a24533810bfa080446f14627397d49c6",
+          "bytes": 1640
+        },
+        "mms-described-data/answers/read-oid.json": {
+          "sha256": "a7907c61c34db0fbb18affa94eda32b38b5d52e26cd42b586d11f835a7013a5c",
+          "bytes": 57469
+        },
+        "mms-described-data/captures/read-oid.pcap": {
+          "sha256": "3ff3da54fabf21adcb7f81efaba768c1ed44e42497bfe645fcf5155e52b3fc1d",
+          "bytes": 1635
+        },
+        "mms-described-data/answers/write-oid.json": {
+          "sha256": "040ca05585d3b4c1a9b68b32eeb84226cbdeae1c3cc852302774a64358a9f02d",
+          "bytes": 57455
+        },
+        "mms-described-data/captures/write-oid.pcap": {
+          "sha256": "258dcc54adb966600a722f611978acc878eac2b8a960f19b6cf8419e3fa04ba7",
+          "bytes": 1635
+        },
+        "mms-described-data/answers/read-utc.json": {
+          "sha256": "641d90845d951634f54532f4a8fd88823e3ba839bafe97f0ba0f0e88d2501772",
+          "bytes": 57679
+        },
+        "mms-described-data/captures/read-utc.pcap": {
+          "sha256": "3d576c5679d4975400abb349426fa82469f67f77728e38d7e9dd5fbeff88ccb3",
+          "bytes": 1641
+        },
+        "mms-described-data/answers/write-utc.json": {
+          "sha256": "3d6a32f56e1b39462f748da01d154d63f42e153016d2ca7f4034da47d4d1e525",
+          "bytes": 57650
+        },
+        "mms-described-data/captures/write-utc.pcap": {
+          "sha256": "1e7e6d5270752db7faf366d04cfd9dcc3892f242951ddb297e2d7535cc9e020f",
+          "bytes": 1641
+        },
+        "mms-described-data/answers/read-array.json": {
+          "sha256": "67c84298c3934713fbc0da59ef44cb79664ad2037cfc461bc34856bf7c32cf3d",
+          "bytes": 60767
+        },
+        "mms-described-data/captures/read-array.pcap": {
+          "sha256": "f77b49460d31c16e52c632d00b93f9642318a47387474a36af5d2f55bf59fe59",
+          "bytes": 1646
+        },
+        "mms-described-data/answers/write-array.json": {
+          "sha256": "ff23ba62608cc9d95d1536965e56b5878b2f16067c8eb8fd5c53ff567160f3cf",
+          "bytes": 60760
+        },
+        "mms-described-data/captures/write-array.pcap": {
+          "sha256": "b7951bc82af238f7c16108771a9bb5b0b9950d0c70037f77f79b601d55e2b2f6",
+          "bytes": 1646
+        },
+        "mms-described-data/answers/read-structure.json": {
+          "sha256": "9247e897724170c31170d46dc8a4d361c3b3e4ba2c9c7840a794b6189c8f7a45",
+          "bytes": 62155
+        },
+        "mms-described-data/captures/read-structure.pcap": {
+          "sha256": "9aeecbde4520a9398712acdf38dfefe9c057ad45ac9803a1df75cb577215a55f",
+          "bytes": 1650
+        },
+        "mms-described-data/answers/write-structure.json": {
+          "sha256": "c61814015a7ef885a41b2bb4197ab78bf09b7d4e371d533acf28bcc3ba756df8",
+          "bytes": 62157
+        },
+        "mms-described-data/captures/write-structure.pcap": {
+          "sha256": "ba7904afd7bd42fffbccdae34a40353ede77fa6ececae7c85acd72e90b698bd9",
+          "bytes": 1650
+        },
+        "mms-described-data/answers/bad-read-wrong-tag.json": {
+          "sha256": "793a1ba10e34e7dc0b4efc4d08d7af4b45952d0c877e1b06616cce1468ac8f6d",
+          "bytes": 43145
+        },
+        "mms-described-data/captures/bad-read-wrong-tag.pcap": {
+          "sha256": "36a4c9f233efa5bfdbfced3ca4a877de18cc98a801825ae83eae7c4a55ab8bfa",
+          "bytes": 1260
+        },
+        "mms-described-data/answers/bad-write-wrong-tag.json": {
+          "sha256": "df940b8427879da820035eeffdededb04745b52af4f60fb5e3e88c9eda0905f7",
+          "bytes": 36712
+        },
+        "mms-described-data/captures/bad-write-wrong-tag.pcap": {
+          "sha256": "d29e651a1f56a83da1ccd5bda41f814ef09a0cddcfcb6bee1fe1f8c92153d6a4",
+          "bytes": 1260
+        },
+        "mms-described-data/answers/bad-read-signed-low.json": {
+          "sha256": "4ff9b3d2346c56ef3ab5ed65f43f23f63ca46ecdcfe450fecb99769823ee47d3",
+          "bytes": 43218
+        },
+        "mms-described-data/captures/bad-read-signed-low.pcap": {
+          "sha256": "654174dff68df5f5cedfe82c6fead6159d7692f0219741fdd9d1c606d068f2da",
+          "bytes": 1262
+        },
+        "mms-described-data/answers/bad-write-signed-low.json": {
+          "sha256": "39eb2034038025ea925291d15ae32cc9701700cd26ecab64feab6967b822cfd8",
+          "bytes": 36720
+        },
+        "mms-described-data/captures/bad-write-signed-low.pcap": {
+          "sha256": "91637ffc23e3fad12b2d1652af250fe6a06fd5abe46fc8da84df497cf6d5e6ca",
+          "bytes": 1262
+        },
+        "mms-described-data/answers/bad-read-signed-high.json": {
+          "sha256": "05d4e65d6c1b0762d72d2a65207e1330601364e0aa937f653fb6220820c8fab4",
+          "bytes": 43218
+        },
+        "mms-described-data/captures/bad-read-signed-high.pcap": {
+          "sha256": "2fa27dfd68244a8f51eaa56d95241cc923abf9841f6ec8f2592cf228e8313247",
+          "bytes": 1262
+        },
+        "mms-described-data/answers/bad-write-signed-high.json": {
+          "sha256": "1c5364ff6693f1faf0100b10e9734c8c578648e1f8812f307db173c558ca0d88",
+          "bytes": 36720
+        },
+        "mms-described-data/captures/bad-write-signed-high.pcap": {
+          "sha256": "af6da5874132ac356b0c69fdbbfb823be9021cbaaf000fe9e55306b470600122",
+          "bytes": 1262
+        },
+        "mms-described-data/answers/bad-read-unsigned-high.json": {
+          "sha256": "614258104a260113ae90e9b47abd932c7c5079b842d993331af817827922b1fb",
+          "bytes": 43219
+        },
+        "mms-described-data/captures/bad-read-unsigned-high.pcap": {
+          "sha256": "16e9a0987b6f1095e871a54bab0b05cc2990e2f7cd09be02b864a62807be2048",
+          "bytes": 1262
+        },
+        "mms-described-data/answers/bad-write-unsigned-high.json": {
+          "sha256": "0072e22f2c6c937b9b2d733d96ec1fc79dba4144f68f43f87586303199e86c70",
+          "bytes": 36720
+        },
+        "mms-described-data/captures/bad-write-unsigned-high.pcap": {
+          "sha256": "869d6bdf091a9ce0e23e94979b2eee6e0699b45069970c1ec3ccd39c975911fe",
+          "bytes": 1262
+        },
+        "mms-described-data/answers/bad-read-bit-count.json": {
+          "sha256": "ae8105cf4ac1f06f27b48cc239a536d95fd2214ddc48d8d3e9eb02778b6f7b24",
+          "bytes": 43226
+        },
+        "mms-described-data/captures/bad-read-bit-count.pcap": {
+          "sha256": "35d0174be6a6260247c057bc3c13f8e2dd95f69a9c27d2c59c622b3cda59d125",
+          "bytes": 1262
+        },
+        "mms-described-data/answers/bad-write-bit-count.json": {
+          "sha256": "d3132aadb7a235c6db7c05f46495890e56db2041e45185f3bab4a7472a7a7c46",
+          "bytes": 36720
+        },
+        "mms-described-data/captures/bad-write-bit-count.pcap": {
+          "sha256": "194a1004806ae675136e5a86e93f1c87529adc6f6c28bad9c3e754e2d676042d",
+          "bytes": 1262
+        },
+        "mms-described-data/answers/bad-read-octet-count.json": {
+          "sha256": "7666eb19abe59a86a3afc6107e85216a28ea24bb9b2385edabedece5b45861f9",
+          "bytes": 43228
+        },
+        "mms-described-data/captures/bad-read-octet-count.pcap": {
+          "sha256": "2efa89792095c0014f1de7c5bf901ce79cc6b40a36b102691d33464f455fd998",
+          "bytes": 1262
+        },
+        "mms-described-data/answers/bad-write-octet-count.json": {
+          "sha256": "7c8386a3a44233b99037a14fae2eb8ebd49ef619cdd69867b9bad9c0e7b02de0",
+          "bytes": 36720
+        },
+        "mms-described-data/captures/bad-write-octet-count.pcap": {
+          "sha256": "d59b3e53bb68445654755d5a8049aa98a522399f54e5ab2b161f1d8a393cdc1c",
+          "bytes": 1262
+        },
+        "mms-described-data/answers/bad-read-ascii-count.json": {
+          "sha256": "b9be4d3ec3e6ed058fb8d6d2e7510feecde0d7d1149e5e3713aac4c83b636afa",
+          "bytes": 43230
+        },
+        "mms-described-data/captures/bad-read-ascii-count.pcap": {
+          "sha256": "fdfe011c2964cffa73500436aedbcd2d8f616b3e33f65267f31628233476e794",
+          "bytes": 1262
+        },
+        "mms-described-data/answers/bad-write-ascii-count.json": {
+          "sha256": "9ab1fa636c6253482f4b9236fe1b19b0ffe54ee2ec5d5bcddc1adbd6c62222fe",
+          "bytes": 36720
+        },
+        "mms-described-data/captures/bad-write-ascii-count.pcap": {
+          "sha256": "a9d80a43a92ab96821439a8b1c66abc0ee2472dffbd2fa66068b5e84c133188e",
+          "bytes": 1262
+        },
+        "mms-described-data/answers/bad-read-float-format.json": {
+          "sha256": "3ffb68b4ecefb4cece0159f9a30bbf2765060a4ef485fe46a4be4853b2827d2a",
+          "bytes": 44460
+        },
+        "mms-described-data/captures/bad-read-float-format.pcap": {
+          "sha256": "5c5156f774053d3d0fdbebd49ec2c0633dd8cc1c960446712bf92219893e219e",
+          "bytes": 1270
+        },
+        "mms-described-data/answers/bad-write-float-format.json": {
+          "sha256": "d840cbfcfb3770a4778c2064c218d751c0889cbabaf2bbbda42365d0f7f0d218",
+          "bytes": 36752
+        },
+        "mms-described-data/captures/bad-write-float-format.pcap": {
+          "sha256": "e75898ff158d6cdbe7779b637d338cc3e40bd0fe35c2a0d0c01b172ababf2913",
+          "bytes": 1270
+        },
+        "mms-described-data/answers/bad-read-binary-date.json": {
+          "sha256": "c892ce66d857a54de2106bddbdb946a09d887c5cc10876d11a5a5bb59680ea6c",
+          "bytes": 43244
+        },
+        "mms-described-data/captures/bad-read-binary-date.pcap": {
+          "sha256": "5bb52e1142d637294b516e67b6b6a583b1a208c1a79fc5b73dae6b2f70d0e205",
+          "bytes": 1266
+        },
+        "mms-described-data/answers/bad-write-binary-date.json": {
+          "sha256": "3d54d3c807f96e3d8b5db161a5dbb4679e92a071f15e2f6b580d5d9da3d651b8",
+          "bytes": 36736
+        },
+        "mms-described-data/captures/bad-write-binary-date.pcap": {
+          "sha256": "a2f11ba9bbd0f793d1787a3083b62a9d9413d7a33db0e45e9cc0c6ce03f33885",
+          "bytes": 1266
+        },
+        "mms-described-data/answers/bad-read-array-count.json": {
+          "sha256": "c0e53f2f1c9aefda281a221e1ad37bace5cb1e7bdd69690add3536501687eac1",
+          "bytes": 45274
+        },
+        "mms-described-data/captures/bad-read-array-count.pcap": {
+          "sha256": "1534e7e3b6601bd2bae72efae0d7920ed49b06858e1d4d50b75223924b07e714",
+          "bytes": 1269
+        },
+        "mms-described-data/answers/bad-write-array-count.json": {
+          "sha256": "c43aca3701dec41f334c6a942c3d783625e43b332dcd92a67340476daf690fdc",
+          "bytes": 36748
+        },
+        "mms-described-data/captures/bad-write-array-count.pcap": {
+          "sha256": "d6a4b68091543fcd53ceb5b915fa45d635ac52b4889d3a2f4f5ee70c7a8bfa01",
+          "bytes": 1269
+        },
+        "mms-described-data/answers/bad-read-array-element.json": {
+          "sha256": "61fa0a444584f5698f1613709b0195d56ec96b5d5842a0a9403b97edda6f3546",
+          "bytes": 45286
+        },
+        "mms-described-data/captures/bad-read-array-element.pcap": {
+          "sha256": "0b6ff20e245a276bc3eebc23ed4496da65fc20c03ed727601b9e69eaabcfe9a5",
+          "bytes": 1272
+        },
+        "mms-described-data/answers/bad-write-array-element.json": {
+          "sha256": "1d3b652bcecf3b37105666501b8ad35f0ca71e3f9f730551c7c183c14b82f81a",
+          "bytes": 36760
+        },
+        "mms-described-data/captures/bad-write-array-element.pcap": {
+          "sha256": "9d0318dc5c59204a2d2c158adede69dff49f11ecbad928f05dccea969e760dfd",
+          "bytes": 1272
+        },
+        "mms-described-data/answers/bad-read-structure-count.json": {
+          "sha256": "0db2b35111b1cc6791aa62855eec603f847b2df897ee0b1598cf519315a39cd4",
+          "bytes": 47187
+        },
+        "mms-described-data/captures/bad-read-structure-count.pcap": {
+          "sha256": "0b4c3f05fac930921b0efb0730853a3604d2de941bd6fb5a41f1f14c5686cc87",
+          "bytes": 1273
+        },
+        "mms-described-data/answers/bad-write-structure-count.json": {
+          "sha256": "5bfc9a1a50b265ed011d8fefa746a29cb96a9228732a4ffea66b2d9d13fc0025",
+          "bytes": 36764
+        },
+        "mms-described-data/captures/bad-write-structure-count.pcap": {
+          "sha256": "724ae447bde47d922f8d2f209e1c7d0c3b8801dba78c3b794449699a14fb07b5",
+          "bytes": 1273
+        },
+        "mms-described-data/answers/unresolved-named.json": {
+          "sha256": "f7c50a6be97cab98a285ce4f1a24e992b83eff2ca2f2d4e52a274b4221ab0edc",
+          "bytes": 45513
+        },
+        "mms-described-data/captures/unresolved-named.pcap": {
+          "sha256": "814cbba5222bf82eca3e4758cb08bf917ee8bcc92c424351a85f723c2903eaa8",
+          "bytes": 1274
+        },
+        "mms-described-data/answers/unresolved-bcd.json": {
+          "sha256": "35bf16a24830802b70b9b62139350e5d8a670c60a9155787a45ccbe1aa7fd300",
+          "bytes": 43216
+        },
+        "mms-described-data/captures/unresolved-bcd.pcap": {
+          "sha256": "907f4af3f42e4dba1da80a91ec4c19c377aa75b80f8331f085c383f5f9315045",
+          "bytes": 1261
+        },
+        "mms-described-data/answers/unresolved-variable-ascii.json": {
+          "sha256": "0e79abb3f4c4b1aa7eece24956e202e3380642bc92b6519890687242e90d21f5",
+          "bytes": 43237
+        },
+        "mms-described-data/captures/unresolved-variable-ascii.pcap": {
+          "sha256": "b79d4652aad6b4118ce5c5f2fb5adfbe232ac45f272a8734499eb106a656f56a",
+          "bytes": 1262
+        },
+        "mms-described-data/answers/unresolved-zero-width.json": {
+          "sha256": "24a3c92f019c627f1d6738c089c39827cdf4830d9a4a165696023ae1391b842e",
+          "bytes": 43220
+        },
+        "mms-described-data/captures/unresolved-zero-width.pcap": {
+          "sha256": "5222484ed1fd0b25cfb15d8028cff4dbfe3eb5e1538899008fe687cc619b07b4",
+          "bytes": 1261
+        },
+        "mms-described-data/answers/read-reported-access-failure.json": {
+          "sha256": "6cfbac2dab835500faf7e1d371371aae52d9d716856fd02e92204fcb10085c06",
+          "bytes": 59681
+        },
+        "mms-described-data/captures/read-reported-access-failure.pcap": {
+          "sha256": "e7a345c0a72a3a57456d3e04c293feae225cca1b44f78a99f1788d30ffede09d",
+          "bytes": 1648
+        },
+        "mms-described-data/answers/read-confirmed-error.json": {
+          "sha256": "5138eb52069e5d641b1c140924fe18d7358967665f3f1166b6556c536bec566d",
+          "bytes": 59616
+        },
+        "mms-described-data/captures/read-confirmed-error.pcap": {
+          "sha256": "dd32dac4d117e5f95ce5de5bb2a5019645a2510307b5fed8b081858ff2e7e67d",
+          "bytes": 1648
+        },
+        "mms-described-data/answers/plain-named-observation.json": {
+          "sha256": "4f70f0bbbe5e880a8235cfcc9a4bfdb527d50d06ba96c41427df9de4f5137475",
+          "bytes": 58196
+        },
+        "mms-described-data/captures/plain-named-observation.pcap": {
+          "sha256": "8b1cf13ec11276134ed36c8e98d7af6544ab9f67924595e999335366928f9610",
+          "bytes": 1643
+        },
+        "mms-described-data/answers/named-array-valid.json": {
+          "sha256": "6beb97b5c8eff8f66a68664f06feb6ee0d45f069b3b31ae754209c462bbe0959",
+          "bytes": 85946
+        },
+        "mms-described-data/captures/named-array-valid.pcap": {
+          "sha256": "84992af4f978533c2cd0a977caf3d443132061e818837992d4ac3b3cd99845a5",
+          "bytes": 2086
+        },
+        "mms-described-data/answers/named-lookup-valid.json": {
+          "sha256": "fffeb384c77dac77767836555af5eb0177de1c2ce0eac2951040f50002d0d038",
+          "bytes": 73247
+        },
+        "mms-described-data/captures/named-lookup-valid.pcap": {
+          "sha256": "2757c8fe8eb4594027fdbd3b4c86d7c6860527cf41dee1b8e8fbb3ad86e4122b",
+          "bytes": 1869
+        },
+        "mms-described-data/answers/named-read-bad-type.json": {
+          "sha256": "ad61b5c790b15db254b2e740222dac16d5223e9f562fe96d2e5b475a484b5232",
+          "bytes": 56018
+        },
+        "mms-described-data/captures/named-read-bad-type.pcap": {
+          "sha256": "058b907f13b64613e8b3d4ae81e749569aadfceee97c5090537047d7f03062a3",
+          "bytes": 1487
+        },
+        "mms-described-data/answers/named-write-bad-type.json": {
+          "sha256": "e02115667811c1ee68b0b04528a47355fb4b1613492bc50a8fc08e3b605a1146",
+          "bytes": 49524
+        },
+        "mms-described-data/captures/named-write-bad-type.pcap": {
+          "sha256": "ec8d029ef0b3de7df082f38077eabf8818f1c05527333eecae530d4af5328c8a",
+          "bytes": 1388
+        },
+        "mms-described-data/answers/named-stale-precedes-data.json": {
+          "sha256": "516ed86a2d08f1aa7e572d6cb4a9159a00ff1424692b282c265ced3c22053904",
+          "bytes": 65778
+        },
+        "mms-described-data/captures/named-stale-precedes-data.pcap": {
+          "sha256": "658e8df695290e7f2a8bb53968a828a09f4a18650c71c271e65d399ac18fc86d",
+          "bytes": 1701
+        },
+        "mms-described-data/answers/interleaved-described-ids.json": {
+          "sha256": "5cc65e6436087ff2c98e1106de10a9ec02e766671c38abd5643a892cd96a62ad",
+          "bytes": 71597
+        },
+        "mms-described-data/captures/interleaved-described-ids.pcap": {
+          "sha256": "de48e6d788c2096946ff7cc9165822520a33f833db1b9c93f04c324464c534cb",
+          "bytes": 1858
+        },
+        "mms-described-data/manifest.json": {
+          "sha256": "e61b262cc27888527dc3de989869ed3e96268dfbb4a2e0df3fb7984fcf623afd",
+          "bytes": 23135
+        },
+        "mms-described-data/generate.py": {
+          "sha256": "724205c91f2561cff9982d85675099bfe05aa6dae54858d81c323615d2402307",
+          "bytes": 5756
+        },
+        "mms-described-data/verify.py": {
+          "sha256": "78742925a754106b2c36e118d6f0223d7061b957166aa762ea1322a36b61f8f3",
+          "bytes": 2148
+        },
+        "mms-described-data/reference.py": {
+          "sha256": "a1af25cfdc5e844e53308481a92f5232400b16b99061c204feb08fd15b7b3bf4",
+          "bytes": 15255
+        },
+        "mms-described-data/MODEL-PINS.json": {
+          "sha256": "c960559452a68e85e891ddbcab0769bf2399b677acca3f1cacd0ee88f4332b0b",
+          "bytes": 345
+        },
+        "mms-described-data/SOURCE-PINS.json": {
+          "sha256": "4b8eedc9cd876b4efdbfefbf0974e385225fb0f766dac0500a9d9ca7ccb36246",
+          "bytes": 5640
+        },
+        "mms-described-data/seal.py": {
+          "sha256": "18c4e3ded673a564e19b7a03f236b67b781b84b22a96b39ccef3dd72e92b8f04",
+          "bytes": 4083
+        },
+        "required-tests-traffic-unified-v45.json": {
+          "sha256": "ec5c97dda45d67f7260233f859bf69689f791bbffcbb565f9cf5a0f80e5f1de7",
+          "bytes": 8872395
+        },
+        "validation/expected.json": {
+          "sha256": "8850614ef8ba74fc4f50ed6c27c075a5e08d2b4b3b3dbacd385619317a04609f",
+          "bytes": 89257
+        }
+      },
+      "aliases": {
+        "common/pcapx/pcaputil/mms-described-data/answers/read-bool.json": "mms-described-data/answers/read-bool.json",
+        "common/pcapx/pcaputil/mms-described-data/captures/read-bool.pcap": "mms-described-data/captures/read-bool.pcap",
+        "common/pcapx/pcaputil/mms-described-data/answers/write-bool.json": "mms-described-data/answers/write-bool.json",
+        "common/pcapx/pcaputil/mms-described-data/answers/read-signed-min.json": "mms-described-data/answers/read-signed-min.json",
+        "common/pcapx/pcaputil/mms-described-data/captures/read-signed-min.pcap": "mms-described-data/captures/read-signed-min.pcap",
+        "common/pcapx/pcaputil/mms-described-data/answers/write-signed-min.json": "mms-described-data/answers/write-signed-min.json",
+        "common/pcapx/pcaputil/mms-described-data/captures/write-signed-min.pcap": "mms-described-data/captures/write-signed-min.pcap",
+        "common/pcapx/pcaputil/mms-described-data/answers/read-signed-max.json": "mms-described-data/answers/read-signed-max.json",
+        "common/pcapx/pcaputil/mms-described-data/captures/read-signed-max.pcap": "mms-described-data/captures/read-signed-max.pcap",
+        "common/pcapx/pcaputil/mms-described-data/answers/write-signed-max.json": "mms-described-data/answers/write-signed-max.json",
+        "common/pcapx/pcaputil/mms-described-data/captures/write-signed-max.pcap": "mms-described-data/captures/write-signed-max.pcap",
+        "common/pcapx/pcaputil/mms-described-data/answers/read-unsigned-max.json": "mms-described-data/answers/read-unsigned-max.json",
+        "common/pcapx/pcaputil/mms-described-data/captures/read-unsigned-max.pcap": "mms-described-data/captures/read-unsigned-max.pcap",
+        "common/pcapx/pcaputil/mms-described-data/answers/write-unsigned-max.json": "mms-described-data/answers/write-unsigned-max.json",
+        "common/pcapx/pcaputil/mms-described-data/captures/write-unsigned-max.pcap": "mms-described-data/captures/write-unsigned-max.pcap",
+        "common/pcapx/pcaputil/mms-described-data/answers/read-bits.json": "mms-described-data/answers/read-bits.json",
+        "common/pcapx/pcaputil/mms-described-data/captures/read-bits.pcap": "mms-described-data/captures/read-bits.pcap",
+        "common/pcapx/pcaputil/mms-described-data/answers/write-bits.json": "mms-described-data/answers/write-bits.json",
+        "common/pcapx/pcaputil/mms-described-data/captures/write-bits.pcap": "mms-described-data/captures/write-bits.pcap",
+        "common/pcapx/pcaputil/mms-described-data/answers/read-octets.json": "mms-described-data/answers/read-octets.json",
+        "common/pcapx/pcaputil/mms-described-data/captures/read-octets.pcap": "mms-described-data/captures/read-octets.pcap",
+        "common/pcapx/pcaputil/mms-described-data/answers/write-octets.json": "mms-described-data/answers/write-octets.json",
+        "common/pcapx/pcaputil/mms-described-data/captures/write-octets.pcap": "mms-described-data/captures/write-octets.pcap",
+        "common/pcapx/pcaputil/mms-described-data/answers/read-ascii.json": "mms-described-data/answers/read-ascii.json",
+        "common/pcapx/pcaputil/mms-described-data/captures/read-ascii.pcap": "mms-described-data/captures/read-ascii.pcap",
+        "common/pcapx/pcaputil/mms-described-data/answers/write-ascii.json": "mms-described-data/answers/write-ascii.json",
+        "common/pcapx/pcaputil/mms-described-data/captures/write-ascii.pcap": "mms-described-data/captures/write-ascii.pcap",
+        "common/pcapx/pcaputil/mms-described-data/answers/read-empty-ascii.json": "mms-described-data/answers/read-empty-ascii.json",
+        "common/pcapx/pcaputil/mms-described-data/captures/read-empty-ascii.pcap": "mms-described-data/captures/read-empty-ascii.pcap",
+        "common/pcapx/pcaputil/mms-described-data/answers/write-empty-ascii.json": "mms-described-data/answers/write-empty-ascii.json",
+        "common/pcapx/pcaputil/mms-described-data/captures/write-empty-ascii.pcap": "mms-described-data/captures/write-empty-ascii.pcap",
+        "common/pcapx/pcaputil/mms-described-data/answers/read-float32.json": "mms-described-data/answers/read-float32.json",
+        "common/pcapx/pcaputil/mms-described-data/captures/read-float32.pcap": "mms-described-data/captures/read-float32.pcap",
+        "common/pcapx/pcaputil/mms-described-data/answers/write-float32.json": "mms-described-data/answers/write-float32.json",
+        "common/pcapx/pcaputil/mms-described-data/captures/write-float32.pcap": "mms-described-data/captures/write-float32.pcap",
+        "common/pcapx/pcaputil/mms-described-data/answers/read-time-no-date.json": "mms-described-data/answers/read-time-no-date.json",
+        "common/pcapx/pcaputil/mms-described-data/captures/read-time-no-date.pcap": "mms-described-data/captures/read-time-no-date.pcap",
+        "common/pcapx/pcaputil/mms-described-data/answers/write-time-no-date.json": "mms-described-data/answers/write-time-no-date.json",
+        "common/pcapx/pcaputil/mms-described-data/captures/write-time-no-date.pcap": "mms-described-data/captures/write-time-no-date.pcap",
+        "common/pcapx/pcaputil/mms-described-data/answers/read-time-date.json": "mms-described-data/answers/read-time-date.json",
+        "common/pcapx/pcaputil/mms-described-data/captures/read-time-date.pcap": "mms-described-data/captures/read-time-date.pcap",
+        "common/pcapx/pcaputil/mms-described-data/answers/write-time-date.json": "mms-described-data/answers/write-time-date.json",
+        "common/pcapx/pcaputil/mms-described-data/captures/write-time-date.pcap": "mms-described-data/captures/write-time-date.pcap",
+        "common/pcapx/pcaputil/mms-described-data/answers/read-oid.json": "mms-described-data/answers/read-oid.json",
+        "common/pcapx/pcaputil/mms-described-data/captures/read-oid.pcap": "mms-described-data/captures/read-oid.pcap",
+        "common/pcapx/pcaputil/mms-described-data/answers/write-oid.json": "mms-described-data/answers/write-oid.json",
+        "common/pcapx/pcaputil/mms-described-data/captures/write-oid.pcap": "mms-described-data/captures/write-oid.pcap",
+        "common/pcapx/pcaputil/mms-described-data/answers/read-utc.json": "mms-described-data/answers/read-utc.json",
+        "common/pcapx/pcaputil/mms-described-data/captures/read-utc.pcap": "mms-described-data/captures/read-utc.pcap",
+        "common/pcapx/pcaputil/mms-described-data/answers/write-utc.json": "mms-described-data/answers/write-utc.json",
+        "common/pcapx/pcaputil/mms-described-data/captures/write-utc.pcap": "mms-described-data/captures/write-utc.pcap",
+        "common/pcapx/pcaputil/mms-described-data/answers/read-array.json": "mms-described-data/answers/read-array.json",
+        "common/pcapx/pcaputil/mms-described-data/captures/read-array.pcap": "mms-described-data/captures/read-array.pcap",
+        "common/pcapx/pcaputil/mms-described-data/answers/write-array.json": "mms-described-data/answers/write-array.json",
+        "common/pcapx/pcaputil/mms-described-data/captures/write-array.pcap": "mms-described-data/captures/write-array.pcap",
+        "common/pcapx/pcaputil/mms-described-data/answers/read-structure.json": "mms-described-data/answers/read-structure.json",
+        "common/pcapx/pcaputil/mms-described-data/captures/read-structure.pcap": "mms-described-data/captures/read-structure.pcap",
+        "common/pcapx/pcaputil/mms-described-data/answers/write-structure.json": "mms-described-data/answers/write-structure.json",
+        "common/pcapx/pcaputil/mms-described-data/captures/write-structure.pcap": "mms-described-data/captures/write-structure.pcap",
+        "common/pcapx/pcaputil/mms-described-data/answers/bad-read-wrong-tag.json": "mms-described-data/answers/bad-read-wrong-tag.json",
+        "common/pcapx/pcaputil/mms-described-data/captures/bad-read-wrong-tag.pcap": "mms-described-data/captures/bad-read-wrong-tag.pcap",
+        "common/pcapx/pcaputil/mms-described-data/answers/bad-write-wrong-tag.json": "mms-described-data/answers/bad-write-wrong-tag.json",
+        "common/pcapx/pcaputil/mms-described-data/captures/bad-write-wrong-tag.pcap": "mms-described-data/captures/bad-write-wrong-tag.pcap",
+        "common/pcapx/pcaputil/mms-described-data/answers/bad-read-signed-low.json": "mms-described-data/answers/bad-read-signed-low.json",
+        "common/pcapx/pcaputil/mms-described-data/captures/bad-read-signed-low.pcap": "mms-described-data/captures/bad-read-signed-low.pcap",
+        "common/pcapx/pcaputil/mms-described-data/answers/bad-write-signed-low.json": "mms-described-data/answers/bad-write-signed-low.json",
+        "common/pcapx/pcaputil/mms-described-data/captures/bad-write-signed-low.pcap": "mms-described-data/captures/bad-write-signed-low.pcap",
+        "common/pcapx/pcaputil/mms-described-data/answers/bad-read-signed-high.json": "mms-described-data/answers/bad-read-signed-high.json",
+        "common/pcapx/pcaputil/mms-described-data/captures/bad-read-signed-high.pcap": "mms-described-data/captures/bad-read-signed-high.pcap",
+        "common/pcapx/pcaputil/mms-described-data/answers/bad-write-signed-high.json": "mms-described-data/answers/bad-write-signed-high.json",
+        "common/pcapx/pcaputil/mms-described-data/captures/bad-write-signed-high.pcap": "mms-described-data/captures/bad-write-signed-high.pcap",
+        "common/pcapx/pcaputil/mms-described-data/answers/bad-read-unsigned-high.json": "mms-described-data/answers/bad-read-unsigned-high.json",
+        "common/pcapx/pcaputil/mms-described-data/captures/bad-read-unsigned-high.pcap": "mms-described-data/captures/bad-read-unsigned-high.pcap",
+        "common/pcapx/pcaputil/mms-described-data/answers/bad-write-unsigned-high.json": "mms-described-data/answers/bad-write-unsigned-high.json",
+        "common/pcapx/pcaputil/mms-described-data/captures/bad-write-unsigned-high.pcap": "mms-described-data/captures/bad-write-unsigned-high.pcap",
+        "common/pcapx/pcaputil/mms-described-data/answers/bad-read-bit-count.json": "mms-described-data/answers/bad-read-bit-count.json",
+        "common/pcapx/pcaputil/mms-described-data/captures/bad-read-bit-count.pcap": "mms-described-data/captures/bad-read-bit-count.pcap",
+        "common/pcapx/pcaputil/mms-described-data/answers/bad-write-bit-count.json": "mms-described-data/answers/bad-write-bit-count.json",
+        "common/pcapx/pcaputil/mms-described-data/captures/bad-write-bit-count.pcap": "mms-described-data/captures/bad-write-bit-count.pcap",
+        "common/pcapx/pcaputil/mms-described-data/answers/bad-read-octet-count.json": "mms-described-data/answers/bad-read-octet-count.json",
+        "common/pcapx/pcaputil/mms-described-data/captures/bad-read-octet-count.pcap": "mms-described-data/captures/bad-read-octet-count.pcap",
+        "common/pcapx/pcaputil/mms-described-data/answers/bad-write-octet-count.json": "mms-described-data/answers/bad-write-octet-count.json",
+        "common/pcapx/pcaputil/mms-described-data/captures/bad-write-octet-count.pcap": "mms-described-data/captures/bad-write-octet-count.pcap",
+        "common/pcapx/pcaputil/mms-described-data/answers/bad-read-ascii-count.json": "mms-described-data/answers/bad-read-ascii-count.json",
+        "common/pcapx/pcaputil/mms-described-data/captures/bad-read-ascii-count.pcap": "mms-described-data/captures/bad-read-ascii-count.pcap",
+        "common/pcapx/pcaputil/mms-described-data/answers/bad-write-ascii-count.json": "mms-described-data/answers/bad-write-ascii-count.json",
+        "common/pcapx/pcaputil/mms-described-data/captures/bad-write-ascii-count.pcap": "mms-described-data/captures/bad-write-ascii-count.pcap",
+        "common/pcapx/pcaputil/mms-described-data/answers/bad-read-float-format.json": "mms-described-data/answers/bad-read-float-format.json",
+        "common/pcapx/pcaputil/mms-described-data/captures/bad-read-float-format.pcap": "mms-described-data/captures/bad-read-float-format.pcap",
+        "common/pcapx/pcaputil/mms-described-data/answers/bad-write-float-format.json": "mms-described-data/answers/bad-write-float-format.json",
+        "common/pcapx/pcaputil/mms-described-data/captures/bad-write-float-format.pcap": "mms-described-data/captures/bad-write-float-format.pcap",
+        "common/pcapx/pcaputil/mms-described-data/answers/bad-read-binary-date.json": "mms-described-data/answers/bad-read-binary-date.json",
+        "common/pcapx/pcaputil/mms-described-data/captures/bad-read-binary-date.pcap": "mms-described-data/captures/bad-read-binary-date.pcap",
+        "common/pcapx/pcaputil/mms-described-data/answers/bad-write-binary-date.json": "mms-described-data/answers/bad-write-binary-date.json",
+        "common/pcapx/pcaputil/mms-described-data/captures/bad-write-binary-date.pcap": "mms-described-data/captures/bad-write-binary-date.pcap",
+        "common/pcapx/pcaputil/mms-described-data/answers/bad-read-array-count.json": "mms-described-data/answers/bad-read-array-count.json",
+        "common/pcapx/pcaputil/mms-described-data/captures/bad-read-array-count.pcap": "mms-described-data/captures/bad-read-array-count.pcap",
+        "common/pcapx/pcaputil/mms-described-data/answers/bad-write-array-count.json": "mms-described-data/answers/bad-write-array-count.json",
+        "common/pcapx/pcaputil/mms-described-data/captures/bad-write-array-count.pcap": "mms-described-data/captures/bad-write-array-count.pcap",
+        "common/pcapx/pcaputil/mms-described-data/answers/bad-read-array-element.json": "mms-described-data/answers/bad-read-array-element.json",
+        "common/pcapx/pcaputil/mms-described-data/captures/bad-read-array-element.pcap": "mms-described-data/captures/bad-read-array-element.pcap",
+        "common/pcapx/pcaputil/mms-described-data/answers/bad-write-array-element.json": "mms-described-data/answers/bad-write-array-element.json",
+        "common/pcapx/pcaputil/mms-described-data/captures/bad-write-array-element.pcap": "mms-described-data/captures/bad-write-array-element.pcap",
+        "common/pcapx/pcaputil/mms-described-data/answers/bad-read-structure-count.json": "mms-described-data/answers/bad-read-structure-count.json",
+        "common/pcapx/pcaputil/mms-described-data/captures/bad-read-structure-count.pcap": "mms-described-data/captures/bad-read-structure-count.pcap",
+        "common/pcapx/pcaputil/mms-described-data/answers/bad-write-structure-count.json": "mms-described-data/answers/bad-write-structure-count.json",
+        "common/pcapx/pcaputil/mms-described-data/captures/bad-write-structure-count.pcap": "mms-described-data/captures/bad-write-structure-count.pcap",
+        "common/pcapx/pcaputil/mms-described-data/answers/unresolved-named.json": "mms-described-data/answers/unresolved-named.json",
+        "common/pcapx/pcaputil/mms-described-data/captures/unresolved-named.pcap": "mms-described-data/captures/unresolved-named.pcap",
+        "common/pcapx/pcaputil/mms-described-data/answers/unresolved-bcd.json": "mms-described-data/answers/unresolved-bcd.json",
+        "common/pcapx/pcaputil/mms-described-data/captures/unresolved-bcd.pcap": "mms-described-data/captures/unresolved-bcd.pcap",
+        "common/pcapx/pcaputil/mms-described-data/answers/unresolved-variable-ascii.json": "mms-described-data/answers/unresolved-variable-ascii.json",
+        "common/pcapx/pcaputil/mms-described-data/captures/unresolved-variable-ascii.pcap": "mms-described-data/captures/unresolved-variable-ascii.pcap",
+        "common/pcapx/pcaputil/mms-described-data/answers/unresolved-zero-width.json": "mms-described-data/answers/unresolved-zero-width.json",
+        "common/pcapx/pcaputil/mms-described-data/captures/unresolved-zero-width.pcap": "mms-described-data/captures/unresolved-zero-width.pcap",
+        "common/pcapx/pcaputil/mms-described-data/answers/read-reported-access-failure.json": "mms-described-data/answers/read-reported-access-failure.json",
+        "common/pcapx/pcaputil/mms-described-data/captures/read-reported-access-failure.pcap": "mms-described-data/captures/read-reported-access-failure.pcap",
+        "common/pcapx/pcaputil/mms-described-data/answers/read-confirmed-error.json": "mms-described-data/answers/read-confirmed-error.json",
+        "common/pcapx/pcaputil/mms-described-data/captures/read-confirmed-error.pcap": "mms-described-data/captures/read-confirmed-error.pcap",
+        "common/pcapx/pcaputil/mms-described-data/answers/plain-named-observation.json": "mms-described-data/answers/plain-named-observation.json",
+        "common/pcapx/pcaputil/mms-described-data/captures/plain-named-observation.pcap": "mms-described-data/captures/plain-named-observation.pcap",
+        "common/pcapx/pcaputil/mms-described-data/answers/named-array-valid.json": "mms-described-data/answers/named-array-valid.json",
+        "common/pcapx/pcaputil/mms-described-data/captures/named-array-valid.pcap": "mms-described-data/captures/named-array-valid.pcap",
+        "common/pcapx/pcaputil/mms-described-data/answers/named-lookup-valid.json": "mms-described-data/answers/named-lookup-valid.json",
+        "common/pcapx/pcaputil/mms-described-data/captures/named-lookup-valid.pcap": "mms-described-data/captures/named-lookup-valid.pcap",
+        "common/pcapx/pcaputil/mms-described-data/answers/named-read-bad-type.json": "mms-described-data/answers/named-read-bad-type.json",
+        "common/pcapx/pcaputil/mms-described-data/captures/named-read-bad-type.pcap": "mms-described-data/captures/named-read-bad-type.pcap",
+        "common/pcapx/pcaputil/mms-described-data/answers/named-write-bad-type.json": "mms-described-data/answers/named-write-bad-type.json",
+        "common/pcapx/pcaputil/mms-described-data/captures/named-write-bad-type.pcap": "mms-described-data/captures/named-write-bad-type.pcap",
+        "common/pcapx/pcaputil/mms-described-data/answers/named-stale-precedes-data.json": "mms-described-data/answers/named-stale-precedes-data.json",
+        "common/pcapx/pcaputil/mms-described-data/captures/named-stale-precedes-data.pcap": "mms-described-data/captures/named-stale-precedes-data.pcap",
+        "common/pcapx/pcaputil/mms-described-data/answers/interleaved-described-ids.json": "mms-described-data/answers/interleaved-described-ids.json",
+        "common/pcapx/pcaputil/mms-described-data/captures/interleaved-described-ids.pcap": "mms-described-data/captures/interleaved-described-ids.pcap",
+        "common/pcapx/pcaputil/mms-described-data/manifest.json": "mms-described-data/manifest.json",
+        "common/pcapx/pcaputil/mms-described-data/generate.py": "mms-described-data/generate.py",
+        "common/pcapx/pcaputil/mms-described-data/verify.py": "mms-described-data/verify.py",
+        "common/pcapx/pcaputil/mms-described-data/reference.py": "mms-described-data/reference.py",
+        "common/pcapx/pcaputil/mms-described-data/MODEL-PINS.json": "mms-described-data/MODEL-PINS.json",
+        "common/pcapx/pcaputil/mms-described-data/SOURCE-PINS.json": "mms-described-data/SOURCE-PINS.json",
+        "common/pcapx/pcaputil/mms-described-data/seal.py": "mms-described-data/seal.py",
+        "scripts/protocol-tests/required-tests-traffic-unified-v45.json": "required-tests-traffic-unified-v45.json"
+      }
     }
   ],
   "schema_version": 1,

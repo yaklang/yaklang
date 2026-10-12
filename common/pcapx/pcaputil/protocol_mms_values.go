@@ -21,6 +21,9 @@ type mmsValueContext struct {
 }
 
 func (m *binMMS) profile() string {
+	if m.validateDescriptions {
+		return "mms-iso-described-data"
+	}
 	if m.values {
 		return mmsServicesProfile
 	}
@@ -43,10 +46,12 @@ func WithProtocolMMSServiceValues(port uint16) CaptureOption {
 }
 func WithSessionMMSServiceValues() ProtocolSessionOption {
 	return func(s *captureSession) error {
+		selectedDescriptions := s.f.mms != nil && s.f.mms.validateDescriptions
 		if err := WithSessionMMSISO()(s); err != nil {
 			return err
 		}
 		s.f.mms.values = true
+		s.f.mms.validateDescriptions = selectedDescriptions
 		return nil
 	}
 }
@@ -551,4 +556,131 @@ func mmsAddress(n mmsBER) (map[string]any, error) {
 		return nil, protocolError(ErrUnsupportedFeature, "MMS Address choice")
 	}
 	return f, nil
+}
+
+// WithProtocolMMSDescriptionValidation selects bounded checks against directly
+// observed variableDescription types, without resolving named types/device truth.
+func WithProtocolMMSDescriptionValidation(port uint16) CaptureOption {
+	return func(c *CaptureConfig) error {
+		if err := WithProtocolMMSServiceValues(port)(c); err != nil {
+			return err
+		}
+		c.binParserConfig.ValidateMMSDescriptions = true
+		return nil
+	}
+}
+
+// WithSessionMMSDescriptionValidation preserves literal services while selecting
+// bounded known-description checks; unresolved type/size context is refused.
+func WithSessionMMSDescriptionValidation() ProtocolSessionOption {
+	return func(s *captureSession) error {
+		if err := WithSessionMMSServiceValues()(s); err != nil {
+			return err
+		}
+		s.f.mms.validateDescriptions = true
+		return nil
+	}
+}
+
+// Description checks consume directly observed schemas. They do not resolve
+// named types or establish namespace, memory-layout, endpoint or device truth.
+func mmsDescriptionValue(typ, value map[string]any, left *int) error {
+	if *left <= 0 {
+		return protocolError(ErrResourceExceeded, "MMS description/value comparison budget")
+	}
+	*left--
+	kind := typ["Type"].(string)
+	if kind == "named-type" || kind == "bcd" || kind == "generalized-time" || kind == "mms-string" {
+		return protocolError(ErrContextRequired, "MMS description requires independently resolved type/size context")
+	}
+	if value["Type"] != kind {
+		return protocolError(ErrMalformedMessage, "MMS Data type differs from observed variableDescription")
+	}
+	switch kind {
+	case "array":
+		values := value["Values"].([]map[string]any)
+		if uint64(len(values)) != uint64(typ["Number Of Elements"].(uint32)) {
+			return protocolError(ErrMalformedMessage, "MMS described array cardinality")
+		}
+		for _, v := range values {
+			if err := mmsDescriptionValue(typ["Element Type"].(map[string]any), v, left); err != nil {
+				return err
+			}
+		}
+	case "structure":
+		values := value["Values"].([]map[string]any)
+		components := typ["Components"].([]map[string]any)
+		if len(values) != len(components) {
+			return protocolError(ErrMalformedMessage, "MMS described structure cardinality")
+		}
+		for i, v := range values {
+			if err := mmsDescriptionValue(components[i]["Type Specification"].(map[string]any), v, left); err != nil {
+				return err
+			}
+		}
+	case "integer", "unsigned":
+		width := typ["Width Bits"].(uint32)
+		if width == 0 {
+			return protocolError(ErrContextRequired, "MMS zero integer width interpretation")
+		}
+		n, ok := new(big.Int).SetString(value["Value Decimal"].(string), 10)
+		if !ok {
+			return protocolError(ErrMalformedMessage, "MMS described integer decimal")
+		}
+		if kind == "unsigned" {
+			if n.Sign() < 0 || n.BitLen() > int(width) {
+				return protocolError(ErrMalformedMessage, "MMS described unsigned width")
+			}
+		} else {
+			max := new(big.Int).Lsh(big.NewInt(1), uint(width-1))
+			min := new(big.Int).Neg(new(big.Int).Set(max))
+			max.Sub(max, big.NewInt(1))
+			if n.Cmp(min) < 0 || n.Cmp(max) > 0 {
+				return protocolError(ErrMalformedMessage, "MMS described signed width")
+			}
+		}
+	case "bit-string", "octet-string", "visible-string":
+		size := typ["Size Constraint"].(int64)
+		if size < 0 {
+			return protocolError(ErrContextRequired, "MMS variable-length bound interpretation needs primary context")
+		}
+		actual := int64(0)
+		switch kind {
+		case "bit-string":
+			actual = int64(value["Bit Count"].(int))
+		case "octet-string":
+			actual = int64(len(value["Bytes"].([]byte)))
+		case "visible-string":
+			actual = int64(len(value["Text"].(string)))
+		}
+		if size != actual {
+			return protocolError(ErrMalformedMessage, "MMS described fixed string/bit length")
+		}
+	case "floating-point":
+		if typ["Width Bits"].(uint32) != uint32(value["Width Bits"].(int)) || typ["Exponent Width"].(uint32) != uint32(value["Exponent Width"].(int)) {
+			return protocolError(ErrMalformedMessage, "MMS described floating format")
+		}
+	case "binary-time":
+		_, date := value["Days Since 1984"]
+		if date != typ["Date Present"].(bool) {
+			return protocolError(ErrMalformedMessage, "MMS described binary-time date mode")
+		}
+	case "boolean", "object-identifier", "utc-time":
+	default:
+		return protocolError(ErrContextRequired, "MMS selected description/value type context")
+	}
+	return nil
+}
+func mmsDescriptionOperands(names, values []map[string]any, limit int) error {
+	if len(names) != len(values) {
+		return protocolError(ErrMalformedMessage, "MMS description/value cardinality")
+	}
+	for i, name := range names {
+		if typ, ok := name["Type Specification"].(map[string]any); ok {
+			if err := mmsDescriptionValue(typ, values[i], &limit); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }

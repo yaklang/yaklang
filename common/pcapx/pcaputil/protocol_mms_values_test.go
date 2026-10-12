@@ -115,11 +115,15 @@ func mmsValuesInput(t *testing.T, c mmsISOCase) ([]byte, mmsISOAnswer) {
 }
 func mmsValuesCheck(t *testing.T, events []*ProtocolEvent, a mmsISOAnswer, replay bool) {
 	t.Helper()
+	mmsValuesCheckProfile(t, events, a, replay, mmsServicesProfile)
+}
+func mmsValuesCheckProfile(t *testing.T, events []*ProtocolEvent, a mmsISOAnswer, replay bool, profile string) {
+	t.Helper()
 	require.Len(t, events, len(a.Events))
 	for i, e := range events {
 		want := a.Events[i]
 		require.Equal(t, "mms", e.Protocol)
-		require.Equal(t, mmsServicesProfile, e.Profile)
+		require.Equal(t, profile, e.Profile)
 		require.EqualValues(t, i+1, e.ID)
 		require.Equal(t, want.Dir, e.Direction)
 		require.Equal(t, want.Raw, hex.EncodeToString(e.Raw))

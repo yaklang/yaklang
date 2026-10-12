@@ -337,8 +337,9 @@ type BinParserBinding struct {
 
 type BinParserConfig struct {
 	// MMSISOPorts explicitly selects bounded RFC1006/COTP/presentation/MMS observations.
-	MMSISOPorts            []uint16
-	DecodeMMSServiceValues bool
+	MMSISOPorts             []uint16
+	DecodeMMSServiceValues  bool
+	ValidateMMSDescriptions bool
 	// DecodeOPCUARead opts into bounded UA Binary Read scalar observations under an observed None policy.
 	DecodeOPCUARead bool
 	// DecodeOPCUABrowse opts into bounded Browse body observations under an observed None policy.
@@ -468,6 +469,9 @@ type binParser struct {
 type binParserError struct{ err error }
 
 func (c *CaptureConfig) prepareBinParser() error {
+	if c.binParserConfig != nil && c.binParserConfig.ValidateMMSDescriptions && (!c.binParserConfig.DecodeMMSServiceValues || len(c.binParserConfig.MMSISOPorts) == 0) {
+		return fmt.Errorf("MMS description validation requires explicit service/value ports")
+	}
 	if c.binParserConfig == nil || (c.binParserConfig.OnEvent == nil && c.binParserConfig.OnStats == nil) {
 		return nil
 	}

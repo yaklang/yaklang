@@ -22,6 +22,7 @@ func (f *binFlow) detectDirection(dir int, wire []byte) {
 		if f.port(port) {
 			f.protocol, f.mms = "mms", newBinMMS()
 			f.mms.values = f.a.config.DecodeMMSServiceValues
+			f.mms.validateDescriptions = f.a.config.ValidateMMSDescriptions
 			return
 		}
 	}

@@ -28,6 +28,7 @@ type binMMS struct {
 	lists                                           [2]map[mmsListKey]mmsListEntry
 	listVersions                                    [2]map[mmsListKey]uint64
 	values                                          bool
+	validateDescriptions                            bool
 	nesting                                         uint32
 	hasNesting                                      bool
 	proposedNesting                                 uint32
@@ -114,6 +115,9 @@ func (m *binMMS) snapshot() map[string]any {
 		if m.hasNesting {
 			f["Data Nesting Limit"] = m.nesting
 		}
+	}
+	if m.validateDescriptions {
+		f["Description Checks Enabled"] = true
 	}
 	if m.listObserved {
 		f["Named List Context Observed"] = true
@@ -412,12 +416,17 @@ func (m *binMMS) applyMMS(d mmsDecoded, dir int, e *ProtocolEvent, limit int, ca
 		}
 		if m.values && d.service == 4 {
 			p.specification, _ = d.fields["Specification With Result"].(bool)
-			if p.specification && d.binding == nil {
+			if (p.specification || m.validateDescriptions) && d.binding == nil {
 				p.names = cloneSessionValue(d.fields["Variables"]).([]map[string]any)
 			}
 		}
 		if m.values {
 			if err := flow.namedMMSRequest(d, &p, dir); err != nil {
+				return err
+			}
+		}
+		if m.validateDescriptions && d.service == 5 {
+			if err := mmsDescriptionOperands(p.names, d.fields["Data"].([]map[string]any), limit); err != nil {
 				return err
 			}
 		}
@@ -454,6 +463,19 @@ func (m *binMMS) applyMMS(d mmsDecoded, dir int, e *ProtocolEvent, limit int, ca
 		if m.values {
 			if err := flow.namedMMSResponse(d, p, dir, e); err != nil {
 				return err
+			}
+		}
+		if m.validateDescriptions && d.tag == 0xa1 && p.service == 4 {
+			results := d.fields["Access Results"].([]map[string]any)
+			budget := limit
+			for i, result := range results {
+				if v, ok := result["Success"].(map[string]any); ok {
+					if typ, ok := p.names[i]["Type Specification"].(map[string]any); ok {
+						if err := mmsDescriptionValue(typ, v, &budget); err != nil {
+							return err
+						}
+					}
+				}
 			}
 		}
 		if m.values && (p.service == 1 || p.service == 6 && p.query != nil) {
