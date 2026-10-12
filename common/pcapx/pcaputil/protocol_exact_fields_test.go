@@ -96,25 +96,39 @@ func rejectLossyProtocolOracle(want, got any) error {
 }
 
 func exactProtocolFieldsEqual(want, got map[string]any) (bool, error) {
+	return exactProtocolFieldsEqualMode(want, got, true)
+}
+func exactProtocolFieldsEqualMode(want, got map[string]any, fast bool) (bool, error) {
 	if err := rejectLossyProtocolOracle(want, got); err != nil {
 		return false, err
 	}
-	normalize := func(v any) (any, error) {
-		b, err := json.Marshal(v)
-		if err != nil {
-			return nil, err
-		}
+	wireWant, err := json.Marshal(want)
+	if err != nil {
+		return false, err
+	}
+	wireGot, err := json.Marshal(got)
+	if err != nil {
+		return false, err
+	}
+	// Equal canonical JSON bytes already prove every key, value, array order
+	// and numeric token equal. Keep the lossy-oracle guard above this path.
+	// Different encodings (1e3/1000, decimals, signed zero) still use the exact
+	// rational comparison below, without a second marshal of either tree.
+	if fast && bytes.Equal(wireWant, wireGot) {
+		return true, nil
+	}
+	normalize := func(b []byte) (any, error) {
 		var n any
-		if err = decodeExactProtocolAnswer(b, &n); err != nil {
+		if err := decodeExactProtocolAnswer(b, &n); err != nil {
 			return nil, err
 		}
 		return canonicalExactProtocolFields(n)
 	}
-	w, err := normalize(want)
+	w, err := normalize(wireWant)
 	if err != nil {
 		return false, err
 	}
-	g, err := normalize(got)
+	g, err := normalize(wireGot)
 	if err != nil {
 		return false, err
 	}
@@ -149,9 +163,34 @@ func TestProtocolExactFieldIntegerOracle(t *testing.T) {
 			equal, err := exactProtocolFieldsEqual(want, got)
 			require.NoError(t, err)
 			require.Equal(t, c.equal, equal)
+			oldEqual, oldErr := exactProtocolFieldsEqualMode(want, got, false)
+			require.NoError(t, oldErr)
+			require.Equal(t, oldEqual, equal, "fast path must retain exact rational semantics")
 		})
 	}
 	equal, err := exactProtocolFieldsEqual(map[string]any{"counter": float64(9007199254740992)}, map[string]any{"counter": uint64(9007199254740993)})
 	require.False(t, equal)
 	require.ErrorContains(t, err, "float64")
+	t.Run("canonical-tree-parity", func(t *testing.T) {
+		values := []any{
+			nil, true, false, "1000", "\xff", []byte{0, 255}, []byte{}, []byte(nil),
+			[]any{}, []any(nil), []uint32{0, 1, ^uint32(0)},
+			map[string]any{"a": json.Number("1e3"), "b": []any{json.Number("0.50"), "x"}},
+			json.Number("-0"), json.Number("1e3"), json.Number("0.50"),
+			int64(-1), uint64(9007199254740993), ^uint64(0), float32(0.1), float64(1e30),
+		}
+		for i, want := range values {
+			for j, got := range values {
+				w, g := map[string]any{"field": want}, map[string]any{"field": got}
+				oldEqual, oldErr := exactProtocolFieldsEqualMode(w, g, false)
+				newEqual, newErr := exactProtocolFieldsEqual(w, g)
+				require.Equal(t, oldEqual, newEqual, "pair%d/%d", i, j)
+				if oldErr != nil {
+					require.EqualError(t, newErr, oldErr.Error())
+				} else {
+					require.NoError(t, newErr)
+				}
+			}
+		}
+	})
 }
