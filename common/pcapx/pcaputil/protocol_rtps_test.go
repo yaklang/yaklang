@@ -8,6 +8,8 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"path/filepath"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -19,6 +21,7 @@ import (
 )
 
 type rtpsControl struct {
+	Root                        string `json:"-"`
 	ID, Capture, Answer, SHA256 string
 	AnswerSHA                   string `json:"answer_sha256"`
 	Packets                     int
@@ -35,8 +38,12 @@ type rtpsControlAnswer struct {
 }
 
 func rtpsControls(t *testing.T) []rtpsControl {
+	return rtpsBatchControls(t, "rtps-spdp", 78)
+}
+
+func rtpsBatchControls(t *testing.T, root string, count int) []rtpsControl {
 	t.Helper()
-	raw, err := trafficfixture.ReadFile("rtps-spdp/manifest.json")
+	raw, err := trafficfixture.ReadFile(root + "/manifest.json")
 	require.NoError(t, err)
 	var m struct {
 		Schema string
@@ -44,7 +51,7 @@ func rtpsControls(t *testing.T) []rtpsControl {
 	}
 	require.NoError(t, json.Unmarshal(raw, &m))
 	require.Equal(t, "pr5013-rtps-spdp/v1", m.Schema)
-	require.Len(t, m.Cases, 78)
+	require.Len(t, m.Cases, count)
 	all, err := trafficfixture.AllExpectations()
 	require.NoError(t, err)
 	found := map[string]trafficfixture.FrozenCase{}
@@ -53,10 +60,15 @@ func rtpsControls(t *testing.T) []rtpsControl {
 			found[c.ID] = c
 		}
 	}
-	for _, c := range m.Cases {
-		v, ok := found["rtps-spdp/"+c.ID]
+	for i := range m.Cases {
+		c := &m.Cases[i]
+		c.Root = root
+		if strings.HasPrefix(c.Capture, "common/") {
+			continue
+		} // Hash-pinned historical capture reused by this new manifest.
+		v, ok := found[root+"/"+c.ID]
 		require.True(t, ok)
-		require.Equal(t, c.Capture, v.Input.File)
+		require.Equal(t, c.Capture, strings.TrimPrefix(v.Input.File, root+"/"))
 		require.Equal(t, c.SHA256, v.Input.SHA256)
 		require.Equal(t, c.Packets, v.Facts.PacketCount)
 		require.Len(t, v.Expectations, 1)
@@ -72,10 +84,10 @@ func rtpsControls(t *testing.T) []rtpsControl {
 }
 func rtpsInput(t *testing.T, c rtpsControl) ([]byte, rtpsControlAnswer) {
 	t.Helper()
-	raw, err := trafficfixture.ReadFile("rtps-spdp/" + c.Capture)
+	raw, err := trafficfixture.ReadFile(rtpsControlPath(t, c, c.Capture))
 	require.NoError(t, err)
 	require.Equal(t, c.SHA256, fmt.Sprintf("%x", sha256.Sum256(raw)))
-	a, err := trafficfixture.ReadFile("rtps-spdp/" + c.Answer)
+	a, err := trafficfixture.ReadFile(rtpsControlPath(t, c, c.Answer))
 	require.NoError(t, err)
 	require.Equal(t, c.AnswerSHA, fmt.Sprintf("%x", sha256.Sum256(a)))
 	var want rtpsControlAnswer
@@ -94,8 +106,22 @@ func rtpsInput(t *testing.T, c rtpsControl) ([]byte, rtpsControlAnswer) {
 	require.ErrorIs(t, err, io.EOF)
 	return raw, want
 }
-func TestRTPSSPDPSealedReplay(t *testing.T) {
-	for _, c := range rtpsControls(t) {
+func rtpsControlPath(t *testing.T, c rtpsControl, file string) string {
+	t.Helper()
+	if strings.HasPrefix(file, "common/") {
+		root, err := trafficfixture.RepositoryRoot()
+		require.NoError(t, err)
+		return filepath.Join(root, file)
+	}
+	return c.Root + "/" + file
+}
+
+func TestRTPSSPDPSealedReplay(t *testing.T) { testRTPSSealedReplay(t, rtpsControls(t)) }
+func TestRTPSReceiverContextReplay(t *testing.T) {
+	testRTPSSealedReplay(t, rtpsBatchControls(t, "rtps-receiver-context", 35))
+}
+func testRTPSSealedReplay(t *testing.T, cases []rtpsControl) {
+	for _, c := range cases {
 		t.Run(c.ID, func(t *testing.T) {
 			raw, want := rtpsInput(t, c)
 			for _, workers := range []int{1, 2, 4} {
@@ -203,9 +229,18 @@ func TestRTPSSPDPSealedReplay(t *testing.T) {
 }
 
 func TestRTPSSPDPProbeBudgetAndLifetime(t *testing.T) {
-	for _, c := range rtpsControls(t) {
+	testRTPSProbeBudgetAndLifetime(t, rtpsControls(t))
+}
+func TestRTPSReceiverContextBudgetAndLifetime(t *testing.T) {
+	testRTPSProbeBudgetAndLifetime(t, rtpsBatchControls(t, "rtps-receiver-context", 35))
+}
+func testRTPSProbeBudgetAndLifetime(t *testing.T, cases []rtpsControl) {
+	for _, c := range cases {
 		t.Run(c.ID, func(t *testing.T) {
 			_, want := rtpsInput(t, c)
+			if c.Root == "rtps-receiver-context" {
+				testRTPSContextSharedSession(t, want)
+			}
 			for i, encoded := range want.Wires {
 				wire, err := hex.DecodeString(encoded)
 				require.NoError(t, err)
@@ -345,4 +380,45 @@ func assertOwnedProtocolRefusal(t *testing.T, event *ProtocolEvent, kind string,
 	require.Equal(t, message, original.Message)
 	require.Equal(t, kind, string(event.sessionError.Kind))
 	require.Equal(t, message, event.sessionError.Message)
+}
+
+// Reuse one UDP session, including refusal then adjacent valid traffic. Earlier
+// events must retain their own receiver context after later logical-source changes.
+func testRTPSContextSharedSession(t *testing.T, want rtpsControlAnswer) {
+	t.Helper()
+	session, err := NewProtocolSessionWithOptions(DefaultParserBudget(), WithSessionTransport("udp"))
+	require.NoError(t, err)
+	var events []*ProtocolEvent
+	for i, encoded := range want.Wires {
+		wire, err := hex.DecodeString(encoded)
+		require.NoError(t, err)
+		result := session.Feed(i%2, time.Unix(1700000000, int64(i)), wire)
+		require.Len(t, result.Events, 1)
+		event := result.Events[0]
+		require.Equal(t, want.Events[i].Protocol, event.Protocol)
+		require.Zero(t, event.ResponseTo)
+		require.Zero(t, event.TransactionID)
+		clear(wire)
+		events = append(events, event)
+	}
+	for i, event := range events {
+		answer := want.Events[i]
+		fields, err := event.GetFields()
+		if answer.Fields != nil {
+			require.NoError(t, err)
+			rocEqualFields(t, answer.Fields, fields)
+			rocEqualFields(t, answer.Fields, event.Session)
+			mutateRTPSQuery(fields)
+			mutateRTPSQuery(event.Session)
+			again, err := event.GetFields()
+			require.NoError(t, err)
+			rocEqualFields(t, answer.Fields, again)
+		} else if answer.Error != "" {
+			require.Nil(t, fields)
+			assertOwnedProtocolRefusal(t, event, answer.Error, err)
+		}
+	}
+	require.Empty(t, session.Close("context-end"))
+	require.Empty(t, session.Close("again"))
+	require.Zero(t, session.Stats().BufferedBytes)
 }

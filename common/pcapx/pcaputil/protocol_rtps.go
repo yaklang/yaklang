@@ -11,7 +11,9 @@ import (
 
 // UDP RTPS 2.x SPDP discovery and inline lifecycle observations (OMG DDSI-RTPS 2.5, 9.4/9.6/10.3).
 // Participant names, GUIDs and locators are observed, never authenticated. User
-// topic CDR, DATA_FRAG, DDS Security and reliable-writer state are separate profiles.
+// topic CDR, DDS Security and reliable-writer state remain separate. Complete
+// DATA_FRAG samples in one datagram are decoded locally; cross-datagram assembly
+// requires the explicit bounded SPDP fragment-session profile.
 func rtpsDatagramHeader(w []byte) bool {
 	return len(w) >= 20 && bytes.Equal(w[:4], []byte("RTPS")) && w[4] == 2
 }
@@ -62,6 +64,20 @@ func rtpsParameters(w []byte, order binary.ByteOrder, remaining *int) ([]rtpsPar
 }
 
 func decodeRTPSDatagram(w []byte, maxElements int) (map[string]any, error) {
+	var fragments []rtpsDataFragment
+	remaining := maxElements
+	out, err := decodeRTPSSelectedDatagram(w, maxElements, &fragments, &remaining)
+	hasFragments := false
+	for _, f := range fragments {
+		hasFragments = hasFragments || !f.fullData
+	}
+	if err != nil || !hasFragments {
+		return out, err
+	}
+	return rtpsLocalFragments(out, fragments, maxElements, len(w), remaining)
+}
+
+func decodeRTPSSelectedDatagram(w []byte, maxElements int, fragments *[]rtpsDataFragment, budgetRemaining *int) (map[string]any, error) {
 	if !rtpsDatagramHeader(w) {
 		return nil, rtpsMalformed("header is truncated or has wrong magic/version")
 	}
@@ -69,9 +85,26 @@ func decodeRTPSDatagram(w []byte, maxElements int) (map[string]any, error) {
 		return nil, rtpsUnsupported("minor version is outside the checked 2.1-2.5 profile")
 	}
 	remaining := maxElements
+	if budgetRemaining != nil {
+		defer func() { *budgetRemaining = remaining }()
+	}
 	out := map[string]any{"Protocol Version": fmt.Sprintf("%d.%d", w[4], w[5]), "Vendor ID": hex.EncodeToString(w[6:8]), "Source GUID Prefix": hex.EncodeToString(w[8:20]), "Observation": "unverified-participant"}
 	var changes []map[string]any
 	var timestamp map[string]any
+	// Receiver context is scoped to one RTPS message. The datagram header stays
+	// the outer observation; explicit context changes are copied into each DATA.
+	sourcePrefix, sourceVersion, sourceVendor := out["Source GUID Prefix"], out["Protocol Version"], out["Vendor ID"]
+	destination := "000000000000000000000000"
+	contextSeen := false
+	contextFields := func(data map[string]any) {
+		if contextSeen {
+			data["Receiver Context"] = map[string]any{
+				"Source GUID Prefix": sourcePrefix, "Protocol Version": sourceVersion,
+				"Vendor ID": sourceVendor, "Destination GUID Prefix": destination,
+				"Destination Known": destination != "000000000000000000000000",
+			}
+		}
+	}
 	for at := 20; at < len(w); {
 		if len(w)-at < 4 {
 			return nil, rtpsMalformed("submessage header is truncated")
@@ -109,6 +142,38 @@ func decodeRTPSDatagram(w []byte, maxElements int) (map[string]any, error) {
 				}
 				timestamp = map[string]any{"Seconds": int32(order.Uint32(body)), "Fraction": order.Uint32(body[4:])}
 			}
+		case 0x0c: // INFO_SRC, DDSI-RTPS 2.5 8.3.8.10 / 9.4.5.11.
+			if len(body) < 20 {
+				return nil, rtpsMalformed("INFO_SRC fixed body is truncated")
+			}
+			if body[4] != 2 || body[5] < 1 || body[5] > 5 {
+				return nil, rtpsUnsupported("INFO_SRC version is outside the checked 2.1-2.5 profile")
+			}
+			// The unused long and future trailing extension bytes are opaque.
+			sourceVersion = fmt.Sprintf("%d.%d", body[4], body[5])
+			sourceVendor = hex.EncodeToString(body[6:8])
+			sourcePrefix = hex.EncodeToString(body[8:20])
+			timestamp, contextSeen = nil, true
+		case 0x0e: // INFO_DST, DDSI-RTPS 2.5 8.3.8.8 / 9.4.5.9.
+			if len(body) < 12 {
+				return nil, rtpsMalformed("INFO_DST GUID prefix is truncated")
+			}
+			destination, contextSeen = hex.EncodeToString(body[:12]), true
+			// GUIDPREFIX_UNKNOWN selects the receiving participant. A passive
+			// capture cannot infer its GUID from an IP address or port.
+		case 0x16:
+			if fragments == nil {
+				return nil, rtpsUnsupported("DATA_FRAG requires fragment support")
+			}
+			fragment, err := rtpsParseFragment(body, flags, order, &remaining)
+			if err != nil {
+				return nil, err
+			}
+			fragment.context = map[string]any{"Source GUID Prefix": sourcePrefix, "Protocol Version": sourceVersion, "Vendor ID": sourceVendor, "Destination GUID Prefix": destination, "Destination Known": destination != "000000000000000000000000"}
+			fragment.position = len(changes)
+			fragment.hasContext = contextSeen
+			fragment.timestamp = cloneSession(timestamp)
+			*fragments = append(*fragments, fragment)
 		case 0x15:
 			if flags&0x0c == 0x0c {
 				return nil, rtpsMalformed("DATA and KEY flags are both set")
@@ -132,11 +197,14 @@ func decodeRTPSDatagram(w []byte, maxElements int) (map[string]any, error) {
 			}
 			data := map[string]any{"Reader Entity ID": hex.EncodeToString(body[4:8]), "Writer Entity ID": hex.EncodeToString(body[8:12]), "Writer Sequence": uint64(uint32(hi))<<32 | uint64(lo)}
 			payload := body[inline:]
+			var normalQoS []rtpsParameter
+			var normalQoSWire []byte
 			if flags&2 != 0 {
 				params, used, err := rtpsParameters(payload, order, &remaining)
 				if err != nil {
 					return nil, err
 				}
+				normalQoS, normalQoSWire = params, payload[:used]
 				var qos []map[string]any
 				for _, p := range params {
 					qos = append(qos, map[string]any{"ID": p.id, "Value": hex.EncodeToString(p.value)})
@@ -169,33 +237,11 @@ func decodeRTPSDatagram(w []byte, maxElements int) (map[string]any, error) {
 				}
 				data["Kind"] = "lifecycle"
 				data["Timestamp"] = cloneSession(timestamp)
+				contextFields(data)
 				changes = append(changes, data)
 				continue
 			}
-			if len(payload) < 4 {
-				return nil, rtpsMalformed("serialized payload header is truncated")
-			}
-			representation := binary.BigEndian.Uint16(payload[:2])
-			var payloadOrder binary.ByteOrder
-			switch representation {
-			case 2:
-				payloadOrder = binary.BigEndian
-			case 3:
-				payloadOrder = binary.LittleEndian
-			default:
-				return nil, rtpsUnsupported("SPDP requires PL_CDR_BE or PL_CDR_LE")
-			}
-			if payload[2] != 0 || payload[3] != 0 {
-				return nil, rtpsUnsupported("serialized payload options require unsupported representation semantics")
-			}
-			params, used, err := rtpsParameters(payload[4:], payloadOrder, &remaining)
-			if err != nil {
-				return nil, err
-			}
-			if used != len(payload)-4 {
-				return nil, rtpsMalformed("bytes follow SPDP parameter sentinel")
-			}
-			fields, err := rtpsDiscoveryFields(params, payloadOrder)
+			fields, err := rtpsSerializedDiscovery(payload, &remaining)
 			if err != nil {
 				return nil, err
 			}
@@ -204,12 +250,16 @@ func decodeRTPSDatagram(w []byte, maxElements int) (map[string]any, error) {
 			}
 			data["Timestamp"] = cloneSession(timestamp)
 			data["Kind"] = "discovery"
+			contextFields(data)
 			changes = append(changes, data)
+			if fragments != nil {
+				*fragments = append(*fragments, rtpsDataFragment{fullData: true, position: len(changes) - 1, reader: hex.EncodeToString(body[4:8]), writer: hex.EncodeToString(body[8:12]), sequence: uint64(uint32(hi))<<32 | uint64(lo), start: 1, count: 1, size: uint32(len(payload)), total: uint32(len(payload)), payload: payload, qos: normalQoS, qosWire: normalQoSWire, context: map[string]any{"Source GUID Prefix": sourcePrefix, "Protocol Version": sourceVersion, "Vendor ID": sourceVendor, "Destination GUID Prefix": destination, "Destination Known": destination != "000000000000000000000000"}, timestamp: cloneSession(timestamp), hasContext: contextSeen})
+			}
 		default:
 			return nil, rtpsUnsupported("submessage is outside the checked SPDP profile")
 		}
 	}
-	if len(changes) == 0 {
+	if len(changes) == 0 && (fragments == nil || len(*fragments) == 0) {
 		return nil, rtpsUnsupported("no SPDP discovery or lifecycle DATA observed")
 	}
 	out["Changes"] = changes

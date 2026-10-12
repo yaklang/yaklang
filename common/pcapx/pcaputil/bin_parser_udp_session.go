@@ -619,6 +619,7 @@ func (a *binParser) closeUDPSessions() {
 	a.udpMu.Lock()
 	defer a.udpMu.Unlock()
 	incomplete = append(incomplete, a.closeAISMultipartLocked()...)
+	incomplete = append(incomplete, a.closeRTPSFragmentsLocked()...)
 	if s := a.semtechSessions; s != nil {
 		for _, el := range s.entries {
 			el.Value.(*binUDPEntry).flow.closeSession()

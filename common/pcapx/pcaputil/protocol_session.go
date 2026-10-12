@@ -170,6 +170,11 @@ func NewProtocolSessionWithOptions(budget ParserBudget, options ...ProtocolSessi
 			return nil, err
 		}
 	}
+	for _, profile := range s.f.a.datagramDecodeAs {
+		if profile == "rtps-spdp-fragments" && s.transport != "udp" {
+			return nil, fmt.Errorf("RTPS fragment observation requires a UDP session")
+		}
+	}
 	if s.transport == "udp" && (s.f.a.config.DecodeOPCUARead || s.f.a.config.DecodeOPCUABrowse || s.f.a.config.DecodeOPCUAWrite || s.f.a.config.DecodeOPCUABrowseNext || s.f.a.config.DecodeOPCUACall) {
 		return nil, fmt.Errorf("OPC UA observations require a TCP session")
 	}
@@ -208,6 +213,9 @@ func NewDecryptedQUICSession(budget ParserBudget, source string) (ProtocolSessio
 
 func (s *captureSession) Probe(data []byte) ProbeResult {
 	if s.transport == "udp" {
+		if p, ok := s.probeRTPSFragments(data); ok {
+			return p
+		}
 		if p, ok := s.probeSemtechDownlink(data); ok {
 			return p
 		}

@@ -418,6 +418,7 @@ type binParser struct {
 	semtechDisabled                                                            bool               // udpMu; bounded opt-in correlation fails closed after global state exhaustion
 	semtechSessions                                                            *binUDPStore       // udpMu; token quarantine must survive unrelated UDP expiry
 	aisMultipart                                                               *aisMultipartStore // udpMu; directed, capture-domain fragment history
+	rtpsFragments                                                              *rtpsFragmentStore // udpMu; directed domain/sample history
 	aisMultipartDisabled                                                       bool               // udpMu; untracked history fails closed
 	datagramDecodeAs                                                           map[uint16]string
 	canDecodeAs                                                                map[int]string

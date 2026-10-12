@@ -564,6 +564,11 @@ func (a *binParser) datagramFields(network gopacket.NetworkLayer, udp *layers.UD
 		}
 	}
 	if truncated || ci.CaptureLength < ci.Length || udp.Length < 8 || int(udp.Length) != len(wire)+8 {
+		if a.rtpsFragmentsSelected(uint16(udp.SrcPort), uint16(udp.DstPort)) {
+			a.decodeRTPSFragmentDatagram(e, wire, protocolError(ErrNeedMore, "RTPS fragment carrier is truncated or has invalid UDP length"))
+			a.emit(e)
+			return
+		}
 		if a.aisMultipartSelected(uint16(udp.SrcPort), uint16(udp.DstPort)) {
 			a.decodeAISMultipartDatagram(e, wire, protocolError(ErrNeedMore, "AIS fragment carrier is truncated or has invalid UDP length"))
 			a.emit(e)
@@ -572,6 +577,11 @@ func (a *binParser) datagramFields(network gopacket.NetworkLayer, udp *layers.UD
 		e.Status, e.Summary = "incomplete", "truncated or invalid UDP datagram"
 		a.incomplete.Add(1)
 	} else if len(wire) > a.config.MaxMessageBytes {
+		if a.rtpsFragmentsSelected(uint16(udp.SrcPort), uint16(udp.DstPort)) {
+			a.decodeRTPSFragmentDatagram(e, wire, protocolError(ErrResourceExceeded, "RTPS fragment exceeds UDP message budget"))
+			a.emit(e)
+			return
+		}
 		if a.aisMultipartSelected(uint16(udp.SrcPort), uint16(udp.DstPort)) {
 			a.decodeAISMultipartDatagram(e, wire, protocolError(ErrResourceExceeded, "AIS fragment exceeds UDP message byte budget"))
 			a.emit(e)
