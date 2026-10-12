@@ -745,7 +745,10 @@ func buildContextPackageHistoryBlock(pkg *aiv1.ContextPackage) string {
 		if sb.Len() == 0 {
 			sb.WriteString("[Conversation history replayed by server (S3 stateless engine)]\n\n")
 		}
-		fmt.Fprintf(&sb, "%s: %s\n", role, m.Content)
+		sb.WriteString(role)
+		sb.WriteString(": ")
+		sb.WriteString(m.Content)
+		sb.WriteByte('\n')
 	}
 	return sb.String()
 }
