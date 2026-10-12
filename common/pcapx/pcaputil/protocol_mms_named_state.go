@@ -138,6 +138,24 @@ func (m *binMMS) namedStorage() int64 {
 	}
 	return n
 }
+
+// Pending direct Read/Write schemas are private retained context too, even
+// when they are not named-list control transactions. Charge all owned copies.
+func mmsPendingHistoryUnits(p mmsPending) int {
+	n := mmsEntryHistoryUnits(p.names)
+	if p.control != nil {
+		if p.control.previous != nil {
+			n += mmsEntryHistoryUnits(p.control.previous.names)
+		}
+		n += len(p.control.targets)
+		for _, target := range p.control.targets {
+			if target.previous != nil {
+				n += mmsEntryHistoryUnits(target.previous.names)
+			}
+		}
+	}
+	return n
+}
 func (m *binMMS) namedElements(skipDir int, skipInvoke uint32) int {
 	n := len(m.listVersions[0]) + len(m.listVersions[1])
 	for dir := 0; dir < 2; dir++ {
@@ -145,19 +163,10 @@ func (m *binMMS) namedElements(skipDir int, skipInvoke uint32) int {
 			n += mmsEntryHistoryUnits(x.names)
 		}
 		for id, p := range m.pending[dir] {
-			if dir == skipDir && id == skipInvoke || p.control == nil {
+			if dir == skipDir && id == skipInvoke {
 				continue
 			}
-			n += mmsEntryHistoryUnits(p.names)
-			if p.control.previous != nil {
-				n += mmsEntryHistoryUnits(p.control.previous.names)
-			}
-			n += len(p.control.targets)
-			for _, t := range p.control.targets {
-				if t.previous != nil {
-					n += mmsEntryHistoryUnits(t.previous.names)
-				}
-			}
+			n += mmsPendingHistoryUnits(p)
 		}
 	}
 	return n

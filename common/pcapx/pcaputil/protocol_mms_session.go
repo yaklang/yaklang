@@ -430,6 +430,9 @@ func (m *binMMS) applyMMS(d mmsDecoded, dir int, e *ProtocolEvent, limit int, ca
 				return err
 			}
 		}
+		if m.values && m.namedElements(-1, 0)+mmsPendingHistoryUnits(p)+len(m.pending[0])+len(m.pending[1])+len(m.retired[0])+len(m.retired[1])+1 > limit {
+			return protocolError(ErrResourceExceeded, "MMS retained pending member history budget")
+		}
 		m.pending[dir][d.invoke] = p
 		e.TransactionID = e.ID
 	case 0xa1, 0xa2:
