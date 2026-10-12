@@ -565,7 +565,7 @@ func (a *binParser) datagramFields(network gopacket.NetworkLayer, udp *layers.UD
 	}
 	if truncated || ci.CaptureLength < ci.Length || udp.Length < 8 || int(udp.Length) != len(wire)+8 {
 		if a.rtpsFragmentsSelected(uint16(udp.SrcPort), uint16(udp.DstPort)) {
-			a.decodeRTPSFragmentDatagram(e, wire, protocolError(ErrNeedMore, "RTPS fragment carrier is truncated or has invalid UDP length"))
+			a.decodeRTPSSelectedFragmentDatagram(e, wire, protocolError(ErrNeedMore, "RTPS fragment carrier is truncated or has invalid UDP length"), uint16(udp.SrcPort), uint16(udp.DstPort))
 			a.emit(e)
 			return
 		}
@@ -578,7 +578,7 @@ func (a *binParser) datagramFields(network gopacket.NetworkLayer, udp *layers.UD
 		a.incomplete.Add(1)
 	} else if len(wire) > a.config.MaxMessageBytes {
 		if a.rtpsFragmentsSelected(uint16(udp.SrcPort), uint16(udp.DstPort)) {
-			a.decodeRTPSFragmentDatagram(e, wire, protocolError(ErrResourceExceeded, "RTPS fragment exceeds UDP message budget"))
+			a.decodeRTPSSelectedFragmentDatagram(e, wire, protocolError(ErrResourceExceeded, "RTPS fragment exceeds UDP message budget"), uint16(udp.SrcPort), uint16(udp.DstPort))
 			a.emit(e)
 			return
 		}

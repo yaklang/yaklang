@@ -11,6 +11,7 @@ import (
 // serialized DATA is selected; keyed/nonstandard payloads remain unsupported.
 type rtpsDataFragment struct {
 	fullData                  bool
+	keyOnly                   bool // selected application serialization, not SPDP
 	qosElements               int
 	position                  int
 	reader, writer            string
@@ -132,7 +133,7 @@ func (s *rtpsSample) add(f rtpsDataFragment) (bool, error) {
 	if s.complete || s.data == nil {
 		return false, protocolError(ErrContextRequired, "RTPS sample identity is retired")
 	}
-	if !f.fullData && s.first.size != f.size || s.first.total != f.total || s.first.context["Protocol Version"] != f.context["Protocol Version"] || s.first.context["Vendor ID"] != f.context["Vendor ID"] {
+	if !f.fullData && s.first.size != f.size || s.first.keyOnly != f.keyOnly || s.first.total != f.total || s.first.context["Protocol Version"] != f.context["Protocol Version"] || s.first.context["Vendor ID"] != f.context["Vendor ID"] {
 		s.retire()
 		return false, protocolError(ErrContextRequired, "RTPS fragment metadata conflicts with observed sample")
 	}

@@ -1,6 +1,7 @@
 package pcaputil
 
 import (
+	"bytes"
 	"encoding/hex"
 	"fmt"
 	"sort"
@@ -51,7 +52,7 @@ func (a *binParser) rtpsFragmentsSelected(src, dst uint16) bool {
 	if p == "" {
 		p = a.datagramDecodeAs[src]
 	}
-	return p == "rtps-spdp-fragments"
+	return p == "rtps-spdp-fragments" || p == "rtps-shape-fragments"
 }
 func (p *rtpsPendingSample) retire(c *rtpsFragmentConversation) {
 	p.sample.retire()
@@ -66,12 +67,20 @@ func (c *rtpsFragmentConversation) retireAll() {
 	}
 }
 func (a *binParser) consumeRTPSFragments(e *ProtocolEvent, w []byte, inputErr error) (map[string]any, error) {
+	return a.consumeRTPSFragmentsMode(e, w, inputErr, nil)
+}
+
+func (a *binParser) consumeRTPSFragmentsMode(e *ProtocolEvent, w []byte, inputErr error, shape *RTPSShapeWriter) (map[string]any, error) {
 	a.udpMu.Lock()
 	defer a.udpMu.Unlock()
-	if a.rtpsFragments == nil {
-		a.rtpsFragments = &rtpsFragmentStore{entries: map[binUDPKey]*rtpsFragmentConversation{}}
+	storePointer := &a.rtpsFragments
+	if shape != nil {
+		storePointer = &a.rtpsShapeFragments
 	}
-	store := a.rtpsFragments
+	if *storePointer == nil {
+		*storePointer = &rtpsFragmentStore{entries: map[binUDPKey]*rtpsFragmentConversation{}}
+	}
+	store := *storePointer
 	if store.disabled {
 		return nil, protocolError(ErrResourceExceeded, "RTPS fragment conversation history exhausted")
 	}
@@ -130,7 +139,13 @@ func (a *binParser) consumeRTPSFragments(e *ProtocolEvent, w []byte, inputErr er
 	}
 	var fragments []rtpsDataFragment
 	remaining := a.budget.MaxCollectionElements
-	fields, err := decodeRTPSSelectedDatagram(w, a.budget.MaxCollectionElements, &fragments, &remaining)
+	var fields map[string]any
+	var err error
+	if shape != nil {
+		fields, fragments, remaining, err = decodeRTPSShapeFragments(w, a.budget, *shape)
+	} else {
+		fields, err = decodeRTPSSelectedDatagram(w, a.budget.MaxCollectionElements, &fragments, &remaining)
+	}
 	if err != nil {
 		return fail(err)
 	}
@@ -195,7 +210,9 @@ func (a *binParser) consumeRTPSFragments(e *ProtocolEvent, w []byte, inputErr er
 				}
 			}
 			var change map[string]any
-			if f.fullData {
+			if shape != nil {
+				change, err = rtpsShapeCompletion(sample, fields["Messages"].([]map[string]any)[f.position], &remaining)
+			} else if f.fullData {
 				change, err = sample.decorate(fields["Changes"].([]map[string]any)[f.position])
 			} else {
 				change, err = sample.change(&remaining)
@@ -209,14 +226,40 @@ func (a *binParser) consumeRTPSFragments(e *ProtocolEvent, w []byte, inputErr er
 			change["Serialized Payload"] = hex.EncodeToString(sample.data)
 			change["Association Verified"] = false
 			change["Sequence Reuse Policy"] = "quarantined for capture lifetime"
-			if f.fullData {
+			if shape != nil {
+				// Preserve literal DATA/DATA_FRAG bytes and current message order;
+				// the reconstructed bytes belong to a separately named field.
+				delete(change, "Serialized Payload")
+				change["Contributor Event IDs"] = change["Fragment Event IDs"]
+				delete(change, "Fragment Event IDs")
+				if f.fullData {
+					change["Serialized Payload"] = bytes.Clone(f.payload)
+				}
+				fields["Messages"].([]map[string]any)[f.position] = change
+			} else if f.fullData {
 				plain := fields["Changes"].([]map[string]any)
 				plain[f.position] = change
 			} else {
 				completed = append(completed, rtpsCompletedChange{f.position, change})
 			}
 			pending.retire(c)
+		} else if shape != nil {
+			entry := cloneSession(fields["Messages"].([]map[string]any)[f.position])
+			observed := uint32(0)
+			for _, seen := range sample.seen {
+				if seen {
+					observed++
+				}
+			}
+			entry["Assembly State"], entry["Observed Fragment Count"] = "pending", observed
+			entry["Contributor Event IDs"] = append([]uint64(nil), pending.ids...)
+			entry["Assembly Scope"], entry["Association Verified"] = "selected-directed-UDP-observation", false
+			entry["Sequence Reuse Policy"] = "quarantined for capture lifetime"
+			fields["Messages"].([]map[string]any)[f.position] = entry
 		}
+	}
+	if shape != nil {
+		return fields, nil
 	}
 	changes := rtpsMergeChanges(fields["Changes"].([]map[string]any), completed)
 	if len(changes) == 0 {
@@ -229,14 +272,22 @@ func (a *binParser) consumeRTPSFragments(e *ProtocolEvent, w []byte, inputErr er
 	return fields, nil
 }
 func (a *binParser) decodeRTPSFragmentDatagram(e *ProtocolEvent, w []byte, inputErr error) bool {
-	e.Protocol, e.Profile, e.Admission, e.Completeness = "rtps", rtpsFragmentProfile, "explicit-decode-as", "message"
+	return a.decodeRTPSFragmentDatagramMode(e, w, inputErr, nil)
+}
+
+func (a *binParser) decodeRTPSFragmentDatagramMode(e *ProtocolEvent, w []byte, inputErr error, shape *RTPSShapeWriter) bool {
+	profile := rtpsFragmentProfile
+	if shape != nil {
+		profile = rtpsShapeFragmentProfile
+	}
+	e.Protocol, e.Profile, e.Admission, e.Completeness = "rtps", profile, "explicit-decode-as", "message"
 	if e.ID == 0 {
 		e.ID = a.ids.Add(1)
 	}
 	if inputErr == nil && len(w) > min(a.budget.MaxFrameBytes, a.config.MaxMessageBytes) {
 		inputErr = protocolError(ErrResourceExceeded, "RTPS wire exceeds frame/message budget")
 	}
-	fields, err := a.consumeRTPSFragments(e, w, inputErr)
+	fields, err := a.consumeRTPSFragmentsMode(e, w, inputErr, shape)
 	if err == nil {
 		e.semanticFields = cloneSession(fields)
 		e.semanticSession = cloneSession(fields)
@@ -261,13 +312,21 @@ func (a *binParser) decodeRTPSFragmentDatagram(e *ProtocolEvent, w []byte, input
 
 // Called under udpMu; callbacks run only after the enclosing Close unlocks.
 func (a *binParser) closeRTPSFragmentsLocked() []*ProtocolEvent {
+	events := a.closeRTPSFragmentStoreLocked(a.rtpsFragments, rtpsFragmentProfile)
+	events = append(events, a.closeRTPSFragmentStoreLocked(a.rtpsShapeFragments, rtpsShapeFragmentProfile)...)
+	a.rtpsFragments, a.rtpsShapeFragments = nil, nil
+	sort.Slice(events, func(i, j int) bool { return events[i].SourceBytes.ParentPDUs[0] < events[j].SourceBytes.ParentPDUs[0] })
+	return events
+}
+
+func (a *binParser) closeRTPSFragmentStoreLocked(store *rtpsFragmentStore, profile string) []*ProtocolEvent {
 	var events []*ProtocolEvent
-	if store := a.rtpsFragments; store != nil {
+	if store != nil {
 		for key, c := range store.entries {
 			for _, p := range c.seen {
 				if p.sample.data != nil {
 					err := &ProtocolError{Kind: ErrNeedMore, Message: "RTPS exchange closed with missing sample fragments"}
-					e := &ProtocolEvent{FlowID: c.flow.id, Timestamp: c.clock, Domain: key.domain, Source: key.a, Destination: key.b, Transport: "udp", Protocol: "rtps", Profile: rtpsFragmentProfile, Status: "incomplete", Completeness: "incomplete", Error: err.Message, sessionError: err, SourceBytes: ByteSource{Kind: "reassembled", ParentPDUs: append([]uint64(nil), p.ids...), PacketRefs: append([]PacketReference(nil), p.refs...)}}
+					e := &ProtocolEvent{FlowID: c.flow.id, Timestamp: c.clock, Domain: key.domain, Source: key.a, Destination: key.b, Transport: "udp", Protocol: "rtps", Profile: profile, Status: "incomplete", Completeness: "incomplete", Error: err.Message, sessionError: err, SourceBytes: ByteSource{Kind: "reassembled", ParentPDUs: append([]uint64(nil), p.ids...), PacketRefs: append([]PacketReference(nil), p.refs...)}}
 					if key.a > key.b {
 						e.Direction = 1
 					}
@@ -279,13 +338,16 @@ func (a *binParser) closeRTPSFragmentsLocked() []*ProtocolEvent {
 			c.flow.closeSession()
 		}
 	}
-	a.rtpsFragments = nil
 	sort.Slice(events, func(i, j int) bool { return events[i].SourceBytes.ParentPDUs[0] < events[j].SourceBytes.ParentPDUs[0] })
 	return events
 }
 
 func (s *captureSession) probeRTPSFragments(data []byte) (ProbeResult, bool) {
-	if !s.f.a.rtpsFragmentsSelected(s.f.ports[0], s.f.ports[1]) {
+	p := s.f.a.datagramDecodeAs[s.f.ports[1]]
+	if p == "" {
+		p = s.f.a.datagramDecodeAs[s.f.ports[0]]
+	}
+	if p != "rtps-spdp-fragments" {
 		return ProbeResult{}, false
 	}
 	reject := func(reason string) (ProbeResult, bool) {

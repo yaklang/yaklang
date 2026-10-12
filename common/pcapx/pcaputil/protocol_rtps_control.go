@@ -23,6 +23,10 @@ func decodeRTPSMessageBudget(w []byte, elements, depth int, withData bool) (map[
 }
 
 func decodeRTPSMessageBudgetRemaining(w []byte, elements, depth int, withData bool, remainder *int) (map[string]any, error) {
+	return decodeRTPSMessageFragments(w, elements, depth, withData, remainder, nil)
+}
+
+func decodeRTPSMessageFragments(w []byte, elements, depth int, withData bool, remainder *int, fragments *[]rtpsDataFragment) (map[string]any, error) {
 	if remainder != nil {
 		defer func() { *remainder = elements }()
 	}
@@ -93,11 +97,20 @@ func decodeRTPSMessageBudgetRemaining(w []byte, elements, depth int, withData bo
 				return nil, rtpsMalformed("control INFO_DST is truncated")
 			}
 			destination = hex.EncodeToString(body[:12])
-		case 2, 3, 0x15, 6, 7, 8, 0x12, 0x13:
+		case 2, 3, 0x15, 0x16, 6, 7, 8, 0x12, 0x13:
 			var d map[string]any
 			var err error
+			var fragment rtpsDataFragment
 			isData := kind == 2 || kind == 3 || kind == 0x15
-			if isData {
+			if kind == 0x16 {
+				if fragments == nil || !withData {
+					return nil, rtpsUnsupported("submessage needs DATA, security or other receiver-state support")
+				}
+				if version == "2.0" {
+					return nil, rtpsUnsupported("modern DATA_FRAG conflicts with logical source2.0")
+				}
+				fragment, d, err = rtpsShapeFragmentWire(body, flags, order, &elements, depth)
+			} else if isData {
 				if !withData {
 					return nil, rtpsUnsupported("submessage needs DATA, security or other receiver-state support")
 				}
@@ -105,7 +118,11 @@ func decodeRTPSMessageBudgetRemaining(w []byte, elements, depth int, withData bo
 					if version == "2.0" {
 						return nil, rtpsUnsupported("modern DATA conflicts with logical source2.0")
 					}
-					d, err = rtpsWireData(body, flags, order, &elements, depth)
+					if fragments != nil {
+						d, err = rtpsWireDataDetails(body, flags, order, &elements, depth, &fragment)
+					} else {
+						d, err = rtpsWireData(body, flags, order, &elements, depth)
+					}
 				} else {
 					if version != "2.0" {
 						return nil, rtpsUnsupported("legacy DATA conflicts with logical source version")
@@ -133,6 +150,13 @@ func decodeRTPSMessageBudgetRemaining(w []byte, elements, depth int, withData bo
 			d["Reader Prefix Known"], d["Writer Prefix Known"] = reader != "000000000000000000000000", writer != "000000000000000000000000"
 			if timestamp != nil {
 				d["Timestamp"] = cloneSession(timestamp)
+			}
+			if fragments != nil && (kind == 0x16 || kind == 0x15 && d["Serialized Payload"] != nil) {
+				fragment.position = len(controls)
+				fragment.context = d["Receiver Context"].(map[string]any)
+				fragment.timestamp = cloneSession(timestamp)
+				fragment.hasContext = true
+				*fragments = append(*fragments, fragment)
 			}
 			controls = append(controls, d)
 		default:

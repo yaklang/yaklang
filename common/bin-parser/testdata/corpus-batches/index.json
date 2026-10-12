@@ -59908,6 +59908,1642 @@
         "common/pcapx/pcaputil/rtps-wire/seal.py": "rtps-wire/seal.py",
         "scripts/protocol-tests/required-tests-traffic-unified-v35.json": "required-tests-traffic-unified-v35.json"
       }
+    },
+    {
+      "id": "validation-rtps-shape-fragments",
+      "kind": "validation",
+      "source_sha": "4bbc17b25702d33278ee0cb96c3b3454f837aa0b",
+      "file": "validation-rtps-shape-fragments.zip",
+      "sha256": "90f28e98f1f557d921af67bd5d2b33f8a473a12cd87361d92d6bb077b4d26c3c",
+      "password": "bin-parser",
+      "members": {
+        "rtps-shape-fragments/answers/le-le-data-normal.json": {
+          "sha256": "06cbacab76044ce049538eec31f6cf39f6c6e7c54a3bdb65d7326f73f0852cb0",
+          "bytes": 8268
+        },
+        "rtps-shape-fragments/captures/le-le-data-normal.pcap": {
+          "sha256": "d7bf140b9cc1ac05ff8f97e742ff0a00da61627bb1b33cdce678ca65d20ee7ad",
+          "bytes": 452
+        },
+        "rtps-shape-fragments/answers/le-le-data-normal-bundle.json": {
+          "sha256": "ed18a3611ed11eec958dfa3018121a67316ee8569102ee7a043a5a8217f6644e",
+          "bytes": 2480
+        },
+        "rtps-shape-fragments/captures/le-le-data-normal-bundle.pcap": {
+          "sha256": "0aa95329ab1f7025c187c04919f68dcf6c2cf569b71d8d1e3a1791f8bcd0f957",
+          "bytes": 152
+        },
+        "rtps-shape-fragments/answers/le-le-data-empty-extremes.json": {
+          "sha256": "d3cf4892e80098a7b0beb580a78cc70dcd4a4b913c3bb4947bb9541228235a8c",
+          "bytes": 6311
+        },
+        "rtps-shape-fragments/captures/le-le-data-empty-extremes.pcap": {
+          "sha256": "88178e4b92d24a09f63baca0dfc5240e8553c5e4e145c3a8e077abebcee1c4a4",
+          "bytes": 348
+        },
+        "rtps-shape-fragments/answers/le-le-data-empty-extremes-bundle.json": {
+          "sha256": "c8b330c3ad94787b6dab8b67e0aefff7710028d67879fd92fc3154d1ff6503e8",
+          "bytes": 2468
+        },
+        "rtps-shape-fragments/captures/le-le-data-empty-extremes-bundle.pcap": {
+          "sha256": "9221b2259e6ca457b727d57be0c31a130cb5a6c23ba1c7d67c8a139c79cb5e32",
+          "bytes": 148
+        },
+        "rtps-shape-fragments/answers/le-le-data-utf8-bound.json": {
+          "sha256": "bda655deaa2fca491ec800a3f4c62ddeae696ff722e5d49ef967df1ee5cfdec9",
+          "bytes": 22838
+        },
+        "rtps-shape-fragments/captures/le-le-data-utf8-bound.pcap": {
+          "sha256": "3b10a2898b4f7a5024d8ce75fefbb732d97a8bfd9101df4b3a5e4d56070aa934",
+          "bytes": 1212
+        },
+        "rtps-shape-fragments/answers/le-le-data-utf8-bound-bundle.json": {
+          "sha256": "763088e3ceac99d1250a2e3e76b50d8198225cd4509a357d6893ab0cdd6f4cfd",
+          "bytes": 2945
+        },
+        "rtps-shape-fragments/captures/le-le-data-utf8-bound-bundle.pcap": {
+          "sha256": "4d0c32ed375037e992e7fcb65cc778ec5184128385bc0f2c021eb73468ac3ac9",
+          "bytes": 212
+        },
+        "rtps-shape-fragments/answers/le-le-key-normal.json": {
+          "sha256": "f8810b54f3af4bee471f7d5fef0a922fd0b9343303ce71279bbbc2bfa11cb8af",
+          "bytes": 4262
+        },
+        "rtps-shape-fragments/captures/le-le-key-normal.pcap": {
+          "sha256": "3dfc2cae3fd2c009fb2491ab463aba96274428c391e5c250e0a78c8c5f33fdb0",
+          "bytes": 240
+        },
+        "rtps-shape-fragments/answers/le-le-key-normal-bundle.json": {
+          "sha256": "ab6bccbe3f38c587a2e9144c19a49a6bb7c8268cdbb4b5ef58e49189f2603828",
+          "bytes": 2351
+        },
+        "rtps-shape-fragments/captures/le-le-key-normal-bundle.pcap": {
+          "sha256": "7bd64f1c2418a90ab25ff81e10d00ec8885c976b5c155d6e3321493146d3ff94",
+          "bytes": 140
+        },
+        "rtps-shape-fragments/answers/le-le-key-empty-extremes.json": {
+          "sha256": "936e942bb0b5ae5d81f4cbe4cc927c1ece22275e95f524a0738381808ccb1bda",
+          "bytes": 4238
+        },
+        "rtps-shape-fragments/captures/le-le-key-empty-extremes.pcap": {
+          "sha256": "3f1503737ad5c533a18d43830af2c174ac6b871f7485d757f2059ca28b96f747",
+          "bytes": 236
+        },
+        "rtps-shape-fragments/answers/le-le-key-empty-extremes-bundle.json": {
+          "sha256": "e7b9bc4f910cf2831818afd7da32ec93ff92c52d2269b63a8fe20277e6afbdb2",
+          "bytes": 2323
+        },
+        "rtps-shape-fragments/captures/le-le-key-empty-extremes-bundle.pcap": {
+          "sha256": "ab3132386ebd47972fed25940ef2686b8997c4ba8e2adc79a057b8230abbc80e",
+          "bytes": 136
+        },
+        "rtps-shape-fragments/answers/le-le-key-utf8-bound.json": {
+          "sha256": "dd79bb9784ab67c986d74c66cfc37ff99c9e136ad5e701ade4f5deeaa43233c1",
+          "bytes": 20644
+        },
+        "rtps-shape-fragments/captures/le-le-key-utf8-bound.pcap": {
+          "sha256": "f66101e74e7d25505741d7c3dfd75b69545ad46ba6da7b7917cf60bb1dd4b89c",
+          "bytes": 1100
+        },
+        "rtps-shape-fragments/answers/le-le-key-utf8-bound-bundle.json": {
+          "sha256": "798837023fd9b3e54d0fd3a99888fb3f94473e13d6479199d33a838df5cc9c1f",
+          "bytes": 2820
+        },
+        "rtps-shape-fragments/captures/le-le-key-utf8-bound-bundle.pcap": {
+          "sha256": "1674557a2935524c590580ececfeecc7605011749ab2300c5dba0cfa821396c1",
+          "bytes": 200
+        },
+        "rtps-shape-fragments/answers/le-be-data-normal.json": {
+          "sha256": "96882bce292f217d1fa66dcd6907be56503aeef738d632c880de16f54924052b",
+          "bytes": 8268
+        },
+        "rtps-shape-fragments/captures/le-be-data-normal.pcap": {
+          "sha256": "cc90d17a66f9fb36501a4568339c9038a6080767161828eb837fdee6e84e9ec1",
+          "bytes": 452
+        },
+        "rtps-shape-fragments/answers/le-be-data-normal-bundle.json": {
+          "sha256": "cf552cd20fd60b4e221100dda15a757db1fc91375aeab1890615546f2793b757",
+          "bytes": 2480
+        },
+        "rtps-shape-fragments/captures/le-be-data-normal-bundle.pcap": {
+          "sha256": "a002c4b74dc3b3d81fc25e53f7bc367ff4c82e78efeeb9d7ac994a5db0ef491c",
+          "bytes": 152
+        },
+        "rtps-shape-fragments/answers/le-be-data-empty-extremes.json": {
+          "sha256": "560f10a91d50f22ab0c80a44169ce7a5a3dda20ce480a42468f105a78efd0a5a",
+          "bytes": 6311
+        },
+        "rtps-shape-fragments/captures/le-be-data-empty-extremes.pcap": {
+          "sha256": "c3813ddfef8ec2d3ab1091af62a8b29f1ee529a0cf3f97e92eeacc1e1062ff2d",
+          "bytes": 348
+        },
+        "rtps-shape-fragments/answers/le-be-data-empty-extremes-bundle.json": {
+          "sha256": "927fb7b64106ed8c30e9ca9d6e7a5404c3dae857a0cf2add03b322b113c8f976",
+          "bytes": 2468
+        },
+        "rtps-shape-fragments/captures/le-be-data-empty-extremes-bundle.pcap": {
+          "sha256": "e7c0cfc403d120a380dd1bf224074ae19ed8cf0960b34d749c037c18983f00df",
+          "bytes": 148
+        },
+        "rtps-shape-fragments/answers/le-be-data-utf8-bound.json": {
+          "sha256": "9b77f9860997e9d4a038081dae0e01da3bde4b2d35d81cd7c395933a5d86b364",
+          "bytes": 22838
+        },
+        "rtps-shape-fragments/captures/le-be-data-utf8-bound.pcap": {
+          "sha256": "2862e240dbaf986c19573129f6e740a9c7a2989155f1f1096a3c8fb9808a5d16",
+          "bytes": 1212
+        },
+        "rtps-shape-fragments/answers/le-be-data-utf8-bound-bundle.json": {
+          "sha256": "241ab3c1fb3489d8d211dd50da9588714f50936c767d35e8e8b53d962571fbdc",
+          "bytes": 2945
+        },
+        "rtps-shape-fragments/captures/le-be-data-utf8-bound-bundle.pcap": {
+          "sha256": "30f431f46903ab776f0793ddc4d5e68ccb6cdde7134cb50c8f202c973ddf726d",
+          "bytes": 212
+        },
+        "rtps-shape-fragments/answers/le-be-key-normal.json": {
+          "sha256": "58132eb2d2041293d9ef75dadf005a2044c3cd01eb702cf5cf5268f13bdf63ff",
+          "bytes": 4262
+        },
+        "rtps-shape-fragments/captures/le-be-key-normal.pcap": {
+          "sha256": "87ba2253192e206d33d96644eb43a9cb854a6bfec1d74fb50ea48eea78ecd2f0",
+          "bytes": 240
+        },
+        "rtps-shape-fragments/answers/le-be-key-normal-bundle.json": {
+          "sha256": "77969acd0985d8f00a5ad4c0e7dad89b45ea8a06ecdeb01645fd21876727a7bf",
+          "bytes": 2351
+        },
+        "rtps-shape-fragments/captures/le-be-key-normal-bundle.pcap": {
+          "sha256": "cac05b21d26f24bd967448808e1a97c6a12e48c4f7dfe67f576ee911ab2f93bc",
+          "bytes": 140
+        },
+        "rtps-shape-fragments/answers/le-be-key-empty-extremes.json": {
+          "sha256": "b6e1ccb38a0161298fb2a4fa24219e814ecff2a595044c54324c4a6e11f64678",
+          "bytes": 4238
+        },
+        "rtps-shape-fragments/captures/le-be-key-empty-extremes.pcap": {
+          "sha256": "050a87da3fed747994285b5a8b68cc90d103051924246ce173a0d33df099ea11",
+          "bytes": 236
+        },
+        "rtps-shape-fragments/answers/le-be-key-empty-extremes-bundle.json": {
+          "sha256": "58e52e1be151159d32a2eeec94d7acd4a1ae6fb1ba8bf3137f98886414ea8210",
+          "bytes": 2323
+        },
+        "rtps-shape-fragments/captures/le-be-key-empty-extremes-bundle.pcap": {
+          "sha256": "8f180a0dabd04c999f15b768df315465657bc9ed77ae7f29d273889559cead54",
+          "bytes": 136
+        },
+        "rtps-shape-fragments/answers/le-be-key-utf8-bound.json": {
+          "sha256": "aec31aa4894ba6833fbadd705f881c4a4b46d1edf5239718011f614213986134",
+          "bytes": 20644
+        },
+        "rtps-shape-fragments/captures/le-be-key-utf8-bound.pcap": {
+          "sha256": "3be4a5e82a2a12cdcb0bec4d636fc7e1ec0b3b6fe0130b3ae44e86fab294825b",
+          "bytes": 1100
+        },
+        "rtps-shape-fragments/answers/le-be-key-utf8-bound-bundle.json": {
+          "sha256": "47747830cc7330b55a9004f3c49010b75b5679245c9860aef31120a9ed3c0a5b",
+          "bytes": 2820
+        },
+        "rtps-shape-fragments/captures/le-be-key-utf8-bound-bundle.pcap": {
+          "sha256": "577d78bfae6a19d61ec7965941afa1668768615c73ae97a631dff35cb04d7ce1",
+          "bytes": 200
+        },
+        "rtps-shape-fragments/answers/le-ordered.json": {
+          "sha256": "fa321b1c453332dc980f476ff2f3fdb8945b08e5584878c8be9ad5bca2c0950f",
+          "bytes": 4391
+        },
+        "rtps-shape-fragments/captures/le-ordered.pcap": {
+          "sha256": "a3eb9196f207f46461abf6e8cbfb42c8f10c73edab23f11c2d9662becf41097f",
+          "bytes": 252
+        },
+        "rtps-shape-fragments/answers/le-duplicate.json": {
+          "sha256": "639c9a826325534118f174a1b5a6dc9ba1ea90b97c4d7777b5256d29e34f4e99",
+          "bytes": 6313
+        },
+        "rtps-shape-fragments/captures/le-duplicate.pcap": {
+          "sha256": "810b5bcb32e49145563ab1285aeea3fad9722c2e732cd6e26d5efd2c511f012c",
+          "bytes": 360
+        },
+        "rtps-shape-fragments/answers/le-overlap-same.json": {
+          "sha256": "3318d60aee497324543259668f0b592a4ddcaed7811a717fb7c0e9fb1a860474",
+          "bytes": 6375
+        },
+        "rtps-shape-fragments/captures/le-overlap-same.pcap": {
+          "sha256": "e6d99c7a3c615dd2f6f4517df2937935ace7dc2c154679fb4db5b4d6f1816e84",
+          "bytes": 368
+        },
+        "rtps-shape-fragments/answers/le-regular-replacement.json": {
+          "sha256": "ef1dd9a067c3d5dcf9d164ae7b8e7d2f6f36217fae5ee49ee9d748a6756a638b",
+          "bytes": 4379
+        },
+        "rtps-shape-fragments/captures/le-regular-replacement.pcap": {
+          "sha256": "ce754550fd34245bcefdd0cefe68712ff032fab1f52bab938602926a39ed375b",
+          "bytes": 248
+        },
+        "rtps-shape-fragments/answers/le-regular-only.json": {
+          "sha256": "43cd469813ba3b33c93208fda28a2883ebc6aea3f089e904b4408da69fdd2e75",
+          "bytes": 2440
+        },
+        "rtps-shape-fragments/answers/le-conflict-overlap-bytes.json": {
+          "sha256": "e4c177a7e99ab0d041e4ef3143c547489bc5b43cc3732c0c8cf9cc13cf4ae7a3",
+          "bytes": 4862
+        },
+        "rtps-shape-fragments/captures/le-conflict-overlap-bytes.pcap": {
+          "sha256": "d7b2be7df09d63e46fcb9c27d3cad0d2ac0264f37c5ff62c5796a3ec33c5cd83",
+          "bytes": 488
+        },
+        "rtps-shape-fragments/answers/le-conflict-size.json": {
+          "sha256": "9df173c33ad4178981e5ab23589763075cd49bd869f151a85b9964aa58f7b0ea",
+          "bytes": 4860
+        },
+        "rtps-shape-fragments/captures/le-conflict-size.pcap": {
+          "sha256": "fc7c7423118ee4a78c019b0fd620e7271e84afdc12c936584a8dc429887c9097",
+          "bytes": 487
+        },
+        "rtps-shape-fragments/answers/le-conflict-key-flag.json": {
+          "sha256": "a98cf4727ed1b1a89ae3e2dbbd1a6f3dce996d7bb677ff6f6b0042b82439cc23",
+          "bytes": 4862
+        },
+        "rtps-shape-fragments/captures/le-conflict-key-flag.pcap": {
+          "sha256": "e3aa055f1ab4380daaf3bc6e85dae5c87d47844019b53437f98f2569de62ccf0",
+          "bytes": 488
+        },
+        "rtps-shape-fragments/answers/le-conflict-sample-size.json": {
+          "sha256": "3eb1a70924a55ccef1e3564e1edf751059f5e1306e7f579859f1a13794e9a20a",
+          "bytes": 4862
+        },
+        "rtps-shape-fragments/captures/le-conflict-sample-size.pcap": {
+          "sha256": "d34ad84aba53f2941995c828f50bbc6b650208e8bfb02c5085877e52d2bd4432",
+          "bytes": 488
+        },
+        "rtps-shape-fragments/answers/le-conflict-version.json": {
+          "sha256": "e2e01d49487066f04c3d240b5a2694f605a573fc525e4a9206c106658824bacd",
+          "bytes": 4862
+        },
+        "rtps-shape-fragments/captures/le-conflict-version.pcap": {
+          "sha256": "ed84c7230f6021dba341c8e8316e3ce00cea94b437804cb079313963b6f4c91b",
+          "bytes": 488
+        },
+        "rtps-shape-fragments/answers/le-conflict-vendor.json": {
+          "sha256": "3f967118cbf9ed0263909e7d57a6220f9e4a1171e8eec9f9ac1e13d43c5f0ae5",
+          "bytes": 4862
+        },
+        "rtps-shape-fragments/captures/le-conflict-vendor.pcap": {
+          "sha256": "92aa480351708b022d3b62325867de50b36b6b574a9665bd424e9a7b97ecbadb",
+          "bytes": 488
+        },
+        "rtps-shape-fragments/answers/le-conflict-regular-conflict.json": {
+          "sha256": "908c9c3ebd5552ad05d2e480816469d3b8d03db90dd85d533f0de6a597121a13",
+          "bytes": 4878
+        },
+        "rtps-shape-fragments/captures/le-conflict-regular-conflict.pcap": {
+          "sha256": "b08ccf0a24e2e7cb59769382b38380b270f24b1480119fad2fd64c47bc1150c2",
+          "bytes": 496
+        },
+        "rtps-shape-fragments/answers/le-retired-reuse.json": {
+          "sha256": "2011c852e39682a7164d55e65b9a19b9b28d936758afefc9474b3d5aac47fd0b",
+          "bytes": 4851
+        },
+        "rtps-shape-fragments/captures/le-retired-reuse.pcap": {
+          "sha256": "22ab6a3cfb6e6f723e457e63ced7c064d9c868a3ffe0f91fe09f9ac79e1c4dfa",
+          "bytes": 480
+        },
+        "rtps-shape-fragments/answers/le-pending-close.json": {
+          "sha256": "7edc69389a26f9108dde3e82abe561f8abfd20fb3470f1fad062275ce1350203",
+          "bytes": 2124
+        },
+        "rtps-shape-fragments/captures/le-pending-close.pcap": {
+          "sha256": "566784b0e82948836164a3007a52e4c93c76680b2ab566faf82bad16f82cf7be",
+          "bytes": 132
+        },
+        "rtps-shape-fragments/answers/le-ttl-before.json": {
+          "sha256": "a7943dd72932109e4a440d6f943dd946da71fb068e04acae10703e9fb818ec49",
+          "bytes": 4392
+        },
+        "rtps-shape-fragments/captures/le-ttl-before.pcap": {
+          "sha256": "52907794b3854ca87bb585341cbf17d0eaa97175adc6bad9740bcfeafa004aab",
+          "bytes": 252
+        },
+        "rtps-shape-fragments/answers/le-ttl-exact.json": {
+          "sha256": "69fe47bb2fc27d7598de045f9b7beed842323e6adce7e381ac02840930a188a9",
+          "bytes": 2344
+        },
+        "rtps-shape-fragments/captures/le-ttl-exact.pcap": {
+          "sha256": "086eebe98041609737a2507e546100b752b1f141c962213d1ea1f2548b73c96b",
+          "bytes": 252
+        },
+        "rtps-shape-fragments/answers/le-retry-no-refresh.json": {
+          "sha256": "a9eb720ac0c91b56984d655b2a7ba47b03daaf39a56c3177f401f1806a499b2e",
+          "bytes": 4267
+        },
+        "rtps-shape-fragments/captures/le-retry-no-refresh.pcap": {
+          "sha256": "288f6dbae0e759c839c6ca387d5c04cc28531adedc1d06c92aa2fb57cd15c66b",
+          "bytes": 360
+        },
+        "rtps-shape-fragments/answers/le-backdated.json": {
+          "sha256": "48cf75b2dd9b45ded3fbf0d8275fce3af8a6f1323209c736d71de134b67894c7",
+          "bytes": 2587
+        },
+        "rtps-shape-fragments/captures/le-backdated.pcap": {
+          "sha256": "e1c83a7b4c715a1c3d35be678ed66a98bd5a3b4b87d1e1faff7267cedfae4ec0",
+          "bytes": 372
+        },
+        "rtps-shape-fragments/answers/le-directions.json": {
+          "sha256": "d7eaf7c57c17464540a33ab54901f0df2e993bf3fd085141c57415e3f84606f9",
+          "bytes": 4107
+        },
+        "rtps-shape-fragments/captures/le-directions.pcap": {
+          "sha256": "f552b8ac277ef533870bc0622f708e0a93f9d562723ccd632de1be695bf7018e",
+          "bytes": 252
+        },
+        "rtps-shape-fragments/answers/le-interleaved.json": {
+          "sha256": "131db984bdcf6bd7c2c27d755481f44f01804c87ae85f2937aa51168e59162fe",
+          "bytes": 8603
+        },
+        "rtps-shape-fragments/captures/le-interleaved.pcap": {
+          "sha256": "7060784e99694ac1c3b7609597fac6532cbe0cc042326e87e1a48fab72f5526a",
+          "bytes": 480
+        },
+        "rtps-shape-fragments/answers/le-unselected-source.json": {
+          "sha256": "f98a4b5ebb4f4b893895a780f04ddbd36cc34cc51d17d3a1fd0b5dceb476133d",
+          "bytes": 1765
+        },
+        "rtps-shape-fragments/captures/le-unselected-source.pcap": {
+          "sha256": "b4ebefbf2ddd2a9d9232785b2b0c981c0df50eb565b0a263ff2b2e1a2f79b89d",
+          "bytes": 132
+        },
+        "rtps-shape-fragments/answers/le-unselected-writer.json": {
+          "sha256": "3cfa863401790962d88006fd2404527916d493e61f7b7880048bc8a7acbc18fb",
+          "bytes": 1765
+        },
+        "rtps-shape-fragments/captures/le-unselected-writer.pcap": {
+          "sha256": "aff3879f594d226d010c48b2f03967d9a4b8e91b5d70b533940a13b391052fa6",
+          "bytes": 132
+        },
+        "rtps-shape-fragments/answers/le-qos-timestamp.json": {
+          "sha256": "d6345c3b803fbb78be8bd1cd57b719064cce1954df343784b35c51d49a183f7a",
+          "bytes": 5213
+        },
+        "rtps-shape-fragments/captures/le-qos-timestamp.pcap": {
+          "sha256": "c7b60c1a1b3b61dd95cf193d33d4eb6450663457de2201563f207582fea1311e",
+          "bytes": 292
+        },
+        "rtps-shape-fragments/answers/le-qos-conflict.json": {
+          "sha256": "11004f1d82f53385c29af03f4b7c6244f94a38effc6b54b26b73209872b040af",
+          "bytes": 2947
+        },
+        "rtps-shape-fragments/captures/le-qos-conflict.pcap": {
+          "sha256": "36e3fa2410e5563ced271effb92f20d729bf773b4a076bd740a3231906d28975",
+          "bytes": 412
+        },
+        "rtps-shape-fragments/answers/le-mixed-context.json": {
+          "sha256": "b4d7f0fe9505081335b9aa152c7c35903c37b3940e64196a774fd5f531afa4ce",
+          "bytes": 7279
+        },
+        "rtps-shape-fragments/captures/le-mixed-context.pcap": {
+          "sha256": "b0b7cd8d677a9cdf6e1444ea8b44f5c8cc4789115c62f0eee41b0c389e2f9c42",
+          "bytes": 284
+        },
+        "rtps-shape-fragments/answers/le-logical-destination-isolation.json": {
+          "sha256": "2cd1e0526b394ffee98afcdf2d57c60a1822a777dd22cd50bde5c86ec550ad70",
+          "bytes": 4169
+        },
+        "rtps-shape-fragments/captures/le-logical-destination-isolation.pcap": {
+          "sha256": "bb49f97926e348be3114ef087c4ee5203f34c1fae020744072868483f385c905",
+          "bytes": 284
+        },
+        "rtps-shape-fragments/answers/le-invalid-zero-start.json": {
+          "sha256": "7b4e4c1292886f37fafaab685a0a4920602c3e196361bd78d2da74ac0653618a",
+          "bytes": 640
+        },
+        "rtps-shape-fragments/captures/le-invalid-zero-start.pcap": {
+          "sha256": "53ceabb4a4fc3c4f1435ebaac4dcc4a24347a7fd59b8a40c410494701bcd5bd0",
+          "bytes": 252
+        },
+        "rtps-shape-fragments/answers/le-invalid-zero-count.json": {
+          "sha256": "fa42533a26ced951f5288742c2b1116416e3c78bedb43dad57495f02bdfd5aec",
+          "bytes": 640
+        },
+        "rtps-shape-fragments/captures/le-invalid-zero-count.pcap": {
+          "sha256": "975fb8458ee7aa3e514e5404f0bb2af218c5531c47923601cf23734837a3a04c",
+          "bytes": 252
+        },
+        "rtps-shape-fragments/answers/le-invalid-zero-size.json": {
+          "sha256": "5f6866cf07c51fbb93cc59d2d06430fc378309eabaf3d9251f2aa8c7fe568d87",
+          "bytes": 656
+        },
+        "rtps-shape-fragments/captures/le-invalid-zero-size.pcap": {
+          "sha256": "edc5f276e602b7efa3de93000b613ad95584d1e09fb830985c3e5673a905a1d1",
+          "bytes": 260
+        },
+        "rtps-shape-fragments/answers/le-invalid-zero-total.json": {
+          "sha256": "2cc7ab598b5f1a48e78e4df881e1a4e9f69a5e4e5f1ee705b70c54e0c08177b7",
+          "bytes": 640
+        },
+        "rtps-shape-fragments/captures/le-invalid-zero-total.pcap": {
+          "sha256": "ead25635068525af3e74efbba2e9293e9248e0399ceedcea0ba6b167183d523c",
+          "bytes": 252
+        },
+        "rtps-shape-fragments/answers/le-invalid-oversize-fragment.json": {
+          "sha256": "e25824a4d232e9714308c01730260f2ac1754b27f29120e2a3812ab8d9ecdc69",
+          "bytes": 696
+        },
+        "rtps-shape-fragments/captures/le-invalid-oversize-fragment.pcap": {
+          "sha256": "180f5433a7fc60a7265cf1cc86250d104b1670463dcac234c51a818327c67da5",
+          "bytes": 280
+        },
+        "rtps-shape-fragments/answers/le-invalid-range-over.json": {
+          "sha256": "c4c677338729a68f6ad97cfeba61aea67af85a09c60f884f7f55c56ecf5b44cf",
+          "bytes": 648
+        },
+        "rtps-shape-fragments/captures/le-invalid-range-over.pcap": {
+          "sha256": "4a4daad39c08c50e1730d54812bca9c761aacb94e6020985c5add74bc0549481",
+          "bytes": 256
+        },
+        "rtps-shape-fragments/answers/le-invalid-offset-small.json": {
+          "sha256": "9eba07a742bb076d691bc5649ea0c7a09fadc92e848e015d963445cd286bfbcb",
+          "bytes": 656
+        },
+        "rtps-shape-fragments/captures/le-invalid-offset-small.pcap": {
+          "sha256": "52237dc5c08ce11649cc8c7558af1f8b3ef0cddd2752cc302c2512148683c2ea",
+          "bytes": 260
+        },
+        "rtps-shape-fragments/answers/le-invalid-offset-unaligned.json": {
+          "sha256": "ce90773415267ba3a166b31d5b411cc987b2e36c0577a1471016917b472fa52c",
+          "bytes": 656
+        },
+        "rtps-shape-fragments/captures/le-invalid-offset-unaligned.pcap": {
+          "sha256": "e490b069a9aa1a74622b911dcb795100b57145d9aabc505f95cbc695f1c50d9d",
+          "bytes": 260
+        },
+        "rtps-shape-fragments/answers/le-invalid-offset-out.json": {
+          "sha256": "f892cd45b1cbddd138ff8a709d99495fbdf7e3551e9101c308d8f301e1ae86d3",
+          "bytes": 656
+        },
+        "rtps-shape-fragments/captures/le-invalid-offset-out.pcap": {
+          "sha256": "20bcd3a7477704d9e1003b574fc671aeb69386637f49476629529858f46c5569",
+          "bytes": 260
+        },
+        "rtps-shape-fragments/answers/le-invalid-zero-seq.json": {
+          "sha256": "e670e9d006f0ce4c1374295d13abb9e1b3383a1c206f549f333c78f8bca2d901",
+          "bytes": 656
+        },
+        "rtps-shape-fragments/captures/le-invalid-zero-seq.pcap": {
+          "sha256": "8e408c4d0a1474bb7dd6ec601d242613cecc48592546331a1565787d09a27744",
+          "bytes": 260
+        },
+        "rtps-shape-fragments/answers/le-invalid-negative-seq.json": {
+          "sha256": "8cb8eb8694e040627655a462e8ad5a4a71ead7cd46a97c2465226b70e7e58ff4",
+          "bytes": 656
+        },
+        "rtps-shape-fragments/captures/le-invalid-negative-seq.pcap": {
+          "sha256": "5d740ea0c2f537f1824836501576057554b4a374dc9e65da7f03bb1a0f3b2533",
+          "bytes": 260
+        },
+        "rtps-shape-fragments/answers/le-invalid-selected-capacity.json": {
+          "sha256": "e2c1d35e97d27d30d24f0090ffc4978895cefaf1f4b6ecd7d111c6fd4d211264",
+          "bytes": 656
+        },
+        "rtps-shape-fragments/captures/le-invalid-selected-capacity.pcap": {
+          "sha256": "cd8ee1baf0a0615bce1818e67572b0fbf8200e46b0cd0ea2d782c2df0cd9ebf9",
+          "bytes": 260
+        },
+        "rtps-shape-fragments/answers/le-invalid-nonstandard.json": {
+          "sha256": "3fc178066bf91133d854ca942ed3be8fc41999193513f77636a00661cab5d55d",
+          "bytes": 658
+        },
+        "rtps-shape-fragments/captures/le-invalid-nonstandard.pcap": {
+          "sha256": "b114c4d1d0c35939887324b3954a6632ddb3d68d1d7696ad398a57f8d1495b25",
+          "bytes": 260
+        },
+        "rtps-shape-fragments/answers/le-invalid-qos-must-understand.json": {
+          "sha256": "d183ff3f9232f3c2ed11cd6cf66931ed042e7b69e6f526b9e7ff429fd06f45e1",
+          "bytes": 682
+        },
+        "rtps-shape-fragments/captures/le-invalid-qos-must-understand.pcap": {
+          "sha256": "60c592c6e2360e8acdda65fbc05544d071529d2d10be64789ee04dcf55117e46",
+          "bytes": 272
+        },
+        "rtps-shape-fragments/answers/le-invalid-truncated.json": {
+          "sha256": "ef393a7abfc8a9f9c5888662393203d7a5b7f4061ab22047e0f87b8836d12ea1",
+          "bytes": 614
+        },
+        "rtps-shape-fragments/captures/le-invalid-truncated.pcap": {
+          "sha256": "867de150e9958f8d6928347c88a8ab2b4b87b5d1fe048ef7c98bdbf9126595fa",
+          "bytes": 239
+        },
+        "rtps-shape-fragments/answers/le-invalid-extra-four.json": {
+          "sha256": "d8527144994c43ff36f466dcfca518fc59e280bea224218cb7456614e3e1c8cc",
+          "bytes": 624
+        },
+        "rtps-shape-fragments/captures/le-invalid-extra-four.pcap": {
+          "sha256": "695f035f5226d1c78fc74cfae8e89ae6f136d30837805a5dfb01a90ab7c617e9",
+          "bytes": 244
+        },
+        "rtps-shape-fragments/answers/le-invalid-security.json": {
+          "sha256": "e164f0da1d61a6ef391fb0f653b1b2e773c9dc86f32269118225594e3517fb6c",
+          "bytes": 546
+        },
+        "rtps-shape-fragments/captures/le-invalid-security.pcap": {
+          "sha256": "ea32232afdcabb2c964fe0793087ab00e2f08ab208ab20e9a2a607567d829577",
+          "bytes": 204
+        },
+        "rtps-shape-fragments/answers/le-invalid-version3.json": {
+          "sha256": "4c89e55207250fa495cd58adde70ed191fca38f293e46c929712b6cefaa93bde",
+          "bytes": 615
+        },
+        "rtps-shape-fragments/captures/le-invalid-version3.pcap": {
+          "sha256": "e89dd58aa0da0b8188bf362334d5e629e8aa5af36ceb03168e30772009b12b81",
+          "bytes": 240
+        },
+        "rtps-shape-fragments/answers/le-fragment-padding.json": {
+          "sha256": "166c92f0e577e75fd805fd7e911775e534c8d37cf13dbf5144807f652f986603",
+          "bytes": 2526
+        },
+        "rtps-shape-fragments/captures/le-fragment-padding.pcap": {
+          "sha256": "f30d389d80a04a036d590d777559bee1f2623ddcea9896eea6c65a347902ac48",
+          "bytes": 155
+        },
+        "rtps-shape-fragments/answers/le-complete-representation.json": {
+          "sha256": "89e033e8ea5e985cc420042477408d4d677db5b01a2adc45d7fea4893e7e9d80",
+          "bytes": 2741
+        },
+        "rtps-shape-fragments/captures/le-complete-representation.pcap": {
+          "sha256": "3e3945cc7b3f066a27fd9b5b428dbc183b7d1380a366f6a9b78debbbb826043f",
+          "bytes": 280
+        },
+        "rtps-shape-fragments/answers/le-complete-bad-string.json": {
+          "sha256": "41aa27a86d108d559649ebb634ed40432f55e0717ee00962d6fc575b323fcaf6",
+          "bytes": 2739
+        },
+        "rtps-shape-fragments/captures/le-complete-bad-string.pcap": {
+          "sha256": "fa234397081736debd53ca61260b0a24eda839663e92b060426fc908cfce3b76",
+          "bytes": 280
+        },
+        "rtps-shape-fragments/answers/le-complete-bad-utf8.json": {
+          "sha256": "ca8077b8537f96af4647ee996df7f0fc820f49672b5dcf7842636165743a03da",
+          "bytes": 2731
+        },
+        "rtps-shape-fragments/captures/le-complete-bad-utf8.pcap": {
+          "sha256": "6b55daa2d89f2f2e285736e67a14a2c4204a21d97de1e81201073e4a4486d1c6",
+          "bytes": 276
+        },
+        "rtps-shape-fragments/answers/le-complete-trailing-fields.json": {
+          "sha256": "71555a7295797b75386a444310fd44571bb780c17aa3a9dd034ce2d0ab00c7e7",
+          "bytes": 2747
+        },
+        "rtps-shape-fragments/captures/le-complete-trailing-fields.pcap": {
+          "sha256": "bda533b9ddbef6311182df2440fe5222991a62284cd46675a655a9ff9ac1509e",
+          "bytes": 284
+        },
+        "rtps-shape-fragments/answers/le-complete-wrong-key-data.json": {
+          "sha256": "7a9730f89ea3954bc16583199491982db22b54e6973d2b13cc54f6cb6f6310e3",
+          "bytes": 2739
+        },
+        "rtps-shape-fragments/captures/le-complete-wrong-key-data.pcap": {
+          "sha256": "8175b16102a7ff24607b99e9250cd8308db32cf5dd2592e14b8b871d44a475c3",
+          "bytes": 280
+        },
+        "rtps-shape-fragments/answers/le-complete-unknown-options.json": {
+          "sha256": "4cbb405cf4237df645fba4057efe9d4dd60152af3c9f2573adccfaf39be09f6b",
+          "bytes": 2741
+        },
+        "rtps-shape-fragments/captures/le-complete-unknown-options.pcap": {
+          "sha256": "a58a992f53df3c7319562108d24537a6cbb0100112c82215267460e8d19909ce",
+          "bytes": 280
+        },
+        "rtps-shape-fragments/answers/be-le-data-normal.json": {
+          "sha256": "0e2f282266380d9738963e622005eaeef5d5175d787f1c915dfcb3b80ef115f7",
+          "bytes": 8268
+        },
+        "rtps-shape-fragments/captures/be-le-data-normal.pcap": {
+          "sha256": "60907543ce9bc8bac5ba0410ff9366696b1a7238bd97a827d3335c6e482ea669",
+          "bytes": 452
+        },
+        "rtps-shape-fragments/answers/be-le-data-normal-bundle.json": {
+          "sha256": "35ff8186257c9f4f32e8efedc93d6d5fcfb11b7eacba74f1a10b25c1e787fd59",
+          "bytes": 2480
+        },
+        "rtps-shape-fragments/captures/be-le-data-normal-bundle.pcap": {
+          "sha256": "953f9088b1b7cb86cabfb5d0c30b545c7b206eba0b94890ca068bc0bb7e17667",
+          "bytes": 152
+        },
+        "rtps-shape-fragments/answers/be-le-data-empty-extremes.json": {
+          "sha256": "26f4b1108f73223859591be8d2230776487c45179d57c861240f9ed7d9666766",
+          "bytes": 6311
+        },
+        "rtps-shape-fragments/captures/be-le-data-empty-extremes.pcap": {
+          "sha256": "72821e8ebead8ea1851eb0e5ddbaab5423fb1edac5c1463f9b52c04f98abfc97",
+          "bytes": 348
+        },
+        "rtps-shape-fragments/answers/be-le-data-empty-extremes-bundle.json": {
+          "sha256": "5c289e8627adbdb5e4e9143f4fd408bd176a37c36661089c6e66e3376315d49f",
+          "bytes": 2468
+        },
+        "rtps-shape-fragments/captures/be-le-data-empty-extremes-bundle.pcap": {
+          "sha256": "afe7452a93fae3e2d059082517070792f158586f5d9280aeee97e3712e95be19",
+          "bytes": 148
+        },
+        "rtps-shape-fragments/answers/be-le-data-utf8-bound.json": {
+          "sha256": "4f0bd02f00934a67c4eaa729b48df6fbfb111069107f842c1b4e03387f477ca7",
+          "bytes": 22838
+        },
+        "rtps-shape-fragments/captures/be-le-data-utf8-bound.pcap": {
+          "sha256": "c990efb42f5df4de339e0b65d530045499e9c43cec48b73199298fa68ef317ca",
+          "bytes": 1212
+        },
+        "rtps-shape-fragments/answers/be-le-data-utf8-bound-bundle.json": {
+          "sha256": "00a891966524d7d03f16e4340662a5c0d10e5c73983035694a175a9f7972eddd",
+          "bytes": 2945
+        },
+        "rtps-shape-fragments/captures/be-le-data-utf8-bound-bundle.pcap": {
+          "sha256": "f04fdf1a1dfab38365f334e28cad83934a93d29d5f3dc3d12981139935b76f87",
+          "bytes": 212
+        },
+        "rtps-shape-fragments/answers/be-le-key-normal.json": {
+          "sha256": "d0250412256a0452c79365deb3752c7bbeb1eebbc554630acf02a7b7653758cd",
+          "bytes": 4262
+        },
+        "rtps-shape-fragments/captures/be-le-key-normal.pcap": {
+          "sha256": "82ae608cbb4ff1644f157cfe73da13dd9a44ac67cf97e86d648cee7676fe9541",
+          "bytes": 240
+        },
+        "rtps-shape-fragments/answers/be-le-key-normal-bundle.json": {
+          "sha256": "7725f0dfb4a66bbe3a123a26d0a2b244e21c000b5cfe8923a1b39216fbdfa3c7",
+          "bytes": 2351
+        },
+        "rtps-shape-fragments/captures/be-le-key-normal-bundle.pcap": {
+          "sha256": "e2e06d6734677df8217ba0116f7a6e8431e83a2b50bf5742e1a54a4e3dad8811",
+          "bytes": 140
+        },
+        "rtps-shape-fragments/answers/be-le-key-empty-extremes.json": {
+          "sha256": "517da4541eec8473cb8968961ec1ee2b5e60f43d7a690d1110bf44761f7a8ceb",
+          "bytes": 4238
+        },
+        "rtps-shape-fragments/captures/be-le-key-empty-extremes.pcap": {
+          "sha256": "e344c170c15b7bef6062c08431b78aea0238a4d3bd365154f86652c3018720fe",
+          "bytes": 236
+        },
+        "rtps-shape-fragments/answers/be-le-key-empty-extremes-bundle.json": {
+          "sha256": "f5745e964da25e0cbb513a65247e5461b5d70f0148408180bcc5c5454e6d4bcb",
+          "bytes": 2323
+        },
+        "rtps-shape-fragments/captures/be-le-key-empty-extremes-bundle.pcap": {
+          "sha256": "36cc4002bcab4aa721ca412d7f68a48553290299d71bd3f4fa35f0a886b88ee0",
+          "bytes": 136
+        },
+        "rtps-shape-fragments/answers/be-le-key-utf8-bound.json": {
+          "sha256": "33d832e673e5bd184a7b5c1496cbe413d8ce61e167d9f9914d00f6352d594fab",
+          "bytes": 20644
+        },
+        "rtps-shape-fragments/captures/be-le-key-utf8-bound.pcap": {
+          "sha256": "ea1c6996e91ad7f1d36293f69cfa8805b7e7befc56c20a9d1504dc0b35da4abc",
+          "bytes": 1100
+        },
+        "rtps-shape-fragments/answers/be-le-key-utf8-bound-bundle.json": {
+          "sha256": "a89d64f0d1ef4115d7ef7018676ec24944b41eac32feb0ebf32fc78aa8fa051f",
+          "bytes": 2820
+        },
+        "rtps-shape-fragments/captures/be-le-key-utf8-bound-bundle.pcap": {
+          "sha256": "32de8e371e50476ec555877aba7cbc83c5eec1e21938f98f407cb77ddbe902bd",
+          "bytes": 200
+        },
+        "rtps-shape-fragments/answers/be-be-data-normal.json": {
+          "sha256": "ff62c13d450f2ddacb8e25abdec6de8637f8ebc3323c0865c7cad9a466d10c5e",
+          "bytes": 8268
+        },
+        "rtps-shape-fragments/captures/be-be-data-normal.pcap": {
+          "sha256": "0b1d207ddf802b3c97d90d8edc01bf50554e085f24ea0a96dc4ed1044e0b27ef",
+          "bytes": 452
+        },
+        "rtps-shape-fragments/answers/be-be-data-normal-bundle.json": {
+          "sha256": "7373b1e23aef214d0d5268eed0923e27c5200f9f01ec2dbeca67cee12b1eb955",
+          "bytes": 2480
+        },
+        "rtps-shape-fragments/captures/be-be-data-normal-bundle.pcap": {
+          "sha256": "8b9a20ee94a81bfc39110e6b913af801e10b54e94d9feb62145c2c194a1c815a",
+          "bytes": 152
+        },
+        "rtps-shape-fragments/answers/be-be-data-empty-extremes.json": {
+          "sha256": "4f93936cca990e3c5e48992f4596544f0511d902bcb149c205a6d7c5051a42b8",
+          "bytes": 6311
+        },
+        "rtps-shape-fragments/captures/be-be-data-empty-extremes.pcap": {
+          "sha256": "8872121cae9c46a7f568544593be15b51654ac7eeed4f6f16d2427a967ab503b",
+          "bytes": 348
+        },
+        "rtps-shape-fragments/answers/be-be-data-empty-extremes-bundle.json": {
+          "sha256": "1fed5487d9bc7783fc63bc4710457b326a9f6c5360acc84a547a43e9c82c7d10",
+          "bytes": 2468
+        },
+        "rtps-shape-fragments/captures/be-be-data-empty-extremes-bundle.pcap": {
+          "sha256": "1c6e866c29ba104e1f3041e0504e8560ca7ff884c73390a7c818d86be17d28d1",
+          "bytes": 148
+        },
+        "rtps-shape-fragments/answers/be-be-data-utf8-bound.json": {
+          "sha256": "efdbe127aef57d0c64a002eb7c5d7615bdafb812bb6f2140d6b3a933fdd892ed",
+          "bytes": 22838
+        },
+        "rtps-shape-fragments/captures/be-be-data-utf8-bound.pcap": {
+          "sha256": "54a44dc43beff74bd9ded65bec4960466d65552871eaa2147103d0921f40ee66",
+          "bytes": 1212
+        },
+        "rtps-shape-fragments/answers/be-be-data-utf8-bound-bundle.json": {
+          "sha256": "808676ad597a8f7af98b66c83d38815d39f764f758e2ee44b224942207356527",
+          "bytes": 2945
+        },
+        "rtps-shape-fragments/captures/be-be-data-utf8-bound-bundle.pcap": {
+          "sha256": "ae7fc5b5338050368d73225b0cd393c02171e8aa1a5ce29048df94e62b5dcb76",
+          "bytes": 212
+        },
+        "rtps-shape-fragments/answers/be-be-key-normal.json": {
+          "sha256": "d7e70bdb9719860d9ceceb80f3532d4ac4aad158b47fa9a7eccf66de8f649d60",
+          "bytes": 4262
+        },
+        "rtps-shape-fragments/captures/be-be-key-normal.pcap": {
+          "sha256": "5fff6125ff9bea4412171cae9c2d4f57172444ad1d2ea910d0a9194c33d242af",
+          "bytes": 240
+        },
+        "rtps-shape-fragments/answers/be-be-key-normal-bundle.json": {
+          "sha256": "367183f70e9dbd712c63df4791697c779170384f0bc4b5ca593f1f554ec6d4a5",
+          "bytes": 2351
+        },
+        "rtps-shape-fragments/captures/be-be-key-normal-bundle.pcap": {
+          "sha256": "2bf63145426f5eba5881638932b66f15a2af2db5fc54cda8c9049cfcfb8019e8",
+          "bytes": 140
+        },
+        "rtps-shape-fragments/answers/be-be-key-empty-extremes.json": {
+          "sha256": "0ceb88aede8b9188fbdc3c5b2c5dbc028cf181391ed79bf954f99c42a7f7bcd5",
+          "bytes": 4238
+        },
+        "rtps-shape-fragments/captures/be-be-key-empty-extremes.pcap": {
+          "sha256": "656da005fe0f9b3efe03d70682d4a70523aefbdb68cac80295359e1f0dde17f0",
+          "bytes": 236
+        },
+        "rtps-shape-fragments/answers/be-be-key-empty-extremes-bundle.json": {
+          "sha256": "45e474f6d608822616047833ed21adc905bb60fa072ab24bc5f52e9dae770661",
+          "bytes": 2323
+        },
+        "rtps-shape-fragments/captures/be-be-key-empty-extremes-bundle.pcap": {
+          "sha256": "65c10fcb9f570b6ed8a0a2da960f00feab35c08c6639357c8f7ab842de8afd3b",
+          "bytes": 136
+        },
+        "rtps-shape-fragments/answers/be-be-key-utf8-bound.json": {
+          "sha256": "0cc42289ae1b67c0153637b99c2f2ca55186a54cfa78a7317bad521d236d859d",
+          "bytes": 20644
+        },
+        "rtps-shape-fragments/captures/be-be-key-utf8-bound.pcap": {
+          "sha256": "7c0b0e0d9ef2f39b38a4a3dc8817d0dd8b5ccc81c68da78b380285868516d245",
+          "bytes": 1100
+        },
+        "rtps-shape-fragments/answers/be-be-key-utf8-bound-bundle.json": {
+          "sha256": "980fc0dcab6f965ec63bab4e4b301e01505c27856130818e319925b1c5efb91c",
+          "bytes": 2820
+        },
+        "rtps-shape-fragments/captures/be-be-key-utf8-bound-bundle.pcap": {
+          "sha256": "5f5218bc5c892c6fda06c59ec4fa6c8f7ff3006b862f9aa8c2f416f4064a1986",
+          "bytes": 200
+        },
+        "rtps-shape-fragments/answers/be-ordered.json": {
+          "sha256": "b3fc9c2f6522167df32225b39e050e03f49b0f1ddae020e0eb11414eac5af4cc",
+          "bytes": 4391
+        },
+        "rtps-shape-fragments/captures/be-ordered.pcap": {
+          "sha256": "2cfd644f6ee39fb157999ea8db49bccbea484e917afe9cab6873e02625cb6260",
+          "bytes": 252
+        },
+        "rtps-shape-fragments/answers/be-duplicate.json": {
+          "sha256": "08449f30058b6a7e4bdd9b58887fe944d61007ba0189e33d763c84acf8da7696",
+          "bytes": 6313
+        },
+        "rtps-shape-fragments/captures/be-duplicate.pcap": {
+          "sha256": "f1d325513ad2b618045d89e8f37be6d7809208d7e0f57d35a92703b6afd67988",
+          "bytes": 360
+        },
+        "rtps-shape-fragments/answers/be-overlap-same.json": {
+          "sha256": "d4b11191a823479dba68146f6735b7d5c3bc78e6c2e4ba5fa97d152bbf016dbe",
+          "bytes": 6375
+        },
+        "rtps-shape-fragments/captures/be-overlap-same.pcap": {
+          "sha256": "d275030324b6e6536f56035fa38a856646e00cc1937f919d60f02d532798c6e4",
+          "bytes": 368
+        },
+        "rtps-shape-fragments/answers/be-regular-replacement.json": {
+          "sha256": "bf3124ff401109060229b3b0c767dc80fdde44c5031f769ac3681a103f4045a5",
+          "bytes": 4379
+        },
+        "rtps-shape-fragments/captures/be-regular-replacement.pcap": {
+          "sha256": "a4c4ebde8bf5ced33d40547e2954094e29144dbd27c139b1dcf339768a2b12b7",
+          "bytes": 248
+        },
+        "rtps-shape-fragments/answers/be-regular-only.json": {
+          "sha256": "54b7801c74f9232a2ed422b5e6e70c261c602ddc246f5c6f8bebca6bd07e4a71",
+          "bytes": 2440
+        },
+        "rtps-shape-fragments/answers/be-conflict-overlap-bytes.json": {
+          "sha256": "9d02fa6190666fb40bba9a71e0646a938924df5687d5485d90c7cd8fe0b4411f",
+          "bytes": 4862
+        },
+        "rtps-shape-fragments/captures/be-conflict-overlap-bytes.pcap": {
+          "sha256": "bd998ad1f71a571670ecb00933565c97dc1e3f1cbd4d53cd7a7ad63e6e5578ac",
+          "bytes": 488
+        },
+        "rtps-shape-fragments/answers/be-conflict-size.json": {
+          "sha256": "6ca8018676f6136d88baf483fa5b2844a629b862d80e437317512aac65639824",
+          "bytes": 4860
+        },
+        "rtps-shape-fragments/captures/be-conflict-size.pcap": {
+          "sha256": "a7b41cc2081d5256859823eea34849b2f78c3025124b4b0efeecdc1f51fc8f5b",
+          "bytes": 487
+        },
+        "rtps-shape-fragments/answers/be-conflict-key-flag.json": {
+          "sha256": "be9cf7ebafecd0a332ac27cd066c195dc7b88e6d8d3851c7f67853993c407655",
+          "bytes": 4862
+        },
+        "rtps-shape-fragments/captures/be-conflict-key-flag.pcap": {
+          "sha256": "ff93a665b96cce26b6bfb4976382c6dcfc88e9a29a40bbd21a9c3bdce0a03b0c",
+          "bytes": 488
+        },
+        "rtps-shape-fragments/answers/be-conflict-sample-size.json": {
+          "sha256": "2209948e272079657f45176abd9d0270ae2ab68a7273b3a94ed613c03659c8ca",
+          "bytes": 4862
+        },
+        "rtps-shape-fragments/captures/be-conflict-sample-size.pcap": {
+          "sha256": "da2cc6411e7938008043d2b6473f770aecc63ca50be6ab3485b0bd746855d268",
+          "bytes": 488
+        },
+        "rtps-shape-fragments/answers/be-conflict-version.json": {
+          "sha256": "d207e5408dcaf17e9e95c2ebb57116ef6a270b58458423f2cc3c68aba2b0bcba",
+          "bytes": 4862
+        },
+        "rtps-shape-fragments/captures/be-conflict-version.pcap": {
+          "sha256": "7e509c7bd22286deddce4e263bc03877a00845c4665e95101c4d48f054311817",
+          "bytes": 488
+        },
+        "rtps-shape-fragments/answers/be-conflict-vendor.json": {
+          "sha256": "b87e262dd37b818cac27538a44f544b862fb31c170faa6b8a861bccf09848f0c",
+          "bytes": 4862
+        },
+        "rtps-shape-fragments/captures/be-conflict-vendor.pcap": {
+          "sha256": "bd049f8634567bb9d71a2fe7f1349d00d47f8132aa2b50d8f42a8ad52ebb4f8e",
+          "bytes": 488
+        },
+        "rtps-shape-fragments/answers/be-conflict-regular-conflict.json": {
+          "sha256": "164b14ae0bb8a9223d771e966796dddd558f614e2aeea9c82e34fab82474a594",
+          "bytes": 4878
+        },
+        "rtps-shape-fragments/captures/be-conflict-regular-conflict.pcap": {
+          "sha256": "62a435db139ea98760613ad32ebcce975f9324d1779d1069c86bbab6ff47ee15",
+          "bytes": 496
+        },
+        "rtps-shape-fragments/answers/be-retired-reuse.json": {
+          "sha256": "dbe64b3f5abe443bdb81fb0adae92f5695fdd3e282754ddd6b5ad0b68ae9ff17",
+          "bytes": 4851
+        },
+        "rtps-shape-fragments/captures/be-retired-reuse.pcap": {
+          "sha256": "e8d65d6ffc91b36cdea71d5882ebadf2bfd572b029cf5014a38ecb0551d32bd5",
+          "bytes": 480
+        },
+        "rtps-shape-fragments/answers/be-pending-close.json": {
+          "sha256": "e042991c94765ccfabebf414f3077634197929184bd5858699dedf569e36dd82",
+          "bytes": 2124
+        },
+        "rtps-shape-fragments/captures/be-pending-close.pcap": {
+          "sha256": "7180da78c4ccc0b954a282f4dbc904a6c4e9af2e463a68b49b7a9d49a33f241b",
+          "bytes": 132
+        },
+        "rtps-shape-fragments/answers/be-ttl-before.json": {
+          "sha256": "410d8bd5db1d9e12069975f38081ba071c38fe6671509680e42b73f64a9d4a85",
+          "bytes": 4392
+        },
+        "rtps-shape-fragments/captures/be-ttl-before.pcap": {
+          "sha256": "2c60c0a3c1e4140e3b1e2ad4901abb4531ceb24f4e7f8f900f0991f76228d86f",
+          "bytes": 252
+        },
+        "rtps-shape-fragments/answers/be-ttl-exact.json": {
+          "sha256": "2723b9ab5f2f9ecc4dd09f4fd3e4d603fd3c79194548b33713bb179858450390",
+          "bytes": 2344
+        },
+        "rtps-shape-fragments/captures/be-ttl-exact.pcap": {
+          "sha256": "ce04ab587502d9238d6c212392c9fe563c673dcc1c93b4f52b312a119b7f315f",
+          "bytes": 252
+        },
+        "rtps-shape-fragments/answers/be-retry-no-refresh.json": {
+          "sha256": "f54391f9b69391d8942e501544016c3be00b394d5eec0993606e7cbf553bc1fd",
+          "bytes": 4267
+        },
+        "rtps-shape-fragments/captures/be-retry-no-refresh.pcap": {
+          "sha256": "c2d2bd7021599a7b2acdad2693dabd8b2a10d3cabc762927a019499be77bebff",
+          "bytes": 360
+        },
+        "rtps-shape-fragments/answers/be-backdated.json": {
+          "sha256": "f0a4ec52a6447225aabae538683168688d4f321a67f6dec92e0ade18eb038421",
+          "bytes": 2587
+        },
+        "rtps-shape-fragments/captures/be-backdated.pcap": {
+          "sha256": "a6edd6897ead442eb3b617b7c0e9c67703b22a21fa76850b568b438fd78da9d6",
+          "bytes": 372
+        },
+        "rtps-shape-fragments/answers/be-directions.json": {
+          "sha256": "41ec87e3e6ae5637f097a1aa587cd5eb4fb96c1d8224b023edbb19e0f23613fa",
+          "bytes": 4107
+        },
+        "rtps-shape-fragments/captures/be-directions.pcap": {
+          "sha256": "39537197ff9af38f0ac23a74e83a0692c0a4811685c4590176e8d8518292edcf",
+          "bytes": 252
+        },
+        "rtps-shape-fragments/answers/be-interleaved.json": {
+          "sha256": "5c9c684772072a03a180ac8825f82b9745812e9b6a7010228ff0876f64151c84",
+          "bytes": 8603
+        },
+        "rtps-shape-fragments/captures/be-interleaved.pcap": {
+          "sha256": "0e010cce6e496e6633c4d9c53d6502cfb2ef0a3b1a0219cff49bada67d9785cd",
+          "bytes": 480
+        },
+        "rtps-shape-fragments/answers/be-unselected-source.json": {
+          "sha256": "9ada7006e284365d31bec607055818929f45cebfbecf45e461dfe22f7951089c",
+          "bytes": 1765
+        },
+        "rtps-shape-fragments/captures/be-unselected-source.pcap": {
+          "sha256": "f0991e16f0cde97b44ea80384b169a7ac878e05967c7fad65e85ee8a07dc8d72",
+          "bytes": 132
+        },
+        "rtps-shape-fragments/answers/be-unselected-writer.json": {
+          "sha256": "9704c05a79d88c7f1a2c726ac3d2c71bea2ea13755b0d3ae2165b55acfc60e09",
+          "bytes": 1765
+        },
+        "rtps-shape-fragments/captures/be-unselected-writer.pcap": {
+          "sha256": "61971680cfe41bd86696581acf6ba3d44716cc3f8cae17c40cfcedcadc59ac89",
+          "bytes": 132
+        },
+        "rtps-shape-fragments/answers/be-qos-timestamp.json": {
+          "sha256": "a8dabe8c7fee0801ba4573196d9c9be46bcdff128eef05ef99a70728bc4fcd61",
+          "bytes": 5213
+        },
+        "rtps-shape-fragments/captures/be-qos-timestamp.pcap": {
+          "sha256": "d62816d49385d38398c0524762ee0e39f08bb58aa0161c1ee220902c36000881",
+          "bytes": 292
+        },
+        "rtps-shape-fragments/answers/be-qos-conflict.json": {
+          "sha256": "393dff53ff4eff52147d44b0d58484debd1d6f619874f0ffa3723882e4c5269d",
+          "bytes": 2947
+        },
+        "rtps-shape-fragments/captures/be-qos-conflict.pcap": {
+          "sha256": "6d5158fad079c1eab37f49999d317aa181164aa964d63f02b43e7f6cc1387af7",
+          "bytes": 412
+        },
+        "rtps-shape-fragments/answers/be-mixed-context.json": {
+          "sha256": "39da4fbd1cc30ea58e832a871aa9099e5069fc35c0e889d13e377caa882eadf7",
+          "bytes": 7279
+        },
+        "rtps-shape-fragments/captures/be-mixed-context.pcap": {
+          "sha256": "06d7a44624296dff43d1f5a2f7a52354e132466f87569aac17c910583843545c",
+          "bytes": 284
+        },
+        "rtps-shape-fragments/answers/be-logical-destination-isolation.json": {
+          "sha256": "37d304d449a1a50f51e704a0d7d8791c61efe8aa8c855d2b7b1705d5ba61747a",
+          "bytes": 4169
+        },
+        "rtps-shape-fragments/captures/be-logical-destination-isolation.pcap": {
+          "sha256": "fe7a94f14dd4424f7fd0f0f5b62f94eb31caf706063aeeedf168226fb033c131",
+          "bytes": 284
+        },
+        "rtps-shape-fragments/answers/be-invalid-zero-start.json": {
+          "sha256": "f1eaa9984eefb1bb5dbcce9bde7612a82ec0ff7ca5f02462e67dc99a126f3949",
+          "bytes": 640
+        },
+        "rtps-shape-fragments/captures/be-invalid-zero-start.pcap": {
+          "sha256": "e63599b6a2c2230c98ca21c70f9bde1d101dff6a2aa4041af55219ca887599b3",
+          "bytes": 252
+        },
+        "rtps-shape-fragments/answers/be-invalid-zero-count.json": {
+          "sha256": "7acbaaf9b7fe716151ed5eb695d0647eff62d861fe772dee603fbc1c9e1eb073",
+          "bytes": 640
+        },
+        "rtps-shape-fragments/captures/be-invalid-zero-count.pcap": {
+          "sha256": "55ae2055041f6146176928d61660410732a8da5ac50eb7a74520fc8f3ef308a8",
+          "bytes": 252
+        },
+        "rtps-shape-fragments/answers/be-invalid-zero-size.json": {
+          "sha256": "a8a71ae80623401798827864ab27d6ef725458eb70c396767ddfd10a3c9fcfbb",
+          "bytes": 656
+        },
+        "rtps-shape-fragments/captures/be-invalid-zero-size.pcap": {
+          "sha256": "0ec0f2fd2c2d857b6e0b94ddcda5f9a496e42b9035cc766fa67563c24dd17f34",
+          "bytes": 260
+        },
+        "rtps-shape-fragments/answers/be-invalid-zero-total.json": {
+          "sha256": "585314e620a4a76df27262991f2b9b4037a0d42a9ab16308e8030bae1f3c7465",
+          "bytes": 640
+        },
+        "rtps-shape-fragments/captures/be-invalid-zero-total.pcap": {
+          "sha256": "1d35201d59f7a8eb99b54bb4a43428f371455dfd35b981968229220358cef844",
+          "bytes": 252
+        },
+        "rtps-shape-fragments/answers/be-invalid-oversize-fragment.json": {
+          "sha256": "01a05942b4aa07256ac78ed7eb6138a74d047b55bfa2a5932dd1d910a3112ea8",
+          "bytes": 696
+        },
+        "rtps-shape-fragments/captures/be-invalid-oversize-fragment.pcap": {
+          "sha256": "bc9ba4baa729f93e76fd969c4c399f547590a8dcdf707a0f08d1e8c6334060ed",
+          "bytes": 280
+        },
+        "rtps-shape-fragments/answers/be-invalid-range-over.json": {
+          "sha256": "543616748544780b24ac6627b51f103caa0c29b625fc7fa00f7450b646c69a92",
+          "bytes": 648
+        },
+        "rtps-shape-fragments/captures/be-invalid-range-over.pcap": {
+          "sha256": "2c520e1ed5cae1b87828be797824129e2d5352036f58166c63ff874003bf48d5",
+          "bytes": 256
+        },
+        "rtps-shape-fragments/answers/be-invalid-offset-small.json": {
+          "sha256": "e9bd1151bbc22e8a183bb62dd05e2e08a38dc65a16ec4261d0c8214073222893",
+          "bytes": 656
+        },
+        "rtps-shape-fragments/captures/be-invalid-offset-small.pcap": {
+          "sha256": "a7a458ff2f75f03f0ac527886d07ae95fc4abe026cd6c4f60702ea3757551412",
+          "bytes": 260
+        },
+        "rtps-shape-fragments/answers/be-invalid-offset-unaligned.json": {
+          "sha256": "725515f07dfa3d719116e183abc3fe48cf87cd4532dd33862f1dbdcd13eb8bad",
+          "bytes": 656
+        },
+        "rtps-shape-fragments/captures/be-invalid-offset-unaligned.pcap": {
+          "sha256": "71601cc58f6424fae4351c54597b0ca16c549a6f77a7425eb70b2d3ea87ea9e3",
+          "bytes": 260
+        },
+        "rtps-shape-fragments/answers/be-invalid-offset-out.json": {
+          "sha256": "13c481f32377c48d57a5ecd8bb28ae8b86727b3d21ef5bf43534b58b9d820248",
+          "bytes": 656
+        },
+        "rtps-shape-fragments/captures/be-invalid-offset-out.pcap": {
+          "sha256": "2a071f7dafae107712d3d2650231f41e2a6d97d25e41f982ca3380fa4df42312",
+          "bytes": 260
+        },
+        "rtps-shape-fragments/answers/be-invalid-zero-seq.json": {
+          "sha256": "f195af64577542317e25f68213fe2276bd6bc1c6f77b8b0f6cd75b1ef2fee83f",
+          "bytes": 656
+        },
+        "rtps-shape-fragments/captures/be-invalid-zero-seq.pcap": {
+          "sha256": "77180e83036fb743085d6683d65aedde59ddc90bca55637ac6064a343d54a4d7",
+          "bytes": 260
+        },
+        "rtps-shape-fragments/answers/be-invalid-negative-seq.json": {
+          "sha256": "fe2d7fe4e09cb671c71e9eb5bcf304e827b85526df9f18c4432ca456435e969b",
+          "bytes": 656
+        },
+        "rtps-shape-fragments/captures/be-invalid-negative-seq.pcap": {
+          "sha256": "0bd0757c511b4ae3e1b55e9814000671c08172de573f73df88651142bd055b59",
+          "bytes": 260
+        },
+        "rtps-shape-fragments/answers/be-invalid-selected-capacity.json": {
+          "sha256": "91d3ae791b6dbf88be58731f7d8631648826a694f7ce0bf6bddc995594a55d58",
+          "bytes": 656
+        },
+        "rtps-shape-fragments/captures/be-invalid-selected-capacity.pcap": {
+          "sha256": "ed611f3517e893b8d5f9165b62f0bd63c37abcef89df2d41ad2fbcfef8885d89",
+          "bytes": 260
+        },
+        "rtps-shape-fragments/answers/be-invalid-nonstandard.json": {
+          "sha256": "79577e8a931c95742aee26bf947a401183c459d3058c6b31baee884e7dda0469",
+          "bytes": 658
+        },
+        "rtps-shape-fragments/captures/be-invalid-nonstandard.pcap": {
+          "sha256": "a2755160ceff261d0a7550638b3a471f38082306c9b84d5297ef3334da0fb96b",
+          "bytes": 260
+        },
+        "rtps-shape-fragments/answers/be-invalid-qos-must-understand.json": {
+          "sha256": "0b00bfa3658c8cfe4ec873747128d7d83a7b60e9fb9181a01d300c735fefa84a",
+          "bytes": 682
+        },
+        "rtps-shape-fragments/captures/be-invalid-qos-must-understand.pcap": {
+          "sha256": "21dbb9164b0e11419b5d6a180ada8fcce8a132e42d630723de00e18d3e7d54bb",
+          "bytes": 272
+        },
+        "rtps-shape-fragments/answers/be-invalid-truncated.json": {
+          "sha256": "d9ec25355c74ad7b1357839a037fb5d4a319670bbcf77f345581bfd60405b130",
+          "bytes": 614
+        },
+        "rtps-shape-fragments/captures/be-invalid-truncated.pcap": {
+          "sha256": "791819a8febcd541b23bf96245e521f04b8fb091abb36261120ade9ce3496383",
+          "bytes": 239
+        },
+        "rtps-shape-fragments/answers/be-invalid-extra-four.json": {
+          "sha256": "f73b7c6d6af3f05c7182011aa5890e69f69393ca06efcf932b1a5ada2f949d39",
+          "bytes": 624
+        },
+        "rtps-shape-fragments/captures/be-invalid-extra-four.pcap": {
+          "sha256": "e9bde4936ba2c61cc71622947d6412210cadb1f050e897e6386cdd2ee15c6f81",
+          "bytes": 244
+        },
+        "rtps-shape-fragments/answers/be-invalid-security.json": {
+          "sha256": "967390e442d238a47146fceba3bda2234c6f2da672a51dd0c9aee08888e5432a",
+          "bytes": 546
+        },
+        "rtps-shape-fragments/captures/be-invalid-security.pcap": {
+          "sha256": "bd8556c7336fb8b9007aed59ee31c5502bda6cfc79476ee474ad60d0bed392ab",
+          "bytes": 204
+        },
+        "rtps-shape-fragments/answers/be-invalid-version3.json": {
+          "sha256": "587a18aa9cc18252a7877672df522b48863f348a0dad2c472e9d8c9238dcdd86",
+          "bytes": 615
+        },
+        "rtps-shape-fragments/captures/be-invalid-version3.pcap": {
+          "sha256": "ee476279b3c5a859186d83a435e27e15f46636cd34e9c44cba4be6bf08725687",
+          "bytes": 240
+        },
+        "rtps-shape-fragments/answers/be-fragment-padding.json": {
+          "sha256": "b6059175d149006f61ead364f375449fc4f73ab636457f4c890bd76addac30ab",
+          "bytes": 2526
+        },
+        "rtps-shape-fragments/captures/be-fragment-padding.pcap": {
+          "sha256": "660ac2955d2c406de4391b3856467abe4794d43f81aa3df14df18cae27ecc697",
+          "bytes": 155
+        },
+        "rtps-shape-fragments/answers/be-complete-representation.json": {
+          "sha256": "f179ced263efc4e074954b4d18205ea68a8cf3014670a9219575329e36427761",
+          "bytes": 2741
+        },
+        "rtps-shape-fragments/captures/be-complete-representation.pcap": {
+          "sha256": "6c906f329e76949d8075e68b110d7ba09b908e1dc31f87f69a015147f836e520",
+          "bytes": 280
+        },
+        "rtps-shape-fragments/answers/be-complete-bad-string.json": {
+          "sha256": "435b1eec49046e248bce7a64a12518e730fcaa022f3fb90975f6146bfda2ae05",
+          "bytes": 2739
+        },
+        "rtps-shape-fragments/captures/be-complete-bad-string.pcap": {
+          "sha256": "645e446ffa071ec81d2cd61d44d663e48bf013ac2d338cdb96ade5b2ba96b91a",
+          "bytes": 280
+        },
+        "rtps-shape-fragments/answers/be-complete-bad-utf8.json": {
+          "sha256": "6641d772c169f3d67863f21b10d0c0f24ec243ca9b5cb1885a64708f006695b0",
+          "bytes": 2731
+        },
+        "rtps-shape-fragments/captures/be-complete-bad-utf8.pcap": {
+          "sha256": "3d54927227cdda19eb2936282f7c4e0bff5fb2c9723039288177c2b9d1bf6117",
+          "bytes": 276
+        },
+        "rtps-shape-fragments/answers/be-complete-trailing-fields.json": {
+          "sha256": "6af5010d284d621933e4217dac759f727d5ad484ea66b9e9cc47c6806edb9af3",
+          "bytes": 2747
+        },
+        "rtps-shape-fragments/captures/be-complete-trailing-fields.pcap": {
+          "sha256": "c9190345f40e3863131b3528b87ea4964faef174214006435630e37f2d0d38a4",
+          "bytes": 284
+        },
+        "rtps-shape-fragments/answers/be-complete-wrong-key-data.json": {
+          "sha256": "e2500234b49c6d2e05e2172f313c9ac319f4744d9f95a20dcd16a6ce02f6bd44",
+          "bytes": 2739
+        },
+        "rtps-shape-fragments/captures/be-complete-wrong-key-data.pcap": {
+          "sha256": "5a113c483089ed0327faf97660add1d2fee99eafff4e6eb9d6edd5a5fea0b20e",
+          "bytes": 280
+        },
+        "rtps-shape-fragments/answers/be-complete-unknown-options.json": {
+          "sha256": "cf43970682180e4c5ac6dace5a6f84bd4c646290032d2f472ea7054b067cd243",
+          "bytes": 2741
+        },
+        "rtps-shape-fragments/captures/be-complete-unknown-options.pcap": {
+          "sha256": "90c6ed5a1159ccbe794e96ec3c020139af4c62480c477ab8326bd83f40c87c84",
+          "bytes": 280
+        },
+        "rtps-shape-fragments/answers/le-sequence-4294967295.json": {
+          "sha256": "f0ffb1354e7db3f41ed4a347532f5c8d6902c082865de78ce3d24ad69f5cb23b",
+          "bytes": 4409
+        },
+        "rtps-shape-fragments/captures/le-sequence-4294967295.pcap": {
+          "sha256": "3ebff30e754b80b9133bbd67e930273967172a50e92bf9cf6c10756e7d0f6526",
+          "bytes": 252
+        },
+        "rtps-shape-fragments/answers/le-sequence-4294967296.json": {
+          "sha256": "e81df7f605e946a356a57c21ae6b5aae3af24882d0ac1994cad8d301f4c4392d",
+          "bytes": 4391
+        },
+        "rtps-shape-fragments/captures/le-sequence-4294967296.pcap": {
+          "sha256": "5e3e4d4384023fbad2bae2c865a56e31342f3795b9ab0421f38fb03f9b5af9bd",
+          "bytes": 252
+        },
+        "rtps-shape-fragments/answers/le-sequence-9223372036854775807.json": {
+          "sha256": "150b19cfb6d19503cdbf5fe5f6cee38a585536027555d95f4ecdcb4a6655b61b",
+          "bytes": 4427
+        },
+        "rtps-shape-fragments/captures/le-sequence-9223372036854775807.pcap": {
+          "sha256": "741d284d60533c458d09b614b8d6cadcde2a8ffc37c59a54e2f94ee8396bec21",
+          "bytes": 252
+        },
+        "rtps-shape-fragments/answers/le-one-byte-fragments.json": {
+          "sha256": "595170fd530d4afb3bfa2f481382c17e79b3ad52358e6ea130c8116c2e2e1950",
+          "bytes": 2481
+        },
+        "rtps-shape-fragments/captures/le-one-byte-fragments.pcap": {
+          "sha256": "030bb4e6847cea87d23d73e528d443dd8ac4763d3cb523beffb365215679e28f",
+          "bytes": 152
+        },
+        "rtps-shape-fragments/answers/le-wire24-complete.json": {
+          "sha256": "f9ba18450185d96f3c67060bcbd8951479e5021c2a3d34d6a344153277197fe3",
+          "bytes": 2480
+        },
+        "rtps-shape-fragments/captures/le-wire24-complete.pcap": {
+          "sha256": "01d85b1714c082bda7779f183928c871b147d77aa9c9ee00c86ea07554c61181",
+          "bytes": 152
+        },
+        "rtps-shape-fragments/answers/be-sequence-4294967295.json": {
+          "sha256": "13b8ee8229c1e8fcd985a8a1e803df93ca1c356aa5cef93df242fe2528f48560",
+          "bytes": 4409
+        },
+        "rtps-shape-fragments/captures/be-sequence-4294967295.pcap": {
+          "sha256": "207fc4247cc30e8a0949649aef3c53d166dfe5951de3398c32a846eb1ff08c9e",
+          "bytes": 252
+        },
+        "rtps-shape-fragments/answers/be-sequence-4294967296.json": {
+          "sha256": "09d584bfdb1abd6abdbcb73a1729ffc044b739deddd8007a471f056aaacaed55",
+          "bytes": 4391
+        },
+        "rtps-shape-fragments/captures/be-sequence-4294967296.pcap": {
+          "sha256": "e209dc9794118530175e99b191509fe8ce863f002312c618378c3c4137e543cd",
+          "bytes": 252
+        },
+        "rtps-shape-fragments/answers/be-sequence-9223372036854775807.json": {
+          "sha256": "708ee0c0a03b404a943a2b0b2180e5d45ccc358dc6a8b202eedcd0df9402194d",
+          "bytes": 4427
+        },
+        "rtps-shape-fragments/captures/be-sequence-9223372036854775807.pcap": {
+          "sha256": "02bb8451541567f622b42ec0947518077b76bc7d17f0439ccb1ae3224c461aa9",
+          "bytes": 252
+        },
+        "rtps-shape-fragments/answers/be-one-byte-fragments.json": {
+          "sha256": "eefc901982f3eb643093e2b3efc4adcd11b9cc4fd5056320b5fde707d6edd14a",
+          "bytes": 2481
+        },
+        "rtps-shape-fragments/captures/be-one-byte-fragments.pcap": {
+          "sha256": "9393ab62483e448bca257800b2fa0fb3183d0cb0bc60824452ddf7a2cc38fd1c",
+          "bytes": 152
+        },
+        "rtps-shape-fragments/answers/be-wire24-complete.json": {
+          "sha256": "a848724aafdb9e53fc8e863824c13be76d9b5c8dec3edf6ca31d2e7ed9178c49",
+          "bytes": 2480
+        },
+        "rtps-shape-fragments/captures/be-wire24-complete.pcap": {
+          "sha256": "2ee9788bae0dbd0607f49b363d1e540b844ed252305e8614d821dab8e86b8cce",
+          "bytes": 152
+        },
+        "rtps-shape-fragments/manifest.json": {
+          "sha256": "fee9210f5aa8cf519877f47d6652c867a673474620e48a2fff4a077d26666f87",
+          "bytes": 56995
+        },
+        "rtps-shape-fragments/generate.py": {
+          "sha256": "e65be4cd0820da117d226da1d77fefef15930de474ff3200f6568c4f131afd97",
+          "bytes": 17778
+        },
+        "rtps-shape-fragments/verify.py": {
+          "sha256": "3cc08ad411c60dc6fde394169178ad4f3974b47c6eb6bf92a223a06050965a1c",
+          "bytes": 3373
+        },
+        "rtps-shape-fragments/SOURCE.json": {
+          "sha256": "6feb1b097c2f55c825e6c48ddf9f70d2407b01e6cdb432132a7dedd8825b337b",
+          "bytes": 3136
+        },
+        "rtps-shape-fragments/seal.py": {
+          "sha256": "694f1dd0031d1eccf2c4b53422367ff42540568a03dca155c440d57e0ce6dc9f",
+          "bytes": 3984
+        },
+        "required-tests-traffic-unified-v36.json": {
+          "sha256": "9bcfd2e29f6de0965bd98fc013de1959597fe8c141154a55765c1d554a3d7a58",
+          "bytes": 1476484
+        },
+        "validation/expected.json": {
+          "sha256": "80dceb406f14a8e9d6fe626d3d2b90eade42632c50070efc03fe9a735198777f",
+          "bytes": 183057
+        }
+      },
+      "aliases": {
+        "common/pcapx/pcaputil/rtps-shape-fragments/answers/le-le-data-normal.json": "rtps-shape-fragments/answers/le-le-data-normal.json",
+        "common/pcapx/pcaputil/rtps-shape-fragments/captures/le-le-data-normal.pcap": "rtps-shape-fragments/captures/le-le-data-normal.pcap",
+        "common/pcapx/pcaputil/rtps-shape-fragments/answers/le-le-data-normal-bundle.json": "rtps-shape-fragments/answers/le-le-data-normal-bundle.json",
+        "common/pcapx/pcaputil/rtps-shape-fragments/captures/le-le-data-normal-bundle.pcap": "rtps-shape-fragments/captures/le-le-data-normal-bundle.pcap",
+        "common/pcapx/pcaputil/rtps-shape-fragments/answers/le-le-data-empty-extremes.json": "rtps-shape-fragments/answers/le-le-data-empty-extremes.json",
+        "common/pcapx/pcaputil/rtps-shape-fragments/captures/le-le-data-empty-extremes.pcap": "rtps-shape-fragments/captures/le-le-data-empty-extremes.pcap",
+        "common/pcapx/pcaputil/rtps-shape-fragments/answers/le-le-data-empty-extremes-bundle.json": "rtps-shape-fragments/answers/le-le-data-empty-extremes-bundle.json",
+        "common/pcapx/pcaputil/rtps-shape-fragments/captures/le-le-data-empty-extremes-bundle.pcap": "rtps-shape-fragments/captures/le-le-data-empty-extremes-bundle.pcap",
+        "common/pcapx/pcaputil/rtps-shape-fragments/answers/le-le-data-utf8-bound.json": "rtps-shape-fragments/answers/le-le-data-utf8-bound.json",
+        "common/pcapx/pcaputil/rtps-shape-fragments/captures/le-le-data-utf8-bound.pcap": "rtps-shape-fragments/captures/le-le-data-utf8-bound.pcap",
+        "common/pcapx/pcaputil/rtps-shape-fragments/answers/le-le-data-utf8-bound-bundle.json": "rtps-shape-fragments/answers/le-le-data-utf8-bound-bundle.json",
+        "common/pcapx/pcaputil/rtps-shape-fragments/captures/le-le-data-utf8-bound-bundle.pcap": "rtps-shape-fragments/captures/le-le-data-utf8-bound-bundle.pcap",
+        "common/pcapx/pcaputil/rtps-shape-fragments/answers/le-le-key-normal.json": "rtps-shape-fragments/answers/le-le-key-normal.json",
+        "common/pcapx/pcaputil/rtps-shape-fragments/captures/le-le-key-normal.pcap": "rtps-shape-fragments/captures/le-le-key-normal.pcap",
+        "common/pcapx/pcaputil/rtps-shape-fragments/answers/le-le-key-normal-bundle.json": "rtps-shape-fragments/answers/le-le-key-normal-bundle.json",
+        "common/pcapx/pcaputil/rtps-shape-fragments/captures/le-le-key-normal-bundle.pcap": "rtps-shape-fragments/captures/le-le-key-normal-bundle.pcap",
+        "common/pcapx/pcaputil/rtps-shape-fragments/answers/le-le-key-empty-extremes.json": "rtps-shape-fragments/answers/le-le-key-empty-extremes.json",
+        "common/pcapx/pcaputil/rtps-shape-fragments/captures/le-le-key-empty-extremes.pcap": "rtps-shape-fragments/captures/le-le-key-empty-extremes.pcap",
+        "common/pcapx/pcaputil/rtps-shape-fragments/answers/le-le-key-empty-extremes-bundle.json": "rtps-shape-fragments/answers/le-le-key-empty-extremes-bundle.json",
+        "common/pcapx/pcaputil/rtps-shape-fragments/captures/le-le-key-empty-extremes-bundle.pcap": "rtps-shape-fragments/captures/le-le-key-empty-extremes-bundle.pcap",
+        "common/pcapx/pcaputil/rtps-shape-fragments/answers/le-le-key-utf8-bound.json": "rtps-shape-fragments/answers/le-le-key-utf8-bound.json",
+        "common/pcapx/pcaputil/rtps-shape-fragments/captures/le-le-key-utf8-bound.pcap": "rtps-shape-fragments/captures/le-le-key-utf8-bound.pcap",
+        "common/pcapx/pcaputil/rtps-shape-fragments/answers/le-le-key-utf8-bound-bundle.json": "rtps-shape-fragments/answers/le-le-key-utf8-bound-bundle.json",
+        "common/pcapx/pcaputil/rtps-shape-fragments/captures/le-le-key-utf8-bound-bundle.pcap": "rtps-shape-fragments/captures/le-le-key-utf8-bound-bundle.pcap",
+        "common/pcapx/pcaputil/rtps-shape-fragments/answers/le-be-data-normal.json": "rtps-shape-fragments/answers/le-be-data-normal.json",
+        "common/pcapx/pcaputil/rtps-shape-fragments/captures/le-be-data-normal.pcap": "rtps-shape-fragments/captures/le-be-data-normal.pcap",
+        "common/pcapx/pcaputil/rtps-shape-fragments/answers/le-be-data-normal-bundle.json": "rtps-shape-fragments/answers/le-be-data-normal-bundle.json",
+        "common/pcapx/pcaputil/rtps-shape-fragments/captures/le-be-data-normal-bundle.pcap": "rtps-shape-fragments/captures/le-be-data-normal-bundle.pcap",
+        "common/pcapx/pcaputil/rtps-shape-fragments/answers/le-be-data-empty-extremes.json": "rtps-shape-fragments/answers/le-be-data-empty-extremes.json",
+        "common/pcapx/pcaputil/rtps-shape-fragments/captures/le-be-data-empty-extremes.pcap": "rtps-shape-fragments/captures/le-be-data-empty-extremes.pcap",
+        "common/pcapx/pcaputil/rtps-shape-fragments/answers/le-be-data-empty-extremes-bundle.json": "rtps-shape-fragments/answers/le-be-data-empty-extremes-bundle.json",
+        "common/pcapx/pcaputil/rtps-shape-fragments/captures/le-be-data-empty-extremes-bundle.pcap": "rtps-shape-fragments/captures/le-be-data-empty-extremes-bundle.pcap",
+        "common/pcapx/pcaputil/rtps-shape-fragments/answers/le-be-data-utf8-bound.json": "rtps-shape-fragments/answers/le-be-data-utf8-bound.json",
+        "common/pcapx/pcaputil/rtps-shape-fragments/captures/le-be-data-utf8-bound.pcap": "rtps-shape-fragments/captures/le-be-data-utf8-bound.pcap",
+        "common/pcapx/pcaputil/rtps-shape-fragments/answers/le-be-data-utf8-bound-bundle.json": "rtps-shape-fragments/answers/le-be-data-utf8-bound-bundle.json",
+        "common/pcapx/pcaputil/rtps-shape-fragments/captures/le-be-data-utf8-bound-bundle.pcap": "rtps-shape-fragments/captures/le-be-data-utf8-bound-bundle.pcap",
+        "common/pcapx/pcaputil/rtps-shape-fragments/answers/le-be-key-normal.json": "rtps-shape-fragments/answers/le-be-key-normal.json",
+        "common/pcapx/pcaputil/rtps-shape-fragments/captures/le-be-key-normal.pcap": "rtps-shape-fragments/captures/le-be-key-normal.pcap",
+        "common/pcapx/pcaputil/rtps-shape-fragments/answers/le-be-key-normal-bundle.json": "rtps-shape-fragments/answers/le-be-key-normal-bundle.json",
+        "common/pcapx/pcaputil/rtps-shape-fragments/captures/le-be-key-normal-bundle.pcap": "rtps-shape-fragments/captures/le-be-key-normal-bundle.pcap",
+        "common/pcapx/pcaputil/rtps-shape-fragments/answers/le-be-key-empty-extremes.json": "rtps-shape-fragments/answers/le-be-key-empty-extremes.json",
+        "common/pcapx/pcaputil/rtps-shape-fragments/captures/le-be-key-empty-extremes.pcap": "rtps-shape-fragments/captures/le-be-key-empty-extremes.pcap",
+        "common/pcapx/pcaputil/rtps-shape-fragments/answers/le-be-key-empty-extremes-bundle.json": "rtps-shape-fragments/answers/le-be-key-empty-extremes-bundle.json",
+        "common/pcapx/pcaputil/rtps-shape-fragments/captures/le-be-key-empty-extremes-bundle.pcap": "rtps-shape-fragments/captures/le-be-key-empty-extremes-bundle.pcap",
+        "common/pcapx/pcaputil/rtps-shape-fragments/answers/le-be-key-utf8-bound.json": "rtps-shape-fragments/answers/le-be-key-utf8-bound.json",
+        "common/pcapx/pcaputil/rtps-shape-fragments/captures/le-be-key-utf8-bound.pcap": "rtps-shape-fragments/captures/le-be-key-utf8-bound.pcap",
+        "common/pcapx/pcaputil/rtps-shape-fragments/answers/le-be-key-utf8-bound-bundle.json": "rtps-shape-fragments/answers/le-be-key-utf8-bound-bundle.json",
+        "common/pcapx/pcaputil/rtps-shape-fragments/captures/le-be-key-utf8-bound-bundle.pcap": "rtps-shape-fragments/captures/le-be-key-utf8-bound-bundle.pcap",
+        "common/pcapx/pcaputil/rtps-shape-fragments/answers/le-ordered.json": "rtps-shape-fragments/answers/le-ordered.json",
+        "common/pcapx/pcaputil/rtps-shape-fragments/captures/le-ordered.pcap": "rtps-shape-fragments/captures/le-ordered.pcap",
+        "common/pcapx/pcaputil/rtps-shape-fragments/answers/le-duplicate.json": "rtps-shape-fragments/answers/le-duplicate.json",
+        "common/pcapx/pcaputil/rtps-shape-fragments/captures/le-duplicate.pcap": "rtps-shape-fragments/captures/le-duplicate.pcap",
+        "common/pcapx/pcaputil/rtps-shape-fragments/answers/le-overlap-same.json": "rtps-shape-fragments/answers/le-overlap-same.json",
+        "common/pcapx/pcaputil/rtps-shape-fragments/captures/le-overlap-same.pcap": "rtps-shape-fragments/captures/le-overlap-same.pcap",
+        "common/pcapx/pcaputil/rtps-shape-fragments/answers/le-regular-replacement.json": "rtps-shape-fragments/answers/le-regular-replacement.json",
+        "common/pcapx/pcaputil/rtps-shape-fragments/captures/le-regular-replacement.pcap": "rtps-shape-fragments/captures/le-regular-replacement.pcap",
+        "common/pcapx/pcaputil/rtps-shape-fragments/answers/le-regular-only.json": "rtps-shape-fragments/answers/le-regular-only.json",
+        "common/pcapx/pcaputil/rtps-shape-fragments/answers/le-conflict-overlap-bytes.json": "rtps-shape-fragments/answers/le-conflict-overlap-bytes.json",
+        "common/pcapx/pcaputil/rtps-shape-fragments/captures/le-conflict-overlap-bytes.pcap": "rtps-shape-fragments/captures/le-conflict-overlap-bytes.pcap",
+        "common/pcapx/pcaputil/rtps-shape-fragments/answers/le-conflict-size.json": "rtps-shape-fragments/answers/le-conflict-size.json",
+        "common/pcapx/pcaputil/rtps-shape-fragments/captures/le-conflict-size.pcap": "rtps-shape-fragments/captures/le-conflict-size.pcap",
+        "common/pcapx/pcaputil/rtps-shape-fragments/answers/le-conflict-key-flag.json": "rtps-shape-fragments/answers/le-conflict-key-flag.json",
+        "common/pcapx/pcaputil/rtps-shape-fragments/captures/le-conflict-key-flag.pcap": "rtps-shape-fragments/captures/le-conflict-key-flag.pcap",
+        "common/pcapx/pcaputil/rtps-shape-fragments/answers/le-conflict-sample-size.json": "rtps-shape-fragments/answers/le-conflict-sample-size.json",
+        "common/pcapx/pcaputil/rtps-shape-fragments/captures/le-conflict-sample-size.pcap": "rtps-shape-fragments/captures/le-conflict-sample-size.pcap",
+        "common/pcapx/pcaputil/rtps-shape-fragments/answers/le-conflict-version.json": "rtps-shape-fragments/answers/le-conflict-version.json",
+        "common/pcapx/pcaputil/rtps-shape-fragments/captures/le-conflict-version.pcap": "rtps-shape-fragments/captures/le-conflict-version.pcap",
+        "common/pcapx/pcaputil/rtps-shape-fragments/answers/le-conflict-vendor.json": "rtps-shape-fragments/answers/le-conflict-vendor.json",
+        "common/pcapx/pcaputil/rtps-shape-fragments/captures/le-conflict-vendor.pcap": "rtps-shape-fragments/captures/le-conflict-vendor.pcap",
+        "common/pcapx/pcaputil/rtps-shape-fragments/answers/le-conflict-regular-conflict.json": "rtps-shape-fragments/answers/le-conflict-regular-conflict.json",
+        "common/pcapx/pcaputil/rtps-shape-fragments/captures/le-conflict-regular-conflict.pcap": "rtps-shape-fragments/captures/le-conflict-regular-conflict.pcap",
+        "common/pcapx/pcaputil/rtps-shape-fragments/answers/le-retired-reuse.json": "rtps-shape-fragments/answers/le-retired-reuse.json",
+        "common/pcapx/pcaputil/rtps-shape-fragments/captures/le-retired-reuse.pcap": "rtps-shape-fragments/captures/le-retired-reuse.pcap",
+        "common/pcapx/pcaputil/rtps-shape-fragments/answers/le-pending-close.json": "rtps-shape-fragments/answers/le-pending-close.json",
+        "common/pcapx/pcaputil/rtps-shape-fragments/captures/le-pending-close.pcap": "rtps-shape-fragments/captures/le-pending-close.pcap",
+        "common/pcapx/pcaputil/rtps-shape-fragments/answers/le-ttl-before.json": "rtps-shape-fragments/answers/le-ttl-before.json",
+        "common/pcapx/pcaputil/rtps-shape-fragments/captures/le-ttl-before.pcap": "rtps-shape-fragments/captures/le-ttl-before.pcap",
+        "common/pcapx/pcaputil/rtps-shape-fragments/answers/le-ttl-exact.json": "rtps-shape-fragments/answers/le-ttl-exact.json",
+        "common/pcapx/pcaputil/rtps-shape-fragments/captures/le-ttl-exact.pcap": "rtps-shape-fragments/captures/le-ttl-exact.pcap",
+        "common/pcapx/pcaputil/rtps-shape-fragments/answers/le-retry-no-refresh.json": "rtps-shape-fragments/answers/le-retry-no-refresh.json",
+        "common/pcapx/pcaputil/rtps-shape-fragments/captures/le-retry-no-refresh.pcap": "rtps-shape-fragments/captures/le-retry-no-refresh.pcap",
+        "common/pcapx/pcaputil/rtps-shape-fragments/answers/le-backdated.json": "rtps-shape-fragments/answers/le-backdated.json",
+        "common/pcapx/pcaputil/rtps-shape-fragments/captures/le-backdated.pcap": "rtps-shape-fragments/captures/le-backdated.pcap",
+        "common/pcapx/pcaputil/rtps-shape-fragments/answers/le-directions.json": "rtps-shape-fragments/answers/le-directions.json",
+        "common/pcapx/pcaputil/rtps-shape-fragments/captures/le-directions.pcap": "rtps-shape-fragments/captures/le-directions.pcap",
+        "common/pcapx/pcaputil/rtps-shape-fragments/answers/le-interleaved.json": "rtps-shape-fragments/answers/le-interleaved.json",
+        "common/pcapx/pcaputil/rtps-shape-fragments/captures/le-interleaved.pcap": "rtps-shape-fragments/captures/le-interleaved.pcap",
+        "common/pcapx/pcaputil/rtps-shape-fragments/answers/le-unselected-source.json": "rtps-shape-fragments/answers/le-unselected-source.json",
+        "common/pcapx/pcaputil/rtps-shape-fragments/captures/le-unselected-source.pcap": "rtps-shape-fragments/captures/le-unselected-source.pcap",
+        "common/pcapx/pcaputil/rtps-shape-fragments/answers/le-unselected-writer.json": "rtps-shape-fragments/answers/le-unselected-writer.json",
+        "common/pcapx/pcaputil/rtps-shape-fragments/captures/le-unselected-writer.pcap": "rtps-shape-fragments/captures/le-unselected-writer.pcap",
+        "common/pcapx/pcaputil/rtps-shape-fragments/answers/le-qos-timestamp.json": "rtps-shape-fragments/answers/le-qos-timestamp.json",
+        "common/pcapx/pcaputil/rtps-shape-fragments/captures/le-qos-timestamp.pcap": "rtps-shape-fragments/captures/le-qos-timestamp.pcap",
+        "common/pcapx/pcaputil/rtps-shape-fragments/answers/le-qos-conflict.json": "rtps-shape-fragments/answers/le-qos-conflict.json",
+        "common/pcapx/pcaputil/rtps-shape-fragments/captures/le-qos-conflict.pcap": "rtps-shape-fragments/captures/le-qos-conflict.pcap",
+        "common/pcapx/pcaputil/rtps-shape-fragments/answers/le-mixed-context.json": "rtps-shape-fragments/answers/le-mixed-context.json",
+        "common/pcapx/pcaputil/rtps-shape-fragments/captures/le-mixed-context.pcap": "rtps-shape-fragments/captures/le-mixed-context.pcap",
+        "common/pcapx/pcaputil/rtps-shape-fragments/answers/le-logical-destination-isolation.json": "rtps-shape-fragments/answers/le-logical-destination-isolation.json",
+        "common/pcapx/pcaputil/rtps-shape-fragments/captures/le-logical-destination-isolation.pcap": "rtps-shape-fragments/captures/le-logical-destination-isolation.pcap",
+        "common/pcapx/pcaputil/rtps-shape-fragments/answers/le-invalid-zero-start.json": "rtps-shape-fragments/answers/le-invalid-zero-start.json",
+        "common/pcapx/pcaputil/rtps-shape-fragments/captures/le-invalid-zero-start.pcap": "rtps-shape-fragments/captures/le-invalid-zero-start.pcap",
+        "common/pcapx/pcaputil/rtps-shape-fragments/answers/le-invalid-zero-count.json": "rtps-shape-fragments/answers/le-invalid-zero-count.json",
+        "common/pcapx/pcaputil/rtps-shape-fragments/captures/le-invalid-zero-count.pcap": "rtps-shape-fragments/captures/le-invalid-zero-count.pcap",
+        "common/pcapx/pcaputil/rtps-shape-fragments/answers/le-invalid-zero-size.json": "rtps-shape-fragments/answers/le-invalid-zero-size.json",
+        "common/pcapx/pcaputil/rtps-shape-fragments/captures/le-invalid-zero-size.pcap": "rtps-shape-fragments/captures/le-invalid-zero-size.pcap",
+        "common/pcapx/pcaputil/rtps-shape-fragments/answers/le-invalid-zero-total.json": "rtps-shape-fragments/answers/le-invalid-zero-total.json",
+        "common/pcapx/pcaputil/rtps-shape-fragments/captures/le-invalid-zero-total.pcap": "rtps-shape-fragments/captures/le-invalid-zero-total.pcap",
+        "common/pcapx/pcaputil/rtps-shape-fragments/answers/le-invalid-oversize-fragment.json": "rtps-shape-fragments/answers/le-invalid-oversize-fragment.json",
+        "common/pcapx/pcaputil/rtps-shape-fragments/captures/le-invalid-oversize-fragment.pcap": "rtps-shape-fragments/captures/le-invalid-oversize-fragment.pcap",
+        "common/pcapx/pcaputil/rtps-shape-fragments/answers/le-invalid-range-over.json": "rtps-shape-fragments/answers/le-invalid-range-over.json",
+        "common/pcapx/pcaputil/rtps-shape-fragments/captures/le-invalid-range-over.pcap": "rtps-shape-fragments/captures/le-invalid-range-over.pcap",
+        "common/pcapx/pcaputil/rtps-shape-fragments/answers/le-invalid-offset-small.json": "rtps-shape-fragments/answers/le-invalid-offset-small.json",
+        "common/pcapx/pcaputil/rtps-shape-fragments/captures/le-invalid-offset-small.pcap": "rtps-shape-fragments/captures/le-invalid-offset-small.pcap",
+        "common/pcapx/pcaputil/rtps-shape-fragments/answers/le-invalid-offset-unaligned.json": "rtps-shape-fragments/answers/le-invalid-offset-unaligned.json",
+        "common/pcapx/pcaputil/rtps-shape-fragments/captures/le-invalid-offset-unaligned.pcap": "rtps-shape-fragments/captures/le-invalid-offset-unaligned.pcap",
+        "common/pcapx/pcaputil/rtps-shape-fragments/answers/le-invalid-offset-out.json": "rtps-shape-fragments/answers/le-invalid-offset-out.json",
+        "common/pcapx/pcaputil/rtps-shape-fragments/captures/le-invalid-offset-out.pcap": "rtps-shape-fragments/captures/le-invalid-offset-out.pcap",
+        "common/pcapx/pcaputil/rtps-shape-fragments/answers/le-invalid-zero-seq.json": "rtps-shape-fragments/answers/le-invalid-zero-seq.json",
+        "common/pcapx/pcaputil/rtps-shape-fragments/captures/le-invalid-zero-seq.pcap": "rtps-shape-fragments/captures/le-invalid-zero-seq.pcap",
+        "common/pcapx/pcaputil/rtps-shape-fragments/answers/le-invalid-negative-seq.json": "rtps-shape-fragments/answers/le-invalid-negative-seq.json",
+        "common/pcapx/pcaputil/rtps-shape-fragments/captures/le-invalid-negative-seq.pcap": "rtps-shape-fragments/captures/le-invalid-negative-seq.pcap",
+        "common/pcapx/pcaputil/rtps-shape-fragments/answers/le-invalid-selected-capacity.json": "rtps-shape-fragments/answers/le-invalid-selected-capacity.json",
+        "common/pcapx/pcaputil/rtps-shape-fragments/captures/le-invalid-selected-capacity.pcap": "rtps-shape-fragments/captures/le-invalid-selected-capacity.pcap",
+        "common/pcapx/pcaputil/rtps-shape-fragments/answers/le-invalid-nonstandard.json": "rtps-shape-fragments/answers/le-invalid-nonstandard.json",
+        "common/pcapx/pcaputil/rtps-shape-fragments/captures/le-invalid-nonstandard.pcap": "rtps-shape-fragments/captures/le-invalid-nonstandard.pcap",
+        "common/pcapx/pcaputil/rtps-shape-fragments/answers/le-invalid-qos-must-understand.json": "rtps-shape-fragments/answers/le-invalid-qos-must-understand.json",
+        "common/pcapx/pcaputil/rtps-shape-fragments/captures/le-invalid-qos-must-understand.pcap": "rtps-shape-fragments/captures/le-invalid-qos-must-understand.pcap",
+        "common/pcapx/pcaputil/rtps-shape-fragments/answers/le-invalid-truncated.json": "rtps-shape-fragments/answers/le-invalid-truncated.json",
+        "common/pcapx/pcaputil/rtps-shape-fragments/captures/le-invalid-truncated.pcap": "rtps-shape-fragments/captures/le-invalid-truncated.pcap",
+        "common/pcapx/pcaputil/rtps-shape-fragments/answers/le-invalid-extra-four.json": "rtps-shape-fragments/answers/le-invalid-extra-four.json",
+        "common/pcapx/pcaputil/rtps-shape-fragments/captures/le-invalid-extra-four.pcap": "rtps-shape-fragments/captures/le-invalid-extra-four.pcap",
+        "common/pcapx/pcaputil/rtps-shape-fragments/answers/le-invalid-security.json": "rtps-shape-fragments/answers/le-invalid-security.json",
+        "common/pcapx/pcaputil/rtps-shape-fragments/captures/le-invalid-security.pcap": "rtps-shape-fragments/captures/le-invalid-security.pcap",
+        "common/pcapx/pcaputil/rtps-shape-fragments/answers/le-invalid-version3.json": "rtps-shape-fragments/answers/le-invalid-version3.json",
+        "common/pcapx/pcaputil/rtps-shape-fragments/captures/le-invalid-version3.pcap": "rtps-shape-fragments/captures/le-invalid-version3.pcap",
+        "common/pcapx/pcaputil/rtps-shape-fragments/answers/le-fragment-padding.json": "rtps-shape-fragments/answers/le-fragment-padding.json",
+        "common/pcapx/pcaputil/rtps-shape-fragments/captures/le-fragment-padding.pcap": "rtps-shape-fragments/captures/le-fragment-padding.pcap",
+        "common/pcapx/pcaputil/rtps-shape-fragments/answers/le-complete-representation.json": "rtps-shape-fragments/answers/le-complete-representation.json",
+        "common/pcapx/pcaputil/rtps-shape-fragments/captures/le-complete-representation.pcap": "rtps-shape-fragments/captures/le-complete-representation.pcap",
+        "common/pcapx/pcaputil/rtps-shape-fragments/answers/le-complete-bad-string.json": "rtps-shape-fragments/answers/le-complete-bad-string.json",
+        "common/pcapx/pcaputil/rtps-shape-fragments/captures/le-complete-bad-string.pcap": "rtps-shape-fragments/captures/le-complete-bad-string.pcap",
+        "common/pcapx/pcaputil/rtps-shape-fragments/answers/le-complete-bad-utf8.json": "rtps-shape-fragments/answers/le-complete-bad-utf8.json",
+        "common/pcapx/pcaputil/rtps-shape-fragments/captures/le-complete-bad-utf8.pcap": "rtps-shape-fragments/captures/le-complete-bad-utf8.pcap",
+        "common/pcapx/pcaputil/rtps-shape-fragments/answers/le-complete-trailing-fields.json": "rtps-shape-fragments/answers/le-complete-trailing-fields.json",
+        "common/pcapx/pcaputil/rtps-shape-fragments/captures/le-complete-trailing-fields.pcap": "rtps-shape-fragments/captures/le-complete-trailing-fields.pcap",
+        "common/pcapx/pcaputil/rtps-shape-fragments/answers/le-complete-wrong-key-data.json": "rtps-shape-fragments/answers/le-complete-wrong-key-data.json",
+        "common/pcapx/pcaputil/rtps-shape-fragments/captures/le-complete-wrong-key-data.pcap": "rtps-shape-fragments/captures/le-complete-wrong-key-data.pcap",
+        "common/pcapx/pcaputil/rtps-shape-fragments/answers/le-complete-unknown-options.json": "rtps-shape-fragments/answers/le-complete-unknown-options.json",
+        "common/pcapx/pcaputil/rtps-shape-fragments/captures/le-complete-unknown-options.pcap": "rtps-shape-fragments/captures/le-complete-unknown-options.pcap",
+        "common/pcapx/pcaputil/rtps-shape-fragments/answers/be-le-data-normal.json": "rtps-shape-fragments/answers/be-le-data-normal.json",
+        "common/pcapx/pcaputil/rtps-shape-fragments/captures/be-le-data-normal.pcap": "rtps-shape-fragments/captures/be-le-data-normal.pcap",
+        "common/pcapx/pcaputil/rtps-shape-fragments/answers/be-le-data-normal-bundle.json": "rtps-shape-fragments/answers/be-le-data-normal-bundle.json",
+        "common/pcapx/pcaputil/rtps-shape-fragments/captures/be-le-data-normal-bundle.pcap": "rtps-shape-fragments/captures/be-le-data-normal-bundle.pcap",
+        "common/pcapx/pcaputil/rtps-shape-fragments/answers/be-le-data-empty-extremes.json": "rtps-shape-fragments/answers/be-le-data-empty-extremes.json",
+        "common/pcapx/pcaputil/rtps-shape-fragments/captures/be-le-data-empty-extremes.pcap": "rtps-shape-fragments/captures/be-le-data-empty-extremes.pcap",
+        "common/pcapx/pcaputil/rtps-shape-fragments/answers/be-le-data-empty-extremes-bundle.json": "rtps-shape-fragments/answers/be-le-data-empty-extremes-bundle.json",
+        "common/pcapx/pcaputil/rtps-shape-fragments/captures/be-le-data-empty-extremes-bundle.pcap": "rtps-shape-fragments/captures/be-le-data-empty-extremes-bundle.pcap",
+        "common/pcapx/pcaputil/rtps-shape-fragments/answers/be-le-data-utf8-bound.json": "rtps-shape-fragments/answers/be-le-data-utf8-bound.json",
+        "common/pcapx/pcaputil/rtps-shape-fragments/captures/be-le-data-utf8-bound.pcap": "rtps-shape-fragments/captures/be-le-data-utf8-bound.pcap",
+        "common/pcapx/pcaputil/rtps-shape-fragments/answers/be-le-data-utf8-bound-bundle.json": "rtps-shape-fragments/answers/be-le-data-utf8-bound-bundle.json",
+        "common/pcapx/pcaputil/rtps-shape-fragments/captures/be-le-data-utf8-bound-bundle.pcap": "rtps-shape-fragments/captures/be-le-data-utf8-bound-bundle.pcap",
+        "common/pcapx/pcaputil/rtps-shape-fragments/answers/be-le-key-normal.json": "rtps-shape-fragments/answers/be-le-key-normal.json",
+        "common/pcapx/pcaputil/rtps-shape-fragments/captures/be-le-key-normal.pcap": "rtps-shape-fragments/captures/be-le-key-normal.pcap",
+        "common/pcapx/pcaputil/rtps-shape-fragments/answers/be-le-key-normal-bundle.json": "rtps-shape-fragments/answers/be-le-key-normal-bundle.json",
+        "common/pcapx/pcaputil/rtps-shape-fragments/captures/be-le-key-normal-bundle.pcap": "rtps-shape-fragments/captures/be-le-key-normal-bundle.pcap",
+        "common/pcapx/pcaputil/rtps-shape-fragments/answers/be-le-key-empty-extremes.json": "rtps-shape-fragments/answers/be-le-key-empty-extremes.json",
+        "common/pcapx/pcaputil/rtps-shape-fragments/captures/be-le-key-empty-extremes.pcap": "rtps-shape-fragments/captures/be-le-key-empty-extremes.pcap",
+        "common/pcapx/pcaputil/rtps-shape-fragments/answers/be-le-key-empty-extremes-bundle.json": "rtps-shape-fragments/answers/be-le-key-empty-extremes-bundle.json",
+        "common/pcapx/pcaputil/rtps-shape-fragments/captures/be-le-key-empty-extremes-bundle.pcap": "rtps-shape-fragments/captures/be-le-key-empty-extremes-bundle.pcap",
+        "common/pcapx/pcaputil/rtps-shape-fragments/answers/be-le-key-utf8-bound.json": "rtps-shape-fragments/answers/be-le-key-utf8-bound.json",
+        "common/pcapx/pcaputil/rtps-shape-fragments/captures/be-le-key-utf8-bound.pcap": "rtps-shape-fragments/captures/be-le-key-utf8-bound.pcap",
+        "common/pcapx/pcaputil/rtps-shape-fragments/answers/be-le-key-utf8-bound-bundle.json": "rtps-shape-fragments/answers/be-le-key-utf8-bound-bundle.json",
+        "common/pcapx/pcaputil/rtps-shape-fragments/captures/be-le-key-utf8-bound-bundle.pcap": "rtps-shape-fragments/captures/be-le-key-utf8-bound-bundle.pcap",
+        "common/pcapx/pcaputil/rtps-shape-fragments/answers/be-be-data-normal.json": "rtps-shape-fragments/answers/be-be-data-normal.json",
+        "common/pcapx/pcaputil/rtps-shape-fragments/captures/be-be-data-normal.pcap": "rtps-shape-fragments/captures/be-be-data-normal.pcap",
+        "common/pcapx/pcaputil/rtps-shape-fragments/answers/be-be-data-normal-bundle.json": "rtps-shape-fragments/answers/be-be-data-normal-bundle.json",
+        "common/pcapx/pcaputil/rtps-shape-fragments/captures/be-be-data-normal-bundle.pcap": "rtps-shape-fragments/captures/be-be-data-normal-bundle.pcap",
+        "common/pcapx/pcaputil/rtps-shape-fragments/answers/be-be-data-empty-extremes.json": "rtps-shape-fragments/answers/be-be-data-empty-extremes.json",
+        "common/pcapx/pcaputil/rtps-shape-fragments/captures/be-be-data-empty-extremes.pcap": "rtps-shape-fragments/captures/be-be-data-empty-extremes.pcap",
+        "common/pcapx/pcaputil/rtps-shape-fragments/answers/be-be-data-empty-extremes-bundle.json": "rtps-shape-fragments/answers/be-be-data-empty-extremes-bundle.json",
+        "common/pcapx/pcaputil/rtps-shape-fragments/captures/be-be-data-empty-extremes-bundle.pcap": "rtps-shape-fragments/captures/be-be-data-empty-extremes-bundle.pcap",
+        "common/pcapx/pcaputil/rtps-shape-fragments/answers/be-be-data-utf8-bound.json": "rtps-shape-fragments/answers/be-be-data-utf8-bound.json",
+        "common/pcapx/pcaputil/rtps-shape-fragments/captures/be-be-data-utf8-bound.pcap": "rtps-shape-fragments/captures/be-be-data-utf8-bound.pcap",
+        "common/pcapx/pcaputil/rtps-shape-fragments/answers/be-be-data-utf8-bound-bundle.json": "rtps-shape-fragments/answers/be-be-data-utf8-bound-bundle.json",
+        "common/pcapx/pcaputil/rtps-shape-fragments/captures/be-be-data-utf8-bound-bundle.pcap": "rtps-shape-fragments/captures/be-be-data-utf8-bound-bundle.pcap",
+        "common/pcapx/pcaputil/rtps-shape-fragments/answers/be-be-key-normal.json": "rtps-shape-fragments/answers/be-be-key-normal.json",
+        "common/pcapx/pcaputil/rtps-shape-fragments/captures/be-be-key-normal.pcap": "rtps-shape-fragments/captures/be-be-key-normal.pcap",
+        "common/pcapx/pcaputil/rtps-shape-fragments/answers/be-be-key-normal-bundle.json": "rtps-shape-fragments/answers/be-be-key-normal-bundle.json",
+        "common/pcapx/pcaputil/rtps-shape-fragments/captures/be-be-key-normal-bundle.pcap": "rtps-shape-fragments/captures/be-be-key-normal-bundle.pcap",
+        "common/pcapx/pcaputil/rtps-shape-fragments/answers/be-be-key-empty-extremes.json": "rtps-shape-fragments/answers/be-be-key-empty-extremes.json",
+        "common/pcapx/pcaputil/rtps-shape-fragments/captures/be-be-key-empty-extremes.pcap": "rtps-shape-fragments/captures/be-be-key-empty-extremes.pcap",
+        "common/pcapx/pcaputil/rtps-shape-fragments/answers/be-be-key-empty-extremes-bundle.json": "rtps-shape-fragments/answers/be-be-key-empty-extremes-bundle.json",
+        "common/pcapx/pcaputil/rtps-shape-fragments/captures/be-be-key-empty-extremes-bundle.pcap": "rtps-shape-fragments/captures/be-be-key-empty-extremes-bundle.pcap",
+        "common/pcapx/pcaputil/rtps-shape-fragments/answers/be-be-key-utf8-bound.json": "rtps-shape-fragments/answers/be-be-key-utf8-bound.json",
+        "common/pcapx/pcaputil/rtps-shape-fragments/captures/be-be-key-utf8-bound.pcap": "rtps-shape-fragments/captures/be-be-key-utf8-bound.pcap",
+        "common/pcapx/pcaputil/rtps-shape-fragments/answers/be-be-key-utf8-bound-bundle.json": "rtps-shape-fragments/answers/be-be-key-utf8-bound-bundle.json",
+        "common/pcapx/pcaputil/rtps-shape-fragments/captures/be-be-key-utf8-bound-bundle.pcap": "rtps-shape-fragments/captures/be-be-key-utf8-bound-bundle.pcap",
+        "common/pcapx/pcaputil/rtps-shape-fragments/answers/be-ordered.json": "rtps-shape-fragments/answers/be-ordered.json",
+        "common/pcapx/pcaputil/rtps-shape-fragments/captures/be-ordered.pcap": "rtps-shape-fragments/captures/be-ordered.pcap",
+        "common/pcapx/pcaputil/rtps-shape-fragments/answers/be-duplicate.json": "rtps-shape-fragments/answers/be-duplicate.json",
+        "common/pcapx/pcaputil/rtps-shape-fragments/captures/be-duplicate.pcap": "rtps-shape-fragments/captures/be-duplicate.pcap",
+        "common/pcapx/pcaputil/rtps-shape-fragments/answers/be-overlap-same.json": "rtps-shape-fragments/answers/be-overlap-same.json",
+        "common/pcapx/pcaputil/rtps-shape-fragments/captures/be-overlap-same.pcap": "rtps-shape-fragments/captures/be-overlap-same.pcap",
+        "common/pcapx/pcaputil/rtps-shape-fragments/answers/be-regular-replacement.json": "rtps-shape-fragments/answers/be-regular-replacement.json",
+        "common/pcapx/pcaputil/rtps-shape-fragments/captures/be-regular-replacement.pcap": "rtps-shape-fragments/captures/be-regular-replacement.pcap",
+        "common/pcapx/pcaputil/rtps-shape-fragments/answers/be-regular-only.json": "rtps-shape-fragments/answers/be-regular-only.json",
+        "common/pcapx/pcaputil/rtps-shape-fragments/answers/be-conflict-overlap-bytes.json": "rtps-shape-fragments/answers/be-conflict-overlap-bytes.json",
+        "common/pcapx/pcaputil/rtps-shape-fragments/captures/be-conflict-overlap-bytes.pcap": "rtps-shape-fragments/captures/be-conflict-overlap-bytes.pcap",
+        "common/pcapx/pcaputil/rtps-shape-fragments/answers/be-conflict-size.json": "rtps-shape-fragments/answers/be-conflict-size.json",
+        "common/pcapx/pcaputil/rtps-shape-fragments/captures/be-conflict-size.pcap": "rtps-shape-fragments/captures/be-conflict-size.pcap",
+        "common/pcapx/pcaputil/rtps-shape-fragments/answers/be-conflict-key-flag.json": "rtps-shape-fragments/answers/be-conflict-key-flag.json",
+        "common/pcapx/pcaputil/rtps-shape-fragments/captures/be-conflict-key-flag.pcap": "rtps-shape-fragments/captures/be-conflict-key-flag.pcap",
+        "common/pcapx/pcaputil/rtps-shape-fragments/answers/be-conflict-sample-size.json": "rtps-shape-fragments/answers/be-conflict-sample-size.json",
+        "common/pcapx/pcaputil/rtps-shape-fragments/captures/be-conflict-sample-size.pcap": "rtps-shape-fragments/captures/be-conflict-sample-size.pcap",
+        "common/pcapx/pcaputil/rtps-shape-fragments/answers/be-conflict-version.json": "rtps-shape-fragments/answers/be-conflict-version.json",
+        "common/pcapx/pcaputil/rtps-shape-fragments/captures/be-conflict-version.pcap": "rtps-shape-fragments/captures/be-conflict-version.pcap",
+        "common/pcapx/pcaputil/rtps-shape-fragments/answers/be-conflict-vendor.json": "rtps-shape-fragments/answers/be-conflict-vendor.json",
+        "common/pcapx/pcaputil/rtps-shape-fragments/captures/be-conflict-vendor.pcap": "rtps-shape-fragments/captures/be-conflict-vendor.pcap",
+        "common/pcapx/pcaputil/rtps-shape-fragments/answers/be-conflict-regular-conflict.json": "rtps-shape-fragments/answers/be-conflict-regular-conflict.json",
+        "common/pcapx/pcaputil/rtps-shape-fragments/captures/be-conflict-regular-conflict.pcap": "rtps-shape-fragments/captures/be-conflict-regular-conflict.pcap",
+        "common/pcapx/pcaputil/rtps-shape-fragments/answers/be-retired-reuse.json": "rtps-shape-fragments/answers/be-retired-reuse.json",
+        "common/pcapx/pcaputil/rtps-shape-fragments/captures/be-retired-reuse.pcap": "rtps-shape-fragments/captures/be-retired-reuse.pcap",
+        "common/pcapx/pcaputil/rtps-shape-fragments/answers/be-pending-close.json": "rtps-shape-fragments/answers/be-pending-close.json",
+        "common/pcapx/pcaputil/rtps-shape-fragments/captures/be-pending-close.pcap": "rtps-shape-fragments/captures/be-pending-close.pcap",
+        "common/pcapx/pcaputil/rtps-shape-fragments/answers/be-ttl-before.json": "rtps-shape-fragments/answers/be-ttl-before.json",
+        "common/pcapx/pcaputil/rtps-shape-fragments/captures/be-ttl-before.pcap": "rtps-shape-fragments/captures/be-ttl-before.pcap",
+        "common/pcapx/pcaputil/rtps-shape-fragments/answers/be-ttl-exact.json": "rtps-shape-fragments/answers/be-ttl-exact.json",
+        "common/pcapx/pcaputil/rtps-shape-fragments/captures/be-ttl-exact.pcap": "rtps-shape-fragments/captures/be-ttl-exact.pcap",
+        "common/pcapx/pcaputil/rtps-shape-fragments/answers/be-retry-no-refresh.json": "rtps-shape-fragments/answers/be-retry-no-refresh.json",
+        "common/pcapx/pcaputil/rtps-shape-fragments/captures/be-retry-no-refresh.pcap": "rtps-shape-fragments/captures/be-retry-no-refresh.pcap",
+        "common/pcapx/pcaputil/rtps-shape-fragments/answers/be-backdated.json": "rtps-shape-fragments/answers/be-backdated.json",
+        "common/pcapx/pcaputil/rtps-shape-fragments/captures/be-backdated.pcap": "rtps-shape-fragments/captures/be-backdated.pcap",
+        "common/pcapx/pcaputil/rtps-shape-fragments/answers/be-directions.json": "rtps-shape-fragments/answers/be-directions.json",
+        "common/pcapx/pcaputil/rtps-shape-fragments/captures/be-directions.pcap": "rtps-shape-fragments/captures/be-directions.pcap",
+        "common/pcapx/pcaputil/rtps-shape-fragments/answers/be-interleaved.json": "rtps-shape-fragments/answers/be-interleaved.json",
+        "common/pcapx/pcaputil/rtps-shape-fragments/captures/be-interleaved.pcap": "rtps-shape-fragments/captures/be-interleaved.pcap",
+        "common/pcapx/pcaputil/rtps-shape-fragments/answers/be-unselected-source.json": "rtps-shape-fragments/answers/be-unselected-source.json",
+        "common/pcapx/pcaputil/rtps-shape-fragments/captures/be-unselected-source.pcap": "rtps-shape-fragments/captures/be-unselected-source.pcap",
+        "common/pcapx/pcaputil/rtps-shape-fragments/answers/be-unselected-writer.json": "rtps-shape-fragments/answers/be-unselected-writer.json",
+        "common/pcapx/pcaputil/rtps-shape-fragments/captures/be-unselected-writer.pcap": "rtps-shape-fragments/captures/be-unselected-writer.pcap",
+        "common/pcapx/pcaputil/rtps-shape-fragments/answers/be-qos-timestamp.json": "rtps-shape-fragments/answers/be-qos-timestamp.json",
+        "common/pcapx/pcaputil/rtps-shape-fragments/captures/be-qos-timestamp.pcap": "rtps-shape-fragments/captures/be-qos-timestamp.pcap",
+        "common/pcapx/pcaputil/rtps-shape-fragments/answers/be-qos-conflict.json": "rtps-shape-fragments/answers/be-qos-conflict.json",
+        "common/pcapx/pcaputil/rtps-shape-fragments/captures/be-qos-conflict.pcap": "rtps-shape-fragments/captures/be-qos-conflict.pcap",
+        "common/pcapx/pcaputil/rtps-shape-fragments/answers/be-mixed-context.json": "rtps-shape-fragments/answers/be-mixed-context.json",
+        "common/pcapx/pcaputil/rtps-shape-fragments/captures/be-mixed-context.pcap": "rtps-shape-fragments/captures/be-mixed-context.pcap",
+        "common/pcapx/pcaputil/rtps-shape-fragments/answers/be-logical-destination-isolation.json": "rtps-shape-fragments/answers/be-logical-destination-isolation.json",
+        "common/pcapx/pcaputil/rtps-shape-fragments/captures/be-logical-destination-isolation.pcap": "rtps-shape-fragments/captures/be-logical-destination-isolation.pcap",
+        "common/pcapx/pcaputil/rtps-shape-fragments/answers/be-invalid-zero-start.json": "rtps-shape-fragments/answers/be-invalid-zero-start.json",
+        "common/pcapx/pcaputil/rtps-shape-fragments/captures/be-invalid-zero-start.pcap": "rtps-shape-fragments/captures/be-invalid-zero-start.pcap",
+        "common/pcapx/pcaputil/rtps-shape-fragments/answers/be-invalid-zero-count.json": "rtps-shape-fragments/answers/be-invalid-zero-count.json",
+        "common/pcapx/pcaputil/rtps-shape-fragments/captures/be-invalid-zero-count.pcap": "rtps-shape-fragments/captures/be-invalid-zero-count.pcap",
+        "common/pcapx/pcaputil/rtps-shape-fragments/answers/be-invalid-zero-size.json": "rtps-shape-fragments/answers/be-invalid-zero-size.json",
+        "common/pcapx/pcaputil/rtps-shape-fragments/captures/be-invalid-zero-size.pcap": "rtps-shape-fragments/captures/be-invalid-zero-size.pcap",
+        "common/pcapx/pcaputil/rtps-shape-fragments/answers/be-invalid-zero-total.json": "rtps-shape-fragments/answers/be-invalid-zero-total.json",
+        "common/pcapx/pcaputil/rtps-shape-fragments/captures/be-invalid-zero-total.pcap": "rtps-shape-fragments/captures/be-invalid-zero-total.pcap",
+        "common/pcapx/pcaputil/rtps-shape-fragments/answers/be-invalid-oversize-fragment.json": "rtps-shape-fragments/answers/be-invalid-oversize-fragment.json",
+        "common/pcapx/pcaputil/rtps-shape-fragments/captures/be-invalid-oversize-fragment.pcap": "rtps-shape-fragments/captures/be-invalid-oversize-fragment.pcap",
+        "common/pcapx/pcaputil/rtps-shape-fragments/answers/be-invalid-range-over.json": "rtps-shape-fragments/answers/be-invalid-range-over.json",
+        "common/pcapx/pcaputil/rtps-shape-fragments/captures/be-invalid-range-over.pcap": "rtps-shape-fragments/captures/be-invalid-range-over.pcap",
+        "common/pcapx/pcaputil/rtps-shape-fragments/answers/be-invalid-offset-small.json": "rtps-shape-fragments/answers/be-invalid-offset-small.json",
+        "common/pcapx/pcaputil/rtps-shape-fragments/captures/be-invalid-offset-small.pcap": "rtps-shape-fragments/captures/be-invalid-offset-small.pcap",
+        "common/pcapx/pcaputil/rtps-shape-fragments/answers/be-invalid-offset-unaligned.json": "rtps-shape-fragments/answers/be-invalid-offset-unaligned.json",
+        "common/pcapx/pcaputil/rtps-shape-fragments/captures/be-invalid-offset-unaligned.pcap": "rtps-shape-fragments/captures/be-invalid-offset-unaligned.pcap",
+        "common/pcapx/pcaputil/rtps-shape-fragments/answers/be-invalid-offset-out.json": "rtps-shape-fragments/answers/be-invalid-offset-out.json",
+        "common/pcapx/pcaputil/rtps-shape-fragments/captures/be-invalid-offset-out.pcap": "rtps-shape-fragments/captures/be-invalid-offset-out.pcap",
+        "common/pcapx/pcaputil/rtps-shape-fragments/answers/be-invalid-zero-seq.json": "rtps-shape-fragments/answers/be-invalid-zero-seq.json",
+        "common/pcapx/pcaputil/rtps-shape-fragments/captures/be-invalid-zero-seq.pcap": "rtps-shape-fragments/captures/be-invalid-zero-seq.pcap",
+        "common/pcapx/pcaputil/rtps-shape-fragments/answers/be-invalid-negative-seq.json": "rtps-shape-fragments/answers/be-invalid-negative-seq.json",
+        "common/pcapx/pcaputil/rtps-shape-fragments/captures/be-invalid-negative-seq.pcap": "rtps-shape-fragments/captures/be-invalid-negative-seq.pcap",
+        "common/pcapx/pcaputil/rtps-shape-fragments/answers/be-invalid-selected-capacity.json": "rtps-shape-fragments/answers/be-invalid-selected-capacity.json",
+        "common/pcapx/pcaputil/rtps-shape-fragments/captures/be-invalid-selected-capacity.pcap": "rtps-shape-fragments/captures/be-invalid-selected-capacity.pcap",
+        "common/pcapx/pcaputil/rtps-shape-fragments/answers/be-invalid-nonstandard.json": "rtps-shape-fragments/answers/be-invalid-nonstandard.json",
+        "common/pcapx/pcaputil/rtps-shape-fragments/captures/be-invalid-nonstandard.pcap": "rtps-shape-fragments/captures/be-invalid-nonstandard.pcap",
+        "common/pcapx/pcaputil/rtps-shape-fragments/answers/be-invalid-qos-must-understand.json": "rtps-shape-fragments/answers/be-invalid-qos-must-understand.json",
+        "common/pcapx/pcaputil/rtps-shape-fragments/captures/be-invalid-qos-must-understand.pcap": "rtps-shape-fragments/captures/be-invalid-qos-must-understand.pcap",
+        "common/pcapx/pcaputil/rtps-shape-fragments/answers/be-invalid-truncated.json": "rtps-shape-fragments/answers/be-invalid-truncated.json",
+        "common/pcapx/pcaputil/rtps-shape-fragments/captures/be-invalid-truncated.pcap": "rtps-shape-fragments/captures/be-invalid-truncated.pcap",
+        "common/pcapx/pcaputil/rtps-shape-fragments/answers/be-invalid-extra-four.json": "rtps-shape-fragments/answers/be-invalid-extra-four.json",
+        "common/pcapx/pcaputil/rtps-shape-fragments/captures/be-invalid-extra-four.pcap": "rtps-shape-fragments/captures/be-invalid-extra-four.pcap",
+        "common/pcapx/pcaputil/rtps-shape-fragments/answers/be-invalid-security.json": "rtps-shape-fragments/answers/be-invalid-security.json",
+        "common/pcapx/pcaputil/rtps-shape-fragments/captures/be-invalid-security.pcap": "rtps-shape-fragments/captures/be-invalid-security.pcap",
+        "common/pcapx/pcaputil/rtps-shape-fragments/answers/be-invalid-version3.json": "rtps-shape-fragments/answers/be-invalid-version3.json",
+        "common/pcapx/pcaputil/rtps-shape-fragments/captures/be-invalid-version3.pcap": "rtps-shape-fragments/captures/be-invalid-version3.pcap",
+        "common/pcapx/pcaputil/rtps-shape-fragments/answers/be-fragment-padding.json": "rtps-shape-fragments/answers/be-fragment-padding.json",
+        "common/pcapx/pcaputil/rtps-shape-fragments/captures/be-fragment-padding.pcap": "rtps-shape-fragments/captures/be-fragment-padding.pcap",
+        "common/pcapx/pcaputil/rtps-shape-fragments/answers/be-complete-representation.json": "rtps-shape-fragments/answers/be-complete-representation.json",
+        "common/pcapx/pcaputil/rtps-shape-fragments/captures/be-complete-representation.pcap": "rtps-shape-fragments/captures/be-complete-representation.pcap",
+        "common/pcapx/pcaputil/rtps-shape-fragments/answers/be-complete-bad-string.json": "rtps-shape-fragments/answers/be-complete-bad-string.json",
+        "common/pcapx/pcaputil/rtps-shape-fragments/captures/be-complete-bad-string.pcap": "rtps-shape-fragments/captures/be-complete-bad-string.pcap",
+        "common/pcapx/pcaputil/rtps-shape-fragments/answers/be-complete-bad-utf8.json": "rtps-shape-fragments/answers/be-complete-bad-utf8.json",
+        "common/pcapx/pcaputil/rtps-shape-fragments/captures/be-complete-bad-utf8.pcap": "rtps-shape-fragments/captures/be-complete-bad-utf8.pcap",
+        "common/pcapx/pcaputil/rtps-shape-fragments/answers/be-complete-trailing-fields.json": "rtps-shape-fragments/answers/be-complete-trailing-fields.json",
+        "common/pcapx/pcaputil/rtps-shape-fragments/captures/be-complete-trailing-fields.pcap": "rtps-shape-fragments/captures/be-complete-trailing-fields.pcap",
+        "common/pcapx/pcaputil/rtps-shape-fragments/answers/be-complete-wrong-key-data.json": "rtps-shape-fragments/answers/be-complete-wrong-key-data.json",
+        "common/pcapx/pcaputil/rtps-shape-fragments/captures/be-complete-wrong-key-data.pcap": "rtps-shape-fragments/captures/be-complete-wrong-key-data.pcap",
+        "common/pcapx/pcaputil/rtps-shape-fragments/answers/be-complete-unknown-options.json": "rtps-shape-fragments/answers/be-complete-unknown-options.json",
+        "common/pcapx/pcaputil/rtps-shape-fragments/captures/be-complete-unknown-options.pcap": "rtps-shape-fragments/captures/be-complete-unknown-options.pcap",
+        "common/pcapx/pcaputil/rtps-shape-fragments/answers/le-sequence-4294967295.json": "rtps-shape-fragments/answers/le-sequence-4294967295.json",
+        "common/pcapx/pcaputil/rtps-shape-fragments/captures/le-sequence-4294967295.pcap": "rtps-shape-fragments/captures/le-sequence-4294967295.pcap",
+        "common/pcapx/pcaputil/rtps-shape-fragments/answers/le-sequence-4294967296.json": "rtps-shape-fragments/answers/le-sequence-4294967296.json",
+        "common/pcapx/pcaputil/rtps-shape-fragments/captures/le-sequence-4294967296.pcap": "rtps-shape-fragments/captures/le-sequence-4294967296.pcap",
+        "common/pcapx/pcaputil/rtps-shape-fragments/answers/le-sequence-9223372036854775807.json": "rtps-shape-fragments/answers/le-sequence-9223372036854775807.json",
+        "common/pcapx/pcaputil/rtps-shape-fragments/captures/le-sequence-9223372036854775807.pcap": "rtps-shape-fragments/captures/le-sequence-9223372036854775807.pcap",
+        "common/pcapx/pcaputil/rtps-shape-fragments/answers/le-one-byte-fragments.json": "rtps-shape-fragments/answers/le-one-byte-fragments.json",
+        "common/pcapx/pcaputil/rtps-shape-fragments/captures/le-one-byte-fragments.pcap": "rtps-shape-fragments/captures/le-one-byte-fragments.pcap",
+        "common/pcapx/pcaputil/rtps-shape-fragments/answers/le-wire24-complete.json": "rtps-shape-fragments/answers/le-wire24-complete.json",
+        "common/pcapx/pcaputil/rtps-shape-fragments/captures/le-wire24-complete.pcap": "rtps-shape-fragments/captures/le-wire24-complete.pcap",
+        "common/pcapx/pcaputil/rtps-shape-fragments/answers/be-sequence-4294967295.json": "rtps-shape-fragments/answers/be-sequence-4294967295.json",
+        "common/pcapx/pcaputil/rtps-shape-fragments/captures/be-sequence-4294967295.pcap": "rtps-shape-fragments/captures/be-sequence-4294967295.pcap",
+        "common/pcapx/pcaputil/rtps-shape-fragments/answers/be-sequence-4294967296.json": "rtps-shape-fragments/answers/be-sequence-4294967296.json",
+        "common/pcapx/pcaputil/rtps-shape-fragments/captures/be-sequence-4294967296.pcap": "rtps-shape-fragments/captures/be-sequence-4294967296.pcap",
+        "common/pcapx/pcaputil/rtps-shape-fragments/answers/be-sequence-9223372036854775807.json": "rtps-shape-fragments/answers/be-sequence-9223372036854775807.json",
+        "common/pcapx/pcaputil/rtps-shape-fragments/captures/be-sequence-9223372036854775807.pcap": "rtps-shape-fragments/captures/be-sequence-9223372036854775807.pcap",
+        "common/pcapx/pcaputil/rtps-shape-fragments/answers/be-one-byte-fragments.json": "rtps-shape-fragments/answers/be-one-byte-fragments.json",
+        "common/pcapx/pcaputil/rtps-shape-fragments/captures/be-one-byte-fragments.pcap": "rtps-shape-fragments/captures/be-one-byte-fragments.pcap",
+        "common/pcapx/pcaputil/rtps-shape-fragments/answers/be-wire24-complete.json": "rtps-shape-fragments/answers/be-wire24-complete.json",
+        "common/pcapx/pcaputil/rtps-shape-fragments/captures/be-wire24-complete.pcap": "rtps-shape-fragments/captures/be-wire24-complete.pcap",
+        "common/pcapx/pcaputil/rtps-shape-fragments/manifest.json": "rtps-shape-fragments/manifest.json",
+        "common/pcapx/pcaputil/rtps-shape-fragments/generate.py": "rtps-shape-fragments/generate.py",
+        "common/pcapx/pcaputil/rtps-shape-fragments/verify.py": "rtps-shape-fragments/verify.py",
+        "common/pcapx/pcaputil/rtps-shape-fragments/SOURCE.json": "rtps-shape-fragments/SOURCE.json",
+        "common/pcapx/pcaputil/rtps-shape-fragments/seal.py": "rtps-shape-fragments/seal.py",
+        "scripts/protocol-tests/required-tests-traffic-unified-v36.json": "required-tests-traffic-unified-v36.json"
+      }
     }
   ],
   "schema_version": 1,

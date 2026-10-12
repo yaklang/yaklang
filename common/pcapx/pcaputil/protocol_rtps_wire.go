@@ -11,6 +11,10 @@ import (
 // schema selection. Payload and key octets are owned observations; decoding a
 // known type will require explicit context, never a guess from entity IDs.
 func rtpsWireData(body []byte, flags byte, order binary.ByteOrder, remaining *int, depth int) (map[string]any, error) {
+	return rtpsWireDataDetails(body, flags, order, remaining, depth, nil)
+}
+
+func rtpsWireDataDetails(body []byte, flags byte, order binary.ByteOrder, remaining *int, depth int, fragment *rtpsDataFragment) (map[string]any, error) {
 	if flags&12 == 12 {
 		return nil, rtpsMalformed("DATA and KEY flags are both set")
 	}
@@ -37,9 +41,15 @@ func rtpsWireData(body []byte, flags byte, order binary.ByteOrder, remaining *in
 		if depth < 5 {
 			return nil, protocolError(ErrResourceExceeded, "RTPS DATA QoS projection exceeds depth budget")
 		}
+		before := *remaining
 		params, used, err := rtpsParameters(body[at:], order, remaining)
 		if err != nil {
 			return nil, err
+		}
+		if fragment != nil {
+			fragment.qosElements = before - *remaining
+			fragment.qos = params
+			fragment.qosWire = body[at : at+used]
 		}
 		var qos []map[string]any
 		for _, p := range params {
@@ -62,6 +72,14 @@ func rtpsWireData(body []byte, flags byte, order binary.ByteOrder, remaining *in
 	d["Representation Options"] = binary.BigEndian.Uint16(body[at+2:])
 	d["Serialized Payload"] = bytes.Clone(body[at:])
 	d["Serialization"] = "opaque-application-data"
+	if fragment != nil {
+		fragment.fullData, fragment.keyOnly = true, flags&8 != 0
+		fragment.reader, fragment.writer = hex.EncodeToString(body[4:8]), hex.EncodeToString(body[8:12])
+		fragment.sequence = sequence
+		fragment.start, fragment.count = 1, 1
+		fragment.payload = body[at:]
+		fragment.size, fragment.total = uint32(len(fragment.payload)), uint32(len(fragment.payload))
+	}
 	return d, nil
 }
 

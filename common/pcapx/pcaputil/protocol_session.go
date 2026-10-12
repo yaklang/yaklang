@@ -174,7 +174,7 @@ func NewProtocolSessionWithOptions(budget ParserBudget, options ...ProtocolSessi
 		if (profile == "rtps-control" || profile == "rtps-wire") && s.transport != "udp" {
 			return nil, fmt.Errorf("RTPS control observation requires a UDP session")
 		}
-		if profile == "rtps-spdp-fragments" && s.transport != "udp" {
+		if (profile == "rtps-spdp-fragments" || profile == "rtps-shape-fragments") && s.transport != "udp" {
 			return nil, fmt.Errorf("RTPS fragment observation requires a UDP session")
 		}
 	}
@@ -216,6 +216,9 @@ func NewDecryptedQUICSession(budget ParserBudget, source string) (ProtocolSessio
 
 func (s *captureSession) Probe(data []byte) ProbeResult {
 	if s.transport == "udp" {
+		if p, ok := s.probeRTPSShapeFragments(data); ok {
+			return p
+		}
 		if p, ok := s.probeRTPSWire(data); ok {
 			return p
 		}

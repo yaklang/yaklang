@@ -419,6 +419,7 @@ type binParser struct {
 	semtechSessions                                                            *binUDPStore       // udpMu; token quarantine must survive unrelated UDP expiry
 	aisMultipart                                                               *aisMultipartStore // udpMu; directed, capture-domain fragment history
 	rtpsFragments                                                              *rtpsFragmentStore // udpMu; directed domain/sample history
+	rtpsShapeFragments                                                         *rtpsFragmentStore // udpMu; separately selected application sample history
 	aisMultipartDisabled                                                       bool               // udpMu; untracked history fails closed
 	datagramDecodeAs                                                           map[uint16]string
 	rtpsShapeWriters                                                           map[uint16]RTPSShapeWriter
