@@ -45,8 +45,13 @@ NEG
 ${/\.(js|jsx|ts|tsx)$/}.pattern_regex(/\bws:\/\//) as $t
 ${/\.(js|jsx|ts|tsx)$/}.pattern_regex(/\bws:\/\/localhost.*/) as $j1
 ${/\.(js|jsx|ts|tsx)$/}.pattern_regex(/\bws:\/\/127\.0\.0\.1.*/) as $j2
+// 排除 UI 文案/本地化文件中的命中：这些文件通常只包含用户可见字符串而非真实连接。
+// 这里通过内容上下文过滤（中文字符或文案帮助字段）来减少误报；
+// syntaxflow 本身不支持按目录路径排除 locales/。
+${/\.(js|jsx|ts|tsx)$/}.pattern_regex(/[\u4e00-\u9fa5]|plaintextUrl|urlHelp|HelpText|helpText/) as $uiText
 $t not_inside $j1 as $a
-$a not_inside $j2 as $hit
+$a not_inside $j2 as $b
+$b not_inside $uiText as $hit
 alert $hit for {
 	level: "middle",
 	title: "检测到不安全的 WebSocket 连接",
