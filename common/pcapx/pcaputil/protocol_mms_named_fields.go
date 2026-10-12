@@ -2,9 +2,9 @@ package pcaputil
 
 // Named-list observations preserve literal names and wire results. A matching
 // observed definition/lookup is required before resolving a later Read/Write.
-func mmsListMembers(n mmsBER) ([]map[string]any, error) {
+func (c *mmsValueContext) listMembers(n mmsBER, d *mmsDecoded) ([]map[string]any, error) {
 	n.tag = 0xa0
-	return mmsVariableNames(mmsBER{children: []mmsBER{n}}, true)
+	return c.variableEntries(n, d)
 }
 func (c *mmsValueContext) namedService(s mmsBER, d *mmsDecoded) error {
 	switch d.service {
@@ -23,7 +23,7 @@ func (c *mmsValueContext) namedService(s mmsBER, d *mmsDecoded) error {
 		if err != nil {
 			return err
 		}
-		names, err := mmsListMembers(s.children[1])
+		names, err := c.listMembers(s.children[1], d)
 		if err != nil {
 			return err
 		}
@@ -51,7 +51,7 @@ func (c *mmsValueContext) namedService(s mmsBER, d *mmsDecoded) error {
 			return err
 		}
 		ls, _ := mmsChild(s, 0xa1)
-		names, err := mmsListMembers(ls)
+		names, err := c.listMembers(ls, d)
 		if err != nil {
 			return err
 		}
@@ -117,7 +117,7 @@ func (c *mmsValueContext) namedService(s mmsBER, d *mmsDecoded) error {
 }
 func (c *mmsValueContext) variableAccess(choice mmsBER, d *mmsDecoded) ([]map[string]any, error) {
 	if choice.tag == 0xa0 {
-		return mmsVariableNames(mmsBER{children: []mmsBER{choice}}, true)
+		return c.variableEntries(choice, d)
 	}
 	if choice.tag != 0xa1 {
 		return nil, protocolError(ErrUnsupportedFeature, "MMS VariableAccessSpecification choice")
@@ -141,7 +141,7 @@ func (c *mmsValueContext) variableAccess(choice mmsBER, d *mmsDecoded) ([]map[st
 	}
 	units := 0
 	for _, name := range entry.names {
-		units += 1 + len(name)
+		units += mmsSelectorUnits(name)
 		if tags, ok := name["Component Tags"].([]byte); ok {
 			units += len(tags)
 		}

@@ -137,6 +137,28 @@ func mmsSingleChild(n mmsBER) (mmsBER, error) {
 	return n.children[0], nil
 }
 func mmsSelectedFields(n mmsBER, d *mmsDecoded, values *mmsValueContext) error {
+	if values != nil && d.tag == 0xa0 && d.service == 6 {
+		s := n.children[1]
+		child, err := mmsSingleChild(s)
+		if err != nil {
+			return err
+		}
+		if child.tag == 0xa1 {
+			selected, err := mmsSingleChild(child)
+			if err != nil {
+				return err
+			}
+			address, err := mmsAddress(selected)
+			if err != nil {
+				return err
+			}
+			d.fields["Address"] = address
+			return nil
+		}
+		if child.tag != 0xa0 {
+			return protocolError(ErrUnsupportedFeature, "MMS GetVariableAccessAttributes selector")
+		}
+	}
 	if values != nil && (d.tag == 0xa0 || d.tag == 0xa1) && d.service >= 11 && d.service <= 13 {
 		return values.namedService(n.children[1], d)
 	}
@@ -280,7 +302,7 @@ func mmsSelectedFields(n mmsBER, d *mmsDecoded, values *mmsValueContext) error {
 						d.fields["Variable List"] = f
 						continue
 					}
-					names, err := mmsVariableNames(c, true)
+					names, err := values.variableEntries(choice, d)
 					if err != nil {
 						return err
 					}

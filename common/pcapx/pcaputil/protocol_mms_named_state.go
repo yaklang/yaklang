@@ -47,7 +47,7 @@ func mmsNamesEqual(a, b []map[string]any) bool {
 		return false
 	}
 	for i := range a {
-		if mmsKey(a[i]) != mmsKey(b[i]) {
+		if !mmsEntriesEqual(a[i], b[i]) {
 			return false
 		}
 	}
@@ -65,6 +65,10 @@ func (k mmsListKey) fields() map[string]any {
 func mmsNamesStorage(names []map[string]any) int64 {
 	var n int64
 	for _, row := range names {
+		if _, extended := row["Variable Choice Tag"]; extended {
+			n += mmsSelectorStorage(row)
+			continue
+		}
 		n += 256
 		for _, v := range row {
 			if text, ok := v.(string); ok {
@@ -79,6 +83,15 @@ func mmsQueryStorage(q map[string]any) int64 {
 		return 0
 	}
 	n := int64(512)
+	if address, ok := q["Address"].(map[string]any); ok {
+		n += 256
+		if v, ok := address["Symbolic"].(string); ok {
+			n += int64(len(v))
+		}
+		if v, ok := address["Bytes"].([]byte); ok {
+			n += int64(len(v))
+		}
+	}
 	if s, ok := q["Continue After"].(string); ok {
 		n += int64(len(s))
 	}
@@ -129,20 +142,20 @@ func (m *binMMS) namedElements(skipDir int, skipInvoke uint32) int {
 	n := len(m.listVersions[0]) + len(m.listVersions[1])
 	for dir := 0; dir < 2; dir++ {
 		for _, x := range m.lists[dir] {
-			n += len(x.names)
+			n += mmsEntryHistoryUnits(x.names)
 		}
 		for id, p := range m.pending[dir] {
 			if dir == skipDir && id == skipInvoke || p.control == nil {
 				continue
 			}
-			n += len(p.names)
+			n += mmsEntryHistoryUnits(p.names)
 			if p.control.previous != nil {
-				n += len(p.control.previous.names)
+				n += mmsEntryHistoryUnits(p.control.previous.names)
 			}
 			n += len(p.control.targets)
 			for _, t := range p.control.targets {
 				if t.previous != nil {
-					n += len(t.previous.names)
+					n += mmsEntryHistoryUnits(t.previous.names)
 				}
 			}
 		}
@@ -241,7 +254,7 @@ func (f *binFlow) namedMMSRequest(d mmsDecoded, p *mmsPending, dir int) error {
 		}
 		if d.service == 11 {
 			names := d.fields["Variables"].([]map[string]any)
-			if m.namedElements(-1, 0)+len(names)+len(m.pending[0])+len(m.pending[1])+len(m.retired[0])+len(m.retired[1]) > f.a.budget.MaxCollectionElements {
+			if m.namedElements(-1, 0)+mmsEntryHistoryUnits(names)+len(m.pending[0])+len(m.pending[1])+len(m.retired[0])+len(m.retired[1]) > f.a.budget.MaxCollectionElements {
 				return protocolError(ErrResourceExceeded, "MMS named-list member context budget")
 			}
 			if err := f.mmsReserve(f.sessionBytes + 512 + 2*mmsNamesStorage(names)); err != nil {
@@ -310,7 +323,7 @@ func (f *binFlow) namedMMSRequest(d mmsDecoded, p *mmsPending, dir int) error {
 func (f *binFlow) installMMSList(peer int, key mmsListKey, names []map[string]any, event uint64, dir int, invoke uint32, transfer bool) error {
 	m := f.mms
 	old := m.lists[peer][key]
-	if m.namedElements(dir, invoke)-len(old.names)+len(names)+len(m.pending[0])+len(m.pending[1])+len(m.retired[0])+len(m.retired[1]) > f.a.budget.MaxCollectionElements {
+	if m.namedElements(dir, invoke)-mmsEntryHistoryUnits(old.names)+mmsEntryHistoryUnits(names)+len(m.pending[0])+len(m.pending[1])+len(m.retired[0])+len(m.retired[1]) > f.a.budget.MaxCollectionElements {
 		return protocolError(ErrResourceExceeded, "MMS retained list members budget")
 	}
 	if !transfer {

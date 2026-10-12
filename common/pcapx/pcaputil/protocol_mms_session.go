@@ -396,6 +396,11 @@ func (m *binMMS) applyMMS(d mmsDecoded, dir int, e *ProtocolEvent, limit int, ca
 			return protocolError(ErrResourceExceeded, "MMS outstanding/history budget")
 		}
 		p := mmsPending{event: e.ID, service: d.service, items: d.items}
+		if m.values && d.service == 6 {
+			if address, ok := d.fields["Address"]; ok {
+				p.query = map[string]any{"Address": cloneSessionValue(address)}
+			}
+		}
 		if m.values && d.service == 1 {
 			p.query = map[string]any{"Object Class": d.fields["Object Class"], "Object Scope": cloneSessionValue(d.fields["Object Scope"])}
 			if after, ok := d.fields["Continue After"]; ok {
@@ -451,7 +456,7 @@ func (m *binMMS) applyMMS(d mmsDecoded, dir int, e *ProtocolEvent, limit int, ca
 				return err
 			}
 		}
-		if m.values && p.service == 1 {
+		if m.values && (p.service == 1 || p.service == 6 && p.query != nil) {
 			d.fields["Observed Request Query"] = cloneSession(p.query)
 		}
 		if m.values && p.service == 5 {

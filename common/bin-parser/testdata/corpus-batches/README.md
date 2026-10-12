@@ -44,7 +44,7 @@ Run from the repository root:
 ```sh
 go run ./internal/trafficfixture/cmd/corpus test
 go test -json -count=1 -timeout=5m ./internal/trafficfixture/... ./common/bin-parser/... ./common/pcapx/... ./common/yak/cmd/yakcmds/shark-cli ./scripts/ci > traffic.jsonl
-go run ./internal/trafficfixture/cmd/corpus exec -- python3 @scripts/protocol-tests/check_go_test_json_v2.py traffic.jsonl --inventory @scripts/protocol-tests/required-tests-traffic-unified-v43.json --tier full
+go run ./internal/trafficfixture/cmd/corpus exec -- python3 @scripts/protocol-tests/check_go_test_json_v2.py traffic.jsonl --inventory @scripts/protocol-tests/required-tests-traffic-unified-v44.json --tier full
 ```
 
 The single `corpus` entry point uses the same bounded Go ZIP loader as tests.
@@ -83,7 +83,7 @@ their semantic coverage. The existing synthetic session keys are test inputs;
 production credentials, user private keys and material without redistribution
 permission belong in an external fixed-source download manifest.
 
-Current test requirements are sealed at `scripts/protocol-tests/required-tests-traffic-unified-v43.json`;
+Current test requirements are sealed at `scripts/protocol-tests/required-tests-traffic-unified-v44.json`;
 the historical inventories and all earlier batches remain unchanged.
 The supplemental small-corpus batch contains 26 minimal controls, their explicit
 expected facts, an offline generator and the compact pinned source manifest.
@@ -203,7 +203,7 @@ opaque selector bytes and one bounded Data value over Wrapper v1 TCP/UDP; object
 selector meaning, access permission and device operation are unverified. The
 original one-packet selective-access capture and original refused answer remain
 immutable; its now-supported answer is matched by exact input SHA and frame.
-The active inventory is `scripts/protocol-tests/required-tests-traffic-unified-v43.json`.
+The active inventory is `scripts/protocol-tests/required-tests-traffic-unified-v44.json`.
 
 The small-graph budget batch reuses accepted graph captures/answers and adds one
 249-byte UDP control for child count255 without child bytes. Its standalone proof
@@ -993,7 +993,7 @@ the normative answer; a missing numeric reference field is not a codec pass.
 Full/deferred, workers1/2/4, observers off/on, Feed chunks1/7/full, ownership,
 resources and close/refusal boundaries remain required.
 
-Current gate: `required-tests-traffic-unified-v43.json` with
+Current gate: `required-tests-traffic-unified-v44.json` with
 `check_go_test_json_v2.py`. The indexed validator preserves missing/unpassed,
 package invocation completion, descendant skips, failures and non-JSON checks;
 its mutation/differential harness is sealed with the material. Older checkers
@@ -1006,3 +1006,26 @@ The current MMS service-values profile also observes named-list Define11/GetAttr
 Delete requests quarantine matching observations. Reported zero deletion restores unchanged prior context; positive, partial or unspecified effects invalidate matching observations again at the reply, including newer proofs while the operation was pending. Conflicting schema generations produce typed context refusals; aggregate counts never identify which individual list survived. Same-value primitive and definite constructed ObjectName identifiers compare by typed name value while raw BER/encoding markers stay owned. X.690 character-string segments use OCTET STRING04/24; nonstandard nested VisibleString1A forms are explicit negative cases, irrespective of reference-codec tolerance. Definite BER only, directly named members only; alternate access/address members, other services, indefinite BER, authentication, complete/current device namespace and physical execution remain unimplemented or unqualified.
 
 The `mms-named-lists` aliases seal133 authored minimum inputs/answers and fixed-source/generation/verification scripts plus current v43 requirements. Full upstream code/PDFs, original downloads and process evidence remain outside Git; history is immutable.
+
+
+The current explicit MMS services/values profile also observes `Address` numeric,
+VisibleString and opaque-octet selectors, including definite constructed strings,
+and the name/address/variableDescription/invalidated VariableSpecification choices
+in direct Read/Write and named-list definition/lookup. Names keep their prior field
+shape; other choices carry `Variable Choice Tag`, literal Address and optional
+Type Specification. Ordered returned specifications must match the privately
+accepted selector/declaration content; allowed string segmentation does not change
+identity. Retained nested metadata charges shared byte/count budgets before derived
+projection. These are passive wire declarations, without verified namespace/memory
+layout, declaration-to-Data conformance or physical execution. Alternate/scattered
+access, BCD size interpretation and original device/oracle gaps remain pending.
+
+`validation-mms-access-selectors.zip` seals106 content-new authored captures and
+complete answers in682232 bytes (SHA256
+`da79337761e1585e0855c9b687663942a3397010dbf6cecd9217c49d8508e028`).
+The106-case matrix covers full/deferred, workers1/2/4, observer-off/on and Feed1/7/full.
+Independent regeneration checks complete selected fields/Session/order/IDs/raw/error
+semantics. TShark4.2.5 selected-field comparison separately records unsigned displays
+and six missing leaves in four legal empty constructed address cases; absent codec
+leaves are not reported as actual decoded agreement. All139 prior ZIPs remain unchanged.
+The latest mandatory inventory is v44; historical inventories remain available.

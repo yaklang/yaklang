@@ -484,24 +484,9 @@ func (c *mmsValueContext) service(n mmsBER, d *mmsDecoded) error {
 				if e != nil {
 					return e
 				}
-				f := map[string]any{"Choice Tag": address.tag}
-				switch address.tag {
-				case 0x80:
-					num, e := mmsUInt(address, 32)
-					if e != nil {
-						return e
-					}
-					f["Numeric"] = num
-				case 0x81:
-					text, e := mmsVisible(address.body)
-					if e != nil {
-						return e
-					}
-					f["Symbolic"] = text
-				case 0x82:
-					f["Bytes"] = bytes.Clone(address.body)
-				default:
-					return protocolError(ErrUnsupportedFeature, "MMS Address choice")
+				f, e := mmsAddress(address)
+				if e != nil {
+					return e
 				}
 				d.fields["Address"] = f
 			}
@@ -510,4 +495,60 @@ func (c *mmsValueContext) service(n mmsBER, d *mmsDecoded) error {
 		return protocolError(ErrFatalSessionError, "MMS internal service selection")
 	}
 	return nil
+}
+
+// Addresses are observed selectors, not verified device locations or permissions.
+func mmsAddress(n mmsBER) (map[string]any, error) {
+	f := map[string]any{"Choice Tag": n.tag}
+	switch n.tag {
+	case 0x80:
+		value, err := mmsUInt(n, 32)
+		if err != nil {
+			return nil, err
+		}
+		f["Numeric"] = value
+	case 0x81:
+		value, err := mmsVisible(n.body)
+		if err != nil {
+			return nil, err
+		}
+		f["Symbolic"] = value
+	case 0x82:
+		f["Bytes"] = bytes.Clone(n.body)
+	case 0xa1, 0xa2:
+		joined := make([]byte, 0, len(n.body))
+		var collect func(mmsBER) error
+		collect = func(v mmsBER) error {
+			if v.tag == 4 {
+				joined = append(joined, v.body...)
+				return nil
+			}
+			if v.tag != 0x24 {
+				return protocolError(ErrMalformedMessage, "MMS constructed Address OCTET STRING segment")
+			}
+			for _, child := range v.children {
+				if err := collect(child); err != nil {
+					return err
+				}
+			}
+			return nil
+		}
+		for _, child := range n.children {
+			if err := collect(child); err != nil {
+				return nil, err
+			}
+		}
+		if n.tag == 0xa1 {
+			value, err := mmsVisible(joined)
+			if err != nil {
+				return nil, err
+			}
+			f["Symbolic"] = value
+		} else {
+			f["Bytes"] = bytes.Clone(joined)
+		}
+	default:
+		return nil, protocolError(ErrUnsupportedFeature, "MMS Address choice")
+	}
+	return f, nil
 }
