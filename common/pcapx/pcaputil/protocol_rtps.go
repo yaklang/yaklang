@@ -64,6 +64,9 @@ func rtpsParameters(w []byte, order binary.ByteOrder, remaining *int) ([]rtpsPar
 }
 
 func decodeRTPSDatagram(w []byte, maxElements int) (map[string]any, error) {
+	if rtpsDatagramHeader(w) && w[5] == 0 {
+		return decodeRTPS20Datagram(w, maxElements)
+	}
 	var fragments []rtpsDataFragment
 	remaining := maxElements
 	out, err := decodeRTPSSelectedDatagram(w, maxElements, &fragments, &remaining)

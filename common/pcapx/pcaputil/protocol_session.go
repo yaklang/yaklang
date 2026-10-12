@@ -213,6 +213,9 @@ func NewDecryptedQUICSession(budget ParserBudget, source string) (ProtocolSessio
 
 func (s *captureSession) Probe(data []byte) ProbeResult {
 	if s.transport == "udp" {
+		if p, ok := s.probeRTPS20(data); ok {
+			return p
+		}
 		if p, ok := s.probeRTPSFragments(data); ok {
 			return p
 		}

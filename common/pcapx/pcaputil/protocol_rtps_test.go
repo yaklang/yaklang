@@ -184,7 +184,7 @@ func testRTPSSealedReplay(t *testing.T, cases []rtpsControl) {
 										require.NoError(t, err)
 										require.JSONEq(t, string(b), string(session))
 										f["Observation"] = "caller-mutated"
-										require.Equal(t, "unverified-participant", e.Session["Observation"])
+										require.Equal(t, answer.Fields["Observation"], e.Session["Observation"])
 										mutateRTPSQuery(f)
 										tree, queryErr := e.Decode()
 										require.NoError(t, queryErr)

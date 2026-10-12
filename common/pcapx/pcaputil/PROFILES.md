@@ -348,3 +348,12 @@ The default envelope observer remains permissive. These checks certify observed
 wire consistency, not cryptographic replay protection under SecurityPolicy None.
 
 RTPS SPDP also supports complete same-datagram DATA_FRAG sets. The opt-in `rtps-spdp-fragments` UDP profile observes bounded cross-datagram sample ranges and regular DATA replacement under directed endpoint, capture-domain and logical writer/reader/sequence context. It accepts consistent out-of-order and repeated ranges, rejects conflicts, retains capture-lifetime retired identities, and applies a 30-second pending deadline without retry extension. Raw/SourceBytes remain literal current-datagram evidence; reconstructed Serialized Payload and Fragment Event IDs are per-change fields. Byte/count/depth budgets, refusal retirement, ownership and Close release apply. This is not a DDS reader reliability, authentication, application schema or security implementation.
+
+
+Native RTPS2.0 UDP observations use the DATA/NOKEY_DATA layout from
+formal/2008-04-09, including the always-present keyed DATA suffix, optional key
+prefix/status, ordered literal QoS parameters and bounded opaque CDR/PL_CDR.
+The fields report unverified data-object claims. They preserve both sequence
+words exactly, keep logical receiver context within one message, and do not
+infer application values, reliable delivery or a DDS session. RTPS1.3 and the
+remaining legacy/reliable control and schema functions require separate work.
