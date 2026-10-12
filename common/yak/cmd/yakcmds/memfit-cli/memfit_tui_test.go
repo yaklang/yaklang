@@ -11,7 +11,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mattn/go-runewidth"
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/schema"
 )
@@ -27,11 +26,11 @@ func TestMemfitSanitizeTerminalText(t *testing.T) {
 func TestMemfitInputViewportPreservesWideAndMultilineInput(t *testing.T) {
 	buffer := []rune("你好\nworld-very-long-tail")
 	text, cursor := memfitInputViewport(buffer, len(buffer), 12)
-	require.LessOrEqual(t, runewidth.StringWidth(text), 12)
+	require.LessOrEqual(t, memfitStringWidth(text), 12)
 	require.Contains(t, text, "tail")
-	require.GreaterOrEqual(t, runewidth.StringWidth(text), 10)
+	require.GreaterOrEqual(t, memfitStringWidth(text), 10)
 	require.GreaterOrEqual(t, cursor, 0)
-	require.LessOrEqual(t, cursor, runewidth.StringWidth(text))
+	require.LessOrEqual(t, cursor, memfitStringWidth(text))
 
 	text, _ = memfitInputViewport([]rune("a\nb"), 2, 20)
 	require.Equal(t, "a↵b", text)
@@ -203,7 +202,7 @@ func TestMemfitWrapCellsPreservesWideRunesAndLineBreaks(t *testing.T) {
 	lines := wrapMemfitCells("abcdef\n你好世界", 5)
 	require.Equal(t, []string{"abcde", "f", "你好", "世界"}, lines)
 	for _, line := range lines {
-		require.LessOrEqual(t, runewidth.StringWidth(line), 5)
+		require.LessOrEqual(t, memfitStringWidth(line), 5)
 	}
 	require.Equal(t,
 		[]string{"Use a tool", "to read", "README.md"},
