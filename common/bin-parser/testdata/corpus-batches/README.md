@@ -44,7 +44,7 @@ Run from the repository root:
 ```sh
 go run ./internal/trafficfixture/cmd/corpus test
 go test -json -count=1 -timeout=5m ./internal/trafficfixture/... ./common/bin-parser/... ./common/pcapx/... ./common/yak/cmd/yakcmds/shark-cli ./scripts/ci > traffic.jsonl
-go run ./internal/trafficfixture/cmd/corpus exec -- python3 @scripts/protocol-tests/check_go_test_json.py traffic.jsonl --inventory @scripts/protocol-tests/required-tests-traffic-unified-v36.json --tier full
+go run ./internal/trafficfixture/cmd/corpus exec -- python3 @scripts/protocol-tests/check_go_test_json.py traffic.jsonl --inventory @scripts/protocol-tests/required-tests-traffic-unified-v37.json --tier full
 ```
 
 The single `corpus` entry point uses the same bounded Go ZIP loader as tests.
@@ -83,7 +83,7 @@ their semantic coverage. The existing synthetic session keys are test inputs;
 production credentials, user private keys and material without redistribution
 permission belong in an external fixed-source download manifest.
 
-Current test requirements are sealed at `scripts/protocol-tests/required-tests-traffic-unified-v36.json`;
+Current test requirements are sealed at `scripts/protocol-tests/required-tests-traffic-unified-v37.json`;
 the historical inventories and all earlier batches remain unchanged.
 The supplemental small-corpus batch contains 26 minimal controls, their explicit
 expected facts, an offline generator and the compact pinned source manifest.
@@ -96,7 +96,7 @@ byte-boundary, malformed-length and ownership tests. These are scoped control
 assertions, not a semantic golden for the entire upstream collection. Process
 logs and the original large downloads remain outside the repository.
 
-The local acceptance inventory is `required-tests-traffic-unified-v36.json`. The published workflow gate currently references v25; v26 adds Call requirements, v27 adds scalar arrays and v28 adds extended builtin fields and v29 adds bounded value graphs and complete diagnostic wire fields; v30 adds message-local RTPS INFO_SRC/INFO_DST context, v31 bounded SPDP fragments and owned answer-cache requirements, and v32 legacy RTPS2.0 DATA wire, budget, lifecycle and ownership requirements. Older
+The local acceptance inventory is `required-tests-traffic-unified-v37.json`. The published workflow gate currently references v25; v26 adds Call requirements, v27 adds scalar arrays and v28 adds extended builtin fields and v29 adds bounded value graphs and complete diagnostic wire fields; v30 adds message-local RTPS INFO_SRC/INFO_DST context, v31 bounded SPDP fragments and owned answer-cache requirements, and v32 legacy RTPS2.0 DATA wire, budget, lifecycle and ownership requirements. Older
 versioned inventories stay available as historical inputs; they are not the
 current acceptance entry. The DLMS HDLC batch contains owned tunnel/Get-normal
 controls and their independent fields/errors, CRC/byte validator, offline
@@ -203,7 +203,7 @@ opaque selector bytes and one bounded Data value over Wrapper v1 TCP/UDP; object
 selector meaning, access permission and device operation are unverified. The
 original one-packet selective-access capture and original refused answer remain
 immutable; its now-supported answer is matched by exact input SHA and frame.
-The active inventory is `scripts/protocol-tests/required-tests-traffic-unified-v36.json`.
+The active inventory is `scripts/protocol-tests/required-tests-traffic-unified-v37.json`.
 
 The small-graph budget batch reuses accepted graph captures/answers and adds one
 249-byte UDP control for child count255 without child bytes. Its standalone proof
@@ -827,3 +827,43 @@ observer-off/on replay combinations compare full fields/Session/errors/contribut
 raw original captures, arbitrary schemas/CDR2/security and DDS reliability remain
 unfinished requirements. The active local acceptance inventory is v36; historical
 ZIPs and their answers/inventories are immutable. No rules changed in this batch.
+
+
+`validation-rtps13-wire.zip` adds190 authored minimal RTPS1.3 UDP scenarios for
+explicit `rtps13-wire` ingress / `WithSessionRTPS13Wire`. The16-byte header and
+8-byte reported prefixes, hash-before-sequence DATA, NOKEY opaque bytes,
+ACKNACK/GAP/HEARTBEAT and literal INFO_TS/SRC/DST are separate from2.x layouts.
+All messages preserve order, message-local receiver context, timestamp resets,
+raw sequence high/low words (including zero/UNKNOWN), signed counter views and
+owned payload/parameter/bitmap bytes. No endpoint association or transaction ID
+is inferred. Reported1.0–1.2 source INFO claims can be observed; their following
+DATA/control layout still requires independently selected context.
+
+The legacy parameter cursor follows declared lengths without importing2.x
+length alignment or must-understand masks. PAD and repeated IDs remain ordered;
+extended-ID encodings remain unselected. The byte observer advances by literal
+legacy submessage lengths; it does not infer physical receiver acceptance from
+an aligned or unaligned header. Selected bitmaps are bounded to256 bits by a
+local ResourceExceeded capacity policy. ACK Count is selected only for an exact
+four-byte tail; longer tails remain `Uninterpreted Counter Tail Bytes` instead
+of guessed counters. These are wire observations, not QoS negotiation,
+application type/CDR validation, DDS reliable state, authentication or delivery.
+
+Fixed Wireshark4.2.5 source hashes, independent authored full field/error answers,
+a deterministic generator, separate capture/parameter/sequence/bitmap cursor,
+build recipe, optional already-installed pinned TShark comparison and current
+local inventory v37 are sealed. The actual reference check matches604 wire
+values from82 captures. Its legacy standalone QoS display passes the full DATA
+body length into a subtree after the fixed body and can throw a bounds exception;
+those original standalone cases retain independent checks, while identical QoS
+with a following valid message is also tested against the actual reference.
+Reference gaps do not become endpoint or application-semantic passes.
+
+The2280 full/deferred, workers1/2/4 and observer-off/on configurations compare
+complete fields, Session, raw bytes, order and typed refusals. Native tests also
+cover shared byte/projection pressure, probe purity, exact count/depth bounds,
+stateless recovery, invalid/truncated carriers, caller mutations and idempotent
+Close. Strict offline truncated-record rejection is preserved separately from
+live carrier refusal. Original captures/specifications/reference source remain
+outside Git; historical ZIPs/answers/inventories are unchanged. No rule archive
+is regenerated for this native-only batch.

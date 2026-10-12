@@ -32,6 +32,7 @@ func NativeProtocolProfiles() []ProtocolProfile {
 		{"roc-plus", "tcp", "October 2022 Read/Set Real-time Clock and Error Indicator frames", "observed TCP initiator and reversed logical station addresses with one pending request; overlaps ambiguous until close, Ethernet CRC diagnostic, reported clock unauthenticated; no other opcodes or serial receiver"},
 		{"rtps", "udp", "RTPS2.0 keyed/no-key DATA wire fields and context; RTPS2.1-2.5 SPDP discovery, inline lifecycle DATA, complete same-datagram DATA_FRAG and receiver context", "version-specific key/status/QoS layout and owned opaque CDR/PL_CDR bytes, or SPDP GUID/sequence/endpoints/lease/locators; repeated claims remain ordered; logical source/destination and timestamp reset are message-local; UNKNOWN destination remains unknown; no RTPS1.3, unselected cross-datagram assembly, application type/schema, reliable-writer or DDS Security inference"},
 		{"rtps-control", "explicit-udp", "RTPS2.0-2.5 common ACKNACK/GAP/HEARTBEAT/NACK_FRAG/HEARTBEAT_FRAG wire reports, wire2.4/2.5 group and wire2.5 filtered-count fields", "ordered bounded bitmap words/selected offsets, exact sequence words, reader/writer logical direction and message-local context; unknown prefixes stay unknown, owned fields and caller budgets; no inferred delivery, response link, authentication, DATA schema or reliable state machine"},
+		{"rtps13-wire", "explicit-udp", "RTPS1.3 DATA/NOKEY, ACKNACK/GAP/HEARTBEAT and literal INFO_TS/SRC/DST", "fixed legacy layout observer with8-byte reported prefixes, DATA hash-before-sequence, literal zero/UNKNOWN sequence words and signed counters, bounded ordered bitmaps/parameters including non-four-byte values/PAD/repeats; INFO_SRC1.0-1.2 claims can be observed but their following DATA/control layout needs context; no inferred schema, reliable endpoint, confirmed key identity, negotiated QoS or DDS security; extended parameter encodings remain unselected"},
 		{"rtps-wire", "explicit-udp", "RTPS2.0 legacy DATA/NOKEY and2.1-2.5 DATA with ordered reliability control reports", "owned opaque serialized payload/key and inline parameters, exact sequence words and logical source layouts; one shared message-local receiver context and atomic errors/budgets; optional exact caller-selected wire2.4/2.5 ShapeType PLAIN_CDR1 data/key fields; no inferred schema, reliable delivery, endpoint state or security"},
 		{"semtech-downlink-session", "explicit-udp", "Semtech v2 PULL_RESP/TX_ACK passive association", "opt-in exact endpoints/capture domain/token and full JSON observation; capture-lifetime token quarantine,30second pending expiry and fail-closed bounded state; no authentication, gateway identity binding or RF delivery proof"},
 		{"semtech-udp", "udp", "Semtech packet-forwarder v2 upstream and PULL_RESP/TX_ACK observations", "fixed v4.0.1 sender fields, exact JSON numbers/base64 and unresolved sender defaults; observed gateway/token only, no token association, radio config/GPS validation, RF delivery or LoRaWAN PHY/security"},
@@ -82,7 +83,7 @@ func WithProtocolDecodeAs(transport string, port uint16, protocol string) Captur
 			return fmt.Errorf("DecodeAs requires UDP and a nonzero port")
 		}
 		switch protocol {
-		case "dns", "mdns", "llmnr", "dhcp", "dhcpv6", "syslog", "snmp", "mqtt-sn", "bittorrent-dht", "bjnp", "rtp", "sip", "stun", "turn", "dtls", "mavlink", "nmea", "nmea-ais-multipart", "semtech-udp", "semtech-downlink-session", "rtps", "rtps-control", "rtps-wire", "rtps-shape-fragments", "rtps-spdp-fragments", "bsap", "slmp", "dlms", "opendroneid", "opendroneid-system", "opendroneid-identity", "opendroneid-auth-pages", "c37118", "c37118-engineering", "knx", "pfcp", "dlms-wrapper", "doip":
+		case "dns", "mdns", "llmnr", "dhcp", "dhcpv6", "syslog", "snmp", "mqtt-sn", "bittorrent-dht", "bjnp", "rtp", "sip", "stun", "turn", "dtls", "mavlink", "nmea", "nmea-ais-multipart", "semtech-udp", "semtech-downlink-session", "rtps", "rtps-control", "rtps-wire", "rtps13-wire", "rtps-shape-fragments", "rtps-spdp-fragments", "bsap", "slmp", "dlms", "opendroneid", "opendroneid-system", "opendroneid-identity", "opendroneid-auth-pages", "c37118", "c37118-engineering", "knx", "pfcp", "dlms-wrapper", "doip":
 		default:
 			return fmt.Errorf("unsupported native DecodeAs profile")
 		}
@@ -154,6 +155,9 @@ func (a *binParser) decodeNativeDatagram(e *ProtocolEvent, w []byte, src, dst ui
 	}
 	if explicit == "semtech-downlink-session" {
 		return a.decodeSemtechCorrelatedDatagram(e, w)
+	}
+	if explicit == "rtps13-wire" {
+		return a.decodeRTPS13WireDatagram(e, w)
 	}
 	if explicit == "rtps-shape-fragments" {
 		return a.decodeRTPSShapeFragmentDatagram(e, w, nil, src, dst)
