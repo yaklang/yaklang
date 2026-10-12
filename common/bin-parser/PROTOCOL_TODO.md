@@ -39,7 +39,7 @@ AnyDesk、DingTalk、DoH、DoQ、DoT、HTTP/3、IMAPS、SMTPS、T.38、WeChat/Mi
 
 <!-- BEGIN GENERATED PROTOCOL INVENTORY -->
 
-路线图共 **616** 项：限定范围 `done` **211**，`partial` **4**，`todo` **401**。目录共 **471** 个入口：`stable` **15**，`partial` **273**，`new` **183**。入口、规则文件和协议家族不是同一个计数。
+路线图共 **616** 项：限定范围 `done` **211**，`partial` **5**，`todo` **400**。目录共 **471** 个入口：`stable` **15**，`partial` **273**，`new` **183**。入口、规则文件和协议家族不是同一个计数。
 
 ### 路线图尚未完成的项目
 
@@ -124,7 +124,7 @@ AnyDesk、DingTalk、DoH、DoQ、DoT、HTTP/3、IMAPS、SMTPS、T.38、WeChat/Mi
 | P2 | IPv6 Routing Header | todo | [partial / Internet Protocol Version 6](rules/internet_protocol_version_6.yaml) |
 | P2 | IRC | todo | [new / IRC](rules/application-layer/extended_protocols.yaml) |
 | P2 | IS-IS | todo | [partial / ISIS](rules/isis.yaml) |
-| P2 | ISO 8583 | todo | 需核对别名/Fields 入口 |
+| P2 | ISO 8583 | partial | 需核对别名/Fields 入口 |
 | P2 | J1939 | todo | [partial / J1939](rules/j1939.yaml) |
 | P2 | KNX/IP | todo | [new / KNXIP](rules/application-layer/extended_protocols.yaml) |
 | P2 | Kryo | todo | 需核对别名/Fields 入口 |
