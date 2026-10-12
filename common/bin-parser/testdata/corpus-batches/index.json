@@ -50859,6 +50859,2794 @@
         "common/pcapx/pcaputil/opcua-browse/dependencies.json": "dependencies.json",
         "common/pcapx/pcaputil/opcua-browse/SOURCE-primary.json": "SOURCE-primary.json"
       }
+    },
+    {
+      "id": "validation-opcua-write",
+      "kind": "validation",
+      "source_sha": "e53fe75476693d1049b488bf9ec7348a5405456b",
+      "file": "validation-opcua-write.zip",
+      "sha256": "78e3523e720fecb1b0439c7812aca47ee1022e3a6363e0c54d2d6da5abb4e665",
+      "password": "bin-parser",
+      "members": {
+        "material/cases.json": {
+          "sha256": "e50a5b01d9c03e9cf58ac513ed7c9962f9eb7cbb77d20831ada1e11c82f882a6",
+          "bytes": 221617
+        },
+        "manifest.json": {
+          "sha256": "cce246702f20a77c3e7660487b30f9f97ff9b920e0864e3e24d1aef095fdb24e",
+          "bytes": 9125
+        },
+        "material/uint64-exact.pcap": {
+          "sha256": "6e6df6dbf5dca20baeac4697f58854aa6ae80072faf4fb610cf8f8eeee6aa723",
+          "bytes": 939
+        },
+        "material/uint64-max.pcap": {
+          "sha256": "9767beb1d97b61a5b354d0ff2fd23be72218bad2bbf95b71a85c66978db66c5e",
+          "bytes": 939
+        },
+        "material/int64-min.pcap": {
+          "sha256": "dfcea8617bc6e0ad03ffd200286528a3cd4749c4720c821ec15c6715f3e07f98",
+          "bytes": 939
+        },
+        "material/boolean.pcap": {
+          "sha256": "0bd37b8a79642fd286b2a81c69b4e970f9b261a17ff1f1858eb5f5d07c2228cf",
+          "bytes": 932
+        },
+        "material/double.pcap": {
+          "sha256": "e10832239d569e53da5e6beb2813784dcc0dbe2cfaf0269319eac3f58e2c98c8",
+          "bytes": 939
+        },
+        "material/double-nan.pcap": {
+          "sha256": "284f473880ac0763149ea5bb92ed27ec85fd356cb3d4557f59242ebf602a95bc",
+          "bytes": 939
+        },
+        "material/float.pcap": {
+          "sha256": "607017055472dfe5d44d41e286b0cd983296b367e677d846483ada1b7aec0a1d",
+          "bytes": 935
+        },
+        "material/string.pcap": {
+          "sha256": "de5dfad13269df887d98dda239845cad496418b57a72ffdc70ce076c1600f491",
+          "bytes": 941
+        },
+        "material/null-string.pcap": {
+          "sha256": "ea5b553503b41010b680da576d705d6de0c9b3c8f63249d86a264c2bf618428e",
+          "bytes": 935
+        },
+        "material/empty-string.pcap": {
+          "sha256": "929f752c2f615cb1ebe6c4ec7aa009cc5f8f871ceb69fdd46367618ae5fbeaf3",
+          "bytes": 935
+        },
+        "material/bytes.pcap": {
+          "sha256": "ce11d96e03b20188be4716e0b85d554bbded83bd977ac2500484ed9de2c322e7",
+          "bytes": 937
+        },
+        "material/datetime.pcap": {
+          "sha256": "a8360c7666b63c237c5c35af6d228ec7c2f0384f22b62e0f742da34a8c30f411",
+          "bytes": 939
+        },
+        "material/guid.pcap": {
+          "sha256": "f44e5d8a528a655759072f68b0deb0f24868039fcd0742f9656e5c5d2409c47c",
+          "bytes": 947
+        },
+        "material/status.pcap": {
+          "sha256": "3d8abd0e6ae3ff5c135c7a85e166ab611a2e6834042798d1d9d2e5a4bc09aecb",
+          "bytes": 935
+        },
+        "material/nodeid.pcap": {
+          "sha256": "5ebbe0caf9ef73d4c5d1a35c8636c45db1eb84fc6cb5d7a16651e62a4c6700fe",
+          "bytes": 946
+        },
+        "material/index-range-literal.pcap": {
+          "sha256": "28d2cf10171af63ba40ea3b089e321be19858c6b81a20e596141b6d85d6ca46a",
+          "bytes": 942
+        },
+        "material/complete-datavalue-mask.pcap": {
+          "sha256": "c08a62aac4caa1aa0057f9f15d4a11f777ec63a919c43e73a6fc013ff23fb427",
+          "bytes": 959
+        },
+        "material/multi-node-order.pcap": {
+          "sha256": "8078eabb54464fb2926cbbf27458f794d2e28cddaadb0592809133e2b56c59e8",
+          "bytes": 969
+        },
+        "material/handle-mismatch.pcap": {
+          "sha256": "4199150249d020e9c28a0d3eadeb5e542d252eb36716710a02ce6a900f77ff8f",
+          "bytes": 939
+        },
+        "material/result-count-mismatch.pcap": {
+          "sha256": "d7a387718628390bca814e933963dcd707c98229327958af6573199ed0c37472",
+          "bytes": 965
+        },
+        "material/bad-service-empty-results.pcap": {
+          "sha256": "f434a79169683390b2bf9c109b170f90d839437ce0641edc97254c76f4b44be2",
+          "bytes": 961
+        },
+        "material/empty-diagnostic-entry.pcap": {
+          "sha256": "009a330e343396f35f809a6dbb8c3c0da451ee2f095309c54ead2f49cc10b274",
+          "bytes": 940
+        },
+        "material/diagnostic-count-mismatch.pcap": {
+          "sha256": "028b4759b26d2efee1efd0e48941be35c97ccacbb8a55151b55ba1ed2e36fcd7",
+          "bytes": 941
+        },
+        "material/unpaired-diagnostic-count-mismatch.pcap": {
+          "sha256": "27b4c253fdada3963b9b8239e7f61bc1fc99743b8e25affed5c7d2c93cf28540",
+          "bytes": 782
+        },
+        "material/unobserved-request.pcap": {
+          "sha256": "f33598f359d0913b9969e53bac73e17340edaca58dcc5d213fdca02df406c380",
+          "bytes": 780
+        },
+        "material/array-variant-unsupported.pcap": {
+          "sha256": "bba6867161b4d256fbaf0e029846396efee570ba45bb863239828fdcf8025fee",
+          "bytes": 817
+        },
+        "material/reserved-datavalue-mask.pcap": {
+          "sha256": "6dde1db0af050a136a196058172ae67d1ee524f87d9bc0c2e697612e0dbbd47c",
+          "bytes": 805
+        },
+        "material/truncated-request-value.pcap": {
+          "sha256": "c7a74aec33a62044505b7c455b9f2c566cece8fc58fb09c99bf12e1f1f0667a3",
+          "bytes": 804
+        },
+        "material/request-trailing-octet.pcap": {
+          "sha256": "8d8eed710d76158722777497b698c8ee7952e71606598f5ffbe3cb614ec56fce",
+          "bytes": 806
+        },
+        "material/response-count-budget.pcap": {
+          "sha256": "f677353a6e4bbcf611e30f85a6e98dabae654d065de3735d725afedde126ef97",
+          "bytes": 939
+        },
+        "material/active-request-id-reuse.pcap": {
+          "sha256": "11b38291a9be271341dae2671b5f67be3ecd862391a1925e9ab288f0aec5fbf1",
+          "bytes": 964
+        },
+        "material/interleaved-write-requests.pcap": {
+          "sha256": "9696881e0ff7dbea73256d926c7b6af8eb5164dbd028341a2ed098d5477673aa",
+          "bytes": 1232
+        },
+        "material/completed-request-id-reuse.pcap": {
+          "sha256": "be372a1ba60c5178589bcd2f9edd08986053f15bfeee08c61f8926fde5042fad",
+          "bytes": 1232
+        },
+        "material/request-ua-chunks.pcap": {
+          "sha256": "5ddbbee05501e09197075fff74447d46ad4f9c2912aa325599b4a5f3f1bd725f",
+          "bytes": 1033
+        },
+        "material/outstanding-write-close.pcap": {
+          "sha256": "a322a3eb9fb289602ee5d32c8e85fe7637465d31e8955365bbfcc2728292f129",
+          "bytes": 805
+        },
+        "material/wrong-direction-unmatched.pcap": {
+          "sha256": "524435f358b825ebbf9d06b167761305e78ff4c00cfbee4da362ce11f4fd04d1",
+          "bytes": 939
+        },
+        "material/abort-clears-request.pcap": {
+          "sha256": "9385863554fb74fc503d42b75db9df1a12af47b84666aaa811a2be7ca2ea382b",
+          "bytes": 916
+        },
+        "material/null-scalar.pcap": {
+          "sha256": "37aa5829550e7d583ea3fd7e7bd3f84c7c365738a64c0776c47646bdd3e759a5",
+          "bytes": 931
+        },
+        "material/response-ua-chunks.pcap": {
+          "sha256": "84892c5a5914f4e6470efbb47c65e48f083b04648e4b23d7bf36cad9475b559a",
+          "bytes": 1033
+        },
+        "material/partial-write-chunk-close.pcap": {
+          "sha256": "e5b506e5dc8abe44a141c8bd982424242343042e901f5b8473c40c68e33ea2d7",
+          "bytes": 760
+        },
+        "material/late-response-after-resource-refusal.pcap": {
+          "sha256": "dcae7b2485bd3b7b47cc64517f864eb3266ceab736607adce1c464657adaeef8",
+          "bytes": 1073
+        },
+        "generate.py": {
+          "sha256": "eeadd857bcc2340a642192fa447ed1091943feb4e013ce9ffea527f0ca2c774b",
+          "bytes": 11272
+        },
+        "emit.py": {
+          "sha256": "4b406f31d98410e8dc678b7c29f6629225ea97ffb3aa1f5662d92664a841866b",
+          "bytes": 594
+        },
+        "verify.py": {
+          "sha256": "f4caee586cb5180a0f89dd1bfe56f64bdc3394fe5f81709faca3278f29dedd10",
+          "bytes": 1513
+        },
+        "seal.py": {
+          "sha256": "ba895d5a5445f21401b24c1fa887b3cd890009de468dda480aa9754442f52beb",
+          "bytes": 3501
+        },
+        "SOURCE.json": {
+          "sha256": "ecdbf1a40187816f989a7e6e50c2e8e27c6798eea18d2a5c35916c272267e8cd",
+          "bytes": 2296
+        },
+        "SOURCE-primary.json": {
+          "sha256": "e722a58e7a4ed9ae0071e60f8227e6fe6a4814ae5e7f183d075d49bf7ee8cfc2",
+          "bytes": 312
+        },
+        "validation/expected.json": {
+          "bytes": 45677,
+          "sha256": "2eb74ebc7a2cd7e0e896b04931b1b4ae99215de7f8935271c8b1fc4252021a32"
+        }
+      },
+      "aliases": {
+        "common/pcapx/pcaputil/opcua-write/material/cases.json": "material/cases.json",
+        "common/pcapx/pcaputil/opcua-write/manifest.json": "manifest.json",
+        "common/pcapx/pcaputil/opcua-write/material/uint64-exact.pcap": "material/uint64-exact.pcap",
+        "common/pcapx/pcaputil/opcua-write/material/uint64-max.pcap": "material/uint64-max.pcap",
+        "common/pcapx/pcaputil/opcua-write/material/int64-min.pcap": "material/int64-min.pcap",
+        "common/pcapx/pcaputil/opcua-write/material/boolean.pcap": "material/boolean.pcap",
+        "common/pcapx/pcaputil/opcua-write/material/double.pcap": "material/double.pcap",
+        "common/pcapx/pcaputil/opcua-write/material/double-nan.pcap": "material/double-nan.pcap",
+        "common/pcapx/pcaputil/opcua-write/material/float.pcap": "material/float.pcap",
+        "common/pcapx/pcaputil/opcua-write/material/string.pcap": "material/string.pcap",
+        "common/pcapx/pcaputil/opcua-write/material/null-string.pcap": "material/null-string.pcap",
+        "common/pcapx/pcaputil/opcua-write/material/empty-string.pcap": "material/empty-string.pcap",
+        "common/pcapx/pcaputil/opcua-write/material/bytes.pcap": "material/bytes.pcap",
+        "common/pcapx/pcaputil/opcua-write/material/datetime.pcap": "material/datetime.pcap",
+        "common/pcapx/pcaputil/opcua-write/material/guid.pcap": "material/guid.pcap",
+        "common/pcapx/pcaputil/opcua-write/material/status.pcap": "material/status.pcap",
+        "common/pcapx/pcaputil/opcua-write/material/nodeid.pcap": "material/nodeid.pcap",
+        "common/pcapx/pcaputil/opcua-write/material/index-range-literal.pcap": "material/index-range-literal.pcap",
+        "common/pcapx/pcaputil/opcua-write/material/complete-datavalue-mask.pcap": "material/complete-datavalue-mask.pcap",
+        "common/pcapx/pcaputil/opcua-write/material/multi-node-order.pcap": "material/multi-node-order.pcap",
+        "common/pcapx/pcaputil/opcua-write/material/handle-mismatch.pcap": "material/handle-mismatch.pcap",
+        "common/pcapx/pcaputil/opcua-write/material/result-count-mismatch.pcap": "material/result-count-mismatch.pcap",
+        "common/pcapx/pcaputil/opcua-write/material/bad-service-empty-results.pcap": "material/bad-service-empty-results.pcap",
+        "common/pcapx/pcaputil/opcua-write/material/empty-diagnostic-entry.pcap": "material/empty-diagnostic-entry.pcap",
+        "common/pcapx/pcaputil/opcua-write/material/diagnostic-count-mismatch.pcap": "material/diagnostic-count-mismatch.pcap",
+        "common/pcapx/pcaputil/opcua-write/material/unpaired-diagnostic-count-mismatch.pcap": "material/unpaired-diagnostic-count-mismatch.pcap",
+        "common/pcapx/pcaputil/opcua-write/material/unobserved-request.pcap": "material/unobserved-request.pcap",
+        "common/pcapx/pcaputil/opcua-write/material/array-variant-unsupported.pcap": "material/array-variant-unsupported.pcap",
+        "common/pcapx/pcaputil/opcua-write/material/reserved-datavalue-mask.pcap": "material/reserved-datavalue-mask.pcap",
+        "common/pcapx/pcaputil/opcua-write/material/truncated-request-value.pcap": "material/truncated-request-value.pcap",
+        "common/pcapx/pcaputil/opcua-write/material/request-trailing-octet.pcap": "material/request-trailing-octet.pcap",
+        "common/pcapx/pcaputil/opcua-write/material/response-count-budget.pcap": "material/response-count-budget.pcap",
+        "common/pcapx/pcaputil/opcua-write/material/active-request-id-reuse.pcap": "material/active-request-id-reuse.pcap",
+        "common/pcapx/pcaputil/opcua-write/material/interleaved-write-requests.pcap": "material/interleaved-write-requests.pcap",
+        "common/pcapx/pcaputil/opcua-write/material/completed-request-id-reuse.pcap": "material/completed-request-id-reuse.pcap",
+        "common/pcapx/pcaputil/opcua-write/material/request-ua-chunks.pcap": "material/request-ua-chunks.pcap",
+        "common/pcapx/pcaputil/opcua-write/material/outstanding-write-close.pcap": "material/outstanding-write-close.pcap",
+        "common/pcapx/pcaputil/opcua-write/material/wrong-direction-unmatched.pcap": "material/wrong-direction-unmatched.pcap",
+        "common/pcapx/pcaputil/opcua-write/material/abort-clears-request.pcap": "material/abort-clears-request.pcap",
+        "common/pcapx/pcaputil/opcua-write/material/null-scalar.pcap": "material/null-scalar.pcap",
+        "common/pcapx/pcaputil/opcua-write/material/response-ua-chunks.pcap": "material/response-ua-chunks.pcap",
+        "common/pcapx/pcaputil/opcua-write/material/partial-write-chunk-close.pcap": "material/partial-write-chunk-close.pcap",
+        "common/pcapx/pcaputil/opcua-write/material/late-response-after-resource-refusal.pcap": "material/late-response-after-resource-refusal.pcap",
+        "common/pcapx/pcaputil/opcua-write/generate.py": "generate.py",
+        "common/pcapx/pcaputil/opcua-write/emit.py": "emit.py",
+        "common/pcapx/pcaputil/opcua-write/verify.py": "verify.py",
+        "common/pcapx/pcaputil/opcua-write/seal.py": "seal.py",
+        "common/pcapx/pcaputil/opcua-write/SOURCE.json": "SOURCE.json",
+        "common/pcapx/pcaputil/opcua-write/SOURCE-primary.json": "SOURCE-primary.json"
+      }
+    },
+    {
+      "id": "validation-opcua-browsenext",
+      "kind": "validation",
+      "source_sha": "045de16c799920a7ea15eaeebec359eb327f8811",
+      "file": "validation-opcua-browsenext.zip",
+      "sha256": "9325f8d1adc62be443e29c146dac04d86e28b14816e13c0c6fa80f36152db037",
+      "password": "bin-parser",
+      "members": {
+        "material/cases.json": {
+          "sha256": "f6d23c8b06b6164323e066a464931f66f89edca326f2d2563cadc6d5a356e1e2",
+          "bytes": 269115
+        },
+        "manifest.json": {
+          "sha256": "e44c5313658d4673f7377d8f42cb9a68f850e438cf43cfeef1101669e3f11dda",
+          "bytes": 9227
+        },
+        "material/one-token-reference.pcap": {
+          "sha256": "64ccabe36d0155ea4a5c9a2124c62727f032cc70ab8bade67d9c7f68e3c06bb6",
+          "bytes": 972
+        },
+        "material/release-points-empty-response.pcap": {
+          "sha256": "32376555ae653185b2b6e4d65c1583a257697f7ffe2208c0a65f2f8eab84b22f",
+          "bytes": 917
+        },
+        "material/release-points-wrong-result-count.pcap": {
+          "sha256": "60f334b10e4959d796e4fff726485836f24f30d413cc6d615d2b3e57bc2a9613",
+          "bytes": 972
+        },
+        "material/multiple-token-order.pcap": {
+          "sha256": "e382ce5b455ef08371262b1abec854884a4de584dca581349dc130a91df76b87",
+          "bytes": 1039
+        },
+        "material/next-token-literal.pcap": {
+          "sha256": "16fe5e3a9e6a4c69f2b07b793532ad74b32719053dfed611eade927edb234286",
+          "bytes": 976
+        },
+        "material/invalid-point-status-literal.pcap": {
+          "sha256": "a0d42e9a1f5968ed78eebf558033bdfc886d3f8695df7a939d8db04bcf43fd16",
+          "bytes": 933
+        },
+        "material/empty-token.pcap": {
+          "sha256": "a8d28ec1776b4cc5f422d7a9a6d07036325038d4727ef818207e69066cbcf661",
+          "bytes": 969
+        },
+        "material/null-token.pcap": {
+          "sha256": "5c7963a030a663bf4a509882e70f8879564819eff11ec6a308838fa8737537b5",
+          "bytes": 969
+        },
+        "material/empty-list.pcap": {
+          "sha256": "88bbbbfa0e53c51ac6f9aa710ad2bb9b985f21f3f6322c6b52b7e8573a563d17",
+          "bytes": 910
+        },
+        "material/result-count-mismatch.pcap": {
+          "sha256": "b6f2027d1f1be83d5c04b1538384b92cda81bebb13f7f4f932be6ee83a7bac8c",
+          "bytes": 975
+        },
+        "material/handle-mismatch.pcap": {
+          "sha256": "572bc7a1c23b5c3da9fe26a186fd575aa7c533dbe9e76ddb930a3ae55b405ace",
+          "bytes": 972
+        },
+        "material/empty-diagnostic-entry.pcap": {
+          "sha256": "6a73d7d910e8517c5a74e703332ac48a277f5283cadd1392b50cd3151571bb03",
+          "bytes": 973
+        },
+        "material/diagnostic-count-mismatch.pcap": {
+          "sha256": "f72c433728b95a7ba1bdbc25f0b8727befbd8eb66b30274f631206986362c235",
+          "bytes": 974
+        },
+        "material/unobserved-request.pcap": {
+          "sha256": "553c8b5f681d63060dcff86ea38bbd3020bcc78df743c176dd136d4b0cec0a32",
+          "bytes": 831
+        },
+        "material/bad-service-empty-results.pcap": {
+          "sha256": "427ce7b8e144a7cd8745eabb118df842802001ad03ee5f11bee0c703b7e690df",
+          "bytes": 917
+        },
+        "material/trailing-octet.pcap": {
+          "sha256": "83907c3d9cb8ab2d2a7466e9b583617168a51d4d71822e477dc1e9a808faab64",
+          "bytes": 973
+        },
+        "material/truncated-diagnostic-array.pcap": {
+          "sha256": "f969b9e19538708eaab4eb6b6e40a7b5e0d82916de8b2bac9eef9fb6a62e5eac",
+          "bytes": 971
+        },
+        "material/token-count-budget.pcap": {
+          "sha256": "e12b56385d84178a82fc6f94081d088a30e8a093c31be9afb4d3c3112b41c4ce",
+          "bytes": 787
+        },
+        "material/negative-token-count.pcap": {
+          "sha256": "ddb586fad0eb8aaea99039a6f6bb56a0383eef896af703ab539dec51eecbeef6",
+          "bytes": 787
+        },
+        "material/oversized-token.pcap": {
+          "sha256": "23609f22171b6bfbc17af7f4d6b10bd38c428e668069ba0ca415a65207e81e41",
+          "bytes": 787
+        },
+        "material/active-request-id-reuse.pcap": {
+          "sha256": "171d22d271a89d291841e65f83a63643b159ce29348eeda140833b2c51b8b68f",
+          "bytes": 928
+        },
+        "material/interleaved-browsenext-requests.pcap": {
+          "sha256": "a6d0f728496e89950825f8d7796304b6a9e9363838efb719bf49c92f9e9da6f1",
+          "bytes": 1298
+        },
+        "material/request-ua-chunks.pcap": {
+          "sha256": "37e7822505991e76dbc85d95b1385ed1369541913cd74c8a5c8f1363c61e8b20",
+          "bytes": 1066
+        },
+        "material/outstanding-browsenext-close.pcap": {
+          "sha256": "2d9e3b9c3201dd51eda2e36531b31b74c43393994f68be4fb2cc367e13f0675b",
+          "bytes": 787
+        },
+        "material/release-bad-service-nonempty-results.pcap": {
+          "sha256": "076d4af6d690b1bb2c80ec02857caabf6c7d169788033862c58791361dfbeb83",
+          "bytes": 972
+        },
+        "material/response-ua-chunks.pcap": {
+          "sha256": "dcfac8425f2ca7095231f321cacf12167d20d66d139f77c54aa212d921379bf1",
+          "bytes": 1066
+        },
+        "material/partial-browsenext-chunk-close.pcap": {
+          "sha256": "43491176040c71a11778d5c373e80853b5d113cb09cf5751b6ecb66917226055",
+          "bytes": 760
+        },
+        "material/completed-request-id-reuse.pcap": {
+          "sha256": "9c72ce70397ebf001534e759a8b8822b9360281bcfde78c57ee5fffaafa22abe",
+          "bytes": 1298
+        },
+        "material/wrong-direction-unmatched.pcap": {
+          "sha256": "7f0600dd147d873069c90dc48af5ff2dcffb4557d611ff5ac3341ac164d3772c",
+          "bytes": 972
+        },
+        "material/late-response-after-resource-refusal.pcap": {
+          "sha256": "b9aeb727fb057f87216d8b5ffd57d603ceb3ed3c6c929e91a07cff7b90076d89",
+          "bytes": 1157
+        },
+        "material/abort-clears-request.pcap": {
+          "sha256": "633dc31d79afb764b7a122a2e19f52f40a38a0a29d023f3b2c5f8770dc553fef",
+          "bytes": 898
+        },
+        "material/sequence-replayed-completed-response.pcap": {
+          "sha256": "95d2e5cc54939ef04cd281300e21bd048a19bb61e43f5b97a1c5980039319009",
+          "bytes": 1298
+        },
+        "material/sequence-backwards-response.pcap": {
+          "sha256": "887bb86b3f12768ec9082af26e36580e8adcc393a54e06f54dc79235f6518e74",
+          "bytes": 1298
+        },
+        "material/sequence-token-change-no-reset.pcap": {
+          "sha256": "0c04a1e4f37d7f51d8cbc87afc657c5bc56596d89327da4c4e2ed74f17c20a33",
+          "bytes": 1298
+        },
+        "material/sequence-forward-capture-gap.pcap": {
+          "sha256": "2929250538446e7d01cbcd9c51fc63be45a119a2ba63821b5393ac69d4acf4cf",
+          "bytes": 1298
+        },
+        "material/sequence-large-forward-capture-gap.pcap": {
+          "sha256": "16ee3a3aa918a055e57a7aee971705332bb5b0049456eb1e8da6d2a6c29f6d66",
+          "bytes": 1298
+        },
+        "material/sequence-valid-legacy-wrap.pcap": {
+          "sha256": "3313e1ca59762e546dc3e33fa2cb3f66d5b3612596ff3d199ac38c1aee484274",
+          "bytes": 1298
+        },
+        "material/sequence-wrap-threshold-rejected.pcap": {
+          "sha256": "bb0a6bf95ca386af20ae99ca4a63fe656adb1040e02f8cf763a16235d7b8d854",
+          "bytes": 1298
+        },
+        "material/sequence-repeat-after-wrap.pcap": {
+          "sha256": "ff4581f39ea58c13d9ff1ed8f8f4ca6bf8c0c04dc9d309ca7f8f291ba89263c7",
+          "bytes": 1624
+        },
+        "generate.py": {
+          "sha256": "e35fe359066adc93a009b5c89085b9cd116f99ca06006496007cb7c6410d7ac7",
+          "bytes": 12780
+        },
+        "emit.py": {
+          "sha256": "e971a8c79fba088fa5ce22cc818daf940fcdd85925f1987e976e516eda8d71d1",
+          "bytes": 599
+        },
+        "verify.py": {
+          "sha256": "746e5a50e22e1d2f2ff29d2a12440e8f2020f0e77ec2a9b9b077086c1fc94a43",
+          "bytes": 1555
+        },
+        "seal.py": {
+          "sha256": "0b1518e6d1e5e941b488b7cb10ca27960552851bfabf11d1434434bf7e85a412",
+          "bytes": 3686
+        },
+        "SOURCE.json": {
+          "sha256": "2158e784256677fb9fcfff6354a2e2644df84c827876356a386ac0ea96d71136",
+          "bytes": 2212
+        },
+        "SOURCE-primary.json": {
+          "sha256": "a3a2d0133381ac6919ae62b17fbe50e53c3bfb3c0edba5d66650ec9cf0b977dd",
+          "bytes": 566
+        },
+        "required-tests-traffic-unified-v25.json": {
+          "sha256": "540c85c1dfdd822d23bb295d5e7ffb3ee9454dce3de50a5fe81449d638f8a3ba",
+          "bytes": 161422
+        },
+        "validation/expected.json": {
+          "bytes": 45304,
+          "sha256": "a8bc4d6aa50a48e370599f2a89f1635d2e44fb740adc11325b4c9f775d57358d"
+        }
+      },
+      "aliases": {
+        "common/pcapx/pcaputil/opcua-browsenext/material/cases.json": "material/cases.json",
+        "common/pcapx/pcaputil/opcua-browsenext/manifest.json": "manifest.json",
+        "common/pcapx/pcaputil/opcua-browsenext/material/one-token-reference.pcap": "material/one-token-reference.pcap",
+        "common/pcapx/pcaputil/opcua-browsenext/material/release-points-empty-response.pcap": "material/release-points-empty-response.pcap",
+        "common/pcapx/pcaputil/opcua-browsenext/material/release-points-wrong-result-count.pcap": "material/release-points-wrong-result-count.pcap",
+        "common/pcapx/pcaputil/opcua-browsenext/material/multiple-token-order.pcap": "material/multiple-token-order.pcap",
+        "common/pcapx/pcaputil/opcua-browsenext/material/next-token-literal.pcap": "material/next-token-literal.pcap",
+        "common/pcapx/pcaputil/opcua-browsenext/material/invalid-point-status-literal.pcap": "material/invalid-point-status-literal.pcap",
+        "common/pcapx/pcaputil/opcua-browsenext/material/empty-token.pcap": "material/empty-token.pcap",
+        "common/pcapx/pcaputil/opcua-browsenext/material/null-token.pcap": "material/null-token.pcap",
+        "common/pcapx/pcaputil/opcua-browsenext/material/empty-list.pcap": "material/empty-list.pcap",
+        "common/pcapx/pcaputil/opcua-browsenext/material/result-count-mismatch.pcap": "material/result-count-mismatch.pcap",
+        "common/pcapx/pcaputil/opcua-browsenext/material/handle-mismatch.pcap": "material/handle-mismatch.pcap",
+        "common/pcapx/pcaputil/opcua-browsenext/material/empty-diagnostic-entry.pcap": "material/empty-diagnostic-entry.pcap",
+        "common/pcapx/pcaputil/opcua-browsenext/material/diagnostic-count-mismatch.pcap": "material/diagnostic-count-mismatch.pcap",
+        "common/pcapx/pcaputil/opcua-browsenext/material/unobserved-request.pcap": "material/unobserved-request.pcap",
+        "common/pcapx/pcaputil/opcua-browsenext/material/bad-service-empty-results.pcap": "material/bad-service-empty-results.pcap",
+        "common/pcapx/pcaputil/opcua-browsenext/material/trailing-octet.pcap": "material/trailing-octet.pcap",
+        "common/pcapx/pcaputil/opcua-browsenext/material/truncated-diagnostic-array.pcap": "material/truncated-diagnostic-array.pcap",
+        "common/pcapx/pcaputil/opcua-browsenext/material/token-count-budget.pcap": "material/token-count-budget.pcap",
+        "common/pcapx/pcaputil/opcua-browsenext/material/negative-token-count.pcap": "material/negative-token-count.pcap",
+        "common/pcapx/pcaputil/opcua-browsenext/material/oversized-token.pcap": "material/oversized-token.pcap",
+        "common/pcapx/pcaputil/opcua-browsenext/material/active-request-id-reuse.pcap": "material/active-request-id-reuse.pcap",
+        "common/pcapx/pcaputil/opcua-browsenext/material/interleaved-browsenext-requests.pcap": "material/interleaved-browsenext-requests.pcap",
+        "common/pcapx/pcaputil/opcua-browsenext/material/request-ua-chunks.pcap": "material/request-ua-chunks.pcap",
+        "common/pcapx/pcaputil/opcua-browsenext/material/outstanding-browsenext-close.pcap": "material/outstanding-browsenext-close.pcap",
+        "common/pcapx/pcaputil/opcua-browsenext/material/release-bad-service-nonempty-results.pcap": "material/release-bad-service-nonempty-results.pcap",
+        "common/pcapx/pcaputil/opcua-browsenext/material/response-ua-chunks.pcap": "material/response-ua-chunks.pcap",
+        "common/pcapx/pcaputil/opcua-browsenext/material/partial-browsenext-chunk-close.pcap": "material/partial-browsenext-chunk-close.pcap",
+        "common/pcapx/pcaputil/opcua-browsenext/material/completed-request-id-reuse.pcap": "material/completed-request-id-reuse.pcap",
+        "common/pcapx/pcaputil/opcua-browsenext/material/wrong-direction-unmatched.pcap": "material/wrong-direction-unmatched.pcap",
+        "common/pcapx/pcaputil/opcua-browsenext/material/late-response-after-resource-refusal.pcap": "material/late-response-after-resource-refusal.pcap",
+        "common/pcapx/pcaputil/opcua-browsenext/material/abort-clears-request.pcap": "material/abort-clears-request.pcap",
+        "common/pcapx/pcaputil/opcua-browsenext/material/sequence-replayed-completed-response.pcap": "material/sequence-replayed-completed-response.pcap",
+        "common/pcapx/pcaputil/opcua-browsenext/material/sequence-backwards-response.pcap": "material/sequence-backwards-response.pcap",
+        "common/pcapx/pcaputil/opcua-browsenext/material/sequence-token-change-no-reset.pcap": "material/sequence-token-change-no-reset.pcap",
+        "common/pcapx/pcaputil/opcua-browsenext/material/sequence-forward-capture-gap.pcap": "material/sequence-forward-capture-gap.pcap",
+        "common/pcapx/pcaputil/opcua-browsenext/material/sequence-large-forward-capture-gap.pcap": "material/sequence-large-forward-capture-gap.pcap",
+        "common/pcapx/pcaputil/opcua-browsenext/material/sequence-valid-legacy-wrap.pcap": "material/sequence-valid-legacy-wrap.pcap",
+        "common/pcapx/pcaputil/opcua-browsenext/material/sequence-wrap-threshold-rejected.pcap": "material/sequence-wrap-threshold-rejected.pcap",
+        "common/pcapx/pcaputil/opcua-browsenext/material/sequence-repeat-after-wrap.pcap": "material/sequence-repeat-after-wrap.pcap",
+        "common/pcapx/pcaputil/opcua-browsenext/generate.py": "generate.py",
+        "common/pcapx/pcaputil/opcua-browsenext/emit.py": "emit.py",
+        "common/pcapx/pcaputil/opcua-browsenext/verify.py": "verify.py",
+        "common/pcapx/pcaputil/opcua-browsenext/seal.py": "seal.py",
+        "common/pcapx/pcaputil/opcua-browsenext/SOURCE.json": "SOURCE.json",
+        "common/pcapx/pcaputil/opcua-browsenext/SOURCE-primary.json": "SOURCE-primary.json",
+        "scripts/protocol-tests/required-tests-traffic-unified-v25.json": "required-tests-traffic-unified-v25.json",
+        "common/pcapx/pcaputil/opcua-browsenext/required-tests-traffic-unified-v25.json": "required-tests-traffic-unified-v25.json"
+      }
+    },
+    {
+      "id": "validation-opcua-call",
+      "kind": "validation",
+      "source_sha": "636a5bcb401c84d2c5e8d9831b4c4f5f4a7563df",
+      "file": "validation-opcua-call.zip",
+      "sha256": "0cfde1a58f2c4c9766186d4d4ace5f7fe7f6870794cff45a22c0487b1556dfa6",
+      "password": "bin-parser",
+      "members": {
+        "material/cases.json": {
+          "sha256": "b9f6e09480312c27182724bf0a747b44daa8df2ec1188c8414196b33d4db1a24",
+          "bytes": 284321
+        },
+        "manifest.json": {
+          "sha256": "f85dc66ffc37b9be5bebec5bf04aac7ce6687bc557dc3f98d9e4a24761e24849",
+          "bytes": 10478
+        },
+        "material/uint64-input-int64-output.pcap": {
+          "sha256": "5dcd63618291c652795d7818ea89122757ecc57cf649f7c334f0bdd38c155aeb",
+          "bytes": 955
+        },
+        "material/empty-string.pcap": {
+          "sha256": "1613d45a244e345913b9cabc4b082871c5df2fbcde9806fbbab3291be7fd7933",
+          "bytes": 947
+        },
+        "material/null-string.pcap": {
+          "sha256": "f709348ac05200d3ad0f2d636472a5e3a0e78d4747244dd9efcc6c897c78e7bd",
+          "bytes": 947
+        },
+        "material/byte-string.pcap": {
+          "sha256": "3a3f6526d2c81d261cbe243ae303c3a13a3e434a14122eeba09306a6200b9701",
+          "bytes": 951
+        },
+        "material/null-bytes.pcap": {
+          "sha256": "b3e4402332f9727d1a6cc48de59b171d02c3c88483af82dc55885209b9e43d42",
+          "bytes": 947
+        },
+        "material/bool.pcap": {
+          "sha256": "221f34f6913dc0ea9f7da36b6f93b4204e7ce192ade9db70d9f4e535b3908877",
+          "bytes": 941
+        },
+        "material/uint64-max.pcap": {
+          "sha256": "90c61d6b500a909f67e87e372d50c4d530bf1ca43bfa9a13d76edfd853a84f32",
+          "bytes": 955
+        },
+        "material/int64-min.pcap": {
+          "sha256": "9ea8245f579c3118b25556dbe397c786bb5f061d23bd22dc83e806f85e72dcfb",
+          "bytes": 955
+        },
+        "material/float-minus-zero.pcap": {
+          "sha256": "4d7ba8e80d109b4484621a92565e7b7cf4d742cb345b0eaa0d6af11aef3b0af4",
+          "bytes": 947
+        },
+        "material/double-nan.pcap": {
+          "sha256": "da03431627989d4cbd67232c52494ab75e7bf5a7f021a07617f93c9af3243230",
+          "bytes": 955
+        },
+        "material/guid.pcap": {
+          "sha256": "e4f4c8a919a092351db17956f46a796333ece25af2cad3adb4dabd98bb2aa5ef",
+          "bytes": 971
+        },
+        "material/nodeid.pcap": {
+          "sha256": "ca298856d8b194aa3e5c175bfef3a93c518c8a7c9f5d8cb4ada30fba252f8539",
+          "bytes": 947
+        },
+        "material/status-code.pcap": {
+          "sha256": "6086bd20b1f7d03770a341fe417be2eb2fbbcd8e6ec3a512beb8900c9a31a184",
+          "bytes": 947
+        },
+        "material/datetime.pcap": {
+          "sha256": "1dc829592419a801493561be2a9d2abb95b4a202949148d36c0430e089ef5163",
+          "bytes": 955
+        },
+        "material/null-scalar.pcap": {
+          "sha256": "be0b26eb10fbd50c9ecc9ccea0027c9817ab174c0bcecee9bdde807b3338ad4d",
+          "bytes": 939
+        },
+        "material/no-arguments.pcap": {
+          "sha256": "4250d7bf2ea1d4e38e2587f0c44f8987124582fa5646c7eba2542c477650c06e",
+          "bytes": 937
+        },
+        "material/input-output-cardinality-independent.pcap": {
+          "sha256": "0331d22bd85f7ef7a7c6ea6da5f45b7a07a4bdb571705d1d669fda809269acdb",
+          "bytes": 955
+        },
+        "material/multiple-method-order.pcap": {
+          "sha256": "a4f2e42b1b3994185d3bb9dafea6540ca7ea02ee8dc5ae9711ade552e5c00948",
+          "bytes": 1001
+        },
+        "material/invalid-argument-result.pcap": {
+          "sha256": "667149e5a95e606903c572fe2c9ca47d777b19d369f09a467788916e4df43184",
+          "bytes": 950
+        },
+        "material/invalid-argument-empty-diagnostic-entry.pcap": {
+          "sha256": "2cc06e8ac0c184536014d4ee761092de93051ad1dc4848bc3bed12aaba699799",
+          "bytes": 951
+        },
+        "material/bad-operation-no-output.pcap": {
+          "sha256": "d9d8836e0df1cd86fa1174609fca04d6949f7924a5e15ce701aff68d48163950",
+          "bytes": 946
+        },
+        "material/uncertain-operation-output.pcap": {
+          "sha256": "466fa8f1a0ae2f5cf56cb11118b27ea68a50e7ebdcbc4adda423863b696dcc11",
+          "bytes": 955
+        },
+        "material/bad-operation-with-output.pcap": {
+          "sha256": "439a74c70ddd86754f214608a732404b5ff6bb6e393ff78102591b5d38e7426d",
+          "bytes": 955
+        },
+        "material/good-operation-with-input-results.pcap": {
+          "sha256": "39a84531f4d4388353440defc7a9b7b3c1a0725e88ff4990e650ec57b2c0017a",
+          "bytes": 959
+        },
+        "material/input-result-count-mismatch.pcap": {
+          "sha256": "ae8feab5ff85928cc7bee30996a67fe83739f6743ff692000a92bc9836c03da4",
+          "bytes": 954
+        },
+        "material/input-diagnostic-count-mismatch.pcap": {
+          "sha256": "bc2b0576731add791bede9bb9499f0f1fcce55572c35bfa35d62c9d80c7ad2ef",
+          "bytes": 948
+        },
+        "material/result-count-mismatch.pcap": {
+          "sha256": "be382baa3f56a1b68b4ed3bec7501dcae6f247b200faa2f755fcac830c1d1699",
+          "bytes": 976
+        },
+        "material/handle-mismatch.pcap": {
+          "sha256": "62d1e939aead608f90ef89169cad9a2ce1e1b641e8b70f4b001d24f2c1d27d49",
+          "bytes": 955
+        },
+        "material/unobserved-request.pcap": {
+          "sha256": "76a9f6bb69a55c5a485b51f612a34e03823fb4f7f215408cdeb62efc39adcb78",
+          "bytes": 801
+        },
+        "material/bad-service-empty-results.pcap": {
+          "sha256": "74c740dd7ff54ddfb6342ab91135e981b1113601d3c6d9313504b1d7879c2ab9",
+          "bytes": 930
+        },
+        "material/truncated-diagnostic-array.pcap": {
+          "sha256": "8925a0b4739f35b3529767ddac0175414224e6f1d25c7772ff14c37d001b621c",
+          "bytes": 954
+        },
+        "material/trailing-octet.pcap": {
+          "sha256": "9f620da86eabbcdd1cc5ecd1768347dbbb0acf8be9f18c7195cc8badc2b5a83b",
+          "bytes": 956
+        },
+        "material/unsupported-array-argument.pcap": {
+          "sha256": "23237ee6848939606eedd768f1c65c8842ee952baaaa8d8251aa3b5582430680",
+          "bytes": 804
+        },
+        "material/method-count-budget.pcap": {
+          "sha256": "cd52a77ae967fb841bec3fb99ee372f5e8889ca7039b8784b122f9d5a504e45d",
+          "bytes": 800
+        },
+        "material/active-request-id-reuse.pcap": {
+          "sha256": "5018670847bbd981195975045933efe816cd21a3229041725a4bb7430b1d67e6",
+          "bytes": 954
+        },
+        "material/interleaved-call-requests.pcap": {
+          "sha256": "0a7299fe678fafc69b975f1f44e5d04e6a180609e0991d065d0c38cbc0f65aa4",
+          "bytes": 1264
+        },
+        "material/request-ua-chunks.pcap": {
+          "sha256": "628fe879d1e5d48ed2d9e7be2f95118a51600542c8571f044b1dc79a3d63c4d0",
+          "bytes": 1049
+        },
+        "material/response-ua-chunks.pcap": {
+          "sha256": "6ca50554cf41ed5fecdf1e7b754738b94c275bebb35773abce24de4c81574f1a",
+          "bytes": 1049
+        },
+        "material/outstanding-call-close.pcap": {
+          "sha256": "c6457dd2b0780993bca5d465c30bb1272e60c090bd68fee9bfd057931af703b0",
+          "bytes": 800
+        },
+        "material/partial-call-chunk-close.pcap": {
+          "sha256": "7d50389e4518f4bb73e97f38e032d5d35d127b73042cc541a736914c05740e61",
+          "bytes": 760
+        },
+        "material/completed-request-id-reuse.pcap": {
+          "sha256": "dc04079ab1fe080ef52c7603676ff3b92cf0a62e6c7d4b9604e0faee3eebbbda",
+          "bytes": 1264
+        },
+        "material/wrong-direction-unmatched.pcap": {
+          "sha256": "7c59f80a7a06c530d5f2183a0a50fe2e060b3f8e5fc9bfe3222e9ea231475a9c",
+          "bytes": 955
+        },
+        "material/per-method-input-counts.pcap": {
+          "sha256": "d887e02e0ce0a927ea31c94a2b9074d915288e7ec8d7fd086f2b6744dae5da52",
+          "bytes": 983
+        },
+        "material/per-method-input-counts-swapped.pcap": {
+          "sha256": "5d231887df251bf71b7d3495dcd2a9c8998f35c56e8d519f3f1572580a6ed53a",
+          "bytes": 983
+        },
+        "material/late-response-after-resource-refusal.pcap": {
+          "sha256": "b7ef238cf297f5dde17c44f0ac8009e6dc73ee5a737326867f6d920d8365ae6e",
+          "bytes": 1110
+        },
+        "material/abort-clears-request.pcap": {
+          "sha256": "ed99dc7cd973636bc061d67f4d62b6775cfef71e30878341bd1bf4ac341d35ae",
+          "bytes": 911
+        },
+        "generate.py": {
+          "sha256": "c58a72bd7ad31de6dffc457302bee281448c17890264c5871fb7aa51f7842b97",
+          "bytes": 12443
+        },
+        "emit.py": {
+          "sha256": "703b9097f0bb746340afbc9fd1e2e3ed449d9fdceb7959218630a756eae30e85",
+          "bytes": 593
+        },
+        "verify.py": {
+          "sha256": "d79e3f4f42a3fe5f0966efd0d449ad5ff7491285f099cc7460e8d9899b6f99cf",
+          "bytes": 1549
+        },
+        "seal.py": {
+          "sha256": "d2b0692e57a95b356d1246d092bfc90bd361dcfbf559f1fdd1467fe47daea8d0",
+          "bytes": 3662
+        },
+        "SOURCE.json": {
+          "sha256": "8081bd9b4e98a813111ed9d73c290ecdab66fc763cb01c6d0ef6304c74aea5ca",
+          "bytes": 2208
+        },
+        "SOURCE-primary.json": {
+          "sha256": "2b34bdecd408920b8e92da0996393fd7654920dc896b6c19dfed644016266862",
+          "bytes": 236
+        },
+        "required-tests-traffic-unified-v26.json": {
+          "sha256": "97ee8503d6f2c896a3df150c0359f583b122652c731dae6ae4912e196f414aab",
+          "bytes": 182785
+        },
+        "validation/expected.json": {
+          "bytes": 51545,
+          "sha256": "154ebcc6ac26f1a612edf4f2013e5528e59d40bae826a6b80d9aa787c514b302"
+        }
+      },
+      "aliases": {
+        "common/pcapx/pcaputil/opcua-call/material/cases.json": "material/cases.json",
+        "common/pcapx/pcaputil/opcua-call/manifest.json": "manifest.json",
+        "common/pcapx/pcaputil/opcua-call/material/uint64-input-int64-output.pcap": "material/uint64-input-int64-output.pcap",
+        "common/pcapx/pcaputil/opcua-call/material/empty-string.pcap": "material/empty-string.pcap",
+        "common/pcapx/pcaputil/opcua-call/material/null-string.pcap": "material/null-string.pcap",
+        "common/pcapx/pcaputil/opcua-call/material/byte-string.pcap": "material/byte-string.pcap",
+        "common/pcapx/pcaputil/opcua-call/material/null-bytes.pcap": "material/null-bytes.pcap",
+        "common/pcapx/pcaputil/opcua-call/material/bool.pcap": "material/bool.pcap",
+        "common/pcapx/pcaputil/opcua-call/material/uint64-max.pcap": "material/uint64-max.pcap",
+        "common/pcapx/pcaputil/opcua-call/material/int64-min.pcap": "material/int64-min.pcap",
+        "common/pcapx/pcaputil/opcua-call/material/float-minus-zero.pcap": "material/float-minus-zero.pcap",
+        "common/pcapx/pcaputil/opcua-call/material/double-nan.pcap": "material/double-nan.pcap",
+        "common/pcapx/pcaputil/opcua-call/material/guid.pcap": "material/guid.pcap",
+        "common/pcapx/pcaputil/opcua-call/material/nodeid.pcap": "material/nodeid.pcap",
+        "common/pcapx/pcaputil/opcua-call/material/status-code.pcap": "material/status-code.pcap",
+        "common/pcapx/pcaputil/opcua-call/material/datetime.pcap": "material/datetime.pcap",
+        "common/pcapx/pcaputil/opcua-call/material/null-scalar.pcap": "material/null-scalar.pcap",
+        "common/pcapx/pcaputil/opcua-call/material/no-arguments.pcap": "material/no-arguments.pcap",
+        "common/pcapx/pcaputil/opcua-call/material/input-output-cardinality-independent.pcap": "material/input-output-cardinality-independent.pcap",
+        "common/pcapx/pcaputil/opcua-call/material/multiple-method-order.pcap": "material/multiple-method-order.pcap",
+        "common/pcapx/pcaputil/opcua-call/material/invalid-argument-result.pcap": "material/invalid-argument-result.pcap",
+        "common/pcapx/pcaputil/opcua-call/material/invalid-argument-empty-diagnostic-entry.pcap": "material/invalid-argument-empty-diagnostic-entry.pcap",
+        "common/pcapx/pcaputil/opcua-call/material/bad-operation-no-output.pcap": "material/bad-operation-no-output.pcap",
+        "common/pcapx/pcaputil/opcua-call/material/uncertain-operation-output.pcap": "material/uncertain-operation-output.pcap",
+        "common/pcapx/pcaputil/opcua-call/material/bad-operation-with-output.pcap": "material/bad-operation-with-output.pcap",
+        "common/pcapx/pcaputil/opcua-call/material/good-operation-with-input-results.pcap": "material/good-operation-with-input-results.pcap",
+        "common/pcapx/pcaputil/opcua-call/material/input-result-count-mismatch.pcap": "material/input-result-count-mismatch.pcap",
+        "common/pcapx/pcaputil/opcua-call/material/input-diagnostic-count-mismatch.pcap": "material/input-diagnostic-count-mismatch.pcap",
+        "common/pcapx/pcaputil/opcua-call/material/result-count-mismatch.pcap": "material/result-count-mismatch.pcap",
+        "common/pcapx/pcaputil/opcua-call/material/handle-mismatch.pcap": "material/handle-mismatch.pcap",
+        "common/pcapx/pcaputil/opcua-call/material/unobserved-request.pcap": "material/unobserved-request.pcap",
+        "common/pcapx/pcaputil/opcua-call/material/bad-service-empty-results.pcap": "material/bad-service-empty-results.pcap",
+        "common/pcapx/pcaputil/opcua-call/material/truncated-diagnostic-array.pcap": "material/truncated-diagnostic-array.pcap",
+        "common/pcapx/pcaputil/opcua-call/material/trailing-octet.pcap": "material/trailing-octet.pcap",
+        "common/pcapx/pcaputil/opcua-call/material/unsupported-array-argument.pcap": "material/unsupported-array-argument.pcap",
+        "common/pcapx/pcaputil/opcua-call/material/method-count-budget.pcap": "material/method-count-budget.pcap",
+        "common/pcapx/pcaputil/opcua-call/material/active-request-id-reuse.pcap": "material/active-request-id-reuse.pcap",
+        "common/pcapx/pcaputil/opcua-call/material/interleaved-call-requests.pcap": "material/interleaved-call-requests.pcap",
+        "common/pcapx/pcaputil/opcua-call/material/request-ua-chunks.pcap": "material/request-ua-chunks.pcap",
+        "common/pcapx/pcaputil/opcua-call/material/response-ua-chunks.pcap": "material/response-ua-chunks.pcap",
+        "common/pcapx/pcaputil/opcua-call/material/outstanding-call-close.pcap": "material/outstanding-call-close.pcap",
+        "common/pcapx/pcaputil/opcua-call/material/partial-call-chunk-close.pcap": "material/partial-call-chunk-close.pcap",
+        "common/pcapx/pcaputil/opcua-call/material/completed-request-id-reuse.pcap": "material/completed-request-id-reuse.pcap",
+        "common/pcapx/pcaputil/opcua-call/material/wrong-direction-unmatched.pcap": "material/wrong-direction-unmatched.pcap",
+        "common/pcapx/pcaputil/opcua-call/material/per-method-input-counts.pcap": "material/per-method-input-counts.pcap",
+        "common/pcapx/pcaputil/opcua-call/material/per-method-input-counts-swapped.pcap": "material/per-method-input-counts-swapped.pcap",
+        "common/pcapx/pcaputil/opcua-call/material/late-response-after-resource-refusal.pcap": "material/late-response-after-resource-refusal.pcap",
+        "common/pcapx/pcaputil/opcua-call/material/abort-clears-request.pcap": "material/abort-clears-request.pcap",
+        "common/pcapx/pcaputil/opcua-call/generate.py": "generate.py",
+        "common/pcapx/pcaputil/opcua-call/emit.py": "emit.py",
+        "common/pcapx/pcaputil/opcua-call/verify.py": "verify.py",
+        "common/pcapx/pcaputil/opcua-call/seal.py": "seal.py",
+        "common/pcapx/pcaputil/opcua-call/SOURCE.json": "SOURCE.json",
+        "common/pcapx/pcaputil/opcua-call/SOURCE-primary.json": "SOURCE-primary.json",
+        "scripts/protocol-tests/required-tests-traffic-unified-v26.json": "required-tests-traffic-unified-v26.json",
+        "common/pcapx/pcaputil/opcua-call/required-tests-traffic-unified-v26.json": "required-tests-traffic-unified-v26.json"
+      }
+    },
+    {
+      "id": "validation-opcua-variant-arrays",
+      "kind": "validation",
+      "source_sha": "2cea5f59c04d2461c3695b0172d3f4adf5deda75",
+      "file": "validation-opcua-variant-arrays.zip",
+      "sha256": "7f501a8bee01501bb1e0c7673f58b627c3bdfc4a67c3d57b929a086125c0f1df",
+      "password": "bin-parser",
+      "members": {
+        "opcua-read-variants/material/cases.json": {
+          "sha256": "bf18a20e20ce9dd2bd4c022478bbc754c934498446316b6f3c32026cdee002e2",
+          "bytes": 228443
+        },
+        "opcua-read-variants/manifest.json": {
+          "sha256": "fb5c6c76a91ff759a2c9375aeae82a84f134a73e010448607c5715a71e512364",
+          "bytes": 8034
+        },
+        "opcua-read-variants/material/scalar-adjacent.pcap": {
+          "sha256": "3dda7c62384461a6c9f353d9018365e6ace804cf2870e74f27046f2dfec853db",
+          "bytes": 951
+        },
+        "opcua-read-variants/material/uint64.pcap": {
+          "sha256": "cd6691c10ec8c6b817a73080fcaf0d0ee74226304bfb928e39df5eb01f3b526a",
+          "bytes": 963
+        },
+        "opcua-read-variants/material/int64.pcap": {
+          "sha256": "349a213cceeb6de40c923bc46024cf5bf9f48d85abfb2be29ba50c5bb4f6d40c",
+          "bytes": 963
+        },
+        "opcua-read-variants/material/bool.pcap": {
+          "sha256": "e3fd766a235591add08f947ee9187ec3dc47611d8389ffbaa138303391260e2f",
+          "bytes": 949
+        },
+        "opcua-read-variants/material/sbyte.pcap": {
+          "sha256": "526bfbf568f5ba2626938b0b425006d9083454012bd005669e8bb21e0bb55d1a",
+          "bytes": 949
+        },
+        "opcua-read-variants/material/byte.pcap": {
+          "sha256": "ab44410287b4dec5f666f65201239db0813bbf72fca65b86aafe3e5b7ed500f1",
+          "bytes": 949
+        },
+        "opcua-read-variants/material/int16.pcap": {
+          "sha256": "ef0691665491efb5a9455777ea1aa7ba975000207915595a0a82e2b682f3d6cc",
+          "bytes": 951
+        },
+        "opcua-read-variants/material/uint16.pcap": {
+          "sha256": "2fc16851c99f461c65bb7a0e03d782a8d3845cac03ebc34495c271c1dbe89f0b",
+          "bytes": 951
+        },
+        "opcua-read-variants/material/int32.pcap": {
+          "sha256": "7dd9139b4a09d01039b799943e01bcc964139b0117c439bfa8f603c04ed9cddc",
+          "bytes": 955
+        },
+        "opcua-read-variants/material/uint32.pcap": {
+          "sha256": "337d1067babe0970054b95b219390c6f8ee8adbedbc3bcddd659f1829935ab21",
+          "bytes": 955
+        },
+        "opcua-read-variants/material/float.pcap": {
+          "sha256": "3641400ed00d7a4af5cc751998296c4dc82e5c21fd15940611f19613fd00a8f7",
+          "bytes": 959
+        },
+        "opcua-read-variants/material/double.pcap": {
+          "sha256": "3e6bcf7ec348d7b97ab93e5c16e2c70a8069155f5aa7e2943663d0caa217781f",
+          "bytes": 971
+        },
+        "opcua-read-variants/material/strings.pcap": {
+          "sha256": "88cb40f11c624801a125c8826b00bf28210c5fe019d052d46fa5c0ae62eb7430",
+          "bytes": 965
+        },
+        "opcua-read-variants/material/bytes.pcap": {
+          "sha256": "35c82d1205a5fcf3c5d5e39712f2653e6adfe77b1260048bde2eaf08e610bc6d",
+          "bytes": 961
+        },
+        "opcua-read-variants/material/datetime.pcap": {
+          "sha256": "c072783314c14ec86a4d80b5d99e244213308e8b7d38126a07964395deaeb33d",
+          "bytes": 955
+        },
+        "opcua-read-variants/material/guid.pcap": {
+          "sha256": "7a72d41dd4ab53feeefe44e98da751b4b7b49744649b3909e215f63b50f06382",
+          "bytes": 963
+        },
+        "opcua-read-variants/material/nodeid.pcap": {
+          "sha256": "8cff3f8c4676eab4e7be6415b1d52cebbf85d07688c60b38ebb91c048133ddef",
+          "bytes": 964
+        },
+        "opcua-read-variants/material/status.pcap": {
+          "sha256": "d572fbbcd4bdff979036fe457709c2b447d3615a44d52f93e7fd65891b0c02da",
+          "bytes": 955
+        },
+        "opcua-read-variants/material/empty-array.pcap": {
+          "sha256": "c78b3ec1990b5e8086b68b4a2894d492cb186edd0850fa3b9d07863214f9d5c1",
+          "bytes": 947
+        },
+        "opcua-read-variants/material/null-array.pcap": {
+          "sha256": "11f64114e5a631cc67ace50cfbc782caa95c9df367798d1778de284c03380325",
+          "bytes": 947
+        },
+        "opcua-read-variants/material/matrix-two-dimensions.pcap": {
+          "sha256": "0b48bdc6307f8fb1b0238be5eae99ffeca4d4e8976878d5d7218b3f1fa692460",
+          "bytes": 975
+        },
+        "opcua-read-variants/material/matrix-three-dimensions.pcap": {
+          "sha256": "b98e521572320d82257f508a86bfec87c9f810c1dcb66d13b67b33dd505daae0",
+          "bytes": 995
+        },
+        "opcua-read-variants/material/dimensions-without-array.pcap": {
+          "sha256": "5308d24adb17c5ad95a40b967796ddbd29d9e818fac20ba07ac766eaa84c2358",
+          "bytes": 975
+        },
+        "opcua-read-variants/material/null-with-dimensions.pcap": {
+          "sha256": "4cf488ef329439ec64f785a3f66c308e084a3f0ade3e283ea843f7c240d43729",
+          "bytes": 959
+        },
+        "opcua-read-variants/material/empty-with-dimensions.pcap": {
+          "sha256": "04fe622ccd957a7238f1f64d0c0331b7f707b3f48f7500cf8afdcd3a2c89bf4d",
+          "bytes": 959
+        },
+        "opcua-read-variants/material/rank-zero.pcap": {
+          "sha256": "f0544f60b403ab05acd2312a7a99b8fe157d56e66d924135ff7513cd547709dc",
+          "bytes": 975
+        },
+        "opcua-read-variants/material/rank-one.pcap": {
+          "sha256": "1536c86a888faa563a520c0b1882f54a4da7ae666d6c8b2e455636a130c09145",
+          "bytes": 975
+        },
+        "opcua-read-variants/material/rank-null.pcap": {
+          "sha256": "9a2f476befbe21fcc29e654a7e0ba1200e317646961b7d97ddd120e09c9829b0",
+          "bytes": 975
+        },
+        "opcua-read-variants/material/negative-dimension.pcap": {
+          "sha256": "fdd5436586cc2bb587ae92aaa2a1cfffd94fe53c431d06bfd4f32a8f6e00a0c9",
+          "bytes": 975
+        },
+        "opcua-read-variants/material/zero-dimension.pcap": {
+          "sha256": "6c26eb0849806b06396574c2047e2e741e05413f327e1b62ec0df5a2c6a90365",
+          "bytes": 975
+        },
+        "opcua-read-variants/material/product-too-small.pcap": {
+          "sha256": "b90bccdad9da789be5c74c4fcb19d9502742618ec3cbfad7f8a7dd76307bc084",
+          "bytes": 975
+        },
+        "opcua-read-variants/material/product-too-large.pcap": {
+          "sha256": "8668ef62b6cbdd3a1952b80cadad1572c142a1222253d221042b99c1ca2eb49f",
+          "bytes": 975
+        },
+        "opcua-read-variants/material/product-overflow.pcap": {
+          "sha256": "c227b3a88dddcb2b3fac2da9752204285acab4e1364ad411fe492666d36f62c5",
+          "bytes": 975
+        },
+        "opcua-read-variants/material/negative-array-length.pcap": {
+          "sha256": "96d0d35877d122b82993de56fd4078c8f899eefa6aecb6d16cb4a335f81f50d9",
+          "bytes": 975
+        },
+        "opcua-read-variants/material/huge-array-length.pcap": {
+          "sha256": "7fa63dd15f96a96418b27b2a9ac34bdc5a25fd3b72f2777bf31f2b8b6938e46e",
+          "bytes": 975
+        },
+        "opcua-read-variants/material/truncated-element.pcap": {
+          "sha256": "ad5b34669629902410b6ff489812f60e9395ee467cb461020f594eafc21206ee",
+          "bytes": 950
+        },
+        "opcua-read-variants/material/truncated-dimensions.pcap": {
+          "sha256": "9354e1d964d5f3ff3855c5f2d98a0dfbf2398a1ed0ea29a91110e20bfe584959",
+          "bytes": 974
+        },
+        "opcua-read-variants/material/trailing-octet.pcap": {
+          "sha256": "9dc6b51fc15152a495982f64f583b8af58ee8436c1a7cd39935fdcb687f277f3",
+          "bytes": 976
+        },
+        "opcua-write-variants/material/cases.json": {
+          "sha256": "45dd4a5fa0ad64ca25dac01f5719a405895d7c3e2c25ec9a615d46700530c11d",
+          "bytes": 174584
+        },
+        "opcua-write-variants/manifest.json": {
+          "sha256": "133a66a00dab84363f4ecde43218f7a6ff68026fed7fe86a4058f3c93d4a2295",
+          "bytes": 8035
+        },
+        "opcua-write-variants/material/scalar-adjacent.pcap": {
+          "sha256": "e6d645c4d10a2d3666646de1e055089d4a7769687178f739ec2b11cca027ba25",
+          "bytes": 937
+        },
+        "opcua-write-variants/material/uint64.pcap": {
+          "sha256": "e4e94768f41939f4ffc53c464ee069b960a157225a4e4c34d634aa8e0effa0c6",
+          "bytes": 949
+        },
+        "opcua-write-variants/material/int64.pcap": {
+          "sha256": "db96a684a3c6e1ff5894562379b17a0cf95453a4fd7ce705fe27096e3ba09f3b",
+          "bytes": 949
+        },
+        "opcua-write-variants/material/bool.pcap": {
+          "sha256": "e3440a10b88f9b9dfbb094ec1a063fd54421f848191e0eb97183132d07dc53ce",
+          "bytes": 935
+        },
+        "opcua-write-variants/material/sbyte.pcap": {
+          "sha256": "fb10b63ec5606b5bd68f9347febe52047c48a4391ad26314bdbc0a1363f2bd41",
+          "bytes": 935
+        },
+        "opcua-write-variants/material/byte.pcap": {
+          "sha256": "b4cfcddeeefb1cfb10ff27ae1d765e2cf8c3cd9c1736fd601a9506917c3fbb47",
+          "bytes": 935
+        },
+        "opcua-write-variants/material/int16.pcap": {
+          "sha256": "db5f7eb936e50b823db10fed1c7fbf4ef121be130d136dcb7719f7fe42b91ed0",
+          "bytes": 937
+        },
+        "opcua-write-variants/material/uint16.pcap": {
+          "sha256": "4500c22ee4e28081990e0f4aa9d2963c69f221880eb41005a8b38c76251f1a4a",
+          "bytes": 937
+        },
+        "opcua-write-variants/material/int32.pcap": {
+          "sha256": "73e1e02c1806e0c7e252d3c3ba531c0b01fdbcaa75fb8045a81b5101358fc281",
+          "bytes": 941
+        },
+        "opcua-write-variants/material/uint32.pcap": {
+          "sha256": "43a2390bd872ef21a7be8a7770c271be824ec7a88d361e4ba4158d5fb17fff62",
+          "bytes": 941
+        },
+        "opcua-write-variants/material/float.pcap": {
+          "sha256": "57e9d2bd7151b70f5f751318d6ab97d4cdbfc428acf448330ea792346025f36f",
+          "bytes": 945
+        },
+        "opcua-write-variants/material/double.pcap": {
+          "sha256": "8863924318a37585f2104178031ec182affdb0f531255c0ceb1f35eb4a97b015",
+          "bytes": 957
+        },
+        "opcua-write-variants/material/strings.pcap": {
+          "sha256": "5102d7842f2355aadddb26d399854571ee600210a847acd3d5914cf104f66ae0",
+          "bytes": 951
+        },
+        "opcua-write-variants/material/bytes.pcap": {
+          "sha256": "67d408388e4dafa88beb3e78574f61a6cefcbe25ff7099e407555803a5838be2",
+          "bytes": 947
+        },
+        "opcua-write-variants/material/datetime.pcap": {
+          "sha256": "4d17eb33fe7a4c9373e9a43ae1b763bc44bdeeb710fe55cae5de375d70e7bc2a",
+          "bytes": 941
+        },
+        "opcua-write-variants/material/guid.pcap": {
+          "sha256": "c52cac6024fd63537c274829c94d5f987e4439b31eb1efc82a857a631fec81eb",
+          "bytes": 949
+        },
+        "opcua-write-variants/material/nodeid.pcap": {
+          "sha256": "33681008e8a38eb5c6573483bdf32f9396e3c558ecffd924b53bad991c5bc119",
+          "bytes": 950
+        },
+        "opcua-write-variants/material/status.pcap": {
+          "sha256": "39fa807f1759266c1716149784e4aeef44b7f26f04b7e1a6580605bf6e6deb53",
+          "bytes": 941
+        },
+        "opcua-write-variants/material/empty-array.pcap": {
+          "sha256": "6161854960b9217cf24475be4cf3421c35d4f14319ed99b888576cf8ece7d2a0",
+          "bytes": 933
+        },
+        "opcua-write-variants/material/null-array.pcap": {
+          "sha256": "d9c450775ed3bca02439fad5531e8ca66dd5c8ee3d8df86346f97673ea1f19d2",
+          "bytes": 933
+        },
+        "opcua-write-variants/material/matrix-two-dimensions.pcap": {
+          "sha256": "a3994674bd3e435b14cf96efaa83d6a180c6e3544962eefb17ec579e651b3ad7",
+          "bytes": 961
+        },
+        "opcua-write-variants/material/matrix-three-dimensions.pcap": {
+          "sha256": "1a5a4455b02fd1887c184ade5f88f2d2b5330dd2d2dd620ab140b009fd789e28",
+          "bytes": 981
+        },
+        "opcua-write-variants/material/dimensions-without-array.pcap": {
+          "sha256": "d8a2eb08859e403e95b332ac7e477d283f04a62cf3279005e8075f5e0a02b548",
+          "bytes": 827
+        },
+        "opcua-write-variants/material/null-with-dimensions.pcap": {
+          "sha256": "d2b4ee75ab0134aa239142d91d459c4b8505305cdf10a17e39add63771866001",
+          "bytes": 811
+        },
+        "opcua-write-variants/material/empty-with-dimensions.pcap": {
+          "sha256": "aa7ed19a49e2094d2bad4aaf30ce7c53068d21683d842d2a80178c3274334553",
+          "bytes": 811
+        },
+        "opcua-write-variants/material/rank-zero.pcap": {
+          "sha256": "ec996d6f5172dda6f01006e6543d0ddce9d468b474d4595254d0c08019a14ab1",
+          "bytes": 827
+        },
+        "opcua-write-variants/material/rank-one.pcap": {
+          "sha256": "8bc15a93f5445894e60e4ef1e5e0f4b4a4652fb4d560e28860281837f7750088",
+          "bytes": 827
+        },
+        "opcua-write-variants/material/rank-null.pcap": {
+          "sha256": "f2fb5d399bcd8fa4f4b3d2bec3d6c2971749b2f2168ee5ec1e2c348d7d59ae39",
+          "bytes": 827
+        },
+        "opcua-write-variants/material/negative-dimension.pcap": {
+          "sha256": "fceea5e534b9445a164f9781915d5b09c11aa47aa4d290aa5ef50edae9f9a167",
+          "bytes": 827
+        },
+        "opcua-write-variants/material/zero-dimension.pcap": {
+          "sha256": "6dc4dbf3c54c433a32d61c3bb77af75d258260f2c1c97f8c58811ec460d6167c",
+          "bytes": 827
+        },
+        "opcua-write-variants/material/product-too-small.pcap": {
+          "sha256": "ebeebc5b1e8b84ef003a4e373ede11c272bd8c2caac866450f4a3e21fe473693",
+          "bytes": 827
+        },
+        "opcua-write-variants/material/product-too-large.pcap": {
+          "sha256": "d3663d619cc0fc40ecaf95938b4570c4847fac324b8683ce7599338b193cf618",
+          "bytes": 827
+        },
+        "opcua-write-variants/material/product-overflow.pcap": {
+          "sha256": "c07a00f0f8b842705cbd0f8649a4063300d3362a910e9bb2c0244ed06ed5b704",
+          "bytes": 827
+        },
+        "opcua-write-variants/material/negative-array-length.pcap": {
+          "sha256": "9fcba333b6cdf1e54dcca45f56732bfe676b9873c87d955a26ab7fc11779d882",
+          "bytes": 827
+        },
+        "opcua-write-variants/material/huge-array-length.pcap": {
+          "sha256": "38d37b7d503a4a3a9fa9684289f8064ea2eaf1d5194b29377bf9b527b7752401",
+          "bytes": 827
+        },
+        "opcua-write-variants/material/truncated-element.pcap": {
+          "sha256": "43d77795a85af218aad9be5f73e403a94940765bed363613a2b9309261024682",
+          "bytes": 802
+        },
+        "opcua-write-variants/material/truncated-dimensions.pcap": {
+          "sha256": "bc6efb2d30035a99049148e5ff307688ca421685dc838f70701873a575e46d69",
+          "bytes": 826
+        },
+        "opcua-write-variants/material/trailing-octet.pcap": {
+          "sha256": "69d119dd6b92ade248aabdcbabd99df7411ea17dc1433756e3e334522c790576",
+          "bytes": 828
+        },
+        "opcua-call-variants/material/cases.json": {
+          "sha256": "84d96ea87e2164d66c4657da75d4d903511557cf39b304e0267adaec9c4b7e8d",
+          "bytes": 221389
+        },
+        "opcua-call-variants/manifest.json": {
+          "sha256": "a25a616a4e8a0b67e7b6c9264c69841118b27618860d90f67a6883624b5538c8",
+          "bytes": 8548
+        },
+        "opcua-call-variants/material/scalar-adjacent.pcap": {
+          "sha256": "c2d1a7f0bec5e2beb4981e5fe18899b1439e8ef06538dce51093f52010dbfb5d",
+          "bytes": 955
+        },
+        "opcua-call-variants/material/uint64.pcap": {
+          "sha256": "583451db7963ccc84fae3caccf9b5c2c9bef98288e4c58796ee19fe4434b1fa9",
+          "bytes": 979
+        },
+        "opcua-call-variants/material/int64.pcap": {
+          "sha256": "4c68d88675e9abe7a1efc7a5d6938b9b632901b1489043ce2ef8d8f9f3ef6aac",
+          "bytes": 979
+        },
+        "opcua-call-variants/material/bool.pcap": {
+          "sha256": "44baa836a183e39faa9258b3251f5a350d9bc10d0fb5de7fbed0a92933d8064e",
+          "bytes": 951
+        },
+        "opcua-call-variants/material/sbyte.pcap": {
+          "sha256": "64e79d97b2ddb96f38feb479aad5e5749a9a1a8dbd10b949e1256f0ead1f5479",
+          "bytes": 951
+        },
+        "opcua-call-variants/material/byte.pcap": {
+          "sha256": "fdb8dace70353310a1d07fe8500f99ebfd6b5e64f0dcc45e2283854df2b3da33",
+          "bytes": 951
+        },
+        "opcua-call-variants/material/int16.pcap": {
+          "sha256": "01be235d134c9d2bce0fc52b0405495b5a5727135338486829fada46d869264d",
+          "bytes": 955
+        },
+        "opcua-call-variants/material/uint16.pcap": {
+          "sha256": "ac50db603ce2ee55d446911df28204ac0ae699611854af88d45b3fb74dcb26da",
+          "bytes": 955
+        },
+        "opcua-call-variants/material/int32.pcap": {
+          "sha256": "99500e295d1b48b7497006ff2ef3f7f3132d48f13f58a21da96e23476ec570f8",
+          "bytes": 963
+        },
+        "opcua-call-variants/material/uint32.pcap": {
+          "sha256": "4b3015f08da1f28d922cb037f778eff1e674cc87c5071ceb7601c1c9cca0935b",
+          "bytes": 963
+        },
+        "opcua-call-variants/material/float.pcap": {
+          "sha256": "b195fa4cd1b7151c890b1a9e0792440848975ab03018e422ed58d63777f13ab2",
+          "bytes": 971
+        },
+        "opcua-call-variants/material/double.pcap": {
+          "sha256": "2d1406ee7d9de0c16ee1bbda122738a49f48ce24476e600e27049e5a46b8694f",
+          "bytes": 995
+        },
+        "opcua-call-variants/material/strings.pcap": {
+          "sha256": "531dea448697774dfae2a5a86aa9ae8ca0a0bb20362bcfb022e85b2bcf3e7e20",
+          "bytes": 983
+        },
+        "opcua-call-variants/material/bytes.pcap": {
+          "sha256": "8ff638649e06c5d94b3a9c26513585114294de3ce70614b221a6fa03735b8157",
+          "bytes": 975
+        },
+        "opcua-call-variants/material/datetime.pcap": {
+          "sha256": "57b370ee102c2ae3dc3972cf98a9b903b518366962582a1233531ec1638779e3",
+          "bytes": 963
+        },
+        "opcua-call-variants/material/guid.pcap": {
+          "sha256": "fc514d106226150eaf65f0f1836c59bfac1c88fb3d2b4d42b200437bc1d5f30c",
+          "bytes": 979
+        },
+        "opcua-call-variants/material/nodeid.pcap": {
+          "sha256": "92c2825ba9001b545908d034a308185fd150407439be5d13b062cc9b1540b0b6",
+          "bytes": 981
+        },
+        "opcua-call-variants/material/status.pcap": {
+          "sha256": "684e68ed54859c5caf16aadc5e73e9401ba71aff91b5f0a4193d56768e544c9c",
+          "bytes": 963
+        },
+        "opcua-call-variants/material/empty-array.pcap": {
+          "sha256": "e559faf5a36df349de30f67bf422b6c7c1585851daae16da4354b9d009c66c47",
+          "bytes": 947
+        },
+        "opcua-call-variants/material/null-array.pcap": {
+          "sha256": "f67efabf4024ff89f4e26916171e25522a28a761ecf9ecb190e07cd8691fafa8",
+          "bytes": 947
+        },
+        "opcua-call-variants/material/matrix-two-dimensions.pcap": {
+          "sha256": "169d8aa0a5e3b6182b45917c41c7e9401c8f7187ab4fe7f22cebb788a2c45143",
+          "bytes": 1003
+        },
+        "opcua-call-variants/material/matrix-three-dimensions.pcap": {
+          "sha256": "5554d915e57abbf759fa2833c78896b722e9d4bd3eacd27337a3e90188878fb0",
+          "bytes": 1043
+        },
+        "opcua-call-variants/material/dimensions-without-array.pcap": {
+          "sha256": "224b5314706adbfe582b0f577d45183f30bfa2f08d0ba15f38ef193f1731c475",
+          "bytes": 824
+        },
+        "opcua-call-variants/material/null-with-dimensions.pcap": {
+          "sha256": "46301a8ba35d2c215322e5d5abd43da7fb0693aea6345cfdb8213672ba903efa",
+          "bytes": 808
+        },
+        "opcua-call-variants/material/empty-with-dimensions.pcap": {
+          "sha256": "3562250b42d3fcab07818458643d4ce991eacf446f66d9a3634a96e95bc4af07",
+          "bytes": 808
+        },
+        "opcua-call-variants/material/rank-zero.pcap": {
+          "sha256": "8f19c24cd7d074d0595941cd557b70ebb223bd9c876ffe8b6ecf8d5c571ac162",
+          "bytes": 824
+        },
+        "opcua-call-variants/material/rank-one.pcap": {
+          "sha256": "9aafc3c6dc0fcd657bcbc539a66028cfc4a9f328e1d6825e5eb7103d3380d63e",
+          "bytes": 824
+        },
+        "opcua-call-variants/material/rank-null.pcap": {
+          "sha256": "12255275ad1a9f1687b05413cc9cbf9cfe7b7ca9dfabdf72ab9ae812c1ae45dd",
+          "bytes": 824
+        },
+        "opcua-call-variants/material/negative-dimension.pcap": {
+          "sha256": "9fc7f46a61f20bb18abdec05be9fc21e659ee89b4ac03073307b8e392977fcfa",
+          "bytes": 824
+        },
+        "opcua-call-variants/material/zero-dimension.pcap": {
+          "sha256": "9ecdfb11f6ce0afcc25ca9d688a28c29b2587e82b8ac742267381585ce24c765",
+          "bytes": 824
+        },
+        "opcua-call-variants/material/product-too-small.pcap": {
+          "sha256": "3f883ef8262d61b89fb738a1771bf0b3976a3385b3c805cd9004d28ab0902e85",
+          "bytes": 824
+        },
+        "opcua-call-variants/material/product-too-large.pcap": {
+          "sha256": "11969d9141a48d6f0a1e4108acbaef49304a5c66f73e86f497ba7259469db274",
+          "bytes": 824
+        },
+        "opcua-call-variants/material/product-overflow.pcap": {
+          "sha256": "4139fa71bb5b2dafd3468a1f5dc1ff917bbb59092b99c59611da50db00d484fd",
+          "bytes": 824
+        },
+        "opcua-call-variants/material/negative-array-length.pcap": {
+          "sha256": "c7e5a4eb604a3942dca8557d5cc9d53991ccb6ea34a73a4b9807434338701956",
+          "bytes": 824
+        },
+        "opcua-call-variants/material/huge-array-length.pcap": {
+          "sha256": "f0574575da1e2d49a74c136d4c84e3f9d39395c6bd4996e1f5a04103a29df7fd",
+          "bytes": 824
+        },
+        "opcua-call-variants/material/truncated-element.pcap": {
+          "sha256": "8f32d16164d147c077b8dc0f8e67eb4a3fab7cf53749025580e0a580518fd38e",
+          "bytes": 799
+        },
+        "opcua-call-variants/material/truncated-dimensions.pcap": {
+          "sha256": "a3c7a78f2c30a12c71d36baa2cc7992617b6f4937e3d8770d55a94a746e3fd8b",
+          "bytes": 823
+        },
+        "opcua-call-variants/material/trailing-octet.pcap": {
+          "sha256": "55d45f9948468942d3d898b525525d0c909b627beb57fda40e462b024b8c7e99",
+          "bytes": 825
+        },
+        "opcua-call-variants/material/array-is-one-method-argument.pcap": {
+          "sha256": "79735fbbb17e9ea1696cfac594518344fc7ff5c42d45203f25e282bc09bf9a38",
+          "bytes": 954
+        },
+        "opcua-call-variants/material/array-element-count-is-not-argument-count.pcap": {
+          "sha256": "80959dd6c7648cdde2a1107bb753235767c46d43328019bddd31069d21d4abad",
+          "bytes": 958
+        },
+        "generate.py": {
+          "sha256": "48570318a5dda853ba823e969c1ea8bd6b7b9cfdb1169be3f6b25e6c9f11eca5",
+          "bytes": 8685
+        },
+        "emit.py": {
+          "sha256": "75ed008f4852ec78b432e917f4e56d12369643ee6c0f551d0c5fd23d5af5ae11",
+          "bytes": 661
+        },
+        "verify.py": {
+          "sha256": "90e2910ab19e6df694ec8fc34793ec90a423e1d8e38c3ac8c8c6e5c8e1b58e36",
+          "bytes": 1583
+        },
+        "seal.py": {
+          "sha256": "9f8735816ddf301c4eb00fc69368394b40f4f460645ee64007f9c44db43dbf8d",
+          "bytes": 3744
+        },
+        "SOURCE.json": {
+          "sha256": "af9d16e000dcefb8fc6932adc3c766b0d4ee5990ab6dc0beef644a1dabd28d71",
+          "bytes": 464
+        },
+        "required-tests-traffic-unified-v27.json": {
+          "sha256": "57ff4f2b8f9f75bb3084aa901d594cf64d6b0f43a657e83fbdf786f30a958635",
+          "bytes": 221860
+        },
+        "validation/expected.json": {
+          "sha256": "e0a413c131df598f4a0cb98d3896dea2bb2554294c253ba0a2b292a4423e3900",
+          "bytes": 131419
+        }
+      },
+      "aliases": {
+        "common/pcapx/pcaputil/opcua-read-variants/material/cases.json": "opcua-read-variants/material/cases.json",
+        "common/pcapx/pcaputil/opcua-read-variants/manifest.json": "opcua-read-variants/manifest.json",
+        "common/pcapx/pcaputil/opcua-read-variants/material/scalar-adjacent.pcap": "opcua-read-variants/material/scalar-adjacent.pcap",
+        "common/pcapx/pcaputil/opcua-read-variants/material/uint64.pcap": "opcua-read-variants/material/uint64.pcap",
+        "common/pcapx/pcaputil/opcua-read-variants/material/int64.pcap": "opcua-read-variants/material/int64.pcap",
+        "common/pcapx/pcaputil/opcua-read-variants/material/bool.pcap": "opcua-read-variants/material/bool.pcap",
+        "common/pcapx/pcaputil/opcua-read-variants/material/sbyte.pcap": "opcua-read-variants/material/sbyte.pcap",
+        "common/pcapx/pcaputil/opcua-read-variants/material/byte.pcap": "opcua-read-variants/material/byte.pcap",
+        "common/pcapx/pcaputil/opcua-read-variants/material/int16.pcap": "opcua-read-variants/material/int16.pcap",
+        "common/pcapx/pcaputil/opcua-read-variants/material/uint16.pcap": "opcua-read-variants/material/uint16.pcap",
+        "common/pcapx/pcaputil/opcua-read-variants/material/int32.pcap": "opcua-read-variants/material/int32.pcap",
+        "common/pcapx/pcaputil/opcua-read-variants/material/uint32.pcap": "opcua-read-variants/material/uint32.pcap",
+        "common/pcapx/pcaputil/opcua-read-variants/material/float.pcap": "opcua-read-variants/material/float.pcap",
+        "common/pcapx/pcaputil/opcua-read-variants/material/double.pcap": "opcua-read-variants/material/double.pcap",
+        "common/pcapx/pcaputil/opcua-read-variants/material/strings.pcap": "opcua-read-variants/material/strings.pcap",
+        "common/pcapx/pcaputil/opcua-read-variants/material/bytes.pcap": "opcua-read-variants/material/bytes.pcap",
+        "common/pcapx/pcaputil/opcua-read-variants/material/datetime.pcap": "opcua-read-variants/material/datetime.pcap",
+        "common/pcapx/pcaputil/opcua-read-variants/material/guid.pcap": "opcua-read-variants/material/guid.pcap",
+        "common/pcapx/pcaputil/opcua-read-variants/material/nodeid.pcap": "opcua-read-variants/material/nodeid.pcap",
+        "common/pcapx/pcaputil/opcua-read-variants/material/status.pcap": "opcua-read-variants/material/status.pcap",
+        "common/pcapx/pcaputil/opcua-read-variants/material/empty-array.pcap": "opcua-read-variants/material/empty-array.pcap",
+        "common/pcapx/pcaputil/opcua-read-variants/material/null-array.pcap": "opcua-read-variants/material/null-array.pcap",
+        "common/pcapx/pcaputil/opcua-read-variants/material/matrix-two-dimensions.pcap": "opcua-read-variants/material/matrix-two-dimensions.pcap",
+        "common/pcapx/pcaputil/opcua-read-variants/material/matrix-three-dimensions.pcap": "opcua-read-variants/material/matrix-three-dimensions.pcap",
+        "common/pcapx/pcaputil/opcua-read-variants/material/dimensions-without-array.pcap": "opcua-read-variants/material/dimensions-without-array.pcap",
+        "common/pcapx/pcaputil/opcua-read-variants/material/null-with-dimensions.pcap": "opcua-read-variants/material/null-with-dimensions.pcap",
+        "common/pcapx/pcaputil/opcua-read-variants/material/empty-with-dimensions.pcap": "opcua-read-variants/material/empty-with-dimensions.pcap",
+        "common/pcapx/pcaputil/opcua-read-variants/material/rank-zero.pcap": "opcua-read-variants/material/rank-zero.pcap",
+        "common/pcapx/pcaputil/opcua-read-variants/material/rank-one.pcap": "opcua-read-variants/material/rank-one.pcap",
+        "common/pcapx/pcaputil/opcua-read-variants/material/rank-null.pcap": "opcua-read-variants/material/rank-null.pcap",
+        "common/pcapx/pcaputil/opcua-read-variants/material/negative-dimension.pcap": "opcua-read-variants/material/negative-dimension.pcap",
+        "common/pcapx/pcaputil/opcua-read-variants/material/zero-dimension.pcap": "opcua-read-variants/material/zero-dimension.pcap",
+        "common/pcapx/pcaputil/opcua-read-variants/material/product-too-small.pcap": "opcua-read-variants/material/product-too-small.pcap",
+        "common/pcapx/pcaputil/opcua-read-variants/material/product-too-large.pcap": "opcua-read-variants/material/product-too-large.pcap",
+        "common/pcapx/pcaputil/opcua-read-variants/material/product-overflow.pcap": "opcua-read-variants/material/product-overflow.pcap",
+        "common/pcapx/pcaputil/opcua-read-variants/material/negative-array-length.pcap": "opcua-read-variants/material/negative-array-length.pcap",
+        "common/pcapx/pcaputil/opcua-read-variants/material/huge-array-length.pcap": "opcua-read-variants/material/huge-array-length.pcap",
+        "common/pcapx/pcaputil/opcua-read-variants/material/truncated-element.pcap": "opcua-read-variants/material/truncated-element.pcap",
+        "common/pcapx/pcaputil/opcua-read-variants/material/truncated-dimensions.pcap": "opcua-read-variants/material/truncated-dimensions.pcap",
+        "common/pcapx/pcaputil/opcua-read-variants/material/trailing-octet.pcap": "opcua-read-variants/material/trailing-octet.pcap",
+        "common/pcapx/pcaputil/opcua-write-variants/material/cases.json": "opcua-write-variants/material/cases.json",
+        "common/pcapx/pcaputil/opcua-write-variants/manifest.json": "opcua-write-variants/manifest.json",
+        "common/pcapx/pcaputil/opcua-write-variants/material/scalar-adjacent.pcap": "opcua-write-variants/material/scalar-adjacent.pcap",
+        "common/pcapx/pcaputil/opcua-write-variants/material/uint64.pcap": "opcua-write-variants/material/uint64.pcap",
+        "common/pcapx/pcaputil/opcua-write-variants/material/int64.pcap": "opcua-write-variants/material/int64.pcap",
+        "common/pcapx/pcaputil/opcua-write-variants/material/bool.pcap": "opcua-write-variants/material/bool.pcap",
+        "common/pcapx/pcaputil/opcua-write-variants/material/sbyte.pcap": "opcua-write-variants/material/sbyte.pcap",
+        "common/pcapx/pcaputil/opcua-write-variants/material/byte.pcap": "opcua-write-variants/material/byte.pcap",
+        "common/pcapx/pcaputil/opcua-write-variants/material/int16.pcap": "opcua-write-variants/material/int16.pcap",
+        "common/pcapx/pcaputil/opcua-write-variants/material/uint16.pcap": "opcua-write-variants/material/uint16.pcap",
+        "common/pcapx/pcaputil/opcua-write-variants/material/int32.pcap": "opcua-write-variants/material/int32.pcap",
+        "common/pcapx/pcaputil/opcua-write-variants/material/uint32.pcap": "opcua-write-variants/material/uint32.pcap",
+        "common/pcapx/pcaputil/opcua-write-variants/material/float.pcap": "opcua-write-variants/material/float.pcap",
+        "common/pcapx/pcaputil/opcua-write-variants/material/double.pcap": "opcua-write-variants/material/double.pcap",
+        "common/pcapx/pcaputil/opcua-write-variants/material/strings.pcap": "opcua-write-variants/material/strings.pcap",
+        "common/pcapx/pcaputil/opcua-write-variants/material/bytes.pcap": "opcua-write-variants/material/bytes.pcap",
+        "common/pcapx/pcaputil/opcua-write-variants/material/datetime.pcap": "opcua-write-variants/material/datetime.pcap",
+        "common/pcapx/pcaputil/opcua-write-variants/material/guid.pcap": "opcua-write-variants/material/guid.pcap",
+        "common/pcapx/pcaputil/opcua-write-variants/material/nodeid.pcap": "opcua-write-variants/material/nodeid.pcap",
+        "common/pcapx/pcaputil/opcua-write-variants/material/status.pcap": "opcua-write-variants/material/status.pcap",
+        "common/pcapx/pcaputil/opcua-write-variants/material/empty-array.pcap": "opcua-write-variants/material/empty-array.pcap",
+        "common/pcapx/pcaputil/opcua-write-variants/material/null-array.pcap": "opcua-write-variants/material/null-array.pcap",
+        "common/pcapx/pcaputil/opcua-write-variants/material/matrix-two-dimensions.pcap": "opcua-write-variants/material/matrix-two-dimensions.pcap",
+        "common/pcapx/pcaputil/opcua-write-variants/material/matrix-three-dimensions.pcap": "opcua-write-variants/material/matrix-three-dimensions.pcap",
+        "common/pcapx/pcaputil/opcua-write-variants/material/dimensions-without-array.pcap": "opcua-write-variants/material/dimensions-without-array.pcap",
+        "common/pcapx/pcaputil/opcua-write-variants/material/null-with-dimensions.pcap": "opcua-write-variants/material/null-with-dimensions.pcap",
+        "common/pcapx/pcaputil/opcua-write-variants/material/empty-with-dimensions.pcap": "opcua-write-variants/material/empty-with-dimensions.pcap",
+        "common/pcapx/pcaputil/opcua-write-variants/material/rank-zero.pcap": "opcua-write-variants/material/rank-zero.pcap",
+        "common/pcapx/pcaputil/opcua-write-variants/material/rank-one.pcap": "opcua-write-variants/material/rank-one.pcap",
+        "common/pcapx/pcaputil/opcua-write-variants/material/rank-null.pcap": "opcua-write-variants/material/rank-null.pcap",
+        "common/pcapx/pcaputil/opcua-write-variants/material/negative-dimension.pcap": "opcua-write-variants/material/negative-dimension.pcap",
+        "common/pcapx/pcaputil/opcua-write-variants/material/zero-dimension.pcap": "opcua-write-variants/material/zero-dimension.pcap",
+        "common/pcapx/pcaputil/opcua-write-variants/material/product-too-small.pcap": "opcua-write-variants/material/product-too-small.pcap",
+        "common/pcapx/pcaputil/opcua-write-variants/material/product-too-large.pcap": "opcua-write-variants/material/product-too-large.pcap",
+        "common/pcapx/pcaputil/opcua-write-variants/material/product-overflow.pcap": "opcua-write-variants/material/product-overflow.pcap",
+        "common/pcapx/pcaputil/opcua-write-variants/material/negative-array-length.pcap": "opcua-write-variants/material/negative-array-length.pcap",
+        "common/pcapx/pcaputil/opcua-write-variants/material/huge-array-length.pcap": "opcua-write-variants/material/huge-array-length.pcap",
+        "common/pcapx/pcaputil/opcua-write-variants/material/truncated-element.pcap": "opcua-write-variants/material/truncated-element.pcap",
+        "common/pcapx/pcaputil/opcua-write-variants/material/truncated-dimensions.pcap": "opcua-write-variants/material/truncated-dimensions.pcap",
+        "common/pcapx/pcaputil/opcua-write-variants/material/trailing-octet.pcap": "opcua-write-variants/material/trailing-octet.pcap",
+        "common/pcapx/pcaputil/opcua-call-variants/material/cases.json": "opcua-call-variants/material/cases.json",
+        "common/pcapx/pcaputil/opcua-call-variants/manifest.json": "opcua-call-variants/manifest.json",
+        "common/pcapx/pcaputil/opcua-call-variants/material/scalar-adjacent.pcap": "opcua-call-variants/material/scalar-adjacent.pcap",
+        "common/pcapx/pcaputil/opcua-call-variants/material/uint64.pcap": "opcua-call-variants/material/uint64.pcap",
+        "common/pcapx/pcaputil/opcua-call-variants/material/int64.pcap": "opcua-call-variants/material/int64.pcap",
+        "common/pcapx/pcaputil/opcua-call-variants/material/bool.pcap": "opcua-call-variants/material/bool.pcap",
+        "common/pcapx/pcaputil/opcua-call-variants/material/sbyte.pcap": "opcua-call-variants/material/sbyte.pcap",
+        "common/pcapx/pcaputil/opcua-call-variants/material/byte.pcap": "opcua-call-variants/material/byte.pcap",
+        "common/pcapx/pcaputil/opcua-call-variants/material/int16.pcap": "opcua-call-variants/material/int16.pcap",
+        "common/pcapx/pcaputil/opcua-call-variants/material/uint16.pcap": "opcua-call-variants/material/uint16.pcap",
+        "common/pcapx/pcaputil/opcua-call-variants/material/int32.pcap": "opcua-call-variants/material/int32.pcap",
+        "common/pcapx/pcaputil/opcua-call-variants/material/uint32.pcap": "opcua-call-variants/material/uint32.pcap",
+        "common/pcapx/pcaputil/opcua-call-variants/material/float.pcap": "opcua-call-variants/material/float.pcap",
+        "common/pcapx/pcaputil/opcua-call-variants/material/double.pcap": "opcua-call-variants/material/double.pcap",
+        "common/pcapx/pcaputil/opcua-call-variants/material/strings.pcap": "opcua-call-variants/material/strings.pcap",
+        "common/pcapx/pcaputil/opcua-call-variants/material/bytes.pcap": "opcua-call-variants/material/bytes.pcap",
+        "common/pcapx/pcaputil/opcua-call-variants/material/datetime.pcap": "opcua-call-variants/material/datetime.pcap",
+        "common/pcapx/pcaputil/opcua-call-variants/material/guid.pcap": "opcua-call-variants/material/guid.pcap",
+        "common/pcapx/pcaputil/opcua-call-variants/material/nodeid.pcap": "opcua-call-variants/material/nodeid.pcap",
+        "common/pcapx/pcaputil/opcua-call-variants/material/status.pcap": "opcua-call-variants/material/status.pcap",
+        "common/pcapx/pcaputil/opcua-call-variants/material/empty-array.pcap": "opcua-call-variants/material/empty-array.pcap",
+        "common/pcapx/pcaputil/opcua-call-variants/material/null-array.pcap": "opcua-call-variants/material/null-array.pcap",
+        "common/pcapx/pcaputil/opcua-call-variants/material/matrix-two-dimensions.pcap": "opcua-call-variants/material/matrix-two-dimensions.pcap",
+        "common/pcapx/pcaputil/opcua-call-variants/material/matrix-three-dimensions.pcap": "opcua-call-variants/material/matrix-three-dimensions.pcap",
+        "common/pcapx/pcaputil/opcua-call-variants/material/dimensions-without-array.pcap": "opcua-call-variants/material/dimensions-without-array.pcap",
+        "common/pcapx/pcaputil/opcua-call-variants/material/null-with-dimensions.pcap": "opcua-call-variants/material/null-with-dimensions.pcap",
+        "common/pcapx/pcaputil/opcua-call-variants/material/empty-with-dimensions.pcap": "opcua-call-variants/material/empty-with-dimensions.pcap",
+        "common/pcapx/pcaputil/opcua-call-variants/material/rank-zero.pcap": "opcua-call-variants/material/rank-zero.pcap",
+        "common/pcapx/pcaputil/opcua-call-variants/material/rank-one.pcap": "opcua-call-variants/material/rank-one.pcap",
+        "common/pcapx/pcaputil/opcua-call-variants/material/rank-null.pcap": "opcua-call-variants/material/rank-null.pcap",
+        "common/pcapx/pcaputil/opcua-call-variants/material/negative-dimension.pcap": "opcua-call-variants/material/negative-dimension.pcap",
+        "common/pcapx/pcaputil/opcua-call-variants/material/zero-dimension.pcap": "opcua-call-variants/material/zero-dimension.pcap",
+        "common/pcapx/pcaputil/opcua-call-variants/material/product-too-small.pcap": "opcua-call-variants/material/product-too-small.pcap",
+        "common/pcapx/pcaputil/opcua-call-variants/material/product-too-large.pcap": "opcua-call-variants/material/product-too-large.pcap",
+        "common/pcapx/pcaputil/opcua-call-variants/material/product-overflow.pcap": "opcua-call-variants/material/product-overflow.pcap",
+        "common/pcapx/pcaputil/opcua-call-variants/material/negative-array-length.pcap": "opcua-call-variants/material/negative-array-length.pcap",
+        "common/pcapx/pcaputil/opcua-call-variants/material/huge-array-length.pcap": "opcua-call-variants/material/huge-array-length.pcap",
+        "common/pcapx/pcaputil/opcua-call-variants/material/truncated-element.pcap": "opcua-call-variants/material/truncated-element.pcap",
+        "common/pcapx/pcaputil/opcua-call-variants/material/truncated-dimensions.pcap": "opcua-call-variants/material/truncated-dimensions.pcap",
+        "common/pcapx/pcaputil/opcua-call-variants/material/trailing-octet.pcap": "opcua-call-variants/material/trailing-octet.pcap",
+        "common/pcapx/pcaputil/opcua-call-variants/material/array-is-one-method-argument.pcap": "opcua-call-variants/material/array-is-one-method-argument.pcap",
+        "common/pcapx/pcaputil/opcua-call-variants/material/array-element-count-is-not-argument-count.pcap": "opcua-call-variants/material/array-element-count-is-not-argument-count.pcap",
+        "common/pcapx/pcaputil/opcua-variant-arrays/generate.py": "generate.py",
+        "common/pcapx/pcaputil/opcua-variant-arrays/emit.py": "emit.py",
+        "common/pcapx/pcaputil/opcua-variant-arrays/verify.py": "verify.py",
+        "common/pcapx/pcaputil/opcua-variant-arrays/seal.py": "seal.py",
+        "common/pcapx/pcaputil/opcua-variant-arrays/SOURCE.json": "SOURCE.json",
+        "scripts/protocol-tests/required-tests-traffic-unified-v27.json": "required-tests-traffic-unified-v27.json"
+      }
+    },
+    {
+      "id": "validation-opcua-extended-variants",
+      "kind": "validation",
+      "source_sha": "b78549da91e637feef09b06d2926edf6e98ffab4",
+      "file": "validation-opcua-extended-variants.zip",
+      "sha256": "e0fcf6fb4f47a22c7ec0201eef765b8dfda948be043c36c952eaf886bf12d98e",
+      "password": "bin-parser",
+      "members": {
+        "opcua-read-extended-variants/material/cases.json": {
+          "sha256": "20195ce4e547e6e67686eb12c4e4488d4f4234d75c2462a6facfe7bd1ec4ef7c",
+          "bytes": 331278
+        },
+        "opcua-read-extended-variants/manifest.json": {
+          "sha256": "c0bc107fdd61505110d050ec8a430fb45e4691ab80573af23a81ea928ff7fdde",
+          "bytes": 11205
+        },
+        "opcua-read-extended-variants/material/qualified-name.pcap": {
+          "sha256": "04a4b56c09b69d31e28fe115d09c95798da6b9cfefa0a280bbf100f473f398f8",
+          "bytes": 955
+        },
+        "opcua-read-extended-variants/material/qualified-null.pcap": {
+          "sha256": "684deb72cbff4ed0a0096ccd0aad6a42e8d2cb5e12c65f536ba0a4173e0967c5",
+          "bytes": 949
+        },
+        "opcua-read-extended-variants/material/qualified-empty.pcap": {
+          "sha256": "2a74f17f2f35969bc881945fff0e6e30f9def82f4c274d60d01294af901778cd",
+          "bytes": 949
+        },
+        "opcua-read-extended-variants/material/localized-both.pcap": {
+          "sha256": "33956fedd742d65c70744bf5a5230624ae365051d47428b218d5e12a84b97ce5",
+          "bytes": 963
+        },
+        "opcua-read-extended-variants/material/localized-text.pcap": {
+          "sha256": "e757f9e86a19709a47d482978f20501a116b4f8e4dc29c37e3a356e7729a8c2d",
+          "bytes": 952
+        },
+        "opcua-read-extended-variants/material/localized-empty.pcap": {
+          "sha256": "51c18773819a1bacc6cea26c3323080ec0d44a81f2eaa5c7c17f3dcfe12ec700",
+          "bytes": 944
+        },
+        "opcua-read-extended-variants/material/expanded-uri-server.pcap": {
+          "sha256": "4b24cfd0e168a789f5dbb47a8a6a079fba3fb13de89403475c4bcb7c185c4b96",
+          "bytes": 969
+        },
+        "opcua-read-extended-variants/material/expanded-nonzero-wire-index-ignored.pcap": {
+          "sha256": "886a49ae3798754d7a5bf9112004069b9f0ba3acdbd7e4549d3d27006585c0bb",
+          "bytes": 969
+        },
+        "opcua-read-extended-variants/material/expanded-index-only.pcap": {
+          "sha256": "f48fd98ddcbbc667fb9b7d712af6162bd48db1cf25f12e45334ace32f30ee4e6",
+          "bytes": 950
+        },
+        "opcua-read-extended-variants/material/future26-bytes.pcap": {
+          "sha256": "b658a8c49f82ad8c8ebf2ee742dd7ce5d25ff1a185cdf70b49236a1be99b0657",
+          "bytes": 949
+        },
+        "opcua-read-extended-variants/material/future26-empty.pcap": {
+          "sha256": "5684b198f4f84aef9296db784b315c8f1de7f384cedea437e7ab445200edd225",
+          "bytes": 947
+        },
+        "opcua-read-extended-variants/material/future27-bytes.pcap": {
+          "sha256": "123eecdf038ce286dcec7898990fe54745c52cfa20ef28ae7bc330dde665bcaa",
+          "bytes": 949
+        },
+        "opcua-read-extended-variants/material/future27-empty.pcap": {
+          "sha256": "d907cba74bdf5b242b7354783b3867312706f8ab3a81cc41a67babd101577beb",
+          "bytes": 947
+        },
+        "opcua-read-extended-variants/material/future28-bytes.pcap": {
+          "sha256": "afacf1c0c002ff4f9d8a52e5e295391ce3d3eda336e7ca97f67902a1e6aa63db",
+          "bytes": 949
+        },
+        "opcua-read-extended-variants/material/future28-empty.pcap": {
+          "sha256": "7b696b86be4c71ba6f6ae09fdcc4ca2846fe750e0aac0ced5c44fa7430fa2711",
+          "bytes": 947
+        },
+        "opcua-read-extended-variants/material/future29-bytes.pcap": {
+          "sha256": "88ddc9aa103c07d8b7189b2525be5344a980532852c441852bb0fc7d73093e75",
+          "bytes": 949
+        },
+        "opcua-read-extended-variants/material/future29-empty.pcap": {
+          "sha256": "9fee014a76234b1668e7e242912bc0b4d4fc10c1378f5353c72307c44bf4978d",
+          "bytes": 947
+        },
+        "opcua-read-extended-variants/material/future30-bytes.pcap": {
+          "sha256": "3b7e3bbe34572087ab9f583f8f32274746a91b5f893049082dd49ac1641e6a24",
+          "bytes": 949
+        },
+        "opcua-read-extended-variants/material/future30-empty.pcap": {
+          "sha256": "e4eab8bf32fbeecfd937c492032ee60d6ccbe996975d39ec2b7c0c5b0a5e6174",
+          "bytes": 947
+        },
+        "opcua-read-extended-variants/material/future31-bytes.pcap": {
+          "sha256": "d95407a563488d479b783d2f17f55971185c36e733ebb6e6ea71a86d5ed53559",
+          "bytes": 949
+        },
+        "opcua-read-extended-variants/material/future31-empty.pcap": {
+          "sha256": "f8a2f5e3f1e8c0e7435b14dffbeb0a6b4ad6a6787aa9c03575e9c18303e3316d",
+          "bytes": 947
+        },
+        "opcua-read-extended-variants/material/qualified-array.pcap": {
+          "sha256": "3e48ece5f15451904a03224b37ae58a68842638f6ff6da3852250916bdfe90d2",
+          "bytes": 964
+        },
+        "opcua-read-extended-variants/material/localized-array.pcap": {
+          "sha256": "a946f4750166135f23cc2abec8b2eda7e4d9284639c33ea120ecddafd67a1973",
+          "bytes": 963
+        },
+        "opcua-read-extended-variants/material/expanded-array.pcap": {
+          "sha256": "e36f5219c0d6f9ec279a23a52f5b65f0cd74dd38765e30db4a1da9ccf2f6215d",
+          "bytes": 978
+        },
+        "opcua-read-extended-variants/material/future26-array.pcap": {
+          "sha256": "6880a95f6ada1665bf5289e00f3f66c4e8f53b5b23700fed9ab639ba8aa0cfb7",
+          "bytes": 961
+        },
+        "opcua-read-extended-variants/material/future27-array.pcap": {
+          "sha256": "5ce8061180a7a2c9146dd178a1c4a065944d46329197f5897f54d2d817a571d0",
+          "bytes": 961
+        },
+        "opcua-read-extended-variants/material/future28-array.pcap": {
+          "sha256": "634a1e36e8acc0e7f90a1272d273f2fea42bbbe3da80fd3231aade9c0af06303",
+          "bytes": 961
+        },
+        "opcua-read-extended-variants/material/future29-array.pcap": {
+          "sha256": "a993f645bfb9b690855c9487c395c4e84dda397bd88d0595e745d8dfabec57be",
+          "bytes": 961
+        },
+        "opcua-read-extended-variants/material/future30-array.pcap": {
+          "sha256": "4d0d300bde9eda376261fc9bce0ce4162755cc165de5cc4a2e3ac7e186156d56",
+          "bytes": 961
+        },
+        "opcua-read-extended-variants/material/future31-array.pcap": {
+          "sha256": "609dd3d9b5bac6b38fae8be31adac62ad5ed349d9ae5fa56620b5946c1c6ae30",
+          "bytes": 961
+        },
+        "opcua-read-extended-variants/material/future26-null.pcap": {
+          "sha256": "94e930aae7734eb725d78754d7c217893bbae214996b64c104eca0ce2ba820ec",
+          "bytes": 947
+        },
+        "opcua-read-extended-variants/material/future27-null.pcap": {
+          "sha256": "151b88cb6a829e4353aa9062b3d399fd250c9bbff0708baeb5f6c7c956f48843",
+          "bytes": 947
+        },
+        "opcua-read-extended-variants/material/future28-null.pcap": {
+          "sha256": "08b04d5cfa18888a5f5c78d303ab3a670cb351afdb3a924ffdf6dc70da346f43",
+          "bytes": 947
+        },
+        "opcua-read-extended-variants/material/future29-null.pcap": {
+          "sha256": "0e2a822f2ba12308234838908d612fe70bc82ff4d17f4715fdab8e78e064efa3",
+          "bytes": 947
+        },
+        "opcua-read-extended-variants/material/future30-null.pcap": {
+          "sha256": "96239abebe9bf91ed99046f227604326588438130b7f22c95cc866bafcb2de1b",
+          "bytes": 947
+        },
+        "opcua-read-extended-variants/material/future31-null.pcap": {
+          "sha256": "59297fc0bbf4e500b5ad9f04df492409027111c36e848b9fc869d91a4c03c6f6",
+          "bytes": 947
+        },
+        "opcua-read-extended-variants/material/xml-text.pcap": {
+          "sha256": "b32be4e182b9ff26eab51958061383bfd1484c506ed552e83375ece6eb7f65b6",
+          "bytes": 960
+        },
+        "opcua-read-extended-variants/material/xml-null.pcap": {
+          "sha256": "6b07516968635bfb0ae5078fffbf62939548b15f4b42cea9226d237034c5ad57",
+          "bytes": 947
+        },
+        "opcua-read-extended-variants/material/xml-empty.pcap": {
+          "sha256": "d1794206a703463970c976416075d3efac6693c4ef07de363fb7d0f432467389",
+          "bytes": 947
+        },
+        "opcua-read-extended-variants/material/xml-unparsed-entity.pcap": {
+          "sha256": "b09ac50f77655510baca3d4f7836c8e247d8647b1ac9e4c83de9cd0b0ca4dacc",
+          "bytes": 1009
+        },
+        "opcua-read-extended-variants/material/xml-array.pcap": {
+          "sha256": "57edc1bf48cbbe6bcc7c5eb7e9bea4d2d5b73cba406ee0f24131cbb456c4881c",
+          "bytes": 972
+        },
+        "opcua-read-extended-variants/material/expanded-empty-uri-flag.pcap": {
+          "sha256": "451f154adcee3fe59ec64c3d6d96a93a97602164dc9307469433febcab12bc8a",
+          "bytes": 958
+        },
+        "opcua-read-extended-variants/material/xml-invalid-utf8.pcap": {
+          "sha256": "d5a3dc4c6dbf6722492f4ba10a83a85b165923d083edefecddf355f7d26d917a",
+          "bytes": 948
+        },
+        "opcua-read-extended-variants/material/localized-reserved-mask.pcap": {
+          "sha256": "3e4b2d5d296d5f2ff5cbca62d57c99d38a1e370b1e3eb0a6c05b9796a3132262",
+          "bytes": 949
+        },
+        "opcua-read-extended-variants/material/qualified-bad-utf8.pcap": {
+          "sha256": "83867e7e1645d2be48acfe0a1ec8c326fc45e9dbf453843bb4bfca414ea176c5",
+          "bytes": 950
+        },
+        "opcua-read-extended-variants/material/future-negative-length.pcap": {
+          "sha256": "d0637a627c508ebdc73cd179aa23dcdb5b67c11d3d9c363a27800983831ebd5a",
+          "bytes": 949
+        },
+        "opcua-read-extended-variants/material/future-huge-length.pcap": {
+          "sha256": "149ab9af64673ddfdb7cf83d9f4eeb5626ccc3e28e7c474175f1db4efb1fc147",
+          "bytes": 949
+        },
+        "opcua-read-extended-variants/material/future-reserved32.pcap": {
+          "sha256": "c26346da65ae4a3278bc6c1af768a81e62b00b524337a9f6d2f58da215eeade5",
+          "bytes": 949
+        },
+        "opcua-read-extended-variants/material/future-truncated.pcap": {
+          "sha256": "9b8414d5d2411805fde06c371eeaea0faf7fb8a11757c62fe5aaa6fc35bfc0fd",
+          "bytes": 948
+        },
+        "opcua-read-extended-variants/material/future-array-count-budget.pcap": {
+          "sha256": "09255ce5fba20ce123f24d2a72a812d37fd37646eb3ef665b69c675c59e0aab5",
+          "bytes": 953
+        },
+        "opcua-write-extended-variants/material/cases.json": {
+          "sha256": "6e1c35ca5443ec91effe4c0cbb4029306eab6b9d8b08e98d8d3d4d1077e49191",
+          "bytes": 290681
+        },
+        "opcua-write-extended-variants/manifest.json": {
+          "sha256": "61396b237aa1260ada85fcbc7df97d6201e5c9123e05d3ea2b2ff0e39546fa06",
+          "bytes": 11206
+        },
+        "opcua-write-extended-variants/material/qualified-name.pcap": {
+          "sha256": "0d9f4c3a4cae6fea7da8b19c64d584bd060becd025c066c902ac93baf57461a5",
+          "bytes": 941
+        },
+        "opcua-write-extended-variants/material/qualified-null.pcap": {
+          "sha256": "a7a1598fc00a2f6065a13557796f24b2b3a17a4e6ad0abcac183319b578b9b59",
+          "bytes": 935
+        },
+        "opcua-write-extended-variants/material/qualified-empty.pcap": {
+          "sha256": "3b656374a04d5b801ec50a94bbd010a92ac557ab6d60f6118eccc711167286b3",
+          "bytes": 935
+        },
+        "opcua-write-extended-variants/material/localized-both.pcap": {
+          "sha256": "a94ca64fef8bf8486700f98da99b98aa6148d665678d6593a6898d8934640106",
+          "bytes": 949
+        },
+        "opcua-write-extended-variants/material/localized-text.pcap": {
+          "sha256": "feab02aed0cdcba0b23637a7d564f33fdb5b9c0565f33cd42c346eb2ea800a4b",
+          "bytes": 938
+        },
+        "opcua-write-extended-variants/material/localized-empty.pcap": {
+          "sha256": "5df7856b7c36a9f386d25cf65bdcf089c7c4745dc66bf438fa5933b9dafdaf9d",
+          "bytes": 930
+        },
+        "opcua-write-extended-variants/material/expanded-uri-server.pcap": {
+          "sha256": "bfca765ac6a5f1f2b5c4c8cbcbc9ee887cb830fa58dde7962c81a9177be34383",
+          "bytes": 955
+        },
+        "opcua-write-extended-variants/material/expanded-nonzero-wire-index-ignored.pcap": {
+          "sha256": "a1f50e80e08373f8be9355b4555c1397f798803df4627efcf49e35b816914dbc",
+          "bytes": 955
+        },
+        "opcua-write-extended-variants/material/expanded-index-only.pcap": {
+          "sha256": "bf34662e080a22cd8fc1a931c51f12b47345079d61a2035755e329ee29d76199",
+          "bytes": 936
+        },
+        "opcua-write-extended-variants/material/future26-bytes.pcap": {
+          "sha256": "b3208bafc77e90f1361bb540ce8240bdb94eef7a86f15238712c31dc556d2201",
+          "bytes": 935
+        },
+        "opcua-write-extended-variants/material/future26-empty.pcap": {
+          "sha256": "1f1a9137222c77c3926bee407835e380b0d19e22d3859bf1ecaae1bac20d4142",
+          "bytes": 933
+        },
+        "opcua-write-extended-variants/material/future27-bytes.pcap": {
+          "sha256": "1e8faaaa6dd005b3111887e334ebce6c1f164c51a30f844c235aef46dca1cd9d",
+          "bytes": 935
+        },
+        "opcua-write-extended-variants/material/future27-empty.pcap": {
+          "sha256": "2a2b5e75517041708bb08c6b7bf49d2fe0ce9f28ae38d427962e6f9c21dcd35c",
+          "bytes": 933
+        },
+        "opcua-write-extended-variants/material/future28-bytes.pcap": {
+          "sha256": "1970b8215d1ad1246be610beabeb8efaf545a095443b6587a67239b8c7f31bfb",
+          "bytes": 935
+        },
+        "opcua-write-extended-variants/material/future28-empty.pcap": {
+          "sha256": "b6634dd9ad228c0e4007fa899fc738ba2d423407f56514ad49223931b13c357b",
+          "bytes": 933
+        },
+        "opcua-write-extended-variants/material/future29-bytes.pcap": {
+          "sha256": "64b3011749dd114f426507979f541eccca2d60369ca7173ae0951e609668c0d9",
+          "bytes": 935
+        },
+        "opcua-write-extended-variants/material/future29-empty.pcap": {
+          "sha256": "c194d100c6bc2795667101f20ccd5b1e764ae0ef0aa9703d2d4eded03ac5f229",
+          "bytes": 933
+        },
+        "opcua-write-extended-variants/material/future30-bytes.pcap": {
+          "sha256": "18b080da95e37d454993b39c9e0b2364a0fb4b2de65df2a05f0128f369887deb",
+          "bytes": 935
+        },
+        "opcua-write-extended-variants/material/future30-empty.pcap": {
+          "sha256": "c43f1576e1402be58c374ce1dd8bee21ee1ab09e16f7e47b8a462b636e5a792c",
+          "bytes": 933
+        },
+        "opcua-write-extended-variants/material/future31-bytes.pcap": {
+          "sha256": "f09bf684e376d9c9b4b0fe85c845f17b853c400c493ef673d17e67c8abcf3caf",
+          "bytes": 935
+        },
+        "opcua-write-extended-variants/material/future31-empty.pcap": {
+          "sha256": "b30fb22e9623b89813a83811086de2702d1e26372a7d37c6343c0780797613c9",
+          "bytes": 933
+        },
+        "opcua-write-extended-variants/material/qualified-array.pcap": {
+          "sha256": "5813562980ac1b817f1b5a5513aca2c9a3c42158d3dd9b955f568b8e42c014a8",
+          "bytes": 950
+        },
+        "opcua-write-extended-variants/material/localized-array.pcap": {
+          "sha256": "4f8c279d5b2bfd6cdabfe24aa910cc5588ae3253f1ea301c495b75e7fb7d9f36",
+          "bytes": 949
+        },
+        "opcua-write-extended-variants/material/expanded-array.pcap": {
+          "sha256": "aabb14ee737d6dc4a0738102eb31cdab6fe565aad38a8301a3e2bde8e5be4cf0",
+          "bytes": 964
+        },
+        "opcua-write-extended-variants/material/future26-array.pcap": {
+          "sha256": "783505f81d4fde354e29e3277a3bb82771ebb24464dee7ecfea0de77beba6db0",
+          "bytes": 947
+        },
+        "opcua-write-extended-variants/material/future27-array.pcap": {
+          "sha256": "e9567d8149bd12b63724f4dcc2878cb28da7abacc1e51a88b0811de61cc8bfa7",
+          "bytes": 947
+        },
+        "opcua-write-extended-variants/material/future28-array.pcap": {
+          "sha256": "8f754bca9466e09f972e0065e2ceb8baef779d23276e2cdcb90241883d2f7e0f",
+          "bytes": 947
+        },
+        "opcua-write-extended-variants/material/future29-array.pcap": {
+          "sha256": "c31d9d8671dd38aaa9815671adc1b88c3118324df3f6b35f7ddf52771d969824",
+          "bytes": 947
+        },
+        "opcua-write-extended-variants/material/future30-array.pcap": {
+          "sha256": "730a5a01d1b5923ef8bd38bedf9f68aba538d0bddebe77bd1e099d65256ede29",
+          "bytes": 947
+        },
+        "opcua-write-extended-variants/material/future31-array.pcap": {
+          "sha256": "0b55538662d775394b6a7089cc35368e042e7fa08a0029ac4f715bf0615ae5aa",
+          "bytes": 947
+        },
+        "opcua-write-extended-variants/material/future26-null.pcap": {
+          "sha256": "3eb62da2bf9082e1d0ca944d809922808f4eb86cc3c577f5f9896c9b68fd9864",
+          "bytes": 933
+        },
+        "opcua-write-extended-variants/material/future27-null.pcap": {
+          "sha256": "aace6f982297edb78442f1bc83d0b99d78914a239280b25d937ba6ef32e9dd22",
+          "bytes": 933
+        },
+        "opcua-write-extended-variants/material/future28-null.pcap": {
+          "sha256": "6244a3a83867a5dbc3dcf28b51789107108b9841b5145e66b45db618c932e605",
+          "bytes": 933
+        },
+        "opcua-write-extended-variants/material/future29-null.pcap": {
+          "sha256": "b21bbc6e06e6407940945a26c13f86269cb53b7b455b590f06dde44072cc3687",
+          "bytes": 933
+        },
+        "opcua-write-extended-variants/material/future30-null.pcap": {
+          "sha256": "0372c10d250bfd809ef6e9f5ba3f942710ac765e1ecf482be5a55c326da79c9d",
+          "bytes": 933
+        },
+        "opcua-write-extended-variants/material/future31-null.pcap": {
+          "sha256": "c03926a7c4083d11b42efa9d43cfa19d48f5f0eeb960a1d899093ff781c15877",
+          "bytes": 933
+        },
+        "opcua-write-extended-variants/material/xml-text.pcap": {
+          "sha256": "755c2e2a7c8270da81338aa99f0007eb2512246a3402bf3c506cf96b2fa9b36f",
+          "bytes": 946
+        },
+        "opcua-write-extended-variants/material/xml-null.pcap": {
+          "sha256": "b8cab0bef7e692ab954300133082a8f97fb438725ccdb440c6bf9394ea14e71a",
+          "bytes": 933
+        },
+        "opcua-write-extended-variants/material/xml-empty.pcap": {
+          "sha256": "85b78d81e829dc776cea70b938e5d08dbc9aac3bd84639d056b94babb8ec5adf",
+          "bytes": 933
+        },
+        "opcua-write-extended-variants/material/xml-unparsed-entity.pcap": {
+          "sha256": "ef9b3888129798f37fa498e1a2ee63f1cfb8c3cdc92b64ede3053523ce71c9c5",
+          "bytes": 995
+        },
+        "opcua-write-extended-variants/material/xml-array.pcap": {
+          "sha256": "5bb00391010c9498dd50ae44754fe9516ba1eb43e65bf5983dee572aa270ca5c",
+          "bytes": 958
+        },
+        "opcua-write-extended-variants/material/expanded-empty-uri-flag.pcap": {
+          "sha256": "32286b46320e69d1860c6be47d9ccbfb37554f00591e8734f59562c45e1759e8",
+          "bytes": 810
+        },
+        "opcua-write-extended-variants/material/xml-invalid-utf8.pcap": {
+          "sha256": "ce95bb86a444578ab6bbf090f2621d69de15eab2b8e513cdafeb66b807f746e6",
+          "bytes": 800
+        },
+        "opcua-write-extended-variants/material/localized-reserved-mask.pcap": {
+          "sha256": "6bc75557cce0792a81b378aed61bba990ec92af12d79c87118f18af3ef3f73b5",
+          "bytes": 801
+        },
+        "opcua-write-extended-variants/material/qualified-bad-utf8.pcap": {
+          "sha256": "82097b71f071d42bd0e3805285670621a6bfd6660d27db361bdf63c52e7ffef5",
+          "bytes": 802
+        },
+        "opcua-write-extended-variants/material/future-negative-length.pcap": {
+          "sha256": "86f4660bf79cc816e0441137dec366123ac9eceff19ab19f7358a9f169b038aa",
+          "bytes": 801
+        },
+        "opcua-write-extended-variants/material/future-huge-length.pcap": {
+          "sha256": "3252b32bcff039f4e4e54a2b33ae71d5e4e87454418aeb15d269438a475da5b4",
+          "bytes": 801
+        },
+        "opcua-write-extended-variants/material/future-reserved32.pcap": {
+          "sha256": "e1ccb9929014b49e3d1626e87b1b753c40087efe821eb5e870e066257b0209ce",
+          "bytes": 801
+        },
+        "opcua-write-extended-variants/material/future-truncated.pcap": {
+          "sha256": "9a76ea9b4918a3756dbb1b4af46660bd266c10fd74c32a813f20c9efaf6fc90c",
+          "bytes": 800
+        },
+        "opcua-write-extended-variants/material/future-array-count-budget.pcap": {
+          "sha256": "6843b0d301e10f5c13ebcf293f0b2e55d39bb55076ffce1ad1fe40f9bb02d0ee",
+          "bytes": 805
+        },
+        "opcua-call-extended-variants/material/cases.json": {
+          "sha256": "33b5ff95b08a340927484128dbcff868109b112c9ef05e7b5684a50518d06f3a",
+          "bytes": 342112
+        },
+        "opcua-call-extended-variants/manifest.json": {
+          "sha256": "fb62f2d6019365d3d9b7eafd5068864b3c48f75f61502d5e98a20aeac68a3724",
+          "bytes": 11206
+        },
+        "opcua-call-extended-variants/material/qualified-name.pcap": {
+          "sha256": "b083f5b8ec88bec969998748cfd16a630fa508b3def214fa9b50d5ab40c10d3c",
+          "bytes": 963
+        },
+        "opcua-call-extended-variants/material/qualified-null.pcap": {
+          "sha256": "ab0af344d95b663d8a612dce8429cd4a74d5854dfca0d97aa32bb413be170b41",
+          "bytes": 951
+        },
+        "opcua-call-extended-variants/material/qualified-empty.pcap": {
+          "sha256": "a4b4af9c2c1aae492d2bf944af58471f222ba757b7746588a0b53db0751f2fb9",
+          "bytes": 951
+        },
+        "opcua-call-extended-variants/material/localized-both.pcap": {
+          "sha256": "4f021c37d17c4935e7eb54a9e19527b0ba1f5f733fd043725e49e5ee0effb987",
+          "bytes": 979
+        },
+        "opcua-call-extended-variants/material/localized-text.pcap": {
+          "sha256": "2d7ea6b0c1d50e9a36e9e15baeecd2f433db345bcc764d54a3def17720209d53",
+          "bytes": 957
+        },
+        "opcua-call-extended-variants/material/localized-empty.pcap": {
+          "sha256": "45de87761e7e10d9755bbae9777762c2cd0a3ffb16c15a10ae78b05e0a747cb3",
+          "bytes": 941
+        },
+        "opcua-call-extended-variants/material/expanded-uri-server.pcap": {
+          "sha256": "5cbebbd39c9dcd5698d26aacdd664573ac047e660d7bb94f7be45a8be9ba0786",
+          "bytes": 991
+        },
+        "opcua-call-extended-variants/material/expanded-nonzero-wire-index-ignored.pcap": {
+          "sha256": "138e81f9c8f561b93ddd346e71242c0811b89cca0278a416788d1a41735449d1",
+          "bytes": 991
+        },
+        "opcua-call-extended-variants/material/expanded-index-only.pcap": {
+          "sha256": "546ae43e26dcdd56476371b2c92f37f15a0141a4540bc7c166e853558e1dc9c3",
+          "bytes": 953
+        },
+        "opcua-call-extended-variants/material/future26-bytes.pcap": {
+          "sha256": "fbc35a32187b56486b58bd041e83e7d24ab92e7a568fc4ffad30663e49f5174b",
+          "bytes": 951
+        },
+        "opcua-call-extended-variants/material/future26-empty.pcap": {
+          "sha256": "1a4637de475ae77689b1a167eb851f9406bcf37f82df565dd29ee15464298a8e",
+          "bytes": 947
+        },
+        "opcua-call-extended-variants/material/future27-bytes.pcap": {
+          "sha256": "3c821571f5c0fbd31a532d966bf0be77a9625f3c888038f660946bda58d3adda",
+          "bytes": 951
+        },
+        "opcua-call-extended-variants/material/future27-empty.pcap": {
+          "sha256": "66f6770da2ae0afe701b51e47afd9d3881a6b97151cd4d61143640e1b36b58fa",
+          "bytes": 947
+        },
+        "opcua-call-extended-variants/material/future28-bytes.pcap": {
+          "sha256": "c626c1a34d2a0adcb7de2ece34b1657160a1c5cf64cf42ec37906e625068e919",
+          "bytes": 951
+        },
+        "opcua-call-extended-variants/material/future28-empty.pcap": {
+          "sha256": "33d3d5705b6a18586cd826379331e716cb4fd3013b0a06dc7780ce0e6ded119a",
+          "bytes": 947
+        },
+        "opcua-call-extended-variants/material/future29-bytes.pcap": {
+          "sha256": "94c10a391f25ff3c8117dde778ca9581efdbad3f18fe4c3c7bf2c6b213e1c59e",
+          "bytes": 951
+        },
+        "opcua-call-extended-variants/material/future29-empty.pcap": {
+          "sha256": "150b6a20c1d9b133f78efdaeb970d9fee747187f4012238fe7011fd2f075a0c3",
+          "bytes": 947
+        },
+        "opcua-call-extended-variants/material/future30-bytes.pcap": {
+          "sha256": "361b8ad0e1454677d4b65c3d48f0f2e7c4e98356de60d8f2c215ec2f4b500e33",
+          "bytes": 951
+        },
+        "opcua-call-extended-variants/material/future30-empty.pcap": {
+          "sha256": "c9eb68ca5910a2aed6ee83a8e55c90dbb5b241b212dbcbf1d3b5c314f1b5eb06",
+          "bytes": 947
+        },
+        "opcua-call-extended-variants/material/future31-bytes.pcap": {
+          "sha256": "80ff37a3961a7433261711090eb6dba7ca0e91cb486086740b291a7dfa310deb",
+          "bytes": 951
+        },
+        "opcua-call-extended-variants/material/future31-empty.pcap": {
+          "sha256": "0381f872a05c70b00da391fb7d10a8e3e153da5d170aed3ecd091a01bdf97325",
+          "bytes": 947
+        },
+        "opcua-call-extended-variants/material/qualified-array.pcap": {
+          "sha256": "0d330c49087be6b4884236322af37d0e98769daaea93e0b967a4d654a38a7a42",
+          "bytes": 981
+        },
+        "opcua-call-extended-variants/material/localized-array.pcap": {
+          "sha256": "5b4a470abd0c48f186a08b4dd774e5c4aec1c5e9f1a7d8142a1a00a9a397330e",
+          "bytes": 979
+        },
+        "opcua-call-extended-variants/material/expanded-array.pcap": {
+          "sha256": "bb8da9a3aeeb77f7dc5212c15047af849c0cebbda38d5e4bdf787987b8a7890f",
+          "bytes": 1009
+        },
+        "opcua-call-extended-variants/material/future26-array.pcap": {
+          "sha256": "9004d59e45e3bbc7d8fc9ca61e145b43a70072c00051f3eb60d862ee83c13c9f",
+          "bytes": 975
+        },
+        "opcua-call-extended-variants/material/future27-array.pcap": {
+          "sha256": "abb6bcff11538d4da3974e0e5552c29cab751c6a8c9c256206bfcdda231c4896",
+          "bytes": 975
+        },
+        "opcua-call-extended-variants/material/future28-array.pcap": {
+          "sha256": "f93e5e7e9e67f1eeb180e9385bd70ad3cb1d6c1b2f1fee61a6476db18e531135",
+          "bytes": 975
+        },
+        "opcua-call-extended-variants/material/future29-array.pcap": {
+          "sha256": "dea82f952db0ad7698f8f8b0300aa33ebbce5821ec0acf44db5b0524cb8174d6",
+          "bytes": 975
+        },
+        "opcua-call-extended-variants/material/future30-array.pcap": {
+          "sha256": "aff6fa266b160da6157999b7c3925040a74642a41ef77e6a8ab536a3a84317c3",
+          "bytes": 975
+        },
+        "opcua-call-extended-variants/material/future31-array.pcap": {
+          "sha256": "2640fce13024c76eefdd1a83ecf649ba0a317399af3db782f8b13b6e4a1e03b4",
+          "bytes": 975
+        },
+        "opcua-call-extended-variants/material/future26-null.pcap": {
+          "sha256": "cb7f38ff6665c6f63cb68491bb1c4cd25e27173345966330eebc6d4aa1ea4efa",
+          "bytes": 947
+        },
+        "opcua-call-extended-variants/material/future27-null.pcap": {
+          "sha256": "872169187432947040e58b2e6ce20188d7f92f073ccc73f1cf98133a7e0ed77f",
+          "bytes": 947
+        },
+        "opcua-call-extended-variants/material/future28-null.pcap": {
+          "sha256": "318ce5c61fe51a12c8ffd95973f082cddbd3acbd10705c27844d0a602da2946a",
+          "bytes": 947
+        },
+        "opcua-call-extended-variants/material/future29-null.pcap": {
+          "sha256": "82b7af345c278eb7a0b2e9d002095bc521c481d97d86ed528247117534f317b6",
+          "bytes": 947
+        },
+        "opcua-call-extended-variants/material/future30-null.pcap": {
+          "sha256": "5b1efc93639598ee406d6555077a5a7dcd8f67ecf65b0ae7c959cfee4b143782",
+          "bytes": 947
+        },
+        "opcua-call-extended-variants/material/future31-null.pcap": {
+          "sha256": "452118a1b45d556019b7c79c8b6156baf25e065752f3d4a5c6b6bf09ae9625fb",
+          "bytes": 947
+        },
+        "opcua-call-extended-variants/material/xml-text.pcap": {
+          "sha256": "52a0c6c35c3808407c3c4077ab8ca08140ba13e20508ecc0f516673408bc2ac8",
+          "bytes": 973
+        },
+        "opcua-call-extended-variants/material/xml-null.pcap": {
+          "sha256": "ad4d9b3d6212365df75e4941bf97d75910c9635f20c6e29c38c8776bc1a27cb2",
+          "bytes": 947
+        },
+        "opcua-call-extended-variants/material/xml-empty.pcap": {
+          "sha256": "4a854899896c204b34a2917d113942145c19203448fc0095929ac5f635edd721",
+          "bytes": 947
+        },
+        "opcua-call-extended-variants/material/xml-unparsed-entity.pcap": {
+          "sha256": "b436c98fa74c516578b93e477a8d2ce8a8e7f176fad6348814e8638f8f663d62",
+          "bytes": 1071
+        },
+        "opcua-call-extended-variants/material/xml-array.pcap": {
+          "sha256": "ba9249f6398f922d328ecf5f1db444b27a57bb126d54dd375acd1ebda77bc81e",
+          "bytes": 997
+        },
+        "opcua-call-extended-variants/material/expanded-empty-uri-flag.pcap": {
+          "sha256": "7c89ee38aff2c1db23f65717b63a18ebfc3c38220f9ca650263d7eb0a5c41a66",
+          "bytes": 807
+        },
+        "opcua-call-extended-variants/material/xml-invalid-utf8.pcap": {
+          "sha256": "fbc694f28c8586e94d6e6b8d7820e04405b1a91624975cf4cae2b49d4d7d8231",
+          "bytes": 797
+        },
+        "opcua-call-extended-variants/material/localized-reserved-mask.pcap": {
+          "sha256": "07286d45f1c728dafa2382c9cfd4d375b792c519133a31462bbf33f2e60342b1",
+          "bytes": 798
+        },
+        "opcua-call-extended-variants/material/qualified-bad-utf8.pcap": {
+          "sha256": "5e7038aed3fe4e9b0e7c4092ea9c551d0237bae4d16ea219574d14e43ec1dac7",
+          "bytes": 799
+        },
+        "opcua-call-extended-variants/material/future-negative-length.pcap": {
+          "sha256": "ab87570295080c44133476380936d13239f90da985559b5615ccb60e5967c691",
+          "bytes": 798
+        },
+        "opcua-call-extended-variants/material/future-huge-length.pcap": {
+          "sha256": "ccc3ad44bf0b6c6ae6892fe0e215992585b13e971710af4fdaa2b1967d8d165c",
+          "bytes": 798
+        },
+        "opcua-call-extended-variants/material/future-reserved32.pcap": {
+          "sha256": "88f80a1aeb280cda0f013da0ab394a575e4b3432ac55e292f900bd8702329f20",
+          "bytes": 798
+        },
+        "opcua-call-extended-variants/material/future-truncated.pcap": {
+          "sha256": "adced6d7c6f305050ccc66847ec09e6529f6ba0e5b9f1e2dd89f599dfcae0d2f",
+          "bytes": 797
+        },
+        "opcua-call-extended-variants/material/future-array-count-budget.pcap": {
+          "sha256": "4085f08809827a33ef584ae08cb63cfbd2cd8bb22a510f7ddbb5d0646e9eb274",
+          "bytes": 802
+        },
+        "generate.py": {
+          "sha256": "8c46f8c01bd8d16cac75cc760c5e14b713b8ac6f2835df47cb804f8673b4a545",
+          "bytes": 8959
+        },
+        "emit.py": {
+          "sha256": "70da055ec4394b44ed2ed7396d78f3ceee5fa4b8b6d0190b868c1490666e4e8d",
+          "bytes": 787
+        },
+        "verify.py": {
+          "sha256": "b58125bad9b6f436bbb583792ba3650f97376b99355ea2cef03ce240fc3598a5",
+          "bytes": 2266
+        },
+        "seal.py": {
+          "sha256": "a239607e9dc396f517aff3d841abd500cc28497711b3334589cbf77cf1635e0f",
+          "bytes": 4060
+        },
+        "SOURCE.json": {
+          "sha256": "8791cf6ddfe7b24085153910d08594b5b2b3ea3a84f0c4ea1bc449118b9f2d9d",
+          "bytes": 1722
+        },
+        "SOURCE-primary.json": {
+          "sha256": "fcfb99e5d6734a6c4e665a2c476c8487e34b757a9f15a6369d64af2cd981b3fd",
+          "bytes": 489
+        },
+        "required-tests-traffic-unified-v28.json": {
+          "sha256": "792b9debbae389da97064353494ab9a082da6ef9ae7e7924fbb99e2466991417",
+          "bytes": 276221
+        },
+        "validation/expected.json": {
+          "sha256": "ce1ad2fc992f7a85d803b3fe18e433754ef526b9a899787d1e7e8caa3cb83d03",
+          "bytes": 178574
+        }
+      },
+      "aliases": {
+        "common/pcapx/pcaputil/opcua-read-extended-variants/material/cases.json": "opcua-read-extended-variants/material/cases.json",
+        "common/pcapx/pcaputil/opcua-read-extended-variants/manifest.json": "opcua-read-extended-variants/manifest.json",
+        "common/pcapx/pcaputil/opcua-read-extended-variants/material/qualified-name.pcap": "opcua-read-extended-variants/material/qualified-name.pcap",
+        "common/pcapx/pcaputil/opcua-read-extended-variants/material/qualified-null.pcap": "opcua-read-extended-variants/material/qualified-null.pcap",
+        "common/pcapx/pcaputil/opcua-read-extended-variants/material/qualified-empty.pcap": "opcua-read-extended-variants/material/qualified-empty.pcap",
+        "common/pcapx/pcaputil/opcua-read-extended-variants/material/localized-both.pcap": "opcua-read-extended-variants/material/localized-both.pcap",
+        "common/pcapx/pcaputil/opcua-read-extended-variants/material/localized-text.pcap": "opcua-read-extended-variants/material/localized-text.pcap",
+        "common/pcapx/pcaputil/opcua-read-extended-variants/material/localized-empty.pcap": "opcua-read-extended-variants/material/localized-empty.pcap",
+        "common/pcapx/pcaputil/opcua-read-extended-variants/material/expanded-uri-server.pcap": "opcua-read-extended-variants/material/expanded-uri-server.pcap",
+        "common/pcapx/pcaputil/opcua-read-extended-variants/material/expanded-nonzero-wire-index-ignored.pcap": "opcua-read-extended-variants/material/expanded-nonzero-wire-index-ignored.pcap",
+        "common/pcapx/pcaputil/opcua-read-extended-variants/material/expanded-index-only.pcap": "opcua-read-extended-variants/material/expanded-index-only.pcap",
+        "common/pcapx/pcaputil/opcua-read-extended-variants/material/future26-bytes.pcap": "opcua-read-extended-variants/material/future26-bytes.pcap",
+        "common/pcapx/pcaputil/opcua-read-extended-variants/material/future26-empty.pcap": "opcua-read-extended-variants/material/future26-empty.pcap",
+        "common/pcapx/pcaputil/opcua-read-extended-variants/material/future27-bytes.pcap": "opcua-read-extended-variants/material/future27-bytes.pcap",
+        "common/pcapx/pcaputil/opcua-read-extended-variants/material/future27-empty.pcap": "opcua-read-extended-variants/material/future27-empty.pcap",
+        "common/pcapx/pcaputil/opcua-read-extended-variants/material/future28-bytes.pcap": "opcua-read-extended-variants/material/future28-bytes.pcap",
+        "common/pcapx/pcaputil/opcua-read-extended-variants/material/future28-empty.pcap": "opcua-read-extended-variants/material/future28-empty.pcap",
+        "common/pcapx/pcaputil/opcua-read-extended-variants/material/future29-bytes.pcap": "opcua-read-extended-variants/material/future29-bytes.pcap",
+        "common/pcapx/pcaputil/opcua-read-extended-variants/material/future29-empty.pcap": "opcua-read-extended-variants/material/future29-empty.pcap",
+        "common/pcapx/pcaputil/opcua-read-extended-variants/material/future30-bytes.pcap": "opcua-read-extended-variants/material/future30-bytes.pcap",
+        "common/pcapx/pcaputil/opcua-read-extended-variants/material/future30-empty.pcap": "opcua-read-extended-variants/material/future30-empty.pcap",
+        "common/pcapx/pcaputil/opcua-read-extended-variants/material/future31-bytes.pcap": "opcua-read-extended-variants/material/future31-bytes.pcap",
+        "common/pcapx/pcaputil/opcua-read-extended-variants/material/future31-empty.pcap": "opcua-read-extended-variants/material/future31-empty.pcap",
+        "common/pcapx/pcaputil/opcua-read-extended-variants/material/qualified-array.pcap": "opcua-read-extended-variants/material/qualified-array.pcap",
+        "common/pcapx/pcaputil/opcua-read-extended-variants/material/localized-array.pcap": "opcua-read-extended-variants/material/localized-array.pcap",
+        "common/pcapx/pcaputil/opcua-read-extended-variants/material/expanded-array.pcap": "opcua-read-extended-variants/material/expanded-array.pcap",
+        "common/pcapx/pcaputil/opcua-read-extended-variants/material/future26-array.pcap": "opcua-read-extended-variants/material/future26-array.pcap",
+        "common/pcapx/pcaputil/opcua-read-extended-variants/material/future27-array.pcap": "opcua-read-extended-variants/material/future27-array.pcap",
+        "common/pcapx/pcaputil/opcua-read-extended-variants/material/future28-array.pcap": "opcua-read-extended-variants/material/future28-array.pcap",
+        "common/pcapx/pcaputil/opcua-read-extended-variants/material/future29-array.pcap": "opcua-read-extended-variants/material/future29-array.pcap",
+        "common/pcapx/pcaputil/opcua-read-extended-variants/material/future30-array.pcap": "opcua-read-extended-variants/material/future30-array.pcap",
+        "common/pcapx/pcaputil/opcua-read-extended-variants/material/future31-array.pcap": "opcua-read-extended-variants/material/future31-array.pcap",
+        "common/pcapx/pcaputil/opcua-read-extended-variants/material/future26-null.pcap": "opcua-read-extended-variants/material/future26-null.pcap",
+        "common/pcapx/pcaputil/opcua-read-extended-variants/material/future27-null.pcap": "opcua-read-extended-variants/material/future27-null.pcap",
+        "common/pcapx/pcaputil/opcua-read-extended-variants/material/future28-null.pcap": "opcua-read-extended-variants/material/future28-null.pcap",
+        "common/pcapx/pcaputil/opcua-read-extended-variants/material/future29-null.pcap": "opcua-read-extended-variants/material/future29-null.pcap",
+        "common/pcapx/pcaputil/opcua-read-extended-variants/material/future30-null.pcap": "opcua-read-extended-variants/material/future30-null.pcap",
+        "common/pcapx/pcaputil/opcua-read-extended-variants/material/future31-null.pcap": "opcua-read-extended-variants/material/future31-null.pcap",
+        "common/pcapx/pcaputil/opcua-read-extended-variants/material/xml-text.pcap": "opcua-read-extended-variants/material/xml-text.pcap",
+        "common/pcapx/pcaputil/opcua-read-extended-variants/material/xml-null.pcap": "opcua-read-extended-variants/material/xml-null.pcap",
+        "common/pcapx/pcaputil/opcua-read-extended-variants/material/xml-empty.pcap": "opcua-read-extended-variants/material/xml-empty.pcap",
+        "common/pcapx/pcaputil/opcua-read-extended-variants/material/xml-unparsed-entity.pcap": "opcua-read-extended-variants/material/xml-unparsed-entity.pcap",
+        "common/pcapx/pcaputil/opcua-read-extended-variants/material/xml-array.pcap": "opcua-read-extended-variants/material/xml-array.pcap",
+        "common/pcapx/pcaputil/opcua-read-extended-variants/material/expanded-empty-uri-flag.pcap": "opcua-read-extended-variants/material/expanded-empty-uri-flag.pcap",
+        "common/pcapx/pcaputil/opcua-read-extended-variants/material/xml-invalid-utf8.pcap": "opcua-read-extended-variants/material/xml-invalid-utf8.pcap",
+        "common/pcapx/pcaputil/opcua-read-extended-variants/material/localized-reserved-mask.pcap": "opcua-read-extended-variants/material/localized-reserved-mask.pcap",
+        "common/pcapx/pcaputil/opcua-read-extended-variants/material/qualified-bad-utf8.pcap": "opcua-read-extended-variants/material/qualified-bad-utf8.pcap",
+        "common/pcapx/pcaputil/opcua-read-extended-variants/material/future-negative-length.pcap": "opcua-read-extended-variants/material/future-negative-length.pcap",
+        "common/pcapx/pcaputil/opcua-read-extended-variants/material/future-huge-length.pcap": "opcua-read-extended-variants/material/future-huge-length.pcap",
+        "common/pcapx/pcaputil/opcua-read-extended-variants/material/future-reserved32.pcap": "opcua-read-extended-variants/material/future-reserved32.pcap",
+        "common/pcapx/pcaputil/opcua-read-extended-variants/material/future-truncated.pcap": "opcua-read-extended-variants/material/future-truncated.pcap",
+        "common/pcapx/pcaputil/opcua-read-extended-variants/material/future-array-count-budget.pcap": "opcua-read-extended-variants/material/future-array-count-budget.pcap",
+        "common/pcapx/pcaputil/opcua-write-extended-variants/material/cases.json": "opcua-write-extended-variants/material/cases.json",
+        "common/pcapx/pcaputil/opcua-write-extended-variants/manifest.json": "opcua-write-extended-variants/manifest.json",
+        "common/pcapx/pcaputil/opcua-write-extended-variants/material/qualified-name.pcap": "opcua-write-extended-variants/material/qualified-name.pcap",
+        "common/pcapx/pcaputil/opcua-write-extended-variants/material/qualified-null.pcap": "opcua-write-extended-variants/material/qualified-null.pcap",
+        "common/pcapx/pcaputil/opcua-write-extended-variants/material/qualified-empty.pcap": "opcua-write-extended-variants/material/qualified-empty.pcap",
+        "common/pcapx/pcaputil/opcua-write-extended-variants/material/localized-both.pcap": "opcua-write-extended-variants/material/localized-both.pcap",
+        "common/pcapx/pcaputil/opcua-write-extended-variants/material/localized-text.pcap": "opcua-write-extended-variants/material/localized-text.pcap",
+        "common/pcapx/pcaputil/opcua-write-extended-variants/material/localized-empty.pcap": "opcua-write-extended-variants/material/localized-empty.pcap",
+        "common/pcapx/pcaputil/opcua-write-extended-variants/material/expanded-uri-server.pcap": "opcua-write-extended-variants/material/expanded-uri-server.pcap",
+        "common/pcapx/pcaputil/opcua-write-extended-variants/material/expanded-nonzero-wire-index-ignored.pcap": "opcua-write-extended-variants/material/expanded-nonzero-wire-index-ignored.pcap",
+        "common/pcapx/pcaputil/opcua-write-extended-variants/material/expanded-index-only.pcap": "opcua-write-extended-variants/material/expanded-index-only.pcap",
+        "common/pcapx/pcaputil/opcua-write-extended-variants/material/future26-bytes.pcap": "opcua-write-extended-variants/material/future26-bytes.pcap",
+        "common/pcapx/pcaputil/opcua-write-extended-variants/material/future26-empty.pcap": "opcua-write-extended-variants/material/future26-empty.pcap",
+        "common/pcapx/pcaputil/opcua-write-extended-variants/material/future27-bytes.pcap": "opcua-write-extended-variants/material/future27-bytes.pcap",
+        "common/pcapx/pcaputil/opcua-write-extended-variants/material/future27-empty.pcap": "opcua-write-extended-variants/material/future27-empty.pcap",
+        "common/pcapx/pcaputil/opcua-write-extended-variants/material/future28-bytes.pcap": "opcua-write-extended-variants/material/future28-bytes.pcap",
+        "common/pcapx/pcaputil/opcua-write-extended-variants/material/future28-empty.pcap": "opcua-write-extended-variants/material/future28-empty.pcap",
+        "common/pcapx/pcaputil/opcua-write-extended-variants/material/future29-bytes.pcap": "opcua-write-extended-variants/material/future29-bytes.pcap",
+        "common/pcapx/pcaputil/opcua-write-extended-variants/material/future29-empty.pcap": "opcua-write-extended-variants/material/future29-empty.pcap",
+        "common/pcapx/pcaputil/opcua-write-extended-variants/material/future30-bytes.pcap": "opcua-write-extended-variants/material/future30-bytes.pcap",
+        "common/pcapx/pcaputil/opcua-write-extended-variants/material/future30-empty.pcap": "opcua-write-extended-variants/material/future30-empty.pcap",
+        "common/pcapx/pcaputil/opcua-write-extended-variants/material/future31-bytes.pcap": "opcua-write-extended-variants/material/future31-bytes.pcap",
+        "common/pcapx/pcaputil/opcua-write-extended-variants/material/future31-empty.pcap": "opcua-write-extended-variants/material/future31-empty.pcap",
+        "common/pcapx/pcaputil/opcua-write-extended-variants/material/qualified-array.pcap": "opcua-write-extended-variants/material/qualified-array.pcap",
+        "common/pcapx/pcaputil/opcua-write-extended-variants/material/localized-array.pcap": "opcua-write-extended-variants/material/localized-array.pcap",
+        "common/pcapx/pcaputil/opcua-write-extended-variants/material/expanded-array.pcap": "opcua-write-extended-variants/material/expanded-array.pcap",
+        "common/pcapx/pcaputil/opcua-write-extended-variants/material/future26-array.pcap": "opcua-write-extended-variants/material/future26-array.pcap",
+        "common/pcapx/pcaputil/opcua-write-extended-variants/material/future27-array.pcap": "opcua-write-extended-variants/material/future27-array.pcap",
+        "common/pcapx/pcaputil/opcua-write-extended-variants/material/future28-array.pcap": "opcua-write-extended-variants/material/future28-array.pcap",
+        "common/pcapx/pcaputil/opcua-write-extended-variants/material/future29-array.pcap": "opcua-write-extended-variants/material/future29-array.pcap",
+        "common/pcapx/pcaputil/opcua-write-extended-variants/material/future30-array.pcap": "opcua-write-extended-variants/material/future30-array.pcap",
+        "common/pcapx/pcaputil/opcua-write-extended-variants/material/future31-array.pcap": "opcua-write-extended-variants/material/future31-array.pcap",
+        "common/pcapx/pcaputil/opcua-write-extended-variants/material/future26-null.pcap": "opcua-write-extended-variants/material/future26-null.pcap",
+        "common/pcapx/pcaputil/opcua-write-extended-variants/material/future27-null.pcap": "opcua-write-extended-variants/material/future27-null.pcap",
+        "common/pcapx/pcaputil/opcua-write-extended-variants/material/future28-null.pcap": "opcua-write-extended-variants/material/future28-null.pcap",
+        "common/pcapx/pcaputil/opcua-write-extended-variants/material/future29-null.pcap": "opcua-write-extended-variants/material/future29-null.pcap",
+        "common/pcapx/pcaputil/opcua-write-extended-variants/material/future30-null.pcap": "opcua-write-extended-variants/material/future30-null.pcap",
+        "common/pcapx/pcaputil/opcua-write-extended-variants/material/future31-null.pcap": "opcua-write-extended-variants/material/future31-null.pcap",
+        "common/pcapx/pcaputil/opcua-write-extended-variants/material/xml-text.pcap": "opcua-write-extended-variants/material/xml-text.pcap",
+        "common/pcapx/pcaputil/opcua-write-extended-variants/material/xml-null.pcap": "opcua-write-extended-variants/material/xml-null.pcap",
+        "common/pcapx/pcaputil/opcua-write-extended-variants/material/xml-empty.pcap": "opcua-write-extended-variants/material/xml-empty.pcap",
+        "common/pcapx/pcaputil/opcua-write-extended-variants/material/xml-unparsed-entity.pcap": "opcua-write-extended-variants/material/xml-unparsed-entity.pcap",
+        "common/pcapx/pcaputil/opcua-write-extended-variants/material/xml-array.pcap": "opcua-write-extended-variants/material/xml-array.pcap",
+        "common/pcapx/pcaputil/opcua-write-extended-variants/material/expanded-empty-uri-flag.pcap": "opcua-write-extended-variants/material/expanded-empty-uri-flag.pcap",
+        "common/pcapx/pcaputil/opcua-write-extended-variants/material/xml-invalid-utf8.pcap": "opcua-write-extended-variants/material/xml-invalid-utf8.pcap",
+        "common/pcapx/pcaputil/opcua-write-extended-variants/material/localized-reserved-mask.pcap": "opcua-write-extended-variants/material/localized-reserved-mask.pcap",
+        "common/pcapx/pcaputil/opcua-write-extended-variants/material/qualified-bad-utf8.pcap": "opcua-write-extended-variants/material/qualified-bad-utf8.pcap",
+        "common/pcapx/pcaputil/opcua-write-extended-variants/material/future-negative-length.pcap": "opcua-write-extended-variants/material/future-negative-length.pcap",
+        "common/pcapx/pcaputil/opcua-write-extended-variants/material/future-huge-length.pcap": "opcua-write-extended-variants/material/future-huge-length.pcap",
+        "common/pcapx/pcaputil/opcua-write-extended-variants/material/future-reserved32.pcap": "opcua-write-extended-variants/material/future-reserved32.pcap",
+        "common/pcapx/pcaputil/opcua-write-extended-variants/material/future-truncated.pcap": "opcua-write-extended-variants/material/future-truncated.pcap",
+        "common/pcapx/pcaputil/opcua-write-extended-variants/material/future-array-count-budget.pcap": "opcua-write-extended-variants/material/future-array-count-budget.pcap",
+        "common/pcapx/pcaputil/opcua-call-extended-variants/material/cases.json": "opcua-call-extended-variants/material/cases.json",
+        "common/pcapx/pcaputil/opcua-call-extended-variants/manifest.json": "opcua-call-extended-variants/manifest.json",
+        "common/pcapx/pcaputil/opcua-call-extended-variants/material/qualified-name.pcap": "opcua-call-extended-variants/material/qualified-name.pcap",
+        "common/pcapx/pcaputil/opcua-call-extended-variants/material/qualified-null.pcap": "opcua-call-extended-variants/material/qualified-null.pcap",
+        "common/pcapx/pcaputil/opcua-call-extended-variants/material/qualified-empty.pcap": "opcua-call-extended-variants/material/qualified-empty.pcap",
+        "common/pcapx/pcaputil/opcua-call-extended-variants/material/localized-both.pcap": "opcua-call-extended-variants/material/localized-both.pcap",
+        "common/pcapx/pcaputil/opcua-call-extended-variants/material/localized-text.pcap": "opcua-call-extended-variants/material/localized-text.pcap",
+        "common/pcapx/pcaputil/opcua-call-extended-variants/material/localized-empty.pcap": "opcua-call-extended-variants/material/localized-empty.pcap",
+        "common/pcapx/pcaputil/opcua-call-extended-variants/material/expanded-uri-server.pcap": "opcua-call-extended-variants/material/expanded-uri-server.pcap",
+        "common/pcapx/pcaputil/opcua-call-extended-variants/material/expanded-nonzero-wire-index-ignored.pcap": "opcua-call-extended-variants/material/expanded-nonzero-wire-index-ignored.pcap",
+        "common/pcapx/pcaputil/opcua-call-extended-variants/material/expanded-index-only.pcap": "opcua-call-extended-variants/material/expanded-index-only.pcap",
+        "common/pcapx/pcaputil/opcua-call-extended-variants/material/future26-bytes.pcap": "opcua-call-extended-variants/material/future26-bytes.pcap",
+        "common/pcapx/pcaputil/opcua-call-extended-variants/material/future26-empty.pcap": "opcua-call-extended-variants/material/future26-empty.pcap",
+        "common/pcapx/pcaputil/opcua-call-extended-variants/material/future27-bytes.pcap": "opcua-call-extended-variants/material/future27-bytes.pcap",
+        "common/pcapx/pcaputil/opcua-call-extended-variants/material/future27-empty.pcap": "opcua-call-extended-variants/material/future27-empty.pcap",
+        "common/pcapx/pcaputil/opcua-call-extended-variants/material/future28-bytes.pcap": "opcua-call-extended-variants/material/future28-bytes.pcap",
+        "common/pcapx/pcaputil/opcua-call-extended-variants/material/future28-empty.pcap": "opcua-call-extended-variants/material/future28-empty.pcap",
+        "common/pcapx/pcaputil/opcua-call-extended-variants/material/future29-bytes.pcap": "opcua-call-extended-variants/material/future29-bytes.pcap",
+        "common/pcapx/pcaputil/opcua-call-extended-variants/material/future29-empty.pcap": "opcua-call-extended-variants/material/future29-empty.pcap",
+        "common/pcapx/pcaputil/opcua-call-extended-variants/material/future30-bytes.pcap": "opcua-call-extended-variants/material/future30-bytes.pcap",
+        "common/pcapx/pcaputil/opcua-call-extended-variants/material/future30-empty.pcap": "opcua-call-extended-variants/material/future30-empty.pcap",
+        "common/pcapx/pcaputil/opcua-call-extended-variants/material/future31-bytes.pcap": "opcua-call-extended-variants/material/future31-bytes.pcap",
+        "common/pcapx/pcaputil/opcua-call-extended-variants/material/future31-empty.pcap": "opcua-call-extended-variants/material/future31-empty.pcap",
+        "common/pcapx/pcaputil/opcua-call-extended-variants/material/qualified-array.pcap": "opcua-call-extended-variants/material/qualified-array.pcap",
+        "common/pcapx/pcaputil/opcua-call-extended-variants/material/localized-array.pcap": "opcua-call-extended-variants/material/localized-array.pcap",
+        "common/pcapx/pcaputil/opcua-call-extended-variants/material/expanded-array.pcap": "opcua-call-extended-variants/material/expanded-array.pcap",
+        "common/pcapx/pcaputil/opcua-call-extended-variants/material/future26-array.pcap": "opcua-call-extended-variants/material/future26-array.pcap",
+        "common/pcapx/pcaputil/opcua-call-extended-variants/material/future27-array.pcap": "opcua-call-extended-variants/material/future27-array.pcap",
+        "common/pcapx/pcaputil/opcua-call-extended-variants/material/future28-array.pcap": "opcua-call-extended-variants/material/future28-array.pcap",
+        "common/pcapx/pcaputil/opcua-call-extended-variants/material/future29-array.pcap": "opcua-call-extended-variants/material/future29-array.pcap",
+        "common/pcapx/pcaputil/opcua-call-extended-variants/material/future30-array.pcap": "opcua-call-extended-variants/material/future30-array.pcap",
+        "common/pcapx/pcaputil/opcua-call-extended-variants/material/future31-array.pcap": "opcua-call-extended-variants/material/future31-array.pcap",
+        "common/pcapx/pcaputil/opcua-call-extended-variants/material/future26-null.pcap": "opcua-call-extended-variants/material/future26-null.pcap",
+        "common/pcapx/pcaputil/opcua-call-extended-variants/material/future27-null.pcap": "opcua-call-extended-variants/material/future27-null.pcap",
+        "common/pcapx/pcaputil/opcua-call-extended-variants/material/future28-null.pcap": "opcua-call-extended-variants/material/future28-null.pcap",
+        "common/pcapx/pcaputil/opcua-call-extended-variants/material/future29-null.pcap": "opcua-call-extended-variants/material/future29-null.pcap",
+        "common/pcapx/pcaputil/opcua-call-extended-variants/material/future30-null.pcap": "opcua-call-extended-variants/material/future30-null.pcap",
+        "common/pcapx/pcaputil/opcua-call-extended-variants/material/future31-null.pcap": "opcua-call-extended-variants/material/future31-null.pcap",
+        "common/pcapx/pcaputil/opcua-call-extended-variants/material/xml-text.pcap": "opcua-call-extended-variants/material/xml-text.pcap",
+        "common/pcapx/pcaputil/opcua-call-extended-variants/material/xml-null.pcap": "opcua-call-extended-variants/material/xml-null.pcap",
+        "common/pcapx/pcaputil/opcua-call-extended-variants/material/xml-empty.pcap": "opcua-call-extended-variants/material/xml-empty.pcap",
+        "common/pcapx/pcaputil/opcua-call-extended-variants/material/xml-unparsed-entity.pcap": "opcua-call-extended-variants/material/xml-unparsed-entity.pcap",
+        "common/pcapx/pcaputil/opcua-call-extended-variants/material/xml-array.pcap": "opcua-call-extended-variants/material/xml-array.pcap",
+        "common/pcapx/pcaputil/opcua-call-extended-variants/material/expanded-empty-uri-flag.pcap": "opcua-call-extended-variants/material/expanded-empty-uri-flag.pcap",
+        "common/pcapx/pcaputil/opcua-call-extended-variants/material/xml-invalid-utf8.pcap": "opcua-call-extended-variants/material/xml-invalid-utf8.pcap",
+        "common/pcapx/pcaputil/opcua-call-extended-variants/material/localized-reserved-mask.pcap": "opcua-call-extended-variants/material/localized-reserved-mask.pcap",
+        "common/pcapx/pcaputil/opcua-call-extended-variants/material/qualified-bad-utf8.pcap": "opcua-call-extended-variants/material/qualified-bad-utf8.pcap",
+        "common/pcapx/pcaputil/opcua-call-extended-variants/material/future-negative-length.pcap": "opcua-call-extended-variants/material/future-negative-length.pcap",
+        "common/pcapx/pcaputil/opcua-call-extended-variants/material/future-huge-length.pcap": "opcua-call-extended-variants/material/future-huge-length.pcap",
+        "common/pcapx/pcaputil/opcua-call-extended-variants/material/future-reserved32.pcap": "opcua-call-extended-variants/material/future-reserved32.pcap",
+        "common/pcapx/pcaputil/opcua-call-extended-variants/material/future-truncated.pcap": "opcua-call-extended-variants/material/future-truncated.pcap",
+        "common/pcapx/pcaputil/opcua-call-extended-variants/material/future-array-count-budget.pcap": "opcua-call-extended-variants/material/future-array-count-budget.pcap",
+        "common/pcapx/pcaputil/opcua-extended-variants/generate.py": "generate.py",
+        "common/pcapx/pcaputil/opcua-extended-variants/emit.py": "emit.py",
+        "common/pcapx/pcaputil/opcua-extended-variants/verify.py": "verify.py",
+        "common/pcapx/pcaputil/opcua-extended-variants/seal.py": "seal.py",
+        "common/pcapx/pcaputil/opcua-extended-variants/SOURCE.json": "SOURCE.json",
+        "common/pcapx/pcaputil/opcua-extended-variants/SOURCE-primary.json": "SOURCE-primary.json",
+        "scripts/protocol-tests/required-tests-traffic-unified-v28.json": "required-tests-traffic-unified-v28.json"
+      }
+    },
+    {
+      "id": "validation-opcua-structured-values",
+      "kind": "validation",
+      "source_sha": "c8a577fa417efead876545f8f5bcfcec977b5324",
+      "file": "validation-opcua-structured-values.zip",
+      "sha256": "52e0165905692ec8f7d782f6c1f1a083a19226675d9f3b8311800edc4568c259",
+      "password": "bin-parser",
+      "members": {
+        "opcua-read-structured-values/material/cases.json": {
+          "sha256": "dc58371d14dd920823f1ecd0287ac7f566d53f596327ad77f7d371e146245796",
+          "bytes": 164371
+        },
+        "opcua-read-structured-values/manifest.json": {
+          "sha256": "681e1296e7a45893b4ba0b093e54737d0d7319aed978730bf1c3df87a47fdfaf",
+          "bytes": 5616
+        },
+        "opcua-read-structured-values/material/nested-datavalue.pcap": {
+          "sha256": "251d181fdaa7ed81b52a1e79368129caea3c220f508d0cb9d3e49f4d6adec02d",
+          "bytes": 977
+        },
+        "opcua-read-structured-values/material/variant-array-mixed.pcap": {
+          "sha256": "fbcafa660932601969e75f096c5c2ff916654c7cbce632d26d4f4e8d3ae570f4",
+          "bytes": 967
+        },
+        "opcua-read-structured-values/material/nested-two.pcap": {
+          "sha256": "6b8aba6ba298cd478c78cbd285a65416ecad1ba2bfe8efb757f9a2e3ffb61365",
+          "bytes": 961
+        },
+        "opcua-read-structured-values/material/nested-eight.pcap": {
+          "sha256": "dc467d391cdc13ec7067124fa0f794df6b151218e29bb3f43eddcc7c75114483",
+          "bytes": 991
+        },
+        "opcua-read-structured-values/material/datavalue-array.pcap": {
+          "sha256": "598d472f6fa2cb36d0da308582c808970440316faf3e7ec52991ee9b62ab2b60",
+          "bytes": 967
+        },
+        "opcua-read-structured-values/material/opaque-extension.pcap": {
+          "sha256": "03f00b238004f8513e4b8ade22569d4520d2028930bd05f9756603aec41cdcc0",
+          "bytes": 954
+        },
+        "opcua-read-structured-values/material/extension-array.pcap": {
+          "sha256": "17a122095c50dac774584b49eeadf75da66a675a742017e1bb8c5062f54ab5c5",
+          "bytes": 959
+        },
+        "opcua-read-structured-values/material/diagnostic-value-additional.pcap": {
+          "sha256": "5adb8dfdfc1f27514ef3aff72f4f721ad032cc7b00091fc89b1d18c8c138c88e",
+          "bytes": 954
+        },
+        "opcua-read-structured-values/material/diagnostic-value-minus-one.pcap": {
+          "sha256": "3a5df7bf58ca47a1f1d2c717b01c3b11f4290dffa32a9b955543eabd3a76d64f",
+          "bytes": 948
+        },
+        "opcua-read-structured-values/material/diagnostic-array-additional.pcap": {
+          "sha256": "5536d145c753ce485489668da17c010f7ab377d76405983435b40f010bf74c1c",
+          "bytes": 968
+        },
+        "opcua-read-structured-values/material/diagnostic-body-index-no-table.pcap": {
+          "sha256": "1d5a71cb60abeb4c0d5fa875c86ef284cfc0fe15e4c4699ac33803c8b1cf3fb4",
+          "bytes": 948
+        },
+        "opcua-read-structured-values/material/opaque-additional-header.pcap": {
+          "sha256": "f9f30bf376e625f0078c7c896ea2dfa3164dc30bc56d4afb5f5c28b19f737348",
+          "bytes": 965
+        },
+        "opcua-read-structured-values/material/diagnostic-null-table-entry.pcap": {
+          "sha256": "61c724da21eac0d802438a9c5f1cfe4ce1c55f1321459b97e0a7ae7e54122432",
+          "bytes": 959
+        },
+        "opcua-read-structured-values/material/nested-depth-refusal.pcap": {
+          "sha256": "2e31e2eda1902bf79cf22bbe24c7acd9ecbca4017864b29d9acca275d00cd5b4",
+          "bytes": 1351
+        },
+        "opcua-read-structured-values/material/diagnostic-all-fields.pcap": {
+          "sha256": "34a09d58d3724b2f9f1e2b674c06b7f89d791ebc6307a419b88a7e0aa462829d",
+          "bytes": 1029
+        },
+        "opcua-read-structured-values/material/diagnostic-locale-only.pcap": {
+          "sha256": "b04ae0f86c6f806f10b48f159124f40f44ab8813b076046b052954f38159a5fb",
+          "bytes": 1003
+        },
+        "opcua-read-structured-values/material/diagnostic-localized-only.pcap": {
+          "sha256": "b9b547d9c34fa13fa0d66a345867722f52ea9baef4c001ea0c383f65becd3a35",
+          "bytes": 1003
+        },
+        "opcua-read-structured-values/material/diagnostic-minus-one.pcap": {
+          "sha256": "0cb92d35fb355c72d992d61df2e985dc8115081e2c48972e15be3d4602b304d6",
+          "bytes": 1003
+        },
+        "opcua-read-structured-values/material/diagnostic-four-levels.pcap": {
+          "sha256": "e28c66b0eb01c7f4d652020294ce436aaaaf2b2ab0d5f12394db4f1f82c45629",
+          "bytes": 1011
+        },
+        "opcua-read-structured-values/material/diagnostic-eleven-refusal.pcap": {
+          "sha256": "fb0a1f63462b029524437e59554a1eac8821aedc544503d1b1b06617c05bcf60",
+          "bytes": 1018
+        },
+        "opcua-read-structured-values/material/diagnostic-index-range.pcap": {
+          "sha256": "cdb3e5ae048fb7b5cc57569b7118628ed9500996c3a1a6174285f59381b8688b",
+          "bytes": 1003
+        },
+        "opcua-read-structured-values/material/diagnostic-negative-index.pcap": {
+          "sha256": "db19e1e8ba9a7a4847bc71166f636d696a9abae2599d074a0b0d8ae855cbfae1",
+          "bytes": 1003
+        },
+        "opcua-read-structured-values/material/diagnostic-reserved-mask.pcap": {
+          "sha256": "e61e8d96a8ad35b6208f3c8fd7f5f36533515d7feaba7d8458eede054b94a7db",
+          "bytes": 951
+        },
+        "opcua-write-structured-values/material/cases.json": {
+          "sha256": "bf90d32cc50e25ea52a18b9f13275c260ebf445807a761e65d1044dfccf5f958",
+          "bytes": 153694
+        },
+        "opcua-write-structured-values/manifest.json": {
+          "sha256": "56425c4721b292fae9b9c04f3dfa9e496cebee8f2d30a0c27504ba23c59ef76b",
+          "bytes": 5612
+        },
+        "opcua-write-structured-values/material/nested-datavalue.pcap": {
+          "sha256": "e5e5b26c3202829a3d6d6d3818833d7c75c0002962a85b57e8ab83687a519dfd",
+          "bytes": 963
+        },
+        "opcua-write-structured-values/material/variant-array-mixed.pcap": {
+          "sha256": "39ff6576affd8c3b172f6a292ea2ebf420f7d6ca925f9a1094c03fc1fa63223d",
+          "bytes": 953
+        },
+        "opcua-write-structured-values/material/nested-two.pcap": {
+          "sha256": "e462df56040fa04b1b4db0be90ca78c0217a61d92ba1bbeed352cc7d367dba51",
+          "bytes": 947
+        },
+        "opcua-write-structured-values/material/nested-eight.pcap": {
+          "sha256": "7bf0823273a823bdbe1e56a16623bc9dd08c5de10581194d1b429f6e23f9b000",
+          "bytes": 977
+        },
+        "opcua-write-structured-values/material/datavalue-array.pcap": {
+          "sha256": "22d3cc82c70e224726ee9970ee643a436529a5f880b1a55749a6237c361e92e1",
+          "bytes": 953
+        },
+        "opcua-write-structured-values/material/opaque-extension.pcap": {
+          "sha256": "32a3411db0e56bf6c7bc12f36cf867e42deca667cd4a20b37a0b239f91442323",
+          "bytes": 940
+        },
+        "opcua-write-structured-values/material/extension-array.pcap": {
+          "sha256": "2039594713563db852efbf9ffd2911e93a6c8ffa1a55a84062d13f6cb76d1447",
+          "bytes": 945
+        },
+        "opcua-write-structured-values/material/diagnostic-value-additional.pcap": {
+          "sha256": "fdbc47282afa1122997dd522f5d0ba1af7ed7ca0df04941cfdf909ad34be6cdc",
+          "bytes": 940
+        },
+        "opcua-write-structured-values/material/diagnostic-value-minus-one.pcap": {
+          "sha256": "33a18249b1db9235613bea8fd3b4d5db53a32e36e628026cdc0638cba2ad490e",
+          "bytes": 934
+        },
+        "opcua-write-structured-values/material/diagnostic-array-additional.pcap": {
+          "sha256": "97f79cd9850349abec44300d6efa746b1e1505df64969484aea18447f757c4ca",
+          "bytes": 954
+        },
+        "opcua-write-structured-values/material/diagnostic-body-index-no-table.pcap": {
+          "sha256": "50020156f7c4c3588feb2878ecef67b6166abb857981b2b2a0fdf080a39fea34",
+          "bytes": 800
+        },
+        "opcua-write-structured-values/material/opaque-additional-header.pcap": {
+          "sha256": "f5a09c562269da9905a23aabb907132b9d3c7686ddfd726af3782ee8066a94e2",
+          "bytes": 951
+        },
+        "opcua-write-structured-values/material/diagnostic-null-table-entry.pcap": {
+          "sha256": "1652c6d44402bfac648d16da71e9b9f260ebb4de80dd3a1caaa698bd76f6cb0e",
+          "bytes": 945
+        },
+        "opcua-write-structured-values/material/nested-depth-refusal.pcap": {
+          "sha256": "dd7c003ce22eff21c6d099328b1da6cfb514e610e2ca136d5a0606fe9751b2ef",
+          "bytes": 1203
+        },
+        "opcua-write-structured-values/material/diagnostic-all-fields.pcap": {
+          "sha256": "98228bff63638b4c139c5d32467e1ba62d3d55a709d72ea6ae1009f92bd37bed",
+          "bytes": 1015
+        },
+        "opcua-write-structured-values/material/diagnostic-locale-only.pcap": {
+          "sha256": "25c86dee3d4d346eb40e1ff3f368c4ff06be65092c87ce1f4a679ff498432b97",
+          "bytes": 989
+        },
+        "opcua-write-structured-values/material/diagnostic-localized-only.pcap": {
+          "sha256": "ec2bea630dba5c6094da88522a528a6304d14c7445fda52e462ab3d6ec5f5b21",
+          "bytes": 989
+        },
+        "opcua-write-structured-values/material/diagnostic-minus-one.pcap": {
+          "sha256": "43b32f888541d1c10da4268e5adbfe56a7f22c67f6524f0fb510aa200ec0d5d0",
+          "bytes": 989
+        },
+        "opcua-write-structured-values/material/diagnostic-four-levels.pcap": {
+          "sha256": "52491a0117102250ea9f86222ab76827e3c39cc054a7857e026ad99d99d5ff90",
+          "bytes": 997
+        },
+        "opcua-write-structured-values/material/diagnostic-eleven-refusal.pcap": {
+          "sha256": "7d3ad179ef76ddbc50e8eb5be2abda689f56765d1148059f99a357afdd3fcb7a",
+          "bytes": 1004
+        },
+        "opcua-write-structured-values/material/diagnostic-index-range.pcap": {
+          "sha256": "bcbbfdb382f1549ea9c3eec727a53ea7a91eb0afb127e6ce4df4752f4d24e851",
+          "bytes": 989
+        },
+        "opcua-write-structured-values/material/diagnostic-negative-index.pcap": {
+          "sha256": "4c790fcb66fd96d69fa998cb4e673990e40e6beea45db82b6d57e9d9372dd966",
+          "bytes": 989
+        },
+        "opcua-write-structured-values/material/diagnostic-reserved-mask.pcap": {
+          "sha256": "1b314c6c00dea328935924651cb5244aec20a80804e4de06e6a0945f8573b1d8",
+          "bytes": 937
+        },
+        "opcua-call-structured-values/material/cases.json": {
+          "sha256": "94cae5f77739107f28f2b3d9cf7b0519341186abe5ac0c74ded5aa934fec6961",
+          "bytes": 185470
+        },
+        "opcua-call-structured-values/manifest.json": {
+          "sha256": "f6362b1523ee6f6bea54768529d5c51e933e0189bb4f33344621a8687a8b815f",
+          "bytes": 5618
+        },
+        "opcua-call-structured-values/material/nested-datavalue.pcap": {
+          "sha256": "f1210a62bfbdc0e72104759806602ddeeb2d9efcf6a9fdeda839e801579f4b08",
+          "bytes": 1007
+        },
+        "opcua-call-structured-values/material/variant-array-mixed.pcap": {
+          "sha256": "afa3bc259c3b526b87d148dfad4af19997f082f28c8709dcf92d8bc26d4ce435",
+          "bytes": 987
+        },
+        "opcua-call-structured-values/material/nested-two.pcap": {
+          "sha256": "f3ae695613ebc13c88836b1fbef6c185cee1754658f680b7a626061623b1212a",
+          "bytes": 975
+        },
+        "opcua-call-structured-values/material/nested-eight.pcap": {
+          "sha256": "3671d3cf179f572ee77a50938ca42c8c3a0dd0b23d7c1af9fd1895f87e2ae016",
+          "bytes": 1035
+        },
+        "opcua-call-structured-values/material/datavalue-array.pcap": {
+          "sha256": "23bec10b0dab3d9ab5de0c8f8b3955d698e1abddb45c86c8cb7114b062f24332",
+          "bytes": 987
+        },
+        "opcua-call-structured-values/material/opaque-extension.pcap": {
+          "sha256": "9548a65c0569dd89e898bac63d956f616ac69aac8eaeb4a5ce85e2062e08329d",
+          "bytes": 961
+        },
+        "opcua-call-structured-values/material/extension-array.pcap": {
+          "sha256": "8ac175a969befad2b7245ebd14fd45179049736344388ffa507a1e8edaf0f57c",
+          "bytes": 971
+        },
+        "opcua-call-structured-values/material/diagnostic-value-additional.pcap": {
+          "sha256": "7ea0137bb225df320e7ba567ca8ffa4318067298918f4084328af3a76412c6d7",
+          "bytes": 961
+        },
+        "opcua-call-structured-values/material/diagnostic-value-minus-one.pcap": {
+          "sha256": "0b3cb38818f8ee8739a40d9eb1031e311b6560612d9b288607f573e84b90fcb5",
+          "bytes": 949
+        },
+        "opcua-call-structured-values/material/diagnostic-array-additional.pcap": {
+          "sha256": "75ab6ee2d20d1b58dfb07ae96202f1991061b8fddcfe4fd1442122a459b11888",
+          "bytes": 989
+        },
+        "opcua-call-structured-values/material/diagnostic-body-index-no-table.pcap": {
+          "sha256": "89b2e436722f91ee01a7e3111df68f9e1464c545c8412570fb518096ee1dd88e",
+          "bytes": 797
+        },
+        "opcua-call-structured-values/material/opaque-additional-header.pcap": {
+          "sha256": "83acefacf91ac2ce8da7fa415310132963412094d1b47f5ea15d59c47ccc3986",
+          "bytes": 969
+        },
+        "opcua-call-structured-values/material/diagnostic-null-table-entry.pcap": {
+          "sha256": "e5efd8d1db006ab3579ece5158c68701b24110707b398d25a6fcdf6a555e0d10",
+          "bytes": 963
+        },
+        "opcua-call-structured-values/material/nested-depth-refusal.pcap": {
+          "sha256": "2e55b1a64e2a7f09e1d39ddf104584e38f5b2a54292b5752218b204fccc1eb77",
+          "bytes": 1200
+        },
+        "opcua-call-structured-values/material/diagnostic-all-fields.pcap": {
+          "sha256": "591f1b88dfaeb6c568a5f3184f0facb131d93d6ca9ab068486930589eeb40efc",
+          "bytes": 1033
+        },
+        "opcua-call-structured-values/material/diagnostic-locale-only.pcap": {
+          "sha256": "897e817aee72b69b61a5af740000ca894b6b3c626dcbdfbd61b8db5f97b6da19",
+          "bytes": 1007
+        },
+        "opcua-call-structured-values/material/diagnostic-localized-only.pcap": {
+          "sha256": "b71f7214813aa795e5c5bec9b45cdc9050be75460bcf5cba751bbc7fd6fe86e8",
+          "bytes": 1007
+        },
+        "opcua-call-structured-values/material/diagnostic-minus-one.pcap": {
+          "sha256": "70e10c75ef7fa628df0c7a6d934055c93d9ea46dc99fd318e2e148606a6a0890",
+          "bytes": 1007
+        },
+        "opcua-call-structured-values/material/diagnostic-four-levels.pcap": {
+          "sha256": "0ebbef13f9d9085b236b4427fd8096c112eedb0b83d4b23e448b5457e11232cc",
+          "bytes": 1015
+        },
+        "opcua-call-structured-values/material/diagnostic-eleven-refusal.pcap": {
+          "sha256": "4b35df32d2f1a3ff7ee9f8e8e70649aecea766de5539842220b37b258da74a66",
+          "bytes": 1022
+        },
+        "opcua-call-structured-values/material/diagnostic-index-range.pcap": {
+          "sha256": "c394f4f9f6eaa048c47d82686c7c18fd594634f2ea3674494bdd7cf3c3a77c51",
+          "bytes": 1007
+        },
+        "opcua-call-structured-values/material/diagnostic-negative-index.pcap": {
+          "sha256": "c22df5d60f4787ce4f1cdd2ee83c1f6e7d3ba1ad61243a4bc091719696c5fc15",
+          "bytes": 1007
+        },
+        "opcua-call-structured-values/material/diagnostic-reserved-mask.pcap": {
+          "sha256": "fa6c339823fba3f70b0c06459a7f25ef79c18cc1e83070d1d7d843d319f7199f",
+          "bytes": 955
+        },
+        "opcua-browse-structured-values/material/cases.json": {
+          "sha256": "682306f2ba453153a7f832c09dc1fa06ac35c7fca0bc401e37cbb22129e1e051",
+          "bytes": 33881
+        },
+        "opcua-browse-structured-values/manifest.json": {
+          "sha256": "ab40941d0616184b54bbb1dc50bac9e69487c92a62152c6330e50217aec66eb6",
+          "bytes": 1005
+        },
+        "opcua-browse-structured-values/material/diagnostic-locale-only.pcap": {
+          "sha256": "6efac620594850fcc522ffcf88f4688243172f547c09f5e5d724e3d312b1f11f",
+          "bytes": 1051
+        },
+        "opcua-browse-structured-values/material/diagnostic-localized-only.pcap": {
+          "sha256": "d3278a67f37d23f6a60d33df6ba6e2bba4fd1e010dcd1a0573836f9c9f57ae00",
+          "bytes": 1051
+        },
+        "opcua-browse-structured-values/material/diagnostic-index-refusal.pcap": {
+          "sha256": "f5594bf8e68949d9e59757a4192d5b8b5cdc92df16fcd04416d35bc9eb18113d",
+          "bytes": 1051
+        },
+        "opcua-browse-structured-values/material/diagnostic-all-fields.pcap": {
+          "sha256": "be4883b7f47bdef7d889e23fb5fbd26b9f31591d37e9b90e902500d8f80c3d2f",
+          "bytes": 1073
+        },
+        "opcua-browsenext-structured-values/material/cases.json": {
+          "sha256": "2a1272d52881460d6a259213f5aee9f76e94b68c0155275ea41758f86ea8f899",
+          "bytes": 28133
+        },
+        "opcua-browsenext-structured-values/manifest.json": {
+          "sha256": "88bfa96d976b7425ea6aac67da0c6edc2c57bdbe17861fcf288d89071ae96228",
+          "bytes": 1009
+        },
+        "opcua-browsenext-structured-values/material/diagnostic-locale-only.pcap": {
+          "sha256": "87d64af01bd4edd5011927cdcd204cb4f2c35fd3c18b5c611bb13b1f8955de4a",
+          "bytes": 1024
+        },
+        "opcua-browsenext-structured-values/material/diagnostic-localized-only.pcap": {
+          "sha256": "13329d3746a463686c9074f7ddee3a65c008008a6045de39d5f02744687c1672",
+          "bytes": 1024
+        },
+        "opcua-browsenext-structured-values/material/diagnostic-index-refusal.pcap": {
+          "sha256": "6af04de81776b5e58145bb489594ddaac74fef3b8304f77572b7cadd3ab5f9ca",
+          "bytes": 1024
+        },
+        "opcua-browsenext-structured-values/material/diagnostic-all-fields.pcap": {
+          "sha256": "4b9e7a8d262af96718029a9535a7ffeec4bd9326b4103dcfbf91554da8d4869e",
+          "bytes": 1046
+        },
+        "generate.py": {
+          "sha256": "a9027ce31d05909b9c89588c79f9e254553d22990fcf004e33af2e1837791d9f",
+          "bytes": 8849
+        },
+        "generate-browse.py": {
+          "sha256": "2221225af051995c1787f326cc8e983381daf1e46779dbb84ae2c6f072a80bd2",
+          "bytes": 3043
+        },
+        "emit.py": {
+          "sha256": "ceedb0d102dacda8e56b602d3b21c6939c26a1ad6f2b7238e9799ab08e5e94fb",
+          "bytes": 809
+        },
+        "verify.py": {
+          "sha256": "a1a7e3fe9fa690afb931f8d943f1367312b7b2a8ce7caa1384e10d9e0f50d757",
+          "bytes": 2629
+        },
+        "seal.py": {
+          "sha256": "1ee31d2313184d909c70b9e8db9a6c81aaa843cf7fc7737b8fdd8771b060df21",
+          "bytes": 4188
+        },
+        "SOURCE.json": {
+          "sha256": "9a1181eb5ed49740be857f4a4f4813e7dda985bc26b43ccff986d4170a1fa866",
+          "bytes": 1452
+        },
+        "SOURCE-primary.json": {
+          "sha256": "9b145d0eb07c75a53bcd894071219f43f21292b3cb2c7020ced1987c0ed2b62e",
+          "bytes": 466
+        },
+        "required-tests-traffic-unified-v29.json": {
+          "sha256": "d42fe6479aaa622024b5ad5a3b712fa09fe1df75afc896c5c263c1f3bc3b0a2c",
+          "bytes": 306486
+        },
+        "validation/expected.json": {
+          "sha256": "89bac25286ffed9c6a2dc5e5d536ce6d150d6effcbb14435934f915825dcb45c",
+          "bytes": 93419
+        }
+      },
+      "aliases": {
+        "common/pcapx/pcaputil/opcua-read-structured-values/material/cases.json": "opcua-read-structured-values/material/cases.json",
+        "common/pcapx/pcaputil/opcua-read-structured-values/manifest.json": "opcua-read-structured-values/manifest.json",
+        "common/pcapx/pcaputil/opcua-read-structured-values/material/nested-datavalue.pcap": "opcua-read-structured-values/material/nested-datavalue.pcap",
+        "common/pcapx/pcaputil/opcua-read-structured-values/material/variant-array-mixed.pcap": "opcua-read-structured-values/material/variant-array-mixed.pcap",
+        "common/pcapx/pcaputil/opcua-read-structured-values/material/nested-two.pcap": "opcua-read-structured-values/material/nested-two.pcap",
+        "common/pcapx/pcaputil/opcua-read-structured-values/material/nested-eight.pcap": "opcua-read-structured-values/material/nested-eight.pcap",
+        "common/pcapx/pcaputil/opcua-read-structured-values/material/datavalue-array.pcap": "opcua-read-structured-values/material/datavalue-array.pcap",
+        "common/pcapx/pcaputil/opcua-read-structured-values/material/opaque-extension.pcap": "opcua-read-structured-values/material/opaque-extension.pcap",
+        "common/pcapx/pcaputil/opcua-read-structured-values/material/extension-array.pcap": "opcua-read-structured-values/material/extension-array.pcap",
+        "common/pcapx/pcaputil/opcua-read-structured-values/material/diagnostic-value-additional.pcap": "opcua-read-structured-values/material/diagnostic-value-additional.pcap",
+        "common/pcapx/pcaputil/opcua-read-structured-values/material/diagnostic-value-minus-one.pcap": "opcua-read-structured-values/material/diagnostic-value-minus-one.pcap",
+        "common/pcapx/pcaputil/opcua-read-structured-values/material/diagnostic-array-additional.pcap": "opcua-read-structured-values/material/diagnostic-array-additional.pcap",
+        "common/pcapx/pcaputil/opcua-read-structured-values/material/diagnostic-body-index-no-table.pcap": "opcua-read-structured-values/material/diagnostic-body-index-no-table.pcap",
+        "common/pcapx/pcaputil/opcua-read-structured-values/material/opaque-additional-header.pcap": "opcua-read-structured-values/material/opaque-additional-header.pcap",
+        "common/pcapx/pcaputil/opcua-read-structured-values/material/diagnostic-null-table-entry.pcap": "opcua-read-structured-values/material/diagnostic-null-table-entry.pcap",
+        "common/pcapx/pcaputil/opcua-read-structured-values/material/nested-depth-refusal.pcap": "opcua-read-structured-values/material/nested-depth-refusal.pcap",
+        "common/pcapx/pcaputil/opcua-read-structured-values/material/diagnostic-all-fields.pcap": "opcua-read-structured-values/material/diagnostic-all-fields.pcap",
+        "common/pcapx/pcaputil/opcua-read-structured-values/material/diagnostic-locale-only.pcap": "opcua-read-structured-values/material/diagnostic-locale-only.pcap",
+        "common/pcapx/pcaputil/opcua-read-structured-values/material/diagnostic-localized-only.pcap": "opcua-read-structured-values/material/diagnostic-localized-only.pcap",
+        "common/pcapx/pcaputil/opcua-read-structured-values/material/diagnostic-minus-one.pcap": "opcua-read-structured-values/material/diagnostic-minus-one.pcap",
+        "common/pcapx/pcaputil/opcua-read-structured-values/material/diagnostic-four-levels.pcap": "opcua-read-structured-values/material/diagnostic-four-levels.pcap",
+        "common/pcapx/pcaputil/opcua-read-structured-values/material/diagnostic-eleven-refusal.pcap": "opcua-read-structured-values/material/diagnostic-eleven-refusal.pcap",
+        "common/pcapx/pcaputil/opcua-read-structured-values/material/diagnostic-index-range.pcap": "opcua-read-structured-values/material/diagnostic-index-range.pcap",
+        "common/pcapx/pcaputil/opcua-read-structured-values/material/diagnostic-negative-index.pcap": "opcua-read-structured-values/material/diagnostic-negative-index.pcap",
+        "common/pcapx/pcaputil/opcua-read-structured-values/material/diagnostic-reserved-mask.pcap": "opcua-read-structured-values/material/diagnostic-reserved-mask.pcap",
+        "common/pcapx/pcaputil/opcua-write-structured-values/material/cases.json": "opcua-write-structured-values/material/cases.json",
+        "common/pcapx/pcaputil/opcua-write-structured-values/manifest.json": "opcua-write-structured-values/manifest.json",
+        "common/pcapx/pcaputil/opcua-write-structured-values/material/nested-datavalue.pcap": "opcua-write-structured-values/material/nested-datavalue.pcap",
+        "common/pcapx/pcaputil/opcua-write-structured-values/material/variant-array-mixed.pcap": "opcua-write-structured-values/material/variant-array-mixed.pcap",
+        "common/pcapx/pcaputil/opcua-write-structured-values/material/nested-two.pcap": "opcua-write-structured-values/material/nested-two.pcap",
+        "common/pcapx/pcaputil/opcua-write-structured-values/material/nested-eight.pcap": "opcua-write-structured-values/material/nested-eight.pcap",
+        "common/pcapx/pcaputil/opcua-write-structured-values/material/datavalue-array.pcap": "opcua-write-structured-values/material/datavalue-array.pcap",
+        "common/pcapx/pcaputil/opcua-write-structured-values/material/opaque-extension.pcap": "opcua-write-structured-values/material/opaque-extension.pcap",
+        "common/pcapx/pcaputil/opcua-write-structured-values/material/extension-array.pcap": "opcua-write-structured-values/material/extension-array.pcap",
+        "common/pcapx/pcaputil/opcua-write-structured-values/material/diagnostic-value-additional.pcap": "opcua-write-structured-values/material/diagnostic-value-additional.pcap",
+        "common/pcapx/pcaputil/opcua-write-structured-values/material/diagnostic-value-minus-one.pcap": "opcua-write-structured-values/material/diagnostic-value-minus-one.pcap",
+        "common/pcapx/pcaputil/opcua-write-structured-values/material/diagnostic-array-additional.pcap": "opcua-write-structured-values/material/diagnostic-array-additional.pcap",
+        "common/pcapx/pcaputil/opcua-write-structured-values/material/diagnostic-body-index-no-table.pcap": "opcua-write-structured-values/material/diagnostic-body-index-no-table.pcap",
+        "common/pcapx/pcaputil/opcua-write-structured-values/material/opaque-additional-header.pcap": "opcua-write-structured-values/material/opaque-additional-header.pcap",
+        "common/pcapx/pcaputil/opcua-write-structured-values/material/diagnostic-null-table-entry.pcap": "opcua-write-structured-values/material/diagnostic-null-table-entry.pcap",
+        "common/pcapx/pcaputil/opcua-write-structured-values/material/nested-depth-refusal.pcap": "opcua-write-structured-values/material/nested-depth-refusal.pcap",
+        "common/pcapx/pcaputil/opcua-write-structured-values/material/diagnostic-all-fields.pcap": "opcua-write-structured-values/material/diagnostic-all-fields.pcap",
+        "common/pcapx/pcaputil/opcua-write-structured-values/material/diagnostic-locale-only.pcap": "opcua-write-structured-values/material/diagnostic-locale-only.pcap",
+        "common/pcapx/pcaputil/opcua-write-structured-values/material/diagnostic-localized-only.pcap": "opcua-write-structured-values/material/diagnostic-localized-only.pcap",
+        "common/pcapx/pcaputil/opcua-write-structured-values/material/diagnostic-minus-one.pcap": "opcua-write-structured-values/material/diagnostic-minus-one.pcap",
+        "common/pcapx/pcaputil/opcua-write-structured-values/material/diagnostic-four-levels.pcap": "opcua-write-structured-values/material/diagnostic-four-levels.pcap",
+        "common/pcapx/pcaputil/opcua-write-structured-values/material/diagnostic-eleven-refusal.pcap": "opcua-write-structured-values/material/diagnostic-eleven-refusal.pcap",
+        "common/pcapx/pcaputil/opcua-write-structured-values/material/diagnostic-index-range.pcap": "opcua-write-structured-values/material/diagnostic-index-range.pcap",
+        "common/pcapx/pcaputil/opcua-write-structured-values/material/diagnostic-negative-index.pcap": "opcua-write-structured-values/material/diagnostic-negative-index.pcap",
+        "common/pcapx/pcaputil/opcua-write-structured-values/material/diagnostic-reserved-mask.pcap": "opcua-write-structured-values/material/diagnostic-reserved-mask.pcap",
+        "common/pcapx/pcaputil/opcua-call-structured-values/material/cases.json": "opcua-call-structured-values/material/cases.json",
+        "common/pcapx/pcaputil/opcua-call-structured-values/manifest.json": "opcua-call-structured-values/manifest.json",
+        "common/pcapx/pcaputil/opcua-call-structured-values/material/nested-datavalue.pcap": "opcua-call-structured-values/material/nested-datavalue.pcap",
+        "common/pcapx/pcaputil/opcua-call-structured-values/material/variant-array-mixed.pcap": "opcua-call-structured-values/material/variant-array-mixed.pcap",
+        "common/pcapx/pcaputil/opcua-call-structured-values/material/nested-two.pcap": "opcua-call-structured-values/material/nested-two.pcap",
+        "common/pcapx/pcaputil/opcua-call-structured-values/material/nested-eight.pcap": "opcua-call-structured-values/material/nested-eight.pcap",
+        "common/pcapx/pcaputil/opcua-call-structured-values/material/datavalue-array.pcap": "opcua-call-structured-values/material/datavalue-array.pcap",
+        "common/pcapx/pcaputil/opcua-call-structured-values/material/opaque-extension.pcap": "opcua-call-structured-values/material/opaque-extension.pcap",
+        "common/pcapx/pcaputil/opcua-call-structured-values/material/extension-array.pcap": "opcua-call-structured-values/material/extension-array.pcap",
+        "common/pcapx/pcaputil/opcua-call-structured-values/material/diagnostic-value-additional.pcap": "opcua-call-structured-values/material/diagnostic-value-additional.pcap",
+        "common/pcapx/pcaputil/opcua-call-structured-values/material/diagnostic-value-minus-one.pcap": "opcua-call-structured-values/material/diagnostic-value-minus-one.pcap",
+        "common/pcapx/pcaputil/opcua-call-structured-values/material/diagnostic-array-additional.pcap": "opcua-call-structured-values/material/diagnostic-array-additional.pcap",
+        "common/pcapx/pcaputil/opcua-call-structured-values/material/diagnostic-body-index-no-table.pcap": "opcua-call-structured-values/material/diagnostic-body-index-no-table.pcap",
+        "common/pcapx/pcaputil/opcua-call-structured-values/material/opaque-additional-header.pcap": "opcua-call-structured-values/material/opaque-additional-header.pcap",
+        "common/pcapx/pcaputil/opcua-call-structured-values/material/diagnostic-null-table-entry.pcap": "opcua-call-structured-values/material/diagnostic-null-table-entry.pcap",
+        "common/pcapx/pcaputil/opcua-call-structured-values/material/nested-depth-refusal.pcap": "opcua-call-structured-values/material/nested-depth-refusal.pcap",
+        "common/pcapx/pcaputil/opcua-call-structured-values/material/diagnostic-all-fields.pcap": "opcua-call-structured-values/material/diagnostic-all-fields.pcap",
+        "common/pcapx/pcaputil/opcua-call-structured-values/material/diagnostic-locale-only.pcap": "opcua-call-structured-values/material/diagnostic-locale-only.pcap",
+        "common/pcapx/pcaputil/opcua-call-structured-values/material/diagnostic-localized-only.pcap": "opcua-call-structured-values/material/diagnostic-localized-only.pcap",
+        "common/pcapx/pcaputil/opcua-call-structured-values/material/diagnostic-minus-one.pcap": "opcua-call-structured-values/material/diagnostic-minus-one.pcap",
+        "common/pcapx/pcaputil/opcua-call-structured-values/material/diagnostic-four-levels.pcap": "opcua-call-structured-values/material/diagnostic-four-levels.pcap",
+        "common/pcapx/pcaputil/opcua-call-structured-values/material/diagnostic-eleven-refusal.pcap": "opcua-call-structured-values/material/diagnostic-eleven-refusal.pcap",
+        "common/pcapx/pcaputil/opcua-call-structured-values/material/diagnostic-index-range.pcap": "opcua-call-structured-values/material/diagnostic-index-range.pcap",
+        "common/pcapx/pcaputil/opcua-call-structured-values/material/diagnostic-negative-index.pcap": "opcua-call-structured-values/material/diagnostic-negative-index.pcap",
+        "common/pcapx/pcaputil/opcua-call-structured-values/material/diagnostic-reserved-mask.pcap": "opcua-call-structured-values/material/diagnostic-reserved-mask.pcap",
+        "common/pcapx/pcaputil/opcua-browse-structured-values/material/cases.json": "opcua-browse-structured-values/material/cases.json",
+        "common/pcapx/pcaputil/opcua-browse-structured-values/manifest.json": "opcua-browse-structured-values/manifest.json",
+        "common/pcapx/pcaputil/opcua-browse-structured-values/material/diagnostic-locale-only.pcap": "opcua-browse-structured-values/material/diagnostic-locale-only.pcap",
+        "common/pcapx/pcaputil/opcua-browse-structured-values/material/diagnostic-localized-only.pcap": "opcua-browse-structured-values/material/diagnostic-localized-only.pcap",
+        "common/pcapx/pcaputil/opcua-browse-structured-values/material/diagnostic-index-refusal.pcap": "opcua-browse-structured-values/material/diagnostic-index-refusal.pcap",
+        "common/pcapx/pcaputil/opcua-browse-structured-values/material/diagnostic-all-fields.pcap": "opcua-browse-structured-values/material/diagnostic-all-fields.pcap",
+        "common/pcapx/pcaputil/opcua-browsenext-structured-values/material/cases.json": "opcua-browsenext-structured-values/material/cases.json",
+        "common/pcapx/pcaputil/opcua-browsenext-structured-values/manifest.json": "opcua-browsenext-structured-values/manifest.json",
+        "common/pcapx/pcaputil/opcua-browsenext-structured-values/material/diagnostic-locale-only.pcap": "opcua-browsenext-structured-values/material/diagnostic-locale-only.pcap",
+        "common/pcapx/pcaputil/opcua-browsenext-structured-values/material/diagnostic-localized-only.pcap": "opcua-browsenext-structured-values/material/diagnostic-localized-only.pcap",
+        "common/pcapx/pcaputil/opcua-browsenext-structured-values/material/diagnostic-index-refusal.pcap": "opcua-browsenext-structured-values/material/diagnostic-index-refusal.pcap",
+        "common/pcapx/pcaputil/opcua-browsenext-structured-values/material/diagnostic-all-fields.pcap": "opcua-browsenext-structured-values/material/diagnostic-all-fields.pcap",
+        "common/pcapx/pcaputil/opcua-structured-values/generate.py": "generate.py",
+        "common/pcapx/pcaputil/opcua-structured-values/generate-browse.py": "generate-browse.py",
+        "common/pcapx/pcaputil/opcua-structured-values/emit.py": "emit.py",
+        "common/pcapx/pcaputil/opcua-structured-values/verify.py": "verify.py",
+        "common/pcapx/pcaputil/opcua-structured-values/seal.py": "seal.py",
+        "common/pcapx/pcaputil/opcua-structured-values/SOURCE.json": "SOURCE.json",
+        "common/pcapx/pcaputil/opcua-structured-values/SOURCE-primary.json": "SOURCE-primary.json",
+        "scripts/protocol-tests/required-tests-traffic-unified-v29.json": "required-tests-traffic-unified-v29.json"
+      }
     }
   ],
   "schema_version": 1,

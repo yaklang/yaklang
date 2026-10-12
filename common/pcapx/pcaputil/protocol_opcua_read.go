@@ -11,11 +11,16 @@ import (
 // uaReadCursor projects a finite UA Binary Read profile. Counts are charged
 // before allocation, across the entire message; DateTime stays signed wire ticks.
 type uaReadCursor struct {
-	wire              []byte
-	at, elements, max int
-	memory            int64
-	reserve           func(int64) error
-	err               error
+	wire                       []byte
+	arrays, structured         bool
+	depth, maxDepth, diagDepth int
+	diagRefs                   []uaDiagnosticRef
+	stringTable                []any
+	tableSeen                  bool
+	at, elements, max          int
+	memory                     int64
+	reserve                    func(int64) error
+	err                        error
 }
 
 func (c *uaReadCursor) charge(n int64) {
@@ -171,25 +176,15 @@ func (c *uaReadCursor) extension() map[string]any {
 	// rather than inferring authentication or silently ignoring custom headers.
 	if c.err == nil && enc != 0 {
 		if enc == 1 || enc == 2 {
-			c.err = protocolError(ErrUnsupportedFeature, "OPC UA Read encoded AdditionalHeader")
+			if c.structured {
+				c.charge(160)
+				m["Body Wire Hex"] = c.blob(false)
+				m["Semantic Status"] = "extension-object-body-opaque"
+			} else {
+				c.err = protocolError(ErrUnsupportedFeature, "OPC UA Read encoded AdditionalHeader")
+			}
 		} else {
 			c.err = fmt.Errorf("opcua: Read ExtensionObject encoding")
-		}
-	}
-	return m
-}
-func (c *uaReadCursor) diagnostic() map[string]any {
-	m := c.object(1)
-	if c.err != nil {
-		return nil
-	}
-	mask := byte(c.u(1))
-	m["Encoding"] = mask
-	if c.err == nil && mask != 0 {
-		if mask&0x80 != 0 {
-			c.err = fmt.Errorf("opcua: Read DiagnosticInfo reserved bit")
-		} else {
-			c.err = protocolError(ErrUnsupportedFeature, "OPC UA Read nonempty DiagnosticInfo")
 		}
 	}
 	return m
@@ -217,6 +212,8 @@ func (c *uaReadCursor) header(response bool) map[string]any {
 		} else {
 			m["String Table"] = nil
 		}
+		c.tableSeen = true
+		c.stringTable, _ = m["String Table"].([]any)
 	} else {
 		m["Return Diagnostics"] = uint32(c.u(4))
 		m["Audit Entry ID"] = c.blob(true)
@@ -226,6 +223,10 @@ func (c *uaReadCursor) header(response bool) map[string]any {
 	return m
 }
 func (c *uaReadCursor) variant() map[string]any {
+	if !c.enterValue() {
+		return nil
+	}
+	defer c.leaveValue()
 	m := c.object(4)
 	if c.err != nil {
 		return nil
@@ -235,9 +236,16 @@ func (c *uaReadCursor) variant() map[string]any {
 	m["Encoding"] = enc
 	m["Type ID"] = typ
 	if enc&0xc0 != 0 {
-		c.err = protocolError(ErrUnsupportedFeature, "OPC UA Read array/dimensional Variant")
-		return m
+		if !c.arrays {
+			c.err = protocolError(ErrUnsupportedFeature, "OPC UA Read array/dimensional Variant")
+			return m
+		}
+		return c.variantArray(enc, typ, m)
 	}
+	return c.variantScalar(typ, m)
+}
+
+func (c *uaReadCursor) variantScalar(typ byte, m map[string]any, arrayElement ...bool) map[string]any {
 	switch typ {
 	case 0:
 		m["Value"] = nil
@@ -281,16 +289,69 @@ func (c *uaReadCursor) variant() map[string]any {
 		m["Value Wire Hex"] = hex.EncodeToString(c.take(16))
 	case 15:
 		m["Value"] = c.blob(false)
+	case 16:
+		// Part 6 5.2.2.8: UTF-8 serialized XML carried as a ByteString.
+		// No XML parser, entity resolution or grammar-validity claim is made.
+		m["Value"] = c.blob(true)
+		m["Semantic Status"] = "xml-wire-text-observation"
 	case 17:
 		m["Value"] = c.node()
+	case 18:
+		value := c.nodeFlags(true)
+		if c.err == nil && value["Encoding"].(byte)&0x80 != 0 {
+			if uri, ok := value["Namespace URI"].(string); !ok || uri == "" {
+				c.err = fmt.Errorf("opcua: ExpandedNodeId URI flag without URI")
+				return m
+			}
+			// Retain the literal wire index, but explicitly mark its lack of
+			// namespace authority when a URI is present (Part 6 5.2.2.10).
+			c.charge(80)
+			if c.err == nil {
+				value["Namespace Index Ignored"] = true
+			}
+		}
+		m["Value"] = value
 	case 19:
 		m["Value"] = uint32(c.u(4))
+	case 20:
+		m["Value"] = c.qualifiedName()
+	case 21:
+		m["Value"] = c.localizedText()
+	case 22, 23, 24, 25:
+		if !c.structured {
+			c.err = protocolError(ErrUnsupportedFeature, "OPC UA structured Variant")
+			return m
+		}
+		switch typ {
+		case 22:
+			m["Value"] = c.extension()
+		case 23:
+			m["Value"] = c.value()
+		case 24:
+			if len(arrayElement) == 0 || !arrayElement[0] {
+				c.err = fmt.Errorf("opcua: scalar Variant cannot contain Variant")
+				return m
+			}
+			m["Value"] = c.variant()
+		case 25:
+			m["Value"] = c.diagnostic()
+		}
+	case 26, 27, 28, 29, 30, 31:
+		// Part 6 5.2.2.16 explicitly requires forward-compatible byte
+		// preservation for these IDs. Their future application meaning is
+		// unknown; do not project a known DataType or decode an object body.
+		m["Value"] = c.blob(false)
+		m["Semantic Status"] = "future-type-bytes-observation"
 	default:
 		c.err = protocolError(ErrUnsupportedFeature, "OPC UA Read Variant built-in type")
 	}
 	return m
 }
 func (c *uaReadCursor) value() map[string]any {
+	if !c.enterValue() {
+		return nil
+	}
+	defer c.leaveValue()
 	m := c.object(7)
 	if c.err != nil {
 		return nil
@@ -321,8 +382,8 @@ func (c *uaReadCursor) value() map[string]any {
 	}
 	return m
 }
-func decodeOPCUARead(w []byte, response bool, max int, reserve func(int64) error) (map[string]any, error) {
-	c := &uaReadCursor{wire: w, max: max, reserve: reserve}
+func decodeOPCUARead(w []byte, response bool, max int, reserve func(int64) error, options ...uaValueOptions) (map[string]any, error) {
+	c := newUAValueCursor(w, max, reserve, options)
 	out := c.object(5)
 	if c.err != nil {
 		return nil, c.err
@@ -382,6 +443,7 @@ func decodeOPCUARead(w []byte, response bool, max int, reserve func(int64) error
 			out["Nodes To Read"] = nil
 		}
 	}
+	c.finishDiagnostics()
 	if c.err != nil {
 		return nil, c.err
 	}

@@ -47,7 +47,7 @@ func opcuaSelectedCodecCases(t *testing.T, root, field string, browse bool) {
 	require.NoError(t, d.Decode(&cases))
 	for _, c := range cases {
 		t.Run(c.Name, func(t *testing.T) {
-			s := &binOPCUA{read: !browse, browse: browse}
+			s := &binOPCUA{read: field == "Read", browse: field == "Browse", write: field == "Write", next: field == "BrowseNext", call: field == "Call", arrays: strings.HasSuffix(root, "-variants") || strings.HasSuffix(root, "-structured-values"), structured: strings.HasSuffix(root, "-structured-values")}
 			for i, step := range c.Steps {
 				w, err := hex.DecodeString(step.Hex)
 				require.NoError(t, err)
@@ -75,11 +75,17 @@ func opcuaSelectedCodecCases(t *testing.T, root, field string, browse bool) {
 					requireExactProtocolFields(t, step.Read, out[field].(map[string]any))
 					if browse {
 						require.Equal(t, "browse-wire-observation", out["Semantic Status"])
+					} else if field == "Write" {
+						require.Equal(t, "write-wire-observation", out["Semantic Status"])
+					} else if field == "Call" {
+						require.Equal(t, "call-wire-observation", out["Semantic Status"])
+					} else if field == "BrowseNext" {
+						require.Equal(t, "browsenext-wire-observation", out["Semantic Status"])
 					} else {
 						require.Equal(t, "read-wire-observation", out["Semantic Status"])
 					}
 				}
-				if step.Service == 634 || step.Service == 530 {
+				if step.Service == 634 || step.Service == 530 || step.Service == 676 || step.Service == 536 || step.Service == 715 {
 					require.Equal(t, step.Matched, out["Matched"])
 				}
 			}
@@ -297,7 +303,7 @@ func opcuaSelectedSealed(t *testing.T, root, field string, profiles int, browse 
 								var stats ProtocolStats
 								var tcp TCPReassemblyStats
 								seen := 0
-								opts := []CaptureOption{WithBinParserConfig(BinParserConfig{DecodeOPCUARead: !browse, DecodeOPCUABrowse: browse, Deferred: deferred}), WithTCPReassemblyWorkers(workers), WithOnProtocolMessage(func(e *ProtocolEvent) { mu.Lock(); events = append(events, e); mu.Unlock() }), WithOnProtocolStats(func(s ProtocolStats) { stats = s }), WithOnTCPReassemblyStats(func(s TCPReassemblyStats) { tcp = s })}
+								opts := []CaptureOption{WithBinParserConfig(BinParserConfig{DecodeOPCUARead: field == "Read", DecodeOPCUABrowse: field == "Browse", DecodeOPCUAWrite: field == "Write", DecodeOPCUABrowseNext: field == "BrowseNext", DecodeOPCUACall: field == "Call", DecodeOPCUAVariantArrays: strings.HasSuffix(root, "-variants"), DecodeOPCUAStructuredValues: strings.HasSuffix(root, "-structured-values"), Deferred: deferred}), WithTCPReassemblyWorkers(workers), WithOnProtocolMessage(func(e *ProtocolEvent) { mu.Lock(); events = append(events, e); mu.Unlock() }), WithOnProtocolStats(func(s ProtocolStats) { stats = s }), WithOnTCPReassemblyStats(func(s TCPReassemblyStats) { tcp = s })}
 								if observe {
 									opts = append(opts, WithEveryPacket(func(p gopacket.Packet) { seen++; require.Nil(t, p.ErrorLayer()) }))
 								}
@@ -349,7 +355,7 @@ func opcuaSelectedSealed(t *testing.T, root, field string, profiles int, browse 
 									require.Zero(t, e.TransactionID)
 									require.Equal(t, "opcua", e.Protocol)
 									require.Equal(t, "tcp", e.Transport)
-									require.Equal(t, root, e.Profile)
+									require.Equal(t, strings.Replace(strings.Replace(root, "-extended-variants", "-variants", 1), "-structured-values", "-values", 1), e.Profile)
 									require.Equal(t, step.Dir, e.Direction)
 									require.Equal(t, wire, e.Raw)
 									require.Equal(t, fmt.Sprintf("%x", sha256.Sum256(wire)), e.SourceBytes.SHA256)
@@ -374,7 +380,7 @@ func opcuaSelectedSealed(t *testing.T, root, field string, profiles int, browse 
 									if step.Error != "" {
 										require.NotEmpty(t, e.Error)
 										rocTypedError(t, step.Error, e.sessionError)
-										if step.Error == "UnsupportedFeature" {
+										if step.Error == "UnsupportedFeature" || step.Error == "ContextRequired" {
 											context++
 										} else if step.Error == "ResourceExceeded" {
 											limited += len(wire)
@@ -407,7 +413,7 @@ func opcuaSelectedSealed(t *testing.T, root, field string, profiles int, browse 
 									if step.Read != nil {
 										requireExactProtocolFields(t, step.Read, e.Session[field].(map[string]any))
 									}
-									if step.Service == 634 || step.Service == 530 {
+									if step.Service == 634 || step.Service == 530 || step.Service == 676 || step.Service == 536 || step.Service == 715 {
 										require.Equal(t, step.Matched, e.Session["Matched"])
 									}
 									fields, err := e.GetFields()
@@ -469,9 +475,32 @@ func opcuaReadInput(name string) ([]byte, error) {
 	return opcuaSelectedInput("opcua-read-scalar", name)
 }
 func opcuaSelectedInput(root, name string) ([]byte, error) {
+	// A manifest may pin a verified input already owned by a historical batch.
+	// Resolve its repository alias relative to this package without copying it.
+	if strings.HasPrefix(name, "common/pcapx/pcaputil/") {
+		return trafficfixture.ReadFile(strings.TrimPrefix(name, "common/pcapx/pcaputil/"))
+	}
+	if strings.HasSuffix(root, "-structured-values") {
+		if base := os.Getenv("OPCUA_STRUCT_TEST_MATERIAL_ROOT"); base != "" {
+			return os.ReadFile(filepath.Join(base, root, name))
+		}
+		return trafficfixture.ReadFile(root + "/" + name)
+	}
+	if strings.HasSuffix(root, "-variants") {
+		if base := os.Getenv("OPCUA_VARIANT_TEST_MATERIAL_ROOT"); base != "" {
+			return os.ReadFile(filepath.Join(base, root, name))
+		}
+		return trafficfixture.ReadFile(root + "/" + name)
+	}
 	env := "OPCUA_TEST_MATERIAL_ROOT"
 	if root == "opcua-browse" {
 		env = "OPCUA_BROWSE_TEST_MATERIAL_ROOT"
+	} else if root == "opcua-write" {
+		env = "OPCUA_WRITE_TEST_MATERIAL_ROOT"
+	} else if root == "opcua-browsenext" {
+		env = "OPCUA_BROWSENEXT_TEST_MATERIAL_ROOT"
+	} else if root == "opcua-call" {
+		env = "OPCUA_CALL_TEST_MATERIAL_ROOT"
 	}
 	if override := os.Getenv(env); override != "" {
 		return os.ReadFile(filepath.Join(override, name))

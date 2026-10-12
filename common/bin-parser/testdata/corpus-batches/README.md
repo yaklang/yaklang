@@ -44,7 +44,7 @@ Run from the repository root:
 ```sh
 go run ./internal/trafficfixture/cmd/corpus test
 go test -json -count=1 -timeout=5m ./internal/trafficfixture/... ./common/bin-parser/... ./common/pcapx/... ./common/yak/cmd/yakcmds/shark-cli ./scripts/ci > traffic.jsonl
-go run ./internal/trafficfixture/cmd/corpus exec -- python3 @scripts/protocol-tests/check_go_test_json.py traffic.jsonl --inventory @scripts/protocol-tests/required-tests-traffic-unified-v24.json --tier full
+go run ./internal/trafficfixture/cmd/corpus exec -- python3 @scripts/protocol-tests/check_go_test_json.py traffic.jsonl --inventory @scripts/protocol-tests/required-tests-traffic-unified-v29.json --tier full
 ```
 
 The single `corpus` entry point uses the same bounded Go ZIP loader as tests.
@@ -83,7 +83,7 @@ their semantic coverage. The existing synthetic session keys are test inputs;
 production credentials, user private keys and material without redistribution
 permission belong in an external fixed-source download manifest.
 
-Current test requirements are sealed at `scripts/protocol-tests/required-tests-traffic-unified-v24.json`;
+Current test requirements are sealed at `scripts/protocol-tests/required-tests-traffic-unified-v29.json`;
 the historical inventories and all earlier batches remain unchanged.
 The supplemental small-corpus batch contains 26 minimal controls, their explicit
 expected facts, an offline generator and the compact pinned source manifest.
@@ -96,7 +96,7 @@ byte-boundary, malformed-length and ownership tests. These are scoped control
 assertions, not a semantic golden for the entire upstream collection. Process
 logs and the original large downloads remain outside the repository.
 
-The current workflow and executable gate use `required-tests-traffic-unified-v24.json`. Older
+The local acceptance inventory is `required-tests-traffic-unified-v29.json`. The published workflow gate currently references v25; v26 adds Call requirements, v27 adds scalar arrays and v28 adds extended builtin fields and v29 adds bounded value graphs and complete diagnostic wire fields. Older
 versioned inventories stay available as historical inputs; they are not the
 current acceptance entry. The DLMS HDLC batch contains owned tunnel/Get-normal
 controls and their independent fields/errors, CRC/byte validator, offline
@@ -203,7 +203,7 @@ opaque selector bytes and one bounded Data value over Wrapper v1 TCP/UDP; object
 selector meaning, access permission and device operation are unverified. The
 original one-packet selective-access capture and original refused answer remain
 immutable; its now-supported answer is matched by exact input SHA and frame.
-The active inventory is `scripts/protocol-tests/required-tests-traffic-unified-v24.json`.
+The active inventory is `scripts/protocol-tests/required-tests-traffic-unified-v29.json`.
 
 The small-graph budget batch reuses accepted graph captures/answers and adds one
 249-byte UDP control for child count255 without child bytes. Its standalone proof
@@ -259,7 +259,7 @@ retain the original request ID. Scope excludes authentication, gateway identity
 binding, device execution and RF delivery. Original large captures, upstream
 source and logs are not bundled.
 
-`validation-dlms-hdlc-normal-data.zip` contains31 owned minimal native normal-GET capture cases and72 ordered independent answers (53 complete byte/field observations,19 expected refusals). It covers TCP/UDP full/deferred, workers1/2/4, observer off/on, TCP feed chunks, nested compact, node/depth boundaries, malformed/trailing contents, strict text, full flags and refusal followed by late feedback. The existing native scalar contract and zero TransactionID are retained. Its source pins and executable independent builder/oracle/reference harness stay in the small ZIP; original reference sources and execution logs stay outside Git. Actual fixed reference codec display/calendar differences remain diagnostics rather than device passes. Current mandatory inventory is `scripts/protocol-tests/required-tests-traffic-unified-v24.json`.
+`validation-dlms-hdlc-normal-data.zip` contains31 owned minimal native normal-GET capture cases and72 ordered independent answers (53 complete byte/field observations,19 expected refusals). It covers TCP/UDP full/deferred, workers1/2/4, observer off/on, TCP feed chunks, nested compact, node/depth boundaries, malformed/trailing contents, strict text, full flags and refusal followed by late feedback. The existing native scalar contract and zero TransactionID are retained. Its source pins and executable independent builder/oracle/reference harness stay in the small ZIP; original reference sources and execution logs stay outside Git. Actual fixed reference codec display/calendar differences remain diagnostics rather than device passes. Current mandatory inventory is `scripts/protocol-tests/required-tests-traffic-unified-v29.json`.
 
 The historical `dlms-hdlc/array` capture is reused in place. Its original `UnsupportedFeature` answer remains immutable; `historical-array-upgrade.json` binds the original capture/answer hashes to two current full-message answers for the now-supported legal empty-array response. No historical capture is copied into the new ZIP and other historical refusals retain their assertions.
 
@@ -303,7 +303,7 @@ its permissive pairing and last-only list error are not independent proof of our
 selected negative association policy or every item error. Owner byte/state
 oracles supply those explicit expectations. No raw download, upstream source,
 dependency, log or cache is included. All56 preceding ZIPs remain unchanged.
-The current inventory is `scripts/protocol-tests/required-tests-traffic-unified-v24.json`.
+The current inventory is `scripts/protocol-tests/required-tests-traffic-unified-v29.json`.
 
 `validation-dlms-hdlc-unobserved-next.zip` adds12 distinct minimal captures and54
 whole answers (36 observations,18 expected ContextRequired refusals). An already
@@ -348,7 +348,7 @@ not an unrecorded31second network delay or device claim. Historical expiry
 capture/answer hashes bind its corrected association answer; no old ZIP is
 modified. Shared-protocol expiry, collection limits, domain isolation, byte
 ownership and Close release also have regressions. Current executable inventory
-is `scripts/protocol-tests/required-tests-traffic-unified-v24.json`; earlier
+is `scripts/protocol-tests/required-tests-traffic-unified-v29.json`; earlier
 versioned inventories remain archived.
 
 
@@ -636,7 +636,7 @@ derived fields and Session across full/deferred, workers 1/2/4 and observers
 on/off. Raw fields and structural values compare exactly; finite derived
 quantities permit eight representable floating-point values of cross-runtime
 rounding, without an absolute tolerance near zero. The current mandatory entry
-is unifiedv24 (434 unique full-tier roots).
+is unifiedv29 (913 mandatory full-tier entries).
 
 The media-owned-queries supplement contains three selected UDP RTCP BYE controls
 using two unique 100-byte PCAPs: one-source observation, inconsistent two-source
@@ -649,3 +649,99 @@ observation contract, not device authentication or complete compound-RTCP compli
 combinations and verifies that caller edits cannot rewrite accepted queries or
 private refusals; packet-reference ownership and exact logical history-budget
 boundaries are also mandatory. Historical ZIPs remain unchanged.
+
+The OPC UA BrowseNext supplement (`validation-opcua-browsenext.zip`) contains
+39 minimal owned captures, complete independent field/session answers, pinned
+codec regeneration and generation scripts. `DecodeOPCUABrowseNext` exposes
+None-policy services533/536, ordered literal continuation bytes and complete
+selected BrowseResult fields. Release replies require empty Results and
+DiagnosticInfos. Token validity, authenticated sessions and successful address
+space traversal are not inferred. Shared codec/capture helpers and the preceding
+Read/Browse/Write inputs are reused by immutable aliases and SHA256.
+
+`TestOPCUASelectedSequenceReplayExistingAPI` and
+`TestOPCUASelectedSequenceIsolation` cover stale responses after completed ID
+reuse, retirement and the unchanged default envelope observer. Selected
+application profiles reject repeated/backwards sequences; forward capture gaps
+and legacy rollover remain observable. None-policy sequence consistency is not
+cryptographic replay protection. The sealed BrowseNext matrix checks full and
+deferred decoding, workers1/2/4, packet observers off/on and TCP chunks0/1/7,
+including rollover boundaries and token changes without a sequence reset.
+Historical ZIPs and their answers remain unchanged.
+
+
+The OPC UA Call supplement (`validation-opcua-call.zip`) contains 46 original
+minimal captures and complete fixed-codec projections, positive and typed
+negative answers, and pinned generation/verification scripts. `DecodeOPCUACall`
+observes None-policy 712/715 selected headers, plain ObjectId/MethodId, ordered
+scalar arguments and per-method results. It checks observed direction, channel,
+service, request ID, handle, result cardinality and input argument result counts
+per Method. Output cardinality is not inferred from input cardinality. Bad
+operation results must not carry output arguments; Uncertain outputs remain
+observable. The shared sequence guard, bounded chunks, abort/Close, allocation
+refusal retirement, late response isolation and owned outputs apply. Complete
+fields and association are checked across full/deferred, workers1/2/4,
+observer off/on and TCP chunks0/1/7. This is wire observation, not Method
+metadata/signature validation, authorization or endpoint invocation success.
+Array/structured Variants, custom headers, nonempty diagnostics and protected
+bodies remain explicit unsupported boundaries. Historical ZIPs are unchanged;
+shared scripts are reused through content hashes rather than copied again.
+
+
+The shared Variant array supplement (`validation-opcua-variant-arrays.zip`)
+contains 116 original minimal inputs for selected Read, Write and Call messages.
+`DecodeOPCUAVariantArrays` explicitly extends those selected profiles with arrays
+of their supported scalar types. Wire order, null versus empty arrays, exact
+64-bit values, floating-point bits and flattened multidimensional shapes are
+retained. Dimensions require rank at least two, positive lengths and a product
+matching the flattened element count; count/shape/truncation/resource boundaries
+are rejected without unbounded allocation or multiplication overflow. A Method
+argument containing an array remains one argument. Complete fields, association,
+errors, packet contributors and owned queries are checked through full/deferred,
+workers1/2/4, observer off/on and TCP chunks0/1/7. The default scalar-only behavior
+is preserved. Nested Variant/ExtensionObject arrays and unsupported built-in
+types remain explicit refusals; wire dimensions do not verify server ValueRank,
+IndexRange results, method signatures, authorization or device success.
+
+
+The extended Variant supplement (`validation-opcua-extended-variants.zip`)
+contains 153 Read/Write/Call scenarios, with150 new minimal captures and3
+immutable historical inputs reused by alias and SHA256. QualifiedName namespace
+and name, LocalizedText presence/locale/text, and ExpandedNodeId URI/server
+fields are observed in scalar and array values. A URI-bearing ExpandedNodeId
+retains its literal wire namespace index and explicitly marks that index
+ignored; an empty URI with the URI flag is rejected. XmlElement is retained as
+UTF-8 wire text without XML parsing or entity resolution. Future type IDs26..31
+use the specified opaque ByteString fallback and are tagged as observations of
+unknown future meaning. Null and empty values remain distinct. Exact fields,
+Session, association, order, errors, source identities, ownership and allocation
+boundaries are checked across full/deferred, workers1/2/4, observer off/on and
+TCP chunks0/1/7. Fixed asyncua v1.1.8 codec execution is recorded separately from
+normative answers: its XML codec and null future scalar variants fail in this
+version, so those cases use independent normative ByteString/tag construction,
+not a claim of reference-codec success. No namespace resolution, XML grammar
+validity, authentication or device invocation success is inferred. Nested
+Variants/ExtensionObjects and remaining professional protocol functionality
+remain open; historical ZIPs and answers are unchanged.
+
+
+The structured-value supplement (`validation-opcua-structured-values.zip`)
+contains80 selected scenarios,77 new minimal captures and3 reused historical
+inputs. `DecodeOPCUAStructuredValues` enables bounded nested DataValues, arrays
+of Variants, DiagnosticInfo and opaque ExtensionObject bodies for selected
+services. Full diagnostics include independent mask/wire-order checks, response
+string-table bounds and resolved fields, absent/null context refusal and a
+separate ten-level diagnostic recursion ceiling. Value graphs also respect the
+configured ParserBudget depth, aggregate collection and allocation limits.
+`WithSessionOPCUAObservation(OPCUAObservationConfig{...})` exposes the same
+service selection through standalone sessions while retaining their budget,
+event ownership and Close semantics; UDP/session configuration conflicts reject.
+Resource/context refusal retires selected associations; late responses do not
+match retired requests. Read/Write/Call and adjacent Browse/BrowseNext use full
+and deferred decoding, workers1/2/4, observer off/on and TCP chunks0/1/7.
+Fixed reference DiagnosticInfo mask and recursive-serialization gaps are
+recorded separately; normative diagnostics are not reported as successful
+reference codec execution. Encoded ExtensionObject bodies, including custom
+AdditionalHeader content, remain explicitly opaque observations rather than
+custom schema, authentication or endpoint success. Historical batches remain
+unchanged.

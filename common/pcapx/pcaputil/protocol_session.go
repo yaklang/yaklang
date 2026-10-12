@@ -170,6 +170,9 @@ func NewProtocolSessionWithOptions(budget ParserBudget, options ...ProtocolSessi
 			return nil, err
 		}
 	}
+	if s.transport == "udp" && (s.f.a.config.DecodeOPCUARead || s.f.a.config.DecodeOPCUABrowse || s.f.a.config.DecodeOPCUAWrite || s.f.a.config.DecodeOPCUABrowseNext || s.f.a.config.DecodeOPCUACall) {
+		return nil, fmt.Errorf("OPC UA observations require a TCP session")
+	}
 	if s.f.a.mavlinkSigning != nil && s.transport != "udp" {
 		return nil, fmt.Errorf("MAVLink signing requires a UDP session")
 	}

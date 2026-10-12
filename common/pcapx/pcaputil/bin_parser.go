@@ -335,7 +335,17 @@ type BinParserConfig struct {
 	// DecodeOPCUARead opts into bounded UA Binary Read scalar observations under an observed None policy.
 	DecodeOPCUARead bool
 	// DecodeOPCUABrowse opts into bounded Browse body observations under an observed None policy.
-	DecodeOPCUABrowse                             bool
+	DecodeOPCUABrowse bool
+	// DecodeOPCUAWrite opts into bounded scalar Write body observations under an observed None policy.
+	DecodeOPCUAWrite bool
+	// DecodeOPCUABrowseNext opts into bounded continuation message observations, without certifying token identity.
+	DecodeOPCUABrowseNext bool
+	// DecodeOPCUACall opts into bounded scalar method argument/result observations, without certifying invocation success.
+	DecodeOPCUACall bool
+	// DecodeOPCUAVariantArrays extends selected Read/Write/Call observations with bounded arrays of supported scalar types.
+	DecodeOPCUAVariantArrays bool
+	// DecodeOPCUAStructuredValues enables bounded recursive values and full diagnostics; encoded ExtensionObject bodies remain opaque.
+	DecodeOPCUAStructuredValues                   bool
 	OnEvent                                       func(*BinParserEvent)
 	OnStats                                       func(BinParserStats)
 	Deferred                                      bool // explicit capture-first mode; full Decode() is done by the viewer
@@ -689,9 +699,9 @@ func (a *binParser) newFlow(t *TrafficFlow) *binFlow {
 func (f *binFlow) event(dir int, raw []byte, status, detail string) *BinParserEvent {
 	d := &f.directions[dir]
 	e := &BinParserEvent{FlowID: f.id, Timestamp: d.ts, Transport: "tcp", Source: f.endpoints[dir], Destination: f.endpoints[1-dir], Direction: dir, Offset: d.offset, Length: len(raw), Protocol: f.protocol, Status: status, Summary: detail, Raw: append([]byte(nil), raw...)}
-	if f.protocol == "opcua" && (f.a.config.DecodeOPCUARead || f.a.config.DecodeOPCUABrowse) {
+	if f.protocol == "opcua" && (f.a.config.DecodeOPCUARead || f.a.config.DecodeOPCUABrowse || f.a.config.DecodeOPCUAWrite || f.a.config.DecodeOPCUABrowseNext || f.a.config.DecodeOPCUACall) {
 		e.nativeOPCUAObservation = true
-		e.Profile = (&binOPCUA{read: f.a.config.DecodeOPCUARead, browse: f.a.config.DecodeOPCUABrowse}).observationProfile()
+		e.Profile = (&binOPCUA{read: f.a.config.DecodeOPCUARead, browse: f.a.config.DecodeOPCUABrowse, write: f.a.config.DecodeOPCUAWrite, next: f.a.config.DecodeOPCUABrowseNext, call: f.a.config.DecodeOPCUACall, arrays: f.a.config.DecodeOPCUAVariantArrays || f.a.config.DecodeOPCUAStructuredValues, structured: f.a.config.DecodeOPCUAStructuredValues}).observationProfile()
 	}
 	f.eventEvidence(dir, e)
 	if f.slmpTCP != nil {

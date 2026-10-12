@@ -48,8 +48,8 @@ func (c *uaReadCursor) browseReference() map[string]any {
 // decodeOPCUABrowse is a bounded wire observation, not an address-space or
 // continuation-point identity assertion. Header/array budgets are shared with
 // the scalar Read profile and aggregate across every nested reference array.
-func decodeOPCUABrowse(w []byte, response bool, max int, reserve func(int64) error) (map[string]any, error) {
-	c := &uaReadCursor{wire: w, max: max, reserve: reserve}
+func decodeOPCUABrowse(w []byte, response bool, max int, reserve func(int64) error, options ...uaValueOptions) (map[string]any, error) {
+	c := newUAValueCursor(w, max, reserve, options)
 	out := c.object(4)
 	if c.err != nil {
 		return nil, c.err
@@ -123,6 +123,7 @@ func decodeOPCUABrowse(w []byte, response bool, max int, reserve func(int64) err
 			out["Nodes To Browse"] = nil
 		}
 	}
+	c.finishDiagnostics()
 	if c.err != nil {
 		return nil, c.err
 	}

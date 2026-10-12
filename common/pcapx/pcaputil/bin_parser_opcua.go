@@ -27,24 +27,28 @@ type uaSelectedPending struct {
 	service, handle uint32
 	count           int
 	maxRefs         uint32
+	release         bool
+	argCounts       []int
 }
 type binOPCUA struct {
-	currentRefs, completedRefs []PacketReference
-	currentID                  uint64
-	completedParents           []uint64
-	read, browse               bool
-	appPending                 map[uaKey]uaSelectedPending
-	appReserve                 func(int64) error
-	transportSeen              bool
-	reverseSeen                bool
-	reverseDir                 int
-	reverseEndpoint            string
-	peers                      [2]uaPeer
-	plain                      map[uint32]bool
-	tokens                     map[uint32]uint32
-	seq                        [2]map[uint32]uint32
-	chunks                     map[uaKey]*uaChunk
-	pending                    map[uaKey]uint32
+	currentRefs, completedRefs      []PacketReference
+	currentID                       uint64
+	completedParents                []uint64
+	read, browse, write, next, call bool
+	arrays, structured              bool
+	maxDepth                        int
+	appPending                      map[uaKey]uaSelectedPending
+	appReserve                      func(int64) error
+	transportSeen                   bool
+	reverseSeen                     bool
+	reverseDir                      int
+	reverseEndpoint                 string
+	peers                           [2]uaPeer
+	plain                           map[uint32]bool
+	tokens                          map[uint32]uint32
+	seq                             [2]map[uint32]uint32
+	chunks                          map[uaKey]*uaChunk
+	pending                         map[uaKey]uint32
 }
 
 func probeOPCUA(w []byte, _ int) ProbeResult {
@@ -68,9 +72,13 @@ func probeOPCUA(w []byte, _ int) ProbeResult {
 func (f *binFlow) frameOPCUA(w []byte) (int, *binSpec, error) {
 	s := f.opcua
 	memory := int64(512 + len(s.reverseEndpoint) + (len(s.plain)+len(s.tokens)+len(s.pending)+len(s.appPending)+len(s.seq[0])+len(s.seq[1]))*128 + 2*len(w))
+	for _, p := range s.appPending {
+		memory += int64(cap(p.argCounts)) * 8
+	}
 	for _, c := range s.chunks {
 		memory += 2*int64(cap(c.data)) + int64(cap(c.refs))*80 + int64(cap(c.parents))*8 + 128
 	}
+	s.maxDepth = f.a.budget.MaxRecursionDepth
 	s.appReserve = func(extra int64) error { return f.reserveSession(memory + 3*extra) }
 	if err := f.reserveSession(memory); err != nil {
 		return 0, nil, err
@@ -320,7 +328,15 @@ func (s *binOPCUA) consume(dir int, w []byte, max, maxBytes int) (result map[str
 	out["Sequence Number"] = sequence
 	out["Request ID"] = request
 	previous, seen := s.seq[dir][channel]
-	if seen && sequence != previous+1 && !(previous > 4294966271 && sequence < 1024) {
+	wrapped := previous > 4294966271 && sequence < 1024
+	// Part 6 6.7.2.4 forbids sequence reuse and resetting on token renewal.
+	// Captures can omit forward chunks; retain their gap observation. A replay
+	// or backwards sequence must not satisfy a newly reused application ID.
+	// Keep the default envelope observer's existing permissive semantics.
+	if s.selected() && seen && sequence <= previous && !wrapped {
+		return nil, protocolError(ErrDesynchronized, "OPC UA repeated or backwards sequence")
+	}
+	if seen && sequence != previous+1 && !wrapped {
 		out["Sequence Gap"] = true
 	}
 	if !seen && len(s.seq[dir]) >= max {
@@ -415,15 +431,15 @@ func (s *binOPCUA) consume(dir int, w []byte, max, maxBytes int) (result map[str
 	out["Service Type ID"] = service
 	out["Service Payload Bytes"] = len(b)
 	out["Semantic Status"] = "service-envelope-only"
-	out["Service Name"] = map[uint32]string{446: "OpenSecureChannelRequest", 449: "OpenSecureChannelResponse", 452: "CloseSecureChannelRequest", 461: "CreateSessionRequest", 464: "CreateSessionResponse", 467: "ActivateSessionRequest", 470: "ActivateSessionResponse", 473: "CloseSessionRequest", 476: "CloseSessionResponse", 527: "BrowseRequest", 530: "BrowseResponse", 631: "ReadRequest", 634: "ReadResponse", 673: "WriteRequest", 676: "WriteResponse"}[service]
+	out["Service Name"] = map[uint32]string{446: "OpenSecureChannelRequest", 449: "OpenSecureChannelResponse", 452: "CloseSecureChannelRequest", 461: "CreateSessionRequest", 464: "CreateSessionResponse", 467: "ActivateSessionRequest", 470: "ActivateSessionResponse", 473: "CloseSessionRequest", 476: "CloseSessionResponse", 527: "BrowseRequest", 530: "BrowseResponse", 533: "BrowseNextRequest", 536: "BrowseNextResponse", 631: "ReadRequest", 634: "ReadResponse", 673: "WriteRequest", 676: "WriteResponse", 712: "CallRequest", 715: "CallResponse"}[service]
 	var readBody map[string]any
-	if s.read && (service == 631 || service == 634) || s.browse && (service == 527 || service == 530) {
+	if s.read && (service == 631 || service == 634) || s.browse && (service == 527 || service == 530) || s.write && (service == 673 || service == 676) || s.next && (service == 533 || service == 536) || s.call && (service == 712 || service == 715) {
 		// Any selected-body refusal invalidates this observed pending exchange.
 		// A later response cannot consume the rejected message's association.
 		defer func() {
 			if err != nil {
 				k := key
-				if service == 634 || service == 530 {
+				if service == 634 || service == 530 || service == 676 || service == 536 || service == 715 {
 					k.dir = 1 - dir
 				}
 				delete(s.pending, k)
@@ -433,9 +449,18 @@ func (s *binOPCUA) consume(dir int, w []byte, max, maxBytes int) (result map[str
 		label := "Read"
 		if service == 527 || service == 530 {
 			label = "Browse"
-			readBody, err = decodeOPCUABrowse(b[serviceBytes:], service == 530, max, s.appReserve)
+			readBody, err = decodeOPCUABrowse(b[serviceBytes:], service == 530, max, s.appReserve, s.valueOptions())
+		} else if service == 673 || service == 676 {
+			label = "Write"
+			readBody, err = decodeOPCUAWrite(b[serviceBytes:], service == 676, max, s.appReserve, s.valueOptions())
+		} else if service == 533 || service == 536 {
+			label = "BrowseNext"
+			readBody, err = decodeOPCUABrowseNext(b[serviceBytes:], service == 536, max, s.appReserve, s.valueOptions())
+		} else if service == 712 || service == 715 {
+			label = "Call"
+			readBody, err = decodeOPCUACall(b[serviceBytes:], service == 715, max, s.appReserve, s.valueOptions())
 		} else {
-			readBody, err = decodeOPCUARead(b[serviceBytes:], service == 634, max, s.appReserve)
+			readBody, err = decodeOPCUARead(b[serviceBytes:], service == 634, max, s.appReserve, s.valueOptions())
 		}
 		if err != nil {
 			return nil, err
@@ -443,10 +468,16 @@ func (s *binOPCUA) consume(dir int, w []byte, max, maxBytes int) (result map[str
 		out[label] = readBody
 		if label == "Read" {
 			out["Semantic Status"] = "read-wire-observation"
-		} else {
+		} else if label == "Browse" {
 			out["Semantic Status"] = "browse-wire-observation"
+		} else if label == "Write" {
+			out["Semantic Status"] = "write-wire-observation"
+		} else if label == "BrowseNext" {
+			out["Semantic Status"] = "browsenext-wire-observation"
+		} else {
+			out["Semantic Status"] = "call-wire-observation"
 		}
-		if service == 634 || service == 530 {
+		if service == 634 || service == 530 || service == 676 || service == 536 || service == 715 {
 			results, _ := readBody["Results"].([]any)
 			diagnostics, _ := readBody["Diagnostic Infos"].([]any)
 			// Diagnostic entries correspond to result entries even when the
@@ -464,6 +495,22 @@ func (s *binOPCUA) consume(dir int, w []byte, max, maxBytes int) (result map[str
 				if header["Service Result"].(uint32)&0x80000000 == 0 && len(results) != pending.count {
 					return nil, protocolError(ErrDesynchronized, "OPC UA Read response result count")
 				}
+				if service == 715 && pending.service == 712 {
+					for i, result := range results {
+						if i >= len(pending.argCounts) {
+							break
+						}
+						m := result.(map[string]any)
+						args, _ := m["Input Argument Results"].([]any)
+						diags, _ := m["Input Argument Diagnostic Infos"].([]any)
+						if len(args) != 0 && len(args) != pending.argCounts[i] || len(diags) != 0 && len(diags) != pending.argCounts[i] {
+							return nil, protocolError(ErrDesynchronized, "OPC UA Call input argument count")
+						}
+					}
+				}
+				if service == 536 && pending.service == 533 && pending.release && (len(results) != 0 || len(diagnostics) != 0) {
+					return nil, protocolError(ErrDesynchronized, "OPC UA BrowseNext release response must have empty results/diagnostics")
+				}
 				if service == 530 && pending.service == 527 && pending.maxRefs != 0 {
 					for _, result := range results {
 						refs, _ := result.(map[string]any)["References"].([]any)
@@ -476,7 +523,7 @@ func (s *binOPCUA) consume(dir int, w []byte, max, maxBytes int) (result map[str
 		}
 	}
 	// Request ID is scoped by secure channel and direction. Other service bodies remain opaque.
-	responseTo := map[uint32]uint32{449: 446, 464: 461, 470: 467, 476: 473, 530: 527, 634: 631, 676: 673}
+	responseTo := map[uint32]uint32{449: 446, 464: 461, 470: 467, 476: 473, 530: 527, 536: 533, 634: 631, 676: 673, 715: 712}
 	if expected, ok := responseTo[service]; ok {
 		key.dir = 1 - dir
 		req, match := s.pending[key]
@@ -492,7 +539,7 @@ func (s *binOPCUA) consume(dir int, w []byte, max, maxBytes int) (result map[str
 			delete(s.pending, key)
 			delete(s.appPending, key)
 		}
-	} else if _, ok := map[uint32]bool{446: true, 461: true, 467: true, 473: true, 527: true, 631: true, 673: true}[service]; ok {
+	} else if _, ok := map[uint32]bool{446: true, 461: true, 467: true, 473: true, 527: true, 533: true, 631: true, 673: true, 712: true}[service]; ok {
 		if _, exists := s.pending[key]; exists {
 			return nil, protocolError(ErrDesynchronized, "OPC UA request ID reused")
 		}
@@ -504,11 +551,30 @@ func (s *binOPCUA) consume(dir int, w []byte, max, maxBytes int) (result map[str
 			nodeKey := "Nodes To Read"
 			if service == 527 {
 				nodeKey = "Nodes To Browse"
+			} else if service == 673 {
+				nodeKey = "Nodes To Write"
+			} else if service == 533 {
+				nodeKey = "Continuation Points"
+			} else if service == 712 {
+				nodeKey = "Methods To Call"
 			}
 			nodes, _ := readBody[nodeKey].([]any)
 			p := uaSelectedPending{service: service, handle: readBody["Header"].(map[string]any)["Request Handle"].(uint32), count: len(nodes)}
 			if service == 527 {
 				p.maxRefs = readBody["Requested Max References Per Node"].(uint32)
+			}
+			if service == 533 {
+				p.release = readBody["Release Continuation Points"].(bool)
+				if p.release {
+					p.count = 0
+				}
+			}
+			if service == 712 {
+				p.argCounts = make([]int, len(nodes))
+				for i, node := range nodes {
+					args, _ := node.(map[string]any)["Input Arguments"].([]any)
+					p.argCounts[i] = len(args)
+				}
 			}
 			s.appPending[key] = p
 		}
@@ -571,13 +637,46 @@ func uaUniqueRefs(a, b []PacketReference) []PacketReference {
 	return out
 }
 
-func (s *binOPCUA) selected() bool { return s.read || s.browse }
+func (s *binOPCUA) selected() bool { return s.read || s.browse || s.write || s.next || s.call }
 func (s *binOPCUA) observationProfile() string {
-	if s.read && !s.browse {
+	if s.structured {
+		switch {
+		case s.read && !s.browse && !s.write && !s.next && !s.call:
+			return "opcua-read-values"
+		case s.browse && !s.read && !s.write && !s.next && !s.call:
+			return "opcua-browse-values"
+		case s.write && !s.read && !s.browse && !s.next && !s.call:
+			return "opcua-write-values"
+		case s.next && !s.read && !s.browse && !s.write && !s.call:
+			return "opcua-browsenext-values"
+		case s.call && !s.read && !s.browse && !s.write && !s.next:
+			return "opcua-call-values"
+		}
+	}
+
+	if s.read && !s.browse && !s.write && !s.next && !s.call {
+		if s.arrays {
+			return "opcua-read-variants"
+		}
 		return "opcua-read-scalar"
 	}
-	if s.browse && !s.read {
+	if s.browse && !s.read && !s.write && !s.next && !s.call {
 		return "opcua-browse"
+	}
+	if s.write && !s.read && !s.browse && !s.next && !s.call {
+		if s.arrays {
+			return "opcua-write-variants"
+		}
+		return "opcua-write"
+	}
+	if s.next && !s.read && !s.browse && !s.write && !s.call {
+		return "opcua-browsenext"
+	}
+	if s.call && !s.read && !s.browse && !s.write && !s.next {
+		if s.arrays {
+			return "opcua-call-variants"
+		}
+		return "opcua-call"
 	}
 	return "opcua-application"
 }

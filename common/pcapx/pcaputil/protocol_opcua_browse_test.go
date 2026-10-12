@@ -90,7 +90,8 @@ func opcuaBrowseResources(t *testing.T) {
 }
 
 // Shared channel state must not confuse interleaved Read and Browse services.
-func opcuaBrowseMixedProfiles(t *testing.T) {
+func opcuaBrowseMixedProfiles(t *testing.T) { opcuaSelectedMixedProfiles(t, "opcua-browse", "Browse") }
+func opcuaSelectedMixedProfiles(t *testing.T, root, field string) {
 	load := func(root string) []uaReadCase {
 		raw, err := opcuaSelectedInput(root, "material/cases.json")
 		require.NoError(t, err)
@@ -100,8 +101,8 @@ func opcuaBrowseMixedProfiles(t *testing.T) {
 		require.NoError(t, d.Decode(&cases))
 		return cases
 	}
-	r, b := load("opcua-read-scalar")[0], load("opcua-browse")[0]
-	s := &binOPCUA{read: true, browse: true}
+	r, b := load("opcua-read-scalar")[0], load(root)[0]
+	s := &binOPCUA{read: true, browse: field == "Browse", write: field == "Write", next: field == "BrowseNext", call: field == "Call"}
 	wire := func(hexWire string, seq, id uint32) []byte {
 		v, err := hex.DecodeString(hexWire)
 		require.NoError(t, err)
@@ -126,7 +127,7 @@ func opcuaBrowseMixedProfiles(t *testing.T) {
 		w        []byte
 		expected map[string]any
 	}{
-		{"Browse", wire(b.Steps[2].Hex, 1, 3), b.Steps[2].Read},
+		{field, wire(b.Steps[2].Hex, 1, 3), b.Steps[2].Read},
 		{"Read", wire(r.Steps[2].Hex, 2, 0), r.Steps[2].Read},
 	} {
 		out, err := s.consumeEvent(1, &ProtocolEvent{Raw: response.w}, 1024, 1<<20)

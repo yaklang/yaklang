@@ -221,7 +221,7 @@ func (f *binFlow) detectDirection(dir int, wire []byte) {
 	case "s7comm":
 		f.protocol, f.s7 = "s7comm", &binS7{}
 	case "opcua":
-		f.protocol, f.opcua = "opcua", &binOPCUA{read: f.a.config.DecodeOPCUARead, browse: f.a.config.DecodeOPCUABrowse}
+		f.protocol, f.opcua = "opcua", &binOPCUA{read: f.a.config.DecodeOPCUARead, browse: f.a.config.DecodeOPCUABrowse, write: f.a.config.DecodeOPCUAWrite, next: f.a.config.DecodeOPCUABrowseNext, call: f.a.config.DecodeOPCUACall, arrays: f.a.config.DecodeOPCUAVariantArrays || f.a.config.DecodeOPCUAStructuredValues, structured: f.a.config.DecodeOPCUAStructuredValues}
 	case "rtsp":
 		f.protocol, f.rtsp = "rtsp", &binRTSP{}
 	case "stun":
@@ -397,6 +397,35 @@ func (f *binFlow) consumeSession(dir int, e *ProtocolEvent, result map[string]an
 				e.Profile = "opcua-read-scalar"
 			} else if e.Session["Browse"] != nil {
 				e.Profile = "opcua-browse"
+			} else if e.Session["Write"] != nil {
+				e.Profile = "opcua-write"
+			} else if e.Session["BrowseNext"] != nil {
+				e.Profile = "opcua-browsenext"
+			} else if e.Session["Call"] != nil {
+				e.Profile = "opcua-call"
+			}
+			if f.opcua.structured {
+				switch e.Profile {
+				case "opcua-read-scalar":
+					e.Profile = "opcua-read-values"
+				case "opcua-write":
+					e.Profile = "opcua-write-values"
+				case "opcua-call":
+					e.Profile = "opcua-call-values"
+				case "opcua-browse":
+					e.Profile = "opcua-browse-values"
+				case "opcua-browsenext":
+					e.Profile = "opcua-browsenext-values"
+				}
+			} else if f.opcua.arrays {
+				switch e.Profile {
+				case "opcua-read-scalar":
+					e.Profile = "opcua-read-variants"
+				case "opcua-write":
+					e.Profile = "opcua-write-variants"
+				case "opcua-call":
+					e.Profile = "opcua-call-variants"
+				}
 			}
 			if err == nil {
 				e.semanticFields = cloneSession(e.Session)
@@ -960,12 +989,18 @@ func (f *binFlow) finishSession(reason TrafficFlowCloseReason) {
 		e.nativeOPCUAObservation = true
 		e.sessionError = &ProtocolError{Kind: ErrNeedMore, Message: e.Summary}
 		e.Session = map[string]any{"Buffered Secure Messages": len(u.chunks)}
-		reads, browses := 0, 0
+		reads, browses, writes, nexts, calls := 0, 0, 0, 0, 0
 		for _, p := range u.appPending {
 			if p.service == 631 {
 				reads++
 			} else if p.service == 527 {
 				browses++
+			} else if p.service == 673 {
+				writes++
+			} else if p.service == 533 {
+				nexts++
+			} else if p.service == 712 {
+				calls++
 			}
 		}
 		if u.read {
@@ -973,6 +1008,15 @@ func (f *binFlow) finishSession(reason TrafficFlowCloseReason) {
 		}
 		if u.browse {
 			e.Session["Outstanding Browse Requests"] = browses
+		}
+		if u.write {
+			e.Session["Outstanding Write Requests"] = writes
+		}
+		if u.next {
+			e.Session["Outstanding BrowseNext Requests"] = nexts
+		}
+		if u.call {
+			e.Session["Outstanding Call Requests"] = calls
 		}
 		f.a.incomplete.Add(1)
 		f.a.emit(e)
