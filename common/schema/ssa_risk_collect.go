@@ -35,9 +35,9 @@ func (f RiskUpdateHandlerFunc) ApplyRiskUpdate(item RiskUpdateItem) error {
 	return f(item)
 }
 
-// RiskCollect keeps one scan's findings keyed by feature hash so a later scan
-// mode can replace an earlier row for the same finding. The stored risk is
-// kept only to recognize and rewrite that row.
+// RiskCollect keeps one scan's findings by cover identity so a later scan
+// mode can replace an earlier row. The cross-scan RiskFeatureHash remains
+// unchanged for diff/disposal history.
 //
 // The collector never writes anything. Submit reports the decision to the
 // caller so the caller can hand a RiskUpdateItem to its handlers.
@@ -63,7 +63,7 @@ func (c *RiskCollect) SetRuleLevelFunc(fn func(ruleName string) int) {
 	c.ruleLevel = fn
 }
 
-// Current returns the risk kept for this feature hash.
+// Current returns the risk kept for this cover key (legacy: feature hash).
 func (c *RiskCollect) Current(feature string) *SSARisk {
 	if c == nil || c.data == nil {
 		return nil
@@ -81,7 +81,8 @@ func (c *RiskCollect) Current(feature string) *SSARisk {
 
 // Submit records in and returns the update the caller must publish.
 //
-// The key is only the feature hash. When it is new the returned item has
+// The key is the scan's CoverKey (or the feature hash for legacy callers).
+// When it is new the returned item has
 // OldID 0. When an earlier risk is replaced the item carries that row's id
 // and hash. When the incoming risk loses to the stored one no update is
 // returned (ok=false), which is how an earlier mode is dropped and how a
@@ -92,7 +93,10 @@ func (c *RiskCollect) Submit(in *SSARisk) (RiskUpdateItem, bool) {
 	if c == nil || in == nil {
 		return item, false
 	}
-	key := strings.TrimSpace(in.RiskFeatureHash)
+	key := strings.TrimSpace(in.CoverKey)
+	if key == "" {
+		key = strings.TrimSpace(in.RiskFeatureHash)
+	}
 	if key == "" {
 		return item, true
 	}
