@@ -16,15 +16,17 @@ type dnp3RequestKey struct {
 	sequence            byte
 }
 type dnp3Request struct {
-	function byte
-	classes  byte
-	digest   [32]byte
+	function  byte
+	classes   byte
+	selectors []dnp3StaticSelector
+	digest    [32]byte
 }
 type binDNP3 struct {
 	pending            map[dnp3RequestKey]dnp3Request
 	maxPending         int
 	maxDepth           int
 	readPoints         bool
+	directReads        bool
 	transportFragments bool
 	fragments          map[dnp3TransportKey]*dnp3TransportFragment
 	maxApplication     int
@@ -239,9 +241,10 @@ func (s *binDNP3) consume(dir int, raw []byte) (map[string]any, error) {
 		}
 	}
 	classes := byte(0)
+	var selectors []dnp3StaticSelector
 	if s.readPoints {
 		var err error
-		classes, err = s.observePoints(out, dir, src, dest, user)
+		classes, selectors, err = s.observePoints(out, dir, src, dest, user)
 		if err != nil {
 			if pe, ok := err.(*ProtocolError); ok && pe.Kind == ErrResourceExceeded {
 				return nil, err
@@ -275,9 +278,9 @@ func (s *binDNP3) consume(dir int, raw []byte) (map[string]any, error) {
 			return out, protocolError(ErrMalformedMessage, "dnp3: invalid solicited request control")
 		}
 		key := dnp3RequestKey{dir, src, dest, seq}
-		req := dnp3Request{function: fc, classes: classes, digest: sha256.Sum256(user[1:])}
+		req := dnp3Request{function: fc, classes: classes, selectors: selectors, digest: sha256.Sum256(user[1:])}
 		if old, ok := s.pending[key]; ok {
-			if old != req {
+			if old.function != req.function || old.classes != req.classes || old.digest != req.digest {
 				delete(s.pending, key)
 				out["Error Scope"] = "application"
 				return out, protocolError(ErrContextRequired, "DNP3 sequence reused with conflicting outstanding request")
@@ -287,7 +290,7 @@ func (s *binDNP3) consume(dir int, raw []byte) (map[string]any, error) {
 				return nil, protocolError(ErrResourceExceeded, "DNP3 pending request count")
 			}
 			if s.reserve != nil {
-				if err := s.reserve(s.memoryTarget(80)); err != nil {
+				if err := s.reserve(s.memoryTarget(80 + int64(cap(selectors))*64)); err != nil {
 					return nil, err
 				}
 			}

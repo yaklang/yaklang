@@ -344,6 +344,8 @@ type BinParserConfig struct {
 	DecodeDNP3ReadPoints bool
 	// DecodeDNP3TransportFragments enables bounded TCP DNP3 transport assembly.
 	DecodeDNP3TransportFragments bool
+	// DecodeDNP3DirectStaticReads adds selected G30V0 all/range READ context.
+	DecodeDNP3DirectStaticReads bool
 	// MMSISOPorts explicitly selects bounded RFC1006/COTP/presentation/MMS observations.
 	MMSISOPorts             []uint16
 	DecodeMMSServiceValues  bool
@@ -740,6 +742,12 @@ func (f *binFlow) event(dir int, raw []byte, status, detail string) *BinParserEv
 		e.Profile = "dnp3-transport"
 		if f.a.config.DecodeDNP3ReadPoints {
 			e.Profile = "dnp3-read-points-transport"
+		}
+	}
+	if f.protocol == "dnp3" && f.a.config.DecodeDNP3DirectStaticReads {
+		e.Profile = "dnp3-direct-static-read"
+		if f.a.config.DecodeDNP3TransportFragments {
+			e.Profile += "-transport"
 		}
 	}
 	if f.protocol == "opcua" && (f.a.config.DecodeOPCUARead || f.a.config.DecodeOPCUABrowse || f.a.config.DecodeOPCUAWrite || f.a.config.DecodeOPCUABrowseNext || f.a.config.DecodeOPCUACall) {

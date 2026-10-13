@@ -44,7 +44,7 @@ Run from the repository root:
 ```sh
 go run ./internal/trafficfixture/cmd/corpus test
 go test -json -count=1 -timeout=5m ./internal/trafficfixture/... ./common/bin-parser/... ./common/pcapx/... ./common/yak/cmd/yakcmds/shark-cli ./scripts/ci > traffic.jsonl
-go run ./internal/trafficfixture/cmd/corpus exec -- python3 @scripts/protocol-tests/check_go_test_json_v2.py traffic.jsonl --inventory @scripts/protocol-tests/required-tests-traffic-unified-v52.json --tier full
+go run ./internal/trafficfixture/cmd/corpus exec -- python3 @scripts/protocol-tests/check_go_test_json_v2.py traffic.jsonl --inventory @scripts/protocol-tests/required-tests-traffic-unified-v53.json --tier full
 ```
 
 The single `corpus` entry point uses the same bounded Go ZIP loader as tests.
@@ -83,7 +83,7 @@ their semantic coverage. The existing synthetic session keys are test inputs;
 production credentials, user private keys and material without redistribution
 permission belong in an external fixed-source download manifest.
 
-Current test requirements are sealed at `scripts/protocol-tests/required-tests-traffic-unified-v52.json`;
+Current test requirements are sealed at `scripts/protocol-tests/required-tests-traffic-unified-v53.json`;
 the historical inventories and all earlier batches remain unchanged.
 The supplemental small-corpus batch contains 26 minimal controls, their explicit
 expected facts, an offline generator and the compact pinned source manifest.
@@ -203,7 +203,7 @@ opaque selector bytes and one bounded Data value over Wrapper v1 TCP/UDP; object
 selector meaning, access permission and device operation are unverified. The
 original one-packet selective-access capture and original refused answer remain
 immutable; its now-supported answer is matched by exact input SHA and frame.
-The active inventory is `scripts/protocol-tests/required-tests-traffic-unified-v52.json`.
+The active inventory is `scripts/protocol-tests/required-tests-traffic-unified-v53.json`.
 
 The small-graph budget batch reuses accepted graph captures/answers and adds one
 249-byte UDP control for child count255 without child bytes. Its standalone proof
@@ -993,7 +993,7 @@ the normative answer; a missing numeric reference field is not a codec pass.
 Full/deferred, workers1/2/4, observers off/on, Feed chunks1/7/full, ownership,
 resources and close/refusal boundaries remain required.
 
-Current gate: `required-tests-traffic-unified-v52.json` with
+Current gate: `required-tests-traffic-unified-v53.json` with
 `check_go_test_json_v2.py`. The indexed validator preserves missing/unpassed,
 package invocation completion, descendant skips, failures and non-JSON checks;
 its mutation/differential harness is sealed with the material. Older checkers
@@ -1196,4 +1196,37 @@ descending layouts, preserve pending context, and check collection boundaries
 and query ownership. All preceding ZIPs remain unchanged. Other objects/events,
 application fragments, individual-object READ selectors, UDP/authentication,
 device/calibration and indistinguishable generations remain open. Current
-full inventory is v52.
+that analog batch was sealed with v52; current entry is below.
+
+
+`WithDNP3DirectStaticReads(true)` / `WithSessionDNP3DirectStaticReads(true)` opt
+into `dnp3-direct-static-read` (or `-transport` when transport assembly is enabled).
+This profile includes G30V0 all-object qualifier6 and inclusive8/16-bit ranges
+(qualifiers0/1), plus the existing class READ headers. Ordered `Read Selectors`
+retain the literal observed headers. Private normalized range unions check every
+returned static point's group/index before its request is retired. Out-of-range,
+gap and wrong-group responses have ContextRequired and leave the request for a
+later covered response. Class0 permits the supported static families; class1..3
+alone do not authorize static data. `Read Context` and `Read Coverage` separately
+identify observed direct/class0/unobserved/no-static-data context; these are
+observations, not endpoint execution or completeness certification. Existing
+class-only options keep their established behavior.
+
+Range state owns its storage independently of public header maps; retained
+capacity is included in the logical capture memory budget. Header count applies
+before retention. Normalized sorted unions avoid quadratic append copies and
+point-by-selector scans. Close/late-input semantics remain bounded. The shared
+traffic typed-error assertion now explicitly refuses a nil typed error rather
+than dereferencing it; subprocess injection proves old panic/new clear rejection.
+
+`validation-dnp3-direct-static-read.zip` seals31 positive/negative minimal
+captures, exact independent fields/Session/coverage/errors, resource vectors and
+source-pinned generation/check tools. Full/deferred, workers1/2/4, observer off/on
+and native1/7/full chunking include the transport composition capture. TShark4.2.5
+actually checked571 selector/response wire scalars across16 captures; the
+unchanged fixed transport receiver separately checked both composed APDUs. Fixed
+opendnp3 READ handler/database source supplies selector semantics. Requested
+specific variations, other direct object groups, index-prefix READs, packed
+binary observations, application fragments, UDP/authentication/device/completeness
+and generation identity remain open. No historical batch is rewritten. Current
+full inventory is v53.

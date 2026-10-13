@@ -103,6 +103,7 @@ func rocTypedError(t *testing.T, kind string, err error) {
 	var pe *ProtocolError
 	require.Error(t, err)
 	require.True(t, errors.As(err, &pe))
+	require.NotNil(t, pe, "expected a non-nil typed protocol error")
 	require.Equal(t, kind, string(pe.Kind))
 }
 func rocCheckEvents(t *testing.T, want rocAnswer, events []*ProtocolEvent, endpoints bool) {

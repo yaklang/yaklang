@@ -209,28 +209,39 @@ func dnp3StaticPoints(b []byte, limit, depth int) ([]any, error) {
 
 // Select before pending mutation. Failed object decoding must not consume a
 // request and cannot leave a partly accepted field tree or allocation behind.
-func (s *binDNP3) observePoints(out map[string]any, dir int, src, dest uint16, user []byte) (byte, error) {
+func (s *binDNP3) observePoints(out map[string]any, dir int, src, dest uint16, user []byte) (byte, []dnp3StaticSelector, error) {
 	ac, fc := user[1], user[2]
 	key := dnp3RequestKey{dir, src, dest, ac & 15}
-	refuse := func(err error) (byte, error) {
+	refuse := func(err error) (byte, []dnp3StaticSelector, error) {
 		if fc == 1 || fc == 2 {
 			delete(s.pending, key)
 		}
 		if pe, ok := err.(*ProtocolError); ok && pe.Kind != ErrResourceExceeded {
 			out["Error Scope"] = "application"
 		}
-		return 0, err
+		return 0, nil, err
 	}
 	switch fc {
 	case 0:
-		return 0, nil
+		return 0, nil, nil
 	case 1:
+		if s.directReads {
+			classes, mask, selectors, headers, err := dnp3DirectReadHeaders(user[3:], sessionCollectionLimit(s.maxPending))
+			if err != nil {
+				return refuse(err)
+			}
+			if len(classes) > 0 {
+				out["Class Selectors"] = classes
+			}
+			out["Read Selectors"] = headers
+			return mask, selectors, nil
+		}
 		classes, mask, err := dnp3ReadClasses(user[3:], sessionCollectionLimit(s.maxPending))
 		if err != nil {
 			return refuse(err)
 		}
 		out["Class Selectors"] = classes
-		return mask, nil
+		return mask, nil, nil
 	case 0x81:
 		objects, err := dnp3StaticPoints(user[5:], sessionCollectionLimit(s.maxPending), s.maxDepth)
 		if err != nil {
@@ -238,14 +249,32 @@ func (s *binDNP3) observePoints(out map[string]any, dir int, src, dest uint16, u
 		}
 		req, known := s.pending[dnp3RequestKey{1 - dir, dest, src, ac & 15}]
 		if known && len(objects) > 0 && req.classes&1 == 0 {
-			return refuse(protocolError(ErrContextRequired, "DNP3 static points are not covered by observed READ class selectors"))
+			if !s.directReads || len(req.selectors) == 0 {
+				return refuse(protocolError(ErrContextRequired, "DNP3 static points are not covered by observed READ class selectors"))
+			}
+			if !dnp3SelectorsCover(req.selectors, objects) {
+				return refuse(protocolError(ErrContextRequired, "DNP3 static points are outside observed READ selectors"))
+			}
 		}
 		out["Objects"] = objects
 		out["Class Context"] = "unobserved"
-		if known {
+		if known && (!s.directReads || req.classes != 0) {
 			out["Class Context"] = "observed"
 		}
-		return 0, nil
+		if s.directReads {
+			out["Read Context"], out["Read Coverage"] = "unobserved", "unobserved"
+			if known {
+				out["Read Context"] = "observed"
+				if len(objects) == 0 {
+					out["Read Coverage"] = "no-static-data"
+				} else if req.classes&1 != 0 {
+					out["Read Coverage"] = "class0"
+				} else {
+					out["Read Coverage"] = "direct-static"
+				}
+			}
+		}
+		return 0, nil, nil
 	default:
 		return refuse(protocolError(ErrUnsupportedFeature, fmt.Sprintf("DNP3 selected READ points do not decode function %d", fc)))
 	}

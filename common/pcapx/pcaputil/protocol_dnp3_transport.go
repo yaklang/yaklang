@@ -38,6 +38,9 @@ type dnp3TransportFragment struct {
 
 func (s *binDNP3) memoryTarget(extra int64) int64 {
 	n := int64(256 + len(s.pending)*80)
+	for _, r := range s.pending {
+		n += int64(cap(r.selectors)) * 64
+	}
 	for _, f := range s.fragments {
 		n += 128 + int64(len(f.data))
 	}
