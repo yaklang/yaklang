@@ -1,6 +1,9 @@
 package ssadb
 
 import (
+	"fmt"
+	"time"
+
 	"github.com/yaklang/gorm"
 
 	"github.com/yaklang/yaklang/common/utils"
@@ -60,16 +63,10 @@ func UpsertIrType(db *gorm.DB, ir *IrType) error {
 	return nil
 }
 
-// SaveIrTypeBatch issues a chunked batched UPSERT for a batch of types: per
-// chunk it DELETEs the (program_name, type_id) rows that this batch is about to
-// write, then bulk-INSERTs them. This preserves the idempotent-update
-// semantics of the old per-row UpsertIrType (a later flush of the same type_id
-// overwrites the row with the merged value — see TestTypeFlushUpsertsExisting
-// TypeRows) while replacing N select-then-insert round-trips with one DELETE +
-// one multi-row INSERT. ir_types has no UNIQUE constraint (only a non-unique
-// composite index idx_ir_types_program_type), so ON CONFLICT is unavailable;
-// the delete-then-insert inside one transaction is the batched equivalent.
-// It still populates the in-process GetIrTypeCache so resident lookups hit.
+// SaveIrTypeBatch writes types as in-place upserts on (program_name, type_id)
+// once ux_ir_types_program_type exists. That keeps the row id stable across
+// flushes. Databases that have not been migrated yet still delete and insert.
+// The in-process GetIrTypeCache is warmed either way.
 func SaveIrTypeBatch(db *gorm.DB, items []*IrType) error {
 	if db == nil || len(items) == 0 {
 		return nil
@@ -80,13 +77,28 @@ func SaveIrTypeBatch(db *gorm.DB, items []*IrType) error {
 			clean = append(clean, it)
 		}
 	}
-	for start := 0; start < len(clean); start += irTypeBatchChunk {
-		end := start + irTypeBatchChunk
-		if end > len(clean) {
-			end = len(clean)
+	if len(clean) == 0 {
+		return nil
+	}
+	if hasNamedIndex(db, TableIrTypes, "ux_ir_types_program_type") {
+		for _, it := range clean {
+			it.ID = 0
+			it.CreatedAt = time.Time{}
+			it.UpdatedAt = time.Time{}
+			it.DeletedAt = nil
 		}
-		if err := bulkUpsertIrType(db, clean[start:end]); err != nil {
-			return err
+		if err := db.New().UpdateInBatches(clean, irTypeBatchChunk, "program_name,type_id").Error; err != nil {
+			return fmt.Errorf("upsert IR type: %w", err)
+		}
+	} else {
+		for start := 0; start < len(clean); start += irTypeBatchChunk {
+			end := start + irTypeBatchChunk
+			if end > len(clean) {
+				end = len(clean)
+			}
+			if err := bulkUpsertIrType(db, clean[start:end]); err != nil {
+				return err
+			}
 		}
 	}
 	// keep the in-process type cache warm (same side effect as UpsertIrType)
