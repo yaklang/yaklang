@@ -75163,6 +75163,622 @@
         "common/pcapx/pcaputil/dnp3-typed-static-read/transport-composition.json": "dnp3-typed-static-read/transport-composition.json",
         "scripts/protocol-tests/required-tests-traffic-unified-v54.json": "required-tests-traffic-unified-v54.json"
       }
+    },
+    {
+      "id": "validation-dnp3-counter-points",
+      "kind": "validation",
+      "source_sha": "508c6b76606dde77f9b1e169dcdec25e2bce3c47",
+      "file": "validation-dnp3-counter-points.zip",
+      "sha256": "47393a44cc1b93d5faecb809455203af844eb7fd5713b27ddf7100cbe27295b2",
+      "password": "bin-parser",
+      "members": {
+        "dnp3-counter-points/answers/all-g20v0.json": {
+          "sha256": "7d14a51d194597146104e94273be032e59c7f5c18dd831a4b91001f93959ce33",
+          "bytes": 7165
+        },
+        "dnp3-counter-points/captures/all-g20v0.pcap": {
+          "sha256": "34cf5b4cd58345a244d182011e3ec3566c85ebeebd7baca1fd6c0e558a91456f",
+          "bytes": 657
+        },
+        "dnp3-counter-points/answers/all-g20v1.json": {
+          "sha256": "117ebd9828da72ea6ac609fcac97706715689a45b4ae3203e33e4bbde00ce8b6",
+          "bytes": 7165
+        },
+        "dnp3-counter-points/captures/all-g20v1.pcap": {
+          "sha256": "ec56505c1af74172c11a11bc3b2f9165933190e0fedc385a6873c76a1c579a35",
+          "bytes": 657
+        },
+        "dnp3-counter-points/answers/all-g20v2.json": {
+          "sha256": "8382ab77cb4081eab4565861673080f9333a7eb65357069830e2168fceed45f5",
+          "bytes": 7072
+        },
+        "dnp3-counter-points/captures/all-g20v2.pcap": {
+          "sha256": "082d3a8b2415505f95338cbf2481e0e0b01be7d4d0c9213722e33d7f3ffe77a5",
+          "bytes": 645
+        },
+        "dnp3-counter-points/answers/all-g20v5.json": {
+          "sha256": "76bc9bff0774434cc045a770f9e1a81ad45f40c2af2d571f3ec478524ff168d5",
+          "bytes": 4269
+        },
+        "dnp3-counter-points/captures/all-g20v5.pcap": {
+          "sha256": "8f0978aa754cd836a41cb8a1e8c1aa4bd6c5c7ba58e10a9be0ac199e10d1c5ff",
+          "bytes": 652
+        },
+        "dnp3-counter-points/answers/all-g20v6.json": {
+          "sha256": "aef153125ad90430832075abc46067d7ed24dd65ab4e57c225451cc8eae7fbd2",
+          "bytes": 4175
+        },
+        "dnp3-counter-points/captures/all-g20v6.pcap": {
+          "sha256": "6780e2372975b812e7dda1f4755316ac04f980012d365d50a1b7cca87ac46a92",
+          "bytes": 640
+        },
+        "dnp3-counter-points/answers/all-g21v0.json": {
+          "sha256": "07a98aaa3f7d17d54cf75174a17257aee60fd5d83fc77b09a3e5f8e3d93ea430",
+          "bytes": 7165
+        },
+        "dnp3-counter-points/captures/all-g21v0.pcap": {
+          "sha256": "bd1b898fd680133c349ce8288c470ee7ec1d6ac08b07ae840e5df38e5d9ceb97",
+          "bytes": 657
+        },
+        "dnp3-counter-points/answers/all-g21v1.json": {
+          "sha256": "3a365247633b18cd97b1edcd7bbec256d89b9c826dcc4539dff462444f91ddbe",
+          "bytes": 7165
+        },
+        "dnp3-counter-points/captures/all-g21v1.pcap": {
+          "sha256": "9e5ece44abc046452353bd9d7e28df5ff23cfa6811ebc0afa92ecfde467c6931",
+          "bytes": 657
+        },
+        "dnp3-counter-points/answers/all-g21v2.json": {
+          "sha256": "ef4267dde0f8f48ddfc687cc568900ca603638c99f5df8b3692aee310746b5b1",
+          "bytes": 7072
+        },
+        "dnp3-counter-points/captures/all-g21v2.pcap": {
+          "sha256": "cb7330f147ef973ac470550c8449a831873e6f60413689fafc2cf7e118acc50e",
+          "bytes": 645
+        },
+        "dnp3-counter-points/answers/all-g21v5.json": {
+          "sha256": "be1bd47b914246fcd66d33a7932615adf4ac19f0d0ee033d8076f68e612ab498",
+          "bytes": 8314
+        },
+        "dnp3-counter-points/captures/all-g21v5.pcap": {
+          "sha256": "86a9c531e0d05728507210fbd2798e8db2466068d36e1d5e4b0d1b51f20a8c3b",
+          "bytes": 691
+        },
+        "dnp3-counter-points/answers/all-g21v6.json": {
+          "sha256": "b92226ed7e7e1a4dcaf947b8d8e8227aaede403661b9eeba14c8bad05a4bae60",
+          "bytes": 8220
+        },
+        "dnp3-counter-points/captures/all-g21v6.pcap": {
+          "sha256": "3f07d503f8c55f6e10e861129846ef26c370bc7ce62a02889737d74104dea581",
+          "bytes": 679
+        },
+        "dnp3-counter-points/answers/all-g21v9.json": {
+          "sha256": "80a36b9392172bee3b286dfee184c8c5bf8ebcb1af2088b66c0fb0f903bf2b1d",
+          "bytes": 4269
+        },
+        "dnp3-counter-points/captures/all-g21v9.pcap": {
+          "sha256": "00f1358ec718ff3026c65d1f41eb4f70220cec88126c8697cd6fe3a6306d3da3",
+          "bytes": 652
+        },
+        "dnp3-counter-points/answers/all-g21v10.json": {
+          "sha256": "0592804f51c1c442a668e501aea54300801054ca0bf5cd79868e3aa1b1864479",
+          "bytes": 4179
+        },
+        "dnp3-counter-points/captures/all-g21v10.pcap": {
+          "sha256": "1c4f9c7818decf9ae14908af3dc761063a7b22aa3ac0521513b23514f920f93f",
+          "bytes": 640
+        },
+        "dnp3-counter-points/answers/range8-counter32.json": {
+          "sha256": "ca5e4eff321d0930130266021422253a1e761fdaecb496fa0810c83f18817c75",
+          "bytes": 7228
+        },
+        "dnp3-counter-points/captures/range8-counter32.pcap": {
+          "sha256": "ba4a1c0c6db15286470163a6e2c347d1ddddafe466ced0b4d39e38925241d444",
+          "bytes": 655
+        },
+        "dnp3-counter-points/answers/range16-counter16.json": {
+          "sha256": "b97446afca44cd4c7e7ee04daf9478209296a4bce87af4a42b6fdae07684761e",
+          "bytes": 4594
+        },
+        "dnp3-counter-points/captures/range16-counter16.pcap": {
+          "sha256": "a00c03c9fbc111de4f1580fc24a5b18a07dcf667f93edf98060d1d5e7fd8645c",
+          "bytes": 638
+        },
+        "dnp3-counter-points/answers/indexed16-time48.json": {
+          "sha256": "cfcb28c46605d429c76fb8fa2f2c1189e5157d91cef0f4296d50d220c8cc042d",
+          "bytes": 8434
+        },
+        "dnp3-counter-points/captures/indexed16-time48.pcap": {
+          "sha256": "f9273724f43ae65ed6e1a1ea545057e91c5999c6614559d86e14428abceef70c",
+          "bytes": 701
+        },
+        "dnp3-counter-points/answers/multiple-counter-groups.json": {
+          "sha256": "37ccff7ad3fcfedfc5acc5ddd593f6389c4bf67e3931a261ad8de0e87d9a9966",
+          "bytes": 7238
+        },
+        "dnp3-counter-points/captures/multiple-counter-groups.pcap": {
+          "sha256": "3f418f1747b30bd72ee3524a8281070624bf865bb65ba042691699062dfa7420",
+          "bytes": 666
+        },
+        "dnp3-counter-points/answers/class0-and-counters.json": {
+          "sha256": "f0c2af2bc55366d2f1cab0dfaa1f2c79a034a82eccdbc1c10d9a62f3e34b0cc7",
+          "bytes": 4908
+        },
+        "dnp3-counter-points/captures/class0-and-counters.pcap": {
+          "sha256": "8b243ff1c4aecd9b65c6592d67f4494891c89d79a33a4f55419bc00493528ab6",
+          "bytes": 641
+        },
+        "dnp3-counter-points/answers/variant-overlap-forward.json": {
+          "sha256": "f0d2d5d378c1d637c88567f202dc0311c75ca556b5b5d9d6859a23ec02218e36",
+          "bytes": 8648
+        },
+        "dnp3-counter-points/captures/variant-overlap-forward.pcap": {
+          "sha256": "0e11d12214855d44d0a7fe6838ec58fafd39c4425f28121d7d6bb1935b642b48",
+          "bytes": 666
+        },
+        "dnp3-counter-points/answers/variant-overlap-reverse.json": {
+          "sha256": "e22534e4649151e34f8fcc10ce296e76cbe863342abeeaca4cd3e1bab7ab0ea9",
+          "bytes": 8688
+        },
+        "dnp3-counter-points/captures/variant-overlap-reverse.pcap": {
+          "sha256": "f4f7a8f6d86ab12ba57ea71d3e86b7c84b3da96282f85139ff9b50883bc20f9e",
+          "bytes": 670
+        },
+        "dnp3-counter-points/answers/variation-conflict-retains.json": {
+          "sha256": "1f72d481e210796b0bac469d1e765b294abf72544608b989371f8edf56f5eedc",
+          "bytes": 5612
+        },
+        "dnp3-counter-points/captures/variation-conflict-retains.pcap": {
+          "sha256": "832146f9d9aae55100007136abff8bcb1544c1d62b834526cf95c8e947a59d9d",
+          "bytes": 744
+        },
+        "dnp3-counter-points/answers/overlap-early-variant-refused.json": {
+          "sha256": "d65916d1c53718baac9556f48a30146f098770aa4679a358c768c54354bcc8b9",
+          "bytes": 5003
+        },
+        "dnp3-counter-points/captures/overlap-early-variant-refused.pcap": {
+          "sha256": "9c4c83946f67b176438e97e2b91e8d4cecc3b8970faf9b9f2d27931be8463d9f",
+          "bytes": 731
+        },
+        "dnp3-counter-points/answers/class0-before-specific.json": {
+          "sha256": "8a73c100227362d2237a4f586200137fe44c05a7595653774ef54df8a0e8927f",
+          "bytes": 5285
+        },
+        "dnp3-counter-points/captures/class0-before-specific.pcap": {
+          "sha256": "ccb074f705d72ce4e237ae10b8b2197dcd1f3fdee1d7ee2136991b4a1120eaee",
+          "bytes": 739
+        },
+        "dnp3-counter-points/answers/class0-after-specific.json": {
+          "sha256": "21b62d5594ff15876bebdba8b11f558671adaf7fadcba77dc1de257333db14f5",
+          "bytes": 4049
+        },
+        "dnp3-counter-points/captures/class0-after-specific.pcap": {
+          "sha256": "f089fd7b708188786f284b2ccdd0bda795167cb89aa51732c990da800445bd3e",
+          "bytes": 634
+        },
+        "dnp3-counter-points/answers/counter-frozen-not-interchangeable.json": {
+          "sha256": "58ea93987f73e2c6dece384b3698f6ffc7ce18846d6ec7859e548181c32e438e",
+          "bytes": 4630
+        },
+        "dnp3-counter-points/captures/counter-frozen-not-interchangeable.pcap": {
+          "sha256": "e370c10e7afec885048dd05fa3fa008243d6047663f6ef411cc04fe80694e955",
+          "bytes": 726
+        },
+        "dnp3-counter-points/answers/range-gap-retains.json": {
+          "sha256": "d4c61dcd7bc58d2ed3d6fca904079f98fae2eb61f5d181ccfbd2b30bdcaeeb15",
+          "bytes": 5895
+        },
+        "dnp3-counter-points/captures/range-gap-retains.pcap": {
+          "sha256": "9ffbfc6a46ca3587a25b5d14fd41ddaf083a60bf0849321314fd20e7235540a9",
+          "bytes": 741
+        },
+        "dnp3-counter-points/answers/unknown-request.json": {
+          "sha256": "37f4da374a437002c416b104d2b5c32fd442724ccf5c0a3ac9a4349dc1666340",
+          "bytes": 2673
+        },
+        "dnp3-counter-points/captures/unknown-request.pcap": {
+          "sha256": "5cb77804780e08d7a4054546d394b62909087538495efd6063cb28857733f854",
+          "bytes": 549
+        },
+        "dnp3-counter-points/answers/wrong-sequence-retains.json": {
+          "sha256": "5805aaceaf9a2cc5d264f13cf4cb33eca8fb80d3d8740cba0016955cf0c84826",
+          "bytes": 6013
+        },
+        "dnp3-counter-points/captures/wrong-sequence-retains.pcap": {
+          "sha256": "2852441f4c6a4639c827f9da762bba1ba961464619181ab3ee65291f44a71998",
+          "bytes": 726
+        },
+        "dnp3-counter-points/answers/wrong-direction-retains.json": {
+          "sha256": "354d6d708318937a5283f5ce42ff39749047f3d00616304d1501a494e9721124",
+          "bytes": 6014
+        },
+        "dnp3-counter-points/captures/wrong-direction-retains.pcap": {
+          "sha256": "d8aea83fbc8f3220e03a267a3b0ee3da518f478a3bfd6881e3dbfdd1090d3345",
+          "bytes": 726
+        },
+        "dnp3-counter-points/answers/wrong-link-peer-retains.json": {
+          "sha256": "8dee9c36eb9014afef3c7275eab60de97b9ceb0295a6a3b321f9d5c8005c1fc1",
+          "bytes": 6014
+        },
+        "dnp3-counter-points/captures/wrong-link-peer-retains.pcap": {
+          "sha256": "76569ca6bc2baf80f8383f8f5826119c060aabc65801a16023a2da19af8b53ca",
+          "bytes": 726
+        },
+        "dnp3-counter-points/answers/identical-retry.json": {
+          "sha256": "dd84e1460b7d3cf4236cffdf988af1bf64ce27c797dd7aa07c1295e2c0c485ef",
+          "bytes": 6220
+        },
+        "dnp3-counter-points/captures/identical-retry.pcap": {
+          "sha256": "3a9fc446e4579232124d6ef62d2afcaf52c7d7ed79fbd7fdaaf3629b76c9a838",
+          "bytes": 743
+        },
+        "dnp3-counter-points/answers/conflicting-id-refused.json": {
+          "sha256": "00de9d86ea1fee92500f599705d974f85401c4ee298c7eda4a3fa714c9ad452e",
+          "bytes": 5662
+        },
+        "dnp3-counter-points/captures/conflicting-id-refused.pcap": {
+          "sha256": "1113253c9ad354ab6d91e3f441ab020074e6b7879ab9c91aca0dd1dd24f551d6",
+          "bytes": 725
+        },
+        "dnp3-counter-points/answers/truncated-time-retains.json": {
+          "sha256": "816b93d097badb4218ffba48e46bc60a41d9746db015694e342c79592e9d4596",
+          "bytes": 4866
+        },
+        "dnp3-counter-points/captures/truncated-time-retains.pcap": {
+          "sha256": "1f790997310505ab0d6f63e691cbc1f9c01a6d7260f075228c080b44b4fc583c",
+          "bytes": 741
+        },
+        "dnp3-counter-points/answers/duplicate-point-refused.json": {
+          "sha256": "372914d4ba89ceffa8667483273791aec0ac452185ec0b67532e7ad521f917f5",
+          "bytes": 4675
+        },
+        "dnp3-counter-points/captures/duplicate-point-refused.pcap": {
+          "sha256": "e7b4b4313fe63894f93c0d4828a5f61443ce577b41e4c7f48755bc30f2e80083",
+          "bytes": 738
+        },
+        "dnp3-counter-points/answers/unknown-static-variation.json": {
+          "sha256": "edc9f21c40592b919b8de1ec13c209c85273f97f80eb3f11bda53f8b8dd00ad0",
+          "bytes": 4625
+        },
+        "dnp3-counter-points/captures/unknown-static-variation.pcap": {
+          "sha256": "541149333736e2bdde72e51d6ad2a34c96751ff9ae7b7c590eb1c33be80ce7d3",
+          "bytes": 726
+        },
+        "dnp3-counter-points/answers/class1-only-refused.json": {
+          "sha256": "51b52a73bf26b4c1f3a99d6ecc595d45361ce6e9af170a590ecbc54b46a86887",
+          "bytes": 3533
+        },
+        "dnp3-counter-points/captures/class1-only-refused.pcap": {
+          "sha256": "62f90f3c715dc8a6220b7ece6a5c01c1697eaa86459f304bb4c6a76e89da1ca8",
+          "bytes": 716
+        },
+        "dnp3-counter-points/answers/empty.json": {
+          "sha256": "2b3890cec52fddbcceab5cbf64e5b85963f6a9708d3d4850c1038259a0630ed8",
+          "bytes": 5445
+        },
+        "dnp3-counter-points/captures/empty.pcap": {
+          "sha256": "8ae9b6b4829a31ae269d227ebce5be8a775052f1fe95643877e9a3c451886fd2",
+          "bytes": 724
+        },
+        "dnp3-counter-points/answers/truncated-header.json": {
+          "sha256": "e97f93e90184c76fd0202fe3c8c11e715062047b7d33b85453c90d2e08aff48c",
+          "bytes": 5454
+        },
+        "dnp3-counter-points/captures/truncated-header.pcap": {
+          "sha256": "3ddfc523ff5f8bc1934189e5d173837620b7a966efb7c40a4a7acbb901b9b9ca",
+          "bytes": 726
+        },
+        "dnp3-counter-points/answers/truncated-range.json": {
+          "sha256": "a6e41e0d4b66980e91905cb836109a957c1c68b121612afd3278858525366d97",
+          "bytes": 5461
+        },
+        "dnp3-counter-points/captures/truncated-range.pcap": {
+          "sha256": "f23ff356ed35f744d4e58218d9f2124286418758ab77212ca10efbe8e2fefd94",
+          "bytes": 728
+        },
+        "dnp3-counter-points/answers/descending.json": {
+          "sha256": "6a0b418a54ff12747d68ad32a83e97a974f7924964bc17e3d49d60eb4e131b0e",
+          "bytes": 5470
+        },
+        "dnp3-counter-points/captures/descending.pcap": {
+          "sha256": "392f65287233b4fc4ae72799aa4f295f01ff99bd1cadb76f9b28eba0a55673a7",
+          "bytes": 729
+        },
+        "dnp3-counter-points/answers/unsupported-read-variation.json": {
+          "sha256": "310baca448dc30b72b379b7acaadc062975e09b9c19a9d4303fa6373c17c34bc",
+          "bytes": 5478
+        },
+        "dnp3-counter-points/captures/unsupported-read-variation.pcap": {
+          "sha256": "5537ef1c7cdd80dac5def18aa98fc624448e09409e42bf8e73505cba9b0a1b98",
+          "bytes": 727
+        },
+        "dnp3-counter-points/answers/other-group.json": {
+          "sha256": "9772a136ede43d71f5f303d1c9a6d0b4ecb28c58f7b41894932e84de580fd656",
+          "bytes": 5478
+        },
+        "dnp3-counter-points/captures/other-group.pcap": {
+          "sha256": "0de1e26a0bcc5aa0a6b69db6f6896c74ca29d5c69a1f80ad1ed55c1ba703fcd5",
+          "bytes": 727
+        },
+        "dnp3-counter-points/answers/read-prefix.json": {
+          "sha256": "ac4cd76beba59c1eee704c992f4df8a2d5e52c346b0f0825f36d78bffadcbd79",
+          "bytes": 5475
+        },
+        "dnp3-counter-points/captures/read-prefix.pcap": {
+          "sha256": "4a6dd76a00e7f7b52357f5a7a67c74b590e06be7119c0118cf4cda1240d8e447",
+          "bytes": 729
+        },
+        "dnp3-counter-points/answers/duplicate-class.json": {
+          "sha256": "2c3f1ea2a7de3ae00fc0188c6d0bec180a728e92c411c721c48b877052ee4abf",
+          "bytes": 5473
+        },
+        "dnp3-counter-points/captures/duplicate-class.pcap": {
+          "sha256": "290c70a607dda382f37f62b9c4db55d04f73df000f5628715421be364383aff1",
+          "bytes": 730
+        },
+        "dnp3-counter-points/answers/time-zero-not-clock-quality.json": {
+          "sha256": "c3231f4066ca58343d25683232a583550bdf1d9252ac3f6b91916f301118a02b",
+          "bytes": 3842
+        },
+        "dnp3-counter-points/captures/time-zero-not-clock-quality.pcap": {
+          "sha256": "b41343d4bbbdbdd38b9a4b16fd000df9bc113a81334a998e795c2c7c2c988c67",
+          "bytes": 637
+        },
+        "dnp3-counter-points/answers/unsigned32-high-not-analog.json": {
+          "sha256": "a5f85ea8c4a330c420bbd3d10410cc98d5645a39cfb69da899c49f8a10cc56b5",
+          "bytes": 3681
+        },
+        "dnp3-counter-points/captures/unsigned32-high-not-analog.pcap": {
+          "sha256": "0a291a782d21c29a19b89eba40d4447b2b06c17166fceb75fb1d41922a7f7e5c",
+          "bytes": 640
+        },
+        "dnp3-counter-points/answers/unsigned16-high-not-analog.json": {
+          "sha256": "841a1939b53a1f47a0c59011f30e046b1cd5af730cdd92cebb0572681ac9007e",
+          "bytes": 3624
+        },
+        "dnp3-counter-points/captures/unsigned16-high-not-analog.pcap": {
+          "sha256": "205f93edbef150f386c40653e53acbf0cd70c595b4033f2f68f275c3f38b01b9",
+          "bytes": 634
+        },
+        "dnp3-counter-points/answers/quality-full-not-analog.json": {
+          "sha256": "66d315bd4b486aae94b1c90b62b94f63286fbb6f23866689f28c45133c706629",
+          "bytes": 3631
+        },
+        "dnp3-counter-points/captures/quality-full-not-analog.pcap": {
+          "sha256": "b01bec19076346b0b0d7370a8e2296c460f61435f8cbbcbff84ece65b6e996ce",
+          "bytes": 629
+        },
+        "dnp3-counter-points/answers/many-alternating-headers.json": {
+          "sha256": "16b16fcfa03cbd9cf4a118a5161df0a0f139b40f47e2fadf987ba4ec17691b2c",
+          "bytes": 15032
+        },
+        "dnp3-counter-points/captures/many-alternating-headers.pcap": {
+          "sha256": "acaab8e88fd837ed9ed2dcfee5313c02bed159bb1e3d8e9c16dabe3ba4cef059",
+          "bytes": 901
+        },
+        "dnp3-counter-points/answers/transport-composition.json": {
+          "sha256": "3c907f96de3a83086e3dac547b32e91714cd0a4ba76fdc70a8cdd1f54c7f0b02",
+          "bytes": 8397
+        },
+        "dnp3-counter-points/captures/transport-composition.pcap": {
+          "sha256": "e23de3d88c47af24e304b0eb230396d3f151f2c5c3536db782c53030a1d03c74",
+          "bytes": 816
+        },
+        "dnp3-counter-points/manifest.json": {
+          "sha256": "2b88344359ba976b192793041fa9ad42a5c13724b643a760eaf865f5950f2a0f",
+          "bytes": 16880
+        },
+        "dnp3-counter-points/generate.py": {
+          "sha256": "4f75c9738ce162016b9f12df07b5cd0c9922b63a188fe309d1f23342cdae0aad",
+          "bytes": 12030
+        },
+        "dnp3-counter-points/wire_model.py": {
+          "sha256": "fd2f3898b6597abf65309a1cb4271d92ef83590a3b842eb1539f97e87d37530c",
+          "bytes": 8044
+        },
+        "dnp3-counter-points/verify.py": {
+          "sha256": "2c98e7ef8cb8f02be332d9ece153718da3202eca4ee390ae3d24efb6e2509fd1",
+          "bytes": 2380
+        },
+        "dnp3-counter-points/MODEL-PINS.json": {
+          "sha256": "a76e30257d7633001bd56668b92f6c5b8877e3c7c8e60c383776e65a91d04541",
+          "bytes": 684
+        },
+        "dnp3-counter-points/SOURCE-PINS.json": {
+          "sha256": "863f7e0b61d98badbdff5845ac97127660b15ebf96342c77060948753f3964fb",
+          "bytes": 6336
+        },
+        "dnp3-counter-points/seal.py": {
+          "sha256": "051bc94f23b801fbc1a8ff9e47e441d502700a0d55f831c969eec933e4a51179",
+          "bytes": 4869
+        },
+        "dnp3-counter-points/REFERENCE-ACTUAL.json": {
+          "sha256": "72b7d8f3a2babf1dacbf59eb62ae214bbc35e70e3247e9e2c6bfce01e8a68a70",
+          "bytes": 6251
+        },
+        "dnp3-counter-points/reference.py": {
+          "sha256": "21a621d40f46e1439a7589b9a23d567bd5b5d54cfc5c0be004df6c050cd85cc8",
+          "bytes": 6009
+        },
+        "dnp3-counter-points/reference_transport.py": {
+          "sha256": "9f813abb3250e581b5e94c2f953bbc99e20ec3c9ddc05cd731f94595eb6eb101",
+          "bytes": 5512
+        },
+        "dnp3-counter-points/TRANSPORT-SOURCE-PINS.json": {
+          "sha256": "76d0590b48e1700c26b260c8ac953c1bd52888f8ee1cd0b21182e0e1d107d2d1",
+          "bytes": 1812
+        },
+        "dnp3-counter-points/REFERENCE-TRANSPORT-ACTUAL.json": {
+          "sha256": "02167b5962100777ce1952fdd2b865e32a61d91c2a1ea1659e302b2e7a2a2d65",
+          "bytes": 706
+        },
+        "dnp3-counter-points/SOURCE-API-BYTE-PROVENANCE.json": {
+          "sha256": "67b13a4f1506df79a9e9c22cfb893d55c211e12f17b7fc145f3750536937086e",
+          "bytes": 2430
+        },
+        "dnp3-counter-points/reference_selection.py": {
+          "sha256": "a5ce66fabfa56d5c75d32a6f65556a1995e5dea7d3fae65f395580ac98c069ab",
+          "bytes": 8663
+        },
+        "dnp3-counter-points/REFERENCE-SELECTION-ACTUAL.json": {
+          "sha256": "9105c420fdd8ea221d917fb8d8a034089644ed2ab322459d1d8f1b39ca255c9c",
+          "bytes": 11152
+        },
+        "dnp3-counter-points/reference_codec.py": {
+          "sha256": "241e424425dc5a847c3bce5aa8904ebd2b27ecd5092d652495587630b64b1056",
+          "bytes": 7323
+        },
+        "dnp3-counter-points/CODEC-SOURCE-PINS.json": {
+          "sha256": "a49adf80dbc87e00a594040be29823ba19566f147626bbd6c6c30421acf4abda",
+          "bytes": 5799
+        },
+        "dnp3-counter-points/REFERENCE-CODEC-ACTUAL.json": {
+          "sha256": "113bdc537a7c5fae8fc276c650983768999b4e75ab3b3dd36fce9becc80cbe5f",
+          "bytes": 14934
+        },
+        "dnp3-counter-points/reference-config.json": {
+          "sha256": "5c6850f00f53bd879cc9af4a487223071cd136ecbf622e1734964c80fe4becbe",
+          "bytes": 264
+        },
+        "dnp3-counter-points/guard-vectors.json": {
+          "sha256": "de74641ef808c06d9e1cbbf316de315abb5f71693255c8f59d75a601acb3fd00",
+          "bytes": 988
+        },
+        "dnp3-counter-points/transport-composition.json": {
+          "sha256": "e8a7168e75bebec30463e923296d8a16aa02d87ce603873132f93a7befbf972b",
+          "bytes": 8380
+        },
+        "required-tests-traffic-unified-v55.json": {
+          "sha256": "5c96e73d326eeaca9ecf83b3c5fbe0d4c8d18fe225c87764ce294355dac987ec",
+          "bytes": 11415066
+        },
+        "validation/expected.json": {
+          "sha256": "5794177271b109fd4d9e26b746cf84cf181feb93303644a26bbfb59a8456c982",
+          "bytes": 74715
+        }
+      },
+      "aliases": {
+        "common/pcapx/pcaputil/dnp3-counter-points/answers/all-g20v0.json": "dnp3-counter-points/answers/all-g20v0.json",
+        "common/pcapx/pcaputil/dnp3-counter-points/captures/all-g20v0.pcap": "dnp3-counter-points/captures/all-g20v0.pcap",
+        "common/pcapx/pcaputil/dnp3-counter-points/answers/all-g20v1.json": "dnp3-counter-points/answers/all-g20v1.json",
+        "common/pcapx/pcaputil/dnp3-counter-points/captures/all-g20v1.pcap": "dnp3-counter-points/captures/all-g20v1.pcap",
+        "common/pcapx/pcaputil/dnp3-counter-points/answers/all-g20v2.json": "dnp3-counter-points/answers/all-g20v2.json",
+        "common/pcapx/pcaputil/dnp3-counter-points/captures/all-g20v2.pcap": "dnp3-counter-points/captures/all-g20v2.pcap",
+        "common/pcapx/pcaputil/dnp3-counter-points/answers/all-g20v5.json": "dnp3-counter-points/answers/all-g20v5.json",
+        "common/pcapx/pcaputil/dnp3-counter-points/captures/all-g20v5.pcap": "dnp3-counter-points/captures/all-g20v5.pcap",
+        "common/pcapx/pcaputil/dnp3-counter-points/answers/all-g20v6.json": "dnp3-counter-points/answers/all-g20v6.json",
+        "common/pcapx/pcaputil/dnp3-counter-points/captures/all-g20v6.pcap": "dnp3-counter-points/captures/all-g20v6.pcap",
+        "common/pcapx/pcaputil/dnp3-counter-points/answers/all-g21v0.json": "dnp3-counter-points/answers/all-g21v0.json",
+        "common/pcapx/pcaputil/dnp3-counter-points/captures/all-g21v0.pcap": "dnp3-counter-points/captures/all-g21v0.pcap",
+        "common/pcapx/pcaputil/dnp3-counter-points/answers/all-g21v1.json": "dnp3-counter-points/answers/all-g21v1.json",
+        "common/pcapx/pcaputil/dnp3-counter-points/captures/all-g21v1.pcap": "dnp3-counter-points/captures/all-g21v1.pcap",
+        "common/pcapx/pcaputil/dnp3-counter-points/answers/all-g21v2.json": "dnp3-counter-points/answers/all-g21v2.json",
+        "common/pcapx/pcaputil/dnp3-counter-points/captures/all-g21v2.pcap": "dnp3-counter-points/captures/all-g21v2.pcap",
+        "common/pcapx/pcaputil/dnp3-counter-points/answers/all-g21v5.json": "dnp3-counter-points/answers/all-g21v5.json",
+        "common/pcapx/pcaputil/dnp3-counter-points/captures/all-g21v5.pcap": "dnp3-counter-points/captures/all-g21v5.pcap",
+        "common/pcapx/pcaputil/dnp3-counter-points/answers/all-g21v6.json": "dnp3-counter-points/answers/all-g21v6.json",
+        "common/pcapx/pcaputil/dnp3-counter-points/captures/all-g21v6.pcap": "dnp3-counter-points/captures/all-g21v6.pcap",
+        "common/pcapx/pcaputil/dnp3-counter-points/answers/all-g21v9.json": "dnp3-counter-points/answers/all-g21v9.json",
+        "common/pcapx/pcaputil/dnp3-counter-points/captures/all-g21v9.pcap": "dnp3-counter-points/captures/all-g21v9.pcap",
+        "common/pcapx/pcaputil/dnp3-counter-points/answers/all-g21v10.json": "dnp3-counter-points/answers/all-g21v10.json",
+        "common/pcapx/pcaputil/dnp3-counter-points/captures/all-g21v10.pcap": "dnp3-counter-points/captures/all-g21v10.pcap",
+        "common/pcapx/pcaputil/dnp3-counter-points/answers/range8-counter32.json": "dnp3-counter-points/answers/range8-counter32.json",
+        "common/pcapx/pcaputil/dnp3-counter-points/captures/range8-counter32.pcap": "dnp3-counter-points/captures/range8-counter32.pcap",
+        "common/pcapx/pcaputil/dnp3-counter-points/answers/range16-counter16.json": "dnp3-counter-points/answers/range16-counter16.json",
+        "common/pcapx/pcaputil/dnp3-counter-points/captures/range16-counter16.pcap": "dnp3-counter-points/captures/range16-counter16.pcap",
+        "common/pcapx/pcaputil/dnp3-counter-points/answers/indexed16-time48.json": "dnp3-counter-points/answers/indexed16-time48.json",
+        "common/pcapx/pcaputil/dnp3-counter-points/captures/indexed16-time48.pcap": "dnp3-counter-points/captures/indexed16-time48.pcap",
+        "common/pcapx/pcaputil/dnp3-counter-points/answers/multiple-counter-groups.json": "dnp3-counter-points/answers/multiple-counter-groups.json",
+        "common/pcapx/pcaputil/dnp3-counter-points/captures/multiple-counter-groups.pcap": "dnp3-counter-points/captures/multiple-counter-groups.pcap",
+        "common/pcapx/pcaputil/dnp3-counter-points/answers/class0-and-counters.json": "dnp3-counter-points/answers/class0-and-counters.json",
+        "common/pcapx/pcaputil/dnp3-counter-points/captures/class0-and-counters.pcap": "dnp3-counter-points/captures/class0-and-counters.pcap",
+        "common/pcapx/pcaputil/dnp3-counter-points/answers/variant-overlap-forward.json": "dnp3-counter-points/answers/variant-overlap-forward.json",
+        "common/pcapx/pcaputil/dnp3-counter-points/captures/variant-overlap-forward.pcap": "dnp3-counter-points/captures/variant-overlap-forward.pcap",
+        "common/pcapx/pcaputil/dnp3-counter-points/answers/variant-overlap-reverse.json": "dnp3-counter-points/answers/variant-overlap-reverse.json",
+        "common/pcapx/pcaputil/dnp3-counter-points/captures/variant-overlap-reverse.pcap": "dnp3-counter-points/captures/variant-overlap-reverse.pcap",
+        "common/pcapx/pcaputil/dnp3-counter-points/answers/variation-conflict-retains.json": "dnp3-counter-points/answers/variation-conflict-retains.json",
+        "common/pcapx/pcaputil/dnp3-counter-points/captures/variation-conflict-retains.pcap": "dnp3-counter-points/captures/variation-conflict-retains.pcap",
+        "common/pcapx/pcaputil/dnp3-counter-points/answers/overlap-early-variant-refused.json": "dnp3-counter-points/answers/overlap-early-variant-refused.json",
+        "common/pcapx/pcaputil/dnp3-counter-points/captures/overlap-early-variant-refused.pcap": "dnp3-counter-points/captures/overlap-early-variant-refused.pcap",
+        "common/pcapx/pcaputil/dnp3-counter-points/answers/class0-before-specific.json": "dnp3-counter-points/answers/class0-before-specific.json",
+        "common/pcapx/pcaputil/dnp3-counter-points/captures/class0-before-specific.pcap": "dnp3-counter-points/captures/class0-before-specific.pcap",
+        "common/pcapx/pcaputil/dnp3-counter-points/answers/class0-after-specific.json": "dnp3-counter-points/answers/class0-after-specific.json",
+        "common/pcapx/pcaputil/dnp3-counter-points/captures/class0-after-specific.pcap": "dnp3-counter-points/captures/class0-after-specific.pcap",
+        "common/pcapx/pcaputil/dnp3-counter-points/answers/counter-frozen-not-interchangeable.json": "dnp3-counter-points/answers/counter-frozen-not-interchangeable.json",
+        "common/pcapx/pcaputil/dnp3-counter-points/captures/counter-frozen-not-interchangeable.pcap": "dnp3-counter-points/captures/counter-frozen-not-interchangeable.pcap",
+        "common/pcapx/pcaputil/dnp3-counter-points/answers/range-gap-retains.json": "dnp3-counter-points/answers/range-gap-retains.json",
+        "common/pcapx/pcaputil/dnp3-counter-points/captures/range-gap-retains.pcap": "dnp3-counter-points/captures/range-gap-retains.pcap",
+        "common/pcapx/pcaputil/dnp3-counter-points/answers/unknown-request.json": "dnp3-counter-points/answers/unknown-request.json",
+        "common/pcapx/pcaputil/dnp3-counter-points/captures/unknown-request.pcap": "dnp3-counter-points/captures/unknown-request.pcap",
+        "common/pcapx/pcaputil/dnp3-counter-points/answers/wrong-sequence-retains.json": "dnp3-counter-points/answers/wrong-sequence-retains.json",
+        "common/pcapx/pcaputil/dnp3-counter-points/captures/wrong-sequence-retains.pcap": "dnp3-counter-points/captures/wrong-sequence-retains.pcap",
+        "common/pcapx/pcaputil/dnp3-counter-points/answers/wrong-direction-retains.json": "dnp3-counter-points/answers/wrong-direction-retains.json",
+        "common/pcapx/pcaputil/dnp3-counter-points/captures/wrong-direction-retains.pcap": "dnp3-counter-points/captures/wrong-direction-retains.pcap",
+        "common/pcapx/pcaputil/dnp3-counter-points/answers/wrong-link-peer-retains.json": "dnp3-counter-points/answers/wrong-link-peer-retains.json",
+        "common/pcapx/pcaputil/dnp3-counter-points/captures/wrong-link-peer-retains.pcap": "dnp3-counter-points/captures/wrong-link-peer-retains.pcap",
+        "common/pcapx/pcaputil/dnp3-counter-points/answers/identical-retry.json": "dnp3-counter-points/answers/identical-retry.json",
+        "common/pcapx/pcaputil/dnp3-counter-points/captures/identical-retry.pcap": "dnp3-counter-points/captures/identical-retry.pcap",
+        "common/pcapx/pcaputil/dnp3-counter-points/answers/conflicting-id-refused.json": "dnp3-counter-points/answers/conflicting-id-refused.json",
+        "common/pcapx/pcaputil/dnp3-counter-points/captures/conflicting-id-refused.pcap": "dnp3-counter-points/captures/conflicting-id-refused.pcap",
+        "common/pcapx/pcaputil/dnp3-counter-points/answers/truncated-time-retains.json": "dnp3-counter-points/answers/truncated-time-retains.json",
+        "common/pcapx/pcaputil/dnp3-counter-points/captures/truncated-time-retains.pcap": "dnp3-counter-points/captures/truncated-time-retains.pcap",
+        "common/pcapx/pcaputil/dnp3-counter-points/answers/duplicate-point-refused.json": "dnp3-counter-points/answers/duplicate-point-refused.json",
+        "common/pcapx/pcaputil/dnp3-counter-points/captures/duplicate-point-refused.pcap": "dnp3-counter-points/captures/duplicate-point-refused.pcap",
+        "common/pcapx/pcaputil/dnp3-counter-points/answers/unknown-static-variation.json": "dnp3-counter-points/answers/unknown-static-variation.json",
+        "common/pcapx/pcaputil/dnp3-counter-points/captures/unknown-static-variation.pcap": "dnp3-counter-points/captures/unknown-static-variation.pcap",
+        "common/pcapx/pcaputil/dnp3-counter-points/answers/class1-only-refused.json": "dnp3-counter-points/answers/class1-only-refused.json",
+        "common/pcapx/pcaputil/dnp3-counter-points/captures/class1-only-refused.pcap": "dnp3-counter-points/captures/class1-only-refused.pcap",
+        "common/pcapx/pcaputil/dnp3-counter-points/answers/empty.json": "dnp3-counter-points/answers/empty.json",
+        "common/pcapx/pcaputil/dnp3-counter-points/captures/empty.pcap": "dnp3-counter-points/captures/empty.pcap",
+        "common/pcapx/pcaputil/dnp3-counter-points/answers/truncated-header.json": "dnp3-counter-points/answers/truncated-header.json",
+        "common/pcapx/pcaputil/dnp3-counter-points/captures/truncated-header.pcap": "dnp3-counter-points/captures/truncated-header.pcap",
+        "common/pcapx/pcaputil/dnp3-counter-points/answers/truncated-range.json": "dnp3-counter-points/answers/truncated-range.json",
+        "common/pcapx/pcaputil/dnp3-counter-points/captures/truncated-range.pcap": "dnp3-counter-points/captures/truncated-range.pcap",
+        "common/pcapx/pcaputil/dnp3-counter-points/answers/descending.json": "dnp3-counter-points/answers/descending.json",
+        "common/pcapx/pcaputil/dnp3-counter-points/captures/descending.pcap": "dnp3-counter-points/captures/descending.pcap",
+        "common/pcapx/pcaputil/dnp3-counter-points/answers/unsupported-read-variation.json": "dnp3-counter-points/answers/unsupported-read-variation.json",
+        "common/pcapx/pcaputil/dnp3-counter-points/captures/unsupported-read-variation.pcap": "dnp3-counter-points/captures/unsupported-read-variation.pcap",
+        "common/pcapx/pcaputil/dnp3-counter-points/answers/other-group.json": "dnp3-counter-points/answers/other-group.json",
+        "common/pcapx/pcaputil/dnp3-counter-points/captures/other-group.pcap": "dnp3-counter-points/captures/other-group.pcap",
+        "common/pcapx/pcaputil/dnp3-counter-points/answers/read-prefix.json": "dnp3-counter-points/answers/read-prefix.json",
+        "common/pcapx/pcaputil/dnp3-counter-points/captures/read-prefix.pcap": "dnp3-counter-points/captures/read-prefix.pcap",
+        "common/pcapx/pcaputil/dnp3-counter-points/answers/duplicate-class.json": "dnp3-counter-points/answers/duplicate-class.json",
+        "common/pcapx/pcaputil/dnp3-counter-points/captures/duplicate-class.pcap": "dnp3-counter-points/captures/duplicate-class.pcap",
+        "common/pcapx/pcaputil/dnp3-counter-points/answers/time-zero-not-clock-quality.json": "dnp3-counter-points/answers/time-zero-not-clock-quality.json",
+        "common/pcapx/pcaputil/dnp3-counter-points/captures/time-zero-not-clock-quality.pcap": "dnp3-counter-points/captures/time-zero-not-clock-quality.pcap",
+        "common/pcapx/pcaputil/dnp3-counter-points/answers/unsigned32-high-not-analog.json": "dnp3-counter-points/answers/unsigned32-high-not-analog.json",
+        "common/pcapx/pcaputil/dnp3-counter-points/captures/unsigned32-high-not-analog.pcap": "dnp3-counter-points/captures/unsigned32-high-not-analog.pcap",
+        "common/pcapx/pcaputil/dnp3-counter-points/answers/unsigned16-high-not-analog.json": "dnp3-counter-points/answers/unsigned16-high-not-analog.json",
+        "common/pcapx/pcaputil/dnp3-counter-points/captures/unsigned16-high-not-analog.pcap": "dnp3-counter-points/captures/unsigned16-high-not-analog.pcap",
+        "common/pcapx/pcaputil/dnp3-counter-points/answers/quality-full-not-analog.json": "dnp3-counter-points/answers/quality-full-not-analog.json",
+        "common/pcapx/pcaputil/dnp3-counter-points/captures/quality-full-not-analog.pcap": "dnp3-counter-points/captures/quality-full-not-analog.pcap",
+        "common/pcapx/pcaputil/dnp3-counter-points/answers/many-alternating-headers.json": "dnp3-counter-points/answers/many-alternating-headers.json",
+        "common/pcapx/pcaputil/dnp3-counter-points/captures/many-alternating-headers.pcap": "dnp3-counter-points/captures/many-alternating-headers.pcap",
+        "common/pcapx/pcaputil/dnp3-counter-points/answers/transport-composition.json": "dnp3-counter-points/answers/transport-composition.json",
+        "common/pcapx/pcaputil/dnp3-counter-points/captures/transport-composition.pcap": "dnp3-counter-points/captures/transport-composition.pcap",
+        "common/pcapx/pcaputil/dnp3-counter-points/manifest.json": "dnp3-counter-points/manifest.json",
+        "common/pcapx/pcaputil/dnp3-counter-points/generate.py": "dnp3-counter-points/generate.py",
+        "common/pcapx/pcaputil/dnp3-counter-points/wire_model.py": "dnp3-counter-points/wire_model.py",
+        "common/pcapx/pcaputil/dnp3-counter-points/verify.py": "dnp3-counter-points/verify.py",
+        "common/pcapx/pcaputil/dnp3-counter-points/MODEL-PINS.json": "dnp3-counter-points/MODEL-PINS.json",
+        "common/pcapx/pcaputil/dnp3-counter-points/SOURCE-PINS.json": "dnp3-counter-points/SOURCE-PINS.json",
+        "common/pcapx/pcaputil/dnp3-counter-points/seal.py": "dnp3-counter-points/seal.py",
+        "common/pcapx/pcaputil/dnp3-counter-points/REFERENCE-ACTUAL.json": "dnp3-counter-points/REFERENCE-ACTUAL.json",
+        "common/pcapx/pcaputil/dnp3-counter-points/reference.py": "dnp3-counter-points/reference.py",
+        "common/pcapx/pcaputil/dnp3-counter-points/reference_transport.py": "dnp3-counter-points/reference_transport.py",
+        "common/pcapx/pcaputil/dnp3-counter-points/TRANSPORT-SOURCE-PINS.json": "dnp3-counter-points/TRANSPORT-SOURCE-PINS.json",
+        "common/pcapx/pcaputil/dnp3-counter-points/REFERENCE-TRANSPORT-ACTUAL.json": "dnp3-counter-points/REFERENCE-TRANSPORT-ACTUAL.json",
+        "common/pcapx/pcaputil/dnp3-counter-points/SOURCE-API-BYTE-PROVENANCE.json": "dnp3-counter-points/SOURCE-API-BYTE-PROVENANCE.json",
+        "common/pcapx/pcaputil/dnp3-counter-points/reference_selection.py": "dnp3-counter-points/reference_selection.py",
+        "common/pcapx/pcaputil/dnp3-counter-points/REFERENCE-SELECTION-ACTUAL.json": "dnp3-counter-points/REFERENCE-SELECTION-ACTUAL.json",
+        "common/pcapx/pcaputil/dnp3-counter-points/reference_codec.py": "dnp3-counter-points/reference_codec.py",
+        "common/pcapx/pcaputil/dnp3-counter-points/CODEC-SOURCE-PINS.json": "dnp3-counter-points/CODEC-SOURCE-PINS.json",
+        "common/pcapx/pcaputil/dnp3-counter-points/REFERENCE-CODEC-ACTUAL.json": "dnp3-counter-points/REFERENCE-CODEC-ACTUAL.json",
+        "common/pcapx/pcaputil/dnp3-counter-points/reference-config.json": "dnp3-counter-points/reference-config.json",
+        "common/pcapx/pcaputil/dnp3-counter-points/guard-vectors.json": "dnp3-counter-points/guard-vectors.json",
+        "common/pcapx/pcaputil/dnp3-counter-points/transport-composition.json": "dnp3-counter-points/transport-composition.json",
+        "scripts/protocol-tests/required-tests-traffic-unified-v55.json": "required-tests-traffic-unified-v55.json"
+      }
     }
   ],
   "schema_version": 1,

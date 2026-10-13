@@ -178,7 +178,7 @@ func NewProtocolSessionWithOptions(budget ParserBudget, options ...ProtocolSessi
 			return nil, fmt.Errorf("RTPS fragment observation requires a UDP session")
 		}
 	}
-	if s.transport == "udp" && (s.f.a.config.DecodeDNP3ReadPoints || s.f.a.config.DecodeDNP3DirectStaticReads || s.f.a.config.DecodeDNP3TypedStaticReads) {
+	if s.transport == "udp" && (s.f.a.config.DecodeDNP3ReadPoints || s.f.a.config.DecodeDNP3DirectStaticReads || s.f.a.config.DecodeDNP3TypedStaticReads || s.f.a.config.DecodeDNP3CounterPoints) {
 		return nil, fmt.Errorf("DNP3 selected READ points require TCP")
 	}
 	if s.transport == "udp" && s.f.a.config.DecodeDNP3TransportFragments {

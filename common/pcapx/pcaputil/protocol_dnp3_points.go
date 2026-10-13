@@ -51,7 +51,7 @@ func dnp3ReadClasses(b []byte, limit int) ([]any, byte, error) {
 	return classes, mask, nil
 }
 
-func dnp3StaticPoints(b []byte, limit, depth int, packed bool) ([]any, error) {
+func dnp3StaticPoints(b []byte, limit, depth int, packed, counters bool) ([]any, error) {
 	if len(b) > 0 && depth < 3 {
 		return nil, protocolError(ErrResourceExceeded, "DNP3 point tree depth")
 	}
@@ -66,8 +66,11 @@ func dnp3StaticPoints(b []byte, limit, depth int, packed bool) ([]any, error) {
 		b = b[3:]
 		width := 0
 		isPacked := packed && group == 1 && variation == 1
+		isCounter := counters && dnp3CounterWidth(group, variation) > 0
 		if isPacked {
 			width = 1
+		} else if isCounter {
+			width = dnp3CounterWidth(group, variation)
 		} else if (group == 1 || group == 10) && variation == 2 {
 			width = 1
 		} else if group == 30 && variation >= 1 && variation <= 6 {
@@ -144,6 +147,11 @@ func dnp3StaticPoints(b []byte, limit, depth int, packed bool) ([]any, error) {
 			}
 			seen[key] = true
 			point := map[string]any{"Index": index}
+			if isCounter {
+				points = append(points, dnp3CounterPoint(index, group, variation, b[:width]))
+				b = b[width:]
+				continue
+			}
 			if isPacked {
 				point["Quality"], point["Value"] = "not-reported", b[i/8]&(1<<uint(i%8)) != 0
 				points = append(points, point)
@@ -244,7 +252,7 @@ func (s *binDNP3) observePoints(out map[string]any, dir int, src, dest uint16, u
 		return 0, nil, nil
 	case 1:
 		if s.directReads {
-			classes, mask, selectors, headers, err := dnp3DirectReadHeaders(user[3:], sessionCollectionLimit(s.maxPending), s.typedReads)
+			classes, mask, selectors, headers, err := dnp3DirectReadHeaders(user[3:], sessionCollectionLimit(s.maxPending), s.typedReads, s.counterPoints)
 			if err != nil {
 				return refuse(err)
 			}
@@ -261,7 +269,7 @@ func (s *binDNP3) observePoints(out map[string]any, dir int, src, dest uint16, u
 		out["Class Selectors"] = classes
 		return mask, nil, nil
 	case 0x81:
-		objects, err := dnp3StaticPoints(user[5:], sessionCollectionLimit(s.maxPending), s.maxDepth, s.typedReads)
+		objects, err := dnp3StaticPoints(user[5:], sessionCollectionLimit(s.maxPending), s.maxDepth, s.typedReads, s.counterPoints)
 		if err != nil {
 			return refuse(err)
 		}

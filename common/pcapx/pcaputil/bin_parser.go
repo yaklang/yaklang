@@ -348,6 +348,8 @@ type BinParserConfig struct {
 	DecodeDNP3DirectStaticReads bool
 	// DecodeDNP3TypedStaticReads adds selected static variants and ordered coverage.
 	DecodeDNP3TypedStaticReads bool
+	// DecodeDNP3CounterPoints adds selected unsigned static/frozen counter observations.
+	DecodeDNP3CounterPoints bool
 	// MMSISOPorts explicitly selects bounded RFC1006/COTP/presentation/MMS observations.
 	MMSISOPorts             []uint16
 	DecodeMMSServiceValues  bool
@@ -754,6 +756,12 @@ func (f *binFlow) event(dir int, raw []byte, status, detail string) *BinParserEv
 	}
 	if f.protocol == "dnp3" && f.a.config.DecodeDNP3TypedStaticReads {
 		e.Profile = "dnp3-typed-static-read"
+		if f.a.config.DecodeDNP3TransportFragments {
+			e.Profile += "-transport"
+		}
+	}
+	if f.protocol == "dnp3" && f.a.config.DecodeDNP3CounterPoints {
+		e.Profile = "dnp3-counter-points"
 		if f.a.config.DecodeDNP3TransportFragments {
 			e.Profile += "-transport"
 		}

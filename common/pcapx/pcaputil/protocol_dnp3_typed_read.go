@@ -48,7 +48,15 @@ func (a *dnp3SelectorPriority) Pop() any {
 // by memoryTarget before any pending request is admitted.
 func normalizeDNP3TypedSelectors(a []dnp3StaticSelector) []dnp3StaticSelector {
 	out := []dnp3StaticSelector{}
-	for _, g := range []byte{1, 10, 30} {
+	groups := [256]bool{}
+	for _, x := range a {
+		groups[x.group] = true
+	}
+	for group := range groups {
+		if !groups[group] {
+			continue
+		}
+		g := byte(group)
 		events := []dnp3SelectorBoundary{}
 		for id, x := range a {
 			if x.group != g {
