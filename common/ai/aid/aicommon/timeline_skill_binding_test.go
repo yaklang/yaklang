@@ -28,15 +28,16 @@ func TestSkillBindingPreservesRetiredTimelineAndRestoredHistory(t *testing.T) {
 			mgr.LoadDefaultSkills()
 			require.True(t, mgr.IsSkillLoaded("default"))
 
-			bindCompressionMock(t, tl, func(_ *AIRequest) (string, error) {
-				return compressionMockSummary("Default guidance summarized."), nil
+			bindCompressionMock(t, tl, func(req *AIRequest) (string, error) {
+				require.NotContains(t, req.GetPrompt(), "RETIRED_DEFAULT_BODY")
+				return compressionMockSummary("Ordinary history summarized."), nil
 			})
 			options := compressionTestOptions()
 			options.FinalizeMemory = true
 			_, err = tl.CompressOnce(options)
 			require.NoError(t, err)
-			require.False(t, mgr.IsSkillLoaded("default"))
-			require.Empty(t, mgr.GetCurrentSelectedSkills())
+			require.True(t, mgr.IsSkillLoaded("default"))
+			require.Len(t, mgr.GetCurrentSelectedSkills(), 1)
 
 			if restore {
 				raw, err := MarshalTimeline(tl)
@@ -63,14 +64,13 @@ func TestSkillBindingPreservesRetiredTimelineAndRestoredHistory(t *testing.T) {
 			if !restore {
 				require.True(t, mgr.HasSkillContentHistory("default"))
 			}
-			require.False(t, mgr.IsSkillLoaded("default"))
-			require.Empty(t, mgr.GetCurrentSelectedSkills())
+			require.True(t, mgr.IsSkillLoaded("default"))
+			require.Len(t, mgr.GetCurrentSelectedSkills(), 1)
 
 			added, err := mgr.LoadAutoSkill("default")
 			require.NoError(t, err)
-			require.True(t, added)
-			require.Contains(t, RenderTimelineFrozenOpen(tl).Open, "RETIRED_DEFAULT_BODY")
-			require.Empty(t, mgr.RenderStable(), "explicit reload must still wait for freezing")
+			require.False(t, added, "exact content must not be appended again")
+			require.Contains(t, mgr.RenderStable(), "RETIRED_DEFAULT_BODY")
 		})
 	}
 }

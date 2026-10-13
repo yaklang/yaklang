@@ -187,9 +187,9 @@ func (m *Timeline) PushSkillContent(id int64, name, path, content, source string
 }
 
 // HasVisibleSkillContent 判断某个技能当前是否还有正文留在上下文里 (Open 或已提
-// 升都算)。被总结退休的正文返回 false, 允许重新读取。
+// 升都算)。被显式 unload 退休的正文返回 false, 允许重新读取。
 //
-// 关键词: HasVisibleSkillContent, 已可见判断, 压缩后可重读
+// 关键词: HasVisibleSkillContent, 已可见判断, 显式移除后可重读
 func (m *Timeline) HasVisibleSkillContent(name string) bool {
 	if m == nil {
 		return false
@@ -258,7 +258,7 @@ func (m *Timeline) VisibleSkillContentNames() []string {
 }
 
 // HasSkillContentHistory 判断该技能是否在本 Timeline 中留下过任何 skill-content
-// 记录 (即使正文已被总结退休)。用于区分两种恢复场景:
+// 记录 (即使正文已被显式移除)。用于区分两种恢复场景:
 //   - 有历史: 这是新版本会话, 正文的可见性完全由压缩结果决定, 不能用旧名单重新展开;
 //   - 无历史: 是真正的旧会话, 允许一次性导入。
 //

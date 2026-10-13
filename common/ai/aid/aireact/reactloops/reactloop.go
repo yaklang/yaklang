@@ -1179,7 +1179,7 @@ func loadConfiguredSkills(mgr *aiskillloader.SkillsContextManager, names []strin
 		return
 	}
 	// 持久会话恢复的是一份技能名单, 不是正文。若本 Timeline 已经记录过该技能
-	// (例如正文已被统一压缩退休), 不能按旧名单把它重新完整展开; 只有真正没有
+	// (例如正文已被显式移除), 不能按旧名单把它重新完整展开; 只有真正没有
 	// 历史记录的技能才允许导入。
 	if source == "persistent session" {
 		filtered := make([]string, 0, len(names))

@@ -41,7 +41,7 @@ func TestDefaultSkillLoadingIsExplicitAndDoesNotReplayHistory(t *testing.T) {
 	mgr.BindTimelineSink(sink)
 	mgr.LoadDefaultSkills()
 	require.Equal(t, 1, loader.loads)
-	require.Equal(t, appends, sink.appendCount(), "binding and initialization must respect retired history")
+	require.Equal(t, appends, sink.appendCount(), "binding and initialization must respect explicit removal")
 	require.False(t, mgr.IsSkillLoaded("default"))
 	require.Empty(t, mgr.GetCurrentSelectedSkills())
 

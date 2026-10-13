@@ -426,7 +426,7 @@ func (m *SkillsContextManager) loadSkillFromWithNew(skillName, source string) (b
 }
 
 // HasSkillContentHistory 判断该技能是否已经在本 Timeline 里留下过正文记录 (即使
-// 已被统一压缩退休)。持久会话恢复用它避免用旧名单把已退休正文重新展开。
+// 已被显式移除)。持久会话恢复用它避免用旧名单把已移除正文重新展开。
 func (m *SkillsContextManager) HasSkillContentHistory(skillName string) bool {
 	skillName = strings.TrimSpace(skillName)
 	if skillName == "" {
