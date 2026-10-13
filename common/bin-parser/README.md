@@ -67,7 +67,7 @@ go test -count=1 -timeout=10m ./common/bin-parser/... ./common/pcapx/...
 
 CI 的 `Bin Parser Traffic Tests` 在解析器、pcapx、Shark CLI、ZIP 加载器、语料或
 验收脚本修改时运行完整测试；当前必跑入口为封存的
-`required-tests-traffic-unified-v47.json`（通过 `corpus exec` 加载）。Go 的超时按整个包
+`required-tests-traffic-unified-v48.json`（通过 `corpus exec` 加载）。Go 的超时按整个包
 累计，完整矩阵使用每包 10 分钟预算，job 总预算保持 30 分钟。WIP/Draft
 不自动运行；可手动选择明确的分支或 commit SHA。默认 `Essential Tests` 保留
 通用测试与工作流分流检查。跳过不计为流量验收通过。

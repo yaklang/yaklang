@@ -1,16 +1,22 @@
 package pcaputil
 
 import (
+	"crypto/sha256"
 	"encoding/binary"
 	"fmt"
 	"math"
 )
 
 type iecCommandKey struct {
-	dir    int
-	kind   byte
-	common uint16
-	ioa    uint32
+	dir        int
+	kind       byte
+	common     uint16
+	ioa        uint32
+	originator byte
+	test       bool
+	phase      byte
+	objects    byte
+	body       [32]byte
 }
 type binIEC104 struct {
 	commands map[iecCommandKey]string
@@ -85,7 +91,7 @@ func iecControl(c []byte) bool {
 	return false
 }
 func (f *binFlow) frameIEC104(w []byte) (int, *binSpec, error) {
-	if err := f.reserveSession(768 + int64(len(f.iec104.commands)+1)*96); err != nil {
+	if err := f.reserveSession(768 + int64(len(f.iec104.commands)+1)*160); err != nil {
 		return 0, nil, err
 	}
 	if len(w) < 2 {
@@ -213,20 +219,37 @@ func (s *binIEC104) consume(dir int, w []byte, max int) (map[string]any, error) 
 			out["Role"] = "response"
 		}
 		// Transport N(R) acknowledges byte-stream delivery, not an ASDU command.
-		// Match activation confirmations by direction/type/common address/IOA.
+		// Match only the same observed originator/test context, complete object
+		// bytes and activation/deactivation phase. N(R) cannot supply this identity.
 		if s.commands == nil {
 			s.commands = map[iecCommandKey]string{}
 		}
 		if w[6] >= 45 && len(w) >= 15 {
+			if cot := w[8] & 63; cot == 7 || cot == 9 || cot == 10 {
+				out["Matched"] = false
+			}
+		}
+		if _, selected := iec104ObjectSizes[w[6]]; selected && iec104CommandType(w[6]) && len(w) >= 15 {
 			cot := w[8] & 63
-			key := iecCommandKey{dir, w[6], binary.LittleEndian.Uint16(w[10:]), uint32(w[12]) | uint32(w[13])<<8 | uint32(w[14])<<16}
+			key := iecCommandKey{dir: dir, kind: w[6], common: binary.LittleEndian.Uint16(w[10:]), ioa: uint32(w[12]) | uint32(w[13])<<8 | uint32(w[14])<<16, originator: w[9], test: w[8]&128 != 0, objects: w[7]}
+			// Echoed controls/interrogation objects are part of their identity.
+			// Clock/test/reset services have distinct response contracts; preserve
+			// their existing coarse observation rather than imposing an echo rule.
+			if (w[6] >= 45 && w[6] <= 64) || w[6] == 100 || w[6] == 101 {
+				key.body = sha256.Sum256(w[12:])
+			}
 			if cot == 6 || cot == 8 {
+				key.phase = cot
 				if _, exists := s.commands[key]; !exists && len(s.commands) >= max {
 					return nil, protocolError(ErrResourceExceeded, "IEC104 outstanding commands")
 				}
 				s.commands[key] = iec104TypeName(w[6])
 			} else if cot == 7 || cot == 9 || cot == 10 {
 				key.dir = 1 - dir
+				key.phase = 6
+				if cot == 9 {
+					key.phase = 8
+				}
 				name, ok := s.commands[key]
 				out["Matched"] = ok
 				if ok {
@@ -287,6 +310,10 @@ func (s *binIEC104) consume(dir int, w []byte, max int) (map[string]any, error) 
 	}
 	out["Observed STARTDT Confirmation"] = s.active
 	return out, nil
+}
+
+func iec104CommandType(kind byte) bool {
+	return kind >= 45 && kind <= 51 || kind >= 58 && kind <= 64 || kind >= 100 && kind <= 107
 }
 
 func iec104UName(c byte) string {

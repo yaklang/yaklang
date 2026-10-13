@@ -44,7 +44,7 @@ Run from the repository root:
 ```sh
 go run ./internal/trafficfixture/cmd/corpus test
 go test -json -count=1 -timeout=5m ./internal/trafficfixture/... ./common/bin-parser/... ./common/pcapx/... ./common/yak/cmd/yakcmds/shark-cli ./scripts/ci > traffic.jsonl
-go run ./internal/trafficfixture/cmd/corpus exec -- python3 @scripts/protocol-tests/check_go_test_json_v2.py traffic.jsonl --inventory @scripts/protocol-tests/required-tests-traffic-unified-v47.json --tier full
+go run ./internal/trafficfixture/cmd/corpus exec -- python3 @scripts/protocol-tests/check_go_test_json_v2.py traffic.jsonl --inventory @scripts/protocol-tests/required-tests-traffic-unified-v48.json --tier full
 ```
 
 The single `corpus` entry point uses the same bounded Go ZIP loader as tests.
@@ -83,7 +83,7 @@ their semantic coverage. The existing synthetic session keys are test inputs;
 production credentials, user private keys and material without redistribution
 permission belong in an external fixed-source download manifest.
 
-Current test requirements are sealed at `scripts/protocol-tests/required-tests-traffic-unified-v47.json`;
+Current test requirements are sealed at `scripts/protocol-tests/required-tests-traffic-unified-v48.json`;
 the historical inventories and all earlier batches remain unchanged.
 The supplemental small-corpus batch contains 26 minimal controls, their explicit
 expected facts, an offline generator and the compact pinned source manifest.
@@ -203,7 +203,7 @@ opaque selector bytes and one bounded Data value over Wrapper v1 TCP/UDP; object
 selector meaning, access permission and device operation are unverified. The
 original one-packet selective-access capture and original refused answer remain
 immutable; its now-supported answer is matched by exact input SHA and frame.
-The active inventory is `scripts/protocol-tests/required-tests-traffic-unified-v47.json`.
+The active inventory is `scripts/protocol-tests/required-tests-traffic-unified-v48.json`.
 
 The small-graph budget batch reuses accepted graph captures/answers and adds one
 249-byte UDP control for child count255 without child bytes. Its standalone proof
@@ -993,7 +993,7 @@ the normative answer; a missing numeric reference field is not a codec pass.
 Full/deferred, workers1/2/4, observers off/on, Feed chunks1/7/full, ownership,
 resources and close/refusal boundaries remain required.
 
-Current gate: `required-tests-traffic-unified-v47.json` with
+Current gate: `required-tests-traffic-unified-v48.json` with
 `check_go_test_json_v2.py`. The indexed validator preserves missing/unpassed,
 package invocation completion, descendant skips, failures and non-JSON checks;
 its mutation/differential harness is sealed with the material. Older checkers
@@ -1080,3 +1080,20 @@ TShark4.2.5 actually agrees on64 selector scalar leaves across26 normal captures
 The full replay matrix retains eager/deferred, workers1/2/4 and observer off/on;
 native sessions additionally cover Feed chunking, private ownership, shared budgets,
 Close idempotence and late-input rejection. All historical ZIPs remain immutable.
+
+
+`validation-iec104-command-context.zip` adds19 minimal command-echo controls,
+complete independent wire/session answers, deterministic generation/verification
+and fixed lib60870 source pins. Selected control/interrogation commands match the originator,
+Test flag, complete object bytes and activation/deactivation phase in addition to
+direction, TypeID, common address and IOA. Different command qualifiers, values
+and Select/Execute modes remain unmatched and cannot retire another command.
+Legacy rule fields, metadata and observed Session now keep private accepted
+snapshots; changing public views cannot turn a retained typed refusal into success.
+The independent matrix covers112 complete message observations,42 observed
+matches and10 explicitly unmatched responses. TShark4.2.5 actually agrees on518
+wire scalars across19 captures; that verifies wire decoding, separately from the
+source/model association contract. Clock/test/reset response contracts retain their legacy coarse observations;
+full service-specific interpretation remains open. Legacy numeric association IDs remain zero.
+Device actuation/authentication and indistinguishable repeated application
+generations remain unresolved. The active mandatory inventory is v48.

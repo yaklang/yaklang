@@ -72491,6 +72491,257 @@
         "common/pcapx/pcaputil/mms-alternate-access/REFERENCE-ACTUAL.json": "mms-alternate-access/REFERENCE-ACTUAL.json",
         "scripts/protocol-tests/required-tests-traffic-unified-v47.json": "required-tests-traffic-unified-v47.json"
       }
+    },
+    {
+      "id": "validation-iec104-command-context",
+      "kind": "validation",
+      "source_sha": "674416c17ad13ec293093740fa07a0b61a2aa557",
+      "file": "validation-iec104-command-context.zip",
+      "sha256": "5e2198d06e7a35486151ac528c3f77c2c957c238988ae93c17b8a142d3f5a73f",
+      "password": "bin-parser",
+      "members": {
+        "iec104-command-context/answers/normal-oa0-test0.json": {
+          "sha256": "34d0ee7591416f6195ec98414639bdbd27044082ac60914b47a659d9ff804a15",
+          "bytes": 4600
+        },
+        "iec104-command-context/captures/normal-oa0-test0.pcap": {
+          "sha256": "d0d41f369658c76e9ccc9c840e58a63f1566f5c59c4169b53f84baf0b66410eb",
+          "bytes": 854
+        },
+        "iec104-command-context/answers/normal-oa0-test1.json": {
+          "sha256": "e812486faf6562ffb5f2ac3b6a7de401db07413a457a38149fc9bbdedb53d676",
+          "bytes": 4597
+        },
+        "iec104-command-context/captures/normal-oa0-test1.pcap": {
+          "sha256": "350b0b17c34c533d3433184984a4c51929811875819510db99582aed2b5e881a",
+          "bytes": 854
+        },
+        "iec104-command-context/answers/normal-oa1-test0.json": {
+          "sha256": "171ac8fd88d49fd0d66495ece3c80320faa23014b320bbe70f906d3c882f4fbb",
+          "bytes": 4600
+        },
+        "iec104-command-context/captures/normal-oa1-test0.pcap": {
+          "sha256": "502c45023a70ef71c12f0170e0730d8c230b47edd60e841a9aef753c35f739c5",
+          "bytes": 854
+        },
+        "iec104-command-context/answers/normal-oa1-test1.json": {
+          "sha256": "562140aa8374bdd51f412a9614b2bb03b23ea208a3b075bccc907b40bc40776c",
+          "bytes": 4597
+        },
+        "iec104-command-context/captures/normal-oa1-test1.pcap": {
+          "sha256": "84ec63178a7df7ae61ea663ce4f5f74880c92405c5ef5473c7d3687b3e34980a",
+          "bytes": 854
+        },
+        "iec104-command-context/answers/normal-oa255-test0.json": {
+          "sha256": "a3306b60865310e272abb6c082208abfbb9118fd56c0be59f54796dfe0691599",
+          "bytes": 4606
+        },
+        "iec104-command-context/captures/normal-oa255-test0.pcap": {
+          "sha256": "7101bd7e0121af586e43e09d3193143289d6a4964dc0c1ef522f17b9cbcc8dd0",
+          "bytes": 854
+        },
+        "iec104-command-context/answers/normal-oa255-test1.json": {
+          "sha256": "e4cac887d8fdb19c6f9e364daacfc89a0c553aadf4833a98b95efc04c9379293",
+          "bytes": 4603
+        },
+        "iec104-command-context/captures/normal-oa255-test1.pcap": {
+          "sha256": "76bb1b551b29d5a3a11ad1b8e643dc23eb37ebe72867f62e29940821d49052c0",
+          "bytes": 854
+        },
+        "iec104-command-context/answers/mismatch-oa.json": {
+          "sha256": "68b1c9430321857d88722918a9d2903739bd76dd9908e05bf5ca99ed84547a03",
+          "bytes": 5720
+        },
+        "iec104-command-context/captures/mismatch-oa.pcap": {
+          "sha256": "875715ebd4b4d567d5cb896354dae42aa1338d90c5b6ade0f6078b402c1665df",
+          "bytes": 940
+        },
+        "iec104-command-context/answers/mismatch-test.json": {
+          "sha256": "4be54d0368648083ea191be2c8910f7427d4899d91ba1544c24d909a119c842c",
+          "bytes": 5719
+        },
+        "iec104-command-context/captures/mismatch-test.pcap": {
+          "sha256": "ca5d2ee1b8cfddda19216e551d52dbc2f896a5c63679676bd60da14a8a00d258",
+          "bytes": 940
+        },
+        "iec104-command-context/answers/mismatch-qualifier.json": {
+          "sha256": "a07226c3b74deae4e47b100385e7767a42242ef314fe98ad6a9fb2928f9f1d10",
+          "bytes": 5720
+        },
+        "iec104-command-context/captures/mismatch-qualifier.pcap": {
+          "sha256": "b1ad6dbb6b4a60efe0e7f0abb8d391e3d28e62b7b7749c3763b0b7ea07592207",
+          "bytes": 940
+        },
+        "iec104-command-context/answers/mismatch-common.json": {
+          "sha256": "e8124a8567bd98b9c2cf196ef32b14626579dabd87b75f732fec98d3052d90b0",
+          "bytes": 5720
+        },
+        "iec104-command-context/captures/mismatch-common.pcap": {
+          "sha256": "622dbe5e48bb7ea7b6bdd927dea5db9e54f863fb69a96a0beab46e6ca5fb79c0",
+          "bytes": 940
+        },
+        "iec104-command-context/answers/mismatch-ioa.json": {
+          "sha256": "3d28fba36aff7c2cbce6e3e344add2acbed52b2f3924194a0687271b865ebc59",
+          "bytes": 5720
+        },
+        "iec104-command-context/captures/mismatch-ioa.pcap": {
+          "sha256": "42b011174a48516dfa70529df469dde5bdad91dfc72f54fbaf682328c03adbd4",
+          "bytes": 940
+        },
+        "iec104-command-context/answers/mismatch-phase.json": {
+          "sha256": "628aa1778777f799e7cf2ead047efada73e01b1dd085da2f397bcb06a53c64f2",
+          "bytes": 5720
+        },
+        "iec104-command-context/captures/mismatch-phase.pcap": {
+          "sha256": "33e0e80771fbddd4209542c64746455d4ecbf0952638e3310cc19b868c7e4b42",
+          "bytes": 940
+        },
+        "iec104-command-context/answers/control-mismatch-value.json": {
+          "sha256": "4b7c29809f957ca8be7efb6cc2afa460c37e1aa2be20b3c3ffb3c6e28dfb880f",
+          "bytes": 5944
+        },
+        "iec104-command-context/captures/control-mismatch-value.pcap": {
+          "sha256": "89b525302c1a0815f8df0315f269b2c3ee1b3300d1c62e63c849d72c4859b40e",
+          "bytes": 940
+        },
+        "iec104-command-context/answers/control-mismatch-select.json": {
+          "sha256": "251f252c37a7623362a343af80e31adf6de9ef254850e05b02695916f3359f50",
+          "bytes": 5941
+        },
+        "iec104-command-context/captures/control-mismatch-select.pcap": {
+          "sha256": "417c7ab64c85e18290e533df0a3b360cd33dff0433a3cbf958af39c590d66b19",
+          "bytes": 940
+        },
+        "iec104-command-context/answers/control-mismatch-qualifier.json": {
+          "sha256": "6e6ee891d13b822ff7c5dcdb85422cf3ed9c9c3b70900ed83a63e96f5db9ac90",
+          "bytes": 5944
+        },
+        "iec104-command-context/captures/control-mismatch-qualifier.pcap": {
+          "sha256": "df2e1c599ab59b81b0c69f30d8294b9f4231ca8c1cd60adb1d9343fe9510041d",
+          "bytes": 940
+        },
+        "iec104-command-context/answers/interleaved-originators.json": {
+          "sha256": "ff5112980c3381aa76b832452abc9b2cef2f259b39659ae69b39e0ffafffaebc",
+          "bytes": 8005
+        },
+        "iec104-command-context/captures/interleaved-originators.pcap": {
+          "sha256": "5985214ded0ce853513fb1f219a41145a44a391af72ba6a651d6b4ab0fea634d",
+          "bytes": 1112
+        },
+        "iec104-command-context/answers/activation-and-deactivation.json": {
+          "sha256": "e912b46c04eeedd2448a57f3d9c506092af5115aba62a91c2f456b311c9ebb19",
+          "bytes": 6848
+        },
+        "iec104-command-context/captures/activation-and-deactivation.pcap": {
+          "sha256": "325b3701b8b98b48053014f6be9dad54bcec32c2cb98a8b9248e61e1f3579bdf",
+          "bytes": 1026
+        },
+        "iec104-command-context/answers/negative-confirmation-retires.json": {
+          "sha256": "3c4f1779ed60cfd71d3ba2a904a748a843daacd4d6ad986685e2a4fddf277777",
+          "bytes": 4564
+        },
+        "iec104-command-context/captures/negative-confirmation-retires.pcap": {
+          "sha256": "a40587fe5e38a32e18c23c84974472d0981a13f63c9a1c68cd585d8a6cabcdb9",
+          "bytes": 854
+        },
+        "iec104-command-context/answers/opposite-direction.json": {
+          "sha256": "a487bc4f36556fc95d7a99dced7d7b430fef49868bf7573a4ae632cf2cfff20d",
+          "bytes": 8005
+        },
+        "iec104-command-context/captures/opposite-direction.pcap": {
+          "sha256": "eddbec02feeff3e92ee95ce8a2d73844de728f0e31dabe4ae618bd8f13830e46",
+          "bytes": 1112
+        },
+        "iec104-command-context/manifest.json": {
+          "sha256": "811054f54db24ba98154e3f54e3964b6166d709208630d751896403d4ba432d9",
+          "bytes": 6644
+        },
+        "iec104-command-context/generate.py": {
+          "sha256": "edf612885df1de94c62e2d05d9e09fd4866c7837aab4bd80da8095896f9b5828",
+          "bytes": 6214
+        },
+        "iec104-command-context/verify.py": {
+          "sha256": "d7bf5c08f14ac55fa53bf28c2258aaa2db36a23c29e566766b8003ae2cf27a53",
+          "bytes": 1619
+        },
+        "iec104-command-context/MODEL-PINS.json": {
+          "sha256": "82b9976288a012e21206f13c59d584bac05814fc7a6020c550cf06bc281104d9",
+          "bytes": 482
+        },
+        "iec104-command-context/SOURCE-PINS.json": {
+          "sha256": "8c0674d6934a60853eaf2bbca0c9f503760dfae0d797046b8a61b85b730bb8fb",
+          "bytes": 1154
+        },
+        "iec104-command-context/seal.py": {
+          "sha256": "0b519651ccfd4950ab87b6144805a99560e89a56bcb83e5a1b151b11a20f8a25",
+          "bytes": 3922
+        },
+        "iec104-command-context/REFERENCE-ACTUAL.json": {
+          "sha256": "687bcbba05814e8e72dd45e29d3703c7c811e0c76173747dd46f2f079fc3d0b3",
+          "bytes": 23740
+        },
+        "iec104-command-context/reference.py": {
+          "sha256": "0e7ab7ce2747e26a8450f2b94d3e25b44c11bc8bd0cbf828e22a16af02cc3605",
+          "bytes": 1930
+        },
+        "required-tests-traffic-unified-v48.json": {
+          "sha256": "9b6cd288d8f0e20357b509fd3f53b71eaa1b1f8676469667479812806ae318f2",
+          "bytes": 9484170
+        },
+        "validation/expected.json": {
+          "sha256": "cdff575b9f2e15229deec9951588b599b1350cd0c5126b8b39f462ba267a931a",
+          "bytes": 21963
+        }
+      },
+      "aliases": {
+        "common/pcapx/pcaputil/iec104-command-context/answers/normal-oa0-test0.json": "iec104-command-context/answers/normal-oa0-test0.json",
+        "common/pcapx/pcaputil/iec104-command-context/captures/normal-oa0-test0.pcap": "iec104-command-context/captures/normal-oa0-test0.pcap",
+        "common/pcapx/pcaputil/iec104-command-context/answers/normal-oa0-test1.json": "iec104-command-context/answers/normal-oa0-test1.json",
+        "common/pcapx/pcaputil/iec104-command-context/captures/normal-oa0-test1.pcap": "iec104-command-context/captures/normal-oa0-test1.pcap",
+        "common/pcapx/pcaputil/iec104-command-context/answers/normal-oa1-test0.json": "iec104-command-context/answers/normal-oa1-test0.json",
+        "common/pcapx/pcaputil/iec104-command-context/captures/normal-oa1-test0.pcap": "iec104-command-context/captures/normal-oa1-test0.pcap",
+        "common/pcapx/pcaputil/iec104-command-context/answers/normal-oa1-test1.json": "iec104-command-context/answers/normal-oa1-test1.json",
+        "common/pcapx/pcaputil/iec104-command-context/captures/normal-oa1-test1.pcap": "iec104-command-context/captures/normal-oa1-test1.pcap",
+        "common/pcapx/pcaputil/iec104-command-context/answers/normal-oa255-test0.json": "iec104-command-context/answers/normal-oa255-test0.json",
+        "common/pcapx/pcaputil/iec104-command-context/captures/normal-oa255-test0.pcap": "iec104-command-context/captures/normal-oa255-test0.pcap",
+        "common/pcapx/pcaputil/iec104-command-context/answers/normal-oa255-test1.json": "iec104-command-context/answers/normal-oa255-test1.json",
+        "common/pcapx/pcaputil/iec104-command-context/captures/normal-oa255-test1.pcap": "iec104-command-context/captures/normal-oa255-test1.pcap",
+        "common/pcapx/pcaputil/iec104-command-context/answers/mismatch-oa.json": "iec104-command-context/answers/mismatch-oa.json",
+        "common/pcapx/pcaputil/iec104-command-context/captures/mismatch-oa.pcap": "iec104-command-context/captures/mismatch-oa.pcap",
+        "common/pcapx/pcaputil/iec104-command-context/answers/mismatch-test.json": "iec104-command-context/answers/mismatch-test.json",
+        "common/pcapx/pcaputil/iec104-command-context/captures/mismatch-test.pcap": "iec104-command-context/captures/mismatch-test.pcap",
+        "common/pcapx/pcaputil/iec104-command-context/answers/mismatch-qualifier.json": "iec104-command-context/answers/mismatch-qualifier.json",
+        "common/pcapx/pcaputil/iec104-command-context/captures/mismatch-qualifier.pcap": "iec104-command-context/captures/mismatch-qualifier.pcap",
+        "common/pcapx/pcaputil/iec104-command-context/answers/mismatch-common.json": "iec104-command-context/answers/mismatch-common.json",
+        "common/pcapx/pcaputil/iec104-command-context/captures/mismatch-common.pcap": "iec104-command-context/captures/mismatch-common.pcap",
+        "common/pcapx/pcaputil/iec104-command-context/answers/mismatch-ioa.json": "iec104-command-context/answers/mismatch-ioa.json",
+        "common/pcapx/pcaputil/iec104-command-context/captures/mismatch-ioa.pcap": "iec104-command-context/captures/mismatch-ioa.pcap",
+        "common/pcapx/pcaputil/iec104-command-context/answers/mismatch-phase.json": "iec104-command-context/answers/mismatch-phase.json",
+        "common/pcapx/pcaputil/iec104-command-context/captures/mismatch-phase.pcap": "iec104-command-context/captures/mismatch-phase.pcap",
+        "common/pcapx/pcaputil/iec104-command-context/answers/control-mismatch-value.json": "iec104-command-context/answers/control-mismatch-value.json",
+        "common/pcapx/pcaputil/iec104-command-context/captures/control-mismatch-value.pcap": "iec104-command-context/captures/control-mismatch-value.pcap",
+        "common/pcapx/pcaputil/iec104-command-context/answers/control-mismatch-select.json": "iec104-command-context/answers/control-mismatch-select.json",
+        "common/pcapx/pcaputil/iec104-command-context/captures/control-mismatch-select.pcap": "iec104-command-context/captures/control-mismatch-select.pcap",
+        "common/pcapx/pcaputil/iec104-command-context/answers/control-mismatch-qualifier.json": "iec104-command-context/answers/control-mismatch-qualifier.json",
+        "common/pcapx/pcaputil/iec104-command-context/captures/control-mismatch-qualifier.pcap": "iec104-command-context/captures/control-mismatch-qualifier.pcap",
+        "common/pcapx/pcaputil/iec104-command-context/answers/interleaved-originators.json": "iec104-command-context/answers/interleaved-originators.json",
+        "common/pcapx/pcaputil/iec104-command-context/captures/interleaved-originators.pcap": "iec104-command-context/captures/interleaved-originators.pcap",
+        "common/pcapx/pcaputil/iec104-command-context/answers/activation-and-deactivation.json": "iec104-command-context/answers/activation-and-deactivation.json",
+        "common/pcapx/pcaputil/iec104-command-context/captures/activation-and-deactivation.pcap": "iec104-command-context/captures/activation-and-deactivation.pcap",
+        "common/pcapx/pcaputil/iec104-command-context/answers/negative-confirmation-retires.json": "iec104-command-context/answers/negative-confirmation-retires.json",
+        "common/pcapx/pcaputil/iec104-command-context/captures/negative-confirmation-retires.pcap": "iec104-command-context/captures/negative-confirmation-retires.pcap",
+        "common/pcapx/pcaputil/iec104-command-context/answers/opposite-direction.json": "iec104-command-context/answers/opposite-direction.json",
+        "common/pcapx/pcaputil/iec104-command-context/captures/opposite-direction.pcap": "iec104-command-context/captures/opposite-direction.pcap",
+        "common/pcapx/pcaputil/iec104-command-context/manifest.json": "iec104-command-context/manifest.json",
+        "common/pcapx/pcaputil/iec104-command-context/generate.py": "iec104-command-context/generate.py",
+        "common/pcapx/pcaputil/iec104-command-context/verify.py": "iec104-command-context/verify.py",
+        "common/pcapx/pcaputil/iec104-command-context/MODEL-PINS.json": "iec104-command-context/MODEL-PINS.json",
+        "common/pcapx/pcaputil/iec104-command-context/SOURCE-PINS.json": "iec104-command-context/SOURCE-PINS.json",
+        "common/pcapx/pcaputil/iec104-command-context/seal.py": "iec104-command-context/seal.py",
+        "common/pcapx/pcaputil/iec104-command-context/REFERENCE-ACTUAL.json": "iec104-command-context/REFERENCE-ACTUAL.json",
+        "common/pcapx/pcaputil/iec104-command-context/reference.py": "iec104-command-context/reference.py",
+        "scripts/protocol-tests/required-tests-traffic-unified-v48.json": "required-tests-traffic-unified-v48.json"
+      }
     }
   ],
   "schema_version": 1,
