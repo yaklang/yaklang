@@ -584,6 +584,10 @@ func (a *binParser) datagramFields(network gopacket.NetworkLayer, udp *layers.UD
 			a.emit(e)
 			return
 		}
+		if a.refuseBACnetReadTruncated(e, wire, uint16(udp.SrcPort), uint16(udp.DstPort)) {
+			a.emit(e)
+			return
+		}
 		e.Status, e.Summary = "incomplete", "truncated or invalid UDP datagram"
 		a.incomplete.Add(1)
 	} else if len(wire) > a.config.MaxMessageBytes {
@@ -607,7 +611,7 @@ func (a *binParser) datagramFields(network gopacket.NetworkLayer, udp *layers.UD
 			a.emit(e)
 			return
 		}
-		if a.refuseUDPOversizeAssociation(e, wire, uint16(udp.SrcPort), uint16(udp.DstPort)) || a.refusePFCPOversize(e, wire, uint16(udp.SrcPort), uint16(udp.DstPort)) || a.refuseSemtechDownlinkOversize(e, wire, uint16(udp.SrcPort), uint16(udp.DstPort)) {
+		if a.refuseBACnetReadOversize(e, wire, uint16(udp.SrcPort), uint16(udp.DstPort)) || a.refuseUDPOversizeAssociation(e, wire, uint16(udp.SrcPort), uint16(udp.DstPort)) || a.refusePFCPOversize(e, wire, uint16(udp.SrcPort), uint16(udp.DstPort)) || a.refuseSemtechDownlinkOversize(e, wire, uint16(udp.SrcPort), uint16(udp.DstPort)) {
 			a.emit(e)
 			return
 		}

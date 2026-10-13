@@ -19,6 +19,7 @@ type ProtocolEvent struct {
 	nativeOPCUAObservation                   bool
 	nativeMMSObservation                     bool
 	nativeUnrecognizedUDP                    bool
+	nativeBACnetRead                         bool
 	Admission                                string
 	semanticFields                           map[string]any
 	semanticSession                          map[string]any
@@ -241,6 +242,9 @@ func (e *ProtocolEvent) retainRuleEnvelope(result map[string]any) {
 }
 
 func (e *ProtocolEvent) ownsNativeFields() bool {
+	if e.nativeBACnetRead {
+		return true
+	}
 	if e.nativeUnrecognizedUDP {
 		return true
 	}
@@ -459,6 +463,8 @@ type binParser struct {
 	pfcpSessionIdentity                                                        *pfcpSessionIdentity
 	semtechDisabled                                                            bool               // udpMu; bounded opt-in correlation fails closed after global state exhaustion
 	semtechSessions                                                            *binUDPStore       // udpMu; token quarantine must survive unrelated UDP expiry
+	bacnetReadDisabled                                                         bool               // udpMu; lost invoke history cannot establish a new generation
+	bacnetReadSessions                                                         *binUDPStore       // udpMu; bounded capture-lifetime invoke quarantine
 	aisMultipart                                                               *aisMultipartStore // udpMu; directed, capture-domain fragment history
 	rtpsFragments                                                              *rtpsFragmentStore // udpMu; directed domain/sample history
 	rtpsShapeFragments                                                         *rtpsFragmentStore // udpMu; separately selected application sample history
@@ -713,6 +719,7 @@ type binFlow struct {
 	bsap              *binBSAP
 	pfcp              *binPFCP
 	semtech           *binSemtechDownlink
+	bacnetRead        *binBACnetRead
 	slmp              *binSLMP
 	slmpTCP           *binSLMPTCP
 	wrapper           *binDLMSWrapper

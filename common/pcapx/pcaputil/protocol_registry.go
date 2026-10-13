@@ -11,6 +11,7 @@ type ProtocolProfile struct{ Protocol, Transport, Framing, Context string }
 
 func NativeProtocolProfiles() []ProtocolProfile {
 	return []ProtocolProfile{
+		{"bacnet-read-property", "explicit-udp", "BACnet/IP original unicast, NPDUv1 unsegmented ReadProperty", "bounded request/ComplexACK primitive application values and Error/Reject/server Abort; exact object/property/optional index and reversed endpoint/domain/invoke observation, reuse/retry/expiry quarantined; no constructed property schemas, segmentation, routing, client Abort, authentication or device-operation success claim"},
 		{"knx", "udp", "KNXnet/IP v1 basic and selected extended UDP search", "bounded HPAI, basic discovery plus extended SRP1-4 and DIB1/2/6; raw unknown DIBs, per-datagram unverified observations without multicast pairing, filter verification, tunneling, cEMI or secure-session claim"},
 		{"pfcp", "udp", "PFCPv1 Heartbeat, AssociationSetup5/6 Update7/8/Release9/10 and unbundled SessionDeletion54/55 selected core", "TS29.244 v16.12.1, first-wins bounded IEs and exact selected NodeID/FQDN/Cause/features; Heartbeat Recovery is mandatory and Setup Recovery does not drive restart; shared originating-endpoint sequence namespace across peer/message kinds, exact response-type/endpoint/domain observation, ambiguity quarantine and erroneous supported reply retirement; receiver-local uint64 SEIDs, Cause2/AURI follow-on-report claims, priority and ordered raw report groups; optional independent SEID binding on an isolated UDP byte session; observed release flags and graceful timer do not prove authenticated association, live session deletion, negotiated features or restart"},
 		{"c37118-engineering", "tcp/udp", "opt-in v1/v2 CFG-2 or complete/collected CFG-3 DATA conversions", "same native publisher/configuration validation; raw fields preserved; configured phasor/frequency and CFG-3 analog conversion, declared GPA status bits and digital masks; CFG-2 integer analog convention requires independent context; no authenticated source, physical quality or inferred digital-label bit association"},
@@ -85,7 +86,7 @@ func WithProtocolDecodeAs(transport string, port uint16, protocol string) Captur
 			return fmt.Errorf("DecodeAs requires UDP and a nonzero port")
 		}
 		switch protocol {
-		case "dns", "mdns", "llmnr", "dhcp", "dhcpv6", "syslog", "snmp", "mqtt-sn", "bittorrent-dht", "bjnp", "rtp", "sip", "stun", "turn", "dtls", "mavlink", "nmea", "nmea-ais-multipart", "semtech-udp", "semtech-downlink-session", "rtps", "rtps-control", "rtps-wire", "rtps13-wire", "rtps13-parameters", "rtps20-rti-filter", "rtps-shape-fragments", "rtps-spdp-fragments", "bsap", "slmp", "dlms", "opendroneid", "opendroneid-system", "opendroneid-identity", "opendroneid-auth-pages", "c37118", "c37118-engineering", "knx", "pfcp", "dlms-wrapper", "doip":
+		case "bacnet-read-property", "dns", "mdns", "llmnr", "dhcp", "dhcpv6", "syslog", "snmp", "mqtt-sn", "bittorrent-dht", "bjnp", "rtp", "sip", "stun", "turn", "dtls", "mavlink", "nmea", "nmea-ais-multipart", "semtech-udp", "semtech-downlink-session", "rtps", "rtps-control", "rtps-wire", "rtps13-wire", "rtps13-parameters", "rtps20-rti-filter", "rtps-shape-fragments", "rtps-spdp-fragments", "bsap", "slmp", "dlms", "opendroneid", "opendroneid-system", "opendroneid-identity", "opendroneid-auth-pages", "c37118", "c37118-engineering", "knx", "pfcp", "dlms-wrapper", "doip":
 		default:
 			return fmt.Errorf("unsupported native DecodeAs profile")
 		}
@@ -157,6 +158,9 @@ func (a *binParser) decodeNativeDatagram(e *ProtocolEvent, w []byte, src, dst ui
 	}
 	if explicit == "semtech-downlink-session" {
 		return a.decodeSemtechCorrelatedDatagram(e, w)
+	}
+	if explicit == "bacnet-read-property" {
+		return a.decodeBACnetReadDatagram(e, w)
 	}
 	if explicit == "rtps20-rti-filter" {
 		return a.decodeRTPS20RTIFilterInput(e, w, nil)

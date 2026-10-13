@@ -80386,6 +80386,482 @@
         "common/pcapx/pcaputil/bacnet-npdu-boundary/REFERENCE-NPDU-ACTUAL.json": "bacnet-npdu-boundary/REFERENCE-NPDU-ACTUAL.json",
         "scripts/protocol-tests/required-tests-traffic-unified-v62.json": "required-tests-traffic-unified-v62.json"
       }
+    },
+    {
+      "id": "validation-bacnet-read-property",
+      "kind": "validation",
+      "source_sha": "2388f2cf1e00dc5ecb54b2e0bd2608b3f962d6f7",
+      "file": "validation-bacnet-read-property.zip",
+      "sha256": "f7f8cbef96e48592b479040bb89d6137cf2aa324fd48e9f5a82a4f9e5a8caec7",
+      "password": "bin-parser",
+      "members": {
+        "bacnet-read-property/captures/null.pcap": {
+          "sha256": "6d2c027478f4539ff9932157143a24ab9ef84fdd2d06f3acb7c652dd75f2bff3",
+          "bytes": 176
+        },
+        "bacnet-read-property/answers/null.json": {
+          "sha256": "42973fdcc80a38382722cdc6b3aa1de8bf1f8ae4b8a7a9e910b136555c23b9ee",
+          "bytes": 3880
+        },
+        "bacnet-read-property/captures/boolean-false.pcap": {
+          "sha256": "4743d60c8992c3ce6e2eb5a3d577550139b91a5d472f823293e837dadabcdb99",
+          "bytes": 176
+        },
+        "bacnet-read-property/answers/boolean-false.json": {
+          "sha256": "c2d72a27476cd2dd034ac68c6927e8af91521f41f780543e47d4afd669db78b5",
+          "bytes": 3888
+        },
+        "bacnet-read-property/captures/boolean-true.pcap": {
+          "sha256": "79aed335b659805bffd1997feaf6e6723c621e9e429436b921fea0e470f6f123",
+          "bytes": 176
+        },
+        "bacnet-read-property/answers/boolean-true.json": {
+          "sha256": "8fb75394586f3b4d0b9ae893e654c80370018262c8b29840119004b6ccf8ddcc",
+          "bytes": 3886
+        },
+        "bacnet-read-property/captures/unsigned64.pcap": {
+          "sha256": "ff355646549675655558e1046c547058a1f596fdf30aa19707158f539f477355",
+          "bytes": 185
+        },
+        "bacnet-read-property/answers/unsigned64.json": {
+          "sha256": "bdb36e93396b549ef0a7ac39acd5272fec2f8df6cc6d963a99a2c0af5b51362e",
+          "bytes": 4010
+        },
+        "bacnet-read-property/captures/signed32.pcap": {
+          "sha256": "ae8b3f21a5a50b0760e37c598e909542eba77525c460cc5d24abee0be85339a0",
+          "bytes": 180
+        },
+        "bacnet-read-property/answers/signed32.json": {
+          "sha256": "64f5f40e43e1ca63487dd8ca17578c6347ca415d84eebacd69964ebc5caffa2b",
+          "bytes": 3930
+        },
+        "bacnet-read-property/captures/real-one.pcap": {
+          "sha256": "8d6390f98760c0241e83cd9a140ae5cbc53df7ff3af77ccaca9cfe329b628803",
+          "bytes": 180
+        },
+        "bacnet-read-property/answers/real-one.json": {
+          "sha256": "f443c888126b71fc45266910977a5047ff57a614ec7ba4b29b448f80b44c69c3",
+          "bytes": 3982
+        },
+        "bacnet-read-property/captures/double-one.pcap": {
+          "sha256": "6ca356d23fb17eacd7b753c8f74f89ef5bc4e863c05c343ee63cc87e54b63eeb",
+          "bytes": 185
+        },
+        "bacnet-read-property/answers/double-one.json": {
+          "sha256": "6d4bb7e50c000c8a66290df23bce130f5c9051a1615b6cfbc5d05465b0e00831",
+          "bytes": 4060
+        },
+        "bacnet-read-property/captures/octets.pcap": {
+          "sha256": "060c972d31f0ee5a435c297e7e1b05177075f69daea44ab7e77a8932d5dfcff6",
+          "bytes": 179
+        },
+        "bacnet-read-property/answers/octets.json": {
+          "sha256": "17619a2f36c7319d9374a5dcb754228214dba528466009d4601f9e505001ff2c",
+          "bytes": 3928
+        },
+        "bacnet-read-property/captures/characters.pcap": {
+          "sha256": "0a177fa72acaac6bd6aadf952e3b0aea683cfa8212ab921ac568579059451501",
+          "bytes": 179
+        },
+        "bacnet-read-property/answers/characters.json": {
+          "sha256": "62cd9f0110b97a772df600139d0cc81be38ee4475c9b86ab21fdd2ecc6d957e9",
+          "bytes": 3990
+        },
+        "bacnet-read-property/captures/bits.pcap": {
+          "sha256": "15c3af8cc016189766677c5202447ec2a05a0500c39c613d0f42a8df06817247",
+          "bytes": 178
+        },
+        "bacnet-read-property/answers/bits.json": {
+          "sha256": "8db396c0308d55f3fa6487b264b9e2d8cec885366dc28b727ebb43645ad893cc",
+          "bytes": 4014
+        },
+        "bacnet-read-property/captures/enumerated.pcap": {
+          "sha256": "676d3dddafd928694e133cbf07ef4952c632554e91d0168d71ea34e9cd3ed84d",
+          "bytes": 178
+        },
+        "bacnet-read-property/answers/enumerated.json": {
+          "sha256": "871217c8a38895961a15ef83292228a065c643758a03b6addaa2c9392581de0d",
+          "bytes": 3894
+        },
+        "bacnet-read-property/captures/date-special.pcap": {
+          "sha256": "5df3505e10f52c3a2711ff4b7346057b0e200425abee4d7ae26f5c794a20bec2",
+          "bytes": 180
+        },
+        "bacnet-read-property/answers/date-special.json": {
+          "sha256": "aebcb0d890171498f58b923efde35bd4b08e70add15df86507cc37e8cfd09a4b",
+          "bytes": 3924
+        },
+        "bacnet-read-property/captures/time-wildcards.pcap": {
+          "sha256": "294f0910516f4ff6834a80bb05f2d3c48967ef3d94972ff79a551d7b77e5276c",
+          "bytes": 180
+        },
+        "bacnet-read-property/answers/time-wildcards.json": {
+          "sha256": "360b4468e802f298d73554933749e12c2c8fce85aa7d6d81b190986ca5f2b21d",
+          "bytes": 3924
+        },
+        "bacnet-read-property/captures/object.pcap": {
+          "sha256": "63b1b884e775c1acbf760d744fa76ff6e07f1918add943da3e77863c6d277949",
+          "bytes": 180
+        },
+        "bacnet-read-property/answers/object.json": {
+          "sha256": "c5b09b5dd6682cd42f7ca31b3cee371992aa2ce9148f41911fabebd86ba92d7e",
+          "bytes": 4010
+        },
+        "bacnet-read-property/captures/real-80000000.pcap": {
+          "sha256": "e896914c637f9b92e1302df4a05995bb525751d43f4ba4af4684d763a460bee6",
+          "bytes": 180
+        },
+        "bacnet-read-property/answers/real-80000000.json": {
+          "sha256": "e0f807cfc7074fc27d36adad928d856be1d8eec12765facee5363ce26ee23e58",
+          "bytes": 3984
+        },
+        "bacnet-read-property/captures/real-00000001.pcap": {
+          "sha256": "00cb29b90e2a199a035b96a7b0a21a5ef92184010c9fc48830ced2fab6ff340e",
+          "bytes": 180
+        },
+        "bacnet-read-property/answers/real-00000001.json": {
+          "sha256": "8def3a34c09a117e0d8b3e109f1acdb5d32f7bc631de73b8ddac8c906b01a209",
+          "bytes": 4018
+        },
+        "bacnet-read-property/captures/real-7f800000.pcap": {
+          "sha256": "468dd15d2b3aa8ae3c8aa0f1d9b3ecb238a803312d2f87e080e1ea64744b368a",
+          "bytes": 180
+        },
+        "bacnet-read-property/answers/real-7f800000.json": {
+          "sha256": "126c6f84e8dde7bfcd55a68be2b5cfb93d2aec38c77e956a6095b7529f2a1ff9",
+          "bytes": 4060
+        },
+        "bacnet-read-property/captures/real-ff800000.pcap": {
+          "sha256": "dde6186d3cefdcdc1e2579d5c8c7c3a834c103da70f8c33e59032dcadc8b52a8",
+          "bytes": 180
+        },
+        "bacnet-read-property/answers/real-ff800000.json": {
+          "sha256": "b4588748004a3a33058414f1a8837f23649ba531d648eab1c0ef3ae156a6f3e5",
+          "bytes": 4060
+        },
+        "bacnet-read-property/captures/real-7fc12345.pcap": {
+          "sha256": "a2ec8936501877f01c7f8decbdc65b06da52a2b7ebd3223e92d72f75693c8935",
+          "bytes": 180
+        },
+        "bacnet-read-property/answers/real-7fc12345.json": {
+          "sha256": "fd8b974cff1432c494926bf78b12e72644d3088c5e4890c9d50c981561bd170c",
+          "bytes": 4048
+        },
+        "bacnet-read-property/captures/double-8000000000000000.pcap": {
+          "sha256": "d2090b5a29e7c79984b630e320eea08a8f4cb3bf7d8411182ace52470d083762",
+          "bytes": 185
+        },
+        "bacnet-read-property/answers/double-8000000000000000.json": {
+          "sha256": "6c8fa0c472f7328acfb8bfeb3ff2abc9c0be9639d53319bf7fd03100f39a9de8",
+          "bytes": 4062
+        },
+        "bacnet-read-property/captures/double-0000000000000001.pcap": {
+          "sha256": "aeea28089c24c3dd8e8d85bcc375d6137347a1bb8162cf58fc77c2e5a83e0f8b",
+          "bytes": 185
+        },
+        "bacnet-read-property/answers/double-0000000000000001.json": {
+          "sha256": "033a73ae367c38d7780d19aae4e1c575279c5b75c56ff8e218ef9bb0fc26dbfa",
+          "bytes": 4066
+        },
+        "bacnet-read-property/captures/double-7ff0000000000000.pcap": {
+          "sha256": "cb018a9c7a8393774c09a7b158516b27fe006499ced5dda9371f56bd5457da3c",
+          "bytes": 185
+        },
+        "bacnet-read-property/answers/double-7ff0000000000000.json": {
+          "sha256": "1169d5e4426f7e1c5dc503f086c862f5ab06eed10964c8eeaab1dded8fec9b8e",
+          "bytes": 4138
+        },
+        "bacnet-read-property/captures/double-fff0000000000000.pcap": {
+          "sha256": "8755a2d678eef8a3d21ca6391c7177758e5bebbc985212767a06fe28f2263ed5",
+          "bytes": 185
+        },
+        "bacnet-read-property/answers/double-fff0000000000000.json": {
+          "sha256": "06755deb5e2eef16b197e52d856be87254cb999e8003d81699743f6259c4d00a",
+          "bytes": 4138
+        },
+        "bacnet-read-property/captures/double-7ff8123456789abc.pcap": {
+          "sha256": "86681b9dc701fed4ce6946bb7c271aaaa00f9d5c3225cf946ee8a1a178857db4",
+          "bytes": 185
+        },
+        "bacnet-read-property/answers/double-7ff8123456789abc.json": {
+          "sha256": "0dae66d79fa22b96f0670d336199247701f599e6a89047c92bada54bfcf8a6df",
+          "bytes": 4126
+        },
+        "bacnet-read-property/captures/ordered-primitives.pcap": {
+          "sha256": "8aa43425345bca9000ef71eb999241470d600bcf58a9f93288851ca700ac5a44",
+          "bytes": 237
+        },
+        "bacnet-read-property/answers/ordered-primitives.json": {
+          "sha256": "a257f7a5e02fa0c80dabdc71315dd447799cd0886d5ddab35c7e011d1d308761",
+          "bytes": 7837
+        },
+        "bacnet-read-property/captures/array-index-0.pcap": {
+          "sha256": "f5ba015c3bc751e55ff4c98c80cfe8e38acae261e5918868955e9122789455d4",
+          "bytes": 186
+        },
+        "bacnet-read-property/answers/array-index-0.json": {
+          "sha256": "02ffc3cc4116e15394d8a821105911bc58318551a8235d5418939c707d45a510",
+          "bytes": 4011
+        },
+        "bacnet-read-property/captures/array-index-4294967295.pcap": {
+          "sha256": "d31493f6c9ce75a2168b0f7634bb7ab49627da2af94061c10d3a70370018518b",
+          "bytes": 186
+        },
+        "bacnet-read-property/answers/array-index-4294967295.json": {
+          "sha256": "959ec944dff83e737998fe460b1b036c349a51edba492899925509df65c4e92f",
+          "bytes": 4047
+        },
+        "bacnet-read-property/captures/extended-context-tags.pcap": {
+          "sha256": "dbe1ab92a4d1fd92949b342128ad4f9e05b9fc7711b8ca18f0898555d3d146de",
+          "bytes": 186
+        },
+        "bacnet-read-property/answers/extended-context-tags.json": {
+          "sha256": "8b06c326a51f64752772fa77ac42199a1859e9a6b1b7457d28ec38d4a5b2baab",
+          "bytes": 4065
+        },
+        "bacnet-read-property/captures/error.pcap": {
+          "sha256": "329c8f83ed595b5776f3cf8e1c787357f3d91599a829226782d68eeed9c4adfd",
+          "bytes": 170
+        },
+        "bacnet-read-property/answers/error.json": {
+          "sha256": "c0852f15cfc5c569e59b62f8f525ecb2b99d9eadd092ff720607f3009948dae3",
+          "bytes": 3393
+        },
+        "bacnet-read-property/captures/reject.pcap": {
+          "sha256": "9b17ce2a8567f19b980b64de35ba67d592d553638dc0a4349f7851c002cafa65",
+          "bytes": 166
+        },
+        "bacnet-read-property/answers/reject.json": {
+          "sha256": "9f29883ca18d5cc7d715a607df0e153754fbe6d672e244724e1afe4757972a28",
+          "bytes": 3313
+        },
+        "bacnet-read-property/captures/abort.pcap": {
+          "sha256": "6cdc72bc28b1c1f793487269b6e328346fe4ab6d6d1d145f18f2a19100eb6315",
+          "bytes": 166
+        },
+        "bacnet-read-property/answers/abort.json": {
+          "sha256": "b6ff3719da21098ee519d1f6a722dd9d24867606c1a293ac9ccad4e354f1bfbf",
+          "bytes": 3359
+        },
+        "bacnet-read-property/captures/boolean-lvt.pcap": {
+          "sha256": "1dc5ba3cdc1cf0c4cbe6e628b6567f95355c87d80a094227eb0f55bf1797373e",
+          "bytes": 253
+        },
+        "bacnet-read-property/answers/boolean-lvt.json": {
+          "sha256": "58f8810775cd8db764ef88350bc2fe7411f9b15c3ab91c9e2c760735e85afb4e",
+          "bytes": 2682
+        },
+        "bacnet-read-property/captures/unsigned-zero.pcap": {
+          "sha256": "02fab48c236aac8677f67a4f41885791527fb6e8b6753762f73c8bd8ec929ec5",
+          "bytes": 253
+        },
+        "bacnet-read-property/answers/unsigned-zero.json": {
+          "sha256": "54ac953f433093b96dab8d860cb8465f5a77a3e1d9dccaa8aa26e22d831ffdd9",
+          "bytes": 2715
+        },
+        "bacnet-read-property/captures/real-short.pcap": {
+          "sha256": "69c3a2402ff23eb2fdcce92ee192b5b20c6a6329cb9f01af2bfbb99a7fe72229",
+          "bytes": 256
+        },
+        "bacnet-read-property/answers/real-short.json": {
+          "sha256": "060d41c25e03416d8e508435e23e4ea48315f14e680bbc78802fb306aac30358",
+          "bytes": 2683
+        },
+        "bacnet-read-property/captures/character-no-encoding.pcap": {
+          "sha256": "5f10273bbc21774cf25dd6bc987fa3b2fc353eaac20e52d22a9538b10a0d30ee",
+          "bytes": 253
+        },
+        "bacnet-read-property/answers/character-no-encoding.json": {
+          "sha256": "4c6d8af849702ae27c64b955121727d11f6ed39c4a2f7020db8380368debf318",
+          "bytes": 2691
+        },
+        "bacnet-read-property/captures/bit-padding.pcap": {
+          "sha256": "bde349d5b0df5ea024c3f19321c2fe9cd9320242a364c6f0216cded4dfeccbaa",
+          "bytes": 255
+        },
+        "bacnet-read-property/answers/bit-padding.json": {
+          "sha256": "0198139ada036cf9787849fafe4a356916aac5647f74632d9dfd146eccd92b36",
+          "bytes": 2685
+        },
+        "bacnet-read-property/captures/wrong-closing.pcap": {
+          "sha256": "5c7af53d17f01c6320f848f5a553a265df12a44ca6216882ec2e0ae366545fa7",
+          "bytes": 253
+        },
+        "bacnet-read-property/answers/wrong-closing.json": {
+          "sha256": "9c2df8a4838e6cf72edca2a0c0da7af567c1887ff1ec33ecad1da9a965a386c0",
+          "bytes": 2683
+        },
+        "bacnet-read-property/captures/constructed-value.pcap": {
+          "sha256": "f78d9e798ef49edb210fbf08a7109ada996c5fbdaf56f2f403be4639538d97ac",
+          "bytes": 254
+        },
+        "bacnet-read-property/answers/constructed-value.json": {
+          "sha256": "d7cdfa98cbf083d7245e51d802d35c551e1e09e1f01686b7dd2c565123e0dfbc",
+          "bytes": 2701
+        },
+        "bacnet-read-property/captures/announced-u32-overflow.pcap": {
+          "sha256": "a55ca5de37112ab21d2025e35f6ddb4592839e782eedf3d39628be8f606ca8c2",
+          "bytes": 259
+        },
+        "bacnet-read-property/answers/announced-u32-overflow.json": {
+          "sha256": "f1a3c5ab888a0a5cb1eb7bc04ce55be4e393e6dd80345f5d3a1ddffd3b6e34a7",
+          "bytes": 2695
+        },
+        "bacnet-read-property/captures/retry.pcap": {
+          "sha256": "772859c4d19c181cd9cce8fa86fbf3b5a0491c27155bfbe78b8b52dd875f17ac",
+          "bytes": 251
+        },
+        "bacnet-read-property/answers/retry.json": {
+          "sha256": "c8845a3d0668759a22432b55851f60b54a9f1b5434be6f1cdebcf3177a739277",
+          "bytes": 2640
+        },
+        "bacnet-read-property/captures/orphan.pcap": {
+          "sha256": "bf910c84e136dc1b7d99dcd0869fad008096c19c58c06ff8a427bb9562a2aa28",
+          "bytes": 101
+        },
+        "bacnet-read-property/answers/orphan.json": {
+          "sha256": "5d13de6443a808ce7311592632685997c558b31c0593f80b8cb804fbc0f531c0",
+          "bytes": 513
+        },
+        "bacnet-read-property/manifest.json": {
+          "sha256": "36fbc0602f9aae7f3cd8cdeac6646f5425c27ccad4a8198d3f830a7a8ee71316",
+          "bytes": 13552
+        },
+        "bacnet-read-property/generate.py": {
+          "sha256": "0b0e77ae0ddf8478f2e3dc8337977c25bc07f8162dcb1672e75b39634a451fe4",
+          "bytes": 8989
+        },
+        "bacnet-read-property/verify.py": {
+          "sha256": "845ddfa6dc5ce21fabb2165f6d5d39bff60bfd195fdfd359bb45a9133b370770",
+          "bytes": 708
+        },
+        "bacnet-read-property/MODEL-PINS.json": {
+          "sha256": "03903577494a705ac68025f9c7363d9b526e6efed57e20946925a88f3de79cb1",
+          "bytes": 1103
+        },
+        "bacnet-read-property/SOURCE-PINS.json": {
+          "sha256": "f81b5c78ed3cc345be6a7bf2a75d27481054e232aa63f28fce4d142c7563a3a0",
+          "bytes": 2165
+        },
+        "bacnet-read-property/reference.py": {
+          "sha256": "5a7fd25da3bf10ec87369683f707053babc559608b026d330ad98682b9d14a3a",
+          "bytes": 3670
+        },
+        "bacnet-read-property/REFERENCE-ACTUAL.json": {
+          "sha256": "0e6b8d3a7cf8ea57d5e0311891e6a16ec3d2d66f8af73a6c508eeb4a7ac25f66",
+          "bytes": 6914
+        },
+        "bacnet-read-property/reference_codec.py": {
+          "sha256": "7bfab1e139b78ede418f1bf8dbcfeedbe045445b6bc3ff2764957c314b0ecc9e",
+          "bytes": 4943
+        },
+        "bacnet-read-property/REFERENCE-CODEC-ACTUAL.json": {
+          "sha256": "f93c1127b4ccba72e464734a71d5ecb9efa9418fa1f6cbef99b62d781e42d77c",
+          "bytes": 8684
+        },
+        "required-tests-traffic-unified-v63.json": {
+          "sha256": "4753da74f08b507eb4504e75071cc1f0c9fd0c1cc8211d2fc461225ffb1e3abb",
+          "bytes": 14834664
+        },
+        "validation/expected.json": {
+          "sha256": "77da71a7327323ad9c6b9e8632bdda921cb3d86b01d635a5840d45d26fb3edd7",
+          "bytes": 51072
+        }
+      },
+      "aliases": {
+        "common/pcapx/pcaputil/bacnet-read-property/captures/null.pcap": "bacnet-read-property/captures/null.pcap",
+        "common/pcapx/pcaputil/bacnet-read-property/answers/null.json": "bacnet-read-property/answers/null.json",
+        "common/pcapx/pcaputil/bacnet-read-property/captures/boolean-false.pcap": "bacnet-read-property/captures/boolean-false.pcap",
+        "common/pcapx/pcaputil/bacnet-read-property/answers/boolean-false.json": "bacnet-read-property/answers/boolean-false.json",
+        "common/pcapx/pcaputil/bacnet-read-property/captures/boolean-true.pcap": "bacnet-read-property/captures/boolean-true.pcap",
+        "common/pcapx/pcaputil/bacnet-read-property/answers/boolean-true.json": "bacnet-read-property/answers/boolean-true.json",
+        "common/pcapx/pcaputil/bacnet-read-property/captures/unsigned64.pcap": "bacnet-read-property/captures/unsigned64.pcap",
+        "common/pcapx/pcaputil/bacnet-read-property/answers/unsigned64.json": "bacnet-read-property/answers/unsigned64.json",
+        "common/pcapx/pcaputil/bacnet-read-property/captures/signed32.pcap": "bacnet-read-property/captures/signed32.pcap",
+        "common/pcapx/pcaputil/bacnet-read-property/answers/signed32.json": "bacnet-read-property/answers/signed32.json",
+        "common/pcapx/pcaputil/bacnet-read-property/captures/real-one.pcap": "bacnet-read-property/captures/real-one.pcap",
+        "common/pcapx/pcaputil/bacnet-read-property/answers/real-one.json": "bacnet-read-property/answers/real-one.json",
+        "common/pcapx/pcaputil/bacnet-read-property/captures/double-one.pcap": "bacnet-read-property/captures/double-one.pcap",
+        "common/pcapx/pcaputil/bacnet-read-property/answers/double-one.json": "bacnet-read-property/answers/double-one.json",
+        "common/pcapx/pcaputil/bacnet-read-property/captures/octets.pcap": "bacnet-read-property/captures/octets.pcap",
+        "common/pcapx/pcaputil/bacnet-read-property/answers/octets.json": "bacnet-read-property/answers/octets.json",
+        "common/pcapx/pcaputil/bacnet-read-property/captures/characters.pcap": "bacnet-read-property/captures/characters.pcap",
+        "common/pcapx/pcaputil/bacnet-read-property/answers/characters.json": "bacnet-read-property/answers/characters.json",
+        "common/pcapx/pcaputil/bacnet-read-property/captures/bits.pcap": "bacnet-read-property/captures/bits.pcap",
+        "common/pcapx/pcaputil/bacnet-read-property/answers/bits.json": "bacnet-read-property/answers/bits.json",
+        "common/pcapx/pcaputil/bacnet-read-property/captures/enumerated.pcap": "bacnet-read-property/captures/enumerated.pcap",
+        "common/pcapx/pcaputil/bacnet-read-property/answers/enumerated.json": "bacnet-read-property/answers/enumerated.json",
+        "common/pcapx/pcaputil/bacnet-read-property/captures/date-special.pcap": "bacnet-read-property/captures/date-special.pcap",
+        "common/pcapx/pcaputil/bacnet-read-property/answers/date-special.json": "bacnet-read-property/answers/date-special.json",
+        "common/pcapx/pcaputil/bacnet-read-property/captures/time-wildcards.pcap": "bacnet-read-property/captures/time-wildcards.pcap",
+        "common/pcapx/pcaputil/bacnet-read-property/answers/time-wildcards.json": "bacnet-read-property/answers/time-wildcards.json",
+        "common/pcapx/pcaputil/bacnet-read-property/captures/object.pcap": "bacnet-read-property/captures/object.pcap",
+        "common/pcapx/pcaputil/bacnet-read-property/answers/object.json": "bacnet-read-property/answers/object.json",
+        "common/pcapx/pcaputil/bacnet-read-property/captures/real-80000000.pcap": "bacnet-read-property/captures/real-80000000.pcap",
+        "common/pcapx/pcaputil/bacnet-read-property/answers/real-80000000.json": "bacnet-read-property/answers/real-80000000.json",
+        "common/pcapx/pcaputil/bacnet-read-property/captures/real-00000001.pcap": "bacnet-read-property/captures/real-00000001.pcap",
+        "common/pcapx/pcaputil/bacnet-read-property/answers/real-00000001.json": "bacnet-read-property/answers/real-00000001.json",
+        "common/pcapx/pcaputil/bacnet-read-property/captures/real-7f800000.pcap": "bacnet-read-property/captures/real-7f800000.pcap",
+        "common/pcapx/pcaputil/bacnet-read-property/answers/real-7f800000.json": "bacnet-read-property/answers/real-7f800000.json",
+        "common/pcapx/pcaputil/bacnet-read-property/captures/real-ff800000.pcap": "bacnet-read-property/captures/real-ff800000.pcap",
+        "common/pcapx/pcaputil/bacnet-read-property/answers/real-ff800000.json": "bacnet-read-property/answers/real-ff800000.json",
+        "common/pcapx/pcaputil/bacnet-read-property/captures/real-7fc12345.pcap": "bacnet-read-property/captures/real-7fc12345.pcap",
+        "common/pcapx/pcaputil/bacnet-read-property/answers/real-7fc12345.json": "bacnet-read-property/answers/real-7fc12345.json",
+        "common/pcapx/pcaputil/bacnet-read-property/captures/double-8000000000000000.pcap": "bacnet-read-property/captures/double-8000000000000000.pcap",
+        "common/pcapx/pcaputil/bacnet-read-property/answers/double-8000000000000000.json": "bacnet-read-property/answers/double-8000000000000000.json",
+        "common/pcapx/pcaputil/bacnet-read-property/captures/double-0000000000000001.pcap": "bacnet-read-property/captures/double-0000000000000001.pcap",
+        "common/pcapx/pcaputil/bacnet-read-property/answers/double-0000000000000001.json": "bacnet-read-property/answers/double-0000000000000001.json",
+        "common/pcapx/pcaputil/bacnet-read-property/captures/double-7ff0000000000000.pcap": "bacnet-read-property/captures/double-7ff0000000000000.pcap",
+        "common/pcapx/pcaputil/bacnet-read-property/answers/double-7ff0000000000000.json": "bacnet-read-property/answers/double-7ff0000000000000.json",
+        "common/pcapx/pcaputil/bacnet-read-property/captures/double-fff0000000000000.pcap": "bacnet-read-property/captures/double-fff0000000000000.pcap",
+        "common/pcapx/pcaputil/bacnet-read-property/answers/double-fff0000000000000.json": "bacnet-read-property/answers/double-fff0000000000000.json",
+        "common/pcapx/pcaputil/bacnet-read-property/captures/double-7ff8123456789abc.pcap": "bacnet-read-property/captures/double-7ff8123456789abc.pcap",
+        "common/pcapx/pcaputil/bacnet-read-property/answers/double-7ff8123456789abc.json": "bacnet-read-property/answers/double-7ff8123456789abc.json",
+        "common/pcapx/pcaputil/bacnet-read-property/captures/ordered-primitives.pcap": "bacnet-read-property/captures/ordered-primitives.pcap",
+        "common/pcapx/pcaputil/bacnet-read-property/answers/ordered-primitives.json": "bacnet-read-property/answers/ordered-primitives.json",
+        "common/pcapx/pcaputil/bacnet-read-property/captures/array-index-0.pcap": "bacnet-read-property/captures/array-index-0.pcap",
+        "common/pcapx/pcaputil/bacnet-read-property/answers/array-index-0.json": "bacnet-read-property/answers/array-index-0.json",
+        "common/pcapx/pcaputil/bacnet-read-property/captures/array-index-4294967295.pcap": "bacnet-read-property/captures/array-index-4294967295.pcap",
+        "common/pcapx/pcaputil/bacnet-read-property/answers/array-index-4294967295.json": "bacnet-read-property/answers/array-index-4294967295.json",
+        "common/pcapx/pcaputil/bacnet-read-property/captures/extended-context-tags.pcap": "bacnet-read-property/captures/extended-context-tags.pcap",
+        "common/pcapx/pcaputil/bacnet-read-property/answers/extended-context-tags.json": "bacnet-read-property/answers/extended-context-tags.json",
+        "common/pcapx/pcaputil/bacnet-read-property/captures/error.pcap": "bacnet-read-property/captures/error.pcap",
+        "common/pcapx/pcaputil/bacnet-read-property/answers/error.json": "bacnet-read-property/answers/error.json",
+        "common/pcapx/pcaputil/bacnet-read-property/captures/reject.pcap": "bacnet-read-property/captures/reject.pcap",
+        "common/pcapx/pcaputil/bacnet-read-property/answers/reject.json": "bacnet-read-property/answers/reject.json",
+        "common/pcapx/pcaputil/bacnet-read-property/captures/abort.pcap": "bacnet-read-property/captures/abort.pcap",
+        "common/pcapx/pcaputil/bacnet-read-property/answers/abort.json": "bacnet-read-property/answers/abort.json",
+        "common/pcapx/pcaputil/bacnet-read-property/captures/boolean-lvt.pcap": "bacnet-read-property/captures/boolean-lvt.pcap",
+        "common/pcapx/pcaputil/bacnet-read-property/answers/boolean-lvt.json": "bacnet-read-property/answers/boolean-lvt.json",
+        "common/pcapx/pcaputil/bacnet-read-property/captures/unsigned-zero.pcap": "bacnet-read-property/captures/unsigned-zero.pcap",
+        "common/pcapx/pcaputil/bacnet-read-property/answers/unsigned-zero.json": "bacnet-read-property/answers/unsigned-zero.json",
+        "common/pcapx/pcaputil/bacnet-read-property/captures/real-short.pcap": "bacnet-read-property/captures/real-short.pcap",
+        "common/pcapx/pcaputil/bacnet-read-property/answers/real-short.json": "bacnet-read-property/answers/real-short.json",
+        "common/pcapx/pcaputil/bacnet-read-property/captures/character-no-encoding.pcap": "bacnet-read-property/captures/character-no-encoding.pcap",
+        "common/pcapx/pcaputil/bacnet-read-property/answers/character-no-encoding.json": "bacnet-read-property/answers/character-no-encoding.json",
+        "common/pcapx/pcaputil/bacnet-read-property/captures/bit-padding.pcap": "bacnet-read-property/captures/bit-padding.pcap",
+        "common/pcapx/pcaputil/bacnet-read-property/answers/bit-padding.json": "bacnet-read-property/answers/bit-padding.json",
+        "common/pcapx/pcaputil/bacnet-read-property/captures/wrong-closing.pcap": "bacnet-read-property/captures/wrong-closing.pcap",
+        "common/pcapx/pcaputil/bacnet-read-property/answers/wrong-closing.json": "bacnet-read-property/answers/wrong-closing.json",
+        "common/pcapx/pcaputil/bacnet-read-property/captures/constructed-value.pcap": "bacnet-read-property/captures/constructed-value.pcap",
+        "common/pcapx/pcaputil/bacnet-read-property/answers/constructed-value.json": "bacnet-read-property/answers/constructed-value.json",
+        "common/pcapx/pcaputil/bacnet-read-property/captures/announced-u32-overflow.pcap": "bacnet-read-property/captures/announced-u32-overflow.pcap",
+        "common/pcapx/pcaputil/bacnet-read-property/answers/announced-u32-overflow.json": "bacnet-read-property/answers/announced-u32-overflow.json",
+        "common/pcapx/pcaputil/bacnet-read-property/captures/retry.pcap": "bacnet-read-property/captures/retry.pcap",
+        "common/pcapx/pcaputil/bacnet-read-property/answers/retry.json": "bacnet-read-property/answers/retry.json",
+        "common/pcapx/pcaputil/bacnet-read-property/captures/orphan.pcap": "bacnet-read-property/captures/orphan.pcap",
+        "common/pcapx/pcaputil/bacnet-read-property/answers/orphan.json": "bacnet-read-property/answers/orphan.json",
+        "common/pcapx/pcaputil/bacnet-read-property/manifest.json": "bacnet-read-property/manifest.json",
+        "common/pcapx/pcaputil/bacnet-read-property/generate.py": "bacnet-read-property/generate.py",
+        "common/pcapx/pcaputil/bacnet-read-property/verify.py": "bacnet-read-property/verify.py",
+        "common/pcapx/pcaputil/bacnet-read-property/MODEL-PINS.json": "bacnet-read-property/MODEL-PINS.json",
+        "common/pcapx/pcaputil/bacnet-read-property/SOURCE-PINS.json": "bacnet-read-property/SOURCE-PINS.json",
+        "common/pcapx/pcaputil/bacnet-read-property/reference.py": "bacnet-read-property/reference.py",
+        "common/pcapx/pcaputil/bacnet-read-property/REFERENCE-ACTUAL.json": "bacnet-read-property/REFERENCE-ACTUAL.json",
+        "common/pcapx/pcaputil/bacnet-read-property/reference_codec.py": "bacnet-read-property/reference_codec.py",
+        "common/pcapx/pcaputil/bacnet-read-property/REFERENCE-CODEC-ACTUAL.json": "bacnet-read-property/REFERENCE-CODEC-ACTUAL.json",
+        "scripts/protocol-tests/required-tests-traffic-unified-v63.json": "required-tests-traffic-unified-v63.json"
+      }
     }
   ],
   "schema_version": 1,

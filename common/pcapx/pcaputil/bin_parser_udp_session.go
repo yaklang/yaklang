@@ -627,6 +627,13 @@ func (a *binParser) closeUDPSessions() {
 		a.semtechSessions = nil
 	}
 	a.semtechDisabled = false
+	if s := a.bacnetReadSessions; s != nil {
+		for _, el := range s.entries {
+			el.Value.(*binUDPEntry).flow.closeSession()
+		}
+		a.bacnetReadSessions = nil
+	}
+	a.bacnetReadDisabled = false
 	if s := a.udpSessions; s != nil {
 		for _, el := range s.entries {
 			v := el.Value.(*binUDPEntry)

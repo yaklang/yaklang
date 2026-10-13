@@ -1047,6 +1047,7 @@ func (f *binFlow) closeSession() {
 	f.bsap = nil
 	f.pfcp = nil
 	f.semtech = nil
+	f.bacnetRead = nil
 	f.slmp = nil
 	f.slmpTCP = nil
 	f.dlms = nil

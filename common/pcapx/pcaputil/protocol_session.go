@@ -99,10 +99,11 @@ type ProtocolSession interface {
 }
 
 type captureSession struct {
-	f         *binFlow
-	events    []*ProtocolEvent
-	closed    bool
-	transport string
+	f          *binFlow
+	events     []*ProtocolEvent
+	closed     bool
+	transport  string
+	bacnetRead bool
 }
 
 // NewProtocolSession builds an isolated capture flow on the same binFlow
@@ -171,11 +172,28 @@ func NewProtocolSessionWithOptions(budget ParserBudget, options ...ProtocolSessi
 		}
 	}
 	for _, profile := range s.f.a.datagramDecodeAs {
+		if profile == "bacnet-read-property" && s.transport != "udp" {
+			return nil, fmt.Errorf("BACnet ReadProperty observations require UDP")
+		}
 		if (profile == "rtps-control" || profile == "rtps-wire" || profile == "rtps13-wire" || profile == "rtps13-parameters" || profile == "rtps20-rti-filter") && s.transport != "udp" {
 			return nil, fmt.Errorf("RTPS control observation requires a UDP session")
 		}
 		if (profile == "rtps-spdp-fragments" || profile == "rtps-shape-fragments") && s.transport != "udp" {
 			return nil, fmt.Errorf("RTPS fragment observation requires a UDP session")
+		}
+	}
+	if s.bacnetRead {
+		if s.transport != "udp" {
+			return nil, fmt.Errorf("BACnet ReadProperty observations require UDP")
+		}
+		if s.f.a.datagramDecodeAs == nil {
+			s.f.a.datagramDecodeAs = map[uint16]string{}
+		}
+		for _, port := range s.f.ports {
+			if old := s.f.a.datagramDecodeAs[port]; old != "" && old != "bacnet-read-property" {
+				return nil, fmt.Errorf("conflicting BACnet ReadProperty session profile")
+			}
+			s.f.a.datagramDecodeAs[port] = "bacnet-read-property"
 		}
 	}
 	if s.transport == "udp" && (s.f.a.config.DecodeDNP3ReadPoints || s.f.a.config.DecodeDNP3DirectStaticReads || s.f.a.config.DecodeDNP3TypedStaticReads || s.f.a.config.DecodeDNP3CounterPoints || s.f.a.config.DecodeDNP3CounterEvents || s.f.a.config.DecodeDNP3EventCountReads || s.f.a.config.DecodeDNP3StaticStatusPoints || s.f.a.config.DecodeDNP3BinaryEvents || s.f.a.config.DecodeDNP3AnalogEvents) {
