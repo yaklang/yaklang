@@ -18,10 +18,26 @@ import (
 // layers above it.
 type OverlayTreeSource func(layerName string) (fi.FileSystem, error)
 
-// ContentSource loads one file's body by its path in the owning layer's
-// tree. OverlayFS uses it to fill empty stubs on first read and write the
-// body back into that layer's tree (not a wrapper filesystem).
-type ContentSource func(path string) ([]byte, error)
+// LazyBodyTree is a filesystem whose file bodies are filled into a
+// VirtualFS keyed by the caller's view path. Callers (e.g. ssadb) load
+// content and WriteBody into BodyTree(); the tree may start with only a
+// subset of paths (e.g. head diff) and grow as more bodies are cached.
+type LazyBodyTree interface {
+	BodyTree() *VirtualFS
+}
+
+// ContentPathResolver remaps a view path to the path used to load content
+// from storage. Filesystems that do not implement it use the view path as
+// the content path.
+type ContentPathResolver interface {
+	ResolveContentPath(viewPath string) (contentPath string, err error)
+}
+
+// BodyWriter writes a filled body into the lazy view under the writer's
+// own lock (so listings and cache updates stay consistent).
+type BodyWriter interface {
+	WriteBody(viewPath string, data []byte)
+}
 
 // OverlayOption configures an OverlayFS.
 type OverlayOption func(*OverlayFS)
@@ -76,14 +92,6 @@ func WithHeadSeparator(sep rune) OverlayOption {
 	return func(o *OverlayFS) { o.sep = sep }
 }
 
-// WithContentSource supplies the body loader for empty stubs: on first
-// ReadFile of a stub, OverlayFS loads the body and writes it back into the
-// owning layer's tree so repeated reads are memory hits and Stat sizes
-// update. Without a source, stubs stay empty (structure-only trees).
-func WithContentSource(src ContentSource) OverlayOption {
-	return func(o *OverlayFS) { o.readContent = src }
-}
-
 // OverlayFS is a filesystem view over a chain of layers: it merges every
 // layer's entries under one head root (the chain's last layer, 换头),
 // newest layers shadowing older ones on name conflicts, minus files
@@ -97,10 +105,11 @@ func WithContentSource(src ContentSource) OverlayOption {
 //   - ReadDirDiff lists only the head layer's own entries (the last-diff
 //     view). Callers that care about a "show all files" toggle pick
 //     ReadDir vs ReadDirDiff; OverlayFS itself does not parse query params.
-//   - ReadFile/Open/Stat resolve each path through its OWNING layer, head
-//     first: any hit on the head tree — including an unfilled stub — means
-//     the head owns the path and must never fall through to an older
-//     layer's copy of the same path.
+//   - ResolveOwningFile / ResolveContentPath map a head path to the owning
+//     layer's storage path (head first, including unfilled stubs).
+//   - BodyTree is a separate lazy VirtualFS keyed by head paths: callers
+//     cache filled bodies there (including base-layer content pulled up on
+//     first read) without polluting the head layer used by ReadDirDiff.
 type OverlayFS struct {
 	sep     rune           // head-root separator, exported paths use it
 	layers  []string       // layer chain oldest→newest, head included and last
@@ -109,10 +118,10 @@ type OverlayFS struct {
 	statusLayers []overlayStatusLayer // per-layer file-status maps, recipe order
 	deleteStatus string               // the status value marking a deleted file
 
-	layerTrees  OverlayTreeSource // materializes one layer's tree on first touch
-	readContent ContentSource     // optional: fills empty stubs on first read
+	layerTrees OverlayTreeSource // materializes one layer's tree on first touch
+	view       *VirtualFS        // lazy body cache under head paths
 
-	mu         sync.Mutex               // guards layerTreeCache and stub fills
+	mu         sync.Mutex               // guards layerCache and view writes
 	layerCache map[string]fi.FileSystem // built layer trees, by layer name
 }
 
@@ -121,22 +130,47 @@ type overlayStatusLayer struct {
 	files map[string]string
 }
 
-var _ fi.FileSystem = (*OverlayFS)(nil)
+var (
+	_ fi.FileSystem        = (*OverlayFS)(nil)
+	_ LazyBodyTree         = (*OverlayFS)(nil)
+	_ ContentPathResolver  = (*OverlayFS)(nil)
+	_ BodyWriter           = (*OverlayFS)(nil)
+)
 
 // NewOverlayFS builds an overlay filesystem. layers and a layer tree source
 // are required; without a layer tree source the overlay serves nothing
 // (every read errors, listings degrade to the layers that did build).
 func NewOverlayFS(opts ...OverlayOption) *OverlayFS {
 	o := &OverlayFS{
-		sep:         '/',
-		deleted:     make(map[string]struct{}),
+		sep:          '/',
+		deleted:      make(map[string]struct{}),
 		deleteStatus: "-1",
-		layerCache:  make(map[string]fi.FileSystem),
+		layerCache:   make(map[string]fi.FileSystem),
+		view:         NewVirtualFs(),
 	}
 	for _, opt := range opts {
 		opt(o)
 	}
 	return o
+}
+
+// BodyTree returns the lazy head-path body cache. It starts empty and grows
+// as callers WriteBody; ReadDirDiff still reads the head layer, not this.
+func (o *OverlayFS) BodyTree() *VirtualFS { return o.view }
+
+// ResolveContentPath maps a head-rooted view path to the owning layer's
+// storage path (for loading the body). Existence follows ResolveOwningFile.
+func (o *OverlayFS) ResolveContentPath(viewPath string) (string, error) {
+	_, lp, err := o.ResolveOwningFile(viewPath)
+	return lp, err
+}
+
+// WriteBody caches a filled body under the head-rooted view path.
+func (o *OverlayFS) WriteBody(viewPath string, data []byte) {
+	o.mu.Lock()
+	o.view.RemoveFileOrDir(viewPath)
+	o.view.AddFile(viewPath, string(data))
+	o.mu.Unlock()
 }
 
 // head returns the chain's last layer name ("" when the chain is empty).
@@ -306,9 +340,13 @@ func (o *OverlayFS) ReadDirDiff(headPath string) ([]fs.DirEntry, error) {
 	return nil, err
 }
 
-// Stat resolves the path through its owning layer, head first; files
-// removed in the final overlay view read as missing everywhere.
+// Stat prefers a cached body in the lazy view (so sizes update after fill);
+// otherwise resolves through the owning layer. Files removed in the final
+// overlay view read as missing everywhere.
 func (o *OverlayFS) Stat(headPath string) (fs.FileInfo, error) {
+	if info, err := o.view.Stat(headPath); err == nil {
+		return info, nil
+	}
 	if !o.deletedInFinalView(headPath) {
 		if tree := o.headTree(); tree != nil {
 			if info, err := tree.Stat(headPath); err == nil {
@@ -324,51 +362,43 @@ func (o *OverlayFS) Stat(headPath string) (fs.FileInfo, error) {
 	return nil, utils.Errorf("file [%v] not exist", headPath)
 }
 
-// ReadFile resolves the path through its OWNING layer, head first: any hit
-// on the head tree — including an unfilled stub — owns the path and must
-// never fall through to an older layer's copy of the same path. Ownership is
-// decided by Stat, so a stub whose content source fails still reports the
-// load error instead of silently serving an older layer's stale copy.
-// Bodies fill into the owning layer's tree when a ContentSource is set.
-func (o *OverlayFS) ReadFile(headPath string) ([]byte, error) {
+// ResolveOwningFile finds the owning layer's tree and the path within that
+// tree for a head-rooted path. Ownership is head-first: any hit on the head
+// tree — including an unfilled stub — owns the path and must never fall
+// through to an older layer. Deleted-in-final-view paths error.
+func (o *OverlayFS) ResolveOwningFile(headPath string) (fi.FileSystem, string, error) {
 	if o.deletedInFinalView(headPath) {
-		return nil, utils.Errorf("file [%v] not exist", headPath)
+		return nil, "", utils.Errorf("file [%v] not exist", headPath)
 	}
 	if tree := o.headTree(); tree != nil {
 		if _, statErr := tree.Stat(headPath); statErr == nil {
-			return o.readTreeFile(tree, headPath)
+			return tree, headPath, nil
 		}
 	}
 	if tree, lp, ok := o.lowerLayerTree(headPath); ok {
-		return o.readTreeFile(tree, lp)
+		return tree, lp, nil
 	}
-	return nil, utils.Errorf("file [%v] not exist", headPath)
+	return nil, "", utils.Errorf("file [%v] not exist", headPath)
 }
 
-// readTreeFile serves one body out of an owning tree: the filled memory
-// hit, else a fill through the content source into that tree (replacing
-// the empty stub). The content fetch runs outside o.mu — a slow load never
-// blocks listings; only the cheap stub replacement takes the lock.
-func (o *OverlayFS) readTreeFile(tree fi.FileSystem, path string) ([]byte, error) {
-	if data, err := tree.ReadFile(path); err == nil && len(data) > 0 {
+// ReadFile serves a cached body from the lazy view when present; otherwise
+// checks that the path exists in the overlay and returns whatever the view
+// currently holds (empty until a caller WriteBody).
+func (o *OverlayFS) ReadFile(headPath string) ([]byte, error) {
+	if data, err := o.view.ReadFile(headPath); err == nil && len(data) > 0 {
 		return data, nil
 	}
-	if o.readContent == nil {
-		return tree.ReadFile(path)
-	}
-	data, err := o.readContent(path)
-	if err != nil {
+	if _, _, err := o.ResolveOwningFile(headPath); err != nil {
 		return nil, err
 	}
-	o.mu.Lock()
-	_ = tree.Delete(path)
-	_ = tree.WriteFile(path, data, 0o644)
-	o.mu.Unlock()
-	return data, nil
+	if data, err := o.view.ReadFile(headPath); err == nil {
+		return data, nil
+	}
+	return []byte{}, nil
 }
 
-// Open reads the path through the owning-layer resolution and serves the
-// body as a read-only file at the caller's (head-rooted) path.
+// Open reads through the owning-layer resolution and serves the body as a
+// read-only file at the caller's (head-rooted) path.
 func (o *OverlayFS) Open(headPath string) (fs.File, error) {
 	data, err := o.ReadFile(headPath)
 	if err != nil {
