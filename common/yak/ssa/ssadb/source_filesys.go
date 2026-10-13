@@ -5,6 +5,7 @@ import (
 	"net/url"
 	"os"
 	"path"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -30,8 +31,9 @@ const (
 // concrete tree: a full-compile program keeps the VirtualFS built from its
 // own ir_sources rows; an incremental program gets an incrementalFS that
 // records the head layer's last-diff tree plus the whole overlay recipe and
-// owns every overlay decision (full expansion, diff-only listing, layer
-// fallback). Trees start structure-only (no QuotedCode pulled); file
+// owns every overlay decision (full expansion, diff-only listing,
+// owning-layer resolution). Trees start structure-only (no QuotedCode
+// pulled); file
 // content is filled in place on demand, so listings stay cheap and read
 // bodies become plain memory afterwards.
 type irSourceFS struct {
@@ -62,21 +64,17 @@ func (fs *irSourceFS) ReadFile(path string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	// Incremental programs: the per-program fs owns body resolution (head
-	// tree first, owning-layer fallback with re-rooting).
-	if ofs, ok := pfs.(overlayLister); ok {
-		return ofs.ReadFile(path)
+	// A bare VirtualFS (full-compile program) only holds empty stubs: serve
+	// the filled memory hit, else fill from the database here. Any other
+	// per-program fs — the incremental one — owns its body resolution: its
+	// ReadFile resolves the owning layer internally, so its result stands.
+	if vf, plainTree := pfs.(*filesys.VirtualFS); plainTree {
+		if data, err := vf.ReadFile(path); err == nil && len(data) > 0 {
+			return data, nil
+		}
+		return fs.fillFileContent(vf, path)
 	}
-	// Plain programs: filled bodies live in the tree; a non-empty read is a
-	// pure memory hit. Empty real files degrade to a DB fetch per read
-	// (correct, just uncached): ir_sources models empty quoted_code rows as
-	// directories, so a file row's quoted source is at least `""` — an
-	// empty tree stub always means "not yet filled" except for that
-	// empty-file corner.
-	if data, err := pfs.ReadFile(path); err == nil && len(data) > 0 {
-		return data, nil
-	}
-	return fs.fillFileContent(pfs, path)
+	return pfs.ReadFile(path)
 }
 
 func (fs *irSourceFS) Open(path string) (fs.File, error) {
@@ -87,17 +85,19 @@ func (fs *irSourceFS) Open(path string) (fs.File, error) {
 	if err != nil {
 		return nil, err
 	}
-	if ofs, ok := pfs.(overlayLister); ok {
-		return ofs.Open(path)
-	}
-	if data, err := pfs.ReadFile(path); err == nil && len(data) > 0 {
+	// Same dispatch as ReadFile: a plain VirtualFS gets its stub filled
+	// here; the incremental fs opens through its own resolution.
+	if vf, plainTree := pfs.(*filesys.VirtualFS); plainTree {
+		if data, err := vf.ReadFile(path); err == nil && len(data) > 0 {
+			return filesys.NewVirtualFile(path, string(data)), nil
+		}
+		data, err := fs.fillFileContent(vf, path)
+		if err != nil {
+			return nil, err
+		}
 		return filesys.NewVirtualFile(path, string(data)), nil
 	}
-	data, err := fs.fillFileContent(pfs, path)
-	if err != nil {
-		return nil, err
-	}
-	return filesys.NewVirtualFile(path, string(data)), nil
+	return pfs.Open(path)
 }
 
 func (fs *irSourceFS) OpenFile(path string, flag int, perm os.FileMode) (fs.File, error) {
@@ -144,9 +144,9 @@ func (isfs *irSourceFS) ReadDir(path string) ([]fs.DirEntry, error) {
 
 // ReadDirQuery lists with the caller's query options. ssadb's only option
 // today is diffOnly (the audit frontend sends it with "show all files"
-// UNCHECKED): an incremental program then lists its head layer's own
-// entries instead of the fully expanded tree. Everything else — including
-// all other filesystems — ignores the query and lists normally.
+// UNCHECKED). The per-program fs that understands options judges them
+// itself — incrementalFS.ReadDirQuery collapses to its head diff — and
+// everything else ignores the query and lists normally.
 func (isfs *irSourceFS) ReadDirQuery(path string, query url.Values) ([]fs.DirEntry, error) {
 	if path == "/" {
 		return programRootEntries(), nil
@@ -155,8 +155,8 @@ func (isfs *irSourceFS) ReadDirQuery(path string, query url.Values) ([]fs.DirEnt
 	if err != nil {
 		return nil, err
 	}
-	if ofs, ok := pfs.(overlayLister); ok && isDiffOnlyQuery(query) {
-		return ofs.ReadDirDiff(path)
+	if ql, ok := pfs.(queryDirLister); ok {
+		return ql.ReadDirQuery(path, query)
 	}
 	return pfs.ReadDir(path)
 }
@@ -200,30 +200,38 @@ func overlayDeletedFiles(prog *IrProgram) map[string]struct{} {
 
 // ------- incremental program fs -------
 
-// overlayLister is the capability interface of an incremental program's
-// filesystem (incrementalFS): beside the plain FileSystem listing it serves
-// the diff-only view — the head layer's own entries ("show all files"
-// unchecked) — and owns body resolution through the owning layers.
-type overlayLister interface {
-	ReadDir(path string) ([]fs.DirEntry, error)
-	ReadDirDiff(path string) ([]fs.DirEntry, error)
-	Stat(path string) (fs.FileInfo, error)
-	ReadFile(path string) ([]byte, error)
-	Open(path string) (fs.File, error)
+// queryDirLister marks a per-program fs that takes listing query options
+// into account: the incremental fs judges the frontend's "show all files"
+// checkbox (diffOnly) inside its own listing path.
+type queryDirLister interface {
+	ReadDirQuery(path string, query url.Values) ([]fs.DirEntry, error)
 }
 
-var _ overlayLister = (*incrementalFS)(nil)
 var _ filesys_interface.FileSystem = (*incrementalFS)(nil)
+var _ queryDirLister = (*incrementalFS)(nil)
 
 // incrementalFS is the per-program filesystem of an incremental (overlay)
-// program. ir_sources keeps every layer's rows under the layer's own
+// program — a standalone FileSystem implementation, not a wrapper around
+// one tree. ir_sources keeps every layer's rows under the layer's own
 // program prefix and the head layer records only the last diff, so this fs
-// keeps the head's diff tree plus the overlay recipe and builds the rest on
-// demand: lower layers' trees are materialized lazily, ReadDir expands the
-// whole chain re-rooted under the head prefix (换头), ReadDirDiff serves the
-// head's own entries, and file bodies fall back through the owning layer.
+// records the head's diff tree plus the whole overlay recipe (layer chain,
+// deletion map) and decides, inside its own ReadFile/Open/ReadDir methods,
+// whether and how far the incremental project actually expands:
+//
+//   - ReadDir serves the fully expanded view: every layer's entries
+//     re-rooted under the head prefix (换头), deduplicated by name with
+//     newer layers shadowing older ones, minus files deleted in the final
+//     view.
+//   - ReadDirQuery judges diffOnly itself: set ("show all files" unchecked)
+//     → ReadDirDiff serves only the head layer's own entries.
+//   - ReadFile/Open/Stat resolve each path through its OWNING layer — head
+//     first (a head stub means the head modified the file: never fall
+//     through to an older layer's copy of the same path), then lower layers
+//     newest-first.
+//
+// Lower layers' trees are materialized lazily and cached inside this fs.
 type incrementalFS struct {
-	*filesys.VirtualFS // head layer's own tree: last diff + ExtraFile stubs; also provides the FileSystem plumbing
+	head *filesys.VirtualFS // the head layer's own tree: last diff + ExtraFile stubs
 
 	prog    *IrProgram          // overlay recipe: layers oldest→head + FileHashMaps
 	deleted map[string]struct{} // files deleted in the final overlay view
@@ -234,7 +242,7 @@ type incrementalFS struct {
 
 func newIncrementalFS(prog *IrProgram, head *filesys.VirtualFS) *incrementalFS {
 	return &incrementalFS{
-		VirtualFS:  head,
+		head:       head,
 		prog:       prog,
 		deleted:    overlayDeletedFiles(prog),
 		layerTrees: make(map[string]*filesys.VirtualFS),
@@ -249,6 +257,7 @@ func newIncrementalFS(prog *IrProgram, head *filesys.VirtualFS) *incrementalFS {
 func (ifs *incrementalFS) ReadDir(path string) ([]fs.DirEntry, error) {
 	rel := strings.Trim(strings.TrimPrefix(path, "/"+ifs.prog.ProgramName), "/")
 	byName := make(map[string]fs.DirEntry)
+	exists := false
 	for _, layer := range ifs.prog.OverlayLayers {
 		tree, err := ifs.layerTreeFor(layer)
 		if err != nil {
@@ -262,6 +271,7 @@ func (ifs *incrementalFS) ReadDir(path string) ([]fs.DirEntry, error) {
 		if err != nil {
 			continue // this layer doesn't have the directory
 		}
+		exists = true
 		for _, e := range list {
 			fullRel := e.Name()
 			if rel != "" {
@@ -273,41 +283,50 @@ func (ifs *incrementalFS) ReadDir(path string) ([]fs.DirEntry, error) {
 			byName[e.Name()] = e // layers oldest→head: head entries overwrite
 		}
 	}
-	if len(byName) == 0 {
-		// No layer has entries here: keep the head tree's error for a path
-		// that exists nowhere (a real but empty dir still reads as empty).
-		if _, err := ifs.VirtualFS.ReadDir(path); err != nil {
-			return nil, err
-		}
+	if !exists {
+		// No layer has this directory: the head tree's error says the path
+		// exists nowhere (a real but empty dir still reads as empty above).
+		return ifs.head.ReadDir(path)
 	}
 	entries := make([]fs.DirEntry, 0, len(byName))
 	for _, e := range byName {
 		entries = append(entries, e)
 	}
+	sort.Slice(entries, func(i, j int) bool { return entries[i].Name() < entries[j].Name() })
 	return entries, nil
 }
 
-// ReadDirDiff lists the diff-only view (diffOnly=true): the head layer's
-// own entries. A directory that lives in lower layers only reads as empty
-// instead of erroring, so nodes expanded in the full view don't break the
-// diff view.
+// ReadDirQuery judges the listing options inside this fs: diffOnly (the
+// audit frontend sends it with "show all files" UNCHECKED) collapses the
+// view to the head layer's own entries; anything else expands the whole
+// overlay chain (ReadDir).
+func (ifs *incrementalFS) ReadDirQuery(path string, query url.Values) ([]fs.DirEntry, error) {
+	if isDiffOnlyQuery(query) {
+		return ifs.ReadDirDiff(path)
+	}
+	return ifs.ReadDir(path)
+}
+
+// ReadDirDiff lists the diff-only view: the head layer's own entries. A
+// directory that lives in lower layers only reads as empty instead of
+// erroring, so nodes visible in the full view don't break the diff view.
 func (ifs *incrementalFS) ReadDirDiff(path string) ([]fs.DirEntry, error) {
-	entries, err := ifs.VirtualFS.ReadDir(path)
+	entries, err := ifs.head.ReadDir(path)
 	if err == nil {
 		return entries, nil
 	}
-	if _, ok := ifs.fallbackPath(path); ok {
+	if _, _, ok := ifs.lowerLayerTree(path); ok {
 		return []fs.DirEntry{}, nil
 	}
 	return nil, err
 }
 
-// fallbackTree resolves /<head>/<rest> against the layer that actually
-// stores it: layers newest-first, the first whose tree has the path wins
-// (the compiler's aggregation order). The returned path keeps the owning
-// layer's own program prefix — re-rooting to the head prefix happens only
-// for full listings (ReadDir); bodies resolve through the owner directly.
-func (ifs *incrementalFS) fallbackTree(path string) (*filesys.VirtualFS, string, bool) {
+// lowerLayerTree resolves /<head>/<rest> against the newest LOWER layer
+// that stores it (head excluded — callers own head lookups). The returned
+// path keeps the owning layer's own program prefix: bodies resolve through
+// the owner directly, re-rooting to the head prefix happens only in full
+// listings (ReadDir).
+func (ifs *incrementalFS) lowerLayerTree(path string) (*filesys.VirtualFS, string, bool) {
 	rest := strings.TrimPrefix(path, "/"+ifs.prog.ProgramName)
 	for i := len(ifs.prog.OverlayLayers) - 1; i >= 0; i-- {
 		layer := ifs.prog.OverlayLayers[i]
@@ -329,20 +348,18 @@ func (ifs *incrementalFS) fallbackTree(path string) (*filesys.VirtualFS, string,
 	return nil, "", false
 }
 
-func (ifs *incrementalFS) fallbackPath(path string) (string, bool) {
-	_, p, ok := ifs.fallbackTree(path)
-	return p, ok
-}
-
 func (ifs *incrementalFS) Stat(path string) (fs.FileInfo, error) {
-	if info, err := ifs.VirtualFS.Stat(path); err == nil {
+	if info, err := ifs.head.Stat(path); err == nil {
 		return info, nil
 	}
-	if tree, layerPath, ok := ifs.fallbackTree(path); ok {
-		return tree.Stat(layerPath)
+	if !ifs.deletedInFinalView(path) {
+		if tree, layerPath, ok := ifs.lowerLayerTree(path); ok {
+			return tree.Stat(layerPath)
+		}
 	}
-	// Not found anywhere: keep the head tree's own error.
-	return ifs.VirtualFS.Stat(path)
+	// Not found anywhere (or removed in the final view): the head tree's
+	// own not-found error.
+	return ifs.head.Stat(path)
 }
 
 func (ifs *incrementalFS) Exists(path string) (bool, error) {
@@ -350,21 +367,41 @@ func (ifs *incrementalFS) Exists(path string) (bool, error) {
 	return err == nil, err
 }
 
-// ReadFile reads through the head prefix: a memory hit on the head tree
-// first, otherwise the owning layer's tree. Bodies fill into the tree that
-// owns the row (keeping the layer prefix), so repeated reads are memory
-// hits and the filled body shows up in that layer's full-view listings.
+// deletedInFinalView reports whether the head-prefixed path is a file the
+// final overlay view removed (FileHashMap "-1" from its newest owning
+// layer): it exists in no view this fs serves.
+func (ifs *incrementalFS) deletedInFinalView(path string) bool {
+	rel := strings.Trim(strings.TrimPrefix(path, "/"+ifs.prog.ProgramName), "/")
+	_, ok := ifs.deleted[rel]
+	return ok
+}
+
+// ReadFile resolves the path through its OWNING layer, head first: any hit
+// on the head tree — including an unfilled stub, which means the head diff
+// touched the file — owns the path and must never fall through to an older
+// layer's copy of the same path. Bodies fill into the tree that owns the
+// row (keeping the layer prefix), so repeated reads are memory hits and the
+// filled body shows up in that layer's full-view listings.
 func (ifs *incrementalFS) ReadFile(path string) ([]byte, error) {
-	if data, err := ifs.VirtualFS.ReadFile(path); err == nil && len(data) > 0 {
+	if ifs.deletedInFinalView(path) {
+		return nil, utils.Errorf("file [%v] not exist", path)
+	}
+	if _, err := ifs.head.Stat(path); err == nil {
+		return ifs.readTreeFile(ifs.head, path)
+	}
+	if tree, layerPath, ok := ifs.lowerLayerTree(path); ok {
+		return ifs.readTreeFile(tree, layerPath)
+	}
+	return nil, utils.Errorf("file [%v] not exist", path)
+}
+
+// readTreeFile serves one body out of an owning tree: the filled memory
+// hit, else a fill from the database into that tree.
+func (ifs *incrementalFS) readTreeFile(vf *filesys.VirtualFS, path string) ([]byte, error) {
+	if data, err := vf.ReadFile(path); err == nil && len(data) > 0 {
 		return data, nil
 	}
-	if tree, layerPath, ok := ifs.fallbackTree(path); ok {
-		if data, err := tree.ReadFile(layerPath); err == nil && len(data) > 0 {
-			return data, nil
-		}
-		return ifs.fillFileContent(tree, layerPath)
-	}
-	return ifs.fillFileContent(ifs.VirtualFS, path)
+	return ifs.fillFileContent(vf, path)
 }
 
 func (ifs *incrementalFS) Open(path string) (fs.File, error) {
@@ -373,6 +410,10 @@ func (ifs *incrementalFS) Open(path string) (fs.File, error) {
 		return nil, err
 	}
 	return filesys.NewVirtualFile(path, string(data)), nil
+}
+
+func (ifs *incrementalFS) OpenFile(path string, flag int, perm os.FileMode) (fs.File, error) {
+	return ifs.Open(path)
 }
 
 // fillFileContent loads one body and writes it back into the owning tree
@@ -393,11 +434,11 @@ func (ifs *incrementalFS) fillFileContent(vf *filesys.VirtualFS, path string) ([
 
 // layerTreeFor returns the raw tree of one overlay layer (its own ir_sources
 // rows + ExtraFile stubs only — no recursive chain expansion: the recipe on
-// the head is flat). The head layer maps to the embedded head tree; lower
+// the head is flat). The head layer maps to this fs's head tree; lower
 // layers are built lazily once and cached in this fs.
 func (ifs *incrementalFS) layerTreeFor(layer string) (*filesys.VirtualFS, error) {
 	if layer == ifs.prog.ProgramName {
-		return ifs.VirtualFS, nil
+		return ifs.head, nil
 	}
 	ifs.mu.Lock()
 	defer ifs.mu.Unlock()
@@ -422,6 +463,39 @@ func (ifs *incrementalFS) layerTreeFor(layer string) (*filesys.VirtualFS, error)
 	}
 	ifs.layerTrees[layer] = tree
 	return tree, nil
+}
+
+// Native path plumbing: this fs serves VirtualFS trees, so the path rules
+// match irSourceFS (separator '/', path.Join semantics, VirtualFS's
+// extension rule). Writes are unsupported — program writes go through
+// irSourceFS, which deletes whole programs.
+func (ifs *incrementalFS) GetSeparators() rune         { return IrSourceFsSeparators }
+func (ifs *incrementalFS) Join(paths ...string) string { return path.Join(paths...) }
+func (ifs *incrementalFS) Base(p string) string        { return path.Base(p) }
+func (ifs *incrementalFS) PathSplit(p string) (string, string) {
+	return pathSplit(p)
+}
+func (ifs *incrementalFS) Ext(name string) string {
+	if idx := strings.LastIndex(name, "."); idx != -1 {
+		return name[idx:]
+	}
+	return ""
+}
+func (ifs *incrementalFS) IsAbs(name string) bool {
+	return len(name) > 0 && name[0] == byte(ifs.GetSeparators())
+}
+func (ifs *incrementalFS) Getwd() (string, error)          { return "", nil }
+func (ifs *incrementalFS) ExtraInfo(string) map[string]any { return nil }
+func (ifs *incrementalFS) Rename(string, string) error     { return utils.Error("implement me") }
+func (ifs *incrementalFS) Rel(string, string) (string, error) {
+	return "", utils.Error("implement me")
+}
+func (ifs *incrementalFS) WriteFile(string, []byte, os.FileMode) error {
+	return utils.Error("implement me")
+}
+func (ifs *incrementalFS) Delete(string) error { return utils.Error("implement me") }
+func (ifs *incrementalFS) MkdirAll(string, os.FileMode) error {
+	return utils.Error("implement me")
 }
 
 func (fs *irSourceFS) PathSplit(p string) (string, string) {
@@ -539,14 +613,14 @@ func (fs *irSourceFS) treeFor(anyPath string) (filesys_interface.FileSystem, err
 // writes it back into its tree (replacing the empty stub, which also makes
 // Stat report the real size). The DB fetch runs outside fs.mu — a slow read
 // never blocks listings; only the cheap stub replacement takes the lock.
-func (fs *irSourceFS) fillFileContent(vf filesys_interface.FileSystem, path string) ([]byte, error) {
+func (fs *irSourceFS) fillFileContent(vf *filesys.VirtualFS, path string) ([]byte, error) {
 	data, err := readIrSourceFileContent(path)
 	if err != nil {
 		return nil, err
 	}
 	fs.mu.Lock()
-	_ = vf.Delete(path)
-	_ = vf.WriteFile(path, data, 0o644)
+	vf.RemoveFileOrDir(path)
+	vf.AddFile(path, string(data))
 	fs.mu.Unlock()
 	return data, nil
 }
@@ -554,8 +628,8 @@ func (fs *irSourceFS) fillFileContent(vf filesys_interface.FileSystem, path stri
 // buildProgramTree builds the per-program filesystem from its ir_sources
 // rows: dirs as dir nodes, files as empty stubs (bodies are lazily filled).
 // A full-compile program keeps the plain VirtualFS; an incremental program
-// wraps it in an incrementalFS, which records the overlay recipe and owns
-// every overlay decision.
+// gets an incrementalFS that keeps the head's last-diff tree plus the
+// overlay recipe and owns every overlay decision.
 func buildProgramTree(progName string) (filesys_interface.FileSystem, error) {
 	vf := filesys.NewVirtualFs()
 	entries, err := GetIrSourceTreeByProgram(progName)

@@ -760,6 +760,12 @@ func TestIrSourceFS_RealIncrementalChain(t *testing.T) {
 	require.ElementsMatch(t, []string{"Base.java", "Added.java"}, names,
 		"expanded tree missing base files; OverlayLayers=%v FileHashMap=%v", headIr.OverlayLayers, headIr.FileHashMap)
 
+	// A head-modified file must read the HEAD's version, not the older
+	// layer's copy of the same path (head-first owning-layer resolution).
+	data, err := dbfs.ReadFile(srcDir + "/Base.java")
+	require.NoError(t, err)
+	require.Contains(t, string(data), "changed = 1")
+
 	// Base-only directory is part of the expanded tree.
 	baseOnlyDir := "/" + diffCompiledName + "/src/main/java2"
 	require.ElementsMatch(t, []string{"Base2.java"}, listNames(t, dbfs, baseOnlyDir))
