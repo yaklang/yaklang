@@ -31,7 +31,7 @@ type dnp3StaticSelector struct {
 	count            uint16 // zero means unbounded; count READs reject zero on the wire
 }
 
-func dnp3DirectReadHeaders(b []byte, limit int, typed, counters, events, counts bool) ([]any, byte, []dnp3StaticSelector, []any, error) {
+func dnp3DirectReadHeaders(b []byte, limit int, typed, counters, events, counts, statuses bool) ([]any, byte, []dnp3StaticSelector, []any, error) {
 	classes := []any{}
 	mask := byte(0)
 	selectors := []dnp3StaticSelector{}
@@ -61,7 +61,7 @@ func dnp3DirectReadHeaders(b []byte, limit int, typed, counters, events, counts 
 			classes = append(classes, int(v-1))
 			h["Class"] = int(v - 1)
 			if typed && v == 1 {
-				for _, g := range dnp3StaticReadGroups(counters) {
+				for _, g := range dnp3StaticReadGroups(counters, statuses) {
 					selectors = append(selectors, dnp3StaticSelector{all: true, group: g})
 				}
 			}
@@ -77,6 +77,9 @@ func dnp3DirectReadHeaders(b []byte, limit int, typed, counters, events, counts 
 				if counters && (g == 20 || g == 21) {
 					valid = v == 0 || dnp3CounterWidth(g, v) > 0
 				}
+			}
+			if statuses {
+				valid = valid || (g == 3 && v <= 2) || (g == 10 && v == 1) || (g == 40 && v <= 4)
 			}
 			isEvent := events && (g == 22 || g == 23)
 			if isEvent {

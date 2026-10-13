@@ -3,7 +3,6 @@ package pcaputil
 import (
 	"encoding/binary"
 	"fmt"
-	"math"
 )
 
 // WithDNP3ReadPoints selects passive complete-link class READ/header and
@@ -51,7 +50,7 @@ func dnp3ReadClasses(b []byte, limit int) ([]any, byte, error) {
 	return classes, mask, nil
 }
 
-func dnp3StaticPoints(b []byte, limit, depth int, packed, counters, events bool) ([]any, error) {
+func dnp3StaticPoints(b []byte, limit, depth int, packed, counters, events, statuses bool) ([]any, error) {
 	if len(b) > 0 && depth < 3 {
 		return nil, protocolError(ErrResourceExceeded, "DNP3 point tree depth")
 	}
@@ -65,11 +64,21 @@ func dnp3StaticPoints(b []byte, limit, depth int, packed, counters, events bool)
 		group, variation, qualifier := b[0], b[1], b[2]
 		b = b[3:]
 		width := 0
-		isPacked := packed && group == 1 && variation == 1
+		isPacked := packed && variation == 1 && (group == 1 || statuses && (group == 3 || group == 10))
+		packedBits := 1
+		if group == 3 {
+			packedBits = 2
+		}
+		isStatus := statuses && ((group == 3 && variation == 2) || (group == 40 && variation >= 1 && variation <= 4))
 		isCounter := counters && dnp3CounterWidth(group, variation) > 0
 		isEvent := events && dnp3CounterEventWidth(group, variation) > 0
 		if isPacked {
 			width = 1
+		} else if isStatus {
+			width = 1
+			if group == 40 {
+				width = [5]int{0, 5, 3, 5, 9}[variation]
+			}
 		} else if isEvent {
 			width = dnp3CounterEventWidth(group, variation)
 			if qualifier != 23 && qualifier != 40 {
@@ -131,7 +140,7 @@ func dnp3StaticPoints(b []byte, limit, depth int, packed, counters, events bool)
 			if prefix != 0 {
 				return nil, protocolError(ErrUnsupportedFeature, "DNP3 packed binary requires contiguous range qualifier")
 			}
-			if (count+7)/8 > len(b) {
+			if (count*packedBits+7)/8 > len(b) {
 				return nil, protocolError(ErrMalformedMessage, "DNP3 truncated packed binary values")
 			}
 		} else if count > len(b)/(width+prefix) {
@@ -167,8 +176,18 @@ func dnp3StaticPoints(b []byte, limit, depth int, packed, counters, events bool)
 				b = b[width:]
 				continue
 			}
+			if isStatus {
+				points = append(points, dnp3StatusPoint(index, group, variation, b[:width]))
+				b = b[width:]
+				continue
+			}
 			if isPacked {
-				point["Quality"], point["Value"] = "not-reported", b[i/8]&(1<<uint(i%8)) != 0
+				point["Quality"] = "not-reported"
+				if group == 3 {
+					dnp3DoubleBitValue(point, (b[i/4]>>uint(2*(i%4)))&3)
+				} else {
+					point["Value"] = b[i/8]&(1<<uint(i%8)) != 0
+				}
 				points = append(points, point)
 				continue
 			}
@@ -200,29 +219,7 @@ func dnp3StaticPoints(b []byte, limit, depth int, packed, counters, events bool)
 				case 2:
 					point["Value"] = int32(int16(binary.LittleEndian.Uint16(b[1:3])))
 				case 5, 6:
-					var value float64
-					if variation == 5 {
-						bits := binary.LittleEndian.Uint32(b[1:5])
-						point["Encoding"], point["Raw Bits"] = "binary32", fmt.Sprintf("%08x", bits)
-						value = float64(math.Float32frombits(bits))
-					} else {
-						bits := binary.LittleEndian.Uint64(b[1:9])
-						point["Encoding"], point["Raw Bits"] = "binary64", fmt.Sprintf("%016x", bits)
-						value = math.Float64frombits(bits)
-					}
-					// Keep all IEEE bits, including NaN payloads and signed zero.
-					// Nonfinite values remain explicit, JSON-safe observations.
-					state := "finite"
-					if math.IsNaN(value) {
-						state = "nan"
-					} else if math.IsInf(value, 1) {
-						state = "positive-infinity"
-					} else if math.IsInf(value, -1) {
-						state = "negative-infinity"
-					} else {
-						point["Value"] = value
-					}
-					point["Value Status"] = state
+					dnp3IEEEPointValue(point, b[1:width])
 				}
 				point["Over Range"] = flags&32 != 0
 				point["Reference Error"] = flags&64 != 0
@@ -240,7 +237,7 @@ func dnp3StaticPoints(b []byte, limit, depth int, packed, counters, events bool)
 			points = append(points, point)
 		}
 		if isPacked {
-			b = b[(count+7)/8:]
+			b = b[(count*packedBits+7)/8:]
 		}
 		object := map[string]any{"Group": int(group), "Variation": int(variation), "Qualifier": int(qualifier), "Points": points}
 		if isEvent {
@@ -271,7 +268,7 @@ func (s *binDNP3) observePoints(out map[string]any, dir int, src, dest uint16, u
 		return 0, nil, nil
 	case 1:
 		if s.directReads {
-			classes, mask, selectors, headers, err := dnp3DirectReadHeaders(user[3:], sessionCollectionLimit(s.maxPending), s.typedReads, s.counterPoints, s.counterEvents, s.eventCountReads)
+			classes, mask, selectors, headers, err := dnp3DirectReadHeaders(user[3:], sessionCollectionLimit(s.maxPending), s.typedReads, s.counterPoints, s.counterEvents, s.eventCountReads, s.statusPoints)
 			if err != nil {
 				return refuse(err)
 			}
@@ -291,7 +288,7 @@ func (s *binDNP3) observePoints(out map[string]any, dir int, src, dest uint16, u
 		if fc == 0x82 && !s.counterEvents {
 			return refuse(protocolError(ErrUnsupportedFeature, "DNP3 selected READ points do not decode function 130"))
 		}
-		objects, err := dnp3StaticPoints(user[5:], sessionCollectionLimit(s.maxPending), s.maxDepth, s.typedReads, s.counterPoints, s.counterEvents)
+		objects, err := dnp3StaticPoints(user[5:], sessionCollectionLimit(s.maxPending), s.maxDepth, s.typedReads, s.counterPoints, s.counterEvents, s.statusPoints)
 		if err != nil {
 			return refuse(err)
 		}
@@ -309,6 +306,9 @@ func (s *binDNP3) observePoints(out map[string]any, dir int, src, dest uint16, u
 		req, known := s.pending[dnp3RequestKey{1 - dir, dest, src, ac & 15, out["Control"].(int)&0x80 == 0}]
 		if fc == 0x82 {
 			known = false
+		}
+		if known && s.directReads && !dnp3StaticSnapshotUnique(objects) {
+			return refuse(protocolError(ErrContextRequired, "DNP3 static points are outside observed READ selectors"))
 		}
 		if known && len(objects) > 0 && s.typedReads {
 			if !dnp3TypedSelectorsCover(req.selectors, objects) {
@@ -351,4 +351,27 @@ func (s *binDNP3) observePoints(out map[string]any, dir int, src, dest uint16, u
 	default:
 		return refuse(protocolError(ErrUnsupportedFeature, fmt.Sprintf("DNP3 selected READ points do not decode function %d", fc)))
 	}
+}
+
+// A selected static snapshot has one record per group/index. Different
+// variations cannot turn the same point into two independently selected points.
+// Unassociated wire observations remain literal; ordered event records can
+// legitimately repeat an index and are excluded from this static invariant.
+func dnp3StaticSnapshotUnique(objects []any) bool {
+	seen := map[uint32]struct{}{}
+	for _, o := range objects {
+		object := o.(map[string]any)
+		if object["Event"] == true {
+			continue
+		}
+		group := uint32(object["Group"].(int))
+		for _, p := range object["Points"].([]any) {
+			key := group<<16 | uint32(p.(map[string]any)["Index"].(int))
+			if _, duplicate := seen[key]; duplicate {
+				return false
+			}
+			seen[key] = struct{}{}
+		}
+	}
+	return true
 }

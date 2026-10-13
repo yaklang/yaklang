@@ -21,7 +21,13 @@ func WithSessionDNP3CounterPoints(enabled bool) ProtocolSessionOption {
 	return func(s *captureSession) error { s.f.a.config.DecodeDNP3CounterPoints = enabled; return nil }
 }
 
-func dnp3StaticReadGroups(counters bool) []byte {
+func dnp3StaticReadGroups(counters, statuses bool) []byte {
+	if statuses {
+		if counters {
+			return []byte{1, 3, 10, 20, 21, 30, 40}
+		}
+		return []byte{1, 3, 10, 30, 40}
+	}
 	if counters {
 		return []byte{1, 10, 20, 21, 30}
 	}

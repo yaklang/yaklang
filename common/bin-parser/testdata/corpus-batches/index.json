@@ -77267,6 +77267,622 @@
         "common/pcapx/pcaputil/dnp3-event-count-reads/REFERENCE-CODEC-ACTUAL.json": "dnp3-event-count-reads/REFERENCE-CODEC-ACTUAL.json",
         "scripts/protocol-tests/required-tests-traffic-unified-v58.json": "required-tests-traffic-unified-v58.json"
       }
+    },
+    {
+      "id": "validation-dnp3-static-status-points",
+      "kind": "validation",
+      "source_sha": "b64ae1f31bdb1733de7aed96196c3858019462f6",
+      "file": "validation-dnp3-static-status-points.zip",
+      "sha256": "aad34b2a2df649a69002a71a4418f49a05b36b765619f780b8c2216a9cadfdf0",
+      "password": "bin-parser",
+      "members": {
+        "dnp3-static-status-points/captures/all-g3v1-request1.pcap": {
+          "sha256": "4553fa6046204a73906753df73e4963e1826da70415079bf20efcfbcccb3734f",
+          "bytes": 627
+        },
+        "dnp3-static-status-points/answers/all-g3v1-request1.json": {
+          "sha256": "58011835441c44f1a877dae9ef0c54d9c0737667167cc88a77f8bd97f01313b4",
+          "bytes": 6000
+        },
+        "dnp3-static-status-points/captures/all-g3v1-request0.pcap": {
+          "sha256": "05792d6338260b60bba2599882c4d515f19d16d2070569180d477265634b4fe5",
+          "bytes": 627
+        },
+        "dnp3-static-status-points/answers/all-g3v1-request0.json": {
+          "sha256": "8bc8820a70439a2d4170261c83867f7a0e18640518c85b5b8ceb5baf3597305b",
+          "bytes": 6000
+        },
+        "dnp3-static-status-points/captures/range8-g3v1.pcap": {
+          "sha256": "f3f58ed42331db669c5e7686d33835eb5fe2465db3923e9c29baf7e7118ee73e",
+          "bytes": 629
+        },
+        "dnp3-static-status-points/answers/range8-g3v1.json": {
+          "sha256": "fcef36091bd0eed7098fca84121e9c5e780ae7f4d397afc16e0bbb98bf0fbc9a",
+          "bytes": 6058
+        },
+        "dnp3-static-status-points/captures/all-g3v2-request2.pcap": {
+          "sha256": "39747894f88389b6aa0438a56d40e69d7ef325a2a0cd247406b2d35ca151b04a",
+          "bytes": 635
+        },
+        "dnp3-static-status-points/answers/all-g3v2-request2.json": {
+          "sha256": "c572672afb11a94001a904f324b1febf58f3f7b165ff0b17d5d6cbde18ed3df9",
+          "bytes": 9932
+        },
+        "dnp3-static-status-points/captures/all-g3v2-request0.pcap": {
+          "sha256": "3c8c50ad09db4cf00488d239ec24beb9767a3398675233a85985459779728760",
+          "bytes": 635
+        },
+        "dnp3-static-status-points/answers/all-g3v2-request0.json": {
+          "sha256": "0358e17a1081eece89cef9d33731079948836034166c93ce5f191d0f1f254a9e",
+          "bytes": 9932
+        },
+        "dnp3-static-status-points/captures/range8-g3v2.pcap": {
+          "sha256": "3748bf4d30c87d5d27e53d1579ef320669294fb2647280737f8d6b7cac410eef",
+          "bytes": 637
+        },
+        "dnp3-static-status-points/answers/range8-g3v2.json": {
+          "sha256": "ae4f63daf284fea2f8cbebb87256671e8bd3acbcfba5ea79b015550bea5ffeff",
+          "bytes": 9990
+        },
+        "dnp3-static-status-points/captures/all-g10v1-request1.pcap": {
+          "sha256": "9d1be806789652e8e7143668f80b2229babd62ed9bce732c8714085fafa330cb",
+          "bytes": 626
+        },
+        "dnp3-static-status-points/answers/all-g10v1-request1.json": {
+          "sha256": "2a7db3ba33ce345ba6eeab07b07063874398737a59ca01b1b3a97fe6d807bf08",
+          "bytes": 5196
+        },
+        "dnp3-static-status-points/captures/all-g10v1-request0.pcap": {
+          "sha256": "6e82936ddb6f1df0eaf54f70f008e03e8569384930ff8365db6088b5fc931c62",
+          "bytes": 626
+        },
+        "dnp3-static-status-points/answers/all-g10v1-request0.json": {
+          "sha256": "f44d7fd372d0dd5d8e7a91fdfced4368f658c2de7fa11d4e9592c8e55f59175f",
+          "bytes": 5196
+        },
+        "dnp3-static-status-points/captures/range8-g10v1.pcap": {
+          "sha256": "e9f605447623a09a50be5eb99c0d5564d9fb8d7cb9b58b47f9ce1bc150f99234",
+          "bytes": 628
+        },
+        "dnp3-static-status-points/answers/range8-g10v1.json": {
+          "sha256": "f799f344443b5482b8c7cb3d3306317b8df777f1e96e56d14fd51d12973cf54e",
+          "bytes": 5254
+        },
+        "dnp3-static-status-points/captures/all-g10v2-request2.pcap": {
+          "sha256": "991eeadc43fb4df194414e9712488c987a8396c30cde1aeafbd1fb6fdfebaee5",
+          "bytes": 635
+        },
+        "dnp3-static-status-points/answers/all-g10v2-request2.json": {
+          "sha256": "bb908654a5098effba34d35e87cf1953886dad002eccc31c28dbc8f27b82ee2d",
+          "bytes": 9082
+        },
+        "dnp3-static-status-points/captures/all-g10v2-request0.pcap": {
+          "sha256": "54b790a76124739323acc79e6f1e6e9241f9b7c1288af0ba0ae3a257b6c15e1b",
+          "bytes": 635
+        },
+        "dnp3-static-status-points/answers/all-g10v2-request0.json": {
+          "sha256": "73010171210580ea0619995b99acda37a2f79c5908a874f944952d7943fc1ba4",
+          "bytes": 9082
+        },
+        "dnp3-static-status-points/captures/range8-g10v2.pcap": {
+          "sha256": "19d6d6f2f6dd85af1dfdcf4c6864d8c7184f22e92b8b6bded56e0d2b5a0ebfc5",
+          "bytes": 637
+        },
+        "dnp3-static-status-points/answers/range8-g10v2.json": {
+          "sha256": "a9748899676790835d2a7a71848d8955d5e3afb0c85dd89fbbaa512214c356ed",
+          "bytes": 9140
+        },
+        "dnp3-static-status-points/captures/all-g40v1-request1.pcap": {
+          "sha256": "c7d34a4f91fd2fef6b12c3aa4efece0998affd63f35038c2bf5717aa73221a3b",
+          "bytes": 641
+        },
+        "dnp3-static-status-points/answers/all-g40v1-request1.json": {
+          "sha256": "eadf15dc7cab777ae5065a4c859369c8fa166b76590e4ae5ee06a7eb7ae1b72c",
+          "bytes": 5238
+        },
+        "dnp3-static-status-points/captures/all-g40v1-request0.pcap": {
+          "sha256": "0bcd746999572c06515351996453461262d75c2075d95c23d97fbab9055f6aa3",
+          "bytes": 641
+        },
+        "dnp3-static-status-points/answers/all-g40v1-request0.json": {
+          "sha256": "1d61fb221d22c012fb9505d7e519cc8520e725c6ac75cfb5b4403f3b207516b5",
+          "bytes": 5238
+        },
+        "dnp3-static-status-points/captures/range8-g40v1.pcap": {
+          "sha256": "0307b6cfa5b6223f1f7fe91bb86beb20b84ff93d9da5a195240e52100bcde73f",
+          "bytes": 643
+        },
+        "dnp3-static-status-points/answers/range8-g40v1.json": {
+          "sha256": "43bf0b5ef8470f2f654ab1263af9af834eaa55937ca7f5a2c219293ad4096354",
+          "bytes": 5294
+        },
+        "dnp3-static-status-points/captures/all-g40v2-request2.pcap": {
+          "sha256": "1cb922a586b94b46b13746f4b87b5c379c00b18b10357da3e0b787b5920cfbdc",
+          "bytes": 635
+        },
+        "dnp3-static-status-points/answers/all-g40v2-request2.json": {
+          "sha256": "88ca79fb4083c48e6d26e2e2dfd7707bb3c98dd563752ed64c4d5a283fbb17b2",
+          "bytes": 5186
+        },
+        "dnp3-static-status-points/captures/all-g40v2-request0.pcap": {
+          "sha256": "098b5f61a6526411946496a59f66bf55cb399045fc39464bb1292c7145da9f3e",
+          "bytes": 635
+        },
+        "dnp3-static-status-points/answers/all-g40v2-request0.json": {
+          "sha256": "a62a5e332d55c056f3a8e15f1ec7c7a7e871fc14791e190f4f2e292a6df8ddfa",
+          "bytes": 5186
+        },
+        "dnp3-static-status-points/captures/range8-g40v2.pcap": {
+          "sha256": "7968293d73928e6b03bb2c53156d8ba04516f80d597edda9ea0a13cb28985f50",
+          "bytes": 637
+        },
+        "dnp3-static-status-points/answers/range8-g40v2.json": {
+          "sha256": "9d36133f70141c9477fae46b380dcb632660fbea586bf7787a3e72e4452403b5",
+          "bytes": 5242
+        },
+        "dnp3-static-status-points/captures/all-g40v3-request3.pcap": {
+          "sha256": "9c213a327e38777e3a6d1be3930eb2895c25998fbf96130c17d13c6551a59c84",
+          "bytes": 641
+        },
+        "dnp3-static-status-points/answers/all-g40v3-request3.json": {
+          "sha256": "8999f7d53db14bdf3e2f9360c58a64445bf278e11272e434188aa25fc0723115",
+          "bytes": 5880
+        },
+        "dnp3-static-status-points/captures/all-g40v3-request0.pcap": {
+          "sha256": "d3f0d0d1793590e2f62b8297cecfd68e558c32ac18cb5c3b25a9e09bf43c0b22",
+          "bytes": 641
+        },
+        "dnp3-static-status-points/answers/all-g40v3-request0.json": {
+          "sha256": "f16e407abe9d0f8f61f75d61d538c0d8f13d83477827e25c487d002b07581e9b",
+          "bytes": 5880
+        },
+        "dnp3-static-status-points/captures/range8-g40v3.pcap": {
+          "sha256": "f3decc4d01b9497b18601ab0a39105fca9ab438b4b0f7bdba8ebfcbe572697b5",
+          "bytes": 643
+        },
+        "dnp3-static-status-points/answers/range8-g40v3.json": {
+          "sha256": "7420626c223598e7c704f09a568271bb4c1f11062c015e070645fc3153a117a8",
+          "bytes": 5936
+        },
+        "dnp3-static-status-points/captures/all-g40v4-request4.pcap": {
+          "sha256": "23b43acc3c615cf540162ba4e92810363a8d59377108a400cdee1d533298a021",
+          "bytes": 655
+        },
+        "dnp3-static-status-points/answers/all-g40v4-request4.json": {
+          "sha256": "ee8cd9a3bb3142df7067610eb8301411216ce64efd93831880c06010e0a86279",
+          "bytes": 6004
+        },
+        "dnp3-static-status-points/captures/all-g40v4-request0.pcap": {
+          "sha256": "11d88846dc4d3ef81542e50697718b4e65e2734f4835e79690f3f15380edf64c",
+          "bytes": 655
+        },
+        "dnp3-static-status-points/answers/all-g40v4-request0.json": {
+          "sha256": "602e6b7f6f16908e1636be3e051b834872104474e104d58fe259a3a2fa2d4043",
+          "bytes": 6004
+        },
+        "dnp3-static-status-points/captures/range8-g40v4.pcap": {
+          "sha256": "165c28f6794de81c0d04c55f3210b335938651a3fa59e260763d8746af770c40",
+          "bytes": 657
+        },
+        "dnp3-static-status-points/answers/range8-g40v4.json": {
+          "sha256": "c5b81a0251847706388363c18042413a6836564f77b494ab755717e12bc681f2",
+          "bytes": 6060
+        },
+        "dnp3-static-status-points/captures/class0-status.pcap": {
+          "sha256": "8472d8aa2c9432f4336677555c2c36f66431aa994710271725b1710a18d7be8e",
+          "bytes": 643
+        },
+        "dnp3-static-status-points/answers/class0-status.json": {
+          "sha256": "8b9b8ddf39a5bf61f6deb9313d2646f07ef1661636d79a472d0ef63f5cd42fbd",
+          "bytes": 5374
+        },
+        "dnp3-static-status-points/captures/ieee-g40v3-positive-zero.pcap": {
+          "sha256": "5cb192a5463048ad5f2d5d15469e881771a330021a7d4703c101b5b4afb9cbc1",
+          "bytes": 633
+        },
+        "dnp3-static-status-points/answers/ieee-g40v3-positive-zero.json": {
+          "sha256": "9359bee7a59c7dbf7b350b6ea6888d27b24c312aad58dfd5fe35e687b8f2a9a9",
+          "bytes": 3844
+        },
+        "dnp3-static-status-points/captures/ieee-g40v3-negative-zero.pcap": {
+          "sha256": "af227734fd43ebdb1bdcd431c4dc4f8b4b855f79bfcf736b2c69709a8b1d099f",
+          "bytes": 633
+        },
+        "dnp3-static-status-points/answers/ieee-g40v3-negative-zero.json": {
+          "sha256": "62ca7ed5d0d29cf50a0f36c5da8d18ee1a5854924135e0bc335351508c32a5d1",
+          "bytes": 3846
+        },
+        "dnp3-static-status-points/captures/ieee-g40v3-positive-infinity.pcap": {
+          "sha256": "1d4a744576d97d6387321042e5606a3e57d6a720d493e5a554c0c51dbe485960",
+          "bytes": 633
+        },
+        "dnp3-static-status-points/answers/ieee-g40v3-positive-infinity.json": {
+          "sha256": "1a821d3cb1d1c676405a4e4c3f15a520d795088f82628b1b00166eb86220c0ef",
+          "bytes": 3806
+        },
+        "dnp3-static-status-points/captures/ieee-g40v3-negative-infinity.pcap": {
+          "sha256": "7cd85634edc69c6607a7d9286a2a8f83837935b0c33e5e916a8f58df12e0d85c",
+          "bytes": 633
+        },
+        "dnp3-static-status-points/answers/ieee-g40v3-negative-infinity.json": {
+          "sha256": "8ef782a33aebbf60e307cc3bf063519512221030b984863d5745cf9eaba99cfd",
+          "bytes": 3806
+        },
+        "dnp3-static-status-points/captures/ieee-g40v3-nan-payload.pcap": {
+          "sha256": "01ad51db4ed214e86ffb00f822287ee7fcf0f3170354dbf49f05f5165d1032fc",
+          "bytes": 633
+        },
+        "dnp3-static-status-points/answers/ieee-g40v3-nan-payload.json": {
+          "sha256": "1227c4a7777986f5a3a16c2ae9ac06125f16cdb1dc78d9dd7536fe09bbd8dfa1",
+          "bytes": 3778
+        },
+        "dnp3-static-status-points/captures/ieee-g40v3-subnormal.pcap": {
+          "sha256": "1a8c3e923bc17a0b01a0abb262851824f53ecb9886f476a487807e09cd0e6c5a",
+          "bytes": 633
+        },
+        "dnp3-static-status-points/answers/ieee-g40v3-subnormal.json": {
+          "sha256": "bd7ea227919a1e88d72538ddcb935b3e00509e7704ffb19e11d0572427249c46",
+          "bytes": 3880
+        },
+        "dnp3-static-status-points/captures/ieee-g40v4-positive-zero.pcap": {
+          "sha256": "cd23068dd45db44bba48358a5a66a1b117b06e653513d51ca7eb348ac10074a1",
+          "bytes": 637
+        },
+        "dnp3-static-status-points/answers/ieee-g40v4-positive-zero.json": {
+          "sha256": "286c5bc0186239b345bb19259d1cbcd8933dd4b8be2b2eb3ce90f8ae99d7ede1",
+          "bytes": 3884
+        },
+        "dnp3-static-status-points/captures/ieee-g40v4-negative-zero.pcap": {
+          "sha256": "8ad27596709513b491889f4044309db7a4f95d236297140cee8697df499a8656",
+          "bytes": 637
+        },
+        "dnp3-static-status-points/answers/ieee-g40v4-negative-zero.json": {
+          "sha256": "65ad5892bad524e3c8e89d671255c8ece470c0e14a76e654d1f0f57e5d3f2c67",
+          "bytes": 3886
+        },
+        "dnp3-static-status-points/captures/ieee-g40v4-positive-infinity.pcap": {
+          "sha256": "0e989b2dd38bdffaa856c75dc3dc61bd9ffcfa86868495581f71d8d70232829f",
+          "bytes": 637
+        },
+        "dnp3-static-status-points/answers/ieee-g40v4-positive-infinity.json": {
+          "sha256": "04f054b027ccd8e3716baa63d9294a6f3d9ea5a769129ddfd42aa0f608344ce8",
+          "bytes": 3846
+        },
+        "dnp3-static-status-points/captures/ieee-g40v4-negative-infinity.pcap": {
+          "sha256": "a9d8ad4240d29d05b73c1dada3163ec89e83dc1e4b52f47555f54160c610cdc6",
+          "bytes": 637
+        },
+        "dnp3-static-status-points/answers/ieee-g40v4-negative-infinity.json": {
+          "sha256": "569b8c6ae55b2c842fad127b24d3d68cb66f4d2dcb18f5bef7a184018d5f43ce",
+          "bytes": 3846
+        },
+        "dnp3-static-status-points/captures/ieee-g40v4-nan-payload.pcap": {
+          "sha256": "8bcb3661c9dcd0a222fee704c221431174e3296f145baaa53bb6021f4d283272",
+          "bytes": 637
+        },
+        "dnp3-static-status-points/answers/ieee-g40v4-nan-payload.json": {
+          "sha256": "da3e0db53e1b5dacde653cf2723143bd7e29b44f42ded29feb5d8dfea405442d",
+          "bytes": 3818
+        },
+        "dnp3-static-status-points/captures/ieee-g40v4-subnormal.pcap": {
+          "sha256": "56ff93863b7c5b24f3efd37907b9ff45adffd9875635e100132f7f1a1f855702",
+          "bytes": 637
+        },
+        "dnp3-static-status-points/answers/ieee-g40v4-subnormal.json": {
+          "sha256": "79e50e830f4f23bd41b81aa7f06aea8b6c2ec091c468b301374833e1556f6711",
+          "bytes": 3890
+        },
+        "dnp3-static-status-points/captures/duplicate-cross-variation-retains.pcap": {
+          "sha256": "db6cf9816764d474ab0841cd13f4f20954add5a11b45e25878303e43074a360f",
+          "bytes": 736
+        },
+        "dnp3-static-status-points/answers/duplicate-cross-variation-retains.json": {
+          "sha256": "860451f167d342b1d97863949e76eac23bcbfbc64fe8af033222d6267c8f5f26",
+          "bytes": 4687
+        },
+        "dnp3-static-status-points/captures/selected-status-variation-retains.pcap": {
+          "sha256": "16dcbd91a297d1ac459e34ed653629bcd999f1428ca1f8d79e78e5888ee0865d",
+          "bytes": 718
+        },
+        "dnp3-static-status-points/answers/selected-status-variation-retains.json": {
+          "sha256": "7a5aab7749c52bef6f0c9949b186d9f1159fd3c9aceb1af87f5b178ddc930935",
+          "bytes": 4106
+        },
+        "dnp3-static-status-points/captures/binary-output-no-quality-promotion.pcap": {
+          "sha256": "14085ce2a36d21c59e96e1e70a211f70f6a4419c1660845af1c396175f08d33d",
+          "bytes": 718
+        },
+        "dnp3-static-status-points/answers/binary-output-no-quality-promotion.json": {
+          "sha256": "d3f78e5e06864f67eb3e66deb2ab4fb11b667400a2b68aaddc7ebfa9e7b10860",
+          "bytes": 4020
+        },
+        "dnp3-static-status-points/captures/ordered-selector-replaces.pcap": {
+          "sha256": "ce3292a4481a99145d3f6e2d9302216bd5916c8ddcfa1cb7db708979a9d8e407",
+          "bytes": 721
+        },
+        "dnp3-static-status-points/answers/ordered-selector-replaces.json": {
+          "sha256": "ddc0585b64f91f0b90bc3c1c80de7a66616c2a72600b1049d8db3c72dc17997e",
+          "bytes": 4816
+        },
+        "dnp3-static-status-points/captures/range-gap-retains.pcap": {
+          "sha256": "1d86032fc3e9d29f42d1bd876bb0953f9b82a275a9cefeee65df15284b3e98d1",
+          "bytes": 727
+        },
+        "dnp3-static-status-points/answers/range-gap-retains.json": {
+          "sha256": "521af30bda0bb23d32b707db3ef987da42f1919a134952494e5df0ade5f063f4",
+          "bytes": 5728
+        },
+        "dnp3-static-status-points/captures/wrong-role-retains.pcap": {
+          "sha256": "12bbdc7f893fa64f7aca9c1db45ea0e0d2e78b30f3808c6650a790fe61ffc83c",
+          "bytes": 718
+        },
+        "dnp3-static-status-points/answers/wrong-role-retains.json": {
+          "sha256": "1ac4388258973987e0ce4131de69d35d3086ce01fbba8abcee743a3460aabd19",
+          "bytes": 5879
+        },
+        "dnp3-static-status-points/captures/packed-unused-high-bits.pcap": {
+          "sha256": "00e49124ce7378a92c6ce6f71e5f7a68d899a86cf5412326687b903411e3a06a",
+          "bytes": 625
+        },
+        "dnp3-static-status-points/answers/packed-unused-high-bits.json": {
+          "sha256": "10b29f481f8b5ad2f5dd969daa5202b8f2e78d5050c9d27b2fe1e2ce3083a79d",
+          "bytes": 3114
+        },
+        "dnp3-static-status-points/captures/truncated-packed.pcap": {
+          "sha256": "b298fddd48a5dc553fbe4acf6ef3dd36bb3ab994d5ee2ed641a59104192d6b8a",
+          "bytes": 718
+        },
+        "dnp3-static-status-points/answers/truncated-packed.json": {
+          "sha256": "9bf19bfc30973ddaa6e6476edbbfa91c7802ca2bd304172e0fc2c557cebc3e70",
+          "bytes": 4524
+        },
+        "dnp3-static-status-points/captures/truncated-analog.pcap": {
+          "sha256": "03491583761cd3ef2a3abc652556996a3f2c0a0e8338f5f53864df64eafcdfbe",
+          "bytes": 727
+        },
+        "dnp3-static-status-points/answers/truncated-analog.json": {
+          "sha256": "26cf4c760bb810d144b119280dd4c1c852b038c94a222d6cccab37ace0cd9555",
+          "bytes": 4564
+        },
+        "dnp3-static-status-points/captures/packed-prefix.pcap": {
+          "sha256": "c0a0ecb66dcc5b924f51b962de31bd0dad00756e585ea9247ebbc0b6f8954dbb",
+          "bytes": 718
+        },
+        "dnp3-static-status-points/answers/packed-prefix.json": {
+          "sha256": "8f135c246c9b8f133e2fb99caa030cec193788c5389e2b18b7c3ac763433c2bb",
+          "bytes": 4545
+        },
+        "dnp3-static-status-points/captures/descending-range.pcap": {
+          "sha256": "9588c9dbd93df4c06ffb2ba97322c1e7ffb3c2b0fe942e0545764adc83319fe4",
+          "bytes": 717
+        },
+        "dnp3-static-status-points/answers/descending-range.json": {
+          "sha256": "a9ef373f6a12ba981beb1644161088e831e6a4c558124496f01de20ffceb12e2",
+          "bytes": 4509
+        },
+        "dnp3-static-status-points/captures/duplicate-same-variation.pcap": {
+          "sha256": "744d6f69762043750af629bc677b330982129bf4eaf20dec26cce394cd5736f5",
+          "bytes": 720
+        },
+        "dnp3-static-status-points/answers/duplicate-same-variation.json": {
+          "sha256": "430546afe54f44c15a1ad0e4fdcfc0a20372124240880447d364673a86d0d98a",
+          "bytes": 4530
+        },
+        "dnp3-static-status-points/captures/unsupported-group.pcap": {
+          "sha256": "804d61a2c21178a712b70005b8e2f863d21a6b81f51516f376a3f572a50a7500",
+          "bytes": 718
+        },
+        "dnp3-static-status-points/answers/unsupported-group.json": {
+          "sha256": "54491c7949fbf93856917bc0fd4222e376b42b293ffac19f0573e36368b68586",
+          "bytes": 4537
+        },
+        "dnp3-static-status-points/captures/unsupported-variation.pcap": {
+          "sha256": "9288650081f86dc7f39d2cced28b332f10d520cae37314c1278abd76e4fee24e",
+          "bytes": 718
+        },
+        "dnp3-static-status-points/answers/unsupported-variation.json": {
+          "sha256": "6efcdf7ecb5b9a24a3f2735705021681db2ea6eeb30d1a8d0d34578e72b241ca",
+          "bytes": 4537
+        },
+        "dnp3-static-status-points/captures/class1-is-not-static.pcap": {
+          "sha256": "1913dca4310b8c86831a8ec630704be3f3c4a1d54328cd8f3f355581b4c2b32b",
+          "bytes": 625
+        },
+        "dnp3-static-status-points/answers/class1-is-not-static.json": {
+          "sha256": "2a1a996c073d53320e7c5230e16aa171019f044a267de2567962ffbeefce022c",
+          "bytes": 2324
+        },
+        "dnp3-static-status-points/manifest.json": {
+          "sha256": "3793c92dfa77e3976c6538cc6182796050cd017c2d899bab0896c36f2eee1c42",
+          "bytes": 18202
+        },
+        "dnp3-static-status-points/guard-vectors.json": {
+          "sha256": "14138c3b1b7bc3e27c00fc9b244579581d8d4df6edc51023e7b572b064d908be",
+          "bytes": 904
+        },
+        "dnp3-static-status-points/reference-config.json": {
+          "sha256": "57425548325081c6731a7245bd7a641a8ad3fd18c05b796334d960868034ebfc",
+          "bytes": 791
+        },
+        "dnp3-static-status-points/generate.py": {
+          "sha256": "b727b6e5218b1110dbf3ee1db85ff743bf955f4a79ca65e8afe8fdd0c61b0849",
+          "bytes": 11089
+        },
+        "dnp3-static-status-points/verify.py": {
+          "sha256": "4e1123c51ce388c56d4796bf15880a13b5bda72ef3d609211eab89b249f7d78f",
+          "bytes": 874
+        },
+        "dnp3-static-status-points/MODEL-PINS.json": {
+          "sha256": "af424d278f4619cccd98806ea8897fd34855876085f75028b8182aa43247b075",
+          "bytes": 1331
+        },
+        "dnp3-static-status-points/SOURCE-PINS.json": {
+          "sha256": "a02dc1a258e6f71de1dcfa8faea14d1574556a99bb8714c921be8a34a8465728",
+          "bytes": 6404
+        },
+        "dnp3-static-status-points/reference.py": {
+          "sha256": "9e14e4bc1f38dff6c128a7378946255a6e180fffbab82e4b1db61855bcdd047b",
+          "bytes": 5149
+        },
+        "dnp3-static-status-points/REFERENCE-ACTUAL.json": {
+          "sha256": "b76dbdd86161c80c68990519d2200092b021812159a1d33b54b2f99570def6f5",
+          "bytes": 12104
+        },
+        "dnp3-static-status-points/reference_selection.py": {
+          "sha256": "5fe0cf6a8b74361a2550d43b9b8026c29b03c5a6e4d3afc76434089c8e4c4323",
+          "bytes": 9532
+        },
+        "dnp3-static-status-points/REFERENCE-SELECTION-ACTUAL.json": {
+          "sha256": "1015481272d26dfa931d48cae515011616ebef39be1c6db1d52f2c0a1e689ccd",
+          "bytes": 14484
+        },
+        "dnp3-static-status-points/reference_bits.py": {
+          "sha256": "f606f7b0857af10d51c5e03c0ac4b28f33c8e4bb3d21f04c198db07cff66dd69",
+          "bytes": 4180
+        },
+        "dnp3-static-status-points/REFERENCE-BITS-ACTUAL.json": {
+          "sha256": "f6f18586cd662c3d76f7446cff63b877b9481d26e801d0e7e0e6ff3efe7cbfee",
+          "bytes": 5670
+        },
+        "dnp3-static-status-points/reference_codec.py": {
+          "sha256": "14e83a58f48e412ecef8b971aa80f196c1c51ff6b8adc3d2eab134a0df92e4fd",
+          "bytes": 7428
+        },
+        "dnp3-static-status-points/REFERENCE-CODEC-ACTUAL.json": {
+          "sha256": "567e18faf1850c39a285b10c49ce4373e9e963328bc225c095666aaa4da85867",
+          "bytes": 26256
+        },
+        "required-tests-traffic-unified-v59.json": {
+          "sha256": "8ccf377ec46ec5e4e176c1ee8b9511d13632020d944ca88b1898e2f9e568723b",
+          "bytes": 12883836
+        },
+        "validation/expected.json": {
+          "sha256": "0cb01eeb4be543ee6f86d7c8580e4f02da1d2f937ca9375366180b33b35e714c",
+          "bytes": 76388
+        }
+      },
+      "aliases": {
+        "common/pcapx/pcaputil/dnp3-static-status-points/captures/all-g3v1-request1.pcap": "dnp3-static-status-points/captures/all-g3v1-request1.pcap",
+        "common/pcapx/pcaputil/dnp3-static-status-points/answers/all-g3v1-request1.json": "dnp3-static-status-points/answers/all-g3v1-request1.json",
+        "common/pcapx/pcaputil/dnp3-static-status-points/captures/all-g3v1-request0.pcap": "dnp3-static-status-points/captures/all-g3v1-request0.pcap",
+        "common/pcapx/pcaputil/dnp3-static-status-points/answers/all-g3v1-request0.json": "dnp3-static-status-points/answers/all-g3v1-request0.json",
+        "common/pcapx/pcaputil/dnp3-static-status-points/captures/range8-g3v1.pcap": "dnp3-static-status-points/captures/range8-g3v1.pcap",
+        "common/pcapx/pcaputil/dnp3-static-status-points/answers/range8-g3v1.json": "dnp3-static-status-points/answers/range8-g3v1.json",
+        "common/pcapx/pcaputil/dnp3-static-status-points/captures/all-g3v2-request2.pcap": "dnp3-static-status-points/captures/all-g3v2-request2.pcap",
+        "common/pcapx/pcaputil/dnp3-static-status-points/answers/all-g3v2-request2.json": "dnp3-static-status-points/answers/all-g3v2-request2.json",
+        "common/pcapx/pcaputil/dnp3-static-status-points/captures/all-g3v2-request0.pcap": "dnp3-static-status-points/captures/all-g3v2-request0.pcap",
+        "common/pcapx/pcaputil/dnp3-static-status-points/answers/all-g3v2-request0.json": "dnp3-static-status-points/answers/all-g3v2-request0.json",
+        "common/pcapx/pcaputil/dnp3-static-status-points/captures/range8-g3v2.pcap": "dnp3-static-status-points/captures/range8-g3v2.pcap",
+        "common/pcapx/pcaputil/dnp3-static-status-points/answers/range8-g3v2.json": "dnp3-static-status-points/answers/range8-g3v2.json",
+        "common/pcapx/pcaputil/dnp3-static-status-points/captures/all-g10v1-request1.pcap": "dnp3-static-status-points/captures/all-g10v1-request1.pcap",
+        "common/pcapx/pcaputil/dnp3-static-status-points/answers/all-g10v1-request1.json": "dnp3-static-status-points/answers/all-g10v1-request1.json",
+        "common/pcapx/pcaputil/dnp3-static-status-points/captures/all-g10v1-request0.pcap": "dnp3-static-status-points/captures/all-g10v1-request0.pcap",
+        "common/pcapx/pcaputil/dnp3-static-status-points/answers/all-g10v1-request0.json": "dnp3-static-status-points/answers/all-g10v1-request0.json",
+        "common/pcapx/pcaputil/dnp3-static-status-points/captures/range8-g10v1.pcap": "dnp3-static-status-points/captures/range8-g10v1.pcap",
+        "common/pcapx/pcaputil/dnp3-static-status-points/answers/range8-g10v1.json": "dnp3-static-status-points/answers/range8-g10v1.json",
+        "common/pcapx/pcaputil/dnp3-static-status-points/captures/all-g10v2-request2.pcap": "dnp3-static-status-points/captures/all-g10v2-request2.pcap",
+        "common/pcapx/pcaputil/dnp3-static-status-points/answers/all-g10v2-request2.json": "dnp3-static-status-points/answers/all-g10v2-request2.json",
+        "common/pcapx/pcaputil/dnp3-static-status-points/captures/all-g10v2-request0.pcap": "dnp3-static-status-points/captures/all-g10v2-request0.pcap",
+        "common/pcapx/pcaputil/dnp3-static-status-points/answers/all-g10v2-request0.json": "dnp3-static-status-points/answers/all-g10v2-request0.json",
+        "common/pcapx/pcaputil/dnp3-static-status-points/captures/range8-g10v2.pcap": "dnp3-static-status-points/captures/range8-g10v2.pcap",
+        "common/pcapx/pcaputil/dnp3-static-status-points/answers/range8-g10v2.json": "dnp3-static-status-points/answers/range8-g10v2.json",
+        "common/pcapx/pcaputil/dnp3-static-status-points/captures/all-g40v1-request1.pcap": "dnp3-static-status-points/captures/all-g40v1-request1.pcap",
+        "common/pcapx/pcaputil/dnp3-static-status-points/answers/all-g40v1-request1.json": "dnp3-static-status-points/answers/all-g40v1-request1.json",
+        "common/pcapx/pcaputil/dnp3-static-status-points/captures/all-g40v1-request0.pcap": "dnp3-static-status-points/captures/all-g40v1-request0.pcap",
+        "common/pcapx/pcaputil/dnp3-static-status-points/answers/all-g40v1-request0.json": "dnp3-static-status-points/answers/all-g40v1-request0.json",
+        "common/pcapx/pcaputil/dnp3-static-status-points/captures/range8-g40v1.pcap": "dnp3-static-status-points/captures/range8-g40v1.pcap",
+        "common/pcapx/pcaputil/dnp3-static-status-points/answers/range8-g40v1.json": "dnp3-static-status-points/answers/range8-g40v1.json",
+        "common/pcapx/pcaputil/dnp3-static-status-points/captures/all-g40v2-request2.pcap": "dnp3-static-status-points/captures/all-g40v2-request2.pcap",
+        "common/pcapx/pcaputil/dnp3-static-status-points/answers/all-g40v2-request2.json": "dnp3-static-status-points/answers/all-g40v2-request2.json",
+        "common/pcapx/pcaputil/dnp3-static-status-points/captures/all-g40v2-request0.pcap": "dnp3-static-status-points/captures/all-g40v2-request0.pcap",
+        "common/pcapx/pcaputil/dnp3-static-status-points/answers/all-g40v2-request0.json": "dnp3-static-status-points/answers/all-g40v2-request0.json",
+        "common/pcapx/pcaputil/dnp3-static-status-points/captures/range8-g40v2.pcap": "dnp3-static-status-points/captures/range8-g40v2.pcap",
+        "common/pcapx/pcaputil/dnp3-static-status-points/answers/range8-g40v2.json": "dnp3-static-status-points/answers/range8-g40v2.json",
+        "common/pcapx/pcaputil/dnp3-static-status-points/captures/all-g40v3-request3.pcap": "dnp3-static-status-points/captures/all-g40v3-request3.pcap",
+        "common/pcapx/pcaputil/dnp3-static-status-points/answers/all-g40v3-request3.json": "dnp3-static-status-points/answers/all-g40v3-request3.json",
+        "common/pcapx/pcaputil/dnp3-static-status-points/captures/all-g40v3-request0.pcap": "dnp3-static-status-points/captures/all-g40v3-request0.pcap",
+        "common/pcapx/pcaputil/dnp3-static-status-points/answers/all-g40v3-request0.json": "dnp3-static-status-points/answers/all-g40v3-request0.json",
+        "common/pcapx/pcaputil/dnp3-static-status-points/captures/range8-g40v3.pcap": "dnp3-static-status-points/captures/range8-g40v3.pcap",
+        "common/pcapx/pcaputil/dnp3-static-status-points/answers/range8-g40v3.json": "dnp3-static-status-points/answers/range8-g40v3.json",
+        "common/pcapx/pcaputil/dnp3-static-status-points/captures/all-g40v4-request4.pcap": "dnp3-static-status-points/captures/all-g40v4-request4.pcap",
+        "common/pcapx/pcaputil/dnp3-static-status-points/answers/all-g40v4-request4.json": "dnp3-static-status-points/answers/all-g40v4-request4.json",
+        "common/pcapx/pcaputil/dnp3-static-status-points/captures/all-g40v4-request0.pcap": "dnp3-static-status-points/captures/all-g40v4-request0.pcap",
+        "common/pcapx/pcaputil/dnp3-static-status-points/answers/all-g40v4-request0.json": "dnp3-static-status-points/answers/all-g40v4-request0.json",
+        "common/pcapx/pcaputil/dnp3-static-status-points/captures/range8-g40v4.pcap": "dnp3-static-status-points/captures/range8-g40v4.pcap",
+        "common/pcapx/pcaputil/dnp3-static-status-points/answers/range8-g40v4.json": "dnp3-static-status-points/answers/range8-g40v4.json",
+        "common/pcapx/pcaputil/dnp3-static-status-points/captures/class0-status.pcap": "dnp3-static-status-points/captures/class0-status.pcap",
+        "common/pcapx/pcaputil/dnp3-static-status-points/answers/class0-status.json": "dnp3-static-status-points/answers/class0-status.json",
+        "common/pcapx/pcaputil/dnp3-static-status-points/captures/ieee-g40v3-positive-zero.pcap": "dnp3-static-status-points/captures/ieee-g40v3-positive-zero.pcap",
+        "common/pcapx/pcaputil/dnp3-static-status-points/answers/ieee-g40v3-positive-zero.json": "dnp3-static-status-points/answers/ieee-g40v3-positive-zero.json",
+        "common/pcapx/pcaputil/dnp3-static-status-points/captures/ieee-g40v3-negative-zero.pcap": "dnp3-static-status-points/captures/ieee-g40v3-negative-zero.pcap",
+        "common/pcapx/pcaputil/dnp3-static-status-points/answers/ieee-g40v3-negative-zero.json": "dnp3-static-status-points/answers/ieee-g40v3-negative-zero.json",
+        "common/pcapx/pcaputil/dnp3-static-status-points/captures/ieee-g40v3-positive-infinity.pcap": "dnp3-static-status-points/captures/ieee-g40v3-positive-infinity.pcap",
+        "common/pcapx/pcaputil/dnp3-static-status-points/answers/ieee-g40v3-positive-infinity.json": "dnp3-static-status-points/answers/ieee-g40v3-positive-infinity.json",
+        "common/pcapx/pcaputil/dnp3-static-status-points/captures/ieee-g40v3-negative-infinity.pcap": "dnp3-static-status-points/captures/ieee-g40v3-negative-infinity.pcap",
+        "common/pcapx/pcaputil/dnp3-static-status-points/answers/ieee-g40v3-negative-infinity.json": "dnp3-static-status-points/answers/ieee-g40v3-negative-infinity.json",
+        "common/pcapx/pcaputil/dnp3-static-status-points/captures/ieee-g40v3-nan-payload.pcap": "dnp3-static-status-points/captures/ieee-g40v3-nan-payload.pcap",
+        "common/pcapx/pcaputil/dnp3-static-status-points/answers/ieee-g40v3-nan-payload.json": "dnp3-static-status-points/answers/ieee-g40v3-nan-payload.json",
+        "common/pcapx/pcaputil/dnp3-static-status-points/captures/ieee-g40v3-subnormal.pcap": "dnp3-static-status-points/captures/ieee-g40v3-subnormal.pcap",
+        "common/pcapx/pcaputil/dnp3-static-status-points/answers/ieee-g40v3-subnormal.json": "dnp3-static-status-points/answers/ieee-g40v3-subnormal.json",
+        "common/pcapx/pcaputil/dnp3-static-status-points/captures/ieee-g40v4-positive-zero.pcap": "dnp3-static-status-points/captures/ieee-g40v4-positive-zero.pcap",
+        "common/pcapx/pcaputil/dnp3-static-status-points/answers/ieee-g40v4-positive-zero.json": "dnp3-static-status-points/answers/ieee-g40v4-positive-zero.json",
+        "common/pcapx/pcaputil/dnp3-static-status-points/captures/ieee-g40v4-negative-zero.pcap": "dnp3-static-status-points/captures/ieee-g40v4-negative-zero.pcap",
+        "common/pcapx/pcaputil/dnp3-static-status-points/answers/ieee-g40v4-negative-zero.json": "dnp3-static-status-points/answers/ieee-g40v4-negative-zero.json",
+        "common/pcapx/pcaputil/dnp3-static-status-points/captures/ieee-g40v4-positive-infinity.pcap": "dnp3-static-status-points/captures/ieee-g40v4-positive-infinity.pcap",
+        "common/pcapx/pcaputil/dnp3-static-status-points/answers/ieee-g40v4-positive-infinity.json": "dnp3-static-status-points/answers/ieee-g40v4-positive-infinity.json",
+        "common/pcapx/pcaputil/dnp3-static-status-points/captures/ieee-g40v4-negative-infinity.pcap": "dnp3-static-status-points/captures/ieee-g40v4-negative-infinity.pcap",
+        "common/pcapx/pcaputil/dnp3-static-status-points/answers/ieee-g40v4-negative-infinity.json": "dnp3-static-status-points/answers/ieee-g40v4-negative-infinity.json",
+        "common/pcapx/pcaputil/dnp3-static-status-points/captures/ieee-g40v4-nan-payload.pcap": "dnp3-static-status-points/captures/ieee-g40v4-nan-payload.pcap",
+        "common/pcapx/pcaputil/dnp3-static-status-points/answers/ieee-g40v4-nan-payload.json": "dnp3-static-status-points/answers/ieee-g40v4-nan-payload.json",
+        "common/pcapx/pcaputil/dnp3-static-status-points/captures/ieee-g40v4-subnormal.pcap": "dnp3-static-status-points/captures/ieee-g40v4-subnormal.pcap",
+        "common/pcapx/pcaputil/dnp3-static-status-points/answers/ieee-g40v4-subnormal.json": "dnp3-static-status-points/answers/ieee-g40v4-subnormal.json",
+        "common/pcapx/pcaputil/dnp3-static-status-points/captures/duplicate-cross-variation-retains.pcap": "dnp3-static-status-points/captures/duplicate-cross-variation-retains.pcap",
+        "common/pcapx/pcaputil/dnp3-static-status-points/answers/duplicate-cross-variation-retains.json": "dnp3-static-status-points/answers/duplicate-cross-variation-retains.json",
+        "common/pcapx/pcaputil/dnp3-static-status-points/captures/selected-status-variation-retains.pcap": "dnp3-static-status-points/captures/selected-status-variation-retains.pcap",
+        "common/pcapx/pcaputil/dnp3-static-status-points/answers/selected-status-variation-retains.json": "dnp3-static-status-points/answers/selected-status-variation-retains.json",
+        "common/pcapx/pcaputil/dnp3-static-status-points/captures/binary-output-no-quality-promotion.pcap": "dnp3-static-status-points/captures/binary-output-no-quality-promotion.pcap",
+        "common/pcapx/pcaputil/dnp3-static-status-points/answers/binary-output-no-quality-promotion.json": "dnp3-static-status-points/answers/binary-output-no-quality-promotion.json",
+        "common/pcapx/pcaputil/dnp3-static-status-points/captures/ordered-selector-replaces.pcap": "dnp3-static-status-points/captures/ordered-selector-replaces.pcap",
+        "common/pcapx/pcaputil/dnp3-static-status-points/answers/ordered-selector-replaces.json": "dnp3-static-status-points/answers/ordered-selector-replaces.json",
+        "common/pcapx/pcaputil/dnp3-static-status-points/captures/range-gap-retains.pcap": "dnp3-static-status-points/captures/range-gap-retains.pcap",
+        "common/pcapx/pcaputil/dnp3-static-status-points/answers/range-gap-retains.json": "dnp3-static-status-points/answers/range-gap-retains.json",
+        "common/pcapx/pcaputil/dnp3-static-status-points/captures/wrong-role-retains.pcap": "dnp3-static-status-points/captures/wrong-role-retains.pcap",
+        "common/pcapx/pcaputil/dnp3-static-status-points/answers/wrong-role-retains.json": "dnp3-static-status-points/answers/wrong-role-retains.json",
+        "common/pcapx/pcaputil/dnp3-static-status-points/captures/packed-unused-high-bits.pcap": "dnp3-static-status-points/captures/packed-unused-high-bits.pcap",
+        "common/pcapx/pcaputil/dnp3-static-status-points/answers/packed-unused-high-bits.json": "dnp3-static-status-points/answers/packed-unused-high-bits.json",
+        "common/pcapx/pcaputil/dnp3-static-status-points/captures/truncated-packed.pcap": "dnp3-static-status-points/captures/truncated-packed.pcap",
+        "common/pcapx/pcaputil/dnp3-static-status-points/answers/truncated-packed.json": "dnp3-static-status-points/answers/truncated-packed.json",
+        "common/pcapx/pcaputil/dnp3-static-status-points/captures/truncated-analog.pcap": "dnp3-static-status-points/captures/truncated-analog.pcap",
+        "common/pcapx/pcaputil/dnp3-static-status-points/answers/truncated-analog.json": "dnp3-static-status-points/answers/truncated-analog.json",
+        "common/pcapx/pcaputil/dnp3-static-status-points/captures/packed-prefix.pcap": "dnp3-static-status-points/captures/packed-prefix.pcap",
+        "common/pcapx/pcaputil/dnp3-static-status-points/answers/packed-prefix.json": "dnp3-static-status-points/answers/packed-prefix.json",
+        "common/pcapx/pcaputil/dnp3-static-status-points/captures/descending-range.pcap": "dnp3-static-status-points/captures/descending-range.pcap",
+        "common/pcapx/pcaputil/dnp3-static-status-points/answers/descending-range.json": "dnp3-static-status-points/answers/descending-range.json",
+        "common/pcapx/pcaputil/dnp3-static-status-points/captures/duplicate-same-variation.pcap": "dnp3-static-status-points/captures/duplicate-same-variation.pcap",
+        "common/pcapx/pcaputil/dnp3-static-status-points/answers/duplicate-same-variation.json": "dnp3-static-status-points/answers/duplicate-same-variation.json",
+        "common/pcapx/pcaputil/dnp3-static-status-points/captures/unsupported-group.pcap": "dnp3-static-status-points/captures/unsupported-group.pcap",
+        "common/pcapx/pcaputil/dnp3-static-status-points/answers/unsupported-group.json": "dnp3-static-status-points/answers/unsupported-group.json",
+        "common/pcapx/pcaputil/dnp3-static-status-points/captures/unsupported-variation.pcap": "dnp3-static-status-points/captures/unsupported-variation.pcap",
+        "common/pcapx/pcaputil/dnp3-static-status-points/answers/unsupported-variation.json": "dnp3-static-status-points/answers/unsupported-variation.json",
+        "common/pcapx/pcaputil/dnp3-static-status-points/captures/class1-is-not-static.pcap": "dnp3-static-status-points/captures/class1-is-not-static.pcap",
+        "common/pcapx/pcaputil/dnp3-static-status-points/answers/class1-is-not-static.json": "dnp3-static-status-points/answers/class1-is-not-static.json",
+        "common/pcapx/pcaputil/dnp3-static-status-points/manifest.json": "dnp3-static-status-points/manifest.json",
+        "common/pcapx/pcaputil/dnp3-static-status-points/guard-vectors.json": "dnp3-static-status-points/guard-vectors.json",
+        "common/pcapx/pcaputil/dnp3-static-status-points/reference-config.json": "dnp3-static-status-points/reference-config.json",
+        "common/pcapx/pcaputil/dnp3-static-status-points/generate.py": "dnp3-static-status-points/generate.py",
+        "common/pcapx/pcaputil/dnp3-static-status-points/verify.py": "dnp3-static-status-points/verify.py",
+        "common/pcapx/pcaputil/dnp3-static-status-points/MODEL-PINS.json": "dnp3-static-status-points/MODEL-PINS.json",
+        "common/pcapx/pcaputil/dnp3-static-status-points/SOURCE-PINS.json": "dnp3-static-status-points/SOURCE-PINS.json",
+        "common/pcapx/pcaputil/dnp3-static-status-points/reference.py": "dnp3-static-status-points/reference.py",
+        "common/pcapx/pcaputil/dnp3-static-status-points/REFERENCE-ACTUAL.json": "dnp3-static-status-points/REFERENCE-ACTUAL.json",
+        "common/pcapx/pcaputil/dnp3-static-status-points/reference_selection.py": "dnp3-static-status-points/reference_selection.py",
+        "common/pcapx/pcaputil/dnp3-static-status-points/REFERENCE-SELECTION-ACTUAL.json": "dnp3-static-status-points/REFERENCE-SELECTION-ACTUAL.json",
+        "common/pcapx/pcaputil/dnp3-static-status-points/reference_bits.py": "dnp3-static-status-points/reference_bits.py",
+        "common/pcapx/pcaputil/dnp3-static-status-points/REFERENCE-BITS-ACTUAL.json": "dnp3-static-status-points/REFERENCE-BITS-ACTUAL.json",
+        "common/pcapx/pcaputil/dnp3-static-status-points/reference_codec.py": "dnp3-static-status-points/reference_codec.py",
+        "common/pcapx/pcaputil/dnp3-static-status-points/REFERENCE-CODEC-ACTUAL.json": "dnp3-static-status-points/REFERENCE-CODEC-ACTUAL.json",
+        "scripts/protocol-tests/required-tests-traffic-unified-v59.json": "required-tests-traffic-unified-v59.json"
+      }
     }
   ],
   "schema_version": 1,
