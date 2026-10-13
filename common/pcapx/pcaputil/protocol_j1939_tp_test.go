@@ -305,6 +305,22 @@ func TestJ1939TPDomainsResourcesAndOwnership(t *testing.T) {
 }
 
 func TestJ1939TPControlIsolationAndPhaseBounds(t *testing.T) {
+	t.Run("CompletedWindowWaitsForCTS", func(t *testing.T) {
+		var es []*ProtocolEvent
+		a := j1939TPParser(&es, DefaultParserBudget())
+		frames := j1939TPFrames(t, "rts-two-windows")
+		now := time.Unix(1700001000, 0)
+		times := []time.Duration{0, 50 * time.Millisecond, 100 * time.Millisecond, 1100 * time.Millisecond, 1150 * time.Millisecond, 1200 * time.Millisecond}
+		for i, w := range frames {
+			droneCANStatsDeliver(a, w, uint64(i+1), CaptureDomain{}, now.Add(times[i]))
+		}
+		require.Len(t, es, 6)
+		require.Nil(t, es[3].sessionError, "Linux v6.6 waits 1250ms for control after a complete granted window")
+		require.Equal(t, []byte{1, 2, 3, 4, 5, 6, 7, 8, 9}, es[5].Session["J1939"].(map[string]any)["Transfer Payload"])
+		a.closeJ1939TP()
+		require.Zero(t, a.buffered.Load())
+	})
+
 	frames := j1939TPFrames(t, "rts-complete")
 	now := time.Unix(1700001000, 0)
 	t.Run("OppositeTransfersAbortAmbiguity", func(t *testing.T) {

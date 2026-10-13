@@ -230,8 +230,17 @@ func (a *binParser) decodeJ1939TP(id uint32, data []byte, ref PacketReference, a
 		}
 		s.lastCommand = 255
 		s.timeout = 750 * time.Millisecond
-		if !s.bam && s.received == s.packets {
-			s.timeout = 1250 * time.Millisecond
+		if !s.bam {
+			windowComplete := true
+			for i := s.windowFirst - 1; i < s.windowLast; i++ {
+				if !s.seen[i] {
+					windowComplete = false
+					break
+				}
+			}
+			if windowComplete {
+				s.timeout = 1250 * time.Millisecond
+			}
 		}
 		complete = s.bam && s.received == s.packets
 	case cmd == 0x11:
