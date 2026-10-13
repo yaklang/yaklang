@@ -5,7 +5,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"sync/atomic"
 
 	"github.com/google/uuid"
 
@@ -36,7 +35,10 @@ const (
 var (
 	SSA_PROJECT_DB_RAW     = "default-yakssa.db"
 	SSA_PROJECT_DB_DIALECT = SQLiteExtend
-	ssaDatabase            atomic.Pointer[gorm.DB]
+	// Plain pointer, same as profileDatabase. initYakitDatabaseOnce is the
+	// only guard: the handle is published when it is still unset, and later
+	// SetGormSSAProjectDatabase calls are explicit rebinds.
+	ssaDatabase *gorm.DB
 )
 
 const (
@@ -148,14 +150,14 @@ func GetTempSSADataBase() (*gorm.DB, error) {
 }
 
 func SetGormSSAProjectDatabase(db *gorm.DB) {
-	// 同步更新 schema 包中的默认 SSA 数据库
+	// schema 里的句柄只是这里的镜像，一起赋值。
 	schema.SetDefaultSSADatabase(db)
-	ssaDatabase.Store(db)
+	ssaDatabase = db
 }
 
 func GetGormSSAProjectDataBase() *gorm.DB {
-	if ssaDatabase.Load() == nil {
+	if ssaDatabase == nil {
 		initYakitDatabase()
 	}
-	return ssaDatabase.Load()
+	return ssaDatabase
 }

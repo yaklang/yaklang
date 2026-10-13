@@ -6,6 +6,7 @@ import (
 	"runtime/debug"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/yaklang/yaklang/common/yak/ssa"
 )
@@ -67,6 +68,44 @@ func compileUnitBuildNodes(prog *ssa.Program, plan *UnitPlan, batch compileUnitE
 type unitBuildResult struct {
 	index int
 	err   error
+}
+
+// executeCompileUnitBatch is the single entry point for one compile batch: it
+// builds every library in the batch through the DAG scheduler (concurrency 1 is
+// the scheduler's own serial mode, not a separate code path), then runs the
+// batch cleanup — struct scan, unit/instruction/aux flushes — in the same
+// goroutine, so the next batch can never observe a half-finished previous one.
+//
+// drainUnscheduled tells the scheduler to cover upstream libraries the plan did
+// not schedule itself; frontends without a concurrency-safe unit build rely on
+// that single-pass coverage to reach their shared application scope.
+//
+// The returned duration covers only the pipeline build so callers can keep
+// their existing pre-handler accounting unchanged.
+func executeCompileUnitBatch(
+	ctx context.Context,
+	prog *ssa.Program,
+	plan *UnitPlan,
+	batch compileUnitExecutionBatch,
+	concurrency, batchIndex int,
+	cleanup compileBatchCleanup,
+	drainUnscheduled bool,
+) (time.Duration, error) {
+	buildStart := time.Now()
+	peak, err := buildCompileUnitPipeline(ctx, prog, plan, batch, concurrency)
+	buildCost := time.Since(buildStart)
+	log.Infof("compile unit pipeline batch=%d groups=%d concurrency=%d peak_active=%d cost=%v",
+		batchIndex+1, len(batch.unitKeys), concurrency, peak, buildCost)
+	if err != nil {
+		return buildCost, err
+	}
+	if drainUnscheduled {
+		prog.DrainUnscheduledApplicationUpstreams(batch.unitKeys)
+	}
+	if err := cleanup.run(); err != nil {
+		return buildCost, err
+	}
+	return buildCost, nil
 }
 
 // buildCompileUnitPipeline runs ready SCCs immediately when their own

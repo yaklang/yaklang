@@ -1039,9 +1039,10 @@ func (s *instructionStore) saveInstructionPersistRecords(records []*instructionP
 		saveErr = cacheWriteTransaction(s.db, func(tx *gorm.DB) error {
 			// Separate insert and upsert paths:
 			// - Insert path: batch CreateInBatches for speed
-			// - Upsert path: SaveIrCodeBatch (delete+bulk insert) — avoids
-			//   per-row FirstOrCreate SELECT that can miss the (program_name,
-			//   code_id) index on large Postgres IR tables.
+			// - Upsert path: SaveIrCodeBatch — one INSERT ... ON CONFLICT
+			//   (program_name, code_id) DO UPDATE per chunk, which avoids the
+			//   per-row FirstOrCreate SELECT that can miss the
+			//   (program_name, code_id) index on large Postgres IR tables.
 			var insertBatch []*ssadb.IrCode
 			var upsertBatch []*ssadb.IrCode
 			for _, record := range records {
