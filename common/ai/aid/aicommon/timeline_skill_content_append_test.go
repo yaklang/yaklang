@@ -2,7 +2,6 @@ package aicommon
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"strings"
 	"sync"
@@ -61,13 +60,9 @@ func TestSkillContentDifferentWindowsStayInHistory(t *testing.T) {
 
 	snapshot, err := tl.captureCompressionSnapshot()
 	require.NoError(t, err)
-	require.Len(t, snapshot.Items, 2)
-	require.Equal(t, firstID, snapshot.Items[0].ID)
-	require.True(t, snapshot.Items[0].Frozen)
-	require.Contains(t, snapshot.Items[0].PromptText, "FIRST_WINDOW")
-	require.Equal(t, secondID, snapshot.Items[1].ID)
-	require.False(t, snapshot.Items[1].Frozen)
-	require.Contains(t, snapshot.Items[1].PromptText, "SECOND_WINDOW")
+	require.Empty(t, snapshot.Items, "skill windows stay exact and are not compression candidates")
+	require.Contains(t, snapshot.ExactItemIDs, firstID)
+	require.Contains(t, snapshot.ExactItemIDs, secondID)
 
 	tl.FreezeAll()
 	skills := tl.RenderSkillContentForPrompt()
@@ -83,49 +78,30 @@ func TestSkillContentDifferentWindowsStayInHistory(t *testing.T) {
 	require.Equal(t, skills, restored.RenderSkillContentForPrompt())
 }
 
-func TestSkillContentCompressionSelectsHistoricalWindows(t *testing.T) {
-	for _, retainBoth := range []bool{false, true} {
-		t.Run(fmt.Sprintf("retainBoth=%t", retainBoth), func(t *testing.T) {
-			cfg := NewConfig(context.Background(), WithDisableAutoSkills(true))
-			tl := cfg.GetTimeline()
-			tl.SetTimelineBucketByteSize(-1)
-			firstID, secondID := cfg.AcquireId(), cfg.AcquireId()
-			require.True(t, tl.PushSkillContent(firstID, "demo-skill", "SKILL.md", "EARLIER_WINDOW", SkillContentSourceAuto))
-			require.True(t, tl.PushSkillContent(secondID, "demo-skill", "SKILL.md", "LATER_WINDOW", SkillContentSourceAuto))
-			tl.FreezeAll()
-			bindCompressionMock(t, tl, func(req *AIRequest) (string, error) {
-				require.Contains(t, req.GetPrompt(), "EARLIER_WINDOW")
-				require.Contains(t, req.GetPrompt(), "LATER_WINDOW")
-				retained := fmt.Sprint(firstID)
-				if retainBoth {
-					retained = fmt.Sprintf("%d-%d", firstID, secondID)
-				}
-				body, err := json.Marshal(map[string]any{
-					"@action": "timeline-summary", "summary": "Skill reading history.",
-					"ratain_timeline_item_range": retained, "memory_entities": []any{},
-				})
-				return string(body), err
-			})
+// 精确提升态的技能窗口不进入压缩候选, 因此两个历史窗口都必须保留;
+// 需要重读旧页时仍可通过显式写入追加新 item。
+func TestSkillContentHistoricalWindowsSurviveCompression(t *testing.T) {
+	cfg := NewConfig(context.Background(), WithDisableAutoSkills(true))
+	tl := cfg.GetTimeline()
+	tl.SetTimelineBucketByteSize(-1)
+	firstID, secondID := cfg.AcquireId(), cfg.AcquireId()
+	require.True(t, tl.PushSkillContent(firstID, "demo-skill", "SKILL.md", "EARLIER_WINDOW", SkillContentSourceAuto))
+	require.True(t, tl.PushSkillContent(secondID, "demo-skill", "SKILL.md", "LATER_WINDOW", SkillContentSourceAuto))
+	tl.FreezeAll()
+	bindCompressionMock(t, tl, func(req *AIRequest) (string, error) {
+		require.NotContains(t, req.GetPrompt(), "EARLIER_WINDOW")
+		require.NotContains(t, req.GetPrompt(), "LATER_WINDOW")
+		return compressionMockSummary("Ordinary history summarized."), nil
+	})
 
-			result, err := tl.CompressOnce(compressionTestOptions())
-			require.NoError(t, err)
-			require.Contains(t, result.RetainedIDs, firstID, "an earlier window must be independently selectable")
-			skills := tl.RenderSkillContentForPrompt()
-			require.Contains(t, skills, "EARLIER_WINDOW")
-			if retainBoth {
-				require.Contains(t, result.RetainedIDs, secondID)
-				require.Empty(t, result.RetiredIDs)
-				require.Contains(t, skills, "LATER_WINDOW")
-			} else {
-				require.Equal(t, []int64{secondID}, result.RetiredIDs)
-				require.NotContains(t, skills, "LATER_WINDOW")
-				require.True(t, tl.PushSkillContent(cfg.AcquireId(), "demo-skill", "SKILL.md",
-					"LATER_WINDOW", SkillContentSourceAuto))
-				require.Contains(t, RenderTimelineFrozenOpen(tl).Open, "LATER_WINDOW")
-				require.Equal(t, skills, tl.RenderSkillContentForPrompt(), "reloading must not rewrite the frozen skill block")
-			}
-		})
-	}
+	result, err := tl.CompressOnce(compressionTestOptions())
+	require.NoError(t, err)
+	require.NotContains(t, result.RetiredIDs, firstID)
+	require.NotContains(t, result.RetiredIDs, secondID)
+	skills := tl.RenderSkillContentForPrompt()
+	require.Contains(t, skills, "EARLIER_WINDOW")
+	require.Contains(t, skills, "LATER_WINDOW")
+	require.Less(t, strings.Index(skills, "EARLIER_WINDOW"), strings.Index(skills, "LATER_WINDOW"))
 }
 
 func TestSkillContentConcurrentDuplicateLoadsAppendOnce(t *testing.T) {
@@ -186,7 +162,7 @@ func TestSkillManagerPagingPreservesPreviousWindow(t *testing.T) {
 	require.Equal(t, skills, tl.RenderSkillContentForPrompt())
 }
 
-func TestSkillManagerReloadsRetiredContentDespiteOtherVisibleItems(t *testing.T) {
+func TestSkillManagerContentSurvivesCompression(t *testing.T) {
 	for _, resource := range []bool{false, true} {
 		t.Run(fmt.Sprintf("resource=%t", resource), func(t *testing.T) {
 			loader, err := aiskillloader.NewFSSkillLoader(buildSkillsVFS())
@@ -201,13 +177,8 @@ func TestSkillManagerReloadsRetiredContentDespiteOtherVisibleItems(t *testing.T)
 				_, err = mgr.LoadSkillResource("deploy-app", "scripts/deploy.sh")
 				require.NoError(t, err)
 			}
-			mainID := tl.idToTimelineItem.Keys()[0]
 			bindCompressionMock(t, tl, func(_ *AIRequest) (string, error) {
-				body, err := json.Marshal(map[string]any{
-					"@action": "timeline-summary", "summary": "Skill windows summarized.",
-					"ratain_timeline_item_range": fmt.Sprint(mainID), "memory_entities": []any{},
-				})
-				return string(body), err
+				return compressionMockSummary("Skill windows kept exact."), nil
 			})
 			_, err = tl.CompressOnce(compressionTestOptions())
 			require.NoError(t, err)
@@ -218,24 +189,19 @@ func TestSkillManagerReloadsRetiredContentDespiteOtherVisibleItems(t *testing.T)
 			if resource {
 				_, err = mgr.LoadSkillResource("deploy-app", "scripts/deploy.sh")
 				require.NoError(t, err)
-				require.Contains(t, RenderTimelineFrozenOpen(tl).Open, "echo deploy")
+				require.Contains(t, tl.RenderSkillContentForPrompt(), "echo deploy")
 			} else {
 				added, err := mgr.LoadAutoSkill("deploy-app")
 				require.NoError(t, err)
-				require.True(t, added, "a remaining tree must not block reloading a retired window")
-				require.Contains(t, RenderTimelineFrozenOpen(tl).Open, "Step 1: build.")
+				require.False(t, added, "an exact skill must not be appended again")
+				require.Contains(t, tl.RenderSkillContentForPrompt(), "Step 1: build.")
 			}
-			require.Len(t, tl.idToTimelineItem.Keys(), len(beforeIDs)+1)
-			require.Equal(t, beforeSkills, tl.RenderSkillContentForPrompt())
 			if resource {
-				_, err = mgr.LoadSkillResource("deploy-app", "scripts/deploy.sh")
-				require.NoError(t, err)
+				require.Len(t, tl.idToTimelineItem.Keys(), len(beforeIDs))
+				require.Equal(t, beforeSkills, tl.RenderSkillContentForPrompt(), "an already visible resource must not be appended twice")
 			} else {
-				added, err := mgr.LoadAutoSkill("deploy-app")
-				require.NoError(t, err)
-				require.False(t, added)
+				require.Equal(t, beforeSkills, tl.RenderSkillContentForPrompt())
 			}
-			require.Len(t, tl.idToTimelineItem.Keys(), len(beforeIDs)+1, "same visible content must not be appended twice")
 		})
 	}
 }

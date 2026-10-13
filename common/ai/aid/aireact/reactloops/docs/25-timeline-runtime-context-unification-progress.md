@@ -84,7 +84,7 @@ Evidence 相关入口：
 go test ./common/ai/aid/aicommon/ -run 'TestSkillContent' -count=1
 ```
 
-结果：通过。覆盖「先 Open 不提前提升」「不被技能名错误去重」「进入压缩候选」。
+结果：通过。覆盖「先 Open 不提前提升」「不被技能名错误去重」「按精确状态保留」。
 
 ## T3：迁移分类渲染及所有 prompt 入口（已完成）
 
@@ -106,23 +106,22 @@ go test ./common/ai/aid/aireact/reactloops/reactloopstests/ -run 'Skill|Resource
 
 结果：全部通过。加载技能不改变 Frozen 段字节，只有 Open 变化。
 
-## T4：扩展现有统一压缩（已完成）
+## T4：skill-content 保持精确状态（已完成）
 
-- `timeline_compression_snapshot.go`：skill-content 进入候选与体积统计；
-  用户强制加载保留精确保护。
-- `timeline_compression_transaction.go`：修正提交顺序为「先退休未选中、后重建
-  promoted」；原顺序会把未选中正文重新物化回类型块。
-- `compression_instruction.txt`：说明 `[skill_content]` 是可选择原文。
+- `timeline_compression_snapshot.go`：skill-content 与其他 promoted item 一样
+  只进入 `ExactItemIDs`，不进入压缩候选、摘要或 `ratain_timeline_item_range`。
+- `timeline_compression_transaction.go`：保持「先退休未选中、后重建 promoted」
+  的提交顺序，确保普通历史按统一选择结果退休。
+- `compression_instruction.txt`：明确技能正文是请求之外的精确状态，不写入
+  summary；未冻结的 pending 仍参与冻结阈值统计。
 
 验证：
 
 ```sh
-go test ./common/ai/aid/aicommon/ -run 'TestSkillContentNotResurrectedAfterCompression|TestSkillContentPromotedOnlyWhenRetained|TestSkillContentAloneTriggersCompression|TestPromotedSkillContentStillCountsTowardTrigger|TestSkillContentAppearsInCompressionRequest' -count=1
+go test ./common/ai/aid/aicommon/ -run 'TestSkillContentStaysExactDuringCompression|TestSkillContentAbsentFromCompressionRequest|TestSkillContentSurvivesCompression|TestPromotedSkillContentStaysExactAcrossCompression|TestSkillContentPendingDeltaTriggersFreezeOnly' -count=1
 ```
 
-结果：通过。并已做反向验证：临时恢复「先重建后退休」旧顺序时，
-`TestSkillContentNotResurrectedAfterCompression` 如预期失败，证明该测试真实捕获
-了物化复活缺陷。
+结果：通过。技能正文在压缩前后、保存恢复后均保持不变。
 
 ## T5：恢复、兼容、回归与清理（已完成）
 
@@ -138,7 +137,8 @@ go test ./common/ai/aid/aicommon/ -run 'TestSkillContentNotResurrectedAfterCompr
 - 加载写入时检查「技能名 + 路径 + 正文」是否完全重复，仅仍存在的相同正文不追加；
   不同阅读窗口作为独立 item 进入 Open / 候选 / 统计，由统一选择和总结决定去留。
 - 冻结技能进入 `promotedState`，按技能名累计正文；新来源 hash 与上一次相同则忽略，
-  不同则拼接老正文与新正文。原始 item 仍独立参与 Timeline 的选择和总结。
+  不同则拼接老正文与新正文。当前阶段 skill-content 与其他 promoted item 一样
+  属于精确状态，不进入压缩候选。
 - `RenderTimelineFrozenOpenWithOptions` 在同一读锁内产出 Open 和已提升技能块，
   经共享材料链路传入 SemiDynamic1；主循环与 helper 不再经过 manager 渲染旁路。
 - 技能目录（意图识别 top-N）同样接入 Timeline，写入时去重，遵守同一冻结边界。
@@ -202,9 +202,9 @@ go test ./common/ai/aid/aicommon/... ./common/ai/aid/aireact/... -count=1
 | 主循环/helper 不再从私有容器重建全文 | 4 处 `Render*` 调用全部转发 Timeline 投影 |
 | 正文与目录先 Open，冻结保留后才进类型块 | `TestSkillContentLoadingKeepsCachedPrefixStable`、`TestForcedSkillContentWaitsForFreezeBoundary` |
 | 前缀字节/hash 一致性测试 | 同上，直接断言 `before.Frozen == after.Frozen` |
-| 进入现有选 ID 与总结机制并正确计费 | `TestSkillContentAloneTriggersCompression`、`TestPromotedSkillContentStillCountsTowardTrigger` |
-| 选中原文完整展示；未选中不复活 | `TestSkillContentPromotedOnlyWhenRetained`、`TestSkillContentNotResurrectedAfterCompression` |
-| 可重读；forced/Schema 保护未破坏 | `TestSkillReloadAfterSummarized`、`TestForcedSkillContentProtectedFromSummarization` |
+| skill 保持精确状态；pending 只触发冻结 | `TestSkillContentPendingDeltaTriggersFreezeOnly`、`TestSkillContentAbsentFromCompressionRequest` |
+| 压缩前后正文不丢失，摘要不替代原文 | `TestSkillContentSurvivesCompression`、`TestPromotedSkillContentStaysExactAcrossCompression` |
+| 显式移除后可重读；来源标记保留 | `TestSkillReloadAfterSummarized`、`TestForcedSkillOnlyMarksSource` |
 | Evidence 既有语义保持 | 既有 Evidence 压缩/事务测试全绿 |
 | 仍只有 prompt 前压缩入口 | 未新增压缩器；仅扩展候选与指令 |
 | 保存/恢复、初始化、分支、并发、失败路径 | `TestSkillContentSaveRestoreKeepsFreezePosition`、`TestSkillContentBranchIsolation`、`TestImportSkipsSkillsWithTimelineHistory`；失败/取消路径沿用既有事务测试 |
@@ -264,7 +264,7 @@ go test ./common/ai/aid/aicommon/... ./common/ai/aid/aireact/... -count=1
 
 新增/重写的关键测试：
 
-- `timeline_skill_content_test.go`：`TestForcedSkillContentIsSummarizableCandidate`、
+- `timeline_skill_content_test.go`：`TestForcedSkillContentStaysExact`、
   `TestDeleteSkillContentRetiresWithoutRewritingFreeze`。
 - `aiskillloader/timeline_reload_test.go`：`TestForcedSkillOnlyMarksSource`、
   `TestAutoAndManualSkillShareTimelineSemantics`。

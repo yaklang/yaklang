@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-// fakeSkillSink 是可控的 Timeline 替身: 记录追加次数并模拟“被总结退休”。
+// fakeSkillSink 是可控的 Timeline 替身: 记录追加次数并模拟显式移除。
 type fakeSkillSink struct {
 	appends  int
 	visible  map[string]bool
@@ -70,8 +70,8 @@ func (f *fakeSkillSink) HasSkillContentHistory(name string) bool {
 
 func (f *fakeSkillSink) RenderSkillContentForPrompt() string { return "" }
 
-// After its body is summarized away, loading the same skill again must append a
-// fresh item instead of being short-circuited by the loader-side cache.
+// After its body is explicitly removed, loading the same skill again must append
+// a fresh item instead of being short-circuited by the loader-side cache.
 func TestSkillReloadAfterSummarized(t *testing.T) {
 	vfs := buildTestVFS()
 	loader, err := NewFSSkillLoader(vfs)
@@ -99,21 +99,21 @@ func TestSkillReloadAfterSummarized(t *testing.T) {
 		t.Fatalf("visible skill must not be re-appended: %d -> %d", firstAppends, sink.appends)
 	}
 
-	// Simulate unified compression retiring the body.
+	// Simulate explicit removal retiring the body.
 	sink.visible[skillName] = false
 
 	if err := mgr.LoadSkill(skillName); err != nil {
-		t.Fatalf("reload after summarization failed: %v", err)
+		t.Fatalf("reload after explicit removal failed: %v", err)
 	}
 	if sink.appends <= firstAppends {
-		t.Fatalf("summarized skill must be re-readable, appends=%d", sink.appends)
+		t.Fatalf("removed skill must be re-readable, appends=%d", sink.appends)
 	}
 	if !strings.Contains(sink.lastBody[skillName], "deploy") {
 		t.Fatalf("reloaded body must carry the skill content, got %q", sink.lastBody[skillName])
 	}
 }
 
-// A summarized skill must not be reported as "already loaded and visible".
+// A removed skill must not be reported as "already loaded and visible".
 func TestSummarizedSkillIsNotVisible(t *testing.T) {
 	vfs := buildTestVFS()
 	loader, err := NewFSSkillLoader(vfs)
@@ -133,7 +133,7 @@ func TestSummarizedSkillIsNotVisible(t *testing.T) {
 
 	sink.visible["deploy-app"] = false
 	if mgr.IsSkillLoadedAndUnfolded("deploy-app") != false {
-		t.Fatal("summarized skill must not short-circuit as visible")
+		t.Fatal("removed skill must not short-circuit as visible")
 	}
 }
 

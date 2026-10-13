@@ -131,23 +131,9 @@ func (m *Timeline) captureCompressionSnapshotLocked() (snapshot *timelineCompres
 			return nil, fmt.Errorf("invalid compression source item %d", id)
 		}
 		if isPromotableTimelineItem(item) || isTimelineUserInput(item) {
-			// Skill bodies join the unified candidate set: they must be
-			// selectable/summarizable instead of being permanently exact.
-			if control := timelinePromotionForItem(item); control != nil && control.Kind == TimelinePromotedKindSkillContent {
-				// 技能正文统一为可总结候选, 不因加载来源 (用户指定 / AI 自动 /
-				// 普通加载) 强制精确保留。来源只写进候选文本, 由压缩提示词判断
-				// 是否值得保留原文; 用户指定的信息本身也允许被 summary 概括。
-				ts, ok := m.idToTs.Get(id)
-				if !ok {
-					return nil, fmt.Errorf("compression source item %d has no timestamp", id)
-				}
-				snapshot.Items = append(snapshot.Items, timelineCompressionSnapshotItem{
-					ID: id, Timestamp: ts, Frozen: id <= snapshot.FrozenThroughID,
-					PromptText: fmt.Sprintf("# item=%d timestamp_ms=%d [skill_content]\n%s",
-						id, ts, timelineSkillContentOpenPrompt(control)),
-				})
-				continue
-			}
+			// Promoted state, including skill content, remains exact for now.
+			// It is excluded from the summarization candidate set; pending Open
+			// payloads are still measured by CompressBeforePrompt.
 			snapshot.ExactItemIDs = append(snapshot.ExactItemIDs, id)
 			if control := timelinePromotionForItem(item); control != nil && control.Kind == TimelinePromotedKindUserInput {
 				snapshot.UserContexts = append(snapshot.UserContexts, timelineCompressionUserContext{id, id <= snapshot.FrozenThroughID, control.Payload})
