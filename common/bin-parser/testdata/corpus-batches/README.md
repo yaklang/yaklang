@@ -44,7 +44,7 @@ Run from the repository root:
 ```sh
 go run ./internal/trafficfixture/cmd/corpus test
 go test -json -count=1 -timeout=5m ./internal/trafficfixture/... ./common/bin-parser/... ./common/pcapx/... ./common/yak/cmd/yakcmds/shark-cli ./scripts/ci > traffic.jsonl
-go run ./internal/trafficfixture/cmd/corpus exec -- python3 @scripts/protocol-tests/check_go_test_json_v2.py traffic.jsonl --inventory @scripts/protocol-tests/required-tests-traffic-unified-v49.json --tier full
+go run ./internal/trafficfixture/cmd/corpus exec -- python3 @scripts/protocol-tests/check_go_test_json_v2.py traffic.jsonl --inventory @scripts/protocol-tests/required-tests-traffic-unified-v50.json --tier full
 ```
 
 The single `corpus` entry point uses the same bounded Go ZIP loader as tests.
@@ -83,7 +83,7 @@ their semantic coverage. The existing synthetic session keys are test inputs;
 production credentials, user private keys and material without redistribution
 permission belong in an external fixed-source download manifest.
 
-Current test requirements are sealed at `scripts/protocol-tests/required-tests-traffic-unified-v49.json`;
+Current test requirements are sealed at `scripts/protocol-tests/required-tests-traffic-unified-v50.json`;
 the historical inventories and all earlier batches remain unchanged.
 The supplemental small-corpus batch contains 26 minimal controls, their explicit
 expected facts, an offline generator and the compact pinned source manifest.
@@ -203,7 +203,7 @@ opaque selector bytes and one bounded Data value over Wrapper v1 TCP/UDP; object
 selector meaning, access permission and device operation are unverified. The
 original one-packet selective-access capture and original refused answer remain
 immutable; its now-supported answer is matched by exact input SHA and frame.
-The active inventory is `scripts/protocol-tests/required-tests-traffic-unified-v49.json`.
+The active inventory is `scripts/protocol-tests/required-tests-traffic-unified-v50.json`.
 
 The small-graph budget batch reuses accepted graph captures/answers and adds one
 249-byte UDP control for child count255 without child bytes. Its standalone proof
@@ -993,7 +993,7 @@ the normative answer; a missing numeric reference field is not a codec pass.
 Full/deferred, workers1/2/4, observers off/on, Feed chunks1/7/full, ownership,
 resources and close/refusal boundaries remain required.
 
-Current gate: `required-tests-traffic-unified-v49.json` with
+Current gate: `required-tests-traffic-unified-v50.json` with
 `check_go_test_json_v2.py`. The indexed validator preserves missing/unpassed,
 package invocation completion, descendant skips, failures and non-JSON checks;
 its mutation/differential harness is sealed with the material. Older checkers
@@ -1116,3 +1116,28 @@ execution and indistinguishable reused-generation identity remain open.
 `validation-dnp3-application-context.zip` contains minimal authored positive and
 negative captures, independent complete field/session/error answers, source
 pins and deterministic generation/verification tools; current inventory is v49.
+
+
+`WithDNP3ReadPoints(true)` / `WithSessionDNP3ReadPoints(true)` explicitly select
+`dnp3-read-points` on TCP. Legacy header-only behavior remains the default.
+The selected observer decodes class READ selectors (G60V1..4, qualifier6), static
+binary input G1V2, binary output G10V2 and signed32 analog input G30V1.
+Point qualifiers0/1 provide inclusive8/16-bit ranges; qualifiers0x17/0x28 provide
+8/16-bit counts and explicit indices. Point values, complete quality flags,
+reserved bits and indices remain visible without asserting calibration or
+endpoint success. Duplicate static indices, truncated/descending/empty ranges
+and unsupported groups/qualifiers are explicit typed refusals. Static data
+cannot claim coverage from an observed READ that omitted class0. Only a decoded
+response consumes its observed pending request. Collection/depth limits are
+checked before allocation; refusal queries and normal trees preserve ownership.
+
+The source-derived case retains only the two complete DNP3 PDUs from the fixed
+CC-BY4.0 ICS-Security-Tools READ capture, with documentation network envelopes,
+necessary handshake/close and full attribution in `SOURCE-INPUT.json`.
+`validation-dnp3-read-points.zip` contains minimal cases, exact independent
+field/session/error answers and deterministic extraction/generation/check tools.
+Primary user-data link function is required before application state mutation;
+other control frames cannot smuggle requests through CRC-valid payloads.
+Other object/event/function layouts, fragment assembly, UDP, authentication,
+calibration/device execution and indistinguishable generation identity remain
+open. The active inventory is v50.

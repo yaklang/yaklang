@@ -73083,6 +73083,287 @@
         "common/pcapx/pcaputil/dnp3-application-context/reference.py": "dnp3-application-context/reference.py",
         "scripts/protocol-tests/required-tests-traffic-unified-v49.json": "required-tests-traffic-unified-v49.json"
       }
+    },
+    {
+      "id": "validation-dnp3-read-points",
+      "kind": "validation",
+      "source_sha": "aa7d3d58fce8ad85b7bdc5e5c3b10403025a4f36",
+      "file": "validation-dnp3-read-points.zip",
+      "sha256": "939b1cf7343d31fbd4d19bd520af5bcb493cbf96140b3ff7a99e5f016cf1cfe6",
+      "password": "bin-parser",
+      "members": {
+        "dnp3-read-points/answers/received-class-read-31-points.json": {
+          "sha256": "33ef3cc984f459589ed3c39bace76a44c69364aa1e4ade78bf77ecc4ca11f2d3",
+          "bytes": 28261
+        },
+        "dnp3-read-points/captures/received-class-read-31-points.pcap": {
+          "sha256": "266a698d670e1e115c4bfe4322b0b04e2b8282cbed2eb9f91843b489ea2cbbba",
+          "bytes": 746
+        },
+        "dnp3-read-points/answers/signed-and-index-boundaries.json": {
+          "sha256": "747bfa47c381f9e6428f6f476bcffa8fb7e5dd053dc6998c767afc41ef8c98d8",
+          "bytes": 7068
+        },
+        "dnp3-read-points/captures/signed-and-index-boundaries.pcap": {
+          "sha256": "f5bea291528c3abb453b056f44041fdb1f46d47dc861de4eeccf22540c627f39",
+          "bytes": 654
+        },
+        "dnp3-read-points/answers/index-prefix16.json": {
+          "sha256": "b527a272404bbf19680906d363ee831a80c296344d7d3b76203e57cf29db149f",
+          "bytes": 3268
+        },
+        "dnp3-read-points/captures/index-prefix16.pcap": {
+          "sha256": "acbcdf4b9648371725bf720906b448963a78b9c2ce647b262e9f04f9b17a788c",
+          "bytes": 633
+        },
+        "dnp3-read-points/answers/quality-flags.json": {
+          "sha256": "96696a546ef8b2d9fac8bb02899dacf2ac0ad54c21a580e9ba6be460467784b9",
+          "bytes": 5332
+        },
+        "dnp3-read-points/captures/quality-flags.pcap": {
+          "sha256": "2dd39f7e64e7c25963cd3f439ccaff082ab028d590360138ae34ed9e8207caf3",
+          "bytes": 643
+        },
+        "dnp3-read-points/answers/empty-response.json": {
+          "sha256": "99d8dd9dc59654cb60b9217ba0c5fa5e6c36a84b185df71f2c98bd6e6d58a73d",
+          "bytes": 2030
+        },
+        "dnp3-read-points/captures/empty-response.pcap": {
+          "sha256": "61160f55a5c0685ef1021c874babcdbd088321752eb6c0ff14d939396dac112e",
+          "bytes": 619
+        },
+        "dnp3-read-points/answers/missing-request.json": {
+          "sha256": "530e98eaf4fcf515fc0db048fa2332bfe0d8138a3890d583abd1ea59440f5aea",
+          "bytes": 6139
+        },
+        "dnp3-read-points/captures/missing-request.pcap": {
+          "sha256": "7c0e382aebcb9f1736530594c4af9f1a4ce28665b7139052ef496f0b2d30bcf5",
+          "bytes": 566
+        },
+        "dnp3-read-points/answers/wrong-sequence-retains.json": {
+          "sha256": "1cebeeeb978544f1ce801c41cef1bed53eca50eaa0ee6aad95625d01c36b2e9a",
+          "bytes": 13153
+        },
+        "dnp3-read-points/captures/wrong-sequence-retains.pcap": {
+          "sha256": "75f5992d73e02b991331c4cef967c8b2d89688171a916d5f7ae0545f04aa71cb",
+          "bytes": 776
+        },
+        "dnp3-read-points/answers/nonclass0-static-refused.json": {
+          "sha256": "1f0f24be90bf08cdbef3c3749c4e490894d3409ba2b2c7e17947f0d99a7e9a6b",
+          "bytes": 3187
+        },
+        "dnp3-read-points/captures/nonclass0-static-refused.pcap": {
+          "sha256": "12313922baac5890925b99fb2c7ce0864c1ad990cbcbd1e95a6d3c2b8d40f1b4",
+          "bytes": 741
+        },
+        "dnp3-read-points/answers/unsupported-group.json": {
+          "sha256": "89e30ae1aa17281213b4ecc4d5a4272ad32ba095f1d199567fa166037586df85",
+          "bytes": 8055
+        },
+        "dnp3-read-points/captures/unsupported-group.pcap": {
+          "sha256": "3b3834ae5e26a13cc0f90731b1105aa748a96f65142b782cd46d6e6feec9dce6",
+          "bytes": 747
+        },
+        "dnp3-read-points/answers/unsupported-variation.json": {
+          "sha256": "b204bf7b4de2bdadef75387ee04c946a6ebb9efe7f051d2e4c2d9d984cea4ad6",
+          "bytes": 8055
+        },
+        "dnp3-read-points/captures/unsupported-variation.pcap": {
+          "sha256": "2fe3fcac74be5fe57976aa326043a4ad45945c6c608b9ca5a965a7409e44c919",
+          "bytes": 747
+        },
+        "dnp3-read-points/answers/unsupported-qualifier.json": {
+          "sha256": "ff10e8e0a6280719bf103b5a22101f8394757479f1e7eb441c508add9301172b",
+          "bytes": 8041
+        },
+        "dnp3-read-points/captures/unsupported-qualifier.pcap": {
+          "sha256": "df3941a0860699fec3e7fa6222e18bcababd600fe75aa77820857e5ba73ca7db",
+          "bytes": 746
+        },
+        "dnp3-read-points/answers/truncated-header.json": {
+          "sha256": "fab5a23cb4def18d32c79210e77fd3e9ed55df5d45e2387748be8210206572c1",
+          "bytes": 8011
+        },
+        "dnp3-read-points/captures/truncated-header.pcap": {
+          "sha256": "365e103198b661034206b70d9e3ba5ca925a6c88fbbf34c31b3eb19f7f6d1e50",
+          "bytes": 743
+        },
+        "dnp3-read-points/answers/truncated-range.json": {
+          "sha256": "9ea13b6204a72c19f111fb453782e2a79544a4c0a2757da72583a3920fceee3c",
+          "bytes": 8022
+        },
+        "dnp3-read-points/captures/truncated-range.pcap": {
+          "sha256": "93bdd239d20bb165a9c61f9255f040ec24c4530e9c4fd7d8161ea6c9d2d8c73c",
+          "bytes": 745
+        },
+        "dnp3-read-points/answers/descending-range.json": {
+          "sha256": "f4f83c1aede0bbc6844c254c851ff71e565458aab327b1740b360bdec0aaa0c9",
+          "bytes": 8027
+        },
+        "dnp3-read-points/captures/descending-range.pcap": {
+          "sha256": "91ebebb99ac63cf486a659dbf21a6bc6ecc79f22e4806848b95a81bdc159ce59",
+          "bytes": 746
+        },
+        "dnp3-read-points/answers/truncated-values.json": {
+          "sha256": "6e3316147eb0669e79c7986e70cc9d37fec8219a3e7e0c7c51f91ab5220f7e21",
+          "bytes": 8038
+        },
+        "dnp3-read-points/captures/truncated-values.pcap": {
+          "sha256": "8aafb25cec42b5a09b591e1a6d2f6d0159ebb105c737f1701b0c8b94e57ab810",
+          "bytes": 748
+        },
+        "dnp3-read-points/answers/empty-index-count.json": {
+          "sha256": "7f28a275281c3bbf45e6fae57ee1489a6dc5591aa75364602c7c73a8687682d8",
+          "bytes": 8026
+        },
+        "dnp3-read-points/captures/empty-index-count.pcap": {
+          "sha256": "248b7412fa3fa9d263a6aa27fa445d5765637b37e62e4d8d1fb9906083fe1957",
+          "bytes": 745
+        },
+        "dnp3-read-points/answers/duplicate-index.json": {
+          "sha256": "e6ad29e1a1d3849241abc279dd63d93e5b8234ed20dd233bbff1e26d52ddccb8",
+          "bytes": 8048
+        },
+        "dnp3-read-points/captures/duplicate-index.pcap": {
+          "sha256": "05c14c08c7bbdabf02a88189dd83b3c5b50e896a459ffea41a2ca7bb7bbbd90e",
+          "bytes": 749
+        },
+        "dnp3-read-points/answers/empty-class-request.json": {
+          "sha256": "6eee6a28db2792e7a347c19554331fb8ff6df030de5574b86d99bd879162db9f",
+          "bytes": 7963
+        },
+        "dnp3-read-points/captures/empty-class-request.pcap": {
+          "sha256": "2669ab9bb4b10caa65804553c0744a0f937358bfa4d23d829a8409927758825a",
+          "bytes": 739
+        },
+        "dnp3-read-points/answers/truncated-class.json": {
+          "sha256": "d29f19b3bf8fb9bbdb32db47ef58dfa843fd60356d3910a2ebbc5c233946cda7",
+          "bytes": 7963
+        },
+        "dnp3-read-points/captures/truncated-class.pcap": {
+          "sha256": "2073895f02d5641924862927bc1d8ba2da003d7578fa09a9bb4636c9ee93862e",
+          "bytes": 741
+        },
+        "dnp3-read-points/answers/unsupported-class.json": {
+          "sha256": "3d1a5b652462a8f005737ecef7bfe3ed6335dcd8bddf3faa7b32d61451dec7fb",
+          "bytes": 7972
+        },
+        "dnp3-read-points/captures/unsupported-class.pcap": {
+          "sha256": "0d4a30e08a40972b1559e5ab485214f3abb1b38447421c61b55feac54a4a8050",
+          "bytes": 742
+        },
+        "dnp3-read-points/answers/duplicate-class.json": {
+          "sha256": "e4c4f65e08293c62304cf50c4ec407a92d296efa53e349462eeb15730bcac24d",
+          "bytes": 7985
+        },
+        "dnp3-read-points/captures/duplicate-class.pcap": {
+          "sha256": "3bba6a85f10da9946edecf9eb856574e966d72b110ceee443ab96dad5d917414",
+          "bytes": 745
+        },
+        "dnp3-read-points/manifest.json": {
+          "sha256": "572e74d7a96dd37f2deae651ed3449b77d7d55f1ef39b46e477719e042f56b8e",
+          "bytes": 7288
+        },
+        "dnp3-read-points/generate.py": {
+          "sha256": "b8ce0d00db6da1c5dd607357172cf687a4ffff1b5cbb8aacfd367c57474ab064",
+          "bytes": 8960
+        },
+        "dnp3-read-points/verify.py": {
+          "sha256": "2aca6795f8a2324dd1c90c4c9747a95220f2b5b2d682674344373d3633ec0baf",
+          "bytes": 1845
+        },
+        "dnp3-read-points/MODEL-PINS.json": {
+          "sha256": "b2d88fa06888b0aa75ff8184f2df4530606feef986509cd17bfc0396912dceea",
+          "bytes": 543
+        },
+        "dnp3-read-points/SOURCE-PINS.json": {
+          "sha256": "d8108e101cc099d318dfb7ef97e52c5a8acdf1b286b26bb201e91791e7860ecb",
+          "bytes": 2549
+        },
+        "dnp3-read-points/SOURCE-INPUT.json": {
+          "sha256": "70e91886ad27cae8428bd3500e69c5698ae124faf21b9aa5562de72dec87708a",
+          "bytes": 1667
+        },
+        "dnp3-read-points/seal.py": {
+          "sha256": "2ed3952589ab4633ee0c1e324e092b3c0827e8736f0e00352b661b40973f7ed0",
+          "bytes": 4082
+        },
+        "dnp3-read-points/REFERENCE-ACTUAL.json": {
+          "sha256": "ba5f8da70e973cc09e3c626fccdfaa0caad00e0c911a7c3886f27c1aa1f5715d",
+          "bytes": 1674
+        },
+        "dnp3-read-points/reference.py": {
+          "sha256": "8a9269c179530d36e7daf2bd0352068c496131797d17dfe1c3970eafa9f3affb",
+          "bytes": 3253
+        },
+        "dnp3-read-points/guard-vectors.json": {
+          "sha256": "2566a25df105ec40d05e30fe9ca338e0d259f1e1ed4d63c5fafc5f68364e5b71",
+          "bytes": 943
+        },
+        "required-tests-traffic-unified-v50.json": {
+          "sha256": "57f71f9d6050616023a97f20ce951a7e1cc00bef416d102f66ceffde93b282d7",
+          "bytes": 9898961
+        },
+        "validation/expected.json": {
+          "sha256": "84f788b031a24870ce3f8fc6dbb0d415e66cf92d3894815b3de707b95e7d4e10",
+          "bytes": 25786
+        }
+      },
+      "aliases": {
+        "common/pcapx/pcaputil/dnp3-read-points/answers/received-class-read-31-points.json": "dnp3-read-points/answers/received-class-read-31-points.json",
+        "common/pcapx/pcaputil/dnp3-read-points/captures/received-class-read-31-points.pcap": "dnp3-read-points/captures/received-class-read-31-points.pcap",
+        "common/pcapx/pcaputil/dnp3-read-points/answers/signed-and-index-boundaries.json": "dnp3-read-points/answers/signed-and-index-boundaries.json",
+        "common/pcapx/pcaputil/dnp3-read-points/captures/signed-and-index-boundaries.pcap": "dnp3-read-points/captures/signed-and-index-boundaries.pcap",
+        "common/pcapx/pcaputil/dnp3-read-points/answers/index-prefix16.json": "dnp3-read-points/answers/index-prefix16.json",
+        "common/pcapx/pcaputil/dnp3-read-points/captures/index-prefix16.pcap": "dnp3-read-points/captures/index-prefix16.pcap",
+        "common/pcapx/pcaputil/dnp3-read-points/answers/quality-flags.json": "dnp3-read-points/answers/quality-flags.json",
+        "common/pcapx/pcaputil/dnp3-read-points/captures/quality-flags.pcap": "dnp3-read-points/captures/quality-flags.pcap",
+        "common/pcapx/pcaputil/dnp3-read-points/answers/empty-response.json": "dnp3-read-points/answers/empty-response.json",
+        "common/pcapx/pcaputil/dnp3-read-points/captures/empty-response.pcap": "dnp3-read-points/captures/empty-response.pcap",
+        "common/pcapx/pcaputil/dnp3-read-points/answers/missing-request.json": "dnp3-read-points/answers/missing-request.json",
+        "common/pcapx/pcaputil/dnp3-read-points/captures/missing-request.pcap": "dnp3-read-points/captures/missing-request.pcap",
+        "common/pcapx/pcaputil/dnp3-read-points/answers/wrong-sequence-retains.json": "dnp3-read-points/answers/wrong-sequence-retains.json",
+        "common/pcapx/pcaputil/dnp3-read-points/captures/wrong-sequence-retains.pcap": "dnp3-read-points/captures/wrong-sequence-retains.pcap",
+        "common/pcapx/pcaputil/dnp3-read-points/answers/nonclass0-static-refused.json": "dnp3-read-points/answers/nonclass0-static-refused.json",
+        "common/pcapx/pcaputil/dnp3-read-points/captures/nonclass0-static-refused.pcap": "dnp3-read-points/captures/nonclass0-static-refused.pcap",
+        "common/pcapx/pcaputil/dnp3-read-points/answers/unsupported-group.json": "dnp3-read-points/answers/unsupported-group.json",
+        "common/pcapx/pcaputil/dnp3-read-points/captures/unsupported-group.pcap": "dnp3-read-points/captures/unsupported-group.pcap",
+        "common/pcapx/pcaputil/dnp3-read-points/answers/unsupported-variation.json": "dnp3-read-points/answers/unsupported-variation.json",
+        "common/pcapx/pcaputil/dnp3-read-points/captures/unsupported-variation.pcap": "dnp3-read-points/captures/unsupported-variation.pcap",
+        "common/pcapx/pcaputil/dnp3-read-points/answers/unsupported-qualifier.json": "dnp3-read-points/answers/unsupported-qualifier.json",
+        "common/pcapx/pcaputil/dnp3-read-points/captures/unsupported-qualifier.pcap": "dnp3-read-points/captures/unsupported-qualifier.pcap",
+        "common/pcapx/pcaputil/dnp3-read-points/answers/truncated-header.json": "dnp3-read-points/answers/truncated-header.json",
+        "common/pcapx/pcaputil/dnp3-read-points/captures/truncated-header.pcap": "dnp3-read-points/captures/truncated-header.pcap",
+        "common/pcapx/pcaputil/dnp3-read-points/answers/truncated-range.json": "dnp3-read-points/answers/truncated-range.json",
+        "common/pcapx/pcaputil/dnp3-read-points/captures/truncated-range.pcap": "dnp3-read-points/captures/truncated-range.pcap",
+        "common/pcapx/pcaputil/dnp3-read-points/answers/descending-range.json": "dnp3-read-points/answers/descending-range.json",
+        "common/pcapx/pcaputil/dnp3-read-points/captures/descending-range.pcap": "dnp3-read-points/captures/descending-range.pcap",
+        "common/pcapx/pcaputil/dnp3-read-points/answers/truncated-values.json": "dnp3-read-points/answers/truncated-values.json",
+        "common/pcapx/pcaputil/dnp3-read-points/captures/truncated-values.pcap": "dnp3-read-points/captures/truncated-values.pcap",
+        "common/pcapx/pcaputil/dnp3-read-points/answers/empty-index-count.json": "dnp3-read-points/answers/empty-index-count.json",
+        "common/pcapx/pcaputil/dnp3-read-points/captures/empty-index-count.pcap": "dnp3-read-points/captures/empty-index-count.pcap",
+        "common/pcapx/pcaputil/dnp3-read-points/answers/duplicate-index.json": "dnp3-read-points/answers/duplicate-index.json",
+        "common/pcapx/pcaputil/dnp3-read-points/captures/duplicate-index.pcap": "dnp3-read-points/captures/duplicate-index.pcap",
+        "common/pcapx/pcaputil/dnp3-read-points/answers/empty-class-request.json": "dnp3-read-points/answers/empty-class-request.json",
+        "common/pcapx/pcaputil/dnp3-read-points/captures/empty-class-request.pcap": "dnp3-read-points/captures/empty-class-request.pcap",
+        "common/pcapx/pcaputil/dnp3-read-points/answers/truncated-class.json": "dnp3-read-points/answers/truncated-class.json",
+        "common/pcapx/pcaputil/dnp3-read-points/captures/truncated-class.pcap": "dnp3-read-points/captures/truncated-class.pcap",
+        "common/pcapx/pcaputil/dnp3-read-points/answers/unsupported-class.json": "dnp3-read-points/answers/unsupported-class.json",
+        "common/pcapx/pcaputil/dnp3-read-points/captures/unsupported-class.pcap": "dnp3-read-points/captures/unsupported-class.pcap",
+        "common/pcapx/pcaputil/dnp3-read-points/answers/duplicate-class.json": "dnp3-read-points/answers/duplicate-class.json",
+        "common/pcapx/pcaputil/dnp3-read-points/captures/duplicate-class.pcap": "dnp3-read-points/captures/duplicate-class.pcap",
+        "common/pcapx/pcaputil/dnp3-read-points/manifest.json": "dnp3-read-points/manifest.json",
+        "common/pcapx/pcaputil/dnp3-read-points/generate.py": "dnp3-read-points/generate.py",
+        "common/pcapx/pcaputil/dnp3-read-points/verify.py": "dnp3-read-points/verify.py",
+        "common/pcapx/pcaputil/dnp3-read-points/MODEL-PINS.json": "dnp3-read-points/MODEL-PINS.json",
+        "common/pcapx/pcaputil/dnp3-read-points/SOURCE-PINS.json": "dnp3-read-points/SOURCE-PINS.json",
+        "common/pcapx/pcaputil/dnp3-read-points/SOURCE-INPUT.json": "dnp3-read-points/SOURCE-INPUT.json",
+        "common/pcapx/pcaputil/dnp3-read-points/seal.py": "dnp3-read-points/seal.py",
+        "common/pcapx/pcaputil/dnp3-read-points/REFERENCE-ACTUAL.json": "dnp3-read-points/REFERENCE-ACTUAL.json",
+        "common/pcapx/pcaputil/dnp3-read-points/reference.py": "dnp3-read-points/reference.py",
+        "common/pcapx/pcaputil/dnp3-read-points/guard-vectors.json": "dnp3-read-points/guard-vectors.json",
+        "scripts/protocol-tests/required-tests-traffic-unified-v50.json": "required-tests-traffic-unified-v50.json"
+      }
     }
   ],
   "schema_version": 1,

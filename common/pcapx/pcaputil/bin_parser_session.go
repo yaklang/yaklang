@@ -313,7 +313,7 @@ func (f *binFlow) detectDirection(dir int, wire []byte) {
 	case "modbus":
 		f.protocol, f.modbus = "modbus", &binModbus{pending: map[uint16]modbusRequest{}, maxPending: f.a.budget.MaxCollectionElements}
 	case "dnp3":
-		f.protocol, f.dnp3 = "dnp3", &binDNP3{pending: map[dnp3RequestKey]dnp3Request{}, maxPending: f.a.budget.MaxCollectionElements, reserve: f.reserveSession}
+		f.protocol, f.dnp3 = "dnp3", &binDNP3{pending: map[dnp3RequestKey]dnp3Request{}, maxPending: f.a.budget.MaxCollectionElements, reserve: f.reserveSession, maxDepth: f.a.budget.MaxRecursionDepth, readPoints: f.a.config.DecodeDNP3ReadPoints}
 	case "c37118":
 		f.protocol, f.c37118 = "c37118", &binC37118{}
 	case "syslog":
@@ -656,7 +656,20 @@ func (f *binFlow) consumeSession(dir int, e *ProtocolEvent, result map[string]an
 	case "modbus":
 		e.Session, err = f.modbus.consume(dir, e.Raw)
 	case "dnp3":
+		if f.dnp3.readPoints {
+			e.Profile = "dnp3-read-points"
+		}
 		e.Session, err = f.dnp3.consume(dir, e.Raw)
+		if err == nil && f.dnp3.readPoints {
+			fields := cloneSession(protocolFields(result))
+			for _, key := range []string{"Objects", "Class Selectors", "Class Context"} {
+				if v, ok := e.Session[key]; ok {
+					fields[key] = cloneSessionValue(v)
+				}
+			}
+			result["fields"] = fields
+		}
+
 	case "c37118":
 		f.advanceC37118ContinuationClock(dir)
 		e.Profile = f.c37118Profile(dir, e.Raw)

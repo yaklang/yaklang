@@ -16,11 +16,14 @@ type dnp3RequestKey struct {
 }
 type dnp3Request struct {
 	function byte
+	classes  byte
 	digest   [32]byte
 }
 type binDNP3 struct {
 	pending    map[dnp3RequestKey]dnp3Request
 	maxPending int
+	maxDepth   int
+	readPoints bool
 	reserve    func(int64) error
 }
 
@@ -31,11 +34,15 @@ func probeDNP3(w []byte, limit int) ProbeResult {
 	if len(w) < 10 {
 		return probeNeed("dnp3", "ieee1815", len(w), 10)
 	}
-	if !dnp3HeaderCRCValid(w[:10]) {
+	if w[2] < 5 || w[2] > 5 && !dnp3UserDataControl(w[3]) || !dnp3HeaderCRCValid(w[:10]) {
 		return ProbeResult{Verdict: ProbeReject}
 	}
 	_ = limit
 	return probeAccept("dnp3", "ieee1815", 94)
+}
+
+func dnp3UserDataControl(control byte) bool {
+	return control&0x40 != 0 && (control&15 == 3 || control&15 == 4)
 }
 
 func dnp3CRC(data []byte) uint16 {
@@ -171,6 +178,9 @@ func (s *binDNP3) consume(dir int, raw []byte) (map[string]any, error) {
 	if err != nil {
 		return nil, err
 	}
+	if len(user) > 0 && !dnp3UserDataControl(raw[3]) {
+		return nil, protocolError(ErrMalformedMessage, "DNP3 application bytes require primary user-data link function")
+	}
 	if s.pending == nil {
 		s.pending = map[dnp3RequestKey]dnp3Request{}
 	}
@@ -214,6 +224,17 @@ func (s *binDNP3) consume(dir int, raw []byte) (map[string]any, error) {
 			return out, protocolError(ErrMalformedMessage, "dnp3: response function disagrees with UNS bit")
 		}
 	}
+	classes := byte(0)
+	if s.readPoints {
+		var err error
+		classes, err = s.observePoints(out, dir, src, dest, user)
+		if err != nil {
+			if pe, ok := err.(*ProtocolError); ok && pe.Kind == ErrResourceExceeded {
+				return nil, err
+			}
+			return out, err
+		}
+	}
 	switch fc {
 	case 0:
 		// Confirm acknowledges application delivery, not a request for a
@@ -240,7 +261,7 @@ func (s *binDNP3) consume(dir int, raw []byte) (map[string]any, error) {
 			return out, protocolError(ErrMalformedMessage, "dnp3: invalid solicited request control")
 		}
 		key := dnp3RequestKey{dir, src, dest, seq}
-		req := dnp3Request{fc, sha256.Sum256(user[1:])}
+		req := dnp3Request{function: fc, classes: classes, digest: sha256.Sum256(user[1:])}
 		if old, ok := s.pending[key]; ok {
 			if old != req {
 				delete(s.pending, key)
