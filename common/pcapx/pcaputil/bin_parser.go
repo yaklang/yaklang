@@ -358,6 +358,8 @@ type BinParserConfig struct {
 	DecodeDNP3StaticStatusPoints bool
 	// DecodeDNP3BinaryEvents selects indexed binary events and message-local CTO.
 	DecodeDNP3BinaryEvents bool
+	// DecodeDNP3AnalogEvents selects indexed G32/G42 analog events.
+	DecodeDNP3AnalogEvents bool
 	// MMSISOPorts explicitly selects bounded RFC1006/COTP/presentation/MMS observations.
 	MMSISOPorts             []uint16
 	DecodeMMSServiceValues  bool
@@ -794,6 +796,12 @@ func (f *binFlow) event(dir int, raw []byte, status, detail string) *BinParserEv
 	}
 	if f.protocol == "dnp3" && f.a.config.DecodeDNP3BinaryEvents {
 		e.Profile = "dnp3-binary-events"
+		if f.a.config.DecodeDNP3TransportFragments {
+			e.Profile += "-transport"
+		}
+	}
+	if f.protocol == "dnp3" && f.a.config.DecodeDNP3AnalogEvents {
+		e.Profile = "dnp3-analog-events"
 		if f.a.config.DecodeDNP3TransportFragments {
 			e.Profile += "-transport"
 		}

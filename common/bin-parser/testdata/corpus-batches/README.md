@@ -44,7 +44,7 @@ Run from the repository root:
 ```sh
 go run ./internal/trafficfixture/cmd/corpus test
 go test -json -count=1 -timeout=5m ./internal/trafficfixture/... ./common/bin-parser/... ./common/pcapx/... ./common/yak/cmd/yakcmds/shark-cli ./scripts/ci > traffic.jsonl
-go run ./internal/trafficfixture/cmd/corpus exec -- python3 @scripts/protocol-tests/check_go_test_json_v2.py traffic.jsonl --inventory @scripts/protocol-tests/required-tests-traffic-unified-v60.json --tier full
+go run ./internal/trafficfixture/cmd/corpus exec -- python3 @scripts/protocol-tests/check_go_test_json_v2.py traffic.jsonl --inventory @scripts/protocol-tests/required-tests-traffic-unified-v61.json --tier full
 ```
 
 The single `corpus` entry point uses the same bounded Go ZIP loader as tests.
@@ -83,7 +83,7 @@ their semantic coverage. The existing synthetic session keys are test inputs;
 production credentials, user private keys and material without redistribution
 permission belong in an external fixed-source download manifest.
 
-Current test requirements are sealed at `scripts/protocol-tests/required-tests-traffic-unified-v60.json`;
+Current test requirements are sealed at `scripts/protocol-tests/required-tests-traffic-unified-v61.json`;
 the historical inventories and all earlier batches remain unchanged.
 The supplemental small-corpus batch contains 26 minimal controls, their explicit
 expected facts, an offline generator and the compact pinned source manifest.
@@ -203,7 +203,7 @@ opaque selector bytes and one bounded Data value over Wrapper v1 TCP/UDP; object
 selector meaning, access permission and device operation are unverified. The
 original one-packet selective-access capture and original refused answer remain
 immutable; its now-supported answer is matched by exact input SHA and frame.
-The active inventory is `scripts/protocol-tests/required-tests-traffic-unified-v60.json`.
+The active inventory is `scripts/protocol-tests/required-tests-traffic-unified-v61.json`.
 
 The small-graph budget batch reuses accepted graph captures/answers and adds one
 249-byte UDP control for child count255 without child bytes. Its standalone proof
@@ -993,7 +993,7 @@ the normative answer; a missing numeric reference field is not a codec pass.
 Full/deferred, workers1/2/4, observers off/on, Feed chunks1/7/full, ownership,
 resources and close/refusal boundaries remain required.
 
-Current gate: `required-tests-traffic-unified-v60.json` with
+Current gate: `required-tests-traffic-unified-v61.json` with
 `check_go_test_json_v2.py`. The indexed validator preserves missing/unpassed,
 package invocation completion, descendant skips, failures and non-JSON checks;
 its mutation/differential harness is sealed with the material. Older checkers
@@ -1229,7 +1229,7 @@ opendnp3 READ handler/database source supplies selector semantics. Requested
 specific variations, other direct object groups, index-prefix READs, packed
 binary observations, application fragments, UDP/authentication/device/completeness
 and generation identity remain open. No historical batch is rewritten. Current
-This preceding batch used v53; the current effective entry is v60.
+This preceding batch used v53; the current effective entry is v61.
 
 
 ### Selected typed static DNP3 READ and packed binary points
@@ -1268,7 +1268,7 @@ are sealed. This is not full SDK, serializer, endpoint, authenticated identity,
 real database/configuration, range-completeness or physical measurement proof.
 Other static/event groups, G10V1, index-prefix READ, application fragments, UDP
 and security remain active unimplemented requirements. No historical batch is
-rewritten. That batch used v54 (23,767 checks); the current full mandatory entry is v60 (28,934 checks); older
+rewritten. That batch used v54 (23,767 checks); the current full mandatory entry is v61 (31,437 checks); older
 inventories above describe their historical delivery snapshots.
 
 
@@ -1368,7 +1368,7 @@ checks. Fixed LinkContext::OnFrame code is executed with a declared fresh
 receiver and no-op dispatch adapters; actual TShark fields remain separate.
 These observed-only boundaries do not certify full SDK delivery, authentication,
 physical devices, role identity or operational success. Historical ZIPs are
-immutable. That role batch used v57; the current full inventory is v60,28,934 required checks.
+immutable. That role batch used v57; the current full inventory is v61,31,437 required checks.
 
 
 ### DNP3 direct count-limited event READ observations
@@ -1392,8 +1392,8 @@ Finite count selectors mixed with event-class selectors remain refused because
 wire points do not report their class. Class-count READs, application fragments,
 wider event groups, device defaults/class/configuration/completeness, security
 and complete endpoint execution remain pending requirements. Historical ZIPs
-and original answers remain immutable. That count batch used v58,26,847 checks. Current effective full entry: v60,
-28,934 mandatory checks; reference and API-contract evidence are distinct.
+and original answers remain immutable. That count batch used v58,26,847 checks. Current effective full entry: v61,
+31,437 mandatory checks; reference and API-contract evidence are distinct.
 
 
 ### DNP3 static status observations and selected-snapshot isolation
@@ -1424,7 +1424,7 @@ ser4cpp float converters lose signed zero, NaN payload and subnormals. Those
 actual differences are retained as reference limitations, not bit-oracle passes;
 wire/Python/TShark expectations and IUT assertions are not weakened to mimic them.
 All previous ZIPs and answers are immutable. That status batch used v59,27,799 full required entries; current effective gate:
-v60,28,934 full required entries. Source/API and independent semantic proof remain
+v61,31,437 full required entries. Source/API and independent semantic proof remain
 separate from replay agreement and unresolved quality/device semantics.
 
 
@@ -1453,3 +1453,29 @@ double-bit scalar gaps are kept distinct from executed SDK evidence.
 All historical archives and answers stay immutable. Current effective inventory:
 v60, 28,934 full required entries. Original raw inputs lacking semantic oracles
 and inherited quality/device gaps remain pending, regardless of replay agreement.
+
+
+### Selected analog events
+
+`WithDNP3AnalogEvents` / Session counterpart select TCP G32/G42V1..8
+indexed observations and explicit V0/concrete all/count READs. Signed16/32,
+IEEE binary32/64 raw bits and time48 preserve wire widths. Ordered repeated-index
+event records and independent per-type first-unselected quotas retain refused
+request context. Binary/counter events and typed static observations remain available;
+explicit transport composition keeps original link and assembled application bytes.
+G32 quality flags remain literal observations; disputed G42 bits5/6 remain
+`Uninterpreted Quality Bits`. Absolute timestamp quality and point class stay
+unreported, without clock/device/default/configuration/units/security inference.
+
+The 138 authored minimal inputs have complete byte/field/Session/direction/order/
+ID/association/error/budget/ownership answers, 138x12 capture and 138x3 native
+configurations, plus count/depth/admission/Close boundaries. Pinned codec,selection
+and TransportRx methods actually execute through declared adapters; TShark checks
+wire values independently. 59 actual reference IEEE conversion losses preserve
+input-bound proof of non-equivalence. IUT/Python/TShark raw-bit/negative-zero/NaN/
+subnormal assertions remain strict. G42 quality meaning and all inherited original
+requirements remain pending where independent semantics are missing.
+
+All previous ZIPs and original answers remain immutable. Current effective
+inventory: v61, 31,437 full required entries. Wider objects, class-count mixing,
+application fragments and device/endpoint completeness are not certified.

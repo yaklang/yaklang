@@ -31,7 +31,7 @@ type dnp3StaticSelector struct {
 	count            uint16 // zero means unbounded; count READs reject zero on the wire
 }
 
-func dnp3DirectReadHeaders(b []byte, limit int, typed, counters, events, counts, statuses, binaries bool) ([]any, byte, []dnp3StaticSelector, []any, error) {
+func dnp3DirectReadHeaders(b []byte, limit int, typed, counters, events, counts, statuses, binaries, analogs bool) ([]any, byte, []dnp3StaticSelector, []any, error) {
 	classes := []any{}
 	mask := byte(0)
 	selectors := []dnp3StaticSelector{}
@@ -66,7 +66,7 @@ func dnp3DirectReadHeaders(b []byte, limit int, typed, counters, events, counts,
 				}
 			}
 			if events && v > 1 {
-				for _, group := range dnp3ObservedEventGroups(binaries) {
+				for _, group := range dnp3ObservedEventGroups(binaries, analogs) {
 					selectors = append(selectors, dnp3StaticSelector{all: true, group: group})
 				}
 			}
@@ -81,9 +81,9 @@ func dnp3DirectReadHeaders(b []byte, limit int, typed, counters, events, counts,
 			if statuses {
 				valid = valid || (g == 3 && v <= 2) || (g == 10 && v == 1) || (g == 40 && v <= 4)
 			}
-			isEvent := events && (g == 22 || g == 23) || binaries && (g == 2 || g == 4 || g == 11)
+			isEvent := events && (g == 22 || g == 23) || binaries && (g == 2 || g == 4 || g == 11) || analogs && (g == 32 || g == 42)
 			if isEvent {
-				valid = v == 0 || dnp3CounterEventWidth(g, v) > 0 || binaries && dnp3BinaryEventWidth(g, v) > 0
+				valid = v == 0 || dnp3CounterEventWidth(g, v) > 0 || binaries && dnp3BinaryEventWidth(g, v) > 0 || analogs && dnp3AnalogEventWidth(g, v) > 0
 				if q != 6 && (!counts || (q != 7 && q != 8)) {
 					return fail(ErrUnsupportedFeature, "DNP3 event READ requires all-object qualifier")
 				}

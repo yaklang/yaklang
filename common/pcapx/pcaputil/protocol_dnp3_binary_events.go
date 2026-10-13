@@ -37,7 +37,10 @@ func dnp3BinaryEventWidth(g, v byte) int {
 	return 0
 }
 
-func dnp3ObservedEventGroups(binaryEvents bool) []byte {
+func dnp3ObservedEventGroups(binaryEvents, analogEvents bool) []byte {
+	if analogEvents {
+		return []byte{2, 4, 11, 22, 23, 32, 42}
+	}
 	if binaryEvents {
 		return []byte{2, 4, 11, 22, 23}
 	}
@@ -56,6 +59,10 @@ func dnp3EventCursorIndex(g byte) int {
 		return 3
 	case 23:
 		return 4
+	case 32:
+		return 5
+	case 42:
+		return 6
 	}
 	return -1
 }

@@ -78619,6 +78619,1487 @@
         "common/pcapx/pcaputil/dnp3-binary-events/TRANSPORT-SOURCE-PINS.json": "dnp3-binary-events/TRANSPORT-SOURCE-PINS.json",
         "scripts/protocol-tests/required-tests-traffic-unified-v60.json": "required-tests-traffic-unified-v60.json"
       }
+    },
+    {
+      "id": "validation-dnp3-analog-events",
+      "kind": "validation",
+      "source_sha": "1ea1c926a4f6b250bf427577c79e327a9e0290b2",
+      "file": "validation-dnp3-analog-events.zip",
+      "sha256": "00e095052e96421bf12e62646a3ceea9d90ebf542f6883559a77ff87d1051646",
+      "password": "bin-parser",
+      "members": {
+        "dnp3-analog-events/captures/all-g32v1-request1.pcap": {
+          "sha256": "938819c0f9d3037a0883aec5dfcc5ee040b0a35f77f795343cde2b127cb8bcf4",
+          "bytes": 647
+        },
+        "dnp3-analog-events/answers/all-g32v1-request1.json": {
+          "sha256": "0aed8c2bf2af3b4d7943cc44214f06e6537f618b1041e8f1fe94241bc3ddc6ee",
+          "bytes": 5854
+        },
+        "dnp3-analog-events/captures/all-g32v1-request0.pcap": {
+          "sha256": "fee9da7593fb4f02a76dea8ab6a04a8488a32f0e58d9ef81ea9ca9d9bdce6bf2",
+          "bytes": 647
+        },
+        "dnp3-analog-events/answers/all-g32v1-request0.json": {
+          "sha256": "30a51f2e9eb232b9d37f45c6d01e204d3a643bb2159bdf1437341f01185738c9",
+          "bytes": 5854
+        },
+        "dnp3-analog-events/captures/count8-g32v1.pcap": {
+          "sha256": "b0e1393ecc4c8018fbea4cfc6330afd78f08cce08280a5aa1f0ae82161d06219",
+          "bytes": 648
+        },
+        "dnp3-analog-events/answers/count8-g32v1.json": {
+          "sha256": "e9f7c0c6abf4cec445eadb322cd83318282b1133f0d6f0bcf6e43617809686b4",
+          "bytes": 5856
+        },
+        "dnp3-analog-events/captures/count16-g32v1.pcap": {
+          "sha256": "f30686e34e316ab6330089fa0a871a53b93475fe9ef226fcbfcda7d5dec42e8a",
+          "bytes": 649
+        },
+        "dnp3-analog-events/answers/count16-g32v1.json": {
+          "sha256": "dccdf872541cba4999a9a1a6e0cad53001cbf1659dd6f8c88e7dc199ad8dbdec",
+          "bytes": 5864
+        },
+        "dnp3-analog-events/captures/all-g32v2-request2.pcap": {
+          "sha256": "31305457d98fa1a6f2cd7bd7a5b48cd62ad1847296a0b9bff28dee06eb7a699e",
+          "bytes": 641
+        },
+        "dnp3-analog-events/answers/all-g32v2-request2.json": {
+          "sha256": "2602b095e2f52b55fba0adb722a998b6f16e17bac24a53a39988d799ac4b5ac2",
+          "bytes": 5802
+        },
+        "dnp3-analog-events/captures/all-g32v2-request0.pcap": {
+          "sha256": "a70412cef0dfc745d0204b34a19d18abdf29b7b212051c0d8c7f94b6637817f6",
+          "bytes": 641
+        },
+        "dnp3-analog-events/answers/all-g32v2-request0.json": {
+          "sha256": "11a6c5de3efa2f75ffe1ad9836db78676f2614c67954364c07e6078f85b85c00",
+          "bytes": 5802
+        },
+        "dnp3-analog-events/captures/count8-g32v2.pcap": {
+          "sha256": "5742cad50760160a9dc2b83145d1dea6138e9d7323cf25af7385ce47da442511",
+          "bytes": 642
+        },
+        "dnp3-analog-events/answers/count8-g32v2.json": {
+          "sha256": "3d00d66536105c818f8391e5e5a281655425d6d16a5812020a94935b37d603b8",
+          "bytes": 5804
+        },
+        "dnp3-analog-events/captures/count16-g32v2.pcap": {
+          "sha256": "1b343473833651e3fb42cc10aab051ea856476a7de53b8b7c8e2cdb7d9e08d52",
+          "bytes": 643
+        },
+        "dnp3-analog-events/answers/count16-g32v2.json": {
+          "sha256": "2a2a4be65e43f27162f6e19df326c66d37e946eebd62c2975309ce0fcf36c71e",
+          "bytes": 5812
+        },
+        "dnp3-analog-events/captures/all-g32v3-request3.pcap": {
+          "sha256": "1d5274906114a1ca9404de371831ce48c0befebc878afd017d2c94d82ee7beea",
+          "bytes": 669
+        },
+        "dnp3-analog-events/answers/all-g32v3-request3.json": {
+          "sha256": "b90aa690a25596773c76a5fc9a1f52a1e0aa9897d90e558fdce4f66a81a97c9b",
+          "bytes": 6564
+        },
+        "dnp3-analog-events/captures/all-g32v3-request0.pcap": {
+          "sha256": "b55c139b7a192bb7206987f29ed47ffba8dcbeec0c834e2d73cb5dd71661eb9a",
+          "bytes": 669
+        },
+        "dnp3-analog-events/answers/all-g32v3-request0.json": {
+          "sha256": "05b84697a9a299f5d7d9598d31975c9e06bbd04f70976aa7074dfd6554113026",
+          "bytes": 6564
+        },
+        "dnp3-analog-events/captures/count8-g32v3.pcap": {
+          "sha256": "c514860aa1e26968432ea58c3a735c80e445bf68b35bb3a2d734899af4d8b286",
+          "bytes": 670
+        },
+        "dnp3-analog-events/answers/count8-g32v3.json": {
+          "sha256": "7be80d36cc1b0df5909428c52b17a14af33be2100b23e351027dc433a86b09c6",
+          "bytes": 6566
+        },
+        "dnp3-analog-events/captures/count16-g32v3.pcap": {
+          "sha256": "e860375c5c6e86acfe917f5ce93e2e08ffc8aae141fea45026cf5515b7defcd4",
+          "bytes": 671
+        },
+        "dnp3-analog-events/answers/count16-g32v3.json": {
+          "sha256": "d48be9301c292d50c69d65a4eb2947552ad32faf7d37fb23f84a0d7962b0d898",
+          "bytes": 6574
+        },
+        "dnp3-analog-events/captures/all-g32v4-request4.pcap": {
+          "sha256": "f3b642d75809792545fdf0ceebd85f50dd08c0b730cbeb5e665814fbfd53c8e5",
+          "bytes": 661
+        },
+        "dnp3-analog-events/answers/all-g32v4-request4.json": {
+          "sha256": "c7dd36a2dfaf6c49ef717b642eb63b7e7204ac52bf86a0af55205fe26a404eb9",
+          "bytes": 6504
+        },
+        "dnp3-analog-events/captures/all-g32v4-request0.pcap": {
+          "sha256": "ace506ecf7f3aa88c8bb298318ab9b2f0711100acf02dc0d4cd57f9632e5d4da",
+          "bytes": 661
+        },
+        "dnp3-analog-events/answers/all-g32v4-request0.json": {
+          "sha256": "eb21b31cad19855d066dd979758035cba99ea08b1e4d54c09117a6dfb8daed56",
+          "bytes": 6504
+        },
+        "dnp3-analog-events/captures/count8-g32v4.pcap": {
+          "sha256": "64dcc06c140ab19b54edb115fc9ada6e2c795a932ab86ab3f684e3a04b2dcd18",
+          "bytes": 662
+        },
+        "dnp3-analog-events/answers/count8-g32v4.json": {
+          "sha256": "b1d121df5d1713593eb5b9832cec89aff0c7bdfc171b4f4d5cebefd2b6a520d5",
+          "bytes": 6506
+        },
+        "dnp3-analog-events/captures/count16-g32v4.pcap": {
+          "sha256": "7b414e3ea56087d7690f7f7d0082471c64f54d817f9e15ab7299d6d714677840",
+          "bytes": 663
+        },
+        "dnp3-analog-events/answers/count16-g32v4.json": {
+          "sha256": "17ee3a6a4bcab1de98ddfd26bd5c7f7164578c3d9fea0d2ec44c1cff481f5ced",
+          "bytes": 6514
+        },
+        "dnp3-analog-events/captures/all-g32v5-request5.pcap": {
+          "sha256": "981ba2a37db0ddd08833fcc46bf29be1231f14ef42ba3778f0770f9e3112b768",
+          "bytes": 647
+        },
+        "dnp3-analog-events/answers/all-g32v5-request5.json": {
+          "sha256": "4714a12cd2c4735d5984715b8be21cafced1c00537bd96ef9f3ee161bdc3ee7a",
+          "bytes": 6568
+        },
+        "dnp3-analog-events/captures/all-g32v5-request0.pcap": {
+          "sha256": "945f79feb9162153773114526d53144987056fb5acf0b044126aeacfa72b810f",
+          "bytes": 647
+        },
+        "dnp3-analog-events/answers/all-g32v5-request0.json": {
+          "sha256": "ca191f1a50a0a33d065c44c700426bbb9327bb1ccea1d56bd797222858865cb2",
+          "bytes": 6568
+        },
+        "dnp3-analog-events/captures/count8-g32v5.pcap": {
+          "sha256": "0d6afc038e314f6fffa44fb384d9910dd5fe1c66db1f320094f2bfb86d77e57c",
+          "bytes": 648
+        },
+        "dnp3-analog-events/answers/count8-g32v5.json": {
+          "sha256": "bb40b878e41217e44446daf766a4d532953034023239a33eed37b8a9b079e4bd",
+          "bytes": 6570
+        },
+        "dnp3-analog-events/captures/count16-g32v5.pcap": {
+          "sha256": "d664573388a11ea7adc2676b152a377d27e03d9274ed81f9f4f682278d5a8f4d",
+          "bytes": 649
+        },
+        "dnp3-analog-events/answers/count16-g32v5.json": {
+          "sha256": "d46f26f7fc0c0f055c3eb722842e2f27bb1fa68dcf150c2f36e35d6a78712bc0",
+          "bytes": 6578
+        },
+        "dnp3-analog-events/captures/ieee-g32v5-zero.pcap": {
+          "sha256": "ad91c1792e3c1f8fb2c19759e4fd2f098e645e4fce5c2cb9afc6581bdcfa3cc3",
+          "bytes": 629
+        },
+        "dnp3-analog-events/answers/ieee-g32v5-zero.json": {
+          "sha256": "104d10197dc4fa36507ac30916e84230b78c8ce382b6955c921a397da1d035c3",
+          "bytes": 4077
+        },
+        "dnp3-analog-events/captures/ieee-g32v5-negative-zero.pcap": {
+          "sha256": "df80cc203fe01a6e7f0d5be811474e5694139d6c5dc2b4671d9b44e116b1d805",
+          "bytes": 629
+        },
+        "dnp3-analog-events/answers/ieee-g32v5-negative-zero.json": {
+          "sha256": "bc586ccc148ea53e5a2221a21c49161b3cf0e1217c4e57c241c99c69b7d4da9c",
+          "bytes": 4079
+        },
+        "dnp3-analog-events/captures/ieee-g32v5-subnormal.pcap": {
+          "sha256": "ae049b7a8b6890f11b5a421e58009a72f1b66dceb171d52b101b1189a60001e3",
+          "bytes": 629
+        },
+        "dnp3-analog-events/answers/ieee-g32v5-subnormal.json": {
+          "sha256": "869636f23c932f89edf33ae4207dbe42e46e79624c66187471cdb0ba557798a2",
+          "bytes": 4113
+        },
+        "dnp3-analog-events/captures/ieee-g32v5-nan.pcap": {
+          "sha256": "2ba18c0fdc1bd6687cc48dab292f06f13bf2fede16dba2d9b43796fd83d87ecf",
+          "bytes": 629
+        },
+        "dnp3-analog-events/answers/ieee-g32v5-nan.json": {
+          "sha256": "f6db3ecd12954b44ef67d8360382418a9de8bc541c8019c7427c2a28f515b57a",
+          "bytes": 4011
+        },
+        "dnp3-analog-events/captures/ieee-g32v5-positive-infinity.pcap": {
+          "sha256": "95155ee57caa0491aeb0bfdc9172544a19d4f5a9be8a1e7f02e811007d729c09",
+          "bytes": 629
+        },
+        "dnp3-analog-events/answers/ieee-g32v5-positive-infinity.json": {
+          "sha256": "f29a7e307444ae9cccfdc417ce5471b8dae659c0e961a0f833db4e52aa95ad60",
+          "bytes": 4039
+        },
+        "dnp3-analog-events/captures/ieee-g32v5-negative-infinity.pcap": {
+          "sha256": "9177ecd74d4fee362ca00251a9a85571ecdae2700a6e658a564266c29cc365f0",
+          "bytes": 629
+        },
+        "dnp3-analog-events/answers/ieee-g32v5-negative-infinity.json": {
+          "sha256": "2edeb0822fc87ea3591e3ceeb933eb03196eba8388e9466f8b43704be22c7ff5",
+          "bytes": 4039
+        },
+        "dnp3-analog-events/captures/all-g32v6-request6.pcap": {
+          "sha256": "8935058ba9f329f28811499d8190810e9b69d6c1a18ef8a99a7deb11cdf1a752",
+          "bytes": 661
+        },
+        "dnp3-analog-events/answers/all-g32v6-request6.json": {
+          "sha256": "1b5d9a2d07a10261a1cfd0a6b053e155bbc767ba3766f318e9e5fa2499c334ce",
+          "bytes": 6692
+        },
+        "dnp3-analog-events/captures/all-g32v6-request0.pcap": {
+          "sha256": "466a46f4a127ef9996d591e4910514a5e05e06b0f0555478f96e39a29121d8ca",
+          "bytes": 661
+        },
+        "dnp3-analog-events/answers/all-g32v6-request0.json": {
+          "sha256": "8a9541c0f076dc7dc21f5474ea720306355e3125ded4bbf33ba411215fc6c309",
+          "bytes": 6692
+        },
+        "dnp3-analog-events/captures/count8-g32v6.pcap": {
+          "sha256": "249020abf8aa02b091367461220000e2a164f789339341a08ff39f16c5dc3c28",
+          "bytes": 662
+        },
+        "dnp3-analog-events/answers/count8-g32v6.json": {
+          "sha256": "67417d05b1dd60af2f977d9b5a0ed9eb578c1bcb498f7b1ac2e3068fd16e1c2f",
+          "bytes": 6694
+        },
+        "dnp3-analog-events/captures/count16-g32v6.pcap": {
+          "sha256": "e20b9bed8a571ad3021a3d7365218fa48a5f2383b97a417a629a711a501c1252",
+          "bytes": 663
+        },
+        "dnp3-analog-events/answers/count16-g32v6.json": {
+          "sha256": "972b406263310c6d1108701f9df6d582dcbc06c6c9ee2f0b7608eef961bba5b2",
+          "bytes": 6702
+        },
+        "dnp3-analog-events/captures/ieee-g32v6-zero.pcap": {
+          "sha256": "e317d6a3d942dc29bf146094b5225fc1f5ddaad06b2ae106b819521928a5c85b",
+          "bytes": 635
+        },
+        "dnp3-analog-events/answers/ieee-g32v6-zero.json": {
+          "sha256": "93b44116ed7968e50714bf47c3ad51c3f607ed7a5b62c1f2dcdbc7cb719d0b17",
+          "bytes": 4126
+        },
+        "dnp3-analog-events/captures/ieee-g32v6-negative-zero.pcap": {
+          "sha256": "c77cea8bc3641da466cb232c8e171871ee154d7f2bf3bc2e90b01ec3c2c98dc3",
+          "bytes": 635
+        },
+        "dnp3-analog-events/answers/ieee-g32v6-negative-zero.json": {
+          "sha256": "5a32ca95affa0805f3a5ec2726f62ca4fd85bb50c67b270dc210fcb656f3bcbc",
+          "bytes": 4128
+        },
+        "dnp3-analog-events/captures/ieee-g32v6-subnormal.pcap": {
+          "sha256": "09f94cb1a8e76f099248c3276bbcbd4979b24a99c08132f75e02fa02f8001f2f",
+          "bytes": 635
+        },
+        "dnp3-analog-events/answers/ieee-g32v6-subnormal.json": {
+          "sha256": "5c8b3e56b085c2027bf49c5792c4655012f35213670817b53f7729acff7d4355",
+          "bytes": 4132
+        },
+        "dnp3-analog-events/captures/ieee-g32v6-nan.pcap": {
+          "sha256": "31c0b43b92ab031679a8a12d6c68121d89f9365fb5f43917450cf02ff648049c",
+          "bytes": 635
+        },
+        "dnp3-analog-events/answers/ieee-g32v6-nan.json": {
+          "sha256": "03080e0adf961fababa07bdf8bc41040f21c27b05e0e718017ebc301bf0d27a7",
+          "bytes": 4060
+        },
+        "dnp3-analog-events/captures/ieee-g32v6-positive-infinity.pcap": {
+          "sha256": "36f8d6b7762fd1a1ab8d87287fd365142de13dabef76756ffd6f6349fd2042b5",
+          "bytes": 635
+        },
+        "dnp3-analog-events/answers/ieee-g32v6-positive-infinity.json": {
+          "sha256": "eab7c10f22cbbb20de8fc9aa822ee7ed84f4c7022ed995e403da461348321c17",
+          "bytes": 4088
+        },
+        "dnp3-analog-events/captures/ieee-g32v6-negative-infinity.pcap": {
+          "sha256": "b4567f414357551cd111f1317821fae8e3b0e84d805abf683871e5bd7adce8d0",
+          "bytes": 635
+        },
+        "dnp3-analog-events/answers/ieee-g32v6-negative-infinity.json": {
+          "sha256": "c274afaca2afb467b021ffd30b87ef44646fc80202af61fd4697099c2937ca0a",
+          "bytes": 4088
+        },
+        "dnp3-analog-events/captures/all-g32v7-request7.pcap": {
+          "sha256": "e60497ae31983bdc78e987f79e793000e61ed1dc97ef5ba0b037ed451d57b25c",
+          "bytes": 669
+        },
+        "dnp3-analog-events/answers/all-g32v7-request7.json": {
+          "sha256": "4489c8e1017f213751e6ce9103a3ef95292583968ee9b3ea1fd5579046ed1a98",
+          "bytes": 7278
+        },
+        "dnp3-analog-events/captures/all-g32v7-request0.pcap": {
+          "sha256": "209d0d775f0618acdcb969cd44be909e6f58f0341b9fffadb3812d86412ebc1c",
+          "bytes": 669
+        },
+        "dnp3-analog-events/answers/all-g32v7-request0.json": {
+          "sha256": "8ac14a55a0bb7c657470fc89d5b75cbf528e5f684703c0b1d6b74f63e6082ba5",
+          "bytes": 7278
+        },
+        "dnp3-analog-events/captures/count8-g32v7.pcap": {
+          "sha256": "964a98fe1003cb72b029eadae0923c96cb67d0715e857aaa51ccfecb4c225287",
+          "bytes": 670
+        },
+        "dnp3-analog-events/answers/count8-g32v7.json": {
+          "sha256": "da619b8be33281cd275185ce824e4198a17b911a7a5faf5f40a48db2908f9457",
+          "bytes": 7280
+        },
+        "dnp3-analog-events/captures/count16-g32v7.pcap": {
+          "sha256": "a1601dca6babec04837c206a09c5e545c04bfbcb256aee999416a19efc14cfc9",
+          "bytes": 671
+        },
+        "dnp3-analog-events/answers/count16-g32v7.json": {
+          "sha256": "e0bbbf460b07ce8b6f821ed9afcab79eba677c8db2586b9f3b0c4607416eab6e",
+          "bytes": 7288
+        },
+        "dnp3-analog-events/captures/ieee-g32v7-zero.pcap": {
+          "sha256": "f531cf9b10e5e7133a1b8f64ee5125bcf74f62b1fdfa6951c06f46fea4081335",
+          "bytes": 637
+        },
+        "dnp3-analog-events/answers/ieee-g32v7-zero.json": {
+          "sha256": "6f52c2964de6f92615a30b19b8e5cedbd02dc140aee4a92c105ae70decc56e52",
+          "bytes": 4302
+        },
+        "dnp3-analog-events/captures/ieee-g32v7-negative-zero.pcap": {
+          "sha256": "a93826b3d4785ec44f027d78aa5c969dffd0078f3bbfb6cc6974126a09a722c1",
+          "bytes": 637
+        },
+        "dnp3-analog-events/answers/ieee-g32v7-negative-zero.json": {
+          "sha256": "da1257a33241bb7308f11c4d4ab5c9742bcf2dd5f2b24a7b992b41f7fb4d7c2a",
+          "bytes": 4304
+        },
+        "dnp3-analog-events/captures/ieee-g32v7-subnormal.pcap": {
+          "sha256": "871de29ca32e5492f1a3251e868e63322e83ff607e10d9f595c6334fa2d19b78",
+          "bytes": 637
+        },
+        "dnp3-analog-events/answers/ieee-g32v7-subnormal.json": {
+          "sha256": "02e3f760342fab9714fbac66d775bd1c942b7a5697d59cbaf14e952d6915ef33",
+          "bytes": 4338
+        },
+        "dnp3-analog-events/captures/ieee-g32v7-nan.pcap": {
+          "sha256": "afff5c9bec93189e09e02530bcfc8346c17f0f6153be0f04cfe7d04e8615e540",
+          "bytes": 637
+        },
+        "dnp3-analog-events/answers/ieee-g32v7-nan.json": {
+          "sha256": "6234a3b26ad219e2434a8d84b1b748979c864b6392adcdf77b5358b01e4c9189",
+          "bytes": 4236
+        },
+        "dnp3-analog-events/captures/ieee-g32v7-positive-infinity.pcap": {
+          "sha256": "2acc9fbb3678a6eb0951a70d5eab05e84647d5ef1b60acddc90a6fe1888e4d14",
+          "bytes": 637
+        },
+        "dnp3-analog-events/answers/ieee-g32v7-positive-infinity.json": {
+          "sha256": "61a1e1b5cf8e979d69de1438caa234bc92212c1abc0d6589fb19ab27ab45efa7",
+          "bytes": 4264
+        },
+        "dnp3-analog-events/captures/ieee-g32v7-negative-infinity.pcap": {
+          "sha256": "6d800248e938a2a90eaadc5a356ebd2c45d4035c4ecfb280c278f6a1762258e8",
+          "bytes": 637
+        },
+        "dnp3-analog-events/answers/ieee-g32v7-negative-infinity.json": {
+          "sha256": "92bf091a9e8d345950f8edb93b9a000a1be3d3452b40075136c01417d688e6f1",
+          "bytes": 4264
+        },
+        "dnp3-analog-events/captures/all-g32v8-request8.pcap": {
+          "sha256": "bb09f4cb1384d7d899d9f5f5af3fd6818d76d7a2d808c111c0bdef0062e6d092",
+          "bytes": 681
+        },
+        "dnp3-analog-events/answers/all-g32v8-request8.json": {
+          "sha256": "97cad83b78b1819228fbd68562a0a4a006b0feaae3dbe947b86fc10e59c7542a",
+          "bytes": 7390
+        },
+        "dnp3-analog-events/captures/all-g32v8-request0.pcap": {
+          "sha256": "52e52cffd3de5bd3ba6fb653bf8cf720f576cedecac50667d839b8dc5d96cf52",
+          "bytes": 681
+        },
+        "dnp3-analog-events/answers/all-g32v8-request0.json": {
+          "sha256": "926997c5cea16e0aed0f031b5c4e4fe0d387972cbdc2f81f7d3d3a57e200daa8",
+          "bytes": 7390
+        },
+        "dnp3-analog-events/captures/count8-g32v8.pcap": {
+          "sha256": "6f4b67bf3d670902788c4ba4796f40c66e1238ee920a9f6d36b08fde6d79900e",
+          "bytes": 682
+        },
+        "dnp3-analog-events/answers/count8-g32v8.json": {
+          "sha256": "95f4d84b571fcd234ecb3e0e7455fcec78f6019dfc69fe1eb42609179fcc5346",
+          "bytes": 7392
+        },
+        "dnp3-analog-events/captures/count16-g32v8.pcap": {
+          "sha256": "1ae6f19bfff19b2991a05944b3b23f016591e5e01b0713c82e6d383c0612a050",
+          "bytes": 683
+        },
+        "dnp3-analog-events/answers/count16-g32v8.json": {
+          "sha256": "087fdf174039c6b165ab4f22f84e395db4ccdb6cfda03030bb492727ead8df3d",
+          "bytes": 7400
+        },
+        "dnp3-analog-events/captures/ieee-g32v8-zero.pcap": {
+          "sha256": "bde486f38a46de080c17553ddbe9d73c5ce9e2c0b3a46d2b4daee861337e23ef",
+          "bytes": 641
+        },
+        "dnp3-analog-events/answers/ieee-g32v8-zero.json": {
+          "sha256": "9e40b98834cff2d8a8fc0d8eed6bd4759239548aaab76110830c2b23599ca429",
+          "bytes": 4338
+        },
+        "dnp3-analog-events/captures/ieee-g32v8-negative-zero.pcap": {
+          "sha256": "b47a6d5b7c2d489e8802a2fcce44c10b58cb6a8da82ae9e7beda5bad50486d21",
+          "bytes": 641
+        },
+        "dnp3-analog-events/answers/ieee-g32v8-negative-zero.json": {
+          "sha256": "5fdfce0ff66a7b5f110f24415916ed4ec215a7cf784e2649de7ae1820173221a",
+          "bytes": 4340
+        },
+        "dnp3-analog-events/captures/ieee-g32v8-subnormal.pcap": {
+          "sha256": "dde9893b34250ae9caf245c0ef73c4724a282cff7d64045dad49bc73379ef919",
+          "bytes": 641
+        },
+        "dnp3-analog-events/answers/ieee-g32v8-subnormal.json": {
+          "sha256": "64327cab5a92c3295de1460361db91d5e8974e5462416ccc4d835a37ee983ec9",
+          "bytes": 4344
+        },
+        "dnp3-analog-events/captures/ieee-g32v8-nan.pcap": {
+          "sha256": "4596e1f0756f94d8f62255b989560ee159a20564f490c9ac2828f9a30845d8ae",
+          "bytes": 641
+        },
+        "dnp3-analog-events/answers/ieee-g32v8-nan.json": {
+          "sha256": "f737935b77d583f3d0ec2178ca7a4561f054c045ffbc59d5e1aad0ba331bb7b3",
+          "bytes": 4272
+        },
+        "dnp3-analog-events/captures/ieee-g32v8-positive-infinity.pcap": {
+          "sha256": "7eedfa6232c9ba4856f3acdf1992c7ef03c4f22303f16c47d84d7ba6cdbc4e6a",
+          "bytes": 641
+        },
+        "dnp3-analog-events/answers/ieee-g32v8-positive-infinity.json": {
+          "sha256": "8d967ddace071d07280185c2ff8c5bbe1babd9e29bb5a507d65654611576dd42",
+          "bytes": 4300
+        },
+        "dnp3-analog-events/captures/ieee-g32v8-negative-infinity.pcap": {
+          "sha256": "0b79061be9f37e5717eadb77492fdb3b9d135587e2d692c8c4d94f2afd5b687b",
+          "bytes": 641
+        },
+        "dnp3-analog-events/answers/ieee-g32v8-negative-infinity.json": {
+          "sha256": "78c893fec934fa368db871ec3e6ad430dc353489783ea0378194f51d028e6a91",
+          "bytes": 4300
+        },
+        "dnp3-analog-events/captures/ordered-count-g32.pcap": {
+          "sha256": "0e119a7c59538860a052209fb8a28b8e37bdd7a7268df1150d2935322206bb7b",
+          "bytes": 764
+        },
+        "dnp3-analog-events/answers/ordered-count-g32.json": {
+          "sha256": "25038090e774c30d6c457441f6ba1f42e93788327446e078f8e6b3f401f7bfe7",
+          "bytes": 7616
+        },
+        "dnp3-analog-events/captures/count-excess-g32.pcap": {
+          "sha256": "75f0c91347e08442fe6e9cb12e52d548296e3cac1c6270a08320bec0a2087ec6",
+          "bytes": 756
+        },
+        "dnp3-analog-events/answers/count-excess-g32.json": {
+          "sha256": "1c0564b6a4599ce9cf2d476d9aebfb9f8edaa127c74f6461d1037fa4da20ad7e",
+          "bytes": 5967
+        },
+        "dnp3-analog-events/captures/wrong-variation-g32.pcap": {
+          "sha256": "dcde3350228036c74d7116c8e4532f8c227dbba66ba976495711db1473302382",
+          "bytes": 784
+        },
+        "dnp3-analog-events/answers/wrong-variation-g32.json": {
+          "sha256": "a311c3b71716b390e123b9b6b43bec2fbfcaafbe9f42b21902e3065e1310629c",
+          "bytes": 7078
+        },
+        "dnp3-analog-events/captures/zero-g32.pcap": {
+          "sha256": "a36418e8f5f527cd52f634f2d8c31a0c3c86fc55f373d385261383fc53beae8e",
+          "bytes": 738
+        },
+        "dnp3-analog-events/answers/zero-g32.json": {
+          "sha256": "1de765b8cc99ea3e4991c1cb7d6001ec81fefc6b6bd6d7ea7c9b034da5a90da8",
+          "bytes": 6812
+        },
+        "dnp3-analog-events/captures/truncated-g32.pcap": {
+          "sha256": "d233035d692f487cb3a40f6834bac0d86b35bd798996280b12cdbda7864152ce",
+          "bytes": 795
+        },
+        "dnp3-analog-events/answers/truncated-g32.json": {
+          "sha256": "059ac4d9722793c2412cb78ec11b7c8843f009ae1fb1711725e019fc741a29a6",
+          "bytes": 7111
+        },
+        "dnp3-analog-events/captures/range-g32.pcap": {
+          "sha256": "c352b1ff20b3cd6900451f08c2c71619027410cfd7337cc83411b0e20a9762f5",
+          "bytes": 744
+        },
+        "dnp3-analog-events/answers/range-g32.json": {
+          "sha256": "3ec383e5312d685207e2d4be760e2574cd2d8577e0943dd5587199e2d0b119ff",
+          "bytes": 6859
+        },
+        "dnp3-analog-events/captures/unsupported-variation-g32.pcap": {
+          "sha256": "395d230d8b216ed35286910ccc53ea226761c1bb80f0294deadb22ce14e748cd",
+          "bytes": 740
+        },
+        "dnp3-analog-events/answers/unsupported-variation-g32.json": {
+          "sha256": "d13cf65d77006fce232fe18858320934b487c5897984e164ded01c74f2135ce2",
+          "bytes": 6841
+        },
+        "dnp3-analog-events/captures/truncated-count-g32.pcap": {
+          "sha256": "8a8cf9b803433435a9af8fa8353038705aec08d64c5002a64577ca639c7e3a8e",
+          "bytes": 738
+        },
+        "dnp3-analog-events/answers/truncated-count-g32.json": {
+          "sha256": "bce926bbf8f6e63ce740d4211420e95af34303d01411157dbe9b1f65b534f0af",
+          "bytes": 6808
+        },
+        "dnp3-analog-events/captures/wrong-role-g32.pcap": {
+          "sha256": "316e80480b16e780be4a5036ff11e95dae793bcd4ef1a75c507dc918d86e4bf3",
+          "bytes": 762
+        },
+        "dnp3-analog-events/answers/wrong-role-g32.json": {
+          "sha256": "c861cfe95a2fd7753ae7f6136d97644d815481efd12809e3f9deb22535729e43",
+          "bytes": 10431
+        },
+        "dnp3-analog-events/captures/class0-not-events-g32.pcap": {
+          "sha256": "c21b94fdd9009e7f6573fa8b3f749a9a4b4bdad33c63a5b0dfa5217c9b4d7ff2",
+          "bytes": 647
+        },
+        "dnp3-analog-events/answers/class0-not-events-g32.json": {
+          "sha256": "84cf6d093c0283248fad0499541d9e34194b7ab343a53b02e7d4900fd1d7aa10",
+          "bytes": 2440
+        },
+        "dnp3-analog-events/captures/all-g42v1-request1.pcap": {
+          "sha256": "a4be3ebebd93b90211c19989d215dbe745b4c596a1b9512a876f3a0797442eef",
+          "bytes": 647
+        },
+        "dnp3-analog-events/answers/all-g42v1-request1.json": {
+          "sha256": "06f4d567a1bab3b02f6fc5984f15a6c20e1eb71ee61e1ce75da5a0279ed62d06",
+          "bytes": 5680
+        },
+        "dnp3-analog-events/captures/all-g42v1-request0.pcap": {
+          "sha256": "07de0f33b307e6c596db9e4f7bc10efee34cf6b768b84bf5c07527fe3bced93e",
+          "bytes": 647
+        },
+        "dnp3-analog-events/answers/all-g42v1-request0.json": {
+          "sha256": "eb26bf0190d3ced5353e40f5ee5db3b9a3a06886bb81e63e4a956708556b9934",
+          "bytes": 5680
+        },
+        "dnp3-analog-events/captures/count8-g42v1.pcap": {
+          "sha256": "661dff874a6c9d99ae27c41b2d01cab1bf95ecb09ada142168d580de1887b457",
+          "bytes": 648
+        },
+        "dnp3-analog-events/answers/count8-g42v1.json": {
+          "sha256": "46c44ddc0bf7d29a22d53259ea817096fe047e9c4628ba296788e5eb951327a2",
+          "bytes": 5682
+        },
+        "dnp3-analog-events/captures/count16-g42v1.pcap": {
+          "sha256": "34837652c9b8f6629419e1ec9feb3c0a16172afcec71610d92b451f2a2602c85",
+          "bytes": 649
+        },
+        "dnp3-analog-events/answers/count16-g42v1.json": {
+          "sha256": "d4adf167c56e72967e5b8501baade52e875cc728aa88a3995c414a572e012cc5",
+          "bytes": 5690
+        },
+        "dnp3-analog-events/captures/all-g42v2-request2.pcap": {
+          "sha256": "5dabe5612f8a7661f06458fdbf753aff39b7c6ec6b50fe10cadf70710be063ef",
+          "bytes": 641
+        },
+        "dnp3-analog-events/answers/all-g42v2-request2.json": {
+          "sha256": "33e956b713e199449932ddaa9765b994c0c36ccc4418757a377a460da1f1893d",
+          "bytes": 5628
+        },
+        "dnp3-analog-events/captures/all-g42v2-request0.pcap": {
+          "sha256": "d0c868d492dd9d0746ddb6cbc366e99a3ce014c4207b7bcbd3685d872786431d",
+          "bytes": 641
+        },
+        "dnp3-analog-events/answers/all-g42v2-request0.json": {
+          "sha256": "a06ee3956f262cb1483ebef88160c49268a9271e68a3cd3f52d3986f1091d5b8",
+          "bytes": 5628
+        },
+        "dnp3-analog-events/captures/count8-g42v2.pcap": {
+          "sha256": "da38682d156e277d39d6b59f7f9f2221f5b38512920b160e8ba7d0bfd44e2bee",
+          "bytes": 642
+        },
+        "dnp3-analog-events/answers/count8-g42v2.json": {
+          "sha256": "18871e41511e7c93c3585fe472c95899dab390837e2fbae4acc22cf3c1189e41",
+          "bytes": 5630
+        },
+        "dnp3-analog-events/captures/count16-g42v2.pcap": {
+          "sha256": "afb01a15338ddc786a6c5c282d314326d8ff0eb51215d3c856a8d355775855c3",
+          "bytes": 643
+        },
+        "dnp3-analog-events/answers/count16-g42v2.json": {
+          "sha256": "aa3ce5947a34c006269d01a7bf946c8bf6138d04427435ed2cb9730277e7bfce",
+          "bytes": 5638
+        },
+        "dnp3-analog-events/captures/all-g42v3-request3.pcap": {
+          "sha256": "14b7aa8824102fad6f6901cf01e5f3576f534f460722e580ee92c7347c3ffdc8",
+          "bytes": 669
+        },
+        "dnp3-analog-events/answers/all-g42v3-request3.json": {
+          "sha256": "7819b097ae6a240d593aa9f92f2a04cfca359ee566afc0eba6ea2e8c498e6914",
+          "bytes": 6390
+        },
+        "dnp3-analog-events/captures/all-g42v3-request0.pcap": {
+          "sha256": "bb36c19f49fed70a5ed30ae0fe208a89b969fb4fc2d3e009b55fbcc9ff804083",
+          "bytes": 669
+        },
+        "dnp3-analog-events/answers/all-g42v3-request0.json": {
+          "sha256": "7a6da6b7cf498bfed83dc18d68499ee1b27faa96643d39130a2ec3451630459c",
+          "bytes": 6390
+        },
+        "dnp3-analog-events/captures/count8-g42v3.pcap": {
+          "sha256": "c813e9170d7a8b66282736d9862073187b2d2449ca0ca021737e2c2dd47504d7",
+          "bytes": 670
+        },
+        "dnp3-analog-events/answers/count8-g42v3.json": {
+          "sha256": "8d100a9eab2845a719e168d131e73fe5e47e82622607061c35ad14a5d64e239d",
+          "bytes": 6392
+        },
+        "dnp3-analog-events/captures/count16-g42v3.pcap": {
+          "sha256": "1f6953ef4787ff8aa759af1931600fc6aa4156b85c6cec0a63beeb367b744c68",
+          "bytes": 671
+        },
+        "dnp3-analog-events/answers/count16-g42v3.json": {
+          "sha256": "a16fdc9c592f29d33ca70e5204d81d20cb1bc358cebb1df6f87ef31a0febeeef",
+          "bytes": 6400
+        },
+        "dnp3-analog-events/captures/all-g42v4-request4.pcap": {
+          "sha256": "281fd11555d55c1bd4625d80627215410214526ff98c456514b889eba3460ad8",
+          "bytes": 661
+        },
+        "dnp3-analog-events/answers/all-g42v4-request4.json": {
+          "sha256": "c6a56b7db88ed0e1707c1024dddd10341e0abcb8373d48296cc2e5c76a6c9c3e",
+          "bytes": 6330
+        },
+        "dnp3-analog-events/captures/all-g42v4-request0.pcap": {
+          "sha256": "54c96233b0c4b2a0ba5431278a24ac3279c738e88bdb4573d8276dbc1b4e8e5f",
+          "bytes": 661
+        },
+        "dnp3-analog-events/answers/all-g42v4-request0.json": {
+          "sha256": "045a87439b8c5accc1947ef573a4a46e15ddedda3a6569e33b5b7d92aa221f71",
+          "bytes": 6330
+        },
+        "dnp3-analog-events/captures/count8-g42v4.pcap": {
+          "sha256": "cb527fe4afe29eb5bae96cd17a13844e2031142040d2b5bc4b503ef163adbb37",
+          "bytes": 662
+        },
+        "dnp3-analog-events/answers/count8-g42v4.json": {
+          "sha256": "d8d4691d77dd017b3d45c1862d330ac8cfdaae96b3feaeae6d729009efad8feb",
+          "bytes": 6332
+        },
+        "dnp3-analog-events/captures/count16-g42v4.pcap": {
+          "sha256": "b9e935d2eb29e41202d4292a9c6c46729f3deb84bb59ed3f0a3463c6ea4af88f",
+          "bytes": 663
+        },
+        "dnp3-analog-events/answers/count16-g42v4.json": {
+          "sha256": "d3eb0a994ea8e6d108ee69b4b0d73f7f7c4b313c04412efeb3fc97429618f1a1",
+          "bytes": 6340
+        },
+        "dnp3-analog-events/captures/all-g42v5-request5.pcap": {
+          "sha256": "c8f0dc2f8c58228c098fc54083aa530af9de672a299ed5cf3e87baa230442867",
+          "bytes": 647
+        },
+        "dnp3-analog-events/answers/all-g42v5-request5.json": {
+          "sha256": "fab9b315fed0f97b4ea74dd3a9b985cfcb5368f465325b2968e344af6e136763",
+          "bytes": 6394
+        },
+        "dnp3-analog-events/captures/all-g42v5-request0.pcap": {
+          "sha256": "0f089e400448157e93c8ce23ed9381510b54ace8c015fea9edee5d3f3719f2df",
+          "bytes": 647
+        },
+        "dnp3-analog-events/answers/all-g42v5-request0.json": {
+          "sha256": "32d3977c015e377ad48cb6d34b5d7baa3ad0c2ac34404be0f81b1db4e5cf924f",
+          "bytes": 6394
+        },
+        "dnp3-analog-events/captures/count8-g42v5.pcap": {
+          "sha256": "21f5c77b3e0dd63fdeb79958a86495b5acf56a9ad3414f5418c7f255127552c8",
+          "bytes": 648
+        },
+        "dnp3-analog-events/answers/count8-g42v5.json": {
+          "sha256": "4c6ada38a204fd1d2e43de5cd9246a9d2a78e2743ecc1940a5ff2fa9994fa300",
+          "bytes": 6396
+        },
+        "dnp3-analog-events/captures/count16-g42v5.pcap": {
+          "sha256": "b5996f111883aede72fd2d8433ffed8fae0c1e481c1b04aa84c971c9d11dd47c",
+          "bytes": 649
+        },
+        "dnp3-analog-events/answers/count16-g42v5.json": {
+          "sha256": "23b49b17a8357823d2e402b4396e4c423d42fc4ffe99eed88580676ad06dca1c",
+          "bytes": 6404
+        },
+        "dnp3-analog-events/captures/ieee-g42v5-zero.pcap": {
+          "sha256": "152c5b4ded970d06d6732a68785b22ccad5f47de4f5770fd873bafa7525d9ef8",
+          "bytes": 629
+        },
+        "dnp3-analog-events/answers/ieee-g42v5-zero.json": {
+          "sha256": "f19abccd1a8bb1af948127a01148fd511edadc5d99edbb27fc7765baf4676f38",
+          "bytes": 4017
+        },
+        "dnp3-analog-events/captures/ieee-g42v5-negative-zero.pcap": {
+          "sha256": "f16bc3267962e26a84140408bdf2cec0d35b54448f6f8884106af65ba96d3c75",
+          "bytes": 629
+        },
+        "dnp3-analog-events/answers/ieee-g42v5-negative-zero.json": {
+          "sha256": "fb5efa4c353777c48610f7cf4b3ef0e90aac65c476cb0cd6d2f521d488ced085",
+          "bytes": 4019
+        },
+        "dnp3-analog-events/captures/ieee-g42v5-subnormal.pcap": {
+          "sha256": "1f091b0e71644a0a0b15b76cb139547237c338deefb25f12925a0432dc7fdbec",
+          "bytes": 629
+        },
+        "dnp3-analog-events/answers/ieee-g42v5-subnormal.json": {
+          "sha256": "28e249d96ab5ea9dc642e88fb9791086dce90751e4714f77736e75e4283cf059",
+          "bytes": 4053
+        },
+        "dnp3-analog-events/captures/ieee-g42v5-nan.pcap": {
+          "sha256": "02c80a7a7c15bdef598c64d1375520f2cc35a1ff26a8e41b1cfd2e84253c7d67",
+          "bytes": 629
+        },
+        "dnp3-analog-events/answers/ieee-g42v5-nan.json": {
+          "sha256": "048240a38b890c887b13a1fd8669be5dbb3607fc9f47e68a291b2d0d65940b38",
+          "bytes": 3951
+        },
+        "dnp3-analog-events/captures/ieee-g42v5-positive-infinity.pcap": {
+          "sha256": "9d85ffb7d234f862845a866fbe24109e8abf94c38ef0214b933e1808d239aa6b",
+          "bytes": 629
+        },
+        "dnp3-analog-events/answers/ieee-g42v5-positive-infinity.json": {
+          "sha256": "a066be4f3bd221a91449b6e362482ecd8e1d05120ac43bf307735a5194168790",
+          "bytes": 3979
+        },
+        "dnp3-analog-events/captures/ieee-g42v5-negative-infinity.pcap": {
+          "sha256": "2cace3a6e032fa916491a3060061885fe1fb06aef1311f39c89b563187cedb6e",
+          "bytes": 629
+        },
+        "dnp3-analog-events/answers/ieee-g42v5-negative-infinity.json": {
+          "sha256": "7fddea82a3e7aea78a4c1fb2b5319264c2b47b1705504493a0499ab495e83ca4",
+          "bytes": 3979
+        },
+        "dnp3-analog-events/captures/all-g42v6-request6.pcap": {
+          "sha256": "9c63cf62dea9b0935353cdaef9c204ba312233547bdc47d4fa13028937432ca7",
+          "bytes": 661
+        },
+        "dnp3-analog-events/answers/all-g42v6-request6.json": {
+          "sha256": "a4f7906b50fde02eaaca2359da81eb61d2af9742241d4482fabdb2e4591f5d75",
+          "bytes": 6518
+        },
+        "dnp3-analog-events/captures/all-g42v6-request0.pcap": {
+          "sha256": "5dfc4f530419a2400d38e703f8c762094bc0cbbd91324c34f66c0ee1f60d2803",
+          "bytes": 661
+        },
+        "dnp3-analog-events/answers/all-g42v6-request0.json": {
+          "sha256": "02a8fdc43dc2f422c580e9d2b957b8a65d0f8e8f2497f36a67778d2a84377a40",
+          "bytes": 6518
+        },
+        "dnp3-analog-events/captures/count8-g42v6.pcap": {
+          "sha256": "e846cc01790bd240c0d6b7c5114566e44d9a19d4e7532509185ff7a6e8ccf4ce",
+          "bytes": 662
+        },
+        "dnp3-analog-events/answers/count8-g42v6.json": {
+          "sha256": "8550f9ec8c0afeab6eada04e254a2dd854577f46a2b4ee9ac30f6d296337a3fa",
+          "bytes": 6520
+        },
+        "dnp3-analog-events/captures/count16-g42v6.pcap": {
+          "sha256": "4bf88d5444fde3186df739c00b25d9da94ef770fba6825c3d0cc6be73df71cff",
+          "bytes": 663
+        },
+        "dnp3-analog-events/answers/count16-g42v6.json": {
+          "sha256": "4289cfaac284b947d800b6097fa667e645c7413563d007379f998c174ed64d74",
+          "bytes": 6528
+        },
+        "dnp3-analog-events/captures/ieee-g42v6-zero.pcap": {
+          "sha256": "4691bb6b0b439d42e0d1b7689d170c6e08164b364703481f49c12982f46450af",
+          "bytes": 635
+        },
+        "dnp3-analog-events/answers/ieee-g42v6-zero.json": {
+          "sha256": "7d2fefd780fde6367f79e5630d014d1b10b31cf78d41a340067bf1dd608fa786",
+          "bytes": 4066
+        },
+        "dnp3-analog-events/captures/ieee-g42v6-negative-zero.pcap": {
+          "sha256": "e48bd74e1bfe955697575e7f9980d1ee8359d6a761df791fd56294acadb9a57f",
+          "bytes": 635
+        },
+        "dnp3-analog-events/answers/ieee-g42v6-negative-zero.json": {
+          "sha256": "289e726ea1477176af457a4ad34d289452e6d05cd8e765bc737dcf98fc18b830",
+          "bytes": 4068
+        },
+        "dnp3-analog-events/captures/ieee-g42v6-subnormal.pcap": {
+          "sha256": "0f3bc4e541d61e324c50c76d63c4d0ced0424f5a0d6882e2341f3c5a594d8c36",
+          "bytes": 635
+        },
+        "dnp3-analog-events/answers/ieee-g42v6-subnormal.json": {
+          "sha256": "eff877b0089a68b7e70c0102ad4ed231e06cea8b48e863d5879bdac88384adbf",
+          "bytes": 4072
+        },
+        "dnp3-analog-events/captures/ieee-g42v6-nan.pcap": {
+          "sha256": "4b20680941308d9ff6cb41c039cca1e02ecff053492c5edb2fbc7d0d81bd5c06",
+          "bytes": 635
+        },
+        "dnp3-analog-events/answers/ieee-g42v6-nan.json": {
+          "sha256": "6fe68d84f63aa0efa5f2d8bc3a6596e1869dc75caba16df57a6890016e626d86",
+          "bytes": 4000
+        },
+        "dnp3-analog-events/captures/ieee-g42v6-positive-infinity.pcap": {
+          "sha256": "54d32ffd44522bb49dfdc9ffe0d2a6654d6ea905cf04f75c855172c39fab8183",
+          "bytes": 635
+        },
+        "dnp3-analog-events/answers/ieee-g42v6-positive-infinity.json": {
+          "sha256": "9a78e118c07f17b72d67a632fcc2804cdfdb593f21584c1d2f7bd8e21de61375",
+          "bytes": 4028
+        },
+        "dnp3-analog-events/captures/ieee-g42v6-negative-infinity.pcap": {
+          "sha256": "4397b0faffbae1c06089fa6f0441892333ca5d6f0937f8c8764aaedd7df6851b",
+          "bytes": 635
+        },
+        "dnp3-analog-events/answers/ieee-g42v6-negative-infinity.json": {
+          "sha256": "8b77725d99150af36de5bf2a8fcd85d2b3146f2ad67ac826e649a4131a48f8da",
+          "bytes": 4028
+        },
+        "dnp3-analog-events/captures/all-g42v7-request7.pcap": {
+          "sha256": "98c36c6dafe752d6f872bd639da8f63124a3aae611921ae616d2a1258619c3e7",
+          "bytes": 669
+        },
+        "dnp3-analog-events/answers/all-g42v7-request7.json": {
+          "sha256": "80fa5b0550a1a3dfe5c8de41e0fbde665f31fe1525b17df685fb0cc6ee9ee574",
+          "bytes": 7104
+        },
+        "dnp3-analog-events/captures/all-g42v7-request0.pcap": {
+          "sha256": "8f97134681119c6ef0ef5479af490b2aa1d63e530f7e7100dc2a0fc668dd3286",
+          "bytes": 669
+        },
+        "dnp3-analog-events/answers/all-g42v7-request0.json": {
+          "sha256": "572c56cc8168471679f7c4c5c67b3ce4ddd9fd5c32d3aefd4612433ae7554c6a",
+          "bytes": 7104
+        },
+        "dnp3-analog-events/captures/count8-g42v7.pcap": {
+          "sha256": "aabda12d044280f85255309837fd29eca90b6e37644898ff616e52ee19cef728",
+          "bytes": 670
+        },
+        "dnp3-analog-events/answers/count8-g42v7.json": {
+          "sha256": "4815903a67de29be26f4a7d27d13374bfde82d8cfb11b1ea0cef105cd101fa21",
+          "bytes": 7106
+        },
+        "dnp3-analog-events/captures/count16-g42v7.pcap": {
+          "sha256": "7833d05b9d64c33e941b44823af3e2ee53fa283ea8ac30ca52411b9e9cfed00b",
+          "bytes": 671
+        },
+        "dnp3-analog-events/answers/count16-g42v7.json": {
+          "sha256": "37de5f84c0401ffa581efc29d37a1147725957a2f70845fd7d79884049bac278",
+          "bytes": 7114
+        },
+        "dnp3-analog-events/captures/ieee-g42v7-zero.pcap": {
+          "sha256": "a43e8c3bbe46b99d60ad3c39ec0fe652e09ae83828d48a592d5e116235c3935e",
+          "bytes": 637
+        },
+        "dnp3-analog-events/answers/ieee-g42v7-zero.json": {
+          "sha256": "4583cc0b6d9cef48d9f723f467462c3b587bd3d84cde0198f0419c14e7ce1c19",
+          "bytes": 4242
+        },
+        "dnp3-analog-events/captures/ieee-g42v7-negative-zero.pcap": {
+          "sha256": "42ab3cb40a9ca3ced858ba1007e31a3e548c62475b60021b7252730a2f9f509c",
+          "bytes": 637
+        },
+        "dnp3-analog-events/answers/ieee-g42v7-negative-zero.json": {
+          "sha256": "9c823d71680d65e06a6b3acd62f9ced855e0d4a297386f91ea1d528814b83647",
+          "bytes": 4244
+        },
+        "dnp3-analog-events/captures/ieee-g42v7-subnormal.pcap": {
+          "sha256": "80a6b8c0863c5b4e440a01d379a0cc781292f6c571e30542bfb901475e81342a",
+          "bytes": 637
+        },
+        "dnp3-analog-events/answers/ieee-g42v7-subnormal.json": {
+          "sha256": "70c5b782502c72caa80ca3aae2f4e28e95645ab214207bac7924515be68990b3",
+          "bytes": 4278
+        },
+        "dnp3-analog-events/captures/ieee-g42v7-nan.pcap": {
+          "sha256": "c8057dbe6068202529f813cfe23c8bd5529b5f7cf9ee090fb2deee7f0b89def2",
+          "bytes": 637
+        },
+        "dnp3-analog-events/answers/ieee-g42v7-nan.json": {
+          "sha256": "65d9c9303691e9b4cf610dbec1dca4cb4f1b7addfd2027423cad01e603f0b2d5",
+          "bytes": 4176
+        },
+        "dnp3-analog-events/captures/ieee-g42v7-positive-infinity.pcap": {
+          "sha256": "36e3bc10ffefeae57a8436b332b7037527eb9015e7bd0d1bc70a534d0fc69ff9",
+          "bytes": 637
+        },
+        "dnp3-analog-events/answers/ieee-g42v7-positive-infinity.json": {
+          "sha256": "d48f990da70c6b58ae237cffdb4cb7906f04c02f8430197783d4702256ae7b50",
+          "bytes": 4204
+        },
+        "dnp3-analog-events/captures/ieee-g42v7-negative-infinity.pcap": {
+          "sha256": "816bf800547d7e771377fb2bf97f826adfa2803e1a9b0e5b41a59663931735cd",
+          "bytes": 637
+        },
+        "dnp3-analog-events/answers/ieee-g42v7-negative-infinity.json": {
+          "sha256": "5952cde5f53448247d114fdf44934c51fbf81688da041945600e02e176eb30ad",
+          "bytes": 4204
+        },
+        "dnp3-analog-events/captures/all-g42v8-request8.pcap": {
+          "sha256": "ae3995ab90e6dc398286ea0118dcf43dd4ad0d1af29178632ede47b8ebb35086",
+          "bytes": 681
+        },
+        "dnp3-analog-events/answers/all-g42v8-request8.json": {
+          "sha256": "5270964b2a2f9f0c8aee25abc3083c128425336e57ce0661d2ba8744a438ae5a",
+          "bytes": 7216
+        },
+        "dnp3-analog-events/captures/all-g42v8-request0.pcap": {
+          "sha256": "9cd7d3e7d8a076948a540ef97b98b2c9f7a38f058f516833391618f390fedb0e",
+          "bytes": 681
+        },
+        "dnp3-analog-events/answers/all-g42v8-request0.json": {
+          "sha256": "f987dde8f20daeef17a5bd1bd715f44747c23f15a4afb3df104e81769364efa1",
+          "bytes": 7216
+        },
+        "dnp3-analog-events/captures/count8-g42v8.pcap": {
+          "sha256": "f1fc18501f5317f02d0650b05049f69c6b08aa5d06133116e2375994b133c555",
+          "bytes": 682
+        },
+        "dnp3-analog-events/answers/count8-g42v8.json": {
+          "sha256": "efdde2cf7876821aa2360342c1bdcead486ae178b79e723f3ed3f8e6dfd3fe8f",
+          "bytes": 7218
+        },
+        "dnp3-analog-events/captures/count16-g42v8.pcap": {
+          "sha256": "9d8d07875ed4fca1dfade3517286eecf0842973e02d3c94772b2ba95bef82e36",
+          "bytes": 683
+        },
+        "dnp3-analog-events/answers/count16-g42v8.json": {
+          "sha256": "a4a14394c26467bb9f468cfd56c38a7d9c13c3b4d0d6f785e1ff1a5be383ac20",
+          "bytes": 7226
+        },
+        "dnp3-analog-events/captures/ieee-g42v8-zero.pcap": {
+          "sha256": "a401799912281e11cb714f27abdcf22311ca8ae6d44b27d9e78d0c25543fca0b",
+          "bytes": 641
+        },
+        "dnp3-analog-events/answers/ieee-g42v8-zero.json": {
+          "sha256": "39482e8c994b36081bc0d95c9d0a1bce3b1f80b24734d50587b3cba3385c44e2",
+          "bytes": 4278
+        },
+        "dnp3-analog-events/captures/ieee-g42v8-negative-zero.pcap": {
+          "sha256": "0e47f7b8a1e1450ceb14b9c59a8516901236398ba5eea31904db2c32bda3da77",
+          "bytes": 641
+        },
+        "dnp3-analog-events/answers/ieee-g42v8-negative-zero.json": {
+          "sha256": "aa38258d082b2c1920e8b1ef3119be0725a76ffb599a60860c985754046e61bc",
+          "bytes": 4280
+        },
+        "dnp3-analog-events/captures/ieee-g42v8-subnormal.pcap": {
+          "sha256": "781892949fd3314018c667d6617e0ec1df16d4b1e9df544432d42e17ae03ba95",
+          "bytes": 641
+        },
+        "dnp3-analog-events/answers/ieee-g42v8-subnormal.json": {
+          "sha256": "347cf5ba7a5da444379a8fbd6d2425845c8839ff48d2b9120311c40612a74de6",
+          "bytes": 4284
+        },
+        "dnp3-analog-events/captures/ieee-g42v8-nan.pcap": {
+          "sha256": "7308b9b12547b5724e2db0395e4f441423c2ce4dab58a86327fb5c0210bc0c24",
+          "bytes": 641
+        },
+        "dnp3-analog-events/answers/ieee-g42v8-nan.json": {
+          "sha256": "3add7bff599a5ed2807e7763f30de31d8ee70130161c537e38c4dd9418ad2eac",
+          "bytes": 4212
+        },
+        "dnp3-analog-events/captures/ieee-g42v8-positive-infinity.pcap": {
+          "sha256": "c845829963ff7bea2424776928074953c20b0aa14a342487a01b192417dc0452",
+          "bytes": 641
+        },
+        "dnp3-analog-events/answers/ieee-g42v8-positive-infinity.json": {
+          "sha256": "8b54c111a6c42803a7e53a4e2c0dd90d69e531310c3cac0cca30e78bdd2c1f51",
+          "bytes": 4240
+        },
+        "dnp3-analog-events/captures/ieee-g42v8-negative-infinity.pcap": {
+          "sha256": "cf3d0b691c4b1a73858f032aee9a74f0b14d2b5914695d1720601828eddfef46",
+          "bytes": 641
+        },
+        "dnp3-analog-events/answers/ieee-g42v8-negative-infinity.json": {
+          "sha256": "4547818b5ed2887fe79138c0140f64fbb7d5e98f29f5955be6c8126b4b2aaa85",
+          "bytes": 4240
+        },
+        "dnp3-analog-events/captures/ordered-count-g42.pcap": {
+          "sha256": "0b35c2a6e9992056c912a229b3672db2f1fcca956c476e5265742afaca7fff9d",
+          "bytes": 764
+        },
+        "dnp3-analog-events/answers/ordered-count-g42.json": {
+          "sha256": "8d918d4cb0eafb24a4dd2cbcca8013de1ae75c61073a50cc5f9aa639b840d1e4",
+          "bytes": 7436
+        },
+        "dnp3-analog-events/captures/count-excess-g42.pcap": {
+          "sha256": "c955a2f16e8416e71cf3981a7bfb233f19e2a236beea648db06741cd1162077d",
+          "bytes": 756
+        },
+        "dnp3-analog-events/answers/count-excess-g42.json": {
+          "sha256": "7c59b2671457a3857a55b0ad0a706e3b1d129e5672073876bdf26bf18298432c",
+          "bytes": 5847
+        },
+        "dnp3-analog-events/captures/wrong-variation-g42.pcap": {
+          "sha256": "1bd51c8c0b0c4c85c79e939f18a963147a11e5055a262a91a9f64370a02b3d32",
+          "bytes": 784
+        },
+        "dnp3-analog-events/answers/wrong-variation-g42.json": {
+          "sha256": "c5be7a1bb93b17f77b3d0773e32bd20449f2e2f5f871e906c547b7b02183cd98",
+          "bytes": 6904
+        },
+        "dnp3-analog-events/captures/zero-g42.pcap": {
+          "sha256": "e2392138f5492752043a839f3168a1447935fa6389a0ea0441499f275ff70f15",
+          "bytes": 738
+        },
+        "dnp3-analog-events/answers/zero-g42.json": {
+          "sha256": "8ddc0a1ae1642b1ee2074548816f8998bee3e7b5c62dfc34f4726e2d4d15f560",
+          "bytes": 6638
+        },
+        "dnp3-analog-events/captures/truncated-g42.pcap": {
+          "sha256": "e063bf85dea4a9fa289f069b5950079d425352b80fec0fc9430d923bf2bb541d",
+          "bytes": 795
+        },
+        "dnp3-analog-events/answers/truncated-g42.json": {
+          "sha256": "f4b5497002bcf7e233ad211a0b481ca65dc7c4064bc658427792c7e4da0fb56f",
+          "bytes": 6937
+        },
+        "dnp3-analog-events/captures/range-g42.pcap": {
+          "sha256": "31819224c95e5583944e7abd60d06c08febfa41eb0bb8b50c348a28ea1636356",
+          "bytes": 744
+        },
+        "dnp3-analog-events/answers/range-g42.json": {
+          "sha256": "660304bb2b47873cd99f65d3a171875d59219da2be4b3cdf6979d5c6a6754ff3",
+          "bytes": 6685
+        },
+        "dnp3-analog-events/captures/unsupported-variation-g42.pcap": {
+          "sha256": "232034cf583df081400672899ab11e038a516906c926f6894bbfbabcdc3aaea7",
+          "bytes": 740
+        },
+        "dnp3-analog-events/answers/unsupported-variation-g42.json": {
+          "sha256": "bbc79b57cefed54316b59b533456a4ab71f888204f97806cb8fba0b64dfbcbe7",
+          "bytes": 6667
+        },
+        "dnp3-analog-events/captures/truncated-count-g42.pcap": {
+          "sha256": "91792b9b7f38f93cdf406b494add1487c7feb61775733d265cfb298504da5b42",
+          "bytes": 738
+        },
+        "dnp3-analog-events/answers/truncated-count-g42.json": {
+          "sha256": "b517c77f906c91951964ee04755282a7da19c33c23db8e8f329776fdbeb56a58",
+          "bytes": 6634
+        },
+        "dnp3-analog-events/captures/wrong-role-g42.pcap": {
+          "sha256": "9b61afd31eac87f1d6b28214801e847b8e2ca54069f4f93101e1a231ed3a1881",
+          "bytes": 762
+        },
+        "dnp3-analog-events/answers/wrong-role-g42.json": {
+          "sha256": "94c2bca870b25a6d21da2aaecddecf90ef9e8ba7b8445aa3f0d8bce9864d112d",
+          "bytes": 10083
+        },
+        "dnp3-analog-events/captures/class0-not-events-g42.pcap": {
+          "sha256": "912316f88b33c33b75e4ba687d672d50bcc1dadc697f345f654e0c207515eb0f",
+          "bytes": 647
+        },
+        "dnp3-analog-events/answers/class0-not-events-g42.json": {
+          "sha256": "338b510fdae62622e995e3d8b8b1e014c060c139050abc6d3c07d972b50a0623",
+          "bytes": 2440
+        },
+        "dnp3-analog-events/captures/class1-mixed-analog-events.pcap": {
+          "sha256": "0fae20648cbec9a0b9641c36b136d8b4eed9f94588e45e1fcef7f93e84abd810",
+          "bytes": 717
+        },
+        "dnp3-analog-events/answers/class1-mixed-analog-events.json": {
+          "sha256": "6114748d54b530b049dba7a8055bbb87859a4c8817464c0492e08aebf0d6c4c6",
+          "bytes": 11208
+        },
+        "dnp3-analog-events/captures/per-type-count.pcap": {
+          "sha256": "e289ef36afdb801d665a60b75e02fa51246cd5145352bdfb5fedcd169329ca7a",
+          "bytes": 653
+        },
+        "dnp3-analog-events/answers/per-type-count.json": {
+          "sha256": "5b69fd529252e70af7637392c5faee84c2fbb65a383491ed0f5dfd564df47208",
+          "bytes": 6408
+        },
+        "dnp3-analog-events/captures/binary-mixed-events.pcap": {
+          "sha256": "482fbde61dc7b5ba3e8fe9d58237f606fbe897d0a2144a35d09bd511c558990b",
+          "bytes": 674
+        },
+        "dnp3-analog-events/answers/binary-mixed-events.json": {
+          "sha256": "9a0926e322f307b887bd7d24faa983ee1256ae73d946f060fc9976adf2d98661",
+          "bytes": 8396
+        },
+        "dnp3-analog-events/captures/missing-cto-mixed-retains.pcap": {
+          "sha256": "4e6c8a665f53ed5402bc818b8f707405369b51e8b8dc6eab4b6c3d19b27cfa4f",
+          "bytes": 801
+        },
+        "dnp3-analog-events/answers/missing-cto-mixed-retains.json": {
+          "sha256": "dfd1b6bee6cc682eac6dcdf4fc6ee679bd4eb867c1f9f5cbe7f176a5308e662a",
+          "bytes": 9580
+        },
+        "dnp3-analog-events/captures/transport-composition.pcap": {
+          "sha256": "a5326221ba97146d37d80e328bb0b0cbeec46978714604a150897c5dc3cb6142",
+          "bytes": 830
+        },
+        "dnp3-analog-events/answers/transport-composition.json": {
+          "sha256": "be03bb399b3b5048be2126033ba43b4bcb6878d83642b65480d801f9ba1b2009",
+          "bytes": 9495
+        },
+        "dnp3-analog-events/captures/binary-transport-composition.pcap": {
+          "sha256": "aa5e3db314213868ded4185027462dbc2952c1eb4836725c573c0dd5041c58fa",
+          "bytes": 838
+        },
+        "dnp3-analog-events/answers/binary-transport-composition.json": {
+          "sha256": "535df49517c46d70a28484fbac911ee024300d0fc59fd0b4c8832d029e7a5f51",
+          "bytes": 11538
+        },
+        "dnp3-analog-events/manifest.json": {
+          "sha256": "17c871c38391245bdd7f09dc033d1764b94ab54f359edcb63242050dab21bb58",
+          "bytes": 47592
+        },
+        "dnp3-analog-events/guard-vectors.json": {
+          "sha256": "de76bc43b86121fb7452dbb98c18d1827da6c63fe1a439576d75f009abaad942",
+          "bytes": 904
+        },
+        "dnp3-analog-events/generate.py": {
+          "sha256": "299e72884ddd4a1875ed53c6afdf3c8d183dbe79d4e49909025a1c8ef4947443",
+          "bytes": 9935
+        },
+        "dnp3-analog-events/verify.py": {
+          "sha256": "8d6a01aaa3158a991f902e44796e5dbdbde8808d161edbc97897408fe273e6ab",
+          "bytes": 954
+        },
+        "dnp3-analog-events/MODEL-PINS.json": {
+          "sha256": "c31d740d108b2a3bdc92afdfebd5206816862ac0413f510708ae6f0fcca3288f",
+          "bytes": 1155
+        },
+        "dnp3-analog-events/MODEL-DEPENDENCIES.json": {
+          "sha256": "22f5e34541285f1f259feca2fe8f71aa052baab79bcfb82ff1c4c53eff9c721f",
+          "bytes": 190
+        },
+        "dnp3-analog-events/SOURCE-PINS.json": {
+          "sha256": "3ac3a05918d09ba092e989a1319ba8186d5887e9f48553c05c2aac85ad661932",
+          "bytes": 1342
+        },
+        "dnp3-analog-events/reference.py": {
+          "sha256": "1c1400a8ce28f71d30988bc4995e9f47cc67b48c781c0503757c5fdaa4dff8b0",
+          "bytes": 4699
+        },
+        "dnp3-analog-events/REFERENCE-ACTUAL.json": {
+          "sha256": "d21821a245b8221f8241e6e59a71f02f4dcf01a73c4aa7355ab3158879e28ced",
+          "bytes": 29067
+        },
+        "dnp3-analog-events/reference_selection.py": {
+          "sha256": "5d09fa92d49f843b5fb660e035c492f47816cbabb9f7af370a4842e041bcce67",
+          "bytes": 5760
+        },
+        "dnp3-analog-events/REFERENCE-SELECTION-ACTUAL.json": {
+          "sha256": "f39827b2abfd9246d1b558935398b81c9ac7afb40b7d1b718d1cb678c7cf252a",
+          "bytes": 39829
+        },
+        "dnp3-analog-events/reference_codec.py": {
+          "sha256": "e1cf5c56e44e9e3d39d22278b81f39673f970778b497decfe2c509a268b14ea6",
+          "bytes": 7595
+        },
+        "dnp3-analog-events/REFERENCE-CODEC-ACTUAL.json": {
+          "sha256": "3f7267706b148abeb80565972f17bc5a123d92edc402ddd9412b7cb0df8e576e",
+          "bytes": 78756
+        },
+        "dnp3-analog-events/reference_transport.py": {
+          "sha256": "600437564fdf60513f0119b291acfc3b03ccd675864dc4c32da8cc6648ee922e",
+          "bytes": 5671
+        },
+        "dnp3-analog-events/REFERENCE-TRANSPORT-ACTUAL.json": {
+          "sha256": "79219d3001929f201ee098e7860f3aabf3a0d49a24e928a6e9a60abe4733e102",
+          "bytes": 919
+        },
+        "dnp3-analog-events/TRANSPORT-SOURCE-PINS.json": {
+          "sha256": "76d0590b48e1700c26b260c8ac953c1bd52888f8ee1cd0b21182e0e1d107d2d1",
+          "bytes": 1812
+        },
+        "required-tests-traffic-unified-v61.json": {
+          "sha256": "021a6a1ad59de48b111babe8b364e32562de99286680fb9d58eddc367160ba2c",
+          "bytes": 14406074
+        },
+        "validation/expected.json": {
+          "sha256": "400b9081d4c81f6ea8fae34654a276ec2fbcbae700fa4805c7b79893e6032719",
+          "bytes": 180506
+        }
+      },
+      "aliases": {
+        "common/pcapx/pcaputil/dnp3-analog-events/captures/all-g32v1-request1.pcap": "dnp3-analog-events/captures/all-g32v1-request1.pcap",
+        "common/pcapx/pcaputil/dnp3-analog-events/answers/all-g32v1-request1.json": "dnp3-analog-events/answers/all-g32v1-request1.json",
+        "common/pcapx/pcaputil/dnp3-analog-events/captures/all-g32v1-request0.pcap": "dnp3-analog-events/captures/all-g32v1-request0.pcap",
+        "common/pcapx/pcaputil/dnp3-analog-events/answers/all-g32v1-request0.json": "dnp3-analog-events/answers/all-g32v1-request0.json",
+        "common/pcapx/pcaputil/dnp3-analog-events/captures/count8-g32v1.pcap": "dnp3-analog-events/captures/count8-g32v1.pcap",
+        "common/pcapx/pcaputil/dnp3-analog-events/answers/count8-g32v1.json": "dnp3-analog-events/answers/count8-g32v1.json",
+        "common/pcapx/pcaputil/dnp3-analog-events/captures/count16-g32v1.pcap": "dnp3-analog-events/captures/count16-g32v1.pcap",
+        "common/pcapx/pcaputil/dnp3-analog-events/answers/count16-g32v1.json": "dnp3-analog-events/answers/count16-g32v1.json",
+        "common/pcapx/pcaputil/dnp3-analog-events/captures/all-g32v2-request2.pcap": "dnp3-analog-events/captures/all-g32v2-request2.pcap",
+        "common/pcapx/pcaputil/dnp3-analog-events/answers/all-g32v2-request2.json": "dnp3-analog-events/answers/all-g32v2-request2.json",
+        "common/pcapx/pcaputil/dnp3-analog-events/captures/all-g32v2-request0.pcap": "dnp3-analog-events/captures/all-g32v2-request0.pcap",
+        "common/pcapx/pcaputil/dnp3-analog-events/answers/all-g32v2-request0.json": "dnp3-analog-events/answers/all-g32v2-request0.json",
+        "common/pcapx/pcaputil/dnp3-analog-events/captures/count8-g32v2.pcap": "dnp3-analog-events/captures/count8-g32v2.pcap",
+        "common/pcapx/pcaputil/dnp3-analog-events/answers/count8-g32v2.json": "dnp3-analog-events/answers/count8-g32v2.json",
+        "common/pcapx/pcaputil/dnp3-analog-events/captures/count16-g32v2.pcap": "dnp3-analog-events/captures/count16-g32v2.pcap",
+        "common/pcapx/pcaputil/dnp3-analog-events/answers/count16-g32v2.json": "dnp3-analog-events/answers/count16-g32v2.json",
+        "common/pcapx/pcaputil/dnp3-analog-events/captures/all-g32v3-request3.pcap": "dnp3-analog-events/captures/all-g32v3-request3.pcap",
+        "common/pcapx/pcaputil/dnp3-analog-events/answers/all-g32v3-request3.json": "dnp3-analog-events/answers/all-g32v3-request3.json",
+        "common/pcapx/pcaputil/dnp3-analog-events/captures/all-g32v3-request0.pcap": "dnp3-analog-events/captures/all-g32v3-request0.pcap",
+        "common/pcapx/pcaputil/dnp3-analog-events/answers/all-g32v3-request0.json": "dnp3-analog-events/answers/all-g32v3-request0.json",
+        "common/pcapx/pcaputil/dnp3-analog-events/captures/count8-g32v3.pcap": "dnp3-analog-events/captures/count8-g32v3.pcap",
+        "common/pcapx/pcaputil/dnp3-analog-events/answers/count8-g32v3.json": "dnp3-analog-events/answers/count8-g32v3.json",
+        "common/pcapx/pcaputil/dnp3-analog-events/captures/count16-g32v3.pcap": "dnp3-analog-events/captures/count16-g32v3.pcap",
+        "common/pcapx/pcaputil/dnp3-analog-events/answers/count16-g32v3.json": "dnp3-analog-events/answers/count16-g32v3.json",
+        "common/pcapx/pcaputil/dnp3-analog-events/captures/all-g32v4-request4.pcap": "dnp3-analog-events/captures/all-g32v4-request4.pcap",
+        "common/pcapx/pcaputil/dnp3-analog-events/answers/all-g32v4-request4.json": "dnp3-analog-events/answers/all-g32v4-request4.json",
+        "common/pcapx/pcaputil/dnp3-analog-events/captures/all-g32v4-request0.pcap": "dnp3-analog-events/captures/all-g32v4-request0.pcap",
+        "common/pcapx/pcaputil/dnp3-analog-events/answers/all-g32v4-request0.json": "dnp3-analog-events/answers/all-g32v4-request0.json",
+        "common/pcapx/pcaputil/dnp3-analog-events/captures/count8-g32v4.pcap": "dnp3-analog-events/captures/count8-g32v4.pcap",
+        "common/pcapx/pcaputil/dnp3-analog-events/answers/count8-g32v4.json": "dnp3-analog-events/answers/count8-g32v4.json",
+        "common/pcapx/pcaputil/dnp3-analog-events/captures/count16-g32v4.pcap": "dnp3-analog-events/captures/count16-g32v4.pcap",
+        "common/pcapx/pcaputil/dnp3-analog-events/answers/count16-g32v4.json": "dnp3-analog-events/answers/count16-g32v4.json",
+        "common/pcapx/pcaputil/dnp3-analog-events/captures/all-g32v5-request5.pcap": "dnp3-analog-events/captures/all-g32v5-request5.pcap",
+        "common/pcapx/pcaputil/dnp3-analog-events/answers/all-g32v5-request5.json": "dnp3-analog-events/answers/all-g32v5-request5.json",
+        "common/pcapx/pcaputil/dnp3-analog-events/captures/all-g32v5-request0.pcap": "dnp3-analog-events/captures/all-g32v5-request0.pcap",
+        "common/pcapx/pcaputil/dnp3-analog-events/answers/all-g32v5-request0.json": "dnp3-analog-events/answers/all-g32v5-request0.json",
+        "common/pcapx/pcaputil/dnp3-analog-events/captures/count8-g32v5.pcap": "dnp3-analog-events/captures/count8-g32v5.pcap",
+        "common/pcapx/pcaputil/dnp3-analog-events/answers/count8-g32v5.json": "dnp3-analog-events/answers/count8-g32v5.json",
+        "common/pcapx/pcaputil/dnp3-analog-events/captures/count16-g32v5.pcap": "dnp3-analog-events/captures/count16-g32v5.pcap",
+        "common/pcapx/pcaputil/dnp3-analog-events/answers/count16-g32v5.json": "dnp3-analog-events/answers/count16-g32v5.json",
+        "common/pcapx/pcaputil/dnp3-analog-events/captures/ieee-g32v5-zero.pcap": "dnp3-analog-events/captures/ieee-g32v5-zero.pcap",
+        "common/pcapx/pcaputil/dnp3-analog-events/answers/ieee-g32v5-zero.json": "dnp3-analog-events/answers/ieee-g32v5-zero.json",
+        "common/pcapx/pcaputil/dnp3-analog-events/captures/ieee-g32v5-negative-zero.pcap": "dnp3-analog-events/captures/ieee-g32v5-negative-zero.pcap",
+        "common/pcapx/pcaputil/dnp3-analog-events/answers/ieee-g32v5-negative-zero.json": "dnp3-analog-events/answers/ieee-g32v5-negative-zero.json",
+        "common/pcapx/pcaputil/dnp3-analog-events/captures/ieee-g32v5-subnormal.pcap": "dnp3-analog-events/captures/ieee-g32v5-subnormal.pcap",
+        "common/pcapx/pcaputil/dnp3-analog-events/answers/ieee-g32v5-subnormal.json": "dnp3-analog-events/answers/ieee-g32v5-subnormal.json",
+        "common/pcapx/pcaputil/dnp3-analog-events/captures/ieee-g32v5-nan.pcap": "dnp3-analog-events/captures/ieee-g32v5-nan.pcap",
+        "common/pcapx/pcaputil/dnp3-analog-events/answers/ieee-g32v5-nan.json": "dnp3-analog-events/answers/ieee-g32v5-nan.json",
+        "common/pcapx/pcaputil/dnp3-analog-events/captures/ieee-g32v5-positive-infinity.pcap": "dnp3-analog-events/captures/ieee-g32v5-positive-infinity.pcap",
+        "common/pcapx/pcaputil/dnp3-analog-events/answers/ieee-g32v5-positive-infinity.json": "dnp3-analog-events/answers/ieee-g32v5-positive-infinity.json",
+        "common/pcapx/pcaputil/dnp3-analog-events/captures/ieee-g32v5-negative-infinity.pcap": "dnp3-analog-events/captures/ieee-g32v5-negative-infinity.pcap",
+        "common/pcapx/pcaputil/dnp3-analog-events/answers/ieee-g32v5-negative-infinity.json": "dnp3-analog-events/answers/ieee-g32v5-negative-infinity.json",
+        "common/pcapx/pcaputil/dnp3-analog-events/captures/all-g32v6-request6.pcap": "dnp3-analog-events/captures/all-g32v6-request6.pcap",
+        "common/pcapx/pcaputil/dnp3-analog-events/answers/all-g32v6-request6.json": "dnp3-analog-events/answers/all-g32v6-request6.json",
+        "common/pcapx/pcaputil/dnp3-analog-events/captures/all-g32v6-request0.pcap": "dnp3-analog-events/captures/all-g32v6-request0.pcap",
+        "common/pcapx/pcaputil/dnp3-analog-events/answers/all-g32v6-request0.json": "dnp3-analog-events/answers/all-g32v6-request0.json",
+        "common/pcapx/pcaputil/dnp3-analog-events/captures/count8-g32v6.pcap": "dnp3-analog-events/captures/count8-g32v6.pcap",
+        "common/pcapx/pcaputil/dnp3-analog-events/answers/count8-g32v6.json": "dnp3-analog-events/answers/count8-g32v6.json",
+        "common/pcapx/pcaputil/dnp3-analog-events/captures/count16-g32v6.pcap": "dnp3-analog-events/captures/count16-g32v6.pcap",
+        "common/pcapx/pcaputil/dnp3-analog-events/answers/count16-g32v6.json": "dnp3-analog-events/answers/count16-g32v6.json",
+        "common/pcapx/pcaputil/dnp3-analog-events/captures/ieee-g32v6-zero.pcap": "dnp3-analog-events/captures/ieee-g32v6-zero.pcap",
+        "common/pcapx/pcaputil/dnp3-analog-events/answers/ieee-g32v6-zero.json": "dnp3-analog-events/answers/ieee-g32v6-zero.json",
+        "common/pcapx/pcaputil/dnp3-analog-events/captures/ieee-g32v6-negative-zero.pcap": "dnp3-analog-events/captures/ieee-g32v6-negative-zero.pcap",
+        "common/pcapx/pcaputil/dnp3-analog-events/answers/ieee-g32v6-negative-zero.json": "dnp3-analog-events/answers/ieee-g32v6-negative-zero.json",
+        "common/pcapx/pcaputil/dnp3-analog-events/captures/ieee-g32v6-subnormal.pcap": "dnp3-analog-events/captures/ieee-g32v6-subnormal.pcap",
+        "common/pcapx/pcaputil/dnp3-analog-events/answers/ieee-g32v6-subnormal.json": "dnp3-analog-events/answers/ieee-g32v6-subnormal.json",
+        "common/pcapx/pcaputil/dnp3-analog-events/captures/ieee-g32v6-nan.pcap": "dnp3-analog-events/captures/ieee-g32v6-nan.pcap",
+        "common/pcapx/pcaputil/dnp3-analog-events/answers/ieee-g32v6-nan.json": "dnp3-analog-events/answers/ieee-g32v6-nan.json",
+        "common/pcapx/pcaputil/dnp3-analog-events/captures/ieee-g32v6-positive-infinity.pcap": "dnp3-analog-events/captures/ieee-g32v6-positive-infinity.pcap",
+        "common/pcapx/pcaputil/dnp3-analog-events/answers/ieee-g32v6-positive-infinity.json": "dnp3-analog-events/answers/ieee-g32v6-positive-infinity.json",
+        "common/pcapx/pcaputil/dnp3-analog-events/captures/ieee-g32v6-negative-infinity.pcap": "dnp3-analog-events/captures/ieee-g32v6-negative-infinity.pcap",
+        "common/pcapx/pcaputil/dnp3-analog-events/answers/ieee-g32v6-negative-infinity.json": "dnp3-analog-events/answers/ieee-g32v6-negative-infinity.json",
+        "common/pcapx/pcaputil/dnp3-analog-events/captures/all-g32v7-request7.pcap": "dnp3-analog-events/captures/all-g32v7-request7.pcap",
+        "common/pcapx/pcaputil/dnp3-analog-events/answers/all-g32v7-request7.json": "dnp3-analog-events/answers/all-g32v7-request7.json",
+        "common/pcapx/pcaputil/dnp3-analog-events/captures/all-g32v7-request0.pcap": "dnp3-analog-events/captures/all-g32v7-request0.pcap",
+        "common/pcapx/pcaputil/dnp3-analog-events/answers/all-g32v7-request0.json": "dnp3-analog-events/answers/all-g32v7-request0.json",
+        "common/pcapx/pcaputil/dnp3-analog-events/captures/count8-g32v7.pcap": "dnp3-analog-events/captures/count8-g32v7.pcap",
+        "common/pcapx/pcaputil/dnp3-analog-events/answers/count8-g32v7.json": "dnp3-analog-events/answers/count8-g32v7.json",
+        "common/pcapx/pcaputil/dnp3-analog-events/captures/count16-g32v7.pcap": "dnp3-analog-events/captures/count16-g32v7.pcap",
+        "common/pcapx/pcaputil/dnp3-analog-events/answers/count16-g32v7.json": "dnp3-analog-events/answers/count16-g32v7.json",
+        "common/pcapx/pcaputil/dnp3-analog-events/captures/ieee-g32v7-zero.pcap": "dnp3-analog-events/captures/ieee-g32v7-zero.pcap",
+        "common/pcapx/pcaputil/dnp3-analog-events/answers/ieee-g32v7-zero.json": "dnp3-analog-events/answers/ieee-g32v7-zero.json",
+        "common/pcapx/pcaputil/dnp3-analog-events/captures/ieee-g32v7-negative-zero.pcap": "dnp3-analog-events/captures/ieee-g32v7-negative-zero.pcap",
+        "common/pcapx/pcaputil/dnp3-analog-events/answers/ieee-g32v7-negative-zero.json": "dnp3-analog-events/answers/ieee-g32v7-negative-zero.json",
+        "common/pcapx/pcaputil/dnp3-analog-events/captures/ieee-g32v7-subnormal.pcap": "dnp3-analog-events/captures/ieee-g32v7-subnormal.pcap",
+        "common/pcapx/pcaputil/dnp3-analog-events/answers/ieee-g32v7-subnormal.json": "dnp3-analog-events/answers/ieee-g32v7-subnormal.json",
+        "common/pcapx/pcaputil/dnp3-analog-events/captures/ieee-g32v7-nan.pcap": "dnp3-analog-events/captures/ieee-g32v7-nan.pcap",
+        "common/pcapx/pcaputil/dnp3-analog-events/answers/ieee-g32v7-nan.json": "dnp3-analog-events/answers/ieee-g32v7-nan.json",
+        "common/pcapx/pcaputil/dnp3-analog-events/captures/ieee-g32v7-positive-infinity.pcap": "dnp3-analog-events/captures/ieee-g32v7-positive-infinity.pcap",
+        "common/pcapx/pcaputil/dnp3-analog-events/answers/ieee-g32v7-positive-infinity.json": "dnp3-analog-events/answers/ieee-g32v7-positive-infinity.json",
+        "common/pcapx/pcaputil/dnp3-analog-events/captures/ieee-g32v7-negative-infinity.pcap": "dnp3-analog-events/captures/ieee-g32v7-negative-infinity.pcap",
+        "common/pcapx/pcaputil/dnp3-analog-events/answers/ieee-g32v7-negative-infinity.json": "dnp3-analog-events/answers/ieee-g32v7-negative-infinity.json",
+        "common/pcapx/pcaputil/dnp3-analog-events/captures/all-g32v8-request8.pcap": "dnp3-analog-events/captures/all-g32v8-request8.pcap",
+        "common/pcapx/pcaputil/dnp3-analog-events/answers/all-g32v8-request8.json": "dnp3-analog-events/answers/all-g32v8-request8.json",
+        "common/pcapx/pcaputil/dnp3-analog-events/captures/all-g32v8-request0.pcap": "dnp3-analog-events/captures/all-g32v8-request0.pcap",
+        "common/pcapx/pcaputil/dnp3-analog-events/answers/all-g32v8-request0.json": "dnp3-analog-events/answers/all-g32v8-request0.json",
+        "common/pcapx/pcaputil/dnp3-analog-events/captures/count8-g32v8.pcap": "dnp3-analog-events/captures/count8-g32v8.pcap",
+        "common/pcapx/pcaputil/dnp3-analog-events/answers/count8-g32v8.json": "dnp3-analog-events/answers/count8-g32v8.json",
+        "common/pcapx/pcaputil/dnp3-analog-events/captures/count16-g32v8.pcap": "dnp3-analog-events/captures/count16-g32v8.pcap",
+        "common/pcapx/pcaputil/dnp3-analog-events/answers/count16-g32v8.json": "dnp3-analog-events/answers/count16-g32v8.json",
+        "common/pcapx/pcaputil/dnp3-analog-events/captures/ieee-g32v8-zero.pcap": "dnp3-analog-events/captures/ieee-g32v8-zero.pcap",
+        "common/pcapx/pcaputil/dnp3-analog-events/answers/ieee-g32v8-zero.json": "dnp3-analog-events/answers/ieee-g32v8-zero.json",
+        "common/pcapx/pcaputil/dnp3-analog-events/captures/ieee-g32v8-negative-zero.pcap": "dnp3-analog-events/captures/ieee-g32v8-negative-zero.pcap",
+        "common/pcapx/pcaputil/dnp3-analog-events/answers/ieee-g32v8-negative-zero.json": "dnp3-analog-events/answers/ieee-g32v8-negative-zero.json",
+        "common/pcapx/pcaputil/dnp3-analog-events/captures/ieee-g32v8-subnormal.pcap": "dnp3-analog-events/captures/ieee-g32v8-subnormal.pcap",
+        "common/pcapx/pcaputil/dnp3-analog-events/answers/ieee-g32v8-subnormal.json": "dnp3-analog-events/answers/ieee-g32v8-subnormal.json",
+        "common/pcapx/pcaputil/dnp3-analog-events/captures/ieee-g32v8-nan.pcap": "dnp3-analog-events/captures/ieee-g32v8-nan.pcap",
+        "common/pcapx/pcaputil/dnp3-analog-events/answers/ieee-g32v8-nan.json": "dnp3-analog-events/answers/ieee-g32v8-nan.json",
+        "common/pcapx/pcaputil/dnp3-analog-events/captures/ieee-g32v8-positive-infinity.pcap": "dnp3-analog-events/captures/ieee-g32v8-positive-infinity.pcap",
+        "common/pcapx/pcaputil/dnp3-analog-events/answers/ieee-g32v8-positive-infinity.json": "dnp3-analog-events/answers/ieee-g32v8-positive-infinity.json",
+        "common/pcapx/pcaputil/dnp3-analog-events/captures/ieee-g32v8-negative-infinity.pcap": "dnp3-analog-events/captures/ieee-g32v8-negative-infinity.pcap",
+        "common/pcapx/pcaputil/dnp3-analog-events/answers/ieee-g32v8-negative-infinity.json": "dnp3-analog-events/answers/ieee-g32v8-negative-infinity.json",
+        "common/pcapx/pcaputil/dnp3-analog-events/captures/ordered-count-g32.pcap": "dnp3-analog-events/captures/ordered-count-g32.pcap",
+        "common/pcapx/pcaputil/dnp3-analog-events/answers/ordered-count-g32.json": "dnp3-analog-events/answers/ordered-count-g32.json",
+        "common/pcapx/pcaputil/dnp3-analog-events/captures/count-excess-g32.pcap": "dnp3-analog-events/captures/count-excess-g32.pcap",
+        "common/pcapx/pcaputil/dnp3-analog-events/answers/count-excess-g32.json": "dnp3-analog-events/answers/count-excess-g32.json",
+        "common/pcapx/pcaputil/dnp3-analog-events/captures/wrong-variation-g32.pcap": "dnp3-analog-events/captures/wrong-variation-g32.pcap",
+        "common/pcapx/pcaputil/dnp3-analog-events/answers/wrong-variation-g32.json": "dnp3-analog-events/answers/wrong-variation-g32.json",
+        "common/pcapx/pcaputil/dnp3-analog-events/captures/zero-g32.pcap": "dnp3-analog-events/captures/zero-g32.pcap",
+        "common/pcapx/pcaputil/dnp3-analog-events/answers/zero-g32.json": "dnp3-analog-events/answers/zero-g32.json",
+        "common/pcapx/pcaputil/dnp3-analog-events/captures/truncated-g32.pcap": "dnp3-analog-events/captures/truncated-g32.pcap",
+        "common/pcapx/pcaputil/dnp3-analog-events/answers/truncated-g32.json": "dnp3-analog-events/answers/truncated-g32.json",
+        "common/pcapx/pcaputil/dnp3-analog-events/captures/range-g32.pcap": "dnp3-analog-events/captures/range-g32.pcap",
+        "common/pcapx/pcaputil/dnp3-analog-events/answers/range-g32.json": "dnp3-analog-events/answers/range-g32.json",
+        "common/pcapx/pcaputil/dnp3-analog-events/captures/unsupported-variation-g32.pcap": "dnp3-analog-events/captures/unsupported-variation-g32.pcap",
+        "common/pcapx/pcaputil/dnp3-analog-events/answers/unsupported-variation-g32.json": "dnp3-analog-events/answers/unsupported-variation-g32.json",
+        "common/pcapx/pcaputil/dnp3-analog-events/captures/truncated-count-g32.pcap": "dnp3-analog-events/captures/truncated-count-g32.pcap",
+        "common/pcapx/pcaputil/dnp3-analog-events/answers/truncated-count-g32.json": "dnp3-analog-events/answers/truncated-count-g32.json",
+        "common/pcapx/pcaputil/dnp3-analog-events/captures/wrong-role-g32.pcap": "dnp3-analog-events/captures/wrong-role-g32.pcap",
+        "common/pcapx/pcaputil/dnp3-analog-events/answers/wrong-role-g32.json": "dnp3-analog-events/answers/wrong-role-g32.json",
+        "common/pcapx/pcaputil/dnp3-analog-events/captures/class0-not-events-g32.pcap": "dnp3-analog-events/captures/class0-not-events-g32.pcap",
+        "common/pcapx/pcaputil/dnp3-analog-events/answers/class0-not-events-g32.json": "dnp3-analog-events/answers/class0-not-events-g32.json",
+        "common/pcapx/pcaputil/dnp3-analog-events/captures/all-g42v1-request1.pcap": "dnp3-analog-events/captures/all-g42v1-request1.pcap",
+        "common/pcapx/pcaputil/dnp3-analog-events/answers/all-g42v1-request1.json": "dnp3-analog-events/answers/all-g42v1-request1.json",
+        "common/pcapx/pcaputil/dnp3-analog-events/captures/all-g42v1-request0.pcap": "dnp3-analog-events/captures/all-g42v1-request0.pcap",
+        "common/pcapx/pcaputil/dnp3-analog-events/answers/all-g42v1-request0.json": "dnp3-analog-events/answers/all-g42v1-request0.json",
+        "common/pcapx/pcaputil/dnp3-analog-events/captures/count8-g42v1.pcap": "dnp3-analog-events/captures/count8-g42v1.pcap",
+        "common/pcapx/pcaputil/dnp3-analog-events/answers/count8-g42v1.json": "dnp3-analog-events/answers/count8-g42v1.json",
+        "common/pcapx/pcaputil/dnp3-analog-events/captures/count16-g42v1.pcap": "dnp3-analog-events/captures/count16-g42v1.pcap",
+        "common/pcapx/pcaputil/dnp3-analog-events/answers/count16-g42v1.json": "dnp3-analog-events/answers/count16-g42v1.json",
+        "common/pcapx/pcaputil/dnp3-analog-events/captures/all-g42v2-request2.pcap": "dnp3-analog-events/captures/all-g42v2-request2.pcap",
+        "common/pcapx/pcaputil/dnp3-analog-events/answers/all-g42v2-request2.json": "dnp3-analog-events/answers/all-g42v2-request2.json",
+        "common/pcapx/pcaputil/dnp3-analog-events/captures/all-g42v2-request0.pcap": "dnp3-analog-events/captures/all-g42v2-request0.pcap",
+        "common/pcapx/pcaputil/dnp3-analog-events/answers/all-g42v2-request0.json": "dnp3-analog-events/answers/all-g42v2-request0.json",
+        "common/pcapx/pcaputil/dnp3-analog-events/captures/count8-g42v2.pcap": "dnp3-analog-events/captures/count8-g42v2.pcap",
+        "common/pcapx/pcaputil/dnp3-analog-events/answers/count8-g42v2.json": "dnp3-analog-events/answers/count8-g42v2.json",
+        "common/pcapx/pcaputil/dnp3-analog-events/captures/count16-g42v2.pcap": "dnp3-analog-events/captures/count16-g42v2.pcap",
+        "common/pcapx/pcaputil/dnp3-analog-events/answers/count16-g42v2.json": "dnp3-analog-events/answers/count16-g42v2.json",
+        "common/pcapx/pcaputil/dnp3-analog-events/captures/all-g42v3-request3.pcap": "dnp3-analog-events/captures/all-g42v3-request3.pcap",
+        "common/pcapx/pcaputil/dnp3-analog-events/answers/all-g42v3-request3.json": "dnp3-analog-events/answers/all-g42v3-request3.json",
+        "common/pcapx/pcaputil/dnp3-analog-events/captures/all-g42v3-request0.pcap": "dnp3-analog-events/captures/all-g42v3-request0.pcap",
+        "common/pcapx/pcaputil/dnp3-analog-events/answers/all-g42v3-request0.json": "dnp3-analog-events/answers/all-g42v3-request0.json",
+        "common/pcapx/pcaputil/dnp3-analog-events/captures/count8-g42v3.pcap": "dnp3-analog-events/captures/count8-g42v3.pcap",
+        "common/pcapx/pcaputil/dnp3-analog-events/answers/count8-g42v3.json": "dnp3-analog-events/answers/count8-g42v3.json",
+        "common/pcapx/pcaputil/dnp3-analog-events/captures/count16-g42v3.pcap": "dnp3-analog-events/captures/count16-g42v3.pcap",
+        "common/pcapx/pcaputil/dnp3-analog-events/answers/count16-g42v3.json": "dnp3-analog-events/answers/count16-g42v3.json",
+        "common/pcapx/pcaputil/dnp3-analog-events/captures/all-g42v4-request4.pcap": "dnp3-analog-events/captures/all-g42v4-request4.pcap",
+        "common/pcapx/pcaputil/dnp3-analog-events/answers/all-g42v4-request4.json": "dnp3-analog-events/answers/all-g42v4-request4.json",
+        "common/pcapx/pcaputil/dnp3-analog-events/captures/all-g42v4-request0.pcap": "dnp3-analog-events/captures/all-g42v4-request0.pcap",
+        "common/pcapx/pcaputil/dnp3-analog-events/answers/all-g42v4-request0.json": "dnp3-analog-events/answers/all-g42v4-request0.json",
+        "common/pcapx/pcaputil/dnp3-analog-events/captures/count8-g42v4.pcap": "dnp3-analog-events/captures/count8-g42v4.pcap",
+        "common/pcapx/pcaputil/dnp3-analog-events/answers/count8-g42v4.json": "dnp3-analog-events/answers/count8-g42v4.json",
+        "common/pcapx/pcaputil/dnp3-analog-events/captures/count16-g42v4.pcap": "dnp3-analog-events/captures/count16-g42v4.pcap",
+        "common/pcapx/pcaputil/dnp3-analog-events/answers/count16-g42v4.json": "dnp3-analog-events/answers/count16-g42v4.json",
+        "common/pcapx/pcaputil/dnp3-analog-events/captures/all-g42v5-request5.pcap": "dnp3-analog-events/captures/all-g42v5-request5.pcap",
+        "common/pcapx/pcaputil/dnp3-analog-events/answers/all-g42v5-request5.json": "dnp3-analog-events/answers/all-g42v5-request5.json",
+        "common/pcapx/pcaputil/dnp3-analog-events/captures/all-g42v5-request0.pcap": "dnp3-analog-events/captures/all-g42v5-request0.pcap",
+        "common/pcapx/pcaputil/dnp3-analog-events/answers/all-g42v5-request0.json": "dnp3-analog-events/answers/all-g42v5-request0.json",
+        "common/pcapx/pcaputil/dnp3-analog-events/captures/count8-g42v5.pcap": "dnp3-analog-events/captures/count8-g42v5.pcap",
+        "common/pcapx/pcaputil/dnp3-analog-events/answers/count8-g42v5.json": "dnp3-analog-events/answers/count8-g42v5.json",
+        "common/pcapx/pcaputil/dnp3-analog-events/captures/count16-g42v5.pcap": "dnp3-analog-events/captures/count16-g42v5.pcap",
+        "common/pcapx/pcaputil/dnp3-analog-events/answers/count16-g42v5.json": "dnp3-analog-events/answers/count16-g42v5.json",
+        "common/pcapx/pcaputil/dnp3-analog-events/captures/ieee-g42v5-zero.pcap": "dnp3-analog-events/captures/ieee-g42v5-zero.pcap",
+        "common/pcapx/pcaputil/dnp3-analog-events/answers/ieee-g42v5-zero.json": "dnp3-analog-events/answers/ieee-g42v5-zero.json",
+        "common/pcapx/pcaputil/dnp3-analog-events/captures/ieee-g42v5-negative-zero.pcap": "dnp3-analog-events/captures/ieee-g42v5-negative-zero.pcap",
+        "common/pcapx/pcaputil/dnp3-analog-events/answers/ieee-g42v5-negative-zero.json": "dnp3-analog-events/answers/ieee-g42v5-negative-zero.json",
+        "common/pcapx/pcaputil/dnp3-analog-events/captures/ieee-g42v5-subnormal.pcap": "dnp3-analog-events/captures/ieee-g42v5-subnormal.pcap",
+        "common/pcapx/pcaputil/dnp3-analog-events/answers/ieee-g42v5-subnormal.json": "dnp3-analog-events/answers/ieee-g42v5-subnormal.json",
+        "common/pcapx/pcaputil/dnp3-analog-events/captures/ieee-g42v5-nan.pcap": "dnp3-analog-events/captures/ieee-g42v5-nan.pcap",
+        "common/pcapx/pcaputil/dnp3-analog-events/answers/ieee-g42v5-nan.json": "dnp3-analog-events/answers/ieee-g42v5-nan.json",
+        "common/pcapx/pcaputil/dnp3-analog-events/captures/ieee-g42v5-positive-infinity.pcap": "dnp3-analog-events/captures/ieee-g42v5-positive-infinity.pcap",
+        "common/pcapx/pcaputil/dnp3-analog-events/answers/ieee-g42v5-positive-infinity.json": "dnp3-analog-events/answers/ieee-g42v5-positive-infinity.json",
+        "common/pcapx/pcaputil/dnp3-analog-events/captures/ieee-g42v5-negative-infinity.pcap": "dnp3-analog-events/captures/ieee-g42v5-negative-infinity.pcap",
+        "common/pcapx/pcaputil/dnp3-analog-events/answers/ieee-g42v5-negative-infinity.json": "dnp3-analog-events/answers/ieee-g42v5-negative-infinity.json",
+        "common/pcapx/pcaputil/dnp3-analog-events/captures/all-g42v6-request6.pcap": "dnp3-analog-events/captures/all-g42v6-request6.pcap",
+        "common/pcapx/pcaputil/dnp3-analog-events/answers/all-g42v6-request6.json": "dnp3-analog-events/answers/all-g42v6-request6.json",
+        "common/pcapx/pcaputil/dnp3-analog-events/captures/all-g42v6-request0.pcap": "dnp3-analog-events/captures/all-g42v6-request0.pcap",
+        "common/pcapx/pcaputil/dnp3-analog-events/answers/all-g42v6-request0.json": "dnp3-analog-events/answers/all-g42v6-request0.json",
+        "common/pcapx/pcaputil/dnp3-analog-events/captures/count8-g42v6.pcap": "dnp3-analog-events/captures/count8-g42v6.pcap",
+        "common/pcapx/pcaputil/dnp3-analog-events/answers/count8-g42v6.json": "dnp3-analog-events/answers/count8-g42v6.json",
+        "common/pcapx/pcaputil/dnp3-analog-events/captures/count16-g42v6.pcap": "dnp3-analog-events/captures/count16-g42v6.pcap",
+        "common/pcapx/pcaputil/dnp3-analog-events/answers/count16-g42v6.json": "dnp3-analog-events/answers/count16-g42v6.json",
+        "common/pcapx/pcaputil/dnp3-analog-events/captures/ieee-g42v6-zero.pcap": "dnp3-analog-events/captures/ieee-g42v6-zero.pcap",
+        "common/pcapx/pcaputil/dnp3-analog-events/answers/ieee-g42v6-zero.json": "dnp3-analog-events/answers/ieee-g42v6-zero.json",
+        "common/pcapx/pcaputil/dnp3-analog-events/captures/ieee-g42v6-negative-zero.pcap": "dnp3-analog-events/captures/ieee-g42v6-negative-zero.pcap",
+        "common/pcapx/pcaputil/dnp3-analog-events/answers/ieee-g42v6-negative-zero.json": "dnp3-analog-events/answers/ieee-g42v6-negative-zero.json",
+        "common/pcapx/pcaputil/dnp3-analog-events/captures/ieee-g42v6-subnormal.pcap": "dnp3-analog-events/captures/ieee-g42v6-subnormal.pcap",
+        "common/pcapx/pcaputil/dnp3-analog-events/answers/ieee-g42v6-subnormal.json": "dnp3-analog-events/answers/ieee-g42v6-subnormal.json",
+        "common/pcapx/pcaputil/dnp3-analog-events/captures/ieee-g42v6-nan.pcap": "dnp3-analog-events/captures/ieee-g42v6-nan.pcap",
+        "common/pcapx/pcaputil/dnp3-analog-events/answers/ieee-g42v6-nan.json": "dnp3-analog-events/answers/ieee-g42v6-nan.json",
+        "common/pcapx/pcaputil/dnp3-analog-events/captures/ieee-g42v6-positive-infinity.pcap": "dnp3-analog-events/captures/ieee-g42v6-positive-infinity.pcap",
+        "common/pcapx/pcaputil/dnp3-analog-events/answers/ieee-g42v6-positive-infinity.json": "dnp3-analog-events/answers/ieee-g42v6-positive-infinity.json",
+        "common/pcapx/pcaputil/dnp3-analog-events/captures/ieee-g42v6-negative-infinity.pcap": "dnp3-analog-events/captures/ieee-g42v6-negative-infinity.pcap",
+        "common/pcapx/pcaputil/dnp3-analog-events/answers/ieee-g42v6-negative-infinity.json": "dnp3-analog-events/answers/ieee-g42v6-negative-infinity.json",
+        "common/pcapx/pcaputil/dnp3-analog-events/captures/all-g42v7-request7.pcap": "dnp3-analog-events/captures/all-g42v7-request7.pcap",
+        "common/pcapx/pcaputil/dnp3-analog-events/answers/all-g42v7-request7.json": "dnp3-analog-events/answers/all-g42v7-request7.json",
+        "common/pcapx/pcaputil/dnp3-analog-events/captures/all-g42v7-request0.pcap": "dnp3-analog-events/captures/all-g42v7-request0.pcap",
+        "common/pcapx/pcaputil/dnp3-analog-events/answers/all-g42v7-request0.json": "dnp3-analog-events/answers/all-g42v7-request0.json",
+        "common/pcapx/pcaputil/dnp3-analog-events/captures/count8-g42v7.pcap": "dnp3-analog-events/captures/count8-g42v7.pcap",
+        "common/pcapx/pcaputil/dnp3-analog-events/answers/count8-g42v7.json": "dnp3-analog-events/answers/count8-g42v7.json",
+        "common/pcapx/pcaputil/dnp3-analog-events/captures/count16-g42v7.pcap": "dnp3-analog-events/captures/count16-g42v7.pcap",
+        "common/pcapx/pcaputil/dnp3-analog-events/answers/count16-g42v7.json": "dnp3-analog-events/answers/count16-g42v7.json",
+        "common/pcapx/pcaputil/dnp3-analog-events/captures/ieee-g42v7-zero.pcap": "dnp3-analog-events/captures/ieee-g42v7-zero.pcap",
+        "common/pcapx/pcaputil/dnp3-analog-events/answers/ieee-g42v7-zero.json": "dnp3-analog-events/answers/ieee-g42v7-zero.json",
+        "common/pcapx/pcaputil/dnp3-analog-events/captures/ieee-g42v7-negative-zero.pcap": "dnp3-analog-events/captures/ieee-g42v7-negative-zero.pcap",
+        "common/pcapx/pcaputil/dnp3-analog-events/answers/ieee-g42v7-negative-zero.json": "dnp3-analog-events/answers/ieee-g42v7-negative-zero.json",
+        "common/pcapx/pcaputil/dnp3-analog-events/captures/ieee-g42v7-subnormal.pcap": "dnp3-analog-events/captures/ieee-g42v7-subnormal.pcap",
+        "common/pcapx/pcaputil/dnp3-analog-events/answers/ieee-g42v7-subnormal.json": "dnp3-analog-events/answers/ieee-g42v7-subnormal.json",
+        "common/pcapx/pcaputil/dnp3-analog-events/captures/ieee-g42v7-nan.pcap": "dnp3-analog-events/captures/ieee-g42v7-nan.pcap",
+        "common/pcapx/pcaputil/dnp3-analog-events/answers/ieee-g42v7-nan.json": "dnp3-analog-events/answers/ieee-g42v7-nan.json",
+        "common/pcapx/pcaputil/dnp3-analog-events/captures/ieee-g42v7-positive-infinity.pcap": "dnp3-analog-events/captures/ieee-g42v7-positive-infinity.pcap",
+        "common/pcapx/pcaputil/dnp3-analog-events/answers/ieee-g42v7-positive-infinity.json": "dnp3-analog-events/answers/ieee-g42v7-positive-infinity.json",
+        "common/pcapx/pcaputil/dnp3-analog-events/captures/ieee-g42v7-negative-infinity.pcap": "dnp3-analog-events/captures/ieee-g42v7-negative-infinity.pcap",
+        "common/pcapx/pcaputil/dnp3-analog-events/answers/ieee-g42v7-negative-infinity.json": "dnp3-analog-events/answers/ieee-g42v7-negative-infinity.json",
+        "common/pcapx/pcaputil/dnp3-analog-events/captures/all-g42v8-request8.pcap": "dnp3-analog-events/captures/all-g42v8-request8.pcap",
+        "common/pcapx/pcaputil/dnp3-analog-events/answers/all-g42v8-request8.json": "dnp3-analog-events/answers/all-g42v8-request8.json",
+        "common/pcapx/pcaputil/dnp3-analog-events/captures/all-g42v8-request0.pcap": "dnp3-analog-events/captures/all-g42v8-request0.pcap",
+        "common/pcapx/pcaputil/dnp3-analog-events/answers/all-g42v8-request0.json": "dnp3-analog-events/answers/all-g42v8-request0.json",
+        "common/pcapx/pcaputil/dnp3-analog-events/captures/count8-g42v8.pcap": "dnp3-analog-events/captures/count8-g42v8.pcap",
+        "common/pcapx/pcaputil/dnp3-analog-events/answers/count8-g42v8.json": "dnp3-analog-events/answers/count8-g42v8.json",
+        "common/pcapx/pcaputil/dnp3-analog-events/captures/count16-g42v8.pcap": "dnp3-analog-events/captures/count16-g42v8.pcap",
+        "common/pcapx/pcaputil/dnp3-analog-events/answers/count16-g42v8.json": "dnp3-analog-events/answers/count16-g42v8.json",
+        "common/pcapx/pcaputil/dnp3-analog-events/captures/ieee-g42v8-zero.pcap": "dnp3-analog-events/captures/ieee-g42v8-zero.pcap",
+        "common/pcapx/pcaputil/dnp3-analog-events/answers/ieee-g42v8-zero.json": "dnp3-analog-events/answers/ieee-g42v8-zero.json",
+        "common/pcapx/pcaputil/dnp3-analog-events/captures/ieee-g42v8-negative-zero.pcap": "dnp3-analog-events/captures/ieee-g42v8-negative-zero.pcap",
+        "common/pcapx/pcaputil/dnp3-analog-events/answers/ieee-g42v8-negative-zero.json": "dnp3-analog-events/answers/ieee-g42v8-negative-zero.json",
+        "common/pcapx/pcaputil/dnp3-analog-events/captures/ieee-g42v8-subnormal.pcap": "dnp3-analog-events/captures/ieee-g42v8-subnormal.pcap",
+        "common/pcapx/pcaputil/dnp3-analog-events/answers/ieee-g42v8-subnormal.json": "dnp3-analog-events/answers/ieee-g42v8-subnormal.json",
+        "common/pcapx/pcaputil/dnp3-analog-events/captures/ieee-g42v8-nan.pcap": "dnp3-analog-events/captures/ieee-g42v8-nan.pcap",
+        "common/pcapx/pcaputil/dnp3-analog-events/answers/ieee-g42v8-nan.json": "dnp3-analog-events/answers/ieee-g42v8-nan.json",
+        "common/pcapx/pcaputil/dnp3-analog-events/captures/ieee-g42v8-positive-infinity.pcap": "dnp3-analog-events/captures/ieee-g42v8-positive-infinity.pcap",
+        "common/pcapx/pcaputil/dnp3-analog-events/answers/ieee-g42v8-positive-infinity.json": "dnp3-analog-events/answers/ieee-g42v8-positive-infinity.json",
+        "common/pcapx/pcaputil/dnp3-analog-events/captures/ieee-g42v8-negative-infinity.pcap": "dnp3-analog-events/captures/ieee-g42v8-negative-infinity.pcap",
+        "common/pcapx/pcaputil/dnp3-analog-events/answers/ieee-g42v8-negative-infinity.json": "dnp3-analog-events/answers/ieee-g42v8-negative-infinity.json",
+        "common/pcapx/pcaputil/dnp3-analog-events/captures/ordered-count-g42.pcap": "dnp3-analog-events/captures/ordered-count-g42.pcap",
+        "common/pcapx/pcaputil/dnp3-analog-events/answers/ordered-count-g42.json": "dnp3-analog-events/answers/ordered-count-g42.json",
+        "common/pcapx/pcaputil/dnp3-analog-events/captures/count-excess-g42.pcap": "dnp3-analog-events/captures/count-excess-g42.pcap",
+        "common/pcapx/pcaputil/dnp3-analog-events/answers/count-excess-g42.json": "dnp3-analog-events/answers/count-excess-g42.json",
+        "common/pcapx/pcaputil/dnp3-analog-events/captures/wrong-variation-g42.pcap": "dnp3-analog-events/captures/wrong-variation-g42.pcap",
+        "common/pcapx/pcaputil/dnp3-analog-events/answers/wrong-variation-g42.json": "dnp3-analog-events/answers/wrong-variation-g42.json",
+        "common/pcapx/pcaputil/dnp3-analog-events/captures/zero-g42.pcap": "dnp3-analog-events/captures/zero-g42.pcap",
+        "common/pcapx/pcaputil/dnp3-analog-events/answers/zero-g42.json": "dnp3-analog-events/answers/zero-g42.json",
+        "common/pcapx/pcaputil/dnp3-analog-events/captures/truncated-g42.pcap": "dnp3-analog-events/captures/truncated-g42.pcap",
+        "common/pcapx/pcaputil/dnp3-analog-events/answers/truncated-g42.json": "dnp3-analog-events/answers/truncated-g42.json",
+        "common/pcapx/pcaputil/dnp3-analog-events/captures/range-g42.pcap": "dnp3-analog-events/captures/range-g42.pcap",
+        "common/pcapx/pcaputil/dnp3-analog-events/answers/range-g42.json": "dnp3-analog-events/answers/range-g42.json",
+        "common/pcapx/pcaputil/dnp3-analog-events/captures/unsupported-variation-g42.pcap": "dnp3-analog-events/captures/unsupported-variation-g42.pcap",
+        "common/pcapx/pcaputil/dnp3-analog-events/answers/unsupported-variation-g42.json": "dnp3-analog-events/answers/unsupported-variation-g42.json",
+        "common/pcapx/pcaputil/dnp3-analog-events/captures/truncated-count-g42.pcap": "dnp3-analog-events/captures/truncated-count-g42.pcap",
+        "common/pcapx/pcaputil/dnp3-analog-events/answers/truncated-count-g42.json": "dnp3-analog-events/answers/truncated-count-g42.json",
+        "common/pcapx/pcaputil/dnp3-analog-events/captures/wrong-role-g42.pcap": "dnp3-analog-events/captures/wrong-role-g42.pcap",
+        "common/pcapx/pcaputil/dnp3-analog-events/answers/wrong-role-g42.json": "dnp3-analog-events/answers/wrong-role-g42.json",
+        "common/pcapx/pcaputil/dnp3-analog-events/captures/class0-not-events-g42.pcap": "dnp3-analog-events/captures/class0-not-events-g42.pcap",
+        "common/pcapx/pcaputil/dnp3-analog-events/answers/class0-not-events-g42.json": "dnp3-analog-events/answers/class0-not-events-g42.json",
+        "common/pcapx/pcaputil/dnp3-analog-events/captures/class1-mixed-analog-events.pcap": "dnp3-analog-events/captures/class1-mixed-analog-events.pcap",
+        "common/pcapx/pcaputil/dnp3-analog-events/answers/class1-mixed-analog-events.json": "dnp3-analog-events/answers/class1-mixed-analog-events.json",
+        "common/pcapx/pcaputil/dnp3-analog-events/captures/per-type-count.pcap": "dnp3-analog-events/captures/per-type-count.pcap",
+        "common/pcapx/pcaputil/dnp3-analog-events/answers/per-type-count.json": "dnp3-analog-events/answers/per-type-count.json",
+        "common/pcapx/pcaputil/dnp3-analog-events/captures/binary-mixed-events.pcap": "dnp3-analog-events/captures/binary-mixed-events.pcap",
+        "common/pcapx/pcaputil/dnp3-analog-events/answers/binary-mixed-events.json": "dnp3-analog-events/answers/binary-mixed-events.json",
+        "common/pcapx/pcaputil/dnp3-analog-events/captures/missing-cto-mixed-retains.pcap": "dnp3-analog-events/captures/missing-cto-mixed-retains.pcap",
+        "common/pcapx/pcaputil/dnp3-analog-events/answers/missing-cto-mixed-retains.json": "dnp3-analog-events/answers/missing-cto-mixed-retains.json",
+        "common/pcapx/pcaputil/dnp3-analog-events/captures/transport-composition.pcap": "dnp3-analog-events/captures/transport-composition.pcap",
+        "common/pcapx/pcaputil/dnp3-analog-events/answers/transport-composition.json": "dnp3-analog-events/answers/transport-composition.json",
+        "common/pcapx/pcaputil/dnp3-analog-events/captures/binary-transport-composition.pcap": "dnp3-analog-events/captures/binary-transport-composition.pcap",
+        "common/pcapx/pcaputil/dnp3-analog-events/answers/binary-transport-composition.json": "dnp3-analog-events/answers/binary-transport-composition.json",
+        "common/pcapx/pcaputil/dnp3-analog-events/manifest.json": "dnp3-analog-events/manifest.json",
+        "common/pcapx/pcaputil/dnp3-analog-events/guard-vectors.json": "dnp3-analog-events/guard-vectors.json",
+        "common/pcapx/pcaputil/dnp3-analog-events/generate.py": "dnp3-analog-events/generate.py",
+        "common/pcapx/pcaputil/dnp3-analog-events/verify.py": "dnp3-analog-events/verify.py",
+        "common/pcapx/pcaputil/dnp3-analog-events/MODEL-PINS.json": "dnp3-analog-events/MODEL-PINS.json",
+        "common/pcapx/pcaputil/dnp3-analog-events/MODEL-DEPENDENCIES.json": "dnp3-analog-events/MODEL-DEPENDENCIES.json",
+        "common/pcapx/pcaputil/dnp3-analog-events/SOURCE-PINS.json": "dnp3-analog-events/SOURCE-PINS.json",
+        "common/pcapx/pcaputil/dnp3-analog-events/reference.py": "dnp3-analog-events/reference.py",
+        "common/pcapx/pcaputil/dnp3-analog-events/REFERENCE-ACTUAL.json": "dnp3-analog-events/REFERENCE-ACTUAL.json",
+        "common/pcapx/pcaputil/dnp3-analog-events/reference_selection.py": "dnp3-analog-events/reference_selection.py",
+        "common/pcapx/pcaputil/dnp3-analog-events/REFERENCE-SELECTION-ACTUAL.json": "dnp3-analog-events/REFERENCE-SELECTION-ACTUAL.json",
+        "common/pcapx/pcaputil/dnp3-analog-events/reference_codec.py": "dnp3-analog-events/reference_codec.py",
+        "common/pcapx/pcaputil/dnp3-analog-events/REFERENCE-CODEC-ACTUAL.json": "dnp3-analog-events/REFERENCE-CODEC-ACTUAL.json",
+        "common/pcapx/pcaputil/dnp3-analog-events/reference_transport.py": "dnp3-analog-events/reference_transport.py",
+        "common/pcapx/pcaputil/dnp3-analog-events/REFERENCE-TRANSPORT-ACTUAL.json": "dnp3-analog-events/REFERENCE-TRANSPORT-ACTUAL.json",
+        "common/pcapx/pcaputil/dnp3-analog-events/TRANSPORT-SOURCE-PINS.json": "dnp3-analog-events/TRANSPORT-SOURCE-PINS.json",
+        "scripts/protocol-tests/required-tests-traffic-unified-v61.json": "required-tests-traffic-unified-v61.json"
+      }
     }
   ],
   "schema_version": 1,

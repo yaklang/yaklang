@@ -125,7 +125,7 @@ func dnp3TypedSelectorsCover(selectors []dnp3StaticSelector, objects []any) bool
 		at, used    int
 		initialized bool
 	}
-	var eventCursor [5]cursor
+	var eventCursor [7]cursor
 	for _, o := range objects {
 		obj := o.(map[string]any)
 		if obj["Context"] == true {

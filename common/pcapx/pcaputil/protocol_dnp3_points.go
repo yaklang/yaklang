@@ -50,7 +50,7 @@ func dnp3ReadClasses(b []byte, limit int) ([]any, byte, error) {
 	return classes, mask, nil
 }
 
-func dnp3StaticPoints(b []byte, limit, depth int, packed, counters, events, statuses, binaries bool) ([]any, error) {
+func dnp3StaticPoints(b []byte, limit, depth int, packed, counters, events, statuses, binaries, analogs bool) ([]any, error) {
 	if len(b) > 0 && depth < 3 {
 		return nil, protocolError(ErrResourceExceeded, "DNP3 point tree depth")
 	}
@@ -82,8 +82,9 @@ func dnp3StaticPoints(b []byte, limit, depth int, packed, counters, events, stat
 		}
 		isStatus := statuses && ((group == 3 && variation == 2) || (group == 40 && variation >= 1 && variation <= 4))
 		isCounter := counters && dnp3CounterWidth(group, variation) > 0
+		isAnalogEvent := analogs && dnp3AnalogEventWidth(group, variation) > 0
 		isBinaryEvent := binaries && dnp3BinaryEventWidth(group, variation) > 0
-		isEvent := events && dnp3CounterEventWidth(group, variation) > 0 || isBinaryEvent
+		isEvent := events && dnp3CounterEventWidth(group, variation) > 0 || isBinaryEvent || isAnalogEvent
 		if isPacked {
 			width = 1
 		} else if isStatus {
@@ -96,7 +97,13 @@ func dnp3StaticPoints(b []byte, limit, depth int, packed, counters, events, stat
 			if isBinaryEvent {
 				width = dnp3BinaryEventWidth(group, variation)
 			}
+			if isAnalogEvent {
+				width = dnp3AnalogEventWidth(group, variation)
+			}
 			if qualifier != 23 && qualifier != 40 {
+				if isAnalogEvent {
+					return nil, protocolError(ErrUnsupportedFeature, "DNP3 analog events require indexed qualifiers")
+				}
 				if isBinaryEvent {
 					return nil, protocolError(ErrUnsupportedFeature, "DNP3 binary events require indexed qualifiers")
 				}
@@ -183,7 +190,9 @@ func dnp3StaticPoints(b []byte, limit, depth int, packed, counters, events, stat
 			}
 			if isEvent {
 				var point map[string]any
-				if isBinaryEvent {
+				if isAnalogEvent {
+					point = dnp3AnalogEventPoint(index, group, variation, b[:width])
+				} else if isBinaryEvent {
 					var err error
 					point, err = dnp3BinaryEventPoint(index, group, variation, b[:width], cto)
 					if err != nil {
@@ -295,7 +304,7 @@ func (s *binDNP3) observePoints(out map[string]any, dir int, src, dest uint16, u
 		return 0, nil, nil
 	case 1:
 		if s.directReads {
-			classes, mask, selectors, headers, err := dnp3DirectReadHeaders(user[3:], sessionCollectionLimit(s.maxPending), s.typedReads, s.counterPoints, s.counterEvents, s.eventCountReads, s.statusPoints, s.binaryEvents)
+			classes, mask, selectors, headers, err := dnp3DirectReadHeaders(user[3:], sessionCollectionLimit(s.maxPending), s.typedReads, s.counterPoints, s.counterEvents, s.eventCountReads, s.statusPoints, s.binaryEvents, s.analogEvents)
 			if err != nil {
 				return refuse(err)
 			}
@@ -315,7 +324,7 @@ func (s *binDNP3) observePoints(out map[string]any, dir int, src, dest uint16, u
 		if fc == 0x82 && !s.counterEvents {
 			return refuse(protocolError(ErrUnsupportedFeature, "DNP3 selected READ points do not decode function 130"))
 		}
-		objects, err := dnp3StaticPoints(user[5:], sessionCollectionLimit(s.maxPending), s.maxDepth, s.typedReads, s.counterPoints, s.counterEvents, s.statusPoints, s.binaryEvents)
+		objects, err := dnp3StaticPoints(user[5:], sessionCollectionLimit(s.maxPending), s.maxDepth, s.typedReads, s.counterPoints, s.counterEvents, s.statusPoints, s.binaryEvents, s.analogEvents)
 		if err != nil {
 			return refuse(err)
 		}
