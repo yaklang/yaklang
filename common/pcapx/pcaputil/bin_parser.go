@@ -392,6 +392,8 @@ type BinParserConfig struct {
 	Bindings                                      []BinParserBinding
 }
 
+// ProtocolStats separates recognized message/diagnostic accounting from
+// unrecognized datagrams, which increment Unknown rather than Messages.
 type ProtocolStats struct {
 	ContextRequired                                                                uint64
 	Flows, ProbeCalls, Messages, Decoded, Deferred, Malformed, Incomplete, Unknown uint64
