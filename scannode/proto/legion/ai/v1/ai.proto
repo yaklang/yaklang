@@ -2197,11 +2197,13 @@ message AITrafficAnalysisContext {
 // Metadata contains only sanitized URL context, never raw headers, bodies,
 // sensitive URL values or target error text. Raw evidence uses authenticated HTTP.
 message AITrafficRecord {
+  reserved 5;
+  reserved "tool_call_id";
+
   uint32 protocol_version = 1;
   string flow_id = 2;
   string session_id = 3;
   string turn_id = 4;
-  string tool_call_id = 5;
   string agent_id = 6;
   string node_id = 7;
   string node_session_id = 8;

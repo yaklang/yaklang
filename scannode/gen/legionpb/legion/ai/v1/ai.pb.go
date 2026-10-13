@@ -20149,7 +20149,6 @@ type AITrafficRecord struct {
 	FlowId            string                 `protobuf:"bytes,2,opt,name=flow_id,json=flowId,proto3" json:"flow_id,omitempty"`
 	SessionId         string                 `protobuf:"bytes,3,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
 	TurnId            string                 `protobuf:"bytes,4,opt,name=turn_id,json=turnId,proto3" json:"turn_id,omitempty"`
-	ToolCallId        string                 `protobuf:"bytes,5,opt,name=tool_call_id,json=toolCallId,proto3" json:"tool_call_id,omitempty"`
 	AgentId           string                 `protobuf:"bytes,6,opt,name=agent_id,json=agentId,proto3" json:"agent_id,omitempty"`
 	NodeId            string                 `protobuf:"bytes,7,opt,name=node_id,json=nodeId,proto3" json:"node_id,omitempty"`
 	NodeSessionId     string                 `protobuf:"bytes,8,opt,name=node_session_id,json=nodeSessionId,proto3" json:"node_session_id,omitempty"`
@@ -20231,13 +20230,6 @@ func (x *AITrafficRecord) GetSessionId() string {
 func (x *AITrafficRecord) GetTurnId() string {
 	if x != nil {
 		return x.TurnId
-	}
-	return ""
-}
-
-func (x *AITrafficRecord) GetToolCallId() string {
-	if x != nil {
-		return x.ToolCallId
 	}
 	return ""
 }
@@ -22712,15 +22704,13 @@ const file_legion_ai_v1_ai_proto_rawDesc = "" +
 	"\x11source_session_id\x18\x01 \x01(\tR\x0fsourceSessionId\x12\x19\n" +
 	"\bflow_ids\x18\x02 \x03(\tR\aflowIds\x12#\n" +
 	"\revidence_text\x18\x03 \x01(\tR\fevidenceText\x12\x1b\n" +
-	"\tread_only\x18\x04 \x01(\bR\breadOnly\"\xf1\x06\n" +
+	"\tread_only\x18\x04 \x01(\bR\breadOnly\"\xe3\x06\n" +
 	"\x0fAITrafficRecord\x12)\n" +
 	"\x10protocol_version\x18\x01 \x01(\rR\x0fprotocolVersion\x12\x17\n" +
 	"\aflow_id\x18\x02 \x01(\tR\x06flowId\x12\x1d\n" +
 	"\n" +
 	"session_id\x18\x03 \x01(\tR\tsessionId\x12\x17\n" +
-	"\aturn_id\x18\x04 \x01(\tR\x06turnId\x12 \n" +
-	"\ftool_call_id\x18\x05 \x01(\tR\n" +
-	"toolCallId\x12\x19\n" +
+	"\aturn_id\x18\x04 \x01(\tR\x06turnId\x12\x19\n" +
 	"\bagent_id\x18\x06 \x01(\tR\aagentId\x12\x17\n" +
 	"\anode_id\x18\a \x01(\tR\x06nodeId\x12&\n" +
 	"\x0fnode_session_id\x18\b \x01(\tR\rnodeSessionId\x12\x1d\n" +
@@ -22744,7 +22734,7 @@ const file_legion_ai_v1_ai_proto_rawDesc = "" +
 	"\x12response_truncated\x18\x17 \x01(\bR\x11responseTruncated\x12#\n" +
 	"\rcapture_error\x18\x18 \x01(\tR\fcaptureError\x12&\n" +
 	"\fredacted_url\x18\x19 \x01(\tH\x00R\vredactedUrl\x88\x01\x01B\x0f\n" +
-	"\r_redacted_url\"t\n" +
+	"\r_redacted_urlJ\x04\b\x05\x10\x06R\ftool_call_id\"t\n" +
 	"\x0eAITrafficBatch\x12)\n" +
 	"\x10protocol_version\x18\x01 \x01(\rR\x0fprotocolVersion\x127\n" +
 	"\arecords\x18\x02 \x03(\v2\x1d.legion.ai.v1.AITrafficRecordR\arecords\"\x8c\x01\n" +

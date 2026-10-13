@@ -110,7 +110,7 @@ func TestAITrafficReadsOversizePacketFilesAndTruncatesBytes(t *testing.T) {
 }
 func TestResilienceAITrafficDrainWaitsForActiveRequestsAndReceipts(t *testing.T) {
 	c := trafficTestCollector(t, "http://127.0.0.1:1")
-	finish := c.observe(lowhttp.HTTPAttempt{ToolCallID: "tool", AgentID: "agent", TurnID: "turn", StartedAt: time.Now(), Request: []byte("GET /?token=hidden HTTP/1.1\r\nHost: test.invalid\r\nAuthorization: hidden\r\n\r\n")})
+	finish := c.observe(lowhttp.HTTPAttempt{TurnID: "turn", StartedAt: time.Now(), Request: []byte("GET /?token=hidden HTTP/1.1\r\nHost: test.invalid\r\nAuthorization: hidden\r\n\r\n")})
 	ctx, cancel := context.WithTimeout(context.Background(), time.Millisecond)
 	defer cancel()
 	result := c.drain(ctx, "drain")
@@ -126,11 +126,57 @@ func TestResilienceAITrafficDrainWaitsForActiveRequestsAndReceipts(t *testing.T)
 		raw, _ := os.ReadFile(path)
 		upload := new(aiv1.AITrafficUpload)
 		proto.Unmarshal(raw, upload)
-		if upload.Record.TurnId != "turn" || upload.Record.ToolCallId != "tool" {
-			t.Fatal("lost turn/tool provenance")
+		if upload.Record.TurnId != "turn" {
+			t.Fatal("lost turn provenance")
 		}
 		if upload.Record.Phase == "terminal" && upload.Record.Outcome != "cancelled" {
 			t.Fatal("cancelled request outcome lost")
+		}
+	}
+}
+func TestAITrafficContextCapturesSessionAndTurnWithoutRuntime(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = io.WriteString(w, "session evidence")
+	}))
+	defer server.Close()
+	collector := trafficTestCollector(t, "http://unused.invalid")
+	collector.currentTurn = "newer-turn"
+	for _, turn := range []string{"turn-a", "turn-b"} {
+		ctx := lowhttp.WithHTTPAttemptObserver(context.Background(), func(start lowhttp.HTTPAttempt) func(lowhttp.HTTPAttempt) {
+			start.TurnID = turn
+			return collector.observe(start)
+		})
+		packet := "GET /" + turn + " HTTP/1.1\r\nHost: " + strings.TrimPrefix(server.URL, "http://") + "\r\nConnection: close\r\n\r\n"
+		if _, err := lowhttp.HTTP(lowhttp.WithContext(ctx), lowhttp.WithSaveHTTPFlow(false), lowhttp.WithPacketBytes([]byte(packet))); err != nil {
+			t.Fatal(err)
+		}
+	}
+	paths, err := collector.pending()
+	if err != nil || len(paths) != 4 {
+		t.Fatalf("missing start/terminal uploads: count=%d err=%v", len(paths), err)
+	}
+	phases := make(map[string]map[string]bool)
+	for _, path := range paths {
+		raw, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		upload := new(aiv1.AITrafficUpload)
+		if err := proto.Unmarshal(raw, upload); err != nil {
+			t.Fatal(err)
+		}
+		record := upload.Record
+		if record.SessionId != "session" || !strings.HasSuffix(record.GetRedactedUrl(), "/"+record.TurnId) {
+			t.Fatalf("lost session/turn context: %+v", record)
+		}
+		if phases[record.TurnId] == nil {
+			phases[record.TurnId] = make(map[string]bool)
+		}
+		phases[record.TurnId][record.Phase] = true
+	}
+	for _, turn := range []string{"turn-a", "turn-b"} {
+		if !phases[turn]["started"] || !phases[turn]["terminal"] {
+			t.Fatalf("missing lifecycle for %s: %v", turn, phases)
 		}
 	}
 }

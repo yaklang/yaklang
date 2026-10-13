@@ -8,10 +8,9 @@ each other's implementations.
 
 ## Capture boundary
 
-An opted-in session receives `BindAISessionCommand.traffic_capture`. The tool
-caller temporarily associates its immutable call ID with the owning engine's
-observer. Captured tool parameters use that same call ID for `runtime_id`, even
-when ReAct supplies a shared session runtime ID or a caller provides that parameter.
+An opted-in session receives `BindAISessionCommand.traffic_capture`. Its execution
+context carries the HTTP observer through existing tool and script context
+propagation. Capture does not bind tool IDs or change tool `runtime_id` parameters.
 HTTP/1, HTTP/2 and HTTP/3 `lowhttp` transports notify that observer for
 each transport attempt, including status retries, redirects, authentication
 retries, protocol fallback, connection failures and cancellation. HTTP/2's
@@ -23,11 +22,12 @@ not TLS records or HTTP/2/HTTP/3 binary frames. An attempt can fail before any
 request byte reaches the target; its lifecycle still records the attempted
 request and failure. External processes, browsers and uninstrumented HTTP
 clients are explicitly unsupported in the `ai_traffic_capability` event.
-Model-provider calls are excluded because only tool runtime IDs are bound.
+Model-provider network contexts explicitly suppress the observer while retaining
+cancellation, deadlines and other context values.
 
-The start record fixes session, turn, tool, agent, node, node-session and bind
-epoch. Start and terminal uploads have the same random flow ID and independent
-phase keys. Metadata carries method, scheme, host, status, timestamps, lengths,
+The start record fixes session, turn, node, node-session and bind epoch.
+Protocol field 5 and its former `tool_call_id` name are reserved. Start and terminal
+uploads have the same random flow ID and independent phase keys. Metadata carries method, scheme, host, status, timestamps, lengths,
 hashes, truncation, fixed error codes and the optional protocol-v1
 `AITrafficRecord.redacted_url` (field 25). The absolute URL is captured at request
 start and retained in terminal records even when packet headers are unavailable
@@ -136,6 +136,8 @@ worktree commit. These tests do not claim deployment/provider acceptance:
 ```sh
 go test ./common/utils/lowhttp -run '^TestHTTPAttemptObserver' -count=1
 go test ./common/ai/aid/aicommon -run '^(TestReadOnlyEvidence|TestToolCallerHTTPAttemptObserver)' -count=1
+go test ./common/ai/openai -run '^TestGatewayExcludesSessionHTTPAttemptObserver$' -count=1
+go test ./common/ai/aid/aitool/buildinaitools/yakscripttools/test -run '^TestDoHTTPRequestCapturesSessionContextWithoutToolIdentity$' -count=1
 go test ./scannode -run '^(TestResilienceAITraffic|TestAITraffic|TestProductNodeManifestCapabilitiesMatchCompiledSurface)' -count=1
 ```
 

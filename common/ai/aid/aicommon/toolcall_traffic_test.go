@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
-	"sync"
 	"testing"
 	"time"
 
@@ -16,18 +15,9 @@ import (
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 )
 
-func TestToolCallerHTTPAttemptObserverUsesConcurrentInvocationIdentity(t *testing.T) {
+func TestToolCallerHTTPAttemptObserverPreservesRuntimeAndSessionContexts(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	var mu sync.Mutex
-	var attempts []lowhttp.HTTPAttempt
-	ctx = lowhttp.WithHTTPAttemptObserver(ctx, func(start lowhttp.HTTPAttempt) func(lowhttp.HTTPAttempt) {
-		return func(end lowhttp.HTTPAttempt) {
-			mu.Lock()
-			attempts = append(attempts, end)
-			mu.Unlock()
-		}
-	})
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_, _ = io.WriteString(w, "observed")
 	}))
@@ -54,17 +44,23 @@ func TestToolCallerHTTPAttemptObserverUsesConcurrentInvocationIdentity(t *testin
 		}),
 	)
 	require.NoError(t, err)
-	cfg := NewTestConfig(ctx, WithAgreeYOLO(), WithWorkdir(t.TempDir()))
 	results := make(chan error, 2)
-	for _, id := range []string{"traffic-tool-a", "traffic-tool-b"} {
-		caller, err := NewToolCaller(ctx,
+	attempts := make([]chan lowhttp.HTTPAttempt, 2)
+	for index, marker := range []string{"session-a", "session-b"} {
+		observed := make(chan lowhttp.HTTPAttempt, 2)
+		attempts[index] = observed
+		callCtx := lowhttp.WithHTTPAttemptObserver(ctx, func(lowhttp.HTTPAttempt) func(lowhttp.HTTPAttempt) {
+			return func(end lowhttp.HTTPAttempt) { observed <- end }
+		})
+		cfg := NewTestConfig(callCtx, WithAgreeYOLO(), WithWorkdir(t.TempDir()))
+		caller, err := NewToolCaller(callCtx,
 			WithToolCaller_AICallerConfig(cfg),
 			WithToolCaller_Task(cfg.DefaultTask), WithToolCaller_Emitter(cfg.Emitter),
-			WithToolCaller_CallToolID(id), WithToolCaller_RuntimeId("shared-react-session"))
+			WithToolCaller_CallToolID("call-"+marker), WithToolCaller_RuntimeId("shared-runtime"))
 		require.NoError(t, err)
-		params := aitool.InvokeParams{"marker": id}
-		if id == "traffic-tool-b" {
-			params["runtime_id"] = "caller-supplied-shared-session"
+		params := aitool.InvokeParams{"marker": marker}
+		if index == 1 {
+			params["runtime_id"] = "caller-supplied-runtime"
 		}
 		go func() {
 			result, _, callErr := caller.CallToolWithExistedParams(tool, params)
@@ -90,16 +86,15 @@ func TestToolCallerHTTPAttemptObserverUsesConcurrentInvocationIdentity(t *testin
 			t.Fatal("tool invocation did not finish")
 		}
 	}
-	mu.Lock()
-	defer mu.Unlock()
-	require.Len(t, attempts, 2)
-	seen := make(map[string]bool)
-	for _, attempt := range attempts {
-		require.Equal(t, attempt.ToolCallID, attempt.RuntimeID)
-		require.Contains(t, string(attempt.Request), "GET /"+attempt.ToolCallID+" HTTP/1.1")
-		require.Equal(t, cfg.GetRuntimeId(), attempt.AgentID)
+	for index, marker := range []string{"session-a", "session-b"} {
+		require.Len(t, attempts[index], 1)
+		attempt := <-attempts[index]
+		require.Contains(t, string(attempt.Request), "GET /"+marker+" HTTP/1.1")
+		wantRuntime := "shared-runtime"
+		if index == 1 {
+			wantRuntime = "caller-supplied-runtime"
+		}
+		require.Equal(t, wantRuntime, attempt.RuntimeID)
 		require.NoError(t, attempt.Error)
-		seen[attempt.ToolCallID] = true
 	}
-	require.Equal(t, map[string]bool{"traffic-tool-a": true, "traffic-tool-b": true}, seen)
 }
