@@ -677,6 +677,9 @@ func mmsDescriptionOperands(names, values []map[string]any, limit int) error {
 	}
 	for i, name := range names {
 		if typ, ok := name["Type Specification"].(map[string]any); ok {
+			if _, alternate := name["Alternate Access"]; alternate {
+				return protocolError(ErrContextRequired, "MMS selected alternate description/Data interpretation")
+			}
 			if err := mmsDescriptionValue(typ, values[i], &limit); err != nil {
 				return err
 			}

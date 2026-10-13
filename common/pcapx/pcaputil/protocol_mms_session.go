@@ -474,6 +474,9 @@ func (m *binMMS) applyMMS(d mmsDecoded, dir int, e *ProtocolEvent, limit int, ca
 			for i, result := range results {
 				if v, ok := result["Success"].(map[string]any); ok {
 					if typ, ok := p.names[i]["Type Specification"].(map[string]any); ok {
+						if _, alternate := p.names[i]["Alternate Access"]; alternate {
+							return protocolError(ErrContextRequired, "MMS selected alternate description/Data interpretation")
+						}
 						if err := mmsDescriptionValue(typ, v, &budget); err != nil {
 							return err
 						}

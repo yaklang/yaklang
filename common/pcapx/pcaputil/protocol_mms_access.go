@@ -15,12 +15,10 @@ func (c *mmsValueContext) variableEntries(list mmsBER, d *mmsDecoded) ([]map[str
 		if row.tag != 0x30 || len(row.children) == 0 {
 			return nil, protocolError(ErrMalformedMessage, "MMS variable entry SEQUENCE")
 		}
-		if len(row.children) != 1 {
-			if len(row.children) == 2 && row.children[1].tag == 0xa5 {
-				return nil, protocolError(ErrUnsupportedFeature, "MMS alternate access requires selected context")
-			}
-			return nil, protocolError(ErrMalformedMessage, "MMS variable entry field cardinality")
+		if len(row.children) != 1 && (len(row.children) != 2 || row.children[1].tag != 0xa5) {
+			return nil, protocolError(ErrMalformedMessage, "MMS variable entry optional alternate access")
 		}
+
 		v := row.children[0]
 		var fields map[string]any
 		switch v.tag {
@@ -67,6 +65,13 @@ func (c *mmsValueContext) variableEntries(list mmsBER, d *mmsDecoded) ([]map[str
 		default:
 			return nil, protocolError(ErrUnsupportedFeature, "MMS VariableSpecification choice")
 		}
+		if len(row.children) == 2 {
+			alt, err := mmsAlternateAccess(row.children[1])
+			if err != nil {
+				return nil, err
+			}
+			fields["Variable Choice Tag"], fields["Alternate Access"] = v.tag, alt
+		}
 		entries = append(entries, fields)
 	}
 	if len(entries) == 0 {
@@ -92,6 +97,17 @@ func mmsNormalizedSelector(v any) any {
 		}
 		if _, ok := x["Domain ID"]; ok {
 			delete(out, "Component Tags")
+		}
+		if _, component := x["Component"]; component {
+			if x["Selection Tag"] == byte(0xa1) {
+				out["Selection Tag"] = byte(0x81)
+			}
+			if x["Access Selection Tag"] == byte(0xa0) {
+				out["Access Selection Tag"] = byte(0x80)
+			}
+		}
+		if _, named := x["Component Name"]; named {
+			out["Component Name Tag"] = byte(0x80)
 		}
 		_, symbolic := x["Symbolic"]
 		_, opaque := x["Bytes"]
@@ -181,4 +197,133 @@ func mmsEntryHistoryUnits(entries []map[string]any) int {
 		}
 	}
 	return n
+}
+
+// Literal AlternateAccess wire observations; selection does not prove a device
+// component/array exists, or establish selected result representation.
+func mmsAlternateIdentifier(n mmsBER, primitive byte) (string, error) {
+	if n.tag != primitive && n.tag != primitive|32 {
+		return "", protocolError(ErrMalformedMessage, "MMS alternate Identifier tag")
+	}
+	b := n.body
+	if n.tag&32 != 0 {
+		var err error
+		b, err = mmsConstructedIdentifier(n)
+		if err != nil {
+			return "", err
+		}
+	}
+	if len(b) == 0 {
+		return "", protocolError(ErrMalformedMessage, "MMS empty alternate Identifier")
+	}
+	return mmsVisible(b)
+}
+func mmsAlternateRange(n mmsBER, f map[string]any) error {
+	if len(n.children) != 2 || n.children[0].tag != 0x80 || n.children[1].tag != 0x81 {
+		return protocolError(ErrMalformedMessage, "MMS alternate index range low/count pair")
+	}
+	low, err := mmsUInt(n.children[0], 32)
+	if err != nil {
+		return err
+	}
+	count, err := mmsUInt(n.children[1], 32)
+	if err != nil {
+		return err
+	}
+	f["Low Index"], f["Number Of Elements"] = low, count
+	return nil
+}
+func mmsAlternateAccess(n mmsBER) ([]map[string]any, error) {
+	// An unbounded ASN SEQUENCE OF may be empty. BER budgets already bound all
+	// nodes and depth; literal zero-count/range selections are not device claims.
+	out := make([]map[string]any, 0, len(n.children))
+	for _, child := range n.children {
+		v, err := mmsAlternateSelection(child)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, v)
+	}
+	return out, nil
+}
+func mmsAlternateSelection(n mmsBER) (map[string]any, error) {
+	f := map[string]any{"Selection Tag": n.tag}
+	switch n.tag {
+	case 0x81, 0xa1:
+		v, err := mmsAlternateIdentifier(n, 0x81)
+		if err != nil {
+			return nil, err
+		}
+		f["Component"] = v
+	case 0x82:
+		v, err := mmsUInt(n, 32)
+		if err != nil {
+			return nil, err
+		}
+		f["Index"] = v
+	case 0xa3:
+		if err := mmsAlternateRange(n, f); err != nil {
+			return nil, err
+		}
+	case 0x84:
+		if len(n.body) != 0 {
+			return nil, protocolError(ErrMalformedMessage, "MMS alternate allElements NULL content")
+		}
+		f["All Elements"] = true
+	case 0xa0:
+		if len(n.children) != 2 || n.children[1].tag != 0x30 {
+			return nil, protocolError(ErrMalformedMessage, "MMS nested alternate selection/list pair")
+		}
+		sel := n.children[0]
+		f["Access Selection Tag"] = sel.tag
+		switch sel.tag {
+		case 0x80, 0xa0:
+			v, err := mmsAlternateIdentifier(sel, 0x80)
+			if err != nil {
+				return nil, err
+			}
+			f["Component"] = v
+		case 0x81:
+			v, err := mmsUInt(sel, 32)
+			if err != nil {
+				return nil, err
+			}
+			f["Index"] = v
+		case 0xa2:
+			if err := mmsAlternateRange(sel, f); err != nil {
+				return nil, err
+			}
+		case 0x83:
+			if len(sel.body) != 0 {
+				return nil, protocolError(ErrMalformedMessage, "MMS nested allElements NULL content")
+			}
+			f["All Elements"] = true
+		default:
+			return nil, protocolError(ErrUnsupportedFeature, "MMS nested alternate choice")
+		}
+		nested, err := mmsAlternateAccess(n.children[1])
+		if err != nil {
+			return nil, err
+		}
+		f["Alternate Access"] = nested
+	case 0xa5:
+		if len(n.children) != 2 {
+			return nil, protocolError(ErrMalformedMessage, "MMS named alternate component/selection pair")
+		}
+		name, err := mmsAlternateIdentifier(n.children[0], 0x80)
+		if err != nil {
+			return nil, err
+		}
+		selected, err := mmsAlternateSelection(n.children[1])
+		if err != nil {
+			return nil, err
+		}
+		if n.children[1].tag == 0xa5 {
+			return nil, protocolError(ErrMalformedMessage, "MMS named alternate cannot directly contain named row")
+		}
+		f["Component Name"], f["Component Name Tag"], f["Selection"] = name, n.children[0].tag, selected
+	default:
+		return nil, protocolError(ErrUnsupportedFeature, "MMS alternate selection choice")
+	}
+	return f, nil
 }

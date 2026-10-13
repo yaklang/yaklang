@@ -44,7 +44,7 @@ Run from the repository root:
 ```sh
 go run ./internal/trafficfixture/cmd/corpus test
 go test -json -count=1 -timeout=5m ./internal/trafficfixture/... ./common/bin-parser/... ./common/pcapx/... ./common/yak/cmd/yakcmds/shark-cli ./scripts/ci > traffic.jsonl
-go run ./internal/trafficfixture/cmd/corpus exec -- python3 @scripts/protocol-tests/check_go_test_json_v2.py traffic.jsonl --inventory @scripts/protocol-tests/required-tests-traffic-unified-v46.json --tier full
+go run ./internal/trafficfixture/cmd/corpus exec -- python3 @scripts/protocol-tests/check_go_test_json_v2.py traffic.jsonl --inventory @scripts/protocol-tests/required-tests-traffic-unified-v47.json --tier full
 ```
 
 The single `corpus` entry point uses the same bounded Go ZIP loader as tests.
@@ -83,7 +83,7 @@ their semantic coverage. The existing synthetic session keys are test inputs;
 production credentials, user private keys and material without redistribution
 permission belong in an external fixed-source download manifest.
 
-Current test requirements are sealed at `scripts/protocol-tests/required-tests-traffic-unified-v46.json`;
+Current test requirements are sealed at `scripts/protocol-tests/required-tests-traffic-unified-v47.json`;
 the historical inventories and all earlier batches remain unchanged.
 The supplemental small-corpus batch contains 26 minimal controls, their explicit
 expected facts, an offline generator and the compact pinned source manifest.
@@ -96,7 +96,7 @@ byte-boundary, malformed-length and ownership tests. These are scoped control
 assertions, not a semantic golden for the entire upstream collection. Process
 logs and the original large downloads remain outside the repository.
 
-The local acceptance inventory and published workflow gate both use `required-tests-traffic-unified-v40.json`; v26 adds Call requirements, v27 adds scalar arrays and v28 adds extended builtin fields and v29 adds bounded value graphs and complete diagnostic wire fields; v30 adds message-local RTPS INFO_SRC/INFO_DST context, v31 bounded SPDP fragments and owned answer-cache requirements, and v32 legacy RTPS2.0 DATA wire, budget, lifecycle and ownership requirements. Older
+Historical inventory v40 remains available; the active local acceptance and published gate use v47. v26 adds Call requirements, v27 adds scalar arrays and v28 adds extended builtin fields and v29 adds bounded value graphs and complete diagnostic wire fields; v30 adds message-local RTPS INFO_SRC/INFO_DST context, v31 bounded SPDP fragments and owned answer-cache requirements, and v32 legacy RTPS2.0 DATA wire, budget, lifecycle and ownership requirements. Older
 versioned inventories stay available as historical inputs; they are not the
 current acceptance entry. The DLMS HDLC batch contains owned tunnel/Get-normal
 controls and their independent fields/errors, CRC/byte validator, offline
@@ -203,7 +203,7 @@ opaque selector bytes and one bounded Data value over Wrapper v1 TCP/UDP; object
 selector meaning, access permission and device operation are unverified. The
 original one-packet selective-access capture and original refused answer remain
 immutable; its now-supported answer is matched by exact input SHA and frame.
-The active inventory is `scripts/protocol-tests/required-tests-traffic-unified-v46.json`.
+The active inventory is `scripts/protocol-tests/required-tests-traffic-unified-v47.json`.
 
 The small-graph budget batch reuses accepted graph captures/answers and adds one
 249-byte UDP control for child count255 without child bytes. Its standalone proof
@@ -993,7 +993,7 @@ the normative answer; a missing numeric reference field is not a codec pass.
 Full/deferred, workers1/2/4, observers off/on, Feed chunks1/7/full, ownership,
 resources and close/refusal boundaries remain required.
 
-Current gate: `required-tests-traffic-unified-v46.json` with
+Current gate: `required-tests-traffic-unified-v47.json` with
 `check_go_test_json_v2.py`. The indexed validator preserves missing/unpassed,
 package invocation completion, descendant skips, failures and non-JSON checks;
 its mutation/differential harness is sealed with the material. Older checkers
@@ -1065,3 +1065,18 @@ and the current v46 inventory. Native64/default4096 and captured default4096 are
 separate configurations with separate answers; larger captures use COTP fragments
 within the observed1024-byte TPDU size. Adjacent fitting requests and literal
 no-private-schema reads remain accepted. Historical141 ZIPs remain unchanged.
+
+
+`validation-mms-alternate-access.zip` adds48 minimal literal AlternateAccess cases.
+Component, index, index range, all-elements, nested and named selectors retain
+complete wire fields and participate in observed Read and named-list identity.
+Named Define/lookup/Read/Write preserve private selection context; changing list
+members while a Read is pending refuses stale association. Selected Data with an
+unresolved description is `ContextRequired` in the described profile, rather than
+being validated against the entire variable. These observations do not establish
+endpoint array existence, selected representation, authentication or device success.
+The independent generator, exact answers, source pins and v47 inventory are sealed;
+TShark4.2.5 actually agrees on64 selector scalar leaves across26 normal captures.
+The full replay matrix retains eager/deferred, workers1/2/4 and observer off/on;
+native sessions additionally cover Feed chunking, private ownership, shared budgets,
+Close idempotence and late-input rejection. All historical ZIPs remain immutable.
