@@ -3,16 +3,19 @@ package ssadb
 import (
 	"testing"
 
-	"github.com/yaklang/gorm"
-	_ "github.com/yaklang/gorm/dialects/sqlite"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/gorm"
+	_ "github.com/yaklang/gorm/dialects/sqlite"
 )
 
 func setupIrTypeTestDB(t *testing.T) *gorm.DB {
 	db, err := gorm.Open("sqlite3", ":memory:")
 	require.NoError(t, err)
 	require.NoError(t, db.AutoMigrate(&IrType{}).Error)
+	require.NoError(t, db.Exec(
+		`CREATE UNIQUE INDEX IF NOT EXISTS ux_ir_types_program_type ON ir_types (program_name, type_id)`,
+	).Error)
 	return db
 }
 
@@ -70,6 +73,8 @@ func TestSaveIrTypeBatch_UpsertOverwritesExisting(t *testing.T) {
 		{TypeId: 1, Kind: 1, ProgramName: "prog", String: "T", ExtraInformation: `{"fullTypeName":["string"]}`},
 	}
 	require.NoError(t, SaveIrTypeBatch(db, items))
+	var before IrType
+	require.NoError(t, db.Where("program_name = ? AND type_id = ?", "prog", uint64(1)).First(&before).Error)
 
 	// re-flush same type_id with merged value
 	items[0].ExtraInformation = `{"fullTypeName":["string","java.lang.String"]}`
@@ -81,6 +86,7 @@ func TestSaveIrTypeBatch_UpsertOverwritesExisting(t *testing.T) {
 
 	var got IrType
 	require.NoError(t, db.Where("type_id = ?", uint64(1)).First(&got).Error)
+	assert.Equal(t, before.ID, got.ID, "updating a type must not delete and reinsert its row")
 	assert.Contains(t, got.ExtraInformation, "string")
 	assert.Contains(t, got.ExtraInformation, "java.lang.String")
 }
