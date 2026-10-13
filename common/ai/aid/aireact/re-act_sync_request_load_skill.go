@@ -24,7 +24,7 @@ import (
 //
 // 服务端处理:
 //  1. 解析 skill_names.
-//  2. 逐个走 SkillsContextManager.LoadForcedSkill (满内容 → frozen_block 顶部, 最高优先级).
+//  2. 逐个走 SkillsContextManager.LoadForcedSkill (来源标记 user-forced, 正文进 Timeline).
 //  3. 每个成功加载的 skill 在 timeline 写 "user_loaded_skill" 条目 (用户要求明确记录).
 //  4. 成功后 SubmitSkillHit(name, "user_force") 累计命中反馈.
 //  5. EmitSyncJSON 同步返回 loaded/failed/already_loaded.
@@ -109,7 +109,7 @@ func (r *ReAct) HandleSyncTypeLoadSkillEvent(event *ypb.AIInputEvent) error {
 	}
 	_, _ = r.EmitSyncJSON(schema.EVENT_TYPE_STRUCTURED, "load_skill", response, event.SyncID)
 
-	// 刷新前端能力清单 (forced skill 现在满内容进 frozen_block).
+	// 刷新前端能力清单 (forced skill 正文已进 Timeline).
 	reactloops.EmitSessionSnapshot(r.config, loop, r.GetCurrentTask())
 	return nil
 }

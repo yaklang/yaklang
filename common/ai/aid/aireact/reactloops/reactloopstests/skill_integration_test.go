@@ -218,7 +218,7 @@ func TestReActLoop_Skills_PromptDifference(t *testing.T) {
 			t.Error("loading_skills SHOULD appear in SCHEMA enum when skills are configured")
 		}
 		// 改造后: SKILL 目录默认隐藏 (节约 token), SKILLS_CONTEXT 段零加载时为空.
-		// 目录仅由意图识别 (SetCatalogSkills + SetCatalogVisible) 主动 surface.
+		// 目录仅由意图识别 (SetCatalogSkills) 主动 surface.
 		// 这里验证「目录隐藏」契约: 注册了 skill 但未 surface 时, prompt 不应含
 		// SKILLS_CONTEXT 标签 / skill 名.
 		if strings.Contains(capturedMainPrompt, "SKILLS_CONTEXT") {

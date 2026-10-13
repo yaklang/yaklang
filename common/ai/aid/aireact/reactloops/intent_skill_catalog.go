@@ -58,7 +58,6 @@ func ApplyMatchedSkillsToCatalog(loop *ReActLoop, cfgFromRuntime aicommon.AICall
 	}
 
 	mgr.SetCatalogSkills(ranked)
-	mgr.SetCatalogVisible(true)
 
 	// 每个入选目录的 skill 记一次 intent_catalog 命中.
 	var cfgConcrete *aicommon.Config

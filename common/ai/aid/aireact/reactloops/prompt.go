@@ -340,18 +340,6 @@ func (r *ReActLoop) generateLoopPrompt(
 	reactiveData += subAgentInput
 	todoCheckpoint := r.consumeTodoCheckpoint()
 
-	// Render skills context if the manager is available.
-	// 三态分离: SkillsContext (SemiDynamic 1, 含 catalog) + ForcedSkills (frozen_block
-	// 顶部) + AutoLoadedSkills (SemiDynamic 2 尾部).
-	var skillsContext string
-	var forcedSkillsBlock string
-	var autoSkillsBlock string
-	if r.skillsContextManager != nil {
-		skillsContext = r.skillsContextManager.RenderStable()
-		forcedSkillsBlock = r.skillsContextManager.RenderForcedSkills()
-		autoSkillsBlock = r.skillsContextManager.RenderAutoLoadedSkills()
-	}
-
 	// Render extra capabilities discovered via intent recognition
 	var extraCapabilities string
 	if r.extraCapabilities != nil && r.extraCapabilities.HasCapabilities() {
@@ -398,6 +386,13 @@ func (r *ReActLoop) generateLoopPrompt(
 	if err := r.compressTimelineBeforePrompt(userInput, frozenUserContext, todoSnapshot); err != nil {
 		return "", err
 	}
+	// 技能正文统一渲染为一个已冻结技能块, 落在 SemiDynamic1 (与
+	// prompted_recent_tools 同段)。必须在压缩事务提交之后读取: 本轮被总结退休的
+	// 正文不能继续出现在同一轮的 prompt 里; 未冻结的正文留在 Timeline Open 尾段。
+	var skillsContext string
+	if r.skillsContextManager != nil {
+		skillsContext = r.skillsContextManager.RenderStable()
+	}
 	var planStatus string
 	if r.planStatusProvider != nil {
 		planStatus = r.planStatusProvider()
@@ -417,8 +412,6 @@ func (r *ReActLoop) generateLoopPrompt(
 		Schema:                   schema,
 		FunctionCallSchemas:      functionCallSchemas,
 		SkillsContext:            skillsContext,
-		ForcedSkills:             forcedSkillsBlock,
-		AutoLoadedSkills:         autoSkillsBlock,
 		ExtraCapabilities:        extraCapabilities,
 		PlanStatus:               planStatus,
 		TodoSnapshot:             todoSnapshot,

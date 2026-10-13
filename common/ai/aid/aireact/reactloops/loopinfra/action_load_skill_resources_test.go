@@ -106,6 +106,9 @@ func registerLoadSkillResourcesAction() reactloops.ReActLoopOption {
 func newSkillResourceLoop(t *testing.T, runtime *skillResourceTestRuntime, loader aiskillloader.SkillLoader) (*reactloops.ReActLoop, aicommon.AIStatefulTask) {
 	t.Helper()
 	mgr := aiskillloader.NewSkillsContextManager(loader)
+	timelineConfig := aicommon.NewConfig(context.Background(), aicommon.WithDisableAutoSkills(true))
+	mgr.BindTimelineSink(aicommon.NewSkillContentTimelineAdapter(
+		timelineConfig.GetTimeline(), timelineConfig.AcquireId))
 	loop, err := reactloops.NewReActLoop(
 		"skill-resource-test",
 		runtime,
