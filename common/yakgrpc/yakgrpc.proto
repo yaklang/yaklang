@@ -9100,6 +9100,8 @@ message SSARisk {
   string Solution = 28;
   string Description = 29 ;
   string LatestDisposalStatus = 30; // 最新处置状态 not_set | is_issue | not_issue | suspicious
+  // Stable result identity, including results without an audit-result row.
+  string ResultUUID = 32;
 }
 
 message SSARisksFilter {
@@ -9124,6 +9126,7 @@ message SSARisksFilter {
   SSARiskDiffRequest SSARiskDiffRequest = 18;
   // 增量查询
   bool Incremental = 19;
+  repeated string ResultUUID = 20;
 }
 
 message QuerySSARisksRequest {

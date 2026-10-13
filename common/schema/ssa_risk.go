@@ -69,6 +69,9 @@ type SSARisk struct {
 	// Risk 特征哈希，用于区分不同批次扫描的同一个漏洞
 	// 包含 SSA 信息(disam、function)、FileUrl、SfRule 信息(ruleId、variableName、level)
 	RiskFeatureHash string `json:"risk_feature_hash" gorm:"index"`
+	// CoverKey is the scan-local identity shared by rules of different modes.
+	// It is not the cross-scan rule identity used by diff/disposal history.
+	CoverKey string `json:"-" gorm:"-"`
 
 	SSAProjectID uint64 `json:"ssa_project_id" gorm:"index"`
 }
@@ -78,12 +81,14 @@ func (*SSARisk) TableName() string {
 }
 
 func (s *SSARisk) CalcHash() string {
-	return utils.CalcSha1(
-		s.CodeSourceUrl, s.CodeRange, // source code range
-		s.RuntimeId,                                                  // syntaxflow scan task id
-		s.ProgramName, s.ResultID, s.ResultUUID, s.Variable, s.Index, // syntaxflow result index
-		s.Title, s.RiskType, // risk info
-	)
+	if s.ResultUUID != "" {
+		// Persisting the audit row must not invalidate a streamed risk hash.
+		return utils.CalcSha1(s.CodeSourceUrl, s.CodeRange, s.RuntimeId,
+			s.ProgramName, s.ResultUUID, s.Variable, s.Index, s.Title, s.RiskType)
+	}
+	// Keep the exact legacy hash for callers without a UUID.
+	return utils.CalcSha1(s.CodeSourceUrl, s.CodeRange, s.RuntimeId,
+		s.ProgramName, s.ResultID, s.Variable, s.Index, s.Title, s.RiskType)
 }
 
 func SSARiskTypeVerbose(s string) string {
@@ -130,6 +135,7 @@ func (s *SSARisk) ToGRPCModel() *ypb.SSARisk {
 		CveAccessComplexity:  s.CveAccessComplexity,
 		Tags:                 s.Tags,
 		ResultID:             s.ResultID,
+		ResultUUID:           s.ResultUUID,
 		IsRead:               s.IsRead,
 		Variable:             s.Variable,
 		Index:                s.Index,
