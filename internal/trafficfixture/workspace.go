@@ -41,6 +41,43 @@ func Verify() error {
 // source dependencies needed to build their Go generators. Callers own its
 // lifetime. Normal traffic tests continue reading ZIPs without extraction.
 func Export(directory string) error {
+	names, err := Names()
+	if err != nil {
+		return err
+	}
+	return exportNames(directory, names)
+}
+
+// ExportTools materializes all archived tools, inputs and answers, but only
+// requested versions of the large unified test inventories. The immutable
+// ZIPs/index remain present, so omitted historical inventories remain readable
+// through ReadFile. This preserves the existing expanded workspace budget.
+func ExportTools(directory string, requested []string) error {
+	names, err := Names()
+	if err != nil {
+		return err
+	}
+	for _, name := range requested {
+		if !validName(name) {
+			return fmt.Errorf("trafficfixture: invalid requested export path %q", name)
+		}
+	}
+	selected := make([]string, 0, len(names))
+	for _, name := range names {
+		include := !strings.HasPrefix(filepath.Base(name), "required-tests-traffic-unified-v")
+		for _, req := range requested {
+			if name == req || strings.HasPrefix(name, req+"/") {
+				include = true
+			}
+		}
+		if include {
+			selected = append(selected, name)
+		}
+	}
+	return exportNames(directory, selected)
+}
+
+func exportNames(directory string, names []string) error {
 	c, err := load()
 	if err != nil {
 		return err
@@ -52,10 +89,6 @@ func Export(directory string) error {
 	entries, err := os.ReadDir(directory)
 	if err != nil || len(entries) != 0 {
 		return fmt.Errorf("trafficfixture: export directory must be empty")
-	}
-	names, err := Names()
-	if err != nil {
-		return err
 	}
 	const maxWorkspace = 384 << 20
 	var total int64
@@ -92,7 +125,10 @@ func Export(directory string) error {
 		return nil
 	}
 	for _, name := range names {
-		loc := c.aliases[name]
+		loc, ok := c.aliases[name]
+		if !ok {
+			return fmt.Errorf("trafficfixture: unknown export alias %q", name)
+		}
 		data, err := readMember(loc.batch, loc.member)
 		if err != nil {
 			return err
