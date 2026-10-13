@@ -237,8 +237,8 @@ func (e *ProtocolEvent) retainRuleEnvelope(result map[string]any) {
 }
 
 func (e *ProtocolEvent) ownsNativeFields() bool {
-	// Preserve accepted IEC104 typed refusals before any mutable public cache.
-	if e.Protocol == "iec104" && e.sessionError != nil {
+	// Preserve accepted IEC104/DNP3 typed refusals before any mutable public cache.
+	if (e.Protocol == "iec104" || e.Protocol == "dnp3") && e.sessionError != nil {
 		return true
 	}
 	if e.nativeMMSObservation {
@@ -592,9 +592,9 @@ func (a *binParser) emit(e *BinParserEvent) {
 	e.setStructured(e.Structured)
 	e.finalizeEvidence()
 	e.summarizeProtocol()
-	// IEC104, GOOSE, MQTT and legacy stream media keep rule fields distinct from observed
+	// IEC104, DNP3, GOOSE, MQTT and legacy stream media keep rule fields distinct from observed
 	// session context. Freeze the final context before handing out public maps.
-	if (e.Protocol == "iec104" || e.Protocol == "goose" || e.Protocol == "mqtt" || e.ocpp || e.Protocol == "rtp" && e.Transport != "udp") && e.semanticSession == nil && e.Session != nil {
+	if ((e.Protocol == "iec104" || e.Protocol == "dnp3") || e.Protocol == "goose" || e.Protocol == "mqtt" || e.ocpp || e.Protocol == "rtp" && e.Transport != "udp") && e.semanticSession == nil && e.Session != nil {
 		e.semanticSession = cloneSession(e.Session)
 	}
 	defer func() {
@@ -1230,7 +1230,7 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 					err = protocolError(ErrUnsupportedFeature, err.Error())
 				}
 				e.Status, e.sessionError = classifySessionError(err)
-				if (e.Protocol == "iec104" || e.Entry == "MySQLPreparedFields" || e.Protocol == "mqtt" || e.nativeOPCUAObservation) && e.sessionError == nil {
+				if ((e.Protocol == "iec104" || e.Protocol == "dnp3") || e.Entry == "MySQLPreparedFields" || e.Protocol == "mqtt" || e.nativeOPCUAObservation) && e.sessionError == nil {
 					// These legacy codecs also return wrapped context or
 					// grammar errors. Preserve their status/message privately so
 					// later queries cannot use a caller-supplied successful cache.
@@ -1254,7 +1254,7 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 				// decoding and history; retrying a different grammar loses fields
 				// or rejects valid argumentless/multiline messages.
 				e.semanticFields = protocolFields(result)
-				if e.Protocol == "iec104" || e.Protocol == "goose" || e.Protocol == "mqtt" || e.nativeOPCUAObservation || e.Protocol == "websocket" && e.Session["OCPP"] != nil || e.Protocol == "rtp" && e.Transport != "udp" {
+				if (e.Protocol == "iec104" || e.Protocol == "dnp3") || e.Protocol == "goose" || e.Protocol == "mqtt" || e.nativeOPCUAObservation || e.Protocol == "websocket" && e.Session["OCPP"] != nil || e.Protocol == "rtp" && e.Transport != "udp" {
 					e.retainRuleEnvelope(result)
 				}
 				if e.Protocol == "tls" || e.Protocol == "redis" || e.Entry == "MySQLPreparedFields" || e.Protocol == "stun" || e.Protocol == "turn" || e.Protocol == "snmp" || e.Protocol == "slmp" || e.Protocol == "dlms-wrapper" || e.Protocol == "dlms" || e.Protocol == "c37118" {
@@ -1312,11 +1312,14 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 		d.pruneContributions(a)
 		wire = wire[n:]
 		failed := e.Error != ""
+		// Only CRC/length-validated complete link frames can carry this private
+		// application-level refusal scope. Snapshot before public callbacks.
+		recoverableDNP3 := e.Protocol == "dnp3" && e.Session["Error Scope"] == "application"
 		a.emit(e)
 		if !failed {
 			f.deliverTLS(dir, e)
 		}
-		if failed && !(e.Protocol == "slmp" && slmpTCPRecoverable(e.sessionError)) && !(e.Protocol == "dlms-wrapper" && dlmsRecoverableMessageError(e.sessionError)) && !(e.Protocol == "c37118" && c37118RecoverableMessageError(e.sessionError)) && !(e.Protocol == "dlms" && dlmsRecoverableMessageError(e.sessionError)) && !(e.Protocol == "roc-plus" && rocRecoverableMessageError(e.sessionError)) && !(e.Protocol == "genisys" && genisysRecoverableMessageError(e.sessionError)) && !((e.Protocol == "http2" || e.Protocol == "grpc" || e.Protocol == "doh") && e.Session["Error Scope"] == "stream") {
+		if failed && !recoverableDNP3 && !(e.Protocol == "slmp" && slmpTCPRecoverable(e.sessionError)) && !(e.Protocol == "dlms-wrapper" && dlmsRecoverableMessageError(e.sessionError)) && !(e.Protocol == "c37118" && c37118RecoverableMessageError(e.sessionError)) && !(e.Protocol == "dlms" && dlmsRecoverableMessageError(e.sessionError)) && !(e.Protocol == "roc-plus" && rocRecoverableMessageError(e.sessionError)) && !(e.Protocol == "genisys" && genisysRecoverableMessageError(e.sessionError)) && !((e.Protocol == "http2" || e.Protocol == "grpc" || e.Protocol == "doh") && e.Session["Error Scope"] == "stream") {
 			if stateful {
 				f.invalidateSession(1 - dir)
 				f.closeSession()

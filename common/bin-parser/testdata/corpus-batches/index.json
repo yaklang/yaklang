@@ -72742,6 +72742,347 @@
         "common/pcapx/pcaputil/iec104-command-context/reference.py": "iec104-command-context/reference.py",
         "scripts/protocol-tests/required-tests-traffic-unified-v48.json": "required-tests-traffic-unified-v48.json"
       }
+    },
+    {
+      "id": "validation-dnp3-application-context",
+      "kind": "validation",
+      "source_sha": "62e5dd396c887127f9644d743a9c42262c10f9c2",
+      "file": "validation-dnp3-application-context.zip",
+      "sha256": "d46bcd7ef84a8909cf3c25ab2912b8fec72e032842577ad935fe13e78dfd9099",
+      "password": "bin-parser",
+      "members": {
+        "dnp3-application-context/answers/normal-seq0.json": {
+          "sha256": "59872e1d0df8b5a69a3951da0f60e888b10c652eb05e8c029e59a43a9323406f",
+          "bytes": 1788
+        },
+        "dnp3-application-context/captures/normal-seq0.pcap": {
+          "sha256": "c2b9c9a4c89fe08c6b158e5547ab098e7932c41a38022eb3121bb24043974450",
+          "bytes": 616
+        },
+        "dnp3-application-context/answers/normal-seq1.json": {
+          "sha256": "50e03dbc3178bca1e8b21f49587148dccb68fdab2f52ba6ff1dd0191e56a0ab3",
+          "bytes": 1788
+        },
+        "dnp3-application-context/captures/normal-seq1.pcap": {
+          "sha256": "a231f0e3efa8af196dd04709360a2a5d84a25a474e1cd4c5d4f230546d45f696",
+          "bytes": 616
+        },
+        "dnp3-application-context/answers/normal-seq15.json": {
+          "sha256": "95a649a011d9f052cda024e4486ca2cd660b2cc7e82e5f6849775f4ac828c5d1",
+          "bytes": 1790
+        },
+        "dnp3-application-context/captures/normal-seq15.pcap": {
+          "sha256": "c8a73b851c7676646f1fc55f3e1e29813ecb771c199f780b83714e68e1df1881",
+          "bytes": 616
+        },
+        "dnp3-application-context/answers/response-confirm-required.json": {
+          "sha256": "b85b268afb18e590dced86a6ec08a0b9aa35bd224305fa8f8f52321eef27629b",
+          "bytes": 3544
+        },
+        "dnp3-application-context/captures/response-confirm-required.pcap": {
+          "sha256": "b966ffb0f7dda3d714f7bd91e91b8a6dc5f20b87b31f14dc660f4b63e013305a",
+          "bytes": 788
+        },
+        "dnp3-application-context/answers/unsolicited-confirm-required.json": {
+          "sha256": "eb02e8f9cf78b21e286a68c66e8e83deaf1eda4c8694a1934d72f1adc7658d2b",
+          "bytes": 3544
+        },
+        "dnp3-application-context/captures/unsolicited-confirm-required.pcap": {
+          "sha256": "15be7dbdc5f96968a2cd7134f01ff876b6c582382f0978c4c3098ab17374520d",
+          "bytes": 788
+        },
+        "dnp3-application-context/answers/interleaved-read-write.json": {
+          "sha256": "f8b4b059ae0ede5b9125f552be00acae53c12ba3bf1cd1fb6338e6f9f734a50e",
+          "bytes": 3526
+        },
+        "dnp3-application-context/captures/interleaved-read-write.pcap": {
+          "sha256": "276e0cc2adcdf6c1941561e05af973f7bd1936cc14437ed954dfe216b52adf6a",
+          "bytes": 788
+        },
+        "dnp3-application-context/answers/wrong-sequence-retains.json": {
+          "sha256": "b7bc6e0557a0bd9653ed01d6a6c9b5eb168899e7f7fbdac7015307b4c5b1ee6b",
+          "bytes": 2711
+        },
+        "dnp3-application-context/captures/wrong-sequence-retains.pcap": {
+          "sha256": "bd170455c358603d253d4a4b25418f25a856ed95159cf82d35a59c23b04de223",
+          "bytes": 703
+        },
+        "dnp3-application-context/answers/unsolicited-does-not-retire.json": {
+          "sha256": "b596ba0fd911533a7f60cdf3510e3c7a9ce330980268bc889f9c1445ebe5a190",
+          "bytes": 2712
+        },
+        "dnp3-application-context/captures/unsolicited-does-not-retire.pcap": {
+          "sha256": "81582aa4940694906722e6122fc1e0a43a6cbe7cce3795c28e49526472ef2e1a",
+          "bytes": 703
+        },
+        "dnp3-application-context/answers/solicited-confirm-does-not-replace.json": {
+          "sha256": "dd01bb483c6f2e8d85f9e52e52d811b01688b3159dc0874a71aa26bc0b6efc5d",
+          "bytes": 2621
+        },
+        "dnp3-application-context/captures/solicited-confirm-does-not-replace.pcap": {
+          "sha256": "3314d09963047fd6d02d3e08301cb70dffa4a1017b950d675813a9127279f0e7",
+          "bytes": 701
+        },
+        "dnp3-application-context/answers/unsolicited-confirm-does-not-replace.json": {
+          "sha256": "2e95447cb8a679e8958cdea3b884f6c9e7e78d940ffee0fc72eb59c1b13bc452",
+          "bytes": 2620
+        },
+        "dnp3-application-context/captures/unsolicited-confirm-does-not-replace.pcap": {
+          "sha256": "219188b818f4977617be52032b754566259d69d375942b19b1a3505492078dd8",
+          "bytes": 701
+        },
+        "dnp3-application-context/answers/wrong-capture-direction-retains.json": {
+          "sha256": "078a38247d7697879838c2d3c2207cfd20cd0d97a37865d3db90412529628ee5",
+          "bytes": 2711
+        },
+        "dnp3-application-context/captures/wrong-capture-direction-retains.pcap": {
+          "sha256": "9baf8972e12b4a1db2f93cf4478f149d3913d355babe4ddac0be59cf14ec9972",
+          "bytes": 703
+        },
+        "dnp3-application-context/answers/wrong-link-address-retains.json": {
+          "sha256": "81d4924675ffa2d16c4db87b2ea046180b99e98add8635dab5ee383ebfdc5210",
+          "bytes": 2711
+        },
+        "dnp3-application-context/captures/wrong-link-address-retains.pcap": {
+          "sha256": "c306ddef15a477abe047a3a3140029a3a95bfcd1b0fed89d14045eee4a715e22",
+          "bytes": 703
+        },
+        "dnp3-application-context/answers/opposite-capture-domains.json": {
+          "sha256": "08687fd08f23a14c393841f1631749e58d75752aea3aaa1c68fbc848be52c418",
+          "bytes": 3526
+        },
+        "dnp3-application-context/captures/opposite-capture-domains.pcap": {
+          "sha256": "6b2de9f9e2eebabe33ea30eb651a4f7cee17b3e6e45b9a8a34ccf4863a67871a",
+          "bytes": 788
+        },
+        "dnp3-application-context/answers/identical-request-retry.json": {
+          "sha256": "13cfd6c1bfedf053e5b85eb02e4a2d62dec673c1018be1ade3164d4bac864729",
+          "bytes": 2610
+        },
+        "dnp3-application-context/captures/identical-request-retry.pcap": {
+          "sha256": "799f0f8458a311dd2ceac2469f90d27fc9de48ff32277eb6a1ef80ba2034792d",
+          "bytes": 701
+        },
+        "dnp3-application-context/answers/response-duplicate.json": {
+          "sha256": "2eae95bcdc4733dd5ec437f257cb6abc78be556fb8017391f809b4a523b5c2ee",
+          "bytes": 2711
+        },
+        "dnp3-application-context/captures/response-duplicate.pcap": {
+          "sha256": "191ec1f95e6bb054ed5367a001abd36bc7c7c523269c95b4dd233fdde74972c6",
+          "bytes": 703
+        },
+        "dnp3-application-context/answers/wrap-completed-sequences.json": {
+          "sha256": "c667cab2f8778b950fd58ba494dbcc00202538d3d17f7ba3224fb4b8aa38112a",
+          "bytes": 3528
+        },
+        "dnp3-application-context/captures/wrap-completed-sequences.pcap": {
+          "sha256": "76c17742b6d483661042665b0084ee7714d56f1377d697b9dc00c99b3b15a8be",
+          "bytes": 788
+        },
+        "dnp3-application-context/answers/same-sequence-conflicting-function.json": {
+          "sha256": "97929e0934645e264ec2ebc9d7f176e746dd9d1579ec527591a888f10c6bcbda",
+          "bytes": 2706
+        },
+        "dnp3-application-context/captures/same-sequence-conflicting-function.pcap": {
+          "sha256": "56d91902bc9268cda5838490101527ca8459ffdb46ff5a07330f0262b98c5f4c",
+          "bytes": 701
+        },
+        "dnp3-application-context/answers/same-sequence-conflicting-objects.json": {
+          "sha256": "332b8e4efd5c534e41e7107b44f1185c85c24b1380fd702d4fcb1d6a97ee6509",
+          "bytes": 2740
+        },
+        "dnp3-application-context/captures/same-sequence-conflicting-objects.pcap": {
+          "sha256": "f4ba757d5583386674c490f64b4e6755d2ee804298c443cd35a208f6698d3e70",
+          "bytes": 707
+        },
+        "dnp3-application-context/answers/unknown-function-untracked.json": {
+          "sha256": "b14eb43f76bd5ce9008fc78b743d8f005cf19db073e6c5dbaedddb368a407608",
+          "bytes": 1848
+        },
+        "dnp3-application-context/captures/unknown-function-untracked.pcap": {
+          "sha256": "bc2a8631ba2dfaf258d9c7c0ff67f214f7e10b69dc24d8d8ffb00eef54d9700e",
+          "bytes": 616
+        },
+        "dnp3-application-context/answers/no-response-function-untracked.json": {
+          "sha256": "7593e899ec8c2720bf3b28692cf32135978e9cc8e5c0f436396e3f4e392235fc",
+          "bytes": 2655
+        },
+        "dnp3-application-context/captures/no-response-function-untracked.pcap": {
+          "sha256": "17a4e81578a30a052deac14edb72ce15c97e4063d38440ad02408da9b4b4c915",
+          "bytes": 701
+        },
+        "dnp3-application-context/answers/unsolicited-without-uns.json": {
+          "sha256": "78109d5d5ebef73906665da2fc61cce99809273afca552a115d07ee67bd9a3ea",
+          "bytes": 2747
+        },
+        "dnp3-application-context/captures/unsolicited-without-uns.pcap": {
+          "sha256": "e9238d7d2c0ab0b42e6b2e44e3c6a34fa6ee1664d60618b8b707999300b88a79",
+          "bytes": 703
+        },
+        "dnp3-application-context/answers/solicited-with-uns.json": {
+          "sha256": "9a9efc0ab8f83f18ebb70ec1f288d464d6969a8c75f0691fb5213cea16da507d",
+          "bytes": 2740
+        },
+        "dnp3-application-context/captures/solicited-with-uns.pcap": {
+          "sha256": "6361d9f7e1676837854d9ddc52deb4e49047d2f80dee264e6fdce49dcde67994",
+          "bytes": 703
+        },
+        "dnp3-application-context/answers/request-with-uns.json": {
+          "sha256": "55dac71435b641cb3de60519d8cfcb4e00821e4bf5f554354be46a9152862c34",
+          "bytes": 2675
+        },
+        "dnp3-application-context/captures/request-with-uns.pcap": {
+          "sha256": "de4df4aff6a8f14c4899109b076e25c59df7ffe5c3d6251b43cc9fd5ace57c40",
+          "bytes": 701
+        },
+        "dnp3-application-context/answers/request-with-con.json": {
+          "sha256": "275c894485b0bb9b5c540a489bef8fc4480ae30891c9a7cc9511237416c17201",
+          "bytes": 2675
+        },
+        "dnp3-application-context/captures/request-with-con.pcap": {
+          "sha256": "91fcd69e4a26982aff6290c3634ffd5c02b9defb511f13408d8853ce8d967ebb",
+          "bytes": 701
+        },
+        "dnp3-application-context/answers/transport-fragment-invalidates.json": {
+          "sha256": "2d5ae52348a8b103e028f5da3002525deba243e216e44eb1d6a1abe1b39da497",
+          "bytes": 2531
+        },
+        "dnp3-application-context/captures/transport-fragment-invalidates.pcap": {
+          "sha256": "f1befe46dd050949f39e12631743cf7779532d45b4351637de8ee0976721f80e",
+          "bytes": 701
+        },
+        "dnp3-application-context/answers/transport-continuation-invalidates.json": {
+          "sha256": "68a69badd730ea49501d1ee11374ddf34f8bbd440f22e7cf1c5c1e7f18bb9cae",
+          "bytes": 2532
+        },
+        "dnp3-application-context/captures/transport-continuation-invalidates.pcap": {
+          "sha256": "4ab00965cfc78662310edfcc88a81047aa2168e9b44e72f51a6c8b7a7f042190",
+          "bytes": 701
+        },
+        "dnp3-application-context/answers/application-fragment-invalidates.json": {
+          "sha256": "e6310e79ae8e0ed92166a603c7c6f09df57c7eb941b2816a9c92b158630e3460",
+          "bytes": 2690
+        },
+        "dnp3-application-context/captures/application-fragment-invalidates.pcap": {
+          "sha256": "ec872e6ddb7c63ac519d7df51834b68aa363cdc7c8e6e10df5f9ad60390eee25",
+          "bytes": 701
+        },
+        "dnp3-application-context/answers/unrelated-link-fragment-preserves.json": {
+          "sha256": "b36e8f038012968a6842c01eace6cbef651f2bf6e874053a525bd31a751517ed",
+          "bytes": 2519
+        },
+        "dnp3-application-context/captures/unrelated-link-fragment-preserves.pcap": {
+          "sha256": "e549cac99d73cba794e63da5c54b677bd74575a8177f9d3140b87577e26daa82",
+          "bytes": 701
+        },
+        "dnp3-application-context/manifest.json": {
+          "sha256": "75daefb98f67721df78b36f4bf372d1c2c66f6a129797d655c7b38c67f7219e8",
+          "bytes": 10293
+        },
+        "dnp3-application-context/generate.py": {
+          "sha256": "e244513986fe02dd8a1ea09fc9d3699853fee1ce69f205160d8be06122542e95",
+          "bytes": 7100
+        },
+        "dnp3-application-context/verify.py": {
+          "sha256": "5afc8a017bea21d78983f63b1a19da7c82909ab050c0274997215700be92ea11",
+          "bytes": 1846
+        },
+        "dnp3-application-context/MODEL-PINS.json": {
+          "sha256": "e50f2fef4228be01d4ab4a4938d48ec7c5b9ae9f1511903bd06e51d83550d3ce",
+          "bytes": 606
+        },
+        "dnp3-application-context/SOURCE-PINS.json": {
+          "sha256": "c52e28d0f46c4f234f21823a10c92b9e2a55474edc43a1f500bc2ffab9728c22",
+          "bytes": 2561
+        },
+        "dnp3-application-context/seal.py": {
+          "sha256": "9caaa3f2230bc6cd67e05019817e6ff1c076e2bb686056bed10624dd780628f1",
+          "bytes": 4009
+        },
+        "dnp3-application-context/REFERENCE-ACTUAL.json": {
+          "sha256": "4a6ece9b0bd6477c1a4a7c0f63301508baccd4079b9d6ec9e8e93d71fc7c402e",
+          "bytes": 18519
+        },
+        "dnp3-application-context/reference.py": {
+          "sha256": "3484a9aa30d7efc9f960d030bc368619d242605a1b047ee62eea07ba712913a3",
+          "bytes": 2085
+        },
+        "required-tests-traffic-unified-v49.json": {
+          "sha256": "977bebd350c595748eb8a91f180f3ac76c420e33dfbd962695aa7c27e37ef60f",
+          "bytes": 9728642
+        },
+        "validation/expected.json": {
+          "sha256": "e4ac8f468a5c8ecc6c82c0e89912ffa304de18f6e93908619d2ce2cf6fabaa5e",
+          "bytes": 35332
+        }
+      },
+      "aliases": {
+        "common/pcapx/pcaputil/dnp3-application-context/answers/normal-seq0.json": "dnp3-application-context/answers/normal-seq0.json",
+        "common/pcapx/pcaputil/dnp3-application-context/captures/normal-seq0.pcap": "dnp3-application-context/captures/normal-seq0.pcap",
+        "common/pcapx/pcaputil/dnp3-application-context/answers/normal-seq1.json": "dnp3-application-context/answers/normal-seq1.json",
+        "common/pcapx/pcaputil/dnp3-application-context/captures/normal-seq1.pcap": "dnp3-application-context/captures/normal-seq1.pcap",
+        "common/pcapx/pcaputil/dnp3-application-context/answers/normal-seq15.json": "dnp3-application-context/answers/normal-seq15.json",
+        "common/pcapx/pcaputil/dnp3-application-context/captures/normal-seq15.pcap": "dnp3-application-context/captures/normal-seq15.pcap",
+        "common/pcapx/pcaputil/dnp3-application-context/answers/response-confirm-required.json": "dnp3-application-context/answers/response-confirm-required.json",
+        "common/pcapx/pcaputil/dnp3-application-context/captures/response-confirm-required.pcap": "dnp3-application-context/captures/response-confirm-required.pcap",
+        "common/pcapx/pcaputil/dnp3-application-context/answers/unsolicited-confirm-required.json": "dnp3-application-context/answers/unsolicited-confirm-required.json",
+        "common/pcapx/pcaputil/dnp3-application-context/captures/unsolicited-confirm-required.pcap": "dnp3-application-context/captures/unsolicited-confirm-required.pcap",
+        "common/pcapx/pcaputil/dnp3-application-context/answers/interleaved-read-write.json": "dnp3-application-context/answers/interleaved-read-write.json",
+        "common/pcapx/pcaputil/dnp3-application-context/captures/interleaved-read-write.pcap": "dnp3-application-context/captures/interleaved-read-write.pcap",
+        "common/pcapx/pcaputil/dnp3-application-context/answers/wrong-sequence-retains.json": "dnp3-application-context/answers/wrong-sequence-retains.json",
+        "common/pcapx/pcaputil/dnp3-application-context/captures/wrong-sequence-retains.pcap": "dnp3-application-context/captures/wrong-sequence-retains.pcap",
+        "common/pcapx/pcaputil/dnp3-application-context/answers/unsolicited-does-not-retire.json": "dnp3-application-context/answers/unsolicited-does-not-retire.json",
+        "common/pcapx/pcaputil/dnp3-application-context/captures/unsolicited-does-not-retire.pcap": "dnp3-application-context/captures/unsolicited-does-not-retire.pcap",
+        "common/pcapx/pcaputil/dnp3-application-context/answers/solicited-confirm-does-not-replace.json": "dnp3-application-context/answers/solicited-confirm-does-not-replace.json",
+        "common/pcapx/pcaputil/dnp3-application-context/captures/solicited-confirm-does-not-replace.pcap": "dnp3-application-context/captures/solicited-confirm-does-not-replace.pcap",
+        "common/pcapx/pcaputil/dnp3-application-context/answers/unsolicited-confirm-does-not-replace.json": "dnp3-application-context/answers/unsolicited-confirm-does-not-replace.json",
+        "common/pcapx/pcaputil/dnp3-application-context/captures/unsolicited-confirm-does-not-replace.pcap": "dnp3-application-context/captures/unsolicited-confirm-does-not-replace.pcap",
+        "common/pcapx/pcaputil/dnp3-application-context/answers/wrong-capture-direction-retains.json": "dnp3-application-context/answers/wrong-capture-direction-retains.json",
+        "common/pcapx/pcaputil/dnp3-application-context/captures/wrong-capture-direction-retains.pcap": "dnp3-application-context/captures/wrong-capture-direction-retains.pcap",
+        "common/pcapx/pcaputil/dnp3-application-context/answers/wrong-link-address-retains.json": "dnp3-application-context/answers/wrong-link-address-retains.json",
+        "common/pcapx/pcaputil/dnp3-application-context/captures/wrong-link-address-retains.pcap": "dnp3-application-context/captures/wrong-link-address-retains.pcap",
+        "common/pcapx/pcaputil/dnp3-application-context/answers/opposite-capture-domains.json": "dnp3-application-context/answers/opposite-capture-domains.json",
+        "common/pcapx/pcaputil/dnp3-application-context/captures/opposite-capture-domains.pcap": "dnp3-application-context/captures/opposite-capture-domains.pcap",
+        "common/pcapx/pcaputil/dnp3-application-context/answers/identical-request-retry.json": "dnp3-application-context/answers/identical-request-retry.json",
+        "common/pcapx/pcaputil/dnp3-application-context/captures/identical-request-retry.pcap": "dnp3-application-context/captures/identical-request-retry.pcap",
+        "common/pcapx/pcaputil/dnp3-application-context/answers/response-duplicate.json": "dnp3-application-context/answers/response-duplicate.json",
+        "common/pcapx/pcaputil/dnp3-application-context/captures/response-duplicate.pcap": "dnp3-application-context/captures/response-duplicate.pcap",
+        "common/pcapx/pcaputil/dnp3-application-context/answers/wrap-completed-sequences.json": "dnp3-application-context/answers/wrap-completed-sequences.json",
+        "common/pcapx/pcaputil/dnp3-application-context/captures/wrap-completed-sequences.pcap": "dnp3-application-context/captures/wrap-completed-sequences.pcap",
+        "common/pcapx/pcaputil/dnp3-application-context/answers/same-sequence-conflicting-function.json": "dnp3-application-context/answers/same-sequence-conflicting-function.json",
+        "common/pcapx/pcaputil/dnp3-application-context/captures/same-sequence-conflicting-function.pcap": "dnp3-application-context/captures/same-sequence-conflicting-function.pcap",
+        "common/pcapx/pcaputil/dnp3-application-context/answers/same-sequence-conflicting-objects.json": "dnp3-application-context/answers/same-sequence-conflicting-objects.json",
+        "common/pcapx/pcaputil/dnp3-application-context/captures/same-sequence-conflicting-objects.pcap": "dnp3-application-context/captures/same-sequence-conflicting-objects.pcap",
+        "common/pcapx/pcaputil/dnp3-application-context/answers/unknown-function-untracked.json": "dnp3-application-context/answers/unknown-function-untracked.json",
+        "common/pcapx/pcaputil/dnp3-application-context/captures/unknown-function-untracked.pcap": "dnp3-application-context/captures/unknown-function-untracked.pcap",
+        "common/pcapx/pcaputil/dnp3-application-context/answers/no-response-function-untracked.json": "dnp3-application-context/answers/no-response-function-untracked.json",
+        "common/pcapx/pcaputil/dnp3-application-context/captures/no-response-function-untracked.pcap": "dnp3-application-context/captures/no-response-function-untracked.pcap",
+        "common/pcapx/pcaputil/dnp3-application-context/answers/unsolicited-without-uns.json": "dnp3-application-context/answers/unsolicited-without-uns.json",
+        "common/pcapx/pcaputil/dnp3-application-context/captures/unsolicited-without-uns.pcap": "dnp3-application-context/captures/unsolicited-without-uns.pcap",
+        "common/pcapx/pcaputil/dnp3-application-context/answers/solicited-with-uns.json": "dnp3-application-context/answers/solicited-with-uns.json",
+        "common/pcapx/pcaputil/dnp3-application-context/captures/solicited-with-uns.pcap": "dnp3-application-context/captures/solicited-with-uns.pcap",
+        "common/pcapx/pcaputil/dnp3-application-context/answers/request-with-uns.json": "dnp3-application-context/answers/request-with-uns.json",
+        "common/pcapx/pcaputil/dnp3-application-context/captures/request-with-uns.pcap": "dnp3-application-context/captures/request-with-uns.pcap",
+        "common/pcapx/pcaputil/dnp3-application-context/answers/request-with-con.json": "dnp3-application-context/answers/request-with-con.json",
+        "common/pcapx/pcaputil/dnp3-application-context/captures/request-with-con.pcap": "dnp3-application-context/captures/request-with-con.pcap",
+        "common/pcapx/pcaputil/dnp3-application-context/answers/transport-fragment-invalidates.json": "dnp3-application-context/answers/transport-fragment-invalidates.json",
+        "common/pcapx/pcaputil/dnp3-application-context/captures/transport-fragment-invalidates.pcap": "dnp3-application-context/captures/transport-fragment-invalidates.pcap",
+        "common/pcapx/pcaputil/dnp3-application-context/answers/transport-continuation-invalidates.json": "dnp3-application-context/answers/transport-continuation-invalidates.json",
+        "common/pcapx/pcaputil/dnp3-application-context/captures/transport-continuation-invalidates.pcap": "dnp3-application-context/captures/transport-continuation-invalidates.pcap",
+        "common/pcapx/pcaputil/dnp3-application-context/answers/application-fragment-invalidates.json": "dnp3-application-context/answers/application-fragment-invalidates.json",
+        "common/pcapx/pcaputil/dnp3-application-context/captures/application-fragment-invalidates.pcap": "dnp3-application-context/captures/application-fragment-invalidates.pcap",
+        "common/pcapx/pcaputil/dnp3-application-context/answers/unrelated-link-fragment-preserves.json": "dnp3-application-context/answers/unrelated-link-fragment-preserves.json",
+        "common/pcapx/pcaputil/dnp3-application-context/captures/unrelated-link-fragment-preserves.pcap": "dnp3-application-context/captures/unrelated-link-fragment-preserves.pcap",
+        "common/pcapx/pcaputil/dnp3-application-context/manifest.json": "dnp3-application-context/manifest.json",
+        "common/pcapx/pcaputil/dnp3-application-context/generate.py": "dnp3-application-context/generate.py",
+        "common/pcapx/pcaputil/dnp3-application-context/verify.py": "dnp3-application-context/verify.py",
+        "common/pcapx/pcaputil/dnp3-application-context/MODEL-PINS.json": "dnp3-application-context/MODEL-PINS.json",
+        "common/pcapx/pcaputil/dnp3-application-context/SOURCE-PINS.json": "dnp3-application-context/SOURCE-PINS.json",
+        "common/pcapx/pcaputil/dnp3-application-context/seal.py": "dnp3-application-context/seal.py",
+        "common/pcapx/pcaputil/dnp3-application-context/REFERENCE-ACTUAL.json": "dnp3-application-context/REFERENCE-ACTUAL.json",
+        "common/pcapx/pcaputil/dnp3-application-context/reference.py": "dnp3-application-context/reference.py",
+        "scripts/protocol-tests/required-tests-traffic-unified-v49.json": "required-tests-traffic-unified-v49.json"
+      }
     }
   ],
   "schema_version": 1,

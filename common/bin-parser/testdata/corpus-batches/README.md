@@ -44,7 +44,7 @@ Run from the repository root:
 ```sh
 go run ./internal/trafficfixture/cmd/corpus test
 go test -json -count=1 -timeout=5m ./internal/trafficfixture/... ./common/bin-parser/... ./common/pcapx/... ./common/yak/cmd/yakcmds/shark-cli ./scripts/ci > traffic.jsonl
-go run ./internal/trafficfixture/cmd/corpus exec -- python3 @scripts/protocol-tests/check_go_test_json_v2.py traffic.jsonl --inventory @scripts/protocol-tests/required-tests-traffic-unified-v48.json --tier full
+go run ./internal/trafficfixture/cmd/corpus exec -- python3 @scripts/protocol-tests/check_go_test_json_v2.py traffic.jsonl --inventory @scripts/protocol-tests/required-tests-traffic-unified-v49.json --tier full
 ```
 
 The single `corpus` entry point uses the same bounded Go ZIP loader as tests.
@@ -83,7 +83,7 @@ their semantic coverage. The existing synthetic session keys are test inputs;
 production credentials, user private keys and material without redistribution
 permission belong in an external fixed-source download manifest.
 
-Current test requirements are sealed at `scripts/protocol-tests/required-tests-traffic-unified-v48.json`;
+Current test requirements are sealed at `scripts/protocol-tests/required-tests-traffic-unified-v49.json`;
 the historical inventories and all earlier batches remain unchanged.
 The supplemental small-corpus batch contains 26 minimal controls, their explicit
 expected facts, an offline generator and the compact pinned source manifest.
@@ -203,7 +203,7 @@ opaque selector bytes and one bounded Data value over Wrapper v1 TCP/UDP; object
 selector meaning, access permission and device operation are unverified. The
 original one-packet selective-access capture and original refused answer remain
 immutable; its now-supported answer is matched by exact input SHA and frame.
-The active inventory is `scripts/protocol-tests/required-tests-traffic-unified-v48.json`.
+The active inventory is `scripts/protocol-tests/required-tests-traffic-unified-v49.json`.
 
 The small-graph budget batch reuses accepted graph captures/answers and adds one
 249-byte UDP control for child count255 without child bytes. Its standalone proof
@@ -993,7 +993,7 @@ the normative answer; a missing numeric reference field is not a codec pass.
 Full/deferred, workers1/2/4, observers off/on, Feed chunks1/7/full, ownership,
 resources and close/refusal boundaries remain required.
 
-Current gate: `required-tests-traffic-unified-v48.json` with
+Current gate: `required-tests-traffic-unified-v49.json` with
 `check_go_test_json_v2.py`. The indexed validator preserves missing/unpassed,
 package invocation completion, descendant skips, failures and non-JSON checks;
 its mutation/differential harness is sealed with the material. Older checkers
@@ -1096,4 +1096,23 @@ wire scalars across19 captures; that verifies wire decoding, separately from the
 source/model association contract. Clock/test/reset response contracts retain their legacy coarse observations;
 full service-specific interpretation remains open. Legacy numeric association IDs remain zero.
 Device actuation/authentication and indistinguishable repeated application
-generations remain unresolved. The active mandatory inventory is v48.
+generations remain unresolved. That batch was sealed with inventory v48; the current entry is documented below.
+
+
+DNP3 complete-link header observation retains the existing IEEE1815 rule field
+shape while isolating bounded READ/WRITE requests by captured direction, link
+addresses and 4-bit application sequence. Identical retries share their slot;
+conflicting outstanding sequence reuse is an explicit context refusal.
+UNSOLICITED and CONFIRM do not replace or retire solicited requests. Unsupported
+or no-response functions stay untracked. Complete CRC-validated application
+refusals are reported per message; CRC/framing/resource failures remain fatal.
+Transport/application fragments explicitly require assembly context and cannot
+be interpreted as independent complete requests. Affected link context is
+invalidated without erasing other address domains. Returned rule/session trees
+and typed refusals are private snapshots. Pending collection and logical
+memory limits apply before insertion; normal responses do not reserve an extra
+request slot. Full fragment/object/measurement decoding, authentication/device
+execution and indistinguishable reused-generation identity remain open.
+`validation-dnp3-application-context.zip` contains minimal authored positive and
+negative captures, independent complete field/session/error answers, source
+pins and deterministic generation/verification tools; current inventory is v49.
