@@ -475,6 +475,10 @@ type binParser struct {
 	datagramDecodeAs                                                           map[uint16]string
 	rtpsShapeWriters                                                           map[uint16]RTPSShapeWriter
 	canDecodeAs                                                                map[int]string
+	j1939TPMu                                                                  sync.Mutex
+	j1939TP                                                                    *j1939TPStore
+	j1939TPRefusedDomains                                                      map[CaptureDomain]int64
+	j1939TPDisabled                                                            bool
 	droneCANMu                                                                 sync.Mutex
 	droneCANStats                                                              *droneCANStatsStore
 	droneCANStatsDisabled                                                      bool // refused untracked transfer history fails closed
@@ -596,6 +600,7 @@ func (c *CaptureConfig) finishBinParser() error {
 		return nil
 	}
 	a := c.binParser
+	a.closeJ1939TP()
 	a.closeDroneCANStats()
 	a.closeUDPSessions()
 	a.closeDCPObservations()

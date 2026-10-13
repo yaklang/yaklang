@@ -26,6 +26,7 @@ func NativeProtocolProfiles() []ProtocolProfile {
 		{"slmp", "tcp/udp", "binary3E/4E connected-station Self Test0619/0000", "exact timer/count/loopback/error fields and observed requester; UDP one outstanding route/serial/echo match with ambiguous overlap quarantined; TCP bounded distinct-serial 4E pipeline and sequential distinct-echo 3E success; completed identifier reuse and later unsequenced TCP errors remain context-required; no ASCII, other commands, private MELSOFT or authenticated device claim"},
 		{"dronecan", "can", "explicit-interface v0 single-frame NodeStatus", "standard message type341 complete fields; strict tail and DSDL bit order; reserved Mode/nonzero SubMode preserved; no multi-frame CRC/reassembly, anonymous/services, CAN FD application, Cyphal v1 or authenticated/online node inference"},
 		{"socketcan", "can", "DLT227 controller records", "network-order CAN IDs; classical data/RTR/controller-error details and canonical72-byteFD; opaque padding, no bus CRC/authenticated peer or transaction claim"},
+		{"j1939-tp", "can", "explicit-interface classical TP BAM and RTS/CTS/EOM ACK/Abort", "bounded capture-domain/directed-address transport observations, complete literal payload/padding and matching control PGN; no ETP, FD application, device delivery/authentication or application PGN semantics"},
 		{"j1939", "can", "explicit-interface classical CAN", "Request PGN and unverified Address Claim NAME fields; other parameter groups stay opaque; no TP reassembly, FD application, address-claim success, ISO-TP/UDS/OBD or automatic extended-ID admission"},
 		{"profinet-dcp", "l2", "bounded Identify/Get/Set/Hello wire properties", "selected service3/4/5/6 layouts; Get selectors, Set qualifiers/control status, Hello BlockInfo; Identify VLAN/interface passive candidates; no authenticated device, configuration success or IO claim"},
 		{"lldp", "l2", "ended Ethernet discovery TLVs", "ordered mandatory identity/TTL and bounded optional/management fields; selected PNO Port Status/Chassis MAC and IEEE802.3 MAC/PHY; unverified neighbor observation, no topology cache or PROFINET DCP/RT claim"},
@@ -106,13 +107,15 @@ func WithProtocolDecodeAs(transport string, port uint16, protocol string) Captur
 // capture interface. Selection is required because extended CAN IDs are also
 // used by other protocols. It does not authenticate an address claim or enable
 // automotive ISO-TP (the existing isotp rule describes RFC1006/COTP).
+// j1939-tp additionally observes bounded classical BAM and RTS/CTS/EOM ACK/Abort
+// transfers. It does not infer authenticated ECU sessions or application PGN values.
 // dronecan-stats additionally selects the bounded v0 GetTransportStats response
 // receiver; dronecan-services also observes GetNodeInfo responses. Neither
 // selection verifies invocation association or node identity. dronecan preserves stateless NodeStatus/RestartNode observations.
 func WithCANDecodeAs(captureInterface int, protocol string) CaptureOption {
 	return func(c *CaptureConfig) error {
-		if captureInterface < 0 || (protocol != "j1939" && protocol != "dronecan" && protocol != "dronecan-stats" && protocol != "dronecan-services") {
-			return fmt.Errorf("CAN DecodeAs requires a nonnegative capture interface and a supported j1939/dronecan/dronecan-stats/dronecan-services profile")
+		if captureInterface < 0 || (protocol != "j1939" && protocol != "j1939-tp" && protocol != "dronecan" && protocol != "dronecan-stats" && protocol != "dronecan-services") {
+			return fmt.Errorf("CAN DecodeAs requires a nonnegative capture interface and a supported j1939/j1939-tp/dronecan/dronecan-stats/dronecan-services profile")
 		}
 		if c.canDecodeAs == nil {
 			c.canDecodeAs = make(map[int]string)

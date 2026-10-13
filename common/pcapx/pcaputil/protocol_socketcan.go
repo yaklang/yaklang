@@ -156,15 +156,25 @@ func (a *binParser) decodeCANRecord(w []byte, evidence captureEvidence, ci gopac
 	e := &ProtocolEvent{nativeCANRecord: true, Timestamp: ci.Timestamp, Transport: "can", Protocol: "socketcan", Profile: "socketcan-controller-record", Admission: "capture-linktype-and-validated-record", Domain: evidence.Ref.Domain, Length: len(w), SourceBytes: ByteSource{Kind: "captured", PacketRefs: []PacketReference{evidence.Ref}}, Completeness: "message"}
 	var fields map[string]any
 	var err error
+	selection := a.canDecodeAs[e.Domain.Interface]
+	if selection == "j1939-tp" {
+		e.Protocol, e.Profile, e.Admission = "j1939", j1939TPProfile, "explicit-interface-decode-as"
+	}
 	switch {
 	case ci.CaptureLength < ci.Length:
 		if a.canDecodeAs[e.Domain.Interface] == "dronecan-stats" || a.canDecodeAs[e.Domain.Interface] == "dronecan-services" {
 			a.refuseDroneCANStatsRecord()
 		}
+		if selection == "j1939-tp" {
+			a.refuseJ1939TPRecord(e.Domain)
+		}
 		err = protocolError(ErrNeedMore, "SocketCAN capture record is truncated")
 	case len(w) > min(a.budget.MaxFrameBytes, a.budget.MaxMessageBytes):
 		if a.canDecodeAs[e.Domain.Interface] == "dronecan-stats" || a.canDecodeAs[e.Domain.Interface] == "dronecan-services" {
 			a.refuseDroneCANStatsRecord()
+		}
+		if selection == "j1939-tp" {
+			a.refuseJ1939TPRecord(e.Domain)
 		}
 		err = protocolError(ErrResourceExceeded, "SocketCAN record exceeds parser byte budget")
 	default:
@@ -175,8 +185,14 @@ func (a *binParser) decodeCANRecord(w []byte, evidence captureEvidence, ci gopac
 		if err != nil && (a.canDecodeAs[e.Domain.Interface] == "dronecan-stats" || a.canDecodeAs[e.Domain.Interface] == "dronecan-services") {
 			a.refuseDroneCANStatsRecord()
 		}
-		selection := a.canDecodeAs[e.Domain.Interface]
-		if err == nil && (selection == "j1939" || selection == "dronecan" || selection == "dronecan-stats" || selection == "dronecan-services") && fields["Extended"] == true && fields["RTR"] == false && fields["Error Frame"] == false && fields["Frame Format"] == "classic" {
+		if err != nil && selection == "j1939-tp" {
+			a.refuseJ1939TPRecord(e.Domain)
+		}
+		if err == nil && selection == "j1939-tp" && (fields["Extended"] != true || fields["RTR"] != false || fields["Error Frame"] != false || fields["Frame Format"] != "classic") {
+			a.refuseJ1939TPRecord(e.Domain)
+			err = protocolError(ErrUnsupportedFeature, "J1939 TP requires classical extended data frames")
+		}
+		if err == nil && (selection == "j1939" || selection == "j1939-tp" || selection == "dronecan" || selection == "dronecan-stats" || selection == "dronecan-services") && fields["Extended"] == true && fields["RTR"] == false && fields["Error Frame"] == false && fields["Frame Format"] == "classic" {
 			e.Protocol, e.Profile, e.Admission = "j1939", "j1939-classic-request-name", "explicit-interface-decode-as"
 			var jf map[string]any
 			if selection == "dronecan" || selection == "dronecan-stats" || selection == "dronecan-services" {
@@ -199,6 +215,13 @@ func (a *binParser) decodeCANRecord(w []byte, evidence captureEvidence, ci gopac
 					}
 				} else {
 					jf, err = decodeDroneCANNodeStatus(identifier, fields["Data"].([]byte))
+				}
+			} else if selection == "j1939-tp" {
+				e.Profile = j1939TPProfile
+				var refs []PacketReference
+				jf, refs, err = a.decodeJ1939TP(fields["Identifier"].(uint32), fields["Data"].([]byte), evidence.Ref, ci.Timestamp)
+				if len(refs) > 1 {
+					e.SourceBytes = ByteSource{Kind: "reassembled", PacketRefs: refs}
 				}
 			} else {
 				jf, err = decodeJ1939RequestName(fields["Identifier"].(uint32), fields["Data"].([]byte))

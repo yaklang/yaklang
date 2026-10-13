@@ -43,8 +43,8 @@ Run from the repository root:
 
 ```sh
 go run ./internal/trafficfixture/cmd/corpus test
-go test -json -count=1 -timeout=5m ./internal/trafficfixture/... ./common/bin-parser/... ./common/pcapx/... ./common/yak/cmd/yakcmds/shark-cli ./scripts/ci > traffic.jsonl
-go run ./internal/trafficfixture/cmd/corpus exec -- python3 @scripts/protocol-tests/check_go_test_json_v2.py traffic.jsonl --inventory @scripts/protocol-tests/required-tests-traffic-unified-v64.json --tier full
+go test -json -count=1 -timeout=10m ./internal/trafficfixture/... ./common/bin-parser/... ./common/pcapx/... ./common/yak/cmd/yakcmds/shark-cli ./scripts/ci > traffic.jsonl
+go run ./internal/trafficfixture/cmd/corpus exec -- python3 @scripts/protocol-tests/check_go_test_json_v2.py traffic.jsonl --inventory @scripts/protocol-tests/required-tests-traffic-unified-v65.json --tier full
 ```
 
 The single `corpus` entry point uses the same bounded Go ZIP loader as tests.
@@ -83,7 +83,7 @@ their semantic coverage. The existing synthetic session keys are test inputs;
 production credentials, user private keys and material without redistribution
 permission belong in an external fixed-source download manifest.
 
-Current test requirements are sealed at `scripts/protocol-tests/required-tests-traffic-unified-v64.json`;
+Current test requirements are sealed at `scripts/protocol-tests/required-tests-traffic-unified-v65.json`;
 the historical inventories and all earlier batches remain unchanged.
 The supplemental small-corpus batch contains 26 minimal controls, their explicit
 expected facts, an offline generator and the compact pinned source manifest.
@@ -203,7 +203,7 @@ opaque selector bytes and one bounded Data value over Wrapper v1 TCP/UDP; object
 selector meaning, access permission and device operation are unverified. The
 original one-packet selective-access capture and original refused answer remain
 immutable; its now-supported answer is matched by exact input SHA and frame.
-The active inventory is `scripts/protocol-tests/required-tests-traffic-unified-v64.json`.
+The active inventory is `scripts/protocol-tests/required-tests-traffic-unified-v65.json`.
 
 The small-graph budget batch reuses accepted graph captures/answers and adds one
 249-byte UDP control for child count255 without child bytes. Its standalone proof
@@ -993,7 +993,7 @@ the normative answer; a missing numeric reference field is not a codec pass.
 Full/deferred, workers1/2/4, observers off/on, Feed chunks1/7/full, ownership,
 resources and close/refusal boundaries remain required.
 
-Current gate: `required-tests-traffic-unified-v64.json` with
+Current gate: `required-tests-traffic-unified-v65.json` with
 `check_go_test_json_v2.py`. The indexed validator preserves missing/unpassed,
 package invocation completion, descendant skips, failures and non-JSON checks;
 its mutation/differential harness is sealed with the material. Older checkers
@@ -1560,6 +1560,39 @@ Nineteen minimal cases have complete independent answers,19x12 capture and19x2
 native configurations. Fixed C NPDU and TSM allocator methods execute with
 explicit bounded adapters; TShark independently validates actual wire fields.
 Reference evidence is not device/router/client conformance or authentication.
-All159 preceding ZIPs remain unchanged. Current effective v64:32,838 full
+All159 preceding ZIPs remain unchanged. The preceding routed ReadProperty batch used v64:32,838 full
 mandatory entries. Original pending protocol and independent-real-input work
 remain pending, with evidence and process reports outside Git.
+
+
+### Classical J1939 transport observations
+
+`WithCANDecodeAs(interface, "j1939-tp")` adds classical TP BAM and unicast
+RTS/CTS/EOM ACK/Abort to the existing Request/Address Claim observations.
+Directed source/destination and capture section/interface/encapsulation isolate
+state. Announced size/count, control PGN, CTS direction/window and every data
+sequence must agree before completion. Identical retransmissions preserve bytes;
+conflicting repeats and overlapping starts retire the bounded pair. Foreign
+PGN control cannot consume the real pending transfer. Unicast data completion
+waits for matching EOM ACK. Abort, phase expiry, refused captures, budgets and
+idempotent Close retain diagnostics and release allocated payload state.
+
+The profile reports unverified captured bytes and literal final padding. TP has
+no transaction ID; it cannot establish authenticated ECU identity, prove physical
+delivery or distinguish an unobservable stale frame that exactly impersonates a
+new transfer. No ETP, CAN FD application, application-PGN payload semantics,
+automotive ISO-TP, UDS/OBD or device conformance claim is made. Those original
+requirements remain open. The existing `j1939` selection remains stateless.
+
+Forty-eight minimal synthetic cases carry independent literal field/Session,
+order, contributor, complete payload and refusal answers in the new small ZIP.
+The 48x12 full/deferred, worker and observer capture matrix is mandatory; record
+chunks are indivisible, so stream splitting is inapplicable. Source/domain,
+resource, ownership and phase-boundary regressions add direct ingress coverage.
+TShark 4.2.5 executes wire-field comparisons. Two exact layout helpers from pinned
+Linux v6.6 source execute through a declared userspace adapter; the full kernel
+receiver/socket/timers and real ECU endpoints are not executed. Source pins and
+reference scripts remain archived, with upstream source and build outputs outside
+Git. All160 preceding ZIPs remain byte-for-byte unchanged.
+
+Current effective v65 inventory: 33,482 full mandatory entries.
