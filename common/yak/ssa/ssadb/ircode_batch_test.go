@@ -74,7 +74,9 @@ func TestUpsertIrCode_UsesBatchPath(t *testing.T) {
 func TestSaveIrCodeBatch_UpsertFailurePreservesExisting(t *testing.T) {
 	db := setupIrCodeTestDB(t)
 	require.NoError(t, SaveIrCodeBatch(db, []*IrCode{{CodeID: 7, ProgramName: "prog", Name: "old"}}))
-	require.NoError(t, db.Exec(`CREATE TRIGGER reject_ir_insert BEFORE INSERT ON ir_codes
+	// The upsert is INSERT ... ON CONFLICT DO UPDATE, so an existing row is
+	// rejected by the UPDATE trigger, not by a BEFORE INSERT trigger.
+	require.NoError(t, db.Exec(`CREATE TRIGGER reject_ir_update BEFORE UPDATE ON ir_codes
 		WHEN NEW.name = 'reject' BEGIN SELECT RAISE(ABORT, 'rejected IR'); END`).Error)
 
 	err := SaveIrCodeBatch(db, []*IrCode{{CodeID: 7, ProgramName: "prog", Name: "reject"}})
