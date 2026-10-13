@@ -1,6 +1,8 @@
 package ssaapi
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"math"
 	"os"
@@ -539,20 +541,20 @@ func (c *Config) parseProjectWithFSUnits(
 		// Second phase of this batch: expand method-body LazyBuilders that
 		// belong to these units. PreHandler already built the skeleton;
 		// without this drain, bodies wait for Application.Finish and the
-		// unit cannot scan or recycle AST/IR on its own.
-		language, concurrentUnits := c.LanguageBuilder.(ssa.ConcurrentUnitBuilder)
-		if !concurrentUnits || !language.SupportsConcurrentUnitBuild() {
-			// Directory-based frontends may share one application scope. Keep
-			// their existing single drain, including upstream library discovery.
-			prog.LazyBuildForUnits(unitKeys)
+		// unit cannot scan or recycle AST/IR on its own. The same DAG
+		// scheduler serves every frontend; concurrency 1 is its serial mode,
+		// not a second implementation.
+		batchConcurrency := c.GetCompileConcurrency()
+		drainUnscheduled := true
+		if language, ok := c.LanguageBuilder.(ssa.ConcurrentUnitBuilder); ok && language.SupportsConcurrentUnitBuild() {
+			// A dependency-aware frontend already schedules its upstream
+			// libraries, so only the scheduler's own plan is built here.
+			drainUnscheduled = false
 		} else {
-			buildStart := time.Now()
-			peak, err := buildCompileUnitPipeline(c.GetContext(), prog, plan, batch, c.GetCompileConcurrency())
-			log.Infof("compile unit pipeline batch=%d groups=%d concurrency=%d peak_active=%d cost=%v",
-				batchIndex+1, len(batch.unitKeys), c.GetCompileConcurrency(), peak, time.Since(buildStart))
-			if err != nil {
-				return nil, err
-			}
+			// Frontends sharing one application scope have no per-unit
+			// dependency DAG; keep batch builds serial and let the
+			// post-build drain cover upstream libraries.
+			batchConcurrency = 1
 		}
 		if c.isStop() {
 			return nil, ErrContextCancel
@@ -563,7 +565,6 @@ func (c *Config) parseProjectWithFSUnits(
 		if structScanOn && len(batches) == 1 {
 			prog.Finish()
 		}
-		parseTime += time.Since(unitBuildStart)
 		if structScanOn && structProgAPI == nil {
 			structProgAPI = NewProgram(prog, c)
 		}
@@ -577,7 +578,14 @@ func (c *Config) parseProjectWithFSUnits(
 		// The scan and cache mutate or traverse shared IR. Finish them before
 		// starting the next batch; compilation parallelism is inside the DAG
 		// scheduler above, not in an unowned cleanup goroutine.
-		if err := cleanup.run(); err != nil {
+		buildCost, err := executeCompileUnitBatch(
+			c.GetContext(), prog, plan, batch, batchConcurrency, batchIndex, cleanup, drainUnscheduled,
+		)
+		parseTime += buildCost
+		if err != nil {
+			if c.isStop() || errors.Is(err, context.Canceled) {
+				return nil, ErrContextCancel
+			}
 			return nil, err
 		}
 	}

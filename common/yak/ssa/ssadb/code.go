@@ -148,13 +148,14 @@ func (ir *IrCode) Save(db *gorm.DB) error {
 	return db.Save(ir).Error
 }
 
+// UpsertIrCode writes one row. It shares the batched upsert path so a single
+// row is still one INSERT ... ON CONFLICT statement instead of a per-row
+// FirstOrCreate SELECT that PG can resolve via the wrong (program_name, opcode)
+// index on large tables (30ms+ scans).
 func UpsertIrCode(db *gorm.DB, ir *IrCode) error {
 	if db == nil || ir == nil {
 		return nil
 	}
-	// Prefer the batched delete+insert path even for one row: FirstOrCreate
-	// issues a SELECT that PG can resolve via the wrong (program_name, opcode)
-	// index on large tables, turning each upsert into a 30ms+ scan.
 	return SaveIrCodeBatch(db, []*IrCode{ir})
 }
 
@@ -163,11 +164,16 @@ func UpsertIrCode(db *gorm.DB, ir *IrCode) error {
 // host-parameter ceiling.
 const irCodeBatchChunk = 500
 
-// SaveIrCodeBatch uses a native batched SQLite UPSERT when the production
-// (program_name, code_id) unique index is present. Updating rows in place avoids
-// deleting and rebuilding their indexes during the final resident-cache flush,
-// and a failed INSERT cannot first remove the previous snapshot. Legacy schemas
-// without that index and other dialects retain the delete-and-insert path.
+// SaveIrCodeBatch writes IR snapshots as batched in-place upserts on
+// (program_name, code_id) via gorm UpdateInBatches (INSERT ... ON CONFLICT DO
+// UPDATE). Updating in place keeps row ids and their secondary-index entries
+// stable across the resident-cache flush, and a rejected statement cannot first
+// remove the previous snapshot. The batch still inserts rows that do not exist
+// yet, so one call both publishes new IR and refreshes changed IR.
+//
+// Legacy databases without the ux_ir_codes_program_code unique index and
+// dialects whose IR tables lack the (program_name, code_id) constraint keep the
+// delete-and-insert fallback, which does not need a conflict target.
 func SaveIrCodeBatch(db *gorm.DB, items []*IrCode) error {
 	if db == nil || len(items) == 0 {
 		return nil
@@ -181,28 +187,17 @@ func SaveIrCodeBatch(db *gorm.DB, items []*IrCode) error {
 	if len(clean) == 0 {
 		return nil
 	}
-	switch db.Dialect().GetName() {
-	case "sqlite3", "sqlite3_extended":
-		var indexed int
-		// SSA caches pass a DB scoped to program_name. Schema inspection must
-		// clear that row predicate while retaining the current transaction.
-		if err := db.New().Raw(`SELECT COUNT(*) FROM sqlite_master WHERE type = 'index' AND tbl_name = ? AND name = ?`,
-			TableIrCodes, "ux_ir_codes_program_code").Row().Scan(&indexed); err != nil {
-			return fmt.Errorf("check IR unique index: %w", err)
+	if hasIrCodeUniqueKey(db) {
+		for _, it := range clean {
+			it.ID = 0
+			it.CreatedAt = time.Time{}
+			it.UpdatedAt = time.Time{}
+			it.DeletedAt = nil
 		}
-		if indexed > 0 {
-			for _, it := range clean {
-				it.ID = 0
-				it.CreatedAt = time.Time{}
-				it.UpdatedAt = time.Time{}
-				it.DeletedAt = nil
-			}
-			upsert := db.New().Model(&IrCode{}).OnConflictUpdateAll("program_name,code_id")
-			if err := upsert.CreateInBatches(clean, irCodeBatchChunk).Error; err != nil {
-				return fmt.Errorf("upsert IR snapshot: %w", err)
-			}
-			return nil
+		if err := db.New().UpdateInBatches(clean, irCodeBatchChunk, "program_name,code_id").Error; err != nil {
+			return fmt.Errorf("upsert IR snapshot: %w", err)
 		}
+		return nil
 	}
 	for start := 0; start < len(clean); start += irCodeBatchChunk {
 		end := start + irCodeBatchChunk
@@ -216,6 +211,45 @@ func SaveIrCodeBatch(db *gorm.DB, items []*IrCode) error {
 	return nil
 }
 
+// hasIrCodeUniqueKey reports whether the (program_name, code_id) conflict
+// target exists, i.e. whether INSERT ... ON CONFLICT can be used. SSA caches
+// pass a DB scoped to program_name, so the probes run on db.New() to drop the
+// row predicate while keeping the current transaction.
+func hasIrCodeUniqueKey(db *gorm.DB) bool {
+	switch db.Dialect().GetName() {
+	case "sqlite3", "sqlite3_extended":
+		var indexed int
+		if err := db.New().Raw(`SELECT COUNT(*) FROM sqlite_master WHERE type = 'index' AND tbl_name = ? AND name = ?`,
+			TableIrCodes, "ux_ir_codes_program_code").Row().Scan(&indexed); err != nil {
+			log.Warnf("check IR unique index: %v", err)
+			return false
+		}
+		return indexed > 0
+	case "postgres":
+		var indexed int
+		if err := db.New().Raw(`SELECT COUNT(*) FROM pg_indexes WHERE tablename = ? AND indexname = ?`,
+			TableIrCodes, "ux_ir_codes_program_code").Row().Scan(&indexed); err != nil {
+			log.Warnf("check IR unique index: %v", err)
+			return false
+		}
+		return indexed > 0
+	case "mysql":
+		var indexed int
+		if err := db.New().Raw(`SELECT COUNT(*) FROM information_schema.statistics WHERE table_name = ? AND index_name = ?`,
+			TableIrCodes, "ux_ir_codes_program_code").Row().Scan(&indexed); err != nil {
+			log.Warnf("check IR unique index: %v", err)
+			return false
+		}
+		return indexed > 0
+	default:
+		return false
+	}
+}
+
+// bulkUpsertIrCode is the fallback for schemas without the (program_name,
+// code_id) unique index: it deletes the batch's rows (chunked at 999 to respect
+// SQLite's host-parameter limit) and reinserts them with new row ids. Must run
+// inside the caller's transaction so the delete and insert are atomic.
 func bulkUpsertIrCode(db *gorm.DB, items []*IrCode) error {
 	if len(items) == 0 {
 		return nil
