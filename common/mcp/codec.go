@@ -80,6 +80,63 @@ func init() {
 	)
 }
 
+// codecTypeHintsFromArguments 从原始 MCP 参数中尽力提取 codecType 字符串，
+// 用于解码失败时构造"方法详情"提示（不依赖解码结果，nil 安全）。
+func codecTypeHintsFromArguments(args map[string]any) []string {
+	raw, ok := args["workFlow"]
+	if !ok {
+		return nil
+	}
+	var out []string
+	switch v := raw.(type) {
+	case string:
+		out = append(out, v)
+	case []any:
+		for _, item := range v {
+			switch it := item.(type) {
+			case string:
+				out = append(out, it)
+			case map[string]any:
+				if ct, ok := it["codecType"].(string); ok && ct != "" {
+					out = append(out, ct)
+				}
+			}
+		}
+	}
+	return out
+}
+
+// buildCodecMethodHelpError 构造带方法详情/可用方法名提示的 invalid argument 错误。
+func buildCodecMethodHelpError(err error, names []string) error {
+	methodDetails := make(map[string]string, len(names))
+	notFound := false
+	for _, name := range names {
+		doc, docErr := getCodecMethodDetail(name)
+		if docErr != nil {
+			methodDetails[name] = docErr.Error()
+			notFound = true
+		} else {
+			methodDetails[name] = doc
+		}
+	}
+	if len(methodDetails) == 0 || notFound {
+		// 提取不到方法名、或所提取的名字不存在时，附可用方法名列表
+		valid := codegrpc.GetCodecLibsDocMethodNames()
+		const maxShow = 60
+		shown := valid
+		if len(shown) > maxShow {
+			shown = shown[:maxShow]
+		}
+		methodDetails["_available_methods"] = strings.Join(shown, ", ") +
+			fmt.Sprintf(" ... (%d total)", len(valid))
+	}
+	detailBytes, marshalErr := json.Marshal(methodDetails)
+	if marshalErr != nil {
+		return utils.Wrap(err, "invalid argument")
+	}
+	return fmt.Errorf("invalid argument: %v\nhere are method details:\n%s", err, string(detailBytes))
+}
+
 func handleExecCodec(s *MCPServer) server.ToolHandlerFunc {
 	return func(
 		ctx context.Context,
@@ -89,18 +146,21 @@ func handleExecCodec(s *MCPServer) server.ToolHandlerFunc {
 		var req ypb.CodecRequestFlow
 		err := mapstructure.Decode(request.Params.Arguments, &req)
 		if err != nil {
-			methodDetails := lo.SliceToMap(req.WorkFlow, func(flow *ypb.CodecWork) (string, string) {
-				doc, err := getCodecMethodDetail(flow.CodecType)
-				if err != nil {
-					return flow.CodecType, err.Error()
-				}
-				return flow.CodecType, doc
-			})
-			detailBytes, marshalErr := json.Marshal(methodDetails)
-			if marshalErr != nil {
-				return nil, utils.Wrap(err, "invalid argument")
-			} else {
-				return nil, fmt.Errorf("invalid argument: %v\nhere are method details:\n%s", err, string(detailBytes))
+			// 注意：不能遍历解码失败后的 req.WorkFlow——mapstructure 在元素级
+			// 解码失败时会留下 nil 元素，解引用 flow.CodecType 会 panic
+			// （曾表现为 "MCP worker failed: exit status 2"）。
+			return nil, buildCodecMethodHelpError(err,
+				codecTypeHintsFromArguments(request.Params.Arguments))
+		}
+		// 预校验：workFlow 元素非 nil 且 codecType 为已知方法；未知方法在 MCP 层
+		// 返回可读错误，而不是透传 codec 引擎的 reflect 零值错误。
+		for _, flow := range req.WorkFlow {
+			if flow == nil {
+				return nil, buildCodecMethodHelpError(
+					utils.Error("workFlow contains a null item"), nil)
+			}
+			if _, err := getCodecMethodDetail(flow.CodecType); err != nil {
+				return nil, buildCodecMethodHelpError(err, []string{flow.CodecType})
 			}
 		}
 		rsp, err := s.grpcClient.NewCodec(ctx, &req)
