@@ -253,7 +253,6 @@ const (
 	lightweightLoopRecentTimelineTokens  = 4096
 	lightweightLoopTaskInstructionTokens = 6144
 	lightweightLoopOutputExampleTokens   = 1024
-	lightweightLoopSkillsTokens          = 1024
 	lightweightLoopPlanContextTokens     = 2048
 	lightweightLoopExtraTokens           = 1024
 	lightweightLoopReactiveTokens        = 3072
@@ -284,7 +283,8 @@ func (pm *PromptManager) projectLightweightLoopMaterials(
 	lightInput := *input
 	lightInput.TaskInstruction = boundedLightweightPromptBlock(input.TaskInstruction, lightweightLoopTaskInstructionTokens, "task instruction")
 	lightInput.OutputExample = boundedLightweightPromptBlock(input.OutputExample, lightweightLoopOutputExampleTokens, "output example")
-	lightInput.SkillsContext = boundedLightweightPromptBlock(input.SkillsContext, lightweightLoopSkillsTokens, "skills context")
+	// Retained skill guidance comes from the same Timeline snapshot in both
+	// modes; freezing must not silently drop it under a separate skill budget.
 	lightInput.FrozenUserContext = boundedLightweightPromptBlock(input.FrozenUserContext, lightweightLoopPlanContextTokens, "plan context")
 	lightInput.FrozenPartitions = nil
 	// TODO already has a single store-level budget. Do not omit the entire work
@@ -340,7 +340,6 @@ func (pm *PromptManager) NewPromptMaterials(base *reactloops.LoopPromptBaseMater
 		materials.FunctionCallMode = input.FunctionCallMode
 		materials.TaskInstruction = input.TaskInstruction
 		materials.OutputExample = input.OutputExample
-		materials.SkillsContext = input.SkillsContext
 		materials.Schema = input.Schema
 		materials.FunctionCallSchemas = input.FunctionCallSchemas
 		// 全局 TODO 块: 在普通 Timeline 之后透传, 物理位置在 timeline-open 段
@@ -438,7 +437,6 @@ func (pm *PromptManager) buildLoopPromptSectionData(base *reactloops.LoopPromptB
 		"TaskInstruction":    "",
 		"OutputExample":      "",
 		"Schema":             "",
-		"SkillsContext":      "",
 		"ExtraCapabilities":  "",
 		"TodoSnapshot":       "",
 		"ReactiveData":       "",
@@ -492,7 +490,6 @@ func (pm *PromptManager) buildLoopPromptSectionData(base *reactloops.LoopPromptB
 		data["OutputExample"] = input.OutputExample
 		data["Schema"] = input.Schema
 		data["FunctionCallSchemas"] = input.FunctionCallSchemas
-		data["SkillsContext"] = input.SkillsContext
 		data["ExtraCapabilities"] = input.ExtraCapabilities
 		data["TodoSnapshot"] = input.TodoSnapshot
 		data["ReactiveData"] = input.ReactiveData

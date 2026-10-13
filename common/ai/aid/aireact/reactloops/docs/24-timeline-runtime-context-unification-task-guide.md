@@ -140,7 +140,7 @@ Manager 不再负责：
 
 用一个窄的“追加、查找、枚举”接口注入能力，或把最小接口/数据类型放到无反向依赖的子包。无需为此拆分完整 Timeline 包，也不需要通用插件注册框架。
 
-绑定必须覆盖 `WithSkillLoader`、`WithSkillsContextManager`、config 自动构建和持久恢复。`BindTimelineSink` 只接入目标 Timeline，不加载、补写或修改内容；manager 的可见性、已加载名单与渲染读取目标 Timeline，不用本地缓存覆盖它。默认自动加载在绑定后的初始化入口显式调用 `LoadDefaultSkills`，已有 skill-content 历史（包括已退休正文）的技能不得重新展开。未绑定 Timeline 的加载请求应返回错误，不能暂存在 manager 中等待绑定时导入。
+绑定必须覆盖 `WithSkillLoader`、`WithSkillsContextManager`、config 自动构建和持久恢复。`BindTimelineSink` 只接入目标 Timeline，不加载、补写或修改内容；manager 的可见性、已加载名单与渲染读取目标 Timeline，不用本地缓存覆盖它。默认自动加载在新会话绑定后的初始化入口显式调用 `LoadDefaultSkills`，持久恢复不重放默认加载。已有 skill-content 历史（包括已退休正文）的技能不得重新展开。未绑定时的本地查看状态不能进入 prompt，也不能在绑定时自动导入；只有显式加载操作可以写入目标 Timeline。
 
 ## 5. 按类型渲染，不按类型维护第二套内容
 
@@ -291,7 +291,7 @@ compressTimelineBeforePrompt
 
 必要的技能名、资源路径和偏移可作为本类型的数据。相同路径的新页不能被错误去重；已经移出的页重新读取也应有效。是否保留旧页继续由现有选择机制决定。
 
-去重只在加载写入时检查当前仍存在的「技能名 + 路径 + 正文」是否完全相同，来源标记不作为正文身份。不要按路径判定旧版本失效，也不要在 Open 渲染、压缩候选或提交时补做版本清理。冻结技能块按 item ID 渲染仍保留的全部阅读内容。
+加载写入时检查当前仍存在的「技能名 + 路径 + 正文」是否完全相同，来源标记不作为正文身份。不要按路径判定旧版本失效，也不要在 Open 渲染、压缩候选或提交时补做版本清理。冻结后的保留内容进入 `promotedState`：同一技能名只有一条累计正文，新来源 hash 与上一次相同则忽略，不同则拼接新旧正文。该提升态在统一 Timeline 渲染入口与 Open 同时读取，再经共享材料链路进入 SemiDynamic1，不能在外面依赖 manager 单独补渲染。
 
 阅读窗口计算可以留在 manager，但窗口缓存不能独立参与 prompt 全文构建。Action 的成功反馈应准确描述新内容在哪里可见，不再指向已退出的 manager 渲染入口。
 

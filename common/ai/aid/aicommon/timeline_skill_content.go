@@ -31,7 +31,8 @@ const (
 	SkillContentSourceManual = "manual"
 )
 
-// skillContentKey 标识技能文件, 只用于写入时检查完全重复的正文, 不用于替换旧 item。
+// skillContentKey 标识技能文件, 用于加载时检查完全重复的正文。
+// 提升态按技能名累计正文, 不用本 key 覆盖旧阅读内容。
 func skillContentKey(name, path string) string {
 	name = strings.TrimSpace(name)
 	path = strings.TrimSpace(path)
@@ -77,7 +78,7 @@ const skillMDPathPlaceholder = "SKILL.md"
 const skillMainBodyPathSentinel = "\x00main"
 
 // timelineSkillContentOpenPrompt 渲染尚未冻结 (Open 尾段) 的 Skill 正文。
-// 冻结后该 item 不再出现在 Open, 由 projectSkillContentLocked 提升渲染。
+// 冻结后该 item 不再出现在 Open, 由 renderPromotedSkillContent 提升渲染。
 func timelineSkillContentOpenPrompt(op *PromotableTimelineItem) string {
 	if op == nil || op.Kind != TimelinePromotedKindSkillContent {
 		return ""
@@ -97,7 +98,7 @@ func timelineSkillContentOpenPrompt(op *PromotableTimelineItem) string {
 		return ""
 	}
 	// Open 段不是缓存前缀, 用可识别的技能段标签包裹, 便于观测与模型区分;
-	// 冻结提交后同一正文会改由 projectSkillContentLocked 的独立技能块渲染。
+	// 冻结提交后同一正文会改由 renderPromotedSkillContent 的独立技能块渲染。
 	nonce := StablePromptNonce("skill-content-open", fmt.Sprint(op.ID))
 	return fmt.Sprintf("<|SKILLS_CONTEXT_OPEN_%s|>\n# item=%d [skill_content]\n%s\n<|SKILLS_CONTEXT_OPEN_END_%s|>",
 		nonce, op.ID, body, nonce)
@@ -366,43 +367,71 @@ func (m *Timeline) DeleteSkillContent(name string) bool {
 	return true
 }
 
-// projectSkillContentLocked 渲染“已提交冻结且原文仍被保留”的 Skill 正文。
-// 直接读取冻结水位内的有效 journal item, 不使用按 Key 覆盖的 promotedState。
-// 同一路径的不同阅读窗口各自保留, 是否退休仅由统一压缩选择或显式移除决定。
+// appendPromotedSkillContent 将同名技能提升到一条累计正文中。
+// 相邻来源 hash 相同则忽略, 不同则拼接正文; 原始 item 始终留在 Timeline 中。
+func appendPromotedSkillContent(entries map[string]*PromotedTimelineEntry, item *PromotableTimelineItem) {
+	if item.Operation == TimelinePromotedOperationDelete {
+		delete(entries, strings.SplitN(item.Key, "\x00", 2)[0])
+		return
+	}
+	if item.Operation != TimelinePromotedOperationUpsert {
+		return
+	}
+	var payload skillContentPayload
+	if json.Unmarshal([]byte(item.Payload), &payload) != nil {
+		return
+	}
+	name := strings.TrimSpace(payload.Name)
+	if name == "" {
+		return
+	}
+	hash := item.PayloadHash
+	if hash == "" {
+		hash = promotedPayloadHash(item.Payload)
+	}
+	previous := entries[name]
+	if previous != nil && previous.PayloadHash == hash {
+		return
+	}
+	body := skillContentBody(payload)
+	if strings.TrimSpace(body) == "" {
+		return
+	}
+	if previous != nil {
+		previous.Payload += "\n" + body
+		previous.PayloadHash = hash
+		return
+	}
+	entries[name] = &PromotedTimelineEntry{
+		Kind: item.Kind, TargetSection: item.TargetSection, Key: name,
+		Payload: body, PayloadHash: hash, SourceItemID: item.ID,
+	}
+}
+
+// renderPromotedSkillContent 渲染 promotedState 中已冻结、仍保留的累计技能正文。
 //
 // Skill 不再按加载来源分块渲染: 不论用户指定、AI 自动还是普通加载, 都按
 // item ID 顺序进入同一个技能块, 加载来源只保留在 payload 里供压缩与观测使用。
 //
-// 关键词: projectSkillContentLocked, 冻结后提升, 单一技能块
-func (m *Timeline) projectSkillContentLocked() string {
-	if m == nil {
+// 关键词: renderPromotedSkillContent, 冻结后提升, 单一技能块
+func renderPromotedSkillContent(state *TimelinePromotedState) string {
+	if state == nil {
 		return ""
 	}
-	throughID := m.frozenThroughLocked()
-	ids := append([]int64(nil), m.idToTimelineItem.Keys()...)
-	sort.Slice(ids, func(i, j int) bool { return ids[i] < ids[j] })
+	entries := state.Entries[TimelinePromotedTargetSemiDynamic1][TimelinePromotedKindSkillContent]
+	ordered := make([]*PromotedTimelineEntry, 0, len(entries))
+	for _, entry := range entries {
+		if entry != nil {
+			ordered = append(ordered, entry)
+		}
+	}
+	sort.Slice(ordered, func(i, j int) bool { return ordered[i].SourceItemID < ordered[j].SourceItemID })
 
 	var body strings.Builder
 	wrote := 0
-	for _, id := range ids {
-		if id > throughID {
-			break
-		}
-		item, ok := m.idToTimelineItem.Get(id)
-		if !ok || item == nil || item.deleted {
-			continue
-		}
-		op, ok := item.value.(*PromotableTimelineItem)
-		if !ok || op == nil || op.Kind != TimelinePromotedKindSkillContent ||
-			op.TargetSection != TimelinePromotedTargetSemiDynamic1 || op.Operation != TimelinePromotedOperationUpsert {
-			continue
-		}
-		var payload skillContentPayload
-		if json.Unmarshal([]byte(op.Payload), &payload) != nil {
-			continue
-		}
-		rendered := skillContentBody(payload)
-		if strings.TrimSpace(rendered) == "" {
+	for _, entry := range ordered {
+		rendered := strings.TrimSpace(entry.Payload)
+		if rendered == "" {
 			continue
 		}
 		if wrote > 0 {
@@ -426,7 +455,7 @@ func (m *Timeline) RenderSkillContentForPrompt() string {
 	}
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-	return m.projectSkillContentLocked()
+	return renderPromotedSkillContent(m.promotedState)
 }
 
 // SkillContentTimelineAdapter 实现 aiskillloader.SkillContentSink: 把 Timeline

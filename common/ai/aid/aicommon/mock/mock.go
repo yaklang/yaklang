@@ -330,7 +330,7 @@ func (m *MockInvoker) AssembleLoopPrompt(tools []*aitool.Tool, input *aicommon.L
 		renderMockTitledBlock("Output Example", input.OutputExample),
 	))
 	semiDynamic := wrapMockPromptSection("semi-dynamic", joinMockPromptParts(
-		renderMockTitledBlock("Skills Context", input.SkillsContext),
+		renderMockTitledBlock("Skills Context", timeline.SkillsContext),
 		renderMockSchemaBlock(input.Schema),
 		timeline.TimelineFrozen,
 		timeline.PromotedUserInputHistory,

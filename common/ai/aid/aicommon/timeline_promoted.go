@@ -69,8 +69,10 @@ type PromotedTimelineEntry struct {
 	TargetSection string `json:"target_section"`
 	Key           string `json:"key"`
 	Payload       string `json:"payload"`
-	PayloadHash   string `json:"payload_hash"`
-	SourceItemID  int64  `json:"source_item_id"`
+	// For skill content, Payload is accumulated prompt text and PayloadHash
+	// identifies the last appended source payload, not the combined text.
+	PayloadHash  string `json:"payload_hash"`
+	SourceItemID int64  `json:"source_item_id"`
 	// LastUsedItemID is independent of the schema source. Older snapshots fall
 	// back to SourceItemID until their journal is replayed.
 	LastUsedItemID int64 `json:"last_used_item_id,omitempty"`
@@ -197,11 +199,6 @@ func (m *Timeline) rebuildPromotedStateLocked(throughID int64) {
 		if id > state.Watermark {
 			state.Watermark = id
 		}
-		// Skill bodies are append-only history, rendered directly from frozen
-		// journal items instead of this key-based state projection.
-		if control.Kind == TimelinePromotedKindSkillContent {
-			continue
-		}
 		kinds := state.Entries[control.TargetSection]
 		if kinds == nil {
 			kinds = make(map[string]map[string]*PromotedTimelineEntry)
@@ -211,6 +208,10 @@ func (m *Timeline) rebuildPromotedStateLocked(throughID int64) {
 		if entries == nil {
 			entries = make(map[string]*PromotedTimelineEntry)
 			kinds[control.Kind] = entries
+		}
+		if control.Kind == TimelinePromotedKindSkillContent {
+			appendPromotedSkillContent(entries, control)
+			continue
 		}
 		if control.Operation == TimelinePromotedOperationDelete {
 			delete(entries, control.Key)
@@ -267,6 +268,10 @@ func (m *Timeline) effectivePromotedEntries(targetSection, kind string) []*Promo
 		}
 		op, ok := item.value.(*PromotableTimelineItem)
 		if !ok || op == nil || op.TargetSection != targetSection || op.Kind != kind {
+			continue
+		}
+		if kind == TimelinePromotedKindSkillContent {
+			appendPromotedSkillContent(active, op)
 			continue
 		}
 		switch op.Operation {
