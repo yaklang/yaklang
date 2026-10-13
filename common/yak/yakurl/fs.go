@@ -26,12 +26,15 @@ type fileSystemAction struct {
 	fs fi.FileSystem
 }
 
-// listDir lists a directory with the caller's query options: filesystems
-// that understand them (filesys.QueryDirLister, e.g. ssadb://IrSourceFS
-// with diffOnly=true) decide their own listing semantics, others (e.g.
-// file://) ignore the query and list their storage directly.
+// dirQueryLister is optional: ssadb IrSourceFS uses it so an incremental
+// program's OverlayFS can collapse to the head-diff view when the audit
+// frontend sends diffOnly. Ordinary filesystems (file://, …) just ReadDir.
+type dirQueryLister interface {
+	ReadDirQuery(path string, query url.Values) ([]fs.DirEntry, error)
+}
+
 func (f fileSystemAction) listDir(absPath string, query url.Values) ([]fs.DirEntry, error) {
-	if ql, ok := f.fs.(filesys.QueryDirLister); ok {
+	if ql, ok := f.fs.(dirQueryLister); ok {
 		return ql.ReadDirQuery(absPath, query)
 	}
 	return f.fs.ReadDir(absPath)

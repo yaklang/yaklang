@@ -123,7 +123,9 @@ func programRootEntries() []fs.DirEntry {
 	return ret
 }
 
-// ReadDir lists a directory through the program's own filesystem.
+// ReadDir lists a directory through the program's own filesystem: plain
+// programs list their single tree; incremental programs get the fully
+// expanded overlay (OverlayFS.ReadDir).
 func (isfs *irSourceFS) ReadDir(path string) ([]fs.DirEntry, error) {
 	if path == "/" {
 		return programRootEntries(), nil
@@ -135,9 +137,9 @@ func (isfs *irSourceFS) ReadDir(path string) ([]fs.DirEntry, error) {
 	return pfs.ReadDir(path)
 }
 
-// ReadDirQuery lists with the caller's query options: the per-program fs
-// that understands options (the overlay one judges diffOnly itself)
-// handles them; everything else ignores the query and lists normally.
+// ReadDirQuery is the yakurl entry for listing with query options. Only an
+// incremental program's OverlayFS has a second view: diffOnly collapses to
+// the head layer's own entries. Plain VirtualFS ignores the query.
 func (isfs *irSourceFS) ReadDirQuery(path string, query url.Values) ([]fs.DirEntry, error) {
 	if path == "/" {
 		return programRootEntries(), nil
@@ -146,10 +148,18 @@ func (isfs *irSourceFS) ReadDirQuery(path string, query url.Values) ([]fs.DirEnt
 	if err != nil {
 		return nil, err
 	}
-	if ql, ok := pfs.(filesys.QueryDirLister); ok {
-		return ql.ReadDirQuery(path, query)
+	if of, ok := pfs.(*filesys.OverlayFS); ok && isDiffOnlyQuery(query) {
+		return of.ReadDirDiff(path)
 	}
 	return pfs.ReadDir(path)
+}
+
+func isDiffOnlyQuery(query url.Values) bool {
+	switch strings.ToLower(strings.TrimSpace(query.Get("diffOnly"))) {
+	case "1", "true", "yes":
+		return true
+	}
+	return false
 }
 
 // ------- per-program tree construction -------
