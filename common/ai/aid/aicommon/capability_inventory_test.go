@@ -169,6 +169,8 @@ func TestBuildInventorySkillsFromLoader_MetadataAndLoaded(t *testing.T) {
 	require.NotNil(t, loaded)
 
 	mgr := aiskillloader.NewSkillsContextManager(loader)
+	cfg := NewConfig(nil, WithDisableAutoSkills(true))
+	bindTestTimeline(mgr, cfg)
 	require.NoError(t, mgr.LoadSkill("deploy-app"))
 
 	withLoaded := BuildInventorySkillsFromManager(mgr)

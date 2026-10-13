@@ -7,7 +7,6 @@ import (
 	"sort"
 	"strings"
 	"sync"
-	"time"
 
 	"github.com/yaklang/gorm"
 	"github.com/yaklang/yaklang/common/log"
@@ -29,16 +28,9 @@ type skillContextState struct {
 	// Skill is the loaded skill data.
 	Skill *LoadedSkill
 
-	// IsFolded indicates whether this skill is displayed in folded mode.
-	IsFolded bool
-
 	// ViewWindows holds active view windows for files in this skill.
 	// Key is the file path within the skill filesystem.
 	ViewWindows map[string]*ViewWindow
-
-	// LastAccessedAt tracks when this skill was last accessed (loaded, unfolded, or queried).
-	// Used by the LRU folding strategy to keep frequently-used skills unfolded.
-	LastAccessedAt time.Time
 }
 
 // ManagerOption configures SkillsContextManager.
@@ -58,13 +50,10 @@ func WithManagerSearchAICallback(cb SkillSearchAICallback) ManagerOption {
 	}
 }
 
-// WithManagerMaxTokens sets the context max size (in tokens) at initialization.
+// WithManagerMaxTokens 兼容入口。技能正文进入 Timeline 后由统一压缩控制体积,
+// manager 不再单独维护 32K 折叠预算, 该选项保留只是为了不破坏既有调用方签名。
 func WithManagerMaxTokens(maxTokens int) ManagerOption {
-	return func(m *SkillsContextManager) {
-		if maxTokens > 0 {
-			m.maxTokens = maxTokens
-		}
-	}
+	return func(m *SkillsContextManager) {}
 }
 
 // WithManagerTokenEstimator sets an optional token estimator function.
@@ -75,44 +64,30 @@ func WithManagerTokenEstimator(estimator func(string) int) ManagerOption {
 	}
 }
 
-// SkillsContextManager manages the skills context window in the ReAct loop prompt.
-// It maintains loaded skills, handles folding/unfolding, and renders the context.
-// It also provides manager-level listing and search capabilities.
+// SkillsContextManager 是技能加载与查看工具, 不是正文托管者。
+//
+// 改造后的职责边界:
+//   - 知道当前有哪些 skill 可以加载 (loader / 元信息 / 搜索 / 目录);
+//   - 把 skill 加载进 Timeline (通过 SkillContentSink 窄接口, 只追加, 不渲染);
+//   - 在 Timeline 中查看/翻页/删除已经加载的技能正文。
+//
+// 它不再维护 loadedSkills / forcedSkills / autoLoadedSkills 三套正文容器, 也不再
+// 拼装 SKILLS_CONTEXT / USER_FORCED_SKILL / AUTO_LOADED_SKILLS 段: 正文的唯一权威
+// 来源是 Timeline, 冻结后由 Timeline 的单一技能块统一渲染。
+//
+// 关键词: 不托管正文, 只加载与查看, 单一 Timeline 来源
 type SkillsContextManager struct {
 	mu sync.RWMutex
 
 	// loader is the skill loader used to load skills on demand.
 	loader SkillLoader
 
-	// loadedSkills is an ordered map of loaded skills, keyed by skill name.
-	// 语义 (改造后): 持久会话恢复的历史加载 + 用户强制加载也会在这里登记一份
-	// (保证 IsSkillLoaded 查询一致, 避免 AI action 重复加载).
-	// 渲染进 SKILLS_CONTEXT 上半段 (与 catalog 目录同处 SemiDynamic 1).
-	// Ordering is by load time (oldest first).
-	loadedSkills *omap.OrderedMap[string, *skillContextState]
+	// states 只记录已加载技能的轻量查看状态 (文件树 / 阅读窗口 / 翻页 offset)。
+	// 它不参与 prompt 拼装, 也不决定展示位置。
+	states *omap.OrderedMap[string, *skillContextState]
 
-	// forcedSkills 是「用户强制加载」专用容器 (满内容, 进 frozen_block 顶部).
-	// 来源: load_skill sync 事件 / EnabledCapabilities / hotpatch skill handler.
-	// 优先级最高, 独立于 loadedSkills / autoLoadedSkills 渲染.
-	forcedSkills *ForcedSkillRegistry
-
-	// autoLoadedSkills 是「AI 意图驱动加载」容器 (进 SemiDynamic 2 尾部).
-	// 来源: loading_skills action (AI 自主加载). 走 LRU 折叠控制体积.
-	autoLoadedSkills *omap.OrderedMap[string, *skillContextState]
-
-	// catalogVisible 控制「最相关 SKILL 目录」(SKILLS_CONTEXT 下半段) 是否渲染.
-	// 默认 false: 意图识别命中后才由 SetCatalogVisible(true) 开启, 节约 token.
-	catalogVisible bool
 	// catalogSkills 是意图识别写入的「最相关 top-N」skill 元信息, 渲染为精简目录.
 	catalogSkills []*SkillMeta
-
-	// maxTokens is the total size limit (in tokens) for the skills context.
-	maxTokens int
-
-	// cachedContextSize stores the last computed context size to avoid repeated rendering.
-	// Invalidated by setting contextSizeDirty to true when skills are loaded/folded/changed.
-	cachedContextSize int
-	contextSizeDirty  bool
 
 	// tokenEstimator overrides the default ytoken.CalcTokenCount for measuring size.
 	// When nil, the built-in ytoken.CalcTokenCount is used.
@@ -121,33 +96,41 @@ type SkillsContextManager struct {
 	// Optional DB and AI callback for manager-level search capabilities.
 	db               *gorm.DB
 	searchAICallback SkillSearchAICallback
+
+	// timeline 是运行上下文 Timeline 的窄接口绑定。绑定后, 技能正文的展示与
+	// 压缩完全由 Timeline 承载, manager 不再独立拼装模型正文。
+	timeline skillTimelineBinding
 }
 
 // NewSkillsContextManager creates a new SkillsContextManager.
 func NewSkillsContextManager(loader SkillLoader, opts ...ManagerOption) *SkillsContextManager {
 	m := &SkillsContextManager{
-		loader:           loader,
-		loadedSkills:     omap.NewOrderedMap[string, *skillContextState](map[string]*skillContextState{}),
-		forcedSkills:     NewForcedSkillRegistry(),
-		autoLoadedSkills: omap.NewOrderedMap[string, *skillContextState](map[string]*skillContextState{}),
-		maxTokens:        SkillsContextMaxTokens,
-		contextSizeDirty: true,
+		loader: loader,
+		states: omap.NewOrderedMap[string, *skillContextState](map[string]*skillContextState{}),
 	}
 	for _, opt := range opts {
 		opt(m)
 	}
 	m.initializeSkillSearchPersistence()
-	if loader != nil {
-		for _, meta := range loader.AllSkillMetas() {
-			if meta.DisableModelInvocation || !strings.EqualFold(strings.TrimSpace(meta.Metadata[SkillMetadataAutoLoad]), "true") {
-				continue
-			}
-			if _, err := m.LoadAutoSkill(meta.Name); err != nil {
-				log.Warnf("failed to load default skill %q: %v", meta.Name, err)
-			}
+	return m
+}
+
+// LoadDefaultSkills 在绑定之后由初始化入口显式加载 metadata auto_load 技能。
+// 已有历史的技能完全遵循 Timeline 的保留结果, 不重新展开已退休的正文。
+func (m *SkillsContextManager) LoadDefaultSkills() {
+	if m == nil || m.loader == nil || m.timelineSink() == nil {
+		return
+	}
+	for _, meta := range m.loader.AllSkillMetas() {
+		if meta == nil || meta.DisableModelInvocation ||
+			!strings.EqualFold(strings.TrimSpace(meta.Metadata[SkillMetadataAutoLoad]), "true") ||
+			m.HasSkillContentHistory(meta.Name) {
+			continue
+		}
+		if _, err := m.LoadAutoSkill(meta.Name); err != nil {
+			log.Warnf("failed to load default skill %q: %v", meta.Name, err)
 		}
 	}
-	return m
 }
 
 // initializeSkillSearchPersistence prepares optional indexes for DB-backed skill sources.
@@ -160,12 +143,9 @@ func (m *SkillsContextManager) initializeSkillSearchPersistence() {
 	}
 }
 
-// SetMaxTokens sets the total context size limit (in tokens).
-func (m *SkillsContextManager) SetMaxTokens(maxTokens int) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	m.maxTokens = maxTokens
-}
+// SetMaxTokens 兼容入口。正文体积改由 Timeline 统一压缩管理, 单个 manager 不再
+// 维护独立的 32K 折叠预算。
+func (m *SkillsContextManager) SetMaxTokens(maxTokens int) {}
 
 // HasRegisteredSkills returns true if the loader has any skills available.
 // This is used to determine whether the loading_skills action should be visible.
@@ -176,20 +156,15 @@ func (m *SkillsContextManager) HasRegisteredSkills() bool {
 	return m.loader.HasSkills()
 }
 
-// HasTruncatedViews returns true if any loaded skill has truncated/folded content.
-// This is used to determine whether the change_skill_view_offset action should be visible.
+// HasTruncatedViews 返回是否存在被截断的阅读窗口, 用于决定 change_skill_view_offset
+// 动作是否可见。
 func (m *SkillsContextManager) HasTruncatedViews() bool {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-
 	hasTruncated := false
-	m.loadedSkills.ForEach(func(name string, state *skillContextState) bool {
-		if state.IsFolded {
-			hasTruncated = true
-			return false
-		}
+	m.states.ForEach(func(name string, state *skillContextState) bool {
 		for _, vw := range state.ViewWindows {
-			if vw.IsTruncated {
+			if vw != nil && vw.IsTruncatedFlag() {
 				hasTruncated = true
 				return false
 			}
@@ -199,49 +174,51 @@ func (m *SkillsContextManager) HasTruncatedViews() bool {
 	return hasTruncated
 }
 
-// HasForcedSkills returns true if there is any user-forced skill (rendered into frozen_block).
-func (m *SkillsContextManager) HasForcedSkills() bool {
-	if m == nil || m.forcedSkills == nil {
-		return false
-	}
-	return !m.forcedSkills.IsEmpty()
-}
-
-// HasAutoLoadedSkills returns true if there is any AI-intent-driven auto-loaded skill
-// (rendered into SemiDynamic 2 tail).
-func (m *SkillsContextManager) HasAutoLoadedSkills() bool {
-	if m == nil {
-		return false
-	}
-	m.mu.RLock()
-	defer m.mu.RUnlock()
-	return m.autoLoadedSkills.Len() > 0
-}
-
-// SetCatalogVisible 控制「最相关 SKILL 目录」(SKILLS_CONTEXT 下半段) 是否渲染.
-// 默认 false; 意图识别命中后由调用方 SetCatalogVisible(true) 开启.
-func (m *SkillsContextManager) SetCatalogVisible(visible bool) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	m.catalogVisible = visible
-}
-
-// IsCatalogVisible 返回目录是否可见.
-func (m *SkillsContextManager) IsCatalogVisible() bool {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
-	return m.catalogVisible
-}
-
 // SetCatalogSkills 写入意图识别命中的「最相关 top-N」skill 元信息 (渲染为精简目录).
 // 内部会截断到 MaxCatalogSkills. 传入 nil / 空等价于清空 + 隐藏目录.
 func (m *SkillsContextManager) SetCatalogSkills(metas []*SkillMeta) {
 	m.mu.Lock()
-	defer m.mu.Unlock()
 	m.catalogSkills = dedupAndTruncateCatalog(metas, MaxCatalogSkills)
-	if len(m.catalogSkills) > 0 {
-		m.catalogVisible = true
+	rendered := renderCatalogSection(m.catalogSkills)
+	m.mu.Unlock()
+
+	// 目录是派生但需要展示的信息, 以 Timeline 为唯一正文来源: 先进入 Open,
+	// 冻结提交后才提升进与技能正文相同的单一技能块。清空目录等价于移除该 item。
+	if strings.TrimSpace(rendered) == "" {
+		m.DeleteSkillCatalogFromTimeline()
+		return
 	}
+	m.AppendSkillCatalogToTimeline(strings.TrimSpace(rendered))
+}
+
+// DeleteSkillCatalogFromTimeline 退休 Timeline 中当前可见的技能目录 item
+// (目录是派生信息, 清空/隐藏时不应继续渲染)。不影响任何技能正文。
+func (m *SkillsContextManager) DeleteSkillCatalogFromTimeline() bool {
+	sink := m.timelineSink()
+	if sink == nil {
+		return false
+	}
+	return sink.DeleteSkillCatalog()
+}
+
+// renderCatalogSection 渲染「最相关 SKILL 目录」正文 (含目录头 + 逐条元信息 +
+// 加载提示)。目录作为 skill-content 类型的一条 item 进入 Timeline。
+func renderCatalogSection(skills []*SkillMeta) string {
+	if len(skills) == 0 {
+		return ""
+	}
+	// 按 name 排序保证字节稳定 (利于缓存)。
+	sorted := sortSkillMetasByName(skills)
+	if len(sorted) > MaxCatalogSkills {
+		sorted = sorted[:MaxCatalogSkills]
+	}
+	var buf bytes.Buffer
+	buf.WriteString(fmt.Sprintf(CatalogHeader, len(sorted)))
+	for _, meta := range sorted {
+		buf.WriteString(FormatAvailableSkillRegistryLine(meta))
+	}
+	buf.WriteString("Use loading_skills action to load any of these when needed.\n")
+	return buf.String()
 }
 
 // GetCatalogSkills 返回当前目录 skill 元信息副本.
@@ -305,98 +282,161 @@ func (m *SkillsContextManager) SearchByAI(userNeed string) ([]*SkillMeta, error)
 	return SearchByAI(metas, userNeed, m.searchAICallback)
 }
 
-// GetCurrentSelectedSkills returns currently loaded/selected skills across all
-// three containers (loadedSkills = persistent-restore + forced 副本, autoLoadedSkills
-// = AI 意图驱动). Forced skills also live in loadedSkills, so no separate iteration
-// needed for them.
+// GetCurrentSelectedSkills 以目标 Timeline 的可见技能名单为准。
+// loader 和文件/窗口缓存仅补充元信息, 不决定技能是否仍在上下文中。
 func (m *SkillsContextManager) GetCurrentSelectedSkills() []*SkillMeta {
+	sink := m.timelineSink()
+	if sink == nil {
+		return nil
+	}
+	names := sink.VisibleSkillContentNames()
+	if len(names) == 0 {
+		return nil
+	}
+	metas := make(map[string]*SkillMeta, len(names))
 	m.mu.RLock()
-	defer m.mu.RUnlock()
-	selected := make([]*SkillMeta, 0, m.loadedSkills.Len()+m.autoLoadedSkills.Len())
-	seen := make(map[string]bool, m.loadedSkills.Len()+m.autoLoadedSkills.Len())
-	m.loadedSkills.ForEach(func(name string, state *skillContextState) bool {
-		if state != nil && state.Skill != nil && state.Skill.Meta != nil && !seen[name] {
-			seen[name] = true
-			selected = append(selected, state.Skill.Meta)
+	m.states.ForEach(func(name string, state *skillContextState) bool {
+		if state != nil && state.Skill != nil && state.Skill.Meta != nil {
+			metas[name] = state.Skill.Meta
 		}
 		return true
 	})
-	m.autoLoadedSkills.ForEach(func(name string, state *skillContextState) bool {
-		if state != nil && state.Skill != nil && state.Skill.Meta != nil && !seen[name] {
-			seen[name] = true
-			selected = append(selected, state.Skill.Meta)
+	m.mu.RUnlock()
+	if m.loader != nil {
+		for _, meta := range m.loader.AllSkillMetas() {
+			if meta != nil {
+				metas[meta.Name] = meta
+			}
 		}
-		return true
-	})
+	}
+	selected := make([]*SkillMeta, 0, len(names))
+	for _, name := range names {
+		meta := metas[name]
+		if meta == nil {
+			if lookup, ok := m.loader.(SkillMetaLookup); ok {
+				meta, _ = lookup.GetSkillMeta(name)
+			}
+		}
+		if meta == nil {
+			meta = &SkillMeta{Name: name}
+		}
+		selected = append(selected, meta)
+	}
 	return selected
 }
 
-// LoadSkill loads a skill into the context manager.
-// If loading the new skill exceeds the size limit, least-recently-used skills are folded.
-func (m *SkillsContextManager) LoadSkill(skillName string) error {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-
-	if m.loader == nil {
-		return utils.Error("skills context manager: no loader configured")
+// stateFor returns the lightweight view state for a loaded skill.
+func (m *SkillsContextManager) stateFor(skillName string) (*skillContextState, bool) {
+	if m == nil || m.states == nil {
+		return nil, false
 	}
+	return m.states.Get(skillName)
+}
 
-	now := time.Now()
-
-	// Check if already loaded
-	if existing, ok := m.loadedSkills.Get(skillName); ok {
-		existing.LastAccessedAt = now
-		if existing.IsFolded {
-			existing.IsFolded = false
-			m.contextSizeDirty = true
-			m.ensureContextFits()
-		}
+// newSkillState 构造一个技能的查看状态: 说明 + 文件树 + SKILL.md 阅读窗口。
+func newSkillState(loaded *LoadedSkill) *skillContextState {
+	if loaded == nil {
 		return nil
 	}
-
-	// Load the skill
-	loaded, err := m.loader.LoadSkill(skillName)
-	if err != nil {
-		return utils.Wrapf(err, "failed to load skill %q", skillName)
-	}
-
-	transformedContent := TransformIncludesToResourceHints(loaded.SkillMDContent, skillName)
-
-	nonce := GenerateNonce(skillName, skillMDFilename)
-	skillMDWindow := NewViewWindow(skillName, skillMDFilename, transformedContent, nonce)
-
-	state := &skillContextState{
-		Skill:    loaded,
-		IsFolded: false,
+	transformedContent := TransformIncludesToResourceHints(loaded.SkillMDContent, loaded.Meta.Name)
+	nonce := GenerateNonce(loaded.Meta.Name, skillMDFilename)
+	skillMDWindow := NewViewWindow(loaded.Meta.Name, skillMDFilename, transformedContent, nonce)
+	return &skillContextState{
+		Skill: loaded,
 		ViewWindows: map[string]*ViewWindow{
 			skillMDFilename: skillMDWindow,
 		},
-		LastAccessedAt: now,
 	}
-
-	m.loadedSkills.Set(skillName, state)
-	m.contextSizeDirty = true
-	log.Infof("loaded skill %q into context", skillName)
-
-	m.ensureContextFits()
-	return nil
 }
 
-// UnloadSkill removes a loaded skill from the context manager.
-func (m *SkillsContextManager) UnloadSkill(skillName string) bool {
+// ensureLoaded 读取 (必要时加载) 一个技能的查看状态。
+// 已绑定 Timeline 时正文写入目标 Timeline; 未绑定时只保留本地查看状态,
+// 绑定不会把这些本地状态补写或覆盖到 Timeline。
+//
+// 返回 (state, loaded, error): loaded=true 表示本次新建了查看状态。
+func (m *SkillsContextManager) ensureLoaded(skillName string) (*skillContextState, bool, error) {
+	if m.loader == nil {
+		return nil, false, utils.Error("skills context manager: no loader configured")
+	}
+	if state, ok := m.stateFor(skillName); ok && state != nil && state.Skill != nil {
+		return state, false, nil
+	}
+	loaded, err := m.loader.LoadSkill(skillName)
+	if err != nil {
+		return nil, false, utils.Wrapf(err, "failed to load skill %q", skillName)
+	}
+	state := newSkillState(loaded)
+	if state == nil {
+		return nil, false, utils.Errorf("failed to build view state for skill %q", skillName)
+	}
+	m.states.Set(skillName, state)
+	return state, true, nil
+}
+
+// LoadSkill 加载一个技能: 读取说明与文件树, 把正文写进 Timeline。
+// 相同正文仍在 Timeline 时不重复写入; 已退休的正文或新阅读内容正常追加。
+func (m *SkillsContextManager) LoadSkill(skillName string) error {
+	return m.loadSkillFrom(skillName, SkillContentSourceManual)
+}
+
+// LoadForcedSkill 加载一个由用户显式指定的技能。它与普通加载的唯一区别是来源
+// 标记 (user-forced), 该标记进入正文 payload 供压缩提示与观测使用; 展示位置与
+// 压缩规则与其它来源完全一致。
+//
+// 返回 (新增?, error): false 表示本次正文完全重复, 无需再次写入。
+func (m *SkillsContextManager) LoadForcedSkill(skillName string) (bool, error) {
+	loaded, err := m.loadSkillFromWithNew(skillName, SkillContentSourceForced)
+	if err != nil {
+		return false, err
+	}
+	return loaded, nil
+}
+
+// LoadAutoSkill 加载一个 AI 意图驱动的技能。与普通加载同构, 仅来源标记不同。
+//
+// 返回 (新增?, error): false 表示本次正文完全重复, 无需再次写入。
+func (m *SkillsContextManager) LoadAutoSkill(skillName string) (bool, error) {
+	loaded, err := m.loadSkillFromWithNew(skillName, SkillContentSourceAuto)
+	if err != nil {
+		return false, err
+	}
+	return loaded, nil
+}
+
+func (m *SkillsContextManager) loadSkillFrom(skillName, source string) error {
+	_, err := m.loadSkillFromWithNew(skillName, source)
+	return err
+}
+
+// loadSkillFromWithNew 是三条加载路径的统一实现: 加载/复用查看状态, 并把正文追加
+// 到 Timeline。由写入入口逐项检查正文是否完全重复, 不能仅按技能名短路。
+// 返回 true 表示实际追加了正文; 未绑定 Timeline 时只建立本地查看状态并返回 false。
+func (m *SkillsContextManager) loadSkillFromWithNew(skillName, source string) (bool, error) {
+	skillName = strings.TrimSpace(skillName)
+	if skillName == "" {
+		return false, utils.Error("skill name is empty")
+	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	state, _, err := m.ensureLoaded(skillName)
+	if err != nil {
+		return false, err
+	}
+	return m.appendSkillBodyToTimelineLocked(state, source), nil
+}
+
+// HasSkillContentHistory 判断该技能是否已经在本 Timeline 里留下过正文记录 (即使
+// 已被统一压缩退休)。持久会话恢复用它避免用旧名单把已退休正文重新展开。
+func (m *SkillsContextManager) HasSkillContentHistory(skillName string) bool {
 	skillName = strings.TrimSpace(skillName)
 	if skillName == "" {
 		return false
 	}
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	if !m.loadedSkills.Have(skillName) {
+	sink := m.timelineSink()
+	if sink == nil {
 		return false
 	}
-	m.loadedSkills.Delete(skillName)
-	m.contextSizeDirty = true
-	log.Infof("unloaded skill %q from context", skillName)
-	return true
+	return sink.HasSkillContentHistory(skillName)
 }
 
 // LoadSkills loads multiple skills into the context manager in batch.
@@ -413,271 +453,128 @@ func (m *SkillsContextManager) LoadSkills(names []string) map[string]error {
 	return results
 }
 
-// LoadForcedSkill 用户强制加载一个 SKILL (满内容, 进 frozen_block 顶部).
-// 与 LoadAutoSkill (AI 意图驱动, 进 SemiDynamic 2) 区分开, 这是最高优先级路径.
-// 同时在 loadedSkills 登记一份, 保证 IsSkillLoaded 查询一致, 避免 AI action 重复加载.
-// 返回 (新增?, error): 新增=false 表示该 skill 已是 forced.
-//
-// 关键词: LoadForcedSkill, 用户强制加载, frozen_block, 满内容
-func (m *SkillsContextManager) LoadForcedSkill(skillName string) (bool, error) {
+// UnloadSkill 从 Timeline 中移除该技能的正文 item。删除只影响后续冻结事务的
+// 成员集合, 不回滚已提交的冻结边界; 再次加载会重新追加一份新正文。
+func (m *SkillsContextManager) UnloadSkill(skillName string) bool {
 	skillName = strings.TrimSpace(skillName)
 	if skillName == "" {
-		return false, utils.Error("skill name is empty")
+		return false
+	}
+	sink := m.timelineSink()
+	if sink == nil {
+		return false
 	}
 	m.mu.Lock()
-	unlock := true
-	defer func() {
-		if unlock {
-			m.mu.Unlock()
-		}
-	}()
-
-	if m.loader == nil {
-		return false, utils.Error("skills context manager: no loader configured")
+	m.states.Delete(skillName)
+	m.mu.Unlock()
+	removed := sink.DeleteSkillContent(skillName)
+	if removed {
+		log.Infof("unloaded skill %q from timeline", skillName)
 	}
-
-	// 已是 forced: 幂等返回.
-	if m.forcedSkills.Has(skillName) {
-		return false, nil
-	}
-
-	loaded, err := m.loader.LoadSkill(skillName)
-	if err != nil {
-		return false, utils.Wrapf(err, "failed to load skill %q", skillName)
-	}
-
-	m.forcedSkills.Add(skillName, loaded)
-
-	// 同时登记进 loadedSkills (若尚未存在), 保证 IsSkillLoaded 查询一致.
-	if _, ok := m.loadedSkills.Get(skillName); !ok {
-		now := time.Now()
-		transformedContent := TransformIncludesToResourceHints(loaded.SkillMDContent, skillName)
-		nonce := GenerateNonce(skillName, skillMDFilename)
-		skillMDWindow := NewViewWindow(skillName, skillMDFilename, transformedContent, nonce)
-		state := &skillContextState{
-			Skill:    loaded,
-			IsFolded: false,
-			ViewWindows: map[string]*ViewWindow{
-				skillMDFilename: skillMDWindow,
-			},
-			LastAccessedAt: now,
-		}
-		m.loadedSkills.Set(skillName, state)
-		m.contextSizeDirty = true
-		// ensureContextFits 需要 mu, 但我们在锁内, 直接传 false 解锁由调用者释放不安全,
-		// 故这里先解锁再调用 (ensureContextFits 内部会自己加锁).
-		m.mu.Unlock()
-		unlock = false
-		m.ensureContextFits()
-	}
-	log.Infof("force-loaded skill %q into frozen_block", skillName)
-	return true, nil
+	return removed
 }
 
-// UnloadForcedSkill 移除一个 forced skill (仅从 frozen_block 容器移除, 不动 loadedSkills).
-// 返回是否曾存在.
+// UnloadForcedSkill 与 UnloadSkill 等价: forced 只是来源标记, 不再是独立容器。
 func (m *SkillsContextManager) UnloadForcedSkill(skillName string) bool {
-	skillName = strings.TrimSpace(skillName)
-	if skillName == "" {
-		return false
-	}
-	return m.forcedSkills.Remove(skillName)
+	return m.UnloadSkill(skillName)
 }
 
-// IsForcedSkill 返回该 skill 是否为用户强制加载.
-func (m *SkillsContextManager) IsForcedSkill(skillName string) bool {
-	skillName = strings.TrimSpace(skillName)
-	return m.forcedSkills.Has(skillName)
-}
-
-// LoadAutoSkill AI 意图驱动加载一个 SKILL (进 SemiDynamic 2 尾部, LRU 折叠).
-// 来源: loading_skills action. 若 skill 已是 forced, 短路返回成功 (不重复加载).
-// 返回 (新增?, error): 新增=false 表示该 skill 已是 forced 或已 auto-loaded.
-//
-// 关键词: LoadAutoSkill, AI 意图驱动, SemiDynamic 2, LRU 折叠
-func (m *SkillsContextManager) LoadAutoSkill(skillName string) (bool, error) {
-	skillName = strings.TrimSpace(skillName)
-	if skillName == "" {
-		return false, utils.Error("skill name is empty")
-	}
-	m.mu.Lock()
-	unlock := true
-	defer func() {
-		if unlock {
-			m.mu.Unlock()
-		}
-	}()
-
-	if m.loader == nil {
-		return false, utils.Error("skills context manager: no loader configured")
-	}
-
-	// 已是 forced: 幂等短路 (forced 优先级更高, 满内容已可见, 无需重复加载).
-	if m.forcedSkills.Has(skillName) {
-		return false, nil
-	}
-
-	now := time.Now()
-
-	// 已 auto-loaded: 刷新 LRU 时间, 若被折叠则展开.
-	if existing, ok := m.autoLoadedSkills.Get(skillName); ok {
-		existing.LastAccessedAt = now
-		if existing.IsFolded {
-			existing.IsFolded = false
-			m.contextSizeDirty = true
-			m.ensureAutoSkillsFits()
-		}
-		return false, nil
-	}
-
-	loaded, err := m.loader.LoadSkill(skillName)
-	if err != nil {
-		return false, utils.Wrapf(err, "failed to load skill %q", skillName)
-	}
-
-	transformedContent := TransformIncludesToResourceHints(loaded.SkillMDContent, skillName)
-	nonce := GenerateNonce(skillName, skillMDFilename)
-	skillMDWindow := NewViewWindow(skillName, skillMDFilename, transformedContent, nonce)
-	state := &skillContextState{
-		Skill:    loaded,
-		IsFolded: false,
-		ViewWindows: map[string]*ViewWindow{
-			skillMDFilename: skillMDWindow,
-		},
-		LastAccessedAt: now,
-	}
-	m.autoLoadedSkills.Set(skillName, state)
-	m.ensureAutoSkillsFits()
-	log.Infof("auto-loaded skill %q into SemiDynamic 2", skillName)
-	return true, nil
-}
-
-// UnloadAutoSkill 从 auto-loaded 容器移除一个 skill.
+// UnloadAutoSkill 与 UnloadSkill 等价。
 func (m *SkillsContextManager) UnloadAutoSkill(skillName string) bool {
-	skillName = strings.TrimSpace(skillName)
-	if skillName == "" {
-		return false
-	}
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	if !m.autoLoadedSkills.Have(skillName) {
-		return false
-	}
-	m.autoLoadedSkills.Delete(skillName)
-	log.Infof("unloaded auto skill %q", skillName)
-	return true
+	return m.UnloadSkill(skillName)
 }
 
-// IsAutoSkillLoadedAndUnfolded 返回 auto-loaded skill 是否已加载且未折叠.
-// 用于 loading_skills action 的 ActionVerifier 短路 (避免重复加载).
-func (m *SkillsContextManager) IsAutoSkillLoadedAndUnfolded(skillName string) bool {
-	skillName = strings.TrimSpace(skillName)
-	if skillName == "" {
-		return false
-	}
-	m.mu.RLock()
-	defer m.mu.RUnlock()
-	// forced 也算「已加载且满可见」, action 应短路.
-	if m.forcedSkills.Has(skillName) {
-		return true
-	}
-	state, ok := m.autoLoadedSkills.Get(skillName)
-	if !ok {
-		return false
-	}
-	return !state.IsFolded
+// HasAutoLoadedSkills 返回是否存在任何已加载技能; 加载来源不再区分展示位置,
+// 该判断保留给既有调用方表达「当前有技能正文进入上下文」。
+func (m *SkillsContextManager) HasAutoLoadedSkills() bool {
+	return len(m.GetCurrentSelectedSkills()) > 0
 }
 
-// ChangeViewOffset changes the view offset for a file in a loaded skill.
+// ChangeViewOffset 重新定位某个技能文件的阅读窗口, 并把新的阅读窗口作为一条
+// 新的 Timeline item 追加进去 (不替换旧 item)。旧窗口在之后由统一压缩按
+// 现有筛选+总结机制决定去留, 缓存前缀不会被热改。
 func (m *SkillsContextManager) ChangeViewOffset(skillName, filePath string, offset int) error {
+	skillName = strings.TrimSpace(skillName)
+	if skillName == "" {
+		return utils.Error("skill name is empty")
+	}
 	m.mu.Lock()
-	defer m.mu.Unlock()
-
-	state, ok := m.loadedSkills.Get(skillName)
-	if !ok {
+	state, ok := m.stateFor(skillName)
+	if !ok || state == nil || state.Skill == nil {
+		m.mu.Unlock()
 		return utils.Errorf("skill %q is not loaded", skillName)
 	}
-
-	state.LastAccessedAt = time.Now()
-
 	if filePath == "" {
 		filePath = skillMDFilename
 	}
-
 	vw, ok := state.ViewWindows[filePath]
 	if !ok {
 		content, err := state.Skill.FileSystem.ReadFile(filePath)
 		if err != nil {
+			m.mu.Unlock()
 			return utils.Wrapf(err, "failed to read file %q from skill %q", filePath, skillName)
 		}
 		nonce := GenerateNonce(skillName, filePath)
 		vw = NewViewWindow(skillName, filePath, string(content), nonce)
 		state.ViewWindows[filePath] = vw
 	}
-
 	vw.SetOffset(offset)
-	m.contextSizeDirty = true
+	body := m.renderViewWindowForTimeline(state, filePath)
+	m.mu.Unlock()
+
+	m.appendSkillContentToTimeline(skillName, filePath, body, SkillContentSourceManual)
 	return nil
 }
 
-// IsSkillLoaded returns true if the given skill is currently loaded in ANY container
-// (loadedSkills = persistent-restore + forced 副本, autoLoadedSkills = AI 意图驱动,
-// or forcedSkills). This is the unified "is this skill present in the manager" check.
+// IsSkillLoaded 返回该技能正文当前是否可见。
+// 只查询目标 Timeline 的可见性, 不使用本地文件/窗口缓存判断上下文是否已加载。
 func (m *SkillsContextManager) IsSkillLoaded(skillName string) bool {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
-	if _, ok := m.loadedSkills.Get(skillName); ok {
-		return true
-	}
-	if _, ok := m.autoLoadedSkills.Get(skillName); ok {
-		return true
-	}
-	if m.forcedSkills != nil && m.forcedSkills.Has(skillName) {
-		return true
-	}
-	return false
-}
-
-// IsSkillLoadedAndUnfolded returns true if the skill is loaded and currently unfolded (fully visible).
-func (m *SkillsContextManager) IsSkillLoadedAndUnfolded(skillName string) bool {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
-	state, ok := m.loadedSkills.Get(skillName)
-	if !ok {
+	skillName = strings.TrimSpace(skillName)
+	if skillName == "" {
 		return false
 	}
-	return !state.IsFolded
+	return m.skillContentVisibleInTimeline(skillName)
 }
 
-// GetSkillViewSummary returns a human-readable summary of a loaded skill's view window state.
-// This is used to inform the AI about what content is already visible in the context.
-// Returns empty string if the skill is not loaded.
-func (m *SkillsContextManager) GetSkillViewSummary(skillName string) string {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
+// IsSkillLoadedAndUnfolded 与 IsSkillLoaded 等价: 折叠/展开由统一压缩取代,
+// 不存在 manager 侧的折叠状态。
+func (m *SkillsContextManager) IsSkillLoadedAndUnfolded(skillName string) bool {
+	return m.IsSkillLoaded(skillName)
+}
 
-	state, ok := m.loadedSkills.Get(skillName)
-	if !ok {
+// IsAutoSkillLoadedAndUnfolded 与 IsSkillLoaded 等价。
+func (m *SkillsContextManager) IsAutoSkillLoadedAndUnfolded(skillName string) bool {
+	return m.IsSkillLoaded(skillName)
+}
+
+// GetSkillViewSummary 返回该技能当前可见的阅读窗口摘要。
+func (m *SkillsContextManager) GetSkillViewSummary(skillName string) string {
+	skillName = strings.TrimSpace(skillName)
+	if skillName == "" {
 		return ""
 	}
+	if !m.skillContentVisibleInTimeline(skillName) {
+		return ""
+	}
+	m.mu.RLock()
+	state, ok := m.stateFor(skillName)
+	if !ok || state == nil {
+		m.mu.RUnlock()
+		return ""
+	}
+	windows := sortedViewWindows(state.ViewWindows)
+	m.mu.RUnlock()
 
 	var buf bytes.Buffer
-	if state.IsFolded {
-		buf.WriteString(fmt.Sprintf("Skill '%s' is loaded but FOLDED. Use loading_skills to unfold it.", skillName))
-		return buf.String()
-	}
-
-	buf.WriteString(fmt.Sprintf("Skill '%s' is loaded and ACTIVE in the SKILLS_CONTEXT section of your prompt. ", skillName))
+	buf.WriteString(fmt.Sprintf("Skill '%s' is loaded and ACTIVE in the skills context of your prompt. ", skillName))
 	buf.WriteString("View Windows:\n")
-	for _, vw := range sortedViewWindows(state.ViewWindows) {
-		filePath := vw.FilePath
-		totalLines := vw.TotalLines()
-		offset := vw.GetOffset()
+	for _, vw := range windows {
 		truncInfo := ""
-		if vw.IsTruncated {
+		if vw.IsTruncatedFlag() {
 			truncInfo = " (truncated, use change_skill_view_offset to see more)"
 		}
-		buf.WriteString(fmt.Sprintf("  - %s: %d total lines, viewing from line %d%s\n", filePath, totalLines, offset, truncInfo))
+		buf.WriteString(fmt.Sprintf("  - %s: %d total lines, viewing from line %d%s\n",
+			vw.FilePath, vw.TotalLines(), vw.GetOffset(), truncInfo))
 	}
 	return buf.String()
 }
@@ -694,204 +591,30 @@ func (m *SkillsContextManager) TokenEstimator() func(string) int {
 	return m.tokenEstimator
 }
 
-// Render generates the full skills context string for injection into the prompt.
+// Render 是兼容入口: 技能正文已统一由 Timeline 渲染, 此处返回 Timeline 的
+// 冻结技能块; nonce 参数保留只为兼容既有调用方。
 func (m *SkillsContextManager) Render(nonce string) string {
-	if strings.TrimSpace(nonce) == "" {
-		nonce = "skills_context"
-	}
-	return m.renderWithTag(nonce)
+	return m.RenderStable()
 }
 
-// RenderStable generates a deterministic skills context block so unchanged skill
-// state can participate in prompt prefix caching.
+// RenderStable 返回 Timeline 中已冻结、仍被保留的技能正文块 (单一技能块, 位于
+// SemiDynamic1, 与 prompted_recent_tools 同段)。
 func (m *SkillsContextManager) RenderStable() string {
-	return m.renderWithTag("skills_context")
-}
-
-// RenderForcedSkills 渲染「用户强制加载」SKILL 段 (满内容, 进 frozen_block 顶部).
-// 无 forced skill 时返回空串 (frozen_block 顶部子块不渲染).
-// 内容委托 ForcedSkillRegistry.Render, 与本 manager 的 mu 解耦.
-//
-// 关键词: RenderForcedSkills, frozen_block, 用户强制加载满内容
-func (m *SkillsContextManager) RenderForcedSkills() string {
-	if m == nil || m.forcedSkills == nil {
+	sink := m.timelineSink()
+	if sink == nil {
 		return ""
 	}
-	return m.forcedSkills.Render()
+	return sink.RenderSkillContentForPrompt()
 }
 
-// RenderAutoLoadedSkills 渲染「AI 意图驱动加载」SKILL 段 (进 SemiDynamic 2 尾部).
-// 输出形如:
+// renderSkillBody 渲染一个技能的说明 + 文件树。
 //
-//	<|AUTO_LOADED_SKILLS|>
-//	=== Skill: X ===
-//	<...>
-//	=== Skill: Y (folded) ===
-//	<...>
-//	<|AUTO_LOADED_SKILLS_END|>
-//
-// 无 auto-loaded skill 时返回空串. 段头/尾用 stable nonce, 保 SemiDynamic 2 前缀缓存.
-func (m *SkillsContextManager) RenderAutoLoadedSkills() string {
-	if m == nil {
+// 调用方需持有 m.mu。
+func (m *SkillsContextManager) renderSkillBody(state *skillContextState) string {
+	if state == nil || state.Skill == nil || state.Skill.Meta == nil {
 		return ""
 	}
-	m.mu.RLock()
-	defer m.mu.RUnlock()
-	if m.autoLoadedSkills.Len() == 0 {
-		return ""
-	}
-
 	var buf bytes.Buffer
-	buf.WriteString("<|AUTO_LOADED_SKILLS|>\n")
-	for _, item := range m.sortedAutoLoadedSkillStates() {
-		state := item.state
-		if state.IsFolded {
-			buf.WriteString(m.renderFolded(state))
-		} else {
-			buf.WriteString(m.renderFull(state))
-		}
-		buf.WriteString("\n")
-	}
-	buf.WriteString("<|AUTO_LOADED_SKILLS_END|>")
-	return buf.String()
-}
-
-// renderWithTag 输出 SKILLS_CONTEXT 段 (SemiDynamic 1).
-//
-// 改造后 (默认隐藏目录 + 意图驱动目录 + 三态分离):
-//
-//	<|SKILLS_CONTEXT_<tag>|>
-//	== Currently Loaded Skills ==
-//	(loadedSkills 渲染: 持久会话恢复 + forced 登记副本; 或 "(none)")
-//
-//	== Relevant Skills (intent-matched, top N) ==    // 仅当 catalogVisible 时
-//	  - skill-a: ...
-//	  - skill-b: ...
-//	<|SKILLS_CONTEXT_END_<tag>|>
-//
-// 默认 catalogVisible=false → 下半段完全不输出 (节约 token).
-// autoLoadedSkills 不在此处 (它们进 SemiDynamic 2, 见 RenderAutoLoadedSkills).
-// forcedSkills 不在此处 (它们进 frozen_block, 见 RenderForcedSkills).
-//
-// 关键词: SkillsContext renderWithTag, 默认隐藏目录, catalog top-N, 三态分离
-func (m *SkillsContextManager) renderWithTag(tag string) string {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
-
-	// forced skill 的满内容已通过 RenderForcedSkills 进 frozen_block 顶部,
-	// 此处需排除 forced 副本, 避免同一份内容在 SKILLS_CONTEXT 中重复渲染.
-	visibleLoaded := make([]namedSkillState, 0, m.loadedSkills.Len())
-	for _, item := range m.sortedLoadedSkillStates() {
-		if m.forcedSkills != nil && m.forcedSkills.Has(item.name) {
-			continue
-		}
-		visibleLoaded = append(visibleLoaded, item)
-	}
-
-	hasLoaded := len(visibleLoaded) > 0
-	hasForced := m.forcedSkills != nil && !m.forcedSkills.IsEmpty()
-	showCatalog := m.catalogVisible && len(m.catalogSkills) > 0
-
-	// 零状态: 不渲染整段.
-	if !hasLoaded && !hasForced && !showCatalog {
-		return ""
-	}
-
-	var buf bytes.Buffer
-	buf.WriteString(fmt.Sprintf("<|SKILLS_CONTEXT_%s|>\n", tag))
-
-	buf.WriteString("== Currently Loaded Skills ==\n")
-	if hasLoaded {
-		for _, item := range visibleLoaded {
-			state := item.state
-			if state.IsFolded {
-				buf.WriteString(m.renderFolded(state))
-			} else {
-				buf.WriteString(m.renderFull(state))
-			}
-			buf.WriteString("\n")
-		}
-	} else {
-		buf.WriteString("(none)\n")
-	}
-
-	if showCatalog {
-		buf.WriteString("\n")
-		m.appendCatalogSection(&buf)
-	}
-
-	buf.WriteString(fmt.Sprintf("<|SKILLS_CONTEXT_END_%s|>", tag))
-	return buf.String()
-}
-
-// appendCatalogSection 写入意图识别驱动的「最相关 SKILL 目录」段 (默认隐藏).
-// 内容来自 catalogSkills (意图识别写入的 top-N), 截断到 MaxCatalogSkills.
-//
-// 关键词: appendCatalogSection, 意图驱动目录, top-N
-func (m *SkillsContextManager) appendCatalogSection(buf *bytes.Buffer) {
-	skills := m.catalogSkills
-	if len(skills) == 0 {
-		return
-	}
-	// 按 name 排序保证字节稳定 (利于缓存), 与旧 Available Skills registry 行为一致.
-	sorted := sortSkillMetasByName(skills)
-	if len(sorted) > MaxCatalogSkills {
-		sorted = sorted[:MaxCatalogSkills]
-	}
-	buf.WriteString(fmt.Sprintf(CatalogHeader, len(sorted)))
-	for _, meta := range sorted {
-		buf.WriteString(FormatAvailableSkillRegistryLine(meta))
-	}
-	buf.WriteString("Use loading_skills action to load any of these when needed.\n")
-}
-
-// appendAvailableSkillsSection 写入"Available Skills"下半段。
-// 内容仅依赖 loader.AllSkillMetas() + GetSkillSourceStats(loader), 不读 loadedSkills,
-// 保证字节稳定性 (registry 不变 -> 输出不变)。
-//
-// 关键词: SkillsContext appendAvailableSkillsSection, registry listing 稳定
-func (m *SkillsContextManager) appendAvailableSkillsSection(buf *bytes.Buffer) {
-	skills := m.loader.AllSkillMetas()
-	stats := GetSkillSourceStats(m.loader)
-
-	if len(skills) == 0 {
-		buf.WriteString("== Available Skills ==\n")
-		if stats.DatabaseCount > 0 {
-			buf.WriteString(fmt.Sprintf("Available database-backed skills: %d. Use search_capabilities or loading_skills with an exact skill name to access them.\n", stats.DatabaseCount))
-		} else {
-			buf.WriteString("(none)\n")
-		}
-		return
-	}
-
-	listed, omitted := SelectSkillMetasForPromptRegistry(skills, m.tokenEstimator)
-	buf.WriteString(AvailableSkillsRegistryHeader)
-	for _, meta := range listed {
-		buf.WriteString(FormatAvailableSkillRegistryLine(meta))
-	}
-	if omitted > 0 {
-		buf.WriteString(AvailableSkillsOverflowHint(omitted))
-	}
-	if stats.DatabaseCount > 0 {
-		buf.WriteString(fmt.Sprintf("  ... plus %d database-backed skills available via search.\n", stats.DatabaseCount))
-	}
-}
-
-// renderFolded renders a skill in folded mode (metadata + compact file tree).
-func (m *SkillsContextManager) renderFolded(state *skillContextState) string {
-	var buf bytes.Buffer
-	buf.WriteString(fmt.Sprintf("=== Skill: %s (folded) ===\n", state.Skill.Meta.Name))
-	buf.WriteString(state.Skill.Meta.BriefString())
-	buf.WriteString("File Tree:\n")
-	buf.WriteString(RenderFileSystemTreeFolded(state.Skill.FileSystem))
-	buf.WriteString("\n[Use loading_skills action to expand this skill]\n")
-	return buf.String()
-}
-
-// renderFull renders a skill in full mode (metadata + full file tree + SKILL.md content).
-func (m *SkillsContextManager) renderFull(state *skillContextState) string {
-	var buf bytes.Buffer
-	buf.WriteString(fmt.Sprintf("=== Skill: %s ===\n", state.Skill.Meta.Name))
 	buf.WriteString(state.Skill.Meta.BriefString())
 
 	relatedSkills := DetectCrossSkillReferences(state.Skill.SkillMDContent, state.Skill.Meta.Name)
@@ -902,102 +625,59 @@ func (m *SkillsContextManager) renderFull(state *skillContextState) string {
 
 	buf.WriteString("\nFile Tree:\n")
 	buf.WriteString(RenderFileSystemTreeFull(state.Skill.FileSystem))
-
-	// Render all active view windows
-	for _, vw := range sortedViewWindows(state.ViewWindows) {
-		buf.WriteString("\n")
-		buf.WriteString(vw.RenderWithInfo())
-	}
-
 	return buf.String()
 }
 
-type namedSkillState struct {
-	name  string
-	state *skillContextState
+// renderViewWindowForTimeline 渲染一个阅读窗口 (含文件信息头)。
+//
+// 调用方需持有 m.mu。
+func (m *SkillsContextManager) renderViewWindowForTimeline(state *skillContextState, filePath string) string {
+	if state == nil {
+		return ""
+	}
+	if vw, ok := state.ViewWindows[filePath]; ok && vw != nil {
+		return vw.RenderWithInfo()
+	}
+	return ""
 }
 
-func (m *SkillsContextManager) sortedLoadedSkillStates() []namedSkillState {
-	items := make([]namedSkillState, 0, m.loadedSkills.Len())
-	m.loadedSkills.ForEach(func(name string, state *skillContextState) bool {
-		items = append(items, namedSkillState{name: name, state: state})
-		return true
-	})
-	sort.Slice(items, func(i, j int) bool {
-		left := items[i].name
-		right := items[j].name
-		if items[i].state != nil && items[i].state.Skill != nil && items[i].state.Skill.Meta != nil && items[i].state.Skill.Meta.Name != "" {
-			left = items[i].state.Skill.Meta.Name
-		}
-		if items[j].state != nil && items[j].state.Skill != nil && items[j].state.Skill.Meta != nil && items[j].state.Skill.Meta.Name != "" {
-			right = items[j].state.Skill.Meta.Name
-		}
-		if left == right {
-			return items[i].name < items[j].name
-		}
-		return left < right
-	})
-	return items
-}
-
-// sortedAutoLoadedSkillStates 返回按名排序的 auto-loaded skill 状态 (用于 RenderAutoLoadedSkills).
-func (m *SkillsContextManager) sortedAutoLoadedSkillStates() []namedSkillState {
-	items := make([]namedSkillState, 0, m.autoLoadedSkills.Len())
-	m.autoLoadedSkills.ForEach(func(name string, state *skillContextState) bool {
-		items = append(items, namedSkillState{name: name, state: state})
-		return true
-	})
-	sort.Slice(items, func(i, j int) bool {
-		return items[i].name < items[j].name
-	})
-	return items
-}
-
-// ensureAutoSkillsFits 对 autoLoadedSkills 做 LRU 折叠, 控制 SemiDynamic 2 体积.
-// 复用 ensureContextFits 的 LRU 策略, 但作用于 autoLoadedSkills 容器 (独立预算).
-// 必须在 m.mu 持有时调用.
-func (m *SkillsContextManager) ensureAutoSkillsFits() {
-	for {
-		totalSize := m.estimateAutoSkillsSize()
-		if totalSize <= m.maxTokens {
-			return
-		}
-		var lruName string
-		var lruTime time.Time
-		m.autoLoadedSkills.ForEach(func(name string, state *skillContextState) bool {
-			if !state.IsFolded {
-				if lruName == "" || state.LastAccessedAt.Before(lruTime) {
-					lruName = name
-					lruTime = state.LastAccessedAt
-				}
-			}
-			return true
-		})
-		if lruName == "" {
-			log.Warnf("all auto skills folded but still exceed limit (total: %d, limit: %d)", totalSize, m.maxTokens)
-			return
-		}
-		if state, ok := m.autoLoadedSkills.Get(lruName); ok {
-			state.IsFolded = true
-			log.Infof("folded LRU auto skill %q to fit SemiDynamic 2 (total: %d, limit: %d)", lruName, totalSize, m.maxTokens)
+// appendSkillBodyToTimelineLocked 分别写入技能说明/文件树和各阅读窗口, 返回是否
+// 实际追加了正文。重复检查由 Timeline 写入入口执行, 不维护 manager 侧正文副本。
+// 调用方需持有 m.mu。sink 只访问 Timeline 自己的锁, 不会回调 manager。
+func (m *SkillsContextManager) appendSkillBodyToTimelineLocked(state *skillContextState, source string) bool {
+	if m == nil || state == nil || state.Skill == nil || state.Skill.Meta == nil {
+		return false
+	}
+	added := false
+	name := state.Skill.Meta.Name
+	if body := m.renderSkillBody(state); strings.TrimSpace(body) != "" {
+		if m.appendSkillContentToTimeline(name, SkillMainBodyPath, body, source) {
+			added = true
 		}
 	}
+	for _, path := range sortedViewWindowPaths(state.ViewWindows) {
+		rendered := m.renderViewWindowForTimeline(state, path)
+		if strings.TrimSpace(rendered) == "" {
+			continue
+		}
+		if m.appendSkillContentToTimeline(name, path, rendered, source) {
+			added = true
+		}
+	}
+	return added
 }
 
-// estimateAutoSkillsSize 估算 autoLoadedSkills 的总 token 体积. 必须在 m.mu 持有时调用.
-func (m *SkillsContextManager) estimateAutoSkillsSize() int {
-	total := 0
-	m.autoLoadedSkills.ForEach(func(name string, state *skillContextState) bool {
-		var rendered string
-		if state.IsFolded {
-			rendered = m.renderFolded(state)
-		} else {
-			rendered = m.renderFull(state)
-		}
-		total += m.measureSize(rendered)
-		return true
-	})
-	return total
+// sortedViewWindowPaths 返回按路径排序的阅读窗口 key 快照。
+func sortedViewWindowPaths(viewWindows map[string]*ViewWindow) []string {
+	if len(viewWindows) == 0 {
+		return nil
+	}
+	paths := make([]string, 0, len(viewWindows))
+	for path := range viewWindows {
+		paths = append(paths, path)
+	}
+	sort.Strings(paths)
+	return paths
 }
 
 // dedupAndTruncateCatalog 对 catalog skill 元信息去重 (按 name) 并截断到 max.
@@ -1096,70 +776,6 @@ func DetectCrossSkillReferences(content string, currentSkillName string) []strin
 
 	sort.Strings(skills)
 	return skills
-}
-
-// ensureContextFits folds the least-recently-used unfolded skill when context exceeds the limit.
-// Must be called with m.mu held.
-func (m *SkillsContextManager) ensureContextFits() {
-	for {
-		totalSize := m.estimateContextSize()
-		if totalSize <= m.maxTokens {
-			return
-		}
-
-		var lruName string
-		var lruTime time.Time
-		m.loadedSkills.ForEach(func(name string, state *skillContextState) bool {
-			if !state.IsFolded {
-				if lruName == "" || state.LastAccessedAt.Before(lruTime) {
-					lruName = name
-					lruTime = state.LastAccessedAt
-				}
-			}
-			return true
-		})
-
-		if lruName == "" {
-			log.Warnf("all skills are folded but context still exceeds limit (total: %d, limit: %d)", totalSize, m.maxTokens)
-			return
-		}
-
-		if state, ok := m.loadedSkills.Get(lruName); ok {
-			state.IsFolded = true
-			m.contextSizeDirty = true
-			log.Infof("folded LRU skill %q to fit context limit (total: %d, limit: %d)", lruName, totalSize, m.maxTokens)
-		}
-	}
-}
-
-// estimateContextSize returns the total size of the current context.
-// Uses a cached value when available to avoid redundant rendering.
-// Must be called with m.mu held.
-func (m *SkillsContextManager) estimateContextSize() int {
-	if !m.contextSizeDirty {
-		return m.cachedContextSize
-	}
-
-	total := 0
-	m.loadedSkills.ForEach(func(name string, state *skillContextState) bool {
-		var rendered string
-		if state.IsFolded {
-			rendered = m.renderFolded(state)
-		} else {
-			rendered = m.renderFull(state)
-		}
-		total += m.measureSize(rendered)
-		return true
-	})
-
-	m.cachedContextSize = total
-	m.contextSizeDirty = false
-	return total
-}
-
-// measureSize returns the size of a rendered string in tokens.
-func (m *SkillsContextManager) measureSize(rendered string) int {
-	return MeasureStringTokens(rendered, m.tokenEstimator)
 }
 
 func buildKeywordsString(meta *SkillMeta) string {

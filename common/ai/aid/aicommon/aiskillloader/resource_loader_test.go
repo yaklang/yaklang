@@ -193,6 +193,7 @@ func TestLoadSkillResource_ExactFile(t *testing.T) {
 	}
 
 	mgr := NewSkillsContextManager(loader)
+	mgr.BindTimelineSink(newTestTimelineSink())
 
 	if err := mgr.LoadSkill("test-res"); err != nil {
 		t.Fatalf("LoadSkill failed: %v", err)
@@ -232,6 +233,7 @@ func TestLoadSkillResource_FuzzyMatch(t *testing.T) {
 	}
 
 	mgr := NewSkillsContextManager(loader)
+	mgr.BindTimelineSink(newTestTimelineSink())
 	if err := mgr.LoadSkill("test-res"); err != nil {
 		t.Fatalf("LoadSkill failed: %v", err)
 	}
@@ -259,6 +261,7 @@ func TestLoadSkillResource_AutoLoadSkill(t *testing.T) {
 	}
 
 	mgr := NewSkillsContextManager(loader)
+	mgr.BindTimelineSink(newTestTimelineSink())
 
 	result, err := mgr.LoadSkillResource("auto-skill", "data.md")
 	if err != nil {
@@ -283,6 +286,7 @@ func TestLoadSkillResource_NotFound(t *testing.T) {
 	}
 
 	mgr := NewSkillsContextManager(loader)
+	mgr.BindTimelineSink(newTestTimelineSink())
 	if err := mgr.LoadSkill("test-res"); err != nil {
 		t.Fatalf("LoadSkill failed: %v", err)
 	}
@@ -303,6 +307,7 @@ func TestLoadSkillResource_EmptyPath(t *testing.T) {
 	}
 
 	mgr := NewSkillsContextManager(loader)
+	mgr.BindTimelineSink(newTestTimelineSink())
 	if err := mgr.LoadSkill("test-res"); err != nil {
 		t.Fatalf("LoadSkill failed: %v", err)
 	}
@@ -317,6 +322,7 @@ func TestLoadSkillResource_SkillNotFound(t *testing.T) {
 	vfs := filesys.NewVirtualFs()
 	loader, _ := NewFSSkillLoader(vfs)
 	mgr := NewSkillsContextManager(loader)
+	mgr.BindTimelineSink(newTestTimelineSink())
 
 	_, err := mgr.LoadSkillResource("nonexistent", "file.md")
 	if err == nil {
@@ -514,6 +520,7 @@ func TestLoadSkillResourceAsScript_LocalFS_ResolvesPath(t *testing.T) {
 		t.Fatalf("NewLocalSkillLoader failed: %v", err)
 	}
 	mgr := NewSkillsContextManager(loader)
+	mgr.BindTimelineSink(newTestTimelineSink())
 
 	materializeCalled := false
 	materialize := func(name, ext string, data any) string {
@@ -561,6 +568,7 @@ func TestLoadSkillResourceAsScript_VirtualFS_Materializes(t *testing.T) {
 		t.Fatalf("NewFSSkillLoader failed: %v", err)
 	}
 	mgr := NewSkillsContextManager(loader)
+	mgr.BindTimelineSink(newTestTimelineSink())
 
 	var materializedName, materializedExt string
 	var materializedData []byte
@@ -613,6 +621,7 @@ func TestLoadSkillResourceAsScript_FuzzyMatch(t *testing.T) {
 		t.Fatalf("NewFSSkillLoader failed: %v", err)
 	}
 	mgr := NewSkillsContextManager(loader)
+	mgr.BindTimelineSink(newTestTimelineSink())
 
 	materialize := func(name, ext string, data any) string {
 		return "/tmp/artifacts/run_materialized.sh"
@@ -635,6 +644,7 @@ func TestLoadSkillResourceAsScript_EmptyPath(t *testing.T) {
 	vfs.AddFile("test-skill/SKILL.md", buildTestSkillMD("test-skill", "Test", "body"))
 	loader, _ := NewFSSkillLoader(vfs)
 	mgr := NewSkillsContextManager(loader)
+	mgr.BindTimelineSink(newTestTimelineSink())
 
 	_, err := mgr.LoadSkillResourceAsScript("test-skill", "", nil)
 	if err == nil {
@@ -647,6 +657,7 @@ func TestLoadSkillResourceAsScript_NotFound(t *testing.T) {
 	vfs.AddFile("test-skill/SKILL.md", buildTestSkillMD("test-skill", "Test", "body"))
 	loader, _ := NewFSSkillLoader(vfs)
 	mgr := NewSkillsContextManager(loader)
+	mgr.BindTimelineSink(newTestTimelineSink())
 
 	_, err := mgr.LoadSkillResourceAsScript("test-skill", "nonexistent.sh", nil)
 	if err == nil {
@@ -660,6 +671,7 @@ func TestLoadSkillResourceAsScript_NilMaterializeFunc(t *testing.T) {
 	vfs.AddFile("vm-skill/run.sh", "#!/bin/bash")
 	loader, _ := NewFSSkillLoader(vfs)
 	mgr := NewSkillsContextManager(loader)
+	mgr.BindTimelineSink(newTestTimelineSink())
 
 	_, err := mgr.LoadSkillResourceAsScript("vm-skill", "run.sh", nil)
 	if err == nil {
@@ -673,6 +685,7 @@ func TestLoadSkillResourceAsScript_MaterializeReturnsEmpty(t *testing.T) {
 	vfs.AddFile("em-skill/run.sh", "#!/bin/bash")
 	loader, _ := NewFSSkillLoader(vfs)
 	mgr := NewSkillsContextManager(loader)
+	mgr.BindTimelineSink(newTestTimelineSink())
 
 	materialize := func(name, ext string, data any) string { return "" }
 	_, err := mgr.LoadSkillResourceAsScript("em-skill", "run.sh", materialize)
@@ -687,6 +700,7 @@ func TestLoadSkillResourceAsScript_AutoLoadSkill(t *testing.T) {
 	vfs.AddFile("auto-skill/setup.sh", "#!/bin/bash\nsetup")
 	loader, _ := NewFSSkillLoader(vfs)
 	mgr := NewSkillsContextManager(loader)
+	mgr.BindTimelineSink(newTestTimelineSink())
 
 	materialize := func(name, ext string, data any) string { return "/tmp/setup.sh" }
 	result, err := mgr.LoadSkillResourceAsScript("auto-skill", "setup.sh", materialize)
@@ -773,6 +787,7 @@ func TestSkillsContextManager_ExpandedLimits(t *testing.T) {
 	}
 
 	mgr := NewSkillsContextManager(loader)
+	mgr.BindTimelineSink(newTestTimelineSink())
 	if err := mgr.LoadSkill("large-skill"); err != nil {
 		t.Fatalf("LoadSkill failed: %v", err)
 	}
@@ -809,6 +824,7 @@ func TestGrepSkillResources_SingleSkill(t *testing.T) {
 		t.Fatalf("NewFSSkillLoader failed: %v", err)
 	}
 	mgr := NewSkillsContextManager(loader)
+	mgr.BindTimelineSink(newTestTimelineSink())
 
 	result, err := mgr.GrepSkillResources("SEARCHME", "alpha")
 	if err != nil {
@@ -842,6 +858,7 @@ func TestGrepSkillResources_AllSkills(t *testing.T) {
 	vfs := buildGrepTestVFS()
 	loader, _ := NewFSSkillLoader(vfs)
 	mgr := NewSkillsContextManager(loader)
+	mgr.BindTimelineSink(newTestTimelineSink())
 
 	result, err := mgr.GrepSkillResources("SEARCHME", "")
 	if err != nil {
@@ -876,6 +893,7 @@ func TestGrepSkillResources_NoMatch(t *testing.T) {
 	vfs := buildGrepTestVFS()
 	loader, _ := NewFSSkillLoader(vfs)
 	mgr := NewSkillsContextManager(loader)
+	mgr.BindTimelineSink(newTestTimelineSink())
 
 	result, err := mgr.GrepSkillResources("ZZZZZ_NONEXISTENT_PATTERN", "")
 	if err != nil {
@@ -893,6 +911,7 @@ func TestGrepSkillResources_RegexPattern(t *testing.T) {
 	vfs := buildGrepTestVFS()
 	loader, _ := NewFSSkillLoader(vfs)
 	mgr := NewSkillsContextManager(loader)
+	mgr.BindTimelineSink(newTestTimelineSink())
 
 	result, err := mgr.GrepSkillResources(`SEARCH\w+`, "alpha")
 	if err != nil {
@@ -907,6 +926,7 @@ func TestGrepSkillResources_ContextLines(t *testing.T) {
 	vfs := buildGrepTestVFS()
 	loader, _ := NewFSSkillLoader(vfs)
 	mgr := NewSkillsContextManager(loader)
+	mgr.BindTimelineSink(newTestTimelineSink())
 
 	result, err := mgr.GrepSkillResources("SEARCHME", "alpha")
 	if err != nil {
@@ -932,6 +952,7 @@ func TestGrepSkillResources_Truncation(t *testing.T) {
 
 	loader, _ := NewFSSkillLoader(vfs)
 	mgr := NewSkillsContextManager(loader)
+	mgr.BindTimelineSink(newTestTimelineSink())
 
 	result, err := mgr.GrepSkillResources("FINDME", "trunc-skill")
 	if err != nil {
@@ -954,6 +975,7 @@ func TestGrepSkillResources_SkipBinary(t *testing.T) {
 
 	loader, _ := NewFSSkillLoader(vfs)
 	mgr := NewSkillsContextManager(loader)
+	mgr.BindTimelineSink(newTestTimelineSink())
 
 	result, err := mgr.GrepSkillResources("SEARCHME", "bin-skill")
 	if err != nil {
@@ -974,6 +996,7 @@ func TestGrepSkillResources_SkillNotFound(t *testing.T) {
 	vfs := filesys.NewVirtualFs()
 	loader, _ := NewFSSkillLoader(vfs)
 	mgr := NewSkillsContextManager(loader)
+	mgr.BindTimelineSink(newTestTimelineSink())
 
 	result, err := mgr.GrepSkillResources("pattern", "nonexistent")
 	if err != nil {
@@ -988,6 +1011,7 @@ func TestGrepSkillResources_EmptyPattern(t *testing.T) {
 	vfs := buildGrepTestVFS()
 	loader, _ := NewFSSkillLoader(vfs)
 	mgr := NewSkillsContextManager(loader)
+	mgr.BindTimelineSink(newTestTimelineSink())
 
 	_, err := mgr.GrepSkillResources("", "alpha")
 	if err == nil {

@@ -6,7 +6,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"time"
 
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -66,34 +65,13 @@ func (m *SkillsContextManager) LoadSkillResource(skillName, filePath string) (*S
 		return nil, utils.Error("skills context manager: no loader configured")
 	}
 
-	now := time.Now()
-
-	state, ok := m.loadedSkills.Get(skillName)
-	if !ok {
-		loaded, err := m.loader.LoadSkill(skillName)
-		if err != nil {
-			return nil, utils.Wrapf(err, "skill %q is not loaded and cannot be loaded on demand", skillName)
-		}
-		transformedContent := TransformIncludesToResourceHints(loaded.SkillMDContent, skillName)
-		nonce := GenerateNonce(skillName, skillMDFilename)
-		skillMDWindow := NewViewWindow(skillName, skillMDFilename, transformedContent, nonce)
-		state = &skillContextState{
-			Skill:    loaded,
-			IsFolded: false,
-			ViewWindows: map[string]*ViewWindow{
-				skillMDFilename: skillMDWindow,
-			},
-			LastAccessedAt: now,
-		}
-		m.loadedSkills.Set(skillName, state)
-		m.contextSizeDirty = true
-		log.Infof("auto-loaded skill %q for resource access", skillName)
+	state, isNew, err := m.ensureLoaded(skillName)
+	if err != nil {
+		return nil, utils.Wrapf(err, "skill %q is not loaded and cannot be loaded on demand", skillName)
 	}
-
-	state.LastAccessedAt = now
-
-	if state.IsFolded {
-		state.IsFolded = false
+	if isNew {
+		log.Infof("auto-loaded skill %q for resource access", skillName)
+		m.appendSkillBodyToTimelineLocked(state, SkillContentSourceManual)
 	}
 
 	if filePath == "" {
@@ -117,7 +95,7 @@ func (m *SkillsContextManager) LoadSkillResource(skillName, filePath string) (*S
 					FilePath:     resolvedPath,
 					ContentSize:  len(strings.Join(vw.Lines, "\n")),
 					TotalLines:   vw.TotalLines(),
-					IsTruncated:  vw.IsTruncated,
+					IsTruncated:  vw.IsTruncatedFlag(),
 					FuzzyMatched: fuzzyMatched,
 					MatchedPath:  resolvedPath,
 				}
@@ -142,7 +120,7 @@ func (m *SkillsContextManager) LoadSkillResource(skillName, filePath string) (*S
 				FilePath:     resolvedPath,
 				ContentSize:  len(content),
 				TotalLines:   vw.TotalLines(),
-				IsTruncated:  vw.IsTruncated,
+				IsTruncated:  vw.IsTruncatedFlag(),
 				FuzzyMatched: fuzzyMatched,
 				MatchedPath:  resolvedPath,
 			}
@@ -156,8 +134,13 @@ func (m *SkillsContextManager) LoadSkillResource(skillName, filePath string) (*S
 		return nil, utils.Errorf("no files found for path %q in skill %q", filePath, skillName)
 	}
 
-	m.contextSizeDirty = true
-	m.ensureContextFits()
+	// 每个阅读窗口独立写入 Timeline, 仅仍存在的相同正文会在写入时去重。
+	// 本地窗口缓存不代表正文仍在上下文中: 被压缩移除后再次读取必须能重新追加。
+	for _, loadedPath := range resolvedPaths {
+		if vw, ok := state.ViewWindows[loadedPath]; ok && vw != nil {
+			m.appendSkillContentToTimeline(skillName, loadedPath, vw.RenderWithInfo(), SkillContentSourceManual)
+		}
+	}
 	return result, nil
 }
 
@@ -179,33 +162,13 @@ func (m *SkillsContextManager) LoadSkillResourceAsScript(
 		return nil, utils.Error("skills context manager: no loader configured")
 	}
 
-	now := time.Now()
-
-	state, ok := m.loadedSkills.Get(skillName)
-	if !ok {
-		loaded, err := m.loader.LoadSkill(skillName)
-		if err != nil {
-			return nil, utils.Wrapf(err, "skill %q is not loaded and cannot be loaded on demand", skillName)
-		}
-		transformedContent := TransformIncludesToResourceHints(loaded.SkillMDContent, skillName)
-		nonce := GenerateNonce(skillName, skillMDFilename)
-		skillMDWindow := NewViewWindow(skillName, skillMDFilename, transformedContent, nonce)
-		state = &skillContextState{
-			Skill:    loaded,
-			IsFolded: false,
-			ViewWindows: map[string]*ViewWindow{
-				skillMDFilename: skillMDWindow,
-			},
-			LastAccessedAt: now,
-		}
-		m.loadedSkills.Set(skillName, state)
-		m.contextSizeDirty = true
-		log.Infof("auto-loaded skill %q for script resource access", skillName)
+	state, isNew, err := m.ensureLoaded(skillName)
+	if err != nil {
+		return nil, utils.Wrapf(err, "skill %q is not loaded and cannot be loaded on demand", skillName)
 	}
-
-	state.LastAccessedAt = now
-	if state.IsFolded {
-		state.IsFolded = false
+	if isNew {
+		log.Infof("auto-loaded skill %q for script resource access", skillName)
+		m.appendSkillBodyToTimelineLocked(state, SkillContentSourceManual)
 	}
 
 	if filePath == "" {
@@ -274,9 +237,9 @@ func (m *SkillsContextManager) LoadSkillResourceAsScript(
 	vw := NewViewWindow(skillName, viewKey, summaryBuf.String(), nonce)
 	state.ViewWindows[viewKey] = vw
 	result.TotalLines = vw.TotalLines()
-
-	m.contextSizeDirty = true
-	m.ensureContextFits()
+	// sink 只访问 Timeline 自己的锁, 不会回调 manager; 与其他写入路径一样在
+	// manager 锁内调用, 避免手动解锁遗漏错误分支。
+	m.appendSkillContentToTimeline(skillName, viewKey, vw.RenderWithInfo(), SkillContentSourceManual)
 	return result, nil
 }
 
@@ -360,7 +323,7 @@ var scriptExtensions = map[string]bool{
 	".sh": true, ".bash": true, ".zsh": true,
 	".py": true, ".python": true,
 	".yak": true,
-	".js": true, ".ts": true,
+	".js":  true, ".ts": true,
 	".go": true,
 	".rb": true, ".pl": true, ".lua": true,
 	".ps1": true, ".bat": true, ".cmd": true,
@@ -379,7 +342,7 @@ func ScriptTypeLabel(ext string) string {
 		".sh": "shell script", ".bash": "bash script", ".zsh": "zsh script",
 		".py": "python script", ".python": "python script",
 		".yak": "yak script",
-		".js": "javascript", ".ts": "typescript",
+		".js":  "javascript", ".ts": "typescript",
 		".go": "go source",
 		".rb": "ruby script", ".pl": "perl script", ".lua": "lua script",
 		".ps1": "powershell script", ".bat": "batch script", ".cmd": "cmd script",
@@ -518,11 +481,11 @@ func (m *SkillsContextManager) GrepSkillResources(pattern, skillName string) (*S
 		}
 		nonce := GenerateNonce("grep", viewKey)
 		vw := NewViewWindow("grep-results", viewKey, viewContent, nonce)
-		state, ok := m.loadedSkills.Get(result.SearchedSkills[0])
-		if ok {
+		if state, ok := m.stateFor(result.SearchedSkills[0]); ok && state != nil {
 			state.ViewWindows[viewKey] = vw
-			m.contextSizeDirty = true
-			m.ensureContextFits()
+			// grep 结果阅读窗口同样是新增一条 item; 在 manager 锁内写入 Timeline,
+			// sink 不会回调 manager。
+			m.appendSkillContentToTimeline(result.SearchedSkills[0], viewKey, vw.RenderWithInfo(), SkillContentSourceManual)
 		}
 	}
 

@@ -71,6 +71,17 @@ func (vw *ViewWindow) GetOffset() int {
 	return vw.Offset
 }
 
+// IsTruncatedFlag 在窗口锁内读取最近一次渲染的截断标记。
+// Render 会在窗口锁内更新该字段, 调用方不能直接读裸字段。
+func (vw *ViewWindow) IsTruncatedFlag() bool {
+	if vw == nil {
+		return false
+	}
+	vw.mu.RLock()
+	defer vw.mu.RUnlock()
+	return vw.IsTruncated
+}
+
 // TotalLines returns the total number of lines in the file.
 func (vw *ViewWindow) TotalLines() int {
 	vw.mu.RLock()
