@@ -100,13 +100,16 @@ func dnpDirectInput(t *testing.T, c mmsISOCase) ([]byte, dnpDirectAnswer) {
 	require.Len(t, a.Events, len(a.Steps))
 	return raw, a
 }
-func dnpDirectCheck(t *testing.T, a dnpDirectAnswer, events []*ProtocolEvent, deferred bool) {
+func dnpDirectCheck(t *testing.T, a dnpDirectAnswer, events []*ProtocolEvent, deferred bool, profiles ...string) {
 	t.Helper()
 	require.Len(t, events, len(a.Events))
 	for i, e := range events {
 		w := a.Events[i]
 		require.Equal(t, "dnp3", e.Protocol)
 		profile := "dnp3-direct-static-read"
+		if len(profiles) > 0 {
+			profile = profiles[0]
+		}
 		if _, ok := w.Session["Transport State"]; ok {
 			profile += "-transport"
 		}

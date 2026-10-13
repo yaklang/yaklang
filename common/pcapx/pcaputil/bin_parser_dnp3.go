@@ -27,6 +27,7 @@ type binDNP3 struct {
 	maxDepth           int
 	readPoints         bool
 	directReads        bool
+	typedReads         bool
 	transportFragments bool
 	fragments          map[dnp3TransportKey]*dnp3TransportFragment
 	maxApplication     int

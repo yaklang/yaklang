@@ -51,7 +51,7 @@ func dnp3ReadClasses(b []byte, limit int) ([]any, byte, error) {
 	return classes, mask, nil
 }
 
-func dnp3StaticPoints(b []byte, limit, depth int) ([]any, error) {
+func dnp3StaticPoints(b []byte, limit, depth int, packed bool) ([]any, error) {
 	if len(b) > 0 && depth < 3 {
 		return nil, protocolError(ErrResourceExceeded, "DNP3 point tree depth")
 	}
@@ -65,7 +65,10 @@ func dnp3StaticPoints(b []byte, limit, depth int) ([]any, error) {
 		group, variation, qualifier := b[0], b[1], b[2]
 		b = b[3:]
 		width := 0
-		if (group == 1 || group == 10) && variation == 2 {
+		isPacked := packed && group == 1 && variation == 1
+		if isPacked {
+			width = 1
+		} else if (group == 1 || group == 10) && variation == 2 {
 			width = 1
 		} else if group == 30 && variation >= 1 && variation <= 6 {
 			width = [7]int{0, 5, 3, 4, 2, 5, 9}[variation]
@@ -115,7 +118,14 @@ func dnp3StaticPoints(b []byte, limit, depth int) ([]any, error) {
 		if total >= limit || count > limit-total-1 {
 			return nil, protocolError(ErrResourceExceeded, "DNP3 object/point collection count")
 		}
-		if count > len(b)/(width+prefix) {
+		if isPacked {
+			if prefix != 0 {
+				return nil, protocolError(ErrUnsupportedFeature, "DNP3 packed binary requires contiguous range qualifier")
+			}
+			if (count+7)/8 > len(b) {
+				return nil, protocolError(ErrMalformedMessage, "DNP3 truncated packed binary values")
+			}
+		} else if count > len(b)/(width+prefix) {
 			return nil, protocolError(ErrMalformedMessage, "DNP3 truncated point values")
 		}
 		points := make([]any, 0, count)
@@ -134,6 +144,11 @@ func dnp3StaticPoints(b []byte, limit, depth int) ([]any, error) {
 			}
 			seen[key] = true
 			point := map[string]any{"Index": index}
+			if isPacked {
+				point["Quality"], point["Value"] = "not-reported", b[i/8]&(1<<uint(i%8)) != 0
+				points = append(points, point)
+				continue
+			}
 			if group == 30 && (variation == 3 || variation == 4) {
 				// These layouts contain no quality octet. Do not fabricate online
 				// or cleared flags from the low byte of the signed value.
@@ -201,6 +216,9 @@ func dnp3StaticPoints(b []byte, limit, depth int) ([]any, error) {
 			b = b[width:]
 			points = append(points, point)
 		}
+		if isPacked {
+			b = b[(count+7)/8:]
+		}
 		objects = append(objects, map[string]any{"Group": int(group), "Variation": int(variation), "Qualifier": int(qualifier), "Points": points})
 		total += count + 1
 	}
@@ -226,7 +244,7 @@ func (s *binDNP3) observePoints(out map[string]any, dir int, src, dest uint16, u
 		return 0, nil, nil
 	case 1:
 		if s.directReads {
-			classes, mask, selectors, headers, err := dnp3DirectReadHeaders(user[3:], sessionCollectionLimit(s.maxPending))
+			classes, mask, selectors, headers, err := dnp3DirectReadHeaders(user[3:], sessionCollectionLimit(s.maxPending), s.typedReads)
 			if err != nil {
 				return refuse(err)
 			}
@@ -243,12 +261,16 @@ func (s *binDNP3) observePoints(out map[string]any, dir int, src, dest uint16, u
 		out["Class Selectors"] = classes
 		return mask, nil, nil
 	case 0x81:
-		objects, err := dnp3StaticPoints(user[5:], sessionCollectionLimit(s.maxPending), s.maxDepth)
+		objects, err := dnp3StaticPoints(user[5:], sessionCollectionLimit(s.maxPending), s.maxDepth, s.typedReads)
 		if err != nil {
 			return refuse(err)
 		}
 		req, known := s.pending[dnp3RequestKey{1 - dir, dest, src, ac & 15}]
-		if known && len(objects) > 0 && req.classes&1 == 0 {
+		if known && len(objects) > 0 && s.typedReads {
+			if !dnp3TypedSelectorsCover(req.selectors, objects) {
+				return refuse(protocolError(ErrContextRequired, "DNP3 static points are outside observed READ selectors"))
+			}
+		} else if known && len(objects) > 0 && req.classes&1 == 0 {
 			if !s.directReads || len(req.selectors) == 0 {
 				return refuse(protocolError(ErrContextRequired, "DNP3 static points are not covered by observed READ class selectors"))
 			}
@@ -267,6 +289,8 @@ func (s *binDNP3) observePoints(out map[string]any, dir int, src, dest uint16, u
 				out["Read Context"] = "observed"
 				if len(objects) == 0 {
 					out["Read Coverage"] = "no-static-data"
+				} else if s.typedReads {
+					out["Read Coverage"] = "selected-static"
 				} else if req.classes&1 != 0 {
 					out["Read Coverage"] = "class0"
 				} else {

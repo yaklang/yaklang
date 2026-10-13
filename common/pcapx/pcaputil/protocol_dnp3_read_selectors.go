@@ -25,11 +25,12 @@ func WithSessionDNP3DirectStaticReads(enabled bool) ProtocolSessionOption {
 }
 
 type dnp3StaticSelector struct {
-	all         bool
-	first, last uint16
+	all              bool
+	first, last      uint16
+	group, variation byte
 }
 
-func dnp3DirectReadHeaders(b []byte, limit int) ([]any, byte, []dnp3StaticSelector, []any, error) {
+func dnp3DirectReadHeaders(b []byte, limit int, typed bool) ([]any, byte, []dnp3StaticSelector, []any, error) {
 	classes := []any{}
 	mask := byte(0)
 	selectors := []dnp3StaticSelector{}
@@ -58,11 +59,23 @@ func dnp3DirectReadHeaders(b []byte, limit int) ([]any, byte, []dnp3StaticSelect
 			mask |= bit
 			classes = append(classes, int(v-1))
 			h["Class"] = int(v - 1)
+			if typed && v == 1 {
+				for _, g := range []byte{1, 10, 30} {
+					selectors = append(selectors, dnp3StaticSelector{all: true, group: g})
+				}
+			}
 		} else {
-			if g != 30 || v != 0 {
+			valid := g == 30 && v == 0
+			if typed {
+				valid = (g == 1 && v <= 2) || (g == 10 && (v == 0 || v == 2)) || (g == 30 && v <= 6)
+			}
+			if !valid {
+				if typed {
+					return fail(ErrUnsupportedFeature, "DNP3 unsupported selected static READ group/variation")
+				}
 				return fail(ErrUnsupportedFeature, "DNP3 direct READ requires G30V0")
 			}
-			x := dnp3StaticSelector{}
+			x := dnp3StaticSelector{group: g, variation: v}
 			switch q {
 			case 6:
 				x.all = true
@@ -93,12 +106,15 @@ func dnp3DirectReadHeaders(b []byte, limit int) ([]any, byte, []dnp3StaticSelect
 		}
 		headers = append(headers, h)
 	}
+	if typed {
+		return classes, mask, normalizeDNP3TypedSelectors(selectors), headers, nil
+	}
 	return classes, mask, normalizeDNP3Selectors(selectors), headers, nil
 }
 func normalizeDNP3Selectors(a []dnp3StaticSelector) []dnp3StaticSelector {
 	for _, x := range a {
 		if x.all {
-			return []dnp3StaticSelector{{all: true}}
+			return []dnp3StaticSelector{{all: true, group: 30}}
 		}
 	}
 	sort.Slice(a, func(i, j int) bool {
