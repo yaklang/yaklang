@@ -39,6 +39,29 @@ Runtime through `legion-node-v*`; candidate bytes are never promoted in place.
 
 ## Provenance contract
 
+The Runtime node is a CGO-enabled, fully static musl executable built through
+the same `.github/scripts/build-legion-linux-musl.sh` recipe as the Linux host
+and portable nodes. The Runtime omits HIDS and uses
+`musl,netgo,osusergo,sqlite_omit_load_extension`. Go 1.22.12, Alpine 3.21, musl
+1.2.5 and GCC 14.2.0 are pinned by the recipe. The final image remains Debian
+with CA certificates; the node has no dynamic libc dependency on that image.
+
+The builder emits its actual compiler, musl version, builder index/platform
+manifest, build tags and resolved APK versions into
+`/usr/local/share/legion/session-runtime-musl-build.json`. CI extracts that file
+alongside the binary. Packaging verifies the binary's static ELF and Go build
+information and matches the recipe to the immutable builder and target
+architecture. `binary.ldd` remains a compatibility summary stating there are
+no dynamic dependencies; ELF checks provide the linkage evidence.
+
+Both native architecture jobs run the extracted binary through the three
+glibc 2.28/NSS startup cases before archiving and handing off the image. Evidence
+is retained on success and failure. These tests end at the expected missing
+Runtime Host release identity check and do not register a session or run AI
+work. Local cross-architecture image builds require
+`--build-arg NODE_MUSL_ALLOW_EMULATION=true`; their recipe records emulation,
+which trusted CI provenance rejects.
+
 `SESSION_RUNTIME_MANIFEST.json` binds the Yaklang source commit, producing
 workflow, target platform, Dockerfile, immutable base images, embedded binary
 digest, image archive digest and size, immutable image ID, and the

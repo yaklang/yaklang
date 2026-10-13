@@ -20,7 +20,7 @@ log() {
   printf '[legion-ai-session-runtime] %s\n' "$*"
 }
 
-for command in file git gzip jq sha256sum stat tar; do
+for command in file git go gzip jq readelf sha256sum stat strings tar; do
   command -v "$command" >/dev/null 2>&1 || die "missing required command: $command"
 done
 
@@ -54,9 +54,11 @@ runtime_image_archive="${RUNTIME_IMAGE_ARCHIVE:-}"
 runtime_base_image="${RUNTIME_BASE_IMAGE:-}"
 runtime_builder_image="${RUNTIME_BUILDER_IMAGE:-}"
 runtime_go_version="${RUNTIME_GO_VERSION:-}"
+runtime_musl_metadata="${RUNTIME_MUSL_BUILD_METADATA:-}"
 
 [[ -f "$runtime_binary" ]] || die "RUNTIME_BINARY must reference the binary extracted from the built image"
-[[ -f "$runtime_ldd_file" ]] || die "RUNTIME_LDD_FILE must reference ldd output captured inside the built image"
+[[ -f "$runtime_ldd_file" ]] || die "RUNTIME_LDD_FILE must reference the compatibility linkage summary"
+[[ -f "$runtime_musl_metadata" ]] || die "RUNTIME_MUSL_BUILD_METADATA must reference the recipe extracted from the built image"
 [[ -f "$dockerfile" ]] || die "runtime Dockerfile does not exist: $dockerfile"
 [[ -f "$dockerignore" ]] || die "runtime Dockerfile ignore file does not exist: $dockerignore"
 [[ "$runtime_image_ref" =~ ^[^[:space:]@]+@sha256:[0-9a-f]{64}$ ]] || \
@@ -94,6 +96,18 @@ fi
 [[ "$runtime_builder_image" =~ ^[^[:space:]@]+@sha256:[0-9a-f]{64}$ ]] || \
   die "RUNTIME_BUILDER_IMAGE must be pinned by sha256 digest"
 [[ -n "$runtime_go_version" ]] || die "RUNTIME_GO_VERSION is required"
+musl_recipe="$(jq -ce --arg arch "$target_arch" --arg builder "$runtime_builder_image" \
+  --arg go_version "$runtime_go_version" '
+    select(.goos == "linux" and .goarch == $arch and .builder_image == $builder and
+      .go_version == $go_version and .c_library == "musl" and
+      (.c_library_version | type == "string" and length > 0) and
+      .cgo_enabled == true and .link_mode == "external-static" and
+      .build_tags == "musl,netgo,osusergo,sqlite_omit_load_extension")
+  ' "$runtime_musl_metadata")" || die 'Runtime musl recipe does not match the built image'
+if [[ "${CI:-}" == true ]]; then
+  [[ "$(jq -r .builder_execution <<<"$musl_recipe")" == native ]] || die 'CI Runtime must use a native musl builder'
+fi
+"$repo_root/.github/scripts/build-legion-linux-musl.sh" --verify-binary "$runtime_binary" "$target_arch" runtime
 grep -qv '^[[:space:]]*$' "$runtime_ldd_file" || die "runtime ldd output is empty"
 if grep -q 'not found' "$runtime_ldd_file"; then
   die "runtime binary has unresolved shared libraries in the final image"
@@ -139,6 +153,7 @@ jq -n \
   --arg dockerignore_sha "$dockerignore_sha" \
   --arg module_go_version "$module_go_version" \
   --arg runtime_go_version "$runtime_go_version" \
+  --argjson musl_recipe "$musl_recipe" \
   --arg target_os "$target_os" \
   --arg target_arch "$target_arch" \
   --arg binary_sha "$binary_sha" \
@@ -165,8 +180,8 @@ jq -n \
       workflow: $ci_workflow,
       actor: $ci_actor
     },
-    recipe: {
-      version: "session-runtime-v1",
+    recipe: ($musl_recipe + {
+      version: "session-runtime-v2-musl",
       base_image: $runtime_base_image,
       builder_image: $runtime_builder_image,
       packaging_repository: $repository,
@@ -177,11 +192,11 @@ jq -n \
       goos: $target_os,
       goarch: $target_arch,
       cgo_enabled: true,
-      link_mode: "dynamic-container",
-      build_tags: "",
+      link_mode: "external-static",
+      build_tags: "musl,netgo,osusergo,sqlite_omit_load_extension",
       module_go_version: $module_go_version,
       go_version: $runtime_go_version
-    },
+    }),
     capabilities: ["ai.forge.custom_tools.v1", "ai.forge_release.v1", "ai.input.managed_attachment.v1", "ai.session.bind_epoch.v1", "ai.session.runtime", "ai.session.turn_lifecycle.v1", "ai.skill_bundle.v1", "ai.tools.builtin.v1", "yak.execute"],
     binary: {
       path: "/usr/local/bin/legion-session-runtime",
