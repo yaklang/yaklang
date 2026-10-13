@@ -58,14 +58,16 @@ func normalizeDNP3TypedSelectors(a []dnp3StaticSelector) []dnp3StaticSelector {
 		}
 		g := byte(group)
 		if g == 22 || g == 23 {
-			// All-object event selection does not reselect events that an earlier
-			// header already selected. Its variation precedence differs from
-			// static range selection. Class/V0 defaults remain unreported.
+			// Event headers select successive unselected records; finite quotas
+			// remain ordered until an unbounded header ends selection of this
+			// type. Class/V0 defaults remain unreported.
 			for _, x := range a {
 				if x.group == g {
 					x.first, x.last, x.all = 0, 65535, false
 					out = append(out, x)
-					break
+					if x.count == 0 {
+						break
+					}
 				}
 			}
 			continue
@@ -116,10 +118,42 @@ func normalizeDNP3TypedSelectors(a []dnp3StaticSelector) []dnp3StaticSelector {
 }
 
 func dnp3TypedSelectorsCover(selectors []dnp3StaticSelector, objects []any) bool {
+	// Count selectors select successive event records, including repeated
+	// point indices. Maintain ephemeral per-type ordinal cursors so a rejected
+	// response cannot mutate retained request coverage or consume its quota.
+	type cursor struct {
+		at, used    int
+		initialized bool
+	}
+	var eventCursor [2]cursor
 	for _, o := range objects {
 		obj := o.(map[string]any)
 		group := byte(obj["Group"].(int))
 		variation := byte(obj["Variation"].(int))
+		if group == 22 || group == 23 {
+			c := &eventCursor[group-22]
+			if !c.initialized {
+				c.at = sort.Search(len(selectors), func(i int) bool { return selectors[i].group >= group })
+				c.initialized = true
+			}
+			for range obj["Points"].([]any) {
+				for c.at < len(selectors) && selectors[c.at].group == group && selectors[c.at].count != 0 && c.used == int(selectors[c.at].count) {
+					c.at++
+					c.used = 0
+				}
+				if c.at == len(selectors) || selectors[c.at].group != group {
+					return false
+				}
+				x := selectors[c.at]
+				if x.variation != 0 && x.variation != variation {
+					return false
+				}
+				if x.count != 0 {
+					c.used++
+				}
+			}
+			continue
+		}
 		for _, p := range obj["Points"].([]any) {
 			point := p.(map[string]any)
 			index := point["Index"].(int)

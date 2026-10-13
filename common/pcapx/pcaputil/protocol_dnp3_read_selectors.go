@@ -28,9 +28,10 @@ type dnp3StaticSelector struct {
 	all              bool
 	first, last      uint16
 	group, variation byte
+	count            uint16 // zero means unbounded; count READs reject zero on the wire
 }
 
-func dnp3DirectReadHeaders(b []byte, limit int, typed, counters, events bool) ([]any, byte, []dnp3StaticSelector, []any, error) {
+func dnp3DirectReadHeaders(b []byte, limit int, typed, counters, events, counts bool) ([]any, byte, []dnp3StaticSelector, []any, error) {
 	classes := []any{}
 	mask := byte(0)
 	selectors := []dnp3StaticSelector{}
@@ -80,7 +81,7 @@ func dnp3DirectReadHeaders(b []byte, limit int, typed, counters, events bool) ([
 			isEvent := events && (g == 22 || g == 23)
 			if isEvent {
 				valid = v == 0 || dnp3CounterEventWidth(g, v) > 0
-				if q != 6 {
+				if q != 6 && (!counts || (q != 7 && q != 8)) {
 					return fail(ErrUnsupportedFeature, "DNP3 event READ requires all-object qualifier")
 				}
 			}
@@ -98,6 +99,26 @@ func dnp3DirectReadHeaders(b []byte, limit int, typed, counters, events bool) ([
 			case 6:
 				x.all = true
 				h["All"] = true
+			case 7, 8:
+				if !isEvent || !counts {
+					return fail(ErrUnsupportedFeature, "DNP3 unsupported direct READ qualifier")
+				}
+				n := 1
+				if q == 8 {
+					n = 2
+				}
+				if len(b) < n {
+					return fail(ErrMalformedMessage, "DNP3 truncated READ selector count")
+				}
+				x.count = uint16(b[0])
+				if n == 2 {
+					x.count = binary.LittleEndian.Uint16(b)
+				}
+				b = b[n:]
+				if x.count == 0 {
+					return fail(ErrMalformedMessage, "DNP3 empty READ selector count")
+				}
+				h["Count"] = int(x.count)
 			case 0, 1:
 				n := 1
 				if q == 1 {
@@ -123,6 +144,17 @@ func dnp3DirectReadHeaders(b []byte, limit int, typed, counters, events bool) ([
 			selectors = append(selectors, x)
 		}
 		headers = append(headers, h)
+	}
+	if counts {
+		hasCount := false
+		for _, x := range selectors {
+			hasCount = hasCount || x.count != 0
+		}
+		// Event class membership is absent from wire points. A limited type
+		// selection mixed with class selection cannot prove ordered coverage.
+		if hasCount && mask&14 != 0 {
+			return fail(ErrUnsupportedFeature, "DNP3 counted event READ with class selectors requires class context")
+		}
 	}
 	if typed {
 		return classes, mask, normalizeDNP3TypedSelectors(selectors), headers, nil

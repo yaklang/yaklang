@@ -271,7 +271,7 @@ func (s *binDNP3) observePoints(out map[string]any, dir int, src, dest uint16, u
 		return 0, nil, nil
 	case 1:
 		if s.directReads {
-			classes, mask, selectors, headers, err := dnp3DirectReadHeaders(user[3:], sessionCollectionLimit(s.maxPending), s.typedReads, s.counterPoints, s.counterEvents)
+			classes, mask, selectors, headers, err := dnp3DirectReadHeaders(user[3:], sessionCollectionLimit(s.maxPending), s.typedReads, s.counterPoints, s.counterEvents, s.eventCountReads)
 			if err != nil {
 				return refuse(err)
 			}

@@ -352,6 +352,8 @@ type BinParserConfig struct {
 	DecodeDNP3CounterPoints bool
 	// DecodeDNP3CounterEvents additionally selects bounded indexed counter events.
 	DecodeDNP3CounterEvents bool
+	// DecodeDNP3EventCountReads also selects bounded direct event count READs.
+	DecodeDNP3EventCountReads bool
 	// MMSISOPorts explicitly selects bounded RFC1006/COTP/presentation/MMS observations.
 	MMSISOPorts             []uint16
 	DecodeMMSServiceValues  bool
@@ -770,6 +772,12 @@ func (f *binFlow) event(dir int, raw []byte, status, detail string) *BinParserEv
 	}
 	if f.protocol == "dnp3" && f.a.config.DecodeDNP3CounterEvents {
 		e.Profile = "dnp3-counter-events"
+		if f.a.config.DecodeDNP3TransportFragments {
+			e.Profile += "-transport"
+		}
+	}
+	if f.protocol == "dnp3" && f.a.config.DecodeDNP3EventCountReads {
+		e.Profile = "dnp3-event-count-read"
 		if f.a.config.DecodeDNP3TransportFragments {
 			e.Profile += "-transport"
 		}
