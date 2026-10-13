@@ -192,9 +192,9 @@ func (s *indexStore) AddClassInstance(name string, inst Instruction) {
 func (s *indexStore) saveIndexDedup(index *ssadb.IrIndex) {
 	if s != nil && s.indexSaver != nil && index != nil {
 		fresh := false
-		s.indexSaved.Update(indexRelationship(index), func(_ struct{}, exists bool) struct{} {
+		s.indexSaved.Update(indexRelationship(index), func(_ struct{}, exists bool) (struct{}, bool) {
 			fresh = !exists
-			return struct{}{}
+			return struct{}{}, true
 		})
 		if fresh {
 			s.indexSaver.Save(index)
@@ -243,11 +243,11 @@ func (s *indexStore) appendIndex(index *utils.SafeMapWithKey[string, []int64], n
 	s.residentMu.Lock()
 	defer s.residentMu.Unlock()
 	// Appending and publishing membership share one lock, including removal.
-	s.residentKeys.Update(residentIndexKey{index, name, id}, func(_ struct{}, exists bool) struct{} {
+	s.residentKeys.Update(residentIndexKey{index, name, id}, func(_ struct{}, exists bool) (struct{}, bool) {
 		if !exists {
 			appendResidentIndex(index, name, id)
 		}
-		return struct{}{}
+		return struct{}{}, true
 	})
 }
 
@@ -354,9 +354,9 @@ func (s *indexStore) saveOffsetDedup(offset *ssadb.IrOffset) {
 	}
 	key := offsetDedupKey(offset.ValueID, offset.FileHash, offset.StartOffset, offset.EndOffset, offset.VariableName)
 	fresh := false
-	s.offsetSaved.Update(key, func(_ struct{}, exists bool) struct{} {
+	s.offsetSaved.Update(key, func(_ struct{}, exists bool) (struct{}, bool) {
 		fresh = !exists
-		return struct{}{}
+		return struct{}{}, true
 	})
 	if fresh {
 		s.offsetSaver.Save(offset)

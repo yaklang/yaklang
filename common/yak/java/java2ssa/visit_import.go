@@ -42,10 +42,13 @@ func (y *singleFileBuilder) visitCapturedImportDeclarations(decls []javaImportDe
 	if y == nil || len(decls) == 0 || y.IsStop() {
 		return
 	}
-	start := time.Now()
-	defer func() {
-		deltaPackageCostFrom(start)
-	}()
+	var start time.Time
+	if javaCompileProfileOn() {
+		start = time.Now()
+		defer func() {
+			deltaPackageCostFrom(start)
+		}()
+	}
 
 	hasImportType := func(lib *ssa.Program, name string) bool {
 		if lib == nil || name == "" {

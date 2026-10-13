@@ -43,9 +43,23 @@ func NewNameCache(program string, useDB bool) *NameCache {
 	return cache
 }
 
-// Intern shares string storage in both memory and DB modes without assigning
-// a database name ID or performing SQL. Own the string to avoid retaining a
-// large source/JSON buffer through a small substring.
+// Intern returns the single canonical copy of name that this cache keeps.
+//
+// It is string interning, not name->id resolution: the map's key and value are
+// always the same string, so a lookup result is exactly the canonical copy. Two
+// reasons to route names through it:
+//
+//  1. Memory: IR names arrive as substrings of a source buffer or JSON blob.
+//     Holding a substring keeps the whole backing array alive, so the first
+//     occurrence is cloned (strings.Clone) and every later caller receives that
+//     owned copy instead of pinning a large buffer.
+//  2. Identity: repeated names collapse to one allocation, which makes name
+//     comparisons and dedup cheap for the millions of IR records a large
+//     project produces.
+//
+// The DB-backed name->id pool is a separate concern (Preload/GetNameID); Intern
+// never assigns an id or runs SQL, so it is safe in the in-memory (useDB=false)
+// mode too.
 func (c *NameCache) Intern(name string) string {
 	if c == nil || name == "" {
 		return name
