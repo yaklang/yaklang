@@ -33,6 +33,17 @@ grep -Fq 'workflow_call:' "$runtime_workflow"
 grep -Fq 'source_mode: alpha' "$runtime_alpha_workflow"
 grep -Fq 'retention_days: 7' "$runtime_alpha_workflow"
 grep -Fq 'uses: ./.github/workflows/build-legion-ai-session-runtime-common.yml' "$runtime_alpha_workflow"
+musl_helper="$repo_root/.github/scripts/build-legion-linux-musl.sh"
+grep -Fq 'hids,musl,netgo,osusergo,sqlite_omit_load_extension' "$musl_helper"
+grep -Fq 'musl=1.2.5-r11' "$musl_helper"
+grep -Fq '6d405dfc5fdf3a45df1529cf060b920041f52ce523487e0f36f02765af294a51' "$musl_helper"
+grep -Fq '7030196c59858ca8942e85aa2f68599240d58282ee35eb795609738a1e242c1f' "$musl_helper"
+grep -Fq 'build-legion-linux-musl.sh --install-toolchain' "$repo_root/docker/session-runtime/Dockerfile"
+grep -Fq 'build-legion-linux-musl.sh --in-container' "$repo_root/docker/session-runtime/Dockerfile"
+grep -Fq '!.github/scripts/build-legion-linux-musl.sh' "$repo_root/docker/session-runtime/Dockerfile.dockerignore"
+grep -Fq 'external-static' "$runtime_workflow"
+grep -Fq -- '--profile runtime' "$runtime_workflow"
+grep -Fq 'Preserve Runtime Node startup evidence' "$runtime_workflow"
 grep -Fq 'Source validation mode: alpha or unified' "$runtime_workflow"
 grep -Fq 'refs/tags/legion-node-v' "$runtime_workflow"
 grep -Fq '.docker.tar.gz' "$runtime_workflow"
@@ -109,6 +120,9 @@ grep -Fq 'default: 7' "$alpha_workflow"
 grep -Fq 'retention-days:' "$alpha_workflow"
 grep -Fq 'inputs.retention_days || 7' "$alpha_workflow"
 grep -Fq 'Actions artifact only; not published to OSS or a stable channel' "$alpha_workflow"
+grep -Fq 'build-legion-linux-musl.sh' "$alpha_workflow"
+grep -Fq -- '--profile portable' "$alpha_workflow"
+grep -Fq 'Preserve Linux portable Node startup evidence' "$alpha_workflow"
 if grep -Eq 'pull-requests: read|/pulls/|OSS_KEY_(ID|SECRET)|upload-oss|build-legion-component-oss-index' "$alpha_workflow"; then
   echo "$alpha_workflow must not resolve PR metadata or publish alpha artifacts to OSS" >&2
   exit 1
@@ -123,6 +137,24 @@ alpha_tag='legion-node-alpha-0212'
 [[ "$alpha_tag" != legion-node-v* ]]
 
 product_workflow="$repo_root/.github/workflows/build-legion-product-node.yml"
+grep -Fq 'build-legion-linux-musl.sh' "$repo_root/.github/scripts/build-legion-product-node.sh"
+grep -Fq '.recipe.c_library == "musl"' "$product_workflow"
+grep -Fq 'Preserve release Node startup evidence' "$product_workflow"
+# Require startup gates before artifacts are handed off or published. Recipe
+# metadata and a separate PR run cannot replace testing each produced binary.
+for workflow in "$product_workflow" "$alpha_workflow" "$runtime_workflow"; do
+  case "$workflow" in
+    "$product_workflow") gate='Verify the release Node on glibc 2.28'; handoff='Stage architecture-specific artifact contract' ;;
+    "$alpha_workflow") gate='Verify Linux portable Node on glibc 2.28'; handoff='Upload portable Legion Node artifact' ;;
+    "$runtime_workflow") gate='Verify extracted Runtime Node on glibc 2.28'; handoff='Stage Runtime image archive' ;;
+  esac
+  gate_line="$(grep -nF "$gate" "$workflow" | cut -d: -f1)"
+  handoff_line="$(grep -nF "$handoff" "$workflow" | cut -d: -f1)"
+  if [[ -z "$gate_line" || -z "$handoff_line" || "$gate_line" -ge "$handoff_line" ]]; then
+    echo "$workflow must verify the actual Node before handoff" >&2
+    exit 1
+  fi
+done
 grep -Fq 'build-portable-nodes:' "$product_workflow"
 grep -Fq 'uses: ./.github/workflows/build-legion-node-alpha.yml' "$product_workflow"
 grep -Fq 'source_mode: release' "$product_workflow"

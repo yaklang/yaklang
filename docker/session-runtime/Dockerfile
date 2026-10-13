@@ -13,10 +13,9 @@
 #   LEGION_SESSIONMGR_URL, LEGION_AI_SESSION_ID, LEGION_AI_RUNTIME
 # 并通过 -agent-installation-id ai-session-<sessionID> 传 ephemeral identity。
 
-# Trusted CI resolves both image arguments to immutable sha256 references before
-# building. The tag defaults keep local development convenient without weakening
-# the published provenance contract.
-ARG GO_BUILDER_IMAGE=golang:1.22.12-bookworm
+# The Node compiler and C toolchain share the host/portable musl recipe. Only
+# the operating-system image used to run the static executable remains Debian.
+ARG GO_BUILDER_IMAGE=docker.io/library/golang:1.22.12-alpine3.21@sha256:1699c10032ca2582ec89a24a1312d986a3f094aed3d5c1147b19880afe40e052
 ARG RUNTIME_BASE_IMAGE=debian:bookworm-slim
 
 # ---------- 构建阶段 ----------
@@ -24,25 +23,29 @@ FROM ${GO_BUILDER_IMAGE} AS builder
 
 ARG TARGETOS
 ARG TARGETARCH
+ARG BUILDARCH
+ARG GO_BUILDER_IMAGE
+ARG NODE_MUSL_ALLOW_EMULATION=false
 
 WORKDIR /src
 COPY . .
 
 # 编译 legion-smoke-node（ai_session 容器不需要 HIDS tag，精简依赖）。
-# Yaklang's embedded pcre2 and pcap dependencies require CGO.
-ENV GOTOOLCHAIN=local
-RUN --mount=type=cache,target=/go/pkg/mod \
-    --mount=type=cache,target=/root/.cache/go-build \
-    module_go_version="$(awk '$1 == "go" { gsub(/\r/, "", $2); print $2; exit }' go.mod)" \
-    && test "$(go env GOVERSION)" = "go${module_go_version}" \
-    && test "$TARGETOS" = "linux" \
-    && case "$TARGETARCH" in amd64|arm64) ;; *) exit 1 ;; esac \
-    && CGO_ENABLED=1 GOOS="$TARGETOS" GOARCH="$TARGETARCH" go build \
-      -trimpath \
-      -buildvcs=false \
-      -ldflags "-s -w -buildid=" \
-      -o /out/legion-session-runtime \
-      ./cmd/legion-smoke-node
+# Yaklang's embedded pcre2 and pcap dependencies require CGO. The same helper
+# configures all their C sources and archives for the musl static linker.
+ENV GOTOOLCHAIN=local GOMODCACHE=/go/pkg/mod GOCACHE=/root/.cache/go-build
+RUN ./.github/scripts/build-legion-linux-musl.sh --install-toolchain
+RUN --mount=type=cache,id=legion-musl-modules-${TARGETARCH},target=/go/pkg/mod \
+    --mount=type=cache,id=legion-musl-build-${TARGETARCH},target=/root/.cache/go-build \
+    test "$TARGETOS" = "linux" \
+    && if [ "$BUILDARCH" = "$TARGETARCH" ]; then execution=native; \
+       else test "$NODE_MUSL_ALLOW_EMULATION" = true && execution=qemu-emulated; fi \
+    && NODE_SOURCE_DIR=/src NODE_GOARCH="$TARGETARCH" NODE_BUILD_PROFILE=runtime \
+       NODE_BUILDVCS=false NODE_MUSL_BUILDER_IMAGE="$GO_BUILDER_IMAGE" \
+       NODE_MUSL_BUILDER_EXECUTION="$execution" \
+       NODE_OUTPUT_BINARY=/out/legion-session-runtime \
+       NODE_MUSL_METADATA_FILE=/out/session-runtime-musl-build.json \
+       ./.github/scripts/build-legion-linux-musl.sh --in-container
 
 # ---------- 运行阶段 ----------
 FROM ${RUNTIME_BASE_IMAGE}
@@ -60,6 +63,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /out/legion-session-runtime /usr/local/bin/legion-session-runtime
+COPY --from=builder /out/session-runtime-musl-build.json /usr/local/share/legion/session-runtime-musl-build.json
 
 # Keep standalone container launches aligned with sessionmgr. Set this to
 # "stateful" only for a temporary rollback.

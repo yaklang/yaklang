@@ -106,7 +106,7 @@ require (
 	github.com/yaklang/goja v0.1.0
 	github.com/yaklang/gorm v1.9.17-0.20260811094634-87ab480108b6
 	github.com/yaklang/javajive v0.1.2
-	github.com/yaklang/pcap v1.0.6-0.20260710032136-5f3df87eea80
+	github.com/yaklang/pcap v1.0.7-0.20261013042911-fa4332334a4a
 	github.com/ysmood/gson v0.7.3
 	github.com/ysmood/leakless v0.9.0
 	go.uber.org/atomic v1.7.0

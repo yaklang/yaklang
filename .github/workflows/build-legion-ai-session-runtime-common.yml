@@ -110,6 +110,7 @@ jobs:
           set -euo pipefail
           export GOTOOLCHAIN=local
           go test ./cmd/legion-smoke-node ./common/node ./scannode
+          sudo apt-get update && sudo apt-get install -y musl-tools
           ./.github/scripts/test-package-legion-ai-session-runtime.sh
 
       - name: Set up Docker Buildx
@@ -120,13 +121,15 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          builder_tag="golang:1.22.12-bookworm"
+          case "$RUNTIME_GOARCH" in
+            amd64) builder_digest=6d405dfc5fdf3a45df1529cf060b920041f52ce523487e0f36f02765af294a51 ;;
+            arm64) builder_digest=7030196c59858ca8942e85aa2f68599240d58282ee35eb795609738a1e242c1f ;;
+            *) echo 'unsupported Runtime architecture' >&2; exit 1 ;;
+          esac
+          builder_ref="docker.io/library/golang:1.22.12-alpine3.21@sha256:$builder_digest"
           runtime_tag="debian:bookworm-slim"
-          builder_digest="$(docker buildx imagetools inspect "$builder_tag" --format '{{json .Manifest.Digest}}' | jq -r .)"
           runtime_digest="$(docker buildx imagetools inspect "$runtime_tag" --format '{{json .Manifest.Digest}}' | jq -r .)"
-          [[ "$builder_digest" =~ ^sha256:[0-9a-f]{64}$ ]]
           [[ "$runtime_digest" =~ ^sha256:[0-9a-f]{64}$ ]]
-          builder_ref="${builder_tag}@${builder_digest}"
           runtime_ref="${runtime_tag}@${runtime_digest}"
           go_version="$(docker run --rm --platform "linux/${RUNTIME_GOARCH}" "$builder_ref" go version)"
           [[ "$go_version" == *"go1.22.12"* ]]
@@ -175,19 +178,37 @@ jobs:
           container_id="$(docker create "$image_tag")"
           trap 'docker rm -f "$container_id" >/dev/null 2>&1 || true' EXIT
           docker cp "$container_id:/usr/local/bin/legion-session-runtime" "$inspect_dir/legion-session-runtime"
-          docker run --rm --entrypoint /bin/sh "$image_tag" -ec \
-            'test -x /usr/local/bin/legion-session-runtime; ldd /usr/local/bin/legion-session-runtime' \
-            >"$inspect_dir/runtime.ldd"
-          if grep -q 'not found' "$inspect_dir/runtime.ldd"; then
-            echo "Runtime binary has unresolved shared libraries" >&2
-            exit 1
-          fi
+          docker cp "$container_id:/usr/local/share/legion/session-runtime-musl-build.json" "$inspect_dir/musl-build.json"
+          ./.github/scripts/build-legion-linux-musl.sh --verify-binary \
+            "$inspect_dir/legion-session-runtime" "$RUNTIME_GOARCH" runtime
+          # Retain the original provenance field for older readers. ELF and Go
+          # build information above, rather than ldd text, prove static linkage.
+          printf 'statically linked (musl); no dynamic dependencies\n' >"$inspect_dir/runtime.ldd"
           {
             echo "image_ref=$image_ref"
             echo "image_tag=$image_tag"
             echo "image_id=$local_image_id"
             echo "inspect_dir=$inspect_dir"
           } >>"$GITHUB_OUTPUT"
+
+      - name: Verify extracted Runtime Node on glibc 2.28 and NSS compat
+        shell: bash
+        env:
+          RUNTIME_BINARY: ${{ steps.inspect.outputs.inspect_dir }}/legion-session-runtime
+        run: |
+          set -euo pipefail
+          ./.github/scripts/verify-linux-nss-startup.sh \
+            --binary "$RUNTIME_BINARY" --goarch "$RUNTIME_GOARCH" --profile runtime \
+            --evidence "${RUNNER_TEMP}/runtime-node-nss-${RUNTIME_GOARCH}"
+
+      - name: Preserve Runtime Node startup evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: runtime-node-nss-startup_linux_${{ matrix.goarch }}
+          path: ${{ runner.temp }}/runtime-node-nss-${{ matrix.goarch }}/
+          if-no-files-found: warn
+          retention-days: ${{ inputs.retention_days || 14 }}
 
       - name: Stage Runtime image archive
         id: runtime-archive
@@ -209,6 +230,7 @@ jobs:
           RUNTIME_CI_PROVIDER: github-actions
           RUNTIME_BINARY: ${{ steps.inspect.outputs.inspect_dir }}/legion-session-runtime
           RUNTIME_LDD_FILE: ${{ steps.inspect.outputs.inspect_dir }}/runtime.ldd
+          RUNTIME_MUSL_BUILD_METADATA: ${{ steps.inspect.outputs.inspect_dir }}/musl-build.json
           RUNTIME_IMAGE_REF: ${{ steps.inspect.outputs.image_ref }}
           RUNTIME_IMAGE_TAG: ${{ steps.inspect.outputs.image_tag }}
           RUNTIME_IMAGE_ARCHIVE: ${{ steps.runtime-archive.outputs.path }}
@@ -242,7 +264,11 @@ jobs:
               .recipe.goos == "linux" and
               .recipe.goarch == $goarch and
               .recipe.cgo_enabled == true and
-              .recipe.link_mode == "dynamic-container" and
+              .recipe.link_mode == "external-static" and
+              .recipe.c_library == "musl" and
+              .recipe.c_library_version == "1.2.5" and
+              .recipe.build_tags == "musl,netgo,osusergo,sqlite_omit_load_extension" and
+              .recipe.builder_execution == "native" and
               (.capabilities | index("ai.session.bind_epoch.v1")) != null and
               (.capabilities | index("ai.session.turn_lifecycle.v1")) != null and
               (.capabilities | index("ai.session.runtime")) != null and
