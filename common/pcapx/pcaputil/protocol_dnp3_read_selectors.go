@@ -30,7 +30,7 @@ type dnp3StaticSelector struct {
 	group, variation byte
 }
 
-func dnp3DirectReadHeaders(b []byte, limit int, typed, counters bool) ([]any, byte, []dnp3StaticSelector, []any, error) {
+func dnp3DirectReadHeaders(b []byte, limit int, typed, counters, events bool) ([]any, byte, []dnp3StaticSelector, []any, error) {
 	classes := []any{}
 	mask := byte(0)
 	selectors := []dnp3StaticSelector{}
@@ -64,12 +64,24 @@ func dnp3DirectReadHeaders(b []byte, limit int, typed, counters bool) ([]any, by
 					selectors = append(selectors, dnp3StaticSelector{all: true, group: g})
 				}
 			}
+			if events && v > 1 {
+				for _, group := range []byte{22, 23} {
+					selectors = append(selectors, dnp3StaticSelector{all: true, group: group})
+				}
+			}
 		} else {
 			valid := g == 30 && v == 0
 			if typed {
 				valid = (g == 1 && v <= 2) || (g == 10 && (v == 0 || v == 2)) || (g == 30 && v <= 6)
 				if counters && (g == 20 || g == 21) {
 					valid = v == 0 || dnp3CounterWidth(g, v) > 0
+				}
+			}
+			isEvent := events && (g == 22 || g == 23)
+			if isEvent {
+				valid = v == 0 || dnp3CounterEventWidth(g, v) > 0
+				if q != 6 {
+					return fail(ErrUnsupportedFeature, "DNP3 event READ requires all-object qualifier")
 				}
 			}
 			if !valid {
@@ -79,6 +91,9 @@ func dnp3DirectReadHeaders(b []byte, limit int, typed, counters bool) ([]any, by
 				return fail(ErrUnsupportedFeature, "DNP3 direct READ requires G30V0")
 			}
 			x := dnp3StaticSelector{group: g, variation: v}
+			if isEvent {
+				h["Event"] = true
+			}
 			switch q {
 			case 6:
 				x.all = true

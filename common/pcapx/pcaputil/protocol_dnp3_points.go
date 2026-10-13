@@ -51,7 +51,7 @@ func dnp3ReadClasses(b []byte, limit int) ([]any, byte, error) {
 	return classes, mask, nil
 }
 
-func dnp3StaticPoints(b []byte, limit, depth int, packed, counters bool) ([]any, error) {
+func dnp3StaticPoints(b []byte, limit, depth int, packed, counters, events bool) ([]any, error) {
 	if len(b) > 0 && depth < 3 {
 		return nil, protocolError(ErrResourceExceeded, "DNP3 point tree depth")
 	}
@@ -67,8 +67,14 @@ func dnp3StaticPoints(b []byte, limit, depth int, packed, counters bool) ([]any,
 		width := 0
 		isPacked := packed && group == 1 && variation == 1
 		isCounter := counters && dnp3CounterWidth(group, variation) > 0
+		isEvent := events && dnp3CounterEventWidth(group, variation) > 0
 		if isPacked {
 			width = 1
+		} else if isEvent {
+			width = dnp3CounterEventWidth(group, variation)
+			if qualifier != 23 && qualifier != 40 {
+				return nil, protocolError(ErrUnsupportedFeature, "DNP3 counter events require indexed qualifiers")
+			}
 		} else if isCounter {
 			width = dnp3CounterWidth(group, variation)
 		} else if (group == 1 || group == 10) && variation == 2 {
@@ -142,10 +148,19 @@ func dnp3StaticPoints(b []byte, limit, depth int, packed, counters bool) ([]any,
 				b = b[prefix:]
 			}
 			key := [3]uint32{uint32(group), uint32(variation), uint32(index)}
-			if seen[key] {
+			if !isEvent && seen[key] {
 				return nil, protocolError(ErrMalformedMessage, "DNP3 duplicate static point index")
 			}
-			seen[key] = true
+			if !isEvent {
+				seen[key] = true
+			}
+			if isEvent {
+				point := dnp3CounterPoint(index, 21, variation, b[:width])
+				point["Event Class"] = "not-reported"
+				points = append(points, point)
+				b = b[width:]
+				continue
+			}
 			point := map[string]any{"Index": index}
 			if isCounter {
 				points = append(points, dnp3CounterPoint(index, group, variation, b[:width]))
@@ -227,7 +242,11 @@ func dnp3StaticPoints(b []byte, limit, depth int, packed, counters bool) ([]any,
 		if isPacked {
 			b = b[(count+7)/8:]
 		}
-		objects = append(objects, map[string]any{"Group": int(group), "Variation": int(variation), "Qualifier": int(qualifier), "Points": points})
+		object := map[string]any{"Group": int(group), "Variation": int(variation), "Qualifier": int(qualifier), "Points": points}
+		if isEvent {
+			object["Event"] = true
+		}
+		objects = append(objects, object)
 		total += count + 1
 	}
 	return objects, nil
@@ -252,7 +271,7 @@ func (s *binDNP3) observePoints(out map[string]any, dir int, src, dest uint16, u
 		return 0, nil, nil
 	case 1:
 		if s.directReads {
-			classes, mask, selectors, headers, err := dnp3DirectReadHeaders(user[3:], sessionCollectionLimit(s.maxPending), s.typedReads, s.counterPoints)
+			classes, mask, selectors, headers, err := dnp3DirectReadHeaders(user[3:], sessionCollectionLimit(s.maxPending), s.typedReads, s.counterPoints, s.counterEvents)
 			if err != nil {
 				return refuse(err)
 			}
@@ -268,12 +287,29 @@ func (s *binDNP3) observePoints(out map[string]any, dir int, src, dest uint16, u
 		}
 		out["Class Selectors"] = classes
 		return mask, nil, nil
-	case 0x81:
-		objects, err := dnp3StaticPoints(user[5:], sessionCollectionLimit(s.maxPending), s.maxDepth, s.typedReads, s.counterPoints)
+	case 0x81, 0x82:
+		if fc == 0x82 && !s.counterEvents {
+			return refuse(protocolError(ErrUnsupportedFeature, "DNP3 selected READ points do not decode function 130"))
+		}
+		objects, err := dnp3StaticPoints(user[5:], sessionCollectionLimit(s.maxPending), s.maxDepth, s.typedReads, s.counterPoints, s.counterEvents)
 		if err != nil {
 			return refuse(err)
 		}
+		hasStatic, hasEvents := false, false
+		for _, o := range objects {
+			if o.(map[string]any)["Event"] == true {
+				hasEvents = true
+			} else {
+				hasStatic = true
+			}
+		}
+		if fc == 0x82 && hasStatic {
+			return refuse(protocolError(ErrUnsupportedFeature, "DNP3 selected unsolicited response requires counter events"))
+		}
 		req, known := s.pending[dnp3RequestKey{1 - dir, dest, src, ac & 15}]
+		if fc == 0x82 {
+			known = false
+		}
 		if known && len(objects) > 0 && s.typedReads {
 			if !dnp3TypedSelectorsCover(req.selectors, objects) {
 				return refuse(protocolError(ErrContextRequired, "DNP3 static points are outside observed READ selectors"))
@@ -297,6 +333,11 @@ func (s *binDNP3) observePoints(out map[string]any, dir int, src, dest uint16, u
 				out["Read Context"] = "observed"
 				if len(objects) == 0 {
 					out["Read Coverage"] = "no-static-data"
+				} else if hasEvents {
+					out["Read Coverage"] = "selected-events"
+					if hasStatic {
+						out["Read Coverage"] = "selected-static-and-events"
+					}
 				} else if s.typedReads {
 					out["Read Coverage"] = "selected-static"
 				} else if req.classes&1 != 0 {

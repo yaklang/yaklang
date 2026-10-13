@@ -57,6 +57,19 @@ func normalizeDNP3TypedSelectors(a []dnp3StaticSelector) []dnp3StaticSelector {
 			continue
 		}
 		g := byte(group)
+		if g == 22 || g == 23 {
+			// All-object event selection does not reselect events that an earlier
+			// header already selected. Its variation precedence differs from
+			// static range selection. Class/V0 defaults remain unreported.
+			for _, x := range a {
+				if x.group == g {
+					x.first, x.last, x.all = 0, 65535, false
+					out = append(out, x)
+					break
+				}
+			}
+			continue
+		}
 		events := []dnp3SelectorBoundary{}
 		for id, x := range a {
 			if x.group != g {

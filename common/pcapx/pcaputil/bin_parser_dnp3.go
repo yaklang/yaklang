@@ -29,6 +29,7 @@ type binDNP3 struct {
 	directReads        bool
 	typedReads         bool
 	counterPoints      bool
+	counterEvents      bool
 	transportFragments bool
 	fragments          map[dnp3TransportKey]*dnp3TransportFragment
 	maxApplication     int

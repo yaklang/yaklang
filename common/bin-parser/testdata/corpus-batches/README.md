@@ -44,7 +44,7 @@ Run from the repository root:
 ```sh
 go run ./internal/trafficfixture/cmd/corpus test
 go test -json -count=1 -timeout=5m ./internal/trafficfixture/... ./common/bin-parser/... ./common/pcapx/... ./common/yak/cmd/yakcmds/shark-cli ./scripts/ci > traffic.jsonl
-go run ./internal/trafficfixture/cmd/corpus exec -- python3 @scripts/protocol-tests/check_go_test_json_v2.py traffic.jsonl --inventory @scripts/protocol-tests/required-tests-traffic-unified-v55.json --tier full
+go run ./internal/trafficfixture/cmd/corpus exec -- python3 @scripts/protocol-tests/check_go_test_json_v2.py traffic.jsonl --inventory @scripts/protocol-tests/required-tests-traffic-unified-v56.json --tier full
 ```
 
 The single `corpus` entry point uses the same bounded Go ZIP loader as tests.
@@ -83,7 +83,7 @@ their semantic coverage. The existing synthetic session keys are test inputs;
 production credentials, user private keys and material without redistribution
 permission belong in an external fixed-source download manifest.
 
-Current test requirements are sealed at `scripts/protocol-tests/required-tests-traffic-unified-v55.json`;
+Current test requirements are sealed at `scripts/protocol-tests/required-tests-traffic-unified-v56.json`;
 the historical inventories and all earlier batches remain unchanged.
 The supplemental small-corpus batch contains 26 minimal controls, their explicit
 expected facts, an offline generator and the compact pinned source manifest.
@@ -203,7 +203,7 @@ opaque selector bytes and one bounded Data value over Wrapper v1 TCP/UDP; object
 selector meaning, access permission and device operation are unverified. The
 original one-packet selective-access capture and original refused answer remain
 immutable; its now-supported answer is matched by exact input SHA and frame.
-The active inventory is `scripts/protocol-tests/required-tests-traffic-unified-v55.json`.
+The active inventory is `scripts/protocol-tests/required-tests-traffic-unified-v56.json`.
 
 The small-graph budget batch reuses accepted graph captures/answers and adds one
 249-byte UDP control for child count255 without child bytes. Its standalone proof
@@ -993,7 +993,7 @@ the normative answer; a missing numeric reference field is not a codec pass.
 Full/deferred, workers1/2/4, observers off/on, Feed chunks1/7/full, ownership,
 resources and close/refusal boundaries remain required.
 
-Current gate: `required-tests-traffic-unified-v55.json` with
+Current gate: `required-tests-traffic-unified-v56.json` with
 `check_go_test_json_v2.py`. The indexed validator preserves missing/unpassed,
 package invocation completion, descendant skips, failures and non-JSON checks;
 its mutation/differential harness is sealed with the material. Older checkers
@@ -1229,7 +1229,7 @@ opendnp3 READ handler/database source supplies selector semantics. Requested
 specific variations, other direct object groups, index-prefix READs, packed
 binary observations, application fragments, UDP/authentication/device/completeness
 and generation identity remain open. No historical batch is rewritten. Current
-This preceding batch used v53; the current effective entry is v55.
+This preceding batch used v53; the current effective entry is v56.
 
 
 ### Selected typed static DNP3 READ and packed binary points
@@ -1268,7 +1268,7 @@ are sealed. This is not full SDK, serializer, endpoint, authenticated identity,
 real database/configuration, range-completeness or physical measurement proof.
 Other static/event groups, G10V1, index-prefix READ, application fragments, UDP
 and security remain active unimplemented requirements. No historical batch is
-rewritten. That batch used v54 (23,767 checks); the current full mandatory entry is v55 (24,668 checks); older
+rewritten. That batch used v54 (23,767 checks); the current full mandatory entry is v56 (25,749 checks); older
 inventories above describe their historical delivery snapshots.
 
 
@@ -1305,5 +1305,45 @@ Declared reference adapters are not a full SDK or device endpoint.
 Counter events, freezing operations, other objects, application fragments, UDP,
 authentication, inferred device defaults, clock synchronization, complete/current
 device state, physical metering and indistinguishable generation identity remain
-unimplemented or unqualified. Previous ZIPs remain immutable. The current full
-mandatory entry is v55 (24,668 checks); earlier inventories remain available.
+unimplemented or unqualified. Previous ZIPs remain immutable. That batch used v55 (24,668 checks); the current full
+mandatory entry is v56 (25,749 checks); earlier inventories remain available.
+
+
+### Selected indexed DNP3 counter events
+
+`WithDNP3CounterEvents` / `WithSessionDNP3CounterEvents` explicitly select TCP
+counter G22 and frozen-counter G23V1/2/5/6, retaining selected static points.
+Responses require indexed qualifiers23/40 and preserve repeated indices and
+wire order. Values are unsigned `uint32`; flagged quality retains separate
+rollover/discontinuity bits. V5/6 expose48-bit milliseconds with clock quality
+not-reported. Every event point has `Event Class: not-reported`; an observed
+class READ is not proof of a particular device event class.
+
+Direct event READ supports V0/concrete all-object qualifier6 and class1/2/3
+selectors. Event all-object selection keeps the first observed type selection:
+later event headers do not override already selected events. Static range
+selection retains its existing later-header precedence. Wrong type/variation
+cannot retire a pending request. Unsolicited responses and confirmations stay
+outside solicited request retirement; confirmation is only observed, not sent.
+Unsupported count/range/index event READs remain explicit refusals. Separate
+TCP transport-fragment assembly can be composed with this profile.
+
+The59 synthetic minimal controls in `validation-dnp3-counter-events.zip` carry
+complete independent bytes/fields/Session/order/association/refusal answers,
+source/model pins and necessary reconstruction/reference scripts. They include
+repeated indices, variant precedence, timestamp/unsigned boundaries, class0
+versus event context, direction/sequence/link peers, retry/conflicting requests,
+malformed/truncated headers/points, unsolicited/confirmation isolation,
+selector ownership, count/memory/depth refusal, release and recovery. All
+whole/1/7-byte native feeds and full/deferred × workers1/2/4 × observeroff/on
+capture combinations are required. Actual TShark fields, fixed Group22/23
+Read/Write code, exact EventSelection methods and unchanged TransportRx execute
+independently with explicitly declared adapters. These are not full SDK or
+endpoint/device proofs. The reference class-selection source has a retained
+TODO about resetting previously used variations; fresh declared reference
+records do not establish long-lived SDK reset equivalence.
+
+Other event layouts/services, event count/range/index READs, application
+fragments, UDP/security, actual device classes/defaults/current configuration,
+completeness, metering and indistinguishable generations remain open. Historical
+ZIPs are immutable. The active full mandatory inventory is v56 (25,749 checks).
