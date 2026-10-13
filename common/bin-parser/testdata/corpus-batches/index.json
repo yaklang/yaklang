@@ -80100,6 +80100,292 @@
         "common/pcapx/pcaputil/dnp3-analog-events/TRANSPORT-SOURCE-PINS.json": "dnp3-analog-events/TRANSPORT-SOURCE-PINS.json",
         "scripts/protocol-tests/required-tests-traffic-unified-v61.json": "required-tests-traffic-unified-v61.json"
       }
+    },
+    {
+      "id": "validation-bacnet-npdu-boundary",
+      "kind": "validation",
+      "source_sha": "a1107db6fa887651e860958cad82c15099abc7bd",
+      "file": "validation-bacnet-npdu-boundary.zip",
+      "sha256": "86eec2d0910ac4724a86aae83706f68bdf7d8d4b6e1321b3ecbc456202fe7bf4",
+      "password": "bin-parser",
+      "members": {
+        "bacnet-npdu-boundary/captures/priority-0.pcap": {
+          "sha256": "682d5bd9d25261eeeb9910a772287fc49f741bf29a05fbc6738b1e06685aed51",
+          "bytes": 90
+        },
+        "bacnet-npdu-boundary/answers/priority-0.json": {
+          "sha256": "b02a625449064ebdd731e5b9e7a47ed31164baaed3e6245b146b0cd10bee315d",
+          "bytes": 1152
+        },
+        "bacnet-npdu-boundary/captures/priority-1.pcap": {
+          "sha256": "40d1833c5eef51b6c984face94180ae13e945e61d51887fda016ec26dbe9a88a",
+          "bytes": 90
+        },
+        "bacnet-npdu-boundary/answers/priority-1.json": {
+          "sha256": "e6fda832bcbfaa285d0a2f891ee982e45ec432168b80db0bd17ce51156d50103",
+          "bytes": 1152
+        },
+        "bacnet-npdu-boundary/captures/priority-2.pcap": {
+          "sha256": "208557e693ea1b8dedd7fb516c8b7635c748cb6ae131b7f3e29b7a789e872fe7",
+          "bytes": 90
+        },
+        "bacnet-npdu-boundary/answers/priority-2.json": {
+          "sha256": "e486aa146ce7bc921bf07110eb956b4da5157a59a3b144dcc31634fc9a23c1f7",
+          "bytes": 1152
+        },
+        "bacnet-npdu-boundary/captures/priority-3.pcap": {
+          "sha256": "97d4424699c88ed5ceaaf9358c74108d6ab3988c589117485cb63701792a0534",
+          "bytes": 90
+        },
+        "bacnet-npdu-boundary/answers/priority-3.json": {
+          "sha256": "c662ccc1b617f7f2337caa3e3c25ba81ea374e33881af2ae9a02267e4dc6cbd3",
+          "bytes": 1152
+        },
+        "bacnet-npdu-boundary/captures/priority-4.pcap": {
+          "sha256": "62ffa43bdfa1b360a8ddd1ebdae90dbb526f614f4e140e57179cc561764c6d62",
+          "bytes": 99
+        },
+        "bacnet-npdu-boundary/answers/priority-4.json": {
+          "sha256": "2b4e4406981444d16dd21db3f93412682810a12b7817aa705ce9845018be67a6",
+          "bytes": 1235
+        },
+        "bacnet-npdu-boundary/captures/priority-5.pcap": {
+          "sha256": "dd368d76e482b653f2b4490b6afeb596dd4a886cfb55460faef8814cacbb8dc7",
+          "bytes": 99
+        },
+        "bacnet-npdu-boundary/answers/priority-5.json": {
+          "sha256": "d5c189605298a2d31da366b0a8f941aef4fc7aea4cd752510fc5fc98a93bbed9",
+          "bytes": 1235
+        },
+        "bacnet-npdu-boundary/captures/priority-6.pcap": {
+          "sha256": "cfe54de90f7cd2f647e532584c53d51fbb0ad51afa45f05a6069f52aef9e9a28",
+          "bytes": 99
+        },
+        "bacnet-npdu-boundary/answers/priority-6.json": {
+          "sha256": "c7d2f6dea829ad738ef769b4f1bf79cb950babce666c3f38cff0ae63b10cef67",
+          "bytes": 1235
+        },
+        "bacnet-npdu-boundary/captures/priority-7.pcap": {
+          "sha256": "df4594d8ab85c24699023ee523f2556f06bcf8390c47ffcca7e1579ab577940c",
+          "bytes": 99
+        },
+        "bacnet-npdu-boundary/answers/priority-7.json": {
+          "sha256": "fb0ffac731ff73bbe64cde68260c0667da801379e11d5bd058b8648b90e0fe16",
+          "bytes": 1235
+        },
+        "bacnet-npdu-boundary/captures/source-trap-readproperty.pcap": {
+          "sha256": "ddea0c012508761a4368ea53ff26fb998c9e1fd320174b30291b1d509cd7eb4b",
+          "bytes": 160
+        },
+        "bacnet-npdu-boundary/answers/source-trap-readproperty.json": {
+          "sha256": "66271f66a85b9607b2c40faf12785447f4336e6a3f3bafc5be8796b40ff8bdaf",
+          "bytes": 1676
+        },
+        "bacnet-npdu-boundary/captures/source-trap-writeproperty.pcap": {
+          "sha256": "fe49f2022e23c88d55bdf0f5a3f70bc3412291208026d1e8f4a9009e5dcb5205",
+          "bytes": 160
+        },
+        "bacnet-npdu-boundary/answers/source-trap-writeproperty.json": {
+          "sha256": "6cbb24ea681618fa40300b0dc54fad1ec3182a9c859a57f13ccc2dbf329ac051",
+          "bytes": 1676
+        },
+        "bacnet-npdu-boundary/captures/source-trap-priority3.pcap": {
+          "sha256": "34357d37f542e8cf4766e49b7647c2d177be56d8d3f2858475033cada4850a5a",
+          "bytes": 160
+        },
+        "bacnet-npdu-boundary/answers/source-trap-priority3.json": {
+          "sha256": "690b0cd680faf0985231d75acda5139dacb6dcbaff717b960ca24434764dc2ba",
+          "bytes": 1676
+        },
+        "bacnet-npdu-boundary/captures/destination-routed.pcap": {
+          "sha256": "fa52fc12ac61ce87db39406b9facb56a555deb37dba09cbae40479b2e4e59fec",
+          "bytes": 161
+        },
+        "bacnet-npdu-boundary/answers/destination-routed.json": {
+          "sha256": "9bce13a3d41586dcbeb7a0167ab54013d7a2df7a5e8b84933487b94d074f09c2",
+          "bytes": 1680
+        },
+        "bacnet-npdu-boundary/captures/network-message.pcap": {
+          "sha256": "124864ffadab22ccb8963a0e09485ca56e2e32397a8e5fc89e89d487ca55f975",
+          "bytes": 155
+        },
+        "bacnet-npdu-boundary/answers/network-message.json": {
+          "sha256": "10e2294cd722c774f4c8d5514687563ee3bd4577e5037e706ec94fc3389d01c5",
+          "bytes": 1656
+        },
+        "bacnet-npdu-boundary/captures/reserved4.pcap": {
+          "sha256": "0212a2574b616d6b3c23d0d57c0347f4fef35c05cb6e52b8e20bbea6c2bf7d9e",
+          "bytes": 156
+        },
+        "bacnet-npdu-boundary/answers/reserved4.json": {
+          "sha256": "4b060a2e45266f1d76431e789d879ad745b85d313c798617dc16f58a7dec16fc",
+          "bytes": 1660
+        },
+        "bacnet-npdu-boundary/captures/reserved6.pcap": {
+          "sha256": "486416d47a0b90e54fd07746413c86d1409ad02708a07ad837461c73dd99ace1",
+          "bytes": 156
+        },
+        "bacnet-npdu-boundary/answers/reserved6.json": {
+          "sha256": "08d15e5e638c392e37e8269b4faa31fc59b234d84132fc5ecccc767e064ef431",
+          "bytes": 1660
+        },
+        "bacnet-npdu-boundary/captures/reserved-both-priority3.pcap": {
+          "sha256": "4f2fbd0241c628d11d006b39cd512a1cb9fd18036c99e44f9d4b8f843d371ff4",
+          "bytes": 156
+        },
+        "bacnet-npdu-boundary/answers/reserved-both-priority3.json": {
+          "sha256": "cf405b83bf5c769a91c9563bc48c9b90adcac2aff95ae1751fbfab23800ae31c",
+          "bytes": 1660
+        },
+        "bacnet-npdu-boundary/captures/bad-version.pcap": {
+          "sha256": "058cdf8f1086181e02d0c137a395b33fd1278b9067c0b55e36b43fc6be822677",
+          "bytes": 156
+        },
+        "bacnet-npdu-boundary/answers/bad-version.json": {
+          "sha256": "e8fd00515083ac7a64df7bfff35a13c28b5c167508e475a3708a8813f86fc94d",
+          "bytes": 1594
+        },
+        "bacnet-npdu-boundary/captures/bad-bvlc-length.pcap": {
+          "sha256": "d8385643c5d838dfaa0a6f63be06df0ac35de134ba0dfc5a62aeff6403a4a636",
+          "bytes": 156
+        },
+        "bacnet-npdu-boundary/answers/bad-bvlc-length.json": {
+          "sha256": "c61416ed3136b3e1c73ee17c6e8e6ff7039c707b846b1190743e26eb3ba7893c",
+          "bytes": 1594
+        },
+        "bacnet-npdu-boundary/captures/bad-function.pcap": {
+          "sha256": "d6c715a9285381592b409622482eb74b0580e7aea325aa35b7e6f9fab147b243",
+          "bytes": 156
+        },
+        "bacnet-npdu-boundary/answers/bad-function.json": {
+          "sha256": "44b509aa2d2d1e32ad4f49960012fef71087d2835c3d23d404e66a5077c09af2",
+          "bytes": 1594
+        },
+        "bacnet-npdu-boundary/captures/truncated-apdu.pcap": {
+          "sha256": "6039b78e10223a8e5f0388b281d2cae4c659a14a0e468573f7d905493a9cf7a9",
+          "bytes": 157
+        },
+        "bacnet-npdu-boundary/answers/truncated-apdu.json": {
+          "sha256": "0ec496bc91e233c95ecf5573b7e1a7443bca0f27c665cdca694e402593c6ef7f",
+          "bytes": 1598
+        },
+        "bacnet-npdu-boundary/captures/reserved-apdu.pcap": {
+          "sha256": "9c2909e2220c637d9419091688247ee4f37d80541a42d1c1486579431216c907",
+          "bytes": 156
+        },
+        "bacnet-npdu-boundary/answers/reserved-apdu.json": {
+          "sha256": "65b1493dff484cae42db1afafd0fde88a12f37584888a8213613eda3e9f5313b",
+          "bytes": 1594
+        },
+        "bacnet-npdu-boundary/captures/udp-boundary-no-join.pcap": {
+          "sha256": "800b2d2919c95e77c789eb2a3afe1fb4e603bbf1ba659637f6cae2d8564e68e2",
+          "bytes": 214
+        },
+        "bacnet-npdu-boundary/answers/udp-boundary-no-join.json": {
+          "sha256": "5955ff007d6a6b7bccbed4898bb3a841a00d0a8f252a5b6810e7b43727a5ab5c",
+          "bytes": 2012
+        },
+        "bacnet-npdu-boundary/manifest.json": {
+          "sha256": "be220dee8627a40c613b6789bc2bb25ef2e42d8f17119df85c89d162b2bf39e2",
+          "bytes": 7372
+        },
+        "bacnet-npdu-boundary/generate.py": {
+          "sha256": "c61b5ce61c3427e4d5f8b26f8cbbdf49ddfd80f1f1f738662287ff5e4c146b9a",
+          "bytes": 4392
+        },
+        "bacnet-npdu-boundary/verify.py": {
+          "sha256": "fed50086fb10516c15d4ce0a4af2d47ff09b3ef4591d3d2f5bdcff5ffc248f77",
+          "bytes": 708
+        },
+        "bacnet-npdu-boundary/MODEL-PINS.json": {
+          "sha256": "47c6296a5e848360debe791215ebc9efa8abc01d7482264c2784cfe2caf107eb",
+          "bytes": 1725
+        },
+        "bacnet-npdu-boundary/SOURCE-PINS.json": {
+          "sha256": "aa63420ea2a0db856ae27c47cbfd0303d959215506b760643d102550db185286",
+          "bytes": 662
+        },
+        "bacnet-npdu-boundary/reference.py": {
+          "sha256": "89c5c98f62fe06be95cf02c045c7502a0a8ad367ff237f338e53fa05b790dd63",
+          "bytes": 3094
+        },
+        "bacnet-npdu-boundary/REFERENCE-ACTUAL.json": {
+          "sha256": "2ebfdc95ad99914088cc45ce28fbbf9cb5528f2b7d8694f9858fc772408f1b14",
+          "bytes": 5905
+        },
+        "bacnet-npdu-boundary/reference_npdu.py": {
+          "sha256": "84f43aebbc08d2e4c259d4b4c45b4a51897e1076173b1b8d3dc05ea35455dee1",
+          "bytes": 4595
+        },
+        "bacnet-npdu-boundary/REFERENCE-NPDU-ACTUAL.json": {
+          "sha256": "388f658b80de8a1b8031e404b838bb97746a0624de702a3de11d222f3c6887d3",
+          "bytes": 9655
+        },
+        "required-tests-traffic-unified-v62.json": {
+          "sha256": "62226984deb3fdc39a13c06d8f3fc22bb374bfa88e234322d7e3a53d7a818a80",
+          "bytes": 14555584
+        },
+        "validation/expected.json": {
+          "sha256": "94c855f94ec2363d7e9c74f9351e53fd49300d87e30ab1410695a447f229f4ef",
+          "bytes": 27424
+        }
+      },
+      "aliases": {
+        "common/pcapx/pcaputil/bacnet-npdu-boundary/captures/priority-0.pcap": "bacnet-npdu-boundary/captures/priority-0.pcap",
+        "common/pcapx/pcaputil/bacnet-npdu-boundary/answers/priority-0.json": "bacnet-npdu-boundary/answers/priority-0.json",
+        "common/pcapx/pcaputil/bacnet-npdu-boundary/captures/priority-1.pcap": "bacnet-npdu-boundary/captures/priority-1.pcap",
+        "common/pcapx/pcaputil/bacnet-npdu-boundary/answers/priority-1.json": "bacnet-npdu-boundary/answers/priority-1.json",
+        "common/pcapx/pcaputil/bacnet-npdu-boundary/captures/priority-2.pcap": "bacnet-npdu-boundary/captures/priority-2.pcap",
+        "common/pcapx/pcaputil/bacnet-npdu-boundary/answers/priority-2.json": "bacnet-npdu-boundary/answers/priority-2.json",
+        "common/pcapx/pcaputil/bacnet-npdu-boundary/captures/priority-3.pcap": "bacnet-npdu-boundary/captures/priority-3.pcap",
+        "common/pcapx/pcaputil/bacnet-npdu-boundary/answers/priority-3.json": "bacnet-npdu-boundary/answers/priority-3.json",
+        "common/pcapx/pcaputil/bacnet-npdu-boundary/captures/priority-4.pcap": "bacnet-npdu-boundary/captures/priority-4.pcap",
+        "common/pcapx/pcaputil/bacnet-npdu-boundary/answers/priority-4.json": "bacnet-npdu-boundary/answers/priority-4.json",
+        "common/pcapx/pcaputil/bacnet-npdu-boundary/captures/priority-5.pcap": "bacnet-npdu-boundary/captures/priority-5.pcap",
+        "common/pcapx/pcaputil/bacnet-npdu-boundary/answers/priority-5.json": "bacnet-npdu-boundary/answers/priority-5.json",
+        "common/pcapx/pcaputil/bacnet-npdu-boundary/captures/priority-6.pcap": "bacnet-npdu-boundary/captures/priority-6.pcap",
+        "common/pcapx/pcaputil/bacnet-npdu-boundary/answers/priority-6.json": "bacnet-npdu-boundary/answers/priority-6.json",
+        "common/pcapx/pcaputil/bacnet-npdu-boundary/captures/priority-7.pcap": "bacnet-npdu-boundary/captures/priority-7.pcap",
+        "common/pcapx/pcaputil/bacnet-npdu-boundary/answers/priority-7.json": "bacnet-npdu-boundary/answers/priority-7.json",
+        "common/pcapx/pcaputil/bacnet-npdu-boundary/captures/source-trap-readproperty.pcap": "bacnet-npdu-boundary/captures/source-trap-readproperty.pcap",
+        "common/pcapx/pcaputil/bacnet-npdu-boundary/answers/source-trap-readproperty.json": "bacnet-npdu-boundary/answers/source-trap-readproperty.json",
+        "common/pcapx/pcaputil/bacnet-npdu-boundary/captures/source-trap-writeproperty.pcap": "bacnet-npdu-boundary/captures/source-trap-writeproperty.pcap",
+        "common/pcapx/pcaputil/bacnet-npdu-boundary/answers/source-trap-writeproperty.json": "bacnet-npdu-boundary/answers/source-trap-writeproperty.json",
+        "common/pcapx/pcaputil/bacnet-npdu-boundary/captures/source-trap-priority3.pcap": "bacnet-npdu-boundary/captures/source-trap-priority3.pcap",
+        "common/pcapx/pcaputil/bacnet-npdu-boundary/answers/source-trap-priority3.json": "bacnet-npdu-boundary/answers/source-trap-priority3.json",
+        "common/pcapx/pcaputil/bacnet-npdu-boundary/captures/destination-routed.pcap": "bacnet-npdu-boundary/captures/destination-routed.pcap",
+        "common/pcapx/pcaputil/bacnet-npdu-boundary/answers/destination-routed.json": "bacnet-npdu-boundary/answers/destination-routed.json",
+        "common/pcapx/pcaputil/bacnet-npdu-boundary/captures/network-message.pcap": "bacnet-npdu-boundary/captures/network-message.pcap",
+        "common/pcapx/pcaputil/bacnet-npdu-boundary/answers/network-message.json": "bacnet-npdu-boundary/answers/network-message.json",
+        "common/pcapx/pcaputil/bacnet-npdu-boundary/captures/reserved4.pcap": "bacnet-npdu-boundary/captures/reserved4.pcap",
+        "common/pcapx/pcaputil/bacnet-npdu-boundary/answers/reserved4.json": "bacnet-npdu-boundary/answers/reserved4.json",
+        "common/pcapx/pcaputil/bacnet-npdu-boundary/captures/reserved6.pcap": "bacnet-npdu-boundary/captures/reserved6.pcap",
+        "common/pcapx/pcaputil/bacnet-npdu-boundary/answers/reserved6.json": "bacnet-npdu-boundary/answers/reserved6.json",
+        "common/pcapx/pcaputil/bacnet-npdu-boundary/captures/reserved-both-priority3.pcap": "bacnet-npdu-boundary/captures/reserved-both-priority3.pcap",
+        "common/pcapx/pcaputil/bacnet-npdu-boundary/answers/reserved-both-priority3.json": "bacnet-npdu-boundary/answers/reserved-both-priority3.json",
+        "common/pcapx/pcaputil/bacnet-npdu-boundary/captures/bad-version.pcap": "bacnet-npdu-boundary/captures/bad-version.pcap",
+        "common/pcapx/pcaputil/bacnet-npdu-boundary/answers/bad-version.json": "bacnet-npdu-boundary/answers/bad-version.json",
+        "common/pcapx/pcaputil/bacnet-npdu-boundary/captures/bad-bvlc-length.pcap": "bacnet-npdu-boundary/captures/bad-bvlc-length.pcap",
+        "common/pcapx/pcaputil/bacnet-npdu-boundary/answers/bad-bvlc-length.json": "bacnet-npdu-boundary/answers/bad-bvlc-length.json",
+        "common/pcapx/pcaputil/bacnet-npdu-boundary/captures/bad-function.pcap": "bacnet-npdu-boundary/captures/bad-function.pcap",
+        "common/pcapx/pcaputil/bacnet-npdu-boundary/answers/bad-function.json": "bacnet-npdu-boundary/answers/bad-function.json",
+        "common/pcapx/pcaputil/bacnet-npdu-boundary/captures/truncated-apdu.pcap": "bacnet-npdu-boundary/captures/truncated-apdu.pcap",
+        "common/pcapx/pcaputil/bacnet-npdu-boundary/answers/truncated-apdu.json": "bacnet-npdu-boundary/answers/truncated-apdu.json",
+        "common/pcapx/pcaputil/bacnet-npdu-boundary/captures/reserved-apdu.pcap": "bacnet-npdu-boundary/captures/reserved-apdu.pcap",
+        "common/pcapx/pcaputil/bacnet-npdu-boundary/answers/reserved-apdu.json": "bacnet-npdu-boundary/answers/reserved-apdu.json",
+        "common/pcapx/pcaputil/bacnet-npdu-boundary/captures/udp-boundary-no-join.pcap": "bacnet-npdu-boundary/captures/udp-boundary-no-join.pcap",
+        "common/pcapx/pcaputil/bacnet-npdu-boundary/answers/udp-boundary-no-join.json": "bacnet-npdu-boundary/answers/udp-boundary-no-join.json",
+        "common/pcapx/pcaputil/bacnet-npdu-boundary/manifest.json": "bacnet-npdu-boundary/manifest.json",
+        "common/pcapx/pcaputil/bacnet-npdu-boundary/generate.py": "bacnet-npdu-boundary/generate.py",
+        "common/pcapx/pcaputil/bacnet-npdu-boundary/verify.py": "bacnet-npdu-boundary/verify.py",
+        "common/pcapx/pcaputil/bacnet-npdu-boundary/MODEL-PINS.json": "bacnet-npdu-boundary/MODEL-PINS.json",
+        "common/pcapx/pcaputil/bacnet-npdu-boundary/SOURCE-PINS.json": "bacnet-npdu-boundary/SOURCE-PINS.json",
+        "common/pcapx/pcaputil/bacnet-npdu-boundary/reference.py": "bacnet-npdu-boundary/reference.py",
+        "common/pcapx/pcaputil/bacnet-npdu-boundary/REFERENCE-ACTUAL.json": "bacnet-npdu-boundary/REFERENCE-ACTUAL.json",
+        "common/pcapx/pcaputil/bacnet-npdu-boundary/reference_npdu.py": "bacnet-npdu-boundary/reference_npdu.py",
+        "common/pcapx/pcaputil/bacnet-npdu-boundary/REFERENCE-NPDU-ACTUAL.json": "bacnet-npdu-boundary/REFERENCE-NPDU-ACTUAL.json",
+        "scripts/protocol-tests/required-tests-traffic-unified-v62.json": "required-tests-traffic-unified-v62.json"
+      }
     }
   ],
   "schema_version": 1,

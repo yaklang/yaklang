@@ -18,6 +18,7 @@ import (
 type ProtocolEvent struct {
 	nativeOPCUAObservation                   bool
 	nativeMMSObservation                     bool
+	nativeUnrecognizedUDP                    bool
 	Admission                                string
 	semanticFields                           map[string]any
 	semanticSession                          map[string]any
@@ -128,6 +129,9 @@ func (e *ProtocolEvent) Decode() (result map[string]any, err error) {
 			result = owned
 		}
 	}()
+	if e.nativeUnrecognizedUDP {
+		return nil, fmt.Errorf("protocol parser: event is unrecognized, not an exact message")
+	}
 	// Native contextual queries preserve the accepted observation or its refusal;
 	// the public Session may be edited or removed by the callback consumer.
 	if (e.Protocol == "tls" || e.Protocol == "redis" || e.Protocol == "mysql" || e.Protocol == "mqtt") && e.sessionError != nil {
@@ -237,6 +241,9 @@ func (e *ProtocolEvent) retainRuleEnvelope(result map[string]any) {
 }
 
 func (e *ProtocolEvent) ownsNativeFields() bool {
+	if e.nativeUnrecognizedUDP {
+		return true
+	}
 	// Preserve accepted IEC104/DNP3 typed refusals before any mutable public cache.
 	if (e.Protocol == "iec104" || e.Protocol == "dnp3") && e.sessionError != nil {
 		return true
@@ -600,6 +607,12 @@ func (a *binParser) emit(e *BinParserEvent) {
 	if e.ID == 0 {
 		e.ID = a.ids.Add(1)
 	}
+	// Capture diagnostics cannot become parsed messages through public cache,
+	// protocol or status edits. Manually constructed events retain legacy caches.
+	if e.Transport == "udp" && e.Protocol == "" && e.Status == "unrecognized" {
+		e.nativeUnrecognizedUDP = true
+	}
+
 	if e.Protocol == "sip" {
 		a.observeSIPMedia(e)
 	}

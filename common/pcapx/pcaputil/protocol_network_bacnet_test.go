@@ -3,6 +3,7 @@ package pcaputil
 import (
 	"bytes"
 	"encoding/binary"
+	"fmt"
 	"path/filepath"
 	"testing"
 
@@ -85,5 +86,117 @@ func TestReplayPcapRejectsBACnetPortAndNearSignatureFrames(t *testing.T) {
 	for _, event := range events {
 		require.NotEqual(t, "bacnet", event.Protocol, "%s: %s", event.Status, event.Error)
 		require.NotEqual(t, "decoded", event.Status)
+	}
+}
+func TestBACnetNPDUCaptureBoundary(t *testing.T) {
+	for _, ctrl := range []byte{0, 1, 2, 3, 4, 5, 6, 7} {
+		t.Run(fmt.Sprintf("priority-%d", ctrl), func(t *testing.T) {
+			apdu := []byte{0x10, 8}
+			fn := byte(0x0b)
+			service := byte(8)
+			name := "Who-Is"
+			typ := "Unconfirmed-Request"
+			if ctrl&4 != 0 {
+				apdu = []byte{0, 5, 36, 12, 12, 0, 128, 0, 1, 25, 85}
+				fn = 10
+				service = 12
+				name = "ReadProperty"
+				typ = "Confirmed-Request"
+			}
+			wire := bacnetTestPacket(fn, append([]byte{1, ctrl}, apdu...))
+			var all []*ProtocolEvent
+			require.NoError(t, ReplayPcap(bytes.NewReader(sessionDatagramPCAP(t, []sessionStep{{dir: 0, wire: wire}}, layers.UDPPort(bacnetIPv4UDPPort))), WithOnProtocolMessage(func(e *ProtocolEvent) { all = append(all, e) })))
+			require.Len(t, all, 1)
+			e := all[0]
+			require.Equal(t, "bacnet", e.Protocol)
+			require.Equal(t, "decoded", e.Status)
+			require.Equal(t, wire, e.Raw)
+			require.Equal(t, "bacnet-ip-envelope", e.Profile)
+			require.Equal(t, "udp", e.Transport)
+			require.Equal(t, ctrl, e.Fields["NPDU Control"])
+			require.Equal(t, ctrl, e.Session["NPDU Control"])
+			require.Equal(t, service, e.Fields["Service Choice"])
+			require.Equal(t, name, e.Session["Service"])
+			require.Equal(t, typ, e.Session["APDU Type"])
+			require.Equal(t, wire[6:], e.Fields["APDU"])
+			require.Equal(t, wire, e.Fields["Complete BVLC PDU"])
+			require.Zero(t, e.ResponseTo)
+			require.Zero(t, e.TransactionID)
+		})
+	}
+	for name, npdu := range map[string][]byte{"source-address-trap": {1, 8, 0, 5, 1, 12, 16, 8}, "reserved4": {1, 16, 16, 8}, "reserved6": {1, 64, 16, 8}} {
+		t.Run(name, func(t *testing.T) {
+			wire := bacnetTestPacket(0x0b, npdu)
+			var all []*ProtocolEvent
+			require.NoError(t, ReplayPcap(bytes.NewReader(sessionDatagramPCAP(t, []sessionStep{{dir: 0, wire: wire}}, layers.UDPPort(bacnetIPv4UDPPort))), WithOnProtocolMessage(func(e *ProtocolEvent) { all = append(all, e) })))
+			require.Len(t, all, 1)
+			require.NotEqual(t, "bacnet", all[0].Protocol)
+			require.NotEqual(t, "decoded", all[0].Status)
+		})
+	}
+}
+func TestBACnetAcceptedQueryOwnership(t *testing.T) {
+	for _, deferred := range []bool{false, true} {
+		t.Run(fmt.Sprint(deferred), func(t *testing.T) {
+			wire := bacnetTestPacket(11, []byte{1, 0, 16, 8})
+			var all []*ProtocolEvent
+			require.NoError(t, ReplayPcap(bytes.NewReader(sessionDatagramPCAP(t, []sessionStep{{dir: 0, wire: wire}}, 47808)), WithBinParserConfig(BinParserConfig{Deferred: deferred}), WithOnProtocolMessage(func(e *ProtocolEvent) { all = append(all, e) })))
+			require.Len(t, all, 1)
+			e := all[0]
+			want := map[string]any{"BVLC Type": uint8(129), "BVLC Function": uint8(11), "BVLC Length": uint16(8), "NPDU Version": uint8(1), "NPDU Control": uint8(0), "APDU": []byte{16, 8}, "APDU Type": "Unconfirmed-Request", "Service Choice": uint8(8), "Service": "Who-Is", "Complete BVLC PDU": bytes.Clone(wire)}
+			session := map[string]any{"BVLC Function": uint8(11), "NPDU Control": uint8(0), "APDU": []byte{16, 8}, "APDU Type": "Unconfirmed-Request", "Service Choice": uint8(8), "Service": "Who-Is"}
+			fields, err := e.GetFields()
+			require.NoError(t, err)
+			require.Equal(t, want, fields)
+			require.Equal(t, session, e.Session)
+			fields["APDU"].([]byte)[0] = 255
+			fields["Service"] = "CALLER"
+			e.Fields = map[string]any{"CALLER": true}
+			e.Structured = map[string]any{"fields": map[string]any{"CALLER": true}, "metadata": "CALLER"}
+			e.Metadata = "CALLER"
+			e.Session = map[string]any{"CALLER": true}
+			clear(e.Raw)
+			got, err := e.GetFields()
+			require.NoError(t, err)
+			require.Equal(t, want, got)
+			result, err := e.Decode()
+			require.NoError(t, err)
+			require.Equal(t, want, protocolFields(result))
+			require.Equal(t, map[string]any{"fields": want, "metadata": nil, "session": session}, result)
+		})
+	}
+}
+func TestUDPUnrecognizedCapturedQueryAuthority(t *testing.T) {
+	wire := bacnetTestPacket(11, []byte{2, 0, 16, 8})
+	var all []*ProtocolEvent
+	require.NoError(t, ReplayPcap(bytes.NewReader(sessionDatagramPCAP(t, []sessionStep{{dir: 0, wire: wire}}, 47808)), WithOnProtocolMessage(func(e *ProtocolEvent) { all = append(all, e) })))
+	require.Len(t, all, 1)
+	e := all[0]
+	require.Equal(t, "unrecognized", e.Status)
+	require.Empty(t, e.Protocol)
+	first, err := e.GetFields()
+	require.Nil(t, first)
+	require.EqualError(t, err, "protocol parser: event is unrecognized, not an exact message")
+	e.Fields = map[string]any{"CALLER": true}
+	e.Structured = map[string]any{"fields": e.Fields}
+	e.Session = map[string]any{"CALLER": true}
+	e.Status = "decoded"
+	e.Protocol = "bacnet"
+	e.Profile = "bacnet-ip-envelope"
+	clear(e.Raw)
+	fields, err := e.GetFields()
+	require.Nil(t, fields)
+	require.EqualError(t, err, "protocol parser: event is unrecognized, not an exact message")
+	result, err := e.Decode()
+	require.Nil(t, result)
+	require.EqualError(t, err, "protocol parser: event is unrecognized, not an exact message")
+}
+
+func TestBACnetManualQueryCacheCompatibility(t *testing.T) {
+	for _, protocol := range []string{"", "bacnet"} {
+		e := &ProtocolEvent{Protocol: protocol, Transport: "udp", Status: "unrecognized", Fields: map[string]any{"Caller": true}}
+		fields, err := e.GetFields()
+		require.NoError(t, err)
+		require.Equal(t, e.Fields, fields)
 	}
 }
