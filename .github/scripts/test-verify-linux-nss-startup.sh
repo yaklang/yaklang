@@ -100,6 +100,10 @@ for ((i=1; i<${#args[@]}; i++)); do
         dir="${args[i+1]%:/evidence:ro}"
         [[ "$(stat -c %a "$dir")" == 755 ]]
         [[ -x "$dir/binary" ]]
+        [[ "$(stat -c %a "$dir/nsswitch.conf")" == 644 ]]
+        backend="${scenario%%-*}"
+        grep -Fxq "passwd: $backend" "$dir/nsswitch.conf"
+        grep -Fxq "group: $backend" "$dir/nsswitch.conf"
         found[fixture]=1
       fi
       ;;
@@ -119,6 +123,11 @@ for setting in platform network readonly caps privileges core fixture image; do
 done
 printf '%s linux/%s\n' "$scenario" "$MOCK_ARCH" >>"$MOCK_RUN_LOG"
 if [[ "$MOCK_FAILURE" == wrong-glibc ]]; then echo 'glibc 2.31'; else echo 'glibc 2.28'; fi
+if [[ "$MOCK_FAILURE" == wrong-backend ]]; then
+  echo 'nss_backend=unknown'
+elif [[ "$MOCK_FAILURE" != missing-backend ]]; then
+  printf 'nss_backend=%s\n' "${scenario%%-*}"
+fi
 if [[ "$scenario" == compat-nohome && "$MOCK_FAILURE" == abort ]]; then
   echo "Inconsistency detected by ld.so: Assertion 'sym != NULL' failed"
   echo SIGABRT
@@ -176,9 +185,13 @@ for arch in amd64 arm64; do
     grep -Fxq "$profile" "$test_root/$name/profile.txt"
   done
 done
+(
+  umask 077
+  run_verifier restrictive-umask amd64 none
+)
 for failure in wrong-arch dynamic-file interp needed version-table glibc-private \
   missing-tag missing-libc-marker abort wrong-glibc missing-main runtime-version \
-  wrong-error exit-zero timed-out; do
+  wrong-error exit-zero timed-out missing-backend wrong-backend; do
   if run_verifier "$failure" amd64 "$failure"; then
     echo "invalid $failure fixture unexpectedly accepted" >&2
     exit 1

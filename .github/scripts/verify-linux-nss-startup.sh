@@ -150,6 +150,7 @@ for scenario in files-nohome compat-home compat-nohome; do
   backend="${scenario%%-*}"
   printf 'passwd: %s\ngroup: %s\nshadow: files\nhosts: files dns\n' \
     "$backend" "$backend" >"$fixture/nsswitch.conf"
+  chmod 644 "$fixture/nsswitch.conf"
   status=0
   # shellcheck disable=SC2016 # Expand environment and arguments inside the container shell.
   timeout --signal=TERM --kill-after=5s 35s \
@@ -166,6 +167,11 @@ for scenario in files-nohome compat-home compat-nohome; do
         printf "%s\n" "$libc_version"
         test "$libc_version" = "glibc 2.28"
         test "$(uname -m)" = "$2"
+        backend="${1%%-*}"
+        test -r /etc/nsswitch.conf
+        grep -Fxq "passwd: $backend" /etc/nsswitch.conf
+        grep -Fxq "group: $backend" /etc/nsswitch.conf
+        printf "nss_backend=%s\n" "$backend"
         unset HOME YAKIT_HOME
         if [ "$1" = compat-home ]; then export HOME=/root; fi
         exec timeout 20 /evidence/binary -api-url http://127.0.0.1:1 \
@@ -180,6 +186,8 @@ for scenario in files-nohome compat-home compat-nohome; do
     result='unexpected exit status'
   elif ! grep -Fxq 'glibc 2.28' "$log_file"; then
     result='missing glibc 2.28 precondition'
+  elif ! grep -Fxq "nss_backend=$backend" "$log_file"; then
+    result='missing NSS backend precondition'
   elif ! grep -Fq 'component=legion-node event=startup stage=main status=entered' "$log_file"; then
     result='main was not entered'
   elif ! grep -Eq 'initialize AI Runtime Host: runtime host installed release identity is required$' "$log_file"; then

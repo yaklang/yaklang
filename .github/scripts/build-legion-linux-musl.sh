@@ -128,18 +128,41 @@ C
 
   unset GOFLAGS GOEXPERIMENT CGO_CFLAGS CGO_CPPFLAGS CGO_CXXFLAGS CGO_FFLAGS CGO_LDFLAGS
   export GOENV=off GOTOOLCHAIN=local CGO_ENABLED=1 GOOS=linux GOARCH="$target_arch" CC=gcc CXX=g++
+  build_source_dir="$source_dir"
   if [ "$buildvcs" = true ]; then
     git config --global --add safe.directory "$source_dir"
+    source_revision="$(git -C "$source_dir" rev-parse HEAD)"
+    source_modified=false
+    if [ -n "$(git -C "$source_dir" status --porcelain --untracked-files=all)" ]; then
+      source_modified=true
+    fi
+    if [ -f "$source_dir/.git" ]; then
+      # Go 1.22's VCS discovery only recognizes .git directories. A linked
+      # worktree's .git file silently omits stamping even with -buildvcs=true.
+      # Copy its actual contents (including local changes) and expose the real
+      # Git directory through a directory symlink; the original stays read-only.
+      build_source_dir="$probe_dir/source"
+      cp -a "$source_dir" "$build_source_dir"
+      git_dir="$(git -C "$source_dir" rev-parse --absolute-git-dir)"
+      rm "$build_source_dir/.git"
+      ln -s "$git_dir" "$build_source_dir/.git"
+      git config --global --add safe.directory "$build_source_dir"
+    fi
   fi
   mkdir -p "$(dirname "$output_binary")" "$(dirname "$metadata_file")"
   log "building Linux $target_arch $profile node with musl $actual_musl_version, GCC $compiler_version"
   (
-    cd "$source_dir"
+    cd "$build_source_dir"
     go build -mod=readonly -trimpath -buildvcs="$buildvcs" -tags "$build_tags" \
       -ldflags '-s -w -buildid= -linkmode external -extld gcc -extldflags "-static"' \
       -o "$output_binary" ./cmd/legion-smoke-node
   )
   verify_binary "$output_binary" "$target_arch" "$build_tags"
+  if [ "$buildvcs" = true ]; then
+    printf '%s\n' "$build_info" | grep -Fq 'vcs=git' || die 'node binary is missing its Git source identity'
+    printf '%s\n' "$build_info" | grep -Fq "vcs.revision=$source_revision" || die 'node VCS revision does not match the source checkout'
+    printf '%s\n' "$build_info" | grep -Fq "vcs.modified=$source_modified" || die 'node VCS modified state does not match the source checkout'
+  fi
 
   # This bounded, no-credential help invocation validates the linked libc
   # marker. The NSS/glibc regression workflow separately exercises real startup.
@@ -162,12 +185,13 @@ C
     --arg build_tags "$build_tags" --arg c_compiler "gcc $compiler_version" \
     --arg c_library_version "$actual_musl_version" --arg alpine_version "$(cat /etc/alpine-release)" \
     --arg pinned_packages "$build_packages" --arg goarch "$target_arch" \
-    --arg builder_execution "${NODE_MUSL_BUILDER_EXECUTION:-native}" --rawfile installed_packages "$probe_dir/packages.txt" \
+    --arg builder_execution "${NODE_MUSL_BUILDER_EXECUTION:-native}" --argjson buildvcs "$buildvcs" \
+    --rawfile installed_packages "$probe_dir/packages.txt" \
     '{builder_image: $builder_image, builder_index: $builder_index, builder_platform_manifest: $builder_platform_manifest,
       go_version: $go_version, build_tags: $build_tags, goos: "linux", goarch: $goarch,
       c_compiler: $c_compiler, c_library: "musl", c_library_version: $c_library_version,
       alpine_version: $alpine_version, link_mode: "external-static", cgo_enabled: true,
-      builder_execution: $builder_execution,
+      builder_execution: $builder_execution, buildvcs: $buildvcs,
       pinned_build_packages: ($pinned_packages | split(" ")),
       installed_packages: ($installed_packages | split("\n") | map(select(length > 0)))}' >"$metadata_file"
   if [ -n "${NODE_OUTPUT_UID:-}" ] && [ -n "${NODE_OUTPUT_GID:-}" ]; then
