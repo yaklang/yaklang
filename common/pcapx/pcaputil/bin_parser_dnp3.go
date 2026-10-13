@@ -7,8 +7,9 @@ import (
 )
 
 // Selected IEEE 1815 complete-link/header observer with bounded READ/WRITE
-// context. Port 20000 is never consulted. Objects, fragment assembly and
-// Secure Authentication are not decoded by this observer.
+// context. Port 20000 is never consulted. Legacy mode does not assemble
+// fragments or decode objects; those bounded observations require explicit options.
+// Secure Authentication is not decoded.
 type dnp3RequestKey struct {
 	dir                 int
 	source, destination uint16
@@ -20,11 +21,14 @@ type dnp3Request struct {
 	digest   [32]byte
 }
 type binDNP3 struct {
-	pending    map[dnp3RequestKey]dnp3Request
-	maxPending int
-	maxDepth   int
-	readPoints bool
-	reserve    func(int64) error
+	pending            map[dnp3RequestKey]dnp3Request
+	maxPending         int
+	maxDepth           int
+	readPoints         bool
+	transportFragments bool
+	fragments          map[dnp3TransportKey]*dnp3TransportFragment
+	maxApplication     int
+	reserve            func(int64) error
 }
 
 func probeDNP3(w []byte, limit int) ProbeResult {
@@ -92,7 +96,7 @@ func (f *binFlow) frameDNP3(w []byte) (int, *binSpec, error) {
 	if s == nil {
 		return 0, nil, sessionContext("DNP3 session was not observed")
 	}
-	if err := f.reserveSession(256 + int64(len(s.pending))*80); err != nil {
+	if err := f.reserveSession(s.memoryTarget(0)); err != nil {
 		return 0, nil, err
 	}
 	n, err := dnp3FrameLength(w)
@@ -192,6 +196,16 @@ func (s *binDNP3) consume(dir int, raw []byte) (map[string]any, error) {
 	// fragment/object assembly remains a separate capability.
 	th := user[0]
 	out["Transport Header"] = int(th)
+	if s.transportFragments {
+		var complete bool
+		user, complete, err = s.assembleTransport(dir, src, dest, raw[3], user, out)
+		if err != nil || !complete {
+			return out, err
+		}
+		// Parsing below operates on one complete APDU. Raw event bytes and
+		// link-rule fields still describe the actual final captured link frame.
+		th = user[0]
+	}
 	if th&0xc0 != 0xc0 {
 		s.discardLink(src, dest)
 		out["Error Scope"] = "application"
@@ -273,7 +287,7 @@ func (s *binDNP3) consume(dir int, raw []byte) (map[string]any, error) {
 				return nil, protocolError(ErrResourceExceeded, "DNP3 pending request count")
 			}
 			if s.reserve != nil {
-				if err := s.reserve(256 + int64(len(s.pending)+1)*80); err != nil {
+				if err := s.reserve(s.memoryTarget(80)); err != nil {
 					return nil, err
 				}
 			}

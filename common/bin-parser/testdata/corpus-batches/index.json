@@ -73364,6 +73364,292 @@
         "common/pcapx/pcaputil/dnp3-read-points/guard-vectors.json": "dnp3-read-points/guard-vectors.json",
         "scripts/protocol-tests/required-tests-traffic-unified-v50.json": "required-tests-traffic-unified-v50.json"
       }
+    },
+    {
+      "id": "validation-dnp3-transport",
+      "kind": "validation",
+      "source_sha": "583bc4a5044fa7900bd3775cc371e7ccb6d734df",
+      "file": "validation-dnp3-transport.zip",
+      "sha256": "a811ed76f12ba4d25595b308f9a31c235eba45e980acc950b86d78f4ab0afb4f",
+      "password": "bin-parser",
+      "members": {
+        "dnp3-transport/answers/adjacent-complete.json": {
+          "sha256": "888abb01b7bb809673b374a842a3cde16ead2527232a70c797c08f9b5dd33dd1",
+          "bytes": 29519
+        },
+        "dnp3-transport/captures/adjacent-complete.pcap": {
+          "sha256": "5d3c4fbd7e183d51198145eb1c00bf52d6ec53733fb50e7337eb04ea5bb184d6",
+          "bytes": 746
+        },
+        "dnp3-transport/answers/source-response-wrap.json": {
+          "sha256": "1ef90795f01ae8f8af22f9b73927c74079ac3f99b847cc30498fdcf4c94cb12b",
+          "bytes": 30558
+        },
+        "dnp3-transport/captures/source-response-wrap.pcap": {
+          "sha256": "ea4f97e642988c6799efc8b09f4f70e408f7fae7cecaba02c3f53a2038c01556",
+          "bytes": 829
+        },
+        "dnp3-transport/answers/split-request-response.json": {
+          "sha256": "e938e098032bbce713205d33248ffefb80b03e1ef1649bf8f4a9fa3e3f78f1d7",
+          "bytes": 34699
+        },
+        "dnp3-transport/captures/split-request-response.pcap": {
+          "sha256": "a8d14b7e16f339a448ce1fc20524e8aea97059158c598d4c5299261bef4fe54a",
+          "bytes": 1161
+        },
+        "dnp3-transport/answers/byte-segments-wrap.json": {
+          "sha256": "f7434a927d5a3ddddc27aa1e9135ddeb7ec2fa248aafb5efcb2e6bf2feb9a965",
+          "bytes": 156233
+        },
+        "dnp3-transport/captures/byte-segments-wrap.pcap": {
+          "sha256": "dbfd167ba31da2446a744c7fcaae77aebc54886286dc9ca6b82ec8f2a916ffb3",
+          "bytes": 10860
+        },
+        "dnp3-transport/answers/middle-duplicate.json": {
+          "sha256": "2baaf138dbc57738dcdf2a0dc18bfd48ab2a06c58f4a98216a1d24dac65a660d",
+          "bytes": 32743
+        },
+        "dnp3-transport/captures/middle-duplicate.pcap": {
+          "sha256": "8ea06cf4be1315ab148359cc3f8e22d7439443e0607fdfc9374dda8c276a7d57",
+          "bytes": 1017
+        },
+        "dnp3-transport/answers/gap-then-expected.json": {
+          "sha256": "ed436a2dc688d424cbf1d7831380f8beb1310f995cf09470c62d1263649109d5",
+          "bytes": 32902
+        },
+        "dnp3-transport/captures/gap-then-expected.pcap": {
+          "sha256": "24564861d203207b19f87ff3550a423a3bd38572bb29f6d976be280a0636e477",
+          "bytes": 1076
+        },
+        "dnp3-transport/answers/orphan-then-new-start.json": {
+          "sha256": "09425535b46c36a43a9291717e190b1ac49a97021801c058389256082e00cb89",
+          "bytes": 32540
+        },
+        "dnp3-transport/captures/orphan-then-new-start.pcap": {
+          "sha256": "87daaf51a67575f245443b28b458daa29bdae62a90f9c844fbd0009ae1d039b7",
+          "bytes": 1017
+        },
+        "dnp3-transport/answers/conflicting-middle-invalidates.json": {
+          "sha256": "471b62e37c00453779566be3ed9bdb4117e0698b904bb8b5609adab18256183f",
+          "bytes": 34095
+        },
+        "dnp3-transport/captures/conflicting-middle-invalidates.pcap": {
+          "sha256": "ec453242b9c773976e7b6bcd753e90a3d224393aacbd968915dd8138fa28ff4f",
+          "bytes": 1222
+        },
+        "dnp3-transport/answers/restart-partial.json": {
+          "sha256": "3c79190acf20568bf85ba5527da366cfc6e155957eefba7ee07986d5e02aa94e",
+          "bytes": 31695
+        },
+        "dnp3-transport/captures/restart-partial.pcap": {
+          "sha256": "9910bbec3cd428cb7e7ad3f0695682278a1a9b48dbaaf769d1c7792ce185f2ab",
+          "bytes": 931
+        },
+        "dnp3-transport/answers/full-frame-replaces-partial.json": {
+          "sha256": "ac4d43348a81aeff63f7927a5547c8e9ef8d8422a849d3e85db1cc46e975279c",
+          "bytes": 30657
+        },
+        "dnp3-transport/captures/full-frame-replaces-partial.pcap": {
+          "sha256": "8ef3898417063eb5e423617090e04bfd421f0aec4c6858828d93ddb7aada5e00",
+          "bytes": 848
+        },
+        "dnp3-transport/answers/link-address-interleave.json": {
+          "sha256": "e1958d05b0be2047e3f7c3bbeecb21b287b04b3fdccf9249c89601f27e1a8d62",
+          "bytes": 62104
+        },
+        "dnp3-transport/captures/link-address-interleave.pcap": {
+          "sha256": "1fc18d6d0c217bf28f788721659a52f75535b1a80adc63fd71812dec924fc0f6",
+          "bytes": 1297
+        },
+        "dnp3-transport/answers/capture-direction-isolation.json": {
+          "sha256": "5113e86fd24d6747d537f70fbb078093529f242d69d09c69af6f0dcac2322a7e",
+          "bytes": 32542
+        },
+        "dnp3-transport/captures/capture-direction-isolation.pcap": {
+          "sha256": "9582cf220aa1e517e7efbd048475e14ccccb9373eaf2dc3aac2d56b2e8f189a3",
+          "bytes": 1017
+        },
+        "dnp3-transport/answers/link-dir-isolation.json": {
+          "sha256": "b8784800302079c802e01bb184712732e18f1083899ac0ee45af5f88a9184588",
+          "bytes": 32542
+        },
+        "dnp3-transport/captures/link-dir-isolation.pcap": {
+          "sha256": "95b71e39753a7139378d372272ae2f12913e539b1fb07a990b83972195770ef8",
+          "bytes": 1017
+        },
+        "dnp3-transport/answers/empty-then-valid.json": {
+          "sha256": "a983459e4a65af668d0ce6031e228993d6557d9ecbf785612af616a1405311a2",
+          "bytes": 32399
+        },
+        "dnp3-transport/captures/empty-then-valid.pcap": {
+          "sha256": "1edbb615a2c25d5443e481d0752a9c43253c846eeb6762cec8bce46d7e5ca035",
+          "bytes": 995
+        },
+        "dnp3-transport/answers/close-partial-one.json": {
+          "sha256": "76960f195f6b9679c90d99bea1618f4ba4a6cca446a253bebec2689a0caaf753",
+          "bytes": 3229
+        },
+        "dnp3-transport/captures/close-partial-one.pcap": {
+          "sha256": "c1aee0bdcac0b63faa33b80d142aa3ed8d074046f0d0d3f51fb1b38772544f86",
+          "bytes": 643
+        },
+        "dnp3-transport/answers/close-partial-two.json": {
+          "sha256": "7c84b81bca5183b8291dd9f46abcca3ce44f38577db01b849de5d353d4e8872d",
+          "bytes": 6381
+        },
+        "dnp3-transport/captures/close-partial-two.pcap": {
+          "sha256": "ccde2dca6580fbba75f3be5746d1f9cb46e888590eae1cceb74a5150a62bc58e",
+          "bytes": 836
+        },
+        "dnp3-transport/answers/application-fragment-not-transport.json": {
+          "sha256": "e6c86db418dd29fc06af080edcb5cbcdd483121de3eee7f3ef9103ec6bdca3d0",
+          "bytes": 32489
+        },
+        "dnp3-transport/captures/application-fragment-not-transport.pcap": {
+          "sha256": "6bff7e6cc87db1902dbec2ac903e8215b461cc035e64f16a881f78451766114c",
+          "bytes": 1034
+        },
+        "dnp3-transport/answers/descending-object-after-assembly.json": {
+          "sha256": "0372e3192a99d2ea7e854bad899442e6b9c908336bd40b121ab600262e1a69ad",
+          "bytes": 31751
+        },
+        "dnp3-transport/captures/descending-object-after-assembly.pcap": {
+          "sha256": "dfba0f1bd2e27a5aebac26f0f72c1639bfb0b61a37339706779346b64128ee3f",
+          "bytes": 921
+        },
+        "dnp3-transport/answers/first-repeat-restarts.json": {
+          "sha256": "b3410685fed736318cbb73656006ea6d1e465707772c168f53ff48eb04df7fe5",
+          "bytes": 32729
+        },
+        "dnp3-transport/captures/first-repeat-restarts.pcap": {
+          "sha256": "34f08b496a7103e8454c04e13bb45f5fce92645f2cf08ac5f4754fdca322f97c",
+          "bytes": 1014
+        },
+        "dnp3-transport/answers/nonwrap-source-response.json": {
+          "sha256": "9bdbfd55d05ad92e59318357a954161bc362ead85d1e67d7ce96a7976c96b999",
+          "bytes": 30559
+        },
+        "dnp3-transport/captures/nonwrap-source-response.pcap": {
+          "sha256": "b8e6c1ab230658f841cd74c2dd4922b639cc2eaa9de6e161445c7fa0e1ef0736",
+          "bytes": 829
+        },
+        "dnp3-transport/manifest.json": {
+          "sha256": "522214c897eae25df098c56c0644be43090d453f6d63965d52df945bcccf303b",
+          "bytes": 7172
+        },
+        "dnp3-transport/generate.py": {
+          "sha256": "039bed64971fd7b998b106a1c6b1fa1d67ceb486fb556c1f3bcd8943968834ff",
+          "bytes": 8300
+        },
+        "dnp3-transport/wire_points.py": {
+          "sha256": "7d94edd02bb7f4199d23796dbae49e938432c8f25b5b16c4d566a86eacceca26",
+          "bytes": 6241
+        },
+        "dnp3-transport/verify.py": {
+          "sha256": "aaf71501bea8e270c3213d03a87c64e5933c176dde94ab97d8e5508cca6e761a",
+          "bytes": 2271
+        },
+        "dnp3-transport/MODEL-PINS.json": {
+          "sha256": "596651fd3f251712483ae2e1035869150caebd6f9282647241e7a1e232ab2714",
+          "bytes": 655
+        },
+        "dnp3-transport/TRANSPORT-SOURCE-PINS.json": {
+          "sha256": "76d0590b48e1700c26b260c8ac953c1bd52888f8ee1cd0b21182e0e1d107d2d1",
+          "bytes": 1812
+        },
+        "dnp3-transport/SOURCE-INPUT.json": {
+          "sha256": "70e91886ad27cae8428bd3500e69c5698ae124faf21b9aa5562de72dec87708a",
+          "bytes": 1667
+        },
+        "dnp3-transport/seal.py": {
+          "sha256": "5628bcac474ff0e081366ff3463334d8545fc937ead77e5c566a14b41e57ab51",
+          "bytes": 4236
+        },
+        "dnp3-transport/REFERENCE-TRANSPORT-ACTUAL.json": {
+          "sha256": "994c1673e7af0a8d7e8090e5bca719f40acba325f669cefe8bb7fc1594c27ef4",
+          "bytes": 2972
+        },
+        "dnp3-transport/reference_transport.py": {
+          "sha256": "f19ce4ef7cb230f79e51c641bc1c4de7a49c63abb5917d8794abd99e1cf00e1a",
+          "bytes": 5765
+        },
+        "dnp3-transport/REFERENCE-TSHARK-ACTUAL.json": {
+          "sha256": "412813a4f46cbe5ad3134f5f7b52915f6ee36cb78c6433440e5d4ad815f89635",
+          "bytes": 6013
+        },
+        "dnp3-transport/reference_tshark.py": {
+          "sha256": "b0faa3baaa5c12716abba1b8aafeba0868c9fcdca6111fe778f8d825be3bf16b",
+          "bytes": 3915
+        },
+        "dnp3-transport/guard-vectors.json": {
+          "sha256": "903bbcbb1af03e7da2516116d2a5de06374a613ba87a21ea622dcf5a4a77c786",
+          "bytes": 2463
+        },
+        "required-tests-traffic-unified-v51.json": {
+          "sha256": "9526fa06a6d653fd39418138553be6d86393bfbaa2f3e1e199a21e6f69a75a30",
+          "bytes": 10047808
+        },
+        "validation/expected.json": {
+          "sha256": "b86fd7269991b81c0230178cd56f495b2f05cbdf7afa7202d13c5d9f9600b616",
+          "bytes": 26282
+        }
+      },
+      "aliases": {
+        "common/pcapx/pcaputil/dnp3-transport/answers/adjacent-complete.json": "dnp3-transport/answers/adjacent-complete.json",
+        "common/pcapx/pcaputil/dnp3-transport/captures/adjacent-complete.pcap": "dnp3-transport/captures/adjacent-complete.pcap",
+        "common/pcapx/pcaputil/dnp3-transport/answers/source-response-wrap.json": "dnp3-transport/answers/source-response-wrap.json",
+        "common/pcapx/pcaputil/dnp3-transport/captures/source-response-wrap.pcap": "dnp3-transport/captures/source-response-wrap.pcap",
+        "common/pcapx/pcaputil/dnp3-transport/answers/split-request-response.json": "dnp3-transport/answers/split-request-response.json",
+        "common/pcapx/pcaputil/dnp3-transport/captures/split-request-response.pcap": "dnp3-transport/captures/split-request-response.pcap",
+        "common/pcapx/pcaputil/dnp3-transport/answers/byte-segments-wrap.json": "dnp3-transport/answers/byte-segments-wrap.json",
+        "common/pcapx/pcaputil/dnp3-transport/captures/byte-segments-wrap.pcap": "dnp3-transport/captures/byte-segments-wrap.pcap",
+        "common/pcapx/pcaputil/dnp3-transport/answers/middle-duplicate.json": "dnp3-transport/answers/middle-duplicate.json",
+        "common/pcapx/pcaputil/dnp3-transport/captures/middle-duplicate.pcap": "dnp3-transport/captures/middle-duplicate.pcap",
+        "common/pcapx/pcaputil/dnp3-transport/answers/gap-then-expected.json": "dnp3-transport/answers/gap-then-expected.json",
+        "common/pcapx/pcaputil/dnp3-transport/captures/gap-then-expected.pcap": "dnp3-transport/captures/gap-then-expected.pcap",
+        "common/pcapx/pcaputil/dnp3-transport/answers/orphan-then-new-start.json": "dnp3-transport/answers/orphan-then-new-start.json",
+        "common/pcapx/pcaputil/dnp3-transport/captures/orphan-then-new-start.pcap": "dnp3-transport/captures/orphan-then-new-start.pcap",
+        "common/pcapx/pcaputil/dnp3-transport/answers/conflicting-middle-invalidates.json": "dnp3-transport/answers/conflicting-middle-invalidates.json",
+        "common/pcapx/pcaputil/dnp3-transport/captures/conflicting-middle-invalidates.pcap": "dnp3-transport/captures/conflicting-middle-invalidates.pcap",
+        "common/pcapx/pcaputil/dnp3-transport/answers/restart-partial.json": "dnp3-transport/answers/restart-partial.json",
+        "common/pcapx/pcaputil/dnp3-transport/captures/restart-partial.pcap": "dnp3-transport/captures/restart-partial.pcap",
+        "common/pcapx/pcaputil/dnp3-transport/answers/full-frame-replaces-partial.json": "dnp3-transport/answers/full-frame-replaces-partial.json",
+        "common/pcapx/pcaputil/dnp3-transport/captures/full-frame-replaces-partial.pcap": "dnp3-transport/captures/full-frame-replaces-partial.pcap",
+        "common/pcapx/pcaputil/dnp3-transport/answers/link-address-interleave.json": "dnp3-transport/answers/link-address-interleave.json",
+        "common/pcapx/pcaputil/dnp3-transport/captures/link-address-interleave.pcap": "dnp3-transport/captures/link-address-interleave.pcap",
+        "common/pcapx/pcaputil/dnp3-transport/answers/capture-direction-isolation.json": "dnp3-transport/answers/capture-direction-isolation.json",
+        "common/pcapx/pcaputil/dnp3-transport/captures/capture-direction-isolation.pcap": "dnp3-transport/captures/capture-direction-isolation.pcap",
+        "common/pcapx/pcaputil/dnp3-transport/answers/link-dir-isolation.json": "dnp3-transport/answers/link-dir-isolation.json",
+        "common/pcapx/pcaputil/dnp3-transport/captures/link-dir-isolation.pcap": "dnp3-transport/captures/link-dir-isolation.pcap",
+        "common/pcapx/pcaputil/dnp3-transport/answers/empty-then-valid.json": "dnp3-transport/answers/empty-then-valid.json",
+        "common/pcapx/pcaputil/dnp3-transport/captures/empty-then-valid.pcap": "dnp3-transport/captures/empty-then-valid.pcap",
+        "common/pcapx/pcaputil/dnp3-transport/answers/close-partial-one.json": "dnp3-transport/answers/close-partial-one.json",
+        "common/pcapx/pcaputil/dnp3-transport/captures/close-partial-one.pcap": "dnp3-transport/captures/close-partial-one.pcap",
+        "common/pcapx/pcaputil/dnp3-transport/answers/close-partial-two.json": "dnp3-transport/answers/close-partial-two.json",
+        "common/pcapx/pcaputil/dnp3-transport/captures/close-partial-two.pcap": "dnp3-transport/captures/close-partial-two.pcap",
+        "common/pcapx/pcaputil/dnp3-transport/answers/application-fragment-not-transport.json": "dnp3-transport/answers/application-fragment-not-transport.json",
+        "common/pcapx/pcaputil/dnp3-transport/captures/application-fragment-not-transport.pcap": "dnp3-transport/captures/application-fragment-not-transport.pcap",
+        "common/pcapx/pcaputil/dnp3-transport/answers/descending-object-after-assembly.json": "dnp3-transport/answers/descending-object-after-assembly.json",
+        "common/pcapx/pcaputil/dnp3-transport/captures/descending-object-after-assembly.pcap": "dnp3-transport/captures/descending-object-after-assembly.pcap",
+        "common/pcapx/pcaputil/dnp3-transport/answers/first-repeat-restarts.json": "dnp3-transport/answers/first-repeat-restarts.json",
+        "common/pcapx/pcaputil/dnp3-transport/captures/first-repeat-restarts.pcap": "dnp3-transport/captures/first-repeat-restarts.pcap",
+        "common/pcapx/pcaputil/dnp3-transport/answers/nonwrap-source-response.json": "dnp3-transport/answers/nonwrap-source-response.json",
+        "common/pcapx/pcaputil/dnp3-transport/captures/nonwrap-source-response.pcap": "dnp3-transport/captures/nonwrap-source-response.pcap",
+        "common/pcapx/pcaputil/dnp3-transport/manifest.json": "dnp3-transport/manifest.json",
+        "common/pcapx/pcaputil/dnp3-transport/generate.py": "dnp3-transport/generate.py",
+        "common/pcapx/pcaputil/dnp3-transport/wire_points.py": "dnp3-transport/wire_points.py",
+        "common/pcapx/pcaputil/dnp3-transport/verify.py": "dnp3-transport/verify.py",
+        "common/pcapx/pcaputil/dnp3-transport/MODEL-PINS.json": "dnp3-transport/MODEL-PINS.json",
+        "common/pcapx/pcaputil/dnp3-transport/TRANSPORT-SOURCE-PINS.json": "dnp3-transport/TRANSPORT-SOURCE-PINS.json",
+        "common/pcapx/pcaputil/dnp3-transport/SOURCE-INPUT.json": "dnp3-transport/SOURCE-INPUT.json",
+        "common/pcapx/pcaputil/dnp3-transport/seal.py": "dnp3-transport/seal.py",
+        "common/pcapx/pcaputil/dnp3-transport/REFERENCE-TRANSPORT-ACTUAL.json": "dnp3-transport/REFERENCE-TRANSPORT-ACTUAL.json",
+        "common/pcapx/pcaputil/dnp3-transport/reference_transport.py": "dnp3-transport/reference_transport.py",
+        "common/pcapx/pcaputil/dnp3-transport/REFERENCE-TSHARK-ACTUAL.json": "dnp3-transport/REFERENCE-TSHARK-ACTUAL.json",
+        "common/pcapx/pcaputil/dnp3-transport/reference_tshark.py": "dnp3-transport/reference_tshark.py",
+        "common/pcapx/pcaputil/dnp3-transport/guard-vectors.json": "dnp3-transport/guard-vectors.json",
+        "scripts/protocol-tests/required-tests-traffic-unified-v51.json": "required-tests-traffic-unified-v51.json"
+      }
     }
   ],
   "schema_version": 1,

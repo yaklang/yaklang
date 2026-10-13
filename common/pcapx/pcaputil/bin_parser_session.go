@@ -313,7 +313,7 @@ func (f *binFlow) detectDirection(dir int, wire []byte) {
 	case "modbus":
 		f.protocol, f.modbus = "modbus", &binModbus{pending: map[uint16]modbusRequest{}, maxPending: f.a.budget.MaxCollectionElements}
 	case "dnp3":
-		f.protocol, f.dnp3 = "dnp3", &binDNP3{pending: map[dnp3RequestKey]dnp3Request{}, maxPending: f.a.budget.MaxCollectionElements, reserve: f.reserveSession, maxDepth: f.a.budget.MaxRecursionDepth, readPoints: f.a.config.DecodeDNP3ReadPoints}
+		f.protocol, f.dnp3 = "dnp3", &binDNP3{pending: map[dnp3RequestKey]dnp3Request{}, maxPending: f.a.budget.MaxCollectionElements, reserve: f.reserveSession, maxDepth: f.a.budget.MaxRecursionDepth, readPoints: f.a.config.DecodeDNP3ReadPoints, transportFragments: f.a.config.DecodeDNP3TransportFragments, maxApplication: f.a.config.MaxMessageBytes}
 	case "c37118":
 		f.protocol, f.c37118 = "c37118", &binC37118{}
 	case "syslog":
@@ -660,9 +660,15 @@ func (f *binFlow) consumeSession(dir int, e *ProtocolEvent, result map[string]an
 			e.Profile = "dnp3-read-points"
 		}
 		e.Session, err = f.dnp3.consume(dir, e.Raw)
-		if err == nil && f.dnp3.readPoints {
+		if f.dnp3.transportFragments {
+			e.Profile = "dnp3-transport"
+			if f.dnp3.readPoints {
+				e.Profile = "dnp3-read-points-transport"
+			}
+		}
+		if err == nil && (f.dnp3.readPoints || f.dnp3.transportFragments) {
 			fields := cloneSession(protocolFields(result))
-			for _, key := range []string{"Objects", "Class Selectors", "Class Context"} {
+			for _, key := range []string{"Objects", "Class Selectors", "Class Context", "Transport State", "Transport Sequence", "Transport FIR", "Transport FIN", "Transport Segments", "Transport Bytes", "Application Data"} {
 				if v, ok := e.Session[key]; ok {
 					fields[key] = cloneSessionValue(v)
 				}
@@ -1005,6 +1011,7 @@ func (f *binFlow) closeSession() {
 }
 
 func (f *binFlow) finishSession(reason TrafficFlowCloseReason) {
+	f.finishDNP3Transport(reason)
 	if m := f.mms; m != nil && (len(m.pending[0])+len(m.pending[1])+len(m.fragment[0].events)+len(m.fragment[1].events) > 0) {
 		e := f.event(0, nil, "incomplete", string(reason)+": MMS outstanding requests/TSDU at close")
 		e.Completeness = "incomplete"

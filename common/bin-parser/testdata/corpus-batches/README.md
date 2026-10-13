@@ -44,7 +44,7 @@ Run from the repository root:
 ```sh
 go run ./internal/trafficfixture/cmd/corpus test
 go test -json -count=1 -timeout=5m ./internal/trafficfixture/... ./common/bin-parser/... ./common/pcapx/... ./common/yak/cmd/yakcmds/shark-cli ./scripts/ci > traffic.jsonl
-go run ./internal/trafficfixture/cmd/corpus exec -- python3 @scripts/protocol-tests/check_go_test_json_v2.py traffic.jsonl --inventory @scripts/protocol-tests/required-tests-traffic-unified-v50.json --tier full
+go run ./internal/trafficfixture/cmd/corpus exec -- python3 @scripts/protocol-tests/check_go_test_json_v2.py traffic.jsonl --inventory @scripts/protocol-tests/required-tests-traffic-unified-v51.json --tier full
 ```
 
 The single `corpus` entry point uses the same bounded Go ZIP loader as tests.
@@ -83,7 +83,7 @@ their semantic coverage. The existing synthetic session keys are test inputs;
 production credentials, user private keys and material without redistribution
 permission belong in an external fixed-source download manifest.
 
-Current test requirements are sealed at `scripts/protocol-tests/required-tests-traffic-unified-v50.json`;
+Current test requirements are sealed at `scripts/protocol-tests/required-tests-traffic-unified-v51.json`;
 the historical inventories and all earlier batches remain unchanged.
 The supplemental small-corpus batch contains 26 minimal controls, their explicit
 expected facts, an offline generator and the compact pinned source manifest.
@@ -203,7 +203,7 @@ opaque selector bytes and one bounded Data value over Wrapper v1 TCP/UDP; object
 selector meaning, access permission and device operation are unverified. The
 original one-packet selective-access capture and original refused answer remain
 immutable; its now-supported answer is matched by exact input SHA and frame.
-The active inventory is `scripts/protocol-tests/required-tests-traffic-unified-v50.json`.
+The active inventory is `scripts/protocol-tests/required-tests-traffic-unified-v51.json`.
 
 The small-graph budget batch reuses accepted graph captures/answers and adds one
 249-byte UDP control for child count255 without child bytes. Its standalone proof
@@ -993,7 +993,7 @@ the normative answer; a missing numeric reference field is not a codec pass.
 Full/deferred, workers1/2/4, observers off/on, Feed chunks1/7/full, ownership,
 resources and close/refusal boundaries remain required.
 
-Current gate: `required-tests-traffic-unified-v50.json` with
+Current gate: `required-tests-traffic-unified-v51.json` with
 `check_go_test_json_v2.py`. The indexed validator preserves missing/unpassed,
 package invocation completion, descendant skips, failures and non-JSON checks;
 its mutation/differential harness is sealed with the material. Older checkers
@@ -1115,7 +1115,7 @@ request slot. Full fragment/object/measurement decoding, authentication/device
 execution and indistinguishable reused-generation identity remain open.
 `validation-dnp3-application-context.zip` contains minimal authored positive and
 negative captures, independent complete field/session/error answers, source
-pins and deterministic generation/verification tools; current inventory is v49.
+pins and deterministic generation/verification tools; that batch was sealed with v49.
 
 
 `WithDNP3ReadPoints(true)` / `WithSessionDNP3ReadPoints(true)` explicitly select
@@ -1140,4 +1140,35 @@ Primary user-data link function is required before application state mutation;
 other control frames cannot smuggle requests through CRC-valid payloads.
 Other object/event/function layouts, fragment assembly, UDP, authentication,
 calibration/device execution and indistinguishable generation identity remain
-open. The active inventory is v50.
+open. That point batch was sealed with v50; current transport entry is below.
+
+
+`WithDNP3TransportFragments(true)` / `WithSessionDNP3TransportFragments(true)`
+explicitly enable `dnp3-transport` on TCP; combining with the READ point option
+selects `dnp3-read-points-transport`. Each CRC-validated link frame retains its
+original Raw and link-rule fields. Transport fields identify buffering, duplicate,
+restart and complete observations; only a complete FIN exposes `Application Data`
+and application/point interpretation. Capture direction, link addresses and DIR
+bit isolate retained transport streams. Sequence numbers advance modulo64; an
+unexpected segment is refused without appending bytes, allowing the expected
+segment to arrive later. An exact duplicate last continuation is observed without
+re-appending; a conflicting duplicate discards that assembly and its link pair's
+request context. New FIR replaces incomplete bytes. Application fragmentation
+still requires separate context. Logical memory, assembled length, segment count
+and concurrent assembly count apply before storage. Close reports incomplete
+assemblies deterministically and releases the session budget. Legacy observation
+without the option keeps its fragment refusal behavior.
+
+`validation-dnp3-transport.zip` seals20 minimal positive/negative captures, exact
+independent wire/session/error answers, resource vectors and generation/check
+tools. The source-derived PDUs retain fixed CC-BY4.0 attribution. Actual unchanged
+opendnp33.1.2 TransportRx code was compiled outside the repository with bounded
+byte/message/logger adapters:12 cases/26 complete APDUs matched exactly, including
+sequence wrap and selected retry/interleave paths. This is receive-algorithm
+execution, not a full SDK or device endpoint. TShark4.2.5 independently checked
+1,456 link/transport scalars and596 application/static-point scalars; its missing
+complete response on the isolated wrap case is retained as a reference limitation.
+Conflicting-duplicate refusal is an explicit observer policy, separate from SDK
+equivalence. Wider object/events, application fragments, UDP, authentication,
+calibration/device behavior and indistinguishable application generations remain
+open. Current full inventory is v51.

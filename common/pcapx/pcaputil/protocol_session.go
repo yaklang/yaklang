@@ -181,6 +181,9 @@ func NewProtocolSessionWithOptions(budget ParserBudget, options ...ProtocolSessi
 	if s.transport == "udp" && s.f.a.config.DecodeDNP3ReadPoints {
 		return nil, fmt.Errorf("DNP3 selected READ points require TCP")
 	}
+	if s.transport == "udp" && s.f.a.config.DecodeDNP3TransportFragments {
+		return nil, fmt.Errorf("DNP3 transport assembly requires TCP")
+	}
 	if s.transport == "udp" && (s.f.a.config.DecodeOPCUARead || s.f.a.config.DecodeOPCUABrowse || s.f.a.config.DecodeOPCUAWrite || s.f.a.config.DecodeOPCUABrowseNext || s.f.a.config.DecodeOPCUACall) {
 		return nil, fmt.Errorf("OPC UA observations require a TCP session")
 	}
