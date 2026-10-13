@@ -212,38 +212,18 @@ func SaveIrCodeBatch(db *gorm.DB, items []*IrCode) error {
 }
 
 // hasIrCodeUniqueKey reports whether the (program_name, code_id) conflict
-// target exists, i.e. whether INSERT ... ON CONFLICT can be used. SSA caches
-// pass a DB scoped to program_name, so the probes run on db.New() to drop the
-// row predicate while keeping the current transaction.
+// target exists, i.e. whether INSERT ... ON CONFLICT can be used.
 func hasIrCodeUniqueKey(db *gorm.DB) bool {
-	switch db.Dialect().GetName() {
-	case "sqlite3", "sqlite3_extended":
-		var indexed int
-		if err := db.New().Raw(`SELECT COUNT(*) FROM sqlite_master WHERE type = 'index' AND tbl_name = ? AND name = ?`,
-			TableIrCodes, "ux_ir_codes_program_code").Row().Scan(&indexed); err != nil {
-			log.Warnf("check IR unique index: %v", err)
-			return false
-		}
-		return indexed > 0
-	case "postgres":
-		var indexed int
-		if err := db.New().Raw(`SELECT COUNT(*) FROM pg_indexes WHERE tablename = ? AND indexname = ?`,
-			TableIrCodes, "ux_ir_codes_program_code").Row().Scan(&indexed); err != nil {
-			log.Warnf("check IR unique index: %v", err)
-			return false
-		}
-		return indexed > 0
-	case "mysql":
-		var indexed int
-		if err := db.New().Raw(`SELECT COUNT(*) FROM information_schema.statistics WHERE table_name = ? AND index_name = ?`,
-			TableIrCodes, "ux_ir_codes_program_code").Row().Scan(&indexed); err != nil {
-			log.Warnf("check IR unique index: %v", err)
-			return false
-		}
-		return indexed > 0
-	default:
+	return hasNamedIndex(db, TableIrCodes, "ux_ir_codes_program_code")
+}
+
+// hasNamedIndex asks the dialect whether index exists. db.New() drops a
+// program_name row scope while keeping the current connection.
+func hasNamedIndex(db *gorm.DB, table, index string) bool {
+	if db == nil || db.Dialect() == nil {
 		return false
 	}
+	return db.New().Dialect().HasIndex(table, index)
 }
 
 // bulkUpsertIrCode is the fallback for schemas without the (program_name,

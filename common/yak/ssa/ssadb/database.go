@@ -130,6 +130,7 @@ func patchIrCodeIndex(db *gorm.DB) {
 	// duplicate instruction INSERTs from race conditions in the async
 	// persist pipeline. This is a hard database invariant.
 	ensureUniqueIrCodesProgramCodeIndex(db)
+	ensureUniqueIrTypesProgramTypeIndex(db)
 	ensureUniqueIrOffsetsIndex(db)
 }
 
@@ -206,6 +207,48 @@ func ensureUniqueIrCodesProgramCodeIndex(db *gorm.DB) {
 		log.Errorf("[unique-constraint] failed to create UNIQUE INDEX %s: %v", indexName, err)
 	} else {
 		log.Infof("[unique-constraint] created UNIQUE INDEX %s on ir_codes (program_name, code_id)", indexName)
+	}
+}
+
+// deleteDuplicateIrTypes removes every row except the oldest (MIN id) per
+// (program_name, type_id) so a UNIQUE index can be created on legacy databases.
+func deleteDuplicateIrTypes(db *gorm.DB) (int64, error) {
+	res := db.Exec(`DELETE FROM ` + TableIrTypes + ` WHERE id IN (
+		SELECT id FROM (
+			SELECT id, ROW_NUMBER() OVER (PARTITION BY program_name, type_id ORDER BY id) AS rn
+			FROM ` + TableIrTypes + `
+		) WHERE rn > 1
+	)`)
+	if res.Error != nil {
+		return 0, res.Error
+	}
+	return res.RowsAffected, nil
+}
+
+// ensureUniqueIrTypesProgramTypeIndex creates UNIQUE (program_name, type_id).
+// SaveIrTypeBatch uses that conflict target for in-place upserts. The older
+// non-unique idx_ir_types_program_type is left in place; it does not conflict.
+func ensureUniqueIrTypesProgramTypeIndex(db *gorm.DB) {
+	if !db.HasTable(TableIrTypes) {
+		return
+	}
+	indexName := "ux_ir_types_program_type"
+	if db.Dialect().HasIndex(TableIrTypes, indexName) {
+		return
+	}
+	removed, err := deleteDuplicateIrTypes(db)
+	if err != nil {
+		log.Warnf("[unique-constraint] failed to remove duplicate ir_types rows: %v", err)
+		return
+	}
+	if removed > 0 {
+		log.Infof("[unique-constraint] removed %d duplicate ir_types rows (kept MIN(id) per (program_name, type_id))", removed)
+	}
+	query := `CREATE UNIQUE INDEX IF NOT EXISTS "ux_ir_types_program_type" ON "` + TableIrTypes + `" ("program_name", "type_id");`
+	if err := db.Exec(query).Error; err != nil {
+		log.Errorf("[unique-constraint] failed to create UNIQUE INDEX %s: %v", indexName, err)
+	} else {
+		log.Infof("[unique-constraint] created UNIQUE INDEX %s on ir_types (program_name, type_id)", indexName)
 	}
 }
 
