@@ -12,9 +12,14 @@ import (
 const (
 	TimelinePromotedTargetSemiDynamic1 = "semi-dynamic-1"
 	TimelinePromotedKindRecentTool     = "recent-tool-cache"
-	TimelinePromotedOperationUpsert    = "upsert"
-	TimelinePromotedOperationDelete    = "delete"
-	TimelinePromotedOperationReuse     = "reuse"
+	// TimelinePromotedKindSkillContent carries Skill SKILL.md / resource bodies
+	// that must follow the same Open -> freeze -> promote path as evidence.
+	//
+	// 关键词: skill content, 半动态正文统一, 先 Open 后冻结提升
+	TimelinePromotedKindSkillContent = "skill-content"
+	TimelinePromotedOperationUpsert  = "upsert"
+	TimelinePromotedOperationDelete  = "delete"
+	TimelinePromotedOperationReuse   = "reuse"
 )
 
 // PromotableTimelineItem is a control-plane timeline entry. It is persisted and
@@ -143,6 +148,12 @@ func (m *Timeline) PushPromotable(id int64, kind, targetSection, key, operation,
 	if m.idToTimelineItem.Have(id) {
 		return false
 	}
+	// Skill loading is idempotent only for the same still-live body. Different
+	// windows of one file remain independent history, not upserted versions.
+	if kind == TimelinePromotedKindSkillContent && operation == TimelinePromotedOperationUpsert &&
+		m.hasDuplicateSkillContentLocked(key, payload) {
+		return false
+	}
 	// Reuse is a reference, never a way to create or resurrect a cache entry.
 	// The caller must submit a full upsert if this returns false.
 	if operation == TimelinePromotedOperationReuse && !m.hasToolCacheBeforeLocked(id, key) {
@@ -185,6 +196,11 @@ func (m *Timeline) rebuildPromotedStateLocked(throughID int64) {
 		}
 		if id > state.Watermark {
 			state.Watermark = id
+		}
+		// Skill bodies are append-only history, rendered directly from frozen
+		// journal items instead of this key-based state projection.
+		if control.Kind == TimelinePromotedKindSkillContent {
+			continue
 		}
 		kinds := state.Entries[control.TargetSection]
 		if kinds == nil {

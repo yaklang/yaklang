@@ -277,11 +277,14 @@ func (m *Timeline) commitCompressionSnapshot(snapshot *timelineCompressionSnapsh
 	// Everything below is local, non-failing state publication; no callback or
 	// AI call is allowed between freezing/promoting and publishing the new head.
 	m.freezeState = &TimelineFreezeState{Version: version + 1, Batches: []*TimelineFreezeBatch{batch}}
-	m.rebuildPromotedStateLocked(snapshot.ThroughID)
-	m.updateCompressedHead(head)
+	// Retire unselected originals BEFORE materializing promoted state. Otherwise
+	// a summarizable body (Skill/Evidence) that the model did not retain would
+	// still be folded into promotedState and resurrected as if it were kept.
 	for _, id := range result.RetiredIDs {
 		m.retireTimelineItemLocked(id)
 	}
+	m.rebuildPromotedStateLocked(snapshot.ThroughID)
+	m.updateCompressedHead(head)
 	if snapshot.MemoryCompletion != nil {
 		if m.sessionMemory == nil {
 			m.sessionMemory = newTimelineSessionMemory(m, nil)
