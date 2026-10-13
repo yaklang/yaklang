@@ -2,7 +2,6 @@ package filesys
 
 import (
 	"io/fs"
-	"net/url"
 	"os"
 	"path"
 	"sort"
@@ -12,30 +11,6 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 )
-
-// DiffOnlyQueryKey is the listing option the audit frontend sends with
-// "show all files" UNCHECKED; a QueryDirLister filesystem then collapses
-// its listing to the head layer's own entries instead of the fully
-// expanded view.
-const DiffOnlyQueryKey = "diffOnly"
-
-// IsDiffOnlyQuery reports whether the listing options ask for the diff-only
-// view ("1"/"true"/"yes", case- and space-insensitive).
-func IsDiffOnlyQuery(query url.Values) bool {
-	switch strings.ToLower(strings.TrimSpace(query.Get(DiffOnlyQueryKey))) {
-	case "1", "true", "yes":
-		return true
-	}
-	return false
-}
-
-// QueryDirLister marks a filesystem whose listings take query options into
-// account: ReadDirQuery decides the listing semantics (e.g. diffOnly → the
-// head layer's own entries of an OverlayFS) inside the filesystem itself;
-// everything else ignores the query and lists its storage directly.
-type QueryDirLister interface {
-	ReadDirQuery(path string, query url.Values) ([]fs.DirEntry, error)
-}
 
 // OverlayTreeSource materializes one overlay layer's filesystem data on
 // first touch. layerName comes from the recipe (OverlayOption.Layers);
@@ -119,9 +94,9 @@ func WithContentSource(src ContentSource) OverlayOption {
 //   - ReadDir serves the fully expanded view: every layer's entries
 //     re-rooted under the head prefix, deduplicated by name (newest wins),
 //     minus deleted files, sorted by name.
-//   - ReadDirQuery judges the query itself: diffOnly (DiffOnlyQueryKey, the
-//     audit frontend's "show all files" unchecked) collapses to the head
-//     layer's own entries (ReadDirDiff); anything else expands.
+//   - ReadDirDiff lists only the head layer's own entries (the last-diff
+//     view). Callers that care about a "show all files" toggle pick
+//     ReadDir vs ReadDirDiff; OverlayFS itself does not parse query params.
 //   - ReadFile/Open/Stat resolve each path through its OWNING layer, head
 //     first: any hit on the head tree — including an unfilled stub — means
 //     the head owns the path and must never fall through to an older
@@ -146,10 +121,7 @@ type overlayStatusLayer struct {
 	files map[string]string
 }
 
-var (
-	_ fi.FileSystem    = (*OverlayFS)(nil)
-	_ QueryDirLister    = (*OverlayFS)(nil)
-)
+var _ fi.FileSystem = (*OverlayFS)(nil)
 
 // NewOverlayFS builds an overlay filesystem. layers and a layer tree source
 // are required; without a layer tree source the overlay serves nothing
@@ -314,17 +286,6 @@ func (o *OverlayFS) ReadDir(headPath string) ([]fs.DirEntry, error) {
 	}
 	sort.Slice(entries, func(i, j int) bool { return entries[i].Name() < entries[j].Name() })
 	return entries, nil
-}
-
-// ReadDirQuery judges the listing options inside this fs: diffOnly (the
-// audit frontend sends it with "show all files" UNCHECKED) collapses the
-// view to the head layer's own entries; anything else expands the whole
-// overlay chain (ReadDir).
-func (o *OverlayFS) ReadDirQuery(headPath string, query url.Values) ([]fs.DirEntry, error) {
-	if IsDiffOnlyQuery(query) {
-		return o.ReadDirDiff(headPath)
-	}
-	return o.ReadDir(headPath)
 }
 
 // ReadDirDiff lists the diff-only view: the head layer's own entries. A
