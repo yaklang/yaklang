@@ -168,6 +168,9 @@ func (a *binParser) decodeCANRecord(w []byte, evidence captureEvidence, ci gopac
 		if selection == "j1939-tp" {
 			a.refuseJ1939TPRecord(e.Domain)
 		}
+		if selection == "can-isotp" {
+			a.refuseCANISORecord(e.Domain)
+		}
 		err = protocolError(ErrNeedMore, "SocketCAN capture record is truncated")
 	case len(w) > min(a.budget.MaxFrameBytes, a.budget.MaxMessageBytes):
 		if a.canDecodeAs[e.Domain.Interface] == "dronecan-stats" || a.canDecodeAs[e.Domain.Interface] == "dronecan-services" {
@@ -176,12 +179,22 @@ func (a *binParser) decodeCANRecord(w []byte, evidence captureEvidence, ci gopac
 		if selection == "j1939-tp" {
 			a.refuseJ1939TPRecord(e.Domain)
 		}
+		if selection == "can-isotp" {
+			a.refuseCANISORecord(e.Domain)
+		}
 		err = protocolError(ErrResourceExceeded, "SocketCAN record exceeds parser byte budget")
 	default:
 		e.Raw = bytes.Clone(w)
 		a.messages.Add(1)
 		a.messageBytes.Add(uint64(len(w)))
 		fields, err = decodeSocketCAN(w)
+		if selection == "can-isotp" {
+			if err != nil {
+				a.refuseCANISORecord(e.Domain)
+			} else {
+				_, err = a.decodeCANISO(fields, e)
+			}
+		}
 		if err != nil && (a.canDecodeAs[e.Domain.Interface] == "dronecan-stats" || a.canDecodeAs[e.Domain.Interface] == "dronecan-services") {
 			a.refuseDroneCANStatsRecord()
 		}

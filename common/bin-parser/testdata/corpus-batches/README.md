@@ -44,7 +44,7 @@ Run from the repository root:
 ```sh
 go run ./internal/trafficfixture/cmd/corpus test
 go test -json -count=1 -timeout=10m ./internal/trafficfixture/... ./common/bin-parser/... ./common/pcapx/... ./common/yak/cmd/yakcmds/shark-cli ./scripts/ci > traffic.jsonl
-go run ./internal/trafficfixture/cmd/corpus exec -- python3 @scripts/protocol-tests/check_go_test_json_v2.py traffic.jsonl --inventory @scripts/protocol-tests/required-tests-traffic-unified-v65.json --tier full
+go run ./internal/trafficfixture/cmd/corpus exec -- python3 @scripts/protocol-tests/check_go_test_json_v2.py traffic.jsonl --inventory @scripts/protocol-tests/required-tests-traffic-unified-v66.json --tier full
 ```
 
 The single `corpus` entry point uses the same bounded Go ZIP loader as tests.
@@ -83,7 +83,7 @@ their semantic coverage. The existing synthetic session keys are test inputs;
 production credentials, user private keys and material without redistribution
 permission belong in an external fixed-source download manifest.
 
-Current test requirements are sealed at `scripts/protocol-tests/required-tests-traffic-unified-v65.json`;
+Current test requirements are sealed at `scripts/protocol-tests/required-tests-traffic-unified-v66.json`;
 the historical inventories and all earlier batches remain unchanged.
 The supplemental small-corpus batch contains 26 minimal controls, their explicit
 expected facts, an offline generator and the compact pinned source manifest.
@@ -203,7 +203,7 @@ opaque selector bytes and one bounded Data value over Wrapper v1 TCP/UDP; object
 selector meaning, access permission and device operation are unverified. The
 original one-packet selective-access capture and original refused answer remain
 immutable; its now-supported answer is matched by exact input SHA and frame.
-The active inventory is `scripts/protocol-tests/required-tests-traffic-unified-v65.json`.
+The active inventory is `scripts/protocol-tests/required-tests-traffic-unified-v66.json`.
 
 The small-graph budget batch reuses accepted graph captures/answers and adds one
 249-byte UDP control for child count255 without child bytes. Its standalone proof
@@ -993,7 +993,7 @@ the normative answer; a missing numeric reference field is not a codec pass.
 Full/deferred, workers1/2/4, observers off/on, Feed chunks1/7/full, ownership,
 resources and close/refusal boundaries remain required.
 
-Current gate: `required-tests-traffic-unified-v65.json` with
+Current gate: `required-tests-traffic-unified-v66.json` with
 `check_go_test_json_v2.py`. The indexed validator preserves missing/unpassed,
 package invocation completion, descendant skips, failures and non-JSON checks;
 its mutation/differential harness is sealed with the material. Older checkers
@@ -1595,4 +1595,38 @@ receiver/socket/timers and real ECU endpoints are not executed. Source pins and
 reference scripts remain archived, with upstream source and build outputs outside
 Git. All160 preceding ZIPs remain byte-for-byte unchanged.
 
-Current effective v65 inventory: 33,482 full mandatory entries.
+The preceding J1939 batch used v65 inventory: 33,482 full mandatory entries.
+
+
+### Explicit physical CAN ISO-TP and selected UDS
+
+`WithCANISOTransport(interface, CANISOTransport{...})` identifies request/response
+CAN IDs, including explicit EFF flags, classical or FD carrier, normal/extended/
+mixed address context, padding and bounded WAIT/capture timeout policies.
+SF/FF/CF/FC observations preserve literal bytes,12/32-bit lengths, modulo16
+sequence, initial static block/STmin parameters, contributor order and full payload.
+Changed FC tuples require a separate dynamic profile. Strict phase/gap/sequence,
+overlap/truncation/budget refusal and idempotent Close prevent partial resurrection.
+Capture timestamps are required for the stateful timing contract.
+
+Optional UDS observes DiagnosticSessionControl and single-DID ReadDataByIdentifier,
+exact SID/descriptor/timing/NRC and raw data-record bytes. Only exact active retries
+remain eligible; changed suppression, reused request identities and unknown DID-list
+context cannot manufacture association. NRC has no descriptor and is refused after
+multiple captured service generations. Suppressed positives do not fabricate device
+success; unsuppressed pending requests emit a Close diagnostic. Histories and owned
+query snapshots remain bounded and independent of public edits.
+
+These are unverified byte/context observations. No authenticated ECU, physical
+service execution, validated VIN/OEM data, general multiple-DID schema, functional
+broadcast/multiple responders, dynamic FC, security or complete UDS claim is made.
+Original pending requirements remain.51 minimal captures and full independent
+field/Session/payload/refusal answers run51x12 capture configurations. Whole CAN
+records are indivisible; stream splits do not apply. Actual fixed TShark wire,
+reassembled payload and selected UDS fields are separate from source-derived
+association answers. The exact pinned Linux canonical-length helper executes in a
+userspace adapter; full kernel receiver/socket/timers and ECU endpoints do not.
+All161 preceding ZIPs remain byte-for-byte unchanged. Raw captures, dependencies,
+reference source/build output and process evidence stay outside Git.
+
+Current effective v66 inventory: 34,210 full mandatory entries.

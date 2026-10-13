@@ -81674,6 +81674,582 @@
         "common/pcapx/pcaputil/j1939-transport/REFERENCE-LINUX-ACTUAL.json": "j1939-transport/REFERENCE-LINUX-ACTUAL.json",
         "scripts/protocol-tests/required-tests-traffic-unified-v65.json": "required-tests-traffic-unified-v65.json"
       }
+    },
+    {
+      "id": "validation-can-isotp-selected-uds",
+      "kind": "validation",
+      "source_sha": "28a36f3c9813a0f9158a8a7e32bec4dcc34d48ff",
+      "file": "validation-can-isotp-selected-uds.zip",
+      "sha256": "932c0c1c1638fc1f8301884781a91cc4b55fc57d5af9d8aa6d31caa0aeb4492f",
+      "password": "bin-parser",
+      "members": {
+        "can-isotp-uds/captures/classic-sf1.pcap": {
+          "sha256": "9aa1fef3e099a44dc2d2191c0728fc96a33529c570fa54af7b07f65e7b107eaf",
+          "bytes": 56
+        },
+        "can-isotp-uds/answers/classic-sf1.json": {
+          "sha256": "6cc2fc5d2ae932cee019d19d0d99693f0162cfb399feda7071586e42c9b4a0d9",
+          "bytes": 1597
+        },
+        "can-isotp-uds/captures/classic-sf7.pcap": {
+          "sha256": "cebff01faa67f06101b7b5cb94cf6e799c8ab41518fe773175625da05b8b949d",
+          "bytes": 56
+        },
+        "can-isotp-uds/answers/classic-sf7.json": {
+          "sha256": "75bd61b85682f4250e5d3e6f34e376a6623329ae02b54fb9ed425f80a1f1c86c",
+          "bytes": 1597
+        },
+        "can-isotp-uds/captures/classic-ff8.pcap": {
+          "sha256": "cdf5a1cd988835c2c3af118f75c2390079ed0bedf0a89f562e01ed88d7fef909",
+          "bytes": 120
+        },
+        "can-isotp-uds/answers/classic-ff8.json": {
+          "sha256": "75a79f5e3d50aa3ea38524ae3b2f96481249a9c2700d4fc9e1229daa6ca4b0df",
+          "bytes": 4050
+        },
+        "can-isotp-uds/captures/classic-ff20.pcap": {
+          "sha256": "d6b7d1e7529d05cd6093fa04c76fd4dfc1825dee50688694b6f9587e8cee15b8",
+          "bytes": 152
+        },
+        "can-isotp-uds/answers/classic-ff20.json": {
+          "sha256": "943e350a03777b50d1395d2bd1dd69bf6c1bff1c056eb1bc633f90aee0f419ee",
+          "bytes": 5240
+        },
+        "can-isotp-uds/captures/classic-bs1.pcap": {
+          "sha256": "77b9cf6c3f2435a1570a3ad4f4d074637777f51db1d084f13a82697802009c7f",
+          "bytes": 312
+        },
+        "can-isotp-uds/answers/classic-bs1.json": {
+          "sha256": "157d644d66e69da548ea4d61e7537a22470bc7dd14dbcec93886273ed0facea3",
+          "bytes": 11711
+        },
+        "can-isotp-uds/captures/sequence-wrap.pcap": {
+          "sha256": "1a401a6f947874d4289d4968004b169d7de4f89a310f92489ad99c540313eca1",
+          "bytes": 664
+        },
+        "can-isotp-uds/answers/sequence-wrap.json": {
+          "sha256": "7203ab83ad6864f45b73f1908bbe28e6433e9a3edb979c62bd6651976f0bca8d",
+          "bytes": 25737
+        },
+        "can-isotp-uds/captures/wide4096.pcap": {
+          "sha256": "549c425a2210f83e18ce662c4c86aa9797518b2e210b98d42d7c5a93f0948637",
+          "bytes": 18808
+        },
+        "can-isotp-uds/answers/wide4096.json": {
+          "sha256": "288484095c060cb0451a035d33f8034b70f46c2d44912f49f03a17464a1fe8cb",
+          "bytes": 2857148
+        },
+        "can-isotp-uds/captures/fd-sf7.pcap": {
+          "sha256": "f3a4879d3ebf48e049ac76b069aa1dac8687d1733983532a101afd504813e462",
+          "bytes": 112
+        },
+        "can-isotp-uds/answers/fd-sf7.json": {
+          "sha256": "49d638fd2db2d478ff66c81b499878d07353b3bfae0474724b7a4bc125ee11df",
+          "bytes": 1877
+        },
+        "can-isotp-uds/captures/fd-sf8.pcap": {
+          "sha256": "552efa3e60f56ef52596a2266873a1d8174013a4ae34f858ff5688bd5613af40",
+          "bytes": 112
+        },
+        "can-isotp-uds/answers/fd-sf8.json": {
+          "sha256": "68a26162d8e01c2f7e6f553fa6f0063cf8be0f6371c78d0b5d5ae8f52ebf8ae1",
+          "bytes": 1882
+        },
+        "can-isotp-uds/captures/fd-sf62.pcap": {
+          "sha256": "45ae6ab56dd385951e5039af86d204a77dfc46ee415237ff0fae16c2a2d926ba",
+          "bytes": 112
+        },
+        "can-isotp-uds/answers/fd-sf62.json": {
+          "sha256": "21a4ba1b4cdb3dcf9a6190d3d792cb0a87b271319b9a8d7790b81c91d3a5d684",
+          "bytes": 1951
+        },
+        "can-isotp-uds/captures/fd-ff63.pcap": {
+          "sha256": "e2ee548fc03a53864bd543031c830e442bb2fb81de85a46820d69e4664cb6e9f",
+          "bytes": 288
+        },
+        "can-isotp-uds/answers/fd-ff63.json": {
+          "sha256": "bdda6b328d052f09e485eb2f6fd0c2bbc2156e1e690d97f448c2ee8986c9b35e",
+          "bytes": 4969
+        },
+        "can-isotp-uds/captures/fd-ff200.pcap": {
+          "sha256": "969b8d7908e9a185e4b0f08d830f3d1b80a41d4392943296eae7bc26b17a071a",
+          "bytes": 640
+        },
+        "can-isotp-uds/answers/fd-ff200.json": {
+          "sha256": "0af5f38109ae99b7c328dc57b9449a696fd07909aaf35ad2d970c8f7e2c460d2",
+          "bytes": 11331
+        },
+        "can-isotp-uds/captures/extended-sf6.pcap": {
+          "sha256": "baf58d6a46e58ca888f370e257fd5dcf1de425e3136408972ee47148c53bc366",
+          "bytes": 56
+        },
+        "can-isotp-uds/answers/extended-sf6.json": {
+          "sha256": "00f8fc5ab5dd6276ce3123cfa97c60743c5b5b76a7afe940ded3d0bff917f99a",
+          "bytes": 1630
+        },
+        "can-isotp-uds/captures/extended-ff7.pcap": {
+          "sha256": "191333ea79ce630f328078846d8123e734a5fda22619d79a10901a670cb35d21",
+          "bytes": 120
+        },
+        "can-isotp-uds/answers/extended-ff7.json": {
+          "sha256": "b5c142d4f84daca2e8e37bbdd38538ad3fd9e8e34f14fca7d4b61e80f84ecb00",
+          "bytes": 4171
+        },
+        "can-isotp-uds/captures/extended-wrap.pcap": {
+          "sha256": "5f7010d3a46f28251d86ac2912a1b1169767eb0aa555822395690c0bee63a541",
+          "bytes": 760
+        },
+        "can-isotp-uds/answers/extended-wrap.json": {
+          "sha256": "f7932e73f24cb504b3e3dd170ed76be82c26803c9fc2666939e018aeeda6d252",
+          "bytes": 30774
+        },
+        "can-isotp-uds/captures/mixed-ff30.pcap": {
+          "sha256": "459005e0638b69a32b11aeafbf0bdac8c78ec652f430fc8412c342b2ca054c01",
+          "bytes": 376
+        },
+        "can-isotp-uds/answers/mixed-ff30.json": {
+          "sha256": "88deb969b645c00c2cad07059d6dd120ae0790b3b0decaf16508701151a40833",
+          "bytes": 14747
+        },
+        "can-isotp-uds/captures/extended-fd-sf61.pcap": {
+          "sha256": "233435f3567dc33a7aefaf3adcb19078bda027aca50850f81df735d223639f21",
+          "bytes": 112
+        },
+        "can-isotp-uds/answers/extended-fd-sf61.json": {
+          "sha256": "c94d852b6c21173f8733f898dfff6c218b8c9574aef32060e4730363a5fd2f9d",
+          "bytes": 1988
+        },
+        "can-isotp-uds/captures/mixed-fd-ff200.pcap": {
+          "sha256": "a639ff39f67013ac337b3531ca3ba2b5598a69cc151e969b05fa80269f9c02a5",
+          "bytes": 640
+        },
+        "can-isotp-uds/answers/mixed-fd-ff200.json": {
+          "sha256": "9a068b6599dad1c7205d06e84dc477371d0307de2e40e5cc1f45f86b82c09af0",
+          "bytes": 11575
+        },
+        "can-isotp-uds/captures/uds-single-did-raw.pcap": {
+          "sha256": "8855d8dfc64a21ccb5d7c66d82783972537055e147dc8b8d90eb25f6e20b2bc3",
+          "bytes": 184
+        },
+        "can-isotp-uds/answers/uds-single-did-raw.json": {
+          "sha256": "4c70e29af5d3389fbf63c0812fed8b524ab4e028c506065ec370b7fe9f82a5f3",
+          "bytes": 7171
+        },
+        "can-isotp-uds/captures/orphan-cf.pcap": {
+          "sha256": "f32a86fdf67cf403da1e576874f0f22a812eaf377d022b99d549781d562661ca",
+          "bytes": 56
+        },
+        "can-isotp-uds/answers/orphan-cf.json": {
+          "sha256": "b55521b0d2b8711f6ab19ce75148636442fb5cd7bf60282c9dad410851ccab2e",
+          "bytes": 720
+        },
+        "can-isotp-uds/captures/zero-sf.pcap": {
+          "sha256": "c94ba70b009b32c4f8db64456b8853ae44f831594d735444fc536197c9e07fd2",
+          "bytes": 56
+        },
+        "can-isotp-uds/answers/zero-sf.json": {
+          "sha256": "464d3ae9ef456223418006d4b4ad498a77530f0ed175558112e4f472ee587a7b",
+          "bytes": 727
+        },
+        "can-isotp-uds/captures/sf-over-length.pcap": {
+          "sha256": "623e15f3b9c92fc372eee31a9d195837d3129f1c72a651dbf3af3fe86eed4b0d",
+          "bytes": 56
+        },
+        "can-isotp-uds/answers/sf-over-length.json": {
+          "sha256": "126b8c8103f08245744b96d76362fe571ca5a073d877edb48fe887369af6974e",
+          "bytes": 727
+        },
+        "can-isotp-uds/captures/short-ff.pcap": {
+          "sha256": "89d437586b81b55392c7a1477b04e5d14d82e94a33891436fe7cbe8bff123eff",
+          "bytes": 56
+        },
+        "can-isotp-uds/answers/short-ff.json": {
+          "sha256": "1edbdf912be0eb4990323b5a19ba1d8836e7d6a712c89686b5162ff4f79b6e61",
+          "bytes": 718
+        },
+        "can-isotp-uds/captures/ff-belongs-sf.pcap": {
+          "sha256": "79b30536bddb13a773a6d779fdee7b34cdbcaedcb48c2849c1ddf253b0be4b4e",
+          "bytes": 56
+        },
+        "can-isotp-uds/answers/ff-belongs-sf.json": {
+          "sha256": "f099266f317ef97992a3afcf471beaf8400803bc4e464abc9c0ae44b70b831ba",
+          "bytes": 718
+        },
+        "can-isotp-uds/captures/wide-noncanonical.pcap": {
+          "sha256": "381fd6c0d053a0f6d89deb0a40c60c77362f82e39c55bf41021a803ab91d7ad2",
+          "bytes": 56
+        },
+        "can-isotp-uds/answers/wide-noncanonical.json": {
+          "sha256": "0dd1dd0ff1f2dcdc89c25f904ed649ab480ec9fea1e92e7cbea36b629448c4ed",
+          "bytes": 723
+        },
+        "can-isotp-uds/captures/wide-budget.pcap": {
+          "sha256": "4412adace37da86e3550cec8bff036875a993f8d1e010b761b9e2c1811449db7",
+          "bytes": 56
+        },
+        "can-isotp-uds/answers/wide-budget.json": {
+          "sha256": "2830825fcec0897766820a5585879ad07a8feea3691be9c435b98eac6d9c6a07",
+          "bytes": 704
+        },
+        "can-isotp-uds/captures/unsupported-pci.pcap": {
+          "sha256": "3a0097af4edf796cfdf1b17f46d892e73a48e23178b69963c8c174c63bdd0afa",
+          "bytes": 56
+        },
+        "can-isotp-uds/answers/unsupported-pci.json": {
+          "sha256": "95f9a39d461f32e9b361b8dcac302d3ad2fbd388408a1b5a57aec6691467fc37",
+          "bytes": 711
+        },
+        "can-isotp-uds/captures/cf-before-cts.pcap": {
+          "sha256": "e5a2e96b38d256b5ab1598f17e5be1a59c3eaca95841a60f3a7af8091dc3bc79",
+          "bytes": 88
+        },
+        "can-isotp-uds/answers/cf-before-cts.json": {
+          "sha256": "51809e3d80aeb03b58d98e5de1f72d6dea4bec55384517493785f21487419542",
+          "bytes": 1796
+        },
+        "can-isotp-uds/captures/overlap-ff.pcap": {
+          "sha256": "3100a6ea033a6a660c6825724d93e88dc6c9e61ff1a83b624147dd8dcbda1638",
+          "bytes": 88
+        },
+        "can-isotp-uds/answers/overlap-ff.json": {
+          "sha256": "bf61bc732b44762ae608af924ba8b4624461dd180f28f3b383c5683ea8d48db5",
+          "bytes": 1806
+        },
+        "can-isotp-uds/captures/overlap-sf.pcap": {
+          "sha256": "a1ec131b4bfc5f92c0b89820c6246154ec3e6540af8a25a39bc4795bb20d2f54",
+          "bytes": 88
+        },
+        "can-isotp-uds/answers/overlap-sf.json": {
+          "sha256": "8af0afab82565476af1c89d6ba7a77a355f02ec4ced8e59b59cd0e8aaeafd9ad",
+          "bytes": 1807
+        },
+        "can-isotp-uds/captures/reserved-fc.pcap": {
+          "sha256": "8993d80bac24af2ad3625476df20c588581ab64597675b0ad6190c34b5b17e27",
+          "bytes": 88
+        },
+        "can-isotp-uds/answers/reserved-fc.json": {
+          "sha256": "3bb384c73e52a882e3468de3e441ba0686b8fc79b7bf4a623d64897ce9f5467f",
+          "bytes": 1792
+        },
+        "can-isotp-uds/captures/short-fc.pcap": {
+          "sha256": "432e88147ea59a02ca35485551ff68d31c534b58d314b850be97701fff977223",
+          "bytes": 88
+        },
+        "can-isotp-uds/answers/short-fc.json": {
+          "sha256": "82d3cbaf18f4dd5344a8416168e614b4c45b35b0005085ca41f96d3355f0bbee",
+          "bytes": 1791
+        },
+        "can-isotp-uds/captures/sequence-mismatch.pcap": {
+          "sha256": "23bc30cc6214b13aa6b2359133da0a9a9f6e838fb9ffc96c6ff52a0627c9c76a",
+          "bytes": 120
+        },
+        "can-isotp-uds/answers/sequence-mismatch.json": {
+          "sha256": "64c8c2319bd09183b85897119529b22eb751c5ec98af2e91c14c7243aa633b36",
+          "bytes": 3090
+        },
+        "can-isotp-uds/captures/cf-no-data.pcap": {
+          "sha256": "8c83e995cbac9a3f0326105d38ae8903b9cfe18bcd522a6ab4905cb17a9081db",
+          "bytes": 120
+        },
+        "can-isotp-uds/answers/cf-no-data.json": {
+          "sha256": "4c725283eaeef30168dd851c5d4277c867eb81a755c6e9682fdbf2bf1c37eeda",
+          "bytes": 3114
+        },
+        "can-isotp-uds/captures/wrong-fc-direction.pcap": {
+          "sha256": "aed24aee98ab7c29a9f58ac22a23561968c8c930559a5333d429f37904c440d8",
+          "bytes": 88
+        },
+        "can-isotp-uds/answers/wrong-fc-direction.json": {
+          "sha256": "40e877f209a245858016a8c309cd2e0f9922f206b2951d4e7f71528305a88bda",
+          "bytes": 2075
+        },
+        "can-isotp-uds/captures/duplicate-cf.pcap": {
+          "sha256": "07f8bfc23046f57d903ad7af9e56696594576e388b34a515b083569b9c54b950",
+          "bytes": 152
+        },
+        "can-isotp-uds/answers/duplicate-cf.json": {
+          "sha256": "2386482da890fdddd70caf0e080fd330819d0621214d0007b1926dc2e4c8025e",
+          "bytes": 4259
+        },
+        "can-isotp-uds/captures/phase-timeout.pcap": {
+          "sha256": "ceda913cdb94eea00ac33f7d31a1ee0f10d99a719b0adbf1e420769157d7c1fd",
+          "bytes": 88
+        },
+        "can-isotp-uds/answers/phase-timeout.json": {
+          "sha256": "ee761c25b97e5f5ae5a00b7986ae4648c7c6aae8370445e9b565b853b2f6577f",
+          "bytes": 1775
+        },
+        "can-isotp-uds/captures/backdated.pcap": {
+          "sha256": "a986d07235a184f6780f590e503447ddf79462d5955cab53719e50b5e8829f16",
+          "bytes": 88
+        },
+        "can-isotp-uds/answers/backdated.json": {
+          "sha256": "2a623321d039a1b83f5e090cf1ce3b4dd15e79b1a11335387a7a045355d66514",
+          "bytes": 1771
+        },
+        "can-isotp-uds/captures/stmin-violation.pcap": {
+          "sha256": "e8eb9e7c585013c78a24c1b93f7b123c1c93dd8f7a59b0ac3c967888e32a5eab",
+          "bytes": 152
+        },
+        "can-isotp-uds/answers/stmin-violation.json": {
+          "sha256": "c219a4b6d357c89630c9f9c73b73af75d5620f1aaf091b223ad575d9ee2d8e91",
+          "bytes": 4265
+        },
+        "can-isotp-uds/captures/close-incomplete.pcap": {
+          "sha256": "47e45a39fae6554fa2ce96c6ac8dad734d462db68cfe0051ebe8687d2ef27499",
+          "bytes": 88
+        },
+        "can-isotp-uds/answers/close-incomplete.json": {
+          "sha256": "5b8bda5f943cf2bc51016c91c3cbf3f9f0be7e824a8c37a8637d3c37dd916b89",
+          "bytes": 3067
+        },
+        "can-isotp-uds/captures/fd-long-sf-no-escape.pcap": {
+          "sha256": "c14f9285f63e96b715f6d122df09733ade1c167e4594978759f430532bb754de",
+          "bytes": 112
+        },
+        "can-isotp-uds/answers/fd-long-sf-no-escape.json": {
+          "sha256": "5753b8b693c7041870d3ad511c5169b8a3f100568fb0a934d0385eb9078e048b",
+          "bytes": 827
+        },
+        "can-isotp-uds/captures/extended-address-mismatch.pcap": {
+          "sha256": "89851e118f5c976ccd939e001721e5832e387fa56bb2fa779b47de3024c7b023",
+          "bytes": 56
+        },
+        "can-isotp-uds/answers/extended-address-mismatch.json": {
+          "sha256": "886abde3e062e83a790b255df77ac929f39f50eefea772bd586ce73a074f51b6",
+          "bytes": 723
+        },
+        "can-isotp-uds/captures/changed-static-fc.pcap": {
+          "sha256": "32814fa13be3b961b491308400ac611cbd57b3395e325f5ad486e66bc81f13f3",
+          "bytes": 152
+        },
+        "can-isotp-uds/answers/changed-static-fc.json": {
+          "sha256": "5b7560ab8fff28451dd93fd050b5c05bc25ee5b447df67ea7c7511e8949b3e71",
+          "bytes": 4325
+        },
+        "can-isotp-uds/captures/uds-dsc.pcap": {
+          "sha256": "128afbe8a5d3ca5c7282a034ad42d41b8608dc720747dea0297159e87fd2cc0b",
+          "bytes": 88
+        },
+        "can-isotp-uds/answers/uds-dsc.json": {
+          "sha256": "d66b7eb8d969f747acd02470668915b48248f9f2fc85e7cbcbdc2ff67edc759c",
+          "bytes": 3532
+        },
+        "can-isotp-uds/captures/uds-nrc-pending.pcap": {
+          "sha256": "b04312b66325ad6c9b489e0a94554645162deff4124f9c50cfc85fcd816472fe",
+          "bytes": 120
+        },
+        "can-isotp-uds/answers/uds-nrc-pending.json": {
+          "sha256": "0b5e164a7e0fb5501700f2b524d33e1f7d5d846b933901097dafe7cc82bfd818",
+          "bytes": 5002
+        },
+        "can-isotp-uds/captures/uds-suppressed.pcap": {
+          "sha256": "61306c6cd4fbb3ffb5e09a62f2c284abe728cc239fecaf7caabd4f24f05abe18",
+          "bytes": 56
+        },
+        "can-isotp-uds/answers/uds-suppressed.json": {
+          "sha256": "99d2c9eb437d03031bdedb5e24e5f651beff9c3a150e3da0509110a9df99745f",
+          "bytes": 1969
+        },
+        "can-isotp-uds/captures/uds-pending-close.pcap": {
+          "sha256": "a6def3a13762fc7af5790ecea70bee7e03b661021f496a8a11c11d5f198bb770",
+          "bytes": 56
+        },
+        "can-isotp-uds/answers/uds-pending-close.json": {
+          "sha256": "270037979332db093963fdbe11fab139d95d99e25ecb633f64d2aff977594deb",
+          "bytes": 2234
+        },
+        "can-isotp-uds/captures/uds-wrong-descriptor.pcap": {
+          "sha256": "31eabf1e5e93d828a9934b508f6733bed3fe67163b44c96ae139507fdfd697fb",
+          "bytes": 88
+        },
+        "can-isotp-uds/answers/uds-wrong-descriptor.json": {
+          "sha256": "3946dc48ce76b0282a4970751c0d88b480b349679e6b7b67a467e0363104a8e6",
+          "bytes": 2574
+        },
+        "can-isotp-uds/captures/uds-reused-identity.pcap": {
+          "sha256": "2f4121a6d4b8c0a26ed9cb4870808e0e119fff56b579a8e20a4f1117ca9c4b49",
+          "bytes": 152
+        },
+        "can-isotp-uds/answers/uds-reused-identity.json": {
+          "sha256": "ed5bfd2384b2182d2f735a0b0a912d25e107b7d4d82da13e60f7338c57598b6a",
+          "bytes": 4166
+        },
+        "can-isotp-uds/captures/uds-changed-suppression-retry.pcap": {
+          "sha256": "562c1a9caeee422fbf971d8a4f2cf93c4d20e48cfb00740861d387a4e049d7f0",
+          "bytes": 120
+        },
+        "can-isotp-uds/answers/uds-changed-suppression-retry.json": {
+          "sha256": "25cab06f937d6f67b66dd5f696f4ca1fae46ed826d5834b4203f7977426bb7f0",
+          "bytes": 2594
+        },
+        "can-isotp-uds/captures/uds-unsupported-did-list.pcap": {
+          "sha256": "abbb77f0d1d3078239ced3fb21b09a89ed62b1e1dced0a472e0037d2a06fc13c",
+          "bytes": 120
+        },
+        "can-isotp-uds/answers/uds-unsupported-did-list.json": {
+          "sha256": "89bb79be06cbdb3106655af495f2dc04ed2fd6c32b0b702e5c8885fb34cb9334",
+          "bytes": 1398
+        },
+        "can-isotp-uds/manifest.json": {
+          "sha256": "da927b90270edbdde9f5fc54a6cfb926c844816079cfe49e51e8f15251ce0f83",
+          "bytes": 16896
+        },
+        "can-isotp-uds/generate.py": {
+          "sha256": "0c0af12d783aabdc5efde8bfaf33504ea8f74fe7ae5deb86de8782c81189750d",
+          "bytes": 15385
+        },
+        "can-isotp-uds/verify.py": {
+          "sha256": "8b60188142eb66c7385c54a370dfd9a7681a88c020d27579d24d07fd8016e2fc",
+          "bytes": 606
+        },
+        "can-isotp-uds/reference.py": {
+          "sha256": "01184c53ed37f88be2583f16d12c122425a7e400074f06811976ff479f0524ef",
+          "bytes": 3863
+        },
+        "can-isotp-uds/reference_linux.py": {
+          "sha256": "62d5d333f37b8068bc8cba37ca8990658f8e8680ae9df6206d1d758d8d5de41c",
+          "bytes": 1403
+        },
+        "can-isotp-uds/LINUX-SOURCE-PIN.json": {
+          "sha256": "35644a151c56dcee1554e898c122f292985949e5777b4301b205f929edef691b",
+          "bytes": 1007
+        },
+        "can-isotp-uds/UDS-SOURCE-PIN.json": {
+          "sha256": "15f62ca058c33a62536a4721103444cf8e1cc165782c67b31c6592ddc820d1ba",
+          "bytes": 319
+        },
+        "can-isotp-uds/REFERENCE-LINUX-ACTUAL.json": {
+          "sha256": "ac1c06554476823335ba0441bd33bd6ec5f92f39bcbdd449707abfdcdac166d0",
+          "bytes": 336
+        },
+        "can-isotp-uds/REFERENCE-TSHARK-FINAL-DEVELOPMENT.jsonl": {
+          "sha256": "e79d086d282fcaccadbfc1558f904c9b17cbef707d818160c93f875a6e406046",
+          "bytes": 1168
+        },
+        "required-tests-traffic-unified-v66.json": {
+          "sha256": "cae358b74e847ba17c9dace3d14825e9a59e70807a0b38926bb28d2c098e9002",
+          "bytes": 15466323
+        },
+        "validation/expected.json": {
+          "sha256": "e01f12888bb142908d93076ca81f0d61f1eb05a80ef97a366276435edb1cccb5",
+          "bytes": 60147
+        }
+      },
+      "aliases": {
+        "common/pcapx/pcaputil/can-isotp-uds/captures/classic-sf1.pcap": "can-isotp-uds/captures/classic-sf1.pcap",
+        "common/pcapx/pcaputil/can-isotp-uds/answers/classic-sf1.json": "can-isotp-uds/answers/classic-sf1.json",
+        "common/pcapx/pcaputil/can-isotp-uds/captures/classic-sf7.pcap": "can-isotp-uds/captures/classic-sf7.pcap",
+        "common/pcapx/pcaputil/can-isotp-uds/answers/classic-sf7.json": "can-isotp-uds/answers/classic-sf7.json",
+        "common/pcapx/pcaputil/can-isotp-uds/captures/classic-ff8.pcap": "can-isotp-uds/captures/classic-ff8.pcap",
+        "common/pcapx/pcaputil/can-isotp-uds/answers/classic-ff8.json": "can-isotp-uds/answers/classic-ff8.json",
+        "common/pcapx/pcaputil/can-isotp-uds/captures/classic-ff20.pcap": "can-isotp-uds/captures/classic-ff20.pcap",
+        "common/pcapx/pcaputil/can-isotp-uds/answers/classic-ff20.json": "can-isotp-uds/answers/classic-ff20.json",
+        "common/pcapx/pcaputil/can-isotp-uds/captures/classic-bs1.pcap": "can-isotp-uds/captures/classic-bs1.pcap",
+        "common/pcapx/pcaputil/can-isotp-uds/answers/classic-bs1.json": "can-isotp-uds/answers/classic-bs1.json",
+        "common/pcapx/pcaputil/can-isotp-uds/captures/sequence-wrap.pcap": "can-isotp-uds/captures/sequence-wrap.pcap",
+        "common/pcapx/pcaputil/can-isotp-uds/answers/sequence-wrap.json": "can-isotp-uds/answers/sequence-wrap.json",
+        "common/pcapx/pcaputil/can-isotp-uds/captures/wide4096.pcap": "can-isotp-uds/captures/wide4096.pcap",
+        "common/pcapx/pcaputil/can-isotp-uds/answers/wide4096.json": "can-isotp-uds/answers/wide4096.json",
+        "common/pcapx/pcaputil/can-isotp-uds/captures/fd-sf7.pcap": "can-isotp-uds/captures/fd-sf7.pcap",
+        "common/pcapx/pcaputil/can-isotp-uds/answers/fd-sf7.json": "can-isotp-uds/answers/fd-sf7.json",
+        "common/pcapx/pcaputil/can-isotp-uds/captures/fd-sf8.pcap": "can-isotp-uds/captures/fd-sf8.pcap",
+        "common/pcapx/pcaputil/can-isotp-uds/answers/fd-sf8.json": "can-isotp-uds/answers/fd-sf8.json",
+        "common/pcapx/pcaputil/can-isotp-uds/captures/fd-sf62.pcap": "can-isotp-uds/captures/fd-sf62.pcap",
+        "common/pcapx/pcaputil/can-isotp-uds/answers/fd-sf62.json": "can-isotp-uds/answers/fd-sf62.json",
+        "common/pcapx/pcaputil/can-isotp-uds/captures/fd-ff63.pcap": "can-isotp-uds/captures/fd-ff63.pcap",
+        "common/pcapx/pcaputil/can-isotp-uds/answers/fd-ff63.json": "can-isotp-uds/answers/fd-ff63.json",
+        "common/pcapx/pcaputil/can-isotp-uds/captures/fd-ff200.pcap": "can-isotp-uds/captures/fd-ff200.pcap",
+        "common/pcapx/pcaputil/can-isotp-uds/answers/fd-ff200.json": "can-isotp-uds/answers/fd-ff200.json",
+        "common/pcapx/pcaputil/can-isotp-uds/captures/extended-sf6.pcap": "can-isotp-uds/captures/extended-sf6.pcap",
+        "common/pcapx/pcaputil/can-isotp-uds/answers/extended-sf6.json": "can-isotp-uds/answers/extended-sf6.json",
+        "common/pcapx/pcaputil/can-isotp-uds/captures/extended-ff7.pcap": "can-isotp-uds/captures/extended-ff7.pcap",
+        "common/pcapx/pcaputil/can-isotp-uds/answers/extended-ff7.json": "can-isotp-uds/answers/extended-ff7.json",
+        "common/pcapx/pcaputil/can-isotp-uds/captures/extended-wrap.pcap": "can-isotp-uds/captures/extended-wrap.pcap",
+        "common/pcapx/pcaputil/can-isotp-uds/answers/extended-wrap.json": "can-isotp-uds/answers/extended-wrap.json",
+        "common/pcapx/pcaputil/can-isotp-uds/captures/mixed-ff30.pcap": "can-isotp-uds/captures/mixed-ff30.pcap",
+        "common/pcapx/pcaputil/can-isotp-uds/answers/mixed-ff30.json": "can-isotp-uds/answers/mixed-ff30.json",
+        "common/pcapx/pcaputil/can-isotp-uds/captures/extended-fd-sf61.pcap": "can-isotp-uds/captures/extended-fd-sf61.pcap",
+        "common/pcapx/pcaputil/can-isotp-uds/answers/extended-fd-sf61.json": "can-isotp-uds/answers/extended-fd-sf61.json",
+        "common/pcapx/pcaputil/can-isotp-uds/captures/mixed-fd-ff200.pcap": "can-isotp-uds/captures/mixed-fd-ff200.pcap",
+        "common/pcapx/pcaputil/can-isotp-uds/answers/mixed-fd-ff200.json": "can-isotp-uds/answers/mixed-fd-ff200.json",
+        "common/pcapx/pcaputil/can-isotp-uds/captures/uds-single-did-raw.pcap": "can-isotp-uds/captures/uds-single-did-raw.pcap",
+        "common/pcapx/pcaputil/can-isotp-uds/answers/uds-single-did-raw.json": "can-isotp-uds/answers/uds-single-did-raw.json",
+        "common/pcapx/pcaputil/can-isotp-uds/captures/orphan-cf.pcap": "can-isotp-uds/captures/orphan-cf.pcap",
+        "common/pcapx/pcaputil/can-isotp-uds/answers/orphan-cf.json": "can-isotp-uds/answers/orphan-cf.json",
+        "common/pcapx/pcaputil/can-isotp-uds/captures/zero-sf.pcap": "can-isotp-uds/captures/zero-sf.pcap",
+        "common/pcapx/pcaputil/can-isotp-uds/answers/zero-sf.json": "can-isotp-uds/answers/zero-sf.json",
+        "common/pcapx/pcaputil/can-isotp-uds/captures/sf-over-length.pcap": "can-isotp-uds/captures/sf-over-length.pcap",
+        "common/pcapx/pcaputil/can-isotp-uds/answers/sf-over-length.json": "can-isotp-uds/answers/sf-over-length.json",
+        "common/pcapx/pcaputil/can-isotp-uds/captures/short-ff.pcap": "can-isotp-uds/captures/short-ff.pcap",
+        "common/pcapx/pcaputil/can-isotp-uds/answers/short-ff.json": "can-isotp-uds/answers/short-ff.json",
+        "common/pcapx/pcaputil/can-isotp-uds/captures/ff-belongs-sf.pcap": "can-isotp-uds/captures/ff-belongs-sf.pcap",
+        "common/pcapx/pcaputil/can-isotp-uds/answers/ff-belongs-sf.json": "can-isotp-uds/answers/ff-belongs-sf.json",
+        "common/pcapx/pcaputil/can-isotp-uds/captures/wide-noncanonical.pcap": "can-isotp-uds/captures/wide-noncanonical.pcap",
+        "common/pcapx/pcaputil/can-isotp-uds/answers/wide-noncanonical.json": "can-isotp-uds/answers/wide-noncanonical.json",
+        "common/pcapx/pcaputil/can-isotp-uds/captures/wide-budget.pcap": "can-isotp-uds/captures/wide-budget.pcap",
+        "common/pcapx/pcaputil/can-isotp-uds/answers/wide-budget.json": "can-isotp-uds/answers/wide-budget.json",
+        "common/pcapx/pcaputil/can-isotp-uds/captures/unsupported-pci.pcap": "can-isotp-uds/captures/unsupported-pci.pcap",
+        "common/pcapx/pcaputil/can-isotp-uds/answers/unsupported-pci.json": "can-isotp-uds/answers/unsupported-pci.json",
+        "common/pcapx/pcaputil/can-isotp-uds/captures/cf-before-cts.pcap": "can-isotp-uds/captures/cf-before-cts.pcap",
+        "common/pcapx/pcaputil/can-isotp-uds/answers/cf-before-cts.json": "can-isotp-uds/answers/cf-before-cts.json",
+        "common/pcapx/pcaputil/can-isotp-uds/captures/overlap-ff.pcap": "can-isotp-uds/captures/overlap-ff.pcap",
+        "common/pcapx/pcaputil/can-isotp-uds/answers/overlap-ff.json": "can-isotp-uds/answers/overlap-ff.json",
+        "common/pcapx/pcaputil/can-isotp-uds/captures/overlap-sf.pcap": "can-isotp-uds/captures/overlap-sf.pcap",
+        "common/pcapx/pcaputil/can-isotp-uds/answers/overlap-sf.json": "can-isotp-uds/answers/overlap-sf.json",
+        "common/pcapx/pcaputil/can-isotp-uds/captures/reserved-fc.pcap": "can-isotp-uds/captures/reserved-fc.pcap",
+        "common/pcapx/pcaputil/can-isotp-uds/answers/reserved-fc.json": "can-isotp-uds/answers/reserved-fc.json",
+        "common/pcapx/pcaputil/can-isotp-uds/captures/short-fc.pcap": "can-isotp-uds/captures/short-fc.pcap",
+        "common/pcapx/pcaputil/can-isotp-uds/answers/short-fc.json": "can-isotp-uds/answers/short-fc.json",
+        "common/pcapx/pcaputil/can-isotp-uds/captures/sequence-mismatch.pcap": "can-isotp-uds/captures/sequence-mismatch.pcap",
+        "common/pcapx/pcaputil/can-isotp-uds/answers/sequence-mismatch.json": "can-isotp-uds/answers/sequence-mismatch.json",
+        "common/pcapx/pcaputil/can-isotp-uds/captures/cf-no-data.pcap": "can-isotp-uds/captures/cf-no-data.pcap",
+        "common/pcapx/pcaputil/can-isotp-uds/answers/cf-no-data.json": "can-isotp-uds/answers/cf-no-data.json",
+        "common/pcapx/pcaputil/can-isotp-uds/captures/wrong-fc-direction.pcap": "can-isotp-uds/captures/wrong-fc-direction.pcap",
+        "common/pcapx/pcaputil/can-isotp-uds/answers/wrong-fc-direction.json": "can-isotp-uds/answers/wrong-fc-direction.json",
+        "common/pcapx/pcaputil/can-isotp-uds/captures/duplicate-cf.pcap": "can-isotp-uds/captures/duplicate-cf.pcap",
+        "common/pcapx/pcaputil/can-isotp-uds/answers/duplicate-cf.json": "can-isotp-uds/answers/duplicate-cf.json",
+        "common/pcapx/pcaputil/can-isotp-uds/captures/phase-timeout.pcap": "can-isotp-uds/captures/phase-timeout.pcap",
+        "common/pcapx/pcaputil/can-isotp-uds/answers/phase-timeout.json": "can-isotp-uds/answers/phase-timeout.json",
+        "common/pcapx/pcaputil/can-isotp-uds/captures/backdated.pcap": "can-isotp-uds/captures/backdated.pcap",
+        "common/pcapx/pcaputil/can-isotp-uds/answers/backdated.json": "can-isotp-uds/answers/backdated.json",
+        "common/pcapx/pcaputil/can-isotp-uds/captures/stmin-violation.pcap": "can-isotp-uds/captures/stmin-violation.pcap",
+        "common/pcapx/pcaputil/can-isotp-uds/answers/stmin-violation.json": "can-isotp-uds/answers/stmin-violation.json",
+        "common/pcapx/pcaputil/can-isotp-uds/captures/close-incomplete.pcap": "can-isotp-uds/captures/close-incomplete.pcap",
+        "common/pcapx/pcaputil/can-isotp-uds/answers/close-incomplete.json": "can-isotp-uds/answers/close-incomplete.json",
+        "common/pcapx/pcaputil/can-isotp-uds/captures/fd-long-sf-no-escape.pcap": "can-isotp-uds/captures/fd-long-sf-no-escape.pcap",
+        "common/pcapx/pcaputil/can-isotp-uds/answers/fd-long-sf-no-escape.json": "can-isotp-uds/answers/fd-long-sf-no-escape.json",
+        "common/pcapx/pcaputil/can-isotp-uds/captures/extended-address-mismatch.pcap": "can-isotp-uds/captures/extended-address-mismatch.pcap",
+        "common/pcapx/pcaputil/can-isotp-uds/answers/extended-address-mismatch.json": "can-isotp-uds/answers/extended-address-mismatch.json",
+        "common/pcapx/pcaputil/can-isotp-uds/captures/changed-static-fc.pcap": "can-isotp-uds/captures/changed-static-fc.pcap",
+        "common/pcapx/pcaputil/can-isotp-uds/answers/changed-static-fc.json": "can-isotp-uds/answers/changed-static-fc.json",
+        "common/pcapx/pcaputil/can-isotp-uds/captures/uds-dsc.pcap": "can-isotp-uds/captures/uds-dsc.pcap",
+        "common/pcapx/pcaputil/can-isotp-uds/answers/uds-dsc.json": "can-isotp-uds/answers/uds-dsc.json",
+        "common/pcapx/pcaputil/can-isotp-uds/captures/uds-nrc-pending.pcap": "can-isotp-uds/captures/uds-nrc-pending.pcap",
+        "common/pcapx/pcaputil/can-isotp-uds/answers/uds-nrc-pending.json": "can-isotp-uds/answers/uds-nrc-pending.json",
+        "common/pcapx/pcaputil/can-isotp-uds/captures/uds-suppressed.pcap": "can-isotp-uds/captures/uds-suppressed.pcap",
+        "common/pcapx/pcaputil/can-isotp-uds/answers/uds-suppressed.json": "can-isotp-uds/answers/uds-suppressed.json",
+        "common/pcapx/pcaputil/can-isotp-uds/captures/uds-pending-close.pcap": "can-isotp-uds/captures/uds-pending-close.pcap",
+        "common/pcapx/pcaputil/can-isotp-uds/answers/uds-pending-close.json": "can-isotp-uds/answers/uds-pending-close.json",
+        "common/pcapx/pcaputil/can-isotp-uds/captures/uds-wrong-descriptor.pcap": "can-isotp-uds/captures/uds-wrong-descriptor.pcap",
+        "common/pcapx/pcaputil/can-isotp-uds/answers/uds-wrong-descriptor.json": "can-isotp-uds/answers/uds-wrong-descriptor.json",
+        "common/pcapx/pcaputil/can-isotp-uds/captures/uds-reused-identity.pcap": "can-isotp-uds/captures/uds-reused-identity.pcap",
+        "common/pcapx/pcaputil/can-isotp-uds/answers/uds-reused-identity.json": "can-isotp-uds/answers/uds-reused-identity.json",
+        "common/pcapx/pcaputil/can-isotp-uds/captures/uds-changed-suppression-retry.pcap": "can-isotp-uds/captures/uds-changed-suppression-retry.pcap",
+        "common/pcapx/pcaputil/can-isotp-uds/answers/uds-changed-suppression-retry.json": "can-isotp-uds/answers/uds-changed-suppression-retry.json",
+        "common/pcapx/pcaputil/can-isotp-uds/captures/uds-unsupported-did-list.pcap": "can-isotp-uds/captures/uds-unsupported-did-list.pcap",
+        "common/pcapx/pcaputil/can-isotp-uds/answers/uds-unsupported-did-list.json": "can-isotp-uds/answers/uds-unsupported-did-list.json",
+        "common/pcapx/pcaputil/can-isotp-uds/manifest.json": "can-isotp-uds/manifest.json",
+        "common/pcapx/pcaputil/can-isotp-uds/generate.py": "can-isotp-uds/generate.py",
+        "common/pcapx/pcaputil/can-isotp-uds/verify.py": "can-isotp-uds/verify.py",
+        "common/pcapx/pcaputil/can-isotp-uds/reference.py": "can-isotp-uds/reference.py",
+        "common/pcapx/pcaputil/can-isotp-uds/reference_linux.py": "can-isotp-uds/reference_linux.py",
+        "common/pcapx/pcaputil/can-isotp-uds/LINUX-SOURCE-PIN.json": "can-isotp-uds/LINUX-SOURCE-PIN.json",
+        "common/pcapx/pcaputil/can-isotp-uds/UDS-SOURCE-PIN.json": "can-isotp-uds/UDS-SOURCE-PIN.json",
+        "common/pcapx/pcaputil/can-isotp-uds/REFERENCE-LINUX-ACTUAL.json": "can-isotp-uds/REFERENCE-LINUX-ACTUAL.json",
+        "common/pcapx/pcaputil/can-isotp-uds/REFERENCE-TSHARK-FINAL-DEVELOPMENT.jsonl": "can-isotp-uds/REFERENCE-TSHARK-FINAL-DEVELOPMENT.jsonl",
+        "scripts/protocol-tests/required-tests-traffic-unified-v66.json": "required-tests-traffic-unified-v66.json"
+      }
     }
   ],
   "schema_version": 1,

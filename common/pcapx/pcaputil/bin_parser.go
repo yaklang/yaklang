@@ -474,6 +474,10 @@ type binParser struct {
 	aisMultipartDisabled                                                       bool                                       // udpMu; untracked history fails closed
 	datagramDecodeAs                                                           map[uint16]string
 	rtpsShapeWriters                                                           map[uint16]RTPSShapeWriter
+	canISOTransports                                                           map[int][]CANISOTransport
+	canISOMu                                                                   sync.Mutex
+	canISO                                                                     *canISOStore
+	canISODisabled                                                             bool
 	canDecodeAs                                                                map[int]string
 	j1939TPMu                                                                  sync.Mutex
 	j1939TP                                                                    *j1939TPStore
@@ -573,6 +577,10 @@ func (c *CaptureConfig) prepareBinParser() error {
 	for port, binding := range c.rtpsShapeWriters {
 		a.rtpsShapeWriters[port] = binding
 	}
+	a.canISOTransports = make(map[int][]CANISOTransport, len(c.canISOTransports))
+	for k, v := range c.canISOTransports {
+		a.canISOTransports[k] = append([]CANISOTransport(nil), v...)
+	}
 	a.canDecodeAs = make(map[int]string, len(c.canDecodeAs))
 	for k, v := range c.canDecodeAs {
 		a.canDecodeAs[k] = v
@@ -600,6 +608,7 @@ func (c *CaptureConfig) finishBinParser() error {
 		return nil
 	}
 	a := c.binParser
+	a.closeCANISO()
 	a.closeJ1939TP()
 	a.closeDroneCANStats()
 	a.closeUDPSessions()

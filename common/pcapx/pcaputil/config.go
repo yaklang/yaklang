@@ -38,6 +38,7 @@ type CaptureConfig struct {
 	tlsSecrets            TLSSecretProvider
 	datagramDecodeAs      map[uint16]string
 	rtpsShapeWriters      map[uint16]RTPSShapeWriter
+	canISOTransports      map[int][]CANISOTransport
 	canDecodeAs           map[int]string
 	binParserConfig       *BinParserConfig
 	binParser             *binParser
