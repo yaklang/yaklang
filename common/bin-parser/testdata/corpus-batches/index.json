@@ -76495,6 +76495,157 @@
         "common/pcapx/pcaputil/dnp3-counter-events/transport-composition.json": "dnp3-counter-events/transport-composition.json",
         "scripts/protocol-tests/required-tests-traffic-unified-v56.json": "required-tests-traffic-unified-v56.json"
       }
+    },
+    {
+      "id": "validation-dnp3-link-role",
+      "kind": "validation",
+      "source_sha": "3d7ae7e0883221128e1189f8af65eaac90b89859",
+      "file": "validation-dnp3-link-role.zip",
+      "sha256": "ee836d47a69710a515ea1ab662ab8e5171559ca0a88664583fb7902899fafaa6",
+      "password": "bin-parser",
+      "members": {
+        "dnp3-link-role/captures/normal-role-complement.pcap": {
+          "sha256": "4c6256fde79e41479e44850421783210a6ecaae671b226049ed1568d218a7ad9",
+          "bytes": 629
+        },
+        "dnp3-link-role/answers/normal-role-complement.json": {
+          "sha256": "940ef5e86f671c91c002480dc83ac911e9f81b1855de58f5d81b7c98438ec84a",
+          "bytes": 3766
+        },
+        "dnp3-link-role/captures/wrong-peer-role-retains.pcap": {
+          "sha256": "438e93bf48a1fd33a0202da21960366a96e0c57bbb2fded014698e5e52bf613e",
+          "bytes": 726
+        },
+        "dnp3-link-role/answers/wrong-peer-role-retains.json": {
+          "sha256": "c409f3de9b8668d491ce1e90d7d595300ddf834d401004c92ea48317f453217e",
+          "bytes": 6197
+        },
+        "dnp3-link-role/captures/repeated-wrong-role-retains.pcap": {
+          "sha256": "7ebcadecea87f5f067aa0fe31058bf5eee3a1b87ad4e0db927cfd45542c5bcfb",
+          "bytes": 823
+        },
+        "dnp3-link-role/answers/repeated-wrong-role-retains.json": {
+          "sha256": "8ff8bbcae1ad916d7e32e23bb40e4b615650245ed095a9e2b286c69794797c61",
+          "bytes": 8629
+        },
+        "dnp3-link-role/captures/wrong-role-transport-loss-retains.pcap": {
+          "sha256": "c2fdce0598e82c3269ddbfd0abfe62d7140d2eb6cd15d600556286dab0f0272d",
+          "bytes": 726
+        },
+        "dnp3-link-role/answers/wrong-role-transport-loss-retains.json": {
+          "sha256": "f9dd519f3df665373c1321f0bfdddb93a7aae1514a15d438cceddb203a0fd42f",
+          "bytes": 4579
+        },
+        "dnp3-link-role/captures/wrong-host-direction-loss-retains.pcap": {
+          "sha256": "f57e49a1c357e732ab95e3807d2ca09c2e28c4bbcd1d8e8c32f6c8c44dd51a4e",
+          "bytes": 717
+        },
+        "dnp3-link-role/answers/wrong-host-direction-loss-retains.json": {
+          "sha256": "699088571e8b06e2479e574e15b4d1cec23fd1e4619fe80b2a00a1932d623969",
+          "bytes": 4531
+        },
+        "dnp3-link-role/captures/wrong-role-application-loss-retains.pcap": {
+          "sha256": "de1a9195b10eaf32f33c944e21fa728d0ff620b91728f375854b61b2c0c20852",
+          "bytes": 726
+        },
+        "dnp3-link-role/answers/wrong-role-application-loss-retains.json": {
+          "sha256": "ea565c13b7181e718960a1cfee6f9d767fdc8e297f076cf43360ddb4939704c7",
+          "bytes": 4745
+        },
+        "dnp3-link-role/captures/own-role-transport-loss-clears.pcap": {
+          "sha256": "323255303d052b31676397f8e6dd5a790e734bb47784d7c0722c206dd5eddd00",
+          "bytes": 726
+        },
+        "dnp3-link-role/answers/own-role-transport-loss-clears.json": {
+          "sha256": "8e3af576a2ec6ff2f020e0a9bd306ece082f925c6f120ebd608f0ba95bffb706",
+          "bytes": 4586
+        },
+        "dnp3-link-role/captures/own-role-application-loss-clears.pcap": {
+          "sha256": "1a487fdbf05d7b490bad45557d782eff5a07935f729c0cb1afe4f1009dc17c33",
+          "bytes": 726
+        },
+        "dnp3-link-role/answers/own-role-application-loss-clears.json": {
+          "sha256": "4281a5a52302ab437d4f0842493656741bafe97166ac588ae5f711898e487316",
+          "bytes": 4752
+        },
+        "dnp3-link-role/manifest.json": {
+          "sha256": "8d33dc41a5e01f878964289e51e66fa6114f52935801f76f704e96ee2e26f6d8",
+          "bytes": 3077
+        },
+        "dnp3-link-role/generate.py": {
+          "sha256": "3049ec6c3d405da2f1926a566432b6e3702a96544691e6bb776601e1ab3a7f8e",
+          "bytes": 4167
+        },
+        "dnp3-link-role/wire_model.py": {
+          "sha256": "46db32e21e4c8c072bceb8192b169125b04ee054ce64727ec3e520ca8d9ca825",
+          "bytes": 8389
+        },
+        "dnp3-link-role/verify.py": {
+          "sha256": "b96939e0d113b89e1972bae7237bfdeecf545005a9a433355edcab74520a1014",
+          "bytes": 1562
+        },
+        "dnp3-link-role/MODEL-PINS.json": {
+          "sha256": "1dab0195ce785007dad83fc3835725edf51e2f6bccb51b759f03627e042403e7",
+          "bytes": 611
+        },
+        "dnp3-link-role/SOURCE-PINS.json": {
+          "sha256": "711877e0b98a659e2fe3c95d5f149aab6a244fdb7e3624438ce1cf7ca494442c",
+          "bytes": 1380
+        },
+        "dnp3-link-role/reference.py": {
+          "sha256": "43f0a95c72fb8c9ba3d17a931c3c9aa5920f51c42fb6c86639ccdef2ab76e348",
+          "bytes": 6180
+        },
+        "dnp3-link-role/REFERENCE-ACTUAL.json": {
+          "sha256": "17ff1f63a2b5fb111c4b24f7eb0aaed2b9a22556f9be901ff5fe2a3d84242905",
+          "bytes": 1130
+        },
+        "dnp3-link-role/reference_link.py": {
+          "sha256": "b348b9fcfaba680394cfbab52fb95f2606bc61be43b228bf44880e44470b55cd",
+          "bytes": 5072
+        },
+        "dnp3-link-role/REFERENCE-LINK-ACTUAL.json": {
+          "sha256": "4f95ad1845a01ca7394728a5e14ca42e04db2d9466e6f5ba19f0ad03bdaffa97",
+          "bytes": 5196
+        },
+        "required-tests-traffic-unified-v57.json": {
+          "sha256": "9872d5f119975e026d539d9b41db241143c01fa315a2eaf814c29c173bf959f0",
+          "bytes": 11991487
+        },
+        "validation/expected.json": {
+          "sha256": "57650b9d07b911473f3e4d4f60c2ab7f1073741d8b97ec1e897ead3815ddffe0",
+          "bytes": 11216
+        }
+      },
+      "aliases": {
+        "common/pcapx/pcaputil/dnp3-link-role/captures/normal-role-complement.pcap": "dnp3-link-role/captures/normal-role-complement.pcap",
+        "common/pcapx/pcaputil/dnp3-link-role/answers/normal-role-complement.json": "dnp3-link-role/answers/normal-role-complement.json",
+        "common/pcapx/pcaputil/dnp3-link-role/captures/wrong-peer-role-retains.pcap": "dnp3-link-role/captures/wrong-peer-role-retains.pcap",
+        "common/pcapx/pcaputil/dnp3-link-role/answers/wrong-peer-role-retains.json": "dnp3-link-role/answers/wrong-peer-role-retains.json",
+        "common/pcapx/pcaputil/dnp3-link-role/captures/repeated-wrong-role-retains.pcap": "dnp3-link-role/captures/repeated-wrong-role-retains.pcap",
+        "common/pcapx/pcaputil/dnp3-link-role/answers/repeated-wrong-role-retains.json": "dnp3-link-role/answers/repeated-wrong-role-retains.json",
+        "common/pcapx/pcaputil/dnp3-link-role/captures/wrong-role-transport-loss-retains.pcap": "dnp3-link-role/captures/wrong-role-transport-loss-retains.pcap",
+        "common/pcapx/pcaputil/dnp3-link-role/answers/wrong-role-transport-loss-retains.json": "dnp3-link-role/answers/wrong-role-transport-loss-retains.json",
+        "common/pcapx/pcaputil/dnp3-link-role/captures/wrong-host-direction-loss-retains.pcap": "dnp3-link-role/captures/wrong-host-direction-loss-retains.pcap",
+        "common/pcapx/pcaputil/dnp3-link-role/answers/wrong-host-direction-loss-retains.json": "dnp3-link-role/answers/wrong-host-direction-loss-retains.json",
+        "common/pcapx/pcaputil/dnp3-link-role/captures/wrong-role-application-loss-retains.pcap": "dnp3-link-role/captures/wrong-role-application-loss-retains.pcap",
+        "common/pcapx/pcaputil/dnp3-link-role/answers/wrong-role-application-loss-retains.json": "dnp3-link-role/answers/wrong-role-application-loss-retains.json",
+        "common/pcapx/pcaputil/dnp3-link-role/captures/own-role-transport-loss-clears.pcap": "dnp3-link-role/captures/own-role-transport-loss-clears.pcap",
+        "common/pcapx/pcaputil/dnp3-link-role/answers/own-role-transport-loss-clears.json": "dnp3-link-role/answers/own-role-transport-loss-clears.json",
+        "common/pcapx/pcaputil/dnp3-link-role/captures/own-role-application-loss-clears.pcap": "dnp3-link-role/captures/own-role-application-loss-clears.pcap",
+        "common/pcapx/pcaputil/dnp3-link-role/answers/own-role-application-loss-clears.json": "dnp3-link-role/answers/own-role-application-loss-clears.json",
+        "common/pcapx/pcaputil/dnp3-link-role/manifest.json": "dnp3-link-role/manifest.json",
+        "common/pcapx/pcaputil/dnp3-link-role/generate.py": "dnp3-link-role/generate.py",
+        "common/pcapx/pcaputil/dnp3-link-role/wire_model.py": "dnp3-link-role/wire_model.py",
+        "common/pcapx/pcaputil/dnp3-link-role/verify.py": "dnp3-link-role/verify.py",
+        "common/pcapx/pcaputil/dnp3-link-role/MODEL-PINS.json": "dnp3-link-role/MODEL-PINS.json",
+        "common/pcapx/pcaputil/dnp3-link-role/SOURCE-PINS.json": "dnp3-link-role/SOURCE-PINS.json",
+        "common/pcapx/pcaputil/dnp3-link-role/reference.py": "dnp3-link-role/reference.py",
+        "common/pcapx/pcaputil/dnp3-link-role/REFERENCE-ACTUAL.json": "dnp3-link-role/REFERENCE-ACTUAL.json",
+        "common/pcapx/pcaputil/dnp3-link-role/reference_link.py": "dnp3-link-role/reference_link.py",
+        "common/pcapx/pcaputil/dnp3-link-role/REFERENCE-LINK-ACTUAL.json": "dnp3-link-role/REFERENCE-LINK-ACTUAL.json",
+        "scripts/protocol-tests/required-tests-traffic-unified-v57.json": "required-tests-traffic-unified-v57.json"
+      }
     }
   ],
   "schema_version": 1,

@@ -14,6 +14,7 @@ type dnp3RequestKey struct {
 	dir                 int
 	source, destination uint16
 	sequence            byte
+	master              bool
 }
 type dnp3Request struct {
 	function  byte
@@ -165,9 +166,11 @@ func dnp3FuncName(fc byte) string {
 
 // Loss of assembly context invalidates outstanding observations for the same
 // link pair only; a different link address domain retains its own requests.
-func (s *binDNP3) discardLink(source, destination uint16) {
+func (s *binDNP3) discardLink(dir int, source, destination uint16, master bool) {
 	for key := range s.pending {
-		if key.source == source && key.destination == destination || key.source == destination && key.destination == source {
+		same := key.dir == dir && key.source == source && key.destination == destination && key.master == master
+		reverse := key.dir == 1-dir && key.source == destination && key.destination == source && key.master != master
+		if same || reverse {
 			delete(s.pending, key)
 		}
 	}
@@ -212,7 +215,7 @@ func (s *binDNP3) consume(dir int, raw []byte) (map[string]any, error) {
 		th = user[0]
 	}
 	if th&0xc0 != 0xc0 {
-		s.discardLink(src, dest)
+		s.discardLink(dir, src, dest, raw[3]&0x80 != 0)
 		out["Error Scope"] = "application"
 		return out, protocolError(ErrContextRequired, "DNP3 transport fragment requires reassembly")
 	}
@@ -228,7 +231,7 @@ func (s *binDNP3) consume(dir int, raw []byte) (map[string]any, error) {
 	out["Unsolicited"] = uns
 	out["Confirm Required"] = ac&32 != 0
 	if ac&0xc0 != 0xc0 {
-		s.discardLink(src, dest)
+		s.discardLink(dir, src, dest, raw[3]&0x80 != 0)
 		out["Error Scope"] = "application"
 		return out, protocolError(ErrContextRequired, "DNP3 application fragment requires assembly")
 	}
@@ -268,7 +271,7 @@ func (s *binDNP3) consume(dir int, raw []byte) (map[string]any, error) {
 		out["Role"], out["Association"] = "response", "unsolicited"
 	case 0x81:
 		out["Role"] = "response"
-		key := dnp3RequestKey{1 - dir, dest, src, seq}
+		key := dnp3RequestKey{1 - dir, dest, src, seq, raw[3]&0x80 == 0}
 		if req, ok := s.pending[key]; ok {
 			out["In Reply To"] = dnp3FuncName(req.function)
 			delete(s.pending, key)
@@ -280,7 +283,7 @@ func (s *binDNP3) consume(dir int, raw []byte) (map[string]any, error) {
 			out["Error Scope"] = "application"
 			return out, protocolError(ErrMalformedMessage, "dnp3: invalid solicited request control")
 		}
-		key := dnp3RequestKey{dir, src, dest, seq}
+		key := dnp3RequestKey{dir, src, dest, seq, raw[3]&0x80 != 0}
 		req := dnp3Request{function: fc, classes: classes, selectors: selectors, digest: sha256.Sum256(user[1:])}
 		if old, ok := s.pending[key]; ok {
 			if old.function != req.function || old.classes != req.classes || old.digest != req.digest {

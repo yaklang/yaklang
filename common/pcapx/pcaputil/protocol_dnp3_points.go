@@ -256,7 +256,7 @@ func dnp3StaticPoints(b []byte, limit, depth int, packed, counters, events bool)
 // request and cannot leave a partly accepted field tree or allocation behind.
 func (s *binDNP3) observePoints(out map[string]any, dir int, src, dest uint16, user []byte) (byte, []dnp3StaticSelector, error) {
 	ac, fc := user[1], user[2]
-	key := dnp3RequestKey{dir, src, dest, ac & 15}
+	key := dnp3RequestKey{dir, src, dest, ac & 15, out["Control"].(int)&0x80 != 0}
 	refuse := func(err error) (byte, []dnp3StaticSelector, error) {
 		if fc == 1 || fc == 2 {
 			delete(s.pending, key)
@@ -306,7 +306,7 @@ func (s *binDNP3) observePoints(out map[string]any, dir int, src, dest uint16, u
 		if fc == 0x82 && hasStatic {
 			return refuse(protocolError(ErrUnsupportedFeature, "DNP3 selected unsolicited response requires counter events"))
 		}
-		req, known := s.pending[dnp3RequestKey{1 - dir, dest, src, ac & 15}]
+		req, known := s.pending[dnp3RequestKey{1 - dir, dest, src, ac & 15, out["Control"].(int)&0x80 == 0}]
 		if fc == 0x82 {
 			known = false
 		}

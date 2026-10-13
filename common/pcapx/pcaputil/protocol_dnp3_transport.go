@@ -110,7 +110,7 @@ func (s *binDNP3) assembleTransport(dir int, src, dst uint16, control byte, user
 			return nil, false, nil
 		}
 		delete(s.fragments, key)
-		s.discardLink(src, dst)
+		s.discardLink(dir, src, dst, control&0x80 != 0)
 		return fail(ErrContextRequired, "DNP3 conflicting duplicate transport segment")
 	}
 	if seq != (fragment.last+1)&63 {
