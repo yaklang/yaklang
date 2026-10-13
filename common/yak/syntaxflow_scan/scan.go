@@ -32,18 +32,11 @@ func Scan(ctx context.Context, option ...ssaconfig.Option) (retErr error) {
 	rt := ensureScanRuntime(config)
 	memory := config.GetSyntaxFlowMemory() ||
 		config.GetSyntaxFlowResultKind() == ssaconfig.SFResultSaveMemory
-	if memory && rt != nil {
-		rt.SetNoRiskDB(true)
-	}
 	if ownsRuntime {
-		registerReport(rt, config.Reporter)
-	}
-	var dbSaver *dbSaver
-	attachSaver := func(taskID string) {
-		if !ownsRuntime || memory || config.IsNoSaveRisk() || dbSaver != nil {
-			return
+		rt.RegisterRiskUpdateHandler(config.Reporter)
+		if !memory && !config.IsNoSaveRisk() {
+			rt.RegisterRiskUpdateHandler(ssaapi.NewRiskDBSaver())
 		}
-		dbSaver = attachDBSaver(rt, schema.SFResultKindScan, taskID, false)
 	}
 
 	// Wire up debug/pprof output when debug_dir is set.
@@ -59,6 +52,9 @@ func Scan(ctx context.Context, option ...ssaconfig.Option) (retErr error) {
 	runningID := uuid.NewString()
 	defer func() {
 		if m == nil {
+			if ownsRuntime {
+				retErr = utils.JoinErrors(retErr, rt.Close())
+			}
 			return
 		}
 		if success && m.status != schema.SYNTAXFLOWSCAN_PAUSED {
@@ -72,10 +68,9 @@ func Scan(ctx context.Context, option ...ssaconfig.Option) (retErr error) {
 		// Stop waited for every queued risk callback, so the pending batch is
 		// complete. Write it before the task row so a caller that sees the
 		// finished task can also read every finding.
-		if dbSaver != nil {
-			if err := dbSaver.Close(); err != nil {
-				log.Errorf("flush risk batch failed: %v", err)
-			}
+		retErr = utils.JoinErrors(retErr, rt.Flush())
+		if ownsRuntime {
+			retErr = utils.JoinErrors(retErr, rt.Close())
 		}
 		// Stop waits for queued result callbacks, so the final task row includes
 		// the complete in-memory risk count even when risks are not persisted.
@@ -99,7 +94,6 @@ func Scan(ctx context.Context, option ...ssaconfig.Option) (retErr error) {
 		if err != nil {
 			return err
 		}
-		attachSaver(m.taskID)
 		log.Info("start to create syntaxflow scan")
 		go func() {
 			err := m.ScanNewTask()
@@ -122,7 +116,6 @@ func Scan(ctx context.Context, option ...ssaconfig.Option) (retErr error) {
 		if err != nil {
 			return err
 		}
-		attachSaver(m.taskID)
 		go func() {
 			err := m.ResumeTask()
 			if err != nil {

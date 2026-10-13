@@ -60,7 +60,7 @@ func TestStructScanLanguageSelection(t *testing.T) {
 		{"ignore", ssaconfig.JAVA, true, 3},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			s := &structScanRuntime{rules: []*schema.SyntaxFlowRule{
+			s := &structScanState{rules: []*schema.SyntaxFlowRule{
 				{Language: ssaconfig.JAVA}, {Language: ssaconfig.PHP}, {Language: ssaconfig.General},
 			}}
 			s.filterLanguage(tc.lang, tc.ignore)
@@ -78,7 +78,7 @@ func TestStructScanReleasesPersistedBatchResults(t *testing.T) {
 	vf.AddFile("b/B.java", `package b; class B { void f(String s) throws Exception { Runtime.getRuntime().exec(s); } }`)
 	name := uuid.NewString()
 	t.Cleanup(func() { ssadb.DeleteProgram(ssadb.GetDB(), name) })
-	var state *structScanRuntime
+	var state *structScanState
 	callbacks := 0
 	completedBatches := 0
 	progs, err := ParseProjectWithFS(vf, WithLanguage(ssaconfig.JAVA), WithProgramName(name),

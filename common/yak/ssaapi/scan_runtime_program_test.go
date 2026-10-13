@@ -27,7 +27,7 @@ func TestProgramSyntaxFlow_JoinsScanRuntime(t *testing.T) {
 
 	rt := ssaapi.NewScanRuntime()
 	var submitted []schema.RiskUpdateItem
-	rt.ListenRisk(schema.RiskUpdateHandlerFunc(func(item schema.RiskUpdateItem) error {
+	rt.RegisterRiskUpdateHandler(schema.RiskUpdateHandlerFunc(func(item schema.RiskUpdateItem) error {
 		submitted = append(submitted, item)
 		return nil
 	}))

@@ -98,16 +98,11 @@ func ScanProject(ctx context.Context, opts ...ssaconfig.Option) (result ProjectR
 	// caller supplied it; either way the report is registered here, once.
 	// Nested stage scans share the runtime and do not register again.
 	rt := ensureScanRuntime(cfg)
-	registerReport(rt, cfg.Reporter)
-	if persistResults && rt != nil && !cfg.IsNoSaveRisk() {
-		if saver := attachDBSaver(rt, schema.SFResultKindScan, rt.ID, false); saver != nil {
-			defer func() {
-				if err := saver.Close(); err != nil {
-					log.Errorf("flush risk batch failed: %v", err)
-				}
-			}()
-		}
+	rt.RegisterRiskUpdateHandler(cfg.Reporter)
+	if persistResults && !cfg.IsNoSaveRisk() {
+		rt.RegisterRiskUpdateHandler(ssaapi.NewRiskDBSaver())
 	}
+	defer func() { err = utils.JoinErrors(err, rt.Close()) }()
 	// programName is published through ProjectResult so compile-only runs can
 	// hand the persisted IR name back to the platform.
 	programName := strings.TrimSpace(cfg.GetProgramName())

@@ -30,7 +30,7 @@ func runtimeRisk(feature, mode string, id uint) *schema.SSARisk {
 func TestScanRuntime_SourceThenSSACoversOneRow(t *testing.T) {
 	rt := NewScanRuntime()
 	handler := &recordingRiskHandler{}
-	rt.ListenRisk(handler)
+	rt.RegisterRiskUpdateHandler(handler)
 
 	source := runtimeRisk("feature-1", string(schema.SFR_MODE_SOURCE), 5)
 	require.True(t, rt.SubmitRisk(source))
@@ -47,7 +47,7 @@ func TestScanRuntime_SourceThenSSACoversOneRow(t *testing.T) {
 func TestScanRuntime_EarlierModePublishesNothing(t *testing.T) {
 	rt := NewScanRuntime()
 	handler := &recordingRiskHandler{}
-	rt.ListenRisk(handler)
+	rt.RegisterRiskUpdateHandler(handler)
 
 	require.True(t, rt.SubmitRisk(runtimeRisk("feature-1", string(schema.SFR_MODE_SSA), 1)))
 	require.True(t, rt.SubmitRisk(runtimeRisk("feature-1", string(schema.SFR_MODE_SOURCE), 0)))
@@ -57,5 +57,5 @@ func TestScanRuntime_EarlierModePublishesNothing(t *testing.T) {
 func TestScanRuntime_NilRuntimeIsSafe(t *testing.T) {
 	var rt *ScanRuntime
 	require.False(t, rt.SubmitRisk(runtimeRisk("f", "ssa", 0)))
-	require.NotPanics(t, func() { rt.ListenRisk(nil) })
+	require.NotPanics(t, func() { rt.RegisterRiskUpdateHandler(nil) })
 }
