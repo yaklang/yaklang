@@ -73650,6 +73650,432 @@
         "common/pcapx/pcaputil/dnp3-transport/guard-vectors.json": "dnp3-transport/guard-vectors.json",
         "scripts/protocol-tests/required-tests-traffic-unified-v51.json": "required-tests-traffic-unified-v51.json"
       }
+    },
+    {
+      "id": "validation-dnp3-static-analogs",
+      "kind": "validation",
+      "source_sha": "568baf747ebc9530235a75378587ff294d6740e4",
+      "file": "validation-dnp3-static-analogs.zip",
+      "sha256": "be15a9166345c6bda2325ca1775b771f6b3693ad08cefc2c16d734d5e19ef2dd",
+      "password": "bin-parser",
+      "members": {
+        "dnp3-static-analogs/answers/legacy32-neighbor.json": {
+          "sha256": "cd2b1df3711cf1748b1fd02725558a168b4a96118c6b8b54ddc7987ec343a920",
+          "bytes": 3227
+        },
+        "dnp3-static-analogs/captures/legacy32-neighbor.pcap": {
+          "sha256": "5eefe3b0fdbc8bdade0d3ac12096d48d3111124ec1d2c0f3a028d7d7b2c17c96",
+          "bytes": 629
+        },
+        "dnp3-static-analogs/answers/int-v2-q0.json": {
+          "sha256": "9190bb3570a0b4083c4613cb4ce6b9dbd2810b029c397961880d8db4f7675f75",
+          "bytes": 5824
+        },
+        "dnp3-static-analogs/captures/int-v2-q0.pcap": {
+          "sha256": "9f861caaa2c251fcd01f00860ecf420a1b703f59edd9dba44046272c6286d2f3",
+          "bytes": 638
+        },
+        "dnp3-static-analogs/answers/int-v2-q1.json": {
+          "sha256": "669ab61d7c23b6a227cf4fec7e641d2cc8ef9e485ce90d141e610b8df278e16d",
+          "bytes": 5835
+        },
+        "dnp3-static-analogs/captures/int-v2-q1.pcap": {
+          "sha256": "30040d45ad08c8c8bb886a2dceb23855a24f895712167127341c652c863b3e19",
+          "bytes": 640
+        },
+        "dnp3-static-analogs/answers/int-v2-q23.json": {
+          "sha256": "2710c07d82aa2368bab9d15c99d36e8dd654ae957038b0eb6c6e67cc5cf2fbfb",
+          "bytes": 5850
+        },
+        "dnp3-static-analogs/captures/int-v2-q23.pcap": {
+          "sha256": "9d5cd80b5d691252931b5c50b2cd7c97779a4ff06d0269aa5111efddba06735c",
+          "bytes": 641
+        },
+        "dnp3-static-analogs/answers/int-v2-q40.json": {
+          "sha256": "d9e77b03c7dafc88e7b6e59fb2a430871150ef7dfbef47864328a13cc7a4d162",
+          "bytes": 5878
+        },
+        "dnp3-static-analogs/captures/int-v2-q40.pcap": {
+          "sha256": "57810f7d5c3fdb1c17fe6a89b5a14d9705b0b739877f1260a5777b8babb729e7",
+          "bytes": 646
+        },
+        "dnp3-static-analogs/answers/int-v3-q0.json": {
+          "sha256": "f98fc0756df4f4936e39873045f0ccc81c2702e7c50a13ada8dff478c26ef948",
+          "bytes": 3538
+        },
+        "dnp3-static-analogs/captures/int-v3-q0.pcap": {
+          "sha256": "50a180e81c95bd9a5aa77ab0509a30b1f0d7fb77a797cfb8f30d1d5f4d5c68e2",
+          "bytes": 642
+        },
+        "dnp3-static-analogs/answers/int-v3-q1.json": {
+          "sha256": "1e08ff5a08ef7511793b836b2e50df889cb03e2ef4c02e616ed0cb4ef728fd7e",
+          "bytes": 3552
+        },
+        "dnp3-static-analogs/captures/int-v3-q1.pcap": {
+          "sha256": "f58ccd10a5fb809885f13da51f35efdbd05a18cd159fe04940e5307c4d427afe",
+          "bytes": 644
+        },
+        "dnp3-static-analogs/answers/int-v3-q23.json": {
+          "sha256": "a3369aab08a85e43e1cc167c9ac25c97394b5ecfa0400b6a855a0f80f8605d48",
+          "bytes": 3566
+        },
+        "dnp3-static-analogs/captures/int-v3-q23.pcap": {
+          "sha256": "3c99cd52ef620eacf6724453f29452681420ead860c289ba9aa4d9857b76fd54",
+          "bytes": 645
+        },
+        "dnp3-static-analogs/answers/int-v3-q40.json": {
+          "sha256": "8bde66c40ea5d2450a267925f539d57e258031965f7a190d230da3d031e2ca6c",
+          "bytes": 3605
+        },
+        "dnp3-static-analogs/captures/int-v3-q40.pcap": {
+          "sha256": "2f4714942d26747d38d504f540df5fff1860df36d1473aade38e42a6fd6d0dff",
+          "bytes": 652
+        },
+        "dnp3-static-analogs/answers/int-v4-q0.json": {
+          "sha256": "b536f1954455a86e15f98885c8cae26494055f033d560fa1361bd460f6459ce4",
+          "bytes": 3480
+        },
+        "dnp3-static-analogs/captures/int-v4-q0.pcap": {
+          "sha256": "c9507594303262cb267c8466b9e61343d4042eaac94c2cb1ef32aee62dc5b850",
+          "bytes": 634
+        },
+        "dnp3-static-analogs/answers/int-v4-q1.json": {
+          "sha256": "b388306e7fc1bb21fad29897cd43c1b8e74a1135fb5a57eaa5be3436f478549d",
+          "bytes": 3488
+        },
+        "dnp3-static-analogs/captures/int-v4-q1.pcap": {
+          "sha256": "aeaf188e1d54c306e75a42d7d70ae6dc0129dff002d8d193e0d0de91f8b8b945",
+          "bytes": 636
+        },
+        "dnp3-static-analogs/answers/int-v4-q23.json": {
+          "sha256": "f6adb7a10874a248d306d68161bfca6de7d1577e2202d554d2f774b10fbd9174",
+          "bytes": 3506
+        },
+        "dnp3-static-analogs/captures/int-v4-q23.pcap": {
+          "sha256": "6400fae7d40c307885304ec6039caefe165bbc0e97438e4e248deb8a782c09c7",
+          "bytes": 637
+        },
+        "dnp3-static-analogs/answers/int-v4-q40.json": {
+          "sha256": "2637a524d51ac0f3b8edd1cd7ccba49bc69c2a45c1e39af4d9dd6372e12f8d2e",
+          "bytes": 3528
+        },
+        "dnp3-static-analogs/captures/int-v4-q40.pcap": {
+          "sha256": "a1c93b8457af5fc65224c930dbaad97ce642f1e6cde5a9b19b7ba8cd6fc93821",
+          "bytes": 642
+        },
+        "dnp3-static-analogs/answers/ieee-v5-q0.json": {
+          "sha256": "38b5f6b7451b43101e062bfc69bdf1ac5a46462aefb9501ac2c9c9d4e5b8438e",
+          "bytes": 13495
+        },
+        "dnp3-static-analogs/captures/ieee-v5-q0.pcap": {
+          "sha256": "0d980f6929ca617d6b1b5a0ba257b79bb23a96fba2ab6834b2968afc10d5afde",
+          "bytes": 680
+        },
+        "dnp3-static-analogs/answers/ieee-v5-q1.json": {
+          "sha256": "1e9bd93b57f9a858deb6bff094e93c6f12c12aa217e643286907bf1ab24577f8",
+          "bytes": 13506
+        },
+        "dnp3-static-analogs/captures/ieee-v5-q1.pcap": {
+          "sha256": "0ef8652f583b1944d713f4af0c9b4497743c2126bb2fa2c00eaf61a767b4b551",
+          "bytes": 682
+        },
+        "dnp3-static-analogs/answers/ieee-v5-q23.json": {
+          "sha256": "7afc184b31e808de9c84ef6d35c0b967c948604cf0bfdb1476177b3360cb6939",
+          "bytes": 13578
+        },
+        "dnp3-static-analogs/captures/ieee-v5-q23.pcap": {
+          "sha256": "1ba7bc6cd8f45b59fb8fef79e6729ff015955f58c32895914452f6aae26d1e63",
+          "bytes": 691
+        },
+        "dnp3-static-analogs/answers/ieee-v5-q40.json": {
+          "sha256": "9dd33b6db2cf91d10ddcaca432ccf6ad63c72b96b57d16103f7b8360a12d22de",
+          "bytes": 13633
+        },
+        "dnp3-static-analogs/captures/ieee-v5-q40.pcap": {
+          "sha256": "cda2e6c40e61009e40055d198d7205277b410544b308d9dcbcfc2edc12ecaed5",
+          "bytes": 702
+        },
+        "dnp3-static-analogs/answers/ieee-v6-q0.json": {
+          "sha256": "b3489b44d97a9a4d53dbc156c629ca2ead7933c9c13f77b631766646683aa5bd",
+          "bytes": 13841
+        },
+        "dnp3-static-analogs/captures/ieee-v6-q0.pcap": {
+          "sha256": "e43f65c9122f9be863d9350022f5b4df2688a4c08d9f29a6e2a6fe9b9451223b",
+          "bytes": 726
+        },
+        "dnp3-static-analogs/answers/ieee-v6-q1.json": {
+          "sha256": "827d86a62ea717467a72f158bbc3d63ffb4242cc309d6e6003c82e0868a6678d",
+          "bytes": 13853
+        },
+        "dnp3-static-analogs/captures/ieee-v6-q1.pcap": {
+          "sha256": "cd960f820186623a7752d26c95d4ae58f618e9ecf2f7f2a58407a969bd0918f5",
+          "bytes": 728
+        },
+        "dnp3-static-analogs/answers/ieee-v6-q23.json": {
+          "sha256": "96ee84b28a904e733a5adf179eaf1615f106e837396ad84b449acfb0e3375eaa",
+          "bytes": 13911
+        },
+        "dnp3-static-analogs/captures/ieee-v6-q23.pcap": {
+          "sha256": "64e1680c9a6b07dd04baf7b3a5dee86ab383a55441ed6c5440f03bf29fc9b282",
+          "bytes": 735
+        },
+        "dnp3-static-analogs/answers/ieee-v6-q40.json": {
+          "sha256": "e21048bd87fd0ef283624ea123d4aa577ab6911f649642e84770b51e93fd7693",
+          "bytes": 13983
+        },
+        "dnp3-static-analogs/captures/ieee-v6-q40.pcap": {
+          "sha256": "5e0bee4cfe4b90cd4a83300371ae7abeda2e60cc813b35756dc5affd49c4a3ae",
+          "bytes": 748
+        },
+        "dnp3-static-analogs/answers/mixed-layouts.json": {
+          "sha256": "b5644afe2cfb7a9e4a7f4366824dbfbf833bf33a790d3d032b691112a3c7b959",
+          "bytes": 8546
+        },
+        "dnp3-static-analogs/captures/mixed-layouts.pcap": {
+          "sha256": "7ac628316822e8d041ec803772badb7a5fc0e604d22e9689a6bd62cb919d3311",
+          "bytes": 683
+        },
+        "dnp3-static-analogs/answers/truncated-v2.json": {
+          "sha256": "00d3e99fffa3a7901d677e8724c6f53e31243144ba1ef9b06a28bb9ee4d11d81",
+          "bytes": 4186
+        },
+        "dnp3-static-analogs/captures/truncated-v2.pcap": {
+          "sha256": "585abe9139306c8d3e658d66b2e7fbca9faeffaff18c87019dae8b81ecf272ca",
+          "bytes": 721
+        },
+        "dnp3-static-analogs/answers/descending-v2.json": {
+          "sha256": "7a5c26cfe56e4675b0ad79a93370e07f75126fece0ae314063f27de7f8efce58",
+          "bytes": 4175
+        },
+        "dnp3-static-analogs/captures/descending-v2.pcap": {
+          "sha256": "738a0afee4ec7ccbf765d2b44905d787a824d1909694256abbcf966536b27322",
+          "bytes": 719
+        },
+        "dnp3-static-analogs/answers/truncated-v3.json": {
+          "sha256": "5cd0fc971173e98b09596ed03ab3caea9e8010a28e1c48ab68ba977281e0859d",
+          "bytes": 3618
+        },
+        "dnp3-static-analogs/captures/truncated-v3.pcap": {
+          "sha256": "59a268bdd24408c80be2921041bd7139bac43c93dc3b14cd461c50236c9821af",
+          "bytes": 723
+        },
+        "dnp3-static-analogs/answers/descending-v3.json": {
+          "sha256": "663bf2b9a84ff8b461da5523b60e4b3688d3a73c1842ca8d8408f663f4e9d46e",
+          "bytes": 3603
+        },
+        "dnp3-static-analogs/captures/descending-v3.pcap": {
+          "sha256": "754e615754a99cdb04cfe563de9ed31f009456b160ad20bcfdfe785fe8d470e3",
+          "bytes": 720
+        },
+        "dnp3-static-analogs/answers/truncated-v4.json": {
+          "sha256": "f752019769561c9946f4f0f922f59292fe7f8fe9e1a3be258ffc2aaaca05c19e",
+          "bytes": 3598
+        },
+        "dnp3-static-analogs/captures/truncated-v4.pcap": {
+          "sha256": "df0788f038b5f10596adad382f554a43b64d4f99f7c68c3e012ed0242738128e",
+          "bytes": 719
+        },
+        "dnp3-static-analogs/answers/descending-v4.json": {
+          "sha256": "50ca4c70b2cddf72d542f7db4bc3debbe965aeb085e3cee7e93055f36cd5baf5",
+          "bytes": 3591
+        },
+        "dnp3-static-analogs/captures/descending-v4.pcap": {
+          "sha256": "516dff2358044e2d813b70523247a03f6fdab8b993093221f511524ee57ba7be",
+          "bytes": 718
+        },
+        "dnp3-static-analogs/answers/truncated-v5.json": {
+          "sha256": "820e08cd68ae19bf4d12237ee6aef41390d75d5a5ff9844d41662ad78025a045",
+          "bytes": 4487
+        },
+        "dnp3-static-analogs/captures/truncated-v5.pcap": {
+          "sha256": "5c6c6784412652f470545d012b6bfc083e17aa94db1a7b1858289b4a736c28f2",
+          "bytes": 725
+        },
+        "dnp3-static-analogs/answers/descending-v5.json": {
+          "sha256": "f54a87a2a6021b30be3b6b2a72f47fc235cf4d150e558c58ca1e804dd4d4a9a4",
+          "bytes": 4464
+        },
+        "dnp3-static-analogs/captures/descending-v5.pcap": {
+          "sha256": "75dd02d7814964dc9dd23aa4d77ac7d21aeb06b642776a26e3558c0c5d7497d5",
+          "bytes": 721
+        },
+        "dnp3-static-analogs/answers/truncated-v6.json": {
+          "sha256": "0547cb03dd1a0ed65ac972198171f31aed3452cdcb29a2eed1f60b5a1e467ed1",
+          "bytes": 4536
+        },
+        "dnp3-static-analogs/captures/truncated-v6.pcap": {
+          "sha256": "9cd76c28fa359bc51dc93723567b6978c48ddd70859253dc6388253a4d46272a",
+          "bytes": 737
+        },
+        "dnp3-static-analogs/answers/descending-v6.json": {
+          "sha256": "7f737a552919487d5330b1bf8317dc7a92036a63472c2ff8683420e440c0d01a",
+          "bytes": 4481
+        },
+        "dnp3-static-analogs/captures/descending-v6.pcap": {
+          "sha256": "94e8db59307fe0068a745edfee3313cd596a880e54da46ab896d597414807dcf",
+          "bytes": 727
+        },
+        "dnp3-static-analogs/answers/variation0-not-response-layout.json": {
+          "sha256": "ce6344d2c1e47b76a9fce984270e6c9da717eb6f126ee09d3349f685d23e33c1",
+          "bytes": 4203
+        },
+        "dnp3-static-analogs/captures/variation0-not-response-layout.pcap": {
+          "sha256": "d139005e2ca80c8a88043bb4d69fbeeb2972737ad3bc75196dc696e18644d1d1",
+          "bytes": 720
+        },
+        "dnp3-static-analogs/answers/variation7-not-response-layout.json": {
+          "sha256": "2aa292af0edd58bd2edaed5ec87244bb7befc0d12b2187007c2a3be19a7cd7c7",
+          "bytes": 4203
+        },
+        "dnp3-static-analogs/captures/variation7-not-response-layout.pcap": {
+          "sha256": "6b88783b6bc4886c2436d8e6a9e0e221375cc4d448d1d0737badd203809adf48",
+          "bytes": 720
+        },
+        "dnp3-static-analogs/answers/class1-static-refused.json": {
+          "sha256": "49033fe78a7e65a6562a15cbae291a8ad72ee1fb7e68059894b7a1bf5a51a1a3",
+          "bytes": 3054
+        },
+        "dnp3-static-analogs/captures/class1-static-refused.pcap": {
+          "sha256": "375fe8f9cd995c2c3b91894491104c472ff3b3c830b62c9b8d68e0526b327d40",
+          "bytes": 716
+        },
+        "dnp3-static-analogs/answers/wrong-sequence-retains.json": {
+          "sha256": "7ed8ced7c77910263cc4e82c7355207080cacb584b93061a7ecba68adbcfdcba",
+          "bytes": 6061
+        },
+        "dnp3-static-analogs/captures/wrong-sequence-retains.pcap": {
+          "sha256": "647e11cac6d67d0b834c7438668078af571b086e091dad1c092b9bba55d0b1b9",
+          "bytes": 738
+        },
+        "dnp3-static-analogs/manifest.json": {
+          "sha256": "a8b4b937da75d7edc731c27f960be92f36dcdf1c2859d5b6f1b28b1e32717075",
+          "bytes": 11887
+        },
+        "dnp3-static-analogs/generate.py": {
+          "sha256": "d7abab0bf5282991fbd565b28262b99a17329126ea66679381996bf711499bff",
+          "bytes": 2919
+        },
+        "dnp3-static-analogs/wire_model.py": {
+          "sha256": "efd83b60b456452f4d1c52b4d34d7453b40e3973d0ef287d3824355136cb2878",
+          "bytes": 6760
+        },
+        "dnp3-static-analogs/verify.py": {
+          "sha256": "3d3513dd2fdf9fc54b638f5a19383abfbf060f4351c1dd4d0c6d22996afde8a9",
+          "bytes": 2348
+        },
+        "dnp3-static-analogs/MODEL-PINS.json": {
+          "sha256": "ca820da3c817174fbd6a8f9ea8ce5683ee8a5f4f7ebb1398bb09569d0d346cfb",
+          "bytes": 481
+        },
+        "dnp3-static-analogs/SOURCE-PINS.json": {
+          "sha256": "d71cf5656f6fab8f639aa95afbf9742bf36c23581310925a42017432b16890be",
+          "bytes": 901
+        },
+        "dnp3-static-analogs/seal.py": {
+          "sha256": "f8bd4f42c876b8f50bf16d32b25b9378d1d9dd7776b36d9c7abf7465c87e2de3",
+          "bytes": 4042
+        },
+        "dnp3-static-analogs/REFERENCE-ACTUAL.json": {
+          "sha256": "7ea974bd26b0fc62cf5e7459fb259632acd39e33c7e49e8c987e1956667cdde2",
+          "bytes": 4810
+        },
+        "dnp3-static-analogs/reference.py": {
+          "sha256": "4854056d97e669d382633c919fabf08c9d00289b73344bb28b9306d65a8e8991",
+          "bytes": 3653
+        },
+        "required-tests-traffic-unified-v52.json": {
+          "sha256": "a98639d5c737184385813fa58ca6084e29462a84fcd82d93d909a36046ac5d6b",
+          "bytes": 10320587
+        },
+        "validation/expected.json": {
+          "sha256": "c1f9092207bf893d08667a9fa7ee80ee1d69d7c993fd62c897dcb167659b6b6c",
+          "bytes": 44647
+        }
+      },
+      "aliases": {
+        "common/pcapx/pcaputil/dnp3-static-analogs/answers/legacy32-neighbor.json": "dnp3-static-analogs/answers/legacy32-neighbor.json",
+        "common/pcapx/pcaputil/dnp3-static-analogs/captures/legacy32-neighbor.pcap": "dnp3-static-analogs/captures/legacy32-neighbor.pcap",
+        "common/pcapx/pcaputil/dnp3-static-analogs/answers/int-v2-q0.json": "dnp3-static-analogs/answers/int-v2-q0.json",
+        "common/pcapx/pcaputil/dnp3-static-analogs/captures/int-v2-q0.pcap": "dnp3-static-analogs/captures/int-v2-q0.pcap",
+        "common/pcapx/pcaputil/dnp3-static-analogs/answers/int-v2-q1.json": "dnp3-static-analogs/answers/int-v2-q1.json",
+        "common/pcapx/pcaputil/dnp3-static-analogs/captures/int-v2-q1.pcap": "dnp3-static-analogs/captures/int-v2-q1.pcap",
+        "common/pcapx/pcaputil/dnp3-static-analogs/answers/int-v2-q23.json": "dnp3-static-analogs/answers/int-v2-q23.json",
+        "common/pcapx/pcaputil/dnp3-static-analogs/captures/int-v2-q23.pcap": "dnp3-static-analogs/captures/int-v2-q23.pcap",
+        "common/pcapx/pcaputil/dnp3-static-analogs/answers/int-v2-q40.json": "dnp3-static-analogs/answers/int-v2-q40.json",
+        "common/pcapx/pcaputil/dnp3-static-analogs/captures/int-v2-q40.pcap": "dnp3-static-analogs/captures/int-v2-q40.pcap",
+        "common/pcapx/pcaputil/dnp3-static-analogs/answers/int-v3-q0.json": "dnp3-static-analogs/answers/int-v3-q0.json",
+        "common/pcapx/pcaputil/dnp3-static-analogs/captures/int-v3-q0.pcap": "dnp3-static-analogs/captures/int-v3-q0.pcap",
+        "common/pcapx/pcaputil/dnp3-static-analogs/answers/int-v3-q1.json": "dnp3-static-analogs/answers/int-v3-q1.json",
+        "common/pcapx/pcaputil/dnp3-static-analogs/captures/int-v3-q1.pcap": "dnp3-static-analogs/captures/int-v3-q1.pcap",
+        "common/pcapx/pcaputil/dnp3-static-analogs/answers/int-v3-q23.json": "dnp3-static-analogs/answers/int-v3-q23.json",
+        "common/pcapx/pcaputil/dnp3-static-analogs/captures/int-v3-q23.pcap": "dnp3-static-analogs/captures/int-v3-q23.pcap",
+        "common/pcapx/pcaputil/dnp3-static-analogs/answers/int-v3-q40.json": "dnp3-static-analogs/answers/int-v3-q40.json",
+        "common/pcapx/pcaputil/dnp3-static-analogs/captures/int-v3-q40.pcap": "dnp3-static-analogs/captures/int-v3-q40.pcap",
+        "common/pcapx/pcaputil/dnp3-static-analogs/answers/int-v4-q0.json": "dnp3-static-analogs/answers/int-v4-q0.json",
+        "common/pcapx/pcaputil/dnp3-static-analogs/captures/int-v4-q0.pcap": "dnp3-static-analogs/captures/int-v4-q0.pcap",
+        "common/pcapx/pcaputil/dnp3-static-analogs/answers/int-v4-q1.json": "dnp3-static-analogs/answers/int-v4-q1.json",
+        "common/pcapx/pcaputil/dnp3-static-analogs/captures/int-v4-q1.pcap": "dnp3-static-analogs/captures/int-v4-q1.pcap",
+        "common/pcapx/pcaputil/dnp3-static-analogs/answers/int-v4-q23.json": "dnp3-static-analogs/answers/int-v4-q23.json",
+        "common/pcapx/pcaputil/dnp3-static-analogs/captures/int-v4-q23.pcap": "dnp3-static-analogs/captures/int-v4-q23.pcap",
+        "common/pcapx/pcaputil/dnp3-static-analogs/answers/int-v4-q40.json": "dnp3-static-analogs/answers/int-v4-q40.json",
+        "common/pcapx/pcaputil/dnp3-static-analogs/captures/int-v4-q40.pcap": "dnp3-static-analogs/captures/int-v4-q40.pcap",
+        "common/pcapx/pcaputil/dnp3-static-analogs/answers/ieee-v5-q0.json": "dnp3-static-analogs/answers/ieee-v5-q0.json",
+        "common/pcapx/pcaputil/dnp3-static-analogs/captures/ieee-v5-q0.pcap": "dnp3-static-analogs/captures/ieee-v5-q0.pcap",
+        "common/pcapx/pcaputil/dnp3-static-analogs/answers/ieee-v5-q1.json": "dnp3-static-analogs/answers/ieee-v5-q1.json",
+        "common/pcapx/pcaputil/dnp3-static-analogs/captures/ieee-v5-q1.pcap": "dnp3-static-analogs/captures/ieee-v5-q1.pcap",
+        "common/pcapx/pcaputil/dnp3-static-analogs/answers/ieee-v5-q23.json": "dnp3-static-analogs/answers/ieee-v5-q23.json",
+        "common/pcapx/pcaputil/dnp3-static-analogs/captures/ieee-v5-q23.pcap": "dnp3-static-analogs/captures/ieee-v5-q23.pcap",
+        "common/pcapx/pcaputil/dnp3-static-analogs/answers/ieee-v5-q40.json": "dnp3-static-analogs/answers/ieee-v5-q40.json",
+        "common/pcapx/pcaputil/dnp3-static-analogs/captures/ieee-v5-q40.pcap": "dnp3-static-analogs/captures/ieee-v5-q40.pcap",
+        "common/pcapx/pcaputil/dnp3-static-analogs/answers/ieee-v6-q0.json": "dnp3-static-analogs/answers/ieee-v6-q0.json",
+        "common/pcapx/pcaputil/dnp3-static-analogs/captures/ieee-v6-q0.pcap": "dnp3-static-analogs/captures/ieee-v6-q0.pcap",
+        "common/pcapx/pcaputil/dnp3-static-analogs/answers/ieee-v6-q1.json": "dnp3-static-analogs/answers/ieee-v6-q1.json",
+        "common/pcapx/pcaputil/dnp3-static-analogs/captures/ieee-v6-q1.pcap": "dnp3-static-analogs/captures/ieee-v6-q1.pcap",
+        "common/pcapx/pcaputil/dnp3-static-analogs/answers/ieee-v6-q23.json": "dnp3-static-analogs/answers/ieee-v6-q23.json",
+        "common/pcapx/pcaputil/dnp3-static-analogs/captures/ieee-v6-q23.pcap": "dnp3-static-analogs/captures/ieee-v6-q23.pcap",
+        "common/pcapx/pcaputil/dnp3-static-analogs/answers/ieee-v6-q40.json": "dnp3-static-analogs/answers/ieee-v6-q40.json",
+        "common/pcapx/pcaputil/dnp3-static-analogs/captures/ieee-v6-q40.pcap": "dnp3-static-analogs/captures/ieee-v6-q40.pcap",
+        "common/pcapx/pcaputil/dnp3-static-analogs/answers/mixed-layouts.json": "dnp3-static-analogs/answers/mixed-layouts.json",
+        "common/pcapx/pcaputil/dnp3-static-analogs/captures/mixed-layouts.pcap": "dnp3-static-analogs/captures/mixed-layouts.pcap",
+        "common/pcapx/pcaputil/dnp3-static-analogs/answers/truncated-v2.json": "dnp3-static-analogs/answers/truncated-v2.json",
+        "common/pcapx/pcaputil/dnp3-static-analogs/captures/truncated-v2.pcap": "dnp3-static-analogs/captures/truncated-v2.pcap",
+        "common/pcapx/pcaputil/dnp3-static-analogs/answers/descending-v2.json": "dnp3-static-analogs/answers/descending-v2.json",
+        "common/pcapx/pcaputil/dnp3-static-analogs/captures/descending-v2.pcap": "dnp3-static-analogs/captures/descending-v2.pcap",
+        "common/pcapx/pcaputil/dnp3-static-analogs/answers/truncated-v3.json": "dnp3-static-analogs/answers/truncated-v3.json",
+        "common/pcapx/pcaputil/dnp3-static-analogs/captures/truncated-v3.pcap": "dnp3-static-analogs/captures/truncated-v3.pcap",
+        "common/pcapx/pcaputil/dnp3-static-analogs/answers/descending-v3.json": "dnp3-static-analogs/answers/descending-v3.json",
+        "common/pcapx/pcaputil/dnp3-static-analogs/captures/descending-v3.pcap": "dnp3-static-analogs/captures/descending-v3.pcap",
+        "common/pcapx/pcaputil/dnp3-static-analogs/answers/truncated-v4.json": "dnp3-static-analogs/answers/truncated-v4.json",
+        "common/pcapx/pcaputil/dnp3-static-analogs/captures/truncated-v4.pcap": "dnp3-static-analogs/captures/truncated-v4.pcap",
+        "common/pcapx/pcaputil/dnp3-static-analogs/answers/descending-v4.json": "dnp3-static-analogs/answers/descending-v4.json",
+        "common/pcapx/pcaputil/dnp3-static-analogs/captures/descending-v4.pcap": "dnp3-static-analogs/captures/descending-v4.pcap",
+        "common/pcapx/pcaputil/dnp3-static-analogs/answers/truncated-v5.json": "dnp3-static-analogs/answers/truncated-v5.json",
+        "common/pcapx/pcaputil/dnp3-static-analogs/captures/truncated-v5.pcap": "dnp3-static-analogs/captures/truncated-v5.pcap",
+        "common/pcapx/pcaputil/dnp3-static-analogs/answers/descending-v5.json": "dnp3-static-analogs/answers/descending-v5.json",
+        "common/pcapx/pcaputil/dnp3-static-analogs/captures/descending-v5.pcap": "dnp3-static-analogs/captures/descending-v5.pcap",
+        "common/pcapx/pcaputil/dnp3-static-analogs/answers/truncated-v6.json": "dnp3-static-analogs/answers/truncated-v6.json",
+        "common/pcapx/pcaputil/dnp3-static-analogs/captures/truncated-v6.pcap": "dnp3-static-analogs/captures/truncated-v6.pcap",
+        "common/pcapx/pcaputil/dnp3-static-analogs/answers/descending-v6.json": "dnp3-static-analogs/answers/descending-v6.json",
+        "common/pcapx/pcaputil/dnp3-static-analogs/captures/descending-v6.pcap": "dnp3-static-analogs/captures/descending-v6.pcap",
+        "common/pcapx/pcaputil/dnp3-static-analogs/answers/variation0-not-response-layout.json": "dnp3-static-analogs/answers/variation0-not-response-layout.json",
+        "common/pcapx/pcaputil/dnp3-static-analogs/captures/variation0-not-response-layout.pcap": "dnp3-static-analogs/captures/variation0-not-response-layout.pcap",
+        "common/pcapx/pcaputil/dnp3-static-analogs/answers/variation7-not-response-layout.json": "dnp3-static-analogs/answers/variation7-not-response-layout.json",
+        "common/pcapx/pcaputil/dnp3-static-analogs/captures/variation7-not-response-layout.pcap": "dnp3-static-analogs/captures/variation7-not-response-layout.pcap",
+        "common/pcapx/pcaputil/dnp3-static-analogs/answers/class1-static-refused.json": "dnp3-static-analogs/answers/class1-static-refused.json",
+        "common/pcapx/pcaputil/dnp3-static-analogs/captures/class1-static-refused.pcap": "dnp3-static-analogs/captures/class1-static-refused.pcap",
+        "common/pcapx/pcaputil/dnp3-static-analogs/answers/wrong-sequence-retains.json": "dnp3-static-analogs/answers/wrong-sequence-retains.json",
+        "common/pcapx/pcaputil/dnp3-static-analogs/captures/wrong-sequence-retains.pcap": "dnp3-static-analogs/captures/wrong-sequence-retains.pcap",
+        "common/pcapx/pcaputil/dnp3-static-analogs/manifest.json": "dnp3-static-analogs/manifest.json",
+        "common/pcapx/pcaputil/dnp3-static-analogs/generate.py": "dnp3-static-analogs/generate.py",
+        "common/pcapx/pcaputil/dnp3-static-analogs/wire_model.py": "dnp3-static-analogs/wire_model.py",
+        "common/pcapx/pcaputil/dnp3-static-analogs/verify.py": "dnp3-static-analogs/verify.py",
+        "common/pcapx/pcaputil/dnp3-static-analogs/MODEL-PINS.json": "dnp3-static-analogs/MODEL-PINS.json",
+        "common/pcapx/pcaputil/dnp3-static-analogs/SOURCE-PINS.json": "dnp3-static-analogs/SOURCE-PINS.json",
+        "common/pcapx/pcaputil/dnp3-static-analogs/seal.py": "dnp3-static-analogs/seal.py",
+        "common/pcapx/pcaputil/dnp3-static-analogs/REFERENCE-ACTUAL.json": "dnp3-static-analogs/REFERENCE-ACTUAL.json",
+        "common/pcapx/pcaputil/dnp3-static-analogs/reference.py": "dnp3-static-analogs/reference.py",
+        "scripts/protocol-tests/required-tests-traffic-unified-v52.json": "required-tests-traffic-unified-v52.json"
+      }
     }
   ],
   "schema_version": 1,

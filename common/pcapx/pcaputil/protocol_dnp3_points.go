@@ -3,10 +3,11 @@ package pcaputil
 import (
 	"encoding/binary"
 	"fmt"
+	"math"
 )
 
 // WithDNP3ReadPoints selects passive complete-link class READ/header and
-// static G1V2/G10V2/G30V1 point observations. It does not authenticate an
+// static G1V2/G10V2/G30V1..6 point observations. It does not authenticate an
 // endpoint, assemble fragments, decode event objects or certify device success.
 func WithDNP3ReadPoints(enabled bool) CaptureOption {
 	return func(c *CaptureConfig) error {
@@ -66,8 +67,8 @@ func dnp3StaticPoints(b []byte, limit, depth int) ([]any, error) {
 		width := 0
 		if (group == 1 || group == 10) && variation == 2 {
 			width = 1
-		} else if group == 30 && variation == 1 {
-			width = 5
+		} else if group == 30 && variation >= 1 && variation <= 6 {
+			width = [7]int{0, 5, 3, 4, 2, 5, 9}[variation]
 		} else {
 			return nil, protocolError(ErrUnsupportedFeature, "DNP3 unsupported static object group/variation")
 		}
@@ -132,11 +133,59 @@ func dnp3StaticPoints(b []byte, limit, depth int) ([]any, error) {
 				return nil, protocolError(ErrMalformedMessage, "DNP3 duplicate static point index")
 			}
 			seen[key] = true
+			point := map[string]any{"Index": index}
+			if group == 30 && (variation == 3 || variation == 4) {
+				// These layouts contain no quality octet. Do not fabricate online
+				// or cleared flags from the low byte of the signed value.
+				point["Quality"] = "not-reported"
+				if variation == 3 {
+					point["Value"] = int32(binary.LittleEndian.Uint32(b[:4]))
+				} else {
+					point["Value"] = int32(int16(binary.LittleEndian.Uint16(b[:2])))
+				}
+				b = b[width:]
+				points = append(points, point)
+				continue
+			}
 			flags := b[0]
-			point := map[string]any{"Index": index, "Flags": int(flags), "Online": flags&1 != 0, "Restart": flags&2 != 0, "Communication Lost": flags&4 != 0, "Remote Forced": flags&8 != 0, "Local Forced": flags&16 != 0}
+			point["Flags"] = int(flags)
+			point["Online"] = flags&1 != 0
+			point["Restart"] = flags&2 != 0
+			point["Communication Lost"] = flags&4 != 0
+			point["Remote Forced"] = flags&8 != 0
+			point["Local Forced"] = flags&16 != 0
 			if group == 30 {
 				point["Reserved Flags"] = int(flags & 128)
-				point["Value"] = int32(binary.LittleEndian.Uint32(b[1:5]))
+				switch variation {
+				case 1:
+					point["Value"] = int32(binary.LittleEndian.Uint32(b[1:5]))
+				case 2:
+					point["Value"] = int32(int16(binary.LittleEndian.Uint16(b[1:3])))
+				case 5, 6:
+					var value float64
+					if variation == 5 {
+						bits := binary.LittleEndian.Uint32(b[1:5])
+						point["Encoding"], point["Raw Bits"] = "binary32", fmt.Sprintf("%08x", bits)
+						value = float64(math.Float32frombits(bits))
+					} else {
+						bits := binary.LittleEndian.Uint64(b[1:9])
+						point["Encoding"], point["Raw Bits"] = "binary64", fmt.Sprintf("%016x", bits)
+						value = math.Float64frombits(bits)
+					}
+					// Keep all IEEE bits, including NaN payloads and signed zero.
+					// Nonfinite values remain explicit, JSON-safe observations.
+					state := "finite"
+					if math.IsNaN(value) {
+						state = "nan"
+					} else if math.IsInf(value, 1) {
+						state = "positive-infinity"
+					} else if math.IsInf(value, -1) {
+						state = "negative-infinity"
+					} else {
+						point["Value"] = value
+					}
+					point["Value Status"] = state
+				}
 				point["Over Range"] = flags&32 != 0
 				point["Reference Error"] = flags&64 != 0
 			} else {

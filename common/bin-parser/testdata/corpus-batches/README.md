@@ -44,7 +44,7 @@ Run from the repository root:
 ```sh
 go run ./internal/trafficfixture/cmd/corpus test
 go test -json -count=1 -timeout=5m ./internal/trafficfixture/... ./common/bin-parser/... ./common/pcapx/... ./common/yak/cmd/yakcmds/shark-cli ./scripts/ci > traffic.jsonl
-go run ./internal/trafficfixture/cmd/corpus exec -- python3 @scripts/protocol-tests/check_go_test_json_v2.py traffic.jsonl --inventory @scripts/protocol-tests/required-tests-traffic-unified-v51.json --tier full
+go run ./internal/trafficfixture/cmd/corpus exec -- python3 @scripts/protocol-tests/check_go_test_json_v2.py traffic.jsonl --inventory @scripts/protocol-tests/required-tests-traffic-unified-v52.json --tier full
 ```
 
 The single `corpus` entry point uses the same bounded Go ZIP loader as tests.
@@ -83,7 +83,7 @@ their semantic coverage. The existing synthetic session keys are test inputs;
 production credentials, user private keys and material without redistribution
 permission belong in an external fixed-source download manifest.
 
-Current test requirements are sealed at `scripts/protocol-tests/required-tests-traffic-unified-v51.json`;
+Current test requirements are sealed at `scripts/protocol-tests/required-tests-traffic-unified-v52.json`;
 the historical inventories and all earlier batches remain unchanged.
 The supplemental small-corpus batch contains 26 minimal controls, their explicit
 expected facts, an offline generator and the compact pinned source manifest.
@@ -203,7 +203,7 @@ opaque selector bytes and one bounded Data value over Wrapper v1 TCP/UDP; object
 selector meaning, access permission and device operation are unverified. The
 original one-packet selective-access capture and original refused answer remain
 immutable; its now-supported answer is matched by exact input SHA and frame.
-The active inventory is `scripts/protocol-tests/required-tests-traffic-unified-v51.json`.
+The active inventory is `scripts/protocol-tests/required-tests-traffic-unified-v52.json`.
 
 The small-graph budget batch reuses accepted graph captures/answers and adds one
 249-byte UDP control for child count255 without child bytes. Its standalone proof
@@ -993,7 +993,7 @@ the normative answer; a missing numeric reference field is not a codec pass.
 Full/deferred, workers1/2/4, observers off/on, Feed chunks1/7/full, ownership,
 resources and close/refusal boundaries remain required.
 
-Current gate: `required-tests-traffic-unified-v51.json` with
+Current gate: `required-tests-traffic-unified-v52.json` with
 `check_go_test_json_v2.py`. The indexed validator preserves missing/unpassed,
 package invocation completion, descendant skips, failures and non-JSON checks;
 its mutation/differential harness is sealed with the material. Older checkers
@@ -1171,4 +1171,29 @@ complete response on the isolated wrap case is retained as a reference limitatio
 Conflicting-duplicate refusal is an explicit observer policy, separate from SDK
 equivalence. Wider object/events, application fragments, UDP, authentication,
 calibration/device behavior and indistinguishable application generations remain
-open. Current full inventory is v51.
+open. That transport batch was sealed with v51; current static analog entry is below.
+
+
+The selected `dnp3-read-points` observer now includes all static analog G30V1..6
+wire layouts: signed32/16 with flags (V1/V2), signed32/16 without flags (V3/V4),
+and IEEE binary32/64 with flags (V5/V6). Existing V1 fields remain compatible.
+Without a quality octet, `Quality` is `not-reported` and no online/error flags are
+fabricated from value bytes. Floating observations retain exact `Raw Bits`,
+`Encoding` and `Value Status` (`finite`, `nan`, `positive-infinity`,
+`negative-infinity`); only finite values expose numeric `Value`. NaN payloads,
+signed zero and subnormal bits survive without emitting non-JSON numbers.
+These are encoded wire values, not engineering units/calibration or device
+quality inference. Qualifier ranges/prefixes, context, budgets and ownership use
+the existing selected observer contracts.
+
+`validation-dnp3-static-analogs.zip` contains36 minimal authored positive/negative
+captures, exact complete field/session/error answers, fixed Group30 source pins
+and generation/check tools. Integer limits, zero, all IEEE classes, complete
+quality flags and missing quality are checked in23 actual TShark4.2.5 captures
+with1,568 wire/index/quality/integer/IEEE comparisons. Native tests additionally
+compare finite IEEE bits (including the sign of zero), refuse truncated and
+descending layouts, preserve pending context, and check collection boundaries
+and query ownership. All preceding ZIPs remain unchanged. Other objects/events,
+application fragments, individual-object READ selectors, UDP/authentication,
+device/calibration and indistinguishable generations remain open. Current
+full inventory is v52.
