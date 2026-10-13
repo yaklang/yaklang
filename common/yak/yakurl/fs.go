@@ -24,6 +24,28 @@ type fileSystemAction struct {
 	fs fi.FileSystem
 }
 
+// fullLister is the optional interface behind the whole-file view:
+// filesystems that can aggregate an incremental program's overlay layers
+// (ssadb://IrSourceFS) serve it via FullReadDir. Others (e.g. file://)
+// fall back to plain ReadDir.
+type fullLister interface {
+	FullReadDir(string) ([]fs.DirEntry, error)
+}
+
+// listDir lists a directory. The default is the FS's own cheap ReadDir —
+// for an incremental program that is the last diff's files only, with no
+// overlay aggregation and no layer-chain IO. The aggregated whole-file
+// view is an explicit opt-in: "show all files" checked in the audit
+// frontend sends no diffOnly query and listDir routes to FullReadDir (the
+// user asked for it, so the heavier walk is expected); unchecked listings
+// send diffOnly=true and keep the cheap view.
+func (f fileSystemAction) listDir(absPath string, query url.Values) ([]fs.DirEntry, error) {
+	if fls, ok := f.fs.(fullLister); ok && !getBoolQueryValue(query, "diffOnly") {
+		return fls.FullReadDir(absPath)
+	}
+	return f.fs.ReadDir(absPath)
+}
+
 func getFirstQueryValue(query url.Values, keys ...string) string {
 	for _, key := range keys {
 		if value := query.Get(key); value != "" {
@@ -158,7 +180,7 @@ func (f *fileSystemAction) fileInfoToResource(originParam *ypb.YakURL, query url
 	fs := f.fs
 	yakURL := &ypb.YakURL{
 		Schema:   originParam.Schema,
-		User:     originParam.GetUser(),
+		User:     originParam.User,
 		Pass:     originParam.GetPass(),
 		Location: originParam.GetLocation(),
 		Path:     currentPath,
@@ -174,12 +196,17 @@ func (f *fileSystemAction) fileInfoToResource(originParam *ypb.YakURL, query url
 		ModifiedTimestamp: info.ModTime().Unix(),
 		Path:              currentPath,
 		YakURLVerbose:     "",
-		Url:               yakURL,
+		Url:                yakURL,
 	}
 	if info.IsDir() {
 		src.ResourceType = "dir"
 		src.VerboseType = "filesystem-directory"
-		infos, err := fs.ReadDir(currentPath)
+		// Stay in the same view as the listing itself: in the whole-file
+		// view ("show all files"), a directory whose entries all live in
+		// lower overlay layers reads as empty via the cheap ReadDir and
+		// the frontend would wrongly mark it a leaf. listDir honors
+		// diffOnly here.
+		infos, err := f.listDir(currentPath, query)
 		if err == nil {
 			src.HaveChildrenNodes = len(infos) > 0
 		}
@@ -258,7 +285,7 @@ func (f fileSystemAction) Get(params *ypb.RequestYakURLParams) (*ypb.RequestYakU
 	switch query.Get("op") {
 	case "list":
 		if info.IsDir() {
-			infos, err := fs.ReadDir(absPath)
+			infos, err := f.listDir(absPath, query)
 			if err != nil {
 				return nil, utils.Wrapf(err, "cannot read dir[%s]", u.GetPath())
 			}

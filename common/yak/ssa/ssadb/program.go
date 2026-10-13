@@ -72,6 +72,26 @@ func (*IrProgram) TableName() string {
 	return TableIrPrograms
 }
 
+// IsIncrementalKind reports whether this row belongs to an incremental
+// compilation series (overlay chain head, diff layer, or base layer).
+func (i *IrProgram) IsIncrementalKind() bool {
+	return i.IsOverlay || i.BaseProgramName != "" || len(i.FileHashMap) > 0
+}
+
+// IsBaseProgramKind reports whether this row is the first (base) layer of an
+// incremental series: incremental, but built on no earlier program.
+func (i *IrProgram) IsBaseProgramKind() bool {
+	return i.IsIncrementalKind() && i.BaseProgramName == ""
+}
+
+// HasSavedOverlayLayers reports whether this row carries a complete overlay
+// recipe: the chain-head flag plus enough layer names (>= 2) to reassemble
+// the merged view. The base layer of a series records only its own name —
+// a one-layer chain needs no assembly.
+func (i *IrProgram) HasSavedOverlayLayers() bool {
+	return i.IsOverlay && len(i.OverlayLayers) >= 2
+}
+
 func CreateProgramWithError(name, version string, kind ProgramKind) (*IrProgram, error) {
 	db := GetDB().Model(&IrProgram{})
 	out := &IrProgram{
@@ -111,6 +131,35 @@ func GetLibrary(name, version string) (*IrProgram, error) {
 
 func GetApplicationProgram(name string) (*IrProgram, error) {
 	return GetProgram(name, Application)
+}
+
+// GetApplicationPrograms fetches the Application rows for names in a single
+// query; missing names are simply absent from the result (callers treat
+// absent layers as skippable, same as a per-name GetProgram error).
+func GetApplicationPrograms(names []string) map[string]*IrProgram {
+	ret := make(map[string]*IrProgram, len(names))
+	clean := make([]string, 0, len(names))
+	for _, name := range names {
+		if name != "" {
+			clean = append(clean, name)
+		}
+	}
+	if len(clean) == 0 {
+		return ret
+	}
+	var progs []*IrProgram
+	err := GetDB().Model(&IrProgram{}).
+		Where("program_name IN (?)", clean).
+		Where("program_kind = ?", Application).
+		Find(&progs).Error
+	if err != nil {
+		log.Errorf("get application programs failed: %v", err)
+		return ret
+	}
+	for _, p := range progs {
+		ret[p.ProgramName] = p
+	}
+	return ret
 }
 
 func GetProgram(name string, kind ProgramKind) (*IrProgram, error) {

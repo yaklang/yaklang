@@ -103,7 +103,7 @@ func (c *Config) prepareStructScan(plan *UnitPlan) error {
 	if strings.TrimSpace(c.GetProgramName()) == "" {
 		return utils.Errorf("struct scan requires withProgramName")
 	}
-	if c.GetEnableIncrementalCompile() || c.GetBaseProgramName() != "" {
+	if c.compileMode() != compileModeFull {
 		s.skipped = true
 		s.skipReason = "incremental compile"
 		log.Warnf("[struct_scan] skipped: %s", s.skipReason)

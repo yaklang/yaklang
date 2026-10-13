@@ -307,53 +307,6 @@ func addFileToAggregatedFS(vfs *filesys.VirtualFS, canonicalPath, content string
 	vfs.AddFile(vfsPath, content)
 }
 
-func deleteFileFromAggregatedFS(vfs *filesys.VirtualFS, canonicalPath string) {
-	if vfs == nil || canonicalPath == "" {
-		return
-	}
-	vfsPath := overlayAggregatedFSPath(canonicalPath)
-	if vfsPath == "" {
-		return
-	}
-	if exists, _ := vfs.Exists(vfsPath); exists {
-		_ = vfs.Delete(vfsPath)
-	}
-}
-
-// cloneAndPatchAggregatedFS copies prev FS then applies newLayer FileHashMap (-1 delete, else upsert).
-func cloneAndPatchAggregatedFS(prev fi.FileSystem, newLayer *Program) (*filesys.VirtualFS, error) {
-	out := filesys.NewVirtualFs()
-	if prev != nil {
-		err := filesys.Recursive(".", filesys.WithFileSystem(prev), filesys.WithFileStat(func(path string, info os.FileInfo) error {
-			content, err := prev.ReadFile(path)
-			if err != nil {
-				return nil
-			}
-			addFileToAggregatedFS(out, overlayPathFromAggregatedFS(path), string(content))
-			return nil
-		}))
-		if err != nil {
-			return nil, err
-		}
-	}
-	if newLayer == nil || newLayer.Program == nil {
-		return out, nil
-	}
-	fileHashMap := newLayer.Program.FileHashMap
-	progName := newLayer.GetProgramName()
-	for filePath, hash := range fileHashMap {
-		path := normalizeOverlayFilePath(filePath, progName)
-		if hash == -1 {
-			deleteFileFromAggregatedFS(out, path)
-			continue
-		}
-		if content, ok := readProgramFileContent(newLayer, path); ok {
-			addFileToAggregatedFS(out, path, content)
-		}
-	}
-	return out, nil
-}
-
 // applyLayerFileHashMap appends a Diff layer and applies its FileHashMap directly:
 //   - add/mod  → strip from older Diff.File, own on new layer.File, add to ExcludeFile
 //   - delete   → strip from older Diff.File, add to ExcludeFile (not owned)
@@ -458,42 +411,21 @@ func extendOverlayWithNewLayer(baseOverlay *ProgramOverLay, newLayerProgram *Pro
 	}
 
 	wireOverlayPrograms(overlay)
-	if baseOverlay.AggregatedFS != nil {
-		patched, err := cloneAndPatchAggregatedFS(baseOverlay.AggregatedFS, newLayerProgram)
-		if err != nil {
-			log.Warnf("patch AggregatedFS failed, falling back to full rebuild: %v", err)
-			overlay.rebuildAggregatedFS()
-		} else {
-			overlay.AggregatedFS = patched
-		}
-	} else {
-		overlay.rebuildAggregatedFS()
-	}
+	// AggregatedFS is lazy (built from ownership metadata on demand), so no
+	// clone/patch of the previous overlay's FS is needed here: the new overlay
+	// simply owns Base + copied layers + the new diff.
 
 	log.Infof("ProgramOverLay: Extended base+%d diffs, exclude=%d files",
 		len(overlay.Diff), len(overlay.ExcludeFile))
 	return overlay
 }
 
-// finishBuild wires programs and builds AggregatedFS from Diff.File + Base − ExcludeFile.
+// finishBuild wires programs; AggregatedFS stays lazy (metadata only).
 func (p *ProgramOverLay) finishBuild() {
 	if p == nil {
 		return
 	}
 	wireOverlayPrograms(p)
-	p.rebuildAggregatedFS()
-}
-
-func (p *ProgramOverLay) rebuildAggregatedFS() {
-	if p == nil {
-		return
-	}
-	aggregatedFS, err := p.aggregateFileSystems()
-	if err != nil {
-		log.Errorf("failed to aggregate file systems: %v", err)
-		return
-	}
-	p.AggregatedFS = aggregatedFS
 }
 
 func NewProgramOverLay(layers ...*Program) *ProgramOverLay {
