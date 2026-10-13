@@ -239,7 +239,8 @@ func (m *Timeline) frozenPromptBlocksLocked(excludeToolCache bool, onlyUserInput
 					filteredToolCache = true
 					continue
 				}
-				if op.Kind != TimelinePromotedKindEvidence && op.Kind != TimelinePromotedKindRecentTool && op.Kind != TimelinePromotedKindUserInput {
+				if op.Kind != TimelinePromotedKindEvidence && op.Kind != TimelinePromotedKindRecentTool &&
+					op.Kind != TimelinePromotedKindUserInput && op.Kind != TimelinePromotedKindSkillContent {
 					continue
 				}
 				// A detached prompt view preserves the journal, reducer exclusion and UI audit.

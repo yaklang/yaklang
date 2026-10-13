@@ -33,5 +33,8 @@ func (m *Timeline) promotableOpenPromptTextLocked(op *PromotableTimelineItem) st
 	if op.Kind == TimelinePromotedKindUserInput && op.Operation == TimelinePromotedOperationUpsert {
 		return wrapUserInputWithKey(m.userInputBoundaryKey, op.Payload)
 	}
+	if op.Kind == TimelinePromotedKindSkillContent {
+		return timelineSkillContentOpenPrompt(op)
+	}
 	return op.OpenPromptText()
 }
