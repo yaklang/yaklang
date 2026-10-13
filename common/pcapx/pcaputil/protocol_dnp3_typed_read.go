@@ -57,7 +57,7 @@ func normalizeDNP3TypedSelectors(a []dnp3StaticSelector) []dnp3StaticSelector {
 			continue
 		}
 		g := byte(group)
-		if g == 22 || g == 23 {
+		if dnp3EventCursorIndex(g) >= 0 {
 			// Event headers select successive unselected records; finite quotas
 			// remain ordered until an unbounded header ends selection of this
 			// type. Class/V0 defaults remain unreported.
@@ -125,13 +125,16 @@ func dnp3TypedSelectorsCover(selectors []dnp3StaticSelector, objects []any) bool
 		at, used    int
 		initialized bool
 	}
-	var eventCursor [2]cursor
+	var eventCursor [5]cursor
 	for _, o := range objects {
 		obj := o.(map[string]any)
+		if obj["Context"] == true {
+			continue
+		}
 		group := byte(obj["Group"].(int))
 		variation := byte(obj["Variation"].(int))
-		if group == 22 || group == 23 {
-			c := &eventCursor[group-22]
+		if eventIndex := dnp3EventCursorIndex(group); eventIndex >= 0 {
+			c := &eventCursor[eventIndex]
 			if !c.initialized {
 				c.at = sort.Search(len(selectors), func(i int) bool { return selectors[i].group >= group })
 				c.initialized = true

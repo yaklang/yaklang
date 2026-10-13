@@ -77883,6 +77883,742 @@
         "common/pcapx/pcaputil/dnp3-static-status-points/REFERENCE-CODEC-ACTUAL.json": "dnp3-static-status-points/REFERENCE-CODEC-ACTUAL.json",
         "scripts/protocol-tests/required-tests-traffic-unified-v59.json": "required-tests-traffic-unified-v59.json"
       }
+    },
+    {
+      "id": "validation-dnp3-binary-events",
+      "kind": "validation",
+      "source_sha": "613e68005d86e0ee0d116bd8c9b00637ecdff034",
+      "file": "validation-dnp3-binary-events.zip",
+      "sha256": "00272b7fa9fc5fd78bf0fa8985807ceed3fb82231a12bafa682994972453d257",
+      "password": "bin-parser",
+      "members": {
+        "dnp3-binary-events/captures/all-g2v1-request1.pcap": {
+          "sha256": "4534d3c089dac19fb046f0c6056581330670de908bf2e90f029ddd1aeca99bae",
+          "bytes": 629
+        },
+        "dnp3-binary-events/answers/all-g2v1-request1.json": {
+          "sha256": "085ffdd6d3a73548f7cc3d0c7113a7910c7ed50dd89a9060d777d4208940369e",
+          "bytes": 5493
+        },
+        "dnp3-binary-events/captures/all-g2v1-request0.pcap": {
+          "sha256": "5725808ac529bb277f2a2d41142aa25209092abb7aee9de43ad23d95eda4eb7c",
+          "bytes": 629
+        },
+        "dnp3-binary-events/answers/all-g2v1-request0.json": {
+          "sha256": "e4190dc8ce68a63bfef1bff50eb0012ec07f438a6de0187f4a6069cb6004a829",
+          "bytes": 5493
+        },
+        "dnp3-binary-events/captures/count8-g2v1.pcap": {
+          "sha256": "df3a639bdcfa05df18780f7229959ff53f7131b23cb64aba4e3e16554deb515b",
+          "bytes": 630
+        },
+        "dnp3-binary-events/answers/count8-g2v1.json": {
+          "sha256": "194ad8a65544b7abb85c30e6b2f3241cde10a284e07cc324234a9670dfa7ed0c",
+          "bytes": 5495
+        },
+        "dnp3-binary-events/captures/count16-g2v1.pcap": {
+          "sha256": "445b14c900cab9eb8f011dd54aa0725283407e123c20c677e88ea4361888342c",
+          "bytes": 631
+        },
+        "dnp3-binary-events/answers/count16-g2v1.json": {
+          "sha256": "be4530b2b301cd8001d61fcb0deaddbc07f22062e128c0f338d848c99179392e",
+          "bytes": 5503
+        },
+        "dnp3-binary-events/captures/all-g2v2-request2.pcap": {
+          "sha256": "94ef72dc520cdbd9cf1671bb675867990332cde43f9276133ca383a7b01e2aa4",
+          "bytes": 651
+        },
+        "dnp3-binary-events/answers/all-g2v2-request2.json": {
+          "sha256": "3e04309a7cab669a31a79e9f552d0dc902585ba50bf2514c1fe8379233bef250",
+          "bytes": 6158
+        },
+        "dnp3-binary-events/captures/all-g2v2-request0.pcap": {
+          "sha256": "b40e063001a92a94978d13958d5cc8e9d38d56f707d6ea092c9845cc475ab2eb",
+          "bytes": 651
+        },
+        "dnp3-binary-events/answers/all-g2v2-request0.json": {
+          "sha256": "139d2a123822dce92312eee215e4ac288da36b73f47bb9109dc79bd496e7f05c",
+          "bytes": 6158
+        },
+        "dnp3-binary-events/captures/count8-g2v2.pcap": {
+          "sha256": "9283c4adb6ab8b0ad807b7f21b1e278c2f29b0cff9ce87de6865e97a90246e30",
+          "bytes": 652
+        },
+        "dnp3-binary-events/answers/count8-g2v2.json": {
+          "sha256": "002306997c7e0324b94440053fa162ab38ed644e8b9d847477de5008c4ead535",
+          "bytes": 6160
+        },
+        "dnp3-binary-events/captures/count16-g2v2.pcap": {
+          "sha256": "c99a28057b1147f7e34a3523def0bdb0ce5973cb6f7ae5b8cbcf0b28388df8fc",
+          "bytes": 653
+        },
+        "dnp3-binary-events/answers/count16-g2v2.json": {
+          "sha256": "da44eec1ae1ccf5aa57d5561b19d5858e71aec9c8a83358bdb1449d5c0611640",
+          "bytes": 6168
+        },
+        "dnp3-binary-events/captures/all-g2v3-request3.pcap": {
+          "sha256": "2cd4dd886c55f26dfd36039ff6941e1c48c6b4359059fc2421a7e7864e2ed83e",
+          "bytes": 647
+        },
+        "dnp3-binary-events/answers/all-g2v3-request3.json": {
+          "sha256": "efaae6b417825892df1117b66b7914aabd673bd582d68e962eeb993398ae5c3e",
+          "bytes": 7240
+        },
+        "dnp3-binary-events/captures/all-g2v3-request0.pcap": {
+          "sha256": "97446403f68c81a203c327993a6370a0dc41c2010d440811646fa498078f92df",
+          "bytes": 647
+        },
+        "dnp3-binary-events/answers/all-g2v3-request0.json": {
+          "sha256": "a4d35d7eee3e23655f1485246c5b37278b0da7183ec3e696d5b03fe5d9d7740b",
+          "bytes": 7240
+        },
+        "dnp3-binary-events/captures/count8-g2v3.pcap": {
+          "sha256": "a96e1ca09a9b34d2e74a98bbbd317a11ed00e1e098b710156a9b97611822ef91",
+          "bytes": 648
+        },
+        "dnp3-binary-events/answers/count8-g2v3.json": {
+          "sha256": "a4f0956cdd961a63c416946a7377eaa3952ea67ea7a18b3f022be9ebff508ec4",
+          "bytes": 7242
+        },
+        "dnp3-binary-events/captures/count16-g2v3.pcap": {
+          "sha256": "eea184227ec51310bee718876807615ccf7e5aa4ace6025da280fefb6b0e7bd0",
+          "bytes": 649
+        },
+        "dnp3-binary-events/answers/count16-g2v3.json": {
+          "sha256": "958a45f67f30fe02ebd4436a9ae28b270fdeb141f7c0deecdb370f409b5251e3",
+          "bytes": 7250
+        },
+        "dnp3-binary-events/captures/all-g4v1-request1.pcap": {
+          "sha256": "ae5272b9929111e2d854bb3294ea88c414edc317ebaef0aa90ad65436969ebe7",
+          "bytes": 629
+        },
+        "dnp3-binary-events/answers/all-g4v1-request1.json": {
+          "sha256": "e465ed7b416a0df4e3172b185be29df4439351a4544eab1b89deb4a0fdfcbc87",
+          "bytes": 5535
+        },
+        "dnp3-binary-events/captures/all-g4v1-request0.pcap": {
+          "sha256": "e8aaaccc886130e27f46018dcb7edfe594e28cc6f949e8d042c47b9f2ef73e74",
+          "bytes": 629
+        },
+        "dnp3-binary-events/answers/all-g4v1-request0.json": {
+          "sha256": "2223dda34c55045ed702ec358fb406a91617430a00ccafa238d9e87586f47f4e",
+          "bytes": 5535
+        },
+        "dnp3-binary-events/captures/count8-g4v1.pcap": {
+          "sha256": "415f8938dc984a003012a237d6df329496e9b52bc85de950ffba03771582cac2",
+          "bytes": 630
+        },
+        "dnp3-binary-events/answers/count8-g4v1.json": {
+          "sha256": "c0365da23e7068ec6a94a90e0658b9227a646fa290207aff98956694a96cf814",
+          "bytes": 5537
+        },
+        "dnp3-binary-events/captures/count16-g4v1.pcap": {
+          "sha256": "ae71edfac82ef0ab6fbeced770a58fbcd40306c1fb60e9e5d8366aacdc2bb715",
+          "bytes": 631
+        },
+        "dnp3-binary-events/answers/count16-g4v1.json": {
+          "sha256": "4220b5afe1507220e3dc876c5d6bf4f259b20505af305d19ccaffb0e326d9b3d",
+          "bytes": 5545
+        },
+        "dnp3-binary-events/captures/all-g4v2-request2.pcap": {
+          "sha256": "f8a21eb314f5263d091e3d8cf8a125bed1505da670d4d1c1927a5e6d23e4e3b5",
+          "bytes": 651
+        },
+        "dnp3-binary-events/answers/all-g4v2-request2.json": {
+          "sha256": "b159fde011dfa114f4a4fb438b424a8fecd73a01dff6ef3d3bdd6ce1dcd342fe",
+          "bytes": 6200
+        },
+        "dnp3-binary-events/captures/all-g4v2-request0.pcap": {
+          "sha256": "0bf599a1dd66d21312db2e1a5edb616af90a15787d2aa954bc6cd962a1dc8ad8",
+          "bytes": 651
+        },
+        "dnp3-binary-events/answers/all-g4v2-request0.json": {
+          "sha256": "a48bfb63c77f31ae3bf0fce7687c8a2298e0e350eae428433fa71bd2abb71249",
+          "bytes": 6200
+        },
+        "dnp3-binary-events/captures/count8-g4v2.pcap": {
+          "sha256": "c0b92e47a3ad77e7049a1b190281e518c91b963a4310255420987d0799e93527",
+          "bytes": 652
+        },
+        "dnp3-binary-events/answers/count8-g4v2.json": {
+          "sha256": "da9359c23ee3091b0c9f80449cc77c95d71efecb6bf95880c6462924cdf70414",
+          "bytes": 6202
+        },
+        "dnp3-binary-events/captures/count16-g4v2.pcap": {
+          "sha256": "5c4c0694afaf928d8036bd6dc72fc49c9f6550b9625dcbc67078c37d4ec54b93",
+          "bytes": 653
+        },
+        "dnp3-binary-events/answers/count16-g4v2.json": {
+          "sha256": "bc40847a05959e09be2d1672e91ea36f895864e64dc11652f4af8a244325a854",
+          "bytes": 6210
+        },
+        "dnp3-binary-events/captures/all-g4v3-request3.pcap": {
+          "sha256": "25422e8e47e123ab66cd8819ac57203bf5b8e05640025e742c7fbaf67b79be9d",
+          "bytes": 647
+        },
+        "dnp3-binary-events/answers/all-g4v3-request3.json": {
+          "sha256": "2b79a6b73678e7d9fc33af2767641088e74908f10130daf43b1a74a0d67450fa",
+          "bytes": 7282
+        },
+        "dnp3-binary-events/captures/all-g4v3-request0.pcap": {
+          "sha256": "63f2f95bbca964c0a6fe1923ee9812df1b486bfd838ff44649863a7014a515b5",
+          "bytes": 647
+        },
+        "dnp3-binary-events/answers/all-g4v3-request0.json": {
+          "sha256": "2c025203a89d4ab8172a04b2990edf7c6983db8674997f22bc328e410baa5ca0",
+          "bytes": 7282
+        },
+        "dnp3-binary-events/captures/count8-g4v3.pcap": {
+          "sha256": "478dcf609e7d8001c73293a19bfc207544dfabb6a6d8afa27010b8a6dd86d1e0",
+          "bytes": 648
+        },
+        "dnp3-binary-events/answers/count8-g4v3.json": {
+          "sha256": "06563ba1c651dd57cff2b571f197b8eb5d61903df0e2af2ae1e4e2b2e07be6ac",
+          "bytes": 7284
+        },
+        "dnp3-binary-events/captures/count16-g4v3.pcap": {
+          "sha256": "d94e2d5e1256c063b9d99c42fc4b913486e68d9d6663b734a3463a17b5c552aa",
+          "bytes": 649
+        },
+        "dnp3-binary-events/answers/count16-g4v3.json": {
+          "sha256": "a0222df1130a645f7cb1103e13ad59b5e831430fe4119d114f76c1fcc2558e79",
+          "bytes": 7292
+        },
+        "dnp3-binary-events/captures/all-g11v1-request1.pcap": {
+          "sha256": "98231a061a60e866ce46586874d7af4395487fb1d1080bda25acb5a05e14f32d",
+          "bytes": 629
+        },
+        "dnp3-binary-events/answers/all-g11v1-request1.json": {
+          "sha256": "008431108c0e5de08f811c95c6d6a3d4be02e26dda7eba8933a9e096891871de",
+          "bytes": 5253
+        },
+        "dnp3-binary-events/captures/all-g11v1-request0.pcap": {
+          "sha256": "e83cd6551e5de1733eec98cb46b50e867eb13a5645d8468ac38422df518b4cb7",
+          "bytes": 629
+        },
+        "dnp3-binary-events/answers/all-g11v1-request0.json": {
+          "sha256": "66137205726b89483caf71ca09b7edb1ec19c5f8328f76ae962341970dd53e76",
+          "bytes": 5253
+        },
+        "dnp3-binary-events/captures/count8-g11v1.pcap": {
+          "sha256": "96ed9a26f2ee9710b07f5fc137bfd0c4fd8f2d61a7c427352d45b6839ddce7bf",
+          "bytes": 630
+        },
+        "dnp3-binary-events/answers/count8-g11v1.json": {
+          "sha256": "7ec943b1118e6f429c217f74b7a1edb1b099c4d8a271bd99cd54c113af303993",
+          "bytes": 5255
+        },
+        "dnp3-binary-events/captures/count16-g11v1.pcap": {
+          "sha256": "48280332c74b132e2f2ad8e1b83e20872484a56e33af6f98328df332d2a5204d",
+          "bytes": 631
+        },
+        "dnp3-binary-events/answers/count16-g11v1.json": {
+          "sha256": "9d2f5cb0ba72196a33aec06317d09bd63b70da0bd1c269d5feecb9b819f6b5b9",
+          "bytes": 5263
+        },
+        "dnp3-binary-events/captures/all-g11v2-request2.pcap": {
+          "sha256": "7a6c67cf711f593eeafd8425509dc1ba808f6d25b3394045d02d46d1bbc8054f",
+          "bytes": 651
+        },
+        "dnp3-binary-events/answers/all-g11v2-request2.json": {
+          "sha256": "ca42810ef88c558e8c37974fd57e20553007edeb35a8ca0b11022783c1ac2237",
+          "bytes": 5918
+        },
+        "dnp3-binary-events/captures/all-g11v2-request0.pcap": {
+          "sha256": "f438c58857fa567fb0128c17cacedf71a6c4a1864eec11ce2bf25d5d40609877",
+          "bytes": 651
+        },
+        "dnp3-binary-events/answers/all-g11v2-request0.json": {
+          "sha256": "03c186e19fa9789bad9344bf0db4be3c7f1fc54f03c9756afaf70c81adce047a",
+          "bytes": 5918
+        },
+        "dnp3-binary-events/captures/count8-g11v2.pcap": {
+          "sha256": "627ba8057be94f2537d5505e292138c95392ef9c81c8410cb98732d38697f688",
+          "bytes": 652
+        },
+        "dnp3-binary-events/answers/count8-g11v2.json": {
+          "sha256": "1edeb6f7f177e7ae023519a59517e8ca3af008531ca9ea48da25bc5a7b6eeebc",
+          "bytes": 5920
+        },
+        "dnp3-binary-events/captures/count16-g11v2.pcap": {
+          "sha256": "a74bcb5ebc60f058a16410a219a802819e210ca3ebfff4220063db0e500cba11",
+          "bytes": 653
+        },
+        "dnp3-binary-events/answers/count16-g11v2.json": {
+          "sha256": "97ea81c842f1c3a12a5fb5e3bed8ac5877178c30b0a3733da2da70bedb3ce8e5",
+          "bytes": 5928
+        },
+        "dnp3-binary-events/captures/missing-cto-g2.pcap": {
+          "sha256": "deef6a2736be1a57dfcfc4d4a63a2f9791d54f9a1ade7949e48b21e124261a0d",
+          "bytes": 752
+        },
+        "dnp3-binary-events/answers/missing-cto-g2.json": {
+          "sha256": "6966f303962c73dc3f35ea2cdffe285b0d3e50f4e35832e9fa7827d07dfcb763",
+          "bytes": 8308
+        },
+        "dnp3-binary-events/captures/cto-replaced-g2.pcap": {
+          "sha256": "ca88d56ba03c3e6922579e60d51e0eeacdfee19f6af7b8a256663ddd0d4fada1",
+          "bytes": 659
+        },
+        "dnp3-binary-events/answers/cto-replaced-g2.json": {
+          "sha256": "fa9b6d87b82bd8ee51344603e9cbe45a1b059332e6a4cf32bf2f3ea0cbbb27fc",
+          "bytes": 6762
+        },
+        "dnp3-binary-events/captures/cto-not-next-message-g2.pcap": {
+          "sha256": "11332532b161930d1f40d3804c22ce10d8baa9dd5465511446a39108b865a71d",
+          "bytes": 955
+        },
+        "dnp3-binary-events/answers/cto-not-next-message-g2.json": {
+          "sha256": "c943037796b5e87870848e2eac5f93aa72aff22d1a0b4b90aaddbfa659f7e696",
+          "bytes": 15481
+        },
+        "dnp3-binary-events/captures/cto-time-carry-g2.pcap": {
+          "sha256": "6ae3735b287576122c6c1b9e8993bf456e26068adf64b741bc46922f25a37e09",
+          "bytes": 642
+        },
+        "dnp3-binary-events/answers/cto-time-carry-g2.json": {
+          "sha256": "c9bd707165ccf629c45c9b59df9105012a663cff1d2b74b0276539e475f7eadd",
+          "bytes": 4736
+        },
+        "dnp3-binary-events/captures/ordered-count-g2.pcap": {
+          "sha256": "18cbe4a8b504c219b9de2683cb7ef6f3a34232c4389c29fd631df3f11375ce39",
+          "bytes": 759
+        },
+        "dnp3-binary-events/answers/ordered-count-g2.json": {
+          "sha256": "2dd5011aad8c8418c40569bfd6e33b886ef084fb117b5f252ede0becf250b120",
+          "bytes": 7698
+        },
+        "dnp3-binary-events/captures/missing-cto-g4.pcap": {
+          "sha256": "cf850ffb8a08f83f0ab55942821bdb4e5c58b1e52d68c955b9bde360d07d56d2",
+          "bytes": 752
+        },
+        "dnp3-binary-events/answers/missing-cto-g4.json": {
+          "sha256": "f09dc409fb2b69a53dc499dbed03ebedab35dc9a7e3e51731b7415ccf708c40b",
+          "bytes": 8350
+        },
+        "dnp3-binary-events/captures/cto-replaced-g4.pcap": {
+          "sha256": "40eb94acbf0ab3113dfcefb5cdf24e90d18a900290b98d9a71ad734b77a44b0d",
+          "bytes": 659
+        },
+        "dnp3-binary-events/answers/cto-replaced-g4.json": {
+          "sha256": "8f83fb6a858565d8b34e0467c3aff33d61cc0ec9d8f56dd4168dd5a705a3896c",
+          "bytes": 6786
+        },
+        "dnp3-binary-events/captures/cto-not-next-message-g4.pcap": {
+          "sha256": "865beb029576ddb193b12b9a7696970981e11ba8b14fa9d16c0a1fafb0dd2e24",
+          "bytes": 955
+        },
+        "dnp3-binary-events/answers/cto-not-next-message-g4.json": {
+          "sha256": "b596a2f8482b42ae3d36c49b13ff06ccc3744f277527445cc578c6a04d6b6c90",
+          "bytes": 15565
+        },
+        "dnp3-binary-events/captures/cto-time-carry-g4.pcap": {
+          "sha256": "057f12b8ab98c9241b43a531a1c0dc4e7454c66afb36e8d222b73225b3189d83",
+          "bytes": 642
+        },
+        "dnp3-binary-events/answers/cto-time-carry-g4.json": {
+          "sha256": "06d2347145993ef3b8093809157812c12466351697c311196bd604563b0d14b1",
+          "bytes": 4748
+        },
+        "dnp3-binary-events/captures/ordered-count-g4.pcap": {
+          "sha256": "eb33d9ed74ee03b0b4eea3c07da86164ed2bfa2dca6e1274a3f316dff9d6f6f7",
+          "bytes": 759
+        },
+        "dnp3-binary-events/answers/ordered-count-g4.json": {
+          "sha256": "b1005bcfa3d0a48a84482e62c0bc11ce0e866209999cbdd7abb3f70544d4f558",
+          "bytes": 7738
+        },
+        "dnp3-binary-events/captures/class1-mixed-events.pcap": {
+          "sha256": "2ce260add55af54f5f34e320636023fbff96b2585d6148d02232630951171468",
+          "bytes": 693
+        },
+        "dnp3-binary-events/answers/class1-mixed-events.json": {
+          "sha256": "12a1e2717d3e35122aae037ace89e6a28a7370190b3f89fb706c5403e7f531e7",
+          "bytes": 12672
+        },
+        "dnp3-binary-events/captures/context-only.pcap": {
+          "sha256": "51caeea75ce5becf01470798ffccf137ac05b7db24c3aa7b1da1fa9b509711c7",
+          "bytes": 629
+        },
+        "dnp3-binary-events/answers/context-only.json": {
+          "sha256": "8d68d66c7a9c0f1cfb70ca8790bfa9945611f700e73c712c869068c642e3f5c3",
+          "bytes": 3021
+        },
+        "dnp3-binary-events/captures/absolute-after-cto.pcap": {
+          "sha256": "de51b2e0ac49ce2c0f0c6c3a0d2399cf5cc152b34c49e4da6db1c22e7c9da25c",
+          "bytes": 643
+        },
+        "dnp3-binary-events/answers/absolute-after-cto.json": {
+          "sha256": "c68513119b5693415b7825c3198699ab66632a2900bc9e6ba8da12e62f9764bc",
+          "bytes": 4504
+        },
+        "dnp3-binary-events/captures/mixed-types-independent-count.pcap": {
+          "sha256": "b9172aaebae2b4db92b630c8c6b74d7da566f5c3a03d531316e7c901a28c7c3e",
+          "bytes": 656
+        },
+        "dnp3-binary-events/answers/mixed-types-independent-count.json": {
+          "sha256": "aa79e0443f3ae963700918ea79d183e89a1bcec471e83e7ad538b7ddf4effbb1",
+          "bytes": 7944
+        },
+        "dnp3-binary-events/captures/unsolicited-preserves-read.pcap": {
+          "sha256": "a18b86de3c0d1ce82ef7d442852ce054acbbd45eba6fdb10c2a9134f31d6c6f6",
+          "bytes": 744
+        },
+        "dnp3-binary-events/answers/unsolicited-preserves-read.json": {
+          "sha256": "e5254f93718f908603859f9ce8b35ed261f38108ae0bab6ad906c2498e10f817",
+          "bytes": 11513
+        },
+        "dnp3-binary-events/captures/confirmation-preserves-read.pcap": {
+          "sha256": "6cf028753e9ede370f54d0ac215a5275b15e845cceb2b7dd4141689b45588c56",
+          "bytes": 714
+        },
+        "dnp3-binary-events/answers/confirmation-preserves-read.json": {
+          "sha256": "4ebe74dbd06b14f013d39f35970af562e86250adfe18996c548d3bab8dc9b67c",
+          "bytes": 6368
+        },
+        "dnp3-binary-events/captures/wrong-role-retains.pcap": {
+          "sha256": "c9681f3794bd8e165da74f59564593e333d5186a378552b10d1335f0c853c94e",
+          "bytes": 726
+        },
+        "dnp3-binary-events/answers/wrong-role-retains.json": {
+          "sha256": "6ab2bfb98fae62361d644ab15fd6a1dce88bb190722eae78b5e74f3e6e4739f3",
+          "bytes": 9712
+        },
+        "dnp3-binary-events/captures/excess-retains.pcap": {
+          "sha256": "11dc9fa3a85f1539826a8a943132dded3f640d57832e63d424ba3c54b38c81ae",
+          "bytes": 725
+        },
+        "dnp3-binary-events/answers/excess-retains.json": {
+          "sha256": "f3ba9d5da06c419798663c9ef98e7515b637b1757474002f385ea0583a6f2a6c",
+          "bytes": 5471
+        },
+        "dnp3-binary-events/captures/different-event-type-retains.pcap": {
+          "sha256": "76bd4d801316aa98e4280e8403053deb63beb5d3d2a121692bbc60172ad76571",
+          "bytes": 726
+        },
+        "dnp3-binary-events/answers/different-event-type-retains.json": {
+          "sha256": "7e3d383812dedc928e68fc34111739462a61ae166b2b566f38cc28ea7dca4103",
+          "bytes": 6504
+        },
+        "dnp3-binary-events/captures/class0-not-events.pcap": {
+          "sha256": "cdea0c9d46ba714b17832fb37e950edc9b59ac9855b566a27ed40614cb9ed6d1",
+          "bytes": 629
+        },
+        "dnp3-binary-events/answers/class0-not-events.json": {
+          "sha256": "47add894d15ccb139977fe56144513ab67d6147436b103ddac13848978f18875",
+          "bytes": 2343
+        },
+        "dnp3-binary-events/captures/cto-zero.pcap": {
+          "sha256": "fa9e3f29fee9f461fe3984b369f382ee7a42b479cf947bc2699987e062587f66",
+          "bytes": 720
+        },
+        "dnp3-binary-events/answers/cto-zero.json": {
+          "sha256": "deec06b3e1916fe3c4727840e2753adb1be9e4ba84206346b0a59e94e3e102d0",
+          "bytes": 6455
+        },
+        "dnp3-binary-events/captures/cto-two.pcap": {
+          "sha256": "1655f51b7d2d1272de501a844b54efd95e2c783fd67272efbb6b2492d5b80296",
+          "bytes": 734
+        },
+        "dnp3-binary-events/answers/cto-two.json": {
+          "sha256": "7f742b95299d4a87521601c630b75b878e7fe46831ab142f0ebb09c3a494f3b4",
+          "bytes": 6533
+        },
+        "dnp3-binary-events/captures/cto-truncated.pcap": {
+          "sha256": "83d1406bb2f00217e30849b281bdf32d15c79cb6c7cd44b1783a57247924f697",
+          "bytes": 725
+        },
+        "dnp3-binary-events/answers/cto-truncated.json": {
+          "sha256": "5ae7308cbbf2dac0947b4545d700d1e2680232e09edaa22c5da747351f4385d3",
+          "bytes": 6471
+        },
+        "dnp3-binary-events/captures/cto-qualifier.pcap": {
+          "sha256": "826e973919d2117443069c9c68c6a8c6094ec29c3feb7e8412b236f774a50a06",
+          "bytes": 725
+        },
+        "dnp3-binary-events/answers/cto-qualifier.json": {
+          "sha256": "f8684d3caf0271032ac8695e962faf0c2f6959d2f4ac26e96a374999b93ce1f5",
+          "bytes": 6490
+        },
+        "dnp3-binary-events/captures/event-zero.pcap": {
+          "sha256": "249203ab354f6e4622193521229705534a1bead43355f8bb0228a94d0b558ed5",
+          "bytes": 720
+        },
+        "dnp3-binary-events/answers/event-zero.json": {
+          "sha256": "1a26b17d246caa25ebcf41ae3fdd689257ba9e65e6306a8e72cef2988fc46b70",
+          "bytes": 6451
+        },
+        "dnp3-binary-events/captures/truncated-relative.pcap": {
+          "sha256": "074506a563e14b1f89c0df3a14adfb42522140c714468df9c6915775da8746eb",
+          "bytes": 733
+        },
+        "dnp3-binary-events/answers/truncated-relative.json": {
+          "sha256": "9cdea65bf1b305c9fd1364e01287fc2a99e25bc27258a99ecd1f6b612094c56e",
+          "bytes": 6515
+        },
+        "dnp3-binary-events/captures/event-range.pcap": {
+          "sha256": "94c6ddc17b1bc8b5d93144f9bf557a0547f1128a75f7c92bdb1f502ab32ee770",
+          "bytes": 722
+        },
+        "dnp3-binary-events/answers/event-range.json": {
+          "sha256": "ea078913697000327b02aec9d6812577796016634598ebee6d0d4a7848316236",
+          "bytes": 6479
+        },
+        "dnp3-binary-events/captures/unsupported-variation.pcap": {
+          "sha256": "c43ccb21d63f5ebec2f109f1eff69aa6d002d805a5326024adf02e1a54b360b6",
+          "bytes": 724
+        },
+        "dnp3-binary-events/answers/unsupported-variation.json": {
+          "sha256": "d7d705edebc435c770fd1f24a1b5d2dbb5f64ad20eddec5d0e3d313f0c4b8cdf",
+          "bytes": 6488
+        },
+        "dnp3-binary-events/captures/transport-composition.pcap": {
+          "sha256": "2e3f55d369d18de815d573c114dbd3170407359769279b096fde0bde72bd9df0",
+          "bytes": 829
+        },
+        "dnp3-binary-events/answers/transport-composition.json": {
+          "sha256": "e0c6ea0b79c170b8f3f502bde0e3ad2093cb50d1bdc4e42246497c83bf114586",
+          "bytes": 13769
+        },
+        "dnp3-binary-events/captures/status-transport-composition.pcap": {
+          "sha256": "b7399cd036cd1e47c525c611363ea250c0fe74b907ce97de0de37f0f6295c17d",
+          "bytes": 816
+        },
+        "dnp3-binary-events/answers/status-transport-composition.json": {
+          "sha256": "1f993331c43545ecabd1e1b5fae8522d27e5d2bedca21959acb059caab1a21fc",
+          "bytes": 9668
+        },
+        "dnp3-binary-events/manifest.json": {
+          "sha256": "02474723a450e1243538467b4da33070d9db4ebb044f4fb04eefbd0137e74fac",
+          "bytes": 21124
+        },
+        "dnp3-binary-events/guard-vectors.json": {
+          "sha256": "ae6469a7d14c1b2bf676239fd415fae7257e9728bef30fbd7371261023e622e7",
+          "bytes": 904
+        },
+        "dnp3-binary-events/generate.py": {
+          "sha256": "3c20553880dbe57f8764ca3d97fc2fe4de58e410ab18378a3548f6e1597d57b7",
+          "bytes": 14168
+        },
+        "dnp3-binary-events/verify.py": {
+          "sha256": "f679731edeabef9f890c67ef045eb241131ff704b260f6c3def9aafbaa3a2b80",
+          "bytes": 850
+        },
+        "dnp3-binary-events/MODEL-PINS.json": {
+          "sha256": "114caa23b5d368463bbbf0246cad7b012271e688bce53e72b2a2a616d17f914b",
+          "bytes": 1699
+        },
+        "dnp3-binary-events/SOURCE-PINS.json": {
+          "sha256": "904a39c9702aff17d844c87a3997fc79430a3bcc79943bcc6daa91ff45c53701",
+          "bytes": 6054
+        },
+        "dnp3-binary-events/reference.py": {
+          "sha256": "512c878261a99024c77f0c931729c5d93e4cd612266edd2a63fd7e90e6fadaf0",
+          "bytes": 4224
+        },
+        "dnp3-binary-events/REFERENCE-ACTUAL.json": {
+          "sha256": "b6754fe7571dece718444178a3cfdf353f665b989b39a5dd65b946dee50ffb03",
+          "bytes": 10695
+        },
+        "dnp3-binary-events/reference_selection.py": {
+          "sha256": "d35b6a0067766295488607c35dea4037037bee11d8dbfabf455ba6d755b71bb2",
+          "bytes": 5754
+        },
+        "dnp3-binary-events/REFERENCE-SELECTION-ACTUAL.json": {
+          "sha256": "71c37a68ae116d62e2c03f0e2172b926a8e5cda3626705f4371d29fae182f579",
+          "bytes": 18326
+        },
+        "dnp3-binary-events/reference_codec.py": {
+          "sha256": "175da7205ad5129b4265c2ff316ca7ea5a53e3063c7a92b1cb2773057e6dbf9d",
+          "bytes": 5649
+        },
+        "dnp3-binary-events/REFERENCE-CODEC-ACTUAL.json": {
+          "sha256": "ca477d1a5571ff280a924fcd537d7d3a4b00270071224d9ea093681ab8c2b709",
+          "bytes": 15915
+        },
+        "dnp3-binary-events/reference_cto.py": {
+          "sha256": "05b49287dd548d1fb272b03fa1504f3bb9c7cee3c0d6523d4df7340d584958f9",
+          "bytes": 4796
+        },
+        "dnp3-binary-events/REFERENCE-CTO-ACTUAL.json": {
+          "sha256": "f04a25b0895e4d1fd12ec73ae1091d6e2ad9627cf8c4ac6697faaadd8177ff1c",
+          "bytes": 1357
+        },
+        "dnp3-binary-events/reference_values.py": {
+          "sha256": "510d12526bd65f1943469901a94c45bb1508124b3b98729b2cf52fceeef909ed",
+          "bytes": 3897
+        },
+        "dnp3-binary-events/REFERENCE-VALUES-ACTUAL.json": {
+          "sha256": "4e1ee08c9de80aa2914f7bc1799abd3e3cfbacb4dae4d1d5f8d009531cafc825",
+          "bytes": 11275
+        },
+        "dnp3-binary-events/reference_transport.py": {
+          "sha256": "c2c73a4d6511951f89dd1d6a097ebc1f76fb59013528e29fa16ad1e3e7ec7ab9",
+          "bytes": 5671
+        },
+        "dnp3-binary-events/REFERENCE-TRANSPORT-ACTUAL.json": {
+          "sha256": "6041d8e0c75cbc55bc713722a981b9a8155b5739ef40e8f96a38b264e1a7a878",
+          "bytes": 919
+        },
+        "dnp3-binary-events/TRANSPORT-SOURCE-PINS.json": {
+          "sha256": "76d0590b48e1700c26b260c8ac953c1bd52888f8ee1cd0b21182e0e1d107d2d1",
+          "bytes": 1812
+        },
+        "required-tests-traffic-unified-v60.json": {
+          "sha256": "f48c6cc5f11304a550ff656bd885ad5c8490221892e9ec3fea2bfb99ecad0212",
+          "bytes": 13379132
+        },
+        "validation/expected.json": {
+          "sha256": "86815288791a762475a347e01dbe9c6a2001a0b5e82171e1c422af07413908f0",
+          "bytes": 80835
+        }
+      },
+      "aliases": {
+        "common/pcapx/pcaputil/dnp3-binary-events/captures/all-g2v1-request1.pcap": "dnp3-binary-events/captures/all-g2v1-request1.pcap",
+        "common/pcapx/pcaputil/dnp3-binary-events/answers/all-g2v1-request1.json": "dnp3-binary-events/answers/all-g2v1-request1.json",
+        "common/pcapx/pcaputil/dnp3-binary-events/captures/all-g2v1-request0.pcap": "dnp3-binary-events/captures/all-g2v1-request0.pcap",
+        "common/pcapx/pcaputil/dnp3-binary-events/answers/all-g2v1-request0.json": "dnp3-binary-events/answers/all-g2v1-request0.json",
+        "common/pcapx/pcaputil/dnp3-binary-events/captures/count8-g2v1.pcap": "dnp3-binary-events/captures/count8-g2v1.pcap",
+        "common/pcapx/pcaputil/dnp3-binary-events/answers/count8-g2v1.json": "dnp3-binary-events/answers/count8-g2v1.json",
+        "common/pcapx/pcaputil/dnp3-binary-events/captures/count16-g2v1.pcap": "dnp3-binary-events/captures/count16-g2v1.pcap",
+        "common/pcapx/pcaputil/dnp3-binary-events/answers/count16-g2v1.json": "dnp3-binary-events/answers/count16-g2v1.json",
+        "common/pcapx/pcaputil/dnp3-binary-events/captures/all-g2v2-request2.pcap": "dnp3-binary-events/captures/all-g2v2-request2.pcap",
+        "common/pcapx/pcaputil/dnp3-binary-events/answers/all-g2v2-request2.json": "dnp3-binary-events/answers/all-g2v2-request2.json",
+        "common/pcapx/pcaputil/dnp3-binary-events/captures/all-g2v2-request0.pcap": "dnp3-binary-events/captures/all-g2v2-request0.pcap",
+        "common/pcapx/pcaputil/dnp3-binary-events/answers/all-g2v2-request0.json": "dnp3-binary-events/answers/all-g2v2-request0.json",
+        "common/pcapx/pcaputil/dnp3-binary-events/captures/count8-g2v2.pcap": "dnp3-binary-events/captures/count8-g2v2.pcap",
+        "common/pcapx/pcaputil/dnp3-binary-events/answers/count8-g2v2.json": "dnp3-binary-events/answers/count8-g2v2.json",
+        "common/pcapx/pcaputil/dnp3-binary-events/captures/count16-g2v2.pcap": "dnp3-binary-events/captures/count16-g2v2.pcap",
+        "common/pcapx/pcaputil/dnp3-binary-events/answers/count16-g2v2.json": "dnp3-binary-events/answers/count16-g2v2.json",
+        "common/pcapx/pcaputil/dnp3-binary-events/captures/all-g2v3-request3.pcap": "dnp3-binary-events/captures/all-g2v3-request3.pcap",
+        "common/pcapx/pcaputil/dnp3-binary-events/answers/all-g2v3-request3.json": "dnp3-binary-events/answers/all-g2v3-request3.json",
+        "common/pcapx/pcaputil/dnp3-binary-events/captures/all-g2v3-request0.pcap": "dnp3-binary-events/captures/all-g2v3-request0.pcap",
+        "common/pcapx/pcaputil/dnp3-binary-events/answers/all-g2v3-request0.json": "dnp3-binary-events/answers/all-g2v3-request0.json",
+        "common/pcapx/pcaputil/dnp3-binary-events/captures/count8-g2v3.pcap": "dnp3-binary-events/captures/count8-g2v3.pcap",
+        "common/pcapx/pcaputil/dnp3-binary-events/answers/count8-g2v3.json": "dnp3-binary-events/answers/count8-g2v3.json",
+        "common/pcapx/pcaputil/dnp3-binary-events/captures/count16-g2v3.pcap": "dnp3-binary-events/captures/count16-g2v3.pcap",
+        "common/pcapx/pcaputil/dnp3-binary-events/answers/count16-g2v3.json": "dnp3-binary-events/answers/count16-g2v3.json",
+        "common/pcapx/pcaputil/dnp3-binary-events/captures/all-g4v1-request1.pcap": "dnp3-binary-events/captures/all-g4v1-request1.pcap",
+        "common/pcapx/pcaputil/dnp3-binary-events/answers/all-g4v1-request1.json": "dnp3-binary-events/answers/all-g4v1-request1.json",
+        "common/pcapx/pcaputil/dnp3-binary-events/captures/all-g4v1-request0.pcap": "dnp3-binary-events/captures/all-g4v1-request0.pcap",
+        "common/pcapx/pcaputil/dnp3-binary-events/answers/all-g4v1-request0.json": "dnp3-binary-events/answers/all-g4v1-request0.json",
+        "common/pcapx/pcaputil/dnp3-binary-events/captures/count8-g4v1.pcap": "dnp3-binary-events/captures/count8-g4v1.pcap",
+        "common/pcapx/pcaputil/dnp3-binary-events/answers/count8-g4v1.json": "dnp3-binary-events/answers/count8-g4v1.json",
+        "common/pcapx/pcaputil/dnp3-binary-events/captures/count16-g4v1.pcap": "dnp3-binary-events/captures/count16-g4v1.pcap",
+        "common/pcapx/pcaputil/dnp3-binary-events/answers/count16-g4v1.json": "dnp3-binary-events/answers/count16-g4v1.json",
+        "common/pcapx/pcaputil/dnp3-binary-events/captures/all-g4v2-request2.pcap": "dnp3-binary-events/captures/all-g4v2-request2.pcap",
+        "common/pcapx/pcaputil/dnp3-binary-events/answers/all-g4v2-request2.json": "dnp3-binary-events/answers/all-g4v2-request2.json",
+        "common/pcapx/pcaputil/dnp3-binary-events/captures/all-g4v2-request0.pcap": "dnp3-binary-events/captures/all-g4v2-request0.pcap",
+        "common/pcapx/pcaputil/dnp3-binary-events/answers/all-g4v2-request0.json": "dnp3-binary-events/answers/all-g4v2-request0.json",
+        "common/pcapx/pcaputil/dnp3-binary-events/captures/count8-g4v2.pcap": "dnp3-binary-events/captures/count8-g4v2.pcap",
+        "common/pcapx/pcaputil/dnp3-binary-events/answers/count8-g4v2.json": "dnp3-binary-events/answers/count8-g4v2.json",
+        "common/pcapx/pcaputil/dnp3-binary-events/captures/count16-g4v2.pcap": "dnp3-binary-events/captures/count16-g4v2.pcap",
+        "common/pcapx/pcaputil/dnp3-binary-events/answers/count16-g4v2.json": "dnp3-binary-events/answers/count16-g4v2.json",
+        "common/pcapx/pcaputil/dnp3-binary-events/captures/all-g4v3-request3.pcap": "dnp3-binary-events/captures/all-g4v3-request3.pcap",
+        "common/pcapx/pcaputil/dnp3-binary-events/answers/all-g4v3-request3.json": "dnp3-binary-events/answers/all-g4v3-request3.json",
+        "common/pcapx/pcaputil/dnp3-binary-events/captures/all-g4v3-request0.pcap": "dnp3-binary-events/captures/all-g4v3-request0.pcap",
+        "common/pcapx/pcaputil/dnp3-binary-events/answers/all-g4v3-request0.json": "dnp3-binary-events/answers/all-g4v3-request0.json",
+        "common/pcapx/pcaputil/dnp3-binary-events/captures/count8-g4v3.pcap": "dnp3-binary-events/captures/count8-g4v3.pcap",
+        "common/pcapx/pcaputil/dnp3-binary-events/answers/count8-g4v3.json": "dnp3-binary-events/answers/count8-g4v3.json",
+        "common/pcapx/pcaputil/dnp3-binary-events/captures/count16-g4v3.pcap": "dnp3-binary-events/captures/count16-g4v3.pcap",
+        "common/pcapx/pcaputil/dnp3-binary-events/answers/count16-g4v3.json": "dnp3-binary-events/answers/count16-g4v3.json",
+        "common/pcapx/pcaputil/dnp3-binary-events/captures/all-g11v1-request1.pcap": "dnp3-binary-events/captures/all-g11v1-request1.pcap",
+        "common/pcapx/pcaputil/dnp3-binary-events/answers/all-g11v1-request1.json": "dnp3-binary-events/answers/all-g11v1-request1.json",
+        "common/pcapx/pcaputil/dnp3-binary-events/captures/all-g11v1-request0.pcap": "dnp3-binary-events/captures/all-g11v1-request0.pcap",
+        "common/pcapx/pcaputil/dnp3-binary-events/answers/all-g11v1-request0.json": "dnp3-binary-events/answers/all-g11v1-request0.json",
+        "common/pcapx/pcaputil/dnp3-binary-events/captures/count8-g11v1.pcap": "dnp3-binary-events/captures/count8-g11v1.pcap",
+        "common/pcapx/pcaputil/dnp3-binary-events/answers/count8-g11v1.json": "dnp3-binary-events/answers/count8-g11v1.json",
+        "common/pcapx/pcaputil/dnp3-binary-events/captures/count16-g11v1.pcap": "dnp3-binary-events/captures/count16-g11v1.pcap",
+        "common/pcapx/pcaputil/dnp3-binary-events/answers/count16-g11v1.json": "dnp3-binary-events/answers/count16-g11v1.json",
+        "common/pcapx/pcaputil/dnp3-binary-events/captures/all-g11v2-request2.pcap": "dnp3-binary-events/captures/all-g11v2-request2.pcap",
+        "common/pcapx/pcaputil/dnp3-binary-events/answers/all-g11v2-request2.json": "dnp3-binary-events/answers/all-g11v2-request2.json",
+        "common/pcapx/pcaputil/dnp3-binary-events/captures/all-g11v2-request0.pcap": "dnp3-binary-events/captures/all-g11v2-request0.pcap",
+        "common/pcapx/pcaputil/dnp3-binary-events/answers/all-g11v2-request0.json": "dnp3-binary-events/answers/all-g11v2-request0.json",
+        "common/pcapx/pcaputil/dnp3-binary-events/captures/count8-g11v2.pcap": "dnp3-binary-events/captures/count8-g11v2.pcap",
+        "common/pcapx/pcaputil/dnp3-binary-events/answers/count8-g11v2.json": "dnp3-binary-events/answers/count8-g11v2.json",
+        "common/pcapx/pcaputil/dnp3-binary-events/captures/count16-g11v2.pcap": "dnp3-binary-events/captures/count16-g11v2.pcap",
+        "common/pcapx/pcaputil/dnp3-binary-events/answers/count16-g11v2.json": "dnp3-binary-events/answers/count16-g11v2.json",
+        "common/pcapx/pcaputil/dnp3-binary-events/captures/missing-cto-g2.pcap": "dnp3-binary-events/captures/missing-cto-g2.pcap",
+        "common/pcapx/pcaputil/dnp3-binary-events/answers/missing-cto-g2.json": "dnp3-binary-events/answers/missing-cto-g2.json",
+        "common/pcapx/pcaputil/dnp3-binary-events/captures/cto-replaced-g2.pcap": "dnp3-binary-events/captures/cto-replaced-g2.pcap",
+        "common/pcapx/pcaputil/dnp3-binary-events/answers/cto-replaced-g2.json": "dnp3-binary-events/answers/cto-replaced-g2.json",
+        "common/pcapx/pcaputil/dnp3-binary-events/captures/cto-not-next-message-g2.pcap": "dnp3-binary-events/captures/cto-not-next-message-g2.pcap",
+        "common/pcapx/pcaputil/dnp3-binary-events/answers/cto-not-next-message-g2.json": "dnp3-binary-events/answers/cto-not-next-message-g2.json",
+        "common/pcapx/pcaputil/dnp3-binary-events/captures/cto-time-carry-g2.pcap": "dnp3-binary-events/captures/cto-time-carry-g2.pcap",
+        "common/pcapx/pcaputil/dnp3-binary-events/answers/cto-time-carry-g2.json": "dnp3-binary-events/answers/cto-time-carry-g2.json",
+        "common/pcapx/pcaputil/dnp3-binary-events/captures/ordered-count-g2.pcap": "dnp3-binary-events/captures/ordered-count-g2.pcap",
+        "common/pcapx/pcaputil/dnp3-binary-events/answers/ordered-count-g2.json": "dnp3-binary-events/answers/ordered-count-g2.json",
+        "common/pcapx/pcaputil/dnp3-binary-events/captures/missing-cto-g4.pcap": "dnp3-binary-events/captures/missing-cto-g4.pcap",
+        "common/pcapx/pcaputil/dnp3-binary-events/answers/missing-cto-g4.json": "dnp3-binary-events/answers/missing-cto-g4.json",
+        "common/pcapx/pcaputil/dnp3-binary-events/captures/cto-replaced-g4.pcap": "dnp3-binary-events/captures/cto-replaced-g4.pcap",
+        "common/pcapx/pcaputil/dnp3-binary-events/answers/cto-replaced-g4.json": "dnp3-binary-events/answers/cto-replaced-g4.json",
+        "common/pcapx/pcaputil/dnp3-binary-events/captures/cto-not-next-message-g4.pcap": "dnp3-binary-events/captures/cto-not-next-message-g4.pcap",
+        "common/pcapx/pcaputil/dnp3-binary-events/answers/cto-not-next-message-g4.json": "dnp3-binary-events/answers/cto-not-next-message-g4.json",
+        "common/pcapx/pcaputil/dnp3-binary-events/captures/cto-time-carry-g4.pcap": "dnp3-binary-events/captures/cto-time-carry-g4.pcap",
+        "common/pcapx/pcaputil/dnp3-binary-events/answers/cto-time-carry-g4.json": "dnp3-binary-events/answers/cto-time-carry-g4.json",
+        "common/pcapx/pcaputil/dnp3-binary-events/captures/ordered-count-g4.pcap": "dnp3-binary-events/captures/ordered-count-g4.pcap",
+        "common/pcapx/pcaputil/dnp3-binary-events/answers/ordered-count-g4.json": "dnp3-binary-events/answers/ordered-count-g4.json",
+        "common/pcapx/pcaputil/dnp3-binary-events/captures/class1-mixed-events.pcap": "dnp3-binary-events/captures/class1-mixed-events.pcap",
+        "common/pcapx/pcaputil/dnp3-binary-events/answers/class1-mixed-events.json": "dnp3-binary-events/answers/class1-mixed-events.json",
+        "common/pcapx/pcaputil/dnp3-binary-events/captures/context-only.pcap": "dnp3-binary-events/captures/context-only.pcap",
+        "common/pcapx/pcaputil/dnp3-binary-events/answers/context-only.json": "dnp3-binary-events/answers/context-only.json",
+        "common/pcapx/pcaputil/dnp3-binary-events/captures/absolute-after-cto.pcap": "dnp3-binary-events/captures/absolute-after-cto.pcap",
+        "common/pcapx/pcaputil/dnp3-binary-events/answers/absolute-after-cto.json": "dnp3-binary-events/answers/absolute-after-cto.json",
+        "common/pcapx/pcaputil/dnp3-binary-events/captures/mixed-types-independent-count.pcap": "dnp3-binary-events/captures/mixed-types-independent-count.pcap",
+        "common/pcapx/pcaputil/dnp3-binary-events/answers/mixed-types-independent-count.json": "dnp3-binary-events/answers/mixed-types-independent-count.json",
+        "common/pcapx/pcaputil/dnp3-binary-events/captures/unsolicited-preserves-read.pcap": "dnp3-binary-events/captures/unsolicited-preserves-read.pcap",
+        "common/pcapx/pcaputil/dnp3-binary-events/answers/unsolicited-preserves-read.json": "dnp3-binary-events/answers/unsolicited-preserves-read.json",
+        "common/pcapx/pcaputil/dnp3-binary-events/captures/confirmation-preserves-read.pcap": "dnp3-binary-events/captures/confirmation-preserves-read.pcap",
+        "common/pcapx/pcaputil/dnp3-binary-events/answers/confirmation-preserves-read.json": "dnp3-binary-events/answers/confirmation-preserves-read.json",
+        "common/pcapx/pcaputil/dnp3-binary-events/captures/wrong-role-retains.pcap": "dnp3-binary-events/captures/wrong-role-retains.pcap",
+        "common/pcapx/pcaputil/dnp3-binary-events/answers/wrong-role-retains.json": "dnp3-binary-events/answers/wrong-role-retains.json",
+        "common/pcapx/pcaputil/dnp3-binary-events/captures/excess-retains.pcap": "dnp3-binary-events/captures/excess-retains.pcap",
+        "common/pcapx/pcaputil/dnp3-binary-events/answers/excess-retains.json": "dnp3-binary-events/answers/excess-retains.json",
+        "common/pcapx/pcaputil/dnp3-binary-events/captures/different-event-type-retains.pcap": "dnp3-binary-events/captures/different-event-type-retains.pcap",
+        "common/pcapx/pcaputil/dnp3-binary-events/answers/different-event-type-retains.json": "dnp3-binary-events/answers/different-event-type-retains.json",
+        "common/pcapx/pcaputil/dnp3-binary-events/captures/class0-not-events.pcap": "dnp3-binary-events/captures/class0-not-events.pcap",
+        "common/pcapx/pcaputil/dnp3-binary-events/answers/class0-not-events.json": "dnp3-binary-events/answers/class0-not-events.json",
+        "common/pcapx/pcaputil/dnp3-binary-events/captures/cto-zero.pcap": "dnp3-binary-events/captures/cto-zero.pcap",
+        "common/pcapx/pcaputil/dnp3-binary-events/answers/cto-zero.json": "dnp3-binary-events/answers/cto-zero.json",
+        "common/pcapx/pcaputil/dnp3-binary-events/captures/cto-two.pcap": "dnp3-binary-events/captures/cto-two.pcap",
+        "common/pcapx/pcaputil/dnp3-binary-events/answers/cto-two.json": "dnp3-binary-events/answers/cto-two.json",
+        "common/pcapx/pcaputil/dnp3-binary-events/captures/cto-truncated.pcap": "dnp3-binary-events/captures/cto-truncated.pcap",
+        "common/pcapx/pcaputil/dnp3-binary-events/answers/cto-truncated.json": "dnp3-binary-events/answers/cto-truncated.json",
+        "common/pcapx/pcaputil/dnp3-binary-events/captures/cto-qualifier.pcap": "dnp3-binary-events/captures/cto-qualifier.pcap",
+        "common/pcapx/pcaputil/dnp3-binary-events/answers/cto-qualifier.json": "dnp3-binary-events/answers/cto-qualifier.json",
+        "common/pcapx/pcaputil/dnp3-binary-events/captures/event-zero.pcap": "dnp3-binary-events/captures/event-zero.pcap",
+        "common/pcapx/pcaputil/dnp3-binary-events/answers/event-zero.json": "dnp3-binary-events/answers/event-zero.json",
+        "common/pcapx/pcaputil/dnp3-binary-events/captures/truncated-relative.pcap": "dnp3-binary-events/captures/truncated-relative.pcap",
+        "common/pcapx/pcaputil/dnp3-binary-events/answers/truncated-relative.json": "dnp3-binary-events/answers/truncated-relative.json",
+        "common/pcapx/pcaputil/dnp3-binary-events/captures/event-range.pcap": "dnp3-binary-events/captures/event-range.pcap",
+        "common/pcapx/pcaputil/dnp3-binary-events/answers/event-range.json": "dnp3-binary-events/answers/event-range.json",
+        "common/pcapx/pcaputil/dnp3-binary-events/captures/unsupported-variation.pcap": "dnp3-binary-events/captures/unsupported-variation.pcap",
+        "common/pcapx/pcaputil/dnp3-binary-events/answers/unsupported-variation.json": "dnp3-binary-events/answers/unsupported-variation.json",
+        "common/pcapx/pcaputil/dnp3-binary-events/captures/transport-composition.pcap": "dnp3-binary-events/captures/transport-composition.pcap",
+        "common/pcapx/pcaputil/dnp3-binary-events/answers/transport-composition.json": "dnp3-binary-events/answers/transport-composition.json",
+        "common/pcapx/pcaputil/dnp3-binary-events/captures/status-transport-composition.pcap": "dnp3-binary-events/captures/status-transport-composition.pcap",
+        "common/pcapx/pcaputil/dnp3-binary-events/answers/status-transport-composition.json": "dnp3-binary-events/answers/status-transport-composition.json",
+        "common/pcapx/pcaputil/dnp3-binary-events/manifest.json": "dnp3-binary-events/manifest.json",
+        "common/pcapx/pcaputil/dnp3-binary-events/guard-vectors.json": "dnp3-binary-events/guard-vectors.json",
+        "common/pcapx/pcaputil/dnp3-binary-events/generate.py": "dnp3-binary-events/generate.py",
+        "common/pcapx/pcaputil/dnp3-binary-events/verify.py": "dnp3-binary-events/verify.py",
+        "common/pcapx/pcaputil/dnp3-binary-events/MODEL-PINS.json": "dnp3-binary-events/MODEL-PINS.json",
+        "common/pcapx/pcaputil/dnp3-binary-events/SOURCE-PINS.json": "dnp3-binary-events/SOURCE-PINS.json",
+        "common/pcapx/pcaputil/dnp3-binary-events/reference.py": "dnp3-binary-events/reference.py",
+        "common/pcapx/pcaputil/dnp3-binary-events/REFERENCE-ACTUAL.json": "dnp3-binary-events/REFERENCE-ACTUAL.json",
+        "common/pcapx/pcaputil/dnp3-binary-events/reference_selection.py": "dnp3-binary-events/reference_selection.py",
+        "common/pcapx/pcaputil/dnp3-binary-events/REFERENCE-SELECTION-ACTUAL.json": "dnp3-binary-events/REFERENCE-SELECTION-ACTUAL.json",
+        "common/pcapx/pcaputil/dnp3-binary-events/reference_codec.py": "dnp3-binary-events/reference_codec.py",
+        "common/pcapx/pcaputil/dnp3-binary-events/REFERENCE-CODEC-ACTUAL.json": "dnp3-binary-events/REFERENCE-CODEC-ACTUAL.json",
+        "common/pcapx/pcaputil/dnp3-binary-events/reference_cto.py": "dnp3-binary-events/reference_cto.py",
+        "common/pcapx/pcaputil/dnp3-binary-events/REFERENCE-CTO-ACTUAL.json": "dnp3-binary-events/REFERENCE-CTO-ACTUAL.json",
+        "common/pcapx/pcaputil/dnp3-binary-events/reference_values.py": "dnp3-binary-events/reference_values.py",
+        "common/pcapx/pcaputil/dnp3-binary-events/REFERENCE-VALUES-ACTUAL.json": "dnp3-binary-events/REFERENCE-VALUES-ACTUAL.json",
+        "common/pcapx/pcaputil/dnp3-binary-events/reference_transport.py": "dnp3-binary-events/reference_transport.py",
+        "common/pcapx/pcaputil/dnp3-binary-events/REFERENCE-TRANSPORT-ACTUAL.json": "dnp3-binary-events/REFERENCE-TRANSPORT-ACTUAL.json",
+        "common/pcapx/pcaputil/dnp3-binary-events/TRANSPORT-SOURCE-PINS.json": "dnp3-binary-events/TRANSPORT-SOURCE-PINS.json",
+        "scripts/protocol-tests/required-tests-traffic-unified-v60.json": "required-tests-traffic-unified-v60.json"
+      }
     }
   ],
   "schema_version": 1,

@@ -314,7 +314,7 @@ func (f *binFlow) detectDirection(dir int, wire []byte) {
 		f.protocol, f.modbus = "modbus", &binModbus{pending: map[uint16]modbusRequest{}, maxPending: f.a.budget.MaxCollectionElements}
 	case "dnp3":
 		cfg := f.a.config
-		events := cfg.DecodeDNP3CounterEvents || cfg.DecodeDNP3EventCountReads
+		events := cfg.DecodeDNP3CounterEvents || cfg.DecodeDNP3EventCountReads || cfg.DecodeDNP3BinaryEvents
 		counters := cfg.DecodeDNP3CounterPoints || events
 		typed := cfg.DecodeDNP3TypedStaticReads || counters || cfg.DecodeDNP3StaticStatusPoints
 		direct := cfg.DecodeDNP3DirectStaticReads || typed
@@ -322,7 +322,7 @@ func (f *binFlow) detectDirection(dir int, wire []byte) {
 			pending: map[dnp3RequestKey]dnp3Request{}, maxPending: f.a.budget.MaxCollectionElements,
 			reserve: f.reserveSession, maxDepth: f.a.budget.MaxRecursionDepth,
 			readPoints: cfg.DecodeDNP3ReadPoints || direct, directReads: direct, typedReads: typed,
-			counterPoints: counters, counterEvents: events, eventCountReads: cfg.DecodeDNP3EventCountReads, statusPoints: cfg.DecodeDNP3StaticStatusPoints,
+			counterPoints: counters, counterEvents: events, eventCountReads: cfg.DecodeDNP3EventCountReads || cfg.DecodeDNP3BinaryEvents, binaryEvents: cfg.DecodeDNP3BinaryEvents, statusPoints: cfg.DecodeDNP3StaticStatusPoints,
 			transportFragments: cfg.DecodeDNP3TransportFragments, maxApplication: cfg.MaxMessageBytes,
 		}
 	case "c37118":
@@ -709,6 +709,12 @@ func (f *binFlow) consumeSession(dir int, e *ProtocolEvent, result map[string]an
 		}
 		if f.dnp3.statusPoints {
 			e.Profile = "dnp3-static-status"
+			if f.dnp3.transportFragments {
+				e.Profile += "-transport"
+			}
+		}
+		if f.dnp3.binaryEvents {
+			e.Profile = "dnp3-binary-events"
 			if f.dnp3.transportFragments {
 				e.Profile += "-transport"
 			}

@@ -33,6 +33,7 @@ type binDNP3 struct {
 	counterEvents      bool
 	eventCountReads    bool
 	statusPoints       bool
+	binaryEvents       bool
 	transportFragments bool
 	fragments          map[dnp3TransportKey]*dnp3TransportFragment
 	maxApplication     int
