@@ -4,12 +4,14 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"time"
+
+	"github.com/yaklang/gorm"
 
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/memedit"
 
 	"github.com/samber/lo"
-	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
@@ -85,7 +87,9 @@ func buildSSARisk(
 	}
 	riskCodeRange, CodeFragment := CoverCodeRange(value.GetRange())
 	rule := result.rule
+	now := time.Now()
 	newSSARisk := &schema.SSARisk{
+		Model:         gorm.Model{CreatedAt: now, UpdatedAt: now},
 		CodeSourceUrl: utils.EscapeInvalidUTF8Byte([]byte(riskCodeRange.URL)),
 		CodeRange:     riskCodeRange.JsonString(),
 		CodeFragment:  utils.EscapeInvalidUTF8Byte([]byte(CodeFragment)),
@@ -146,17 +150,18 @@ func buildSSARisk(
 		}
 	}
 
-	// The rule name, title and alert variable are deliberately omitted: a
-	// source, struct and SSA rule that report the same value of the same risk
-	// type share one feature hash, which is what lets a later scan mode cover
-	// an earlier finding. The reported position is added by the scan collect,
-	// so two sibling statements with identical value text stay distinct.
+	// Preserve the existing cross-scan identity for diff and disposal history.
+	// Updating a rule is not the same finding in a comparison of two scans.
 	newSSARisk.RiskFeatureHash = utils.CalcSha1(
-		newSSARisk.FunctionName,
-		value.String(),
-		newSSARisk.RiskType,
-		newSSARisk.Language,
-		string(newSSARisk.Severity),
+		newSSARisk.FunctionName, value.String(), newSSARisk.FromRule,
+		newSSARisk.Variable, string(newSSARisk.Severity), newSSARisk.RiskType,
+		newSSARisk.Language, newSSARisk.Title,
+	)
+	// Covering across modes is a separate, scan-local decision. Include the
+	// source position so identical values in sibling statements stay distinct.
+	newSSARisk.CoverKey = utils.CalcSha1(
+		newSSARisk.FunctionName, value.String(), newSSARisk.RiskType,
+		newSSARisk.Language, newSSARisk.CodeSourceUrl, newSSARisk.CodeRange,
 	)
 	newSSARisk.Hash = newSSARisk.CalcHash()
 	return newSSARisk
@@ -203,12 +208,9 @@ func (r *SyntaxFlowResult) GetRisks() []*schema.SSARisk {
 	return out
 }
 
-func (r *SyntaxFlowResult) SaveRisk(
-	variable string,
-	index int,
-	value *Value,
-	save bool,
-) string {
+// BuildRisk materializes one alert and publishes it once. Persistence belongs
+// to the registered handler, or to the direct Save caller's saver.
+func (r *SyntaxFlowResult) BuildRisk(variable string, index int, value *Value) string {
 	_, ok := r.GetAlertInfo(variable)
 	if !ok {
 		return ""
@@ -217,6 +219,16 @@ func (r *SyntaxFlowResult) SaveRisk(
 	// Building a risk is idempotent per alert slot: the same result may persist
 	// its values after the streaming path already materialized them.
 	if prev, exist := r.riskMap[name]; exist && prev != nil {
+		if prev.ResultID != uint64(r.GetResultID()) || prev.RuntimeId != r.TaskID {
+			// Saving a prebuilt memory result binds the numeric audit row id.
+			// Copy it: a scan handler may still be reading the published risk.
+			row := *prev
+			row.ResultID, row.RuntimeId = uint64(r.GetResultID()), r.TaskID
+			row.ID = 0
+			row.PrepareForSave()
+			r.riskMap[name] = &row
+			return row.Hash
+		}
 		return prev.Hash
 	}
 	ssaRisk := buildSSARisk(r, variable, index, value)
@@ -231,27 +243,10 @@ func (r *SyntaxFlowResult) SaveRisk(
 	// The row hash covers the result identity, so it must be computed after
 	// those fields are set: the same finding reported by two results is two
 	// rows, and the unique index on hash must not collapse them.
-	ssaRisk.Hash = ssaRisk.CalcHash()
+	ssaRisk.PrepareForSave()
 	r.riskMap[name] = ssaRisk
-
-	// A scan registers a callback and decides there whether this finding is
-	// created or rewrites an earlier mode. Only a result with no callback
-	// writes the row here.
 	if r.onRisk != nil {
 		r.onRisk(ssaRisk)
-		return ssaRisk.Hash
-	}
-	if save {
-		err := yakit.CreateSSARisk(consts.GetGormSSAProjectDataBase(), ssaRisk)
-		if err != nil {
-			// Keep the risk in memory so the streaming path (EmitSSAResult →
-			// ssa-stream → platform artifact import) and in-process results
-			// still deliver it even when the local SSA IR DB is stale or
-			// read-only (e.g. missing a newly added column). The platform
-			// stores its own copy from the stream.
-			log.Errorf("save risk failed: %s", err)
-			return ""
-		}
 	}
 	return ssaRisk.Hash
 }
@@ -267,14 +262,11 @@ func (r *SyntaxFlowResult) GetGRPCModelRisk() []*ypb.SSARisk {
 			r.getRisk(name)
 		}
 	}
-	// transform to grpc model
-	if len(r.riskGRPCCache) != len(r.riskMap) {
-		r.riskGRPCCache = lo.MapToSlice(r.riskMap, func(name string, risk *schema.SSARisk) *ypb.SSARisk {
-			return risk.ToGRPCModel()
-		})
-	}
-	// return
-	return r.riskGRPCCache
+	// Binding an audit row changes metadata but not the number of risks.
+	// Do not cache by map length: it would return stale ids and timestamps.
+	return lo.MapToSlice(r.riskMap, func(name string, risk *schema.SSARisk) *ypb.SSARisk {
+		return risk.ToGRPCModel()
+	})
 }
 
 func (r *SyntaxFlowResult) GetRiskByValue(variable string, i int) *schema.SSARisk {
