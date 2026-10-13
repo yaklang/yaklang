@@ -136,7 +136,7 @@ var loopAction_LoadingSkills = &reactloops.LoopAction{
 			alreadyLoadedMsg := fmt.Sprintf(
 				"IMPORTANT: Skill '%s' is ALREADY loaded and visible in your context. "+
 					"Do NOT load it again. The skill content is already displayed in the "+
-					"SKILLS_CONTEXT / AUTO_LOADED_SKILLS / USER_FORCED_SKILL section of your prompt. "+
+					"SKILLS_CONTEXT section of your prompt. "+
 					"Read the View Window content that is already available to you. %s",
 				skillName, viewSummary,
 			)

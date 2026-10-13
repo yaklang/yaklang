@@ -21,11 +21,12 @@ func newIntentSkillRecommendationTestLoop(t *testing.T) (*ReActLoop, *mockcfg.Mo
 	require.NoError(t, err)
 
 	mgr := aiskillloader.NewSkillsContextManager(loader)
+	cfg := aicommon.NewConfig(context.Background(), aicommon.WithSkillLoader(loader))
+	bindSkillsManagerToTimeline(mgr, cfg)
 	added, err := mgr.LoadForcedSkill("active-skill")
 	require.NoError(t, err)
 	require.True(t, added)
 
-	cfg := aicommon.NewConfig(context.Background(), aicommon.WithSkillLoader(loader))
 	invoker := mockcfg.NewMockInvoker(context.Background())
 	invoker.SetConfig(cfg)
 	loop := NewMinimalReActLoop(cfg, invoker)

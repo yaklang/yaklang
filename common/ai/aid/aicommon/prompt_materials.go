@@ -43,13 +43,6 @@ type PromptMaterials struct {
 	OriginalUserInput string
 	StableInstruction string
 
-	// ForcedSkills 是「用户强制加载」SKILL 满内容, 进 frozen_block 顶部 (最高优先级).
-	// 空时 frozen_block 顶部子块不渲染.
-	ForcedSkills string
-	// AutoLoadedSkills 是「AI 意图驱动加载」SKILL, 进 semi_dynamic_2 尾部.
-	// 空时 semi_dynamic_2 尾部子块不渲染.
-	AutoLoadedSkills string
-
 	ToolInventory bool
 	ToolsCount    int
 	TopToolsCount int
@@ -121,7 +114,7 @@ func (m *PromptMaterials) SemiDynamic1Data() map[string]any {
 }
 
 // SemiDynamic2Data selects either the text example/schema or native action
-// tags for this request. AutoLoadedSkills remain visible in both modes.
+// tags for this request.
 func (m *PromptMaterials) SemiDynamic2Data() map[string]any {
 	if m == nil {
 		return map[string]any{}
@@ -133,17 +126,16 @@ func (m *PromptMaterials) SemiDynamic2Data() map[string]any {
 		"Schema":              m.Schema,
 		"FunctionCallSchemas": m.FunctionCallSchemas,
 		"OutputExample":       m.OutputExample,
-		"AutoLoadedSkills":    m.AutoLoadedSkills,
 	}
 }
 
-// FrozenBlockData 供 frozen-block 模板消费, 顶部前置 ForcedSkills (用户强制加载 SKILL 满内容).
+// FrozenBlockData 供 frozen-block 模板消费。技能正文不再进入 frozen block:
+// 它们统一在 SemiDynamic1 的单个技能块渲染; 未冻结部分留在 Timeline Open。
 func (m *PromptMaterials) FrozenBlockData() map[string]any {
 	if m == nil {
 		return map[string]any{}
 	}
 	return map[string]any{
-		"ForcedSkills":     m.ForcedSkills,
 		"FunctionCallMode": m.FunctionCallMode,
 		"ToolInventory":    m.ToolInventory,
 		"ToolsCount":       m.ToolsCount,

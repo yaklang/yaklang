@@ -738,6 +738,16 @@ func NewReActLoop(name string, invoker aicommon.AIInvokeRuntime, options ...ReAc
 	// Auto-register perception context provider (nil-safe, skips if perception disabled)
 	r.RegisterPerceptionContextProvider()
 
+	// Options 提供的 manager 先绑定, 再由初始化入口明确执行默认加载。
+	if r.skillsContextManager != nil {
+		if realConfig, ok := config.(*aicommon.Config); ok {
+			bindSkillsManagerToTimeline(r.skillsContextManager, realConfig)
+			if !realConfig.InitStatus.IsPersistentSessionRestored() {
+				r.skillsContextManager.LoadDefaultSkills()
+			}
+		}
+	}
+
 	// Auto-apply skillLoader from config if not already set via options
 	// This allows users to configure skills via aicommon.WithSkillsLocalDir etc.
 	if r.skillsContextManager == nil && config != nil {
@@ -751,6 +761,11 @@ func NewReActLoop(name string, invoker aicommon.AIInvokeRuntime, options ...ReAc
 				r.allowSkillViewOffset = func() bool {
 					return mgr.HasTruncatedViews()
 				}
+				// 绑定只接入当前 Timeline; 默认加载是独立的初始化操作。
+				bindSkillsManagerToTimeline(mgr, realConfig)
+				if !realConfig.InitStatus.IsPersistentSessionRestored() {
+					mgr.LoadDefaultSkills()
+				}
 
 				// Restore previously loaded skills from persistent session
 				if realConfig.InitStatus.IsPersistentSessionRestored() {
@@ -760,8 +775,8 @@ func NewReActLoop(name string, invoker aicommon.AIInvokeRuntime, options ...ReAc
 				}
 
 				// Load user-specified skills from EnabledCapabilities (AIStartParams).
-				// 这些是用户主动指定的, 作为「用户强制加载」走 frozen_block 顶部 (满内容, 最高优先级),
-				// 与 persistent session 恢复 (走 SKILLS_CONTEXT) 区分开.
+				// 这些是用户主动指定的, 只把加载来源标记为 user-forced;
+				// 展示位置与其它来源一致 (冻结后进入同一个技能块).
 				if names := realConfig.GetEnabledSkillNames(); len(names) > 0 {
 					loadConfiguredForcedSkills(mgr, names, "enabled capabilities")
 				}
@@ -896,6 +911,17 @@ func NewReActLoop(name string, invoker aicommon.AIInvokeRuntime, options ...ReAc
 	}
 
 	return r, nil
+}
+
+// bindSkillsManagerToTimeline 把 SkillsContextManager 绑定到 config 的 Timeline。
+// 只切换绑定, 不向目标 Timeline 导入 manager 的本地缓存。
+func bindSkillsManagerToTimeline(mgr *aiskillloader.SkillsContextManager, config *aicommon.Config) {
+	if mgr == nil || config == nil || config.GetTimeline() == nil {
+		return
+	}
+	if sink := aicommon.NewSkillContentTimelineAdapter(config.GetTimeline(), config.AcquireId); sink != nil {
+		mgr.BindTimelineSink(sink)
+	}
 }
 
 func (r *ReActLoop) Delete(key string) {
@@ -1152,6 +1178,22 @@ func loadConfiguredSkills(mgr *aiskillloader.SkillsContextManager, names []strin
 	if mgr == nil || len(names) == 0 {
 		return
 	}
+	// 持久会话恢复的是一份技能名单, 不是正文。若本 Timeline 已经记录过该技能
+	// (例如正文已被统一压缩退休), 不能按旧名单把它重新完整展开; 只有真正没有
+	// 历史记录的技能才允许导入。
+	if source == "persistent session" {
+		filtered := make([]string, 0, len(names))
+		for _, name := range names {
+			if mgr.HasSkillContentHistory(name) {
+				continue
+			}
+			filtered = append(filtered, name)
+		}
+		names = filtered
+		if len(names) == 0 {
+			return
+		}
+	}
 	results := mgr.LoadSkills(names)
 	var loaded, failed []string
 	for name, err := range results {
@@ -1170,11 +1212,11 @@ func loadConfiguredSkills(mgr *aiskillloader.SkillsContextManager, names []strin
 	}
 }
 
-// loadConfiguredForcedSkills 把用户 EnabledCapabilities 来源的 skill 作为「用户强制加载」
-// 走 LoadForcedSkill (满内容 → frozen_block 顶部, 最高优先级). 这与 persistent session
-// 恢复 (走 LoadSkill → SKILLS_CONTEXT) 区分开, 是「用户主动指定」语义.
+// loadConfiguredForcedSkills 把用户 EnabledCapabilities 来源的 skill 走
+// LoadForcedSkill, 只把加载来源标记为 user-forced (供压缩提示与观测使用);
+// 正文展示位置与其它来源一致, 冻结后进入同一个技能块.
 //
-// 关键词: loadConfiguredForcedSkills, EnabledCapabilities → forced, frozen_block
+// 关键词: loadConfiguredForcedSkills, EnabledCapabilities → user-forced 来源
 func loadConfiguredForcedSkills(mgr *aiskillloader.SkillsContextManager, names []string, source string) {
 	if mgr == nil || len(names) == 0 {
 		return
