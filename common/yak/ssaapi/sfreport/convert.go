@@ -9,6 +9,7 @@ import (
 )
 
 type IReport interface {
+	schema.RiskUpdateHandler
 	AddSyntaxFlowResult(result *ssaapi.SyntaxFlowResult) bool
 	AddSyntaxFlowRisks(risks ...*schema.SSARisk)
 	SetWriter(writer io.Writer) error

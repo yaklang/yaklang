@@ -73,7 +73,7 @@ func TestSarifReport_ApplyRiskUpdateReplacesCoveredResult(t *testing.T) {
 func TestReport_SourceFindingIsCoveredBySSA(t *testing.T) {
 	runtime := ssaapi.NewScanRuntime()
 	report := NewReport(IRifyReportType)
-	runtime.ListenRisk(report)
+	runtime.RegisterRiskUpdateHandler(report)
 
 	source := coveredRisk("hash-source", "feature-cover", string(schema.SFR_MODE_SOURCE))
 	require.True(t, runtime.SubmitRisk(source))

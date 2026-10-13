@@ -1,4 +1,4 @@
-package syntaxflow_scan
+package ssaapi
 
 import (
 	"testing"
@@ -9,8 +9,8 @@ import (
 )
 
 func batchRisk(hash, feature, mode, title string) *schema.SSARisk {
-	return &schema.SSARisk{
-		Hash:            hash,
+	risk := &schema.SSARisk{
+		ResultUUID:      hash,
 		RiskFeatureHash: feature,
 		ScanMode:        mode,
 		FromRule:        "batch-rule",
@@ -23,6 +23,8 @@ func batchRisk(hash, feature, mode, title string) *schema.SSARisk {
 		CodeSourceUrl:   "file:///main.go",
 		CodeRange:       "1:1-1:2",
 	}
+	risk.PrepareForSave()
+	return risk
 }
 
 func countBatchedRisks(t *testing.T, runtimeID string) int64 {
@@ -43,7 +45,7 @@ func TestDBSaver_FlushBatchesCreatesAndRewrites(t *testing.T) {
 		ssadb.GetDB().Unscoped().Where("runtime_id = ?", "batch-runtime").Delete(&schema.SSARisk{})
 	})
 
-	saver := newDBSaver(schema.SFResultKindScan, "batch-task", false)
+	saver := NewRiskDBSaver()
 	t.Cleanup(func() { _ = saver.Close() })
 	first := batchRisk("batch-hash-1", "batch-feature-1", string(schema.SFR_MODE_SOURCE), "first")
 	second := batchRisk("batch-hash-2", "batch-feature-2", string(schema.SFR_MODE_SSA), "second")
@@ -53,19 +55,21 @@ func TestDBSaver_FlushBatchesCreatesAndRewrites(t *testing.T) {
 
 	require.NoError(t, saver.Flush())
 	require.Equal(t, int64(2), countBatchedRisks(t, "batch-runtime"))
+	var original schema.SSARisk
+	require.NoError(t, ssadb.GetDB().Where("hash = ?", first.Hash).First(&original).Error)
 
 	// A later mode covers the first finding: the same row is rewritten.
 	covered := batchRisk("batch-hash-1-ssa", "batch-feature-1", string(schema.SFR_MODE_SSA), "covered")
 	require.NoError(t, saver.ApplyRiskUpdate(schema.RiskUpdateItem{
 		Risk:    covered,
-		OldID:   first.ID,
+		OldID:   original.ID,
 		OldHash: first.Hash,
 	}))
 	require.NoError(t, saver.Flush())
 	require.Equal(t, int64(2), countBatchedRisks(t, "batch-runtime"), "a cover rewrites instead of inserting")
 
 	var stored schema.SSARisk
-	require.NoError(t, ssadb.GetDB().Where("id = ?", first.ID).First(&stored).Error)
+	require.NoError(t, ssadb.GetDB().Where("id = ?", original.ID).First(&stored).Error)
 	require.Equal(t, string(schema.SFR_MODE_SSA), stored.ScanMode)
 	require.Equal(t, covered.Hash, stored.Hash)
 }
@@ -80,7 +84,7 @@ func TestDBSaver_CoverBeforeFlushInsertsOnce(t *testing.T) {
 		ssadb.GetDB().Unscoped().Where("runtime_id = ?", "batch-runtime").Delete(&schema.SSARisk{})
 	})
 
-	saver := newDBSaver(schema.SFResultKindScan, "batch-task", false)
+	saver := NewRiskDBSaver()
 	t.Cleanup(func() { _ = saver.Close() })
 
 	source := batchRisk("pending-source-hash", "pending-feature", string(schema.SFR_MODE_SOURCE), "source")

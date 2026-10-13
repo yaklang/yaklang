@@ -1,90 +1,90 @@
 package ssaapi
 
 import (
+	"io"
+	"sync"
+
 	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
-// ScanRuntime is the control point of one syntaxflow scan. It owns the risk
-// collect and the handlers that apply each decision.
-//
-// The runtime never writes anything itself. Scanning code submits a risk; the
-// collect decides whether that finding is created or replaces an earlier mode,
-// and each handler receives that one RiskUpdateItem. Handlers are registered
-// before the scan starts submitting, so delivery does not take a lock.
+// ScanRuntime decides which finding survives, then hands that one decision to
+// its consumers. Database saving and reporting are ordinary handlers; neither
+// has a dedicated path or persistence flag on the runtime.
 type ScanRuntime struct {
 	ID string
 
-	collect *schema.RiskCollect
-
-	risks    []schema.RiskUpdateHandler
-	noRiskDB bool
+	collect            *schema.RiskCollect
+	riskUpdateHandlers []schema.RiskUpdateHandler
+	mu                 sync.Mutex
+	closeOnce          sync.Once
+	closeErr           error
 }
 
-// NewScanRuntime creates the runtime of one scan.
 func NewScanRuntime() *ScanRuntime {
-	return &ScanRuntime{
-		ID:      uuid.NewString(),
-		collect: schema.NewRiskCollect(),
-	}
+	return &ScanRuntime{ID: uuid.NewString(), collect: schema.NewRiskCollect()}
 }
 
-// SetRuleLevelFunc installs the ranking used to filter findings that share a
-// feature hash but come from different rules of the same scan mode.
 func (r *ScanRuntime) SetRuleLevelFunc(fn func(ruleName string) int) {
-	if r == nil || r.collect == nil {
+	if r != nil && r.collect != nil {
+		r.collect.SetRuleLevelFunc(fn)
+	}
+}
+
+// RegisterRiskUpdateHandler registers a consumer before scanning starts.
+func (r *ScanRuntime) RegisterRiskUpdateHandler(handler schema.RiskUpdateHandler) {
+	if r == nil || utils.IsNil(handler) {
 		return
 	}
-	r.collect.SetRuleLevelFunc(fn)
+	r.riskUpdateHandlers = append(r.riskUpdateHandlers, handler)
 }
 
-// ListenRisk registers a consumer of risk updates. Handlers run in the order
-// they were registered. Register every handler before SubmitRisk.
-func (r *ScanRuntime) ListenRisk(handler schema.RiskUpdateHandler) {
-	if r == nil || handler == nil {
-		return
-	}
-	r.risks = append(r.risks, handler)
-}
-
-// SetNoRiskDB marks this scan as "do not persist risks". Consumers that
-// persist rows check this flag; report-only consumers ignore it.
-func (r *ScanRuntime) SetNoRiskDB(noSave bool) {
-	if r == nil {
-		return
-	}
-	r.noRiskDB = noSave
-}
-
-// NoRiskDB reports whether this scan asked not to persist risks.
-func (r *ScanRuntime) NoRiskDB() bool {
-	if r == nil {
-		return false
-	}
-	return r.noRiskDB
-}
-
-// SubmitRisk runs the scan's single risk decision and publishes the update.
-//
-// It reports whether this runtime took the decision. A nil runtime returns
-// false so the caller keeps its previous behavior. A dropped finding (an
-// earlier mode, or a lower-level rule of the same mode) returns true and
-// publishes nothing.
+// SubmitRisk reports whether this runtime owns the decision, including a
+// dropped finding. Serialize decision and delivery together so concurrent
+// rules cannot deliver a cover before the decision it replaces.
 func (r *ScanRuntime) SubmitRisk(risk *schema.SSARisk) bool {
 	if r == nil || risk == nil || r.collect == nil {
 		return false
 	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
 	item, ok := r.collect.Submit(risk)
-	if !ok {
-		return true
-	}
-	for _, handler := range r.risks {
-		if handler == nil {
-			continue
-		}
-		if err := handler.ApplyRiskUpdate(item); err != nil {
-			log.Errorf("apply risk update failed: %v", err)
+	if ok {
+		for _, handler := range r.riskUpdateHandlers {
+			if err := handler.ApplyRiskUpdate(item); err != nil {
+				log.Errorf("apply risk update failed: %v", err)
+			}
 		}
 	}
 	return true
+}
+
+// Flush waits for handlers with buffered work. Call it before publishing a
+// durable task status; handlers without buffers have nothing to flush.
+func (r *ScanRuntime) Flush() (err error) {
+	if r != nil {
+		for _, handler := range r.riskUpdateHandlers {
+			if flusher, ok := handler.(interface{ Flush() error }); ok {
+				err = utils.JoinErrors(err, flusher.Flush())
+			}
+		}
+	}
+	return
+}
+
+// Close finishes the registered consumers. The call that creates a runtime
+// owns this lifecycle; nested stages just borrow it.
+func (r *ScanRuntime) Close() error {
+	if r == nil {
+		return nil
+	}
+	r.closeOnce.Do(func() {
+		for _, handler := range r.riskUpdateHandlers {
+			if closer, ok := handler.(io.Closer); ok {
+				r.closeErr = utils.JoinErrors(r.closeErr, closer.Close())
+			}
+		}
+	})
+	return r.closeErr
 }

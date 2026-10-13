@@ -61,7 +61,7 @@ type Config struct {
 	// diagnostics configuration
 	diagnosticsEnabled  bool
 	diagnosticsRecorder *diagnostics.Recorder
-	structScan          *structScanRuntime
+	structScan          *structScanState
 	// onRisk is called with each risk this compile's struct rules produce.
 	// Nil means the compile is outside a scan and keeps its previous behavior.
 	onRisk func(*schema.SSARisk)

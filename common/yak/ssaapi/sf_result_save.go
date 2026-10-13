@@ -183,6 +183,19 @@ func (r *SyntaxFlowResult) save(
 		errs = utils.JoinErrors(errs, err)
 	}
 	r.dbResult = result
+	if r.onRisk == nil {
+		// Direct saves use the same storage function as the scan handler,
+		// without creating a runtime or running cover decisions again.
+		updates := make([]schema.RiskUpdateItem, 0, len(r.riskMap))
+		for _, risk := range r.GetRisks() {
+			updates = append(updates, schema.RiskUpdateItem{Risk: risk})
+		}
+		if err := SaveRiskUpdates(ssadb.GetDB(), updates...); err != nil {
+			// Keep findings available to stream consumers on a stale/read-only
+			// local risk DB, as the original direct-save path did.
+			log.Errorf("save risks failed: %v", err)
+		}
+	}
 	return result.ID, errs
 }
 func (r *SyntaxFlowResult) CreateRisk() error {
@@ -192,7 +205,7 @@ func (r *SyntaxFlowResult) CreateRisk() error {
 
 	r.GetAlertValues().ForEach(func(i string, v Values) bool {
 		for index, v := range v {
-			r.SaveRisk(i, index, v, false)
+			r.BuildRisk(i, index, v)
 		}
 		return true
 	})
@@ -264,7 +277,7 @@ func (r *SyntaxFlowResult) saveValue(ctx context.Context, result *ssadb.AuditRes
 			// don't leak across values. Build a fresh slice each iteration
 			// (SaveValue consumes opts and the loop reuses varOpts otherwise).
 			valueOpts := varOpts
-			hash := r.SaveRisk(name, index, v, true)
+			hash := r.BuildRisk(name, index, v)
 			if hash != "" {
 				valueOpts = append(valueOpts, OptionSaveValue_ResultRiskHash(hash))
 			}

@@ -45,7 +45,7 @@ func TestScanProject_RisksFlowThroughScanRuntime(t *testing.T) {
 	rt := ssaapi.NewScanRuntime()
 	var mu sync.Mutex
 	var items []schema.RiskUpdateItem
-	rt.ListenRisk(schema.RiskUpdateHandlerFunc(func(item schema.RiskUpdateItem) error {
+	rt.RegisterRiskUpdateHandler(schema.RiskUpdateHandlerFunc(func(item schema.RiskUpdateItem) error {
 		mu.Lock()
 		defer mu.Unlock()
 		items = append(items, item)
@@ -122,7 +122,7 @@ func TestScanProject_SourceStageSubmitsThroughRuntime(t *testing.T) {
 	rt := ssaapi.NewScanRuntime()
 	var mu sync.Mutex
 	var modes []string
-	rt.ListenRisk(schema.RiskUpdateHandlerFunc(func(item schema.RiskUpdateItem) error {
+	rt.RegisterRiskUpdateHandler(schema.RiskUpdateHandlerFunc(func(item schema.RiskUpdateItem) error {
 		mu.Lock()
 		defer mu.Unlock()
 		if item.Risk != nil {

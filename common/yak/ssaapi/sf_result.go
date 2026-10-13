@@ -16,7 +16,6 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/orderedmap"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
-	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
 type SyntaxFlowResult struct {
@@ -54,8 +53,6 @@ type SyntaxFlowResult struct {
 
 	riskMap      map[string]*schema.SSARisk
 	riskCountMap map[string]int64
-	// cache
-	riskGRPCCache []*ypb.SSARisk
 	*ssaconfig.Config
 }
 
