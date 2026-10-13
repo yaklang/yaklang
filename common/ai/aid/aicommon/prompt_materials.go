@@ -24,7 +24,7 @@ type PromptMaterials struct {
 	OutputExample       string
 
 	// SemiDynamic 提示材料:
-	//   - aireact: SkillsContext
+	//   - SkillsContext: Timeline 中已冻结并提升的技能正文
 	//   - aid: PlanHelp / OriginalUserInput / StableInstruction 等 prompt-specific
 	//     但仍属可缓存半动态前缀的内容
 	SkillsContext string
@@ -175,6 +175,7 @@ func (m *PromptMaterials) TimelineOpenData() map[string]any {
 type TimelineFrozenOpenBlocks struct {
 	Frozen                   string
 	Open                     string
+	SkillsContext            string
 	PromotedRecentTools      string
 	PromotedUserInputHistory string
 	FrozenTimeUnix           int64
@@ -201,7 +202,7 @@ type TimelinePromptOptions struct {
 	// PromoteUserInput is opt-in for main context construction. Helper and
 	// parameter prompts retain typed user records in their ordinary history.
 	PromoteUserInput bool
-	// UserInputOnly supplies exact user context and session evidence to
+	// UserInputOnly supplies exact user context, skill guidance and session evidence to
 	// lightweight loops; ordinary execution history uses a separate recent window.
 	UserInputOnly bool
 }
@@ -242,6 +243,7 @@ func RenderTimelineFrozenOpenWithOptions(timeline *Timeline, options TimelinePro
 	return TimelineFrozenOpenBlocks{
 		Frozen:                   promptBlocks.RenderFrozenOnly(TimelineDumpDefaultAITagName),
 		Open:                     promptBlocks.RenderOpenOnly(TimelineDumpDefaultAITagName),
+		SkillsContext:            renderPromotedSkillContent(timeline.promotedState),
 		PromotedRecentTools:      recentTools,
 		PromotedUserInputHistory: userInputHistory,
 		FrozenTimeUnix:           timelineFrozenTimeUnixFromRenderable(rb),
@@ -252,6 +254,7 @@ func RenderTimelineFrozenOpenWithOptions(timeline *Timeline, options TimelinePro
 type PromptFrozenOpenMaterials struct {
 	TimelineFrozen             string
 	TimelineOpen               string
+	SkillsContext              string
 	PromotedRecentTools        string
 	PromotedUserInputHistory   string
 	TimelineFrozenTimeUnix     int64
@@ -285,6 +288,7 @@ func BuildPromptFrozenOpenMaterialsWithOptions(config *Config, options TimelineP
 	return PromptFrozenOpenMaterials{
 		TimelineFrozen:             timelineBlocks.Frozen,
 		TimelineOpen:               timelineBlocks.Open,
+		SkillsContext:              timelineBlocks.SkillsContext,
 		PromotedRecentTools:        timelineBlocks.PromotedRecentTools,
 		PromotedUserInputHistory:   timelineBlocks.PromotedUserInputHistory,
 		TimelineFrozenTimeUnix:     timelineBlocks.FrozenTimeUnix,
@@ -300,6 +304,7 @@ func ApplyPromptFrozenOpenMaterials(materials *PromptMaterials, frozenOpen Promp
 	}
 	materials.TimelineFrozen = frozenOpen.TimelineFrozen
 	materials.TimelineOpen = frozenOpen.TimelineOpen
+	materials.SkillsContext = frozenOpen.SkillsContext
 	materials.PromotedRecentTools = frozenOpen.PromotedRecentTools
 	materials.PromotedUserInputHistory = frozenOpen.PromotedUserInputHistory
 	materials.TimelineFrozenTimeUnix = frozenOpen.TimelineFrozenTimeUnix

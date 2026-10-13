@@ -264,7 +264,6 @@ type LoopPromptAssemblyInput struct {
 	OutputExample       string
 	Schema              string
 	FunctionCallSchemas string
-	SkillsContext       string
 	ExtraCapabilities   string
 	// PlanStatus is the live, read-only plan state displayed between Timeline Open
 	// and TODO. It does not contain task goals, documents, or result summaries.
@@ -313,7 +312,6 @@ type LoopPromptAssemblyInput struct {
 	// FrozenPartitions 是业务侧提供的通用 frozen-block 分区。共享模板只识别
 	// FrozenBlockPartition，不直接依赖 planAndExec / CONTENT / DOCUMENT 等业务类型。
 	FrozenPartitions []FrozenBlockPartition
-
 }
 
 type LoopPromptAssemblyResult struct {

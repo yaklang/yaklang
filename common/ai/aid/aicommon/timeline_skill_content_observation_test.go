@@ -28,15 +28,15 @@ func TestSkillContentMaterialsMatchModelView(t *testing.T) {
 	require.Contains(t, after.Open, "OBSERVED_SKILL_BODY")
 	require.Equal(t, before.Frozen, after.Frozen)
 	// Observation source of truth: promoted renderer must not report it yet.
-	require.NotContains(t, tl.RenderSkillContentForPrompt(), "OBSERVED_SKILL_BODY")
+	require.Empty(t, after.SkillsContext)
 
 	// After a legal freeze commit the typed block becomes the single location.
 	tl.FreezeAll()
-	require.Contains(t, tl.RenderSkillContentForPrompt(), "OBSERVED_SKILL_BODY")
 	final := RenderTimelineFrozenOpen(tl)
+	require.Contains(t, final.SkillsContext, "OBSERVED_SKILL_BODY")
 	require.NotContains(t, final.Open, "OBSERVED_SKILL_BODY")
 	// 模型视图 = Open 尾段 + 类型化技能块; 提升后正文恰好出现一次。
-	modelView := final.Open + "\n" + tl.RenderSkillContentForPrompt()
+	modelView := final.Open + "\n" + final.SkillsContext
 	require.Equal(t, 1, strings.Count(modelView, "OBSERVED_SKILL_BODY"),
 		"body must be reported exactly once across the model view")
 }

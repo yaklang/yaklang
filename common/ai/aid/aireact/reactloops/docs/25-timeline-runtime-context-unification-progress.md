@@ -68,7 +68,7 @@ Evidence 相关入口：
 新增/修改：
 
 - `aicommon/timeline_skill_content.go`：`PushSkillContent`、`HasVisibleSkillContent`、
-  `projectSkillContentLocked` 与 `SkillContentTimelineAdapter`（实现 aiskillloader 侧
+  `renderPromotedSkillContent` 与 `SkillContentTimelineAdapter`（实现 aiskillloader 侧
   的 `SkillContentSink`；早期草稿里重复定义的 `SkillContentTimelineView` 已删除）。
 - `aicommon/timeline_promoted.go`：新增 `TimelinePromotedKindSkillContent`。
 - `aicommon/user_input_boundary.go`、`timeline_compression_freeze.go`：Open 尾段渲染
@@ -137,7 +137,10 @@ go test ./common/ai/aid/aicommon/ -run 'TestSkillContentNotResurrectedAfterCompr
   冻结提交后才改由独立技能块渲染。
 - 加载写入时检查「技能名 + 路径 + 正文」是否完全重复，仅仍存在的相同正文不追加；
   不同阅读窗口作为独立 item 进入 Open / 候选 / 统计，由统一选择和总结决定去留。
-- 冻结技能块直接读取仍保留的冻结 item，不依赖按 Key 覆盖的 promotedState。
+- 冻结技能进入 `promotedState`，按技能名累计正文；新来源 hash 与上一次相同则忽略，
+  不同则拼接老正文与新正文。原始 item 仍独立参与 Timeline 的选择和总结。
+- `RenderTimelineFrozenOpenWithOptions` 在同一读锁内产出 Open 和已提升技能块，
+  经共享材料链路传入 SemiDynamic1；主循环与 helper 不再经过 manager 渲染旁路。
 - 技能目录（意图识别 top-N）同样接入 Timeline，写入时去重，遵守同一冻结边界。
 - 既有回归：`aicommon`、`aiskillloader`、`reactloops`、`loopinfra`、
   `reactloopstests`、`aireact` 相关测试全部通过。
@@ -150,9 +153,10 @@ go test ./common/ai/aid/aicommon/ -run 'TestSkillContentNotResurrectedAfterCompr
   `TestSkillContentMaterialsMatchModelView`（提升前只在 Open；提升后模型视图
   中正文恰好出现一次）。
 - [x] 其余累计材料是否接入的最终清单（见下方「未迁移项清单」）。
-- [x] 旧正文渲染调用方确认：仅剩 4 处，全部经 manager 转发到 Timeline 投影
-  （`reactloops/prompt.go` 三处、`aireact/prompts.go` 一处）。`Render*` 保留为
-  兼容 API，绑定 Timeline 后不再从私有容器重建正文，因此无需删除。
+- [x] Prompt 渲染不再调用 manager：主循环和 helper 统一使用
+  `RenderTimelineFrozenOpenWithOptions` → `PromptFrozenOpenMaterials` → `PromptMaterials`。
+  已删除 `LoopPromptAssemblyInput.SkillsContext` 及对应旁路赋值，避免覆盖统一冻结快照。
+  manager 的 `RenderStable` 仅作为查看兼容入口。
 - [x] 恢复边界修正：显式初始化和旧会话导入只迁移 Timeline 中没有任何
   skill-content 记录的技能；已有历史（含已被总结退休）的正文不会被旧名单
   重新展开。`HasSkillContentHistory` + 两个专项测试。

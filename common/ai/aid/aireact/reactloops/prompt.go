@@ -386,13 +386,6 @@ func (r *ReActLoop) generateLoopPrompt(
 	if err := r.compressTimelineBeforePrompt(userInput, frozenUserContext, todoSnapshot); err != nil {
 		return "", err
 	}
-	// 技能正文统一渲染为一个已冻结技能块, 落在 SemiDynamic1 (与
-	// prompted_recent_tools 同段)。必须在压缩事务提交之后读取: 本轮被总结退休的
-	// 正文不能继续出现在同一轮的 prompt 里; 未冻结的正文留在 Timeline Open 尾段。
-	var skillsContext string
-	if r.skillsContextManager != nil {
-		skillsContext = r.skillsContextManager.RenderStable()
-	}
 	var planStatus string
 	if r.planStatusProvider != nil {
 		planStatus = r.planStatusProvider()
@@ -411,7 +404,6 @@ func (r *ReActLoop) generateLoopPrompt(
 		OutputExample:            outputExample,
 		Schema:                   schema,
 		FunctionCallSchemas:      functionCallSchemas,
-		SkillsContext:            skillsContext,
 		ExtraCapabilities:        extraCapabilities,
 		PlanStatus:               planStatus,
 		TodoSnapshot:             todoSnapshot,
