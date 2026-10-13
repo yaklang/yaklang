@@ -43,6 +43,11 @@ type QueryDirLister interface {
 // layers above it.
 type OverlayTreeSource func(layerName string) (fi.FileSystem, error)
 
+// ContentSource loads one file's body by its path in the owning layer's
+// tree. OverlayFS uses it to fill empty stubs on first read and write the
+// body back into that layer's tree (not a wrapper filesystem).
+type ContentSource func(path string) ([]byte, error)
+
 // OverlayOption configures an OverlayFS.
 type OverlayOption func(*OverlayFS)
 
@@ -96,6 +101,14 @@ func WithHeadSeparator(sep rune) OverlayOption {
 	return func(o *OverlayFS) { o.sep = sep }
 }
 
+// WithContentSource supplies the body loader for empty stubs: on first
+// ReadFile of a stub, OverlayFS loads the body and writes it back into the
+// owning layer's tree so repeated reads are memory hits and Stat sizes
+// update. Without a source, stubs stay empty (structure-only trees).
+func WithContentSource(src ContentSource) OverlayOption {
+	return func(o *OverlayFS) { o.readContent = src }
+}
+
 // OverlayFS is a filesystem view over a chain of layers: it merges every
 // layer's entries under one head root (the chain's last layer, 换头),
 // newest layers shadowing older ones on name conflicts, minus files
@@ -121,9 +134,10 @@ type OverlayFS struct {
 	statusLayers []overlayStatusLayer // per-layer file-status maps, recipe order
 	deleteStatus string               // the status value marking a deleted file
 
-	layerTrees OverlayTreeSource // materializes one layer's tree on first touch
+	layerTrees  OverlayTreeSource // materializes one layer's tree on first touch
+	readContent ContentSource     // optional: fills empty stubs on first read
 
-	mu       sync.Mutex             // guards layerTreeCache and stub fills
+	mu         sync.Mutex               // guards layerTreeCache and stub fills
 	layerCache map[string]fi.FileSystem // built layer trees, by layer name
 }
 
@@ -354,19 +368,42 @@ func (o *OverlayFS) Stat(headPath string) (fs.FileInfo, error) {
 // never fall through to an older layer's copy of the same path. Ownership is
 // decided by Stat, so a stub whose content source fails still reports the
 // load error instead of silently serving an older layer's stale copy.
+// Bodies fill into the owning layer's tree when a ContentSource is set.
 func (o *OverlayFS) ReadFile(headPath string) ([]byte, error) {
 	if o.deletedInFinalView(headPath) {
 		return nil, utils.Errorf("file [%v] not exist", headPath)
 	}
 	if tree := o.headTree(); tree != nil {
 		if _, statErr := tree.Stat(headPath); statErr == nil {
-			return tree.ReadFile(headPath)
+			return o.readTreeFile(tree, headPath)
 		}
 	}
 	if tree, lp, ok := o.lowerLayerTree(headPath); ok {
-		return tree.ReadFile(lp)
+		return o.readTreeFile(tree, lp)
 	}
 	return nil, utils.Errorf("file [%v] not exist", headPath)
+}
+
+// readTreeFile serves one body out of an owning tree: the filled memory
+// hit, else a fill through the content source into that tree (replacing
+// the empty stub). The content fetch runs outside o.mu — a slow load never
+// blocks listings; only the cheap stub replacement takes the lock.
+func (o *OverlayFS) readTreeFile(tree fi.FileSystem, path string) ([]byte, error) {
+	if data, err := tree.ReadFile(path); err == nil && len(data) > 0 {
+		return data, nil
+	}
+	if o.readContent == nil {
+		return tree.ReadFile(path)
+	}
+	data, err := o.readContent(path)
+	if err != nil {
+		return nil, err
+	}
+	o.mu.Lock()
+	_ = tree.Delete(path)
+	_ = tree.WriteFile(path, data, 0o644)
+	o.mu.Unlock()
+	return data, nil
 }
 
 // Open reads the path through the owning-layer resolution and serves the

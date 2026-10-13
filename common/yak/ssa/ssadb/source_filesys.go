@@ -26,12 +26,12 @@ const (
 
 // irSourceFS is the ssadb:// filesystem: one root listing every compiled
 // program ("/"), each program served by its own cached filesystem. A
-// plain program gets a LazyFillFS over a VirtualFS built from its
-// ir_sources rows (structure only, bodies filled on demand); an
-// incremental program gets a filesys.OverlayFS that merges the whole
-// overlay chain under the program's head prefix — the overlay semantics
-// live in common/utils/filesys, this file only wires the database rows
-// into them.
+// plain program keeps a structure-only VirtualFS (ir_sources rows +
+// ExtraFile stubs); bodies fill into that tree on first ReadFile/Open.
+// An incremental program gets a filesys.OverlayFS that merges the whole
+// overlay chain under the program's head prefix — overlay semantics and
+// stub fill live in common/utils/filesys (via ContentSource), this file
+// only wires the database rows into them.
 type irSourceFS struct {
 	mu      sync.Mutex // guards the tree cache itself (build / fill)
 	virtual *utils.CacheExWithKey[string, filesys_interface.FileSystem]
@@ -60,6 +60,16 @@ func (fs *irSourceFS) ReadFile(path string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
+	// A bare VirtualFS (full-compile program) only holds empty stubs: serve
+	// the filled memory hit, else fill from the database here. Any other
+	// per-program fs — OverlayFS — owns its body resolution (and stub fill
+	// via ContentSource), so its result stands.
+	if vf, plainTree := pfs.(*filesys.VirtualFS); plainTree {
+		if data, err := vf.ReadFile(path); err == nil && len(data) > 0 {
+			return data, nil
+		}
+		return fs.fillFileContent(vf, path)
+	}
 	return pfs.ReadFile(path)
 }
 
@@ -70,6 +80,18 @@ func (fs *irSourceFS) Open(path string) (fs.File, error) {
 	pfs, err := fs.treeFor(path)
 	if err != nil {
 		return nil, err
+	}
+	// Same dispatch as ReadFile: a plain VirtualFS gets its stub filled
+	// here; OverlayFS opens through its own resolution.
+	if vf, plainTree := pfs.(*filesys.VirtualFS); plainTree {
+		if data, err := vf.ReadFile(path); err == nil && len(data) > 0 {
+			return filesys.NewVirtualFile(path, string(data)), nil
+		}
+		data, err := fs.fillFileContent(vf, path)
+		if err != nil {
+			return nil, err
+		}
+		return filesys.NewVirtualFile(path, string(data)), nil
 	}
 	return pfs.Open(path)
 }
@@ -157,11 +179,11 @@ func (fs *irSourceFS) treeFor(anyPath string) (filesys_interface.FileSystem, err
 }
 
 // buildProgramTree builds the per-program filesystem from its database
-// rows: a plain program gets a LazyFillFS over its VirtualFS (structure
-// from ir_sources + ExtraFile stubs, bodies loaded on demand); an
-// incremental program (saved overlay layers) gets a filesys.OverlayFS
-// that assembles the whole chain — layer trees built lazily per layer,
-// bodies lazily per file — and owns the overlay semantics.
+// rows: a plain program keeps its structure-only VirtualFS (ir_sources +
+// ExtraFile stubs; bodies fill on ReadFile/Open); an incremental program
+// (saved overlay layers) gets a filesys.OverlayFS that assembles the
+// whole chain — layer trees built lazily per layer, bodies filled via
+// ContentSource — and owns the overlay semantics.
 func buildProgramTree(progName string) (filesys_interface.FileSystem, error) {
 	prog, err := GetApplicationProgram(progName)
 	if err != nil {
@@ -171,7 +193,7 @@ func buildProgramTree(progName string) (filesys_interface.FileSystem, error) {
 		return buildOverlayProgramTree(prog), nil
 	}
 
-	// Plain program: structure-only tree + lazy body fill.
+	// Plain program: structure-only tree; irSourceFS fills bodies on read.
 	vf, err := buildPlainProgramTree(progName)
 	if err != nil {
 		return nil, err
@@ -179,14 +201,14 @@ func buildProgramTree(progName string) (filesys_interface.FileSystem, error) {
 	if prog != nil {
 		mergeExtraFileStubs(prog, vf)
 	}
-	return filesys.NewLazyFillFS(vf, readIrSourceFileContent), nil
+	return vf, nil
 }
 
 // buildOverlayProgramTree wires an incremental program's database rows
 // into a filesys.OverlayFS: every layer's tree (structure + ExtraFile
-// stubs) builds lazily on first touch, bodies load lazily per file, and
-// each layer's FileHashMap contributes to the deletion resolution
-// (newest layer's entry per path decides).
+// stubs) builds lazily on first touch, bodies fill via ContentSource into
+// the owning layer's tree, and each layer's FileHashMap contributes to
+// the deletion resolution (newest layer's entry per path decides).
 func buildOverlayProgramTree(prog *IrProgram) filesys_interface.FileSystem {
 	layers := prog.OverlayLayers
 	layerProgs := GetApplicationPrograms(layers)
@@ -199,13 +221,14 @@ func buildOverlayProgramTree(prog *IrProgram) filesys_interface.FileSystem {
 		if lp, ok := layerProgs[layer]; ok && lp != nil {
 			mergeExtraFileStubs(lp, vf)
 		}
-		// Bodies resolve through the owning layer's own prefix.
-		return filesys.NewLazyFillFS(vf, readIrSourceFileContent), nil
+		// Structure only; OverlayFS fills bodies through ContentSource.
+		return vf, nil
 	}
 
 	opts := []filesys.OverlayOption{
 		filesys.WithLayers(layers...),
 		filesys.WithLayerTrees(buildLayer),
+		filesys.WithContentSource(readIrSourceFileContent),
 	}
 	for _, layer := range layers {
 		if lp, ok := layerProgs[layer]; ok && lp != nil && len(lp.FileHashMap) > 0 {
@@ -232,6 +255,22 @@ func buildPlainProgramTree(progName string) (*filesys.VirtualFS, error) {
 		vf.AddFile(sourcePath, "")
 	}
 	return vf, nil
+}
+
+// fillFileContent loads one plain-program file's body from the database and
+// writes it back into its tree (replacing the empty stub, which also makes
+// Stat report the real size). The DB fetch runs outside fs.mu — a slow read
+// never blocks listings; only the cheap stub replacement takes the lock.
+func (fs *irSourceFS) fillFileContent(vf *filesys.VirtualFS, path string) ([]byte, error) {
+	data, err := readIrSourceFileContent(path)
+	if err != nil {
+		return nil, err
+	}
+	fs.mu.Lock()
+	vf.RemoveFileOrDir(path)
+	vf.AddFile(path, string(data))
+	fs.mu.Unlock()
+	return data, nil
 }
 
 func readIrSourceFileContent(filePath string) ([]byte, error) {
