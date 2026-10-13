@@ -5,7 +5,6 @@ import "C"
 import (
 	_ "unsafe"
 	ai "github.com/yaklang/yaklang/common/ai"
-	aiforge "github.com/yaklang/yaklang/common/aiforge"
 	aitool "github.com/yaklang/yaklang/common/ai/aid/aitool"
 	antlr4nasl "github.com/yaklang/yaklang/common/yak/antlr4nasl"
 	aotlib "github.com/yaklang/yaklang/common/yak/ssa2llvm/runtime/aotlib"
@@ -25,6 +24,7 @@ import (
 	htmlquery "github.com/yaklang/yaklang/common/utils/htmlquery"
 	httptpl "github.com/yaklang/yaklang/common/yak/httptpl"
 	iiop "github.com/yaklang/yaklang/common/iiop"
+	liteforgeapp "github.com/yaklang/yaklang/common/ai/aid/liteforge/liteforgeapp"
 	netstack_exports "github.com/yaklang/yaklang/common/netstack_exports"
 	omnisearch "github.com/yaklang/yaklang/common/omnisearch"
 	openapi "github.com/yaklang/yaklang/common/openapi"
@@ -741,7 +741,7 @@ func yak_register_module_ldap() {
 
 //export yak_register_module_liteforge
 func yak_register_module_liteforge() {
-	runtimeRegisterYaklibModule("liteforge", aiforge.LiteForgeExport)
+	runtimeRegisterYaklibModule("liteforge", liteforgeapp.LiteForgeExport)
 }
 
 //export yak_register_module_log
