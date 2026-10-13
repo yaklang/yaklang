@@ -168,7 +168,7 @@ func (c *aiTrafficCollector) observe(start lowhttp.HTTPAttempt) func(lowhttp.HTT
 		turn = c.currentTurn
 	}
 	c.mu.Unlock()
-	record := &aiv1.AITrafficRecord{ProtocolVersion: 1, FlowId: uuid.NewString(), SessionId: c.binding.Ref.SessionID, TurnId: turn, ToolCallId: start.ToolCallID, AgentId: start.AgentID, NodeId: c.binding.NodeID, NodeSessionId: c.binding.NodeSessionID, BindEpoch: c.binding.Ref.BindEpoch, Phase: "started", Outcome: "pending", StartedAtMs: start.StartedAt.UnixMilli(), Scheme: "http"}
+	record := &aiv1.AITrafficRecord{ProtocolVersion: 1, FlowId: uuid.NewString(), SessionId: c.binding.Ref.SessionID, TurnId: turn, NodeId: c.binding.NodeID, NodeSessionId: c.binding.NodeSessionID, BindEpoch: c.binding.Ref.BindEpoch, Phase: "started", Outcome: "pending", StartedAtMs: start.StartedAt.UnixMilli(), Scheme: "http"}
 	if start.HTTPS {
 		record.Scheme = "https"
 	}

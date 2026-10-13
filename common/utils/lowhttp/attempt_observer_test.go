@@ -36,10 +36,9 @@ func TestHTTPAttemptObserverRecordsRetryRedirectAndIsolation(t *testing.T) {
 		mu.Unlock()
 		return func(end HTTPAttempt) { mu.Lock(); ends = append(ends, end); mu.Unlock() }
 	})
-	unbind := BindHTTPAttemptObserver(WithHTTPAttemptObserver(context.Background(), observer), "tool-observed", "agent-observed")
-	defer unbind()
+	ctx := WithHTTPAttemptObserver(context.Background(), observer)
 	host := strings.TrimPrefix(server.URL, "http://")
-	options := []LowhttpOpt{WithPacketBytes([]byte(fmt.Sprintf("GET /redirect HTTP/1.1\r\nHost: %s\r\nConnection: close\r\n\r\n", host))), WithRuntimeId("tool-observed"), WithSaveHTTPFlow(false), WithRetryTimes(1), WithRetryInStatusCode([]int{503}), WithRetryWaitTime(time.Millisecond), WithRetryMaxWaitTime(time.Millisecond)}
+	options := []LowhttpOpt{WithContext(ctx), WithPacketBytes([]byte(fmt.Sprintf("GET /redirect HTTP/1.1\r\nHost: %s\r\nConnection: close\r\n\r\n", host))), WithRuntimeId("tool-observed"), WithSaveHTTPFlow(false), WithRetryTimes(1), WithRetryInStatusCode([]int{503}), WithRetryWaitTime(time.Millisecond), WithRetryMaxWaitTime(time.Millisecond)}
 	response, err := HTTP(options...)
 	if err != nil {
 		t.Fatal(err)
@@ -52,19 +51,19 @@ func TestHTTPAttemptObserverRecordsRetryRedirectAndIsolation(t *testing.T) {
 		t.Fatalf("got starts=%d ends=%d, expected redirect + retry + success", len(starts), len(ends))
 	}
 	for _, end := range ends {
-		if end.ToolCallID != "tool-observed" || end.AgentID != "agent-observed" || end.Error != nil || end.FinishedAt.Before(end.StartedAt) {
+		if end.RuntimeID != "tool-observed" || end.Error != nil || end.FinishedAt.Before(end.StartedAt) {
 			t.Fatalf("invalid source/lifecycle: %+v", end)
 		}
 	}
 	mu.Unlock()
-	options = append(options, WithRuntimeId("other-tool"))
+	options = append(options, WithContext(context.Background()))
 	if _, err := HTTP(options...); err != nil {
 		t.Fatal(err)
 	}
 	mu.Lock()
 	defer mu.Unlock()
 	if len(ends) != 3 {
-		t.Fatal("unrelated runtime was captured")
+		t.Fatal("unobserved context sharing the same runtime ID was captured")
 	}
 }
 
@@ -83,8 +82,7 @@ func TestHTTPAttemptObserverRecordsDialFailureAndCancellation(t *testing.T) {
 			if cancelled {
 				cancel()
 			}
-			unbind := BindHTTPAttemptObserver(WithHTTPAttemptObserver(context.Background(), func(start HTTPAttempt) func(HTTPAttempt) { return func(end HTTPAttempt) { terminal = &end } }), "failure-tool", "")
-			defer unbind()
+			ctx = WithHTTPAttemptObserver(ctx, func(start HTTPAttempt) func(HTTPAttempt) { return func(end HTTPAttempt) { terminal = &end } })
 			_, err := HTTPWithoutRedirect(WithContext(ctx), WithRuntimeId("failure-tool"), WithPacketBytes([]byte("GET / HTTP/1.1\r\nHost: "+addr+"\r\n\r\n")), WithConnectTimeout(100*time.Millisecond), WithSaveHTTPFlow(false))
 			if err == nil {
 				t.Fatal("expected transport failure")
@@ -108,10 +106,9 @@ func TestHTTPAttemptObserverSeparatesAuthenticationRetry(t *testing.T) {
 		w.Write([]byte("authorized"))
 	}))
 	defer server.Close()
-	unbind := BindHTTPAttemptObserver(WithHTTPAttemptObserver(context.Background(), func(HTTPAttempt) func(HTTPAttempt) { return func(end HTTPAttempt) { ends = append(ends, end) } }), "auth-tool", "")
-	defer unbind()
+	ctx := WithHTTPAttemptObserver(context.Background(), func(HTTPAttempt) func(HTTPAttempt) { return func(end HTTPAttempt) { ends = append(ends, end) } })
 	host := strings.TrimPrefix(server.URL, "http://")
-	response, err := HTTPWithoutRedirect(WithConnPool(false), WithRuntimeId("auth-tool"), WithPacketBytes([]byte("GET / HTTP/1.1\r\nHost: "+host+"\r\n\r\n")), WithUsername("user"), WithPassword("password"), WithSaveHTTPFlow(false))
+	response, err := HTTPWithoutRedirect(WithContext(ctx), WithConnPool(false), WithRuntimeId("auth-tool"), WithPacketBytes([]byte("GET / HTTP/1.1\r\nHost: "+host+"\r\n\r\n")), WithUsername("user"), WithPassword("password"), WithSaveHTTPFlow(false))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -132,15 +129,14 @@ func TestHTTPAttemptObserverSeparatesAuthenticationRetry(t *testing.T) {
 
 func TestHTTPAttemptObserverOwnsPacketSnapshotsAcrossBufferReuse(t *testing.T) {
 	var started, ended HTTPAttempt
-	unbind := BindHTTPAttemptObserver(WithHTTPAttemptObserver(context.Background(), func(start HTTPAttempt) func(HTTPAttempt) {
+	ctx := WithHTTPAttemptObserver(context.Background(), func(start HTTPAttempt) func(HTTPAttempt) {
 		started = start
 		return func(end HTTPAttempt) { ended = end }
-	}), "buffer-tool", "")
-	defer unbind()
+	})
 	request := []byte("GET /original HTTP/1.1\r\nHost: example.invalid\r\n\r\n")
 	response := []byte("HTTP/1.1 401 Unauthorized\r\nContent-Length: 0\r\n\r\n")
 	wantRequest, wantResponse := string(request), string(response)
-	tr := &transportRequest{option: &LowhttpExecConfig{RuntimeId: "buffer-tool"}, packet: request}
+	tr := &transportRequest{option: &LowhttpExecConfig{Ctx: ctx, RuntimeId: "buffer-tool"}, packet: request}
 	finish := observeHTTPAttempt(tr)
 	finish(&transportResult{rawBytes: response}, nil)
 	// bytes.Buffer.Reset retains its backing array. A later retry writing into
@@ -154,9 +150,8 @@ func TestHTTPAttemptObserverOwnsPacketSnapshotsAcrossBufferReuse(t *testing.T) {
 
 func TestHTTPAttemptObserverRetainsPooledPartialResponse(t *testing.T) {
 	var terminal HTTPAttempt
-	unbind := BindHTTPAttemptObserver(WithHTTPAttemptObserver(context.Background(), func(HTTPAttempt) func(HTTPAttempt) { return func(end HTTPAttempt) { terminal = end } }), "partial-tool", "")
-	defer unbind()
-	request := &transportRequest{option: &LowhttpExecConfig{RuntimeId: "partial-tool"}, packet: []byte("GET / HTTP/1.1\r\nHost: example.invalid\r\n\r\n")}
+	ctx := WithHTTPAttemptObserver(context.Background(), func(HTTPAttempt) func(HTTPAttempt) { return func(end HTTPAttempt) { terminal = end } })
+	request := &transportRequest{option: &LowhttpExecConfig{Ctx: ctx, RuntimeId: "partial-tool"}, packet: []byte("GET / HTTP/1.1\r\nHost: example.invalid\r\n\r\n")}
 	finish := observeHTTPAttempt(request)
 	partial := []byte("HTTP/1.1 200 OK\r\nContent-Length: 50\r\n\r\npartial")
 	request.attemptResponsePacket = partial

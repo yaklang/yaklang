@@ -17,7 +17,6 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/yak/yaklib"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -228,8 +227,6 @@ func (a *ToolCaller) invoke(
 	if policy, ok := c.(interface{ IsReadOnlyEvidence() bool }); ok && policy.IsReadOnlyEvidence() {
 		return nil, fmt.Errorf("external tool execution is disabled for evidence-only analysis")
 	}
-	unbindAttemptObserver := lowhttp.BindHTTPAttemptObserver(c.GetContext(), a.callToolId, c.GetRuntimeId())
-	defer unbindAttemptObserver()
 	e := a.emitter
 	if err := toolCallerContextErr(a.ctx); err != nil {
 		return nil, err
@@ -363,12 +360,7 @@ func (a *ToolCaller) invoke(
 	}()
 
 	noRuntimeId := !params.Has("runtime_id")
-	if lowhttp.HasHTTPAttemptObserver(c.GetContext()) {
-		// ReAct may share a.runtimeId between concurrent tools. Captured HTTP must
-		// use the same invocation ID as the observer and ToolRuntimeConfig, even
-		// when a caller supplied a runtime_id parameter.
-		params.Set("runtime_id", a.callToolId)
-	} else if noRuntimeId {
+	if noRuntimeId {
 		params.Set("runtime_id", a.runtimeId)
 	}
 

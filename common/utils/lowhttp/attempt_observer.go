@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"github.com/yaklang/yaklang/common/utils/lowhttp/httpctx"
-	"sync"
 	"time"
 )
 
@@ -13,8 +12,6 @@ import (
 type HTTPAttempt struct {
 	TurnID             string
 	RuntimeID          string
-	ToolCallID         string
-	AgentID            string
 	StartedAt          time.Time
 	FinishedAt         time.Time
 	HTTPS              bool
@@ -29,48 +26,27 @@ type HTTPAttempt struct {
 
 type HTTPAttemptObserver func(HTTPAttempt) func(HTTPAttempt)
 type attemptObserverContextKey struct{}
-type scopedAttemptObserver struct {
-	observer            HTTPAttemptObserver
-	toolCallID, agentID string
-}
-
-var attemptObservers sync.Map
 
 func WithHTTPAttemptObserver(ctx context.Context, observer HTTPAttemptObserver) context.Context {
 	return context.WithValue(ctx, attemptObserverContextKey{}, observer)
 }
 
-func HasHTTPAttemptObserver(ctx context.Context) bool {
-	observer, _ := ctx.Value(attemptObserverContextKey{}).(HTTPAttemptObserver)
-	return observer != nil
-}
-
-// BindHTTPAttemptObserver bridges tool runtime IDs to the owning engine context.
-// It is deliberately opt-in: ordinary clients and model-provider traffic are excluded.
-func BindHTTPAttemptObserver(ctx context.Context, runtimeID, agentID string) func() {
-	observer, _ := ctx.Value(attemptObserverContextKey{}).(HTTPAttemptObserver)
-	if observer == nil || runtimeID == "" {
-		return func() {}
-	}
-	entry := &scopedAttemptObserver{observer: observer, toolCallID: runtimeID, agentID: agentID}
-	attemptObservers.Store(runtimeID, entry)
-	return func() { attemptObservers.CompareAndDelete(runtimeID, entry) }
-}
-
 func observeHTTPAttempt(tr *transportRequest) func(*transportResult, error) {
-	entry, ok := attemptObservers.Load(tr.option.RuntimeId)
-	if !ok {
+	if tr.option.Ctx == nil {
 		return func(*transportResult, error) {}
 	}
-	scoped := entry.(*scopedAttemptObserver)
+	observer, _ := tr.option.Ctx.Value(attemptObserverContextKey{}).(HTTPAttemptObserver)
+	if observer == nil {
+		return func(*transportResult, error) {}
+	}
 	tr.attemptRequestPacket = tr.packet
 	tr.attemptResponsePacket = nil
 	if tr.reqIns != nil {
 		httpctx.SetResponseTooLargeHeaderFile(tr.reqIns, "")
 		httpctx.SetResponseTooLargeBodyFile(tr.reqIns, "")
 	}
-	event := HTTPAttempt{RuntimeID: tr.option.RuntimeId, ToolCallID: scoped.toolCallID, AgentID: scoped.agentID, StartedAt: time.Now(), HTTPS: tr.option.Https, Request: bytes.Clone(tr.packet)}
-	finish := scoped.observer(event)
+	event := HTTPAttempt{RuntimeID: tr.option.RuntimeId, StartedAt: time.Now(), HTTPS: tr.option.Https, Request: bytes.Clone(tr.packet)}
+	finish := observer(event)
 	return func(result *transportResult, err error) {
 		if finish == nil {
 			return
