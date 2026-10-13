@@ -242,6 +242,16 @@ func TestBACnetReadPropertySealedSession(t *testing.T) {
 					for i, st := range a.Events {
 						raw, err := hex.DecodeString(st.Raw)
 						require.NoError(t, err)
+						before := s.Stats()
+						probe := s.Probe(raw)
+						want := ProbeAccept
+						if st.ErrorKind == ErrMalformedMessage || st.ErrorKind == ErrUnsupportedFeature {
+							want = ProbeReject
+						}
+						require.Equal(t, want, probe.Verdict)
+						require.Equal(t, "bacnet", probe.Protocol)
+						require.Equal(t, bacnetReadPropertyProfile, probe.Version)
+						require.Equal(t, before, s.Stats(), "Probe cannot consume or retire observation state")
 						out := s.Feed(st.Dir, time.Unix(1700000000, int64(i+1)*1234), raw)
 						require.Len(t, out.Events, 1)
 						events = append(events, out.Events...)

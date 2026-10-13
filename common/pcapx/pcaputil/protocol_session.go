@@ -264,6 +264,9 @@ func (s *captureSession) Probe(data []byte) ProbeResult {
 	}
 
 	if s.transport == "udp" {
+		if s.bacnetRead {
+			return s.probeBACnetRead(data)
+		}
 		if p, ok := s.probeRTPS20RTIFilter(data); ok {
 			return p
 		}

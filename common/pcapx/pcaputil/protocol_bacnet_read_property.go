@@ -532,6 +532,36 @@ func WithSessionBACnetReadProperty() ProtocolSessionOption {
 	}
 }
 
+// Probe checks selected wire structure only. It cannot consume an invoke ID,
+// retire pending association state, change clocks or establish peer context.
+func (s *captureSession) probeBACnetRead(w []byte) ProbeResult {
+	a := s.f.a
+	refuse := func(err error) ProbeResult {
+		return ProbeResult{Verdict: ProbeReject, Protocol: "bacnet", Version: bacnetReadPropertyProfile, Reason: err.Error()}
+	}
+	if len(w) > min(a.budget.MaxFrameBytes, a.config.MaxMessageBytes) {
+		return refuse(bacnetReadError(ErrResourceExceeded, "message budget"))
+	}
+	// Sessions are serialized by contract. Bound this temporary projection
+	// before allocating, without mutating the observation/resource ledger.
+	if a.buffered.Load()+8192+int64(len(w))*512 > int64(a.config.MaxBufferedBytes) {
+		return refuse(bacnetReadError(ErrResourceExceeded, "probe projection budget"))
+	}
+	m, err := decodeBACnetReadProperty(w, min(a.budget.MaxFrameBytes, a.config.MaxMessageBytes), sessionCollectionLimit(a.budget.MaxCollectionElements))
+	if err != nil {
+		return refuse(err)
+	}
+	m.fields["Observation Scope"], m.fields["Authentication Verified"] = "conversation", false
+	m.fields["Role"], m.fields["Association"] = "", ""
+	if !m.request {
+		m.fields["Response To"] = uint64(0)
+	}
+	if err = bacnetReadProjectionLimit(m.fields, a.budget.MaxCollectionElements, a.budget.MaxRecursionDepth); err != nil {
+		return refuse(err)
+	}
+	return probeAccept("bacnet", bacnetReadPropertyProfile, 98)
+}
+
 func (a *binParser) refuseBACnetReadTruncated(e *ProtocolEvent, w []byte, src, dst uint16) bool {
 	if a.datagramDecodeAs[src] != "bacnet-read-property" && a.datagramDecodeAs[dst] != "bacnet-read-property" {
 		return false

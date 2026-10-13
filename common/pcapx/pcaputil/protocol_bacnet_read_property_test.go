@@ -226,6 +226,14 @@ func TestBACnetReadPropertyBudgetAndClose(t *testing.T) {
 				}
 			}
 			invoke := byte(100)
+			before := s.Stats()
+			probe := s.Probe(bacnetRPWire(invoke, false, nil))
+			if kind == "identity-count" {
+				require.Equal(t, ProbeAccept, probe.Verdict, "wire probe does not establish association eligibility")
+			} else {
+				require.Equal(t, ProbeReject, probe.Verdict)
+			}
+			require.Equal(t, before, s.Stats())
 			e := bacnetRPFeed(t, s, 0, 100, bacnetRPWire(invoke, false, nil))
 			bacnetRPReject(t, e, ErrResourceExceeded)
 			// Increasing the caller budget cannot manufacture forgotten on-wire
