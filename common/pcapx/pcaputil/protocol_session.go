@@ -99,11 +99,12 @@ type ProtocolSession interface {
 }
 
 type captureSession struct {
-	f          *binFlow
-	events     []*ProtocolEvent
-	closed     bool
-	transport  string
-	bacnetRead bool
+	f                *binFlow
+	events           []*ProtocolEvent
+	closed           bool
+	transport        string
+	bacnetRead       bool
+	bacnetRoutedRead bool
 }
 
 // NewProtocolSession builds an isolated capture flow on the same binFlow
@@ -172,7 +173,7 @@ func NewProtocolSessionWithOptions(budget ParserBudget, options ...ProtocolSessi
 		}
 	}
 	for _, profile := range s.f.a.datagramDecodeAs {
-		if profile == "bacnet-read-property" && s.transport != "udp" {
+		if (profile == "bacnet-read-property" || profile == "bacnet-routed-read-property") && s.transport != "udp" {
 			return nil, fmt.Errorf("BACnet ReadProperty observations require UDP")
 		}
 		if (profile == "rtps-control" || profile == "rtps-wire" || profile == "rtps13-wire" || profile == "rtps13-parameters" || profile == "rtps20-rti-filter") && s.transport != "udp" {
@@ -189,11 +190,15 @@ func NewProtocolSessionWithOptions(budget ParserBudget, options ...ProtocolSessi
 		if s.f.a.datagramDecodeAs == nil {
 			s.f.a.datagramDecodeAs = map[uint16]string{}
 		}
+		profile := "bacnet-read-property"
+		if s.bacnetRoutedRead {
+			profile = "bacnet-routed-read-property"
+		}
 		for _, port := range s.f.ports {
-			if old := s.f.a.datagramDecodeAs[port]; old != "" && old != "bacnet-read-property" {
+			if old := s.f.a.datagramDecodeAs[port]; old != "" && old != profile {
 				return nil, fmt.Errorf("conflicting BACnet ReadProperty session profile")
 			}
-			s.f.a.datagramDecodeAs[port] = "bacnet-read-property"
+			s.f.a.datagramDecodeAs[port] = profile
 		}
 	}
 	if s.transport == "udp" && (s.f.a.config.DecodeDNP3ReadPoints || s.f.a.config.DecodeDNP3DirectStaticReads || s.f.a.config.DecodeDNP3TypedStaticReads || s.f.a.config.DecodeDNP3CounterPoints || s.f.a.config.DecodeDNP3CounterEvents || s.f.a.config.DecodeDNP3EventCountReads || s.f.a.config.DecodeDNP3StaticStatusPoints || s.f.a.config.DecodeDNP3BinaryEvents || s.f.a.config.DecodeDNP3AnalogEvents) {

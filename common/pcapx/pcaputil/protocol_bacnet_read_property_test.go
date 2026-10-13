@@ -316,3 +316,28 @@ func TestBACnetReadPropertyOptionsAndDatagramBoundary(t *testing.T) {
 	require.Zero(t, second.Events[0].ResponseTo)
 	require.Error(t, second.Err)
 }
+
+func TestBACnetUnconfirmedDoesNotPoisonReadExistingAPI(t *testing.T) {
+	q, ack := bacnetRPWire(36, false, nil), bacnetRPWire(36, true, []byte{0})
+	whois := bacnetTestPacket(10, []byte{1, 0, 0x10, 8})
+	for _, mixed := range []bool{false, true} {
+		t.Run(fmt.Sprintf("mixed=%v", mixed), func(t *testing.T) {
+			steps := []sessionStep{{0, q}, {1, ack}}
+			if mixed {
+				steps = append([]sessionStep{{0, whois}}, steps...)
+			}
+			var events []*ProtocolEvent
+			require.NoError(t, ReplayPcap(bytes.NewReader(sessionDatagramPCAP(t, steps, 47808)), WithProtocolDecodeAs("udp", 47808, "bacnet-read-property"), WithOnProtocolMessage(func(e *ProtocolEvent) { events = append(events, e) })))
+			require.Len(t, events, len(steps))
+			req := events[len(events)-2]
+			resp := events[len(events)-1]
+			f, err := req.GetFields()
+			require.NoError(t, err)
+			require.Equal(t, uint32(85), f["Property Identifier"])
+			f, err = resp.GetFields()
+			require.NoError(t, err)
+			require.Equal(t, uint32(85), f["Property Identifier"])
+			require.Equal(t, req.ID, resp.ResponseTo)
+		})
+	}
+}

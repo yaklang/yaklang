@@ -80862,6 +80862,277 @@
         "common/pcapx/pcaputil/bacnet-read-property/REFERENCE-CODEC-ACTUAL.json": "bacnet-read-property/REFERENCE-CODEC-ACTUAL.json",
         "scripts/protocol-tests/required-tests-traffic-unified-v63.json": "required-tests-traffic-unified-v63.json"
       }
+    },
+    {
+      "id": "validation-bacnet-routed-read-property",
+      "kind": "validation",
+      "source_sha": "6f8b112ec3ce7d4a01a177f88d0044df3aac4c04",
+      "file": "validation-bacnet-routed-read-property.zip",
+      "sha256": "bf676c46bb5523ad803dea6c83a5eb27ce93f46ab0483f72685f0159e79e9f26",
+      "password": "bin-parser",
+      "members": {
+        "bacnet-routed-read-property/captures/outbound-one.pcap": {
+          "sha256": "3b0e5160694ef6dd7d666de3bcb6406bde1b858c5ac440bd620d3fa23a8bf3a5",
+          "bytes": 189
+        },
+        "bacnet-routed-read-property/answers/outbound-one.json": {
+          "sha256": "c674acbb31a51ffc74a992ff4ad0c2eacac904920a0cd3d46c41eb512db47584",
+          "bytes": 5284
+        },
+        "bacnet-routed-read-property/captures/inbound-one.pcap": {
+          "sha256": "8399471ac6036ca33ac8cb1a809c56fc9b159d2030242a067971a47722c2f28c",
+          "bytes": 189
+        },
+        "bacnet-routed-read-property/answers/inbound-one.json": {
+          "sha256": "69d10dde9393d5dfd9a63174f05d68d72da7de9d209104e2c05dbf7ee6752245",
+          "bytes": 5268
+        },
+        "bacnet-routed-read-property/captures/outbound-six.pcap": {
+          "sha256": "c8dd5c2700ef20ce640f4b73bced6fbb57f6d91c6dd789ca7303f052794db18d",
+          "bytes": 199
+        },
+        "bacnet-routed-read-property/answers/outbound-six.json": {
+          "sha256": "d5c0cf39a89472b8a904b3d017abad6c079b54a57e5bf5872436948d0a947a2c",
+          "bytes": 5368
+        },
+        "bacnet-routed-read-property/captures/inbound-six.pcap": {
+          "sha256": "12393f00fed4a604a03ff8b23158a4e48104dc23c7d2c177542e37b71614d3bd",
+          "bytes": 199
+        },
+        "bacnet-routed-read-property/answers/inbound-six.json": {
+          "sha256": "1d153968d1ff497b1e53a0aebbd1e7df45ea088fe363638507f088fdc3c89377",
+          "bytes": 5352
+        },
+        "bacnet-routed-read-property/captures/both-routes.pcap": {
+          "sha256": "654a7906369e13a1017576450fe4c17f577e720fdf3337ebfae6a304efd9f7b3",
+          "bytes": 198
+        },
+        "bacnet-routed-read-property/answers/both-routes.json": {
+          "sha256": "4ec4c31d488f6f5933f7161587e9193b02c3ebb22f7e6600e808033e26a5fe48",
+          "bytes": 5713
+        },
+        "bacnet-routed-read-property/captures/two-logical-origins.pcap": {
+          "sha256": "5736384772f7d63d424cf2122293050aeb591c8be81eae95d2b3d56af1fa5883",
+          "bytes": 354
+        },
+        "bacnet-routed-read-property/answers/two-logical-origins.json": {
+          "sha256": "90b17e4a004b16d6648ca31c5629809cbd49493551da2a1a096a6e94e2946360",
+          "bytes": 10283
+        },
+        "bacnet-routed-read-property/captures/same-mac-other-network.pcap": {
+          "sha256": "40f5054f92d06a961e1e46a9bc12cb7db839295026f81b83da2e47a88caf47ca",
+          "bytes": 354
+        },
+        "bacnet-routed-read-property/answers/same-mac-other-network.json": {
+          "sha256": "becec09374b18b7e27f5f0172bcb1c3804a5d330af374312caed96494ebfce26",
+          "bytes": 10246
+        },
+        "bacnet-routed-read-property/captures/source-distinct-invokes-peers.pcap": {
+          "sha256": "24458f8492d35c7ad7648e9cf9b1d7923da8632352c05d7e05a259528012e4b8",
+          "bytes": 354
+        },
+        "bacnet-routed-read-property/answers/source-distinct-invokes-peers.json": {
+          "sha256": "81b76c6702a0999b928e1a8d3c0dad3101c69bdf4761d80203b6aec9313cf69d",
+          "bytes": 10262
+        },
+        "bacnet-routed-read-property/captures/same-source-id-cross-peer.pcap": {
+          "sha256": "5a4b07ac6807caa67b32589abc6d68ad298ea2dfe046686e7d27ece76b576eeb",
+          "bytes": 354
+        },
+        "bacnet-routed-read-property/answers/same-source-id-cross-peer.json": {
+          "sha256": "d7933d030be4ee7d8ad00e2c081855d7986f6e23d34bae7c7f982a8a34138df5",
+          "bytes": 3940
+        },
+        "bacnet-routed-read-property/captures/whois-before.pcap": {
+          "sha256": "33878e9fd39fbd753f3400938544949bd527611e96d5cae1511e06ff05fb36ea",
+          "bytes": 255
+        },
+        "bacnet-routed-read-property/answers/whois-before.json": {
+          "sha256": "a64a3ef90f8190b27a766f62f314d9c259a71110aa4f12374fb16b24f26e07ce",
+          "bytes": 5620
+        },
+        "bacnet-routed-read-property/captures/whois-pending.pcap": {
+          "sha256": "18367ed29e798b05bd4d02dfbbcb95ad06e4e3c5baa70a7ea3ddb4af98ca8eb4",
+          "bytes": 255
+        },
+        "bacnet-routed-read-property/answers/whois-pending.json": {
+          "sha256": "165b7ae4988e8dfb3d77be33764686be9a3689d0e42f38c6c981c474842033c0",
+          "bytes": 5609
+        },
+        "bacnet-routed-read-property/captures/foreign-service-false.pcap": {
+          "sha256": "bd79237d0e987897df65f4fe4c3e73eee16e505edc1929ea7b79d31a9b9bfd16",
+          "bytes": 276
+        },
+        "bacnet-routed-read-property/answers/foreign-service-false.json": {
+          "sha256": "e090867ab701ef5af8b048b25edca0aad4212ec2d68c4ba71730fbe977034302",
+          "bytes": 5733
+        },
+        "bacnet-routed-read-property/captures/foreign-service-true.pcap": {
+          "sha256": "f97471b91ccbb28e08d4071f3dc9ca31331b164ab50be2acb043006f74173682",
+          "bytes": 276
+        },
+        "bacnet-routed-read-property/answers/foreign-service-true.json": {
+          "sha256": "0acf6f6bf54bdc5d8d95e844f225dac496ad241969bb0ad4e85a33e582ba66d7",
+          "bytes": 3547
+        },
+        "bacnet-routed-read-property/captures/short-address.pcap": {
+          "sha256": "5e1d1fa216403836cc64fa25b6b0c1220fc11d69ee0cc356dc47cad0403fd693",
+          "bytes": 257
+        },
+        "bacnet-routed-read-property/answers/short-address.json": {
+          "sha256": "77ca76ba58ae7ec38c9c28bf837bd15c9560ba73881b7965cd1ff57ec72ef323",
+          "bytes": 3443
+        },
+        "bacnet-routed-read-property/captures/zero-source-network.pcap": {
+          "sha256": "96c247c16756eaccc98a610bb3196254c560db85e8f6169b014a5776c9f83745",
+          "bytes": 268
+        },
+        "bacnet-routed-read-property/answers/zero-source-network.json": {
+          "sha256": "a651cb40c6fab853aeb5d0d068590eb33167198eda800c9f99c04fc4fbfc5ad3",
+          "bytes": 3479
+        },
+        "bacnet-routed-read-property/captures/global-source-network.pcap": {
+          "sha256": "83d917f2723528ad83730dfcd5c06207b2041a3e89dd3a63794e7f5f0fbefccb",
+          "bytes": 268
+        },
+        "bacnet-routed-read-property/answers/global-source-network.json": {
+          "sha256": "7f0e68c482977920cb677cd3c34146f6ec91d3112576a9f949c61ae73d92aba1",
+          "bytes": 3479
+        },
+        "bacnet-routed-read-property/captures/zero-dest-network.pcap": {
+          "sha256": "9b0f236fbab7d6b64ea4025e19c806cdf3441020e3865b87c5ca73bf0ba821b1",
+          "bytes": 269
+        },
+        "bacnet-routed-read-property/answers/zero-dest-network.json": {
+          "sha256": "61db9d95edfa686a487d4c31df8fdaf07e6144128107e973a466ff7695cdc761",
+          "bytes": 3481
+        },
+        "bacnet-routed-read-property/captures/global-dest.pcap": {
+          "sha256": "6103fc9cd61b324026b642d4ecb3d5b884d646731f769d142a5957a8ae0daebd",
+          "bytes": 268
+        },
+        "bacnet-routed-read-property/answers/global-dest.json": {
+          "sha256": "21c9fa866bdbcc9d9f5325dd71e8cfbebda97a749baca5ed94ff7ea0e8f88366",
+          "bytes": 3509
+        },
+        "bacnet-routed-read-property/captures/address-seven.pcap": {
+          "sha256": "5e636e9c73973ebafbbef5b1b05d1568589b8386858cde5a66e8d787fbfaae34",
+          "bytes": 274
+        },
+        "bacnet-routed-read-property/answers/address-seven.json": {
+          "sha256": "6cf297d7ad2d5f49a08f31e4e8472e1b7e114974f4665d5c98f334fdae8852af",
+          "bytes": 3513
+        },
+        "bacnet-routed-read-property/manifest.json": {
+          "sha256": "9818151106c5970fa8413fd5401b50c10bd7371f7c3c61d5be0c9b3da6eb110e",
+          "bytes": 6508
+        },
+        "bacnet-routed-read-property/generate.py": {
+          "sha256": "5693a62a21396d6fa8749e2cef58dc4e7070b1e6604e7e8d8747dae2e228652d",
+          "bytes": 8448
+        },
+        "bacnet-routed-read-property/verify.py": {
+          "sha256": "d2cb99407e449d5ed990a6a1f7a5815146f375372b6d796d53c6a8d43d7dc4bc",
+          "bytes": 747
+        },
+        "bacnet-routed-read-property/MODEL-PINS.json": {
+          "sha256": "b12ba95b51d622c3630593d6762ec126c2dff282809b622941edb2dc413308a9",
+          "bytes": 1494
+        },
+        "bacnet-routed-read-property/NPDU-SOURCE-PINS.json": {
+          "sha256": "aa63420ea2a0db856ae27c47cbfd0303d959215506b760643d102550db185286",
+          "bytes": 662
+        },
+        "bacnet-routed-read-property/TSM-SOURCE-PINS.json": {
+          "sha256": "9d25ece0f6088b0f482620901baf2553a5b9811445e55311b0cbd203813ad201",
+          "bytes": 712
+        },
+        "bacnet-routed-read-property/reference.py": {
+          "sha256": "9b6dc640729af534c14a29a54fc32c2786f4050f4535eb2588ae684e764d1250",
+          "bytes": 2589
+        },
+        "bacnet-routed-read-property/REFERENCE-ACTUAL.json": {
+          "sha256": "17a9dbbf3953ad0b0808b8baa4d0c88ede6a1c70c50f8813825897ed5d04b0b8",
+          "bytes": 3381
+        },
+        "bacnet-routed-read-property/reference_npdu.py": {
+          "sha256": "52c2e5b27aadc88d316ce594fcd3321a459496ece11c93fa94490a08b459eaab",
+          "bytes": 4355
+        },
+        "bacnet-routed-read-property/REFERENCE-NPDU-ACTUAL.json": {
+          "sha256": "a79d82c1772d9e35899e5ab6719d167de67561f0085fb2017b5f2e6eb777b997",
+          "bytes": 4204
+        },
+        "bacnet-routed-read-property/reference_tsm.py": {
+          "sha256": "1135b7201843a33f3ba6b940a04674d5f8d8c8a40c9444025f71f2a76fcd7011",
+          "bytes": 2496
+        },
+        "bacnet-routed-read-property/REFERENCE-TSM-ACTUAL.json": {
+          "sha256": "07d15260fb4832c450ab96859eeb9b33d3ac304d850af12d877cc2fc2c8ccb4a",
+          "bytes": 2054
+        },
+        "required-tests-traffic-unified-v64.json": {
+          "sha256": "06cdf33245cbc65869992eefd97e41295374e697602eb6bce38de429a17b7f6e",
+          "bytes": 14961887
+        },
+        "validation/expected.json": {
+          "sha256": "9d15920e165cc7abc19902558e344d7f544e0c758f52767a273a6fb3d1bd5ade",
+          "bytes": 24919
+        }
+      },
+      "aliases": {
+        "common/pcapx/pcaputil/bacnet-routed-read-property/captures/outbound-one.pcap": "bacnet-routed-read-property/captures/outbound-one.pcap",
+        "common/pcapx/pcaputil/bacnet-routed-read-property/answers/outbound-one.json": "bacnet-routed-read-property/answers/outbound-one.json",
+        "common/pcapx/pcaputil/bacnet-routed-read-property/captures/inbound-one.pcap": "bacnet-routed-read-property/captures/inbound-one.pcap",
+        "common/pcapx/pcaputil/bacnet-routed-read-property/answers/inbound-one.json": "bacnet-routed-read-property/answers/inbound-one.json",
+        "common/pcapx/pcaputil/bacnet-routed-read-property/captures/outbound-six.pcap": "bacnet-routed-read-property/captures/outbound-six.pcap",
+        "common/pcapx/pcaputil/bacnet-routed-read-property/answers/outbound-six.json": "bacnet-routed-read-property/answers/outbound-six.json",
+        "common/pcapx/pcaputil/bacnet-routed-read-property/captures/inbound-six.pcap": "bacnet-routed-read-property/captures/inbound-six.pcap",
+        "common/pcapx/pcaputil/bacnet-routed-read-property/answers/inbound-six.json": "bacnet-routed-read-property/answers/inbound-six.json",
+        "common/pcapx/pcaputil/bacnet-routed-read-property/captures/both-routes.pcap": "bacnet-routed-read-property/captures/both-routes.pcap",
+        "common/pcapx/pcaputil/bacnet-routed-read-property/answers/both-routes.json": "bacnet-routed-read-property/answers/both-routes.json",
+        "common/pcapx/pcaputil/bacnet-routed-read-property/captures/two-logical-origins.pcap": "bacnet-routed-read-property/captures/two-logical-origins.pcap",
+        "common/pcapx/pcaputil/bacnet-routed-read-property/answers/two-logical-origins.json": "bacnet-routed-read-property/answers/two-logical-origins.json",
+        "common/pcapx/pcaputil/bacnet-routed-read-property/captures/same-mac-other-network.pcap": "bacnet-routed-read-property/captures/same-mac-other-network.pcap",
+        "common/pcapx/pcaputil/bacnet-routed-read-property/answers/same-mac-other-network.json": "bacnet-routed-read-property/answers/same-mac-other-network.json",
+        "common/pcapx/pcaputil/bacnet-routed-read-property/captures/source-distinct-invokes-peers.pcap": "bacnet-routed-read-property/captures/source-distinct-invokes-peers.pcap",
+        "common/pcapx/pcaputil/bacnet-routed-read-property/answers/source-distinct-invokes-peers.json": "bacnet-routed-read-property/answers/source-distinct-invokes-peers.json",
+        "common/pcapx/pcaputil/bacnet-routed-read-property/captures/same-source-id-cross-peer.pcap": "bacnet-routed-read-property/captures/same-source-id-cross-peer.pcap",
+        "common/pcapx/pcaputil/bacnet-routed-read-property/answers/same-source-id-cross-peer.json": "bacnet-routed-read-property/answers/same-source-id-cross-peer.json",
+        "common/pcapx/pcaputil/bacnet-routed-read-property/captures/whois-before.pcap": "bacnet-routed-read-property/captures/whois-before.pcap",
+        "common/pcapx/pcaputil/bacnet-routed-read-property/answers/whois-before.json": "bacnet-routed-read-property/answers/whois-before.json",
+        "common/pcapx/pcaputil/bacnet-routed-read-property/captures/whois-pending.pcap": "bacnet-routed-read-property/captures/whois-pending.pcap",
+        "common/pcapx/pcaputil/bacnet-routed-read-property/answers/whois-pending.json": "bacnet-routed-read-property/answers/whois-pending.json",
+        "common/pcapx/pcaputil/bacnet-routed-read-property/captures/foreign-service-false.pcap": "bacnet-routed-read-property/captures/foreign-service-false.pcap",
+        "common/pcapx/pcaputil/bacnet-routed-read-property/answers/foreign-service-false.json": "bacnet-routed-read-property/answers/foreign-service-false.json",
+        "common/pcapx/pcaputil/bacnet-routed-read-property/captures/foreign-service-true.pcap": "bacnet-routed-read-property/captures/foreign-service-true.pcap",
+        "common/pcapx/pcaputil/bacnet-routed-read-property/answers/foreign-service-true.json": "bacnet-routed-read-property/answers/foreign-service-true.json",
+        "common/pcapx/pcaputil/bacnet-routed-read-property/captures/short-address.pcap": "bacnet-routed-read-property/captures/short-address.pcap",
+        "common/pcapx/pcaputil/bacnet-routed-read-property/answers/short-address.json": "bacnet-routed-read-property/answers/short-address.json",
+        "common/pcapx/pcaputil/bacnet-routed-read-property/captures/zero-source-network.pcap": "bacnet-routed-read-property/captures/zero-source-network.pcap",
+        "common/pcapx/pcaputil/bacnet-routed-read-property/answers/zero-source-network.json": "bacnet-routed-read-property/answers/zero-source-network.json",
+        "common/pcapx/pcaputil/bacnet-routed-read-property/captures/global-source-network.pcap": "bacnet-routed-read-property/captures/global-source-network.pcap",
+        "common/pcapx/pcaputil/bacnet-routed-read-property/answers/global-source-network.json": "bacnet-routed-read-property/answers/global-source-network.json",
+        "common/pcapx/pcaputil/bacnet-routed-read-property/captures/zero-dest-network.pcap": "bacnet-routed-read-property/captures/zero-dest-network.pcap",
+        "common/pcapx/pcaputil/bacnet-routed-read-property/answers/zero-dest-network.json": "bacnet-routed-read-property/answers/zero-dest-network.json",
+        "common/pcapx/pcaputil/bacnet-routed-read-property/captures/global-dest.pcap": "bacnet-routed-read-property/captures/global-dest.pcap",
+        "common/pcapx/pcaputil/bacnet-routed-read-property/answers/global-dest.json": "bacnet-routed-read-property/answers/global-dest.json",
+        "common/pcapx/pcaputil/bacnet-routed-read-property/captures/address-seven.pcap": "bacnet-routed-read-property/captures/address-seven.pcap",
+        "common/pcapx/pcaputil/bacnet-routed-read-property/answers/address-seven.json": "bacnet-routed-read-property/answers/address-seven.json",
+        "common/pcapx/pcaputil/bacnet-routed-read-property/manifest.json": "bacnet-routed-read-property/manifest.json",
+        "common/pcapx/pcaputil/bacnet-routed-read-property/generate.py": "bacnet-routed-read-property/generate.py",
+        "common/pcapx/pcaputil/bacnet-routed-read-property/verify.py": "bacnet-routed-read-property/verify.py",
+        "common/pcapx/pcaputil/bacnet-routed-read-property/MODEL-PINS.json": "bacnet-routed-read-property/MODEL-PINS.json",
+        "common/pcapx/pcaputil/bacnet-routed-read-property/NPDU-SOURCE-PINS.json": "bacnet-routed-read-property/NPDU-SOURCE-PINS.json",
+        "common/pcapx/pcaputil/bacnet-routed-read-property/TSM-SOURCE-PINS.json": "bacnet-routed-read-property/TSM-SOURCE-PINS.json",
+        "common/pcapx/pcaputil/bacnet-routed-read-property/reference.py": "bacnet-routed-read-property/reference.py",
+        "common/pcapx/pcaputil/bacnet-routed-read-property/REFERENCE-ACTUAL.json": "bacnet-routed-read-property/REFERENCE-ACTUAL.json",
+        "common/pcapx/pcaputil/bacnet-routed-read-property/reference_npdu.py": "bacnet-routed-read-property/reference_npdu.py",
+        "common/pcapx/pcaputil/bacnet-routed-read-property/REFERENCE-NPDU-ACTUAL.json": "bacnet-routed-read-property/REFERENCE-NPDU-ACTUAL.json",
+        "common/pcapx/pcaputil/bacnet-routed-read-property/reference_tsm.py": "bacnet-routed-read-property/reference_tsm.py",
+        "common/pcapx/pcaputil/bacnet-routed-read-property/REFERENCE-TSM-ACTUAL.json": "bacnet-routed-read-property/REFERENCE-TSM-ACTUAL.json",
+        "scripts/protocol-tests/required-tests-traffic-unified-v64.json": "required-tests-traffic-unified-v64.json"
+      }
     }
   ],
   "schema_version": 1,

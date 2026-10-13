@@ -634,6 +634,8 @@ func (a *binParser) closeUDPSessions() {
 		a.bacnetReadSessions = nil
 	}
 	a.bacnetReadDisabled = false
+	a.bacnetRoutedReadDisabled = false
+	a.bacnetInvokeOrigins = nil
 	if s := a.udpSessions; s != nil {
 		for _, el := range s.entries {
 			v := el.Value.(*binUDPEntry)

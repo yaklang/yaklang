@@ -20,6 +20,7 @@ type ProtocolEvent struct {
 	nativeMMSObservation                     bool
 	nativeUnrecognizedUDP                    bool
 	nativeBACnetRead                         bool
+	nativeBACnetRoutedRead                   bool
 	Admission                                string
 	semanticFields                           map[string]any
 	semanticSession                          map[string]any
@@ -461,14 +462,16 @@ type binParser struct {
 	c37118Engineering                                                          bool
 	mavlinkSigning                                                             *mavlinkSigningState
 	pfcpSessionIdentity                                                        *pfcpSessionIdentity
-	semtechDisabled                                                            bool               // udpMu; bounded opt-in correlation fails closed after global state exhaustion
-	semtechSessions                                                            *binUDPStore       // udpMu; token quarantine must survive unrelated UDP expiry
-	bacnetReadDisabled                                                         bool               // udpMu; lost invoke history cannot establish a new generation
-	bacnetReadSessions                                                         *binUDPStore       // udpMu; bounded capture-lifetime invoke quarantine
-	aisMultipart                                                               *aisMultipartStore // udpMu; directed, capture-domain fragment history
-	rtpsFragments                                                              *rtpsFragmentStore // udpMu; directed domain/sample history
-	rtpsShapeFragments                                                         *rtpsFragmentStore // udpMu; separately selected application sample history
-	aisMultipartDisabled                                                       bool               // udpMu; untracked history fails closed
+	semtechDisabled                                                            bool                                       // udpMu; bounded opt-in correlation fails closed after global state exhaustion
+	semtechSessions                                                            *binUDPStore                               // udpMu; token quarantine must survive unrelated UDP expiry
+	bacnetReadDisabled                                                         bool                                       // udpMu; lost invoke history cannot establish a new generation
+	bacnetRoutedReadDisabled                                                   bool                                       // udpMu; unretained route identity loss
+	bacnetReadSessions                                                         *binUDPStore                               // udpMu; bounded capture-lifetime invoke quarantine
+	bacnetInvokeOrigins                                                        map[bacnetInvokeOrigin]bacnetInvokeHistory // udpMu; shared originating logical device namespace
+	aisMultipart                                                               *aisMultipartStore                         // udpMu; directed, capture-domain fragment history
+	rtpsFragments                                                              *rtpsFragmentStore                         // udpMu; directed domain/sample history
+	rtpsShapeFragments                                                         *rtpsFragmentStore                         // udpMu; separately selected application sample history
+	aisMultipartDisabled                                                       bool                                       // udpMu; untracked history fails closed
 	datagramDecodeAs                                                           map[uint16]string
 	rtpsShapeWriters                                                           map[uint16]RTPSShapeWriter
 	canDecodeAs                                                                map[int]string

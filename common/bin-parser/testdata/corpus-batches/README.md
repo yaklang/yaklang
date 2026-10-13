@@ -44,7 +44,7 @@ Run from the repository root:
 ```sh
 go run ./internal/trafficfixture/cmd/corpus test
 go test -json -count=1 -timeout=5m ./internal/trafficfixture/... ./common/bin-parser/... ./common/pcapx/... ./common/yak/cmd/yakcmds/shark-cli ./scripts/ci > traffic.jsonl
-go run ./internal/trafficfixture/cmd/corpus exec -- python3 @scripts/protocol-tests/check_go_test_json_v2.py traffic.jsonl --inventory @scripts/protocol-tests/required-tests-traffic-unified-v63.json --tier full
+go run ./internal/trafficfixture/cmd/corpus exec -- python3 @scripts/protocol-tests/check_go_test_json_v2.py traffic.jsonl --inventory @scripts/protocol-tests/required-tests-traffic-unified-v64.json --tier full
 ```
 
 The single `corpus` entry point uses the same bounded Go ZIP loader as tests.
@@ -83,7 +83,7 @@ their semantic coverage. The existing synthetic session keys are test inputs;
 production credentials, user private keys and material without redistribution
 permission belong in an external fixed-source download manifest.
 
-Current test requirements are sealed at `scripts/protocol-tests/required-tests-traffic-unified-v63.json`;
+Current test requirements are sealed at `scripts/protocol-tests/required-tests-traffic-unified-v64.json`;
 the historical inventories and all earlier batches remain unchanged.
 The supplemental small-corpus batch contains 26 minimal controls, their explicit
 expected facts, an offline generator and the compact pinned source manifest.
@@ -203,7 +203,7 @@ opaque selector bytes and one bounded Data value over Wrapper v1 TCP/UDP; object
 selector meaning, access permission and device operation are unverified. The
 original one-packet selective-access capture and original refused answer remain
 immutable; its now-supported answer is matched by exact input SHA and frame.
-The active inventory is `scripts/protocol-tests/required-tests-traffic-unified-v63.json`.
+The active inventory is `scripts/protocol-tests/required-tests-traffic-unified-v64.json`.
 
 The small-graph budget batch reuses accepted graph captures/answers and adds one
 249-byte UDP control for child count255 without child bytes. Its standalone proof
@@ -993,7 +993,7 @@ the normative answer; a missing numeric reference field is not a codec pass.
 Full/deferred, workers1/2/4, observers off/on, Feed chunks1/7/full, ownership,
 resources and close/refusal boundaries remain required.
 
-Current gate: `required-tests-traffic-unified-v63.json` with
+Current gate: `required-tests-traffic-unified-v64.json` with
 `check_go_test_json_v2.py`. The indexed validator preserves missing/unpassed,
 package invocation completion, descendant skips, failures and non-JSON checks;
 its mutation/differential harness is sealed with the material. Older checkers
@@ -1229,7 +1229,7 @@ opendnp3 READ handler/database source supplies selector semantics. Requested
 specific variations, other direct object groups, index-prefix READs, packed
 binary observations, application fragments, UDP/authentication/device/completeness
 and generation identity remain open. No historical batch is rewritten. Current
-This preceding batch used v53; the current effective entry is v63.
+This preceding batch used v53; the current effective entry is v64.
 
 
 ### Selected typed static DNP3 READ and packed binary points
@@ -1268,7 +1268,7 @@ are sealed. This is not full SDK, serializer, endpoint, authenticated identity,
 real database/configuration, range-completeness or physical measurement proof.
 Other static/event groups, G10V1, index-prefix READ, application fragments, UDP
 and security remain active unimplemented requirements. No historical batch is
-rewritten. That batch used v54 (23,767 checks); the current full mandatory entry is v63 (32,514 checks); older
+rewritten. That batch used v54 (23,767 checks); the current full mandatory entry is v64 (32,838 checks); older
 inventories above describe their historical delivery snapshots.
 
 
@@ -1368,7 +1368,7 @@ checks. Fixed LinkContext::OnFrame code is executed with a declared fresh
 receiver and no-op dispatch adapters; actual TShark fields remain separate.
 These observed-only boundaries do not certify full SDK delivery, authentication,
 physical devices, role identity or operational success. Historical ZIPs are
-immutable. That role batch used v57; the current full inventory is v63,32,514 required checks.
+immutable. That role batch used v57; the current full inventory is v64,32,838 required checks.
 
 
 ### DNP3 direct count-limited event READ observations
@@ -1392,8 +1392,8 @@ Finite count selectors mixed with event-class selectors remain refused because
 wire points do not report their class. Class-count READs, application fragments,
 wider event groups, device defaults/class/configuration/completeness, security
 and complete endpoint execution remain pending requirements. Historical ZIPs
-and original answers remain immutable. That count batch used v58,26,847 checks. Current effective full entry: v63,
-32,514 mandatory checks; reference and API-contract evidence are distinct.
+and original answers remain immutable. That count batch used v58,26,847 checks. Current effective full entry: v64,
+32,838 mandatory checks; reference and API-contract evidence are distinct.
 
 
 ### DNP3 static status observations and selected-snapshot isolation
@@ -1424,7 +1424,7 @@ ser4cpp float converters lose signed zero, NaN payload and subnormals. Those
 actual differences are retained as reference limitations, not bit-oracle passes;
 wire/Python/TShark expectations and IUT assertions are not weakened to mimic them.
 All previous ZIPs and answers are immutable. That status batch used v59,27,799 full required entries; current effective gate:
-v63,32,514 full required entries. Source/API and independent semantic proof remain
+v64,32,838 full required entries. Source/API and independent semantic proof remain
 separate from replay agreement and unresolved quality/device semantics.
 
 
@@ -1533,6 +1533,33 @@ The41 minimal capture cases have independent complete answers and41x12 replay
 coverage plus41x2 native datagram configurations. Fixed1.4.1 source service
 encoders and TShark run independently; primitive adapters, sentinel/nonminimal
 index differences and TShark float display rounding are explicitly qualified.
-Current effective v63 inventory:32,514 full required entries. All historical
+The preceding ReadProperty batch used v63 inventory:32,514 full required entries. All historical
 ZIPs/answers are immutable; raw downloads, upstream sources and run evidence
 remain outside Git.
+
+
+### Routed ReadProperty and originating invoke namespaces
+
+Explicit `bacnet-routed-read-property` UDP selection additionally observes
+NPDUv1 source/destination network and one-to-six-byte logical MAC addresses,
+actual APDU offset and present-only hop count. Reversed physical endpoints,
+logical routing addresses, capture domain, invoke and descriptor must match.
+No authenticated logical device, applied routing, forwarding BVLC, broadcast
+peer, longer-address carrier, segmentation or constructed property claim is made.
+
+Source-origin invoke history is shared across destination/service contexts.
+A complete valid unconfirmed APDU has no invoke and cannot poison confirmed
+transactions. Unsupported confirmed service headers retire their observed
+identity; unrelated IDs remain eligible. Same origin ID across peers is
+ambiguous; distinct logical originating devices behind one relay stay separate.
+Refused unknown routes quarantine the bounded physical relay pair. Histories
+remain charged until idempotent Close; public edits cannot rewrite accepted
+field/Session/error answers. Probe remains wire-only and does not mutate state.
+
+Nineteen minimal cases have complete independent answers,19x12 capture and19x2
+native configurations. Fixed C NPDU and TSM allocator methods execute with
+explicit bounded adapters; TShark independently validates actual wire fields.
+Reference evidence is not device/router/client conformance or authentication.
+All159 preceding ZIPs remain unchanged. Current effective v64:32,838 full
+mandatory entries. Original pending protocol and independent-real-input work
+remain pending, with evidence and process reports outside Git.
