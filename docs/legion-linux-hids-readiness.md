@@ -104,8 +104,11 @@ requires an explicit `NODE_MUSL_ALLOW_EMULATION=true`; its recipe records
 build caches live outside the source checkout and may be located with
 `NODE_MUSL_CACHE_DIR`. A registry mirror may be supplied through
 `NODE_MUSL_BUILDER_IMAGE` while retaining the pinned platform digest. Source
-mounts are read-only, including a worktree's common Git directory; normal Node
-builds preserve Go VCS metadata. Dirty local packages record `source.dirty=true`;
+mounts are read-only, including a worktree's common Git directory. For Go 1.22's
+directory-only VCS discovery, a linked worktree is copied inside the builder
+with a directory symlink to its actual Git directory. Normal Node builds verify
+the binary's Go VCS revision and modified state against the source checkout.
+Dirty local packages record `source.dirty=true`;
 trusted CI requires a clean checkout.
 
 ### Short-lived native alpha nodes

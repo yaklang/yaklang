@@ -74,7 +74,7 @@ musl_recipe="$(jq -ce --arg arch "$target_arch" '
 build_tags="$(jq -er .build_tags <<<"$musl_recipe")"
 go_version="$(jq -er .go_version <<<"$musl_recipe")"
 mkdir -p "$package_dir"
-install -m 0750 "$build_dir/$binary_name" "$binary"
+install -m 0755 "$build_dir/$binary_name" "$binary"
 
 file_description="$(file "$binary")"
 printf '%s\n' "$file_description"
