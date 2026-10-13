@@ -16,8 +16,9 @@ import (
 type RuleProcessCallback func(progress float64, info *RuleProcessInfoList)
 
 type processMonitor struct {
-	ctx    context.Context
-	Status *omap.OrderedMap[string, *RuleProcessInfo] `json:"status"`
+	ctx      context.Context
+	Status   *omap.OrderedMap[string, *RuleProcessInfo] `json:"status"`
+	statusMu sync.Mutex
 
 	// query execute
 	FailedQuery   atomic.Int64 // query failed
@@ -251,6 +252,8 @@ func (p *processMonitor) snapshotInfoList(withRule bool) *RuleProcessInfoList {
 		return ret
 	}
 
+	p.statusMu.Lock()
+	defer p.statusMu.Unlock()
 	ret.Rules = make([]*RuleProcessInfo, 0, p.Status.Len())
 	p.Status.ForEach(func(i string, rpi *RuleProcessInfo) bool {
 		if rpi.Finished && rpi.Report {
@@ -261,13 +264,18 @@ func (p *processMonitor) snapshotInfoList(withRule bool) *RuleProcessInfoList {
 		if rpi.Finished {
 			rpi.Report = true // mark as reported
 		}
-		ret.Rules = append(ret.Rules, rpi)
+		// Callbacks keep snapshots while queries continue updating Status.
+		// Publishing the live pointer makes past progress change underneath them.
+		copy := *rpi
+		ret.Rules = append(ret.Rules, &copy)
 		return true
 	})
 	return ret
 }
 
 func (p *processMonitor) UpdateRuleError(program, rule string, err error) {
+	p.statusMu.Lock()
+	defer p.statusMu.Unlock()
 	key := rule + "@" + program
 	ruleInfo, ok := p.Status.Get(key)
 	if !ok {
@@ -292,6 +300,8 @@ func (p *processMonitor) UpdateRuleError(program, rule string, err error) {
 
 func (p *processMonitor) UpdateRuleSkipped(program, rule, reason string) {
 	p.UpdateRuleStatus(program, rule, 1, reason)
+	p.statusMu.Lock()
+	defer p.statusMu.Unlock()
 	key := rule + "@" + program
 	ruleInfo, ok := p.Status.Get(key)
 	if !ok {
@@ -303,6 +313,8 @@ func (p *processMonitor) UpdateRuleSkipped(program, rule, reason string) {
 }
 
 func (p *processMonitor) UpdateRuleStatus(program, rule string, progress float64, info string) {
+	p.statusMu.Lock()
+	defer p.statusMu.Unlock()
 	key := rule + "@" + program
 	statusMap := p.Status
 
@@ -316,7 +328,11 @@ func (p *processMonitor) UpdateRuleStatus(program, rule string, progress float64
 	}
 
 	ruleInfo.UpdateTime = time.Now().Unix()
-	ruleInfo.Progress = progress
+	// A multi-unit rule can start another VM frame; that frame's local
+	// progress must not move the scan's per-rule progress backwards.
+	if progress > ruleInfo.Progress {
+		ruleInfo.Progress = progress
+	}
 	ruleInfo.Info = info
 
 	if progress >= 1.0 {
