@@ -24,24 +24,20 @@ type fileSystemAction struct {
 	fs fi.FileSystem
 }
 
-// fullLister is the optional interface behind the whole-file view:
-// filesystems that can aggregate an incremental program's overlay layers
-// (ssadb://IrSourceFS) serve it via FullReadDir. Others (e.g. file://)
-// fall back to plain ReadDir.
-type fullLister interface {
-	FullReadDir(string) ([]fs.DirEntry, error)
+// queryDirLister marks a filesystem whose listings take query options into
+// account (ssadb://IrSourceFS with diffOnly=true lists an incremental
+// program's head-layer diff instead of the expanded tree).
+type queryDirLister interface {
+	ReadDirQuery(path string, query url.Values) ([]fs.DirEntry, error)
 }
 
-// listDir lists a directory. The default is the FS's own cheap ReadDir —
-// for an incremental program that is the last diff's files only, with no
-// overlay aggregation and no layer-chain IO. The aggregated whole-file
-// view is an explicit opt-in: "show all files" checked in the audit
-// frontend sends no diffOnly query and listDir routes to FullReadDir (the
-// user asked for it, so the heavier walk is expected); unchecked listings
-// send diffOnly=true and keep the cheap view.
+// listDir lists a directory with the caller's query options: filesystems
+// that understand them (ssadb://IrSourceFS) decide their own listing
+// semantics, others (e.g. file://) ignore the query and list their storage
+// directly.
 func (f fileSystemAction) listDir(absPath string, query url.Values) ([]fs.DirEntry, error) {
-	if fls, ok := f.fs.(fullLister); ok && !getBoolQueryValue(query, "diffOnly") {
-		return fls.FullReadDir(absPath)
+	if ql, ok := f.fs.(queryDirLister); ok {
+		return ql.ReadDirQuery(absPath, query)
 	}
 	return f.fs.ReadDir(absPath)
 }
@@ -201,11 +197,10 @@ func (f *fileSystemAction) fileInfoToResource(originParam *ypb.YakURL, query url
 	if info.IsDir() {
 		src.ResourceType = "dir"
 		src.VerboseType = "filesystem-directory"
-		// Stay in the same view as the listing itself: in the whole-file
-		// view ("show all files"), a directory whose entries all live in
-		// lower overlay layers reads as empty via the cheap ReadDir and
-		// the frontend would wrongly mark it a leaf. listDir honors
-		// diffOnly here.
+		// HaveChildrenNodes must agree with what listing the directory
+		// returns under the same query: for an incremental program with
+		// diffOnly, a directory whose entries all live in lower overlay
+		// layers reports no children, matching the diff view the user sees.
 		infos, err := f.listDir(currentPath, query)
 		if err == nil {
 			src.HaveChildrenNodes = len(infos) > 0

@@ -244,12 +244,18 @@ excludeFile := cli.String(
 filePerformanceLog := cli.Bool("filePerformanceLog", cli.setDefault(false), cli.setVerboseName("文件性能日志"), cli.setHelp("启用文件级别编译性能日志"), cli.setCliGroup("compile"))
 
 // 增量编译选项
-// 基础程序名称不再由用户输入：启用增量后，编译时自动以项目上一次编译的程序作为基础程序
+// 基础程序名称默认由编译自动以项目上一次编译的程序解析；用户可通过 base-program-name 显式指定
 enableIncrementalCompile := cli.Bool(
     "incremental-compile",
     cli.setDefault(false),
     cli.setVerboseName("启用增量编译"),
     cli.setHelp("启用增量编译模式。首次编译时作为基础程序；后续编译时基于基础程序进行差量编译，只编译变更的文件，提高编译速度。"),
+    cli.setCliGroup("compile"),
+)
+baseProgramName := cli.String(
+    "base-program-name",
+    cli.setVerboseName("基础程序名称"),
+    cli.setHelp("增量编译的基础程序名称。可选；不提供时自动以项目上一次编译的程序作为基础程序（首次增量编译则当前编译即基础程序）。"),
     cli.setCliGroup("compile"),
 )
 
@@ -768,11 +774,16 @@ if authConfig != nil && authConfig != undefined {
     }
 }
 
-// 添加增量编译配置（基础程序由【SSA 项目编译】自动按上一次编译的程序解析，无需用户指定）
+// 添加增量编译配置（基础程序默认自动按上一次编译的程序解析；显式指定 base-program-name 时以用户为准）
 // re_compile 仅随配置静默透传，不影响增量编译
 if enableIncrementalCompile {
     options = append(options, ssa.withEnableIncrementalCompile(true))
-    yakit.Info("已启用增量编译")
+    if baseProgramName != "" {
+        options = append(options, ssa.withBaseProgramName(baseProgramName))
+        yakit.Info("已启用增量编译，基础程序: %s", baseProgramName)
+    } else {
+        yakit.Info("已启用增量编译（基础程序将自动按上一次编译的程序解析）")
+    }
 }
 
 // 如果项目不存在或获取已有配置失败，创建新配置；否则更新已有配置

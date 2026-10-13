@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"net/url"
 	"os"
 	"path/filepath"
 	"slices"
@@ -519,8 +520,9 @@ func markOverlayChain(t *testing.T, base, layer1, head string, headFileHash map[
 	require.NoError(t, ssadb.UpdateProgramWithError(prog))
 }
 
-// listNames lists dir entry names under path on dbfs (the cheap single-layer
-// view — for an overlay head that is the last diff's files only).
+// listNames lists dir entry names under path on dbfs: the FULL view
+// (ReadDir) — for an incremental program the whole overlay chain expanded
+// under the head prefix.
 func listNames(t *testing.T, dbfs fi.FileSystem, path string) []string {
 	t.Helper()
 	entries, err := dbfs.ReadDir(path)
@@ -532,15 +534,16 @@ func listNames(t *testing.T, dbfs fi.FileSystem, path string) []string {
 	return names
 }
 
-// fullListNames lists entry names via the aggregated whole-file view (the
-// explicit opt-in behind "show all files"). The concrete FS type is
-// unexported, so the helper takes anything with FullReadDir (the same
-// optional interface yakurl asserts).
-func fullListNames(t *testing.T, dbfs interface {
-	FullReadDir(string) ([]fs.DirEntry, error)
-}, path string) []string {
+// listDiffNames lists dir entry names with diffOnly=true ("show all files"
+// unchecked): an incremental program then shows its head layer's own
+// entries; plain programs ignore the query and list normally.
+func listDiffNames(t *testing.T, dbfs fi.FileSystem, path string) []string {
 	t.Helper()
-	entries, err := dbfs.FullReadDir(path)
+	ql, ok := dbfs.(interface {
+		ReadDirQuery(path string, query url.Values) ([]fs.DirEntry, error)
+	})
+	require.True(t, ok, "fs does not implement ReadDirQuery")
+	entries, err := ql.ReadDirQuery(path, url.Values{"diffOnly": []string{"true"}})
 	require.NoError(t, err)
 	names := make([]string, 0, len(entries))
 	for _, e := range entries {
@@ -549,12 +552,12 @@ func fullListNames(t *testing.T, dbfs interface {
 	return names
 }
 
-// TestIrSourceFS_OverlayFullReadDir covers the show-all-files view of an
-// overlay chain: the cheap ReadDir stays the last-diff layer only,
-// FullReadDir merges base + layer1 + head (newest wins on name conflicts),
-// and lower layers' file bodies are readable through the head path via
-// layer fallback.
-func TestIrSourceFS_OverlayFullReadDir(t *testing.T) {
+// TestIrSourceFS_OverlayDiffAndFull covers both listings of an overlay
+// chain: diffOnly=true shows the head layer's own entries, plain ReadDir
+// fully expands base + layer1 + head under the head prefix (newest wins on
+// name conflicts), and lower layers' file bodies are readable through the
+// head path.
+func TestIrSourceFS_OverlayDiffAndFull(t *testing.T) {
 	base := compileJavaLayer(t, map[string]string{
 		"src/main/java/Base.java":        "package src.main.java; class Base {}",
 		"src/main/java2/OnlyInBase.java": "package src.main.java2; class OnlyInBase {}",
@@ -572,18 +575,19 @@ func TestIrSourceFS_OverlayFullReadDir(t *testing.T) {
 	dbfs := ssadb.NewIrSourceFs()
 	srcDir := "/" + head + "/src/main/java"
 
-	// Default (diff) view: only the head layer's own file.
-	require.ElementsMatch(t, []string{"java"}, listNames(t, dbfs, "/"+head+"/src/main"))
-	require.ElementsMatch(t, []string{"Head.java"}, listNames(t, dbfs, srcDir))
+	// Diff view: only the head layer's own file.
+	require.ElementsMatch(t, []string{"Head.java"}, listDiffNames(t, dbfs, srcDir))
 
-	// Whole-file view: base + layer1 + head merged under the head root.
+	// Full view: base + layer1 + head merged under the head root.
 	require.ElementsMatch(t, []string{"Base.java", "Layer1.java", "Head.java"},
-		fullListNames(t, dbfs, srcDir))
+		listNames(t, dbfs, srcDir))
 
 	// The parent chain resolves too (src / src/main are layer dirs in base).
-	require.ElementsMatch(t, []string{"main"}, fullListNames(t, dbfs, "/"+head+"/src"))
+	require.ElementsMatch(t, []string{"main"}, listNames(t, dbfs, "/"+head+"/src"))
+	require.ElementsMatch(t, []string{"java", "java2"}, listNames(t, dbfs, "/"+head+"/src/main"))
 
-	// Lower layers' bodies are readable through the head path (layer fallback).
+	// Lower layers' bodies are readable through the head path (owning-layer
+	// fallback on content fill).
 	data, err := dbfs.ReadFile(srcDir + "/Base.java")
 	require.NoError(t, err)
 	require.Contains(t, string(data), "class Base")
@@ -591,20 +595,20 @@ func TestIrSourceFS_OverlayFullReadDir(t *testing.T) {
 	require.NoError(t, err)
 	require.Contains(t, string(data), "class Layer1")
 
-	// A directory existing only in lower layers (surfaces in the full view as
-	// an expanded node) must not error after switching back to the diff view:
-	// Stat resolves via layer fallback and the diff ReadDir shows it empty.
+	// A directory existing only in lower layers: the full view shows the
+	// base files, the diff view reads it as empty, Stat resolves it either
+	// way.
 	baseOnlyDir := "/" + head + "/src/main/java2"
 	info, err := dbfs.Stat(baseOnlyDir)
 	require.NoError(t, err)
 	require.True(t, info.IsDir())
-	require.Empty(t, listNames(t, dbfs, baseOnlyDir))
-	require.ElementsMatch(t, []string{"OnlyInBase.java"}, fullListNames(t, dbfs, baseOnlyDir))
+	require.Empty(t, listDiffNames(t, dbfs, baseOnlyDir))
+	require.ElementsMatch(t, []string{"OnlyInBase.java"}, listNames(t, dbfs, baseOnlyDir))
 }
 
-// TestIrSourceFS_OverlayDeleteExcluded covers FileHashMap "-1": files deleted
-// by any layer are absent from the whole-file view, while the default diff
-// view is unaffected.
+// TestIrSourceFS_OverlayDeleteExcluded covers FileHashMap "-1": files
+// deleted by any layer are absent from the full view's listing; the diff
+// view (head's own entries) never contained them to begin with.
 func TestIrSourceFS_OverlayDeleteExcluded(t *testing.T) {
 	base := compileJavaLayer(t, map[string]string{
 		"src/main/java/Keep.java":    "package src.main.java; class Keep {}",
@@ -638,13 +642,15 @@ func TestIrSourceFS_OverlayDeleteExcluded(t *testing.T) {
 	dbfs := ssadb.NewIrSourceFs()
 	srcDir := "/" + head + "/src/main/java"
 
-	require.ElementsMatch(t, []string{"Head.java"}, listNames(t, dbfs, srcDir))
+	// Diff view: only the head's own file. Full view: the chain minus the
+	// deleted files.
+	require.ElementsMatch(t, []string{"Head.java"}, listDiffNames(t, dbfs, srcDir))
 	require.ElementsMatch(t, []string{"Keep.java", "Head.java", "Added1.java"},
-		fullListNames(t, dbfs, srcDir))
+		listNames(t, dbfs, srcDir))
 }
 
 // TestIrSourceFS_OverlayDeleteThenReAdd pins the newest-wins rule of the
-// whole-file view: when a newer layer re-added ("1") a file an older layer
+// merged tree: when a newer layer re-added ("1") a file an older layer
 // deleted ("-1"), the file stays visible — matching how the compiler applies
 // layer FileHashMaps (a newer layer re-owns the path).
 func TestIrSourceFS_OverlayDeleteThenReAdd(t *testing.T) {
@@ -671,15 +677,15 @@ func TestIrSourceFS_OverlayDeleteThenReAdd(t *testing.T) {
 	dbfs := ssadb.NewIrSourceFs()
 	srcDir := "/" + head + "/src/main/java"
 
-	// The re-added file must survive the whole-file view's deletion filter.
+	// The re-added file must survive the merged tree's deletion filter.
 	require.ElementsMatch(t, []string{"Bar.java", "Foo.java"},
-		fullListNames(t, dbfs, srcDir))
+		listNames(t, dbfs, srcDir))
 }
 
 // TestIrSourceFS_RealIncrementalChain drives the REAL incremental compile
 // pipeline (no hand-stamped OverlayLayers/FileHashMap): first incremental
-// base compile, then a diff compile, then checks the ssadb views — this is
-// what the audit frontend's "show all files" checkbox consumes end to end.
+// base compile, then a diff compile, then checks the ssadb views — the
+// listing is the complete incremental tree end to end.
 func TestIrSourceFS_RealIncrementalChain(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping incremental compile E2E in short mode")
@@ -739,7 +745,7 @@ func TestIrSourceFS_RealIncrementalChain(t *testing.T) {
 		ssadb.DeleteProgram(ssadb.GetDB(), diffName)
 	})
 
-	// The head must carry the saved overlay chain for FullReadDir to expand.
+	// The head must carry the saved overlay chain for the merged tree to expand.
 	headIr, err := ssadb.GetProgram(diffCompiledName, ssadb.Application)
 	require.NoError(t, err)
 	require.NotNil(t, headIr)
@@ -749,30 +755,24 @@ func TestIrSourceFS_RealIncrementalChain(t *testing.T) {
 	dbfs := ssadb.NewIrSourceFs()
 	srcDir := "/" + diffCompiledName + "/src/main/java"
 
-	// Default diff view: only the diff layer's own entries.
-	diffNames := listNames(t, dbfs, srcDir)
-	require.ElementsMatch(t, []string{"Base.java", "Added.java"}, diffNames)
+	// The full-view listing: base files + diff files, newest wins on Base.java.
+	names := listNames(t, dbfs, srcDir)
+	require.ElementsMatch(t, []string{"Base.java", "Added.java"}, names,
+		"expanded tree missing base files; OverlayLayers=%v FileHashMap=%v", headIr.OverlayLayers, headIr.FileHashMap)
 
-	// Whole-file view: base files + diff files.
-	fullNames := fullListNames(t, dbfs, srcDir)
-	require.ElementsMatch(t, []string{"Base.java", "Added.java"}, fullNames,
-		"full view missing base files; OverlayLayers=%v FileHashMap=%v", headIr.OverlayLayers, headIr.FileHashMap)
-
-	// Base-only directory via the whole-file view.
+	// Base-only directory is part of the expanded tree.
 	baseOnlyDir := "/" + diffCompiledName + "/src/main/java2"
-	require.ElementsMatch(t, []string{"Base2.java"}, fullListNames(t, dbfs, baseOnlyDir))
+	require.ElementsMatch(t, []string{"Base2.java"}, listNames(t, dbfs, baseOnlyDir))
 
-	// YakURL layer: the frontend derives isLeaf from HaveChildrenNodes, so a
-	// whole-file listing must report lower-layer-only directories as having
-	// children (they are NOT empty leaves in the full view).
+	// YakURL layer: the frontend derives isLeaf from HaveChildrenNodes, and
+	// diffOnly rides the same query the frontend sends ("show all files"
+	// unchecked).
 	local, err := yakgrpc.NewLocalClient()
 	require.NoError(t, err)
 	listYakURL := func(path string, diffOnly bool) map[string]bool {
 		t.Helper()
 		q := []*ypb.KVPair{{Key: "op", Value: "list"}}
 		if diffOnly {
-			// The reverted frontend contract: diffOnly=true is sent only when
-			// "show all files" is UNCHECKED; checked listings send no key.
 			q = append(q, &ypb.KVPair{Key: "diffOnly", Value: "true"})
 		}
 		res, err := local.RequestYakURL(context.Background(), &ypb.RequestYakURLParams{
@@ -786,17 +786,17 @@ func TestIrSourceFS_RealIncrementalChain(t *testing.T) {
 		}
 		return haveChildren
 	}
-	// Whole-file view (no diffOnly key): src/main contains java (diff) and
-	// java2 (base-only) — both must show children; java2 previously read as
-	// empty because HaveChildrenNodes came from the diff-view ReadDir.
+	// Full view (no query = "show all files" checked): src/main contains
+	// java (diff) and java2 (base-only) — both are real directories in the
+	// expanded tree and must show children; java2 also exposes Base2.java
+	// when listed itself.
 	children := listYakURL("/"+diffCompiledName+"/src/main", false)
 	require.True(t, children["java"], "diff dir lost HaveChildrenNodes")
-	require.True(t, children["java2"], "base-only dir lost HaveChildrenNodes in full view")
-	// and java2 must expose Base2.java when listed itself
+	require.True(t, children["java2"], "base-only dir lost HaveChildrenNodes in expanded tree")
 	require.Contains(t, listYakURL(baseOnlyDir, false), "Base2.java")
-	// Diff view (diffOnly=true): java2 is empty in the last-diff layer, so it
-	// must report no children there.
+	// Diff view (diffOnly): java2 is base-only — no head entries, so it must
+	// be childless; java still carries the diff's files.
 	diffChildren := listYakURL("/"+diffCompiledName+"/src/main", true)
-	require.True(t, diffChildren["java"])
-	require.False(t, diffChildren["java2"], "base-only dir must be a leaf in diff view")
+	require.True(t, diffChildren["java"], "diff dir lost HaveChildrenNodes in diff view")
+	require.False(t, diffChildren["java2"], "base-only dir must be childless in diff view")
 }
