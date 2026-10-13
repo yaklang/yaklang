@@ -1,9 +1,12 @@
 package aicommon
 
 import (
+	"context"
 	"strings"
 	"sync"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon/aiskillloader"
 	"github.com/yaklang/yaklang/common/utils/filesys"
@@ -42,6 +45,8 @@ func TestSkillsContextManager_Integration_FullLifecycle(t *testing.T) {
 	}
 
 	mgr := aiskillloader.NewSkillsContextManager(loader)
+	cfg := NewConfig(context.Background(), WithDisableAutoSkills(true))
+	bindTestTimeline(mgr, cfg)
 
 	// Step 1: before loading, manager should still detect available skills
 	if !mgr.HasRegisteredSkills() {
@@ -56,54 +61,41 @@ func TestSkillsContextManager_Integration_FullLifecycle(t *testing.T) {
 	if rendered != "" {
 		t.Fatalf("default render with hidden catalog should be empty. Got:\n%s", rendered)
 	}
-	// Surface catalog (simulating intent recognition).
+	// Surface catalog (simulating intent recognition): 目录先进入 Timeline Open。
 	mgr.SetCatalogSkills(loader.AllSkillMetas())
-	rendered = mgr.Render("lifecycle_nonce")
-	if !strings.Contains(rendered, "<|SKILLS_CONTEXT_lifecycle_nonce|>") {
-		t.Fatal("render should have context start tag when catalog visible")
-	}
-	if !strings.Contains(rendered, "<|SKILLS_CONTEXT_END_lifecycle_nonce|>") {
-		t.Fatal("render should have context end tag when catalog visible")
-	}
-	if !strings.Contains(rendered, "deploy-app") || !strings.Contains(rendered, "code-review") {
-		t.Fatal("render should list catalog skills when visible")
-	}
+	require.Contains(t, RenderTimelineFrozenOpen(cfg.GetTimeline()).Open, "deploy-app")
+	require.Empty(t, mgr.Render("lifecycle_nonce"), "未冻结内容不得提前进入可缓存技能块")
 
-	// Step 3: load a skill
+	// Step 3: load a skill。正文同样先进入 Open 尾段。
 	if err := mgr.LoadSkill("deploy-app"); err != nil {
 		t.Fatalf("LoadSkill failed: %v", err)
 	}
+	require.Contains(t, RenderTimelineFrozenOpen(cfg.GetTimeline()).Open, "VIEW_WINDOW")
 
+	// Step 4: 由既有冻结事务提交后, 正文才提升进单一技能块。
+	cfg.GetTimeline().FreezeAll()
 	rendered = mgr.Render("lifecycle_nonce")
-	if !strings.Contains(rendered, "=== Skill: deploy-app ===") {
-		t.Fatal("rendered should contain fully expanded skill")
-	}
-	if !strings.Contains(rendered, "VIEW_WINDOW") {
-		t.Fatal("rendered should contain SKILL.md view window")
-	}
+	require.Contains(t, rendered, "<|SKILLS_CONTEXT_")
+	require.Contains(t, rendered, "=== Skill: deploy-app ===")
+	require.Contains(t, rendered, "VIEW_WINDOW")
+	require.Contains(t, rendered, "deploy-app")
+	require.Contains(t, rendered, "code-review")
 
-	// Step 4: load second skill
+	// Step 5: 加载第二个技能, 再次冻结后两个技能共处同一个块。
 	if err := mgr.LoadSkill("code-review"); err != nil {
 		t.Fatalf("LoadSkill for code-review failed: %v", err)
 	}
-
+	cfg.GetTimeline().FreezeAll()
 	rendered = mgr.Render("lifecycle_nonce")
-	if !strings.Contains(rendered, "deploy-app") {
-		t.Fatal("rendered should still contain deploy-app")
-	}
-	if !strings.Contains(rendered, "code-review") {
-		t.Fatal("rendered should contain code-review")
-	}
+	require.Contains(t, rendered, "=== Skill: code-review ===")
 
-	// Step 5: change view offset
+	// Step 6: 翻页产生一条新的阅读窗口 item。
 	if err := mgr.ChangeViewOffset("deploy-app", "", 2); err != nil {
 		t.Fatalf("ChangeViewOffset failed: %v", err)
 	}
-
+	cfg.GetTimeline().FreezeAll()
 	rendered = mgr.Render("lifecycle_nonce")
-	if rendered == "" {
-		t.Fatal("render after offset change should not be empty")
-	}
+	require.Contains(t, rendered, "File: SKILL.md (Skill: deploy-app)")
 }
 
 // --- Integration: AISkillContextProvider safe usage ---
@@ -209,25 +201,29 @@ func TestSkillsContextManager_FoldingPreservesPromptIntegrity(t *testing.T) {
 	vfs := buildSkillsVFS()
 	loader, _ := aiskillloader.NewFSSkillLoader(vfs)
 	mgr := aiskillloader.NewSkillsContextManager(loader)
+	cfg := NewConfig(context.Background(), WithDisableAutoSkills(true))
+	bindTestTimeline(mgr, cfg)
 
+	// manager 侧不再有独立折叠预算: 正文体积由 Timeline 统一压缩控制。
 	mgr.SetMaxTokens(50)
 
 	_ = mgr.LoadSkill("deploy-app")
 	_ = mgr.LoadSkill("code-review")
+	cfg.GetTimeline().FreezeAll()
 
 	rendered := mgr.Render("fold_nonce")
 
-	// The rendered prompt must still be valid (have open/close tags)
-	if !strings.Contains(rendered, "<|SKILLS_CONTEXT_fold_nonce|>") {
-		t.Fatal("folded render must have start tag")
+	if !strings.Contains(rendered, "SKILLS_CONTEXT_") {
+		t.Fatal("render must have start tag")
 	}
-	if !strings.Contains(rendered, "<|SKILLS_CONTEXT_END_fold_nonce|>") {
-		t.Fatal("folded render must have end tag")
+	if !strings.Contains(rendered, "SKILLS_CONTEXT_END_") {
+		t.Fatal("render must have end tag")
 	}
-
-	// At least one skill should be folded
-	if !strings.Contains(rendered, "(folded)") {
-		t.Fatal("with very small limit, skills should be folded")
+	if strings.Contains(rendered, "(folded)") {
+		t.Fatal("manager must not fold skills behind the unified compression")
+	}
+	if !strings.Contains(rendered, "=== Skill: deploy-app ===") || !strings.Contains(rendered, "=== Skill: code-review ===") {
+		t.Fatal("both skills should render in full")
 	}
 }
 
@@ -235,19 +231,22 @@ func TestSkillsContextManager_UnfoldByReload(t *testing.T) {
 	vfs := buildSkillsVFS()
 	loader, _ := aiskillloader.NewFSSkillLoader(vfs)
 	mgr := aiskillloader.NewSkillsContextManager(loader)
+	cfg := NewConfig(context.Background(), WithDisableAutoSkills(true))
+	bindTestTimeline(mgr, cfg)
 
-	mgr.SetMaxTokens(50)
 	_ = mgr.LoadSkill("deploy-app")
 	_ = mgr.LoadSkill("code-review")
+	cfg.GetTimeline().FreezeAll()
 
-	// Now increase limit and reload the folded skill
-	mgr.SetMaxTokens(aiskillloader.SkillsContextMaxTokens)
-	// Reloading a folded skill should unfold it
+	// Reload is idempotent while the body is still visible: no duplicate append.
+	before := RenderTimelineFrozenOpen(cfg.GetTimeline()).Open
 	_ = mgr.LoadSkill("deploy-app")
+	after := RenderTimelineFrozenOpen(cfg.GetTimeline()).Open
+	if before != after {
+		t.Fatalf("reloading a visible skill must not change the Open tail:\nbefore=%q\nafter=%q", before, after)
+	}
 
 	rendered := mgr.Render("unfold_nonce")
-	// deploy-app should be unfolded now (not have "(folded)")
-	// Check that deploy-app section exists and has VIEW_WINDOW (indicating full view)
 	if !strings.Contains(rendered, "=== Skill: deploy-app ===") {
 		t.Fatal("deploy-app should appear in rendered output")
 	}
@@ -259,6 +258,8 @@ func TestSkillsContextManager_ChangeViewOffset_SubFile(t *testing.T) {
 	vfs := buildSkillsVFS()
 	loader, _ := aiskillloader.NewFSSkillLoader(vfs)
 	mgr := aiskillloader.NewSkillsContextManager(loader)
+	cfg := NewConfig(context.Background(), WithDisableAutoSkills(true))
+	bindTestTimeline(mgr, cfg)
 
 	_ = mgr.LoadSkill("code-review")
 
@@ -267,6 +268,7 @@ func TestSkillsContextManager_ChangeViewOffset_SubFile(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ChangeViewOffset for sub-file failed: %v", err)
 	}
+	cfg.GetTimeline().FreezeAll()
 
 	rendered := mgr.Render("subfile_nonce")
 	if !strings.Contains(rendered, "rules/RULES.md") {
@@ -278,6 +280,8 @@ func TestSkillsContextManager_ChangeViewOffset_NonexistentFile(t *testing.T) {
 	vfs := buildSkillsVFS()
 	loader, _ := aiskillloader.NewFSSkillLoader(vfs)
 	mgr := aiskillloader.NewSkillsContextManager(loader)
+	cfg := NewConfig(context.Background(), WithDisableAutoSkills(true))
+	bindTestTimeline(mgr, cfg)
 
 	_ = mgr.LoadSkill("deploy-app")
 
@@ -293,6 +297,8 @@ func TestSkillsContextManager_ConcurrentAccess(t *testing.T) {
 	vfs := buildSkillsVFS()
 	loader, _ := aiskillloader.NewFSSkillLoader(vfs)
 	mgr := aiskillloader.NewSkillsContextManager(loader)
+	cfg := NewConfig(context.Background(), WithDisableAutoSkills(true))
+	bindTestTimeline(mgr, cfg)
 
 	var wg sync.WaitGroup
 	// Concurrent loads
@@ -329,13 +335,14 @@ func TestSkillsContextManager_ConcurrentAccess(t *testing.T) {
 		}()
 	}
 	wg.Wait()
+	cfg.GetTimeline().FreezeAll()
 
 	// After all concurrent ops, render should still produce valid output
 	rendered := mgr.Render("final_nonce")
 	if rendered == "" {
 		t.Fatal("render after concurrent access should not be empty")
 	}
-	if !strings.Contains(rendered, "<|SKILLS_CONTEXT_final_nonce|>") {
+	if !strings.Contains(rendered, "SKILLS_CONTEXT_") {
 		t.Fatal("render after concurrent access should have proper tags")
 	}
 }
@@ -364,19 +371,21 @@ func TestSkillsContextManager_PromptContextCompleteness(t *testing.T) {
 	vfs := buildSkillsVFS()
 	loader, _ := aiskillloader.NewFSSkillLoader(vfs)
 	mgr := aiskillloader.NewSkillsContextManager(loader)
+	cfg := NewConfig(context.Background(), WithDisableAutoSkills(true))
+	bindTestTimeline(mgr, cfg)
 
 	_ = mgr.LoadSkill("deploy-app")
+	// 冻结提交后正文才进入可缓存的单一技能块。
+	cfg.GetTimeline().FreezeAll()
 
-	nonce := "completeness_test"
-	rendered := mgr.Render(nonce)
+	rendered := mgr.Render("completeness_test")
 
 	// Check all required structural elements
 	requiredElements := []struct {
 		element     string
 		description string
 	}{
-		{"<|SKILLS_CONTEXT_" + nonce + "|>", "context start tag"},
-		{"<|SKILLS_CONTEXT_END_" + nonce + "|>", "context end tag"},
+		{"SKILLS_CONTEXT_", "context block tag"},
 		{"=== Skill: deploy-app ===", "skill header"},
 		{"Description:", "skill description"},
 		{"File Tree:", "file tree section"},
@@ -391,16 +400,16 @@ func TestSkillsContextManager_PromptContextCompleteness(t *testing.T) {
 		}
 	}
 
-	// Validate tag pairing
-	startTagCount := strings.Count(rendered, "<|SKILLS_CONTEXT_"+nonce+"|>")
-	endTagCount := strings.Count(rendered, "<|SKILLS_CONTEXT_END_"+nonce+"|>")
-	if startTagCount != 1 || endTagCount != 1 {
-		t.Fatalf("expected exactly 1 start and 1 end context tag, got start=%d end=%d", startTagCount, endTagCount)
+	// Validate tag pairing: 单一技能块只有一对边界标签。
+	// 注: END 标签本身也带 "SKILLS_CONTEXT_" 前缀。
+	endTagCount := strings.Count(rendered, "SKILLS_CONTEXT_END_")
+	allTagCount := strings.Count(rendered, "SKILLS_CONTEXT_")
+	if endTagCount != 1 || allTagCount != 2 {
+		t.Fatalf("expected exactly one start/end pair, got all=%d end=%d", allTagCount, endTagCount)
 	}
 
-	// Check that start tag comes before end tag
-	startIdx := strings.Index(rendered, "<|SKILLS_CONTEXT_"+nonce+"|>")
-	endIdx := strings.Index(rendered, "<|SKILLS_CONTEXT_END_"+nonce+"|>")
+	startIdx := strings.Index(rendered, "SKILLS_CONTEXT_")
+	endIdx := strings.Index(rendered, "SKILLS_CONTEXT_END_")
 	if startIdx >= endIdx {
 		t.Fatal("context start tag should come before end tag")
 	}
@@ -424,9 +433,12 @@ func TestSkillsContextManager_LargeSkillMD(t *testing.T) {
 	}
 
 	mgr := aiskillloader.NewSkillsContextManager(loader)
+	cfg := NewConfig(context.Background(), WithDisableAutoSkills(true))
+	bindTestTimeline(mgr, cfg)
 	if err := mgr.LoadSkill("large-skill"); err != nil {
 		t.Fatalf("LoadSkill failed: %v", err)
 	}
+	cfg.GetTimeline().FreezeAll()
 
 	rendered := mgr.Render("large_nonce")
 	if rendered == "" {

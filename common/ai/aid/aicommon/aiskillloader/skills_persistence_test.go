@@ -35,6 +35,7 @@ func TestSkillsContextManager_LoadAndExtractNames(t *testing.T) {
 		t.Fatalf("failed to create loader: %v", err)
 	}
 	mgr := NewSkillsContextManager(loader)
+	mgr.BindTimelineSink(newTestTimelineSink())
 
 	if err := mgr.LoadSkill("recon"); err != nil {
 		t.Fatalf("failed to load recon: %v", err)
@@ -63,6 +64,7 @@ func TestSkillsContextManager_RestoreFromNames(t *testing.T) {
 	// Simulate first session: load skills
 	loader1, _ := NewFSSkillLoader(vfs)
 	mgr1 := NewSkillsContextManager(loader1)
+	mgr1.BindTimelineSink(newTestTimelineSink())
 	mgr1.LoadSkill("recon")
 	mgr1.LoadSkill("exploit")
 
@@ -77,6 +79,7 @@ func TestSkillsContextManager_RestoreFromNames(t *testing.T) {
 	// Simulate second session: create new manager, restore from names
 	loader2, _ := NewFSSkillLoader(vfs)
 	mgr2 := NewSkillsContextManager(loader2)
+	mgr2.BindTimelineSink(newTestTimelineSink())
 
 	// Verify skills are NOT loaded initially
 	if len(mgr2.GetCurrentSelectedSkills()) != 0 {
@@ -119,6 +122,7 @@ func TestSkillsContextManager_RestorePartialFailure(t *testing.T) {
 	vfs := buildPersistenceTestVFS()
 	loader, _ := NewFSSkillLoader(vfs)
 	mgr := NewSkillsContextManager(loader)
+	mgr.BindTimelineSink(newTestTimelineSink())
 
 	// Try restoring with one valid and one invalid skill name
 	results := mgr.LoadSkills([]string{"recon", "nonexistent-skill"})
@@ -140,6 +144,7 @@ func TestSkillsContextManager_RestoreMultipleSkills_ContextFits(t *testing.T) {
 	vfs := buildPersistenceTestVFS()
 	loader, _ := NewFSSkillLoader(vfs)
 	mgr := NewSkillsContextManager(loader)
+	mgr.BindTimelineSink(newTestTimelineSink())
 
 	results := mgr.LoadSkills([]string{"recon", "exploit", "privesc"})
 	for name, err := range results {
@@ -173,6 +178,7 @@ func TestSkillsContextManager_EmptyNamesRestore(t *testing.T) {
 	vfs := buildPersistenceTestVFS()
 	loader, _ := NewFSSkillLoader(vfs)
 	mgr := NewSkillsContextManager(loader)
+	mgr.BindTimelineSink(newTestTimelineSink())
 
 	results := mgr.LoadSkills([]string{})
 	if len(results) != 0 {

@@ -3,188 +3,161 @@ package aiskillloader
 import (
 	"strings"
 	"testing"
-
-	"github.com/yaklang/yaklang/common/utils/filesys"
 )
 
-// forced_skills_test.go 验证 ForcedSkillRegistry + 三态分离 (forced/catalog/auto).
+// forced_skills_test.go 验证「加载来源」收敛为 item 上的一个标记。
+//
+// 改造后不再有 ForcedSkillRegistry / 独立渲染块 / 独立压缩保护:
+//   - 三条加载路径 (manual / forced / auto) 写入同一 Timeline 类型;
+//   - 差异只在 payload 的 source 字段;
+//   - 冻结后统一进入同一个技能块。
 
-func TestForcedSkillRegistry_AddRemoveRender(t *testing.T) {
-	reg := NewForcedSkillRegistry()
-	if !reg.IsEmpty() {
-		t.Fatal("new registry should be empty")
-	}
-	if reg.Render() != "" {
-		t.Fatal("empty registry should render empty string")
-	}
-
-	// 构造一个 LoadedSkill.
-	vfs := filesys.NewVirtualFs()
-	vfs.AddFile("SKILL.md", "---\nname: test-skill\ndescription: a test\n---\n# Body\nHello")
-	loaded := &LoadedSkill{
-		Meta:           &SkillMeta{Name: "test-skill", Description: "a test"},
-		FileSystem:     vfs,
-		SkillMDContent: "# Body\nHello",
-	}
-
-	added := reg.Add("test-skill", loaded)
-	if !added {
-		t.Fatal("first Add should return true (new)")
-	}
-	if reg.IsEmpty() {
-		t.Fatal("registry should not be empty after add")
-	}
-	if !reg.Has("test-skill") {
-		t.Fatal("Has should return true")
-	}
-
-	// 重复 Add → false.
-	if reg.Add("test-skill", loaded) {
-		t.Fatal("second Add of same name should return false")
-	}
-
-	// Render 应包含满内容 + USER_FORCED_SKILL 边界.
-	rendered := reg.Render()
-	if !strings.Contains(rendered, "USER_FORCED_SKILL") {
-		t.Fatalf("render should contain USER_FORCED_SKILL boundary. Got:\n%s", rendered)
-	}
-	if !strings.Contains(rendered, "=== Skill: test-skill ===") {
-		t.Fatalf("render should contain skill header. Got:\n%s", rendered)
-	}
-	if !strings.Contains(rendered, "# Body") {
-		t.Fatalf("render should contain full SKILL.md body. Got:\n%s", rendered)
-	}
-
-	// Names.
-	names := reg.Names()
-	if len(names) != 1 || names[0] != "test-skill" {
-		t.Fatalf("Names should be [test-skill], got %v", names)
-	}
-
-	// Remove.
-	if !reg.Remove("test-skill") {
-		t.Fatal("Remove should return true")
-	}
-	if !reg.IsEmpty() {
-		t.Fatal("registry should be empty after remove")
-	}
-}
-
-// TestSkillsContextManager_ForcedSkill_LoadAndRender 验证 LoadForcedSkill 把满内容
-// 登记进 forced 容器, RenderForcedSkills 输出, 同时 loadedSkills 也登记.
-func TestSkillsContextManager_ForcedSkill_LoadAndRender(t *testing.T) {
+func TestForcedSkill_MarksSourceOnly(t *testing.T) {
 	vfs := buildTestVFS()
 	loader, err := NewFSSkillLoader(vfs)
 	if err != nil {
 		t.Fatalf("NewFSSkillLoader failed: %v", err)
 	}
 	mgr := NewSkillsContextManager(loader)
+	sink := newTestTimelineSink()
+	mgr.BindTimelineSink(sink)
 
 	added, err := mgr.LoadForcedSkill("deploy-app")
 	if err != nil {
 		t.Fatalf("LoadForcedSkill failed: %v", err)
 	}
 	if !added {
-		t.Fatal("first LoadForcedSkill should return added=true")
+		t.Fatal("first LoadForcedSkill should report newly loaded")
 	}
-	if !mgr.HasForcedSkills() {
-		t.Fatal("HasForcedSkills should be true after load")
+	for _, item := range sink.items {
+		if item.src != SkillContentSourceForced {
+			t.Fatalf("each forced item must carry source=%q, got %q", SkillContentSourceForced, item.src)
+		}
 	}
-	if !mgr.IsForcedSkill("deploy-app") {
-		t.Fatal("IsForcedSkill should be true")
-	}
-	// loadedSkills 也应登记 (IsSkillLoaded 一致性).
 	if !mgr.IsSkillLoaded("deploy-app") {
-		t.Fatal("forced skill should also register in loadedSkills for IsSkillLoaded consistency")
+		t.Fatal("forced skill must be visible as loaded")
 	}
 
-	forced := mgr.RenderForcedSkills()
-	if !strings.Contains(forced, "USER_FORCED_SKILL") {
-		t.Fatalf("RenderForcedSkills should contain boundary. Got:\n%s", forced)
+	// 全文进入同一个技能块, 而不是独立的 USER_FORCED_SKILL 段。
+	rendered := mgr.RenderStable()
+	if !strings.Contains(rendered, "deploy-app") {
+		t.Fatalf("forced skill body must render in the shared skill block. Got:\n%s", rendered)
 	}
-	if !strings.Contains(forced, "deploy-app") {
-		t.Fatalf("RenderForcedSkills should contain skill name. Got:\n%s", forced)
+	if strings.Contains(rendered, "USER_FORCED_SKILL") {
+		t.Fatalf("dedicated USER_FORCED_SKILL block must be gone. Got:\n%s", rendered)
 	}
 
-	// 重复 LoadForcedSkill → added=false (幂等).
+	// 幂等: 已可见不再重复追加。
+	appendsBefore := sink.appendCount()
 	added2, err := mgr.LoadForcedSkill("deploy-app")
 	if err != nil {
 		t.Fatalf("second LoadForcedSkill err: %v", err)
 	}
 	if added2 {
-		t.Fatal("second LoadForcedSkill should return added=false (idempotent)")
+		t.Fatal("second LoadForcedSkill should report already visible")
 	}
-
-	// UnloadForcedSkill.
-	if !mgr.UnloadForcedSkill("deploy-app") {
-		t.Fatal("UnloadForcedSkill should return true")
-	}
-	if mgr.HasForcedSkills() {
-		t.Fatal("HasForcedSkills should be false after unload")
+	if sink.appendCount() != appendsBefore {
+		t.Fatal("already visible skill must not be re-appended")
 	}
 }
 
-// TestSkillsContextManager_AutoSkill_LoadAndRender 验证 LoadAutoSkill 进入 autoLoadedSkills,
-// RenderAutoLoadedSkills 输出 AUTO_LOADED_SKILLS 段; 且 forced 优先短路.
-func TestSkillsContextManager_AutoSkill_LoadAndRender(t *testing.T) {
+// 重复加载自动技能幂等, 且与普通加载同构 (没有 AUTO_LOADED_SKILLS 段)。
+func TestAutoSkill_SameAsManual(t *testing.T) {
 	vfs := buildTestVFS()
 	loader, err := NewFSSkillLoader(vfs)
 	if err != nil {
 		t.Fatalf("NewFSSkillLoader failed: %v", err)
 	}
 	mgr := NewSkillsContextManager(loader)
+	mgr.BindTimelineSink(newTestTimelineSink())
 
 	added, err := mgr.LoadAutoSkill("code-review")
 	if err != nil {
 		t.Fatalf("LoadAutoSkill failed: %v", err)
 	}
 	if !added {
-		t.Fatal("first LoadAutoSkill should return added=true")
+		t.Fatal("first LoadAutoSkill should report newly loaded")
 	}
 	if !mgr.HasAutoLoadedSkills() {
-		t.Fatal("HasAutoLoadedSkills should be true")
+		t.Fatal("HasAutoLoadedSkills should be true after any load")
 	}
 	if !mgr.IsAutoSkillLoadedAndUnfolded("code-review") {
 		t.Fatal("IsAutoSkillLoadedAndUnfolded should be true")
 	}
 
-	auto := mgr.RenderAutoLoadedSkills()
-	if !strings.Contains(auto, "AUTO_LOADED_SKILLS") {
-		t.Fatalf("RenderAutoLoadedSkills should contain boundary. Got:\n%s", auto)
+	rendered := mgr.RenderStable()
+	if strings.Contains(rendered, "AUTO_LOADED_SKILLS") {
+		t.Fatalf("dedicated AUTO_LOADED_SKILLS block must be gone. Got:\n%s", rendered)
 	}
-	if !strings.Contains(auto, "code-review") {
-		t.Fatalf("RenderAutoLoadedSkills should contain skill name. Got:\n%s", auto)
+	if !strings.Contains(rendered, "code-review") {
+		t.Fatalf("auto skill body must render in the shared skill block. Got:\n%s", rendered)
 	}
 
-	// 重复 LoadAutoSkill → added=false.
 	added2, _ := mgr.LoadAutoSkill("code-review")
 	if added2 {
-		t.Fatal("second LoadAutoSkill should return added=false (idempotent)")
+		t.Fatal("second LoadAutoSkill should report already visible")
 	}
 }
 
-// TestSkillsContextManager_ForcePreemptsAuto 验证 forced skill 优先: 若已 forced,
-// LoadAutoSkill 短路 (added=false), IsAutoSkillLoadedAndUnfolded 也返回 true.
-func TestSkillsContextManager_ForcePreemptsAuto(t *testing.T) {
+// 同一技能从任意来源加载后, 相同正文不会再次追加或改写已有 item 的来源。
+func TestForcedThenAuto_NoDuplicateBody(t *testing.T) {
 	vfs := buildTestVFS()
 	loader, err := NewFSSkillLoader(vfs)
 	if err != nil {
 		t.Fatalf("NewFSSkillLoader failed: %v", err)
 	}
 	mgr := NewSkillsContextManager(loader)
+	sink := newTestTimelineSink()
+	mgr.BindTimelineSink(sink)
 
 	if _, err := mgr.LoadForcedSkill("deploy-app"); err != nil {
 		t.Fatalf("LoadForcedSkill: %v", err)
 	}
-	// 对同名 skill 调 LoadAutoSkill 应短路.
 	added, err := mgr.LoadAutoSkill("deploy-app")
 	if err != nil {
-		t.Fatalf("LoadAutoSkill on forced skill err: %v", err)
+		t.Fatalf("LoadAutoSkill on visible skill err: %v", err)
 	}
 	if added {
-		t.Fatal("LoadAutoSkill on already-forced skill should short-circuit (added=false)")
+		t.Fatal("loading an already-visible skill must not report new content")
 	}
 	if !mgr.IsAutoSkillLoadedAndUnfolded("deploy-app") {
-		t.Fatal("IsAutoSkillLoadedAndUnfolded should be true for forced skill (forced preempts)")
+		t.Fatal("visible skill must satisfy the auto-loaded check")
+	}
+	for _, item := range sink.items {
+		if item.src != SkillContentSourceForced {
+			t.Fatal("the original item source marker must be preserved")
+		}
+	}
+
+	bodyRenders := strings.Count(mgr.RenderStable(), "Run `scripts/deploy.sh`")
+	if bodyRenders != 1 {
+		t.Fatalf("skill body must appear exactly once, got %d\n%s", bodyRenders, mgr.RenderStable())
+	}
+}
+
+// 显式移除只退休 Timeline item: 之后再次加载会重新追加一份新正文。
+func TestUnloadRetiresTimelineItem(t *testing.T) {
+	vfs := buildTestVFS()
+	loader, err := NewFSSkillLoader(vfs)
+	if err != nil {
+		t.Fatalf("NewFSSkillLoader failed: %v", err)
+	}
+	mgr := NewSkillsContextManager(loader)
+	mgr.BindTimelineSink(newTestTimelineSink())
+
+	if _, err := mgr.LoadForcedSkill("deploy-app"); err != nil {
+		t.Fatalf("LoadForcedSkill: %v", err)
+	}
+	if !mgr.UnloadSkill("deploy-app") {
+		t.Fatal("UnloadSkill should retire the timeline items")
+	}
+	if mgr.IsSkillLoaded("deploy-app") {
+		t.Fatal("unloaded skill must not be visible")
+	}
+	if _, err := mgr.LoadForcedSkill("deploy-app"); err != nil {
+		t.Fatalf("reload after unload failed: %v", err)
+	}
+	if !mgr.IsSkillLoaded("deploy-app") {
+		t.Fatal("reloaded skill must be visible again")
 	}
 }

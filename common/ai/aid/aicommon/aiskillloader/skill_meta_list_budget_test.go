@@ -38,6 +38,7 @@ func TestSelectSkillMetasForPromptRegistry_MatchesAppendAvailableSkillsSection(t
 		t.Fatalf("NewFSSkillLoader failed: %v", err)
 	}
 	mgr := NewSkillsContextManager(loader)
+	mgr.BindTimelineSink(newTestTimelineSink())
 
 	listed, omitted := SelectSkillMetasForPromptRegistry(loader.AllSkillMetas(), mgr.TokenEstimator())
 	if len(listed) != 2 || omitted != 0 {

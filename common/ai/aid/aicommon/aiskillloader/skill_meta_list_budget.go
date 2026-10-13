@@ -10,8 +10,9 @@ import (
 // AvailableSkillsRegistryHeader is the registry listing header in SKILLS_CONTEXT.
 const AvailableSkillsRegistryHeader = "== Available Skills (use loading_skills action to load) ==\n"
 
-// MaxCatalogSkills 是意图识别写入「最相关 SKILL 目录」(SKILLS_CONTEXT 下半段) 的最大条目数.
-// 目录默认隐藏, 仅当意图识别命中后由 SetCatalogVisible(true) 开启, 取最相关 top-N.
+// MaxCatalogSkills 是意图识别写入「最相关 SKILL 目录」的最大条目数
+// (目录与技能正文共处 SemiDynamic1 的同一个技能块).
+// 目录默认不写入, 仅当意图识别命中后由 SetCatalogSkills 写入, 取最相关 top-N.
 // 关键词: MaxCatalogSkills, 意图识别目录 top-N, 默认隐藏 SKILL 目录
 const MaxCatalogSkills = 10
 
