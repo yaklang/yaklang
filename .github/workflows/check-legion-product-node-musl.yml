@@ -81,6 +81,12 @@ jobs:
       - name: Build musl Product Node with the release recipe
         run: ./.github/scripts/build-legion-product-node.sh
 
+      - name: Verify local and unknown HIDS account identities with osusergo
+        env:
+          CGO_ENABLED: "0"
+          GOTOOLCHAIN: local
+        run: go test -tags hids,osusergo ./common/hids/enrich -run '^TestFileIdentity' -count=1
+
       - name: Verify the package and its musl recipe
         shell: bash
         run: |
