@@ -25,6 +25,9 @@ func init() {
 	globalHotPatchRuntimeCache.Store(&globalHotPatchRuntime{Config: &ypb.GlobalHotPatchConfig{}})
 	RegisterPostInitDatabaseFunction(func() error {
 		db := consts.GetGormProfileDatabase()
+		if err := EnsureBuiltinHotPatchTemplates(db); err != nil {
+			log.Errorf("initialize builtin hotpatch templates failed: %v", err)
+		}
 		cfg, err := GetGlobalHotPatchConfigFromKV(db)
 		if err != nil {
 			log.Errorf("load global hotpatch config failed: %v", err)
