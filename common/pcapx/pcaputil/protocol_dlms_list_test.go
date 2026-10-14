@@ -228,6 +228,9 @@ func TestDLMSHDLCListSealedMatrix(t *testing.T) { dlmsSealedMatrix(t, dlmsListCo
 func dlmsControlInput(t *testing.T, alias string) ([]byte, error) {
 	t.Helper()
 	rel := strings.TrimPrefix(alias, "common/pcapx/pcaputil/")
+	if root := os.Getenv("DLMS_LLS_TEST_ROOT"); root != "" && strings.HasPrefix(rel, "dlms-lls-") {
+		return os.ReadFile(filepath.Join(root, rel))
+	}
 	if root := os.Getenv("DLMS_ACSE_SEG_TEST_ROOT"); root != "" && strings.HasPrefix(rel, "dlms-acse-segmented/") {
 		return os.ReadFile(filepath.Join(root, strings.TrimPrefix(rel, "dlms-acse-segmented/")))
 	}

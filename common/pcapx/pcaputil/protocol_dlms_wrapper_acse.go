@@ -60,6 +60,31 @@ func acseEnvelopeHint(p []byte) bool {
 			bit = 8
 		case 0x80:
 			bit = 16
+		case 0x8a:
+			bit = 32
+			if !context || seen&(64|128|8) != 0 {
+				return false
+			}
+			if p[0] != 0x60 || !bytes.Equal(v, []byte{7, 128}) {
+				return false
+			}
+		case 0x8b:
+			bit = 64
+			if !context || seen&(128|8) != 0 {
+				return false
+			}
+			if p[0] != 0x60 || !bytes.Equal(v, []byte{0x60, 0x85, 0x74, 5, 8, 2, 1}) {
+				return false
+			}
+		case 0xac:
+			bit = 128
+			if !context || seen&8 != 0 {
+				return false
+			}
+			auth, err := acseOnlyTLV(v, 0x80)
+			if p[0] != 0x60 || err != nil || len(auth) == 0 || len(auth) > 64 {
+				return false
+			}
 		default:
 			return false
 		}
@@ -91,7 +116,7 @@ func acseEnvelopeHint(p []byte) bool {
 			information = true
 		}
 	}
-	return context && (p[0] == 0x60 || seen&6 == 6)
+	return context && (p[0] == 0x60 || seen&6 == 6) && (seen&224 == 0 || seen&224 == 224)
 }
 
 type acseCursor struct {
@@ -155,6 +180,7 @@ type wrapperAssociation struct {
 	pending, ambiguous                            bool
 	conformance                                   uint32
 	maxPDU                                        uint16
+	lowAuthentication                             bool
 	closed                                        bool
 	releaseSeen, releasePending, releaseAmbiguous bool
 	releaseID                                     uint64
@@ -276,6 +302,43 @@ func decodeACSEAPDU(p []byte, limit int) (*wrapperMessage, error) {
 				return nil, wrapperError(ErrUnsupportedFeature, "ACSE protocol version outside version1")
 			}
 			f["protocol_version"], f["protocol_version_explicit"] = 1, true
+		case 0x8a:
+			if !seen[0xa1] || seen[0x8b] || seen[0xac] || seen[0xbe] {
+				return nil, wrapperError(ErrMalformedMessage, "sender requirements out of ACSE SEQUENCE order")
+			}
+			if len(v) == 0 || v[0] > 7 || len(v) == 1 && v[0] != 0 || len(v) > 1 && v[len(v)-1]&byte((1<<v[0])-1) != 0 {
+				return nil, wrapperError(ErrMalformedMessage, "invalid ACSE requirements BIT STRING padding")
+			}
+			if !request || !bytes.Equal(v, []byte{7, 128}) {
+				return nil, wrapperError(ErrUnsupportedFeature, "unselected sender ACSE requirements")
+			}
+			f["sender_acse_requirements_hex"] = hex.EncodeToString(v)
+		case 0x8b:
+			if !seen[0xa1] || seen[0xac] || seen[0xbe] {
+				return nil, wrapperError(ErrMalformedMessage, "mechanism out of ACSE SEQUENCE order")
+			}
+			if !request || !bytes.Equal(v, []byte{0x60, 0x85, 0x74, 5, 8, 2, 1}) {
+				return nil, wrapperError(ErrUnsupportedFeature, "authentication mechanism outside selected LOW")
+			}
+			f["authentication_mechanism_oid"], f["authentication_mechanism_oid_hex"] = "2.16.756.5.8.2.1", hex.EncodeToString(v)
+		case 0xac:
+			if !seen[0xa1] || seen[0xbe] {
+				return nil, wrapperError(ErrMalformedMessage, "calling authentication out of ACSE SEQUENCE order")
+			}
+			if !request {
+				return nil, wrapperError(ErrUnsupportedFeature, "calling authentication component in response")
+			}
+			auth, err := acseOnlyTLV(v, 0x80)
+			if err != nil {
+				return nil, err
+			}
+			if len(auth) == 0 {
+				return nil, wrapperError(ErrUnsupportedFeature, "empty LOW value outside selected observation")
+			}
+			if len(auth) > 64 {
+				return nil, wrapperError(ErrResourceExceeded, "LOW value byte budget")
+			}
+			f["calling_authentication_value_hex"] = hex.EncodeToString(auth)
 		default:
 			return nil, wrapperError(ErrUnsupportedFeature, "ACSE authentication/title/unselected component")
 		}
@@ -287,6 +350,13 @@ func decodeACSEAPDU(p []byte, limit int) (*wrapperMessage, error) {
 		return nil, wrapperError(ErrMalformedMessage, "accepted AARE has nonzero diagnostic")
 	}
 	m := &wrapperMessage{fields: f, request: request, acse: true, acseAccepted: !request && result == 0 && diagnostic == 0 && diagnosticSource != 0}
+	if seen[0x8a] || seen[0x8b] || seen[0xac] {
+		if !seen[0x8a] || !seen[0x8b] || !seen[0xac] {
+			return nil, wrapperError(ErrUnsupportedFeature, "incomplete selected LOW components")
+		}
+		f["authentication_requested"] = true
+		m.acseLowAuthentication = true
+	}
 	m.acseInfo = len(initiate) > 0
 	f["initiate_information_present"] = m.acseInfo
 	if len(initiate) == 0 {
@@ -430,12 +500,22 @@ func (f *binFlow) consumeWrapperACSE(s *binDLMSWrapper, m *wrapperMessage, dir i
 			s.associations[key] = &wrapperAssociation{ambiguous: true}
 			return "unverified-association-initiate-context", nil
 		}
-		s.associations[key] = &wrapperAssociation{id: e.ID, pending: true, conformance: m.acseConformance, maxPDU: m.acseMaxPDU}
+		s.associations[key] = &wrapperAssociation{id: e.ID, pending: true, conformance: m.acseConformance, maxPDU: m.acseMaxPDU, lowAuthentication: m.acseLowAuthentication}
 		e.TransactionID = e.ID
 		return "observed-association-request", nil
 	}
 	p := s.associations[wrapperAssociationKey{1 - dir, m.destination, m.source}]
 	if p == nil {
+		// An observed orphan AARE may be replayed after a later AARQ. Wrapper
+		// carries no association nonce, so retain a charged canonical endpoint
+		// tombstone even when there is no outstanding eligible request.
+		if len(s.associations) >= sessionCollectionLimit(f.a.budget.MaxCollectionElements) {
+			return "", wrapperError(ErrResourceExceeded, "orphan ACSE retained context budget")
+		}
+		if s.associations == nil {
+			s.associations = make(map[wrapperAssociationKey]*wrapperAssociation)
+		}
+		s.associations[wrapperAssociationKey{1 - dir, m.destination, m.source}] = &wrapperAssociation{ambiguous: true}
 		return "unmatched-association-response", nil
 	}
 	if p.ambiguous || !p.pending {
@@ -460,6 +540,9 @@ func (f *binFlow) consumeWrapperACSE(s *binDLMSWrapper, m *wrapperMessage, dir i
 	e.TransactionID, e.ResponseTo = p.id, p.id
 	m.fields["association_observed"] = true
 	m.fields["association_request_event"] = p.id
+	if p.lowAuthentication {
+		m.fields["proposed_authentication_mechanism_oid"] = "2.16.756.5.8.2.1"
+	}
 	m.fields["proposed_conformance_bits"] = p.conformance
 	m.fields["proposed_max_pdu_size"] = p.maxPDU
 	return "observed-association-response", nil

@@ -86963,6 +86963,677 @@
         "common/pcapx/pcaputil/dlms-acse-segmented/verify.py": "dlms-acse-segmented/verify.py",
         "scripts/protocol-tests/required-tests-traffic-unified-v79.json": "required-tests-traffic-unified-v79.json"
       }
+    },
+    {
+      "id": "validation-dlms-lls",
+      "kind": "validation",
+      "source_sha": "425ebbf194a7d4bc6fd002ecf2849717d307bad7",
+      "file": "validation-dlms-lls.zip",
+      "sha256": "65dd9ef7376618f231111cc619ed67f46176b51d7e4d9c7657a4da245407bfe0",
+      "password": "bin-parser",
+      "members": {
+        "dlms-lls-hdlc/answers/accepted-tcp.json": {
+          "sha256": "d409e916c329fc75ab46c6b24d60debcf2a9b2254f8efe17dd8dc9fed3588abc",
+          "bytes": 4871
+        },
+        "dlms-lls-hdlc/answers/accepted-udp.json": {
+          "sha256": "dba290f56a780b43909cd416218e0c33d7be9bb4e51d06263ab41f20fedfaf62",
+          "bytes": 4819
+        },
+        "dlms-lls-hdlc/answers/changed-value-same-generation-tcp.json": {
+          "sha256": "f6261ac777a706d71592e0e868aa5c7c395fb27226ea9a62fba7574118197908",
+          "bytes": 3677
+        },
+        "dlms-lls-hdlc/answers/changed-value-same-generation-udp.json": {
+          "sha256": "3f0cfd8f9566d9d82fc04ceeee0948e9ebe31a3e4632f71d0ab42fbc349ddc58",
+          "bytes": 3598
+        },
+        "dlms-lls-hdlc/answers/duplicate-value-tcp.json": {
+          "sha256": "9e84309affe8c5938d7d20ee219b833d3da607f40a4108a6f32d59743c0e90d4",
+          "bytes": 3206
+        },
+        "dlms-lls-hdlc/answers/duplicate-value-udp.json": {
+          "sha256": "37005f594eb2809a9a9063733739218f8da8f31d237b3904c838ab972c265ba9",
+          "bytes": 3153
+        },
+        "dlms-lls-hdlc/answers/empty-value-tcp.json": {
+          "sha256": "7accfa878e6f0357abd5376606dbf3beb7585c4a161c7320aee5cd551e5f9f68",
+          "bytes": 3102
+        },
+        "dlms-lls-hdlc/answers/empty-value-udp.json": {
+          "sha256": "e8928f9663684aa703c5ebef2897a3fc95474b80af6eb86478f15a817921c7aa",
+          "bytes": 3049
+        },
+        "dlms-lls-hdlc/answers/exact-active-retry-tcp.json": {
+          "sha256": "ec4807b30d911956ed07e7a51ac70c699b59ffb363fde263cb298260e2fee69a",
+          "bytes": 7281
+        },
+        "dlms-lls-hdlc/answers/exact-active-retry-udp.json": {
+          "sha256": "a59d7b1a837386078b75ad75a0f398d13c49b046be027709345a71c21cb697eb",
+          "bytes": 7202
+        },
+        "dlms-lls-hdlc/answers/invalid-unused-bits-tcp.json": {
+          "sha256": "997d004ca749da87d95f60d5056b9ef7972dc81f42406c0252f564ebae0f31b6",
+          "bytes": 3166
+        },
+        "dlms-lls-hdlc/answers/invalid-unused-bits-udp.json": {
+          "sha256": "9ee940ef3fa07109ba033cf54882db44c10480f62b9a43d0a6e37e5940a66496",
+          "bytes": 3113
+        },
+        "dlms-lls-hdlc/answers/invalid-unused-count-tcp.json": {
+          "sha256": "57412a2dddece61fcf8a4a63eeb26f1c22c5c25a5ac6e75e674d1d3f14a04d29",
+          "bytes": 3170
+        },
+        "dlms-lls-hdlc/answers/invalid-unused-count-udp.json": {
+          "sha256": "88b39839fab7ab9218775d84cf34f177272b3f21f5fc7e44abbf92fac10e5267",
+          "bytes": 3117
+        },
+        "dlms-lls-hdlc/answers/maximum-value-tcp.json": {
+          "sha256": "01da1f5dd3e125c83870d128123fa772ae366b02f26f41ea7190b948c71a371b",
+          "bytes": 5131
+        },
+        "dlms-lls-hdlc/answers/maximum-value-udp.json": {
+          "sha256": "0937feb8f38ebf0ff6f53b5330fc4712668c285eed044a835abc4d546573ac78",
+          "bytes": 5079
+        },
+        "dlms-lls-hdlc/answers/minimum-value-tcp.json": {
+          "sha256": "ddf5e2b411af16ba58e93d549c61351363b79d1a0c1d3474f94866b904f1bc4b",
+          "bytes": 4753
+        },
+        "dlms-lls-hdlc/answers/minimum-value-udp.json": {
+          "sha256": "e4dfe0bd8d70c6f9465866922c134f76dfe60164a5f7b62e545ce64ecf88b448",
+          "bytes": 4701
+        },
+        "dlms-lls-hdlc/answers/missing-mechanism-tcp.json": {
+          "sha256": "2153b51d858e60599babf75a12b89b754169f39622c0ab51872636213f40308f",
+          "bytes": 3156
+        },
+        "dlms-lls-hdlc/answers/missing-mechanism-udp.json": {
+          "sha256": "b470a38afabf5c253853c923cbfbcaa53270a1158b5ede16af82586ddd3336db",
+          "bytes": 3103
+        },
+        "dlms-lls-hdlc/answers/missing-requirements-tcp.json": {
+          "sha256": "80060b3a518c2c14ee5d0c8edae6ae2e73f554fbe01284ecb26021c84fa06412",
+          "bytes": 3178
+        },
+        "dlms-lls-hdlc/answers/missing-requirements-udp.json": {
+          "sha256": "96f65436aae8f1ce83218efdfb618f7fd9b69f3860abe2e31f915eae3efc006e",
+          "bytes": 3125
+        },
+        "dlms-lls-hdlc/answers/missing-value-tcp.json": {
+          "sha256": "5b913da1a82c27ff0649e9350e7007dd1ccd12c52f4d9bf23ffadc3b8da1e8cf",
+          "bytes": 3102
+        },
+        "dlms-lls-hdlc/answers/missing-value-udp.json": {
+          "sha256": "a9053477ca65167f74f9e2401234fbcab14427faebe25422e18a4c97f462bf36",
+          "bytes": 3049
+        },
+        "dlms-lls-hdlc/answers/orphan-late-tcp.json": {
+          "sha256": "b82de330078fd9e001776fef4fa227e98bc22a7df58b2491485bd6f6eb48c095",
+          "bytes": 1775
+        },
+        "dlms-lls-hdlc/answers/orphan-late-udp.json": {
+          "sha256": "f3e40d72b01fec6b24b1146eb17c24186580c69c701fb098c58cee2a2470faf2",
+          "bytes": 1696
+        },
+        "dlms-lls-hdlc/answers/rejected-authentication-observation-tcp.json": {
+          "sha256": "f5bf4f199632335da1709a0bb8a846cf437ee1d7611d59e0c5ffdfa61c0e162c",
+          "bytes": 4628
+        },
+        "dlms-lls-hdlc/answers/rejected-authentication-observation-udp.json": {
+          "sha256": "4894d0a76d905a0a59909610c48d85033956e161546af7040dff3f52c4fd5f2a",
+          "bytes": 4576
+        },
+        "dlms-lls-hdlc/answers/reordered-authentication-components-tcp.json": {
+          "sha256": "aa8ae11d477bcb46fe7521233043976f05f8034bb05827e73c49c8e2e341f8b0",
+          "bytes": 3230
+        },
+        "dlms-lls-hdlc/answers/reordered-authentication-components-udp.json": {
+          "sha256": "00acd9cf10630100bd3eeac382607b98373ca46f210a7d278ca973b2522ccf69",
+          "bytes": 3177
+        },
+        "dlms-lls-hdlc/answers/trailing-value-choice-tcp.json": {
+          "sha256": "049a9e4ee77557403384ec45b793bcc417180120782478838d40af69a3631254",
+          "bytes": 3176
+        },
+        "dlms-lls-hdlc/answers/trailing-value-choice-udp.json": {
+          "sha256": "5464af283b5a2139c3ad84c1bb1d178ceb2b69ab0a2085a678d75aaa67b7cddc",
+          "bytes": 3123
+        },
+        "dlms-lls-hdlc/answers/unknown-mechanism-tcp.json": {
+          "sha256": "7049c48fc5be0f59b0000ffb62293e905a84c153fe28ca7b845fc2711d5c8dc9",
+          "bytes": 3174
+        },
+        "dlms-lls-hdlc/answers/unknown-mechanism-udp.json": {
+          "sha256": "0dc9ba8f3faa9c50dfe8d40870e46f49e67e07029549ed32ccf8509fa6354fb8",
+          "bytes": 3121
+        },
+        "dlms-lls-hdlc/answers/unselected-requirement-tcp.json": {
+          "sha256": "b5a95138963ddd95bfae25c23486ee4066a0baa8cc6d43add9f08c26d5689b42",
+          "bytes": 3194
+        },
+        "dlms-lls-hdlc/answers/unselected-requirement-udp.json": {
+          "sha256": "139f45fcb41e52aa45eff18344afd5d83df7219b01954316cbd5dbe6df998e5c",
+          "bytes": 3141
+        },
+        "dlms-lls-hdlc/answers/value-over-budget-tcp.json": {
+          "sha256": "b0b10dfb59afe211825696688a972622e0dc398a606447ac8c1a1d0a86033a1b",
+          "bytes": 3236
+        },
+        "dlms-lls-hdlc/answers/value-over-budget-udp.json": {
+          "sha256": "b6d98ed369ff7247c36b8e262aaba57c7a5d30a543df6cc6e4ca3c0f2041c069",
+          "bytes": 3183
+        },
+        "dlms-lls-hdlc/answers/wrong-direction-tcp.json": {
+          "sha256": "a4ef8fb51e9d558caa39576cfabea7f85b1609e46c30a7a32ee2e5343635a92c",
+          "bytes": 5360
+        },
+        "dlms-lls-hdlc/answers/wrong-direction-udp.json": {
+          "sha256": "b3783d3ee4aff2896f0586f491d8ba0d29e8f5f1520d26b96e1cd282697740c5",
+          "bytes": 5281
+        },
+        "dlms-lls-hdlc/cases/accepted-tcp.pcap": {
+          "sha256": "d4e72823fcc35d52df047542ef882901302229a6e3f7e93de56fce82566f1b30",
+          "bytes": 517
+        },
+        "dlms-lls-hdlc/cases/accepted-udp.pcap": {
+          "sha256": "9eef20b2e0a642e20197fa697c94ce16ed86f557885ddfa3bd97fca6083e1f87",
+          "bytes": 283
+        },
+        "dlms-lls-hdlc/cases/changed-value-same-generation-tcp.pcap": {
+          "sha256": "0a31687167750e43aa248fa2ccfea47409939f52e96b0fe7de3e8b392b5e2024",
+          "bytes": 672
+        },
+        "dlms-lls-hdlc/cases/changed-value-same-generation-udp.pcap": {
+          "sha256": "02f2a49e8985fa6f974097a60daac0e7f1295502e6236e32b3364060e26bf5ca",
+          "bytes": 426
+        },
+        "dlms-lls-hdlc/cases/duplicate-value-tcp.pcap": {
+          "sha256": "0ec8bf591258fb3bcbcca342a6949d96a8d19240904637917133424a94146dfe",
+          "bytes": 574
+        },
+        "dlms-lls-hdlc/cases/duplicate-value-udp.pcap": {
+          "sha256": "47d3a6349cd5682510986555a7ce85ab50f47f2a3ac05903394081beb9267970",
+          "bytes": 340
+        },
+        "dlms-lls-hdlc/cases/empty-value-tcp.pcap": {
+          "sha256": "438bb2018c9389866cbef24773d59f6d2b57d30318686601b0506bd8dbbb9074",
+          "bytes": 522
+        },
+        "dlms-lls-hdlc/cases/empty-value-udp.pcap": {
+          "sha256": "a33b85bdd69fe89f72b7adcfd5f898a42817910ffb4ef723ebef46866bae861d",
+          "bytes": 288
+        },
+        "dlms-lls-hdlc/cases/exact-active-retry-tcp.pcap": {
+          "sha256": "e7cf46e13489e8bd3457f0e4746aa16255e195e5db40c08f74265976616a59ac",
+          "bytes": 673
+        },
+        "dlms-lls-hdlc/cases/exact-active-retry-udp.pcap": {
+          "sha256": "63744fb8e56276438120f31824a6cfa9fa663e2a92accb950868fecaa9a3e5d8",
+          "bytes": 427
+        },
+        "dlms-lls-hdlc/cases/invalid-unused-bits-tcp.pcap": {
+          "sha256": "47bd56e8024d25519ed089022781b94baf370f040dd197e3f9c13bb364ad0b68",
+          "bytes": 546
+        },
+        "dlms-lls-hdlc/cases/invalid-unused-bits-udp.pcap": {
+          "sha256": "b02add9bdc75ce6ebd3d7fa94e5f26e05d40ea0d17d1139af0f9535dd1f4e6b7",
+          "bytes": 312
+        },
+        "dlms-lls-hdlc/cases/invalid-unused-count-tcp.pcap": {
+          "sha256": "a37ca9608042f9ab4626e6cf39b6599853c8b602cd6c86096f8655f3450c3664",
+          "bytes": 546
+        },
+        "dlms-lls-hdlc/cases/invalid-unused-count-udp.pcap": {
+          "sha256": "7b87174ed76b725bbeba837c0d17d3678689e2cbe665a64e4a5eab6d49d5a6a0",
+          "bytes": 312
+        },
+        "dlms-lls-hdlc/cases/maximum-value-tcp.pcap": {
+          "sha256": "85a9cf444125211d73d0e1ce917c9bda57175015dabf1e20e299ec1c18486b32",
+          "bytes": 557
+        },
+        "dlms-lls-hdlc/cases/maximum-value-udp.pcap": {
+          "sha256": "8ec2b7d84b0032944bef010d166fd40c88aadd296e4ccd426c19d9223a139ee3",
+          "bytes": 323
+        },
+        "dlms-lls-hdlc/cases/minimum-value-tcp.pcap": {
+          "sha256": "5863f498ba4e47fb276141a4f6292c0d2e6714c73a16c35dd004768915d38792",
+          "bytes": 494
+        },
+        "dlms-lls-hdlc/cases/minimum-value-udp.pcap": {
+          "sha256": "948598ea0283fb505b60deebbe3a9abe43e582f0627590b8d06dcceb0be983a1",
+          "bytes": 260
+        },
+        "dlms-lls-hdlc/cases/missing-mechanism-tcp.pcap": {
+          "sha256": "1d29b3e5123e13411cf127f0b0a47df6656b11af933133822652fa5073dfdd3d",
+          "bytes": 537
+        },
+        "dlms-lls-hdlc/cases/missing-mechanism-udp.pcap": {
+          "sha256": "ffdccfcf21e016d1bbefaa95c6b4d886d93c81eba90f9ccf41c6f6ef79e3dc39",
+          "bytes": 303
+        },
+        "dlms-lls-hdlc/cases/missing-requirements-tcp.pcap": {
+          "sha256": "b9fc0c241614a192fff573751282c1192da6f357d2b448415f4ca9ed3dd6bd68",
+          "bytes": 542
+        },
+        "dlms-lls-hdlc/cases/missing-requirements-udp.pcap": {
+          "sha256": "46e13d287263d14a58105e3f9aed49713a510414467a36f5afe07afd4a87b776",
+          "bytes": 308
+        },
+        "dlms-lls-hdlc/cases/missing-value-tcp.pcap": {
+          "sha256": "74c0d8f5b219f6299046d02ba207bb73249eb614de55c965888da8edceb76087",
+          "bytes": 518
+        },
+        "dlms-lls-hdlc/cases/missing-value-udp.pcap": {
+          "sha256": "68f64700446bfed74beebd23585f94b3ef4b0bae98c33e03f303a3ecde7b7728",
+          "bytes": 284
+        },
+        "dlms-lls-hdlc/cases/orphan-late-tcp.pcap": {
+          "sha256": "b6f954756a4b115cbe5a4f8df49d9a99dd429d8a1b14a20c94a558810553579c",
+          "bytes": 644
+        },
+        "dlms-lls-hdlc/cases/orphan-late-udp.pcap": {
+          "sha256": "86ab11cd3db9dd1748398e5849573cc412ba9d43e99d1e9425deddf5b54653ee",
+          "bytes": 398
+        },
+        "dlms-lls-hdlc/cases/rejected-authentication-observation-tcp.pcap": {
+          "sha256": "fc9e1c925467d702989646e8141f68c6c5a546782a6a2e69f2ec176ca991b0b0",
+          "bytes": 499
+        },
+        "dlms-lls-hdlc/cases/rejected-authentication-observation-udp.pcap": {
+          "sha256": "0f2540978ae231cfd07a562cafc34303c03c7fbc05eaf8ba39937a56bcb9a32d",
+          "bytes": 265
+        },
+        "dlms-lls-hdlc/cases/reordered-authentication-components-tcp.pcap": {
+          "sha256": "39b5d61cd77a386c734e55a387ab90d18b5895bf918e71fc45c068fc88477eb7",
+          "bytes": 546
+        },
+        "dlms-lls-hdlc/cases/reordered-authentication-components-udp.pcap": {
+          "sha256": "54b0665667653e036a5458473a58dff00f2cba0983fb2c057f98e190db7676d7",
+          "bytes": 312
+        },
+        "dlms-lls-hdlc/cases/trailing-value-choice-tcp.pcap": {
+          "sha256": "45202b934308df2b64cb2a28abf1df60e7ce07099257dc1a7d05a921e9164dc7",
+          "bytes": 547
+        },
+        "dlms-lls-hdlc/cases/trailing-value-choice-udp.pcap": {
+          "sha256": "290abba91729a163be8c7f4cab8b4eec29bf8be7064cbf22b1838af2156589c1",
+          "bytes": 313
+        },
+        "dlms-lls-hdlc/cases/unknown-mechanism-tcp.pcap": {
+          "sha256": "35c0221e939f7f9e600556e8d7e75f0770a3123e6deff8ff04d761e8e97f6196",
+          "bytes": 546
+        },
+        "dlms-lls-hdlc/cases/unknown-mechanism-udp.pcap": {
+          "sha256": "55e0470f0b1a01dca3b122d6b0282e553076c91405d973ab9e385ea6e1ad6d37",
+          "bytes": 312
+        },
+        "dlms-lls-hdlc/cases/unselected-requirement-tcp.pcap": {
+          "sha256": "febe79f2e6b1b553a8bf9721b73a77888739d84c6b9494a82f967a102abc5a9c",
+          "bytes": 546
+        },
+        "dlms-lls-hdlc/cases/unselected-requirement-udp.pcap": {
+          "sha256": "4ecc2434b9ef589c7f523da0cecbdb89b1670e327d3ea3cdac5c6289e8d546f2",
+          "bytes": 312
+        },
+        "dlms-lls-hdlc/cases/value-over-budget-tcp.pcap": {
+          "sha256": "6697d06cdce76145e86867f8f42cd8139cf637d7b12393246f03c932ae65588c",
+          "bytes": 587
+        },
+        "dlms-lls-hdlc/cases/value-over-budget-udp.pcap": {
+          "sha256": "cc3a9ba5be4e90a9a1f47bba474e28215f5b2888a01867f22d6798d85d887067",
+          "bytes": 353
+        },
+        "dlms-lls-hdlc/cases/wrong-direction-tcp.pcap": {
+          "sha256": "52a678d76a6b9fedf7f2cf19569b5e13728cdfe9c5f460240ca6e4751adc5231",
+          "bytes": 644
+        },
+        "dlms-lls-hdlc/cases/wrong-direction-udp.pcap": {
+          "sha256": "ee8f362eda597194f80ec0d25f997f1f8b0221e72657269e1fa6d5f3158da7a9",
+          "bytes": 398
+        },
+        "dlms-lls-hdlc/controls.json": {
+          "sha256": "e7037c57c249929417820eb156c72e55ea9d5f4edd8ddd1be024f9f3bed244cd",
+          "bytes": 169718
+        },
+        "dlms-lls-wrapper/cases/accepted-tcp.pcap": {
+          "sha256": "0f3f1f3ebd8182fe66584802faf1fc432c8c9a0dd786a49ccf4e688211da8e95",
+          "bytes": 505
+        },
+        "dlms-lls-wrapper/cases/accepted-udp.pcap": {
+          "sha256": "af425068d393946f8e1b8a24382deaeca7c929aa3b65387ff8634f0d9cfdfe19",
+          "bytes": 271
+        },
+        "dlms-lls-wrapper/cases/changed-value-same-generation-tcp.pcap": {
+          "sha256": "2fce5e408481d589e0500d0217765828d6954931c7a56a28ded3ae9aef35bd13",
+          "bytes": 654
+        },
+        "dlms-lls-wrapper/cases/changed-value-same-generation-udp.pcap": {
+          "sha256": "4349f0875a6a8c8c1ced61069c56cdb60a1f5cae7032ad5104483f4ea92f4d08",
+          "bytes": 408
+        },
+        "dlms-lls-wrapper/cases/duplicate-value-tcp.pcap": {
+          "sha256": "145ced2bcb695204ae0a97306747e7d06b02e9b33355242814343d50cde6c086",
+          "bytes": 562
+        },
+        "dlms-lls-wrapper/cases/duplicate-value-udp.pcap": {
+          "sha256": "48a0d2dc7d79ceabcf731c09684475dd8840665b4b89eb48c1c00322b6d7f49e",
+          "bytes": 328
+        },
+        "dlms-lls-wrapper/cases/empty-value-tcp.pcap": {
+          "sha256": "5375758b64caf87522bc629ec35f2bb3fbccd0c3a6c09c907f6cdbb2ac9361ea",
+          "bytes": 510
+        },
+        "dlms-lls-wrapper/cases/empty-value-udp.pcap": {
+          "sha256": "0bb50cfce6e505a59394e8e75afece39e5793af3bf02bde551274e13d4ad5e41",
+          "bytes": 276
+        },
+        "dlms-lls-wrapper/cases/exact-active-retry-tcp.pcap": {
+          "sha256": "0c792c2eb72e797a0f898e76c2debfe32627bfa8781e5c2a1909ccf97ca9d70b",
+          "bytes": 655
+        },
+        "dlms-lls-wrapper/cases/exact-active-retry-udp.pcap": {
+          "sha256": "e31e3fea8a6f829c1a83f82c99779edfa48ef7232795ce2d1cc28bad175b8c09",
+          "bytes": 409
+        },
+        "dlms-lls-wrapper/cases/invalid-unused-bits-tcp.pcap": {
+          "sha256": "63b2f0f016114385d377ab7f4446b688599453acbf9204004d797a5529fe8cd6",
+          "bytes": 534
+        },
+        "dlms-lls-wrapper/cases/invalid-unused-bits-udp.pcap": {
+          "sha256": "16affcb0b3d2fcae0dd7de36c4f07ca00036b0c32369aeb76b0f071a99fcb68f",
+          "bytes": 300
+        },
+        "dlms-lls-wrapper/cases/invalid-unused-count-tcp.pcap": {
+          "sha256": "dd3c9c633ff2bfbe3ae7303550823856edddebc79630888f6850c161a739448e",
+          "bytes": 534
+        },
+        "dlms-lls-wrapper/cases/invalid-unused-count-udp.pcap": {
+          "sha256": "3d8bd65f7b714aa55553571cdde2de9ded664524a095085a685703fca04ff071",
+          "bytes": 300
+        },
+        "dlms-lls-wrapper/cases/maximum-value-tcp.pcap": {
+          "sha256": "86676b333097565868fe4ca6a05b8f00169e0001c38ec91c4aedd5b572ec5368",
+          "bytes": 545
+        },
+        "dlms-lls-wrapper/cases/maximum-value-udp.pcap": {
+          "sha256": "49fb842983ebc508cff5119a79de902eddac41b93101b49d2fd951b90a12c265",
+          "bytes": 311
+        },
+        "dlms-lls-wrapper/cases/minimum-value-tcp.pcap": {
+          "sha256": "5bd8adac53b7890e4b07c798bad113869d2abfe26b83b536fc9bf7a83f524960",
+          "bytes": 482
+        },
+        "dlms-lls-wrapper/cases/minimum-value-udp.pcap": {
+          "sha256": "0b245464edb9802810ec4cf382cebd370e9972f4d62ac0445be107709c5b6cbc",
+          "bytes": 248
+        },
+        "dlms-lls-wrapper/cases/missing-mechanism-tcp.pcap": {
+          "sha256": "20d657f3ec98519a15d20a72a64c45179474b80110acd4021d92da088ac1ac45",
+          "bytes": 525
+        },
+        "dlms-lls-wrapper/cases/missing-mechanism-udp.pcap": {
+          "sha256": "b4237042b97b6b2886565151acd9b0d13dd47c39e4e97c8a3f36063b563cffa9",
+          "bytes": 291
+        },
+        "dlms-lls-wrapper/cases/missing-requirements-tcp.pcap": {
+          "sha256": "4747f621bd1e20273ae21e331bd42a4afd56557b3988128158b319f369921e76",
+          "bytes": 530
+        },
+        "dlms-lls-wrapper/cases/missing-requirements-udp.pcap": {
+          "sha256": "be23b1211bdc76008c37418cf150ba206b27f9cf4533820c1e12337818cd4de2",
+          "bytes": 296
+        },
+        "dlms-lls-wrapper/cases/missing-value-tcp.pcap": {
+          "sha256": "dac2dd77fd3e3cf7aa9e87fc227b5123d4d0c7bd2acfa67e0ca715403139478f",
+          "bytes": 506
+        },
+        "dlms-lls-wrapper/cases/missing-value-udp.pcap": {
+          "sha256": "7cfcb883b8ededcc61801785afb6deb92fd6f89116cec71893263651c6dbec51",
+          "bytes": 272
+        },
+        "dlms-lls-wrapper/cases/orphan-late-tcp.pcap": {
+          "sha256": "66aadfc5588532280f4f03dead30f833eff406c8762df2cb73125e950e26d9c7",
+          "bytes": 626
+        },
+        "dlms-lls-wrapper/cases/orphan-late-udp.pcap": {
+          "sha256": "a5841f51e2149de6d9f53ff9630e0234a7535757af9ea60bd899a6d3484d2a1a",
+          "bytes": 380
+        },
+        "dlms-lls-wrapper/cases/rejected-authentication-observation-tcp.pcap": {
+          "sha256": "d8f9613852585920ed76f223dfd4bc2ade13481e6d12cf6a3cb2707ba0dc9d03",
+          "bytes": 487
+        },
+        "dlms-lls-wrapper/cases/rejected-authentication-observation-udp.pcap": {
+          "sha256": "e71f59dc2234a98c68050d41af817b3e1bd683c51c52736f5e75d3029556ff08",
+          "bytes": 253
+        },
+        "dlms-lls-wrapper/cases/reordered-authentication-components-tcp.pcap": {
+          "sha256": "8f31172fbb01e0f231821d0beda73e4231c9e7bc6d8d5abf97004f0c0beb484e",
+          "bytes": 534
+        },
+        "dlms-lls-wrapper/cases/reordered-authentication-components-udp.pcap": {
+          "sha256": "24d349e66fa80cdfa629eccaa6b1807249b604a8dc2c51f4718ecba3c872be11",
+          "bytes": 300
+        },
+        "dlms-lls-wrapper/cases/trailing-value-choice-tcp.pcap": {
+          "sha256": "c3f856c88bb4207ad86dfb2848d4ba0ec007798db13095366ab33f33f81c5492",
+          "bytes": 535
+        },
+        "dlms-lls-wrapper/cases/trailing-value-choice-udp.pcap": {
+          "sha256": "b67d20a12d480361a8d86c71aaf35376ec5851238b39eb5171c7398d8991fe02",
+          "bytes": 301
+        },
+        "dlms-lls-wrapper/cases/unknown-mechanism-tcp.pcap": {
+          "sha256": "e92f3b2978be1688cab139f4ba21f36c3681a19404cb205e1a8fab9fa3440901",
+          "bytes": 534
+        },
+        "dlms-lls-wrapper/cases/unknown-mechanism-udp.pcap": {
+          "sha256": "e3c43e6b5aa67e5a0a97ba1791245b64ac8e0119f4f1dfefa7161f71acecf589",
+          "bytes": 300
+        },
+        "dlms-lls-wrapper/cases/unselected-requirement-tcp.pcap": {
+          "sha256": "30fd36c4d333df20da0e44a1cb3e458b1bfa93b4e88a95213ad529ab237f9551",
+          "bytes": 534
+        },
+        "dlms-lls-wrapper/cases/unselected-requirement-udp.pcap": {
+          "sha256": "28fac53f7bdcc517248cd3d4073d46781f1f5acf21968b3494843612b08dd8c1",
+          "bytes": 300
+        },
+        "dlms-lls-wrapper/cases/value-over-budget-tcp.pcap": {
+          "sha256": "c94f554cf6f8eb6c6ba7492471ed4dc84aed2675b8ee801356d223a1199039f2",
+          "bytes": 575
+        },
+        "dlms-lls-wrapper/cases/value-over-budget-udp.pcap": {
+          "sha256": "72c25570c9c7f878929e6ca4d369f4d539b58c8cbb4d0ac636993b0e64faebc3",
+          "bytes": 341
+        },
+        "dlms-lls-wrapper/cases/wrong-direction-tcp.pcap": {
+          "sha256": "264bdbf6b24423cdab0ae82ada66a409a46f529f425c28e0b90087c2073855b7",
+          "bytes": 626
+        },
+        "dlms-lls-wrapper/cases/wrong-direction-udp.pcap": {
+          "sha256": "a2f6506bac57681b74916ca8b9167a66b475bd6fb4694ffd202b95df0ee64cc5",
+          "bytes": 380
+        },
+        "dlms-lls-wrapper/controls.json": {
+          "sha256": "db91bd3a2a8e6ecc88e64a33c4fae26bd120639f55147d95aa8d26af3fbfbf36",
+          "bytes": 180268
+        },
+        "dlms-lls/REFERENCE-ACTUAL.json": {
+          "sha256": "0661625e580dc108cd7c4cf08881dc6b4f9b28cdf12a2cc858296472d3b9f078",
+          "bytes": 1567
+        },
+        "dlms-lls/acse_model.py": {
+          "sha256": "b6354845cd9c76e10e6f80f34ad6ca3c97b85f517cb8d1a7e8ec19b2e60129dd",
+          "bytes": 1801
+        },
+        "dlms-lls/build.py": {
+          "sha256": "c3f0a1d9d4220e73631172b25d63d26b9aeb9c0b2ec6cca63745c866d831a838",
+          "bytes": 8128
+        },
+        "dlms-lls/carrier.py": {
+          "sha256": "01b94cc32d91810ba8f8e106294834820fa56fe73bc3f108ce42ecbb3e0dd379",
+          "bytes": 1380
+        },
+        "dlms-lls/hdlc_model.py": {
+          "sha256": "a821fc16a535f1092345da46cc4d4f088968dd9441e2808da7a57066c15eca5e",
+          "bytes": 2239
+        },
+        "dlms-lls/reference.py": {
+          "sha256": "d2e44b5e621771d1d8bc772ec36a79515eea9ccdc53a94cd1055066e71cf5eb3",
+          "bytes": 3541
+        },
+        "dlms-lls/source-pin.json": {
+          "sha256": "f8c49fce198632e7200fe87c4226c4b1eab66e6f92b4bb535680582d7495a0ba",
+          "bytes": 13504
+        },
+        "dlms-lls/verify.py": {
+          "sha256": "682e8b3ab3aade340ef9e876b4662e95934c962cb8ed9de71461ff17f27606b8",
+          "bytes": 2229
+        },
+        "required-tests-traffic-unified-v80.json": {
+          "sha256": "ae296535ea7f2b584c0910659699a8de86afc8bbb8548fc5fd163ecd46419704",
+          "bytes": 18743546
+        },
+        "validation/expected.json": {
+          "sha256": "a37d751665bf6eadce241bd2af7be12218dae3f187d7b052423d8d22e3b3593d",
+          "bytes": 98105
+        }
+      },
+      "aliases": {
+        "common/pcapx/pcaputil/dlms-lls-hdlc/answers/accepted-tcp.json": "dlms-lls-hdlc/answers/accepted-tcp.json",
+        "common/pcapx/pcaputil/dlms-lls-hdlc/answers/accepted-udp.json": "dlms-lls-hdlc/answers/accepted-udp.json",
+        "common/pcapx/pcaputil/dlms-lls-hdlc/answers/changed-value-same-generation-tcp.json": "dlms-lls-hdlc/answers/changed-value-same-generation-tcp.json",
+        "common/pcapx/pcaputil/dlms-lls-hdlc/answers/changed-value-same-generation-udp.json": "dlms-lls-hdlc/answers/changed-value-same-generation-udp.json",
+        "common/pcapx/pcaputil/dlms-lls-hdlc/answers/duplicate-value-tcp.json": "dlms-lls-hdlc/answers/duplicate-value-tcp.json",
+        "common/pcapx/pcaputil/dlms-lls-hdlc/answers/duplicate-value-udp.json": "dlms-lls-hdlc/answers/duplicate-value-udp.json",
+        "common/pcapx/pcaputil/dlms-lls-hdlc/answers/empty-value-tcp.json": "dlms-lls-hdlc/answers/empty-value-tcp.json",
+        "common/pcapx/pcaputil/dlms-lls-hdlc/answers/empty-value-udp.json": "dlms-lls-hdlc/answers/empty-value-udp.json",
+        "common/pcapx/pcaputil/dlms-lls-hdlc/answers/exact-active-retry-tcp.json": "dlms-lls-hdlc/answers/exact-active-retry-tcp.json",
+        "common/pcapx/pcaputil/dlms-lls-hdlc/answers/exact-active-retry-udp.json": "dlms-lls-hdlc/answers/exact-active-retry-udp.json",
+        "common/pcapx/pcaputil/dlms-lls-hdlc/answers/invalid-unused-bits-tcp.json": "dlms-lls-hdlc/answers/invalid-unused-bits-tcp.json",
+        "common/pcapx/pcaputil/dlms-lls-hdlc/answers/invalid-unused-bits-udp.json": "dlms-lls-hdlc/answers/invalid-unused-bits-udp.json",
+        "common/pcapx/pcaputil/dlms-lls-hdlc/answers/invalid-unused-count-tcp.json": "dlms-lls-hdlc/answers/invalid-unused-count-tcp.json",
+        "common/pcapx/pcaputil/dlms-lls-hdlc/answers/invalid-unused-count-udp.json": "dlms-lls-hdlc/answers/invalid-unused-count-udp.json",
+        "common/pcapx/pcaputil/dlms-lls-hdlc/answers/maximum-value-tcp.json": "dlms-lls-hdlc/answers/maximum-value-tcp.json",
+        "common/pcapx/pcaputil/dlms-lls-hdlc/answers/maximum-value-udp.json": "dlms-lls-hdlc/answers/maximum-value-udp.json",
+        "common/pcapx/pcaputil/dlms-lls-hdlc/answers/minimum-value-tcp.json": "dlms-lls-hdlc/answers/minimum-value-tcp.json",
+        "common/pcapx/pcaputil/dlms-lls-hdlc/answers/minimum-value-udp.json": "dlms-lls-hdlc/answers/minimum-value-udp.json",
+        "common/pcapx/pcaputil/dlms-lls-hdlc/answers/missing-mechanism-tcp.json": "dlms-lls-hdlc/answers/missing-mechanism-tcp.json",
+        "common/pcapx/pcaputil/dlms-lls-hdlc/answers/missing-mechanism-udp.json": "dlms-lls-hdlc/answers/missing-mechanism-udp.json",
+        "common/pcapx/pcaputil/dlms-lls-hdlc/answers/missing-requirements-tcp.json": "dlms-lls-hdlc/answers/missing-requirements-tcp.json",
+        "common/pcapx/pcaputil/dlms-lls-hdlc/answers/missing-requirements-udp.json": "dlms-lls-hdlc/answers/missing-requirements-udp.json",
+        "common/pcapx/pcaputil/dlms-lls-hdlc/answers/missing-value-tcp.json": "dlms-lls-hdlc/answers/missing-value-tcp.json",
+        "common/pcapx/pcaputil/dlms-lls-hdlc/answers/missing-value-udp.json": "dlms-lls-hdlc/answers/missing-value-udp.json",
+        "common/pcapx/pcaputil/dlms-lls-hdlc/answers/orphan-late-tcp.json": "dlms-lls-hdlc/answers/orphan-late-tcp.json",
+        "common/pcapx/pcaputil/dlms-lls-hdlc/answers/orphan-late-udp.json": "dlms-lls-hdlc/answers/orphan-late-udp.json",
+        "common/pcapx/pcaputil/dlms-lls-hdlc/answers/rejected-authentication-observation-tcp.json": "dlms-lls-hdlc/answers/rejected-authentication-observation-tcp.json",
+        "common/pcapx/pcaputil/dlms-lls-hdlc/answers/rejected-authentication-observation-udp.json": "dlms-lls-hdlc/answers/rejected-authentication-observation-udp.json",
+        "common/pcapx/pcaputil/dlms-lls-hdlc/answers/reordered-authentication-components-tcp.json": "dlms-lls-hdlc/answers/reordered-authentication-components-tcp.json",
+        "common/pcapx/pcaputil/dlms-lls-hdlc/answers/reordered-authentication-components-udp.json": "dlms-lls-hdlc/answers/reordered-authentication-components-udp.json",
+        "common/pcapx/pcaputil/dlms-lls-hdlc/answers/trailing-value-choice-tcp.json": "dlms-lls-hdlc/answers/trailing-value-choice-tcp.json",
+        "common/pcapx/pcaputil/dlms-lls-hdlc/answers/trailing-value-choice-udp.json": "dlms-lls-hdlc/answers/trailing-value-choice-udp.json",
+        "common/pcapx/pcaputil/dlms-lls-hdlc/answers/unknown-mechanism-tcp.json": "dlms-lls-hdlc/answers/unknown-mechanism-tcp.json",
+        "common/pcapx/pcaputil/dlms-lls-hdlc/answers/unknown-mechanism-udp.json": "dlms-lls-hdlc/answers/unknown-mechanism-udp.json",
+        "common/pcapx/pcaputil/dlms-lls-hdlc/answers/unselected-requirement-tcp.json": "dlms-lls-hdlc/answers/unselected-requirement-tcp.json",
+        "common/pcapx/pcaputil/dlms-lls-hdlc/answers/unselected-requirement-udp.json": "dlms-lls-hdlc/answers/unselected-requirement-udp.json",
+        "common/pcapx/pcaputil/dlms-lls-hdlc/answers/value-over-budget-tcp.json": "dlms-lls-hdlc/answers/value-over-budget-tcp.json",
+        "common/pcapx/pcaputil/dlms-lls-hdlc/answers/value-over-budget-udp.json": "dlms-lls-hdlc/answers/value-over-budget-udp.json",
+        "common/pcapx/pcaputil/dlms-lls-hdlc/answers/wrong-direction-tcp.json": "dlms-lls-hdlc/answers/wrong-direction-tcp.json",
+        "common/pcapx/pcaputil/dlms-lls-hdlc/answers/wrong-direction-udp.json": "dlms-lls-hdlc/answers/wrong-direction-udp.json",
+        "common/pcapx/pcaputil/dlms-lls-hdlc/cases/accepted-tcp.pcap": "dlms-lls-hdlc/cases/accepted-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-lls-hdlc/cases/accepted-udp.pcap": "dlms-lls-hdlc/cases/accepted-udp.pcap",
+        "common/pcapx/pcaputil/dlms-lls-hdlc/cases/changed-value-same-generation-tcp.pcap": "dlms-lls-hdlc/cases/changed-value-same-generation-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-lls-hdlc/cases/changed-value-same-generation-udp.pcap": "dlms-lls-hdlc/cases/changed-value-same-generation-udp.pcap",
+        "common/pcapx/pcaputil/dlms-lls-hdlc/cases/duplicate-value-tcp.pcap": "dlms-lls-hdlc/cases/duplicate-value-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-lls-hdlc/cases/duplicate-value-udp.pcap": "dlms-lls-hdlc/cases/duplicate-value-udp.pcap",
+        "common/pcapx/pcaputil/dlms-lls-hdlc/cases/empty-value-tcp.pcap": "dlms-lls-hdlc/cases/empty-value-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-lls-hdlc/cases/empty-value-udp.pcap": "dlms-lls-hdlc/cases/empty-value-udp.pcap",
+        "common/pcapx/pcaputil/dlms-lls-hdlc/cases/exact-active-retry-tcp.pcap": "dlms-lls-hdlc/cases/exact-active-retry-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-lls-hdlc/cases/exact-active-retry-udp.pcap": "dlms-lls-hdlc/cases/exact-active-retry-udp.pcap",
+        "common/pcapx/pcaputil/dlms-lls-hdlc/cases/invalid-unused-bits-tcp.pcap": "dlms-lls-hdlc/cases/invalid-unused-bits-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-lls-hdlc/cases/invalid-unused-bits-udp.pcap": "dlms-lls-hdlc/cases/invalid-unused-bits-udp.pcap",
+        "common/pcapx/pcaputil/dlms-lls-hdlc/cases/invalid-unused-count-tcp.pcap": "dlms-lls-hdlc/cases/invalid-unused-count-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-lls-hdlc/cases/invalid-unused-count-udp.pcap": "dlms-lls-hdlc/cases/invalid-unused-count-udp.pcap",
+        "common/pcapx/pcaputil/dlms-lls-hdlc/cases/maximum-value-tcp.pcap": "dlms-lls-hdlc/cases/maximum-value-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-lls-hdlc/cases/maximum-value-udp.pcap": "dlms-lls-hdlc/cases/maximum-value-udp.pcap",
+        "common/pcapx/pcaputil/dlms-lls-hdlc/cases/minimum-value-tcp.pcap": "dlms-lls-hdlc/cases/minimum-value-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-lls-hdlc/cases/minimum-value-udp.pcap": "dlms-lls-hdlc/cases/minimum-value-udp.pcap",
+        "common/pcapx/pcaputil/dlms-lls-hdlc/cases/missing-mechanism-tcp.pcap": "dlms-lls-hdlc/cases/missing-mechanism-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-lls-hdlc/cases/missing-mechanism-udp.pcap": "dlms-lls-hdlc/cases/missing-mechanism-udp.pcap",
+        "common/pcapx/pcaputil/dlms-lls-hdlc/cases/missing-requirements-tcp.pcap": "dlms-lls-hdlc/cases/missing-requirements-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-lls-hdlc/cases/missing-requirements-udp.pcap": "dlms-lls-hdlc/cases/missing-requirements-udp.pcap",
+        "common/pcapx/pcaputil/dlms-lls-hdlc/cases/missing-value-tcp.pcap": "dlms-lls-hdlc/cases/missing-value-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-lls-hdlc/cases/missing-value-udp.pcap": "dlms-lls-hdlc/cases/missing-value-udp.pcap",
+        "common/pcapx/pcaputil/dlms-lls-hdlc/cases/orphan-late-tcp.pcap": "dlms-lls-hdlc/cases/orphan-late-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-lls-hdlc/cases/orphan-late-udp.pcap": "dlms-lls-hdlc/cases/orphan-late-udp.pcap",
+        "common/pcapx/pcaputil/dlms-lls-hdlc/cases/rejected-authentication-observation-tcp.pcap": "dlms-lls-hdlc/cases/rejected-authentication-observation-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-lls-hdlc/cases/rejected-authentication-observation-udp.pcap": "dlms-lls-hdlc/cases/rejected-authentication-observation-udp.pcap",
+        "common/pcapx/pcaputil/dlms-lls-hdlc/cases/reordered-authentication-components-tcp.pcap": "dlms-lls-hdlc/cases/reordered-authentication-components-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-lls-hdlc/cases/reordered-authentication-components-udp.pcap": "dlms-lls-hdlc/cases/reordered-authentication-components-udp.pcap",
+        "common/pcapx/pcaputil/dlms-lls-hdlc/cases/trailing-value-choice-tcp.pcap": "dlms-lls-hdlc/cases/trailing-value-choice-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-lls-hdlc/cases/trailing-value-choice-udp.pcap": "dlms-lls-hdlc/cases/trailing-value-choice-udp.pcap",
+        "common/pcapx/pcaputil/dlms-lls-hdlc/cases/unknown-mechanism-tcp.pcap": "dlms-lls-hdlc/cases/unknown-mechanism-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-lls-hdlc/cases/unknown-mechanism-udp.pcap": "dlms-lls-hdlc/cases/unknown-mechanism-udp.pcap",
+        "common/pcapx/pcaputil/dlms-lls-hdlc/cases/unselected-requirement-tcp.pcap": "dlms-lls-hdlc/cases/unselected-requirement-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-lls-hdlc/cases/unselected-requirement-udp.pcap": "dlms-lls-hdlc/cases/unselected-requirement-udp.pcap",
+        "common/pcapx/pcaputil/dlms-lls-hdlc/cases/value-over-budget-tcp.pcap": "dlms-lls-hdlc/cases/value-over-budget-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-lls-hdlc/cases/value-over-budget-udp.pcap": "dlms-lls-hdlc/cases/value-over-budget-udp.pcap",
+        "common/pcapx/pcaputil/dlms-lls-hdlc/cases/wrong-direction-tcp.pcap": "dlms-lls-hdlc/cases/wrong-direction-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-lls-hdlc/cases/wrong-direction-udp.pcap": "dlms-lls-hdlc/cases/wrong-direction-udp.pcap",
+        "common/pcapx/pcaputil/dlms-lls-hdlc/controls.json": "dlms-lls-hdlc/controls.json",
+        "common/pcapx/pcaputil/dlms-lls-wrapper/cases/accepted-tcp.pcap": "dlms-lls-wrapper/cases/accepted-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-lls-wrapper/cases/accepted-udp.pcap": "dlms-lls-wrapper/cases/accepted-udp.pcap",
+        "common/pcapx/pcaputil/dlms-lls-wrapper/cases/changed-value-same-generation-tcp.pcap": "dlms-lls-wrapper/cases/changed-value-same-generation-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-lls-wrapper/cases/changed-value-same-generation-udp.pcap": "dlms-lls-wrapper/cases/changed-value-same-generation-udp.pcap",
+        "common/pcapx/pcaputil/dlms-lls-wrapper/cases/duplicate-value-tcp.pcap": "dlms-lls-wrapper/cases/duplicate-value-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-lls-wrapper/cases/duplicate-value-udp.pcap": "dlms-lls-wrapper/cases/duplicate-value-udp.pcap",
+        "common/pcapx/pcaputil/dlms-lls-wrapper/cases/empty-value-tcp.pcap": "dlms-lls-wrapper/cases/empty-value-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-lls-wrapper/cases/empty-value-udp.pcap": "dlms-lls-wrapper/cases/empty-value-udp.pcap",
+        "common/pcapx/pcaputil/dlms-lls-wrapper/cases/exact-active-retry-tcp.pcap": "dlms-lls-wrapper/cases/exact-active-retry-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-lls-wrapper/cases/exact-active-retry-udp.pcap": "dlms-lls-wrapper/cases/exact-active-retry-udp.pcap",
+        "common/pcapx/pcaputil/dlms-lls-wrapper/cases/invalid-unused-bits-tcp.pcap": "dlms-lls-wrapper/cases/invalid-unused-bits-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-lls-wrapper/cases/invalid-unused-bits-udp.pcap": "dlms-lls-wrapper/cases/invalid-unused-bits-udp.pcap",
+        "common/pcapx/pcaputil/dlms-lls-wrapper/cases/invalid-unused-count-tcp.pcap": "dlms-lls-wrapper/cases/invalid-unused-count-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-lls-wrapper/cases/invalid-unused-count-udp.pcap": "dlms-lls-wrapper/cases/invalid-unused-count-udp.pcap",
+        "common/pcapx/pcaputil/dlms-lls-wrapper/cases/maximum-value-tcp.pcap": "dlms-lls-wrapper/cases/maximum-value-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-lls-wrapper/cases/maximum-value-udp.pcap": "dlms-lls-wrapper/cases/maximum-value-udp.pcap",
+        "common/pcapx/pcaputil/dlms-lls-wrapper/cases/minimum-value-tcp.pcap": "dlms-lls-wrapper/cases/minimum-value-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-lls-wrapper/cases/minimum-value-udp.pcap": "dlms-lls-wrapper/cases/minimum-value-udp.pcap",
+        "common/pcapx/pcaputil/dlms-lls-wrapper/cases/missing-mechanism-tcp.pcap": "dlms-lls-wrapper/cases/missing-mechanism-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-lls-wrapper/cases/missing-mechanism-udp.pcap": "dlms-lls-wrapper/cases/missing-mechanism-udp.pcap",
+        "common/pcapx/pcaputil/dlms-lls-wrapper/cases/missing-requirements-tcp.pcap": "dlms-lls-wrapper/cases/missing-requirements-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-lls-wrapper/cases/missing-requirements-udp.pcap": "dlms-lls-wrapper/cases/missing-requirements-udp.pcap",
+        "common/pcapx/pcaputil/dlms-lls-wrapper/cases/missing-value-tcp.pcap": "dlms-lls-wrapper/cases/missing-value-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-lls-wrapper/cases/missing-value-udp.pcap": "dlms-lls-wrapper/cases/missing-value-udp.pcap",
+        "common/pcapx/pcaputil/dlms-lls-wrapper/cases/orphan-late-tcp.pcap": "dlms-lls-wrapper/cases/orphan-late-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-lls-wrapper/cases/orphan-late-udp.pcap": "dlms-lls-wrapper/cases/orphan-late-udp.pcap",
+        "common/pcapx/pcaputil/dlms-lls-wrapper/cases/rejected-authentication-observation-tcp.pcap": "dlms-lls-wrapper/cases/rejected-authentication-observation-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-lls-wrapper/cases/rejected-authentication-observation-udp.pcap": "dlms-lls-wrapper/cases/rejected-authentication-observation-udp.pcap",
+        "common/pcapx/pcaputil/dlms-lls-wrapper/cases/reordered-authentication-components-tcp.pcap": "dlms-lls-wrapper/cases/reordered-authentication-components-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-lls-wrapper/cases/reordered-authentication-components-udp.pcap": "dlms-lls-wrapper/cases/reordered-authentication-components-udp.pcap",
+        "common/pcapx/pcaputil/dlms-lls-wrapper/cases/trailing-value-choice-tcp.pcap": "dlms-lls-wrapper/cases/trailing-value-choice-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-lls-wrapper/cases/trailing-value-choice-udp.pcap": "dlms-lls-wrapper/cases/trailing-value-choice-udp.pcap",
+        "common/pcapx/pcaputil/dlms-lls-wrapper/cases/unknown-mechanism-tcp.pcap": "dlms-lls-wrapper/cases/unknown-mechanism-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-lls-wrapper/cases/unknown-mechanism-udp.pcap": "dlms-lls-wrapper/cases/unknown-mechanism-udp.pcap",
+        "common/pcapx/pcaputil/dlms-lls-wrapper/cases/unselected-requirement-tcp.pcap": "dlms-lls-wrapper/cases/unselected-requirement-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-lls-wrapper/cases/unselected-requirement-udp.pcap": "dlms-lls-wrapper/cases/unselected-requirement-udp.pcap",
+        "common/pcapx/pcaputil/dlms-lls-wrapper/cases/value-over-budget-tcp.pcap": "dlms-lls-wrapper/cases/value-over-budget-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-lls-wrapper/cases/value-over-budget-udp.pcap": "dlms-lls-wrapper/cases/value-over-budget-udp.pcap",
+        "common/pcapx/pcaputil/dlms-lls-wrapper/cases/wrong-direction-tcp.pcap": "dlms-lls-wrapper/cases/wrong-direction-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-lls-wrapper/cases/wrong-direction-udp.pcap": "dlms-lls-wrapper/cases/wrong-direction-udp.pcap",
+        "common/pcapx/pcaputil/dlms-lls-wrapper/controls.json": "dlms-lls-wrapper/controls.json",
+        "common/pcapx/pcaputil/dlms-lls/REFERENCE-ACTUAL.json": "dlms-lls/REFERENCE-ACTUAL.json",
+        "common/pcapx/pcaputil/dlms-lls/acse_model.py": "dlms-lls/acse_model.py",
+        "common/pcapx/pcaputil/dlms-lls/build.py": "dlms-lls/build.py",
+        "common/pcapx/pcaputil/dlms-lls/carrier.py": "dlms-lls/carrier.py",
+        "common/pcapx/pcaputil/dlms-lls/hdlc_model.py": "dlms-lls/hdlc_model.py",
+        "common/pcapx/pcaputil/dlms-lls/reference.py": "dlms-lls/reference.py",
+        "common/pcapx/pcaputil/dlms-lls/source-pin.json": "dlms-lls/source-pin.json",
+        "common/pcapx/pcaputil/dlms-lls/verify.py": "dlms-lls/verify.py",
+        "scripts/protocol-tests/required-tests-traffic-unified-v80.json": "required-tests-traffic-unified-v80.json"
+      }
     }
   ],
   "schema_version": 1,

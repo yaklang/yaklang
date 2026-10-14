@@ -49,8 +49,14 @@ func wrapperBlockExpectedFields(t *testing.T, a wrapperBlockAnswer, events []*Pr
 	require.GreaterOrEqual(t, i, 0)
 	require.Less(t, i, len(events))
 	f := cloneSession(a.Fields)
-	require.Contains(t, f, "release_request_event")
-	f["release_request_event"] = events[i].ID
+	bound := false
+	for _, key := range []string{"release_request_event", "association_request_event"} {
+		if _, ok := f[key]; ok {
+			f[key] = events[i].ID
+			bound = true
+		}
+	}
+	require.True(t, bound, "dynamic index must bind an independently present request-event field")
 	return f
 }
 

@@ -49,6 +49,7 @@ type wrapperMessage struct {
 	acse, acseAccepted     bool
 	acseRelease, acseAbort bool
 	acseInfo               bool
+	acseLowAuthentication  bool
 	acseConformance        uint32
 	acseMaxPDU             uint16
 }
@@ -575,7 +576,11 @@ func (a *binParser) decodeWrapperDatagram(e *ProtocolEvent, w []byte, src, dst u
 				store = &binUDPStore{entries: make(map[binUDPKey]*list.Element), clock: e.Timestamp}
 				a.udpSessions = store
 			}
-			f.id, f.endpoints, f.domain = a.flows.Add(1), [2]string{e.Source, e.Destination}, e.Domain
+			endpoints := [2]string{e.Source, e.Destination}
+			if e.Direction == 1 {
+				endpoints = [2]string{e.Destination, e.Source}
+			}
+			f.id, f.endpoints, f.domain = a.flows.Add(1), endpoints, e.Domain
 			store.entries[key] = store.lru.PushBack(&binUDPEntry{key, f, store.clock})
 			e.FlowID = f.id
 			created = false

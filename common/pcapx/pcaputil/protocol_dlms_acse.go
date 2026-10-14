@@ -91,7 +91,7 @@ func (s *binDLMS) consumeACSE(m *dlmsMessage, w []byte, dir int, id uint64, limi
 		s.acseSeen[key] = h
 		s.clientKnown, s.clientDir = true, dir
 		s.next[dir], s.seqKnown[dir] = (m.ns+1)&7, true
-		s.pending = &dlmsPending{wire: bytes.Clone(w), kind: "ACSE", acseCommand: 0x60, acseInfo: a.acseInfo, acseConformance: a.acseConformance, acseMaxPDU: a.acseMaxPDU, dir: dir, source: m.source, destination: m.destination, id: id, ns: m.ns}
+		s.pending = &dlmsPending{wire: bytes.Clone(w), kind: "ACSE", acseCommand: 0x60, acseInfo: a.acseInfo, acseLowAuthentication: a.acseLowAuthentication, acseConformance: a.acseConformance, acseMaxPDU: a.acseMaxPDU, dir: dir, source: m.source, destination: m.destination, id: id, ns: m.ns}
 		m.fields["Association"] = "observed-association-request"
 		if !a.acseInfo {
 			m.fields["Association"] = "unverified-association-initiate-context"
@@ -140,6 +140,9 @@ func (s *binDLMS) consumeACSE(m *dlmsMessage, w []byte, dir int, id uint64, limi
 	}
 	a.fields["proposed_conformance_bits"], a.fields["proposed_max_pdu_size"] = p.acseConformance, p.acseMaxPDU
 	a.fields["association_observed"], a.fields["association_request_event"] = true, p.id
+	if p.acseLowAuthentication {
+		a.fields["proposed_authentication_mechanism_oid"] = "2.16.756.5.8.2.1"
+	}
 	m.fields["Association"] = "observed-association-response"
 	return m.fields, p.id, nil
 }

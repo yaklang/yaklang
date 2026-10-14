@@ -649,6 +649,11 @@ func (a *binParser) closeUDPSessions() {
 			f := v.flow
 			if w := f.wrapper; w != nil {
 				for key, p := range w.associations {
+					if p.pending && p.lowAuthentication {
+						summary := "DLMS Wrapper LOW association ended with an unmatched request"
+						incomplete = append(incomplete, &ProtocolEvent{FlowID: f.id, Timestamp: v.touched, Domain: v.key.domain, Transport: "udp", Source: f.endpoints[key.dir], Destination: f.endpoints[1-key.dir], Direction: key.dir, Protocol: "dlms-wrapper", Profile: "dlms-wrapper-v1-acse", Status: "incomplete", Completeness: "incomplete", Summary: summary, Session: map[string]any{"Outstanding": 1, "source_wport": key.source, "destination_wport": key.destination}, Error: summary, sessionError: &ProtocolError{Kind: ErrNeedMore, Message: summary}})
+						a.incomplete.Add(1)
+					}
 					if p.releasePending {
 						summary := "DLMS Wrapper release ended with an unmatched request"
 						incomplete = append(incomplete, &ProtocolEvent{FlowID: f.id, Timestamp: v.touched, Domain: v.key.domain, Transport: "udp", Source: f.endpoints[key.dir], Destination: f.endpoints[1-key.dir], Direction: key.dir, Protocol: "dlms-wrapper", Profile: "dlms-wrapper-v1-acse-lifecycle", Status: "incomplete", Completeness: "incomplete", Summary: summary, Session: map[string]any{"Outstanding": 1, "source_wport": key.source, "destination_wport": key.destination}, Error: summary, sessionError: &ProtocolError{Kind: ErrNeedMore, Message: summary}})

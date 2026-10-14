@@ -520,20 +520,21 @@ func probeDLMS(w []byte, limit int) ProbeResult {
 }
 
 type dlmsPending struct {
-	wire                []byte
-	requestInformation  []byte // bounded owned APDU for an exact final-frame retry
-	requestFrames       int
-	kind                string
-	acseInfo            bool
-	acseCommand         byte
-	acseConformance     uint32
-	acseMaxPDU          uint16
-	dir                 int
-	source, destination uint32
-	id                  uint64
-	invoke, ns          byte
-	flags, choice       byte
-	count               int
+	wire                  []byte
+	requestInformation    []byte // bounded owned APDU for an exact final-frame retry
+	requestFrames         int
+	kind                  string
+	acseInfo              bool
+	acseCommand           byte
+	acseLowAuthentication bool
+	acseConformance       uint32
+	acseMaxPDU            uint16
+	dir                   int
+	source, destination   uint32
+	id                    uint64
+	invoke, ns            byte
+	flags, choice         byte
+	count                 int
 }
 type binDLMS struct {
 	pending             *dlmsPending

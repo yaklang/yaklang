@@ -1270,6 +1270,16 @@ func (f *binFlow) finishSession(reason TrafficFlowCloseReason) {
 	if w := f.wrapper; w != nil && w.outstanding() > 0 {
 		n := 0
 		for key, p := range w.associations {
+			if p.pending && p.lowAuthentication {
+				e := f.event(key.dir, nil, "incomplete", string(reason)+": DLMS Wrapper LOW association ended with an unmatched request")
+				e.Profile = "dlms-wrapper-v1-acse"
+				e.Session = map[string]any{"Outstanding": 1, "source_wport": key.source, "destination_wport": key.destination}
+				e.sessionError = &ProtocolError{Kind: ErrNeedMore, Message: e.Summary}
+				e.Error = e.Summary
+				f.a.incomplete.Add(1)
+				f.a.emit(e)
+				n++
+			}
 			if p.releasePending {
 				e := f.event(key.dir, nil, "incomplete", string(reason)+": DLMS Wrapper release ended with an unmatched request")
 				e.Profile = "dlms-wrapper-v1-acse-lifecycle"
