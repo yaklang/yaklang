@@ -17,7 +17,6 @@ import (
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	aiv1 "github.com/yaklang/yaklang/scannode/gen/legionpb/legion/ai/v1"
 	"github.com/yaklang/yaklang/scannode/inputresolver"
 )
@@ -657,7 +656,7 @@ func (m *aiSessionRuntimeManager) Bind(
 	}
 	if collector != nil {
 		runtime.trafficCollector = collector
-		ctx = lowhttp.WithHTTPAttemptObserver(ctx, collector.observe)
+		ctx = withAITrafficContext(ctx, collector, "")
 		binding.TrafficCollector = collector
 	}
 	handle, err := m.driver.Bind(ctx, binding, managedEmitter)

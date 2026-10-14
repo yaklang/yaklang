@@ -2,35 +2,34 @@
 
 Legion owns access control, durable traffic evidence, session quotas, masked
 views and export/analysis authorization. Yaklang owns the actual instrumented
-HTTP attempts and their local upload queue. The two repositories exchange the
+HTTPFlow records and their local upload queue. The two repositories exchange the
 versioned messages in `scannode/proto/legion/ai/v1/ai.proto`; they do not import
 each other's implementations.
 
 ## Capture boundary
 
-An opted-in session receives `BindAISessionCommand.traffic_capture`. Its execution
-context carries the HTTP observer through existing tool and script context
-propagation. Capture does not bind tool IDs or change tool `runtime_id` parameters.
-HTTP/1, HTTP/2 and HTTP/3 `lowhttp` transports notify that observer for
-each transport attempt, including status retries, redirects, authentication
-retries, protocol fallback, connection failures and cancellation. HTTP/2's
-internal stream retries are separate observations. A saved HTTPFlow is never
-used to infer the attempt count. Existing HTTPFlow query behavior is unchanged.
+An opted-in session receives `BindAISessionCommand.traffic_capture`. Scan Node
+adds session/turn ownership to the execution context and extends the existing
+`RegisterSaveHTTPFlowHandler` integration while preserving `yakit.SaveLowHTTPFlow`.
+Capture follows the original HTTPFlow save granularity and respects
+`SaveHTTPFlow=false`. Model requests already disable saving in the existing AI
+HTTP client. No transport observer or model-context modification is needed.
 
-The captured packets are the HTTP representation at the transport boundary,
-not TLS records or HTTP/2/HTTP/3 binary frames. An attempt can fail before any
-request byte reaches the target; its lifecycle still records the attempted
-request and failure. External processes, browsers and uninstrumented HTTP
-clients are explicitly unsupported in the `ai_traffic_capability` event.
-Model-provider network contexts explicitly suppress the observer while retaining
-cancellation, deadlines and other context values.
+Only completed flows with response packets are uploaded. Requests still in
+flight, failures without responses, and individual transport/authentication
+retries are not separately recorded. Redirects and retries follow the records
+produced by the existing save path. External processes, browsers and HTTP clients
+outside that path are unsupported. A zero count means no captured flows, not no
+network activity. Capture does not bind tool IDs or override runtime IDs.
 
-The start record fixes session, turn, node, node-session and bind epoch.
-Protocol field 5 and its former `tool_call_id` name are reserved. Start and terminal
-uploads have the same random flow ID and independent phase keys. Metadata carries method, scheme, host, status, timestamps, lengths,
+Each saved flow produces one terminal upload with a random flow ID, session,
+turn, node session and bind epoch. Legacy started uploads remain readable for
+queue recovery and mixed-version compatibility; new capture emits no started
+records. Field 5 and its former `tool_call_id` name remain reserved.
+Metadata carries method, scheme, host, status, timestamps, lengths,
 hashes, truncation, fixed error codes and the optional protocol-v1
-`AITrafficRecord.redacted_url` (field 25). The absolute URL is captured at request
-start and retained in terminal records even when packet headers are unavailable
+`AITrafficRecord.redacted_url` (field 25). The absolute URL is captured from the saved request
+and retained in terminal records even when packet headers are unavailable
 or local/platform byte quotas drop raw evidence. It is limited to 16 KiB and must
 match the record's scheme and host. Userinfo and fragments are removed. Sensitive
 query values and path segments following sensitive keys are replaced with
@@ -135,10 +134,8 @@ Run compilation and tests on the authorized remote WSL host using the exact
 worktree commit. These tests do not claim deployment/provider acceptance:
 
 ```sh
-go test ./common/utils/lowhttp -run '^TestHTTPAttemptObserver' -count=1
-go test ./common/ai/aid/aicommon -run '^(TestReadOnlyEvidence|TestToolCallerHTTPAttemptObserver)' -count=1
-go test ./common/ai/openai -run '^TestGatewayExcludesSessionHTTPAttemptObserver$' -count=1
-go test ./common/ai/aid/aitool/buildinaitools/yakscripttools/test -run '^TestDoHTTPRequestCapturesSessionContextWithoutToolIdentity$' -count=1
+go test ./common/ai/aid/aicommon -run '^TestDisableToolUse' -count=1
+go test ./scannode -run 'TestAITraffic(ReusesSavePolicy|ContextCaptures)' -count=1
 go test ./scannode -run '^(TestResilienceAITraffic|TestAITraffic|TestProductNodeManifestCapabilitiesMatchCompiledSurface)' -count=1
 ```
 

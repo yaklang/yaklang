@@ -13,7 +13,6 @@ import (
 	"github.com/yaklang/yaklang/common/aiengine"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils/chanx"
-	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	aiv1 "github.com/yaklang/yaklang/scannode/gen/legionpb/legion/ai/v1"
 )
@@ -163,10 +162,7 @@ func (h *statelessAIEngineRuntimeHandle) SendInput(ctx context.Context, input ai
 	if collector := h.binding.TrafficCollector; collector != nil {
 		turnID := input.Ref.CommandID
 		options = append(options, func(config *aiengine.AIEngineConfig) {
-			config.Context = lowhttp.WithHTTPAttemptObserver(config.Context, func(start lowhttp.HTTPAttempt) func(lowhttp.HTTPAttempt) {
-				start.TurnID = turnID
-				return collector.observe(start)
-			})
+			config.Context = withAITrafficContext(config.Context, collector, turnID)
 		})
 	}
 

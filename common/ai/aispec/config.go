@@ -10,7 +10,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/utils/lowhttp/poc"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 
@@ -486,9 +485,6 @@ func _NewDefaultAIConfig(opts ...AIConfigOption) *AIConfig {
 type AIConfigOption func(*AIConfig)
 
 func WithContext(ctx context.Context) AIConfigOption {
-	if ctx != nil {
-		ctx = lowhttp.WithHTTPAttemptObserver(ctx, nil)
-	}
 	return func(c *AIConfig) {
 		c.Context = ctx
 	}
