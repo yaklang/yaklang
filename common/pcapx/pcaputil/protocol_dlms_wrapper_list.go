@@ -317,7 +317,7 @@ func decodeWrapperList(m *wrapperMessage, p []byte, limit, depth int) error {
 	}
 	return nil
 }
-func wrapperIsList(w []byte) bool { return len(w) > 9 && w[9] == 3 }
+func wrapperIsList(w []byte) bool { return !wrapperIsGBT(w) && len(w) > 9 && w[9] == 3 }
 func wrapperExtendedScalarTag(tag byte) bool {
 	return tag == 19 || tag == 4 || tag == 10 || tag == 12 || tag == 23 || tag == 24 || tag == 25 || tag == 26 || tag == 27
 }
@@ -331,6 +331,9 @@ func wrapperNormalAccess(w []byte) bool {
 	return len(w) > 20 && w[8] == 0xc0 && w[9] == 1 && w[20] == 1
 }
 func wrapperProfile(w []byte) string {
+	if wrapperIsGBT(w) {
+		return "dlms-wrapper-v1-gbt"
+	}
 	if wrapperIsBlock(w) {
 		return "dlms-wrapper-v1-get-block"
 	}
@@ -340,6 +343,9 @@ func wrapperProfile(w []byte) string {
 	return "dlms-wrapper-v1-get-normal"
 }
 func wrapperProbeVersion(w []byte) string {
+	if wrapperIsGBT(w) {
+		return "v1-gbt"
+	}
 	if wrapperIsBlock(w) {
 		return "v1-get-block"
 	}

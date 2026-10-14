@@ -85023,6 +85023,182 @@
         "common/pcapx/pcaputil/doip-context-late/verify.py": "doip-context-late/verify.py",
         "scripts/protocol-tests/required-tests-traffic-unified-v74.json": "required-tests-traffic-unified-v74.json"
       }
+    },
+    {
+      "id": "validation-dlms-gbt",
+      "kind": "validation",
+      "source_sha": "d4263e0ce2e211e9bd5155b5e8fb2c5b50146481",
+      "file": "validation-dlms-gbt.zip",
+      "sha256": "e4b9b096ba234189fc1e82b868cbb72081de4a6da0a2130f1ab91ca394cfff43",
+      "password": "bin-parser",
+      "members": {
+        "dlms-gbt/REFERENCE-ACTUAL.json": {
+          "sha256": "096b3283db6143c646cb59c46bd4916cd29d0cd0628faa1e5abebc5a5ff2bdfd",
+          "bytes": 587
+        },
+        "dlms-gbt/build.py": {
+          "sha256": "a07818f49b779ae08a02e90b95b7a05ac89f83036b1f636366af2be9b10d2297",
+          "bytes": 6797
+        },
+        "dlms-gbt/carrier.py": {
+          "sha256": "01b94cc32d91810ba8f8e106294834820fa56fe73bc3f108ce42ecbb3e0dd379",
+          "bytes": 1380
+        },
+        "dlms-gbt/cases/ambiguous-peer-ack-tcp.pcap": {
+          "sha256": "fa3ba90fd5d6b31aa57607857892617b0480b27718ba5991b918d46a9c8dff00",
+          "bytes": 586
+        },
+        "dlms-gbt/cases/ambiguous-peer-ack-udp.pcap": {
+          "sha256": "b8b7fd0127f7b87a4df2431400c93448d7106339109c6b58554a070eebdae955",
+          "bytes": 328
+        },
+        "dlms-gbt/cases/conflict-tcp.pcap": {
+          "sha256": "2ff333d90e701bcc0e1ab1db79cc93c03dbed682267bc24a97fbec2b1ecba036",
+          "bytes": 508
+        },
+        "dlms-gbt/cases/conflict-udp.pcap": {
+          "sha256": "2dd3bfe93e7fe16b28757c349d32c595bd6938b927b20bdf84d55b729f9a4efa",
+          "bytes": 262
+        },
+        "dlms-gbt/cases/duplicate-block-tcp.pcap": {
+          "sha256": "b3b7b088164a17e738fd87b6ee5461c15e76d07bafb266ba91911c5bff8751ef",
+          "bytes": 600
+        },
+        "dlms-gbt/cases/duplicate-block-udp.pcap": {
+          "sha256": "a454d54126fd4ca9cf3fc8faf349cace7d86e71ea240d6367bd6fda4686c733b",
+          "bytes": 342
+        },
+        "dlms-gbt/cases/gap-tcp.pcap": {
+          "sha256": "91177d328108e2106395002e36a49c51f0e206001f94cee3b0a78bf3e8602fb0",
+          "bytes": 509
+        },
+        "dlms-gbt/cases/gap-udp.pcap": {
+          "sha256": "4898007af204ec5cbf44cd062008e85449664cb9a3422396317d0c098230bfef",
+          "bytes": 263
+        },
+        "dlms-gbt/cases/observed-ack-chain-tcp.pcap": {
+          "sha256": "07b775032887f2b0894948ea4107c6fe7e57179aabbbaecc272200945987cb99",
+          "bytes": 594
+        },
+        "dlms-gbt/cases/observed-ack-chain-udp.pcap": {
+          "sha256": "a63233d5f24295bb61b1abd1ab1f38f6ded3fad74e94caaa668885dde2d02f63",
+          "bytes": 336
+        },
+        "dlms-gbt/cases/projection-resource-tcp.pcap": {
+          "sha256": "b20522f83b6c473616ce49ad0870743e326abe7fb165518c80f1167e0888106d",
+          "bytes": 417
+        },
+        "dlms-gbt/cases/projection-resource-udp.pcap": {
+          "sha256": "e88ce989c9446d208171bb87d9bbcacf36c6c45166998f788688d4e79790e54a",
+          "bytes": 256
+        },
+        "dlms-gbt/cases/streaming-request-response-tcp.pcap": {
+          "sha256": "71c3dfc3d7a62858e89c9d4f8339902a90acd0504ce1203a16fecc36e09d0743",
+          "bytes": 509
+        },
+        "dlms-gbt/cases/streaming-request-response-udp.pcap": {
+          "sha256": "e8670ba9a900a4357232fbf7011a2590829440d21a536969090735f0572e67f8",
+          "bytes": 263
+        },
+        "dlms-gbt/cases/unknown-ack-tcp.pcap": {
+          "sha256": "592de8e652c2a25a2e5eaef8bfe26b252825480a7014670c1761dc0562773608",
+          "bytes": 509
+        },
+        "dlms-gbt/cases/unknown-ack-udp.pcap": {
+          "sha256": "bc4e0cb330a86414b76c2d457f903a6fec1b05742de2b08c2f434b39659940f8",
+          "bytes": 263
+        },
+        "dlms-gbt/cases/unobserved-get-response-tcp.pcap": {
+          "sha256": "6539ca61419cf42ad25c2a0af7747c2bf82f18b3ffa6fe226fbc158c2c103035",
+          "bytes": 326
+        },
+        "dlms-gbt/cases/unobserved-get-response-udp.pcap": {
+          "sha256": "9f77d950440217e717cd4269e9ea27fbd0e311e242ff79350d2bd9f4f2611679",
+          "bytes": 104
+        },
+        "dlms-gbt/cases/window-raw-3-tcp.pcap": {
+          "sha256": "2c3b6171e1d1c4d3f7beea87d03565e1e892a5b061c24a347cc08a225cdff8f9",
+          "bytes": 509
+        },
+        "dlms-gbt/cases/window-raw-3-udp.pcap": {
+          "sha256": "e5cd8249eaeea630ce8884d69ecc36b7450f83caf0bb5d5bd0344d814ccf7dfa",
+          "bytes": 263
+        },
+        "dlms-gbt/cases/window-raw-63-tcp.pcap": {
+          "sha256": "a5e0b5b7ac09fdcdd429c2183603a5b88d5e72376b56b5c519a41f3118f857d0",
+          "bytes": 509
+        },
+        "dlms-gbt/cases/window-raw-63-udp.pcap": {
+          "sha256": "f80f6a0b037605213d905a7c324aafe0814df7321b5552e7ffecbb7fafc558f5",
+          "bytes": 263
+        },
+        "dlms-gbt/cases/zero-window-tcp.pcap": {
+          "sha256": "d63549317e11f24cb2019e724dbe79a5d8e8bcbe6186aef2199fd751ede54c7c",
+          "bytes": 509
+        },
+        "dlms-gbt/cases/zero-window-udp.pcap": {
+          "sha256": "5979d485a7c4c52c53efbe6054a7e1fc1353f31648cf6f1e58a27b62a1c14dc9",
+          "bytes": 263
+        },
+        "dlms-gbt/controls.json": {
+          "sha256": "a519141ba0aac0b1a925506b175f260353626030db35c14971bd5d79958e7da5",
+          "bytes": 139537
+        },
+        "dlms-gbt/reference.py": {
+          "sha256": "430fae419f4e6e3719e62afa848d6d0fa55e779e35a92abc0d21f793b24ee08c",
+          "bytes": 1888
+        },
+        "dlms-gbt/source-pin.json": {
+          "sha256": "22aeeac02864a3f820f9a00eedf785af2a675c829f8daafbb2b02c6802d6a2f4",
+          "bytes": 12658
+        },
+        "dlms-gbt/verify.py": {
+          "sha256": "7775154809ff10c3fc3dd71a7c60a1d8282e046bd1d2d7f3595f08a4067d392c",
+          "bytes": 1419
+        },
+        "required-tests-traffic-unified-v75.json": {
+          "sha256": "caa3c3bebf50735932061a37bd1ed74b38c5940642a4208c1ab3b7c5880ad633",
+          "bytes": 16888499
+        },
+        "validation/expected.json": {
+          "sha256": "a686f63338f9ac5e187615968853eaf6841807ab9477a69bb3492d0460205ec4",
+          "bytes": 27583
+        }
+      },
+      "aliases": {
+        "common/pcapx/pcaputil/dlms-gbt/REFERENCE-ACTUAL.json": "dlms-gbt/REFERENCE-ACTUAL.json",
+        "common/pcapx/pcaputil/dlms-gbt/build.py": "dlms-gbt/build.py",
+        "common/pcapx/pcaputil/dlms-gbt/carrier.py": "dlms-gbt/carrier.py",
+        "common/pcapx/pcaputil/dlms-gbt/cases/ambiguous-peer-ack-tcp.pcap": "dlms-gbt/cases/ambiguous-peer-ack-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-gbt/cases/ambiguous-peer-ack-udp.pcap": "dlms-gbt/cases/ambiguous-peer-ack-udp.pcap",
+        "common/pcapx/pcaputil/dlms-gbt/cases/conflict-tcp.pcap": "dlms-gbt/cases/conflict-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-gbt/cases/conflict-udp.pcap": "dlms-gbt/cases/conflict-udp.pcap",
+        "common/pcapx/pcaputil/dlms-gbt/cases/duplicate-block-tcp.pcap": "dlms-gbt/cases/duplicate-block-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-gbt/cases/duplicate-block-udp.pcap": "dlms-gbt/cases/duplicate-block-udp.pcap",
+        "common/pcapx/pcaputil/dlms-gbt/cases/gap-tcp.pcap": "dlms-gbt/cases/gap-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-gbt/cases/gap-udp.pcap": "dlms-gbt/cases/gap-udp.pcap",
+        "common/pcapx/pcaputil/dlms-gbt/cases/observed-ack-chain-tcp.pcap": "dlms-gbt/cases/observed-ack-chain-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-gbt/cases/observed-ack-chain-udp.pcap": "dlms-gbt/cases/observed-ack-chain-udp.pcap",
+        "common/pcapx/pcaputil/dlms-gbt/cases/projection-resource-tcp.pcap": "dlms-gbt/cases/projection-resource-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-gbt/cases/projection-resource-udp.pcap": "dlms-gbt/cases/projection-resource-udp.pcap",
+        "common/pcapx/pcaputil/dlms-gbt/cases/streaming-request-response-tcp.pcap": "dlms-gbt/cases/streaming-request-response-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-gbt/cases/streaming-request-response-udp.pcap": "dlms-gbt/cases/streaming-request-response-udp.pcap",
+        "common/pcapx/pcaputil/dlms-gbt/cases/unknown-ack-tcp.pcap": "dlms-gbt/cases/unknown-ack-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-gbt/cases/unknown-ack-udp.pcap": "dlms-gbt/cases/unknown-ack-udp.pcap",
+        "common/pcapx/pcaputil/dlms-gbt/cases/unobserved-get-response-tcp.pcap": "dlms-gbt/cases/unobserved-get-response-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-gbt/cases/unobserved-get-response-udp.pcap": "dlms-gbt/cases/unobserved-get-response-udp.pcap",
+        "common/pcapx/pcaputil/dlms-gbt/cases/window-raw-3-tcp.pcap": "dlms-gbt/cases/window-raw-3-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-gbt/cases/window-raw-3-udp.pcap": "dlms-gbt/cases/window-raw-3-udp.pcap",
+        "common/pcapx/pcaputil/dlms-gbt/cases/window-raw-63-tcp.pcap": "dlms-gbt/cases/window-raw-63-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-gbt/cases/window-raw-63-udp.pcap": "dlms-gbt/cases/window-raw-63-udp.pcap",
+        "common/pcapx/pcaputil/dlms-gbt/cases/zero-window-tcp.pcap": "dlms-gbt/cases/zero-window-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-gbt/cases/zero-window-udp.pcap": "dlms-gbt/cases/zero-window-udp.pcap",
+        "common/pcapx/pcaputil/dlms-gbt/controls.json": "dlms-gbt/controls.json",
+        "common/pcapx/pcaputil/dlms-gbt/reference.py": "dlms-gbt/reference.py",
+        "common/pcapx/pcaputil/dlms-gbt/source-pin.json": "dlms-gbt/source-pin.json",
+        "common/pcapx/pcaputil/dlms-gbt/verify.py": "dlms-gbt/verify.py",
+        "scripts/protocol-tests/required-tests-traffic-unified-v75.json": "required-tests-traffic-unified-v75.json"
+      }
     }
   ],
   "schema_version": 1,

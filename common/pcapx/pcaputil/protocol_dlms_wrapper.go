@@ -43,6 +43,9 @@ type wrapperMessage struct {
 	blockNumber           uint32
 	blockData             []byte
 	lastBlock, blockError bool
+	gbt                   bool
+	gbtControl            byte
+	gbtNumber, gbtAck     uint16
 }
 
 func decodeDLMSWrapper(w []byte, limit int) (*wrapperMessage, error) {
@@ -65,6 +68,9 @@ func decodeDLMSWrapperBudget(w []byte, limit, depth int) (*wrapperMessage, error
 	p := w[8:]
 	if len(p) == 0 {
 		return unsupported("empty WPDU has no selected Get APDU")
+	}
+	if p[0] == 0xe0 {
+		return decodeWrapperGBT(w, limit)
 	}
 	if p[0] != 0xc0 && p[0] != 0xc4 {
 		return unsupported("APDU outside unciphered LN Get")
@@ -284,6 +290,7 @@ type wrapperPending struct {
 }
 type binDLMSWrapper struct {
 	seen    map[wrapperToken]*wrapperPending
+	gbt     map[wrapperGBTKey]*wrapperGBTTransfer
 	blocked bool
 }
 
@@ -291,6 +298,9 @@ func (s *binDLMSWrapper) storage() int64 {
 	n := 512 + 256*int64(len(s.seen))
 	for _, p := range s.seen {
 		n += int64(len(p.blockData))
+	}
+	for _, p := range s.gbt {
+		n += 512 + int64(cap(p.data)) + 128*int64(len(p.blocks))
 	}
 	return n
 }
@@ -301,9 +311,19 @@ func (s *binDLMSWrapper) outstanding() int {
 			n++
 		}
 	}
+	for _, p := range s.gbt {
+		if p.active {
+			n++
+		}
+	}
 	return n
 }
 func (s *binDLMSWrapper) invalidate() {
+	for _, p := range s.gbt {
+		p.data = nil
+		p.active = false
+		p.ambiguous = true
+	}
 	for _, p := range s.seen {
 		p.pending = false
 		p.ambiguous = true
@@ -312,6 +332,12 @@ func (s *binDLMSWrapper) invalidate() {
 	s.blocked = true
 }
 func (f *binFlow) consumeWrapper(dir int, w []byte, e *ProtocolEvent) error {
+	return f.consumeWrapperReserved(dir, w, e, 0)
+}
+
+// A reconstructed APDU shares a live outer GBT projection. Its reservation
+// must not temporarily release that outer graph's credits to other flows.
+func (f *binFlow) consumeWrapperReserved(dir int, w []byte, e *ProtocolEvent, floor int64) error {
 	s := f.wrapper
 	if s == nil {
 		s = &binDLMSWrapper{}
@@ -323,6 +349,7 @@ func (f *binFlow) consumeWrapper(dir int, w []byte, e *ProtocolEvent) error {
 	if wrapperIsBlock(w) {
 		target += wrapperBlockBytes
 	}
+	target = max(target, floor)
 	if err := f.reserveSession(target); err != nil {
 		s.invalidate()
 		var pe *ProtocolError
@@ -332,7 +359,7 @@ func (f *binFlow) consumeWrapper(dir int, w []byte, e *ProtocolEvent) error {
 		return err
 	}
 	depth := 2
-	if wrapperUsesDataGraph(w) {
+	if wrapperUsesDataGraph(w) || wrapperIsGBT(w) {
 		depth = 4
 	}
 	if f.a.budget.MaxRecursionDepth < depth {
@@ -347,6 +374,12 @@ func (f *binFlow) consumeWrapper(dir int, w []byte, e *ProtocolEvent) error {
 	assoc := "unmatched-response"
 	if s.blocked {
 		assoc = "ambiguous-conversation"
+	} else if m.gbt {
+		assoc, err = f.consumeWrapperGBT(s, m, dir, e, w)
+		if err != nil {
+			s.invalidate()
+			return err
+		}
 	} else if m.choice == 2 {
 		assoc, err = f.consumeWrapperBlock(s, m, dir, e, w)
 		if err != nil {
@@ -403,6 +436,9 @@ const wrapperIdleTTL = 30 * time.Second
 // inspect the fixed Wrapper/service header here; this hint is not an accepted
 // descriptor, Data value, association or authenticated peer generation.
 func wrapperUDPRefusalHint(w []byte) bool {
+	if wrapperIsGBT(w) {
+		return wrapperGBTRefusalHint(w)
+	}
 	return len(w) >= 11 && w[0] == 0 && w[1] == 1 && int(binary.BigEndian.Uint16(w[6:8])) == len(w)-8 &&
 		(w[8] == 0xc0 || w[8] == 0xc4) && (w[9] == 1 || w[9] == 2 || w[9] == 3) && w[10]&0x30 == 0
 }
@@ -570,7 +606,7 @@ func wrapperIncompletePrefix(w []byte, limit int) bool {
 		return false
 	}
 	n, err := wrapperFrameSize(w, limit)
-	return err == nil && n == 0 && (len(w) <= 8 || w[8] == 0xc0 || w[8] == 0xc4)
+	return err == nil && n == 0 && (len(w) <= 8 || w[8] == 0xc0 || w[8] == 0xc4 || w[8] == 0xe0)
 }
 func (a *binParser) probeWrapperDatagram(w []byte) ProbeResult {
 	n, err := wrapperFrameSize(w, min(a.budget.MaxFrameBytes, a.config.MaxMessageBytes))

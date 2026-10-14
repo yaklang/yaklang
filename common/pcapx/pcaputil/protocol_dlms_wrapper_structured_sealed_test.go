@@ -6,7 +6,9 @@ import (
 	"fmt"
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/internal/trafficfixture"
+	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 )
@@ -20,6 +22,11 @@ type wrapperStructuredControl struct {
 
 func wrapperStructuredInput(t *testing.T, alias string) []byte {
 	t.Helper()
+	if root := os.Getenv("DLMS_GBT_TEST_ROOT"); root != "" && strings.HasPrefix(alias, "common/pcapx/pcaputil/dlms-gbt/") {
+		b, err := os.ReadFile(filepath.Join(root, strings.TrimPrefix(alias, "common/pcapx/pcaputil/dlms-gbt/")))
+		require.NoError(t, err)
+		return b
+	}
 	root, err := trafficfixture.RepositoryRoot()
 	require.NoError(t, err)
 	w, err := trafficfixture.ReadFile(filepath.Join(root, alias))

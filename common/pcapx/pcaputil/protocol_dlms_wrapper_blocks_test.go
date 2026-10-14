@@ -128,10 +128,16 @@ func assertWrapperBlocks(t *testing.T, c wrapperBlockControl, events []*Protocol
 }
 func TestDLMSWrapperBlocksSealedMatrix(t *testing.T) { wrapperBlocksReplay(t, wrapperBlockControls(t)) }
 func wrapperBlocksReplay(t *testing.T, cases []wrapperBlockControl) {
+	wrapperBlocksReplayConfigured(t, cases, nil)
+}
+func wrapperBlocksReplayConfigured(t *testing.T, cases []wrapperBlockControl, configure func(wrapperBlockControl) []CaptureOption) {
 	for _, c := range cases {
 		t.Run(c.Name, func(t *testing.T) {
 			discoveryMatrix(t, func(t *testing.T, workers int, deferred, observe bool) {
 				var opts []CaptureOption
+				if configure != nil {
+					opts = append(opts, configure(c)...)
+				}
 				if c.Transport == "udp" {
 					opts = append(opts, WithProtocolDecodeAs("udp", 4059, "dlms-wrapper"))
 				}
@@ -166,6 +172,9 @@ func TestDLMSWrapperBlocksBudgetsOwnership(t *testing.T) {
 	wrapperBlocksOwnership(t, wrapperBlockControls(t))
 }
 func wrapperBlocksOwnership(t *testing.T, cases []wrapperBlockControl) {
+	wrapperBlocksOwnershipConfigured(t, cases, nil)
+}
+func wrapperBlocksOwnershipConfigured(t *testing.T, cases []wrapperBlockControl, configure func(wrapperBlockControl, *ParserBudget)) {
 	for _, c := range cases {
 		for _, deferred := range []bool{false, true} {
 			for _, size := range []int{1, 7, 64, 65543} {
@@ -175,6 +184,9 @@ func wrapperBlocksOwnership(t *testing.T, cases []wrapperBlockControl) {
 				t.Run(fmt.Sprintf("%s/%v/%d", c.Name, deferred, size), func(t *testing.T) {
 					b := DefaultParserBudget()
 					b.MaxCollectionElements = c.Limit
+					if configure != nil {
+						configure(c, &b)
+					}
 					s, err := NewProtocolSessionWithOptions(b, WithSessionTransport(c.Transport), WithSessionPorts(40000, 4059))
 					require.NoError(t, err)
 					s.(*captureSession).f.a.config.Deferred = deferred
