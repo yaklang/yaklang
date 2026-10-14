@@ -448,7 +448,7 @@ func (r *dispatchAdmissionRegistry) CompactTerminal(reservation *dispatchReserva
 func (r *dispatchAdmissionRegistry) pruneLocked(now time.Time) {
 	cutoff := now.Add(-dispatchReservationRetention)
 	for attemptID, reservation := range r.byAttempt {
-		if reservation == nil || reservation.state != dispatchAdmissionTerminal ||
+		if reservation == nil || reservation.state != dispatchAdmissionTerminal || reservation.task != nil ||
 			reservation.finishedAt.IsZero() || reservation.finishedAt.After(cutoff) {
 			continue
 		}

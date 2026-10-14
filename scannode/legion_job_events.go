@@ -3,7 +3,10 @@ package scannode
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
+	"net"
 	"reflect"
 	"strings"
 	"sync"
@@ -26,10 +29,13 @@ type jobExecutionRef struct {
 	// EventNamespace opts managed input attempts into transport-scoped NATS
 	// deduplication. Ordinary scan and conversation event identities stay stable.
 	EventNamespace string
-	CommandID      string
-	JobID          string
-	SubtaskID      string
-	AttemptID      string
+	// NodeSessionID fences ordinary dispatch events to their admitted session.
+	// Other event producers can leave it empty when they own their bind fencing.
+	NodeSessionID string
+	CommandID     string
+	JobID         string
+	SubtaskID     string
+	AttemptID     string
 }
 
 func (ref jobExecutionRef) scopedEventID(eventID string) string {
@@ -361,9 +367,15 @@ func (p *jobEventPublisher) publish(
 	eventID string,
 	message proto.Message,
 ) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	session, ok := p.node.GetSessionState()
 	if !ok {
 		return fmt.Errorf("node session is not ready")
+	}
+	if ref.NodeSessionID != "" && ref.NodeSessionID != session.SessionID {
+		return fmt.Errorf("job event belongs to a retired node session")
 	}
 	if err := p.ensureJetStream(session.NATSURL); err != nil {
 		return err
@@ -409,11 +421,22 @@ func (p *jobEventPublisher) publish(
 	if js == nil {
 		return fmt.Errorf("jetstream context is not ready")
 	}
-	if _, err := js.PublishMsg(msg, nats.MsgId(eventID)); err != nil {
+	if _, err := js.PublishMsg(msg, nats.MsgId(eventID), nats.Context(ctx)); err != nil {
 		return fmt.Errorf("publish job event %s: %w", eventType, err)
 	}
 	log.Infof("published legion job event: type=%s attempt_id=%s", eventType, ref.AttemptID)
 	return nil
+}
+
+func isTransientJobEventError(err error) bool {
+	for _, transient := range []error{nats.ErrTimeout, nats.ErrConnectionClosed, nats.ErrDisconnected,
+		nats.ErrNoServers, nats.ErrNoResponders, nats.ErrReconnectBufExceeded, io.EOF} {
+		if errors.Is(err, transient) {
+			return true
+		}
+	}
+	var networkError net.Error
+	return errors.As(err, &networkError)
 }
 
 // sanitizeUTF8String replaces invalid UTF-8 bytes in a diagnostic string with

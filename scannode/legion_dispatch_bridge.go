@@ -39,6 +39,7 @@ func (b *legionJobBridge) handleDispatch(
 	}
 
 	ref := jobExecutionRefFromCommand(&command)
+	ref.NodeSessionID = sessionID
 	if err := validateDispatchCommand(b.currentNodeID(), &command); err != nil {
 		return termMessage(), b.publishDispatchFailure(
 			ctx,
@@ -385,15 +386,59 @@ func (b *legionJobBridge) finishDispatch(
 	if release != nil {
 		release()
 	}
-	if b.admissions().MarkTerminal(reservation) {
-		if err := retryDispatchEvent(publish); err != nil {
-			logDispatchPublishError("terminal", err)
+	if !b.admissions().MarkTerminal(reservation) {
+		if reservation != nil && reservation.stale.Load() && task != nil {
+			b.agent.manager.RemoveAttempt(task.AttemptID)
+			b.admissions().CompactTerminal(reservation)
+		}
+		return
+	}
+	defer func() {
+		if task != nil {
+			b.agent.manager.RemoveAttempt(task.AttemptID)
+		}
+		b.admissions().CompactTerminal(reservation)
+	}()
+	if publish == nil {
+		return
+	}
+
+	// Execution has ended, but the platform cannot retire this Attempt until
+	// JetStream acknowledges the terminal event. Keep its HTTP heartbeat while
+	// NATS is unavailable so lease reclamation cannot repeat completed work.
+	// This is in-memory delivery: node death still relies on platform recovery.
+	ctx := b.rootContext()
+	retryDelay := time.Second
+	if interval := b.heartbeatInterval(); interval > 0 && interval < retryDelay {
+		retryDelay = interval
+	}
+	failures := 0
+	for {
+		if ctx.Err() != nil || reservation.stale.Load() {
+			return
+		}
+		if task != nil {
+			task.Touch()
+		}
+		attemptCtx, cancel := context.WithTimeout(ctx, 6*time.Second)
+		err := publish(attemptCtx)
+		cancel()
+		if err == nil {
+			return
+		}
+		failures++
+		logDispatchPublishError("terminal pending acknowledgement", err)
+		if failures >= dispatchEventRetryAttempts && !isTransientJobEventError(err) {
+			return
+		}
+		timer := time.NewTimer(retryDelay)
+		select {
+		case <-ctx.Done():
+			timer.Stop()
+			return
+		case <-timer.C:
 		}
 	}
-	if task != nil {
-		b.agent.manager.RemoveAttempt(task.AttemptID)
-	}
-	b.admissions().CompactTerminal(reservation)
 }
 
 func retryDispatchEvent(publish func(context.Context) error) error {

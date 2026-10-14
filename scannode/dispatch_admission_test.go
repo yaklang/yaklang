@@ -16,14 +16,16 @@ import (
 )
 
 type recordingDispatchReporter struct {
-	mu            sync.Mutex
-	events        []string
-	failureCodes  map[string]string
-	failureDetail map[string]map[string]string
-	failStarted   bool
-	failSucceeded bool
-	failFailed    bool
-	cancelBlock   <-chan struct{}
+	mu              sync.Mutex
+	events          []string
+	failureCodes    map[string]string
+	failureDetail   map[string]map[string]string
+	failStarted     bool
+	failSucceeded   bool
+	succeededOutage *atomic.Bool
+	succeededError  error
+	failFailed      bool
+	cancelBlock     <-chan struct{}
 }
 
 func (r *recordingDispatchReporter) record(kind string, ref jobExecutionRef) {
@@ -47,8 +49,11 @@ func (r *recordingDispatchReporter) PublishStarted(_ context.Context, ref jobExe
 
 func (r *recordingDispatchReporter) PublishSucceeded(_ context.Context, ref jobExecutionRef, _ any) error {
 	r.record("succeeded", ref)
-	if r.failSucceeded {
-		return errors.New("terminal unavailable")
+	if r.succeededError != nil {
+		return r.succeededError
+	}
+	if r.failSucceeded || (r.succeededOutage != nil && r.succeededOutage.Load()) {
+		return fmt.Errorf("terminal unavailable: %w", nats.ErrTimeout)
 	}
 	return nil
 }
@@ -811,18 +816,94 @@ func TestStartedPublishFailureIsBoundedAndDoesNotExecute(t *testing.T) {
 	}
 }
 
-func TestTerminalPublishFailureRetriesBoundedlyThenRemovesActiveAttempt(t *testing.T) {
+func TestTerminalPublishOutageKeepsHeartbeatUntilAcknowledged(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	t.Cleanup(cancel)
+	var executions atomic.Int32
+	bridge, reporter := newAdmissionTestBridge(1, func(*Task, ScriptExecutionRequest) (*ScriptExecutionResult, error) {
+		executions.Add(1)
+		return &ScriptExecutionResult{}, nil
+	})
+	bridge.rootContextProvider = func() context.Context { return ctx }
+	outage := &atomic.Bool{}
+	outage.Store(true)
+	reporter.succeededOutage = outage
+	command := admissionTestCommand("cmd-1", "job-1", "subtask-1", "attempt-1")
+	startAdmissionDispatch(t, bridge, command)
+	waitForAdmission(t, func() bool { return reporter.count("succeeded", "attempt-1") > dispatchEventRetryAttempts },
+		"terminal delivery stopped after the short retry budget")
+	if beats := bridge.agent.manager.ActiveAttemptHeartbeats(time.Now()); len(beats) != 1 || beats[0].AttemptID != "attempt-1" {
+		t.Fatalf("unacknowledged execution disappeared from HTTP heartbeats: %+v", beats)
+	}
+	if bridge.agent.invokeLimiter.activeCount() != 0 {
+		t.Fatal("completed script retained its execution resource slot")
+	}
+	registry := bridge.admissions()
+	registry.mu.Lock()
+	pending := registry.byAttempt["attempt-1"]
+	pending.finishedAt = time.Now().Add(-dispatchReservationRetention - time.Minute)
+	registry.mu.Unlock()
+	registry.Reserve("session-a", jobExecutionRef{CommandID: "cmd-other", JobID: "job-other", SubtaskID: "subtask-other", AttemptID: "attempt-other"},
+		"other-dispatch", time.Now().Add(time.Minute))
+	registry.mu.Lock()
+	retained := registry.byAttempt["attempt-1"] == pending
+	registry.mu.Unlock()
+	if !retained {
+		t.Fatal("terminal retention pruned a result still awaiting acknowledgement")
+	}
+	disposition, err := bridge.handleDispatch(ctx, "session-a", marshalAdmissionCommand(t, command))
+	if err != nil || disposition.kind != messageAckSync || disposition.afterAck != nil {
+		t.Fatalf("duplicate pending completion disposition=%+v err=%v", disposition, err)
+	}
+	outage.Store(false)
+	waitForAdmission(t, func() bool { return bridge.agent.manager.Count() == 0 }, "acknowledged execution was not removed")
+	if executions.Load() != 1 {
+		t.Fatalf("completed execution ran %d times", executions.Load())
+	}
+}
+
+func TestTerminalPublishOutageStopsWhenNodeShutsDown(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	t.Cleanup(cancel)
 	bridge, reporter := newAdmissionTestBridge(1, func(*Task, ScriptExecutionRequest) (*ScriptExecutionResult, error) {
 		return &ScriptExecutionResult{}, nil
 	})
+	bridge.rootContextProvider = func() context.Context { return ctx }
 	reporter.failSucceeded = true
 	startAdmissionDispatch(t, bridge, admissionTestCommand("cmd-1", "job-1", "subtask-1", "attempt-1"))
-	waitForAdmission(t, func() bool { return bridge.agent.manager.Count() == 0 }, "terminal retry did not remove active attempt")
-	if got := reporter.count("succeeded", "attempt-1"); got != dispatchEventRetryAttempts {
-		t.Fatalf("terminal attempts = %d, want %d", got, dispatchEventRetryAttempts)
+	waitForAdmission(t, func() bool { return reporter.count("succeeded", "attempt-1") > dispatchEventRetryAttempts }, "terminal did not remain pending")
+	cancel()
+	waitForAdmission(t, func() bool { return bridge.agent.manager.Count() == 0 }, "node shutdown leaked the pending delivery")
+}
+
+func TestTerminalPublishOutageStopsForRetiredSession(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	t.Cleanup(cancel)
+	bridge, reporter := newAdmissionTestBridge(1, func(*Task, ScriptExecutionRequest) (*ScriptExecutionResult, error) {
+		return &ScriptExecutionResult{}, nil
+	})
+	bridge.rootContextProvider = func() context.Context { return ctx }
+	reporter.failSucceeded = true
+	startAdmissionDispatch(t, bridge, admissionTestCommand("cmd-1", "job-1", "subtask-1", "attempt-1"))
+	waitForAdmission(t, func() bool { return reporter.count("succeeded", "attempt-1") > dispatchEventRetryAttempts }, "terminal did not remain pending")
+	bridge.admissions().SwitchSession("session-b")
+	waitForAdmission(t, func() bool { return bridge.agent.manager.Count() == 0 }, "retired session retained an active heartbeat")
+	before := reporter.count("succeeded", "attempt-1")
+	time.Sleep(150 * time.Millisecond)
+	if reporter.count("succeeded", "attempt-1") != before {
+		t.Fatal("retired session continued publishing its old terminal event")
 	}
-	if bridge.agent.invokeLimiter.activeCount() != 0 {
-		t.Fatal("terminal publish failure leaked slot")
+}
+
+func TestTerminalPermanentPublishFailureRemainsBounded(t *testing.T) {
+	bridge, reporter := newAdmissionTestBridge(1, func(*Task, ScriptExecutionRequest) (*ScriptExecutionResult, error) {
+		return &ScriptExecutionResult{}, nil
+	})
+	reporter.succeededError = errors.New("cannot encode result")
+	startAdmissionDispatch(t, bridge, admissionTestCommand("cmd-1", "job-1", "subtask-1", "attempt-1"))
+	waitForAdmission(t, func() bool { return bridge.agent.manager.Count() == 0 }, "permanent failure kept a live lease forever")
+	if got := reporter.count("succeeded", "attempt-1"); got != dispatchEventRetryAttempts {
+		t.Fatalf("permanent publish failure attempts=%d, want %d", got, dispatchEventRetryAttempts)
 	}
 }
 

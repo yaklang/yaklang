@@ -3,16 +3,84 @@ package scannode
 import (
 	"context"
 	"errors"
+	"fmt"
+	"io"
+	"net"
 	"strings"
 	"testing"
 	"time"
 	"unicode/utf8"
 
+	"github.com/nats-io/nats.go"
+	"github.com/yaklang/yaklang/common/node"
 	jobv1 "github.com/yaklang/yaklang/scannode/gen/legionpb/legion/job/v1"
 	nodev1 "github.com/yaklang/yaklang/scannode/gen/legionpb/legion/node/v1"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/emptypb"
 )
+
+func TestJobEventPublisherFencesSessionAndHonorsCancellation(t *testing.T) {
+	session := node.SessionState{
+		NodeID: "node-terminal", SessionID: "session-current", SessionToken: "token-fixture",
+		NATSURL: "nats://unused.test", CommandSubject: "legion.command.node.node-terminal",
+		EventSubjectPrefix: "legion.event",
+	}
+	base, err := node.NewNodeBase(node.BaseConfig{
+		NodeID: session.NodeID, BaseDir: t.TempDir(), EnrollmentToken: "enroll-fixture",
+		PlatformAPIBaseURL: "http://platform.test", TransportClient: &bootstrapSessionTransport{session: session},
+		HeartbeatInterval: time.Hour, TickerInterval: time.Hour, RequestTimeout: time.Second,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	go base.Serve()
+	t.Cleanup(base.Shutdown)
+	waitForNodeSession(t, base)
+	fakeJS := &fakeJetStreamContext{}
+	publisher := newJobEventPublisher(base)
+	publisher.js, publisher.natsURL = fakeJS, session.NATSURL
+	ref := jobExecutionRef{CommandID: "cmd-a", JobID: "job-a", SubtaskID: "sub-a", AttemptID: "attempt-a", NodeSessionID: "session-retired"}
+	if err := publisher.PublishSucceeded(context.Background(), ref, "done"); err == nil {
+		t.Fatal("retired execution was published under the current session")
+	}
+	ref.NodeSessionID = session.SessionID
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	if err := publisher.PublishSucceeded(ctx, ref, "done"); !errors.Is(err, context.Canceled) {
+		t.Fatalf("cancelled publication error=%v", err)
+	}
+	fakeJS.mu.Lock()
+	count := len(fakeJS.publish)
+	fakeJS.mu.Unlock()
+	if count != 0 {
+		t.Fatalf("fenced/cancelled publication sent %d events", count)
+	}
+	if err := publisher.PublishSucceeded(context.Background(), ref, "done"); err != nil {
+		t.Fatal(err)
+	}
+	event := &jobv1.JobSucceeded{}
+	if err := proto.Unmarshal(fakeJS.waitForMessage(t).Data, event); err != nil {
+		t.Fatal(err)
+	}
+	if event.GetMetadata().GetNode().GetNodeSessionId() != session.SessionID || event.GetMetadata().GetEventId() != "attempt-a:succeeded" {
+		t.Fatalf("unexpected terminal metadata: %+v", event.GetMetadata())
+	}
+}
+
+func TestTransientJobEventErrors(t *testing.T) {
+	for _, err := range []error{nats.ErrTimeout, nats.ErrConnectionClosed, nats.ErrDisconnected,
+		nats.ErrNoServers, nats.ErrNoResponders, nats.ErrReconnectBufExceeded, io.EOF,
+		&net.OpError{Op: "dial", Net: "tcp", Err: errors.New("connection refused")}} {
+		if !isTransientJobEventError(fmt.Errorf("publish failed: %w", err)) {
+			t.Errorf("transport error was not retryable: %v", err)
+		}
+	}
+	for _, err := range []error{context.Canceled, errors.New("marshal job result: invalid value")} {
+		if isTransientJobEventError(err) {
+			t.Errorf("permanent error classified as transport outage: %v", err)
+		}
+	}
+}
 
 func TestAttachEventMetadata(t *testing.T) {
 	t.Parallel()
