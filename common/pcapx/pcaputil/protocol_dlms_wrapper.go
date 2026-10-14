@@ -46,6 +46,10 @@ type wrapperMessage struct {
 	gbt                   bool
 	gbtControl            byte
 	gbtNumber, gbtAck     uint16
+	acse, acseAccepted    bool
+	acseInfo              bool
+	acseConformance       uint32
+	acseMaxPDU            uint16
 }
 
 func decodeDLMSWrapper(w []byte, limit int) (*wrapperMessage, error) {
@@ -68,6 +72,9 @@ func decodeDLMSWrapperBudget(w []byte, limit, depth int) (*wrapperMessage, error
 	p := w[8:]
 	if len(p) == 0 {
 		return unsupported("empty WPDU has no selected Get APDU")
+	}
+	if p[0] == 0x60 || p[0] == 0x61 {
+		return decodeWrapperACSE(w, limit)
 	}
 	if p[0] == 0xe0 {
 		return decodeWrapperGBT(w, limit)
@@ -289,13 +296,14 @@ type wrapperPending struct {
 	blocks                int
 }
 type binDLMSWrapper struct {
-	seen    map[wrapperToken]*wrapperPending
-	gbt     map[wrapperGBTKey]*wrapperGBTTransfer
-	blocked bool
+	seen         map[wrapperToken]*wrapperPending
+	associations map[wrapperAssociationKey]*wrapperAssociation
+	gbt          map[wrapperGBTKey]*wrapperGBTTransfer
+	blocked      bool
 }
 
 func (s *binDLMSWrapper) storage() int64 {
-	n := 512 + 256*int64(len(s.seen))
+	n := 512 + 256*int64(len(s.seen)) + 256*int64(len(s.associations))
 	for _, p := range s.seen {
 		n += int64(len(p.blockData))
 	}
@@ -306,6 +314,11 @@ func (s *binDLMSWrapper) storage() int64 {
 }
 func (s *binDLMSWrapper) outstanding() int {
 	n := 0
+	for _, p := range s.associations {
+		if p.pending {
+			n++
+		}
+	}
 	for _, p := range s.seen {
 		if p.pending {
 			n++
@@ -319,6 +332,10 @@ func (s *binDLMSWrapper) outstanding() int {
 	return n
 }
 func (s *binDLMSWrapper) invalidate() {
+	for _, p := range s.associations {
+		p.pending = false
+		p.ambiguous = true
+	}
 	for _, p := range s.gbt {
 		p.data = nil
 		p.active = false
@@ -374,6 +391,12 @@ func (f *binFlow) consumeWrapperReserved(dir int, w []byte, e *ProtocolEvent, fl
 	assoc := "unmatched-response"
 	if s.blocked {
 		assoc = "ambiguous-conversation"
+	} else if m.acse {
+		assoc, err = f.consumeWrapperACSE(s, m, dir, e)
+		if err != nil {
+			s.invalidate()
+			return err
+		}
 	} else if m.gbt {
 		assoc, err = f.consumeWrapperGBT(s, m, dir, e, w)
 		if err != nil {
@@ -436,6 +459,9 @@ const wrapperIdleTTL = 30 * time.Second
 // inspect the fixed Wrapper/service header here; this hint is not an accepted
 // descriptor, Data value, association or authenticated peer generation.
 func wrapperUDPRefusalHint(w []byte) bool {
+	if wrapperIsACSE(w) {
+		return wrapperACSERefusalHint(w)
+	}
 	if wrapperIsGBT(w) {
 		return wrapperGBTRefusalHint(w)
 	}
@@ -523,7 +549,10 @@ func (a *binParser) decodeWrapperDatagram(e *ProtocolEvent, w []byte, src, dst u
 			}
 		}
 	}
-	if err == nil && created && f.wrapper.outstanding() > 0 {
+	// Incomplete/ambiguous ACSE requests retain a charged endpoint tombstone,
+	// even without pending eligibility. A later same-endpoint AARQ has no nonce
+	// with which to distinguish an old AARE from its own response.
+	if err == nil && created && (f.wrapper.outstanding() > 0 || len(f.wrapper.associations) > 0) {
 		if store != nil && len(store.entries) >= sessionCollectionLimit(a.budget.MaxCollectionElements) {
 			err = wrapperError(ErrResourceExceeded, "UDP conversation limit")
 		} else {
@@ -606,7 +635,7 @@ func wrapperIncompletePrefix(w []byte, limit int) bool {
 		return false
 	}
 	n, err := wrapperFrameSize(w, limit)
-	return err == nil && n == 0 && (len(w) <= 8 || w[8] == 0xc0 || w[8] == 0xc4 || w[8] == 0xe0)
+	return err == nil && n == 0 && (len(w) <= 8 || w[8] == 0xc0 || w[8] == 0xc4 || w[8] == 0xe0 || w[8] == 0x60 || w[8] == 0x61)
 }
 func (a *binParser) probeWrapperDatagram(w []byte) ProbeResult {
 	n, err := wrapperFrameSize(w, min(a.budget.MaxFrameBytes, a.config.MaxMessageBytes))

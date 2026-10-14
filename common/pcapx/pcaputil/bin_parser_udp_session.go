@@ -82,6 +82,10 @@ func (f *binFlow) retireDLMSUDP() {
 			complete = complete && !p.blockActive
 		}
 		if complete {
+			for _, p := range s.associations {
+				p.pending = false
+				p.ambiguous = true
+			}
 			// Keep every used logical-endpoint/invoke token charged and unusable.
 			// A late reply for one token cannot poison another pending token.
 			for _, p := range s.seen {

@@ -26,6 +26,7 @@ func TestDLMSWrapperBlocksExistingAPIBaseline(t *testing.T) {
 }
 
 type wrapperBlockAnswer struct {
+	Profile     string                         `json:"profile,omitempty"`
 	Wire        string                         `json:"wire_hex"`
 	SHA         string                         `json:"wire_sha256"`
 	Fields      map[string]any                 `json:"fields"`
@@ -89,7 +90,11 @@ func assertWrapperBlocks(t *testing.T, c wrapperBlockControl, events []*Protocol
 			require.Greater(t, e.ID, events[i-1].ID)
 		}
 		require.Equal(t, "dlms-wrapper", e.Protocol)
-		require.Equal(t, wrapperProfile(w), e.Profile)
+		profile := wrapperProfile(w)
+		if a.Profile != "" {
+			profile = a.Profile
+		}
+		require.Equal(t, profile, e.Profile)
 		require.Equal(t, len(w), e.Length)
 		if a.Error != nil {
 			rocTypedError(t, a.Error.Kind, err)

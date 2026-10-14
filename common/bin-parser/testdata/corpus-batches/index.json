@@ -85199,6 +85199,222 @@
         "common/pcapx/pcaputil/dlms-gbt/verify.py": "dlms-gbt/verify.py",
         "scripts/protocol-tests/required-tests-traffic-unified-v75.json": "required-tests-traffic-unified-v75.json"
       }
+    },
+    {
+      "id": "validation-dlms-acse",
+      "kind": "validation",
+      "source_sha": "f00101a3569ae8563e7114f6a4cb87ce48f015e6",
+      "file": "validation-dlms-acse.zip",
+      "sha256": "3673f5d113172799f14d1569b37a7aa090324ae4832b88afa75bd595573cee39",
+      "password": "bin-parser",
+      "members": {
+        "dlms-acse/REFERENCE-ACTUAL.json": {
+          "sha256": "8cd49a9b5266674f1647b4fcf364c0bf6d62261f4cfffc93ab55b441eb8a8677",
+          "bytes": 9442
+        },
+        "dlms-acse/build.py": {
+          "sha256": "1a1ddcb47a072a61fb7843b4957a74158634fd7760c5bc3f12ef5584738c463b",
+          "bytes": 5877
+        },
+        "dlms-acse/carrier.py": {
+          "sha256": "01b94cc32d91810ba8f8e106294834820fa56fe73bc3f108ce42ecbb3e0dd379",
+          "bytes": 1380
+        },
+        "dlms-acse/cases/accepted-tcp.pcap": {
+          "sha256": "ea81f4ac9c338bdfc24ef1e1d63d2ff6221f878b8bac4c2b05ef9e8f9c97f216",
+          "bytes": 464
+        },
+        "dlms-acse/cases/accepted-udp.pcap": {
+          "sha256": "95ecd539252d48f91cf348e87690e51000ba6e9b43e7eed699407fa70740d8ac",
+          "bytes": 230
+        },
+        "dlms-acse/cases/cipher-context-tcp.pcap": {
+          "sha256": "0119e3d46f5a7dbfc5ad709984afe8724eee662ab3e0d0172e17e029d30204d4",
+          "bytes": 343
+        },
+        "dlms-acse/cases/cipher-context-udp.pcap": {
+          "sha256": "38ab78e92cc2147563e91fbb2148b1ae2ad504d858a271f2bd184ea7c4845266",
+          "bytes": 121
+        },
+        "dlms-acse/cases/duplicate-context-tcp.pcap": {
+          "sha256": "15906924cbec647c8ebc8bd2adbe9f3720ddbf73fe9247dc516c2c8428772c26",
+          "bytes": 354
+        },
+        "dlms-acse/cases/duplicate-context-udp.pcap": {
+          "sha256": "e39697a31ec3e2aa0fbd597e3d91606ba50dea19e7734377beed4f2adfde7ade",
+          "bytes": 132
+        },
+        "dlms-acse/cases/explicit-protocol-version-tcp.pcap": {
+          "sha256": "2bf900c654112590de042b384a2cf79b7678a0bd3e15060b0f128b012aceec7a",
+          "bytes": 472
+        },
+        "dlms-acse/cases/explicit-protocol-version-udp.pcap": {
+          "sha256": "62ad0bda91ed8f12d9a4e58079da68ee328d56ab2378ba336cd8cf6896787f33",
+          "bytes": 238
+        },
+        "dlms-acse/cases/indefinite-tcp.pcap": {
+          "sha256": "90569541f2eba1aaa64131db4ff3695b9c5041f9d1e9e366400ed6bf24a21fcf",
+          "bytes": 316
+        },
+        "dlms-acse/cases/indefinite-udp.pcap": {
+          "sha256": "0977923a99d821b3f639d9382e111284b8d379d8a57ba9bf103ad749091fbf17",
+          "bytes": 94
+        },
+        "dlms-acse/cases/missing-request-information-tcp.pcap": {
+          "sha256": "06d1ee152fba1dbea2022444f79318aa187330f6f8dbdfbe694e6bb6cc142b09",
+          "bytes": 446
+        },
+        "dlms-acse/cases/missing-request-information-udp.pcap": {
+          "sha256": "00ccc5a85a3cb10f6a1178798919fab9722efc41fbf62e715e8e508fe3444962",
+          "bytes": 212
+        },
+        "dlms-acse/cases/missing-response-information-tcp.pcap": {
+          "sha256": "296ee01d7aa562131fc11530a148547897a91fa4ec528602e908ed8806559757",
+          "bytes": 446
+        },
+        "dlms-acse/cases/missing-response-information-udp.pcap": {
+          "sha256": "3afaf902683c15104a78330144cc523e2232b82470b8af7d6fad1ab0a57de23d",
+          "bytes": 212
+        },
+        "dlms-acse/cases/orphan-response-tcp.pcap": {
+          "sha256": "9a3470ee803a194f0d785f782d4a2cf583f37dad6ae2b37a403f7ecdccf0a97e",
+          "bytes": 355
+        },
+        "dlms-acse/cases/orphan-response-udp.pcap": {
+          "sha256": "28b3a4e6c25a604c1690f789aa3a6770e26813b60f1ee5023800c202c5d7f833",
+          "bytes": 133
+        },
+        "dlms-acse/cases/outer-truncated-tcp.pcap": {
+          "sha256": "ccb9d48c9684fcf9bf9bf3fd4b9a1b3c9c75968acf375b07471323655a6b1dee",
+          "bytes": 343
+        },
+        "dlms-acse/cases/outer-truncated-udp.pcap": {
+          "sha256": "fb406d17c19150a0b40cb67ef4999e03f2a6e3614599c3aef8aaba987a4bb8eb",
+          "bytes": 121
+        },
+        "dlms-acse/cases/rejected-no-information-tcp.pcap": {
+          "sha256": "3334ad1dcad9bcbfb5658f98464d24be63b51f6d5e82dd5d71d46b06dad0367a",
+          "bytes": 446
+        },
+        "dlms-acse/cases/rejected-no-information-udp.pcap": {
+          "sha256": "6afc779cfa927a5c601e5852d67f877fc935b41953d5f48a132be1f55847f7c2",
+          "bytes": 212
+        },
+        "dlms-acse/cases/repeated-response-tcp.pcap": {
+          "sha256": "0e51001d3f93f94651db5431541bc6feedffca864e5268e722208e8532acf47f",
+          "bytes": 585
+        },
+        "dlms-acse/cases/repeated-response-udp.pcap": {
+          "sha256": "5297c57865c9421b2206b7627315ef645a1b7b73c521b5ad5524dce179c82bbd",
+          "bytes": 339
+        },
+        "dlms-acse/cases/resource-low-buffer-tcp.pcap": {
+          "sha256": "2f7412cc302f880b67f047f5952c1d92bd6c89200d4b59027caf8068406b0343",
+          "bytes": 343
+        },
+        "dlms-acse/cases/resource-low-buffer-udp.pcap": {
+          "sha256": "71c6dad26998112d17601bf8a47da07e39bb362635bd8636356508e2714762aa",
+          "bytes": 121
+        },
+        "dlms-acse/cases/reused-request-tcp.pcap": {
+          "sha256": "3eab10f359a5c77fa25af789d197ffb1ff77d8fa7299cb629dea54bd4cb9f91f",
+          "bytes": 573
+        },
+        "dlms-acse/cases/reused-request-udp.pcap": {
+          "sha256": "02eab8f169dacf5adafc978f9a0bb37e30bf83ebff0ac6a41c9b974e20a3c849",
+          "bytes": 327
+        },
+        "dlms-acse/cases/trailing-tcp.pcap": {
+          "sha256": "c5e07ed6ff5fed0f81fd8ed82e770b187c59e3f781633043a6f81d7a00d5fb77",
+          "bytes": 344
+        },
+        "dlms-acse/cases/trailing-udp.pcap": {
+          "sha256": "2bf2fca5b2108664a93e8e0b0fbcf8f645c626ffeab307c6146ad835c3849cce",
+          "bytes": 122
+        },
+        "dlms-acse/cases/unproposed-conformance-tcp.pcap": {
+          "sha256": "745aa00ce8e056ccda3c31e315255b800ab07f074b18fe7e0fabfd47cd7098f9",
+          "bytes": 464
+        },
+        "dlms-acse/cases/unproposed-conformance-udp.pcap": {
+          "sha256": "052929bdce78fd655404f109728de4b8598c1a3d53cbbbbc51e988d608d48334",
+          "bytes": 230
+        },
+        "dlms-acse/cases/wrong-wport-tcp.pcap": {
+          "sha256": "0d1aade11434a9cc28d439fe617dab3e80db8f1dd3bec05d90460f3568f17c00",
+          "bytes": 585
+        },
+        "dlms-acse/cases/wrong-wport-udp.pcap": {
+          "sha256": "45a862fb0bf63de67e6df0ac5ffe3542b5e4458cab16fb620fe30ee7f4f935d2",
+          "bytes": 339
+        },
+        "dlms-acse/controls.json": {
+          "sha256": "eb12fdfcfa72e86a24c045757b43ca12043049b9477cd95eaab0180c3b82fa9d",
+          "bytes": 100691
+        },
+        "dlms-acse/reference.py": {
+          "sha256": "6b8db15b4c6b8b6e6749a8f6beaa4aae877e63816db514d273f01314d99472d2",
+          "bytes": 2008
+        },
+        "dlms-acse/source-pin.json": {
+          "sha256": "22aeeac02864a3f820f9a00eedf785af2a675c829f8daafbb2b02c6802d6a2f4",
+          "bytes": 12658
+        },
+        "dlms-acse/verify.py": {
+          "sha256": "e9fc01fa9d67328602f0e7daa742e3536766f060596c810b2a739f4ca957bbe6",
+          "bytes": 1422
+        },
+        "required-tests-traffic-unified-v76.json": {
+          "sha256": "ab734f1702ba28570c1950b26498073da387a9aa3d5456cfd6d010992555ec69",
+          "bytes": 17152819
+        },
+        "validation/expected.json": {
+          "sha256": "b64048d8818f3ce572a7a7715184d81ff7c8b87631c89f7ead3517fc8efe1e38",
+          "bytes": 36750
+        }
+      },
+      "aliases": {
+        "common/pcapx/pcaputil/dlms-acse/REFERENCE-ACTUAL.json": "dlms-acse/REFERENCE-ACTUAL.json",
+        "common/pcapx/pcaputil/dlms-acse/build.py": "dlms-acse/build.py",
+        "common/pcapx/pcaputil/dlms-acse/carrier.py": "dlms-acse/carrier.py",
+        "common/pcapx/pcaputil/dlms-acse/cases/accepted-tcp.pcap": "dlms-acse/cases/accepted-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-acse/cases/accepted-udp.pcap": "dlms-acse/cases/accepted-udp.pcap",
+        "common/pcapx/pcaputil/dlms-acse/cases/cipher-context-tcp.pcap": "dlms-acse/cases/cipher-context-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-acse/cases/cipher-context-udp.pcap": "dlms-acse/cases/cipher-context-udp.pcap",
+        "common/pcapx/pcaputil/dlms-acse/cases/duplicate-context-tcp.pcap": "dlms-acse/cases/duplicate-context-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-acse/cases/duplicate-context-udp.pcap": "dlms-acse/cases/duplicate-context-udp.pcap",
+        "common/pcapx/pcaputil/dlms-acse/cases/explicit-protocol-version-tcp.pcap": "dlms-acse/cases/explicit-protocol-version-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-acse/cases/explicit-protocol-version-udp.pcap": "dlms-acse/cases/explicit-protocol-version-udp.pcap",
+        "common/pcapx/pcaputil/dlms-acse/cases/indefinite-tcp.pcap": "dlms-acse/cases/indefinite-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-acse/cases/indefinite-udp.pcap": "dlms-acse/cases/indefinite-udp.pcap",
+        "common/pcapx/pcaputil/dlms-acse/cases/missing-request-information-tcp.pcap": "dlms-acse/cases/missing-request-information-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-acse/cases/missing-request-information-udp.pcap": "dlms-acse/cases/missing-request-information-udp.pcap",
+        "common/pcapx/pcaputil/dlms-acse/cases/missing-response-information-tcp.pcap": "dlms-acse/cases/missing-response-information-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-acse/cases/missing-response-information-udp.pcap": "dlms-acse/cases/missing-response-information-udp.pcap",
+        "common/pcapx/pcaputil/dlms-acse/cases/orphan-response-tcp.pcap": "dlms-acse/cases/orphan-response-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-acse/cases/orphan-response-udp.pcap": "dlms-acse/cases/orphan-response-udp.pcap",
+        "common/pcapx/pcaputil/dlms-acse/cases/outer-truncated-tcp.pcap": "dlms-acse/cases/outer-truncated-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-acse/cases/outer-truncated-udp.pcap": "dlms-acse/cases/outer-truncated-udp.pcap",
+        "common/pcapx/pcaputil/dlms-acse/cases/rejected-no-information-tcp.pcap": "dlms-acse/cases/rejected-no-information-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-acse/cases/rejected-no-information-udp.pcap": "dlms-acse/cases/rejected-no-information-udp.pcap",
+        "common/pcapx/pcaputil/dlms-acse/cases/repeated-response-tcp.pcap": "dlms-acse/cases/repeated-response-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-acse/cases/repeated-response-udp.pcap": "dlms-acse/cases/repeated-response-udp.pcap",
+        "common/pcapx/pcaputil/dlms-acse/cases/resource-low-buffer-tcp.pcap": "dlms-acse/cases/resource-low-buffer-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-acse/cases/resource-low-buffer-udp.pcap": "dlms-acse/cases/resource-low-buffer-udp.pcap",
+        "common/pcapx/pcaputil/dlms-acse/cases/reused-request-tcp.pcap": "dlms-acse/cases/reused-request-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-acse/cases/reused-request-udp.pcap": "dlms-acse/cases/reused-request-udp.pcap",
+        "common/pcapx/pcaputil/dlms-acse/cases/trailing-tcp.pcap": "dlms-acse/cases/trailing-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-acse/cases/trailing-udp.pcap": "dlms-acse/cases/trailing-udp.pcap",
+        "common/pcapx/pcaputil/dlms-acse/cases/unproposed-conformance-tcp.pcap": "dlms-acse/cases/unproposed-conformance-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-acse/cases/unproposed-conformance-udp.pcap": "dlms-acse/cases/unproposed-conformance-udp.pcap",
+        "common/pcapx/pcaputil/dlms-acse/cases/wrong-wport-tcp.pcap": "dlms-acse/cases/wrong-wport-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-acse/cases/wrong-wport-udp.pcap": "dlms-acse/cases/wrong-wport-udp.pcap",
+        "common/pcapx/pcaputil/dlms-acse/controls.json": "dlms-acse/controls.json",
+        "common/pcapx/pcaputil/dlms-acse/reference.py": "dlms-acse/reference.py",
+        "common/pcapx/pcaputil/dlms-acse/source-pin.json": "dlms-acse/source-pin.json",
+        "common/pcapx/pcaputil/dlms-acse/verify.py": "dlms-acse/verify.py",
+        "scripts/protocol-tests/required-tests-traffic-unified-v76.json": "required-tests-traffic-unified-v76.json"
+      }
     }
   ],
   "schema_version": 1,
