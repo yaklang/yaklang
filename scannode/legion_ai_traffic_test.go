@@ -17,6 +17,8 @@ import (
 
 	"github.com/nats-io/nats.go"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
+	"github.com/yaklang/yaklang/common/utils/lowhttp/httpctx"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	aiv1 "github.com/yaklang/yaklang/scannode/gen/legionpb/legion/ai/v1"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
@@ -108,33 +110,19 @@ func TestAITrafficReadsOversizePacketFilesAndTruncatesBytes(t *testing.T) {
 		t.Fatalf("actual packet reconstruction failed: size=%d truncated=%v err=%v raw=%q", size, truncated, err, raw)
 	}
 }
-func TestResilienceAITrafficDrainWaitsForActiveRequestsAndReceipts(t *testing.T) {
+func TestResilienceAITrafficDrainWaitsForSavedFlowReceipts(t *testing.T) {
 	c := trafficTestCollector(t, "http://127.0.0.1:1")
-	finish := c.observe(lowhttp.HTTPAttempt{TurnID: "turn", StartedAt: time.Now(), Request: []byte("GET /?token=hidden HTTP/1.1\r\nHost: test.invalid\r\nAuthorization: hidden\r\n\r\n")})
+	c.recordHTTPFlow(&lowhttp.LowhttpResponse{RawRequest: []byte("GET / HTTP/1.1\r\nHost: test.invalid\r\n\r\n"), RawPacket: []byte("HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n")}, "turn")
 	ctx, cancel := context.WithTimeout(context.Background(), time.Millisecond)
 	defer cancel()
 	result := c.drain(ctx, "drain")
-	if result.Complete || result.PendingRecords < 2 {
-		t.Fatalf("active/unacknowledged request reported complete: %+v", result)
-	}
-	finish(lowhttp.HTTPAttempt{FinishedAt: time.Now(), Error: context.Canceled})
-	paths, _ := c.pending()
-	if len(paths) != 2 {
-		t.Fatalf("start/terminal queue lost: %d", len(paths))
-	}
-	for _, path := range paths {
-		raw, _ := os.ReadFile(path)
-		upload := new(aiv1.AITrafficUpload)
-		proto.Unmarshal(raw, upload)
-		if upload.Record.TurnId != "turn" {
-			t.Fatal("lost turn provenance")
-		}
-		if upload.Record.Phase == "terminal" && upload.Record.Outcome != "cancelled" {
-			t.Fatal("cancelled request outcome lost")
-		}
+	if result.Complete || result.PendingRecords != 1 {
+		t.Fatalf("unacknowledged flow reported complete: %+v", result)
 	}
 }
 func TestAITrafficContextCapturesSessionAndTurnWithoutRuntime(t *testing.T) {
+	lowhttp.RegisterSaveHTTPFlowHandler(saveAITrafficHTTPFlow)
+	t.Cleanup(yakit.RegisterLowHTTPSaveCallback)
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_, _ = io.WriteString(w, "session evidence")
 	}))
@@ -142,18 +130,15 @@ func TestAITrafficContextCapturesSessionAndTurnWithoutRuntime(t *testing.T) {
 	collector := trafficTestCollector(t, "http://unused.invalid")
 	collector.currentTurn = "newer-turn"
 	for _, turn := range []string{"turn-a", "turn-b"} {
-		ctx := lowhttp.WithHTTPAttemptObserver(context.Background(), func(start lowhttp.HTTPAttempt) func(lowhttp.HTTPAttempt) {
-			start.TurnID = turn
-			return collector.observe(start)
-		})
+		ctx := withAITrafficContext(context.Background(), collector, turn)
 		packet := "GET /" + turn + " HTTP/1.1\r\nHost: " + strings.TrimPrefix(server.URL, "http://") + "\r\nConnection: close\r\n\r\n"
-		if _, err := lowhttp.HTTP(lowhttp.WithContext(ctx), lowhttp.WithSaveHTTPFlow(false), lowhttp.WithPacketBytes([]byte(packet))); err != nil {
+		if _, err := lowhttp.HTTP(lowhttp.WithContext(ctx), lowhttp.WithSaveHTTPFlow(true), lowhttp.WithPacketBytes([]byte(packet))); err != nil {
 			t.Fatal(err)
 		}
 	}
 	paths, err := collector.pending()
-	if err != nil || len(paths) != 4 {
-		t.Fatalf("missing start/terminal uploads: count=%d err=%v", len(paths), err)
+	if err != nil || len(paths) != 2 {
+		t.Fatalf("missing saved flow uploads: count=%d err=%v", len(paths), err)
 	}
 	phases := make(map[string]map[string]bool)
 	for _, path := range paths {
@@ -175,7 +160,7 @@ func TestAITrafficContextCapturesSessionAndTurnWithoutRuntime(t *testing.T) {
 		phases[record.TurnId][record.Phase] = true
 	}
 	for _, turn := range []string{"turn-a", "turn-b"} {
-		if !phases[turn]["started"] || !phases[turn]["terminal"] {
+		if phases[turn]["started"] || !phases[turn]["terminal"] {
 			t.Fatalf("missing lifecycle for %s: %v", turn, phases)
 		}
 	}
@@ -204,8 +189,7 @@ func TestAITrafficRejectsForeignUploadOriginAndUnsupportedVersion(t *testing.T) 
 }
 func TestAITrafficMetadataExcludesSensitiveURLAndHeaders(t *testing.T) {
 	c := trafficTestCollector(t, "http://unused.invalid")
-	finish := c.observe(lowhttp.HTTPAttempt{StartedAt: time.Now(), Request: []byte("GET /private?token=SECRET HTTP/1.1\r\nHost: example.invalid\r\nAuthorization: SECRET\r\nCookie: SECRET\r\n\r\n")})
-	finish(lowhttp.HTTPAttempt{FinishedAt: time.Now()})
+	c.recordHTTPFlow(&lowhttp.LowhttpResponse{RawRequest: []byte("GET /private?token=SECRET HTTP/1.1\r\nHost: example.invalid\r\nAuthorization: SECRET\r\nCookie: SECRET\r\n\r\n"), RawPacket: []byte("HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n")}, "turn")
 	paths, _ := c.pending()
 	for _, path := range paths {
 		raw, _ := os.ReadFile(path)
@@ -460,8 +444,7 @@ func TestAITrafficCombinedPacketBudgetRetainsBothHeaders(t *testing.T) {
 	responseHeader := []byte("HTTP/1.1 200 OK\r\nContent-Type: application/octet-stream\r\n\r\n")
 	request := append(append([]byte(nil), requestHeader...), bytes.Repeat([]byte("q"), (6<<20)-len(requestHeader))...)
 	response := append(append([]byte(nil), responseHeader...), bytes.Repeat([]byte("s"), (6<<20)-len(responseHeader))...)
-	finish := c.observe(lowhttp.HTTPAttempt{StartedAt: time.Now(), Request: request})
-	finish(lowhttp.HTTPAttempt{FinishedAt: time.Now(), Request: request, Response: response})
+	c.recordHTTPFlow(&lowhttp.LowhttpResponse{RawRequest: request, RawPacket: response}, "turn")
 	paths, _ := filepath.Glob(filepath.Join(c.dir, "*.terminal.pb"))
 	if len(paths) != 1 {
 		t.Fatalf("terminal record count=%d", len(paths))
@@ -535,8 +518,7 @@ func TestAITrafficConfigHonorsIncreasedLimitsAndHardCaps(t *testing.T) {
 func TestAITrafficSingleHeaderBeyondPacketLimitIsExplicit(t *testing.T) {
 	c := trafficTestCollector(t, "http://unused.invalid")
 	request := []byte("GET / HTTP/1.1\r\nHost: example.invalid\r\nX-Padding: " + strings.Repeat("r", 2048) + "\r\n\r\n")
-	finish := c.observe(lowhttp.HTTPAttempt{StartedAt: time.Now(), Request: request})
-	finish(lowhttp.HTTPAttempt{FinishedAt: time.Now(), Request: request})
+	c.recordHTTPFlow(&lowhttp.LowhttpResponse{RawRequest: request, RawPacket: []byte("HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n")}, "turn")
 	paths, _ := filepath.Glob(filepath.Join(c.dir, "*.terminal.pb"))
 	if len(paths) != 1 {
 		t.Fatal("missing terminal upload")
@@ -549,7 +531,7 @@ func TestAITrafficSingleHeaderBeyondPacketLimitIsExplicit(t *testing.T) {
 	if err = proto.Unmarshal(raw, upload); err != nil {
 		t.Fatal(err)
 	}
-	if len(upload.RawRequest) != int(c.policy.PacketLimitBytes) || upload.Record.CaptureError != "packet_headers_limit" || !upload.Record.RequestTruncated {
+	if len(upload.RawRequest)+len(upload.RawResponse) != int(c.policy.PacketLimitBytes) || upload.Record.CaptureError != "packet_headers_limit" || !upload.Record.RequestTruncated {
 		t.Fatal("single oversized header was mistaken for body truncation")
 	}
 }
@@ -597,16 +579,15 @@ func TestAITrafficCaptureKeepsStartURLThroughQuotaAndUnavailablePackets(t *testi
 				c.policy.PacketLimitBytes = 16
 			}
 			request := []byte("GET /large?i=3&token=SECRET HTTP/1.1\r\nHost: example.test\r\nAuthorization: SECRET\r\n\r\n")
-			start := time.Now()
-			finish := c.observe(lowhttp.HTTPAttempt{HTTPS: true, StartedAt: start, Request: request})
-			end := lowhttp.HTTPAttempt{FinishedAt: start.Add(time.Second), Request: request, Response: []byte("HTTP/1.1 200 OK\r\nContent-Length: 4\r\n\r\nbody")}
+			end := lowhttp.LowhttpResponse{Https: true, RawRequest: request, RawPacket: []byte("HTTP/1.1 200 OK\r\nContent-Length: 4\r\n\r\nbody")}
 			if mode == "missing_packets" {
-				end.RequestHeaderFile = filepath.Join(c.dir, "missing-packet")
+				end.RequestInstance, _ = http.NewRequest("GET", "https://example.test/", nil)
+				httpctx.SetRequestTooLargeHeaderFile(end.RequestInstance, filepath.Join(c.dir, "missing-packet"))
 			}
-			finish(end)
+			c.recordHTTPFlow(&end, "turn")
 			paths, err := c.pending()
-			if err != nil || len(paths) != 2 {
-				t.Fatalf("start/terminal queue not preserved: %v %v", paths, err)
+			if err != nil || len(paths) != 1 {
+				t.Fatalf("saved flow queue not preserved: %v %v", paths, err)
 			}
 			var captured string
 			for _, path := range paths {

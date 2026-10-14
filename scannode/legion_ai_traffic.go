@@ -22,6 +22,8 @@ import (
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
+	"github.com/yaklang/yaklang/common/utils/lowhttp/httpctx"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	aiv1 "github.com/yaklang/yaklang/scannode/gen/legionpb/legion/ai/v1"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
@@ -155,68 +157,96 @@ func (c *aiTrafficCollector) emit(ctx context.Context, kind string, message prot
 }
 func trafficSHA(raw []byte) string { hash := sha256.Sum256(raw); return hex.EncodeToString(hash[:]) }
 
-func (c *aiTrafficCollector) observe(start lowhttp.HTTPAttempt) func(lowhttp.HTTPAttempt) {
+type aiTrafficContextKey struct{}
+type aiTrafficContext struct {
+	collector *aiTrafficCollector
+	turnID    string
+}
+
+func withAITrafficContext(ctx context.Context, collector *aiTrafficCollector, turnID string) context.Context {
+	return context.WithValue(ctx, aiTrafficContextKey{}, aiTrafficContext{collector, turnID})
+}
+
+func init() {
+	lowhttp.RegisterSaveHTTPFlowHandler(saveAITrafficHTTPFlow)
+	yakit.RegisterPostInitDatabaseFunction(func() error {
+		lowhttp.RegisterSaveHTTPFlowHandler(saveAITrafficHTTPFlow)
+		return nil
+	})
+}
+
+func saveAITrafficHTTPFlow(r *lowhttp.LowhttpResponse, syncSave bool) {
+	if r == nil {
+		return
+	}
+	if r.RequestInstance != nil {
+		if scope, ok := r.RequestInstance.Context().Value(aiTrafficContextKey{}).(aiTrafficContext); ok && scope.collector != nil {
+			scope.collector.recordHTTPFlow(r, scope.turnID)
+		}
+	}
+	yakit.SaveLowHTTPFlow(r, syncSave)
+}
+
+func (c *aiTrafficCollector) recordHTTPFlow(r *lowhttp.LowhttpResponse, turn string) {
+	if r == nil || len(r.RawPacket) == 0 {
+		return
+	}
 	c.mu.Lock()
 	if !c.accepting {
 		c.failed = true
 		c.mu.Unlock()
-		return nil
+		return
 	}
 	c.active++
-	turn := start.TurnID
 	if turn == "" {
 		turn = c.currentTurn
 	}
 	c.mu.Unlock()
-	record := &aiv1.AITrafficRecord{ProtocolVersion: 1, FlowId: uuid.NewString(), SessionId: c.binding.Ref.SessionID, TurnId: turn, NodeId: c.binding.NodeID, NodeSessionId: c.binding.NodeSessionID, BindEpoch: c.binding.Ref.BindEpoch, Phase: "started", Outcome: "pending", StartedAtMs: start.StartedAt.UnixMilli(), Scheme: "http"}
-	if start.HTTPS {
-		record.Scheme = "https"
+	defer func() { c.mu.Lock(); c.active--; c.mu.Unlock(); c.signal() }()
+	finished := time.Now()
+	started := finished
+	if r.TraceInfo != nil {
+		started = finished.Add(-r.TraceInfo.TotalTime)
 	}
-	trafficRequestMetadata(record, start.Request)
-	c.enqueue(&aiv1.AITrafficUpload{Record: record})
-	var once sync.Once
-	return func(end lowhttp.HTTPAttempt) {
-		once.Do(func() {
-			defer func() { c.mu.Lock(); c.active--; c.mu.Unlock(); c.signal() }()
-			terminal := proto.Clone(record).(*aiv1.AITrafficRecord)
-			terminal.Phase = "terminal"
-			terminal.FinishedAtMs = end.FinishedAt.UnixMilli()
-			terminal.Outcome = "success"
-			if end.Error != nil {
-				terminal.Outcome = "network_failed"
-				if errors.Is(end.Error, context.Canceled) || errors.Is(end.Error, context.DeadlineExceeded) {
-					terminal.Outcome = "cancelled"
-				}
-			}
-			request, requestSize, requestTruncated, reqErr := trafficPacket(end.Request, end.RequestHeaderFile, end.RequestBodyFile, int64(c.policy.PacketLimitBytes))
-			response, responseSize, responseTruncated, rspErr := trafficPacket(end.Response, end.ResponseHeaderFile, end.ResponseBodyFile, int64(c.policy.PacketLimitBytes))
-			request, response, packetLimitReason := trafficBoundPacketPair(request, response, int(c.policy.PacketLimitBytes))
-			requestTruncated = requestTruncated || int64(len(request)) < requestSize
-			responseTruncated = responseTruncated || int64(len(response)) < responseSize
-			if (requestTruncated && len(request) > 0 && !trafficHeadersComplete(request)) || (responseTruncated && len(response) > 0 && !trafficHeadersComplete(response)) {
-				terminal.CaptureError = "packet_headers_limit"
-			} else if packetLimitReason != "" {
-				terminal.CaptureError = packetLimitReason
-			} else if requestTruncated || responseTruncated {
-				terminal.CaptureError = "packet_limit"
-			}
-			trafficRequestMetadata(terminal, request)
-			terminal.RequestSizeBytes = uint64(requestSize)
-			terminal.ResponseSizeBytes = uint64(responseSize)
-			terminal.RequestTruncated = requestTruncated
-			terminal.ResponseTruncated = responseTruncated
-			if reqErr != nil || rspErr != nil {
-				terminal.CaptureError = "local_packet_unavailable"
-			}
-			if rsp, err := http.ReadResponse(bufio.NewReader(bytes.NewReader(response)), nil); err == nil {
-				terminal.StatusCode = int32(rsp.StatusCode)
-				rsp.Body.Close()
-			}
-			terminal.RequestSha256 = trafficSHA(request)
-			terminal.ResponseSha256 = trafficSHA(response)
-			c.enqueue(&aiv1.AITrafficUpload{Record: terminal, RawRequest: request, RawResponse: response})
-		})
+	terminal := &aiv1.AITrafficRecord{ProtocolVersion: 1, FlowId: uuid.NewString(), SessionId: c.binding.Ref.SessionID, TurnId: turn, NodeId: c.binding.NodeID, NodeSessionId: c.binding.NodeSessionID, BindEpoch: c.binding.Ref.BindEpoch, Phase: "terminal", Outcome: "success", StartedAtMs: started.UnixMilli(), FinishedAtMs: finished.UnixMilli(), Scheme: "http"}
+	if r.Https {
+		terminal.Scheme = "https"
 	}
+	trafficRequestMetadata(terminal, r.RawRequest)
+	var requestHeaderFile, requestBodyFile, responseHeaderFile, responseBodyFile string
+	if r.RequestInstance != nil {
+		requestHeaderFile = httpctx.GetRequestTooLargeHeaderFile(r.RequestInstance)
+		requestBodyFile = httpctx.GetRequestTooLargeBodyFile(r.RequestInstance)
+		responseHeaderFile = httpctx.GetResponseTooLargeHeaderFile(r.RequestInstance)
+		responseBodyFile = httpctx.GetResponseTooLargeBodyFile(r.RequestInstance)
+	}
+	request, requestSize, requestTruncated, reqErr := trafficPacket(r.RawRequest, requestHeaderFile, requestBodyFile, int64(c.policy.PacketLimitBytes))
+	response, responseSize, responseTruncated, rspErr := trafficPacket(r.RawPacket, responseHeaderFile, responseBodyFile, int64(c.policy.PacketLimitBytes))
+	request, response, packetLimitReason := trafficBoundPacketPair(request, response, int(c.policy.PacketLimitBytes))
+	requestTruncated = requestTruncated || int64(len(request)) < requestSize
+	responseTruncated = responseTruncated || int64(len(response)) < responseSize
+	if (requestTruncated && len(request) > 0 && !trafficHeadersComplete(request)) || (responseTruncated && len(response) > 0 && !trafficHeadersComplete(response)) {
+		terminal.CaptureError = "packet_headers_limit"
+	} else if packetLimitReason != "" {
+		terminal.CaptureError = packetLimitReason
+	} else if requestTruncated || responseTruncated {
+		terminal.CaptureError = "packet_limit"
+	}
+	trafficRequestMetadata(terminal, request)
+	terminal.RequestSizeBytes = uint64(requestSize)
+	terminal.ResponseSizeBytes = uint64(responseSize)
+	terminal.RequestTruncated = requestTruncated
+	terminal.ResponseTruncated = responseTruncated
+	if reqErr != nil || rspErr != nil {
+		terminal.CaptureError = "local_packet_unavailable"
+	}
+	if rsp, err := http.ReadResponse(bufio.NewReader(bytes.NewReader(response)), nil); err == nil {
+		terminal.StatusCode = int32(rsp.StatusCode)
+		rsp.Body.Close()
+	}
+	terminal.RequestSha256 = trafficSHA(request)
+	terminal.ResponseSha256 = trafficSHA(response)
+	c.enqueue(&aiv1.AITrafficUpload{Record: terminal, RawRequest: request, RawResponse: response})
 }
 
 // trafficBoundPacketPair uses one budget for the complete flow. Reserve both
