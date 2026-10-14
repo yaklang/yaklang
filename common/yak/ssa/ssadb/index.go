@@ -55,12 +55,7 @@ func SaveIrIndexBatch(db *gorm.DB, items []*IrIndex) error {
 	if db == nil || len(items) == 0 {
 		return nil
 	}
-	clean := make([]*IrIndex, 0, len(items))
-	for _, it := range items {
-		if it != nil {
-			clean = append(clean, it)
-		}
-	}
+	clean := withoutNil(items)
 	if len(clean) == 0 {
 		return nil
 	}

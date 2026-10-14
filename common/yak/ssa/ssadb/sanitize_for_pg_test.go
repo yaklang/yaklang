@@ -286,3 +286,27 @@ func TestBeforeSaveHookStripsInvalidUTF8_IrCode(t *testing.T) {
 	assert.Equal(t, "func\x07\x10name", result.Name)
 	assert.Equal(t, "helloworld\x07\x10!", result.String)
 }
+
+// The test above runs on a database without the unique index and so takes the
+// delete-and-insert fallback. This one takes the SaveInBatches path and checks
+// the BeforeSave sanitizer still runs for every element there.
+func TestBeforeSaveHookStripsNUL_SaveInBatchesPath(t *testing.T) {
+	db, err := gorm.Open("sqlite3", ":memory:")
+	require.NoError(t, err)
+	defer db.Close()
+
+	require.NoError(t, db.AutoMigrate(&IrCode{}, &IrType{}).Error)
+	patchIrCodeIndex(db)
+	require.True(t, hasIrCodeUniqueKey(db))
+	require.True(t, hasNamedIndex(db, TableIrTypes, "ux_ir_types_program_type"))
+
+	require.NoError(t, SaveIrCodeBatch(db, []*IrCode{{ProgramName: "p\x00rog", CodeID: 1, Name: "func\x00x"}}))
+	var code IrCode
+	require.NoError(t, db.Where("program_name = ?", "prog").First(&code).Error)
+	assert.Equal(t, "funcx", code.Name)
+
+	require.NoError(t, SaveIrTypeBatch(db, []*IrType{{ProgramName: "prog", TypeId: 1, String: "ty\x00pe"}}))
+	var typ IrType
+	require.NoError(t, db.Where("program_name = ? AND type_id = ?", "prog", 1).First(&typ).Error)
+	assert.Equal(t, "type", typ.String)
+}
