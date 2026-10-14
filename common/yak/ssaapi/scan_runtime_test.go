@@ -35,13 +35,14 @@ func TestScanRuntime_SourceThenSSACoversOneRow(t *testing.T) {
 	source := runtimeRisk("feature-1", string(schema.SFR_MODE_SOURCE), 5)
 	require.True(t, rt.SubmitRisk(source))
 	require.Len(t, handler.items, 1)
-	require.Zero(t, handler.items[0].OldID)
+	require.Equal(t, schema.RiskUpdateCreate, handler.items[0].Mode)
 
 	ssa := runtimeRisk("feature-1", string(schema.SFR_MODE_SSA), 0)
 	require.True(t, rt.SubmitRisk(ssa))
 	require.Len(t, handler.items, 2)
-	require.Equal(t, uint(5), handler.items[1].OldID)
+	require.Equal(t, schema.RiskUpdateUpdate, handler.items[1].Mode)
 	require.Equal(t, source.Hash, handler.items[1].OldHash)
+	require.Zero(t, ssa.ID, "submit does not copy the previous row id")
 }
 
 func TestScanRuntime_EarlierModePublishesNothing(t *testing.T) {

@@ -268,17 +268,25 @@ func (r *SyntaxFlowResult) saveValue(ctx context.Context, result *ssadb.AuditRes
 
 		// save variable that has value
 		for index, v := range values {
+			// The handler owns the graph when the risk was published with one.
+			// Writing it here as well would persist the covered graph twice.
+			hash, owned := r.stageRisk(name, index, v)
+			if owned {
+				continue
+			}
 			// Per-value opts, derived from the per-variable varOpts so index/hash
-			// don't leak across values. Build a fresh slice each iteration
-			// (SaveValue consumes opts and the loop reuses varOpts otherwise).
-			valueOpts := varOpts
-			hash := r.BuildRisk(name, index, v)
+			// don't leak across values. Copy the header: append reuses the backing
+			// array when it has spare capacity.
+			valueOpts := make([]SaveValueOption, len(varOpts), len(varOpts)+3)
+			copy(valueOpts, varOpts)
 			if hash != "" {
 				valueOpts = append(valueOpts, OptionSaveValue_ResultRiskHash(hash))
+				if prev := r.riskMap[ssaRiskName(name, index)]; prev != nil && prev.RiskFeatureHash != "" {
+					valueOpts = append(valueOpts, OptionSaveValue_ResultRiskFeatureHash(prev.RiskFeatureHash))
+				}
 			}
 			valueOpts = append(valueOpts, OptionSaveValue_ResultIndex(uint(index)))
-			e := SaveValue(v, valueOpts...)
-			err = utils.JoinErrors(err, e)
+			err = utils.JoinErrors(err, SaveValue(v, valueOpts...))
 		}
 	}
 

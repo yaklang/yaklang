@@ -6,8 +6,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/yaklang/gorm"
 	"github.com/oklog/ulid"
+	"github.com/yaklang/gorm"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
 )
 
@@ -20,6 +20,9 @@ type AuditNodeStatus struct {
 	ResultIndex    uint   `json:"result_index" gorm:"index"`
 	// ResultAlertMsg string `json:"result_alert_msg"`
 	RiskHash string `json:"risk_hash"`
+	// RiskFeatureHash is the finding's cover key. A later scan mode deletes the
+	// previous graph by this plus the task id, without loading node ids first.
+	RiskFeatureHash string `json:"risk_feature_hash" gorm:"index"`
 	// rule  info
 	RuleName  string `json:"rule_name" gorm:"index"`
 	RuleTitle string `json:"rule_title"`
@@ -253,6 +256,10 @@ type AuditEdge struct {
 	// program
 	ProgramName string `json:"program_name" gorm:"index"`
 
+	// RiskFeatureHash matches the finding this edge belongs to, so a cover can
+	// delete the edge without walking its nodes.
+	RiskFeatureHash string `json:"risk_feature_hash" gorm:"index"`
+
 	// type
 	EdgeType AuditEdgeType `json:"edge_type" gorm:"index"`
 
@@ -267,38 +274,41 @@ func (*AuditEdge) TableName() string {
 
 func (n *AuditNode) CreateDependsOnEdge(progName string, to *AuditNode) *AuditEdge {
 	ae := &AuditEdge{
-		ProgramName: progName,
-		FromNode:    n.NodeID,
-		ToNode:      to.NodeID,
-		EdgeType:    EdgeType_DependsOn,
-		TaskId:      n.TaskId,
-		ResultId:    n.ResultId,
+		ProgramName:     progName,
+		FromNode:        n.NodeID,
+		ToNode:          to.NodeID,
+		EdgeType:        EdgeType_DependsOn,
+		TaskId:          n.TaskId,
+		ResultId:        n.ResultId,
+		RiskFeatureHash: n.RiskFeatureHash,
 	}
 	return ae
 }
 
 func (n *AuditNode) CreateEffectsOnEdge(progName string, to *AuditNode) *AuditEdge {
 	ae := &AuditEdge{
-		ProgramName: progName,
-		FromNode:    n.NodeID,
-		ToNode:      to.NodeID,
-		EdgeType:    EdgeType_EffectsOn,
-		TaskId:      n.TaskId,
-		ResultId:    n.ResultId,
+		ProgramName:     progName,
+		FromNode:        n.NodeID,
+		ToNode:          to.NodeID,
+		EdgeType:        EdgeType_EffectsOn,
+		TaskId:          n.TaskId,
+		ResultId:        n.ResultId,
+		RiskFeatureHash: n.RiskFeatureHash,
 	}
 	return ae
 }
 
 func (n *AuditNode) CreatePredecessorEdge(progName string, to *AuditNode, step int64, label string) *AuditEdge {
 	ae := &AuditEdge{
-		ProgramName:   progName,
-		FromNode:      n.NodeID,
-		ToNode:        to.NodeID,
-		EdgeType:      EdgeType_Predecessor,
-		AnalysisStep:  step,
-		AnalysisLabel: label,
-		TaskId:        n.TaskId,
-		ResultId:      n.ResultId,
+		ProgramName:     progName,
+		FromNode:        n.NodeID,
+		ToNode:          to.NodeID,
+		EdgeType:        EdgeType_Predecessor,
+		AnalysisStep:    step,
+		AnalysisLabel:   label,
+		TaskId:          n.TaskId,
+		ResultId:        n.ResultId,
+		RiskFeatureHash: n.RiskFeatureHash,
 	}
 	return ae
 }

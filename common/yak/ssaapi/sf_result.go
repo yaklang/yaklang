@@ -29,6 +29,9 @@ type SyntaxFlowResult struct {
 	// onRisk receives each risk this result builds. When it is set the result
 	// does not write the risk row itself.
 	onRisk func(*schema.SSARisk)
+	// auditHanded records alert slots whose graph was given to onRisk. A later
+	// save of the same result must not write that graph again.
+	auditHanded map[string]struct{}
 	// dbKind is the syntaxflow result kind used when this result is persisted.
 	dbKind schema.SyntaxflowResultKind
 	// result

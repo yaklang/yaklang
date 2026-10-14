@@ -298,21 +298,25 @@ func sarifFeatureKey(risk *schema.SSARisk) string {
 	return key
 }
 
-// ApplyRiskUpdate creates or replaces one alert. The scan already filtered the
-// finding. OldHash empty adds the alert; any other OldHash drops the alert it
-// names and adds the new one, so the document keeps one alert per finding.
+// ApplyRiskUpdate applies one decision. Create and update record the alert
+// and drop OldHash when the item names one. Delete only drops that alert.
 func (r *SarifReport) ApplyRiskUpdate(item schema.RiskUpdateItem) error {
-	if r == nil || item.Risk == nil {
+	if r == nil {
 		return nil
 	}
-	if item.OldHash != "" {
-		feature := sarifFeatureKey(item.Risk)
-		if feature == "" {
-			feature = strings.TrimSpace(item.OldHash)
+	switch item.Mode {
+	case schema.RiskUpdateDelete:
+		r.removeSarifResult(strings.TrimSpace(item.OldHash))
+	case schema.RiskUpdateCreate, schema.RiskUpdateUpdate:
+		if item.OldHash != "" {
+			feature := sarifFeatureKey(item.Risk)
+			if feature == "" {
+				feature = strings.TrimSpace(item.OldHash)
+			}
+			r.removeSarifResult(feature)
 		}
-		r.removeSarifResult(feature)
+		r.appendRisk(item.Risk)
 	}
-	r.appendRisk(item.Risk)
 	return nil
 }
 

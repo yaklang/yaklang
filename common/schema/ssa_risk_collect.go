@@ -6,16 +6,29 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
+// RiskUpdateMode is what a consumer should do with one finding. It is the
+// write operation, not the scan mode (source, struct, ssa).
+type RiskUpdateMode string
+
+const (
+	// RiskUpdateCreate inserts a finding this task has not reported yet.
+	RiskUpdateCreate RiskUpdateMode = "create"
+	// RiskUpdateUpdate rewrites the row of this task with the same feature hash.
+	RiskUpdateUpdate RiskUpdateMode = "update"
+	// RiskUpdateDelete removes the finding of this task with that feature hash.
+	RiskUpdateDelete RiskUpdateMode = "delete"
+)
+
 // RiskUpdateItem is one decision the scan reached about a single finding.
-//
-// OldID 0 means "create a new row". Any other OldID means "rewrite that row",
-// which happens when a later scan mode covers a finding an earlier mode
-// already reported. OldHash is the previous row hash so consumers holding a
-// copy of the old data (for example a JSON report) can drop it.
+// Mode says which operation that is. The database matches an update or a
+// delete by the risk's runtime id and feature hash, not by its row id.
+// OldHash is the previous row hash so a report can drop its copy. Audit
+// persists the graph for a create or an update; other consumers ignore it.
 type RiskUpdateItem struct {
+	Mode    RiskUpdateMode
 	Risk    *SSARisk
-	OldID   uint
 	OldHash string
+	Audit   func() error
 }
 
 // RiskUpdateHandler consumes the decisions of one scan. A scan never writes a
@@ -82,14 +95,14 @@ func (c *RiskCollect) Current(feature string) *SSARisk {
 // Submit records in and returns the update the caller must publish.
 //
 // The key is RiskFeatureHash, the same identity diff and disposal use.
-// When it is new the returned item has OldID 0. When an earlier risk is
-// replaced the item carries that row's id and hash. When the incoming risk
-// loses to the stored one no update is returned (ok=false), which is how an
-// earlier mode is dropped and how a lower-level rule is filtered out. An
-// empty feature hash is always kept and is not stored, so it never covers
-// another finding.
+// A feature hash this task has not seen yet is a create. One it already
+// keeps is an update, whether or not that row has been written. When the
+// incoming risk loses to the stored one no update is returned (ok=false),
+// which is how an earlier mode is dropped and how a lower-level rule is
+// filtered out. An empty feature hash is always kept and is not stored, so
+// it never covers another finding.
 func (c *RiskCollect) Submit(in *SSARisk) (RiskUpdateItem, bool) {
-	item := RiskUpdateItem{Risk: in}
+	item := RiskUpdateItem{Mode: RiskUpdateCreate, Risk: in}
 	if c == nil || in == nil {
 		return item, false
 	}
@@ -110,11 +123,8 @@ func (c *RiskCollect) Submit(in *SSARisk) (RiskUpdateItem, bool) {
 			return old, false
 		}
 		if old != nil {
-			item.OldID = old.ID
 			item.OldHash = old.Hash
-		}
-		if in.ID == 0 {
-			in.ID = item.OldID
+			item.Mode = RiskUpdateUpdate
 		}
 		accepted = true
 		return in, true

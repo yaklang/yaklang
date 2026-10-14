@@ -71,6 +71,11 @@ type SSARisk struct {
 	RiskFeatureHash string `json:"risk_feature_hash" gorm:"index"`
 
 	SSAProjectID uint64 `json:"ssa_project_id" gorm:"index"`
+
+	// AuditSave persists this finding's graph. It is not a column. The result
+	// sets it before publishing; the scan moves it onto the update item and
+	// clears it so a report never observes the closure.
+	AuditSave func() error `json:"-" gorm:"-"`
 }
 
 func (*SSARisk) TableName() string {

@@ -49,8 +49,15 @@ func (r *ScanRuntime) SubmitRisk(risk *schema.SSARisk) bool {
 	}
 	r.mu.Lock()
 	defer r.mu.Unlock()
+	// The item is finished here. Handlers trust it and do not prepare,
+	// coalesce, or guess a mode from a zero id. The audit closure moves onto
+	// the item; this call does not wait for a handler to persist anything.
+	audit := risk.AuditSave
+	risk.AuditSave = nil
+	prepareRiskRow(risk)
 	item, ok := r.collect.Submit(risk)
 	if ok {
+		item.Audit = audit
 		for _, handler := range r.riskUpdateHandlers {
 			if err := handler.ApplyRiskUpdate(item); err != nil {
 				log.Errorf("apply risk update failed: %v", err)

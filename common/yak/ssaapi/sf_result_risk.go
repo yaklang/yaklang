@@ -1,6 +1,7 @@
 package ssaapi
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -200,29 +201,43 @@ func (r *SyntaxFlowResult) GetRisks() []*schema.SSARisk {
 // BuildRisk materializes one alert and publishes it once. Persistence belongs
 // to the registered handler, or to the direct Save caller's saver.
 func (r *SyntaxFlowResult) BuildRisk(variable string, index int, value *Value) string {
+	hash, _ := r.stageRisk(variable, index, value)
+	return hash
+}
+
+// stageRisk is BuildRisk plus whether the handler now owns the audit graph.
+// The second result is true only when this call attached that graph to the
+// published risk, so the caller must not write it again.
+func (r *SyntaxFlowResult) stageRisk(variable string, index int, value *Value) (string, bool) {
 	_, ok := r.GetAlertInfo(variable)
 	if !ok {
-		return ""
+		return "", false
 	}
 	name := ssaRiskName(variable, index)
 	// Building a risk is idempotent per alert slot: the same result may persist
 	// its values after the streaming path already materialized them.
 	if prev, exist := r.riskMap[name]; exist && prev != nil {
+		if r.auditHanded != nil {
+			if _, owned := r.auditHanded[name]; owned {
+				return prev.Hash, true
+			}
+		}
 		if prev.ResultID != uint64(r.GetResultID()) || prev.RuntimeId != r.TaskID {
 			// Saving a prebuilt memory result binds the numeric audit row id.
 			// Copy it: a scan handler may still be reading the published risk.
+			// The copy keeps the row id, so Save updates that row. Clearing it
+			// would insert a second row under the same hash.
 			row := *prev
 			row.ResultID, row.RuntimeId = uint64(r.GetResultID()), r.TaskID
-			row.ID = 0
 			row.PrepareForSave()
 			r.riskMap[name] = &row
-			return row.Hash
+			return row.Hash, false
 		}
-		return prev.Hash
+		return prev.Hash, false
 	}
 	ssaRisk := buildSSARisk(r, variable, index, value)
 	if ssaRisk == nil {
-		return ""
+		return "", false
 	}
 
 	ssaRisk.SSAProjectID = r.GetProjectID()
@@ -234,10 +249,60 @@ func (r *SyntaxFlowResult) BuildRisk(variable string, index int, value *Value) s
 	// rows, and the unique index on hash must not collapse them.
 	ssaRisk.PrepareForSave()
 	r.riskMap[name] = ssaRisk
-	if r.onRisk != nil {
-		r.onRisk(ssaRisk)
+	if r.onRisk == nil {
+		return ssaRisk.Hash, false
 	}
-	return ssaRisk.Hash
+	if audit := r.auditSaver(value, variable, index, ssaRisk); audit != nil {
+		ssaRisk.AuditSave = audit
+		if r.auditHanded == nil {
+			r.auditHanded = map[string]struct{}{}
+		}
+		r.auditHanded[name] = struct{}{}
+	}
+	r.onRisk(ssaRisk)
+	ssaRisk.AuditSave = nil
+	_, owned := r.auditHanded[name]
+	return ssaRisk.Hash, owned
+}
+
+// auditSaver walks the graph immediately. The database saver later inserts
+// the rows; it must not walk again, because the rule may already have cleared
+// the value's analysis caches by then.
+func (r *SyntaxFlowResult) auditSaver(value *Value, variable string, index int, risk *schema.SSARisk) func() error {
+	if r == nil || value == nil || risk == nil {
+		return nil
+	}
+	nodes, edges, sources, err := captureAuditGraph(context.Background(), value,
+		OptionSaveValue_TaskID(risk.RuntimeId),
+		OptionSaveValue_ResultID(uint(risk.ResultID)),
+		OptionSaveValue_RuleName(risk.FromRule),
+		OptionSaveValue_RuleTitle(risk.Title),
+		OptionSaveValue_ProgramName(risk.ProgramName),
+		OptionSaveValue_ResultVariable(variable),
+		OptionSaveValue_ResultIndex(uint(index)),
+		OptionSaveValue_ResultRiskHash(risk.Hash),
+		OptionSaveValue_ResultRiskFeatureHash(risk.RiskFeatureHash),
+		OptionSaveValue_IsMemoryCompile(r.IsProgMemoryCompile()),
+	)
+	if err != nil {
+		return func() error { return err }
+	}
+	if len(nodes) == 0 && len(edges) == 0 && len(sources) == 0 {
+		return nil
+	}
+	return func() error {
+		db := ssadb.GetDB()
+		if db == nil {
+			return utils.Error("save audit: database is nil")
+		}
+		if err := batchSaveAuditNodes(db, nodes); err != nil {
+			return err
+		}
+		if err := batchSaveAuditEdges(db, edges); err != nil {
+			return err
+		}
+		return saveAuditSources(db, sources)
+	}
 }
 
 func (r *SyntaxFlowResult) GetGRPCModelRisk() []*ypb.SSARisk {

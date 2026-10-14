@@ -21,15 +21,30 @@ func collectRisk(feature, mode, rule string, id uint) *SSARisk {
 func TestRiskCollect_LaterModeCoversEarlier(t *testing.T) {
 	c := NewRiskCollect()
 	source := collectRisk("feature-1", string(SFR_MODE_SOURCE), "source-rule", 11)
+	item, ok := c.Submit(source)
+	require.True(t, ok)
+	require.Equal(t, RiskUpdateCreate, item.Mode)
+	ssa := collectRisk("feature-1", string(SFR_MODE_SSA), "ssa-rule", 0)
+	item, ok = c.Submit(ssa)
+	require.True(t, ok)
+	require.Equal(t, RiskUpdateUpdate, item.Mode)
+	require.Equal(t, source.Hash, item.OldHash)
+	require.Zero(t, ssa.ID, "a cover does not copy the stored row id")
+	require.Equal(t, ssa, c.Current("feature-1"))
+}
+
+func TestRiskCollect_CoverOfUnsavedRiskIsUpdate(t *testing.T) {
+	c := NewRiskCollect()
+	source := collectRisk("feature-unsaved", string(SFR_MODE_SOURCE), "source-rule", 0)
 	if _, ok := c.Submit(source); !ok {
 		t.Fatal("the first finding must be kept")
 	}
-	ssa := collectRisk("feature-1", string(SFR_MODE_SSA), "ssa-rule", 0)
+	ssa := collectRisk("feature-unsaved", string(SFR_MODE_SSA), "ssa-rule", 0)
 	item, ok := c.Submit(ssa)
 	require.True(t, ok)
-	require.Equal(t, uint(11), item.OldID)
+	require.Equal(t, RiskUpdateUpdate, item.Mode)
 	require.Equal(t, source.Hash, item.OldHash)
-	require.Equal(t, ssa, c.Current("feature-1"))
+	require.Zero(t, ssa.ID)
 }
 
 func TestRiskCollect_EarlierModeIsDropped(t *testing.T) {
@@ -89,7 +104,7 @@ func TestRiskCollect_SeverityFiltersSameModeByDefault(t *testing.T) {
 	stronger.Severity = SFR_SEVERITY_HIGH
 	item, ok := c.Submit(stronger)
 	require.True(t, ok)
-	require.Equal(t, uint(4), item.OldID)
+	require.Equal(t, RiskUpdateUpdate, item.Mode)
 	require.Equal(t, low.Hash, item.OldHash)
 }
 
@@ -102,7 +117,7 @@ func TestRiskCollect_FeatureHashIsTheCoverKey(t *testing.T) {
 	item, ok := c.Submit(ssa)
 	require.True(t, ok)
 	require.Equal(t, source.Hash, item.OldHash)
-	require.Equal(t, uint(9), item.OldID)
+	require.Equal(t, RiskUpdateUpdate, item.Mode)
 	other := collectRisk("other-feature", string(SFR_MODE_SSA), "ssa-rule", 0)
 	item, ok = c.Submit(other)
 	require.True(t, ok)
@@ -114,7 +129,7 @@ func TestRiskCollect_EmptyFeatureHashIsAlwaysKept(t *testing.T) {
 	first := collectRisk("", string(SFR_MODE_SOURCE), "rule", 0)
 	item, ok := c.Submit(first)
 	require.True(t, ok)
-	require.Zero(t, item.OldID)
+	require.Equal(t, RiskUpdateCreate, item.Mode)
 	second := collectRisk("", string(SFR_MODE_SOURCE), "rule", 0)
 	_, ok = c.Submit(second)
 	require.True(t, ok, "a finding without a feature hash never covers another")
