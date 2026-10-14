@@ -384,6 +384,12 @@ type anValue struct {
 
 	occultation []int64
 
+	// capturedByClosure is set while compiling, when this value is the
+	// current value of a variable a nested function captures. Const folding
+	// reads it so a later callback can still update the variable. It is not
+	// stored: folding happens before the instruction is saved.
+	capturedByClosure bool
+
 	lazySaveType func()
 }
 
@@ -512,9 +518,15 @@ func (n *anValue) resolveLinkedValue(id int64) (Value, bool) {
 			}
 		}
 	}
-	if inst, err := NewLazyInstruction(app, id); err == nil && inst != nil {
-		if val, ok := ToValue(inst); ok {
-			return val, true
+	// Lazy instructions are only meaningful for DB-backed programs. A
+	// memory-mode program (fresh compile, no program name) has every value in
+	// its cache; querying the SSA database here would read stale rows from
+	// other compiles sharing the same YAKIT_HOME and can loop the compiler.
+	if progName != "" {
+		if inst, err := NewLazyInstruction(app, id); err == nil && inst != nil {
+			if val, ok := ToValue(inst); ok {
+				return val, true
+			}
 		}
 	}
 	return nil, false

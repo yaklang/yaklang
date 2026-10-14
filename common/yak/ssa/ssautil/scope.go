@@ -68,6 +68,11 @@ type ScopedVersionedTableIF[T versionedValue] interface {
 	SetCapturedVariable(string, VersionedIF[T])
 	SetCapturedSideEffect(string, VersionedIF[T], VersionedIF[T])
 	ChangeCapturedSideEffect(string, VersionedIF[T])
+	// RegisterCapturedVariable records ver as a capture of its name.
+	// The first assignment of an outer variable runs before the free-value
+	// parameter exists, so the caller registers again once that parameter
+	// is installed.
+	RegisterCapturedVariable(VersionedIF[T])
 
 	// use in phi
 	CoverBy(ScopedVersionedTableIF[T])
@@ -523,6 +528,17 @@ func (scope *ScopedVersionedTable[T]) ChangeCapturedSideEffect(name string, ver 
 // }
 
 // try register captured variable
+// RegisterCapturedVariable records ver as a capture of name in this scope.
+// Call it again after the free-value parameter exists: the first assignment
+// of an outer variable runs before that parameter is installed, and the
+// initial registration sees no parent and drops the branch from the phi.
+func (v *ScopedVersionedTable[T]) RegisterCapturedVariable(ver VersionedIF[T]) {
+	if v == nil || ver == nil {
+		return
+	}
+	v.tryRegisterCapturedVariable(ver.GetName(), ver)
+}
+
 func (v *ScopedVersionedTable[T]) tryRegisterCapturedVariable(name string, ver VersionedIF[T]) {
 	if v.IsRoot() {
 		return

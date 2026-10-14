@@ -83,6 +83,10 @@ type FunctionBuilder struct {
 
 	//External variables acquired by use will determine whether sideEffect should be generated when assign variable is assigned
 	captureFreeValue map[string]struct{}
+	// capturedNames are lexical names a nested function has captured from
+	// this function. Later assignments of those names are marked so const
+	// folding does not drop the callback's update.
+	capturedNames map[string]struct{}
 }
 
 func NewBuilder(editor *memedit.MemEditor, f *Function, parent *FunctionBuilder) *FunctionBuilder {
