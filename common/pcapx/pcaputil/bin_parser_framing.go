@@ -564,6 +564,11 @@ func (a *binParser) datagramFields(network gopacket.NetworkLayer, udp *layers.UD
 		}
 	}
 	if truncated || ci.CaptureLength < ci.Length || udp.Length < 8 || int(udp.Length) != len(wire)+8 {
+		if a.finsSelected(uint16(udp.SrcPort), uint16(udp.DstPort)) {
+			a.decodeFINSDatagram(e, wire, protocolError(ErrNeedMore, "FINS truncated or invalid UDP carrier"))
+			a.emit(e)
+			return
+		}
 		if a.someIPSDSelected(uint16(udp.SrcPort), uint16(udp.DstPort)) {
 			a.decodeSomeIPSDDatagram(e, wire, protocolError(ErrNeedMore, "SD carrier truncated or invalid UDP length"))
 			a.emit(e)
@@ -601,6 +606,11 @@ func (a *binParser) datagramFields(network gopacket.NetworkLayer, udp *layers.UD
 		e.Status, e.Summary = "incomplete", "truncated or invalid UDP datagram"
 		a.incomplete.Add(1)
 	} else if len(wire) > a.config.MaxMessageBytes {
+		if a.finsSelected(uint16(udp.SrcPort), uint16(udp.DstPort)) {
+			a.decodeFINSDatagram(e, wire, protocolError(ErrResourceExceeded, "FINS UDP byte budget"))
+			a.emit(e)
+			return
+		}
 		if a.someIPSDSelected(uint16(udp.SrcPort), uint16(udp.DstPort)) {
 			a.decodeSomeIPSDDatagram(e, wire, protocolError(ErrResourceExceeded, "SD carrier byte budget"))
 			a.emit(e)

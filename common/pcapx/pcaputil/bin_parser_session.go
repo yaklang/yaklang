@@ -26,6 +26,13 @@ func (f *binFlow) detectDirection(dir int, wire []byte) {
 			return
 		}
 	}
+	if len(wire) > 0 && len(wire) < 4 && bytes.HasPrefix([]byte("FINS"), wire) {
+		return
+	}
+	if len(wire) >= 4 && bytes.Equal(wire[:4], []byte("FINS")) {
+		f.protocol, f.fins = "fins", &binFINS{}
+		return
+	}
 	if p := probeSLMPTCP(wire, min(f.a.budget.MaxFrameBytes, f.a.config.MaxMessageBytes), f.port(5000)); p.Verdict == ProbeAccept {
 		client := dir
 		if f.tcpClientKnown {
@@ -387,6 +394,21 @@ func (f *binFlow) consumeSession(dir int, e *ProtocolEvent, result map[string]an
 		if err == nil {
 			e.semanticFields = cloneSession(e.Session)
 			e.semanticSession = cloneSession(e.Session)
+		}
+	case "fins":
+		if e.ID == 0 {
+			e.ID = f.a.ids.Add(1)
+		}
+		e.Profile, e.Completeness = finsProfile, "message"
+		e.Session, e.ResponseTo, err = f.fins.consumeTCP(e.Raw, dir, e.ID, e.Timestamp, f.a.budget)
+		if err == nil {
+			e.semanticFields, e.semanticSession = cloneSession(e.Session), cloneSession(e.Session)
+			e.TransactionID = e.ResponseTo
+			if e.TransactionID == 0 {
+				if inner, ok := e.Session["fins"].(map[string]any); ok {
+					e.TransactionID, _ = inner["observed_request_id"].(uint64)
+				}
+			}
 		}
 	case "slmp":
 		if e.ID == 0 {
@@ -1057,6 +1079,7 @@ func (f *binFlow) closeSession() {
 	f.bacnetRead = nil
 	f.slmp = nil
 	f.slmpTCP = nil
+	f.fins = nil
 	f.dlms = nil
 	f.wrapper = nil
 	if f.memcached != nil {
@@ -1263,6 +1286,19 @@ func (f *binFlow) finishSession(reason TrafficFlowCloseReason) {
 	}
 	if a := f.atg; a != nil && a.outstanding() > 0 {
 		emit(a.clientDir, map[string]any{"Outstanding": a.outstanding()}, "ATG exchange ended with unmatched requests")
+	}
+	if s := f.fins; s != nil {
+		for dir, count := range s.counts() {
+			if count > 0 {
+				e := f.event(dir, nil, "incomplete", string(reason)+": FINS unmatched observed requests")
+				e.Session = map[string]any{"Outstanding": count}
+				e.semanticSession = cloneSession(e.Session)
+				e.sessionError = &ProtocolError{Kind: ErrNeedMore, Message: e.Summary}
+				e.Error, e.Completeness = e.Summary, "incomplete"
+				f.a.incomplete.Add(1)
+				f.a.emit(e)
+			}
+		}
 	}
 	if s := f.slmpTCP; s != nil && s.outstanding() > 0 {
 		emit(s.clientDir, map[string]any{"Outstanding": s.outstanding()}, "SLMP TCP exchange ended with unmatched observed requests")

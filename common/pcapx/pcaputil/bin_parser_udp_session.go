@@ -648,6 +648,17 @@ func (a *binParser) closeUDPSessions() {
 		for _, el := range s.entries {
 			v := el.Value.(*binUDPEntry)
 			f := v.flow
+			if state := f.fins; state != nil {
+				for dir, count := range state.counts() {
+					if count > 0 {
+						summary := "FINS UDP unmatched observed requests"
+						e := &ProtocolEvent{FlowID: f.id, Timestamp: v.touched, Domain: v.key.domain, Transport: "udp", Source: f.endpoints[dir], Destination: f.endpoints[1-dir], Direction: dir, Protocol: "fins", nativeFINSObservation: true, Profile: finsProfile, Status: "incomplete", Completeness: "incomplete", Summary: summary, Error: summary, Session: map[string]any{"Outstanding": count}, sessionError: &ProtocolError{Kind: ErrNeedMore, Message: summary}}
+						e.semanticSession = cloneSession(e.Session)
+						incomplete = append(incomplete, e)
+						a.incomplete.Add(1)
+					}
+				}
+			}
 			if w := f.wrapper; w != nil {
 				for key, p := range w.associations {
 					if p.pending && p.lowAuthentication {

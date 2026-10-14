@@ -11,6 +11,7 @@ type ProtocolProfile struct{ Protocol, Transport, Framing, Context string }
 
 func NativeProtocolProfiles() []ProtocolProfile {
 	return []ProtocolProfile{
+		{"fins", "tcp/explicit-udp", "W421 FINS/TCP0/1/2/3/6 and W342 CPU Unit Data0501 / DM word Read0101", "owned literal node/header/end-code/CPU fields and exact selected word counts; bounded first-use directional SID observation, reversed full logical endpoints and optional observed TCP node allocation; retry/reuse/expiry/refusal quarantine; no node-zero alias inference, device execution, authentication, routing validation, writes or arbitrary memory schemas"},
 		{"bacnet-routed-read-property", "explicit-udp", "BACnet/IP NPDUv1 selected direct or routed ReadProperty", "bounded one-to-six-byte logical source/destination MAC observations, network and present-only hop count; reversed physical endpoints plus logical route addresses/domain/invoke/descriptor association; unknown/refused routes quarantine the physical relay pair; same primitive/terminal APDU scope as direct profile, no network services, broadcast peer inference, forwarded BVLC, segmentation, device/authentication or router-operation claim"},
 		{"bacnet-read-property", "explicit-udp", "BACnet/IP original unicast, NPDUv1 unsegmented ReadProperty", "bounded request/ComplexACK primitive application values and Error/Reject/server Abort; exact object/property/optional index and reversed endpoint/domain/invoke observation, reuse/retry/expiry quarantined; no constructed property schemas, segmentation, routing, client Abort, authentication or device-operation success claim"},
 		{"knx", "udp", "KNXnet/IP v1 basic and selected extended UDP search", "bounded HPAI, basic discovery plus extended SRP1-4 and DIB1/2/6; raw unknown DIBs, per-datagram unverified observations without multicast pairing, filter verification, tunneling, cEMI or secure-session claim"},
@@ -91,7 +92,7 @@ func WithProtocolDecodeAs(transport string, port uint16, protocol string) Captur
 			return fmt.Errorf("DecodeAs requires UDP and a nonzero port")
 		}
 		switch protocol {
-		case "someip-sd", "someip-tp", "bacnet-routed-read-property", "bacnet-read-property", "dns", "mdns", "llmnr", "dhcp", "dhcpv6", "syslog", "snmp", "mqtt-sn", "bittorrent-dht", "bjnp", "rtp", "sip", "stun", "turn", "dtls", "mavlink", "nmea", "nmea-ais-multipart", "semtech-udp", "semtech-downlink-session", "rtps", "rtps-control", "rtps-wire", "rtps13-wire", "rtps13-parameters", "rtps20-rti-filter", "rtps-shape-fragments", "rtps-spdp-fragments", "bsap", "slmp", "dlms", "opendroneid", "opendroneid-system", "opendroneid-identity", "opendroneid-auth-pages", "c37118", "c37118-engineering", "knx", "pfcp", "dlms-wrapper", "doip":
+		case "fins", "someip-sd", "someip-tp", "bacnet-routed-read-property", "bacnet-read-property", "dns", "mdns", "llmnr", "dhcp", "dhcpv6", "syslog", "snmp", "mqtt-sn", "bittorrent-dht", "bjnp", "rtp", "sip", "stun", "turn", "dtls", "mavlink", "nmea", "nmea-ais-multipart", "semtech-udp", "semtech-downlink-session", "rtps", "rtps-control", "rtps-wire", "rtps13-wire", "rtps13-parameters", "rtps20-rti-filter", "rtps-shape-fragments", "rtps-spdp-fragments", "bsap", "slmp", "dlms", "opendroneid", "opendroneid-system", "opendroneid-identity", "opendroneid-auth-pages", "c37118", "c37118-engineering", "knx", "pfcp", "dlms-wrapper", "doip":
 		default:
 			return fmt.Errorf("unsupported native DecodeAs profile")
 		}
@@ -171,6 +172,9 @@ func (a *binParser) decodeNativeDatagram(e *ProtocolEvent, w []byte, src, dst ui
 	}
 	if explicit == "bacnet-routed-read-property" {
 		return a.decodeBACnetReadDatagram(e, w, true)
+	}
+	if explicit == "fins" {
+		return a.decodeFINSDatagram(e, w, nil)
 	}
 	if explicit == "someip-sd" {
 		return a.decodeSomeIPSDDatagram(e, w, nil)

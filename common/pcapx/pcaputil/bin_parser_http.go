@@ -53,6 +53,8 @@ func (f *binFlow) frameDirection(dir int, w []byte) (int, *binSpec, error) {
 		switch f.protocol {
 		case "mms":
 			return f.frameMMSISO(w)
+		case "fins":
+			return f.frameFINS(w)
 		case "slmp":
 			return f.frameSLMPTCP(w)
 		case "vnc":

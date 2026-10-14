@@ -18,6 +18,7 @@ import (
 type ProtocolEvent struct {
 	nativeOPCUAObservation                   bool
 	nativeMMSObservation                     bool
+	nativeFINSObservation                    bool
 	nativeUnrecognizedUDP                    bool
 	nativeBACnetRead                         bool
 	nativeBACnetRoutedRead                   bool
@@ -100,7 +101,7 @@ func (e *ProtocolEvent) Decode() (result map[string]any, err error) {
 		}
 		// These native observations already retain their complete session
 		// context in the private field tree. Public projections are not authority.
-		ownedIndustrial := e.Protocol == "slmp" && (e.Profile == slmpTCPProfile || e.Profile == "slmp-binary-self-test") ||
+		ownedIndustrial := e.nativeFINSObservation || e.Protocol == "slmp" && (e.Profile == slmpTCPProfile || e.Profile == "slmp-binary-self-test") ||
 			e.Transport == "ethernet" && (e.Protocol == "sv" && e.Profile == "iec61850-sv-raw-asdu" || e.Protocol == "ethercat" && e.Profile == "ethercat-datagram-chain")
 		if ownedIndustrial && e.semanticFields != nil {
 			session = e.semanticFields
@@ -249,7 +250,7 @@ func (e *ProtocolEvent) retainRuleEnvelope(result map[string]any) {
 }
 
 func (e *ProtocolEvent) ownsNativeFields() bool {
-	if e.nativeDiagnosticError != "" {
+	if e.nativeFINSObservation || e.nativeDiagnosticError != "" {
 		return true
 	}
 	if e.nativeDoIPObservation {
@@ -332,7 +333,7 @@ func (e *ProtocolEvent) ownsNativeFields() bool {
 		return true
 	}
 	switch e.Protocol {
-	case "someip", "snmp", "dlms-wrapper", "dlms", "opendroneid", "c37118", "sv", "ethercat", "knx", "pfcp", "profinet-dcp", "mavlink", "rtps", "nmea", "semtech-udp":
+	case "fins", "someip", "snmp", "dlms-wrapper", "dlms", "opendroneid", "c37118", "sv", "ethercat", "knx", "pfcp", "profinet-dcp", "mavlink", "rtps", "nmea", "semtech-udp":
 		return true
 	}
 	return false
@@ -508,6 +509,7 @@ type binParser struct {
 	stunUntrackedRefusal                                                       bool // constant-size quarantine when an admitted UDP key cannot be retained
 	pfcpUntrackedRefusal                                                       bool // udpMu; forgotten rejected identity cannot verify a newly admitted PFCP key
 	dlmsUntrackedRefusal                                                       bool // udpMu; no fresh HDLC association after an unretained admitted refusal
+	finsUntrackedRefusal                                                       bool // udpMu; unretained identity cannot become a fresh generation
 	slmpUntrackedRefusal                                                       bool // udpMu; refused unretained SLMP identity has no verified generation
 	wrapperUntrackedRefusal                                                    bool // udpMu; missing Wrapper history cannot prove a fresh invoke generation
 	dcpMu                                                                      sync.Mutex
@@ -760,6 +762,7 @@ type binFlow struct {
 	bacnetRead        *binBACnetRead
 	slmp              *binSLMP
 	slmpTCP           *binSLMPTCP
+	fins              *binFINS
 	wrapper           *binDLMSWrapper
 	dlms              *binDLMS
 	memcached         *binMemcached
@@ -879,6 +882,10 @@ func (f *binFlow) event(dir int, raw []byte, status, detail string) *BinParserEv
 		e.Profile = "doip-routing-dsc"
 	}
 	f.eventEvidence(dir, e)
+	if f.fins != nil {
+		e.nativeFINSObservation = true
+		e.Profile, e.Completeness = finsProfile, "message"
+	}
 	if f.slmpTCP != nil {
 		e.Profile, e.Completeness = slmpTCPProfile, "message"
 	}
@@ -936,6 +943,24 @@ func (f *binFlow) stop(dir int, wire []byte, status, reason string) {
 	}
 	e := f.event(dir, preview, status, reason)
 	e.sessionError, f.lastSessionError = f.lastSessionError, nil
+	if e.nativeFINSObservation {
+		if e.sessionError == nil {
+			kind := ErrMalformedMessage
+			switch status {
+			case "limited":
+				kind = ErrResourceExceeded
+			case "context-required":
+				kind = ErrContextRequired
+			case "incomplete":
+				kind = ErrNeedMore
+			}
+			e.sessionError = &ProtocolError{Kind: kind, Message: reason}
+		}
+		e.Error = e.sessionError.Error()
+		if status == "incomplete" {
+			e.Completeness = "incomplete"
+		}
+	}
 	if e.nativeOPCUAObservation && e.sessionError == nil {
 		kind := ErrMalformedMessage
 		switch status {
@@ -1270,7 +1295,7 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 				} else {
 					result, err = f.consumeTLS(dir, e)
 				}
-			} else if f.protocol == "mms" || f.protocol == "slmp" || f.protocol == "redis" || f.protocol == "syslog" || f.protocol == "snmp" || f.protocol == "smb2" || f.protocol == "enip" || f.protocol == "doip" || f.protocol == "genisys" || f.protocol == "dlms-wrapper" || f.protocol == "dlms" || f.protocol == "c37118" || f.protocol == "roc-plus" || f.protocol == "atg" || f.memcached != nil || (e.Entry == "SSHIdentification" || e.Entry == "SSHPreIdentification") || f.protocol == "stratum" || f.protocol == "gearman" || f.protocol == "beanstalkd" || f.protocol == "scgi" || f.protocol == "msgpack-rpc" || f.protocol == "zookeeper" || f.protocol == "clickhouse" || f.protocol == "stomp" || f.protocol == "nats" || f.textInternet != nil || e.Entry == "MySQLPreparedFields" {
+			} else if f.protocol == "fins" || f.protocol == "mms" || f.protocol == "slmp" || f.protocol == "redis" || f.protocol == "syslog" || f.protocol == "snmp" || f.protocol == "smb2" || f.protocol == "enip" || f.protocol == "doip" || f.protocol == "genisys" || f.protocol == "dlms-wrapper" || f.protocol == "dlms" || f.protocol == "c37118" || f.protocol == "roc-plus" || f.protocol == "atg" || f.memcached != nil || (e.Entry == "SSHIdentification" || e.Entry == "SSHPreIdentification") || f.protocol == "stratum" || f.protocol == "gearman" || f.protocol == "beanstalkd" || f.protocol == "scgi" || f.protocol == "msgpack-rpc" || f.protocol == "zookeeper" || f.protocol == "clickhouse" || f.protocol == "stomp" || f.protocol == "nats" || f.textInternet != nil || e.Entry == "MySQLPreparedFields" {
 				result = map[string]any{}
 			} else if e.Protocol == "rtsp" && rtspAppleControlWire(e.Raw, a.budget.MaxCollectionElements) {
 				result = map[string]any{}
@@ -1307,7 +1332,7 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 					e.semanticFields = cloneSession(e.Session)
 					result = map[string]any{"fields": cloneSession(e.semanticFields)}
 				}
-				if (f.protocol == "mms" || f.protocol == "dlms-wrapper" || f.protocol == "slmp") && e.Session != nil {
+				if (f.protocol == "fins" || f.protocol == "mms" || f.protocol == "dlms-wrapper" || f.protocol == "slmp") && e.Session != nil {
 					result = map[string]any{"fields": cloneSession(e.semanticFields)}
 				}
 				if (f.protocol == "enip" || f.protocol == "doip" || f.protocol == "genisys" || f.protocol == "dlms" || f.protocol == "c37118" || f.protocol == "roc-plus" || f.protocol == "atg" || f.memcached != nil) && e.Session != nil {
@@ -1461,7 +1486,7 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 		if !failed {
 			f.deliverTLS(dir, e)
 		}
-		if failed && !recoverableDNP3 && !recoverableDoIP && !(e.Protocol == "slmp" && slmpTCPRecoverable(e.sessionError)) && !(e.Protocol == "dlms-wrapper" && dlmsRecoverableMessageError(e.sessionError)) && !(e.Protocol == "c37118" && c37118RecoverableMessageError(e.sessionError)) && !(e.Protocol == "dlms" && dlmsRecoverableMessageError(e.sessionError)) && !(e.Protocol == "roc-plus" && rocRecoverableMessageError(e.sessionError)) && !(e.Protocol == "genisys" && genisysRecoverableMessageError(e.sessionError)) && !((e.Protocol == "http2" || e.Protocol == "grpc" || e.Protocol == "doh") && e.Session["Error Scope"] == "stream") {
+		if failed && !(e.Protocol == "fins" && finsRecoverable(e.sessionError)) && !recoverableDNP3 && !recoverableDoIP && !(e.Protocol == "slmp" && slmpTCPRecoverable(e.sessionError)) && !(e.Protocol == "dlms-wrapper" && dlmsRecoverableMessageError(e.sessionError)) && !(e.Protocol == "c37118" && c37118RecoverableMessageError(e.sessionError)) && !(e.Protocol == "dlms" && dlmsRecoverableMessageError(e.sessionError)) && !(e.Protocol == "roc-plus" && rocRecoverableMessageError(e.sessionError)) && !(e.Protocol == "genisys" && genisysRecoverableMessageError(e.sessionError)) && !((e.Protocol == "http2" || e.Protocol == "grpc" || e.Protocol == "doh") && e.Session["Error Scope"] == "stream") {
 			if stateful {
 				f.invalidateSession(1 - dir)
 				f.closeSession()
@@ -1589,6 +1614,11 @@ func (f *binFlow) close(reason TrafficFlowCloseReason) {
 				continue
 			}
 			e := f.event(dir, d.buffer, "incomplete", string(reason)+": exact message boundary was not reached")
+			if e.nativeFINSObservation {
+				e.Completeness = "incomplete"
+				e.sessionError = &ProtocolError{Kind: ErrNeedMore, Message: e.Summary}
+				e.Error = e.Summary
+			}
 			f.a.incomplete.Add(1)
 			f.release(d)
 			f.a.emit(e)
