@@ -113,6 +113,23 @@ func guiWaitCompleted(t *testing.T, ctx context.Context, events *guiReplayEvents
 	require.Equal(t, "completed", status)
 }
 
+// Runtime lifecycle shutdown joins input/task loops; explicitly join retained
+// async resources too, including on a failed assertion with an open tool gate.
+func guiShutdownAsyncLoop(t *testing.T, loop *reactloops.ReActLoop) {
+	t.Helper()
+	if loop == nil {
+		return
+	}
+	manager, err := loop.GetAsyncExecutionManager()
+	if errors.Is(err, asyncexecmanager.ErrClosed) {
+		return // Released before any execution manager was created.
+	}
+	require.NoError(t, err)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	require.NoError(t, manager.Shutdown(ctx))
+}
+
 func guiData(e *ypb.AIOutputEvent) map[string]any {
 	var v map[string]any
 	_ = json.Unmarshal(e.Content, &v)
