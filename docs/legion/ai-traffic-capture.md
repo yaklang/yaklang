@@ -122,9 +122,10 @@ stateless runtime. A separate analysis session binds server-owned
 server-assembled read-only evidence for those references. Hotpatches, sync and
 interactive overrides, executable Focus/Forge/Skill context or runtime options, MCP, working directories, managed workspaces,
 attachments and credentials are rejected. Engine setup disables tools, search,
-planning, perception and automatic skills. An immutable config flag additionally
-rejects the tool invocation entry point and propagates to child agents. User
-prompts and mutable runtime flags cannot clear it. Evidence text is bounded to
+planning, perception and automatic skills. The final engine options enforce the
+existing `DisableToolUse` setting after provider and message options. The tool
+invocation entry point checks that setting, and child configurations inherit it.
+Analysis inputs cannot supply hotpatches to reopen tool execution. Evidence text is bounded to
 1 MiB of UTF-8 bytes; the platform also reserves command transport overhead. It is
 untrusted; findings are instructed to cite exact `[flow:<flow_id>]` references.
 

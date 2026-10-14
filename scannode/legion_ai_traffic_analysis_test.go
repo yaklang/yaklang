@@ -61,12 +61,12 @@ func TestAITrafficAnalysisRejectsMissingEvidenceAndControlOverrides(t *testing.T
 	}
 }
 func TestAITrafficAnalysisClampsProviderAndMessageOptions(t *testing.T) {
-	config := aiengine.NewAIEngineConfig(aiengine.WithDisableToolUse(false), aiengine.WithDisableAIForge(false), aiengine.WithDisableMCPServers(false), aiengine.WithFocus("network-focus"), trafficAnalysisEnginePolicy())
+	config := aiengine.NewAIEngineConfig(aiengine.WithDisableToolUse(false), aiengine.WithDisableAIForge(false), aiengine.WithDisableMCPServers(false), aiengine.WithFocus("network-focus"), aiengine.WithExtOptions(aicommon.WithDisableToolUse(false)), trafficAnalysisEnginePolicy())
 	if !config.DisableToolUse || !config.DisableAIForge || !config.DisableMCPServers || config.EnableAISearchTool || config.EnableForgeSearchTool || config.Focus != "" {
 		t.Fatal("provider settings escaped final evidence-only policy")
 	}
 	common := aicommon.NewConfig(context.Background(), config.ExtOptions...)
-	if !common.IsReadOnlyEvidence() || !common.DisableToolUse || !common.DisableWebSearch {
+	if !common.IsToolUseDisabled() || !common.DisableWebSearch {
 		t.Fatal("execution-level policy was not applied")
 	}
 }

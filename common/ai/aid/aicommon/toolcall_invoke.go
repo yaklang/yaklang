@@ -224,8 +224,8 @@ func (a *ToolCaller) invoke(
 	// suppress session/stat notifications when no plugin callback ran.
 	a.checkpointReplayed = false
 	c := a.config
-	if policy, ok := c.(interface{ IsReadOnlyEvidence() bool }); ok && policy.IsReadOnlyEvidence() {
-		return nil, fmt.Errorf("external tool execution is disabled for evidence-only analysis")
+	if policy, ok := c.(interface{ IsToolUseDisabled() bool }); ok && policy.IsToolUseDisabled() {
+		return nil, fmt.Errorf("tool execution is disabled")
 	}
 	e := a.emitter
 	if err := toolCallerContextErr(a.ctx); err != nil {

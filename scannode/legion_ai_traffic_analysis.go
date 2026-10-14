@@ -42,7 +42,7 @@ func trafficAnalysisEnginePolicy() aiengine.AIEngineConfigOption {
 		config.ExtraMCPServers = nil
 		config.IncludeToolNames = nil
 		config.Focus = ""
-		config.ExtOptions = append(config.ExtOptions, aicommon.WithReadOnlyEvidence(), aicommon.WithDisallowMCPServers(true), aicommon.WithDisableAutoSkills(true), aicommon.WithDisableWebSearch(true), aicommon.WithEnablePlanAndExec(false), aicommon.WithDisableDynamicPlanning(true), aicommon.WithDisablePerception(true), aicommon.WithDisableIntentRecognition(true), aicommon.WithDisableMemoryTriage(true), aicommon.WithAllowSyncInitContext(false))
+		config.ExtOptions = append(config.ExtOptions, aicommon.WithDisableToolUse(true), aicommon.WithDisallowMCPServers(true), aicommon.WithDisableAutoSkills(true), aicommon.WithDisableWebSearch(true), aicommon.WithEnablePlanAndExec(false), aicommon.WithDisableDynamicPlanning(true), aicommon.WithDisablePerception(true), aicommon.WithDisableIntentRecognition(true), aicommon.WithDisableMemoryTriage(true), aicommon.WithAllowSyncInitContext(false))
 	}
 }
 func validateTrafficAnalysisInput(binding aiSessionBinding, input aiSessionInput) error {
