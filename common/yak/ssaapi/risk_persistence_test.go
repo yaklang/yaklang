@@ -54,7 +54,7 @@ alert $target`, QueryWithMemory(), QueryWithTaskID(uuid.NewString()))
 	require.Equal(t, int64(1), n)
 }
 
-func TestRiskDBSaverConcurrentCoversKeepOneRowAndHistory(t *testing.T) {
+func TestRiskDBSaverConcurrentCoversKeepOneRow(t *testing.T) {
 	runtimeID := uuid.NewString()
 	db := ssadb.GetDB()
 	t.Cleanup(func() { db.Unscoped().Where("runtime_id = ?", runtimeID).Delete(&schema.SSARisk{}) })
@@ -74,7 +74,6 @@ func TestRiskDBSaverConcurrentCoversKeepOneRowAndHistory(t *testing.T) {
 	require.NoError(t, rt.Flush())
 	var first schema.SSARisk
 	require.NoError(t, db.Where("hash = ?", risks[0].Hash).First(&first).Error)
-	require.NoError(t, db.Model(&first).UpdateColumn("latest_disposal_status", "is_issue").Error)
 
 	var wg sync.WaitGroup
 	for i := range risks {
@@ -101,9 +100,10 @@ func TestRiskDBSaverConcurrentCoversKeepOneRowAndHistory(t *testing.T) {
 	require.NoError(t, db.Model(&schema.SSARisk{}).Where("runtime_id = ? AND scan_mode != ?", runtimeID, "ssa").Count(&n).Error)
 	require.Zero(t, n)
 	var covered schema.SSARisk
-	require.NoError(t, db.Where("id = ?", first.ID).First(&covered).Error)
-	require.Equal(t, "is_issue", covered.LatestDisposalStatus)
+	require.NoError(t, db.Where("runtime_id = ? AND risk_feature_hash = ?", runtimeID, risks[0].RiskFeatureHash).First(&covered).Error)
 	require.Equal(t, "ssa", covered.ScanMode)
+	require.NoError(t, db.Model(&schema.SSARisk{}).Where("hash = ?", first.Hash).Count(&n).Error)
+	require.Zero(t, n, "the replaced hash does not leave its row behind")
 	// The asynchronous saver never mutates objects already visible to streams.
 	require.Zero(t, risks[0].ID)
 }
