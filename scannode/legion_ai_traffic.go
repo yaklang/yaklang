@@ -208,7 +208,7 @@ func (c *aiTrafficCollector) recordHTTPFlow(r *lowhttp.LowhttpResponse, turn str
 	if r.TraceInfo != nil {
 		started = finished.Add(-r.TraceInfo.TotalTime)
 	}
-	terminal := &aiv1.AITrafficRecord{ProtocolVersion: 1, FlowId: uuid.NewString(), SessionId: c.binding.Ref.SessionID, TurnId: turn, NodeId: c.binding.NodeID, NodeSessionId: c.binding.NodeSessionID, BindEpoch: c.binding.Ref.BindEpoch, Phase: "terminal", Outcome: "success", StartedAtMs: started.UnixMilli(), FinishedAtMs: finished.UnixMilli(), Scheme: "http"}
+	terminal := &aiv1.AITrafficRecord{ProtocolVersion: 1, FlowId: uuid.NewString(), SessionId: c.binding.Ref.SessionID, TurnId: turn, RuntimeId: r.RuntimeId, NodeId: c.binding.NodeID, NodeSessionId: c.binding.NodeSessionID, BindEpoch: c.binding.Ref.BindEpoch, Phase: "terminal", Outcome: "success", StartedAtMs: started.UnixMilli(), FinishedAtMs: finished.UnixMilli(), Scheme: "http"}
 	if r.Https {
 		terminal.Scheme = "https"
 	}
