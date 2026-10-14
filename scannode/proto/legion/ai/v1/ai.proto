@@ -2227,6 +2227,7 @@ message AITrafficRecord {
   // Strip userinfo/fragment; redact sensitive path segments and query values.
   // Captured before packet quotas apply. Absent legacy records use scheme/host.
   optional string redacted_url = 25;
+  string runtime_id = 26;
 }
 
 message AITrafficBatch {

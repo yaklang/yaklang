@@ -2,9 +2,12 @@ package scannode
 
 import (
 	"context"
+	aiv1 "github.com/yaklang/yaklang/scannode/gen/legionpb/legion/ai/v1"
+	"google.golang.org/protobuf/proto"
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"testing"
 
@@ -61,4 +64,21 @@ func TestAITrafficReusesSavePolicyAndKeepsSessionsIsolated(t *testing.T) {
 	paths, err = first.pending()
 	require.NoError(t, err)
 	require.Len(t, paths, 1, "no-response flows follow the existing save policy")
+}
+
+func TestAITrafficPreservesHTTPFlowRuntimeID(t *testing.T) {
+	for _, runtimeID := range []string{"", "tool-call-a", "explicit-script-runtime"} {
+		t.Run(runtimeID, func(t *testing.T) {
+			c := trafficTestCollector(t, "http://unused.invalid")
+			c.recordHTTPFlow(&lowhttp.LowhttpResponse{RuntimeId: runtimeID, RawRequest: []byte("GET / HTTP/1.1\r\nHost: example.test\r\n\r\n"), RawPacket: []byte("HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n")}, "turn-a")
+			paths, err := c.pending()
+			require.NoError(t, err)
+			require.Len(t, paths, 1)
+			raw, err := os.ReadFile(paths[0])
+			require.NoError(t, err)
+			upload := new(aiv1.AITrafficUpload)
+			require.NoError(t, proto.Unmarshal(raw, upload))
+			require.Equal(t, runtimeID, upload.Record.RuntimeId)
+		})
+	}
 }

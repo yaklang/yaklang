@@ -20172,6 +20172,7 @@ type AITrafficRecord struct {
 	// Strip userinfo/fragment; redact sensitive path segments and query values.
 	// Captured before packet quotas apply. Absent legacy records use scheme/host.
 	RedactedUrl   *string `protobuf:"bytes,25,opt,name=redacted_url,json=redactedUrl,proto3,oneof" json:"redacted_url,omitempty"`
+	RuntimeId     string  `protobuf:"bytes,26,opt,name=runtime_id,json=runtimeId,proto3" json:"runtime_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -20370,6 +20371,13 @@ func (x *AITrafficRecord) GetCaptureError() string {
 func (x *AITrafficRecord) GetRedactedUrl() string {
 	if x != nil && x.RedactedUrl != nil {
 		return *x.RedactedUrl
+	}
+	return ""
+}
+
+func (x *AITrafficRecord) GetRuntimeId() string {
+	if x != nil {
+		return x.RuntimeId
 	}
 	return ""
 }
@@ -22704,7 +22712,7 @@ const file_legion_ai_v1_ai_proto_rawDesc = "" +
 	"\x11source_session_id\x18\x01 \x01(\tR\x0fsourceSessionId\x12\x19\n" +
 	"\bflow_ids\x18\x02 \x03(\tR\aflowIds\x12#\n" +
 	"\revidence_text\x18\x03 \x01(\tR\fevidenceText\x12\x1b\n" +
-	"\tread_only\x18\x04 \x01(\bR\breadOnly\"\xe3\x06\n" +
+	"\tread_only\x18\x04 \x01(\bR\breadOnly\"\x82\a\n" +
 	"\x0fAITrafficRecord\x12)\n" +
 	"\x10protocol_version\x18\x01 \x01(\rR\x0fprotocolVersion\x12\x17\n" +
 	"\aflow_id\x18\x02 \x01(\tR\x06flowId\x12\x1d\n" +
@@ -22733,7 +22741,9 @@ const file_legion_ai_v1_ai_proto_rawDesc = "" +
 	"\x11request_truncated\x18\x16 \x01(\bR\x10requestTruncated\x12-\n" +
 	"\x12response_truncated\x18\x17 \x01(\bR\x11responseTruncated\x12#\n" +
 	"\rcapture_error\x18\x18 \x01(\tR\fcaptureError\x12&\n" +
-	"\fredacted_url\x18\x19 \x01(\tH\x00R\vredactedUrl\x88\x01\x01B\x0f\n" +
+	"\fredacted_url\x18\x19 \x01(\tH\x00R\vredactedUrl\x88\x01\x01\x12\x1d\n" +
+	"\n" +
+	"runtime_id\x18\x1a \x01(\tR\truntimeIdB\x0f\n" +
 	"\r_redacted_urlJ\x04\b\x05\x10\x06R\ftool_call_id\"t\n" +
 	"\x0eAITrafficBatch\x12)\n" +
 	"\x10protocol_version\x18\x01 \x01(\rR\x0fprotocolVersion\x127\n" +
