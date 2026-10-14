@@ -37,6 +37,7 @@ var runtimeDispatchHandlers = map[abi.FuncID]runtimeDispatchFunc{
 	abi.IDRuntimeChanSend:     runtimeDispatchChanSend,
 	abi.IDRuntimeMakeChan:     runtimeDispatchMakeChan,
 	abi.IDRuntimeWaitAsync:    runtimeDispatchWaitAsync,
+	abi.IDRuntimeSelect:       runtimeDispatchSelect,
 }
 
 // runtimeDispatchWaitAsync implements the yak builtin waitAllAsyncCallFinish():

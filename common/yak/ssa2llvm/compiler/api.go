@@ -468,13 +468,18 @@ func entryFunctionCandidates(requested string) []string {
 		*out = append(*out, name)
 	}
 
-	out := make([]string, 0, 4)
+	out := make([]string, 0, 6)
 	add(requested, &out)
 	if strings.HasPrefix(requested, "@") {
 		add(strings.TrimPrefix(requested, "@"), &out)
 	} else {
 		add("@"+requested, &out)
 	}
+	// User-defined LLVM functions are namespaced by llvmFunctionName. Keep
+	// source-level entry names accepted by the public compile API.
+	userName := abi.UserSymbolPrefix + strings.TrimPrefix(requested, "@")
+	add(userName, &out)
+	add("@"+userName, &out)
 	if requested == "check" {
 		add("main", &out)
 		add("@main", &out)
