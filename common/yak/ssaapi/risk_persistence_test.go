@@ -104,7 +104,8 @@ func TestRiskDBSaverConcurrentCoversKeepOneRow(t *testing.T) {
 	require.Equal(t, "ssa", covered.ScanMode)
 	require.NoError(t, db.Model(&schema.SSARisk{}).Where("hash = ?", first.Hash).Count(&n).Error)
 	require.Zero(t, n, "the replaced hash does not leave its row behind")
-	// The asynchronous saver never mutates objects already visible to streams.
+	// The saver writes a copy, so it never mutates a risk the report and the
+	// result stream are still reading.
 	require.Zero(t, risks[0].ID)
 }
 
@@ -136,13 +137,21 @@ func TestRiskSaverDropsOnlyCoveredAuditEdges(t *testing.T) {
 	risk := batchRisk(name, name, "source", "source")
 	risk.RuntimeId = name
 	risk.PrepareForSave()
-	require.NoError(t, SaveRiskUpdates(db, schema.RiskUpdateItem{Risk: risk}))
-	node := &ssadb.AuditNode{NodeID: uuid.NewString(), AuditNodeStatus: ssadb.AuditNodeStatus{RiskHash: risk.Hash, ProgramName: name}}
+	require.NoError(t, SaveRiskUpdates(db, schema.RiskUpdateItem{Mode: schema.RiskUpdateCreate, Risk: risk}))
+	node := &ssadb.AuditNode{NodeID: uuid.NewString(), AuditNodeStatus: ssadb.AuditNodeStatus{
+		RiskHash: risk.Hash, ProgramName: name, TaskId: name, RiskFeatureHash: risk.RiskFeatureHash,
+	}}
 	other := &ssadb.AuditNode{NodeID: uuid.NewString(), AuditNodeStatus: ssadb.AuditNodeStatus{RiskHash: "other", ProgramName: name}}
 	require.NoError(t, db.Create(node).Error)
 	require.NoError(t, db.Create(other).Error)
-	edge := &ssadb.AuditEdge{FromNode: node.NodeID, ToNode: other.NodeID, ProgramName: name}
+	edge := &ssadb.AuditEdge{FromNode: node.NodeID, ToNode: other.NodeID, ProgramName: name, TaskId: name, RiskFeatureHash: risk.RiskFeatureHash}
 	require.NoError(t, db.Create(edge).Error)
+	// This edge shares neither endpoint with the covered node. Only the feature
+	// hash plus the task id identifies it.
+	stray := &ssadb.AuditEdge{FromNode: uuid.NewString(), ToNode: uuid.NewString(), ProgramName: name, TaskId: name, RiskFeatureHash: risk.RiskFeatureHash}
+	require.NoError(t, db.Create(stray).Error)
+	kept := &ssadb.AuditEdge{FromNode: uuid.NewString(), ToNode: uuid.NewString(), ProgramName: name, TaskId: "other-task", RiskFeatureHash: risk.RiskFeatureHash}
+	require.NoError(t, db.Create(kept).Error)
 	t.Cleanup(func() {
 		db.Unscoped().Where("program_name = ?", name).Delete(&ssadb.AuditNode{})
 		db.Unscoped().Where("program_name = ?", name).Delete(&ssadb.AuditEdge{})
@@ -150,10 +159,17 @@ func TestRiskSaverDropsOnlyCoveredAuditEdges(t *testing.T) {
 	})
 	covered := batchRisk(uuid.NewString(), name, "ssa", "covered")
 	covered.RuntimeId = name
-	require.NoError(t, SaveRiskUpdates(db, schema.RiskUpdateItem{Risk: covered, OldID: risk.ID, OldHash: risk.Hash}))
+	covered.PrepareForSave()
+	require.NoError(t, SaveRiskUpdates(db, schema.RiskUpdateItem{
+		Mode: schema.RiskUpdateUpdate, Risk: covered, OldHash: risk.Hash,
+	}))
 	var n int64
 	require.NoError(t, db.Model(&ssadb.AuditEdge{}).Where("id = ?", edge.ID).Count(&n).Error)
 	require.Zero(t, n)
+	require.NoError(t, db.Model(&ssadb.AuditEdge{}).Where("id = ?", stray.ID).Count(&n).Error)
+	require.Zero(t, n, "an edge is deleted by task id and feature hash")
+	require.NoError(t, db.Model(&ssadb.AuditEdge{}).Where("id = ?", kept.ID).Count(&n).Error)
+	require.Equal(t, int64(1), n, "another task keeps its edge")
 	require.NoError(t, db.Model(&ssadb.AuditNode{}).Where("id = ?", other.ID).Count(&n).Error)
 	require.Equal(t, int64(1), n)
 }

@@ -372,6 +372,8 @@ github.com/yaklang/gorm v1.9.17-0.20260811094634-87ab480108b6 h1:YIkdoBc7ASRoRdm
 github.com/yaklang/gorm v1.9.17-0.20260811094634-87ab480108b6/go.mod h1:C5A6qs3ohHkyTElJnNDhJqCD0zBoaNBYRNNWNgYRPEg=
 github.com/yaklang/gorm v1.9.17-0.20261013085024-390fd51f9246 h1:iJxm0M3/rW2JXcAHtwpEjq+hDzKPVusNcI2flD3MKf8=
 github.com/yaklang/gorm v1.9.17-0.20261013085024-390fd51f9246/go.mod h1:C5A6qs3ohHkyTElJnNDhJqCD0zBoaNBYRNNWNgYRPEg=
+github.com/yaklang/gorm v1.9.17-0.20261014094850-478163d62c38 h1:B/3+oMyY3IngSsWFDaumNdkLOezuQpMe3Gh1NPAZFLg=
+github.com/yaklang/gorm v1.9.17-0.20261014094850-478163d62c38/go.mod h1:C5A6qs3ohHkyTElJnNDhJqCD0zBoaNBYRNNWNgYRPEg=
 github.com/yaklang/javajive v0.1.2 h1:sAE/UruiNqcjCrEK1wyp3E3ooHJPwWHdXnNUbybxHvA=
 github.com/yaklang/javajive v0.1.2/go.mod h1:MP6RfWwjQ40V4J+n4k2NwXH1p5s/dNqzxC3Klx6ckRY=
 github.com/yaklang/pcap v1.0.6-0.20260710032136-5f3df87eea80 h1:ZSw9udYCWovKLhUQhoNurjaEvX+HroS6il3hE3ulTC4=

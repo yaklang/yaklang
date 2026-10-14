@@ -29,13 +29,13 @@ func coveredRisk(hash, feature, mode string) *schema.SSARisk {
 func TestReport_ApplyRiskUpdateReplacesCoveredBody(t *testing.T) {
 	report := NewReport(IRifyReportType)
 	source := coveredRisk("hash-source", "feature-1", string(schema.SFR_MODE_SOURCE))
-	require.NoError(t, report.ApplyRiskUpdate(schema.RiskUpdateItem{Risk: source}))
+	require.NoError(t, report.ApplyRiskUpdate(schema.RiskUpdateItem{Mode: schema.RiskUpdateCreate, Risk: source}))
 	require.Len(t, report.Risks, 1)
 
 	ssa := coveredRisk("hash-ssa", "feature-1", string(schema.SFR_MODE_SSA))
 	require.NoError(t, report.ApplyRiskUpdate(schema.RiskUpdateItem{
+		Mode:    schema.RiskUpdateUpdate,
 		Risk:    ssa,
-		OldID:   1,
 		OldHash: source.Hash,
 	}))
 	require.Len(t, report.Risks, 1, "one entry per finding")
@@ -52,13 +52,13 @@ func TestSarifReport_ApplyRiskUpdateReplacesCoveredResult(t *testing.T) {
 	require.NoError(t, err)
 
 	source := coveredRisk("hash-source", "feature-1", string(schema.SFR_MODE_SOURCE))
-	require.NoError(t, report.ApplyRiskUpdate(schema.RiskUpdateItem{Risk: source}))
+	require.NoError(t, report.ApplyRiskUpdate(schema.RiskUpdateItem{Mode: schema.RiskUpdateCreate, Risk: source}))
 	require.Len(t, report.run.Results, 1)
 
 	ssa := coveredRisk("hash-ssa", "feature-1", string(schema.SFR_MODE_SSA))
 	require.NoError(t, report.ApplyRiskUpdate(schema.RiskUpdateItem{
+		Mode:    schema.RiskUpdateUpdate,
 		Risk:    ssa,
-		OldID:   1,
 		OldHash: source.Hash,
 	}))
 	require.Len(t, report.run.Results, 1, "one alert per finding")

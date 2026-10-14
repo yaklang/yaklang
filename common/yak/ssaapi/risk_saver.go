@@ -1,8 +1,10 @@
 package ssaapi
 
 import (
+	"fmt"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/yaklang/gorm"
 	"github.com/yaklang/yaklang/common/schema"
@@ -39,14 +41,17 @@ func NewRiskDBSaver() *RiskDBSaver {
 var _ schema.RiskUpdateHandler = (*RiskDBSaver)(nil)
 
 func (s *RiskDBSaver) ApplyRiskUpdate(item schema.RiskUpdateItem) error {
-	if s == nil || item.Risk == nil {
+	if s == nil {
 		return nil
 	}
-	// The worker writes a copy so GORM cannot mutate the caller's object
-	// while a reporter still reads it.
-	row := *item.Risk
-	row.CWE = append(schema.StringArray(nil), row.CWE...)
-	item.Risk = &row
+	// The worker runs on its own goroutine, and GORM writes the assigned id
+	// and created_at into the struct it is handed. Give it a copy: the risk
+	// collect and the report keep reading the published one.
+	if item.Risk != nil {
+		row := *item.Risk
+		row.CWE = append(schema.StringArray(nil), row.CWE...)
+		item.Risk = &row
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.closed {
@@ -83,8 +88,6 @@ func (s *RiskDBSaver) drain() {
 	batch := s.pending
 	s.pending = nil
 	s.mu.Unlock()
-	// Fold the batch before it is committed. A finding covered before it is
-	// written must not be inserted and deleted by the next batch.
 	if err := SaveRiskUpdates(ssadb.GetDB(), batch...); err != nil {
 		s.mu.Lock()
 		s.err = utils.JoinErrors(s.err, err)
@@ -124,8 +127,10 @@ func (s *RiskDBSaver) Close() error {
 	return s.err
 }
 
-// SaveRisk inserts new findings and rewrites rows the caller already points
-// at by id. A row with an id is an update; a row without one is a create.
+// SaveRisk writes the rows it is given. It is not a cover decision: a risk
+// with no id is inserted, and a risk that already has one is updated in place
+// by its primary key. Callers that create, update, or delete by mode use
+// SaveRiskUpdates.
 func SaveRisk(db *gorm.DB, risks ...*schema.SSARisk) error {
 	if len(risks) == 0 {
 		return nil
@@ -133,19 +138,33 @@ func SaveRisk(db *gorm.DB, risks ...*schema.SSARisk) error {
 	if db == nil {
 		return utils.Error("save risks: database is nil")
 	}
-	updates := make([]schema.RiskUpdateItem, 0, len(risks))
+	creates := make([]*schema.SSARisk, 0, len(risks))
+	updates := make([]*schema.SSARisk, 0)
 	for _, risk := range risks {
 		if risk == nil {
 			continue
 		}
-		updates = append(updates, schema.RiskUpdateItem{Risk: risk, OldID: risk.ID})
+		prepareRiskRow(risk)
+		if risk.ID == 0 {
+			creates = append(creates, risk)
+		} else {
+			updates = append(updates, risk)
+		}
 	}
-	return saveRiskDecisions(db, updates)
+	return db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.CreateInBatches(creates, riskBatchSize).Error; err != nil {
+			return err
+		}
+		// One chunk must not repeat a conflict key. The id is that key here.
+		return tx.SaveInBatches(dedupeRisksByID(updates), riskBatchSize, "id").Error
+	})
 }
 
-// SaveRiskUpdates applies cover decisions. OldID names the row to rewrite;
-// OldHash names the previous hash whose audit nodes must go. A decision that
-// only exists to be replaced inside this batch never reaches the database.
+// SaveRiskUpdates runs each decision the way its mode says. The scan runtime
+// already prepared the risk and chose create, update, or delete. An update or
+// a delete matches runtime id plus feature hash, so another task's row is
+// left alone. The new audit graph is written after that transaction commits:
+// overlapping it with the transaction deadlocks SQLite's single writer.
 func SaveRiskUpdates(db *gorm.DB, updates ...schema.RiskUpdateItem) error {
 	if len(updates) == 0 {
 		return nil
@@ -153,52 +172,215 @@ func SaveRiskUpdates(db *gorm.DB, updates ...schema.RiskUpdateItem) error {
 	if db == nil {
 		return utils.Error("save risks: database is nil")
 	}
-	return saveRiskDecisions(db, updates)
-}
-
-func saveRiskDecisions(db *gorm.DB, updates []schema.RiskUpdateItem) error {
-	updates = coalesceRiskUpdates(updates)
-	return db.Transaction(func(tx *gorm.DB) error {
-		creates, rewrites, oldHashes := splitRiskUpdates(updates)
-		if err := deleteAuditNodesByRiskHashes(tx, oldHashes); err != nil {
-			return err
-		}
-		// A known id is rewritten in place. Everything else is inserted, or
-		// overwrites the row that already has this hash.
-		if err := tx.UpdateInBatches(rewrites, riskBatchSize, "id").Error; err != nil {
-			return err
-		}
-		if err := tx.UpdateInBatches(creates, riskBatchSize, "hash").Error; err != nil {
-			return err
-		}
-		return deleteRisksByHashes(tx, oldHashes)
-	})
-}
-
-// splitRiskUpdates reads each decision as the caller stated it. OldID 0 is a
-// create; any other OldID rewrites that row in place. The previous hash of a
-// rewrite is deleted from the audit graph.
-func splitRiskUpdates(updates []schema.RiskUpdateItem) (creates, rewrites []*schema.SSARisk, oldHashes []string) {
-	creates = make([]*schema.SSARisk, 0, len(updates))
-	rewrites = make([]*schema.SSARisk, 0)
-	oldHashes = make([]string, 0)
-	for _, item := range updates {
-		if item.Risk == nil {
-			continue
-		}
-		prepareRiskRow(item.Risk)
-		if item.OldHash != "" && item.OldHash != item.Risk.Hash {
-			oldHashes = append(oldHashes, item.OldHash)
-		}
-		if item.OldID == 0 {
-			item.Risk.ID = 0
-			creates = append(creates, item.Risk)
-			continue
-		}
-		item.Risk.ID = item.OldID
-		rewrites = append(rewrites, item.Risk)
+	batch, err := batchRiskDecisions(updates)
+	if err != nil {
+		return err
 	}
-	return creates, rewrites, uniqueStrings(oldHashes)
+	writeErr := db.Transaction(func(tx *gorm.DB) error {
+		if err := deleteAuditByFeature(tx, batch.dropAudit); err != nil {
+			return err
+		}
+		if err := deleteAuditNodesByRiskHashes(tx, batch.hashAudit); err != nil {
+			return err
+		}
+		if err := tx.CreateInBatches(batch.creates, riskBatchSize).Error; err != nil {
+			return err
+		}
+		if err := updateRiskRows(tx, batch.rewrites); err != nil {
+			return err
+		}
+		if err := deleteRisksByHashes(tx, batch.dropHashes); err != nil {
+			return err
+		}
+		return deleteRisksByFeature(tx, batch.dropRisk)
+	})
+	var auditErr error
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		if writeErr != nil {
+			return
+		}
+		auditErr = runAuditSaves(batch.audits)
+	}()
+	wg.Wait()
+	return utils.JoinErrors(writeErr, auditErr)
+}
+
+type featureKey struct {
+	runtime string
+	feature string
+}
+
+type riskBatch struct {
+	creates    []*schema.SSARisk
+	rewrites   []*schema.SSARisk
+	dropAudit  []featureKey
+	dropRisk   []featureKey
+	dropHashes []string
+	hashAudit  []string
+	audits     []func() error
+}
+
+// batchRiskDecisions groups a batch by the mode on each item. It does not
+// change the risks or invent a mode. The last audit closure for one feature
+// is the one that gets saved.
+func batchRiskDecisions(updates []schema.RiskUpdateItem) (riskBatch, error) {
+	var batch riskBatch
+	batch.creates = make([]*schema.SSARisk, 0, len(updates))
+	jobs := make(map[string]func() error)
+	var order []string
+	put := func(key string, fn func() error) {
+		if _, ok := jobs[key]; !ok {
+			order = append(order, key)
+		}
+		jobs[key] = fn
+	}
+	for i, item := range updates {
+		switch item.Mode {
+		case schema.RiskUpdateDelete:
+			key, err := featureOf(item.Risk)
+			if err != nil {
+				return riskBatch{}, err
+			}
+			batch.dropRisk = append(batch.dropRisk, key)
+			batch.dropAudit = append(batch.dropAudit, key)
+			put(key.runtime+"\x00"+key.feature, nil)
+		case schema.RiskUpdateUpdate:
+			key, err := featureOf(item.Risk)
+			if err != nil {
+				return riskBatch{}, err
+			}
+			batch.rewrites = append(batch.rewrites, item.Risk)
+			batch.dropAudit = append(batch.dropAudit, key)
+			if item.OldHash != "" && item.OldHash != item.Risk.Hash {
+				batch.hashAudit = append(batch.hashAudit, item.OldHash)
+			}
+			put(key.runtime+"\x00"+key.feature, item.Audit)
+		case schema.RiskUpdateCreate:
+			if item.Risk == nil {
+				continue
+			}
+			batch.creates = append(batch.creates, item.Risk)
+			if item.OldHash != "" && item.OldHash != item.Risk.Hash {
+				batch.dropHashes = append(batch.dropHashes, item.OldHash)
+				batch.hashAudit = append(batch.hashAudit, item.OldHash)
+			}
+			runtime := strings.TrimSpace(item.Risk.RuntimeId)
+			feature := strings.TrimSpace(item.Risk.RiskFeatureHash)
+			if runtime == "" || feature == "" {
+				// An empty feature hash never covers another row, so its graph is
+				// not grouped with anyone else's.
+				put(fmt.Sprintf("\x00%d", i), item.Audit)
+				continue
+			}
+			put(runtime+"\x00"+feature, item.Audit)
+		default:
+			return riskBatch{}, utils.Errorf("risk update: unknown mode %q", item.Mode)
+		}
+	}
+	for _, key := range order {
+		if jobs[key] != nil {
+			batch.audits = append(batch.audits, jobs[key])
+		}
+	}
+	return batch, nil
+}
+
+func featureOf(risk *schema.SSARisk) (featureKey, error) {
+	if risk == nil {
+		return featureKey{}, utils.Error("risk update: missing risk")
+	}
+	key := featureKey{
+		runtime: strings.TrimSpace(risk.RuntimeId),
+		feature: strings.TrimSpace(risk.RiskFeatureHash),
+	}
+	if key.runtime == "" || key.feature == "" {
+		return featureKey{}, utils.Error("risk update: runtime id and feature hash are required")
+	}
+	return key, nil
+}
+
+// updateRiskRows rewrites each row in place, matched by runtime id and feature
+// hash. SaveInBatches cannot: that pair is not unique (an empty feature hash
+// is inserted again, and existing databases already contain duplicates), and
+// its upsert would clear disposal, read and ignore marks.
+func updateRiskRows(db *gorm.DB, risks []*schema.SSARisk) error {
+	for _, risk := range risks {
+		if risk == nil {
+			continue
+		}
+		runtime := strings.TrimSpace(risk.RuntimeId)
+		feature := strings.TrimSpace(risk.RiskFeatureHash)
+		if runtime == "" || feature == "" {
+			return utils.Errorf("update risk %q: runtime id and feature hash are required", risk.Hash)
+		}
+		cols, err := riskRewriteColumns(risk)
+		if err != nil {
+			return err
+		}
+		if err := db.Model(&schema.SSARisk{}).Where("runtime_id = ? AND risk_feature_hash = ?", runtime, feature).UpdateColumns(cols).Error; err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func riskRewriteColumns(risk *schema.SSARisk) (map[string]interface{}, error) {
+	cwe, err := risk.CWE.Value()
+	if err != nil {
+		return nil, err
+	}
+	return map[string]interface{}{
+		"hash":                  risk.Hash,
+		"title":                 risk.Title,
+		"title_verbose":         risk.TitleVerbose,
+		"description":           risk.Description,
+		"solution":              risk.Solution,
+		"risk_type":             risk.RiskType,
+		"details":               risk.Details,
+		"severity":              risk.Severity,
+		"language":              risk.Language,
+		"is_potential":          risk.IsPotential,
+		"cve":                   risk.CVE,
+		"cwe":                   cwe,
+		"cve_access_vector":     risk.CveAccessVector,
+		"cve_access_complexity": risk.CveAccessComplexity,
+		"from_rule":             risk.FromRule,
+		"scan_mode":             risk.ScanMode,
+		"program_name":          risk.ProgramName,
+		"code_source_url":       risk.CodeSourceUrl,
+		"code_range":            risk.CodeRange,
+		"code_fragment":         risk.CodeFragment,
+		"function_name":         risk.FunctionName,
+		"line":                  risk.Line,
+		"result_id":             risk.ResultID,
+		"result_uuid":           risk.ResultUUID,
+		"variable":              risk.Variable,
+		"index":                 risk.Index,
+		"ssa_project_id":        risk.SSAProjectID,
+		"updated_at":            time.Now(),
+	}, nil
+}
+
+func dedupeRisksByID(risks []*schema.SSARisk) []*schema.SSARisk {
+	if len(risks) == 0 {
+		return risks
+	}
+	last := make(map[uint]int, len(risks))
+	for i, risk := range risks {
+		if risk != nil {
+			last[risk.ID] = i
+		}
+	}
+	out := make([]*schema.SSARisk, 0, len(last))
+	for i, risk := range risks {
+		if risk != nil && last[risk.ID] == i {
+			out = append(out, risk)
+		}
+	}
+	return out
 }
 
 func prepareRiskRow(risk *schema.SSARisk) {
@@ -211,37 +393,74 @@ func prepareRiskRow(risk *schema.SSARisk) {
 	}
 }
 
-// coalesceRiskUpdates folds a chain that one batch both writes and replaces.
-// source -> struct -> ssa becomes the final ssa row, still aimed at the
-// original stored id when the chain started from one.
-func coalesceRiskUpdates(updates []schema.RiskUpdateItem) []schema.RiskUpdateItem {
-	out := make([]schema.RiskUpdateItem, 0, len(updates))
-	byHash := make(map[string]int)
-	for _, item := range updates {
-		if item.Risk == nil {
+func deleteAuditByFeature(db *gorm.DB, keys []featureKey) error {
+	for runtime, features := range groupFeatures(keys) {
+		if err := forEachChunk(features, func(part []string) error {
+			if err := db.Where("task_id = ? AND risk_feature_hash IN (?)", runtime, part).Delete(&ssadb.AuditEdge{}).Error; err != nil {
+				return err
+			}
+			return db.Where("task_id = ? AND risk_feature_hash IN (?)", runtime, part).Delete(&ssadb.AuditNode{}).Error
+		}); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func deleteRisksByFeature(db *gorm.DB, keys []featureKey) error {
+	for runtime, features := range groupFeatures(keys) {
+		if err := forEachChunk(features, func(part []string) error {
+			// Unscoped: a soft-deleted hash still occupies the unique index.
+			return db.Unscoped().Where("runtime_id = ? AND risk_feature_hash IN (?)", runtime, part).Delete(&schema.SSARisk{}).Error
+		}); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func groupFeatures(keys []featureKey) map[string][]string {
+	seen := make(map[featureKey]struct{}, len(keys))
+	out := make(map[string][]string)
+	for _, key := range keys {
+		if key.runtime == "" || key.feature == "" {
 			continue
 		}
-		item.Risk.PrepareForSave()
-		i, found := byHash[item.OldHash]
-		if !found {
-			i, found = byHash[item.Risk.Hash]
+		if _, ok := seen[key]; ok {
+			continue
 		}
-		if found {
-			old := out[i]
-			delete(byHash, old.Risk.Hash)
-			item.OldID, item.OldHash = old.OldID, old.OldHash
-			out[i] = item
-			byHash[item.Risk.Hash] = i
-		} else {
-			byHash[item.Risk.Hash] = len(out)
-			out = append(out, item)
-		}
+		seen[key] = struct{}{}
+		out[key.runtime] = append(out[key.runtime], key.feature)
 	}
 	return out
 }
 
-// deleteRisksByHashes removes findings a later decision replaced. An id
-// rewrite has already changed that row's hash, so this does not touch it.
+func forEachChunk(values []string, fn func([]string) error) error {
+	const chunk = 500
+	for start := 0; start < len(values); start += chunk {
+		end := start + chunk
+		if end > len(values) {
+			end = len(values)
+		}
+		if err := fn(values[start:end]); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func runAuditSaves(audits []func() error) error {
+	var err error
+	for _, audit := range audits {
+		if audit == nil {
+			continue
+		}
+		err = utils.JoinErrors(err, audit())
+	}
+	return err
+}
+
+// deleteRisksByHashes removes rows a create decision named by the previous hash.
 func deleteRisksByHashes(db *gorm.DB, hashes []string) error {
 	hashes = uniqueStrings(hashes)
 	const chunk = 500

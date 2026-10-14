@@ -3,7 +3,6 @@ package sfreport
 import (
 	"encoding/json"
 	"io"
-	"strings"
 	"sync"
 	"time"
 
@@ -196,19 +195,22 @@ func (r *Report) shouldFlushLocked() bool {
 	return true
 }
 
-// ApplyRiskUpdate creates or replaces one finding. The scan already decided
-// which mode wins and passes that decision here. OldHash empty means create.
-// Any other OldHash is the row this finding replaces.
+// ApplyRiskUpdate applies one decision. Create and update record the risk
+// and drop OldHash when the item names one. Delete only drops OldHash.
 func (r *Report) ApplyRiskUpdate(item schema.RiskUpdateItem) error {
-	if r == nil || item.Risk == nil {
+	if r == nil {
 		return nil
 	}
 	r.mu.Lock()
-	newHash := strings.TrimSpace(item.Risk.Hash)
-	if item.OldHash != "" && item.OldHash != newHash {
+	switch item.Mode {
+	case schema.RiskUpdateDelete:
 		r.dropRiskLocked(item.OldHash)
+	case schema.RiskUpdateCreate, schema.RiskUpdateUpdate:
+		if item.OldHash != "" && item.Risk != nil && item.OldHash != item.Risk.Hash {
+			r.dropRiskLocked(item.OldHash)
+		}
+		r.addSchemaRiskLocked(item.Risk)
 	}
-	r.addSchemaRiskLocked(item.Risk)
 	flush := r.shouldFlushLocked()
 	r.mu.Unlock()
 	if flush {

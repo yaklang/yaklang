@@ -3,6 +3,7 @@ package ssaapi
 import (
 	"context"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/yaklang/yaklang/common/utils/dbcache"
@@ -105,6 +106,12 @@ func OptionSaveValue_ResultIndex(index uint) SaveValueOption {
 func OptionSaveValue_ResultRiskHash(hash string) SaveValueOption {
 	return func(c *saveValueCtx) {
 		c.RiskHash = hash
+	}
+}
+
+func OptionSaveValue_ResultRiskFeatureHash(hash string) SaveValueOption {
+	return func(c *saveValueCtx) {
+		c.RiskFeatureHash = hash
 	}
 }
 
@@ -358,6 +365,66 @@ func (a *auditDatabase) Close() error {
 		}
 	}
 	return utils.JoinErrors(errs...)
+}
+
+// captureAuditGraph walks value now and keeps the rows in memory. The walk
+// has to happen while this rule's analysis is still on the value:
+// ResetInterRuleState nils those caches when the rule returns, and a later
+// GetPredecessors call does not rebuild them. The returned rows are what the
+// database saver inserts.
+func captureAuditGraph(ctx context.Context, value *Value, opts ...SaveValueOption) ([]*ssadb.AuditNode, []*ssadb.AuditEdge, []*ssadb.IrSource, error) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	var mu sync.Mutex
+	var nodes []*ssadb.AuditNode
+	var edges []*ssadb.AuditEdge
+	var sources []*ssadb.IrSource
+	db := &auditDatabase{}
+	queue := dbcache.WithInitialBufferSize(64)
+	saveSize := dbcache.WithSaveSize(defaultSize)
+	db.nodeSave = dbcache.NewSave(func(items []*ssadb.AuditNode) error {
+		mu.Lock()
+		nodes = append(nodes, items...)
+		mu.Unlock()
+		return nil
+	}, dbcache.WithContext(ctx), saveSize, queue, dbcache.WithName("AuditNodeCapture"))
+	db.edgeSave = dbcache.NewSave(func(items []*ssadb.AuditEdge) error {
+		mu.Lock()
+		edges = append(edges, items...)
+		mu.Unlock()
+		return nil
+	}, dbcache.WithContext(ctx), saveSize, queue, dbcache.WithName("AuditEdgeCapture"))
+	db.editorSave = dbcache.NewSave(func(items []*ssadb.IrSource) error {
+		mu.Lock()
+		sources = append(sources, items...)
+		mu.Unlock()
+		return nil
+	}, dbcache.WithContext(ctx), saveSize, queue, dbcache.WithName("SourceFileCapture"))
+
+	call := make([]SaveValueOption, len(opts), len(opts)+2)
+	copy(call, opts)
+	call = append(call, OptionSaveValue_Database(db), OptionSaveValue_Context(ctx))
+	err := SaveValue(value, call...)
+	err = utils.JoinErrors(err, db.Close())
+	return nodes, edges, sources, err
+}
+
+func saveAuditSources(db *gorm.DB, sources []*ssadb.IrSource) error {
+	if db == nil || len(sources) == 0 {
+		return nil
+	}
+	return utils.GormTransaction(db, func(tx *gorm.DB) error {
+		for _, source := range sources {
+			if source == nil {
+				continue
+			}
+			if err := tx.Save(source).Error; err != nil {
+				return utils.Errorf("save IrSource failed: %w", err)
+			}
+		}
+		return nil
+	})
 }
 
 func newAuditDatabase(ctx context.Context, db *gorm.DB, size int) *auditDatabase {
