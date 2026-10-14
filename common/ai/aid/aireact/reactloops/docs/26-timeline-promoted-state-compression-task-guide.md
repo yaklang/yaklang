@@ -48,6 +48,8 @@
 
 入口：[timeline_skill_content.go](../../../aicommon/timeline_skill_content.go)、[timeline_promoted.go](../../../aicommon/timeline_promoted.go)、[prompt_materials.go](../../../aicommon/prompt_materials.go)。
 
+固定 Skill Inventory 与下述运行时 skill item 不同：它在 manager 初始化时生成，只有有限的名称与简短描述，在 FrozenBlock 紧跟 Tool Inventory 渲染；不包含加载状态、不随 loader 变更刷新、不进入 Timeline 或压缩快照。下面所说的“技能目录”指运行时意图匹配的推荐目录，不是这份固定 inventory。
+
 - 所有加载方式共用 `skill` kind，但技能被拆成两类 item：`metadata`（说明、关联技能、文件树）与 `content`（一个文件的一段行范围）。资源读取、翻页追加新的 content item，不替换旧页。`[source: user-forced]` 只出现在 metadata，不参与正文身份。
 - content 携带 `range: {start_line, end_line, total, reached_end}`；`end_line == total` 时渲染 `END`，明确告诉模型该文件已经翻完。
 - 写入去重比较当前仍存活的 part 身份与正文：metadata 按技能名，content 按“技能名 + 路径 + 起止行”。同一范围内容相同则丢弃，内容不同则拼接；不同范围即使文本相同也分别保留。去重不在压缩或渲染时补做。

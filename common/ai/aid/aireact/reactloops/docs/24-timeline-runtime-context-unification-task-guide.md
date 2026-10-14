@@ -43,6 +43,7 @@ Manager 保留业务加载和查询能力，但不再作为独立正文来源参
 | 最近工具及完整参数 Schema | 已由 Timeline 承载；保留完整 Schema 的既有保护，不拿文本摘要当可执行 Schema |
 | 用户输入 | 已由 Timeline 承载；本次不顺带改变当前用户要求的原文保护规则 |
 | 运行时技能推荐目录 | 如当前会话展示它，改从 Timeline 的类型化目录内容读取；不复制整个静态技能库 |
+| 固定 Skill Inventory | manager 初始化时按名称排序、过滤并以 2K token 预算生成名称与简短描述；保存最终文本，在 FrozenBlock 紧跟 Tool Inventory 渲染，不包含加载状态、不随运行时变更刷新，也不追加 Timeline |
 | ExtraCapabilities、检索记忆等其他累计材料 | 逐项盘点读写位置，可沿同一路径接入；不能仅为追求字段清空而改变原有语义 |
 | TODO、PlanStatus、PlanDocument、CurrentReport | 本次不重做其业务状态或编辑模型；保持现有行为，列出仍独立提供材料的入口 |
 | 静态指令、输出示例、每轮 Action Schema、时钟和固定环境 | 仍属于静态/请求级材料，不为统一而每轮追加进 Timeline |
@@ -121,6 +122,7 @@ type SkillTimelineItem struct {
 Manager 仍可以负责：
 
 - SkillLoader、搜索和资源路径校验。
+- 初始化时固定的有限 Skill Inventory（仅目录文本，不是运行时技能正文）。
 - 文件读取缓存、阅读窗口计算和加载结果反馈。
 - 对 Timeline 的追加、查找和枚举封装。
 
@@ -150,6 +152,8 @@ Manager 不再负责：
 - 决策 prompt 用途：未冻结正文留在 Open；已冻结且保留的原文按类型划成 Skills、Evidence 等独立块；其余普通历史保留原布局。
 
 “单独渲染”只是呈现方式，不得成为“单独存储、单独压缩、永远全文展示”的理由。
+
+固定 Skill Inventory 是初始化快照，不受上述运行时转移约束：它仅使用初始化时已枚举的、允许模型调用的 skill 元信息，描述确定性截短，预算包含标题、提示与省略数量；超出目录的技能（包括尚未枚举的数据库来源）由 `search_capabilities` 发现。普通与轻量模式使用相同快照。后续加载、翻页、卸载、意图推荐及 loader 来源变化均不重建它；正文及运行时推荐目录继续遵循 Timeline 的 Open/冻结边界。
 
 ### 5.2 保留外层六段协议
 

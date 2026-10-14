@@ -139,6 +139,7 @@ func (pm *PromptManager) getLoopPromptBaseMaterials(
 		if actions := loop.Actions(); actions != nil {
 			_, hasLoadCapability = actions.Get("load_capability")
 		}
+		materials.SkillInventory = loop.GetSkillsContextManager().SkillInventory()
 	}
 
 	materials.AllowPlanAndExec = allowPlanAndExec
@@ -279,6 +280,7 @@ func (pm *PromptManager) projectLightweightLoopMaterials(
 	lightBase.TopToolsCount = len(lightBase.TopTools)
 	lightBase.HasMoreTools = lightBase.ToolsCount > lightBase.TopToolsCount
 	lightBase.MoreToolsCount = lightBase.ToolsCount - lightBase.TopToolsCount
+	// SkillInventory already has a fixed 2K budget; use the same snapshot in both modes.
 
 	lightInput := *input
 	lightInput.TaskInstruction = boundedLightweightPromptBlock(input.TaskInstruction, lightweightLoopTaskInstructionTokens, "task instruction")
@@ -323,6 +325,7 @@ func (pm *PromptManager) NewPromptMaterials(base *reactloops.LoopPromptBaseMater
 		materials.TopTools = append([]*aitool.Tool{}, base.TopTools...)
 		materials.HasMoreTools = base.HasMoreTools
 		materials.MoreToolsCount = base.MoreToolsCount
+		materials.SkillInventory = base.SkillInventory
 		materials.ForgeInventory = base.ShowForgeInventory && strings.TrimSpace(base.AIForgeList) != ""
 		materials.AIForgeList = base.AIForgeList
 
@@ -372,7 +375,7 @@ func (pm *PromptManager) NewPromptMaterials(base *reactloops.LoopPromptBaseMater
 // OutputExample) | TimelineOpen。Prompt 字段是 5 段拼接结果, 调用方拼上 Dynamic
 // 段后形成完整 prompt。
 //
-// FrozenBlock 段 (Tool Inventory + Forge Inventory + Timeline-frozen) 整体字节稳定,
+// FrozenBlock 段 (Tool/Skill/Forge Inventory + Timeline-frozen) 整体字节稳定,
 // 由 buildTaggedPromptSections 用 <|AI_CACHE_FROZEN_semi-dynamic|>...
 // <|AI_CACHE_FROZEN_END_semi-dynamic|> 标签包裹, 供 aicache hijacker
 // splitByFrozenBoundary 精准切片 user1 (frozen prefix) / user2 (open tail)。
@@ -538,11 +541,11 @@ func (pm *PromptManager) buildHighStaticObservation(
 }
 
 // buildFrozenBlockObservation 给"AI_CACHE_FROZEN 块"做观测树:
-// Tool Inventory + Forge Inventory + Timeline-frozen (reducer + 非末 interval)。
+// Tool/Skill/Forge Inventory + Timeline-frozen (reducer + 非末 interval)。
 //
-// 段顺序: Tool/Forge 是整个 root 任务生命周期都不变的"系统级"内容, 排在最前;
+// 段顺序: Tool/Skill/Forge 是初始化后不变的目录内容, 排在最前;
 // Timeline-frozen 随时间轴增长可能间歇性扩展 (新一段 reducer 块产生时), 排在
-// 最后, 让前两段的前缀缓存更稳定。
+// 最后, 让前面的目录前缀缓存更稳定。
 //
 // PlanContext (PE-TASK PLAN 产物) 历史上曾在此段渲染, 但因仅 PE-TASK 子任务
 // 有内容, root task / 普通 ReAct 时为空, 这种"有时存在有时不存在"的渲染态
@@ -550,7 +553,7 @@ func (pm *PromptManager) buildHighStaticObservation(
 // prefix cache 命中。现已迁到 buildSemiDynamicResidualObservation
 // (section.semi_dynamic.plan_context, AI_CACHE_SEMI 边界包裹)。
 //
-// 关键词: buildFrozenBlockObservation, Tool/Forge/Timeline-frozen,
+// 关键词: buildFrozenBlockObservation, Tool/Skill/Forge/Timeline-frozen,
 //
 //	AI_CACHE_FROZEN, PlanContext 已迁出
 func (pm *PromptManager) buildFrozenBlockObservation(
@@ -565,6 +568,10 @@ func (pm *PromptManager) buildFrozenBlockObservation(
 	// 子节点 Name 已去掉 "Frozen Block / " 前缀: UI 字节统计面板里父容器
 	// "Frozen Block" 已经表达层级.
 	// 关键词: section.frozen_block 子节点 Name 去前缀, UI 信息密度
+	var skillInventory string
+	if materials != nil {
+		skillInventory = materials.SkillInventory
+	}
 	children := []*reactloops.PromptSectionObservation{
 		reactloops.NewPromptSectionObservation(
 			"section.frozen_block.tool_inventory",
@@ -572,6 +579,13 @@ func (pm *PromptManager) buildFrozenBlockObservation(
 			reactloops.PromptSectionRoleFrozenBlock,
 			true,
 			renderToolInventoryBlock(materials),
+		),
+		reactloops.NewPromptSectionObservation(
+			"section.frozen_block.skill_inventory",
+			"Skill Inventory",
+			reactloops.PromptSectionRoleFrozenBlock,
+			true,
+			skillInventory,
 		),
 		reactloops.NewPromptSectionObservation(
 			"section.frozen_block.forge_inventory",

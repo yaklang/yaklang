@@ -18,6 +18,7 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/ai/ytoken"
 	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/utils/filesys"
 )
 
 func mustLoopPromptSections(t *testing.T, raw any) []*reactloops.PromptSectionObservation {
@@ -546,8 +547,8 @@ func TestPromptManager_RenderLoopSemiDynamic2Section_Order(t *testing.T) {
 }
 
 // TestPromptManager_RenderLoopFrozenBlockSection_Order 验证 FrozenBlock 段
-// (frozen_block_section.txt) 渲染顺序为 Tool Inventory -> Forge Inventory ->
-// Timeline (Frozen Prefix), 且不包含 Skills/Schema。
+// (frozen_block_section.txt) 渲染顺序为 Tool -> Skill -> Forge Inventory ->
+// Timeline (Frozen Prefix), 且不包含技能正文/Schema。
 //
 // 关键词: renderLoopFrozenBlockSection, Tool/Forge/Timeline-frozen 顺序
 func TestPromptManager_RenderLoopFrozenBlockSection_Order(t *testing.T) {
@@ -567,6 +568,7 @@ func TestPromptManager_RenderLoopFrozenBlockSection_Order(t *testing.T) {
 		TopToolsCount:  1,
 		TopTools:       []*aitool.Tool{aitool.NewWithoutCallback("tool-a", aitool.WithDescription("tool a desc"))},
 		HasMoreTools:   true,
+		SkillInventory: "# Skill Inventory\n  - skill-a: skill a desc",
 		ForgeInventory: true,
 		AIForgeList:    "* `forge-a`: forge a desc",
 		TimelineFrozen: "<|TIMELINE_r1t100|>\nfrozen reducer body\n<|TIMELINE_END_r1t100|>",
@@ -574,15 +576,97 @@ func TestPromptManager_RenderLoopFrozenBlockSection_Order(t *testing.T) {
 	require.NoError(t, err)
 
 	toolIdx := strings.Index(rendered, "# Tool Inventory")
+	skillIdx := strings.Index(rendered, "# Skill Inventory")
 	forgeIdx := strings.Index(rendered, "# AI Blueprint Inventory")
 	timelineFrozenIdx := strings.Index(rendered, "# Timeline Memory (Frozen Prefix)")
 	require.NotEqual(t, -1, toolIdx)
+	require.NotEqual(t, -1, skillIdx)
 	require.NotEqual(t, -1, forgeIdx)
 	require.NotEqual(t, -1, timelineFrozenIdx)
-	require.Less(t, toolIdx, forgeIdx)
+	require.Less(t, toolIdx, skillIdx)
+	require.Less(t, skillIdx, forgeIdx)
 	require.Less(t, forgeIdx, timelineFrozenIdx)
 	require.NotContains(t, rendered, "<|SKILLS_CONTEXT_")
 	require.NotContains(t, rendered, "<|SCHEMA|>")
+}
+
+func TestPromptManagerSkillInventorySnapshot(t *testing.T) {
+	for _, native := range []bool{false, true} {
+		t.Run(strconv.FormatBool(native), func(t *testing.T) {
+			vfs := filesys.NewVirtualFs()
+			vfs.AddFile("inventory-skill/SKILL.md", "---\nname: inventory-skill\ndescription: Static guide\n---\nSKILL_BODY_ONLY_AFTER_LOAD\nsecond line\n")
+			react, err := NewTestReAct(aicommon.WithSkillsFS(vfs))
+			require.NoError(t, err)
+			loop, err := reactloops.NewReActLoop("skill-inventory-test", react, reactloops.WithFunctionCallMode(native))
+			require.NoError(t, err)
+			defer loop.Release()
+			mgr := loop.GetSkillsContextManager()
+			require.NotNil(t, mgr)
+			tools := []*aitool.Tool{aitool.NewWithoutCallback("inventory-tool", aitool.WithDescription("tool guide"))}
+			input := &reactloops.LoopPromptAssemblyInput{Nonce: "inventory", FunctionCallMode: native}
+			base, err := react.promptManager.GetLoopPromptBaseMaterialsForLoop(tools, input.Nonce, loop)
+			require.NoError(t, err)
+			require.Equal(t, mgr.SkillInventory(), base.SkillInventory)
+			before, err := react.promptManager.AssemblePromptPrefix(react.promptManager.NewPromptMaterials(base, input))
+			require.NoError(t, err)
+			require.Contains(t, before.FrozenBlock, mgr.SkillInventory())
+			require.Less(t, strings.Index(before.FrozenBlock, "# Tool Inventory"), strings.Index(before.FrozenBlock, "# Skill Inventory"))
+			require.NotContains(t, before.Prompt, "SKILL_BODY_ONLY_AFTER_LOAD")
+			require.NotContains(t, before.SemiDynamic1, "SKILLS_CONTEXT")
+
+			var observation *reactloops.PromptSectionObservation
+			for _, child := range before.Sections[1].Children {
+				if child.Key == "section.frozen_block.skill_inventory" {
+					observation = child
+				}
+			}
+			require.NotNil(t, observation)
+			require.Equal(t, mgr.SkillInventory(), observation.Content)
+			require.Equal(t, reactloops.PromptSectionRoleFrozenBlock, observation.Role)
+
+			added, err := mgr.LoadForcedSkill("inventory-skill")
+			require.NoError(t, err)
+			require.True(t, added)
+			require.NoError(t, mgr.ChangeViewOffset("inventory-skill", "SKILL.md", 2))
+			later := filesys.NewVirtualFs()
+			later.AddFile("later-skill/SKILL.md", "---\nname: later-skill\ndescription: Added later\n---\nLATER_BODY")
+			require.NoError(t, aicommon.WithSkillsFS(later)(react.config))
+
+			afterBase, err := react.promptManager.GetLoopPromptBaseMaterialsForLoop(tools, input.Nonce, loop)
+			require.NoError(t, err)
+			after, err := react.promptManager.AssemblePromptPrefix(react.promptManager.NewPromptMaterials(afterBase, input))
+			require.NoError(t, err)
+			require.Equal(t, before.FrozenBlock, after.FrozenBlock)
+			require.Contains(t, after.TimelineOpen, "SKILL_BODY_ONLY_AFTER_LOAD")
+			require.NotContains(t, after.FrozenBlock, "later-skill")
+			require.NotContains(t, after.SemiDynamic1, "SKILLS_CONTEXT", "loading must not bypass the freeze boundary")
+
+			lightInput := *input
+			lightInput.Lightweight = true
+			lightBase, _ := react.promptManager.projectLightweightLoopMaterials(afterBase, &lightInput)
+			require.Equal(t, afterBase.SkillInventory, lightBase.SkillInventory)
+		})
+	}
+}
+
+func TestPromptManagerSkillInventoryAbsentWithoutManager(t *testing.T) {
+	react, err := NewTestReAct()
+	require.NoError(t, err)
+	loop, err := reactloops.NewReActLoop("no-skill-inventory-test", react)
+	require.NoError(t, err)
+	defer loop.Release()
+	require.Nil(t, loop.GetSkillsContextManager())
+	for _, candidate := range []*reactloops.ReActLoop{nil, loop} {
+		base, err := react.promptManager.GetLoopPromptBaseMaterialsForLoop(nil, "no-inventory", candidate)
+		require.NoError(t, err)
+		require.Empty(t, base.SkillInventory)
+		prefix, err := react.promptManager.AssemblePromptPrefix(react.promptManager.NewPromptMaterials(base, nil))
+		require.NoError(t, err)
+		require.NotContains(t, prefix.Prompt, "# Skill Inventory")
+		for _, child := range prefix.Sections[1].Children {
+			require.NotEqual(t, "section.frozen_block.skill_inventory", child.Key)
+		}
+	}
 }
 
 // TestPromptManager_AssemblePromptPrefix 验证 5 段 prefix 输出 (high_static +
