@@ -26,12 +26,10 @@ const (
 )
 
 // irSourceFS is the ssadb:// filesystem: one root listing every compiled
-// program ("/"), each program served by its own cached filesystem. Plain
-// programs get their bodies filled here on ReadFile/Open into their
-// structure-only tree; the overlay filesystem owns its own body loading
-// end to end.
+// program ("/"), each program served by its own cached overlay filesystem
+// that owns its body loading end to end.
 type irSourceFS struct {
-	mu      sync.Mutex // guards the tree cache itself (build / plain fill)
+	mu      sync.Mutex // guards the tree cache builds
 	virtual *utils.CacheExWithKey[string, filesys_interface.FileSystem]
 }
 
@@ -58,19 +56,10 @@ func (fs *irSourceFS) ReadFile(path string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	// A chain-assembled program's filesystem owns its body loading end to
-	// end: its ReadFile resolves the owning layer internally and never
-	// returns an empty body, so its result (data or error) stands as is.
-	// A plain program's tree only holds empty stubs: serve the filled
-	// memory hit, else fill from the database here.
-	data, err := pfs.ReadFile(path)
-	if err != nil {
-		return nil, err
-	}
-	if len(data) > 0 {
-		return data, nil
-	}
-	return fs.fillFileContent(pfs, path)
+	// Every program's filesystem is an overlay that owns its body loading
+	// end to end: its ReadFile resolves the owning layer internally and
+	// never returns an empty body, so its result (data or error) stands.
+	return pfs.ReadFile(path)
 }
 
 func (fs *irSourceFS) Open(path string) (fs.File, error) {
@@ -111,9 +100,9 @@ func programRootEntries() []fs.DirEntry {
 	return ret
 }
 
-// ReadDir lists a directory through the program's own filesystem: plain
-// programs list their single tree; chain-assembled programs get the fully
-// expanded overlay view.
+// ReadDir lists a directory through the program's own overlay: the fully
+// expanded view over its layer chain (a single-layer chain is the
+// program's own tree).
 func (isfs *irSourceFS) ReadDir(path string) ([]fs.DirEntry, error) {
 	if path == "/" {
 		return programRootEntries(), nil
@@ -125,21 +114,21 @@ func (isfs *irSourceFS) ReadDir(path string) ([]fs.DirEntry, error) {
 	return pfs.ReadDir(path)
 }
 
-// incrementalFS is implemented by a per-program filesystem assembled from
-// a saved layer chain (an incremental head, or a base recording itself as
-// its chain): it owns its body loading end to end, and it serves a
-// diff-only listing view (the head layer's own entries) on top of the
-// fully expanded one.
-type incrementalFS interface {
+// diffViewFS is the diff-view capability of a per-program overlay
+// filesystem: ReadDirDiff lists the head layer's own entries instead of
+// the fully expanded chain. Every per-program filesystem built by
+// buildProgramTree implements it; for a single-layer chain the two views
+// coincide.
+type diffViewFS interface {
 	ReadDirDiff(path string) ([]fs.DirEntry, error)
 }
 
 // ReadDirDiffOnly lists a directory through the program's own filesystem,
 // honoring the diffOnly query option (yakurl reaches it through its
-// optional diffOnlyLister capability): when diffOnly is set and the
-// program's filesystem serves a diff view (a chain-assembled head), the
-// listing collapses to the head layer's own entries; a plain program's
-// tree ignores the query and lists normally.
+// optional diffOnlyLister capability): diffOnly collapses the listing to
+// the head layer's own entries — for a single-layer chain (a program
+// without saved layers) that is the whole tree, so the query changes
+// nothing there.
 func (isfs *irSourceFS) ReadDirDiffOnly(path string, query url.Values) ([]fs.DirEntry, error) {
 	if path == "/" {
 		return programRootEntries(), nil
@@ -149,8 +138,8 @@ func (isfs *irSourceFS) ReadDirDiffOnly(path string, query url.Values) ([]fs.Dir
 		return nil, err
 	}
 	if isDiffOnlyQuery(query) {
-		if inc, ok := pfs.(incrementalFS); ok {
-			return inc.ReadDirDiff(path)
+		if dv, ok := pfs.(diffViewFS); ok {
+			return dv.ReadDirDiff(path)
 		}
 	}
 	return pfs.ReadDir(path)
@@ -191,46 +180,43 @@ func (fs *irSourceFS) treeFor(anyPath string) (filesys_interface.FileSystem, err
 }
 
 // buildProgramTree builds the per-program filesystem from its database
-// rows. A program name with ir_sources rows but no ir_program row still
-// serves its plain tree (folder rows can outlive or precede the program
-// row). A row carrying a layer chain — the head of an incremental series
-// (>= 2 layers), or a chain-head base recording just itself (1 layer) —
-// assembles a filesys.OverlayFS from it: a chain is a chain, no flavor
-// check. The overlay loads every layer's tree lazily through the same
-// buildPlainProgramTree, resolves deletions through the layers' file
-// status maps, and fills bodies itself through the DB loader. A program
-// without a chain keeps its structure-only tree; irSourceFS fills its
-// bodies on read.
+// rows. Every program is an overlay over a layer chain: a program with a
+// saved chain (an incremental head) uses it, and any other program —
+// including a program name with ir_sources rows but no ir_program row —
+// is a single-layer chain over itself. No flavor check: "incremental"
+// exists only as chain length. The overlay loads every layer's tree
+// lazily through buildPlainProgramTree, resolves deletions through the
+// layers' file status maps, and fills bodies itself through the DB
+// loader.
 func buildProgramTree(progName string) (filesys_interface.FileSystem, error) {
 	prog, err := GetApplicationProgram(progName)
 	if err != nil && !gorm.IsRecordNotFoundError(err) {
 		return nil, err
 	}
-	if prog == nil || len(prog.OverlayLayers) == 0 {
-		// No chain: structure-only tree; irSourceFS fills bodies on read.
-		return buildPlainProgramTree(progName)
+	layers := []string{progName}
+	if prog != nil && len(prog.OverlayLayers) > 0 {
+		layers = prog.OverlayLayers
 	}
-
-	layers := prog.OverlayLayers
 	layerProgs := GetApplicationPrograms(layers)
-	opts := []filesys.OverlayOption{
-		filesys.WithLayers(layers...),
-		filesys.WithLayerTrees(buildPlainProgramTree),
-		filesys.WithBodyLoader(readIrSourceFileContent),
+	opts := []overlayOption{
+		withLayers(layers...),
+		withLayerTrees(buildPlainProgramTree),
+		withBodyLoader(readIrSourceFileContent),
 	}
 	// Keep the recipe order: status layers resolve newest-first.
 	for _, layer := range layers {
 		if lp := layerProgs[layer]; lp != nil && len(lp.FileHashMap) > 0 {
-			opts = append(opts, filesys.WithFileStatus(layer, lp.FileHashMap))
+			opts = append(opts, withFileStatus(layer, lp.FileHashMap))
 		}
 	}
-	return filesys.NewOverlayFS(opts...), nil
+	return newOverlayFS(opts...), nil
 }
 
-// buildPlainProgramTree builds one program's structure-only tree from its
+// buildPlainProgramTree builds one layer's structure-only tree from its
 // ir_sources rows (dirs as dir nodes, files as empty stubs) plus its
-// ExtraFile paths as stubs. Shared by plain programs and overlay layers
-// alike: the overlay pulls each layer's tree through it on first touch.
+// ExtraFile paths as stubs. It never serves as a per-program filesystem
+// directly: the overlay pulls each layer's tree through it on first
+// touch.
 func buildPlainProgramTree(progName string) (filesys_interface.FileSystem, error) {
 	vf := filesys.NewVirtualFs()
 	entries, err := GetIrSourceTreeByProgram(progName)
@@ -253,22 +239,6 @@ func buildPlainProgramTree(progName string) (filesys_interface.FileSystem, error
 		mergeExtraFileStubs(prog, vf)
 	}
 	return vf, nil
-}
-
-// fillFileContent loads one plain-program file's body from the database
-// and caches it into its tree (replacing the empty stub, which also makes
-// Stat report the real size). The DB fetch runs outside fs.mu — a slow
-// query never blocks listings; only the cheap stub replacement takes it.
-func (fs *irSourceFS) fillFileContent(vf filesys_interface.FileSystem, path string) ([]byte, error) {
-	data, err := readIrSourceFileContent(path)
-	if err != nil {
-		return nil, err
-	}
-	fs.mu.Lock()
-	vf.Delete(path)
-	vf.WriteFile(path, data, 0o644)
-	fs.mu.Unlock()
-	return data, nil
 }
 
 func readIrSourceFileContent(filePath string) ([]byte, error) {
