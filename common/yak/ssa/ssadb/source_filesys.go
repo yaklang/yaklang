@@ -10,6 +10,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/yaklang/gorm"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
@@ -25,10 +26,10 @@ const (
 )
 
 // irSourceFS is the ssadb:// filesystem: one root listing every compiled
-// program ("/"), each program served by its own cached filesystem. Bodies
-// are filled only here on ReadFile/Open into the program's LazyBodyTree
-// under the caller's path (a lazy view that can grow as more files are
-// read). Optional ContentPathResolver remaps that path for DB loads.
+// program ("/"), each program served by its own cached filesystem. Plain
+// programs get their bodies filled here on ReadFile/Open into their
+// structure-only tree; the overlay filesystem owns its own body loading
+// end to end.
 type irSourceFS struct {
 	mu      sync.Mutex // guards the tree cache itself (build / plain fill)
 	virtual *utils.CacheExWithKey[string, filesys_interface.FileSystem]
@@ -57,22 +58,19 @@ func (fs *irSourceFS) ReadFile(path string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	bt, ok := pfs.(filesys.LazyBodyTree)
-	if !ok {
-		return nil, utils.Errorf("program filesystem has no body tree: %T", pfs)
+	// An incremental program's filesystem owns its body loading end to
+	// end: its ReadFile resolves the owning layer internally and never
+	// returns an empty body, so its result (data or error) stands as is.
+	// A plain program's tree only holds empty stubs: serve the filled
+	// memory hit, else fill from the database here.
+	data, err := pfs.ReadFile(path)
+	if err != nil {
+		return nil, err
 	}
-	vf := bt.BodyTree()
-	if data, err := vf.ReadFile(path); err == nil && len(data) > 0 {
+	if len(data) > 0 {
 		return data, nil
 	}
-	contentPath := path
-	if r, ok := pfs.(filesys.ContentPathResolver); ok {
-		contentPath, err = r.ResolveContentPath(path)
-		if err != nil {
-			return nil, err
-		}
-	}
-	return fs.fillFileContent(pfs, vf, path, contentPath)
+	return fs.fillFileContent(pfs, path)
 }
 
 func (fs *irSourceFS) Open(path string) (fs.File, error) {
@@ -127,9 +125,17 @@ func (isfs *irSourceFS) ReadDir(path string) ([]fs.DirEntry, error) {
 	return pfs.ReadDir(path)
 }
 
+// incrementalFS is the per-program filesystem of an incremental-compile
+// program: its ReadFile resolves and loads bodies through the owning
+// overlay layer itself, and it serves a diff-only listing view (the head
+// layer's own entries) on top of the fully expanded one.
+type incrementalFS interface {
+	ReadDirDiff(path string) ([]fs.DirEntry, error)
+}
+
 // ReadDirQuery is the yakurl entry for listing with query options. Only an
-// incremental program's OverlayFS has a second view: diffOnly collapses to
-// the head layer's own entries. Plain VirtualFS ignores the query.
+// incremental program's filesystem has a second view: diffOnly collapses to
+// the head layer's own entries. A plain program's tree ignores the query.
 func (isfs *irSourceFS) ReadDirQuery(path string, query url.Values) ([]fs.DirEntry, error) {
 	if path == "/" {
 		return programRootEntries(), nil
@@ -138,8 +144,10 @@ func (isfs *irSourceFS) ReadDirQuery(path string, query url.Values) ([]fs.DirEnt
 	if err != nil {
 		return nil, err
 	}
-	if of, ok := pfs.(*filesys.OverlayFS); ok && isDiffOnlyQuery(query) {
-		return of.ReadDirDiff(path)
+	if isDiffOnlyQuery(query) {
+		if inc, ok := pfs.(incrementalFS); ok {
+			return inc.ReadDirDiff(path)
+		}
 	}
 	return pfs.ReadDir(path)
 }
@@ -179,66 +187,47 @@ func (fs *irSourceFS) treeFor(anyPath string) (filesys_interface.FileSystem, err
 }
 
 // buildProgramTree builds the per-program filesystem from its database
-// rows: a plain program keeps its structure-only VirtualFS (ir_sources +
-// ExtraFile stubs); an incremental program gets a filesys.OverlayFS that
-// assembles the overlay chain. Bodies are never stored at build time —
-// irSourceFS.fill them on ReadFile/Open into LazyBodyTree under the caller path.
+// rows. A program name with ir_sources rows but no ir_program row still
+// serves its plain tree (folder rows can outlive or precede the program
+// row). A row carrying a layer chain — the head of an incremental series
+// (>= 2 layers), or a chain-head base recording just itself (1 layer) —
+// assembles a filesys.OverlayFS from it: a chain is a chain, no flavor
+// check. The overlay loads every layer's tree lazily through the same
+// buildPlainProgramTree, resolves deletions through the layers' file
+// status maps, and fills bodies itself through the DB loader. A program
+// without a chain keeps its structure-only tree; irSourceFS fills its
+// bodies on read.
 func buildProgramTree(progName string) (filesys_interface.FileSystem, error) {
 	prog, err := GetApplicationProgram(progName)
-	if err != nil {
+	if err != nil && !gorm.IsRecordNotFoundError(err) {
 		return nil, err
 	}
-	if prog != nil && prog.HasSavedOverlayLayers() {
-		return buildOverlayProgramTree(prog), nil
+	if prog == nil || len(prog.OverlayLayers) == 0 {
+		// No chain: structure-only tree; irSourceFS fills bodies on read.
+		return buildPlainProgramTree(progName)
 	}
 
-	// Plain program: structure-only tree; irSourceFS fills bodies on read.
-	vf, err := buildPlainProgramTree(progName)
-	if err != nil {
-		return nil, err
-	}
-	if prog != nil {
-		mergeExtraFileStubs(prog, vf)
-	}
-	return vf, nil
-}
-
-// buildOverlayProgramTree wires an incremental program's database rows
-// into a filesys.OverlayFS: every layer's tree (structure + ExtraFile
-// stubs) builds lazily on first touch; each layer's FileHashMap contributes
-// to deletion resolution. Bodies stay empty until irSourceFS fills them
-// into OverlayFS's lazy head-path BodyTree (base content is cached there
-// on first read without writing into layer trees).
-func buildOverlayProgramTree(prog *IrProgram) filesys_interface.FileSystem {
 	layers := prog.OverlayLayers
 	layerProgs := GetApplicationPrograms(layers)
-
-	buildLayer := func(layer string) (filesys_interface.FileSystem, error) {
-		vf, err := buildPlainProgramTree(layer)
-		if err != nil {
-			return nil, err
-		}
-		if lp, ok := layerProgs[layer]; ok && lp != nil {
-			mergeExtraFileStubs(lp, vf)
-		}
-		return vf, nil
-	}
-
 	opts := []filesys.OverlayOption{
 		filesys.WithLayers(layers...),
-		filesys.WithLayerTrees(buildLayer),
+		filesys.WithLayerTrees(buildPlainProgramTree),
+		filesys.WithBodyLoader(readIrSourceFileContent),
 	}
+	// Keep the recipe order: status layers resolve newest-first.
 	for _, layer := range layers {
-		if lp, ok := layerProgs[layer]; ok && lp != nil && len(lp.FileHashMap) > 0 {
+		if lp := layerProgs[layer]; lp != nil && len(lp.FileHashMap) > 0 {
 			opts = append(opts, filesys.WithFileStatus(layer, lp.FileHashMap))
 		}
 	}
-	return filesys.NewOverlayFS(opts...)
+	return filesys.NewOverlayFS(opts...), nil
 }
 
-// buildPlainProgramTree builds one program's structure-only VirtualFS from
-// its ir_sources rows: dirs as dir nodes, files as empty stubs.
-func buildPlainProgramTree(progName string) (*filesys.VirtualFS, error) {
+// buildPlainProgramTree builds one program's structure-only tree from its
+// ir_sources rows (dirs as dir nodes, files as empty stubs) plus its
+// ExtraFile paths as stubs. Shared by plain programs and overlay layers
+// alike: the overlay pulls each layer's tree through it on first touch.
+func buildPlainProgramTree(progName string) (filesys_interface.FileSystem, error) {
 	vf := filesys.NewVirtualFs()
 	entries, err := GetIrSourceTreeByProgram(progName)
 	if err != nil {
@@ -252,25 +241,28 @@ func buildPlainProgramTree(progName string) (*filesys.VirtualFS, error) {
 		}
 		vf.AddFile(sourcePath, "")
 	}
+	prog, err := GetApplicationProgram(progName)
+	if err != nil && !gorm.IsRecordNotFoundError(err) {
+		return nil, err
+	}
+	if prog != nil {
+		mergeExtraFileStubs(prog, vf)
+	}
 	return vf, nil
 }
 
-// fillFileContent loads one file's body from the database at contentPath
-// and caches it into the lazy body tree at viewPath (the caller's path).
-// The DB fetch runs outside any lock. Write-back uses BodyWriter when the
-// tree provides one, otherwise fs.mu for a plain VirtualFS.
-func (fs *irSourceFS) fillFileContent(pfs filesys_interface.FileSystem, vf *filesys.VirtualFS, viewPath, contentPath string) ([]byte, error) {
-	data, err := readIrSourceFileContent(contentPath)
+// fillFileContent loads one plain-program file's body from the database
+// and caches it into its tree (replacing the empty stub, which also makes
+// Stat report the real size). The DB fetch runs outside fs.mu — a slow
+// query never blocks listings; only the cheap stub replacement takes it.
+func (fs *irSourceFS) fillFileContent(vf filesys_interface.FileSystem, path string) ([]byte, error) {
+	data, err := readIrSourceFileContent(path)
 	if err != nil {
 		return nil, err
 	}
-	if w, ok := pfs.(filesys.BodyWriter); ok {
-		w.WriteBody(viewPath, data)
-		return data, nil
-	}
 	fs.mu.Lock()
-	vf.RemoveFileOrDir(viewPath)
-	vf.AddFile(viewPath, string(data))
+	vf.Delete(path)
+	vf.WriteFile(path, data, 0o644)
 	fs.mu.Unlock()
 	return data, nil
 }
@@ -346,7 +338,7 @@ func normalizeExtraFilePath(progName, fileURL string) string {
 
 // mergeExtraFileStubs adds the program's own ExtraFile paths as empty stubs
 // (tree only).
-func mergeExtraFileStubs(prog *IrProgram, vf *filesys.VirtualFS) {
+func mergeExtraFileStubs(prog *IrProgram, vf filesys_interface.FileSystem) {
 	if prog == nil || vf == nil || len(prog.ExtraFile) == 0 {
 		return
 	}
@@ -355,7 +347,7 @@ func mergeExtraFileStubs(prog *IrProgram, vf *filesys.VirtualFS) {
 		if ok, err := vf.Exists(vfPath); err == nil && ok {
 			continue
 		}
-		vf.AddFile(vfPath, "")
+		vf.WriteFile(vfPath, nil, 0o644)
 	}
 }
 

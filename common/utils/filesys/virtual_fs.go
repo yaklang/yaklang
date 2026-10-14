@@ -51,12 +51,7 @@ func (f *VirtualFS) Base(s string) string {
 
 var (
 	_ fi.FileSystem = (*VirtualFS)(nil)
-	_ LazyBodyTree  = (*VirtualFS)(nil)
 )
-
-// BodyTree returns the tree itself: a plain VirtualFS is its own lazy
-// body cache (stubs filled in place under the caller's path).
-func (f *VirtualFS) BodyTree() *VirtualFS { return f }
 
 func NewVirtualFs() *VirtualFS {
 	vs := &VirtualFS{
