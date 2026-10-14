@@ -93,25 +93,20 @@ func TestRiskCollect_SeverityFiltersSameModeByDefault(t *testing.T) {
 	require.Equal(t, low.Hash, item.OldHash)
 }
 
-func TestRiskCollect_CoverKeyIsSeparateFromDiffIdentity(t *testing.T) {
+func TestRiskCollect_FeatureHashIsTheCoverKey(t *testing.T) {
 	c := NewRiskCollect()
-	source := collectRisk("source-diff-identity", string(SFR_MODE_SOURCE), "source-rule", 9)
-	source.CoverKey = "same-code-location"
+	source := collectRisk("same-feature", string(SFR_MODE_SOURCE), "source-rule", 9)
 	_, ok := c.Submit(source)
 	require.True(t, ok)
-	ssa := collectRisk("ssa-diff-identity", string(SFR_MODE_SSA), "ssa-rule", 0)
-	ssa.CoverKey = source.CoverKey
+	ssa := collectRisk("same-feature", string(SFR_MODE_SSA), "ssa-rule", 0)
 	item, ok := c.Submit(ssa)
 	require.True(t, ok)
 	require.Equal(t, source.Hash, item.OldHash)
 	require.Equal(t, uint(9), item.OldID)
-	require.NotEqual(t, source.RiskFeatureHash, ssa.RiskFeatureHash,
-		"cross-scan diff identities must not be overwritten to make a cover")
-	sibling := collectRisk(ssa.RiskFeatureHash, string(SFR_MODE_SSA), "ssa-rule", 0)
-	sibling.CoverKey = "different-code-location"
-	item, ok = c.Submit(sibling)
+	other := collectRisk("other-feature", string(SFR_MODE_SSA), "ssa-rule", 0)
+	item, ok = c.Submit(other)
 	require.True(t, ok)
-	require.Empty(t, item.OldHash, "an identical value at another position is a separate finding")
+	require.Empty(t, item.OldHash, "a different feature hash is a different finding")
 }
 
 func TestRiskCollect_EmptyFeatureHashIsAlwaysKept(t *testing.T) {

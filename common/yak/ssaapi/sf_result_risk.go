@@ -157,12 +157,6 @@ func buildSSARisk(
 		newSSARisk.Variable, string(newSSARisk.Severity), newSSARisk.RiskType,
 		newSSARisk.Language, newSSARisk.Title,
 	)
-	// Covering across modes is a separate, scan-local decision. Include the
-	// source position so identical values in sibling statements stay distinct.
-	newSSARisk.CoverKey = utils.CalcSha1(
-		newSSARisk.FunctionName, value.String(), newSSARisk.RiskType,
-		newSSARisk.Language, newSSARisk.CodeSourceUrl, newSSARisk.CodeRange,
-	)
 	newSSARisk.Hash = newSSARisk.CalcHash()
 	return newSSARisk
 }
