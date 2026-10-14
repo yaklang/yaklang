@@ -24,16 +24,17 @@ type fileSystemAction struct {
 	fs fi.FileSystem
 }
 
-// dirQueryLister is optional: ssadb IrSourceFS uses it so an incremental
-// program's OverlayFS can collapse to the head-diff view when the audit
-// frontend sends diffOnly. Ordinary filesystems (file://, …) just ReadDir.
-type dirQueryLister interface {
-	ReadDirQuery(path string, query url.Values) ([]fs.DirEntry, error)
+// diffOnlyLister is optional: filesystems that understand the diffOnly
+// listing option implement it — ssadb's irSourceFS collapses an
+// incremental program's listing to the head layer's own entries.
+// Ordinary filesystems (file://, …) just ReadDir.
+type diffOnlyLister interface {
+	ReadDirDiffOnly(path string, query url.Values) ([]fs.DirEntry, error)
 }
 
 func (f fileSystemAction) listDir(absPath string, query url.Values) ([]fs.DirEntry, error) {
-	if ql, ok := f.fs.(dirQueryLister); ok {
-		return ql.ReadDirQuery(absPath, query)
+	if d, ok := f.fs.(diffOnlyLister); ok {
+		return d.ReadDirDiffOnly(absPath, query)
 	}
 	return f.fs.ReadDir(absPath)
 }

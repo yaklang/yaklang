@@ -537,13 +537,9 @@ func listNames(t *testing.T, dbfs fi.FileSystem, path string) []string {
 // listDiffNames lists dir entry names with diffOnly=true ("show all files"
 // unchecked): an incremental program then shows its head layer's own
 // entries; plain programs ignore the query and list normally.
-func listDiffNames(t *testing.T, dbfs fi.FileSystem, path string) []string {
+func listDiffNames(t *testing.T, listDiffOnly func(string, url.Values) ([]fs.DirEntry, error), path string) []string {
 	t.Helper()
-	ql, ok := dbfs.(interface {
-		ReadDirQuery(path string, query url.Values) ([]fs.DirEntry, error)
-	})
-	require.True(t, ok, "fs does not implement ReadDirQuery")
-	entries, err := ql.ReadDirQuery(path, url.Values{"diffOnly": []string{"true"}})
+	entries, err := listDiffOnly(path, url.Values{"diffOnly": []string{"true"}})
 	require.NoError(t, err)
 	names := make([]string, 0, len(entries))
 	for _, e := range entries {
@@ -576,7 +572,7 @@ func TestIrSourceFS_OverlayDiffAndFull(t *testing.T) {
 	srcDir := "/" + head + "/src/main/java"
 
 	// Diff view: only the head layer's own file.
-	require.ElementsMatch(t, []string{"Head.java"}, listDiffNames(t, dbfs, srcDir))
+	require.ElementsMatch(t, []string{"Head.java"}, listDiffNames(t, dbfs.ReadDirDiffOnly, srcDir))
 
 	// Full view: base + layer1 + head merged under the head root.
 	require.ElementsMatch(t, []string{"Base.java", "Layer1.java", "Head.java"},
@@ -602,7 +598,7 @@ func TestIrSourceFS_OverlayDiffAndFull(t *testing.T) {
 	info, err := dbfs.Stat(baseOnlyDir)
 	require.NoError(t, err)
 	require.True(t, info.IsDir())
-	require.Empty(t, listDiffNames(t, dbfs, baseOnlyDir))
+	require.Empty(t, listDiffNames(t, dbfs.ReadDirDiffOnly, baseOnlyDir))
 	require.ElementsMatch(t, []string{"OnlyInBase.java"}, listNames(t, dbfs, baseOnlyDir))
 }
 
@@ -644,7 +640,7 @@ func TestIrSourceFS_OverlayDeleteExcluded(t *testing.T) {
 
 	// Diff view: only the head's own file. Full view: the chain minus the
 	// deleted files.
-	require.ElementsMatch(t, []string{"Head.java"}, listDiffNames(t, dbfs, srcDir))
+	require.ElementsMatch(t, []string{"Head.java"}, listDiffNames(t, dbfs.ReadDirDiffOnly, srcDir))
 	require.ElementsMatch(t, []string{"Keep.java", "Head.java", "Added1.java"},
 		listNames(t, dbfs, srcDir))
 }

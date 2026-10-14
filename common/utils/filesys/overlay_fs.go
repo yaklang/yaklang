@@ -46,21 +46,11 @@ func WithBodyLoader(load BodyLoader) OverlayOption {
 	return func(o *OverlayFS) { o.bodyLoader = load }
 }
 
-// WithDeletedPaths sets the paths deleted in the final overlay view
-// (leading "/" trimmed, same normalization as OverlayOption's file-status
-// maps): the merged view hides them and bodies resolve them as missing.
-func WithDeletedPaths(paths []string) OverlayOption {
-	return func(o *OverlayFS) {
-		for _, p := range paths {
-			o.deleted[strings.Trim(p, "/")] = struct{}{}
-		}
-	}
-}
-
 // WithFileStatus adds one layer's file-status map (path → status) to the
-// deletion resolution: the NEWEST layer's entry per path decides — any
-// status other than the delete one keeps the file visible, so a newer
-// layer re-owning a path an older layer deleted resurrects it.
+// deletion resolution: the NEWEST layer's entry per path decides — status
+// "-1" (statusDeleted) removes the path from the final view; any other
+// status keeps it visible, so a newer layer re-owning a path an older
+// layer deleted resurrects it.
 func WithFileStatus(layerName string, fileStatus map[string]string) OverlayOption {
 	return func(o *OverlayFS) {
 		// Store oldest→newest; resolution walks backwards, so append keeps
@@ -70,18 +60,6 @@ func WithFileStatus(layerName string, fileStatus map[string]string) OverlayOptio
 			files: fileStatus,
 		})
 	}
-}
-
-// WithDeleteStatus sets which status value marks a deleted file. Default
-// "-1".
-func WithDeleteStatus(status string) OverlayOption {
-	return func(o *OverlayFS) { o.deleteStatus = status }
-}
-
-// WithHeadSeparator sets the rune separating head-root segments in caller
-// paths. Default '/'.
-func WithHeadSeparator(sep rune) OverlayOption {
-	return func(o *OverlayFS) { o.sep = sep }
 }
 
 // OverlayFS is a filesystem view over a chain of layers: it merges every
@@ -97,20 +75,15 @@ func WithHeadSeparator(sep rune) OverlayOption {
 //   - ReadDirDiff lists only the head layer's own entries (the last-diff
 //     view). Callers that care about a "show all files" toggle pick
 //     ReadDir vs ReadDirDiff; OverlayFS itself does not parse query params.
-//   - ResolveOwningFile maps a head path to the owning layer's storage path
-//     (head first, including unfilled stubs).
 //   - ReadFile fills bodies on demand: the owning layer's storage path
 //     resolves, the body loads through the configured BodyLoader, and the
 //     filled body caches in a separate lazy VirtualFS keyed by head paths
 //     (including base-layer content pulled up on first read) without
 //     polluting the head layer used by ReadDirDiff.
 type OverlayFS struct {
-	sep     rune           // head-root separator, exported paths use it
-	layers  []string       // layer chain oldest→newest, head included and last
-	deleted map[string]struct{} // files deleted in the final overlay view
+	layers []string // layer chain oldest→newest, head included and last
 
 	statusLayers []overlayStatusLayer // per-layer file-status maps, recipe order
-	deleteStatus string               // the status value marking a deleted file
 
 	layerTrees OverlayTreeSource // materializes one layer's tree on first touch
 	bodyLoader BodyLoader        // loads one body by its owning layer's storage path
@@ -125,20 +98,20 @@ type overlayStatusLayer struct {
 	files map[string]string
 }
 
+// statusDeleted is the file-status value marking a file its layer removed.
+const statusDeleted = "-1"
+
 var (
 	_ fi.FileSystem = (*OverlayFS)(nil)
 )
 
-// NewOverlayFS builds an overlay filesystem. layers and a layer tree source
-// are required; without a layer tree source the overlay serves nothing
-// (every read errors, listings degrade to the layers that did build).
+// NewOverlayFS builds an overlay filesystem. layers and a layer tree
+// source are required: a layer that fails to build degrades to the layers
+// above it, and without a layer tree source every read errors.
 func NewOverlayFS(opts ...OverlayOption) *OverlayFS {
 	o := &OverlayFS{
-		sep:          '/',
-		deleted:      make(map[string]struct{}),
-		deleteStatus: "-1",
-		layerCache:   make(map[string]fi.FileSystem),
-		view:         NewVirtualFs(),
+		layerCache: make(map[string]fi.FileSystem),
+		view:       NewVirtualFs(),
 	}
 	for _, opt := range opts {
 		opt(o)
@@ -185,18 +158,14 @@ func (o *OverlayFS) deletedInFinalView(headPath string) bool {
 }
 
 // deletedInFinalViewByRel is deletedInFinalView for a path already relative
-// to the head root (ReadDir composes one while merging entries). Explicit
-// deletions always win; otherwise the status maps resolve newest-first —
-// the first layer holding the path decides: its status is the delete one →
-// removed, anything else → alive (a newer layer re-owning a path an older
-// layer deleted resurrects it).
+// to the head root (ReadDir composes one while merging entries). The status
+// maps resolve newest-first — the first layer holding the path decides:
+// its status is statusDeleted → removed, anything else → alive (a newer
+// layer re-owning a path an older layer deleted resurrects it).
 func (o *OverlayFS) deletedInFinalViewByRel(rel string) bool {
-	if _, ok := o.deleted[rel]; ok {
-		return true
-	}
 	for i := len(o.statusLayers) - 1; i >= 0; i-- {
 		if status, ok := o.statusLayers[i].files[rel]; ok {
-			return status == o.deleteStatus
+			return status == statusDeleted
 		}
 	}
 	return false
@@ -205,8 +174,8 @@ func (o *OverlayFS) deletedInFinalViewByRel(rel string) bool {
 // relToHead trims the head prefix and the leading separator from a
 // head-rooted path: "" names the head root itself.
 func (o *OverlayFS) relToHead(headPath string) string {
-	trimmed := strings.TrimPrefix(strings.Trim(headPath, string(o.sep)), o.head())
-	return strings.Trim(trimmed, string(o.sep))
+	trimmed := strings.TrimPrefix(strings.Trim(headPath, "/"), o.head())
+	return strings.Trim(trimmed, "/")
 }
 
 // layerPath maps a head-rooted path into a layer's own prefix: "/" +
@@ -215,9 +184,9 @@ func (o *OverlayFS) relToHead(headPath string) string {
 // owning layer directly (re-rooting to the head prefix happens only in
 // full listings).
 func (o *OverlayFS) layerPath(layer, headPath string) string {
-	rest := strings.TrimPrefix(headPath, string(o.sep)+o.head())
-	layerPrefix := string(o.sep) + layer
-	if rest == "" || rest == string(o.sep) {
+	rest := strings.TrimPrefix(headPath, "/"+o.head())
+	layerPrefix := "/" + layer
+	if rest == "" || rest == "/" {
 		return layerPrefix
 	}
 	return layerPrefix + rest
@@ -289,7 +258,7 @@ func (o *OverlayFS) ReadDir(headPath string) ([]fs.DirEntry, error) {
 		for _, e := range list {
 			fullRel := e.Name()
 			if rel != "" {
-				fullRel = rel + string(o.sep) + e.Name()
+				fullRel = rel + "/" + e.Name()
 			}
 			if o.deletedInFinalViewByRel(fullRel) && !e.IsDir() {
 				continue // deleted in the final overlay view
@@ -353,23 +322,23 @@ func (o *OverlayFS) Stat(headPath string) (fs.FileInfo, error) {
 	return nil, utils.Errorf("file [%v] not exist", headPath)
 }
 
-// ResolveOwningFile finds the owning layer's tree and the path within that
-// tree for a head-rooted path. Ownership is head-first: any hit on the head
-// tree — including an unfilled stub — owns the path and must never fall
-// through to an older layer. Deleted-in-final-view paths error.
-func (o *OverlayFS) ResolveOwningFile(headPath string) (fi.FileSystem, string, error) {
+// resolveContentPath finds the owning layer's storage path for a
+// head-rooted path. Ownership is head-first: any hit on the head tree —
+// including an unfilled stub — owns the path and must never fall through
+// to an older layer. Deleted-in-final-view paths error.
+func (o *OverlayFS) resolveContentPath(headPath string) (string, error) {
 	if o.deletedInFinalView(headPath) {
-		return nil, "", utils.Errorf("file [%v] not exist", headPath)
+		return "", utils.Errorf("file [%v] not exist", headPath)
 	}
 	if tree := o.headTree(); tree != nil {
 		if _, statErr := tree.Stat(headPath); statErr == nil {
-			return tree, headPath, nil
+			return headPath, nil
 		}
 	}
-	if tree, lp, ok := o.lowerLayerTree(headPath); ok {
-		return tree, lp, nil
+	if _, lp, ok := o.lowerLayerTree(headPath); ok {
+		return lp, nil
 	}
-	return nil, "", utils.Errorf("file [%v] not exist", headPath)
+	return "", utils.Errorf("file [%v] not exist", headPath)
 }
 
 // ReadFile serves a cached body from the lazy view when present; otherwise
@@ -379,7 +348,7 @@ func (o *OverlayFS) ReadFile(headPath string) ([]byte, error) {
 	if data, err := o.view.ReadFile(headPath); err == nil && len(data) > 0 {
 		return data, nil
 	}
-	_, contentPath, err := o.ResolveOwningFile(headPath)
+	contentPath, err := o.resolveContentPath(headPath)
 	if err != nil {
 		return nil, err
 	}
@@ -409,15 +378,15 @@ func (o *OverlayFS) Exists(headPath string) (bool, error) {
 // path rules follow VirtualFS (separator '/', path.Join semantics,
 // getExtension's extension rule). Writes are unsupported — an overlay view
 // is read-only by design; callers mutate the layers' own filesystems.
-func (o *OverlayFS) GetSeparators() rune         { return o.sep }
+func (o *OverlayFS) GetSeparators() rune         { return '/' }
 func (o *OverlayFS) Join(paths ...string) string { return path.Join(paths...) }
 func (o *OverlayFS) Base(p string) string        { return path.Base(p) }
 func (o *OverlayFS) PathSplit(p string) (string, string) {
-	return SplitWithSeparator(p, o.sep)
+	return SplitWithSeparator(p, '/')
 }
 func (o *OverlayFS) Ext(name string) string { return getExtension(name) }
 func (o *OverlayFS) IsAbs(name string) bool {
-	return len(name) > 0 && name[0] == byte(o.sep)
+	return len(name) > 0 && name[0] == '/'
 }
 func (o *OverlayFS) Getwd() (string, error)          { return "", nil }
 func (o *OverlayFS) ExtraInfo(string) map[string]any { return nil }
