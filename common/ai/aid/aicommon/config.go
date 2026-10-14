@@ -259,7 +259,6 @@ type Config struct {
 	browserSessionTracker BrowserSessionTracker
 
 	// tool config
-	readOnlyEvidence             bool // Immutable server evidence boundary, never hotpatchable.
 	DisableToolUse               bool
 	AiToolManagerOption          []buildinaitools.ToolManagerOption
 	EnableAISearch               bool
@@ -1840,6 +1839,14 @@ func WithDisableToolUse(disable bool) ConfigOption {
 		c.m.Unlock()
 		return nil
 	}
+}
+
+func (c *Config) IsToolUseDisabled() bool {
+	if c.m != nil {
+		c.m.Lock()
+		defer c.m.Unlock()
+	}
+	return c.DisableToolUse
 }
 
 func WithEnableToolManagerAISearch(enable bool) ConfigOption {
@@ -4288,10 +4295,6 @@ func convertConfigToOptions(i *Config, inheritHotPatch bool) []ConfigOption {
 	// Keywords
 	if len(i.Keywords) > 0 {
 		opts = append(opts, WithKeywords(i.Keywords...))
-	}
-
-	if i.readOnlyEvidence {
-		opts = append(opts, WithReadOnlyEvidence())
 	}
 
 	// Disable tool use flag
