@@ -988,6 +988,11 @@ func (s *ScanNode) executeScript(
 	workspaceOwner := s.nextSSAGitWorkspaceOwner()
 	env = replaceEnvironmentValue(env, ssagitworkdir.OwnerEnv, workspaceOwner)
 	cmd.Env = env
+	closeLifetime, err := configureScriptProcessLifetime(cmd)
+	if err != nil {
+		return utils.Errorf("configure script process lifetime: %v", err)
+	}
+	defer closeLifetime()
 
 	// Use a combined output writer: stdout/stderr go to both the parent
 	// process (for docker logs) and the per-task log file. We also capture
