@@ -104,7 +104,20 @@ container_build() {
   # Check the actual default C linker, not just a user-supplied build tag. The
   # static probe strongly references a musl-only symbol and executes its version.
   probe_dir="$(mktemp -d /tmp/legion-musl-probe.XXXXXX)"
-  trap 'rm -rf "$probe_dir"' EXIT HUP INT TERM
+  binary_stage_dir=
+  metadata_stage_dir=
+  # shellcheck disable=SC2317 # Called indirectly by the EXIT trap below.
+  cleanup_build() {
+    rm -rf "$probe_dir"
+    if [ -n "$binary_stage_dir" ]; then rm -rf "$binary_stage_dir"; fi
+    if [ -n "$metadata_stage_dir" ] && [ "$metadata_stage_dir" != "$binary_stage_dir" ]; then
+      rm -rf "$metadata_stage_dir"
+    fi
+  }
+  trap 'cleanup_build' EXIT
+  trap 'exit 129' HUP
+  trap 'exit 130' INT
+  trap 'exit 143' TERM
   cat >"$probe_dir/probe.c" <<'C'
 #include <features.h>
 #include <stdio.h>
@@ -150,14 +163,28 @@ C
     fi
   fi
   mkdir -p "$(dirname "$output_binary")" "$(dirname "$metadata_file")"
+  [ "$output_binary" != "$metadata_file" ] || die 'Node binary and metadata must use different paths'
+  [ ! -d "$output_binary" ] || die 'Node output path must not be a directory'
+  [ ! -d "$metadata_file" ] || die 'Node metadata path must not be a directory'
+  # Existing /tmp outputs belong to NODE_OUTPUT_UID after the first build.
+  # protected_regular prevents container root from reopening them with O_CREAT.
+  # Stage in private directories on each destination filesystem, then rename;
+  # /tmp inside the container may be a different mount from either destination.
+  binary_stage_dir="$(mktemp -d "$(dirname "$output_binary")/.legion-musl-build.XXXXXX")"
+  metadata_stage_dir="$binary_stage_dir"
+  if [ "$(dirname "$metadata_file")" != "$(dirname "$output_binary")" ]; then
+    metadata_stage_dir="$(mktemp -d "$(dirname "$metadata_file")/.legion-musl-build.XXXXXX")"
+  fi
+  staged_binary="$binary_stage_dir/node"
+  staged_metadata="$metadata_stage_dir/musl-build.json"
   log "building Linux $target_arch $profile node with musl $actual_musl_version, GCC $compiler_version"
   (
     cd "$build_source_dir"
     go build -mod=readonly -trimpath -buildvcs="$buildvcs" -tags "$build_tags" \
       -ldflags '-s -w -buildid= -linkmode external -extld gcc -extldflags "-static"' \
-      -o "$output_binary" ./cmd/legion-smoke-node
+      -o "$staged_binary" ./cmd/legion-smoke-node
   )
-  verify_binary "$output_binary" "$target_arch" "$build_tags"
+  verify_binary "$staged_binary" "$target_arch" "$build_tags"
   if [ "$buildvcs" = true ]; then
     printf '%s\n' "$build_info" | grep -Fq 'vcs=git' || die 'node binary is missing its Git source identity'
     printf '%s\n' "$build_info" | grep -Fq "vcs.revision=$source_revision" || die 'node VCS revision does not match the source checkout'
@@ -168,7 +195,7 @@ C
   # marker. The NSS/glibc regression workflow separately exercises real startup.
   mkdir -p "$probe_dir/home" "$probe_dir/yakit"
   startup_status=0
-  HOME="$probe_dir/home" YAKIT_HOME="$probe_dir/yakit" timeout 30 "$output_binary" -h >"$probe_dir/startup.log" 2>&1 || startup_status=$?
+  HOME="$probe_dir/home" YAKIT_HOME="$probe_dir/yakit" timeout 30 "$staged_binary" -h >"$probe_dir/startup.log" 2>&1 || startup_status=$?
   # The existing Node CLI returns flag.ErrHelp through log.Fatal, hence exit 1.
   # An arbitrary exit 1, a crash or timeout must never count as successful help.
   if [ "$startup_status" -ne 1 ] ||
@@ -193,10 +220,15 @@ C
       alpine_version: $alpine_version, link_mode: "external-static", cgo_enabled: true,
       builder_execution: $builder_execution, buildvcs: $buildvcs,
       pinned_build_packages: ($pinned_packages | split(" ")),
-      installed_packages: ($installed_packages | split("\n") | map(select(length > 0)))}' >"$metadata_file"
+      installed_packages: ($installed_packages | split("\n") | map(select(length > 0)))}' >"$staged_metadata"
+  chmod 755 "$staged_binary"
   if [ -n "${NODE_OUTPUT_UID:-}" ] && [ -n "${NODE_OUTPUT_GID:-}" ]; then
-    chown "$NODE_OUTPUT_UID:$NODE_OUTPUT_GID" "$output_binary" "$metadata_file"
+    chown "$NODE_OUTPUT_UID:$NODE_OUTPUT_GID" "$staged_binary" "$staged_metadata"
   fi
+  # Both outputs have passed validation. Each rename replaces the destination
+  # atomically; failures before publication preserve the previous pair.
+  mv -f "$staged_binary" "$output_binary"
+  mv -f "$staged_metadata" "$metadata_file"
 }
 
 case "${1:-}" in
