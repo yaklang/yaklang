@@ -68,6 +68,7 @@ func WithManagerTokenEstimator(estimator func(string) int) ManagerOption {
 //
 // 改造后的职责边界:
 //   - 知道当前有哪些 skill 可以加载 (loader / 元信息 / 搜索 / 目录);
+//   - 初始化时固定有限的 Skill Inventory，供 FrozenBlock 展示默认加载目录;
 //   - 把 skill 加载进 Timeline (通过 SkillContentSink 窄接口, 只追加, 不渲染);
 //   - 在 Timeline 中查看/翻页/删除已经加载的技能正文。
 //
@@ -81,6 +82,10 @@ type SkillsContextManager struct {
 
 	// loader is the skill loader used to load skills on demand.
 	loader SkillLoader
+
+	// skillInventory 是初始化时确定的有限目录，后续加载、翻页和来源变化不修改它。
+	// 只保存名称和简短描述的最终渲染文本，不托管技能正文或加载状态。
+	skillInventory string
 
 	// states 只记录已加载技能的轻量查看状态 (文件树 / 阅读窗口 / 翻页 offset)。
 	// 它不参与 prompt 拼装, 也不决定展示位置。
@@ -111,8 +116,19 @@ func NewSkillsContextManager(loader SkillLoader, opts ...ManagerOption) *SkillsC
 	for _, opt := range opts {
 		opt(m)
 	}
+	if loader != nil {
+		m.skillInventory = renderSkillInventory(loader.AllSkillMetas(), m.tokenEstimator)
+	}
 	m.initializeSkillSearchPersistence()
 	return m
+}
+
+// SkillInventory 返回初始化时固定的技能目录，供 FrozenBlock 只读渲染。
+func (m *SkillsContextManager) SkillInventory() string {
+	if m == nil {
+		return ""
+	}
+	return m.skillInventory
 }
 
 // LoadDefaultSkills 在绑定之后由初始化入口显式加载 metadata auto_load 技能。

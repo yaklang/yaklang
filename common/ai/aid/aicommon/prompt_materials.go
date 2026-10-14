@@ -53,6 +53,9 @@ type PromptMaterials struct {
 	// available via search_capabilities"), 而不是只给一个无信息的省略号.
 	// 关键词: MoreToolsCount, Tool Inventory 剩余工具数
 	MoreToolsCount int
+	// SkillInventory is the bounded directory fixed when the skill manager is initialized.
+	// Loaded skill content still comes exclusively from Timeline.
+	SkillInventory string
 	ForgeInventory bool
 	AIForgeList    string
 
@@ -143,6 +146,7 @@ func (m *PromptMaterials) FrozenBlockData() map[string]any {
 		"TopTools":         m.TopTools,
 		"HasMoreTools":     m.HasMoreTools,
 		"MoreToolsCount":   m.MoreToolsCount,
+		"SkillInventory":   m.SkillInventory,
 		"ForgeInventory":   m.ForgeInventory,
 		"AIForgeList":      m.AIForgeList,
 		"FrozenPartitions": NormalizeFrozenBlockPartitions(m.FrozenPartitions),

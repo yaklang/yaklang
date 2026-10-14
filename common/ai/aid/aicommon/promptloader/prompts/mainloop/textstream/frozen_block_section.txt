@@ -19,6 +19,8 @@
 > 此处为优先展示目录；完整能力范围可按需通过能力检索入口查询。
 {{ end }}
 
+{{ if .SkillInventory }}{{ .SkillInventory }}{{ end }}
+
 {{ if .ForgeInventory }}# AI Blueprint Inventory
 以下是当前可直接调用的 AI 蓝图列表：
 {{ .AIForgeList }}{{ end }}

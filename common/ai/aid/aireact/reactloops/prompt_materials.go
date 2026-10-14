@@ -38,6 +38,7 @@ type LoopPromptBaseMaterials struct {
 	// 计算结果设置, 让模板能给出具体数字而不是模糊的 "...".
 	// 关键词: MoreToolsCount, Tool Inventory 剩余工具数, search_capabilities 具象提示
 	MoreToolsCount int
+	SkillInventory string
 	AIForgeList    string
 	aicommon.PromptFrozenOpenMaterials
 }

@@ -224,15 +224,12 @@ func TestReActLoop_Skills_PromptDifference(t *testing.T) {
 		if !strings.Contains(schemaBlock, "loading_skills") {
 			t.Error("loading_skills SHOULD appear in SCHEMA enum when skills are configured")
 		}
-		// 改造后: SKILL 目录默认隐藏 (节约 token), SKILLS_CONTEXT 段零加载时为空.
-		// 目录仅由意图识别 (SetCatalogSkills) 主动 surface.
-		// 这里验证「目录隐藏」契约: 注册了 skill 但未 surface 时, prompt 不应含
-		// SKILLS_CONTEXT 标签 / skill 名.
+		// 固定 Skill Inventory 在 FrozenBlock 展示名称；未加载时没有技能正文块。
 		if strings.Contains(capturedMainPrompt, "SKILLS_CONTEXT") {
-			t.Error("SKILLS_CONTEXT tag should NOT appear when catalog is hidden (default)")
+			t.Error("SKILLS_CONTEXT tag should NOT appear before any skill is loaded")
 		}
-		if strings.Contains(capturedMainPrompt, "test-skill") {
-			t.Error("'test-skill' should NOT appear when catalog is hidden (default)")
+		if !strings.Contains(capturedMainPrompt, "# Skill Inventory") || !strings.Contains(capturedMainPrompt, "  - test-skill:") {
+			t.Error("fixed Skill Inventory should list 'test-skill' before loading")
 		}
 	})
 }
@@ -333,14 +330,16 @@ func TestReActLoop_Skills_LoadedContentInPrompt(t *testing.T) {
 	firstPrompt := mainPrompts[0]
 	secondPrompt := mainPrompts[1]
 
-	// 改造后: 目录默认隐藏, 首个 prompt (加载前) 不应含 skill 名 / SKILLS_CONTEXT.
-	if strings.Contains(firstPrompt, "test-skill") {
-		t.Error("First main prompt should NOT list 'test-skill' (catalog hidden by default)")
+	// 加载前只有固定目录，正文仍需按需加载进 Timeline。
+	if !strings.Contains(firstPrompt, "# Skill Inventory") || !strings.Contains(firstPrompt, "  - test-skill:") {
+		t.Error("First main prompt should list 'test-skill' in the fixed inventory")
+	}
+	if strings.Contains(firstPrompt, "SKILLS_CONTEXT") {
+		t.Error("First main prompt should NOT contain a loaded skill context block")
 	}
 
 	// Second prompt: should have the actual loaded skill body content.
-	// AI 自主加载 (loading_skills action) 现走 LoadAutoSkill, 渲染进 AUTO_LOADED_SKILLS
-	// 段 (semi_dynamic_2 尾部), 仍含满内容 (header + body).
+	// AI 自主加载先进入 Timeline Open；冻结后才进入 SemiDynamic1 技能块。
 	if !strings.Contains(secondPrompt, "This is a test skill") {
 		t.Error("Second main prompt should contain loaded skill body 'This is a test skill'")
 	}
