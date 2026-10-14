@@ -84,7 +84,7 @@ func TestSkillBindingQueriesOnlyTheTargetTimeline(t *testing.T) {
 	firstAppends, loads := first.appendCount(), loader.loads
 
 	target := newTestTimelineSink()
-	require.True(t, target.AppendSkillContent("code-review", "SKILL.md", "TARGET_BODY", SkillContentSourceAuto))
+	require.True(t, target.AppendSkillFileContent("code-review", "SKILL.md", "TARGET_BODY", SkillContentSourceAuto, 1, 1, 1))
 	mgr.BindTimelineSink(target)
 	require.Equal(t, 1, target.appendCount(), "binding must not copy cached skills into the target")
 	require.Equal(t, firstAppends, first.appendCount())

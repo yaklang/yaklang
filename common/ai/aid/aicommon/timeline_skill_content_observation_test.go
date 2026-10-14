@@ -20,8 +20,7 @@ func TestSkillContentMaterialsMatchModelView(t *testing.T) {
 	tl.FreezeAll()
 	before := RenderTimelineFrozenOpen(tl)
 
-	require.True(t, tl.PushSkillContent(cfg.AcquireId(), "demo-skill", "",
-		"OBSERVED_SKILL_BODY", SkillContentSourceAuto))
+	require.True(t, tl.PushSkillFileContent(cfg.AcquireId(), "demo-skill", "SKILL.md", "OBSERVED_SKILL_BODY", SkillContentSourceAuto, 1, 1, 1))
 	after := RenderTimelineFrozenOpen(tl)
 
 	// Model view: Open carries the body; the cached prefix does not change.

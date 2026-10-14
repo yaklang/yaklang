@@ -299,7 +299,7 @@ func TestSkillsContextManager_RenderStable_CatalogVisibleWhenSet(t *testing.T) {
 }
 
 // TestSkillsContextManager_RenderStable_CatalogInSingleBlock 验证意图目录与技能
-// 正文共用一个技能块: 目录本身也是一条 skill-content item。
+// 正文共用一个技能块: 目录本身也是一条 skill item。
 func TestSkillsContextManager_RenderStable_CatalogInSingleBlock(t *testing.T) {
 	vfs := buildTestVFS()
 	loader, err := NewFSSkillLoader(vfs)
@@ -393,10 +393,10 @@ func TestSkillsContextManager_RenderStable_SortsLoadedSkillsAndViews(t *testing.
 		t.Fatalf("loaded skills should be rendered in load order. Got:\n%s", rendered)
 	}
 
-	skillMDIdx := strings.Index(rendered, "File: SKILL.md (Skill: deploy-app)")
-	deployScriptIdx := strings.Index(rendered, "File: scripts/deploy.sh (Skill: deploy-app)")
+	skillMDIdx := strings.Index(rendered, "[SKILL.md:1-8/8 END]")
+	deployScriptIdx := strings.Index(rendered, "[scripts/deploy.sh:1-2/2 END]")
 	if skillMDIdx == -1 || deployScriptIdx == -1 {
-		t.Fatalf("stable render should contain both deploy-app view windows. Got:\n%s", rendered)
+		t.Fatalf("stable render should contain both deploy-app content ranges. Got:\n%s", rendered)
 	}
 }
 
@@ -754,8 +754,8 @@ func TestSkillsContextManager_LoadAndRender(t *testing.T) {
 	if !strings.Contains(rendered, "=== Skill: deploy-app ===") {
 		t.Fatalf("rendered should contain full skill header, got: %s", rendered)
 	}
-	if !strings.Contains(rendered, "VIEW_WINDOW") {
-		t.Fatal("rendered should contain VIEW_WINDOW for SKILL.md content")
+	if !strings.Contains(rendered, "[SKILL.md:") || !strings.Contains(rendered, " END]") {
+		t.Fatal("rendered should contain the SKILL.md range, including END when the file is complete")
 	}
 }
 

@@ -19,8 +19,7 @@ func TestPromptManagerSkillTransferUsesPromotedTimelineWithoutManager(t *testing
 				require.Nil(t, react.GetCurrentLoop(), "the shared prompt must not require a loop skill manager")
 				tl := react.config.GetTimeline()
 				tl.SetTimelineBucketByteSize(-1)
-				require.True(t, tl.PushSkillContent(react.config.AcquireId(), "demo-skill", "SKILL.md",
-					"ACTUAL_PROMPT_SKILL_BODY", aicommon.SkillContentSourceManual))
+				require.True(t, tl.PushSkillFileContent(react.config.AcquireId(), "demo-skill", "SKILL.md", "ACTUAL_PROMPT_SKILL_BODY", aicommon.SkillContentSourceManual, 1, 1, 1))
 				input := &reactloops.LoopPromptAssemblyInput{
 					Nonce: "skill-transfer", Lightweight: lightweight, FunctionCallMode: native,
 					TaskInstruction: "continue the task", Schema: `{"type":"object"}`,
@@ -49,8 +48,7 @@ func TestPromptManagerSkillTransferUsesPromotedTimelineWithoutManager(t *testing
 				}
 				require.Equal(t, aicommon.RenderTimelineFrozenOpen(tl).SkillsContext, observed)
 
-				require.True(t, tl.PushSkillContent(react.config.AcquireId(), "demo-skill", "SKILL.md",
-					"NEXT_PROMPT_SKILL_PAGE", aicommon.SkillContentSourceManual))
+				require.True(t, tl.PushSkillFileContent(react.config.AcquireId(), "demo-skill", "SKILL.md", "NEXT_PROMPT_SKILL_PAGE", aicommon.SkillContentSourceManual, 1, 1, 1))
 				pending, err := react.promptManager.AssembleLoopPrompt(nil, input)
 				require.NoError(t, err)
 				require.Equal(t, loopPromptSection(t, after.Prompt, "semi-dynamic-1"),

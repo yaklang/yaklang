@@ -86,11 +86,9 @@ func TestSkillBindingViewsTargetWithoutChangingEitherTimeline(t *testing.T) {
 
 	target := NewConfig(context.Background(), WithDisableAutoSkills(true))
 	target.GetTimeline().SetTimelineBucketByteSize(-1)
-	require.True(t, target.GetTimeline().PushSkillContent(target.AcquireId(), "code-review",
-		"SKILL.md", "TARGET_FROZEN_BODY", SkillContentSourceAuto))
+	require.True(t, target.GetTimeline().PushSkillFileContent(target.AcquireId(), "code-review", "SKILL.md", "TARGET_FROZEN_BODY", SkillContentSourceAuto, 1, 1, 1))
 	target.GetTimeline().FreezeAll()
-	require.True(t, target.GetTimeline().PushSkillContent(target.AcquireId(), "target-only",
-		"SKILL.md", "TARGET_OPEN_BODY", SkillContentSourceManual))
+	require.True(t, target.GetTimeline().PushSkillFileContent(target.AcquireId(), "target-only", "SKILL.md", "TARGET_OPEN_BODY", SkillContentSourceManual, 1, 1, 1))
 	require.True(t, target.GetTimeline().PushSkillCatalog(target.AcquireId(), "TARGET_CATALOG"))
 	beforeOriginal, err := MarshalTimeline(original.GetTimeline())
 	require.NoError(t, err)

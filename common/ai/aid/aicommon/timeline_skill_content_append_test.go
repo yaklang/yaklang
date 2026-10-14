@@ -19,7 +19,7 @@ func TestSkillContentDuplicateIsCheckedBeforeAppend(t *testing.T) {
 			tl := cfg.GetTimeline()
 			tl.SetTimelineBucketByteSize(-1)
 			id := cfg.AcquireId()
-			require.True(t, tl.PushSkillContent(id, "demo-skill", "", "SAME_BODY", SkillContentSourceForced))
+			require.True(t, tl.PushSkillFileContent(id, "demo-skill", "SKILL.md", "SAME_BODY", SkillContentSourceForced, 1, 1, 1))
 			if frozen {
 				tl.FreezeAll()
 			}
@@ -27,16 +27,14 @@ func TestSkillContentDuplicateIsCheckedBeforeAppend(t *testing.T) {
 			beforeSkills := tl.RenderSkillContentForPrompt()
 			beforeFreeze := tl.FreezeSnapshot()
 
-			require.False(t, tl.PushSkillContent(cfg.AcquireId(), "demo-skill", "SKILL.md",
-				"SAME_BODY", SkillContentSourceAuto), "same content must not be appended even from another source")
+			require.False(t, tl.PushSkillFileContent(cfg.AcquireId(), "demo-skill", "SKILL.md", "SAME_BODY", SkillContentSourceAuto, 1, 1, 1), "same content must not be appended even from another source")
 			require.Equal(t, []int64{id}, tl.idToTimelineItem.Keys())
 			require.Equal(t, before, RenderTimelineFrozenOpen(tl))
 			require.Equal(t, beforeSkills, tl.RenderSkillContentForPrompt())
 			require.Equal(t, beforeFreeze, tl.FreezeSnapshot())
 
 			require.True(t, tl.DeleteSkillContent("demo-skill"))
-			require.True(t, tl.PushSkillContent(cfg.AcquireId(), "demo-skill", "SKILL.md",
-				"SAME_BODY", SkillContentSourceManual), "retired content must be readable again")
+			require.True(t, tl.PushSkillFileContent(cfg.AcquireId(), "demo-skill", "SKILL.md", "SAME_BODY", SkillContentSourceManual, 1, 1, 1), "retired content must be readable again")
 			require.Contains(t, RenderTimelineFrozenOpen(tl).Open, "SAME_BODY")
 		})
 	}
@@ -47,13 +45,13 @@ func TestSkillContentDifferentWindowsStayInHistory(t *testing.T) {
 	tl := cfg.GetTimeline()
 	tl.SetTimelineBucketByteSize(-1)
 	firstID := cfg.AcquireId()
-	require.True(t, tl.PushSkillContent(firstID, "demo-skill", "SKILL.md", "FIRST_WINDOW", SkillContentSourceAuto))
+	require.True(t, tl.PushSkillFileContent(firstID, "demo-skill", "SKILL.md", "FIRST_WINDOW", SkillContentSourceAuto, 1, 1, 1))
 	tl.FreezeAll()
 	before := RenderTimelineFrozenOpen(tl)
 	beforeSkills := tl.RenderSkillContentForPrompt()
 
 	secondID := cfg.AcquireId()
-	require.True(t, tl.PushSkillContent(secondID, "demo-skill", "SKILL.md", "SECOND_WINDOW", SkillContentSourceAuto))
+	require.True(t, tl.PushSkillFileContent(secondID, "demo-skill", "SKILL.md", "SECOND_WINDOW", SkillContentSourceAuto, 1, 1, 1))
 	require.Equal(t, before.Frozen, RenderTimelineFrozenOpen(tl).Frozen)
 	require.Equal(t, beforeSkills, tl.RenderSkillContentForPrompt())
 	require.Contains(t, RenderTimelineFrozenOpen(tl).Open, "SECOND_WINDOW")
@@ -85,8 +83,8 @@ func TestSkillContentHistoricalWindowsSurviveCompression(t *testing.T) {
 	tl := cfg.GetTimeline()
 	tl.SetTimelineBucketByteSize(-1)
 	firstID, secondID := cfg.AcquireId(), cfg.AcquireId()
-	require.True(t, tl.PushSkillContent(firstID, "demo-skill", "SKILL.md", "EARLIER_WINDOW", SkillContentSourceAuto))
-	require.True(t, tl.PushSkillContent(secondID, "demo-skill", "SKILL.md", "LATER_WINDOW", SkillContentSourceAuto))
+	require.True(t, tl.PushSkillFileContent(firstID, "demo-skill", "SKILL.md", "EARLIER_WINDOW", SkillContentSourceAuto, 1, 1, 1))
+	require.True(t, tl.PushSkillFileContent(secondID, "demo-skill", "SKILL.md", "LATER_WINDOW", SkillContentSourceAuto, 1, 1, 1))
 	tl.FreezeAll()
 	bindCompressionMock(t, tl, func(req *AIRequest) (string, error) {
 		require.NotContains(t, req.GetPrompt(), "EARLIER_WINDOW")
@@ -115,7 +113,7 @@ func TestSkillContentConcurrentDuplicateLoadsAppendOnce(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			results <- sink.AppendSkillContent("demo-skill", "SKILL.md", "CONCURRENT_BODY", SkillContentSourceManual)
+			results <- sink.AppendSkillFileContent("demo-skill", "SKILL.md", "CONCURRENT_BODY", SkillContentSourceManual, 1, 1, 1)
 		}()
 	}
 	wg.Wait()
@@ -149,12 +147,14 @@ func TestSkillManagerPagingPreservesPreviousWindow(t *testing.T) {
 	require.NoError(t, mgr.ChangeViewOffset("demo-skill", "", 2))
 	require.Len(t, tl.idToTimelineItem.Keys(), len(beforeIDs)+1)
 	require.Equal(t, beforeSkills, tl.RenderSkillContentForPrompt())
-	require.Contains(t, RenderTimelineFrozenOpen(tl).Open, "Current Offset: 2")
+	require.Contains(t, RenderTimelineFrozenOpen(tl).Open, "[skill demo-skill | SKILL.md:2-")
+	require.Contains(t, RenderTimelineFrozenOpen(tl).Open, " END]")
 	tl.FreezeAll()
 	skills := tl.RenderSkillContentForPrompt()
 	require.Contains(t, skills, "FIRST_LINE")
-	require.Contains(t, skills, "Current Offset: 2")
-	require.Equal(t, 2, strings.Count(skills, "File: SKILL.md (Skill: demo-skill)"))
+	require.Contains(t, skills, "[SKILL.md:2-")
+	require.Equal(t, 1, strings.Count(skills, "[SKILL.md:1-"))
+	require.Equal(t, 1, strings.Count(skills, "[SKILL.md:2-"))
 
 	require.NoError(t, mgr.ChangeViewOffset("demo-skill", "", 2))
 	require.NoError(t, mgr.ChangeViewOffset("demo-skill", "", 1))
@@ -182,7 +182,7 @@ func TestSkillManagerContentSurvivesCompression(t *testing.T) {
 			})
 			_, err = tl.CompressOnce(compressionTestOptions())
 			require.NoError(t, err)
-			require.True(t, tl.HasVisibleSkillContent("deploy-app"), "the metadata/tree remains visible")
+			require.True(t, skillVisible(tl, "deploy-app"), "the metadata/tree remains visible")
 			beforeIDs := tl.idToTimelineItem.Keys()
 			beforeSkills := tl.RenderSkillContentForPrompt()
 

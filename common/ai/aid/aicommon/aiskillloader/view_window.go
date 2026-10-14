@@ -117,15 +117,14 @@ func (vw *ViewWindow) TotalLines() int {
 // 关键词: ViewWindow.Render, 全文模式去行号, isFullView,
 //
 //	change_skill_view_offset 输入契约, ViewWindowMaxBytes
-func (vw *ViewWindow) Render() (string, bool) {
-	vw.mu.Lock()
-	defer vw.mu.Unlock()
-
-	if len(vw.Lines) == 0 {
-		return "", false
-	}
-
+//
+// boundsLocked 计算本次视窗实际覆盖的行。调用方需持有 vw.mu。
+// end 小于 start 表示预算内一行都放不下。
+func (vw *ViewWindow) boundsLocked() (start, end int, truncated bool) {
 	totalLines := len(vw.Lines)
+	if totalLines == 0 {
+		return 0, 0, false
+	}
 	offset := vw.Offset
 	if offset < 1 {
 		offset = 1
@@ -133,72 +132,96 @@ func (vw *ViewWindow) Render() (string, bool) {
 	if offset > totalLines {
 		offset = totalLines
 	}
-
 	headerTag := fmt.Sprintf("<|VIEW_WINDOW_%s|>", vw.Nonce)
 	footerTag := fmt.Sprintf("<|VIEW_WINDOW_END_%s|>", vw.Nonce)
-
-	// Mode 1: try full-view mode (no line numbers) when starting from the top.
-	// Estimate the unprefixed render size: header + "\n" + sum(line + "\n") + footer.
-	// 关键词: 全文模式预算估算, plainSize, ViewWindow no line number
 	if offset == 1 {
 		plainSize := len(headerTag) + 1 + len(footerTag)
-		for _, l := range vw.Lines {
-			plainSize += len(l) + 1
+		for _, line := range vw.Lines {
+			plainSize += len(line) + 1
 		}
 		if plainSize <= ViewWindowMaxBytes {
-			var buf bytes.Buffer
-			buf.Grow(plainSize)
-			buf.WriteString(headerTag)
-			buf.WriteString("\n")
-			for _, l := range vw.Lines {
-				buf.WriteString(l)
-				buf.WriteString("\n")
-			}
-			buf.WriteString(footerTag)
-			vw.IsTruncated = false
-			return buf.String(), false
+			return 1, totalLines, false
 		}
 	}
+	used := len(headerTag) + 1
+	if offset > 1 {
+		used += len("...\n")
+	}
+	last := offset - 1
+	for i := offset - 1; i < totalLines; i++ {
+		line := fmt.Sprintf("%d | %s\n", i+1, vw.Lines[i])
+		if used+len(line)+len("...\n")+len(footerTag)+1 > ViewWindowMaxBytes {
+			return offset, last, true
+		}
+		used += len(line)
+		last = i + 1
+	}
+	if last < totalLines {
+		truncated = true
+	}
+	return offset, last, truncated
+}
 
-	// Mode 2: partial-view mode (line numbers + ellipsis) — needed when the
-	// AI must subsequently scroll via change_skill_view_offset.
+func (vw *ViewWindow) Render() (string, bool) {
+	vw.mu.Lock()
+	defer vw.mu.Unlock()
+	return vw.renderLocked()
+}
+
+func (vw *ViewWindow) renderLocked() (string, bool) {
+	if len(vw.Lines) == 0 {
+		vw.IsTruncated = false
+		return "", false
+	}
+	start, end, truncated := vw.boundsLocked()
+	totalLines := len(vw.Lines)
+	headerTag := fmt.Sprintf("<|VIEW_WINDOW_%s|>", vw.Nonce)
+	footerTag := fmt.Sprintf("<|VIEW_WINDOW_END_%s|>", vw.Nonce)
+	fullView := start == 1 && end == totalLines && !truncated
 	var buf bytes.Buffer
 	buf.WriteString(headerTag)
 	buf.WriteString("\n")
-
-	// Show leading ellipsis if not starting from line 1.
-	if offset > 1 {
+	if fullView {
+		for _, line := range vw.Lines {
+			buf.WriteString(line)
+			buf.WriteString("\n")
+		}
+		buf.WriteString(footerTag)
+		vw.IsTruncated = false
+		return buf.String(), false
+	}
+	if start > 1 {
 		buf.WriteString("...\n")
 	}
-
-	truncated := false
-	lastRenderedLine := offset - 1
-
-	for i := offset - 1; i < totalLines; i++ {
-		lineNum := i + 1
-		line := fmt.Sprintf("%d | %s\n", lineNum, vw.Lines[i])
-
-		// Project size after appending this line + potential trailing "..." + footer.
-		projectedSize := buf.Len() + len(line) + len("...\n") + len(footerTag) + 1
-		if projectedSize > ViewWindowMaxBytes {
-			truncated = true
-			break
+	if end >= start {
+		for i := start - 1; i < end && i < totalLines; i++ {
+			fmt.Fprintf(&buf, "%d | %s\n", i+1, vw.Lines[i])
 		}
-
-		buf.WriteString(line)
-		lastRenderedLine = lineNum
 	}
-
-	// Show trailing ellipsis if not ending at the last line.
-	if lastRenderedLine < totalLines {
+	if end < totalLines {
 		buf.WriteString("...\n")
 		truncated = true
 	}
-
 	buf.WriteString(footerTag)
-
 	vw.IsTruncated = truncated
 	return buf.String(), truncated
+}
+
+// Segment 返回本次视窗的正文和行范围。ReachedEnd 表示已经读到文件最后一行。
+func (vw *ViewWindow) Segment() (content string, start, end, total int, reachedEnd bool) {
+	if vw == nil {
+		return "", 0, 0, 0, false
+	}
+	vw.mu.Lock()
+	defer vw.mu.Unlock()
+	total = len(vw.Lines)
+	start, end, truncated := vw.boundsLocked()
+	vw.IsTruncated = truncated
+	if start < 1 || end < start || end > total {
+		return "", 0, 0, total, false
+	}
+	content = strings.Join(vw.Lines[start-1:end], "\n")
+	return content, start, end, total, end == total
 }
 
 // RenderWithInfo renders the view window with a file info header tailored to

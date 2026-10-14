@@ -4,24 +4,39 @@ import (
 	"encoding/json"
 	"fmt"
 	"sort"
+	"strconv"
 	"strings"
+
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon/aiskillloader"
 
 	"github.com/yaklang/yaklang/common/log"
 )
 
-// skillContentPayload 是 Skill 正文 item 的载荷。只保留“读到了什么”, 不承载
-// 加载成功/失败的业务状态机: 同一文件的不同阅读内容各自追加为独立 item。
+// skillContentPayload 区分技能的两类内容:
+// metadata 是说明、关联技能和文件树; content 是一个文件的一段行范围。
+// Range.ReachedEnd 为 true 时, 这一段已经到达文件末尾。
 //
-// Source 仅作为提示信息 (用户指定 / AI 自动 / 普通加载 / 目录), 用于压缩说明与
-// 观测, 不再决定渲染分块: 所有技能正文冻结后进入同一个技能块。
-//
-// 关键词: skillContentPayload, 最小字段, 只加和读, 来源仅提示
-type skillContentPayload struct {
-	Name    string `json:"name"`
-	Path    string `json:"path,omitempty"`
-	Content string `json:"content"`
-	Source  string `json:"source,omitempty"`
+// Source 只作为来源提示, 不参与去重, 也不决定渲染分块。
+type skillContentRange struct {
+	StartLine  int  `json:"start_line,omitempty"`
+	EndLine    int  `json:"end_line,omitempty"`
+	Total      int  `json:"total,omitempty"`
+	ReachedEnd bool `json:"reached_end,omitempty"`
 }
+
+type skillContentPayload struct {
+	Name    string             `json:"name"`
+	Kind    string             `json:"kind,omitempty"`
+	Path    string             `json:"path,omitempty"`
+	Range   *skillContentRange `json:"range,omitempty"`
+	Content string             `json:"content"`
+	Source  string             `json:"source,omitempty"`
+}
+
+const (
+	skillContentKindMetadata = "metadata"
+	skillContentKindContent  = "content"
+)
 
 // Skill 正文来源取值 (与 aiskillloader.SkillContentSource* 保持一致)。
 // 此处不 import aiskillloader 以避免无谓耦合, 仅做字面量校验。
@@ -31,15 +46,68 @@ const (
 	SkillContentSourceManual = "manual"
 )
 
-// skillContentKey 标识技能文件, 用于加载时检查完全重复的正文。
-// 提升态按技能名累计正文, 不用本 key 覆盖旧阅读内容。
-func skillContentKey(name, path string) string {
-	name = strings.TrimSpace(name)
-	path = strings.TrimSpace(path)
-	if path == "" {
-		path = skillMDPathPlaceholder
+func isSkillCatalogPayload(payload skillContentPayload) bool {
+	return strings.TrimSpace(payload.Name) == skillCatalogKey || strings.TrimSpace(payload.Source) == skillCatalogSource
+}
+
+func normalizeSkillContentPayload(payload *skillContentPayload) {
+	if payload == nil {
+		return
 	}
-	return name + "\x00" + path
+	payload.Name = strings.TrimSpace(payload.Name)
+	payload.Kind = strings.TrimSpace(payload.Kind)
+	payload.Path = strings.TrimSpace(payload.Path)
+	payload.Source = strings.TrimSpace(payload.Source)
+	payload.Content = strings.TrimSpace(payload.Content)
+	if isSkillCatalogPayload(*payload) {
+		payload.Kind = ""
+		payload.Path = ""
+		payload.Range = nil
+		return
+	}
+	if payload.Kind == skillContentKindMetadata {
+		payload.Path = ""
+		payload.Range = nil
+		return
+	}
+	payload.Kind = skillContentKindContent
+	if payload.Path == "" {
+		payload.Path = skillMDPathPlaceholder
+	}
+	if payload.Range == nil {
+		return
+	}
+	if payload.Range.StartLine < 0 {
+		payload.Range.StartLine = 0
+	}
+	if payload.Range.EndLine < 0 {
+		payload.Range.EndLine = 0
+	}
+	if payload.Range.Total < 0 {
+		payload.Range.Total = 0
+	}
+	if payload.Range.StartLine == 0 && payload.Range.EndLine == 0 && payload.Range.Total == 0 {
+		payload.Range = nil
+		return
+	}
+	payload.Range.ReachedEnd = payload.Range.Total > 0 && payload.Range.EndLine == payload.Range.Total
+}
+
+// skillPartIdentity 是一条技能内容的身份: 元信息按技能名, 文件内容按路径和行范围。
+// 相同文本出现在不同范围时不是重复内容。
+func skillPartIdentity(payload skillContentPayload) string {
+	normalizeSkillContentPayload(&payload)
+	if isSkillCatalogPayload(payload) {
+		return skillCatalogKey
+	}
+	if payload.Kind == skillContentKindMetadata {
+		return payload.Name + "\x00metadata"
+	}
+	start, end := 0, 0
+	if payload.Range != nil {
+		start, end = payload.Range.StartLine, payload.Range.EndLine
+	}
+	return fmt.Sprintf("%s\x00content\x00%s\x00%d\x00%d", payload.Name, payload.Path, start, end)
 }
 
 // skillCatalogKey 标识“最相关 SKILL 目录”, 用于写入去重和显式移除。
@@ -70,13 +138,6 @@ func (m *Timeline) PushSkillCatalog(id int64, rendered string) bool {
 // skillMDPathPlaceholder 表示技能主文档 (SKILL.md) 的固定路径位。
 const skillMDPathPlaceholder = "SKILL.md"
 
-// skillMainBodyPathSentinel 标记“技能整体视图”(说明 + 文件树 + 阅读窗口) 的
-// 对象 Key, 与具体文件路径区分。渲染时不作为路径展示。
-//
-// 该字面量必须与 aiskillloader.SkillMainBodyPath 保持一致 (两边不能互相
-// import, 故各自定义; timeline_skill_content_test.go 断言二者相等)。
-const skillMainBodyPathSentinel = "\x00main"
-
 // timelineSkillContentOpenPrompt 渲染尚未冻结 (Open 尾段) 的 Skill 正文。
 // 冻结后该 item 不再出现在 Open, 由 renderPromotedSkillContent 提升渲染。
 func timelineSkillContentOpenPrompt(op *PromotableTimelineItem) string {
@@ -93,55 +154,102 @@ func timelineSkillContentOpenPrompt(op *PromotableTimelineItem) string {
 	if err := json.Unmarshal([]byte(op.Payload), &payload); err != nil {
 		return fmt.Sprintf("[skill_delta]:\n[id: %s]\n[INVALID] 无效技能正文载荷。", op.Key)
 	}
-	body := skillContentBody(payload)
+	body := skillOpenText(payload)
 	if strings.TrimSpace(body) == "" {
 		return ""
 	}
 	// Open 段不是缓存前缀, 用可识别的技能段标签包裹, 便于观测与模型区分;
 	// 冻结提交后同一正文会改由 renderPromotedSkillContent 的独立技能块渲染。
-	nonce := StablePromptNonce("skill-content-open", fmt.Sprint(op.ID))
-	return fmt.Sprintf("<|SKILLS_CONTEXT_OPEN_%s|>\n# item=%d [skill_content]\n%s\n<|SKILLS_CONTEXT_OPEN_END_%s|>",
+	nonce := StablePromptNonce("skill-open", fmt.Sprint(op.ID))
+	return fmt.Sprintf("<|SKILLS_CONTEXT_OPEN_%s|>\n# item=%d [skill]\n%s\n<|SKILLS_CONTEXT_OPEN_END_%s|>",
 		nonce, op.ID, body, nonce)
 }
 
-func skillContentBody(payload skillContentPayload) string {
-	name := strings.TrimSpace(payload.Name)
-	if name == "" {
-		name = "unknown"
+func skillSourceLine(source string) string {
+	switch strings.TrimSpace(source) {
+	case SkillContentSourceForced:
+		return "[source: user-forced]"
+	case SkillContentSourceAuto:
+		return "[source: intent-auto-loaded]"
+	default:
+		return ""
 	}
-	content := strings.TrimSpace(payload.Content)
+}
+
+func skillRangeLabel(payload skillContentPayload) string {
+	path := payload.Path
+	if path == "" {
+		path = skillMDPathPlaceholder
+	}
+	if payload.Range == nil || payload.Range.EndLine <= 0 {
+		return path
+	}
+	label := fmt.Sprintf("%s:%d-%d/%d", path, payload.Range.StartLine, payload.Range.EndLine, payload.Range.Total)
+	if payload.Range.ReachedEnd {
+		label += " END"
+	}
+	return label
+}
+
+func skillOpenText(payload skillContentPayload) string {
+	normalizeSkillContentPayload(&payload)
+	content := payload.Content
 	if content == "" {
 		return ""
 	}
-	if name == skillCatalogKey || strings.TrimSpace(payload.Source) == skillCatalogSource {
-		// 目录是派生信息, 按目录原文渲染, 不套用技能正文 header。
+	if isSkillCatalogPayload(payload) {
 		return content
 	}
-	var buf strings.Builder
-	path := strings.TrimSpace(payload.Path)
-	if path == "" || path == skillMDPathPlaceholder || path == skillMainBodyPathSentinel {
-		// 主文档保持与既有 SKILLS_CONTEXT 段落一致的 header 形态。
-		fmt.Fprintf(&buf, "=== Skill: %s ===\n", name)
-	} else {
-		fmt.Fprintf(&buf, "=== Skill: %s (%s) ===\n", name, path)
+	name := payload.Name
+	if name == "" {
+		name = "unknown"
 	}
-	switch strings.TrimSpace(payload.Source) {
-	case SkillContentSourceForced:
-		buf.WriteString("[source: user-forced]\n")
-	case SkillContentSourceAuto:
-		buf.WriteString("[source: intent-auto-loaded]\n")
+	var buf strings.Builder
+	if payload.Kind == skillContentKindMetadata {
+		fmt.Fprintf(&buf, "[skill %s | metadata]\n", name)
+		if source := skillSourceLine(payload.Source); source != "" {
+			buf.WriteString(source)
+			buf.WriteString("\n")
+		}
+	} else {
+		fmt.Fprintf(&buf, "[skill %s | %s]\n", name, skillRangeLabel(payload))
 	}
 	buf.WriteString(content)
 	return buf.String()
 }
 
-// hasDuplicateSkillContentLocked 只在写入时检查同一技能文件的相同正文是否仍然存在。
-// 来源只是加载提示, 不参与正文去重; 已退休正文不阻止重新加载。
-func (m *Timeline) hasDuplicateSkillContentLocked(key, body string) bool {
+func skillPromotedFragment(payload skillContentPayload) string {
+	normalizeSkillContentPayload(&payload)
+	content := payload.Content
+	if content == "" {
+		return ""
+	}
+	if isSkillCatalogPayload(payload) {
+		return content
+	}
+	var buf strings.Builder
+	if payload.Kind == skillContentKindMetadata {
+		buf.WriteString("[metadata]\n")
+		if source := skillSourceLine(payload.Source); source != "" {
+			buf.WriteString(source)
+			buf.WriteString("\n")
+		}
+	} else {
+		fmt.Fprintf(&buf, "[%s]\n", skillRangeLabel(payload))
+	}
+	buf.WriteString(content)
+	return buf.String()
+}
+
+// hasDuplicateSkillContentLocked 按技能部分身份和正文检查完全重复。
+// 来源不参与比较; 已退休正文不阻止重新加载; 不同行范围即使文本相同也不是重复。
+func (m *Timeline) hasDuplicateSkillContentLocked(identity string, body string) bool {
 	var incoming skillContentPayload
 	if json.Unmarshal([]byte(body), &incoming) != nil {
 		return false
 	}
+	normalizeSkillContentPayload(&incoming)
+	incomingContent := incoming.Content
 	for _, id := range m.idToTimelineItem.Keys() {
 		item, ok := m.idToTimelineItem.Get(id)
 		if !ok || item == nil || item.deleted {
@@ -149,89 +257,75 @@ func (m *Timeline) hasDuplicateSkillContentLocked(key, body string) bool {
 		}
 		op, ok := item.value.(*PromotableTimelineItem)
 		if !ok || op == nil || op.Kind != TimelinePromotedKindSkillContent ||
-			op.Operation != TimelinePromotedOperationUpsert || op.Key != key {
+			op.Operation != TimelinePromotedOperationUpsert {
 			continue
 		}
 		var existing skillContentPayload
-		if json.Unmarshal([]byte(op.Payload), &existing) == nil &&
-			skillContentKey(existing.Name, existing.Path) == skillContentKey(incoming.Name, incoming.Path) &&
-			strings.TrimSpace(existing.Content) == strings.TrimSpace(incoming.Content) {
+		if json.Unmarshal([]byte(op.Payload), &existing) != nil {
+			continue
+		}
+		if skillPartIdentity(existing) == identity && strings.TrimSpace(existing.Content) == incomingContent {
 			return true
 		}
 	}
 	return false
 }
 
-// PushSkillContent 追加一条 Skill 正文 item。它不冻结、不提升、不渲染:
-// 只有既有冻结/压缩事务提交后, 正文才允许进入半动态段的独立技能块。
-// 同一技能文件的相同正文仍存在时返回 false; 不同窗口或内容变化正常追加。
-//
-// 关键词: PushSkillContent, 先 Open 后冻结提升, 复用选 ID 压缩
-func (m *Timeline) PushSkillContent(id int64, name, path, content, source string) bool {
+func (m *Timeline) pushSkillContentPayload(id int64, payload skillContentPayload) bool {
 	if m == nil || id <= 0 {
 		return false
 	}
-	name = strings.TrimSpace(name)
-	content = strings.TrimSpace(content)
-	if name == "" || content == "" {
+	normalizeSkillContentPayload(&payload)
+	if payload.Name == "" || payload.Content == "" {
 		return false
 	}
-	payload, err := json.Marshal(skillContentPayload{
-		Name: name, Path: strings.TrimSpace(path), Content: content, Source: strings.TrimSpace(source),
-	})
+	raw, err := json.Marshal(payload)
 	if err != nil {
 		return false
 	}
 	return m.PushPromotable(id, TimelinePromotedKindSkillContent,
-		TimelinePromotedTargetSemiDynamic1, skillContentKey(name, path), TimelinePromotedOperationUpsert, string(payload))
+		TimelinePromotedTargetSemiDynamic1, skillPartIdentity(payload), TimelinePromotedOperationUpsert, string(raw))
 }
 
-// HasVisibleSkillContent 判断某个技能当前是否还有正文留在上下文里 (Open 或已提
-// 升都算)。被显式 unload 退休的正文返回 false, 允许重新读取。
-//
-// 关键词: HasVisibleSkillContent, 已可见判断, 显式移除后可重读
-func (m *Timeline) HasVisibleSkillContent(name string) bool {
-	if m == nil {
-		return false
-	}
-	name = strings.TrimSpace(name)
-	if name == "" {
-		return false
-	}
-	m.mu.RLock()
-	defer m.mu.RUnlock()
-	for _, id := range m.idToTimelineItem.Keys() {
-		item, ok := m.idToTimelineItem.Get(id)
-		if !ok || item == nil || item.deleted {
-			continue
-		}
-		op, ok := item.value.(*PromotableTimelineItem)
-		if !ok || op == nil || op.Kind != TimelinePromotedKindSkillContent {
-			continue
-		}
-		var payload skillContentPayload
-		if json.Unmarshal([]byte(op.Payload), &payload) != nil {
-			continue
-		}
-		if strings.TrimSpace(payload.Name) == name && strings.TrimSpace(payload.Content) != "" {
-			return true
-		}
-	}
-	return false
+// PushSkillMetadata 追加技能说明、关联技能和文件树。
+func (m *Timeline) PushSkillMetadata(id int64, name, content, source string) bool {
+	return m.pushSkillContentPayload(id, skillContentPayload{
+		Name: name, Kind: skillContentKindMetadata, Content: content, Source: source,
+	})
 }
 
-// VisibleSkillContentNames 按 item 顺序返回仍有正文的技能名, 包含 Open 和冻结部分。
-// 目录不算已加载技能; 同一技能的多个阅读窗口只计一次。
-func (m *Timeline) VisibleSkillContentNames() []string {
+// PushSkillFileContent 追加一个文件范围。EndLine 等于 Total 时标记为文件已翻完。
+func (m *Timeline) PushSkillFileContent(id int64, name, path, content, source string, startLine, endLine, total int) bool {
+	return m.pushSkillContentPayload(id, skillContentPayload{
+		Name: name, Kind: skillContentKindContent, Path: path, Content: content, Source: source,
+		Range: &skillContentRange{StartLine: startLine, EndLine: endLine, Total: total},
+	})
+}
+
+// SkillContextPart 是仍在上下文中的一个技能部分。同一路径和范围只出现一次。
+type SkillContextPart struct {
+	Name       string
+	Kind       string
+	Path       string
+	StartLine  int
+	EndLine    int
+	Total      int
+	ReachedEnd bool
+}
+
+// VisibleSkillParts 返回目标技能当前仍可见的 metadata 和 content。
+// name 为空时返回全部技能。目录和已退休 item 不计入。
+func (m *Timeline) VisibleSkillParts(name string) []SkillContextPart {
 	if m == nil {
 		return nil
 	}
+	name = strings.TrimSpace(name)
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	ids := append([]int64(nil), m.idToTimelineItem.Keys()...)
 	sort.Slice(ids, func(i, j int) bool { return ids[i] < ids[j] })
-	var names []string
-	seen := make(map[string]bool)
+	var parts []SkillContextPart
+	seen := map[string]bool{}
 	for _, id := range ids {
 		item, ok := m.idToTimelineItem.Get(id)
 		if !ok || item == nil || item.deleted {
@@ -246,18 +340,46 @@ func (m *Timeline) VisibleSkillContentNames() []string {
 		if json.Unmarshal([]byte(op.Payload), &payload) != nil {
 			continue
 		}
-		name := strings.TrimSpace(payload.Name)
-		if name == "" || name == skillCatalogKey || payload.Source == skillCatalogSource ||
-			strings.TrimSpace(payload.Content) == "" || seen[name] {
+		normalizeSkillContentPayload(&payload)
+		if isSkillCatalogPayload(payload) || payload.Content == "" {
 			continue
 		}
-		seen[name] = true
-		names = append(names, name)
+		if name != "" && payload.Name != name {
+			continue
+		}
+		identity := skillPartIdentity(payload)
+		if seen[identity] {
+			continue
+		}
+		seen[identity] = true
+		part := SkillContextPart{Name: payload.Name, Kind: payload.Kind, Path: payload.Path}
+		if payload.Range != nil {
+			part.StartLine = payload.Range.StartLine
+			part.EndLine = payload.Range.EndLine
+			part.Total = payload.Range.Total
+			part.ReachedEnd = payload.Range.ReachedEnd
+		}
+		parts = append(parts, part)
 	}
-	return names
+	sort.Slice(parts, func(i, j int) bool {
+		if parts[i].Name != parts[j].Name {
+			return parts[i].Name < parts[j].Name
+		}
+		if parts[i].Kind != parts[j].Kind {
+			return parts[i].Kind == skillContentKindMetadata
+		}
+		if parts[i].Path != parts[j].Path {
+			return parts[i].Path < parts[j].Path
+		}
+		if parts[i].StartLine != parts[j].StartLine {
+			return parts[i].StartLine < parts[j].StartLine
+		}
+		return parts[i].EndLine < parts[j].EndLine
+	})
+	return parts
 }
 
-// HasSkillContentHistory 判断该技能是否在本 Timeline 中留下过任何 skill-content
+// HasSkillContentHistory 判断该技能是否在本 Timeline 中留下过任何 skill
 // 记录 (即使正文已被显式移除)。用于区分两种恢复场景:
 //   - 有历史: 这是新版本会话, 正文的可见性完全由压缩结果决定, 不能用旧名单重新展开;
 //   - 无历史: 是真正的旧会话, 允许一次性导入。
@@ -367,11 +489,19 @@ func (m *Timeline) DeleteSkillContent(name string) bool {
 	return true
 }
 
-// appendPromotedSkillContent 将同名技能提升到一条累计正文中。
-// 相邻来源 hash 相同则忽略, 不同则拼接正文; 原始 item 始终留在 Timeline 中。
+// appendPromotedSkillContent 按“技能名 + 路径 + 行范围”提升。
+// 同一身份 hash 相同则忽略, 不同则拼接; 不同范围分别保留。
 func appendPromotedSkillContent(entries map[string]*PromotedTimelineEntry, item *PromotableTimelineItem) {
+	if item == nil {
+		return
+	}
 	if item.Operation == TimelinePromotedOperationDelete {
-		delete(entries, strings.SplitN(item.Key, "\x00", 2)[0])
+		var payload skillContentPayload
+		if json.Unmarshal([]byte(item.Payload), &payload) == nil && strings.TrimSpace(payload.Name) != "" {
+			delete(entries, skillPartIdentity(payload))
+			return
+		}
+		delete(entries, item.Key)
 		return
 	}
 	if item.Operation != TimelinePromotedOperationUpsert {
@@ -381,19 +511,20 @@ func appendPromotedSkillContent(entries map[string]*PromotedTimelineEntry, item 
 	if json.Unmarshal([]byte(item.Payload), &payload) != nil {
 		return
 	}
-	name := strings.TrimSpace(payload.Name)
-	if name == "" {
+	normalizeSkillContentPayload(&payload)
+	if payload.Name == "" && !isSkillCatalogPayload(payload) {
 		return
 	}
+	key := skillPartIdentity(payload)
 	hash := item.PayloadHash
 	if hash == "" {
 		hash = promotedPayloadHash(item.Payload)
 	}
-	previous := entries[name]
+	previous := entries[key]
 	if previous != nil && previous.PayloadHash == hash {
 		return
 	}
-	body := skillContentBody(payload)
+	body := skillPromotedFragment(payload)
 	if strings.TrimSpace(body) == "" {
 		return
 	}
@@ -402,10 +533,39 @@ func appendPromotedSkillContent(entries map[string]*PromotedTimelineEntry, item 
 		previous.PayloadHash = hash
 		return
 	}
-	entries[name] = &PromotedTimelineEntry{
-		Kind: item.Kind, TargetSection: item.TargetSection, Key: name,
+	entries[key] = &PromotedTimelineEntry{
+		Kind: item.Kind, TargetSection: item.TargetSection, Key: key,
 		Payload: body, PayloadHash: hash, SourceItemID: item.ID,
 	}
+}
+
+type skillPromotedGroup struct {
+	name    string
+	catalog bool
+	firstID int64
+	parts   []*PromotedTimelineEntry
+}
+
+func skillPromotedGroupKey(entry *PromotedTimelineEntry) (group string, catalog bool, kind, path string, start, end int) {
+	if entry == nil {
+		return "", false, "", "", 0, 0
+	}
+	if entry.Key == skillCatalogKey {
+		return skillCatalogKey, true, "", "", 0, 0
+	}
+	fields := strings.Split(entry.Key, "\x00")
+	if len(fields) >= 2 && fields[1] == skillContentKindMetadata {
+		return fields[0], false, skillContentKindMetadata, "", 0, 0
+	}
+	if len(fields) == 5 && fields[1] == skillContentKindContent {
+		start, _ = strconv.Atoi(fields[3])
+		end, _ = strconv.Atoi(fields[4])
+		return fields[0], false, skillContentKindContent, fields[2], start, end
+	}
+	if len(fields) == 2 {
+		return fields[0], false, skillContentKindContent, fields[1], 0, 0
+	}
+	return entry.Key, false, skillContentKindContent, "", 0, 0
 }
 
 // renderPromotedSkillContent 渲染 promotedState 中已冻结、仍保留的累计技能正文。
@@ -421,16 +581,74 @@ func renderPromotedSkillContent(state *TimelinePromotedState) string {
 	entries := state.Entries[TimelinePromotedTargetSemiDynamic1][TimelinePromotedKindSkillContent]
 	ordered := make([]*PromotedTimelineEntry, 0, len(entries))
 	for _, entry := range entries {
-		if entry != nil {
+		if entry != nil && strings.TrimSpace(entry.Payload) != "" {
 			ordered = append(ordered, entry)
 		}
 	}
-	sort.Slice(ordered, func(i, j int) bool { return ordered[i].SourceItemID < ordered[j].SourceItemID })
-
+	if len(ordered) == 0 {
+		return ""
+	}
+	groups := make([]*skillPromotedGroup, 0)
+	index := map[string]int{}
+	for _, entry := range ordered {
+		groupName, catalog, _, _, _, _ := skillPromotedGroupKey(entry)
+		key := groupName
+		if catalog {
+			key = skillCatalogKey + ":" + fmt.Sprint(entry.SourceItemID)
+		}
+		position, found := index[key]
+		if !found {
+			position = len(groups)
+			index[key] = position
+			groups = append(groups, &skillPromotedGroup{name: groupName, catalog: catalog, firstID: entry.SourceItemID})
+		}
+		group := groups[position]
+		if entry.SourceItemID < group.firstID {
+			group.firstID = entry.SourceItemID
+		}
+		group.parts = append(group.parts, entry)
+	}
+	sort.Slice(groups, func(i, j int) bool { return groups[i].firstID < groups[j].firstID })
 	var body strings.Builder
 	wrote := 0
-	for _, entry := range ordered {
-		rendered := strings.TrimSpace(entry.Payload)
+	for _, group := range groups {
+		sort.Slice(group.parts, func(i, j int) bool {
+			leftName, _, leftKind, leftPath, leftStart, leftEnd := skillPromotedGroupKey(group.parts[i])
+			rightName, _, rightKind, rightPath, rightStart, rightEnd := skillPromotedGroupKey(group.parts[j])
+			_ = leftName
+			_ = rightName
+			if leftKind != rightKind {
+				return leftKind == skillContentKindMetadata
+			}
+			if leftPath != rightPath {
+				return leftPath < rightPath
+			}
+			if leftStart != rightStart {
+				return leftStart < rightStart
+			}
+			if leftEnd != rightEnd {
+				return leftEnd < rightEnd
+			}
+			return group.parts[i].SourceItemID < group.parts[j].SourceItemID
+		})
+		var section strings.Builder
+		if group.catalog {
+			for _, part := range group.parts {
+				if section.Len() > 0 {
+					section.WriteString("\n")
+				}
+				section.WriteString(strings.TrimSpace(part.Payload))
+			}
+		} else {
+			fmt.Fprintf(&section, "=== Skill: %s ===\n", group.name)
+			for index, part := range group.parts {
+				if index > 0 {
+					section.WriteString("\n")
+				}
+				section.WriteString(strings.TrimSpace(part.Payload))
+			}
+		}
+		rendered := strings.TrimSpace(section.String())
 		if rendered == "" {
 			continue
 		}
@@ -443,7 +661,7 @@ func renderPromotedSkillContent(state *TimelinePromotedState) string {
 	if wrote == 0 {
 		return ""
 	}
-	nonce := StablePromptNonce("session-skill-content")
+	nonce := StablePromptNonce("session-skill")
 	return fmt.Sprintf("<|SKILLS_CONTEXT_%s|>\n== Currently Loaded Skills (from Timeline) ==\n\n%s\n<|SKILLS_CONTEXT_END_%s|>",
 		nonce, strings.TrimSpace(body.String()), nonce)
 }
@@ -473,11 +691,33 @@ func NewSkillContentTimelineAdapter(timeline *Timeline, acquireID func() int64) 
 	return &SkillContentTimelineAdapter{timeline: timeline, acquireID: acquireID}
 }
 
-func (a *SkillContentTimelineAdapter) AppendSkillContent(name, path, content, source string) bool {
+func (a *SkillContentTimelineAdapter) AppendSkillMetadata(name, content, source string) bool {
 	if a == nil || a.timeline == nil || a.acquireID == nil {
 		return false
 	}
-	return a.timeline.PushSkillContent(a.acquireID(), name, path, content, source)
+	return a.timeline.PushSkillMetadata(a.acquireID(), name, content, source)
+}
+
+func (a *SkillContentTimelineAdapter) AppendSkillFileContent(name, path, content, source string, startLine, endLine, total int) bool {
+	if a == nil || a.timeline == nil || a.acquireID == nil {
+		return false
+	}
+	return a.timeline.PushSkillFileContent(a.acquireID(), name, path, content, source, startLine, endLine, total)
+}
+
+func (a *SkillContentTimelineAdapter) VisibleSkillParts(name string) []aiskillloader.SkillContextPart {
+	if a == nil || a.timeline == nil {
+		return nil
+	}
+	parts := a.timeline.VisibleSkillParts(name)
+	out := make([]aiskillloader.SkillContextPart, 0, len(parts))
+	for _, part := range parts {
+		out = append(out, aiskillloader.SkillContextPart{
+			Name: part.Name, Kind: part.Kind, Path: part.Path,
+			StartLine: part.StartLine, EndLine: part.EndLine, Total: part.Total, ReachedEnd: part.ReachedEnd,
+		})
+	}
+	return out
 }
 
 func (a *SkillContentTimelineAdapter) DeleteSkillCatalog() bool {
@@ -492,20 +732,6 @@ func (a *SkillContentTimelineAdapter) DeleteSkillContent(name string) bool {
 		return false
 	}
 	return a.timeline.DeleteSkillContent(name)
-}
-
-func (a *SkillContentTimelineAdapter) HasVisibleSkillContent(name string) bool {
-	if a == nil || a.timeline == nil {
-		return false
-	}
-	return a.timeline.HasVisibleSkillContent(name)
-}
-
-func (a *SkillContentTimelineAdapter) VisibleSkillContentNames() []string {
-	if a == nil || a.timeline == nil {
-		return nil
-	}
-	return a.timeline.VisibleSkillContentNames()
 }
 
 // HasSkillContentHistory 供 manager 判断持久会话恢复时是否可以按旧名单展开正文。

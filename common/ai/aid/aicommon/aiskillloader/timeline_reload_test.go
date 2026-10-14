@@ -1,7 +1,7 @@
 package aiskillloader
 
 import (
-	"sort"
+	"fmt"
 	"strings"
 	"testing"
 )
@@ -13,6 +13,7 @@ type fakeSkillSink struct {
 	lastBody map[string]string
 	lastSrc  map[string]string
 	bodies   map[string]map[string]bool
+	parts    []SkillContextPart
 }
 
 func newFakeSkillSink() *fakeSkillSink {
@@ -24,7 +25,19 @@ func newFakeSkillSink() *fakeSkillSink {
 	}
 }
 
-func (f *fakeSkillSink) AppendSkillContent(name, path, content, source string) bool {
+func (f *fakeSkillSink) AppendSkillMetadata(name, content, source string) bool {
+	return f.appendPart(name, SkillContentKindMetadata, content, source, 0, 0)
+}
+
+func (f *fakeSkillSink) AppendSkillFileContent(name, path, content, source string, startLine, endLine, total int) bool {
+	return f.appendPart(name, path+"\x00"+fmtRange(startLine, endLine, total), content, source, startLine, endLine)
+}
+
+func fmtRange(start, end, total int) string {
+	return fmt.Sprintf("%d:%d:%d", start, end, total)
+}
+
+func (f *fakeSkillSink) appendPart(name, path, content, source string, start, end int) bool {
 	if !f.visible[name] {
 		f.bodies[name] = map[string]bool{}
 	}
@@ -37,7 +50,21 @@ func (f *fakeSkillSink) AppendSkillContent(name, path, content, source string) b
 	f.visible[name] = true
 	f.lastBody[name] = content
 	f.lastSrc[name] = source
+	f.parts = append(f.parts, SkillContextPart{Name: name, Path: path, StartLine: start, EndLine: end})
 	return true
+}
+
+func (f *fakeSkillSink) VisibleSkillParts(name string) []SkillContextPart {
+	var parts []SkillContextPart
+	for _, part := range f.parts {
+		if !f.visible[part.Name] {
+			continue
+		}
+		if name == "" || part.Name == name {
+			parts = append(parts, part)
+		}
+	}
+	return parts
 }
 
 func (f *fakeSkillSink) DeleteSkillContent(name string) bool {
@@ -49,19 +76,6 @@ func (f *fakeSkillSink) DeleteSkillContent(name string) bool {
 }
 
 func (f *fakeSkillSink) DeleteSkillCatalog() bool { return true }
-
-func (f *fakeSkillSink) HasVisibleSkillContent(name string) bool { return f.visible[name] }
-
-func (f *fakeSkillSink) VisibleSkillContentNames() []string {
-	var names []string
-	for name, visible := range f.visible {
-		if visible {
-			names = append(names, name)
-		}
-	}
-	sort.Strings(names)
-	return names
-}
 
 func (f *fakeSkillSink) HasSkillContentHistory(name string) bool {
 	_, found := f.bodies[name]
@@ -233,4 +247,10 @@ func TestClearCatalogRemovesTimelineItem(t *testing.T) {
 	if !strings.Contains(rendered, "=== Skill: deploy-app ===") {
 		t.Fatalf("clearing the catalog must not remove skill bodies:\n%s", rendered)
 	}
+}
+
+func (f *fakeSkillSink) AppendSkillCatalog(rendered string) bool {
+	f.appends++
+	f.visible["__skill_catalog__"] = true
+	return true
 }

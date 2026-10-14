@@ -16,10 +16,8 @@ func TestSkillContentSaveRestoreKeepsFreezePosition(t *testing.T) {
 
 	tl.PushText(cfg.AcquireId(), "ordinary observation")
 	tl.FreezeAll()
-	require.True(t, tl.PushSkillContent(cfg.AcquireId(), "open-skill", "SKILL.md",
-		"OPEN_BODY_AFTER_RESTORE", SkillContentSourceAuto))
-	require.True(t, tl.PushSkillContent(cfg.AcquireId(), "promoted-skill", "SKILL.md",
-		"PROMOTED_BODY_AFTER_RESTORE", SkillContentSourceAuto))
+	require.True(t, tl.PushSkillFileContent(cfg.AcquireId(), "open-skill", "SKILL.md", "OPEN_BODY_AFTER_RESTORE", SkillContentSourceAuto, 1, 1, 1))
+	require.True(t, tl.PushSkillFileContent(cfg.AcquireId(), "promoted-skill", "SKILL.md", "PROMOTED_BODY_AFTER_RESTORE", SkillContentSourceAuto, 1, 1, 1))
 	// Promote only what is present up to now.
 	tl.FreezeAll()
 
@@ -27,8 +25,7 @@ func TestSkillContentSaveRestoreKeepsFreezePosition(t *testing.T) {
 	require.Contains(t, beforeTyped, "PROMOTED_BODY_AFTER_RESTORE")
 
 	// A later body stays in Open across save/restore.
-	require.True(t, tl.PushSkillContent(cfg.AcquireId(), "later-skill", "SKILL.md",
-		"STILL_OPEN_BODY", SkillContentSourceAuto))
+	require.True(t, tl.PushSkillFileContent(cfg.AcquireId(), "later-skill", "SKILL.md", "STILL_OPEN_BODY", SkillContentSourceAuto, 1, 1, 1))
 	openBefore := RenderTimelineFrozenOpen(tl)
 	require.Contains(t, openBefore.Open, "STILL_OPEN_BODY")
 	require.NotContains(t, openBefore.Frozen, "STILL_OPEN_BODY")
@@ -52,15 +49,13 @@ func TestSkillContentBranchIsolation(t *testing.T) {
 	tl := cfg.GetTimeline()
 	tl.SetTimelineBucketByteSize(-1)
 	tl.PushText(cfg.AcquireId(), "parent observation")
-	require.True(t, tl.PushSkillContent(cfg.AcquireId(), "parent-skill", "SKILL.md",
-		"PARENT_BODY", SkillContentSourceAuto))
+	require.True(t, tl.PushSkillFileContent(cfg.AcquireId(), "parent-skill", "SKILL.md", "PARENT_BODY", SkillContentSourceAuto, 1, 1, 1))
 
 	child := tl.CreateSubTimeline(0)
 	if child == nil || child == tl {
 		t.Skip("sub timeline not supported in this configuration")
 	}
-	require.True(t, child.PushSkillContent(cfg.AcquireId(), "child-skill", "SKILL.md",
-		"CHILD_PRIVATE_BODY", SkillContentSourceAuto))
+	require.True(t, child.PushSkillFileContent(cfg.AcquireId(), "child-skill", "SKILL.md", "CHILD_PRIVATE_BODY", SkillContentSourceAuto, 1, 1, 1))
 
 	require.Contains(t, RenderTimelineFrozenOpen(child).Open, "CHILD_PRIVATE_BODY")
 	require.NotContains(t, RenderTimelineFrozenOpen(tl).Open, "CHILD_PRIVATE_BODY")

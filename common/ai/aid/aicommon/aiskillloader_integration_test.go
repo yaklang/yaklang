@@ -70,14 +70,16 @@ func TestSkillsContextManager_Integration_FullLifecycle(t *testing.T) {
 	if err := mgr.LoadSkill("deploy-app"); err != nil {
 		t.Fatalf("LoadSkill failed: %v", err)
 	}
-	require.Contains(t, RenderTimelineFrozenOpen(cfg.GetTimeline()).Open, "VIEW_WINDOW")
+	require.Contains(t, RenderTimelineFrozenOpen(cfg.GetTimeline()).Open, "[skill deploy-app | SKILL.md:")
+	require.Contains(t, RenderTimelineFrozenOpen(cfg.GetTimeline()).Open, " END]")
 
 	// Step 4: 由既有冻结事务提交后, 正文才提升进单一技能块。
 	cfg.GetTimeline().FreezeAll()
 	rendered = mgr.Render("lifecycle_nonce")
 	require.Contains(t, rendered, "<|SKILLS_CONTEXT_")
 	require.Contains(t, rendered, "=== Skill: deploy-app ===")
-	require.Contains(t, rendered, "VIEW_WINDOW")
+	require.Contains(t, rendered, "[SKILL.md:")
+	require.Contains(t, rendered, " END]")
 	require.Contains(t, rendered, "deploy-app")
 	require.Contains(t, rendered, "code-review")
 
@@ -95,7 +97,8 @@ func TestSkillsContextManager_Integration_FullLifecycle(t *testing.T) {
 	}
 	cfg.GetTimeline().FreezeAll()
 	rendered = mgr.Render("lifecycle_nonce")
-	require.Contains(t, rendered, "File: SKILL.md (Skill: deploy-app)")
+	require.Contains(t, rendered, "[SKILL.md:")
+	require.Contains(t, rendered, " END]")
 }
 
 // --- Integration: AISkillContextProvider safe usage ---
@@ -389,8 +392,8 @@ func TestSkillsContextManager_PromptContextCompleteness(t *testing.T) {
 		{"=== Skill: deploy-app ===", "skill header"},
 		{"Description:", "skill description"},
 		{"File Tree:", "file tree section"},
-		{"<|VIEW_WINDOW_", "view window start tag"},
-		{"<|VIEW_WINDOW_END_", "view window end tag"},
+		{"[SKILL.md:", "skill file range"},
+		{" END]", "completed file range"},
 	}
 
 	for _, req := range requiredElements {
@@ -444,9 +447,11 @@ func TestSkillsContextManager_LargeSkillMD(t *testing.T) {
 	if rendered == "" {
 		t.Fatal("render should not be empty for large skill")
 	}
-	// VIEW_WINDOW should exist and contain truncation indicator
-	if !strings.Contains(rendered, "VIEW_WINDOW") {
-		t.Fatal("rendered should contain VIEW_WINDOW")
+	if !strings.Contains(rendered, "[SKILL.md:") {
+		t.Fatal("rendered should contain the SKILL.md range")
+	}
+	if strings.Contains(rendered, " END]") {
+		t.Fatal("truncated SKILL.md must not be marked END")
 	}
 	// HasTruncatedViews should detect the truncation
 	if !mgr.HasTruncatedViews() {

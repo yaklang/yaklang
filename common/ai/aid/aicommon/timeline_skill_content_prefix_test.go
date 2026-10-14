@@ -19,7 +19,7 @@ func TestSkillContentLoadingKeepsCachedPrefixStable(t *testing.T) {
 	tl.FreezeAll()
 	before := RenderTimelineFrozenOpen(tl)
 
-	require.True(t, tl.PushSkillContent(cfg.AcquireId(), "demo-skill", "", "PREFIX_SAFE_SECRET", SkillContentSourceAuto))
+	require.True(t, tl.PushSkillFileContent(cfg.AcquireId(), "demo-skill", "SKILL.md", "PREFIX_SAFE_SECRET", SkillContentSourceAuto, 1, 1, 1))
 	after := RenderTimelineFrozenOpen(tl)
 
 	require.Equal(t, before.Frozen, after.Frozen)
@@ -45,7 +45,7 @@ func TestForcedSkillContentWaitsForFreezeBoundary(t *testing.T) {
 	tl.FreezeAll()
 	before := RenderTimelineFrozenOpen(tl)
 
-	require.True(t, tl.PushSkillContent(cfg.AcquireId(), "forced-skill", "", "FORCED_BODY_SECRET", SkillContentSourceForced))
+	require.True(t, tl.PushSkillFileContent(cfg.AcquireId(), "forced-skill", "SKILL.md", "FORCED_BODY_SECRET", SkillContentSourceForced, 1, 1, 1))
 	after := RenderTimelineFrozenOpen(tl)
 
 	require.Equal(t, before.Frozen, after.Frozen)
