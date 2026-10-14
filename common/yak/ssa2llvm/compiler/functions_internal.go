@@ -6,6 +6,7 @@ import (
 
 	"github.com/yaklang/go-llvm"
 	"github.com/yaklang/yaklang/common/yak/ssa"
+	"github.com/yaklang/yaklang/common/yak/ssa2llvm/runtime/abi"
 )
 
 func (c *Compiler) llvmFunctionName(fn *ssa.Function) string {
@@ -18,16 +19,22 @@ func (c *Compiler) llvmFunctionName(fn *ssa.Function) string {
 		return fn.GetName()
 	}
 
-	// YakSSA uses a synthetic "@main" container; functions declared at the
-	// top-level keep their names stable so entry resolution (e.g. "check")
-	// continues to work. Anonymous closures nested in @main are also named
-	// "@main$<n>" and their IDs differ per closure; using the human name
-	// would make all of them share one LLVM function, silently dropping
-	// distinct closure bodies.
+	// YakSSA uses a synthetic "@main" container. Every user-defined
+	// top-level function gets a private prefix before entering the LLVM module.
+	// Calls are resolved from SSA function objects, so the LLVM symbol does not
+	// need to preserve the Yak source name. Keeping all user symbols in their
+	// own namespace avoids collisions with libc/libgc/libgcc symbols (e.g.
+	// a Yak function named `read` must never replace libc's read()). Anonymous
+	// closures nested in @main use ID-based names below.
 	parent := fn.GetParent()
 	if parent == nil || parent.GetName() == "@main" {
-		if !strings.HasPrefix(fn.GetName(), "@main$") {
-			return fn.GetName()
+		name := fn.GetName()
+		if name == "@main" {
+			// renameConflictingMainFunctions handles this synthetic container.
+			return name
+		}
+		if !strings.HasPrefix(name, "@main$") {
+			return abi.UserSymbolPrefix + strings.TrimPrefix(name, "@")
 		}
 	}
 
