@@ -160,6 +160,28 @@ func buildAction(identifier string) *aicommon.Action {
 
 // --- Verifier Tests ---
 
+func TestSearchCapabilitiesIsCoreAction(t *testing.T) {
+	invoker := mock.NewMockInvoker(context.Background())
+	loop, err := reactloops.NewReActLoop(schema.AI_REACT_LOOP_NAME_DEFAULT, invoker)
+	require.NoError(t, err)
+	defer loop.Release()
+
+	actionName := schema.AI_REACT_LOOP_ACTION_SEARCH_CAPABILITIES
+	require.Contains(t, loop.GetAllActionNames(), actionName)
+	handler, err := loop.GetActionHandler(actionName)
+	require.NoError(t, err)
+	registered, ok := reactloops.GetLoopAction(actionName)
+	require.True(t, ok)
+	require.Same(t, registered, handler)
+	require.NotNil(t, handler.ActionHandler)
+	require.ErrorContains(t, handler.ActionVerifier(loop,
+		aicommon.NewSimpleAction(actionName, aitool.InvokeParams{"search_query": " "})),
+		"search_query is required")
+	require.NoError(t, handler.ActionVerifier(loop,
+		aicommon.NewSimpleAction(actionName, aitool.InvokeParams{"search_query": " find encoding tools "})))
+	require.Equal(t, "find encoding tools", loop.Get("_search_capabilities_query"))
+}
+
 func TestLoadCapability_Verifier_EmptyIdentifier(t *testing.T) {
 	action := buildAction("")
 	cfg := &aicommon.Config{}
