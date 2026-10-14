@@ -85916,6 +85916,627 @@
         "common/pcapx/pcaputil/dlms-hdlc-acse/verify.py": "dlms-hdlc-acse/verify.py",
         "scripts/protocol-tests/required-tests-traffic-unified-v77.json": "required-tests-traffic-unified-v77.json"
       }
+    },
+    {
+      "id": "validation-dlms-release",
+      "kind": "validation",
+      "source_sha": "58052b8ba67920495565789c32525c8011a1c3ed",
+      "file": "validation-dlms-release.zip",
+      "sha256": "02d2ac8b449e4601118cd831203408ed007f05a3bd49d5473f87a560e4bfe90a",
+      "password": "bin-parser",
+      "members": {
+        "dlms-release-hdlc/answers/abort-opaque-information-tcp.json": {
+          "sha256": "e00ed34fac03da1718a8f9f5c19696d9163848ac117764dbcb600a39476a6e22",
+          "bytes": 3573
+        },
+        "dlms-release-hdlc/answers/abort-opaque-information-udp.json": {
+          "sha256": "b4ac77f1f3d66593ecbd842be3a274f62a537294499d346476b7f7d81b9dba36",
+          "bytes": 3494
+        },
+        "dlms-release-hdlc/answers/abort-pending-tcp.json": {
+          "sha256": "1415613ef0a6ffb0d062d17ece375e2b678fe4347b61301203208ca25d8d860b",
+          "bytes": 3392
+        },
+        "dlms-release-hdlc/answers/abort-pending-udp.json": {
+          "sha256": "6853a0f346fe9c25e1414a03f86990b2401772b525294ed85035cabf39b40878",
+          "bytes": 3313
+        },
+        "dlms-release-hdlc/answers/absent-reason-tcp.json": {
+          "sha256": "5437d507f2e59b2b3fab28b592bbf59ee2dfaf6b5b7d761e7a8df40531d5ab1d",
+          "bytes": 2985
+        },
+        "dlms-release-hdlc/answers/absent-reason-udp.json": {
+          "sha256": "5522df54e078bf317fbce6e9d0d62ddbb04c94b3188bfb9bb686bfa0568bc024",
+          "bytes": 2933
+        },
+        "dlms-release-hdlc/answers/active-identical-retry-tcp.json": {
+          "sha256": "6ac00f69a9652e60f9e1f42b10f8efc6eab040a8753308ed5ae13382051f2a2d",
+          "bytes": 4447
+        },
+        "dlms-release-hdlc/answers/active-identical-retry-udp.json": {
+          "sha256": "7b154bc98f546bfc11879a8aef46a342333935bc698ab8f65107454fa770b2e3",
+          "bytes": 4368
+        },
+        "dlms-release-hdlc/answers/duplicate-reason-tcp.json": {
+          "sha256": "0f42f349db8c6f1077bfafab80dd9f11c618dc03e9c30a452da3339bd226867b",
+          "bytes": 2067
+        },
+        "dlms-release-hdlc/answers/duplicate-reason-udp.json": {
+          "sha256": "f5f8c35d70e41e34343e89e30f59a6c9ab7b2d3bcbb5cf56afc7161114ff7bdf",
+          "bytes": 2015
+        },
+        "dlms-release-hdlc/answers/empty-information-tcp.json": {
+          "sha256": "6e936c91b5f2f4053f833e0a8f2dd0f2b43b848a6b20da16fbd228251bdc04da",
+          "bytes": 2073
+        },
+        "dlms-release-hdlc/answers/empty-information-udp.json": {
+          "sha256": "99972b591be755ade4d2eaa30dac0e1455802bd364960144919ab8c4f7e1efab",
+          "bytes": 2021
+        },
+        "dlms-release-hdlc/answers/indefinite-envelope-tcp.json": {
+          "sha256": "6477d40e6c1c4e00f27d48353bb2fcf250f7ce5fa6170cf5044fa65204db3411",
+          "bytes": 2087
+        },
+        "dlms-release-hdlc/answers/indefinite-envelope-udp.json": {
+          "sha256": "f30c0b84e2ab6baf23e43279530b3637bf2ed82486498e5034c9b010d14a3b20",
+          "bytes": 2035
+        },
+        "dlms-release-hdlc/answers/invalid-abort-source-tcp.json": {
+          "sha256": "8d51f5d2a9f3b00de55c56f97d8c0b615d310556d54be48ad36022409360b609",
+          "bytes": 2093
+        },
+        "dlms-release-hdlc/answers/invalid-abort-source-udp.json": {
+          "sha256": "0f4eec7efc3135e8aa8cf558443ad6bf89bec0c1d466776b23cda53e0f0dda5e",
+          "bytes": 2041
+        },
+        "dlms-release-hdlc/answers/malformed-fixed-server-tcp.json": {
+          "sha256": "866df4efe6f444a8af2449fd5e49adbc61cce992ac5bd7df7b9bf85d32151ac9",
+          "bytes": 2516
+        },
+        "dlms-release-hdlc/answers/malformed-fixed-server-udp.json": {
+          "sha256": "3bb2e53934666fe7e24a493768128868c0eb1ef3539488e9bc72e27365e467a0",
+          "bytes": 2437
+        },
+        "dlms-release-hdlc/answers/missing-abort-source-tcp.json": {
+          "sha256": "cf9f95b3380f67f63469e7bda958bf858efeb0b63ae1b616ecb28784f244e81f",
+          "bytes": 2071
+        },
+        "dlms-release-hdlc/answers/missing-abort-source-udp.json": {
+          "sha256": "c1a17f1d4562fb8caa74da10dc3dfd2e5973b9be82eb7463d977d289367f9b2a",
+          "bytes": 2019
+        },
+        "dlms-release-hdlc/answers/normal-tcp.json": {
+          "sha256": "2400d6c0baa31242c0aeae3124bb364b93e2e2ce1cc99544ee0fd3b7518aef84",
+          "bytes": 3024
+        },
+        "dlms-release-hdlc/answers/normal-udp.json": {
+          "sha256": "283687991ac0ccc792219302f49d6a1072bc0cbba8754e1725bdf5441460f1b0",
+          "bytes": 2972
+        },
+        "dlms-release-hdlc/answers/orphan-late-tcp.json": {
+          "sha256": "836273bc748eec8117f1b1f88af6f81aeb4d08f57674e0031618d873bf822ba6",
+          "bytes": 1523
+        },
+        "dlms-release-hdlc/answers/orphan-late-udp.json": {
+          "sha256": "12bbe5de4de54b97595b3b9a759817ff204bdf0299c91b9e3e8e6dbfafc41de5",
+          "bytes": 1444
+        },
+        "dlms-release-hdlc/answers/reason-one-tcp.json": {
+          "sha256": "f03ec2a94cf36a5433f834a709bb154eeec77ac8a01d6a8a264c68c1dbde0a8d",
+          "bytes": 3040
+        },
+        "dlms-release-hdlc/answers/reason-one-udp.json": {
+          "sha256": "be27e6a08fee054f3e05c3d964d484295bab61856eb42f3c4f9a5d0a716656fe",
+          "bytes": 2988
+        },
+        "dlms-release-hdlc/answers/selected-initiate-information-tcp.json": {
+          "sha256": "52d924b65087a0e26174744a1336e9f140c2b642fe12e0cbadf9ec95d3c5395a",
+          "bytes": 3875
+        },
+        "dlms-release-hdlc/answers/selected-initiate-information-udp.json": {
+          "sha256": "78ea070db89e1061dbe402eb6e06e73b17af990fcb7a14b7db5c0e75fd1d03ca",
+          "bytes": 3823
+        },
+        "dlms-release-hdlc/answers/unknown-release-reason-tcp.json": {
+          "sha256": "eeb1446b2a95c42195dc0a838cfd5bfb59c94e9f3014d80be5af6282665d3449",
+          "bytes": 2101
+        },
+        "dlms-release-hdlc/answers/unknown-release-reason-udp.json": {
+          "sha256": "893b3f6374952c15f48baa491428146d299bcacb13e74b24898d6f167efc59ac",
+          "bytes": 2049
+        },
+        "dlms-release-hdlc/answers/user-defined-reason-tcp.json": {
+          "sha256": "f086415df68c3f51358b6410f4d1797ffbe03d254309106f4d52f9cd2f713726",
+          "bytes": 3079
+        },
+        "dlms-release-hdlc/answers/user-defined-reason-udp.json": {
+          "sha256": "6006ee9aa342cbba42d6980ab36c2d528e72a67a040a81f8100a96fad57463ee",
+          "bytes": 3027
+        },
+        "dlms-release-hdlc/answers/wrong-address-tcp.json": {
+          "sha256": "eae67489c30f1901915792c2857da842caf2c1a948e33ee8f4fca25a4ad88ea3",
+          "bytes": 3447
+        },
+        "dlms-release-hdlc/answers/wrong-address-udp.json": {
+          "sha256": "5968462e8b49b67c1d88ba5952551805b3d4790c1727e76ac61612c6f8e510af",
+          "bytes": 3368
+        },
+        "dlms-release-hdlc/answers/wrong-direction-tcp.json": {
+          "sha256": "d783d98befc56ab51437b60300260fd8842befd56b66e91de448a64adb14364e",
+          "bytes": 3455
+        },
+        "dlms-release-hdlc/answers/wrong-direction-udp.json": {
+          "sha256": "f23ddd416e16a2a9186c3352ddb6988ae62dbb0ae2a1cc047540c54cc1a2b6b5",
+          "bytes": 3376
+        },
+        "dlms-release-hdlc/cases/abort-opaque-information-tcp.pcap": {
+          "sha256": "4eb03c73615e6c241a0d4f0da37b74135ebfb578b6904a22e3dae674c6b5278c",
+          "bytes": 510
+        },
+        "dlms-release-hdlc/cases/abort-opaque-information-udp.pcap": {
+          "sha256": "dd67dd96f3f0ecaf1008e8f5057177f8de17b7a25d082083493343eaedda26de",
+          "bytes": 264
+        },
+        "dlms-release-hdlc/cases/abort-pending-tcp.pcap": {
+          "sha256": "8b93979fe2f744519a84454fcb9c44c232c92d76e6245e274ca82af90561d3d4",
+          "bytes": 504
+        },
+        "dlms-release-hdlc/cases/abort-pending-udp.pcap": {
+          "sha256": "e763e4928a9dff4c0860d320a85cdd41ab21c15e5cf167e94f803469a181f912",
+          "bytes": 258
+        },
+        "dlms-release-hdlc/cases/absent-reason-tcp.pcap": {
+          "sha256": "45a72bec1b2031c450223a2e482609fdd7701857492863e4cfd9460c1f62d219",
+          "bytes": 406
+        },
+        "dlms-release-hdlc/cases/absent-reason-udp.pcap": {
+          "sha256": "f2818ef16989bfccd620a5d982387d1124e301705fce6dc8427703ea84386ee8",
+          "bytes": 172
+        },
+        "dlms-release-hdlc/cases/active-identical-retry-tcp.pcap": {
+          "sha256": "8b9e969a694362d5bb888f4ed77890293ada39bccdd20bce9c74710c85f4dda6",
+          "bytes": 501
+        },
+        "dlms-release-hdlc/cases/active-identical-retry-udp.pcap": {
+          "sha256": "7d0293fa78102dcfcf3e08b58310ba90705720f45f48fdc8b344c398bdc3020e",
+          "bytes": 255
+        },
+        "dlms-release-hdlc/cases/duplicate-reason-tcp.pcap": {
+          "sha256": "d7ece58665a3dc5ecb04b4eeb1fe78d97e867d9498666aa116d0aa73dba5808e",
+          "bytes": 415
+        },
+        "dlms-release-hdlc/cases/duplicate-reason-udp.pcap": {
+          "sha256": "9d0d6bdef4bfb97b9dada4f511720b6f4636c7bd917f6b13bc9e3f2d53c79e67",
+          "bytes": 181
+        },
+        "dlms-release-hdlc/cases/empty-information-tcp.pcap": {
+          "sha256": "2885058606a0842ee8859cb47493e0d689909db13426b30ca55dab9d4e436d95",
+          "bytes": 416
+        },
+        "dlms-release-hdlc/cases/empty-information-udp.pcap": {
+          "sha256": "4664c998980990a36bc9e06f332815ac0b9f4553bfd1c753ca19379a82460366",
+          "bytes": 182
+        },
+        "dlms-release-hdlc/cases/indefinite-envelope-tcp.pcap": {
+          "sha256": "7094271262bee04ce00755c017d91c42cd607e962fa1800982589a32ce6497e1",
+          "bytes": 411
+        },
+        "dlms-release-hdlc/cases/indefinite-envelope-udp.pcap": {
+          "sha256": "9fcc517e78ebad3e038d0ec3335da86649ae8c19125312ef84f8d22926d216d6",
+          "bytes": 177
+        },
+        "dlms-release-hdlc/cases/invalid-abort-source-tcp.pcap": {
+          "sha256": "b94818e3c1711dedbde94fa0fb5b638bc331c1874b1630bce5632b7dc55a9f4a",
+          "bytes": 412
+        },
+        "dlms-release-hdlc/cases/invalid-abort-source-udp.pcap": {
+          "sha256": "ea84c1a647d5fa34783d05e6cd78e6e9238a54ab7049f202907be27e0b572af9",
+          "bytes": 178
+        },
+        "dlms-release-hdlc/cases/malformed-fixed-server-tcp.pcap": {
+          "sha256": "a5934daf361486a4d553a7f8913b5a4b886bd09b5d86be42128a9d97081242b4",
+          "bytes": 519
+        },
+        "dlms-release-hdlc/cases/malformed-fixed-server-udp.pcap": {
+          "sha256": "7e197796829966a1bb495f0da7fb6325e3df6bbd0f718bc2f311ac01bea0920b",
+          "bytes": 273
+        },
+        "dlms-release-hdlc/cases/missing-abort-source-tcp.pcap": {
+          "sha256": "211d70c18a611d8c5f40703783f977b964fac3a28ebda7f2eba973020a355b7c",
+          "bytes": 409
+        },
+        "dlms-release-hdlc/cases/missing-abort-source-udp.pcap": {
+          "sha256": "9d004876c5a6624738c2166970151e98c1f59ba0e2354bdf6134456de2410516",
+          "bytes": 175
+        },
+        "dlms-release-hdlc/cases/normal-tcp.pcap": {
+          "sha256": "98b7b3cd633fcfb836d8fac141effcdb31d6f3f4788b52b39a50b88319394123",
+          "bytes": 412
+        },
+        "dlms-release-hdlc/cases/normal-udp.pcap": {
+          "sha256": "07fbecc43c7bd9b5ffe235662d2743fda2c8193d92855f177ba99f2122b75346",
+          "bytes": 178
+        },
+        "dlms-release-hdlc/cases/orphan-late-tcp.pcap": {
+          "sha256": "6a4610e8792e15d944aa737884e6ac83287c3d0cc568ca3aa1455e6fef7d0081",
+          "bytes": 501
+        },
+        "dlms-release-hdlc/cases/orphan-late-udp.pcap": {
+          "sha256": "049fa3d2c35e95cf80e9b82513cabf7b7f198a22e6111ccce54a2b022efed349",
+          "bytes": 255
+        },
+        "dlms-release-hdlc/cases/reason-one-tcp.pcap": {
+          "sha256": "d713bdd8de5eafaf88750bfe5212780c42f36fb0aa0cd5bc01976c9c4c5231f8",
+          "bytes": 412
+        },
+        "dlms-release-hdlc/cases/reason-one-udp.pcap": {
+          "sha256": "df35280bd981d14793b164196160fcd1a81dcfd6caf383618e93b121ff30cad9",
+          "bytes": 178
+        },
+        "dlms-release-hdlc/cases/selected-initiate-information-tcp.pcap": {
+          "sha256": "33a7a8b35b43fddca9f194b15b47fcf065513887b1aacb872eff8898091463e8",
+          "bytes": 448
+        },
+        "dlms-release-hdlc/cases/selected-initiate-information-udp.pcap": {
+          "sha256": "e62e1d53d94c0584732cfa87bcc6ab90451f589bcdc07d7f0899fba9d9a704b8",
+          "bytes": 214
+        },
+        "dlms-release-hdlc/cases/unknown-release-reason-tcp.pcap": {
+          "sha256": "735274ef55b7cc8632f2e29d59a309143fe20459613ea431716ca2d002ca707a",
+          "bytes": 412
+        },
+        "dlms-release-hdlc/cases/unknown-release-reason-udp.pcap": {
+          "sha256": "10b6cf0ddca62149561dba12b1340baa07c6b5f78fde76192492b4c4953fb334",
+          "bytes": 178
+        },
+        "dlms-release-hdlc/cases/user-defined-reason-tcp.pcap": {
+          "sha256": "a9ae9a39a1821cecbb690693794509bb044c56515189e9b6212da7b379c6843c",
+          "bytes": 412
+        },
+        "dlms-release-hdlc/cases/user-defined-reason-udp.pcap": {
+          "sha256": "56dee21783e302c22274cdda36345c27b86c97dc5439d3d4c4b7e0c582920a17",
+          "bytes": 178
+        },
+        "dlms-release-hdlc/cases/wrong-address-tcp.pcap": {
+          "sha256": "b598dda7ca48025ea61381f2a4c8a49925ef4513a54cc882f21e0f05eb28e92e",
+          "bytes": 501
+        },
+        "dlms-release-hdlc/cases/wrong-address-udp.pcap": {
+          "sha256": "0c2f7202bcbe3c5264772b5c14bb0e3ee8f75a2fa2668c7af927260b3fd7c22e",
+          "bytes": 255
+        },
+        "dlms-release-hdlc/cases/wrong-direction-tcp.pcap": {
+          "sha256": "a7ad930872c645a32c20e5991d8fa2dbc27e12bf9cc68a1d434d21ad5c67753f",
+          "bytes": 501
+        },
+        "dlms-release-hdlc/cases/wrong-direction-udp.pcap": {
+          "sha256": "3430959bfd6987a7df0c61be7b0da0062f389724e6f02095af927c3076b91f40",
+          "bytes": 255
+        },
+        "dlms-release-hdlc/controls.json": {
+          "sha256": "3783094b8186d50545a63bfc6d1b85ff3c804eef1949d3b5300e74e9b926440a",
+          "bytes": 117493
+        },
+        "dlms-release-wrapper/cases/abort-opaque-information-tcp.pcap": {
+          "sha256": "cadbf913fab490351cb82815034a9b15781edfdb7949843cc07586364855e1d1",
+          "bytes": 492
+        },
+        "dlms-release-wrapper/cases/abort-opaque-information-udp.pcap": {
+          "sha256": "244bdea2f56bd77e525184e684c9476b7fde9a90ed9540b6fd04078afc40e4d9",
+          "bytes": 246
+        },
+        "dlms-release-wrapper/cases/abort-pending-tcp.pcap": {
+          "sha256": "8d7c700e0be4c974dbf1d5da06d5ef1ba79e9045ec3e5efa9b68fc9b19117530",
+          "bytes": 486
+        },
+        "dlms-release-wrapper/cases/abort-pending-udp.pcap": {
+          "sha256": "56f78c912ae480cd53406b0525b4d67b9ddcf908e29dc8fb9d98ed7f78e277d5",
+          "bytes": 240
+        },
+        "dlms-release-wrapper/cases/absent-reason-tcp.pcap": {
+          "sha256": "d9f1d6828a86c87dfee4f1c77a332c2fa967cdbfc3ac02a971bcd26b1cff5198",
+          "bytes": 394
+        },
+        "dlms-release-wrapper/cases/absent-reason-udp.pcap": {
+          "sha256": "4207957591ee282f4b635c0fa6a239a5bdf87fb5900885357eadb79b604f13e2",
+          "bytes": 160
+        },
+        "dlms-release-wrapper/cases/active-identical-retry-tcp.pcap": {
+          "sha256": "7571f5c01228bd0bf32edec71ca687999b19e1c5a7b246ae6456e7c8355614b7",
+          "bytes": 483
+        },
+        "dlms-release-wrapper/cases/active-identical-retry-udp.pcap": {
+          "sha256": "a981fed5c28676e85606ef0ed2f255752a659d6f088f133953c9c4d53b39388a",
+          "bytes": 237
+        },
+        "dlms-release-wrapper/cases/duplicate-reason-tcp.pcap": {
+          "sha256": "7fed1ff4e792790e63ba975f89961af8aeaeec0bd77ba04955895c6457f8e12b",
+          "bytes": 403
+        },
+        "dlms-release-wrapper/cases/duplicate-reason-udp.pcap": {
+          "sha256": "4a517eec64b2cdeca07913b4f1a001f11f3ae41adbfc75069291858bb2cdf006",
+          "bytes": 169
+        },
+        "dlms-release-wrapper/cases/empty-information-tcp.pcap": {
+          "sha256": "158761e836ddf0ab55efde685a6b08aba1213857fc0ced7c2ab8a3dc4a547534",
+          "bytes": 404
+        },
+        "dlms-release-wrapper/cases/empty-information-udp.pcap": {
+          "sha256": "abc6165afbb55895f88eed8979f8841fb543a4120abc20a8b040e86aee4f802c",
+          "bytes": 170
+        },
+        "dlms-release-wrapper/cases/indefinite-envelope-tcp.pcap": {
+          "sha256": "a7b87f8d4f5e63bedf9b6deda571c8c03ea18462f0931ac7b8153cdc6d75c026",
+          "bytes": 399
+        },
+        "dlms-release-wrapper/cases/indefinite-envelope-udp.pcap": {
+          "sha256": "b1b5885b44497f4a2356edbfc2350a8bb36730224555a83b2a0d9654d5338c00",
+          "bytes": 165
+        },
+        "dlms-release-wrapper/cases/invalid-abort-source-tcp.pcap": {
+          "sha256": "293d19527986afd70b3921e60f88ffcd8b388c90e5a8c6d9e8a5858265a8e9c7",
+          "bytes": 400
+        },
+        "dlms-release-wrapper/cases/invalid-abort-source-udp.pcap": {
+          "sha256": "ca6aa1ad8b0c98f58c5e086aa24d27e30b2ef4634afedd84f6cbd5c2f97fba31",
+          "bytes": 166
+        },
+        "dlms-release-wrapper/cases/malformed-fixed-server-tcp.pcap": {
+          "sha256": "8da85be94e0d202799c6c69b6da37b2ebbb5435b6c341a6cb13cc3c52e557ca6",
+          "bytes": 501
+        },
+        "dlms-release-wrapper/cases/malformed-fixed-server-udp.pcap": {
+          "sha256": "81afb937f9c12a6b1639a4aa83d9dcda9576e3fd2f86c4723d4712231da3226f",
+          "bytes": 255
+        },
+        "dlms-release-wrapper/cases/missing-abort-source-tcp.pcap": {
+          "sha256": "e2dc4f05b0d50152bd354e38d99d4ae09f00e038c13cc0f7a5e38e556f7f66b6",
+          "bytes": 397
+        },
+        "dlms-release-wrapper/cases/missing-abort-source-udp.pcap": {
+          "sha256": "4c0e071e71d9daf25344d65a739aff9a5456bbd91ec5e0eb67d93e3689defcf3",
+          "bytes": 163
+        },
+        "dlms-release-wrapper/cases/normal-tcp.pcap": {
+          "sha256": "fe5bcedc1b277ba465c4b8ef33c6d08eb850475894e640f991f33478caa0049c",
+          "bytes": 400
+        },
+        "dlms-release-wrapper/cases/normal-udp.pcap": {
+          "sha256": "3850dc6f76ae53a5fadacca1b1246ff99f9a98c4eb81ecb57fe0b349f9d02695",
+          "bytes": 166
+        },
+        "dlms-release-wrapper/cases/orphan-late-tcp.pcap": {
+          "sha256": "b4274de092f1ed5465b0c222ddb7107cdc94050bf145b4a83d8601080276adfe",
+          "bytes": 483
+        },
+        "dlms-release-wrapper/cases/orphan-late-udp.pcap": {
+          "sha256": "a939bb99a43a836b5646d814c7f1c145f931267f88821b0052c63ac652f93b5e",
+          "bytes": 237
+        },
+        "dlms-release-wrapper/cases/reason-one-tcp.pcap": {
+          "sha256": "21547522509e9b4a46b9804c351a86f7ecd26072d7eeaa368756dad2ba11a8d8",
+          "bytes": 400
+        },
+        "dlms-release-wrapper/cases/reason-one-udp.pcap": {
+          "sha256": "f4622ced5168180de25c1ddf2666df87823011ab3c560078e1653fdc0e8f1d4a",
+          "bytes": 166
+        },
+        "dlms-release-wrapper/cases/selected-initiate-information-tcp.pcap": {
+          "sha256": "5ace73a5774e9bd100264671fc875998bc563852baeed19024f625f82c7ad0dd",
+          "bytes": 436
+        },
+        "dlms-release-wrapper/cases/selected-initiate-information-udp.pcap": {
+          "sha256": "559e66035d64857f3903ad0bfceb4d7dd8cb7dcc337dbf3d5492019f5906c418",
+          "bytes": 202
+        },
+        "dlms-release-wrapper/cases/unknown-release-reason-tcp.pcap": {
+          "sha256": "689e8c3f80b80940c84b838671df13b201d9ad10452455d7d367ecf74be29cb1",
+          "bytes": 400
+        },
+        "dlms-release-wrapper/cases/unknown-release-reason-udp.pcap": {
+          "sha256": "c603391384461dbefe4b209a06d62e3d21524ea14521325e8c230b928bb4a721",
+          "bytes": 166
+        },
+        "dlms-release-wrapper/cases/user-defined-reason-tcp.pcap": {
+          "sha256": "010cbce3593b84872b230d109f0df9327467e65a32463fd107521aa42a5a9e9d",
+          "bytes": 400
+        },
+        "dlms-release-wrapper/cases/user-defined-reason-udp.pcap": {
+          "sha256": "964fc83a2e3007f381bcf987a57c5d398553e6b0a8286569ef470a609fe72bae",
+          "bytes": 166
+        },
+        "dlms-release-wrapper/cases/wrong-address-tcp.pcap": {
+          "sha256": "ffe0814174d481da0fdcface3e32299febdd5d47f81b259d44daad106f82d56f",
+          "bytes": 483
+        },
+        "dlms-release-wrapper/cases/wrong-address-udp.pcap": {
+          "sha256": "9691cac1dad1bd4d0ad039926a710095eea1019c552637294d81c38ba4740794",
+          "bytes": 237
+        },
+        "dlms-release-wrapper/cases/wrong-direction-tcp.pcap": {
+          "sha256": "48c93620402c936a1e98e51d03b49571eaab778d562bc907879955a248062e8e",
+          "bytes": 483
+        },
+        "dlms-release-wrapper/cases/wrong-direction-udp.pcap": {
+          "sha256": "fc6cf33ccbf094a13a07c9d560d5a01ec96f6b57117d7c1ca77fb6101cf94cc5",
+          "bytes": 237
+        },
+        "dlms-release-wrapper/controls.json": {
+          "sha256": "b8ba0b96a41734ebd195ca53286080cc91d5d2389f220863408d5663c2bd56fd",
+          "bytes": 111968
+        },
+        "dlms-release/REFERENCE-ACTUAL.json": {
+          "sha256": "4c02aed26f9a00de6ea700c277c1a3f7845495b505776d7501c0d17e5538e55a",
+          "bytes": 595
+        },
+        "dlms-release/REFERENCE-AUDIT.json": {
+          "sha256": "5a5acb0b9e93462a7ba026ab856ff3c38a99b2a12731587b5133f06f2eae7fb4",
+          "bytes": 1115
+        },
+        "dlms-release/acse_model.py": {
+          "sha256": "b6354845cd9c76e10e6f80f34ad6ca3c97b85f517cb8d1a7e8ec19b2e60129dd",
+          "bytes": 1801
+        },
+        "dlms-release/build.py": {
+          "sha256": "5f6f09a74bc62bb55c59d8180bb2e7af073533b21c550c81631276d1d2931a69",
+          "bytes": 10034
+        },
+        "dlms-release/carrier.py": {
+          "sha256": "01b94cc32d91810ba8f8e106294834820fa56fe73bc3f108ce42ecbb3e0dd379",
+          "bytes": 1380
+        },
+        "dlms-release/hdlc_model.py": {
+          "sha256": "a821fc16a535f1092345da46cc4d4f088968dd9441e2808da7a57066c15eca5e",
+          "bytes": 2239
+        },
+        "dlms-release/reference-audit.py": {
+          "sha256": "fe22e6a6479fcab34431b9b055c81e74997fb66e3007af1fe9af88c96738f0d6",
+          "bytes": 1957
+        },
+        "dlms-release/reference.py": {
+          "sha256": "07aea8f7eb2f189ff02cc10feb7eddc903bc7de475b1ef2ef4db052434c41a76",
+          "bytes": 3716
+        },
+        "dlms-release/source-pin.json": {
+          "sha256": "df25b5c037cd965caae3e081531e24e4e607e9e6ae621b48914e9c4c0e2b6cd3",
+          "bytes": 13095
+        },
+        "dlms-release/verify.py": {
+          "sha256": "8fa9ce98b8caec9d9197d63506e053b7e617b70d85cd10cadbfd5189a7a129e2",
+          "bytes": 2002
+        },
+        "required-tests-traffic-unified-v78.json": {
+          "sha256": "d279f2a329e9adb624e7f21535cb1a887ba34e3f27d9cb434b4ce1180645d195",
+          "bytes": 17949218
+        },
+        "validation/expected.json": {
+          "sha256": "5077c7297f78d049f7d9a4a3e9443182cd6e3141efeb7c89f0a44abe48c84a7e",
+          "bytes": 88357
+        }
+      },
+      "aliases": {
+        "common/pcapx/pcaputil/dlms-release-hdlc/answers/abort-opaque-information-tcp.json": "dlms-release-hdlc/answers/abort-opaque-information-tcp.json",
+        "common/pcapx/pcaputil/dlms-release-hdlc/answers/abort-opaque-information-udp.json": "dlms-release-hdlc/answers/abort-opaque-information-udp.json",
+        "common/pcapx/pcaputil/dlms-release-hdlc/answers/abort-pending-tcp.json": "dlms-release-hdlc/answers/abort-pending-tcp.json",
+        "common/pcapx/pcaputil/dlms-release-hdlc/answers/abort-pending-udp.json": "dlms-release-hdlc/answers/abort-pending-udp.json",
+        "common/pcapx/pcaputil/dlms-release-hdlc/answers/absent-reason-tcp.json": "dlms-release-hdlc/answers/absent-reason-tcp.json",
+        "common/pcapx/pcaputil/dlms-release-hdlc/answers/absent-reason-udp.json": "dlms-release-hdlc/answers/absent-reason-udp.json",
+        "common/pcapx/pcaputil/dlms-release-hdlc/answers/active-identical-retry-tcp.json": "dlms-release-hdlc/answers/active-identical-retry-tcp.json",
+        "common/pcapx/pcaputil/dlms-release-hdlc/answers/active-identical-retry-udp.json": "dlms-release-hdlc/answers/active-identical-retry-udp.json",
+        "common/pcapx/pcaputil/dlms-release-hdlc/answers/duplicate-reason-tcp.json": "dlms-release-hdlc/answers/duplicate-reason-tcp.json",
+        "common/pcapx/pcaputil/dlms-release-hdlc/answers/duplicate-reason-udp.json": "dlms-release-hdlc/answers/duplicate-reason-udp.json",
+        "common/pcapx/pcaputil/dlms-release-hdlc/answers/empty-information-tcp.json": "dlms-release-hdlc/answers/empty-information-tcp.json",
+        "common/pcapx/pcaputil/dlms-release-hdlc/answers/empty-information-udp.json": "dlms-release-hdlc/answers/empty-information-udp.json",
+        "common/pcapx/pcaputil/dlms-release-hdlc/answers/indefinite-envelope-tcp.json": "dlms-release-hdlc/answers/indefinite-envelope-tcp.json",
+        "common/pcapx/pcaputil/dlms-release-hdlc/answers/indefinite-envelope-udp.json": "dlms-release-hdlc/answers/indefinite-envelope-udp.json",
+        "common/pcapx/pcaputil/dlms-release-hdlc/answers/invalid-abort-source-tcp.json": "dlms-release-hdlc/answers/invalid-abort-source-tcp.json",
+        "common/pcapx/pcaputil/dlms-release-hdlc/answers/invalid-abort-source-udp.json": "dlms-release-hdlc/answers/invalid-abort-source-udp.json",
+        "common/pcapx/pcaputil/dlms-release-hdlc/answers/malformed-fixed-server-tcp.json": "dlms-release-hdlc/answers/malformed-fixed-server-tcp.json",
+        "common/pcapx/pcaputil/dlms-release-hdlc/answers/malformed-fixed-server-udp.json": "dlms-release-hdlc/answers/malformed-fixed-server-udp.json",
+        "common/pcapx/pcaputil/dlms-release-hdlc/answers/missing-abort-source-tcp.json": "dlms-release-hdlc/answers/missing-abort-source-tcp.json",
+        "common/pcapx/pcaputil/dlms-release-hdlc/answers/missing-abort-source-udp.json": "dlms-release-hdlc/answers/missing-abort-source-udp.json",
+        "common/pcapx/pcaputil/dlms-release-hdlc/answers/normal-tcp.json": "dlms-release-hdlc/answers/normal-tcp.json",
+        "common/pcapx/pcaputil/dlms-release-hdlc/answers/normal-udp.json": "dlms-release-hdlc/answers/normal-udp.json",
+        "common/pcapx/pcaputil/dlms-release-hdlc/answers/orphan-late-tcp.json": "dlms-release-hdlc/answers/orphan-late-tcp.json",
+        "common/pcapx/pcaputil/dlms-release-hdlc/answers/orphan-late-udp.json": "dlms-release-hdlc/answers/orphan-late-udp.json",
+        "common/pcapx/pcaputil/dlms-release-hdlc/answers/reason-one-tcp.json": "dlms-release-hdlc/answers/reason-one-tcp.json",
+        "common/pcapx/pcaputil/dlms-release-hdlc/answers/reason-one-udp.json": "dlms-release-hdlc/answers/reason-one-udp.json",
+        "common/pcapx/pcaputil/dlms-release-hdlc/answers/selected-initiate-information-tcp.json": "dlms-release-hdlc/answers/selected-initiate-information-tcp.json",
+        "common/pcapx/pcaputil/dlms-release-hdlc/answers/selected-initiate-information-udp.json": "dlms-release-hdlc/answers/selected-initiate-information-udp.json",
+        "common/pcapx/pcaputil/dlms-release-hdlc/answers/unknown-release-reason-tcp.json": "dlms-release-hdlc/answers/unknown-release-reason-tcp.json",
+        "common/pcapx/pcaputil/dlms-release-hdlc/answers/unknown-release-reason-udp.json": "dlms-release-hdlc/answers/unknown-release-reason-udp.json",
+        "common/pcapx/pcaputil/dlms-release-hdlc/answers/user-defined-reason-tcp.json": "dlms-release-hdlc/answers/user-defined-reason-tcp.json",
+        "common/pcapx/pcaputil/dlms-release-hdlc/answers/user-defined-reason-udp.json": "dlms-release-hdlc/answers/user-defined-reason-udp.json",
+        "common/pcapx/pcaputil/dlms-release-hdlc/answers/wrong-address-tcp.json": "dlms-release-hdlc/answers/wrong-address-tcp.json",
+        "common/pcapx/pcaputil/dlms-release-hdlc/answers/wrong-address-udp.json": "dlms-release-hdlc/answers/wrong-address-udp.json",
+        "common/pcapx/pcaputil/dlms-release-hdlc/answers/wrong-direction-tcp.json": "dlms-release-hdlc/answers/wrong-direction-tcp.json",
+        "common/pcapx/pcaputil/dlms-release-hdlc/answers/wrong-direction-udp.json": "dlms-release-hdlc/answers/wrong-direction-udp.json",
+        "common/pcapx/pcaputil/dlms-release-hdlc/cases/abort-opaque-information-tcp.pcap": "dlms-release-hdlc/cases/abort-opaque-information-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-release-hdlc/cases/abort-opaque-information-udp.pcap": "dlms-release-hdlc/cases/abort-opaque-information-udp.pcap",
+        "common/pcapx/pcaputil/dlms-release-hdlc/cases/abort-pending-tcp.pcap": "dlms-release-hdlc/cases/abort-pending-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-release-hdlc/cases/abort-pending-udp.pcap": "dlms-release-hdlc/cases/abort-pending-udp.pcap",
+        "common/pcapx/pcaputil/dlms-release-hdlc/cases/absent-reason-tcp.pcap": "dlms-release-hdlc/cases/absent-reason-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-release-hdlc/cases/absent-reason-udp.pcap": "dlms-release-hdlc/cases/absent-reason-udp.pcap",
+        "common/pcapx/pcaputil/dlms-release-hdlc/cases/active-identical-retry-tcp.pcap": "dlms-release-hdlc/cases/active-identical-retry-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-release-hdlc/cases/active-identical-retry-udp.pcap": "dlms-release-hdlc/cases/active-identical-retry-udp.pcap",
+        "common/pcapx/pcaputil/dlms-release-hdlc/cases/duplicate-reason-tcp.pcap": "dlms-release-hdlc/cases/duplicate-reason-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-release-hdlc/cases/duplicate-reason-udp.pcap": "dlms-release-hdlc/cases/duplicate-reason-udp.pcap",
+        "common/pcapx/pcaputil/dlms-release-hdlc/cases/empty-information-tcp.pcap": "dlms-release-hdlc/cases/empty-information-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-release-hdlc/cases/empty-information-udp.pcap": "dlms-release-hdlc/cases/empty-information-udp.pcap",
+        "common/pcapx/pcaputil/dlms-release-hdlc/cases/indefinite-envelope-tcp.pcap": "dlms-release-hdlc/cases/indefinite-envelope-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-release-hdlc/cases/indefinite-envelope-udp.pcap": "dlms-release-hdlc/cases/indefinite-envelope-udp.pcap",
+        "common/pcapx/pcaputil/dlms-release-hdlc/cases/invalid-abort-source-tcp.pcap": "dlms-release-hdlc/cases/invalid-abort-source-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-release-hdlc/cases/invalid-abort-source-udp.pcap": "dlms-release-hdlc/cases/invalid-abort-source-udp.pcap",
+        "common/pcapx/pcaputil/dlms-release-hdlc/cases/malformed-fixed-server-tcp.pcap": "dlms-release-hdlc/cases/malformed-fixed-server-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-release-hdlc/cases/malformed-fixed-server-udp.pcap": "dlms-release-hdlc/cases/malformed-fixed-server-udp.pcap",
+        "common/pcapx/pcaputil/dlms-release-hdlc/cases/missing-abort-source-tcp.pcap": "dlms-release-hdlc/cases/missing-abort-source-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-release-hdlc/cases/missing-abort-source-udp.pcap": "dlms-release-hdlc/cases/missing-abort-source-udp.pcap",
+        "common/pcapx/pcaputil/dlms-release-hdlc/cases/normal-tcp.pcap": "dlms-release-hdlc/cases/normal-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-release-hdlc/cases/normal-udp.pcap": "dlms-release-hdlc/cases/normal-udp.pcap",
+        "common/pcapx/pcaputil/dlms-release-hdlc/cases/orphan-late-tcp.pcap": "dlms-release-hdlc/cases/orphan-late-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-release-hdlc/cases/orphan-late-udp.pcap": "dlms-release-hdlc/cases/orphan-late-udp.pcap",
+        "common/pcapx/pcaputil/dlms-release-hdlc/cases/reason-one-tcp.pcap": "dlms-release-hdlc/cases/reason-one-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-release-hdlc/cases/reason-one-udp.pcap": "dlms-release-hdlc/cases/reason-one-udp.pcap",
+        "common/pcapx/pcaputil/dlms-release-hdlc/cases/selected-initiate-information-tcp.pcap": "dlms-release-hdlc/cases/selected-initiate-information-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-release-hdlc/cases/selected-initiate-information-udp.pcap": "dlms-release-hdlc/cases/selected-initiate-information-udp.pcap",
+        "common/pcapx/pcaputil/dlms-release-hdlc/cases/unknown-release-reason-tcp.pcap": "dlms-release-hdlc/cases/unknown-release-reason-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-release-hdlc/cases/unknown-release-reason-udp.pcap": "dlms-release-hdlc/cases/unknown-release-reason-udp.pcap",
+        "common/pcapx/pcaputil/dlms-release-hdlc/cases/user-defined-reason-tcp.pcap": "dlms-release-hdlc/cases/user-defined-reason-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-release-hdlc/cases/user-defined-reason-udp.pcap": "dlms-release-hdlc/cases/user-defined-reason-udp.pcap",
+        "common/pcapx/pcaputil/dlms-release-hdlc/cases/wrong-address-tcp.pcap": "dlms-release-hdlc/cases/wrong-address-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-release-hdlc/cases/wrong-address-udp.pcap": "dlms-release-hdlc/cases/wrong-address-udp.pcap",
+        "common/pcapx/pcaputil/dlms-release-hdlc/cases/wrong-direction-tcp.pcap": "dlms-release-hdlc/cases/wrong-direction-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-release-hdlc/cases/wrong-direction-udp.pcap": "dlms-release-hdlc/cases/wrong-direction-udp.pcap",
+        "common/pcapx/pcaputil/dlms-release-hdlc/controls.json": "dlms-release-hdlc/controls.json",
+        "common/pcapx/pcaputil/dlms-release-wrapper/cases/abort-opaque-information-tcp.pcap": "dlms-release-wrapper/cases/abort-opaque-information-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-release-wrapper/cases/abort-opaque-information-udp.pcap": "dlms-release-wrapper/cases/abort-opaque-information-udp.pcap",
+        "common/pcapx/pcaputil/dlms-release-wrapper/cases/abort-pending-tcp.pcap": "dlms-release-wrapper/cases/abort-pending-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-release-wrapper/cases/abort-pending-udp.pcap": "dlms-release-wrapper/cases/abort-pending-udp.pcap",
+        "common/pcapx/pcaputil/dlms-release-wrapper/cases/absent-reason-tcp.pcap": "dlms-release-wrapper/cases/absent-reason-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-release-wrapper/cases/absent-reason-udp.pcap": "dlms-release-wrapper/cases/absent-reason-udp.pcap",
+        "common/pcapx/pcaputil/dlms-release-wrapper/cases/active-identical-retry-tcp.pcap": "dlms-release-wrapper/cases/active-identical-retry-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-release-wrapper/cases/active-identical-retry-udp.pcap": "dlms-release-wrapper/cases/active-identical-retry-udp.pcap",
+        "common/pcapx/pcaputil/dlms-release-wrapper/cases/duplicate-reason-tcp.pcap": "dlms-release-wrapper/cases/duplicate-reason-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-release-wrapper/cases/duplicate-reason-udp.pcap": "dlms-release-wrapper/cases/duplicate-reason-udp.pcap",
+        "common/pcapx/pcaputil/dlms-release-wrapper/cases/empty-information-tcp.pcap": "dlms-release-wrapper/cases/empty-information-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-release-wrapper/cases/empty-information-udp.pcap": "dlms-release-wrapper/cases/empty-information-udp.pcap",
+        "common/pcapx/pcaputil/dlms-release-wrapper/cases/indefinite-envelope-tcp.pcap": "dlms-release-wrapper/cases/indefinite-envelope-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-release-wrapper/cases/indefinite-envelope-udp.pcap": "dlms-release-wrapper/cases/indefinite-envelope-udp.pcap",
+        "common/pcapx/pcaputil/dlms-release-wrapper/cases/invalid-abort-source-tcp.pcap": "dlms-release-wrapper/cases/invalid-abort-source-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-release-wrapper/cases/invalid-abort-source-udp.pcap": "dlms-release-wrapper/cases/invalid-abort-source-udp.pcap",
+        "common/pcapx/pcaputil/dlms-release-wrapper/cases/malformed-fixed-server-tcp.pcap": "dlms-release-wrapper/cases/malformed-fixed-server-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-release-wrapper/cases/malformed-fixed-server-udp.pcap": "dlms-release-wrapper/cases/malformed-fixed-server-udp.pcap",
+        "common/pcapx/pcaputil/dlms-release-wrapper/cases/missing-abort-source-tcp.pcap": "dlms-release-wrapper/cases/missing-abort-source-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-release-wrapper/cases/missing-abort-source-udp.pcap": "dlms-release-wrapper/cases/missing-abort-source-udp.pcap",
+        "common/pcapx/pcaputil/dlms-release-wrapper/cases/normal-tcp.pcap": "dlms-release-wrapper/cases/normal-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-release-wrapper/cases/normal-udp.pcap": "dlms-release-wrapper/cases/normal-udp.pcap",
+        "common/pcapx/pcaputil/dlms-release-wrapper/cases/orphan-late-tcp.pcap": "dlms-release-wrapper/cases/orphan-late-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-release-wrapper/cases/orphan-late-udp.pcap": "dlms-release-wrapper/cases/orphan-late-udp.pcap",
+        "common/pcapx/pcaputil/dlms-release-wrapper/cases/reason-one-tcp.pcap": "dlms-release-wrapper/cases/reason-one-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-release-wrapper/cases/reason-one-udp.pcap": "dlms-release-wrapper/cases/reason-one-udp.pcap",
+        "common/pcapx/pcaputil/dlms-release-wrapper/cases/selected-initiate-information-tcp.pcap": "dlms-release-wrapper/cases/selected-initiate-information-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-release-wrapper/cases/selected-initiate-information-udp.pcap": "dlms-release-wrapper/cases/selected-initiate-information-udp.pcap",
+        "common/pcapx/pcaputil/dlms-release-wrapper/cases/unknown-release-reason-tcp.pcap": "dlms-release-wrapper/cases/unknown-release-reason-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-release-wrapper/cases/unknown-release-reason-udp.pcap": "dlms-release-wrapper/cases/unknown-release-reason-udp.pcap",
+        "common/pcapx/pcaputil/dlms-release-wrapper/cases/user-defined-reason-tcp.pcap": "dlms-release-wrapper/cases/user-defined-reason-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-release-wrapper/cases/user-defined-reason-udp.pcap": "dlms-release-wrapper/cases/user-defined-reason-udp.pcap",
+        "common/pcapx/pcaputil/dlms-release-wrapper/cases/wrong-address-tcp.pcap": "dlms-release-wrapper/cases/wrong-address-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-release-wrapper/cases/wrong-address-udp.pcap": "dlms-release-wrapper/cases/wrong-address-udp.pcap",
+        "common/pcapx/pcaputil/dlms-release-wrapper/cases/wrong-direction-tcp.pcap": "dlms-release-wrapper/cases/wrong-direction-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-release-wrapper/cases/wrong-direction-udp.pcap": "dlms-release-wrapper/cases/wrong-direction-udp.pcap",
+        "common/pcapx/pcaputil/dlms-release-wrapper/controls.json": "dlms-release-wrapper/controls.json",
+        "common/pcapx/pcaputil/dlms-release/REFERENCE-ACTUAL.json": "dlms-release/REFERENCE-ACTUAL.json",
+        "common/pcapx/pcaputil/dlms-release/REFERENCE-AUDIT.json": "dlms-release/REFERENCE-AUDIT.json",
+        "common/pcapx/pcaputil/dlms-release/acse_model.py": "dlms-release/acse_model.py",
+        "common/pcapx/pcaputil/dlms-release/build.py": "dlms-release/build.py",
+        "common/pcapx/pcaputil/dlms-release/carrier.py": "dlms-release/carrier.py",
+        "common/pcapx/pcaputil/dlms-release/hdlc_model.py": "dlms-release/hdlc_model.py",
+        "common/pcapx/pcaputil/dlms-release/reference-audit.py": "dlms-release/reference-audit.py",
+        "common/pcapx/pcaputil/dlms-release/reference.py": "dlms-release/reference.py",
+        "common/pcapx/pcaputil/dlms-release/source-pin.json": "dlms-release/source-pin.json",
+        "common/pcapx/pcaputil/dlms-release/verify.py": "dlms-release/verify.py",
+        "scripts/protocol-tests/required-tests-traffic-unified-v78.json": "required-tests-traffic-unified-v78.json"
+      }
     }
   ],
   "schema_version": 1,

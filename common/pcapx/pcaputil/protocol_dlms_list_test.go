@@ -104,6 +104,10 @@ func dlmsListAssert(t *testing.T, c dlmsListControl, events []*ProtocolEvent) {
 				bound = true
 			}
 			if a, ok := w.Fields["ACSE"].(map[string]any); ok {
+				if _, ok := a["release_request_event"]; ok {
+					a["release_request_event"] = events[j].ID
+					bound = true
+				}
 				if _, ok := a["association_request_event"]; ok {
 					a["association_request_event"] = events[j].ID
 					bound = true
@@ -224,6 +228,9 @@ func TestDLMSHDLCListSealedMatrix(t *testing.T) { dlmsSealedMatrix(t, dlmsListCo
 func dlmsControlInput(t *testing.T, alias string) ([]byte, error) {
 	t.Helper()
 	rel := strings.TrimPrefix(alias, "common/pcapx/pcaputil/")
+	if root := os.Getenv("DLMS_RELEASE_TEST_ROOT"); root != "" && strings.HasPrefix(rel, "dlms-release-") {
+		return os.ReadFile(filepath.Join(root, rel))
+	}
 	if root := os.Getenv("DLMS_HDLC_ACSE_TEST_ROOT"); root != "" && strings.HasPrefix(rel, "dlms-hdlc-acse/") {
 		return os.ReadFile(filepath.Join(root, strings.TrimPrefix(rel, "dlms-hdlc-acse/")))
 	}

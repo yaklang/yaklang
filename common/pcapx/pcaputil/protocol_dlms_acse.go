@@ -8,7 +8,7 @@ type dlmsACSEKey struct {
 }
 
 func dlmsACSEAPDU(p []byte) bool {
-	return len(p) > 0 && (p[0] == 0x60 || p[0] == 0x61)
+	return len(p) > 0 && (p[0] >= 0x60 && p[0] <= 0x64)
 }
 
 func dlmsACSEWireEvidence(w []byte) bool {
@@ -21,14 +21,14 @@ func dlmsACSEWireEvidence(w []byte) bool {
 		return false
 	}
 	llc := m.information[:3]
-	return bytes.Equal(llc, []byte{0xe6, 0xe6, 0}) && p[0] == 0x60 || bytes.Equal(llc, []byte{0xe6, 0xe7, 0}) && p[0] == 0x61
+	return bytes.Equal(llc, []byte{0xe6, 0xe6, 0}) && (p[0] == 0x60 || p[0] == 0x62 || p[0] == 0x64) || bytes.Equal(llc, []byte{0xe6, 0xe7, 0}) && (p[0] == 0x61 || p[0] == 0x63 || p[0] == 0x64)
 }
 
 func decodeDLMSACSEInformation(m *dlmsMessage, p []byte, llc byte, limit, depth int) (*dlmsMessage, error) {
 	if depth < 4 {
 		return nil, dlmsError(ErrResourceExceeded, "ACSE field depth exceeds recursion budget")
 	}
-	if p[0] == 0x60 && llc != 0xe6 || p[0] == 0x61 && llc != 0xe7 {
+	if (p[0] == 0x60 || p[0] == 0x62) && llc != 0xe6 || (p[0] == 0x61 || p[0] == 0x63) && llc != 0xe7 {
 		return nil, dlmsError(ErrMalformedMessage, "ACSE command differs from LLC direction")
 	}
 	a, err := decodeACSEAPDU(p, limit)
@@ -50,6 +50,9 @@ func (s *binDLMS) consumeACSE(m *dlmsMessage, w []byte, dir int, id uint64, limi
 		return ctx("ACSE requires trustworthy HDLC conversation")
 	}
 	a := m.acse
+	if a.acseRelease || a.acseAbort {
+		return s.consumeLifecycle(m, w, dir, id, limit)
+	}
 	if m.request {
 		if s.transfer != nil || s.fragments != nil {
 			s.invalidate()
@@ -68,7 +71,7 @@ func (s *binDLMS) consumeACSE(m *dlmsMessage, w []byte, dir int, id uint64, limi
 			return ctx("ACSE overlaps distinct outstanding request")
 		}
 		key := dlmsACSEKey{dir, m.source, m.destination}
-		if s.acseSeen[key]&(1<<m.ns) != 0 {
+		if s.acseSeen[key].used&(1<<m.ns) != 0 {
 			s.invalidate()
 			return ctx("ACSE logical-address/send-sequence tuple reused")
 		}
@@ -81,12 +84,14 @@ func (s *binDLMS) consumeACSE(m *dlmsMessage, w []byte, dir int, id uint64, limi
 			return nil, 0, dlmsError(ErrResourceExceeded, "ACSE retained address history exceeds budget")
 		}
 		if s.acseSeen == nil {
-			s.acseSeen = make(map[dlmsACSEKey]uint8)
+			s.acseSeen = make(map[dlmsACSEKey]dlmsACSEHistory)
 		}
-		s.acseSeen[key] |= 1 << m.ns
+		h := s.acseSeen[key]
+		h.used |= 1 << m.ns
+		s.acseSeen[key] = h
 		s.clientKnown, s.clientDir = true, dir
 		s.next[dir], s.seqKnown[dir] = (m.ns+1)&7, true
-		s.pending = &dlmsPending{wire: bytes.Clone(w), kind: "ACSE", acseInfo: a.acseInfo, acseConformance: a.acseConformance, acseMaxPDU: a.acseMaxPDU, dir: dir, source: m.source, destination: m.destination, id: id, ns: m.ns}
+		s.pending = &dlmsPending{wire: bytes.Clone(w), kind: "ACSE", acseCommand: 0x60, acseInfo: a.acseInfo, acseConformance: a.acseConformance, acseMaxPDU: a.acseMaxPDU, dir: dir, source: m.source, destination: m.destination, id: id, ns: m.ns}
 		m.fields["Association"] = "observed-association-request"
 		if !a.acseInfo {
 			m.fields["Association"] = "unverified-association-initiate-context"
@@ -104,12 +109,14 @@ func (s *binDLMS) consumeACSE(m *dlmsMessage, w []byte, dir int, id uint64, limi
 			return nil, 0, dlmsError(ErrResourceExceeded, "orphan ACSE address history exceeds budget")
 		}
 		if s.acseSeen == nil {
-			s.acseSeen = make(map[dlmsACSEKey]uint8)
+			s.acseSeen = make(map[dlmsACSEKey]dlmsACSEHistory)
 		}
-		s.acseSeen[key] |= 1 << ((m.nr - 1) & 7)
+		h := s.acseSeen[key]
+		h.used |= 1 << ((m.nr - 1) & 7)
+		s.acseSeen[key] = h
 		s.next[dir], s.seqKnown[dir] = (m.ns+1)&7, true
 	}
-	if p == nil || p.kind != "ACSE" || p.dir == dir || p.source != m.destination || p.destination != m.source {
+	if p == nil || p.kind != "ACSE" || p.acseCommand != 0x60 || p.dir == dir || p.source != m.destination || p.destination != m.source {
 		return ctx("AARE lacks reversed observed carrier/logical-address AARQ")
 	}
 	if m.nr != (p.ns+1)&7 || s.seqKnown[dir] && m.ns != s.next[dir] {
@@ -120,6 +127,12 @@ func (s *binDLMS) consumeACSE(m *dlmsMessage, w []byte, dir int, id uint64, limi
 		return ctx("AARE selects unproposed conformance")
 	}
 	s.pending = nil
+	if a.acseAccepted && a.acseInfo && p.acseInfo {
+		key := dlmsACSEKey{p.dir, p.source, p.destination}
+		h := s.acseSeen[key]
+		h.retired = false
+		s.acseSeen[key] = h
+	}
 	s.next[dir], s.seqKnown[dir] = (m.ns+1)&7, true
 	if !p.acseInfo || a.acseAccepted && !a.acseInfo {
 		m.fields["Association"] = "unverified-association-initiate-context"

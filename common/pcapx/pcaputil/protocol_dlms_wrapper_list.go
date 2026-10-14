@@ -332,6 +332,9 @@ func wrapperNormalAccess(w []byte) bool {
 }
 func wrapperProfile(w []byte) string {
 	if wrapperIsACSE(w) {
+		if acseLifecycleAPDU(w[8:]) {
+			return "dlms-wrapper-v1-acse-lifecycle"
+		}
 		return "dlms-wrapper-v1-acse"
 	}
 	if wrapperIsGBT(w) {
@@ -347,6 +350,9 @@ func wrapperProfile(w []byte) string {
 }
 func wrapperProbeVersion(w []byte) string {
 	if wrapperIsACSE(w) {
+		if acseLifecycleAPDU(w[8:]) {
+			return "v1-acse-lifecycle"
+		}
 		return "v1-acse"
 	}
 	if wrapperIsGBT(w) {

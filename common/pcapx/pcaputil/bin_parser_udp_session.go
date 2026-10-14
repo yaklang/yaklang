@@ -647,6 +647,16 @@ func (a *binParser) closeUDPSessions() {
 		for _, el := range s.entries {
 			v := el.Value.(*binUDPEntry)
 			f := v.flow
+			if w := f.wrapper; w != nil {
+				for key, p := range w.associations {
+					if p.releasePending {
+						summary := "DLMS Wrapper release ended with an unmatched request"
+						incomplete = append(incomplete, &ProtocolEvent{FlowID: f.id, Timestamp: v.touched, Domain: v.key.domain, Transport: "udp", Source: f.endpoints[key.dir], Destination: f.endpoints[1-key.dir], Direction: key.dir, Protocol: "dlms-wrapper", Profile: "dlms-wrapper-v1-acse-lifecycle", Status: "incomplete", Completeness: "incomplete", Summary: summary, Session: map[string]any{"Outstanding": 1, "source_wport": key.source, "destination_wport": key.destination}, Error: summary, sessionError: &ProtocolError{Kind: ErrNeedMore, Message: summary}})
+						a.incomplete.Add(1)
+					}
+				}
+			}
+
 			if d := f.dlms; d != nil && d.fragments != nil {
 				dir := d.fragmentCloseDirection()
 				profile, summary := "dlms-hdlc-segmented-response", "DLMS HDLC exchange ended with an incomplete segmented response"
@@ -663,7 +673,11 @@ func (a *binParser) closeUDPSessions() {
 			} else if d != nil && d.pending != nil && d.pending.kind == "ACSE" {
 				dir := d.pending.dir
 				summary := "DLMS HDLC association ended with an unmatched request"
-				incomplete = append(incomplete, &ProtocolEvent{FlowID: f.id, Timestamp: v.touched, Domain: v.key.domain, Transport: "udp", Source: f.endpoints[dir], Destination: f.endpoints[1-dir], Direction: dir, Protocol: "dlms", Profile: "dlms-hdlc-acse", Status: "incomplete", Completeness: "incomplete", Summary: "DLMS HDLC association ended with an unmatched request", Session: map[string]any{"Outstanding": 1}, Error: summary, sessionError: &ProtocolError{Kind: ErrNeedMore, Message: summary}})
+				profile := "dlms-hdlc-acse"
+				if d.pending.acseCommand == 0x62 {
+					profile = "dlms-hdlc-acse-lifecycle"
+				}
+				incomplete = append(incomplete, &ProtocolEvent{FlowID: f.id, Timestamp: v.touched, Domain: v.key.domain, Transport: "udp", Source: f.endpoints[dir], Destination: f.endpoints[1-dir], Direction: dir, Protocol: "dlms", Profile: profile, Status: "incomplete", Completeness: "incomplete", Summary: "DLMS HDLC association ended with an unmatched request", Session: map[string]any{"Outstanding": 1}, Error: summary, sessionError: &ProtocolError{Kind: ErrNeedMore, Message: summary}})
 				a.incomplete.Add(1)
 			}
 			f.closeSession()

@@ -22,6 +22,11 @@ type wrapperStructuredControl struct {
 
 func wrapperStructuredInput(t *testing.T, alias string) []byte {
 	t.Helper()
+	if root := os.Getenv("DLMS_RELEASE_TEST_ROOT"); root != "" && strings.HasPrefix(alias, "common/pcapx/pcaputil/dlms-release-") {
+		b, e := os.ReadFile(filepath.Join(root, strings.TrimPrefix(alias, "common/pcapx/pcaputil/")))
+		require.NoError(t, e)
+		return b
+	}
 	if root := os.Getenv("DLMS_ACSE_TEST_ROOT"); root != "" && strings.HasPrefix(alias, "common/pcapx/pcaputil/dlms-acse/") {
 		b, err := os.ReadFile(filepath.Join(root, strings.TrimPrefix(alias, "common/pcapx/pcaputil/dlms-acse/")))
 		require.NoError(t, err)

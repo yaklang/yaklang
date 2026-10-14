@@ -229,7 +229,7 @@ func decodeDLMSInformation(m *dlmsMessage, info []byte, maxElements, depth int) 
 	}
 	f["LLC"] = bytes.Clone(info[:3])
 	p := info[3:]
-	if p[0] == 0x60 || p[0] == 0x61 {
+	if p[0] >= 0x60 && p[0] <= 0x64 {
 		return decodeDLMSACSEInformation(m, p, info[1], maxElements, depth)
 	}
 	if p[0] != 0xc0 && p[0] != 0xc4 {
@@ -484,7 +484,11 @@ func probeDLMS(w []byte, limit int) ProbeResult {
 	apdu := dlmsAPDU(w[:n])
 	if dlmsACSEAPDU(apdu) {
 		if dlmsACSEWireEvidence(w[:n]) {
-			return probeAccept("dlms", "hdlc-acse", 98)
+			version := "hdlc-acse"
+			if acseLifecycleAPDU(apdu) {
+				version = "hdlc-acse-lifecycle"
+			}
+			return probeAccept("dlms", version, 98)
 		}
 		return ProbeResult{Verdict: ProbeReject}
 	}
@@ -515,6 +519,7 @@ type dlmsPending struct {
 	requestFrames       int
 	kind                string
 	acseInfo            bool
+	acseCommand         byte
 	acseConformance     uint32
 	acseMaxPDU          uint16
 	dir                 int
@@ -526,7 +531,7 @@ type dlmsPending struct {
 }
 type binDLMS struct {
 	pending             *dlmsPending
-	acseSeen            map[dlmsACSEKey]uint8
+	acseSeen            map[dlmsACSEKey]dlmsACSEHistory
 	clientKnown         bool
 	clientDir           int
 	ambiguous, usedLink bool
@@ -555,6 +560,9 @@ func (s *binDLMS) consume(m *dlmsMessage, w []byte, dir int, id uint64) (map[str
 		s.invalidate()
 		m.fields["Association"] = "unassociated-link-observation"
 		return m.fields, 0, nil
+	}
+	if m.kind == "GET" && s.hdlcEndpointRetired(dir, m.source, m.destination, m.request) {
+		return ctx("Get belongs to retired association context")
 	}
 	if s.ambiguous {
 		return ctx("ambiguous/reused exchange requires new conversation")
@@ -682,6 +690,9 @@ func (f *binFlow) consumeDLMS(dir int, w []byte, id uint64) (map[string]any, uin
 }
 func (f *binFlow) consumeDecodedDLMS(dir int, w []byte, id uint64, m *dlmsMessage) (map[string]any, uint64, error) {
 	s := f.dlms
+	if (m.kind == "GET" || m.kind == "I") && s.hdlcEndpointRetired(dir, m.source, m.destination, m.request) {
+		return nil, 0, dlmsError(ErrContextRequired, "Get information belongs to retired association context")
+	}
 	if p := s.pending; p != nil && len(p.requestInformation) > 0 && dir == p.dir && bytes.Equal(p.wire, w) {
 		// CRC/header validation and the full request projection were reserved before
 		// this decode. Rebuild private fields from the retained bounded APDU, never
@@ -707,7 +718,15 @@ func (f *binFlow) consumeDecodedDLMS(dir int, w []byte, id uint64, m *dlmsMessag
 		return nil, 0, dlmsError(ErrResourceExceeded, "retained invoke/sequence token limit")
 	}
 	if m.acse != nil {
-		return s.consumeACSE(m, w, dir, id, f.a.budget.MaxCollectionElements)
+		fields, response, err := s.consumeACSE(m, w, dir, id, f.a.budget.MaxCollectionElements)
+		if m.acse.acseRelease || m.acse.acseAbort {
+			retained := s.storage() + dlmsProjection(w)
+			if retained < f.sessionBytes {
+				f.a.buffered.Add(retained - f.sessionBytes)
+				f.sessionBytes = retained
+			}
+		}
+		return fields, response, err
 	}
 	return s.consume(m, w, dir, id)
 }
@@ -796,7 +815,7 @@ func (a *binParser) decodeDLMSDatagram(e *ProtocolEvent, w []byte, explicit bool
 	} else if err = f.reserveSession(f.dlms.storage() + f.dlmsProjection(w)); err == nil {
 		m, err = decodeDLMSFrameBudget(w, a.budget.MaxCollectionElements, a.budget.MaxRecursionDepth, f.dlmsLinkAssembly(w))
 	}
-	if created && m != nil && !m.request && m.kind != "S" {
+	if created && m != nil && !m.request && m.kind != "S" && (m.acse == nil || !m.acse.acseAbort) {
 		e.Direction = 1
 		if m.acse != nil {
 			f.endpoints = [2]string{e.Destination, e.Source}

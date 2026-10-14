@@ -26,18 +26,34 @@ func TestDLMSWrapperBlocksExistingAPIBaseline(t *testing.T) {
 }
 
 type wrapperBlockAnswer struct {
-	Profile     string                         `json:"profile,omitempty"`
-	Wire        string                         `json:"wire_hex"`
-	SHA         string                         `json:"wire_sha256"`
-	Fields      map[string]any                 `json:"fields"`
-	Error       *struct{ Kind, Detail string } `json:"error"`
-	Association string                         `json:"association"`
-	Outstanding int                            `json:"outstanding"`
-	Transaction int                            `json:"transaction_index"`
-	Response    int                            `json:"response_index"`
-	Dir         int                            `json:"dir"`
-	Refs        []uint64                       `json:"packet_refs"`
+	DynamicRequest *int                           `json:"dynamic_request_index,omitempty"`
+	Profile        string                         `json:"profile,omitempty"`
+	Wire           string                         `json:"wire_hex"`
+	SHA            string                         `json:"wire_sha256"`
+	Fields         map[string]any                 `json:"fields"`
+	Error          *struct{ Kind, Detail string } `json:"error"`
+	Association    string                         `json:"association"`
+	Outstanding    int                            `json:"outstanding"`
+	Transaction    int                            `json:"transaction_index"`
+	Response       int                            `json:"response_index"`
+	Dir            int                            `json:"dir"`
+	Refs           []uint64                       `json:"packet_refs"`
 }
+
+func wrapperBlockExpectedFields(t *testing.T, a wrapperBlockAnswer, events []*ProtocolEvent) map[string]any {
+	t.Helper()
+	if a.DynamicRequest == nil {
+		return a.Fields
+	}
+	i := *a.DynamicRequest
+	require.GreaterOrEqual(t, i, 0)
+	require.Less(t, i, len(events))
+	f := cloneSession(a.Fields)
+	require.Contains(t, f, "release_request_event")
+	f["release_request_event"] = events[i].ID
+	return f
+}
+
 type wrapperBlockControl struct {
 	Name      string `json:"name"`
 	Alias     string `json:"input_alias"`
@@ -83,6 +99,7 @@ func assertWrapperBlocks(t *testing.T, c wrapperBlockControl, events []*Protocol
 	}
 	for i, e := range events {
 		a := c.Answers[i]
+		a.Fields = wrapperBlockExpectedFields(t, a, events)
 		w := wrapperWire(t, a.Wire)
 		fields, err := e.GetFields()
 		require.NotZero(t, e.ID)
@@ -220,11 +237,11 @@ func wrapperBlocksOwnershipConfigured(t *testing.T, cases []wrapperBlockControl,
 						poisonWrapperStructured(e.Session)
 						f, err := e.GetFields()
 						require.NoError(t, err)
-						rocEqualFields(t, c.Answers[i].Fields, f)
+						rocEqualFields(t, wrapperBlockExpectedFields(t, c.Answers[i], events), f)
 						poisonWrapperStructured(f)
 						f, err = e.GetFields()
 						require.NoError(t, err)
-						rocEqualFields(t, c.Answers[i].Fields, f)
+						rocEqualFields(t, wrapperBlockExpectedFields(t, c.Answers[i], events), f)
 					}
 					closed := s.Close("blocks")
 					if c.Close != 0 {

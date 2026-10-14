@@ -35,21 +35,22 @@ func wrapperFrameSize(w []byte, limit int) (int, error) {
 }
 
 type wrapperMessage struct {
-	fields                map[string]any
-	source, destination   uint16
-	invoke, flags, choice byte
-	count                 int
-	request, confirmed    bool
-	blockNumber           uint32
-	blockData             []byte
-	lastBlock, blockError bool
-	gbt                   bool
-	gbtControl            byte
-	gbtNumber, gbtAck     uint16
-	acse, acseAccepted    bool
-	acseInfo              bool
-	acseConformance       uint32
-	acseMaxPDU            uint16
+	fields                 map[string]any
+	source, destination    uint16
+	invoke, flags, choice  byte
+	count                  int
+	request, confirmed     bool
+	blockNumber            uint32
+	blockData              []byte
+	lastBlock, blockError  bool
+	gbt                    bool
+	gbtControl             byte
+	gbtNumber, gbtAck      uint16
+	acse, acseAccepted     bool
+	acseRelease, acseAbort bool
+	acseInfo               bool
+	acseConformance        uint32
+	acseMaxPDU             uint16
 }
 
 func decodeDLMSWrapper(w []byte, limit int) (*wrapperMessage, error) {
@@ -73,7 +74,7 @@ func decodeDLMSWrapperBudget(w []byte, limit, depth int) (*wrapperMessage, error
 	if len(p) == 0 {
 		return unsupported("empty WPDU has no selected Get APDU")
 	}
-	if p[0] == 0x60 || p[0] == 0x61 {
+	if p[0] >= 0x60 && p[0] <= 0x64 {
 		return decodeWrapperACSE(w, limit)
 	}
 	if p[0] == 0xe0 {
@@ -315,7 +316,7 @@ func (s *binDLMSWrapper) storage() int64 {
 func (s *binDLMSWrapper) outstanding() int {
 	n := 0
 	for _, p := range s.associations {
-		if p.pending {
+		if p.pending || p.releasePending {
 			n++
 		}
 	}
@@ -335,6 +336,8 @@ func (s *binDLMSWrapper) invalidate() {
 	for _, p := range s.associations {
 		p.pending = false
 		p.ambiguous = true
+		p.releasePending = false
+		p.releaseAmbiguous = true
 	}
 	for _, p := range s.gbt {
 		p.data = nil
@@ -363,6 +366,9 @@ func (f *binFlow) consumeWrapperReserved(dir int, w []byte, e *ProtocolEvent, fl
 	// Reserve the complete field/projection graph and any new association slot
 	// before allocating maps, raw hex strings or committing request identity.
 	target := s.storage() + wrapperProjection(w, len(w)) + 256
+	if wrapperIsACSE(w) && w[8] == 0x64 {
+		target += 256
+	} // Abort may retain both endpoint directions.
 	if wrapperIsBlock(w) {
 		target += wrapperBlockBytes
 	}
@@ -397,6 +403,8 @@ func (f *binFlow) consumeWrapperReserved(dir int, w []byte, e *ProtocolEvent, fl
 			s.invalidate()
 			return err
 		}
+	} else if s.wrapperEndpointClosed(dir, m.source, m.destination, m.request) {
+		assoc = "retired-association-context"
 	} else if m.gbt {
 		assoc, err = f.consumeWrapperGBT(s, m, dir, e, w)
 		if err != nil {
@@ -450,6 +458,13 @@ func (f *binFlow) consumeWrapperReserved(dir int, w []byte, e *ProtocolEvent, fl
 		e.semanticSession[k] = v
 	}
 	e.semanticSession["Association"], e.semanticSession["Outstanding"] = assoc, s.outstanding()
+	if m.acseRelease || m.acseAbort {
+		retained := max(s.storage()+wrapperProjection(w, len(w)), floor)
+		if retained < f.sessionBytes {
+			f.a.buffered.Add(retained - f.sessionBytes)
+			f.sessionBytes = retained
+		}
+	}
 	return nil
 }
 
@@ -635,7 +650,7 @@ func wrapperIncompletePrefix(w []byte, limit int) bool {
 		return false
 	}
 	n, err := wrapperFrameSize(w, limit)
-	return err == nil && n == 0 && (len(w) <= 8 || w[8] == 0xc0 || w[8] == 0xc4 || w[8] == 0xe0 || w[8] == 0x60 || w[8] == 0x61)
+	return err == nil && n == 0 && (len(w) <= 8 || w[8] == 0xc0 || w[8] == 0xc4 || w[8] == 0xe0 || w[8] >= 0x60 && w[8] <= 0x64)
 }
 func (a *binParser) probeWrapperDatagram(w []byte) ProbeResult {
 	n, err := wrapperFrameSize(w, min(a.budget.MaxFrameBytes, a.config.MaxMessageBytes))

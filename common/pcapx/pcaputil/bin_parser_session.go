@@ -1268,7 +1268,22 @@ func (f *binFlow) finishSession(reason TrafficFlowCloseReason) {
 		emit(s.clientDir, map[string]any{"Outstanding": s.outstanding()}, "SLMP TCP exchange ended with unmatched observed requests")
 	}
 	if w := f.wrapper; w != nil && w.outstanding() > 0 {
-		emit(0, map[string]any{"Outstanding": w.outstanding()}, "DLMS Wrapper exchange ended with unmatched observed requests")
+		n := 0
+		for key, p := range w.associations {
+			if p.releasePending {
+				e := f.event(key.dir, nil, "incomplete", string(reason)+": DLMS Wrapper release ended with an unmatched request")
+				e.Profile = "dlms-wrapper-v1-acse-lifecycle"
+				e.Session = map[string]any{"Outstanding": 1, "source_wport": key.source, "destination_wport": key.destination}
+				e.sessionError = &ProtocolError{Kind: ErrNeedMore, Message: e.Summary}
+				e.Error = e.Summary
+				f.a.incomplete.Add(1)
+				f.a.emit(e)
+				n++
+			}
+		}
+		if left := w.outstanding() - n; left > 0 {
+			emit(0, map[string]any{"Outstanding": left}, "DLMS Wrapper exchange ended with unmatched observed requests")
+		}
 	}
 	if d := f.dlms; d != nil {
 		if d.fragments != nil {
@@ -1278,6 +1293,9 @@ func (f *binFlow) finishSession(reason TrafficFlowCloseReason) {
 		} else if d.pending != nil && d.pending.kind == "ACSE" {
 			e := f.event(d.pending.dir, nil, "incomplete", string(reason)+": DLMS HDLC association ended with an unmatched request")
 			e.Profile = "dlms-hdlc-acse"
+			if d.pending.acseCommand == 0x62 {
+				e.Profile = "dlms-hdlc-acse-lifecycle"
+			}
 			e.Session = map[string]any{"Outstanding": 1}
 			e.sessionError = &ProtocolError{Kind: ErrNeedMore, Message: e.Summary}
 			e.Error = e.Summary

@@ -10,7 +10,7 @@ import (
 // Fixed Gurux6e409ae9 ACSE/xDLMS codec layout. Accepted wire negotiation is
 // observational only: it never certifies authentication, object rights or a meter.
 func wrapperIsACSE(w []byte) bool {
-	return len(w) > 8 && w[0] == 0 && w[1] == 1 && (w[8] == 0x60 || w[8] == 0x61)
+	return len(w) > 8 && w[0] == 0 && w[1] == 1 && (w[8] >= 0x60 && w[8] <= 0x64)
 }
 
 // This header-only refusal hint allocates no key/history maps. A malformed
@@ -24,6 +24,9 @@ func wrapperACSERefusalHint(w []byte) bool {
 
 // Bounded allocation-free envelope evidence, never semantic acceptance.
 func acseEnvelopeHint(p []byte) bool {
+	if acseLifecycleAPDU(p) {
+		return acseLifecycleEnvelopeHint(p)
+	}
 	if len(p) < 2 || p[0] != 0x60 && p[0] != 0x61 {
 		return false
 	}
@@ -148,10 +151,13 @@ type wrapperAssociationKey struct {
 	source, destination uint16
 }
 type wrapperAssociation struct {
-	id                 uint64
-	pending, ambiguous bool
-	conformance        uint32
-	maxPDU             uint16
+	id                                            uint64
+	pending, ambiguous                            bool
+	conformance                                   uint32
+	maxPDU                                        uint16
+	closed                                        bool
+	releaseSeen, releasePending, releaseAmbiguous bool
+	releaseID                                     uint64
 }
 
 func decodeWrapperACSE(w []byte, limit int) (*wrapperMessage, error) {
@@ -169,6 +175,9 @@ func decodeWrapperACSE(w []byte, limit int) (*wrapperMessage, error) {
 // Carrier-neutral selected ACSE envelope. HDLC logical addresses never narrow
 // to Wrapper's 16-bit ports and its field tree contains no fabricated WPDU.
 func decodeACSEAPDU(p []byte, limit int) (*wrapperMessage, error) {
+	if acseLifecycleAPDU(p) {
+		return decodeACSELifecycle(p, limit)
+	}
 	if len(p) > min(limit, 4096) {
 		return nil, wrapperError(ErrResourceExceeded, "ACSE field-byte budget")
 	}
@@ -288,6 +297,11 @@ func decodeACSEAPDU(p []byte, limit int) (*wrapperMessage, error) {
 		// cannot certify xDLMS negotiation and must not be called bad BER.
 		return m, nil
 	}
+	return decodeACSEInitiate(m, initiate)
+}
+
+func decodeACSEInitiate(m *wrapperMessage, initiate []byte) (*wrapperMessage, error) {
+	f, request := m.fields, m.request
 	at := 0
 	take := func(n int) ([]byte, error) {
 		if n > len(initiate)-at {
@@ -396,6 +410,9 @@ func decodeACSEAPDU(p []byte, limit int) (*wrapperMessage, error) {
 	return m, nil
 }
 func (f *binFlow) consumeWrapperACSE(s *binDLMSWrapper, m *wrapperMessage, dir int, e *ProtocolEvent) (string, error) {
+	if m.acseRelease || m.acseAbort {
+		return f.consumeWrapperLifecycle(s, m, dir, e)
+	}
 	if m.request {
 		key := wrapperAssociationKey{dir, m.source, m.destination}
 		if p := s.associations[key]; p != nil {

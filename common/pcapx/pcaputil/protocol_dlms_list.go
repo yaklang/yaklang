@@ -21,7 +21,7 @@ func dlmsAPDU(w []byte) []byte {
 		return nil
 	}
 	p := w[at+6 : end] // control, HCS(2), LLC(3)
-	if len(p) < 2 || p[0] != 0xc0 && p[0] != 0xc4 && p[0] != 0x60 && p[0] != 0x61 {
+	if len(p) < 2 || p[0] != 0xc0 && p[0] != 0xc4 && (p[0] < 0x60 || p[0] > 0x64) {
 		return nil
 	}
 	return p
@@ -42,6 +42,9 @@ func dlmsNormalAccess(p []byte) bool {
 }
 func dlmsProfile(w []byte) string {
 	if dlmsACSEAPDU(dlmsAPDU(w)) {
+		if acseLifecycleAPDU(dlmsAPDU(w)) {
+			return "dlms-hdlc-acse-lifecycle"
+		}
 		return "dlms-hdlc-acse"
 	}
 	if dlmsBlockAPDU(dlmsAPDU(w)) {
