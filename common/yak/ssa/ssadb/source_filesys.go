@@ -58,7 +58,7 @@ func (fs *irSourceFS) ReadFile(path string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	// An incremental program's filesystem owns its body loading end to
+	// A chain-assembled program's filesystem owns its body loading end to
 	// end: its ReadFile resolves the owning layer internally and never
 	// returns an empty body, so its result (data or error) stands as is.
 	// A plain program's tree only holds empty stubs: serve the filled
@@ -112,8 +112,8 @@ func programRootEntries() []fs.DirEntry {
 }
 
 // ReadDir lists a directory through the program's own filesystem: plain
-// programs list their single tree; incremental programs get the fully
-// expanded overlay (OverlayFS.ReadDir).
+// programs list their single tree; chain-assembled programs get the fully
+// expanded overlay view.
 func (isfs *irSourceFS) ReadDir(path string) ([]fs.DirEntry, error) {
 	if path == "/" {
 		return programRootEntries(), nil
@@ -125,18 +125,22 @@ func (isfs *irSourceFS) ReadDir(path string) ([]fs.DirEntry, error) {
 	return pfs.ReadDir(path)
 }
 
-// incrementalFS is the per-program filesystem of an incremental-compile
-// program: its ReadFile resolves and loads bodies through the owning
-// overlay layer itself, and it serves a diff-only listing view (the head
-// layer's own entries) on top of the fully expanded one.
+// incrementalFS is implemented by a per-program filesystem assembled from
+// a saved layer chain (an incremental head, or a base recording itself as
+// its chain): it owns its body loading end to end, and it serves a
+// diff-only listing view (the head layer's own entries) on top of the
+// fully expanded one.
 type incrementalFS interface {
 	ReadDirDiff(path string) ([]fs.DirEntry, error)
 }
 
-// ReadDirQuery is the yakurl entry for listing with query options. Only an
-// incremental program's filesystem has a second view: diffOnly collapses to
-// the head layer's own entries. A plain program's tree ignores the query.
-func (isfs *irSourceFS) ReadDirQuery(path string, query url.Values) ([]fs.DirEntry, error) {
+// ReadDirDiffOnly lists a directory through the program's own filesystem,
+// honoring the diffOnly query option (yakurl reaches it through its
+// optional diffOnlyLister capability): when diffOnly is set and the
+// program's filesystem serves a diff view (a chain-assembled head), the
+// listing collapses to the head layer's own entries; a plain program's
+// tree ignores the query and lists normally.
+func (isfs *irSourceFS) ReadDirDiffOnly(path string, query url.Values) ([]fs.DirEntry, error) {
 	if path == "/" {
 		return programRootEntries(), nil
 	}
