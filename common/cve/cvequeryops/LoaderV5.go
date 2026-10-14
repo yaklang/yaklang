@@ -350,7 +350,7 @@ func batchMergeCVEV5Fields(db *gorm.DB, cves []*cveresources.CVE) error {
 
 	// 一次性查询所有已有记录
 	var existingList []cveresources.CVE
-	if err := db.Where("cve IN ?", cveIDs).Find(&existingList).Error; err != nil {
+	if err := db.Where("cve IN (?)", cveIDs).Find(&existingList).Error; err != nil {
 		// 如果批量查询失败，回退到逐条处理
 		for _, cve := range cves {
 			cveresources.MergeCVEV5Fields(db, cve)
@@ -370,13 +370,14 @@ func batchMergeCVEV5Fields(db *gorm.DB, cves []*cveresources.CVE) error {
 		return tx.Error
 	}
 
+	var skipped int
 	for _, v5 := range cves {
 		existing, found := existingMap[v5.CVE]
 		if !found {
-			// 记录不存在，创建
+			// 记录不存在，创建；单条失败跳过（不回滚整个事务）
 			if err := tx.Save(v5).Error; err != nil {
-				tx.Rollback()
-				return err
+				skipped++
+				continue
 			}
 			continue
 		}
@@ -427,12 +428,19 @@ func batchMergeCVEV5Fields(db *gorm.DB, cves []*cveresources.CVE) error {
 		}
 
 		if err := tx.Model(&cveresources.CVE{}).Where("cve = ?", v5.CVE).Updates(updates).Error; err != nil {
-			tx.Rollback()
-			return err
+			// 单条更新失败跳过（不回滚整个事务）
+			skipped++
+			continue
 		}
 	}
 
-	return tx.Commit().Error
+	if err := tx.Commit().Error; err != nil {
+		return err
+	}
+	if skipped > 0 {
+		log.Infof("batchMergeCVEV5Fields: %d/%d records skipped due to non-fatal errors", skipped, len(cves))
+	}
+	return nil
 }
 
 // FetchCVEV5Record 通过 cveawg API 实时查询单个 CVE 的 5.0 Record
