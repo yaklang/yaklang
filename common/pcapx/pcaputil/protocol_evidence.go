@@ -30,8 +30,9 @@ type ByteSource struct {
 	PacketRefs []PacketReference
 }
 type captureEvidence struct {
-	Ref  PacketReference
-	refs []PacketReference
+	tcpMissingTail uint32 // validated captured TCP payload suffix; no invented bytes
+	Ref            PacketReference
+	refs           []PacketReference
 	// Applies to the current IP packet, not an outer tunnel carrier.
 	ipv6Fragment bool
 	// Count normalization across reconstructed outer/inner fragment layers.
