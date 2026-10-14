@@ -823,6 +823,12 @@ func NewReActLoop(name string, invoker aicommon.AIInvokeRuntime, options ...ReAc
 		}
 	}
 
+	if _, ok := r.actions.Get(schema.AI_REACT_LOOP_ACTION_SEARCH_CAPABILITIES); !ok {
+		if searchCap := optionalRegisteredLoopAction(schema.AI_REACT_LOOP_ACTION_SEARCH_CAPABILITIES, "optional capability discovery"); searchCap != nil {
+			r.actions.Set(searchCap.ActionType, searchCap)
+		}
+	}
+
 	if _, ok := r.actions.Get(schema.AI_REACT_LOOP_ACTION_LOAD_CAPABILITY); !ok {
 		if loadCap := optionalRegisteredLoopAction(schema.AI_REACT_LOOP_ACTION_LOAD_CAPABILITY, "optional capability discovery"); loadCap != nil {
 			r.actions.Set(loadCap.ActionType, loadCap)

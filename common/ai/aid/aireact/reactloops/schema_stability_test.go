@@ -8,6 +8,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon/mock"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools"
 	"github.com/yaklang/yaklang/common/schema"
@@ -108,6 +109,94 @@ func TestGenerateSchema_StableAcrossHasRecentlyUsedTools(t *testing.T) {
 
 	require.Equal(t, schemaBefore, schemaAfter,
 		"P2.1 invariant: schema must be byte-identical across HasRecentlyUsedTools 0->1 transition")
+}
+
+func TestNewReActLoopRegistersSearchCapabilities(t *testing.T) {
+	actionName := schema.AI_REACT_LOOP_ACTION_SEARCH_CAPABILITIES
+	previous, existed := GetLoopAction(actionName)
+	RegisterAction(&LoopAction{
+		ActionType:  actionName,
+		Description: "Search for capabilities",
+		Options: []aitool.ToolOption{
+			aitool.WithStringParam("search_query", aitool.WithParam_Required(true)),
+		},
+	})
+	t.Cleanup(func() {
+		if existed {
+			actions.Set(actionName, previous)
+		} else {
+			actions.Delete(actionName)
+		}
+	})
+
+	for _, test := range []struct {
+		name     string
+		native   bool
+		override bool
+	}{
+		{name: "text"},
+		{name: "functioncall", native: true},
+		{name: "custom_action_is_preserved", override: true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			ctx := context.Background()
+			invoker := mock.NewMockInvoker(ctx)
+			invoker.SetConfig(aicommon.NewConfig(ctx,
+				aicommon.WithDisableAutoSkills(true), aicommon.WithDisallowMCPServers(true)))
+			options := []ReActLoopOption{
+				WithFunctionCallMode(test.native), WithDisableLoopPerception(true),
+				WithAllowRAG(false), WithAllowAIForge(false),
+				WithAllowPlanAndExec(false), WithAllowUserInteract(false),
+				WithRegisterLoopAction(schema.AI_REACT_LOOP_ACTION_REQUIRE_TOOL, "tool routing", nil, nil, nil),
+			}
+			if test.override {
+				options = append(options, WithOverrideLoopAction(&LoopAction{
+					ActionType: actionName, Description: "Custom capability search",
+				}))
+			}
+			loop, err := NewReActLoop(schema.AI_REACT_LOOP_NAME_DEFAULT, invoker, options...)
+			require.NoError(t, err)
+			defer loop.Release()
+			require.Contains(t, loop.GetAllActionNames(), actionName)
+			handler, err := loop.GetActionHandler(actionName)
+			require.NoError(t, err)
+			if test.override {
+				require.Equal(t, "Custom capability search", handler.Description)
+				return
+			}
+
+			textSchema, nativeSchemas, err := loop.prepareLoopActionSchemas(nil)
+			require.NoError(t, err)
+			if !test.native {
+				require.Empty(t, nativeSchemas)
+				var parsed struct {
+					Properties map[string]json.RawMessage `json:"properties"`
+				}
+				require.NoError(t, json.Unmarshal([]byte(textSchema), &parsed))
+				var selector struct {
+					Enum []string `json:"enum"`
+				}
+				require.NoError(t, json.Unmarshal(parsed.Properties["@action"], &selector))
+				require.Contains(t, selector.Enum, actionName)
+				require.Contains(t, parsed.Properties, "search_query")
+				return
+			}
+			require.Empty(t, textSchema)
+			require.Contains(t, nativeSchemas, actionName)
+			require.Contains(t, loop.lastNativeActionNames, actionName)
+			for _, tool := range loop.lastNativeTools {
+				if tool.Function.Name != actionName {
+					continue
+				}
+				parameters, ok := tool.Function.Parameters.(map[string]any)
+				require.True(t, ok)
+				require.Contains(t, parameters["properties"], "search_query")
+				require.Contains(t, parameters["required"], "search_query")
+				return
+			}
+			t.Fatal("search_capabilities native tool is missing")
+		})
+	}
 }
 
 // TestGenerateSchema_DirectlyCallToolDisabledWhenNoToolManager 验证 P2.1 之后
