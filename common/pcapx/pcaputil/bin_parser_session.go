@@ -30,7 +30,7 @@ func (f *binFlow) detectDirection(dir int, wire []byte) {
 		return
 	}
 	if len(wire) >= 4 && bytes.Equal(wire[:4], []byte("FINS")) {
-		f.protocol, f.fins = "fins", &binFINS{}
+		f.protocol, f.fins = "fins", &binFINS{clientKnown: f.tcpClientKnown, clientDir: f.tcpClientDir}
 		return
 	}
 	if p := probeSLMPTCP(wire, min(f.a.budget.MaxFrameBytes, f.a.config.MaxMessageBytes), f.port(5000)); p.Verdict == ProbeAccept {

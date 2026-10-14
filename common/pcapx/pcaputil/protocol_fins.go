@@ -19,6 +19,9 @@ type finsPending struct {
 	at   time.Time
 }
 type binFINS struct {
+	clock       time.Time
+	clientKnown bool
+	clientDir   int
 	seen        [2][256]bool
 	pending     [2]map[byte]*finsPending
 	blocked     bool
@@ -49,6 +52,12 @@ func (s *binFINS) retire() {
 	s.nodeSeen = true
 }
 func (s *binFINS) expire(now time.Time) {
+	if now.After(s.clock) {
+		s.clock = now
+	} else {
+		now = s.clock
+	}
+
 	for d, m := range s.pending {
 		for sid, p := range m {
 			if now.Sub(p.at) >= 30*time.Second {
@@ -122,6 +131,11 @@ func finsHex(w []byte) string { return hex.EncodeToString(w) }
 func finsBE(w []byte) uint64  { return uint64(binary.BigEndian.Uint16(w)) }
 
 func (s *binFINS) consumeTCP(w []byte, dir int, id uint64, now time.Time, b ParserBudget) (map[string]any, uint64, error) {
+	// Every validated envelope advances capture time, including discarded
+	// confirmations. A later timestamp regression cannot revive old ownership.
+	s.expire(now)
+	now = s.clock
+
 	cmd, code := binary.BigEndian.Uint32(w[8:12]), binary.BigEndian.Uint32(w[12:16])
 	out := map[string]any{"tcp_command": uint64(cmd), "tcp_error": uint64(code), "tcp_length": uint64(len(w) - 8), "authenticated": false}
 	if b.MaxCollectionElements < 32 || b.MaxRecursionDepth < 4 {
@@ -139,6 +153,13 @@ func (s *binFINS) consumeTCP(w []byte, dir int, id uint64, now time.Time, b Pars
 			return nil, 0, finsErr(ErrMalformedMessage, "client node request")
 		}
 		out["client_node"] = uint64(n)
+		// W421 node0 is the TCP client's address-exchange request. A known
+		// SYN initiator contradicting that role cannot establish allocation.
+		if s.clientKnown && dir != s.clientDir {
+			s.retire()
+			out["allocation_status"] = "unverified-tcp-role"
+			return out, 0, nil
+		}
 		if s.nodeSeen {
 			s.retire()
 			out["allocation_status"] = "unverified-repeated-exchange"
@@ -206,6 +227,7 @@ func finsHeader(w []byte, b ParserBudget) (map[string]any, error) {
 }
 func (s *binFINS) consume(w []byte, dir int, id uint64, now time.Time, b ParserBudget, tcp bool) (map[string]any, uint64, error) {
 	s.expire(now)
+	now = s.clock
 	f, err := finsHeader(w, b)
 	// Any rejected frame with an observable SID retires that direction's request
 	// or the opposite response slot. A refusal cannot leave an old owner alive.

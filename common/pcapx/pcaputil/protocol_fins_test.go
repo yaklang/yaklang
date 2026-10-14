@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/gopacket/gopacket/layers"
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/internal/trafficfixture"
 )
@@ -553,6 +554,37 @@ func TestFINSSelectedAdmissionAndIncompleteClose(t *testing.T) {
 	rocTypedError(t, "NeedMore", err)
 	require.Empty(t, s.Close("again"))
 	require.Zero(t, s.Stats().BufferedBytes)
+	// Reuse the same sealed node0/1 bytes; only observed TCP direction changes.
+	// All12 capture configurations and IPv4/IPv6 must reject the false link.
+	nodes := finsCase(t, "tcp-node-cpu-notifications-tcp")
+	executed := 0
+	discoveryMatrix(t, func(t *testing.T, workers int, deferred, observe bool) {
+		for _, ipv6 := range []bool{false, true} {
+			raw := sessionTestPCAP(t, []sessionStep{{dir: 1, wire: wrapperWire(t, nodes.Events[0].Raw)}, {dir: 0, wire: wrapperWire(t, nodes.Events[1].Raw)}}, layers.TCPPort(9600), 0, ipv6, false)
+			events, stats := discoveryReplay(t, raw, workers, deferred, observe)
+			require.Len(t, events, 2)
+			for i, e := range events {
+				require.Equal(t, 1-i, e.Direction)
+				require.Zero(t, e.ResponseTo)
+				require.Zero(t, e.TransactionID)
+				require.Equal(t, nodes.Events[i].Raw, hex.EncodeToString(e.Raw))
+				want := cloneSession(nodes.Events[i].Fields)
+				want["allocation_status"] = "unverified-response"
+				if i == 0 {
+					want["allocation_status"] = "unverified-tcp-role"
+				}
+				f, err := e.GetFields()
+				require.NoError(t, err)
+				rocEqualFields(t, want, f)
+				rocEqualFields(t, want, e.Session)
+			}
+			require.Equal(t, events[0].FlowID, events[1].FlowID)
+			require.Zero(t, stats.BufferedBytes)
+			executed++
+		}
+	})
+	require.Equal(t, 24, executed)
+
 }
 
 func TestFINSLiveOwnershipAndExactAssociation(t *testing.T) {
@@ -586,6 +618,36 @@ func TestFINSLiveOwnershipAndExactAssociation(t *testing.T) {
 				rocEqualFields(t, want, reply.Session)
 				require.Empty(t, s.Close("end"))
 				require.Zero(t, s.Stats().BufferedBytes)
+
+				if transport == "tcp" {
+					clocked := finsSession(t, "tcp", DefaultParserBudget())
+					clocked.(*captureSession).f.a.config.Deferred = deferred
+					first := clocked.Feed(0, time.Unix(1, 0), wrapperWire(t, c.Events[0].Raw))
+					require.Len(t, first.Events, 1)
+					confirm := clocked.Feed(1, time.Unix(32, 0), wrapperWire(t, "46494e53000000080000000600000000"))
+					require.Len(t, confirm.Events, 1)
+					late := clocked.Feed(1, time.Unix(2, 0), wrapperWire(t, c.Events[1].Raw))
+					require.Len(t, late.Events, 1)
+					require.Zero(t, late.Events[0].ResponseTo)
+					require.Zero(t, late.Events[0].TransactionID)
+					want := cloneSession(c.Events[1].Fields)
+					inner := want["fins"].(map[string]any)
+					inner["association_status"], inner["option_context_observed"] = "unverified-response", false
+					delete(inner, "observed_request_id")
+					f, err := late.Events[0].GetFields()
+					require.NoError(t, err)
+					rocEqualFields(t, want, f)
+					rocEqualFields(t, want, late.Events[0].Session)
+					q, r := wrapperWire(t, c.Events[0].Raw), wrapperWire(t, c.Events[1].Raw)
+					q[25], r[25] = 1, 1
+					fresh := clocked.Feed(0, time.Unix(2, 0), q)
+					require.Len(t, fresh.Events, 1)
+					response := clocked.Feed(1, time.Unix(3, 0), r)
+					require.Len(t, response.Events, 1)
+					require.Equal(t, fresh.Events[0].ID, response.Events[0].ResponseTo)
+					require.Empty(t, clocked.Close("end"))
+					require.Zero(t, clocked.Stats().BufferedBytes)
+				}
 			})
 		}
 	}
