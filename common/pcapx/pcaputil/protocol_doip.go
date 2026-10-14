@@ -306,6 +306,26 @@ func (s *binDoIP) consumeEvent(dir int, raw []byte, eventID uint64) (map[string]
 				out["Generation Identifiable"] = false
 			}
 		} else {
+			// A complete late message from an observed diagnostic target lacks
+			// active eligibility. Validate bytes first and keep that refusal local.
+			if !client && !s.diagnosticPending && target == s.tester {
+				if h, known := s.history[source]; known {
+					if err := doipDiagnosticResponseShape(kind, data); err != nil {
+						return nil, err
+					}
+					descriptor, hasDescriptor := byte(0), false
+					if kind == 0x8001 && data[0] == 0x50 {
+						descriptor, hasDescriptor = data[1], true
+					}
+					if (kind == 0x8002 || kind == 0x8003) && len(data) == 3 {
+						descriptor, hasDescriptor = data[2], true
+					}
+					if !hasDescriptor || descriptor < 128 && h.seen[descriptor/64]&(uint64(1)<<(descriptor%64)) != 0 {
+						s.associationRefusal = true
+						return nil, protocolError(ErrContextRequired, "DoIP late response has no active diagnostic request")
+					}
+				}
+			}
 			if client || !s.diagnosticPending || source != s.target || target != s.tester {
 				if !client && s.diagnosticPending && s.diagnosticSuperseded && target == s.tester {
 					if _, known := s.history[source]; known {

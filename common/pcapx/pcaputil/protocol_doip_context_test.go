@@ -158,6 +158,9 @@ func doipContextFile(t *testing.T, prefix, name string) []byte {
 	if prefix == "doip-context-echo" {
 		env = "DOIP_ECHO_TEST_ROOT"
 	}
+	if prefix == "doip-context-late" {
+		env = "DOIP_LATE_TEST_ROOT"
+	}
 	if root := os.Getenv(env); root != "" {
 		b, err := os.ReadFile(filepath.Join(root, name))
 		require.NoError(t, err)
@@ -182,7 +185,7 @@ func runDoIPContextMatrix(t *testing.T, prefix string, count int) {
 	require.NoError(t, json.Unmarshal(doipContextFile(t, prefix, "manifest.json"), &m))
 	require.Len(t, m.Cases, count)
 	var frozen map[string]trafficfixture.FrozenCase
-	if os.Getenv("DOIP_CONTEXT_TEST_ROOT") == "" && os.Getenv("DOIP_ECHO_TEST_ROOT") == "" {
+	if os.Getenv("DOIP_CONTEXT_TEST_ROOT") == "" && os.Getenv("DOIP_ECHO_TEST_ROOT") == "" && os.Getenv("DOIP_LATE_TEST_ROOT") == "" {
 		frozen = map[string]trafficfixture.FrozenCase{}
 		all, err := trafficfixture.AllExpectations()
 		require.NoError(t, err)
@@ -353,4 +356,135 @@ func TestDoIPContextRetiredEchoHighBitCannotPanic(t *testing.T) {
 			require.Zero(t, s.Stats().BufferedBytes)
 		})
 	}
+}
+
+// Passive late complete known wire cannot certify completion or consume future eligibility.
+func TestDoIPLateCompletedContextBoundary(t *testing.T) {
+	for _, late := range []bool{false, true} {
+		t.Run(fmt.Sprintf("late=%t", late), func(t *testing.T) {
+			s := doipPublicActive(t)
+			defer s.Close("test")
+			rq := func(v byte) []byte { return doipTestWire(0x8001, 0x0e, 0x80, 0x40, 0x10, 0x10, v) }
+			rp := func(v byte) []byte { return doipTestWire(0x8001, 0x40, 0x10, 0x0e, 0x80, 0x50, v, 0, 50, 1, 244) }
+			first := doipPublicFeed(t, s, 0, rq(2))
+			require.Nil(t, first.Err)
+			done := doipPublicFeed(t, s, 1, rp(2))
+			require.Nil(t, done.Err)
+			require.Equal(t, first.Events[0].ID, done.Events[0].ResponseTo)
+			if late {
+				x := doipPublicFeed(t, s, 1, rp(2))
+				require.NotNil(t, x.Err)
+				require.Equal(t, ErrContextRequired, x.Err.Kind, "complete known late bytes lack active request context; do not misclassify wire")
+				require.Zero(t, x.Events[0].ResponseTo)
+				require.Nil(t, x.Events[0].Session)
+				f, e := x.Events[0].GetFields()
+				require.Nil(t, f)
+				rocTypedError(t, string(ErrContextRequired), e)
+			}
+			next := doipPublicFeed(t, s, 0, rq(3))
+			require.Nil(t, next.Err)
+			done = doipPublicFeed(t, s, 1, rp(3))
+			require.Nil(t, done.Err)
+			require.Equal(t, next.Events[0].ID, done.Events[0].ResponseTo)
+			require.Empty(t, s.Close("test"))
+			require.Empty(t, s.Close("again"))
+			require.Zero(t, s.Stats().BufferedBytes)
+		})
+	}
+}
+
+func TestDoIPLateCompletedWireAndContextBoundaries(t *testing.T) {
+	cases := []struct {
+		name           string
+		kind           uint16
+		source, target uint16
+		dir            int
+		body           []byte
+		want           ProtocolErrorKind
+		recoverable    bool
+	}{
+		{"known-positive", 0x8001, 0x4010, 0x0e80, 1, []byte{0x50, 2, 0, 50, 1, 244}, ErrContextRequired, true},
+		{"known-ack-echo", 0x8002, 0x4010, 0x0e80, 1, []byte{0, 0x10, 2}, ErrContextRequired, true},
+		{"known-nack-echo", 0x8003, 0x4010, 0x0e80, 1, []byte{6, 0x10, 2}, ErrContextRequired, true},
+		{"known-short-ack", 0x8002, 0x4010, 0x0e80, 1, []byte{0}, ErrContextRequired, true},
+		{"known-service-nrc", 0x8001, 0x4010, 0x0e80, 1, []byte{0x7f, 0x10, 0x78}, ErrContextRequired, true},
+		{"malformed-positive", 0x8001, 0x4010, 0x0e80, 1, []byte{0x50, 2, 0, 50, 1}, ErrMalformedMessage, false},
+		{"invalid-ack-code", 0x8002, 0x4010, 0x0e80, 1, []byte{9}, ErrMalformedMessage, false},
+		{"suppressed-echo", 0x8002, 0x4010, 0x0e80, 1, []byte{0, 0x10, 0x82}, ErrUnsupportedFeature, false},
+		{"unknown-service", 0x8001, 0x4010, 0x0e80, 1, []byte{0x51, 2}, ErrUnsupportedFeature, false},
+		{"unknown-descriptor", 0x8001, 0x4010, 0x0e80, 1, []byte{0x50, 4, 0, 50, 1, 244}, ErrMalformedMessage, false},
+		{"unknown-source", 0x8001, 0x4020, 0x0e80, 1, []byte{0x50, 2, 0, 50, 1, 244}, ErrMalformedMessage, false},
+		{"wrong-target", 0x8001, 0x4010, 0x0e81, 1, []byte{0x50, 2, 0, 50, 1, 244}, ErrMalformedMessage, false},
+		{"wrong-direction", 0x8001, 0x4010, 0x0e80, 0, []byte{0x50, 2, 0, 50, 1, 244}, ErrMalformedMessage, false},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			s := doipPublicActive(t)
+			defer s.Close("test")
+			rq := func(v byte) []byte { return doipTestWire(0x8001, 0x0e, 0x80, 0x40, 0x10, 0x10, v) }
+			rp := func(v byte) []byte { return doipTestWire(0x8001, 0x40, 0x10, 0x0e, 0x80, 0x50, v, 0, 50, 1, 244) }
+			first := doipPublicFeed(t, s, 0, rq(2))
+			require.Nil(t, first.Err)
+			done := doipPublicFeed(t, s, 1, rp(2))
+			require.Nil(t, done.Err)
+			require.Equal(t, first.Events[0].ID, done.Events[0].ResponseTo)
+			body := append([]byte{byte(c.source >> 8), byte(c.source), byte(c.target >> 8), byte(c.target)}, c.body...)
+			x := doipPublicFeed(t, s, c.dir, doipTestWire(c.kind, body...))
+			require.NotNil(t, x.Err)
+			require.Equal(t, c.want, x.Err.Kind)
+			require.Zero(t, x.Events[0].ResponseTo)
+			require.Nil(t, x.Events[0].Session)
+			require.Equal(t, c.dir, x.Events[0].Direction)
+			f, e := x.Events[0].GetFields()
+			require.Nil(t, f)
+			rocTypedError(t, string(c.want), e)
+			require.Zero(t, s.Stats().CallbackPanics)
+			if c.recoverable {
+				next := doipPublicFeed(t, s, 0, rq(3))
+				require.Nil(t, next.Err)
+				done = doipPublicFeed(t, s, 1, rp(3))
+				require.Nil(t, done.Err)
+				require.Equal(t, next.Events[0].ID, done.Events[0].ResponseTo)
+				require.Equal(t, 3, done.Events[0].Session["Session Type"])
+			}
+			require.Empty(t, s.Close("test"))
+			require.Empty(t, s.Close("again"))
+			require.Zero(t, s.Stats().BufferedBytes)
+		})
+	}
+}
+
+func TestDoIPLateCompletedContextRetainsIdentityBudget(t *testing.T) {
+	b := DefaultParserBudget()
+	b.MaxCollectionElements = 1
+	s, err := NewProtocolSession(b)
+	require.NoError(t, err)
+	defer s.Close("test")
+	for _, a := range []struct {
+		d int
+		b []byte
+	}{{0, doipTestWire(5, 0x0e, 0x80, 0, 0, 0, 0, 0)}, {1, doipTestWire(6, 0x0e, 0x80, 0x40, 0x10, 0x10, 0, 0, 0, 0)}} {
+		require.Nil(t, doipPublicFeed(t, s, a.d, a.b).Err)
+	}
+	req := func(v byte) []byte { return doipTestWire(0x8001, 0x0e, 0x80, 0x40, 0x10, 0x10, v) }
+	positive := doipTestWire(0x8001, 0x40, 0x10, 0x0e, 0x80, 0x50, 2, 0, 50, 1, 244)
+	r := doipPublicFeed(t, s, 0, req(2))
+	require.Nil(t, r.Err)
+	done := doipPublicFeed(t, s, 1, positive)
+	require.Nil(t, done.Err)
+	require.Equal(t, r.Events[0].ID, done.Events[0].ResponseTo)
+	late := doipPublicFeed(t, s, 1, positive)
+	require.Equal(t, ErrContextRequired, late.Err.Kind)
+	require.Zero(t, late.Events[0].ResponseTo)
+	rejected := doipPublicFeed(t, s, 0, req(3))
+	require.Equal(t, ErrResourceExceeded, rejected.Err.Kind)
+	require.Zero(t, rejected.Events[0].ResponseTo)
+	require.Nil(t, rejected.Events[0].Session)
+	require.Empty(t, s.Close("test"))
+	require.Empty(t, s.Close("again"))
+	require.Zero(t, s.Stats().BufferedBytes)
+}
+
+func TestDoIPLateCompletedSealedMatrix(t *testing.T) {
+	runDoIPContextMatrix(t, "doip-context-late", 42)
 }
