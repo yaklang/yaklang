@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"sync"
 	"testing"
-	"time"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
@@ -25,10 +24,8 @@ alert $target`, QueryWithMemory(), QueryWithTaskID(uuid.NewString()))
 	require.Len(t, res.GetRisks(), 1)
 	before := res.GetRisks()[0]
 	hash := before.Hash
-	// Materialization is independent of DB callbacks, so memory and streaming
-	// consumers already have a valid timestamp before any save happens.
-	require.False(t, before.CreatedAt.IsZero())
-	require.Greater(t, res.GetGRPCModelRisk()[0].CreatedAt, int64(0))
+	// The row timestamp belongs to the database insert, not to construction.
+	require.True(t, before.CreatedAt.IsZero())
 	var n int64
 	require.NoError(t, ssadb.GetDB().Model(&schema.SSARisk{}).Where("hash = ?", hash).Count(&n).Error)
 	require.Zero(t, n)
@@ -37,6 +34,8 @@ alert $target`, QueryWithMemory(), QueryWithTaskID(uuid.NewString()))
 	require.NoError(t, err)
 	var stored schema.SSARisk
 	require.NoError(t, ssadb.GetDB().Where("hash = ?", hash).First(&stored).Error)
+	require.False(t, stored.CreatedAt.IsZero())
+	require.Greater(t, res.GetGRPCModelRisk()[0].CreatedAt, int64(0))
 	require.Equal(t, uint64(id), stored.ResultID)
 	require.Equal(t, res.GetResultUUID(), stored.ResultUUID)
 	require.Equal(t, hash, res.GetRiskHash("target", 0))
@@ -151,7 +150,6 @@ func TestRiskSaverDropsOnlyCoveredAuditEdges(t *testing.T) {
 	})
 	covered := batchRisk(uuid.NewString(), name, "ssa", "covered")
 	covered.RuntimeId = name
-	covered.CreatedAt = time.Now()
 	require.NoError(t, SaveRiskUpdates(db, schema.RiskUpdateItem{Risk: covered, OldID: risk.ID, OldHash: risk.Hash}))
 	var n int64
 	require.NoError(t, db.Model(&ssadb.AuditEdge{}).Where("id = ?", edge.ID).Count(&n).Error)

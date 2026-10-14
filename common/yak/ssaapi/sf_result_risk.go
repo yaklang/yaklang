@@ -4,9 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
-	"time"
-
-	"github.com/yaklang/gorm"
 
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/memedit"
@@ -87,9 +84,7 @@ func buildSSARisk(
 	}
 	riskCodeRange, CodeFragment := CoverCodeRange(value.GetRange())
 	rule := result.rule
-	now := time.Now()
 	newSSARisk := &schema.SSARisk{
-		Model:         gorm.Model{CreatedAt: now, UpdatedAt: now},
 		CodeSourceUrl: utils.EscapeInvalidUTF8Byte([]byte(riskCodeRange.URL)),
 		CodeRange:     riskCodeRange.JsonString(),
 		CodeFragment:  utils.EscapeInvalidUTF8Byte([]byte(CodeFragment)),
