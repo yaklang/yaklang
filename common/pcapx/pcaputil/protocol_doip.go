@@ -9,18 +9,43 @@ import (
 // Wire fields were cross-checked with python-doipclient messages.py and Scapy
 // automotive/doip.py. It does not establish vehicle identity or decode other UDS
 // services, UDP discovery, TLS, or manufacturer routing activation semantics.
+type doipDiagnosticHistory struct {
+	seen        [2]uint64
+	generations byte
+}
 type binDoIP struct {
-	clientDir                                 int
-	maxPending                                int
-	routePending, active, alivePending        bool
-	tester, entity                            uint16
-	version                                   byte
-	diagnosticPending, diagnosticAcknowledged bool
-	target                                    uint16
-	request                                   [2]byte
+	clientDir                                        int
+	maxPending                                       int
+	routePending, active, alivePending               bool
+	tester, entity                                   uint16
+	version                                          byte
+	diagnosticPending, diagnosticAcknowledged        bool
+	target                                           uint16
+	request                                          [2]byte
+	history                                          map[uint16]doipDiagnosticHistory
+	identities                                       int
+	diagnosticRetired                                bool
+	diagnosticAmbiguous                              bool
+	associationRefusal                               bool // complete bounded reply; no pending state consumed
+	routeEvent, aliveEvent, diagnosticEvent, replyTo uint64
+	reserveMemory                                    func(int64) error
 }
 
-func (s *binDoIP) sessionBytes() int64 { return 256 }
+func (s *binDoIP) sessionBytes() int64 { return 256 + int64(len(s.history))*128 }
+func (s *binDoIP) retireDiagnostics() {
+	s.diagnosticPending, s.diagnosticAcknowledged, s.diagnosticRetired = false, false, true
+	s.diagnosticEvent, s.target, s.request = 0, 0, [2]byte{}
+	s.diagnosticAmbiguous = false
+}
+
+// A rejected client diagnostic frame cannot leave old eligibility behind.
+// Unknown response/direction errors do not consume a legitimate pending request.
+func (s *binDoIP) refusedWire(dir int, w []byte) {
+	if dir == s.clientDir && len(w) >= 8 && binary.BigEndian.Uint16(w[2:4]) == 0x8001 {
+		s.retireDiagnostics()
+	}
+}
+
 func (s *binDoIP) outstanding() int {
 	n := 0
 	if s.routePending {
@@ -102,6 +127,11 @@ func probeDoIP(w []byte, limit int) ProbeResult {
 }
 
 func (s *binDoIP) consume(dir int, raw []byte) (map[string]any, error) {
+	return s.consumeEvent(dir, raw, 0)
+}
+func (s *binDoIP) consumeEvent(dir int, raw []byte, eventID uint64) (map[string]any, error) {
+	s.replyTo = 0
+	s.associationRefusal = false
 	n, err := doipFrameSize(raw, len(raw))
 	if err != nil {
 		return nil, err
@@ -134,6 +164,7 @@ func (s *binDoIP) consume(dir int, raw []byte) (map[string]any, error) {
 			return nil, protocolError(ErrResourceExceeded, "DoIP pending limit exceeded")
 		}
 		s.tester, s.routePending, s.version = binary.BigEndian.Uint16(p[:2]), true, raw[0]
+		s.routeEvent = eventID
 		out["Packet Name"], out["Role"] = "Routing Activation Request", "request"
 		out["Tester Address"], out["Activation Type"] = int(s.tester), int(p[2])
 		if len(p) == 11 {
@@ -153,6 +184,8 @@ func (s *binDoIP) consume(dir int, raw []byte) (map[string]any, error) {
 		s.entity = binary.BigEndian.Uint16(p[2:4])
 		// 0x11 requires confirmation: it does not activate this profile.
 		s.active, s.routePending = code == 0x10, false
+		s.replyTo = s.routeEvent
+		s.routeEvent = 0
 		out["Packet Name"], out["Role"], out["Association"] = "Routing Activation Response", "response", "matched"
 		out["Tester Address"], out["Entity Address"], out["Response Code"] = int(s.tester), int(s.entity), int(code)
 		out["Routing Active"] = s.active
@@ -170,12 +203,15 @@ func (s *binDoIP) consume(dir int, raw []byte) (map[string]any, error) {
 			return nil, protocolError(ErrResourceExceeded, "DoIP pending limit exceeded")
 		}
 		s.alivePending = true
+		s.aliveEvent = eventID
 		out["Packet Name"], out["Role"] = "Alive Check Request", "request"
 	case 8:
 		if !client || !s.alivePending || binary.BigEndian.Uint16(p) != s.tester {
 			return nil, protocolError(ErrMalformedMessage, "DoIP alive response has no matching request")
 		}
 		s.alivePending = false
+		s.replyTo = s.aliveEvent
+		s.aliveEvent = 0
 		out["Packet Name"], out["Role"], out["Association"] = "Alive Check Response", "response", "matched"
 		out["Tester Address"] = int(s.tester)
 	case 0x8001, 0x8002, 0x8003:
@@ -185,30 +221,75 @@ func (s *binDoIP) consume(dir int, raw []byte) (map[string]any, error) {
 		source, target := binary.BigEndian.Uint16(p[:2]), binary.BigEndian.Uint16(p[2:4])
 		out["Source Address"], out["Target Address"] = int(source), int(target)
 		data := p[4:]
+		if s.diagnosticRetired {
+			return nil, sessionContext("DoIP diagnostic context retired after rejected request")
+		}
 		if kind == 0x8001 && client {
 			if source != s.tester || target == 0 || s.diagnosticPending {
+				if source == s.tester && (target != s.target || len(data) != 2 || !bytes.Equal(data, s.request[:])) {
+					s.retireDiagnostics()
+				}
 				return nil, protocolError(ErrMalformedMessage, "DoIP diagnostic request address or order is invalid")
 			}
 			if data[0] != 0x10 {
+				s.retireDiagnostics()
 				return nil, protocolError(ErrUnsupportedFeature, "DoIP UDS service is outside DiagnosticSessionControl profile")
 			}
 			if len(data) != 2 || data[1]&0x7f == 0 {
+				s.retireDiagnostics()
 				return nil, protocolError(ErrMalformedMessage, "UDS DiagnosticSessionControl request is malformed")
 			}
 			if data[1]&0x80 != 0 {
+				s.retireDiagnostics()
 				return nil, protocolError(ErrUnsupportedFeature, "UDS suppressed positive response requires unsupported completion semantics")
 			}
 			if s.maxPending <= s.outstanding() {
 				return nil, protocolError(ErrResourceExceeded, "DoIP pending limit exceeded")
 			}
+			h := s.history[target]
+			index, bit := data[1]/64, uint64(1)<<(data[1]%64)
+			reused := h.seen[index]&bit != 0
+			if !reused && s.identities >= sessionCollectionLimit(s.maxPending) {
+				s.retireDiagnostics()
+				return nil, protocolError(ErrResourceExceeded, "DoIP diagnostic identity history limit exceeded")
+			}
+			if _, exists := s.history[target]; !exists {
+				if s.reserveMemory != nil {
+					if err := s.reserveMemory(s.sessionBytes() + 128); err != nil {
+						s.retireDiagnostics()
+						return nil, protocolError(ErrResourceExceeded, "DoIP diagnostic history memory reservation failed")
+					}
+				}
+				if s.history == nil {
+					s.history = make(map[uint16]doipDiagnosticHistory)
+				}
+			}
+			h.seen[index] |= bit
+			if h.generations < 2 {
+				h.generations++
+			}
+			s.history[target] = h
+			if !reused {
+				s.identities++
+			}
+			s.diagnosticAmbiguous = reused
+			s.diagnosticEvent = eventID
 			s.request, s.target = [2]byte{data[0], data[1]}, target
 			s.diagnosticPending, s.diagnosticAcknowledged = true, false
 			out["Packet Name"], out["Role"] = "DiagnosticSessionControl Request", "request"
 			out["UDS Service"], out["Session Type"] = 0x10, int(data[1]&0x7f)
 			out["Suppress Positive Response"] = data[1]&0x80 != 0
+			if reused {
+				out["Association"] = "unverified-reused-diagnostic-request"
+				out["Generation Identifiable"] = false
+			}
 		} else {
 			if client || !s.diagnosticPending || source != s.target || target != s.tester {
 				return nil, protocolError(ErrMalformedMessage, "DoIP diagnostic response has no matching address/direction/request")
+			}
+			if s.diagnosticAmbiguous {
+				s.associationRefusal = true
+				return nil, protocolError(ErrContextRequired, "DoIP reply cannot identify a reused diagnostic identity generation")
 			}
 			out["Role"], out["Association"], out["In Reply To"] = "response", "matched", "DiagnosticSessionControl Request"
 			out["Session Type"] = int(s.request[1] & 0x7f)
@@ -219,6 +300,10 @@ func (s *binDoIP) consume(dir int, raw []byte) (map[string]any, error) {
 				}
 				if len(data) > 3 || !bytes.Equal(data[1:], s.request[:len(data)-1]) {
 					return nil, protocolError(ErrMalformedMessage, "DoIP acknowledgement previous message differs from request")
+				}
+				if s.history[source].generations > 1 && len(data) != 3 {
+					s.associationRefusal = true
+					return nil, protocolError(ErrContextRequired, "DoIP acknowledgement omits a unique diagnostic descriptor")
 				}
 				out["Acknowledgement Code"] = int(code)
 				if kind == 0x8002 {
@@ -248,6 +333,10 @@ func (s *binDoIP) consume(dir int, raw []byte) (map[string]any, error) {
 					if len(data) != 3 || data[1] != 0x10 || data[2] == 0 {
 						return nil, protocolError(ErrMalformedMessage, "UDS negative response differs from request")
 					}
+					if s.history[source].generations > 1 {
+						s.associationRefusal = true
+						return nil, protocolError(ErrContextRequired, "DoIP service-only negative response cannot identify diagnostic generation")
+					}
 					out["Packet Name"], out["UDS Service"], out["Negative Response Code"] = "DiagnosticSessionControl Negative Response", 0x7f, int(data[2])
 					out["Response Pending"] = data[2] == 0x78
 					s.diagnosticPending = data[2] == 0x78
@@ -255,11 +344,14 @@ func (s *binDoIP) consume(dir int, raw []byte) (map[string]any, error) {
 					return nil, protocolError(ErrUnsupportedFeature, "DoIP UDS response service is unsupported")
 				}
 			}
+			s.replyTo = s.diagnosticEvent
 			out["Diagnostic Acknowledged"] = s.diagnosticAcknowledged
 			if !s.diagnosticPending {
 				s.diagnosticAcknowledged = false
 				s.request = [2]byte{}
 				s.target = 0
+				s.diagnosticEvent = 0
+				s.diagnosticAmbiguous = false
 			}
 		}
 	}

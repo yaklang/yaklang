@@ -27,6 +27,8 @@ type ProtocolEvent struct {
 	semanticMetadata                         any
 	ownedRuleEnvelope, hasRuleMetadata       bool
 	nativeQUICWire                           bool
+	nativeDoIPObservation                    bool
+	doipAssociationRefusal                   bool // private complete-frame refusal scope
 	nativeCANRecord                          bool
 	ocpp                                     bool
 	Domain                                   CaptureDomain
@@ -243,6 +245,9 @@ func (e *ProtocolEvent) retainRuleEnvelope(result map[string]any) {
 }
 
 func (e *ProtocolEvent) ownsNativeFields() bool {
+	if e.nativeDoIPObservation {
+		return true
+	}
 	if e.nativeBACnetRead {
 		return true
 	}
@@ -853,6 +858,10 @@ func (f *binFlow) event(dir int, raw []byte, status, detail string) *BinParserEv
 		e.nativeMMSObservation = true
 		e.Profile = f.mms.profile()
 	}
+	if f.doip != nil {
+		e.nativeDoIPObservation = true
+		e.Profile = "doip-routing-dsc"
+	}
 	f.eventEvidence(dir, e)
 	if f.slmpTCP != nil {
 		e.Profile, e.Completeness = slmpTCPProfile, "message"
@@ -1430,12 +1439,13 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 		failed := e.Error != ""
 		// Only CRC/length-validated complete link frames can carry this private
 		// application-level refusal scope. Snapshot before public callbacks.
+		recoverableDoIP := e.Protocol == "doip" && e.doipAssociationRefusal
 		recoverableDNP3 := e.Protocol == "dnp3" && e.Session["Error Scope"] == "application"
 		a.emit(e)
 		if !failed {
 			f.deliverTLS(dir, e)
 		}
-		if failed && !recoverableDNP3 && !(e.Protocol == "slmp" && slmpTCPRecoverable(e.sessionError)) && !(e.Protocol == "dlms-wrapper" && dlmsRecoverableMessageError(e.sessionError)) && !(e.Protocol == "c37118" && c37118RecoverableMessageError(e.sessionError)) && !(e.Protocol == "dlms" && dlmsRecoverableMessageError(e.sessionError)) && !(e.Protocol == "roc-plus" && rocRecoverableMessageError(e.sessionError)) && !(e.Protocol == "genisys" && genisysRecoverableMessageError(e.sessionError)) && !((e.Protocol == "http2" || e.Protocol == "grpc" || e.Protocol == "doh") && e.Session["Error Scope"] == "stream") {
+		if failed && !recoverableDNP3 && !recoverableDoIP && !(e.Protocol == "slmp" && slmpTCPRecoverable(e.sessionError)) && !(e.Protocol == "dlms-wrapper" && dlmsRecoverableMessageError(e.sessionError)) && !(e.Protocol == "c37118" && c37118RecoverableMessageError(e.sessionError)) && !(e.Protocol == "dlms" && dlmsRecoverableMessageError(e.sessionError)) && !(e.Protocol == "roc-plus" && rocRecoverableMessageError(e.sessionError)) && !(e.Protocol == "genisys" && genisysRecoverableMessageError(e.sessionError)) && !((e.Protocol == "http2" || e.Protocol == "grpc" || e.Protocol == "doh") && e.Session["Error Scope"] == "stream") {
 			if stateful {
 				f.invalidateSession(1 - dir)
 				f.closeSession()

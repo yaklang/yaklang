@@ -194,9 +194,13 @@ func (f *binFlow) frameDirection(dir int, w []byte) (int, *binSpec, error) {
 			return n, &binSpec{}, err
 		case "doip":
 			if err := f.reserveSession(f.doip.sessionBytes()); err != nil {
+				f.doip.refusedWire(dir, w)
 				return 0, nil, err
 			}
 			n, err := doipFrameSize(w, f.a.budget.MaxFrameBytes)
+			if err != nil {
+				f.doip.refusedWire(dir, w)
+			}
 			return n, &binSpec{}, err
 		case "enip":
 			return f.frameENIP(w)

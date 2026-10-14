@@ -83158,6 +83158,417 @@
         "common/pcapx/pcaputil/can-uds-parameter/verify.py": "can-uds-parameter/verify.py",
         "scripts/protocol-tests/required-tests-traffic-unified-v69.json": "required-tests-traffic-unified-v69.json"
       }
+    },
+    {
+      "id": "validation-doip-generation",
+      "kind": "validation",
+      "source_sha": "cd9cc7e05482d5e0b5703bad98ff55e9d6ee9d0e",
+      "file": "validation-doip-generation.zip",
+      "sha256": "7b45ac9c5fd1436254debc29e87963613ba4dea6d975f1e1bc2df5b3b38a6262",
+      "password": "bin-parser",
+      "members": {
+        "doip-generation/REFERENCE-TSHARK-ACTUAL.json": {
+          "sha256": "e7c1bd630551de595241c37d8062912aad9bd3de8bc71b5764cda6999d18f5bd",
+          "bytes": 319
+        },
+        "doip-generation/SOURCE-PIN.json": {
+          "sha256": "f6f6f99e0d776d15c227c22838da067051a660e897288612d1c3406592acd9e4",
+          "bytes": 326
+        },
+        "doip-generation/answers/ambiguous-ack-then-positive-c1.json": {
+          "sha256": "ec517c94954b159940b2081227d05b538ac491443470857ed9d18b994ad5b3e6",
+          "bytes": 5821
+        },
+        "doip-generation/answers/ambiguous-ack-then-positive-c65535.json": {
+          "sha256": "2cabbd54dc6cc35b65bc0126c94661e2bfca5f40e2a3c24a610e1fb9543278d7",
+          "bytes": 4587
+        },
+        "doip-generation/answers/ambiguous-ack-then-positive-c7.json": {
+          "sha256": "efb3b8014caf8072c95096e5c47545358e9ac145a939497bf83dc4ec3369b865",
+          "bytes": 4715
+        },
+        "doip-generation/answers/ambiguous-nack-then-positive-c1.json": {
+          "sha256": "76e2a5e2505fe255ba358040bb9011eabf8c55e1da5a19f3872718ceee905528",
+          "bytes": 5821
+        },
+        "doip-generation/answers/ambiguous-nack-then-positive-c65535.json": {
+          "sha256": "fc426ef8231f35853f8d639a23f3bf835e9e232cd6d886d43d1c142f3953dd55",
+          "bytes": 4587
+        },
+        "doip-generation/answers/ambiguous-nack-then-positive-c7.json": {
+          "sha256": "60063d871e6b69a4b40e7c212231132ffd3f577bb336f03a8e698f9dc663b1d9",
+          "bytes": 4715
+        },
+        "doip-generation/answers/ambiguous-nrc-then-positive-c1.json": {
+          "sha256": "0d0bbe9d183119c912672d2431458a69547e2a8c2860653bcf0cf19a70b4d3f0",
+          "bytes": 5867
+        },
+        "doip-generation/answers/ambiguous-nrc-then-positive-c65535.json": {
+          "sha256": "bbb5ab6fd8c0ec4475c0a276b40a208a53805e3082d4703f483cff7974de264f",
+          "bytes": 4607
+        },
+        "doip-generation/answers/ambiguous-nrc-then-positive-c7.json": {
+          "sha256": "7215460b3255bc2fce19e3041c82043d740b29f6d32412d6628529e0a0e86cda",
+          "bytes": 4747
+        },
+        "doip-generation/answers/ambiguous-sid-prefix-then-positive-c1.json": {
+          "sha256": "0619d919aec27797fa2403b21a130fd0784072b1bd9c613ce22d7e8dcbfc9629",
+          "bytes": 5836
+        },
+        "doip-generation/answers/ambiguous-sid-prefix-then-positive-c65535.json": {
+          "sha256": "ddfa5fb3dfab8cb2ac7e56bc1cd8dcd90e2b16e67d642ab01b3439bd002ffcc1",
+          "bytes": 4589
+        },
+        "doip-generation/answers/ambiguous-sid-prefix-then-positive-c7.json": {
+          "sha256": "214fae48520f05b699a9f6bc78d2839042038b7e3bc3847a8d0de9664c62ca7c",
+          "bytes": 4717
+        },
+        "doip-generation/answers/another-logical-target-c1.json": {
+          "sha256": "cabcaa61fab29e1f47b388b9a50edd8f030052e44413101984749b1eba89cab5",
+          "bytes": 5307
+        },
+        "doip-generation/answers/another-logical-target-c65535.json": {
+          "sha256": "351c1d150cd8a3bb41b14da8c6a8a9c7292a40a114edf772cba48a46b55ca1d4",
+          "bytes": 4266
+        },
+        "doip-generation/answers/another-logical-target-c7.json": {
+          "sha256": "1656c7824c852ef6428e35fbc0d553470030c92c5b6be3b3dc7529c8b4592a81",
+          "bytes": 4383
+        },
+        "doip-generation/answers/first-negative-c1.json": {
+          "sha256": "3f010d01b1ce8016d7be7e69321271a14784a80417da0d7a2f3f4f8c610a647f",
+          "bytes": 3461
+        },
+        "doip-generation/answers/first-negative-c65535.json": {
+          "sha256": "4629098337fbf1f4fd0e5b45bbcc3e71a7ccb04c234184829549a52400ff05f0",
+          "bytes": 2782
+        },
+        "doip-generation/answers/first-negative-c7.json": {
+          "sha256": "a46d4535cf541fd805ea9318cfd18cec2ed09c833fc3e01bbe2d0384bb0c48e4",
+          "bytes": 2861
+        },
+        "doip-generation/answers/first-pending-terminal-c1.json": {
+          "sha256": "c8b168221d62876454dfe9d0c4d90a796c75178b2751f7a5eece200d92216386",
+          "bytes": 4504
+        },
+        "doip-generation/answers/first-pending-terminal-c65535.json": {
+          "sha256": "63e8d1a965443141c29a8e6d70a23abe112ab684175c021ba05f67bc92b64977",
+          "bytes": 3620
+        },
+        "doip-generation/answers/first-pending-terminal-c7.json": {
+          "sha256": "94ce0057ee9ebd3e53f8dc5c37bec4487996ec997be09659510583f854cf6852",
+          "bytes": 3724
+        },
+        "doip-generation/answers/first-positive-c1.json": {
+          "sha256": "80e94649b621f9bd341880bc1d6fa72523f8d49400bb2c18de126aaa54e06b02",
+          "bytes": 5560
+        },
+        "doip-generation/answers/first-positive-c65535.json": {
+          "sha256": "5a27a93157af7e0324f0867e6ca2a0b3c5adec6e218cf9dcb8366bb2df656599",
+          "bytes": 4508
+        },
+        "doip-generation/answers/first-positive-c7.json": {
+          "sha256": "b901513a072ced337aa6458ba1e572e673fa6b74318a7ad5720f25bd55231918",
+          "bytes": 4624
+        },
+        "doip-generation/answers/reused-type-close-c1.json": {
+          "sha256": "543cf15e59b6edb931ab9550aaadde7f93dec8d5d9a387e9f74c740af4cfa4a6",
+          "bytes": 5217
+        },
+        "doip-generation/answers/reused-type-close-c65535.json": {
+          "sha256": "ac06f6a795375b20aff87f4d119723326f54fb7212740e4d629d7c953cec2738",
+          "bytes": 4140
+        },
+        "doip-generation/answers/reused-type-close-c7.json": {
+          "sha256": "73efd79478466b04d094469a4935fc14474151414596f94534b2cae3aba7163e",
+          "bytes": 4257
+        },
+        "doip-generation/answers/second-negative-echo-c1.json": {
+          "sha256": "920f91f76b836193b86cfd0bb77b49b75c520862fa77e3ee8fba1786939f3dfe",
+          "bytes": 5222
+        },
+        "doip-generation/answers/second-negative-echo-c65535.json": {
+          "sha256": "fbda9aa801f4f9b5a32d6a398a82b012cd2f1f87896161d57003354a6fe3651d",
+          "bytes": 4181
+        },
+        "doip-generation/answers/second-negative-echo-c7.json": {
+          "sha256": "54e6f00b6cb92f2dfb3f2b01b1cde84c1958f845c2e1842d126b39074415a7a9",
+          "bytes": 4298
+        },
+        "doip-generation/answers/second-positive-echo-c1.json": {
+          "sha256": "a9e57bc9b24b0ebc6f007a8304120c4e33112feed1932eae3e9d1c40c25c2246",
+          "bytes": 6278
+        },
+        "doip-generation/answers/second-positive-echo-c65535.json": {
+          "sha256": "b327d1c07cb5848e8f40114a94aa33e0df111ea89928fbb66fbc11b64c31f08d",
+          "bytes": 5018
+        },
+        "doip-generation/answers/second-positive-echo-c7.json": {
+          "sha256": "06c93bd8b7dd08840acc830ebc50b98927b500e5a5b865bafa446410b39d3087",
+          "bytes": 5158
+        },
+        "doip-generation/answers/version3-positive-c1.json": {
+          "sha256": "4ca20c6ec783ee667b94ea40a44937beb7ed410f7f4ab2b66c7edc29dc6b4e7f",
+          "bytes": 3512
+        },
+        "doip-generation/answers/version3-positive-c65535.json": {
+          "sha256": "2eacfe749c1d319af992f1edafbcf2ff2128f48dc4db2b4242ee6ee4626100d1",
+          "bytes": 2797
+        },
+        "doip-generation/answers/version3-positive-c7.json": {
+          "sha256": "2735970040ded3f7798cb1a4b6e513822ebadf7b8205b72b5fe4eaf2ad55c3d2",
+          "bytes": 2876
+        },
+        "doip-generation/captures/ambiguous-ack-then-positive-c1.pcap": {
+          "sha256": "7ea109532829e2b6308cf301834fa5b25afa108a3ec2b5dfd023e6b7b40c720c",
+          "bytes": 7973
+        },
+        "doip-generation/captures/ambiguous-ack-then-positive-c65535.pcap": {
+          "sha256": "53eab7bce06a700c09f40e335e79f1007b21645a2eec5825e5840e575feb09de",
+          "bytes": 833
+        },
+        "doip-generation/captures/ambiguous-ack-then-positive-c7.pcap": {
+          "sha256": "75e75ecb7abe39e96ffc8b27d3fa92128c5bc9c2364a7efead8fa7967da9fecc",
+          "bytes": 1603
+        },
+        "doip-generation/captures/ambiguous-nack-then-positive-c1.pcap": {
+          "sha256": "a9a5d082e3b43e4db533cebe80e234d71c4b3dcf72d72e127c99de0d29bfbca5",
+          "bytes": 7973
+        },
+        "doip-generation/captures/ambiguous-nack-then-positive-c65535.pcap": {
+          "sha256": "44aa30c9cc3ee0d1894b72c658f58a5dea502f7af5a23828d4d89a60e19966d6",
+          "bytes": 833
+        },
+        "doip-generation/captures/ambiguous-nack-then-positive-c7.pcap": {
+          "sha256": "3e1d4ab7c9ce664bb0a6c69cc7e49cd7e2b4e663d30f182fb707d5331a49e960",
+          "bytes": 1603
+        },
+        "doip-generation/captures/ambiguous-nrc-then-positive-c1.pcap": {
+          "sha256": "4e7c3dbee8fb8910b65582ef4f9d05d8f041ebd2d2c2f3ea1117c7b710f07234",
+          "bytes": 8115
+        },
+        "doip-generation/captures/ambiguous-nrc-then-positive-c65535.pcap": {
+          "sha256": "edd1f3c34db7fdd32ca84d4a858f42176f6f85a7e4ca4b7db8b356746949cf25",
+          "bytes": 835
+        },
+        "doip-generation/captures/ambiguous-nrc-then-positive-c7.pcap": {
+          "sha256": "032ab6ab7eec9f8d1ccfd491ca3a96eace35aa5c0adbeb22b00c6a5ce67869d9",
+          "bytes": 1675
+        },
+        "doip-generation/captures/ambiguous-sid-prefix-then-positive-c1.pcap": {
+          "sha256": "01b32b0ebf9d81044ebe59057ff3d663b75c3ed8db3b051221b713dcd62a2f35",
+          "bytes": 8044
+        },
+        "doip-generation/captures/ambiguous-sid-prefix-then-positive-c65535.pcap": {
+          "sha256": "95a102f644c384f479009e285183f9a430834960bc58460107cbbcf4554d65cc",
+          "bytes": 834
+        },
+        "doip-generation/captures/ambiguous-sid-prefix-then-positive-c7.pcap": {
+          "sha256": "55383eee48bd6927b8ef73f27d7a442a8d1339c946372e18635f0b6db1446b8d",
+          "bytes": 1604
+        },
+        "doip-generation/captures/another-logical-target-c1.pcap": {
+          "sha256": "beb1c8c810bd0f74b2068d1aa1590690c220a08ffdcd388572aa0fbb501128af",
+          "bytes": 6837
+        },
+        "doip-generation/captures/another-logical-target-c65535.pcap": {
+          "sha256": "7af25964e175cf8b4cfceee733cbe8384785a9551086f53d25c3b2d927ab8536",
+          "bytes": 747
+        },
+        "doip-generation/captures/another-logical-target-c7.pcap": {
+          "sha256": "62a8b25d15e9db7cc30fa3aa80989e92398f9964da7777f4b8c2bc1c2340a386",
+          "bytes": 1447
+        },
+        "doip-generation/captures/first-negative-c1.pcap": {
+          "sha256": "ea4621b6326454753970c233b6a70bb0a4418f17d12da9cb6d7b3912f131c10c",
+          "bytes": 4565
+        },
+        "doip-generation/captures/first-negative-c65535.pcap": {
+          "sha256": "5825677e56b47ee7be355212efbab93f37151b349b7f97146eff70eeaa58150e",
+          "bytes": 575
+        },
+        "doip-generation/captures/first-negative-c7.pcap": {
+          "sha256": "434feb582f21fb53b52657b0d7b596f388fe3163cd84c9bd04e8a56eaf4032db",
+          "bytes": 1065
+        },
+        "doip-generation/captures/first-pending-terminal-c1.pcap": {
+          "sha256": "8a70bdeb7f2e984bd5dd72bd2d06baf380b05364c7c04b39809555dbe417ce75",
+          "bytes": 5843
+        },
+        "doip-generation/captures/first-pending-terminal-c65535.pcap": {
+          "sha256": "95b974798080fcdb63ea79c0579560019efb8d01cca908a10dfa6a303eccbbdd",
+          "bytes": 663
+        },
+        "doip-generation/captures/first-pending-terminal-c7.pcap": {
+          "sha256": "ee68e557045da7314129a392738852197a2ad8d0ea2f75405e46bab9d062d57d",
+          "bytes": 1293
+        },
+        "doip-generation/captures/first-positive-c1.pcap": {
+          "sha256": "449a372767a42e18b6b3d1d1fa3c07f847e716dda61c94b06af663d7c1b19620",
+          "bytes": 6979
+        },
+        "doip-generation/captures/first-positive-c65535.pcap": {
+          "sha256": "4a24845d5d632fb3f2ce09308ed6526d0c5ebf7c362a2362ac90e8eea8a59812",
+          "bytes": 819
+        },
+        "doip-generation/captures/first-positive-c7.pcap": {
+          "sha256": "83c6d6558eca21c7a5c9932c66fd998fde6f980ede475d65cc79717f3f2cea21",
+          "bytes": 1519
+        },
+        "doip-generation/captures/reused-type-close-c1.pcap": {
+          "sha256": "05bc00f07a8e39c706766ed2c9875846f56487f08fbaacec5c679ba17649cecd",
+          "bytes": 7050
+        },
+        "doip-generation/captures/reused-type-close-c65535.pcap": {
+          "sha256": "3ea6c117b421472f448f66b0fecff68a574502b3ab55f707f48c8be72235abce",
+          "bytes": 750
+        },
+        "doip-generation/captures/reused-type-close-c7.pcap": {
+          "sha256": "163787790e72786d1f0f26adf364b9e5faac70e517a2f554a6e6fdd638c471d5",
+          "bytes": 1450
+        },
+        "doip-generation/captures/second-negative-echo-c1.pcap": {
+          "sha256": "665a724a948179d166fdc2135eb7cfbca12b5a07b5f08b3d3e2148fa0483cc4b",
+          "bytes": 6837
+        },
+        "doip-generation/captures/second-negative-echo-c65535.pcap": {
+          "sha256": "f1cc0c60d096aa0dc7de561c0f457c55f0b7042c3078ba9d6381cef8b3a9298e",
+          "bytes": 747
+        },
+        "doip-generation/captures/second-negative-echo-c7.pcap": {
+          "sha256": "a9de89494528d74b45fd99416cab005b310c490d898c718084d7561e2998d2e2",
+          "bytes": 1447
+        },
+        "doip-generation/captures/second-positive-echo-c1.pcap": {
+          "sha256": "6e4be41b571d23fdb4c1123afde95ca14a0e11211c7e907e4df17ad4f65ff44b",
+          "bytes": 8115
+        },
+        "doip-generation/captures/second-positive-echo-c65535.pcap": {
+          "sha256": "0dc9356cc101ceca00b3fc0ca998056c2341b2b76088ec37796bff00c4b0a8c8",
+          "bytes": 835
+        },
+        "doip-generation/captures/second-positive-echo-c7.pcap": {
+          "sha256": "5d3444073f6dd6810c9fbddbeda5220f08b37a0f7435a1979f33608875ed4cb0",
+          "bytes": 1675
+        },
+        "doip-generation/captures/version3-positive-c1.pcap": {
+          "sha256": "c4ac2b48bb40ad55d15e8a5b9639b8ff27476966f979243b60db302115b352ae",
+          "bytes": 4778
+        },
+        "doip-generation/captures/version3-positive-c65535.pcap": {
+          "sha256": "2dc431880a551d008925cdb65a78f5c148e76ab7c2b2aa06fae85cee6424b303",
+          "bytes": 578
+        },
+        "doip-generation/captures/version3-positive-c7.pcap": {
+          "sha256": "536537c2d27cc87f9fd8796086f06bcf2f1db7360299bb5de622f19ac4dfa792",
+          "bytes": 1068
+        },
+        "doip-generation/generate.py": {
+          "sha256": "44c45a4919355d7a534c4cc85696126f3fb7b89e877c4537a8d4b0c23ebd3323",
+          "bytes": 7581
+        },
+        "doip-generation/manifest.json": {
+          "sha256": "64d153a18920f12c74ca1e8093a1313a45423eed4d72820923f042a95f5f44bf",
+          "bytes": 13380
+        },
+        "doip-generation/reference.py": {
+          "sha256": "a95f8d091f4303e5655e18990da8321d575711b41fcf380b1c98b7978cd88679",
+          "bytes": 2023
+        },
+        "doip-generation/verify.py": {
+          "sha256": "61dd2747f4612eda1fbd41b29ea22a4d718f6fad6e2b348df50146cea570a05b",
+          "bytes": 609
+        },
+        "required-tests-traffic-unified-v70.json": {
+          "sha256": "8d0965520c37e2dbc68e317d048fa916afc07832e245becdeba79a0a79164faf",
+          "bytes": 16003339
+        },
+        "validation/expected.json": {
+          "sha256": "9a523a09e8562ee9397b2c82647dddea28650fb3fb4406e047eb8e8c096d7031",
+          "bytes": 47639
+        }
+      },
+      "aliases": {
+        "common/pcapx/pcaputil/doip-generation/REFERENCE-TSHARK-ACTUAL.json": "doip-generation/REFERENCE-TSHARK-ACTUAL.json",
+        "common/pcapx/pcaputil/doip-generation/SOURCE-PIN.json": "doip-generation/SOURCE-PIN.json",
+        "common/pcapx/pcaputil/doip-generation/answers/ambiguous-ack-then-positive-c1.json": "doip-generation/answers/ambiguous-ack-then-positive-c1.json",
+        "common/pcapx/pcaputil/doip-generation/answers/ambiguous-ack-then-positive-c65535.json": "doip-generation/answers/ambiguous-ack-then-positive-c65535.json",
+        "common/pcapx/pcaputil/doip-generation/answers/ambiguous-ack-then-positive-c7.json": "doip-generation/answers/ambiguous-ack-then-positive-c7.json",
+        "common/pcapx/pcaputil/doip-generation/answers/ambiguous-nack-then-positive-c1.json": "doip-generation/answers/ambiguous-nack-then-positive-c1.json",
+        "common/pcapx/pcaputil/doip-generation/answers/ambiguous-nack-then-positive-c65535.json": "doip-generation/answers/ambiguous-nack-then-positive-c65535.json",
+        "common/pcapx/pcaputil/doip-generation/answers/ambiguous-nack-then-positive-c7.json": "doip-generation/answers/ambiguous-nack-then-positive-c7.json",
+        "common/pcapx/pcaputil/doip-generation/answers/ambiguous-nrc-then-positive-c1.json": "doip-generation/answers/ambiguous-nrc-then-positive-c1.json",
+        "common/pcapx/pcaputil/doip-generation/answers/ambiguous-nrc-then-positive-c65535.json": "doip-generation/answers/ambiguous-nrc-then-positive-c65535.json",
+        "common/pcapx/pcaputil/doip-generation/answers/ambiguous-nrc-then-positive-c7.json": "doip-generation/answers/ambiguous-nrc-then-positive-c7.json",
+        "common/pcapx/pcaputil/doip-generation/answers/ambiguous-sid-prefix-then-positive-c1.json": "doip-generation/answers/ambiguous-sid-prefix-then-positive-c1.json",
+        "common/pcapx/pcaputil/doip-generation/answers/ambiguous-sid-prefix-then-positive-c65535.json": "doip-generation/answers/ambiguous-sid-prefix-then-positive-c65535.json",
+        "common/pcapx/pcaputil/doip-generation/answers/ambiguous-sid-prefix-then-positive-c7.json": "doip-generation/answers/ambiguous-sid-prefix-then-positive-c7.json",
+        "common/pcapx/pcaputil/doip-generation/answers/another-logical-target-c1.json": "doip-generation/answers/another-logical-target-c1.json",
+        "common/pcapx/pcaputil/doip-generation/answers/another-logical-target-c65535.json": "doip-generation/answers/another-logical-target-c65535.json",
+        "common/pcapx/pcaputil/doip-generation/answers/another-logical-target-c7.json": "doip-generation/answers/another-logical-target-c7.json",
+        "common/pcapx/pcaputil/doip-generation/answers/first-negative-c1.json": "doip-generation/answers/first-negative-c1.json",
+        "common/pcapx/pcaputil/doip-generation/answers/first-negative-c65535.json": "doip-generation/answers/first-negative-c65535.json",
+        "common/pcapx/pcaputil/doip-generation/answers/first-negative-c7.json": "doip-generation/answers/first-negative-c7.json",
+        "common/pcapx/pcaputil/doip-generation/answers/first-pending-terminal-c1.json": "doip-generation/answers/first-pending-terminal-c1.json",
+        "common/pcapx/pcaputil/doip-generation/answers/first-pending-terminal-c65535.json": "doip-generation/answers/first-pending-terminal-c65535.json",
+        "common/pcapx/pcaputil/doip-generation/answers/first-pending-terminal-c7.json": "doip-generation/answers/first-pending-terminal-c7.json",
+        "common/pcapx/pcaputil/doip-generation/answers/first-positive-c1.json": "doip-generation/answers/first-positive-c1.json",
+        "common/pcapx/pcaputil/doip-generation/answers/first-positive-c65535.json": "doip-generation/answers/first-positive-c65535.json",
+        "common/pcapx/pcaputil/doip-generation/answers/first-positive-c7.json": "doip-generation/answers/first-positive-c7.json",
+        "common/pcapx/pcaputil/doip-generation/answers/reused-type-close-c1.json": "doip-generation/answers/reused-type-close-c1.json",
+        "common/pcapx/pcaputil/doip-generation/answers/reused-type-close-c65535.json": "doip-generation/answers/reused-type-close-c65535.json",
+        "common/pcapx/pcaputil/doip-generation/answers/reused-type-close-c7.json": "doip-generation/answers/reused-type-close-c7.json",
+        "common/pcapx/pcaputil/doip-generation/answers/second-negative-echo-c1.json": "doip-generation/answers/second-negative-echo-c1.json",
+        "common/pcapx/pcaputil/doip-generation/answers/second-negative-echo-c65535.json": "doip-generation/answers/second-negative-echo-c65535.json",
+        "common/pcapx/pcaputil/doip-generation/answers/second-negative-echo-c7.json": "doip-generation/answers/second-negative-echo-c7.json",
+        "common/pcapx/pcaputil/doip-generation/answers/second-positive-echo-c1.json": "doip-generation/answers/second-positive-echo-c1.json",
+        "common/pcapx/pcaputil/doip-generation/answers/second-positive-echo-c65535.json": "doip-generation/answers/second-positive-echo-c65535.json",
+        "common/pcapx/pcaputil/doip-generation/answers/second-positive-echo-c7.json": "doip-generation/answers/second-positive-echo-c7.json",
+        "common/pcapx/pcaputil/doip-generation/answers/version3-positive-c1.json": "doip-generation/answers/version3-positive-c1.json",
+        "common/pcapx/pcaputil/doip-generation/answers/version3-positive-c65535.json": "doip-generation/answers/version3-positive-c65535.json",
+        "common/pcapx/pcaputil/doip-generation/answers/version3-positive-c7.json": "doip-generation/answers/version3-positive-c7.json",
+        "common/pcapx/pcaputil/doip-generation/captures/ambiguous-ack-then-positive-c1.pcap": "doip-generation/captures/ambiguous-ack-then-positive-c1.pcap",
+        "common/pcapx/pcaputil/doip-generation/captures/ambiguous-ack-then-positive-c65535.pcap": "doip-generation/captures/ambiguous-ack-then-positive-c65535.pcap",
+        "common/pcapx/pcaputil/doip-generation/captures/ambiguous-ack-then-positive-c7.pcap": "doip-generation/captures/ambiguous-ack-then-positive-c7.pcap",
+        "common/pcapx/pcaputil/doip-generation/captures/ambiguous-nack-then-positive-c1.pcap": "doip-generation/captures/ambiguous-nack-then-positive-c1.pcap",
+        "common/pcapx/pcaputil/doip-generation/captures/ambiguous-nack-then-positive-c65535.pcap": "doip-generation/captures/ambiguous-nack-then-positive-c65535.pcap",
+        "common/pcapx/pcaputil/doip-generation/captures/ambiguous-nack-then-positive-c7.pcap": "doip-generation/captures/ambiguous-nack-then-positive-c7.pcap",
+        "common/pcapx/pcaputil/doip-generation/captures/ambiguous-nrc-then-positive-c1.pcap": "doip-generation/captures/ambiguous-nrc-then-positive-c1.pcap",
+        "common/pcapx/pcaputil/doip-generation/captures/ambiguous-nrc-then-positive-c65535.pcap": "doip-generation/captures/ambiguous-nrc-then-positive-c65535.pcap",
+        "common/pcapx/pcaputil/doip-generation/captures/ambiguous-nrc-then-positive-c7.pcap": "doip-generation/captures/ambiguous-nrc-then-positive-c7.pcap",
+        "common/pcapx/pcaputil/doip-generation/captures/ambiguous-sid-prefix-then-positive-c1.pcap": "doip-generation/captures/ambiguous-sid-prefix-then-positive-c1.pcap",
+        "common/pcapx/pcaputil/doip-generation/captures/ambiguous-sid-prefix-then-positive-c65535.pcap": "doip-generation/captures/ambiguous-sid-prefix-then-positive-c65535.pcap",
+        "common/pcapx/pcaputil/doip-generation/captures/ambiguous-sid-prefix-then-positive-c7.pcap": "doip-generation/captures/ambiguous-sid-prefix-then-positive-c7.pcap",
+        "common/pcapx/pcaputil/doip-generation/captures/another-logical-target-c1.pcap": "doip-generation/captures/another-logical-target-c1.pcap",
+        "common/pcapx/pcaputil/doip-generation/captures/another-logical-target-c65535.pcap": "doip-generation/captures/another-logical-target-c65535.pcap",
+        "common/pcapx/pcaputil/doip-generation/captures/another-logical-target-c7.pcap": "doip-generation/captures/another-logical-target-c7.pcap",
+        "common/pcapx/pcaputil/doip-generation/captures/first-negative-c1.pcap": "doip-generation/captures/first-negative-c1.pcap",
+        "common/pcapx/pcaputil/doip-generation/captures/first-negative-c65535.pcap": "doip-generation/captures/first-negative-c65535.pcap",
+        "common/pcapx/pcaputil/doip-generation/captures/first-negative-c7.pcap": "doip-generation/captures/first-negative-c7.pcap",
+        "common/pcapx/pcaputil/doip-generation/captures/first-pending-terminal-c1.pcap": "doip-generation/captures/first-pending-terminal-c1.pcap",
+        "common/pcapx/pcaputil/doip-generation/captures/first-pending-terminal-c65535.pcap": "doip-generation/captures/first-pending-terminal-c65535.pcap",
+        "common/pcapx/pcaputil/doip-generation/captures/first-pending-terminal-c7.pcap": "doip-generation/captures/first-pending-terminal-c7.pcap",
+        "common/pcapx/pcaputil/doip-generation/captures/first-positive-c1.pcap": "doip-generation/captures/first-positive-c1.pcap",
+        "common/pcapx/pcaputil/doip-generation/captures/first-positive-c65535.pcap": "doip-generation/captures/first-positive-c65535.pcap",
+        "common/pcapx/pcaputil/doip-generation/captures/first-positive-c7.pcap": "doip-generation/captures/first-positive-c7.pcap",
+        "common/pcapx/pcaputil/doip-generation/captures/reused-type-close-c1.pcap": "doip-generation/captures/reused-type-close-c1.pcap",
+        "common/pcapx/pcaputil/doip-generation/captures/reused-type-close-c65535.pcap": "doip-generation/captures/reused-type-close-c65535.pcap",
+        "common/pcapx/pcaputil/doip-generation/captures/reused-type-close-c7.pcap": "doip-generation/captures/reused-type-close-c7.pcap",
+        "common/pcapx/pcaputil/doip-generation/captures/second-negative-echo-c1.pcap": "doip-generation/captures/second-negative-echo-c1.pcap",
+        "common/pcapx/pcaputil/doip-generation/captures/second-negative-echo-c65535.pcap": "doip-generation/captures/second-negative-echo-c65535.pcap",
+        "common/pcapx/pcaputil/doip-generation/captures/second-negative-echo-c7.pcap": "doip-generation/captures/second-negative-echo-c7.pcap",
+        "common/pcapx/pcaputil/doip-generation/captures/second-positive-echo-c1.pcap": "doip-generation/captures/second-positive-echo-c1.pcap",
+        "common/pcapx/pcaputil/doip-generation/captures/second-positive-echo-c65535.pcap": "doip-generation/captures/second-positive-echo-c65535.pcap",
+        "common/pcapx/pcaputil/doip-generation/captures/second-positive-echo-c7.pcap": "doip-generation/captures/second-positive-echo-c7.pcap",
+        "common/pcapx/pcaputil/doip-generation/captures/version3-positive-c1.pcap": "doip-generation/captures/version3-positive-c1.pcap",
+        "common/pcapx/pcaputil/doip-generation/captures/version3-positive-c65535.pcap": "doip-generation/captures/version3-positive-c65535.pcap",
+        "common/pcapx/pcaputil/doip-generation/captures/version3-positive-c7.pcap": "doip-generation/captures/version3-positive-c7.pcap",
+        "common/pcapx/pcaputil/doip-generation/generate.py": "doip-generation/generate.py",
+        "common/pcapx/pcaputil/doip-generation/manifest.json": "doip-generation/manifest.json",
+        "common/pcapx/pcaputil/doip-generation/reference.py": "doip-generation/reference.py",
+        "common/pcapx/pcaputil/doip-generation/verify.py": "doip-generation/verify.py",
+        "scripts/protocol-tests/required-tests-traffic-unified-v70.json": "required-tests-traffic-unified-v70.json"
+      }
     }
   ],
   "schema_version": 1,

@@ -77,7 +77,7 @@ func (f *binFlow) detectDirection(dir int, wire []byte) {
 		return
 	}
 	if p := probeDoIP(wire, f.a.budget.MaxFrameBytes); p.Verdict == ProbeAccept {
-		f.protocol, f.doip = "doip", &binDoIP{clientDir: dir, maxPending: f.a.budget.MaxCollectionElements}
+		f.protocol, f.doip = "doip", &binDoIP{clientDir: dir, maxPending: f.a.budget.MaxCollectionElements, reserveMemory: f.reserveSession}
 		return
 	} else if p.Verdict == ProbeNeedMore {
 		return
@@ -197,7 +197,7 @@ func (f *binFlow) detectDirection(dir int, wire []byte) {
 	case "roc-plus":
 		f.protocol, f.rocplus = "roc-plus", &binROCPlus{clientDir: f.tcpClientDir, clientKnown: f.tcpClientKnown}
 	case "doip":
-		f.protocol, f.doip = "doip", &binDoIP{clientDir: dir, maxPending: f.a.budget.MaxCollectionElements}
+		f.protocol, f.doip = "doip", &binDoIP{clientDir: dir, maxPending: f.a.budget.MaxCollectionElements, reserveMemory: f.reserveSession}
 	case "enip":
 		f.protocol, f.enip = "enip", &binENIP{clientDir: dir, maxPending: f.a.budget.MaxCollectionElements}
 	case "zookeeper":
@@ -796,8 +796,15 @@ func (f *binFlow) consumeSession(dir int, e *ProtocolEvent, result map[string]an
 			e.Profile, e.Completeness = "roc-plus-tcp-clock-2022", "message"
 		}
 	case "doip":
-		e.Session, err = f.doip.consume(dir, e.Raw)
+		e.Profile = "doip-routing-dsc"
+		e.nativeDoIPObservation = true
+		if e.ID == 0 {
+			e.ID = f.a.ids.Add(1)
+		}
+		e.Session, err = f.doip.consumeEvent(dir, e.Raw, e.ID)
+		e.doipAssociationRefusal = f.doip.associationRefusal
 		if err == nil {
+			e.ResponseTo = f.doip.replyTo
 			e.semanticFields = cloneSession(e.Session)
 			e.Profile, e.Completeness = "doip-routing-dsc", "message"
 		}
@@ -1276,7 +1283,13 @@ func (f *binFlow) finishSession(reason TrafficFlowCloseReason) {
 		emit(r.clientDir, map[string]any{"Outstanding": 1}, "ROC Plus clock exchange ended with an unmatched request")
 	}
 	if d := f.doip; d != nil && d.outstanding() > 0 {
-		emit(d.clientDir, map[string]any{"Outstanding": d.outstanding()}, "DoIP exchange ended with unmatched requests")
+		e := f.event(d.clientDir, nil, "incomplete", string(reason)+": DoIP exchange ended with unmatched requests")
+		e.Profile, e.Completeness = "doip-routing-dsc", "incomplete"
+		e.Session = map[string]any{"Outstanding": d.outstanding()}
+		e.sessionError = &ProtocolError{Kind: ErrNeedMore, Message: e.Summary}
+		e.Error = e.sessionError.Error()
+		f.a.incomplete.Add(1)
+		f.a.emit(e)
 	}
 	if m := f.modbus; m != nil && len(m.pending) > 0 {
 		emit(0, map[string]any{"Outstanding": len(m.pending)}, "Modbus exchange ended with unmatched Transaction IDs")
