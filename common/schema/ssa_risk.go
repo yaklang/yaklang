@@ -66,12 +66,9 @@ type SSARisk struct {
 
 	// 最新处置状态
 	LatestDisposalStatus string `json:"latest_disposal_status" gorm:"index;default:'not_set'"`
-	// Risk 特征哈希，用于区分不同批次扫描的同一个漏洞
+	// Risk 特征哈希，用于区分不同批次扫描的同一个漏洞，也是同一次扫描里后一个模式覆盖前一个模式的键。
 	// 包含 SSA 信息(disam、function)、FileUrl、SfRule 信息(ruleId、variableName、level)
 	RiskFeatureHash string `json:"risk_feature_hash" gorm:"index"`
-	// CoverKey is the scan-local identity shared by rules of different modes.
-	// It is not the cross-scan rule identity used by diff/disposal history.
-	CoverKey string `json:"-" gorm:"-"`
 
 	SSAProjectID uint64 `json:"ssa_project_id" gorm:"index"`
 }

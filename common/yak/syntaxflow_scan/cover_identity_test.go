@@ -15,7 +15,7 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
-func TestScanProject_CoversModesWithoutMergingSiblingCalls(t *testing.T) {
+func TestScanProject_SameFeatureHashCoversAcrossModes(t *testing.T) {
 	dir := t.TempDir()
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "main.go"), []byte(`package main
 func run(cmd string) {
@@ -30,18 +30,20 @@ func sink(any) {}`), 0o644))
 		ssaconfig.WithProjectRawLanguage("golang"),
 		ssaconfig.WithSetProgramName(uuid.NewString()),
 		ssaconfig.WithRuleInput(&ypb.SyntaxFlowRuleInput{Language: "golang", Content: `
-desc(mode: "struct", language: golang, title: "struct finding")
+desc(mode: "struct", language: golang, title: "cover siblings")
 sink(* as $arg) as $call
 alert $call`}),
 		ssaconfig.WithRuleInput(&ypb.SyntaxFlowRuleInput{Language: "golang", Content: `
-desc(mode: "ssa", language: golang, title: "ssa finding")
+desc(mode: "ssa", language: golang, title: "cover siblings")
 sink(* as $arg) as $call
 alert $call`}),
 		syntaxflow_scan.WithMode(syntaxflow_scan.StructMode, syntaxflow_scan.SSAMode),
 		syntaxflow_scan.WithReporter(report),
 	)
 	require.NoError(t, err)
-	require.Len(t, report.Risks, 2, "different statements must not share the cover key")
+	// Both calls disassemble to the same feature, so they are one finding.
+	// The ssa rule covers the struct rule because that feature hash matches.
+	require.Len(t, report.Risks, 1)
 	for _, risk := range report.Risks {
 		require.Equal(t, string(schema.SFR_MODE_SSA), risk.ScanMode)
 	}

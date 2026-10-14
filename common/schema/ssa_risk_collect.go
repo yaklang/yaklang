@@ -63,7 +63,7 @@ func (c *RiskCollect) SetRuleLevelFunc(fn func(ruleName string) int) {
 	c.ruleLevel = fn
 }
 
-// Current returns the risk kept for this cover key (legacy: feature hash).
+// Current returns the risk kept for this feature hash.
 func (c *RiskCollect) Current(feature string) *SSARisk {
 	if c == nil || c.data == nil {
 		return nil
@@ -81,22 +81,19 @@ func (c *RiskCollect) Current(feature string) *SSARisk {
 
 // Submit records in and returns the update the caller must publish.
 //
-// The key is the scan's CoverKey (or the feature hash for legacy callers).
-// When it is new the returned item has
-// OldID 0. When an earlier risk is replaced the item carries that row's id
-// and hash. When the incoming risk loses to the stored one no update is
-// returned (ok=false), which is how an earlier mode is dropped and how a
-// lower-level rule is filtered out. An empty feature hash is always kept and
-// is not stored, so it never covers another finding.
+// The key is RiskFeatureHash, the same identity diff and disposal use.
+// When it is new the returned item has OldID 0. When an earlier risk is
+// replaced the item carries that row's id and hash. When the incoming risk
+// loses to the stored one no update is returned (ok=false), which is how an
+// earlier mode is dropped and how a lower-level rule is filtered out. An
+// empty feature hash is always kept and is not stored, so it never covers
+// another finding.
 func (c *RiskCollect) Submit(in *SSARisk) (RiskUpdateItem, bool) {
 	item := RiskUpdateItem{Risk: in}
 	if c == nil || in == nil {
 		return item, false
 	}
-	key := strings.TrimSpace(in.CoverKey)
-	if key == "" {
-		key = strings.TrimSpace(in.RiskFeatureHash)
-	}
+	key := strings.TrimSpace(in.RiskFeatureHash)
 	if key == "" {
 		return item, true
 	}
