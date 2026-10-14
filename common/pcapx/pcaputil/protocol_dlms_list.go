@@ -21,7 +21,7 @@ func dlmsAPDU(w []byte) []byte {
 		return nil
 	}
 	p := w[at+6 : end] // control, HCS(2), LLC(3)
-	if len(p) < 2 || p[0] != 0xc0 && p[0] != 0xc4 {
+	if len(p) < 2 || p[0] != 0xc0 && p[0] != 0xc4 && p[0] != 0x60 && p[0] != 0x61 {
 		return nil
 	}
 	return p
@@ -41,6 +41,9 @@ func dlmsNormalAccess(p []byte) bool {
 	return len(p) >= 13 && p[0] == 0xc0 && p[1] == 1 && p[12] == 1
 }
 func dlmsProfile(w []byte) string {
+	if dlmsACSEAPDU(dlmsAPDU(w)) {
+		return "dlms-hdlc-acse"
+	}
 	if dlmsBlockAPDU(dlmsAPDU(w)) {
 		return "dlms-hdlc-get-block"
 	}
@@ -66,6 +69,9 @@ func dlmsObservedProfile(w []byte, fields map[string]any) string {
 }
 
 func dlmsProjection(w []byte) int64 {
+	if dlmsACSEAPDU(dlmsAPDU(w)) {
+		return 32768 + 512*int64(len(w))
+	}
 	if p := dlmsAPDU(w); dlmsBlockAPDU(p) && p[0] == 0xc4 {
 		// A final block may complete a previously opaque compact/list body.
 		// Reserve the full bounded graph, list projections and joined copy before

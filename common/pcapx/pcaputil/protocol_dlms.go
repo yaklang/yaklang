@@ -15,7 +15,7 @@ import (
 // HDLC frames through a TCP/UDP tunnel, plus bounded LN Get-with-list.
 // Selected response information segmentation requires observed request context;
 // initial normal/list request information may establish it only after assembly.
-// ACSE, authentication, ciphering, link-negotiation segmentation and GBT remain
+// Authentication, ciphering, ACSE/link-negotiation segmentation and GBT remain
 // explicit unsupported boundaries. Values and link identities are unverified.
 func dlmsError(k ProtocolErrorKind, why string) error { return protocolError(k, "DLMS HDLC %s", why) }
 func dlmsCRC(w []byte) uint16 {
@@ -92,6 +92,7 @@ type dlmsMessage struct {
 	flags, choice       byte
 	count               int
 	block               *wrapperMessage
+	acse                *wrapperMessage
 	information         []byte
 	segmented           bool
 }
@@ -228,6 +229,9 @@ func decodeDLMSInformation(m *dlmsMessage, info []byte, maxElements, depth int) 
 	}
 	f["LLC"] = bytes.Clone(info[:3])
 	p := info[3:]
+	if p[0] == 0x60 || p[0] == 0x61 {
+		return decodeDLMSACSEInformation(m, p, info[1], maxElements, depth)
+	}
 	if p[0] != 0xc0 && p[0] != 0xc4 {
 		return unsupported("APDU is outside unencrypted LN Get-normal")
 	}
@@ -478,6 +482,12 @@ func probeDLMS(w []byte, limit int) ProbeResult {
 	elements := 4096
 	list := dlmsListAPDU(w[:n])
 	apdu := dlmsAPDU(w[:n])
+	if dlmsACSEAPDU(apdu) {
+		if dlmsACSEWireEvidence(w[:n]) {
+			return probeAccept("dlms", "hdlc-acse", 98)
+		}
+		return ProbeResult{Verdict: ProbeReject}
+	}
 	if list != nil || dlmsBlockAPDU(apdu) || dlmsNormalExtended(apdu) || dlmsNormalAccess(apdu) {
 		// Probe never admits unsolicited responses. Check frame integrity with
 		// a zero Data pool; selected requests expand only after reservation too.
@@ -504,6 +514,9 @@ type dlmsPending struct {
 	requestInformation  []byte // bounded owned APDU for an exact final-frame retry
 	requestFrames       int
 	kind                string
+	acseInfo            bool
+	acseConformance     uint32
+	acseMaxPDU          uint16
 	dir                 int
 	source, destination uint32
 	id                  uint64
@@ -513,6 +526,7 @@ type dlmsPending struct {
 }
 type binDLMS struct {
 	pending             *dlmsPending
+	acseSeen            map[dlmsACSEKey]uint8
 	clientKnown         bool
 	clientDir           int
 	ambiguous, usedLink bool
@@ -639,7 +653,7 @@ func dlmsRequestEvidence(w []byte) bool {
 // Fixed direction/sequence/ID state plus an owned pending wire copy. Parsing
 // fields and byte projections is reserved before it allocates either copy.
 func (s *binDLMS) storage() int64 {
-	n := int64(512)
+	n := int64(512) + 128*int64(len(s.acseSeen))
 	if s.pending != nil {
 		n += int64(len(s.pending.wire)+len(s.pending.requestInformation)) * 2
 	}
@@ -692,6 +706,9 @@ func (f *binFlow) consumeDecodedDLMS(dir int, w []byte, id uint64, m *dlmsMessag
 		s.ambiguous = true
 		return nil, 0, dlmsError(ErrResourceExceeded, "retained invoke/sequence token limit")
 	}
+	if m.acse != nil {
+		return s.consumeACSE(m, w, dir, id, f.a.budget.MaxCollectionElements)
+	}
 	return s.consume(m, w, dir, id)
 }
 
@@ -730,7 +747,7 @@ func (a *binParser) decodeDLMSDatagram(e *ProtocolEvent, w []byte, explicit bool
 	a.udpMu.Lock()
 	store := a.udpSessions
 	existing := store != nil && store.entries[key] != nil
-	if !explicit && !(len(w) > 0 && w[0] == 0x7e && (existing || dlmsRequestEvidence(w))) {
+	if !explicit && !(len(w) > 0 && w[0] == 0x7e && (existing || dlmsRequestEvidence(w) || dlmsACSEWireEvidence(w))) {
 		a.udpMu.Unlock()
 		return false
 	}
@@ -781,11 +798,14 @@ func (a *binParser) decodeDLMSDatagram(e *ProtocolEvent, w []byte, explicit bool
 	}
 	if created && m != nil && !m.request && m.kind != "S" {
 		e.Direction = 1
+		if m.acse != nil {
+			f.endpoints = [2]string{e.Destination, e.Source}
+		}
 	}
 	if err == nil {
 		if created && (m.kind == "S" || m.kind == "DM") {
 			e.Session, e.ResponseTo, err = f.dlms.consume(m, w, e.Direction, e.ID)
-		} else if created && !m.request {
+		} else if created && !m.request && m.acse == nil {
 			err = dlmsError(ErrContextRequired, "response lacks observed request context")
 		} else if created && len(store.entries) >= sessionCollectionLimit(a.budget.MaxCollectionElements) {
 			err = dlmsError(ErrResourceExceeded, "UDP conversation limit")
@@ -810,6 +830,18 @@ func (a *binParser) decodeDLMSDatagram(e *ProtocolEvent, w []byte, explicit bool
 		if f.dlms.storage() < f.sessionBytes {
 			a.buffered.Add(f.dlms.storage() - f.sessionBytes)
 			f.sessionBytes = f.dlms.storage()
+		}
+	}
+	if created && m != nil && m.acse != nil && len(f.dlms.acseSeen) > 0 && err != nil {
+		// A parsed orphan may retain only a bounded logical-address/sequence
+		// refusal token. It remains an error with no fields or request link.
+		if len(store.entries) >= sessionCollectionLimit(a.budget.MaxCollectionElements) {
+			err = dlmsError(ErrResourceExceeded, "UDP orphan ACSE conversation limit")
+		} else {
+			f.id, f.domain = a.flows.Add(1), e.Domain
+			store.entries[key] = store.lru.PushBack(&binUDPEntry{key, f, store.clock})
+			e.FlowID = f.id
+			created = false
 		}
 	}
 	if created {

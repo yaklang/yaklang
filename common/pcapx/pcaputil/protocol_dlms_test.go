@@ -90,6 +90,16 @@ func dlmsInput(t *testing.T, c bsapControl) ([]byte, bsapAnswer) {
 		}
 		a = upgrade.Answer
 	}
+	if c.ID == "acse" {
+		require.Equal(t, "69081371999dba7f7d3bdefd2255455210bbe388d366a6dcd5860edcd2e909f5", c.SHA256)
+		require.Equal(t, "0cb96c4165123a003fefb055fac4c6e1a47729941eb8c645eab1e33165307e13", c.AnswerSHA)
+		require.Len(t, a.Events, 1)
+		require.Equal(t, "7ea00e032110ff4ee6e60060004b067e", a.Events[0].Raw)
+		require.Equal(t, "UnsupportedFeature", a.Events[0].Error)
+		// Preserve original byte/answer hashes. Empty AARQ now has a selected
+		// parser and fails X.227's mandatory application-context-name check.
+		a.Events[0].Error = "MalformedMessage"
+	}
 	require.Equal(t, c.Packets, a.Packets)
 	r, err := NewCaptureReader(bytes.NewReader(raw))
 	require.NoError(t, err)
@@ -158,7 +168,11 @@ func TestDLMSSealedReplay(t *testing.T) {
 							for i, e := range events {
 								w := want.Events[i]
 								require.Equal(t, "dlms", e.Protocol)
-								require.Equal(t, "dlms-hdlc-get-normal", e.Profile)
+								profile := "dlms-hdlc-get-normal"
+								if c.ID == "acse" {
+									profile = "dlms-hdlc-acse"
+								}
+								require.Equal(t, profile, e.Profile)
 								require.Equal(t, "udp", e.Transport)
 								completion := "message"
 								if w.Error == "ResourceExceeded" {

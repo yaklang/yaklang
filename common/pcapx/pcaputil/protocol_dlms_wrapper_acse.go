@@ -19,7 +19,15 @@ func wrapperACSERefusalHint(w []byte) bool {
 	if len(w) < 10 || int(binary.BigEndian.Uint16(w[6:8])) != len(w)-8 {
 		return false
 	}
-	c := acseCursor{w: w[8:]}
+	return acseEnvelopeHint(w[8:])
+}
+
+// Bounded allocation-free envelope evidence, never semantic acceptance.
+func acseEnvelopeHint(p []byte) bool {
+	if len(p) < 2 || p[0] != 0x60 && p[0] != 0x61 {
+		return false
+	}
+	c := acseCursor{w: p}
 	_, body, e := c.tlv()
 	if e != nil || c.at != len(c.w) {
 		return false
@@ -56,7 +64,7 @@ func wrapperACSERefusalHint(w []byte) bool {
 			return false
 		}
 		seen |= bit
-		if w[8] == 0x60 && (t == 0xa2 || t == 0xa3) {
+		if p[0] == 0x60 && (t == 0xa2 || t == 0xa3) {
 			return false
 		}
 		if t == 0xa1 {
@@ -80,7 +88,7 @@ func wrapperACSERefusalHint(w []byte) bool {
 			information = true
 		}
 	}
-	return context && (w[8] == 0x60 || seen&6 == 6)
+	return context && (p[0] == 0x60 || seen&6 == 6)
 }
 
 type acseCursor struct {
@@ -147,10 +155,24 @@ type wrapperAssociation struct {
 }
 
 func decodeWrapperACSE(w []byte, limit int) (*wrapperMessage, error) {
-	if len(w)-8 > min(limit, 4096) {
+	m, err := decodeACSEAPDU(w[8:], limit)
+	if err != nil {
+		return nil, err
+	}
+	m.source, m.destination = binary.BigEndian.Uint16(w[2:4]), binary.BigEndian.Uint16(w[4:6])
+	m.fields["wrapper_version"] = uint16(1)
+	m.fields["source_wport"], m.fields["destination_wport"] = m.source, m.destination
+	m.fields["payload_length"], m.fields["wrapper_header_hex"] = len(w)-8, hex.EncodeToString(w[:8])
+	return m, nil
+}
+
+// Carrier-neutral selected ACSE envelope. HDLC logical addresses never narrow
+// to Wrapper's 16-bit ports and its field tree contains no fabricated WPDU.
+func decodeACSEAPDU(p []byte, limit int) (*wrapperMessage, error) {
+	if len(p) > min(limit, 4096) {
 		return nil, wrapperError(ErrResourceExceeded, "ACSE field-byte budget")
 	}
-	c := acseCursor{w: w[8:]}
+	c := acseCursor{w: p}
 	tag, body, e := c.tlv()
 	if e != nil {
 		return nil, e
@@ -159,7 +181,7 @@ func decodeWrapperACSE(w []byte, limit int) (*wrapperMessage, error) {
 		return nil, wrapperError(ErrMalformedMessage, "ACSE APDU trailing bytes")
 	}
 	request := tag == 0x60
-	f := map[string]any{"kind": "AARE", "wrapper_version": uint16(1), "source_wport": binary.BigEndian.Uint16(w[2:4]), "destination_wport": binary.BigEndian.Uint16(w[4:6]), "payload_length": len(w) - 8, "wrapper_header_hex": hex.EncodeToString(w[:8]), "apdu_hex": hex.EncodeToString(w[8:]), "command": tag, "authentication_requested": false, "authentication_verified": false, "object_model_verified": false, "operation_success_verified": false}
+	f := map[string]any{"kind": "AARE", "apdu_hex": hex.EncodeToString(p), "command": tag, "authentication_requested": false, "authentication_verified": false, "object_model_verified": false, "operation_success_verified": false}
 	f["protocol_version"], f["protocol_version_explicit"] = 1, false
 	if request {
 		f["kind"] = "AARQ"
@@ -255,7 +277,7 @@ func decodeWrapperACSE(w []byte, limit int) (*wrapperMessage, error) {
 	if !request && result == 0 && diagnostic != 0 {
 		return nil, wrapperError(ErrMalformedMessage, "accepted AARE has nonzero diagnostic")
 	}
-	m := &wrapperMessage{fields: f, source: binary.BigEndian.Uint16(w[2:4]), destination: binary.BigEndian.Uint16(w[4:6]), request: request, acse: true, acseAccepted: !request && result == 0 && diagnostic == 0 && diagnosticSource != 0}
+	m := &wrapperMessage{fields: f, request: request, acse: true, acseAccepted: !request && result == 0 && diagnostic == 0 && diagnosticSource != 0}
 	m.acseInfo = len(initiate) > 0
 	f["initiate_information_present"] = m.acseInfo
 	if len(initiate) == 0 {

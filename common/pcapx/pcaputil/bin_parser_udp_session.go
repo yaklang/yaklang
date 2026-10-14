@@ -75,6 +75,9 @@ func (f *binFlow) retireDLMSUDP() {
 		f.dlms.invalidate()
 	}
 	retained := int64(512)
+	if f.dlms != nil {
+		retained = f.dlms.storage()
+	}
 	if f.wrapper != nil {
 		s := f.wrapper
 		complete := !s.blocked && s.outstanding() == 0
@@ -656,6 +659,11 @@ func (a *binParser) closeUDPSessions() {
 				t := d.transfer
 				dir := t.initial.dir
 				incomplete = append(incomplete, &ProtocolEvent{FlowID: f.id, Timestamp: v.touched, Domain: v.key.domain, Transport: "udp", Source: f.endpoints[dir], Destination: f.endpoints[1-dir], Direction: dir, Protocol: "dlms", Profile: "dlms-hdlc-get-block", Status: "incomplete", Completeness: "incomplete", Summary: "DLMS HDLC exchange ended with an incomplete data-block transfer", Session: map[string]any{"Outstanding": 1, "ObservedBlocks": t.blocks, "EncodedBytes": len(t.data)}})
+				a.incomplete.Add(1)
+			} else if d != nil && d.pending != nil && d.pending.kind == "ACSE" {
+				dir := d.pending.dir
+				summary := "DLMS HDLC association ended with an unmatched request"
+				incomplete = append(incomplete, &ProtocolEvent{FlowID: f.id, Timestamp: v.touched, Domain: v.key.domain, Transport: "udp", Source: f.endpoints[dir], Destination: f.endpoints[1-dir], Direction: dir, Protocol: "dlms", Profile: "dlms-hdlc-acse", Status: "incomplete", Completeness: "incomplete", Summary: "DLMS HDLC association ended with an unmatched request", Session: map[string]any{"Outstanding": 1}, Error: summary, sessionError: &ProtocolError{Kind: ErrNeedMore, Message: summary}})
 				a.incomplete.Add(1)
 			}
 			f.closeSession()

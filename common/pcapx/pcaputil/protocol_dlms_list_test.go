@@ -6,6 +6,8 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -22,17 +24,20 @@ type dlmsListControl struct {
 	MaxMessageBytes                        int     `json:"max_message_bytes"`
 	UnclassifiedBytes                      *uint64 `json:"unclassified_bytes"`
 	LimitedBytes                           *uint64 `json:"limited_bytes"`
+	ExpectedDeferred                       bool    `json:"-"`
 	Events                                 []dlmsListAnswer
 }
 type dlmsListAnswer struct {
-	Raw, Error, Profile string
-	FeedRaw             string  `json:"feed_raw,omitempty"` // TCP idle bytes are not message bytes.
-	StreamOffset        *uint64 `json:"stream_offset,omitempty"`
-	Direction           int
-	Fields              map[string]any
-	Reply               *int  `json:"response_to_index"`
-	PacketRefs          []int `json:"packet_refs"`
-	OmitRaw             bool  `json:"omit_raw"`
+	Raw, Error, Profile  string
+	Status, Completeness string
+	FeedRaw              string  `json:"feed_raw,omitempty"` // TCP idle bytes are not message bytes.
+	StreamOffset         *uint64 `json:"stream_offset,omitempty"`
+	Direction            int
+	Fields               map[string]any
+	Reply                *int  `json:"response_to_index"`
+	RequestEvent         *int  `json:"request_event_index,omitempty"`
+	PacketRefs           []int `json:"packet_refs"`
+	OmitRaw              bool  `json:"omit_raw"`
 }
 
 func dlmsListControls(t *testing.T) []dlmsListControl {
@@ -88,12 +93,38 @@ func dlmsListAssert(t *testing.T, c dlmsListControl, events []*ProtocolEvent) {
 	ids := map[uint64]bool{}
 	for i, e := range events {
 		w := c.Events[i]
+		if w.RequestEvent != nil {
+			j := *w.RequestEvent
+			require.GreaterOrEqual(t, j, 0)
+			require.Less(t, j, i)
+			w.Fields = cloneSession(w.Fields)
+			bound := false
+			if _, ok := w.Fields["Association Request Event"]; ok {
+				w.Fields["Association Request Event"] = events[j].ID
+				bound = true
+			}
+			if a, ok := w.Fields["ACSE"].(map[string]any); ok {
+				if _, ok := a["association_request_event"]; ok {
+					a["association_request_event"] = events[j].ID
+					bound = true
+				}
+			}
+			require.True(t, bound, "independent request-event index requires a present field")
+		}
 		require.NotZero(t, e.ID)
 		require.False(t, ids[e.ID], "event identities cannot be reused")
 		ids[e.ID] = true
 		require.Equal(t, "dlms", e.Protocol)
 		require.Equal(t, w.Profile, e.Profile)
 		require.Equal(t, w.Direction, e.Direction)
+		if w.Status != "" {
+			status := w.Status
+			if status == "decoded" && c.ExpectedDeferred {
+				status = "deferred"
+			}
+			require.Equal(t, status, e.Status)
+			require.Equal(t, w.Completeness, e.Completeness)
+		}
 		require.Zero(t, e.TransactionID, "preserve native HDLC public contract")
 		if w.StreamOffset != nil {
 			require.Equal(t, *w.StreamOffset, e.Offset)
@@ -128,6 +159,10 @@ func dlmsListAssert(t *testing.T, c dlmsListControl, events []*ProtocolEvent) {
 		require.NoError(t, err)
 		rocEqualFields(t, w.Fields, protocolFields(v))
 		f["Observation"] = "caller-mutated"
+		if a, ok := f["ACSE"].(map[string]any); ok {
+			a["apdu_hex"] = "caller-mutated-acse"
+			a["association_request_event"] = uint64(999999)
+		}
 		for _, key := range []string{"Data Value", "Access Parameters"} {
 			data, ok := f[key].(map[string]any)
 			if !ok {
@@ -185,10 +220,19 @@ func dlmsListAssert(t *testing.T, c dlmsListControl, events []*ProtocolEvent) {
 }
 
 func TestDLMSHDLCListSealedMatrix(t *testing.T) { dlmsSealedMatrix(t, dlmsListControls(t)) }
+
+func dlmsControlInput(t *testing.T, alias string) ([]byte, error) {
+	t.Helper()
+	rel := strings.TrimPrefix(alias, "common/pcapx/pcaputil/")
+	if root := os.Getenv("DLMS_HDLC_ACSE_TEST_ROOT"); root != "" && strings.HasPrefix(rel, "dlms-hdlc-acse/") {
+		return os.ReadFile(filepath.Join(root, strings.TrimPrefix(rel, "dlms-hdlc-acse/")))
+	}
+	return trafficfixture.ReadFile(rel)
+}
 func dlmsSealedMatrix(t *testing.T, controls []dlmsListControl) {
 	for _, c := range controls {
 		t.Run(c.ID, func(t *testing.T) {
-			raw, err := trafficfixture.ReadFile(strings.TrimPrefix(c.InputAlias, "common/pcapx/pcaputil/"))
+			raw, err := dlmsControlInput(t, c.InputAlias)
 			require.NoError(t, err)
 			require.Equal(t, c.SHA256, fmt.Sprintf("%x", sha256.Sum256(raw)))
 			discoveryMatrix(t, func(t *testing.T, workers int, deferred, observe bool) {
@@ -200,6 +244,7 @@ func dlmsSealedMatrix(t *testing.T, controls []dlmsListControl) {
 					extra = append(extra, WithProtocolBudget(c.MaxMessageBytes, 1<<20))
 				}
 				events, stats := discoveryReplay(t, raw, workers, deferred, observe, extra...)
+				c.ExpectedDeferred = deferred
 				dlmsListAssert(t, c, events)
 				require.Zero(t, stats.BufferedBytes)
 				if c.LimitedBytes != nil {
@@ -260,6 +305,7 @@ func dlmsOwnershipAndChunks(t *testing.T, controls []dlmsListControl) {
 					}
 				}
 				events = append(events, s.Close("list-complete")...)
+				c.ExpectedDeferred = deferred
 				dlmsListAssert(t, c, events)
 				require.Empty(t, s.Close("idempotent"))
 				require.Zero(t, s.Stats().BufferedBytes)

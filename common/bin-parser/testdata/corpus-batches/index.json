@@ -85415,6 +85415,507 @@
         "common/pcapx/pcaputil/dlms-acse/verify.py": "dlms-acse/verify.py",
         "scripts/protocol-tests/required-tests-traffic-unified-v76.json": "required-tests-traffic-unified-v76.json"
       }
+    },
+    {
+      "id": "validation-dlms-hdlc-acse",
+      "kind": "validation",
+      "source_sha": "58196f82cd3b1296a3a743f74e72dbb6cbed10ad",
+      "file": "validation-dlms-hdlc-acse.zip",
+      "sha256": "75ecfe06a1e24831cc40cb5d9e0e25ca7939d22a2e4b2eb25a2871b4f7473185",
+      "password": "bin-parser",
+      "members": {
+        "dlms-hdlc-acse/REFERENCE-ACTUAL.json": {
+          "sha256": "da3db7b066bca899836e01eaab682f8d4f2fa77d33be705fedd06d0567a7f450",
+          "bytes": 19790
+        },
+        "dlms-hdlc-acse/acse_model.py": {
+          "sha256": "b6354845cd9c76e10e6f80f34ad6ca3c97b85f517cb8d1a7e8ec19b2e60129dd",
+          "bytes": 1801
+        },
+        "dlms-hdlc-acse/answers/accepted-tcp.json": {
+          "sha256": "be40bc57d649c6017efc1b945a4e580d2c9be67db1cb5e1575dbdf2839385a28",
+          "bytes": 4364
+        },
+        "dlms-hdlc-acse/answers/accepted-udp.json": {
+          "sha256": "2fd264efb607c321b56cc7c06a37b71bd649ad7a75f3cce7af22a161d8905719",
+          "bytes": 4312
+        },
+        "dlms-hdlc-acse/answers/active-identical-retry-tcp.json": {
+          "sha256": "3c7b62c3aa7b2fcd858b4607cb1c0a9b2ee309005c7d455e5bd853bef4938a90",
+          "bytes": 6353
+        },
+        "dlms-hdlc-acse/answers/active-identical-retry-udp.json": {
+          "sha256": "f6b5b403bb4e096331732036f245192969e5b9d92eb6819cb63c716fb7b1e512",
+          "bytes": 6274
+        },
+        "dlms-hdlc-acse/answers/bad-FCS-tcp.json": {
+          "sha256": "402d3932334f348f6ada7fd54bd63ff05ce138797cfe613c09f1132992d5a5bf",
+          "bytes": 2623
+        },
+        "dlms-hdlc-acse/answers/bad-FCS-udp.json": {
+          "sha256": "598ef8649a547188b1f01303ed967ece3a5b57f5d97462a6b6ce7e4dd6c188f4",
+          "bytes": 2571
+        },
+        "dlms-hdlc-acse/answers/bad-HCS-tcp.json": {
+          "sha256": "95c1a3d6d34fe4c549226a483658a82ac954fa5387c4b75ea3c4cc301bf34314",
+          "bytes": 2623
+        },
+        "dlms-hdlc-acse/answers/bad-HCS-udp.json": {
+          "sha256": "495a7e5e96617623882cefc76ab5ba9f319fc7390f1a93bf09373dbc193815e9",
+          "bytes": 2571
+        },
+        "dlms-hdlc-acse/answers/cipher-context-tcp.json": {
+          "sha256": "74741f85477bc9bf78aad2ce00732bfb127259c4b8cd5121babc5198fe1e7b5e",
+          "bytes": 2667
+        },
+        "dlms-hdlc-acse/answers/cipher-context-udp.json": {
+          "sha256": "853431334987e1e7e8585b96c613bf895d908e28feab7dbb9a2fe4c31ffd48e9",
+          "bytes": 2615
+        },
+        "dlms-hdlc-acse/answers/distinct-sequence-tcp.json": {
+          "sha256": "6318946cb943eec81617052f1c925f3af076fc05ddc77233c5a6443c9d568e6c",
+          "bytes": 8441
+        },
+        "dlms-hdlc-acse/answers/distinct-sequence-udp.json": {
+          "sha256": "15db4fd15af08c967fcd1a1a48907014684406be42a9f1b1b8f94f4f2d4d104c",
+          "bytes": 8335
+        },
+        "dlms-hdlc-acse/answers/empty-AARE-tcp.json": {
+          "sha256": "f12d9eb5735e991d0a6af570321f5244b8aea82c34627bb0e678c12494e76e00",
+          "bytes": 2553
+        },
+        "dlms-hdlc-acse/answers/empty-AARE-udp.json": {
+          "sha256": "0238f13c567f51194f156319b473e6a56c6457531c1dde993a0b69093969e9ca",
+          "bytes": 2501
+        },
+        "dlms-hdlc-acse/answers/initial-sequence-seven-tcp.json": {
+          "sha256": "a374268e3c2f8ed11f21d0f45e864d8547090387f2396ab7d96bf7dbaead6c4b",
+          "bytes": 8461
+        },
+        "dlms-hdlc-acse/answers/initial-sequence-seven-udp.json": {
+          "sha256": "fd868ec8c3e518b69c5d70e41336d009387ffdefc5a35ee1ca5bc5f4604698c2",
+          "bytes": 8355
+        },
+        "dlms-hdlc-acse/answers/late-first-response-tcp.json": {
+          "sha256": "c30978633c7c925e93fb41be46022f5675b738e16ae1b0dedfd689e107c59156",
+          "bytes": 8911
+        },
+        "dlms-hdlc-acse/answers/late-first-response-udp.json": {
+          "sha256": "225d9aee118b2a4ca977bc8b67bf67d6aaf396924674d2073183c73aecec0d50",
+          "bytes": 8777
+        },
+        "dlms-hdlc-acse/answers/missing-request-information-tcp.json": {
+          "sha256": "6753ec2439bb26a9d47cc2231021217c2228782f7f4c73cdcaa714d0fb29c0d5",
+          "bytes": 3852
+        },
+        "dlms-hdlc-acse/answers/missing-request-information-udp.json": {
+          "sha256": "526880ac229ea789d0a449d5303f35a60adc212ebe062faf7ffb1777dc0c4c60",
+          "bytes": 3800
+        },
+        "dlms-hdlc-acse/answers/missing-response-information-tcp.json": {
+          "sha256": "b93b1a30f0c5550ba9a64e9b8beee2d674be6c9e60a411213da1f5756f9aa965",
+          "bytes": 3901
+        },
+        "dlms-hdlc-acse/answers/missing-response-information-udp.json": {
+          "sha256": "7429f16ab7cfdfecffcecf3577297d4bcac904309262f75cb391a2ac125698a4",
+          "bytes": 3849
+        },
+        "dlms-hdlc-acse/answers/orphan-late-tcp.json": {
+          "sha256": "0ec9e2aa5230ef33e2d581bf4672e9d5fa6e18f28e0963a4468bd941d0ca8bd8",
+          "bytes": 1694
+        },
+        "dlms-hdlc-acse/answers/orphan-late-udp.json": {
+          "sha256": "b768f95cde2caf857db5e01960ded585e95cf09474c32ffb1a9ed28c55284ae1",
+          "bytes": 1615
+        },
+        "dlms-hdlc-acse/answers/overlap-tcp.json": {
+          "sha256": "d07a865811eedb9e43a520c12042eb91b8a69d2caf4ba55ada829aa6db7b847c",
+          "bytes": 3073
+        },
+        "dlms-hdlc-acse/answers/overlap-udp.json": {
+          "sha256": "5a2c5a0fe51efe260000f156cf7bc812bcf224ef244cde8ffcf5f25b4eb2e377",
+          "bytes": 2994
+        },
+        "dlms-hdlc-acse/answers/rejected-no-information-tcp.json": {
+          "sha256": "d8a200b0d3f908a49485579879c7ec4aca6253ca2d1517ad46cf671f274b6694",
+          "bytes": 4072
+        },
+        "dlms-hdlc-acse/answers/rejected-no-information-udp.json": {
+          "sha256": "fe8bc7f9c84a4db424c011bafe65a099695af80171e576a1d98f99007107c523",
+          "bytes": 4020
+        },
+        "dlms-hdlc-acse/answers/unproposed-conformance-tcp.json": {
+          "sha256": "5446a6f82a077b5fb51752f3acd5c091f5eb3f93472ed0bcae054b95a70d57c6",
+          "bytes": 2696
+        },
+        "dlms-hdlc-acse/answers/unproposed-conformance-udp.json": {
+          "sha256": "a728ccc685cbd385dd4c05e9bde941330bf0e4fa81baec794eeaff3fe47fbe18",
+          "bytes": 2644
+        },
+        "dlms-hdlc-acse/answers/wide-server-address-tcp.json": {
+          "sha256": "c3c1112c8fee4f8e08cc933383d1508cde691aa66d1cdb3795626bcec10d3703",
+          "bytes": 4889
+        },
+        "dlms-hdlc-acse/answers/wide-server-address-udp.json": {
+          "sha256": "db6461a2b8b45ec5982a4e47e26f099536f6a1f0f816296d7166db37c23a66e8",
+          "bytes": 4810
+        },
+        "dlms-hdlc-acse/answers/wrapped-tuple-refusal-tcp.json": {
+          "sha256": "c7dd74df21743f8fa6172953534c357fa326b48bea5d5d512596c109750fcea8",
+          "bytes": 33643
+        },
+        "dlms-hdlc-acse/answers/wrapped-tuple-refusal-udp.json": {
+          "sha256": "d57f66e91a6d4881426eac53e8d8ea431205f1a66175a5e26ac36b6f6d2d05c6",
+          "bytes": 33143
+        },
+        "dlms-hdlc-acse/answers/wrong-LLC-tcp.json": {
+          "sha256": "19de8e9d4f0028dd02f21d72af421c095387da4d74f652a1e700d58575ba83a1",
+          "bytes": 2631
+        },
+        "dlms-hdlc-acse/answers/wrong-LLC-udp.json": {
+          "sha256": "329234f221ca279aea345174278af7bb1efc7532cc503072b09fe37160c57c5c",
+          "bytes": 2579
+        },
+        "dlms-hdlc-acse/answers/wrong-ack-tcp.json": {
+          "sha256": "09df31ce90b2bcb9fd538b3f91ec32d89d2238f1df11899fa5883793c5786276",
+          "bytes": 4829
+        },
+        "dlms-hdlc-acse/answers/wrong-ack-udp.json": {
+          "sha256": "8f4e23831f48a4987c57f395c000d8f71e89aec3583b7b15e9f04ce631eaf7c6",
+          "bytes": 4750
+        },
+        "dlms-hdlc-acse/answers/wrong-address-tcp.json": {
+          "sha256": "5dae5580fc4e203a22b0954b502741ed0d9bcaa607c1b856918ae5398c7a83bb",
+          "bytes": 4845
+        },
+        "dlms-hdlc-acse/answers/wrong-address-udp.json": {
+          "sha256": "000f7669b4afafb4066ec5b6c11c350ac8a48a5a1e103f98b1304b2063624c79",
+          "bytes": 4766
+        },
+        "dlms-hdlc-acse/answers/wrong-carrier-direction-tcp.json": {
+          "sha256": "3a17b6a3b4b19442b64e9ee225b020ae6d6a31832a4f0a4a9af764cfdd1b42c3",
+          "bytes": 4885
+        },
+        "dlms-hdlc-acse/answers/wrong-carrier-direction-udp.json": {
+          "sha256": "9bd470e90b9eb5b4b5ed9026ff4121713bf0ce09e9f254ff49c39ff107fdcccc",
+          "bytes": 4806
+        },
+        "dlms-hdlc-acse/answers/wrong-next-peer-sequence-tcp.json": {
+          "sha256": "d9371cf6a6a13bd39013cc60d3f06e51a16aceef18b0fa9dbef08902ff5f7ee6",
+          "bytes": 8931
+        },
+        "dlms-hdlc-acse/answers/wrong-next-peer-sequence-udp.json": {
+          "sha256": "bb192ecaca98a74541ad848b758e9d46e18943293c85955902273a5a8c361534",
+          "bytes": 8797
+        },
+        "dlms-hdlc-acse/build.py": {
+          "sha256": "40b83ab0f6b825aba09a447168c47850be05b60bd1c77bd159d7654d6ce671c9",
+          "bytes": 7268
+        },
+        "dlms-hdlc-acse/carrier.py": {
+          "sha256": "01b94cc32d91810ba8f8e106294834820fa56fe73bc3f108ce42ecbb3e0dd379",
+          "bytes": 1380
+        },
+        "dlms-hdlc-acse/cases/accepted-tcp.pcap": {
+          "sha256": "213efe3a369a15307bc73701b26882ad7fe11f761dd43df938a9e733ff8f3b01",
+          "bytes": 476
+        },
+        "dlms-hdlc-acse/cases/accepted-udp.pcap": {
+          "sha256": "acd04b4590a051edf6e2e2db8e62a296e31d4b3dac9189b41bd59c030be571c9",
+          "bytes": 242
+        },
+        "dlms-hdlc-acse/cases/active-identical-retry-tcp.pcap": {
+          "sha256": "762172728822efb9cdd4fd44f58704d693eec7c4b424d1961edcbe31422c7282",
+          "bytes": 591
+        },
+        "dlms-hdlc-acse/cases/active-identical-retry-udp.pcap": {
+          "sha256": "2daf9202e3cc55ee97c7c9beffc120a6ce34d9595e805c8e916101c961f3f049",
+          "bytes": 345
+        },
+        "dlms-hdlc-acse/cases/bad-FCS-tcp.pcap": {
+          "sha256": "4730f5d82e684942fb9745c61c5a725dbb84ec31c78e9622757f9dea7b6e2c22",
+          "bytes": 476
+        },
+        "dlms-hdlc-acse/cases/bad-FCS-udp.pcap": {
+          "sha256": "c5f2b163c0484be3098d1e4cd230e29ff6090463df2abd696030327cb0b3790f",
+          "bytes": 242
+        },
+        "dlms-hdlc-acse/cases/bad-HCS-tcp.pcap": {
+          "sha256": "49c45621cf60bfc1768dea7bbde2d9f803f043931ea0b7184efebea7d4bb6d0f",
+          "bytes": 476
+        },
+        "dlms-hdlc-acse/cases/bad-HCS-udp.pcap": {
+          "sha256": "d0f26c9a2ddd28623f4d0a90e146b545d0df7f132c0633cebc45d4485e93bd2c",
+          "bytes": 242
+        },
+        "dlms-hdlc-acse/cases/cipher-context-tcp.pcap": {
+          "sha256": "34d52e4f050c14b7384261e9fbfd65e4df871a6be067d033b5fec1f09e473002",
+          "bytes": 476
+        },
+        "dlms-hdlc-acse/cases/cipher-context-udp.pcap": {
+          "sha256": "e5339e8bc65d287e05819068fc382c0275c353329cb5cf410572a854a9953e7c",
+          "bytes": 242
+        },
+        "dlms-hdlc-acse/cases/distinct-sequence-tcp.pcap": {
+          "sha256": "4e4a9cea69dfbf426d38956cab9eeee8eb28ab991c9d279c0588220e41feda48",
+          "bytes": 718
+        },
+        "dlms-hdlc-acse/cases/distinct-sequence-udp.pcap": {
+          "sha256": "8731e464e6b650cd74d2a5388f954f3c58bc97f9e6912bd750c423a165742f66",
+          "bytes": 460
+        },
+        "dlms-hdlc-acse/cases/empty-AARE-tcp.pcap": {
+          "sha256": "818e1f5397cd869b3488928a0d7db70f488ce6fe4fc16e66b097891068b242ac",
+          "bytes": 435
+        },
+        "dlms-hdlc-acse/cases/empty-AARE-udp.pcap": {
+          "sha256": "114a4a5db8dcc1beb963f1e51101ac64b365f107283743476864a0dced6c9138",
+          "bytes": 201
+        },
+        "dlms-hdlc-acse/cases/initial-sequence-seven-tcp.pcap": {
+          "sha256": "d9af62638e437e0925ea26e63ce1fe2cb465c4f1d618da72e098bdb7afc94bbb",
+          "bytes": 718
+        },
+        "dlms-hdlc-acse/cases/initial-sequence-seven-udp.pcap": {
+          "sha256": "07425dac68c99fceb8190d38507f50247b7b462ae5d70fb002240cadcd052a7a",
+          "bytes": 460
+        },
+        "dlms-hdlc-acse/cases/late-first-response-tcp.pcap": {
+          "sha256": "9ac48c7bd7ec2677811ad8aa87214bb69b9155d71d21dcbad4557467e577482d",
+          "bytes": 845
+        },
+        "dlms-hdlc-acse/cases/late-first-response-udp.pcap": {
+          "sha256": "e4bba4e893903bc64a997c2718336a0f47ab243481a4ff749852e6c1a14f3e52",
+          "bytes": 575
+        },
+        "dlms-hdlc-acse/cases/missing-request-information-tcp.pcap": {
+          "sha256": "3dfb3d6217d7854eaa218f8006aa6692fa6b10f85dca0a80b2c6e6caa68f40c5",
+          "bytes": 458
+        },
+        "dlms-hdlc-acse/cases/missing-request-information-udp.pcap": {
+          "sha256": "aad70e976a8d185bc4489101d5eb2e5b5f8098a9b2da1eab9671860f6392f93c",
+          "bytes": 224
+        },
+        "dlms-hdlc-acse/cases/missing-response-information-tcp.pcap": {
+          "sha256": "ba85ecfba422bb1e172192ffa6ff335c91fac61365f9f421c605707ecbe3e76f",
+          "bytes": 458
+        },
+        "dlms-hdlc-acse/cases/missing-response-information-udp.pcap": {
+          "sha256": "41817663381ea5d2398bd7363fe53f55b4ea72266ba927b94d12319a45b7e7a7",
+          "bytes": 224
+        },
+        "dlms-hdlc-acse/cases/orphan-late-tcp.pcap": {
+          "sha256": "1754355d4239cfcee1b69c2fa8b73e1c43b61c485dff171eb5ab2adcda7e05b1",
+          "bytes": 603
+        },
+        "dlms-hdlc-acse/cases/orphan-late-udp.pcap": {
+          "sha256": "0ed1036cd3138abc2acc491d0c00cbb83ed3c1cd044439c6c92f99686f1c5e06",
+          "bytes": 357
+        },
+        "dlms-hdlc-acse/cases/overlap-tcp.pcap": {
+          "sha256": "901a656cd2385824de0964d519d59d7e44376f50740505f2cef48175cc0169e2",
+          "bytes": 591
+        },
+        "dlms-hdlc-acse/cases/overlap-udp.pcap": {
+          "sha256": "949e3c08230ddb215858efaf0ed5fcc63bc3237de10422aa99b8579a9cf5074e",
+          "bytes": 345
+        },
+        "dlms-hdlc-acse/cases/rejected-no-information-tcp.pcap": {
+          "sha256": "25b30a8a2aabb9a9044774879e9be70ba742c0bfa9d6c91c23001914cdece941",
+          "bytes": 458
+        },
+        "dlms-hdlc-acse/cases/rejected-no-information-udp.pcap": {
+          "sha256": "67b4f5c015b270b36c09a3c502acafc6030a0c5075c1d946a657a1618354bc87",
+          "bytes": 224
+        },
+        "dlms-hdlc-acse/cases/unproposed-conformance-tcp.pcap": {
+          "sha256": "ba6e51242cac3e9a53c4ac60d7f819c915a7af5008d16cd4d044d74cd4015e8a",
+          "bytes": 476
+        },
+        "dlms-hdlc-acse/cases/unproposed-conformance-udp.pcap": {
+          "sha256": "fc56544c0a020ad8a497165bfa0365a14053348b88932b3a40026c6f6c4de321",
+          "bytes": 242
+        },
+        "dlms-hdlc-acse/cases/wide-server-address-tcp.pcap": {
+          "sha256": "1c41b89a256e9d22ad2ac461c123c40d2fce08d0bc9d02861a43ed2e810e3fc2",
+          "bytes": 609
+        },
+        "dlms-hdlc-acse/cases/wide-server-address-udp.pcap": {
+          "sha256": "d42de67d5b40d444e96001baff6712ca8d8980c1577ef2f39059aa83a655bc9e",
+          "bytes": 363
+        },
+        "dlms-hdlc-acse/cases/wrapped-tuple-refusal-tcp.pcap": {
+          "sha256": "4cf31202c84209ef8e828bbfc4c8384602e374995cd176fb7a524898f210e5bf",
+          "bytes": 2412
+        },
+        "dlms-hdlc-acse/cases/wrapped-tuple-refusal-udp.pcap": {
+          "sha256": "2848661bc90253f5fadddd3237fe6a50ac3994d733473ed30c2116b4840136d1",
+          "bytes": 1986
+        },
+        "dlms-hdlc-acse/cases/wrong-LLC-tcp.pcap": {
+          "sha256": "50c48bcad30bcae34db655229a76a5bb0639b76c9ef8df72ffb55e4f6b40435a",
+          "bytes": 476
+        },
+        "dlms-hdlc-acse/cases/wrong-LLC-udp.pcap": {
+          "sha256": "cfbfdc5f60f842f33e842e7aa0cc164b3a8fbb71eadf36e35dad38afdfeda7f1",
+          "bytes": 242
+        },
+        "dlms-hdlc-acse/cases/wrong-ack-tcp.pcap": {
+          "sha256": "6a1246fdf99bea98381a7255c2404686b80305dc0cb7080840d60b2e6ccf00e1",
+          "bytes": 603
+        },
+        "dlms-hdlc-acse/cases/wrong-ack-udp.pcap": {
+          "sha256": "e26255d02374bc4a00838b1a56bbf5c33e230701762f022044a764d3d3cbab97",
+          "bytes": 357
+        },
+        "dlms-hdlc-acse/cases/wrong-address-tcp.pcap": {
+          "sha256": "974a4237759deff40786053f55bcd5e24b11d94201bf6ef6f8350a0e82b84ef7",
+          "bytes": 603
+        },
+        "dlms-hdlc-acse/cases/wrong-address-udp.pcap": {
+          "sha256": "2c8458121cf0c92bfdb81360d3142f034154607cc8ec8734b91057a7d09ea378",
+          "bytes": 357
+        },
+        "dlms-hdlc-acse/cases/wrong-carrier-direction-tcp.pcap": {
+          "sha256": "20c52bdbf3e10da601390f84ed88b78c126a787b18f641e6679d786ebbc5b369",
+          "bytes": 603
+        },
+        "dlms-hdlc-acse/cases/wrong-carrier-direction-udp.pcap": {
+          "sha256": "2fb94bea23f8749e1568daaf7def315f1cfed1e54084fac1b81b81374598a8b4",
+          "bytes": 357
+        },
+        "dlms-hdlc-acse/cases/wrong-next-peer-sequence-tcp.pcap": {
+          "sha256": "ed2d1788409508da25b3672a53b4e0142fefcc372d21dd2c2cf0d799d72f4c5c",
+          "bytes": 845
+        },
+        "dlms-hdlc-acse/cases/wrong-next-peer-sequence-udp.pcap": {
+          "sha256": "17ddaae6768367236b244c075335cc89220a3c6fd594ddd302931387901dcf01",
+          "bytes": 575
+        },
+        "dlms-hdlc-acse/controls.json": {
+          "sha256": "c96b48d0334b4c68a2bbe0558228fe063d34b4a5afa3895a9e8a303446c9cfe0",
+          "bytes": 294252
+        },
+        "dlms-hdlc-acse/reference.py": {
+          "sha256": "630910d82d261c24d3edde74125c8b4a19734d12fa597390194d283c98541ec5",
+          "bytes": 2789
+        },
+        "dlms-hdlc-acse/source-pin.json": {
+          "sha256": "22aeeac02864a3f820f9a00eedf785af2a675c829f8daafbb2b02c6802d6a2f4",
+          "bytes": 12658
+        },
+        "dlms-hdlc-acse/verify.py": {
+          "sha256": "3ad7a1aba58d5392248ca5b23edc0b11bad52dc30b566ae2b31c6adddee874d0",
+          "bytes": 1671
+        },
+        "required-tests-traffic-unified-v77.json": {
+          "sha256": "7b9ba4e049c5667fae11e02d3a48d5d82e393603765480f79d83e422e6111b4f",
+          "bytes": 17405641
+        },
+        "validation/expected.json": {
+          "sha256": "ce797acd61ea94d2cdb59da3f5f640a4b3e165835ea5226a1cd04c0e78ba9468",
+          "bytes": 49575
+        }
+      },
+      "aliases": {
+        "common/pcapx/pcaputil/dlms-hdlc-acse/REFERENCE-ACTUAL.json": "dlms-hdlc-acse/REFERENCE-ACTUAL.json",
+        "common/pcapx/pcaputil/dlms-hdlc-acse/acse_model.py": "dlms-hdlc-acse/acse_model.py",
+        "common/pcapx/pcaputil/dlms-hdlc-acse/answers/accepted-tcp.json": "dlms-hdlc-acse/answers/accepted-tcp.json",
+        "common/pcapx/pcaputil/dlms-hdlc-acse/answers/accepted-udp.json": "dlms-hdlc-acse/answers/accepted-udp.json",
+        "common/pcapx/pcaputil/dlms-hdlc-acse/answers/active-identical-retry-tcp.json": "dlms-hdlc-acse/answers/active-identical-retry-tcp.json",
+        "common/pcapx/pcaputil/dlms-hdlc-acse/answers/active-identical-retry-udp.json": "dlms-hdlc-acse/answers/active-identical-retry-udp.json",
+        "common/pcapx/pcaputil/dlms-hdlc-acse/answers/bad-FCS-tcp.json": "dlms-hdlc-acse/answers/bad-FCS-tcp.json",
+        "common/pcapx/pcaputil/dlms-hdlc-acse/answers/bad-FCS-udp.json": "dlms-hdlc-acse/answers/bad-FCS-udp.json",
+        "common/pcapx/pcaputil/dlms-hdlc-acse/answers/bad-HCS-tcp.json": "dlms-hdlc-acse/answers/bad-HCS-tcp.json",
+        "common/pcapx/pcaputil/dlms-hdlc-acse/answers/bad-HCS-udp.json": "dlms-hdlc-acse/answers/bad-HCS-udp.json",
+        "common/pcapx/pcaputil/dlms-hdlc-acse/answers/cipher-context-tcp.json": "dlms-hdlc-acse/answers/cipher-context-tcp.json",
+        "common/pcapx/pcaputil/dlms-hdlc-acse/answers/cipher-context-udp.json": "dlms-hdlc-acse/answers/cipher-context-udp.json",
+        "common/pcapx/pcaputil/dlms-hdlc-acse/answers/distinct-sequence-tcp.json": "dlms-hdlc-acse/answers/distinct-sequence-tcp.json",
+        "common/pcapx/pcaputil/dlms-hdlc-acse/answers/distinct-sequence-udp.json": "dlms-hdlc-acse/answers/distinct-sequence-udp.json",
+        "common/pcapx/pcaputil/dlms-hdlc-acse/answers/empty-AARE-tcp.json": "dlms-hdlc-acse/answers/empty-AARE-tcp.json",
+        "common/pcapx/pcaputil/dlms-hdlc-acse/answers/empty-AARE-udp.json": "dlms-hdlc-acse/answers/empty-AARE-udp.json",
+        "common/pcapx/pcaputil/dlms-hdlc-acse/answers/initial-sequence-seven-tcp.json": "dlms-hdlc-acse/answers/initial-sequence-seven-tcp.json",
+        "common/pcapx/pcaputil/dlms-hdlc-acse/answers/initial-sequence-seven-udp.json": "dlms-hdlc-acse/answers/initial-sequence-seven-udp.json",
+        "common/pcapx/pcaputil/dlms-hdlc-acse/answers/late-first-response-tcp.json": "dlms-hdlc-acse/answers/late-first-response-tcp.json",
+        "common/pcapx/pcaputil/dlms-hdlc-acse/answers/late-first-response-udp.json": "dlms-hdlc-acse/answers/late-first-response-udp.json",
+        "common/pcapx/pcaputil/dlms-hdlc-acse/answers/missing-request-information-tcp.json": "dlms-hdlc-acse/answers/missing-request-information-tcp.json",
+        "common/pcapx/pcaputil/dlms-hdlc-acse/answers/missing-request-information-udp.json": "dlms-hdlc-acse/answers/missing-request-information-udp.json",
+        "common/pcapx/pcaputil/dlms-hdlc-acse/answers/missing-response-information-tcp.json": "dlms-hdlc-acse/answers/missing-response-information-tcp.json",
+        "common/pcapx/pcaputil/dlms-hdlc-acse/answers/missing-response-information-udp.json": "dlms-hdlc-acse/answers/missing-response-information-udp.json",
+        "common/pcapx/pcaputil/dlms-hdlc-acse/answers/orphan-late-tcp.json": "dlms-hdlc-acse/answers/orphan-late-tcp.json",
+        "common/pcapx/pcaputil/dlms-hdlc-acse/answers/orphan-late-udp.json": "dlms-hdlc-acse/answers/orphan-late-udp.json",
+        "common/pcapx/pcaputil/dlms-hdlc-acse/answers/overlap-tcp.json": "dlms-hdlc-acse/answers/overlap-tcp.json",
+        "common/pcapx/pcaputil/dlms-hdlc-acse/answers/overlap-udp.json": "dlms-hdlc-acse/answers/overlap-udp.json",
+        "common/pcapx/pcaputil/dlms-hdlc-acse/answers/rejected-no-information-tcp.json": "dlms-hdlc-acse/answers/rejected-no-information-tcp.json",
+        "common/pcapx/pcaputil/dlms-hdlc-acse/answers/rejected-no-information-udp.json": "dlms-hdlc-acse/answers/rejected-no-information-udp.json",
+        "common/pcapx/pcaputil/dlms-hdlc-acse/answers/unproposed-conformance-tcp.json": "dlms-hdlc-acse/answers/unproposed-conformance-tcp.json",
+        "common/pcapx/pcaputil/dlms-hdlc-acse/answers/unproposed-conformance-udp.json": "dlms-hdlc-acse/answers/unproposed-conformance-udp.json",
+        "common/pcapx/pcaputil/dlms-hdlc-acse/answers/wide-server-address-tcp.json": "dlms-hdlc-acse/answers/wide-server-address-tcp.json",
+        "common/pcapx/pcaputil/dlms-hdlc-acse/answers/wide-server-address-udp.json": "dlms-hdlc-acse/answers/wide-server-address-udp.json",
+        "common/pcapx/pcaputil/dlms-hdlc-acse/answers/wrapped-tuple-refusal-tcp.json": "dlms-hdlc-acse/answers/wrapped-tuple-refusal-tcp.json",
+        "common/pcapx/pcaputil/dlms-hdlc-acse/answers/wrapped-tuple-refusal-udp.json": "dlms-hdlc-acse/answers/wrapped-tuple-refusal-udp.json",
+        "common/pcapx/pcaputil/dlms-hdlc-acse/answers/wrong-LLC-tcp.json": "dlms-hdlc-acse/answers/wrong-LLC-tcp.json",
+        "common/pcapx/pcaputil/dlms-hdlc-acse/answers/wrong-LLC-udp.json": "dlms-hdlc-acse/answers/wrong-LLC-udp.json",
+        "common/pcapx/pcaputil/dlms-hdlc-acse/answers/wrong-ack-tcp.json": "dlms-hdlc-acse/answers/wrong-ack-tcp.json",
+        "common/pcapx/pcaputil/dlms-hdlc-acse/answers/wrong-ack-udp.json": "dlms-hdlc-acse/answers/wrong-ack-udp.json",
+        "common/pcapx/pcaputil/dlms-hdlc-acse/answers/wrong-address-tcp.json": "dlms-hdlc-acse/answers/wrong-address-tcp.json",
+        "common/pcapx/pcaputil/dlms-hdlc-acse/answers/wrong-address-udp.json": "dlms-hdlc-acse/answers/wrong-address-udp.json",
+        "common/pcapx/pcaputil/dlms-hdlc-acse/answers/wrong-carrier-direction-tcp.json": "dlms-hdlc-acse/answers/wrong-carrier-direction-tcp.json",
+        "common/pcapx/pcaputil/dlms-hdlc-acse/answers/wrong-carrier-direction-udp.json": "dlms-hdlc-acse/answers/wrong-carrier-direction-udp.json",
+        "common/pcapx/pcaputil/dlms-hdlc-acse/answers/wrong-next-peer-sequence-tcp.json": "dlms-hdlc-acse/answers/wrong-next-peer-sequence-tcp.json",
+        "common/pcapx/pcaputil/dlms-hdlc-acse/answers/wrong-next-peer-sequence-udp.json": "dlms-hdlc-acse/answers/wrong-next-peer-sequence-udp.json",
+        "common/pcapx/pcaputil/dlms-hdlc-acse/build.py": "dlms-hdlc-acse/build.py",
+        "common/pcapx/pcaputil/dlms-hdlc-acse/carrier.py": "dlms-hdlc-acse/carrier.py",
+        "common/pcapx/pcaputil/dlms-hdlc-acse/cases/accepted-tcp.pcap": "dlms-hdlc-acse/cases/accepted-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-acse/cases/accepted-udp.pcap": "dlms-hdlc-acse/cases/accepted-udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-acse/cases/active-identical-retry-tcp.pcap": "dlms-hdlc-acse/cases/active-identical-retry-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-acse/cases/active-identical-retry-udp.pcap": "dlms-hdlc-acse/cases/active-identical-retry-udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-acse/cases/bad-FCS-tcp.pcap": "dlms-hdlc-acse/cases/bad-FCS-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-acse/cases/bad-FCS-udp.pcap": "dlms-hdlc-acse/cases/bad-FCS-udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-acse/cases/bad-HCS-tcp.pcap": "dlms-hdlc-acse/cases/bad-HCS-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-acse/cases/bad-HCS-udp.pcap": "dlms-hdlc-acse/cases/bad-HCS-udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-acse/cases/cipher-context-tcp.pcap": "dlms-hdlc-acse/cases/cipher-context-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-acse/cases/cipher-context-udp.pcap": "dlms-hdlc-acse/cases/cipher-context-udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-acse/cases/distinct-sequence-tcp.pcap": "dlms-hdlc-acse/cases/distinct-sequence-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-acse/cases/distinct-sequence-udp.pcap": "dlms-hdlc-acse/cases/distinct-sequence-udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-acse/cases/empty-AARE-tcp.pcap": "dlms-hdlc-acse/cases/empty-AARE-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-acse/cases/empty-AARE-udp.pcap": "dlms-hdlc-acse/cases/empty-AARE-udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-acse/cases/initial-sequence-seven-tcp.pcap": "dlms-hdlc-acse/cases/initial-sequence-seven-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-acse/cases/initial-sequence-seven-udp.pcap": "dlms-hdlc-acse/cases/initial-sequence-seven-udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-acse/cases/late-first-response-tcp.pcap": "dlms-hdlc-acse/cases/late-first-response-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-acse/cases/late-first-response-udp.pcap": "dlms-hdlc-acse/cases/late-first-response-udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-acse/cases/missing-request-information-tcp.pcap": "dlms-hdlc-acse/cases/missing-request-information-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-acse/cases/missing-request-information-udp.pcap": "dlms-hdlc-acse/cases/missing-request-information-udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-acse/cases/missing-response-information-tcp.pcap": "dlms-hdlc-acse/cases/missing-response-information-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-acse/cases/missing-response-information-udp.pcap": "dlms-hdlc-acse/cases/missing-response-information-udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-acse/cases/orphan-late-tcp.pcap": "dlms-hdlc-acse/cases/orphan-late-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-acse/cases/orphan-late-udp.pcap": "dlms-hdlc-acse/cases/orphan-late-udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-acse/cases/overlap-tcp.pcap": "dlms-hdlc-acse/cases/overlap-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-acse/cases/overlap-udp.pcap": "dlms-hdlc-acse/cases/overlap-udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-acse/cases/rejected-no-information-tcp.pcap": "dlms-hdlc-acse/cases/rejected-no-information-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-acse/cases/rejected-no-information-udp.pcap": "dlms-hdlc-acse/cases/rejected-no-information-udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-acse/cases/unproposed-conformance-tcp.pcap": "dlms-hdlc-acse/cases/unproposed-conformance-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-acse/cases/unproposed-conformance-udp.pcap": "dlms-hdlc-acse/cases/unproposed-conformance-udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-acse/cases/wide-server-address-tcp.pcap": "dlms-hdlc-acse/cases/wide-server-address-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-acse/cases/wide-server-address-udp.pcap": "dlms-hdlc-acse/cases/wide-server-address-udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-acse/cases/wrapped-tuple-refusal-tcp.pcap": "dlms-hdlc-acse/cases/wrapped-tuple-refusal-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-acse/cases/wrapped-tuple-refusal-udp.pcap": "dlms-hdlc-acse/cases/wrapped-tuple-refusal-udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-acse/cases/wrong-LLC-tcp.pcap": "dlms-hdlc-acse/cases/wrong-LLC-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-acse/cases/wrong-LLC-udp.pcap": "dlms-hdlc-acse/cases/wrong-LLC-udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-acse/cases/wrong-ack-tcp.pcap": "dlms-hdlc-acse/cases/wrong-ack-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-acse/cases/wrong-ack-udp.pcap": "dlms-hdlc-acse/cases/wrong-ack-udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-acse/cases/wrong-address-tcp.pcap": "dlms-hdlc-acse/cases/wrong-address-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-acse/cases/wrong-address-udp.pcap": "dlms-hdlc-acse/cases/wrong-address-udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-acse/cases/wrong-carrier-direction-tcp.pcap": "dlms-hdlc-acse/cases/wrong-carrier-direction-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-acse/cases/wrong-carrier-direction-udp.pcap": "dlms-hdlc-acse/cases/wrong-carrier-direction-udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-acse/cases/wrong-next-peer-sequence-tcp.pcap": "dlms-hdlc-acse/cases/wrong-next-peer-sequence-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-acse/cases/wrong-next-peer-sequence-udp.pcap": "dlms-hdlc-acse/cases/wrong-next-peer-sequence-udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-acse/controls.json": "dlms-hdlc-acse/controls.json",
+        "common/pcapx/pcaputil/dlms-hdlc-acse/reference.py": "dlms-hdlc-acse/reference.py",
+        "common/pcapx/pcaputil/dlms-hdlc-acse/source-pin.json": "dlms-hdlc-acse/source-pin.json",
+        "common/pcapx/pcaputil/dlms-hdlc-acse/verify.py": "dlms-hdlc-acse/verify.py",
+        "scripts/protocol-tests/required-tests-traffic-unified-v77.json": "required-tests-traffic-unified-v77.json"
+      }
     }
   ],
   "schema_version": 1,
