@@ -125,3 +125,61 @@ func TestSaveIrCodeBatch_ProductionScopedTransaction(t *testing.T) {
 	require.NoError(t, db.Where("program_name = ? AND code_id = ?", program, 1).First(&got).Error)
 	require.Equal(t, "after", got.Name)
 }
+
+// The flush used to clear ID/CreatedAt/UpdatedAt/DeletedAt on every struct before
+// saving. SaveInBatches keys on (program_name, code_id) and never writes the
+// primary key, so a struct that still carries state from an earlier load or save
+// lands on the right row and leaves the others alone.
+func TestSaveIrCodeBatch_StructStateFromEarlierSaveIsHarmless(t *testing.T) {
+	db := setupIrCodeTestDB(t)
+	require.NoError(t, SaveIrCodeBatch(db, []*IrCode{
+		{CodeID: 1, ProgramName: "prog", Name: "one"},
+		{CodeID: 2, ProgramName: "prog", Name: "two"},
+	}))
+	var one, two IrCode
+	require.NoError(t, db.Where("program_name = ? AND code_id = ?", "prog", 1).First(&one).Error)
+	require.NoError(t, db.Where("program_name = ? AND code_id = ?", "prog", 2).First(&two).Error)
+
+	// A loaded row for code 1 that was re-pointed at the primary key of code 2.
+	reused := one
+	reused.ID = two.ID
+	reused.Name = "one-renewed"
+	require.NoError(t, SaveIrCodeBatch(db, []*IrCode{&reused}))
+
+	var got1, got2 IrCode
+	require.NoError(t, db.Where("program_name = ? AND code_id = ?", "prog", 1).First(&got1).Error)
+	require.NoError(t, db.Where("program_name = ? AND code_id = ?", "prog", 2).First(&got2).Error)
+	require.Equal(t, one.ID, got1.ID, "the row keeps its id whatever id the struct carries")
+	require.Equal(t, "one-renewed", got1.Name)
+	require.Equal(t, two.ID, got2.ID)
+	require.Equal(t, "two", got2.Name, "another row must not be touched")
+	require.True(t, got1.CreatedAt.Equal(one.CreatedAt), "created_at is kept")
+}
+
+// A flush may be handed a sparse slice; nil entries are skipped on both paths.
+func TestSaveIrCodeBatch_NilEntriesSkipped(t *testing.T) {
+	db := setupIrCodeTestDB(t)
+	require.NoError(t, SaveIrCodeBatch(db, []*IrCode{nil, {CodeID: 1, ProgramName: "p", Name: "a"}, nil, {CodeID: 2, ProgramName: "p", Name: "b"}}))
+	var count int
+	require.NoError(t, db.Model(&IrCode{}).Count(&count).Error)
+	require.Equal(t, 2, count)
+	require.NoError(t, SaveIrCodeBatch(db, []*IrCode{nil, nil}))
+}
+
+// Databases that were never migrated have no unique index; the delete-and-insert
+// fallback must keep working for them, including a repeated save.
+func TestSaveIrCodeBatch_FallbackWithoutUniqueIndex(t *testing.T) {
+	db, err := gorm.Open("sqlite3", ":memory:")
+	require.NoError(t, err)
+	t.Cleanup(func() { db.Close() })
+	require.NoError(t, db.AutoMigrate(&IrCode{}).Error)
+	require.False(t, hasIrCodeUniqueKey(db), "this test needs a database without the unique index")
+
+	require.NoError(t, SaveIrCodeBatch(db, []*IrCode{nil, {CodeID: 1, ProgramName: "p", Name: "old"}}))
+	require.NoError(t, SaveIrCodeBatch(db, []*IrCode{{CodeID: 1, ProgramName: "p", Name: "new"}, nil}))
+
+	var rows []IrCode
+	require.NoError(t, db.Where("program_name = ?", "p").Find(&rows).Error)
+	require.Len(t, rows, 1)
+	require.Equal(t, "new", rows[0].Name)
+}
