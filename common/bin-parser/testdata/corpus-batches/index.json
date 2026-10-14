@@ -87880,6 +87880,397 @@
         "common/pcapx/pcaputil/someip-tp/zero-request-id.pcap": "someip-tp/zero-request-id.pcap",
         "scripts/protocol-tests/required-tests-traffic-unified-v81.json": "required-tests-traffic-unified-v81.json"
       }
+    },
+    {
+      "id": "validation-ppi-someip-sd",
+      "kind": "validation",
+      "source_sha": "af9af1364f30f3265c65897d9ebd147c26bf87f2",
+      "file": "validation-ppi-someip-sd.zip",
+      "sha256": "e40d677504fd12b7248812daf5cd58597a51d361444c277fe8d1ea9fcce8465c",
+      "password": "bin-parser",
+      "members": {
+        "ppi-capture/absent-is-not-zero.pcap": {
+          "sha256": "c822cbbbfcdfe07be231c02d929b52c3ffb50c51942561f4b386fa2457150d5f",
+          "bytes": 314
+        },
+        "ppi-capture/aggregate-isolation.pcap": {
+          "sha256": "69c6d7a8d1e2e0930ece81b70ec9ae0821b9e8617992c61b0f06abdb0e6da542",
+          "bytes": 330
+        },
+        "ppi-capture/dcp-known-inner-offset.pcap": {
+          "sha256": "cede15a44a0c578b4e63eb7047f8fb69cb5f80e18534e1425d82f7bca452d099",
+          "bytes": 116
+        },
+        "ppi-capture/ipv4-fragment-domain-isolation.pcap": {
+          "sha256": "5631715dbb0200be30407da26524ac83b2c56c557c046023433f4e0571afc6f8",
+          "bytes": 384
+        },
+        "ppi-capture/ipv4-fragment-outoforder.pcap": {
+          "sha256": "79007fdc027cedd5356a23e7d024057c298ada14df0d86fbf2f95c0305406697",
+          "bytes": 298
+        },
+        "ppi-capture/ipv6-fragment-domain-isolation.pcap": {
+          "sha256": "ea2332511ebf3e33d20a37150fc897f92c963db23c06629ac03cd0098df83251",
+          "bytes": 488
+        },
+        "ppi-capture/ipv6-fragment-outoforder.pcap": {
+          "sha256": "644f830dbacce6756f5ee8451855f3cd2d5260d87d3330c957674dbc5e3ca81c",
+          "bytes": 374
+        },
+        "ppi-capture/manifest.json": {
+          "sha256": "acad5df6bdf85c73be5c7e90fda99e087f53f5323086cd5e0acff0b1ba13dfd0",
+          "bytes": 47586
+        },
+        "ppi-capture/ordered-0.pcap": {
+          "sha256": "985b5d2ae39f979604f368124bdf7d077c91b7ee192344399b025f5d90fe4076",
+          "bytes": 232
+        },
+        "ppi-capture/ordered-4294967295.pcap": {
+          "sha256": "ab97d3ecd90b8374be17e320543e1d1f624c725b1fd5bce765ea7ff542dbd5ae",
+          "bytes": 232
+        },
+        "ppi-capture/ordered-None.pcap": {
+          "sha256": "63d5e4c209c9c078acebc9b96047efc070cc07d0589991d7a78ffe0240b766c4",
+          "bytes": 216
+        },
+        "ppi-capture/pending-close.pcap": {
+          "sha256": "aeb40a59c448daa3504e7ceaf8cbafa2dfce05429e19b6287e3f2409fb273ae2",
+          "bytes": 134
+        },
+        "ppi-capture/refuse-duplicate-aggregation.pcap": {
+          "sha256": "505938b10035754bb472281a49689f38b1cbdfa8d193d969830e9df229f97643",
+          "bytes": 142
+        },
+        "ppi-capture/refuse-flags.pcap": {
+          "sha256": "79cbadc500aa5b8e50d6dbb54a5f5c992b7a1889297fb6a63b2bbda603979ac1",
+          "bytes": 126
+        },
+        "ppi-capture/refuse-inner-DLT.pcap": {
+          "sha256": "fdc7a664b96786f8fb4dcf81db39689ba6009938ec7a18257e8271d83c51c942",
+          "bytes": 126
+        },
+        "ppi-capture/refuse-length-overrun.pcap": {
+          "sha256": "5a2edabab6c3f7984c04d0eede04d47c6ca85cbd008348d3a4f1387ac27a3df9",
+          "bytes": 126
+        },
+        "ppi-capture/refuse-length-underflow.pcap": {
+          "sha256": "aac5d9a240c14f5c74d44ba1a5e3f0948840a51f2877a0871608ce6f348eda36",
+          "bytes": 126
+        },
+        "ppi-capture/refuse-short-field.pcap": {
+          "sha256": "238b207f42fab0c2d2bf689c7f52fc46e1d24104b238ab5923d837aa6b00c641",
+          "bytes": 134
+        },
+        "ppi-capture/refuse-short.pcap": {
+          "sha256": "d77d94987a2169827d185ded109be801ee0975d34ebed4c628903edf9db955f0",
+          "bytes": 47
+        },
+        "ppi-capture/refuse-unknown-field.pcap": {
+          "sha256": "1eed05fd862726d7eeae09c9ffb03587d0f7a023c8ad4b1529fecf3780d1aa5a",
+          "bytes": 134
+        },
+        "ppi-capture/refuse-version.pcap": {
+          "sha256": "223cdfa74684dac8a4bb026d5be70acecc673629a7db1b5f3d7cf121bbc7d598",
+          "bytes": 126
+        },
+        "ppi-capture/wrong-declared-Ethernet.pcap": {
+          "sha256": "338e5a4c237df0ac2380d93aa44652c6a82406c365d08105dc3d3f7274695a14",
+          "bytes": 126
+        },
+        "required-tests-traffic-unified-v82.json": {
+          "sha256": "bb9935f7173189d575bc0742eaeb795c0b1e8e3f6488b842e3fa82677c7cdb66",
+          "bytes": 19636436
+        },
+        "someip-sd/ack-empty.pcap": {
+          "sha256": "c05465e8672883f233b303d1992d44511774f29e20bf281a5a7007f85148f155",
+          "bytes": 126
+        },
+        "someip-sd/bad-client.pcap": {
+          "sha256": "76e753fddc9f5a3eef0cf273b9aa13d4c8812d963b29c1d5106c7fa358a7e6ad",
+          "bytes": 138
+        },
+        "someip-sd/bad-message-id.pcap": {
+          "sha256": "9debecd26f6851c31f4e4c01080d7f37b0289dcfc5d2e40522e5342c092dfcdb",
+          "bytes": 138
+        },
+        "someip-sd/bad-return.pcap": {
+          "sha256": "f0619222f81187b345bc217a309a9ff544f37571bb530013276b7ad942407898",
+          "bytes": 138
+        },
+        "someip-sd/coalesced-PDUs.pcap": {
+          "sha256": "b74a59fe9130866c1d090f9964757b0e1153940cdde4b2c1d77c264fc4693007",
+          "bytes": 194
+        },
+        "someip-sd/duplicate-referenced-options.pcap": {
+          "sha256": "206c50b94fcc3070e6c0aa14bb1db6c4a2de4d4d6d83ace5100dd99aa79ed8b1",
+          "bytes": 150
+        },
+        "someip-sd/empty-message.pcap": {
+          "sha256": "dd7ef7d7d329a98a82115931c42425697e6591ce11039c0b550308150cbf4893",
+          "bytes": 110
+        },
+        "someip-sd/empty-run-nonzero-indices.pcap": {
+          "sha256": "ee6eab5623c077523d5ba69202e93aaaf1e447048abbc67cfa61c4714f6ba429",
+          "bytes": 126
+        },
+        "someip-sd/endpoint-proto-unknown.pcap": {
+          "sha256": "d24abf7565c67e2f59e5226e3166a3c26eafb4a4fb1d89abd00903694af0b63a",
+          "bytes": 138
+        },
+        "someip-sd/entry-length-max.pcap": {
+          "sha256": "1a0387fa6eb579a30f77130e569be3970c4ed62f9010b21fe5e0ac4ba1b0da44",
+          "bytes": 138
+        },
+        "someip-sd/entry-length-nonmultiple.pcap": {
+          "sha256": "eb53c91fa20c44f6ba04832104100f884b30f358a16ec9f195563ed243df8bf7",
+          "bytes": 138
+        },
+        "someip-sd/find-any-instance.pcap": {
+          "sha256": "50d6205fe338fc2c89c87412230aaebccddb42846e09f4290382d0e63a1b1732",
+          "bytes": 126
+        },
+        "someip-sd/group-wildcard.pcap": {
+          "sha256": "b59b1559cfeab17986152f415526bd56b99cb55134bf72f20a104bf656d421bd",
+          "bytes": 138
+        },
+        "someip-sd/interface2.pcap": {
+          "sha256": "830505b60915c61c553a06b33af4c0327f8674be104875aa3d9a14a008508d82",
+          "bytes": 138
+        },
+        "someip-sd/ipv4-length-mismatch.pcap": {
+          "sha256": "0473c26a641f269fcc1404288ca9e54d83c7767ad745a3b184d7165dd09e93f9",
+          "bytes": 137
+        },
+        "someip-sd/ipv6.pcap": {
+          "sha256": "d000a1ff37201e430df4887578654c019d0bdc94934a7ce4e59ad96807b6f0a8",
+          "bytes": 150
+        },
+        "someip-sd/literal-reserved-observation.pcap": {
+          "sha256": "3c0b9ba93007799bc964e6adabadf9a6432023093526d43816f5a450cdfaf1ea",
+          "bytes": 138
+        },
+        "someip-sd/major-wildcard.pcap": {
+          "sha256": "8fbbf0f994797d94b964559ce80a6d3b98019defa7858420da8529d600bda06d",
+          "bytes": 138
+        },
+        "someip-sd/manifest.json": {
+          "sha256": "719a10daae2af96fb8a7d4a4197c1c6aad262fd04cdce405bbdf8a4daabb3802",
+          "bytes": 71678
+        },
+        "someip-sd/missing-reference.pcap": {
+          "sha256": "0f2ba036dd6e8747ef6f69f429df7852e7abb1ac50f36a5ac3c815206dbd388d",
+          "bytes": 138
+        },
+        "someip-sd/multicast-option-unicast-address.pcap": {
+          "sha256": "61e52f6ff5b8f581dc3c53cd46296db821e398ebcbbff7b55f3727c1b5f4bddc",
+          "bytes": 138
+        },
+        "someip-sd/multicast-v4-ack.pcap": {
+          "sha256": "c2f092661a3c644087ea9ae5326593b08e8c57758497b050b80baa800e3eb82c",
+          "bytes": 138
+        },
+        "someip-sd/multicast-v6-ack.pcap": {
+          "sha256": "3ac019c9a530238be0f681692252d83d6ea719c60be85e14355464e6d9c0a5da",
+          "bytes": 150
+        },
+        "someip-sd/nack-empty.pcap": {
+          "sha256": "15afc767050b381ad8cf8ccd6bb09114cfa469ae695e47ce0a9b8ee5bfea1f39",
+          "bytes": 126
+        },
+        "someip-sd/offer.pcap": {
+          "sha256": "560d46014d993437432b2be747e076b08ace728532acae7d9c6dfcb715309bc2",
+          "bytes": 138
+        },
+        "someip-sd/opaque-nondiscardable.pcap": {
+          "sha256": "e2bc7dcdd6611aa84858876a69d84a854e80976b1ace16bc1b3325679d140f35",
+          "bytes": 148
+        },
+        "someip-sd/option-length-max.pcap": {
+          "sha256": "dd9ac938e64ed332130bac169a024863dd867e7e8bc7f66152915989dc3a4e2d",
+          "bytes": 138
+        },
+        "someip-sd/option-length-zero.pcap": {
+          "sha256": "28b8d9b302364046aab4e129555b6fe915fec116ebec31149c9f86950e002628",
+          "bytes": 138
+        },
+        "someip-sd/ordered-mixed-entries.pcap": {
+          "sha256": "02820ada19642f637c37ad95a345dc7db09a9e01cf3332bac3e70900705e9b7c",
+          "bytes": 170
+        },
+        "someip-sd/port-zero-unverified.pcap": {
+          "sha256": "8ef559f3c62d20bf4b54fdaa673559aff7ef52432fffc90091972974292f2a46",
+          "bytes": 138
+        },
+        "someip-sd/protocol2.pcap": {
+          "sha256": "b20567d4124d132afef1fc773427188c97fb53ae3b5abbc07d93c9ca14764c46",
+          "bytes": 138
+        },
+        "someip-sd/referenced-opaque-discardable.pcap": {
+          "sha256": "4902858461123ed957f709d5732f76f2c0c84853ce128ca66b15f745796b775d",
+          "bytes": 148
+        },
+        "someip-sd/request-instead-notify.pcap": {
+          "sha256": "9874e880e6477c25362239f2277201cb2ba152bcab408533bd0d875655b3671e",
+          "bytes": 138
+        },
+        "someip-sd/short-SD-header.pcap": {
+          "sha256": "e8c8125e10c3e3243cd9770e67e6db46312d0f8fa441dd6420e6c2fba53758fa",
+          "bytes": 109
+        },
+        "someip-sd/sid-wrap-literal.pcap": {
+          "sha256": "7fb62b3ebc1582d47b9f680a7f5cb39eb0de21f5c676bb881392841f2a9b9a55",
+          "bytes": 138
+        },
+        "someip-sd/sid-zero.pcap": {
+          "sha256": "e614115d3fe4c2398f2e3a12031017b7df8f2a28cca543b0f7e7cb0c290c331c",
+          "bytes": 138
+        },
+        "someip-sd/stop-offer.pcap": {
+          "sha256": "bafe74013f3188faba2dbb303af1e7da8b5fa7cdf01daed022057a9df3fd0357",
+          "bytes": 138
+        },
+        "someip-sd/stop-subscribe.pcap": {
+          "sha256": "9affdbb245752c9ced212ebd40edd0678b727ef9f8cefb69a802028d02ab2005",
+          "bytes": 138
+        },
+        "someip-sd/subscribe-ipv4.pcap": {
+          "sha256": "50661c70a829329e70edb5ae96cdec5c2e6a75fe1c3d49d1f84b3b3ee40000bd",
+          "bytes": 138
+        },
+        "someip-sd/subscribe-tcp.pcap": {
+          "sha256": "1c3d002d3b002f9656bec8f05f6f104fea0537c7b452697c93c132702106d270",
+          "bytes": 138
+        },
+        "someip-sd/ttl-and-counter-max.pcap": {
+          "sha256": "31adb6e1f18c74efc1598e60179a33c8eba40f428c4ef74869c6d6c9c8655ad2",
+          "bytes": 138
+        },
+        "someip-sd/two-option-runs.pcap": {
+          "sha256": "77285baf661c956b711ab07a4091154e318c5d928930017024498073b23c023b",
+          "bytes": 150
+        },
+        "someip-sd/undefined-flags-ignored.pcap": {
+          "sha256": "389ff3db3c35be0962319565c148bd3c3342ec26683992fbb7fb1544adb5fa9b",
+          "bytes": 138
+        },
+        "someip-sd/unicast-option-multicast-address.pcap": {
+          "sha256": "255c5ff64a81fe0bc51686a7d13f0d8789894bd948c0bf951e36efb1c042db4a",
+          "bytes": 138
+        },
+        "someip-sd/unknown-entry.pcap": {
+          "sha256": "5f229e61af0812ecdbd143b12f561bd50034d9a486cf1989962c46e837c221f1",
+          "bytes": 138
+        },
+        "someip-sd/unreferenced-opaque-mandatory.pcap": {
+          "sha256": "703716b3daf9418c368dc35b80bad40b0d9b6419096bb2080944b505960e58bc",
+          "bytes": 148
+        },
+        "someip-tools/REFERENCE-ACTUAL-FIRST.json": {
+          "sha256": "86e1da178a34d8460364764244e6add96e1d2026eea76606a56ed07241688fb7",
+          "bytes": 3669
+        },
+        "someip-tools/build.py": {
+          "sha256": "766d5e2e307e8b76416418f5f423e11c83a733d90e7f025d063c1221a5b41be3",
+          "bytes": 7929
+        },
+        "someip-tools/ppi-build.py": {
+          "sha256": "4c103ab043df0a1a31b15928c0238cfdb2cc6763b6ccd66b003778b8c2c64efb",
+          "bytes": 6701
+        },
+        "someip-tools/reference.py": {
+          "sha256": "a8380406d6643f3a1ad51bbd454db35bab58244040788aab8005f308f27af0f9",
+          "bytes": 3458
+        },
+        "someip-tools/source-pin.json": {
+          "sha256": "5b26af0000bb83920ee1402842c4ae46b0b61a09f2b5bb21d59d743c715df53a",
+          "bytes": 4944
+        },
+        "someip-tools/verify.py": {
+          "sha256": "4fa5525652d95785457a30c00b4215ef022bc2d6703874752508747ee056707b",
+          "bytes": 1125
+        },
+        "validation/expected.json": {
+          "sha256": "6ffe840941568ce98fb48922529f2ce84a5f047803ab4753def5e21ea159e15d",
+          "bytes": 87839
+        }
+      },
+      "aliases": {
+        "common/pcapx/pcaputil/ppi-capture/absent-is-not-zero.pcap": "ppi-capture/absent-is-not-zero.pcap",
+        "common/pcapx/pcaputil/ppi-capture/aggregate-isolation.pcap": "ppi-capture/aggregate-isolation.pcap",
+        "common/pcapx/pcaputil/ppi-capture/dcp-known-inner-offset.pcap": "ppi-capture/dcp-known-inner-offset.pcap",
+        "common/pcapx/pcaputil/ppi-capture/ipv4-fragment-domain-isolation.pcap": "ppi-capture/ipv4-fragment-domain-isolation.pcap",
+        "common/pcapx/pcaputil/ppi-capture/ipv4-fragment-outoforder.pcap": "ppi-capture/ipv4-fragment-outoforder.pcap",
+        "common/pcapx/pcaputil/ppi-capture/ipv6-fragment-domain-isolation.pcap": "ppi-capture/ipv6-fragment-domain-isolation.pcap",
+        "common/pcapx/pcaputil/ppi-capture/ipv6-fragment-outoforder.pcap": "ppi-capture/ipv6-fragment-outoforder.pcap",
+        "common/pcapx/pcaputil/ppi-capture/manifest.json": "ppi-capture/manifest.json",
+        "common/pcapx/pcaputil/ppi-capture/ordered-0.pcap": "ppi-capture/ordered-0.pcap",
+        "common/pcapx/pcaputil/ppi-capture/ordered-4294967295.pcap": "ppi-capture/ordered-4294967295.pcap",
+        "common/pcapx/pcaputil/ppi-capture/ordered-None.pcap": "ppi-capture/ordered-None.pcap",
+        "common/pcapx/pcaputil/ppi-capture/pending-close.pcap": "ppi-capture/pending-close.pcap",
+        "common/pcapx/pcaputil/ppi-capture/refuse-duplicate-aggregation.pcap": "ppi-capture/refuse-duplicate-aggregation.pcap",
+        "common/pcapx/pcaputil/ppi-capture/refuse-flags.pcap": "ppi-capture/refuse-flags.pcap",
+        "common/pcapx/pcaputil/ppi-capture/refuse-inner-DLT.pcap": "ppi-capture/refuse-inner-DLT.pcap",
+        "common/pcapx/pcaputil/ppi-capture/refuse-length-overrun.pcap": "ppi-capture/refuse-length-overrun.pcap",
+        "common/pcapx/pcaputil/ppi-capture/refuse-length-underflow.pcap": "ppi-capture/refuse-length-underflow.pcap",
+        "common/pcapx/pcaputil/ppi-capture/refuse-short-field.pcap": "ppi-capture/refuse-short-field.pcap",
+        "common/pcapx/pcaputil/ppi-capture/refuse-short.pcap": "ppi-capture/refuse-short.pcap",
+        "common/pcapx/pcaputil/ppi-capture/refuse-unknown-field.pcap": "ppi-capture/refuse-unknown-field.pcap",
+        "common/pcapx/pcaputil/ppi-capture/refuse-version.pcap": "ppi-capture/refuse-version.pcap",
+        "common/pcapx/pcaputil/ppi-capture/wrong-declared-Ethernet.pcap": "ppi-capture/wrong-declared-Ethernet.pcap",
+        "common/pcapx/pcaputil/someip-sd/ack-empty.pcap": "someip-sd/ack-empty.pcap",
+        "common/pcapx/pcaputil/someip-sd/bad-client.pcap": "someip-sd/bad-client.pcap",
+        "common/pcapx/pcaputil/someip-sd/bad-message-id.pcap": "someip-sd/bad-message-id.pcap",
+        "common/pcapx/pcaputil/someip-sd/bad-return.pcap": "someip-sd/bad-return.pcap",
+        "common/pcapx/pcaputil/someip-sd/coalesced-PDUs.pcap": "someip-sd/coalesced-PDUs.pcap",
+        "common/pcapx/pcaputil/someip-sd/duplicate-referenced-options.pcap": "someip-sd/duplicate-referenced-options.pcap",
+        "common/pcapx/pcaputil/someip-sd/empty-message.pcap": "someip-sd/empty-message.pcap",
+        "common/pcapx/pcaputil/someip-sd/empty-run-nonzero-indices.pcap": "someip-sd/empty-run-nonzero-indices.pcap",
+        "common/pcapx/pcaputil/someip-sd/endpoint-proto-unknown.pcap": "someip-sd/endpoint-proto-unknown.pcap",
+        "common/pcapx/pcaputil/someip-sd/entry-length-max.pcap": "someip-sd/entry-length-max.pcap",
+        "common/pcapx/pcaputil/someip-sd/entry-length-nonmultiple.pcap": "someip-sd/entry-length-nonmultiple.pcap",
+        "common/pcapx/pcaputil/someip-sd/find-any-instance.pcap": "someip-sd/find-any-instance.pcap",
+        "common/pcapx/pcaputil/someip-sd/group-wildcard.pcap": "someip-sd/group-wildcard.pcap",
+        "common/pcapx/pcaputil/someip-sd/interface2.pcap": "someip-sd/interface2.pcap",
+        "common/pcapx/pcaputil/someip-sd/ipv4-length-mismatch.pcap": "someip-sd/ipv4-length-mismatch.pcap",
+        "common/pcapx/pcaputil/someip-sd/ipv6.pcap": "someip-sd/ipv6.pcap",
+        "common/pcapx/pcaputil/someip-sd/literal-reserved-observation.pcap": "someip-sd/literal-reserved-observation.pcap",
+        "common/pcapx/pcaputil/someip-sd/major-wildcard.pcap": "someip-sd/major-wildcard.pcap",
+        "common/pcapx/pcaputil/someip-sd/manifest.json": "someip-sd/manifest.json",
+        "common/pcapx/pcaputil/someip-sd/missing-reference.pcap": "someip-sd/missing-reference.pcap",
+        "common/pcapx/pcaputil/someip-sd/multicast-option-unicast-address.pcap": "someip-sd/multicast-option-unicast-address.pcap",
+        "common/pcapx/pcaputil/someip-sd/multicast-v4-ack.pcap": "someip-sd/multicast-v4-ack.pcap",
+        "common/pcapx/pcaputil/someip-sd/multicast-v6-ack.pcap": "someip-sd/multicast-v6-ack.pcap",
+        "common/pcapx/pcaputil/someip-sd/nack-empty.pcap": "someip-sd/nack-empty.pcap",
+        "common/pcapx/pcaputil/someip-sd/offer.pcap": "someip-sd/offer.pcap",
+        "common/pcapx/pcaputil/someip-sd/opaque-nondiscardable.pcap": "someip-sd/opaque-nondiscardable.pcap",
+        "common/pcapx/pcaputil/someip-sd/option-length-max.pcap": "someip-sd/option-length-max.pcap",
+        "common/pcapx/pcaputil/someip-sd/option-length-zero.pcap": "someip-sd/option-length-zero.pcap",
+        "common/pcapx/pcaputil/someip-sd/ordered-mixed-entries.pcap": "someip-sd/ordered-mixed-entries.pcap",
+        "common/pcapx/pcaputil/someip-sd/port-zero-unverified.pcap": "someip-sd/port-zero-unverified.pcap",
+        "common/pcapx/pcaputil/someip-sd/protocol2.pcap": "someip-sd/protocol2.pcap",
+        "common/pcapx/pcaputil/someip-sd/referenced-opaque-discardable.pcap": "someip-sd/referenced-opaque-discardable.pcap",
+        "common/pcapx/pcaputil/someip-sd/request-instead-notify.pcap": "someip-sd/request-instead-notify.pcap",
+        "common/pcapx/pcaputil/someip-sd/short-SD-header.pcap": "someip-sd/short-SD-header.pcap",
+        "common/pcapx/pcaputil/someip-sd/sid-wrap-literal.pcap": "someip-sd/sid-wrap-literal.pcap",
+        "common/pcapx/pcaputil/someip-sd/sid-zero.pcap": "someip-sd/sid-zero.pcap",
+        "common/pcapx/pcaputil/someip-sd/stop-offer.pcap": "someip-sd/stop-offer.pcap",
+        "common/pcapx/pcaputil/someip-sd/stop-subscribe.pcap": "someip-sd/stop-subscribe.pcap",
+        "common/pcapx/pcaputil/someip-sd/subscribe-ipv4.pcap": "someip-sd/subscribe-ipv4.pcap",
+        "common/pcapx/pcaputil/someip-sd/subscribe-tcp.pcap": "someip-sd/subscribe-tcp.pcap",
+        "common/pcapx/pcaputil/someip-sd/ttl-and-counter-max.pcap": "someip-sd/ttl-and-counter-max.pcap",
+        "common/pcapx/pcaputil/someip-sd/two-option-runs.pcap": "someip-sd/two-option-runs.pcap",
+        "common/pcapx/pcaputil/someip-sd/undefined-flags-ignored.pcap": "someip-sd/undefined-flags-ignored.pcap",
+        "common/pcapx/pcaputil/someip-sd/unicast-option-multicast-address.pcap": "someip-sd/unicast-option-multicast-address.pcap",
+        "common/pcapx/pcaputil/someip-sd/unknown-entry.pcap": "someip-sd/unknown-entry.pcap",
+        "common/pcapx/pcaputil/someip-sd/unreferenced-opaque-mandatory.pcap": "someip-sd/unreferenced-opaque-mandatory.pcap",
+        "common/pcapx/pcaputil/someip-tools/REFERENCE-ACTUAL-FIRST.json": "someip-tools/REFERENCE-ACTUAL-FIRST.json",
+        "common/pcapx/pcaputil/someip-tools/build.py": "someip-tools/build.py",
+        "common/pcapx/pcaputil/someip-tools/ppi-build.py": "someip-tools/ppi-build.py",
+        "common/pcapx/pcaputil/someip-tools/reference.py": "someip-tools/reference.py",
+        "common/pcapx/pcaputil/someip-tools/source-pin.json": "someip-tools/source-pin.json",
+        "common/pcapx/pcaputil/someip-tools/verify.py": "someip-tools/verify.py",
+        "scripts/protocol-tests/required-tests-traffic-unified-v82.json": "required-tests-traffic-unified-v82.json"
+      }
     }
   ],
   "schema_version": 1,

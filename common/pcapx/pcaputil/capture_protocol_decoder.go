@@ -22,7 +22,11 @@ func protocolAnalysisPacket(packet gopacket.Packet) gopacket.Packet {
 		// Payload layer tag must not be used to recreate an untyped packet.
 		return packet
 	}
-	p := gopacket.NewPacket(packet.Data(), protocolPacketDecoder{decoder: decoded[0].LayerType()}, gopacket.DecodeOptions{Lazy: true, NoCopy: true, DecodeStreamsAsDatagrams: false})
+	decoder := gopacket.Decoder(decoded[0].LayerType())
+	if _, ok := decoded[0].(*capturePPILayer); ok {
+		decoder = capturePPIDecoder{}
+	}
+	p := gopacket.NewPacket(packet.Data(), protocolPacketDecoder{decoder: decoder}, gopacket.DecodeOptions{Lazy: true, NoCopy: true, DecodeStreamsAsDatagrams: false})
 	p.Metadata().CaptureInfo = packet.Metadata().CaptureInfo
 	return p
 }

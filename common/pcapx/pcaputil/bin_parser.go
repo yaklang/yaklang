@@ -22,6 +22,7 @@ type ProtocolEvent struct {
 	nativeBACnetRead                         bool
 	nativeBACnetRoutedRead                   bool
 	Admission                                string
+	nativeDiagnosticError                    string // immutable query refusal; public caches are not authority
 	semanticFields                           map[string]any
 	semanticSession                          map[string]any
 	semanticMetadata                         any
@@ -133,6 +134,9 @@ func (e *ProtocolEvent) Decode() (result map[string]any, err error) {
 			result = owned
 		}
 	}()
+	if e.nativeDiagnosticError != "" {
+		return nil, fmt.Errorf("%s", e.nativeDiagnosticError)
+	}
 	if e.nativeUnrecognizedUDP {
 		return nil, fmt.Errorf("protocol parser: event is unrecognized, not an exact message")
 	}
@@ -245,6 +249,9 @@ func (e *ProtocolEvent) retainRuleEnvelope(result map[string]any) {
 }
 
 func (e *ProtocolEvent) ownsNativeFields() bool {
+	if e.nativeDiagnosticError != "" {
+		return true
+	}
 	if e.nativeDoIPObservation {
 		return true
 	}
@@ -644,6 +651,14 @@ func (a *binParser) emit(e *BinParserEvent) {
 		e.nativeUnrecognizedUDP = true
 	}
 
+	// All emitted IP diagnostics, including incomplete fragment Close, keep
+	// the original field-query refusal independent of editable public caches.
+	if e.Transport == "network" && e.Protocol == "ip" && e.Error != "" && e.semanticFields == nil {
+		e.nativeDiagnosticError = fmt.Sprintf("protocol parser: event is %s, not an exact message", e.Status)
+		if e.Status == "malformed" || e.Status == "decoded" || e.Status == "deferred" {
+			e.nativeDiagnosticError = "protocol parser: no exact rule for this message"
+		}
+	}
 	if e.Protocol == "sip" {
 		a.observeSIPMedia(e)
 	}

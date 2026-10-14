@@ -60,7 +60,16 @@ func (a *binParser) networkPacket(p gopacket.Packet) (gopacket.Packet, bool) {
 			payload = payload[4:]
 		}
 		if etherType == layers.EthernetType(0x8892) {
-			a.decodeDCPEthernet(p.Data(), e, ci)
+			frame := p.Data()
+			// The DCP wire codec takes the observed Ethernet frame, not its PPI
+			// metadata prefix. Select only a validated, declared PPI layer; never
+			// guess/strip a prefix from ordinary Ethernet or change packet identity.
+			if decoded := p.Layers(); len(decoded) > 0 {
+				if ppi, ok := decoded[0].(*capturePPILayer); ok {
+					frame = ppi.payload
+				}
+			}
+			a.decodeDCPEthernet(frame, e, ci)
 			return nil, true
 		}
 		if etherType == layers.EthernetType(0x88cc) {

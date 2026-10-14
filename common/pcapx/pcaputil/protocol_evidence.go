@@ -69,6 +69,11 @@ func packetEvidence(p gopacket.Packet) captureEvidence {
 			outer = a + "~" + b
 		}
 		switch v := l.(type) {
+		case *capturePPILayer:
+			e.Ref.Domain.Encapsulation += "/ppi:ethernet"
+			if v.aggregation {
+				e.Ref.Domain.Encapsulation += fmt.Sprintf("/aggregation:%d", v.interfaceID)
+			}
 		case *layers.Dot1Q:
 			e.Ref.Domain.Encapsulation += fmt.Sprintf("/vlan:%d", v.VLANIdentifier)
 		case *layers.VXLAN:
