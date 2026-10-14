@@ -184,13 +184,8 @@ func (r *SyntaxFlowResult) save(
 	}
 	r.dbResult = result
 	if r.onRisk == nil {
-		// Direct saves use the same storage function as the scan handler,
-		// without creating a runtime or running cover decisions again.
-		updates := make([]schema.RiskUpdateItem, 0, len(r.riskMap))
-		for _, risk := range r.GetRisks() {
-			updates = append(updates, schema.RiskUpdateItem{Risk: risk})
-		}
-		if err := SaveRiskUpdates(ssadb.GetDB(), updates...); err != nil {
+		// No scan handler is listening, so this result saves its own risks.
+		if err := SaveRisk(ssadb.GetDB(), r.GetRisks()...); err != nil {
 			// Keep findings available to stream consumers on a stale/read-only
 			// local risk DB, as the original direct-save path did.
 			log.Errorf("save risks failed: %v", err)
