@@ -7,6 +7,9 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon/aiskillloader"
+	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/utils/filesys"
 )
 
 func TestBuildSessionSnapshot_AlwaysEmitsFullPayload(t *testing.T) {
@@ -43,4 +46,48 @@ func TestBuildSessionSnapshot_ExecutionRoundsFromLoop(t *testing.T) {
 	require.NotNil(t, snapshot)
 	require.NotNil(t, snapshot.Execution)
 	require.Equal(t, 4, snapshot.Execution.ExecutionRounds)
+}
+
+func TestEmitSessionSnapshotLoadedSkillTokenCounts(t *testing.T) {
+	captured := map[string][]byte{}
+	emitter := aicommon.NewEmitter("coordinator", func(event *schema.AiOutputEvent) (*schema.AiOutputEvent, error) {
+		if event != nil && (event.NodeId == aicommon.SessionSnapshotNodeID || event.NodeId == aicommon.CapabilityInventoryNodeID) {
+			captured[event.NodeId] = append([]byte(nil), event.Content...)
+		}
+		return event, nil
+	})
+	cfg := aicommon.NewConfig(context.Background(),
+		aicommon.WithDisableAutoSkills(true), aicommon.WithDisallowMCPServers(true), aicommon.WithEmitter(emitter))
+	vfs := filesys.NewVirtualFs()
+	vfs.AddFile("loaded-skill/SKILL.md", "---\nname: loaded-skill\ndescription: Loaded guide\n---\nBODY_IN_TIMELINE")
+	vfs.AddFile("metadata-skill/SKILL.md", "---\nname: metadata-skill\ndescription: Available guide\n---\nUNLOADED_BODY")
+	loader, err := aiskillloader.NewFSSkillLoader(vfs)
+	require.NoError(t, err)
+	mgr := aiskillloader.NewSkillsContextManager(loader)
+	bindSkillsManagerToTimeline(mgr, cfg)
+	require.NoError(t, mgr.LoadSkill("loaded-skill"))
+	loop := NewMinimalReActLoop(cfg, nil)
+	loop.skillsContextManager = mgr
+	expected := mgr.GetCurrentSelectedSkills()[0].TokenCount
+
+	EmitSessionSnapshot(cfg, loop, nil)
+	require.Contains(t, captured, aicommon.SessionSnapshotNodeID)
+	require.Contains(t, captured, aicommon.CapabilityInventoryNodeID)
+	var snapshot aicommon.SessionSnapshot
+	require.NoError(t, json.Unmarshal(captured[aicommon.SessionSnapshotNodeID], &snapshot))
+	skills := map[string]aicommon.CapabilityInventoryItem{}
+	for _, item := range snapshot.Capabilities {
+		if item.Type == "skill" {
+			skills[item.Name] = item
+		}
+	}
+	require.Equal(t, float64(expected), skills["loaded-skill"].Data.(map[string]any)["token_count"])
+	require.NotContains(t, skills["metadata-skill"].Data.(map[string]any), "token_count")
+	var legacy aicommon.CapabilityInventoryPayload
+	require.NoError(t, json.Unmarshal(captured[aicommon.CapabilityInventoryNodeID], &legacy))
+	require.Len(t, legacy.Fixed.Skills, 2)
+	require.Equal(t, "loaded-skill", legacy.Fixed.Skills[0].Name)
+	require.Equal(t, expected, legacy.Fixed.Skills[0].TokenCount)
+	require.Equal(t, "metadata-skill", legacy.Fixed.Skills[1].Name)
+	require.Zero(t, legacy.Fixed.Skills[1].TokenCount)
 }

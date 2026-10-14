@@ -3,6 +3,7 @@ package aicommon
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"strings"
 	"sync"
 	"testing"
@@ -113,8 +114,9 @@ func TestSkillPromptSnapshotStaysCompleteDuringFreeze(t *testing.T) {
 	tl := NewTimeline(nil, nil)
 	tl.SetTimelineBucketByteSize(-1)
 	require.True(t, tl.PushSkillFileContent(1, "demo-skill", "SKILL.md", "ATOMIC_SKILL_BODY", SkillContentSourceManual, 1, 1, 1))
+	expectedTokens := MeasureTokens("ATOMIC_SKILL_BODY")
 	var wg sync.WaitGroup
-	errors := make(chan int, 4)
+	errors := make(chan string, 4)
 	ready := make(chan struct{}, 4)
 	start := make(chan struct{})
 	for i := 0; i < cap(errors); i++ {
@@ -127,7 +129,12 @@ func TestSkillPromptSnapshotStaysCompleteDuringFreeze(t *testing.T) {
 				view := RenderTimelineFrozenOpen(tl)
 				count := strings.Count(view.Open+view.SkillsContext, "ATOMIC_SKILL_BODY")
 				if count != 1 {
-					errors <- count
+					errors <- fmt.Sprintf("visible body count: %d", count)
+					return
+				}
+				parts := tl.VisibleSkillParts("demo-skill")
+				if len(parts) != 1 || parts[0].TokenCount != expectedTokens {
+					errors <- fmt.Sprintf("unexpected visible skill size: %+v", parts)
 					return
 				}
 			}
@@ -140,7 +147,7 @@ func TestSkillPromptSnapshotStaysCompleteDuringFreeze(t *testing.T) {
 	tl.FreezeAll()
 	wg.Wait()
 	close(errors)
-	for count := range errors {
-		require.Equal(t, 1, count, "one snapshot must not lose or duplicate content during transfer")
+	for issue := range errors {
+		t.Error(issue)
 	}
 }

@@ -1,6 +1,7 @@
 package aicommon
 
 import (
+	"encoding/json"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -181,6 +182,107 @@ func TestBuildInventorySkillsFromLoader_MetadataAndLoaded(t *testing.T) {
 	}
 	require.Equal(t, CapabilityInventorySkillLoadLoaded, byName["deploy-app"].SkillLoadState)
 	require.Equal(t, CapabilityInventorySkillLoadMetadata, byName["code-review"].SkillLoadState)
+	require.Equal(t, mgr.GetCurrentSelectedSkills()[0].TokenCount, byName["deploy-app"].TokenCount)
+	require.Positive(t, byName["deploy-app"].TokenCount)
+	require.Zero(t, byName["code-review"].TokenCount)
+}
+
+func TestBuildInventorySkillsFromManagerIncludesTimelineSkillTokens(t *testing.T) {
+	for _, withLoader := range []bool{false, true} {
+		name := "timeline_only"
+		if withLoader {
+			name = "outside_registry_budget"
+		}
+		t.Run(name, func(t *testing.T) {
+			var loader aiskillloader.SkillLoader
+			if withLoader {
+				var err error
+				loader, err = aiskillloader.NewFSSkillLoader(testSkillInventoryVFS())
+				require.NoError(t, err)
+			}
+			mgr := aiskillloader.NewSkillsContextManager(loader,
+				aiskillloader.WithManagerTokenEstimator(func(string) int {
+					return aiskillloader.MetadataListMaxTokens + 1
+				}))
+			cfg := NewConfig(nil, WithDisableAutoSkills(true))
+			bindTestTimeline(mgr, cfg)
+			tl := cfg.GetTimeline()
+			require.True(t, tl.PushSkillMetadata(cfg.AcquireId(), "deploy-app", "SKILL_METADATA", SkillContentSourceManual))
+			require.True(t, tl.PushSkillFileContent(cfg.AcquireId(), "deploy-app", "SKILL.md", "SKILL_BODY", SkillContentSourceManual, 1, 1, 1))
+			expected := MeasureTokens("SKILL_METADATA") + MeasureTokens("SKILL_BODY")
+
+			items := BuildInventorySkillsFromManager(mgr)
+			require.Len(t, items, 1, "active Timeline skills must be included regardless of the loader registry")
+			require.Equal(t, "deploy-app", items[0].Name)
+			require.Equal(t, CapabilityInventorySkillLoadLoaded, items[0].SkillLoadState)
+			require.Equal(t, expected, items[0].TokenCount)
+			tl.FreezeAll()
+			require.Equal(t, items, BuildInventorySkillsFromManager(mgr))
+		})
+	}
+}
+
+func TestCapabilityInventorySkillTokensReachBothFrontendPayloads(t *testing.T) {
+	loader, err := aiskillloader.NewFSSkillLoader(testSkillInventoryVFS())
+	require.NoError(t, err)
+	mgr := aiskillloader.NewSkillsContextManager(loader)
+	cfg := NewConfig(nil, WithDisableAutoSkills(true), WithDisallowMCPServers(true))
+	bindTestTimeline(mgr, cfg)
+	require.NoError(t, mgr.LoadSkill("deploy-app"))
+
+	loop := &testCapabilityInventoryLoop{inventorySkills: BuildInventorySkillsFromManager(mgr)}
+	expected := mgr.GetCurrentSelectedSkills()[0].TokenCount
+	items := BuildCapabilityInventoryItems(cfg, loop)
+	skills := map[string]CapabilityInventoryItem{}
+	for _, item := range items {
+		if item.Type == "skill" {
+			skills[item.Name] = item
+		}
+	}
+	require.Equal(t, CapabilityInventoryStageLoaded, skills["deploy-app"].Stage)
+	require.Equal(t, expected, skills["deploy-app"].Data.(map[string]any)["token_count"])
+	require.NotContains(t, skills["code-review"].Data.(map[string]any), "token_count")
+
+	// A session_snapshot JSON round trip changes Data's integer to float64.
+	raw, err := json.Marshal(&SessionSnapshot{Capabilities: items})
+	require.NoError(t, err)
+	var snapshot SessionSnapshot
+	require.NoError(t, json.Unmarshal(raw, &snapshot))
+	legacy := CapabilityInventoryPayloadFromItems(snapshot.Capabilities, nil)
+	byName := map[string]CapabilityInventoryNamedItem{}
+	for _, skill := range legacy.Fixed.Skills {
+		byName[skill.Name] = skill
+	}
+	require.Equal(t, expected, byName["deploy-app"].TokenCount)
+	require.Zero(t, byName["code-review"].TokenCount)
+	loadedJSON, err := json.Marshal(byName["deploy-app"])
+	require.NoError(t, err)
+	var loadedFields map[string]any
+	require.NoError(t, json.Unmarshal(loadedJSON, &loadedFields))
+	require.Equal(t, float64(expected), loadedFields["token_count"])
+	metadataJSON, err := json.Marshal(byName["code-review"])
+	require.NoError(t, err)
+	var metadataFields map[string]any
+	require.NoError(t, json.Unmarshal(metadataJSON, &metadataFields))
+	require.NotContains(t, metadataFields, "token_count", "registry-only skills have no loaded size")
+
+	require.NoError(t, mgr.ChangeViewOffset("deploy-app", "SKILL.md", 2))
+	loop.inventorySkills = BuildInventorySkillsFromManager(mgr)
+	larger := BuildCapabilityInventoryPayload(cfg, loop)
+	for _, skill := range larger.Fixed.Skills {
+		if skill.Name == "deploy-app" {
+			require.Greater(t, skill.TokenCount, expected, "paging adds another retained range")
+			require.Equal(t, mgr.GetCurrentSelectedSkills()[0].TokenCount, skill.TokenCount)
+		}
+	}
+	require.True(t, mgr.UnloadSkill("deploy-app"))
+	loop.inventorySkills = BuildInventorySkillsFromManager(mgr)
+	for _, item := range BuildCapabilityInventoryItems(cfg, loop) {
+		if item.Type == "skill" {
+			require.Equal(t, CapabilityInventoryStageMetadata, item.Stage)
+			require.NotContains(t, item.Data.(map[string]any), "token_count", "unloading clears previously reported sizes")
+		}
+	}
 }
 
 func TestBuildCapabilityInventoryPayload_IncludesInventorySkills(t *testing.T) {
@@ -235,4 +337,20 @@ func TestCapabilityInventoryPayloadFromItems_SplitsByPromptPosition(t *testing.T
 
 	require.Len(t, payload.Dynamic.Forges, 1)
 	require.Equal(t, "my-forge", payload.Dynamic.Forges[0].Name)
+}
+
+func TestCapabilityInventoryPayloadFromItemsPreservesDecodedSkillTokens(t *testing.T) {
+	items := []CapabilityInventoryItem{
+		{Name: "loaded-skill", Type: "skill", Stage: CapabilityInventoryStageLoaded,
+			Position: CapabilityInventoryPositionSemiDynamic, Data: map[string]any{"token_count": 1_500_000}},
+		{Name: "metadata-skill", Type: "skill", Stage: CapabilityInventoryStageMetadata,
+			Position: CapabilityInventoryPositionSemiDynamic, Data: map[string]any{"token_count": 999}},
+	}
+	raw, err := json.Marshal(items)
+	require.NoError(t, err)
+	require.NoError(t, json.Unmarshal(raw, &items))
+	payload := CapabilityInventoryPayloadFromItems(items, nil)
+	require.Len(t, payload.Fixed.Skills, 2)
+	require.Equal(t, 1_500_000, payload.Fixed.Skills[0].TokenCount, "float64 JSON counts must not be lost through scientific-notation string conversion")
+	require.Zero(t, payload.Fixed.Skills[1].TokenCount, "metadata must never inherit a stale loaded count")
 }

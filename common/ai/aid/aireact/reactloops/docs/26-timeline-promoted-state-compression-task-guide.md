@@ -57,6 +57,8 @@
 - 冻结后，`rebuildPromotedStateLocked` 通过 `appendPromotedSkillContent` 按 part 身份聚合：同一 part 的 hash 相同则忽略，不同则拼接。`renderPromotedSkillContent` 再按技能名分组展示，组内 metadata 在前，其余按路径和范围排序，输出 Semi1 单一技能块。
 - `PromotedTimelineEntry.Payload` 是单个 part 的展示文本，`PayloadHash` 是该 part 最后一次追加的来源 hash。journal key 与 promoted part key 都是 part 身份；按技能名分组只发生在渲染阶段，不改变聚合粒度。
 - `renderPromotedSkillContent` 只读取已冻结的 `promotedState`，按技能名分组后输出。主循环与 helper 经 `RenderTimelineFrozenOpenWithOptions` → `PromptFrozenOpenMaterials` → `PromptMaterials` 共用这一材料链路；Open 与技能块在同一读锁内采集。
+- `VisibleSkillParts` 的 `TokenCount` 按 `MeasureTokens` 计量当前可见的 metadata/content 正文，合计 Open 与已冻结部分；同范围的不同正文都计入，冻结聚合已忽略的相邻同 hash 内容不重复计量，退休 item、技能目录及渲染标签不计入。`GetCurrentSelectedSkills` 返回带总 `TokenCount` 的 `SkillContext`，`GetSkillViewSummary` 展示总量及各部分用量；它们只读 Timeline，不从 loader 文件大小推算，不维护第二套计数缓存。
+- 前端能力清单复用同一计量：已加载 skill 在 `session_snapshot.capabilities[].data.token_count` 与 `capability_inventory` 的 `skills[].token_count` 披露正文 token 数；仅有目录元信息的 skill 不披露用量，卸载后不保留旧计数。没有 loader 元信息或超出目录预算的 Timeline 可见技能也必须包含在已加载清单中。
 - [aiskillloader/timeline_binding.go](../../../aicommon/aiskillloader/timeline_binding.go) 的 `BindTimelineSink` 只切换引用，不加载、不补写 Timeline。Manager 是 loader/viewer，不是 prompt 正文来源；本任务不增加第二个读写接口。
 - 当前只有显式 `DeleteSkillContent` / unload 等移除操作才会使 Skill 原文退出上下文，之后可重新加载。压缩不会淘汰 Skill，不能写成“被总结后重读”。
 

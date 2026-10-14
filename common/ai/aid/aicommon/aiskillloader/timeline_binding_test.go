@@ -1,6 +1,7 @@
 package aiskillloader
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -94,6 +95,44 @@ func TestSkillBindingQueriesOnlyTheTargetTimeline(t *testing.T) {
 	selected := mgr.GetCurrentSelectedSkills()
 	require.Len(t, selected, 1)
 	require.Equal(t, "code-review", selected[0].Name)
+	require.Equal(t, MeasureStringTokens("TARGET_BODY", nil), selected[0].TokenCount)
 	require.Equal(t, target.RenderSkillContentForPrompt(), mgr.RenderStable())
 	require.Equal(t, loads, loader.loads, "viewing the target must not load content")
+}
+
+func TestSkillManagerViewsTimelineTokenCounts(t *testing.T) {
+	base, err := NewFSSkillLoader(buildTestVFS())
+	require.NoError(t, err)
+	loader := &bindingTestLoader{SkillLoader: base}
+	mgr := NewSkillsContextManager(loader)
+	require.Empty(t, mgr.GetCurrentSelectedSkills())
+	require.Empty(t, mgr.GetSkillViewSummary("deploy-app"))
+	sink := newTestTimelineSink()
+	mgr.BindTimelineSink(sink)
+	inventory := mgr.SkillInventory()
+
+	metadata, first, second := "Skill metadata", "First page body", "Second page body"
+	require.True(t, sink.AppendSkillMetadata("deploy-app", metadata, SkillContentSourceManual))
+	require.True(t, sink.AppendSkillFileContent("deploy-app", "SKILL.md", first, SkillContentSourceManual, 1, 4, 8))
+	require.True(t, sink.AppendSkillCatalog("this catalog is not loaded skill content"))
+	expected := MeasureStringTokens(metadata, nil) + MeasureStringTokens(first, nil)
+	selected := mgr.GetCurrentSelectedSkills()
+	require.Len(t, selected, 1)
+	require.Equal(t, expected, selected[0].TokenCount)
+	require.Same(t, base.skills["deploy-app"].meta, selected[0].SkillMeta, "runtime size is separate from loader metadata")
+
+	require.True(t, sink.AppendSkillFileContent("deploy-app", "SKILL.md", second, SkillContentSourceAuto, 5, 8, 8))
+	expected += MeasureStringTokens(second, nil)
+	require.Equal(t, expected, mgr.GetCurrentSelectedSkills()[0].TokenCount)
+	require.Equal(t, expected-MeasureStringTokens(second, nil), selected[0].TokenCount, "an earlier query result must not acquire later sizes")
+	summary := mgr.GetSkillViewSummary("deploy-app")
+	require.Contains(t, summary, fmt.Sprintf("Timeline content: %d tokens", expected))
+	require.Contains(t, summary, fmt.Sprintf("Metadata: loaded (%d tokens)", MeasureStringTokens(metadata, nil)))
+	require.Contains(t, summary, fmt.Sprintf("SKILL.md:5-8/8 END (%d tokens)", MeasureStringTokens(second, nil)))
+	require.Zero(t, loader.loads, "observing skill sizes must not read skill files")
+	require.Equal(t, inventory, mgr.SkillInventory(), "runtime sizes must not rewrite the fixed inventory")
+
+	require.True(t, mgr.UnloadSkill("deploy-app"))
+	require.Empty(t, mgr.GetCurrentSelectedSkills())
+	require.Empty(t, mgr.GetSkillViewSummary("deploy-app"))
 }
