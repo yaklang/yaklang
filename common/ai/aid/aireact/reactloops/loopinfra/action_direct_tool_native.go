@@ -21,7 +21,7 @@ var nativeDirectToolAction = &reactloops.LoopAction{
 		aitool.WithStringParam("directly_call_tool_name", aitool.WithParam_Description("单调用的业务工具名称；批次时省略。此名称不能作为原生 function.name。")),
 		aitool.WithRawParam("directly_call_tool_params", map[string]any{"type": "object", "description": "单调用业务参数，字段必须遵循已加载的业务工具 Schema；无参数工具填 {}，批次时省略。长文本写入 JSON 字符串，不输出外置 AITAG。"}),
 		aitool.WithBoolParam("async_directly_call_tool", aitool.WithParam_Default(false),
-			aitool.WithParam_Description("可选的单调用异步标记，默认 false 同步等待；true 提交后台执行并返回 execute_id，通过 manage_async_execution_runtime 查看或等待结果。批量调用使用每项 async，可混合同步和异步。")),
+			aitool.WithParam_Description("可选的单调用异步标记，省略时遵循工具默认策略；显式 false 同步等待，true 提交后台执行并返回 execute_id，通过 manage_async_execution_runtime 查看或等待结果。批量调用使用每项 async，可混合同步和异步。")),
 		aitool.WithStringParam("directly_call_reason", aitool.WithParam_Description("可选的单调用目的；批次时省略，各子调用分别填写目的。")),
 		aitool.WithStructArrayParam("directly_call_tool_params_group", []aitool.PropertyOption{
 			aitool.WithParam_Description("执行低风险、独立且互不干扰的调用，每项参数来自完整 Schema；省略单调用名称和参数。各项使用不同 identifier 和明确目的，顶层目的不会复制给子调用。"),
@@ -33,7 +33,7 @@ var nativeDirectToolAction = &reactloops.LoopAction{
 			aitool.WithStringParam("reason", aitool.WithParam_Description("向用户简述本项具体操作目的，与其他项区分。")),
 			aitool.WithStringParam("expectations", aitool.WithParam_Description("可选的预期结果与判断依据。")),
 			aitool.WithBoolParam("async", aitool.WithParam_Default(false),
-				aitool.WithParam_Description("可选的本项异步标记，默认 false 同步等待；true 提交后台执行并返回本项 execute_id。同一批次可混合同步和异步调用。")),
+				aitool.WithParam_Description("可选的本项异步标记，省略时遵循工具默认策略；显式 false 同步等待，true 提交后台执行并返回本项 execute_id。同一批次可混合同步和异步调用。")),
 		),
 	},
 	ActionVerifier: verifyNativeDirectTool,
@@ -81,7 +81,7 @@ func verifyNativeDirectTool(loop *reactloops.ReActLoop, action *aicommon.Action)
 	reactloops.MaybeWarnBashBeforeEdit(loop, name)
 	loop.SetActionExecutionValue(action, "directly_call_tool_name", name)
 	loop.SetActionExecutionValue(action, actionStateNativeDirectParams, params)
-	loop.SetActionExecutionValue(action, actionStateDirectToolAsync, directToolActionAsync(action))
+	loop.SetActionExecutionValue(action, actionStateDirectToolAsync, directToolActionAsync(action, tool.DefaultAsync))
 	return nil
 }
 

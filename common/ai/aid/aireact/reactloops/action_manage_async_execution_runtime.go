@@ -106,7 +106,16 @@ var loopAction_ManageAsyncExecutionRuntime = &LoopAction{
 				}
 			case "wait":
 				ctx, cancel := context.WithTimeout(operator.GetContext(), request.timeout)
+				stopWatch := make(chan struct{})
+				go func() {
+					select {
+					case <-loop.AsyncDirectAnswerSignal():
+						cancel()
+					case <-stopWatch:
+					}
+				}()
 				summary, waitErr := manager.Wait(ctx, request.id)
+				close(stopWatch)
 				cancel()
 				err = waitErr
 				if summary.ID != "" {

@@ -8,6 +8,7 @@ import (
 	"io"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 	"unicode"
 
@@ -140,6 +141,11 @@ type ToolCaller struct {
 
 	ctx    context.Context
 	cancel context.CancelFunc
+
+	detachHandler func() (string, error)
+	onDetach      func()
+	detachOnce    sync.Once
+	detached      atomic.Bool
 
 	m               *sync.Mutex
 	onCallToolStart func(callToolId string)

@@ -52,6 +52,17 @@ func New(parent context.Context, config Config) (*Manager, error) {
 // Start registers an execution before launching it. The receipt is lifecycle
 // metadata only: Inspect explicitly obtains observations from the resource.
 func (m *Manager) Start(request Request) (Summary, error) {
+	return m.start(request, false)
+}
+
+// Adopt registers already-running work. Its Resource.Execute must join that
+// work and cleanup even when ctx is cancelled before Execute is entered. Failed
+// admission leaves ownership with the caller; it neither cancels nor restarts it.
+func (m *Manager) Adopt(request Request) (Summary, error) {
+	return m.start(request, true)
+}
+
+func (m *Manager) start(request Request, adopted bool) (Summary, error) {
 	if isNil(request.Resource) {
 		return Summary{}, ErrInvalidResource
 	}
@@ -80,6 +91,7 @@ func (m *Manager) Start(request Request) (Summary, error) {
 	}
 	ctx, cancel := context.WithCancelCause(m.ctx)
 	e := &execution{
+		adopted: adopted,
 		summary: Summary{ID: id, Metadata: cloneMetadata(request.Metadata), State: StatePending,
 			CreatedAt: time.Now(), Revision: 1},
 		resource: request.Resource, inspector: inspector,
@@ -104,18 +116,20 @@ func (m *Manager) run(e *execution) {
 		e.cancel(nil)
 	}()
 	m.mu.Lock()
-	if e.ctx.Err() != nil || e.summary.State == StateStopping {
+	if !e.adopted && (e.ctx.Err() != nil || e.summary.State == StateStopping) {
 		m.mu.Unlock()
 		return
 	}
 	now := time.Now()
 	e.summary.StartedAt = &now
-	e.summary.State = StateRunning
+	if e.summary.State != StateStopping {
+		e.summary.State = StateRunning
+	}
 	e.summary.Revision++
 	m.notifyLocked()
 	m.mu.Unlock()
 	// Recheck cancellation after admission, before invoking user work.
-	if e.ctx.Err() != nil {
+	if !e.adopted && e.ctx.Err() != nil {
 		return
 	}
 	runErr = e.resource.Execute(e.ctx)

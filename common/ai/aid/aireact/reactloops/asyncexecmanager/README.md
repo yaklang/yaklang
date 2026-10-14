@@ -80,9 +80,9 @@ context 取消就提前返回，把仍在运行的工作留在后台。否则 Ma
 等待停止完成。外部进程也由适配器处理终止和 Wait。Go 的 context 无法强制杀死
 不配合取消的 goroutine；此时记录会保持 stopping，占用并发名额，Shutdown 可超时。
 
-取消可能发生在 Execute 开始之前，因此创建 resource 时应只准备描述和观察器。
-把需要释放的句柄、worker 等放在 Execute 内创建并清理。如果是接管已有任务，
-要另外明确交接失败或执行未开始时的所有权，不能假设 Execute 一定会被调用。
+使用 `Start` 时，取消可能发生在 Execute 开始之前，因此创建 resource 时应只准备
+描述和观察器，把句柄、worker 等放在 Execute 内创建并清理。接管已有任务使用
+`Adopt`，交接失败时仍由原调用方负责执行和清理；详见下文接管协议。
 
 Inspect 不能返回仍会被其他 goroutine 修改的切片，尤其是 `json.RawMessage`。
 资源应在自己的锁或快照机制下完成复制。Manager 对返回的 JSON 再做防御性复制，
@@ -196,7 +196,8 @@ null（默认取消路径中 callback 可能仍在修改参数），运行期间
 提交失败和 Release 时的 caller 取消。
 
 适配器自动开启 `WithToolCaller_WaitForCallbackOnCancel` 的行为，取消时等待 callback
-退出后再关闭输出管道及清理产物。原同步调用仍默认及时返回取消。
+退出后再关闭输出管道及清理产物。可动态转换的同步调用也使用此行为；未绑定
+异步或接管适配器的 ToolCaller 保持原来的及时返回取消行为。
 manager 的执行 context 会联动取消该 caller，执行返回后也会取消 caller 的 context；
 创建 caller 时应使用所属任务的 context，而不是单次 action 的短期 context。例如：
 
@@ -226,8 +227,9 @@ if err != nil {
 修改参数的内部递归重复归档。ReAct 的准备入口会安装原有的 finalizeToolCallResult。
 
 Inspector 直接返回原 caller 的观察器，不增加输出或结果缓存。工具返回错误或
-不成功的 ToolResult 会产生 failed 执行；direct_answer / nil result 也会报告
-未产生工具结果，不能误当作完成了工具调用。context 取消保留取消/超时错误。
+不成功的 ToolResult 会产生 failed 执行；direct_answer 产生 cancelled 状态并通知
+所属 loop 回答，其他 nil result 报告 failed，不能误当作完成了工具调用。
+context 取消保留取消/超时错误。
 
 适配器验证见 [资源接入综合测试](../../../aicommon/toolcall_resource_test.go)：
 参数固定、真实观察器绑定、执行成功/失败、重复执行保护、执行前取消和原参数验证。
@@ -355,3 +357,80 @@ go vet ./common/ai/aid/aireact/reactloops/asyncexecmanager
 
 测试覆盖实时观察、终态观察、等待超时、取消与清理、父 context 传播、容量、
 并发操作，以及函数适配器的参数检查和 context 传递。示例随测试编译并执行。
+
+## ReAct 工具的三种异步入口
+
+三种入口最终都由工具所属 ReActLoop 的 manager 管理，模型使用同一个
+`manage_async_execution_runtime` action 的 `list / inspect / wait / stop / stop_all`。
+执行 ID 的协议字段是 `execute_id`。提交回执不代表工具完成或业务成功；`wait`
+等待执行和清理结束，读取输出和退出结果用 `inspect`。等待超时不取消工具。
+
+1. 模型在 `directly_call_tool` 的根参数中设置 `async_directly_call_tool: true`。
+   批量调用对应每项的 `async: true`。业务参数中的同名字段不会改变调度。
+2. 工具默认异步：Go 工具用 `aitool.WithDefaultAsync(true)`；Yak AI 工具在脚本
+   元数据中声明 `__ASYNC__ = true`。模型省略调度字段时使用工具默认值，显式
+   `false` 只覆盖本次初始调度，不禁止工具之后主动 Detach。
+3. 已运行的同步工具可以在 interval review 中选择 `decision: "detach"`，或由
+   Yak 工具脚本主动调用 `ai.Detach()`。转换保留原来的 ToolCaller、执行栈、
+   输出管道和清理逻辑，不重新执行脚本、不重新审批、不复制执行结果。
+
+长驻工具可以在完成准备工作后主动释放前台：
+
+```yak
+__DESC__ = "后台服务示例"
+
+// 在真实工具中先绑定监听端口、初始化服务，确认准备成功。
+println("service ready")
+executionID = ai.Detach()~
+println("execution: " + executionID)
+
+// Detach 之后仍处于原脚本，原来的 CTX、defer、stdout 都继续有效。
+defer func() {
+    println("service cleanup")
+}()
+for {
+    sleep(1)
+}
+```
+
+`ai.Detach()` 返回 `(string, error)`；`~` 是 Yak 的错误传播写法。并发或重复
+调用返回同一个 ID，已经预先异步启动的工具也返回原 ID。绑定仅属于本次脚本
+调用，不能通过共享的 `ai` 导出表串到其他脚本。脱离 AI 工具运行环境调用会
+返回错误。容量不足、owner 已关闭或调用已完成时，转换失败；容量失败不会
+取消、重启原调用或释放其前台等待责任。脚本可自行处理该错误并继续同步运行。
+
+## 接管正在运行的工作
+
+新工作仍使用 `Start`。已经运行的工作使用 `Adopt`，二者不能互换：`Start`
+可以在执行前取消，从而完全不调用 `Resource.Execute`；`Adopt` 即使在登记后
+立即取消，也必须进入 Execute，将取消传给原工作并等待它和清理真正结束。
+`aicommon.ToolCallExecution` 实现了这一接管协议，并对完成与 Detach 的竞争
+做唯一归属判定：结果只进入一次 task/Timeline，前台不会把回执计为工具完成。
+批量同步子调用转后台后释放前台调用槽位，实际 worker 和取消作用域保留到清理
+结束；已返回的批次回执不会被后台改写。
+
+只有仍可转换的前台调用会向 interval review 暴露 Detach 能力。它们即使持续
+产生输出也可进入 review，避免长驻服务永远无法转后台；已在后台的调用恢复
+原有的“输出变化时跳过辅助模型”策略。工具自行调用 `ai.Detach()` 不依赖
+interval review 是否开启，也不依赖辅助模型是否启用。
+
+后台执行成功后仍更新最近使用工具 Schema 缓存。缓存按工具定义维护；异步
+执行列表按调用实例维护，不能用最近工具缓存代替执行登记表。后台审批的
+`direct_answer` 是 owner loop 的控制信号：停止接收新后台执行、取消相关工具、
+唤醒 wait，并由主循环在 action 边界统一回答，不在后台复用旧 action operator。
+
+## 所有权和测试边界
+
+manager 是 ReActLoop 的实例字段，首次创建时绑定所属任务的 context。父 agent
+和每个 subagent 各有独立 manager；子 agent 的工具不会自动转移给父 agent。
+子 loop 退出会请求取消其工具。`Release/Close` 不等待清理；需要确认结束应在
+退出前 `wait`，或由宿主使用有界 `Shutdown`。context 取消仍是协作式取消，不能
+强制杀死不配合的 Go 回调。
+
+回归测试覆盖：文本/原生 action、默认策略与显式覆盖、同步运行中转换、真实
+Yak 引擎与 defer 清理、重复/并发 Detach、完成竞争、容量拒绝、接管后立即取消、
+多于前台槽位的混合调度、后台审批控制信号、真实 subagent 的 manager 隔离。
+对应测试位于 `aicommon/toolcall_detach_test.go`、
+`aireact/invoke_toolcall_detach_test.go`、`reactloops/async_execution_control_test.go`、
+`reactloops/async_subagent_test.go`、本目录 `adopt_test.go`，以及
+`common/yak/ai_detach*_test.go`。

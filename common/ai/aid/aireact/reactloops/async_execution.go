@@ -2,8 +2,10 @@ package reactloops
 
 import (
 	"errors"
+	"fmt"
 	"strings"
 
+	"github.com/segmentio/ksuid"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/asyncexecmanager"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
@@ -23,7 +25,7 @@ func (r *ReActLoop) GetAsyncExecutionManager() (*asyncexecmanager.Manager, error
 	if r.asyncExecutionManager != nil {
 		return r.asyncExecutionManager, nil
 	}
-	if r.released {
+	if r.released || r.asyncDirectAnswerRequested {
 		return nil, asyncexecmanager.ErrClosed
 	}
 	if utils.IsNil(task) {
@@ -60,6 +62,8 @@ func (r *ReActLoop) StartAsyncToolCall(name string, params aitool.InvokeParams, 
 	if utils.IsNil(task) || name == "" || params == nil {
 		return asyncexecmanager.Summary{}, errors.New("async tool call requires an owner, tool name and explicit parameters")
 	}
+	executionID := "exec-" + ksuid.New().String()
+	opts = append(opts, aicommon.WithToolCaller_AsyncExecutionID(executionID))
 	resource, cancel, err := runtime.PrepareAsyncToolCall(task, name, params, opts...)
 	if err != nil {
 		if cancel != nil {
@@ -78,9 +82,17 @@ func (r *ReActLoop) StartAsyncToolCall(name string, params aitool.InvokeParams, 
 	}
 	r.onRelease = append(r.onRelease, cancel)
 	r.onReleaseMutex.Unlock()
+	attributes := map[string]string{"task_id": task.GetId(), "loop": r.GetLoopName()}
+	if identity, ok := resource.(interface {
+		CallToolID() string
+		ResultID() int64
+	}); ok {
+		attributes["call_tool_id"] = identity.CallToolID()
+		attributes["result_id"] = fmt.Sprint(identity.ResultID())
+	}
 	receipt, err := manager.Start(asyncexecmanager.Request{
-		Resource: resource,
-		Metadata: asyncexecmanager.Metadata{Name: name, Attributes: map[string]string{"task_id": task.GetId(), "loop": r.GetLoopName()}},
+		ID: executionID, Resource: resource,
+		Metadata: asyncexecmanager.Metadata{Name: name, Attributes: attributes},
 	})
 	if err != nil {
 		cancel()

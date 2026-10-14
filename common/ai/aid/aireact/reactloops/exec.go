@@ -634,6 +634,11 @@ func (r *ReActLoop) ExecuteWithExistedTask(task aicommon.AIStatefulTask) (finalE
 	needSummary := utils.NewBool(false)
 LOOP:
 	for {
+		if r.asyncReviewRequiresAnswer() {
+			answerErr := r.answerAsyncReview(task)
+			r.finishIterationLoopWithError(iterationCount, task, answerErr)
+			return answerErr
+		}
 		iterationCount++
 		r.currentIterationIndex = iterationCount
 		// 主循环每轮推进一次都给 stall heartbeat 打个 tick, 让心跳协程
@@ -727,6 +732,12 @@ LOOP:
 			log.Debugf("AI loop transaction stop=%s provider_finish=%q", stopReason, resultDescriptor.Snapshot().ProviderFinishReason)
 		}
 		streamWg.Wait()
+		if r.asyncReviewRequiresAnswer() {
+			r.clearCallsExecutionValues(loopCalls)
+			answerErr := r.answerAsyncReview(task)
+			r.finishIterationLoopWithError(iterationCount, task, answerErr)
+			return answerErr
+		}
 		iterationModelThinking := strings.TrimSpace(r.takeModelThinkingForTimeline())
 		if transactionErr != nil {
 			r.recordModelThinkingTimeline(iterationModelThinking, "", nonce, false)

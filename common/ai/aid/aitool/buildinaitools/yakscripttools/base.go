@@ -228,6 +228,7 @@ func LoadYakScriptToAiTools(name string, content string) *schema.AIYakTool {
 		Description:   ins.Description,
 		Keywords:      strings.Join(ins.Keywords, ","),
 		Usage:         ins.Usage,
+		DefaultAsync:  ins.DefaultAsync,
 		Content:       content,
 		Params:        string(params),
 	}
