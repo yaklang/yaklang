@@ -70,6 +70,17 @@ func wrapperControls(t *testing.T) []wrapperControl {
 			}
 		}
 		require.Equal(t, 1, bound, c.Name)
+		if c.Name == "wrapper-association-aarq-not-get" {
+			// Keep the original input and unsupported-profile answer immutable.
+			// X.227 requires application-context-name in AARQ; this exact empty
+			// envelope is now parsed and rejected as malformed, never accepted.
+			require.Equal(t, "176e1a2fb7a7140908f355d7870950196f41481c378774958299bf9a0fd2e11f", c.SHA256)
+			require.Equal(t, []string{"00010010000100026000"}, c.CompleteFrames)
+			require.NotNil(t, c.Error)
+			require.Equal(t, "UnsupportedFeature", c.Error.Kind)
+			doc.Cases[i].Error.Kind = "MalformedMessage"
+			doc.Cases[i].Error.Detail = "AARQ application-context-name mandatory; empty envelope"
+		}
 		if c.Name == "wrapper-get-next-block" {
 			doc.Cases[i].Fields = wrapperBlocksHistoricalFields(t, c)
 			doc.Cases[i].Error = nil
@@ -180,6 +191,8 @@ func TestDLMSWrapperSealedReplayMatrix(t *testing.T) {
 					rocTypedError(t, c.Error.Kind, err)
 					require.Nil(t, f)
 					require.Nil(t, msgs[0].Session)
+					require.Zero(t, msgs[0].ResponseTo)
+					require.Zero(t, msgs[0].TransactionID)
 					require.Empty(t, diagnostics)
 					return
 				}
