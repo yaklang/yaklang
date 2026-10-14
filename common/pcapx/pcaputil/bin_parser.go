@@ -325,7 +325,7 @@ func (e *ProtocolEvent) ownsNativeFields() bool {
 		return true
 	}
 	switch e.Protocol {
-	case "snmp", "dlms-wrapper", "dlms", "opendroneid", "c37118", "sv", "ethercat", "knx", "pfcp", "profinet-dcp", "mavlink", "rtps", "nmea", "semtech-udp":
+	case "someip", "snmp", "dlms-wrapper", "dlms", "opendroneid", "c37118", "sv", "ethercat", "knx", "pfcp", "profinet-dcp", "mavlink", "rtps", "nmea", "semtech-udp":
 		return true
 	}
 	return false
@@ -474,6 +474,7 @@ type binParser struct {
 	bacnetReadSessions                                                         *binUDPStore                               // udpMu; bounded capture-lifetime invoke quarantine
 	bacnetInvokeOrigins                                                        map[bacnetInvokeOrigin]bacnetInvokeHistory // udpMu; shared originating logical device namespace
 	aisMultipart                                                               *aisMultipartStore                         // udpMu; directed, capture-domain fragment history
+	someIPTP                                                                   *someIPStore                               // udpMu; directed bounded passive transfer history
 	rtpsFragments                                                              *rtpsFragmentStore                         // udpMu; directed domain/sample history
 	rtpsShapeFragments                                                         *rtpsFragmentStore                         // udpMu; separately selected application sample history
 	aisMultipartDisabled                                                       bool                                       // udpMu; untracked history fails closed

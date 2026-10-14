@@ -173,6 +173,9 @@ func NewProtocolSessionWithOptions(budget ParserBudget, options ...ProtocolSessi
 		}
 	}
 	for _, profile := range s.f.a.datagramDecodeAs {
+		if profile == "someip-tp" && s.transport != "udp" {
+			return nil, fmt.Errorf("SOME/IP-TP observation requires UDP")
+		}
 		if (profile == "bacnet-read-property" || profile == "bacnet-routed-read-property") && s.transport != "udp" {
 			return nil, fmt.Errorf("BACnet ReadProperty observations require UDP")
 		}
@@ -269,6 +272,9 @@ func (s *captureSession) Probe(data []byte) ProbeResult {
 	}
 
 	if s.transport == "udp" {
+		if p, ok := s.probeSomeIPTP(data); ok {
+			return p
+		}
 		if s.bacnetRead {
 			return s.probeBACnetRead(data)
 		}

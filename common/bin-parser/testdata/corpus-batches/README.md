@@ -44,7 +44,7 @@ Run from the repository root:
 ```sh
 go run ./internal/trafficfixture/cmd/corpus test
 go test -json -count=1 -timeout=10m ./internal/trafficfixture/... ./common/bin-parser/... ./common/pcapx/... ./common/yak/cmd/yakcmds/shark-cli ./scripts/ci > traffic.jsonl
-go run ./internal/trafficfixture/cmd/corpus exec -- python3 @scripts/protocol-tests/check_go_test_json_v2.py traffic.jsonl --inventory @scripts/protocol-tests/required-tests-traffic-unified-v80.json --tier full
+go run ./internal/trafficfixture/cmd/corpus exec -- python3 @scripts/protocol-tests/check_go_test_json_v2.py traffic.jsonl --inventory @scripts/protocol-tests/required-tests-traffic-unified-v81.json --tier full
 ```
 
 The single `corpus` entry point uses the same bounded Go ZIP loader as tests.
@@ -83,7 +83,7 @@ their semantic coverage. The existing synthetic session keys are test inputs;
 production credentials, user private keys and material without redistribution
 permission belong in an external fixed-source download manifest.
 
-Current test requirements are sealed at `scripts/protocol-tests/required-tests-traffic-unified-v80.json`;
+Current test requirements are sealed at `scripts/protocol-tests/required-tests-traffic-unified-v81.json`;
 the historical inventories and all earlier batches remain unchanged.
 The supplemental small-corpus batch contains 26 minimal controls, their explicit
 expected facts, an offline generator and the compact pinned source manifest.
@@ -203,7 +203,7 @@ opaque selector bytes and one bounded Data value over Wrapper v1 TCP/UDP; object
 selector meaning, access permission and device operation are unverified. The
 original one-packet selective-access capture and original refused answer remain
 immutable; its now-supported answer is matched by exact input SHA and frame.
-The active inventory is `scripts/protocol-tests/required-tests-traffic-unified-v80.json`.
+The active inventory is `scripts/protocol-tests/required-tests-traffic-unified-v81.json`.
 
 The small-graph budget batch reuses accepted graph captures/answers and adds one
 249-byte UDP control for child count255 without child bytes. Its standalone proof
@@ -993,7 +993,7 @@ the normative answer; a missing numeric reference field is not a codec pass.
 Full/deferred, workers1/2/4, observers off/on, Feed chunks1/7/full, ownership,
 resources and close/refusal boundaries remain required.
 
-Current gate: `required-tests-traffic-unified-v80.json` with
+Current gate: `required-tests-traffic-unified-v81.json` with
 `check_go_test_json_v2.py`. The indexed validator preserves missing/unpassed,
 package invocation completion, descendant skips, failures and non-JSON checks;
 its mutation/differential harness is sealed with the material. Older checkers
@@ -1629,7 +1629,7 @@ userspace adapter; full kernel receiver/socket/timers and ECU endpoints do not.
 All161 preceding ZIPs remain byte-for-byte unchanged. Raw captures, dependencies,
 reference source/build output and process evidence stay outside Git.
 
-Current effective v80 inventory: 41,942 entries; 41,935 are mandatory for the full tier.
+Current effective v81 inventory: 42,587 entries; 42,580 are mandatory for the full tier.
 
 The opt-in `DynamicFlowControl` profile follows Linux v6.12 FC tuple updates (including WAIT without granting data). Disjoint address extensions or classical/FD carriers may share CAN IDs; unknown selectors cannot choose or mutate a conversation. Ambiguous selectors are rejected. Seven sealed cases exercise full/deferred, workers 1/2/4, and observer off/on, with exact fields, byte collections, contributor references, errors and resource ownership. The existing static FC profile remains unchanged. Pinned upstream FC and filter functions execute with declared userspace stubs; this is not a kernel/ECU endpoint. TShark 4.2.5 checks wire tuples and two complete payloads, but cannot independently reassemble the shared-address transcripts.
 
@@ -1658,3 +1658,5 @@ The Wrapper/HDLC lifecycle supplement seals72 minimal inputs for selected RLRQ/R
 Selected AARQ/AARE HDLC information assembly seals36 minimal TCP/UDP captures across432 full/deferred workers1/2/4 observeroff/on configurations and180 native split/ownership combinations. Every carrier CRC/address/control remains literal; assembled LLC/APDU is explicitly identified in metadata. Complete request identity belongs to the final request event and response ACK confirms the last request frame. Exact active segment retries, wrong address/direction/ACK, orphan/gap/conflict/CRC/BER refusal, typed incomplete Close, budgets/idle and owned projections are checked. Pools are capped at8 distinct sequence frames and4099 information bytes, further capped by caller limits. Fixed unmodified Gurux6e409ae9 executes22 unique frame encodings,46 complete ACSE codec parses and both complete public segment streams; passive association and negative expected boundaries are separate independent transcripts. Segmented release/abort, authentication/cipher/SN and original device/object/oracle obligations remain pending.
 
 Selected Wrapper/type3HDLC LOW mechanism2.16.756.5.8.2.1 observations seal80 unique minimal TCP/UDP captures,960 capture configurations and400 native chunk/deferred/ownership combinations. Exact requirements padding/component order, calling GraphicString bytes1..64, unchanged no-auth defaults and observed proposals never verify credentials or devices. Charged canonical orphan AARE history prevents later false request ownership, including first reverse UDP arrival. Complete fields, Session, zero/nonzero links, ordered errors, budget/idle refusal, typed unmatched LOW Close and ownership are mandatory. Unmodified fixed Gurux6e409ae9 executes112 normal complete parses,4 expected typed rejection exceptions,84 LOW value checks,5 unique HDLC encodings and three public client value-length anchors. Normative malformed/unselected/refusal boundaries remain separate independent answers. Values are public synthetic fixtures; HLS/cipher/SN, device/object and original semantic obligations remain pending.
+
+Selected SOME/IP1 explicit UDP TP observations seal39 unique minimal synthetic captures and full literal/assembly answers. Exact direction/domain/message/request identity, contiguous offsets, reserved-bit receiver tolerance, complete contributor IDs, typed conflicts/gaps/restarts/reuse/refusal, bounded bytes/segments/idle and owned Close are covered. Ordinary wire observations can repeat request IDs without clearing retired TP history. This passive first-observed contract does not infer PduR routing, configured ECU restart behavior, SD, payload schemas or authenticated invocation. Fixed AUTOSAR R22-11 requirements and installed Wireshark4.2.5 independently anchor selected wire facts; originals and specification PDF remain outside Git.

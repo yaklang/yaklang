@@ -564,6 +564,11 @@ func (a *binParser) datagramFields(network gopacket.NetworkLayer, udp *layers.UD
 		}
 	}
 	if truncated || ci.CaptureLength < ci.Length || udp.Length < 8 || int(udp.Length) != len(wire)+8 {
+		if a.someIPSelected(uint16(udp.SrcPort), uint16(udp.DstPort)) {
+			a.decodeSomeIPTPDatagram(e, wire, protocolError(ErrNeedMore, "SOME/IP carrier truncated or invalid UDP length"))
+			a.emit(e)
+			return
+		}
 		if a.rtps20RTIFilterSelected(uint16(udp.SrcPort), uint16(udp.DstPort)) {
 			a.decodeRTPS20RTIFilterInput(e, wire, protocolError(ErrNeedMore, "RTI filter carrier is truncated or has invalid UDP length"))
 			a.emit(e)
@@ -591,6 +596,11 @@ func (a *binParser) datagramFields(network gopacket.NetworkLayer, udp *layers.UD
 		e.Status, e.Summary = "incomplete", "truncated or invalid UDP datagram"
 		a.incomplete.Add(1)
 	} else if len(wire) > a.config.MaxMessageBytes {
+		if a.someIPSelected(uint16(udp.SrcPort), uint16(udp.DstPort)) {
+			a.decodeSomeIPTPDatagram(e, wire, protocolError(ErrResourceExceeded, "SOME/IP carrier exceeds byte budget"))
+			a.emit(e)
+			return
+		}
 		if a.rtps20RTIFilterSelected(uint16(udp.SrcPort), uint16(udp.DstPort)) {
 			a.decodeRTPS20RTIFilterInput(e, wire, protocolError(ErrResourceExceeded, "RTI filter exceeds UDP message budget"))
 			a.emit(e)

@@ -34,6 +34,7 @@ func NativeProtocolProfiles() []ProtocolProfile {
 		{"genisys", "tcp", "bounded escaped serial wire messages", "pinned reverse-engineered CRC0 and received-trace CRCFFFF dialects stay distinct and fixed per flow; ordered raw address/value pairs; checksum-free controls need prior strong admission; no signal meaning, authentication or checkback/request association claim"},
 		{"bsap", "udp", "Jan-2022 local serial-carried RDB ReadByName", "DLE/CRC validation, endpoint/application sequence and one bounded request; selected type/logical/string values and errors; value-only responses require type context; no analog interpretation, global routing or native BSAP-IP"},
 		{"roc-plus", "tcp", "October 2022 Read/Set Real-time Clock and Error Indicator frames", "observed TCP initiator and reversed logical station addresses with one pending request; overlaps ambiguous until close, Ethernet CRC diagnostic, reported clock unauthenticated; no other opcodes or serial receiver"},
+		{"someip-tp", "explicit-udp", "SOME/IP1 single-PDU UDP with contiguous TP offset observations", "owned literal headers/payloads and bounded first observed directed message/request generation,64 segments/65536 payload bytes plus caller budgets; reserved bits ignored per R22-11; gaps/conflicts/restarts/reuse/idle/refusal remain ambiguous,30second local pending policy; standalone wire observations do not certify invocation; no SD, application schema, PduR routing, configured ECU receiver or authentication inference"},
 		{"rtps", "udp", "RTPS2.0 keyed/no-key DATA wire fields and context; RTPS2.1-2.5 SPDP discovery, inline lifecycle DATA, complete same-datagram DATA_FRAG and receiver context", "version-specific key/status/QoS layout and owned opaque CDR/PL_CDR bytes, or SPDP GUID/sequence/endpoints/lease/locators; repeated claims remain ordered; logical source/destination and timestamp reset are message-local; UNKNOWN destination remains unknown; no RTPS1.3, unselected cross-datagram assembly, application type/schema, reliable-writer or DDS Security inference"},
 		{"rtps-control", "explicit-udp", "RTPS2.0-2.5 common ACKNACK/GAP/HEARTBEAT/NACK_FRAG/HEARTBEAT_FRAG wire reports, wire2.4/2.5 group and wire2.5 filtered-count fields", "ordered bounded bitmap words/selected offsets, exact sequence words, reader/writer logical direction and message-local context; unknown prefixes stay unknown, owned fields and caller budgets; no inferred delivery, response link, authentication, DATA schema or reliable state machine"},
 		{"rtps20-rti-filter", "explicit-udp", "RTPS2.0 reported RTI0101 inline locator-filter-list PID8006", "bounded literal channel/string-byte/padding and multichannel kind-address-port records; logical source vendor is required, unknown locator kinds remain raw; shared collection/depth/projection budgets; no filter evaluation, usable endpoint, authenticated vendor or device claim"},
@@ -89,7 +90,7 @@ func WithProtocolDecodeAs(transport string, port uint16, protocol string) Captur
 			return fmt.Errorf("DecodeAs requires UDP and a nonzero port")
 		}
 		switch protocol {
-		case "bacnet-routed-read-property", "bacnet-read-property", "dns", "mdns", "llmnr", "dhcp", "dhcpv6", "syslog", "snmp", "mqtt-sn", "bittorrent-dht", "bjnp", "rtp", "sip", "stun", "turn", "dtls", "mavlink", "nmea", "nmea-ais-multipart", "semtech-udp", "semtech-downlink-session", "rtps", "rtps-control", "rtps-wire", "rtps13-wire", "rtps13-parameters", "rtps20-rti-filter", "rtps-shape-fragments", "rtps-spdp-fragments", "bsap", "slmp", "dlms", "opendroneid", "opendroneid-system", "opendroneid-identity", "opendroneid-auth-pages", "c37118", "c37118-engineering", "knx", "pfcp", "dlms-wrapper", "doip":
+		case "someip-tp", "bacnet-routed-read-property", "bacnet-read-property", "dns", "mdns", "llmnr", "dhcp", "dhcpv6", "syslog", "snmp", "mqtt-sn", "bittorrent-dht", "bjnp", "rtp", "sip", "stun", "turn", "dtls", "mavlink", "nmea", "nmea-ais-multipart", "semtech-udp", "semtech-downlink-session", "rtps", "rtps-control", "rtps-wire", "rtps13-wire", "rtps13-parameters", "rtps20-rti-filter", "rtps-shape-fragments", "rtps-spdp-fragments", "bsap", "slmp", "dlms", "opendroneid", "opendroneid-system", "opendroneid-identity", "opendroneid-auth-pages", "c37118", "c37118-engineering", "knx", "pfcp", "dlms-wrapper", "doip":
 		default:
 			return fmt.Errorf("unsupported native DecodeAs profile")
 		}
@@ -169,6 +170,9 @@ func (a *binParser) decodeNativeDatagram(e *ProtocolEvent, w []byte, src, dst ui
 	}
 	if explicit == "bacnet-routed-read-property" {
 		return a.decodeBACnetReadDatagram(e, w, true)
+	}
+	if explicit == "someip-tp" {
+		return a.decodeSomeIPTPDatagram(e, w, nil)
 	}
 	if explicit == "rtps20-rti-filter" {
 		return a.decodeRTPS20RTIFilterInput(e, w, nil)
