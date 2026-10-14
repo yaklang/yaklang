@@ -12,13 +12,16 @@ func dlmsACSESegmentPrefix(info []byte) bool {
 		return false
 	}
 	tag := info[3]
-	return tag == 0x60 && info[1] == 0xe6 || tag == 0x61 && info[1] == 0xe7
+	return tag == 0x60 && info[1] == 0xe6 || tag == 0x61 && info[1] == 0xe7 || dlmsLifecycleSegmentPrefix(info)
 }
 
 // Only complete selected ACSE information installs or consumes request identity.
 // Literal final frame header/CRC/raw bytes remain captured, never synthesized.
 func (f *binFlow) consumeDLMSACSESegments(dir int, wire []byte, id uint64, m *dlmsMessage) (map[string]any, uint64, error) {
 	s := f.dlms
+	if s.fragments != nil && s.fragments.acseCommand >= 0x62 || s.fragments == nil && dlmsLifecycleSegmentPrefix(m.information) {
+		return f.consumeDLMSLifecycleSegments(dir, wire, id, m)
+	}
 	fail := func(kind ProtocolErrorKind, why string, retire bool) (map[string]any, uint64, error) {
 		if retire {
 			s.invalidate()

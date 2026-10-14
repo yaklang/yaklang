@@ -446,6 +446,21 @@ func (s *captureSession) Close(reason string) []*ProtocolEvent {
 	s.f.a.flows.Store(0)
 	events := s.events
 	s.events = nil
+	if s.transport == "udp" {
+		for _, e := range events {
+			if e.Protocol != "dlms" {
+				continue
+			}
+			// Feed uses caller-relative directions; retained UDP conversations
+			// use their own first-observed endpoint orientation. Close must map
+			// the same physical endpoints back without inferring a client role.
+			if e.Source == s.f.endpoints[0] && e.Destination == s.f.endpoints[1] {
+				e.Direction = 0
+			} else if e.Source == s.f.endpoints[1] && e.Destination == s.f.endpoints[0] {
+				e.Direction = 1
+			}
+		}
+	}
 	return events
 }
 

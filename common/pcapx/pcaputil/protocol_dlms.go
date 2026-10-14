@@ -697,11 +697,8 @@ func (f *binFlow) consumeDLMS(dir int, w []byte, id uint64) (map[string]any, uin
 }
 func (f *binFlow) consumeDecodedDLMS(dir int, w []byte, id uint64, m *dlmsMessage) (map[string]any, uint64, error) {
 	s := f.dlms
-	if s.fragments != nil && s.fragments.acseCommand != 0 || m.kind == "I" && dlmsACSESegmentPrefix(m.information) {
+	if s.fragments != nil && s.fragments.acseCommand != 0 || s.fragments == nil && m.kind == "I" && dlmsACSESegmentPrefix(m.information) {
 		return f.consumeDLMSACSESegments(dir, w, id, m)
-	}
-	if (m.kind == "GET" || m.kind == "I") && s.hdlcEndpointRetired(dir, m.source, m.destination, m.request) {
-		return nil, 0, dlmsError(ErrContextRequired, "Get information belongs to retired association context")
 	}
 	if p := s.pending; p != nil && len(p.requestInformation) > 0 && dir == p.dir && bytes.Equal(p.wire, w) {
 		// CRC/header validation and the full request projection were reserved before
@@ -720,6 +717,9 @@ func (f *binFlow) consumeDecodedDLMS(dir int, w []byte, id uint64, m *dlmsMessag
 		} else {
 			m.fields["HDLC Segmentation"] = meta
 		}
+	}
+	if (m.kind == "GET" || m.kind == "I") && s.hdlcEndpointRetired(dir, m.source, m.destination, m.request) {
+		return nil, 0, dlmsError(ErrContextRequired, "Get information belongs to retired association context")
 	}
 	if m.kind == "I" || s.fragments != nil {
 		return f.consumeDLMSSegments(dir, w, id, m)
@@ -829,7 +829,7 @@ func (a *binParser) decodeDLMSDatagram(e *ProtocolEvent, w []byte, explicit bool
 	} else if err = f.reserveSession(f.dlms.storage() + f.dlmsProjection(w)); err == nil {
 		m, err = decodeDLMSFrameBudget(w, a.budget.MaxCollectionElements, a.budget.MaxRecursionDepth, f.dlmsLinkAssembly(w))
 	}
-	if created && m != nil && !m.request && m.kind != "S" && (m.acse == nil || !m.acse.acseAbort) {
+	if created && m != nil && !m.request && m.kind != "S" && (m.acse == nil || !m.acse.acseAbort) && !dlmsAbortSegmentPrefix(m.information) {
 		e.Direction = 1
 		if m.acse != nil || dlmsACSESegmentPrefix(m.information) {
 			f.endpoints = [2]string{e.Destination, e.Source}

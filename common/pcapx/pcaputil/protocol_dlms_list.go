@@ -73,6 +73,9 @@ func dlmsObservedProfile(w []byte, fields map[string]any) string {
 		if fields["Get List"] != nil {
 			return "dlms-hdlc-get-list"
 		}
+		if fields["Frame Kind"] == "Get Request Normal" || fields["Frame Kind"] == "Get Response Normal" {
+			return "dlms-hdlc-get-normal"
+		}
 	}
 	return dlmsProfile(w)
 }

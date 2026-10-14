@@ -88271,6 +88271,592 @@
         "common/pcapx/pcaputil/someip-tools/verify.py": "someip-tools/verify.py",
         "scripts/protocol-tests/required-tests-traffic-unified-v82.json": "required-tests-traffic-unified-v82.json"
       }
+    },
+    {
+      "id": "validation-dlms-release-segmented",
+      "kind": "validation",
+      "source_sha": "030539fb991bb8f0c9cebdbbc7a672922a6af473",
+      "file": "validation-dlms-release-segmented.zip",
+      "sha256": "2d6100968493d2a2debaa23653bed0c86827d76977d40d9a5e9d25082dc8ff52",
+      "password": "bin-parser",
+      "members": {
+        "dlms-release-segment-tools/build.py": {
+          "sha256": "b9fd5085e72d49bb214a6c6a6944d3c0cbb83ec921d422bf7ae1d37d5ae173a1",
+          "bytes": 11410
+        },
+        "dlms-release-segment-tools/reference.py": {
+          "sha256": "4cfd385d0b2220759fccd50dadd33a5b459693e1764daf3b3280282443a51879",
+          "bytes": 2519
+        },
+        "dlms-release-segment-tools/source-pin.json": {
+          "sha256": "647307ac47f7bec89363ac1d87d0660d44a9bca048b08b5e58e317f34e59c618",
+          "bytes": 13778
+        },
+        "dlms-release-segment-tools/verify.py": {
+          "sha256": "7386619d90595de0069dd4436c48e1b6fd7c27127c0b1506bce7ef1ab5b8e056",
+          "bytes": 1361
+        },
+        "dlms-release-segmented/answers/abort-client-tcp.json": {
+          "sha256": "64d32f4fb915051614268bc6e8a2f1c78e3cb206a32fc0383e4c796e40f9f813",
+          "bytes": 4253
+        },
+        "dlms-release-segmented/answers/abort-client-udp.json": {
+          "sha256": "5033c2c4fa217f3dd6b7ceef9eb2466742063b97f0ebb63ad135fbc116d7fdb9",
+          "bytes": 4251
+        },
+        "dlms-release-segmented/answers/abort-server-tcp.json": {
+          "sha256": "5159f5f0c04a6734b891372371f3d382bdb530cf7afbd1bcdcfb13865f7c4672",
+          "bytes": 4253
+        },
+        "dlms-release-segmented/answers/abort-server-udp.json": {
+          "sha256": "73605152b895ca01a4e44e26327210ccba14a9b77f93e11eec00a8b13847b9cd",
+          "bytes": 4252
+        },
+        "dlms-release-segmented/answers/assembled-trailing-byte-tcp.json": {
+          "sha256": "2a5ff73be637b857c385bd55b9d1fd3776ae4607a4a45085f2e3cb055a349f2b",
+          "bytes": 1790
+        },
+        "dlms-release-segmented/answers/assembled-trailing-byte-udp.json": {
+          "sha256": "600cdf5fe51c109f581de2c23282d2149c9dff1b51cb9adc801eace4d5bf1483",
+          "bytes": 1789
+        },
+        "dlms-release-segmented/answers/association-interrupted-by-release-tcp.json": {
+          "sha256": "8cab1efe7b5d874236ab211398f23de0082c89f5017b55a24efa92621c1bb3d2",
+          "bytes": 7485
+        },
+        "dlms-release-segmented/answers/association-interrupted-by-release-udp.json": {
+          "sha256": "3a172a3f21a502028e933da78cdf3b6501718a81b8bc89ae467921bb4ade53ef",
+          "bytes": 7482
+        },
+        "dlms-release-segmented/answers/bad-release-integer-length-tcp.json": {
+          "sha256": "583cb19ffeb74d39971d6e4d8cf4e40f56266960cb3e35f6cfae897013bac338",
+          "bytes": 1803
+        },
+        "dlms-release-segmented/answers/bad-release-integer-length-udp.json": {
+          "sha256": "c68e00fb8ad209df84e1ee42f5a91c4af97568c5ef8c87e09401749230194b32",
+          "bytes": 1802
+        },
+        "dlms-release-segmented/answers/complete-request-segmented-response-tcp.json": {
+          "sha256": "677529762706ff060d77bf80a0e64a0da1c869b74dfa5ecb7bb71b8bca54b783",
+          "bytes": 4388
+        },
+        "dlms-release-segmented/answers/complete-request-segmented-response-udp.json": {
+          "sha256": "bff3640a132f9a0b3ccdba529d3fe6796cfdc01542453dc2663cc4bfe30c2a56",
+          "bytes": 4387
+        },
+        "dlms-release-segmented/answers/conflicting-sequence-tcp.json": {
+          "sha256": "4be12bcc14ae78beba3ec9f006783406f1ce01779542eca31407afa00abf46d4",
+          "bytes": 1789
+        },
+        "dlms-release-segmented/answers/conflicting-sequence-udp.json": {
+          "sha256": "6e8dca2788366e6c860082ea5eea5d2176fe6e3ae3b2dc0a7438429337c9aa48",
+          "bytes": 1788
+        },
+        "dlms-release-segmented/answers/duplicate-release-component-tcp.json": {
+          "sha256": "dc3334f6e6cf42a3f31e697a0665bda18d3de7d8b03b2ef06c5552e273ad1cdb",
+          "bytes": 1811
+        },
+        "dlms-release-segmented/answers/duplicate-release-component-udp.json": {
+          "sha256": "6edd32424c4510cd4674dfc5fa0bb562b95f4cb4dca03cad4b77c3f8ad3aa5e9",
+          "bytes": 1810
+        },
+        "dlms-release-segmented/answers/empty-final-information-tcp.json": {
+          "sha256": "e391480de25940939e4fedf08be9be443de8d5dc15cecb73a201458e4e21dbe0",
+          "bytes": 1782
+        },
+        "dlms-release-segmented/answers/empty-final-information-udp.json": {
+          "sha256": "1f078b6eba68ac7e131ff28e39d11378cb1ca73b3583425f53c41a17859a2fe0",
+          "bytes": 1781
+        },
+        "dlms-release-segmented/answers/information-byte-cap-tcp.json": {
+          "sha256": "ab6392717fed07d5be24b898318716e30ac329d5ad1766817c3a6419269ffc70",
+          "bytes": 18165
+        },
+        "dlms-release-segmented/answers/information-byte-cap-udp.json": {
+          "sha256": "1ddcbb25ed5fb96729ecc0616828213bbd07f96b49fb5488ecdf37cb03453cb2",
+          "bytes": 18159
+        },
+        "dlms-release-segmented/answers/invalid-final-fcs-tcp.json": {
+          "sha256": "1c58d4f81685d2aeb40aa0903be3bcef824383fe7b3d8cb06f7db70caf2db645",
+          "bytes": 1764
+        },
+        "dlms-release-segmented/answers/invalid-final-fcs-udp.json": {
+          "sha256": "a79e0178373a91dc4730705d572f59ca93576d15f365f986b7fb2363ebc6d318",
+          "bytes": 1763
+        },
+        "dlms-release-segmented/answers/literal-lifecycle-prefix-in-get-octets-tcp.json": {
+          "sha256": "fae59eff515e35e062824de4d2278bc31ca7ded8f11ea3cb67818242c7458f00",
+          "bytes": 4000
+        },
+        "dlms-release-segmented/answers/literal-lifecycle-prefix-in-get-octets-udp.json": {
+          "sha256": "1fbd80fbcb048f625a0f6a01debf36e055883db7d2160cdf16963980edab8b68",
+          "bytes": 3999
+        },
+        "dlms-release-segmented/answers/literal-lifecycle-prefix-in-low-value-tcp.json": {
+          "sha256": "85d385befa0b17dbc3ab27daba9a59c0fe15f341d16c61f44ec8d119c03ca046",
+          "bytes": 6497
+        },
+        "dlms-release-segmented/answers/literal-lifecycle-prefix-in-low-value-udp.json": {
+          "sha256": "420e131ee246e2363da0a7b8c8b1fddb687f9884a8af5659747012aa1a5de07b",
+          "bytes": 6496
+        },
+        "dlms-release-segmented/answers/missing-abort-source-tcp.json": {
+          "sha256": "93a530c1070dd64e2c8960b68a840e1f2e3c796ca2bbcb447f646615143a07c1",
+          "bytes": 1777
+        },
+        "dlms-release-segmented/answers/missing-abort-source-udp.json": {
+          "sha256": "2819607f1e8ffc0ba569d7cbd5dbcedfa47948af29ceb78f1e96864efefd7568",
+          "bytes": 1776
+        },
+        "dlms-release-segmented/answers/missing-sequence-tcp.json": {
+          "sha256": "5694b050dfb7e2be938bbb37c146bd404caeab203fbc67dd80565ea5804597c8",
+          "bytes": 1773
+        },
+        "dlms-release-segmented/answers/missing-sequence-udp.json": {
+          "sha256": "6a00b9fa2a2c1228a025bd8396c5509695e1de5e524d2a615a24e609405fed07",
+          "bytes": 1772
+        },
+        "dlms-release-segmented/answers/normal-tcp.json": {
+          "sha256": "142b79c62c7be26a5ff7a812c640e2349ffe4a68e4eeb4d8043f6b2d65b73e69",
+          "bytes": 5514
+        },
+        "dlms-release-segmented/answers/normal-udp.json": {
+          "sha256": "ea21a73949e8a64eafb36854a54c03ac4e4f541b55b94676f5c1bce4f87dcc98",
+          "bytes": 5512
+        },
+        "dlms-release-segmented/answers/orphan-client-abort-tcp.json": {
+          "sha256": "49c65672dd5d103de6a029109b99eb0f342dac94919a44275aaa578fe4df7426",
+          "bytes": 2960
+        },
+        "dlms-release-segmented/answers/orphan-client-abort-udp.json": {
+          "sha256": "809cfd0221eed73d9a2a72991d36fad476bf29f06f1b7bbd1b3b557674dffa7b",
+          "bytes": 2959
+        },
+        "dlms-release-segmented/answers/orphan-release-ack-reuse-tcp.json": {
+          "sha256": "4f0d5b2e331c82a7a6124f6d2b4f48c3422cb138a30df994a21143ee809a7511",
+          "bytes": 1173
+        },
+        "dlms-release-segmented/answers/orphan-release-ack-reuse-udp.json": {
+          "sha256": "56b6943cf2417a3771616b2c0f5e5aaa92344895dc8bb8b238ef08b3ce87e19d",
+          "bytes": 1173
+        },
+        "dlms-release-segmented/answers/request-final-retry-tcp.json": {
+          "sha256": "60b3f5c16651359631c3f2739b0bcec980361fe0c3f09f6c301644c1e2a07285",
+          "bytes": 7139
+        },
+        "dlms-release-segmented/answers/request-final-retry-udp.json": {
+          "sha256": "cc1a164d40e358992bf35aed6fb17bd251a11c565ff86b9b3a8903cc7899c874",
+          "bytes": 7136
+        },
+        "dlms-release-segmented/answers/request-first-retry-tcp.json": {
+          "sha256": "85c48f6f00d03c359a4c1d1a826a7ac6c2e83c222e21a061c8b8e0991c488952",
+          "bytes": 6599
+        },
+        "dlms-release-segmented/answers/request-first-retry-udp.json": {
+          "sha256": "4619209e1fa01e61604b9549d4a448d614cd69a7b9e38318d43635df581049af",
+          "bytes": 6596
+        },
+        "dlms-release-segmented/answers/response-first-retry-tcp.json": {
+          "sha256": "08b3a6c968de314912eaf3c4f6286995364ac1b5236397fbd8b74156cce12916",
+          "bytes": 6603
+        },
+        "dlms-release-segmented/answers/response-first-retry-udp.json": {
+          "sha256": "80dfafcbbd77c349bfa0c03bc1840ead156f9d5b319864b1f79fed2d128b3fa8",
+          "bytes": 6600
+        },
+        "dlms-release-segmented/answers/segmented-request-complete-response-tcp.json": {
+          "sha256": "961d6388c594484870b6785f4a5741680c787e6cf6153e3052532f75f458902d",
+          "bytes": 4387
+        },
+        "dlms-release-segmented/answers/segmented-request-complete-response-udp.json": {
+          "sha256": "5e004f8a2e4d7f67250574833dc639dbef6468f1b6d47d425cb3b9526f20ceba",
+          "bytes": 4386
+        },
+        "dlms-release-segmented/answers/sequence-wrap-tcp.json": {
+          "sha256": "ff9d177ba655933e2cbeb3a9762a3438ceef00e91730cf9be90fa05cecbb067d",
+          "bytes": 5543
+        },
+        "dlms-release-segmented/answers/sequence-wrap-udp.json": {
+          "sha256": "e93b3aad1ecaff5284e465dbdc6cb7063cbb9fd9e22c6084b4bb16701fec51d4",
+          "bytes": 5541
+        },
+        "dlms-release-segmented/answers/unknown-release-reason-tcp.json": {
+          "sha256": "eea5a7ab9ab7ebe5b4881867e5e5bc9f3a53ce91e2d476510c22351d1fa99a26",
+          "bytes": 1800
+        },
+        "dlms-release-segmented/answers/unknown-release-reason-udp.json": {
+          "sha256": "b7482af08cb0c51f97fa82fc1ba5d3f54a81daeaa74eb72ebbb95772fa387668",
+          "bytes": 1799
+        },
+        "dlms-release-segmented/answers/wrong-ack-tcp.json": {
+          "sha256": "2f938a1bd975cebe38f526ed712d92f5b933d176c13fd4aa3ca09243415778f6",
+          "bytes": 5907
+        },
+        "dlms-release-segmented/answers/wrong-ack-udp.json": {
+          "sha256": "dd4aa731bd1d50b141b6a48a43a65e1bd6f6e20bb083fc9e03cda4b5fc195fa6",
+          "bytes": 5904
+        },
+        "dlms-release-segmented/answers/wrong-direction-tcp.json": {
+          "sha256": "b0506285ad8caeb11c150bf9178304f9e6109413e80f99e54648ffd1e587955b",
+          "bytes": 5931
+        },
+        "dlms-release-segmented/answers/wrong-direction-udp.json": {
+          "sha256": "0c4b6c3183209905624c97aff886ea3d70649280ab0d30fb40264e585903c09c",
+          "bytes": 5928
+        },
+        "dlms-release-segmented/answers/wrong-logical-endpoint-tcp.json": {
+          "sha256": "8ab6ea72edfc6e86e78143c9f48a11f10a37a3b0bfeb06964553f311a554cb6a",
+          "bytes": 5959
+        },
+        "dlms-release-segmented/answers/wrong-logical-endpoint-udp.json": {
+          "sha256": "9cff9136377a9968277e02d36351241d77272a2884a322fd97d2f87561c185fb",
+          "bytes": 5956
+        },
+        "dlms-release-segmented/cases/abort-client-tcp.pcap": {
+          "sha256": "9c7eaef01d3011d8e73e560a69eda6d7695b042488427e46678c06ad7eb62cec",
+          "bytes": 496
+        },
+        "dlms-release-segmented/cases/abort-client-udp.pcap": {
+          "sha256": "5afb964fd263700baad86fa7bf16dfdcff4bea9b989697df191d75e50128d071",
+          "bytes": 250
+        },
+        "dlms-release-segmented/cases/abort-server-tcp.pcap": {
+          "sha256": "95d9755a9f541a3210a880fabbbc8ee5fa56f57f96a639218a1538f0f41cc22e",
+          "bytes": 496
+        },
+        "dlms-release-segmented/cases/abort-server-udp.pcap": {
+          "sha256": "acd4855f49ff1087c879dde8da74fb73ef349edca45ebde45c7edf055367c186",
+          "bytes": 250
+        },
+        "dlms-release-segmented/cases/assembled-trailing-byte-tcp.pcap": {
+          "sha256": "e1b972c2a1f4b840b88e22120768db45c33e223dee5d472355e2039924f36fea",
+          "bytes": 405
+        },
+        "dlms-release-segmented/cases/assembled-trailing-byte-udp.pcap": {
+          "sha256": "81bff093f4a07b903b97dd62a5074d63556a7cf0232473fe6855ebafddbe78b2",
+          "bytes": 171
+        },
+        "dlms-release-segmented/cases/association-interrupted-by-release-tcp.pcap": {
+          "sha256": "a2c3b64695c76740156c86f94254c524d4343945977b1902e647dadfb5e25016",
+          "bytes": 689
+        },
+        "dlms-release-segmented/cases/association-interrupted-by-release-udp.pcap": {
+          "sha256": "5299c2eaa4eca2f59cbf2484b30a5b49f50fe6f6fd3ab275052104936c034c33",
+          "bytes": 419
+        },
+        "dlms-release-segmented/cases/bad-release-integer-length-tcp.pcap": {
+          "sha256": "bae187e38e6fcfdac5e0364cc47ed1d10c119f5973183bdd2ce00b9632fb5b7b",
+          "bytes": 405
+        },
+        "dlms-release-segmented/cases/bad-release-integer-length-udp.pcap": {
+          "sha256": "0dafa71f76338ba5f4bf15dfe9b4db68b136cbb6dd38384064ff955c305f8dd6",
+          "bytes": 171
+        },
+        "dlms-release-segmented/cases/complete-request-segmented-response-tcp.pcap": {
+          "sha256": "747b76cf88383068dfe7bffc586b835b2daa15c8c2fd1462dfae7d4bda85388e",
+          "bytes": 493
+        },
+        "dlms-release-segmented/cases/complete-request-segmented-response-udp.pcap": {
+          "sha256": "a2f634bbfcdde31eebcb3125cd32eb10e961552be5c5a1e60e966b75eb26f165",
+          "bytes": 247
+        },
+        "dlms-release-segmented/cases/conflicting-sequence-tcp.pcap": {
+          "sha256": "8baff2b68ead24c213d68b3b44f96bd118a8e73156b027766addc8aa4bf5542d",
+          "bytes": 404
+        },
+        "dlms-release-segmented/cases/conflicting-sequence-udp.pcap": {
+          "sha256": "9baece55fd5b3638f471734129bc2bc21a33583a04b86882320dfe98076707d7",
+          "bytes": 170
+        },
+        "dlms-release-segmented/cases/duplicate-release-component-tcp.pcap": {
+          "sha256": "5da63d34555ff0270aa4bcb6db0601137f9a64b242a7e129695eda60cfd9079a",
+          "bytes": 407
+        },
+        "dlms-release-segmented/cases/duplicate-release-component-udp.pcap": {
+          "sha256": "c6b13a0fbc41da87f33fdd19ef159e37942fccc1bb0675a6ab395290fe2e3b93",
+          "bytes": 173
+        },
+        "dlms-release-segmented/cases/empty-final-information-tcp.pcap": {
+          "sha256": "245630f1899861a78666a266a1a462498bf25810b2282e55674fb623eb053340",
+          "bytes": 401
+        },
+        "dlms-release-segmented/cases/empty-final-information-udp.pcap": {
+          "sha256": "bda1b244809cec6980add1bc5677e8e94c6122652baa5e85e499956cd04e22a6",
+          "bytes": 167
+        },
+        "dlms-release-segmented/cases/information-byte-cap-tcp.pcap": {
+          "sha256": "eeba0f0c8e477f0016c991340b2b6300bfbe9084e4e3e95d22db7b8ebbfc393a",
+          "bytes": 4577
+        },
+        "dlms-release-segmented/cases/information-byte-cap-udp.pcap": {
+          "sha256": "973834c2b5025c9a320f589ee75161b8a3fa8a8843e18c7093f7603822a15d9f",
+          "bytes": 4331
+        },
+        "dlms-release-segmented/cases/invalid-final-fcs-tcp.pcap": {
+          "sha256": "072e561e70d5ea16b3f6fa6d0d8071958ca18a380c31a47f609636175f25ffc8",
+          "bytes": 404
+        },
+        "dlms-release-segmented/cases/invalid-final-fcs-udp.pcap": {
+          "sha256": "db9c65cb57612d1a3ae6e434703285187dbd1a8dd535c354ac4e7658ffe019b3",
+          "bytes": 170
+        },
+        "dlms-release-segmented/cases/literal-lifecycle-prefix-in-get-octets-tcp.pcap": {
+          "sha256": "f814e4ff721d03b7b2de7bc9ca26ed7ef620e8c41bcc6c2bdb830c966ac882a7",
+          "bytes": 507
+        },
+        "dlms-release-segmented/cases/literal-lifecycle-prefix-in-get-octets-udp.pcap": {
+          "sha256": "71c8475042c1cb30c94515ad0b38a76f63e8c92acb65d0bd7208957b33a16585",
+          "bytes": 261
+        },
+        "dlms-release-segmented/cases/literal-lifecycle-prefix-in-low-value-tcp.pcap": {
+          "sha256": "3ac97961a2adcd9aa3c95a25a159769db2054c58a13ac8bb6eb24a0b37dac9d9",
+          "bytes": 596
+        },
+        "dlms-release-segmented/cases/literal-lifecycle-prefix-in-low-value-udp.pcap": {
+          "sha256": "9ce48ce5ea6b97b6835dcf182adf8fb5a48a843fc741a2b65b5c09910e009966",
+          "bytes": 350
+        },
+        "dlms-release-segmented/cases/missing-abort-source-tcp.pcap": {
+          "sha256": "3154828752b5c8bd05afa8bc7a2800d1701a87f80f1a8e7899e220a8acbdee3e",
+          "bytes": 404
+        },
+        "dlms-release-segmented/cases/missing-abort-source-udp.pcap": {
+          "sha256": "d038250c16c56852d3a433ce3fb2bfae449ccbc7641bc15a7cab8ff0560c7815",
+          "bytes": 170
+        },
+        "dlms-release-segmented/cases/missing-sequence-tcp.pcap": {
+          "sha256": "90f5045fde27e16b15d72edf183c179d0bb0134fdf9b16b8ad5426c95c51d096",
+          "bytes": 404
+        },
+        "dlms-release-segmented/cases/missing-sequence-udp.pcap": {
+          "sha256": "1846445a2d61bb9a0bd8e3871f38dc2592c3658a1ab7fd3f53f12ed7d1dd05aa",
+          "bytes": 170
+        },
+        "dlms-release-segmented/cases/normal-tcp.pcap": {
+          "sha256": "bdcebcf338fd81058d980a3b27896c0c0fd5018c934676f74399624e717d58b8",
+          "bytes": 574
+        },
+        "dlms-release-segmented/cases/normal-udp.pcap": {
+          "sha256": "96b11a776685ca434eec0f271c6f4f4ec327fd6eba01cb2a1e774b40420d165b",
+          "bytes": 316
+        },
+        "dlms-release-segmented/cases/orphan-client-abort-tcp.pcap": {
+          "sha256": "22e3bac70e167f0bc94222e33a0103d404a45238e4d2210f9ba605321dc8a837",
+          "bytes": 407
+        },
+        "dlms-release-segmented/cases/orphan-client-abort-udp.pcap": {
+          "sha256": "ded178a346768f03e912ac43d2863b012840d890787152a35cc3694fd210f353",
+          "bytes": 173
+        },
+        "dlms-release-segmented/cases/orphan-release-ack-reuse-tcp.pcap": {
+          "sha256": "b96d63025cee49f18233547eaaf5617f35253780723976a07f69753cc26eb805",
+          "bytes": 406
+        },
+        "dlms-release-segmented/cases/orphan-release-ack-reuse-udp.pcap": {
+          "sha256": "dd17b167e62e3af90adf9d2433aa762b20b7c73337186d187d83b1878cd80b63",
+          "bytes": 172
+        },
+        "dlms-release-segmented/cases/request-final-retry-tcp.pcap": {
+          "sha256": "3405de0df5bf0db6a775b23ed2b6e1a1e901260a7ae02ba62300fcfc0b5d5f56",
+          "bytes": 658
+        },
+        "dlms-release-segmented/cases/request-final-retry-udp.pcap": {
+          "sha256": "855958299c9905970a0ef50ab958bca84d9f9494eabd4efc0c444936605a406b",
+          "bytes": 388
+        },
+        "dlms-release-segmented/cases/request-first-retry-tcp.pcap": {
+          "sha256": "bb4eebd16ab80297c7f0643caa9b6fb95c3663d8a375631d08c416442f1234e2",
+          "bytes": 660
+        },
+        "dlms-release-segmented/cases/request-first-retry-udp.pcap": {
+          "sha256": "1cdab7ed527f979d26cb3b2986aaf9041d691f536e660e521afa7af29eab39a3",
+          "bytes": 390
+        },
+        "dlms-release-segmented/cases/response-first-retry-tcp.pcap": {
+          "sha256": "6fe3491ae02b46d2d19f6c650464e7ebdadab88c97bf837817681e79a41b9386",
+          "bytes": 660
+        },
+        "dlms-release-segmented/cases/response-first-retry-udp.pcap": {
+          "sha256": "dfdd80b31e5d893a616bd3aa432e564456b61c371f513c287a2062e823943c79",
+          "bytes": 390
+        },
+        "dlms-release-segmented/cases/segmented-request-complete-response-tcp.pcap": {
+          "sha256": "1547be402f21c57ed3fbe0344ac8cbae59fee37ec1ca637f5a4210eda41a7ec5",
+          "bytes": 493
+        },
+        "dlms-release-segmented/cases/segmented-request-complete-response-udp.pcap": {
+          "sha256": "e74258d9fcdae08f2f2c965b04cef4ffc67fc2c412e3b49db5cfe8e416b06c22",
+          "bytes": 247
+        },
+        "dlms-release-segmented/cases/sequence-wrap-tcp.pcap": {
+          "sha256": "cad1a7d6039ba1b3d8ad2d6a7f11ef8a86428389192e98686da4e8f68dbf5b38",
+          "bytes": 574
+        },
+        "dlms-release-segmented/cases/sequence-wrap-udp.pcap": {
+          "sha256": "8f44ebecb715dacca1c8983ebd635a2ec606b9071973a09234bee7e26bcdf9be",
+          "bytes": 316
+        },
+        "dlms-release-segmented/cases/unknown-release-reason-tcp.pcap": {
+          "sha256": "0d43328dd6d554b279f09f355a0df320b6287c60d21f493e2beee3bbf59d0250",
+          "bytes": 404
+        },
+        "dlms-release-segmented/cases/unknown-release-reason-udp.pcap": {
+          "sha256": "1037f0b72d4b9228ca780056479803dfa2814fdcabb6350201e6ae78f9d1ea3b",
+          "bytes": 170
+        },
+        "dlms-release-segmented/cases/wrong-ack-tcp.pcap": {
+          "sha256": "c04b4d59e8cacc517c3f4c6b4b04905e579a825d109d06a911823c03c42e2ea4",
+          "bytes": 658
+        },
+        "dlms-release-segmented/cases/wrong-ack-udp.pcap": {
+          "sha256": "2ea224607e16ee0f911284e636188e2c2ee647febb3065f25c2864e6601a232b",
+          "bytes": 388
+        },
+        "dlms-release-segmented/cases/wrong-direction-tcp.pcap": {
+          "sha256": "16fb0297f482274581f8aaa2332291d2d14406b2e226a762a198dd5a39553a0d",
+          "bytes": 658
+        },
+        "dlms-release-segmented/cases/wrong-direction-udp.pcap": {
+          "sha256": "494fa55099fd08e9f0e9b9bc5a2c9f2d62f3709f734d5987abb658fd10b7bb42",
+          "bytes": 388
+        },
+        "dlms-release-segmented/cases/wrong-logical-endpoint-tcp.pcap": {
+          "sha256": "ba9377e69f6113f67b97c1b440ad947edbb7381bed406abac895e2db502a136d",
+          "bytes": 658
+        },
+        "dlms-release-segmented/cases/wrong-logical-endpoint-udp.pcap": {
+          "sha256": "2f3fe882d60f798210a5e70708b4fcd65fb5ae903b9e319e0f79eff908c39814",
+          "bytes": 388
+        },
+        "dlms-release-segmented/controls.json": {
+          "sha256": "74941d0e41033e1276211995edc12d3c837b8f0e286495f1d721fca7b59718b4",
+          "bytes": 279853
+        },
+        "required-tests-traffic-unified-v83.json": {
+          "sha256": "96847df4d9ebc5c8363c5685b961c551e93ad40488723917a2722d7b43602017",
+          "bytes": 20005757
+        },
+        "validation/expected.json": {
+          "sha256": "80ff677bf379a246131d4e5ff6e01c0d12b5086d83cab144e9f756ca68458a81",
+          "bytes": 70649
+        }
+      },
+      "aliases": {
+        "common/pcapx/pcaputil/dlms-release-segment-tools/build.py": "dlms-release-segment-tools/build.py",
+        "common/pcapx/pcaputil/dlms-release-segment-tools/reference.py": "dlms-release-segment-tools/reference.py",
+        "common/pcapx/pcaputil/dlms-release-segment-tools/source-pin.json": "dlms-release-segment-tools/source-pin.json",
+        "common/pcapx/pcaputil/dlms-release-segment-tools/verify.py": "dlms-release-segment-tools/verify.py",
+        "common/pcapx/pcaputil/dlms-release-segmented/answers/abort-client-tcp.json": "dlms-release-segmented/answers/abort-client-tcp.json",
+        "common/pcapx/pcaputil/dlms-release-segmented/answers/abort-client-udp.json": "dlms-release-segmented/answers/abort-client-udp.json",
+        "common/pcapx/pcaputil/dlms-release-segmented/answers/abort-server-tcp.json": "dlms-release-segmented/answers/abort-server-tcp.json",
+        "common/pcapx/pcaputil/dlms-release-segmented/answers/abort-server-udp.json": "dlms-release-segmented/answers/abort-server-udp.json",
+        "common/pcapx/pcaputil/dlms-release-segmented/answers/assembled-trailing-byte-tcp.json": "dlms-release-segmented/answers/assembled-trailing-byte-tcp.json",
+        "common/pcapx/pcaputil/dlms-release-segmented/answers/assembled-trailing-byte-udp.json": "dlms-release-segmented/answers/assembled-trailing-byte-udp.json",
+        "common/pcapx/pcaputil/dlms-release-segmented/answers/association-interrupted-by-release-tcp.json": "dlms-release-segmented/answers/association-interrupted-by-release-tcp.json",
+        "common/pcapx/pcaputil/dlms-release-segmented/answers/association-interrupted-by-release-udp.json": "dlms-release-segmented/answers/association-interrupted-by-release-udp.json",
+        "common/pcapx/pcaputil/dlms-release-segmented/answers/bad-release-integer-length-tcp.json": "dlms-release-segmented/answers/bad-release-integer-length-tcp.json",
+        "common/pcapx/pcaputil/dlms-release-segmented/answers/bad-release-integer-length-udp.json": "dlms-release-segmented/answers/bad-release-integer-length-udp.json",
+        "common/pcapx/pcaputil/dlms-release-segmented/answers/complete-request-segmented-response-tcp.json": "dlms-release-segmented/answers/complete-request-segmented-response-tcp.json",
+        "common/pcapx/pcaputil/dlms-release-segmented/answers/complete-request-segmented-response-udp.json": "dlms-release-segmented/answers/complete-request-segmented-response-udp.json",
+        "common/pcapx/pcaputil/dlms-release-segmented/answers/conflicting-sequence-tcp.json": "dlms-release-segmented/answers/conflicting-sequence-tcp.json",
+        "common/pcapx/pcaputil/dlms-release-segmented/answers/conflicting-sequence-udp.json": "dlms-release-segmented/answers/conflicting-sequence-udp.json",
+        "common/pcapx/pcaputil/dlms-release-segmented/answers/duplicate-release-component-tcp.json": "dlms-release-segmented/answers/duplicate-release-component-tcp.json",
+        "common/pcapx/pcaputil/dlms-release-segmented/answers/duplicate-release-component-udp.json": "dlms-release-segmented/answers/duplicate-release-component-udp.json",
+        "common/pcapx/pcaputil/dlms-release-segmented/answers/empty-final-information-tcp.json": "dlms-release-segmented/answers/empty-final-information-tcp.json",
+        "common/pcapx/pcaputil/dlms-release-segmented/answers/empty-final-information-udp.json": "dlms-release-segmented/answers/empty-final-information-udp.json",
+        "common/pcapx/pcaputil/dlms-release-segmented/answers/information-byte-cap-tcp.json": "dlms-release-segmented/answers/information-byte-cap-tcp.json",
+        "common/pcapx/pcaputil/dlms-release-segmented/answers/information-byte-cap-udp.json": "dlms-release-segmented/answers/information-byte-cap-udp.json",
+        "common/pcapx/pcaputil/dlms-release-segmented/answers/invalid-final-fcs-tcp.json": "dlms-release-segmented/answers/invalid-final-fcs-tcp.json",
+        "common/pcapx/pcaputil/dlms-release-segmented/answers/invalid-final-fcs-udp.json": "dlms-release-segmented/answers/invalid-final-fcs-udp.json",
+        "common/pcapx/pcaputil/dlms-release-segmented/answers/literal-lifecycle-prefix-in-get-octets-tcp.json": "dlms-release-segmented/answers/literal-lifecycle-prefix-in-get-octets-tcp.json",
+        "common/pcapx/pcaputil/dlms-release-segmented/answers/literal-lifecycle-prefix-in-get-octets-udp.json": "dlms-release-segmented/answers/literal-lifecycle-prefix-in-get-octets-udp.json",
+        "common/pcapx/pcaputil/dlms-release-segmented/answers/literal-lifecycle-prefix-in-low-value-tcp.json": "dlms-release-segmented/answers/literal-lifecycle-prefix-in-low-value-tcp.json",
+        "common/pcapx/pcaputil/dlms-release-segmented/answers/literal-lifecycle-prefix-in-low-value-udp.json": "dlms-release-segmented/answers/literal-lifecycle-prefix-in-low-value-udp.json",
+        "common/pcapx/pcaputil/dlms-release-segmented/answers/missing-abort-source-tcp.json": "dlms-release-segmented/answers/missing-abort-source-tcp.json",
+        "common/pcapx/pcaputil/dlms-release-segmented/answers/missing-abort-source-udp.json": "dlms-release-segmented/answers/missing-abort-source-udp.json",
+        "common/pcapx/pcaputil/dlms-release-segmented/answers/missing-sequence-tcp.json": "dlms-release-segmented/answers/missing-sequence-tcp.json",
+        "common/pcapx/pcaputil/dlms-release-segmented/answers/missing-sequence-udp.json": "dlms-release-segmented/answers/missing-sequence-udp.json",
+        "common/pcapx/pcaputil/dlms-release-segmented/answers/normal-tcp.json": "dlms-release-segmented/answers/normal-tcp.json",
+        "common/pcapx/pcaputil/dlms-release-segmented/answers/normal-udp.json": "dlms-release-segmented/answers/normal-udp.json",
+        "common/pcapx/pcaputil/dlms-release-segmented/answers/orphan-client-abort-tcp.json": "dlms-release-segmented/answers/orphan-client-abort-tcp.json",
+        "common/pcapx/pcaputil/dlms-release-segmented/answers/orphan-client-abort-udp.json": "dlms-release-segmented/answers/orphan-client-abort-udp.json",
+        "common/pcapx/pcaputil/dlms-release-segmented/answers/orphan-release-ack-reuse-tcp.json": "dlms-release-segmented/answers/orphan-release-ack-reuse-tcp.json",
+        "common/pcapx/pcaputil/dlms-release-segmented/answers/orphan-release-ack-reuse-udp.json": "dlms-release-segmented/answers/orphan-release-ack-reuse-udp.json",
+        "common/pcapx/pcaputil/dlms-release-segmented/answers/request-final-retry-tcp.json": "dlms-release-segmented/answers/request-final-retry-tcp.json",
+        "common/pcapx/pcaputil/dlms-release-segmented/answers/request-final-retry-udp.json": "dlms-release-segmented/answers/request-final-retry-udp.json",
+        "common/pcapx/pcaputil/dlms-release-segmented/answers/request-first-retry-tcp.json": "dlms-release-segmented/answers/request-first-retry-tcp.json",
+        "common/pcapx/pcaputil/dlms-release-segmented/answers/request-first-retry-udp.json": "dlms-release-segmented/answers/request-first-retry-udp.json",
+        "common/pcapx/pcaputil/dlms-release-segmented/answers/response-first-retry-tcp.json": "dlms-release-segmented/answers/response-first-retry-tcp.json",
+        "common/pcapx/pcaputil/dlms-release-segmented/answers/response-first-retry-udp.json": "dlms-release-segmented/answers/response-first-retry-udp.json",
+        "common/pcapx/pcaputil/dlms-release-segmented/answers/segmented-request-complete-response-tcp.json": "dlms-release-segmented/answers/segmented-request-complete-response-tcp.json",
+        "common/pcapx/pcaputil/dlms-release-segmented/answers/segmented-request-complete-response-udp.json": "dlms-release-segmented/answers/segmented-request-complete-response-udp.json",
+        "common/pcapx/pcaputil/dlms-release-segmented/answers/sequence-wrap-tcp.json": "dlms-release-segmented/answers/sequence-wrap-tcp.json",
+        "common/pcapx/pcaputil/dlms-release-segmented/answers/sequence-wrap-udp.json": "dlms-release-segmented/answers/sequence-wrap-udp.json",
+        "common/pcapx/pcaputil/dlms-release-segmented/answers/unknown-release-reason-tcp.json": "dlms-release-segmented/answers/unknown-release-reason-tcp.json",
+        "common/pcapx/pcaputil/dlms-release-segmented/answers/unknown-release-reason-udp.json": "dlms-release-segmented/answers/unknown-release-reason-udp.json",
+        "common/pcapx/pcaputil/dlms-release-segmented/answers/wrong-ack-tcp.json": "dlms-release-segmented/answers/wrong-ack-tcp.json",
+        "common/pcapx/pcaputil/dlms-release-segmented/answers/wrong-ack-udp.json": "dlms-release-segmented/answers/wrong-ack-udp.json",
+        "common/pcapx/pcaputil/dlms-release-segmented/answers/wrong-direction-tcp.json": "dlms-release-segmented/answers/wrong-direction-tcp.json",
+        "common/pcapx/pcaputil/dlms-release-segmented/answers/wrong-direction-udp.json": "dlms-release-segmented/answers/wrong-direction-udp.json",
+        "common/pcapx/pcaputil/dlms-release-segmented/answers/wrong-logical-endpoint-tcp.json": "dlms-release-segmented/answers/wrong-logical-endpoint-tcp.json",
+        "common/pcapx/pcaputil/dlms-release-segmented/answers/wrong-logical-endpoint-udp.json": "dlms-release-segmented/answers/wrong-logical-endpoint-udp.json",
+        "common/pcapx/pcaputil/dlms-release-segmented/cases/abort-client-tcp.pcap": "dlms-release-segmented/cases/abort-client-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-release-segmented/cases/abort-client-udp.pcap": "dlms-release-segmented/cases/abort-client-udp.pcap",
+        "common/pcapx/pcaputil/dlms-release-segmented/cases/abort-server-tcp.pcap": "dlms-release-segmented/cases/abort-server-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-release-segmented/cases/abort-server-udp.pcap": "dlms-release-segmented/cases/abort-server-udp.pcap",
+        "common/pcapx/pcaputil/dlms-release-segmented/cases/assembled-trailing-byte-tcp.pcap": "dlms-release-segmented/cases/assembled-trailing-byte-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-release-segmented/cases/assembled-trailing-byte-udp.pcap": "dlms-release-segmented/cases/assembled-trailing-byte-udp.pcap",
+        "common/pcapx/pcaputil/dlms-release-segmented/cases/association-interrupted-by-release-tcp.pcap": "dlms-release-segmented/cases/association-interrupted-by-release-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-release-segmented/cases/association-interrupted-by-release-udp.pcap": "dlms-release-segmented/cases/association-interrupted-by-release-udp.pcap",
+        "common/pcapx/pcaputil/dlms-release-segmented/cases/bad-release-integer-length-tcp.pcap": "dlms-release-segmented/cases/bad-release-integer-length-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-release-segmented/cases/bad-release-integer-length-udp.pcap": "dlms-release-segmented/cases/bad-release-integer-length-udp.pcap",
+        "common/pcapx/pcaputil/dlms-release-segmented/cases/complete-request-segmented-response-tcp.pcap": "dlms-release-segmented/cases/complete-request-segmented-response-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-release-segmented/cases/complete-request-segmented-response-udp.pcap": "dlms-release-segmented/cases/complete-request-segmented-response-udp.pcap",
+        "common/pcapx/pcaputil/dlms-release-segmented/cases/conflicting-sequence-tcp.pcap": "dlms-release-segmented/cases/conflicting-sequence-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-release-segmented/cases/conflicting-sequence-udp.pcap": "dlms-release-segmented/cases/conflicting-sequence-udp.pcap",
+        "common/pcapx/pcaputil/dlms-release-segmented/cases/duplicate-release-component-tcp.pcap": "dlms-release-segmented/cases/duplicate-release-component-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-release-segmented/cases/duplicate-release-component-udp.pcap": "dlms-release-segmented/cases/duplicate-release-component-udp.pcap",
+        "common/pcapx/pcaputil/dlms-release-segmented/cases/empty-final-information-tcp.pcap": "dlms-release-segmented/cases/empty-final-information-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-release-segmented/cases/empty-final-information-udp.pcap": "dlms-release-segmented/cases/empty-final-information-udp.pcap",
+        "common/pcapx/pcaputil/dlms-release-segmented/cases/information-byte-cap-tcp.pcap": "dlms-release-segmented/cases/information-byte-cap-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-release-segmented/cases/information-byte-cap-udp.pcap": "dlms-release-segmented/cases/information-byte-cap-udp.pcap",
+        "common/pcapx/pcaputil/dlms-release-segmented/cases/invalid-final-fcs-tcp.pcap": "dlms-release-segmented/cases/invalid-final-fcs-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-release-segmented/cases/invalid-final-fcs-udp.pcap": "dlms-release-segmented/cases/invalid-final-fcs-udp.pcap",
+        "common/pcapx/pcaputil/dlms-release-segmented/cases/literal-lifecycle-prefix-in-get-octets-tcp.pcap": "dlms-release-segmented/cases/literal-lifecycle-prefix-in-get-octets-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-release-segmented/cases/literal-lifecycle-prefix-in-get-octets-udp.pcap": "dlms-release-segmented/cases/literal-lifecycle-prefix-in-get-octets-udp.pcap",
+        "common/pcapx/pcaputil/dlms-release-segmented/cases/literal-lifecycle-prefix-in-low-value-tcp.pcap": "dlms-release-segmented/cases/literal-lifecycle-prefix-in-low-value-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-release-segmented/cases/literal-lifecycle-prefix-in-low-value-udp.pcap": "dlms-release-segmented/cases/literal-lifecycle-prefix-in-low-value-udp.pcap",
+        "common/pcapx/pcaputil/dlms-release-segmented/cases/missing-abort-source-tcp.pcap": "dlms-release-segmented/cases/missing-abort-source-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-release-segmented/cases/missing-abort-source-udp.pcap": "dlms-release-segmented/cases/missing-abort-source-udp.pcap",
+        "common/pcapx/pcaputil/dlms-release-segmented/cases/missing-sequence-tcp.pcap": "dlms-release-segmented/cases/missing-sequence-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-release-segmented/cases/missing-sequence-udp.pcap": "dlms-release-segmented/cases/missing-sequence-udp.pcap",
+        "common/pcapx/pcaputil/dlms-release-segmented/cases/normal-tcp.pcap": "dlms-release-segmented/cases/normal-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-release-segmented/cases/normal-udp.pcap": "dlms-release-segmented/cases/normal-udp.pcap",
+        "common/pcapx/pcaputil/dlms-release-segmented/cases/orphan-client-abort-tcp.pcap": "dlms-release-segmented/cases/orphan-client-abort-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-release-segmented/cases/orphan-client-abort-udp.pcap": "dlms-release-segmented/cases/orphan-client-abort-udp.pcap",
+        "common/pcapx/pcaputil/dlms-release-segmented/cases/orphan-release-ack-reuse-tcp.pcap": "dlms-release-segmented/cases/orphan-release-ack-reuse-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-release-segmented/cases/orphan-release-ack-reuse-udp.pcap": "dlms-release-segmented/cases/orphan-release-ack-reuse-udp.pcap",
+        "common/pcapx/pcaputil/dlms-release-segmented/cases/request-final-retry-tcp.pcap": "dlms-release-segmented/cases/request-final-retry-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-release-segmented/cases/request-final-retry-udp.pcap": "dlms-release-segmented/cases/request-final-retry-udp.pcap",
+        "common/pcapx/pcaputil/dlms-release-segmented/cases/request-first-retry-tcp.pcap": "dlms-release-segmented/cases/request-first-retry-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-release-segmented/cases/request-first-retry-udp.pcap": "dlms-release-segmented/cases/request-first-retry-udp.pcap",
+        "common/pcapx/pcaputil/dlms-release-segmented/cases/response-first-retry-tcp.pcap": "dlms-release-segmented/cases/response-first-retry-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-release-segmented/cases/response-first-retry-udp.pcap": "dlms-release-segmented/cases/response-first-retry-udp.pcap",
+        "common/pcapx/pcaputil/dlms-release-segmented/cases/segmented-request-complete-response-tcp.pcap": "dlms-release-segmented/cases/segmented-request-complete-response-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-release-segmented/cases/segmented-request-complete-response-udp.pcap": "dlms-release-segmented/cases/segmented-request-complete-response-udp.pcap",
+        "common/pcapx/pcaputil/dlms-release-segmented/cases/sequence-wrap-tcp.pcap": "dlms-release-segmented/cases/sequence-wrap-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-release-segmented/cases/sequence-wrap-udp.pcap": "dlms-release-segmented/cases/sequence-wrap-udp.pcap",
+        "common/pcapx/pcaputil/dlms-release-segmented/cases/unknown-release-reason-tcp.pcap": "dlms-release-segmented/cases/unknown-release-reason-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-release-segmented/cases/unknown-release-reason-udp.pcap": "dlms-release-segmented/cases/unknown-release-reason-udp.pcap",
+        "common/pcapx/pcaputil/dlms-release-segmented/cases/wrong-ack-tcp.pcap": "dlms-release-segmented/cases/wrong-ack-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-release-segmented/cases/wrong-ack-udp.pcap": "dlms-release-segmented/cases/wrong-ack-udp.pcap",
+        "common/pcapx/pcaputil/dlms-release-segmented/cases/wrong-direction-tcp.pcap": "dlms-release-segmented/cases/wrong-direction-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-release-segmented/cases/wrong-direction-udp.pcap": "dlms-release-segmented/cases/wrong-direction-udp.pcap",
+        "common/pcapx/pcaputil/dlms-release-segmented/cases/wrong-logical-endpoint-tcp.pcap": "dlms-release-segmented/cases/wrong-logical-endpoint-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-release-segmented/cases/wrong-logical-endpoint-udp.pcap": "dlms-release-segmented/cases/wrong-logical-endpoint-udp.pcap",
+        "common/pcapx/pcaputil/dlms-release-segmented/controls.json": "dlms-release-segmented/controls.json",
+        "scripts/protocol-tests/required-tests-traffic-unified-v83.json": "required-tests-traffic-unified-v83.json"
+      }
     }
   ],
   "schema_version": 1,
