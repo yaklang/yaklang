@@ -39,6 +39,29 @@ func (a *binParser) decodeCANUDS(s *canISOConnection, dir int, body []byte, e *P
 			f["Session Type"] = key.descriptor
 			f["Suppress Positive Response"] = suppressed
 			f["Positive Response Expected"] = !suppressed
+		case 0x11, 0x3e:
+			service := body[0]
+			if len(body) != 2 {
+				s.pending = nil
+				s.serviceSeen[service] = 2
+				s.blockedServices[service] = true
+				return fail(ErrMalformedMessage, "control request requires one subfunction")
+			}
+			key.descriptor = uint16(body[1] & 0x7f)
+			if (service == 0x3e && key.descriptor != 0) || (service == 0x11 && (key.descriptor < 1 || key.descriptor > 5)) {
+				s.pending = nil
+				s.serviceSeen[service] = 2
+				s.blockedServices[service] = true
+				return fail(ErrUnsupportedFeature, "control subfunction outside selected TesterPresent/ECUReset profile")
+			}
+			suppressed = body[1]&0x80 != 0
+			f["Suppress Positive Response"] = suppressed
+			f["Positive Response Expected"] = !suppressed
+			if service == 0x11 {
+				f["Reset Type"] = key.descriptor
+			} else {
+				f["Subfunction"] = key.descriptor
+			}
 		case 0x22:
 			if len(body) != 3 {
 				s.pending = nil
@@ -50,7 +73,7 @@ func (a *binParser) decodeCANUDS(s *canISOConnection, dir int, body []byte, e *P
 			f["Data Identifier"] = key.descriptor
 		default:
 			s.pending = nil
-			return fail(ErrUnsupportedFeature, "service outside DSC/single-DID ReadDataByIdentifier profile")
+			return fail(ErrUnsupportedFeature, "service outside selected DSC/control/single-DID ReadDataByIdentifier profile")
 		}
 		if s.pending != nil {
 			if s.pending.key == key {
@@ -113,6 +136,31 @@ func (a *binParser) decodeCANUDS(s *canISOConnection, dir int, body []byte, e *P
 			return fail(ErrMalformedMessage, "DiagnosticSessionControl response differs from pending request")
 		}
 		f["Session Type"], f["P2 Server Max Milliseconds"], f["P2 Star Server Max Milliseconds"] = p.key.descriptor, binary.BigEndian.Uint16(body[2:4]), uint32(binary.BigEndian.Uint16(body[4:6]))*10
+		s.pending = nil
+	case 0x51, 0x7e:
+		service := byte(0x11)
+		if body[0] == 0x7e {
+			service = 0x3e
+		}
+		wantLength := 2
+		if service == 0x11 && p.key.descriptor == 4 {
+			wantLength = 3
+		}
+		if p.key.service != service || len(body) != wantLength || uint16(body[1]) != p.key.descriptor || p.suppressed {
+			return fail(ErrMalformedMessage, "control response differs from pending service/subfunction")
+		}
+		if service == 0x11 {
+			f["Reset Type"] = p.key.descriptor
+			if p.key.descriptor == 4 {
+				f["Power Down Time Raw"] = body[2]
+				f["Power Down Time Known"] = body[2] != 0xff
+				if body[2] != 0xff {
+					f["Power Down Time Seconds"] = body[2]
+				}
+			}
+		} else {
+			f["Subfunction"] = p.key.descriptor
+		}
 		s.pending = nil
 	case 0x62:
 		if p.key.service != 0x22 || len(body) < 4 || binary.BigEndian.Uint16(body[1:3]) != p.key.descriptor {

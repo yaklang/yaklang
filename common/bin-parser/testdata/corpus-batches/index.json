@@ -82391,6 +82391,302 @@
         "common/pcapx/pcaputil/can-isotp-context/verify.py": "can-isotp-context/verify.py",
         "scripts/protocol-tests/required-tests-traffic-unified-v67.json": "required-tests-traffic-unified-v67.json"
       }
+    },
+    {
+      "id": "validation-can-uds-control",
+      "kind": "validation",
+      "source_sha": "b9917134fd835c382630176d9b8b711c57ec57b2",
+      "file": "validation-can-uds-control.zip",
+      "sha256": "f3fe0adb46a2f04044064269c45cf287e4d307d611fccd2f247e5d155e1a698e",
+      "password": "bin-parser",
+      "members": {
+        "can-uds-control/REFERENCE-FUNCTIONS-ACTUAL.json": {
+          "sha256": "3ca2324e83410961ad74d6d0ef972719b16b7979cdc2055636333963369d63fb",
+          "bytes": 762
+        },
+        "can-uds-control/REFERENCE-SOURCE-PIN.json": {
+          "sha256": "6175442e736351c08544f1cc99713259eccfc7a2539bc929b47d1380cd0def84",
+          "bytes": 574
+        },
+        "can-uds-control/REFERENCE-TSHARK-ACTUAL.json": {
+          "sha256": "aa6f3f9c3cffb4118eed0dde3ae7287e10d0618c414c8f88baa1a62363c7d04c",
+          "bytes": 253
+        },
+        "can-uds-control/SOURCE-PIN.json": {
+          "sha256": "15f62ca058c33a62536a4721103444cf8e1cc165782c67b31c6592ddc820d1ba",
+          "bytes": 319
+        },
+        "can-uds-control/answers/classic-reset1.json": {
+          "sha256": "8569ca55efbd5849a248b256ac20b99aa6a4eca1d752b6a3f146e1b3e8d8b20a",
+          "bytes": 3431
+        },
+        "can-uds-control/answers/classic-reset2.json": {
+          "sha256": "82892395d9e7b588f10697094347cf56aa6a6fb550f7338bc0da91d9d24779e3",
+          "bytes": 3431
+        },
+        "can-uds-control/answers/classic-reset3.json": {
+          "sha256": "203feabe7f08818bd8a4a6697370ab5081db9e4075b1c0e5b12b78c33fd40688",
+          "bytes": 3431
+        },
+        "can-uds-control/answers/classic-reset4.json": {
+          "sha256": "1ca9239475a9316f44269ecd91ca924d3837cb95f3da736d954ad2e9a0f163c9",
+          "bytes": 3554
+        },
+        "can-uds-control/answers/classic-reset5.json": {
+          "sha256": "f9cb3e86581fe2b5fbe0325bcb105f96eba189ee7a72b197d4ec511802d9572f",
+          "bytes": 3431
+        },
+        "can-uds-control/answers/classic-tester-present.json": {
+          "sha256": "b9370058215d85e8a74511cc22b3d391946998468309c553b9a7942f85e5476a",
+          "bytes": 3423
+        },
+        "can-uds-control/answers/exact-active-retry.json": {
+          "sha256": "b7b1fe5434694a7154ffea14a9d1a6eb4883592526e4e80960e859846e510988",
+          "bytes": 4899
+        },
+        "can-uds-control/answers/fd-reset1.json": {
+          "sha256": "de9dd64c7c4bc4f8788666e80918ed036be784a6b56dc55d9da939b9284f58f6",
+          "bytes": 4067
+        },
+        "can-uds-control/answers/fd-reset2.json": {
+          "sha256": "d26f202f26aa3da1fa3a00cfc1ed8392dcabd5e5c1dfb9af02f7db4423f2e927",
+          "bytes": 4067
+        },
+        "can-uds-control/answers/fd-reset3.json": {
+          "sha256": "745e5c11781004f94b8f39e7ba81471c4467cde54dd87c42b4f5fa645fcb3340",
+          "bytes": 4067
+        },
+        "can-uds-control/answers/fd-reset4.json": {
+          "sha256": "62e642b8b4cddfef480932a6c0756aefd0b378ba5a18fdd6626b9a4f34e0f4e4",
+          "bytes": 4186
+        },
+        "can-uds-control/answers/fd-reset5.json": {
+          "sha256": "0237d657253c0fc6337c9cb853825b23edb539dc71b1236c31ce2c3e89b2f87b",
+          "bytes": 4067
+        },
+        "can-uds-control/answers/fd-tester-present.json": {
+          "sha256": "73fef2944321b0119e82a4d8a23a97847c22a3c89068a8b998d605f465295843",
+          "bytes": 4059
+        },
+        "can-uds-control/answers/pending-close.json": {
+          "sha256": "aa8e90beee7c3a1afa9da1c6c5668295dbf2831b747108d9e033108a67567ec3",
+          "bytes": 2220
+        },
+        "can-uds-control/answers/pending-then-terminal.json": {
+          "sha256": "fbfe8746072f187668ed907875039f6ec8ad4cfc270f2530047f5d7293b4d104",
+          "bytes": 4892
+        },
+        "can-uds-control/answers/power-time-unavailable.json": {
+          "sha256": "63c98afc40f503d0e0945466f3c55cf858acdf17b4e1c32b967f5726733e41da",
+          "bytes": 3439
+        },
+        "can-uds-control/answers/rapid-missing-time.json": {
+          "sha256": "2af7bd4e1c07e442bcc67847a3d1940102aba3090e134a6e84755b6a770793e6",
+          "bytes": 3832
+        },
+        "can-uds-control/answers/response-after-policy-expiry.json": {
+          "sha256": "b97f9149d622aa231549e0010c3bb4cdd5c0ad20e13f51eaf1e4082c1c55b42e",
+          "bytes": 2290
+        },
+        "can-uds-control/answers/reused-identity.json": {
+          "sha256": "77968b2483c93b67f97d169f21f1822c6f8f626115f68418a0e577db1d514ba9",
+          "bytes": 4055
+        },
+        "can-uds-control/answers/suppressed-close.json": {
+          "sha256": "de19c381b841b85e76b7251143e90db58be8b379e9f7b86b871a457bed82496f",
+          "bytes": 1946
+        },
+        "can-uds-control/answers/suppressed-negative.json": {
+          "sha256": "57a597437955723c5d2235bafd24ed1ad70be99db136686d25776d6fa959722c",
+          "bytes": 3442
+        },
+        "can-uds-control/answers/unsupported-reset-type.json": {
+          "sha256": "0d38ccb51d987d5bea550eef8382f0f1892be12956abbdcfb1b4e1c0a4e40b8d",
+          "bytes": 1409
+        },
+        "can-uds-control/answers/wrong-echo-keeps-request.json": {
+          "sha256": "d2307e8fb96d3e20aa2ed3595399aa7e29a6c8128dd117440191c7892b21e4f9",
+          "bytes": 3685
+        },
+        "can-uds-control/captures/classic-reset1.pcap": {
+          "sha256": "a5873f3d7974e133d25870903b454e7c62d916a2812fd793b78b4fc1f63e4f31",
+          "bytes": 88
+        },
+        "can-uds-control/captures/classic-reset2.pcap": {
+          "sha256": "37c12ca55e0c9c4d85659b4896412d9555a651f1bbc9a67ee35aea16541c8a0f",
+          "bytes": 88
+        },
+        "can-uds-control/captures/classic-reset3.pcap": {
+          "sha256": "3bd5dbd589e2315f9ba1958aaf90b37119ee7a9815de19ce402731a5f3fbdee9",
+          "bytes": 88
+        },
+        "can-uds-control/captures/classic-reset4.pcap": {
+          "sha256": "f065c8af99ea30efddc0d827146508cd923fa7e7e7cf5d74a86fd98264b023bf",
+          "bytes": 88
+        },
+        "can-uds-control/captures/classic-reset5.pcap": {
+          "sha256": "85697cbb44d20465687ebb0c56638f51929c6021b660d86a9b81d7391a330e91",
+          "bytes": 88
+        },
+        "can-uds-control/captures/classic-tester-present.pcap": {
+          "sha256": "6a9ddad6642c1f2c39f0b2cda9314114b4bc899a4d8a9aa7efcda1dd35501388",
+          "bytes": 88
+        },
+        "can-uds-control/captures/exact-active-retry.pcap": {
+          "sha256": "a4503af40ee36e5eef63b3dce9dab40ace9033bd6b1f6aae848259e102a4e3a4",
+          "bytes": 120
+        },
+        "can-uds-control/captures/fd-reset1.pcap": {
+          "sha256": "c990fece5d08056680ceb186684087792ddb9288a0d24ce497ae419ecd3f351c",
+          "bytes": 200
+        },
+        "can-uds-control/captures/fd-reset2.pcap": {
+          "sha256": "25c2edac8fd43560a5142e3fd8c79dca9304f4b366d62a14c8d4afcd5bd8f97c",
+          "bytes": 200
+        },
+        "can-uds-control/captures/fd-reset3.pcap": {
+          "sha256": "a27a4ac4154e069413b918ebba5f738d51a9151099af63eb4cab95bd619a78ec",
+          "bytes": 200
+        },
+        "can-uds-control/captures/fd-reset4.pcap": {
+          "sha256": "88a2888dd90f2b144ff574d0886cdeacbec1487bd15ccc2aad9a6cebb9f72ba7",
+          "bytes": 200
+        },
+        "can-uds-control/captures/fd-reset5.pcap": {
+          "sha256": "a199da3019211b543c2c042ee3d79cb4c42e8712f9632b42d727b61eef08901a",
+          "bytes": 200
+        },
+        "can-uds-control/captures/fd-tester-present.pcap": {
+          "sha256": "8e00c262000e40a6721f71feaa42e1fd9fcc14b9ad77c8298ab633d1895df5b0",
+          "bytes": 200
+        },
+        "can-uds-control/captures/pending-close.pcap": {
+          "sha256": "266c1004f6a357bd94efe56328b864ec0d80e1bb666a4a75e0a5762b2038686b",
+          "bytes": 56
+        },
+        "can-uds-control/captures/pending-then-terminal.pcap": {
+          "sha256": "bcb0f4066991dd5c6499857b560f6c146c4d3190d0ada2ee99d2c98597f1ac0e",
+          "bytes": 120
+        },
+        "can-uds-control/captures/power-time-unavailable.pcap": {
+          "sha256": "275ec713d60f465e89072eb90a91e069b260ba26fb5082838082e6faa198ea5a",
+          "bytes": 88
+        },
+        "can-uds-control/captures/rapid-missing-time.pcap": {
+          "sha256": "45c310b67527f2e7431db9f19d0f19fdafdf570dcdd493c93a53a4c88600265a",
+          "bytes": 120
+        },
+        "can-uds-control/captures/response-after-policy-expiry.pcap": {
+          "sha256": "83368bc6480daee23bf8fca77cc3ca7181b7bbe08db10f40f0296022a428a6bd",
+          "bytes": 88
+        },
+        "can-uds-control/captures/reused-identity.pcap": {
+          "sha256": "23309805531d28de2223b8129830b09883b9452c0f45d0068578f7b24d7d65a6",
+          "bytes": 152
+        },
+        "can-uds-control/captures/suppressed-close.pcap": {
+          "sha256": "11a440881f82d85d6857f244169dce81011428bda6dfe59efe385b0c7df6325e",
+          "bytes": 56
+        },
+        "can-uds-control/captures/suppressed-negative.pcap": {
+          "sha256": "730720d3c9b749833e17afee264cb7769fc4692ab09c08fb43147ace8c354bce",
+          "bytes": 88
+        },
+        "can-uds-control/captures/unsupported-reset-type.pcap": {
+          "sha256": "76d01d98e1cfcab723c0fa60c570f81f8dd7ceff4ec4aa9717e3383f0b693132",
+          "bytes": 120
+        },
+        "can-uds-control/captures/wrong-echo-keeps-request.pcap": {
+          "sha256": "5731fa83e13821aeffc26e68cd313f8eacbf013fac7027c79f3344eb08c1407c",
+          "bytes": 120
+        },
+        "can-uds-control/generate.py": {
+          "sha256": "7764fa130f04f06dc190d09bb6d78fc3eaf250092818f131e53ab05fe2622396",
+          "bytes": 7700
+        },
+        "can-uds-control/manifest.json": {
+          "sha256": "5ade6cd170156be22f54c8819a99e9c7f7c40e8d5f1011b1429240a3f7ce0a24",
+          "bytes": 7846
+        },
+        "can-uds-control/reference.py": {
+          "sha256": "83e04f0be3e11c1b10572356b784f4be17a4106e74f3a7a7db0044b81e1b6af9",
+          "bytes": 1776
+        },
+        "can-uds-control/reference_functions.py": {
+          "sha256": "dd719d170f7c57ebcd58ea8ef62ecc53c38907e624d0a144c8046fe15c2c3cb6",
+          "bytes": 2540
+        },
+        "can-uds-control/verify.py": {
+          "sha256": "c1f5ac66be1348aa0676904921d908835269839ff5050aadc223c0f2cc44db85",
+          "bytes": 609
+        },
+        "required-tests-traffic-unified-v68.json": {
+          "sha256": "063296b4afd770f1d0d8ba82eaf7ac24dcab1c062613a166abd0f3db167a80b2",
+          "bytes": 15612824
+        },
+        "validation/expected.json": {
+          "sha256": "aad76b4c3a2b8621cf4db2a6149666089688ce1bdde953efcbaaa668ea463495",
+          "bytes": 28783
+        }
+      },
+      "aliases": {
+        "common/pcapx/pcaputil/can-uds-control/REFERENCE-FUNCTIONS-ACTUAL.json": "can-uds-control/REFERENCE-FUNCTIONS-ACTUAL.json",
+        "common/pcapx/pcaputil/can-uds-control/REFERENCE-SOURCE-PIN.json": "can-uds-control/REFERENCE-SOURCE-PIN.json",
+        "common/pcapx/pcaputil/can-uds-control/REFERENCE-TSHARK-ACTUAL.json": "can-uds-control/REFERENCE-TSHARK-ACTUAL.json",
+        "common/pcapx/pcaputil/can-uds-control/SOURCE-PIN.json": "can-uds-control/SOURCE-PIN.json",
+        "common/pcapx/pcaputil/can-uds-control/answers/classic-reset1.json": "can-uds-control/answers/classic-reset1.json",
+        "common/pcapx/pcaputil/can-uds-control/answers/classic-reset2.json": "can-uds-control/answers/classic-reset2.json",
+        "common/pcapx/pcaputil/can-uds-control/answers/classic-reset3.json": "can-uds-control/answers/classic-reset3.json",
+        "common/pcapx/pcaputil/can-uds-control/answers/classic-reset4.json": "can-uds-control/answers/classic-reset4.json",
+        "common/pcapx/pcaputil/can-uds-control/answers/classic-reset5.json": "can-uds-control/answers/classic-reset5.json",
+        "common/pcapx/pcaputil/can-uds-control/answers/classic-tester-present.json": "can-uds-control/answers/classic-tester-present.json",
+        "common/pcapx/pcaputil/can-uds-control/answers/exact-active-retry.json": "can-uds-control/answers/exact-active-retry.json",
+        "common/pcapx/pcaputil/can-uds-control/answers/fd-reset1.json": "can-uds-control/answers/fd-reset1.json",
+        "common/pcapx/pcaputil/can-uds-control/answers/fd-reset2.json": "can-uds-control/answers/fd-reset2.json",
+        "common/pcapx/pcaputil/can-uds-control/answers/fd-reset3.json": "can-uds-control/answers/fd-reset3.json",
+        "common/pcapx/pcaputil/can-uds-control/answers/fd-reset4.json": "can-uds-control/answers/fd-reset4.json",
+        "common/pcapx/pcaputil/can-uds-control/answers/fd-reset5.json": "can-uds-control/answers/fd-reset5.json",
+        "common/pcapx/pcaputil/can-uds-control/answers/fd-tester-present.json": "can-uds-control/answers/fd-tester-present.json",
+        "common/pcapx/pcaputil/can-uds-control/answers/pending-close.json": "can-uds-control/answers/pending-close.json",
+        "common/pcapx/pcaputil/can-uds-control/answers/pending-then-terminal.json": "can-uds-control/answers/pending-then-terminal.json",
+        "common/pcapx/pcaputil/can-uds-control/answers/power-time-unavailable.json": "can-uds-control/answers/power-time-unavailable.json",
+        "common/pcapx/pcaputil/can-uds-control/answers/rapid-missing-time.json": "can-uds-control/answers/rapid-missing-time.json",
+        "common/pcapx/pcaputil/can-uds-control/answers/response-after-policy-expiry.json": "can-uds-control/answers/response-after-policy-expiry.json",
+        "common/pcapx/pcaputil/can-uds-control/answers/reused-identity.json": "can-uds-control/answers/reused-identity.json",
+        "common/pcapx/pcaputil/can-uds-control/answers/suppressed-close.json": "can-uds-control/answers/suppressed-close.json",
+        "common/pcapx/pcaputil/can-uds-control/answers/suppressed-negative.json": "can-uds-control/answers/suppressed-negative.json",
+        "common/pcapx/pcaputil/can-uds-control/answers/unsupported-reset-type.json": "can-uds-control/answers/unsupported-reset-type.json",
+        "common/pcapx/pcaputil/can-uds-control/answers/wrong-echo-keeps-request.json": "can-uds-control/answers/wrong-echo-keeps-request.json",
+        "common/pcapx/pcaputil/can-uds-control/captures/classic-reset1.pcap": "can-uds-control/captures/classic-reset1.pcap",
+        "common/pcapx/pcaputil/can-uds-control/captures/classic-reset2.pcap": "can-uds-control/captures/classic-reset2.pcap",
+        "common/pcapx/pcaputil/can-uds-control/captures/classic-reset3.pcap": "can-uds-control/captures/classic-reset3.pcap",
+        "common/pcapx/pcaputil/can-uds-control/captures/classic-reset4.pcap": "can-uds-control/captures/classic-reset4.pcap",
+        "common/pcapx/pcaputil/can-uds-control/captures/classic-reset5.pcap": "can-uds-control/captures/classic-reset5.pcap",
+        "common/pcapx/pcaputil/can-uds-control/captures/classic-tester-present.pcap": "can-uds-control/captures/classic-tester-present.pcap",
+        "common/pcapx/pcaputil/can-uds-control/captures/exact-active-retry.pcap": "can-uds-control/captures/exact-active-retry.pcap",
+        "common/pcapx/pcaputil/can-uds-control/captures/fd-reset1.pcap": "can-uds-control/captures/fd-reset1.pcap",
+        "common/pcapx/pcaputil/can-uds-control/captures/fd-reset2.pcap": "can-uds-control/captures/fd-reset2.pcap",
+        "common/pcapx/pcaputil/can-uds-control/captures/fd-reset3.pcap": "can-uds-control/captures/fd-reset3.pcap",
+        "common/pcapx/pcaputil/can-uds-control/captures/fd-reset4.pcap": "can-uds-control/captures/fd-reset4.pcap",
+        "common/pcapx/pcaputil/can-uds-control/captures/fd-reset5.pcap": "can-uds-control/captures/fd-reset5.pcap",
+        "common/pcapx/pcaputil/can-uds-control/captures/fd-tester-present.pcap": "can-uds-control/captures/fd-tester-present.pcap",
+        "common/pcapx/pcaputil/can-uds-control/captures/pending-close.pcap": "can-uds-control/captures/pending-close.pcap",
+        "common/pcapx/pcaputil/can-uds-control/captures/pending-then-terminal.pcap": "can-uds-control/captures/pending-then-terminal.pcap",
+        "common/pcapx/pcaputil/can-uds-control/captures/power-time-unavailable.pcap": "can-uds-control/captures/power-time-unavailable.pcap",
+        "common/pcapx/pcaputil/can-uds-control/captures/rapid-missing-time.pcap": "can-uds-control/captures/rapid-missing-time.pcap",
+        "common/pcapx/pcaputil/can-uds-control/captures/response-after-policy-expiry.pcap": "can-uds-control/captures/response-after-policy-expiry.pcap",
+        "common/pcapx/pcaputil/can-uds-control/captures/reused-identity.pcap": "can-uds-control/captures/reused-identity.pcap",
+        "common/pcapx/pcaputil/can-uds-control/captures/suppressed-close.pcap": "can-uds-control/captures/suppressed-close.pcap",
+        "common/pcapx/pcaputil/can-uds-control/captures/suppressed-negative.pcap": "can-uds-control/captures/suppressed-negative.pcap",
+        "common/pcapx/pcaputil/can-uds-control/captures/unsupported-reset-type.pcap": "can-uds-control/captures/unsupported-reset-type.pcap",
+        "common/pcapx/pcaputil/can-uds-control/captures/wrong-echo-keeps-request.pcap": "can-uds-control/captures/wrong-echo-keeps-request.pcap",
+        "common/pcapx/pcaputil/can-uds-control/generate.py": "can-uds-control/generate.py",
+        "common/pcapx/pcaputil/can-uds-control/manifest.json": "can-uds-control/manifest.json",
+        "common/pcapx/pcaputil/can-uds-control/reference.py": "can-uds-control/reference.py",
+        "common/pcapx/pcaputil/can-uds-control/reference_functions.py": "can-uds-control/reference_functions.py",
+        "common/pcapx/pcaputil/can-uds-control/verify.py": "can-uds-control/verify.py",
+        "scripts/protocol-tests/required-tests-traffic-unified-v68.json": "required-tests-traffic-unified-v68.json"
+      }
     }
   ],
   "schema_version": 1,

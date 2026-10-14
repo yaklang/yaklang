@@ -21,7 +21,7 @@ type CANISOTransport struct {
 	PaddingByte                     byte
 	MaxWaitFrames                   byte
 	DynamicFlowControl              bool          // fixed Linux v6.12 CAN_ISOTP_DYN_FC_PARMS semantics
-	DecodeUDS                       bool          // selected DSC and single-DID RDBI, no arbitrary DID schema
+	DecodeUDS                       bool          // selected DSC/control/single-DID RDBI; no arbitrary DID schema
 	UDSResponseTimeout              time.Duration // capture policy; zero selects thirty seconds
 }
 
