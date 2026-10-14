@@ -20,6 +20,7 @@ type CANISOTransport struct {
 	CheckPadding                    bool
 	PaddingByte                     byte
 	MaxWaitFrames                   byte
+	DynamicFlowControl              bool          // fixed Linux v6.12 CAN_ISOTP_DYN_FC_PARMS semantics
 	DecodeUDS                       bool          // selected DSC and single-DID RDBI, no arbitrary DID schema
 	UDSResponseTimeout              time.Duration // capture policy; zero selects thirty seconds
 }
@@ -40,9 +41,11 @@ func WithCANISOTransport(captureInterface int, options CANISOTransport) CaptureO
 			if old == options {
 				return nil
 			}
-			for _, id := range []uint32{options.RequestID, options.ResponseID} {
-				if id == old.RequestID || id == old.ResponseID {
-					return fmt.Errorf("overlapping ISO-TP CAN IDs require an unambiguous pair")
+			for d := 0; d < 2; d++ {
+				for other := 0; other < 2; other++ {
+					if canISOSelectorsOverlap(options, d, old, other) {
+						return fmt.Errorf("overlapping ISO-TP CAN IDs require an unambiguous pair/address/carrier")
+					}
 				}
 			}
 		}
@@ -104,6 +107,23 @@ type canISOStore struct {
 	cost    int64
 }
 
+func canISOSelector(o CANISOTransport, dir int) (uint32, byte) {
+	if dir == 0 {
+		return o.RequestID, o.RequestAddress
+	}
+	return o.ResponseID, o.ResponseAddress
+}
+func canISOSelectorsOverlap(a CANISOTransport, ad int, b CANISOTransport, bd int) bool {
+	ai, aa := canISOSelector(a, ad)
+	bi, ba := canISOSelector(b, bd)
+	if ai != bi || a.CANFD != b.CANFD {
+		return false
+	}
+	if a.ExtendedAddressing != b.ExtendedAddressing {
+		return true
+	}
+	return !a.ExtendedAddressing || aa == ba
+}
 func canISODirection(o CANISOTransport, id uint32) (int, bool) {
 	if id == o.RequestID {
 		return 0, true
@@ -200,11 +220,38 @@ func (a *binParser) decodeCANISO(fields map[string]any, e *ProtocolEvent) (bool,
 	}
 	var options CANISOTransport
 	pair, dir := -1, 0
+	idCandidates := 0
+	fallbackPair, fallbackDir := -1, 0
+	var fallback CANISOTransport
 	for i, o := range a.canISOTransports[e.Domain.Interface] {
 		if d, ok := canISODirection(o, id); ok {
+			idCandidates++
+			fallbackPair, fallbackDir, fallback = i, d, o
+			if (fields["Frame Format"] == "fd") != o.CANFD {
+				continue
+			}
+			data := fields["Data"].([]byte)
+			if o.ExtendedAddressing {
+				_, addr := canISOSelector(o, d)
+				if len(data) == 0 || data[0] != addr {
+					continue
+				}
+			}
 			pair, dir, options = i, d, o
 			break
 		}
+	}
+	if pair < 0 && idCandidates == 1 {
+		pair, dir, options = fallbackPair, fallbackDir, fallback
+	}
+	if pair < 0 && idCandidates > 1 {
+		e.ID = a.ids.Add(1)
+		e.Protocol, e.Profile, e.Admission = "can-isotp", canISOProfile, "explicit-interface-id-pair"
+		if len(fields["Data"].([]byte)) == 0 {
+			a.refuseCANISORecord(e.Domain)
+			return true, protocolError(ErrMalformedMessage, "CAN ISO-TP address/PCI absent for shared selectors")
+		}
+		return true, protocolError(ErrContextRequired, "CAN ISO-TP frame does not select one configured address/carrier")
 	}
 	if pair < 0 {
 		return false, nil
@@ -301,6 +348,9 @@ func (a *binParser) decodeCANISO(fields map[string]any, e *ProtocolEvent) (bool,
 		return nil
 	}
 	f := map[string]any{"Observation": "unverified-captured-transport", "Configured Request CAN ID": options.RequestID, "Configured Response CAN ID": options.ResponseID, "Carrier": "classic", "Addressing": "normal", "Direction": dir, "PCI Type": typ, "Address Bytes": ae, "Transfer Complete": false, "Transaction ID Present": false}
+	if options.DynamicFlowControl {
+		f["Dynamic Flow Control"] = true
+	}
 	if options.CANFD {
 		f["Carrier"] = "fd"
 	}
@@ -474,9 +524,14 @@ func (a *binParser) decodeCANISO(fields map[string]any, e *ProtocolEvent) (bool,
 		if fs == 0 {
 			f["Effective STmin Nanoseconds"] = int64(stmin)
 		}
+		if options.DynamicFlowControl {
+			f["Parameters Applied"] = true
+			f["Effective STmin Nanoseconds"] = int64(stmin)
+			r.block, r.stminCode, r.stmin = bs, code, stmin
+		}
 		switch fs {
 		case 0:
-			if r.firstFC && (bs != r.block || code != r.stminCode) {
+			if r.firstFC && !options.DynamicFlowControl && (bs != r.block || code != r.stminCode) {
 				return true, refuse(ErrUnsupportedFeature, "changed FC parameters need a dynamic-parameter profile")
 			}
 			r.firstFC = true

@@ -82250,6 +82250,147 @@
         "common/pcapx/pcaputil/can-isotp-uds/REFERENCE-TSHARK-FINAL-DEVELOPMENT.jsonl": "can-isotp-uds/REFERENCE-TSHARK-FINAL-DEVELOPMENT.jsonl",
         "scripts/protocol-tests/required-tests-traffic-unified-v66.json": "required-tests-traffic-unified-v66.json"
       }
+    },
+    {
+      "id": "validation-can-isotp-context",
+      "kind": "validation",
+      "source_sha": "609059b0e27625461daca9da3144126ef04c5894",
+      "file": "validation-can-isotp-context.zip",
+      "sha256": "5f97e8f31c3125b1a503a67f2fbccf8666b1883c904e68cdb208f8b7a66623e2",
+      "password": "bin-parser",
+      "members": {
+        "can-isotp-context/REFERENCE-FC-ACTUAL.json": {
+          "sha256": "87a941e2bd10950b8068d2aae29ebc7bdf2877f1303d52089014103198095880",
+          "bytes": 418
+        },
+        "can-isotp-context/REFERENCE-SELECTOR-ACTUAL.json": {
+          "sha256": "5cbb826c7620722b3ccdcaa18f813681cb262ce1184918c94fd6fed70cf98371",
+          "bytes": 440
+        },
+        "can-isotp-context/REFERENCE-TSHARK-ACTUAL.json": {
+          "sha256": "fa8b484dd9581731917701be008a1890bbf18f390d3a68aae75a9fc96281bee1",
+          "bytes": 1342
+        },
+        "can-isotp-context/SOURCE-PIN.json": {
+          "sha256": "b30212d72cc5f09e62188425307640577bf9b5d174ff93e8cb952d13254ec963",
+          "bytes": 313
+        },
+        "can-isotp-context/answers/dynamic-bs-and-stmin.json": {
+          "sha256": "2ccdc5d83c450b1d4e0290fc813b5eba61af6414dbc44c2d922ceb203a702e29",
+          "bytes": 9437
+        },
+        "can-isotp-context/answers/dynamic-new-stmin-refusal.json": {
+          "sha256": "f910a358c24c171ca757168a1fd3f4579194552d4e2cad5f7c40a2281b598439",
+          "bytes": 5896
+        },
+        "can-isotp-context/answers/dynamic-wait-data-refusal.json": {
+          "sha256": "66beb367b99b62adaf8bf8753c4d9fb4e74d9e1e0753930e2fdc39832034db1d",
+          "bytes": 3274
+        },
+        "can-isotp-context/answers/dynamic-wait-then-cts.json": {
+          "sha256": "9106f15146d802df9ffed74183747eee802cc5d785b946ddf30c94650f104138",
+          "bytes": 6904
+        },
+        "can-isotp-context/answers/legacy-changed-tuple-refusal.json": {
+          "sha256": "bb1a250da849359267b6858f92652e237a9ba0f902a6a985c840bdfaaa38568f",
+          "bytes": 4390
+        },
+        "can-isotp-context/answers/shared-address-classic.json": {
+          "sha256": "97ec1bf1b16818e605d22671d6c4f0a3231670bc2b72506cebe2040c5a2b1e49",
+          "bytes": 15815
+        },
+        "can-isotp-context/answers/shared-address-fd.json": {
+          "sha256": "74334b796a9133da17cd1fd75ebf24ce63686a57a7c34b53374933097e41781c",
+          "bytes": 13070
+        },
+        "can-isotp-context/captures/dynamic-bs-and-stmin.pcap": {
+          "sha256": "ee7602f2af1544b4b11e73eff5ae14e251cc1b3c82a019744419f10c4aff267e",
+          "bytes": 248
+        },
+        "can-isotp-context/captures/dynamic-new-stmin-refusal.pcap": {
+          "sha256": "ff812a9a11a6d77f20ad1c21f7026f683cffc97dda1ed4f15d06d0fc7f1ece86",
+          "bytes": 184
+        },
+        "can-isotp-context/captures/dynamic-wait-data-refusal.pcap": {
+          "sha256": "d5b59c9902964b3237234c6cf41023157c5d64b98a82e5c10097bd98e392bcfc",
+          "bytes": 120
+        },
+        "can-isotp-context/captures/dynamic-wait-then-cts.pcap": {
+          "sha256": "1e7aff6ef0d211c09b66634e0d098d5618da14c16804c67dada0dda785d361eb",
+          "bytes": 184
+        },
+        "can-isotp-context/captures/legacy-changed-tuple-refusal.pcap": {
+          "sha256": "f8b2e3f83634182a63b12ebfc0ec5ecb17666f08038ee6c4b87970b2f37a5684",
+          "bytes": 152
+        },
+        "can-isotp-context/captures/shared-address-classic.pcap": {
+          "sha256": "5845f7f9e1761bc8005687b37677ff5c2a0bc26eba215092afe5979ba8168b10",
+          "bytes": 408
+        },
+        "can-isotp-context/captures/shared-address-fd.pcap": {
+          "sha256": "1d271423e3adfff6409a6f90a6acba3da0c64fd952419df0c4b6a1a81fd32249",
+          "bytes": 728
+        },
+        "can-isotp-context/generate.py": {
+          "sha256": "e13b39bb5c716f5cf8e76a994618eebd93f4b2ec438f5b64ab907698bf87d82e",
+          "bytes": 6729
+        },
+        "can-isotp-context/manifest.json": {
+          "sha256": "829209baf626873633111faf37bd58c5f132d3547805bf43f7e19e6215f09476",
+          "bytes": 2555
+        },
+        "can-isotp-context/reference.py": {
+          "sha256": "6edd2a0e3fa96f8c191d0fd3f39d8458ec66f17f9f32f96d0893cf2fefd561bb",
+          "bytes": 1974
+        },
+        "can-isotp-context/reference_fc.py": {
+          "sha256": "629bace363a361eb99bb257d54e58188f683d126de19a090d0ae33257f30a047",
+          "bytes": 3823
+        },
+        "can-isotp-context/reference_selector.py": {
+          "sha256": "6c596e0bce86e465762eaabb777a6af0e55732ae6bec8f58549a939e152005ed",
+          "bytes": 3223
+        },
+        "can-isotp-context/verify.py": {
+          "sha256": "32025d9487bd6739323de736d5eedba2e2d4d5f583c31d5eb66463df2e5293ac",
+          "bytes": 607
+        },
+        "required-tests-traffic-unified-v67.json": {
+          "sha256": "c6fa58282cddcd67c332226672f9eb066d1355cb6efe8ac9d7fdd2fd4dc9d110",
+          "bytes": 15504475
+        },
+        "validation/expected.json": {
+          "sha256": "8060944901e074b17ef9c0bc0a29099807058e17ea49ae6c547caae905f9f328",
+          "bytes": 9190
+        }
+      },
+      "aliases": {
+        "common/pcapx/pcaputil/can-isotp-context/REFERENCE-FC-ACTUAL.json": "can-isotp-context/REFERENCE-FC-ACTUAL.json",
+        "common/pcapx/pcaputil/can-isotp-context/REFERENCE-SELECTOR-ACTUAL.json": "can-isotp-context/REFERENCE-SELECTOR-ACTUAL.json",
+        "common/pcapx/pcaputil/can-isotp-context/REFERENCE-TSHARK-ACTUAL.json": "can-isotp-context/REFERENCE-TSHARK-ACTUAL.json",
+        "common/pcapx/pcaputil/can-isotp-context/SOURCE-PIN.json": "can-isotp-context/SOURCE-PIN.json",
+        "common/pcapx/pcaputil/can-isotp-context/answers/dynamic-bs-and-stmin.json": "can-isotp-context/answers/dynamic-bs-and-stmin.json",
+        "common/pcapx/pcaputil/can-isotp-context/answers/dynamic-new-stmin-refusal.json": "can-isotp-context/answers/dynamic-new-stmin-refusal.json",
+        "common/pcapx/pcaputil/can-isotp-context/answers/dynamic-wait-data-refusal.json": "can-isotp-context/answers/dynamic-wait-data-refusal.json",
+        "common/pcapx/pcaputil/can-isotp-context/answers/dynamic-wait-then-cts.json": "can-isotp-context/answers/dynamic-wait-then-cts.json",
+        "common/pcapx/pcaputil/can-isotp-context/answers/legacy-changed-tuple-refusal.json": "can-isotp-context/answers/legacy-changed-tuple-refusal.json",
+        "common/pcapx/pcaputil/can-isotp-context/answers/shared-address-classic.json": "can-isotp-context/answers/shared-address-classic.json",
+        "common/pcapx/pcaputil/can-isotp-context/answers/shared-address-fd.json": "can-isotp-context/answers/shared-address-fd.json",
+        "common/pcapx/pcaputil/can-isotp-context/captures/dynamic-bs-and-stmin.pcap": "can-isotp-context/captures/dynamic-bs-and-stmin.pcap",
+        "common/pcapx/pcaputil/can-isotp-context/captures/dynamic-new-stmin-refusal.pcap": "can-isotp-context/captures/dynamic-new-stmin-refusal.pcap",
+        "common/pcapx/pcaputil/can-isotp-context/captures/dynamic-wait-data-refusal.pcap": "can-isotp-context/captures/dynamic-wait-data-refusal.pcap",
+        "common/pcapx/pcaputil/can-isotp-context/captures/dynamic-wait-then-cts.pcap": "can-isotp-context/captures/dynamic-wait-then-cts.pcap",
+        "common/pcapx/pcaputil/can-isotp-context/captures/legacy-changed-tuple-refusal.pcap": "can-isotp-context/captures/legacy-changed-tuple-refusal.pcap",
+        "common/pcapx/pcaputil/can-isotp-context/captures/shared-address-classic.pcap": "can-isotp-context/captures/shared-address-classic.pcap",
+        "common/pcapx/pcaputil/can-isotp-context/captures/shared-address-fd.pcap": "can-isotp-context/captures/shared-address-fd.pcap",
+        "common/pcapx/pcaputil/can-isotp-context/generate.py": "can-isotp-context/generate.py",
+        "common/pcapx/pcaputil/can-isotp-context/manifest.json": "can-isotp-context/manifest.json",
+        "common/pcapx/pcaputil/can-isotp-context/reference.py": "can-isotp-context/reference.py",
+        "common/pcapx/pcaputil/can-isotp-context/reference_fc.py": "can-isotp-context/reference_fc.py",
+        "common/pcapx/pcaputil/can-isotp-context/reference_selector.py": "can-isotp-context/reference_selector.py",
+        "common/pcapx/pcaputil/can-isotp-context/verify.py": "can-isotp-context/verify.py",
+        "scripts/protocol-tests/required-tests-traffic-unified-v67.json": "required-tests-traffic-unified-v67.json"
+      }
     }
   ],
   "schema_version": 1,
