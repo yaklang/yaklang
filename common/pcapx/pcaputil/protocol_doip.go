@@ -333,7 +333,7 @@ func (s *binDoIP) consumeEvent(dir int, raw []byte, eventID uint64) (map[string]
 					descriptor, hasDescriptor = data[2], true
 				}
 				h := s.history[source]
-				if hasDescriptor && descriptor != s.request[1] && h.seen[descriptor/64]&(uint64(1)<<(descriptor%64)) != 0 {
+				if hasDescriptor && descriptor < 128 && descriptor != s.request[1] && h.seen[descriptor/64]&(uint64(1)<<(descriptor%64)) != 0 {
 					s.associationRefusal, s.diagnosticReplyUncertain = true, true
 					return nil, protocolError(ErrContextRequired, "DoIP response echoes a retired diagnostic descriptor")
 				}
@@ -432,6 +432,9 @@ func doipDiagnosticResponseShape(kind uint16, data []byte) error {
 		}
 		if len(data) == 3 && data[2]&0x7f == 0 {
 			return protocolError(ErrMalformedMessage, "DoIP acknowledgement echoes a zero DSC session")
+		}
+		if len(data) == 3 && data[2]&0x80 != 0 {
+			return protocolError(ErrUnsupportedFeature, "DoIP acknowledgement echoes an unsupported suppressed DSC request")
 		}
 
 		return nil

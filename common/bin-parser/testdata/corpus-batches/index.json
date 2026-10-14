@@ -84401,6 +84401,152 @@
         "common/pcapx/pcaputil/doip-context/verify.py": "doip-context/verify.py",
         "scripts/protocol-tests/required-tests-traffic-unified-v72.json": "required-tests-traffic-unified-v72.json"
       }
+    },
+    {
+      "id": "validation-doip-context-echo",
+      "kind": "validation",
+      "source_sha": "c241cf08d177e5bb04b09af24cbe5f07dac2a996",
+      "file": "validation-doip-context-echo.zip",
+      "sha256": "1c367c6ec7c768acae47c85d0d28f46711416e63995c0270d10ff34fcac337d6",
+      "password": "bin-parser",
+      "members": {
+        "doip-context-echo/REFERENCE-TSHARK-ACTUAL.json": {
+          "sha256": "a5d7df847f3d514cf0a63151a1bf7a417b1cd0d0e6a770a32cecf80da11996cf",
+          "bytes": 344
+        },
+        "doip-context-echo/SOURCE-PIN.json": {
+          "sha256": "826a7d7158228bef023d1bcae56448063aabf36c335ff55bac67a25275ae38d1",
+          "bytes": 549
+        },
+        "doip-context-echo/answers/echo-highbit-128-c1.json": {
+          "sha256": "281f2f43510de95d71921d96f2e409b1d1e502fc6a6a50902ef19b0f01aacbab",
+          "bytes": 6425
+        },
+        "doip-context-echo/answers/echo-highbit-128-c65535.json": {
+          "sha256": "82ab73441c00df6e59efc03acc1a9ea51cf5b510802e9c70e1afd486cd946259",
+          "bytes": 4995
+        },
+        "doip-context-echo/answers/echo-highbit-128-c7.json": {
+          "sha256": "879bf1844d9487e78c847226972d1f2c2a9f7ed6595364b066e4c3f9ad87e1e1",
+          "bytes": 5147
+        },
+        "doip-context-echo/answers/echo-highbit-131-c1.json": {
+          "sha256": "07a038bc3c4c5bd52326a32d23a58af1e89932fbdc679f2871ad450684661188",
+          "bytes": 6445
+        },
+        "doip-context-echo/answers/echo-highbit-131-c65535.json": {
+          "sha256": "846d4f7c1a2cceaf37370f81c8162ebecff45814827c52e1a3b4c4061b43d7b9",
+          "bytes": 5015
+        },
+        "doip-context-echo/answers/echo-highbit-131-c7.json": {
+          "sha256": "31231c7c7c21f59e0d4cddafcd8acf8c804842d1bd96c3cd4749ce389843dd54",
+          "bytes": 5167
+        },
+        "doip-context-echo/answers/echo-highbit-255-c1.json": {
+          "sha256": "77753ab4c942aaf6197e42f6d045eea6f0fb7b32eec0af64567bc647ab94e9e1",
+          "bytes": 6445
+        },
+        "doip-context-echo/answers/echo-highbit-255-c65535.json": {
+          "sha256": "d64b5b53a844f2d9af1d075dbb8173adcb0eb215fd56af1fb27f2c0adb3c0dc0",
+          "bytes": 5015
+        },
+        "doip-context-echo/answers/echo-highbit-255-c7.json": {
+          "sha256": "5ba1f60124354015e3139fb03dcda6da1c46abffe459fa4bef533950b3382161",
+          "bytes": 5167
+        },
+        "doip-context-echo/captures/echo-highbit-128-c1.pcap": {
+          "sha256": "a69f746a2c85ce707f7e60acee341a2da1468ec9ae6d1dfac17b24e51b02f4eb",
+          "bytes": 9109
+        },
+        "doip-context-echo/captures/echo-highbit-128-c65535.pcap": {
+          "sha256": "67f4211d05e828db2a95b16a44862a7b61dee16fd946546686cb767b20f1f601",
+          "bytes": 919
+        },
+        "doip-context-echo/captures/echo-highbit-128-c7.pcap": {
+          "sha256": "7028eb09886f3838cbaa2da449dc2a7a290bbaea071d6445bd52735f664e28fb",
+          "bytes": 1829
+        },
+        "doip-context-echo/captures/echo-highbit-131-c1.pcap": {
+          "sha256": "eecb5778262e5f5f5d8d2882e527c9b38e30471f10c3fb85188940cde5499712",
+          "bytes": 9109
+        },
+        "doip-context-echo/captures/echo-highbit-131-c65535.pcap": {
+          "sha256": "b6d3402e95353b27b04123ed7e6695f7ac1efd6eadf5ce0d317e5af6433006de",
+          "bytes": 919
+        },
+        "doip-context-echo/captures/echo-highbit-131-c7.pcap": {
+          "sha256": "ba0d9e3704e96699d535ee06e94b903a97ffbba831048793d9001fa1d42dbe20",
+          "bytes": 1829
+        },
+        "doip-context-echo/captures/echo-highbit-255-c1.pcap": {
+          "sha256": "2c06163c38a3d0d126952f87794ef5a11de1c61274fbb9e239afdaccb6411eea",
+          "bytes": 9109
+        },
+        "doip-context-echo/captures/echo-highbit-255-c65535.pcap": {
+          "sha256": "e0f59c7b49b7af78e5523117ba635e0615aedad09aa8cd6c1d7d7fcd03607ac1",
+          "bytes": 919
+        },
+        "doip-context-echo/captures/echo-highbit-255-c7.pcap": {
+          "sha256": "b647930bb4bd57891d336c446b53ff0fd547b0d21ba3b1611782bdc51140e3ab",
+          "bytes": 1829
+        },
+        "doip-context-echo/generate.py": {
+          "sha256": "6734af32bf68db58a591ab5af3a7a9701e2152ed9bc695fb78a153ec7ad81b28",
+          "bytes": 6967
+        },
+        "doip-context-echo/manifest.json": {
+          "sha256": "06eb5503d795c095f79ee477c4a500e39fbe2af1f10f8d33fd7a02f8a24f9dd3",
+          "bytes": 3223
+        },
+        "doip-context-echo/reference-codec.py": {
+          "sha256": "974c1a7476261b75488654019ef28d4f6463477e96245e43c08430d743c6c260",
+          "bytes": 2405
+        },
+        "doip-context-echo/reference.py": {
+          "sha256": "162d53e69473e265d2b45ba735813096fea8df7f7720a300f14a9eaa1b223526",
+          "bytes": 2019
+        },
+        "doip-context-echo/verify.py": {
+          "sha256": "fa913052f9f3e276fffbdae04d895c388bc7c56ecc1725bd8679462ddb3cbe3e",
+          "bytes": 607
+        },
+        "required-tests-traffic-unified-v73.json": {
+          "sha256": "bac900e476386aba4205891fe638be06cc6701e5bfdcc41301a7795b0720b648",
+          "bytes": 16473330
+        },
+        "validation/expected.json": {
+          "sha256": "dc818467a810f35161a36e79df98a51d92daeedc0c3e289cdc0ace3368b62788",
+          "bytes": 11596
+        }
+      },
+      "aliases": {
+        "common/pcapx/pcaputil/doip-context-echo/REFERENCE-TSHARK-ACTUAL.json": "doip-context-echo/REFERENCE-TSHARK-ACTUAL.json",
+        "common/pcapx/pcaputil/doip-context-echo/SOURCE-PIN.json": "doip-context-echo/SOURCE-PIN.json",
+        "common/pcapx/pcaputil/doip-context-echo/answers/echo-highbit-128-c1.json": "doip-context-echo/answers/echo-highbit-128-c1.json",
+        "common/pcapx/pcaputil/doip-context-echo/answers/echo-highbit-128-c65535.json": "doip-context-echo/answers/echo-highbit-128-c65535.json",
+        "common/pcapx/pcaputil/doip-context-echo/answers/echo-highbit-128-c7.json": "doip-context-echo/answers/echo-highbit-128-c7.json",
+        "common/pcapx/pcaputil/doip-context-echo/answers/echo-highbit-131-c1.json": "doip-context-echo/answers/echo-highbit-131-c1.json",
+        "common/pcapx/pcaputil/doip-context-echo/answers/echo-highbit-131-c65535.json": "doip-context-echo/answers/echo-highbit-131-c65535.json",
+        "common/pcapx/pcaputil/doip-context-echo/answers/echo-highbit-131-c7.json": "doip-context-echo/answers/echo-highbit-131-c7.json",
+        "common/pcapx/pcaputil/doip-context-echo/answers/echo-highbit-255-c1.json": "doip-context-echo/answers/echo-highbit-255-c1.json",
+        "common/pcapx/pcaputil/doip-context-echo/answers/echo-highbit-255-c65535.json": "doip-context-echo/answers/echo-highbit-255-c65535.json",
+        "common/pcapx/pcaputil/doip-context-echo/answers/echo-highbit-255-c7.json": "doip-context-echo/answers/echo-highbit-255-c7.json",
+        "common/pcapx/pcaputil/doip-context-echo/captures/echo-highbit-128-c1.pcap": "doip-context-echo/captures/echo-highbit-128-c1.pcap",
+        "common/pcapx/pcaputil/doip-context-echo/captures/echo-highbit-128-c65535.pcap": "doip-context-echo/captures/echo-highbit-128-c65535.pcap",
+        "common/pcapx/pcaputil/doip-context-echo/captures/echo-highbit-128-c7.pcap": "doip-context-echo/captures/echo-highbit-128-c7.pcap",
+        "common/pcapx/pcaputil/doip-context-echo/captures/echo-highbit-131-c1.pcap": "doip-context-echo/captures/echo-highbit-131-c1.pcap",
+        "common/pcapx/pcaputil/doip-context-echo/captures/echo-highbit-131-c65535.pcap": "doip-context-echo/captures/echo-highbit-131-c65535.pcap",
+        "common/pcapx/pcaputil/doip-context-echo/captures/echo-highbit-131-c7.pcap": "doip-context-echo/captures/echo-highbit-131-c7.pcap",
+        "common/pcapx/pcaputil/doip-context-echo/captures/echo-highbit-255-c1.pcap": "doip-context-echo/captures/echo-highbit-255-c1.pcap",
+        "common/pcapx/pcaputil/doip-context-echo/captures/echo-highbit-255-c65535.pcap": "doip-context-echo/captures/echo-highbit-255-c65535.pcap",
+        "common/pcapx/pcaputil/doip-context-echo/captures/echo-highbit-255-c7.pcap": "doip-context-echo/captures/echo-highbit-255-c7.pcap",
+        "common/pcapx/pcaputil/doip-context-echo/generate.py": "doip-context-echo/generate.py",
+        "common/pcapx/pcaputil/doip-context-echo/manifest.json": "doip-context-echo/manifest.json",
+        "common/pcapx/pcaputil/doip-context-echo/reference-codec.py": "doip-context-echo/reference-codec.py",
+        "common/pcapx/pcaputil/doip-context-echo/reference.py": "doip-context-echo/reference.py",
+        "common/pcapx/pcaputil/doip-context-echo/verify.py": "doip-context-echo/verify.py",
+        "scripts/protocol-tests/required-tests-traffic-unified-v73.json": "required-tests-traffic-unified-v73.json"
+      }
     }
   ],
   "schema_version": 1,

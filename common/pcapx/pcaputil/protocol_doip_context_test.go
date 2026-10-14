@@ -14,6 +14,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 )
 
 func TestDoIPContextWireValidationBeforeAmbiguity(t *testing.T) {
@@ -151,18 +152,26 @@ func TestDoIPContextContinuationBudgetAndOwnership(t *testing.T) {
 	require.Empty(t, s.Close("again"))
 }
 
-func doipContextFile(t *testing.T, n string) []byte {
+func doipContextFile(t *testing.T, prefix, name string) []byte {
 	t.Helper()
-	if root := os.Getenv("DOIP_CONTEXT_TEST_ROOT"); root != "" {
-		b, err := os.ReadFile(filepath.Join(root, n))
+	env := "DOIP_CONTEXT_TEST_ROOT"
+	if prefix == "doip-context-echo" {
+		env = "DOIP_ECHO_TEST_ROOT"
+	}
+	if root := os.Getenv(env); root != "" {
+		b, err := os.ReadFile(filepath.Join(root, name))
 		require.NoError(t, err)
 		return b
 	}
-	b, err := trafficfixture.ReadFile("doip-context/" + n)
+	b, err := trafficfixture.ReadFile(prefix + "/" + name)
 	require.NoError(t, err)
 	return b
 }
-func TestDoIPContextSealedMatrix(t *testing.T) {
+func TestDoIPContextSealedMatrix(t *testing.T) { runDoIPContextMatrix(t, "doip-context", 48) }
+func TestDoIPContextEchoHighBitSealedMatrix(t *testing.T) {
+	runDoIPContextMatrix(t, "doip-context-echo", 9)
+}
+func runDoIPContextMatrix(t *testing.T, prefix string, count int) {
 	var m struct {
 		Cases []struct {
 			ID, Capture, Answer, SHA256 string
@@ -170,10 +179,10 @@ func TestDoIPContextSealedMatrix(t *testing.T) {
 			Packets                     int
 		}
 	}
-	require.NoError(t, json.Unmarshal(doipContextFile(t, "manifest.json"), &m))
-	require.Len(t, m.Cases, 48)
+	require.NoError(t, json.Unmarshal(doipContextFile(t, prefix, "manifest.json"), &m))
+	require.Len(t, m.Cases, count)
 	var frozen map[string]trafficfixture.FrozenCase
-	if os.Getenv("DOIP_CONTEXT_TEST_ROOT") == "" {
+	if os.Getenv("DOIP_CONTEXT_TEST_ROOT") == "" && os.Getenv("DOIP_ECHO_TEST_ROOT") == "" {
 		frozen = map[string]trafficfixture.FrozenCase{}
 		all, err := trafficfixture.AllExpectations()
 		require.NoError(t, err)
@@ -186,10 +195,10 @@ func TestDoIPContextSealedMatrix(t *testing.T) {
 	for _, c := range m.Cases {
 		t.Run(c.ID, func(t *testing.T) {
 			if frozen != nil {
-				v, ok := frozen["doip-context/"+c.ID]
+				v, ok := frozen[prefix+"/"+c.ID]
 				require.True(t, ok)
 				require.Equal(t, c.SHA256, v.Input.SHA256)
-				require.Equal(t, "doip-context/"+c.Capture, v.Input.File)
+				require.Equal(t, prefix+"/"+c.Capture, v.Input.File)
 				require.Equal(t, c.Packets, v.Facts.PacketCount)
 				require.Len(t, v.Expectations, 1)
 				var bind struct {
@@ -200,7 +209,7 @@ func TestDoIPContextSealedMatrix(t *testing.T) {
 				require.Equal(t, c.Answer, bind.Answer)
 				require.Equal(t, c.AnswerSHA, bind.SHA)
 			}
-			cap, answer := doipContextFile(t, c.Capture), doipContextFile(t, c.Answer)
+			cap, answer := doipContextFile(t, prefix, c.Capture), doipContextFile(t, prefix, c.Answer)
 			require.Equal(t, c.SHA256, fmt.Sprintf("%x", sha256.Sum256(cap)))
 			require.Equal(t, c.AnswerSHA, fmt.Sprintf("%x", sha256.Sum256(answer)))
 			var a struct {
@@ -310,6 +319,38 @@ func TestDoIPContextSealedMatrix(t *testing.T) {
 					}
 				}
 			}
+		})
+	}
+}
+
+func TestDoIPContextRetiredEchoHighBitCannotPanic(t *testing.T) {
+	for _, echo := range []byte{0x80, 0x83, 0xff} {
+		t.Run(fmt.Sprintf("echo=%02x", echo), func(t *testing.T) {
+			s := doipPublicActive(t)
+			defer s.Close("test")
+			rq := func(v byte) []byte { return doipTestWire(0x8001, 0x0e, 0x80, 0x40, 0x10, 0x10, v) }
+			pos := func(v byte) []byte { return doipTestWire(0x8001, 0x40, 0x10, 0x0e, 0x80, 0x50, v, 0, 50, 1, 244) }
+			require.Nil(t, doipPublicFeed(t, s, 0, rq(2)).Err)
+			require.Nil(t, doipPublicFeed(t, s, 1, pos(2)).Err)
+			require.Nil(t, doipPublicFeed(t, s, 0, rq(2)).Err)
+			r := doipPublicFeed(t, s, 1, pos(2))
+			require.Equal(t, ErrContextRequired, r.Err.Kind)
+			require.Nil(t, doipPublicFeed(t, s, 0, rq(3)).Err)
+			require.NotPanics(t, func() {
+				r = s.Feed(1, time.Unix(1700001000, 0), doipTestWire(0x8002, 0x40, 0x10, 0x0e, 0x80, 0, 0x10, echo))
+				require.Zero(t, s.Stats().CallbackPanics, "wire validation must not enter panic recovery")
+				require.Len(t, r.Events, 1)
+				require.NotNil(t, r.Err)
+				want := ErrUnsupportedFeature
+				if echo == 0x80 {
+					want = ErrMalformedMessage
+				}
+				require.Equal(t, want, r.Err.Kind)
+				require.Zero(t, r.Events[0].ResponseTo)
+				require.Nil(t, r.Events[0].Session)
+			}, "untrusted echoed subfunction cannot index outside the 128-bit history")
+			s.Close("test")
+			require.Zero(t, s.Stats().BufferedBytes)
 		})
 	}
 }
