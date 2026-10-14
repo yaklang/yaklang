@@ -82,14 +82,16 @@ func TestAutoSkillLoader_Integration_WithContextManager(t *testing.T) {
 	open := RenderTimelineFrozenOpen(cfg.GetTimeline()).Open
 	require.Contains(t, open, "deploy-app")
 	require.Contains(t, open, "vuln-scan")
-	require.Contains(t, open, "VIEW_WINDOW")
+	require.Contains(t, open, "[skill deploy-app | SKILL.md:")
+	require.Contains(t, open, " END]")
 
 	cfg.GetTimeline().FreezeAll()
 	rendered := mgr.Render("autoload_nonce")
 	require.Contains(t, rendered, "deploy-app")
 	require.Contains(t, rendered, "vuln-scan")
 	require.Contains(t, rendered, "=== Skill: deploy-app ===")
-	require.Contains(t, rendered, "VIEW_WINDOW")
+	require.Contains(t, rendered, "[SKILL.md:")
+	require.Contains(t, rendered, " END]")
 }
 
 func TestAutoSkillLoader_Integration_PromptCompleteness(t *testing.T) {
@@ -114,8 +116,8 @@ func TestAutoSkillLoader_Integration_PromptCompleteness(t *testing.T) {
 		{"SKILLS_CONTEXT_END_", "context end tag"},
 		{"=== Skill: vuln-scan ===", "skill header"},
 		{"Description:", "skill description"},
-		{"<|VIEW_WINDOW_", "view window start tag"},
-		{"<|VIEW_WINDOW_END_", "view window end tag"},
+		{"[SKILL.md:", "skill file range"},
+		{" END]", "completed file range"},
 	}
 
 	for _, req := range requiredElements {

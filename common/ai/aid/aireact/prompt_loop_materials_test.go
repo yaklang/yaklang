@@ -29,8 +29,7 @@ func mustLoopPromptSections(t *testing.T, raw any) []*reactloops.PromptSectionOb
 
 func freezePromptTestSkill(t *testing.T, react *ReAct, body string) {
 	t.Helper()
-	require.True(t, react.config.GetTimeline().PushSkillContent(
-		react.config.AcquireId(), "prompt-test-skill", "SKILL.md", body, aicommon.SkillContentSourceManual))
+	require.True(t, react.config.GetTimeline().PushSkillFileContent(react.config.AcquireId(), "prompt-test-skill", "SKILL.md", body, aicommon.SkillContentSourceManual, 1, 1, 1))
 	react.config.GetTimeline().FreezeAll()
 }
 

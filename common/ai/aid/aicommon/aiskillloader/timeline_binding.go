@@ -1,6 +1,9 @@
 package aiskillloader
 
-import "sync"
+import (
+	"strings"
+	"sync"
+)
 
 // SkillContentSource* 区分技能正文的来源, 仅用于压缩提示与观测; 它不是渲染分组,
 // 也不再对应独立的展示块或独立的压缩保护。
@@ -8,30 +11,43 @@ const (
 	SkillContentSourceAuto   = "auto"
 	SkillContentSourceForced = "forced"
 	SkillContentSourceManual = "manual"
-	// SkillMainBodyPath 是“技能说明 + 文件树”这一非文件主体的 Key 后缀;
-	// 具体文件/阅读窗口使用真实路径, 因此两者不会互相覆盖。
-	SkillMainBodyPath = "\x00main"
+
+	SkillContentKindMetadata = "metadata"
+	SkillContentKindContent  = "content"
 )
+
+// SkillContextPart 是 Timeline 中仍可见的一个技能部分。
+type SkillContextPart struct {
+	Name       string
+	Kind       string
+	Path       string
+	StartLine  int
+	EndLine    int
+	Total      int
+	ReachedEnd bool
+}
 
 // SkillContentSink 是 aiskillloader 侧对“运行时上下文 Timeline”的最小依赖。
 // 具体实现由 aicommon 提供, 避免 aiskillloader 反向 import aicommon 造成循环依赖。
 //
 // 语义:
-//   - AppendSkillContent 追加一段可供模型阅读的正文, 已存在相同正文时返回 false,
-//     不触发冻结/提升, 不替换同一路径的其它阅读内容。
+//   - AppendSkillMetadata 追加技能的说明、关联技能和文件树。
+//   - AppendSkillFileContent 追加一个文件的一段行范围, 不替换其它范围。
+//   - AppendSkillCatalog 追加意图识别选出的技能目录。
 //   - DeleteSkillContent 退休该技能当前可见的正文, 不触碰冻结边界。
-//   - HasVisibleSkillContent 判断当前上下文中是否仍有该技能正文。
-//   - VisibleSkillContentNames 枚举目标 Timeline 中仍可见的技能。
+//   - VisibleSkillParts 枚举目标 Timeline 中仍可见的元信息和文件范围,
+//     技能是否仍然可见由它派生, 不单独维护查询入口。
 //   - HasSkillContentHistory 判断是否存在加载历史, 包括已经退休的正文。
 //   - RenderSkillContentForPrompt 返回已冻结且被保留的单一技能块 (只读)。
 //
 // 关键词: SkillContentSink, 窄接口, 避免包循环依赖, 只加载与查看
 type SkillContentSink interface {
-	AppendSkillContent(name, path, content, source string) bool
+	AppendSkillMetadata(name, content, source string) bool
+	AppendSkillFileContent(name, path, content, source string, startLine, endLine, total int) bool
+	AppendSkillCatalog(rendered string) bool
 	DeleteSkillContent(name string) bool
 	DeleteSkillCatalog() bool
-	HasVisibleSkillContent(name string) bool
-	VisibleSkillContentNames() []string
+	VisibleSkillParts(name string) []SkillContextPart
 	HasSkillContentHistory(name string) bool
 	RenderSkillContentForPrompt() string
 }
@@ -67,38 +83,50 @@ func (m *SkillsContextManager) timelineSink() SkillContentSink {
 	return m.timeline.sink
 }
 
-// appendSkillContentToTimeline 把一次成功读取的正文写入 Timeline。返回是否写入
-// 成功; 未绑定 Timeline 时返回 false。
-func (m *SkillsContextManager) appendSkillContentToTimeline(name, path, content, source string) bool {
+func (m *SkillsContextManager) appendSkillMetadataToTimeline(name, content, source string) bool {
 	sink := m.timelineSink()
 	if sink == nil {
 		return false
 	}
-	return sink.AppendSkillContent(name, path, content, source)
+	return sink.AppendSkillMetadata(name, content, source)
+}
+
+func (m *SkillsContextManager) appendSkillFileContentToTimeline(name, path, content, source string, startLine, endLine, total int) bool {
+	sink := m.timelineSink()
+	if sink == nil {
+		return false
+	}
+	return sink.AppendSkillFileContent(name, path, content, source, startLine, endLine, total)
+}
+
+func (m *SkillsContextManager) appendViewSegmentToTimeline(name, path, source string, vw *ViewWindow) bool {
+	if vw == nil {
+		return false
+	}
+	content, start, end, total, _ := vw.Segment()
+	if strings.TrimSpace(content) == "" {
+		return false
+	}
+	return m.appendSkillFileContentToTimeline(name, path, content, source, start, end, total)
 }
 
 // skillContentVisibleInTimeline 表示该技能正文当前仍可被模型读到 (Open 或已提升)。
+// 可见性直接从仍未被退休的 metadata/content 派生, 不额外维护状态。
 func (m *SkillsContextManager) skillContentVisibleInTimeline(name string) bool {
 	sink := m.timelineSink()
 	if sink == nil {
 		return false
 	}
-	return sink.HasVisibleSkillContent(name)
+	return len(sink.VisibleSkillParts(name)) > 0
 }
 
-// AppendSkillCatalogToTimeline 把意图识别命中的「最相关 SKILL 目录」交给 Timeline。
+// appendSkillCatalogToTimeline 把意图识别命中的「最相关 SKILL 目录」交给 Timeline。
 // 目录是派生信息, 同样遵守“先 Open、冻结后才进前缀”的边界, 不能用实时目录提前改变
 // 可缓存前缀。
-func (m *SkillsContextManager) AppendSkillCatalogToTimeline(rendered string) bool {
+func (m *SkillsContextManager) appendSkillCatalogToTimeline(rendered string) bool {
 	sink := m.timelineSink()
 	if sink == nil {
 		return false
 	}
-	catalog, ok := sink.(interface {
-		AppendSkillCatalog(rendered string) bool
-	})
-	if !ok {
-		return false
-	}
-	return catalog.AppendSkillCatalog(rendered)
+	return sink.AppendSkillCatalog(rendered)
 }

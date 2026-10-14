@@ -26,15 +26,15 @@ func TestPromotedSkillContentConcatenatesSameNameAndSkipsSameHash(t *testing.T) 
 		id := int64(i + 1)
 		importFreezeItem(tl, id, timestamp.Add(time.Duration(i)*time.Millisecond), &PromotableTimelineItem{
 			ID: id, Kind: TimelinePromotedKindSkillContent, TargetSection: TimelinePromotedTargetSemiDynamic1,
-			Key: skillContentKey("demo-skill", "SKILL.md"), Operation: TimelinePromotedOperationUpsert,
+			Key: skillPartIdentity(skillContentPayload{Name: "demo-skill", Path: "SKILL.md"}), Operation: TimelinePromotedOperationUpsert,
 			Payload: string(payload), PayloadHash: lastHash,
 		})
 	}
 	tl.FreezeAll()
 	entries := tl.promotedState.Entries[TimelinePromotedTargetSemiDynamic1][TimelinePromotedKindSkillContent]
 	require.Len(t, entries, 1)
-	require.Contains(t, entries, "demo-skill", "one entry per skill name, not one key per hash")
-	entry := entries["demo-skill"]
+	entry := entries[skillPartIdentity(skillContentPayload{Name: "demo-skill", Path: "SKILL.md"})]
+	require.NotNil(t, entry, "same path without a range stays one promoted part")
 	require.Equal(t, lastHash, entry.PayloadHash, "compare the next payload against the last appended hash")
 	require.Equal(t, int64(1), entry.SourceItemID)
 	require.Equal(t, 1, strings.Count(entry.Payload, "FIRST_PAGE"))
@@ -45,17 +45,21 @@ func TestPromotedSkillContentConcatenatesSameNameAndSkipsSameHash(t *testing.T) 
 	before := RenderTimelineFrozenOpen(tl)
 	require.Contains(t, before.SkillsContext, "FIRST_PAGE")
 	require.Contains(t, before.SkillsContext, "SECOND_PAGE")
-	require.True(t, tl.PushSkillContent(4, "demo-skill", "references/api.md", "RESOURCE_PAGE", SkillContentSourceForced))
+	require.True(t, tl.PushSkillFileContent(4, "demo-skill", "references/api.md", "RESOURCE_PAGE", SkillContentSourceForced, 1, 1, 1))
 	effective := tl.effectivePromotedEntries(TimelinePromotedTargetSemiDynamic1, TimelinePromotedKindSkillContent)
-	require.Len(t, effective, 1)
-	require.Contains(t, effective[0].Payload, "RESOURCE_PAGE")
+	require.Len(t, effective, 2, "a different path is a separate promoted part")
+	joined := effective[0].Payload + "\n" + effective[1].Payload
+	require.Contains(t, joined, "RESOURCE_PAGE")
+	require.Contains(t, joined, "FIRST_PAGE")
 	require.Equal(t, before.SkillsContext, RenderTimelineFrozenOpen(tl).SkillsContext,
 		"reading Open content must not mutate the promoted snapshot")
 	tl.FreezeAll()
 	entries = tl.promotedState.Entries[TimelinePromotedTargetSemiDynamic1][TimelinePromotedKindSkillContent]
-	require.Len(t, entries, 1, "different files of the same skill join the same accumulated body")
-	require.Contains(t, entries["demo-skill"].Payload, "RESOURCE_PAGE")
-	require.Contains(t, entries["demo-skill"].Payload, "[source: user-forced]")
+	require.Len(t, entries, 2, "different paths stay separate after promotion")
+	rendered := tl.RenderSkillContentForPrompt()
+	require.Equal(t, 1, strings.Count(rendered, "=== Skill: demo-skill ==="))
+	require.Contains(t, rendered, "RESOURCE_PAGE")
+	require.NotContains(t, rendered, "[source: user-forced]", "source is shown on metadata, not repeated on content ranges")
 
 	raw, err := MarshalTimeline(tl)
 	require.NoError(t, err)
@@ -79,8 +83,7 @@ func TestSkillContentFlowsThroughSharedPromptMaterials(t *testing.T) {
 			cfg := NewConfig(context.Background(), WithDisableAutoSkills(true))
 			tl := cfg.GetTimeline()
 			tl.SetTimelineBucketByteSize(-1)
-			require.True(t, tl.PushSkillContent(cfg.AcquireId(), "demo-skill", "SKILL.md",
-				"SHARED_SKILL_BODY", SkillContentSourceManual))
+			require.True(t, tl.PushSkillFileContent(cfg.AcquireId(), "demo-skill", "SKILL.md", "SHARED_SKILL_BODY", SkillContentSourceManual, 1, 1, 1))
 			for _, frozen := range []bool{false, true} {
 				if frozen {
 					tl.FreezeAll()
@@ -109,7 +112,7 @@ func TestSkillContentFlowsThroughSharedPromptMaterials(t *testing.T) {
 func TestSkillPromptSnapshotStaysCompleteDuringFreeze(t *testing.T) {
 	tl := NewTimeline(nil, nil)
 	tl.SetTimelineBucketByteSize(-1)
-	require.True(t, tl.PushSkillContent(1, "demo-skill", "SKILL.md", "ATOMIC_SKILL_BODY", SkillContentSourceManual))
+	require.True(t, tl.PushSkillFileContent(1, "demo-skill", "SKILL.md", "ATOMIC_SKILL_BODY", SkillContentSourceManual, 1, 1, 1))
 	var wg sync.WaitGroup
 	errors := make(chan int, 4)
 	ready := make(chan struct{}, 4)

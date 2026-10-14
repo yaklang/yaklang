@@ -67,7 +67,7 @@ Evidence 相关入口：
 
 新增/修改：
 
-- `aicommon/timeline_skill_content.go`：`PushSkillContent`、`HasVisibleSkillContent`、
+- `aicommon/timeline_skill_content.go`：`PushSkillMetadata`、`PushSkillFileContent`、`VisibleSkillParts`、
   `renderPromotedSkillContent` 与 `SkillContentTimelineAdapter`（实现 aiskillloader 侧
   的 `SkillContentSink`；早期草稿里重复定义的 `SkillContentTimelineView` 已删除）。
 - `aicommon/timeline_promoted.go`：新增 `TimelinePromotedKindSkillContent`。
@@ -106,9 +106,9 @@ go test ./common/ai/aid/aireact/reactloops/reactloopstests/ -run 'Skill|Resource
 
 结果：全部通过。加载技能不改变 Frozen 段字节，只有 Open 变化。
 
-## T4：skill-content 保持精确状态（已完成）
+## T4：skill 保持精确状态（已完成）
 
-- `timeline_compression_snapshot.go`：skill-content 与其他 promoted item 一样
+- `timeline_compression_snapshot.go`：skill 与其他 promoted item 一样
   只进入 `ExactItemIDs`，不进入压缩候选、摘要或 `ratain_timeline_item_range`。
 - `timeline_compression_transaction.go`：保持「先退休未选中、后重建 promoted」
   的提交顺序，确保普通历史按统一选择结果退休。
@@ -137,7 +137,7 @@ go test ./common/ai/aid/aicommon/ -run 'TestSkillContentStaysExactDuringCompress
 - 加载写入时检查「技能名 + 路径 + 正文」是否完全重复，仅仍存在的相同正文不追加；
   不同阅读窗口作为独立 item 进入 Open / 候选 / 统计，由统一选择和总结决定去留。
 - 冻结技能进入 `promotedState`，按技能名累计正文；新来源 hash 与上一次相同则忽略，
-  不同则拼接老正文与新正文。当前阶段 skill-content 与其他 promoted item 一样
+  不同则拼接老正文与新正文。当前阶段 skill 与其他 promoted item 一样
   属于精确状态，不进入压缩候选。
 - `RenderTimelineFrozenOpenWithOptions` 在同一读锁内产出 Open 和已提升技能块，
   经共享材料链路传入 SemiDynamic1；主循环与 helper 不再经过 manager 渲染旁路。
@@ -158,7 +158,7 @@ go test ./common/ai/aid/aicommon/ -run 'TestSkillContentStaysExactDuringCompress
   已删除 `LoopPromptAssemblyInput.SkillsContext` 及对应旁路赋值，避免覆盖统一冻结快照。
   manager 的 `RenderStable` 仅作为查看兼容入口。
 - [x] 恢复边界修正：显式初始化和旧会话导入只迁移 Timeline 中没有任何
-  skill-content 记录的技能；已有历史（含已被总结退休）的正文不会被旧名单
+  skill 记录的技能；已有历史（含已被总结退休）的正文不会被旧名单
   重新展开。`HasSkillContentHistory` + 两个专项测试。
 - [x] 可见性短路修正：`IsSkillLoadedAndUnfolded` 与 `IsAutoSkillLoadedAndUnfolded`
   统一以 Timeline 可见性为准；`TestSkillReloadAfterSummarized`、
@@ -198,7 +198,7 @@ go test ./common/ai/aid/aicommon/... ./common/ai/aid/aireact/... -count=1
 | 指导文档第 10 节要求 | 证据 |
 | --- | --- |
 | 新增类型字段最小，无通用状态模型 | 复用 `PromotableTimelineItem`；载荷只含 name/path/content/source |
-| Skill 正文进入实际 Timeline，资源/分页无旁路 | `PushSkillContent` 接入 5 条路径；`TestSkillContentStaysInOpenUntilFrozen` |
+| Skill 正文进入实际 Timeline，资源/分页无旁路 | `PushSkillMetadata` / `PushSkillFileContent` 接入 5 条路径；`TestSkillContentStaysInOpenUntilFrozen` |
 | 主循环/helper 不再从私有容器重建全文 | 4 处 `Render*` 调用全部转发 Timeline 投影 |
 | 正文与目录先 Open，冻结保留后才进类型块 | `TestSkillContentLoadingKeepsCachedPrefixStable`、`TestForcedSkillContentWaitsForFreezeBoundary` |
 | 前缀字节/hash 一致性测试 | 同上，直接断言 `before.Frozen == after.Frozen` |
@@ -231,7 +231,7 @@ go test ./common/ai/aid/aicommon/... ./common/ai/aid/aireact/... -count=1
 
 ### 现在的设计
 
-1. 不论哪种加载方式，正文都只是 Timeline 里一条 skill-content item；manager 不再托管正文，
+1. 不论哪种加载方式，正文都只是 Timeline 里一条 skill item；manager 不再托管正文，
    只保留“知道有哪些 skill 可加载 + 把 skill 写进 Timeline + 查看/翻页/移除已加载正文”三项职责。
 2. 冻结后只由 Timeline 的一个投影函数渲染**单一技能块**（SemiDynamic1，与 `prompted_recent_tools` 同段）。
    渲染不再依赖 manager，也不再按来源分块。

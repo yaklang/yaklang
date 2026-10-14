@@ -18,12 +18,12 @@ func TestSkillContentStaysInOpenUntilFrozen(t *testing.T) {
 	tl.PushText(cfg.AcquireId(), "ordinary observation")
 	before := RenderTimelineFrozenOpen(tl)
 
-	require.True(t, tl.PushSkillContent(cfg.AcquireId(), "demo-skill", "", "SKILL_BODY_SECRET", SkillContentSourceAuto))
+	require.True(t, tl.PushSkillFileContent(cfg.AcquireId(), "demo-skill", "SKILL.md", "SKILL_BODY_SECRET", SkillContentSourceAuto, 1, 1, 1))
 	after := RenderTimelineFrozenOpen(tl)
 
 	require.Contains(t, after.Open, "SKILL_BODY_SECRET")
 	require.Equal(t, before.Frozen, after.Frozen)
-	require.True(t, tl.HasVisibleSkillContent("demo-skill"))
+	require.True(t, skillVisible(tl, "demo-skill"))
 }
 
 // A second read must not be blocked by a stale loader cache once the previous
@@ -33,8 +33,8 @@ func TestSkillContentNotDedupedBySkillName(t *testing.T) {
 	tl := cfg.GetTimeline()
 	tl.SetTimelineBucketByteSize(-1)
 
-	require.True(t, tl.PushSkillContent(cfg.AcquireId(), "demo-skill", "SKILL.md", "MAIN_BODY", SkillContentSourceAuto))
-	require.True(t, tl.PushSkillContent(cfg.AcquireId(), "demo-skill", "references/api.md", "RESOURCE_BODY", SkillContentSourceAuto))
+	require.True(t, tl.PushSkillFileContent(cfg.AcquireId(), "demo-skill", "SKILL.md", "MAIN_BODY", SkillContentSourceAuto, 1, 1, 1))
+	require.True(t, tl.PushSkillFileContent(cfg.AcquireId(), "demo-skill", "references/api.md", "RESOURCE_BODY", SkillContentSourceAuto, 1, 1, 1))
 
 	open := RenderTimelineFrozenOpen(tl).Open
 	require.Contains(t, open, "MAIN_BODY")
@@ -49,7 +49,7 @@ func TestSkillContentStaysExactDuringCompression(t *testing.T) {
 	tl.SetTimelineBucketByteSize(-1)
 
 	tl.PushText(cfg.AcquireId(), strings.Repeat("ordinary observation ", 40))
-	require.True(t, tl.PushSkillContent(cfg.AcquireId(), "demo-skill", "", "CANDIDATE_BODY_SECRET", SkillContentSourceAuto))
+	require.True(t, tl.PushSkillFileContent(cfg.AcquireId(), "demo-skill", "SKILL.md", "CANDIDATE_BODY_SECRET", SkillContentSourceAuto, 1, 1, 1))
 
 	snapshot, err := tl.captureCompressionSnapshot()
 	require.NoError(t, err)
@@ -87,7 +87,7 @@ func TestSkillContentSurvivesCompression(t *testing.T) {
 	tl := cfg.GetTimeline()
 	tl.SetTimelineBucketByteSize(-1)
 	tl.PushText(cfg.AcquireId(), strings.Repeat("old ordinary observation ", 60))
-	require.True(t, tl.PushSkillContent(cfg.AcquireId(), "demo-skill", "", "SKILL_SUMMARIZED_SECRET", SkillContentSourceAuto))
+	require.True(t, tl.PushSkillFileContent(cfg.AcquireId(), "demo-skill", "SKILL.md", "SKILL_SUMMARIZED_SECRET", SkillContentSourceAuto, 1, 1, 1))
 
 	_, err := tl.CompressOnce(compressionTestOptions())
 	require.NoError(t, err)
@@ -95,7 +95,7 @@ func TestSkillContentSurvivesCompression(t *testing.T) {
 	materials := RenderTimelineFrozenOpen(tl)
 	require.Contains(t, materials.SkillsContext, "SKILL_SUMMARIZED_SECRET")
 	require.NotContains(t, materials.Open, "SKILL_SUMMARIZED_SECRET")
-	require.True(t, tl.HasVisibleSkillContent("demo-skill"))
+	require.True(t, skillVisible(tl, "demo-skill"))
 	require.Contains(t, tl.compressedHead.Text, "summarized")
 }
 
@@ -113,16 +113,15 @@ func TestExactSkillBodyKeepsTimelineHistory(t *testing.T) {
 	tl := cfg.GetTimeline()
 	tl.SetTimelineBucketByteSize(-1)
 	tl.PushText(cfg.AcquireId(), strings.Repeat("ordinary observation ", 60))
-	require.True(t, tl.PushSkillContent(cfg.AcquireId(), "demo-skill", skillMainBodyPathSentinel,
-		"RETIRED_BODY_SECRET", SkillContentSourceManual))
+	require.True(t, tl.PushSkillMetadata(cfg.AcquireId(), "demo-skill", "RETIRED_BODY_SECRET", SkillContentSourceManual))
 
 	_, err := tl.CompressOnce(compressionTestOptions())
 	require.NoError(t, err)
-	require.True(t, tl.HasVisibleSkillContent("demo-skill"))
+	require.True(t, skillVisible(tl, "demo-skill"))
 	require.True(t, tl.HasSkillContentHistory("demo-skill"))
 }
 
-// A Timeline with no skill-content record at all is a genuine old-session case.
+// A Timeline with no skill record at all is a genuine old-session case.
 func TestUnknownSkillHasNoContentHistory(t *testing.T) {
 	cfg := NewConfig(context.Background(), WithDisableAutoSkills(true))
 	tl := cfg.GetTimeline()
@@ -144,13 +143,13 @@ func TestSkillContentPromotedAfterFreeze(t *testing.T) {
 	tl := cfg.GetTimeline()
 	tl.SetTimelineBucketByteSize(-1)
 	tl.PushText(cfg.AcquireId(), strings.Repeat("old ordinary observation ", 60))
-	require.True(t, tl.PushSkillContent(cfg.AcquireId(), "demo-skill", "", "SKILL_KEPT_SECRET", SkillContentSourceAuto))
+	require.True(t, tl.PushSkillFileContent(cfg.AcquireId(), "demo-skill", "SKILL.md", "SKILL_KEPT_SECRET", SkillContentSourceAuto, 1, 1, 1))
 
 	_, err := tl.CompressOnce(compressionTestOptions())
 	require.NoError(t, err)
 
 	require.Contains(t, tl.RenderSkillContentForPrompt(), "SKILL_KEPT_SECRET")
-	require.True(t, tl.HasVisibleSkillContent("demo-skill"))
+	require.True(t, skillVisible(tl, "demo-skill"))
 	require.NotContains(t, RenderTimelineFrozenOpen(tl).Open, "SKILL_KEPT_SECRET")
 }
 
@@ -170,8 +169,7 @@ func TestSkillContentPendingDeltaTriggersFreezeOnly(t *testing.T) {
 	tl := cfg.GetTimeline()
 	tl.SetTimelineBucketByteSize(-1)
 	skillID := cfg.AcquireId()
-	require.True(t, tl.PushSkillContent(skillID, "demo-skill", "",
-		"ONLY_SKILL_HISTORY_SECRET "+strings.Repeat("skill step detail ", 200), SkillContentSourceAuto))
+	require.True(t, tl.PushSkillFileContent(skillID, "demo-skill", "SKILL.md", "ONLY_SKILL_HISTORY_SECRET "+strings.Repeat("skill step detail ", 200), SkillContentSourceAuto, 1, 1, 1))
 
 	tl.SetTimelineContentLimit(1)
 	_, err := tl.CompressBeforePrompt(compressionTestOptions())
@@ -188,8 +186,7 @@ func TestSkillContentAbsentFromCompressionRequest(t *testing.T) {
 	tl := cfg.GetTimeline()
 	tl.SetTimelineBucketByteSize(-1)
 	tl.PushText(cfg.AcquireId(), "ORDINARY_HISTORY_SECRET "+strings.Repeat("ordinary detail ", 40))
-	require.True(t, tl.PushSkillContent(cfg.AcquireId(), "demo-skill", "references/api.md",
-		"REQUEST_VISIBLE_SECRET", SkillContentSourceAuto))
+	require.True(t, tl.PushSkillFileContent(cfg.AcquireId(), "demo-skill", "references/api.md", "REQUEST_VISIBLE_SECRET", SkillContentSourceAuto, 1, 1, 1))
 
 	snapshot, err := tl.captureCompressionSnapshot()
 	require.NoError(t, err)
@@ -212,8 +209,7 @@ func TestForcedSkillContentStaysExact(t *testing.T) {
 	tl := cfg.GetTimeline()
 	tl.SetTimelineBucketByteSize(-1)
 	tl.PushText(cfg.AcquireId(), strings.Repeat("old ordinary observation ", 60))
-	require.True(t, tl.PushSkillContent(cfg.AcquireId(), "forced-skill", skillMainBodyPathSentinel,
-		"FORCED_CANDIDATE_SECRET", SkillContentSourceForced))
+	require.True(t, tl.PushSkillMetadata(cfg.AcquireId(), "forced-skill", "FORCED_CANDIDATE_SECRET", SkillContentSourceForced))
 
 	// The forced body must stay exact and absent from the AI request.
 	snapshot, err := tl.captureCompressionSnapshot()
@@ -228,7 +224,7 @@ func TestForcedSkillContentStaysExact(t *testing.T) {
 
 	_, err = tl.CompressOnce(compressionTestOptions())
 	require.NoError(t, err)
-	require.True(t, tl.HasVisibleSkillContent("forced-skill"))
+	require.True(t, skillVisible(tl, "forced-skill"))
 	require.Contains(t, tl.RenderSkillContentForPrompt(), "FORCED_CANDIDATE_SECRET")
 }
 
@@ -249,8 +245,7 @@ func TestPromotedSkillContentStaysExactAcrossCompression(t *testing.T) {
 	tl := cfg.GetTimeline()
 	tl.SetTimelineBucketByteSize(-1)
 	tl.PushText(cfg.AcquireId(), strings.Repeat("ordinary history detail ", 400))
-	require.True(t, tl.PushSkillContent(cfg.AcquireId(), "demo-skill", "",
-		"PROMOTED_SKILL_SECRET "+strings.Repeat("promoted skill detail ", 400), SkillContentSourceAuto))
+	require.True(t, tl.PushSkillFileContent(cfg.AcquireId(), "demo-skill", "SKILL.md", "PROMOTED_SKILL_SECRET "+strings.Repeat("promoted skill detail ", 400), SkillContentSourceAuto, 1, 1, 1))
 
 	// Freeze so the body is promoted into the cached Skill block (Semi/typed view).
 	tl.FreezeAll()
@@ -270,7 +265,7 @@ func TestDeleteSkillContentRetiresWithoutRewritingFreeze(t *testing.T) {
 	tl := cfg.GetTimeline()
 	tl.SetTimelineBucketByteSize(-1)
 	tl.PushText(cfg.AcquireId(), "ordinary observation")
-	require.True(t, tl.PushSkillContent(cfg.AcquireId(), "demo-skill", "", "DELETE_ME_SECRET", SkillContentSourceManual))
+	require.True(t, tl.PushSkillFileContent(cfg.AcquireId(), "demo-skill", "SKILL.md", "DELETE_ME_SECRET", SkillContentSourceManual, 1, 1, 1))
 
 	tl.FreezeAll()
 	require.Contains(t, tl.RenderSkillContentForPrompt(), "DELETE_ME_SECRET")
@@ -279,7 +274,7 @@ func TestDeleteSkillContentRetiresWithoutRewritingFreeze(t *testing.T) {
 
 	require.True(t, tl.DeleteSkillContent("demo-skill"))
 	require.NotContains(t, tl.RenderSkillContentForPrompt(), "DELETE_ME_SECRET")
-	require.False(t, tl.HasVisibleSkillContent("demo-skill"))
+	require.False(t, skillVisible(tl, "demo-skill"))
 	require.Equal(t, frozenThroughBefore, tl.frozenThroughLocked(), "删除不得改写冻结水位")
 	require.Equal(t, freezeVersionBefore, tl.freezeState.Version, "删除不得重排既有冻结批次")
 
@@ -287,7 +282,7 @@ func TestDeleteSkillContentRetiresWithoutRewritingFreeze(t *testing.T) {
 	require.False(t, tl.DeleteSkillContent("never-loaded"))
 
 	// 重新读取会追加一份新正文, 冻结提交后再次可见。
-	require.True(t, tl.PushSkillContent(cfg.AcquireId(), "demo-skill", "", "RELOADED_SECRET", SkillContentSourceManual))
+	require.True(t, tl.PushSkillFileContent(cfg.AcquireId(), "demo-skill", "SKILL.md", "RELOADED_SECRET", SkillContentSourceManual, 1, 1, 1))
 	tl.FreezeAll()
 	require.Contains(t, tl.RenderSkillContentForPrompt(), "RELOADED_SECRET")
 	require.NotContains(t, tl.RenderSkillContentForPrompt(), "DELETE_ME_SECRET")

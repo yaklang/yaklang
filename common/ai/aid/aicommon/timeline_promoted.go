@@ -16,7 +16,7 @@ const (
 	// that must follow the same Open -> freeze -> promote path as evidence.
 	//
 	// 关键词: skill content, 半动态正文统一, 先 Open 后冻结提升
-	TimelinePromotedKindSkillContent = "skill-content"
+	TimelinePromotedKindSkillContent = "skill"
 	TimelinePromotedOperationUpsert  = "upsert"
 	TimelinePromotedOperationDelete  = "delete"
 	TimelinePromotedOperationReuse   = "reuse"

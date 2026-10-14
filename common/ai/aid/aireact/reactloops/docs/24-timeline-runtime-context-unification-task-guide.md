@@ -13,9 +13,9 @@ Manager 保留业务加载和查询能力，但不再作为独立正文来源参
 1. 复用现有 Timeline 容器、ID、时间、持久化、快照和压缩事务，不重新设计一套容器。
 2. 新增的内容 item 以“追加、读取”为核心，不提前设计通用更新、删除、版本和对象状态机。
 3. 不新增 Skill 压缩器、Evidence 压缩器、按类型独立的摘要 head，也不更换压缩算法。
-4. 当前阶段 skill-content 与其它 promoted item 一样属于**精确状态**：不进入压缩候选、不写入 summary、不会被压缩退休；正文是否展示只由 Open/冻结提升和显式 unload 决定，manager 不能另行注入。
+4. 当前阶段 skill 与其它 promoted item 一样属于**精确状态**：不进入压缩候选、不写入 summary、不会被压缩退休；正文是否展示只由 Open/冻结提升和显式 unload 决定，manager 不能另行注入。
 5. 写入 Timeline 不等于立即进入 Semi/Frozen。已提交的冻结边界决定何时允许转移，不能因加载技能提前改写可缓存前缀。
-6. **加载来源不再是一个渲染分类。** 用户指定、AI 自动、普通加载和持久恢复都是同一种 skill-content item，只在 payload 里带一个来源标记；冻结后统一进入 SemiDynamic1 的**单一技能块**（与 `prompted_recent_tools` 同段）。原先按来源拆分的三个容器、三个渲染入口和按来源过滤的投影都是过度设计，已删除。
+6. **加载来源不再是一个渲染分类。** 用户指定、AI 自动、普通加载和持久恢复都是同一种 skill item，只在 payload 里带一个来源标记；冻结后统一进入 SemiDynamic1 的**单一技能块**（与 `prompted_recent_tools` 同段）。原先按来源拆分的三个容器、三个渲染入口和按来源过滤的投影都是过度设计，已删除。
 
 这里统一的是“运行时上下文内容”，不是所有运行对象。工具实现、文件系统、数据库连接、回调、取消句柄和 coordinator 的执行控制逻辑仍由原组件负责。
 
@@ -140,7 +140,7 @@ Manager 不再负责：
 
 用一个窄的“追加、查找、枚举”接口注入能力，或把最小接口/数据类型放到无反向依赖的子包。无需为此拆分完整 Timeline 包，也不需要通用插件注册框架。
 
-绑定必须覆盖 `WithSkillLoader`、`WithSkillsContextManager`、config 自动构建和持久恢复。`BindTimelineSink` 只接入目标 Timeline，不加载、补写或修改内容；manager 的可见性、已加载名单与渲染读取目标 Timeline，不用本地缓存覆盖它。默认自动加载在新会话绑定后的初始化入口显式调用 `LoadDefaultSkills`，持久恢复不重放默认加载。已有 skill-content 历史（包括已退休正文）的技能不得重新展开。未绑定时的本地查看状态不能进入 prompt，也不能在绑定时自动导入；只有显式加载操作可以写入目标 Timeline。
+绑定必须覆盖 `WithSkillLoader`、`WithSkillsContextManager`、config 自动构建和持久恢复。`BindTimelineSink` 只接入目标 Timeline，不加载、补写或修改内容；manager 的可见性、已加载名单与渲染读取目标 Timeline，不用本地缓存覆盖它。默认自动加载在新会话绑定后的初始化入口显式调用 `LoadDefaultSkills`，持久恢复不重放默认加载。已有 skill 历史（包括已退休正文）的技能不得重新展开。未绑定时的本地查看状态不能进入 prompt，也不能在绑定时自动导入；只有显式加载操作可以写入目标 Timeline。
 
 ## 5. 按类型渲染，不按类型维护第二套内容
 
@@ -374,7 +374,7 @@ fork/clean 按已有配置继承规则工作；子 Agent 的私有内容不能�
 | 冻结前前缀一致 | 固定其他指令/Schema，加载 Skill 或读取新页后，HighStatic/Frozen/Semi1/Semi2 的字节与 hash 不变，只有 Open 变化 |
 | 派生信息不绕过边界 | 加载数量、目录、文件树、折叠状态和排序不能因 Open 新内容提前改变前缀 |
 | 冻结后的提升 | 成功提交后，保留 item 从 Open 转入对应独立块；正文恰好展示一次，不重复、不丢失 |
-| 技能正文保持精确 | 压缩候选与请求不含 skill-content；冻结提交后正文仍在独立块 |
+| 技能正文保持精确 | 压缩候选与请求不含 skill；冻结提交后正文仍在独立块 |
 | 仅有冻结之前的查询 | manager 能读到 Open 原文，“已可见”判断不会因尚未 promote 而重复加载 |
 | 重复构建 prompt | 不重新加载、不增加 item、不改变冻结版本、正文不重复 |
 | 同技能多个资源/页 | 新读取内容不被按技能名错误去重 |
@@ -426,7 +426,7 @@ go test ./common/ai/aid/aireact -run 'Prompt|Skill|Evidence|Timeline' -count=1
 - [x] 主循环和相关 helper 不再从 manager 私有容器重建全文。
 - [x] 新正文及其派生目录信息先留在 Open；只有已提交冻结且保留原文的 item 才进入前面的独立类型块。
 - [x] 未冻结的技能加载/资源读取不改写可缓存前缀；冻结转移只发生在合法提交边界，有字节/hash 一致性测试。
-- [x] skill-content 当前作为精确状态，不进入压缩候选、不写入 summary；普通历史仍使用现有选 ID 和总结机制。
+- [x] skill 当前作为精确状态，不进入压缩候选、不写入 summary；普通历史仍使用现有选 ID 和总结机制。
 - [x] 技能正文按类型完整展示；普通历史未选择原文不会被任何迁移入口复活。
 - [x] Skill 被显式移除后能重读；工具 Schema 准确性未被破坏。
 - [x] 三种加载来源收敛为同一 item 类型与同一渲染块，来源只影响压缩提示文本。

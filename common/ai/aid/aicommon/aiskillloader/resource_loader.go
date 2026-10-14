@@ -138,7 +138,7 @@ func (m *SkillsContextManager) LoadSkillResource(skillName, filePath string) (*S
 	// 本地窗口缓存不代表正文仍在上下文中: 被压缩移除后再次读取必须能重新追加。
 	for _, loadedPath := range resolvedPaths {
 		if vw, ok := state.ViewWindows[loadedPath]; ok && vw != nil {
-			m.appendSkillContentToTimeline(skillName, loadedPath, vw.RenderWithInfo(), SkillContentSourceManual)
+			m.appendViewSegmentToTimeline(skillName, loadedPath, SkillContentSourceManual, vw)
 		}
 	}
 	return result, nil
@@ -239,7 +239,7 @@ func (m *SkillsContextManager) LoadSkillResourceAsScript(
 	result.TotalLines = vw.TotalLines()
 	// sink 只访问 Timeline 自己的锁, 不会回调 manager; 与其他写入路径一样在
 	// manager 锁内调用, 避免手动解锁遗漏错误分支。
-	m.appendSkillContentToTimeline(skillName, viewKey, vw.RenderWithInfo(), SkillContentSourceManual)
+	m.appendViewSegmentToTimeline(skillName, viewKey, SkillContentSourceManual, vw)
 	return result, nil
 }
 
@@ -485,7 +485,7 @@ func (m *SkillsContextManager) GrepSkillResources(pattern, skillName string) (*S
 			state.ViewWindows[viewKey] = vw
 			// grep 结果阅读窗口同样是新增一条 item; 在 manager 锁内写入 Timeline,
 			// sink 不会回调 manager。
-			m.appendSkillContentToTimeline(result.SearchedSkills[0], viewKey, vw.RenderWithInfo(), SkillContentSourceManual)
+			m.appendViewSegmentToTimeline(result.SearchedSkills[0], viewKey, SkillContentSourceManual, vw)
 		}
 	}
 

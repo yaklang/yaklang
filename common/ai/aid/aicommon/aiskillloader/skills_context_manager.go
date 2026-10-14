@@ -188,7 +188,7 @@ func (m *SkillsContextManager) SetCatalogSkills(metas []*SkillMeta) {
 		m.DeleteSkillCatalogFromTimeline()
 		return
 	}
-	m.AppendSkillCatalogToTimeline(strings.TrimSpace(rendered))
+	m.appendSkillCatalogToTimeline(strings.TrimSpace(rendered))
 }
 
 // DeleteSkillCatalogFromTimeline 退休 Timeline 中当前可见的技能目录 item
@@ -202,7 +202,7 @@ func (m *SkillsContextManager) DeleteSkillCatalogFromTimeline() bool {
 }
 
 // renderCatalogSection 渲染「最相关 SKILL 目录」正文 (含目录头 + 逐条元信息 +
-// 加载提示)。目录作为 skill-content 类型的一条 item 进入 Timeline。
+// 加载提示)。目录作为 skill 类型的一条 item 进入 Timeline。
 func renderCatalogSection(skills []*SkillMeta) string {
 	if len(skills) == 0 {
 		return ""
@@ -289,9 +289,17 @@ func (m *SkillsContextManager) GetCurrentSelectedSkills() []*SkillMeta {
 	if sink == nil {
 		return nil
 	}
-	names := sink.VisibleSkillContentNames()
-	if len(names) == 0 {
+	parts := sink.VisibleSkillParts("")
+	if len(parts) == 0 {
 		return nil
+	}
+	names := make([]string, 0, len(parts))
+	seenNames := make(map[string]bool, len(parts))
+	for _, part := range parts {
+		if part.Name != "" && !seenNames[part.Name] {
+			seenNames[part.Name] = true
+			names = append(names, part.Name)
+		}
 	}
 	metas := make(map[string]*SkillMeta, len(names))
 	m.mu.RLock()
@@ -519,10 +527,11 @@ func (m *SkillsContextManager) ChangeViewOffset(skillName, filePath string, offs
 		state.ViewWindows[filePath] = vw
 	}
 	vw.SetOffset(offset)
-	body := m.renderViewWindowForTimeline(state, filePath)
+	content, start, end, total, _ := vw.Segment()
 	m.mu.Unlock()
-
-	m.appendSkillContentToTimeline(skillName, filePath, body, SkillContentSourceManual)
+	if strings.TrimSpace(content) != "" {
+		m.appendSkillFileContentToTimeline(skillName, filePath, content, SkillContentSourceManual, start, end, total)
+	}
 	return nil
 }
 
@@ -556,6 +565,11 @@ func (m *SkillsContextManager) GetSkillViewSummary(skillName string) string {
 	if !m.skillContentVisibleInTimeline(skillName) {
 		return ""
 	}
+	if sink := m.timelineSink(); sink != nil {
+		if summary := renderSkillPartSummary(skillName, sink.VisibleSkillParts(skillName)); summary != "" {
+			return summary
+		}
+	}
 	m.mu.RLock()
 	state, ok := m.stateFor(skillName)
 	if !ok || state == nil {
@@ -575,6 +589,39 @@ func (m *SkillsContextManager) GetSkillViewSummary(skillName string) string {
 		}
 		buf.WriteString(fmt.Sprintf("  - %s: %d total lines, viewing from line %d%s\n",
 			vw.FilePath, vw.TotalLines(), vw.GetOffset(), truncInfo))
+	}
+	return buf.String()
+}
+
+func renderSkillPartSummary(skillName string, parts []SkillContextPart) string {
+	if len(parts) == 0 {
+		return ""
+	}
+	var buf bytes.Buffer
+	fmt.Fprintf(&buf, "Skill '%s' is loaded and ACTIVE in the skills context of your prompt.\n", skillName)
+	for _, part := range parts {
+		if part.Kind == SkillContentKindMetadata {
+			buf.WriteString("Metadata: loaded\n")
+		}
+	}
+	wrote := false
+	for _, part := range parts {
+		if part.Kind == SkillContentKindMetadata {
+			continue
+		}
+		if !wrote {
+			buf.WriteString("Content:\n")
+			wrote = true
+		}
+		end := ""
+		if part.ReachedEnd {
+			end = " END"
+		}
+		if part.EndLine > 0 {
+			fmt.Fprintf(&buf, "  - %s:%d-%d/%d%s\n", part.Path, part.StartLine, part.EndLine, part.Total, end)
+			continue
+		}
+		fmt.Fprintf(&buf, "  - %s\n", part.Path)
 	}
 	return buf.String()
 }
@@ -651,16 +698,12 @@ func (m *SkillsContextManager) appendSkillBodyToTimelineLocked(state *skillConte
 	added := false
 	name := state.Skill.Meta.Name
 	if body := m.renderSkillBody(state); strings.TrimSpace(body) != "" {
-		if m.appendSkillContentToTimeline(name, SkillMainBodyPath, body, source) {
+		if m.appendSkillMetadataToTimeline(name, body, source) {
 			added = true
 		}
 	}
 	for _, path := range sortedViewWindowPaths(state.ViewWindows) {
-		rendered := m.renderViewWindowForTimeline(state, path)
-		if strings.TrimSpace(rendered) == "" {
-			continue
-		}
-		if m.appendSkillContentToTimeline(name, path, rendered, source) {
+		if m.appendViewSegmentToTimeline(name, path, source, state.ViewWindows[path]) {
 			added = true
 		}
 	}

@@ -45,6 +45,13 @@ import (
 // 即为 schema 字面量. 找不到时返回空串, 调用方应视为 "未启用".
 //
 // 关键词: extractSchemaBlock, SCHEMA enum 精确判断, high-static 反污染对应测试侧调整
+// skillPromptMarkerPresent 判断 prompt 中是否包含该技能的可见内容:
+// 未冻结时是 Open 段的 [skill <name> | ...] 标签, 冻结提升后是 === Skill: <name> === 块。
+func skillPromptMarkerPresent(prompt, name string) bool {
+	return strings.Contains(prompt, "=== Skill: "+name+" ===") ||
+		strings.Contains(prompt, "[skill "+name+" |")
+}
+
 func extractSchemaBlock(prompt string) string {
 	const tag = "<|SCHEMA|>"
 	first := strings.Index(prompt, tag)
@@ -311,7 +318,7 @@ func TestReActLoop_Skills_LoadedContentInPrompt(t *testing.T) {
 		}),
 	)
 
-	loop, err := reactloops.NewReActLoop("skill-content-test", reactIns)
+	loop, err := reactloops.NewReActLoop("skill-test", reactIns)
 	if err != nil {
 		t.Fatalf("failed to create loop: %v", err)
 	}
@@ -337,8 +344,8 @@ func TestReActLoop_Skills_LoadedContentInPrompt(t *testing.T) {
 	if !strings.Contains(secondPrompt, "This is a test skill") {
 		t.Error("Second main prompt should contain loaded skill body 'This is a test skill'")
 	}
-	if !strings.Contains(secondPrompt, "=== Skill: test-skill ===") {
-		t.Error("Second main prompt should contain skill header '=== Skill: test-skill ==='")
+	if !skillPromptMarkerPresent(secondPrompt, "test-skill") {
+		t.Error("Second main prompt should contain the loaded skill section")
 	}
 
 	t.Logf("Captured %d main prompts; verified skill content transition", len(mainPrompts))
@@ -422,11 +429,11 @@ description: A large skill for view offset testing
 	// Verify the loaded prompt contains truncation metadata (Total Lines, Current Offset)
 	if len(mainPrompts) >= 2 {
 		loadedPrompt := mainPrompts[1]
-		if !strings.Contains(loadedPrompt, "Total Lines") {
-			t.Error("Loaded large skill prompt should contain 'Total Lines' metadata")
+		if !strings.Contains(loadedPrompt, "[skill large-skill | SKILL.md:") {
+			t.Error("Loaded large skill prompt should contain the SKILL.md range")
 		}
-		if !strings.Contains(loadedPrompt, "Current Offset") {
-			t.Error("Loaded large skill prompt should contain 'Current Offset' metadata")
+		if strings.Contains(loadedPrompt, " END]") {
+			t.Error("truncated first range must not claim the file has ended")
 		}
 	}
 
