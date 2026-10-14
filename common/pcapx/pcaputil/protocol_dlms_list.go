@@ -42,6 +42,9 @@ func dlmsNormalAccess(p []byte) bool {
 }
 func dlmsProfile(w []byte) string {
 	if dlmsACSEAPDU(dlmsAPDU(w)) {
+		if len(w) > 1 && w[1]&8 != 0 {
+			return "dlms-hdlc-acse-segmented"
+		}
 		if acseLifecycleAPDU(dlmsAPDU(w)) {
 			return "dlms-hdlc-acse-lifecycle"
 		}
@@ -60,6 +63,9 @@ func dlmsProfile(w []byte) string {
 // final carrier contains no LLC/service header. Partial/error envelopes retain
 // the literal-header profile without inventing a completed message.
 func dlmsObservedProfile(w []byte, fields map[string]any) string {
+	if fields["ACSE Segmentation"] != nil {
+		return "dlms-hdlc-acse-segmented"
+	}
 	if meta, ok := fields["HDLC Segmentation"].(map[string]any); ok && meta["complete"] == true {
 		if fields["Get Block"] != nil {
 			return "dlms-hdlc-get-block"

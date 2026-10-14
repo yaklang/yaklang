@@ -44,7 +44,7 @@ Run from the repository root:
 ```sh
 go run ./internal/trafficfixture/cmd/corpus test
 go test -json -count=1 -timeout=10m ./internal/trafficfixture/... ./common/bin-parser/... ./common/pcapx/... ./common/yak/cmd/yakcmds/shark-cli ./scripts/ci > traffic.jsonl
-go run ./internal/trafficfixture/cmd/corpus exec -- python3 @scripts/protocol-tests/check_go_test_json_v2.py traffic.jsonl --inventory @scripts/protocol-tests/required-tests-traffic-unified-v78.json --tier full
+go run ./internal/trafficfixture/cmd/corpus exec -- python3 @scripts/protocol-tests/check_go_test_json_v2.py traffic.jsonl --inventory @scripts/protocol-tests/required-tests-traffic-unified-v79.json --tier full
 ```
 
 The single `corpus` entry point uses the same bounded Go ZIP loader as tests.
@@ -83,7 +83,7 @@ their semantic coverage. The existing synthetic session keys are test inputs;
 production credentials, user private keys and material without redistribution
 permission belong in an external fixed-source download manifest.
 
-Current test requirements are sealed at `scripts/protocol-tests/required-tests-traffic-unified-v78.json`;
+Current test requirements are sealed at `scripts/protocol-tests/required-tests-traffic-unified-v79.json`;
 the historical inventories and all earlier batches remain unchanged.
 The supplemental small-corpus batch contains 26 minimal controls, their explicit
 expected facts, an offline generator and the compact pinned source manifest.
@@ -203,7 +203,7 @@ opaque selector bytes and one bounded Data value over Wrapper v1 TCP/UDP; object
 selector meaning, access permission and device operation are unverified. The
 original one-packet selective-access capture and original refused answer remain
 immutable; its now-supported answer is matched by exact input SHA and frame.
-The active inventory is `scripts/protocol-tests/required-tests-traffic-unified-v78.json`.
+The active inventory is `scripts/protocol-tests/required-tests-traffic-unified-v79.json`.
 
 The small-graph budget batch reuses accepted graph captures/answers and adds one
 249-byte UDP control for child count255 without child bytes. Its standalone proof
@@ -993,7 +993,7 @@ the normative answer; a missing numeric reference field is not a codec pass.
 Full/deferred, workers1/2/4, observers off/on, Feed chunks1/7/full, ownership,
 resources and close/refusal boundaries remain required.
 
-Current gate: `required-tests-traffic-unified-v78.json` with
+Current gate: `required-tests-traffic-unified-v79.json` with
 `check_go_test_json_v2.py`. The indexed validator preserves missing/unpassed,
 package invocation completion, descendant skips, failures and non-JSON checks;
 its mutation/differential harness is sealed with the material. Older checkers
@@ -1629,7 +1629,7 @@ userspace adapter; full kernel receiver/socket/timers and ECU endpoints do not.
 All161 preceding ZIPs remain byte-for-byte unchanged. Raw captures, dependencies,
 reference source/build output and process evidence stay outside Git.
 
-Current effective v78 inventory: 40,192 entries; 40,185 are mandatory for the full tier.
+Current effective v79 inventory: 40,681 entries; 40,674 are mandatory for the full tier.
 
 The opt-in `DynamicFlowControl` profile follows Linux v6.12 FC tuple updates (including WAIT without granting data). Disjoint address extensions or classical/FD carriers may share CAN IDs; unknown selectors cannot choose or mutate a conversation. Ambiguous selectors are rejected. Seven sealed cases exercise full/deferred, workers 1/2/4, and observer off/on, with exact fields, byte collections, contributor references, errors and resource ownership. The existing static FC profile remains unchanged. Pinned upstream FC and filter functions execute with declared userspace stubs; this is not a kernel/ECU endpoint. TShark 4.2.5 checks wire tuples and two complete payloads, but cannot independently reassemble the shared-address transcripts.
 
@@ -1654,3 +1654,5 @@ Wrapper v1 ACSE selected no-authentication LN context 2.16.756.5.8.1.1 seals32 m
 The HDLC ACSE supplement seals44 minimal TCP/UDP captures. Selected unciphered LN AARQ/AARE/initiatev6 preserve complete logical addresses, HCS/FCS, LLC, fields, Session, modulo8 NS/NR and exact active retries. Used address/sequence tuples and observed orphan acknowledgements retain charged refusal history; later ambiguous/expired/refused responses cannot own a fresh request. Unmatched ACSE Close emits NeedMore and releases resources.528 capture configurations plus220 native split/deferred/ownership combinations are required. Fixed unmodified Gurux6e409ae9 checks32 unique frame encodings and116 ACSE messages; ITUX.2271995 supplies optional envelope-field evidence. Authentication, ciphering, ACSE information segmentation, SN and object/device semantics remain pending; no physical meter success is claimed.
 
 The Wrapper/HDLC lifecycle supplement seals72 minimal inputs for selected RLRQ/RLRE/ABRT, optional reason without invented defaults, selected initiate information and literal unverified abort information. Scope-specific retirement preserves unrelated logical endpoints, blocks late Get/block/fragment ownership and retains bounded history. Wrapper repeats remain ambiguous; exact active HDLC retries retain the original identity and fresh observed AA may restore its endpoint.864 capture configurations plus360 native ownership/chunk configurations are required, alongside budget/idle/typed Close regressions. Fixed Gurux6e409ae9 actually produces both release requests and20 unique HDLC encodings; selected initiate codec runs separately. Its malformed server RLRE and non-validating release-response pass branch are explicitly not successful semantic oracles. Positive reason/BER fields use X2271995 independent normative transcripts, not IUT output; no authenticated/device-success claim.
+
+Selected AARQ/AARE HDLC information assembly seals36 minimal TCP/UDP captures across432 full/deferred workers1/2/4 observeroff/on configurations and180 native split/ownership combinations. Every carrier CRC/address/control remains literal; assembled LLC/APDU is explicitly identified in metadata. Complete request identity belongs to the final request event and response ACK confirms the last request frame. Exact active segment retries, wrong address/direction/ACK, orphan/gap/conflict/CRC/BER refusal, typed incomplete Close, budgets/idle and owned projections are checked. Pools are capped at8 distinct sequence frames and4099 information bytes, further capped by caller limits. Fixed unmodified Gurux6e409ae9 executes22 unique frame encodings,46 complete ACSE codec parses and both complete public segment streams; passive association and negative expected boundaries are separate independent transcripts. Segmented release/abort, authentication/cipher/SN and original device/object/oracle obligations remain pending.

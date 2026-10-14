@@ -86537,6 +86537,432 @@
         "common/pcapx/pcaputil/dlms-release/verify.py": "dlms-release/verify.py",
         "scripts/protocol-tests/required-tests-traffic-unified-v78.json": "required-tests-traffic-unified-v78.json"
       }
+    },
+    {
+      "id": "validation-dlms-acse-segmented",
+      "kind": "validation",
+      "source_sha": "1f1ff3b4bf10b1a6918eaaa5ddce67c5a042252e",
+      "file": "validation-dlms-acse-segmented.zip",
+      "sha256": "e3d129c169bc7e504334e455d5bd1ff6c55e69d77cf1f869bd16d809dda2500c",
+      "password": "bin-parser",
+      "members": {
+        "dlms-acse-segmented/REFERENCE-ACTUAL.json": {
+          "sha256": "f39960e91b3cac5745b22edbf33f0ff9cb948b6348d999a525ba3ef96bd01708",
+          "bytes": 735
+        },
+        "dlms-acse-segmented/acse_model.py": {
+          "sha256": "b6354845cd9c76e10e6f80f34ad6ca3c97b85f517cb8d1a7e8ec19b2e60129dd",
+          "bytes": 1801
+        },
+        "dlms-acse-segmented/answers/accepted-tcp.json": {
+          "sha256": "3120144d8b17ae0988233a2ade2e6afe44f6a6efeff90faa6647311d8ed6e121",
+          "bytes": 8140
+        },
+        "dlms-acse-segmented/answers/accepted-udp.json": {
+          "sha256": "584276c70f49d1b8735622c2f9552b0a1dae493f826495197617276f15a1e7f8",
+          "bytes": 8007
+        },
+        "dlms-acse-segmented/answers/active-segment-retry-tcp.json": {
+          "sha256": "284b1f2ca1d7ae7d26f8af02070ae0b66ed3b4818a13bd8344aafcff01f013d8",
+          "bytes": 10377
+        },
+        "dlms-acse-segmented/answers/active-segment-retry-udp.json": {
+          "sha256": "b18830939ef99155ac357014d139f9fd46ed1c2433460f2dd576e381d77a8b12",
+          "bytes": 10188
+        },
+        "dlms-acse-segmented/answers/assembled-trailing-BER-tcp.json": {
+          "sha256": "a98d9baeed0bc2254aae27a2385546ee24671e154e77721594c4e4a654506b23",
+          "bytes": 1865
+        },
+        "dlms-acse-segmented/answers/assembled-trailing-BER-udp.json": {
+          "sha256": "b12742e3b85b3f31b1f72a235dbe061f460388bb0e0cf33b64338eeb496e8207",
+          "bytes": 1812
+        },
+        "dlms-acse-segmented/answers/bad-continuation-FCS-tcp.json": {
+          "sha256": "076902c3d52004f70b91299daf4cb4c5bb68151d29382fb66109e4fc3b5dc032",
+          "bytes": 5079
+        },
+        "dlms-acse-segmented/answers/bad-continuation-FCS-udp.json": {
+          "sha256": "7d759e171a5b09c29ca299338b092383d37ff2108d9ccb770567196eb301c60e",
+          "bytes": 4973
+        },
+        "dlms-acse-segmented/answers/bad-continuation-HCS-tcp.json": {
+          "sha256": "38cdf93f0b676e87c1b61209cd06a0f4424d8610d1e610c2deefbbd4ba81a23b",
+          "bytes": 5079
+        },
+        "dlms-acse-segmented/answers/bad-continuation-HCS-udp.json": {
+          "sha256": "069a878afc193dcd7f97206f720c12d78798221a2a452ae712d6cd6c2f7d05f1",
+          "bytes": 4973
+        },
+        "dlms-acse-segmented/answers/conflicting-request-sequence-tcp.json": {
+          "sha256": "cdd494efe1fc0fc8ed2a8bc2bda3c2fe91de7dddddacdc57474aadcfc52518a6",
+          "bytes": 2334
+        },
+        "dlms-acse-segmented/answers/conflicting-request-sequence-udp.json": {
+          "sha256": "1d5885f8983d36646c9d8882c195c5dc43e9ccedda5f12da5dc501630601430c",
+          "bytes": 2255
+        },
+        "dlms-acse-segmented/answers/initial-sequence-seven-tcp.json": {
+          "sha256": "db860185986471838defa8e438a242cf148fad1c0070e469b273880b2b35c613",
+          "bytes": 8196
+        },
+        "dlms-acse-segmented/answers/initial-sequence-seven-udp.json": {
+          "sha256": "bc17fdaf6e4ef7d09128b4dd99f29227c9cd200c9aecb64f965ca98f38f9bdbe",
+          "bytes": 8063
+        },
+        "dlms-acse-segmented/answers/missing-request-fragment-tcp.json": {
+          "sha256": "001100f4ca3c0c024cb00af7b4e132d255d71fc495e140350213708c4b1f7d15",
+          "bytes": 2302
+        },
+        "dlms-acse-segmented/answers/missing-request-fragment-udp.json": {
+          "sha256": "22c1f672f1f676ecdff58f904be3846e742f5168018164ffbc9dada2e399a204",
+          "bytes": 2223
+        },
+        "dlms-acse-segmented/answers/missing-response-fragment-tcp.json": {
+          "sha256": "08d43d48bb7b36e4301de1e1bdd90108882d29df1cae8762e794e36e16d544eb",
+          "bytes": 5499
+        },
+        "dlms-acse-segmented/answers/missing-response-fragment-udp.json": {
+          "sha256": "ae04a464640fc1f09f990f0124dbfc5ec55152dbb88c9cf6372b2443980ca8ce",
+          "bytes": 5366
+        },
+        "dlms-acse-segmented/answers/orphan-late-generation-tcp.json": {
+          "sha256": "75441a78e1dde420797fbedf23d2ff793c106c1e3b84f4dde5034a56323b1b9d",
+          "bytes": 2820
+        },
+        "dlms-acse-segmented/answers/orphan-late-generation-udp.json": {
+          "sha256": "5c218c8823b4ece92584f5a41b2f0864a1132bbf6b09b886b4d336fc3ee3d86e",
+          "bytes": 2660
+        },
+        "dlms-acse-segmented/answers/wide-logical-address-tcp.json": {
+          "sha256": "de65cc58f141039ca7268795b4be1a82453c3a0588dbac1a23291452f0a9c9a8",
+          "bytes": 8237
+        },
+        "dlms-acse-segmented/answers/wide-logical-address-udp.json": {
+          "sha256": "dd2d048130ea52274d3cfe4f54d1c361d188f4aa23d78caff12905d00c6d9264",
+          "bytes": 8104
+        },
+        "dlms-acse-segmented/answers/wrong-continuation-ack-tcp.json": {
+          "sha256": "cc7f1346c637cf21486560b1410bd3fdfc4ca8f7d7430ca97abffab4f2eeb626",
+          "bytes": 8611
+        },
+        "dlms-acse-segmented/answers/wrong-continuation-ack-udp.json": {
+          "sha256": "14da513b4dd74f93a101b9edb6bd1a7d75937fb185497d5f0c9aab182705c9db",
+          "bytes": 8451
+        },
+        "dlms-acse-segmented/answers/wrong-continuation-address-tcp.json": {
+          "sha256": "15e7eaf28346d9329302bda766c98caae47e91cf47377a0176dbcb03eeeb7082",
+          "bytes": 8627
+        },
+        "dlms-acse-segmented/answers/wrong-continuation-address-udp.json": {
+          "sha256": "d9f3ac35baa151cb183321ed5bbe3ed8d7573d52e77ddbb4673954b45d854a12",
+          "bytes": 8467
+        },
+        "dlms-acse-segmented/answers/wrong-continuation-direction-tcp.json": {
+          "sha256": "e67a0cf4d0f799d996e26f6cb52cf47bfe260bf18d178a6ed7ba941df94b24bd",
+          "bytes": 8635
+        },
+        "dlms-acse-segmented/answers/wrong-continuation-direction-udp.json": {
+          "sha256": "e6e000f9178370ae947590ee6130e603ebce6beaad17baa7256f01db0e065948",
+          "bytes": 8475
+        },
+        "dlms-acse-segmented/answers/wrong-initial-LLC-tcp.json": {
+          "sha256": "eacd283586baace11aa5bfa06623af8b222eb1b524837ceace8a9a801cde3247",
+          "bytes": 1872
+        },
+        "dlms-acse-segmented/answers/wrong-initial-LLC-udp.json": {
+          "sha256": "6521216229ebd63a09dc4837a38c16f82dd0568ef9b97f85e68e6e2391c82ff0",
+          "bytes": 1819
+        },
+        "dlms-acse-segmented/answers/wrong-response-ack-tcp.json": {
+          "sha256": "e0e4bbf9782322d2ca5404dbd0ac2ff6d9c4e2897dcc6e4c498c1e40c9da4118",
+          "bytes": 8599
+        },
+        "dlms-acse-segmented/answers/wrong-response-ack-udp.json": {
+          "sha256": "28fd216c8ebd3352439a992677d4eedc0da82147245ff466fe60738d219d7fca",
+          "bytes": 8439
+        },
+        "dlms-acse-segmented/answers/wrong-response-address-tcp.json": {
+          "sha256": "ec8d91d2f4c958bf206a5a219d2785d0adf75f60053a44811800ea9d9efad215",
+          "bytes": 8615
+        },
+        "dlms-acse-segmented/answers/wrong-response-address-udp.json": {
+          "sha256": "6daf4380ccda3a41897baeb3a1fd07659fafd363b3249173740afe0d95f3bbfe",
+          "bytes": 8455
+        },
+        "dlms-acse-segmented/answers/wrong-response-direction-tcp.json": {
+          "sha256": "8f5a76258b367e6387ded44519bd06daeba70f4a7317490e9598dca593afe2b2",
+          "bytes": 8623
+        },
+        "dlms-acse-segmented/answers/wrong-response-direction-udp.json": {
+          "sha256": "507555c9d60c09b4353635a414959a00fcefd8dbfd213b1d9f9f22a563909ec8",
+          "bytes": 8463
+        },
+        "dlms-acse-segmented/build.py": {
+          "sha256": "13c70702bc4aa2ef2f1b1f2861a73702b139396f20c561436e5356897ecf1924",
+          "bytes": 7361
+        },
+        "dlms-acse-segmented/carrier.py": {
+          "sha256": "01b94cc32d91810ba8f8e106294834820fa56fe73bc3f108ce42ecbb3e0dd379",
+          "bytes": 1380
+        },
+        "dlms-acse-segmented/cases/accepted-tcp.pcap": {
+          "sha256": "80ac591267b7d5f6d94a4fe8ebe33c49d2ce5fd3cfda7199314b9b728fae3f99",
+          "bytes": 719
+        },
+        "dlms-acse-segmented/cases/accepted-udp.pcap": {
+          "sha256": "73133e25777076b6029b5bd707fc8031b2ecfe1bd2f2cff24224b7979e58ee58",
+          "bytes": 449
+        },
+        "dlms-acse-segmented/cases/active-segment-retry-tcp.pcap": {
+          "sha256": "3f501773891d9561a5e9cf8771aae527f9fb4eda3be25b057c8d33ce3aadcebf",
+          "bytes": 921
+        },
+        "dlms-acse-segmented/cases/active-segment-retry-udp.pcap": {
+          "sha256": "c4cee5bbf839c2eb903fe3607c298cd6de3165aeba29585d8ddfcc9b948ddea3",
+          "bytes": 627
+        },
+        "dlms-acse-segmented/cases/assembled-trailing-BER-tcp.pcap": {
+          "sha256": "fdf1f94fe7ee8dea9d6eadd0c6f4e93c7550e3e00b4650088f34a5db49833a56",
+          "bytes": 431
+        },
+        "dlms-acse-segmented/cases/assembled-trailing-BER-udp.pcap": {
+          "sha256": "7f91ac1f5cc73e096af7bf28a44ba6c19cfee646d453571d40b67638d2529187",
+          "bytes": 197
+        },
+        "dlms-acse-segmented/cases/bad-continuation-FCS-tcp.pcap": {
+          "sha256": "959521cecf14e60d2c9aa5b0c0eda17d311b79411f4b7cb51c25f9100c8dd0ee",
+          "bytes": 632
+        },
+        "dlms-acse-segmented/cases/bad-continuation-FCS-udp.pcap": {
+          "sha256": "8d090d7a3d714df833bd86cbebb45b714eec5cea37763b19d63e1abdca3977a6",
+          "bytes": 374
+        },
+        "dlms-acse-segmented/cases/bad-continuation-HCS-tcp.pcap": {
+          "sha256": "832e3f0e88571cbc39d620e11eb68690f6b4046bdd48376f7502d2791608d35b",
+          "bytes": 632
+        },
+        "dlms-acse-segmented/cases/bad-continuation-HCS-udp.pcap": {
+          "sha256": "9cd1ed64d4f54a4244c654667ce981454eee58566b8100501746e579dfc362e7",
+          "bytes": 374
+        },
+        "dlms-acse-segmented/cases/conflicting-request-sequence-tcp.pcap": {
+          "sha256": "7dd9b6f97b37ec5257cc092571c82dae179393ac5a400ae81a15e16edaad0d7f",
+          "bytes": 537
+        },
+        "dlms-acse-segmented/cases/conflicting-request-sequence-udp.pcap": {
+          "sha256": "da385f2c3fb60e7b84381f36dfb2a034084e9b96da41d899912b3a87d649c6b9",
+          "bytes": 291
+        },
+        "dlms-acse-segmented/cases/initial-sequence-seven-tcp.pcap": {
+          "sha256": "d19df9715df980336479b249e12ef32fad7caa9e35e6c1de16db87e0e2694676",
+          "bytes": 719
+        },
+        "dlms-acse-segmented/cases/initial-sequence-seven-udp.pcap": {
+          "sha256": "77de14a095ebaa404d25c9c168f0ffd0ecfa97f5c687bcd364ca246b5a2c1d00",
+          "bytes": 449
+        },
+        "dlms-acse-segmented/cases/missing-request-fragment-tcp.pcap": {
+          "sha256": "0bc77cf7e8148818c5e44a2b108c39abe425180d8d6288da6dfbffdca09d0b60",
+          "bytes": 531
+        },
+        "dlms-acse-segmented/cases/missing-request-fragment-udp.pcap": {
+          "sha256": "b1d6d26cd762e61dd141cdf275dd42f2bcb716e38559b11ac9348d24d8514826",
+          "bytes": 285
+        },
+        "dlms-acse-segmented/cases/missing-response-fragment-tcp.pcap": {
+          "sha256": "87ac1be39e1ea5e69105f8dac8742098dfbd80d257e295402ddda16ffb2d364a",
+          "bytes": 719
+        },
+        "dlms-acse-segmented/cases/missing-response-fragment-udp.pcap": {
+          "sha256": "2b00fc49ecdd37f333a3ecbe1ec690ab5cfdec77d536eac72aa1b09630f8602d",
+          "bytes": 449
+        },
+        "dlms-acse-segmented/cases/orphan-late-generation-tcp.pcap": {
+          "sha256": "c3a55915d9fe8cc0c336ec1430d74328b392586c8dfb4cd2c648807863bf6d26",
+          "bytes": 820
+        },
+        "dlms-acse-segmented/cases/orphan-late-generation-udp.pcap": {
+          "sha256": "a0d5424a879da9e916cfa50b57dd2830152839d3ceb97d9bb122a54ff8570edc",
+          "bytes": 538
+        },
+        "dlms-acse-segmented/cases/wide-logical-address-tcp.pcap": {
+          "sha256": "e43b6edc9a8900969000f11b84b6c89d3677a96947a277a8d3b721bd129a6ac0",
+          "bytes": 734
+        },
+        "dlms-acse-segmented/cases/wide-logical-address-udp.pcap": {
+          "sha256": "5f5872eb0aa2375b598980e3893bd210f81e8e5466e566bb9b6e1e0f34d17dd6",
+          "bytes": 464
+        },
+        "dlms-acse-segmented/cases/wrong-continuation-ack-tcp.pcap": {
+          "sha256": "3260da9d443d90df8cadb54dbb52c803dc24ce18a09657ca7c4fa7758f622e0e",
+          "bytes": 820
+        },
+        "dlms-acse-segmented/cases/wrong-continuation-ack-udp.pcap": {
+          "sha256": "5096810e9a6358ed2a61f9571d05a6a59e6d6e690666f741a9654b1106b52703",
+          "bytes": 538
+        },
+        "dlms-acse-segmented/cases/wrong-continuation-address-tcp.pcap": {
+          "sha256": "ad36f8930f9f9ad384b2c56023ff5b5846621d058c327ff4b916101647025aba",
+          "bytes": 820
+        },
+        "dlms-acse-segmented/cases/wrong-continuation-address-udp.pcap": {
+          "sha256": "c2b9cc8bfdc3770dae814598de0c27bf4c5d110987b93bd222c7f5563cef8995",
+          "bytes": 538
+        },
+        "dlms-acse-segmented/cases/wrong-continuation-direction-tcp.pcap": {
+          "sha256": "c728c95ef2be295f50a6183387b0bcbfcea827f64dc4ff6554c1034b295f154a",
+          "bytes": 820
+        },
+        "dlms-acse-segmented/cases/wrong-continuation-direction-udp.pcap": {
+          "sha256": "9530279c576ddcfb4c2f7bb6e7a2fcde955b4858eda8dbe7f866c82fab96892a",
+          "bytes": 538
+        },
+        "dlms-acse-segmented/cases/wrong-initial-LLC-tcp.pcap": {
+          "sha256": "f0b7d6cecdda59d65fa3679429c60e745a569f94929576dc238bff5103e890e4",
+          "bytes": 436
+        },
+        "dlms-acse-segmented/cases/wrong-initial-LLC-udp.pcap": {
+          "sha256": "707f97f8aa22eadcd28d3d44cf80bb97c6f776af917b67541f072d890c3c0423",
+          "bytes": 202
+        },
+        "dlms-acse-segmented/cases/wrong-response-ack-tcp.pcap": {
+          "sha256": "9e85f7f06c87c7250579ff5c208157e1c900a9ed4f21fca26fd77d4f37165ca5",
+          "bytes": 820
+        },
+        "dlms-acse-segmented/cases/wrong-response-ack-udp.pcap": {
+          "sha256": "e702c6a4aac1419a81a33322f9d052ff12462ac48f8c6714a51c4e0cf33ee41a",
+          "bytes": 538
+        },
+        "dlms-acse-segmented/cases/wrong-response-address-tcp.pcap": {
+          "sha256": "77af39d9e2ff5e2e2d41e2fb023f7c9f2fb82e02db84960bc1a1cc994d3d0b50",
+          "bytes": 820
+        },
+        "dlms-acse-segmented/cases/wrong-response-address-udp.pcap": {
+          "sha256": "8542863c17de617718a76f7ed34bb614a13117a73c6f9e44b4a390c482bd0a97",
+          "bytes": 538
+        },
+        "dlms-acse-segmented/cases/wrong-response-direction-tcp.pcap": {
+          "sha256": "1094ee76b66b2b7b0e0d411eeaf83defe5f6889642639db79d670ab27b2acd14",
+          "bytes": 820
+        },
+        "dlms-acse-segmented/cases/wrong-response-direction-udp.pcap": {
+          "sha256": "b0b9ee7d305ba56ef2828cd040ff99e45c94eac71acb79e404d2631a7b498f0f",
+          "bytes": 538
+        },
+        "dlms-acse-segmented/controls.json": {
+          "sha256": "cda8560297b04e1c8f54433decc29a3e495fe0e1e9df1006e2f041bd578af858",
+          "bytes": 256245
+        },
+        "dlms-acse-segmented/hdlc_model.py": {
+          "sha256": "a821fc16a535f1092345da46cc4d4f088968dd9441e2808da7a57066c15eca5e",
+          "bytes": 2239
+        },
+        "dlms-acse-segmented/reference.py": {
+          "sha256": "7dd7f3cd22d5ade2121ba4fb77c160e9be02eecfad815dc6ccdbd6b9babec703",
+          "bytes": 2856
+        },
+        "dlms-acse-segmented/source-pin.json": {
+          "sha256": "df25b5c037cd965caae3e081531e24e4e607e9e6ae621b48914e9c4c0e2b6cd3",
+          "bytes": 13095
+        },
+        "dlms-acse-segmented/verify.py": {
+          "sha256": "905f92b62eadf97326cb01bbd364e809ce811d27a8c233296fe63f95f7caf42b",
+          "bytes": 1581
+        },
+        "required-tests-traffic-unified-v79.json": {
+          "sha256": "a601e77dd7aec29a2148c052121b0fc23ac87d91319d13551ecf99c40d84cdd1",
+          "bytes": 18173239
+        },
+        "validation/expected.json": {
+          "sha256": "7f9097a65c031f336ace60b7bbc583af2c4d79ebc4a567d54c224c77e588c685",
+          "bytes": 44556
+        }
+      },
+      "aliases": {
+        "common/pcapx/pcaputil/dlms-acse-segmented/REFERENCE-ACTUAL.json": "dlms-acse-segmented/REFERENCE-ACTUAL.json",
+        "common/pcapx/pcaputil/dlms-acse-segmented/acse_model.py": "dlms-acse-segmented/acse_model.py",
+        "common/pcapx/pcaputil/dlms-acse-segmented/answers/accepted-tcp.json": "dlms-acse-segmented/answers/accepted-tcp.json",
+        "common/pcapx/pcaputil/dlms-acse-segmented/answers/accepted-udp.json": "dlms-acse-segmented/answers/accepted-udp.json",
+        "common/pcapx/pcaputil/dlms-acse-segmented/answers/active-segment-retry-tcp.json": "dlms-acse-segmented/answers/active-segment-retry-tcp.json",
+        "common/pcapx/pcaputil/dlms-acse-segmented/answers/active-segment-retry-udp.json": "dlms-acse-segmented/answers/active-segment-retry-udp.json",
+        "common/pcapx/pcaputil/dlms-acse-segmented/answers/assembled-trailing-BER-tcp.json": "dlms-acse-segmented/answers/assembled-trailing-BER-tcp.json",
+        "common/pcapx/pcaputil/dlms-acse-segmented/answers/assembled-trailing-BER-udp.json": "dlms-acse-segmented/answers/assembled-trailing-BER-udp.json",
+        "common/pcapx/pcaputil/dlms-acse-segmented/answers/bad-continuation-FCS-tcp.json": "dlms-acse-segmented/answers/bad-continuation-FCS-tcp.json",
+        "common/pcapx/pcaputil/dlms-acse-segmented/answers/bad-continuation-FCS-udp.json": "dlms-acse-segmented/answers/bad-continuation-FCS-udp.json",
+        "common/pcapx/pcaputil/dlms-acse-segmented/answers/bad-continuation-HCS-tcp.json": "dlms-acse-segmented/answers/bad-continuation-HCS-tcp.json",
+        "common/pcapx/pcaputil/dlms-acse-segmented/answers/bad-continuation-HCS-udp.json": "dlms-acse-segmented/answers/bad-continuation-HCS-udp.json",
+        "common/pcapx/pcaputil/dlms-acse-segmented/answers/conflicting-request-sequence-tcp.json": "dlms-acse-segmented/answers/conflicting-request-sequence-tcp.json",
+        "common/pcapx/pcaputil/dlms-acse-segmented/answers/conflicting-request-sequence-udp.json": "dlms-acse-segmented/answers/conflicting-request-sequence-udp.json",
+        "common/pcapx/pcaputil/dlms-acse-segmented/answers/initial-sequence-seven-tcp.json": "dlms-acse-segmented/answers/initial-sequence-seven-tcp.json",
+        "common/pcapx/pcaputil/dlms-acse-segmented/answers/initial-sequence-seven-udp.json": "dlms-acse-segmented/answers/initial-sequence-seven-udp.json",
+        "common/pcapx/pcaputil/dlms-acse-segmented/answers/missing-request-fragment-tcp.json": "dlms-acse-segmented/answers/missing-request-fragment-tcp.json",
+        "common/pcapx/pcaputil/dlms-acse-segmented/answers/missing-request-fragment-udp.json": "dlms-acse-segmented/answers/missing-request-fragment-udp.json",
+        "common/pcapx/pcaputil/dlms-acse-segmented/answers/missing-response-fragment-tcp.json": "dlms-acse-segmented/answers/missing-response-fragment-tcp.json",
+        "common/pcapx/pcaputil/dlms-acse-segmented/answers/missing-response-fragment-udp.json": "dlms-acse-segmented/answers/missing-response-fragment-udp.json",
+        "common/pcapx/pcaputil/dlms-acse-segmented/answers/orphan-late-generation-tcp.json": "dlms-acse-segmented/answers/orphan-late-generation-tcp.json",
+        "common/pcapx/pcaputil/dlms-acse-segmented/answers/orphan-late-generation-udp.json": "dlms-acse-segmented/answers/orphan-late-generation-udp.json",
+        "common/pcapx/pcaputil/dlms-acse-segmented/answers/wide-logical-address-tcp.json": "dlms-acse-segmented/answers/wide-logical-address-tcp.json",
+        "common/pcapx/pcaputil/dlms-acse-segmented/answers/wide-logical-address-udp.json": "dlms-acse-segmented/answers/wide-logical-address-udp.json",
+        "common/pcapx/pcaputil/dlms-acse-segmented/answers/wrong-continuation-ack-tcp.json": "dlms-acse-segmented/answers/wrong-continuation-ack-tcp.json",
+        "common/pcapx/pcaputil/dlms-acse-segmented/answers/wrong-continuation-ack-udp.json": "dlms-acse-segmented/answers/wrong-continuation-ack-udp.json",
+        "common/pcapx/pcaputil/dlms-acse-segmented/answers/wrong-continuation-address-tcp.json": "dlms-acse-segmented/answers/wrong-continuation-address-tcp.json",
+        "common/pcapx/pcaputil/dlms-acse-segmented/answers/wrong-continuation-address-udp.json": "dlms-acse-segmented/answers/wrong-continuation-address-udp.json",
+        "common/pcapx/pcaputil/dlms-acse-segmented/answers/wrong-continuation-direction-tcp.json": "dlms-acse-segmented/answers/wrong-continuation-direction-tcp.json",
+        "common/pcapx/pcaputil/dlms-acse-segmented/answers/wrong-continuation-direction-udp.json": "dlms-acse-segmented/answers/wrong-continuation-direction-udp.json",
+        "common/pcapx/pcaputil/dlms-acse-segmented/answers/wrong-initial-LLC-tcp.json": "dlms-acse-segmented/answers/wrong-initial-LLC-tcp.json",
+        "common/pcapx/pcaputil/dlms-acse-segmented/answers/wrong-initial-LLC-udp.json": "dlms-acse-segmented/answers/wrong-initial-LLC-udp.json",
+        "common/pcapx/pcaputil/dlms-acse-segmented/answers/wrong-response-ack-tcp.json": "dlms-acse-segmented/answers/wrong-response-ack-tcp.json",
+        "common/pcapx/pcaputil/dlms-acse-segmented/answers/wrong-response-ack-udp.json": "dlms-acse-segmented/answers/wrong-response-ack-udp.json",
+        "common/pcapx/pcaputil/dlms-acse-segmented/answers/wrong-response-address-tcp.json": "dlms-acse-segmented/answers/wrong-response-address-tcp.json",
+        "common/pcapx/pcaputil/dlms-acse-segmented/answers/wrong-response-address-udp.json": "dlms-acse-segmented/answers/wrong-response-address-udp.json",
+        "common/pcapx/pcaputil/dlms-acse-segmented/answers/wrong-response-direction-tcp.json": "dlms-acse-segmented/answers/wrong-response-direction-tcp.json",
+        "common/pcapx/pcaputil/dlms-acse-segmented/answers/wrong-response-direction-udp.json": "dlms-acse-segmented/answers/wrong-response-direction-udp.json",
+        "common/pcapx/pcaputil/dlms-acse-segmented/build.py": "dlms-acse-segmented/build.py",
+        "common/pcapx/pcaputil/dlms-acse-segmented/carrier.py": "dlms-acse-segmented/carrier.py",
+        "common/pcapx/pcaputil/dlms-acse-segmented/cases/accepted-tcp.pcap": "dlms-acse-segmented/cases/accepted-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-acse-segmented/cases/accepted-udp.pcap": "dlms-acse-segmented/cases/accepted-udp.pcap",
+        "common/pcapx/pcaputil/dlms-acse-segmented/cases/active-segment-retry-tcp.pcap": "dlms-acse-segmented/cases/active-segment-retry-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-acse-segmented/cases/active-segment-retry-udp.pcap": "dlms-acse-segmented/cases/active-segment-retry-udp.pcap",
+        "common/pcapx/pcaputil/dlms-acse-segmented/cases/assembled-trailing-BER-tcp.pcap": "dlms-acse-segmented/cases/assembled-trailing-BER-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-acse-segmented/cases/assembled-trailing-BER-udp.pcap": "dlms-acse-segmented/cases/assembled-trailing-BER-udp.pcap",
+        "common/pcapx/pcaputil/dlms-acse-segmented/cases/bad-continuation-FCS-tcp.pcap": "dlms-acse-segmented/cases/bad-continuation-FCS-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-acse-segmented/cases/bad-continuation-FCS-udp.pcap": "dlms-acse-segmented/cases/bad-continuation-FCS-udp.pcap",
+        "common/pcapx/pcaputil/dlms-acse-segmented/cases/bad-continuation-HCS-tcp.pcap": "dlms-acse-segmented/cases/bad-continuation-HCS-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-acse-segmented/cases/bad-continuation-HCS-udp.pcap": "dlms-acse-segmented/cases/bad-continuation-HCS-udp.pcap",
+        "common/pcapx/pcaputil/dlms-acse-segmented/cases/conflicting-request-sequence-tcp.pcap": "dlms-acse-segmented/cases/conflicting-request-sequence-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-acse-segmented/cases/conflicting-request-sequence-udp.pcap": "dlms-acse-segmented/cases/conflicting-request-sequence-udp.pcap",
+        "common/pcapx/pcaputil/dlms-acse-segmented/cases/initial-sequence-seven-tcp.pcap": "dlms-acse-segmented/cases/initial-sequence-seven-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-acse-segmented/cases/initial-sequence-seven-udp.pcap": "dlms-acse-segmented/cases/initial-sequence-seven-udp.pcap",
+        "common/pcapx/pcaputil/dlms-acse-segmented/cases/missing-request-fragment-tcp.pcap": "dlms-acse-segmented/cases/missing-request-fragment-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-acse-segmented/cases/missing-request-fragment-udp.pcap": "dlms-acse-segmented/cases/missing-request-fragment-udp.pcap",
+        "common/pcapx/pcaputil/dlms-acse-segmented/cases/missing-response-fragment-tcp.pcap": "dlms-acse-segmented/cases/missing-response-fragment-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-acse-segmented/cases/missing-response-fragment-udp.pcap": "dlms-acse-segmented/cases/missing-response-fragment-udp.pcap",
+        "common/pcapx/pcaputil/dlms-acse-segmented/cases/orphan-late-generation-tcp.pcap": "dlms-acse-segmented/cases/orphan-late-generation-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-acse-segmented/cases/orphan-late-generation-udp.pcap": "dlms-acse-segmented/cases/orphan-late-generation-udp.pcap",
+        "common/pcapx/pcaputil/dlms-acse-segmented/cases/wide-logical-address-tcp.pcap": "dlms-acse-segmented/cases/wide-logical-address-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-acse-segmented/cases/wide-logical-address-udp.pcap": "dlms-acse-segmented/cases/wide-logical-address-udp.pcap",
+        "common/pcapx/pcaputil/dlms-acse-segmented/cases/wrong-continuation-ack-tcp.pcap": "dlms-acse-segmented/cases/wrong-continuation-ack-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-acse-segmented/cases/wrong-continuation-ack-udp.pcap": "dlms-acse-segmented/cases/wrong-continuation-ack-udp.pcap",
+        "common/pcapx/pcaputil/dlms-acse-segmented/cases/wrong-continuation-address-tcp.pcap": "dlms-acse-segmented/cases/wrong-continuation-address-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-acse-segmented/cases/wrong-continuation-address-udp.pcap": "dlms-acse-segmented/cases/wrong-continuation-address-udp.pcap",
+        "common/pcapx/pcaputil/dlms-acse-segmented/cases/wrong-continuation-direction-tcp.pcap": "dlms-acse-segmented/cases/wrong-continuation-direction-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-acse-segmented/cases/wrong-continuation-direction-udp.pcap": "dlms-acse-segmented/cases/wrong-continuation-direction-udp.pcap",
+        "common/pcapx/pcaputil/dlms-acse-segmented/cases/wrong-initial-LLC-tcp.pcap": "dlms-acse-segmented/cases/wrong-initial-LLC-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-acse-segmented/cases/wrong-initial-LLC-udp.pcap": "dlms-acse-segmented/cases/wrong-initial-LLC-udp.pcap",
+        "common/pcapx/pcaputil/dlms-acse-segmented/cases/wrong-response-ack-tcp.pcap": "dlms-acse-segmented/cases/wrong-response-ack-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-acse-segmented/cases/wrong-response-ack-udp.pcap": "dlms-acse-segmented/cases/wrong-response-ack-udp.pcap",
+        "common/pcapx/pcaputil/dlms-acse-segmented/cases/wrong-response-address-tcp.pcap": "dlms-acse-segmented/cases/wrong-response-address-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-acse-segmented/cases/wrong-response-address-udp.pcap": "dlms-acse-segmented/cases/wrong-response-address-udp.pcap",
+        "common/pcapx/pcaputil/dlms-acse-segmented/cases/wrong-response-direction-tcp.pcap": "dlms-acse-segmented/cases/wrong-response-direction-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-acse-segmented/cases/wrong-response-direction-udp.pcap": "dlms-acse-segmented/cases/wrong-response-direction-udp.pcap",
+        "common/pcapx/pcaputil/dlms-acse-segmented/controls.json": "dlms-acse-segmented/controls.json",
+        "common/pcapx/pcaputil/dlms-acse-segmented/hdlc_model.py": "dlms-acse-segmented/hdlc_model.py",
+        "common/pcapx/pcaputil/dlms-acse-segmented/reference.py": "dlms-acse-segmented/reference.py",
+        "common/pcapx/pcaputil/dlms-acse-segmented/source-pin.json": "dlms-acse-segmented/source-pin.json",
+        "common/pcapx/pcaputil/dlms-acse-segmented/verify.py": "dlms-acse-segmented/verify.py",
+        "scripts/protocol-tests/required-tests-traffic-unified-v79.json": "required-tests-traffic-unified-v79.json"
+      }
     }
   ],
   "schema_version": 1,

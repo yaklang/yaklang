@@ -1287,7 +1287,17 @@ func (f *binFlow) finishSession(reason TrafficFlowCloseReason) {
 	}
 	if d := f.dlms; d != nil {
 		if d.fragments != nil {
-			emit(d.fragmentCloseDirection(), d.fragmentCloseFields(), "DLMS HDLC exchange ended with incomplete segmented information")
+			if d.fragments.acseCommand != 0 {
+				e := f.event(d.fragmentCloseDirection(), nil, "incomplete", string(reason)+": DLMS HDLC exchange ended with incomplete ACSE information")
+				e.Profile = "dlms-hdlc-acse-segmented"
+				e.Session = d.fragmentCloseFields()
+				e.sessionError = &ProtocolError{Kind: ErrNeedMore, Message: e.Summary}
+				e.Error = e.Summary
+				f.a.incomplete.Add(1)
+				f.a.emit(e)
+			} else {
+				emit(d.fragmentCloseDirection(), d.fragmentCloseFields(), "DLMS HDLC exchange ended with incomplete segmented information")
+			}
 		} else if d.transfer != nil {
 			emit(d.transfer.initial.dir, map[string]any{"Outstanding": 1, "ObservedBlocks": d.transfer.blocks, "EncodedBytes": len(d.transfer.data)}, "DLMS HDLC exchange ended with an incomplete data-block transfer")
 		} else if d.pending != nil && d.pending.kind == "ACSE" {

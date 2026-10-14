@@ -212,6 +212,9 @@ func decodeDLMSFrameBudget(w []byte, maxElements, depth int, linkOnly bool) (*dl
 		// Preserve literal initial request direction for native session decoding.
 		// Never infer an endpoint role from continuation bytes in an existing chain.
 		m.request = len(info) >= 4 && bytes.Equal(info[:4], []byte{0xe6, 0xe6, 0, 0xc0})
+		if len(info) >= 4 && bytes.Equal(info[:3], []byte{0xe6, 0xe6, 0}) && dlmsACSEAPDU(info[3:]) {
+			m.request = info[3] == 0x60 || info[3] == 0x62
+		}
 		return m, nil
 	}
 	return decodeDLMSInformation(m, info, maxElements, depth)
@@ -474,6 +477,9 @@ func probeDLMS(w []byte, limit int) ProbeResult {
 	}
 	if w[1]&8 != 0 {
 		m, err := decodeDLMSFrameBudget(w[:n], 0, 0, true)
+		if err == nil && m.kind == "I" && dlmsACSESegmentPrefix(m.information) {
+			return probeAccept("dlms", "hdlc-acse-segmented", 98)
+		}
 		if err == nil && m.kind == "I" && m.request && len(m.information) >= 6 && (m.information[4] == 1 || m.information[4] == 3) && m.information[5]&0x30 == 0 {
 			return probeAccept("dlms", "hdlc-get-normal", 98)
 		}
@@ -690,6 +696,9 @@ func (f *binFlow) consumeDLMS(dir int, w []byte, id uint64) (map[string]any, uin
 }
 func (f *binFlow) consumeDecodedDLMS(dir int, w []byte, id uint64, m *dlmsMessage) (map[string]any, uint64, error) {
 	s := f.dlms
+	if s.fragments != nil && s.fragments.acseCommand != 0 || m.kind == "I" && dlmsACSESegmentPrefix(m.information) {
+		return f.consumeDLMSACSESegments(dir, w, id, m)
+	}
 	if (m.kind == "GET" || m.kind == "I") && s.hdlcEndpointRetired(dir, m.source, m.destination, m.request) {
 		return nil, 0, dlmsError(ErrContextRequired, "Get information belongs to retired association context")
 	}
@@ -705,7 +714,11 @@ func (f *binFlow) consumeDecodedDLMS(dir int, w []byte, id uint64, m *dlmsMessag
 		}
 		meta := dlmsSegmentFields(m, p.requestFrames, true)
 		meta["assembled_information_hex"] = hex.EncodeToString(p.requestInformation)
-		m.fields["HDLC Segmentation"] = meta
+		if m.acse != nil {
+			m.fields["ACSE Segmentation"] = meta
+		} else {
+			m.fields["HDLC Segmentation"] = meta
+		}
 	}
 	if m.kind == "I" || s.fragments != nil {
 		return f.consumeDLMSSegments(dir, w, id, m)
@@ -817,14 +830,14 @@ func (a *binParser) decodeDLMSDatagram(e *ProtocolEvent, w []byte, explicit bool
 	}
 	if created && m != nil && !m.request && m.kind != "S" && (m.acse == nil || !m.acse.acseAbort) {
 		e.Direction = 1
-		if m.acse != nil {
+		if m.acse != nil || dlmsACSESegmentPrefix(m.information) {
 			f.endpoints = [2]string{e.Destination, e.Source}
 		}
 	}
 	if err == nil {
 		if created && (m.kind == "S" || m.kind == "DM") {
 			e.Session, e.ResponseTo, err = f.dlms.consume(m, w, e.Direction, e.ID)
-		} else if created && !m.request && m.acse == nil {
+		} else if created && !m.request && m.acse == nil && !dlmsACSESegmentPrefix(m.information) {
 			err = dlmsError(ErrContextRequired, "response lacks observed request context")
 		} else if created && len(store.entries) >= sessionCollectionLimit(a.budget.MaxCollectionElements) {
 			err = dlmsError(ErrResourceExceeded, "UDP conversation limit")
@@ -851,7 +864,7 @@ func (a *binParser) decodeDLMSDatagram(e *ProtocolEvent, w []byte, explicit bool
 			f.sessionBytes = f.dlms.storage()
 		}
 	}
-	if created && m != nil && m.acse != nil && len(f.dlms.acseSeen) > 0 && err != nil {
+	if created && m != nil && (m.acse != nil || dlmsACSESegmentPrefix(m.information)) && len(f.dlms.acseSeen) > 0 && err != nil {
 		// A parsed orphan may retain only a bounded logical-address/sequence
 		// refusal token. It remains an error with no fields or request link.
 		if len(store.entries) >= sessionCollectionLimit(a.budget.MaxCollectionElements) {

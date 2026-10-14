@@ -663,7 +663,15 @@ func (a *binParser) closeUDPSessions() {
 				if d.fragments.request {
 					profile, summary = "dlms-hdlc-segmented-request", "DLMS HDLC exchange ended with an incomplete segmented request"
 				}
+				if d.fragments.acseCommand != 0 {
+					profile, summary = "dlms-hdlc-acse-segmented", "DLMS HDLC exchange ended with incomplete ACSE information"
+				}
 				incomplete = append(incomplete, &ProtocolEvent{FlowID: f.id, Timestamp: v.touched, Domain: v.key.domain, Transport: "udp", Source: f.endpoints[dir], Destination: f.endpoints[1-dir], Direction: dir, Protocol: "dlms", Profile: profile, Status: "incomplete", Completeness: "incomplete", Summary: summary, Session: d.fragmentCloseFields()})
+				if d.fragments.acseCommand != 0 {
+					e := incomplete[len(incomplete)-1]
+					e.sessionError = &ProtocolError{Kind: ErrNeedMore, Message: summary}
+					e.Error = summary
+				}
 				a.incomplete.Add(1)
 			} else if d != nil && d.transfer != nil {
 				t := d.transfer
