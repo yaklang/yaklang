@@ -110,6 +110,9 @@ func (s *Server) SaveAITool(ctx context.Context, req *ypb.SaveAIToolRequest) (*y
 		Path:        req.GetToolPath(),
 		Keywords:    strings.Join(req.GetKeywords(), ","),
 	}
+	if parsed := yakscripttools.LoadYakScriptToAiTools(tool.Name, tool.Content); parsed != nil {
+		tool.DefaultAsync = parsed.DefaultAsync
+	}
 	tool.EnableAIOutputLog = yakscripttools.ParseAIToolEnableAIOutputLog(tool.Content)
 
 	affected, err := yakit.CreateAIYakTool(db, tool)
@@ -378,6 +381,8 @@ func fixAIToolMetadata(tool *schema.AIYakTool) error {
 		return utils.Errorf("failed to load yak script to AI tool")
 	}
 
+	// Scheduling metadata is derived from the current script, including removal.
+	tool.DefaultAsync = parsedAITool.DefaultAsync
 	if tool.Params == "" {
 		tool.Params = parsedAITool.Params
 	}

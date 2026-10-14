@@ -72,7 +72,8 @@ type ToolCallGroupCall struct {
 	Reason       string              `json:"reason,omitempty"`
 
 	// Async returns a manager execution receipt instead of waiting for the result.
-	Async bool `json:"async,omitempty"`
+	Async          bool `json:"async,omitempty"`
+	AsyncSpecified bool `json:"-"`
 
 	// ExecutionCallID is assigned by the runtime, never by the model. Keeping it
 	// on the request lets events, checkpoints and results identify one child.

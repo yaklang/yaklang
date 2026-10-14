@@ -100,7 +100,10 @@ func (r *toolCallResource) Execute(ctx context.Context) error {
 	if err := r.caller.ctx.Err(); err != nil {
 		return err
 	}
-	if directlyAnswer || result == nil {
+	if directlyAnswer {
+		return ErrToolReviewDirectAnswer
+	}
+	if result == nil {
 		return errors.New("tool call did not produce a result")
 	}
 	if !result.Success {
@@ -111,3 +114,6 @@ func (r *toolCallResource) Execute(ctx context.Context) error {
 	}
 	return nil
 }
+
+func (r *toolCallResource) CallToolID() string { return r.caller.CallToolID() }
+func (r *toolCallResource) ResultID() int64    { return r.caller.ResultID() }

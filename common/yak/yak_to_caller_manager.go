@@ -1277,6 +1277,7 @@ func (y *YakToCallerManager) fetchFunctionFromSourceCode(pluginContext *YakitPlu
 			yaklib.BindEngineClient(engine, y.aiRuntimeClient)
 			bindMemorySearchToEngine(engine, pluginContext.Ctx, y.aiRuntimeConfig)
 			bindAIHistoryToEngine(engine, pluginContext.Ctx, y.aiRuntimeConfig)
+			bindAIDetachToEngine(engine, y.aiRuntimeConfig)
 			bindDBHistoryToEngine(engine, pluginContext.Ctx, y.aiRuntimeConfig)
 		}
 		return nil

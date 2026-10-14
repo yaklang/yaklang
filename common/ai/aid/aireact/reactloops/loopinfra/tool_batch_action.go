@@ -137,7 +137,7 @@ func directlyCallToolBatchSchemaOption() aitool.ToolOption {
 		aitool.WithStringParam("reason",
 			aitool.WithParam_Description("可选。直接展示在该工具卡片上；用简短短语说明这个 child 具体做什么，同名工具的不同调用也要分别描述，不能照搬整批任务的理由。")),
 		aitool.WithBoolParam("async", aitool.WithParam_Default(false),
-			aitool.WithParam_Description("可选的本项异步标记，默认 false 同步等待；true 提交后台执行并返回本项 execute_id。同一批次可混合同步和异步调用。")),
+			aitool.WithParam_Description("可选的本项异步标记，省略时遵循工具默认策略；显式 false 同步等待，true 提交后台执行并返回本项 execute_id。同一批次可混合同步和异步调用。")),
 	)
 }
 
@@ -339,6 +339,7 @@ func parseDirectToolBatchActionWithMetadata(loop *reactloops.ReActLoop, action *
 			return nil, true, utils.Wrapf(err, "%s[%d]", directlyCallToolBatchField, index)
 		}
 		async := normalizeDirectToolAsync(item["async"])
+		_, asyncSpecified := item["async"]
 		toolName, err := strictBatchString(item, "tool_name", true)
 		if err != nil {
 			return nil, true, utils.Wrapf(err, "%s[%d]", directlyCallToolBatchField, index)
@@ -385,13 +386,14 @@ func parseDirectToolBatchActionWithMetadata(loop *reactloops.ReActLoop, action *
 		}
 		reactloops.MaybeWarnBashBeforeEdit(loop, toolName)
 		request.Calls = append(request.Calls, aicommon.ToolCallGroupCall{
-			Index:        index,
-			ToolName:     toolName,
-			Params:       params,
-			Identifier:   identifier,
-			Expectations: expectations,
-			Reason:       reason,
-			Async:        async,
+			Index:          index,
+			ToolName:       toolName,
+			Params:         params,
+			Identifier:     identifier,
+			Expectations:   expectations,
+			Reason:         reason,
+			Async:          async,
+			AsyncSpecified: asyncSpecified,
 		})
 	}
 	if allowMetadata {

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/segmentio/ksuid"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/asyncexecmanager"
@@ -327,6 +328,7 @@ func (r *ReAct) newToolCallerForBatchCall(
 	reviewGate aicommon.ToolCallerGate,
 	beforeInvoke aicommon.ToolCallerBeforeInvoke,
 	paramMutator func(*aitool.Tool, aitool.InvokeParams) aitool.InvokeParams,
+	extra ...aicommon.ToolCallerOption,
 ) (*aicommon.ToolCaller, error) {
 	childEmitter := baseEmitter
 	if childEmitter != nil {
@@ -373,7 +375,7 @@ func (r *ReAct) newToolCallerForBatchCall(
 			}
 		}
 	}
-	return aicommon.NewToolCaller(ctx, opts...)
+	return aicommon.NewToolCaller(ctx, append(opts, extra...)...)
 }
 
 // ExecuteToolCallGroup executes an explicit directly_call_tool parameter group. It never
@@ -402,12 +404,20 @@ func (r *ReAct) ExecuteToolCallGroup(
 		return nil, fmt.Errorf("tool batch task is nil")
 	}
 	hasAsync := false
+	for i := range request.Calls {
+		call := &request.Calls[i]
+		if !call.Async && !call.AsyncSpecified {
+			if tool, err := r.config.GetAiToolManager().GetToolByName(call.ToolName); err == nil && tool != nil {
+				call.Async = tool.DefaultAsync
+			}
+		}
+	}
 	for _, call := range request.Calls {
 		hasAsync = hasAsync || call.Async
 	}
 	loop := toolBatchLoop(task)
 	var manager *asyncexecmanager.Manager
-	if hasAsync {
+	if hasAsync || loop != nil {
 		if loop == nil || task.GetContext() == nil {
 			return nil, fmt.Errorf("async tool batch requires an owning loop and task context")
 		}
@@ -655,6 +665,7 @@ func (r *ReAct) ExecuteToolCallGroup(
 					return reactloops.ApplyToolInvokeParamsMutators(loop, currentTool.Name, params)
 				}
 			}
+			detachGate := new(toolBatchDetachGate)
 			beforeInvoke := func(
 				callCtx context.Context,
 				_ *aitool.Tool,
@@ -670,7 +681,7 @@ func (r *ReAct) ExecuteToolCallGroup(
 				if !work.call.Async {
 					release, err := barrier.wait(callCtx, i, invokeGate)
 					admitSync()
-					return release, err
+					return detachGate.bind(release), err
 				}
 				if _, err := barrier.wait(callCtx, i, nil); err != nil {
 					return nil, err
@@ -681,11 +692,17 @@ func (r *ReAct) ExecuteToolCallGroup(
 				case <-callCtx.Done():
 					return nil, callCtx.Err()
 				case <-syncAdmitted:
-					return invokeGate(callCtx)
+					release, err := invokeGate(callCtx)
+					return detachGate.bind(release), err
 				}
 			}
 			reviewGate := func(callCtx context.Context) (func(), error) {
 				return orderedReviews.wait(callCtx, i)
+			}
+			executionID := "exec-" + ksuid.New().String()
+			extra := []aicommon.ToolCallerOption{aicommon.WithToolCaller_OnDetach(detachGate.detach)}
+			if work.call.Async {
+				extra = append(extra, aicommon.WithToolCaller_AsyncExecutionID(executionID))
 			}
 			caller, callerErr := r.newToolCallerForBatchCall(
 				workerCtx,
@@ -695,6 +712,7 @@ func (r *ReAct) ExecuteToolCallGroup(
 				reviewGate,
 				beforeInvoke,
 				paramMutator,
+				extra...,
 			)
 			if callerErr != nil {
 				result.Outcomes[i].Stage = aicommon.ToolCallStagePrepareFailed
@@ -709,16 +727,14 @@ func (r *ReAct) ExecuteToolCallGroup(
 							barrier.arrive(i, true)
 							cancelWorkers()
 						}
-						if callErr == nil && !directlyAnswer && toolResult != nil {
-							_, _, _ = r.finalizeToolCallResult(task, toolResult, false)
-						}
+						r.finishDetachedToolCall(task, toolResult, directlyAnswer, callErr)
 					})
 				if resourceErr != nil {
 					result.Outcomes[i].Stage = aicommon.ToolCallStagePrepareFailed
 					result.Outcomes[i].Err = resourceErr
 					return
 				}
-				receipt, startErr := manager.Start(asyncexecmanager.Request{Resource: resource,
+				receipt, startErr := manager.Start(asyncexecmanager.Request{ID: executionID, Resource: resource,
 					Metadata: asyncexecmanager.Metadata{Name: work.call.ToolName, Attributes: map[string]string{
 						"task_id": task.GetId(), "loop": loop.GetLoopName(), "batch_id": work.batchID,
 						"call_index": fmt.Sprint(i), "identifier": work.call.Identifier, "call_id": work.call.ExecutionCallID,
@@ -742,7 +758,28 @@ func (r *ReAct) ExecuteToolCallGroup(
 			var toolResult *aitool.ToolResult
 			var directlyAnswer bool
 			var callErr error
-			toolResult, directlyAnswer, callErr = caller.CallToolWithExistedParams(work.tool, work.params)
+			if loop != nil {
+				execution, err := r.newDetachableToolCall(task, caller, work.call.ToolName)
+				if err != nil {
+					result.Outcomes[i].Stage = aicommon.ToolCallStagePrepareFailed
+					result.Outcomes[i].Err = err
+					return
+				}
+				execution.Start(func() (*aitool.ToolResult, bool, error) {
+					return caller.CallToolWithExistedParams(work.tool, work.params)
+				})
+				toolResult, directlyAnswer, callErr = execution.Wait()
+				var receipt *aicommon.ToolCallDetached
+				if errors.As(callErr, &receipt) {
+					result.Outcomes[i].Stage = aicommon.ToolCallStageSubmitted
+					result.Outcomes[i].ExecuteID = receipt.Receipt.ID
+					releaseForeground()
+					<-execution.Done()
+					return
+				}
+			} else {
+				toolResult, directlyAnswer, callErr = caller.CallToolWithExistedParams(work.tool, work.params)
+			}
 
 			outcome := &result.Outcomes[i]
 			outcome.Result = toolResult
@@ -779,7 +816,7 @@ func (r *ReAct) ExecuteToolCallGroup(
 		}()
 	}
 	foreground.Wait()
-	if hasAsync {
+	if hasAsync || loop != nil {
 		detached = true
 		// Start cleanup only after this method returns. If every async admission
 		// failed, all workers may already be done; cancelling ctx earlier would
@@ -816,4 +853,36 @@ func (r *ReAct) ExecuteToolCallGroup(
 		return result, err
 	}
 	return result, nil
+}
+
+// A promoted child no longer occupies a foreground invoke slot. Its caller
+// still owns the release callback, so both paths share an idempotent release.
+type toolBatchDetachGate struct {
+	mu       sync.Mutex
+	release  func()
+	detached bool
+}
+
+func (g *toolBatchDetachGate) bind(release func()) func() {
+	if release == nil {
+		return nil
+	}
+	release = aicommonIdempotentRelease(release)
+	g.mu.Lock()
+	g.release = release
+	detached := g.detached
+	g.mu.Unlock()
+	if detached {
+		release()
+	}
+	return release
+}
+func (g *toolBatchDetachGate) detach() {
+	g.mu.Lock()
+	g.detached = true
+	release := g.release
+	g.mu.Unlock()
+	if release != nil {
+		release()
+	}
 }

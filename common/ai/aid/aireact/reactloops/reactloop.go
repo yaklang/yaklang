@@ -115,7 +115,9 @@ type ReActLoop struct {
 
 	// Lazily bound to the owning task; guarded by onReleaseMutex.
 	// Direct calls and individual batch children can dispatch asynchronously.
-	asyncExecutionManager *asyncexecmanager.Manager
+	asyncExecutionManager      *asyncexecmanager.Manager
+	asyncDirectAnswer          chan struct{}
+	asyncDirectAnswerRequested bool
 
 	// memory management
 	memorySizeLimit        int

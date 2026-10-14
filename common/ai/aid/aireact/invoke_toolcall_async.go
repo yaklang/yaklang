@@ -36,7 +36,7 @@ func (r *ReAct) PrepareAsyncToolCall(task aicommon.AIStatefulTask, name string, 
 		params = reactloops.ApplyToolInvokeParamsMutators(ownerLoop, name, params)
 	}
 	// Assign before execution so the Inspector and task/timeline use the same ID.
-	opts = append(opts, aicommon.WithToolCaller_ResultID(r.config.AcquireId()),
+	opts = append(opts,
 		aicommon.WithToolCaller_StatsSource(aicommon.StatsSourceToolDirect),
 		aicommon.WithToolCaller_Task(task), aicommon.WithToolCaller_InvokeRuntime(r))
 	caller, err := r.newToolCallerForCall(ctx, task, name, opts...)
@@ -44,10 +44,7 @@ func (r *ReAct) PrepareAsyncToolCall(task aicommon.AIStatefulTask, name string, 
 		return nil, nil, err
 	}
 	resource, err := caller.NewAsyncResource(tool, params, func(result *aitool.ToolResult, directly bool, callErr error) {
-		if callErr == nil {
-			// Capture the original task, never re-read ReAct.currentTask here.
-			_, _, _ = r.finalizeToolCallResult(task, result, directly)
-		}
+		r.finishDetachedToolCall(task, result, directly, callErr)
 	})
 	if err != nil {
 		caller.Cancel()

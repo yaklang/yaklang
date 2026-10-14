@@ -89,6 +89,15 @@ func handleToolCallResult(
 	err error,
 	operator *reactloops.LoopActionHandlerOperator,
 ) {
+	var detached *aicommon.ToolCallDetached
+	if errors.As(err, &detached) {
+		feedback := fmt.Sprintf("工具已转为异步执行，尚未取得结果。execute_id: %q。通过 manage_async_execution_runtime 的 inspect/wait/stop 管理；所需执行结束并核验后再结束任务。", detached.Receipt.ID)
+		invoker.AddToTimeline("ASYNC_TOOL_SUBMITTED", feedback)
+		operator.Feedback(feedback)
+		operator.Continue()
+		return
+	}
+
 	// A non-nil ToolResult is the objective boundary that proves the plugin
 	// callback settled. Count both completed and protocol-failed calls. Review-driven
 	// direct_answer/cancel is terminal user intent, not a tool execution.

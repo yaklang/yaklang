@@ -142,6 +142,9 @@ func (a *ToolCaller) intervalReviewContext(
 				ToolExecutionStartedAt: startedAt,
 				ReviewCount:            reviewCount,
 			})
+			if a.detachHandler != nil && !a.detached.Load() {
+				reviewCtx = withToolDetachContext(reviewCtx, a.Detach)
+			}
 			shouldContinue, err := a.intervalReviewHandler(reviewCtx, tool, params, stdout, stderr, a.callExpectations)
 			reviewDurationMS := time.Since(reviewStartedAt).Milliseconds()
 			if err != nil {
@@ -162,6 +165,9 @@ func (a *ToolCaller) intervalReviewContext(
 			}
 
 			decision := "continue"
+			if toolDetachedDuringReview(reviewCtx) {
+				decision = "detach"
+			}
 			if !shouldContinue {
 				decision = "cancel"
 			}
@@ -489,6 +495,8 @@ func (a *ToolCaller) invoke(
 			runtimeCfg.CurrentTaskUserInput = currentTask.GetOriginUserInput()
 		}
 	}
+	runtimeCfg.Detach = a.Detach
+
 	// When the runtime is bound to a server-authorized target (Focus release or
 	// conversation-audit session), route tool-emitted risks to the platform
 	// result sink instead of process-local SQLite.

@@ -37,10 +37,13 @@ func normalizeDirectToolAsync(value any) bool {
 	return false
 }
 
-func directToolActionAsync(action *aicommon.Action) bool {
+func directToolActionAsync(action *aicommon.Action, defaults ...bool) bool {
 	// Read only the canonical root (or next_action wrapper), never flattened
 	// nested tool parameters or sibling batch members.
-	raw, _ := lookupCanonicalActionParam(action, actionStateDirectToolAsync)
+	raw, exists := lookupCanonicalActionParam(action, actionStateDirectToolAsync)
+	if !exists && len(defaults) > 0 {
+		return defaults[0]
+	}
 	return normalizeDirectToolAsync(raw)
 }
 

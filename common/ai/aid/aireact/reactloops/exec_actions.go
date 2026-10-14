@@ -194,23 +194,45 @@ func (r *ReActLoop) execCalls(
 			r.effectiveIterationCount++
 		}
 	}()
+	finishAsyncReview := func() loopActionsResult {
+		if answerDelivered {
+			// A review may arrive while the foreground is already answering.
+			// The answer just delivered satisfies it; do not generate a duplicate.
+			r.StopSubAgentsForUser()
+		} else {
+			result.err = r.answerAsyncReview(task)
+		}
+		result.result = loopActionsExit
+		result.operator.ExitForUser()
+		if result.err != nil {
+			result.result = loopActionsError
+		}
+		return result
+	}
+
 	for index, call := range calls {
+		if r.asyncReviewRequiresAnswer() {
+			return finishAsyncReview()
+		}
 		if appliedAdjustment || remainingAdjustments > 0 {
 			r.Set(loopVarNativeTodoBatchAdjusted, true)
 		} else {
 			r.Delete(loopVarNativeTodoBatchAdjusted)
 		}
 		outcome := r.execOneCall(call, iteration, task, prompt, done, index, len(calls), eventSink)
+		if call.Action != nil && call.Action.Name() == loopAction_DirectlyAnswer.ActionType &&
+			outcome.err == nil && !outcome.skipPostIteration {
+			answerDelivered = true
+		}
+		if r.asyncReviewRequiresAnswer() {
+			return finishAsyncReview()
+		}
 		countIteration = countIteration || outcome.countsEffectiveIteration
 		if call.Action != nil && call.Action.Name() == nativeAdjustTodolistActionName {
 			if delta, err := aicommon.NormalizeTodoDelta(call.Action); err == nil && delta != nil {
 				remainingAdjustments--
 			}
 			appliedAdjustment = appliedAdjustment || outcome.appliedTodoDelta != nil && outcome.appliedTodoDelta.HasChanges()
-		}
-		if call.Action != nil && call.Action.Name() == loopAction_DirectlyAnswer.ActionType &&
-			outcome.err == nil && !outcome.skipPostIteration {
-			answerDelivered = true
 		}
 		if len(calls) == 1 {
 			result.operator = outcome.operator

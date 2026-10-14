@@ -22,6 +22,9 @@ import (
 )
 
 type ToolRuntimeConfig struct {
+	// Detach transfers this invocation to its owning loop's background manager.
+	// It returns the same execution ID on repeated calls. Nil means unsupported.
+	Detach          func() (string, error)
 	FeedBacker      func(result *ypb.ExecResult) error
 	RuntimeID       string
 	ProjectDatabase *gorm.DB
@@ -61,6 +64,8 @@ type MCPClientCloser interface {
 
 type Tool struct {
 	*mcp.Tool
+	// DefaultAsync is scheduling metadata, never a business input parameter.
+	DefaultAsync bool `json:"default_async,omitempty"`
 	// A list of keywords for tool indexing and searching.
 	Keywords      []string `json:"keywords,omitempty"`
 	VerboseName   string   `json:"verbose_name,omitempty"`    // English string（事件/列表同名字段保持 string）
@@ -79,6 +84,10 @@ type Tool struct {
 
 // ToolOption 定义工具选项函数的类型
 type ToolOption func(*Tool)
+
+func WithDefaultAsync(enabled bool) ToolOption {
+	return func(t *Tool) { t.DefaultAsync = enabled }
+}
 
 // PropertyOption 定义属性选项函数的类型
 type PropertyOption func(map[string]any)
