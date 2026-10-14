@@ -94,6 +94,7 @@ type someIPTransfer struct {
 }
 type someIPConversation struct {
 	flow          *binFlow
+	direction     int
 	clock         time.Time
 	seen          map[someIPKey]*someIPTransfer
 	charge        int64
@@ -169,7 +170,7 @@ func (a *binParser) consumeSomeIPTP(e *ProtocolEvent, w []byte, inputErr error) 
 			store.refuseUnknown = true
 			return nil, problem
 		}
-		c = &someIPConversation{flow: flow, clock: e.Timestamp, seen: map[someIPKey]*someIPTransfer{}, charge: someIPTPBase}
+		c = &someIPConversation{flow: flow, clock: e.Timestamp, direction: e.Direction, seen: map[someIPKey]*someIPTransfer{}, charge: someIPTPBase}
 		store.entries[key] = c
 	}
 	defer func() {
@@ -331,10 +332,7 @@ func (a *binParser) closeSomeIPTPLocked() []*ProtocolEvent {
 			for _, p := range c.seen {
 				if p.active {
 					er := &ProtocolError{Kind: ErrNeedMore, Message: "SOME/IP-TP closed with missing final fragment"}
-					e := &ProtocolEvent{FlowID: c.flow.id, Timestamp: c.clock, Domain: key.domain, Source: key.a, Destination: key.b, Transport: "udp", Protocol: "someip", Profile: someIPTPProfile, Status: "incomplete", Completeness: "incomplete", Error: er.Message, sessionError: er, SourceBytes: ByteSource{Kind: "reassembled", ParentPDUs: append([]uint64(nil), p.ids...), PacketRefs: append([]PacketReference(nil), p.refs...)}}
-					if key.a > key.b {
-						e.Direction = 1
-					}
+					e := &ProtocolEvent{FlowID: c.flow.id, Direction: c.direction, Timestamp: c.clock, Domain: key.domain, Source: key.a, Destination: key.b, Transport: "udp", Protocol: "someip", Profile: someIPTPProfile, Status: "incomplete", Completeness: "incomplete", Error: er.Message, sessionError: er, SourceBytes: ByteSource{Kind: "reassembled", ParentPDUs: append([]uint64(nil), p.ids...), PacketRefs: append([]PacketReference(nil), p.refs...)}}
 					out = append(out, e)
 					a.incomplete.Add(1)
 				}
@@ -356,4 +354,17 @@ func (s *captureSession) probeSomeIPTP(data []byte) (ProbeResult, bool) {
 		return ProbeResult{Verdict: ProbeReject, Reason: err.Error()}, true
 	}
 	return probeAccept("someip", someIPTPProfile, 98), true
+}
+
+// Native Feed supplies caller-relative direction after constructing the UDP
+// carrier. Preserve that fact for Close; captures retain their directed flow's
+// original direction instead of inventing an orientation from address ordering.
+func (a *binParser) retainSomeIPSessionDirection(e *ProtocolEvent) {
+	a.udpMu.Lock()
+	defer a.udpMu.Unlock()
+	if a.someIPTP != nil {
+		if c := a.someIPTP.entries[binUDPKey{e.Source, e.Destination, e.Domain}]; c != nil {
+			c.direction = e.Direction
+		}
+	}
 }

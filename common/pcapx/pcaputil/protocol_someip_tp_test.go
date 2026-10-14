@@ -163,6 +163,7 @@ func TestSomeIPTPSealedReplay(t *testing.T) {
 							}
 							for i, ids := range c.CloseIDs {
 								e := events[len(c.Steps)+i]
+								require.Equal(t, 0, e.Direction, "directed capture Close must retain its preceding event direction")
 								require.Equal(t, ids, e.SourceBytes.ParentPDUs)
 								require.Len(t, e.SourceBytes.PacketRefs, len(ids))
 								for j, n := range ids {

@@ -54,6 +54,9 @@ func (s *captureSession) feedDatagram(dir int, ts time.Time, raw []byte) FeedRes
 	out := FeedResult{Consumed: int(s.f.a.input.Load() - before), Events: s.events, State: "undetected"}
 	for _, e := range out.Events {
 		e.Direction = dir
+		if e.Profile == someIPTPProfile {
+			s.f.a.retainSomeIPSessionDirection(e)
+		}
 		if e.Protocol != "" {
 			out.State = e.Protocol
 		}
