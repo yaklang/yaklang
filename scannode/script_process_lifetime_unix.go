@@ -12,6 +12,7 @@ import (
 	"syscall"
 
 	"github.com/yaklang/yaklang/common/utils/subprocess"
+	"golang.org/x/sys/unix"
 )
 
 const scriptParentLifetimeFDEnv = "LEGION_SCRIPT_PARENT_LIFETIME_FD"
@@ -61,7 +62,7 @@ func watchScriptParentLifetime() (func(), error) {
 		_ = reader.Close()
 		return nil, fmt.Errorf("script parent lifetime descriptor is not a pipe")
 	}
-	if syscall.Getpgrp() != os.Getpid() {
+	if !scriptOwnsProcessGroup() {
 		_ = reader.Close()
 		return nil, fmt.Errorf("supervised script must own its process group")
 	}
@@ -79,7 +80,7 @@ func watchScriptParentLifetime() (func(), error) {
 		// The parent cannot run cancellation handlers after SIGKILL. Stop the
 		// execution even if a Yak/native function ignores context cancellation.
 		// Never signal an inherited caller group if code changed our group.
-		if syscall.Getpgrp() == os.Getpid() {
+		if scriptOwnsProcessGroup() {
 			_ = syscall.Kill(-os.Getpid(), syscall.SIGKILL)
 		}
 		os.Exit(125)
@@ -90,4 +91,9 @@ func watchScriptParentLifetime() (func(), error) {
 			_ = reader.Close()
 		})
 	}, nil
+}
+
+func scriptOwnsProcessGroup() bool {
+	group, err := unix.Getpgid(0)
+	return err == nil && group == os.Getpid()
 }
