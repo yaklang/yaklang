@@ -1,0 +1,52 @@
+{
+  "source_session": "b3031a5d-159f-446a-87d2-79386ce0a352",
+  "title": "test_default_async同步异步对比",
+  "prompt": "调用 `test_default_async`，第一次省略异步调度字段，观察是否返回执行 ID，并等待、读取结果。然后再调用一次，这次显式指定同步执行。比较两次调用是否提前返回异步回执。",
+  "steps": [
+    {
+      "action": "require_tool",
+      "params": {
+        "identifier": "load_test_default_async_schema",
+        "require_tool_payload": "test_default_async"
+      }
+    },
+    {
+      "action": "directly_call_tool",
+      "params": {
+        "identifier": "default_async_omit_field",
+        "directly_call_tool_name": "test_default_async",
+        "directly_call_tool_params": {}
+      }
+    },
+    {
+      "action": "manage_async_execution_runtime",
+      "params": {
+        "identifier": "wait_first_async_exec",
+        "op": "wait",
+        "execute_id": "$exec1",
+        "timeout_seconds": 30
+      }
+    },
+    {
+      "action": "directly_call_tool",
+      "params": {
+        "directly_call_tool_name": "test_default_async",
+        "directly_call_tool_params": {},
+        "async_directly_call_tool": false,
+        "directly_call_reason": "显式指定同步执行，观察调用是否阻塞至完成后才返回结果",
+        "identifier": "explicit_sync_call"
+      }
+    }
+  ],
+  "expected_cards": 2,
+  "expected_executions": [
+    {
+      "id": "$exec1",
+      "state": "completed",
+      "stdout_contains": [
+        "START",
+        "DONE"
+      ]
+    }
+  ]
+}

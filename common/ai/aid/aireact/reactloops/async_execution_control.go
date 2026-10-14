@@ -48,6 +48,17 @@ func (r *ReActLoop) answerAsyncReview(task aicommon.AIStatefulTask) error {
 	answer, err := r.invoker.DirectlyAnswer(task.GetContext(), "用户在后台工具调用审批中要求直接回答。停止继续调用工具，根据已有信息回答用户。", nil)
 	if err == nil {
 		r.invoker.AddToTimeline("directly-answer", answer)
+		// This host-directed answer bypasses execOneCall. Record its delivery
+		// so ordinary finalizers do not see the preceding tool action and
+		// generate a second answer. It executes no tool callbacks.
+		r.actionHistoryMutex.Lock()
+		r.actionHistory = append(r.actionHistory, &ActionRecord{
+			ActionType:     loopAction_DirectlyAnswer.ActionType,
+			ActionName:     loopAction_DirectlyAnswer.ActionType,
+			ActionParams:   map[string]interface{}{"answer_payload": answer},
+			IterationIndex: r.currentIterationIndex,
+		})
+		r.actionHistoryMutex.Unlock()
 	}
 	return err
 }

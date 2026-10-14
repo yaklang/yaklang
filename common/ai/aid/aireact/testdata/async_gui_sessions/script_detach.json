@@ -1,0 +1,71 @@
+{
+  "source_session": "8232a107-42d0-409e-bc8d-4e229de9e50b",
+  "title": "test_detach异步执行",
+  "prompt": "调用 `test_detach`，显式指定初始同步执行。工具返回异步回执后，立即调用 bash 输出 `AGENT_CONTINUES`，然后等待原执行结束并读取完整输出及结果。",
+  "steps": [
+    {
+      "action": "require_tool",
+      "params": {
+        "identifier": "load_test_detach_schema",
+        "require_tool_payload": [
+          "test_detach",
+          "bash"
+        ]
+      }
+    },
+    {
+      "action": "directly_call_tool",
+      "params": {
+        "identifier": "call_test_detach_sync_start",
+        "directly_call_tool_name": "test_detach",
+        "directly_call_tool_params": {},
+        "async_directly_call_tool": false,
+        "directly_call_reason": "显式同步（async=false）发起 test_detach，观察其内部主动 Detach 后的异步回执与 execute_id"
+      }
+    },
+    {
+      "action": "directly_call_tool",
+      "params": {
+        "directly_call_tool_name": "bash",
+        "directly_call_tool_params": {
+          "accepted-exit-codes": "0",
+          "command": "echo AGENT_CONTINUES",
+          "timeout": 10
+        },
+        "identifier": "bash_echo_agent_continues",
+        "directly_call_reason": "test_detach 已转为后台异步执行，证明控制权已回到主循环；立即用 bash 输出 AGENT_CONTINUES"
+      }
+    },
+    {
+      "action": "manage_async_execution_runtime",
+      "params": {
+        "identifier": "wait_detach_exec_done",
+        "op": "wait",
+        "execute_id": "$exec1",
+        "timeout_seconds": 60
+      }
+    },
+    {
+      "action": "manage_async_execution_runtime",
+      "params": {
+        "execute_id": "$exec1",
+        "identifier": "inspect_detach_exec_output",
+        "op": "inspect"
+      }
+    }
+  ],
+  "expected_cards": 2,
+  "expected_executions": [
+    {
+      "id": "$exec1",
+      "state": "completed",
+      "stdout_contains": [
+        "START",
+        "EXECUTION_ID=",
+        "REPEATED_EXECUTION_ID=",
+        "DONE",
+        "CLEANUP"
+      ]
+    }
+  ]
+}

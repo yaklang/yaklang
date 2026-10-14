@@ -1,0 +1,71 @@
+{
+  "source_session": "22e91387-4550-4b0f-b9c5-8a7209038e99",
+  "title": "test_detach流程验证",
+  "prompt": "调用 `test_detach`，拿到执行 ID 后立即请求停止，再 wait 确认退出，最后 inspect。请报告最终状态、是否出现 CLEANUP，以及是否出现 DONE。不要重新运行这个工具。",
+  "steps": [
+    {
+      "action": "require_tool",
+      "params": {
+        "identifier": "load_test_detach_schema",
+        "require_tool_payload": "test_detach"
+      }
+    },
+    {
+      "action": "directly_call_tool",
+      "params": {
+        "identifier": "run_test_detach",
+        "directly_call_tool_name": "test_detach",
+        "directly_call_tool_params": {},
+        "directly_call_reason": "提交 test_detach 取执行 ID"
+      }
+    },
+    {
+      "action": "manage_async_execution_runtime",
+      "params": {
+        "identifier": "stop_detach_exec",
+        "op": "stop",
+        "execute_id": "$exec1"
+      }
+    },
+    {
+      "action": "manage_async_execution_runtime",
+      "params": {
+        "execute_id": "$exec1",
+        "identifier": "wait_detach_exec",
+        "op": "wait",
+        "timeout_seconds": 30
+      }
+    },
+    {
+      "action": "manage_async_execution_runtime",
+      "params": {
+        "execute_id": "$exec1",
+        "identifier": "wait_detach_exec_again",
+        "op": "wait",
+        "timeout_seconds": 30
+      }
+    },
+    {
+      "action": "manage_async_execution_runtime",
+      "params": {
+        "execute_id": "$exec1",
+        "identifier": "inspect_detach_exec",
+        "op": "inspect"
+      }
+    }
+  ],
+  "expected_cards": 1,
+  "expected_executions": [
+    {
+      "id": "$exec1",
+      "state": "cancelled",
+      "stdout_contains": [
+        "START",
+        "CLEANUP"
+      ],
+      "stdout_not_contains": [
+        "DONE"
+      ]
+    }
+  ]
+}

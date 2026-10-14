@@ -222,7 +222,9 @@ func (r *ReAct) _invokeToolCall_IntervalReviewWithContextForTaskAndEmitter(
 		),
 	)
 	if reviewErr != nil {
-		log.Errorf("interval review failed: %v", reviewErr)
+		if ctx.Err() == nil {
+			log.Errorf("interval review failed: %v", reviewErr)
+		}
 		return true, reviewErr
 	}
 	return shouldContinue, nil
