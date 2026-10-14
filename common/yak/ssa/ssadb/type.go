@@ -2,7 +2,6 @@ package ssadb
 
 import (
 	"fmt"
-	"time"
 
 	"github.com/yaklang/gorm"
 
@@ -71,38 +70,21 @@ func SaveIrTypeBatch(db *gorm.DB, items []*IrType) error {
 	if db == nil || len(items) == 0 {
 		return nil
 	}
-	clean := make([]*IrType, 0, len(items))
-	for _, it := range items {
-		if it != nil {
-			clean = append(clean, it)
-		}
-	}
-	if len(clean) == 0 {
-		return nil
-	}
+	items = withoutNil(items)
 	if hasNamedIndex(db, TableIrTypes, "ux_ir_types_program_type") {
-		for _, it := range clean {
-			it.ID = 0
-			it.CreatedAt = time.Time{}
-			it.UpdatedAt = time.Time{}
-			it.DeletedAt = nil
-		}
-		if err := db.New().UpdateInBatches(clean, irTypeBatchChunk, "program_name,type_id").Error; err != nil {
+		if err := db.New().SaveInBatches(items, irTypeBatchChunk, "program_name", "type_id").Error; err != nil {
 			return fmt.Errorf("upsert IR type: %w", err)
 		}
 	} else {
-		for start := 0; start < len(clean); start += irTypeBatchChunk {
-			end := start + irTypeBatchChunk
-			if end > len(clean) {
-				end = len(clean)
-			}
-			if err := bulkUpsertIrType(db, clean[start:end]); err != nil {
+		for start := 0; start < len(items); start += irTypeBatchChunk {
+			end := min(start+irTypeBatchChunk, len(items))
+			if err := bulkUpsertIrType(db, items[start:end]); err != nil {
 				return err
 			}
 		}
 	}
 	// keep the in-process type cache warm (same side effect as UpsertIrType)
-	for _, it := range clean {
+	for _, it := range items {
 		if cache := GetIrTypeCache(it.ProgramName); cache != nil {
 			cache.Set(int64(it.TypeId), it)
 		}
