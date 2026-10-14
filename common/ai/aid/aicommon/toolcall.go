@@ -1273,8 +1273,22 @@ func (t *ToolCaller) CallToolWithExistedParams(tool *aitool.Tool, invokeParams a
 		handleError(ctxErr)
 		return nil, false, ctxErr
 	}
+	// Watchers/review can request cancellation while the callback is still
+	// cleaning up. Defer terminal UI events until both output streams are flushed.
+	var outcomeMu sync.Mutex
+	var cancellationReason, invocationError any
 	toolResult, err = t.invoke(
-		tool, invokeParams, handleUserCancel, handleError,
+		tool, invokeParams,
+		func(reason any) {
+			outcomeMu.Lock()
+			cancellationReason = reason
+			outcomeMu.Unlock()
+		},
+		func(err any) {
+			outcomeMu.Lock()
+			invocationError = err
+			outcomeMu.Unlock()
+		},
 		stdoutMultiWriter, stderrMultiWriter,
 		stdoutBuffer, stderrBuffer,
 		func(result *aitool.ToolResult) error {
@@ -1328,6 +1342,20 @@ func (t *ToolCaller) CallToolWithExistedParams(tool *aitool.Tool, invokeParams a
 	t.emitter.EmitInfo("start to generate and feedback tool[%v] result in task: %#v", tool.Name, t.task.GetName())
 	if toolResult != nil && toolResult.Data != nil {
 		t.emitter.EmitToolCallResult(callToolId, toolResult.Data)
+	}
+
+	outcomeMu.Lock()
+	cancelReason, reportedError := cancellationReason, invocationError
+	outcomeMu.Unlock()
+	if cancelReason != nil || errors.Is(err, context.Canceled) {
+		if cancelReason == nil {
+			cancelReason = err
+		}
+		handleUserCancel(cancelReason)
+	} else if err != nil {
+		handleError(err)
+	} else if reportedError != nil {
+		handleError(reportedError)
 	}
 
 	if !t.checkpointReplayed && (t.ctx == nil || t.ctx.Err() == nil) {

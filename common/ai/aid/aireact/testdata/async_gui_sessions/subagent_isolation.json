@@ -1,0 +1,57 @@
+{
+  "source_session": "290d7fe9-0015-408d-b3e4-0596029b9fb5",
+  "title": "Subagent异步执行与结果汇总",
+  "prompt": "创建两个 subagent。每个分别异步执行 `sleep 20; echo CHILD_DONE`，在自己的执行列表中查询、等待并读取结果后再退出，同时报告执行 ID。主 agent 查询自己的异步执行列表，最后汇总两个子 agent 的真实结果。",
+  "steps": [
+    {
+      "action": "dispatch_sub_react_agents",
+      "params": {
+        "identifier": "dispatch_two_async_sleep_children",
+        "dispatches": [
+          {
+            "context_mode": "task_only",
+            "goal": "独立完成一个自包含的异步执行实验：1) 使用业务工具 bash（通过 directly_call_tool，directly_call_tool_name=\"bash\"，参数形如 {\"command\":\"sleep 20; echo CHILD_DONE\"}）提交命令 `sleep 20; echo CHILD_DONE`，并显式设置 async_directly_call_tool=true 使其后台异步执行，记录返回的 execute_id；2) 随后用顶层 action manage_async_execution_runtime，op=wait、execute_id=<该ID>、timeout_seconds 最多 60 等待其结束（若超时则再次 wait 或 op=inspect），再用 op=inspect 读取真实 stdout；3) 确认 stdout 中出现 CHILD_DONE 后才退出。不要用同步方式绕过异步要求，不要仅凭提交回执判断成功。",
+            "identifier": "child_a_async_sleep",
+            "result_contract": "返回：A) 异步执行的 execute_id 原文；B) manage_async_execution_runtime 的 inspect 得到的真实 stdout（须含 CHILD_DONE）；C) 终态状态（completed/succeeded 等）与是否读到最终输出。若失败，给出失败原因与已尝试步骤。",
+            "task_name": "子agentA异步sleep20"
+          },
+          {
+            "context_mode": "task_only",
+            "goal": "独立完成一个自包含的异步执行实验：1) 使用业务工具 bash（通过 directly_call_tool，directly_call_tool_name=\"bash\"，参数形如 {\"command\":\"sleep 20; echo CHILD_DONE\"}）提交命令 `sleep 20; echo CHILD_DONE`，并显式设置 async_directly_call_tool=true 使其后台异步执行，记录返回的 execute_id；2) 随后用顶层 action manage_async_execution_runtime，op=wait、execute_id=<该ID>、timeout_seconds 最多 60 等待其结束（若超时则再次 wait 或 op=inspect），再用 op=inspect 读取真实 stdout；3) 确认 stdout 中出现 CHILD_DONE 后才退出。不要用同步方式绕过异步要求，不要仅凭提交回执判断成功。",
+            "identifier": "child_b_async_sleep",
+            "result_contract": "返回：A) 异步执行的 execute_id 原文；B) manage_async_execution_runtime 的 inspect 得到的真实 stdout（须含 CHILD_DONE）；C) 终态状态（completed/succeeded 等）与是否读到最终输出。若失败，给出失败原因与已尝试步骤。",
+            "task_name": "子agentB异步sleep20"
+          }
+        ]
+      }
+    },
+    {
+      "action": "manage_async_execution_runtime",
+      "params": {
+        "identifier": "parent_list_async_runs",
+        "op": "list"
+      }
+    },
+    {
+      "action": "wait_sub_react_agents",
+      "params": {
+        "identifier": "wait_two_children",
+        "timeout_ms": 30000
+      }
+    },
+    {
+      "action": "wait_sub_react_agents",
+      "params": {
+        "identifier": "wait_two_children_again",
+        "timeout_ms": 30000
+      }
+    },
+    {
+      "action": "wait_sub_react_agents",
+      "params": {
+        "identifier": "wait_child_a_done",
+        "timeout_ms": 30000
+      }
+    }
+  ]
+}

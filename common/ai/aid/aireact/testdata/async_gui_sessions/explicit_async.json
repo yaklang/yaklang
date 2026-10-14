@@ -1,0 +1,76 @@
+{
+  "source_session": "d99cf2a4-fa9d-41c8-917a-58ccb9151cd4",
+  "title": "Bash异步执行任务",
+  "prompt": "使用框架异步调用 bash，执行 `sleep 20; echo ASYNC_DONE`。拿到执行 ID 后，立即另调用一次 bash 执行 `echo FOREGROUND_DONE`。最后等待后台执行结束并读取结果。请报告执行 ID 和实际输出，不要提前结束任务。",
+  "steps": [
+    {
+      "action": "require_tool",
+      "params": {
+        "identifier": "load_bash_schema",
+        "require_tool_payload": "bash"
+      }
+    },
+    {
+      "action": "directly_call_tool",
+      "params": {
+        "identifier": "async_and_foreground_bash",
+        "directly_call_tool_params_group": [
+          {
+            "async": true,
+            "expectations": "立即返回 execute_id，命令在后台运行",
+            "identifier": "bash_async_sleep20",
+            "params": {
+              "accepted-exit-codes": "0",
+              "command": "sleep 20; echo ASYNC_DONE",
+              "timeout": 60
+            },
+            "reason": "异步后台执行 sleep 20 后输出 ASYNC_DONE，取回 execute_id",
+            "tool_name": "bash"
+          },
+          {
+            "async": false,
+            "expectations": "stdout 输出 FOREGROUND_DONE，exit_code=0",
+            "identifier": "bash_foreground_echo",
+            "params": {
+              "accepted-exit-codes": "0",
+              "command": "echo FOREGROUND_DONE",
+              "timeout": 15
+            },
+            "reason": "异步提交后立即执行前台命令，验证前台调用不被阻塞",
+            "tool_name": "bash"
+          }
+        ]
+      }
+    },
+    {
+      "action": "manage_async_execution_runtime",
+      "params": {
+        "identifier": "wait_async_bash_done",
+        "op": "wait",
+        "execute_id": "$exec1",
+        "timeout_seconds": 30
+      }
+    },
+    {
+      "action": "manage_async_execution_runtime",
+      "params": {
+        "execute_id": "$exec1",
+        "identifier": "inspect_async_bash_output",
+        "op": "inspect"
+      }
+    }
+  ],
+  "expected_cards": 2,
+  "expected_executions": [
+    {
+      "id": "$exec1",
+      "state": "completed",
+      "stdout_contains": [
+        "ASYNC_DONE"
+      ],
+      "stdout_not_contains": [
+        "FOREGROUND_DONE"
+      ]
+    }
+  ]
+}

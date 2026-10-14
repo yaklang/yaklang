@@ -236,6 +236,7 @@ func yakTool2AITool(aitools []*schema.AIYakTool, invokeForgeHandle bool) []*aito
 					bindMemorySearchToEngine(ae, ctx, runtimeConfig)
 					bindAIHistoryToEngine(ae, ctx, runtimeConfig)
 					bindAIDetachToEngine(ae, runtimeConfig)
+					bindAIToolSleep(ae, ctx)
 					bindDBHistoryToEngine(ae, ctx, runtimeConfig)
 					return nil
 				})

@@ -1,0 +1,103 @@
+{
+  "source_session": "b3644da5-2661-49da-8cd3-d659629b2624",
+  "title": "test_detach并发执行测试",
+  "prompt": "在同一批次中调用两次 `test_detach`，两项都显式指定初始同步，并使用不同 identifier。取得两个执行 ID 后，只停止第一个；第二个正常等待完成。最后分别读取两个执行的状态和结果。",
+  "steps": [
+    {
+      "action": "require_tool",
+      "params": {
+        "identifier": "load_test_detach_schema",
+        "require_tool_payload": "test_detach"
+      }
+    },
+    {
+      "action": "directly_call_tool",
+      "params": {
+        "identifier": "detach_two_sync_calls",
+        "directly_call_tool_params_group": [
+          {
+            "async": false,
+            "expectations": "回执返回 execute_id",
+            "identifier": "detach_first_sync",
+            "params": {},
+            "reason": "第一批次第一项：显式初始同步调用 test_detach，取得执行 ID",
+            "tool_name": "test_detach"
+          },
+          {
+            "async": false,
+            "expectations": "回执返回不同于第一项的 execute_id",
+            "identifier": "detach_second_sync",
+            "params": {},
+            "reason": "第一批次第二项：显式初始同步调用 test_detach，取得另一个执行 ID",
+            "tool_name": "test_detach"
+          }
+        ]
+      }
+    },
+    {
+      "action": "manage_async_execution_runtime",
+      "params": {
+        "identifier": "stop_first_exec",
+        "op": "stop",
+        "execute_id": "$exec1"
+      }
+    },
+    {
+      "action": "manage_async_execution_runtime",
+      "params": {
+        "execute_id": "$exec1",
+        "identifier": "wait_first_stopped",
+        "op": "wait",
+        "timeout_seconds": 20
+      }
+    },
+    {
+      "action": "manage_async_execution_runtime",
+      "params": {
+        "execute_id": "$exec1",
+        "identifier": "wait_first_stopped_again",
+        "op": "wait",
+        "timeout_seconds": 30
+      }
+    },
+    {
+      "action": "manage_async_execution_runtime",
+      "params": {
+        "execute_id": "$exec1",
+        "identifier": "inspect_first_cancelled",
+        "op": "inspect"
+      }
+    },
+    {
+      "action": "manage_async_execution_runtime",
+      "params": {
+        "execute_id": "$exec2",
+        "identifier": "inspect_second_done",
+        "op": "inspect"
+      }
+    }
+  ],
+  "expected_cards": 2,
+  "expected_executions": [
+    {
+      "id": "$exec1",
+      "state": "cancelled",
+      "stdout_contains": [
+        "START",
+        "CLEANUP"
+      ],
+      "stdout_not_contains": [
+        "DONE"
+      ]
+    },
+    {
+      "id": "$exec2",
+      "state": "completed",
+      "stdout_contains": [
+        "START",
+        "DONE",
+        "CLEANUP"
+      ]
+    }
+  ]
+}

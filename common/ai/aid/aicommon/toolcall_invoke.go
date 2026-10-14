@@ -147,6 +147,11 @@ func (a *ToolCaller) intervalReviewContext(
 			}
 			shouldContinue, err := a.intervalReviewHandler(reviewCtx, tool, params, stdout, stderr, a.callExpectations)
 			reviewDurationMS := time.Since(reviewStartedAt).Milliseconds()
+			// A completed/stopped tool cancels its pending review normally.
+			// Do not turn that teardown into a failed progress card.
+			if ctx.Err() != nil {
+				return
+			}
 			if err != nil {
 				log.Errorf("interval review handler failed: %v", err)
 				emitProgressReview(ToolCallProgressReviewPayload{
@@ -352,8 +357,15 @@ func (a *ToolCaller) invoke(
 		return result, err
 	}
 
+	watcherDone := make(chan struct{})
+	defer func() { cancel(); <-watcherDone }()
 	go func() {
-		ep.WaitContext(ctx)
+		defer close(watcherDone)
+		// Cancellation wakes the watcher without a user decision. In particular,
+		// async stop must not consume the card's terminal event before cleanup.
+		if err := ep.sig.WaitContext(ctx); err != nil || ctx.Err() != nil {
+			return
+		}
 		userSuggestion := ep.GetParams()
 		switch userSuggestion.GetString("suggestion") {
 		case string(ToolCallAction_Enough_Cancel):
@@ -379,7 +391,10 @@ func (a *ToolCaller) invoke(
 		// an immutable deep snapshot instead of racing those tool-owned mutations.
 		intervalReviewParams := cloneEndpointParams(params)
 		intervalStart := make(chan struct{})
+		intervalDone := make(chan struct{})
+		defer func() { cancel(); <-intervalDone }()
 		go func() {
+			defer close(intervalDone)
 			close(intervalStart)
 			a.intervalReviewContext(
 				ctx, cancel,
