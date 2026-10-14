@@ -82,13 +82,15 @@ type canISOReceiver struct {
 type canUDSIdentity struct {
 	service    byte
 	descriptor uint16
+	argument   uint16 // additional echoed routine identifier
 }
 type canUDSPending struct {
-	ref        PacketReference
-	key        canUDSIdentity
-	id         uint64
-	at         time.Time
-	suppressed bool
+	ref           PacketReference
+	key           canUDSIdentity
+	id            uint64
+	at            time.Time
+	suppressed    bool
+	requestDigest [32]byte // exact active request, without retaining caller-owned bytes
 }
 type canISOConnection struct {
 	cost            int64

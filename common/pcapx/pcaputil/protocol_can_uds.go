@@ -2,7 +2,9 @@ package pcaputil
 
 import (
 	"bytes"
+	"crypto/sha256"
 	"encoding/binary"
+	"unsafe"
 )
 
 // Selected ISO14229 wire observations, not an authenticated ECU service. The
@@ -62,6 +64,63 @@ func (a *binParser) decodeCANUDS(s *canISOConnection, dir int, body []byte, e *P
 			} else {
 				f["Subfunction"] = key.descriptor
 			}
+		case 0x31, 0x28, 0x85:
+			service := body[0]
+			retire := func(kind ProtocolErrorKind, why string) (map[string]any, error) {
+				s.pending = nil
+				s.serviceSeen[service] = 2
+				s.blockedServices[service] = true
+				return fail(kind, why)
+			}
+			minimum := 2
+			if service == 0x31 {
+				minimum = 4
+			} else if service == 0x28 {
+				minimum = 3
+			}
+			if len(body) < minimum {
+				return retire(ErrMalformedMessage, "parameter control request is truncated")
+			}
+			key.descriptor = uint16(body[1] & 0x7f)
+			suppressed = body[1]&0x80 != 0
+			f["Suppress Positive Response"] = suppressed
+			f["Positive Response Expected"] = !suppressed
+			switch service {
+			case 0x31:
+				if key.descriptor < 1 || key.descriptor > 3 {
+					return retire(ErrUnsupportedFeature, "routine control type outside selected types 1..3")
+				}
+				key.argument = binary.BigEndian.Uint16(body[2:4])
+				f["Control Type"], f["Routine Identifier"] = key.descriptor, key.argument
+				f["Routine Option Record"] = bytes.Clone(body[4:])
+				f["Record Interpretation"] = "unverified routine option bytes"
+			case 0x28:
+				if key.descriptor > 5 {
+					return retire(ErrUnsupportedFeature, "communication control type outside selected types 0..5")
+				}
+				want := 3
+				if key.descriptor >= 4 {
+					want = 5
+				}
+				if len(body) != want {
+					return retire(ErrMalformedMessage, "communication control node/length differs from selected type")
+				}
+				if body[2]&3 == 0 || body[2]&0x0c != 0 {
+					return retire(ErrUnsupportedFeature, "communication type is not a canonical selected message/subnet byte")
+				}
+				f["Control Type"], f["Communication Type Raw"] = key.descriptor, body[2]
+				f["Normal Messages"], f["Network Management Messages"], f["Subnet"] = body[2]&1 != 0, body[2]&2 != 0, body[2]>>4
+				if want == 5 {
+					f["Node Identifier"] = binary.BigEndian.Uint16(body[3:5])
+				}
+			case 0x85:
+				if key.descriptor < 1 || key.descriptor > 2 {
+					return retire(ErrUnsupportedFeature, "DTC setting type outside selected types 1..2")
+				}
+				f["Setting Type"] = key.descriptor
+				f["DTC Option Record"] = bytes.Clone(body[2:])
+				f["Record Interpretation"] = "unverified DTC control option bytes"
+			}
 		case 0x22:
 			if len(body) != 3 {
 				s.pending = nil
@@ -81,6 +140,11 @@ func (a *binParser) decodeCANUDS(s *canISOConnection, dir int, body []byte, e *P
 					s.pending = nil
 					return fail(ErrContextRequired, "retry changed response-suppression bit")
 				}
+				if s.pending.requestDigest != sha256.Sum256(body) {
+					s.pending = nil
+					s.serviceSeen[key.service] = 2
+					return fail(ErrContextRequired, "retry changed request parameters without a distinguishing response identity")
+				}
 				f["Association"] = "observed-active-request-retry"
 				f["Original Request Event"] = s.pending.id
 				return f, nil
@@ -88,7 +152,7 @@ func (a *binParser) decodeCANUDS(s *canISOConnection, dir int, body []byte, e *P
 			if !s.pending.suppressed {
 				s.pending = nil
 				if _, used := s.used[key]; !used {
-					if len(s.used) >= sessionCollectionLimit(a.budget.MaxCollectionElements) || !a.reserveEvidence(128) {
+					if len(s.used) >= sessionCollectionLimit(a.budget.MaxCollectionElements) || !a.reserveEvidence(canUDSIdentityCost()) {
 						s.udsDisabled = true
 						return fail(ErrResourceExceeded, "diagnostic identity byte/element budget")
 					}
@@ -96,7 +160,7 @@ func (a *binParser) decodeCANUDS(s *canISOConnection, dir int, body []byte, e *P
 						s.used = make(map[canUDSIdentity]uint64)
 					}
 					s.used[key] = e.ID
-					s.cost += 128
+					s.cost += canUDSIdentityCost()
 					s.serviceSeen[key.service] = 2
 				}
 				return fail(ErrContextRequired, "overlapping diagnostic requests are ambiguous")
@@ -106,7 +170,7 @@ func (a *binParser) decodeCANUDS(s *canISOConnection, dir int, body []byte, e *P
 			s.pending = nil
 			return fail(ErrContextRequired, "diagnostic request identity was already used")
 		}
-		cost := int64(128)
+		cost := canUDSIdentityCost()
 		if len(s.used) >= sessionCollectionLimit(a.budget.MaxCollectionElements) || !a.reserveEvidence(cost) {
 			s.pending = nil
 			s.udsDisabled = true
@@ -120,7 +184,7 @@ func (a *binParser) decodeCANUDS(s *canISOConnection, dir int, body []byte, e *P
 		if s.serviceSeen[key.service] < 2 {
 			s.serviceSeen[key.service]++
 		}
-		s.pending = &canUDSPending{key: key, id: e.ID, at: e.Timestamp, suppressed: suppressed, ref: e.SourceBytes.PacketRefs[0]}
+		s.pending = &canUDSPending{key: key, id: e.ID, at: e.Timestamp, suppressed: suppressed, requestDigest: sha256.Sum256(body), ref: e.SourceBytes.PacketRefs[0]}
 		f["Association"] = "observed-configured-request"
 		f["Original Request Event"] = e.ID
 		return f, nil
@@ -162,6 +226,31 @@ func (a *binParser) decodeCANUDS(s *canISOConnection, dir int, body []byte, e *P
 			f["Subfunction"] = p.key.descriptor
 		}
 		s.pending = nil
+	case 0x71, 0x68, 0xc5:
+		service := body[0] - 0x40
+		minimum := 2
+		if service == 0x31 {
+			minimum = 4
+		}
+		if p.key.service != service || len(body) < minimum || uint16(body[1]) != p.key.descriptor || p.suppressed {
+			return fail(ErrMalformedMessage, "parameter control response differs from pending service/type")
+		}
+		if service != 0x31 && len(body) != 2 {
+			return fail(ErrMalformedMessage, "parameter control response has unexpected trailing bytes")
+		}
+		if service == 0x31 {
+			if binary.BigEndian.Uint16(body[2:4]) != p.key.argument {
+				return fail(ErrMalformedMessage, "routine identifier differs from pending request")
+			}
+			f["Control Type"], f["Routine Identifier"] = p.key.descriptor, p.key.argument
+			f["Routine Status Record"] = bytes.Clone(body[4:])
+			f["Record Interpretation"] = "unverified routine status bytes"
+		} else if service == 0x28 {
+			f["Control Type"] = p.key.descriptor
+		} else {
+			f["Setting Type"] = p.key.descriptor
+		}
+		s.pending = nil
 	case 0x62:
 		if p.key.service != 0x22 || len(body) < 4 || binary.BigEndian.Uint16(body[1:3]) != p.key.descriptor {
 			return fail(ErrMalformedMessage, "ReadDataByIdentifier response differs from pending DID")
@@ -185,4 +274,11 @@ func (a *binParser) decodeCANUDS(s *canISOConnection, dir int, body []byte, e *P
 	e.ResponseTo = p.id
 	f["Association"], f["Response To"] = "observed-request-match", p.id
 	return f, nil
+}
+
+// Retained identity bookkeeping and an owned pending descriptor are charged
+// together. The conservative charge remains until capture Close, even after
+// the pending pointer is released, so history cannot evade the byte budget.
+func canUDSIdentityCost() int64 {
+	return 128 + int64(unsafe.Sizeof(canUDSPending{}))
 }
