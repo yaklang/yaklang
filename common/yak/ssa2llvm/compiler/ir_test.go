@@ -56,8 +56,8 @@ func TestIR_LocalFunctionCallUsesUnifiedInvoke(t *testing.T) {
 	_, _, ir, err := compileToIRFromCodeWithExternBindings(code, "yak", nil)
 	require.NoError(t, err)
 	require.GreaterOrEqual(t, strings.Count(ir, "call void @"+abi.InvokeSymbol), 2)
-	require.Contains(t, ir, "@add")
-	require.NotContains(t, ir, "call void @add")
+	require.Contains(t, ir, "@"+abi.UserSymbolPrefix+"add")
+	require.NotContains(t, ir, "call void @"+abi.UserSymbolPrefix+"add")
 	requireIRAvoidsLegacyCallEntrypoints(t, ir)
 }
 
@@ -198,7 +198,7 @@ func TestIR_GoStmtCallableUsesAsyncInvoke(t *testing.T) {
 	_, _, ir, err := compileToIRFromCodeWithExternBindings(code, "yak", nil)
 	require.NoError(t, err)
 	requireIRContainsInOrder(t, ir,
-		"@f",
+		"@"+abi.UserSymbolPrefix+"f",
 		"store i64 1",
 		"call void @"+abi.InvokeSymbol,
 	)

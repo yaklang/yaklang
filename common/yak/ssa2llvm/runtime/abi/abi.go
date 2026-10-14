@@ -81,6 +81,7 @@ const (
 	// Compiler renames clashing user main/@main (not part of linkprep manifest).
 	InternalAtMainSymbol = "yak_internal_atmain"
 	InternalMainSymbol   = "yak_internal_main"
+	UserSymbolPrefix     = "yak_user_"
 )
 
 const (
@@ -178,6 +179,11 @@ const (
 	// wrapper already waits once after the entry function returns, but a
 	// script may also call the builtin explicitly to synchronise mid-run.
 	IDRuntimeWaitAsync FuncID = 31
+
+	// Yak select. The frontend emits one call to "$yak:select$" whose
+	// arguments are the flattened cases (direction, channel, send value).
+	// The result is a 3-tuple (index, received value, ok).
+	IDRuntimeSelect FuncID = 32
 )
 
 type SliceElemKind int64

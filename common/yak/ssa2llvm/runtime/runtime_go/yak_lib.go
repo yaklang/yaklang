@@ -380,6 +380,9 @@ func resolveField(obj any, name string) (reflect.Value, error) {
 	if om, ok := obj.(runtimeStringMap); ok {
 		value, exists := om.Get(name)
 		if !exists {
+			if method, err := runtimeResolveMethod(obj, name); err == nil && method.IsValid() {
+				return method, nil
+			}
 			return reflect.Value{}, nil
 		}
 		if value == nil {
@@ -407,15 +410,25 @@ func resolveField(obj any, name string) (reflect.Value, error) {
 			if _, err := strconv.Atoi(name); err == nil {
 				return reflect.Value{}, fmt.Errorf("index %q out of range", name)
 			}
+			if method, err := runtimeResolveMethod(obj, name); err == nil && method.IsValid() {
+				return method, nil
+			}
 			return reflect.Value{}, nil
 		}
 		return reflect.ValueOf(runes[idx]), nil
 	case reflect.Struct:
 		f := v.FieldByName(name)
-		if !f.IsValid() {
-			return reflect.Value{}, fmt.Errorf("field %q not found", name)
+		if f.IsValid() {
+			return f, nil
 		}
-		return f, nil
+		// Yak method calls on a Go value are member reads (obj.Method). The
+		// method is not a struct field; return the bound method so the call
+		// site can invoke it. Pointer methods are resolved from the original
+		// value, before this function dereferenced it.
+		if method, err := runtimeResolveMethod(obj, name); err == nil && method.IsValid() {
+			return method, nil
+		}
+		return reflect.Value{}, fmt.Errorf("field %q not found", name)
 	case reflect.Map:
 		key, ok := resolveMapKey(v.Type().Key(), name)
 		if !ok {
@@ -423,6 +436,9 @@ func resolveField(obj any, name string) (reflect.Value, error) {
 		}
 		f := v.MapIndex(key)
 		if !f.IsValid() {
+			if method, err := runtimeResolveMethod(obj, name); err == nil && method.IsValid() {
+				return method, nil
+			}
 			return reflect.Value{}, nil
 		}
 		return f, nil
@@ -436,12 +452,20 @@ func resolveField(obj any, name string) (reflect.Value, error) {
 			if _, err := strconv.Atoi(name); err == nil {
 				return reflect.Value{}, fmt.Errorf("index %q out of range", name)
 			}
+			if method, err := runtimeResolveMethod(obj, name); err == nil && method.IsValid() {
+				return method, nil
+			}
 			return reflect.Value{}, nil
 		}
 		return v.Index(idx), nil
 	default:
 		// Weak-typed member reads on unsupported receivers (e.g. a string
-		// probed as an object) read as nil instead of panicking.
+		// probed as an object) read as nil instead of panicking. Before falling
+		// back to nil, try the Go method set so interface-returned values and
+		// promoted methods from embedded structs remain callable.
+		if method, err := runtimeResolveMethod(obj, name); err == nil && method.IsValid() {
+			return method, nil
+		}
 		return reflect.Value{}, nil
 	}
 }

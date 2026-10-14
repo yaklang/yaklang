@@ -52,6 +52,16 @@ func (c *Compiler) newDynamicCallableContextCallSpec(inst *ssa.Call, fn *ssa.Fun
 		// stored in the collection, or a method bound to the object). Even
 		// when its static type is a function, do not treat it as a direct
 		// function reference.
+	} else if phi, ok := calleeVal.(*ssa.Phi); ok && phi != nil {
+		memberName := phi.GetName()
+		if strings.HasPrefix(memberName, "#") {
+			if idx := strings.LastIndexByte(memberName, '.'); idx >= 0 {
+				suffix := memberName[idx+1:]
+				if suffix != "key" && suffix != "field" && suffix != "ok" {
+					return contextCallSpec{}, false, nil
+				}
+			}
+		}
 	} else if ssaFn, ok := ssa.ToFunction(calleeVal); ok && ssaFn != nil {
 		return contextCallSpec{}, false, nil
 	}

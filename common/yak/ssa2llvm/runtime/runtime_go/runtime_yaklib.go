@@ -698,3 +698,82 @@ func runtimeDispatchChanSend(args []uint64, _ bool) (int64, error) {
 	rv.Send(reflect.ValueOf(value))
 	return 0, nil
 }
+
+// runtimeDispatchSelect implements the yak2ssa select builtin ($yak:select$).
+// Arguments are flattened cases. A default is one word (the direction). A
+// receive is direction plus channel. A send is direction, channel, then the
+// value. The result is the tuple the frontend indexes: chosen case, received
+// value, and the receive ok flag. Send cases leave the value nil and ok false.
+func runtimeDispatchSelect(args []uint64, _ bool) (int64, error) {
+	cases := make([]reflect.SelectCase, 0, len(args))
+	for i := 0; i < len(args); {
+		dir := reflect.SelectDir(int64(args[i]))
+		i++
+		one := reflect.SelectCase{Dir: dir}
+		switch dir {
+		case reflect.SelectDefault:
+		case reflect.SelectRecv:
+			if i >= len(args) {
+				return 0, fmt.Errorf("select recv missing channel")
+			}
+			ch, ok := runtimeDecodeChannel(args[i])
+			i++
+			if !ok {
+				return 0, fmt.Errorf("select recv on non-channel %T", runtimeDecodeIterValue(args[i-1]))
+			}
+			one.Chan = ch
+		case reflect.SelectSend:
+			if i+1 >= len(args) {
+				return 0, fmt.Errorf("select send missing channel or value")
+			}
+			ch, ok := runtimeDecodeChannel(args[i])
+			i++
+			if !ok {
+				return 0, fmt.Errorf("select send on non-channel %T", runtimeDecodeIterValue(args[i-1]))
+			}
+			one.Chan = ch
+			one.Send = runtimeSelectSendValue(ch.Type().Elem(), runtimeDecodeIterValue(args[i]))
+			i++
+		default:
+			return 0, fmt.Errorf("select has invalid direction %d", dir)
+		}
+		cases = append(cases, one)
+	}
+	if len(cases) == 0 {
+		return 0, fmt.Errorf("select has no cases")
+	}
+	chosen, recv, ok := reflect.Select(cases)
+	var received any
+	if recv.IsValid() && recv.CanInterface() {
+		received = recv.Interface()
+	}
+	return int64(uintptr(newRuntimeShadow([]any{chosen, received, ok}))), nil
+}
+
+// runtimeSelectSendValue boxes a decoded Yak value so reflect.Select can send
+// it on a chan any. ValueOf unwraps interfaces, and an int is not assignable
+// to interface{} until it is stored in one.
+func runtimeSelectSendValue(elem reflect.Type, value any) reflect.Value {
+	if elem == nil {
+		return reflect.ValueOf(value)
+	}
+	if value == nil {
+		return reflect.Zero(elem)
+	}
+	sv := reflect.ValueOf(value)
+	if !sv.IsValid() {
+		return reflect.Zero(elem)
+	}
+	if sv.Type().AssignableTo(elem) {
+		return sv
+	}
+	if elem.Kind() == reflect.Interface {
+		boxed := reflect.New(elem).Elem()
+		boxed.Set(sv)
+		return boxed
+	}
+	if sv.Type().ConvertibleTo(elem) {
+		return sv.Convert(elem)
+	}
+	return sv
+}
