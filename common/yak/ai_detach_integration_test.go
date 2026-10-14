@@ -15,6 +15,7 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/asyncexecmanager"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
+	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools/yakscripttools"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/yak"
@@ -64,7 +65,9 @@ println("must not reach DONE")
 		}
 	}
 
-	runtime, err := aireact.NewTestReAct(aicommon.WithEventHandler(onEvent), aicommon.WithContext(ctx), aicommon.WithTools(tools[0]), aicommon.WithAgreeYOLO(), aicommon.WithWorkdir(t.TempDir()), aicommon.WithDisableToolCallerIntervalReview(true), aicommon.WithAICallback(func(aicommon.AICallerConfigIf, *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+	// Keep the script local to this runtime: never install it in the profile DB
+	// or fall back to a built-in/debug tool with a matching name.
+	runtime, err := aireact.NewTestReAct(aicommon.WithEventHandler(onEvent), aicommon.WithContext(ctx), aicommon.WithAiToolManagerOptions(buildinaitools.WithOnlyTools(tools[0])), aicommon.WithAgreeYOLO(), aicommon.WithWorkdir(t.TempDir()), aicommon.WithDisableToolCallerIntervalReview(true), aicommon.WithAICallback(func(aicommon.AICallerConfigIf, *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 		return nil, errors.New("unexpected AI request")
 	}))
 	require.NoError(t, err)
@@ -88,6 +91,11 @@ println("must not reach DONE")
 	}
 	manager, err := loop.GetAsyncExecutionManager()
 	require.NoError(t, err)
+	defer func() {
+		cleanupCtx, stop := context.WithTimeout(context.Background(), 30*time.Second)
+		defer stop()
+		require.NoError(t, manager.Shutdown(cleanupCtx), "join the Yak callback even when an assertion fails")
+	}()
 	entries := manager.List()
 	require.Len(t, entries, 1)
 	select {
