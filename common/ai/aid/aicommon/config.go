@@ -1841,6 +1841,14 @@ func WithDisableToolUse(disable bool) ConfigOption {
 	}
 }
 
+func (c *Config) IsToolUseDisabled() bool {
+	if c.m != nil {
+		c.m.Lock()
+		defer c.m.Unlock()
+	}
+	return c.DisableToolUse
+}
+
 func WithEnableToolManagerAISearch(enable bool) ConfigOption {
 	return func(c *Config) error {
 		if c.m == nil {

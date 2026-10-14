@@ -100,6 +100,10 @@ type aiSessionRuntimeRefEmitter interface {
 	EmitForRef(aiSessionCommandRef, string, []byte) bool
 }
 
+type aiSessionRuntimeContextRefEmitter interface {
+	EmitForRefContext(context.Context, aiSessionCommandRef, string, []byte) bool
+}
+
 type aiSessionRuntimeTurnCompleter interface {
 	DoneTurn(string, []byte)
 	FailTurn(string, string, string, []byte)
@@ -123,6 +127,10 @@ type aiSessionRuntimeFocusTurnReporter interface {
 }
 
 type aiSessionBinding struct {
+	TrafficCapture             *aiv1.AITrafficCapturePolicy
+	TrafficCollector           *aiTrafficCollector
+	TrafficAnalysis            *aiv1.AITrafficAnalysisContext
+	NodeID                     string
 	InputWorkspace             *inputresolver.Workspace
 	Ref                        aiSessionCommandRef
 	ProjectID                  string
@@ -281,6 +289,7 @@ type aiSessionRuntime struct {
 	seq                      uint64
 	cancel                   context.CancelFunc
 	handle                   aiSessionRuntimeHandle
+	trafficCollector         *aiTrafficCollector
 	resultSink               *aiSessionResultSinkProxy
 	processedInputCommands   map[string]processedAISessionInput
 	processedInputOrder      []string
@@ -332,6 +341,19 @@ func (m *aiSessionRuntimeManager) Bind(
 	options aiSessionRuntimeBindOptions,
 ) (aiSessionCommandRef, error) {
 	ref := aiSessionRefFromBindCommand(command)
+	if command.GetTrafficAnalysis() != nil {
+		checkBinding := aiSessionBinding{Ref: ref, TrafficAnalysis: command.GetTrafficAnalysis(), ProviderPolicySnapshotJSON: command.GetProviderPolicySnapshotJson(), RuntimeOptionSnapshotJSON: command.GetRuntimeOptionSnapshotJson(), AuthorizedFocusReleaseID: command.GetResultContext().GetFocusReleaseId(), Attachments: legacyAISessionAttachmentRefs(command), CredentialRefs: cloneAISessionCredentialRefs(command.GetCredentialRefs())}
+		checkOptions, err := mergedYakRuntimeOptions(checkBinding)
+		if err != nil {
+			return ref, err
+		}
+		if command.GetInputManifest() != nil {
+			return ref, fmt.Errorf("traffic analysis forbids managed input workspaces")
+		}
+		if err = validateTrafficAnalysisBinding(checkBinding, checkOptions); err != nil {
+			return ref, err
+		}
+	}
 	if err := validateInputWorkspaceBind(command); err != nil {
 		return ref, err
 	}
@@ -605,7 +627,10 @@ func (m *aiSessionRuntimeManager) Bind(
 		serverRuntime.inputWorkspace = inputWorkspace
 		serverRuntime.authorizedFocusReleaseID = strings.TrimSpace(command.GetResultContext().GetFocusReleaseId())
 	}
-	handle, err := m.driver.Bind(ctx, aiSessionBinding{
+	binding := aiSessionBinding{
+		TrafficCapture:             command.GetTrafficCapture(),
+		TrafficAnalysis:            command.GetTrafficAnalysis(),
+		NodeID:                     command.GetTargetNodeId(),
 		InputWorkspace:             inputWorkspace,
 		Ref:                        ref,
 		ProjectID:                  runtime.projectID,
@@ -622,7 +647,25 @@ func (m *aiSessionRuntimeManager) Bind(
 		ExecutionMode:              strings.TrimSpace(command.GetResultContext().GetExecutionMode()),
 		AuthorizedFocusReleaseID:   strings.TrimSpace(command.GetResultContext().GetFocusReleaseId()),
 		AuthorizedTargetURL:        strings.TrimSpace(command.GetResultContext().GetTargetUrl()),
-	}, managedEmitter)
+	}
+	collector, err := newAITrafficCollector(binding, managedEmitter)
+	if err != nil {
+		cancel()
+		_ = codeWorkspace.Cleanup()
+		return ref, m.finishBindError(ref, err)
+	}
+	if collector != nil {
+		runtime.trafficCollector = collector
+		ctx = withAITrafficContext(ctx, collector, "")
+		binding.TrafficCollector = collector
+	}
+	handle, err := m.driver.Bind(ctx, binding, managedEmitter)
+	if err != nil && collector != nil {
+		collector.stopped.Do(func() { close(collector.stop) })
+	}
+	if err == nil && collector != nil {
+		handle = &aiTrafficRuntimeHandle{aiSessionRuntimeHandle: handle, collector: collector}
+	}
 	if err != nil {
 		cancel()
 		if handle != nil {
@@ -716,6 +759,9 @@ func (m *aiSessionRuntimeManager) Bind(
 			}
 			replaced.emissionWG.Wait()
 		}()
+	}
+	if collector != nil {
+		collector.emit(ctx, "ai_traffic_capability", &aiv1.AITrafficCapability{ProtocolVersion: 1, SupportedTransports: []string{"yaklang_lowhttp"}, UnsupportedSources: []string{"external_process", "browser", "uninstrumented_http_client"}})
 	}
 	if err := m.publishWorkspaceReady(ctx, runtime, publisher); err != nil {
 		return ref, err
@@ -1323,6 +1369,22 @@ func (m *aiSessionRuntimeManager) CompleteTerminal(
 			kind,
 			currentKind,
 		)
+	}
+	// Keep the runtime and its spill files addressable until the bounded receipt
+	// drain completes. Network I/O and emitter callbacks must not hold these locks.
+	session.mu.Unlock()
+	m.mu.Unlock()
+	session.finishTrafficCapture()
+	m.mu.Lock()
+	if m.sessions[ref.SessionID] != session {
+		m.mu.Unlock()
+		return nil
+	}
+	session.mu.Lock()
+	if session.terminalCommandID != ref.CommandID || session.terminalKind != kind {
+		session.mu.Unlock()
+		m.mu.Unlock()
+		return fmt.Errorf("ai session terminal ownership changed during traffic drain: %s", ref.SessionID)
 	}
 	delete(m.sessions, ref.SessionID)
 	m.recordTerminalTombstoneLocked(ref.SessionID, aiSessionTerminalTombstone{
@@ -2161,7 +2223,7 @@ type managedAISessionRuntimeEmitter struct {
 }
 
 func (e *managedAISessionRuntimeEmitter) Emit(eventType string, payloadJSON []byte) {
-	e.emitForRef(nil, eventType, payloadJSON)
+	e.emitForRef(nil, nil, eventType, payloadJSON)
 }
 
 func (e *managedAISessionRuntimeEmitter) EmitForRef(
@@ -2169,16 +2231,41 @@ func (e *managedAISessionRuntimeEmitter) EmitForRef(
 	eventType string,
 	payloadJSON []byte,
 ) bool {
-	return e.emitForRef(&ref, eventType, payloadJSON)
+	return e.emitForRef(nil, &ref, eventType, payloadJSON)
+}
+
+func (e *managedAISessionRuntimeEmitter) EmitForRefContext(
+	ctx context.Context,
+	ref aiSessionCommandRef,
+	eventType string,
+	payloadJSON []byte,
+) bool {
+	if e == nil {
+		return false
+	}
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	if e.ctx != nil {
+		stop := context.AfterFunc(e.ctx, cancel)
+		defer stop()
+		if e.ctx.Err() != nil {
+			cancel()
+		}
+	}
+	return e.emitForRef(ctx, &ref, eventType, payloadJSON)
 }
 
 func (e *managedAISessionRuntimeEmitter) emitForRef(
+	ctx context.Context,
 	frozenRef *aiSessionCommandRef,
 	eventType string,
 	payloadJSON []byte,
 ) bool {
 	if e == nil || e.runtime == nil || e.publisher == nil {
 		return false
+	}
+	if ctx == nil {
+		ctx = e.ctx
 	}
 	if !e.runtime.beginEmission() {
 		return false
@@ -2195,6 +2282,12 @@ func (e *managedAISessionRuntimeEmitter) emitForRef(
 	if rootTerminal {
 		ref, claimed = e.runtime.claimRootPlanTerminal(ref.CommandID)
 	}
+	if claimed {
+		e.runtime.finishTrafficCapture()
+		// The drain emits metadata/coverage events. The terminal must follow their
+		// sequence numbers as well as their actual publication order.
+		ref, seq = e.runtime.nextEventRefAndSeqFor(ref)
+	}
 	publish := func(ctx context.Context) error {
 		if claimed {
 			if err := e.runtime.resultSink.Succeed(ctx, payloadJSON); err != nil {
@@ -2205,9 +2298,9 @@ func (e *managedAISessionRuntimeEmitter) emitForRef(
 	}
 	var err error
 	if claimed {
-		err = retryAISessionTerminalPublish(e.ctx, publish)
+		err = retryAISessionTerminalPublish(ctx, publish)
 	} else {
-		err = publish(e.ctx)
+		err = publish(ctx)
 	}
 	if err != nil {
 		logAISessionRuntimePublishError("event", ref.SessionID, err)
@@ -2235,6 +2328,7 @@ func (e *managedAISessionRuntimeEmitter) Done(resultJSON []byte) {
 	}
 	defer e.runtime.endEmission()
 	ref := e.runtime.currentRef()
+	e.runtime.finishTrafficCapture()
 	if err := retryAISessionTerminalPublish(e.ctx, func(ctx context.Context) error {
 		if err := e.runtime.resultSink.Succeed(ctx, resultJSON); err != nil {
 			return err
@@ -2257,6 +2351,7 @@ func (e *managedAISessionRuntimeEmitter) DoneTurn(turnID string, resultJSON []by
 		e.runtime.endEmission()
 		return
 	}
+	e.runtime.finishTrafficCapture()
 	if err := retryAISessionTerminalPublish(e.ctx, func(ctx context.Context) error {
 		if err := e.runtime.resultSink.Succeed(ctx, resultJSON); err != nil {
 			return err
@@ -2291,6 +2386,7 @@ func (e *managedAISessionRuntimeEmitter) FailTurn(
 		e.runtime.endEmission()
 		return
 	}
+	e.runtime.finishTrafficCapture()
 	if err := retryAISessionTerminalPublish(e.ctx, func(ctx context.Context) error {
 		if err := e.runtime.resultSink.Fail(ctx, code, message, detailJSON); err != nil {
 			return err
@@ -2449,6 +2545,7 @@ func (e *managedAISessionRuntimeEmitter) Failed(code string, message string, det
 	}
 	defer e.runtime.endEmission()
 	ref := e.runtime.currentRef()
+	e.runtime.finishTrafficCapture()
 	if err := retryAISessionTerminalPublish(e.ctx, func(ctx context.Context) error {
 		if err := e.runtime.resultSink.Fail(ctx, code, message, detailJSON); err != nil {
 			return err

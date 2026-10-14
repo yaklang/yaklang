@@ -4,6 +4,7 @@ package scannode
 
 func compiledScanNodeCapabilityKeys() []string {
 	return []string{
+		aiTrafficCapabilityV1, aiTrafficAnalysisCapabilityV1,
 		"yak.execute",
 		capabilityKeySSARuleSyncExport,
 		capabilityKeySSARuleSnapshotExecutionV2,

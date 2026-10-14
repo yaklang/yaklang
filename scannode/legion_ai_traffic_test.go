@@ -1,0 +1,895 @@
+package scannode
+
+import (
+	"bytes"
+	"context"
+	"fmt"
+	"io"
+	"net/http"
+	"net/http/httptest"
+	"net/url"
+	"os"
+	"path/filepath"
+	"strings"
+	"sync"
+	"testing"
+	"time"
+
+	"github.com/nats-io/nats.go"
+	"github.com/yaklang/yaklang/common/utils/lowhttp"
+	"github.com/yaklang/yaklang/common/utils/lowhttp/httpctx"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
+	aiv1 "github.com/yaklang/yaklang/scannode/gen/legionpb/legion/ai/v1"
+	"google.golang.org/protobuf/encoding/protojson"
+	"google.golang.org/protobuf/proto"
+)
+
+type trafficTestEmitter struct {
+	mu     sync.Mutex
+	events [][]byte
+}
+
+func (e *trafficTestEmitter) Emit(_ string, raw []byte) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	e.events = append(e.events, append([]byte(nil), raw...))
+}
+func (e *trafficTestEmitter) EmitForRefContext(_ context.Context, _ aiSessionCommandRef, kind string, raw []byte) bool {
+	e.Emit(kind, raw)
+	return true
+}
+func (*trafficTestEmitter) Done([]byte)                   {}
+func (*trafficTestEmitter) Failed(string, string, []byte) {}
+func trafficTestCollector(t *testing.T, endpoint string) *aiTrafficCollector {
+	t.Helper()
+	return &aiTrafficCollector{binding: aiSessionBinding{Ref: aiSessionCommandRef{SessionID: "session", BindEpoch: 7}, NodeID: "node", NodeSessionID: "node-session", PlatformBearerToken: "node-secret"}, policy: &aiv1.AITrafficCapturePolicy{ProtocolVersion: 1, UploadBaseUrl: endpoint, PacketLimitBytes: 1024, SessionLimitBytes: 4096}, dir: t.TempDir(), client: &http.Client{Timeout: time.Second}, wake: make(chan struct{}, 1), stop: make(chan struct{}), accepting: true, emitter: &trafficTestEmitter{}}
+}
+func TestResilienceAITrafficUploadRequiresDurableMatchingReceipt(t *testing.T) {
+	var attempts [][]byte
+	durable := false
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("Authorization") != "Bearer node-secret" || r.Header.Get("X-Node-Session-ID") != "node-session" {
+			t.Error("missing node credentials")
+		}
+		raw, _ := io.ReadAll(r.Body)
+		attempts = append(attempts, raw)
+		upload := new(aiv1.AITrafficUpload)
+		if err := proto.Unmarshal(raw, upload); err != nil {
+			t.Error(err)
+		}
+		receipt := &aiv1.AITrafficReceipt{ProtocolVersion: 1, FlowId: upload.Record.FlowId, Phase: upload.Record.Phase, Durable: durable, UploadSha256: trafficSHA(raw), StorageStatus: "stored"}
+		body, _ := proto.Marshal(receipt)
+		w.Write(body)
+	}))
+	defer server.Close()
+	c := trafficTestCollector(t, server.URL)
+	c.enqueue(&aiv1.AITrafficUpload{Record: &aiv1.AITrafficRecord{ProtocolVersion: 1, FlowId: "flow", SessionId: "session", Phase: "terminal", Outcome: "success"}, RawRequest: []byte("secret request")})
+	c.flush(context.Background())
+	paths, _ := c.pending()
+	if len(paths) != 1 {
+		t.Fatal("unconfirmed upload was deleted")
+	}
+	durable = true
+	c.flush(context.Background())
+	paths, _ = c.pending()
+	if len(paths) != 0 {
+		t.Fatal("confirmed upload remained queued")
+	}
+	if len(attempts) != 2 || !bytes.Equal(attempts[0], attempts[1]) {
+		t.Fatal("retry changed stable upload identity or packet bytes")
+	}
+	receipt := filepath.Join(c.dir, "flow.terminal.receipt")
+	if _, err := os.Stat(receipt); err != nil {
+		t.Fatal("durable receipt not persisted")
+	}
+	// Simulate a crash after receipt fsync, before unlinking the queue file.
+	if err := os.WriteFile(filepath.Join(c.dir, "flow.terminal.pb"), attempts[0], 0600); err != nil {
+		t.Fatal(err)
+	}
+	c.flush(context.Background())
+	if len(attempts) != 2 {
+		t.Fatal("restart ignored its durable receipt")
+	}
+	emitter := c.emitter.(*trafficTestEmitter)
+	for _, event := range emitter.events {
+		if bytes.Contains(event, []byte("secret request")) || bytes.Contains(event, []byte("node-secret")) {
+			t.Fatal("raw evidence leaked through metadata events")
+		}
+	}
+}
+func TestAITrafficReadsOversizePacketFilesAndTruncatesBytes(t *testing.T) {
+	dir := t.TempDir()
+	header := []byte("HTTP/1.1 200 OK\r\nContent-Length: 8\r\n\r\n")
+	body := []byte("12345678")
+	hp, bp := filepath.Join(dir, "headers"), filepath.Join(dir, "body")
+	os.WriteFile(hp, header, 0600)
+	os.WriteFile(bp, body, 0600)
+	want := append(append([]byte(nil), header...), body...)
+	raw, size, truncated, err := trafficPacket([]byte("placeholder with local paths"), hp, bp, int64(len(want)-3))
+	if err != nil || size != int64(len(want)) || !truncated || !bytes.Equal(raw, want[:len(want)-3]) {
+		t.Fatalf("actual packet reconstruction failed: size=%d truncated=%v err=%v raw=%q", size, truncated, err, raw)
+	}
+}
+func TestResilienceAITrafficDrainWaitsForSavedFlowReceipts(t *testing.T) {
+	c := trafficTestCollector(t, "http://127.0.0.1:1")
+	c.recordHTTPFlow(&lowhttp.LowhttpResponse{RawRequest: []byte("GET / HTTP/1.1\r\nHost: test.invalid\r\n\r\n"), RawPacket: []byte("HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n")}, "turn")
+	ctx, cancel := context.WithTimeout(context.Background(), time.Millisecond)
+	defer cancel()
+	result := c.drain(ctx, "drain")
+	if result.Complete || result.PendingRecords != 1 {
+		t.Fatalf("unacknowledged flow reported complete: %+v", result)
+	}
+}
+func TestAITrafficContextCapturesSessionAndTurnWithoutRuntime(t *testing.T) {
+	lowhttp.RegisterSaveHTTPFlowHandler(saveAITrafficHTTPFlow)
+	t.Cleanup(yakit.RegisterLowHTTPSaveCallback)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = io.WriteString(w, "session evidence")
+	}))
+	defer server.Close()
+	collector := trafficTestCollector(t, "http://unused.invalid")
+	collector.currentTurn = "newer-turn"
+	for _, turn := range []string{"turn-a", "turn-b"} {
+		ctx := withAITrafficContext(context.Background(), collector, turn)
+		packet := "GET /" + turn + " HTTP/1.1\r\nHost: " + strings.TrimPrefix(server.URL, "http://") + "\r\nConnection: close\r\n\r\n"
+		if _, err := lowhttp.HTTP(lowhttp.WithContext(ctx), lowhttp.WithSaveHTTPFlow(true), lowhttp.WithPacketBytes([]byte(packet))); err != nil {
+			t.Fatal(err)
+		}
+	}
+	paths, err := collector.pending()
+	if err != nil || len(paths) != 2 {
+		t.Fatalf("missing saved flow uploads: count=%d err=%v", len(paths), err)
+	}
+	phases := make(map[string]map[string]bool)
+	for _, path := range paths {
+		raw, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		upload := new(aiv1.AITrafficUpload)
+		if err := proto.Unmarshal(raw, upload); err != nil {
+			t.Fatal(err)
+		}
+		record := upload.Record
+		if record.SessionId != "session" || !strings.HasSuffix(record.GetRedactedUrl(), "/"+record.TurnId) {
+			t.Fatalf("lost session/turn context: %+v", record)
+		}
+		if phases[record.TurnId] == nil {
+			phases[record.TurnId] = make(map[string]bool)
+		}
+		phases[record.TurnId][record.Phase] = true
+	}
+	for _, turn := range []string{"turn-a", "turn-b"} {
+		if phases[turn]["started"] || !phases[turn]["terminal"] {
+			t.Fatalf("missing lifecycle for %s: %v", turn, phases)
+		}
+	}
+}
+func TestAITrafficSessionQuotaPreservesTerminalMetadata(t *testing.T) {
+	c := trafficTestCollector(t, "http://unused.invalid")
+	c.used = c.policy.SessionLimitBytes
+	c.enqueue(&aiv1.AITrafficUpload{Record: &aiv1.AITrafficRecord{FlowId: "flow", Phase: "terminal", Outcome: "success"}, RawRequest: []byte("too much")})
+	paths, _ := c.pending()
+	raw, _ := os.ReadFile(paths[0])
+	upload := new(aiv1.AITrafficUpload)
+	proto.Unmarshal(raw, upload)
+	if len(upload.RawRequest) != 0 || upload.Record.CaptureError != "local_session_limit" || upload.Record.Outcome != "success" {
+		t.Fatal("quota must preserve attempt outcome and explicitly drop evidence")
+	}
+}
+func TestAITrafficRejectsForeignUploadOriginAndUnsupportedVersion(t *testing.T) {
+	for _, version := range []uint32{1, 2} {
+		t.Run(fmt.Sprint(version), func(t *testing.T) {
+			binding := aiSessionBinding{Ref: aiSessionCommandRef{SessionID: "session"}, PlatformAPIBaseURL: "https://platform.invalid", PlatformBearerToken: "secret", NodeSessionID: "node", TrafficCapture: &aiv1.AITrafficCapturePolicy{ProtocolVersion: version, UploadBaseUrl: "https://foreign.invalid"}}
+			if _, err := newAITrafficCollector(binding, nil); err == nil {
+				t.Fatal("unsafe upload policy accepted")
+			}
+		})
+	}
+}
+func TestAITrafficMetadataExcludesSensitiveURLAndHeaders(t *testing.T) {
+	c := trafficTestCollector(t, "http://unused.invalid")
+	c.recordHTTPFlow(&lowhttp.LowhttpResponse{RawRequest: []byte("GET /private?token=SECRET HTTP/1.1\r\nHost: example.invalid\r\nAuthorization: SECRET\r\nCookie: SECRET\r\n\r\n"), RawPacket: []byte("HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n")}, "turn")
+	paths, _ := c.pending()
+	for _, path := range paths {
+		raw, _ := os.ReadFile(path)
+		upload := new(aiv1.AITrafficUpload)
+		proto.Unmarshal(raw, upload)
+		metadata := fmt.Sprint(upload.Record)
+		if strings.Contains(metadata, "SECRET") {
+			t.Fatal("sensitive metadata escaped")
+		}
+		if !strings.Contains(upload.Record.GetRedactedUrl(), "/private?") {
+			t.Fatal("safe request path was lost")
+		}
+	}
+}
+
+func TestResilienceAITrafficAcknowledgedStartRemainsIncompleteAfterRestart(t *testing.T) {
+	c := trafficTestCollector(t, "http://unused.invalid")
+	// The process died after receiving the start receipt, before persisting any
+	// terminal record. An empty pending upload directory must not mean complete.
+	if err := os.WriteFile(filepath.Join(c.dir, "flow.started.receipt"), []byte("durable start"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), time.Millisecond)
+	defer cancel()
+	result := c.drain(ctx, "drain-after-restart")
+	if result.Complete || result.PendingRecords != 1 {
+		t.Fatalf("orphaned started attempt was hidden: %+v", result)
+	}
+}
+
+func TestResilienceAITrafficReceiptPreservesIncompleteCoverageAfterRestart(t *testing.T) {
+	for _, test := range []struct{ status, captureError string }{
+		{"metadata_only", "local_packet_unavailable"},
+		{"quota_dropped", ""},
+		{"stored", "packet_limit"},
+	} {
+		t.Run(test.status, func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				raw, _ := io.ReadAll(r.Body)
+				upload := new(aiv1.AITrafficUpload)
+				if err := proto.Unmarshal(raw, upload); err != nil {
+					t.Error(err)
+					w.WriteHeader(http.StatusBadRequest)
+					return
+				}
+				receipt, _ := proto.Marshal(&aiv1.AITrafficReceipt{ProtocolVersion: 1, FlowId: upload.Record.FlowId, Phase: upload.Record.Phase, Durable: true, UploadSha256: trafficSHA(raw), StorageStatus: test.status})
+				_, _ = w.Write(receipt)
+			}))
+			defer server.Close()
+			t.Setenv("YAKIT_HOME", t.TempDir())
+			fixture := trafficTestCollector(t, server.URL)
+			binding := fixture.binding
+			binding.PlatformAPIBaseURL = server.URL
+			binding.TrafficCapture = fixture.policy
+			c, err := newAITrafficCollector(binding, &trafficTestEmitter{})
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer c.stopped.Do(func() { close(c.stop) })
+			defer aiTrafficCollectors.Delete(c.key())
+			c.enqueue(&aiv1.AITrafficUpload{Record: &aiv1.AITrafficRecord{ProtocolVersion: 1, FlowId: "flow", SessionId: "session", Phase: "terminal", CaptureError: test.captureError}})
+			ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+			defer cancel()
+			result := c.drain(ctx, "before-restart")
+			c.stopped.Do(func() { close(c.stop) })
+			if ctx.Err() != nil || result.Complete || result.PendingRecords != 0 {
+				t.Fatalf("acknowledgement hid missing evidence or drain waited unnecessarily: %+v", result)
+			}
+			restarted, err := newAITrafficCollector(binding, &trafficTestEmitter{})
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer restarted.stopped.Do(func() { close(restarted.stop) })
+			defer aiTrafficCollectors.Delete(restarted.key())
+			result = restarted.drain(ctx, "after-restart")
+			if ctx.Err() != nil || result.Complete || result.PendingRecords != 0 {
+				t.Fatalf("restart cleared persisted incomplete coverage: %+v", result)
+			}
+		})
+	}
+}
+
+func trafficReceiptTestServer(t *testing.T) *httptest.Server {
+	t.Helper()
+	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		raw, err := io.ReadAll(r.Body)
+		if err != nil {
+			t.Error(err)
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		upload := new(aiv1.AITrafficUpload)
+		if err = proto.Unmarshal(raw, upload); err != nil {
+			t.Error(err)
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		receipt := &aiv1.AITrafficReceipt{ProtocolVersion: 1, FlowId: upload.Record.FlowId, Phase: upload.Record.Phase, Durable: true, UploadSha256: trafficSHA(raw), StorageStatus: "stored"}
+		body, _ := proto.Marshal(receipt)
+		_, _ = w.Write(body)
+	}))
+}
+
+func waitForAITrafficDrainStart(t *testing.T, c *aiTrafficCollector) {
+	t.Helper()
+	deadline := time.Now().Add(time.Second)
+	for time.Now().Before(deadline) {
+		c.mu.Lock()
+		accepting := c.accepting
+		c.mu.Unlock()
+		if !accepting {
+			return
+		}
+		time.Sleep(time.Millisecond)
+	}
+	t.Fatal("terminal path did not start traffic drain")
+}
+
+func TestResilienceAITrafficAutomaticTerminalWaitsForReceipts(t *testing.T) {
+	for _, kind := range []string{"done", "failed", "root_plan"} {
+		t.Run(kind, func(t *testing.T) {
+			bridge, fakeJS, driver := newTestAISessionBridge(t)
+			if err := bridge.handleAISessionBind(context.Background(), mustMarshalProto(t, validAISessionBindCommand())); err != nil {
+				t.Fatal(err)
+			}
+			driver.mu.Lock()
+			emitter := driver.emitters[0].(*managedAISessionRuntimeEmitter)
+			driver.mu.Unlock()
+			server := trafficReceiptTestServer(t)
+			defer server.Close()
+			c := trafficTestCollector(t, server.URL)
+			c.binding.Ref = emitter.runtime.ref
+			c.emitter = emitter
+			c.enqueue(&aiv1.AITrafficUpload{Record: &aiv1.AITrafficRecord{ProtocolVersion: 1, FlowId: "flow", SessionId: c.binding.Ref.SessionID, Phase: "terminal", Outcome: "success"}})
+			// The worker is intentionally withheld until the pre-receipt assertions.
+			defer c.flush(context.Background())
+			emitter.runtime.mu.Lock()
+			emitter.runtime.trafficCollector = c
+			emitter.runtime.executionMode = "single_run"
+			emitter.runtime.mu.Unlock()
+			resetPublishedMessages(fakeJS)
+			done := make(chan struct{})
+			go func() {
+				defer close(done)
+				switch kind {
+				case "done":
+					emitter.DoneTurn("turn", []byte(`{"status":"done"}`))
+				case "failed":
+					emitter.FailTurn("turn", "runtime_failed", "failed", nil)
+				case "root_plan":
+					emitter.Emit("ai_runtime", []byte(`{"type":"end_plan_and_execution","content_json":{}}`))
+				}
+			}()
+			waitForAITrafficDrainStart(t, c)
+			if publishedMessageCount(fakeJS) != 0 || !hasAISessionRuntime(bridge.aiRuntime, c.binding.Ref.SessionID) {
+				t.Fatal("terminal publication or runtime removal preceded the durable receipt")
+			}
+			c.flush(context.Background())
+			select {
+			case <-done:
+			case <-time.After(2 * time.Second):
+				t.Fatal("automatic terminal did not finish after receipt")
+			}
+			if hasAISessionRuntime(bridge.aiRuntime, c.binding.Ref.SessionID) {
+				t.Fatal("runtime retained after receipt and terminal publication")
+			}
+			select {
+			case <-c.stop:
+			default:
+				t.Fatal("collector worker was not stopped")
+			}
+			fakeJS.mu.Lock()
+			defer fakeJS.mu.Unlock()
+			drainIndex, terminalIndex := -1, -1
+			var lastSequence uint64
+			for index, msg := range fakeJS.publish {
+				if msg.Subject == "legion.event."+legionEventAISessionDone || msg.Subject == "legion.event."+legionEventAISessionFailed {
+					terminalIndex = index
+				}
+				if msg.Subject != "legion.event."+legionEventAISessionEvent {
+					continue
+				}
+				event := new(aiv1.AISessionEvent)
+				if err := proto.Unmarshal(msg.Data, event); err != nil {
+					t.Fatal(err)
+				}
+				if event.Seq <= lastSequence {
+					t.Fatal("terminal traffic events were published with decreasing sequence")
+				}
+				lastSequence = event.Seq
+				if event.EventType == "ai_traffic_drain" {
+					result := new(aiv1.AITrafficDrainResult)
+					if err := protojson.Unmarshal(event.PayloadJson, result); err != nil || !result.Complete {
+						t.Fatalf("missing completed coverage: %v %v", result, err)
+					}
+					drainIndex = index
+				}
+				if kind == "root_plan" && event.EventType == "ai_runtime" {
+					terminalIndex = index
+				}
+			}
+			if drainIndex < 0 || terminalIndex <= drainIndex {
+				t.Fatal("coverage completion did not precede terminal publication")
+			}
+		})
+	}
+}
+
+func TestResilienceAITrafficManagerDrainsBeforeWorkspaceCleanup(t *testing.T) {
+	server := trafficReceiptTestServer(t)
+	defer server.Close()
+	c := trafficTestCollector(t, server.URL)
+	c.enqueue(&aiv1.AITrafficUpload{Record: &aiv1.AITrafficRecord{ProtocolVersion: 1, FlowId: "flow", SessionId: "session", Phase: "terminal"}})
+	defer c.flush(context.Background())
+	manager := newAISessionRuntimeManager(nil)
+	ref := aiSessionCommandRef{SessionID: "session", CommandID: "turn", BindEpoch: 7, OwnerUserID: "owner"}
+	cleaned := make(chan struct{})
+	runtime := &aiSessionRuntime{ref: ref, bindEpoch: 7, terminalCommandID: "turn", terminalKind: "auto", trafficCollector: c, codeWorkspace: &legionCodeWorkspaceRuntime{cleanup: func() error { close(cleaned); return nil }}}
+	manager.sessions[ref.SessionID] = runtime
+	done := make(chan error, 1)
+	go func() { done <- manager.CompleteTerminal(ref, "auto") }()
+	waitForAITrafficDrainStart(t, c)
+	if !hasAISessionRuntime(manager, ref.SessionID) {
+		t.Fatal("manager removed runtime before traffic receipt")
+	}
+	select {
+	case <-cleaned:
+		t.Fatal("workspace was cleaned before traffic receipt")
+	default:
+	}
+	c.flush(context.Background())
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Fatal(err)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("manager cleanup deadlocked after receipt")
+	}
+	select {
+	case <-cleaned:
+	default:
+		t.Fatal("workspace cleanup was skipped")
+	}
+}
+
+func TestAITrafficCombinedPacketBudgetRetainsBothHeaders(t *testing.T) {
+	c := trafficTestCollector(t, "http://unused.invalid")
+	c.policy.PacketLimitBytes = aiTrafficDefaultPacketLimit
+	c.policy.SessionLimitBytes = aiTrafficDefaultSessionLimit
+	requestHeader := []byte("POST /upload HTTP/1.1\r\nHost: example.invalid\r\nContent-Type: application/octet-stream\r\n\r\n")
+	responseHeader := []byte("HTTP/1.1 200 OK\r\nContent-Type: application/octet-stream\r\n\r\n")
+	request := append(append([]byte(nil), requestHeader...), bytes.Repeat([]byte("q"), (6<<20)-len(requestHeader))...)
+	response := append(append([]byte(nil), responseHeader...), bytes.Repeat([]byte("s"), (6<<20)-len(responseHeader))...)
+	c.recordHTTPFlow(&lowhttp.LowhttpResponse{RawRequest: request, RawPacket: response}, "turn")
+	paths, _ := filepath.Glob(filepath.Join(c.dir, "*.terminal.pb"))
+	if len(paths) != 1 {
+		t.Fatalf("terminal record count=%d", len(paths))
+	}
+	raw, err := os.ReadFile(paths[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+	upload := new(aiv1.AITrafficUpload)
+	if err = proto.Unmarshal(raw, upload); err != nil {
+		t.Fatal(err)
+	}
+	if len(upload.RawRequest)+len(upload.RawResponse) != aiTrafficDefaultPacketLimit {
+		t.Fatal("combined flow exceeded or wasted packet budget")
+	}
+	if len(raw) > aiTrafficDefaultPacketLimit+(128<<10) {
+		t.Fatal("upload would exceed the platform HTTP request-body limit")
+	}
+	if !bytes.HasPrefix(upload.RawRequest, requestHeader) || !bytes.HasPrefix(upload.RawResponse, responseHeader) {
+		t.Fatal("body allocation displaced one side's headers")
+	}
+	if upload.Record.RequestSizeBytes != 6<<20 || upload.Record.ResponseSizeBytes != 6<<20 || !upload.Record.RequestTruncated || !upload.Record.ResponseTruncated || upload.Record.CaptureError != "packet_limit" {
+		t.Fatalf("original sizes or combined truncation reason lost: %v", upload.Record)
+	}
+}
+
+func TestAITrafficCombinedBudgetExplainsOversizeHeaders(t *testing.T) {
+	request := []byte("GET / HTTP/1.1\r\nHost: example.invalid\r\nX-Padding: " + strings.Repeat("r", 700) + "\r\n\r\nrequest-body")
+	response := []byte("HTTP/1.1 200 OK\r\nX-Padding: " + strings.Repeat("s", 700) + "\r\n\r\nresponse-body")
+	keptRequest, keptResponse, reason := trafficBoundPacketPair(request, response, 1024)
+	if len(keptRequest)+len(keptResponse) > 1024 || len(keptRequest) == 0 || len(keptResponse) == 0 || reason != "packet_headers_limit" {
+		t.Fatalf("oversize headers were not explicitly bounded: req=%d rsp=%d reason=%s", len(keptRequest), len(keptResponse), reason)
+	}
+	if !bytes.HasPrefix(keptRequest, []byte("GET / HTTP/1.1\r\n")) || !bytes.HasPrefix(keptResponse, []byte("HTTP/1.1 200 OK\r\n")) {
+		t.Fatal("one side lost its first line")
+	}
+	if bytes.Contains(keptRequest, []byte("request-body")) || bytes.Contains(keptResponse, []byte("response-body")) {
+		t.Fatal("body retained while headers did not fit")
+	}
+}
+
+func TestAITrafficCombinedBudgetReallocatesUnusedBodySpace(t *testing.T) {
+	request := []byte("GET / HTTP/1.1\r\nHost: example.invalid\r\n\r\n")
+	response := []byte("HTTP/1.1 200 OK\r\n\r\n" + strings.Repeat("b", 4096))
+	keptRequest, keptResponse, reason := trafficBoundPacketPair(request, response, 1024)
+	if !bytes.Equal(request, keptRequest) || len(keptRequest)+len(keptResponse) != 1024 || reason != "packet_limit" {
+		t.Fatal("unused request body quota was not allocated to response")
+	}
+}
+
+func TestAITrafficConfigHonorsIncreasedLimitsAndHardCaps(t *testing.T) {
+	for _, test := range []struct {
+		name                                      string
+		configured, defaultLimit, hardLimit, want uint64
+	}{
+		{"packet default", 0, aiTrafficDefaultPacketLimit, aiTrafficMaxPacketLimit, 10 << 20},
+		{"larger packet", 32 << 20, aiTrafficDefaultPacketLimit, aiTrafficMaxPacketLimit, 32 << 20},
+		{"packet hard cap", 128 << 20, aiTrafficDefaultPacketLimit, aiTrafficMaxPacketLimit, 64 << 20},
+		{"session default", 0, aiTrafficDefaultSessionLimit, aiTrafficMaxSessionLimit, 1 << 30},
+		{"larger session", 8 << 30, aiTrafficDefaultSessionLimit, aiTrafficMaxSessionLimit, 8 << 30},
+		{"session hard cap", 128 << 30, aiTrafficDefaultSessionLimit, aiTrafficMaxSessionLimit, 64 << 30},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			if got := trafficCaptureLimit(test.configured, test.defaultLimit, test.hardLimit); got != test.want {
+				t.Fatalf("limit=%d want=%d", got, test.want)
+			}
+		})
+	}
+}
+
+func TestAITrafficSingleHeaderBeyondPacketLimitIsExplicit(t *testing.T) {
+	c := trafficTestCollector(t, "http://unused.invalid")
+	request := []byte("GET / HTTP/1.1\r\nHost: example.invalid\r\nX-Padding: " + strings.Repeat("r", 2048) + "\r\n\r\n")
+	c.recordHTTPFlow(&lowhttp.LowhttpResponse{RawRequest: request, RawPacket: []byte("HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n")}, "turn")
+	paths, _ := filepath.Glob(filepath.Join(c.dir, "*.terminal.pb"))
+	if len(paths) != 1 {
+		t.Fatal("missing terminal upload")
+	}
+	raw, err := os.ReadFile(paths[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+	upload := new(aiv1.AITrafficUpload)
+	if err = proto.Unmarshal(raw, upload); err != nil {
+		t.Fatal(err)
+	}
+	if len(upload.RawRequest)+len(upload.RawResponse) != int(c.policy.PacketLimitBytes) || upload.Record.CaptureError != "packet_headers_limit" || !upload.Record.RequestTruncated {
+		t.Fatal("single oversized header was mistaken for body truncation")
+	}
+}
+
+func TestAITrafficRedactedURLPreservesSafeContextAndMasksSecrets(t *testing.T) {
+	for _, raw := range []string{
+		"https://user:SECRET@example.test/api/token/SECRET?i=3&api_key=SECRET&ordinary=yes#SECRET",
+		"https://example.test/api/%74oken/%53ECRET?i=3&%70assword=SECRET&session_id=SECRET&ordinary=yes",
+	} {
+		target, err := url.Parse(raw)
+		if err != nil {
+			t.Fatal(err)
+		}
+		redacted := trafficRedactedURL(target, "https", "example.test")
+		if redacted == "" || strings.Contains(redacted, "SECRET") || strings.Contains(redacted, "user") || !strings.Contains(redacted, "/api/token/%5BREDACTED%5D") || !strings.Contains(redacted, "i=3") || !strings.Contains(redacted, "ordinary=yes") {
+			t.Fatalf("unsafe or missing URL metadata: %q", redacted)
+		}
+	}
+	for _, raw := range []string{"http://example.test/path", "https://foreign.test/path", "https:opaque", "https://example.test/path?token=%zz", "https://example.test/" + strings.Repeat("x", 16<<10)} {
+		target, err := url.Parse(raw)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if trafficRedactedURL(target, "https", "example.test") != "" {
+			t.Fatalf("unsafe URL was admitted: %.70s", raw)
+		}
+	}
+	for _, host := range []string{"example.test?token=SECRET", "example.test/SECRET", "user:SECRET@example.test", "example.test#SECRET", "example.test:invalid", ""} {
+		record := &aiv1.AITrafficRecord{Scheme: "https"}
+		trafficRequestMetadata(record, []byte("GET /large?i=3 HTTP/1.1\r\nHost: "+host+"\r\n\r\n"))
+		if record.Host != "" || record.RedactedUrl != nil {
+			t.Fatal("host syntax allowed sensitive URL parts into metadata")
+		}
+	}
+}
+
+func TestAITrafficCaptureKeepsStartURLThroughQuotaAndUnavailablePackets(t *testing.T) {
+	for _, mode := range []string{"local_quota", "platform_quota", "packet_headers", "missing_packets"} {
+		t.Run(mode, func(t *testing.T) {
+			c := trafficTestCollector(t, "https://platform.invalid/records")
+			if mode == "local_quota" {
+				c.used = c.policy.SessionLimitBytes
+			}
+			if mode == "packet_headers" {
+				c.policy.PacketLimitBytes = 16
+			}
+			request := []byte("GET /large?i=3&token=SECRET HTTP/1.1\r\nHost: example.test\r\nAuthorization: SECRET\r\n\r\n")
+			end := lowhttp.LowhttpResponse{Https: true, RawRequest: request, RawPacket: []byte("HTTP/1.1 200 OK\r\nContent-Length: 4\r\n\r\nbody")}
+			if mode == "missing_packets" {
+				end.RequestInstance, _ = http.NewRequest("GET", "https://example.test/", nil)
+				httpctx.SetRequestTooLargeHeaderFile(end.RequestInstance, filepath.Join(c.dir, "missing-packet"))
+			}
+			c.recordHTTPFlow(&end, "turn")
+			paths, err := c.pending()
+			if err != nil || len(paths) != 1 {
+				t.Fatalf("saved flow queue not preserved: %v %v", paths, err)
+			}
+			var captured string
+			for _, path := range paths {
+				raw, err := os.ReadFile(path)
+				if err != nil {
+					t.Fatal(err)
+				}
+				upload := new(aiv1.AITrafficUpload)
+				if err := proto.Unmarshal(raw, upload); err != nil {
+					t.Fatal(err)
+				}
+				metadata, _ := protojson.Marshal(upload.Record)
+				if bytes.Contains(metadata, []byte("SECRET")) || !strings.Contains(upload.Record.GetRedactedUrl(), "/large?i=3") {
+					t.Fatalf("secret leaked or request URL lost in %s metadata", upload.Record.Phase)
+				}
+				if captured != "" && captured != upload.Record.GetRedactedUrl() {
+					t.Fatal("terminal metadata replaced the start URL")
+				}
+				captured = upload.Record.GetRedactedUrl()
+				if mode == "local_quota" && upload.Record.Phase == "terminal" && (len(upload.RawRequest) > 0 || len(upload.RawResponse) > 0 || upload.Record.CaptureError != "local_session_limit") {
+					t.Fatal("local quota did not drop raw packets while keeping metadata")
+				}
+			}
+			// Exercise event emission and a platform quota receipt without network.
+			c.client.Transport = aiRuntimeRoundTripFunc(func(r *http.Request) (*http.Response, error) {
+				raw, _ := io.ReadAll(r.Body)
+				upload := new(aiv1.AITrafficUpload)
+				if err := proto.Unmarshal(raw, upload); err != nil {
+					return nil, err
+				}
+				status := "metadata_only"
+				if upload.Record.Phase == "terminal" && mode == "platform_quota" {
+					status = "quota_dropped"
+				}
+				receipt, _ := proto.Marshal(&aiv1.AITrafficReceipt{ProtocolVersion: 1, FlowId: upload.Record.FlowId, Phase: upload.Record.Phase, Durable: true, UploadSha256: trafficSHA(raw), StorageStatus: status})
+				return &http.Response{StatusCode: 200, Header: make(http.Header), Body: io.NopCloser(bytes.NewReader(receipt))}, nil
+			})
+			c.flush(context.Background())
+			emitter := c.emitter.(*trafficTestEmitter)
+			if len(emitter.events) == 0 {
+				t.Fatal("no metadata events emitted")
+			}
+			for _, raw := range emitter.events {
+				if bytes.Contains(raw, []byte("SECRET")) || !bytes.Contains(raw, []byte("/large?i=3")) {
+					t.Fatal("event leaked secrets or lost the captured URL")
+				}
+			}
+		})
+	}
+}
+
+func TestResilienceAITrafficFormalDrainRecoversAfterAutomaticTimeout(t *testing.T) {
+	server := trafficReceiptTestServer(t)
+	defer server.Close()
+	unavailable := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusServiceUnavailable)
+	}))
+	defer unavailable.Close()
+	c := trafficTestCollector(t, unavailable.URL)
+	c.enqueue(&aiv1.AITrafficUpload{Record: &aiv1.AITrafficRecord{ProtocolVersion: 1, FlowId: "flow", SessionId: "session", Phase: "terminal", Outcome: "success"}})
+	c.flush(context.Background())
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	c.finishDrain(ctx)
+	select {
+	case <-c.stop:
+	default:
+		t.Fatal("automatic timeout retained the background worker")
+	}
+	c.policy.UploadBaseUrl = server.URL
+	ctx, cancel = context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	result := c.drain(ctx, "formal-drain")
+	if !result.Complete || result.PendingRecords != 0 || ctx.Err() != nil {
+		t.Fatalf("formal drain did not recover the stopped worker's queue: %+v, %v", result, ctx.Err())
+	}
+}
+
+func TestResilienceAITrafficStoppedDrainHonorsDeadlineDuringConcurrentFlush(t *testing.T) {
+	c := trafficTestCollector(t, "http://unused.invalid")
+	c.enqueue(&aiv1.AITrafficUpload{Record: &aiv1.AITrafficRecord{FlowId: "flow", Phase: "terminal"}})
+	c.stopped.Do(func() { close(c.stop) })
+	c.uploadMu.Lock()
+	defer c.uploadMu.Unlock()
+	ctx, cancel := context.WithTimeout(context.Background(), time.Millisecond)
+	defer cancel()
+	done := make(chan *aiv1.AITrafficDrainResult, 1)
+	go func() { done <- c.drain(ctx, "formal-drain") }()
+	select {
+	case result := <-done:
+		if result.Complete || result.PendingRecords != 1 {
+			t.Fatalf("concurrent uploader incorrectly confirmed evidence: %+v", result)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("formal drain waited on another upload past its deadline")
+	}
+}
+
+type trafficRetryTestEmitter struct {
+	trafficTestEmitter
+	acknowledged bool
+	attempts     int
+}
+
+func (e *trafficRetryTestEmitter) EmitForRefContext(ctx context.Context, ref aiSessionCommandRef, kind string, raw []byte) bool {
+	e.attempts++
+	if !e.acknowledged {
+		return false
+	}
+	return e.trafficTestEmitter.EmitForRefContext(ctx, ref, kind, raw)
+}
+
+func TestResilienceAITrafficMetadataAcknowledgementSurvivesUploadRetryAndRestart(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusServiceUnavailable)
+	}))
+	defer server.Close()
+	c := trafficTestCollector(t, server.URL)
+	emitter := &trafficRetryTestEmitter{}
+	c.emitter = emitter
+	c.enqueue(&aiv1.AITrafficUpload{Record: &aiv1.AITrafficRecord{ProtocolVersion: 1, FlowId: "flow", SessionId: "session", Phase: "terminal"}})
+	c.flush(context.Background())
+	if emitter.attempts != 1 {
+		t.Fatal("metadata was not attempted before packet upload")
+	}
+	marker := filepath.Join(c.dir, "flow.terminal.metadata")
+	if _, err := os.Stat(marker); !os.IsNotExist(err) {
+		t.Fatal("unacknowledged metadata was marked delivered")
+	}
+	emitter.acknowledged = true
+	c.flush(context.Background())
+	c.flush(context.Background())
+	if emitter.attempts != 2 || len(emitter.events) != 1 {
+		t.Fatalf("upload retries republished acknowledged metadata: attempts=%d events=%d", emitter.attempts, len(emitter.events))
+	}
+	restarted := trafficTestCollector(t, server.URL)
+	restarted.dir = c.dir
+	restarted.flush(context.Background())
+	if len(restarted.emitter.(*trafficTestEmitter).events) != 0 {
+		t.Fatal("restart ignored durable metadata acknowledgement")
+	}
+	if err := os.Remove(marker); err != nil {
+		t.Fatal(err)
+	}
+	restarted.flush(context.Background())
+	if len(restarted.emitter.(*trafficTestEmitter).events) != 1 {
+		t.Fatal("restart did not replay an ambiguous metadata acknowledgement")
+	}
+	paths, _ := restarted.pending()
+	if len(paths) != 1 {
+		t.Fatal("metadata acknowledgement discarded unacknowledged packet upload")
+	}
+	recovered := trafficReceiptTestServer(t)
+	defer recovered.Close()
+	restarted.policy.UploadBaseUrl = recovered.URL
+	restarted.flush(context.Background())
+	paths, _ = restarted.pending()
+	if len(paths) != 0 || len(restarted.emitter.(*trafficTestEmitter).events) != 1 {
+		t.Fatal("recovered upload lost its receipt or republished metadata")
+	}
+	if _, err := os.Stat(marker); !os.IsNotExist(err) {
+		t.Fatal("acknowledged upload left its metadata marker behind")
+	}
+}
+
+type trafficBlockingJetStream struct {
+	nats.JetStreamContext
+	entered chan struct{}
+}
+
+func (p *trafficBlockingJetStream) PublishMsg(_ *nats.Msg, options ...nats.PubOpt) (*nats.PubAck, error) {
+	for _, option := range options {
+		if ctx, ok := option.(nats.ContextOpt); ok {
+			select {
+			case p.entered <- struct{}{}:
+			default:
+			}
+			<-ctx.Done()
+			return nil, ctx.Err()
+		}
+	}
+	return nil, fmt.Errorf("publisher did not receive a context")
+}
+
+func trafficBlockedPublisherCollector(t *testing.T, endpoint string) (*aiTrafficCollector, *trafficBlockingJetStream) {
+	t.Helper()
+	bridge, _, driver := newTestAISessionBridge(t)
+	if err := bridge.handleAISessionBind(context.Background(), mustMarshalProto(t, validAISessionBindCommand())); err != nil {
+		t.Fatal(err)
+	}
+	driver.mu.Lock()
+	emitter := driver.emitters[0].(*managedAISessionRuntimeEmitter)
+	driver.mu.Unlock()
+	blocked := &trafficBlockingJetStream{entered: make(chan struct{}, 8)}
+	emitter.publisher.mu.Lock()
+	emitter.publisher.js = blocked
+	emitter.publisher.mu.Unlock()
+	c := trafficTestCollector(t, endpoint)
+	c.binding.Ref = emitter.runtime.ref
+	c.emitter = emitter
+	c.enqueue(&aiv1.AITrafficUpload{Record: &aiv1.AITrafficRecord{ProtocolVersion: 1, FlowId: "flow", SessionId: c.binding.Ref.SessionID, Phase: "terminal"}})
+	return c, blocked
+}
+
+func TestResilienceAITrafficDrainBoundsBlockedPubAck(t *testing.T) {
+	for _, kind := range []string{"stopped_platform_drain", "automatic_finish"} {
+		t.Run(kind, func(t *testing.T) {
+			c, blocked := trafficBlockedPublisherCollector(t, "http://unused.invalid")
+			if kind == "automatic_finish" {
+				flushCtx, stopFlush := context.WithCancel(context.Background())
+				flushed := make(chan struct{})
+				go func() { defer close(flushed); c.flush(flushCtx) }()
+				defer func() {
+					stopFlush()
+					select {
+					case <-flushed:
+					case <-time.After(time.Second):
+						t.Error("cancelled background flush remained blocked")
+					}
+				}()
+				select {
+				case <-blocked.entered:
+				case <-time.After(time.Second):
+					t.Fatal("background upload did not enter the blocking publisher")
+				}
+			}
+			ctx, cancel := context.WithTimeout(context.Background(), 20*time.Millisecond)
+			defer cancel()
+			done := make(chan struct{})
+			go func() {
+				defer close(done)
+				if kind == "automatic_finish" {
+					c.finishDrain(ctx)
+				} else {
+					c.stopped.Do(func() { close(c.stop) })
+					c.drain(ctx, "formal-drain")
+				}
+			}()
+			select {
+			case <-done:
+			case <-time.After(time.Second):
+				t.Fatal("PubAck wait exceeded the drain deadline")
+			}
+		})
+	}
+}
+
+func TestResilienceAITrafficBlockedMetadataDoesNotPreventHTTPReceipt(t *testing.T) {
+	server := trafficReceiptTestServer(t)
+	defer server.Close()
+	c, blocked := trafficBlockedPublisherCollector(t, server.URL)
+	done := make(chan struct{})
+	go func() { defer close(done); c.flush(context.Background()) }()
+	select {
+	case <-blocked.entered:
+	case <-time.After(time.Second):
+		t.Fatal("metadata did not enter the blocking publisher")
+	}
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+		t.Fatal("redundant metadata publication prevented HTTP upload")
+	}
+	paths, _ := c.pending()
+	if len(paths) != 0 {
+		t.Fatal("HTTP receipt did not clear the durable queue")
+	}
+}
+
+func TestResilienceAITrafficPublisherHonorsRuntimeCancellation(t *testing.T) {
+	c, blocked := trafficBlockedPublisherCollector(t, "http://unused.invalid")
+	emitter := c.emitter.(*managedAISessionRuntimeEmitter)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	emitter.ctx = ctx
+	done := make(chan bool, 1)
+	go func() {
+		done <- emitter.EmitForRefContext(context.Background(), c.binding.Ref, "ai_traffic_batch", []byte(`{}`))
+	}()
+	select {
+	case <-blocked.entered:
+	case <-time.After(time.Second):
+		t.Fatal("metadata did not enter the blocking publisher")
+	}
+	cancel()
+	select {
+	case acknowledged := <-done:
+		if acknowledged {
+			t.Fatal("runtime cancellation acknowledged unpublished metadata")
+		}
+	case <-time.After(time.Second):
+		t.Fatal("traffic publication ignored runtime cancellation")
+	}
+}
+
+func TestAITrafficContextEmitterPreservesNilReceiver(t *testing.T) {
+	var emitter *managedAISessionRuntimeEmitter
+	emitter.Emit("event", nil)
+	if emitter.EmitForRef(aiSessionCommandRef{}, "event", nil) {
+		t.Fatal("nil emitter acknowledged an event")
+	}
+	if emitter.EmitForRefContext(context.Background(), aiSessionCommandRef{}, "event", nil) {
+		t.Fatal("nil emitter acknowledged a contextual event")
+	}
+}

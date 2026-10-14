@@ -13,6 +13,7 @@ func TestNormalizeScanNodeCapabilityKeysDefaultsToNonHIDSBuildSurface(t *testing
 
 	got := normalizeScanNodeCapabilityKeys(nil)
 	want := []string{
+		aiTrafficCapabilityV1, aiTrafficAnalysisCapabilityV1,
 		"yak.execute",
 		capabilityKeySSARuleSyncExport,
 		capabilityKeySSARuleSnapshotExecutionV2,
@@ -53,6 +54,7 @@ func TestNormalizeScanNodeCapabilityKeysKeepsExplicitExtrasWithoutDuplicates(t *
 		"extra.capability",
 	})
 	want := []string{
+		aiTrafficCapabilityV1, aiTrafficAnalysisCapabilityV1,
 		"yak.execute",
 		capabilityKeySSARuleSyncExport,
 		capabilityKeySSARuleSnapshotExecutionV2,
@@ -91,7 +93,7 @@ func TestNormalizeScanNodeCapabilityKeysHidesCodeWorkspaceInStatefulRollbackMode
 		aiSessionRuntimeModeStateful,
 	)
 	for _, key := range got {
-		if key == capabilityKeyAICodeWorkspaceV1 || key == capabilityKeyAIForgeReleaseV1 {
+		if key == capabilityKeyAICodeWorkspaceV1 || key == capabilityKeyAIForgeReleaseV1 || key == aiTrafficAnalysisCapabilityV1 {
 			t.Fatalf("stateful rollback mode advertised unsupported capability: %#v", got)
 		}
 	}
