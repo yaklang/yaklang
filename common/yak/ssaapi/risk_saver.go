@@ -42,8 +42,8 @@ func (s *RiskDBSaver) ApplyRiskUpdate(item schema.RiskUpdateItem) error {
 	if s == nil || item.Risk == nil {
 		return nil
 	}
-	// The result and reporter may keep reading this object while the worker
-	// writes. Never let GORM mutate the caller's risk in the background.
+	// The worker writes a copy so GORM cannot mutate the caller's object
+	// while a reporter still reads it.
 	row := *item.Risk
 	row.CWE = append(schema.StringArray(nil), row.CWE...)
 	item.Risk = &row
@@ -83,8 +83,8 @@ func (s *RiskDBSaver) drain() {
 	batch := s.pending
 	s.pending = nil
 	s.mu.Unlock()
-	// Resolve covers here, after the preceding batch was committed. Resolving
-	// them on the producer races with a batch already taken by the worker.
+	// Fold the batch before it is committed. A finding covered before it is
+	// written must not be inserted and deleted by the next batch.
 	if err := SaveRiskUpdates(ssadb.GetDB(), batch...); err != nil {
 		s.mu.Lock()
 		s.err = utils.JoinErrors(s.err, err)
@@ -124,9 +124,8 @@ func (s *RiskDBSaver) Close() error {
 	return s.err
 }
 
-// SaveRisk inserts risks and updates rows that already exist. A row matches
-// by hash, or by ID when the caller already points at a stored row. Disposal
-// status and created_at stay on that row.
+// SaveRisk inserts new findings and rewrites rows the caller already points
+// at by id. A row with an id is an update; a row without one is a create.
 func SaveRisk(db *gorm.DB, risks ...*schema.SSARisk) error {
 	if len(risks) == 0 {
 		return nil
@@ -134,14 +133,19 @@ func SaveRisk(db *gorm.DB, risks ...*schema.SSARisk) error {
 	if db == nil {
 		return utils.Error("save risks: database is nil")
 	}
-	return db.Transaction(func(tx *gorm.DB) error {
-		return saveRiskRows(tx, risks)
-	})
+	updates := make([]schema.RiskUpdateItem, 0, len(risks))
+	for _, risk := range risks {
+		if risk == nil {
+			continue
+		}
+		updates = append(updates, schema.RiskUpdateItem{Risk: risk, OldID: risk.ID})
+	}
+	return saveRiskDecisions(db, updates)
 }
 
-// SaveRiskUpdates applies cover decisions, then saves the resulting risks.
-// A cover keeps the earlier row id; audit nodes of a replaced hash are removed
-// in one batch.
+// SaveRiskUpdates applies cover decisions. OldID names the row to rewrite;
+// OldHash names the previous hash whose audit nodes must go. A decision that
+// only exists to be replaced inside this batch never reaches the database.
 func SaveRiskUpdates(db *gorm.DB, updates ...schema.RiskUpdateItem) error {
 	if len(updates) == 0 {
 		return nil
@@ -149,148 +153,67 @@ func SaveRiskUpdates(db *gorm.DB, updates ...schema.RiskUpdateItem) error {
 	if db == nil {
 		return utils.Error("save risks: database is nil")
 	}
+	return saveRiskDecisions(db, updates)
+}
+
+func saveRiskDecisions(db *gorm.DB, updates []schema.RiskUpdateItem) error {
 	updates = coalesceRiskUpdates(updates)
 	return db.Transaction(func(tx *gorm.DB) error {
-		risks, oldHashes, err := risksFromUpdates(tx, updates)
-		if err != nil {
-			return err
-		}
+		creates, rewrites, oldHashes := splitRiskUpdates(updates)
 		if err := deleteAuditNodesByRiskHashes(tx, oldHashes); err != nil {
 			return err
 		}
-		return saveRiskRows(tx, risks)
+		// A known id is rewritten in place. Everything else is inserted, or
+		// overwrites the row that already has this hash.
+		if err := tx.UpdateInBatches(rewrites, riskBatchSize, "id").Error; err != nil {
+			return err
+		}
+		if err := tx.UpdateInBatches(creates, riskBatchSize, "hash").Error; err != nil {
+			return err
+		}
+		return deleteRisksByHashes(tx, oldHashes)
 	})
 }
 
-func risksFromUpdates(tx *gorm.DB, updates []schema.RiskUpdateItem) ([]*schema.SSARisk, []string, error) {
-	oldHashes := make([]string, 0, len(updates))
-	lookup := make([]string, 0, len(updates))
-	risks := make([]*schema.SSARisk, 0, len(updates))
+// splitRiskUpdates reads each decision as the caller stated it. OldID 0 is a
+// create; any other OldID rewrites that row in place. The previous hash of a
+// rewrite is deleted from the audit graph.
+func splitRiskUpdates(updates []schema.RiskUpdateItem) (creates, rewrites []*schema.SSARisk, oldHashes []string) {
+	creates = make([]*schema.SSARisk, 0, len(updates))
+	rewrites = make([]*schema.SSARisk, 0)
+	oldHashes = make([]string, 0)
 	for _, item := range updates {
 		if item.Risk == nil {
 			continue
 		}
-		if item.OldID != 0 {
-			item.Risk.ID = item.OldID
-		}
+		prepareRiskRow(item.Risk)
 		if item.OldHash != "" && item.OldHash != item.Risk.Hash {
 			oldHashes = append(oldHashes, item.OldHash)
-			if item.Risk.ID == 0 {
-				lookup = append(lookup, item.OldHash)
-			}
 		}
-		risks = append(risks, item.Risk)
-	}
-	if len(lookup) == 0 {
-		return risks, uniqueStrings(oldHashes), nil
-	}
-	var stored []*schema.SSARisk
-	if err := tx.Select("id, hash").Where("hash IN (?)", uniqueStrings(lookup)).Find(&stored).Error; err != nil {
-		return nil, nil, err
-	}
-	byHash := make(map[string]uint, len(stored))
-	for _, row := range stored {
-		byHash[row.Hash] = row.ID
-	}
-	for _, item := range updates {
-		if item.Risk == nil || item.Risk.ID != 0 {
+		if item.OldID == 0 {
+			item.Risk.ID = 0
+			creates = append(creates, item.Risk)
 			continue
 		}
-		item.Risk.ID = byHash[item.OldHash]
+		item.Risk.ID = item.OldID
+		rewrites = append(rewrites, item.Risk)
 	}
-	return risks, uniqueStrings(oldHashes), nil
+	return creates, rewrites, uniqueStrings(oldHashes)
 }
 
-func saveRiskRows(tx *gorm.DB, risks []*schema.SSARisk) error {
-	rows := make([]*schema.SSARisk, 0, len(risks))
-	hashes := make([]string, 0, len(risks))
-	ids := make([]uint, 0, len(risks))
-	for _, risk := range risks {
-		if risk == nil {
-			continue
-		}
-		risk.PrepareForSave()
-		if risk.TitleVerbose == "" {
-			risk.TitleVerbose = risk.Title
-		}
-		rows = append(rows, risk)
-		if risk.Hash != "" {
-			hashes = append(hashes, risk.Hash)
-		}
-		if risk.ID != 0 {
-			ids = append(ids, risk.ID)
-		}
+func prepareRiskRow(risk *schema.SSARisk) {
+	risk.PrepareForSave()
+	if risk.TitleVerbose == "" {
+		risk.TitleVerbose = risk.Title
 	}
-	if len(rows) == 0 {
-		return nil
+	if risk.LatestDisposalStatus == "" {
+		risk.LatestDisposalStatus = string(schema.SSARiskDisposalStatus_NotSet)
 	}
-	stored, err := loadStoredRisks(tx, ids, hashes)
-	if err != nil {
-		return err
-	}
-	byID := make(map[uint]*schema.SSARisk, len(stored))
-	byHash := make(map[string]*schema.SSARisk, len(stored))
-	for _, row := range stored {
-		byID[row.ID] = row
-		byHash[row.Hash] = row
-	}
-	for _, row := range rows {
-		var prev *schema.SSARisk
-		if row.ID != 0 {
-			prev = byID[row.ID]
-		}
-		if prev == nil {
-			prev = byHash[row.Hash]
-		}
-		if prev != nil {
-			keepStoredRiskState(row, prev)
-		}
-		if row.LatestDisposalStatus == "" {
-			row.LatestDisposalStatus = string(schema.SSARiskDisposalStatus_NotSet)
-		}
-	}
-	return tx.UpdateInBatches(rows, riskBatchSize, "id").Error
 }
 
-func loadStoredRisks(tx *gorm.DB, ids []uint, hashes []string) ([]*schema.SSARisk, error) {
-	if len(ids) == 0 && len(hashes) == 0 {
-		return nil, nil
-	}
-	var stored []*schema.SSARisk
-	query := tx
-	switch {
-	case len(ids) > 0 && len(hashes) > 0:
-		query = query.Where("id IN (?) OR hash IN (?)", ids, uniqueStrings(hashes))
-	default:
-		if len(ids) > 0 {
-			query = query.Where("id IN (?)", ids)
-		} else {
-			query = query.Where("hash IN (?)", uniqueStrings(hashes))
-		}
-	}
-	if err := query.Find(&stored).Error; err != nil {
-		return nil, err
-	}
-	return stored, nil
-}
-
-// keepStoredRiskState copies the columns a rescan must not reset: the row id,
-// when it was first stored, and the user's disposal marks.
-func keepStoredRiskState(row, stored *schema.SSARisk) {
-	row.ID = stored.ID
-	row.CreatedAt = stored.CreatedAt
-	row.LatestDisposalStatus = stored.LatestDisposalStatus
-	row.IsRead = stored.IsRead
-	row.Ignore = stored.Ignore
-	row.UploadOnline = stored.UploadOnline
-	row.IsPotential = stored.IsPotential
-	row.CveAccessVector = stored.CveAccessVector
-	row.CveAccessComplexity = stored.CveAccessComplexity
-	row.Tags = stored.Tags
-}
-
-// A pending source -> struct -> SSA chain must reach the database only once.
-// If the chain started at a stored row, keep that original replacement target.
+// coalesceRiskUpdates folds a chain that one batch both writes and replaces.
+// source -> struct -> ssa becomes the final ssa row, still aimed at the
+// original stored id when the chain started from one.
 func coalesceRiskUpdates(updates []schema.RiskUpdateItem) []schema.RiskUpdateItem {
 	out := make([]schema.RiskUpdateItem, 0, len(updates))
 	byHash := make(map[string]int)
@@ -315,6 +238,24 @@ func coalesceRiskUpdates(updates []schema.RiskUpdateItem) []schema.RiskUpdateIte
 		}
 	}
 	return out
+}
+
+// deleteRisksByHashes removes findings a later decision replaced. An id
+// rewrite has already changed that row's hash, so this does not touch it.
+func deleteRisksByHashes(db *gorm.DB, hashes []string) error {
+	hashes = uniqueStrings(hashes)
+	const chunk = 500
+	for start := 0; start < len(hashes); start += chunk {
+		end := start + chunk
+		if end > len(hashes) {
+			end = len(hashes)
+		}
+		// Unscoped: a soft-deleted hash still occupies the unique index.
+		if err := db.Unscoped().Where("hash IN (?)", hashes[start:end]).Delete(&schema.SSARisk{}).Error; err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func deleteAuditNodesByRiskHashes(db *gorm.DB, hashes []string) error {
