@@ -75,9 +75,10 @@ type SarifReport struct {
 	// driver is run.Tool.Driver, kept for O(1) rule registration.
 	driver   *sarif.ToolComponent
 	ruleByID map[string]struct{}
-	// resultByHash remembers where each appended finding sits so a covered
-	// finding is replaced instead of reported twice.
-	resultByHash map[string]int
+	// sarifResultByFeature is the index of an appended sarif.Result, keyed by
+	// the risk feature hash (the SARIF fingerprint). A later mode replaces that
+	// result instead of reporting the finding twice.
+	sarifResultByFeature map[string]int
 	// sinceFlush counts findings appended since the last snapshot, so a long
 	// scan publishes intermediate documents instead of only the final one.
 	sinceFlush int
@@ -225,7 +226,7 @@ func (r *SarifReport) appendResult(result *ssaapi.SyntaxFlowResult) {
 		}
 
 		r.registerRule(ruleID, SFRule, risk)
-		r.rememberResult(risk, res)
+		r.rememberSarifResult(risk)
 		r.run.Results = append(r.run.Results, res)
 		added++
 	}
@@ -270,23 +271,31 @@ func (r *SarifReport) currentFlusher() *reportFlusher {
 	return r.flusher
 }
 
-// rememberResult records the slot of a finding keyed by its feature hash (its
-// SARIF fingerprint) so a later scan mode replaces it.
-func (r *SarifReport) rememberResult(risk *schema.SSARisk, res *sarif.Result) {
-	if r == nil || risk == nil || res == nil {
+// rememberSarifResult records the slot a sarif.Result will occupy. Call it
+// immediately before appending that result.
+func (r *SarifReport) rememberSarifResult(risk *schema.SSARisk) {
+	if r == nil || risk == nil || r.run == nil {
 		return
+	}
+	key := sarifFeatureKey(risk)
+	if key == "" {
+		return
+	}
+	if r.sarifResultByFeature == nil {
+		r.sarifResultByFeature = map[string]int{}
+	}
+	r.sarifResultByFeature[key] = len(r.run.Results)
+}
+
+func sarifFeatureKey(risk *schema.SSARisk) string {
+	if risk == nil {
+		return ""
 	}
 	key := strings.TrimSpace(risk.RiskFeatureHash)
 	if key == "" {
 		key = strings.TrimSpace(risk.Hash)
 	}
-	if key == "" {
-		return
-	}
-	if r.resultByHash == nil {
-		r.resultByHash = map[string]int{}
-	}
-	r.resultByHash[key] = len(r.run.Results)
+	return key
 }
 
 // ApplyRiskUpdate creates or replaces one alert. The scan already filtered the
@@ -297,11 +306,11 @@ func (r *SarifReport) ApplyRiskUpdate(item schema.RiskUpdateItem) error {
 		return nil
 	}
 	if item.OldHash != "" {
-		feature := strings.TrimSpace(item.Risk.RiskFeatureHash)
+		feature := sarifFeatureKey(item.Risk)
 		if feature == "" {
 			feature = strings.TrimSpace(item.OldHash)
 		}
-		r.removeResultByFeatureHash(feature)
+		r.removeSarifResult(feature)
 	}
 	r.appendRisk(item.Risk)
 	return nil
@@ -331,7 +340,7 @@ func (r *SarifReport) appendRisk(risk *schema.SSARisk) {
 		res.WithLocations([]*sarif.Location{loc})
 	}
 	r.registerRule(ruleID, rule, risk)
-	r.rememberResult(risk, res)
+	r.rememberSarifResult(risk)
 	r.run.Results = append(r.run.Results, res)
 	r.noteFlush(1)
 }
@@ -353,27 +362,39 @@ func locationFromRisk(risk *schema.SSARisk) *sarif.Location {
 	)
 }
 
-// removeResultByFeatureHash drops the alert of a covered finding, keyed by the
-// same feature hash the fingerprint uses.
-func (r *SarifReport) removeResultByFeatureHash(feature string) {
+// removeSarifResult drops the alert of a covered finding. The index is the
+// feature hash, which is also the SARIF fingerprint.
+func (r *SarifReport) removeSarifResult(feature string) {
 	feature = strings.TrimSpace(feature)
-	if feature == "" || r == nil || r.run == nil {
+	if feature == "" || r == nil || r.run == nil || r.sarifResultByFeature == nil {
 		return
 	}
-	out := r.run.Results[:0]
-	for _, res := range r.run.Results {
-		if res == nil {
-			continue
-		}
-		if fp, ok := res.PartialFingerprints[SarifFingerprintKey]; ok {
-			if text, ok := fp.(string); ok && text == feature {
-				continue
-			}
-		}
-		out = append(out, res)
+	idx, ok := r.sarifResultByFeature[feature]
+	delete(r.sarifResultByFeature, feature)
+	if !ok || idx < 0 || idx >= len(r.run.Results) {
+		return
 	}
-	r.run.Results = out
-	delete(r.resultByHash, feature)
+	last := len(r.run.Results) - 1
+	if idx != last {
+		moved := r.run.Results[last]
+		r.run.Results[idx] = moved
+		if key := sarifResultFeature(moved); key != "" {
+			r.sarifResultByFeature[key] = idx
+		}
+	}
+	r.run.Results = r.run.Results[:last]
+}
+
+func sarifResultFeature(res *sarif.Result) string {
+	if res == nil || res.PartialFingerprints == nil {
+		return ""
+	}
+	fp, ok := res.PartialFingerprints[SarifFingerprintKey]
+	if !ok {
+		return ""
+	}
+	text, _ := fp.(string)
+	return text
 }
 
 // registerRule appends the result rule to the driver once per rule ID.
