@@ -351,6 +351,41 @@ func TestSliceAnyBoolNilRoundTrip(t *testing.T) {
 	}
 }
 
+type runtimeEmbeddedInterface interface {
+	EmbeddedMethod() string
+}
+
+type runtimeEmbeddedBase struct{}
+
+func (runtimeEmbeddedBase) EmbeddedMethod() string {
+	return "embedded"
+}
+
+type runtimeEmbeddedOuter struct {
+	runtimeEmbeddedBase
+}
+
+func (runtimeEmbeddedOuter) AsInterface() runtimeEmbeddedInterface {
+	return runtimeEmbeddedOuter{}
+}
+
+func TestResolveFieldReflectsMethodsThroughReturnedInterface(t *testing.T) {
+	outerMethod := mustResolve(t, runtimeEmbeddedOuter{}, "AsInterface")
+	returned := outerMethod.Call(nil)
+	if len(returned) != 1 || !returned[0].IsValid() {
+		t.Fatalf("AsInterface returned %#v", returned)
+	}
+
+	embeddedMethod := mustResolve(t, returned[0].Interface(), "EmbeddedMethod")
+	if !embeddedMethod.IsValid() || embeddedMethod.Kind() != reflect.Func {
+		t.Fatalf("EmbeddedMethod = %#v", embeddedMethod)
+	}
+	got := embeddedMethod.Call(nil)
+	if len(got) != 1 || got[0].String() != "embedded" {
+		t.Fatalf("EmbeddedMethod returned %#v", got)
+	}
+}
+
 func resultField(elem any) map[string]any {
 	return map[string]any{"field": elem}
 }

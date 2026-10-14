@@ -22,7 +22,12 @@ func (c *Compiler) addMainWrapperToModule(entryFunc string, printEntryResult boo
 
 	entry := mod.NamedFunction(entryFunc)
 	if entry.IsNil() {
-		return fmt.Errorf("addMainWrapperToModule: entry function %q not found in module", entryFunc)
+		resolvedName, resolved, err := resolveEntryFunction(mod, entryFunc)
+		if err != nil {
+			return fmt.Errorf("addMainWrapperToModule: entry function %q not found in module", entryFunc)
+		}
+		entryFunc = resolvedName
+		entry = resolved
 	}
 
 	gcName := c.runtimeSymName(abi.RuntimeGCSymbol)

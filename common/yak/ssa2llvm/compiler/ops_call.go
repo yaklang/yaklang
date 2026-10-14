@@ -2,6 +2,8 @@ package compiler
 
 import (
 	"fmt"
+	"strconv"
+	"strings"
 
 	"github.com/yaklang/go-llvm"
 	"github.com/yaklang/yaklang/common/yak/ssa"
@@ -80,24 +82,42 @@ func (c *Compiler) newRuntimeMethodDispatchSpec(inst *ssa.Call, fn *ssa.Function
 	if inst == nil || calleeVal == nil {
 		return contextCallSpec{}, false, nil
 	}
-	mc, ok := calleeVal.(ssa.MemberCall)
-	if !ok || !mc.IsMember() {
+
+	var obj ssa.Value
+	var methodName string
+
+	if mc, ok := calleeVal.(ssa.MemberCall); ok && mc.IsMember() {
+		obj = ssa.GetLatestObject(calleeVal)
+		key := ssa.GetLatestKey(calleeVal)
+		if obj == nil || key == nil {
+			return contextCallSpec{}, false, nil
+		}
+		// Numeric/dynamic keys (slice index, map lookup) yield a callable VALUE
+		// (e.g. fns[0] is a closure stored in the slice), not a method name.
+		// Only string-constant keys are method dispatches.
+		if key != nil && !c.memberKeyIsStringConst(key) {
+			return contextCallSpec{}, false, nil
+		}
+		methodName = c.resolveMemberKeyString(key)
+	} else if phi, ok := calleeVal.(*ssa.Phi); ok && phi != nil {
+		// A member call on a loop-carried object (e.g. freq.GetFirstFuzzHTTPRequest())
+		// is lowered by member_call_api as a synthetic phi whose name is "#<objID>.<method>".
+		name := phi.GetName()
+		if strings.HasPrefix(name, "#") {
+			if dot := strings.IndexByte(name, '.'); dot > 1 {
+				if objID, err := strconv.ParseInt(name[1:dot], 10, 64); err == nil && fn != nil {
+					if targetObj, ok := fn.GetValueById(objID); ok && targetObj != nil {
+						obj = targetObj
+						methodName = name[dot+1:]
+					}
+				}
+			}
+		}
+	} else {
 		return contextCallSpec{}, false, nil
 	}
 
-	obj := ssa.GetLatestObject(calleeVal)
-	key := ssa.GetLatestKey(calleeVal)
-	if obj == nil || key == nil {
-		return contextCallSpec{}, false, nil
-	}
-	// Numeric/dynamic keys (slice index, map lookup) yield a callable VALUE
-	// (e.g. fns[0] is a closure stored in the slice), not a method name.
-	// Only string-constant keys are method dispatches.
-	if key != nil && !c.memberKeyIsStringConst(key) {
-		return contextCallSpec{}, false, nil
-	}
-	methodName := c.resolveMemberKeyString(key)
-	if methodName == "" {
+	if methodName == "" || obj == nil {
 		return contextCallSpec{}, false, nil
 	}
 	// Map lookups yield values, not methods: a["c"] is a closure stored in
