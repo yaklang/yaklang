@@ -64,7 +64,7 @@ jobs:
           # The timeout is cumulative per package, including every sealed matrix.
           # Keep the complete suite bounded without aborting a newly started test.
           go test -json -count=1 -timeout=10m ./internal/trafficfixture/... ./common/bin-parser/... ./common/pcapx/... ./common/yak/cmd/yakcmds/shark-cli ./scripts/ci > "$RUNNER_TEMP/bin-parser-traffic.jsonl" 2> "$RUNNER_TEMP/bin-parser-build.log"
-          go run ./internal/trafficfixture/cmd/corpus exec -- python3 @scripts/protocol-tests/check_go_test_json_v2.py "$RUNNER_TEMP/bin-parser-traffic.jsonl" --inventory @scripts/protocol-tests/required-tests-traffic-unified-v71.json --tier full > "$RUNNER_TEMP/required-tests-result.json"
+          go run ./internal/trafficfixture/cmd/corpus exec -- python3 @scripts/protocol-tests/check_go_test_json_v2.py "$RUNNER_TEMP/bin-parser-traffic.jsonl" --inventory @scripts/protocol-tests/required-tests-traffic-unified-v72.json --tier full > "$RUNNER_TEMP/required-tests-result.json"
 
       - name: Upload test log
         if: always()

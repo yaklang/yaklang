@@ -26,6 +26,8 @@ type binDoIP struct {
 	identities                                       int
 	diagnosticRetired                                bool
 	diagnosticAmbiguous                              bool
+	diagnosticReplyUncertain                         bool
+	diagnosticSuperseded                             bool
 	associationRefusal                               bool // complete bounded reply; no pending state consumed
 	routeEvent, aliveEvent, diagnosticEvent, replyTo uint64
 	reserveMemory                                    func(int64) error
@@ -36,6 +38,8 @@ func (s *binDoIP) retireDiagnostics() {
 	s.diagnosticPending, s.diagnosticAcknowledged, s.diagnosticRetired = false, false, true
 	s.diagnosticEvent, s.target, s.request = 0, 0, [2]byte{}
 	s.diagnosticAmbiguous = false
+	s.diagnosticReplyUncertain = false
+	s.diagnosticSuperseded = false
 }
 
 // A rejected client diagnostic frame cannot leave old eligibility behind.
@@ -225,7 +229,10 @@ func (s *binDoIP) consumeEvent(dir int, raw []byte, eventID uint64) (map[string]
 			return nil, sessionContext("DoIP diagnostic context retired after rejected request")
 		}
 		if kind == 0x8001 && client {
-			if source != s.tester || target == 0 || s.diagnosticPending {
+			replacingUncertain := s.diagnosticPending && s.diagnosticReplyUncertain &&
+				source == s.tester && target != 0 && len(data) == 2 && data[0] == 0x10 && data[1]&0x7f != 0 && data[1]&0x80 == 0 &&
+				(target != s.target || !bytes.Equal(data, s.request[:]))
+			if source != s.tester || target == 0 || s.diagnosticPending && !replacingUncertain {
 				if source == s.tester && (target != s.target || len(data) != 2 || !bytes.Equal(data, s.request[:])) {
 					s.retireDiagnostics()
 				}
@@ -243,7 +250,11 @@ func (s *binDoIP) consumeEvent(dir int, raw []byte, eventID uint64) (map[string]
 				s.retireDiagnostics()
 				return nil, protocolError(ErrUnsupportedFeature, "UDS suppressed positive response requires unsupported completion semantics")
 			}
-			if s.maxPending <= s.outstanding() {
+			outstanding := s.outstanding()
+			if replacingUncertain {
+				outstanding--
+			}
+			if s.maxPending <= outstanding {
 				return nil, protocolError(ErrResourceExceeded, "DoIP pending limit exceeded")
 			}
 			h := s.history[target]
@@ -264,6 +275,17 @@ func (s *binDoIP) consumeEvent(dir int, raw []byte, eventID uint64) (map[string]
 					s.history = make(map[uint16]doipDiagnosticHistory)
 				}
 			}
+			if replacingUncertain {
+				// Captured association ambiguity cannot prove the prior request completed.
+				// A distinct descriptor stays observable with that explicit uncertainty;
+				// old eligibility is retired, and history still prevents reused matches.
+				s.diagnosticSuperseded = true
+				out["Previous Diagnostic Completion Unverified"] = true
+				out["Unresolved Previous Request Event"] = s.diagnosticEvent
+				out["Unresolved Previous Session Type"] = int(s.request[1] & 0x7f)
+				out["Unresolved Previous Target Address"] = int(s.target)
+			}
+			s.diagnosticReplyUncertain = false
 			h.seen[index] |= bit
 			if h.generations < 2 {
 				h.generations++
@@ -285,10 +307,40 @@ func (s *binDoIP) consumeEvent(dir int, raw []byte, eventID uint64) (map[string]
 			}
 		} else {
 			if client || !s.diagnosticPending || source != s.target || target != s.tester {
+				if !client && s.diagnosticPending && s.diagnosticSuperseded && target == s.tester {
+					if _, known := s.history[source]; known {
+						if err := doipDiagnosticResponseShape(kind, data); err != nil {
+							return nil, err
+						}
+						s.associationRefusal, s.diagnosticReplyUncertain = true, true
+						return nil, protocolError(ErrContextRequired, "DoIP response belongs to a retired logical target context")
+					}
+				}
 				return nil, protocolError(ErrMalformedMessage, "DoIP diagnostic response has no matching address/direction/request")
+			}
+			// Wire validity is independent of whether a captured response can be
+			// associated. Never let ambiguity turn malformed or unsupported bytes
+			// into the private, recoverable complete-message refusal scope.
+			if err := doipDiagnosticResponseShape(kind, data); err != nil {
+				return nil, err
+			}
+			if s.diagnosticSuperseded {
+				descriptor, hasDescriptor := byte(0), false
+				if kind == 0x8001 && data[0] == 0x50 {
+					descriptor, hasDescriptor = data[1], true
+				}
+				if (kind == 0x8002 || kind == 0x8003) && len(data) == 3 {
+					descriptor, hasDescriptor = data[2], true
+				}
+				h := s.history[source]
+				if hasDescriptor && descriptor != s.request[1] && h.seen[descriptor/64]&(uint64(1)<<(descriptor%64)) != 0 {
+					s.associationRefusal, s.diagnosticReplyUncertain = true, true
+					return nil, protocolError(ErrContextRequired, "DoIP response echoes a retired diagnostic descriptor")
+				}
 			}
 			if s.diagnosticAmbiguous {
 				s.associationRefusal = true
+				s.diagnosticReplyUncertain = true
 				return nil, protocolError(ErrContextRequired, "DoIP reply cannot identify a reused diagnostic identity generation")
 			}
 			out["Role"], out["Association"], out["In Reply To"] = "response", "matched", "DiagnosticSessionControl Request"
@@ -303,6 +355,7 @@ func (s *binDoIP) consumeEvent(dir int, raw []byte, eventID uint64) (map[string]
 				}
 				if s.history[source].generations > 1 && len(data) != 3 {
 					s.associationRefusal = true
+					s.diagnosticReplyUncertain = true
 					return nil, protocolError(ErrContextRequired, "DoIP acknowledgement omits a unique diagnostic descriptor")
 				}
 				out["Acknowledgement Code"] = int(code)
@@ -335,6 +388,7 @@ func (s *binDoIP) consumeEvent(dir int, raw []byte, eventID uint64) (map[string]
 					}
 					if s.history[source].generations > 1 {
 						s.associationRefusal = true
+						s.diagnosticReplyUncertain = true
 						return nil, protocolError(ErrContextRequired, "DoIP service-only negative response cannot identify diagnostic generation")
 					}
 					out["Packet Name"], out["UDS Service"], out["Negative Response Code"] = "DiagnosticSessionControl Negative Response", 0x7f, int(data[2])
@@ -352,9 +406,47 @@ func (s *binDoIP) consumeEvent(dir int, raw []byte, eventID uint64) (map[string]
 				s.target = 0
 				s.diagnosticEvent = 0
 				s.diagnosticAmbiguous = false
+				s.diagnosticReplyUncertain = false
+				s.diagnosticSuperseded = false
 			}
 		}
 	}
 	out["Outstanding Requests"] = s.outstanding()
 	return out, nil
+}
+
+// The selected modern DSC response profile has six positive bytes, three NRC
+// bytes and at most two echoed DSC request bytes in a DoIP ACK/NACK. Context-
+// dependent echo/type comparisons remain in consumeEvent after these checks.
+func doipDiagnosticResponseShape(kind uint16, data []byte) error {
+	if kind == 0x8002 || kind == 0x8003 {
+		code := data[0]
+		if kind == 0x8002 && code != 0 || kind == 0x8003 && (code < 2 || code > 8) {
+			return protocolError(ErrMalformedMessage, "DoIP diagnostic acknowledgement code is invalid")
+		}
+		if len(data) > 3 {
+			return protocolError(ErrMalformedMessage, "DoIP acknowledgement previous message exceeds DSC request")
+		}
+		if len(data) >= 2 && data[1] != 0x10 {
+			return protocolError(ErrUnsupportedFeature, "DoIP acknowledgement echoes an unsupported UDS service")
+		}
+		if len(data) == 3 && data[2]&0x7f == 0 {
+			return protocolError(ErrMalformedMessage, "DoIP acknowledgement echoes a zero DSC session")
+		}
+
+		return nil
+	}
+	switch data[0] {
+	case 0x50:
+		if len(data) != 6 || data[1] == 0 || data[1]&0x80 != 0 {
+			return protocolError(ErrMalformedMessage, "UDS DiagnosticSessionControl response is malformed")
+		}
+	case 0x7f:
+		if len(data) != 3 || data[1] != 0x10 || data[2] == 0 {
+			return protocolError(ErrMalformedMessage, "UDS negative response differs from request")
+		}
+	default:
+		return protocolError(ErrUnsupportedFeature, "DoIP UDS response service is unsupported")
+	}
+	return nil
 }

@@ -83860,6 +83860,547 @@
         "common/pcapx/pcaputil/tcp-capture-prefix/verify.py": "tcp-capture-prefix/verify.py",
         "scripts/protocol-tests/required-tests-traffic-unified-v71.json": "required-tests-traffic-unified-v71.json"
       }
+    },
+    {
+      "id": "validation-doip-context",
+      "kind": "validation",
+      "source_sha": "f8fb7add219a147d80625fe68e3659fbe8108022",
+      "file": "validation-doip-context.zip",
+      "sha256": "5ffca928e2a355df0f086a0a2f85ac64e349d78d8f54af09730c423a38e89eb3",
+      "password": "bin-parser",
+      "members": {
+        "doip-context/REFERENCE-CODEC-ACTUAL.json": {
+          "sha256": "969feb1ebeb02705dc5ed28dd2af0e13a6f7f326265c3fbe71546a24b8ef5b64",
+          "bytes": 549
+        },
+        "doip-context/REFERENCE-TSHARK-ACTUAL.json": {
+          "sha256": "3ee54bb518703d7403116bbb10c661b312c7f26751527c914621d4f2b1e59459",
+          "bytes": 347
+        },
+        "doip-context/SOURCE-PIN.json": {
+          "sha256": "826a7d7158228bef023d1bcae56448063aabf36c335ff55bac67a25275ae38d1",
+          "bytes": 549
+        },
+        "doip-context/answers/adjacent-complete-c1.json": {
+          "sha256": "7de447766b93f926672b74c442acc793bdfd9f53bb6af273ac77b40568c67428",
+          "bytes": 4416
+        },
+        "doip-context/answers/adjacent-complete-c65535.json": {
+          "sha256": "fbb9762581555c36b5855cf3d5b600c8c32f2c233b23f1bf9086e0ec0429a087",
+          "bytes": 3532
+        },
+        "doip-context/answers/adjacent-complete-c7.json": {
+          "sha256": "d7b31997cb261e7c7c808b77db119825a55cc8bf993a6833be67c9fa3564844d",
+          "bytes": 3636
+        },
+        "doip-context/answers/bad-ack-c1.json": {
+          "sha256": "e212824b8cff587dca6e73a8eda428eeb470318b33e8704c252f37904d24a8a9",
+          "bytes": 4833
+        },
+        "doip-context/answers/bad-ack-c65535.json": {
+          "sha256": "a743633e8946266591e145e5ac141e761d669f16170eb7079e2c49e4d4f9782a",
+          "bytes": 3816
+        },
+        "doip-context/answers/bad-ack-c7.json": {
+          "sha256": "5a140f41d473bd3f5488ad0250b89c8e8922bca8a229c5152ba3f38ea5805c76",
+          "bytes": 3921
+        },
+        "doip-context/answers/bad-nack-c1.json": {
+          "sha256": "ae96ecefaa0b5d45fc38920caab9fef02780b95f519bc534fadec9e4f60e7003",
+          "bytes": 4833
+        },
+        "doip-context/answers/bad-nack-c65535.json": {
+          "sha256": "71b14bf5d58bb301e06c31a7fedba15f7d62d352b6f9c917f3b8ba5b1f2035f3",
+          "bytes": 3816
+        },
+        "doip-context/answers/bad-nack-c7.json": {
+          "sha256": "a2983a8e6dad11c1e40d2aab0d5e0f6e7eb77e9ab39680360b8cc494047be9d7",
+          "bytes": 3921
+        },
+        "doip-context/answers/different-target-c1.json": {
+          "sha256": "398a2bd6a59ee91d266fb3688b09e61bb338dac2fe17b14e28e7103688161d54",
+          "bytes": 7544
+        },
+        "doip-context/answers/different-target-c65535.json": {
+          "sha256": "1ad6c357b6249636ab91103f82271570560966563c187ca84a6c5a00457e6561",
+          "bytes": 5853
+        },
+        "doip-context/answers/different-target-c7.json": {
+          "sha256": "74c92f3a797917321073a1c28540c4064e025564e2721d0703b0c4e784c665d4",
+          "bytes": 6029
+        },
+        "doip-context/answers/distinct-after-uncertain-c1.json": {
+          "sha256": "2516dbb130b761920564b6c13b3f958b3f5cad4a509b74bfba421b97db2d129f",
+          "bytes": 7034
+        },
+        "doip-context/answers/distinct-after-uncertain-c65535.json": {
+          "sha256": "2ca77e251ba706c9b57141857680f62f4cefc12ecc0316e26e942cb685720637",
+          "bytes": 5565
+        },
+        "doip-context/answers/distinct-after-uncertain-c7.json": {
+          "sha256": "860678bdb6e33f355525a5d10ec515fa0129e3e869086fa97ff95b2e21b1f234",
+          "bytes": 5717
+        },
+        "doip-context/answers/echo-unknown-service-c1.json": {
+          "sha256": "d62e3b7d1b9708f8fd142dd0104b1cbc11bd92b2f0d63e4167a61188ec7e53a3",
+          "bytes": 4866
+        },
+        "doip-context/answers/echo-unknown-service-c65535.json": {
+          "sha256": "a029c735be07837f18253bb2c6b46317a4b6249ab47c52b27a394920dedad1d2",
+          "bytes": 3825
+        },
+        "doip-context/answers/echo-unknown-service-c7.json": {
+          "sha256": "64e1a6da029d983e2794bf4fd02eac41c89a1d3f2f0635f727600f9fabdd69f7",
+          "bytes": 3942
+        },
+        "doip-context/answers/echo-zero-session-c1.json": {
+          "sha256": "d4fff2bf847a729cbfefca5d94e719890da1520ea65ccd73664e89cabac42db8",
+          "bytes": 4857
+        },
+        "doip-context/answers/echo-zero-session-c65535.json": {
+          "sha256": "e5a9b9b038c33e54c720e9dcb9a7fd6c3db3b33020943ec5cd80a6612effca95",
+          "bytes": 3816
+        },
+        "doip-context/answers/echo-zero-session-c7.json": {
+          "sha256": "0dc22dee0aeb9364fa136de881e0c0442f36d77367970fe3a97d9776ed3a0b0c",
+          "bytes": 3933
+        },
+        "doip-context/answers/fresh-close-unresolved-c1.json": {
+          "sha256": "f8e2d70e260c57f47814fe0ca2135fbd124bd45c82cfc5e3e8fc18fdb3c8c0a3",
+          "bytes": 6242
+        },
+        "doip-context/answers/fresh-close-unresolved-c65535.json": {
+          "sha256": "8c8aaa29c5aea5666dc9ffe9a2eeeccaa8ae34dccd6e1412d598b5019aa3450a",
+          "bytes": 4995
+        },
+        "doip-context/answers/fresh-close-unresolved-c7.json": {
+          "sha256": "308944a663a8f975e7c0aea0f4c2afd4d6fa7385779c59eac6b0cf702bca59a1",
+          "bytes": 5123
+        },
+        "doip-context/answers/late-nrc-fresh-completion-c1.json": {
+          "sha256": "f275e7ea3997ecd5e21d4c84064e08a6260354221971ab87e7b7f1d17715b4f9",
+          "bytes": 7542
+        },
+        "doip-context/answers/late-nrc-fresh-completion-c65535.json": {
+          "sha256": "8385203b9c24e31ee2a8c2aaac9be2b21bf965319c4d5dbd4604f2240b9888fe",
+          "bytes": 5890
+        },
+        "doip-context/answers/late-nrc-fresh-completion-c7.json": {
+          "sha256": "ba46ea08d2099eaf018fd4960d3ff9eafb4a75d2e19d88c42de8795645fd22d9",
+          "bytes": 6066
+        },
+        "doip-context/answers/late-old-ack-c1.json": {
+          "sha256": "a745dcd3dbb5a76cdbbeecacc8036d4b904e13a3b00b940ae829b25dd63cfc75",
+          "bytes": 7498
+        },
+        "doip-context/answers/late-old-ack-c65535.json": {
+          "sha256": "89a8c046a295e383d74c7e1443df7fb2e573fb26d8100b23bc73d8c2b0e23782",
+          "bytes": 5846
+        },
+        "doip-context/answers/late-old-ack-c7.json": {
+          "sha256": "bb95bbe797bd2cd8a44324ace4c522e7eb00029b532a9c35265bf2fe6ceb4718",
+          "bytes": 6022
+        },
+        "doip-context/answers/late-old-nack-c1.json": {
+          "sha256": "149905a9ab96c134a0a7e5bc719de1b69a247b29eb52af5865ec62dac6cf3a2f",
+          "bytes": 7498
+        },
+        "doip-context/answers/late-old-nack-c65535.json": {
+          "sha256": "4421343cce2c2496af1e7c32e81c519a3e61f5e5e0e1dffb66f07b1dd1426c01",
+          "bytes": 5846
+        },
+        "doip-context/answers/late-old-nack-c7.json": {
+          "sha256": "701fa654a86a3ae429819efe07ac057462bea4319f8eaa9836a4d9e4a848bbe5",
+          "bytes": 6022
+        },
+        "doip-context/answers/late-old-positive-c1.json": {
+          "sha256": "e395f89dc588edff33430a4453700b40c7efb328cff7424039e01c6100e3f375",
+          "bytes": 7543
+        },
+        "doip-context/answers/late-old-positive-c65535.json": {
+          "sha256": "31b28682a53604a5ddb46a344632239a5bb642e7a205509990bf3a318606caf5",
+          "bytes": 5852
+        },
+        "doip-context/answers/late-old-positive-c7.json": {
+          "sha256": "a32f6c39fe6884fe3166053892737e51a7e6bf7114b7625068c65a86dbafdce7",
+          "bytes": 6028
+        },
+        "doip-context/answers/short-negative-c1.json": {
+          "sha256": "a02b4a499581abdfd1f8325fc7434138676d8d3190981186aa6bba47bbbae59b",
+          "bytes": 4852
+        },
+        "doip-context/answers/short-negative-c65535.json": {
+          "sha256": "61279e754cb723b108df218d6f7e1a00f2abcffc9c83b86a850300e9fb2d761b",
+          "bytes": 3823
+        },
+        "doip-context/answers/short-negative-c7.json": {
+          "sha256": "a3f884ed1512069fa0031a1dc49d0f3a8e386d858e1323f6c7849424a5e32dc7",
+          "bytes": 3928
+        },
+        "doip-context/answers/short-positive-c1.json": {
+          "sha256": "05f9591411c55dbab47ae4ad6a3ab91c682363d96f088550b0c609d0f0517fac",
+          "bytes": 4890
+        },
+        "doip-context/answers/short-positive-c65535.json": {
+          "sha256": "1c1574f288e15fb2943b879fbdac59ca6a5054f2d2570ff2b4c8516b34a792ce",
+          "bytes": 3825
+        },
+        "doip-context/answers/short-positive-c7.json": {
+          "sha256": "33bacf4b7422a3a5cff07cb1aab15b02abeb94f4a43f6014538037da6a8fba76",
+          "bytes": 3942
+        },
+        "doip-context/answers/unknown-service-c1.json": {
+          "sha256": "6f61ee3787756134539bbfaec469e67b70fc3629a0a07ffb9b71d7c25ffd14bd",
+          "bytes": 4860
+        },
+        "doip-context/answers/unknown-service-c65535.json": {
+          "sha256": "e32a2b31c607435d8d5d52d150c53a2d9b722d498e12ed59365f8803e69d7055",
+          "bytes": 3831
+        },
+        "doip-context/answers/unknown-service-c7.json": {
+          "sha256": "6f5be07dc2546453c90118df5f15a66d1c2a8547a4dfe621b6cf1dc040f6ee20",
+          "bytes": 3936
+        },
+        "doip-context/answers/zero-nrc-c1.json": {
+          "sha256": "6c7b642085df25656d72eb67c8a8e64ce837bd144c8376fd443a5ec2315ef0fc",
+          "bytes": 4866
+        },
+        "doip-context/answers/zero-nrc-c65535.json": {
+          "sha256": "e8d91e9a0c7a09a63567d1a77636f564b0632d80c5f272e73f039fa5744a5850",
+          "bytes": 3825
+        },
+        "doip-context/answers/zero-nrc-c7.json": {
+          "sha256": "bc1ba25d4bc1da8050dad98575df82e8d2d8d32ec8c58c12ff7cb5e8d19abaff",
+          "bytes": 3942
+        },
+        "doip-context/captures/adjacent-complete-c1.pcap": {
+          "sha256": "814356a779e943abea7e1614523ba19cb3d4f5e09a0bb850695319d269bc5398",
+          "bytes": 5843
+        },
+        "doip-context/captures/adjacent-complete-c65535.pcap": {
+          "sha256": "ec377c58846d5551383d9cc26257aec15bab4edeab1307a5dde20c7db41e2f8a",
+          "bytes": 663
+        },
+        "doip-context/captures/adjacent-complete-c7.pcap": {
+          "sha256": "f46c9de7c0450a130545e897ecf1fb8e24a13ae595a6375f1d77e42cdea79fb2",
+          "bytes": 1293
+        },
+        "doip-context/captures/bad-ack-c1.pcap": {
+          "sha256": "3a11cce610fd9970336a93e1648893a0aea3e658e461df0454499a80f9e87b76",
+          "bytes": 6695
+        },
+        "doip-context/captures/bad-ack-c65535.pcap": {
+          "sha256": "49daccbd799db63293ec023a77c56d7d93e888788c4d88edfd41ab92e3e8044f",
+          "bytes": 745
+        },
+        "doip-context/captures/bad-ack-c7.pcap": {
+          "sha256": "d216b2daba01b1e7320916c767c711f0216a52e8b9c18f0b2af4c72328c5ddcf",
+          "bytes": 1375
+        },
+        "doip-context/captures/bad-nack-c1.pcap": {
+          "sha256": "e848682def1134ab2d79d1b6b831bd61d422e96b229289af05aa01303ff5a1d8",
+          "bytes": 6695
+        },
+        "doip-context/captures/bad-nack-c65535.pcap": {
+          "sha256": "e09452a0aa37bc3497b5dd4ca7f96b465a075d939a6ab2db639e18671de5ab29",
+          "bytes": 745
+        },
+        "doip-context/captures/bad-nack-c7.pcap": {
+          "sha256": "5a02f2a4a3609f82a85fddc8d01f8c40747f01c970a41a36ba2bf8d6d46195dc",
+          "bytes": 1375
+        },
+        "doip-context/captures/different-target-c1.pcap": {
+          "sha256": "b160abcf32db6bd6e2dc6cfa9572aa238816a660f3f7a43054333d9a99dd15ea",
+          "bytes": 10600
+        },
+        "doip-context/captures/different-target-c65535.pcap": {
+          "sha256": "2c975e9d569da4abed2aeac9d5603ba8b39022bf4b92a1edda6a03ec609124bc",
+          "bytes": 1010
+        },
+        "doip-context/captures/different-target-c7.pcap": {
+          "sha256": "a15e23ead2ae3137fc3a3f809a769879e83063af4022335b0c343c5e89e8b2fa",
+          "bytes": 2060
+        },
+        "doip-context/captures/distinct-after-uncertain-c1.pcap": {
+          "sha256": "83cac2debcef578dd9d584d7f316081c88c8f4ee901f76b34a1ee87a640d22ef",
+          "bytes": 9322
+        },
+        "doip-context/captures/distinct-after-uncertain-c65535.pcap": {
+          "sha256": "bf101b12d0b10eb8b8bc7c893a9b8f35da7c70d3c860d2bbd6ac426a722b25ad",
+          "bytes": 922
+        },
+        "doip-context/captures/distinct-after-uncertain-c7.pcap": {
+          "sha256": "7439b0b8e6daf518277ff5b69cc6ec2e5a327dacd078d91b87662157e12f294a",
+          "bytes": 1832
+        },
+        "doip-context/captures/echo-unknown-service-c1.pcap": {
+          "sha256": "5fd39c544d164d6ca22529b233d9b7ec96c9652f028b323b86b97fbadace223e",
+          "bytes": 6837
+        },
+        "doip-context/captures/echo-unknown-service-c65535.pcap": {
+          "sha256": "4e3d3fcfcf1fbbe62dd23197adeee4d86503b2b030f84014e84c01da27abc8c8",
+          "bytes": 747
+        },
+        "doip-context/captures/echo-unknown-service-c7.pcap": {
+          "sha256": "2369cdb717bf98be1db900fc78bc56d82ec0d1f71e3dc8a8fca4be1d33232878",
+          "bytes": 1447
+        },
+        "doip-context/captures/echo-zero-session-c1.pcap": {
+          "sha256": "dfd89a733eb4dfa61b785b3b66d48056f3ef4ec4e133cbf42ebfc85cf7247fce",
+          "bytes": 6837
+        },
+        "doip-context/captures/echo-zero-session-c65535.pcap": {
+          "sha256": "261d698095d459c302bbde5300244b8af58caf32eb91df887b109790195f6b90",
+          "bytes": 747
+        },
+        "doip-context/captures/echo-zero-session-c7.pcap": {
+          "sha256": "f920d72455fdcbb4f11dfaf79db676993d833bad9db5bf63582a9822c6539b4a",
+          "bytes": 1447
+        },
+        "doip-context/captures/fresh-close-unresolved-c1.pcap": {
+          "sha256": "2b91992b2c077380713b0ffbaceb3c08fe5b3a875f264cab62337aaf00087b8c",
+          "bytes": 8044
+        },
+        "doip-context/captures/fresh-close-unresolved-c65535.pcap": {
+          "sha256": "29c9c5479703c0fb273a3a1137131db9c393642c77dca29d1c9025c1d270256f",
+          "bytes": 834
+        },
+        "doip-context/captures/fresh-close-unresolved-c7.pcap": {
+          "sha256": "848516aafbcb906fa59cb1998af97f215cd94a73eea2562b9c3da9b1e3ea3410",
+          "bytes": 1604
+        },
+        "doip-context/captures/late-nrc-fresh-completion-c1.pcap": {
+          "sha256": "966ed82cd44a71766ad2f1b500f7e0b3f5c7d435fa5cb948462a55744834b6da",
+          "bytes": 10387
+        },
+        "doip-context/captures/late-nrc-fresh-completion-c65535.pcap": {
+          "sha256": "9d6ac5e79ceffa69a93b5c03211fbc2df215d6907bd46376b710a4caf25c9b2a",
+          "bytes": 1007
+        },
+        "doip-context/captures/late-nrc-fresh-completion-c7.pcap": {
+          "sha256": "bea9e0b595a74ae1e44ded3bc1c33a9187f585b3607595091bcd8a3ad3fca72d",
+          "bytes": 2057
+        },
+        "doip-context/captures/late-old-ack-c1.pcap": {
+          "sha256": "3edbff927c35d6847def59ca78634a268c99ae892412678200f8b761d8c98e21",
+          "bytes": 10387
+        },
+        "doip-context/captures/late-old-ack-c65535.pcap": {
+          "sha256": "f2c0848bc4a8fe81654a3c35df7f2456114964e3f14ab12e8f247e74b82dfe9a",
+          "bytes": 1007
+        },
+        "doip-context/captures/late-old-ack-c7.pcap": {
+          "sha256": "9bcd5e3b18fe80c4c5a1d143af6672b7a75d0761334a5747df0d45aed385236d",
+          "bytes": 2057
+        },
+        "doip-context/captures/late-old-nack-c1.pcap": {
+          "sha256": "45f298265362726b277a32b1478a419e7c45c11c09e54bbb1984dba5b59ec3d6",
+          "bytes": 10387
+        },
+        "doip-context/captures/late-old-nack-c65535.pcap": {
+          "sha256": "4ec0b7df9d12775870755fa56ec294b9c4b29c740df2e563e35ff3fcd59a0240",
+          "bytes": 1007
+        },
+        "doip-context/captures/late-old-nack-c7.pcap": {
+          "sha256": "9f2cc55f1b796d14944974d1aaa1f0e15102d3c27242cd35de7d08dd810b6384",
+          "bytes": 2057
+        },
+        "doip-context/captures/late-old-positive-c1.pcap": {
+          "sha256": "934cf0970ff298db85654fb4d99486f620f8b71f89722066b35777515cd310d2",
+          "bytes": 10600
+        },
+        "doip-context/captures/late-old-positive-c65535.pcap": {
+          "sha256": "aca3ef5feeb71a45c4ba2b4ab6925957d673327cbcfda2b90d623669e1b22136",
+          "bytes": 1010
+        },
+        "doip-context/captures/late-old-positive-c7.pcap": {
+          "sha256": "3cb7e21de992b7a24d3ed3d5a6a21ae3181c6724bff581c517da94675201aa4a",
+          "bytes": 2060
+        },
+        "doip-context/captures/short-negative-c1.pcap": {
+          "sha256": "437af1f39f02ddde47a25a57a4a0a9d43fc95f8817fcda5f0dcac60183f9a40f",
+          "bytes": 6766
+        },
+        "doip-context/captures/short-negative-c65535.pcap": {
+          "sha256": "a8a70bd75b0e00bb75624c5e3ab3904b15c326f935859ba6763f82628bbee089",
+          "bytes": 746
+        },
+        "doip-context/captures/short-negative-c7.pcap": {
+          "sha256": "a142fe271f1c1b63b6f1f44efb45121293d5c90eb787f701bfb95e26b9987a69",
+          "bytes": 1376
+        },
+        "doip-context/captures/short-positive-c1.pcap": {
+          "sha256": "76e42575d99d83063d9765dbfa342c6201b511ca09cbb322de6421e297d5ad88",
+          "bytes": 6979
+        },
+        "doip-context/captures/short-positive-c65535.pcap": {
+          "sha256": "ea6ecb92db8df8b83bc067c67254571ada865330db99f2db766f0ef9a14e1258",
+          "bytes": 749
+        },
+        "doip-context/captures/short-positive-c7.pcap": {
+          "sha256": "d6496eddafa5ce74d0fe43ec4d1ab84a756115f91fcbeaddd4a8de8826220c57",
+          "bytes": 1449
+        },
+        "doip-context/captures/unknown-service-c1.pcap": {
+          "sha256": "60b722a9f3ea5a279b85128529781d5511c4261fb38f9a49b8a25375fdf6aef7",
+          "bytes": 6766
+        },
+        "doip-context/captures/unknown-service-c65535.pcap": {
+          "sha256": "1b2cb79a6f5ae1114bc674ff5f5c13f2959a310f12df976634b6185b2812a19b",
+          "bytes": 746
+        },
+        "doip-context/captures/unknown-service-c7.pcap": {
+          "sha256": "8dd1350205d0827d74efd3fc412f0cad956e9d1078f2f3ea40b01b4cbdab2c6e",
+          "bytes": 1376
+        },
+        "doip-context/captures/zero-nrc-c1.pcap": {
+          "sha256": "a160502fb9952aff1d747465405de77574c885d129ec8385adb17a58f5b3dfbc",
+          "bytes": 6837
+        },
+        "doip-context/captures/zero-nrc-c65535.pcap": {
+          "sha256": "6e645227e8ef0142664cce3a8c658dd27aa6a525930dab242cb24ef3d2ee4165",
+          "bytes": 747
+        },
+        "doip-context/captures/zero-nrc-c7.pcap": {
+          "sha256": "babc0ca6fdf87a9c0747b7851ce46ae3b0d7fc29209f2313ed70e09f70d31036",
+          "bytes": 1447
+        },
+        "doip-context/generate.py": {
+          "sha256": "4014a275d78157350dfee7230b19fe12888cd1e9a1e491454426ec60c365ea88",
+          "bytes": 8688
+        },
+        "doip-context/manifest.json": {
+          "sha256": "99f7110f1e03541ae291fe3d0bb1ee776cb882a8a9a78fd3ecb145faea4ecf3a",
+          "bytes": 16922
+        },
+        "doip-context/reference-codec.py": {
+          "sha256": "33ea2f0624d8abb880a7336ee19be3c0c881312901b1be0a92e3d70dff4ebbe2",
+          "bytes": 2406
+        },
+        "doip-context/reference.py": {
+          "sha256": "8b7b0fac9b637d917177ee47998716bba593944e3941f88103ad1ea7e9b6bb94",
+          "bytes": 2020
+        },
+        "doip-context/verify.py": {
+          "sha256": "c9d00064b115c86b74d9ede58edb48910ee1be779c1fa791101a8cc3b58c6c69",
+          "bytes": 609
+        },
+        "required-tests-traffic-unified-v72.json": {
+          "sha256": "7d8efdbd74b44edcad9ee0b06e7217ca110ab52d4e61691fe3375da9e9d85233",
+          "bytes": 16422210
+        },
+        "validation/expected.json": {
+          "sha256": "40e5d501344c82e1036ea22a9610c6a80247e9d4594c000942d4d3868e6ad28b",
+          "bytes": 64052
+        }
+      },
+      "aliases": {
+        "common/pcapx/pcaputil/doip-context/REFERENCE-CODEC-ACTUAL.json": "doip-context/REFERENCE-CODEC-ACTUAL.json",
+        "common/pcapx/pcaputil/doip-context/REFERENCE-TSHARK-ACTUAL.json": "doip-context/REFERENCE-TSHARK-ACTUAL.json",
+        "common/pcapx/pcaputil/doip-context/SOURCE-PIN.json": "doip-context/SOURCE-PIN.json",
+        "common/pcapx/pcaputil/doip-context/answers/adjacent-complete-c1.json": "doip-context/answers/adjacent-complete-c1.json",
+        "common/pcapx/pcaputil/doip-context/answers/adjacent-complete-c65535.json": "doip-context/answers/adjacent-complete-c65535.json",
+        "common/pcapx/pcaputil/doip-context/answers/adjacent-complete-c7.json": "doip-context/answers/adjacent-complete-c7.json",
+        "common/pcapx/pcaputil/doip-context/answers/bad-ack-c1.json": "doip-context/answers/bad-ack-c1.json",
+        "common/pcapx/pcaputil/doip-context/answers/bad-ack-c65535.json": "doip-context/answers/bad-ack-c65535.json",
+        "common/pcapx/pcaputil/doip-context/answers/bad-ack-c7.json": "doip-context/answers/bad-ack-c7.json",
+        "common/pcapx/pcaputil/doip-context/answers/bad-nack-c1.json": "doip-context/answers/bad-nack-c1.json",
+        "common/pcapx/pcaputil/doip-context/answers/bad-nack-c65535.json": "doip-context/answers/bad-nack-c65535.json",
+        "common/pcapx/pcaputil/doip-context/answers/bad-nack-c7.json": "doip-context/answers/bad-nack-c7.json",
+        "common/pcapx/pcaputil/doip-context/answers/different-target-c1.json": "doip-context/answers/different-target-c1.json",
+        "common/pcapx/pcaputil/doip-context/answers/different-target-c65535.json": "doip-context/answers/different-target-c65535.json",
+        "common/pcapx/pcaputil/doip-context/answers/different-target-c7.json": "doip-context/answers/different-target-c7.json",
+        "common/pcapx/pcaputil/doip-context/answers/distinct-after-uncertain-c1.json": "doip-context/answers/distinct-after-uncertain-c1.json",
+        "common/pcapx/pcaputil/doip-context/answers/distinct-after-uncertain-c65535.json": "doip-context/answers/distinct-after-uncertain-c65535.json",
+        "common/pcapx/pcaputil/doip-context/answers/distinct-after-uncertain-c7.json": "doip-context/answers/distinct-after-uncertain-c7.json",
+        "common/pcapx/pcaputil/doip-context/answers/echo-unknown-service-c1.json": "doip-context/answers/echo-unknown-service-c1.json",
+        "common/pcapx/pcaputil/doip-context/answers/echo-unknown-service-c65535.json": "doip-context/answers/echo-unknown-service-c65535.json",
+        "common/pcapx/pcaputil/doip-context/answers/echo-unknown-service-c7.json": "doip-context/answers/echo-unknown-service-c7.json",
+        "common/pcapx/pcaputil/doip-context/answers/echo-zero-session-c1.json": "doip-context/answers/echo-zero-session-c1.json",
+        "common/pcapx/pcaputil/doip-context/answers/echo-zero-session-c65535.json": "doip-context/answers/echo-zero-session-c65535.json",
+        "common/pcapx/pcaputil/doip-context/answers/echo-zero-session-c7.json": "doip-context/answers/echo-zero-session-c7.json",
+        "common/pcapx/pcaputil/doip-context/answers/fresh-close-unresolved-c1.json": "doip-context/answers/fresh-close-unresolved-c1.json",
+        "common/pcapx/pcaputil/doip-context/answers/fresh-close-unresolved-c65535.json": "doip-context/answers/fresh-close-unresolved-c65535.json",
+        "common/pcapx/pcaputil/doip-context/answers/fresh-close-unresolved-c7.json": "doip-context/answers/fresh-close-unresolved-c7.json",
+        "common/pcapx/pcaputil/doip-context/answers/late-nrc-fresh-completion-c1.json": "doip-context/answers/late-nrc-fresh-completion-c1.json",
+        "common/pcapx/pcaputil/doip-context/answers/late-nrc-fresh-completion-c65535.json": "doip-context/answers/late-nrc-fresh-completion-c65535.json",
+        "common/pcapx/pcaputil/doip-context/answers/late-nrc-fresh-completion-c7.json": "doip-context/answers/late-nrc-fresh-completion-c7.json",
+        "common/pcapx/pcaputil/doip-context/answers/late-old-ack-c1.json": "doip-context/answers/late-old-ack-c1.json",
+        "common/pcapx/pcaputil/doip-context/answers/late-old-ack-c65535.json": "doip-context/answers/late-old-ack-c65535.json",
+        "common/pcapx/pcaputil/doip-context/answers/late-old-ack-c7.json": "doip-context/answers/late-old-ack-c7.json",
+        "common/pcapx/pcaputil/doip-context/answers/late-old-nack-c1.json": "doip-context/answers/late-old-nack-c1.json",
+        "common/pcapx/pcaputil/doip-context/answers/late-old-nack-c65535.json": "doip-context/answers/late-old-nack-c65535.json",
+        "common/pcapx/pcaputil/doip-context/answers/late-old-nack-c7.json": "doip-context/answers/late-old-nack-c7.json",
+        "common/pcapx/pcaputil/doip-context/answers/late-old-positive-c1.json": "doip-context/answers/late-old-positive-c1.json",
+        "common/pcapx/pcaputil/doip-context/answers/late-old-positive-c65535.json": "doip-context/answers/late-old-positive-c65535.json",
+        "common/pcapx/pcaputil/doip-context/answers/late-old-positive-c7.json": "doip-context/answers/late-old-positive-c7.json",
+        "common/pcapx/pcaputil/doip-context/answers/short-negative-c1.json": "doip-context/answers/short-negative-c1.json",
+        "common/pcapx/pcaputil/doip-context/answers/short-negative-c65535.json": "doip-context/answers/short-negative-c65535.json",
+        "common/pcapx/pcaputil/doip-context/answers/short-negative-c7.json": "doip-context/answers/short-negative-c7.json",
+        "common/pcapx/pcaputil/doip-context/answers/short-positive-c1.json": "doip-context/answers/short-positive-c1.json",
+        "common/pcapx/pcaputil/doip-context/answers/short-positive-c65535.json": "doip-context/answers/short-positive-c65535.json",
+        "common/pcapx/pcaputil/doip-context/answers/short-positive-c7.json": "doip-context/answers/short-positive-c7.json",
+        "common/pcapx/pcaputil/doip-context/answers/unknown-service-c1.json": "doip-context/answers/unknown-service-c1.json",
+        "common/pcapx/pcaputil/doip-context/answers/unknown-service-c65535.json": "doip-context/answers/unknown-service-c65535.json",
+        "common/pcapx/pcaputil/doip-context/answers/unknown-service-c7.json": "doip-context/answers/unknown-service-c7.json",
+        "common/pcapx/pcaputil/doip-context/answers/zero-nrc-c1.json": "doip-context/answers/zero-nrc-c1.json",
+        "common/pcapx/pcaputil/doip-context/answers/zero-nrc-c65535.json": "doip-context/answers/zero-nrc-c65535.json",
+        "common/pcapx/pcaputil/doip-context/answers/zero-nrc-c7.json": "doip-context/answers/zero-nrc-c7.json",
+        "common/pcapx/pcaputil/doip-context/captures/adjacent-complete-c1.pcap": "doip-context/captures/adjacent-complete-c1.pcap",
+        "common/pcapx/pcaputil/doip-context/captures/adjacent-complete-c65535.pcap": "doip-context/captures/adjacent-complete-c65535.pcap",
+        "common/pcapx/pcaputil/doip-context/captures/adjacent-complete-c7.pcap": "doip-context/captures/adjacent-complete-c7.pcap",
+        "common/pcapx/pcaputil/doip-context/captures/bad-ack-c1.pcap": "doip-context/captures/bad-ack-c1.pcap",
+        "common/pcapx/pcaputil/doip-context/captures/bad-ack-c65535.pcap": "doip-context/captures/bad-ack-c65535.pcap",
+        "common/pcapx/pcaputil/doip-context/captures/bad-ack-c7.pcap": "doip-context/captures/bad-ack-c7.pcap",
+        "common/pcapx/pcaputil/doip-context/captures/bad-nack-c1.pcap": "doip-context/captures/bad-nack-c1.pcap",
+        "common/pcapx/pcaputil/doip-context/captures/bad-nack-c65535.pcap": "doip-context/captures/bad-nack-c65535.pcap",
+        "common/pcapx/pcaputil/doip-context/captures/bad-nack-c7.pcap": "doip-context/captures/bad-nack-c7.pcap",
+        "common/pcapx/pcaputil/doip-context/captures/different-target-c1.pcap": "doip-context/captures/different-target-c1.pcap",
+        "common/pcapx/pcaputil/doip-context/captures/different-target-c65535.pcap": "doip-context/captures/different-target-c65535.pcap",
+        "common/pcapx/pcaputil/doip-context/captures/different-target-c7.pcap": "doip-context/captures/different-target-c7.pcap",
+        "common/pcapx/pcaputil/doip-context/captures/distinct-after-uncertain-c1.pcap": "doip-context/captures/distinct-after-uncertain-c1.pcap",
+        "common/pcapx/pcaputil/doip-context/captures/distinct-after-uncertain-c65535.pcap": "doip-context/captures/distinct-after-uncertain-c65535.pcap",
+        "common/pcapx/pcaputil/doip-context/captures/distinct-after-uncertain-c7.pcap": "doip-context/captures/distinct-after-uncertain-c7.pcap",
+        "common/pcapx/pcaputil/doip-context/captures/echo-unknown-service-c1.pcap": "doip-context/captures/echo-unknown-service-c1.pcap",
+        "common/pcapx/pcaputil/doip-context/captures/echo-unknown-service-c65535.pcap": "doip-context/captures/echo-unknown-service-c65535.pcap",
+        "common/pcapx/pcaputil/doip-context/captures/echo-unknown-service-c7.pcap": "doip-context/captures/echo-unknown-service-c7.pcap",
+        "common/pcapx/pcaputil/doip-context/captures/echo-zero-session-c1.pcap": "doip-context/captures/echo-zero-session-c1.pcap",
+        "common/pcapx/pcaputil/doip-context/captures/echo-zero-session-c65535.pcap": "doip-context/captures/echo-zero-session-c65535.pcap",
+        "common/pcapx/pcaputil/doip-context/captures/echo-zero-session-c7.pcap": "doip-context/captures/echo-zero-session-c7.pcap",
+        "common/pcapx/pcaputil/doip-context/captures/fresh-close-unresolved-c1.pcap": "doip-context/captures/fresh-close-unresolved-c1.pcap",
+        "common/pcapx/pcaputil/doip-context/captures/fresh-close-unresolved-c65535.pcap": "doip-context/captures/fresh-close-unresolved-c65535.pcap",
+        "common/pcapx/pcaputil/doip-context/captures/fresh-close-unresolved-c7.pcap": "doip-context/captures/fresh-close-unresolved-c7.pcap",
+        "common/pcapx/pcaputil/doip-context/captures/late-nrc-fresh-completion-c1.pcap": "doip-context/captures/late-nrc-fresh-completion-c1.pcap",
+        "common/pcapx/pcaputil/doip-context/captures/late-nrc-fresh-completion-c65535.pcap": "doip-context/captures/late-nrc-fresh-completion-c65535.pcap",
+        "common/pcapx/pcaputil/doip-context/captures/late-nrc-fresh-completion-c7.pcap": "doip-context/captures/late-nrc-fresh-completion-c7.pcap",
+        "common/pcapx/pcaputil/doip-context/captures/late-old-ack-c1.pcap": "doip-context/captures/late-old-ack-c1.pcap",
+        "common/pcapx/pcaputil/doip-context/captures/late-old-ack-c65535.pcap": "doip-context/captures/late-old-ack-c65535.pcap",
+        "common/pcapx/pcaputil/doip-context/captures/late-old-ack-c7.pcap": "doip-context/captures/late-old-ack-c7.pcap",
+        "common/pcapx/pcaputil/doip-context/captures/late-old-nack-c1.pcap": "doip-context/captures/late-old-nack-c1.pcap",
+        "common/pcapx/pcaputil/doip-context/captures/late-old-nack-c65535.pcap": "doip-context/captures/late-old-nack-c65535.pcap",
+        "common/pcapx/pcaputil/doip-context/captures/late-old-nack-c7.pcap": "doip-context/captures/late-old-nack-c7.pcap",
+        "common/pcapx/pcaputil/doip-context/captures/late-old-positive-c1.pcap": "doip-context/captures/late-old-positive-c1.pcap",
+        "common/pcapx/pcaputil/doip-context/captures/late-old-positive-c65535.pcap": "doip-context/captures/late-old-positive-c65535.pcap",
+        "common/pcapx/pcaputil/doip-context/captures/late-old-positive-c7.pcap": "doip-context/captures/late-old-positive-c7.pcap",
+        "common/pcapx/pcaputil/doip-context/captures/short-negative-c1.pcap": "doip-context/captures/short-negative-c1.pcap",
+        "common/pcapx/pcaputil/doip-context/captures/short-negative-c65535.pcap": "doip-context/captures/short-negative-c65535.pcap",
+        "common/pcapx/pcaputil/doip-context/captures/short-negative-c7.pcap": "doip-context/captures/short-negative-c7.pcap",
+        "common/pcapx/pcaputil/doip-context/captures/short-positive-c1.pcap": "doip-context/captures/short-positive-c1.pcap",
+        "common/pcapx/pcaputil/doip-context/captures/short-positive-c65535.pcap": "doip-context/captures/short-positive-c65535.pcap",
+        "common/pcapx/pcaputil/doip-context/captures/short-positive-c7.pcap": "doip-context/captures/short-positive-c7.pcap",
+        "common/pcapx/pcaputil/doip-context/captures/unknown-service-c1.pcap": "doip-context/captures/unknown-service-c1.pcap",
+        "common/pcapx/pcaputil/doip-context/captures/unknown-service-c65535.pcap": "doip-context/captures/unknown-service-c65535.pcap",
+        "common/pcapx/pcaputil/doip-context/captures/unknown-service-c7.pcap": "doip-context/captures/unknown-service-c7.pcap",
+        "common/pcapx/pcaputil/doip-context/captures/zero-nrc-c1.pcap": "doip-context/captures/zero-nrc-c1.pcap",
+        "common/pcapx/pcaputil/doip-context/captures/zero-nrc-c65535.pcap": "doip-context/captures/zero-nrc-c65535.pcap",
+        "common/pcapx/pcaputil/doip-context/captures/zero-nrc-c7.pcap": "doip-context/captures/zero-nrc-c7.pcap",
+        "common/pcapx/pcaputil/doip-context/generate.py": "doip-context/generate.py",
+        "common/pcapx/pcaputil/doip-context/manifest.json": "doip-context/manifest.json",
+        "common/pcapx/pcaputil/doip-context/reference-codec.py": "doip-context/reference-codec.py",
+        "common/pcapx/pcaputil/doip-context/reference.py": "doip-context/reference.py",
+        "common/pcapx/pcaputil/doip-context/verify.py": "doip-context/verify.py",
+        "scripts/protocol-tests/required-tests-traffic-unified-v72.json": "required-tests-traffic-unified-v72.json"
+      }
     }
   ],
   "schema_version": 1,

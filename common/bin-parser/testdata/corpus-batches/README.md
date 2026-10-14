@@ -44,7 +44,7 @@ Run from the repository root:
 ```sh
 go run ./internal/trafficfixture/cmd/corpus test
 go test -json -count=1 -timeout=10m ./internal/trafficfixture/... ./common/bin-parser/... ./common/pcapx/... ./common/yak/cmd/yakcmds/shark-cli ./scripts/ci > traffic.jsonl
-go run ./internal/trafficfixture/cmd/corpus exec -- python3 @scripts/protocol-tests/check_go_test_json_v2.py traffic.jsonl --inventory @scripts/protocol-tests/required-tests-traffic-unified-v71.json --tier full
+go run ./internal/trafficfixture/cmd/corpus exec -- python3 @scripts/protocol-tests/check_go_test_json_v2.py traffic.jsonl --inventory @scripts/protocol-tests/required-tests-traffic-unified-v72.json --tier full
 ```
 
 The single `corpus` entry point uses the same bounded Go ZIP loader as tests.
@@ -83,7 +83,7 @@ their semantic coverage. The existing synthetic session keys are test inputs;
 production credentials, user private keys and material without redistribution
 permission belong in an external fixed-source download manifest.
 
-Current test requirements are sealed at `scripts/protocol-tests/required-tests-traffic-unified-v71.json`;
+Current test requirements are sealed at `scripts/protocol-tests/required-tests-traffic-unified-v72.json`;
 the historical inventories and all earlier batches remain unchanged.
 The supplemental small-corpus batch contains 26 minimal controls, their explicit
 expected facts, an offline generator and the compact pinned source manifest.
@@ -203,7 +203,7 @@ opaque selector bytes and one bounded Data value over Wrapper v1 TCP/UDP; object
 selector meaning, access permission and device operation are unverified. The
 original one-packet selective-access capture and original refused answer remain
 immutable; its now-supported answer is matched by exact input SHA and frame.
-The active inventory is `scripts/protocol-tests/required-tests-traffic-unified-v71.json`.
+The active inventory is `scripts/protocol-tests/required-tests-traffic-unified-v72.json`.
 
 The small-graph budget batch reuses accepted graph captures/answers and adds one
 249-byte UDP control for child count255 without child bytes. Its standalone proof
@@ -993,7 +993,7 @@ the normative answer; a missing numeric reference field is not a codec pass.
 Full/deferred, workers1/2/4, observers off/on, Feed chunks1/7/full, ownership,
 resources and close/refusal boundaries remain required.
 
-Current gate: `required-tests-traffic-unified-v71.json` with
+Current gate: `required-tests-traffic-unified-v72.json` with
 `check_go_test_json_v2.py`. The indexed validator preserves missing/unpassed,
 package invocation completion, descendant skips, failures and non-JSON checks;
 its mutation/differential harness is sealed with the material. Older checkers
@@ -1629,7 +1629,7 @@ userspace adapter; full kernel receiver/socket/timers and ECU endpoints do not.
 All161 preceding ZIPs remain byte-for-byte unchanged. Raw captures, dependencies,
 reference source/build output and process evidence stay outside Git.
 
-Current effective v71 inventory: 36,053 entries; 36,046 are mandatory for the full tier.
+Current effective v72 inventory: 36,691 entries; 36,684 are mandatory for the full tier.
 
 The opt-in `DynamicFlowControl` profile follows Linux v6.12 FC tuple updates (including WAIT without granting data). Disjoint address extensions or classical/FD carriers may share CAN IDs; unknown selectors cannot choose or mutate a conversation. Ambiguous selectors are rejected. Seven sealed cases exercise full/deferred, workers 1/2/4, and observer off/on, with exact fields, byte collections, contributor references, errors and resource ownership. The existing static FC profile remains unchanged. Pinned upstream FC and filter functions execute with declared userspace stubs; this is not a kernel/ECU endpoint. TShark 4.2.5 checks wire tuples and two complete payloads, but cannot independently reassemble the shared-address transcripts.
 
@@ -1640,3 +1640,5 @@ Selected CAN UDS parameter control observations cover RoutineControl types 1..3 
 DoIP TCP diagnostic-generation observations distinguish a new DSC descriptor or logical target from an indistinguishable reused identity. Repeated request bytes remain observable, while replies cannot claim a generation absent a unique descriptor. Service-only NRC and short ACK/NACK after multiple target generations are typed context refusals; complete uniquely echoed responses remain eligible. Only three private complete-frame association refusals permit continued parsing. Length, resource and other errors still invalidate the session. Request event IDs are assigned before retaining routing/alive/diagnostic slots, and successful responses refer to the actual request event. Private field/error ownership also covers Close NeedMore. Thirty-six minimal captures exercise1/7/full TCP chunks across432 full/deferred, workers1/2/4, observeroff/on configurations; actual TShark4.2.5 verifies219 complete wire messages and1860 fields. This does not certify ECU execution, authentication, all UDS services or all original raw-capture oracles.
 
 TCP capture-prefix recovery accepts only reader-proven loss after complete IP/TCP headers, while retaining capture-truncation errors. Only actual captured bytes enter the stream. FIN is anchored after the declared wire payload, so retransmission may fill its missing suffix and a remaining gap stays incomplete. Header, options, wire bounds, sequence-window and resource errors remain rejected. Twenty-four own minimal IPv4/IPv6 captures include sequence wrap, FIN recovery/gaps/duplicate FIN and malformed lengths/headers across288 full/deferred, workers1/2/4, observeroff/on configurations. The ZIP contains independent exact stream, MQTT fields/Session, error and resource expectations and deterministic generators; actual TShark4.2.5 checks72 wire frames and280 fields. This does not certify live endpoint conformance, all tunnel truncation behavior or device sample oracles.
+
+DoIP context continuation validates complete selected DSC/ACK/NACK wire shapes before any recoverable association refusal. Invalid codes/lengths/services remain fatal. A distinct valid request following an unassignable response is observable with explicit previous-completion uncertainty; its old eligibility is retired and bounded history remains. Late retired target/descriptor replies cannot consume a fresh request. Forty-eight minimal captures span TCP chunks1/7/full and576 full/deferred, workers1/2/4, observeroff/on configurations with exact messages, fields/Session, errors, event refs, ownership and resources. Fixed python-doipclientv1.1.7 codec classes execute with stdlib dependencies, without import replacements; they verify payload/address/code/echo bytes and NACK enums. Passive association and modern DSC length rules have separate explicit answers; no ECU execution or installed endpoint claim.
