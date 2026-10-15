@@ -12,9 +12,15 @@ export：传 id 和 output（明确的本地目标文件路径），精确恢复
 delete：仅在用户要求删除该库时调用，id 必须为 list/load 返回的精确 dataset_id，不接受文件路径或数字登记 ID。删除登记和包 BLOB 子库，保留原始 PCAP 及已导出文件；占用时返回 error.code=busy，不强制关闭其他 reader/writer。deleted=true 且 cleanup_pending=false 且 error=null 才是清理完成；中断/清理错误可用同一 id 重试，启动时也会恢复清理。少量删除标记及锁文件会保留。
 id 仅用于 validate/export/delete；output 仅用于 export；deep 仅用于 validate；分页/字节预算仅用于 list。切换 op 时重新选择参数，不能继承上次操作的参数。
 [[- if .FunctionCallMode -]]
+arguments 示例：
+```json
 {"op":"list","limit":20}
+```
 [[- else -]]
+文本流 action：
+```json
 {"@action":"directly_call_tool","directly_call_tool_name":"manage_pcapdb","directly_call_tool_params":{"op":"list","limit":20}}
+```
 [[- end -]]
 USAGE
 op = cli.String("op",cli.setDefault("list"),cli.setHelp("list/count/validate/export/delete"))

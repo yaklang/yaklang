@@ -13,9 +13,15 @@ field_path 从 fields 的真实发现结果中选择，details 核实值，然�
 返回结构化 result。先检查 error，再判断 has_more；after=上次 next_cursor，保持身份、模式、record_id 和筛选条件一致。limit 1–1000，result_bytes 4096–65536，preview_bytes 0–4096。fields 是有界采样，scanned/skipped/sampled/truncated 必须保留；protocol_count 是消息数。Data 的 JSON 编码为 base64；截断预览不能作为完整流，stream_data 游标为块 ID。
 metadata 返回库状态、精确计数及能力。普通页不含完整 BLOB/JSON。details 超预算报错；不返回半棵字段树。错误或能力缺失不能解释为无流量。没有隐含粘性参数、任意全文查询或跨调用固定快照。
 [[- if .FunctionCallMode -]]
+arguments 示例：
+```json
 {"id":"dataset-uuid","query_type":"protocols","protocol":"http","limit":10}
+```
 [[- else -]]
-{"@action":"directly_call_tool","directly_call_tool_name":"query_pcapdb","directly_call_tool_params":{"pcapfile":"/absolute/path/capture.pcap","query_type":"metadata"}}
+文本流 action：
+```json
+{"@action":"directly_call_tool","directly_call_tool_name":"query_pcapdb","directly_call_tool_params":{"id":"dataset-uuid","query_type":"protocols","protocol":"http","limit":10}}
+```
 [[- end -]]
 USAGE
 id = cli.String("id", cli.setHelp("持久流量库 DatasetID；与 pcapfile 二选一"))
