@@ -1,34 +1,36 @@
 // Package builtinmetadata verifies compressed analysis results against the
-// exact script set that produced them. Its hash is the SHA-256 of the gzip file.
+// exact script set that produced them. Its hash is the SHA-256 of the compressed file.
 package builtinmetadata
 
 import (
 	"bytes"
-	"compress/gzip"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
 	"io/fs"
+	"sort"
 	"strings"
+
+	"github.com/andybalholm/brotli"
 )
 
 //go:generate bash ../../../scripts/generate-builtin-metadata.sh
 
 // Bump Version when extraction semantics change, even if scripts do not.
-const Version = 1
+const Version = 2
 
 type Metadata struct {
-	VerboseName       string `json:"verbose_name,omitempty"`
-	VerboseNameZh     string `json:"verbose_name_zh,omitempty"`
-	Description       string `json:"description,omitempty"`
-	Keywords          string `json:"keywords,omitempty"`
-	Usage             string `json:"usage,omitempty"`
-	Parameters        string `json:"parameters,omitempty"`
-	EnvironmentKeys   string `json:"environment_keys,omitempty"`
-	EnableAIOutputLog int    `json:"enable_ai_output_log,omitempty"`
-	SyntaxFlowRule    string `json:"syntaxflow_rule,omitempty"`
+	VerboseName       string          `json:"verbose_name,omitempty"`
+	VerboseNameZh     string          `json:"verbose_name_zh,omitempty"`
+	Description       string          `json:"description,omitempty"`
+	Keywords          string          `json:"keywords,omitempty"`
+	Usage             string          `json:"usage,omitempty"`
+	Parameters        json.RawMessage `json:"parameters,omitempty"`
+	EnvironmentKeys   json.RawMessage `json:"environment_keys,omitempty"`
+	EnableAIOutputLog int             `json:"enable_ai_output_log,omitempty"`
+	SyntaxFlowRule    json.RawMessage `json:"syntaxflow_rule,omitempty"`
 }
 
 type File struct {
@@ -38,9 +40,8 @@ type File struct {
 }
 
 type Entry struct {
-	Script       string   `json:"script"`
-	SourceSHA256 string   `json:"source_sha256"`
-	Metadata     Metadata `json:"metadata"`
+	Script   string   `json:"script"`
+	Metadata Metadata `json:"metadata"`
 }
 
 type Bundle struct {
@@ -79,7 +80,7 @@ func (b *Bundle) lookup(key, source string) (Metadata, bool) {
 		return Metadata{}, false
 	}
 	e, ok := b.Entries[key]
-	if !ok || e.SourceSHA256 != SourceHash(source) {
+	if !ok || b.Files[e.Script].SHA256 != SourceHash(source) {
 		return Metadata{}, false
 	}
 
@@ -92,7 +93,7 @@ func Encode(b *Bundle) ([]byte, error) {
 		return nil, err
 	}
 	var out bytes.Buffer
-	w := gzip.NewWriter(&out)
+	w := brotli.NewWriterLevel(&out, 11)
 	if _, err := w.Write(data); err != nil {
 		return nil, err
 	}
@@ -102,19 +103,70 @@ func Encode(b *Bundle) ([]byte, error) {
 	return out.Bytes(), nil
 }
 
+// Text keeps one file/entry per line: readable JSON with local, stable diffs,
+// without indenting thousands of instructions or escaping nested JSON strings.
+func Text(b *Bundle) ([]byte, error) {
+	raw, err := json.Marshal(b)
+	if err != nil {
+		return nil, err
+	}
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal(raw, &fields); err != nil {
+		return nil, err
+	}
+	var out bytes.Buffer
+	out.WriteString("{\n")
+	for i, key := range []string{"version", "kind", "recipe", "source_hash", "files", "entries"} {
+		if i > 0 {
+			out.WriteString(",\n")
+		}
+		fmt.Fprintf(&out, "  %q: ", key)
+		if key != "files" && key != "entries" {
+			out.Write(fields[key])
+			continue
+		}
+		var entries map[string]json.RawMessage
+		if err := json.Unmarshal(fields[key], &entries); err != nil {
+			return nil, err
+		}
+		keys := make([]string, 0, len(entries))
+		for k := range entries {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+		out.WriteString("{\n")
+		for j, k := range keys {
+			if j > 0 {
+				out.WriteString(",\n")
+			}
+			name, _ := json.Marshal(k)
+			out.WriteString("    ")
+			out.Write(name)
+			out.WriteString(": ")
+			out.Write(entries[k])
+		}
+		out.WriteString("\n  }")
+	}
+	out.WriteString("\n}\n")
+	return out.Bytes(), nil
+}
+
 func Decode(data []byte, kind, expectedHash string) (*Bundle, error) {
 	if expectedHash != "" && Digest(data) != expectedHash {
 		return nil, fmt.Errorf("%s metadata hash mismatch", kind)
 	}
-	r, err := gzip.NewReader(bytes.NewReader(data))
+	raw, err := io.ReadAll(io.LimitReader(brotli.NewReader(bytes.NewReader(data)), (128<<20)+1))
 	if err != nil {
 		return nil, err
 	}
-	defer r.Close()
-	raw, err := io.ReadAll(io.LimitReader(r, 128<<20))
-	if err != nil {
-		return nil, err
+	if len(raw) > 128<<20 {
+		return nil, fmt.Errorf("metadata exceeds size limit")
 	}
+	return Parse(raw, kind)
+}
+
+// Parse validates the checked-in text without invoking any script parser.
+func Parse(raw []byte, kind string) (*Bundle, error) {
 	var b Bundle
 	if err := json.Unmarshal(raw, &b); err != nil {
 		return nil, err
@@ -129,7 +181,7 @@ func Decode(data []byte, kind, expectedHash string) (*Bundle, error) {
 	}
 	for key, e := range b.Entries {
 		file, ok := b.Files[e.Script]
-		if !ok || file.SHA256 != e.SourceSHA256 || kindForKey(key) != kind || !validMetadata(key, e.Metadata) {
+		if !ok || fs.FileMode(file.Mode).IsDir() || kindForKey(key) != kind || !validMetadata(key, e.Metadata) {
 			return nil, fmt.Errorf("invalid script/metadata mapping: %s", key)
 		}
 	}
@@ -154,31 +206,22 @@ func kindForKey(key string) string {
 func validMetadata(key string, m Metadata) bool {
 	switch kindForKey(key) {
 	case "syntaxflow":
-		return m.SyntaxFlowRule != "" && json.Valid([]byte(m.SyntaxFlowRule))
+		return len(m.SyntaxFlowRule) > 0 && json.Valid(m.SyntaxFlowRule)
 	case "aitool":
 		var object map[string]json.RawMessage
-		return (m.EnableAIOutputLog == 1 || m.EnableAIOutputLog == 2) && json.Unmarshal([]byte(m.Parameters), &object) == nil && object != nil
+		return (m.EnableAIOutputLog == 1 || m.EnableAIOutputLog == 2) && json.Unmarshal(m.Parameters, &object) == nil && object != nil
 	case "coreplugin", "forge":
-		if m.EnvironmentKeys != "" {
-			var encoded string
+		if len(m.EnvironmentKeys) > 0 {
 			var keys []string
-			if json.Unmarshal([]byte(m.EnvironmentKeys), &encoded) != nil || json.Unmarshal([]byte(encoded), &keys) != nil {
+			if json.Unmarshal(m.EnvironmentKeys, &keys) != nil || keys == nil {
 				return false
 			}
 		}
-		if m.Parameters == "" {
+		if len(m.Parameters) == 0 {
 			return true
 		}
-		params := m.Parameters
-		if kindForKey(key) == "coreplugin" {
-			var encoded string
-			if json.Unmarshal([]byte(params), &encoded) != nil {
-				return false
-			}
-			params = encoded
-		}
 		var fields []json.RawMessage
-		return json.Unmarshal([]byte(params), &fields) == nil
+		return json.Unmarshal(m.Parameters, &fields) == nil && fields != nil
 	}
 	return false
 }

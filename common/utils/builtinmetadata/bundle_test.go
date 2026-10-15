@@ -4,6 +4,7 @@ import (
 	"archive/tar"
 	"bytes"
 	"compress/gzip"
+	"encoding/json"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -13,7 +14,7 @@ import (
 func fixture() *Bundle {
 	const code = "cli.String(\"target\")"
 	files := map[string]File{".": {Mode: uint32(fs.ModeDir | 0755)}, "demo.yak": {Mode: 0644, Size: int64(len(code)), SHA256: SourceHash(code)}}
-	return &Bundle{Version: Version, Kind: "aitool", Recipe: "fixture", Files: files, SourceHash: Fingerprint(files, "fixture"), Entries: map[string]Entry{"tool:demo": {Script: "demo.yak", SourceSHA256: SourceHash(code), Metadata: Metadata{Parameters: `{"type":"object"}`, EnableAIOutputLog: 1}}}}
+	return &Bundle{Version: Version, Kind: "aitool", Recipe: "fixture", Files: files, SourceHash: Fingerprint(files, "fixture"), Entries: map[string]Entry{"tool:demo": {Script: "demo.yak", Metadata: Metadata{Parameters: json.RawMessage(`{"type":"object"}`), EnableAIOutputLog: 1}}}}
 }
 
 func TestBundleBindsKindPathSourceAndVersion(t *testing.T) {
@@ -32,7 +33,7 @@ func TestBundleBindsKindPathSourceAndVersion(t *testing.T) {
 	}
 	again, _ := Encode(b)
 	if !bytes.Equal(data, again) {
-		t.Fatal("gzip metadata must be deterministic")
+		t.Fatal("compressed metadata must be deterministic")
 	}
 	if _, err := Decode(data, "aitool", Digest(data)); err != nil {
 		t.Fatal(err)
@@ -70,11 +71,11 @@ func TestMalformedMetadataAndEmptyCLI(t *testing.T) {
 		key string
 		m   Metadata
 	}{
-		{"tool:demo", Metadata{Parameters: `[]`, EnableAIOutputLog: 1}},
-		{"tool:demo", Metadata{Parameters: `{}`, EnableAIOutputLog: 0}},
-		{"plugin:yak:demo", Metadata{Parameters: `"invalid"`}},
-		{"plugin:yak:demo", Metadata{EnvironmentKeys: `"invalid"`}},
-		{"sf:demo.sf", Metadata{SyntaxFlowRule: `broken`}},
+		{"tool:demo", Metadata{Parameters: json.RawMessage(`[]`), EnableAIOutputLog: 1}},
+		{"tool:demo", Metadata{Parameters: json.RawMessage(`{}`), EnableAIOutputLog: 0}},
+		{"plugin:yak:demo", Metadata{Parameters: json.RawMessage(`"invalid"`)}},
+		{"plugin:yak:demo", Metadata{EnvironmentKeys: json.RawMessage(`"invalid"`)}},
+		{"sf:demo.sf", Metadata{SyntaxFlowRule: json.RawMessage(`broken`)}},
 	} {
 		if validMetadata(tc.key, tc.m) {
 			t.Errorf("invalid metadata accepted: %s", tc.key)
@@ -84,6 +85,35 @@ func TestMalformedMetadataAndEmptyCLI(t *testing.T) {
 		if !validMetadata(key, Metadata{}) {
 			t.Fatal("empty CLI metadata is legitimate")
 		}
+	}
+}
+
+func TestReadableMetadataPreservesParameterDefaults(t *testing.T) {
+	b := fixture()
+	e := b.Entries["tool:demo"]
+	e.Metadata.Parameters = json.RawMessage(`{"type":"object","properties":{"flag":{"default":false},"count":{"default":0},"name":{"default":""},"optional":{"default":null}}}`)
+	b.Entries["tool:demo"] = e
+	text, err := Text(b)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if bytes.Contains(text, []byte(`\"default\"`)) || bytes.Contains(text, []byte("source_sha256")) {
+		t.Fatal("nested JSON or redundant script digest")
+	}
+	parsed, err := Parse(text, "aitool")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(parsed.Entries["tool:demo"].Metadata.Parameters, e.Metadata.Parameters) {
+		t.Fatal("parameter defaults changed")
+	}
+	a, err := Encode(b)
+	if err != nil {
+		t.Fatal(err)
+	}
+	binary, err := Encode(parsed)
+	if err != nil || !bytes.Equal(a, binary) {
+		t.Fatal("text round trip changed the published hash", err)
 	}
 }
 
@@ -244,8 +274,12 @@ func TestLocalHashCannotConfuseMetadataAndScripts(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	file := filepath.Join(t.TempDir(), "aitool-metadata.json.gz")
-	if err := os.WriteFile(file, data, 0644); err != nil {
+	file := filepath.Join(t.TempDir(), "aitool-metadata.json")
+	text, err := Text(b)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(file, text, 0644); err != nil {
 		t.Fatal(err)
 	}
 	hash, err := LocalHash(root, file, "aitool")

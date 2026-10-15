@@ -129,7 +129,7 @@ func LocalHash(sourceDir, metadataPath, kind string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	bundle, err := Decode(data, kind, "")
+	bundle, err := Parse(data, kind)
 	if err != nil {
 		return "", err
 	}
@@ -140,5 +140,9 @@ func LocalHash(sourceDir, metadataPath, kind string) (string, error) {
 	if !bundle.Matches(files, bundle.Recipe) {
 		return "", fmt.Errorf("%s metadata is stale; refresh embedded resource hashes", kind)
 	}
-	return Digest(data), nil
+	packed, err := Encode(bundle)
+	if err != nil {
+		return "", err
+	}
+	return Digest(packed), nil
 }

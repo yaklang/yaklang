@@ -3,6 +3,7 @@
 package sfbuildin
 
 import (
+	"encoding/json"
 	"io/fs"
 	"path"
 	"strings"
@@ -11,6 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfdb"
+	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils/builtinmetadata"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
@@ -34,6 +36,11 @@ func TestBuiltinSyntaxFlowMetadataMatchesParser(t *testing.T) {
 		require.NoError(t, err)
 		dynamic, err := sfdb.CheckSyntaxFlowRuleContent(string(content))
 		require.NoError(t, err)
+		var wantOps, gotOps sfvm.OpCodes
+		require.NoError(t, json.Unmarshal([]byte(dynamic.OpCodes), &wantOps))
+		require.NoError(t, json.Unmarshal([]byte(cached.OpCodes), &gotOps))
+		require.Equal(t, wantOps, gotOps, "cached instructions differ for %s", name)
+		dynamic.OpCodes, cached.OpCodes = "", ""
 		require.Equal(t, dynamic, cached, "cached rule differs for %s", name)
 		return nil
 	})))

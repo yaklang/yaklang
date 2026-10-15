@@ -2,6 +2,6 @@
 // nolint: golint
 package consts
 
-// ExistedCorePluginEmbedFSHash is the SHA-256 of coreplugin-metadata.json.gz.
+// ExistedCorePluginEmbedFSHash is the SHA-256 of coreplugin-metadata.json.br.
 // The metadata binds analysis results to script paths, permissions and hashes.
-const ExistedCorePluginEmbedFSHash string = "2bb0edf51f73c7af082ec91226716a489fcde37dc7588f057e9aca669c9f16aa"
+const ExistedCorePluginEmbedFSHash string = "c865e817b5a4ec59a4714b12d48582f3f64fd6efd4dc794c2d471f705baa2110"

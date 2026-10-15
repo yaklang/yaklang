@@ -197,7 +197,7 @@ var UtilsCommands = []*cli.Command{
 					if sourceDir == "" {
 						sourceDir = config.sourceDir
 					}
-					bundlePath := filepath.Join(filepath.Dir(config.defaultOutput), t+"-metadata.json.gz")
+					bundlePath := filepath.Join(filepath.Dir(config.defaultOutput), t+"-metadata.json")
 					hash, err = builtinmetadata.LocalHash(sourceDir, bundlePath, t)
 					if err != nil {
 						return utils.Wrapf(err, "metadata/source verification for %s failed", t)

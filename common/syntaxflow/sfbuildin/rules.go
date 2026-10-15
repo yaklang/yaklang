@@ -4,7 +4,6 @@ package sfbuildin
 
 import (
 	"embed"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"github.com/yaklang/yaklang/common/utils/builtinmetadata"
@@ -21,6 +20,7 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfdb"
+	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
@@ -311,10 +311,8 @@ func parseBuiltinRule(name, content string, buildin bool) (*schema.SyntaxFlowRul
 	if buildin {
 		name = strings.TrimPrefix(strings.TrimPrefix(path.Clean(name), "./"), "buildin/")
 		if meta, hit := builtinmetadata.Lookup("sf:"+name, content); hit {
-			var rule schema.SyntaxFlowRule
-			if json.Unmarshal([]byte(meta.SyntaxFlowRule), &rule) == nil && rule.OpCodes != "" {
-				rule.Content = content
-				return &rule, nil
+			if rule, err := sfvm.DecodeBuiltinRuleMetadata(meta.SyntaxFlowRule, content); err == nil {
+				return rule, nil
 			}
 		}
 	}

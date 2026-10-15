@@ -2,6 +2,6 @@
 // nolint: golint
 package consts
 
-// ExistedSyntaxFlowEmbedFSHash is the SHA-256 of syntaxflow-metadata.json.gz.
+// ExistedSyntaxFlowEmbedFSHash is the SHA-256 of syntaxflow-metadata.json.br.
 // The metadata binds analysis results to script paths, permissions and hashes.
-const ExistedSyntaxFlowEmbedFSHash string = "e7f134b95426227580f5a3513c28210d91125dfd6f9de57c4bc5a3b894e43ae5"
+const ExistedSyntaxFlowEmbedFSHash string = "0ec52990ba0c53ddb86fc9d98dbfd046f86ce7f087c59473a0aa6b62a2b83002"

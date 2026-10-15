@@ -76,7 +76,7 @@ func Lookup(key, source string) (Metadata, bool) {
 	return load(kindForKey(key)).bundle.lookup(key, source)
 }
 
-// SyncHash retains ordinary-build behavior. An invalid gzip metadata bundle
+// SyncHash retains ordinary-build behavior. An invalid metadata bundle
 // returns no marker: callers use dynamic analysis and must not mark it current.
 func SyncHash(kind, ordinaryHash string) string {
 	if !Enabled {

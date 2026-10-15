@@ -20,6 +20,7 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools/yakscripttools"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools/yakscripttools/metadata"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfdb"
+	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils/builtinmetadata"
 	_ "github.com/yaklang/yaklang/common/yak"
 	"github.com/yaklang/yaklang/common/yak/static_analyzer"
@@ -46,9 +47,9 @@ func moduleRoot() (string, error) {
 func analyze(root, kind string, files map[string]builtinmetadata.File, recipe string) (*builtinmetadata.Bundle, error) {
 	catalog := &builtinmetadata.Bundle{Version: builtinmetadata.Version, Kind: kind, Recipe: recipe, Files: files, SourceHash: builtinmetadata.Fingerprint(files, recipe), Entries: map[string]builtinmetadata.Entry{}}
 	sourceDir := filepath.Join(root, specFor(kind).dir)
-	add := func(key, path, code string, value builtinmetadata.Metadata) {
+	add := func(key, path string, value builtinmetadata.Metadata) {
 		relative, _ := filepath.Rel(sourceDir, path)
-		catalog.Entries[key] = builtinmetadata.Entry{Script: filepath.ToSlash(relative), SourceSHA256: builtinmetadata.SourceHash(code), Metadata: value}
+		catalog.Entries[key] = builtinmetadata.Entry{Script: filepath.ToSlash(relative), Metadata: value}
 	}
 	if kind == "aitool" {
 		tools := filepath.Join(root, "common/ai/aid/aitool/buildinaitools/yakscripttools/yakscriptforai")
@@ -74,10 +75,10 @@ func analyze(root, kind string, files map[string]builtinmetadata.File, recipe st
 			if err != nil {
 				return err
 			}
-			add("tool:"+name, path, string(code), builtinmetadata.Metadata{
+			add("tool:"+name, path, builtinmetadata.Metadata{
 				VerboseName: tool.VerboseName, VerboseNameZh: tool.VerboseNameZh,
 				Description: tool.Description, Keywords: tool.Keywords, Usage: tool.Usage,
-				Parameters: string(params), EnableAIOutputLog: tool.EnableAIOutputLog,
+				Parameters: params, EnableAIOutputLog: tool.EnableAIOutputLog,
 			})
 			return nil
 		}); err != nil {
@@ -149,7 +150,7 @@ func analyze(root, kind string, files map[string]builtinmetadata.File, recipe st
 			}
 			params, envKeys, err := information.GenerateParameterFromProgram(prog)
 			generationErr = err
-			add("plugin:"+pluginType+":"+name, filepath.Join(root, "common/coreplugin/base-yak-plugin", name+".yak"), string(code), builtinmetadata.Metadata{Parameters: params, EnvironmentKeys: envKeys})
+			add("plugin:"+pluginType+":"+name, filepath.Join(root, "common/coreplugin/base-yak-plugin", name+".yak"), builtinmetadata.Metadata{Parameters: unquoteJSON(params), EnvironmentKeys: unquoteJSON(envKeys)})
 			return false
 		})
 		if generationErr != nil {
@@ -208,9 +209,9 @@ func analyze(root, kind string, files map[string]builtinmetadata.File, recipe st
 			if unquoted, err := strconv.Unquote(params); err == nil {
 				params = unquoted
 			}
-			add("forge:"+name, path, string(code), builtinmetadata.Metadata{
+			add("forge:"+name, path, builtinmetadata.Metadata{
 				VerboseName: meta.VerboseName, Description: meta.Description,
-				Keywords: strings.Join(meta.Keywords, ","), Parameters: params,
+				Keywords: strings.Join(meta.Keywords, ","), Parameters: json.RawMessage(params),
 			})
 			return nil
 		}); err != nil {
@@ -218,7 +219,7 @@ func analyze(root, kind string, files map[string]builtinmetadata.File, recipe st
 		}
 	}
 	if kind == "syntaxflow" {
-		for name, file := range files {
+		for name := range files {
 			if filepath.Ext(name) != ".sf" {
 				continue
 			}
@@ -230,13 +231,11 @@ func analyze(root, kind string, files map[string]builtinmetadata.File, recipe st
 			if err != nil {
 				return nil, fmt.Errorf("analyze %s: %w", name, err)
 			}
-			// These are parser outputs only: no DB identity, timestamps or user state.
-			rule.Content = ""
-			raw, err := json.Marshal(rule)
+			raw, err := sfvm.EncodeBuiltinRuleMetadata(rule)
 			if err != nil {
 				return nil, err
 			}
-			catalog.Entries["sf:"+name] = builtinmetadata.Entry{Script: name, SourceSHA256: file.SHA256, Metadata: builtinmetadata.Metadata{SyntaxFlowRule: string(raw)}}
+			catalog.Entries["sf:"+name] = builtinmetadata.Entry{Script: name, Metadata: builtinmetadata.Metadata{SyntaxFlowRule: raw}}
 		}
 	}
 	currentRecipe, err := recipeFor(root, kind)
@@ -247,6 +246,17 @@ func analyze(root, kind string, files map[string]builtinmetadata.File, recipe st
 		return nil, fmt.Errorf("%s registration changed during generation", kind)
 	}
 	return catalog, nil
+}
+
+func unquoteJSON(value string) json.RawMessage {
+	if value == "" {
+		return nil
+	}
+	decoded, err := strconv.Unquote(value)
+	if err != nil {
+		return json.RawMessage(value)
+	}
+	return json.RawMessage(decoded)
 }
 
 var resourceSpecs = []struct{ kind, dir, constant string }{
@@ -270,6 +280,40 @@ func specFor(kind string) struct{ kind, dir, constant string } {
 func recipeFor(root, kind string) (string, error) {
 	var file, fn string
 	switch kind {
+	case "syntaxflow":
+		// A compiler edit invalidates precompiled instructions even when every
+		// rule is unchanged. Do this at build time, never at engine startup.
+		inputs := map[string]string{}
+		for _, dir := range []string{"common/syntaxflow/sf", "common/syntaxflow/sfvm"} {
+			names, err := filepath.Glob(filepath.Join(root, dir, "*.go"))
+			if err != nil {
+				return "", err
+			}
+			if len(names) == 0 {
+				return "", fmt.Errorf("missing compiler sources: %s", dir)
+			}
+			for _, name := range names {
+				if strings.HasSuffix(name, "_test.go") {
+					continue
+				}
+				data, err := os.ReadFile(name)
+				if err != nil {
+					return "", err
+				}
+				relative, _ := filepath.Rel(root, name)
+				inputs[filepath.ToSlash(relative)] = builtinmetadata.Digest(data)
+			}
+		}
+		data, err := os.ReadFile(filepath.Join(root, "common/schema/syntaxflow_rule.go"))
+		if err != nil {
+			return "", err
+		}
+		inputs["common/schema/syntaxflow_rule.go"] = builtinmetadata.Digest(data)
+		raw, err := json.Marshal(inputs)
+		if err != nil {
+			return "", err
+		}
+		return builtinmetadata.Digest(raw), nil
 	case "coreplugin":
 		file = "common/coreplugin/coreplugin.go"
 		fn = "registerBuildInPlugin"
@@ -313,7 +357,8 @@ func updateSet(sourceDir, outputDir, kind, constant, recipe string, check, force
 	if err != nil {
 		return false, err
 	}
-	bundlePath := filepath.Join(outputDir, kind+"-metadata.json.gz")
+	bundlePath := filepath.Join(outputDir, kind+"-metadata.json")
+	packedPath := bundlePath + ".br"
 	hashPath := filepath.Join(outputDir, kind+"-hash.go")
 	oldHash, err := os.ReadFile(hashPath)
 	if err != nil {
@@ -332,8 +377,29 @@ func updateSet(sourceDir, outputDir, kind, constant, recipe string, check, force
 	}
 	if !force {
 		if data, err := os.ReadFile(bundlePath); err == nil {
-			if previous, err := builtinmetadata.Decode(data, kind, expected); err == nil && previous.Matches(files, recipe) {
-				return false, nil
+			if previous, err := builtinmetadata.Parse(data, kind); err == nil && previous.Matches(files, recipe) {
+				// Reuse an existing verified build artifact without running the
+				// expensive compressor again. Compare canonical text as well as
+				// the source manifest so a metadata edit cannot hide behind it.
+				if packed, err := os.ReadFile(packedPath); err == nil {
+					if verified, err := builtinmetadata.Decode(packed, kind, expected); err == nil {
+						a, errA := json.Marshal(previous)
+						b, errB := json.Marshal(verified)
+						if errA == nil && errB == nil && bytes.Equal(a, b) {
+							return false, nil
+						}
+					}
+				}
+				packed, err := builtinmetadata.Encode(previous)
+				if err != nil {
+					return false, err
+				}
+				if builtinmetadata.Digest(packed) == expected {
+					if !check {
+						err = writeGenerated(packedPath, packed)
+					}
+					return false, err
+				}
 			}
 		}
 	}
@@ -344,6 +410,12 @@ func updateSet(sourceDir, outputDir, kind, constant, recipe string, check, force
 	if err != nil {
 		return false, err
 	}
+	data, err := builtinmetadata.Encode(bundle)
+	if err != nil {
+		return false, err
+	}
+	// Compression can take seconds. Verify the source again immediately before
+	// publishing either artifact or its hash.
 	latest, err := builtinmetadata.Scan(sourceDir)
 	if err != nil {
 		return false, err
@@ -351,11 +423,11 @@ func updateSet(sourceDir, outputDir, kind, constant, recipe string, check, force
 	if !bundle.Matches(latest, recipe) {
 		return false, fmt.Errorf("%s sources changed during generation", kind)
 	}
-	data, err := builtinmetadata.Encode(bundle)
-	if err != nil {
+	if _, err := builtinmetadata.Decode(data, kind, ""); err != nil {
 		return false, err
 	}
-	if _, err := builtinmetadata.Decode(data, kind, ""); err != nil {
+	text, err := builtinmetadata.Text(bundle)
+	if err != nil {
 		return false, err
 	}
 	lines := strings.Split(string(oldHash), "\n")
@@ -364,7 +436,10 @@ func updateSet(sourceDir, outputDir, kind, constant, recipe string, check, force
 			lines[i] = marker + strconv.Quote(builtinmetadata.Digest(data))
 		}
 	}
-	if err := writeGenerated(bundlePath, data); err != nil {
+	if err := writeGenerated(bundlePath, text); err != nil {
+		return false, err
+	}
+	if err := writeGenerated(packedPath, data); err != nil {
 		return false, err
 	}
 	if err := writeGenerated(hashPath, []byte(strings.Join(lines, "\n"))); err != nil {

@@ -41,7 +41,7 @@ func TestUnchangedSetsSkipAnalysisAndWrites(t *testing.T) {
 				}
 			}
 			run(true)
-			artifact := filepath.Join(output, kind+"-metadata.json.gz")
+			artifact := filepath.Join(output, kind+"-metadata.json")
 			before, _ := os.ReadFile(artifact)
 			stat, _ := os.Stat(artifact)
 			run(false)
@@ -49,6 +49,20 @@ func TestUnchangedSetsSkipAnalysisAndWrites(t *testing.T) {
 			stat2, _ := os.Stat(artifact)
 			if calls != 1 || !bytes.Equal(before, after) || !stat.ModTime().Equal(stat2.ModTime()) {
 				t.Fatal("unchanged metadata was analyzed or rewritten")
+			}
+			packed, err := os.ReadFile(artifact + ".br")
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := os.Remove(artifact + ".br"); err != nil {
+				t.Fatal(err)
+			}
+			// A fresh checkout has only text. Restore the ignored build artifact
+			// without invoking SSA/AST analysis or rewriting the tracked files.
+			run(false)
+			restored, err := os.ReadFile(artifact + ".br")
+			if err != nil || !bytes.Equal(packed, restored) || calls != 1 {
+				t.Fatal("packing repeated analysis or changed the artifact", err)
 			}
 			// A check-only run must also avoid the parser.
 			if changed, err := updateSet(source, output, kind, constant, "recipe", true, false, build); err != nil || changed {
@@ -75,7 +89,7 @@ func TestUnchangedSetsSkipAnalysisAndWrites(t *testing.T) {
 				}
 				run(true)
 			}
-			// Corrupt compressed metadata; source hashes alone must not allow reuse.
+			// Corrupt readable metadata; source hashes alone must not allow reuse.
 			data, _ := os.ReadFile(artifact)
 			data[len(data)/2] ^= 0xff
 			_ = os.WriteFile(artifact, data, 0644)
@@ -95,6 +109,31 @@ func TestUnchangedSetsSkipAnalysisAndWrites(t *testing.T) {
 				t.Fatal("failed analysis changed the artifact or hash")
 			}
 		})
+	}
+}
+
+func TestSyntaxFlowCompilerChangesInvalidateMetadata(t *testing.T) {
+	root := t.TempDir()
+	for _, file := range []string{"common/syntaxflow/sf/parser.go", "common/syntaxflow/sfvm/compiler.go", "common/schema/syntaxflow_rule.go"} {
+		name := filepath.Join(root, file)
+		if err := os.MkdirAll(filepath.Dir(name), 0755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(name, []byte("package fixture"), 0644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	before, err := recipeFor(root, "syntaxflow")
+	if err != nil {
+		t.Fatal(err)
+	}
+	compiler := filepath.Join(root, "common/syntaxflow/sfvm/compiler.go")
+	if err := os.WriteFile(compiler, []byte("package changed"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	after, err := recipeFor(root, "syntaxflow")
+	if err != nil || before == after {
+		t.Fatal("compiler change reused stale instructions", err)
 	}
 }
 

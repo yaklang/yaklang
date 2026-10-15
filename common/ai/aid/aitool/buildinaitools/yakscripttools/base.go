@@ -207,7 +207,7 @@ func loadAllYakScriptFromEmbedFS() ([]*schema.AIYakTool, error) {
 func loadBuiltinAITool(name, content string) *schema.AIYakTool {
 	if meta, ok := builtinmetadata.Lookup("tool:"+name, content); ok {
 		return &schema.AIYakTool{
-			Name: name, Content: content, Params: meta.Parameters,
+			Name: name, Content: content, Params: string(meta.Parameters),
 			VerboseName: meta.VerboseName, VerboseNameZh: meta.VerboseNameZh,
 			Description: meta.Description, Keywords: meta.Keywords, Usage: meta.Usage,
 			EnableAIOutputLog: meta.EnableAIOutputLog,

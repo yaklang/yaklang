@@ -10,7 +10,7 @@ if [[ "${CI:-}" == "true" ]]; then
       exit 0
     fi
   done
-  # Existing CI callers stage the Go hash files; include their gzip companions.
-  git add -- common/consts/aitool-metadata.json.gz common/consts/coreplugin-metadata.json.gz \
-    common/consts/forge-metadata.json.gz common/consts/syntaxflow-metadata.json.gz
+  # Commit readable metadata with the existing Go hashes; compression is build output.
+  git add -- common/consts/aitool-metadata.json common/consts/coreplugin-metadata.json \
+    common/consts/forge-metadata.json common/consts/syntaxflow-metadata.json
 fi

@@ -2,6 +2,7 @@ package coreplugin
 
 import (
 	"errors"
+	"strconv"
 	"strings"
 
 	uuid "github.com/google/uuid"
@@ -619,7 +620,13 @@ func overwriteYakPlugin(db *gorm.DB, name string, scriptData *schema.YakScript, 
 	generateParam := func(code, pluginType string) (string, string, error) {
 		if enableGenerateParam {
 			if meta, ok := builtinmetadata.Lookup("plugin:"+pluginType+":"+name, code); ok {
-				return meta.Parameters, meta.EnvironmentKeys, nil
+				quote := func(raw []byte) string {
+					if len(raw) == 0 {
+						return ""
+					}
+					return strconv.Quote(string(raw))
+				}
+				return quote(meta.Parameters), quote(meta.EnvironmentKeys), nil
 			}
 			oldLevel := log.GetLevel()
 			log.SetLevel(log.ErrorLevel)

@@ -287,7 +287,7 @@ func buildAIForgeFromYakCode(forgeName string, codeBytes []byte) (*schema.AIForg
 		}
 		meta = builtinmetadata.Metadata{
 			VerboseName: scriptMetadata.VerboseName, Description: scriptMetadata.Description,
-			Keywords: strings.Join(scriptMetadata.Keywords, ","), Parameters: unquote(uiParamsConfig),
+			Keywords: strings.Join(scriptMetadata.Keywords, ","), Parameters: json.RawMessage(unquote(uiParamsConfig)),
 		}
 	}
 
@@ -299,7 +299,7 @@ func buildAIForgeFromYakCode(forgeName string, codeBytes []byte) (*schema.AIForg
 		Author:           schema.AIResourceAuthorBuiltin,
 		IsBuiltin:        true,
 		ForgeContent:     string(codeBytes),
-		ParamsUIConfig:   meta.Parameters,
+		ParamsUIConfig:   string(meta.Parameters),
 		ForgeType:        schema.FORGE_TYPE_YAK,
 	}, nil
 }
@@ -381,7 +381,7 @@ func buildAIForgeFromConfig(name string, configBytes []byte, codeContent []byte,
 	// This is critical for frontend to display UI parameters correctly
 	if len(codeContent) > 0 && forge.ForgeContent != "" {
 		if meta, ok := builtinmetadata.Lookup("forge:"+name, forge.ForgeContent); ok {
-			forge.ParamsUIConfig = meta.Parameters
+			forge.ParamsUIConfig = string(meta.Parameters)
 			return string(configBytes), forge, nil
 		}
 		prog, err := static_analyzer.SSAParse(forge.ForgeContent, "yak")
