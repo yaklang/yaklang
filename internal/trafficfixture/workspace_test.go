@@ -27,6 +27,14 @@ func TestWorkspaceExportPreservesSealedFiles(t *testing.T) {
 	var size int64
 	verify := func() {
 		directory := t.TempDir()
+		// Every byte/hash assertion for this window finishes before the next
+		// export. Retaining all verified windows until the parent test exits
+		// multiplies peak disk use as immutable inventory history grows.
+		defer func() {
+			if err := os.RemoveAll(directory); err != nil {
+				t.Errorf("release verified export window: %v", err)
+			}
+		}()
 		if err := exportNames(directory, window); err != nil {
 			t.Fatal(err)
 		}
