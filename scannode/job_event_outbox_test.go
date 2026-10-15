@@ -64,7 +64,7 @@ func TestJobOutboxRetainsTerminalUntilProjectionAndFencesDuplicate(t *testing.T)
 	manifest := box.pendingDeliveries()
 	require.Len(t, manifest, 1)
 	require.Error(t, box.acceptRecovery(node.SessionState{SessionID: "new-session"}), "old platforms must not silently lose recovery")
-	require.NoError(t, box.acceptRecovery(node.SessionState{SessionID: "new-session", JobDeliveryRecoverySupported: true, AcceptedJobDeliveryAttempts: []string{"attempt-a"}}))
+	require.NoError(t, box.acceptRecovery(node.SessionState{NodeID: "node-a", SessionID: "new-session", JobDeliveryRecoverySupported: true, AcceptedJobDeliveryAttempts: []string{"attempt-a"}}))
 	require.NoError(t, box.applyReceipts([]node.JobDeliveryReceipt{{AttemptID: "wrong-attempt", TerminalEventID: manifest[0].TerminalEventID, Disposition: "projected"}}))
 	require.Len(t, box.snapshot(), 1)
 	require.NoError(t, box.applyReceipts([]node.JobDeliveryReceipt{{AttemptID: "attempt-a", TerminalEventID: manifest[0].TerminalEventID, Disposition: "projected"}}))
@@ -156,7 +156,7 @@ func TestJobOutboxRetiresStalePayloadsWithoutRebinding(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, box.enqueue(outboxTestEvent(t, "asset")))
 	require.NoError(t, box.enqueue(outboxTestEvent(t, "succeeded")))
-	require.NoError(t, box.acceptRecovery(node.SessionState{SessionID: "new-session", JobDeliveryRecoverySupported: true, JobDeliveryReceipts: []node.JobDeliveryReceipt{{AttemptID: "attempt-a", TerminalEventID: "attempt-a:succeeded", Disposition: "retired"}}}))
+	require.NoError(t, box.acceptRecovery(node.SessionState{NodeID: "node-a", SessionID: "new-session", JobDeliveryRecoverySupported: true, JobDeliveryReceipts: []node.JobDeliveryReceipt{{AttemptID: "attempt-a", TerminalEventID: "attempt-a:succeeded", Disposition: "retired"}}}))
 	require.Empty(t, box.snapshot())
 	files, err := os.ReadDir(filepath.Join(dir, "retired"))
 	require.NoError(t, err)
@@ -216,4 +216,32 @@ func TestJobOutboxCompletedDispatchCannotExecuteAfterRestart(t *testing.T) {
 	require.Equal(t, messageAckSync, disposition.kind)
 	require.Nil(t, disposition.afterAck)
 	require.Zero(t, reporter.count("claimed", "attempt-a"))
+}
+
+func TestJobOutboxStorageFailureStopsNewExecution(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "outbox")
+	box, err := openJobEventOutbox(dir)
+	require.NoError(t, err)
+	require.NoError(t, os.Rename(dir, dir+"-offline"))
+	require.Error(t, box.enqueue(outboxTestEvent(t, "succeeded")), "a failed fsync path cannot acknowledge enqueue")
+	bridge, reporter := newAdmissionTestBridge(1, nil)
+	bridge.publisher = &jobEventPublisher{outbox: box}
+	cmd := admissionTestCommand("new-command", "new-job", "new-sub", "new-attempt")
+	disposition, err := bridge.handleDispatch(context.Background(), "session", marshalAdmissionCommand(t, cmd))
+	require.Error(t, err)
+	require.Equal(t, messageNakDelayed, disposition.kind)
+	require.Zero(t, reporter.count("claimed", "new-attempt"))
+	require.NoError(t, os.Rename(dir+"-offline", dir))
+	require.Error(t, box.admissionError(), "I/O failure stays closed until storage is recovered and reopened")
+	reopened, err := openJobEventOutbox(dir)
+	require.NoError(t, err)
+	require.NoError(t, reopened.admissionError())
+}
+
+func TestJobOutboxRefusesAChangedNodeIdentity(t *testing.T) {
+	box, err := openJobEventOutbox(filepath.Join(t.TempDir(), "outbox"))
+	require.NoError(t, err)
+	require.NoError(t, box.enqueue(outboxTestEvent(t, "asset")))
+	require.Error(t, box.acceptRecovery(node.SessionState{NodeID: "another-node", SessionID: "new-session", JobDeliveryRecoverySupported: true}))
+	require.Len(t, box.snapshot(), 1, "unowned partial results must be preserved")
 }

@@ -305,6 +305,11 @@ func (b *jobEventOutbox) acceptRecovery(session node.SessionState) error {
 	if len(b.pendingDeliveries()) > 0 && !session.JobDeliveryRecoverySupported {
 		return fmt.Errorf("platform does not support durable job delivery recovery")
 	}
+	for _, e := range b.snapshot() {
+		if e.NodeID != session.NodeID {
+			return fmt.Errorf("durable job outbox belongs to another node; preserve its state separately")
+		}
+	}
 	if err := b.applyReceipts(session.JobDeliveryReceipts); err != nil {
 		return err
 	}
