@@ -145,10 +145,14 @@ func TestCorePluginItemHashStorage(t *testing.T) {
 	}{
 		{name: "empty"},
 		{name: "null", raw: "null"},
+		{name: "null-hash", raw: `{"first":null}`},
 		{name: "legacy-json", raw: `{"first":"old-extractor"}`},
+		{name: "whitespace", raw: " \n\t", invalid: true},
 		{name: "malformed", raw: "{", invalid: true},
 		{name: "array", raw: "[]", invalid: true},
+		{name: "scalar", raw: "true", invalid: true},
 		{name: "non-string-hash", raw: `{"first":1}`, invalid: true},
+		{name: "nested-hash", raw: `{"first":{"nested":"value"}}`, invalid: true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			db := newCorePluginSyncDB(t)
@@ -170,6 +174,37 @@ func TestCorePluginItemHashStorage(t *testing.T) {
 			require.EqualValues(t, 1, count.Swap(0))
 			// The shared serializer must keep the existing KV format readable.
 			require.NoError(t, syncCorePlugins(db, plugins, "repacked:1", true))
+			require.Zero(t, count.Load())
+		})
+	}
+}
+
+func TestCorePluginSyncRejectsNilDefinitions(t *testing.T) {
+	db := newCorePluginSyncDB(t)
+	previous := corePluginFixture("first").YakScript
+	require.NoError(t, db.Create(previous).Error)
+	require.NoError(t, yakit.SetKey(db, corePluginEmbedKey, "previous"))
+	require.NoError(t, yakit.SetKey(db, corePluginItemHashesKey, "{}"))
+	count := countCorePluginParses(t)
+	for _, tc := range []struct {
+		name    string
+		plugins map[string]*builtinCorePlugin
+	}{
+		{name: "nil-set"},
+		{name: "nil-entry", plugins: map[string]*builtinCorePlugin{"invalid": nil}},
+		{name: "nil-script", plugins: map[string]*builtinCorePlugin{"invalid": {}}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			require.NotPanics(t, func() {
+				require.Error(t, syncCorePlugins(db, tc.plugins, "new:1", true))
+			})
+			preserved, err := yakit.GetYakScriptByName(db, "first")
+			require.NoError(t, err)
+			require.Equal(t, previous.ID, preserved.ID)
+			require.Equal(t, previous.Content, preserved.Content)
+			require.Equal(t, previous.UpdatedAt.UnixNano(), preserved.UpdatedAt.UnixNano())
+			require.Equal(t, "previous", yakit.GetKey(db, corePluginEmbedKey))
+			require.Equal(t, "{}", yakit.GetKey(db, corePluginItemHashesKey))
 			require.Zero(t, count.Load())
 		})
 	}
