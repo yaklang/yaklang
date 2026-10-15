@@ -102769,6 +102769,222 @@
         "common/pcapx/pcaputil/atg-delivery/zero-deliveries.pcap": "atg-delivery/zero-deliveries.pcap",
         "scripts/protocol-tests/required-tests-traffic-unified-v103.json": "required-tests-traffic-unified-v103.json"
       }
+    },
+    {
+      "id": "validation-dns-context",
+      "kind": "support",
+      "source_sha": "7f3964173b27b67d34610d8d5f1d486e6bd4c6e6",
+      "file": "validation-dns-context.zip",
+      "sha256": "0e69238c4eb23f7ec6a63265fd528fc8540adf15c0f023c81c754e9810ba3eb4",
+      "password": "bin-parser",
+      "members": {
+        "dns-context-tools/build.py": {
+          "sha256": "4aaa0725135c919f54f2bb6cd8f14585756a3b9a8b47ea8e6a8ae2fbbc58cbca",
+          "bytes": 12225
+        },
+        "dns-context-tools/shared-lan-recipe.json": {
+          "sha256": "cb51faa5a446e6fca668d0e36f572547c66abf583adf918eb4194ad8041d3c9e",
+          "bytes": 1912
+        },
+        "dns-context-tools/source-pins.json": {
+          "sha256": "710d43b734f014a9df404888819f877e24b96e306577e7240b6a7fd65bcf407f",
+          "bytes": 3078
+        },
+        "dns-context-tools/verify.py": {
+          "sha256": "5ea507a18021a8d2fdb28b6185aa81d2bbc21b4357063e97cd9b5323e6c38086",
+          "bytes": 4656
+        },
+        "dns-context/backward-local-time.pcapng": {
+          "sha256": "ab90382a19f6ef89c4fb811a371fa3942fdd771768589965c4843b1c106d1514",
+          "bytes": 532
+        },
+        "dns-context/byte-refusal-pending.pcapng": {
+          "sha256": "16aa9497d0616e1ef9f3eb2ed624f2f4a1f520ef6e1dc6a9cf137306062b9fe6",
+          "bytes": 664
+        },
+        "dns-context/changed-case-request.pcapng": {
+          "sha256": "5068c5c4bbd017bb5c90d6304ce9ec81ce91bcbe86f9a64efe6561ef5d527099",
+          "bytes": 408
+        },
+        "dns-context/changed-recursion-request.pcapng": {
+          "sha256": "fc089d5e5081e8bcfd07940a04cf7df20ee9508cc03e4927fdcb034c2f51ea52",
+          "bytes": 408
+        },
+        "dns-context/coalesced-explicit-ids.pcapng": {
+          "sha256": "efa6b319a1719c5f6b808971760aa3a7baae9369e8bd2db62352e634eb8bd800",
+          "bytes": 532
+        },
+        "dns-context/completed-id-reuse.pcapng": {
+          "sha256": "e5c1d4cc496448b8441de26153835aa5eef4c5c58fe3874da5ba26e94749b54b",
+          "bytes": 532
+        },
+        "dns-context/controls.json": {
+          "sha256": "1362e36d107f2ecf43577c6b8587ddce847e90610ed9d46c77e21dad8306aca2",
+          "bytes": 339999
+        },
+        "dns-context/expected.json": {
+          "sha256": "5336a9bf10fdf702b7bfdfd54f03ce727a823e667afdfcc3c1641c3eeca84755",
+          "bytes": 38342
+        },
+        "dns-context/first-byte-refused.pcapng": {
+          "sha256": "ba1b877cc2e7be368db745fa9ba993a3d4d8bf14661fbe41ba48e050eb6f30ea",
+          "bytes": 664
+        },
+        "dns-context/foreign-byte-refusal-clock.pcapng": {
+          "sha256": "9ce0f71cd01b836456b8af5764c7b796c58dd97e43f316cff6e1a6467664244a",
+          "bytes": 664
+        },
+        "dns-context/foreign-endpoint-clock.pcapng": {
+          "sha256": "ecaab1276374718cf4343560cc39364914f53a51d30868ad36f80a718b4ca573",
+          "bytes": 408
+        },
+        "dns-context/foreign-interface-clock.pcapng": {
+          "sha256": "25a1c187b97a5f1a0b01945d88428838509dfe65637d78e41c5a830a56f29852",
+          "bytes": 408
+        },
+        "dns-context/foreign-llmnr-clock.pcapng": {
+          "sha256": "fa48b7d9255e38794a54c6cbe6a5c3413569231eb68e47ae1c5b49c8cbd4b24a",
+          "bytes": 408
+        },
+        "dns-context/history-count-budget.pcapng": {
+          "sha256": "064c34e8a4e8658f92999cd624ea8b2ad22badbc01a8e40b31309e838777efb5",
+          "bytes": 500
+        },
+        "dns-context/idle-exact30.pcapng": {
+          "sha256": "ae18fd06540298c0c4372b70090ff84c8407925b6631ecdf8fcff4ff1c73f805",
+          "bytes": 300
+        },
+        "dns-context/idle-over30.pcapng": {
+          "sha256": "4840c6d851e8f68aee9e8c17d019e3573522a290d2ba0e01e40eb073a33d6da1",
+          "bytes": 300
+        },
+        "dns-context/llmnr-unicast.pcapng": {
+          "sha256": "62f6b64d52d63ce4d2260cd79feac4ecc3e5335c8bf0d73f603e415e8aa1a037",
+          "bytes": 300
+        },
+        "dns-context/mdns-observation.pcapng": {
+          "sha256": "6ec9dd24fa170981d446e0dd80c000151556cd5a86c45eb4f6780f1c1800fdae",
+          "bytes": 300
+        },
+        "dns-context/mdns-refusal-no-transaction.pcapng": {
+          "sha256": "f118324f6a82e7261c53cde08b0cd465680efb4372a1758d5713661e273eeb98",
+          "bytes": 404
+        },
+        "dns-context/multicast-query-change.pcapng": {
+          "sha256": "bc0446c9d737fe7bf863185adaddaeec1113705df930f6a60c0466244427b2fe",
+          "bytes": 532
+        },
+        "dns-context/multicast-responder-budget.pcapng": {
+          "sha256": "c51571c5bc35da890d40884fc9d1b6230e094c92cd8ccbccbda5a0e033dbadf0",
+          "bytes": 548
+        },
+        "dns-context/multicast-responder-retry.pcapng": {
+          "sha256": "e9ef3fe0d894c5640f2f681ec94b221a549701a14646bc521f1edef900051258",
+          "bytes": 548
+        },
+        "dns-context/observed-nonstandard-port-refusal.pcapng": {
+          "sha256": "2090e0cbd612fd5612c3ea2371adabdb9763e963090cd1ffdce1f8d359ebd991",
+          "bytes": 664
+        },
+        "dns-context/opcode-mismatch-and-normal.pcapng": {
+          "sha256": "93c4cfcf46e54f5642aaf35ba81612364fdddfb877ded64190ba9aa0b47e9c2d",
+          "bytes": 424
+        },
+        "dns-context/ordinary.pcapng": {
+          "sha256": "fb77537d5520e8a304f9f9b82f0044b120437858e1395eb79540f51d2f1ff463",
+          "bytes": 300
+        },
+        "dns-context/orphan-before-request.pcapng": {
+          "sha256": "95c65db9377c2901d1e0b3276a27bb9f0f0e294a09ba82c31db3e4bf2b7d74e4",
+          "bytes": 424
+        },
+        "dns-context/record-budget-first-refused.pcapng": {
+          "sha256": "962f4d0292dc5f2481359326da32c10b575c90990398393d01c0f2f224e88f75",
+          "bytes": 408
+        },
+        "dns-context/retry-renews-idle.pcapng": {
+          "sha256": "ba6c44e998f6268076ea2bbe7fb52009eea3c463bc515b60142ddbaf8059fbb5",
+          "bytes": 408
+        },
+        "dns-context/semantic-refusal-and-fresh-id.pcapng": {
+          "sha256": "3e4efae656a5b644f009da0f77126a110a9af55d15927eeb508ebaa4a91a77ae",
+          "bytes": 744
+        },
+        "dns-context/two-interfaces-isolated.pcapng": {
+          "sha256": "ee069e5a8c60e705dd20b705a5645e3c047e15c1bb532d0bd541b569e4b929db",
+          "bytes": 532
+        },
+        "dns-context/unretained-refusal-keeps-owner.pcapng": {
+          "sha256": "a71d9e8710e06c08e76cda59f544dac638909fabbf7e6811058ce71769aa1c3f",
+          "bytes": 864
+        },
+        "dns-context/unretained-request-keeps-owner.pcapng": {
+          "sha256": "135268a69601d7ef0f79901a4e792b3ed81bc15e3d3d8349df526fe78c75561b",
+          "bytes": 500
+        },
+        "dns-context/wrong-direction-and-normal.pcapng": {
+          "sha256": "5829fd6857d6cca439ca12a886022998a0e39639225ee42aa882a5fc92df0511",
+          "bytes": 424
+        },
+        "dns-context/wrong-endpoint-and-normal.pcapng": {
+          "sha256": "3f84b96c3a24460eba4416b06883bbd0449b4cc458201e40432c6d14f73f9b94",
+          "bytes": 424
+        },
+        "dns-context/wrong-question-and-normal.pcapng": {
+          "sha256": "89cfccb85cf7b4817dcee7f5d5c03055966e766dbc90a81d217da9c8b33fdceb",
+          "bytes": 424
+        },
+        "required-tests-traffic-unified-v104.json": {
+          "sha256": "fb1490a67c7f1708e98f1bf7918e9d80efc2948bee8cc76527927d4764d3d2d3",
+          "bytes": 17901113
+        },
+        "validation/expected.json": {
+          "sha256": "5336a9bf10fdf702b7bfdfd54f03ce727a823e667afdfcc3c1641c3eeca84755",
+          "bytes": 38342
+        }
+      },
+      "aliases": {
+        "common/pcapx/pcaputil/dns-context-tools/build.py": "dns-context-tools/build.py",
+        "common/pcapx/pcaputil/dns-context-tools/shared-lan-recipe.json": "dns-context-tools/shared-lan-recipe.json",
+        "common/pcapx/pcaputil/dns-context-tools/source-pins.json": "dns-context-tools/source-pins.json",
+        "common/pcapx/pcaputil/dns-context-tools/verify.py": "dns-context-tools/verify.py",
+        "common/pcapx/pcaputil/dns-context/backward-local-time.pcapng": "dns-context/backward-local-time.pcapng",
+        "common/pcapx/pcaputil/dns-context/byte-refusal-pending.pcapng": "dns-context/byte-refusal-pending.pcapng",
+        "common/pcapx/pcaputil/dns-context/changed-case-request.pcapng": "dns-context/changed-case-request.pcapng",
+        "common/pcapx/pcaputil/dns-context/changed-recursion-request.pcapng": "dns-context/changed-recursion-request.pcapng",
+        "common/pcapx/pcaputil/dns-context/coalesced-explicit-ids.pcapng": "dns-context/coalesced-explicit-ids.pcapng",
+        "common/pcapx/pcaputil/dns-context/completed-id-reuse.pcapng": "dns-context/completed-id-reuse.pcapng",
+        "common/pcapx/pcaputil/dns-context/controls.json": "dns-context/controls.json",
+        "common/pcapx/pcaputil/dns-context/expected.json": "dns-context/expected.json",
+        "common/pcapx/pcaputil/dns-context/first-byte-refused.pcapng": "dns-context/first-byte-refused.pcapng",
+        "common/pcapx/pcaputil/dns-context/foreign-byte-refusal-clock.pcapng": "dns-context/foreign-byte-refusal-clock.pcapng",
+        "common/pcapx/pcaputil/dns-context/foreign-endpoint-clock.pcapng": "dns-context/foreign-endpoint-clock.pcapng",
+        "common/pcapx/pcaputil/dns-context/foreign-interface-clock.pcapng": "dns-context/foreign-interface-clock.pcapng",
+        "common/pcapx/pcaputil/dns-context/foreign-llmnr-clock.pcapng": "dns-context/foreign-llmnr-clock.pcapng",
+        "common/pcapx/pcaputil/dns-context/history-count-budget.pcapng": "dns-context/history-count-budget.pcapng",
+        "common/pcapx/pcaputil/dns-context/idle-exact30.pcapng": "dns-context/idle-exact30.pcapng",
+        "common/pcapx/pcaputil/dns-context/idle-over30.pcapng": "dns-context/idle-over30.pcapng",
+        "common/pcapx/pcaputil/dns-context/llmnr-unicast.pcapng": "dns-context/llmnr-unicast.pcapng",
+        "common/pcapx/pcaputil/dns-context/mdns-observation.pcapng": "dns-context/mdns-observation.pcapng",
+        "common/pcapx/pcaputil/dns-context/mdns-refusal-no-transaction.pcapng": "dns-context/mdns-refusal-no-transaction.pcapng",
+        "common/pcapx/pcaputil/dns-context/multicast-query-change.pcapng": "dns-context/multicast-query-change.pcapng",
+        "common/pcapx/pcaputil/dns-context/multicast-responder-budget.pcapng": "dns-context/multicast-responder-budget.pcapng",
+        "common/pcapx/pcaputil/dns-context/multicast-responder-retry.pcapng": "dns-context/multicast-responder-retry.pcapng",
+        "common/pcapx/pcaputil/dns-context/observed-nonstandard-port-refusal.pcapng": "dns-context/observed-nonstandard-port-refusal.pcapng",
+        "common/pcapx/pcaputil/dns-context/opcode-mismatch-and-normal.pcapng": "dns-context/opcode-mismatch-and-normal.pcapng",
+        "common/pcapx/pcaputil/dns-context/ordinary.pcapng": "dns-context/ordinary.pcapng",
+        "common/pcapx/pcaputil/dns-context/orphan-before-request.pcapng": "dns-context/orphan-before-request.pcapng",
+        "common/pcapx/pcaputil/dns-context/record-budget-first-refused.pcapng": "dns-context/record-budget-first-refused.pcapng",
+        "common/pcapx/pcaputil/dns-context/retry-renews-idle.pcapng": "dns-context/retry-renews-idle.pcapng",
+        "common/pcapx/pcaputil/dns-context/semantic-refusal-and-fresh-id.pcapng": "dns-context/semantic-refusal-and-fresh-id.pcapng",
+        "common/pcapx/pcaputil/dns-context/two-interfaces-isolated.pcapng": "dns-context/two-interfaces-isolated.pcapng",
+        "common/pcapx/pcaputil/dns-context/unretained-refusal-keeps-owner.pcapng": "dns-context/unretained-refusal-keeps-owner.pcapng",
+        "common/pcapx/pcaputil/dns-context/unretained-request-keeps-owner.pcapng": "dns-context/unretained-request-keeps-owner.pcapng",
+        "common/pcapx/pcaputil/dns-context/wrong-direction-and-normal.pcapng": "dns-context/wrong-direction-and-normal.pcapng",
+        "common/pcapx/pcaputil/dns-context/wrong-endpoint-and-normal.pcapng": "dns-context/wrong-endpoint-and-normal.pcapng",
+        "common/pcapx/pcaputil/dns-context/wrong-question-and-normal.pcapng": "dns-context/wrong-question-and-normal.pcapng",
+        "scripts/protocol-tests/required-tests-traffic-unified-v104.json": "required-tests-traffic-unified-v104.json"
+      }
     }
   ],
   "schema_version": 1,

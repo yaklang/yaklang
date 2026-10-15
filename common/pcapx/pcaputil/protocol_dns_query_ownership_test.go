@@ -137,8 +137,10 @@ func testDNSOwnedDatagramQueries(t *testing.T) {
 				require.Equal(t, want, f)
 				require.Zero(t, next.Events[0].ResponseTo)
 				if protocol != "mdns" {
-					require.Equal(t, e.TransactionID, next.Events[0].TransactionID)
-					require.Equal(t, true, next.Events[0].Session["Retransmission"])
+					// A refused same-identity input is not an invisible exact retry.
+					require.Zero(t, next.Events[0].TransactionID)
+					require.Equal(t, "ambiguous", next.Events[0].Session["Association Status"])
+					require.NotContains(t, next.Events[0].Session, "Retransmission")
 				}
 				require.Empty(t, s.Close("complete"))
 				require.Empty(t, s.Close("again"))

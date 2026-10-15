@@ -672,6 +672,10 @@ func (a *binParser) closeUDPSessions() {
 		a.buffered.Add(-p.cost)
 	}
 	a.dns.pending = nil
+	for _, p := range a.lan.pending {
+		a.buffered.Add(-p.cost)
+	}
+	a.lan.pending = nil
 	a.dnsMu.Unlock()
 	a.udpMu.Lock()
 	defer a.udpMu.Unlock()

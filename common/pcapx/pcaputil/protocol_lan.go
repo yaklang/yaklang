@@ -127,7 +127,7 @@ func (a *binParser) dhcpObservation(e *ProtocolEvent) {
 	key := fmt.Sprintf("dhcp/%v/%v/%s/%v", e.Domain, info["Relay IP"], identity, info["Xid"])
 	a.dnsMu.Lock()
 	defer a.dnsMu.Unlock()
-	s := &a.dns
+	s := &a.lan
 	if s.pending == nil {
 		s.pending = map[string]dnsPending{}
 	}
@@ -146,7 +146,7 @@ func (a *binParser) dhcpObservation(e *ProtocolEvent) {
 	if typ == 1 || typ == 3 || typ == 8 {
 		if p, ok := s.pending[key]; ok {
 			e.TransactionID = p.id
-		} else if len(s.pending) < a.budget.MaxCollectionElements && a.reserveEvidence(int64(len(key)+128)) {
+		} else if len(s.pending)+len(a.dns.pending) < a.budget.MaxCollectionElements && a.reserveEvidence(int64(len(key)+128)) {
 			s.pending[key] = dnsPending{id: e.ID, ts: e.Timestamp, cost: int64(len(key) + 128)}
 			e.TransactionID = e.ID
 		}
@@ -199,7 +199,7 @@ func (a *binParser) dhcp6Observation(e *ProtocolEvent) {
 	typ, _ := info["Message Type"].(byte)
 	a.dnsMu.Lock()
 	defer a.dnsMu.Unlock()
-	s := &a.dns
+	s := &a.lan
 	if s.pending == nil {
 		s.pending = map[string]dnsPending{}
 	}
@@ -226,7 +226,7 @@ func (a *binParser) dhcp6Observation(e *ProtocolEvent) {
 	} else if typ != 10 {
 		if p, ok := s.pending[key]; ok {
 			e.TransactionID = p.id
-		} else if len(s.pending) < a.budget.MaxCollectionElements && a.reserveEvidence(int64(len(key)+128)) {
+		} else if len(s.pending)+len(a.dns.pending) < a.budget.MaxCollectionElements && a.reserveEvidence(int64(len(key)+128)) {
 			s.pending[key] = dnsPending{id: e.ID, ts: e.Timestamp, cost: int64(len(key) + 128)}
 			e.TransactionID = e.ID
 		}

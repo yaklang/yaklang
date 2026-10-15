@@ -28,6 +28,8 @@ type ProtocolEvent struct {
 	nativeSIPObservation                     bool
 	nativeTFTPObservation                    bool
 	nativeATGObservation                     bool
+	nativeDNSObservation                     bool
+	nativeDNSStreamObservation               bool
 	nativeDLMSOrSLMPObservation              bool
 	nativeUnrecognizedUDP                    bool
 	nativeBACnetRead                         bool
@@ -136,6 +138,9 @@ func (e *ProtocolEvent) Decode() (result map[string]any, err error) {
 		if e.Protocol == "c37118" && (e.Profile == "c37118-v1-v2-cfg2-data" || e.Profile == "c37118-v2-cfg3-complete-data" || e.Profile == "c37118-v2-cfg3-continuation-data" || e.Profile == "c37118-engineering") && e.semanticFields != nil {
 			session = e.semanticFields
 		}
+		if (e.nativeDNSObservation || e.nativeDNSStreamObservation) && e.semanticSession != nil {
+			session = e.semanticSession
+		}
 		if e.nativeATGObservation && e.semanticFields != nil {
 			session = e.semanticFields
 		}
@@ -151,6 +156,19 @@ func (e *ProtocolEvent) Decode() (result map[string]any, err error) {
 			result = owned
 		}
 	}()
+	if e.nativeDNSStreamObservation {
+		if e.sessionError != nil {
+			owned := *e.sessionError
+			return nil, &owned
+		}
+		if e.semanticFields != nil {
+			out := map[string]any{"fields": cloneSession(e.semanticFields)}
+			if e.hasRuleMetadata {
+				out["metadata"] = cloneSessionValue(e.semanticMetadata)
+			}
+			return out, nil
+		}
+	}
 	// Accepted SIP wire fields and passive context have independent ownership.
 	// A typed semantic refusal cannot become a successful raw grammar decode.
 	if e.nativeSIPObservation {
@@ -166,7 +184,7 @@ func (e *ProtocolEvent) Decode() (result map[string]any, err error) {
 			return result, nil
 		}
 	}
-	if e.nativeATGObservation || e.nativeTFTPObservation || e.nativeDLMSOrSLMPObservation {
+	if e.nativeDNSObservation || e.nativeATGObservation || e.nativeTFTPObservation || e.nativeDLMSOrSLMPObservation {
 		if e.semanticFields != nil {
 			return map[string]any{"fields": cloneSession(e.semanticFields)}, nil
 		}
@@ -321,7 +339,7 @@ func (e *ProtocolEvent) retainRuleEnvelope(result map[string]any) {
 }
 
 func (e *ProtocolEvent) ownsNativeFields() bool {
-	if e.nativeATGObservation || e.nativeDLMSOrSLMPObservation || e.nativeTFTPObservation || e.nativeSIPObservation || e.nativeSTUNObservation || e.nativeSNMPObservation || e.nativeTLSObservation || e.nativeDTLSObservation || e.nativeHARTIPObservation || e.nativeENIPObservation || e.nativeFINSObservation || e.nativeDiagnosticError != "" {
+	if e.nativeDNSStreamObservation || e.nativeDNSObservation || e.nativeATGObservation || e.nativeDLMSOrSLMPObservation || e.nativeTFTPObservation || e.nativeSIPObservation || e.nativeSTUNObservation || e.nativeSNMPObservation || e.nativeTLSObservation || e.nativeDTLSObservation || e.nativeHARTIPObservation || e.nativeENIPObservation || e.nativeFINSObservation || e.nativeDiagnosticError != "" {
 		return true
 	}
 	if e.nativeDoIPObservation {
@@ -575,7 +593,8 @@ type binParser struct {
 	droneCANStatsDisabled                                                      bool // refused untracked transfer history fails closed
 	fragments                                                                  fragmentStore
 	dnsMu                                                                      sync.Mutex
-	dns                                                                        dnsCorrelation
+	dns                                                                        dnsObservationCorrelation
+	lan                                                                        dnsCorrelation
 	tlsSecrets                                                                 TLSSecretProvider
 	udpMu                                                                      sync.Mutex
 	udpSessions                                                                *binUDPStore
@@ -761,7 +780,7 @@ func (a *binParser) emit(e *BinParserEvent) {
 	if ((e.Protocol == "iec104" || e.Protocol == "dnp3") || e.Protocol == "goose" || e.Protocol == "mqtt" || e.ocpp || e.Protocol == "rtp" && e.Transport != "udp") && e.semanticSession == nil && e.Session != nil {
 		e.semanticSession = cloneSession(e.Session)
 	}
-	if (e.nativeDLMSOrSLMPObservation || e.nativeSTUNObservation || e.nativeSIPObservation || e.nativeTFTPObservation) && e.semanticSession == nil && e.Session != nil {
+	if (e.nativeDNSStreamObservation || e.nativeDLMSOrSLMPObservation || e.nativeSTUNObservation || e.nativeSIPObservation || e.nativeTFTPObservation) && e.semanticSession == nil && e.Session != nil {
 		e.semanticSession = cloneSession(e.Session)
 	}
 	defer func() {
@@ -969,6 +988,13 @@ func (f *binFlow) event(dir int, raw []byte, status, detail string) *BinParserEv
 		e.Profile = "doip-routing-dsc"
 	}
 	f.eventEvidence(dir, e)
+	if f.protocol == "dns" || f.protocol == "dot" {
+		e.nativeDNSStreamObservation = true
+		e.Profile = "dns-tcp"
+		if f.protocol == "dot" {
+			e.Profile = "dns-over-tls"
+		}
+	}
 	if f.atg != nil {
 		e.nativeATGObservation = true
 		e.Profile = "atg-tls450-i201"
@@ -1060,7 +1086,7 @@ func (f *binFlow) stop(dir int, wire []byte, status, reason string) {
 	}
 	e := f.event(dir, preview, status, reason)
 	e.sessionError, f.lastSessionError = f.lastSessionError, nil
-	if e.nativeATGObservation || e.nativeDLMSOrSLMPObservation || e.nativeTFTPObservation || e.nativeSIPObservation || e.nativeSTUNObservation || e.nativeSNMPObservation || e.nativeTLSObservation || e.nativeHARTIPObservation || e.nativeFINSObservation || e.nativeENIPObservation {
+	if e.nativeDNSStreamObservation || e.nativeDNSObservation || e.nativeATGObservation || e.nativeDLMSOrSLMPObservation || e.nativeTFTPObservation || e.nativeSIPObservation || e.nativeSTUNObservation || e.nativeSNMPObservation || e.nativeTLSObservation || e.nativeHARTIPObservation || e.nativeFINSObservation || e.nativeENIPObservation {
 		if e.sessionError == nil {
 			kind := ErrMalformedMessage
 			switch status {
@@ -1531,6 +1557,9 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 			} else {
 				e.Status, e.Structured = "decoded", result
 			}
+			if err == nil && e.nativeDNSStreamObservation {
+				e.retainRuleEnvelope(result)
+			}
 			if err == nil && (stateful || e.Protocol == "tls") {
 				// This exact result has already been accepted by the bounded
 				// session codec. Retain its owned field projection for deferred
@@ -1540,7 +1569,7 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 				if e.nativeSIPObservation || (e.Protocol == "iec104" || e.Protocol == "dnp3") || e.Protocol == "goose" || e.Protocol == "mqtt" || e.nativeOPCUAObservation || e.Protocol == "websocket" && e.Session["OCPP"] != nil || e.Protocol == "rtp" && e.Transport != "udp" {
 					e.retainRuleEnvelope(result)
 				}
-				if e.nativeATGObservation || e.nativeHARTIPObservation || e.nativeENIPObservation || e.Protocol == "tls" || e.Protocol == "redis" || e.Entry == "MySQLPreparedFields" || e.Protocol == "stun" || e.Protocol == "turn" || e.Protocol == "snmp" || e.Protocol == "slmp" || e.Protocol == "dlms-wrapper" || e.Protocol == "dlms" || e.Protocol == "c37118" {
+				if e.nativeDNSStreamObservation || e.nativeATGObservation || e.nativeHARTIPObservation || e.nativeENIPObservation || e.Protocol == "tls" || e.Protocol == "redis" || e.Entry == "MySQLPreparedFields" || e.Protocol == "stun" || e.Protocol == "turn" || e.Protocol == "snmp" || e.Protocol == "slmp" || e.Protocol == "dlms-wrapper" || e.Protocol == "dlms" || e.Protocol == "c37118" {
 					e.semanticFields = cloneSession(e.semanticFields)
 				}
 			}
@@ -1573,6 +1602,21 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 					e.Error = err.Error()
 					e.Structured = nil
 				}
+			}
+		}
+		if e.nativeDNSStreamObservation && e.Error != "" && e.sessionError == nil {
+			kind := ErrMalformedMessage
+			switch e.Status {
+			case "limited":
+				kind = ErrResourceExceeded
+			case "context-required":
+				kind = ErrContextRequired
+			case "incomplete":
+				kind = ErrNeedMore
+			}
+			e.sessionError = &ProtocolError{Kind: kind, Message: e.Error}
+			if e.ExpertCode == "" {
+				e.ExpertCode = string(kind)
 			}
 		}
 		// Count the final outcome after all semantic validation, including DNS
