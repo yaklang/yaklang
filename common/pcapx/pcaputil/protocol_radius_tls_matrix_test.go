@@ -53,14 +53,14 @@ func radiusTLSWant(t *testing.T, m map[string]any) {
 				m[k] = byte(x)
 			case "Version", "Cipher Suite":
 				m[k] = uint16(x)
-			case "Message Length":
+			case "Message Length", "Reassembled Length":
 				m[k] = uint32(x)
 			default:
 				m[k] = int(x)
 			}
 		case string:
 			switch k {
-			case "Data", "Raw", "Payload", "Body", "Random", "Session ID", "Compression Methods":
+			case "Data", "Raw", "Payload", "Body", "Random", "Session ID", "Compression Methods", "Reassembled Data":
 				m[k] = radiusWire(t, x)
 			}
 		case map[string]any:

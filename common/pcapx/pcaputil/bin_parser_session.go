@@ -1365,15 +1365,26 @@ func (f *binFlow) finishSession(reason TrafficFlowCloseReason) {
 	if n := f.tns; n != nil && n.pending > 0 {
 		emit(0, map[string]any{"Outstanding": n.pending}, "TNS exchange ended with unmatched Connect")
 	}
-	if r := f.radius; r != nil && r.outstanding() > 0 {
-		e := f.event(0, nil, "incomplete", string(reason)+": RADIUS unmatched observed Identifiers")
-		e.nativeRADIUSObservation, e.Profile, e.Completeness = true, r.profile(), "incomplete"
-		e.Session = map[string]any{"Outstanding": r.outstanding()}
-		e.semanticSession = cloneSession(e.Session)
-		e.sessionError = &ProtocolError{Kind: ErrNeedMore, Message: e.Summary}
-		e.Error = e.Summary
-		f.a.incomplete.Add(1)
-		f.a.emit(e)
+	if r := f.radius; r != nil {
+		groups, buffered := r.tlsRounds.unfinished()
+		if r.outstanding() > 0 || groups > 0 {
+			detail := string(reason) + ": RADIUS unmatched observed Identifiers"
+			if groups > 0 {
+				detail += " or observed TLS fragments"
+			}
+			e := f.event(0, nil, "incomplete", detail)
+			e.nativeRADIUSObservation, e.Profile, e.Completeness = true, r.profile(), "incomplete"
+			e.Session = map[string]any{"Outstanding": r.outstanding()}
+			if groups > 0 {
+				e.Session["TLS Fragment Groups"] = groups
+				e.Session["TLS Fragment Buffered Bytes"] = buffered
+			}
+			e.semanticSession = cloneSession(e.Session)
+			e.sessionError = &ProtocolError{Kind: ErrNeedMore, Message: e.Summary}
+			e.Error = e.Summary
+			f.a.incomplete.Add(1)
+			f.a.emit(e)
+		}
 	}
 	if d := f.dhcp; d != nil && len(d.pending) > 0 {
 		emit(0, map[string]any{"Outstanding": len(d.pending)}, "DHCP exchange ended with unmatched xids")

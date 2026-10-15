@@ -26,17 +26,23 @@ type radiusOwner struct {
 type binRADIUS struct {
 	pending   map[radiusKey]radiusOwner
 	untracked bool
+	tlsRounds *radiusTLSRounds
 }
 
 const radiusObserverTTL = 5 * time.Minute
 
-func (s *binRADIUS) storage() int64 { return 256 + 192*int64(len(s.pending)) }
+func (s *binRADIUS) storage() int64 { return 256 + 192*int64(len(s.pending)) + s.tlsRounds.storage() }
 func (s *binRADIUS) invalidate() {
 	for k, v := range s.pending {
 		v.retired = true
 		s.pending[k] = v
 	}
 	s.untracked = true
+	if s.tlsRounds != nil {
+		for _, c := range s.tlsRounds.rounds {
+			c.discard()
+		}
+	}
 }
 func (s *binRADIUS) outstanding() int {
 	n := 0

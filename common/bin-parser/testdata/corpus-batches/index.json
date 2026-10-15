@@ -105466,6 +105466,137 @@
         "common/pcapx/pcaputil/tls-record-tools/verify.py": "tls-record-tools/verify.py",
         "scripts/protocol-tests/required-tests-traffic-unified-v114.json": "required-tests-traffic-unified-v114.json"
       }
+    },
+    {
+      "id": "validation-radius-tls-chain",
+      "kind": "support",
+      "source_sha": "f7103531a796b53a8539c1b449d12fa205ee64a4",
+      "file": "validation-radius-tls-chain.zip",
+      "sha256": "de7fa624de9499613789c1bf777fc67e670fdae07c1542398892216268dde348",
+      "password": "bin-parser",
+      "members": {
+        "radius-tls-chain-tools/freeze_v2.py": {
+          "sha256": "c07604dd07d63ed82cbdca098ed2b92da59f83d351ec5f8d5d9ec730478da91e",
+          "bytes": 7465
+        },
+        "radius-tls-chain-tools/generate.py": {
+          "sha256": "3d5a9ea3ac81850d786e1c7ee9281a71e283e628a916fa1ed877fb180fe11cc1",
+          "bytes": 9902
+        },
+        "radius-tls-chain-tools/generate_supplement.py": {
+          "sha256": "ab19d0a82dc717fee3be8203e53868523824e386dff4b41bd384a1d4e0f4d0ac",
+          "bytes": 12163
+        },
+        "radius-tls-chain-tools/sources.json": {
+          "sha256": "91a90b26dd2a1ebbced4c61c0c6760152bc83ab928380db3d57b3e1dd1d36a3d",
+          "bytes": 2836
+        },
+        "radius-tls-chain-tools/validate_supplement.py": {
+          "sha256": "e0a152b4a06d131f19d376fd4f7420a0db63ecc57d1899582158956c84a172c6",
+          "bytes": 3864
+        },
+        "radius-tls-chain-tools/verify.py": {
+          "sha256": "758a6f851920f8a79b57b028a505ce0d9eda7209b188f2020466556fefd480ef",
+          "bytes": 3616
+        },
+        "radius-tls-chain/aggregate-seven-Alerts-cap6-discard-neighbor-owner.pcap": {
+          "sha256": "57368b19768b84644f92f9f916c949027e1a80c78258ae8ee2e40a58cb925e40",
+          "bytes": 961
+        },
+        "radius-tls-chain/controls.json": {
+          "sha256": "a71ee3fb1c374781c91193bfec307fa5991b49bf37927e92ffc93bc28bd25636",
+          "bytes": 350756
+        },
+        "radius-tls-chain/declared-round-budget-refusal-neighbor-owner.pcap": {
+          "sha256": "9989805a5753e25ef435cb3a8d950e620d750f3c26f0f48d08b5cf9fd757d2a9",
+          "bytes": 673
+        },
+        "radius-tls-chain/exact-challenge-retry-no-double-append.pcap": {
+          "sha256": "f1e0dbc31f760d60128d8f6dc3d953ff210cd823d875015b53869dbc16bc8297",
+          "bytes": 944
+        },
+        "radius-tls-chain/historical-first-Challenge-after-complete-no-resurrection.pcap": {
+          "sha256": "a27729303b23d1cbd2dfe6dd74ae21b2f858e08590142ee95c56bf237976d989",
+          "bytes": 944
+        },
+        "radius-tls-chain/legacy-compatibility.json": {
+          "sha256": "cb673c556023dcfc4b8f32750f0294b36da294d8199ecea425e1989081f79c2d",
+          "bytes": 15095
+        },
+        "radius-tls-chain/missing-State-echo.pcap": {
+          "sha256": "12c1a7f2404d4d6a2b8d6fba8045bc121ed903f9a17a8db56eb574743fdcd2fc",
+          "bytes": 815
+        },
+        "radius-tls-chain/opposite-request-direction-same-descriptor-State-ID-isolated.pcap": {
+          "sha256": "4d43d5f10b8b79be116517293fab445097705292eaf896f217b81daa0a4fc62a",
+          "bytes": 1614
+        },
+        "radius-tls-chain/outer-padding-only-exact-first-retry-no-append.pcap": {
+          "sha256": "2c4e4c793a32ee9cb180a5d1fbbbb6da9b0fcf41abb1b013852ea137f7df6121",
+          "bytes": 951
+        },
+        "radius-tls-chain/partial-observed-round-Close.pcap": {
+          "sha256": "969484086e89ef5947cba25e310626df6960e990bd3717fb91b381377b9967f5",
+          "bytes": 433
+        },
+        "radius-tls-chain/same-State-and-EAPID-distinct-session-isolated.pcap": {
+          "sha256": "ef727383acd943c6d601d800ba71f35a78bd38f07da19bc8c41fb04cea234169",
+          "bytes": 1614
+        },
+        "radius-tls-chain/same-State-same-session-conflicting-chain.pcap": {
+          "sha256": "eee420ed40faf50bcdd32ccc44ad3c854dd8d34f96322b7a2fc8f8e5f3fc4e26",
+          "bytes": 842
+        },
+        "radius-tls-chain/server-two-fragments-full-observed-chain.pcap": {
+          "sha256": "5052a38fc9210eca61cb2a5464ec7967040630bd933ad190e3963ef8f66be74b",
+          "bytes": 819
+        },
+        "radius-tls-chain/supplement-legacy.json": {
+          "sha256": "39a9612d669f2bb52c7fc763425f1c1d4d68fe517c19655d42381a43924bb3ee",
+          "bytes": 6941
+        },
+        "radius-tls-chain/supplement.json": {
+          "sha256": "1264f4bd3288445bd551eba490abaf27f8cc7cc387c53f9662ed057aaab23702",
+          "bytes": 220760
+        },
+        "radius-tls-chain/wrong-EAP-ACK-Identifier.pcap": {
+          "sha256": "3ff732e6449ef59e71aace138c42461a7f02742e06cbb9495550ced9d9d65b21",
+          "bytes": 819
+        },
+        "required-tests-traffic-unified-v115.json": {
+          "sha256": "5c5feac9cb795f134bfa616ee3f38f1fe71b351b383e1a3c67eb04e07f360e49",
+          "bytes": 19637217
+        },
+        "validation/expected.json": {
+          "sha256": "a766563c1ad0d8b7fd66dd8dd910754817af3a2263ae84bede28f2acad25b7d6",
+          "bytes": 15691
+        }
+      },
+      "aliases": {
+        "common/pcapx/pcaputil/radius-tls-chain-tools/freeze_v2.py": "radius-tls-chain-tools/freeze_v2.py",
+        "common/pcapx/pcaputil/radius-tls-chain-tools/generate.py": "radius-tls-chain-tools/generate.py",
+        "common/pcapx/pcaputil/radius-tls-chain-tools/generate_supplement.py": "radius-tls-chain-tools/generate_supplement.py",
+        "common/pcapx/pcaputil/radius-tls-chain-tools/sources.json": "radius-tls-chain-tools/sources.json",
+        "common/pcapx/pcaputil/radius-tls-chain-tools/validate_supplement.py": "radius-tls-chain-tools/validate_supplement.py",
+        "common/pcapx/pcaputil/radius-tls-chain-tools/verify.py": "radius-tls-chain-tools/verify.py",
+        "common/pcapx/pcaputil/radius-tls-chain/aggregate-seven-Alerts-cap6-discard-neighbor-owner.pcap": "radius-tls-chain/aggregate-seven-Alerts-cap6-discard-neighbor-owner.pcap",
+        "common/pcapx/pcaputil/radius-tls-chain/controls.json": "radius-tls-chain/controls.json",
+        "common/pcapx/pcaputil/radius-tls-chain/declared-round-budget-refusal-neighbor-owner.pcap": "radius-tls-chain/declared-round-budget-refusal-neighbor-owner.pcap",
+        "common/pcapx/pcaputil/radius-tls-chain/exact-challenge-retry-no-double-append.pcap": "radius-tls-chain/exact-challenge-retry-no-double-append.pcap",
+        "common/pcapx/pcaputil/radius-tls-chain/historical-first-Challenge-after-complete-no-resurrection.pcap": "radius-tls-chain/historical-first-Challenge-after-complete-no-resurrection.pcap",
+        "common/pcapx/pcaputil/radius-tls-chain/legacy-compatibility.json": "radius-tls-chain/legacy-compatibility.json",
+        "common/pcapx/pcaputil/radius-tls-chain/missing-State-echo.pcap": "radius-tls-chain/missing-State-echo.pcap",
+        "common/pcapx/pcaputil/radius-tls-chain/opposite-request-direction-same-descriptor-State-ID-isolated.pcap": "radius-tls-chain/opposite-request-direction-same-descriptor-State-ID-isolated.pcap",
+        "common/pcapx/pcaputil/radius-tls-chain/outer-padding-only-exact-first-retry-no-append.pcap": "radius-tls-chain/outer-padding-only-exact-first-retry-no-append.pcap",
+        "common/pcapx/pcaputil/radius-tls-chain/partial-observed-round-Close.pcap": "radius-tls-chain/partial-observed-round-Close.pcap",
+        "common/pcapx/pcaputil/radius-tls-chain/same-State-and-EAPID-distinct-session-isolated.pcap": "radius-tls-chain/same-State-and-EAPID-distinct-session-isolated.pcap",
+        "common/pcapx/pcaputil/radius-tls-chain/same-State-same-session-conflicting-chain.pcap": "radius-tls-chain/same-State-same-session-conflicting-chain.pcap",
+        "common/pcapx/pcaputil/radius-tls-chain/server-two-fragments-full-observed-chain.pcap": "radius-tls-chain/server-two-fragments-full-observed-chain.pcap",
+        "common/pcapx/pcaputil/radius-tls-chain/supplement-legacy.json": "radius-tls-chain/supplement-legacy.json",
+        "common/pcapx/pcaputil/radius-tls-chain/supplement.json": "radius-tls-chain/supplement.json",
+        "common/pcapx/pcaputil/radius-tls-chain/wrong-EAP-ACK-Identifier.pcap": "radius-tls-chain/wrong-EAP-ACK-Identifier.pcap",
+        "scripts/protocol-tests/required-tests-traffic-unified-v115.json": "required-tests-traffic-unified-v115.json"
+      }
     }
   ],
   "schema_version": 1,

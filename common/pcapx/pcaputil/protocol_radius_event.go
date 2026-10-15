@@ -18,9 +18,11 @@ func (f *binFlow) consumeRADIUS(dir int, e *ProtocolEvent, wire []byte, legacy .
 	err := f.reserveSession(s.storage() + 192 + int64(len(wire))*4)
 	if err != nil {
 		s.retire(dir, wire, false)
+		f.refuseRADIUSTLSRound(dir, wire)
 		return err
 	}
 	fields, err := radiusFields(wire, f.a.budget.MaxCollectionElements)
+	err = f.observeRADIUSTLSRound(dir, e, wire, fields, err)
 	var selected *radiusEAPFailure
 	errors.As(err, &selected)
 	if fields["EAP"] != nil || selected != nil {
@@ -29,6 +31,7 @@ func (f *binFlow) consumeRADIUS(dir int, e *ProtocolEvent, wire []byte, legacy .
 	if err != nil {
 		e.radiusApplicationRefusal = selected != nil
 		s.retire(dir, wire, len(s.pending) < f.a.budget.MaxCollectionElements)
+		f.refuseRADIUSTLSRound(dir, wire)
 		if fields != nil {
 			e.Session = fields
 			e.semanticFields = cloneSession(fields)
@@ -46,6 +49,7 @@ func (f *binFlow) consumeRADIUS(dir int, e *ProtocolEvent, wire []byte, legacy .
 	key := radiusIdentity(dir, wire)
 	if _, known := s.pending[key]; !known && len(s.pending) >= f.a.budget.MaxCollectionElements {
 		s.untracked = true
+		f.refuseRADIUSTLSRound(dir, wire)
 		return protocolError(ErrResourceExceeded, "RADIUS identity budget")
 	}
 	if e.ID == 0 {
@@ -166,6 +170,7 @@ func (a *binParser) refuseRADIUSOversize(e *ProtocolEvent, w []byte) bool {
 			canAdd = f.reserveSession(f.radius.storage()+192) == nil
 		}
 		f.radius.retire(dir, w, canAdd)
+		f.refuseRADIUSTLSRound(dir, w)
 		e.FlowID = f.id
 		if e.Source != f.endpoints[0] {
 			e.Direction = 1

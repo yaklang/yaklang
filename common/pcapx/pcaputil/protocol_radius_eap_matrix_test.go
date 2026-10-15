@@ -37,6 +37,7 @@ type radiusEAPControl struct {
 	Close         struct {
 		Profile     string
 		Outstanding int
+		Fields      map[string]any `json:"fields_hexbytes"`
 		Error       string
 	} `json:"close_expected"`
 }
@@ -178,7 +179,7 @@ func radiusEAPCheck(t *testing.T, c radiusEAPControl, events []*ProtocolEvent, c
 	t.Helper()
 	legacy := len(byteCarrier) > 0 && byteCarrier[0]
 	extra := 0
-	if c.Close.Outstanding > 0 {
+	if c.Close.Outstanding > 0 || c.Close.Fields != nil {
 		extra = 1
 	}
 	require.Len(t, events, len(c.Steps)+extra)
@@ -304,10 +305,39 @@ func radiusEAPCheck(t *testing.T, c radiusEAPControl, events []*ProtocolEvent, c
 		require.Equal(t, "incomplete", e.Status)
 		require.Zero(t, e.ResponseTo)
 		require.Zero(t, e.TransactionID)
-		require.Equal(t, map[string]any{"Outstanding": c.Close.Outstanding}, e.Session)
+		want := map[string]any{"Outstanding": c.Close.Outstanding}
+		if c.Close.Fields != nil {
+			want = cloneSession(c.Close.Fields)
+			for k, v := range want {
+				if n, ok := v.(float64); ok {
+					want[k] = int(n)
+				}
+			}
+		}
+		require.Equal(t, want, e.Session)
+		if c.Close.Fields != nil {
+			require.Equal(t, "incomplete", e.Completeness)
+			require.Nil(t, e.Raw)
+			require.Zero(t, e.Length)
+			require.NotZero(t, e.ID)
+			require.Equal(t, events[0].FlowID, e.FlowID)
+			require.Equal(t, CaptureDomain{}, e.Domain)
+			require.Zero(t, e.Direction)
+			require.Equal(t, events[len(c.Steps)-1].Timestamp, e.Timestamp)
+		}
 		f, err := e.GetFields()
 		require.Nil(t, f)
 		rocTypedError(t, "NeedMore", err)
+		if c.Close.Fields != nil {
+			decoded, err := e.Decode()
+			require.Nil(t, decoded)
+			rocTypedError(t, "NeedMore", err)
+			tlsDTLSPoison(e, "http")
+			e.Error, e.Summary = "caller", "caller"
+			f, err = e.GetFields()
+			require.Nil(t, f)
+			rocTypedError(t, "NeedMore", err)
+		}
 	}
 }
 func radiusEAPBudget(c radiusEAPControl) ParserBudget {

@@ -44,7 +44,7 @@ Run from the repository root:
 ```sh
 go run ./internal/trafficfixture/cmd/corpus test
 go test -json -count=1 -timeout=10m ./internal/trafficfixture/... ./common/bin-parser/... ./common/pcapx/... ./common/yak/cmd/yakcmds/shark-cli ./scripts/ci > traffic.jsonl
-go run ./internal/trafficfixture/cmd/corpus exec -- python3 @scripts/protocol-tests/check_go_test_json_v2.py traffic.jsonl --inventory @scripts/protocol-tests/required-tests-traffic-unified-v114.json --tier full
+go run ./internal/trafficfixture/cmd/corpus exec -- python3 @scripts/protocol-tests/check_go_test_json_v2.py traffic.jsonl --inventory @scripts/protocol-tests/required-tests-traffic-unified-v115.json --tier full
 ```
 
 The single `corpus` entry point uses the same bounded Go ZIP loader as tests.
@@ -83,7 +83,7 @@ their semantic coverage. The existing synthetic session keys are test inputs;
 production credentials, user private keys and material without redistribution
 permission belong in an external fixed-source download manifest.
 
-Current test requirements are sealed at `scripts/protocol-tests/required-tests-traffic-unified-v114.json`;
+Current test requirements are sealed at `scripts/protocol-tests/required-tests-traffic-unified-v115.json`;
 the historical inventories and all earlier batches remain unchanged.
 The supplemental small-corpus batch contains 26 minimal controls, their explicit
 expected facts, an offline generator and the compact pinned source manifest.
@@ -203,7 +203,7 @@ opaque selector bytes and one bounded Data value over Wrapper v1 TCP/UDP; object
 selector meaning, access permission and device operation are unverified. The
 original one-packet selective-access capture and original refused answer remain
 immutable; its now-supported answer is matched by exact input SHA and frame.
-The active inventory is `scripts/protocol-tests/required-tests-traffic-unified-v114.json`.
+The active inventory is `scripts/protocol-tests/required-tests-traffic-unified-v115.json`.
 
 The small-graph budget batch reuses accepted graph captures/answers and adds one
 249-byte UDP control for child count255 without child bytes. Its standalone proof
@@ -993,7 +993,7 @@ the normative answer; a missing numeric reference field is not a codec pass.
 Full/deferred, workers1/2/4, observers off/on, Feed chunks1/7/full, ownership,
 resources and close/refusal boundaries remain required.
 
-Current gate: `required-tests-traffic-unified-v114.json` with
+Current gate: `required-tests-traffic-unified-v115.json` with
 `check_go_test_json_v2.py`. The indexed validator preserves missing/unpassed,
 package invocation completion, descendant skips, failures and non-JSON checks;
 its mutation/differential harness is sealed with the material. Older checkers
@@ -1629,7 +1629,7 @@ userspace adapter; full kernel receiver/socket/timers and ECU endpoints do not.
 All161 preceding ZIPs remain byte-for-byte unchanged. Raw captures, dependencies,
 reference source/build output and process evidence stay outside Git.
 
-Current effective v114 inventory: 77,834 entries; 77,827 are mandatory for the full tier.
+Current effective v115 inventory: 78,110 entries; 78,103 are mandatory for the full tier.
 
 The opt-in `DynamicFlowControl` profile follows Linux v6.12 FC tuple updates (including WAIT without granting data). Disjoint address extensions or classical/FD carriers may share CAN IDs; unknown selectors cannot choose or mutate a conversation. Ambiguous selectors are rejected. Seven sealed cases exercise full/deferred, workers 1/2/4, and observer off/on, with exact fields, byte collections, contributor references, errors and resource ownership. The existing static FC profile remains unchanged. Pinned upstream FC and filter functions execute with declared userspace stubs; this is not a kernel/ECU endpoint. TShark 4.2.5 checks wire tuples and two complete payloads, but cannot independently reassemble the shared-address transcripts.
 
@@ -1730,3 +1730,5 @@ The NAS/NAK batch requires Access NAS4/32/95 identity, validates NAS95 width/sin
 The OTP/GTC batch exposes complete observed GTC prompts/token bytes and OTP challenge/context, ordered capabilities and standard six-word/checksum/hex candidate fields through the existing RADIUS APIs. It preserves ambiguous encodings and exact bytes without claiming a hash-chain, authenticated inner FSM, protected tunnel, token or device acceptance. Unknown/init/alternate encodings remain explicit missing context; generic hex/extended candidates have unconfirmed EAP applicability.45 finite traces require full/deferred native views,540 capture configurations and270 compatibility views, exact or zero outer owners, ordered complete fields, typed wire/resource/unsupported results, returned-list ownership and close/release. General extension tokens preserve SP, concrete hex/word permits HTAB, and definite syntax/checksum errors outrank later unsupported/resource outcomes. The public synthetic secret only checks fixture construction. The original207 ZIPs remain unchanged; original whole-input oracle gaps and all unfinished requirements remain open.
 
 The TLS record/EAP-TLS batch supports ordered TLS<=1.2 Alert collections and per-direction fragments, bounded pending-byte Close diagnostics, preserved single-Alert fields and explicit known-TLS1.3 alignment. An exact-SHA sidecar corrects the historical one-byte Alert interpretation without changing the archived capture or answer. Observed RADIUS EAP-TLS Type13 supports Start/ACK/flags/length, local complete TLS record collections, ClientHello/ServerHello vectors and Alert observations. Missing cross-EAP context, unproven cipher state, unknown handshake semantics and device authentication remain explicit unfinished work.56 finite traces retain full fields, order, exact or zero outer owners, typed errors, preallocation budgets, deep ownership and resource release across672 capture configurations; EAP-TLS also has246 compatibility byte views. Fixed independent generators and pinned source references are sealed with minimal synthetic captures; no full RFC/upstream source or original download collection is vendored.208 historical ZIPs remain unchanged.
+
+The observed EAP-TLS server-to-peer fragment batch reconstructs a bounded flight only from a uniquely observed outer root, exact NAS/session descriptors and request direction, opaque State echo, matching empty EAP ACK and incremented Identifier. State and EAP Identifier alone are never unique session keys. Exact retries (including an older first fragment after completion and declared-packet padding variants) cannot append twice. Independent directions and sessions remain isolated; aggregate resource refusals release prefixes and history, preserving neighboring outer owners. Partial Close separately reports outer outstanding requests and pending fragment groups/bytes with privately owned NeedMore. Current-fragment bytes remain distinct from aggregate records and selected ServerHello fields. Twelve minimal synthetic controls retain complete fields/order/types, exact-or-zero outer IDs, active input/public/query ownership and resource/lifecycle assertions. Fixed-spec generators/source pins are sealed; 209 historical archives remain unchanged. Peer-to-server fragmentation, authenticated inner FSM, cryptography/certificates/device outcomes and original whole-input oracle gaps remain unfinished requirements.
