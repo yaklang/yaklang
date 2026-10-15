@@ -5,8 +5,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/yaklang/gorm"
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/gorm"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -212,6 +212,34 @@ func TestAISessionMetaStartParamsCRUD(t *testing.T) {
 	require.Equal(t, "gpt-test", got.GetAIModelName())
 	require.True(t, got.GetEnablePlan())
 	require.True(t, got.GetPreferSessionCachedConfig())
+}
+
+func TestAISessionMetaContextLimitDoesNotMigrateLegacyValues(t *testing.T) {
+	db, err := utils.CreateTempTestDatabaseInMemory()
+	require.NoError(t, err)
+	defer db.Close()
+	require.NoError(t, db.AutoMigrate(&schema.AISession{}).Error)
+
+	const sessionID = "legacy-context-limit"
+	stored, err := CreateOrUpdateAISessionMetaStartParams(db, sessionID, &ypb.AIStartParams{
+		TimelineContentSizeLimit: 20 * 1024,
+	})
+	require.NoError(t, err)
+	params, err := GetAISessionMetaStartParamsBySessionID(db, sessionID)
+	require.NoError(t, err)
+	require.EqualValues(t, 20*1024, params.GetTimelineContentSizeLimit())
+	require.Zero(t, params.GetRuntimeContextSizeLimit(), "reading legacy DB parameters must not populate the new field")
+
+	cached := MergeCachedAISessionStartParams(params, &ypb.AIStartParams{UserQuery: "continue"})
+	require.Zero(t, cached.GetRuntimeContextSizeLimit(), "session restoration must not migrate the legacy limit")
+	overlay := OverlayAISessionStartParams(params, &ypb.AIStartParams{TimelineContentSizeLimit: 64 * 1024})
+	require.Zero(t, overlay.GetRuntimeContextSizeLimit(), "overlaying a legacy field must not populate the new field")
+	explicit := OverlayAISessionStartParams(params, &ypb.AIStartParams{RuntimeContextSizeLimit: 128 * 1024})
+	require.EqualValues(t, 128*1024, explicit.GetRuntimeContextSizeLimit(), "an explicitly supplied new value remains supported")
+
+	after, err := GetAISessionMetaBySessionID(db, sessionID)
+	require.NoError(t, err)
+	require.Equal(t, stored.StartParams, after.StartParams, "reads and in-memory overlays must not rewrite old DB parameters")
 }
 
 func TestGetAISessionMetaStartParams_DiscardUnknownFields(t *testing.T) {

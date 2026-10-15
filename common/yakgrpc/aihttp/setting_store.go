@@ -34,6 +34,7 @@ type aiAgentChatSettingPayload struct {
 	ReActMaxIteration              int64   `json:"ReActMaxIteration"`
 	TimelineItemLimit              int64   `json:"TimelineItemLimit"`
 	TimelineContentSizeLimit       int64   `json:"TimelineContentSizeLimit"` // KB
+	RuntimeContextSizeLimit        int64   `json:"RuntimeContextSizeLimit"`  // 0 使用服务端默认值，不从旧字段迁移
 	UserInteractLimit              int64   `json:"UserInteractLimit"`
 	TimelineSessionID              string  `json:"TimelineSessionID"`
 
@@ -92,6 +93,7 @@ func defaultAIAgentChatSettingPayload() aiAgentChatSettingPayload {
 		ReActMaxIteration:              100,
 		TimelineItemLimit:              100,
 		TimelineContentSizeLimit:       20,
+		RuntimeContextSizeLimit:        0,
 		UserInteractLimit:              0,
 		TimelineSessionID:              "",
 	}

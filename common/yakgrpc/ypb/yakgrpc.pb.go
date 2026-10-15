@@ -11007,8 +11007,15 @@ type AIStartParams struct {
 	AIModelName       string `protobuf:"bytes,33,opt,name=AIModelName,proto3" json:"AIModelName,omitempty"`
 	ReActMaxIteration int64  `protobuf:"varint,27,opt,name=ReActMaxIteration,proto3" json:"ReActMaxIteration,omitempty"`
 	// 限制 Timeline 的最大条目和最大内容大小（bytes）
-	TimelineItemLimit        int64 `protobuf:"varint,28,opt,name=TimelineItemLimit,proto3" json:"TimelineItemLimit,omitempty"` // 已经废弃，功能不可用了，只需要关注 TimelineContentSizeLimit 就好
+	TimelineItemLimit int64 `protobuf:"varint,28,opt,name=TimelineItemLimit,proto3" json:"TimelineItemLimit,omitempty"` // 已经废弃，功能不可用了，只需要关注 TimelineContentSizeLimit 就好
+	// Deprecated: 运行时的 Timeline 现在除了普通历史，还承载 Skill 正文、Evidence 等
+	// 运行时上下文，内容规模已经不同；而且前端会下发一个非零默认值，覆盖服务端默认阈值。
+	// 请改用 RuntimeContextSizeLimit。
 	TimelineContentSizeLimit int64 `protobuf:"varint,29,opt,name=TimelineContentSizeLimit,proto3" json:"TimelineContentSizeLimit,omitempty"`
+	// 运行时上下文（普通历史、Skill 正文、Evidence 等）的压缩阈值。
+	// >0 时覆盖服务端默认阈值；<=0（含前端不传）时使用服务端默认值，保证携带运行时
+	// 上下文的时间线不会被过早压缩。
+	RuntimeContextSizeLimit int64 `protobuf:"varint,51,opt,name=RuntimeContextSizeLimit,proto3" json:"RuntimeContextSizeLimit,omitempty"`
 	// 用户交互的最大次数限制,超过这个次数，AI 将不再被允许问用户问题
 	UserInteractLimit int64 `protobuf:"varint,30,opt,name=UserInteractLimit,proto3" json:"UserInteractLimit,omitempty"`
 	// timeline sessionID  用于多轮对话保持上下文
@@ -11288,6 +11295,13 @@ func (x *AIStartParams) GetTimelineItemLimit() int64 {
 func (x *AIStartParams) GetTimelineContentSizeLimit() int64 {
 	if x != nil {
 		return x.TimelineContentSizeLimit
+	}
+	return 0
+}
+
+func (x *AIStartParams) GetRuntimeContextSizeLimit() int64 {
+	if x != nil {
+		return x.RuntimeContextSizeLimit
 	}
 	return 0
 }
@@ -79746,7 +79760,7 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\x03Url\x18\x03 \x01(\tR\x03Url\"=\n" +
 	"\x13AIEnabledCapability\x12\x12\n" +
 	"\x04Name\x18\x01 \x01(\tR\x04Name\x12\x12\n" +
-	"\x04Type\x18\x02 \x01(\tR\x04Type\"\xe7\x11\n" +
+	"\x04Type\x18\x02 \x01(\tR\x04Type\"\xa1\x12\n" +
 	"\rAIStartParams\x12$\n" +
 	"\rCoordinatorId\x18\x11 \x01(\tR\rCoordinatorId\x12\x1a\n" +
 	"\bSequence\x18\x12 \x01(\x03R\bSequence\x12.\n" +
@@ -79780,7 +79794,8 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\vAIModelName\x18! \x01(\tR\vAIModelName\x12,\n" +
 	"\x11ReActMaxIteration\x18\x1b \x01(\x03R\x11ReActMaxIteration\x12,\n" +
 	"\x11TimelineItemLimit\x18\x1c \x01(\x03R\x11TimelineItemLimit\x12:\n" +
-	"\x18TimelineContentSizeLimit\x18\x1d \x01(\x03R\x18TimelineContentSizeLimit\x12,\n" +
+	"\x18TimelineContentSizeLimit\x18\x1d \x01(\x03R\x18TimelineContentSizeLimit\x128\n" +
+	"\x17RuntimeContextSizeLimit\x183 \x01(\x03R\x17RuntimeContextSizeLimit\x12,\n" +
 	"\x11UserInteractLimit\x18\x1e \x01(\x03R\x11UserInteractLimit\x12,\n" +
 	"\x11TimelineSessionID\x18\x1f \x01(\tR\x11TimelineSessionID\x12*\n" +
 	"\x10AICallTokenLimit\x18\" \x01(\x03R\x10AICallTokenLimit\x12*\n" +
