@@ -52,7 +52,7 @@ func TestResilienceStructOverlayBoundsCallerAndUseTraversal(t *testing.T) {
 			if olderDiff {
 				addCallers()
 				diffName := baseName + "-diff"
-				_, err := ParseProjectWithIncrementalCompile(fs, baseName, diffName, ssaconfig.JAVA)
+				_, err := ParseProjectWithFS(fs, WithBaseProgramName(baseName), WithProgramName(diffName), WithLanguage(ssaconfig.JAVA))
 				require.NoError(t, err)
 				names = append(names, diffName)
 			}
@@ -63,7 +63,7 @@ func TestResilienceStructOverlayBoundsCallerAndUseTraversal(t *testing.T) {
 			current.AddFile("a/Overridden.java", `package a; class Overridden { void run() {} }`)
 			current.AddFile("b/Foreign.java", `package b; import a.Keep; class Foreign { void run() { Keep.sink("foreign"); } }`)
 			topName := baseName + "-current"
-			_, err = ParseProjectWithIncrementalCompile(current, names[len(names)-1], topName, ssaconfig.JAVA)
+			_, err = ParseProjectWithFS(current, WithBaseProgramName(names[len(names)-1]), WithProgramName(topName), WithLanguage(ssaconfig.JAVA))
 			require.NoError(t, err)
 			names = append(names, topName)
 			for _, name := range names {
@@ -101,7 +101,7 @@ alert $uses
 				for _, result := range top.StructScanResults() {
 					require.Equal(t, topName, result.GetProgramName())
 					for _, value := range result.GetValues(variable) {
-						require.NotNil(t, value.GetRange())
+						require.NotNil(t, value.GetRange(), "%s: value=%s id=%d program=%s", variable, value.String(), value.GetId(), value.GetProgramName())
 						require.NotNil(t, value.GetRange().GetEditor())
 						paths = append(paths, value.GetRange().GetEditor().GetUrl())
 					}
@@ -130,7 +130,7 @@ func TestResilienceStructScanMissingOverlayBaseFailsClosed(t *testing.T) {
 	_, err = ParseProjectWithFS(fs, WithLanguage(ssaconfig.JAVA), WithProgramName(baseName))
 	require.NoError(t, err)
 	fs.AddFile("a/Added.java", `package a; class Added { void run() { println("diff"); } }`)
-	_, err = ParseProjectWithIncrementalCompile(fs, baseName, diffName, ssaconfig.JAVA)
+	_, err = ParseProjectWithFS(fs, WithBaseProgramName(baseName), WithProgramName(diffName), WithLanguage(ssaconfig.JAVA))
 	require.NoError(t, err)
 	require.NoError(t, ssadb.DeleteProgramChecked(db, baseName))
 	for _, name := range []string{baseName, diffName} {

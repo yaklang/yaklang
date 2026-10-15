@@ -783,7 +783,9 @@ func fileListKeys(prog *ssa.Program) []string {
 	}
 	files := make([]string, 0, len(prog.FileList))
 	for path := range prog.FileList {
-		if strings.TrimSpace(path) == "" {
+		// Synthetic editors have no source filename and persist as the root path.
+		// They do not represent a source file or a compile unit.
+		if strings.TrimSpace(path) == "" || normalizeOverlayFilePath(path, prog.GetProgramName()) == "/" {
 			continue
 		}
 		files = append(files, path)
