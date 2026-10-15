@@ -72,7 +72,10 @@ func TestDefaultLocalClientDoesNotModifyInheritedInstallation(t *testing.T) {
 	result := filepath.Join(t.TempDir(), "test-home")
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
-	cmd := exec.CommandContext(ctx, os.Args[0], "-test.run=^TestDefaultLocalClientDoesNotModifyInheritedInstallation$", "-test.count=1")
+	// Execute only this test binary with a fixed selector; no shell is used.
+	executable, err := os.Executable()
+	require.NoError(t, err)
+	cmd := exec.CommandContext(ctx, executable, "-test.run=^TestDefaultLocalClientDoesNotModifyInheritedInstallation$", "-test.count=1")
 	cmd.Env = append(os.Environ(), "YAK_TEST_ISOLATION_CHILD=1", "YAK_TEST_ISOLATION_RESULT="+result,
 		"YAKIT_HOME="+home,
 		"YAK_DEFAULT_PROFILE_DATABASE_NAME="+profilePath,

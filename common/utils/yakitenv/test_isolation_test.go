@@ -49,9 +49,15 @@ func TestIsolationBeforePackageInitialization(t *testing.T) {
 	}
 	production := t.TempDir()
 	result := filepath.Join(t.TempDir(), "home")
+	// Use the running executable, never a caller-controlled argv[0]. No shell
+	// or externally supplied command arguments are involved in these probes.
+	executable, err := os.Executable()
+	if err != nil {
+		t.Fatal(err)
+	}
 	var previous string
 	for _, inheritedHome := range []string{production, "", production} {
-		cmd := exec.Command(os.Args[0], "-test.run=^TestIsolationBeforePackageInitialization$")
+		cmd := exec.Command(executable, "-test.run=^TestIsolationBeforePackageInitialization$")
 		cmd.Env = append(os.Environ(), "YAK_TEST_ENV_CHILD=1", "YAK_TEST_ENV_RESULT="+result,
 			"YAKIT_HOME="+inheritedHome,
 			"YAK_DEFAULT_PROJECT_DATABASE_NAME="+filepath.Join(production, "project.db"),
