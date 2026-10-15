@@ -89,7 +89,7 @@ jobs:
 
   prune:
     needs: [base, suites]
-    if: always() && needs.base.result == 'success'
+    if: always() && !cancelled() && needs.base.result == 'success'
     runs-on: ubuntu-22.04
     timeout-minutes: 10
     continue-on-error: true
