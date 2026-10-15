@@ -21,6 +21,8 @@ type ProtocolEvent struct {
 	nativeFINSObservation                    bool
 	nativeENIPObservation                    bool
 	nativeHARTIPObservation                  bool
+	nativeTLSObservation                     bool
+	nativeDTLSObservation                    bool
 	nativeUnrecognizedUDP                    bool
 	nativeBACnetRead                         bool
 	nativeBACnetRoutedRead                   bool
@@ -103,9 +105,9 @@ func (e *ProtocolEvent) Decode() (result map[string]any, err error) {
 		}
 		// These native observations already retain their complete session
 		// context in the private field tree. Public projections are not authority.
-		ownedIndustrial := e.nativeHARTIPObservation || e.nativeENIPObservation || e.nativeFINSObservation || e.Protocol == "slmp" && (e.Profile == slmpTCPProfile || e.Profile == "slmp-binary-self-test") ||
+		ownedContext := e.nativeTLSObservation || e.nativeDTLSObservation || e.nativeHARTIPObservation || e.nativeENIPObservation || e.nativeFINSObservation || e.Protocol == "slmp" && (e.Profile == slmpTCPProfile || e.Profile == "slmp-binary-self-test") ||
 			e.Transport == "ethernet" && (e.Protocol == "sv" && e.Profile == "iec61850-sv-raw-asdu" || e.Protocol == "ethercat" && e.Profile == "ethercat-datagram-chain")
-		if ownedIndustrial && e.semanticFields != nil {
+		if ownedContext && e.semanticFields != nil {
 			session = e.semanticFields
 		}
 		// TLS and Redis keep the accepted observation and its passive context
@@ -137,6 +139,17 @@ func (e *ProtocolEvent) Decode() (result map[string]any, err error) {
 			result = owned
 		}
 	}()
+	// Native TLS/DTLS identity survives edits to every public projection,
+	// including a protocol name that would select a legacy cache below.
+	if e.nativeTLSObservation || e.nativeDTLSObservation {
+		if e.sessionError != nil {
+			owned := *e.sessionError
+			return nil, &owned
+		}
+		if e.semanticFields != nil {
+			return map[string]any{"fields": cloneSession(e.semanticFields)}, nil
+		}
+	}
 	if e.nativeDiagnosticError != "" {
 		return nil, fmt.Errorf("%s", e.nativeDiagnosticError)
 	}
@@ -252,7 +265,7 @@ func (e *ProtocolEvent) retainRuleEnvelope(result map[string]any) {
 }
 
 func (e *ProtocolEvent) ownsNativeFields() bool {
-	if e.nativeHARTIPObservation || e.nativeENIPObservation || e.nativeFINSObservation || e.nativeDiagnosticError != "" {
+	if e.nativeTLSObservation || e.nativeDTLSObservation || e.nativeHARTIPObservation || e.nativeENIPObservation || e.nativeFINSObservation || e.nativeDiagnosticError != "" {
 		return true
 	}
 	if e.nativeDoIPObservation {
@@ -886,6 +899,9 @@ func (f *binFlow) event(dir int, raw []byte, status, detail string) *BinParserEv
 		e.Profile = "doip-routing-dsc"
 	}
 	f.eventEvidence(dir, e)
+	if f.protocol == "tls" && f.binding == nil {
+		e.nativeTLSObservation = true
+	}
 	if f.hart != nil {
 		e.nativeHARTIPObservation = true
 		e.Profile, e.Completeness = hartIPProfile, "message"
@@ -955,7 +971,7 @@ func (f *binFlow) stop(dir int, wire []byte, status, reason string) {
 	}
 	e := f.event(dir, preview, status, reason)
 	e.sessionError, f.lastSessionError = f.lastSessionError, nil
-	if e.nativeHARTIPObservation || e.nativeFINSObservation || e.nativeENIPObservation {
+	if e.nativeTLSObservation || e.nativeHARTIPObservation || e.nativeFINSObservation || e.nativeENIPObservation {
 		if e.sessionError == nil {
 			kind := ErrMalformedMessage
 			switch status {
@@ -1408,7 +1424,7 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 					err = protocolError(ErrUnsupportedFeature, err.Error())
 				}
 				e.Status, e.sessionError = classifySessionError(err)
-				if ((e.Protocol == "iec104" || e.Protocol == "dnp3") || e.Entry == "MySQLPreparedFields" || e.Protocol == "mqtt" || e.nativeOPCUAObservation) && e.sessionError == nil {
+				if ((e.Protocol == "iec104" || e.Protocol == "dnp3") || e.Entry == "MySQLPreparedFields" || e.Protocol == "mqtt" || e.nativeOPCUAObservation || e.nativeTLSObservation) && e.sessionError == nil {
 					// These legacy codecs also return wrapped context or
 					// grammar errors. Preserve their status/message privately so
 					// later queries cannot use a caller-supplied successful cache.
@@ -1495,9 +1511,20 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 		recoverableHARTIP := e.nativeHARTIPObservation && hartIPRecoverable(e.Raw, e.sessionError)
 		recoverableDoIP := e.Protocol == "doip" && e.doipAssociationRefusal
 		recoverableDNP3 := e.Protocol == "dnp3" && e.Session["Error Scope"] == "application"
+		tlsParent := e
+		if !failed && f.tls != nil && f.tls.plaintext != nil {
+			if e.ID == 0 {
+				e.ID = a.ids.Add(1)
+			}
+			// The callback owns its event. Child evidence must retain the
+			// emitted parent's identity, capture time and packet references.
+			owned := *e
+			owned.SourceBytes.PacketRefs = append([]PacketReference(nil), e.SourceBytes.PacketRefs...)
+			tlsParent = &owned
+		}
 		a.emit(e)
 		if !failed {
-			f.deliverTLS(dir, e)
+			f.deliverTLS(dir, tlsParent)
 		}
 		if failed && !recoverableHARTIP && !(e.Protocol == "fins" && finsRecoverable(e.sessionError)) && !recoverableDNP3 && !recoverableDoIP && !(e.Protocol == "slmp" && slmpTCPRecoverable(e.sessionError)) && !(e.Protocol == "dlms-wrapper" && dlmsRecoverableMessageError(e.sessionError)) && !(e.Protocol == "c37118" && c37118RecoverableMessageError(e.sessionError)) && !(e.Protocol == "dlms" && dlmsRecoverableMessageError(e.sessionError)) && !(e.Protocol == "roc-plus" && rocRecoverableMessageError(e.sessionError)) && !(e.Protocol == "genisys" && genisysRecoverableMessageError(e.sessionError)) && !((e.Protocol == "http2" || e.Protocol == "grpc" || e.Protocol == "doh") && e.Session["Error Scope"] == "stream") {
 			if stateful {

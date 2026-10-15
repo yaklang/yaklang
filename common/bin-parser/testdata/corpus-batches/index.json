@@ -101190,6 +101190,108 @@
         "common/pcapx/pcaputil/hart-admission/controls.json": "hart-admission/controls.json",
         "scripts/protocol-tests/required-tests-traffic-unified-v95.json": "required-tests-traffic-unified-v95.json"
       }
+    },
+    {
+      "id": "validation-tls-dtls-context",
+      "kind": "validation",
+      "source_sha": "e77c402af5756e4afafa724275f344629b798b40",
+      "file": "validation-tls-dtls-context.zip",
+      "sha256": "f86563e85fe118833514a874c06f0fc17738758d7004c288369f903936fdfc6a",
+      "password": "bin-parser",
+      "members": {
+        "required-tests-traffic-unified-v96.json": {
+          "sha256": "f597b2d0783e16b3b0b2d74074cf615272e266345d1426040faff994a8e76e0b",
+          "bytes": 16777860
+        },
+        "tls-dtls-context-tools/build.py": {
+          "sha256": "0d2c7dae7b429e054c3398c6adc533669af2c0fb173c5dabd981d64ec961a994",
+          "bytes": 8890
+        },
+        "tls-dtls-context-tools/reference.py": {
+          "sha256": "ed2455d8f87d367874ddb479154868902bd54a5fe035228a594af4c035f98548",
+          "bytes": 1732
+        },
+        "tls-dtls-context-tools/source-pins.json": {
+          "sha256": "1356d14c1162c52dfbb53d7a56515335223b01a0f0ac5061c644ba521cf059b4",
+          "bytes": 548
+        },
+        "tls-dtls-context-tools/verify.py": {
+          "sha256": "e81c6fb5f5d48f134af5393f6db65a81ade4bd4ec1302a0893dec8c8144ad02b",
+          "bytes": 1457
+        },
+        "tls-dtls-context/backdated-retains-clock.pcapng": {
+          "sha256": "fea2f51319b6ffe598fc632815cb9cdbcf767eea5f478ce0d1eef18a025a345f",
+          "bytes": 400
+        },
+        "tls-dtls-context/controls.json": {
+          "sha256": "4cec74248c8b149bd34b2da539943e3d880dbfc67b448c4d291cbed203f596a0",
+          "bytes": 48789
+        },
+        "tls-dtls-context/exact-expiry.pcapng": {
+          "sha256": "6745c2bfa6f741ad585b1a269b9150afa3d38df2951e2673d98e6756c08a44af",
+          "bytes": 308
+        },
+        "tls-dtls-context/foreign-future-birth.pcapng": {
+          "sha256": "a6a57b20d254cd61909efa0770c2634aaf98c0af8e4ee1b4999150618c35a63f",
+          "bytes": 452
+        },
+        "tls-dtls-context/foreign-future.pcapng": {
+          "sha256": "060c5618b68c1f1b6c60d71e912b4016d39ad7112782aba7a746eb1e138fff9c",
+          "bytes": 452
+        },
+        "tls-dtls-context/foreign-port-future.pcapng": {
+          "sha256": "6becfd50adc04c20252f8f34e2ed53eeba75a728748c62098189ce7015e0010f",
+          "bytes": 452
+        },
+        "tls-dtls-context/interface-isolation.pcapng": {
+          "sha256": "a87ff8b3b9941c33d445b531efa28e9ccae618443e8c884aaa38038d953e7ac5",
+          "bytes": 432
+        },
+        "tls-dtls-context/ordered.pcapng": {
+          "sha256": "419dc21344ce227e0bb9ace00f794fdd957c407c393885108deb5372410d6a11",
+          "bytes": 308
+        },
+        "tls-dtls-context/own-expiry.pcapng": {
+          "sha256": "ab9d20aa5b70b385794c4e0a5d45bd259e7f2f875288711d199ba25c5aa963a3",
+          "bytes": 308
+        },
+        "tls-dtls-context/tail-first.pcapng": {
+          "sha256": "b3d6291c87e0b641ab766dfc67477596a372b855ffa8733d2e84bbffa57ad9e9",
+          "bytes": 308
+        },
+        "tls-dtls-context/tls-parent-reused.json": {
+          "sha256": "516cacaa3b26903bb72901b0e51a7172391c9ed5081896e776b1820b57c2c111",
+          "bytes": 882
+        },
+        "tls-dtls-context/within-window.pcapng": {
+          "sha256": "3e25f1d33f52c8ea372c0103eba7e3b34de376e4cf81f971e5f7cb5c7d74316b",
+          "bytes": 308
+        },
+        "validation/expected.json": {
+          "sha256": "bbbf369ae0e4ed950474b91e78edb97d5ff4ef05b602ebe3e401da29f2706c4d",
+          "bytes": 11931
+        }
+      },
+      "aliases": {
+        "common/pcapx/pcaputil/tls-dtls-context-tools/build.py": "tls-dtls-context-tools/build.py",
+        "common/pcapx/pcaputil/tls-dtls-context-tools/reference.py": "tls-dtls-context-tools/reference.py",
+        "common/pcapx/pcaputil/tls-dtls-context-tools/source-pins.json": "tls-dtls-context-tools/source-pins.json",
+        "common/pcapx/pcaputil/tls-dtls-context-tools/verify.py": "tls-dtls-context-tools/verify.py",
+        "common/pcapx/pcaputil/tls-dtls-context/backdated-retains-clock.pcapng": "tls-dtls-context/backdated-retains-clock.pcapng",
+        "common/pcapx/pcaputil/tls-dtls-context/controls.json": "tls-dtls-context/controls.json",
+        "common/pcapx/pcaputil/tls-dtls-context/exact-expiry.pcapng": "tls-dtls-context/exact-expiry.pcapng",
+        "common/pcapx/pcaputil/tls-dtls-context/foreign-future-birth.pcapng": "tls-dtls-context/foreign-future-birth.pcapng",
+        "common/pcapx/pcaputil/tls-dtls-context/foreign-future.pcapng": "tls-dtls-context/foreign-future.pcapng",
+        "common/pcapx/pcaputil/tls-dtls-context/foreign-port-future.pcapng": "tls-dtls-context/foreign-port-future.pcapng",
+        "common/pcapx/pcaputil/tls-dtls-context/interface-isolation.pcapng": "tls-dtls-context/interface-isolation.pcapng",
+        "common/pcapx/pcaputil/tls-dtls-context/ordered.pcapng": "tls-dtls-context/ordered.pcapng",
+        "common/pcapx/pcaputil/tls-dtls-context/own-expiry.pcapng": "tls-dtls-context/own-expiry.pcapng",
+        "common/pcapx/pcaputil/tls-dtls-context/tail-first.pcapng": "tls-dtls-context/tail-first.pcapng",
+        "common/pcapx/pcaputil/tls-dtls-context/within-window.pcapng": "tls-dtls-context/within-window.pcapng",
+        "scripts/protocol-tests/required-tests-traffic-unified-v96.json": "required-tests-traffic-unified-v96.json",
+        "common/pcapx/pcaputil/tls-dtls-context/expected.json": "validation/expected.json",
+        "common/pcapx/pcaputil/tls-dtls-context/tls-parent-reused.json": "tls-dtls-context/tls-parent-reused.json"
+      }
     }
   ],
   "schema_version": 1,

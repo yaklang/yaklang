@@ -192,6 +192,12 @@ func (f *binFlow) eventEvidence(dir int, e *ProtocolEvent) {
 			}
 		}
 	}
+	// Context discovery can release bytes queued in the opposite direction.
+	// The latest connection-wide parent is not necessarily this message's
+	// contributor. Keep the scalar link consistent with its byte provenance.
+	if len(e.SourceBytes.ParentPDUs) != 0 {
+		e.SourceBytes.ParentPDU = e.SourceBytes.ParentPDUs[len(e.SourceBytes.ParentPDUs)-1]
+	}
 	if d.evidenceLimited {
 		e.ExpertCode = "PacketReferencesLimited"
 	}

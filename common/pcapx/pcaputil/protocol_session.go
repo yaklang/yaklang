@@ -467,7 +467,7 @@ func (s *captureSession) Close(reason string) []*ProtocolEvent {
 	s.events = nil
 	if s.transport == "udp" {
 		for _, e := range events {
-			if e.Protocol != "dlms" && e.Protocol != "fins" {
+			if e.Protocol != "dlms" && e.Protocol != "fins" && !e.nativeHARTIPObservation {
 				continue
 			}
 			// Feed uses caller-relative directions; retained UDP conversations

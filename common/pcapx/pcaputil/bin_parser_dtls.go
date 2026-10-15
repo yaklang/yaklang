@@ -8,7 +8,6 @@ import (
 	"encoding/hex"
 	"fmt"
 	"sort"
-	"strings"
 	"time"
 )
 
@@ -131,23 +130,15 @@ func (a *binParser) decodeDTLSDatagram(e *ProtocolEvent, w []byte, explicit bool
 	store := a.udpSessions
 	var el *list.Element
 	if store != nil {
-		if e.Timestamp.After(store.clock) {
-			store.clock = e.Timestamp
-		}
-		for cur := store.lru.Front(); cur != nil; {
-			next := cur.Next()
-			entry := cur.Value.(*binUDPEntry)
-			if store.clock.Sub(entry.touched) < dtlsIdleTTL {
-				break
-			}
-			if strings.HasPrefix(entry.key.a, "dtls/") {
-				entry.flow.closeSession()
-				delete(store.entries, entry.key)
-				store.lru.Remove(cur)
-			}
-			cur = next
-		}
 		el = store.entries[key]
+		if el != nil && e.Timestamp.Sub(el.Value.(*binUDPEntry).touched) >= dtlsIdleTTL {
+			// Expiry belongs to this endpoint pair and capture domain. A future
+			// timestamp on another conversation cannot retire or prolong it.
+			el.Value.(*binUDPEntry).flow.closeSession()
+			delete(store.entries, key)
+			store.lru.Remove(el)
+			el = nil
+		}
 	}
 	if !explicit && !dtlsWireCandidate(w) {
 		// A negotiated DTLS conversation can report unsupported modern/CID
@@ -156,6 +147,7 @@ func (a *binParser) decodeDTLSDatagram(e *ProtocolEvent, w []byte, explicit bool
 			return false
 		}
 	}
+	e.nativeDTLSObservation = true
 	e.Protocol, e.Profile, e.Admission, e.Completeness = "dtls", "dtls-legacy-udp", "wire-signature", "datagram"
 	if explicit {
 		e.Admission = "explicit-decode-as"
@@ -178,14 +170,16 @@ func (a *binParser) decodeDTLSDatagram(e *ProtocolEvent, w []byte, explicit bool
 			state := &binDTLS{client: -1, fragments: map[dtlsMessageKey]*dtlsAssembly{}, completed: map[dtlsMessageKey]dtlsCompleted{}, records: map[dtlsRecordKey][32]byte{}}
 			flow := &binFlow{a: a, id: a.flows.Add(1), protocol: "dtls", dtls: state, endpoints: [2]string{endpoints[0], endpoints[1]}}
 			if err = flow.reserveSession(state.storage()); err == nil {
-				el = store.lru.PushBack(&binUDPEntry{key, flow, store.clock})
+				el = store.lru.PushBack(&binUDPEntry{key, flow, e.Timestamp})
 				store.entries[key] = el
 			}
 		}
 	}
 	if el != nil {
 		entry := el.Value.(*binUDPEntry)
-		entry.touched = store.clock
+		if e.Timestamp.After(entry.touched) {
+			entry.touched = e.Timestamp
+		}
 		store.lru.MoveToBack(el)
 		f := entry.flow
 		e.FlowID = f.id

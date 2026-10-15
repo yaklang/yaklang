@@ -227,6 +227,39 @@ func TestHARTIPProjectionAndProbe(t *testing.T) {
 			require.Empty(t, s.Close("end"))
 			require.Zero(t, s.Stats().BufferedBytes)
 			if carrier == "udp" {
+				for _, responseFirst := range []bool{false, true} {
+					u := hartIPSession(t, carrier, DefaultParserBudget())
+					keep := finsDiagnosticFind(t, all, "keepalive-close-udp")
+					request := wrapperWire(t, keep.Events[2].Raw)
+					request[5]++ // distinct sequence from the observed keepalive response
+					response := wrapperWire(t, keep.Events[3].Raw)
+					if responseFirst {
+						out := u.Feed(1, time.Unix(1, 0), response)
+						require.Nil(t, out.Err)
+						require.Len(t, out.Events, 1)
+						require.Equal(t, 1, out.Events[0].Direction)
+					}
+					out := u.Feed(0, time.Unix(2, 0), request)
+					require.Nil(t, out.Err)
+					require.Len(t, out.Events, 1)
+					require.Equal(t, 0, out.Events[0].Direction)
+					closed := u.Close("end")
+					require.Len(t, closed, 1)
+					e := closed[0]
+					require.Equal(t, 0, e.Direction)
+					require.Equal(t, "192.0.2.1:40000", e.Source)
+					require.Equal(t, "192.0.2.2:5094", e.Destination)
+					require.Equal(t, "incomplete", e.Status)
+					require.Zero(t, e.ResponseTo)
+					require.Zero(t, e.TransactionID)
+					rocEqualFields(t, map[string]any{"Outstanding": 1}, e.Session)
+					_, err := e.GetFields()
+					rocTypedError(t, "NeedMore", err)
+					require.Empty(t, u.Close("again"))
+					require.Zero(t, u.Stats().BufferedBytes)
+				}
+			}
+			if carrier == "udp" {
 				alt, err := NewProtocolSessionWithOptions(DefaultParserBudget(), WithSessionHARTIP(5095), WithSessionTransport("udp"), WithSessionPorts(40000, 5095))
 				require.NoError(t, err)
 				var events []*ProtocolEvent
