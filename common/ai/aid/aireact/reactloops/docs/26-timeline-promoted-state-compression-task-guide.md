@@ -21,7 +21,7 @@ Timeline 的占用是它实际提供给主模型 prompt 的材料，不是原始
 完成：实际占用 <= max(1, TimelineContentSizeLimit / 6)
 ```
 
-历史实现 `a7e888c2b^` 的 `timeline_compression.go` 使用 `currentSize / 6`。本次沿用六分之一比例，但按配置上限计算目标，使突发输入不会抬高压缩后的水位。默认上限仍为 `300 * 1024` tokens，目标为 `50 * 1024` tokens。
+历史实现 `a7e888c2b^` 的 `timeline_compression.go` 使用 `currentSize / 6`。本次改为上限的二分之一，并按配置上限计算目标，使突发输入不会抬高压缩后的水位。默认上限仍为 `300 * 1024` tokens，目标为 `150 * 1024` tokens。
 
 非正上限关闭自动检查。未触发时，即使材料大于目标，也不整理、不调用 AI、不改变冻结块。
 
@@ -78,13 +78,13 @@ Skill 是追加阅读语义，不在这里折叠不同正文或不同范围。�
 请求示例：
 
 ```text
-# entry=310 timestamp_ms=... [recent-tool-cache] read_file operation=upsert
+========== RETIRE_ID 310 ==========
+
+========== RETIRE_ID 310 ==========
+kind=recent-tool-cache name=read_file operation=upsert
 [UPSERT] read_file
 <完整工具描述与参数 Schema>
-
-# entry=311 timestamp_ms=... [skill] demo:ref.md:1-200 operation=upsert
-[skill demo | ref.md:1-200/200 END]
-<这一次阅读的完整正文>
+========== END RETIRE_ID 310 ==========
 ```
 
 正文全量，不做预览或条数截断。内部技能身份中的 NUL 分隔符不会直接渲染。Evidence 全文已在 promoted 项中出现时，不重复添加 `SESSION_EVIDENCE` 参考块；该字段仍用于旧记忆快照兼容和现有记忆指纹。
@@ -97,7 +97,7 @@ Skill 是追加阅读语义，不在这里折叠不同正文或不同范围。�
 - `retire_promoted_entries` 是可选字符串，只接受本次列出的原始 promoted item ID，逗号分隔，不支持区间。缺失、空字符串、非法类型均不删；未知 ID 忽略。
 - 未点名的 promoted item 默认原样保留。不能从一个 ID 扩大到整个同名工具、技能或证据。
 - Skill 不同资源页独立选择；删除后按剩余原始 item 重建累计技能块。
-- Evidence 与其它 item 一样退休，不增加 Config/session 的第二条 post-commit 删除通道。它会改变当前 Timeline 重放出的证据账本，提示词要求保守判断。
+- Evidence 与其它 item 一样退休，不增加 Config/session 的第二条 post-commit 删除通道。它会改变当前 Timeline 重放出的证据账本。提示词要求按当前进度主动淘汰不再影响下一步的证据、工具和技能；用户输入不可删除。
 
 解析阶段已将删除名单限制在本次快照列出的 promoted item ID 中。提交直接使用该名单，不扩大或取消删除，不按同 key 的 REUSE、DELETE 或水位后新操作调整选择。未点名的原始 item 和水位后的新 item 不退休；删除后按剩余 journal 正常重放。
 
@@ -109,12 +109,12 @@ Skill 是追加阅读语义，不在这里折叠不同正文或不同范围。�
 
 有 promoted 候选时，提前发布必须等待删除名单字段；旧模型响应缺少字段时，完成解析后按“不删”回退。摘要、普通选择、黑名单一起成为已发布的选择。发布后尾流变更选择会使记忆尾流失败，不会倒推撤销已经提交的 Timeline。`FinalizeMemory` 保持等待完整结果的既有语义。
 
-仅有 promoted 候选时允许空摘要；没有可决策材料时保留 freeze-only 能力。压缩请求给出 `COMPRESSION_TARGET`，说明目标覆盖整个 Timeline，而不是只约束 summary。
+仅有 promoted 候选时允许空摘要；没有可决策材料时保留 freeze-only 能力。压缩请求直接给出当前占用、目标、缺口，以及普通历史和 promoted 内容两个可优化部分的大小。目标覆盖整个 Timeline，而不是只约束 summary。
 
 预算分别处理：
 
 - 主上下文触发上限默认 300K；
-- 目标为上限的六分之一；
+- 目标为上限的二分之一；
 - 辅助请求完整输入默认安全上限为 512K，避免原来的 256K 本地上限先于 300K 触发拒绝；调用方可覆盖，模型/provider 仍可能有更小容量；
 - 摘要、保留普通原文和记忆候选保持现有 16K 输出安全检查；
 - 不截断输入绕过检查，不把未达目标当成功。

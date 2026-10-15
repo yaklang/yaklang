@@ -43,7 +43,7 @@ sequenceDiagram
 
 ## 请求和输出
 
-模板：`prompts/timeline/compression.txt`；输出协议：`prompts/timeline/compression.json`。
+模板：`prompts/timeline/compression.txt` 只放固定指令。请求再附上计算出的容量和渲染后的 Timeline。输出协议：`prompts/timeline/compression.json`。
 
 一次请求包含 `previous_summary`、`history_to_summarize` 和调用方传入的 `retained_context`。主循环传实际用户输入、冻结用户上下文、TODO、任务指令，避免摘要重复这些未被压缩的字段。evidence/tool schema 不进入待替换文本。历史中的 assistant + N tools 作为完整历史记录输入；只在请求副本去掉 projection nonce 并 JSON 编码，原 Timeline 不改写。
 
