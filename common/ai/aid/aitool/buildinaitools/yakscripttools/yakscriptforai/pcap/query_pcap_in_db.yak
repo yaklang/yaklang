@@ -1,0 +1,143 @@
+__DESC__ = "Query a pcapdb capture by persistent dataset ID or auto-import a local PCAP/PCAPNG path. Return bounded packet/protocol/session/stream evidence, real protocol fields, previews and indexed associations so the caller can answer traffic questions."
+__VERBOSE_NAME__ = "Query PCAP Database"
+__VERBOSE_NAME_ZH__ = "查询 PCAP 流量库"
+__KEYWORDS__ = "pcap,pcapng,pcapdb,query,流量分析,协议字段,session,stream"
+__INPUT_CONSTRAINTS__ = '{"oneOf":[{"required":["id"],"not":{"required":["pcapfile"]}},{"required":["pcapfile"],"not":{"required":["id"]}}]}'
+__USAGE__ = <<<USAGE
+id 为 load_pcapfile 返回的 dataset_id；或传 pcapfile 自动导入/按内容复用，并开启协议和 stream 分析。只能传一个身份参数，后续优先使用返回的 dataset_id。
+query_type: metadata / packets / protocols(default) / fields / sessions / streams / details / packet_data / protocol_data / stream_data / protocol_packets / chunk_packets / packet_sessions。
+details、*_data、protocol_packets、chunk_packets、packet_sessions 必须给正整数 record_id，其类型分别是消息/包/消息/流/消息/块/包。其余模式不传 record_id。
+筛选：packets/sessions/packet_sessions 支持 transport、source_ip/destination_ip、source_port/destination_port；protocols/fields 支持 transport、protocol 和一个 field 条件；packets/protocols/fields/sessions/packet_sessions 支持 time_start_ns/time_end_ns（十进制字符串，[start,end)）；sessions 按首包时间。packets/protocols/fields/sessions/streams/packet_sessions 支持 session_id/stream_id。其他模式拒绝这些筛选。
+field_path 从 fields 的真实发现结果中选择。field_op=eq/exists/missing；eq 的 field_type=string/integer/real/boolean/null，field_value 总是字符串（整数用精确十进制；布尔只用 true/false；null 不传值）。Field 条件从 Fields 根开始，不搜索 Session 快照；不支持任意 SQL、LIKE、OR、范围或字段通配符。
+返回结构化 result。先检查 error，再判断 has_more；after=上次 next_cursor，保持身份、模式、record_id 和筛选条件一致。limit 1–1000，result_bytes 4096–65536，preview_bytes 0–4096。fields 是有界采样，scanned/skipped/sampled/truncated 必须保留；protocol_count 是消息数。Data 的 JSON 编码为 base64；截断预览不能作为完整流，stream_data 游标为块 ID。
+metadata 返回库状态、精确计数及能力。普通页不含完整 BLOB/JSON。details 超预算报错；不返回半棵字段树。错误或能力缺失不能解释为无流量。没有隐含粘性参数、任意全文查询或跨调用固定快照。
+[[- if .FunctionCallMode -]]
+{"id":"dataset-uuid","query_type":"protocols","protocol":"http","limit":10}
+[[- else -]]
+{"@action":"directly_call_tool","directly_call_tool_name":"query_pcap_in_db","directly_call_tool_params":{"pcapfile":"/absolute/path/capture.pcap","query_type":"metadata"}}
+[[- end -]]
+USAGE
+id = cli.String("id", cli.setHelp("持久流量库 DatasetID；与 pcapfile 二选一"))
+pcapfile = cli.String("pcapfile", cli.setHelp("自动导入/复用的捕获文件路径；与 id 二选一"))
+mode = cli.String("query_type", cli.setDefault("protocols"), cli.setHelp("metadata/packets/protocols/fields/sessions/streams/details/packet_data/protocol_data/stream_data/protocol_packets/chunk_packets/packet_sessions"))
+recordID = cli.Int("record_id", cli.setDefault(0), cli.setHelp("详情、预览或关联的目标记录 ID，类型由 query_type 决定"))
+limit = cli.Int("limit", cli.setDefault(20), cli.setHelp("本页记录数 1–1000；fields 为采样消息数"))
+after = cli.Int("after", cli.setDefault(0), cli.setHelp("前一页 next_cursor，首次为 0；不是页号"))
+resultBytes = cli.Int("result_bytes", cli.setDefault(8192), cli.setHelp("完整紧凑结果 JSON 预算，4096–65536 字节"))
+previewBytes = cli.Int("preview_bytes", cli.setDefault(128), cli.setHelp("每个 BLOB 预览 0–4096 字节；不是完整内容"))
+protocol = cli.String("protocol", cli.setHelp("protocols/fields 的实际协议名"))
+transport = cli.String("transport", cli.setHelp("支持模式的传输协议精确匹配，如 tcp/udp"))
+sourceIP = cli.String("source_ip", cli.setHelp("包或会话的源 IP 精确匹配"))
+destinationIP = cli.String("destination_ip", cli.setHelp("包或会话的目标 IP 精确匹配"))
+sourcePort = cli.Int("source_port", cli.setDefault(-1), cli.setHelp("源端口 0–65535；-1 不限制"))
+destinationPort = cli.Int("destination_port", cli.setDefault(-1), cli.setHelp("目标端口 0–65535；-1 不限制"))
+sessionID = cli.Int("session_id", cli.setDefault(0), cli.setHelp("网络会话关联 ID；0 不限制"))
+streamID = cli.Int("stream_id", cli.setDefault(0), cli.setHelp("方向流关联 ID；0 不限制"))
+timeStart = cli.String("time_start_ns", cli.setHelp("起始纳秒时间十进制字符串；需同时给 time_end_ns"))
+timeEnd = cli.String("time_end_ns", cli.setHelp("结束纳秒时间十进制字符串，排他边界"))
+fieldPath = cli.String("field_path", cli.setHelp("protocols/fields 的已核实 Fields JSON 路径"))
+fieldOp = cli.String("field_op", cli.setDefault("eq"), cli.setHelp("eq/exists/missing；需要 field_path"))
+fieldType = cli.String("field_type", cli.setDefault("string"), cli.setHelp("eq 值类型：string/integer/real/boolean/null"))
+fieldValue = cli.String("field_value", cli.setHelp("eq 条件的文本值；允许空字符串，integer 保留精确十进制"))
+cli.check()
+
+assert (id != "") != (pcapfile != ""), "Provide exactly one of id or pcapfile"
+assert mode in ["metadata","packets","protocols","fields","sessions","streams","details","packet_data","protocol_data","stream_data","protocol_packets","chunk_packets","packet_sessions"], "Unsupported query_type"
+assert limit >= 1 && limit <= 1000 && after >= 0, "Invalid limit/after"
+assert resultBytes >= 4096 && resultBytes <= 65536 && previewBytes >= 0 && previewBytes <= 4096, "Invalid output budget"
+assert sourcePort >= -1 && sourcePort <= 65535 && destinationPort >= -1 && destinationPort <= 65535, "Invalid port"
+assert sessionID >= 0 && streamID >= 0 && recordID >= 0, "Invalid association ID"
+recordModes = ["details","packet_data","protocol_data","stream_data","protocol_packets","chunk_packets","packet_sessions"]
+assert (mode in recordModes) == (recordID > 0), "record_id is required only for detail/preview/reference queries"
+assert (timeStart == "") == (timeEnd == ""), "Both time boundaries are required"
+if protocol != "" || fieldPath != "" { assert mode in ["protocols","fields"], "Protocol/field filters require protocols or fields" }
+if sourceIP != "" || destinationIP != "" || sourcePort >= 0 || destinationPort >= 0 {
+    assert mode in ["packets","sessions","packet_sessions"], "Endpoint filters require packet/session queries"
+}
+if transport != "" || timeStart != "" {
+    assert mode in ["packets","protocols","fields","sessions","packet_sessions"], "Transport/time filter is unsupported for this query"
+}
+if sessionID > 0 || streamID > 0 {
+    assert mode in ["packets","protocols","fields","sessions","streams","packet_sessions"], "Association filter is unsupported for this query"
+}
+if mode in ["metadata","details","packet_data","protocol_data"] { assert after == 0, "This query does not accept a cursor" }
+if fieldPath == "" {
+    assert fieldOp == "eq" && fieldType == "string" && fieldValue == "", "Field options require field_path"
+}
+
+options = [pcapdb.limit(limit),pcapdb.after(after),pcapdb.resultBytes(resultBytes),pcapdb.previewBytes(previewBytes)]
+if protocol != "" { options = append(options,pcapdb.protocol(protocol)) }
+if transport != "" { options = append(options,pcapdb.transport(transport)) }
+if sourceIP != "" { options = append(options,pcapdb.sourceIP(sourceIP)) }
+if destinationIP != "" { options = append(options,pcapdb.destinationIP(destinationIP)) }
+if sourcePort >= 0 { options = append(options,pcapdb.sourcePort(sourcePort)) }
+if destinationPort >= 0 { options = append(options,pcapdb.destinationPort(destinationPort)) }
+if sessionID > 0 { options = append(options,pcapdb.session(sessionID)) }
+if streamID > 0 { options = append(options,pcapdb.stream(streamID)) }
+if timeStart != "" {
+    start = atoi(timeStart)~
+    end = atoi(timeEnd)~
+    assert end >= start, "Inverted time range"
+    options = append(options,pcapdb.timeRange(start,end))
+}
+if fieldPath != "" {
+    switch fieldOp {
+    case "exists": options = append(options,pcapdb.fieldExists(fieldPath))
+    case "missing": options = append(options,pcapdb.fieldMissing(fieldPath))
+    case "eq":
+        value = nil
+        switch fieldType {
+        case "string": value = fieldValue
+        case "integer": value = atoi(fieldValue)~
+        case "real":
+            assert re.Match("^-?(0|[1-9][0-9]*)([.][0-9]+)?([eE][+-]?[0-9]+)?$",fieldValue), "Invalid real value"
+            value = json.New(fieldValue)~.Value()
+        case "boolean":
+            assert fieldValue in ["true","false"], "Boolean value must be true or false"
+            value = fieldValue == "true"
+        case "null": assert fieldValue == "", "Null has no field_value"
+        default: die("Unsupported field_type")
+        }
+        options = append(options,pcapdb.field(fieldPath,value))
+    default: die("Unsupported field_op")
+    }
+}
+
+db = nil
+if id != "" {
+    db = pcapdb.OpenPCAPDatabase(id)~
+} else {
+    db = pcapdb.GetOrCreatePCAPDatabase(pcapfile,pcapdb.withProtocols(true),pcapdb.withStreams(true))~
+}
+defer db.Close()
+RESULT = nil
+page, err = nil, nil
+switch mode {
+case "metadata":
+    meta = db.Metadata()~
+    RESULT = {
+        "dataset_id":db.ID,"state":meta.State,"format":meta.Format,
+        "schema_version":meta.SchemaVersion,"full_sha256":meta.FullSHA256,
+        "packet_count":meta.PacketCount,"protocol_count":meta.ProtocolCount,
+        "session_count":meta.SessionCount,"stream_count":meta.StreamCount,
+        "protocols_indexed":meta.ProtocolsIndexed,"streams_indexed":meta.StreamsIndexed,
+    }
+case "packets": page,err = db.QueryPacketsPage(options...)
+case "protocols": page,err = db.QueryProtocolsPage(options...)
+case "fields": page,err = db.DiscoverProtocolFields(options...)
+case "sessions": page,err = db.QuerySessionsPage(options...)
+case "streams": page,err = db.QueryStreamsPage(options...)
+case "details": page,err = db.ProtocolDetailsPage(recordID,options...)
+case "packet_data": page,err = db.ReadPacketPage(recordID,options...)
+case "protocol_data": page,err = db.ReadProtocolPage(recordID,options...)
+case "stream_data": page,err = db.ReadStreamPage(recordID,options...)
+case "protocol_packets": page,err = db.ProtocolPacketIDsPage(recordID,options...)
+case "chunk_packets": page,err = db.StreamChunkPacketIDsPage(recordID,options...)
+case "packet_sessions": page,err = db.PacketSessionsPage(recordID,options...)
+}
+if page != nil { RESULT = page }
+if err != nil {
+    // Preserve the structured page and error together for semantic inspection.
+    // Do not turn a failed query into an empty successful search.
+    if page == nil { die(err) }
+}
