@@ -9,6 +9,10 @@ on:
       - ".github/workflows/auto-build-sfweb.yml"
       - ".github/workflows/reuse-build-sfweb.yml"
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build:
     uses: ./.github/workflows/reuse-build-sfweb.yml
