@@ -98,7 +98,7 @@ func TestPCAPAnalysisTools(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
 	defer cancel()
 	tools := map[string]*aitool.Tool{}
-	for _, name := range []string{"load_pcapfile", "query_pcap_in_db"} {
+	for _, name := range []string{"load_pcapfile", "pcapdb", "manage_pcapdb"} {
 		source, err := yakscripttools.GetEmbedFS().ReadFile("yakscriptforai/pcap/" + name + ".yak")
 		require.NoError(t, err)
 		metadata := yakscripttools.LoadYakScriptToAiTools(name, string(source))
@@ -108,12 +108,20 @@ func TestPCAPAnalysisTools(t *testing.T) {
 		tools[name] = converted[0]
 	}
 	for _, params := range []map[string]any{{"id": "dataset-id"}, {"pcapfile": "capture.pcap"}} {
-		valid, errs := tools["query_pcap_in_db"].ValidateParams(params)
+		valid, errs := tools["pcapdb"].ValidateParams(params)
 		require.True(t, valid, "%v", errs)
 	}
 	for _, params := range []map[string]any{{}, {"id": "dataset-id", "pcapfile": "capture.pcap"}} {
-		valid, _ := tools["query_pcap_in_db"].ValidateParams(params)
+		valid, _ := tools["pcapdb"].ValidateParams(params)
 		require.False(t, valid, "identity must be exclusive in the AI tool schema too")
+	}
+	for _, params := range []map[string]any{{"op": "list"}, {"op": "count"}, {"op": "delete", "id": "dataset-id"}, {"op": "validate", "id": "dataset-id"}, {"op": "export", "id": "dataset-id", "output": "export.pcap"}} {
+		valid, errs := tools["manage_pcapdb"].ValidateParams(params)
+		require.True(t, valid, "%v", errs)
+	}
+	for _, params := range []map[string]any{{"op": "unknown"}, {"op": "delete"}, {"op": "export", "id": "dataset-id"}} {
+		valid, _ := tools["manage_pcapdb"].ValidateParams(params)
+		require.False(t, valid)
 	}
 	execute := func(name string, params map[string]any) (*aitool.ToolExecutionResult, error) {
 		t.Helper()
@@ -158,14 +166,14 @@ func TestPCAPAnalysisTools(t *testing.T) {
 		for k, v := range extra {
 			params[k] = v
 		}
-		return invoke("query_pcap_in_db", params)
+		return invoke("pcapdb", params)
 	}
 	t.Run("dedup_and_path_selection", func(t *testing.T) {
 		copyPath := filepath.Join(home, "same-content.pcap")
 		require.NoError(t, os.WriteFile(copyPath, capture, 0600))
 		same := object(invoke("load_pcapfile", map[string]any{"pcapfile": copyPath}))
 		require.Equal(t, id, same["dataset_id"])
-		meta := object(invoke("query_pcap_in_db", map[string]any{"pcapfile": copyPath, "query_type": "metadata"}))
+		meta := object(invoke("pcapdb", map[string]any{"pcapfile": copyPath, "query_type": "metadata"}))
 		require.Equal(t, id, meta["dataset_id"])
 		count, err := pcapdb.CountPCAPDatabases()
 		require.NoError(t, err)
@@ -255,10 +263,10 @@ func TestPCAPAnalysisTools(t *testing.T) {
 		require.NoError(t, w.WritePacket(gopacket.CaptureInfo{Timestamp: time.Unix(1700000000, 0), CaptureLength: len(packet.Bytes()), Length: len(packet.Bytes())}, packet.Bytes()))
 		path := filepath.Join(home, "numeric-dns.pcap")
 		require.NoError(t, os.WriteFile(path, capture.Bytes(), 0600))
-		page := invoke("query_pcap_in_db", map[string]any{"pcapfile": path, "protocol": "dns"}).(*pcapdb.ResultPage[pcapdb.ProtocolSummary])
+		page := invoke("pcapdb", map[string]any{"pcapfile": path, "protocol": "dns"}).(*pcapdb.ResultPage[pcapdb.ProtocolSummary])
 		require.Nil(t, page.Error)
 		require.Len(t, page.Items, 1)
-		detail := invoke("query_pcap_in_db", map[string]any{"id": page.DatasetID, "query_type": "details", "record_id": page.Items[0].ID}).(*pcapdb.ResultPage[pcapdb.ProtocolDetail])
+		detail := invoke("pcapdb", map[string]any{"id": page.DatasetID, "query_type": "details", "record_id": page.Items[0].ID}).(*pcapdb.ResultPage[pcapdb.ProtocolDetail])
 		require.Nil(t, detail.Error)
 		require.Len(t, detail.Items, 1)
 		leaves := map[string]any{}
@@ -269,11 +277,11 @@ func TestPCAPAnalysisTools(t *testing.T) {
 			if !ok || number.String() != "531" {
 				continue
 			}
-			typed := invoke("query_pcap_in_db", map[string]any{"id": page.DatasetID, "field_path": path, "field_type": "integer", "field_value": number.String()}).(*pcapdb.ResultPage[pcapdb.ProtocolSummary])
+			typed := invoke("pcapdb", map[string]any{"id": page.DatasetID, "field_path": path, "field_type": "integer", "field_value": number.String()}).(*pcapdb.ResultPage[pcapdb.ProtocolSummary])
 			require.Nil(t, typed.Error)
 			require.Len(t, typed.Items, 1)
 			require.Equal(t, page.Items[0].ID, typed.Items[0].ID)
-			wrongType := invoke("query_pcap_in_db", map[string]any{"id": page.DatasetID, "field_path": path, "field_type": "string", "field_value": number.String()}).(*pcapdb.ResultPage[pcapdb.ProtocolSummary])
+			wrongType := invoke("pcapdb", map[string]any{"id": page.DatasetID, "field_path": path, "field_type": "string", "field_value": number.String()}).(*pcapdb.ResultPage[pcapdb.ProtocolSummary])
 			require.Nil(t, wrongType.Error)
 			require.Empty(t, wrongType.Items)
 			matched = true
@@ -333,15 +341,15 @@ func TestPCAPAnalysisTools(t *testing.T) {
 		require.NoError(t, err)
 		otherID := unindexed.ID
 		require.NoError(t, unindexed.Close())
-		failed := object(invoke("query_pcap_in_db", map[string]any{"id": otherID}))
+		failed := object(invoke("pcapdb", map[string]any{"id": otherID}))
 		require.NotNil(t, failed["error"], "missing analysis is never zero hits")
-		upgraded := invoke("query_pcap_in_db", map[string]any{"pcapfile": other}).(*pcapdb.ResultPage[pcapdb.ProtocolSummary])
+		upgraded := invoke("pcapdb", map[string]any{"pcapfile": other}).(*pcapdb.ResultPage[pcapdb.ProtocolSummary])
 		require.Nil(t, upgraded.Error)
 		require.Equal(t, otherID, upgraded.DatasetID)
 		require.Len(t, upgraded.Items, 2)
 		fresh := filepath.Join(home, "fresh-auto.pcap")
 		require.NoError(t, os.WriteFile(fresh, pcapAnalysisCapture(t, "fresh.example"), 0600))
-		page := invoke("query_pcap_in_db", map[string]any{"pcapfile": fresh}).(*pcapdb.ResultPage[pcapdb.ProtocolSummary])
+		page := invoke("pcapdb", map[string]any{"pcapfile": fresh}).(*pcapdb.ResultPage[pcapdb.ProtocolSummary])
 		require.Nil(t, page.Error)
 		require.NotEqual(t, id, page.DatasetID)
 		require.Len(t, page.Items, 2)
@@ -349,15 +357,15 @@ func TestPCAPAnalysisTools(t *testing.T) {
 	t.Run("oversized_detail_preserves_error_and_cursor", func(t *testing.T) {
 		large := filepath.Join(home, "large-fields.pcap")
 		require.NoError(t, os.WriteFile(large, pcapAnalysisCapture(t, strings.Repeat("x", 8192)+".example"), 0600))
-		page := invoke("query_pcap_in_db", map[string]any{"pcapfile": large}).(*pcapdb.ResultPage[pcapdb.ProtocolSummary])
+		page := invoke("pcapdb", map[string]any{"pcapfile": large}).(*pcapdb.ResultPage[pcapdb.ProtocolSummary])
 		require.Nil(t, page.Error)
 		require.Len(t, page.Items, 2)
-		failed := invoke("query_pcap_in_db", map[string]any{"id": page.DatasetID, "query_type": "details", "record_id": page.Items[0].ID, "result_bytes": 4096}).(*pcapdb.ResultPage[pcapdb.ProtocolDetail])
+		failed := invoke("pcapdb", map[string]any{"id": page.DatasetID, "query_type": "details", "record_id": page.Items[0].ID, "result_bytes": 4096}).(*pcapdb.ResultPage[pcapdb.ProtocolDetail])
 		require.NotNil(t, failed.Error)
 		require.Equal(t, "result_too_large", failed.Error.Code)
 		require.Empty(t, failed.Items)
 		require.Zero(t, failed.NextCursor)
-		retried := invoke("query_pcap_in_db", map[string]any{"id": page.DatasetID, "query_type": "details", "record_id": page.Items[0].ID, "result_bytes": 65536}).(*pcapdb.ResultPage[pcapdb.ProtocolDetail])
+		retried := invoke("pcapdb", map[string]any{"id": page.DatasetID, "query_type": "details", "record_id": page.Items[0].ID, "result_bytes": 65536}).(*pcapdb.ResultPage[pcapdb.ProtocolDetail])
 		require.Nil(t, retried.Error)
 		require.Len(t, retried.Items, 1)
 	})
@@ -378,7 +386,7 @@ func TestPCAPAnalysisTools(t *testing.T) {
 			{"id": id, "query_type": "details"}, {"id": id, "result_bytes": 1024},
 			{"id": id, "time_start_ns": "1700000000123456789"},
 		} {
-			_, err := execute("query_pcap_in_db", params)
+			_, err := execute("pcapdb", params)
 			require.Error(t, err, "params=%v", params)
 		}
 	})
@@ -389,5 +397,56 @@ func TestPCAPAnalysisTools(t *testing.T) {
 		page := object(query("protocol_data", map[string]any{"record_id": messageID, "preview_bytes": 4096}))
 		require.Nil(t, page["error"])
 		require.NotEmpty(t, page["items"])
+	})
+	t.Run("manage_list_validate_export_delete", func(t *testing.T) {
+		manage := func(op string, extra map[string]any) map[string]any {
+			params := map[string]any{"op": op}
+			for k, v := range extra {
+				params[k] = v
+			}
+			return object(invoke("manage_pcapdb", params))
+		}
+		count := manage("count", nil)
+		require.Greater(t, count["registered_count"].(float64), float64(1))
+		page := manage("list", map[string]any{"limit": 1})
+		require.Nil(t, page["error"])
+		require.Len(t, page["items"], 1)
+		require.Equal(t, true, page["has_more"])
+		second := manage("list", map[string]any{"limit": 1, "after": page["next_cursor"]})
+		require.Nil(t, second["error"])
+		require.NotEqual(t, page["items"].([]any)[0].(map[string]any)["dataset_id"], second["items"].([]any)[0].(map[string]any)["dataset_id"])
+		valid := manage("validate", map[string]any{"id": id, "deep": true})
+		require.Nil(t, valid["error"])
+		require.Equal(t, true, valid["valid"])
+		output := filepath.Join(home, "managed-export.pcap")
+		exported := manage("export", map[string]any{"id": id, "output": output})
+		require.Equal(t, output, exported["output"])
+		data, err := os.ReadFile(output)
+		require.NoError(t, err)
+		require.Equal(t, capture, data)
+		_, err = execute("manage_pcapdb", map[string]any{"op": "export", "id": id, "output": output})
+		require.Error(t, err)
+		// An independently held reader must survive a refused deletion.
+		held, err := pcapdb.OpenPCAPDatabase(id)
+		require.NoError(t, err)
+		busy := manage("delete", map[string]any{"id": id})
+		require.Equal(t, false, busy["deleted"])
+		require.Equal(t, "busy", busy["error"].(map[string]any)["code"])
+		require.NoError(t, held.Close())
+		deleted := manage("delete", map[string]any{"id": id})
+		require.Nil(t, deleted["error"])
+		require.Equal(t, true, deleted["deleted"])
+		require.Equal(t, false, deleted["cleanup_pending"])
+		require.FileExists(t, output)
+		_, err = execute("pcapdb", map[string]any{"id": id})
+		require.Error(t, err)
+		require.Nil(t, manage("delete", map[string]any{"id": id})["error"])
+		for _, params := range []map[string]any{
+			{"op": "delete"}, {"op": "delete", "id": "1"}, {"op": "list", "id": id},
+			{"op": "export", "id": id}, {"op": "count", "after": 1}, {"op": "delete", "id": id, "deep": true},
+		} {
+			_, err := execute("manage_pcapdb", params)
+			require.Error(t, err, "params=%v", params)
+		}
 	})
 }

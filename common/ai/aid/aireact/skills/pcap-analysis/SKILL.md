@@ -9,16 +9,21 @@ metadata:
 
 适用于用户给出本地 PCAP/PCAPNG 文件，或此前导入得到的 pcapdb DatasetID。Yakit 项目的 HTTP 历史使用 yaklang-system；这里查询的是独立捕获库。
 
-## 两个工具
+## 三个核心工具
 
 先通过 require_tool 加载需要的工具说明，再调用：
 
 | 工具 | 用途 |
 | --- | --- |
 | load_pcapfile | 导入或按完整内容去重复用捕获，返回 dataset_id、状态、计数和分析能力；默认分析协议及 session/stream |
-| query_pcap_in_db | 传 id 查询已有库，或传 pcapfile 自动导入/复用；按 query_type 返回有界证据 |
+| pcapdb | 传 id 查询已有库，或传 pcapfile 自动导入/复用；按 query_type 返回有界证据 |
+| manage_pcapdb | op=list/count/validate/export/delete；分页选库、登记计数、校验、导出和删除库 |
 
 导入和查询的业务结果在结构化 result 中。观察日志不代表成功；不要只看工具调用是否结束。
+
+用户只给已有库线索时先用 manage_pcapdb(op=list) 选库，取 items[].dataset_id。目录的数字 id/next_cursor 只用于列库分页；目录页 state=ready 不代表每个子库均 ready。count 只是登记数，需确认可用性时按 id 做 validate；deep=true 会读全部 BLOB，按任务需要选择。
+
+导出使用 manage_pcapdb(op=export,id=实际库ID,output=明确目标路径)，不覆盖已有文件。仅在用户要求删除指定库时执行 op=delete；不能将清理库当作分析的默认收尾。删除保留源 PCAP/导出文件，busy 时先结束自己的读取再重试，不强制关闭别人的连接。检查 deleted、cleanup_pending 和 error，未完成的删除不能报告成功；同一 ID 可重试。
 
 ## 从问题定位证据
 

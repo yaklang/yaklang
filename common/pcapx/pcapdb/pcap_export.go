@@ -38,6 +38,9 @@ func (m *InstanceManager) Export(ctx context.Context, identifier, output string)
 		return "", err
 	}
 	defer releaseFileLock(lock)
+	if err = checkNotDeleted(result.Metadata.DatabasePath); err != nil {
+		return "", err
+	}
 	reader, err := openIndex(result.Metadata.DatabasePath, false, false)
 	if err != nil {
 		return "", err
