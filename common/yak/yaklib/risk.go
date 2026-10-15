@@ -35,19 +35,13 @@ import (
 // )
 // // 写入后可用 risk.YieldRiskByTarget 等查询（示意性示例）
 // ```
-// yakitClientForOutput returns the client captured when the export was built,
-// or the process-wide client if that capture is still nil. RiskExports is
-// initialized before AutoInitYakit runs, and the AOT runtime skips that init,
-// so the captured client is nil unless something installs one later.
-func yakitClientForOutput(client *YakitClient) *YakitClient {
-	if client != nil {
-		return client
-	}
-	return GetYakitClientInstance()
-}
-
+// outputRiskToYakit sends the risk through the captured client when present;
+// AOT exports may be initialized before the process-wide client is installed.
 func outputRiskToYakit(client *YakitClient, risk *schema.Risk) {
-	if client = yakitClientForOutput(client); client == nil {
+	if client == nil {
+		client = GetYakitClientInstance()
+	}
+	if client == nil {
 		return
 	}
 	client.Output(risk)
