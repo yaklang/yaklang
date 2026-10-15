@@ -160,12 +160,30 @@ func (p *jobEventPublisher) deliverPending(ctx context.Context, pending []durabl
 	if !ok {
 		return nil
 	}
+	completed := make(map[string]bool)
+	for _, e := range pending {
+		if e.Terminal {
+			completed[e.Ref.AttemptID] = true
+		}
+	}
 	for _, e := range pending {
 		if ctx.Err() != nil {
 			return ctx.Err()
 		}
 		if e.NodeID != p.node.CurrentNodeID() {
 			return fmt.Errorf("durable job event belongs to another node")
+		}
+		if e.Ref.NodeSessionID != session.SessionID && !completed[e.Ref.AttemptID] {
+			switch e.Subject {
+			case "legion.event.job.claimed", "legion.event.job.started", "legion.event.job.progressed", "legion.event.job.rule_snapshot_prepared":
+				// This process has no durable completion for that old execution.
+				// Its delayed state must not reopen a dead/lost attempt. Results
+				// can still replay with their original identity and platform fence.
+				if err := p.outbox.retireInterruptedState(e.EventID); err != nil {
+					return err
+				}
+				continue
+			}
 		}
 		if e.Terminal && e.BrokerAck {
 			continue

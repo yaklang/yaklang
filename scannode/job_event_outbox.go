@@ -240,6 +240,16 @@ func (b *jobEventOutbox) brokerAck(eventID string) error {
 	return b.removeLocked(e, false)
 }
 
+func (b *jobEventOutbox) retireInterruptedState(eventID string) error {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	e, ok := b.entries[eventID]
+	if !ok {
+		return nil
+	}
+	return b.removeLocked(e, true)
+}
+
 func (b *jobEventOutbox) removeLocked(e durableJobEvent, retired bool) error {
 	path := filepath.Join(b.dir, e.filename())
 	if retired {

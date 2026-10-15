@@ -27,6 +27,8 @@ func outboxTestEvent(t *testing.T, kind string) durableJobEvent {
 	var message proto.Message
 	terminal := false
 	switch kind {
+	case "started":
+		message = &jobv1.JobStarted{Metadata: m, Job: j, StartedAt: timestamppb.Now()}
 	case "asset":
 		message = &jobv1.JobAsset{Metadata: m, Job: j, AssetKind: "port", AssetJson: []byte(`{"port":80}`)}
 	case "risk":
@@ -244,4 +246,34 @@ func TestJobOutboxRefusesAChangedNodeIdentity(t *testing.T) {
 	require.NoError(t, box.enqueue(outboxTestEvent(t, "asset")))
 	require.Error(t, box.acceptRecovery(node.SessionState{NodeID: "another-node", SessionID: "new-session", JobDeliveryRecoverySupported: true}))
 	require.Len(t, box.snapshot(), 1, "unowned partial results must be preserved")
+}
+
+func TestJobOutboxInterruptedStateCannotReopenOldExecution(t *testing.T) {
+	box, err := openJobEventOutbox(filepath.Join(t.TempDir(), "outbox"))
+	require.NoError(t, err)
+	for _, kind := range []string{"started", "asset", "risk"} {
+		require.NoError(t, box.enqueue(outboxTestEvent(t, kind)))
+	}
+	session := node.SessionState{NodeID: "node-a", SessionID: "new-session", SessionToken: "fixture", NATSURL: "nats://unused.test", JobDeliveryRecoverySupported: true}
+	base, err := node.NewNodeBase(node.BaseConfig{NodeID: "node-a", BaseDir: t.TempDir(), EnrollmentToken: "fixture", PlatformAPIBaseURL: "http://fixture.test", TransportClient: &bootstrapSessionTransport{session: session}, HeartbeatInterval: time.Hour, TickerInterval: time.Hour})
+	require.NoError(t, err)
+	go base.Serve()
+	defer base.Shutdown()
+	waitForNodeSession(t, base)
+	fake := &fakeJetStreamContext{}
+	publisher := newJobEventPublisher(base)
+	publisher.outbox = box
+	publisher.js = fake
+	publisher.natsURL = session.NATSURL
+	require.NoError(t, box.acceptRecovery(session))
+	require.NoError(t, publisher.deliverPending(context.Background(), box.snapshot()))
+	fake.mu.Lock()
+	defer fake.mu.Unlock()
+	require.Len(t, fake.publish, 2)
+	require.Equal(t, "legion.event.job.asset", fake.publish[0].Subject)
+	require.Equal(t, "legion.event.job.risk", fake.publish[1].Subject)
+	archived, err := os.ReadDir(filepath.Join(box.dir, "retired"))
+	require.NoError(t, err)
+	require.Len(t, archived, 1)
+	require.Empty(t, box.snapshot())
 }
