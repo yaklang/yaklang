@@ -1,7 +1,11 @@
 package yakgrpc
 
 import (
+	"context"
+	"os"
+	"os/exec"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/consts"
@@ -10,6 +14,19 @@ import (
 )
 
 func TestCleanBootstrapConfigurationPassesGuard(t *testing.T) {
+	// A package-wide run may already contain intentional test settings. Check
+	// bootstrap in its own process so this assertion is independent of test order.
+	if os.Getenv("YAK_TEST_CLEAN_BOOTSTRAP_CHILD") != "1" {
+		executable, err := os.Executable()
+		require.NoError(t, err)
+		ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+		defer cancel()
+		cmd := exec.CommandContext(ctx, executable, "-test.run=^TestCleanBootstrapConfigurationPassesGuard$", "-test.count=1")
+		cmd.Env = append(os.Environ(), "YAK_TEST_CLEAN_BOOTSTRAP_CHILD=1")
+		output, err := cmd.CombinedOutput()
+		require.NoError(t, err, "%s", output)
+		return
+	}
 	var skipped bool
 	t.Run("clean isolated bootstrap", func(st *testing.T) {
 		defer func() { skipped = st.Skipped() }()
@@ -25,6 +42,10 @@ func TestConfigurationGuardSkipsBeforeChangingExistingAPIKeys(t *testing.T) {
 	// outer precondition has proved that the shared database is disposable.
 	const private = `{"Enabled":true,"IntelligentModels":[{"Provider":{"Type":"openai","APIKey":"private-test-sentinel"},"ModelName":"test-model"}]}`
 	require.NoError(t, yakit.SetKey(db, consts.AI_GLOBAL_CONFIG_KEY, private))
+	// A bootstrap regression must also pass after earlier tests left settings,
+	// while keeping the parent process's existing credential unchanged.
+	t.Run("bootstrap uses a separate process", TestCleanBootstrapConfigurationPassesGuard)
+	require.True(t, yakit.GetKey(db, consts.AI_GLOBAL_CONFIG_KEY) == private)
 	var skipped bool
 	t.Run("pre-existing settings", func(st *testing.T) {
 		defer func() { skipped = st.Skipped() }()
