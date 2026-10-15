@@ -1,4 +1,4 @@
-package scannode
+package distyak
 
 import (
 	"context"
@@ -59,4 +59,3 @@ func TestDistYakCommandConsumesSSADatabaseEnv(t *testing.T) {
 		t.Fatalf("expected SSA DB raw to be %q, got %q (env var was not consumed)", fakeDSN, raw)
 	}
 }
-
