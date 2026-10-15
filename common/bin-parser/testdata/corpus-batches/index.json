@@ -99691,6 +99691,112 @@
         "common/pcapx/pcaputil/fins-program-area/controls.json": "fins-program-area/controls.json",
         "scripts/protocol-tests/required-tests-traffic-unified-v92.json": "required-tests-traffic-unified-v92.json"
       }
+    },
+    {
+      "id": "validation-fins-clock",
+      "kind": "validation",
+      "source_sha": "706f50e88ed5c34fc3a02367fec4a942d889d81c",
+      "file": "validation-fins-clock.zip",
+      "sha256": "ca2ac564e88c6ff151142aaf2990f968d860bb7ec209b91a3974d24ab1e98782",
+      "password": "bin-parser",
+      "members": {
+        "fins-clock-tools/build.py": {
+          "sha256": "068bc7d4309a4d38ba1b8158d58e6b8ee838a14e6ad00f8aff6ddcc3e3bda21d",
+          "bytes": 4388
+        },
+        "fins-clock-tools/reference.py": {
+          "sha256": "5ebcda5ec75ab6b4f3a27b518cb25db6b37d7fe636c72e21885c05e070cb95a1",
+          "bytes": 1333
+        },
+        "fins-clock-tools/source-pin.json": {
+          "sha256": "00e53ab062e35a76e808d3cc527471b62d6599783a8769395d6361d4037d3184",
+          "bytes": 1052
+        },
+        "fins-clock-tools/verify.py": {
+          "sha256": "3a253f3ec2f8f9fac09f34777170839b8e30b595f8990c5e59c5e3f870c58916",
+          "bytes": 2301
+        },
+        "fins-clock/captures/expired-after-foreign.pcapng": {
+          "sha256": "afd7362a09118a8885c8086748939703881b0e297676b672f28384ed439c169b",
+          "bytes": 352
+        },
+        "fins-clock/captures/foreign-endpoint.pcapng": {
+          "sha256": "ecb91a895234990716c2b44125e5ada412a9b01c63d20e97f7191ed95218ef95",
+          "bytes": 352
+        },
+        "fins-clock/captures/foreign-interface.pcapng": {
+          "sha256": "2abaa221b256d158e0312c452185e6cac1746f662acdc5d9b0d7528302139bdb",
+          "bytes": 352
+        },
+        "fins-clock/captures/foreign-survives-local-expiry.pcapng": {
+          "sha256": "35afef2a85b089f894e9a795da7cae5431ad0bc9c966f34b82c15961b0b38644",
+          "bytes": 544
+        },
+        "fins-clock/captures/interleaved.pcapng": {
+          "sha256": "08a596e1ebf7c9e277904d97ad4655589077a63e4e85cdac9cd1b156cd7fe30a",
+          "bytes": 544
+        },
+        "fins-clock/captures/local-idle.pcapng": {
+          "sha256": "f23121fcc887e869be4f45c82df1bf7d2b54fccdb8a1e2b7c7a5500f1944cc6b",
+          "bytes": 260
+        },
+        "fins-clock/captures/normal.pcapng": {
+          "sha256": "14ff3f8234d0c20904fef418d696562c9aaf946c7e76b2cc58f5ee1da70e753f",
+          "bytes": 260
+        },
+        "fins-clock/captures/own-backdated.pcapng": {
+          "sha256": "0a1ad36f96943d0ca8c7f46e5fcf9581faf4d0bbc2a9eb79a0573edd6927d81a",
+          "bytes": 352
+        },
+        "fins-clock/captures/post-foreign-pending.pcapng": {
+          "sha256": "13972e2f3b8665bffdcc71c8a5c9d0071cd36ebc4e982970a5872f4fd9624781",
+          "bytes": 252
+        },
+        "fins-clock/captures/retry.pcapng": {
+          "sha256": "e960ad31de892eab4eddfe8f0a0ce311e90a2fdd69a8b5873f1ac02e5edd1b6f",
+          "bytes": 352
+        },
+        "fins-clock/captures/ttl-at.pcapng": {
+          "sha256": "0a4c1bab4d5c62d78ddf1ecc5e3ca4d07ab8f30db52416d41debcd4bf7c6cf66",
+          "bytes": 260
+        },
+        "fins-clock/captures/ttl-before.pcapng": {
+          "sha256": "f3097be616f723a32ad162136c432a343e2a3920014a3020d9c3fd7e78b54c91",
+          "bytes": 260
+        },
+        "fins-clock/controls.json": {
+          "sha256": "c694e6d1e7482470565ca28197455ee0243ec9e6c948592c3b37922b75b15cf7",
+          "bytes": 55376
+        },
+        "required-tests-traffic-unified-v93.json": {
+          "sha256": "64efb15ba6a7d74aa7182e7b9c79531b18f398538f890a9fcf6fb99fbeef3525",
+          "bytes": 12399394
+        },
+        "validation/expected.json": {
+          "sha256": "a14be1d49d3d7c3933d9baa827f8669a911c91589cf692208449a389869fe929",
+          "bytes": 12567
+        }
+      },
+      "aliases": {
+        "common/pcapx/pcaputil/fins-clock-tools/build.py": "fins-clock-tools/build.py",
+        "common/pcapx/pcaputil/fins-clock-tools/reference.py": "fins-clock-tools/reference.py",
+        "common/pcapx/pcaputil/fins-clock-tools/source-pin.json": "fins-clock-tools/source-pin.json",
+        "common/pcapx/pcaputil/fins-clock-tools/verify.py": "fins-clock-tools/verify.py",
+        "common/pcapx/pcaputil/fins-clock/captures/expired-after-foreign.pcapng": "fins-clock/captures/expired-after-foreign.pcapng",
+        "common/pcapx/pcaputil/fins-clock/captures/foreign-endpoint.pcapng": "fins-clock/captures/foreign-endpoint.pcapng",
+        "common/pcapx/pcaputil/fins-clock/captures/foreign-interface.pcapng": "fins-clock/captures/foreign-interface.pcapng",
+        "common/pcapx/pcaputil/fins-clock/captures/foreign-survives-local-expiry.pcapng": "fins-clock/captures/foreign-survives-local-expiry.pcapng",
+        "common/pcapx/pcaputil/fins-clock/captures/interleaved.pcapng": "fins-clock/captures/interleaved.pcapng",
+        "common/pcapx/pcaputil/fins-clock/captures/local-idle.pcapng": "fins-clock/captures/local-idle.pcapng",
+        "common/pcapx/pcaputil/fins-clock/captures/normal.pcapng": "fins-clock/captures/normal.pcapng",
+        "common/pcapx/pcaputil/fins-clock/captures/own-backdated.pcapng": "fins-clock/captures/own-backdated.pcapng",
+        "common/pcapx/pcaputil/fins-clock/captures/post-foreign-pending.pcapng": "fins-clock/captures/post-foreign-pending.pcapng",
+        "common/pcapx/pcaputil/fins-clock/captures/retry.pcapng": "fins-clock/captures/retry.pcapng",
+        "common/pcapx/pcaputil/fins-clock/captures/ttl-at.pcapng": "fins-clock/captures/ttl-at.pcapng",
+        "common/pcapx/pcaputil/fins-clock/captures/ttl-before.pcapng": "fins-clock/captures/ttl-before.pcapng",
+        "common/pcapx/pcaputil/fins-clock/controls.json": "fins-clock/controls.json",
+        "scripts/protocol-tests/required-tests-traffic-unified-v93.json": "required-tests-traffic-unified-v93.json"
+      }
     }
   ],
   "schema_version": 1,

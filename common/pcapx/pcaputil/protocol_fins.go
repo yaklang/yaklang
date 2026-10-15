@@ -478,12 +478,8 @@ func (a *binParser) decodeFINSDatagram(e *ProtocolEvent, w []byte, inputErr erro
 	if e.Timestamp.After(store.clock) {
 		store.clock = e.Timestamp
 	}
-	for _, el := range store.entries {
-		f := el.Value.(*binUDPEntry).flow
-		if f.fins != nil {
-			f.fins.expire(store.clock)
-		}
-	}
+	// Capture domains and unrelated conversations do not share a clock.
+	// Expire only this flow, using its own monotonic observed timestamps.
 	el := store.entries[key]
 	err := inputErr
 	if el == nil && err == nil {
@@ -492,7 +488,7 @@ func (a *binParser) decodeFINSDatagram(e *ProtocolEvent, w []byte, inputErr erro
 		} else {
 			f := &binFlow{a: a, id: a.flows.Add(1), protocol: "fins", fins: &binFINS{blocked: a.finsUntrackedRefusal}, endpoints: [2]string{e.Source, e.Destination}}
 			if err = f.reserveSession(1024 + 8192 + int64(len(w))*256); err == nil {
-				el = store.lru.PushBack(&binUDPEntry{key, f, store.clock})
+				el = store.lru.PushBack(&binUDPEntry{key, f, e.Timestamp})
 				store.entries[key] = el
 			}
 		}
@@ -500,7 +496,10 @@ func (a *binParser) decodeFINSDatagram(e *ProtocolEvent, w []byte, inputErr erro
 	if el != nil {
 		entry := el.Value.(*binUDPEntry)
 		f := entry.flow
-		entry.touched = store.clock
+		if e.Timestamp.After(entry.touched) {
+			entry.touched = e.Timestamp
+		}
+		f.fins.expire(e.Timestamp)
 		store.lru.MoveToBack(el)
 		e.FlowID, e.Direction = f.id, 0
 		if e.Source != f.endpoints[0] {
@@ -510,7 +509,7 @@ func (a *binParser) decodeFINSDatagram(e *ProtocolEvent, w []byte, inputErr erro
 			err = f.reserveSession(f.fins.storage() + 8192 + int64(len(w))*256)
 		}
 		if err == nil {
-			e.Session, e.ResponseTo, err = f.fins.consume(w, e.Direction, e.ID, store.clock, a.budget, false)
+			e.Session, e.ResponseTo, err = f.fins.consume(w, e.Direction, e.ID, e.Timestamp, a.budget, false)
 		} else {
 			f.fins.retire()
 		}
