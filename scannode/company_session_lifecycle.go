@@ -5,6 +5,7 @@ import (
 	"errors"
 	"time"
 
+	"github.com/nats-io/nats.go"
 	"github.com/yaklang/yaklang/common/log"
 )
 
@@ -17,6 +18,11 @@ func (b *legionJobBridge) invalidateCompanyExecution() {
 	}
 	b.companyCleanupMu.Lock()
 	defer b.companyCleanupMu.Unlock()
+	b.invalidateCompanyExecutionLocked()
+}
+
+// Caller holds companyCleanupMu across invalidation and consumer replacement.
+func (b *legionJobBridge) invalidateCompanyExecutionLocked() {
 	b.mu.Lock()
 	if b.companyExecutionCancel != nil {
 		b.companyExecutionCancel()
@@ -168,5 +174,36 @@ func (m *aiKnowledgeBaseQueryManager) cancelAllForTransportLoss() {
 			state.cancel()
 		}
 		delete(m.queries, id)
+	}
+}
+
+// A delayed callback may retire only its own transport, never its replacement.
+func (b *legionJobBridge) invalidateCompanyTransport(conn *nats.Conn) {
+	b.companyCleanupMu.Lock()
+	defer b.companyCleanupMu.Unlock()
+	b.mu.Lock()
+	current := b.consumer
+	owned := current != nil && current.conn == conn
+	b.mu.Unlock()
+	if owned {
+		b.invalidateCompanyExecutionLocked()
+	}
+}
+
+// Fetch failures must fence company work before detaching the consumer. Otherwise
+// the asynchronous disconnect callback sees no owner and skips cancellation.
+func (b *legionJobBridge) invalidateCommandConsumer(consumer *commandConsumer) {
+	b.companyCleanupMu.Lock()
+	defer b.companyCleanupMu.Unlock()
+	b.mu.Lock()
+	owned := b.consumer == consumer
+	b.mu.Unlock()
+	if !owned {
+		return
+	}
+	if b.companyBound.Load() {
+		b.invalidateCompanyExecutionLocked()
+	} else {
+		b.stopConsumer()
 	}
 }

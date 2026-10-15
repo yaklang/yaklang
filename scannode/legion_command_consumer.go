@@ -218,13 +218,15 @@ func (b *legionJobBridge) forwardCapabilityAlerts(ctx context.Context) {
 }
 
 func (b *legionJobBridge) syncConsumer(parent context.Context) {
+	b.companyCleanupMu.Lock()
+	defer b.companyCleanupMu.Unlock()
 	if b.shuttingDown.Load() {
 		b.stopConsumer()
 		return
 	}
 	if !b.agent.node.IsRegistered() {
 		if b.companyBound.Load() {
-			b.invalidateCompanyExecution()
+			b.invalidateCompanyExecutionLocked()
 		} else {
 			b.stopConsumer()
 		}
@@ -242,7 +244,7 @@ func (b *legionJobBridge) syncConsumer(parent context.Context) {
 		b.companyBound.Store(true)
 	}
 	if err := validateCompanyNATSSession(session, time.Now()); err != nil {
-		b.invalidateCompanyExecution()
+		b.invalidateCompanyExecutionLocked()
 		return
 	}
 	b.mu.Lock()
@@ -254,12 +256,15 @@ func (b *legionJobBridge) syncConsumer(parent context.Context) {
 		return
 	}
 
+	if session.CompanyID != "" && current != nil && current.conn != nil && current.conn.IsClosed() {
+		b.invalidateCompanyExecutionLocked()
+	}
 	b.stopConsumer()
 	b.switchDispatchSession(session.SessionID)
 	_, err := b.startConsumer(parent, session)
 	if err != nil {
 		if session.CompanyID != "" {
-			b.invalidateCompanyExecution()
+			b.invalidateCompanyExecutionLocked()
 		}
 		log.Errorf("start legion command consumer failed: %v", err)
 		return
@@ -274,15 +279,7 @@ func (b *legionJobBridge) startConsumer(
 	currentNodeID := b.agent.node.CurrentNodeID()
 	var options []nats.Option
 	if session.CompanyID != "" {
-		onLost := func(conn *nats.Conn) {
-			b.mu.Lock()
-			current := b.consumer
-			owned := current != nil && current.conn == conn
-			b.mu.Unlock()
-			if owned {
-				b.invalidateCompanyExecution()
-			}
-		}
+		onLost := b.invalidateCompanyTransport
 		options = append(options, nats.NoReconnect(), nats.DisconnectErrHandler(func(conn *nats.Conn, _ error) { onLost(conn) }), nats.ClosedHandler(onLost))
 	}
 	conn, err := connectNATSForSession(session, "yak-node-commands-"+currentNodeID, options...)
@@ -400,7 +397,7 @@ func (b *legionJobBridge) consumeLoop(ctx context.Context, consumer *commandCons
 					err,
 					"another process may be running with the same node_id, or the platform session/consumer was replaced",
 				)
-				b.stopConsumer()
+				b.invalidateCommandConsumer(consumer)
 				return
 			}
 			log.Errorf(
