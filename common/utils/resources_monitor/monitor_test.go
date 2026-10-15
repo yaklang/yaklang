@@ -1,7 +1,9 @@
 package resources_monitor
 
 import (
+	"crypto/sha256"
 	"embed"
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -34,8 +36,9 @@ func TestStandardResourceMonitor(t *testing.T) {
 
 	content, err := monitor.ReadFile("testdata/normal/file1.txt")
 	assert.NoError(t, err)
-	// Embedded content matches echo output (with newline)
-	assert.Equal(t, "content1\n", string(content))
+	expected, err := normalFS.ReadFile("testdata/normal/file1.txt")
+	assert.NoError(t, err)
+	assert.Equal(t, string(expected), string(content))
 
 	entries, err := monitor.ReadDir("testdata/normal")
 	assert.NoError(t, err)
@@ -110,4 +113,24 @@ func TestGzipResourceMonitorPrefixFallback(t *testing.T) {
 func TestResourceMonitorInterface(t *testing.T) {
 	var _ ResourceMonitor = (*standardResourceMonitor)(nil)
 	var _ ResourceMonitor = (*gzipResourceMonitor)(nil)
+}
+
+func TestGzipResourceHashDoesNotDecompress(t *testing.T) {
+	monitor := NewGzipResourceMonitor(&compressedFS, "testdata/compressed.tar.gz", "").(*gzipResourceMonitor)
+	monitor.SetNotify(func(float64, string) { t.Fatal("hashing must not initialize the decompressed FS") })
+	raw, err := compressedFS.ReadFile("testdata/compressed.tar.gz")
+	assert.NoError(t, err)
+	hash, err := monitor.GetHash()
+	assert.NoError(t, err)
+	assert.Equal(t, fmt.Sprintf("%x", sha256.Sum256(raw)), hash)
+}
+
+func TestGzipResourceReadErrorIsNotAnEmptyDirectory(t *testing.T) {
+	monitor := NewGzipResourceMonitor(&normalFS, "testdata/normal/file1.txt", "")
+	_, err := monitor.ReadDir(".")
+	assert.Error(t, err)
+	_, err = monitor.Stat(".")
+	assert.Error(t, err)
+	_, err = monitor.ReadFile("missing.yak")
+	assert.Error(t, err)
 }
