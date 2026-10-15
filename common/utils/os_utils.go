@@ -13,7 +13,6 @@ import (
 	"net/http"
 	"os"
 	"os/user"
-	"strings"
 	"sync"
 	"time"
 
@@ -24,6 +23,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/yaklang/yaklang/common/gmsm/gmtls"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils/yakitenv"
 	"golang.org/x/net/http2"
 )
 
@@ -249,20 +249,7 @@ func InGithubActions() bool {
 }
 
 func InTestcase() bool {
-	if len(os.Args) > 0 {
-		if strings.HasSuffix(strings.ToLower(os.Args[0]), ".test") {
-			return true
-		}
-	}
-	for _, v := range os.Args {
-		if strings.Contains(v, "-test.v") {
-			return true
-		}
-		if strings.Contains(v, "-test.run") {
-			return true
-		}
-	}
-	return false
+	return yakitenv.InTest()
 }
 
 func Debug(f func()) {
