@@ -139,18 +139,28 @@ func TestCorePluginSyncRollbackAndRetry(t *testing.T) {
 }
 
 func TestCorePluginItemHashStorage(t *testing.T) {
-	for _, raw := range []string{"null", "{"} {
-		t.Run(raw, func(t *testing.T) {
+	for _, tc := range []struct {
+		name, raw string
+		invalid   bool
+	}{
+		{name: "empty"},
+		{name: "null", raw: "null"},
+		{name: "legacy-json", raw: `{"first":"old-extractor"}`},
+		{name: "malformed", raw: "{", invalid: true},
+		{name: "array", raw: "[]", invalid: true},
+		{name: "non-string-hash", raw: `{"first":1}`, invalid: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
 			db := newCorePluginSyncDB(t)
-			require.NoError(t, yakit.SetKey(db, corePluginItemHashesKey, raw))
+			require.NoError(t, yakit.SetKey(db, corePluginItemHashesKey, tc.raw))
 			require.NoError(t, yakit.SetKey(db, corePluginEmbedKey, "previous"))
 			plugins := map[string]*builtinCorePlugin{"first": corePluginFixture("first")}
 			count := countCorePluginParses(t)
-			if raw == "{" {
+			if tc.invalid {
 				require.ErrorContains(t, syncCorePlugins(db, plugins, "archive:1", true), "read core plugin item hashes")
 				require.Zero(t, count.Load())
 				require.Equal(t, "previous", yakit.GetKey(db, corePluginEmbedKey))
-				require.Equal(t, raw, yakit.GetKey(db, corePluginItemHashesKey))
+				require.Equal(t, tc.raw, yakit.GetKey(db, corePluginItemHashesKey))
 				var rows int
 				require.NoError(t, db.Model(&schema.YakScript{}).Count(&rows).Error)
 				require.Zero(t, rows)
