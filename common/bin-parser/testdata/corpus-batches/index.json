@@ -103616,6 +103616,193 @@
         "common/pcapx/pcaputil/dhcp-phase/v6true-selected-server.expected.json": "dhcp-phase/v6true-ordinary.expected.json",
         "scripts/protocol-tests/required-tests-traffic-unified-v107.json": "required-tests-traffic-unified-v107.json"
       }
+    },
+    {
+      "id": "validation-radius-context",
+      "kind": "support",
+      "source_sha": "338785b4719f74b8f492e99c84e590ad108f388d",
+      "file": "validation-radius-context.zip",
+      "sha256": "068b483f32ead836d2232bfb093febf1993a307391da7ea4ded7fdf18f1fd2ce",
+      "password": "bin-parser",
+      "members": {
+        "radius-context-tools/build_inputs.py": {
+          "sha256": "dbda5b2ba53d73da45236b77c6d848bcd38601b27e945c5a1f4f325983e61798",
+          "bytes": 9560
+        },
+        "radius-context-tools/generate.py": {
+          "sha256": "a2288d92bf1c5bbbf04eebdea796948f77c8f2d2e318eaac6089ff2e44df7340",
+          "bytes": 445
+        },
+        "radius-context-tools/source-pins.json": {
+          "sha256": "5102f107b89b35630bf63984c0e90e4ee2331858a26a25a451cf28fb48545c47",
+          "bytes": 298
+        },
+        "radius-context-tools/verify.py": {
+          "sha256": "119c31db9b9f8d8ae6471841fda5afdab8a69affe8543ae7a3f41de57e7f5c01",
+          "bytes": 4445
+        },
+        "radius-context/accept.pcap": {
+          "sha256": "92efaa42ec6bcf22ce41f87168c6059641da6b8f3def782cd959c3ee5f78da00",
+          "bytes": 224
+        },
+        "radius-context/authenticator-only-live-change.pcap": {
+          "sha256": "37db826b700a0600e1e23c1d1c17acbc3d2d96ed190948b0914e8d2e73a1dbc9",
+          "bytes": 346
+        },
+        "radius-context/challenge-new-id.pcap": {
+          "sha256": "e5a8917ee3dabde05593492fe6cb6b737193c43f96eb54d419a3643281a4427d",
+          "bytes": 455
+        },
+        "radius-context/changed-terminal.pcap": {
+          "sha256": "d5b19108ee3a33a8d82467121477eeee962464232271a262e34cbe62feed8e2d",
+          "bytes": 302
+        },
+        "radius-context/completed-reuse.pcap": {
+          "sha256": "160dfd4f96d8f9082664da4248462a10155c3cc4603284af8163b40a51b6bb9a",
+          "bytes": 424
+        },
+        "radius-context/controls.json": {
+          "sha256": "eb744b6c770d29fbb8a904815b4cabea8d36a92996ceede9d9d70cde0775bba7",
+          "bytes": 135849
+        },
+        "radius-context/duplicate-nas-identifier.pcap": {
+          "sha256": "d19558a1f340aa7342a90e738e4a505765a4fe604f01ed0ce349185fd6cae4c2",
+          "bytes": 157
+        },
+        "radius-context/duplicate-nas-ip.pcap": {
+          "sha256": "0af9cb7da948621d1b207f8d889c4649ad921f8ae3d9489c21da171039a1ce0c",
+          "bytes": 152
+        },
+        "radius-context/duplicate-terminal.pcap": {
+          "sha256": "da65a31557ed2ba156b233e023b98bc1235f44098a9cba0adaf93ea1c61d812b",
+          "bytes": 302
+        },
+        "radius-context/duplicate-user-name.pcap": {
+          "sha256": "3c7edb87e4190339da1c66b69af66f7739c6df3605bed024e2baf5d65123f7e7",
+          "bytes": 153
+        },
+        "radius-context/exact-retry.pcap": {
+          "sha256": "45f204a553e7d882b16f7478066cd67b065f2d109e7ab55021e4c111444436e5",
+          "bytes": 346
+        },
+        "radius-context/expired-policy.pcap": {
+          "sha256": "69fac2fc2b48dc485aafa5e0ab68069355a2c5ae572d6671bfa35f831501e49f",
+          "bytes": 224
+        },
+        "radius-context/identifier-zero-reject.pcap": {
+          "sha256": "770de22be7cd8fa2754c70d1b7852ec98f4cb1175a527a98c990a8ba3880f12f",
+          "bytes": 224
+        },
+        "radius-context/interleaved-ids.pcap": {
+          "sha256": "918fbc30cbf05ea0c5ffe22cc86337cb9885b0688a55df003649937e8f7ebcb5",
+          "bytes": 429
+        },
+        "radius-context/live-changed-id.pcap": {
+          "sha256": "117111585f3cbd7b6b3d863067fac76840682347441c2ff8b8e7907417d7dbf9",
+          "bytes": 346
+        },
+        "radius-context/nas-width3.pcap": {
+          "sha256": "937e0c8c12fa6c01d3d1ae15b446a57ce814e700d434172118d80723c63feee1",
+          "bytes": 107
+        },
+        "radius-context/nonstandard-port.pcap": {
+          "sha256": "066323df4f5fe0cc0539f08c67524262d2b106f2d3c75267906ef66eba8cfece",
+          "bytes": 224
+        },
+        "radius-context/orphan-reply.pcap": {
+          "sha256": "bc9f7cf0d98f6157367a6f5cc8cf8a77d142458cee9cf85f54482321dc68c881",
+          "bytes": 102
+        },
+        "radius-context/orphan-then-reuse.pcap": {
+          "sha256": "0ef963e29e33cea68a5114f3395de568974ec2ce5e9160f4b9b87c41622b79c8",
+          "bytes": 302
+        },
+        "radius-context/padding.pcap": {
+          "sha256": "bb46808b282de93722d3d87eb45b6d2a04b2f028cf7a040034025381967fe064",
+          "bytes": 228
+        },
+        "radius-context/password-128.pcap": {
+          "sha256": "6091a54869d6315fb86a7960cf71d56c1eb3ebe298060e27d41384d07db3e80a",
+          "bytes": 238
+        },
+        "radius-context/password-width1.pcap": {
+          "sha256": "93accd74ca5be23164e665863f5c4d1a401c26d592de503cca1cfcd17d439bf7",
+          "bytes": 105
+        },
+        "radius-context/password-width129.pcap": {
+          "sha256": "46a89b9f867e384519081b39118cf8a2dac31c53053febd0c5f041b429d7bfc0",
+          "bytes": 233
+        },
+        "radius-context/password-width17.pcap": {
+          "sha256": "365c006e6b1abde2f2b731bd183c19a0af991e22033b0bcfc2393a09733cca3a",
+          "bytes": 121
+        },
+        "radius-context/reject.pcap": {
+          "sha256": "87023f0ca5afb420ad88bbf76ec942a3700c38da65f259c75843f6312a8921dd",
+          "bytes": 224
+        },
+        "radius-context/retry-renew-policy.pcap": {
+          "sha256": "1facbe30d0bfc10ec52abe0a0005213765a31dd03eaf83055542fb1e8ae8f01c",
+          "bytes": 346
+        },
+        "radius-context/truncated-tlv.pcap": {
+          "sha256": "6a9fee70854dfed33dc5000007d9baab53df6577f64c49a15e791b0d6d27038c",
+          "bytes": 105
+        },
+        "radius-context/unknown-attribute.pcap": {
+          "sha256": "0ddf45e4d51b79ff624b486763cfe58d09c209528cef637981b7178872453dd4",
+          "bytes": 150
+        },
+        "radius-context/wrong-direction.pcap": {
+          "sha256": "71c7e6dbb40c0b8a370e6f52a0051a4640981b8690d72a600d6b29524cdcd5bd",
+          "bytes": 302
+        },
+        "required-tests-traffic-unified-v108.json": {
+          "sha256": "dd4fd9de7f00f284849404228011e9cea6bf97ea8cfd6e70848c89aac2c224a3",
+          "bytes": 18227783
+        },
+        "validation/expected.json": {
+          "sha256": "e1e2655927f8b0e5d0b06e020331682c3f2ea0cff61d4517fe091bc5aa2464fe",
+          "bytes": 33024
+        }
+      },
+      "aliases": {
+        "common/pcapx/pcaputil/radius-context-tools/build_inputs.py": "radius-context-tools/build_inputs.py",
+        "common/pcapx/pcaputil/radius-context-tools/generate.py": "radius-context-tools/generate.py",
+        "common/pcapx/pcaputil/radius-context-tools/source-pins.json": "radius-context-tools/source-pins.json",
+        "common/pcapx/pcaputil/radius-context-tools/verify.py": "radius-context-tools/verify.py",
+        "common/pcapx/pcaputil/radius-context/accept.pcap": "radius-context/accept.pcap",
+        "common/pcapx/pcaputil/radius-context/authenticator-only-live-change.pcap": "radius-context/authenticator-only-live-change.pcap",
+        "common/pcapx/pcaputil/radius-context/challenge-new-id.pcap": "radius-context/challenge-new-id.pcap",
+        "common/pcapx/pcaputil/radius-context/changed-terminal.pcap": "radius-context/changed-terminal.pcap",
+        "common/pcapx/pcaputil/radius-context/completed-reuse.pcap": "radius-context/completed-reuse.pcap",
+        "common/pcapx/pcaputil/radius-context/controls.json": "radius-context/controls.json",
+        "common/pcapx/pcaputil/radius-context/duplicate-nas-identifier.pcap": "radius-context/duplicate-nas-identifier.pcap",
+        "common/pcapx/pcaputil/radius-context/duplicate-nas-ip.pcap": "radius-context/duplicate-nas-ip.pcap",
+        "common/pcapx/pcaputil/radius-context/duplicate-terminal.pcap": "radius-context/duplicate-terminal.pcap",
+        "common/pcapx/pcaputil/radius-context/duplicate-user-name.pcap": "radius-context/duplicate-user-name.pcap",
+        "common/pcapx/pcaputil/radius-context/exact-retry.pcap": "radius-context/exact-retry.pcap",
+        "common/pcapx/pcaputil/radius-context/expired-policy.pcap": "radius-context/expired-policy.pcap",
+        "common/pcapx/pcaputil/radius-context/identifier-zero-reject.pcap": "radius-context/identifier-zero-reject.pcap",
+        "common/pcapx/pcaputil/radius-context/interleaved-ids.pcap": "radius-context/interleaved-ids.pcap",
+        "common/pcapx/pcaputil/radius-context/live-changed-id.pcap": "radius-context/live-changed-id.pcap",
+        "common/pcapx/pcaputil/radius-context/nas-width3.pcap": "radius-context/nas-width3.pcap",
+        "common/pcapx/pcaputil/radius-context/nonstandard-port.pcap": "radius-context/nonstandard-port.pcap",
+        "common/pcapx/pcaputil/radius-context/orphan-reply.pcap": "radius-context/orphan-reply.pcap",
+        "common/pcapx/pcaputil/radius-context/orphan-then-reuse.pcap": "radius-context/orphan-then-reuse.pcap",
+        "common/pcapx/pcaputil/radius-context/padding.pcap": "radius-context/padding.pcap",
+        "common/pcapx/pcaputil/radius-context/password-128.pcap": "radius-context/password-128.pcap",
+        "common/pcapx/pcaputil/radius-context/password-width1.pcap": "radius-context/password-width1.pcap",
+        "common/pcapx/pcaputil/radius-context/password-width129.pcap": "radius-context/password-width129.pcap",
+        "common/pcapx/pcaputil/radius-context/password-width17.pcap": "radius-context/password-width17.pcap",
+        "common/pcapx/pcaputil/radius-context/reject.pcap": "radius-context/reject.pcap",
+        "common/pcapx/pcaputil/radius-context/retry-renew-policy.pcap": "radius-context/retry-renew-policy.pcap",
+        "common/pcapx/pcaputil/radius-context/truncated-tlv.pcap": "radius-context/truncated-tlv.pcap",
+        "common/pcapx/pcaputil/radius-context/unknown-attribute.pcap": "radius-context/unknown-attribute.pcap",
+        "common/pcapx/pcaputil/radius-context/wrong-direction.pcap": "radius-context/wrong-direction.pcap",
+        "common/pcapx/pcaputil/radius-context/attribute-budget.pcap": "radius-context/accept.pcap",
+        "scripts/protocol-tests/required-tests-traffic-unified-v108.json": "required-tests-traffic-unified-v108.json"
+      }
     }
   ],
   "schema_version": 1,

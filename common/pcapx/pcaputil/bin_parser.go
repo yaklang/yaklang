@@ -23,6 +23,7 @@ type ProtocolEvent struct {
 	nativeHARTIPObservation                  bool
 	nativeTLSObservation                     bool
 	nativeDTLSObservation                    bool
+	nativeRADIUSObservation                  bool
 	nativeSNMPObservation                    bool
 	nativeSTUNObservation                    bool
 	nativeSIPObservation                     bool
@@ -188,6 +189,21 @@ func (e *ProtocolEvent) Decode() (result map[string]any, err error) {
 			return result, nil
 		}
 	}
+	// Preserve the legacy RADIUS rule envelope and its independently owned
+	// passive Session; UDP uses its complete canonical observation instead.
+	if e.nativeRADIUSObservation {
+		if e.sessionError != nil {
+			owned := *e.sessionError
+			return nil, &owned
+		}
+		if e.semanticFields != nil {
+			out := map[string]any{"fields": cloneSession(e.semanticFields)}
+			if e.hasRuleMetadata {
+				out["metadata"] = cloneSessionValue(e.semanticMetadata)
+			}
+			return out, nil
+		}
+	}
 	if e.nativeDNSObservation || e.nativeATGObservation || e.nativeTFTPObservation || e.nativeDLMSOrSLMPObservation {
 		if e.semanticFields != nil {
 			return map[string]any{"fields": cloneSession(e.semanticFields)}, nil
@@ -343,7 +359,7 @@ func (e *ProtocolEvent) retainRuleEnvelope(result map[string]any) {
 }
 
 func (e *ProtocolEvent) ownsNativeFields() bool {
-	if e.nativeDHCPObservation || e.nativeDNSStreamObservation || e.nativeDNSObservation || e.nativeATGObservation || e.nativeDLMSOrSLMPObservation || e.nativeTFTPObservation || e.nativeSIPObservation || e.nativeSTUNObservation || e.nativeSNMPObservation || e.nativeTLSObservation || e.nativeDTLSObservation || e.nativeHARTIPObservation || e.nativeENIPObservation || e.nativeFINSObservation || e.nativeDiagnosticError != "" {
+	if e.nativeRADIUSObservation || e.nativeDHCPObservation || e.nativeDNSStreamObservation || e.nativeDNSObservation || e.nativeATGObservation || e.nativeDLMSOrSLMPObservation || e.nativeTFTPObservation || e.nativeSIPObservation || e.nativeSTUNObservation || e.nativeSNMPObservation || e.nativeTLSObservation || e.nativeDTLSObservation || e.nativeHARTIPObservation || e.nativeENIPObservation || e.nativeFINSObservation || e.nativeDiagnosticError != "" {
 		return true
 	}
 	if e.nativeDoIPObservation {
@@ -608,6 +624,7 @@ type binParser struct {
 	pfcpUntrackedRefusal                                                       bool // udpMu; forgotten rejected identity cannot verify a newly admitted PFCP key
 	dlmsUntrackedRefusal                                                       bool // udpMu; no fresh HDLC association after an unretained admitted refusal
 	hartUntrackedRefusal                                                       bool // udpMu; unidentified refusals cannot start a fresh association
+	radiusUntrackedRefusal                                                     bool // udpMu; unretained RADIUS history
 	snmpUntrackedRefusal                                                       bool // udpMu; only newly untrackable SNMP conversations are conservative
 	finsUntrackedRefusal                                                       bool // udpMu; unretained identity cannot become a fresh generation
 	slmpUntrackedRefusal                                                       bool // udpMu; refused unretained SLMP identity has no verified generation

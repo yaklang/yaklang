@@ -44,7 +44,7 @@ Run from the repository root:
 ```sh
 go run ./internal/trafficfixture/cmd/corpus test
 go test -json -count=1 -timeout=10m ./internal/trafficfixture/... ./common/bin-parser/... ./common/pcapx/... ./common/yak/cmd/yakcmds/shark-cli ./scripts/ci > traffic.jsonl
-go run ./internal/trafficfixture/cmd/corpus exec -- python3 @scripts/protocol-tests/check_go_test_json_v2.py traffic.jsonl --inventory @scripts/protocol-tests/required-tests-traffic-unified-v107.json --tier full
+go run ./internal/trafficfixture/cmd/corpus exec -- python3 @scripts/protocol-tests/check_go_test_json_v2.py traffic.jsonl --inventory @scripts/protocol-tests/required-tests-traffic-unified-v108.json --tier full
 ```
 
 The single `corpus` entry point uses the same bounded Go ZIP loader as tests.
@@ -83,7 +83,7 @@ their semantic coverage. The existing synthetic session keys are test inputs;
 production credentials, user private keys and material without redistribution
 permission belong in an external fixed-source download manifest.
 
-Current test requirements are sealed at `scripts/protocol-tests/required-tests-traffic-unified-v107.json`;
+Current test requirements are sealed at `scripts/protocol-tests/required-tests-traffic-unified-v108.json`;
 the historical inventories and all earlier batches remain unchanged.
 The supplemental small-corpus batch contains 26 minimal controls, their explicit
 expected facts, an offline generator and the compact pinned source manifest.
@@ -203,7 +203,7 @@ opaque selector bytes and one bounded Data value over Wrapper v1 TCP/UDP; object
 selector meaning, access permission and device operation are unverified. The
 original one-packet selective-access capture and original refused answer remain
 immutable; its now-supported answer is matched by exact input SHA and frame.
-The active inventory is `scripts/protocol-tests/required-tests-traffic-unified-v107.json`.
+The active inventory is `scripts/protocol-tests/required-tests-traffic-unified-v108.json`.
 
 The small-graph budget batch reuses accepted graph captures/answers and adds one
 249-byte UDP control for child count255 without child bytes. Its standalone proof
@@ -993,7 +993,7 @@ the normative answer; a missing numeric reference field is not a codec pass.
 Full/deferred, workers1/2/4, observers off/on, Feed chunks1/7/full, ownership,
 resources and close/refusal boundaries remain required.
 
-Current gate: `required-tests-traffic-unified-v107.json` with
+Current gate: `required-tests-traffic-unified-v108.json` with
 `check_go_test_json_v2.py`. The indexed validator preserves missing/unpassed,
 package invocation completion, descendant skips, failures and non-JSON checks;
 its mutation/differential harness is sealed with the material. Older checkers
@@ -1629,7 +1629,7 @@ userspace adapter; full kernel receiver/socket/timers and ECU endpoints do not.
 All161 preceding ZIPs remain byte-for-byte unchanged. Raw captures, dependencies,
 reference source/build output and process evidence stay outside Git.
 
-Current effective v107 inventory: 71,909 entries; 71,902 are mandatory for the full tier.
+Current effective v108 inventory: 72,370 entries; 72,363 are mandatory for the full tier.
 
 The opt-in `DynamicFlowControl` profile follows Linux v6.12 FC tuple updates (including WAIT without granting data). Disjoint address extensions or classical/FD carriers may share CAN IDs; unknown selectors cannot choose or mutate a conversation. Ambiguous selectors are rejected. Seven sealed cases exercise full/deferred, workers 1/2/4, and observer off/on, with exact fields, byte collections, contributor references, errors and resource ownership. The existing static FC profile remains unchanged. Pinned upstream FC and filter functions execute with declared userspace stubs; this is not a kernel/ECU endpoint. TShark 4.2.5 checks wire tuples and two complete payloads, but cannot independently reassemble the shared-address transcripts.
 
@@ -1716,3 +1716,5 @@ DHCP context controls reuse the fixed historical full wire/field goldens to cons
 The same DHCP batch adds eleven refusal scenarios using ten unique deterministic pcapng captures; marker-allocation pressure reuses the exact unknown-prefix capture by content hash. Pending/first rejected input, unrelated clients/interfaces, nonstandard DHCPv4 and unknown DHCPv6 DUID prefixes preserve conservative association. Bounded exact or domain/relay/XID history is charged; matching known candidates are quarantined even when the marker cannot fit, without corrupting retained separate owners.132 additional full/deferred workers1/2/4 observer views assert complete selected fields/Session/links/provenance/typed refusals, Raw previews, full denied byte counts and Close release. SourceBytes hashes retained Raw.200 earlier ZIPs are unchanged. The added unique-wire reference checks are separate from authenticated lease/endpoint or whole-original semantic truth.
 
 The native DHCP phase batch separates the transaction root from the observed request answered by each response: Offer/Advertise and Request/ACK/Reply retain explicit phase conditions. BOOTP role, identity singletons and fixed option widths are checked; selected-server mismatch and absent Rapid Commit cannot manufacture owners. Only exact/elapsed-only retransmission renews its phase; expired discovery replies and foreign servers do not age an active Request.33 logical controls reuse32 unique captures, with complete independent fields/types/Session/order/links,396 packet/message callback configurations,66 native datagram views and compact state/Close/ownership guards. Fixed RFC source pins and actual pinned tshark wire facts complement the passive-policy oracle.201 earlier ZIPs remain unchanged; real client/lease/allocation/authentication and whole-original semantics are not claimed.
+
+The RADIUS Access observation batch adds native UDP request/response context, selected complete header/ordered attributes, explicit unverified authentication, declared Length with ignored UDP padding, Identifier zero Reject, direction/digest/retry and charged completed/orphan/refused identity history.29 literal controls use348 capture configurations and58 native UDP views; byte-denial exact counters/owned preview, pending Close, interface/VLAN isolation and legacy field-tree/metadata/type compatibility are separately guarded. Synthetic Response MD5 construction proves fixtures only; no shared-secret verification, device access decision, complete endpoint attribute schema or whole-original oracle is claimed.202 prior ZIPs are unchanged.

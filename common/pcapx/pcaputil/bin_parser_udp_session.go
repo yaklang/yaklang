@@ -702,6 +702,13 @@ func (a *binParser) closeUDPSessions() {
 		for _, el := range s.entries {
 			v := el.Value.(*binUDPEntry)
 			f := v.flow
+			if state := f.radius; state != nil && state.outstanding() > 0 {
+				summary := "RADIUS UDP unmatched observed Identifiers"
+				e := &ProtocolEvent{FlowID: f.id, Timestamp: v.touched, Domain: v.key.domain, Transport: "udp", Source: f.endpoints[0], Destination: f.endpoints[1], Protocol: "radius", nativeRADIUSObservation: true, Profile: "radius-access-observed", Status: "incomplete", Completeness: "incomplete", Summary: summary, Error: summary, Session: map[string]any{"Outstanding": state.outstanding()}, sessionError: &ProtocolError{Kind: ErrNeedMore, Message: summary}}
+				e.semanticSession = cloneSession(e.Session)
+				incomplete = append(incomplete, e)
+				a.incomplete.Add(1)
+			}
 			if p := f.hart; p != nil && len(p.pending) > 0 {
 				dir := max(p.client, 0)
 				summary := "HART-IP UDP outstanding observed requests"

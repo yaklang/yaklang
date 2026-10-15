@@ -320,7 +320,7 @@ func (f *binFlow) detectDirection(dir int, wire []byte) {
 	case "tns":
 		f.protocol, f.tns = "tns", &binTNS{}
 	case "radius":
-		f.protocol, f.radius = "radius", &binRADIUS{pending: map[uint8]string{}}
+		f.protocol, f.radius = "radius", &binRADIUS{}
 	case "dhcp":
 		f.protocol, f.dhcp = "dhcp", &binDHCP{pending: map[uint32]string{}}
 	case "ntp":
@@ -689,7 +689,7 @@ func (f *binFlow) consumeSession(dir int, e *ProtocolEvent, result map[string]an
 	case "tns":
 		e.Session, err = f.tns.consume(e.Raw)
 	case "radius":
-		e.Session, err = f.radius.consume(e.Raw, f.a.budget.MaxCollectionElements)
+		err = f.consumeRADIUS(dir, e, e.Raw, result)
 	case "dhcp":
 		e.Session, err = f.dhcp.consume(e.Raw)
 	case "ntp":
@@ -1350,8 +1350,15 @@ func (f *binFlow) finishSession(reason TrafficFlowCloseReason) {
 	if n := f.tns; n != nil && n.pending > 0 {
 		emit(0, map[string]any{"Outstanding": n.pending}, "TNS exchange ended with unmatched Connect")
 	}
-	if r := f.radius; r != nil && len(r.pending) > 0 {
-		emit(0, map[string]any{"Outstanding": len(r.pending)}, "RADIUS exchange ended with unmatched Identifiers")
+	if r := f.radius; r != nil && r.outstanding() > 0 {
+		e := f.event(0, nil, "incomplete", string(reason)+": RADIUS unmatched observed Identifiers")
+		e.nativeRADIUSObservation, e.Profile, e.Completeness = true, "radius-access-observed", "incomplete"
+		e.Session = map[string]any{"Outstanding": r.outstanding()}
+		e.semanticSession = cloneSession(e.Session)
+		e.sessionError = &ProtocolError{Kind: ErrNeedMore, Message: e.Summary}
+		e.Error = e.Summary
+		f.a.incomplete.Add(1)
+		f.a.emit(e)
 	}
 	if d := f.dhcp; d != nil && len(d.pending) > 0 {
 		emit(0, map[string]any{"Outstanding": len(d.pending)}, "DHCP exchange ended with unmatched xids")

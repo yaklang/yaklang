@@ -265,21 +265,5 @@ func (f *binFlow) needsMoreSSHServerPreamble(dir int, wire []byte) bool {
 }
 
 func radiusDatagramEvidence(w []byte, src, dst string) bool {
-	if probeRADIUS(w, len(w)).Verdict != ProbeAccept || int(binary.BigEndian.Uint16(w[2:4])) != len(w) {
-		return false
-	}
-	// A known carrier still reports malformed attributes; arbitrary ports need
-	// complete attribute spans rather than a four-byte length coincidence.
-	_, sp, _ := net.SplitHostPort(src)
-	_, dp, _ := net.SplitHostPort(dst)
-	if sp == "1812" || sp == "1813" || dp == "1812" || dp == "1813" {
-		return true
-	}
-	for at := 20; at < len(w); {
-		if at+2 > len(w) || w[at+1] < 2 || at+int(w[at+1]) > len(w) {
-			return false
-		}
-		at += int(w[at+1])
-	}
-	return true
+	return radiusAdmittedDatagram(w, src, dst)
 }
