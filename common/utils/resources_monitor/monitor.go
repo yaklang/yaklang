@@ -1,7 +1,9 @@
 package resources_monitor
 
 import (
+	"crypto/sha256"
 	"embed"
+	"fmt"
 	"io/fs"
 	"os"
 	"path"
@@ -58,6 +60,7 @@ type gzipResourceMonitor struct {
 	notify     func(float64, string)
 
 	initOnce sync.Once
+	initErr  error
 	fs       filesys_interface.FileSystem
 }
 
@@ -105,6 +108,7 @@ func (g *gzipResourceMonitor) ensureInit() {
 		}
 		if err != nil {
 			log.Errorf("init gzip embed[%s] failed: %v", g.fileName, err)
+			g.initErr = err
 			g.fs = gzip_embed.NewEmptyPreprocessingEmbed()
 			return
 		}
@@ -117,13 +121,20 @@ func (g *gzipResourceMonitor) ensureInit() {
 
 func (g *gzipResourceMonitor) GetHash() (string, error) {
 	// For gzip embed, we just calculate the hash of the embedded tar.gz file
-	return filesys.CreateEmbedFSHash(*g.rawFS)
+	raw, err := g.rawFS.ReadFile(g.fileName)
+	if err != nil {
+		return "", err
+	}
+	return fmt.Sprintf("%x", sha256.Sum256(raw)), nil
 }
 
 // Delegate all FileSystem methods to the underlying fs instance
 
 func (g *gzipResourceMonitor) ReadDir(name string) ([]fs.DirEntry, error) {
 	g.ensureInit()
+	if g.initErr != nil {
+		return nil, g.initErr
+	}
 	entries, err := g.fs.ReadDir(name)
 	if err == nil {
 		return entries, nil
@@ -136,6 +147,9 @@ func (g *gzipResourceMonitor) ReadDir(name string) ([]fs.DirEntry, error) {
 
 func (g *gzipResourceMonitor) ReadFile(name string) ([]byte, error) {
 	g.ensureInit()
+	if g.initErr != nil {
+		return nil, g.initErr
+	}
 	data, err := g.fs.ReadFile(name)
 	if err == nil {
 		return data, nil
@@ -172,6 +186,9 @@ func (g *gzipResourceMonitor) Open(name string) (fs.File, error) {
 
 func (g *gzipResourceMonitor) Stat(name string) (fs.FileInfo, error) {
 	g.ensureInit()
+	if g.initErr != nil {
+		return nil, g.initErr
+	}
 	info, err := g.fs.Stat(name)
 	if err == nil {
 		return info, nil

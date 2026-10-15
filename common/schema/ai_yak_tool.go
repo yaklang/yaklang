@@ -6,6 +6,9 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
+// Bump when builtin metadata, CLI conversion or SSA extraction changes its output.
+const BuiltinAIToolExtractorVersion = "1"
+
 type AIYakTool struct {
 	gorm.Model
 
@@ -86,6 +89,9 @@ func (*AIYakTool) TableName() string {
 }
 
 func (d *AIYakTool) CalcHash() string {
+	if d.IsBuiltin {
+		return utils.CalcSha1(d.Name, d.Content, d.Path, BuiltinAIToolExtractorVersion)
+	}
 	return utils.CalcSha1(d.Name, d.Content, d.Params, d.Path, d.Description, d.Keywords, d.Usage)
 }
 

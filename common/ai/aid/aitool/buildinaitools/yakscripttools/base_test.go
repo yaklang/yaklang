@@ -137,7 +137,7 @@ func TestRemoveRetiredBuiltInAIToolsPreservesCustomTools(t *testing.T) {
 	edited.Content = `println("user customized content")`
 	_, err = yakit.UpdateAIYakToolByID(db, edited)
 	assert.NilError(t, err)
-	assert.NilError(t, removeRetiredBuiltInAITools(db))
+	assert.NilError(t, removeRetiredBuiltInAITools(db, "do_http_request"))
 
 	var remaining []schema.AIYakTool
 	assert.NilError(t, db.Find(&remaining).Error)
@@ -176,7 +176,7 @@ func TestPCAPCoreToolRename(t *testing.T) {
 	for _, name := range []string{"query_pcap_in_db", "pcapdb"} {
 		assert.NilError(t, db.Create(&schema.AIYakTool{Name: name, IsBuiltin: true}).Error)
 	}
-	assert.NilError(t, removeRetiredBuiltInAITools(db))
+	assert.NilError(t, removeRetiredBuiltInAITools(db, "query_pcapdb"))
 	var remaining []schema.AIYakTool
 	assert.NilError(t, db.Find(&remaining).Error)
 	assert.Equal(t, len(remaining), 1)
@@ -185,7 +185,7 @@ func TestPCAPCoreToolRename(t *testing.T) {
 	for _, name := range []string{"query_pcap_in_db", "pcapdb"} {
 		assert.NilError(t, db.Create(&schema.AIYakTool{Name: name, Author: schema.AIResourceAuthorBuiltin, IsBuiltin: false}).Error)
 	}
-	assert.NilError(t, removeRetiredBuiltInAITools(db))
+	assert.NilError(t, removeRetiredBuiltInAITools(db, "query_pcapdb"))
 	var count int64
 	assert.NilError(t, db.Model(&schema.AIYakTool{}).Count(&count).Error)
 	assert.Equal(t, count, int64(3))

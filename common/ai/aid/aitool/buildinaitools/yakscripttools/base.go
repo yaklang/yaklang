@@ -10,6 +10,9 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
+
+	"golang.org/x/sync/errgroup"
 
 	"github.com/yaklang/gorm"
 	"github.com/yaklang/yaklang/common/consts"
@@ -21,7 +24,7 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/mcp/yakcliconvert"
 	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
-	utils "github.com/yaklang/yaklang/common/utils/resources_monitor"
+	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/static_analyzer"
 )
 
@@ -33,6 +36,8 @@ type FileSystemWithHash interface {
 	GetHash() (string, error)
 }
 
+const builtinAIToolEmbedKey = "2b709ef7252a06a0c1cfbb952f77f976"
+
 func init() {
 	InitEmbedFS()
 	yakit.RegisterPostInitDatabaseFunction(func() error {
@@ -42,13 +47,17 @@ func init() {
 				return nil
 			}
 		}
-		const key = "2b709ef7252a06a0c1cfbb952f77f976"
-		err := utils.NewEmbedResourcesMonitor(key, consts.ExistedBuildInAIToolEmbedFSHash).MonitorModifiedWithAction(func() string {
-			buildinHash, _ := BuildInAIToolHash()
-			return buildinHash
-		}, func() error {
-			return OverrideYakScriptAiTools()
-		})
+		hash := consts.ExistedBuildInAIToolEmbedFSHash
+		if consts.IsDevMode() {
+			var err error
+			hash, err = BuildInAIToolHash()
+			if err != nil {
+				return err
+			}
+		}
+		overrideYakScriptAiToolsMu.Lock()
+		err := syncBuiltinAITools(consts.GetGormProfileDatabase(), hash+":"+schema.BuiltinAIToolExtractorVersion)
+		overrideYakScriptAiToolsMu.Unlock()
 		if err != nil {
 			return err
 		}
@@ -62,7 +71,8 @@ func UpdateAIYakToolAIOutputOption() {
 	if db == nil {
 		return
 	}
-	db = db.Model(&schema.AIYakTool{}).Where("enable_ai_output_log = ?", 0)
+	// Only legacy user tools need the fallback; builtin tools are parsed at sync.
+	db = db.Model(&schema.AIYakTool{}).Where("enable_ai_output_log = ? AND is_builtin = ?", 0, false)
 	toolsChan := yakit.YieldAllAITools(context.Background(), db)
 	for tool := range toolsChan {
 		mode := ParseAIToolEnableAIOutputLog(tool.Content)
@@ -82,6 +92,10 @@ func ParseAIToolEnableAIOutputLog(code string) int {
 		log.Warnf("failed to parse AI tool content for AIOutput: %v", err)
 		return 1
 	}
+	return aiToolOutputMode(code, prog)
+}
+
+func aiToolOutputMode(code string, prog *ssaapi.Program) int {
 	if prog.SyntaxFlowChain(`AIOutput<getCallee> as $call`).Len() > 0 {
 		return 2
 	}
@@ -95,7 +109,16 @@ func BuildInAIToolHash() (string, error) {
 	return yakScriptFS.GetHash()
 }
 
+func GetEmbedFS() fi.FileSystem {
+	InitEmbedFS()
+	return yakScriptFS
+}
+
 var overrideYakScriptAiToolsMu sync.Mutex
+
+var parseBuiltinAITool = func(name, content string) *schema.AIYakTool {
+	return loadYakScriptToAiTools(name, content, false)
+}
 
 func OverrideYakScriptAiTools() error {
 	overrideYakScriptAiToolsMu.Lock()
@@ -104,42 +127,104 @@ func OverrideYakScriptAiTools() error {
 }
 
 func overrideYakScriptAiTools(db *gorm.DB) error {
+	return syncBuiltinAITools(db, "")
+}
+
+func syncBuiltinAITools(db *gorm.DB, resourceHash string) error {
 	if db == nil {
 		return fmt.Errorf("AI tool profile database is not initialized")
 	}
+	if resourceHash != "" && yakit.GetKey(db, builtinAIToolEmbedKey) == resourceHash {
+		return nil
+	}
+	start := time.Now()
 	aiTools, err := loadAllYakScriptFromEmbedFS()
 	if err != nil {
 		return fmt.Errorf("load builtin AI tools: %w", err)
 	}
-	// Roll back failed syncs so the resource monitor can retry safely.
-	return db.Transaction(func(tx *gorm.DB) error {
-		if err := removeRetiredBuiltInAITools(tx); err != nil {
-			return fmt.Errorf("remove retired builtin AI tools: %w", err)
+	// Include colliding user names in the same query so an edited builtin is
+	// never overwritten or recreated (Author remains builtin after an edit).
+	names := make([]string, 0, len(aiTools))
+	for _, tool := range aiTools {
+		names = append(names, tool.Name)
+	}
+	var stored []schema.AIYakTool
+	if err := db.Select("id, name, hash, is_builtin, enable_ai_output_log").
+		Where("is_builtin = ? OR name IN (?)", true, names).Find(&stored).Error; err != nil {
+		return err
+	}
+	existing := make(map[string]schema.AIYakTool, len(stored))
+	for _, tool := range stored {
+		existing[tool.Name] = tool
+	}
+	changed := make([]*schema.AIYakTool, 0)
+	for _, tool := range aiTools {
+		old, ok := existing[tool.Name]
+		delete(existing, tool.Name)
+		if ok && (!old.IsBuiltin || (old.Hash == tool.CalcHash() && old.EnableAIOutputLog != 0)) {
+			continue
 		}
-		for _, aiTool := range aiTools {
-			if _, err := yakit.SaveAIYakTool(tx, aiTool); err != nil {
-				return fmt.Errorf("save builtin AI tool %q: %w", aiTool.Name, err)
+		tool.ID = old.ID
+		changed = append(changed, tool)
+	}
+	group := new(errgroup.Group)
+	group.SetLimit(2)
+	for i, tool := range changed {
+		group.Go(func() error {
+			parsed := parseBuiltinAITool(tool.Name, tool.Content)
+			if parsed == nil {
+				return fmt.Errorf("parse builtin AI tool %q.yak", tool.Path)
 			}
+			parsed.ID, parsed.Author, parsed.IsBuiltin, parsed.Path = tool.ID, tool.Author, true, tool.Path
+			changed[i] = parsed
+			return nil
+		})
+	}
+	if err := group.Wait(); err != nil {
+		return err
+	}
+	deleted := 0
+	for _, old := range existing {
+		if old.IsBuiltin {
+			deleted++
+		}
+	}
+	err = db.Transaction(func(tx *gorm.DB) error {
+		if err := removeRetiredBuiltInAITools(tx, names...); err != nil {
+			return err
+		}
+		for _, tool := range changed {
+			if tool.ID == 0 {
+				err = tx.Create(tool).Error
+			} else {
+				updates := tool.ToUpdateMap()
+				delete(updates, "is_favorite")
+				err = tx.Model(tool).Where("is_builtin = ?", true).Updates(updates).Error
+			}
+			if err != nil {
+				return fmt.Errorf("save builtin AI tool %q: %w", tool.Name, err)
+			}
+		}
+		if resourceHash != "" {
+			return yakit.SetKey(tx, builtinAIToolEmbedKey, resourceHash)
 		}
 		return nil
 	})
+	if err == nil {
+		log.Infof("ai-tool sync: total=%d changed=%d deleted=%d elapsed=%s", len(aiTools), len(changed), deleted, time.Since(start))
+	}
+	return err
 }
 
 // 清理升级前写入 profile 数据库的内置工具，保留同名的用户自定义工具。
-func removeRetiredBuiltInAITools(db *gorm.DB) error {
-	retiredNames := []string{
-		"http_response_diff",
-		"url_content_summary",
-		"send_http_request_by_url",
-		"send_http_request_packet",
-		// Previous names of query_pcapdb; remove only the stored builtin records.
-		"query_pcap_in_db",
-		"pcapdb",
-	}
+func removeRetiredBuiltInAITools(db *gorm.DB, currentNames ...string) error {
 	// Editing a builtin clears IsBuiltin but preserves Author. Author alone
 	// cannot distinguish a retired builtin from user-owned content.
-	return db.Where("name IN (?) AND is_builtin = ?", retiredNames, true).
-		Unscoped().Delete(&schema.AIYakTool{}).Error
+	db = db.Where("is_builtin = ?", true)
+	if len(currentNames) > 0 {
+		db = db.Where("name NOT IN (?)", currentNames)
+	}
+	return db.Unscoped().Delete(&schema.AIYakTool{}).Error
 }
 
 func loadAllYakScriptFromEmbedFS() ([]*schema.AIYakTool, error) {
@@ -164,19 +249,9 @@ func loadAllYakScriptFromEmbedFS() ([]*schema.AIYakTool, error) {
 		if err != nil {
 			return fmt.Errorf("read builtin AI tool %q: %w", s, err)
 		}
-		aiTool := LoadYakScriptToAiTools(toolname, string(content))
-		if aiTool == nil {
-			return fmt.Errorf("parse builtin AI tool %q", s)
-		}
-		aiTool.Author = schema.AIResourceAuthorBuiltin
-		aiTool.IsBuiltin = true
+		aiTool := &schema.AIYakTool{Name: toolname, Content: string(content), Author: schema.AIResourceAuthorBuiltin, IsBuiltin: true}
 
-		namePath := ""
-		dirnameClean, ok := strings.CutPrefix(dirname, `yakscriptforai`)
-		if ok {
-			namePath = dirnameClean
-		}
-		namePath = strings.Trim(namePath, `/`)
+		namePath := strings.Trim(strings.TrimPrefix(dirname, "yakscriptforai"), "/")
 		aiTool.Path = filepath.Join(namePath, toolname)
 
 		aiTools = append(aiTools, aiTool)
@@ -201,8 +276,13 @@ func loadAllYakScriptFromEmbedFS() ([]*schema.AIYakTool, error) {
 // dump(tool)
 // ```
 func LoadYakScriptToAiTools(name string, content string) *schema.AIYakTool {
+	return loadYakScriptToAiTools(name, content, true)
+}
+
+func loadYakScriptToAiTools(name, content string, enableCache bool) *schema.AIYakTool {
 	// Parse once and reuse the program for both metadata and CLI parameter conversion
-	prog, err := static_analyzer.SSAParse(content, "yak")
+	// Cached programs are mutable; each sync worker owns its program.
+	prog, err := static_analyzer.SSAParse(content, "yak", ssaapi.WithEnableCache(enableCache))
 	if err != nil {
 		log.Warnf("static_analyzer.SSAParse content[%q] failed: %v", name, err)
 		return nil
@@ -225,15 +305,16 @@ func LoadYakScriptToAiTools(name string, content string) *schema.AIYakTool {
 	}
 	params, _ := json.Marshal(tool.InputSchema.ToMap())
 	return &schema.AIYakTool{
-		Name:          name,
-		VerboseName:   ins.VerboseName,
-		VerboseNameZh: ins.VerboseNameZh,
-		Description:   ins.Description,
-		Keywords:      strings.Join(ins.Keywords, ","),
-		Usage:         ins.Usage,
-		DefaultAsync:  ins.DefaultAsync,
-		Content:       content,
-		Params:        string(params),
+		EnableAIOutputLog: aiToolOutputMode(content, prog),
+		Name:              name,
+		VerboseName:       ins.VerboseName,
+		VerboseNameZh:     ins.VerboseNameZh,
+		Description:       ins.Description,
+		Keywords:          strings.Join(ins.Keywords, ","),
+		Usage:             ins.Usage,
+		DefaultAsync:      ins.DefaultAsync,
+		Content:           content,
+		Params:            string(params),
 	}
 }
 
