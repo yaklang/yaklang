@@ -3,11 +3,14 @@ package aiforge
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"strconv"
 	"strings"
 	"sync"
+
+	"github.com/yaklang/gorm"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon/promptloader"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
@@ -17,6 +20,7 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/builtinmetadata"
 	"github.com/yaklang/yaklang/common/utils/resources_monitor"
 	"github.com/yaklang/yaklang/common/yak/static_analyzer"
 	"github.com/yaklang/yaklang/common/yak/static_analyzer/information"
@@ -189,6 +193,9 @@ const buildInForgeEmbedKey = "6ef3c850244a2b26ed0b163d1fda9600"
 // syncBuildInForgeInternal 将内置 AI forge 从 embed 同步到数据库，不更新 hash（由调用方决定）
 func syncBuildInForgeInternal() error {
 	resetBuildInForgeRegisterTrace()
+	var syncError error
+	register := registerBuildInForge
+	registerBuildInForge := func(name string) { syncError = errors.Join(syncError, register(name)) }
 	registerBuildInForge("web_log_monitor")
 	registerBuildInForge("flow_report") // 流量分析报告生成
 
@@ -199,20 +206,21 @@ func syncBuildInForgeInternal() error {
 	registerBuildInForge("alert_denoising")
 	registerBuildInForge("sf_rule_completion")
 	registerBuildInForge("sf_project_scan_check")
-	cleanupRemovedBuildInForges()
-	return nil
+	return errors.Join(syncError, cleanupRemovedBuildInForges())
 }
 
-func cleanupRemovedBuildInForges() {
+func cleanupRemovedBuildInForges() error {
 	db := consts.GetGormProfileDatabase()
 	if db == nil {
-		return
+		return fmt.Errorf("profile database is unavailable")
 	}
+	var result error
 	for _, name := range []string{"entity_identify", "log_event_formatter", "event_analyzer"} {
 		if err := yakit.DeleteAIForgeByName(db, name); err != nil {
-			log.Warnf("delete removed buildin forge %s failed: %v", name, err)
+			result = errors.Join(result, fmt.Errorf("delete removed builtin forge %s: %w", name, err))
 		}
 	}
+	return result
 }
 
 // ForceSyncBuildInForge 强制同步内置 AI forge 到数据库，忽略哈希检查（用于版本更新后修复导入失败等场景）
@@ -220,15 +228,23 @@ func ForceSyncBuildInForge() error {
 	if err := syncBuildInForgeInternal(); err != nil {
 		return err
 	}
-	yakit.Set(buildInForgeEmbedKey, consts.ExistedBuildInForgeEmbedFSHash)
+	hash := consts.ExistedBuildInForgeEmbedFSHash
+	if consts.IsDevMode() && !builtinmetadata.Enabled {
+		var err error
+		hash, err = BuildInForgeHash()
+		if err != nil {
+			return err
+		}
+	}
+	yakit.Set(buildInForgeEmbedKey, builtinmetadata.ResourceHash(hash, "forge:"))
 	return nil
 }
 
 func init() {
 	yakit.RegisterPostInitDatabaseFunction(func() error {
-		return resources_monitor.NewEmbedResourcesMonitor(buildInForgeEmbedKey, consts.ExistedBuildInForgeEmbedFSHash).MonitorModifiedWithAction(func() string {
+		return resources_monitor.NewEmbedResourcesMonitor(buildInForgeEmbedKey, builtinmetadata.ResourceHash(consts.ExistedBuildInForgeEmbedFSHash, "forge:")).MonitorModifiedWithAction(func() string {
 			buildinHash, _ := BuildInForgeHash()
-			return buildinHash
+			return builtinmetadata.ResourceHash(buildinHash, "forge:")
 		}, syncBuildInForgeInternal)
 	}, "sync-buildin-ai-forge")
 }
@@ -250,36 +266,35 @@ func getBuildInForgeYakScript(name string) (*schema.AIForge, error) {
 }
 
 func buildAIForgeFromYakCode(forgeName string, codeBytes []byte) (*schema.AIForge, error) {
-	prog, err := static_analyzer.SSAParse(string(codeBytes), "yak")
-	if err != nil {
-		return nil, err
+	meta, ok := builtinmetadata.Lookup("forge:"+forgeName, string(codeBytes))
+	if !ok {
+		prog, err := static_analyzer.SSAParse(string(codeBytes), "yak")
+		if err != nil {
+			return nil, err
+		}
+		scriptMetadata, err := metadata.ParseYakScriptMetadataProg(forgeName, prog)
+		if err != nil {
+			return nil, utils.Errorf("parse yak script metadata failed: %v", err)
+		}
+		uiParamsConfig, _, err := information.GenerateParameterFromProgram(prog)
+		if err != nil {
+			return nil, utils.Errorf("generate yak script parameters failed: %v", err)
+		}
+		meta = builtinmetadata.Metadata{
+			VerboseName: scriptMetadata.VerboseName, Description: scriptMetadata.Description,
+			Keywords: strings.Join(scriptMetadata.Keywords, ","), Parameters: unquote(uiParamsConfig),
+		}
 	}
-
-	scriptMetadata, err := metadata.ParseYakScriptMetadataProg(forgeName, prog)
-	if err != nil {
-
-		return nil, utils.Errorf("parse yak script metadata failed: %v", err)
-	}
-
-	uiParamsConfig, _, err := information.GenerateParameterFromProgram(prog)
-	if err != nil {
-		return nil, utils.Errorf("generate yak script parameters failed: %v", err)
-	}
-
-	// Remove outer quotes from uiParamsConfig if present
-	// GenerateParameterFromProgram uses strconv.Quote which adds outer quotes
-	// But frontend expects raw JSON array string without outer quotes
-	uiParamsConfig = unquote(uiParamsConfig)
 
 	return &schema.AIForge{
-		ForgeName:        scriptMetadata.Name,
-		ForgeVerboseName: scriptMetadata.VerboseName,
-		Description:      scriptMetadata.Description,
-		Tags:             strings.Join(scriptMetadata.Keywords, ","),
+		ForgeName:        forgeName,
+		ForgeVerboseName: meta.VerboseName,
+		Description:      meta.Description,
+		Tags:             meta.Keywords,
 		Author:           schema.AIResourceAuthorBuiltin,
 		IsBuiltin:        true,
 		ForgeContent:     string(codeBytes),
-		ParamsUIConfig:   uiParamsConfig,
+		ParamsUIConfig:   meta.Parameters,
 		ForgeType:        schema.FORGE_TYPE_YAK,
 	}, nil
 }
@@ -360,6 +375,10 @@ func buildAIForgeFromConfig(name string, configBytes []byte, codeContent []byte,
 	// Generate ParamsUIConfig from code content if available
 	// This is critical for frontend to display UI parameters correctly
 	if len(codeContent) > 0 && forge.ForgeContent != "" {
+		if meta, ok := builtinmetadata.Lookup("forge:"+name, forge.ForgeContent); ok {
+			forge.ParamsUIConfig = meta.Parameters
+			return string(configBytes), forge, nil
+		}
 		prog, err := static_analyzer.SSAParse(forge.ForgeContent, "yak")
 		if err == nil {
 			uiParamsConfig, _, err := information.GenerateParameterFromProgram(prog)
@@ -403,18 +422,23 @@ func getBuildInForgeFromFS(name string) (*schema.AIForge, error) {
 	return forge, nil
 }
 
-func registerBuildInForge(name string) {
+func registerBuildInForge(name string) error {
 	noteBuildInForgeRegistration(name)
 	forge, err := getBuildInForgeFromFS(name)
 	if err != nil {
-		log.Error(err)
-		return
+		return fmt.Errorf("load builtin forge %s: %w", name, err)
 	}
-	err = yakit.CreateOrUpdateAIForgeByName(consts.GetGormProfileDatabase(), forge.ForgeName, forge)
-	if err != nil {
-		log.Errorf("create or update forge %v failed: %v", name, err)
-		return
+	if err := saveBuiltinForge(consts.GetGormProfileDatabase(), forge); err != nil {
+		return fmt.Errorf("save builtin forge %s: %w", name, err)
 	}
+	return nil
+}
+
+func saveBuiltinForge(db *gorm.DB, forge *schema.AIForge) error {
+	fields := forge.ToUpdateMap()
+	delete(fields, "user_persistent_data")
+	return db.Model(&schema.AIForge{}).Where("forge_name = ?", forge.ForgeName).
+		Assign(fields).FirstOrCreate(forge).Error
 }
 
 func UpdateForgesMetaData(inputDir, outputDir string, concurrency int, forceUpdate bool) error {

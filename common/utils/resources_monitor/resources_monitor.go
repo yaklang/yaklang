@@ -2,6 +2,7 @@ package resources_monitor
 
 import (
 	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/utils/builtinmetadata"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 )
 
@@ -18,7 +19,7 @@ func NewEmbedResourcesMonitor(resourceID string, buildInHash string) *EmbedResou
 }
 
 func (m *EmbedResourcesMonitor) getCurrentHash(currentHashGetter func() string) string {
-	if consts.IsDevMode() {
+	if consts.IsDevMode() && !builtinmetadata.Enabled {
 		return currentHashGetter()
 	} else {
 		return m.buildInHash

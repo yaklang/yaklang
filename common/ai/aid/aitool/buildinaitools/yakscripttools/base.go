@@ -20,12 +20,20 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools/yakscripttools/metadata"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/mcp/yakcliconvert"
+	"github.com/yaklang/yaklang/common/utils/builtinmetadata"
 	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 	utils "github.com/yaklang/yaklang/common/utils/resources_monitor"
+	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/static_analyzer"
 )
 
 //go:generate gzip-embed -cache --source ./yakscriptforai --gz yakscriptforai.tar.gz --no-embed
+
+// GetEmbedFS exposes the same resource interface in both build modes.
+func GetEmbedFS() fi.FileSystem {
+	InitEmbedFS()
+	return yakScriptFS
+}
 
 // FileSystemWithHash 是一个带有 GetHash 方法的文件系统接口
 type FileSystemWithHash interface {
@@ -43,9 +51,9 @@ func init() {
 			}
 		}
 		const key = "2b709ef7252a06a0c1cfbb952f77f976"
-		err := utils.NewEmbedResourcesMonitor(key, consts.ExistedBuildInAIToolEmbedFSHash).MonitorModifiedWithAction(func() string {
+		err := utils.NewEmbedResourcesMonitor(key, builtinmetadata.ResourceHash(consts.ExistedBuildInAIToolEmbedFSHash, "tool:")).MonitorModifiedWithAction(func() string {
 			buildinHash, _ := BuildInAIToolHash()
-			return buildinHash
+			return builtinmetadata.ResourceHash(buildinHash, "tool:")
 		}, func() error {
 			return OverrideYakScriptAiTools()
 		})
@@ -82,6 +90,10 @@ func ParseAIToolEnableAIOutputLog(code string) int {
 		log.Warnf("failed to parse AI tool content for AIOutput: %v", err)
 		return 1
 	}
+	return aiToolEnableAIOutputLog(prog, code)
+}
+
+func aiToolEnableAIOutputLog(prog *ssaapi.Program, code string) int {
 	if prog.SyntaxFlowChain(`AIOutput<getCallee> as $call`).Len() > 0 {
 		return 2
 	}
@@ -117,7 +129,11 @@ func overrideYakScriptAiTools(db *gorm.DB) error {
 			return fmt.Errorf("remove retired builtin AI tools: %w", err)
 		}
 		for _, aiTool := range aiTools {
-			if _, err := yakit.SaveAIYakTool(tx, aiTool); err != nil {
+			fields := aiTool.ToUpdateMap()
+			// Resource/schema upgrades must retain the user's favorite choice.
+			delete(fields, "is_favorite")
+			if err := tx.Model(&schema.AIYakTool{}).Where("name = ?", aiTool.Name).
+				Assign(fields).FirstOrCreate(aiTool).Error; err != nil {
 				return fmt.Errorf("save builtin AI tool %q: %w", aiTool.Name, err)
 			}
 		}
@@ -164,7 +180,7 @@ func loadAllYakScriptFromEmbedFS() ([]*schema.AIYakTool, error) {
 		if err != nil {
 			return fmt.Errorf("read builtin AI tool %q: %w", s, err)
 		}
-		aiTool := LoadYakScriptToAiTools(toolname, string(content))
+		aiTool := loadBuiltinAITool(toolname, string(content))
 		if aiTool == nil {
 			return fmt.Errorf("parse builtin AI tool %q", s)
 		}
@@ -183,6 +199,18 @@ func loadAllYakScriptFromEmbedFS() ([]*schema.AIYakTool, error) {
 		return nil
 	})
 	return aiTools, err
+}
+
+func loadBuiltinAITool(name, content string) *schema.AIYakTool {
+	if meta, ok := builtinmetadata.Lookup("tool:"+name, content); ok {
+		return &schema.AIYakTool{
+			Name: name, Content: content, Params: meta.Parameters,
+			VerboseName: meta.VerboseName, VerboseNameZh: meta.VerboseNameZh,
+			Description: meta.Description, Keywords: meta.Keywords, Usage: meta.Usage,
+			EnableAIOutputLog: meta.EnableAIOutputLog,
+		}
+	}
+	return LoadYakScriptToAiTools(name, content)
 }
 
 // LoadYakScriptToAiTools 将一段 Yak 插件源码解析为 AI 工具描述（导出名为 aiagent.ParseYakScriptToAiTools）
@@ -225,14 +253,17 @@ func LoadYakScriptToAiTools(name string, content string) *schema.AIYakTool {
 	}
 	params, _ := json.Marshal(tool.InputSchema.ToMap())
 	return &schema.AIYakTool{
-		Name:          name,
-		VerboseName:   ins.VerboseName,
-		VerboseNameZh: ins.VerboseNameZh,
-		Description:   ins.Description,
-		Keywords:      strings.Join(ins.Keywords, ","),
-		Usage:         ins.Usage,
-		Content:       content,
-		Params:        string(params),
+		// Reuse the metadata/parameter program so first-run synchronization does
+		// not parse every builtin again in UpdateAIYakToolAIOutputOption.
+		EnableAIOutputLog: aiToolEnableAIOutputLog(prog, content),
+		Name:              name,
+		VerboseName:       ins.VerboseName,
+		VerboseNameZh:     ins.VerboseNameZh,
+		Description:       ins.Description,
+		Keywords:          strings.Join(ins.Keywords, ","),
+		Usage:             ins.Usage,
+		Content:           content,
+		Params:            string(params),
 	}
 }
 

@@ -177,19 +177,25 @@ func initializeDatabase(projectDatabase string, profileDBName string, ssadb stri
 	if isVersionCommand() {
 		return nil
 	}
+	start := time.Now()
 	// project and profile
 	if err := consts.InitializeYakitDatabase(projectDatabase, profileDBName, ssadb); err != nil {
 		return err
 	}
+	log.Debugf("database startup: open and migrate took %s", time.Since(start))
 
 	// cve
+	start = time.Now()
 	_, err := consts.InitializeCVEDatabase()
 	if err != nil {
 		log.Warnf("initialized cve database failed: %v", err)
 	}
+	log.Debugf("database startup: cve took %s", time.Since(start))
 
 	// 调用一些数据库初始化的操作
+	start = time.Now()
 	err = yakit.CallPostInitDatabase()
+	log.Debugf("database startup: post-init took %s", time.Since(start))
 	if err != nil {
 		return utils.Errorf("CallPostInitDatabase failed: %s", err)
 	}

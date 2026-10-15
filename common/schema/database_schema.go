@@ -1,6 +1,8 @@
 package schema
 
 import (
+	"time"
+
 	"github.com/samber/lo"
 	"github.com/yaklang/gorm"
 	"github.com/yaklang/yaklang/common/log"
@@ -160,6 +162,10 @@ func RegisterDatabaseSchema(key uint8, schema ...any) {
 }
 
 func AutoMigrate(db *gorm.DB, key uint8) {
+	start := time.Now()
+	defer func() {
+		log.Debugf("database migrate: %s took %s", KeySchemaToName(key), time.Since(start))
+	}()
 	if schemas, ok := databaseSchemas[key]; ok {
 		if len(schemas) == 0 {
 			log.Errorf("Database schema [%v] is empty", KeySchemaToName(key))

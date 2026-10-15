@@ -1,13 +1,16 @@
 package coreplugin
 
 import (
+	"errors"
 	"strings"
 
 	uuid "github.com/google/uuid"
+	"github.com/yaklang/gorm"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/builtinmetadata"
 	"github.com/yaklang/yaklang/common/utils/resources_monitor"
 	"github.com/yaklang/yaklang/common/yak/static_analyzer"
 	"github.com/yaklang/yaklang/common/yak/static_analyzer/information"
@@ -68,10 +71,10 @@ func withPluginEnableForAI(desc string, keywords string) pluginOption {
 	}
 }
 
-func registerBuildInPlugin(pluginType string, name string, opt ...pluginOption) {
+func registerBuildInPlugin(pluginType string, name string, opt ...pluginOption) error {
 	codes := string(GetCorePluginData(name))
 	if len(codes) <= 0 {
-		return
+		return utils.Errorf("missing builtin plugin source: %s", name)
 	}
 
 	config := &pluginConfig{}
@@ -98,7 +101,7 @@ func registerBuildInPlugin(pluginType string, name string, opt ...pluginOption) 
 		AIKeywords:         config.AIKeywords,
 	}
 	buildInPlugin[name] = plugin
-	OverWriteYakPlugin(plugin.ScriptName, plugin, config.EnableGenerateParam)
+	return overwriteYakPlugin(consts.GetGormProfileDatabase(), plugin.ScriptName, plugin, config.EnableGenerateParam)
 }
 
 var BlackListCorePlugin = []string{
@@ -117,6 +120,11 @@ const corePluginEmbedKey = "cd336beba498c97738c275f6771efca3"
 
 // syncCorePluginEmbedInternal 将内置 core plugin 从 embed 同步到数据库，不更新 hash（由调用方决定）
 func syncCorePluginEmbedInternal() error {
+	var syncError error
+	register := registerBuildInPlugin
+	registerBuildInPlugin := func(pluginType, name string, opts ...pluginOption) {
+		syncError = errors.Join(syncError, register(pluginType, name, opts...))
+	}
 	log.Debug("start to load core plugin")
 	registerBuildInPlugin(
 		"mitm",
@@ -510,7 +518,7 @@ func syncCorePluginEmbedInternal() error {
 			"allow-custom-multiple-history-mutate",
 		}),
 	)
-	return nil
+	return syncError
 }
 
 // ForceSyncCorePlugin 强制同步内置 core plugin 到数据库，忽略哈希检查（用于版本更新后修复导入失败等场景）
@@ -518,16 +526,24 @@ func ForceSyncCorePlugin() error {
 	if err := syncCorePluginEmbedInternal(); err != nil {
 		return err
 	}
-	yakit.Set(corePluginEmbedKey, consts.ExistedCorePluginEmbedFSHash)
+	hash := consts.ExistedCorePluginEmbedFSHash
+	if consts.IsDevMode() && !builtinmetadata.Enabled {
+		var err error
+		hash, err = CorePluginHash()
+		if err != nil {
+			return err
+		}
+	}
+	yakit.Set(corePluginEmbedKey, builtinmetadata.ResourceHash(hash, "plugin:"))
 	return nil
 }
 
 func init() {
 	yakit.RegisterPostInitDatabaseFunction(func() error {
 		ClearBlackListPlugin(BlackListCorePlugin)
-		return resources_monitor.NewEmbedResourcesMonitor(corePluginEmbedKey, consts.ExistedCorePluginEmbedFSHash).MonitorModifiedWithAction(func() string {
+		return resources_monitor.NewEmbedResourcesMonitor(corePluginEmbedKey, builtinmetadata.ResourceHash(consts.ExistedCorePluginEmbedFSHash, "plugin:")).MonitorModifiedWithAction(func() string {
 			hash, _ := CorePluginHash()
-			return hash
+			return builtinmetadata.ResourceHash(hash, "plugin:")
 		}, syncCorePluginEmbedInternal)
 	}, "sync-core-plugin-for-yakit")
 
@@ -591,9 +607,18 @@ func OverWriteCorePluginToLocal() {
 }
 
 func OverWriteYakPlugin(name string, scriptData *schema.YakScript, enableGenerateParam bool) {
+	if err := overwriteYakPlugin(consts.GetGormProfileDatabase(), name, scriptData, enableGenerateParam); err != nil {
+		log.Errorf("sync builtin plugin %s failed: %v", name, err)
+	}
+}
+
+func overwriteYakPlugin(db *gorm.DB, name string, scriptData *schema.YakScript, enableGenerateParam bool) error {
 	var err error
 	generateParam := func(code, pluginType string) (string, string, error) {
 		if enableGenerateParam {
+			if meta, ok := builtinmetadata.Lookup("plugin:"+pluginType+":"+name, code); ok {
+				return meta.Parameters, meta.EnvironmentKeys, nil
+			}
 			oldLevel := log.GetLevel()
 			log.SetLevel(log.ErrorLevel)
 			defer log.SetLevel(oldLevel)
@@ -616,12 +641,14 @@ func OverWriteYakPlugin(name string, scriptData *schema.YakScript, enableGenerat
 	codeBytes := GetCorePluginData(name)
 	code := string(codeBytes)
 	if codeBytes == nil {
-		log.Errorf("fetch buildin-plugin: %v failed", name)
-		return
+		return utils.Errorf("fetch builtin plugin: %s failed", name)
 	}
 	newestPluginHash := pluginHash(code, scriptData.HeadImg, scriptData.Tags, scriptData.Ignored, scriptData.EnableForAI, scriptData.AIDesc, scriptData.AIKeywords)
 
-	databasePlugins := yakit.QueryYakScriptByNames(consts.GetGormProfileDatabase(), name)
+	var databasePlugins []*schema.YakScript
+	if err := db.Where("script_name = ?", name).Find(&databasePlugins).Error; err != nil {
+		return err
+	}
 	if len(databasePlugins) == 0 {
 		log.Infof("add core plugin %v to plugin database", name)
 		// 添加核心插件字段
@@ -629,13 +656,9 @@ func OverWriteYakPlugin(name string, scriptData *schema.YakScript, enableGenerat
 		// 生成参数
 		scriptData.Params, scriptData.PluginEnvKey, err = generateParam(code, scriptData.Type)
 		if err != nil {
-			log.Error(err)
+			return err
 		}
-		err = yakit.CreateOrUpdateYakScriptByName(consts.GetGormProfileDatabase(), name, scriptData)
-		if err != nil {
-			log.Errorf("create/update yak script[%v] failed: %s", name, err)
-		}
-		return
+		return yakit.CreateOrUpdateYakScriptByName(db, name, scriptData)
 	}
 	databasePlugin := databasePlugins[0]
 	if scriptData.Type == schema.SCRIPT_TYPE_CONTEXT_MENU && databasePlugin.Uuid != "" {
@@ -644,24 +667,40 @@ func OverWriteYakPlugin(name string, scriptData *schema.YakScript, enableGenerat
 		scriptData.Uuid = databasePlugin.Uuid
 	}
 	if databasePlugin.Content != "" && newestPluginHash == pluginHash(databasePlugin.Content, databasePlugin.HeadImg, databasePlugin.Tags, databasePlugin.Ignored, databasePlugin.EnableForAI, databasePlugin.AIDesc, databasePlugin.AIKeywords) && databasePlugin.IsCorePlugin {
+		// Extractor changes can alter parameters without changing plugin source.
+		// Refresh only derived fields instead of deleting/recreating the plugin.
+		if enableGenerateParam {
+			params, envKeys, err := generateParam(code, scriptData.Type)
+			if err != nil {
+				return err
+			}
+			if params != databasePlugin.Params || envKeys != databasePlugin.PluginEnvKey {
+				if err := db.Model(&schema.YakScript{}).
+					Where("id = ?", databasePlugin.ID).UpdateColumns(map[string]interface{}{
+					"params": params, "plugin_env_key": envKeys,
+				}).Error; err != nil {
+					return err
+				}
+			}
+		}
 		log.Debugf("existed plugin's code is not changed, skip: %v", name)
-		return
+		return nil
 	} else {
 		// 生成参数
 		scriptData.Params, scriptData.PluginEnvKey, err = generateParam(string(codeBytes), scriptData.Type)
 		if err != nil {
-			log.Error(err)
+			return err
 		}
-		err := yakit.DeleteYakScriptByIDs(consts.GetGormProfileDatabase(), int64(databasePlugin.ID))
+		err := yakit.DeleteYakScriptByIDs(db, int64(databasePlugin.ID))
 		if err != nil {
-			log.Warnf("delete legacy script reason: overrid")
+			return err
 		}
 		log.Infof("start to override existed plugin: %v", name)
-		err = yakit.CreateOrUpdateYakScriptByName(consts.GetGormProfileDatabase(), name, scriptData)
+		err = yakit.CreateOrUpdateYakScriptByName(db, name, scriptData)
 		if err != nil {
-			log.Errorf("override %v failed: %s", name, err)
-			return
+			return err
 		}
 		log.Debugf("override buildin-plugin %v success", name)
 	}
+	return nil
 }
