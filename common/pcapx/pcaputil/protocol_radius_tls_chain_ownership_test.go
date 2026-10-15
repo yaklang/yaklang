@@ -12,7 +12,10 @@ import (
 // Poison every public result before feeding the next datagram, while the
 // incomplete method body and outer request owners are still retained.
 func TestRADIUSTLSChainActiveOwnership(t *testing.T) {
-	for _, c := range radiusTLSChainControls(t) {
+	radiusTLSActiveOwnershipCases(t, radiusTLSChainControls(t))
+}
+func radiusTLSActiveOwnershipCases(t *testing.T, controls []radiusEAPControl) {
+	for _, c := range controls {
 		for _, deferred := range []bool{false, true} {
 			t.Run(fmt.Sprintf("%s/d%t", c.Name, deferred), func(t *testing.T) {
 				s, err := NewProtocolSessionWithOptions(radiusEAPBudget(c), WithSessionTransport("udp"), WithSessionPorts(c.Ports[0], c.Ports[1]))
@@ -91,8 +94,11 @@ func TestRADIUSTLSChainActiveOwnership(t *testing.T) {
 // it behind a completed/tombstone flag. Outer IDs and the independent neighbor
 // are asserted by the same full-answer checker as the ordinary matrix.
 func TestRADIUSTLSChainResourceRelease(t *testing.T) {
+	radiusTLSResourceReleaseCases(t, radiusTLSChainControls(t), 0)
+}
+func radiusTLSResourceReleaseCases(t *testing.T, controls []radiusEAPControl, newRetiredOwnerCost int64) {
 	found := false
-	for _, c := range radiusTLSChainControls(t) {
+	for _, c := range controls {
 		if c.Budget.MaxCollectionElements == 0 {
 			continue
 		}
@@ -119,7 +125,7 @@ func TestRADIUSTLSChainResourceRelease(t *testing.T) {
 				require.Equal(t, want, out.Events[0].Session)
 				if pendingBytes > 0 && w.Error == "ResourceExceeded" {
 					found = true
-					require.LessOrEqual(t, s.Stats().BufferedBytes, before-pendingBytes, "refused aggregate must release at least its owned prefix without discarding the neighbor's outer ID")
+					require.LessOrEqual(t, s.Stats().BufferedBytes, before+newRetiredOwnerCost-pendingBytes, "refused aggregate must release at least its owned prefix without discarding the neighbor's outer ID")
 					pendingBytes = 0
 				}
 				if inner, ok := want["EAP"].(map[string]any); ok {

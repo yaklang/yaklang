@@ -11,9 +11,14 @@ import (
 // This is an observed RADIUS/EAP adjacency chain, not an authenticated TLS
 // session. State is opaque and not unique. A chain additionally requires a
 // stable NAS + port + station descriptor and a unique observed request root.
+// Fixed retained-structure charge includes the extended round headers; dynamic
+// backing capacities remain charged separately, before allocation.
+const radiusTLSRoundStorage = 320
+
 type radiusTLSRounds struct {
-	owners map[radiusKey]radiusTLSOwner
-	rounds []*radiusTLSRound
+	peerOffers []radiusTLSPeerOffer
+	owners     map[radiusKey]radiusTLSOwner
+	rounds     []*radiusTLSRound
 }
 type radiusTLSOwner struct {
 	context [32]byte
@@ -26,6 +31,7 @@ type radiusTLSFragmentView struct {
 	complete             bool
 }
 type radiusTLSRound struct {
+	peer                       bool
 	history                    []radiusTLSFragmentView
 	context                    [32]byte
 	root, next, lastReply      radiusKey
@@ -42,9 +48,12 @@ func (r *radiusTLSRounds) storage() int64 {
 	if r == nil {
 		return 0
 	}
-	n := int64(512 + 128*len(r.owners) + 8*cap(r.rounds))
+	n := int64(512 + 128*len(r.owners) + 8*cap(r.rounds) + 192*cap(r.peerOffers))
+	for _, o := range r.peerOffers {
+		n += int64(cap(o.state))
+	}
 	for _, c := range r.rounds {
-		n += 256 + int64(cap(c.state)+cap(c.data)) + 96*int64(cap(c.history))
+		n += radiusTLSRoundStorage + int64(cap(c.state)+cap(c.data)) + 96*int64(cap(c.history))
 	}
 	return n
 }
@@ -193,6 +202,9 @@ func (f *binFlow) observeRADIUSTLSRound(dir int, e *ProtocolEvent, wire []byte, 
 	typ, _ := inner["Type"].(byte)
 	tls, _ := inner["TLS"].(map[string]any)
 	ctx, haveContext := radiusTLSDescriptor(fields)
+	if handled, err := f.observeRADIUSTLSPeerRound(dir, e, wire, fields, inner, tls, original); handled {
+		return err
+	}
 	if wire[0] == 1 && haveContext && original == nil {
 		p, known := s.pending[key]
 		if !s.untracked && len(s.pending) < f.a.budget.MaxCollectionElements && (!known || !p.retired && !p.completed && p.digest == digest) {
@@ -235,7 +247,7 @@ func (f *binFlow) observeRADIUSTLSRound(dir int, e *ProtocolEvent, wire []byte, 
 		candidates := make([]*radiusTLSRound, 0)
 		activeContext := false
 		for _, c := range r.rounds {
-			if !c.retired && !c.done && c.context == ctx && c.root.dir == key.dir {
+			if !c.peer && !c.retired && !c.done && c.context == ctx && c.root.dir == key.dir {
 				activeContext = true
 				if !haveState || bytes.Equal(c.state, state) {
 					candidates = append(candidates, c)
@@ -291,7 +303,7 @@ func (f *binFlow) observeRADIUSTLSRound(dir int, e *ProtocolEvent, wire []byte, 
 	// Every accepted fragment has a bounded observation snapshot. Replaying
 	// an earlier first/middle fragment cannot create another active flight.
 	for _, c := range r.rounds {
-		if !c.retired {
+		if !c.peer && !c.retired {
 			for _, v := range c.history {
 				if v.key == key && v.digest == digest {
 					if v.complete {
@@ -312,7 +324,7 @@ func (f *binFlow) observeRADIUSTLSRound(dir int, e *ProtocolEvent, wire []byte, 
 	}
 	var linked *radiusTLSRound
 	for _, c := range r.rounds {
-		if !c.retired && !c.done && !c.awaitingACK && c.next == key {
+		if !c.peer && !c.retired && !c.done && !c.awaitingACK && c.next == key {
 			if linked != nil {
 				linked.discard()
 				c.discard()
@@ -340,7 +352,7 @@ func (f *binFlow) observeRADIUSTLSRound(dir int, e *ProtocolEvent, wire []byte, 
 		if len(data) == 0 || uint64(len(data)) >= uint64(declared) {
 			return original
 		}
-		extra := int64(360 + len(state) + len(data))
+		extra := int64(radiusTLSRoundStorage + 104 + len(state) + len(data))
 		if err := f.reserveSession(s.storage() + extra); err != nil {
 			radiusTLSRoundDiagnostic(fields, "")
 			return &radiusEAPFailure{err}

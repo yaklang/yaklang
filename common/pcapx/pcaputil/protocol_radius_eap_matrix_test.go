@@ -323,7 +323,17 @@ func radiusEAPCheck(t *testing.T, c radiusEAPControl, events []*ProtocolEvent, c
 			require.Equal(t, events[0].FlowID, e.FlowID)
 			require.Equal(t, CaptureDomain{}, e.Domain)
 			require.Zero(t, e.Direction)
-			require.Equal(t, events[len(c.Steps)-1].Timestamp, e.Timestamp)
+			closeTime := events[len(c.Steps)-1].Timestamp
+			if legacy {
+				// Existing byte Close is direction0-scoped; native UDP uses
+				// conversation touched time. Do not invent identical clocks.
+				for _, step := range c.Steps {
+					if step.Direction == 0 {
+						closeTime = time.Unix(step.At, step.Nanos)
+					}
+				}
+			}
+			require.Equal(t, closeTime, e.Timestamp)
 		}
 		f, err := e.GetFields()
 		require.Nil(t, f)

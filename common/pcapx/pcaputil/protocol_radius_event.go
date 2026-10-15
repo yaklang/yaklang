@@ -30,7 +30,24 @@ func (f *binFlow) consumeRADIUS(dir int, e *ProtocolEvent, wire []byte, legacy .
 	}
 	if err != nil {
 		e.radiusApplicationRefusal = selected != nil
+		var key radiusKey
+		hadIdentity := false
+		knownEAP := fields["EAP"] != nil
+		if knownEAP {
+			key = radiusIdentity(dir, wire)
+			_, hadIdentity = s.pending[key]
+		}
 		s.retire(dir, wire, len(s.pending) < f.a.budget.MaxCollectionElements)
+		// A completely parsed EAP refusal is still EAP wire evidence. A new
+		// tombstone must not fabricate an additional non-EAP Access profile.
+		// Preserve existing owners' known subtype, and never allocate a denied
+		// identity just to improve this diagnostic projection.
+		if knownEAP && !hadIdentity {
+			if owner, ok := s.pending[key]; ok {
+				owner.eap = true
+				s.pending[key] = owner
+			}
+		}
 		f.refuseRADIUSTLSRound(dir, wire)
 		if fields != nil {
 			e.Session = fields

@@ -105597,6 +105597,142 @@
         "common/pcapx/pcaputil/radius-tls-chain/wrong-EAP-ACK-Identifier.pcap": "radius-tls-chain/wrong-EAP-ACK-Identifier.pcap",
         "scripts/protocol-tests/required-tests-traffic-unified-v115.json": "required-tests-traffic-unified-v115.json"
       }
+    },
+    {
+      "id": "validation-radius-tls-peer",
+      "kind": "support",
+      "source_sha": "7f2def729d04323c52b6690415ec2eca6ae1e4fe",
+      "file": "validation-radius-tls-peer.zip",
+      "sha256": "761b235a9158dbac84afc26d9a8b71251d3bc62bce9f24248acb65ffac02f1de",
+      "password": "bin-parser",
+      "members": {
+        "radius-tls-peer-tools/generate.py": {
+          "sha256": "097266cc48f9efb7e99207e2bc858e33ee843d277784b25f4f1e516032685063",
+          "bytes": 12786
+        },
+        "radius-tls-peer-tools/generate_profile.py": {
+          "sha256": "0d7b66727d26c30f59f888ae61027e77e618127278b61da673c097a57ee3e570",
+          "bytes": 6624
+        },
+        "radius-tls-peer-tools/sources.json": {
+          "sha256": "04edb18db44f4959f8e2dc1b443c0e202425d3bd891649859008dc82ad62d012",
+          "bytes": 2498
+        },
+        "radius-tls-peer-tools/validate.py": {
+          "sha256": "b95c419cb13721bd575f5fda8e8e5bb8f710ab3dd2187d17355ee4857da996d1",
+          "bytes": 4060
+        },
+        "radius-tls-peer-tools/validate_profile.py": {
+          "sha256": "a15e9a6e20291523b16791b689c9dbdf8472db96a26607276e1998f1cc10dde6",
+          "bytes": 3141
+        },
+        "radius-tls-peer-tools/verify.py": {
+          "sha256": "2d29c8fa0bd52d8981b32af2f06924b1301c0bff867853d3d7260463da3cbc36",
+          "bytes": 3395
+        },
+        "radius-tls-peer/carrier-budget-sidecar.json": {
+          "sha256": "543c1a4e107943f4ec37435ce0e7729043347386da28df7f3f7da37d1a46615d",
+          "bytes": 2043
+        },
+        "radius-tls-peer/controls.json": {
+          "sha256": "36cd6734565135b76608172e4efb0ca13ef65a6bb033c48b61608f7738461e8d",
+          "bytes": 312179
+        },
+        "radius-tls-peer/genuine-nonEAP-mixed-adjacent.pcap": {
+          "sha256": "9eda5231009270007c9f9141a31611ec64a15ca524858f4d644b41e8f1040d7e",
+          "bytes": 354
+        },
+        "radius-tls-peer/known-nonEAP-sameID-later-EAP-refusal-remains-mixed.pcap": {
+          "sha256": "6fccc5026b2f61513c261587123dda0141d8375f5d265d2b6030f09034a311bb",
+          "bytes": 354
+        },
+        "radius-tls-peer/legacy-compatibility.json": {
+          "sha256": "a992ae24c05e7739503e8bab1cbedc211be9d7574400db9d834b8732b5e41d9c",
+          "bytes": 11024
+        },
+        "radius-tls-peer/peer-aggregate-record-cap-refusal-neighbor-late.pcap": {
+          "sha256": "8942146ccd2f9fb1af7f2a5d6aa3d8eb08a87ae5bfcbe621236dc163420e9ef1",
+          "bytes": 1239
+        },
+        "radius-tls-peer/peer-exact-first-query-retry-before-ACK-noappend.pcap": {
+          "sha256": "fa1ccb039f99fdc79e6d182c66f64f7cf1594743a21b2e90e0d95acfc0d3e9c4",
+          "bytes": 981
+        },
+        "radius-tls-peer/peer-first-query-missing-State.pcap": {
+          "sha256": "a05d9e6c2f756bcef90484429e7f21a6d6a31fd44ebf7b2283966b84b7ca2a3a",
+          "bytes": 669
+        },
+        "radius-tls-peer/peer-first-query-wrong-State.pcap": {
+          "sha256": "4c47cc7149bb383dc5bd1b98e870605c15977a7cba77dd3c9c2da3f743a823b0",
+          "bytes": 673
+        },
+        "radius-tls-peer/peer-missing-server-ACK-no-State-adjacency.pcap": {
+          "sha256": "c0e2ec5b96f22f0edd2fd174642b1c5e55844deb5f73f664042e5a9ec90a5c72",
+          "bytes": 852
+        },
+        "radius-tls-peer/peer-opposite-direction-same-descriptor-State-ID-isolated.pcap": {
+          "sha256": "f35fc7502053ea9a5b14d17c7ee33b85cf67fa5aa015b3cc491c7ed78419799f",
+          "bytes": 1620
+        },
+        "radius-tls-peer/peer-pending-prefix-Close.pcap": {
+          "sha256": "606aabe849c0f1e8ec735c618bb238df29b7bafbca77c70f89d2549ad91dfee8",
+          "bytes": 433
+        },
+        "radius-tls-peer/peer-server-ACK-Identifier-not-incremented.pcap": {
+          "sha256": "6ce6a05048e5780f12025f7a32da8dce62605ca76bdcf8aa889b86b49d1a58ee",
+          "bytes": 960
+        },
+        "radius-tls-peer/peer-two-fragments-Start-State-ACK-complete.pcap": {
+          "sha256": "3e57a2be856136e52172ec3170d44298c3f4e88cf94fbe25a41ab38ecfdf787d",
+          "bytes": 822
+        },
+        "radius-tls-peer/profile-legacy.json": {
+          "sha256": "2934272c1dac3ae8d5f692e445355c03f30acd6feb8ee51bcc16de8f67f8a766",
+          "bytes": 2114
+        },
+        "radius-tls-peer/profile-refusals.json": {
+          "sha256": "d1620fbd52c12fc1910cd698f87e144187fa4fcf5d11d1698a7046ad1116757d",
+          "bytes": 39726
+        },
+        "radius-tls-peer/pure-known-EAP-refusal-profile-oldfail.pcap": {
+          "sha256": "6f29d3bf240b6c3a00a1bee3d5f7af2e83509ae6cc15b2f38cffa81cf3036c7d",
+          "bytes": 260
+        },
+        "required-tests-traffic-unified-v116.json": {
+          "sha256": "f7c9bcf39bfd6fdd20d9273c082aac11b6c8f5cf026f96817aa5aa0f45288689",
+          "bytes": 19712794
+        },
+        "validation/expected.json": {
+          "sha256": "b9e8a0c0f5c1b53091b439dac577d752dcc14cf3dbe4e6af45fc779ac0cacd70",
+          "bytes": 15694
+        }
+      },
+      "aliases": {
+        "common/pcapx/pcaputil/radius-tls-peer-tools/generate.py": "radius-tls-peer-tools/generate.py",
+        "common/pcapx/pcaputil/radius-tls-peer-tools/generate_profile.py": "radius-tls-peer-tools/generate_profile.py",
+        "common/pcapx/pcaputil/radius-tls-peer-tools/sources.json": "radius-tls-peer-tools/sources.json",
+        "common/pcapx/pcaputil/radius-tls-peer-tools/validate.py": "radius-tls-peer-tools/validate.py",
+        "common/pcapx/pcaputil/radius-tls-peer-tools/validate_profile.py": "radius-tls-peer-tools/validate_profile.py",
+        "common/pcapx/pcaputil/radius-tls-peer-tools/verify.py": "radius-tls-peer-tools/verify.py",
+        "common/pcapx/pcaputil/radius-tls-peer/carrier-budget-sidecar.json": "radius-tls-peer/carrier-budget-sidecar.json",
+        "common/pcapx/pcaputil/radius-tls-peer/controls.json": "radius-tls-peer/controls.json",
+        "common/pcapx/pcaputil/radius-tls-peer/genuine-nonEAP-mixed-adjacent.pcap": "radius-tls-peer/genuine-nonEAP-mixed-adjacent.pcap",
+        "common/pcapx/pcaputil/radius-tls-peer/known-nonEAP-sameID-later-EAP-refusal-remains-mixed.pcap": "radius-tls-peer/known-nonEAP-sameID-later-EAP-refusal-remains-mixed.pcap",
+        "common/pcapx/pcaputil/radius-tls-peer/legacy-compatibility.json": "radius-tls-peer/legacy-compatibility.json",
+        "common/pcapx/pcaputil/radius-tls-peer/peer-aggregate-record-cap-refusal-neighbor-late.pcap": "radius-tls-peer/peer-aggregate-record-cap-refusal-neighbor-late.pcap",
+        "common/pcapx/pcaputil/radius-tls-peer/peer-exact-first-query-retry-before-ACK-noappend.pcap": "radius-tls-peer/peer-exact-first-query-retry-before-ACK-noappend.pcap",
+        "common/pcapx/pcaputil/radius-tls-peer/peer-first-query-missing-State.pcap": "radius-tls-peer/peer-first-query-missing-State.pcap",
+        "common/pcapx/pcaputil/radius-tls-peer/peer-first-query-wrong-State.pcap": "radius-tls-peer/peer-first-query-wrong-State.pcap",
+        "common/pcapx/pcaputil/radius-tls-peer/peer-missing-server-ACK-no-State-adjacency.pcap": "radius-tls-peer/peer-missing-server-ACK-no-State-adjacency.pcap",
+        "common/pcapx/pcaputil/radius-tls-peer/peer-opposite-direction-same-descriptor-State-ID-isolated.pcap": "radius-tls-peer/peer-opposite-direction-same-descriptor-State-ID-isolated.pcap",
+        "common/pcapx/pcaputil/radius-tls-peer/peer-pending-prefix-Close.pcap": "radius-tls-peer/peer-pending-prefix-Close.pcap",
+        "common/pcapx/pcaputil/radius-tls-peer/peer-server-ACK-Identifier-not-incremented.pcap": "radius-tls-peer/peer-server-ACK-Identifier-not-incremented.pcap",
+        "common/pcapx/pcaputil/radius-tls-peer/peer-two-fragments-Start-State-ACK-complete.pcap": "radius-tls-peer/peer-two-fragments-Start-State-ACK-complete.pcap",
+        "common/pcapx/pcaputil/radius-tls-peer/profile-legacy.json": "radius-tls-peer/profile-legacy.json",
+        "common/pcapx/pcaputil/radius-tls-peer/profile-refusals.json": "radius-tls-peer/profile-refusals.json",
+        "common/pcapx/pcaputil/radius-tls-peer/pure-known-EAP-refusal-profile-oldfail.pcap": "radius-tls-peer/pure-known-EAP-refusal-profile-oldfail.pcap",
+        "scripts/protocol-tests/required-tests-traffic-unified-v116.json": "required-tests-traffic-unified-v116.json"
+      }
     }
   ],
   "schema_version": 1,
