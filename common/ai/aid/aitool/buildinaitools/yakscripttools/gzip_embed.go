@@ -4,6 +4,7 @@ package yakscripttools
 
 import (
 	"embed"
+	"github.com/yaklang/yaklang/common/utils/builtinmetadata"
 
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils/gzip_embed"
@@ -15,6 +16,7 @@ var resourceFS embed.FS
 var yakScriptFS FileSystemWithHash
 
 func InitEmbedFS() {
+	builtinmetadata.Register("aitool", "", func() ([]byte, error) { return resourceFS.ReadFile("yakscriptforai.tar.gz") })
 	var err error
 	fs, err := gzip_embed.NewPreprocessingEmbed(&resourceFS, "yakscriptforai.tar.gz", true)
 	if err != nil {

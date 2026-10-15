@@ -2,6 +2,7 @@ package resources_monitor
 
 import (
 	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/utils/builtinmetadata"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 )
 
@@ -18,7 +19,7 @@ func NewEmbedResourcesMonitor(resourceID string, buildInHash string) *EmbedResou
 }
 
 func (m *EmbedResourcesMonitor) getCurrentHash(currentHashGetter func() string) string {
-	if consts.IsDevMode() {
+	if consts.IsDevMode() && !builtinmetadata.Enabled {
 		return currentHashGetter()
 	} else {
 		return m.buildInHash
@@ -27,11 +28,11 @@ func (m *EmbedResourcesMonitor) getCurrentHash(currentHashGetter func() string) 
 
 func (m *EmbedResourcesMonitor) MonitorModifiedWithAction(currentHashGetter func() string, callBack func() error) error {
 	resourceHash := m.getCurrentHash(currentHashGetter)
-	if resourceHash != yakit.Get(m.resourceID) {
+	if resourceHash == "" || resourceHash != yakit.Get(m.resourceID) {
 		err := callBack()
 		if err != nil {
 			return err
-		} else {
+		} else if resourceHash != "" {
 			yakit.Set(m.resourceID, resourceHash)
 		}
 	}

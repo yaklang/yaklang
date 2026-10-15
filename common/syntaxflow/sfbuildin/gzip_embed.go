@@ -4,6 +4,7 @@ package sfbuildin
 
 import (
 	"embed"
+	"github.com/yaklang/yaklang/common/utils/builtinmetadata"
 
 	"github.com/yaklang/yaklang/common/utils/resources_monitor"
 )
@@ -12,6 +13,7 @@ import (
 var ruleFS embed.FS
 
 func InitEmbedFS() {
+	builtinmetadata.Register("syntaxflow", "buildin", func() ([]byte, error) { return ruleFS.ReadFile("buildin.tar.gz") })
 	ruleFSWithHash = resources_monitor.NewGzipResourceMonitor(&ruleFS, "buildin.tar.gz", "buildin")
 }
 

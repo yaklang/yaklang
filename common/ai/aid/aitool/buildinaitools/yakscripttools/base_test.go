@@ -2,6 +2,7 @@ package yakscripttools
 
 import (
 	"embed"
+	"encoding/json"
 	"errors"
 	"io/fs"
 	"strings"
@@ -9,12 +10,95 @@ import (
 
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/builtinmetadata"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"gotest.tools/v3/assert"
 )
 
 //go:embed yakscriptforai
 var testYakScriptFS embed.FS
+
+func TestBuiltinAIToolMetadataMatchesDynamicAnalysis(t *testing.T) {
+	err := fs.WalkDir(testYakScriptFS, "yakscriptforai", func(path string, d fs.DirEntry, err error) error {
+		if err != nil || d.IsDir() || !strings.HasSuffix(d.Name(), ".yak") {
+			return err
+		}
+		content, err := testYakScriptFS.ReadFile(path)
+		assert.NilError(t, err)
+		name := strings.TrimSuffix(d.Name(), ".yak")
+		t.Run(name, func(t *testing.T) {
+			_, hit := builtinmetadata.Lookup("tool:"+name, string(content))
+			assert.Equal(t, hit, builtinmetadata.Enabled, "metadata activation for %s", name)
+			want, got := LoadYakScriptToAiTools(name, string(content)), loadBuiltinAITool(name, string(content))
+			assert.Assert(t, want != nil && got != nil)
+			var wantSchema, gotSchema any
+			assert.NilError(t, json.Unmarshal([]byte(want.Params), &wantSchema))
+			assert.NilError(t, json.Unmarshal([]byte(got.Params), &gotSchema))
+			assert.DeepEqual(t, gotSchema, wantSchema)
+			want.Params, got.Params = "", ""
+			assert.DeepEqual(t, got, want)
+		})
+		return nil
+	})
+	assert.NilError(t, err)
+}
+
+func TestBuiltinAIToolChangedSourceUsesDynamicAnalysis(t *testing.T) {
+	// The name deliberately matches a builtin, but its source and parameter
+	// schema have changed. A source-hash miss must use the new source.
+	code := `cli.String("new_user_parameter", cli.setRequired(true))`
+	_, hit := builtinmetadata.Lookup("tool:do_http_request", code)
+	assert.Assert(t, !hit)
+	tool := loadBuiltinAITool("do_http_request", code)
+	assert.Assert(t, tool != nil)
+	assert.Assert(t, strings.Contains(tool.Params, "new_user_parameter"))
+	assert.Assert(t, !strings.Contains(tool.Params, "raw_http_request"))
+}
+
+func TestBuiltinAIToolSyncPreservesFavorites(t *testing.T) {
+	db, err := utils.CreateTempTestDatabaseInMemory()
+	assert.NilError(t, err)
+	t.Cleanup(func() { _ = db.Close() })
+	assert.NilError(t, db.AutoMigrate(&schema.AIYakTool{}).Error)
+	tool := &schema.AIYakTool{Name: "do_http_request", Content: "old content", IsFavorite: true, Author: "user"}
+	assert.NilError(t, db.Create(tool).Error)
+	assert.NilError(t, overrideYakScriptAiTools(db))
+	stored, err := yakit.GetAIYakTool(db, tool.Name)
+	assert.NilError(t, err)
+	assert.Equal(t, stored.ID, tool.ID)
+	assert.Equal(t, stored.IsFavorite, true)
+	assert.Equal(t, stored.Author, "user")
+	assert.Assert(t, stored.Content != "old content")
+}
+
+func TestLoadedAIToolPersistsAIOutputMode(t *testing.T) {
+	db, err := utils.CreateTempTestDatabaseInMemory()
+	assert.NilError(t, err)
+	t.Cleanup(func() { _ = db.Close() })
+	assert.NilError(t, db.AutoMigrate(&schema.AIYakTool{}).Error)
+	for _, tc := range []struct {
+		name, code string
+		mode       int
+	}{
+		{"plain", `println("hello")`, 1},
+		{"output", `yakit.AIOutput("hello")`, 2},
+		{"alias", `output = yakit.AIOutput; output("hello")`, 2},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			tool := LoadYakScriptToAiTools(tc.name, tc.code)
+			assert.Assert(t, tool != nil)
+			assert.Equal(t, tool.EnableAIOutputLog, tc.mode)
+			_, err := yakit.SaveAIYakTool(db, tool)
+			assert.NilError(t, err)
+			stored, err := yakit.GetAIYakTool(db, tc.name)
+			assert.NilError(t, err)
+			assert.Equal(t, stored.EnableAIOutputLog, ParseAIToolEnableAIOutputLog(tc.code))
+		})
+	}
+	var pending int
+	assert.NilError(t, db.Model(&schema.AIYakTool{}).Where("enable_ai_output_log = ?", 0).Count(&pending).Error)
+	assert.Equal(t, pending, 0, "new tools must not need the legacy startup backfill")
+}
 
 func TestLoadAllYakScriptFromEmbedFS(t *testing.T) {
 	// 统计 embed FS 中所有 .yak 文件的数量，并收集文件名（去掉.yak后缀）

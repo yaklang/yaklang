@@ -4,10 +4,13 @@ package sfbuildin
 
 import (
 	"embed"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/yaklang/yaklang/common/utils/builtinmetadata"
 	"io/fs"
 	"os"
+	"path"
 	"runtime"
 	"strings"
 	"sync"
@@ -176,7 +179,7 @@ func syncRuleFromFileSystemToDB(db *gorm.DB, fsInstance filesys_interface.FileSy
 			go func() {
 				defer close(results)
 				for _, index := range indexes {
-					rule, err := sfdb.CheckSyntaxFlowRuleContent(files[index].content)
+					rule, err := parseBuiltinRule(files[index].path, files[index].content, buildin)
 					results <- compileResult{index: index, rule: rule, err: err}
 				}
 			}()
@@ -189,7 +192,7 @@ func syncRuleFromFileSystemToDB(db *gorm.DB, fsInstance filesys_interface.FileSy
 			go func() {
 				defer wg.Done()
 				for index := range jobs {
-					rule, err := sfdb.CheckSyntaxFlowRuleContent(files[index].content)
+					rule, err := parseBuiltinRule(files[index].path, files[index].content, buildin)
 					results <- compileResult{index: index, rule: rule, err: err}
 				}
 			}()
@@ -304,9 +307,23 @@ func ruleTagsFromDir(dirName string) []string {
 	return tags
 }
 
+func parseBuiltinRule(name, content string, buildin bool) (*schema.SyntaxFlowRule, error) {
+	if buildin {
+		name = strings.TrimPrefix(strings.TrimPrefix(path.Clean(name), "./"), "buildin/")
+		if meta, hit := builtinmetadata.Lookup("sf:"+name, content); hit {
+			var rule schema.SyntaxFlowRule
+			if json.Unmarshal([]byte(meta.SyntaxFlowRule), &rule) == nil && rule.OpCodes != "" {
+				rule.Content = content
+				return &rule, nil
+			}
+		}
+	}
+	return sfdb.CheckSyntaxFlowRuleContent(content)
+}
+
 func SyncEmbedRule(notifies ...func(process float64, ruleName string)) (err error) {
 	const key = consts.EmbedSfBuildInRuleKey
-	return resources_monitor.NewEmbedResourcesMonitor(key, consts.ExistedSyntaxFlowEmbedFSHash).MonitorModifiedWithAction(func() string {
+	return resources_monitor.NewEmbedResourcesMonitor(key, builtinmetadata.SyncHash("syntaxflow", consts.ExistedSyntaxFlowEmbedFSHash)).MonitorModifiedWithAction(func() string {
 		hash, _ := SyntaxFlowRuleHash()
 		return hash
 	}, func() error {
@@ -354,9 +371,12 @@ func syncEmbedRuleInternal(notifies ...func(process float64, ruleName string)) (
 	return utils.Wrapf(err, "init builtin rules error")
 }
 
-// SyntaxFlowRuleHash is deprecated. Use filesys.CreateEmbedFSHash(ruleFS, filesys.WithIncludeExts(".sf")) instead.
-// This function is kept for backward compatibility but should not be used in new code.
+// SyntaxFlowRuleHash returns the verified metadata hash in gzip builds and
+// retains the source-filesystem hash for ordinary local development.
 func SyntaxFlowRuleHash() (string, error) {
+	if builtinmetadata.Enabled {
+		return builtinmetadata.Hash("syntaxflow")
+	}
 	// Use GetHash method to calculate hash for .sf files
 	hash, err := ruleFSWithHash.GetHash()
 	if err != nil {
@@ -369,12 +389,23 @@ func SyntaxFlowRuleHash() (string, error) {
 	return hash, nil
 }
 
+func ruleSyncHash() string {
+	if consts.IsDevMode() && !builtinmetadata.Enabled {
+		hash, _ := SyntaxFlowRuleHash()
+		return hash
+	}
+	return builtinmetadata.SyncHash("syntaxflow", consts.ExistedSyntaxFlowEmbedFSHash)
+}
+
 func NeedSyncEmbedRule() bool {
-	diffHash := yakit.Get(consts.EmbedSfBuildInRuleKey) != consts.ExistedSyntaxFlowEmbedFSHash
+	hash := ruleSyncHash()
+	diffHash := hash == "" || yakit.Get(consts.EmbedSfBuildInRuleKey) != hash
 	return diffHash
 }
 
 func DoneEmbedRule() {
-	log.Infof("done sync embed rule with hash: %s", consts.ExistedSyntaxFlowEmbedFSHash)
-	yakit.Set(consts.EmbedSfBuildInRuleKey, consts.ExistedSyntaxFlowEmbedFSHash)
+	if hash := ruleSyncHash(); hash != "" {
+		log.Infof("done sync embed rule with hash: %s", hash)
+		yakit.Set(consts.EmbedSfBuildInRuleKey, hash)
+	}
 }

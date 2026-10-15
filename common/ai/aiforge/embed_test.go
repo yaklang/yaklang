@@ -8,7 +8,10 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/builtinmetadata"
 	"github.com/yaklang/yaklang/common/yak/static_analyzer"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 )
 
 // buildInForgeYakEmbedRelPaths 与 getBuildInForgeYakScript / getBuildInForgeConfig 的目录约定一致（平铺、子目录、下划线前缀）。
@@ -78,4 +81,40 @@ func TestGetBuildInForgeFromFS_DefaultAuthor(t *testing.T) {
 	assert.NotNil(t, forge)
 	assert.Equal(t, schema.AIResourceAuthorBuiltin, forge.Author)
 	assert.Equal(t, true, forge.IsBuiltin)
+}
+
+func TestBuiltinForgeMetadataMatchesDynamicAnalysis(t *testing.T) {
+	for _, name := range []string{"web_log_monitor", "flow_report", "ssa_vulnerability_analyzer"} {
+		t.Run(name, func(t *testing.T) {
+			code := readEmbeddedYakBytesForBuildInForge(name)
+			require.NotEmpty(t, code)
+			_, hit := builtinmetadata.Lookup("forge:"+name, string(code))
+			require.Equal(t, builtinmetadata.Enabled, hit)
+			cached, err := buildAIForgeFromYakCode(name, code)
+			require.NoError(t, err)
+			// A different name cannot hit the builtin catalog. All derived
+			// information must agree with the full SSA extraction path.
+			dynamic, err := buildAIForgeFromYakCode("user-"+name, code)
+			require.NoError(t, err)
+			dynamic.ForgeName = name
+			require.Equal(t, dynamic, cached)
+		})
+	}
+}
+
+func TestBuiltinForgeSyncPreservesUserPreferences(t *testing.T) {
+	db, err := utils.CreateTempTestDatabaseInMemory()
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = db.Close() })
+	require.NoError(t, db.AutoMigrate(&schema.AIForge{}).Error)
+	forge := &schema.AIForge{ForgeName: "web_log_monitor", UserPersistentData: "user preferences", ForgeContent: "old source"}
+	require.NoError(t, db.Create(forge).Error)
+	builtin, err := getBuildInForgeFromFS(forge.ForgeName)
+	require.NoError(t, err)
+	require.NoError(t, saveBuiltinForge(db, builtin))
+	stored, err := yakit.GetAIForgeByName(db, forge.ForgeName)
+	require.NoError(t, err)
+	require.Equal(t, forge.ID, stored.ID)
+	require.Equal(t, forge.UserPersistentData, stored.UserPersistentData)
+	require.NotEqual(t, "old source", stored.ForgeContent)
 }

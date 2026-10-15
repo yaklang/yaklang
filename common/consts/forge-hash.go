@@ -2,7 +2,6 @@
 // nolint: golint
 package consts
 
-// ExistedBuildInForgeEmbedFSHash contains the SHA256 hash of the embedded build-in forge filesystem.
-// This hash is used to verify the integrity of the built-in forge templates and resources.
-// The forge system provides templates for code generation and vulnerability testing scenarios.
-const ExistedBuildInForgeEmbedFSHash string = "1af19b189e7e6eafcd0d22cf2066b6686478635110c18ba0510f10a696dd9e9c"
+// ExistedBuildInForgeEmbedFSHash is the SHA-256 of forge-metadata.json.gz.
+// The metadata binds analysis results to script paths, permissions and hashes.
+const ExistedBuildInForgeEmbedFSHash string = "e43a888b309ca9cf098ea10b446caaca09a6ddbb4de2651bef6553824800df9e"

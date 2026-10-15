@@ -2,7 +2,6 @@
 // nolint: golint
 package consts
 
-// ExistedCorePluginEmbedFSHash contains the SHA256 hash of the embedded core plugin filesystem.
-// This hash is used to verify the integrity of core plugins and detect changes in the plugin bundle.
-// The hash is automatically generated during the build process and should not be manually modified.
-const ExistedCorePluginEmbedFSHash string = "268099e12d0ca5a7c8942c6e89051c19add3d6c270b2feb70df9a5b0a2fd04da"
+// ExistedCorePluginEmbedFSHash is the SHA-256 of coreplugin-metadata.json.gz.
+// The metadata binds analysis results to script paths, permissions and hashes.
+const ExistedCorePluginEmbedFSHash string = "2bb0edf51f73c7af082ec91226716a489fcde37dc7588f057e9aca669c9f16aa"

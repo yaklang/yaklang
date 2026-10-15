@@ -2,7 +2,6 @@
 // nolint: golint
 package consts
 
-// ExistedSyntaxFlowEmbedFSHash contains the SHA256 hash of the embedded SyntaxFlow filesystem.
-// This hash is used to verify the integrity of SyntaxFlow rules and templates embedded in the binary.
-// The hash is automatically calculated from the SyntaxFlow rule files during compilation.
-const ExistedSyntaxFlowEmbedFSHash string = "feca61b6a64cef49dbceea34e7e36427ad331502cb52f648a9fe985f3450dc9c"
+// ExistedSyntaxFlowEmbedFSHash is the SHA-256 of syntaxflow-metadata.json.gz.
+// The metadata binds analysis results to script paths, permissions and hashes.
+const ExistedSyntaxFlowEmbedFSHash string = "e7f134b95426227580f5a3513c28210d91125dfd6f9de57c4bc5a3b894e43ae5"

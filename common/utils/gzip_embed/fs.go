@@ -70,6 +70,10 @@ func NewPreprocessingEmbedWithDecode(source *embed.FS, fileName string, cache bo
 	return &PreprocessingEmbed{FS: source, sourceFileName: fileName, EnableCache: cache, decode: decode}, nil
 }
 
+// DecodeArchive decodes the owned bytes of an archive produced by gzip-embed.
+// It accepts both legacy gzip and archives with the shared resource XOR key.
+func DecodeArchive(raw []byte) ([]byte, error) { return decodeDefaultArchive(raw) }
+
 func decodeDefaultArchive(raw []byte) ([]byte, error) {
 	if len(raw) >= 3 && raw[0] == 0x1f && raw[1] == 0x8b && raw[2] == 8 {
 		return raw, nil

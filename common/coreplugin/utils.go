@@ -3,6 +3,7 @@ package coreplugin
 import (
 	"errors"
 	"fmt"
+	"github.com/yaklang/yaklang/common/utils/builtinmetadata"
 	"path"
 	"strings"
 	"sync"
@@ -92,6 +93,9 @@ func GetAllCorePluginWithType() []CorePluginInfo {
 // This function is implemented in embed.go and gzip_embed.go
 
 func CorePluginHash() (string, error) {
+	if builtinmetadata.Enabled {
+		return builtinmetadata.Hash("coreplugin")
+	}
 	// Only calculate hash for .yak files to ensure stability
 	// This prevents hash changes when non-plugin files (like .gitkeep, .DS_Store) are added/removed
 	hash, err := basePluginFS.GetHash()

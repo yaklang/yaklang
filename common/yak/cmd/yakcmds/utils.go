@@ -43,6 +43,7 @@ import (
 	"github.com/yaklang/yaklang/common/spec"
 	"github.com/yaklang/yaklang/common/urfavecli"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/builtinmetadata"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/utils/omap"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak/dap"
@@ -56,40 +57,37 @@ type embedHashConfig struct {
 	constName     string
 	defaultOutput string
 	comment       string
-	exts          []string
+	sourceDir     string
 }
 
 var embedHashConfigs = map[string]*embedHashConfig{
 	"coreplugin": {
 		constName:     "ExistedCorePluginEmbedFSHash",
 		defaultOutput: "common/consts/coreplugin-hash.go",
-		comment: `// ExistedCorePluginEmbedFSHash contains the SHA256 hash of the embedded core plugin filesystem.
-// This hash is used to verify the integrity of core plugins and detect changes in the plugin bundle.
-// The hash is automatically generated during the build process and should not be manually modified.`,
-		exts: []string{".yak"},
+		comment: `// ExistedCorePluginEmbedFSHash is the SHA-256 of compressed script metadata.
+// The metadata binds analysis results to script paths, permissions and hashes.`,
+		sourceDir: "common/coreplugin/base-yak-plugin",
 	},
 	"syntaxflow": {
 		constName:     "ExistedSyntaxFlowEmbedFSHash",
 		defaultOutput: "common/consts/syntaxflow-hash.go",
-		comment: `// ExistedSyntaxFlowEmbedFSHash contains the SHA256 hash of the embedded SyntaxFlow filesystem.
-// This hash is used to verify the integrity of SyntaxFlow rules and templates embedded in the binary.
-// The hash is automatically calculated from the SyntaxFlow rule files during compilation.`,
-		exts: []string{".sf"},
+		comment: `// ExistedSyntaxFlowEmbedFSHash is the SHA-256 of compressed script metadata.
+// The metadata binds analysis results to script paths, permissions and hashes.`,
+		sourceDir: "common/syntaxflow/sfbuildin/buildin",
 	},
 	"forge": {
 		constName:     "ExistedBuildInForgeEmbedFSHash",
+		sourceDir:     "common/ai/aiforge/buildinforge",
 		defaultOutput: "common/consts/forge-hash.go",
-		comment: `// ExistedBuildInForgeEmbedFSHash contains the SHA256 hash of the embedded build-in forge filesystem.
-// This hash is used to verify the integrity of the built-in forge templates and resources.
-// The forge system provides templates for code generation and vulnerability testing scenarios.`,
+		comment: `// ExistedBuildInForgeEmbedFSHash is the SHA-256 of compressed script metadata.
+// The metadata binds analysis results to script paths, permissions and hashes.`,
 	},
 	"aitool": {
 		constName:     "ExistedBuildInAIToolEmbedFSHash",
 		defaultOutput: "common/consts/aitool-hash.go",
-		comment: `// ExistedBuildInAIToolEmbedFSHash contains the SHA256 hash of the embedded AI tool filesystem.
-// This hash is used to verify the integrity of AI-related tools and configurations embedded in the binary.
-// These tools include AI-powered analysis engines and machine learning models for security testing.`,
-		exts: []string{".yak"},
+		comment: `// ExistedBuildInAIToolEmbedFSHash is the SHA-256 of compressed script metadata.
+// The metadata binds analysis results to script paths, permissions and hashes.`,
+		sourceDir: "common/ai/aid/aitool/buildinaitools/yakscripttools/yakscriptforai",
 	},
 }
 
@@ -194,14 +192,15 @@ var UtilsCommands = []*cli.Command{
 
 				var hash string
 				var err error
-				if dir != "" {
-					if len(config.exts) > 0 {
-						hash, err = filesys.CreateLocalFSHash(dir, filesys.WithIncludeExts(config.exts...))
-					} else {
-						hash, err = filesys.CreateLocalFSHash(dir)
+				if dir != "" || outputFile != "" || c.Bool("override") {
+					sourceDir := dir
+					if sourceDir == "" {
+						sourceDir = config.sourceDir
 					}
+					bundlePath := filepath.Join(filepath.Dir(config.defaultOutput), t+"-metadata.json.gz")
+					hash, err = builtinmetadata.LocalHash(sourceDir, bundlePath, t)
 					if err != nil {
-						return utils.Wrapf(err, "calculate %s hash failed", config.constName)
+						return utils.Wrapf(err, "metadata/source verification for %s failed", t)
 					}
 				} else {
 					switch t {

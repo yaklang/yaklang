@@ -4,6 +4,8 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
+bash scripts/generate-builtin-metadata.sh
+
 gzip_embed_tool="${GZIP_EMBED:-gzip-embed}"
 # Accept native Windows paths from PowerShell as well as Git Bash paths.
 if command -v cygpath >/dev/null 2>&1 && [[ "$gzip_embed_tool" == [[:alpha:]]:* ]]; then
