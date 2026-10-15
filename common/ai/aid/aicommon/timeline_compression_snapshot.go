@@ -35,12 +35,13 @@ type timelineCompressionSnapshot struct {
 	FreezeVersion           int64
 	Evidence                string // detached effective session evidence, including pending mutations
 	UserContexts            []timelineCompressionUserContext
-	SessionMemoryCandidates []any                          // completed session extractions, detached from listeners and storage
-	MemoryCompletion        *timelineCompressionCompletion `json:"-"`
-	Output                  *timelineCompressionOutput     `json:"-"`
-	SummaryPrompt           string                         `json:"-"` // actual rendered request source, runtime-only
-	CommittedFreeze         TimelineFreezeResult           `json:"-"` // detached receipt, populated only after validation
-	NotifyCommitted         func()                         `json:"-"` // observers captured at commit, called after unlock
+	SessionMemoryCandidates []any                           // completed session extractions, detached from listeners and storage
+	MemoryCompletion        *timelineCompressionCompletion  `json:"-"`
+	Output                  *timelineCompressionOutput      `json:"-"`
+	SummaryPrompt           string                          `json:"-"` // actual rendered request source, runtime-only
+	CommittedFreeze         TimelineFreezeResult            `json:"-"` // detached receipt, populated only after validation
+	NotifyCommitted         func()                          `json:"-"` // observers captured at commit, called after unlock
+	PromptBudget            timelineCompressionPromptBudget `json:"-"` // main-model occupancy captured with this snapshot
 }
 
 type timelineCompressionUserContext struct {
@@ -64,6 +65,21 @@ type timelineCompressionPromotedItem struct {
 	Kind      string
 	Key       string
 	Operation string
+}
+
+// timelineCompressionPromptBudget is the main-model Timeline occupancy, using
+// the same projection that decides whether compression runs. Section token
+// counts are for the helper prompt; they are not a second budget enforcer.
+type timelineCompressionPromptBudget struct {
+	Current  int64
+	Target   int64
+	Limit    int64
+	Sections []timelineCompressionSectionUsage
+}
+
+type timelineCompressionSectionUsage struct {
+	Name   string
+	Tokens int64
 }
 
 // buildCompressionSnapshot includes the old summary and the original Frozen/Open
@@ -212,12 +228,12 @@ func (m *Timeline) captureCompressionSnapshotLocked() (snapshot *timelineCompres
 				if !ok {
 					return nil, fmt.Errorf("compression source item %d has no timestamp", id)
 				}
+				// PromptText is the original body only. RETIRE_ID frames are added
+				// when the helper prompt is rendered, after this lock is released.
 				snapshot.PromotedItems = append(snapshot.PromotedItems, timelineCompressionPromotedItem{
 					timelineCompressionSnapshotItem: timelineCompressionSnapshotItem{
 						ID: id, Timestamp: ts, Frozen: id <= snapshot.FrozenThroughID,
-						PromptText: fmt.Sprintf("# entry=%d timestamp_ms=%d [%s] %s operation=%s\n%s",
-							id, ts, control.Kind, compressionPromotedItemLabel(control), control.Operation,
-							compressionPromotedItemText(control)),
+						PromptText: compressionPromotedItemText(control),
 					},
 					Kind: control.Kind, Key: compressionPromotedItemKey(control), Operation: control.Operation,
 				})
@@ -285,7 +301,7 @@ func (m *Timeline) captureCompressionSnapshotLocked() (snapshot *timelineCompres
 			if replayText != "" {
 				body = replayText
 			}
-			entry.PromptText = fmt.Sprintf("# item=%d timestamp_ms=%d [%s]\n%s",
+			entry.PromptText = fmt.Sprintf("ITEM_ID=%d timestamp_ms=%d [%s]\n%s",
 				id, ts, renderItemTypeVerbose(projected), body)
 		}
 		snapshot.Items = append(snapshot.Items, entry)

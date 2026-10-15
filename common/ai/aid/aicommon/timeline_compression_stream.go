@@ -118,7 +118,7 @@ func (m *Timeline) startCompressionResponse(snapshot *timelineCompressionSnapsho
 				return action, nil
 			}),
 			WithAuxiliaryOnError(func(err error) { completion.err = fmt.Errorf("timeline compression request failed: %w", err) }),
-			WithAuxiliaryOpts(WithLiteForgeDisableTimeline(), WithLiteForgeStaticInstruction(timelineCompressionInstruction),
+			WithAuxiliaryOpts(WithLiteForgeDisableTimeline(),
 				WithLiteForgeMaxPromptTokens(limit.MaxInputTokens), WithGeneralConfigExtraRequestOpts(WithAIRequest_CallerLabel(CallerLabelTimelineCompress))),
 		)
 	}()

@@ -75,7 +75,6 @@ func TestSkillContentSurvivesCompression(t *testing.T) {
 			// The body is listed exactly once as a complete item; it is not
 			// duplicated into the ordinary history sections.
 			require.Equal(t, 1, strings.Count(req.GetPrompt(), "SKILL_SUMMARIZED_SECRET"))
-			require.Contains(t, req.GetPrompt(), "PROMOTED_ENTRIES_")
 			rsp := NewUnboundAIResponse()
 			rsp.EmitOutputStream(strings.NewReader(compressionMockSummary("Ordinary history summarized.")))
 			rsp.Close()
@@ -159,7 +158,6 @@ func TestSkillContentPendingDeltaTriggersCompression(t *testing.T) {
 	cfg := NewConfig(context.Background(), WithDisableAutoSkills(true),
 		WithSpeedPriorityAICallback(func(_ AICallerConfigIf, req *AIRequest) (*AIResponse, error) {
 			requests++
-			require.Contains(t, req.GetPrompt(), "PROMOTED_ENTRIES_")
 			rsp := NewUnboundAIResponse()
 			rsp.EmitOutputStream(strings.NewReader(compressionMockWithRetire("", fmt.Sprint(skillID))))
 			rsp.Close()
@@ -193,10 +191,9 @@ func TestSkillContentListedWithFullBodyInCompressionRequest(t *testing.T) {
 	require.NoError(t, err)
 	prompt, err := renderCompressionSummaryPrompt(snapshot)
 	require.NoError(t, err)
-	require.Contains(t, prompt, "PROMOTED_ENTRIES_")
-	require.Contains(t, prompt, "[skill] demo-skill:references/api.md:1-1")
-	require.Contains(t, prompt, "SKILL_PREVIEW_HEAD")
-	require.Contains(t, prompt, "SKILL_DEEP_SECRET")
+	require.Len(t, snapshot.PromotedItems, 1)
+	skillID := snapshot.PromotedItems[0].ID
+	requireCompressionPromotedEntry(t, prompt, skillID, "kind=skill name=demo-skill:references/api.md:1-1 operation=upsert", "[skill demo-skill | references/api.md:1-1/1 END]\n"+body)
 	require.Equal(t, 1, strings.Count(prompt, "SKILL_DEEP_SECRET"))
 	require.Contains(t, prompt, "ORDINARY_HISTORY_SECRET")
 }
@@ -242,7 +239,6 @@ func TestPromotedSkillContentKeptByDefaultAcrossCompression(t *testing.T) {
 		WithSpeedPriorityAICallback(func(_ AICallerConfigIf, req *AIRequest) (*AIResponse, error) {
 			requests++
 			require.Equal(t, 1, strings.Count(req.GetPrompt(), "PROMOTED_SKILL_SECRET"))
-			require.Contains(t, req.GetPrompt(), "PROMOTED_ENTRIES_")
 			rsp := NewUnboundAIResponse()
 			rsp.EmitOutputStream(strings.NewReader(compressionMockSummary("ordinary history summarized")))
 			rsp.Close()

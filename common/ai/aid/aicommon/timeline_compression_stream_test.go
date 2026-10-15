@@ -141,19 +141,26 @@ func TestTimelineCompressionSlowMemoryConsumerDoesNotBlockSummary(t *testing.T) 
 func TestTimelineCompressionMemoryOnlySubscription(t *testing.T) {
 	tl := NewTimeline(nil, nil)
 	tl.PushText(1, "verified observation")
-	bindCompressionMock(t, tl, func(*AIRequest) (string, error) { return compressionMockSummary("verified summary"), nil })
+	var requestPrompt string
+	bindCompressionMock(t, tl, func(request *AIRequest) (string, error) {
+		requestPrompt = request.GetPrompt()
+		return compressionMockSummary("verified summary"), nil
+	})
+	source, err := tl.buildCompressionSnapshot()
+	require.NoError(t, err)
 	memory := make(chan TimelineMemoryEvent, 1)
 	tl.RegisterMemoryCallback("replaced", func(TimelineMemoryEvent) { panic("superseded") })
 	tl.RegisterMemoryCallback("replaced", func(event TimelineMemoryEvent) { memory <- event })
 	tl.RegisterMemoryCallback("removed", func(TimelineMemoryEvent) { t.Error("unregistered observer") })
 	tl.RegisterMemoryCallback("removed", nil)
-	_, err := tl.CompressOnce(compressionTestOptions())
+	_, err = tl.CompressOnce(compressionTestOptions())
 	require.NoError(t, err)
 	select {
 	case event := <-memory:
 		require.NoError(t, event.Err)
 		require.Empty(t, event.MemoryEntities)
-		require.True(t, strings.Contains(event.Prompt, "OPEN_TIMELINE_"))
+		require.Equal(t, requestPrompt, event.Prompt, "a memory-only subscriber must receive the actual complete compression request")
+		require.Contains(t, event.Prompt, "## 历史条目\n"+source.Items[0].PromptText+"\n")
 	case <-time.After(5 * time.Second):
 		t.Fatal("memory-only subscriber was not notified")
 	}

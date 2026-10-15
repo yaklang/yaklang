@@ -37,13 +37,15 @@ func TestTimelineCompressionPlainSource(t *testing.T) {
 	snapshot.RetainedContext = map[string]string{"user_query": query, "todo": "核对嵌套路径", "z": "last", "a": "first"}
 	prompt, err := renderCompressionSummaryPrompt(snapshot)
 	require.NoError(t, err)
-	require.Contains(t, prompt, compressionSourceTag("ORIGINAL_USER_QUERY", query))
+	require.Contains(t, prompt, "## 当前用户要求\n"+query+"\n", "the independent user query must remain plain text in its own reference section")
 	require.NotContains(t, prompt, `C:\\repo`)
 	require.NotContains(t, prompt, `\"value\"`)
 	require.NotContains(t, prompt, "PRIVATE_THOUGHT")
 	require.NotContains(t, prompt, "ITERATION_NOISE")
-	require.Contains(t, prompt, compressionSourceTag("FROZEN_TIMELINE", snapshot.Items[2].PromptText))
-	require.Contains(t, prompt, compressionSourceTag("OPEN_TIMELINE", snapshot.Items[3].PromptText))
+	require.Contains(t, prompt, "## 历史条目\n"+snapshot.Items[2].PromptText+"\n"+snapshot.Items[3].PromptText+"\n",
+		"both previously frozen and open originals must reach the helper together, in order")
+	require.Equal(t, 1, strings.Count(prompt, snapshot.Items[2].PromptText))
+	require.Equal(t, 1, strings.Count(prompt, snapshot.Items[3].PromptText))
 	require.Less(t, strings.Index(prompt, "a:\nfirst"), strings.Index(prompt, "z:\nlast"))
 	again, err := renderCompressionSummaryPrompt(snapshot)
 	require.NoError(t, err)

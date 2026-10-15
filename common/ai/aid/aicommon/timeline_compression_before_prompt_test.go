@@ -21,7 +21,8 @@ func TestTimelineCompressionBeforePromptLifecycle(t *testing.T) {
 		// The exact schema stays out of the ordinary history sections; it is
 		// listed once as a retained promoted entry the model may delete.
 		require.Equal(t, 1, strings.Count(req.GetPrompt(), "EXACT_BEFORE_PROMPT_SCHEMA"))
-		require.Contains(t, req.GetPrompt(), "PROMOTED_ENTRIES_")
+		requireCompressionPromotedEntry(t, req.GetPrompt(), 3,
+			"kind=recent-tool-cache name=probe operation=upsert", "[UPSERT] probe\nEXACT_BEFORE_PROMPT_SCHEMA")
 		if calls == 2 {
 			require.Contains(t, req.GetPrompt(), "FIRST_SUMMARY")
 			return compressionMockSummary("SECOND_SUMMARY"), nil

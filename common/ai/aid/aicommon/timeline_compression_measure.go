@@ -4,6 +4,7 @@ import (
 	"crypto/sha256"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 )
 
@@ -66,4 +67,44 @@ func (m *Timeline) recordCompressionOutcome(options TimelineCompressionOptions, 
 	m.mu.Lock()
 	m.compressionLastFailure, m.compressionRetryAfter = fingerprint, retryAfter
 	m.mu.Unlock()
+}
+
+// captureCompressionBudgetBlocksLocked renders the main-model projection while
+// the snapshot lock is held. Token counts are computed by the caller after
+// releasing the lock.
+func (m *Timeline) captureCompressionBudgetBlocksLocked(options TimelinePromptOptions) (blocks TimelineFrozenOpenBlocks, limit int64, err error) {
+	defer func() {
+		if recovered := recover(); recovered != nil {
+			err = fmt.Errorf("render timeline compression budget: %v", recovered)
+		}
+	}()
+	if m == nil {
+		return TimelineFrozenOpenBlocks{}, 0, fmt.Errorf("timeline compression budget requires a timeline")
+	}
+	return m.renderTimelinePromptLocked(options), m.totalDumpContentLimit, nil
+}
+
+func newCompressionPromptBudget(blocks TimelineFrozenOpenBlocks, limit, target int64) timelineCompressionPromptBudget {
+	named := []struct{ name, text string }{
+		{"frozen_timeline", blocks.Frozen},
+		{"skill_content", blocks.SkillsContext},
+		{"recent_tools", blocks.PromotedRecentTools},
+		{"user_input", blocks.PromotedUserInputHistory},
+		{"evidence", blocks.EvidenceSemiDynamic},
+		{"open_timeline", blocks.Open},
+	}
+	budget := timelineCompressionPromptBudget{
+		Current: int64(MeasureTokens(blocks.PromptText())),
+		Target:  target,
+		Limit:   limit,
+	}
+	for _, section := range named {
+		if strings.TrimSpace(section.text) == "" {
+			continue
+		}
+		budget.Sections = append(budget.Sections, timelineCompressionSectionUsage{
+			Name: section.name, Tokens: int64(MeasureTokens(section.text)),
+		})
+	}
+	return budget
 }

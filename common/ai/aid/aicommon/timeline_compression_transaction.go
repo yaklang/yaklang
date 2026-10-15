@@ -141,6 +141,7 @@ func (m *Timeline) compressTimelineOnceWithAI(options TimelineCompressionOptions
 	snapshot.FinalizingMemory = options.FinalizeMemory
 	snapshot.TargetTokens = options.TargetTokens
 	snapshot.Context = options.Context
+	blocks, limit, budgetErr := m.captureCompressionBudgetBlocksLocked(options.PromptOptions)
 	m.mu.Unlock()
 	defer func() {
 		if recovered := recover(); recovered != nil {
@@ -150,6 +151,10 @@ func (m *Timeline) compressTimelineOnceWithAI(options TimelineCompressionOptions
 		m.compressionSnapshot = nil
 		m.mu.Unlock()
 	}()
+	if budgetErr != nil {
+		return nil, budgetErr
+	}
+	snapshot.PromptBudget = newCompressionPromptBudget(blocks, limit, snapshot.TargetTokens)
 	options.reportProgress(TimelineCompressionOptimizing)
 	snapshot.RetainedContext = make(map[string]string, len(options.RetainedContext))
 	for key, value := range options.RetainedContext {

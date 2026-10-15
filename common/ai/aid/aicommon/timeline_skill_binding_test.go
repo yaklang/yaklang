@@ -31,7 +31,6 @@ func TestSkillBindingPreservesRetiredTimelineAndRestoredHistory(t *testing.T) {
 
 			bindCompressionMock(t, tl, func(req *AIRequest) (string, error) {
 				// The live skill body is listed once as a deletable entry.
-				require.Contains(t, req.GetPrompt(), "PROMOTED_ENTRIES_")
 				require.Equal(t, 1, strings.Count(req.GetPrompt(), "RETIRED_DEFAULT_BODY"))
 				return compressionMockSummary("Ordinary history summarized."), nil
 			})

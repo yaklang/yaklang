@@ -269,7 +269,7 @@ func (m *Timeline) compressionCallbackLocked(snapshot *timelineCompressionSnapsh
 		for _, callback := range summaryCallbacks {
 			invokeTimelineCallback(callback, TimelineSummaryEvent{
 				ThroughID: result.ThroughID, Summary: strings.NewReader(result.Summary),
-				Prompt: snapshot.SummaryPrompt, Instruction: timelineCompressionInstruction,
+				Prompt:      snapshot.SummaryPrompt,
 				RetainedIDs: append([]int64(nil), result.RetainedIDs...), RetainedRange: result.RetainedRange,
 			})
 		}
@@ -294,7 +294,7 @@ func (m *Timeline) compressionCallbackLocked(snapshot *timelineCompressionSnapsh
 			}
 			for _, callback := range memoryCallbacks {
 				invokeTimelineCallback(callback, TimelineMemoryEvent{ThroughID: result.ThroughID,
-					Prompt: snapshot.SummaryPrompt, Instruction: timelineCompressionInstruction,
+					Prompt:         snapshot.SummaryPrompt,
 					MemoryEntities: cloneCompressionMemoryEntities(entities), Err: notifyErr})
 			}
 		}()
