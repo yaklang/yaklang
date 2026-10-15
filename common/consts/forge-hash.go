@@ -2,6 +2,6 @@
 // nolint: golint
 package consts
 
-// ExistedBuildInForgeEmbedFSHash is the SHA-256 of forge-metadata.json.br.
+// ExistedBuildInForgeEmbedFSHash is the SHA-256 of forge-metadata.bin.
 // The metadata binds analysis results to script paths, permissions and hashes.
-const ExistedBuildInForgeEmbedFSHash string = "8eeea491552358f59d35b95daeb19dce157253286472965e3812c35e7e7a46d0"
+const ExistedBuildInForgeEmbedFSHash string = "21e1e06612ebeffd90eef14b78cde30661b70c02a7af0ddf53f77d4aa2b74723"

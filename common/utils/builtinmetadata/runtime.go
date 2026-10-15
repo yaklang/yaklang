@@ -2,17 +2,30 @@ package builtinmetadata
 
 import (
 	"fmt"
-	"github.com/yaklang/yaklang/common/log"
 	"sync"
+
+	"github.com/yaklang/yaklang/common/log"
 )
 
+type lazyEntry struct {
+	once     sync.Once
+	entry    Entry
+	metadata Metadata
+	err      error
+}
+
 type resource struct {
-	once    sync.Once
-	archive func() ([]byte, error)
-	prefix  string
-	bundle  *Bundle
-	hash    string
-	err     error
+	once          sync.Once
+	entriesOnce   sync.Once
+	mu            sync.RWMutex
+	archive       func() ([]byte, error)
+	prefix        string
+	bundle        *Bundle
+	hash          string
+	err           error
+	entriesErr    error
+	packedEntries []byte
+	entries       map[string]*lazyEntry
 }
 
 var resources sync.Map
@@ -40,7 +53,7 @@ func load(kind string) *resource {
 			r.err = err
 			return
 		}
-		b, err := Decode(data, kind, expected)
+		b, entries, err := decodeIndex(data, kind, expected)
 		if err != nil {
 			r.err = err
 			return
@@ -54,6 +67,7 @@ func load(kind string) *resource {
 			return
 		}
 		r.bundle = b
+		r.packedEntries = entries
 		r.hash = expected
 	})
 	return r
@@ -66,14 +80,79 @@ func Hash(kind string) (string, error) {
 		return "", fmt.Errorf("metadata is disabled in ordinary builds")
 	}
 	r := load(kind)
-	return r.hash, r.err
+	if r.err != nil {
+		return "", r.err
+	}
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	if r.entriesErr != nil {
+		return "", r.entriesErr
+	}
+	return r.hash, nil
+}
+
+// Invalidate withdraws the sync hash if a domain-specific decoder rejects a
+// lazily loaded value. Successful dynamic fallback must not bless that cache.
+func Invalidate(kind string, err error) {
+	if err == nil {
+		return
+	}
+	if value, ok := resources.Load(kind); ok {
+		r := value.(*resource)
+		r.mu.Lock()
+		first := r.entriesErr == nil
+		r.entriesErr = err
+		r.mu.Unlock()
+		if first {
+			log.Warnf("builtin %s metadata invalid, using dynamic analysis: %v", kind, err)
+		}
+	}
 }
 
 func Lookup(key, source string) (Metadata, bool) {
 	if !Enabled {
 		return Metadata{}, false
 	}
-	return load(kindForKey(key)).bundle.lookup(key, source)
+	r := load(kindForKey(key))
+	if r.err != nil {
+		return Metadata{}, false
+	}
+	r.entriesOnce.Do(func() {
+		err := r.bundle.decodeEntries(r.packedEntries)
+		r.packedEntries = nil
+		if err == nil {
+			r.entries = make(map[string]*lazyEntry, len(r.bundle.Entries))
+			for key, entry := range r.bundle.Entries {
+				r.entries[key] = &lazyEntry{entry: entry}
+			}
+		}
+		r.bundle.Entries = nil
+		if err != nil {
+			Invalidate(kindForKey(key), err)
+		}
+	})
+	r.mu.RLock()
+	err := r.entriesErr
+	r.mu.RUnlock()
+	if err != nil {
+		return Metadata{}, false
+	}
+	entry, ok := r.entries[key]
+	if !ok || r.bundle.Files[entry.entry.Script].SHA256 != SourceHash(source) {
+		return Metadata{}, false
+	}
+	entry.once.Do(func() {
+		entry.metadata, entry.err = entry.entry.resolve(source)
+		if entry.err == nil && !validMetadata(key, entry.metadata) {
+			entry.err = fmt.Errorf("invalid metadata entry: %s", key)
+		}
+		// Retain either the unresolved template or the resolved value, never both.
+		entry.entry.Metadata, entry.entry.SourceStrings = nil, nil
+		if entry.err != nil {
+			Invalidate(kindForKey(key), entry.err)
+		}
+	})
+	return entry.metadata, entry.err == nil
 }
 
 // SyncHash retains ordinary-build behavior. An invalid metadata bundle

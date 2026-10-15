@@ -72,7 +72,7 @@ func DecodeBuiltinRuleMetadata(raw json.RawMessage, content string) (*schema.Syn
 	if err := json.Unmarshal(wire.OpCodes, &opcodes); err != nil {
 		return nil, err
 	}
-	if opcodes.SchemaVersion != CurrentOpcodeSchemaVersion || len(opcodes.Opcode) == 0 || opcodes.Opcode[0] != '[' {
+	if opcodes.SchemaVersion != CurrentOpcodeSchemaVersion || len(opcodes.Opcode) == 0 || (opcodes.Opcode[0] != '[' && string(opcodes.Opcode) != "null") {
 		return nil, fmt.Errorf("incompatible builtin rule opcodes")
 	}
 	opcodes.Version = consts.GetYakVersion()

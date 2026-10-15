@@ -55,3 +55,15 @@ func TestBuiltinRuleMetadataPreservesOperandsAndReleaseCache(t *testing.T) {
 	_, hit = ToOpCodes(original.OpCodes)
 	require.False(t, hit)
 }
+
+func TestBuiltinMetadataHandlesRuleWithoutInstructions(t *testing.T) {
+	frame, err := NewSyntaxFlowVirtualMachine().Compile(`desc(title:"metadata only");`)
+	require.NoError(t, err)
+	raw, err := EncodeBuiltinRuleMetadata(frame.GetRule())
+	require.NoError(t, err)
+	rule, err := DecodeBuiltinRuleMetadata(raw, frame.GetRule().Content)
+	require.NoError(t, err)
+	_, compiled, err := NewSyntaxFlowVirtualMachine().Load(rule)
+	require.NoError(t, err)
+	require.False(t, compiled)
+}

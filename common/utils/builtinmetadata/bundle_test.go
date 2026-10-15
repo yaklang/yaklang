@@ -14,7 +14,11 @@ import (
 func fixture() *Bundle {
 	const code = "cli.String(\"target\")"
 	files := map[string]File{".": {Mode: uint32(fs.ModeDir | 0755)}, "demo.yak": {Mode: 0644, Size: int64(len(code)), SHA256: SourceHash(code)}}
-	return &Bundle{Version: Version, Kind: "aitool", Recipe: "fixture", Files: files, SourceHash: Fingerprint(files, "fixture"), Entries: map[string]Entry{"tool:demo": {Script: "demo.yak", Metadata: Metadata{Parameters: json.RawMessage(`{"type":"object"}`), EnableAIOutputLog: 1}}}}
+	entry, err := NewEntry("demo.yak", Metadata{Parameters: json.RawMessage(`{"type":"object"}`), EnableAIOutputLog: 1}, code)
+	if err != nil {
+		panic(err)
+	}
+	return &Bundle{Version: Version, Kind: "aitool", Recipe: "fixture", Files: files, SourceHash: Fingerprint(files, "fixture"), Entries: map[string]Entry{"tool:demo": entry}}
 }
 
 func TestBundleBindsKindPathSourceAndVersion(t *testing.T) {
@@ -46,7 +50,15 @@ func TestBundleBindsKindPathSourceAndVersion(t *testing.T) {
 	}
 	old := Digest(data)
 	e := b.Entries["tool:demo"]
-	e.Metadata.Description = "new metadata"
+	metadata, err := e.resolve(`cli.String("target")`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	metadata.Description = "new metadata"
+	e, err = NewEntry(e.Script, metadata, `cli.String("target")`)
+	if err != nil {
+		t.Fatal(err)
+	}
 	b.Entries["tool:demo"] = e
 	data, _ = Encode(b)
 	if Digest(data) == old {
@@ -91,7 +103,15 @@ func TestMalformedMetadataAndEmptyCLI(t *testing.T) {
 func TestReadableMetadataPreservesParameterDefaults(t *testing.T) {
 	b := fixture()
 	e := b.Entries["tool:demo"]
-	e.Metadata.Parameters = json.RawMessage(`{"type":"object","properties":{"flag":{"default":false},"count":{"default":0},"name":{"default":""},"optional":{"default":null}}}`)
+	metadata, err := e.resolve(`cli.String("target")`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	metadata.Parameters = json.RawMessage(`{"type":"object","properties":{"flag":{"default":false},"count":{"default":0},"name":{"default":""},"optional":{"default":null}}}`)
+	e, err = NewEntry(e.Script, metadata, `cli.String("target")`)
+	if err != nil {
+		t.Fatal(err)
+	}
 	b.Entries["tool:demo"] = e
 	text, err := Text(b)
 	if err != nil {
@@ -104,7 +124,11 @@ func TestReadableMetadataPreservesParameterDefaults(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !bytes.Equal(parsed.Entries["tool:demo"].Metadata.Parameters, e.Metadata.Parameters) {
+	resolved, err := parsed.Entries["tool:demo"].resolve(`cli.String("target")`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(resolved.Parameters, metadata.Parameters) {
 		t.Fatal("parameter defaults changed")
 	}
 	a, err := Encode(b)

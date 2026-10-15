@@ -32,7 +32,7 @@ func (m *EmbedResourcesMonitor) MonitorModifiedWithAction(currentHashGetter func
 		err := callBack()
 		if err != nil {
 			return err
-		} else if resourceHash != "" {
+		} else if resourceHash != "" && (!builtinmetadata.Enabled || currentHashGetter() != "") {
 			yakit.Set(m.resourceID, resourceHash)
 		}
 	}

@@ -9,6 +9,25 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 )
 
+func TestLazyMetadataFailureDoesNotAdvanceMarker(t *testing.T) {
+	if !builtinmetadata.Enabled {
+		t.Skip("gzip runtime")
+	}
+	const key = "test-lazy-metadata-failure-marker"
+	old := yakit.Get(key)
+	defer yakit.Set(key, old)
+	yakit.Set(key, "previous")
+	monitor := NewEmbedResourcesMonitor(key, "prepared")
+	for i := 0; i < 2; i++ {
+		if err := monitor.MonitorModifiedWithAction(func() string { return "" }, func() error { return nil }); err != nil {
+			t.Fatal(err)
+		}
+		if got := yakit.Get(key); got != "previous" {
+			t.Fatal("lazy metadata failure advanced the marker", got)
+		}
+	}
+}
+
 func TestGzipMonitorUsesPreparedHashInDevBuild(t *testing.T) {
 	old := consts.GetYakVersion()
 	consts.SetYakVersion("dev")

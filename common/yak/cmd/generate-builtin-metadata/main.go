@@ -47,9 +47,13 @@ func moduleRoot() (string, error) {
 func analyze(root, kind string, files map[string]builtinmetadata.File, recipe string) (*builtinmetadata.Bundle, error) {
 	catalog := &builtinmetadata.Bundle{Version: builtinmetadata.Version, Kind: kind, Recipe: recipe, Files: files, SourceHash: builtinmetadata.Fingerprint(files, recipe), Entries: map[string]builtinmetadata.Entry{}}
 	sourceDir := filepath.Join(root, specFor(kind).dir)
-	add := func(key, path string, value builtinmetadata.Metadata) {
+	add := func(key, path string, source []byte, value builtinmetadata.Metadata) error {
 		relative, _ := filepath.Rel(sourceDir, path)
-		catalog.Entries[key] = builtinmetadata.Entry{Script: filepath.ToSlash(relative), Metadata: value}
+		entry, err := builtinmetadata.NewEntry(filepath.ToSlash(relative), value, string(source))
+		if err == nil {
+			catalog.Entries[key] = entry
+		}
+		return err
 	}
 	if kind == "aitool" {
 		tools := filepath.Join(root, "common/ai/aid/aitool/buildinaitools/yakscripttools/yakscriptforai")
@@ -75,12 +79,11 @@ func analyze(root, kind string, files map[string]builtinmetadata.File, recipe st
 			if err != nil {
 				return err
 			}
-			add("tool:"+name, path, builtinmetadata.Metadata{
+			return add("tool:"+name, path, code, builtinmetadata.Metadata{
 				VerboseName: tool.VerboseName, VerboseNameZh: tool.VerboseNameZh,
 				Description: tool.Description, Keywords: tool.Keywords, Usage: tool.Usage,
 				Parameters: params, EnableAIOutputLog: tool.EnableAIOutputLog,
 			})
-			return nil
 		}); err != nil {
 			return nil, err
 		}
@@ -150,7 +153,9 @@ func analyze(root, kind string, files map[string]builtinmetadata.File, recipe st
 			}
 			params, envKeys, err := information.GenerateParameterFromProgram(prog)
 			generationErr = err
-			add("plugin:"+pluginType+":"+name, filepath.Join(root, "common/coreplugin/base-yak-plugin", name+".yak"), builtinmetadata.Metadata{Parameters: unquoteJSON(params), EnvironmentKeys: unquoteJSON(envKeys)})
+			if generationErr == nil {
+				generationErr = add("plugin:"+pluginType+":"+name, filepath.Join(root, "common/coreplugin/base-yak-plugin", name+".yak"), code, builtinmetadata.Metadata{Parameters: unquoteJSON(params), EnvironmentKeys: unquoteJSON(envKeys)})
+			}
 			return false
 		})
 		if generationErr != nil {
@@ -209,11 +214,10 @@ func analyze(root, kind string, files map[string]builtinmetadata.File, recipe st
 			if unquoted, err := strconv.Unquote(params); err == nil {
 				params = unquoted
 			}
-			add("forge:"+name, path, builtinmetadata.Metadata{
+			return add("forge:"+name, path, code, builtinmetadata.Metadata{
 				VerboseName: meta.VerboseName, Description: meta.Description,
 				Keywords: strings.Join(meta.Keywords, ","), Parameters: json.RawMessage(params),
 			})
-			return nil
 		}); err != nil {
 			return nil, err
 		}
@@ -235,7 +239,9 @@ func analyze(root, kind string, files map[string]builtinmetadata.File, recipe st
 			if err != nil {
 				return nil, err
 			}
-			catalog.Entries["sf:"+name] = builtinmetadata.Entry{Script: name, Metadata: builtinmetadata.Metadata{SyntaxFlowRule: raw}}
+			if err := add("sf:"+name, filepath.Join(sourceDir, filepath.FromSlash(name)), code, builtinmetadata.Metadata{SyntaxFlowRule: raw}); err != nil {
+				return nil, err
+			}
 		}
 	}
 	currentRecipe, err := recipeFor(root, kind)
@@ -358,7 +364,7 @@ func updateSet(sourceDir, outputDir, kind, constant, recipe string, check, force
 		return false, err
 	}
 	bundlePath := filepath.Join(outputDir, kind+"-metadata.json")
-	packedPath := bundlePath + ".br"
+	packedPath := filepath.Join(outputDir, kind+"-metadata.bin")
 	hashPath := filepath.Join(outputDir, kind+"-hash.go")
 	oldHash, err := os.ReadFile(hashPath)
 	if err != nil {

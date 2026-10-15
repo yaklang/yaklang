@@ -42,6 +42,7 @@ func TestUnchangedSetsSkipAnalysisAndWrites(t *testing.T) {
 			}
 			run(true)
 			artifact := filepath.Join(output, kind+"-metadata.json")
+			packedArtifact := filepath.Join(output, kind+"-metadata.bin")
 			before, _ := os.ReadFile(artifact)
 			stat, _ := os.Stat(artifact)
 			run(false)
@@ -50,17 +51,17 @@ func TestUnchangedSetsSkipAnalysisAndWrites(t *testing.T) {
 			if calls != 1 || !bytes.Equal(before, after) || !stat.ModTime().Equal(stat2.ModTime()) {
 				t.Fatal("unchanged metadata was analyzed or rewritten")
 			}
-			packed, err := os.ReadFile(artifact + ".br")
+			packed, err := os.ReadFile(packedArtifact)
 			if err != nil {
 				t.Fatal(err)
 			}
-			if err := os.Remove(artifact + ".br"); err != nil {
+			if err := os.Remove(packedArtifact); err != nil {
 				t.Fatal(err)
 			}
 			// A fresh checkout has only text. Restore the ignored build artifact
 			// without invoking SSA/AST analysis or rewriting the tracked files.
 			run(false)
-			restored, err := os.ReadFile(artifact + ".br")
+			restored, err := os.ReadFile(packedArtifact)
 			if err != nil || !bytes.Equal(packed, restored) || calls != 1 {
 				t.Fatal("packing repeated analysis or changed the artifact", err)
 			}

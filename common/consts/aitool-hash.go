@@ -2,6 +2,6 @@
 // nolint: golint
 package consts
 
-// ExistedBuildInAIToolEmbedFSHash is the SHA-256 of aitool-metadata.json.br.
+// ExistedBuildInAIToolEmbedFSHash is the SHA-256 of aitool-metadata.bin.
 // The metadata binds analysis results to script paths, permissions and hashes.
-const ExistedBuildInAIToolEmbedFSHash string = "922e685bdbf733cb488c7cd4ab1656a361f112deec6861303f481d81eb0e1058"
+const ExistedBuildInAIToolEmbedFSHash string = "b493ad2c24cf33cb2a8e6c56d464835b57fa91145bd98322789ae319f4cbb11f"

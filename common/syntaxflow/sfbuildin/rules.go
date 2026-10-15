@@ -313,6 +313,8 @@ func parseBuiltinRule(name, content string, buildin bool) (*schema.SyntaxFlowRul
 		if meta, hit := builtinmetadata.Lookup("sf:"+name, content); hit {
 			if rule, err := sfvm.DecodeBuiltinRuleMetadata(meta.SyntaxFlowRule, content); err == nil {
 				return rule, nil
+			} else {
+				builtinmetadata.Invalidate("syntaxflow", err)
 			}
 		}
 	}

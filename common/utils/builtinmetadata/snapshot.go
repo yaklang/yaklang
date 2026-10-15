@@ -68,6 +68,7 @@ func (b *Bundle) ValidateArchive(data []byte, prefix string) error {
 	defer r.Close()
 	tr := tar.NewReader(r)
 	seen := map[string]bool{}
+	buffer := make([]byte, 32*1024)
 	for {
 		h, err := tr.Next()
 		if err == io.EOF {
@@ -98,7 +99,7 @@ func (b *Bundle) ValidateArchive(data []byte, prefix string) error {
 			return fmt.Errorf("resource attributes changed: %s", name)
 		}
 		if !h.FileInfo().IsDir() {
-			hash := shaReader(tr)
+			hash := shaReader(tr, buffer)
 			if hash != file.SHA256 {
 				return fmt.Errorf("resource content changed: %s", name)
 			}
@@ -113,10 +114,10 @@ func (b *Bundle) ValidateArchive(data []byte, prefix string) error {
 	return nil
 }
 
-func shaReader(r io.Reader) string {
+func shaReader(r io.Reader, buffer []byte) string {
 	// Stream rule sets without materializing another copy of every source file.
 	h := sha256.New()
-	if _, err := io.Copy(h, r); err != nil {
+	if _, err := io.CopyBuffer(h, r, buffer); err != nil {
 		return ""
 	}
 	return hex.EncodeToString(h.Sum(nil))

@@ -8,18 +8,15 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"io"
 	"io/fs"
 	"sort"
 	"strings"
-
-	"github.com/andybalholm/brotli"
 )
 
 //go:generate bash ../../../scripts/generate-builtin-metadata.sh
 
 // Bump Version when extraction semantics change, even if scripts do not.
-const Version = 2
+const Version = 3
 
 type Metadata struct {
 	VerboseName       string          `json:"verbose_name,omitempty"`
@@ -40,8 +37,9 @@ type File struct {
 }
 
 type Entry struct {
-	Script   string   `json:"script"`
-	Metadata Metadata `json:"metadata"`
+	Script        string          `json:"script"`
+	Metadata      json.RawMessage `json:"metadata"`
+	SourceStrings []SourceString  `json:"source_strings,omitempty"`
 }
 
 type Bundle struct {
@@ -84,23 +82,8 @@ func (b *Bundle) lookup(key, source string) (Metadata, bool) {
 		return Metadata{}, false
 	}
 
-	return e.Metadata, true
-}
-
-func Encode(b *Bundle) ([]byte, error) {
-	data, err := json.Marshal(b)
-	if err != nil {
-		return nil, err
-	}
-	var out bytes.Buffer
-	w := brotli.NewWriterLevel(&out, 11)
-	if _, err := w.Write(data); err != nil {
-		return nil, err
-	}
-	if err := w.Close(); err != nil {
-		return nil, err
-	}
-	return out.Bytes(), nil
+	metadata, err := e.resolve(source)
+	return metadata, err == nil && validMetadata(key, metadata)
 }
 
 // Text keeps one file/entry per line: readable JSON with local, stable diffs,
@@ -151,20 +134,6 @@ func Text(b *Bundle) ([]byte, error) {
 	return out.Bytes(), nil
 }
 
-func Decode(data []byte, kind, expectedHash string) (*Bundle, error) {
-	if expectedHash != "" && Digest(data) != expectedHash {
-		return nil, fmt.Errorf("%s metadata hash mismatch", kind)
-	}
-	raw, err := io.ReadAll(io.LimitReader(brotli.NewReader(bytes.NewReader(data)), (128<<20)+1))
-	if err != nil {
-		return nil, err
-	}
-	if len(raw) > 128<<20 {
-		return nil, fmt.Errorf("metadata exceeds size limit")
-	}
-	return Parse(raw, kind)
-}
-
 // Parse validates the checked-in text without invoking any script parser.
 func Parse(raw []byte, kind string) (*Bundle, error) {
 	var b Bundle
@@ -179,13 +148,24 @@ func Parse(raw []byte, kind string) (*Bundle, error) {
 			return nil, fmt.Errorf("invalid script fingerprint: %s", name)
 		}
 	}
-	for key, e := range b.Entries {
-		file, ok := b.Files[e.Script]
-		if !ok || fs.FileMode(file.Mode).IsDir() || kindForKey(key) != kind || !validMetadata(key, e.Metadata) {
-			return nil, fmt.Errorf("invalid script/metadata mapping: %s", key)
-		}
+	if err := b.validateEntries(); err != nil {
+		return nil, err
 	}
 	return &b, nil
+}
+
+func (b *Bundle) validateEntries() error {
+	for key, e := range b.Entries {
+		file, ok := b.Files[e.Script]
+		var metadata Metadata
+		if !ok || fs.FileMode(file.Mode).IsDir() || kindForKey(key) != b.Kind || json.Unmarshal(e.Metadata, &metadata) != nil || !validMetadata(key, metadata) {
+			return fmt.Errorf("invalid script/metadata mapping: %s", key)
+		}
+		if err := e.validate(file.Size); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func kindForKey(key string) string {

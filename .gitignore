@@ -112,4 +112,4 @@ CLAUDE.md
 /common/syntaxflow/sfdb/rule_versions.tar.gz
 /common/ai/aid/aireact/skills.tar.gz
 /common/ai/aid/aicommon/promptloader/prompts.tar.gz
-/common/consts/*-metadata.json.br
+/common/consts/*-metadata.bin

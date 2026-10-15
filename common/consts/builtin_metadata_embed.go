@@ -7,7 +7,7 @@ import (
 	"fmt"
 )
 
-//go:embed aitool-metadata.json.br coreplugin-metadata.json.br forge-metadata.json.br syntaxflow-metadata.json.br
+//go:embed aitool-metadata.bin coreplugin-metadata.bin forge-metadata.bin syntaxflow-metadata.bin
 var builtinMetadataFiles embed.FS
 
 // BuiltinMetadata returns the compressed artifact and its expected SHA-256.
@@ -25,6 +25,6 @@ func BuiltinMetadata(kind string) ([]byte, string, error) {
 	default:
 		return nil, "", fmt.Errorf("unknown script set: %s", kind)
 	}
-	data, err := builtinMetadataFiles.ReadFile(kind + "-metadata.json.br")
+	data, err := builtinMetadataFiles.ReadFile(kind + "-metadata.bin")
 	return data, hash, err
 }
