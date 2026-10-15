@@ -31,7 +31,11 @@ func TestTimelineCompressionSummaryPrompt(t *testing.T) {
 	require.Contains(t, prompt, "EXACT_EVIDENCE")
 	require.NotContains(t, prompt, "FRAMEWORK_RULES_NOT_HISTORY")
 	require.NotContains(t, prompt, "TASK_INSTRUCTION")
-	require.NotContains(t, prompt, "EXACT_SCHEMA")
+	// Promoted entries are exact state: they are listed once as deletable
+	// candidates, never duplicated into the ordinary history sections.
+	require.Contains(t, prompt, "PROMOTED_ENTRIES_")
+	require.Contains(t, prompt, "entry=245")
+	require.Equal(t, 1, strings.Count(prompt, "EXACT_SCHEMA"))
 	require.NotContains(t, prompt, aiprojection.Nonce())
 	// Historical native calls must not turn into assistant/tool messages in
 	// the reducer's request. Only the outer user section is projected here.
@@ -46,7 +50,14 @@ func TestTimelineCompressionSummaryPrompt(t *testing.T) {
 	require.Contains(t, prompt, "call_b")
 	_, err = renderCompressionSummaryPrompt(nil)
 	require.Error(t, err)
+	// A snapshot without ordinary history can still render a deletion-only
+	// request while deletable promoted entries exist.
 	snapshot.Head, snapshot.Items = nil, nil
+	deletionOnly, err := renderCompressionSummaryPrompt(snapshot)
+	require.NoError(t, err)
+	require.Contains(t, deletionOnly, "PROMOTED_ENTRIES_")
+	// Without any decidable content the request must not be rendered.
+	snapshot.PromotedItems = nil
 	_, err = renderCompressionSummaryPrompt(snapshot)
 	require.Error(t, err)
 }

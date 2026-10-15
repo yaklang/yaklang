@@ -47,6 +47,11 @@ func TestEvidenceSurvivesHistoryCompression(t *testing.T) {
 
 func TestTimelineEvidencePayloadWaitsForCompressionBeforePrompt(t *testing.T) {
 	c := evidenceConfig(t)
+	requests := 0
+	bindCompressionMock(t, c.Timeline, func(*AIRequest) (string, error) {
+		requests++
+		return compressionMockSummary("evidence retained; no deletions"), nil
+	})
 	c.Timeline.SetTimelineBucketByteSize(256)
 	saveTestEvidence(c, "large", strings.Repeat("confirmed observation ", 100))
 	require.Empty(t, BuildPromptFrozenOpenMaterials(c).SessionEvidenceSemiDynamic)
@@ -58,4 +63,5 @@ func TestTimelineEvidencePayloadWaitsForCompressionBeforePrompt(t *testing.T) {
 	require.NotEmpty(t, blocks.SessionEvidenceSemiDynamic)
 	require.Empty(t, blocks.TimelineOpen)
 	require.NotEmpty(t, c.Timeline.FreezeSnapshot().Batches)
+	require.Equal(t, 1, requests)
 }

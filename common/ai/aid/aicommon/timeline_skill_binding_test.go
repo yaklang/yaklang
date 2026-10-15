@@ -2,6 +2,7 @@ package aicommon
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -29,7 +30,9 @@ func TestSkillBindingPreservesRetiredTimelineAndRestoredHistory(t *testing.T) {
 			require.True(t, mgr.IsSkillLoaded("default"))
 
 			bindCompressionMock(t, tl, func(req *AIRequest) (string, error) {
-				require.NotContains(t, req.GetPrompt(), "RETIRED_DEFAULT_BODY")
+				// The live skill body is listed once as a deletable entry.
+				require.Contains(t, req.GetPrompt(), "PROMOTED_ENTRIES_")
+				require.Equal(t, 1, strings.Count(req.GetPrompt(), "RETIRED_DEFAULT_BODY"))
 				return compressionMockSummary("Ordinary history summarized."), nil
 			})
 			options := compressionTestOptions()

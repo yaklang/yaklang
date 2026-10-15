@@ -30,12 +30,24 @@ func registerTimelineTestLiteForge(t testing.TB) {
 			}
 			return nil, errors.New("no test LiteForge adapter for this task")
 		}
-		cfg := NewConfig(req.Context, append([]ConfigOption{WithDisableAutoSkills(true)}, configOpts...)...)
-		if req.ActionName == CallerLabelTimelineCompress {
-			g := NewGeneralKVConfig(req.Options...)
-			require.True(t, g.GetLiteForgeDisableTimeline(), "the snapshot is the only history source")
-			require.Equal(t, timelineCompressionInstruction, g.GetLiteForgeStaticInstruction())
-		}
+		g := NewGeneralKVConfig(req.Options...)
+		require.True(t, g.GetLiteForgeDisableTimeline(), "the snapshot is the only history source")
+		require.Equal(t, timelineCompressionInstruction, g.GetLiteForgeStaticInstruction())
+		// NewConfig SoftBinds whatever Timeline it owns and copies that config's
+		// content limit onto it. Production liteforge.Execute drops or copies a
+		// shared Timeline before construction. This adapter must do the same,
+		// or the helper's default 300K limit overwrites the parent halfway
+		// through compression.
+		configOpts = append([]ConfigOption{WithDisableAutoSkills(true)}, configOpts...)
+		configOpts = append(configOpts, func(cfg *Config) error {
+			if g.GetLiteForgeDisableTimeline() {
+				cfg.Timeline = nil
+			} else if cfg.Timeline != nil {
+				cfg.Timeline = cfg.Timeline.CopyReducibleTimelineWithMemory()
+			}
+			return nil
+		})
+		cfg := NewConfig(req.Context, configOpts...)
 		requestPrompt := prompt
 		if req.ResponseHandler == nil {
 			requestPrompt = NewGeneralKVConfig(req.Options...).GetLiteForgeStaticInstruction() + "\n" + prompt + "\n" + req.OutputSchema

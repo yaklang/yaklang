@@ -43,7 +43,7 @@ func (c *compressionBeforePromptConfig) ScheduleAuxiliaryTask(ctx context.Contex
 
 func TestTimelineCompressionBeforeLoopPrompt(t *testing.T) {
 	ctx := context.Background()
-	cfg := &compressionBeforePromptConfig{Config: aicommon.NewConfig(ctx, aicommon.WithDisableAutoSkills(true), aicommon.WithDisableCreateDBRuntime(true), aicommon.WithTimelineContentLimit(1))}
+	cfg := &compressionBeforePromptConfig{Config: aicommon.NewConfig(ctx, aicommon.WithDisableAutoSkills(true), aicommon.WithDisableCreateDBRuntime(true), aicommon.WithTimelineContentLimit(1200))}
 	cfg.Timeline.SoftBindConfig(cfg, nil)
 	loop := makeSchemaStabilityTestLoop(cfg)
 	capture := captureActivityStatus(loop)
@@ -54,7 +54,7 @@ func TestTimelineCompressionBeforeLoopPrompt(t *testing.T) {
 			"optimization status must arrive before the compression model returns")
 	}
 	loop.invoker = &compressionBeforePromptInvoker{MockInvoker: mock.NewMockInvoker(ctx), timeline: cfg.Timeline}
-	cfg.Timeline.PushText(1, "ORIGINAL_HISTORY")
+	cfg.Timeline.PushText(1, strings.Repeat("ORIGINAL_HISTORY ", 2000))
 	loop.persistentInstructionProvider = func(*ReActLoop, string) (string, error) { return "CURRENT_INSTRUCTION", nil }
 	prompt, err := loop.generateLoopPrompt("compression-before-prompt", "CURRENT_QUERY", "FROZEN_USER_CONTEXT", nil, "", &LoopActionHandlerOperator{})
 	require.NoError(t, err)
@@ -79,7 +79,7 @@ func TestTimelineCompressionBeforeLoopPrompt(t *testing.T) {
 	require.Equal(t, "response.preparing", statuses[1].Code, "completed optimization must release its status")
 	labels := map[string]bool{statuses[0].Value: true}
 	for i := 1; i < len(contextOptimizationStatusNames); i++ {
-		cfg.Timeline.PushText(int64(i+1), "NEW_HISTORY")
+		cfg.Timeline.PushText(int64(i+1), strings.Repeat("NEW_HISTORY ", 2000))
 		require.NoError(t, loop.compressTimelineBeforePrompt("CURRENT_QUERY", "", ""))
 		statuses = capture.snapshot()
 		label := statuses[len(statuses)-2]

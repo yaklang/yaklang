@@ -1,6 +1,10 @@
 package aicommon
 
-import "github.com/yaklang/yaklang/common/ai/aid/aitool"
+import (
+	"strings"
+
+	"github.com/yaklang/yaklang/common/ai/aid/aitool"
+)
 
 // PromptMaterials 是 prefix 渲染的统一语义材料模型。
 //
@@ -186,6 +190,20 @@ type TimelineFrozenOpenBlocks struct {
 	EvidenceSemiDynamic      string
 }
 
+// PromptText combines only the Timeline-owned material supplied to the prompt
+// templates, in section order. Threshold checks use these same rendered fields,
+// not journal JSON, compression-request text, or an extra effective-state fold.
+func (b TimelineFrozenOpenBlocks) PromptText() string {
+	var parts []string
+	for _, text := range []string{b.Frozen, b.SkillsContext, b.PromotedRecentTools,
+		b.PromotedUserInputHistory, b.EvidenceSemiDynamic, b.Open} {
+		if text != "" {
+			parts = append(parts, text)
+		}
+	}
+	return strings.Join(parts, "\n\n")
+}
+
 func RenderTimelineFrozenOpen(timeline *Timeline) TimelineFrozenOpenBlocks {
 	return RenderTimelineFrozenOpenWithOptions(timeline, TimelinePromptOptions{})
 }
@@ -218,6 +236,13 @@ func RenderTimelineFrozenOpenWithOptions(timeline *Timeline, options TimelinePro
 	// Freeze is committed on writes/import, never as a rendering side effect.
 	timeline.mu.RLock()
 	defer timeline.mu.RUnlock()
+	return timeline.renderTimelinePromptLocked(options)
+}
+
+// Both prompt assembly and compression accounting capture these fields under
+// one lock, so Open and promoted content cannot be omitted or counted twice
+// while moving across a freeze boundary.
+func (timeline *Timeline) renderTimelinePromptLocked(options TimelinePromptOptions) TimelineFrozenOpenBlocks {
 	rb := timeline.frozenPromptBlocksLocked(options.ExcludeToolCache, options.UserInputOnly, options.PromoteUserInput || options.UserInputOnly)
 	var recentTools string
 	if !options.ExcludeToolCache && !options.UserInputOnly {
