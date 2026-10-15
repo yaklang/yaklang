@@ -2,7 +2,6 @@ package ssadb
 
 import (
 	"io/fs"
-	"net/url"
 	"os"
 	"path"
 	"strconv"
@@ -30,7 +29,7 @@ const (
 // that owns its body loading end to end.
 type irSourceFS struct {
 	mu      sync.Mutex // guards the tree cache builds
-	virtual *utils.CacheExWithKey[string, filesys_interface.FileSystem]
+	virtual *utils.CacheExWithKey[string, *overlayFS]
 }
 
 var IrSourceFsSeparators = '/'
@@ -41,7 +40,7 @@ var _ filesys_interface.FileSystem = (*irSourceFS)(nil)
 func NewIrSourceFs() *irSourceFS {
 	// Touch-on-hit (default): active viewing extends life; idle 10m → evict.
 	return &irSourceFS{
-		virtual: utils.NewCacheExWithKey[string, filesys_interface.FileSystem](
+		virtual: utils.NewCacheExWithKey[string, *overlayFS](
 			utils.WithCacheTTL(irSourceTreeTTL),
 			utils.WithCacheCapacity(irSourceTreeCap),
 		),
@@ -114,22 +113,11 @@ func (isfs *irSourceFS) ReadDir(path string) ([]fs.DirEntry, error) {
 	return pfs.ReadDir(path)
 }
 
-// diffViewFS is the diff-view capability of a per-program overlay
-// filesystem: ReadDirDiff lists the head layer's own entries instead of
-// the fully expanded chain. Every per-program filesystem built by
-// buildProgramTree implements it; for a single-layer chain the two views
-// coincide.
-type diffViewFS interface {
-	ReadDirDiff(path string) ([]fs.DirEntry, error)
-}
-
-// ReadDirDiffOnly lists a directory through the program's own filesystem,
-// honoring the diffOnly query option (yakurl reaches it through its
-// optional diffOnlyLister capability): diffOnly collapses the listing to
-// the head layer's own entries — for a single-layer chain (a program
-// without saved layers) that is the whole tree, so the query changes
-// nothing there.
-func (isfs *irSourceFS) ReadDirDiffOnly(path string, query url.Values) ([]fs.DirEntry, error) {
+// ReadDirDiff lists a directory through the program's own overlay diff
+// view: the head layer's own entries instead of the fully expanded chain
+// (for a single-layer chain the two views coincide). yakurl picks this
+// view when the listing request carries the diffOnly option.
+func (isfs *irSourceFS) ReadDirDiff(path string) ([]fs.DirEntry, error) {
 	if path == "/" {
 		return programRootEntries(), nil
 	}
@@ -137,20 +125,7 @@ func (isfs *irSourceFS) ReadDirDiffOnly(path string, query url.Values) ([]fs.Dir
 	if err != nil {
 		return nil, err
 	}
-	if isDiffOnlyQuery(query) {
-		if dv, ok := pfs.(diffViewFS); ok {
-			return dv.ReadDirDiff(path)
-		}
-	}
-	return pfs.ReadDir(path)
-}
-
-func isDiffOnlyQuery(query url.Values) bool {
-	switch strings.ToLower(strings.TrimSpace(query.Get("diffOnly"))) {
-	case "1", "true", "yes":
-		return true
-	}
-	return false
+	return pfs.ReadDirDiff(path)
 }
 
 // ------- per-program tree construction -------
@@ -158,7 +133,7 @@ func isDiffOnlyQuery(query url.Values) bool {
 // treeFor resolves (and builds on first touch) the cached per-program
 // filesystem named by anyPath. The DB build runs under fs.mu to avoid
 // duplicate builds.
-func (fs *irSourceFS) treeFor(anyPath string) (filesys_interface.FileSystem, error) {
+func (fs *irSourceFS) treeFor(anyPath string) (*overlayFS, error) {
 	progName, _ := fs.getProgram(anyPath)
 	if progName == "" {
 		return nil, utils.Errorf("invalid path [%v]: missing program name", anyPath)
@@ -186,7 +161,7 @@ func (fs *irSourceFS) treeFor(anyPath string) (filesys_interface.FileSystem, err
 // is a single-layer chain over itself. No flavor check: "incremental"
 // exists only as chain length. Layer status (FileHashMap) rides on the
 // chain members; layers that recorded none keep nil.
-func buildProgramTree(progName string) (filesys_interface.FileSystem, error) {
+func buildProgramTree(progName string) (*overlayFS, error) {
 	prog, err := GetApplicationProgram(progName)
 	if err != nil && !gorm.IsRecordNotFoundError(err) {
 		return nil, err

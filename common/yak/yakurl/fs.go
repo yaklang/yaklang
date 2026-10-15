@@ -24,19 +24,30 @@ type fileSystemAction struct {
 	fs fi.FileSystem
 }
 
-// diffOnlyLister is optional: filesystems that understand the diffOnly
-// listing option implement it — ssadb's irSourceFS collapses an
-// incremental program's listing to the head layer's own entries.
-// Ordinary filesystems (file://, …) just ReadDir.
+// diffOnlyLister is optional: filesystems that serve a diff view implement
+// it — ssadb's irSourceFS lists an incremental program's head layer's own
+// entries. Ordinary filesystems (file://, …) just ReadDir.
 type diffOnlyLister interface {
-	ReadDirDiffOnly(path string, query url.Values) ([]fs.DirEntry, error)
+	ReadDirDiff(path string) ([]fs.DirEntry, error)
 }
 
 func (f fileSystemAction) listDir(absPath string, query url.Values) ([]fs.DirEntry, error) {
-	if d, ok := f.fs.(diffOnlyLister); ok {
-		return d.ReadDirDiffOnly(absPath, query)
+	if isDiffOnlyQuery(query) {
+		if d, ok := f.fs.(diffOnlyLister); ok {
+			return d.ReadDirDiff(absPath)
+		}
 	}
 	return f.fs.ReadDir(absPath)
+}
+
+// isDiffOnlyQuery reports whether the listing request carries the
+// diffOnly option (the frontend's "show all files" checkbox unchecked).
+func isDiffOnlyQuery(query url.Values) bool {
+	switch strings.ToLower(strings.TrimSpace(query.Get("diffOnly"))) {
+	case "1", "true", "yes":
+		return true
+	}
+	return false
 }
 
 func getFirstQueryValue(query url.Values, keys ...string) string {
