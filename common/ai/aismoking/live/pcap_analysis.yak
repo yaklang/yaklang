@@ -37,12 +37,12 @@ for name in cases {
     if name == "auto_file_fields" {
         source = file.Join(root,"auto.pcap")
         file.Save(source,fixture)~
-        task = "请加载 pcap-analysis Skill，仅用 pcapdb，传 pcapfile="+source+" 自动选择流量库。先 fields 发现实际 HTTP 字段，再 details 核实请求路径对应的字符串字段，用该真实 field_path 做 eq 搜索 /pcap-skill-proof。回答命中的消息 ID 和路径。说明字段发现为采样，不能把页条数当全库计数。不进入 PLAN 或子任务，不调用其他工具。"
+        task = "请加载 pcap-analysis Skill，仅用 query_pcapdb，传 pcapfile="+source+" 自动选择流量库。先 fields 发现实际 HTTP 字段，再 details 核实请求路径对应的字符串字段，用该真实 field_path 做 eq 搜索 /pcap-skill-proof。回答命中的消息 ID 和路径。说明字段发现为采样，不能把页条数当全库计数。不进入 PLAN 或子任务，不调用其他工具。"
     }
     if name == "manage_lifecycle" {
         file.Save(source,fixture)~
         exportPath=file.Join(root,"managed-export.pcap")
-        task="请加载 pcap-analysis Skill。验证这个临时样本的完整生命周期，仅操作本测试捕获 "+source+"：先 load_pcapfile 导入；用 manage_pcapdb 的 list 找到实际 dataset_id；用 pcapdb 的 metadata 核实包数；用 manage_pcapdb 做轻量 validate，export 到 "+exportPath+"，然后 delete 刚才的这一个测试库，最后 list 确认它已不存在。用户在本条明确授权删除这个测试库，保留源捕获和导出文件。报告精确包数、ID、校验/删除状态及导出路径。只用 load_pcapfile、pcapdb、manage_pcapdb，不进入 PLAN 或子任务；切换查询类型或管理 op 时重新选参数。"
+        task="请加载 pcap-analysis Skill。验证这个临时样本的完整生命周期，仅操作本测试捕获 "+source+"：先 load_pcapfile 导入；用 manage_pcapdb 的 list 找到实际 dataset_id；用 query_pcapdb 的 metadata 核实包数；用 manage_pcapdb 做轻量 validate，export 到 "+exportPath+"，然后 delete 刚才的这一个测试库，最后 list 确认它已不存在。用户在本条明确授权删除这个测试库，保留源捕获和导出文件。报告精确包数、ID、校验/删除状态及导出路径。只用 load_pcapfile、query_pcapdb、manage_pcapdb，不进入 PLAN 或子任务；切换查询类型或管理 op 时重新选参数。"
     }
     dir = file.Join(root,name)
     file.MkdirAll(dir)~
@@ -58,7 +58,7 @@ for name in cases {
         aim.workdir(dir),aim.context(context.Seconds(300)),aim.timeout(300),
         aim.maxIteration(24),aim.reviewPolicy("yolo"),aim.allowUserInteract(false),
         aim.disableMCPServers(true),aim.disableAIForge(true),
-        aim.includeToolNames("load_pcapfile","pcapdb","manage_pcapdb"),
+        aim.includeToolNames("load_pcapfile","query_pcapdb","manage_pcapdb"),
         aim.onEvent(func(op,event){
             mu.Lock()
             defer mu.Unlock()
@@ -86,7 +86,7 @@ for name in cases {
     for _,call in calls {
         if counts[call.tool] == nil { counts[call.tool]=0 }
         counts[call.tool]++
-        if !(call.tool in ["load_pcapfile","pcapdb","manage_pcapdb"]) { failed=append(failed,"out_of_scope_tool") }
+        if !(call.tool in ["load_pcapfile","query_pcapdb","manage_pcapdb"]) { failed=append(failed,"out_of_scope_tool") }
         if call.params != nil && call.params.query_type != nil { modes=append(modes,call.params.query_type) }
     }
     if runErr != nil { failed=append(failed,"runtime_error") }
@@ -106,7 +106,7 @@ for name in cases {
             }
         }
     }
-    if counts["pcapdb"] == nil { failed=append(failed,"missing_real_query") }
+    if counts["query_pcapdb"] == nil { failed=append(failed,"missing_real_query") }
     if name == "import_answer" {
         if counts["load_pcapfile"] != 1 { failed=append(failed,"expected_one_import") }
         for value in ["/pcap-skill-proof","skill.example","200","8"] {
@@ -173,7 +173,7 @@ for name in cases {
         for _,call in calls {
             if call.result==nil {failed=append(failed,"missing_semantic_result");continue}
             if call.tool=="load_pcapfile" {loadedID=call.result.dataset_id}
-            if call.tool=="pcapdb" && call.params.query_type=="metadata" && call.result.packet_count==8 {metadataOK=true}
+            if call.tool=="query_pcapdb" && call.params.query_type=="metadata" && call.result.packet_count==8 {metadataOK=true}
             if call.tool!="manage_pcapdb" {continue}
             operations=append(operations,call.params.op)
             if call.params.op=="validate" && call.result.valid && !call.result.busy {validated=true}

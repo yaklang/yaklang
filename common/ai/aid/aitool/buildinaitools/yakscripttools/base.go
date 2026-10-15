@@ -132,7 +132,9 @@ func removeRetiredBuiltInAITools(db *gorm.DB) error {
 		"url_content_summary",
 		"send_http_request_by_url",
 		"send_http_request_packet",
+		// Previous names of query_pcapdb; remove only the stored builtin records.
 		"query_pcap_in_db",
+		"pcapdb",
 	}
 	// Editing a builtin clears IsBuiltin but preserves Author. Author alone
 	// cannot distinguish a retired builtin from user-owned content.

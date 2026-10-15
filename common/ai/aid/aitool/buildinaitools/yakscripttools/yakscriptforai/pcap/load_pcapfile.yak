@@ -3,7 +3,7 @@ __VERBOSE_NAME__ = "Load PCAP File"
 __VERBOSE_NAME_ZH__ = "加载 PCAP 流量库"
 __KEYWORDS__ = "pcap,pcapng,pcapdb,import,流量,导入,协议,会话"
 __USAGE__ = <<<USAGE
-pcapfile 为稳定的本地 PCAP/PCAPNG 文件路径。导入写入独立流量库，完整内容去重，并建立协议及 session/stream 分析。返回结构化 result，dataset_id 是后续 pcapdb 的 id，不能用数字登记行 ID 替代。
+pcapfile 为稳定的本地 PCAP/PCAPNG 文件路径。导入写入独立流量库，完整内容去重，并建立协议及 session/stream 分析。返回结构化 result，dataset_id 是后续 query_pcapdb/manage_pcapdb 的 id，不能用数字登记行 ID 替代。
 state=ready 代表所选阶段完成，还要检查 protocols_indexed/streams_indexed。protocol_count 为消息数。来源删除后可按 dataset_id 查询；首次导入和协议重放可能耗时，执行取消跟随任务 context。
 [[- if .FunctionCallMode -]]
 {"pcapfile":"/absolute/path/capture.pcapng"}

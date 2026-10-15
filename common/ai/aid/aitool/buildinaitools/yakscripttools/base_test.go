@@ -162,24 +162,33 @@ func TestPCAPCoreToolRename(t *testing.T) {
 	for _, tool := range tools {
 		loaded[tool.Name] = true
 	}
-	for _, name := range []string{"load_pcapfile", "pcapdb", "manage_pcapdb"} {
+	for _, name := range []string{"load_pcapfile", "query_pcapdb", "manage_pcapdb"} {
 		assert.Assert(t, loaded[name], "missing PCAP core tool %s", name)
 	}
-	assert.Assert(t, !loaded["query_pcap_in_db"])
+	for _, name := range []string{"query_pcap_in_db", "pcapdb"} {
+		assert.Assert(t, !loaded[name], "retired tool %s should not be embedded", name)
+	}
 	db, err := utils.CreateTempTestDatabaseInMemory()
 	assert.NilError(t, err)
 	defer db.Close()
 	assert.NilError(t, db.AutoMigrate(&schema.AIYakTool{}).Error)
-	assert.NilError(t, db.Create(&schema.AIYakTool{Name: "query_pcap_in_db", IsBuiltin: true}).Error)
+	assert.NilError(t, db.Create(&schema.AIYakTool{Name: "query_pcapdb", IsBuiltin: true}).Error)
+	for _, name := range []string{"query_pcap_in_db", "pcapdb"} {
+		assert.NilError(t, db.Create(&schema.AIYakTool{Name: name, IsBuiltin: true}).Error)
+	}
+	assert.NilError(t, removeRetiredBuiltInAITools(db))
+	var remaining []schema.AIYakTool
+	assert.NilError(t, db.Find(&remaining).Error)
+	assert.Equal(t, len(remaining), 1)
+	assert.Equal(t, remaining[0].Name, "query_pcapdb")
+	// Edited/user-owned scripts with either old name must not be removed on sync.
+	for _, name := range []string{"query_pcap_in_db", "pcapdb"} {
+		assert.NilError(t, db.Create(&schema.AIYakTool{Name: name, Author: schema.AIResourceAuthorBuiltin, IsBuiltin: false}).Error)
+	}
 	assert.NilError(t, removeRetiredBuiltInAITools(db))
 	var count int64
 	assert.NilError(t, db.Model(&schema.AIYakTool{}).Count(&count).Error)
-	assert.Equal(t, count, int64(0))
-	// Edited/user-owned scripts with the old name must not be removed on sync.
-	assert.NilError(t, db.Create(&schema.AIYakTool{Name: "query_pcap_in_db", Author: schema.AIResourceAuthorBuiltin, IsBuiltin: false}).Error)
-	assert.NilError(t, removeRetiredBuiltInAITools(db))
-	assert.NilError(t, db.Model(&schema.AIYakTool{}).Count(&count).Error)
-	assert.Equal(t, count, int64(1))
+	assert.Equal(t, count, int64(3))
 }
 
 type failingAIToolFS struct {
