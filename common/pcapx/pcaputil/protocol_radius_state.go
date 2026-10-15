@@ -20,6 +20,7 @@ type radiusOwner struct {
 	eventID                     uint64
 	last                        time.Time
 	retired, completed, replied bool
+	eap                         bool
 }
 type binRADIUS struct {
 	pending   map[radiusKey]radiusOwner
@@ -125,6 +126,21 @@ func radiusFields(raw []byte, max int) (map[string]any, error) {
 		}
 	}
 	out["Attributes"], out["Attribute Count"] = attrs, len(attrs)
+	complete, err := radiusEAPFields(out)
+	if err != nil {
+		if code != 4 {
+			for _, a := range attrs {
+				if a["Type"].(byte) == 79 {
+					err = &radiusEAPFailure{err}
+					break
+				}
+			}
+		}
+		if complete {
+			return out, err
+		}
+		return nil, err
+	}
 	return out, nil
 }
 func (s *binRADIUS) observe(dir int, ts time.Time, wire []byte, id uint64, out map[string]any, limit int) (reply, transaction uint64) {
@@ -176,7 +192,7 @@ func (s *binRADIUS) observe(dir int, ts time.Time, wire []byte, id uint64, out m
 		out["Association"] = "untracked-history"
 		return 0, 0
 	}
-	s.pending[key] = radiusOwner{digest: digest, eventID: id, last: ts}
+	s.pending[key] = radiusOwner{digest: digest, eventID: id, last: ts, eap: out["EAP"] != nil}
 	return 0, id
 }
 
@@ -233,19 +249,30 @@ func radiusIdentity(dir int, w []byte) radiusKey {
 	return radiusKey{dir: dir, id: w[1], family: family}
 }
 func (s *binRADIUS) profile() string {
-	access, accounting := false, false
-	for k := range s.pending {
+	access, accounting, eap := false, false, false
+	for k, v := range s.pending {
 		if k.family == 4 {
 			accounting = true
+		} else if v.eap {
+			eap = true
 		} else {
 			access = true
 		}
 	}
-	if accounting && !access {
-		return "radius-accounting-observed"
+	n := 0
+	for _, b := range []bool{access, accounting, eap} {
+		if b {
+			n++
+		}
+	}
+	if n > 1 {
+		return "radius-observed"
 	}
 	if accounting {
-		return "radius-observed"
+		return "radius-accounting-observed"
+	}
+	if eap {
+		return "radius-eap-observed"
 	}
 	return "radius-access-observed"
 }

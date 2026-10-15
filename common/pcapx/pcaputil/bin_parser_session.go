@@ -1352,7 +1352,7 @@ func (f *binFlow) finishSession(reason TrafficFlowCloseReason) {
 	}
 	if r := f.radius; r != nil && r.outstanding() > 0 {
 		e := f.event(0, nil, "incomplete", string(reason)+": RADIUS unmatched observed Identifiers")
-		e.nativeRADIUSObservation, e.Profile, e.Completeness = true, "radius-access-observed", "incomplete"
+		e.nativeRADIUSObservation, e.Profile, e.Completeness = true, r.profile(), "incomplete"
 		e.Session = map[string]any{"Outstanding": r.outstanding()}
 		e.semanticSession = cloneSession(e.Session)
 		e.sessionError = &ProtocolError{Kind: ErrNeedMore, Message: e.Summary}

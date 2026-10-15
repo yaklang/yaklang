@@ -195,6 +195,12 @@ func TestRound3UpstreamCaptureReplay(t *testing.T) {
 			t.Run(fmt.Sprintf("%s/workers=%d", tc.protocol, workers), func(t *testing.T) {
 				events, stats, err := binReplay(t, binCorpusBytes(t, tc.capture), workers)
 				require.NoError(t, err)
+				if tc.protocol == "radius" {
+					// All four original frames remain required: two complete wire
+					// observations and two RFC3579 MUST-attribute refusals.
+					radiusEAPAssertReceived(t, events, events, stats, false)
+					return
+				}
 				count := 0
 				var messageBytes uint64
 				for _, event := range events {

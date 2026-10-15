@@ -24,6 +24,7 @@ type ProtocolEvent struct {
 	nativeTLSObservation                     bool
 	nativeDTLSObservation                    bool
 	nativeRADIUSObservation                  bool
+	radiusApplicationRefusal                 bool
 	nativeSNMPObservation                    bool
 	nativeSTUNObservation                    bool
 	nativeSIPObservation                     bool
@@ -1555,6 +1556,19 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 					err = cerr
 				}
 			}
+			if err != nil && f.radius != nil && !e.nativeRADIUSObservation {
+				_, typed := classifySessionError(err)
+				if typed != nil && typed.Kind == ErrResourceExceeded {
+					if refused := f.consumeRADIUS(dir, e, e.Raw); refused != nil {
+						err = refused
+					} else {
+						// Never turn a failed legacy projection into an accepted owner.
+						f.radius.retire(dir, e.Raw, false)
+						e.ResponseTo, e.TransactionID = 0, 0
+						e.Session, e.semanticFields, e.semanticSession = nil, nil, nil
+					}
+				}
+			}
 			if err != nil {
 				if errors.Is(err, stream_parser.ErrKafkaUnsupported) {
 					err = protocolError(ErrUnsupportedFeature, err.Error())
@@ -1590,7 +1604,7 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 				if e.nativeSIPObservation || (e.Protocol == "iec104" || e.Protocol == "dnp3") || e.Protocol == "goose" || e.Protocol == "mqtt" || e.nativeOPCUAObservation || e.Protocol == "websocket" && e.Session["OCPP"] != nil || e.Protocol == "rtp" && e.Transport != "udp" {
 					e.retainRuleEnvelope(result)
 				}
-				if e.nativeDNSStreamObservation || e.nativeATGObservation || e.nativeHARTIPObservation || e.nativeENIPObservation || e.Protocol == "tls" || e.Protocol == "redis" || e.Entry == "MySQLPreparedFields" || e.Protocol == "stun" || e.Protocol == "turn" || e.Protocol == "snmp" || e.Protocol == "slmp" || e.Protocol == "dlms-wrapper" || e.Protocol == "dlms" || e.Protocol == "c37118" {
+				if e.nativeRADIUSObservation || e.nativeDNSStreamObservation || e.nativeATGObservation || e.nativeHARTIPObservation || e.nativeENIPObservation || e.Protocol == "tls" || e.Protocol == "redis" || e.Entry == "MySQLPreparedFields" || e.Protocol == "stun" || e.Protocol == "turn" || e.Protocol == "snmp" || e.Protocol == "slmp" || e.Protocol == "dlms-wrapper" || e.Protocol == "dlms" || e.Protocol == "c37118" {
 					e.semanticFields = cloneSession(e.semanticFields)
 				}
 			}
@@ -1663,6 +1677,7 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 		// Only complete frames with an independently retained boundary carry this private
 		// application-level refusal scope. Snapshot before public callbacks.
 		recoverableHARTIP := e.nativeHARTIPObservation && hartIPRecoverable(e.Raw, e.sessionError)
+		recoverableRADIUS := e.nativeRADIUSObservation && radiusRecoverableFrame(e.Raw, e.sessionError, e.radiusApplicationRefusal)
 		recoverableDoIP := e.Protocol == "doip" && e.doipAssociationRefusal
 		recoverableDNP3 := e.Protocol == "dnp3" && e.Session["Error Scope"] == "application"
 		tlsParent := e
@@ -1677,7 +1692,7 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 			tlsParent = &owned
 		}
 		// Recovery is engine policy, not a caller-editable event projection.
-		stopAfterFailure := failed && !recoverableHARTIP && !(e.Protocol == "fins" && finsRecoverable(e.sessionError)) && !recoverableDNP3 && !recoverableDoIP && !(e.Protocol == "slmp" && slmpTCPRecoverable(e.sessionError)) && !(e.Protocol == "dlms-wrapper" && dlmsRecoverableMessageError(e.sessionError)) && !(e.Protocol == "c37118" && c37118RecoverableMessageError(e.sessionError)) && !(e.Protocol == "dlms" && dlmsRecoverableMessageError(e.sessionError)) && !(e.Protocol == "roc-plus" && rocRecoverableMessageError(e.sessionError)) && !(e.Protocol == "genisys" && genisysRecoverableMessageError(e.sessionError)) && !((e.Protocol == "http2" || e.Protocol == "grpc" || e.Protocol == "doh") && e.Session["Error Scope"] == "stream")
+		stopAfterFailure := failed && !recoverableRADIUS && !recoverableHARTIP && !(e.Protocol == "fins" && finsRecoverable(e.sessionError)) && !recoverableDNP3 && !recoverableDoIP && !(e.Protocol == "slmp" && slmpTCPRecoverable(e.sessionError)) && !(e.Protocol == "dlms-wrapper" && dlmsRecoverableMessageError(e.sessionError)) && !(e.Protocol == "c37118" && c37118RecoverableMessageError(e.sessionError)) && !(e.Protocol == "dlms" && dlmsRecoverableMessageError(e.sessionError)) && !(e.Protocol == "roc-plus" && rocRecoverableMessageError(e.sessionError)) && !(e.Protocol == "genisys" && genisysRecoverableMessageError(e.sessionError)) && !((e.Protocol == "http2" || e.Protocol == "grpc" || e.Protocol == "doh") && e.Session["Error Scope"] == "stream")
 		a.emit(e)
 		if !failed {
 			f.deliverTLS(dir, tlsParent)

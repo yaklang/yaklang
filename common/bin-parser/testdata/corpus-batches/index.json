@@ -104086,6 +104086,322 @@
         "common/pcapx/pcaputil/radius-accounting/byte-budget.pcap": "radius-accounting/stop-selected-complete.pcap",
         "scripts/protocol-tests/required-tests-traffic-unified-v109.json": "required-tests-traffic-unified-v109.json"
       }
+    },
+    {
+      "id": "validation-radius-eap",
+      "kind": "support",
+      "source_sha": "bb3c6dbe9605e3f1920507936676edd142c9afb8",
+      "file": "validation-radius-eap.zip",
+      "sha256": "e249fbeb6c325e29d88c017446101216f93769dadb2645934a3cc5a9df904989",
+      "password": "bin-parser",
+      "members": {
+        "radius-eap-tools/build_inputs.py": {
+          "sha256": "04668657b1233cdd705a0e9a67b5a1f6d14944eaae755187e3493ca87a44ebce",
+          "bytes": 5341
+        },
+        "radius-eap-tools/generate.py": {
+          "sha256": "02bb574b34600ead7b78a1a78ea478b64f3f23e4aa1358c94f0e77d8dd90a3e8",
+          "bytes": 1431
+        },
+        "radius-eap-tools/hostap-source-pins.json": {
+          "sha256": "1018b21e6b009f1f0e16a725d10dd9991cfc5f7fc25fb5e2884690e0df169b9e",
+          "bytes": 670
+        },
+        "radius-eap-tools/scope.json": {
+          "sha256": "db112f6c8d2478002aa1d084fce84d98465a4e30ed4771765330dfbed4ce6533",
+          "bytes": 1673
+        },
+        "radius-eap-tools/source-pins.json": {
+          "sha256": "04595796ce6c0c86c4ad1000cf015c2242bbfd3ef015ee9227d2b247265bf268",
+          "bytes": 587
+        },
+        "radius-eap-tools/verify.py": {
+          "sha256": "6f91283ef99b3b225ced157467d4b26893211f3d4fa521856d88eb8858fa0d87",
+          "bytes": 4378
+        },
+        "radius-eap/accept-with-eap-failure-should-conflict.pcap": {
+          "sha256": "2584477b50a8481c2a72a1067ea217a03457013608bb2d4bccbb753c56a56c9a",
+          "bytes": 247
+        },
+        "radius-eap/accounting-forbidden-79-80.pcap": {
+          "sha256": "a1bd492d37026ce8e9a5fb4d708b24be7220d5d75de2e522204c629ea9b39cf4",
+          "bytes": 153
+        },
+        "radius-eap/attribute-refusal-neighbor-owner.pcap": {
+          "sha256": "0074660030291cfbbe30b96bd078beb3e44ff48a5bfd7cfdbfd688e2ae1f343a",
+          "bytes": 457
+        },
+        "radius-eap/bad-message-authenticator-width.pcap": {
+          "sha256": "e9406a5ba75c14757e364c4bca363b2a1354f5dafa0dc1476ae365b8aaa62a48",
+          "bytes": 131
+        },
+        "radius-eap/byte-refusal-neighbor-owner.pcap": {
+          "sha256": "8905332cba72a333312d574b7970c6c4ddcefc89b44e055a6e05f115ed2090df",
+          "bytes": 1043
+        },
+        "radius-eap/consecutive-three-fragments.pcap": {
+          "sha256": "010e17e347773d1b8e61f9b4c9a21df0533d97d7f4b1a8741397192367715e32",
+          "bytes": 833
+        },
+        "radius-eap/controls.json": {
+          "sha256": "a1180cd2b842351029b9f183111b2ee31e05b76692188a24ccdefd98b3d01da4",
+          "bytes": 238208
+        },
+        "radius-eap/duplicate-message-authenticator.pcap": {
+          "sha256": "324546ea38d7ce2c5f9f8818ffa5d0959437dae37022db30f43bc1b75442cf42",
+          "bytes": 150
+        },
+        "radius-eap/eap-start-empty-identity-request.pcap": {
+          "sha256": "f5cb54218b93894d2dd8f5b23924b92a64374238955856d8ec71a3d347717adb",
+          "bytes": 225
+        },
+        "radius-eap/exact-request-retry.pcap": {
+          "sha256": "6643db4675ce6093e318f91283f8f689fc133ce1f2c865bcc0a084dff4080246",
+          "bytes": 386
+        },
+        "radius-eap/forbidden-attribute-18.pcap": {
+          "sha256": "f521f7c9fa9986907e838e0e9be51157f4a19e44e697cdfacd0fbd7f7be4f38c",
+          "bytes": 139
+        },
+        "radius-eap/forbidden-attribute-2.pcap": {
+          "sha256": "bc3ed4b28f9a0c33f6f0bb05f1dd360f1390ea08e734125ec8f692a6e1ec4b6b",
+          "bytes": 150
+        },
+        "radius-eap/forbidden-attribute-3.pcap": {
+          "sha256": "50bf61c90425a96b9380de293c9fb634c1602fead64596a40333e97733f330e1",
+          "bytes": 151
+        },
+        "radius-eap/forbidden-attribute-60.pcap": {
+          "sha256": "3d939295281d858e47c93a8bae876bc2badb15c0ea63ecda35fb0d6244dba5c6",
+          "bytes": 143
+        },
+        "radius-eap/forbidden-attribute-70.pcap": {
+          "sha256": "acabd61c356c9d75ede517171ab45c1f90f3d2ebd99ea039a12f4163389ccd06",
+          "bytes": 150
+        },
+        "radius-eap/forbidden-attribute-75.pcap": {
+          "sha256": "a28522e90f0b27844357aa3a0a74507c9425fc8e0f69463278837b132586ac58",
+          "bytes": 135
+        },
+        "radius-eap/identity-empty-response.pcap": {
+          "sha256": "3a0aad6e77eebfd66254b297a16ab020391a7897220bd129df64eecffc1f6e7f",
+          "bytes": 229
+        },
+        "radius-eap/identity-request-nul-options.pcap": {
+          "sha256": "368f494e4b4e0aaf821aca0f7a4a1ff8437811efccfe72e37b3438745c87eed7",
+          "bytes": 255
+        },
+        "radius-eap/identity-response-failure.pcap": {
+          "sha256": "da9bb84cbaa736ae774d44f2bf8b0fd2381b88607f06fb995b8993b08a529ceb",
+          "bytes": 234
+        },
+        "radius-eap/identity-response-nul.pcap": {
+          "sha256": "8254d0a9d89cebfcd54121339faf248b869c7b1a47dadfbf13e323249759b153",
+          "bytes": 133
+        },
+        "radius-eap/identity-response-success.pcap": {
+          "sha256": "1a65ba06ba89ca710015f8afc25e7b8eced72ae17d6da44ab338baf8ed313933",
+          "bytes": 247
+        },
+        "radius-eap/inner-padding-ignored.pcap": {
+          "sha256": "90868e8f4df83849b3fb6ec23ecaf0fbc9954ec22091c347925f7d8c23f2b230",
+          "bytes": 236
+        },
+        "radius-eap/legacy-compatibility.json": {
+          "sha256": "afb2daf686c420e9867b0832fa91d6e76e2b665daf6169e8c1c050f4754e3f63",
+          "bytes": 39083
+        },
+        "radius-eap/length-too-large.pcap": {
+          "sha256": "45978f378d8fed47f6562a777110c27fa2aff1e37d3b17a2f9b156afc95cd31c",
+          "bytes": 127
+        },
+        "radius-eap/length-too-small.pcap": {
+          "sha256": "e99057ec23f11411b21a186a0e50b35e1473d2bc20e4f4c0ccc29f1596db7ba8",
+          "bytes": 127
+        },
+        "radius-eap/live-outer-id-changed.pcap": {
+          "sha256": "80ec523e57dbf78ba53692c7f74997b7b8889eaa79bf2773f9c121c7b4e1f0e9",
+          "bytes": 355
+        },
+        "radius-eap/md5-no-size.pcap": {
+          "sha256": "150c8c3811a9f61d267e1f231f8b334f2373dbaaa115ce5b6f49046d17f853a1",
+          "bytes": 127
+        },
+        "radius-eap/md5-request-empty-name.pcap": {
+          "sha256": "1ce3b2fe8d3d29626fc0f2b2bb627c33dc35cf946e18247f2fff917f354ee716",
+          "bytes": 265
+        },
+        "radius-eap/md5-request-one-byte-challenge.pcap": {
+          "sha256": "161a09ef9ebe095a3bb16e8e24f3c3b36df0a43d3879cf2f243f19333984324f",
+          "bytes": 250
+        },
+        "radius-eap/md5-response-15.pcap": {
+          "sha256": "e77538957d9c19892fe19c7faa9640d1d0114b90dae664c7284743000a8d761c",
+          "bytes": 147
+        },
+        "radius-eap/md5-response-16.pcap": {
+          "sha256": "9cef7d982c4e921316fc762cf6b925c18823a87804fc1c7741ebabc514c2ac26",
+          "bytes": 250
+        },
+        "radius-eap/md5-response-empty-name.pcap": {
+          "sha256": "e76d1e79ee639ad7f452294034f57d674e8eb5da975753b62873b8ff338582a5",
+          "bytes": 246
+        },
+        "radius-eap/md5-truncated-value.pcap": {
+          "sha256": "951c558e6f918db62e84892c64c18c5d9f22e268e68368d9e93b734cf8fb7e2b",
+          "bytes": 130
+        },
+        "radius-eap/md5-zero-value.pcap": {
+          "sha256": "62a8f100b32f25a5d89d061a5a260edf9a354b13f44eb6bd1a069ac29ab6be8a",
+          "bytes": 128
+        },
+        "radius-eap/missing-message-authenticator.pcap": {
+          "sha256": "fe0e9b7a71bac9c403e91f92a3fbf7bf2af23f265acd885a89453c0fd438867e",
+          "bytes": 114
+        },
+        "radius-eap/never-cross-datagram-fragments.pcap": {
+          "sha256": "7ee180460f3bf20b9a003f1df456cdc02396b58bc0bf1e63f012e84510385b62",
+          "bytes": 228
+        },
+        "radius-eap/nonconsecutive-fragments.pcap": {
+          "sha256": "6b48da03d6b98bb5596ae8bd62b2fec304846bd5edf921ac68069bfbbcf22a58",
+          "bytes": 143
+        },
+        "radius-eap/notification-request-empty.pcap": {
+          "sha256": "0f74d75a5eb86faf8a639fd87952cfb3afe864302902ccd310afc5c37234169e",
+          "bytes": 127
+        },
+        "radius-eap/notification-request-invalid-utf8.pcap": {
+          "sha256": "46cd970e6c31b691c2fb9993ca2e0ede1c30b9df76b468959c2305ea8b7fdda5",
+          "bytes": 128
+        },
+        "radius-eap/notification-request-nul.pcap": {
+          "sha256": "fd0ec9fc5fe5d14b07b730e31e071cd10948e0f4a655273f6442aacd0df93d66",
+          "bytes": 133
+        },
+        "radius-eap/notification-request-utf8.pcap": {
+          "sha256": "4ddb1df3374e7c88f17478c9ae5f5d7e82dcd910d99c9e70f3d0ba5940ec5de3",
+          "bytes": 263
+        },
+        "radius-eap/notification-response-data.pcap": {
+          "sha256": "072a5d6148187c25906e88181ee69a3af1f15384510bedc8a0f697b968b999be",
+          "bytes": 130
+        },
+        "radius-eap/notification-response-empty.pcap": {
+          "sha256": "426f5fe37e9a09e145cba4b46cefe59b5066d30f111a145ce3307bf6ac588353",
+          "bytes": 229
+        },
+        "radius-eap/outer-padding-ignored.pcap": {
+          "sha256": "0059d430a7c9997a07d0e42bac1a95827e2848d4c61bc5cce8fe59b50e67ede1",
+          "bytes": 249
+        },
+        "radius-eap/pending-close.pcap": {
+          "sha256": "84ef997efef12741a8ee49d43746c6e9e8e2aeef3b7556578ec6069629454a1b",
+          "bytes": 145
+        },
+        "radius-eap/real-carrier.json": {
+          "sha256": "7a8002a9aff074130e9938284219935785423e39e6ea39aa7f44342c63b8d3c4",
+          "bytes": 5251
+        },
+        "radius-eap/reject-with-eap-success-should-conflict.pcap": {
+          "sha256": "0b3598c1c77f653f4bf091e26c6b00ddcea3ae784720faf624293454b336d90d",
+          "bytes": 247
+        },
+        "radius-eap/rejection-poisons-only-same-identity.pcap": {
+          "sha256": "d2a7157fef9a3e9f5417dd5e54c8721bfd83cb7c73576e83560317eb55b65942",
+          "bytes": 216
+        },
+        "radius-eap/request-no-type.pcap": {
+          "sha256": "a876f4128268ed81e0bdbddd9f37052739042f07c776cf06812d90dea8af1fc8",
+          "bytes": 126
+        },
+        "radius-eap/result-extra-data.pcap": {
+          "sha256": "54e1a32063773a9282a8194fd759046681b1a9963c0a5abf365058ceda9f1a89",
+          "bytes": 127
+        },
+        "radius-eap/short-header.pcap": {
+          "sha256": "9c5c2f8867390f914f4c7145fa5a991ab3402ef905e083c962e9cad6315c6c71",
+          "bytes": 125
+        },
+        "radius-eap/unknown-eap-code.pcap": {
+          "sha256": "bbe197da52346d01bb2206c173b015662d64a7a806fd8e1a84203d114697f9a8",
+          "bytes": 127
+        },
+        "radius-eap/wrong-direction-response.pcap": {
+          "sha256": "2e96015ba9cdac3395ab36832dd355ae53760925ca73babeb1315c1bee98a9cd",
+          "bytes": 349
+        },
+        "required-tests-traffic-unified-v110.json": {
+          "sha256": "31d5f49b7030fb8815e3f59754803a564b285c41be0d948d99368a2ebe07decb",
+          "bytes": 18667241
+        },
+        "validation/expected.json": {
+          "sha256": "1b857d26302e1fa05f9e6ff6e23cb277caee5a682b5e89732cc43e26eaadb4db",
+          "bytes": 58284
+        }
+      },
+      "aliases": {
+        "common/pcapx/pcaputil/radius-eap-tools/build_inputs.py": "radius-eap-tools/build_inputs.py",
+        "common/pcapx/pcaputil/radius-eap-tools/generate.py": "radius-eap-tools/generate.py",
+        "common/pcapx/pcaputil/radius-eap-tools/hostap-source-pins.json": "radius-eap-tools/hostap-source-pins.json",
+        "common/pcapx/pcaputil/radius-eap-tools/scope.json": "radius-eap-tools/scope.json",
+        "common/pcapx/pcaputil/radius-eap-tools/source-pins.json": "radius-eap-tools/source-pins.json",
+        "common/pcapx/pcaputil/radius-eap-tools/verify.py": "radius-eap-tools/verify.py",
+        "common/pcapx/pcaputil/radius-eap/accept-with-eap-failure-should-conflict.pcap": "radius-eap/accept-with-eap-failure-should-conflict.pcap",
+        "common/pcapx/pcaputil/radius-eap/accounting-forbidden-79-80.pcap": "radius-eap/accounting-forbidden-79-80.pcap",
+        "common/pcapx/pcaputil/radius-eap/attribute-refusal-neighbor-owner.pcap": "radius-eap/attribute-refusal-neighbor-owner.pcap",
+        "common/pcapx/pcaputil/radius-eap/bad-message-authenticator-width.pcap": "radius-eap/bad-message-authenticator-width.pcap",
+        "common/pcapx/pcaputil/radius-eap/byte-refusal-neighbor-owner.pcap": "radius-eap/byte-refusal-neighbor-owner.pcap",
+        "common/pcapx/pcaputil/radius-eap/consecutive-three-fragments.pcap": "radius-eap/consecutive-three-fragments.pcap",
+        "common/pcapx/pcaputil/radius-eap/controls.json": "radius-eap/controls.json",
+        "common/pcapx/pcaputil/radius-eap/duplicate-message-authenticator.pcap": "radius-eap/duplicate-message-authenticator.pcap",
+        "common/pcapx/pcaputil/radius-eap/eap-start-empty-identity-request.pcap": "radius-eap/eap-start-empty-identity-request.pcap",
+        "common/pcapx/pcaputil/radius-eap/exact-request-retry.pcap": "radius-eap/exact-request-retry.pcap",
+        "common/pcapx/pcaputil/radius-eap/forbidden-attribute-18.pcap": "radius-eap/forbidden-attribute-18.pcap",
+        "common/pcapx/pcaputil/radius-eap/forbidden-attribute-2.pcap": "radius-eap/forbidden-attribute-2.pcap",
+        "common/pcapx/pcaputil/radius-eap/forbidden-attribute-3.pcap": "radius-eap/forbidden-attribute-3.pcap",
+        "common/pcapx/pcaputil/radius-eap/forbidden-attribute-60.pcap": "radius-eap/forbidden-attribute-60.pcap",
+        "common/pcapx/pcaputil/radius-eap/forbidden-attribute-70.pcap": "radius-eap/forbidden-attribute-70.pcap",
+        "common/pcapx/pcaputil/radius-eap/forbidden-attribute-75.pcap": "radius-eap/forbidden-attribute-75.pcap",
+        "common/pcapx/pcaputil/radius-eap/identity-empty-response.pcap": "radius-eap/identity-empty-response.pcap",
+        "common/pcapx/pcaputil/radius-eap/identity-request-nul-options.pcap": "radius-eap/identity-request-nul-options.pcap",
+        "common/pcapx/pcaputil/radius-eap/identity-response-failure.pcap": "radius-eap/identity-response-failure.pcap",
+        "common/pcapx/pcaputil/radius-eap/identity-response-nul.pcap": "radius-eap/identity-response-nul.pcap",
+        "common/pcapx/pcaputil/radius-eap/identity-response-success.pcap": "radius-eap/identity-response-success.pcap",
+        "common/pcapx/pcaputil/radius-eap/inner-padding-ignored.pcap": "radius-eap/inner-padding-ignored.pcap",
+        "common/pcapx/pcaputil/radius-eap/legacy-compatibility.json": "radius-eap/legacy-compatibility.json",
+        "common/pcapx/pcaputil/radius-eap/length-too-large.pcap": "radius-eap/length-too-large.pcap",
+        "common/pcapx/pcaputil/radius-eap/length-too-small.pcap": "radius-eap/length-too-small.pcap",
+        "common/pcapx/pcaputil/radius-eap/live-outer-id-changed.pcap": "radius-eap/live-outer-id-changed.pcap",
+        "common/pcapx/pcaputil/radius-eap/md5-no-size.pcap": "radius-eap/md5-no-size.pcap",
+        "common/pcapx/pcaputil/radius-eap/md5-request-empty-name.pcap": "radius-eap/md5-request-empty-name.pcap",
+        "common/pcapx/pcaputil/radius-eap/md5-request-one-byte-challenge.pcap": "radius-eap/md5-request-one-byte-challenge.pcap",
+        "common/pcapx/pcaputil/radius-eap/md5-response-15.pcap": "radius-eap/md5-response-15.pcap",
+        "common/pcapx/pcaputil/radius-eap/md5-response-16.pcap": "radius-eap/md5-response-16.pcap",
+        "common/pcapx/pcaputil/radius-eap/md5-response-empty-name.pcap": "radius-eap/md5-response-empty-name.pcap",
+        "common/pcapx/pcaputil/radius-eap/md5-truncated-value.pcap": "radius-eap/md5-truncated-value.pcap",
+        "common/pcapx/pcaputil/radius-eap/md5-zero-value.pcap": "radius-eap/md5-zero-value.pcap",
+        "common/pcapx/pcaputil/radius-eap/missing-message-authenticator.pcap": "radius-eap/missing-message-authenticator.pcap",
+        "common/pcapx/pcaputil/radius-eap/never-cross-datagram-fragments.pcap": "radius-eap/never-cross-datagram-fragments.pcap",
+        "common/pcapx/pcaputil/radius-eap/nonconsecutive-fragments.pcap": "radius-eap/nonconsecutive-fragments.pcap",
+        "common/pcapx/pcaputil/radius-eap/notification-request-empty.pcap": "radius-eap/notification-request-empty.pcap",
+        "common/pcapx/pcaputil/radius-eap/notification-request-invalid-utf8.pcap": "radius-eap/notification-request-invalid-utf8.pcap",
+        "common/pcapx/pcaputil/radius-eap/notification-request-nul.pcap": "radius-eap/notification-request-nul.pcap",
+        "common/pcapx/pcaputil/radius-eap/notification-request-utf8.pcap": "radius-eap/notification-request-utf8.pcap",
+        "common/pcapx/pcaputil/radius-eap/notification-response-data.pcap": "radius-eap/notification-response-data.pcap",
+        "common/pcapx/pcaputil/radius-eap/notification-response-empty.pcap": "radius-eap/notification-response-empty.pcap",
+        "common/pcapx/pcaputil/radius-eap/outer-padding-ignored.pcap": "radius-eap/outer-padding-ignored.pcap",
+        "common/pcapx/pcaputil/radius-eap/pending-close.pcap": "radius-eap/pending-close.pcap",
+        "common/pcapx/pcaputil/radius-eap/real-carrier.json": "radius-eap/real-carrier.json",
+        "common/pcapx/pcaputil/radius-eap/reject-with-eap-success-should-conflict.pcap": "radius-eap/reject-with-eap-success-should-conflict.pcap",
+        "common/pcapx/pcaputil/radius-eap/rejection-poisons-only-same-identity.pcap": "radius-eap/rejection-poisons-only-same-identity.pcap",
+        "common/pcapx/pcaputil/radius-eap/request-no-type.pcap": "radius-eap/request-no-type.pcap",
+        "common/pcapx/pcaputil/radius-eap/result-extra-data.pcap": "radius-eap/result-extra-data.pcap",
+        "common/pcapx/pcaputil/radius-eap/short-header.pcap": "radius-eap/short-header.pcap",
+        "common/pcapx/pcaputil/radius-eap/unknown-eap-code.pcap": "radius-eap/unknown-eap-code.pcap",
+        "common/pcapx/pcaputil/radius-eap/wrong-direction-response.pcap": "radius-eap/wrong-direction-response.pcap",
+        "scripts/protocol-tests/required-tests-traffic-unified-v110.json": "required-tests-traffic-unified-v110.json"
+      }
     }
   ],
   "schema_version": 1,

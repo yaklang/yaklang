@@ -21,8 +21,22 @@ func (f *binFlow) consumeRADIUS(dir int, e *ProtocolEvent, wire []byte, legacy .
 		return err
 	}
 	fields, err := radiusFields(wire, f.a.budget.MaxCollectionElements)
+	var selected *radiusEAPFailure
+	errors.As(err, &selected)
+	if fields["EAP"] != nil || selected != nil {
+		e.Profile = "radius-eap-observed"
+	}
 	if err != nil {
+		e.radiusApplicationRefusal = selected != nil
 		s.retire(dir, wire, len(s.pending) < f.a.budget.MaxCollectionElements)
+		if fields != nil {
+			e.Session = fields
+			e.semanticFields = cloneSession(fields)
+			e.semanticSession = cloneSession(fields)
+			if len(legacy) > 0 && legacy[0] != nil {
+				e.retainRuleEnvelope(legacy[0])
+			}
+		}
 		var typed *ProtocolError
 		if !errors.As(err, &typed) {
 			err = protocolError(ErrMalformedMessage, "%s", err)
