@@ -88,38 +88,15 @@ func finsServiceResponse(command uint16, data []byte, p *finsPending, linked boo
 		if len(data) != 7 {
 			return finsErr(ErrMalformedMessage, "clock response needs7 data bytes")
 		}
-		var v [6]int
-		for i, c := range data[:6] {
-			if c&15 > 9 || c>>4 > 9 {
-				return finsErr(ErrMalformedMessage, "clock value is not BCD")
-			}
-			v[i] = int(c>>4)*10 + int(c&15)
-		}
-		year, month, day, hour, minute, second := v[0], v[1], v[2], v[3], v[4], v[5]
-		if month < 1 || month > 12 || day < 1 || hour > 23 || minute > 59 || second > 59 || data[6] > 6 {
+		if data[6] > 6 {
 			return finsErr(ErrMalformedMessage, "clock field range")
 		}
-		days := [12]int{31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31}
-		// YY alone does not establish a century. YY00 can be leap2000 even though
-		// century1900 would not be leap; accept a possible date, never invent a year.
-		if year%4 == 0 {
-			days[1] = 29
+		calendar, err := finsReportedCalendar(data[:6])
+		if err != nil {
+			return err
 		}
-		if day > days[month-1] {
-			return finsErr(ErrMalformedMessage, "impossible clock calendar fields")
-		}
-		fields["clock"] = map[string]any{
-			"year_two_digits":       uint64(year),
-			"month":                 uint64(month),
-			"day":                   uint64(day),
-			"hour":                  uint64(hour),
-			"minute":                uint64(minute),
-			"second":                uint64(second),
-			"weekday_raw":           uint64(data[6]),
-			"century_observed":      false,
-			"timezone_observed":     false,
-			"device_clock_verified": false,
-		}
+		calendar["weekday_raw"] = uint64(data[6])
+		fields["clock"] = calendar
 	}
 	return nil
 }
