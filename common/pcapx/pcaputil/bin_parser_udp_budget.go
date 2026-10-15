@@ -11,6 +11,9 @@ import (
 // reply did not disappear. Admission here examines only bounded headers/ports or
 // an already observed exact endpoint/capture-domain key, never an oversized body.
 func (a *binParser) refuseUDPOversizeAssociation(e *ProtocolEvent, w []byte, src, dst uint16) bool {
+	if a.refuseSIPOversizeAssociation(e, w) {
+		return true
+	}
 	if a.refuseTFTPOversizeAssociation(e, w) {
 		return true
 	}

@@ -101940,6 +101940,297 @@
         "common/pcapx/pcaputil/stun-admission/ordinary-coap.pcap": "stun-admission/ordinary-coap.pcap",
         "scripts/protocol-tests/required-tests-traffic-unified-v99.json": "required-tests-traffic-unified-v99.json"
       }
+    },
+    {
+      "id": "validation-sip-context",
+      "kind": "support",
+      "source_sha": "9407f436a81795757c11f3ad338e7feb409fe8ba",
+      "file": "validation-sip-context.zip",
+      "sha256": "97620eb309dc97e7dc22248152cfcb70f24b5250c20ebe17c1c1a35e11686141",
+      "password": "bin-parser",
+      "members": {
+        "required-tests-traffic-unified-v100.json": {
+          "sha256": "d707971ef5dc659fa7f41d460e800246e234574584bae7af5df775eb5964f1a2",
+          "bytes": 17353808
+        },
+        "sip-context-tools/build.py": {
+          "sha256": "6fac4b34cd2e1ade63fdde5ed792c7dce7394564dd8935930b8d9aca5d90feb9",
+          "bytes": 9084
+        },
+        "sip-context-tools/carrier.py": {
+          "sha256": "bee78afa56423757164ace1e216a2a239ee4846600e4a7e5813c4d4cbf1b2511",
+          "bytes": 1888
+        },
+        "sip-context-tools/source-pins.json": {
+          "sha256": "aa305ca44ec694a1fba88a5087b76d69c7ccea5aad7598c00931eff5e1a9385d",
+          "bytes": 1109
+        },
+        "sip-context-tools/verify.py": {
+          "sha256": "3b7030699cf871ed73e6b81731939b2a2a8581a7856a006fceaced9d9873309e",
+          "bytes": 2848
+        },
+        "sip-context/controls.json": {
+          "sha256": "cae6a9f2a93d943316c85fa1ceb65c8e2b3ef23f8ac74a0a0d46711d4c89f89a",
+          "bytes": 368080
+        },
+        "sip-context/expected.json": {
+          "sha256": "71dbb5b87a36e9bccf974afae0e7d24487e13765061f358ad2cfa070b634fd2e",
+          "bytes": 48124
+        },
+        "sip-context/tcp-active-exact-retry.pcapng": {
+          "sha256": "289a97aace8131b2175edd08f3942db3b854291084dedbd26132f405ce8f7620",
+          "bytes": 1256
+        },
+        "sip-context/tcp-changed-response.pcapng": {
+          "sha256": "cd12565f2bc5336d87ab3e8f2542bb1e3d2bede8ea1360adc9927b457f0675a8",
+          "bytes": 1244
+        },
+        "sip-context/tcp-completed-same-identity.pcapng": {
+          "sha256": "72b92ce72b30c42c29ca7adc21aa88364d8c558ebf34c86bf77c2775de58ce06",
+          "bytes": 1560
+        },
+        "sip-context/tcp-conflict-keeps-other-request.pcapng": {
+          "sha256": "06367ef04cc29fadbdf6e28bf397511cdd65becf0e9273dbf3fcebfbc5395866",
+          "bytes": 1872
+        },
+        "sip-context/tcp-conflicting-live-request.pcapng": {
+          "sha256": "aa95b9a6e0d3961bf85b8fdd9e571005374b73d06cc80ee50090d27e48fd5f16",
+          "bytes": 1256
+        },
+        "sip-context/tcp-cseq-case-mismatch.pcapng": {
+          "sha256": "10f8cd195080e43dcc4899de7ef0f51b876f381eb511170ce65c7c149f9a3c51",
+          "bytes": 632
+        },
+        "sip-context/tcp-cseq-high31bit.pcapng": {
+          "sha256": "1b4a8e25fedaf765f005b2be52555d9c835580554199fc66d65e60a3141e76f0",
+          "bytes": 640
+        },
+        "sip-context/tcp-cseq-last31bit.pcapng": {
+          "sha256": "ca6b4934c701e92e61ff1e3be12bea37c8e7215b071b767de94f0bbe683d18d9",
+          "bytes": 952
+        },
+        "sip-context/tcp-cseq-mismatch.pcapng": {
+          "sha256": "4471341a34645038ebd0b62987df701eb36361a8013a662251efbcb015d28aa6",
+          "bytes": 628
+        },
+        "sip-context/tcp-cseq-plus-number.pcapng": {
+          "sha256": "a9cc8ef7a09a1e5001e8f60fc03350734f8239670c36f858119e5c4f42024070",
+          "bytes": 632
+        },
+        "sip-context/tcp-cseq-tab-LWS.pcapng": {
+          "sha256": "ab7ab488b0d34fb56943d135423c01bd5b14cfce019304a3ae290b0f5796ac19",
+          "bytes": 936
+        },
+        "sip-context/tcp-distinct-new-branch.pcapng": {
+          "sha256": "31d3f3f15d9f81906cb8eb29feebbb463444d30ca89166f5d99e1b346a4356a4",
+          "bytes": 1248
+        },
+        "sip-context/tcp-exact-response-retry.pcapng": {
+          "sha256": "2fc493cd508f93313d0ad864af939bd1d9c4deb2b0ef8072e0e6b60d80c53ace",
+          "bytes": 1240
+        },
+        "sip-context/tcp-exact-window-expiry.pcapng": {
+          "sha256": "55a063f9eca3d7d91bdf363b96052cedfdab635ab3cc323b67ac5c327cf9932a",
+          "bytes": 936
+        },
+        "sip-context/tcp-expired-same-identity.pcapng": {
+          "sha256": "8b132b6d7a177631795e81b0186b367919518445edcf2dd0a9ec9fd2ed0fb598",
+          "bytes": 1256
+        },
+        "sip-context/tcp-malformed-missing-call-id.pcapng": {
+          "sha256": "a09bd5d8596cd37741548a63cb0dc24d67cded6e785bdc98d0b105f30d4fd06f",
+          "bytes": 600
+        },
+        "sip-context/tcp-ordinary.pcapng": {
+          "sha256": "7bec713ea1ff8b7b813daed0e63c60fc995e10aa78990f0081becf9733154d15",
+          "bytes": 936
+        },
+        "sip-context/tcp-own-future-then-backdated.pcapng": {
+          "sha256": "c7311f1f8c38153e95f61dac961a6a7073ecedac5c209fbd24aa01db561b7a54",
+          "bytes": 1872
+        },
+        "sip-context/tcp-response-method-case.pcapng": {
+          "sha256": "3ad96ecb287579ee2aac63644646c1e178cf5f713aa8d2830d7cd017791d28b2",
+          "bytes": 1240
+        },
+        "sip-context/tcp-reversed-responses.pcapng": {
+          "sha256": "9ba040694f466f67423a0b87f16401dbc3f252ae9c7c1a02400baab67707fc21",
+          "bytes": 1552
+        },
+        "sip-context/tcp-within-window.pcapng": {
+          "sha256": "ae39bf9a1ad05c9b93609c64914eee9a18c83e64e4e68a0f0cfe355492b2c1e7",
+          "bytes": 936
+        },
+        "sip-context/udp-active-exact-retry.pcapng": {
+          "sha256": "42e4d541d43d1ebe8240766d2b8bbde366002584c1f30593d343c472bdeaf193",
+          "bytes": 956
+        },
+        "sip-context/udp-changed-response.pcapng": {
+          "sha256": "96c0bfe4ebd69d415eae51aa23aad5bc34950353e669635ddc3880db425a7271",
+          "bytes": 944
+        },
+        "sip-context/udp-collection-history.pcapng": {
+          "sha256": "615de983d537b8c59ef86c6b544a3b97b53eac6c3dde3b8f1605b9c19fa9b510",
+          "bytes": 1240
+        },
+        "sip-context/udp-completed-same-identity.pcapng": {
+          "sha256": "d43c6c3cb717c56c3ee004fe9d49736c8f9fe4867e7e00f29f3bd4ded70f5137",
+          "bytes": 1248
+        },
+        "sip-context/udp-conflict-keeps-other-request.pcapng": {
+          "sha256": "52257f632d5ad5083ef0d9515f040622b852c306f4776a80e93846f07f4ca4c6",
+          "bytes": 1548
+        },
+        "sip-context/udp-conflicting-live-request.pcapng": {
+          "sha256": "83ae3de49287b4274b3d0cad5f3cd9586121b74636fc4f4de16bdf955b2418e7",
+          "bytes": 956
+        },
+        "sip-context/udp-cseq-case-mismatch.pcapng": {
+          "sha256": "51b7e93eade133339b71e76d9cbbde40c1a7ed72fd24bd4866145be1c7965dd9",
+          "bytes": 356
+        },
+        "sip-context/udp-cseq-high31bit.pcapng": {
+          "sha256": "993fb41732196970ee0cf66d282805a13fd09ec77534b31e5a50a2f099ced808",
+          "bytes": 364
+        },
+        "sip-context/udp-cseq-last31bit.pcapng": {
+          "sha256": "eb838f47c9472ffca512d05c8a1ca16c46b628db3f772beaacc53a7958db72c9",
+          "bytes": 664
+        },
+        "sip-context/udp-cseq-mismatch.pcapng": {
+          "sha256": "269a356a64e123cbe738938d83698fa12083b7909def34653e31b765c044345a",
+          "bytes": 352
+        },
+        "sip-context/udp-cseq-plus-number.pcapng": {
+          "sha256": "1cfaeac1c1e18dc51bba050ae041b36e3f6e2d8a9ee38bf7aacb0349bed62d03",
+          "bytes": 356
+        },
+        "sip-context/udp-cseq-tab-LWS.pcapng": {
+          "sha256": "0bb2fc310cd0eac60a0ad26d4a6273aa0368ca2c7b900c97e98593b47e817543",
+          "bytes": 648
+        },
+        "sip-context/udp-distinct-new-branch.pcapng": {
+          "sha256": "e0c754f0ea421e67e64f18e3861aa50d27147a0524e850b7820098708902ff51",
+          "bytes": 948
+        },
+        "sip-context/udp-exact-response-retry.pcapng": {
+          "sha256": "09cb2f9e4e779d789bfe6e50335daef66bb2c086f6b5ccb1f355132e7afa812d",
+          "bytes": 940
+        },
+        "sip-context/udp-exact-window-expiry.pcapng": {
+          "sha256": "e9d6a38eb04f521bd94d3eb15fc2263c273aa08bb77327291a0c04ac169da319",
+          "bytes": 648
+        },
+        "sip-context/udp-expired-same-identity.pcapng": {
+          "sha256": "a1a33968900562ea66b919cabaacd309114752d6e887c3205548732a812fe156",
+          "bytes": 956
+        },
+        "sip-context/udp-first-byte-refusal.pcapng": {
+          "sha256": "bd2777f332819635b61b0401ab52978cd2aec2b96e0b614f77612735db09167a",
+          "bytes": 1992
+        },
+        "sip-context/udp-foreign-byte-refusal.pcapng": {
+          "sha256": "d7c65fd2e371585be0226cfe6104e551e07445b41d00e103757fd1816184dcb8",
+          "bytes": 2012
+        },
+        "sip-context/udp-foreign-first.pcapng": {
+          "sha256": "b20775ff83eae65b66366912db08daec6b73b93a43c1f1a7eda88e161c3c175f",
+          "bytes": 1260
+        },
+        "sip-context/udp-foreign-interface-clock.pcapng": {
+          "sha256": "71a9955c7f83795ad1e5f74f1f398aa9ba06aa73bf87a123f3aef878e77d2937",
+          "bytes": 1260
+        },
+        "sip-context/udp-malformed-missing-call-id.pcapng": {
+          "sha256": "4eb120b5d3ede7bc7a5b2700b1db42b204e70bb6326782a289bf0f502e344b5d",
+          "bytes": 324
+        },
+        "sip-context/udp-ordinary.pcapng": {
+          "sha256": "9a569fcf59e3b8effbe327bb8db0b6670374e65c5b69f425ecade4646e025324",
+          "bytes": 648
+        },
+        "sip-context/udp-own-byte-refusal.pcapng": {
+          "sha256": "9f2585b53181d471c1acd644b73fc0232e025a7ea9080d88865566ce2c32fd1f",
+          "bytes": 1992
+        },
+        "sip-context/udp-own-future-then-backdated.pcapng": {
+          "sha256": "23fd1ca50a59a92311f0c32ba44c1c7bb43e33054de9db3534b7e8d95c5347e0",
+          "bytes": 1548
+        },
+        "sip-context/udp-response-method-case.pcapng": {
+          "sha256": "cc905ff47e10d78928dba8f297fa4b7f3edabf5830860519104abbf22039b425",
+          "bytes": 940
+        },
+        "sip-context/udp-reversed-responses.pcapng": {
+          "sha256": "69605faa082b28864b4955a8bd53c276b436a32058c08918d8dfcf2e6de74cdc",
+          "bytes": 1240
+        },
+        "sip-context/udp-within-window.pcapng": {
+          "sha256": "5399b095b54dc592d28fbc7a6550258157a6fb599e86840c289018ccb0e335c2",
+          "bytes": 648
+        },
+        "validation/expected.json": {
+          "sha256": "71dbb5b87a36e9bccf974afae0e7d24487e13765061f358ad2cfa070b634fd2e",
+          "bytes": 48124
+        }
+      },
+      "aliases": {
+        "common/pcapx/pcaputil/sip-context-tools/build.py": "sip-context-tools/build.py",
+        "common/pcapx/pcaputil/sip-context-tools/carrier.py": "sip-context-tools/carrier.py",
+        "common/pcapx/pcaputil/sip-context-tools/source-pins.json": "sip-context-tools/source-pins.json",
+        "common/pcapx/pcaputil/sip-context-tools/verify.py": "sip-context-tools/verify.py",
+        "common/pcapx/pcaputil/sip-context/controls.json": "sip-context/controls.json",
+        "common/pcapx/pcaputil/sip-context/expected.json": "sip-context/expected.json",
+        "common/pcapx/pcaputil/sip-context/tcp-active-exact-retry.pcapng": "sip-context/tcp-active-exact-retry.pcapng",
+        "common/pcapx/pcaputil/sip-context/tcp-changed-response.pcapng": "sip-context/tcp-changed-response.pcapng",
+        "common/pcapx/pcaputil/sip-context/tcp-completed-same-identity.pcapng": "sip-context/tcp-completed-same-identity.pcapng",
+        "common/pcapx/pcaputil/sip-context/tcp-conflict-keeps-other-request.pcapng": "sip-context/tcp-conflict-keeps-other-request.pcapng",
+        "common/pcapx/pcaputil/sip-context/tcp-conflicting-live-request.pcapng": "sip-context/tcp-conflicting-live-request.pcapng",
+        "common/pcapx/pcaputil/sip-context/tcp-cseq-case-mismatch.pcapng": "sip-context/tcp-cseq-case-mismatch.pcapng",
+        "common/pcapx/pcaputil/sip-context/tcp-cseq-high31bit.pcapng": "sip-context/tcp-cseq-high31bit.pcapng",
+        "common/pcapx/pcaputil/sip-context/tcp-cseq-last31bit.pcapng": "sip-context/tcp-cseq-last31bit.pcapng",
+        "common/pcapx/pcaputil/sip-context/tcp-cseq-mismatch.pcapng": "sip-context/tcp-cseq-mismatch.pcapng",
+        "common/pcapx/pcaputil/sip-context/tcp-cseq-plus-number.pcapng": "sip-context/tcp-cseq-plus-number.pcapng",
+        "common/pcapx/pcaputil/sip-context/tcp-cseq-tab-LWS.pcapng": "sip-context/tcp-cseq-tab-LWS.pcapng",
+        "common/pcapx/pcaputil/sip-context/tcp-distinct-new-branch.pcapng": "sip-context/tcp-distinct-new-branch.pcapng",
+        "common/pcapx/pcaputil/sip-context/tcp-exact-response-retry.pcapng": "sip-context/tcp-exact-response-retry.pcapng",
+        "common/pcapx/pcaputil/sip-context/tcp-exact-window-expiry.pcapng": "sip-context/tcp-exact-window-expiry.pcapng",
+        "common/pcapx/pcaputil/sip-context/tcp-expired-same-identity.pcapng": "sip-context/tcp-expired-same-identity.pcapng",
+        "common/pcapx/pcaputil/sip-context/tcp-malformed-missing-call-id.pcapng": "sip-context/tcp-malformed-missing-call-id.pcapng",
+        "common/pcapx/pcaputil/sip-context/tcp-ordinary.pcapng": "sip-context/tcp-ordinary.pcapng",
+        "common/pcapx/pcaputil/sip-context/tcp-own-future-then-backdated.pcapng": "sip-context/tcp-own-future-then-backdated.pcapng",
+        "common/pcapx/pcaputil/sip-context/tcp-response-method-case.pcapng": "sip-context/tcp-response-method-case.pcapng",
+        "common/pcapx/pcaputil/sip-context/tcp-reversed-responses.pcapng": "sip-context/tcp-reversed-responses.pcapng",
+        "common/pcapx/pcaputil/sip-context/tcp-within-window.pcapng": "sip-context/tcp-within-window.pcapng",
+        "common/pcapx/pcaputil/sip-context/udp-active-exact-retry.pcapng": "sip-context/udp-active-exact-retry.pcapng",
+        "common/pcapx/pcaputil/sip-context/udp-changed-response.pcapng": "sip-context/udp-changed-response.pcapng",
+        "common/pcapx/pcaputil/sip-context/udp-collection-history.pcapng": "sip-context/udp-collection-history.pcapng",
+        "common/pcapx/pcaputil/sip-context/udp-completed-same-identity.pcapng": "sip-context/udp-completed-same-identity.pcapng",
+        "common/pcapx/pcaputil/sip-context/udp-conflict-keeps-other-request.pcapng": "sip-context/udp-conflict-keeps-other-request.pcapng",
+        "common/pcapx/pcaputil/sip-context/udp-conflicting-live-request.pcapng": "sip-context/udp-conflicting-live-request.pcapng",
+        "common/pcapx/pcaputil/sip-context/udp-cseq-case-mismatch.pcapng": "sip-context/udp-cseq-case-mismatch.pcapng",
+        "common/pcapx/pcaputil/sip-context/udp-cseq-high31bit.pcapng": "sip-context/udp-cseq-high31bit.pcapng",
+        "common/pcapx/pcaputil/sip-context/udp-cseq-last31bit.pcapng": "sip-context/udp-cseq-last31bit.pcapng",
+        "common/pcapx/pcaputil/sip-context/udp-cseq-mismatch.pcapng": "sip-context/udp-cseq-mismatch.pcapng",
+        "common/pcapx/pcaputil/sip-context/udp-cseq-plus-number.pcapng": "sip-context/udp-cseq-plus-number.pcapng",
+        "common/pcapx/pcaputil/sip-context/udp-cseq-tab-LWS.pcapng": "sip-context/udp-cseq-tab-LWS.pcapng",
+        "common/pcapx/pcaputil/sip-context/udp-distinct-new-branch.pcapng": "sip-context/udp-distinct-new-branch.pcapng",
+        "common/pcapx/pcaputil/sip-context/udp-exact-response-retry.pcapng": "sip-context/udp-exact-response-retry.pcapng",
+        "common/pcapx/pcaputil/sip-context/udp-exact-window-expiry.pcapng": "sip-context/udp-exact-window-expiry.pcapng",
+        "common/pcapx/pcaputil/sip-context/udp-expired-same-identity.pcapng": "sip-context/udp-expired-same-identity.pcapng",
+        "common/pcapx/pcaputil/sip-context/udp-first-byte-refusal.pcapng": "sip-context/udp-first-byte-refusal.pcapng",
+        "common/pcapx/pcaputil/sip-context/udp-foreign-byte-refusal.pcapng": "sip-context/udp-foreign-byte-refusal.pcapng",
+        "common/pcapx/pcaputil/sip-context/udp-foreign-first.pcapng": "sip-context/udp-foreign-first.pcapng",
+        "common/pcapx/pcaputil/sip-context/udp-foreign-interface-clock.pcapng": "sip-context/udp-foreign-interface-clock.pcapng",
+        "common/pcapx/pcaputil/sip-context/udp-malformed-missing-call-id.pcapng": "sip-context/udp-malformed-missing-call-id.pcapng",
+        "common/pcapx/pcaputil/sip-context/udp-ordinary.pcapng": "sip-context/udp-ordinary.pcapng",
+        "common/pcapx/pcaputil/sip-context/udp-own-byte-refusal.pcapng": "sip-context/udp-own-byte-refusal.pcapng",
+        "common/pcapx/pcaputil/sip-context/udp-own-future-then-backdated.pcapng": "sip-context/udp-own-future-then-backdated.pcapng",
+        "common/pcapx/pcaputil/sip-context/udp-response-method-case.pcapng": "sip-context/udp-response-method-case.pcapng",
+        "common/pcapx/pcaputil/sip-context/udp-reversed-responses.pcapng": "sip-context/udp-reversed-responses.pcapng",
+        "common/pcapx/pcaputil/sip-context/udp-within-window.pcapng": "sip-context/udp-within-window.pcapng",
+        "scripts/protocol-tests/required-tests-traffic-unified-v100.json": "required-tests-traffic-unified-v100.json"
+      }
     }
   ],
   "schema_version": 1,

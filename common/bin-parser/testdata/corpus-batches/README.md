@@ -44,7 +44,7 @@ Run from the repository root:
 ```sh
 go run ./internal/trafficfixture/cmd/corpus test
 go test -json -count=1 -timeout=10m ./internal/trafficfixture/... ./common/bin-parser/... ./common/pcapx/... ./common/yak/cmd/yakcmds/shark-cli ./scripts/ci > traffic.jsonl
-go run ./internal/trafficfixture/cmd/corpus exec -- python3 @scripts/protocol-tests/check_go_test_json_v2.py traffic.jsonl --inventory @scripts/protocol-tests/required-tests-traffic-unified-v99.json --tier full
+go run ./internal/trafficfixture/cmd/corpus exec -- python3 @scripts/protocol-tests/check_go_test_json_v2.py traffic.jsonl --inventory @scripts/protocol-tests/required-tests-traffic-unified-v100.json --tier full
 ```
 
 The single `corpus` entry point uses the same bounded Go ZIP loader as tests.
@@ -83,7 +83,7 @@ their semantic coverage. The existing synthetic session keys are test inputs;
 production credentials, user private keys and material without redistribution
 permission belong in an external fixed-source download manifest.
 
-Current test requirements are sealed at `scripts/protocol-tests/required-tests-traffic-unified-v99.json`;
+Current test requirements are sealed at `scripts/protocol-tests/required-tests-traffic-unified-v100.json`;
 the historical inventories and all earlier batches remain unchanged.
 The supplemental small-corpus batch contains 26 minimal controls, their explicit
 expected facts, an offline generator and the compact pinned source manifest.
@@ -203,7 +203,7 @@ opaque selector bytes and one bounded Data value over Wrapper v1 TCP/UDP; object
 selector meaning, access permission and device operation are unverified. The
 original one-packet selective-access capture and original refused answer remain
 immutable; its now-supported answer is matched by exact input SHA and frame.
-The active inventory is `scripts/protocol-tests/required-tests-traffic-unified-v99.json`.
+The active inventory is `scripts/protocol-tests/required-tests-traffic-unified-v100.json`.
 
 The small-graph budget batch reuses accepted graph captures/answers and adds one
 249-byte UDP control for child count255 without child bytes. Its standalone proof
@@ -993,7 +993,7 @@ the normative answer; a missing numeric reference field is not a codec pass.
 Full/deferred, workers1/2/4, observers off/on, Feed chunks1/7/full, ownership,
 resources and close/refusal boundaries remain required.
 
-Current gate: `required-tests-traffic-unified-v99.json` with
+Current gate: `required-tests-traffic-unified-v100.json` with
 `check_go_test_json_v2.py`. The indexed validator preserves missing/unpassed,
 package invocation completion, descendant skips, failures and non-JSON checks;
 its mutation/differential harness is sealed with the material. Older checkers
@@ -1629,7 +1629,7 @@ userspace adapter; full kernel receiver/socket/timers and ECU endpoints do not.
 All161 preceding ZIPs remain byte-for-byte unchanged. Raw captures, dependencies,
 reference source/build output and process evidence stay outside Git.
 
-Current effective v99 inventory: 67,965 entries; 67,958 are mandatory for the full tier.
+Current effective v100 inventory: 68,823 entries; 68,816 are mandatory for the full tier.
 
 The opt-in `DynamicFlowControl` profile follows Linux v6.12 FC tuple updates (including WAIT without granting data). Disjoint address extensions or classical/FD carriers may share CAN IDs; unknown selectors cannot choose or mutate a conversation. Ambiguous selectors are rejected. Seven sealed cases exercise full/deferred, workers 1/2/4, and observer off/on, with exact fields, byte collections, contributor references, errors and resource ownership. The existing static FC profile remains unchanged. Pinned upstream FC and filter functions execute with declared userspace stubs; this is not a kernel/ECU endpoint. TShark 4.2.5 checks wire tuples and two complete payloads, but cannot independently reassemble the shared-address transcripts.
 
@@ -1700,3 +1700,5 @@ The SNMP context batch preserves existing v1/v2c and plaintext unverified USM v3
 The STUN/TURN context batch retains selected unauthenticated passive wire and relay observations. Request clocks are local to endpoint/capture domain and use actual per-request timestamps; fixed-duration grants retain their latest known expiry, while explicit allocation lifetime remains a separate observation. Missing mandatory Lifetime is rejected before association. Unknown UDP cannot age STUN; slot reclaim cannot revoke active request/relay state using foreign time. Fields, Session and typed refusals retain private ownership through caller edits and same-packet callback mutation. The42 tiny own captures total24132B; complete literal controls and deterministic tools reuse the unchanged earlier wire recipe. Actual pinned tshark checks178 messages/1670 wire facts separately from Session/lifetime policy. The40-second pending window is analyzer resource policy, not a mandated endpoint deadline. SIP/noise carriers assert only refusal/isolation, not application semantics. No authenticated grants, NAT/device/relay/media success or complete-original oracle is claimed. All193 preceding ZIPs and prior inventory tuples/definitions remain immutable.
 
 An observed STUN request is not a TURN channel binding. The neighboring-admission controls require exact still-observed channel selectors, preserve complete RFC7252 empty ACK fields and missing CoAP association without losing the STUN owner, and retain malformed known-channel/explicit-TURN handling. Two own captures add340B and reuse sealed STUN answers; independent regeneration and pinned tshark check the CoAP header separately from observer/session policy. Resource recovery now requires already inactive state rather than foreign-clock expiry, retains active owners and quarantines forgotten identities. All194 preceding archives remain unchanged.
+
+The SIP context controls cover exact request/response identity, retirement/conflict and refused-input uncertainty with bounded history, endpoint-local monotonic capture time and owned wire/Session/query refusal. Fixed RFC3261 recipes and actual pinned tshark wire facts are distinct from local observation policy; no endpoint authentication or whole-original semantic oracle is inferred. Run TestSIPContextSealedMatrix and TestSIPContextNativeChunks through the current inventory. The historical STUN carrier now requires the stronger native SIP typed resource-query refusal; its original capture and archive remain unchanged.

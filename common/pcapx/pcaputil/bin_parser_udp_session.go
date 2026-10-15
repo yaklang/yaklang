@@ -7,7 +7,6 @@ import (
 	"net"
 	"sort"
 	"strconv"
-	"strings"
 	"time"
 )
 
@@ -242,11 +241,13 @@ func (a *binParser) decodeSIPDatagram(e *ProtocolEvent, wire []byte, explicit bo
 	if probe.Verdict != ProbeAccept {
 		return false
 	}
+	e.nativeSIPObservation = true
 	if err := validateSIPDatagramLength(wire); err != nil {
 		e.Protocol, e.Profile, e.Admission, e.Completeness = "sip", "sip-udp-observed", "wire-signature", "message"
 		if explicit {
 			e.Admission = "explicit-decode-as"
 		}
+		a.recordSIPGap(e)
 		a.finishProtocolDatagram(e, wire, a.specs["sip/SIP"], err)
 		return true
 	}
@@ -259,50 +260,46 @@ func (a *binParser) decodeSIPDatagram(e *ProtocolEvent, wire []byte, explicit bo
 	if store == nil {
 		store = &binUDPStore{entries: map[binUDPKey]*list.Element{}, clock: e.Timestamp}
 		a.udpSessions = store
-	} else if e.Timestamp.After(store.clock) {
-		store.clock = e.Timestamp
 	}
-	for el := store.lru.Front(); el != nil; {
-		next := el.Next()
-		entry := el.Value.(*binUDPEntry)
-		if store.clock.Before(entry.touched) || store.clock.Sub(entry.touched) < sipDialogStateTTL {
-			break
-		}
-		if strings.HasPrefix(entry.key.a, "sip/") {
-			entry.flow.closeSession()
-			delete(store.entries, entry.key)
-			store.lru.Remove(el)
-		}
-		el = next
-	}
+	// Foreign endpoints/interfaces cannot expire this owner. The retained
+	// per-conversation SIP clock below prunes only its own protocol state.
 	el := store.entries[key]
 	var err error
 	if el == nil {
 		if len(store.entries) >= sessionCollectionLimit(a.budget.MaxCollectionElements) {
+			a.sipUntrackedRefusal = true
 			err = protocolError(ErrResourceExceeded, "UDP conversation budget")
 		} else {
 			endpoints := []string{e.Source, e.Destination}
 			sort.Strings(endpoints)
-			flow := &binFlow{a: a, id: a.flows.Add(1), protocol: "sip", sip: &binSIP{}, endpoints: [2]string{endpoints[0], endpoints[1]}}
+			flow := &binFlow{a: a, id: a.flows.Add(1), protocol: "sip", sip: &binSIP{unverified: a.sipUntrackedRefusal}, endpoints: [2]string{endpoints[0], endpoints[1]}}
 			if err = flow.reserveSession(512); err == nil {
-				el = store.lru.PushBack(&binUDPEntry{key: key, flow: flow, touched: store.clock})
+				el = store.lru.PushBack(&binUDPEntry{key: key, flow: flow, touched: e.Timestamp})
 				store.entries[key] = el
+			} else {
+				a.sipUntrackedRefusal = true
 			}
 		}
 	}
 	if el != nil {
 		entry := el.Value.(*binUDPEntry)
-		entry.touched = store.clock
+		if e.Timestamp.After(entry.touched) {
+			entry.touched = e.Timestamp
+		}
 		store.lru.MoveToBack(el)
 		flow := entry.flow
 		e.FlowID = flow.id
 		if e.Source != flow.endpoints[0] {
 			e.Direction = 1
 		}
-		stateEntries := len(flow.sip.pending) + len(flow.sip.seen) + len(flow.sip.inviteStatus) + len(flow.sip.inviteComplete) + len(flow.sip.dialogs) + len(flow.sip.dialogTxns) + len(flow.sip.pendingAt) + len(flow.sip.completedAt) + len(flow.sip.seenAt) + len(flow.sip.finalResponses) + len(flow.sip.responseAt) + len(flow.sip.responseDir) + len(flow.sip.dialogAt)
-		if err = flow.reserveSession(512 + int64(stateEntries)*128 + int64(len(wire))*3); err == nil {
+		if err = flow.reserveSession(512 + flow.sip.retainedBytes() + flow.sip.projectedStateBytes(wire, e.Direction, a.budget.MaxCollectionElements)); err == nil {
 			e.Session, err = flow.sip.consumeAt(wire, a.budget.MaxCollectionElements, e.Timestamp, e.Direction)
 		}
+		if err != nil {
+			flow.sip = &binSIP{unverified: true}
+			_ = flow.reserveSession(512)
+		}
+
 		if e.Session != nil {
 			e.Session["Observation Scope"] = "conversation"
 			e.Session["Transport"] = "UDP"

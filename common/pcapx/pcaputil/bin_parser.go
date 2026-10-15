@@ -25,6 +25,7 @@ type ProtocolEvent struct {
 	nativeDTLSObservation                    bool
 	nativeSNMPObservation                    bool
 	nativeSTUNObservation                    bool
+	nativeSIPObservation                     bool
 	nativeUnrecognizedUDP                    bool
 	nativeBACnetRead                         bool
 	nativeBACnetRoutedRead                   bool
@@ -132,7 +133,7 @@ func (e *ProtocolEvent) Decode() (result map[string]any, err error) {
 		if e.Protocol == "c37118" && (e.Profile == "c37118-v1-v2-cfg2-data" || e.Profile == "c37118-v2-cfg3-complete-data" || e.Profile == "c37118-v2-cfg3-continuation-data" || e.Profile == "c37118-engineering") && e.semanticFields != nil {
 			session = e.semanticFields
 		}
-		if e.nativeSTUNObservation && e.semanticSession != nil {
+		if (e.nativeSTUNObservation || e.nativeSIPObservation) && e.semanticSession != nil {
 			session = e.semanticSession
 		}
 		if err == nil && result != nil && session != nil {
@@ -144,6 +145,21 @@ func (e *ProtocolEvent) Decode() (result map[string]any, err error) {
 			result = owned
 		}
 	}()
+	// Accepted SIP wire fields and passive context have independent ownership.
+	// A typed semantic refusal cannot become a successful raw grammar decode.
+	if e.nativeSIPObservation {
+		if e.sessionError != nil {
+			owned := *e.sessionError
+			return nil, &owned
+		}
+		if e.semanticFields != nil {
+			result := map[string]any{"fields": cloneSession(e.semanticFields)}
+			if e.hasRuleMetadata {
+				result["metadata"] = cloneSessionValue(e.semanticMetadata)
+			}
+			return result, nil
+		}
+	}
 	// STUN/TURN wire fields and passive context have separate private snapshots.
 	if e.nativeSTUNObservation {
 		if e.semanticFields != nil {
@@ -290,7 +306,7 @@ func (e *ProtocolEvent) retainRuleEnvelope(result map[string]any) {
 }
 
 func (e *ProtocolEvent) ownsNativeFields() bool {
-	if e.nativeSTUNObservation || e.nativeSNMPObservation || e.nativeTLSObservation || e.nativeDTLSObservation || e.nativeHARTIPObservation || e.nativeENIPObservation || e.nativeFINSObservation || e.nativeDiagnosticError != "" {
+	if e.nativeSIPObservation || e.nativeSTUNObservation || e.nativeSNMPObservation || e.nativeTLSObservation || e.nativeDTLSObservation || e.nativeHARTIPObservation || e.nativeENIPObservation || e.nativeFINSObservation || e.nativeDiagnosticError != "" {
 		return true
 	}
 	if e.nativeDoIPObservation {
@@ -546,6 +562,7 @@ type binParser struct {
 	tlsSecrets                                                                 TLSSecretProvider
 	udpMu                                                                      sync.Mutex
 	udpSessions                                                                *binUDPStore
+	sipUntrackedRefusal                                                        bool // udpMu; uncertainty for identities that could not be retained
 	stunUntrackedRefusal                                                       bool // constant-size quarantine when an admitted UDP key cannot be retained
 	pfcpUntrackedRefusal                                                       bool // udpMu; forgotten rejected identity cannot verify a newly admitted PFCP key
 	dlmsUntrackedRefusal                                                       bool // udpMu; no fresh HDLC association after an unretained admitted refusal
@@ -720,7 +737,7 @@ func (a *binParser) emit(e *BinParserEvent) {
 	if ((e.Protocol == "iec104" || e.Protocol == "dnp3") || e.Protocol == "goose" || e.Protocol == "mqtt" || e.ocpp || e.Protocol == "rtp" && e.Transport != "udp") && e.semanticSession == nil && e.Session != nil {
 		e.semanticSession = cloneSession(e.Session)
 	}
-	if e.nativeSTUNObservation && e.semanticSession == nil && e.Session != nil {
+	if (e.nativeSTUNObservation || e.nativeSIPObservation) && e.semanticSession == nil && e.Session != nil {
 		e.semanticSession = cloneSession(e.Session)
 	}
 	defer func() {
@@ -928,6 +945,9 @@ func (f *binFlow) event(dir int, raw []byte, status, detail string) *BinParserEv
 		e.Profile = "doip-routing-dsc"
 	}
 	f.eventEvidence(dir, e)
+	if f.protocol == "sip" && f.binding == nil {
+		e.nativeSIPObservation = true
+	}
 	if f.protocol == "stun" && f.binding == nil {
 		e.nativeSTUNObservation = true
 	}
@@ -1006,7 +1026,7 @@ func (f *binFlow) stop(dir int, wire []byte, status, reason string) {
 	}
 	e := f.event(dir, preview, status, reason)
 	e.sessionError, f.lastSessionError = f.lastSessionError, nil
-	if e.nativeSTUNObservation || e.nativeSNMPObservation || e.nativeTLSObservation || e.nativeHARTIPObservation || e.nativeFINSObservation || e.nativeENIPObservation {
+	if e.nativeSIPObservation || e.nativeSTUNObservation || e.nativeSNMPObservation || e.nativeTLSObservation || e.nativeHARTIPObservation || e.nativeFINSObservation || e.nativeENIPObservation {
 		if e.sessionError == nil {
 			kind := ErrMalformedMessage
 			switch status {
@@ -1459,7 +1479,7 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 					err = protocolError(ErrUnsupportedFeature, err.Error())
 				}
 				e.Status, e.sessionError = classifySessionError(err)
-				if ((e.Protocol == "iec104" || e.Protocol == "dnp3") || e.Entry == "MySQLPreparedFields" || e.Protocol == "mqtt" || e.nativeOPCUAObservation || e.nativeTLSObservation || e.nativeSNMPObservation || e.nativeSTUNObservation) && e.sessionError == nil {
+				if ((e.Protocol == "iec104" || e.Protocol == "dnp3") || e.Entry == "MySQLPreparedFields" || e.Protocol == "mqtt" || e.nativeOPCUAObservation || e.nativeTLSObservation || e.nativeSNMPObservation || e.nativeSTUNObservation || e.nativeSIPObservation) && e.sessionError == nil {
 					// These legacy codecs also return wrapped context or
 					// grammar errors. Preserve their status/message privately so
 					// later queries cannot use a caller-supplied successful cache.
@@ -1483,7 +1503,7 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 				// decoding and history; retrying a different grammar loses fields
 				// or rejects valid argumentless/multiline messages.
 				e.semanticFields = protocolFields(result)
-				if (e.Protocol == "iec104" || e.Protocol == "dnp3") || e.Protocol == "goose" || e.Protocol == "mqtt" || e.nativeOPCUAObservation || e.Protocol == "websocket" && e.Session["OCPP"] != nil || e.Protocol == "rtp" && e.Transport != "udp" {
+				if e.nativeSIPObservation || (e.Protocol == "iec104" || e.Protocol == "dnp3") || e.Protocol == "goose" || e.Protocol == "mqtt" || e.nativeOPCUAObservation || e.Protocol == "websocket" && e.Session["OCPP"] != nil || e.Protocol == "rtp" && e.Transport != "udp" {
 					e.retainRuleEnvelope(result)
 				}
 				if e.nativeHARTIPObservation || e.nativeENIPObservation || e.Protocol == "tls" || e.Protocol == "redis" || e.Entry == "MySQLPreparedFields" || e.Protocol == "stun" || e.Protocol == "turn" || e.Protocol == "snmp" || e.Protocol == "slmp" || e.Protocol == "dlms-wrapper" || e.Protocol == "dlms" || e.Protocol == "c37118" {

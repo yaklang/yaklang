@@ -80,6 +80,12 @@ func stunContextRawAttributes(t *testing.T, w []byte, fields map[string]any) {
 }
 func stunContextQuery(t *testing.T, e *ProtocolEvent, w stunContextEvent) {
 	t.Helper()
+	// The immutable older SIP carrier recorded a generic limited-query error.
+	// Native SIP now preserves a typed resource refusal; retain that stronger
+	// assertion without changing the original carrier or application answers.
+	if w.Protocol == "sip" && w.QueryError == "LegacyLimited" {
+		w.QueryError = "ResourceExceeded"
+	}
 	f, err := e.GetFields()
 	if w.QueryError != "" {
 		if w.QueryError == "LegacyLimited" {
