@@ -104829,6 +104829,297 @@
         "common/pcapx/pcaputil/radius-nak/wrong-direction.pcap": "radius-nak/wrong-direction.pcap",
         "scripts/protocol-tests/required-tests-traffic-unified-v112.json": "required-tests-traffic-unified-v112.json"
       }
+    },
+    {
+      "id": "validation-radius-otp-gtc",
+      "kind": "support",
+      "source_sha": "700e43838fbab3c7ccb35c6bd93baa1b92a26abc",
+      "file": "validation-radius-otp-gtc.zip",
+      "sha256": "80fd8d25c416d0abdbbe2b0bed9eeb3f249e537f700563198060716cd271f77f",
+      "password": "bin-parser",
+      "members": {
+        "radius-token-tools/DICTIONARY-NOTICE.txt": {
+          "sha256": "3253170a996862f908f7485038db6e2e2190a9666d69c22c2ec5c698bebe9cca",
+          "bytes": 1588
+        },
+        "radius-token-tools/generate.py": {
+          "sha256": "b2c1e535ee2de0ca33fe6b3a143331fe7e2dc644154b9fc82b312b26e73acba4",
+          "bytes": 18191
+        },
+        "radius-token-tools/generate_supplements.py": {
+          "sha256": "0e315d92e8dfa82421815a0e2160e3493d1601d9f5b49638ff5bb5a14d6627f5",
+          "bytes": 5911
+        },
+        "radius-token-tools/otp-standard-dictionary.txt": {
+          "sha256": "8305c66c4dee7f2d923b7ea1cab11b7b6fa832f6a99b8b3f74fdb7fb5c8fe980",
+          "bytes": 9614
+        },
+        "radius-token-tools/sources.json": {
+          "sha256": "dc2f3c8be5f9adda823cfdd13d77351b871c662116df78e4fb7a9d53d52c9a84",
+          "bytes": 6057
+        },
+        "radius-token-tools/validate_model.py": {
+          "sha256": "f064df5dfc7ebb7c23cfc6dfa98f28a2c28b44063cb8f2ae61783ac7054fc610",
+          "bytes": 3415
+        },
+        "radius-token-tools/verify.py": {
+          "sha256": "346ac6f3401d2cccffd907e2a26b373520f237377a6ce3a0ec0639200dc31e58",
+          "bytes": 6169
+        },
+        "radius-token/controls.json": {
+          "sha256": "d5fd63fd9e6be38510f5d27f42c2ffd20a5b40fc2e4bece1697d9c3c113f9f6e",
+          "bytes": 316496
+        },
+        "radius-token/gtc-conversation.pcap": {
+          "sha256": "323b083ba8716765def07dcc1b95f42dfb6a38400a6196976bfd27225528739d",
+          "bytes": 474
+        },
+        "radius-token/gtc-request-empty.pcap": {
+          "sha256": "d7f9b7d0aef80f9691e0b476a55fc24d4bf7200aa4a0f233bafcd45eb808b6b2",
+          "bytes": 240
+        },
+        "radius-token/gtc-request-inner-padding.pcap": {
+          "sha256": "55398cfc270025ee6685ee9726b0d13b63867211032ab55043f858a92ab74f74",
+          "bytes": 248
+        },
+        "radius-token/gtc-request-null-terminated.pcap": {
+          "sha256": "04dde87d07601bca41270df901aa4c597ef71d32cb30d5e7b378fb22b9c0032f",
+          "bytes": 247
+        },
+        "radius-token/gtc-request-utf8.pcap": {
+          "sha256": "df51055e05a4ea6a4165e17fe2615fd6c1658d4ab1e6a1f41dde81d212a9969a",
+          "bytes": 255
+        },
+        "radius-token/gtc-response-binary-nul.pcap": {
+          "sha256": "7212727cb889a5af09cf56b53d3e067d6c639e6d7b0e364328eb71e99707087c",
+          "bytes": 240
+        },
+        "radius-token/gtc-response-empty.pcap": {
+          "sha256": "9c05d0b05cc5392c3a1a4e3f946ec8145b20407bc80e18e235bde868bb0b522a",
+          "bytes": 238
+        },
+        "radius-token/gtc-response-fragmented.pcap": {
+          "sha256": "c623fceaf5a001670a0b5254af9c227d3a47c1261a335e36d3a149b6c937623d",
+          "bytes": 842
+        },
+        "radius-token/gtc-response-utf8.pcap": {
+          "sha256": "36b6e95de954ce79d1a3252caa365d4b0d2b4b95c9a13b6439a8c106eaf46842",
+          "bytes": 247
+        },
+        "radius-token/gtc-wrong-direction.pcap": {
+          "sha256": "baa73aa3a1be642a47d2697bce3d70b384ae969767ae818f69d062b0e7f42108",
+          "bytes": 354
+        },
+        "radius-token/legacy-compatibility.json": {
+          "sha256": "c0894f8b2381a4f448f70a734f36398476e648012a2e3de12d86bacd725ca04a",
+          "bytes": 43016
+        },
+        "radius-token/otp-alternate-dictionary-boundary.pcap": {
+          "sha256": "179d2faf7ade333301e0be052686da83566dd76579a42a8893fe84d35e711095",
+          "bytes": 270
+        },
+        "radius-token/otp-capability-budget-neighbor.pcap": {
+          "sha256": "06c1b4d4d906a42abfc8c0799e102ab8d7fe7be3d5969910cade05c5b6c56825",
+          "bytes": 584
+        },
+        "radius-token/otp-challenge-leading-zero-ext.pcap": {
+          "sha256": "c06ded60619afbb197bd7ef58006debfb75520e487262d3b50e5372b63ba3170",
+          "bytes": 274
+        },
+        "radius-token/otp-challenge-md4-display-context.pcap": {
+          "sha256": "46e5184b2c1eeef82efea694126a637512bc9a1345537d15c3bc82fda9e65dde",
+          "bytes": 284
+        },
+        "radius-token/otp-challenge-no-context.pcap": {
+          "sha256": "60a9c2d8d44d607d6fc1715de053923460ca6b1498e62f61b14af7c8f72d53cd",
+          "bytes": 261
+        },
+        "radius-token/otp-challenge-no-terminator.pcap": {
+          "sha256": "e27ce8457b8a9f0b6a34e703865c586faf5b8d6c06026295d3eb30213688611b",
+          "bytes": 254
+        },
+        "radius-token/otp-challenge-seed-punctuation.pcap": {
+          "sha256": "051af8efa86d5b2c37ff2222516b2a1d825ad0af8db0dad3754c8e54e7ae4983",
+          "bytes": 259
+        },
+        "radius-token/otp-challenge-seed-too-long.pcap": {
+          "sha256": "1adb16120b8c5e18c6bfa9475e31ac1c536481d29338db83df8fded39411fd56",
+          "bytes": 268
+        },
+        "radius-token/otp-challenge-sequence.pcap": {
+          "sha256": "f8550752bb466a658bc3acd3440a5d7f8e63298939fb8ae8de481bd412fd04ca",
+          "bytes": 256
+        },
+        "radius-token/otp-challenge-sha1.pcap": {
+          "sha256": "8092be176921d69e6c093bef17d473e8776cd3b92d692dbe2c2c8a3844b16848",
+          "bytes": 257
+        },
+        "radius-token/otp-challenge-two-contexts.pcap": {
+          "sha256": "883e1e42cdfef9b63b19597033f9b6c06cf466db1125c8b0b1cd13763bd67bef",
+          "bytes": 273
+        },
+        "radius-token/otp-challenge-unicode-seed-boundary.pcap": {
+          "sha256": "01d8af690840286dc855546d8401e45b1598ce30159bcaf7f0ec157899baf3f1",
+          "bytes": 256
+        },
+        "radius-token/otp-challenge-unknown-algorithm.pcap": {
+          "sha256": "0b6a483caf5a18788fcf2d68a912b9b972062cdf6bba619b72ba0369b9264f8a",
+          "bytes": 258
+        },
+        "radius-token/otp-checksum-fatal-before-budget.pcap": {
+          "sha256": "1d09c163665128351ce45385d764a5a00e8f5adb900dd1ee8d7c1c31182e1ad7",
+          "bytes": 481
+        },
+        "radius-token/otp-conversation-standard.pcap": {
+          "sha256": "53909027e4d9198e14bb1abc560441be33cd3473fc6ca2c4c952ef9dbc4bc630",
+          "bytes": 499
+        },
+        "radius-token/otp-exact-retry.pcap": {
+          "sha256": "b633c288bed245dc7cefb50db6f46336163841f4ccc9001f4780861024179a3a",
+          "bytes": 406
+        },
+        "radius-token/otp-extended-hex-boundary.pcap": {
+          "sha256": "b8d2286ff9100b8eb41bf90ffb843e2ecaba66a82bcb55a916f48f7ae9e770cf",
+          "bytes": 262
+        },
+        "radius-token/otp-extended-known-hex-word-tab-lwsp.pcap": {
+          "sha256": "6fb018c00c0fdc1b4aa0712755e6cf78ffb432c4c84fd283b046ebef6c97ff73",
+          "bytes": 521
+        },
+        "radius-token/otp-extended-sp-token-and-leading-sp-label.pcap": {
+          "sha256": "76de963549e4eb6a9e83755752bbd5fa1c65038214014e98ec86c63458c26b44",
+          "bytes": 711
+        },
+        "radius-token/otp-extended-unknown-control-in-argument.pcap": {
+          "sha256": "c590fbf3ff20b6e16cfcf78bacee2b801ae76d9f80a5a2a72b024e6768c36f5b",
+          "bytes": 464
+        },
+        "radius-token/otp-extended-unknown-empty-argument.pcap": {
+          "sha256": "053a629797926bc294c90025ef0692574ce770db9ec90938d447a3b5ee71190e",
+          "bytes": 461
+        },
+        "radius-token/otp-extended-word-boundary.pcap": {
+          "sha256": "ebcf04194a80a10852df6b583b2a34ddc15ae4cb69ae0a88e73fddbf87470c71",
+          "bytes": 272
+        },
+        "radius-token/otp-hex-generic-boundary.pcap": {
+          "sha256": "0c9afd85dd88b6db9c1cad9e569c254e5c442cbbe684e0a5e695b6b6c5d56f5c",
+          "bytes": 257
+        },
+        "radius-token/otp-init-boundary.pcap": {
+          "sha256": "0255e5d447163edf26d569ee70ba1ebd60da3f4844e91b58a5bc25b90034a7b6",
+          "bytes": 292
+        },
+        "radius-token/otp-invalid-response-format.pcap": {
+          "sha256": "405a418e6e64cb8fbfb3110f80daf6ebc9a3a0fdef6d5accdaee2a5991b2f2a3",
+          "bytes": 253
+        },
+        "radius-token/otp-mac-fatal-before-budget.pcap": {
+          "sha256": "87191b5a7bd36b6cfe178b6c7300ef4de6b0911009366e28de7e1e218c8b2b01",
+          "bytes": 463
+        },
+        "radius-token/otp-response-inner-padding.pcap": {
+          "sha256": "03e4fab289cb2828aa8e22e5f68d0f4f19a43f8ba206f694462f9224b6ad68b4",
+          "bytes": 268
+        },
+        "radius-token/otp-response-null-terminated.pcap": {
+          "sha256": "eb08b4da9a907ec1fa533af15ff3c672d01b18871b37e8dda1eaa41ec3a52268",
+          "bytes": 267
+        },
+        "radius-token/otp-sixword-case-whitespace.pcap": {
+          "sha256": "1bf0737ffc7799720b1e06eef3394edfec532ae9d059289b488343c207b21a4f",
+          "bytes": 267
+        },
+        "radius-token/otp-standard-ambiguous-two-valid.pcap": {
+          "sha256": "b4d2147437960617fdde30ad8d3c0a313d13cc41d4d43ffc35a2ebb2e7e05ece",
+          "bytes": 259
+        },
+        "radius-token/otp-unknown-seed-encoding-known-ascii-punctuation.pcap": {
+          "sha256": "7adcaaa495b31e0aab693f5945317c1ddeb5aa974392abf378ea29b7889ea2ca",
+          "bytes": 472
+        },
+        "radius-token/otp-unknown-word-budget-neighbor.pcap": {
+          "sha256": "f2979f01ca140f9e295d94a6d58159fba44e35b05bd3dd93b3e33efef43b7b2c",
+          "bytes": 485
+        },
+        "radius-token/otp-word-bad-but-hex-valid.pcap": {
+          "sha256": "04551d437066d757984ffd33d2abcea4c310ee918ddab536b0c1a8d82729f759",
+          "bytes": 259
+        },
+        "radius-token/otp-word-budget-neighbor.pcap": {
+          "sha256": "9221c11700b986f7d97b902916f3a9d6f194152ab89241bc4262b48a7ba8aba4",
+          "bytes": 481
+        },
+        "radius-token/otp-word-checksum-invalid.pcap": {
+          "sha256": "a4c2e376b2516c0ff5bacecf9a7de01f4783c4669d2ee56c765595dd0b662223",
+          "bytes": 266
+        },
+        "required-tests-traffic-unified-v113.json": {
+          "sha256": "c0ebef5d20b6feaed157c52bdb8e06f3b5105d773dd50cfa0ad877993adce58b",
+          "bytes": 19274558
+        },
+        "validation/expected.json": {
+          "sha256": "860c6275507d31c3ec15e309353f7c274ec6d876afe20a73f326e32327b51fab",
+          "bytes": 54378
+        }
+      },
+      "aliases": {
+        "common/pcapx/pcaputil/radius-token-tools/DICTIONARY-NOTICE.txt": "radius-token-tools/DICTIONARY-NOTICE.txt",
+        "common/pcapx/pcaputil/radius-token-tools/generate.py": "radius-token-tools/generate.py",
+        "common/pcapx/pcaputil/radius-token-tools/generate_supplements.py": "radius-token-tools/generate_supplements.py",
+        "common/pcapx/pcaputil/radius-token-tools/otp-standard-dictionary.txt": "radius-token-tools/otp-standard-dictionary.txt",
+        "common/pcapx/pcaputil/radius-token-tools/sources.json": "radius-token-tools/sources.json",
+        "common/pcapx/pcaputil/radius-token-tools/validate_model.py": "radius-token-tools/validate_model.py",
+        "common/pcapx/pcaputil/radius-token-tools/verify.py": "radius-token-tools/verify.py",
+        "common/pcapx/pcaputil/radius-token/controls.json": "radius-token/controls.json",
+        "common/pcapx/pcaputil/radius-token/gtc-conversation.pcap": "radius-token/gtc-conversation.pcap",
+        "common/pcapx/pcaputil/radius-token/gtc-request-empty.pcap": "radius-token/gtc-request-empty.pcap",
+        "common/pcapx/pcaputil/radius-token/gtc-request-inner-padding.pcap": "radius-token/gtc-request-inner-padding.pcap",
+        "common/pcapx/pcaputil/radius-token/gtc-request-null-terminated.pcap": "radius-token/gtc-request-null-terminated.pcap",
+        "common/pcapx/pcaputil/radius-token/gtc-request-utf8.pcap": "radius-token/gtc-request-utf8.pcap",
+        "common/pcapx/pcaputil/radius-token/gtc-response-binary-nul.pcap": "radius-token/gtc-response-binary-nul.pcap",
+        "common/pcapx/pcaputil/radius-token/gtc-response-empty.pcap": "radius-token/gtc-response-empty.pcap",
+        "common/pcapx/pcaputil/radius-token/gtc-response-fragmented.pcap": "radius-token/gtc-response-fragmented.pcap",
+        "common/pcapx/pcaputil/radius-token/gtc-response-utf8.pcap": "radius-token/gtc-response-utf8.pcap",
+        "common/pcapx/pcaputil/radius-token/gtc-wrong-direction.pcap": "radius-token/gtc-wrong-direction.pcap",
+        "common/pcapx/pcaputil/radius-token/legacy-compatibility.json": "radius-token/legacy-compatibility.json",
+        "common/pcapx/pcaputil/radius-token/otp-alternate-dictionary-boundary.pcap": "radius-token/otp-alternate-dictionary-boundary.pcap",
+        "common/pcapx/pcaputil/radius-token/otp-capability-budget-neighbor.pcap": "radius-token/otp-capability-budget-neighbor.pcap",
+        "common/pcapx/pcaputil/radius-token/otp-challenge-leading-zero-ext.pcap": "radius-token/otp-challenge-leading-zero-ext.pcap",
+        "common/pcapx/pcaputil/radius-token/otp-challenge-md4-display-context.pcap": "radius-token/otp-challenge-md4-display-context.pcap",
+        "common/pcapx/pcaputil/radius-token/otp-challenge-no-context.pcap": "radius-token/otp-challenge-no-context.pcap",
+        "common/pcapx/pcaputil/radius-token/otp-challenge-no-terminator.pcap": "radius-token/otp-challenge-no-terminator.pcap",
+        "common/pcapx/pcaputil/radius-token/otp-challenge-seed-punctuation.pcap": "radius-token/otp-challenge-seed-punctuation.pcap",
+        "common/pcapx/pcaputil/radius-token/otp-challenge-seed-too-long.pcap": "radius-token/otp-challenge-seed-too-long.pcap",
+        "common/pcapx/pcaputil/radius-token/otp-challenge-sequence.pcap": "radius-token/otp-challenge-sequence.pcap",
+        "common/pcapx/pcaputil/radius-token/otp-challenge-sha1.pcap": "radius-token/otp-challenge-sha1.pcap",
+        "common/pcapx/pcaputil/radius-token/otp-challenge-two-contexts.pcap": "radius-token/otp-challenge-two-contexts.pcap",
+        "common/pcapx/pcaputil/radius-token/otp-challenge-unicode-seed-boundary.pcap": "radius-token/otp-challenge-unicode-seed-boundary.pcap",
+        "common/pcapx/pcaputil/radius-token/otp-challenge-unknown-algorithm.pcap": "radius-token/otp-challenge-unknown-algorithm.pcap",
+        "common/pcapx/pcaputil/radius-token/otp-checksum-fatal-before-budget.pcap": "radius-token/otp-checksum-fatal-before-budget.pcap",
+        "common/pcapx/pcaputil/radius-token/otp-conversation-standard.pcap": "radius-token/otp-conversation-standard.pcap",
+        "common/pcapx/pcaputil/radius-token/otp-exact-retry.pcap": "radius-token/otp-exact-retry.pcap",
+        "common/pcapx/pcaputil/radius-token/otp-extended-hex-boundary.pcap": "radius-token/otp-extended-hex-boundary.pcap",
+        "common/pcapx/pcaputil/radius-token/otp-extended-known-hex-word-tab-lwsp.pcap": "radius-token/otp-extended-known-hex-word-tab-lwsp.pcap",
+        "common/pcapx/pcaputil/radius-token/otp-extended-sp-token-and-leading-sp-label.pcap": "radius-token/otp-extended-sp-token-and-leading-sp-label.pcap",
+        "common/pcapx/pcaputil/radius-token/otp-extended-unknown-control-in-argument.pcap": "radius-token/otp-extended-unknown-control-in-argument.pcap",
+        "common/pcapx/pcaputil/radius-token/otp-extended-unknown-empty-argument.pcap": "radius-token/otp-extended-unknown-empty-argument.pcap",
+        "common/pcapx/pcaputil/radius-token/otp-extended-word-boundary.pcap": "radius-token/otp-extended-word-boundary.pcap",
+        "common/pcapx/pcaputil/radius-token/otp-hex-generic-boundary.pcap": "radius-token/otp-hex-generic-boundary.pcap",
+        "common/pcapx/pcaputil/radius-token/otp-init-boundary.pcap": "radius-token/otp-init-boundary.pcap",
+        "common/pcapx/pcaputil/radius-token/otp-invalid-response-format.pcap": "radius-token/otp-invalid-response-format.pcap",
+        "common/pcapx/pcaputil/radius-token/otp-mac-fatal-before-budget.pcap": "radius-token/otp-mac-fatal-before-budget.pcap",
+        "common/pcapx/pcaputil/radius-token/otp-response-inner-padding.pcap": "radius-token/otp-response-inner-padding.pcap",
+        "common/pcapx/pcaputil/radius-token/otp-response-null-terminated.pcap": "radius-token/otp-response-null-terminated.pcap",
+        "common/pcapx/pcaputil/radius-token/otp-sixword-case-whitespace.pcap": "radius-token/otp-sixword-case-whitespace.pcap",
+        "common/pcapx/pcaputil/radius-token/otp-standard-ambiguous-two-valid.pcap": "radius-token/otp-standard-ambiguous-two-valid.pcap",
+        "common/pcapx/pcaputil/radius-token/otp-unknown-seed-encoding-known-ascii-punctuation.pcap": "radius-token/otp-unknown-seed-encoding-known-ascii-punctuation.pcap",
+        "common/pcapx/pcaputil/radius-token/otp-unknown-word-budget-neighbor.pcap": "radius-token/otp-unknown-word-budget-neighbor.pcap",
+        "common/pcapx/pcaputil/radius-token/otp-word-bad-but-hex-valid.pcap": "radius-token/otp-word-bad-but-hex-valid.pcap",
+        "common/pcapx/pcaputil/radius-token/otp-word-budget-neighbor.pcap": "radius-token/otp-word-budget-neighbor.pcap",
+        "common/pcapx/pcaputil/radius-token/otp-word-checksum-invalid.pcap": "radius-token/otp-word-checksum-invalid.pcap",
+        "scripts/protocol-tests/required-tests-traffic-unified-v113.json": "required-tests-traffic-unified-v113.json"
+      }
     }
   ],
   "schema_version": 1,

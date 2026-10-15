@@ -159,8 +159,16 @@ func radiusEAPFields(out map[string]any, max int) (bool, error) {
 							note("eap-notification-response-data", true)
 						}
 					}
-				case 3, 254:
-					dissected, err := radiusNAKFields(inner, ec, typ, data, max, note)
+				case 6:
+					radiusGTCFields(inner, ec, data, note)
+				case 3, 5, 254:
+					var dissected bool
+					var err error
+					if typ == 5 {
+						dissected, err = radiusOTPFields(inner, ec, data, max, note)
+					} else {
+						dissected, err = radiusNAKFields(inner, ec, typ, data, max, note)
+					}
 					if err != nil {
 						if len(fatal)+len(info) > 0 {
 							out["EAP Diagnostics"] = append(fatal, info...)

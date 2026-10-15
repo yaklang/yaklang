@@ -93,18 +93,45 @@ func radiusEAPWant(t *testing.T, c radiusEAPControl, i int) map[string]any {
 		s["EAP Diagnostics"] = d
 	}
 	if e, ok := s["EAP"].(map[string]any); ok {
-		if v, ok := e["Method Count"].(float64); ok {
-			e["Method Count"] = int(v)
+		for _, k := range []string{"Method Count", "Token Bytes", "OTP Capability Count", "OTP Candidate Count"} {
+			if v, ok := e[k].(float64); ok {
+				e[k] = int(v)
+			}
 		}
 		for _, k := range []string{"Vendor-Id", "Vendor-Type"} {
 			if v, ok := e[k].(float64); ok {
 				e[k] = uint32(v)
 			}
 		}
-		for _, k := range []string{"Desired Types", "Vendor Data"} {
+		for _, k := range []string{"Desired Types", "Vendor Data", "Token Data", "OTP Challenge", "OTP Prefix", "OTP Suffix", "OTP Seed Raw", "OTP Extended Arguments"} {
 			if v, ok := e[k].(string); ok {
 				e[k] = radiusWire(t, v)
 			}
+		}
+		for _, k := range []string{"OTP Capabilities", "OTP Uninterpreted Words"} {
+			if rows, ok := e[k].([]any); ok {
+				v := make([]string, len(rows))
+				for i, r := range rows {
+					v[i] = r.(string)
+				}
+				e[k] = v
+			}
+		}
+		if rows, ok := e["OTP Candidates"].([]any); ok {
+			out := make([]map[string]any, 0, len(rows))
+			for _, r := range rows {
+				m := r.(map[string]any)
+				m["Value"] = radiusWire(t, m["Value"].(string))
+				if words, ok := m["Words"].([]any); ok {
+					v := make([]string, len(words))
+					for i, w := range words {
+						v[i] = w.(string)
+					}
+					m["Words"] = v
+				}
+				out = append(out, m)
+			}
+			e["OTP Candidates"] = out
 		}
 		if rows, ok := e["Desired Expanded Types"].([]any); ok {
 			out := make([]map[string]any, 0, len(rows))
@@ -242,6 +269,8 @@ func radiusEAPCheck(t *testing.T, c radiusEAPControl, events []*ProtocolEvent, c
 			tree, err := e.Decode()
 			require.NoError(t, err)
 			require.Equal(t, want, tree["session"])
+			radiusEAPMutateStringLists(tree)
+			radiusEAPMutateStringLists(f)
 			mutateRTPSQuery(tree)
 			mutateRTPSQuery(f)
 		} else {
@@ -255,6 +284,14 @@ func radiusEAPCheck(t *testing.T, c radiusEAPControl, events []*ProtocolEvent, c
 			require.Equal(t, queryWant, f)
 		} else {
 			require.Nil(t, f)
+		}
+		again, decodeErr := e.Decode()
+		rocTypedError(t, w.Error, decodeErr)
+		if w.Error == "" {
+			require.Equal(t, want, again["session"])
+			require.Equal(t, queryWant, again["fields"])
+		} else {
+			require.Nil(t, again)
 		}
 	}
 	if extra == 1 {
@@ -484,6 +521,29 @@ func radiusLegacyCases(t *testing.T, controls []radiusEAPControl, expected int) 
 					radiusEAPCheck(t, c, events, false, deferred, true)
 				})
 			}
+		}
+	}
+}
+
+// Mutate slice elements as well as map entries; replacing an entry alone cannot
+// expose a borrowed Words/Capabilities backing array in a private query tree.
+func radiusEAPMutateStringLists(v any) {
+	switch x := v.(type) {
+	case map[string]any:
+		for _, child := range x {
+			radiusEAPMutateStringLists(child)
+		}
+	case []map[string]any:
+		for _, child := range x {
+			radiusEAPMutateStringLists(child)
+		}
+	case []any:
+		for _, child := range x {
+			radiusEAPMutateStringLists(child)
+		}
+	case []string:
+		for i := range x {
+			x[i] = "caller-mutated"
 		}
 	}
 }
