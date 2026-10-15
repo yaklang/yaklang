@@ -137,30 +137,6 @@ func (o *overlayFS) treeOfLocked(layer string) filesys_interface.FileSystem {
 	return tree
 }
 
-// lowerLayerTreeLocked resolves a head-rooted path against the newest
-// LOWER layer that stores it (head excluded — callers own head lookups).
-// The returned path keeps the owning layer's own prefix.
-func (o *overlayFS) lowerLayerTreeLocked(headPath string) (filesys_interface.FileSystem, string, bool) {
-	// Stat, not Exists: some filesystems' Exists goes through Open, which
-	// fails on directories ("is a dir"), so base-only directories would
-	// never match.
-	for i := len(o.layers) - 2; i >= 0; i-- {
-		layer := o.layers[i].name
-		if layer == "" || layer == o.head() {
-			continue
-		}
-		tree := o.treeOfLocked(layer)
-		if tree == nil {
-			continue
-		}
-		lp := o.layerPath(layer, headPath)
-		if _, err := tree.Stat(lp); err == nil {
-			return tree, lp, true
-		}
-	}
-	return nil, "", false
-}
-
 // ReadDir lists the fully expanded view of the overlay chain: every layer's
 // entries re-rooted under the head prefix, deduplicated by name with newer
 // layers shadowing older ones, minus files deleted in the final view.
@@ -221,48 +197,53 @@ func (o *overlayFS) ReadDirDiff(headPath string) ([]fs.DirEntry, error) {
 	if err == nil {
 		return entries, nil
 	}
-	if _, _, ok := o.lowerLayerTreeLocked(headPath); ok {
-		return []fs.DirEntry{}, nil
+	// The head layer doesn't carry the path, but a lower layer's tree
+	// holds it: a real directory that's just empty in the diff view.
+	for i := len(o.layers) - 2; i >= 0; i-- {
+		name := o.layers[i].name
+		if t := o.treeOfLocked(name); t != nil {
+			if _, statErr := t.Stat(o.layerPath(name, headPath)); statErr == nil {
+				return []fs.DirEntry{}, nil
+			}
+		}
 	}
 	return nil, err
 }
 
-// Stat resolves through the owning layer; a filled body replaces its
-// tree stub in place, so the size turns real after the first read. Files
-// removed in the final overlay view read as missing everywhere.
+// Stat resolves through the owning layer; a filled body replaces its tree
+// stub in place, so the size turns real after the first read. Files removed
+// in the final overlay view read as missing everywhere.
 func (o *overlayFS) Stat(headPath string) (fs.FileInfo, error) {
 	o.mu.Lock()
 	defer o.mu.Unlock()
-	if !o.deletedInFinalView(headPath) {
-		if tree := o.headTreeLocked(); tree != nil {
-			if info, err := tree.Stat(headPath); err == nil {
-				return info, nil
-			}
-		}
-		if tree, lp, ok := o.lowerLayerTreeLocked(headPath); ok {
-			return tree.Stat(lp)
-		}
+	tree, lp, err := o.resolveOwnerLocked(headPath)
+	if err != nil {
+		return nil, err
 	}
-	// Not found anywhere (or removed in the final view): a not-found error
-	// naming the caller's path.
-	return nil, utils.Errorf("file [%v] not exist", headPath)
+	return tree.Stat(lp)
 }
 
 // resolveOwnerLocked finds the owning layer's tree and storage path for a
-// head-rooted path. Ownership is head-first: any hit on the head tree —
-// including an unfilled stub — owns the path and must never fall through
-// to an older layer. Deleted-in-final-view paths error.
+// head-rooted path with one rule: walking the chain newest→oldest, the
+// first layer whose tree holds the path owns it — an unfilled stub counts
+// as holding, so the newest version always wins and its body loads later.
+// layerPath re-roots into each layer's own prefix (identity for the head
+// itself); holding is tested with Stat because Exists can go through Open
+// and fail on directories. Deleted-in-final-view paths error.
 func (o *overlayFS) resolveOwnerLocked(headPath string) (filesys_interface.FileSystem, string, error) {
 	if o.deletedInFinalView(headPath) {
 		return nil, "", utils.Errorf("file [%v] not exist", headPath)
 	}
-	if tree := o.headTreeLocked(); tree != nil {
-		if _, statErr := tree.Stat(headPath); statErr == nil {
-			return tree, headPath, nil
+	for i := len(o.layers) - 1; i >= 0; i-- {
+		name := o.layers[i].name
+		tree := o.treeOfLocked(name)
+		if tree == nil {
+			continue // a broken layer falls through to older ones
 		}
-	}
-	if tree, lp, ok := o.lowerLayerTreeLocked(headPath); ok {
-		return tree, lp, nil
+		lp := o.layerPath(name, headPath)
+		if _, err := tree.Stat(lp); err == nil {
+			return tree, lp, nil
+		}
 	}
 	return nil, "", utils.Errorf("file [%v] not exist", headPath)
 }
