@@ -16,7 +16,10 @@ func readAIHTTPError(status int, body io.Reader, chunked bool, captured *bytes.B
 	_, readErr := io.Copy(captured, io.LimitReader(body, 4096))
 	err := utils.Errorf("AI provider returned HTTP %d: %s", status, captured.String())
 	if readErr != nil {
-		return utils.Wrapf(readErr, "%v", err)
+		err = utils.Wrapf(readErr, "%v", err)
+	}
+	if evidence := DetectPromptOverflow(status, captured.Bytes(), ""); evidence != nil {
+		return &PromptOverflowError{PromptOverflowEvidence: *evidence, Cause: err}
 	}
 	return err
 }

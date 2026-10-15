@@ -359,7 +359,7 @@ func processAIResponse(r []byte, closer io.ReadCloser, outWriter io.Writer, reas
 				fmt.Println(chunkedErrorMirror.String())
 				return streamErr
 			}
-			return nil
+			return promptOverflowAfterStream(statusCode, providerResponsePayload(r, mirrorResponse.Bytes()))
 		}
 		if string(line) == "" {
 			continue
@@ -465,7 +465,7 @@ func processAIResponse(r []byte, closer io.ReadCloser, outWriter io.Writer, reas
 				log.Errorf("error in non-stream json extraction: %v", handleResponseErr)
 				return wrapStreamReadError(handleResponseErr)
 			}
-			return nil
+			return promptOverflowAfterStream(statusCode, providerResponsePayload(r, mirrorResponse.Bytes()))
 		}
 
 		lineStr := string(line)
@@ -628,8 +628,6 @@ func processAIResponse(r []byte, closer io.ReadCloser, outWriter io.Writer, reas
 			if !handled {
 				if ret := codec.AnyToString(jsonpath.Find(j, `$..finish_reason`)); utils.IContains(ret, "stop") {
 					//log.Info("finished normal")
-				} else if strings.TrimRight(codec.AnyToString(jsonpath.Find(j, `$..error`)), "[]\"'") != "" {
-					log.Errorf("error for stream fetching: %v", j)
 				} else {
 					//log.Infof("extra ai stream json: %v", j)
 				}
@@ -780,7 +778,10 @@ func processAIResponseForResponses(r []byte, closer io.ReadCloser, outWriter io.
 	contentType := strings.ToLower(lowhttp.GetHTTPPacketHeader(r, "content-type"))
 	bufferedReader := bufio.NewReader(reader)
 	if strings.Contains(contentType, "text/event-stream") {
-		return handleResponsesSSEStream(bufferedReader, outWriter, reasonWriter, toolCallArgumentsWriter, toolCallCallback)
+		if err := handleResponsesSSEStream(bufferedReader, outWriter, reasonWriter, toolCallArgumentsWriter, toolCallCallback); err != nil {
+			return err
+		}
+		return promptOverflowAfterStream(statusCode, providerResponsePayload(r, mirrorResponse.Bytes()))
 	}
 
 	prefix, firstNonSpace, err := readResponsesPrefix(bufferedReader)
@@ -804,12 +805,18 @@ func processAIResponseForResponses(r []byte, closer io.ReadCloser, outWriter io.
 			return nil
 		}
 		if handleResponsesJSONPayload(bodyTrim, outWriter, reasonWriter, toolCallArgumentsWriter, toolCallCallback) {
-			return nil
+			return promptOverflowAfterStream(statusCode, providerResponsePayload(r, mirrorResponse.Bytes()))
 		}
-		return handleResponsesSSEStream(bytes.NewReader(body), outWriter, reasonWriter, toolCallArgumentsWriter, toolCallCallback)
+		if err := handleResponsesSSEStream(bytes.NewReader(body), outWriter, reasonWriter, toolCallArgumentsWriter, toolCallCallback); err != nil {
+			return err
+		}
+		return promptOverflowAfterStream(statusCode, providerResponsePayload(r, mirrorResponse.Bytes()))
 	}
 
-	return handleResponsesSSEStream(fullReader, outWriter, reasonWriter, toolCallArgumentsWriter, toolCallCallback)
+	if err := handleResponsesSSEStream(fullReader, outWriter, reasonWriter, toolCallArgumentsWriter, toolCallCallback); err != nil {
+		return err
+	}
+	return promptOverflowAfterStream(statusCode, providerResponsePayload(r, mirrorResponse.Bytes()))
 }
 
 type responsesToolCallState struct {
