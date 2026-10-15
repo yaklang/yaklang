@@ -27,6 +27,7 @@ type ProtocolEvent struct {
 	nativeSTUNObservation                    bool
 	nativeSIPObservation                     bool
 	nativeTFTPObservation                    bool
+	nativeATGObservation                     bool
 	nativeDLMSOrSLMPObservation              bool
 	nativeUnrecognizedUDP                    bool
 	nativeBACnetRead                         bool
@@ -135,6 +136,9 @@ func (e *ProtocolEvent) Decode() (result map[string]any, err error) {
 		if e.Protocol == "c37118" && (e.Profile == "c37118-v1-v2-cfg2-data" || e.Profile == "c37118-v2-cfg3-complete-data" || e.Profile == "c37118-v2-cfg3-continuation-data" || e.Profile == "c37118-engineering") && e.semanticFields != nil {
 			session = e.semanticFields
 		}
+		if e.nativeATGObservation && e.semanticFields != nil {
+			session = e.semanticFields
+		}
 		if (e.nativeDLMSOrSLMPObservation || e.nativeSTUNObservation || e.nativeSIPObservation || e.nativeTFTPObservation) && e.semanticSession != nil {
 			session = e.semanticSession
 		}
@@ -162,7 +166,7 @@ func (e *ProtocolEvent) Decode() (result map[string]any, err error) {
 			return result, nil
 		}
 	}
-	if e.nativeTFTPObservation || e.nativeDLMSOrSLMPObservation {
+	if e.nativeATGObservation || e.nativeTFTPObservation || e.nativeDLMSOrSLMPObservation {
 		if e.semanticFields != nil {
 			return map[string]any{"fields": cloneSession(e.semanticFields)}, nil
 		}
@@ -317,7 +321,7 @@ func (e *ProtocolEvent) retainRuleEnvelope(result map[string]any) {
 }
 
 func (e *ProtocolEvent) ownsNativeFields() bool {
-	if e.nativeDLMSOrSLMPObservation || e.nativeTFTPObservation || e.nativeSIPObservation || e.nativeSTUNObservation || e.nativeSNMPObservation || e.nativeTLSObservation || e.nativeDTLSObservation || e.nativeHARTIPObservation || e.nativeENIPObservation || e.nativeFINSObservation || e.nativeDiagnosticError != "" {
+	if e.nativeATGObservation || e.nativeDLMSOrSLMPObservation || e.nativeTFTPObservation || e.nativeSIPObservation || e.nativeSTUNObservation || e.nativeSNMPObservation || e.nativeTLSObservation || e.nativeDTLSObservation || e.nativeHARTIPObservation || e.nativeENIPObservation || e.nativeFINSObservation || e.nativeDiagnosticError != "" {
 		return true
 	}
 	if e.nativeDoIPObservation {
@@ -965,6 +969,13 @@ func (f *binFlow) event(dir int, raw []byte, status, detail string) *BinParserEv
 		e.Profile = "doip-routing-dsc"
 	}
 	f.eventEvidence(dir, e)
+	if f.atg != nil {
+		e.nativeATGObservation = true
+		e.Profile = "atg-tls450-i201"
+		if len(raw) >= 5 && string(raw[1:5]) == "i202" || len(raw) == 0 && f.atg.count > 0 && f.atg.pending[0].function == '2' {
+			e.Profile = "atg-tls450-i202"
+		}
+	}
 	if f.binding == nil && (f.protocol == "slmp" || f.protocol == "dlms" || f.protocol == "dlms-wrapper") {
 		e.nativeDLMSOrSLMPObservation = true
 	}
@@ -1049,7 +1060,7 @@ func (f *binFlow) stop(dir int, wire []byte, status, reason string) {
 	}
 	e := f.event(dir, preview, status, reason)
 	e.sessionError, f.lastSessionError = f.lastSessionError, nil
-	if e.nativeDLMSOrSLMPObservation || e.nativeTFTPObservation || e.nativeSIPObservation || e.nativeSTUNObservation || e.nativeSNMPObservation || e.nativeTLSObservation || e.nativeHARTIPObservation || e.nativeFINSObservation || e.nativeENIPObservation {
+	if e.nativeATGObservation || e.nativeDLMSOrSLMPObservation || e.nativeTFTPObservation || e.nativeSIPObservation || e.nativeSTUNObservation || e.nativeSNMPObservation || e.nativeTLSObservation || e.nativeHARTIPObservation || e.nativeFINSObservation || e.nativeENIPObservation {
 		if e.sessionError == nil {
 			kind := ErrMalformedMessage
 			switch status {
@@ -1529,7 +1540,7 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 				if e.nativeSIPObservation || (e.Protocol == "iec104" || e.Protocol == "dnp3") || e.Protocol == "goose" || e.Protocol == "mqtt" || e.nativeOPCUAObservation || e.Protocol == "websocket" && e.Session["OCPP"] != nil || e.Protocol == "rtp" && e.Transport != "udp" {
 					e.retainRuleEnvelope(result)
 				}
-				if e.nativeHARTIPObservation || e.nativeENIPObservation || e.Protocol == "tls" || e.Protocol == "redis" || e.Entry == "MySQLPreparedFields" || e.Protocol == "stun" || e.Protocol == "turn" || e.Protocol == "snmp" || e.Protocol == "slmp" || e.Protocol == "dlms-wrapper" || e.Protocol == "dlms" || e.Protocol == "c37118" {
+				if e.nativeATGObservation || e.nativeHARTIPObservation || e.nativeENIPObservation || e.Protocol == "tls" || e.Protocol == "redis" || e.Entry == "MySQLPreparedFields" || e.Protocol == "stun" || e.Protocol == "turn" || e.Protocol == "snmp" || e.Protocol == "slmp" || e.Protocol == "dlms-wrapper" || e.Protocol == "dlms" || e.Protocol == "c37118" {
 					e.semanticFields = cloneSession(e.semanticFields)
 				}
 			}

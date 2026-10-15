@@ -44,7 +44,7 @@ Run from the repository root:
 ```sh
 go run ./internal/trafficfixture/cmd/corpus test
 go test -json -count=1 -timeout=10m ./internal/trafficfixture/... ./common/bin-parser/... ./common/pcapx/... ./common/yak/cmd/yakcmds/shark-cli ./scripts/ci > traffic.jsonl
-go run ./internal/trafficfixture/cmd/corpus exec -- python3 @scripts/protocol-tests/check_go_test_json_v2.py traffic.jsonl --inventory @scripts/protocol-tests/required-tests-traffic-unified-v102.json --tier full
+go run ./internal/trafficfixture/cmd/corpus exec -- python3 @scripts/protocol-tests/check_go_test_json_v2.py traffic.jsonl --inventory @scripts/protocol-tests/required-tests-traffic-unified-v103.json --tier full
 ```
 
 The single `corpus` entry point uses the same bounded Go ZIP loader as tests.
@@ -83,7 +83,7 @@ their semantic coverage. The existing synthetic session keys are test inputs;
 production credentials, user private keys and material without redistribution
 permission belong in an external fixed-source download manifest.
 
-Current test requirements are sealed at `scripts/protocol-tests/required-tests-traffic-unified-v102.json`;
+Current test requirements are sealed at `scripts/protocol-tests/required-tests-traffic-unified-v103.json`;
 the historical inventories and all earlier batches remain unchanged.
 The supplemental small-corpus batch contains 26 minimal controls, their explicit
 expected facts, an offline generator and the compact pinned source manifest.
@@ -203,7 +203,7 @@ opaque selector bytes and one bounded Data value over Wrapper v1 TCP/UDP; object
 selector meaning, access permission and device operation are unverified. The
 original one-packet selective-access capture and original refused answer remain
 immutable; its now-supported answer is matched by exact input SHA and frame.
-The active inventory is `scripts/protocol-tests/required-tests-traffic-unified-v102.json`.
+The active inventory is `scripts/protocol-tests/required-tests-traffic-unified-v103.json`.
 
 The small-graph budget batch reuses accepted graph captures/answers and adds one
 249-byte UDP control for child count255 without child bytes. Its standalone proof
@@ -993,7 +993,7 @@ the normative answer; a missing numeric reference field is not a codec pass.
 Full/deferred, workers1/2/4, observers off/on, Feed chunks1/7/full, ownership,
 resources and close/refusal boundaries remain required.
 
-Current gate: `required-tests-traffic-unified-v102.json` with
+Current gate: `required-tests-traffic-unified-v103.json` with
 `check_go_test_json_v2.py`. The indexed validator preserves missing/unpassed,
 package invocation completion, descendant skips, failures and non-JSON checks;
 its mutation/differential harness is sealed with the material. Older checkers
@@ -1629,7 +1629,7 @@ userspace adapter; full kernel receiver/socket/timers and ECU endpoints do not.
 All161 preceding ZIPs remain byte-for-byte unchanged. Raw captures, dependencies,
 reference source/build output and process evidence stay outside Git.
 
-Current effective v102 inventory: 69,596 entries; 69,589 are mandatory for the full tier.
+Current effective v103 inventory: 70,394 entries; 70,387 are mandatory for the full tier.
 
 The opt-in `DynamicFlowControl` profile follows Linux v6.12 FC tuple updates (including WAIT without granting data). Disjoint address extensions or classical/FD carriers may share CAN IDs; unknown selectors cannot choose or mutate a conversation. Ambiguous selectors are rejected. Seven sealed cases exercise full/deferred, workers 1/2/4, and observer off/on, with exact fields, byte collections, contributor references, errors and resource ownership. The existing static FC profile remains unchanged. Pinned upstream FC and filter functions execute with declared userspace stubs; this is not a kernel/ECU endpoint. TShark 4.2.5 checks wire tuples and two complete payloads, but cannot independently reassemble the shared-address transcripts.
 
@@ -1706,3 +1706,5 @@ The SIP context controls cover exact request/response identity, retirement/confl
 The TFTP file controls exercise opt-in bounded octet RRQ/WRQ file observation on a selected initial UDP service with final-ACK completion, owned binary bytes/hash and explicit request/OACK/first-DATA provenance. TestTFTPFileSealedMatrix validates complete messages, refusal and capture-domain/generation isolation; TestTFTPOriginalObservedFile reuses an immutable historical nDPI input and independently exported selected file. Recipe reconstruction and actual pinned tshark wire/export checks are separate from local association/resource policy. Empty-file exports are unavailable in that reference tool, so RFC-derived zero-byte answers remain a separate assertion. Netascii, windowed transfer and authenticated endpoint/storage or whole-original semantics remain unclaimed.
 
 The UDP context controls preserve complete selected SLMP and DLMS fields while testing endpoint/domain-local idle observation. Foreign future traffic and refused foreign bytes cannot retire a timely owner; the exact30-second boundary and backward timestamps retain conservative identity handling. TestUDPContextSealedMatrix checks full/deferred workers1/2/4 observer views, exact request/reply/transaction IDs, fields, Session, typed errors, raw byte provenance and Close. Fixed earlier independent wire answers plus explicit bounded observation policy are reconstructed without IUT output; no authenticated peer or whole-original success is inferred. Native Wrapper Session/refusal queries retain their private origin after caller metadata edits.
+
+ATG delivery controls extend the read-only TLS450 computer profile with RevisionG function i202 version1 dates, decimal tank/delivery counts and ten finite binary32 values per delivery. Units and physical delivery remain unobserved. Repeated function/selector identities and multi-query untagged rejection retain unresolved candidates with zero precise association; Close reports them as typed NeedMore. Thirty scenarios share29 byte-distinct synthetic TCP captures; i201 low-budget/field behavior stays covered. Full/deferred workers1/2/4 observer capture views and native coalesced/1/2/7/64/4096 chunk views assert complete fields, Session, IDs, order, errors, release and query ownership. Own recipes and independent fixed vendor-manual/IEEE754 answers are sealed with source pins; the mirror is not claimed officially byte-equivalent and pinned tshark verifies TCP/IP facts only, with no ATG dissector/device truth claim.

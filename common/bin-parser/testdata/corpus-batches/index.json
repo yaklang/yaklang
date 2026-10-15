@@ -102568,6 +102568,207 @@
         "common/pcapx/pcaputil/udp-context/expected.json": "udp-context/expected.json",
         "scripts/protocol-tests/required-tests-traffic-unified-v102.json": "required-tests-traffic-unified-v102.json"
       }
+    },
+    {
+      "id": "validation-atg-delivery",
+      "kind": "support",
+      "source_sha": "1efc5e4608cdfe16721864bd0cf61adc5de9e66a",
+      "file": "validation-atg-delivery.zip",
+      "sha256": "c53fc1890e2488f10da319dc08601dcac54ffb26b1b4c544d4e9ea81dffd0b77",
+      "password": "bin-parser",
+      "members": {
+        "atg-delivery-tools/build.py": {
+          "sha256": "c76c4e0ed9c69b497ae0362a15dbcc241b75c6650081e6697be6f853dafa7cae",
+          "bytes": 11852
+        },
+        "atg-delivery-tools/carrier.py": {
+          "sha256": "efe178075aa953f05eac835b1c95a8880ff636b562f409b7473fc0f488f036b9",
+          "bytes": 1805
+        },
+        "atg-delivery-tools/legacy-i201.json": {
+          "sha256": "4663225008b526abca37151b8ae2f159f4065818e481bc9cdc307c0a6d9f0d29",
+          "bytes": 1600
+        },
+        "atg-delivery-tools/source-pins.json": {
+          "sha256": "35c18dedff65f926e7066e5572ff9e75376e2bacfaf7d2032d17d36b34b3a360",
+          "bytes": 1864
+        },
+        "atg-delivery-tools/verify.py": {
+          "sha256": "daada3ba26c14c07424ed9c07244b21254f4c7942ff606af2fef77726a86f422",
+          "bytes": 4066
+        },
+        "atg-delivery/all-no-records.pcap": {
+          "sha256": "087feb4314b2ec942a5a8b6201e39ca4e35171ce83e4443ebc5cb53cbd42147f",
+          "bytes": 685
+        },
+        "atg-delivery/all-tanks.pcap": {
+          "sha256": "512c81131f68677a128ad4cc7c8ecaf940deb1691ad1a1745cf7c1813034c3ef",
+          "bytes": 797
+        },
+        "atg-delivery/checksum.pcap": {
+          "sha256": "5d15c016a4a3c294b623df87aed07588018ec68d95acb8fdca34cf0fb021ae15",
+          "bytes": 792
+        },
+        "atg-delivery/command-rejected.pcap": {
+          "sha256": "33f22d4f45480244ed3f4c9f467fa556980d51b2fb789894cb6fa29a7b2e04ed",
+          "bytes": 671
+        },
+        "atg-delivery/controls.json": {
+          "sha256": "4a68768183cd9ea53d349d80fc1fd3ae9657343e77614093dc7ca5dfb74f3524",
+          "bytes": 205445
+        },
+        "atg-delivery/distinct-queries.pcap": {
+          "sha256": "09665c1ff984000ef8f2508c062b7358065cd260a3e5ea15158911a3785443fc",
+          "bytes": 1070
+        },
+        "atg-delivery/duplicate-pending.pcap": {
+          "sha256": "ff156ba7aa802ac38f2d1c25236f87dcbe4e2d6cb292f5b2e351af31d73e52ba",
+          "bytes": 1070
+        },
+        "atg-delivery/duplicate-tank.pcap": {
+          "sha256": "669046a958295bd461ee5ed3ddddbe20156d511cdde66a0915f288817c3811af",
+          "bytes": 695
+        },
+        "atg-delivery/expected.json": {
+          "sha256": "e068b75f5ee9cb62cd5912c583d0f01ff908d4090a36ccdd3bdd4611e647da9f",
+          "bytes": 30847
+        },
+        "atg-delivery/finite-IEEE-boundaries.pcap": {
+          "sha256": "4326041415d2688a13d265abab9cc9f05f2fd5419ea367c2ad4bc81fcd52770c",
+          "bytes": 792
+        },
+        "atg-delivery/invalid-current-date.pcap": {
+          "sha256": "579d35e3cae208f15f223fc18a41a7b601bf18c3431b080ebfac445d32178b71",
+          "bytes": 792
+        },
+        "atg-delivery/invalid-end.pcap": {
+          "sha256": "a55002b003355540f4fd7e901a16ff095f4ee23de41f0171cf17d67e43ea1008",
+          "bytes": 792
+        },
+        "atg-delivery/invalid-start.pcap": {
+          "sha256": "a4e4b0a06ac330cbff2adf7d8c7a28d422c18b034a329edcaba9f3785d3b85bb",
+          "bytes": 792
+        },
+        "atg-delivery/legacy-reused-selector.pcap": {
+          "sha256": "89007bd1f71b2aac05727beda5fd4018d6e1347cf30d235c29811732a1c79790",
+          "bytes": 986
+        },
+        "atg-delivery/legacy-untagged-rejection.pcap": {
+          "sha256": "ca322d81c64ee52f7a064ba812c3a50ee709d5b6d8e8e353a17b6297f87866d1",
+          "bytes": 748
+        },
+        "atg-delivery/mixed-inventory-delivery.pcap": {
+          "sha256": "934f22f49420c91265263618dca774626accfca207c28efe27a38e836121a021",
+          "bytes": 1028
+        },
+        "atg-delivery/nonfinite-IEEE.pcap": {
+          "sha256": "99bee77dbb7bf0c592ad6dd0b0a71005c2441e9596b1a7060893f1fb98107f1c",
+          "bytes": 792
+        },
+        "atg-delivery/orphan-delivery.pcap": {
+          "sha256": "21b03b97db54b05fa3505b2b9686711d57ebaefd665b0aa112e4c220c4a2161d",
+          "bytes": 715
+        },
+        "atg-delivery/out-of-order-explicit-selectors.pcap": {
+          "sha256": "656d7b6f523f25317f4d09393367c64bb8aa39ae2c02d8994fe02717238b5f97",
+          "bytes": 1070
+        },
+        "atg-delivery/pending-close.pcap": {
+          "sha256": "0ce332f8431ca9543c64a69b9d7d46df53de28b5c37e5ed3c4cb752e95694f09",
+          "bytes": 591
+        },
+        "atg-delivery/pending-slot-budget.pcap": {
+          "sha256": "ad1f7dec67c27b8f4d12ca522766c695a25ea7633ed9a5aac535146237838681",
+          "bytes": 1823
+        },
+        "atg-delivery/selector-reused-after-complete.pcap": {
+          "sha256": "a2b58f10b4723153b23e1dc33d5c7b4405dc284259c3e14f1f09747e7138b576",
+          "bytes": 1070
+        },
+        "atg-delivery/single-delivery.pcap": {
+          "sha256": "01bdde04bf530d49e5de70186361df1562291278319ed886babdc13da359e2de",
+          "bytes": 792
+        },
+        "atg-delivery/truncated-values.pcap": {
+          "sha256": "24bcb739de29ba8d28934f29e81f14b66feb6a4401ee98b34175f0a817737287",
+          "bytes": 784
+        },
+        "atg-delivery/two-deliveries.pcap": {
+          "sha256": "87024cad8b6afadd59a8e5b116a749a518170923287e44db2dec71583d8b83d4",
+          "bytes": 894
+        },
+        "atg-delivery/unknown-value-layout.pcap": {
+          "sha256": "e7a225b22189fdd237708cb745b3d7e7902dbdaa0a0a64d5631601a7ad570687",
+          "bytes": 792
+        },
+        "atg-delivery/untagged-rejection.pcap": {
+          "sha256": "2e72593fcbcb487262af5abe68a627de80ecad8e473672fbdb46bf28ea4d447a",
+          "bytes": 847
+        },
+        "atg-delivery/wrong-function-context.pcap": {
+          "sha256": "0bb461b87223590c9f1dc8de37cf880f5ca3da4dffa1e45d995fb9a00b1960fd",
+          "bytes": 750
+        },
+        "atg-delivery/wrong-selected-tank.pcap": {
+          "sha256": "65d1ab323ef22884359bd32efea520559abdc712ac224c7c8c22b0a3376a7046",
+          "bytes": 690
+        },
+        "atg-delivery/wrong-selector-context.pcap": {
+          "sha256": "a479b0e1dd50fc200b0b7bcebba5915106ab3d3b45b63acd7c4661e23e4f14ab",
+          "bytes": 690
+        },
+        "atg-delivery/zero-deliveries.pcap": {
+          "sha256": "666bcfe5edea9afe73b99dfc245996986c2b4adc07b710185f636760e158bfc9",
+          "bytes": 690
+        },
+        "required-tests-traffic-unified-v103.json": {
+          "sha256": "4f35e3429d3387b16f749ccf7701536ac71247457a5cc1f1ed5e52e5582e7880",
+          "bytes": 17738501
+        },
+        "validation/expected.json": {
+          "sha256": "e068b75f5ee9cb62cd5912c583d0f01ff908d4090a36ccdd3bdd4611e647da9f",
+          "bytes": 30847
+        }
+      },
+      "aliases": {
+        "common/pcapx/pcaputil/atg-delivery-tools/build.py": "atg-delivery-tools/build.py",
+        "common/pcapx/pcaputil/atg-delivery-tools/carrier.py": "atg-delivery-tools/carrier.py",
+        "common/pcapx/pcaputil/atg-delivery-tools/legacy-i201.json": "atg-delivery-tools/legacy-i201.json",
+        "common/pcapx/pcaputil/atg-delivery-tools/source-pins.json": "atg-delivery-tools/source-pins.json",
+        "common/pcapx/pcaputil/atg-delivery-tools/verify.py": "atg-delivery-tools/verify.py",
+        "common/pcapx/pcaputil/atg-delivery/all-no-records.pcap": "atg-delivery/all-no-records.pcap",
+        "common/pcapx/pcaputil/atg-delivery/all-tanks.pcap": "atg-delivery/all-tanks.pcap",
+        "common/pcapx/pcaputil/atg-delivery/checksum.pcap": "atg-delivery/checksum.pcap",
+        "common/pcapx/pcaputil/atg-delivery/command-rejected.pcap": "atg-delivery/command-rejected.pcap",
+        "common/pcapx/pcaputil/atg-delivery/controls.json": "atg-delivery/controls.json",
+        "common/pcapx/pcaputil/atg-delivery/distinct-queries.pcap": "atg-delivery/distinct-queries.pcap",
+        "common/pcapx/pcaputil/atg-delivery/duplicate-pending.pcap": "atg-delivery/duplicate-pending.pcap",
+        "common/pcapx/pcaputil/atg-delivery/duplicate-tank.pcap": "atg-delivery/duplicate-tank.pcap",
+        "common/pcapx/pcaputil/atg-delivery/expected.json": "atg-delivery/expected.json",
+        "common/pcapx/pcaputil/atg-delivery/finite-IEEE-boundaries.pcap": "atg-delivery/finite-IEEE-boundaries.pcap",
+        "common/pcapx/pcaputil/atg-delivery/invalid-current-date.pcap": "atg-delivery/invalid-current-date.pcap",
+        "common/pcapx/pcaputil/atg-delivery/invalid-end.pcap": "atg-delivery/invalid-end.pcap",
+        "common/pcapx/pcaputil/atg-delivery/invalid-start.pcap": "atg-delivery/invalid-start.pcap",
+        "common/pcapx/pcaputil/atg-delivery/legacy-reused-selector.pcap": "atg-delivery/legacy-reused-selector.pcap",
+        "common/pcapx/pcaputil/atg-delivery/legacy-untagged-rejection.pcap": "atg-delivery/legacy-untagged-rejection.pcap",
+        "common/pcapx/pcaputil/atg-delivery/mixed-inventory-delivery.pcap": "atg-delivery/mixed-inventory-delivery.pcap",
+        "common/pcapx/pcaputil/atg-delivery/nonfinite-IEEE.pcap": "atg-delivery/nonfinite-IEEE.pcap",
+        "common/pcapx/pcaputil/atg-delivery/orphan-delivery.pcap": "atg-delivery/orphan-delivery.pcap",
+        "common/pcapx/pcaputil/atg-delivery/out-of-order-explicit-selectors.pcap": "atg-delivery/out-of-order-explicit-selectors.pcap",
+        "common/pcapx/pcaputil/atg-delivery/pending-close.pcap": "atg-delivery/pending-close.pcap",
+        "common/pcapx/pcaputil/atg-delivery/pending-slot-budget.pcap": "atg-delivery/pending-slot-budget.pcap",
+        "common/pcapx/pcaputil/atg-delivery/selector-reused-after-complete.pcap": "atg-delivery/selector-reused-after-complete.pcap",
+        "common/pcapx/pcaputil/atg-delivery/single-delivery.pcap": "atg-delivery/single-delivery.pcap",
+        "common/pcapx/pcaputil/atg-delivery/truncated-values.pcap": "atg-delivery/truncated-values.pcap",
+        "common/pcapx/pcaputil/atg-delivery/two-deliveries.pcap": "atg-delivery/two-deliveries.pcap",
+        "common/pcapx/pcaputil/atg-delivery/unknown-value-layout.pcap": "atg-delivery/unknown-value-layout.pcap",
+        "common/pcapx/pcaputil/atg-delivery/untagged-rejection.pcap": "atg-delivery/untagged-rejection.pcap",
+        "common/pcapx/pcaputil/atg-delivery/wrong-function-context.pcap": "atg-delivery/wrong-function-context.pcap",
+        "common/pcapx/pcaputil/atg-delivery/wrong-selected-tank.pcap": "atg-delivery/wrong-selected-tank.pcap",
+        "common/pcapx/pcaputil/atg-delivery/wrong-selector-context.pcap": "atg-delivery/wrong-selector-context.pcap",
+        "common/pcapx/pcaputil/atg-delivery/zero-deliveries.pcap": "atg-delivery/zero-deliveries.pcap",
+        "scripts/protocol-tests/required-tests-traffic-unified-v103.json": "required-tests-traffic-unified-v103.json"
+      }
     }
   ],
   "schema_version": 1,

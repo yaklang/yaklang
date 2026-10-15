@@ -75,7 +75,7 @@ func NativeProtocolProfiles() []ProtocolProfile {
 		{"mqtt-sn", "udp", "v1.2 one- or three-octet length datagram", "wire length, supported message type and complete type-specific fields; port hint or explicit DecodeAs"},
 		{"bittorrent-dht", "udp", "complete KRPC bencoded datagram", "canonical bounded dictionary, transaction, 20-byte node ID and method-specific fields; port hint or explicit DecodeAs"},
 		{"stratum", "tcp", "newline-delimited mining JSON-RPC", "complete mining request and observed request ID for response association"},
-		{"atg", "tcp", "TLS-450 SOH+i201TT computer-format inventory", "observed TCP initiator, command echo, bounded tank records, checksum and request order; units unobserved"},
+		{"atg", "tcp", "TLS-450 computer i201 inventory and i202 version1 delivery", "observed initiator, checksum, bounded tank/delivery records; explicit selector context, ambiguous reuse/rejection candidates retained; units and physical delivery unobserved"},
 		{"gearman", "tcp", "12-byte binary header and exact payload length", "request/response magic, supported type and bounded method-specific fields"},
 		{"beanstalkd", "tcp", "CRLF commands with bounded put/reserved body", "strict put syntax on port 11300 and observed response order"},
 		{"bjnp", "udp", "16-byte printer datagram header and exact payload", "observed command family, direction, sequence and session; port hint or explicit DecodeAs"},

@@ -790,10 +790,38 @@ func (f *binFlow) consumeSession(dir int, e *ProtocolEvent, result map[string]an
 			}
 		}
 	case "atg":
-		e.Session, err = f.atg.consume(dir, e.Raw)
+		if e.ID == 0 {
+			e.ID = f.a.ids.Add(1)
+		}
+		e.nativeATGObservation = true
+		e.Profile = "atg-tls450-i201"
+		if len(e.Raw) >= 5 && string(e.Raw[1:5]) == "i202" {
+			e.Profile = "atg-tls450-i202"
+		}
+		e.Session, err = f.atg.consume(dir, e.Raw, e.ID)
+		if err == nil {
+			if id, ok := e.Session["Observed Request ID"].(uint64); ok {
+				e.TransactionID = id
+				if e.Session["Role"] == "response" {
+					e.ResponseTo = id
+				}
+			}
+		}
 		if err == nil {
 			e.semanticFields = cloneSession(e.Session)
 			e.Profile, e.Completeness = "atg-tls450-i201", "message"
+			deliveryCandidates := false
+			if candidates, ok := e.Session["Candidate Requests"].([]map[string]any); ok && len(candidates) > 0 {
+				deliveryCandidates = true
+				for _, c := range candidates {
+					if c["Function"] != "i202" {
+						deliveryCandidates = false
+					}
+				}
+			}
+			if deliveryCandidates || e.Session["Function"] == "i202" || e.Session["In Reply To"] == "In-Tank Delivery Request" {
+				e.Profile = "atg-tls450-i202"
+			}
 		}
 	case "dlms-wrapper":
 		if e.ID == 0 {
@@ -1335,7 +1363,18 @@ func (f *binFlow) finishSession(reason TrafficFlowCloseReason) {
 		emit(m.clientDir, map[string]any{"Outstanding": m.outstanding()}, "Memcached exchange ended with unmatched requests")
 	}
 	if a := f.atg; a != nil && a.outstanding() > 0 {
-		emit(a.clientDir, map[string]any{"Outstanding": a.outstanding()}, "ATG exchange ended with unmatched requests")
+		e := f.event(a.clientDir, nil, "incomplete", string(reason)+": ATG exchange ended with unmatched requests")
+		e.Session = map[string]any{"Outstanding": a.outstanding()}
+		e.semanticSession = cloneSession(e.Session)
+		e.sessionError = &ProtocolError{Kind: ErrNeedMore, Message: e.Summary}
+		e.Error, e.Completeness = e.sessionError.Error(), "incomplete"
+		e.ExpertCode = string(ErrNeedMore)
+		e.Profile = "atg-tls450-i201"
+		if a.pending[0].function == '2' {
+			e.Profile = "atg-tls450-i202"
+		}
+		f.a.incomplete.Add(1)
+		f.a.emit(e)
 	}
 	if s := f.fins; s != nil {
 		for dir, count := range s.counts() {
