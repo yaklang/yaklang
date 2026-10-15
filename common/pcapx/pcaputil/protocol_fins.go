@@ -248,7 +248,7 @@ func (s *binFINS) consume(w []byte, dir int, id uint64, now time.Time, b ParserB
 		return nil, 0, err
 	}
 	sid, cmd, response := w[9], binary.BigEndian.Uint16(w[10:12]), w[0]&0x40 != 0
-	if cmd != 0x0101 && cmd != 0x0501 && !finsServiceCommand(cmd) {
+	if cmd != 0x0101 && cmd != 0x0104 && cmd != 0x0501 && !finsServiceCommand(cmd) {
 		invalidate()
 		return nil, 0, finsErr(ErrUnsupportedFeature, "selected memory/CPU/status/cycle/clock services only")
 	}
@@ -262,24 +262,11 @@ func (s *binFINS) consume(w []byte, dir int, id uint64, now time.Time, b ParserB
 				invalidate()
 				return nil, 0, err
 			}
-		} else if cmd == 0x0101 {
-			if len(w) != 18 {
+		} else if cmd == 0x0101 || cmd == 0x0104 {
+			if err := finsMemoryRequest(cmd, w, f, b); err != nil {
 				invalidate()
-				return nil, 0, finsErr(ErrMalformedMessage, "DM read request exact length")
+				return nil, 0, err
 			}
-			if w[15] > 15 {
-				invalidate()
-				return nil, 0, finsErr(ErrMalformedMessage, "address bit exceeds four-bit range")
-			}
-			if w[12] != 0x82 {
-				invalidate()
-				return nil, 0, finsErr(ErrUnsupportedFeature, "selected DM word area82 only")
-			}
-			if w[15] != 0 {
-				invalidate()
-				return nil, 0, finsErr(ErrMalformedMessage, "word address bit must be zero")
-			}
-			f["memory_area"], f["word_address"], f["bit_address"], f["word_count"] = uint64(w[12]), finsBE(w[13:15]), uint64(w[15]), finsBE(w[16:18])
 		} else {
 			if len(w) < 12 || len(w) > 13 {
 				invalidate()
@@ -357,25 +344,10 @@ func (s *binFINS) consume(w []byte, dir int, id uint64, now time.Time, b ParserB
 		if err := finsServiceResponse(cmd, data, p, linked, f, b); err != nil {
 			return nil, 0, err
 		}
-	} else if cmd == 0x0101 {
-		if !linked {
-			return nil, 0, finsErr(ErrContextRequired, "DM response lacks exact reversed request/address/count context")
+	} else if cmd == 0x0101 || cmd == 0x0104 {
+		if err := finsMemoryResponse(cmd, data, p, linked, f, b); err != nil {
+			return nil, 0, err
 		}
-		count := int(binary.BigEndian.Uint16(p.wire[16:18]))
-		if count > 999 {
-			return nil, 0, finsErr(ErrUnsupportedFeature, "successful Ethernet DM read exceeds999 words")
-		}
-		if len(data) != 2*count {
-			return nil, 0, finsErr(ErrMalformedMessage, "DM response word count")
-		}
-		if count > b.MaxCollectionElements-32 {
-			return nil, 0, finsErr(ErrResourceExceeded, "DM word projection count")
-		}
-		words := make([]any, count)
-		for i := range words {
-			words[i] = finsBE(data[2*i:])
-		}
-		f["memory_area"], f["word_address"], f["bit_address"], f["word_count"], f["words"] = uint64(0x82), finsBE(p.wire[13:15]), uint64(0), uint64(count), words
 	} else {
 		option := uint64(255)
 		switch len(data) {

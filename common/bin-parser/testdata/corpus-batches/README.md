@@ -44,7 +44,7 @@ Run from the repository root:
 ```sh
 go run ./internal/trafficfixture/cmd/corpus test
 go test -json -count=1 -timeout=10m ./internal/trafficfixture/... ./common/bin-parser/... ./common/pcapx/... ./common/yak/cmd/yakcmds/shark-cli ./scripts/ci > traffic.jsonl
-go run ./internal/trafficfixture/cmd/corpus exec -- python3 @scripts/protocol-tests/check_go_test_json_v2.py traffic.jsonl --inventory @scripts/protocol-tests/required-tests-traffic-unified-v85.json --tier full
+go run ./internal/trafficfixture/cmd/corpus exec -- python3 @scripts/protocol-tests/check_go_test_json_v2.py traffic.jsonl --inventory @scripts/protocol-tests/required-tests-traffic-unified-v86.json --tier full
 ```
 
 The single `corpus` entry point uses the same bounded Go ZIP loader as tests.
@@ -83,7 +83,7 @@ their semantic coverage. The existing synthetic session keys are test inputs;
 production credentials, user private keys and material without redistribution
 permission belong in an external fixed-source download manifest.
 
-Current test requirements are sealed at `scripts/protocol-tests/required-tests-traffic-unified-v85.json`;
+Current test requirements are sealed at `scripts/protocol-tests/required-tests-traffic-unified-v86.json`;
 the historical inventories and all earlier batches remain unchanged.
 The supplemental small-corpus batch contains 26 minimal controls, their explicit
 expected facts, an offline generator and the compact pinned source manifest.
@@ -203,7 +203,7 @@ opaque selector bytes and one bounded Data value over Wrapper v1 TCP/UDP; object
 selector meaning, access permission and device operation are unverified. The
 original one-packet selective-access capture and original refused answer remain
 immutable; its now-supported answer is matched by exact input SHA and frame.
-The active inventory is `scripts/protocol-tests/required-tests-traffic-unified-v85.json`.
+The active inventory is `scripts/protocol-tests/required-tests-traffic-unified-v86.json`.
 
 The small-graph budget batch reuses accepted graph captures/answers and adds one
 249-byte UDP control for child count255 without child bytes. Its standalone proof
@@ -993,7 +993,7 @@ the normative answer; a missing numeric reference field is not a codec pass.
 Full/deferred, workers1/2/4, observers off/on, Feed chunks1/7/full, ownership,
 resources and close/refusal boundaries remain required.
 
-Current gate: `required-tests-traffic-unified-v85.json` with
+Current gate: `required-tests-traffic-unified-v86.json` with
 `check_go_test_json_v2.py`. The indexed validator preserves missing/unpassed,
 package invocation completion, descendant skips, failures and non-JSON checks;
 its mutation/differential harness is sealed with the material. Older checkers
@@ -1629,7 +1629,7 @@ userspace adapter; full kernel receiver/socket/timers and ECU endpoints do not.
 All161 preceding ZIPs remain byte-for-byte unchanged. Raw captures, dependencies,
 reference source/build output and process evidence stay outside Git.
 
-Current effective v85 inventory: 48,001 entries; 47,994 are mandatory for the full tier.
+Current effective v86 inventory: 50,026 entries; 50,019 are mandatory for the full tier.
 
 The opt-in `DynamicFlowControl` profile follows Linux v6.12 FC tuple updates (including WAIT without granting data). Disjoint address extensions or classical/FD carriers may share CAN IDs; unknown selectors cannot choose or mutate a conversation. Ambiguous selectors are rejected. Seven sealed cases exercise full/deferred, workers 1/2/4, and observer off/on, with exact fields, byte collections, contributor references, errors and resource ownership. The existing static FC profile remains unchanged. Pinned upstream FC and filter functions execute with declared userspace stubs; this is not a kernel/ECU endpoint. TShark 4.2.5 checks wire tuples and two complete payloads, but cannot independently reassemble the shared-address transcripts.
 
@@ -1668,3 +1668,5 @@ Selected plain type3 HDLC lifecycle RLRQ/RLRE/ABRT information now has bounded8-
 Native FINS observes W421-E1-04 TCP commands0/1/2/3/6 and explicitly selected UDP W342-E1-18 CPU UNIT DATA READ0501 (options00/01/absent) and DM word82 MEMORY AREA READ0101. Exact literal CPU padding, reserved area bytes, reported values, raw end-code flags and bounded ordered words remain observations; receiver-tolerated response bits/GCT and TCP reserved error words are not rejection criteria. First-use directional SID links require exact reversed physical/logical endpoints; zero/broadcast aliases, repeated node exchange, reused/expired/refused identities and allocation mismatches remain unverified. No PLC execution, authentication, physical memory map or arbitrary FINS command support is inferred. The new small ZIP seals81 unique own captures, complete independent field/session/error/association answers and CC0 generators/reference/verification scripts. Broader protocol and original rights/oracle requirements remain open; all earlier archives are immutable.
 
 The FINS services batch adds W342-E1-18 CPU UNIT STATUS READ0601 (selected masks/modes, raw error words and complete16-byte message), CYCLE TIME READ0620 (observed00/01 operation and0/12-byte replies, literal100us ticks), and CLOCK READ0701 (BCD fields with only two reported year digits). Reserved status bits remain raw; MSG bitmap padding and selected mode/length/calendar bounds are checked. No century, timezone, epoch, physical device/error-cause/measurement/clock truth or execution is inferred. Existing first-use SID, exact endpoint/domain/direction, observed TCP node role, monotonic capture time, refusal history and owned fields/Session remain intact.112 unique own captures, complete independent answers and necessary small tooling are sealed; the earlier own carrier alias is reused. All older ZIPs and broader original requirements are preserved.
+
+Selected FINS memory reads add CS/CJ/CP/NSJ bit02/30-33 and word82/B0-B3 layouts for0101, plus ordered mixed0104 descriptors with forced-bit70-72 and forced-wordF0-F2. Continuous selected reads cap999 items and multiple reads167; no installed model/map or execution is inferred. Complete reversed request context determines counts/addresses and ordered echoed areas; orphan successes are ContextRequired. Plain bits are00/01; forced bits preserve unassigned raw bits and word masks precede values. First-use/reuse/refusal/budget/Close/ownership remain enforced.112 own minimal captures and complete independent answers/tools are sealed; all prior archives stay immutable and the existing carrier alias is reused. Fixed reference comparison covers38 complete selected wire controls; two legal empty multiple replies lack its response-code field and remain explicitly uncertified by that reference, with normative/session controls still required. Raw originals and remaining protocol/oracle requirements stay external and open.
