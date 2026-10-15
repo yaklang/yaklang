@@ -5,6 +5,7 @@
     "@action",
     "summary",
     "ratain_timeline_item_range",
+    "retire_promoted_entries",
     "memory_entities"
   ],
   "additionalProperties": false,
@@ -24,7 +25,7 @@
     },
     "retire_promoted_entries": {
       "type": "string",
-      "description": "可选删除名单：PROMOTED_ENTRIES 中确认不再需要的原始 item ID（entry 编号），逗号分隔，不写区间；缺失或空字符串表示全部保留。只删除点名 item，不扩大到同名工具或整个技能。"
+      "description": "本次判断不再需要的 promoted item 数字 ID，逗号分隔，不写区间。只使用历史条目中标注的 RETIRE_ID 数字，不写 RETIRE_ID 字样。仍需使用的条目应保留，不要求全部删除；空字符串表示本次不删除。只删除点名 ID。"
     },
     "memory_entities": {
       "type": "array",

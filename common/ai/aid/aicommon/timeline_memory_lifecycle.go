@@ -404,7 +404,7 @@ func (m *Timeline) replayMemorySources(ctx context.Context) error {
 			defer close(completion.notified)
 			for _, callback := range callbacks {
 				invokeTimelineCallback(callback, TimelineMemoryEvent{ThroughID: snapshot.ThroughID, Prompt: snapshot.SummaryPrompt,
-					Instruction: timelineCompressionInstruction, MemoryEntities: cloneCompressionMemoryEntities(entities)})
+					MemoryEntities: cloneCompressionMemoryEntities(entities)})
 			}
 		}()
 		select {

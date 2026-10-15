@@ -23,8 +23,7 @@ func TestTimelineToolCacheSurvivesHistoryCompression(t *testing.T) {
 			requests++
 			// The entry is listed as a deletable candidate with its full
 			// effective body, exactly once.
-			require.Contains(t, req.GetPrompt(), "PROMOTED_ENTRIES_")
-			require.Contains(t, req.GetPrompt(), "[recent-tool-cache] compression_probe")
+			require.Contains(t, req.GetPrompt(), "kind=recent-tool-cache name=compression_probe")
 			require.Contains(t, req.GetPrompt(), "Direct Params Schema")
 			require.Equal(t, 1, strings.Count(req.GetPrompt(), "EXACT_CACHE_SCHEMA"))
 			rsp := NewUnboundAIResponse()

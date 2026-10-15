@@ -16,6 +16,13 @@ func compressionMockWithRetire(summary, retire string) string {
 	return string(payload)
 }
 
+func requireCompressionPromotedEntry(t testing.TB, prompt string, id int64, metadata, body string) {
+	t.Helper()
+	entry := fmt.Sprintf("========== RETIRE_ID %d ==========\n%s\n%s\n========== END RETIRE_ID %d ==========",
+		id, metadata, strings.TrimRight(body, "\n"), id)
+	require.Equal(t, 1, strings.Count(prompt, entry), "item %d must associate its ID and metadata with its complete original body", id)
+}
+
 func pushCompressionTool(t *testing.T, tl *Timeline, id int64, key, operation, payload string) {
 	t.Helper()
 	require.True(t, tl.PushPromotable(id, TimelinePromotedKindRecentTool, TimelinePromotedTargetSemiDynamic1,
@@ -262,4 +269,49 @@ func TestTimelineCompressionCompactionPreservesEffectiveToolsAndEvidence(t *test
 	tl.finishCompression([]*timelineCompressionCommit{again})
 	require.NoError(t, err)
 	require.Nil(t, again, "already tidy journal must be a no-op")
+}
+
+func TestTimelineCompressionPromptShowsOccupancyAndRetireIDs(t *testing.T) {
+	tl := NewTimeline(nil, nil)
+	schema := "SCHEMA_BODY: path is a required string parameter."
+	pushCompressionTool(t, tl, 1, "alpha", TimelinePromotedOperationUpsert, schema)
+	obsoleteSchema := "OBSOLETE_SCHEMA: tool for the completed investigation."
+	pushCompressionTool(t, tl, 2, "obsolete", TimelinePromotedOperationUpsert, obsoleteSchema)
+	tl.PushText(3, "ordinary history still needs a summary")
+	tl.EnsureTaskUserInput("task", "KEEP_USER", func() int64 { return 4 })
+	bindCompressionMock(t, tl, func(req *AIRequest) (string, error) {
+		prompt := req.GetPrompt()
+		blocks := RenderTimelineFrozenOpenWithOptions(tl, compressionTestOptions().PromptOptions)
+		rendered := int64(MeasureTokens(blocks.PromptText()))
+		ordinary := MeasureTokens(blocks.Frozen) + MeasureTokens(blocks.Open)
+		promoted := MeasureTokens(blocks.SkillsContext) + MeasureTokens(blocks.PromotedRecentTools) + MeasureTokens(blocks.EvidenceSemiDynamic)
+		tl.mu.RLock()
+		limit := tl.totalDumpContentLimit
+		tl.mu.RUnlock()
+		target := max(int64(1), limit/timelineCompressionTargetDivisor)
+		require.Greater(t, rendered, target)
+		require.Contains(t, prompt, fmt.Sprintf("当前主模型 Timeline：%d tokens", rendered))
+		require.Contains(t, prompt, fmt.Sprintf("目标：不超过 %d tokens", target))
+		require.Contains(t, prompt, fmt.Sprintf("还需要减少：%d tokens", rendered-target))
+		require.Contains(t, prompt, fmt.Sprintf("两个可优化部分：普通历史 %d tokens，promoted 内容 %d tokens。", ordinary, promoted))
+		requireCompressionPromotedEntry(t, prompt, 1, "kind=recent-tool-cache name=alpha operation=upsert", "[UPSERT] alpha\n"+schema)
+		requireCompressionPromotedEntry(t, prompt, 2, "kind=recent-tool-cache name=obsolete operation=upsert", "[UPSERT] obsolete\n"+obsoleteSchema)
+		require.Contains(t, prompt, "ordinary history still needs a summary")
+		require.Contains(t, prompt, "USER_INPUT_ID=4 不可删除\n[current task user input] [task:task]:\nKEEP_USER")
+		require.NotContains(t, prompt, "========== RETIRE_ID 4 ==========", "protected user input must not be offered for retirement")
+		return compressionMockWithRetire("summary", "2"), nil
+	})
+	current := int64(mainTimelineTokens(tl))
+	require.Greater(t, current, int64(timelineCompressionTargetDivisor))
+	tl.SetTimelineContentLimit(current)
+	result, err := tl.CompressBeforePrompt(compressionTestOptions())
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	require.Equal(t, []int64{2}, result.RetiredPromotedEntryIDs)
+	require.Equal(t, []int64{2, 3}, result.RetiredIDs)
+	require.Equal(t, "summary", result.Summary)
+	after := RenderTimelineFrozenOpenWithOptions(tl, compressionTestOptions().PromptOptions)
+	require.Contains(t, after.PromotedRecentTools, schema, "unselected promoted content must survive")
+	require.NotContains(t, after.PromotedRecentTools, obsoleteSchema)
+	require.Contains(t, after.PromotedUserInputHistory, "KEEP_USER")
 }

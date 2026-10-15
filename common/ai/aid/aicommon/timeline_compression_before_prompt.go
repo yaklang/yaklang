@@ -9,7 +9,7 @@ const (
 	TimelineCompressionMaxInputTokens   = 512 * 1024
 	TimelineCompressionMaxSummaryTokens = 16 * 1024
 	timelineCompressionRetryDelay       = time.Minute
-	timelineCompressionTargetDivisor    = 6
+	timelineCompressionTargetDivisor    = 2
 )
 
 // CompressBeforePrompt owns scheduling: normalize, reserve, measure the actual

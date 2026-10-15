@@ -24,17 +24,24 @@ func TestTimelineCompressionSummaryPrompt(t *testing.T) {
 	snapshot.RetainedContext = map[string]string{"user_query": "current task", "task_instruction": "FRAMEWORK_RULES_NOT_HISTORY"}
 	prompt, err := renderCompressionSummaryPrompt(snapshot)
 	require.NoError(t, err)
-	require.Contains(t, prompt, compressionSourceTag("PREVIOUS_SUMMARY", snapshot.Head.Text))
-	require.Contains(t, prompt, compressionSourceTag("ORIGINAL_USER_QUERY", "current task"))
-	require.Contains(t, prompt, "FROZEN_TIMELINE_")
-	require.Contains(t, prompt, "OPEN_TIMELINE_")
-	require.Contains(t, prompt, "EXACT_EVIDENCE")
+	require.Contains(t, prompt, "## 旧历史摘要\n"+strings.TrimSpace(snapshot.Head.Text)+"\n")
+	require.Contains(t, prompt, "## 当前用户要求\ncurrent task\n")
+	// Frozen and open ordinary sources now share one chronological history.
+	// Every original must still reach the helper, with its actual item ID.
+	for _, item := range snapshot.Items {
+		require.Equal(t, 1, strings.Count(prompt, strings.TrimRight(item.PromptText, "\n")),
+			"ordinary item %d must be supplied in full exactly once", item.ID)
+	}
 	require.NotContains(t, prompt, "FRAMEWORK_RULES_NOT_HISTORY")
 	require.NotContains(t, prompt, "TASK_INSTRUCTION")
-	// Promoted entries are exact state: they are listed once as deletable
-	// candidates, never duplicated into the ordinary history sections.
-	require.Contains(t, prompt, "PROMOTED_ENTRIES_")
-	require.Contains(t, prompt, "entry=245")
+	// Promotion does not remove an original from the compression source.
+	requireCompressionPromotedEntry(t, prompt, 15, "kind=session-evidence name=e1 operation=upsert", "[UPSERT] e1\nEXACT_EVIDENCE")
+	requireCompressionPromotedEntry(t, prompt, 245, "kind=recent-tool-cache name=alpha operation=upsert", "[UPSERT] alpha\nEXACT_SCHEMA")
+	require.Less(t, strings.Index(prompt, "ITEM_ID=10 "), strings.Index(prompt, "========== RETIRE_ID 15 =========="))
+	require.Less(t, strings.Index(prompt, "========== END RETIRE_ID 15 =========="), strings.Index(prompt, "ITEM_ID=20 "))
+	require.Less(t, strings.Index(prompt, "ITEM_ID=240 "), strings.Index(prompt, "========== RETIRE_ID 245 =========="))
+	require.Less(t, strings.Index(prompt, "========== END RETIRE_ID 245 =========="), strings.Index(prompt, "ITEM_ID=250 "))
+	require.Equal(t, 1, strings.Count(prompt, "EXACT_EVIDENCE"))
 	require.Equal(t, 1, strings.Count(prompt, "EXACT_SCHEMA"))
 	require.NotContains(t, prompt, aiprojection.Nonce())
 	// Historical native calls must not turn into assistant/tool messages in
@@ -42,7 +49,7 @@ func TestTimelineCompressionSummaryPrompt(t *testing.T) {
 	projected := aiprojection.ProjectAndObserve("timeline-compression-summary-test",
 		aiprojection.CreateTag("PROMPT_SECTION", "timeline-open", prompt))
 	require.NotNil(t, projected)
-	require.NotEmpty(t, projected.Messages)
+	require.Len(t, projected.Messages, 1, "historical native replay must remain one user material block")
 	for _, message := range projected.Messages {
 		require.Equal(t, "user", message.Role)
 	}
@@ -55,7 +62,10 @@ func TestTimelineCompressionSummaryPrompt(t *testing.T) {
 	snapshot.Head, snapshot.Items = nil, nil
 	deletionOnly, err := renderCompressionSummaryPrompt(snapshot)
 	require.NoError(t, err)
-	require.Contains(t, deletionOnly, "PROMOTED_ENTRIES_")
+	requireCompressionPromotedEntry(t, deletionOnly, 15, "kind=session-evidence name=e1 operation=upsert", "[UPSERT] e1\nEXACT_EVIDENCE")
+	requireCompressionPromotedEntry(t, deletionOnly, 245, "kind=recent-tool-cache name=alpha operation=upsert", "[UPSERT] alpha\nEXACT_SCHEMA")
+	require.NotContains(t, deletionOnly, "OLD_SUMMARY")
+	require.NotContains(t, deletionOnly, "ITEM_ID=10 ")
 	// Without any decidable content the request must not be rendered.
 	snapshot.PromotedItems = nil
 	_, err = renderCompressionSummaryPrompt(snapshot)
@@ -194,7 +204,7 @@ func TestTimelineCompressionSummaryExamples(t *testing.T) {
 			t.Logf("%s: complete input=%d tokens, no fixed output ratio", example.name, snapshot.InputTokens)
 			if dir := os.Getenv("YAK_TIMELINE_COMPRESSION_EXAMPLES_DIR"); dir != "" {
 				require.NoError(t, os.MkdirAll(dir, 0755))
-				require.NoError(t, os.WriteFile(filepath.Join(dir, example.name+".prompt.txt"), []byte(prompt+"\n# 输出 Schema\n"+timelineCompressionSchema), 0644))
+				require.NoError(t, os.WriteFile(filepath.Join(dir, example.name+".prompt.txt"), []byte(prompt), 0644))
 			}
 		})
 	}

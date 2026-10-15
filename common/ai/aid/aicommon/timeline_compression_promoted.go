@@ -128,10 +128,26 @@ func compressionPromotedItemText(op *PromotableTimelineItem) string {
 	return strings.TrimSpace(op.Payload)
 }
 
-func renderCompressionPromotedItems(items []timelineCompressionPromotedItem) string {
-	texts := make([]string, 0, len(items))
-	for _, item := range items {
-		texts = append(texts, item.PromptText)
+func compressionPromotedDisplayName(item timelineCompressionPromotedItem) string {
+	if item.Kind == TimelinePromotedKindSkillContent {
+		return skillIdentityLabel(item.Key)
 	}
-	return strings.Join(texts, "\n")
+	if name := strings.TrimSpace(item.Key); name != "" {
+		return name
+	}
+	return item.Kind
+}
+
+func renderCompressionPromotedItems(items []timelineCompressionPromotedItem) string {
+	var entries []string
+	for _, item := range items {
+		entries = append(entries, renderCompressionPromotedItem(item))
+	}
+	return strings.Join(entries, "\n")
+}
+
+func renderCompressionPromotedItem(item timelineCompressionPromotedItem) string {
+	return fmt.Sprintf("========== RETIRE_ID %d ==========\nkind=%s name=%s operation=%s\n%s\n========== END RETIRE_ID %d ==========",
+		item.ID, item.Kind, compressionPromotedDisplayName(item), item.Operation,
+		strings.TrimRight(item.PromptText, "\n"), item.ID)
 }

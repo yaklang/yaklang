@@ -165,8 +165,8 @@ func TestTimelineCallbacksCompressionCommit(t *testing.T) {
 	require.Contains(t, summaryEvent.Prompt, "new ordinary finding")
 	require.NotContains(t, summaryEvent.Prompt, "arrived during compression")
 	require.Contains(t, summaryEvent.Prompt, "exact evidence", "effective evidence informs extraction without being retired")
-	require.Contains(t, requestPrompt, summaryEvent.Prompt, "must capture the prompt actually used")
-	require.Contains(t, requestPrompt, summaryEvent.Instruction)
+	require.Equal(t, requestPrompt, summaryEvent.Prompt, "the callback must capture the complete request, including its instruction, materials and schema")
+	require.Equal(t, 1, strings.Count(summaryEvent.Prompt, timelineCompressionSchema), "the captured request must include the full output contract")
 	// Reader remains usable after the callback and is not exhausted by its peer.
 	body, err := io.ReadAll(secondReader)
 	require.NoError(t, err)

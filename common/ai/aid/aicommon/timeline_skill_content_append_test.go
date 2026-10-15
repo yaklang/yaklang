@@ -88,10 +88,9 @@ func TestSkillContentHistoricalWindowsSurviveCompression(t *testing.T) {
 	bindCompressionMock(t, tl, func(req *AIRequest) (string, error) {
 		// Same identity does not aggregate compression candidates: both
 		// original reads and their full bodies are independently selectable.
-		require.Equal(t, 2, strings.Count(req.GetPrompt(), "demo-skill:SKILL.md"))
-		require.Contains(t, req.GetPrompt(), "EARLIER_WINDOW")
-		require.Contains(t, req.GetPrompt(), "LATER_WINDOW")
-		require.Contains(t, req.GetPrompt(), "PROMOTED_ENTRIES_")
+		// The catalog and the body banner each mention the name; the body itself is once.
+		requireCompressionPromotedEntry(t, req.GetPrompt(), firstID, "kind=skill name=demo-skill:SKILL.md:1-1 operation=upsert", "[skill demo-skill | SKILL.md:1-1/1 END]\nEARLIER_WINDOW")
+		requireCompressionPromotedEntry(t, req.GetPrompt(), secondID, "kind=skill name=demo-skill:SKILL.md:1-1 operation=upsert", "[skill demo-skill | SKILL.md:1-1/1 END]\nLATER_WINDOW")
 		return compressionMockSummary("Ordinary history summarized."), nil
 	})
 
