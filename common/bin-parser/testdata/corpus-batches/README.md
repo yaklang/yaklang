@@ -44,7 +44,7 @@ Run from the repository root:
 ```sh
 go run ./internal/trafficfixture/cmd/corpus test
 go test -json -count=1 -timeout=10m ./internal/trafficfixture/... ./common/bin-parser/... ./common/pcapx/... ./common/yak/cmd/yakcmds/shark-cli ./scripts/ci > traffic.jsonl
-go run ./internal/trafficfixture/cmd/corpus exec -- python3 @scripts/protocol-tests/check_go_test_json_v2.py traffic.jsonl --inventory @scripts/protocol-tests/required-tests-traffic-unified-v91.json --tier full
+go run ./internal/trafficfixture/cmd/corpus exec -- python3 @scripts/protocol-tests/check_go_test_json_v2.py traffic.jsonl --inventory @scripts/protocol-tests/required-tests-traffic-unified-v92.json --tier full
 ```
 
 The single `corpus` entry point uses the same bounded Go ZIP loader as tests.
@@ -83,7 +83,7 @@ their semantic coverage. The existing synthetic session keys are test inputs;
 production credentials, user private keys and material without redistribution
 permission belong in an external fixed-source download manifest.
 
-Current test requirements are sealed at `scripts/protocol-tests/required-tests-traffic-unified-v91.json`;
+Current test requirements are sealed at `scripts/protocol-tests/required-tests-traffic-unified-v92.json`;
 the historical inventories and all earlier batches remain unchanged.
 The supplemental small-corpus batch contains 26 minimal controls, their explicit
 expected facts, an offline generator and the compact pinned source manifest.
@@ -203,7 +203,7 @@ opaque selector bytes and one bounded Data value over Wrapper v1 TCP/UDP; object
 selector meaning, access permission and device operation are unverified. The
 original one-packet selective-access capture and original refused answer remain
 immutable; its now-supported answer is matched by exact input SHA and frame.
-The active inventory is `scripts/protocol-tests/required-tests-traffic-unified-v91.json`.
+The active inventory is `scripts/protocol-tests/required-tests-traffic-unified-v92.json`.
 
 The small-graph budget batch reuses accepted graph captures/answers and adds one
 249-byte UDP control for child count255 without child bytes. Its standalone proof
@@ -993,7 +993,7 @@ the normative answer; a missing numeric reference field is not a codec pass.
 Full/deferred, workers1/2/4, observers off/on, Feed chunks1/7/full, ownership,
 resources and close/refusal boundaries remain required.
 
-Current gate: `required-tests-traffic-unified-v91.json` with
+Current gate: `required-tests-traffic-unified-v92.json` with
 `check_go_test_json_v2.py`. The indexed validator preserves missing/unpassed,
 package invocation completion, descendant skips, failures and non-JSON checks;
 its mutation/differential harness is sealed with the material. Older checkers
@@ -1629,7 +1629,7 @@ userspace adapter; full kernel receiver/socket/timers and ECU endpoints do not.
 All161 preceding ZIPs remain byte-for-byte unchanged. Raw captures, dependencies,
 reference source/build output and process evidence stay outside Git.
 
-Current effective v91 inventory: 61,624 entries; 61,617 are mandatory for the full tier.
+Current effective v92 inventory: 63,679 entries; 63,672 are mandatory for the full tier.
 
 The opt-in `DynamicFlowControl` profile follows Linux v6.12 FC tuple updates (including WAIT without granting data). Disjoint address extensions or classical/FD carriers may share CAN IDs; unknown selectors cannot choose or mutate a conversation. Ambiguous selectors are rejected. Seven sealed cases exercise full/deferred, workers 1/2/4, and observer off/on, with exact fields, byte collections, contributor references, errors and resource ownership. The existing static FC profile remains unchanged. Pinned upstream FC and filter functions execute with declared userspace stubs; this is not a kernel/ECU endpoint. TShark 4.2.5 checks wire tuples and two complete payloads, but cannot independently reassemble the shared-address transcripts.
 
@@ -1682,3 +1682,5 @@ TCP FIN completeness controls reuse eight immutable captures and add eight minim
 Selected FINS parameter-area observations add W3420201 read,0202 write and0203 clear over TCP and explicit UDP. Fixed area codes8000/8010/8012/8013/8002 carry exact beginning/count and complete BE16 values. Read/write are bounded to498 returned/written words; count bit15 is command-specific and clear retains a scalar16-bit count without constructing memory. Read replies self-describe area/count/last flags; exact observed requests constrain echoes and partial1104/1108 counts. Unpaired reads never invent an owner; empty write/clear acknowledgements require exact reverse context. Simultaneous range/count-limit priority stays unknown. Zero acknowledgements never prove RUN-mode writing or physical clearing, and multi-command atomic whole-area completion is not inferred. The new small archive contains only own minimal inputs/answers/tools; all185 previous archives are unchanged.
 
 ENIPv1 TCP RegisterSession now requires an exact opaque8-byte context echo and observed32-bit handle. Selected SendRRData single simple ANSI-tag DINT read/write uses context+service per-flow ownership, distinct-context pipelining, exact active retries, and conservative refusal of completed cookie reuse or active collisions. Full private fields and typed errors remain authoritative after public result mutation. Pending/history state is collection/byte-budgeted and outstanding Close is explicit. Success acknowledgements are passive wire observations, never proof of physical writing, authentication or general CIP support. The small archive adds42 own inputs, independent answers and reproducible tools; all186 preceding archives are unchanged.
+
+FINS W3420306/0307/0308 add passive program read/write/clear observations: FFFF program, aligned BE32 address and BE16 byte count,992-byte read/996-byte write bounds, command-specific last flags, exact data and echoed parameters. Read/write replies may self-describe literal fields without an invented request owner; an empty clear acknowledgement requires the observed00/10 clear request. Bytes are not decoded as PLC instructions, and acknowledgements do not prove CPU mode/protection, physical operations or atomic whole-program transfer. All187 prior archives are unchanged. The v92 inventory factors repeated requirement prose into `requirement_definitions` keyed by each row's `requirement` reference; resolving these references exactly preserves every preceding test/package/tier/requirement, without dropping checks or raising the25MiB loader bound.

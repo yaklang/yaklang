@@ -248,16 +248,21 @@ func (s *binFINS) consume(w []byte, dir int, id uint64, now time.Time, b ParserB
 		return nil, 0, err
 	}
 	sid, cmd, response := w[9], binary.BigEndian.Uint16(w[10:12]), w[0]&0x40 != 0
-	if cmd != 0x0101 && cmd != 0x0104 && cmd != 0x0501 && !finsServiceCommand(cmd) && !finsDiagnosticCommand(cmd) && !finsOperationCommand(cmd) && !finsParameterCommand(cmd) {
+	if cmd != 0x0101 && cmd != 0x0104 && cmd != 0x0501 && !finsServiceCommand(cmd) && !finsDiagnosticCommand(cmd) && !finsOperationCommand(cmd) && !finsParameterCommand(cmd) && !finsProgramCommand(cmd) {
 		invalidate()
-		return nil, 0, finsErr(ErrUnsupportedFeature, "selected memory/CPU/status/cycle/clock/diagnostic/memory-operation/parameter-area services only")
+		return nil, 0, finsErr(ErrUnsupportedFeature, "selected memory/CPU/status/cycle/clock/diagnostic/memory-operation/parameter-area/program-area services only")
 	}
 	var p *finsPending
 	if response {
 		p = s.pending[1-dir][sid]
 	}
 	if !response {
-		if finsParameterCommand(cmd) {
+		if finsProgramCommand(cmd) {
+			if err := finsProgramRequest(cmd, w, f, b); err != nil {
+				invalidate()
+				return nil, 0, err
+			}
+		} else if finsParameterCommand(cmd) {
 			if err := finsParameterRequest(cmd, w, f, b); err != nil {
 				invalidate()
 				return nil, 0, err
@@ -369,7 +374,11 @@ func (s *binFINS) consume(w []byte, dir int, id uint64, now time.Time, b ParserB
 		}
 		return f, reply, nil
 	}
-	if finsParameterCommand(cmd) {
+	if finsProgramCommand(cmd) {
+		if err := finsProgramResponse(cmd, data, p, linked, f, b); err != nil {
+			return nil, 0, err
+		}
+	} else if finsParameterCommand(cmd) {
 		if err := finsParameterResponse(cmd, data, p, linked, f, b, 0); err != nil {
 			return nil, 0, err
 		}
