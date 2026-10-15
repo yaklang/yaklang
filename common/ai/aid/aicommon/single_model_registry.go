@@ -46,6 +46,8 @@ func initSingleModelRegistry() {
 	register(CallerLabelBatchMemoryDeduplication, SingleModelSkip)
 	register(CallerLabelPerception, SingleModelSkip)
 
+	// Overflow classification is a small Speed call and must remain available.
+	register(CallerLabelPromptOverflowClassify, SingleModelRun)
 }
 
 // ensureSingleModelRegistry initializes the registry once.
