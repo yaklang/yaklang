@@ -103,14 +103,15 @@ func syncCorePlugins(db *gorm.DB, plugins map[string]*builtinCorePlugin, resourc
 	if db == nil {
 		return fmt.Errorf("core plugin profile database is not initialized")
 	}
-	hashes := make(schema.MapStringString)
+	hashes := make(map[string]string)
 	if raw := yakit.GetKey(db, corePluginItemHashesKey); raw != "" {
-		if err := hashes.Scan(raw); err != nil {
-			return fmt.Errorf("read core plugin item hashes: %w", err)
+		parsed := utils.MustUnmarshalJson[map[string]string]([]byte(raw))
+		if parsed == nil {
+			return fmt.Errorf("read core plugin item hashes: invalid JSON string map")
 		}
-	}
-	if hashes == nil {
-		hashes = make(schema.MapStringString)
+		if *parsed != nil {
+			hashes = *parsed
+		}
 	}
 	names := make([]string, 0, len(plugins))
 	for name := range plugins {
@@ -173,17 +174,14 @@ func syncCorePlugins(db *gorm.DB, plugins map[string]*builtinCorePlugin, resourc
 			delete(hashes, name)
 		}
 	}
-	rawHashes, err := hashes.Value()
-	if err != nil {
-		return err
-	}
-	err = db.Transaction(func(tx *gorm.DB) error {
+	err := db.Transaction(func(tx *gorm.DB) error {
 		if len(retired) > 0 {
 			if err := tx.Where("id IN (?) AND is_core_plugin = ?", retired, true).Unscoped().Delete(&schema.YakScript{}).Error; err != nil {
 				return err
 			}
 		}
 		for _, plugin := range changed {
+			var err error
 			if plugin.ID == 0 {
 				err = tx.Create(plugin.YakScript).Error
 			} else {
@@ -207,7 +205,7 @@ func syncCorePlugins(db *gorm.DB, plugins map[string]*builtinCorePlugin, resourc
 				return fmt.Errorf("save core plugin %q: %w", plugin.ScriptName, err)
 			}
 		}
-		if err := yakit.SetKey(tx, corePluginItemHashesKey, rawHashes); err != nil {
+		if err := yakit.SetKey(tx, corePluginItemHashesKey, hashes); err != nil {
 			return err
 		}
 		if resourceHash != "" {
