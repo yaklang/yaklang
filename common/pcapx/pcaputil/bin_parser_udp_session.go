@@ -145,6 +145,10 @@ func (a *binParser) decodeTFTPDatagram(e *ProtocolEvent, w []byte) bool {
 	if !request && el == nil {
 		return false
 	}
+	e.nativeTFTPObservation = true
+	if e.ID == 0 {
+		e.ID = a.ids.Add(1)
+	}
 	e.Protocol = "tftp"
 	if s == nil {
 		s = &binUDPStore{entries: map[binUDPKey]*list.Element{}, clock: e.Timestamp}
@@ -162,6 +166,9 @@ func (a *binParser) decodeTFTPDatagram(e *ProtocolEvent, w []byte) bool {
 			count++
 		}
 		target := int64(512 + len(w)*3 + count*128)
+		if a.newTFTPFile(e.Destination) != nil {
+			target += 96
+		}
 		if count > min(128, sessionCollectionLimit(a.budget.MaxCollectionElements)) {
 			err = protocolError(ErrResourceExceeded, "TFTP retired transfer ID budget")
 		} else {
@@ -179,7 +186,7 @@ func (a *binParser) decodeTFTPDatagram(e *ProtocolEvent, w []byte) bool {
 			if t.server != "" {
 				history[t.server] = struct{}{}
 			}
-			f.tftp = &binTFTP{retired: history}
+			f.tftp = &binTFTP{retired: history, file: a.newTFTPFile(e.Destination), ambiguous: t.futureAmbiguous, futureAmbiguous: t.futureAmbiguous}
 			f.id = a.flows.Add(1)
 			f.endpoints = [2]string{e.Source, e.Destination}
 			if target < f.sessionBytes {
@@ -190,12 +197,19 @@ func (a *binParser) decodeTFTPDatagram(e *ProtocolEvent, w []byte) bool {
 	}
 	if el == nil {
 		if len(s.entries) >= sessionCollectionLimit(a.budget.MaxCollectionElements) {
+			a.tftpUntrackedRefusal = true
 			err = protocolError(ErrResourceExceeded, "UDP conversation budget")
 		} else {
-			f := &binFlow{a: a, id: a.flows.Add(1), protocol: "tftp", tftp: &binTFTP{}, endpoints: [2]string{e.Source, e.Destination}}
-			if err = f.reserveSession(512 + int64(len(w))*3); err == nil {
+			f := &binFlow{a: a, id: a.flows.Add(1), protocol: "tftp", tftp: &binTFTP{file: a.newTFTPFile(e.Destination), ambiguous: a.tftpUntrackedRefusal, unverified: a.tftpUntrackedRefusal, futureAmbiguous: a.tftpUntrackedRefusal}, endpoints: [2]string{e.Source, e.Destination}}
+			target := int64(512 + len(w)*3)
+			if f.tftp.file != nil {
+				target += 96
+			}
+			if err = f.reserveSession(target); err == nil {
 				el = s.lru.PushBack(&binUDPEntry{key, f, s.clock})
 				s.entries[key] = el
+			} else {
+				a.tftpUntrackedRefusal = true
 			}
 		}
 	}
@@ -214,12 +228,40 @@ func (a *binParser) decodeTFTPDatagram(e *ProtocolEvent, w []byte) bool {
 		// Only consume after admission succeeds: a budget refusal must preserve
 		// the completed generation and cannot quietly replace its history.
 		if err == nil {
-			if !request && t.retiredTID(peer) {
+			if request && e.Destination != f.endpoints[1] {
+				t.ambiguous, t.unverified, t.futureAmbiguous = true, true, true
+				if t.file != nil {
+					t.file.abort()
+				}
+				err = protocolError(ErrContextRequired, "TFTP request reused a client TID on another initial service")
+			} else if !request && t.retiredTID(peer) {
 				err = protocolError(ErrContextRequired, "TFTP packet uses a retired transfer ID")
 			} else if dir == 1 && t.server != "" && t.server != e.Source || dir == 0 && !request && t.server != "" && t.server != e.Destination {
 				err = protocolError(ErrContextRequired, "TFTP packet from unexpected transfer ID")
+				if tftpCandidatePrefix(w) {
+					if historyErr := f.rememberTFTPCandidate(peer); historyErr != nil {
+						err = historyErr
+					}
+				}
 			} else {
-				e.Session, err = t.consume(dir, w, sessionCollectionLimit(a.budget.MaxCollectionElements))
+				if t.file != nil {
+					base := f.sessionBytes - t.file.allocated()
+					t.file.reserve = func(n int64) error {
+						target := base + n
+						if target < f.sessionBytes {
+							a.buffered.Add(target - f.sessionBytes)
+							f.sessionBytes = target
+							return nil
+						}
+						return f.reserveSession(target)
+					}
+				}
+				e.Session, err = t.consume(dir, w, sessionCollectionLimit(a.budget.MaxCollectionElements), tftpFileEvidence{ID: e.ID, Refs: e.SourceBytes.PacketRefs})
+				if err != nil && t.file != nil {
+					t.file.abort()
+					t.ambiguous = true
+					t.futureAmbiguous = true
+				}
 				if err == nil && dir == 1 && t.server == "" {
 					t.server = e.Source
 				}
@@ -229,6 +271,9 @@ func (a *binParser) decodeTFTPDatagram(e *ProtocolEvent, w []byte) bool {
 			e.Session["Observation Scope"] = "conversation"
 			e.Session["Server Transfer ID"] = t.server
 		}
+	}
+	if el != nil && el.Value.(*binUDPEntry).flow.tftp.file != nil {
+		e.Profile = "tftp-octet-file"
 	}
 	a.finishProtocolDatagram(e, w, a.specs["tftp/TFTP"], err)
 	return true

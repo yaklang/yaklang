@@ -12,8 +12,12 @@ import (
 )
 
 // TFTP is datagram-only and changes server TID after RRQ/WRQ. File bytes are
-// never accumulated: the transfer state retains sequence/digest metadata only.
+// are retained only by the explicit bounded octet-file profile; the default
+// transfer observer retains sequence/digest metadata only.
 type binTFTP struct {
+	unverified                       bool
+	futureAmbiguous                  bool
+	file                             *binTFTPFile
 	write                            bool
 	request                          [32]byte
 	filename, mode                   string
@@ -82,7 +86,11 @@ func probeTFTP(w []byte, max int) bool {
 	_, err = tftpOptions(p[2:])
 	return err == nil
 }
-func (s *binTFTP) consume(dir int, w []byte, max int) (result map[string]any, err error) {
+func (s *binTFTP) consume(dir int, w []byte, max int, evidence ...tftpFileEvidence) (result map[string]any, err error) {
+	source := tftpFileEvidence{}
+	if len(evidence) > 0 {
+		source = evidence[0]
+	}
 	defer func() {
 		var typed *ProtocolError
 		if err != nil && !errors.As(err, &typed) {
@@ -93,6 +101,12 @@ func (s *binTFTP) consume(dir int, w []byte, max int) (result map[string]any, er
 		return nil, fmt.Errorf("tftp: missing opcode")
 	}
 	op := binary.BigEndian.Uint16(w)
+	if s.unverified && op >= 3 && op <= 6 {
+		return nil, protocolError(ErrContextRequired, "TFTP generation is unverified after refused input")
+	}
+	if s.file != nil && s.mode != "" && s.mode != "octet" {
+		return nil, protocolError(ErrUnsupportedFeature, "TFTP file profile requires octet mode")
+	}
 	if s.ambiguous && (op == 3 || op == 4 || op == 6) {
 		return nil, protocolError(ErrContextRequired, "TFTP negotiation is ambiguous")
 	}
@@ -124,6 +138,14 @@ func (s *binTFTP) consume(dir int, w []byte, max int) (result map[string]any, er
 			}
 			out["Retransmission"] = true
 		} else {
+			if s.file != nil && mode != "octet" {
+				return nil, protocolError(ErrUnsupportedFeature, "TFTP file profile requires octet mode")
+			}
+			if s.file != nil {
+				if err := s.file.context(source, max, false); err != nil {
+					return nil, err
+				}
+			}
 			s.filename, s.mode, s.options, s.request, s.write, s.blockSize, s.expected = parts[0], mode, opts, digest, op == 2, 512, 1
 			if s.write {
 				s.pending = true
@@ -198,6 +220,11 @@ func (s *binTFTP) consume(dir int, w []byte, max int) (result map[string]any, er
 		if s.hasData || s.done {
 			return nil, fmt.Errorf("tftp: OACK after transfer started")
 		}
+		if s.file != nil {
+			if err := s.file.context(source, max, true); err != nil {
+				return nil, err
+			}
+		}
 		s.blockSize = bs
 		s.negotiated = true
 		s.oack = digest
@@ -228,6 +255,12 @@ func (s *binTFTP) consume(dir int, w []byte, max int) (result map[string]any, er
 			if s.done || s.pending || block != s.expected {
 				return nil, protocolError(ErrContextRequired, "TFTP DATA missing preceding exchange")
 			}
+			if s.file != nil {
+				if err := s.file.append(w[4:], source, max); err != nil {
+					s.ambiguous = true
+					return nil, err
+				}
+			}
 			s.block, s.digest, s.pending, s.final = block, digest, true, size < s.blockSize
 			s.hasData = true
 		}
@@ -254,6 +287,9 @@ func (s *binTFTP) consume(dir int, w []byte, max int) (result map[string]any, er
 			s.expected = block + 1
 			if s.final {
 				s.done = true
+				if s.file != nil {
+					s.file.complete(out)
+				}
 			}
 		}
 		out["Packet Name"] = "ACK"
@@ -267,6 +303,9 @@ func (s *binTFTP) consume(dir int, w []byte, max int) (result map[string]any, er
 		out["Error Code"] = binary.BigEndian.Uint16(w[2:])
 		out["Error Message"] = string(w[4 : len(w)-1])
 		s.done = true
+		if s.file != nil {
+			s.file.abort()
+		}
 	default:
 		return nil, fmt.Errorf("tftp: unknown opcode")
 	}
@@ -278,4 +317,36 @@ func cloneSessionStringMap(m map[string]string) map[string]any {
 		out[k] = v
 	}
 	return out
+}
+
+// A rejected, wire-observed candidate is history too. Forgetting its TID on a
+// later RRQ can turn its delayed DATA into a supposedly fresh transfer. Retain
+// only the endpoint identity, reserving it before insertion. Refusal to retain
+// new history quarantines future generations without killing the live owner.
+func (f *binFlow) rememberTFTPCandidate(peer string) error {
+	s := f.tftp
+	if s.retiredTID(peer) {
+		return nil
+	}
+	if len(s.retired) >= min(128, sessionCollectionLimit(f.a.budget.MaxCollectionElements)) {
+		s.futureAmbiguous = true
+		return protocolError(ErrResourceExceeded, "TFTP candidate transfer ID history budget")
+	}
+	if err := f.reserveSession(f.sessionBytes + 128); err != nil {
+		s.futureAmbiguous = true
+		return err
+	}
+	if s.retired == nil {
+		s.retired = map[string]struct{}{}
+	}
+	s.retired[strings.Clone(peer)] = struct{}{}
+	return nil
+}
+
+func tftpCandidatePrefix(w []byte) bool {
+	if len(w) < 2 {
+		return false
+	}
+	op := binary.BigEndian.Uint16(w)
+	return op >= 3 && op <= 6
 }

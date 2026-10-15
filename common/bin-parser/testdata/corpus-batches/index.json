@@ -102231,6 +102231,162 @@
         "common/pcapx/pcaputil/sip-context/udp-within-window.pcapng": "sip-context/udp-within-window.pcapng",
         "scripts/protocol-tests/required-tests-traffic-unified-v100.json": "required-tests-traffic-unified-v100.json"
       }
+    },
+    {
+      "id": "validation-tftp-file",
+      "kind": "support",
+      "source_sha": "6b67558bf03a350196848ea3278c824f94bbc4b7",
+      "file": "validation-tftp-file.zip",
+      "sha256": "ba9f63bf4b0225402eee52f507828984bde11cfa7f4fcd1259fc7826b0d56a0a",
+      "password": "bin-parser",
+      "members": {
+        "required-tests-traffic-unified-v101.json": {
+          "sha256": "9b4b9f05df17a46b99fa639993c1f5d0b9ed811aa7dcf1bacc0cacd797ade23f",
+          "bytes": 17447135
+        },
+        "tftp-file-tools/build.py": {
+          "sha256": "5db90891e94a8fe4fc34c4a1293989446eb0f6bfa112d1d76db07037561b29b1",
+          "bytes": 13153
+        },
+        "tftp-file-tools/verify.py": {
+          "sha256": "64593c87151079302850790d66a35e71f08ecd4ce9a2b8bcbe085473b43f950e",
+          "bytes": 2898
+        },
+        "tftp-file/RRQ-OACK8.pcapng": {
+          "sha256": "917b3e35bf524322450b972c3d68e13ed26b28dd7d900a95de5cb358fefeaec6",
+          "bytes": 664
+        },
+        "tftp-file/RRQ-binary-ordinary.pcapng": {
+          "sha256": "21c3f402c1e00e7ec90e1313f95affe7a05d1f9e35f5c0b60897e924761474fd",
+          "bytes": 976
+        },
+        "tftp-file/RRQ-binary-retries.pcapng": {
+          "sha256": "48d39cefd2a585b53e3a1e5b05381b14f1011146fdcdb2ecb2166ee4f21d15bf",
+          "bytes": 1648
+        },
+        "tftp-file/RRQ-empty.pcapng": {
+          "sha256": "c9197a3ac9fb1d78665b6c23677b06cf62d85403985e8b448f47a10d5951a5db",
+          "bytes": 300
+        },
+        "tftp-file/RRQ-exact-request-retry.pcapng": {
+          "sha256": "788348ae307174f7c6e733e06ea781c5ef4333f0627a48b8dc3af04580784287",
+          "bytes": 396
+        },
+        "tftp-file/RRQ-final-zero-block.pcapng": {
+          "sha256": "3d83fe10dbc67e0ac8cbb75269be1cf10967a2756a99772c0b7674a6abce58ea",
+          "bytes": 644
+        },
+        "tftp-file/UDP-no-byte-stitch.pcapng": {
+          "sha256": "caf70b4d01115e66fb3425d9c9aa5152e2156a4643800a5d62456d09c27b68ea",
+          "bytes": 380
+        },
+        "tftp-file/WRQ-OACK8.pcapng": {
+          "sha256": "38efb276d2604bbe567798ead4c4e572f2a3cb65d1d27c4f21f7e10891e49c66",
+          "bytes": 568
+        },
+        "tftp-file/WRQ-one-block.pcapng": {
+          "sha256": "dd4bd081ec1ddd88519cf4d8e2cef99055a0719c0f3b31b41df75949914d2438",
+          "bytes": 384
+        },
+        "tftp-file/changed-DATA-bytes.pcapng": {
+          "sha256": "2bb24a8297c3becb7555f14c07e0ca4badd263d6c418b176a6d9a781de4afd29",
+          "bytes": 388
+        },
+        "tftp-file/changed-initial-service.pcapng": {
+          "sha256": "a9428c346c325d1e99556404d38de8eae6273e4b1da335895097ea987382072e",
+          "bytes": 396
+        },
+        "tftp-file/controls.json": {
+          "sha256": "0e03ad4270da5cb09d4593f8bb01b6ac1c9691aaaaf38c01686a18fbfe13a13f",
+          "bytes": 138080
+        },
+        "tftp-file/data-gap.pcapng": {
+          "sha256": "5c247e4cafbe0ef8cd81c5aeab6e2b015e8c30e2229d9e21803e0ee4d58a5acb",
+          "bytes": 388
+        },
+        "tftp-file/domain-no-joining.pcapng": {
+          "sha256": "0f2e278ca11855366a381e8d0bc9dc9b6875628fe55e01ca0bab15f826f8feb1",
+          "bytes": 408
+        },
+        "tftp-file/expected.json": {
+          "sha256": "06b04a295c0ed27e3d671ac845d198e4ef1ed90e86503e9523cce7adc1319a26",
+          "bytes": 21800
+        },
+        "tftp-file/first-request-byte-refusal.pcapng": {
+          "sha256": "3f1dca270fd5e2c794bb5a15aaf6464d5960153abbec2da7021d6f1485893deb",
+          "bytes": 644
+        },
+        "tftp-file/history-refusal-keeps-old-owner.pcapng": {
+          "sha256": "d1d4ff608e00378989878c177b405163fd728d44900943cec4fe1a8c38174c7e",
+          "bytes": 480
+        },
+        "tftp-file/missing-final-ACK.pcapng": {
+          "sha256": "5ec477d445d94ca3fb68daafc169d2739a10608dba0ca10115be42b543d93eec",
+          "bytes": 224
+        },
+        "tftp-file/netascii-explicit-boundary.pcapng": {
+          "sha256": "a8262e18915211431d0879fef58139d9a5629c453d8ea6d8428aaaaf94bb4075",
+          "bytes": 144
+        },
+        "tftp-file/plain-wire-compatibility.pcapng": {
+          "sha256": "97e19feaf313529360133496c5ef1b8326dbfb70ed7ef1ecbed77aac957726a5",
+          "bytes": 304
+        },
+        "tftp-file/rejected-TID-not-fresh.pcapng": {
+          "sha256": "6b6d7f1d200e30e40d5d968e0728ff18ea2e8c45ec62f879b3cc40ff2ee31cce",
+          "bytes": 728
+        },
+        "tftp-file/source-pins.json": {
+          "sha256": "3f66ed69a5f4aceaadf8a2f5437bec43757bf0a81e3e8bbe12ac861d25122ef9",
+          "bytes": 1814
+        },
+        "tftp-file/two-domains-independent.pcapng": {
+          "sha256": "3bd26118f733ce54f2c59e7206a7b1311beedb2d7afc2b28dde16ce8a530a1ea",
+          "bytes": 580
+        },
+        "tftp-file/unexpected-TID-keeps-owner.pcapng": {
+          "sha256": "5504db145eb5adcca3090b6b3cfcb335d602274f89a1ce7395f5b33b9bc38fdc",
+          "bytes": 388
+        },
+        "tftp-file/wrong-DATA-direction.pcapng": {
+          "sha256": "153513d72ee9ca5d35563ab1b8909113be075b36c3f261ce48addaacb9d1150a",
+          "bytes": 304
+        },
+        "validation/expected.json": {
+          "sha256": "06b04a295c0ed27e3d671ac845d198e4ef1ed90e86503e9523cce7adc1319a26",
+          "bytes": 21800
+        }
+      },
+      "aliases": {
+        "common/pcapx/pcaputil/tftp-file-tools/build.py": "tftp-file-tools/build.py",
+        "common/pcapx/pcaputil/tftp-file-tools/verify.py": "tftp-file-tools/verify.py",
+        "common/pcapx/pcaputil/tftp-file/RRQ-OACK8.pcapng": "tftp-file/RRQ-OACK8.pcapng",
+        "common/pcapx/pcaputil/tftp-file/RRQ-binary-ordinary.pcapng": "tftp-file/RRQ-binary-ordinary.pcapng",
+        "common/pcapx/pcaputil/tftp-file/RRQ-binary-retries.pcapng": "tftp-file/RRQ-binary-retries.pcapng",
+        "common/pcapx/pcaputil/tftp-file/RRQ-empty.pcapng": "tftp-file/RRQ-empty.pcapng",
+        "common/pcapx/pcaputil/tftp-file/RRQ-exact-request-retry.pcapng": "tftp-file/RRQ-exact-request-retry.pcapng",
+        "common/pcapx/pcaputil/tftp-file/RRQ-final-zero-block.pcapng": "tftp-file/RRQ-final-zero-block.pcapng",
+        "common/pcapx/pcaputil/tftp-file/UDP-no-byte-stitch.pcapng": "tftp-file/UDP-no-byte-stitch.pcapng",
+        "common/pcapx/pcaputil/tftp-file/WRQ-OACK8.pcapng": "tftp-file/WRQ-OACK8.pcapng",
+        "common/pcapx/pcaputil/tftp-file/WRQ-one-block.pcapng": "tftp-file/WRQ-one-block.pcapng",
+        "common/pcapx/pcaputil/tftp-file/changed-DATA-bytes.pcapng": "tftp-file/changed-DATA-bytes.pcapng",
+        "common/pcapx/pcaputil/tftp-file/changed-initial-service.pcapng": "tftp-file/changed-initial-service.pcapng",
+        "common/pcapx/pcaputil/tftp-file/controls.json": "tftp-file/controls.json",
+        "common/pcapx/pcaputil/tftp-file/data-gap.pcapng": "tftp-file/data-gap.pcapng",
+        "common/pcapx/pcaputil/tftp-file/domain-no-joining.pcapng": "tftp-file/domain-no-joining.pcapng",
+        "common/pcapx/pcaputil/tftp-file/expected.json": "tftp-file/expected.json",
+        "common/pcapx/pcaputil/tftp-file/first-request-byte-refusal.pcapng": "tftp-file/first-request-byte-refusal.pcapng",
+        "common/pcapx/pcaputil/tftp-file/history-refusal-keeps-old-owner.pcapng": "tftp-file/history-refusal-keeps-old-owner.pcapng",
+        "common/pcapx/pcaputil/tftp-file/missing-final-ACK.pcapng": "tftp-file/missing-final-ACK.pcapng",
+        "common/pcapx/pcaputil/tftp-file/netascii-explicit-boundary.pcapng": "tftp-file/netascii-explicit-boundary.pcapng",
+        "common/pcapx/pcaputil/tftp-file/plain-wire-compatibility.pcapng": "tftp-file/plain-wire-compatibility.pcapng",
+        "common/pcapx/pcaputil/tftp-file/rejected-TID-not-fresh.pcapng": "tftp-file/rejected-TID-not-fresh.pcapng",
+        "common/pcapx/pcaputil/tftp-file/source-pins.json": "tftp-file/source-pins.json",
+        "common/pcapx/pcaputil/tftp-file/two-domains-independent.pcapng": "tftp-file/two-domains-independent.pcapng",
+        "common/pcapx/pcaputil/tftp-file/unexpected-TID-keeps-owner.pcapng": "tftp-file/unexpected-TID-keeps-owner.pcapng",
+        "common/pcapx/pcaputil/tftp-file/wrong-DATA-direction.pcapng": "tftp-file/wrong-DATA-direction.pcapng",
+        "scripts/protocol-tests/required-tests-traffic-unified-v101.json": "required-tests-traffic-unified-v101.json"
+      }
     }
   ],
   "schema_version": 1,

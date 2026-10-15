@@ -1,8 +1,10 @@
 package pcaputil
 
 import (
+	"bytes"
 	"container/list"
 	"net"
+	"strconv"
 	"time"
 )
 
@@ -212,6 +214,49 @@ func (a *binParser) refuseTFTPOversizeAssociation(e *ProtocolEvent, w []byte) bo
 	a.udpMu.Lock()
 	defer a.udpMu.Unlock()
 	s := a.udpSessions
+	if tftpInitialRefusalHint(a, e, w) {
+		key := binUDPKey{"tftp/" + e.Source, dstIP, e.Domain}
+		var initial *list.Element
+		if s != nil {
+			initial = s.entries[key]
+		}
+		if initial == nil {
+			if s == nil {
+				s = &binUDPStore{entries: map[binUDPKey]*list.Element{}}
+				a.udpSessions = s
+			}
+			if len(s.entries) >= sessionCollectionLimit(a.budget.MaxCollectionElements) {
+				a.tftpUntrackedRefusal = true
+			} else {
+				t := &binTFTP{ambiguous: true, unverified: true, futureAmbiguous: true, file: a.newTFTPFile(e.Destination)}
+				f := &binFlow{a: a, id: a.flows.Add(1), protocol: "tftp", tftp: t, endpoints: [2]string{e.Source, e.Destination}}
+				target := int64(512)
+				if t.file != nil {
+					target += 96
+				}
+				if f.reserveSession(target) != nil {
+					a.tftpUntrackedRefusal = true
+				} else {
+					initial = s.lru.PushBack(&binUDPEntry{key: key, flow: f, touched: e.Timestamp})
+					s.entries[key] = initial
+				}
+			}
+		}
+		if initial != nil {
+			f := initial.Value.(*binUDPEntry).flow
+			t := f.tftp
+			t.ambiguous, t.unverified, t.futureAmbiguous = true, true, true
+			if t.file != nil {
+				t.file.abort()
+			}
+			e.FlowID = f.id
+		}
+		e.nativeTFTPObservation = true
+		e.Protocol, e.Profile, e.Admission, e.Completeness = "tftp", "tftp", "port-header-refusal", "message"
+		a.finishProtocolDatagram(e, nil, nil, protocolError(ErrResourceExceeded, "TFTP initial request exceeds message byte budget"))
+		a.limited.Add(uint64(len(w)))
+		return true
+	}
 	if s == nil {
 		return false
 	}
@@ -238,7 +283,12 @@ func (a *binParser) refuseTFTPOversizeAssociation(e *ProtocolEvent, w []byte) bo
 	// but their old generation cannot poison a fresh observed candidate.
 	if !t.retiredTID(peer) {
 		t.ambiguous = true
+		t.futureAmbiguous = true
+		if t.file != nil {
+			t.file.abort()
+		}
 	}
+	e.nativeTFTPObservation = true
 	e.Protocol, e.FlowID, e.Direction = "tftp", f.id, dir
 	e.Admission, e.Completeness = "observed-conversation", "message"
 	if e.ID == 0 {
@@ -248,4 +298,37 @@ func (a *binParser) refuseTFTPOversizeAssociation(e *ProtocolEvent, w []byte) bo
 	e.Completeness = e.Status
 	a.limited.Add(uint64(len(w)))
 	return true
+}
+
+// An already selected initial service or a bounded filename/mode prefix is
+// enough to retain refusal uncertainty; it is never a successful wire decode.
+func tftpInitialRefusalHint(a *binParser, e *ProtocolEvent, w []byte) bool {
+	if len(w) < 2 || w[0] != 0 || (w[1] != 1 && w[1] != 2) {
+		return false
+	}
+	_, port, err := net.SplitHostPort(e.Destination)
+	if err != nil {
+		return false
+	}
+	p, err := strconv.ParseUint(port, 10, 16)
+	if err != nil {
+		return false
+	}
+	if a.datagramDecodeAs[uint16(p)] != "" {
+		return false
+	}
+	if p == 69 || uint16(p) == a.config.TFTPFilePort {
+		return true
+	}
+	prefix := w[2:min(len(w), a.config.ProbeBytes)]
+	end := bytes.IndexByte(prefix, 0)
+	if end <= 0 {
+		return false
+	}
+	mode := prefix[end+1:]
+	end = bytes.IndexByte(mode, 0)
+	if end < 0 {
+		return false
+	}
+	return bytes.EqualFold(mode[:end], []byte("octet")) || bytes.EqualFold(mode[:end], []byte("netascii"))
 }

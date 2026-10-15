@@ -26,6 +26,7 @@ type ProtocolEvent struct {
 	nativeSNMPObservation                    bool
 	nativeSTUNObservation                    bool
 	nativeSIPObservation                     bool
+	nativeTFTPObservation                    bool
 	nativeUnrecognizedUDP                    bool
 	nativeBACnetRead                         bool
 	nativeBACnetRoutedRead                   bool
@@ -133,7 +134,7 @@ func (e *ProtocolEvent) Decode() (result map[string]any, err error) {
 		if e.Protocol == "c37118" && (e.Profile == "c37118-v1-v2-cfg2-data" || e.Profile == "c37118-v2-cfg3-complete-data" || e.Profile == "c37118-v2-cfg3-continuation-data" || e.Profile == "c37118-engineering") && e.semanticFields != nil {
 			session = e.semanticFields
 		}
-		if (e.nativeSTUNObservation || e.nativeSIPObservation) && e.semanticSession != nil {
+		if (e.nativeSTUNObservation || e.nativeSIPObservation || e.nativeTFTPObservation) && e.semanticSession != nil {
 			session = e.semanticSession
 		}
 		if err == nil && result != nil && session != nil {
@@ -158,6 +159,15 @@ func (e *ProtocolEvent) Decode() (result map[string]any, err error) {
 				result["metadata"] = cloneSessionValue(e.semanticMetadata)
 			}
 			return result, nil
+		}
+	}
+	if e.nativeTFTPObservation {
+		if e.semanticFields != nil {
+			return map[string]any{"fields": cloneSession(e.semanticFields)}, nil
+		}
+		if e.sessionError != nil {
+			owned := *e.sessionError
+			return nil, &owned
 		}
 	}
 	// STUN/TURN wire fields and passive context have separate private snapshots.
@@ -306,7 +316,7 @@ func (e *ProtocolEvent) retainRuleEnvelope(result map[string]any) {
 }
 
 func (e *ProtocolEvent) ownsNativeFields() bool {
-	if e.nativeSIPObservation || e.nativeSTUNObservation || e.nativeSNMPObservation || e.nativeTLSObservation || e.nativeDTLSObservation || e.nativeHARTIPObservation || e.nativeENIPObservation || e.nativeFINSObservation || e.nativeDiagnosticError != "" {
+	if e.nativeTFTPObservation || e.nativeSIPObservation || e.nativeSTUNObservation || e.nativeSNMPObservation || e.nativeTLSObservation || e.nativeDTLSObservation || e.nativeHARTIPObservation || e.nativeENIPObservation || e.nativeFINSObservation || e.nativeDiagnosticError != "" {
 		return true
 	}
 	if e.nativeDoIPObservation {
@@ -421,6 +431,8 @@ type BinParserBinding struct {
 }
 
 type BinParserConfig struct {
+	TFTPFilePort       uint16
+	TFTPFileBytesLimit int
 	// DecodeDNP3ReadPoints opts into bounded class READ/static point observations.
 	DecodeDNP3ReadPoints bool
 	// DecodeDNP3TransportFragments enables bounded TCP DNP3 transport assembly.
@@ -562,6 +574,7 @@ type binParser struct {
 	tlsSecrets                                                                 TLSSecretProvider
 	udpMu                                                                      sync.Mutex
 	udpSessions                                                                *binUDPStore
+	tftpUntrackedRefusal                                                       bool // udpMu; unknown refused client/server identity
 	sipUntrackedRefusal                                                        bool // udpMu; uncertainty for identities that could not be retained
 	stunUntrackedRefusal                                                       bool // constant-size quarantine when an admitted UDP key cannot be retained
 	pfcpUntrackedRefusal                                                       bool // udpMu; forgotten rejected identity cannot verify a newly admitted PFCP key
@@ -617,6 +630,12 @@ func (c *CaptureConfig) prepareBinParser() error {
 	}
 	if config.ProbeBytes == 0 {
 		config.ProbeBytes = 64
+	}
+	if config.TFTPFilePort != 0 && c.datagramDecodeAs[config.TFTPFilePort] != "" {
+		return fmt.Errorf("TFTP file service conflicts with explicit DecodeAs")
+	}
+	if config.TFTPFileBytesLimit < 0 || config.TFTPFileBytesLimit > tftpMaximumFileBytes || (config.TFTPFilePort == 0) != (config.TFTPFileBytesLimit == 0) {
+		return fmt.Errorf("invalid TFTP file assembly configuration")
 	}
 	if config.MaxMessageBytes < 64 || config.MaxMessageBytes > 64<<20 || config.MaxBufferedBytes < config.MaxMessageBytes || config.ProbeBytes < 16 || config.ProbeBytes > config.MaxMessageBytes {
 		return fmt.Errorf("invalid protocol parser limits: message=%d (64..67108864), buffered=%d (must cover message), probe=%d (16..message)", config.MaxMessageBytes, config.MaxBufferedBytes, config.ProbeBytes)
@@ -737,7 +756,7 @@ func (a *binParser) emit(e *BinParserEvent) {
 	if ((e.Protocol == "iec104" || e.Protocol == "dnp3") || e.Protocol == "goose" || e.Protocol == "mqtt" || e.ocpp || e.Protocol == "rtp" && e.Transport != "udp") && e.semanticSession == nil && e.Session != nil {
 		e.semanticSession = cloneSession(e.Session)
 	}
-	if (e.nativeSTUNObservation || e.nativeSIPObservation) && e.semanticSession == nil && e.Session != nil {
+	if (e.nativeSTUNObservation || e.nativeSIPObservation || e.nativeTFTPObservation) && e.semanticSession == nil && e.Session != nil {
 		e.semanticSession = cloneSession(e.Session)
 	}
 	defer func() {
@@ -1026,7 +1045,7 @@ func (f *binFlow) stop(dir int, wire []byte, status, reason string) {
 	}
 	e := f.event(dir, preview, status, reason)
 	e.sessionError, f.lastSessionError = f.lastSessionError, nil
-	if e.nativeSIPObservation || e.nativeSTUNObservation || e.nativeSNMPObservation || e.nativeTLSObservation || e.nativeHARTIPObservation || e.nativeFINSObservation || e.nativeENIPObservation {
+	if e.nativeTFTPObservation || e.nativeSIPObservation || e.nativeSTUNObservation || e.nativeSNMPObservation || e.nativeTLSObservation || e.nativeHARTIPObservation || e.nativeFINSObservation || e.nativeENIPObservation {
 		if e.sessionError == nil {
 			kind := ErrMalformedMessage
 			switch status {
