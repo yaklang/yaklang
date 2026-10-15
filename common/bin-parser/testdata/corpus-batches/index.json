@@ -102985,6 +102985,279 @@
         "common/pcapx/pcaputil/dns-context/wrong-question-and-normal.pcapng": "dns-context/wrong-question-and-normal.pcapng",
         "scripts/protocol-tests/required-tests-traffic-unified-v104.json": "required-tests-traffic-unified-v104.json"
       }
+    },
+    {
+      "id": "validation-dhcp-context",
+      "kind": "support",
+      "source_sha": "2b0083482ed9a470f04207457c0f867ef8d2f7ab",
+      "file": "validation-dhcp-context.zip",
+      "sha256": "89465f1cc7d3e8b432872fb14b6bf6cf61ec8a734a9eac64612c6066d142540b",
+      "password": "bin-parser",
+      "members": {
+        "dhcp-context-tools/generate.py": {
+          "sha256": "258788137860980707ed929ab5ac833b14ec48bf19fe769f4517acf561f7eebc",
+          "bytes": 708
+        },
+        "dhcp-context-tools/scope.json": {
+          "sha256": "3964c9e9768b67cec35ac921feb52c8da8181dcd4d57ab338c0c52b87b40730b",
+          "bytes": 1763
+        },
+        "dhcp-context-tools/source-pins.json": {
+          "sha256": "7bb1a760acf3ace0512986f3affdb8704c3bdda15ad9fab35223f0a51681d8c8",
+          "bytes": 339
+        },
+        "dhcp-context-tools/verify-all.py": {
+          "sha256": "2e0524e597a0bd978d1556a21c2b32336b4b7e50fdf0ad86456bdb0cf6a5322e",
+          "bytes": 323
+        },
+        "dhcp-context-tools/verify-refusal.py": {
+          "sha256": "7c7ac30ab42ef3af73f93c2da00a821e280509976cd681fbea771b606e0c3767",
+          "bytes": 3268
+        },
+        "dhcp-context-tools/verify.py": {
+          "sha256": "dae1e63b735bcf8315190fb6e4df84bb2f0bda3455672818ef0dedb24ef81d72",
+          "bytes": 4106
+        },
+        "dhcp-context/v6false-adjacent.expected.json": {
+          "sha256": "5163bf9a7bf99ee22f87cf0cbe239f657cdbfef957f72bf9ccd256eb5ebdc759",
+          "bytes": 1912
+        },
+        "dhcp-context/v6false-adjacent.pcap": {
+          "sha256": "3e32b727b8ad16a2ab56ac05fc70c2617362edc285f04f9a8d411fb948635694",
+          "bytes": 628
+        },
+        "dhcp-context/v6false-backwards-clock.expected.json": {
+          "sha256": "2eb4d45917334a4f479bb82ef0153a966dfd99a0af1f3169b871c64267c3f0de",
+          "bytes": 2846
+        },
+        "dhcp-context/v6false-backwards-clock.pcap": {
+          "sha256": "2870791b18feb68e06dfd9b82f96bb1767d64a35e74683348fd07e1ab164e4cf",
+          "bytes": 930
+        },
+        "dhcp-context/v6false-completed-reuse.expected.json": {
+          "sha256": "3323e32a0f8716547beb0a004c36b592bdd6647f916f6630bc02ecdbaccd856b",
+          "bytes": 3820
+        },
+        "dhcp-context/v6false-completed-reuse.pcap": {
+          "sha256": "47b5996c18c65d59e3cdeb5ca95ab5ce626eff869f50496cabc300bfa83ce89d",
+          "bytes": 1232
+        },
+        "dhcp-context/v6false-foreign-client.expected.json": {
+          "sha256": "b7047cc98eb0e1e35de12edd28127a4d29084223fbdb69b40395675e9a526c19",
+          "bytes": 2848
+        },
+        "dhcp-context/v6false-foreign-client.pcap": {
+          "sha256": "81af08daf03cf5491fe9c949923262c932b9721519c024f21fad87e4a7bbd53a",
+          "bytes": 930
+        },
+        "dhcp-context/v6false-foreign-protocol.expected.json": {
+          "sha256": "e2494b4c34d644140ef8927dd35585e2aa2e6447a4f3f2d9f08ff6a72b303376",
+          "bytes": 2754
+        },
+        "dhcp-context/v6false-foreign-protocol.pcap": {
+          "sha256": "fe38062e64e77f192f0ac397d8760d4fc655484557800647c261ad25b26f98bf",
+          "bytes": 758
+        },
+        "dhcp-context/v6false-same-owner-expired.expected.json": {
+          "sha256": "95f996e40c48308c418cc398ffe92722415d2f839f7548080c6f91b0374d3995",
+          "bytes": 1910
+        },
+        "dhcp-context/v6false-same-owner-expired.pcap": {
+          "sha256": "8ace5bfc52f98c9c2b67ea34eaf37945fdd04cbddb7164d0dacef724deef1333",
+          "bytes": 628
+        },
+        "dhcp-context/v6true-adjacent.expected.json": {
+          "sha256": "ceaefe1fe9aed917b8f785f53b229e8f127fe22dd3f7159d0c6acbee8d556223",
+          "bytes": 2153
+        },
+        "dhcp-context/v6true-adjacent.pcap": {
+          "sha256": "a57442697220222ba30dc5085cafcfb724ba9f89d6378636d3b5e8950d08290a",
+          "bytes": 317
+        },
+        "dhcp-context/v6true-backwards-clock.expected.json": {
+          "sha256": "063f18370984b17f5bd7c9df8af49f76a1da5929ff9b039e1f43f3d46f09a2f9",
+          "bytes": 2993
+        },
+        "dhcp-context/v6true-backwards-clock.pcap": {
+          "sha256": "462c30efa82fbbe6e5b2a63e4f5a902aaa5284ae769fb573f87b18871fdc6485",
+          "bytes": 447
+        },
+        "dhcp-context/v6true-completed-reuse.expected.json": {
+          "sha256": "0ce502985eccf7f2ee88b24616e99c80b653cbfebe87cacd8c74124b282562a1",
+          "bytes": 5500
+        },
+        "dhcp-context/v6true-completed-reuse.pcap": {
+          "sha256": "e85028f1af5947d419df7fd0561f3486a6afc10c6245b1fa8b2a6bd7bdc6fb36",
+          "bytes": 704
+        },
+        "dhcp-context/v6true-foreign-client.expected.json": {
+          "sha256": "3e57307e82db3df41380a2ea16faf4faf9e0e5825baa2d2d09fa503ddec5e263",
+          "bytes": 2995
+        },
+        "dhcp-context/v6true-foreign-client.pcap": {
+          "sha256": "554920ff0fdd8e866e2c11735808451edcb2015a6533dec870d2a08d2b2e98e6",
+          "bytes": 447
+        },
+        "dhcp-context/v6true-foreign-protocol.expected.json": {
+          "sha256": "d2945c827e979ffc16dfb71ae65d5467f781256a8ebdbd3a6d97316b49ff7baa",
+          "bytes": 3089
+        },
+        "dhcp-context/v6true-foreign-protocol.pcap": {
+          "sha256": "18acf5e5f07d2843d76b7d91d7f86152c07573c45fe5035d13a0f1afa2c92dfe",
+          "bytes": 619
+        },
+        "dhcp-context/v6true-same-owner-expired.expected.json": {
+          "sha256": "0e61528e62a8fc4a49806558c746d5ab6326f5114b83eb432df410125e74c51d",
+          "bytes": 2151
+        },
+        "dhcp-context/v6true-same-owner-expired.pcap": {
+          "sha256": "aebc52afe545d68f3c187e35f457d123e2a2441f6969178f13001a958e01711a",
+          "bytes": 317
+        },
+        "dhcp-refusal/v6false-first-refused.expected.json": {
+          "sha256": "fb66bec56513d6990f056fe9f93dc425aa6b2fb539a6796ea2a30c7e25e800b3",
+          "bytes": 4034
+        },
+        "dhcp-refusal/v6false-first-refused.pcapng": {
+          "sha256": "81ab49d8e77387497a4c4ff1852f9a1413c29c5de7fbb13fe416f5aa8fc2f866",
+          "bytes": 1192
+        },
+        "dhcp-refusal/v6false-foreign-client.expected.json": {
+          "sha256": "9d1532c364a018d383bcef6096f5105be630f3976a3f1121bd6db90133200192",
+          "bytes": 4033
+        },
+        "dhcp-refusal/v6false-foreign-client.pcapng": {
+          "sha256": "7180acd444fa19fce87a4ba333161f38d36cb2f2c405af384a3e77c59c58653f",
+          "bytes": 1192
+        },
+        "dhcp-refusal/v6false-foreign-interface.expected.json": {
+          "sha256": "f419d4c7fa454bf51e46138dd8cdf9b12e452c91438c71ab96951ea9c0d11918",
+          "bytes": 4033
+        },
+        "dhcp-refusal/v6false-foreign-interface.pcapng": {
+          "sha256": "3d373b31ebcf2190d64d3261e0f8c2ba6f9caab32d05b89afcd936f3d9a6d2bf",
+          "bytes": 1192
+        },
+        "dhcp-refusal/v6false-nonstandard.expected.json": {
+          "sha256": "b8b9084c452bf906b953079bf2031b701f040fdd72495bfd6dd2471e14db0978",
+          "bytes": 4033
+        },
+        "dhcp-refusal/v6false-nonstandard.pcapng": {
+          "sha256": "b50fe8d2058ac012bf1a1ed9fb3d3b39439c16388f6186f8a957b3302f76e380",
+          "bytes": 1192
+        },
+        "dhcp-refusal/v6false-pending.expected.json": {
+          "sha256": "b8b9084c452bf906b953079bf2031b701f040fdd72495bfd6dd2471e14db0978",
+          "bytes": 4033
+        },
+        "dhcp-refusal/v6false-pending.pcapng": {
+          "sha256": "75c90697ca3ae8e2a7dd9c2e61bb0b4782cf9a34e885ed4c3b65416983165cce",
+          "bytes": 1192
+        },
+        "dhcp-refusal/v6true-duid-beyond-prefix.expected.json": {
+          "sha256": "393cff2922a7766f31509f72d27d40d084a613f65d502356a0695b6a71424dbe",
+          "bytes": 7394
+        },
+        "dhcp-refusal/v6true-duid-beyond-prefix.pcapng": {
+          "sha256": "f6c0dc0b3bf2b3566d8c578c472f7a3ca4177c1bd671d7d79294842554134fd1",
+          "bytes": 968
+        },
+        "dhcp-refusal/v6true-first-refused.expected.json": {
+          "sha256": "ec9cf54840a688c81e10873e9dcc3f4a700763be11923207a1120f37681e8160",
+          "bytes": 7527
+        },
+        "dhcp-refusal/v6true-first-refused.pcapng": {
+          "sha256": "20c166db254f7abe331110eeaaec0708827605eef0965b7e52af81a4c207410d",
+          "bytes": 1008
+        },
+        "dhcp-refusal/v6true-foreign-client.expected.json": {
+          "sha256": "f7556934521562a1d2e6e10f6d8779a34769cf2efa85c5436dacb11019ddc49b",
+          "bytes": 7526
+        },
+        "dhcp-refusal/v6true-foreign-client.pcapng": {
+          "sha256": "7c0370d10bd1bca108d214f7ad22ea7b9f7ea7d17e69c752253201c022eec90d",
+          "bytes": 1008
+        },
+        "dhcp-refusal/v6true-foreign-interface.expected.json": {
+          "sha256": "e420e577c3da8f52d68bfeb275322f56275bd4a2c993c455f30c14bb810c8e1b",
+          "bytes": 7526
+        },
+        "dhcp-refusal/v6true-foreign-interface.pcapng": {
+          "sha256": "d294f0c0ce5d82bada5de77d16581ad0dcfe198261b56d8c7f29a910b84453ac",
+          "bytes": 1008
+        },
+        "dhcp-refusal/v6true-pending.expected.json": {
+          "sha256": "889a3b85804f5aa72016e46b88b5cbf168b624d88812e89740449a3c71cc0618",
+          "bytes": 7526
+        },
+        "dhcp-refusal/v6true-pending.pcapng": {
+          "sha256": "494fbb4119d4aed8d9fafb13d00100fff1e4ed5629de19522a1822b5fa8708e4",
+          "bytes": 1008
+        },
+        "required-tests-traffic-unified-v106.json": {
+          "sha256": "8ed3c65bc291fcc0dd3648aa23debe91f52ed04b21426ddfbf046af4a8a732cf",
+          "bytes": 17984937
+        },
+        "validation/expected.json": {
+          "sha256": "7d51a6001399d74397bfb8a15e6e69be0b8a5f2f90e578b3cad1ff073ba1fcee",
+          "bytes": 26162
+        }
+      },
+      "aliases": {
+        "common/pcapx/pcaputil/dhcp-context-tools/generate.py": "dhcp-context-tools/generate.py",
+        "common/pcapx/pcaputil/dhcp-context-tools/scope.json": "dhcp-context-tools/scope.json",
+        "common/pcapx/pcaputil/dhcp-context-tools/source-pins.json": "dhcp-context-tools/source-pins.json",
+        "common/pcapx/pcaputil/dhcp-context-tools/verify-all.py": "dhcp-context-tools/verify-all.py",
+        "common/pcapx/pcaputil/dhcp-context-tools/verify-refusal.py": "dhcp-context-tools/verify-refusal.py",
+        "common/pcapx/pcaputil/dhcp-context-tools/verify.py": "dhcp-context-tools/verify.py",
+        "common/pcapx/pcaputil/dhcp-context/v6false-adjacent.expected.json": "dhcp-context/v6false-adjacent.expected.json",
+        "common/pcapx/pcaputil/dhcp-context/v6false-adjacent.pcap": "dhcp-context/v6false-adjacent.pcap",
+        "common/pcapx/pcaputil/dhcp-context/v6false-backwards-clock.expected.json": "dhcp-context/v6false-backwards-clock.expected.json",
+        "common/pcapx/pcaputil/dhcp-context/v6false-backwards-clock.pcap": "dhcp-context/v6false-backwards-clock.pcap",
+        "common/pcapx/pcaputil/dhcp-context/v6false-completed-reuse.expected.json": "dhcp-context/v6false-completed-reuse.expected.json",
+        "common/pcapx/pcaputil/dhcp-context/v6false-completed-reuse.pcap": "dhcp-context/v6false-completed-reuse.pcap",
+        "common/pcapx/pcaputil/dhcp-context/v6false-foreign-client.expected.json": "dhcp-context/v6false-foreign-client.expected.json",
+        "common/pcapx/pcaputil/dhcp-context/v6false-foreign-client.pcap": "dhcp-context/v6false-foreign-client.pcap",
+        "common/pcapx/pcaputil/dhcp-context/v6false-foreign-protocol.expected.json": "dhcp-context/v6false-foreign-protocol.expected.json",
+        "common/pcapx/pcaputil/dhcp-context/v6false-foreign-protocol.pcap": "dhcp-context/v6false-foreign-protocol.pcap",
+        "common/pcapx/pcaputil/dhcp-context/v6false-same-owner-expired.expected.json": "dhcp-context/v6false-same-owner-expired.expected.json",
+        "common/pcapx/pcaputil/dhcp-context/v6false-same-owner-expired.pcap": "dhcp-context/v6false-same-owner-expired.pcap",
+        "common/pcapx/pcaputil/dhcp-context/v6true-adjacent.expected.json": "dhcp-context/v6true-adjacent.expected.json",
+        "common/pcapx/pcaputil/dhcp-context/v6true-adjacent.pcap": "dhcp-context/v6true-adjacent.pcap",
+        "common/pcapx/pcaputil/dhcp-context/v6true-backwards-clock.expected.json": "dhcp-context/v6true-backwards-clock.expected.json",
+        "common/pcapx/pcaputil/dhcp-context/v6true-backwards-clock.pcap": "dhcp-context/v6true-backwards-clock.pcap",
+        "common/pcapx/pcaputil/dhcp-context/v6true-completed-reuse.expected.json": "dhcp-context/v6true-completed-reuse.expected.json",
+        "common/pcapx/pcaputil/dhcp-context/v6true-completed-reuse.pcap": "dhcp-context/v6true-completed-reuse.pcap",
+        "common/pcapx/pcaputil/dhcp-context/v6true-foreign-client.expected.json": "dhcp-context/v6true-foreign-client.expected.json",
+        "common/pcapx/pcaputil/dhcp-context/v6true-foreign-client.pcap": "dhcp-context/v6true-foreign-client.pcap",
+        "common/pcapx/pcaputil/dhcp-context/v6true-foreign-protocol.expected.json": "dhcp-context/v6true-foreign-protocol.expected.json",
+        "common/pcapx/pcaputil/dhcp-context/v6true-foreign-protocol.pcap": "dhcp-context/v6true-foreign-protocol.pcap",
+        "common/pcapx/pcaputil/dhcp-context/v6true-same-owner-expired.expected.json": "dhcp-context/v6true-same-owner-expired.expected.json",
+        "common/pcapx/pcaputil/dhcp-context/v6true-same-owner-expired.pcap": "dhcp-context/v6true-same-owner-expired.pcap",
+        "common/pcapx/pcaputil/dhcp-refusal/v6false-first-refused.expected.json": "dhcp-refusal/v6false-first-refused.expected.json",
+        "common/pcapx/pcaputil/dhcp-refusal/v6false-first-refused.pcapng": "dhcp-refusal/v6false-first-refused.pcapng",
+        "common/pcapx/pcaputil/dhcp-refusal/v6false-foreign-client.expected.json": "dhcp-refusal/v6false-foreign-client.expected.json",
+        "common/pcapx/pcaputil/dhcp-refusal/v6false-foreign-client.pcapng": "dhcp-refusal/v6false-foreign-client.pcapng",
+        "common/pcapx/pcaputil/dhcp-refusal/v6false-foreign-interface.expected.json": "dhcp-refusal/v6false-foreign-interface.expected.json",
+        "common/pcapx/pcaputil/dhcp-refusal/v6false-foreign-interface.pcapng": "dhcp-refusal/v6false-foreign-interface.pcapng",
+        "common/pcapx/pcaputil/dhcp-refusal/v6false-nonstandard.expected.json": "dhcp-refusal/v6false-nonstandard.expected.json",
+        "common/pcapx/pcaputil/dhcp-refusal/v6false-nonstandard.pcapng": "dhcp-refusal/v6false-nonstandard.pcapng",
+        "common/pcapx/pcaputil/dhcp-refusal/v6false-pending.expected.json": "dhcp-refusal/v6false-pending.expected.json",
+        "common/pcapx/pcaputil/dhcp-refusal/v6false-pending.pcapng": "dhcp-refusal/v6false-pending.pcapng",
+        "common/pcapx/pcaputil/dhcp-refusal/v6true-duid-beyond-prefix.expected.json": "dhcp-refusal/v6true-duid-beyond-prefix.expected.json",
+        "common/pcapx/pcaputil/dhcp-refusal/v6true-duid-beyond-prefix.pcapng": "dhcp-refusal/v6true-duid-beyond-prefix.pcapng",
+        "common/pcapx/pcaputil/dhcp-refusal/v6true-first-refused.expected.json": "dhcp-refusal/v6true-first-refused.expected.json",
+        "common/pcapx/pcaputil/dhcp-refusal/v6true-first-refused.pcapng": "dhcp-refusal/v6true-first-refused.pcapng",
+        "common/pcapx/pcaputil/dhcp-refusal/v6true-foreign-client.expected.json": "dhcp-refusal/v6true-foreign-client.expected.json",
+        "common/pcapx/pcaputil/dhcp-refusal/v6true-foreign-client.pcapng": "dhcp-refusal/v6true-foreign-client.pcapng",
+        "common/pcapx/pcaputil/dhcp-refusal/v6true-foreign-interface.expected.json": "dhcp-refusal/v6true-foreign-interface.expected.json",
+        "common/pcapx/pcaputil/dhcp-refusal/v6true-foreign-interface.pcapng": "dhcp-refusal/v6true-foreign-interface.pcapng",
+        "common/pcapx/pcaputil/dhcp-refusal/v6true-pending.expected.json": "dhcp-refusal/v6true-pending.expected.json",
+        "common/pcapx/pcaputil/dhcp-refusal/v6true-pending.pcapng": "dhcp-refusal/v6true-pending.pcapng",
+        "common/pcapx/pcaputil/dhcp-refusal/v6true-marker-budget.pcapng": "dhcp-refusal/v6true-duid-beyond-prefix.pcapng",
+        "common/pcapx/pcaputil/dhcp-refusal/v6true-marker-budget.expected.json": "dhcp-refusal/v6true-duid-beyond-prefix.expected.json",
+        "scripts/protocol-tests/required-tests-traffic-unified-v106.json": "required-tests-traffic-unified-v106.json"
+      }
     }
   ],
   "schema_version": 1,

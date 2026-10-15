@@ -28,6 +28,7 @@ type ProtocolEvent struct {
 	nativeSIPObservation                     bool
 	nativeTFTPObservation                    bool
 	nativeATGObservation                     bool
+	nativeDHCPObservation                    bool
 	nativeDNSObservation                     bool
 	nativeDNSStreamObservation               bool
 	nativeDLMSOrSLMPObservation              bool
@@ -136,6 +137,9 @@ func (e *ProtocolEvent) Decode() (result map[string]any, err error) {
 		// C37.118 exposes its complete accepted observation in both views
 		// on TCP and UDP. The public map is caller-owned, not query authority.
 		if e.Protocol == "c37118" && (e.Profile == "c37118-v1-v2-cfg2-data" || e.Profile == "c37118-v2-cfg3-complete-data" || e.Profile == "c37118-v2-cfg3-continuation-data" || e.Profile == "c37118-engineering") && e.semanticFields != nil {
+			session = e.semanticFields
+		}
+		if e.nativeDHCPObservation && e.semanticFields != nil {
 			session = e.semanticFields
 		}
 		if (e.nativeDNSObservation || e.nativeDNSStreamObservation) && e.semanticSession != nil {
@@ -339,7 +343,7 @@ func (e *ProtocolEvent) retainRuleEnvelope(result map[string]any) {
 }
 
 func (e *ProtocolEvent) ownsNativeFields() bool {
-	if e.nativeDNSStreamObservation || e.nativeDNSObservation || e.nativeATGObservation || e.nativeDLMSOrSLMPObservation || e.nativeTFTPObservation || e.nativeSIPObservation || e.nativeSTUNObservation || e.nativeSNMPObservation || e.nativeTLSObservation || e.nativeDTLSObservation || e.nativeHARTIPObservation || e.nativeENIPObservation || e.nativeFINSObservation || e.nativeDiagnosticError != "" {
+	if e.nativeDHCPObservation || e.nativeDNSStreamObservation || e.nativeDNSObservation || e.nativeATGObservation || e.nativeDLMSOrSLMPObservation || e.nativeTFTPObservation || e.nativeSIPObservation || e.nativeSTUNObservation || e.nativeSNMPObservation || e.nativeTLSObservation || e.nativeDTLSObservation || e.nativeHARTIPObservation || e.nativeENIPObservation || e.nativeFINSObservation || e.nativeDiagnosticError != "" {
 		return true
 	}
 	if e.nativeDoIPObservation {

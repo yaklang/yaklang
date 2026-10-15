@@ -9,7 +9,7 @@ import (
 )
 
 // DHCP leases are observations, not proof of address ownership. Broadcast
-// discovery can receive several offers; correlations remain available until TTL.
+// discovery can receive several offers; active observations age locally while charged identity history survives until Close.
 func decodeDHCP4(w []byte, limit int) (map[string]any, error) {
 	if len(w) < 240 || binary.BigEndian.Uint32(w[236:240]) != dhcpCookie || w[0] < 1 || w[0] > 2 || w[2] == 0 || w[2] > 16 {
 		return nil, fmt.Errorf("DHCP header")
@@ -131,35 +131,49 @@ func (a *binParser) dhcpObservation(e *ProtocolEvent) {
 	if s.pending == nil {
 		s.pending = map[string]dnsPending{}
 	}
-	if e.Timestamp.After(s.clock) {
-		s.clock = e.Timestamp
-	}
-	for k, v := range s.pending {
-		if s.clock.Sub(v.ts) > 30*time.Second {
-			delete(s.pending, k)
-			a.buffered.Add(-v.cost)
-		}
+	// Capture timestamps belong to this observed domain/client/relay/xid,
+	// not to every DHCP client or to the other DHCP IP family. An unrelated
+	// future packet must not erase a timely pending observation. A regressing
+	// timestamp never advances its age. Retained entries remain charged and
+	// count against the original aggregate ceiling until Close, including ambiguous/expired history.
+	if p, ok := s.pending[key]; ok && e.Timestamp.Sub(p.ts) > 30*time.Second {
+		// Keep charged identity history: a new request cannot make an old,
+		// indistinguishable response appear to belong to a fresh generation.
+		p.ambiguous = true
+		s.pending[key] = p
 	}
 	if e.ID == 0 {
 		e.ID = a.ids.Add(1)
 	}
 	if typ == 1 || typ == 3 || typ == 8 {
 		if p, ok := s.pending[key]; ok {
-			e.TransactionID = p.id
-		} else if len(s.pending)+len(a.dns.pending) < a.budget.MaxCollectionElements && a.reserveEvidence(int64(len(key)+128)) {
+			if p.completed || p.ambiguous {
+				p.ambiguous = true
+				s.pending[key] = p
+			} else {
+				e.TransactionID = p.id
+			}
+		} else if !s.untracked4 && len(s.pending)+len(a.dns.pending) < a.budget.MaxCollectionElements && a.reserveEvidence(int64(len(key)+128)) {
 			s.pending[key] = dnsPending{id: e.ID, ts: e.Timestamp, cost: int64(len(key) + 128)}
 			e.TransactionID = e.ID
 		}
 	} else if typ == 2 || typ == 5 || typ == 6 {
-		if p, ok := s.pending[key]; ok {
+		if p, ok := s.pending[key]; ok && !p.ambiguous {
 			e.ResponseTo = p.id
 			e.TransactionID = p.id
 			info["Association"] = "observed-client-xid"
 			if typ == 5 || typ == 6 {
 				e.Completeness = "transaction"
+				p.completed = true
+				s.pending[key] = p
 			}
 		} else {
 			info["Association"] = "missing-request"
+			if p, ok := s.pending[key]; ok && p.refused {
+				info["Association"] = "refused-client-xid"
+			} else if p, ok := s.pending[key]; ok && p.ambiguous && p.completed {
+				info["Association"] = "ambiguous-client-xid"
+			}
 		}
 	}
 }
@@ -203,30 +217,55 @@ func (a *binParser) dhcp6Observation(e *ProtocolEvent) {
 	if s.pending == nil {
 		s.pending = map[string]dnsPending{}
 	}
-	if e.Timestamp.After(s.clock) {
-		s.clock = e.Timestamp
-	}
-	for k, v := range s.pending {
-		if s.clock.Sub(v.ts) > 30*time.Second {
-			delete(s.pending, k)
-			a.buffered.Add(-v.cost)
-		}
+	// Capture timestamps belong to this observed domain/client/relay/xid,
+	// not to every DHCP client or to the other DHCP IP family. An unrelated
+	// future packet must not erase a timely pending observation. A regressing
+	// timestamp never advances its age. Retained entries remain charged and
+	// count against the original aggregate ceiling until Close, including ambiguous/expired history.
+	if p, ok := s.pending[key]; ok && e.Timestamp.Sub(p.ts) > 30*time.Second {
+		// Keep charged identity history: a new request cannot make an old,
+		// indistinguishable response appear to belong to a fresh generation.
+		p.ambiguous = true
+		s.pending[key] = p
 	}
 	if e.ID == 0 {
 		e.ID = a.ids.Add(1)
 	}
-	if typ == 2 || typ == 7 {
+	if _, denied := s.pending[dhcp6DeniedKey(e.Domain, relay, info["Transaction ID"])]; denied {
 		if p, ok := s.pending[key]; ok {
+			p.ambiguous, p.refused = true, true
+			s.pending[key] = p
+		} else {
+			e.Session["Association"] = "refused-client-xid"
+			return
+		}
+	}
+	if typ == 2 || typ == 7 {
+		if p, ok := s.pending[key]; ok && !p.ambiguous {
 			e.ResponseTo, e.TransactionID = p.id, p.id
 			e.Session["Association"] = "observed-client-xid"
 			e.Completeness = "transaction"
+			if typ == 7 {
+				p.completed = true
+				s.pending[key] = p
+			}
 		} else {
 			e.Session["Association"] = "missing-request"
+			if p, ok := s.pending[key]; ok && p.refused {
+				e.Session["Association"] = "refused-client-xid"
+			} else if p, ok := s.pending[key]; ok && p.ambiguous && p.completed {
+				e.Session["Association"] = "ambiguous-client-xid"
+			}
 		}
 	} else if typ != 10 {
 		if p, ok := s.pending[key]; ok {
-			e.TransactionID = p.id
-		} else if len(s.pending)+len(a.dns.pending) < a.budget.MaxCollectionElements && a.reserveEvidence(int64(len(key)+128)) {
+			if p.completed || p.ambiguous {
+				p.ambiguous = true
+				s.pending[key] = p
+			} else {
+				e.TransactionID = p.id
+			}
+		} else if !s.untracked6 && len(s.pending)+len(a.dns.pending) < a.budget.MaxCollectionElements && a.reserveEvidence(int64(len(key)+128)) {
 			s.pending[key] = dnsPending{id: e.ID, ts: e.Timestamp, cost: int64(len(key) + 128)}
 			e.TransactionID = e.ID
 		}

@@ -184,12 +184,12 @@ func testDHCPOwnedQueries(t *testing.T) {
 				require.Zero(t, offer.Events[0].ResponseTo)
 				require.Zero(t, offer.Events[0].TransactionID)
 				want := dhcpOwnedFields(1)
-				want["Association"] = "missing-request"
+				want["Association"] = "refused-client-xid"
 				dhcpAssertOwnedQuery(t, offer.Events[0], want, wires[1])
 				next := s.Feed(0, time.Unix(3, 0), wires[0])
 				require.Nil(t, next.Err)
 				require.Len(t, next.Events, 1)
-				require.Equal(t, next.Events[0].ID, next.Events[0].TransactionID)
+				require.Zero(t, next.Events[0].TransactionID, "a malformed/denied identity must not disappear into a fresh precise owner")
 				dhcpAssertOwnedQuery(t, next.Events[0], dhcpOwnedFields(0), wires[0])
 				require.Empty(t, s.Close("complete"))
 				require.Empty(t, s.Close("again"))

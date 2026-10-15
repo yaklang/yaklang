@@ -79,7 +79,7 @@ func NativeProtocolProfiles() []ProtocolProfile {
 		{"gearman", "tcp", "12-byte binary header and exact payload length", "request/response magic, supported type and bounded method-specific fields"},
 		{"beanstalkd", "tcp", "CRLF commands with bounded put/reserved body", "strict put syntax on port 11300 and observed response order"},
 		{"bjnp", "udp", "16-byte printer datagram header and exact payload", "observed command family, direction, sequence and session; port hint or explicit DecodeAs"},
-		{"dns", "udp/tcp", "datagram or two-byte TCP length prefix", "RFC1035 opcode/question and reversed endpoint/flow/domain observations; local idle clock, exact retries and charged identity/refusal history; ambiguous reuse has no precise owner, new TCP generations recover; shared count/byte caps and owned UDP/TCP queries; no DNSSEC/authenticated resolver claim"}, {"mdns", "udp", "datagram", "multicast observation"}, {"llmnr", "udp", "datagram", "domain/requester/opcode/question with bounded multicast responders, local idle clock and charged identity/refusal history; ambiguous reuse has no precise owner; no authenticated peer claim"}, {"dhcp", "udp", "datagram", "domain/client/xid observation"}, {"dhcpv6", "udp", "datagram", "domain/relay/client/xid observation"}, {"syslog", "udp/tcp", "RFC 5424 v1, bounded RFC 3164; UDP datagram or RFC 6587", "PRI signature/port hint or explicit DecodeAs; hostname is unverified message content"},
+		{"dns", "udp/tcp", "datagram or two-byte TCP length prefix", "RFC1035 opcode/question and reversed endpoint/flow/domain observations; local idle clock, exact retries and charged identity/refusal history; ambiguous reuse has no precise owner, new TCP generations recover; shared count/byte caps and owned UDP/TCP queries; no DNSSEC/authenticated resolver claim"}, {"mdns", "udp", "datagram", "multicast observation"}, {"llmnr", "udp", "datagram", "domain/requester/opcode/question with bounded multicast responders, local idle clock and charged identity/refusal history; ambiguous reuse has no precise owner; no authenticated peer claim"}, {"dhcp", "udp", "datagram", "domain/client/relay/xid-local idle and owned native fields/refusals; bounded observed association, not a DHCP lease state machine"}, {"dhcpv6", "udp", "datagram", "domain/relay/client/xid-local idle and owned native fields/refusals; bounded observed association, not an authenticated allocation"}, {"syslog", "udp/tcp", "RFC 5424 v1, bounded RFC 3164; UDP datagram or RFC 6587", "PRI signature/port hint or explicit DecodeAs; hostname is unverified message content"},
 		{"arp", "l2", "ethernet", "unverified neighbor"}, {"icmp", "network", "IP", "quoted packet observation"}, {"icmpv6", "network", "IPv6", "unverified neighbor"},
 		{"http", "tcp", "ordered bytes", "observed request method"}, {"websocket", "tcp", "ordered bytes", "validated HTTP upgrade"}, {"tls", "tcp", "records", "ClientRandom/direction/epoch; TLS 1.3 non-PSK HelloRetryRequest"}, {"http2", "tcp", "frames", "preface and HPACK state"}, {"grpc", "tcp", "HTTP2 DATA", "content-type and stream"},
 	}
@@ -388,6 +388,12 @@ func (a *binParser) decodeNativeDatagram(e *ProtocolEvent, w []byte, src, dst ui
 				if !errors.As(err, &typed) {
 					err = protocolError(ErrMalformedMessage, "%s", err)
 				}
+			}
+		}
+		if p.name == "dhcp" || p.name == "dhcpv6" {
+			e.nativeDHCPObservation = true
+			if err != nil {
+				a.recordDHCPRefusal(e, p.name, w)
 			}
 		}
 		if p.name == "dns" || p.name == "mdns" || p.name == "llmnr" {

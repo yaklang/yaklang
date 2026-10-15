@@ -221,10 +221,13 @@ func testDHCP6OwnedQueries(t *testing.T) {
 				require.Zero(t, e.TransactionID)
 				require.Zero(t, e.ResponseTo)
 				require.Equal(t, bad, e.Raw)
-				require.Zero(t, s.Stats().BufferedBytes)
+				retained := s.Stats().BufferedBytes
+				require.Positive(t, retained, "the denied identity must remain charged")
+				require.LessOrEqual(t, retained, int64(budget.MaxBufferedBytes))
 				assertOwnedProtocolRefusal(t, e, errorKind, err)
 				// Under limit1, a client-DUID-only Solicit is the adjacent native
-				// observation. It tests recovery, not a full IA_PD endpoint exchange.
+				// observation. Decoding remains usable, but denied identity history
+				// cannot recover a precise owner or prove an IA_PD endpoint exchange.
 				good, want := wires[0], dhcp6OwnedFields(t, 0)
 				if kind == "option-budget" {
 					good = bytes.Clone(wires[0][:22])
@@ -233,7 +236,8 @@ func testDHCP6OwnedQueries(t *testing.T) {
 				next := s.Feed(0, time.Unix(2, 0), good)
 				require.Nil(t, next.Err)
 				require.Len(t, next.Events, 1)
-				require.Equal(t, next.Events[0].ID, next.Events[0].TransactionID)
+				require.Zero(t, next.Events[0].TransactionID, "same refused identity is not a fresh precise owner")
+				require.Equal(t, retained, s.Stats().BufferedBytes, "same identity must not consume a second history slot")
 				dhcp6AssertOwnedQuery(t, next.Events[0], want, good)
 				require.Empty(t, s.Close("complete"))
 				require.Empty(t, s.Close("again"))
