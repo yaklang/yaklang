@@ -137,13 +137,23 @@ func TestRound5UDPExpiryAndBudget(t *testing.T) {
 	require.Empty(t, first.Error)
 	limited := feed("192.0.2.1:2222", 2)
 	require.Equal(t, "limited", limited.Status)
-	next := feed("192.0.2.1:2222", 602)
+	stillLimited := feed("192.0.2.1:2222", 602)
+	require.Equal(t, "limited", stillLimited.Status)
+	require.Len(t, a.udpSessions.entries, 1)
+	// Foreign capture time cannot prove the first request inactive. Complete
+	// that retained request using its own timely observation before reclaim.
+	firstReply := &ProtocolEvent{Source: first.Destination, Destination: first.Source, Timestamp: time.Unix(2, 0)}
+	require.True(t, a.decodeSTUNDatagram(firstReply, stunTestMessage(1, 2, 1)))
+	require.Empty(t, firstReply.Error)
+	require.Equal(t, first.FlowID, firstReply.FlowID)
+	require.Equal(t, true, firstReply.Session["Matched"])
+	next := feed("192.0.2.1:2222", 603)
 	require.Empty(t, next.Error)
 	require.NotEqual(t, first.FlowID, next.FlowID)
 	require.Len(t, a.udpSessions.entries, 1)
-	// Reclaiming an idle slot restores bounded literal observation, not proof
+	// Reclaiming an inactive slot restores bounded literal observation, not proof
 	// that previously unseen or evicted transaction identities are fresh.
-	reply := &ProtocolEvent{Source: next.Destination, Destination: next.Source, Timestamp: time.Unix(603, 0)}
+	reply := &ProtocolEvent{Source: next.Destination, Destination: next.Source, Timestamp: time.Unix(604, 0)}
 	require.True(t, a.decodeSTUNDatagram(reply, stunTestMessage(1, 2, 1)))
 	require.Empty(t, reply.Error)
 	require.Equal(t, next.FlowID, reply.FlowID)

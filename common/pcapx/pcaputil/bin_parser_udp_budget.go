@@ -46,7 +46,7 @@ func (a *binParser) refuseUDPOversizeAssociation(e *ProtocolEvent, w []byte, src
 	store := a.udpSessions
 	// A denied SNMP datagram retires only its exact admitted key below.
 	// Its timestamp cannot expire other endpoint/domain observations.
-	if store != nil && protocol != "snmp" {
+	if store != nil && protocol != "snmp" && protocol != "stun" {
 		if e.Timestamp.After(store.clock) {
 			store.clock = e.Timestamp
 		}
@@ -113,13 +113,13 @@ func (a *binParser) refuseUDPOversizeAssociation(e *ProtocolEvent, w []byte, src
 	}
 	if protocol == "stun" && !existing {
 		if store == nil {
-			store = &binUDPStore{entries: map[binUDPKey]*list.Element{}, clock: e.Timestamp}
+			store = &binUDPStore{entries: map[binUDPKey]*list.Element{}}
 			a.udpSessions = store
 		}
-		a.reclaimIdleSTUNSlot(store)
+		a.reclaimInactiveSTUNSlot(store)
 		f := &binFlow{a: a, id: a.flows.Add(1), endpoints: [2]string{e.Source, e.Destination}, protocol: "stun", stun: &binSTUN{blocked: true}}
 		if len(store.entries) < sessionCollectionLimit(a.budget.MaxCollectionElements) && f.reserveSession(f.stun.bytes()) == nil {
-			el := store.lru.PushBack(&binUDPEntry{key, f, store.clock})
+			el := store.lru.PushBack(&binUDPEntry{key, f, e.Timestamp})
 			store.entries[key] = el
 			existing = true
 		} else {
@@ -166,7 +166,7 @@ func (a *binParser) refuseUDPOversizeAssociation(e *ProtocolEvent, w []byte, src
 			a.buffered.Add(retained - f.sessionBytes)
 			f.sessionBytes = retained
 		}
-		if protocol == "snmp" {
+		if protocol == "snmp" || protocol == "stun" {
 			if e.Timestamp.After(v.touched) {
 				v.touched = e.Timestamp
 			}
@@ -178,6 +178,9 @@ func (a *binParser) refuseUDPOversizeAssociation(e *ProtocolEvent, w []byte, src
 	a.udpMu.Unlock()
 	if protocol == "snmp" {
 		e.nativeSNMPObservation = true
+	}
+	if protocol == "stun" {
+		e.nativeSTUNObservation = true
 	}
 	e.Protocol, e.Profile, e.Admission, e.Completeness = protocol, profile, "observed-conversation", "message"
 	if explicit != "" {

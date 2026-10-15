@@ -35,16 +35,16 @@ func (f *binFlow) retireSTUNUDP(ts time.Time) {
 	}
 }
 
-// Under slot pressure an idle STUN entry may be reclaimed, but its forgotten
-// identities cannot become a new verified generation. A capture-owned marker
-// quarantines subsequently admitted keys; existing retained keys stay usable.
-func (a *binParser) reclaimIdleSTUNSlot(s *binUDPStore) {
+// Reclaim only already inactive STUN observations under slot pressure. A foreign
+// capture timestamp cannot declare a live request/allocation/relay idle. Losing
+// retired identities still quarantines new keys; retained active peers survive.
+func (a *binParser) reclaimInactiveSTUNSlot(s *binUDPStore) {
 	if len(s.entries) < sessionCollectionLimit(a.budget.MaxCollectionElements) {
 		return
 	}
 	for el := s.lru.Front(); el != nil; el = el.Next() {
 		v := el.Value.(*binUDPEntry)
-		if v.flow.stun == nil || s.clock.Sub(v.touched) < 10*time.Minute {
+		if v.flow.stun == nil || len(v.flow.stun.pending) != 0 || len(v.flow.stun.channels) != 0 || len(v.flow.stun.permissions) != 0 || !v.flow.stun.allocations[0].IsZero() || !v.flow.stun.allocations[1].IsZero() {
 			continue
 		}
 		a.stunUntrackedRefusal = true
@@ -430,31 +430,27 @@ func (a *binParser) decodeSTUNDatagram(e *ProtocolEvent, w []byte, explicitTurn 
 		key.a, key.b = key.b, key.a
 	}
 	s := a.udpSessions
-	if s != nil {
-		if e.Timestamp.After(s.clock) {
-			s.clock = e.Timestamp
-		}
-		for el := s.lru.Front(); el != nil; {
-			next := el.Next()
-			v := el.Value.(*binUDPEntry)
-			if s.clock.Sub(v.touched) < 10*time.Minute {
-				break
-			}
-			// This store also contains unrelated application state and quarantine.
-			// STUN's idle policy cannot reset another protocol's identity history.
-			if v.flow.stun != nil {
-				v.flow.retireSTUNUDP(s.clock)
-			}
-			el = next
-		}
-	}
 	var el *list.Element
 	if s != nil {
 		el = s.entries[key]
 	}
 	stun := probeSTUN(w, len(w)).Verdict == ProbeAccept
 	channelHeader := len(w) >= 4 && w[0]&0xc0 == 0x40
-	channel := channelHeader && el != nil
+	channel := false
+	if channelHeader && el != nil {
+		// An observed STUN transaction is not a TURN channel binding. Only
+		// an exact still-observed channel can disambiguate malformed data
+		// from a neighboring protocol such as a four-byte CoAP ACK.
+		if state := el.Value.(*binUDPEntry).flow.stun; state != nil {
+			ch := uint16(w[0])<<8 | uint16(w[1])
+			for _, dir := range [2]int{0, 1} {
+				if binding, ok := state.channels[turnChannelKey{dir, ch}]; ok && binding.expires.After(e.Timestamp) && binding.expires.After(state.clock) {
+					channel = true
+					break
+				}
+			}
+		}
+	}
 	selectedTurn := len(explicitTurn) > 0 && explicitTurn[0]
 	knownTURNPort := udpEndpointPort(e.Source, 3478) || udpEndpointPort(e.Destination, 3478)
 	coap := probeCoAP(w, len(w)).Verdict == ProbeAccept
@@ -465,6 +461,13 @@ func (a *binParser) decodeSTUNDatagram(e *ProtocolEvent, w []byte, explicitTurn 
 	if !stun && !channelAdmitted {
 		return false
 	}
+	if el != nil {
+		v := el.Value.(*binUDPEntry)
+		if v.flow.stun != nil && e.Timestamp.Sub(v.touched) >= 10*time.Minute {
+			v.flow.retireSTUNUDP(e.Timestamp)
+		}
+	}
+	e.nativeSTUNObservation = true
 	e.Protocol = "stun"
 	e.Profile = "stun-rfc8489-udp"
 	e.Admission = "wire-signature"
@@ -492,17 +495,17 @@ func (a *binParser) decodeSTUNDatagram(e *ProtocolEvent, w []byte, explicitTurn 
 	}
 	var err error
 	if s == nil {
-		s = &binUDPStore{entries: map[binUDPKey]*list.Element{}, clock: e.Timestamp}
+		s = &binUDPStore{entries: map[binUDPKey]*list.Element{}}
 		a.udpSessions = s
 	}
 	if el == nil {
-		a.reclaimIdleSTUNSlot(s)
+		a.reclaimInactiveSTUNSlot(s)
 		if len(s.entries) >= sessionCollectionLimit(a.budget.MaxCollectionElements) {
 			err = protocolError(ErrResourceExceeded, "UDP conversation budget")
 		} else {
 			f := &binFlow{a: a, id: a.flows.Add(1), endpoints: [2]string{e.Source, e.Destination}, protocol: "stun", stun: &binSTUN{blocked: a.stunUntrackedRefusal}}
 			if err = f.reserveSession(1024); err == nil {
-				el = s.lru.PushBack(&binUDPEntry{key, f, s.clock})
+				el = s.lru.PushBack(&binUDPEntry{key, f, e.Timestamp})
 				s.entries[key] = el
 			}
 		}
@@ -512,7 +515,9 @@ func (a *binParser) decodeSTUNDatagram(e *ProtocolEvent, w []byte, explicitTurn 
 	}
 	if el != nil {
 		v := el.Value.(*binUDPEntry)
-		v.touched = s.clock
+		if e.Timestamp.After(v.touched) {
+			v.touched = e.Timestamp
+		}
 		s.lru.MoveToBack(el)
 		f := v.flow
 		e.FlowID = f.id

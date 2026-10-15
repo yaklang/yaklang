@@ -101618,6 +101618,328 @@
         "common/pcapx/pcaputil/snmp-clock/v3-udp-within-window.pcapng": "snmp-clock/v3-udp-within-window.pcapng",
         "scripts/protocol-tests/required-tests-traffic-unified-v97.json": "required-tests-traffic-unified-v97.json"
       }
+    },
+    {
+      "id": "validation-stun-context",
+      "kind": "support",
+      "source_sha": "24e47debc6a898ab32a5d4ba231876d65eb29c83",
+      "file": "validation-stun-context.zip",
+      "sha256": "ad2c05bdf2bf1909e89362ef6ad67d80f450808139efec4e5ad2c20a5ef8de03",
+      "password": "bin-parser",
+      "members": {
+        "required-tests-traffic-unified-v98.json": {
+          "sha256": "fb1c7a577296c704aacf2d39151e267b158688b865b1a4b1a3f767c7c185ca02",
+          "bytes": 17132736
+        },
+        "stun-context-tools/REUSED-MODEL.json": {
+          "sha256": "feed6717d764fb84d356c8ab7d55c74abccc2f0f604eec66e76ff00ad8436aa1",
+          "bytes": 502
+        },
+        "stun-context-tools/build.py": {
+          "sha256": "35f2a17ca71eec18c084516c672c1949b58f35bec70ca51bce6d13f39183bc69",
+          "bytes": 12304
+        },
+        "stun-context-tools/reference.py": {
+          "sha256": "41e5a1d2b9d0b248fe5ed3b6c743d90d840da7e7bad6e8691a04053da5273005",
+          "bytes": 2857
+        },
+        "stun-context-tools/source-pins.json": {
+          "sha256": "0821b511d0aab942eab49e7f6cb4127b4c5e201d4ba97f7d33624054a10ef7a0",
+          "bytes": 339
+        },
+        "stun-context-tools/verify.py": {
+          "sha256": "568033d8a26fc87b3250c05709356bc1e045bd937c1d9957c4ab88c605a1f29b",
+          "bytes": 3440
+        },
+        "stun-context/controls.json": {
+          "sha256": "a35b310341359be43e83afd4ba2402203d6dd20bdc4ef835174c508123439513",
+          "bytes": 253601
+        },
+        "stun-context/expected.json": {
+          "sha256": "74860753017a085c5d5580fb965139c2526f565a2c13272c9073277552aa9d0e",
+          "bytes": 43594
+        },
+        "stun-context/tcp-backdated-first-request.pcapng": {
+          "sha256": "b7485fa5206cd9d9037b91ffeaf303cd3bd8f1cac7ae8482747929aca0111144",
+          "bytes": 768
+        },
+        "stun-context/tcp-coalesced-callback.pcapng": {
+          "sha256": "a0597f83459256067ef7b1f6f096dfcc8890f8d8c1bd7b77d6a8bebff6d009e9",
+          "bytes": 592
+        },
+        "stun-context/tcp-old-retry-exact-expiry.pcapng": {
+          "sha256": "e7a41e80a138d9b7a1a5263a5a1bd8cbfd184b147820b77b4b11d948581daf55",
+          "bytes": 984
+        },
+        "stun-context/tcp-older-than-first.pcapng": {
+          "sha256": "2db11bbe43deef83c70153e4b1ddf2240a5dbd178811909d865db04b0c0ed699",
+          "bytes": 984
+        },
+        "stun-context/tcp-recent-retry.pcapng": {
+          "sha256": "c0749ca65bcfa5bae6db89786d75b9b36e922e0ceef321b171b9aca6ca22df96",
+          "bytes": 984
+        },
+        "stun-context/tcp-stale-retry.pcapng": {
+          "sha256": "5aca56ff445de6a69beece8c46207f7cb7c4b91faa4e543f9c396dff05a94a70",
+          "bytes": 984
+        },
+        "stun-context/udp-active-slot-pressure.pcapng": {
+          "sha256": "b4cebce9a39e43ef3f7df79c8536b9ba9e844143f8ab6f21d461b6922b729c77",
+          "bytes": 676
+        },
+        "stun-context/udp-allocate-orphan-complete.pcapng": {
+          "sha256": "5a8787f9d984c16f937babf97cb190d6ef008f8b145041b33c9f1f3f20cbe660",
+          "bytes": 176
+        },
+        "stun-context/udp-allocate-orphan-missing-lifetime.pcapng": {
+          "sha256": "4bce914ffafc543d07e827430aeac6e8a19093b0ddf7a6d5d1a13e025c8a19d7",
+          "bytes": 168
+        },
+        "stun-context/udp-allocation-backdated-expired.pcapng": {
+          "sha256": "8ae89957014aa380af2de1439cf69e91db49881f24de63af03eeaac45dceef92",
+          "bytes": 668
+        },
+        "stun-context/udp-allocation-backdated-live.pcapng": {
+          "sha256": "ff9cbc5acc247f7dad6b3f188085f0a245ed79cf318b305d6cfd9366625ebdef",
+          "bytes": 668
+        },
+        "stun-context/udp-allocation-ordered-expired.pcapng": {
+          "sha256": "8382381f2512fe469a248bfb5c25739b729617ce6dedd9a23cba7dda9aa83295",
+          "bytes": 668
+        },
+        "stun-context/udp-allocation-ordered-live.pcapng": {
+          "sha256": "abdf9b64ad32a8fb24f74bf5d5edbf5303b07a8564a0238f05e263183a18a75a",
+          "bytes": 668
+        },
+        "stun-context/udp-backdated-first-request.pcapng": {
+          "sha256": "08276b342eb5e6916f4e69d5a2e53938eafcd55a1f28accd81b596f1d8567302",
+          "bytes": 456
+        },
+        "stun-context/udp-channel-backdated-expired.pcapng": {
+          "sha256": "c407f821c13afb3bc115160ec7c2181abde4bbd1ea1215ac17d99a5060a82400",
+          "bytes": 436
+        },
+        "stun-context/udp-channel-backdated-live.pcapng": {
+          "sha256": "b45913fea782e91aa8001bcbc7a83239ec55f3403f532064abc1371d9d934030",
+          "bytes": 436
+        },
+        "stun-context/udp-channel-ordered-expired.pcapng": {
+          "sha256": "a052406d98b3f3b008248a3bf0c314854b07e647adb694c371ddb5e7e9367dd9",
+          "bytes": 436
+        },
+        "stun-context/udp-channel-ordered-live.pcapng": {
+          "sha256": "8bf187a85c20b730f70a48c513d900d1aabecde4dac79d956a29ff40af6edf6f",
+          "bytes": 436
+        },
+        "stun-context/udp-channel-renew-699.pcapng": {
+          "sha256": "e15971570d3ac38877335744a29a76c98d87e76c0b63c985a7d48a570549f723",
+          "bytes": 552
+        },
+        "stun-context/udp-channel-renew-700.pcapng": {
+          "sha256": "806119815a241bea9ca56c74e80fcbd4f4b86bef9f9b6f61a5b9a5dd76d89846",
+          "bytes": 552
+        },
+        "stun-context/udp-exact-request-expiry.pcapng": {
+          "sha256": "c2943669e838c36adca5f4f4ef727602a71398e994e79b124ef6935f6e09c011",
+          "bytes": 252
+        },
+        "stun-context/udp-first-byte-refusal.pcapng": {
+          "sha256": "bc13ee83a9f96d0fe302ac6d88f8b11529574595864140108690cec55e04ed1f",
+          "bytes": 864
+        },
+        "stun-context/udp-foreign-byte-refusal.pcapng": {
+          "sha256": "92547d8784272e43d86219ea00cf05699469b2e2b90a57546b5237e94c9db107",
+          "bytes": 1088
+        },
+        "stun-context/udp-foreign-first.pcapng": {
+          "sha256": "0da4fe2a96b2dfac8a5d2e6ab292015a30557752d5e9debc2e41b33b0f49b9dd",
+          "bytes": 476
+        },
+        "stun-context/udp-foreign-future.pcapng": {
+          "sha256": "2128ecc72e3174c02794cb3ae3a30b75e0d38f3a85e2401ae121d06444a72835",
+          "bytes": 476
+        },
+        "stun-context/udp-foreign-port.pcapng": {
+          "sha256": "b7295204d74eccb84eb1adddf454d5e40525a7d390f3b7f55b185614301cd353",
+          "bytes": 456
+        },
+        "stun-context/udp-inactive-slot-quarantine.pcapng": {
+          "sha256": "eb28448ed61e2f1e2d97189f1911367b9a26025cbd4434bd1766fa0659831337",
+          "bytes": 476
+        },
+        "stun-context/udp-malformed-fingerprint.pcapng": {
+          "sha256": "46c07b76f1439f7506b49f7fd8ce2d238ca71bf07e91bec3b25d5bf8d7db3486",
+          "bytes": 452
+        },
+        "stun-context/udp-normal.pcapng": {
+          "sha256": "c0f97948a3b447bb6966d540333210ad0f7c02709c41841112b654e3da4af5b7",
+          "bytes": 252
+        },
+        "stun-context/udp-old-retry-exact-expiry.pcapng": {
+          "sha256": "f23e3b785c1501b1944fc478ad37ff7e5e928403e255ef86c8612844a5ae94b4",
+          "bytes": 648
+        },
+        "stun-context/udp-older-than-first.pcapng": {
+          "sha256": "2b70b1534c6b4daad8563492927a962678480f81677687e66da8f8d6e85773b7",
+          "bytes": 648
+        },
+        "stun-context/udp-own-byte-refusal.pcapng": {
+          "sha256": "e3f8d8c4228cf413b22076b57c0c1f0a9459d4390214ab87ecd10d442e456ae6",
+          "bytes": 864
+        },
+        "stun-context/udp-permission-renew-399.pcapng": {
+          "sha256": "c90a4161fa83a100d8ab046081451004f3b2f25117116758f620087315be9137",
+          "bytes": 732
+        },
+        "stun-context/udp-permission-renew-400.pcapng": {
+          "sha256": "ba398faecb983eb4f56f6b7061dac0f0a848c303a1e3cda9e0c4273ac97db346",
+          "bytes": 732
+        },
+        "stun-context/udp-permissions-expire-2.pcapng": {
+          "sha256": "35576911eff2fd211895f93e4190718e1ef0330501ea86bc66b4fb8f36ff201e",
+          "bytes": 600
+        },
+        "stun-context/udp-permissions-expire-31.pcapng": {
+          "sha256": "c9e4240391f6c828f4417597a1e17b6ab77f4093116131beda73430a75147d0e",
+          "bytes": 600
+        },
+        "stun-context/udp-recent-retry.pcapng": {
+          "sha256": "516862b7f9a7f9f4a48c7e72e16ebe8be514f3d11b1d22b8a5dbae3f49632c17",
+          "bytes": 648
+        },
+        "stun-context/udp-refresh-orphan-complete.pcapng": {
+          "sha256": "eaddabc10d2e2bf571731841a5af90b90252217362629133315f0d44832afce5",
+          "bytes": 176
+        },
+        "stun-context/udp-refresh-orphan-missing-lifetime.pcapng": {
+          "sha256": "bd85cbec03263cbbd07f2f478e40c4a7b75402793397ba20bd325a0f07d44003",
+          "bytes": 168
+        },
+        "stun-context/udp-stale-retry.pcapng": {
+          "sha256": "ba41191d5110f3deec0ca8f0f6c11d3ab73138eae862fd296278acd794850b43",
+          "bytes": 648
+        },
+        "stun-context/udp-unadmitted-noise.pcapng": {
+          "sha256": "16477d6e5be69a02fbb2128b990295e46e426bde5b34271b935589f840798474",
+          "bytes": 332
+        },
+        "stun-context/udp-within-request-window.pcapng": {
+          "sha256": "42925bd785fed6ec500eac61158c4acedc1693a8053648d5be9a92e4b8797bc0",
+          "bytes": 252
+        },
+        "validation/expected.json": {
+          "sha256": "74860753017a085c5d5580fb965139c2526f565a2c13272c9073277552aa9d0e",
+          "bytes": 43594
+        }
+      },
+      "aliases": {
+        "common/pcapx/pcaputil/stun-context-tools/REUSED-MODEL.json": "stun-context-tools/REUSED-MODEL.json",
+        "common/pcapx/pcaputil/stun-context-tools/build.py": "stun-context-tools/build.py",
+        "common/pcapx/pcaputil/stun-context-tools/reference.py": "stun-context-tools/reference.py",
+        "common/pcapx/pcaputil/stun-context-tools/source-pins.json": "stun-context-tools/source-pins.json",
+        "common/pcapx/pcaputil/stun-context-tools/verify.py": "stun-context-tools/verify.py",
+        "common/pcapx/pcaputil/stun-context/controls.json": "stun-context/controls.json",
+        "common/pcapx/pcaputil/stun-context/expected.json": "stun-context/expected.json",
+        "common/pcapx/pcaputil/stun-context/tcp-backdated-first-request.pcapng": "stun-context/tcp-backdated-first-request.pcapng",
+        "common/pcapx/pcaputil/stun-context/tcp-coalesced-callback.pcapng": "stun-context/tcp-coalesced-callback.pcapng",
+        "common/pcapx/pcaputil/stun-context/tcp-old-retry-exact-expiry.pcapng": "stun-context/tcp-old-retry-exact-expiry.pcapng",
+        "common/pcapx/pcaputil/stun-context/tcp-older-than-first.pcapng": "stun-context/tcp-older-than-first.pcapng",
+        "common/pcapx/pcaputil/stun-context/tcp-recent-retry.pcapng": "stun-context/tcp-recent-retry.pcapng",
+        "common/pcapx/pcaputil/stun-context/tcp-stale-retry.pcapng": "stun-context/tcp-stale-retry.pcapng",
+        "common/pcapx/pcaputil/stun-context/udp-active-slot-pressure.pcapng": "stun-context/udp-active-slot-pressure.pcapng",
+        "common/pcapx/pcaputil/stun-context/udp-allocate-orphan-complete.pcapng": "stun-context/udp-allocate-orphan-complete.pcapng",
+        "common/pcapx/pcaputil/stun-context/udp-allocate-orphan-missing-lifetime.pcapng": "stun-context/udp-allocate-orphan-missing-lifetime.pcapng",
+        "common/pcapx/pcaputil/stun-context/udp-allocation-backdated-expired.pcapng": "stun-context/udp-allocation-backdated-expired.pcapng",
+        "common/pcapx/pcaputil/stun-context/udp-allocation-backdated-live.pcapng": "stun-context/udp-allocation-backdated-live.pcapng",
+        "common/pcapx/pcaputil/stun-context/udp-allocation-ordered-expired.pcapng": "stun-context/udp-allocation-ordered-expired.pcapng",
+        "common/pcapx/pcaputil/stun-context/udp-allocation-ordered-live.pcapng": "stun-context/udp-allocation-ordered-live.pcapng",
+        "common/pcapx/pcaputil/stun-context/udp-backdated-first-request.pcapng": "stun-context/udp-backdated-first-request.pcapng",
+        "common/pcapx/pcaputil/stun-context/udp-channel-backdated-expired.pcapng": "stun-context/udp-channel-backdated-expired.pcapng",
+        "common/pcapx/pcaputil/stun-context/udp-channel-backdated-live.pcapng": "stun-context/udp-channel-backdated-live.pcapng",
+        "common/pcapx/pcaputil/stun-context/udp-channel-ordered-expired.pcapng": "stun-context/udp-channel-ordered-expired.pcapng",
+        "common/pcapx/pcaputil/stun-context/udp-channel-ordered-live.pcapng": "stun-context/udp-channel-ordered-live.pcapng",
+        "common/pcapx/pcaputil/stun-context/udp-channel-renew-699.pcapng": "stun-context/udp-channel-renew-699.pcapng",
+        "common/pcapx/pcaputil/stun-context/udp-channel-renew-700.pcapng": "stun-context/udp-channel-renew-700.pcapng",
+        "common/pcapx/pcaputil/stun-context/udp-exact-request-expiry.pcapng": "stun-context/udp-exact-request-expiry.pcapng",
+        "common/pcapx/pcaputil/stun-context/udp-first-byte-refusal.pcapng": "stun-context/udp-first-byte-refusal.pcapng",
+        "common/pcapx/pcaputil/stun-context/udp-foreign-byte-refusal.pcapng": "stun-context/udp-foreign-byte-refusal.pcapng",
+        "common/pcapx/pcaputil/stun-context/udp-foreign-first.pcapng": "stun-context/udp-foreign-first.pcapng",
+        "common/pcapx/pcaputil/stun-context/udp-foreign-future.pcapng": "stun-context/udp-foreign-future.pcapng",
+        "common/pcapx/pcaputil/stun-context/udp-foreign-port.pcapng": "stun-context/udp-foreign-port.pcapng",
+        "common/pcapx/pcaputil/stun-context/udp-inactive-slot-quarantine.pcapng": "stun-context/udp-inactive-slot-quarantine.pcapng",
+        "common/pcapx/pcaputil/stun-context/udp-malformed-fingerprint.pcapng": "stun-context/udp-malformed-fingerprint.pcapng",
+        "common/pcapx/pcaputil/stun-context/udp-normal.pcapng": "stun-context/udp-normal.pcapng",
+        "common/pcapx/pcaputil/stun-context/udp-old-retry-exact-expiry.pcapng": "stun-context/udp-old-retry-exact-expiry.pcapng",
+        "common/pcapx/pcaputil/stun-context/udp-older-than-first.pcapng": "stun-context/udp-older-than-first.pcapng",
+        "common/pcapx/pcaputil/stun-context/udp-own-byte-refusal.pcapng": "stun-context/udp-own-byte-refusal.pcapng",
+        "common/pcapx/pcaputil/stun-context/udp-permission-renew-399.pcapng": "stun-context/udp-permission-renew-399.pcapng",
+        "common/pcapx/pcaputil/stun-context/udp-permission-renew-400.pcapng": "stun-context/udp-permission-renew-400.pcapng",
+        "common/pcapx/pcaputil/stun-context/udp-permissions-expire-2.pcapng": "stun-context/udp-permissions-expire-2.pcapng",
+        "common/pcapx/pcaputil/stun-context/udp-permissions-expire-31.pcapng": "stun-context/udp-permissions-expire-31.pcapng",
+        "common/pcapx/pcaputil/stun-context/udp-recent-retry.pcapng": "stun-context/udp-recent-retry.pcapng",
+        "common/pcapx/pcaputil/stun-context/udp-refresh-orphan-complete.pcapng": "stun-context/udp-refresh-orphan-complete.pcapng",
+        "common/pcapx/pcaputil/stun-context/udp-refresh-orphan-missing-lifetime.pcapng": "stun-context/udp-refresh-orphan-missing-lifetime.pcapng",
+        "common/pcapx/pcaputil/stun-context/udp-stale-retry.pcapng": "stun-context/udp-stale-retry.pcapng",
+        "common/pcapx/pcaputil/stun-context/udp-unadmitted-noise.pcapng": "stun-context/udp-unadmitted-noise.pcapng",
+        "common/pcapx/pcaputil/stun-context/udp-within-request-window.pcapng": "stun-context/udp-within-request-window.pcapng",
+        "scripts/protocol-tests/required-tests-traffic-unified-v98.json": "required-tests-traffic-unified-v98.json"
+      }
+    },
+    {
+      "id": "validation-stun-admission",
+      "kind": "support",
+      "source_sha": "e47797388656aec0489639c7acf8f993b3ce823b",
+      "file": "validation-stun-admission.zip",
+      "sha256": "d7426aedbcda0a2a61dbae6ad031ef851891d75bb4664fb45a592818fe1de677",
+      "password": "bin-parser",
+      "members": {
+        "required-tests-traffic-unified-v99.json": {
+          "sha256": "b247b0f5846b753f2f7c3541e362ad360ab764867addeed81928a0cb555b9149",
+          "bytes": 17139818
+        },
+        "stun-admission-tools/build.py": {
+          "sha256": "8f53cce1e7d5d5be6d9ec2836c2a8a5c03a6eacc81c037c3d47bf8e1d5353f58",
+          "bytes": 3100
+        },
+        "stun-admission-tools/source-pins.json": {
+          "sha256": "71489070ec26021fb561c9ce0a44acd6c2e1517e084fd97c8c1404974f56f136",
+          "bytes": 171
+        },
+        "stun-admission-tools/verify.py": {
+          "sha256": "e8fb50cfac86746896f091429e9f64236fb5e608fafba5378efeaa438ce46d73",
+          "bytes": 2074
+        },
+        "stun-admission/after-stun.pcap": {
+          "sha256": "a27cb8a75cabeeceb458f31c73fb764cc136489832756b42f14697d0c9cd85f5",
+          "bytes": 254
+        },
+        "stun-admission/controls.json": {
+          "sha256": "76a1a6ed4419241a8b67b89f2966169b586e8c02a512577f9e6744e0c1e0589a",
+          "bytes": 5300
+        },
+        "stun-admission/expected.json": {
+          "sha256": "a333df9cc91f3e949db7e59513a9c463305cf1393297e770834ed9a1044db1ec",
+          "bytes": 2050
+        },
+        "stun-admission/ordinary-coap.pcap": {
+          "sha256": "9ad78e68a1c6edef145838ecda84e19d070642309fd789e2d1c48077c28213d8",
+          "bytes": 86
+        },
+        "validation/expected.json": {
+          "sha256": "a333df9cc91f3e949db7e59513a9c463305cf1393297e770834ed9a1044db1ec",
+          "bytes": 2050
+        }
+      },
+      "aliases": {
+        "common/pcapx/pcaputil/stun-admission-tools/build.py": "stun-admission-tools/build.py",
+        "common/pcapx/pcaputil/stun-admission-tools/source-pins.json": "stun-admission-tools/source-pins.json",
+        "common/pcapx/pcaputil/stun-admission-tools/verify.py": "stun-admission-tools/verify.py",
+        "common/pcapx/pcaputil/stun-admission/after-stun.pcap": "stun-admission/after-stun.pcap",
+        "common/pcapx/pcaputil/stun-admission/controls.json": "stun-admission/controls.json",
+        "common/pcapx/pcaputil/stun-admission/expected.json": "stun-admission/expected.json",
+        "common/pcapx/pcaputil/stun-admission/ordinary-coap.pcap": "stun-admission/ordinary-coap.pcap",
+        "scripts/protocol-tests/required-tests-traffic-unified-v99.json": "required-tests-traffic-unified-v99.json"
+      }
     }
   ],
   "schema_version": 1,

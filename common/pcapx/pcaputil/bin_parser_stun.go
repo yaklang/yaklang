@@ -276,7 +276,7 @@ func (s *binSTUN) consume(dir int, ts time.Time, w []byte, max int, stream bool)
 	class := (t>>4)&1 | (t>>7)&2
 	var id [12]byte
 	copy(id[:], w[8:20])
-	req := stunRequest{method: method, hash: sha256.Sum256(w), expires: s.clock.Add(40 * time.Second)}
+	req := stunRequest{method: method, hash: sha256.Sum256(w), expires: ts.Add(40 * time.Second)}
 	out := map[string]any{"Packet Name": stunName(method), "Class": class, "Transaction ID": hex.EncodeToString(id[:]), "TURN": stunTURNMethod(method), "Integrity": "absent"}
 	attrs := []any{}
 	fingerprint := false
@@ -365,6 +365,10 @@ func (s *binSTUN) consume(dir int, ts time.Time, w []byte, max int, stream bool)
 		at = next
 	}
 	out["Attributes"] = attrs
+	// Required response grammar does not depend on owning its request.
+	if class == 2 && (method == 3 || method == 4) && !req.hasLifetime {
+		return nil, fmt.Errorf("turn: successful allocation/refresh lacks lifetime")
+	}
 	key := stunKey{dir, id}
 	if class == 0 {
 		old, ok := s.pending[key]
@@ -392,6 +396,9 @@ func (s *binSTUN) consume(dir int, ts time.Time, w []byte, max int, stream bool)
 		if method == 9 && (req.channel == 0 || len(req.peers) != 1) {
 			return nil, fmt.Errorf("turn: ChannelBind lacks channel")
 		}
+		if ok && req.expires.Before(old.expires) {
+			req.expires = old.expires
+		}
 		s.history[key] = false
 		s.pending[key] = req
 		out["Retransmission"] = ok
@@ -406,13 +413,10 @@ func (s *binSTUN) consume(dir int, ts time.Time, w []byte, max int, stream bool)
 			if class == 2 {
 				switch method {
 				case 3, 4:
-					if !req.hasLifetime {
-						return nil, fmt.Errorf("turn: successful allocation/refresh lacks lifetime")
-					}
 					if req.lifetime == 0 {
 						s.clearAllocation(key.dir)
 					} else {
-						s.allocations[key.dir] = s.clock.Add(time.Duration(req.lifetime) * time.Second)
+						s.allocations[key.dir] = ts.Add(time.Duration(req.lifetime) * time.Second)
 					}
 					out["Lifetime"] = req.lifetime
 				case 8, 9:
@@ -441,10 +445,19 @@ func (s *binSTUN) consume(dir int, ts time.Time, w []byte, max int, stream bool)
 								return nil, protocolError(ErrDesynchronized, "TURN peer bound to another channel")
 							}
 						}
-						s.channels[ck] = turnChannel{old.peer, s.clock.Add(600 * time.Second)}
+						expiry := ts.Add(600 * time.Second)
+						if prior, ok := s.channels[ck]; ok && prior.expires.After(expiry) {
+							expiry = prior.expires
+						}
+						s.channels[ck] = turnChannel{old.peer, expiry}
 					}
 					for _, peer := range old.peers {
-						s.permissions[turnPeerKey{key.dir, peer.Addr()}] = s.clock.Add(300 * time.Second)
+						pk := turnPeerKey{key.dir, peer.Addr()}
+						expiry := ts.Add(300 * time.Second)
+						if prior := s.permissions[pk]; prior.After(expiry) {
+							expiry = prior
+						}
+						s.permissions[pk] = expiry
 					}
 				}
 			}
