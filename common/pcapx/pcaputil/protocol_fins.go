@@ -248,16 +248,21 @@ func (s *binFINS) consume(w []byte, dir int, id uint64, now time.Time, b ParserB
 		return nil, 0, err
 	}
 	sid, cmd, response := w[9], binary.BigEndian.Uint16(w[10:12]), w[0]&0x40 != 0
-	if cmd != 0x0101 && cmd != 0x0104 && cmd != 0x0501 && !finsServiceCommand(cmd) && !finsDiagnosticCommand(cmd) && !finsOperationCommand(cmd) {
+	if cmd != 0x0101 && cmd != 0x0104 && cmd != 0x0501 && !finsServiceCommand(cmd) && !finsDiagnosticCommand(cmd) && !finsOperationCommand(cmd) && !finsParameterCommand(cmd) {
 		invalidate()
-		return nil, 0, finsErr(ErrUnsupportedFeature, "selected memory/CPU/status/cycle/clock/diagnostic/memory-operation services only")
+		return nil, 0, finsErr(ErrUnsupportedFeature, "selected memory/CPU/status/cycle/clock/diagnostic/memory-operation/parameter-area services only")
 	}
 	var p *finsPending
 	if response {
 		p = s.pending[1-dir][sid]
 	}
 	if !response {
-		if finsOperationCommand(cmd) {
+		if finsParameterCommand(cmd) {
+			if err := finsParameterRequest(cmd, w, f, b); err != nil {
+				invalidate()
+				return nil, 0, err
+			}
+		} else if finsOperationCommand(cmd) {
 			if err := finsOperationRequest(cmd, w, f, b); err != nil {
 				invalidate()
 				return nil, 0, err
@@ -345,8 +350,14 @@ func (s *binFINS) consume(w []byte, dir int, id uint64, now time.Time, b ParserB
 	data := w[14:]
 	f["data_hex"] = finsHex(data)
 	if code&0x7f3f != 0 {
-		// W342 ERROR LOG READ alone may return records with range-overflow1104.
-		// Keep every other nonzero end-code payload's existing strict boundary.
+		// Parameter reads and error-log reads have distinct, bounded partial
+		// response layouts. Every other nonzero-code payload stays strict.
+		if cmd == 0x0201 && (code&0x7f3f == 0x1104 || code&0x7f3f == 0x1108) && len(data) != 0 {
+			if err := finsParameterResponse(cmd, data, p, linked, f, b, code&0x7f3f); err != nil {
+				return nil, 0, err
+			}
+			return f, reply, nil
+		}
 		if cmd == 0x2102 && code&0x7f3f == 0x1104 && len(data) != 0 {
 			if err := finsDiagnosticResponse(cmd, data, p, linked, f, b, 0x1104); err != nil {
 				return nil, 0, err
@@ -358,7 +369,11 @@ func (s *binFINS) consume(w []byte, dir int, id uint64, now time.Time, b ParserB
 		}
 		return f, reply, nil
 	}
-	if finsOperationCommand(cmd) {
+	if finsParameterCommand(cmd) {
+		if err := finsParameterResponse(cmd, data, p, linked, f, b, 0); err != nil {
+			return nil, 0, err
+		}
+	} else if finsOperationCommand(cmd) {
 		if err := finsOperationResponse(cmd, data, p, linked, f, b); err != nil {
 			return nil, 0, err
 		}

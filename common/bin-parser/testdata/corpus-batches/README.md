@@ -44,7 +44,7 @@ Run from the repository root:
 ```sh
 go run ./internal/trafficfixture/cmd/corpus test
 go test -json -count=1 -timeout=10m ./internal/trafficfixture/... ./common/bin-parser/... ./common/pcapx/... ./common/yak/cmd/yakcmds/shark-cli ./scripts/ci > traffic.jsonl
-go run ./internal/trafficfixture/cmd/corpus exec -- python3 @scripts/protocol-tests/check_go_test_json_v2.py traffic.jsonl --inventory @scripts/protocol-tests/required-tests-traffic-unified-v89.json --tier full
+go run ./internal/trafficfixture/cmd/corpus exec -- python3 @scripts/protocol-tests/check_go_test_json_v2.py traffic.jsonl --inventory @scripts/protocol-tests/required-tests-traffic-unified-v90.json --tier full
 ```
 
 The single `corpus` entry point uses the same bounded Go ZIP loader as tests.
@@ -83,7 +83,7 @@ their semantic coverage. The existing synthetic session keys are test inputs;
 production credentials, user private keys and material without redistribution
 permission belong in an external fixed-source download manifest.
 
-Current test requirements are sealed at `scripts/protocol-tests/required-tests-traffic-unified-v89.json`;
+Current test requirements are sealed at `scripts/protocol-tests/required-tests-traffic-unified-v90.json`;
 the historical inventories and all earlier batches remain unchanged.
 The supplemental small-corpus batch contains 26 minimal controls, their explicit
 expected facts, an offline generator and the compact pinned source manifest.
@@ -203,7 +203,7 @@ opaque selector bytes and one bounded Data value over Wrapper v1 TCP/UDP; object
 selector meaning, access permission and device operation are unverified. The
 original one-packet selective-access capture and original refused answer remain
 immutable; its now-supported answer is matched by exact input SHA and frame.
-The active inventory is `scripts/protocol-tests/required-tests-traffic-unified-v89.json`.
+The active inventory is `scripts/protocol-tests/required-tests-traffic-unified-v90.json`.
 
 The small-graph budget batch reuses accepted graph captures/answers and adds one
 249-byte UDP control for child count255 without child bytes. Its standalone proof
@@ -993,7 +993,7 @@ the normative answer; a missing numeric reference field is not a codec pass.
 Full/deferred, workers1/2/4, observers off/on, Feed chunks1/7/full, ownership,
 resources and close/refusal boundaries remain required.
 
-Current gate: `required-tests-traffic-unified-v89.json` with
+Current gate: `required-tests-traffic-unified-v90.json` with
 `check_go_test_json_v2.py`. The indexed validator preserves missing/unpassed,
 package invocation completion, descendant skips, failures and non-JSON checks;
 its mutation/differential harness is sealed with the material. Older checkers
@@ -1629,7 +1629,7 @@ userspace adapter; full kernel receiver/socket/timers and ECU endpoints do not.
 All161 preceding ZIPs remain byte-for-byte unchanged. Raw captures, dependencies,
 reference source/build output and process evidence stay outside Git.
 
-Current effective v89 inventory: 57,422 entries; 57,415 are mandatory for the full tier.
+Current effective v90 inventory: 60,701 entries; 60,694 are mandatory for the full tier.
 
 The opt-in `DynamicFlowControl` profile follows Linux v6.12 FC tuple updates (including WAIT without granting data). Disjoint address extensions or classical/FD carriers may share CAN IDs; unknown selectors cannot choose or mutate a conversation. Ambiguous selectors are rejected. Seven sealed cases exercise full/deferred, workers 1/2/4, and observer off/on, with exact fields, byte collections, contributor references, errors and resource ownership. The existing static FC profile remains unchanged. Pinned upstream FC and filter functions execute with declared userspace stubs; this is not a kernel/ECU endpoint. TShark 4.2.5 checks wire tuples and two complete payloads, but cannot independently reassemble the shared-address transcripts.
 
@@ -1678,3 +1678,5 @@ Selected FINS memory-operation observations add0102 CS/CJ/CP/NSJ bit02/30-33 and
 The immutable first FINS batch contains four short0102 historical controls under the versioned unselected-command and unknown-command-retires-sid IDs. The current memory-operation batch binds exact old control/input/wire SHA values in legacy-overrides.json and asserts MalformedMessage for the now-selected command with only one00 body byte. Old ZIPs and original UnsupportedFeature answers remain unchanged; this is a strict current decoder answer update, not a permissive error fallback. The independent model verifies both interpretations and actual historical hashes.
 
 TCP FIN completeness controls reuse eight immutable captures and add eight minimal record extractions. Twenty scenarios check finite sequence-window refusal, pending-byte refusal and successful recovery in IPv4/IPv6 with normal and wrapping sequence numbers. Exact bytes, complete MQTT fields/session, source references, ownership, zero residual budget and close completeness are asserted across workers, deferred decoding and observers. Twelve observer-panic configurations independently check that allowing missing input never suppresses operational failures. RFC9293 sequence semantics and the local analysis-budget policy are distinguished in the sealed source pin. All184 preceding archives remain unchanged.
+
+Selected FINS parameter-area observations add W3420201 read,0202 write and0203 clear over TCP and explicit UDP. Fixed area codes8000/8010/8012/8013/8002 carry exact beginning/count and complete BE16 values. Read/write are bounded to498 returned/written words; count bit15 is command-specific and clear retains a scalar16-bit count without constructing memory. Read replies self-describe area/count/last flags; exact observed requests constrain echoes and partial1104/1108 counts. Unpaired reads never invent an owner; empty write/clear acknowledgements require exact reverse context. Simultaneous range/count-limit priority stays unknown. Zero acknowledgements never prove RUN-mode writing or physical clearing, and multi-command atomic whole-area completion is not inferred. The new small archive contains only own minimal inputs/answers/tools; all185 previous archives are unchanged.
