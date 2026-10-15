@@ -125,7 +125,7 @@ func (f *binFlow) observeRADIUSTLSPeerRound(dir int, e *ProtocolEvent, w []byte,
 		for _, v := range c.history {
 			if v.key == key && v.digest == digest {
 				if v.complete {
-					return true, c.annotate(fields, tls, f.a.budget.MaxCollectionElements)
+					return true, c.annotate(fields, tls, f.a.budget.MaxCollectionElements, f.a.budget.MaxRecursionDepth)
 				}
 				tls["Fragment Status"] = "pending"
 				tls["Fragment Count"] = v.fragments
@@ -280,7 +280,7 @@ func (f *binFlow) observeRADIUSTLSPeerRound(dir int, e *ProtocolEvent, w []byte,
 	copy(history, c.history)
 	history[len(c.history)] = radiusTLSFragmentView{key: key, digest: digest, fragments: c.fragments, collected: next, complete: c.done}
 	c.history = history
-	if err := c.annotate(fields, tls, f.a.budget.MaxCollectionElements); err != nil {
+	if err := c.annotate(fields, tls, f.a.budget.MaxCollectionElements, f.a.budget.MaxRecursionDepth); err != nil {
 		return true, err
 	}
 	r.owners[key] = radiusTLSOwner{context: ctx}

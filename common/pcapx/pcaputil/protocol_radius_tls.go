@@ -8,7 +8,7 @@ import (
 // EAP-TLS observations are scoped to this complete outer EAP message. A RADIUS
 // endpoint tuple is not an authentication-session identity. Cross-round TLS
 // fragments require a proven State/Identifier chain and are never guessed.
-func radiusTLSFields(inner map[string]any, code byte, data []byte, max int, note func(string, bool)) (bool, error) {
+func radiusTLSFields(inner map[string]any, code byte, data []byte, max int, note func(string, bool), depths ...int) (bool, error) {
 	inner["Type Name"] = "TLS"
 	note("eap-tls-authentication-not-verified", false)
 	if len(data) == 0 || data[0]&0x80 != 0 && len(data) < 5 {
@@ -48,7 +48,11 @@ func radiusTLSFields(inner map[string]any, code byte, data []byte, max int, note
 		t["Record Count"], t["Records"] = 0, []map[string]any{}
 		return true, nil
 	}
-	err := radiusTLSRecordFields(t, body, max, included && uint64(declared) == uint64(len(body)))
+	limits := radiusTLSCertificateLimits{depth: 64, server: code == 1}
+	if len(depths) > 0 {
+		limits.depth = depths[0]
+	}
+	err := radiusTLSRecordFields(t, body, max, included && uint64(declared) == uint64(len(body)), limits)
 	if p, ok := err.(*ProtocolError); ok {
 		switch p.Kind {
 		case ErrMalformedMessage:
@@ -62,7 +66,7 @@ func radiusTLSFields(inner map[string]any, code byte, data []byte, max int, note
 	return true, err
 }
 
-func radiusTLSRecordFields(out map[string]any, data []byte, max int, completeBoundary bool) error {
+func radiusTLSRecordFields(out map[string]any, data []byte, max int, completeBoundary bool, contexts ...radiusTLSCertificateLimits) error {
 	boundaryError := ErrContextRequired
 	if completeBoundary {
 		boundaryError = ErrMalformedMessage
@@ -130,12 +134,15 @@ func radiusTLSRecordFields(out map[string]any, data []byte, max int, completeBou
 	// Each concatenation is bounded by this already-admitted outer message;
 	// it never reserves from the untrusted four-octet EAP declared length.
 	if len(handshake) > 0 {
-		rows, left, err := radiusTLSHandshakeFields(handshake, max)
+		rows, left, err := radiusTLSHandshakeFields(handshake, max, contexts...)
 		out["Handshake Incomplete"] = left > 0
 		if left > 0 {
 			out["Handshake Buffered Bytes"] = left
 		}
 		if err != nil {
+			if len(rows) > 0 && rows[len(rows)-1]["Type"] == byte(11) {
+				out["Handshake Messages"] = rows
+			}
 			if e, ok := err.(*ProtocolError); ok && e.Kind == ErrUnsupportedFeature {
 				unknown = err
 			} else {
@@ -165,7 +172,7 @@ func radiusTLSRecordFields(out map[string]any, data []byte, max int, completeBou
 	return unknown
 }
 
-func radiusTLSHandshakeFields(w []byte, max int) ([]map[string]any, int, error) {
+func radiusTLSHandshakeFields(w []byte, max int, contexts ...radiusTLSCertificateLimits) ([]map[string]any, int, error) {
 	count, at := 0, 0
 	for len(w)-at >= 4 {
 		n := 4 + tlsU24(w[at+1:])
@@ -181,6 +188,7 @@ func radiusTLSHandshakeFields(w []byte, max int) ([]map[string]any, int, error) 
 	}
 	rows := make([]map[string]any, 0, count)
 	var unsupported error
+	certificateContext, serverHellos := 0, 0
 	for p := 0; p < at; {
 		n := 4 + tlsU24(w[p+1:])
 		raw := w[p : p+n]
@@ -192,6 +200,31 @@ func radiusTLSHandshakeFields(w []byte, max int) ([]map[string]any, int, error) 
 				return nil, left, err
 			}
 			row["Hello"] = hello
+			if raw[0] == 2 {
+				serverHellos++
+				certificateContext = radiusTLSCertificateContext(hello)
+				if serverHellos > 1 {
+					certificateContext = 0
+				}
+			}
+		} else if raw[0] == 11 && serverHellos > 0 && len(contexts) > 0 && contexts[0].server {
+			rows = append(rows, row)
+			limits := radiusTLSCertificateLimits{depth: 64}
+			if len(contexts) > 0 {
+				limits = contexts[0]
+			}
+			if certificateContext != 1 || !limits.server {
+				kind := ErrContextRequired
+				if certificateContext == 2 {
+					kind = ErrUnsupportedFeature
+				}
+				return rows, left, protocolError(kind, "EAP-TLS certificate grammar requires a single observed legacy ServerHello context")
+			}
+			depth := limits.depth
+			if err := radiusTLSCertificateFields(row, raw[4:], max, depth); err != nil {
+				return rows, left, err
+			}
+			continue
 		} else {
 			unsupported = protocolError(ErrUnsupportedFeature, "EAP-TLS handshake requires a separate semantic profile")
 		}
@@ -307,4 +340,33 @@ func radiusTLSHelloFields(w []byte, client bool, max int) (map[string]any, error
 	}
 	hello["Extensions"] = extensions
 	return hello, nil
+}
+
+// A 0303 record or legacy_version alone is insufficient negotiation evidence.
+// This is a structural observation, never proof of a peer's cipher state.
+func radiusTLSCertificateContext(h map[string]any) int {
+	v, _ := h["Version"].(uint16)
+	suite, _ := h["Cipher Suite"].(uint16)
+	exts, _ := h["Extensions"].([]map[string]any)
+	for _, e := range exts {
+		if e["Type"] == uint16(9) || e["Type"] == uint16(20) {
+			if !bytes.Equal(e["Raw"].([]byte), []byte{0}) {
+				return 0
+			}
+		}
+		if e["Type"] == uint16(43) {
+			if v == 0x303 && bytes.Equal(e["Raw"].([]byte), []byte{3, 4}) && suite >= 0x1301 && suite <= 0x1305 {
+				return 2
+			}
+			return 0
+		}
+	}
+	if v != 0x303 {
+		return 0
+	}
+	switch suite {
+	case 0x003c:
+		return 1
+	}
+	return 0
 }

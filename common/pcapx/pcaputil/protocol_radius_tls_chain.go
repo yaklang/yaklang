@@ -145,14 +145,18 @@ func (c *radiusTLSRound) discard() {
 	c.retired = true
 	c.awaitingACK = false
 }
-func (c *radiusTLSRound) annotate(fields, t map[string]any, max int) error {
+func (c *radiusTLSRound) annotate(fields, t map[string]any, max int, depths ...int) error {
 	if c.done {
 		// A final fragment may coincidentally contain locally complete records.
 		// Replace their dissection, never combine stale local and aggregate fields.
 		for _, k := range []string{"Record Count", "Records", "Handshake Incomplete", "Handshake Buffered Bytes", "Handshake Messages", "Alert Messages", "Alert Buffered Bytes"} {
 			delete(t, k)
 		}
-		if err := radiusTLSRecordFields(t, c.data, max, true); err != nil {
+		limits := radiusTLSCertificateLimits{depth: 64, server: !c.peer}
+		if len(depths) > 0 {
+			limits.depth = depths[0]
+		}
+		if err := radiusTLSRecordFields(t, c.data, max, true, limits); err != nil {
 			c.discard()
 			radiusTLSRoundDiagnostic(fields, "")
 			if pe, ok := err.(*ProtocolError); ok {
@@ -307,7 +311,7 @@ func (f *binFlow) observeRADIUSTLSRound(dir int, e *ProtocolEvent, wire []byte, 
 			for _, v := range c.history {
 				if v.key == key && v.digest == digest {
 					if v.complete {
-						return c.annotate(fields, tls, f.a.budget.MaxCollectionElements)
+						return c.annotate(fields, tls, f.a.budget.MaxCollectionElements, f.a.budget.MaxRecursionDepth)
 					}
 					tls["Fragment Status"] = "pending"
 					tls["Fragment Count"] = v.fragments
@@ -363,7 +367,7 @@ func (f *binFlow) observeRADIUSTLSRound(dir int, e *ProtocolEvent, wire []byte, 
 		copy(nextRounds, r.rounds)
 		nextRounds[len(r.rounds)] = c
 		r.rounds = nextRounds
-		return c.annotate(fields, tls, f.a.budget.MaxCollectionElements)
+		return c.annotate(fields, tls, f.a.budget.MaxCollectionElements, f.a.budget.MaxRecursionDepth)
 	}
 	c := linked
 	if c.context != ownerContext || (more && !haveState) || ei != c.identifier+1 || e.Timestamp.Before(c.last) {
@@ -412,7 +416,7 @@ func (f *binFlow) observeRADIUSTLSRound(dir int, e *ProtocolEvent, wire []byte, 
 	copy(history, c.history)
 	history[len(c.history)] = radiusTLSFragmentView{key: key, digest: digest, fragments: c.fragments, collected: len(c.data), complete: c.done}
 	c.history = history
-	return c.annotate(fields, tls, f.a.budget.MaxCollectionElements)
+	return c.annotate(fields, tls, f.a.budget.MaxCollectionElements, f.a.budget.MaxRecursionDepth)
 }
 
 // Inspect descriptors without allocating protocol fields when the ordinary

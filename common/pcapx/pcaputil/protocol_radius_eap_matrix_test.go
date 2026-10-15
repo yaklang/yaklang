@@ -33,7 +33,7 @@ type radiusEAPControl struct {
 	Steps         []radiusEAPStep
 	Ports         [2]uint16
 	Legacy        bool `json:"legacy_byte_applicable"`
-	Budget        struct{ MaxMessageBytes, MaxCollectionElements int }
+	Budget        struct{ MaxMessageBytes, MaxCollectionElements, MaxRecursionDepth int }
 	Close         struct {
 		Profile     string
 		Outstanding int
@@ -357,6 +357,9 @@ func radiusEAPBudget(c radiusEAPControl) ParserBudget {
 	}
 	if c.Budget.MaxCollectionElements > 0 {
 		b.MaxCollectionElements = c.Budget.MaxCollectionElements
+	}
+	if c.Budget.MaxRecursionDepth > 0 {
+		b.MaxRecursionDepth = c.Budget.MaxRecursionDepth
 	}
 	return b
 }

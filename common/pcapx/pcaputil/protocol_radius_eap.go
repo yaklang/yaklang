@@ -8,7 +8,7 @@ import (
 
 // EAP-Message is assembled only from attributes of this one RADIUS message.
 // MAC bytes are observed, never verified or treated as an access decision.
-func radiusEAPFields(out map[string]any, max int) (bool, error) {
+func radiusEAPFields(out map[string]any, max int, depths ...int) (bool, error) {
 	attrs := out["Attributes"].([]map[string]any)
 	code := out["Code"].(int)
 	wire := make([]byte, 0)
@@ -165,7 +165,7 @@ func radiusEAPFields(out map[string]any, max int) (bool, error) {
 					var dissected bool
 					var err error
 					if typ == 13 {
-						dissected, err = radiusTLSFields(inner, ec, data, max, note)
+						dissected, err = radiusTLSFields(inner, ec, data, max, note, depths...)
 					} else if typ == 5 {
 						dissected, err = radiusOTPFields(inner, ec, data, max, note)
 					} else {

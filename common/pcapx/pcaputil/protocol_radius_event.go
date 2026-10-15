@@ -21,7 +21,7 @@ func (f *binFlow) consumeRADIUS(dir int, e *ProtocolEvent, wire []byte, legacy .
 		f.refuseRADIUSTLSRound(dir, wire)
 		return err
 	}
-	fields, err := radiusFields(wire, f.a.budget.MaxCollectionElements)
+	fields, err := radiusFields(wire, f.a.budget.MaxCollectionElements, f.a.budget.MaxRecursionDepth)
 	err = f.observeRADIUSTLSRound(dir, e, wire, fields, err)
 	var selected *radiusEAPFailure
 	errors.As(err, &selected)

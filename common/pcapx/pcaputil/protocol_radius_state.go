@@ -53,7 +53,7 @@ func (s *binRADIUS) outstanding() int {
 	}
 	return n
 }
-func radiusFields(raw []byte, max int) (map[string]any, error) {
+func radiusFields(raw []byte, max int, depths ...int) (map[string]any, error) {
 	if len(raw) < 20 {
 		return nil, fmt.Errorf("radius: truncated header")
 	}
@@ -153,7 +153,7 @@ func radiusFields(raw []byte, max int) (map[string]any, error) {
 		}
 	}
 	out["Attributes"], out["Attribute Count"] = attrs, len(attrs)
-	complete, err := radiusEAPFields(out, max)
+	complete, err := radiusEAPFields(out, max, depths...)
 	if err != nil {
 		if code != 4 {
 			for _, a := range attrs {

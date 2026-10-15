@@ -52,7 +52,13 @@ func radiusTLSWant(t *testing.T, m map[string]any) {
 			case "Flags", "Reserved Bits", "Content Type", "Level", "Description", "Compression Method":
 				m[k] = byte(x)
 			case "Version", "Cipher Suite":
-				m[k] = uint16(x)
+				if _, cert := m["DER"]; cert && k == "Version" {
+					m[k] = int(x)
+				} else {
+					m[k] = uint16(x)
+				}
+			case "Not Before", "Not After":
+				m[k] = int64(x)
 			case "Message Length", "Reassembled Length":
 				m[k] = uint32(x)
 			default:
@@ -60,13 +66,19 @@ func radiusTLSWant(t *testing.T, m map[string]any) {
 			}
 		case string:
 			switch k {
-			case "Data", "Raw", "Payload", "Body", "Random", "Session ID", "Compression Methods", "Reassembled Data":
+			case "Data", "Raw", "Payload", "Body", "Random", "Session ID", "Compression Methods", "Reassembled Data", "DER":
 				m[k] = radiusWire(t, x)
 			}
 		case map[string]any:
 			radiusTLSWant(t, x)
 		case []any:
-			if k == "Cipher Suites" {
+			if k == "DNS Names" || k == "IP Addresses" {
+				a := make([]string, len(x))
+				for i, v := range x {
+					a[i] = v.(string)
+				}
+				m[k] = a
+			} else if k == "Cipher Suites" {
 				a := make([]uint16, len(x))
 				for i, v := range x {
 					a[i] = uint16(v.(float64))

@@ -105733,6 +105733,198 @@
         "common/pcapx/pcaputil/radius-tls-peer/pure-known-EAP-refusal-profile-oldfail.pcap": "radius-tls-peer/pure-known-EAP-refusal-profile-oldfail.pcap",
         "scripts/protocol-tests/required-tests-traffic-unified-v116.json": "required-tests-traffic-unified-v116.json"
       }
+    },
+    {
+      "id": "validation-radius-tls-certificate",
+      "kind": "support",
+      "source_sha": "9f0aecbb24194870c23a3aa7a1c2ace74eceb77f",
+      "file": "validation-radius-tls-certificate.zip",
+      "sha256": "59c644d503be7c7765d8557689780d819d28401e4f2560d701e5966c3496de52",
+      "password": "bin-parser",
+      "members": {
+        "radius-tls-certificate-tools/der_model.py": {
+          "sha256": "2f35a6528cb374f3f662cfd11d27a891f996372bcbd18e01e615a8747a9a2e06",
+          "bytes": 6634
+        },
+        "radius-tls-certificate-tools/generate.py": {
+          "sha256": "24911bb60ba3d4baafc1f1827d6eb7d79f4fd9120b262deccdda98c1119d3443",
+          "bytes": 17711
+        },
+        "radius-tls-certificate-tools/public/leaf.der": {
+          "sha256": "ba3d8d25ede2c10ba4330c0737517ff8421c7d2db2ab8ad85d3cf54df2e15599",
+          "bytes": 922
+        },
+        "radius-tls-certificate-tools/public/root.der": {
+          "sha256": "30585a47694cf67c235311e4c541ef717ed0b5f9c5eeb264195b790683a2aaed",
+          "bytes": 779
+        },
+        "radius-tls-certificate-tools/public/san129.der": {
+          "sha256": "9f40da30c8d404a95ef46e15861de5c8b15643bca9fab07b1c0d6b9584f4867e",
+          "bytes": 2574
+        },
+        "radius-tls-certificate-tools/public/subjectOID129.der": {
+          "sha256": "325ac9f18b0ed54066a1b3eaf3e1344b94cb485bf333023c0be70ab635a0e1d9",
+          "bytes": 1051
+        },
+        "radius-tls-certificate-tools/public/unknown-opaque.der": {
+          "sha256": "f56773883a48da21d675d6c1206f41858761492a426bcb418ad5f68e05fa2686",
+          "bytes": 936
+        },
+        "radius-tls-certificate-tools/sources.json": {
+          "sha256": "bba5acea4a0a6b3139a6ae2299baba20693da9566a993e866488b332c7018f07",
+          "bytes": 6711
+        },
+        "radius-tls-certificate-tools/tls_wire_model.py": {
+          "sha256": "209898519931bbec075a659231693154cfaa750337bcd30e676eafcc073be92a",
+          "bytes": 9069
+        },
+        "radius-tls-certificate-tools/verify.py": {
+          "sha256": "9c5234712b385c7c9260b07e9724a536fea9a162a018aa488c33c0a11c7fecbd",
+          "bytes": 2880
+        },
+        "radius-tls-certificate-tools/verify_public.py": {
+          "sha256": "f869b8b14f8eea3404812c0800b9cf86c75c91ac5252f4914f46f436938c218d",
+          "bytes": 2845
+        },
+        "radius-tls-certificate-tools/verify_public_exact.py": {
+          "sha256": "a955e21f0de521db65cd39b5d57dab650da33bed949352ed2d2e01a4d361890e",
+          "bytes": 3364
+        },
+        "radius-tls-certificate/certificate-DER-trailing-octet.pcap": {
+          "sha256": "ade35811adcd4354ef50143f60a56498d4fce86cd53854574de81ead1e5cddb5",
+          "bytes": 1452
+        },
+        "radius-tls-certificate/certificate-OpenPGP-format-context.pcap": {
+          "sha256": "d97416ded03a19f584d12f0bacd8442a6894468b27738561e9ea9a2b58a38b32",
+          "bytes": 1458
+        },
+        "radius-tls-certificate/certificate-SAN129-cap128.pcap": {
+          "sha256": "3350f4aa036db29286471c3e92083bd1cf57ffc75160142cc1975bae43a33781",
+          "bytes": 3117
+        },
+        "radius-tls-certificate/certificate-SubjectOID129-cap128.pcap": {
+          "sha256": "b4b2bc69424c738f611e07e8b08bbdc4044c2a12eb3616493f08460fc2ebfa08",
+          "bytes": 1582
+        },
+        "radius-tls-certificate/certificate-TLS13-supported-versions.pcap": {
+          "sha256": "69aa138bb63863d431a7d8d7f587ca14b700f534fcbad45806bfdee9f9b15244",
+          "bytes": 1459
+        },
+        "radius-tls-certificate/certificate-after-CCS-opaque.pcap": {
+          "sha256": "0334f9940a277f21f26aa85202e12700461b99a06c7414fe9f1c57465649373a",
+          "bytes": 1462
+        },
+        "radius-tls-certificate/certificate-chain-known-codec-node-cap64-refusal-neighbor-late.pcap": {
+          "sha256": "4e9ec53142b8624624cf911430b01e284454dba163f6dc33e06eede235eece53",
+          "bytes": 2835
+        },
+        "radius-tls-certificate/certificate-client-format-does-not-change-server.pcap": {
+          "sha256": "b19b658ce3878aedde8adf5d516d2eefa4c0ebd9c2c006a535a4f521b872c04e",
+          "bytes": 1458
+        },
+        "radius-tls-certificate/certificate-conflicting-supported-versions.pcap": {
+          "sha256": "8ac4ec43af0d7100f36763808dcf4ddc3e4e069395af51884a075e6bf39fd16b",
+          "bytes": 1459
+        },
+        "radius-tls-certificate/certificate-count17-cap16.pcap": {
+          "sha256": "e1cbc0bd812ad1cdedf809a72cb4cb7b944e05e491ac45aafbedb943cf3367f3",
+          "bytes": 605
+        },
+        "radius-tls-certificate/certificate-handshake-cross-two-local-records.pcap": {
+          "sha256": "dc1435a884fa0d0e563f9b392a602cd67c2315803545e83745661077c81346eb",
+          "bytes": 1456
+        },
+        "radius-tls-certificate/certificate-legacy12-leaf.pcap": {
+          "sha256": "ec00cff6b0ff0547dd2381d0b98de3a4a0809a52361302653bd90627ec7140ac",
+          "bytes": 1451
+        },
+        "radius-tls-certificate/certificate-legacy12-ordered-leaf-root.pcap": {
+          "sha256": "bc99d4ccff659836586021b4ab559e0ebf49994eef4839b2d571f1538555e5b9",
+          "bytes": 2239
+        },
+        "radius-tls-certificate/certificate-list-total-length-mismatch.pcap": {
+          "sha256": "126f7df052e3725b5284416ecb0462c293be8ab86b465d2f3ad8ea084f5d91f2",
+          "bytes": 1451
+        },
+        "radius-tls-certificate/certificate-no-serverhello-context.pcap": {
+          "sha256": "f3ab692072dd5c2f10814d92a5ea545f23bf8f55a90b40fe42a704b73df1ee4f",
+          "bytes": 1409
+        },
+        "radius-tls-certificate/certificate-peer-response-no-server-role.pcap": {
+          "sha256": "d8558c156a70929aa94cb9fe03f46144ea39afc3b2cb306b843ed6bb08ba4a2c",
+          "bytes": 1445
+        },
+        "radius-tls-certificate/certificate-proven-server-State-chain-reassembled.pcap": {
+          "sha256": "1e588651c5e243a98514ffb98b3fceefa678357604e90f0a1dc5a8d30341cb9c",
+          "bytes": 1757
+        },
+        "radius-tls-certificate/certificate-rawpublickey-format-context.pcap": {
+          "sha256": "0431743fbdf1a33b89d36e216f28491783d1c7aff0ae09f2008bb061f8fa7157",
+          "bytes": 1458
+        },
+        "radius-tls-certificate/certificate-unknown-cipher-context.pcap": {
+          "sha256": "c23a879971b585b9b6830a0e1814655d94f3ef565c0e657eec92fc6c6273f250",
+          "bytes": 1451
+        },
+        "radius-tls-certificate/certificate-unknown-extension-opaque-depth8.pcap": {
+          "sha256": "4e7870b9ae97ff5923b6d35b506aff6c777620b43bb181c5bc034232919f6f08",
+          "bytes": 1465
+        },
+        "radius-tls-certificate/controls.json": {
+          "sha256": "4371f91d471377257d7095808b7669bfb797ee2aee70b14b7431d64fa7a45824",
+          "bytes": 1003427
+        },
+        "radius-tls-certificate/legacy.json": {
+          "sha256": "f26eae4fe9c5461ed29bd74ab080a844abe6fd0b57f0e00dd72161c48c7d4b25",
+          "bytes": 63748
+        },
+        "required-tests-traffic-unified-v117.json": {
+          "sha256": "1dfc8556c01a53a3089c15667ad5cd106fc5366fbd6cf8ab1f36ce30c2f5a6d4",
+          "bytes": 19845143
+        },
+        "validation/expected.json": {
+          "sha256": "5c10a539442ffe4d9a603ab8de2c2531b67f761ed40a320b62009e556c393d3c",
+          "bytes": 27943
+        }
+      },
+      "aliases": {
+        "common/pcapx/pcaputil/radius-tls-certificate-tools/der_model.py": "radius-tls-certificate-tools/der_model.py",
+        "common/pcapx/pcaputil/radius-tls-certificate-tools/generate.py": "radius-tls-certificate-tools/generate.py",
+        "common/pcapx/pcaputil/radius-tls-certificate-tools/public/leaf.der": "radius-tls-certificate-tools/public/leaf.der",
+        "common/pcapx/pcaputil/radius-tls-certificate-tools/public/root.der": "radius-tls-certificate-tools/public/root.der",
+        "common/pcapx/pcaputil/radius-tls-certificate-tools/public/san129.der": "radius-tls-certificate-tools/public/san129.der",
+        "common/pcapx/pcaputil/radius-tls-certificate-tools/public/subjectOID129.der": "radius-tls-certificate-tools/public/subjectOID129.der",
+        "common/pcapx/pcaputil/radius-tls-certificate-tools/public/unknown-opaque.der": "radius-tls-certificate-tools/public/unknown-opaque.der",
+        "common/pcapx/pcaputil/radius-tls-certificate-tools/sources.json": "radius-tls-certificate-tools/sources.json",
+        "common/pcapx/pcaputil/radius-tls-certificate-tools/tls_wire_model.py": "radius-tls-certificate-tools/tls_wire_model.py",
+        "common/pcapx/pcaputil/radius-tls-certificate-tools/verify.py": "radius-tls-certificate-tools/verify.py",
+        "common/pcapx/pcaputil/radius-tls-certificate-tools/verify_public.py": "radius-tls-certificate-tools/verify_public.py",
+        "common/pcapx/pcaputil/radius-tls-certificate-tools/verify_public_exact.py": "radius-tls-certificate-tools/verify_public_exact.py",
+        "common/pcapx/pcaputil/radius-tls-certificate/certificate-DER-trailing-octet.pcap": "radius-tls-certificate/certificate-DER-trailing-octet.pcap",
+        "common/pcapx/pcaputil/radius-tls-certificate/certificate-OpenPGP-format-context.pcap": "radius-tls-certificate/certificate-OpenPGP-format-context.pcap",
+        "common/pcapx/pcaputil/radius-tls-certificate/certificate-SAN129-cap128.pcap": "radius-tls-certificate/certificate-SAN129-cap128.pcap",
+        "common/pcapx/pcaputil/radius-tls-certificate/certificate-SubjectOID129-cap128.pcap": "radius-tls-certificate/certificate-SubjectOID129-cap128.pcap",
+        "common/pcapx/pcaputil/radius-tls-certificate/certificate-TLS13-supported-versions.pcap": "radius-tls-certificate/certificate-TLS13-supported-versions.pcap",
+        "common/pcapx/pcaputil/radius-tls-certificate/certificate-after-CCS-opaque.pcap": "radius-tls-certificate/certificate-after-CCS-opaque.pcap",
+        "common/pcapx/pcaputil/radius-tls-certificate/certificate-chain-known-codec-node-cap64-refusal-neighbor-late.pcap": "radius-tls-certificate/certificate-chain-known-codec-node-cap64-refusal-neighbor-late.pcap",
+        "common/pcapx/pcaputil/radius-tls-certificate/certificate-client-format-does-not-change-server.pcap": "radius-tls-certificate/certificate-client-format-does-not-change-server.pcap",
+        "common/pcapx/pcaputil/radius-tls-certificate/certificate-conflicting-supported-versions.pcap": "radius-tls-certificate/certificate-conflicting-supported-versions.pcap",
+        "common/pcapx/pcaputil/radius-tls-certificate/certificate-count17-cap16.pcap": "radius-tls-certificate/certificate-count17-cap16.pcap",
+        "common/pcapx/pcaputil/radius-tls-certificate/certificate-handshake-cross-two-local-records.pcap": "radius-tls-certificate/certificate-handshake-cross-two-local-records.pcap",
+        "common/pcapx/pcaputil/radius-tls-certificate/certificate-legacy12-leaf.pcap": "radius-tls-certificate/certificate-legacy12-leaf.pcap",
+        "common/pcapx/pcaputil/radius-tls-certificate/certificate-legacy12-ordered-leaf-root.pcap": "radius-tls-certificate/certificate-legacy12-ordered-leaf-root.pcap",
+        "common/pcapx/pcaputil/radius-tls-certificate/certificate-list-total-length-mismatch.pcap": "radius-tls-certificate/certificate-list-total-length-mismatch.pcap",
+        "common/pcapx/pcaputil/radius-tls-certificate/certificate-no-serverhello-context.pcap": "radius-tls-certificate/certificate-no-serverhello-context.pcap",
+        "common/pcapx/pcaputil/radius-tls-certificate/certificate-peer-response-no-server-role.pcap": "radius-tls-certificate/certificate-peer-response-no-server-role.pcap",
+        "common/pcapx/pcaputil/radius-tls-certificate/certificate-proven-server-State-chain-reassembled.pcap": "radius-tls-certificate/certificate-proven-server-State-chain-reassembled.pcap",
+        "common/pcapx/pcaputil/radius-tls-certificate/certificate-rawpublickey-format-context.pcap": "radius-tls-certificate/certificate-rawpublickey-format-context.pcap",
+        "common/pcapx/pcaputil/radius-tls-certificate/certificate-unknown-cipher-context.pcap": "radius-tls-certificate/certificate-unknown-cipher-context.pcap",
+        "common/pcapx/pcaputil/radius-tls-certificate/certificate-unknown-extension-opaque-depth8.pcap": "radius-tls-certificate/certificate-unknown-extension-opaque-depth8.pcap",
+        "common/pcapx/pcaputil/radius-tls-certificate/controls.json": "radius-tls-certificate/controls.json",
+        "common/pcapx/pcaputil/radius-tls-certificate/legacy.json": "radius-tls-certificate/legacy.json",
+        "common/pcapx/pcaputil/radius-tls-certificate/certificate-known-codec-depth7.pcap": "radius-tls-certificate/certificate-legacy12-leaf.pcap",
+        "scripts/protocol-tests/required-tests-traffic-unified-v117.json": "required-tests-traffic-unified-v117.json"
+      }
     }
   ],
   "schema_version": 1,
