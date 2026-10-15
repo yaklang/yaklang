@@ -173,7 +173,16 @@ func (c *Config) wrapper(i AICallbackType, tier consts.ModelTier) AICallbackType
 					}
 					continue
 				}
+				if ctxErr := requestCtx.Err(); ctxErr != nil {
+					return nil, ctxErr
+				}
+				if overflowErr := ClassifyPromptTooLong(rsp, err); overflowErr != nil {
+					return rsp, overflowErr
+				}
 				if rsp != nil && isNonRetryableAIHTTPResponse(rsp) {
+					if !waitOrigAIResponseCallbackContext(requestCtx, rsp) {
+						return nil, requestCtx.Err()
+					}
 					return rsp, aiHTTPResponseError(rsp)
 				}
 				if err != nil || rsp == nil {
@@ -190,6 +199,9 @@ func (c *Config) wrapper(i AICallbackType, tier consts.ModelTier) AICallbackType
 				})
 				if !waitOrigAIResponseCallbackContext(requestCtx, origRsp) {
 					return nil, requestCtx.Err()
+				}
+				if overflowErr := ClassifyPromptTooLong(rsp, err); overflowErr != nil {
+					return rsp, overflowErr
 				}
 				return rsp, err
 			}
@@ -249,7 +261,16 @@ func (c *Config) wrapper(i AICallbackType, tier consts.ModelTier) AICallbackType
 				}
 				continue
 			}
+			if ctxErr := requestCtx.Err(); ctxErr != nil {
+				return nil, ctxErr
+			}
+			if overflowErr := ClassifyPromptTooLong(rsp, err); overflowErr != nil {
+				return rsp, overflowErr
+			}
 			if rsp != nil && isNonRetryableAIHTTPResponse(rsp) {
+				if !waitOrigAIResponseCallbackContext(requestCtx, rsp) {
+					return nil, requestCtx.Err()
+				}
 				return rsp, aiHTTPResponseError(rsp)
 			}
 			if err != nil || rsp == nil {
@@ -400,6 +421,9 @@ func (c *Config) wrapper(i AICallbackType, tier consts.ModelTier) AICallbackType
 			})
 			if !waitOrigAIResponseCallbackContext(requestCtx, origRsp) {
 				return nil, requestCtx.Err()
+			}
+			if overflowErr := ClassifyPromptTooLong(rsp, err); overflowErr != nil {
+				return rsp, overflowErr
 			}
 			if c.DebugPrompt {
 				rsp.Debug(true)

@@ -1395,7 +1395,7 @@ func executeChatBaseRequest(
 				cancel()
 			}
 		}
-		return body.String(), utils.Errorf("request post to %v：%v", url, finalErr)
+		return body.String(), utils.Errorf("request post to %v：%w", url, finalErr)
 	}
 	return body.String(), nil
 }
