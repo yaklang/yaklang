@@ -101,12 +101,14 @@ func TestTimelineCompressionRetainsOriginalsAcrossRounds(t *testing.T) {
 	restored, err := UnmarshalTimeline(raw)
 	require.NoError(t, err)
 	require.Equal(t, view, RenderTimelineFrozenOpen(restored))
+	tl.SetTimelineContentLimit(int64(mainTimelineTokens(tl) + 1))
 	for i := 0; i < 3; i++ {
 		next, err := tl.CompressBeforePrompt(compressionTestOptions())
 		require.NoError(t, err)
-		require.Nil(t, next, "retained originals alone must not repeat compression")
+		require.Nil(t, next, "retained originals below the limit must not repeat compression")
 	}
 	require.Equal(t, 1, calls)
+	tl.SetTimelineContentLimit(1)
 	tl.PushText(3, "嵌套验证结果已通过。")
 	second, err := tl.CompressBeforePrompt(compressionTestOptions())
 	require.NoError(t, err)

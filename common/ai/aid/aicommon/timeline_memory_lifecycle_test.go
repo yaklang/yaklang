@@ -35,10 +35,16 @@ func TestTimelineMemoryFinalizationExactOnlyAndUnchanged(t *testing.T) {
 				raw, err := json.Marshal(compressionOutputFixture("", []any{compressionMemoryFixture()}))
 				return string(raw), err
 			})
-			// Promotion/freezing itself must not invoke the model.
+			// Promotion/freezing itself must not invoke the model when nothing
+			// is decidable; evidence is decidable promoted state, so that case
+			// asks once and keeps the evidence by default.
+			wantInitialCalls := 0
+			if kind == "evidence" {
+				wantInitialCalls = 1
+			}
 			_, err := tl.CompressOnce(compressionTestOptions())
 			require.NoError(t, err)
-			require.Zero(t, calls)
+			require.Equal(t, wantInitialCalls, calls)
 			tl.RequestMemoryFinalization()
 			require.NoError(t, tl.FinalizeMemory(context.Background(), compressionTestOptions()))
 			tl.FinishMemoryFinalization()

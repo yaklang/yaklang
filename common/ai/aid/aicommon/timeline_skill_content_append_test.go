@@ -58,9 +58,8 @@ func TestSkillContentDifferentWindowsStayInHistory(t *testing.T) {
 
 	snapshot, err := tl.captureCompressionSnapshot()
 	require.NoError(t, err)
-	require.Empty(t, snapshot.Items, "skill windows stay exact and are not compression candidates")
-	require.Contains(t, snapshot.ExactItemIDs, firstID)
-	require.Contains(t, snapshot.ExactItemIDs, secondID)
+	require.Empty(t, snapshot.Items, "skill windows are promoted items, not ordinary history")
+	require.Equal(t, []int64{firstID, secondID}, []int64{snapshot.PromotedItems[0].ID, snapshot.PromotedItems[1].ID})
 
 	tl.FreezeAll()
 	skills := tl.RenderSkillContentForPrompt()
@@ -87,8 +86,12 @@ func TestSkillContentHistoricalWindowsSurviveCompression(t *testing.T) {
 	require.True(t, tl.PushSkillFileContent(secondID, "demo-skill", "SKILL.md", "LATER_WINDOW", SkillContentSourceAuto, 1, 1, 1))
 	tl.FreezeAll()
 	bindCompressionMock(t, tl, func(req *AIRequest) (string, error) {
-		require.NotContains(t, req.GetPrompt(), "EARLIER_WINDOW")
-		require.NotContains(t, req.GetPrompt(), "LATER_WINDOW")
+		// Same identity does not aggregate compression candidates: both
+		// original reads and their full bodies are independently selectable.
+		require.Equal(t, 2, strings.Count(req.GetPrompt(), "demo-skill:SKILL.md"))
+		require.Contains(t, req.GetPrompt(), "EARLIER_WINDOW")
+		require.Contains(t, req.GetPrompt(), "LATER_WINDOW")
+		require.Contains(t, req.GetPrompt(), "PROMOTED_ENTRIES_")
 		return compressionMockSummary("Ordinary history summarized."), nil
 	})
 

@@ -47,15 +47,15 @@ func TestTimelineCompressionSnapshotRange(t *testing.T) {
 	require.Len(t, snapshot.Items, 24)
 	require.True(t, snapshot.Items[0].Frozen)
 	require.False(t, snapshot.Items[23].Frozen)
-	require.Equal(t, []int64{15, 245}, snapshot.ExactItemIDs)
-	for _, item := range snapshot.Items {
-		require.NotContains(t, snapshot.ExactItemIDs, item.ID, "no exact item may enter the retirement list")
-	}
+	require.Empty(t, snapshot.ExactItemIDs)
+	require.Equal(t, []int64{15, 245}, []int64{snapshot.PromotedItems[0].ID, snapshot.PromotedItems[1].ID})
 	require.Contains(t, snapshot.InputText, "OLD_SUMMARY")
 	require.Contains(t, snapshot.InputText, "item-10")
 	require.Contains(t, snapshot.InputText, "item-240")
-	require.NotContains(t, snapshot.InputText, "EXACT_EVIDENCE")
-	require.NotContains(t, snapshot.InputText, "EXACT_SCHEMA")
+	require.Contains(t, snapshot.InputText, "EXACT_EVIDENCE")
+	require.Contains(t, snapshot.InputText, "EXACT_SCHEMA")
+	require.Equal(t, 1, strings.Count(snapshot.InputText, "EXACT_EVIDENCE"))
+	require.Equal(t, 1, strings.Count(snapshot.InputText, "EXACT_SCHEMA"))
 	require.Equal(t, MeasureTokens(snapshot.InputText), snapshot.InputTokens)
 
 	tl.mu.Lock()

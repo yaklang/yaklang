@@ -31,10 +31,17 @@ func renderCompressionSummaryPrompt(snapshot *timelineCompressionSnapshot) (stri
 	}
 	history := renderCompressionSnapshotItems(snapshot.Items)
 	if strings.TrimSpace(previous) == "" && strings.TrimSpace(history) == "" &&
+		!snapshot.hasPromotedItems() &&
 		(!snapshot.FinalizingMemory || (len(snapshot.UserContexts) == 0 && strings.TrimSpace(snapshot.Evidence) == "")) {
 		return "", fmt.Errorf("timeline compression has no history to summarize")
 	}
 	var source strings.Builder
+	if snapshot.TargetTokens > 0 {
+		source.WriteString(compressionSourceTag("COMPRESSION_TARGET",
+			fmt.Sprintf("压缩后的主模型 Timeline 材料总占用目标为不超过 %d tokens。"+
+				"该目标包含 summary、保留原文、promoted 正文和不可删除的用户输入，不是仅 summary 的长度。"+
+				"保留继续任务需要的信息，主动选择不再需要的 promoted item；不能删除用户输入来满足目标。", snapshot.TargetTokens)))
+	}
 	keys := []string{"user_query", "frozen_user_context", "todo"}
 	labels := map[string]string{"user_query": "ORIGINAL_USER_QUERY", "frozen_user_context": "FROZEN_USER_CONTEXT", "todo": "TODO"}
 	var extra []string
@@ -74,7 +81,10 @@ func renderCompressionSummaryPrompt(snapshot *timelineCompressionSnapshot) (stri
 		}
 	}
 	source.WriteString(compressionSourceTag("OPEN_USER_CONTEXT", openUser.String()))
-	source.WriteString(compressionSourceTag("SESSION_EVIDENCE", snapshot.Evidence))
+	if !snapshot.hasEvidenceItems() {
+		source.WriteString(compressionSourceTag("SESSION_EVIDENCE", snapshot.Evidence))
+	}
+	source.WriteString(compressionSourceTag("PROMOTED_ENTRIES", renderCompressionPromotedItems(snapshot.PromotedItems)))
 	source.WriteString(compressionSourceTag("SESSION_MEMORY_CANDIDATES", renderSessionMemoryCandidates(snapshot.SessionMemoryCandidates)))
 	source.WriteString(compressionSourceTag("PREVIOUS_SUMMARY", previous))
 	var frozen, open []timelineCompressionSnapshotItem
@@ -168,7 +178,8 @@ func (m *Timeline) summarizeCompressionSnapshot(snapshot *timelineCompressionSna
 		}
 		// Only summary and selection belong to the atomic Timeline commit.
 		snapshot.Output = &timelineCompressionOutput{Summary: output.Summary, RetainedRange: output.RetainedRange,
-			RetainedIDs: append([]int64(nil), output.RetainedIDs...)}
+			RetainedIDs:            append([]int64(nil), output.RetainedIDs...),
+			RetiredPromotedEntries: append([]int64(nil), output.RetiredPromotedEntries...)}
 		return output.Summary, nil
 	case <-ctx.Done():
 		return "", ctx.Err()

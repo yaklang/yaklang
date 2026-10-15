@@ -19,7 +19,13 @@ type timelineCompressionCompletion struct {
 }
 
 func validateCompressionSelection(output *timelineCompressionOutput, snapshot *timelineCompressionSnapshot, limit TimelineCompressionOptions) error {
-	if output == nil || strings.TrimSpace(output.Summary) == "" {
+	if output == nil {
+		return fmt.Errorf("timeline compression requires a summary object")
+	}
+	// A deletion-only pass has no ordinary history to summarize; its summary
+	// may stay empty. Every other pass still requires a non-empty summary.
+	deletionOnly := snapshot != nil && !snapshot.hasSummarySource() && snapshot.hasPromotedItems()
+	if strings.TrimSpace(output.Summary) == "" && !deletionOnly {
 		return fmt.Errorf("timeline compression requires a non-empty summary string")
 	}
 	if strings.Contains(output.Summary, aiprojection.Nonce()) {
@@ -41,6 +47,12 @@ func (m *Timeline) startCompressionResponse(snapshot *timelineCompressionSnapsho
 	if ctx == nil {
 		ctx = config.GetContext()
 	}
+	// A pass with deletable promoted entries must wait for the blacklist field
+	// before publishing early, otherwise the committed selection would silently
+	// miss the model's deletion decision. Passes without candidates keep the
+	// original summary+range publication.
+	requireRetireField := snapshot != nil && snapshot.hasPromotedItems()
+	deletionOnly := requireRetireField && snapshot != nil && !snapshot.hasSummarySource()
 	var publish sync.Once
 	var published *timelineCompressionOutput
 	go func() {
@@ -65,7 +77,8 @@ func (m *Timeline) startCompressionResponse(snapshot *timelineCompressionSnapsho
 					completion.err = err
 					return
 				}
-				if published != nil && (published.Summary != output.Summary || published.RetainedRange != output.RetainedRange) {
+				if published != nil && (published.Summary != output.Summary || published.RetainedRange != output.RetainedRange ||
+					!equalCompressionSelection(published.RetiredPromotedEntries, output.RetiredPromotedEntries)) {
 					completion.err = fmt.Errorf("timeline compression selection changed after publication; memory discarded")
 					return
 				}
@@ -83,7 +96,11 @@ func (m *Timeline) startCompressionResponse(snapshot *timelineCompressionSnapsho
 					if !summarySeen || !rangeSeen {
 						return
 					}
-					output := compressionSelection(snapshot, summary, rawRange)
+					rawRetire, retireSeen := fields["retire_promoted_entries"]
+					if requireRetireField && !retireSeen {
+						return
+					}
+					output := compressionSelection(snapshot, summary, rawRange, rawRetire)
 					if validateCompressionSelection(output, snapshot, limit) != nil {
 						return
 					}
@@ -95,7 +112,7 @@ func (m *Timeline) startCompressionResponse(snapshot *timelineCompressionSnapsho
 				action.WaitStream(ctx)
 				raw, _ := action.LookupCanonicalParam("summary")
 				text, ok := raw.(string)
-				if !ok || strings.TrimSpace(text) == "" {
+				if !ok || (strings.TrimSpace(text) == "" && !deletionOnly) {
 					return nil, fmt.Errorf("timeline compression requires a non-empty summary string")
 				}
 				return action, nil
@@ -106,4 +123,16 @@ func (m *Timeline) startCompressionResponse(snapshot *timelineCompressionSnapsho
 		)
 	}()
 	return ready, completion
+}
+
+func equalCompressionSelection(left, right []int64) bool {
+	if len(left) != len(right) {
+		return false
+	}
+	for i := range left {
+		if left[i] != right[i] {
+			return false
+		}
+	}
+	return true
 }

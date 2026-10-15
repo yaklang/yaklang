@@ -135,7 +135,7 @@ func (m *Timeline) freezeBudgetGroupsLocked(useSizer bool) TimelineIntervalBlock
 func (m *Timeline) freezeLocked(all bool) TimelineFreezeResult {
 	// A one-shot compression publishes its captured freeze and summary together.
 	// Writes remain append-only during generation, including exact-state deltas.
-	if m.compressionSnapshot != nil {
+	if m.compressing {
 		version := int64(0)
 		if m.freezeState != nil {
 			version = m.freezeState.Version

@@ -23,6 +23,7 @@ func newTimelineMemoryRetry(snapshot *timelineCompressionSnapshot) timelineMemor
 	copy.Context, copy.MemoryCompletion, copy.Output, copy.NotifyCommitted = nil, nil, nil, nil
 	copy.Head = cloneTimelineCompressedHead(snapshot.Head)
 	copy.Items = append([]timelineCompressionSnapshotItem(nil), snapshot.Items...)
+	copy.PromotedItems = append([]timelineCompressionPromotedItem(nil), snapshot.PromotedItems...)
 	copy.ExactItemIDs = append([]int64(nil), snapshot.ExactItemIDs...)
 	copy.UserContexts = append([]timelineCompressionUserContext(nil), snapshot.UserContexts...)
 	copy.SessionMemoryCandidates = cloneCompressionMemoryEntities(snapshot.SessionMemoryCandidates)

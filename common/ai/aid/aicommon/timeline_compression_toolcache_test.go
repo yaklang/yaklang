@@ -21,7 +21,12 @@ func TestTimelineToolCacheSurvivesHistoryCompression(t *testing.T) {
 		WithToolManager(buildinaitools.NewToolManager(buildinaitools.WithOnlyTools(tool))),
 		WithSpeedPriorityAICallback(func(_ AICallerConfigIf, req *AIRequest) (*AIResponse, error) {
 			requests++
-			require.NotContains(t, req.GetPrompt(), "EXACT_CACHE_SCHEMA")
+			// The entry is listed as a deletable candidate with its full
+			// effective body, exactly once.
+			require.Contains(t, req.GetPrompt(), "PROMOTED_ENTRIES_")
+			require.Contains(t, req.GetPrompt(), "[recent-tool-cache] compression_probe")
+			require.Contains(t, req.GetPrompt(), "Direct Params Schema")
+			require.Equal(t, 1, strings.Count(req.GetPrompt(), "EXACT_CACHE_SCHEMA"))
 			rsp := NewUnboundAIResponse()
 			rsp.EmitOutputStream(strings.NewReader(compressionMockSummary("Verified observation; further checks pending.")))
 			rsp.Close()

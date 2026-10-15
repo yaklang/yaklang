@@ -40,14 +40,16 @@ const (
 )
 
 // TimelineCompressionOptions describes one explicit compression, not automatic
-// scheduling policy. Safety limits reject oversized input/output without loss;
-// they are never requested target lengths or compression ratios in the prompt.
+// scheduling policy. Safety limits reject oversized helper input/output;
+// TargetTokens is the separate desired size of the main Timeline prompt.
 type TimelineCompressionOptions struct {
 	Context          context.Context
 	MaxInputTokens   int
 	MaxSummaryTokens int
-	RetainedContext  map[string]string // actual independent prompt fields, not inferred from their names
-	FinalizeMemory   bool              // include exact-only business context and wait for the full memory tail before commit
+	RetainedContext  map[string]string     // actual independent prompt fields, not inferred from their names
+	FinalizeMemory   bool                  // include exact-only business context and wait for the full memory tail before commit
+	PromptOptions    TimelinePromptOptions // same projection used to assemble the main-model prompt
+	TargetTokens     int64                 // runtime target, zero for an explicit one-shot reduction
 	// OnProgress runs synchronously outside Timeline locks, only when work or
 	// waiting actually occurs. It must not schedule another compression.
 	OnProgress func(TimelineCompressionStage)
@@ -60,7 +62,7 @@ func (o TimelineCompressionOptions) reportProgress(stage TimelineCompressionStag
 }
 
 var errTimelineCompressionBusy = errors.New("timeline compression is already running")
-var errTimelineCompressionBeforePromptChanged = errors.New("timeline changed after threshold check")
+var errTimelineCompressionLimitChanged = errors.New("timeline content limit changed during compression")
 
 type TimelineCompressionResult struct {
 	ThroughID     int64
@@ -70,6 +72,8 @@ type TimelineCompressionResult struct {
 	Summary       string
 	InputTokens   int
 	SummaryTokens int
+	// Original promoted item IDs actually retired, never aggregate handles.
+	RetiredPromotedEntryIDs []int64
 }
 
 // compressionSourceStateLocked detects edits, rollback, late insertions and
@@ -102,58 +106,49 @@ func (m *Timeline) compressionSourceStateLocked(through int64) (string, error) {
 	return fmt.Sprintf("%x", sha256.Sum256(raw)), nil
 }
 
-// CompressOnce is the explicit compression/retry entry used by before-prompt checks.
-// It reserves a snapshot, invokes the configured auxiliary AI
-// outside Timeline.mu, then publishes all state changes under one write lock.
-func (m *Timeline) CompressOnce(options TimelineCompressionOptions) (result *TimelineCompressionResult, err error) {
-	return m.compressOnce(options, nil)
-}
-
-func (m *Timeline) compressOnce(options TimelineCompressionOptions, checked *timelineCompressionSnapshot) (result *TimelineCompressionResult, err error) {
+// CompressOnce explicitly requests one transaction. It uses the same execution
+// reservation as automatic optimization, but has no threshold or retry policy.
+func (m *Timeline) CompressOnce(options TimelineCompressionOptions) (*TimelineCompressionResult, error) {
 	if m == nil || options.MaxInputTokens <= 0 || options.MaxSummaryTokens <= 0 {
 		return nil, fmt.Errorf("compression requires a timeline and positive input/summary safety limits")
 	}
-	m.mu.Lock()
-	if m.compressing {
-		m.mu.Unlock()
+	options = m.prepareCompressionOptions(options)
+	if err := options.Context.Err(); err != nil {
+		return nil, err
+	}
+	if _, acquired := m.tryBeginCompression(); !acquired {
 		return nil, errTimelineCompressionBusy
 	}
+	var commits []*timelineCompressionCommit
+	defer func() { m.finishCompression(commits) }()
+	commit, err := m.compressTimelineOnceWithAI(options)
+	if commit != nil {
+		commits = append(commits, commit)
+	}
+	return collectCompressionResults(commits), err
+}
+
+// The caller owns the execution reservation. This function owns exactly one
+// snapshot -> model -> validation -> commit, never scheduling or notification.
+func (m *Timeline) compressTimelineOnceWithAI(options TimelineCompressionOptions) (commit *timelineCompressionCommit, err error) {
+	m.mu.Lock()
 	snapshot, err := m.captureCompressionSnapshotLocked()
 	if err != nil {
 		m.mu.Unlock()
 		return nil, err
 	}
-	// The threshold was measured outside the lock. A different before-prompt check may
-	// have finished meanwhile; never summarize its newly committed head again.
-	if checked != nil && (m.totalDumpContentLimit != checked.BeforePromptLimit || snapshot.SourceState != checked.SourceState || snapshot.FreezeVersion != checked.FreezeVersion || !sameTimelineCompressedHead(snapshot.Head, checked.Head)) {
-		m.mu.Unlock()
-		return nil, errTimelineCompressionBeforePromptChanged
-	}
-	m.compressing, m.compressionSnapshot = true, snapshot
+	m.compressionSnapshot = snapshot
 	snapshot.FinalizingMemory = options.FinalizeMemory
-	m.compressionDone = make(chan struct{})
+	snapshot.TargetTokens = options.TargetTokens
+	snapshot.Context = options.Context
 	m.mu.Unlock()
 	defer func() {
 		if recovered := recover(); recovered != nil {
-			result, err = nil, fmt.Errorf("timeline compression panicked: %v", recovered)
+			commit, err = nil, fmt.Errorf("timeline compression panicked: %v", recovered)
 		}
 		m.mu.Lock()
-		// Publish backoff before waking waiting before-prompt callers, otherwise a failed
-		// request could be immediately repeated by the next waiting caller.
-		if err != nil && checked != nil {
-			m.compressionLastFailure = checked.BeforePromptFingerprint
-			m.compressionRetryAfter = time.Now().Add(timelineCompressionRetryDelay)
-		} else if err == nil {
-			m.compressionLastFailure = ""
-			m.compressionRetryAfter = time.Time{}
-		}
-		m.compressing, m.compressionSnapshot = false, nil
-		close(m.compressionDone)
-		m.compressionDone = nil
+		m.compressionSnapshot = nil
 		m.mu.Unlock()
-		if err == nil && result != nil && snapshot.NotifyCommitted != nil {
-			snapshot.NotifyCommitted()
-		}
 	}()
 	options.reportProgress(TimelineCompressionOptimizing)
 	snapshot.RetainedContext = make(map[string]string, len(options.RetainedContext))
@@ -163,23 +158,17 @@ func (m *Timeline) compressOnce(options TimelineCompressionOptions, checked *tim
 	if err := prepareCompressionSnapshot(snapshot); err != nil && len(snapshot.ExactItemIDs) == 0 {
 		return nil, err
 	}
-	if options.Context == nil {
-		if config := m.compressionCallerConfig(); config != nil {
-			options.Context = config.GetContext()
-		}
-	}
-	if options.Context == nil {
-		options.Context = context.Background()
-	}
-	snapshot.Context = options.Context
 	if err := options.Context.Err(); err != nil {
 		return nil, err
 	}
-	if snapshot.InputText == "" {
-		return m.commitCompressionSnapshot(snapshot, "")
+	if !snapshot.hasCompressionInput() {
+		if options.TargetTokens > 0 {
+			return nil, fmt.Errorf("protected timeline content cannot reach compression target %d", options.TargetTokens)
+		}
+		return m.commitCompressionRound(snapshot, "")
 	}
 	waitedForMemory := false
-	if err := m.sessionMemory.waitWithProgress(options.Context, func() {
+	if err := m.sessionMemory.waitForModelTail(options.Context, func() {
 		waitedForMemory = true
 		options.reportProgress(TimelineCompressionMemory)
 	}); err != nil {
@@ -212,13 +201,22 @@ func (m *Timeline) compressOnce(options TimelineCompressionOptions, checked *tim
 	if err := m.checkpointCompressionMemory(snapshot); err != nil {
 		return nil, err
 	}
-	return m.commitCompressionSnapshot(snapshot, summary)
+	return m.commitCompressionRound(snapshot, summary)
+}
+
+func (m *Timeline) commitCompressionRound(snapshot *timelineCompressionSnapshot, summary string) (*timelineCompressionCommit, error) {
+	result, err := m.commitCompressionSnapshot(snapshot, summary)
+	if err != nil {
+		return nil, err
+	}
+	return &timelineCompressionCommit{Result: result, Notify: snapshot.NotifyCommitted,
+		FreezeVersion: snapshot.FreezeVersion + 1}, nil
 }
 
 func (m *Timeline) commitCompressionSnapshot(snapshot *timelineCompressionSnapshot, summary string) (*TimelineCompressionResult, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	if snapshot == nil || m.compressionSnapshot != snapshot || (strings.TrimSpace(summary) == "" && snapshot.InputText != "") {
+	if snapshot == nil || m.compressionSnapshot != snapshot || (strings.TrimSpace(summary) == "" && snapshot.hasSummarySource()) {
 		return nil, fmt.Errorf("invalid or inactive compression transaction")
 	}
 	version, err := m.validateCompressionSourceLocked(snapshot)
@@ -231,11 +229,13 @@ func (m *Timeline) commitCompressionSnapshot(snapshot *timelineCompressionSnapsh
 	if snapshot.Output != nil {
 		result.RetainedIDs = append([]int64(nil), snapshot.Output.RetainedIDs...)
 		result.RetainedRange = snapshot.Output.RetainedRange
+		// Parsing already restricts this list to promoted IDs in the snapshot.
+		// Apply exactly those IDs without expanding or cancelling the selection.
+		result.RetiredPromotedEntryIDs = append([]int64(nil), snapshot.Output.RetiredPromotedEntries...)
 		for _, id := range result.RetainedIDs {
 			selected[id] = true
 		}
 	}
-	snapshot.NotifyCommitted = m.compressionCallbackLocked(snapshot, result)
 	head := &TimelineCompressedHead{Text: summary}
 	if snapshot.Head != nil {
 		head.CoveredEndItemID, head.CoveredEndAtMs = snapshot.Head.CoveredEndItemID, snapshot.Head.CoveredEndAtMs
@@ -248,10 +248,46 @@ func (m *Timeline) commitCompressionSnapshot(snapshot *timelineCompressionSnapsh
 			head.CoveredEndItemID, head.CoveredEndAtMs = item.ID, item.Timestamp
 		}
 	}
-	// Exact journals retain freeze membership. The watermark sentinel survives
-	// serialization even when every ordinary original has been retired.
+	result.RetiredIDs = append(result.RetiredIDs, result.RetiredPromotedEntryIDs...)
+	sort.Slice(result.RetiredIDs, func(i, j int) bool { return result.RetiredIDs[i] < result.RetiredIDs[j] })
+	snapshot.NotifyCommitted = m.compressionCallbackLocked(snapshot, result)
+	m.freezeState = m.compressionFreezeStateLocked(snapshot, result.RetainedIDs, result.RetiredPromotedEntryIDs, version+1)
+	for _, id := range result.RetiredIDs {
+		m.retireTimelineItemLocked(id)
+	}
+	m.rebuildPromotedStateLocked(snapshot.ThroughID)
+	m.updateCompressedHead(head)
+	if snapshot.MemoryCompletion != nil {
+		if m.sessionMemory == nil {
+			m.sessionMemory = newTimelineSessionMemory(m, nil)
+		}
+		m.sessionMemory.record(snapshot)
+		m.markCompressionMemoryCoveredLocked(snapshot)
+	}
+	if snapshot.NotifyCommitted != nil {
+		for _, pending := range m.freezeBudgetGroupsLocked(false) {
+			snapshot.CommittedFreeze.PendingBytes += len(pending.Render())
+		}
+	}
+	return result, nil
+}
+
+// Build all freeze metadata before publishing or retiring any original.
+// Deterministic compaction keeps every ordinary item; AI uses its whitelist.
+func (m *Timeline) compressionFreezeStateLocked(snapshot *timelineCompressionSnapshot, retainedIDs, retiredPromotedIDs []int64, version int64) *TimelineFreezeState {
+	// Exact and promoted journals retain freeze membership. The watermark
+	// sentinel survives serialization even when every original was retired.
 	ids := append([]int64(nil), snapshot.ExactItemIDs...)
-	ids = append(ids, result.RetainedIDs...)
+	retiredSet := make(map[int64]bool, len(retiredPromotedIDs))
+	for _, id := range retiredPromotedIDs {
+		retiredSet[id] = true
+	}
+	for _, item := range snapshot.PromotedItems {
+		if !retiredSet[item.ID] {
+			ids = append(ids, item.ID)
+		}
+	}
+	ids = append(ids, retainedIDs...)
 	ids = append(ids, snapshot.ThroughID)
 	sort.Slice(ids, func(i, j int) bool { return ids[i] < ids[j] })
 	unique := ids[:0]
@@ -273,31 +309,8 @@ func (m *Timeline) commitCompressionSnapshot(snapshot *timelineCompressionSnapsh
 		}
 	}
 	batch := &TimelineFreezeBatch{IDs: unique, BucketStart: start, BucketEnd: end,
-		Nonce: fmt.Sprintf("c%dv%d", snapshot.ThroughID, version+1)}
-	// Everything below is local, non-failing state publication; no callback or
-	// AI call is allowed between freezing/promoting and publishing the new head.
-	m.freezeState = &TimelineFreezeState{Version: version + 1, Batches: []*TimelineFreezeBatch{batch}}
-	// Retire unselected originals BEFORE materializing promoted state. Otherwise
-	// a summarizable body (Skill/Evidence) that the model did not retain would
-	// still be folded into promotedState and resurrected as if it were kept.
-	for _, id := range result.RetiredIDs {
-		m.retireTimelineItemLocked(id)
-	}
-	m.rebuildPromotedStateLocked(snapshot.ThroughID)
-	m.updateCompressedHead(head)
-	if snapshot.MemoryCompletion != nil {
-		if m.sessionMemory == nil {
-			m.sessionMemory = newTimelineSessionMemory(m, nil)
-		}
-		m.sessionMemory.record(snapshot)
-		m.markCompressionMemoryCoveredLocked(snapshot)
-	}
-	if snapshot.NotifyCommitted != nil {
-		for _, pending := range m.freezeBudgetGroupsLocked(false) {
-			snapshot.CommittedFreeze.PendingBytes += len(pending.Render())
-		}
-	}
-	return result, nil
+		Nonce: fmt.Sprintf("c%dv%d", snapshot.ThroughID, version)}
+	return &TimelineFreezeState{Version: version, Batches: []*TimelineFreezeBatch{batch}}
 }
 
 func cloneTimelineCompressedHead(head *TimelineCompressedHead) *TimelineCompressedHead {
