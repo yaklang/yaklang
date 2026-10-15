@@ -104,7 +104,7 @@ Yak 模块名称为 `pcapdb`，正确拼写为 **`GetOrCreatePCAPDatabase`**。�
 
 兼容接口 `ListPCAPDatabases()` 返回全部登记模型，没有结果字节预算；AI 工具应使用分页版本。
 
-内置流量分析工具为 `load_pcapfile`（导入）、`pcapdb`（查询/取证）、`manage_pcapdb`（`op=list/count/validate/export/delete`）。查询工具与 Yak 模块同名，前者是 AI 工具名，后者是脚本内的模块命名空间。
+内置流量分析工具为 `load_pcapfile`（导入）、`query_pcapdb`（查询/取证）、`manage_pcapdb`（`op=list/count/validate/export/delete`）。三个工具在脚本内使用 `pcapdb` 模块调用数据库 API。
 
 删除只接受精确 DatasetID，保留原始 PCAP 和导出文件，不删除登记路径以外的文件。当前版本的读池持有跨进程共享生命周期锁；删除取得独占生命周期锁和实例写锁，占用时返回 `ErrBusy`，不强制关闭其他连接。持久删除标记先于登记软删除和子库清理，启动会续做未完成清理；旧 ID 不会被登记恢复重新激活。检查 `err == nil && deletion.Deleted && !deletion.CleanupPending` 后再报告完成，同一 ID 可重试。为避免锁 inode 被替换，UUID 目录中的少量锁文件和删除标记保留。登记软删除时同时释放内容去重键，后续导入相同捕获会得到新 DatasetID。
 
@@ -686,7 +686,7 @@ resultBytes 测量的是 pcapdb 的紧凑 encoding/json 结果，包括字符串
 | 脚本 | 核心 API | 职责 |
 | --- | --- | --- |
 | load_pcapfile.yak | GetOrCreatePCAPDatabase | 导入/去重，建立协议与 session/stream 分析，返回 DatasetID、状态和计数 |
-| pcapdb.yak | 各类 Query/Discover/Details/Read/Reference Page | query_type 选择协议字段发现/检索、物理包、会话、方向流、详情、预览和关联；有结果预算 |
+| query_pcapdb.yak | 各类 Query/Discover/Details/Read/Reference Page | query_type 选择协议字段发现/检索、物理包、会话、方向流、详情、预览和关联；有结果预算 |
 | manage_pcapdb.yak | ListPage / Count / Validate / Export / Delete | op=list/count/validate/export/delete；发现、校验、导出和删除库 |
 
 start_sniff/end_sniff/list_net_interface_devices 等在线捕获工具属于另外的生命周期。完成捕获后将稳定文件交给 import；不要用 GetOrCreate 假装启动抓包。
@@ -697,7 +697,7 @@ start_sniff/end_sniff/list_net_interface_devices 等在线捕获工具属于另�
 
 1. 用 `__DESC__`、`__VERBOSE_NAME__`、`__VERBOSE_NAME_ZH__`、`__KEYWORDS__` 和 `__USAGE__` 定义能力与调用说明，不把尚未实现的搜索语法写入描述。
 2. 用 cli.String/cli.Int/cli.Bool、setRequired/setDefault/setHelp 和 cli.check 定义并核对输入；核实是否会丢失 64 位整数精度，给显式 null 与“参数没传”不同表示。
-3. 已有库优先使用 DatasetID。`pcapdb` 也可传 pcapfile 自动导入/复用，必须说明这种调用可能写入库，且 id/pcapfile 二选一；管理操作使用精确 DatasetID。记录 ID 的类型由 query_type 明确指定，拒绝混用。
+3. 已有库优先使用 DatasetID。`query_pcapdb` 也可传 pcapfile 自动导入/复用，必须说明这种调用可能写入库，且 id/pcapfile 二选一；管理操作使用精确 DatasetID。记录 ID 的类型由 query_type 明确指定，拒绝混用。
 4. 声明支持的筛选项、时间单位、游标种类、预算上限和输出限制。开放任意 SQL、任意文件偏移或任意 query 字符串并不属于当前 API 契约。
 5. 在调用前校验参数并检查必要能力；native 校验作为第二道约束，不用修正/忽略用户输入掩盖语义变化。
 6. 开启执行 context，取得句柄后 defer Close；封装普通 err 与 Page.Error，设置有限重试。

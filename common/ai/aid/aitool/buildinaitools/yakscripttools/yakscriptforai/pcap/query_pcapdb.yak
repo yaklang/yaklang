@@ -15,7 +15,7 @@ metadata 返回库状态、精确计数及能力。普通页不含完整 BLOB/JS
 [[- if .FunctionCallMode -]]
 {"id":"dataset-uuid","query_type":"protocols","protocol":"http","limit":10}
 [[- else -]]
-{"@action":"directly_call_tool","directly_call_tool_name":"pcapdb","directly_call_tool_params":{"pcapfile":"/absolute/path/capture.pcap","query_type":"metadata"}}
+{"@action":"directly_call_tool","directly_call_tool_name":"query_pcapdb","directly_call_tool_params":{"pcapfile":"/absolute/path/capture.pcap","query_type":"metadata"}}
 [[- end -]]
 USAGE
 id = cli.String("id", cli.setHelp("持久流量库 DatasetID；与 pcapfile 二选一"))

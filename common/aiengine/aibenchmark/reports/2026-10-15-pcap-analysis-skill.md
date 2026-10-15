@@ -9,7 +9,7 @@
 | 工具 | 输入与行为 | 业务结果 |
 | --- | --- | --- |
 | `load_pcapfile` | `pcapfile`；调用 `pcapdb.GetOrCreatePCAPDatabase`，开启协议及 session/stream 分析，按完整内容去重复用 | 持久的 `dataset_id`、ready 状态、能力、精确计数、内容 hash |
-| `pcapdb` | `id` 或 `pcapfile` 二选一；ID 打开已有库，文件路径自动导入/复用并补齐分析 | 有字节预算、游标、完整性标记和业务错误的结构化证据 |
+| `query_pcapdb` | `id` 或 `pcapfile` 二选一；ID 打开已有库，文件路径自动导入/复用并补齐分析 | 有字节预算、游标、完整性标记和业务错误的结构化证据 |
 | `manage_pcapdb` | `op=list/count/validate/export/delete`；按实际 DatasetID 管理已有库 | 有界目录、登记计数、校验状态、精确导出和删除/清理状态 |
 
 自然语言问题由 AI 按 Skill 组织查询并回答。查询工具提供结构化操作：metadata、packets、protocols、fields、sessions、streams、details、packet_data、protocol_data、stream_data、protocol_packets、chunk_packets、packet_sessions。
@@ -76,7 +76,7 @@ export PCAP_SKILL_OUTPUT="$(mktemp -d)"
 /tmp/pcap-skill-yak -c 'include "common/ai/aismoking/live/pcap_analysis.yak"'
 ```
 
-首轮测试时查询工具名为 `query_pcap_in_db`；本次按要求改为 `pcapdb`，并增加 `manage_pcapdb`。以下三项为首轮记录，后文记录三个工具的新增生命周期验证。测试脚本内直接调用 `aim.InvokeReAct`；使用真实模型、真实 Skill 加载流程、真实工具及数据库。主循环使用本机配置的 AIBalance `memfit-qwen3.8-flash-free`；运行时辅助请求还观察到默认的 `memfit-light-free`。未注入模拟 AI 回答。每项最多 24 次迭代、300 秒，首轮工具范围为 load_pcapfile 和改名前的查询工具；当前测试入口包含三个核心工具。
+首轮测试时查询工具名为 `query_pcap_in_db`；增加 `manage_pcapdb` 时曾改为 `pcapdb`，当前统一为带查询动词的 `query_pcapdb`。以下三项为首轮记录，后文记录三个工具的新增生命周期验证。测试脚本内直接调用 `aim.InvokeReAct`；使用真实模型、真实 Skill 加载流程、真实工具及数据库。主循环使用本机配置的 AIBalance `memfit-qwen3.8-flash-free`；运行时辅助请求还观察到默认的 `memfit-light-free`。未注入模拟 AI 回答。每项最多 24 次迭代、300 秒，首轮工具范围为 load_pcapfile 和改名前的查询工具；当前测试入口包含三个核心工具。
 
 | 场景 | 结果 | 实际工具调用 | 核实内容 |
 | --- | --- | --- | --- |
@@ -103,7 +103,7 @@ Skill 要求先检查执行错误和业务 `error`，再解释 Items、分页及
 
 ## 三个核心工具的生命周期补充验证
 
-`query_pcap_in_db.yak` 已改为 `pcapdb.yak`。内置工具升级同步会移除旧名称的内置记录，保留用户编辑/创建的同名脚本；注册发现、旧名称退役及用户脚本保留均有测试。
+`query_pcapdb.yak` 是当前查询入口。内置工具升级同步会移除 `query_pcap_in_db` 和 `pcapdb` 两个旧名称的内置记录，保留用户编辑/创建的同名脚本；注册发现、旧名称退役及用户脚本保留均有测试。
 
 `manage_pcapdb` 包含以下操作：
 
@@ -119,7 +119,7 @@ Skill 要求先检查执行错误和业务 `error`，再解释 Items、分页及
 
 原生测试覆盖独立 manager/reader、writer 占用、取消、重复删除、删除后重新导入生成新 ID、目录外路径拒绝，以及 durable intent 后中断/登记丢失的启动恢复。另用不可删除的模拟 sidecar 检查 cleanup_pending/error 保留、恢复诊断和解除阻塞后的重试。相关 race 检查通过（包含真实子进程保持 reader、父进程拒绝删除、reader 结束后删除成功）。
 
-真实模型新增场景为 manage_lifecycle：仅在隔离的临时库中，授权 AI 导入本测试样本，按三工具完成列库、metadata 查询、校验、导出、删除、再次列库；检查源文件和导出文件均与 709 字节样本完全一致。实际模型完整执行 7 次工具调用：load_pcapfile 1 次、pcapdb 1 次、manage_pcapdb 5 次（list 两次、validate/export/delete 各一次），116.8 秒。8 个包、valid=true、deleted=true、cleanup_pending=false、最终 list 为空均与实际工具结果一致。源 PCAP 和导出文件仍各为 709 字节，SHA-256 均为上文样本值。
+真实模型新增场景为 manage_lifecycle：仅在隔离的临时库中，授权 AI 导入本测试样本，按三工具完成列库、metadata 查询、校验、导出、删除、再次列库；检查源文件和导出文件均与 709 字节样本完全一致。实际模型完整执行 7 次工具调用（该轮查询工具仍名为 pcapdb）：load_pcapfile 1 次、pcapdb 1 次、manage_pcapdb 5 次（list 两次、validate/export/delete 各一次），116.8 秒。8 个包、valid=true、deleted=true、cleanup_pending=false、最终 list 为空均与实际工具结果一致。源 PCAP 和导出文件仍各为 709 字节，SHA-256 均为上文样本值。
 
 第一轮执行完成后的测试脚本曾因 exportPath 定义在局部 if 块中，导致收尾读取找不到变量并误报文件不一致；已将变量移到循环作用域。未修改字节一致性断言，使用最终检查逻辑重新读取原始真实调用事件、同一隔离库及实际源/导出文件，全部语义检查通过。第二轮真实调用在导出后被会话中断，不计作通过场景，也未替换第一轮原始记录。
 

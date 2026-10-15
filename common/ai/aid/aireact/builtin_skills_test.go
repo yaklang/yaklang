@@ -35,7 +35,7 @@ var allBuiltinSkills = []struct {
 	{"http-packet-history", "skills/http-packet-history/SKILL.md", []string{"yaklang-system", "load_skill_resources"}},
 	{"ai-history-memory", "skills/ai-history-memory/SKILL.md", []string{"yaklang-system", "load_skill_resources"}},
 	{"yaklang-system", "skills/yaklang-system/SKILL.md", []string{"Yaklang", "Yakit", "Memfit", "grep_timeline_history", "amend_memory", "fetch_http_packet_by_id"}},
-	{"pcap-analysis", "skills/pcap-analysis/SKILL.md", []string{"load_pcapfile", "pcapdb", "manage_pcapdb", "dataset_id", "has_more", "ReferencesComplete"}},
+	{"pcap-analysis", "skills/pcap-analysis/SKILL.md", []string{"load_pcapfile", "query_pcapdb", "manage_pcapdb", "dataset_id", "has_more", "ReferencesComplete"}},
 	{"fuzztag", "skills/fuzztag/SKILL.md", []string{"fuzz.Strings", "笛卡尔积", "同步配对"}},
 	{"fuzztag-reference", "skills/fuzztag-reference/SKILL.md", []string{"exec_fuzztag", "codecflow", "params", "别名"}},
 }

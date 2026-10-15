@@ -16,7 +16,7 @@ metadata:
 | 工具 | 用途 |
 | --- | --- |
 | load_pcapfile | 导入或按完整内容去重复用捕获，返回 dataset_id、状态、计数和分析能力；默认分析协议及 session/stream |
-| pcapdb | 传 id 查询已有库，或传 pcapfile 自动导入/复用；按 query_type 返回有界证据 |
+| query_pcapdb | 传 id 查询已有库，或传 pcapfile 自动导入/复用；按 query_type 返回有界证据 |
 | manage_pcapdb | op=list/count/validate/export/delete；分页选库、登记计数、校验、导出和删除库 |
 
 导入和查询的业务结果在结构化 result 中。观察日志不代表成功；不要只看工具调用是否结束。
