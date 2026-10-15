@@ -295,6 +295,47 @@ func applyToolBatchSchemaMaxItems(schemaText string, maxCalls int) (string, erro
 // 关键词: generateLoopPrompt, frozenUserContext, PLAN_CONTEXT 段,
 //
 //	prefix cache, PE-TASK 缓存优化
+//
+// loopPromptBuildInput pins the one-shot inputs of a single iteration so an
+// overflow retry can rebuild the prompt without consuming them twice.
+type loopPromptBuildInput struct {
+	nonce             string
+	userInput         string
+	frozenUserContext string
+	frozenPartitions  []aicommon.FrozenBlockPartition
+	memory            string
+	operator          *LoopActionHandlerOperator
+
+	// Captured exactly once per iteration: these reads mutate loop state.
+	subAgentInput    string
+	subAgentRevision uint64
+	todoCheckpoint   string
+}
+
+// captureLoopPromptBuildInput fixes the iteration inputs. The returned value is
+// reused by every prompt rebuild of this iteration.
+func (r *ReActLoop) captureLoopPromptBuildInput(
+	nonce string,
+	userInput string,
+	frozenUserContext string,
+	frozenPartitions []aicommon.FrozenBlockPartition,
+	memory string,
+	operator *LoopActionHandlerOperator,
+) *loopPromptBuildInput {
+	subAgentInput, subAgentRevision := r.prepareSubAgentPrompt()
+	return &loopPromptBuildInput{
+		nonce:             nonce,
+		userInput:         userInput,
+		frozenUserContext: frozenUserContext,
+		frozenPartitions:  frozenPartitions,
+		memory:            memory,
+		operator:          operator,
+		subAgentInput:     subAgentInput,
+		subAgentRevision:  subAgentRevision,
+		todoCheckpoint:    r.consumeTodoCheckpoint(),
+	}
+}
+
 func (r *ReActLoop) generateLoopPrompt(
 	nonce string,
 	userInput string,
@@ -303,7 +344,18 @@ func (r *ReActLoop) generateLoopPrompt(
 	memory string,
 	operator *LoopActionHandlerOperator,
 ) (string, error) {
-	subAgentInput, subAgentRevision := r.prepareSubAgentPrompt()
+	return r.generateLoopPromptFromInput(r.captureLoopPromptBuildInput(
+		nonce, userInput, frozenUserContext, frozenPartitions, memory, operator,
+	))
+}
+
+func (r *ReActLoop) generateLoopPromptFromInput(input *loopPromptBuildInput) (string, error) {
+	if input == nil {
+		return "", utils.Error("loop prompt build input is nil")
+	}
+	nonce, userInput, frozenUserContext := input.nonce, input.userInput, input.frozenUserContext
+	frozenPartitions, memory, operator := input.frozenPartitions, input.memory, input.operator
+	subAgentInput, subAgentRevision := input.subAgentInput, input.subAgentRevision
 	var tools []*aitool.Tool
 	if r.toolsGetter == nil {
 		tools = []*aitool.Tool{}
@@ -349,7 +401,7 @@ func (r *ReActLoop) generateLoopPrompt(
 	// Keep deliveries in the formal dynamic section so prompt analysis and the
 	// model request agree about which evidence belongs to this iteration.
 	reactiveData += subAgentInput
-	todoCheckpoint := r.consumeTodoCheckpoint()
+	todoCheckpoint := input.todoCheckpoint
 
 	// Render extra capabilities discovered via intent recognition
 	var extraCapabilities string
@@ -394,6 +446,7 @@ func (r *ReActLoop) generateLoopPrompt(
 		return "", err
 	}
 	r.lastLoopSchema = schema
+	r.syncPromptOverflowTimelineLimit()
 	if err := r.compressTimelineBeforePrompt(userInput, frozenUserContext, todoSnapshot); err != nil {
 		return "", err
 	}
