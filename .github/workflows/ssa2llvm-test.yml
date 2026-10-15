@@ -46,6 +46,9 @@ jobs:
       run: |
         sudo bash common/yak/ssa2llvm/scripts/install_deps_ubuntu.sh
 
+    - name: Patch Go runtime text section lookup
+      run: bash common/yak/ssa2llvm/scripts/patch_go_runtime.sh
+
     - name: Init Module
       run: go mod tidy
 
