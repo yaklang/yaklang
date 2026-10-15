@@ -52,7 +52,13 @@ GOOS=linux GOARCH=amd64 go build -tags hids -o ./legion-smoke-node-hids-linux-am
 ### Trusted HIDS Product Node release
 
 `.github/workflows/build-legion-product-node.yml` produces the deployable
-Linux amd64 and arm64 product nodes from the repository's declared Go version.
+Linux amd64 and arm64 product nodes with Go 1.22.12 and musl 1.2.5. The shared
+`.github/scripts/build-legion-linux-musl.sh` recipe compiles every CGO C source
+with the pinned Alpine 3.21 GCC toolchain and links the node fully statically.
+Product builds retain CGO and use
+`hids,musl,netgo,osusergo,sqlite_omit_load_extension`; the `musl` selection uses
+the matching static libpcap archive. Native amd64 and arm64 CI runners use
+architecture-specific manifests selected from the same pinned Go builder index.
 The trusted packaging workflow runs only for tags in the isolated
 `legion-node-v*` namespace, including alpha tags. The `pull_request` event and
 ordinary branch pushes do not produce trusted Product Node packages. This
@@ -61,9 +67,49 @@ workflows.
 
 The same formal tag also calls the portable Node workflow and emits native
 development nodes for macOS Intel, macOS Apple Silicon, Linux amd64, and Linux
-arm64. These four GitHub Actions artifacts use the default non-HIDS build and
-are retained for 14 days. The existing Linux HIDS Product Node artifacts and
-their immutable OSS release indexes remain unchanged for deployment consumers.
+arm64. These four GitHub Actions artifacts omit HIDS and are retained for 14
+days. The Linux portable nodes share the musl static recipe with the Product
+Node; macOS nodes use their native system toolchain. The Linux Product Node
+object names and immutable OSS index schema remain compatible with deployment
+consumers.
+
+Before publication, each Linux Product Node, portable Node and extracted AI
+Session Runtime binary must pass the actual glibc 2.28 startup regression:
+NSS files without HOME, NSS compat with HOME, and NSS compat without HOME.
+The tests use pinned Debian Buster images, no network, no capabilities and
+invalid credentials. They prove initialization reaches main and the expected
+missing Runtime Host release identity check; registration, heartbeats, tasks
+and target-kernel HIDS operation require separate acceptance. CI preserves the
+startup evidence even on failure.
+
+The `osusergo` selection resolves local users and groups from the filesystem.
+Directory identities provided only through LDAP/SSSD NSS modules are outside
+that resolver's semantics; unknown HIDS identities retain numeric UID/GID.
+`netgo` uses Go DNS resolution, and `sqlite_omit_load_extension` removes SQLite
+runtime extension loading. A static ELF alone does not prove these choices:
+the recipe also checks the actual musl C linker/version, Node build information,
+absence of ELF interpreter/shared-library and glibc version references, and the
+node's linked-libc startup marker.
+
+For a local validation package, use an output directory outside the checkout:
+
+```bash
+node_output=$(mktemp -d)
+NODE_DIST_DIR="$node_output" ./.github/scripts/build-legion-product-node.sh
+```
+
+Set `NODE_GOARCH` to the native Linux architecture. Local Docker QEMU validation
+requires an explicit `NODE_MUSL_ALLOW_EMULATION=true`; its recipe records
+`builder_execution=qemu-emulated`, and CI rejects that mode. The Go module and
+build caches live outside the source checkout and may be located with
+`NODE_MUSL_CACHE_DIR`. A registry mirror may be supplied through
+`NODE_MUSL_BUILDER_IMAGE` while retaining the pinned platform digest. Source
+mounts are read-only, including a worktree's common Git directory. For Go 1.22's
+directory-only VCS discovery, a linked worktree is copied inside the builder
+with a directory symlink to its actual Git directory. Normal Node builds verify
+the binary's Go VCS revision and modified state against the source checkout.
+Dirty local packages record `source.dirty=true`;
+trusted CI requires a clean checkout.
 
 ### Short-lived native alpha nodes
 
@@ -77,8 +123,8 @@ commit is the complete source identity.
 
 Alpha packages are kept as GitHub Actions artifacts for seven days. They are
 not uploaded to OSS, do not update a stable channel, and are not accepted as
-trusted product-release inputs. They use the default build without the `hids`
-tag, so macOS testers can run them locally while exercising `yak.execute` and
+trusted product-release inputs. They omit the `hids` tag; Linux uses the shared
+musl recipe and macOS uses its native build, while exercising `yak.execute` and
 `ssa.rule_sync.export`. Use a new alpha tag for every candidate; never move or
 reuse an existing tag.
 
@@ -122,8 +168,10 @@ share one immutable OSS release directory:
 The direct files are the cross-repository assembly contract. The archive
 contains the same statically linked executable, manifest, and inner checksums
 for standalone downloads. The manifest binds the binary to the exact Yaklang
-source commit, Go toolchain, Linux target architecture, `hids` build tag, and
-advertised capability set. This artifact is an input to the Legion deployment
+source commit, Go toolchain, Linux target architecture, build tags and
+advertised capability set. Its recipe also records `c_library=musl`, the actual
+libc and GCC versions, builder index and selected platform manifest, pinned
+build packages and complete resolved APK package versions. This artifact is an input to the Legion deployment
 packaging pipeline; it is not a complete deployment bundle.
 
 A SemVer `legion-node-v*` tag reachable from `main` also publishes these files

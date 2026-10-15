@@ -10,9 +10,59 @@ import (
 // AvailableSkillsRegistryHeader is the registry listing header in SKILLS_CONTEXT.
 const AvailableSkillsRegistryHeader = "== Available Skills (use loading_skills action to load) ==\n"
 
-// MaxCatalogSkills 是意图识别写入「最相关 SKILL 目录」(SKILLS_CONTEXT 下半段) 的最大条目数.
-// 目录默认隐藏, 仅当意图识别命中后由 SetCatalogVisible(true) 开启, 取最相关 top-N.
-// 关键词: MaxCatalogSkills, 意图识别目录 top-N, 默认隐藏 SKILL 目录
+// SkillInventoryMaxTokens caps the complete, fixed inventory block in FrozenBlock.
+const SkillInventoryMaxTokens = 2048
+
+const skillInventoryDescriptionMaxRunes = 120
+
+const skillInventoryHeader = "# Skill Inventory\nNames and brief descriptions only, not loaded skill content. Use loading_skills or load_capability to load a skill; use search_capabilities to discover more.\n"
+
+// renderSkillInventory snapshots a bounded directory without retaining mutable
+// metadata pointers, loaded state, or skill bodies.
+func renderSkillInventory(metas []*SkillMeta, tokenEstimator func(string) int) string {
+	skills := make([]*SkillMeta, 0, len(metas))
+	seen := make(map[string]bool, len(metas))
+	for _, meta := range sortSkillMetasByName(metas) {
+		if meta == nil || meta.DisableModelInvocation {
+			continue
+		}
+		name := strings.TrimSpace(meta.Name)
+		if name == "" || seen[name] {
+			continue
+		}
+		seen[name] = true
+		description := []rune(strings.Join(strings.Fields(meta.Description), " "))
+		if len(description) > skillInventoryDescriptionMaxRunes {
+			description = append(description[:skillInventoryDescriptionMaxRunes], '…')
+		}
+		skills = append(skills, &SkillMeta{Name: name, Description: string(description)})
+	}
+	if len(skills) == 0 {
+		return ""
+	}
+
+	var inventory strings.Builder
+	inventory.WriteString(skillInventoryHeader)
+	for i, meta := range skills {
+		line := FormatAvailableSkillRegistryLine(meta)
+		candidate := inventory.String() + line
+		if remaining := len(skills) - i - 1; remaining > 0 {
+			candidate += AvailableSkillsOverflowHint(remaining)
+		}
+		// Include the header and potential overflow hint in the actual budget.
+		if MeasureStringTokens(candidate, tokenEstimator) > SkillInventoryMaxTokens {
+			inventory.WriteString(AvailableSkillsOverflowHint(len(skills) - i))
+			break
+		}
+		inventory.WriteString(line)
+	}
+	return strings.TrimSpace(inventory.String())
+}
+
+// MaxCatalogSkills 是意图识别写入「最相关 SKILL 目录」的最大条目数
+// (目录与技能正文共处 SemiDynamic1 的同一个技能块).
+// 目录默认不写入, 仅当意图识别命中后由 SetCatalogSkills 写入, 取最相关 top-N.
+// 这里的运行时推荐目录与初始化时固定的 Skill Inventory 是两份不同用途的材料。
 const MaxCatalogSkills = 10
 
 // CatalogHeader 是意图识别驱动的「最相关 SKILL 目录」段头.

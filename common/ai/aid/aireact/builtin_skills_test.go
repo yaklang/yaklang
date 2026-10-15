@@ -1,6 +1,7 @@
 package aireact
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"strings"
@@ -35,6 +36,7 @@ var allBuiltinSkills = []struct {
 	{"http-packet-history", "skills/http-packet-history/SKILL.md", []string{"yaklang-system", "load_skill_resources"}},
 	{"ai-history-memory", "skills/ai-history-memory/SKILL.md", []string{"yaklang-system", "load_skill_resources"}},
 	{"yaklang-system", "skills/yaklang-system/SKILL.md", []string{"Yaklang", "Yakit", "Memfit", "grep_timeline_history", "amend_memory", "fetch_http_packet_by_id"}},
+	{"pcap-analysis", "skills/pcap-analysis/SKILL.md", []string{"load_pcapfile", "query_pcapdb", "manage_pcapdb", "dataset_id", "has_more", "ReferencesComplete"}},
 	{"fuzztag", "skills/fuzztag/SKILL.md", []string{"fuzz.Strings", "笛卡尔积", "同步配对"}},
 	{"fuzztag-reference", "skills/fuzztag-reference/SKILL.md", []string{"exec_fuzztag", "codecflow", "params", "别名"}},
 }
@@ -592,12 +594,20 @@ func TestBuiltinSystemSkillsDefaultContext(t *testing.T) {
 		t.Fatal(err)
 	}
 	manager := aiskillloader.NewSkillsContextManager(loader)
+	// 绑定真实 Timeline: 默认加载的技能正文先进入 Open, 冻结事务提交后才提升进
+	// SemiDynamic1 的单一技能块。这里模拟既有冻结提交, 验证两处内容都可读。
+	builtinTestCfg := aicommon.NewConfig(context.Background(), aicommon.WithDisableAutoSkills(true))
+	if sink := aicommon.NewSkillContentTimelineAdapter(builtinTestCfg.GetTimeline(), builtinTestCfg.AcquireId); sink != nil {
+		manager.BindTimelineSink(sink)
+	}
+	manager.LoadDefaultSkills()
+	builtinTestCfg.GetTimeline().FreezeAll()
 	if len(loader.AllSkillMetas()) != len(allBuiltinSkills) {
 		t.Fatal("upgrade left unexpected skill copies")
 	}
 	for _, meta := range loader.AllSkillMetas() {
 		expected := meta.Name == "yaklang-system" || meta.Name == "fuzztag"
-		if manager.IsSkillLoaded(meta.Name) != expected || manager.IsAutoSkillLoadedAndUnfolded(meta.Name) != expected || manager.IsForcedSkill(meta.Name) {
+		if manager.IsSkillLoaded(meta.Name) != expected || manager.IsAutoSkillLoadedAndUnfolded(meta.Name) != expected {
 			t.Errorf("unexpected default loading state for %s", meta.Name)
 		}
 		forge, err := yakit.GetAIForgeByName(builtinSkillReleaseDB(), meta.Name)
@@ -608,7 +618,11 @@ func TestBuiltinSystemSkillsDefaultContext(t *testing.T) {
 			t.Errorf("DB default loading metadata differs for %s", meta.Name)
 		}
 	}
-	rendered := manager.RenderAutoLoadedSkills()
+	// 默认加载的正文已经冻结, 统一渲染为一个技能块, 每条 item 携带自动加载来源。
+	rendered := manager.RenderStable()
+	if strings.Contains(rendered, "[source: user-forced]") {
+		t.Fatal("default skills must not carry user-forced source markers")
+	}
 	for _, text := range []string{"FuzzTag 文本生成", "grep_timeline_history", "read_memory", "amend_memory", "list_yak_projects", "query_http_packet_history", "fetch_http_packet_by_id", "@yaklang-system/reference.md"} {
 		if !strings.Contains(rendered, text) {
 			t.Errorf("default prompt missing %q", text)
@@ -627,6 +641,7 @@ func TestBuiltinSystemSkillsDefaultContext(t *testing.T) {
 	if result.FuzzyMatched || result.IsTruncated || result.ContentSize == 0 {
 		t.Fatalf("reference must load fully by its exact path: %+v", result)
 	}
+	builtinTestCfg.GetTimeline().FreezeAll()
 	for _, text := range []string{"items, err = aihistory.Query", "items, err = aimemory.Search", "projects, err = db.ListYakProjects", "files, err = item.ExportPackets", "db.QueryHTTPFlowByID", "db.SaveHTTPFlowInstance"} {
 		if !strings.Contains(manager.RenderStable(), text) {
 			t.Errorf("merged reference missing %q", text)

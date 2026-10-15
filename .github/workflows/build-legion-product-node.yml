@@ -122,7 +122,11 @@ jobs:
               .source.dirty == false and
               .recipe.goos == "linux" and
               .recipe.goarch == $goarch and
-              .recipe.build_tags == "hids" and
+              .recipe.build_tags == "hids,musl,netgo,osusergo,sqlite_omit_load_extension" and
+              .recipe.c_library == "musl" and
+              .recipe.c_library_version == "1.2.5" and
+              .recipe.link_mode == "external-static" and
+              .recipe.builder_execution == "native" and
               .ci.workflow == "Build Trusted Legion Product Node" and
               (.capabilities | index("hids") != null) and
               (.capabilities | index("ai.code_workspace.v1") != null) and
@@ -132,6 +136,25 @@ jobs:
               (.capabilities | index("ai.session.turn_lifecycle.v1") != null) and
               (.capabilities | index("ssa.rule_snapshot.execution.v2") != null)
             ' PRODUCT_NODE_MANIFEST.json >/dev/null
+
+      - name: Verify the release Node on glibc 2.28 and NSS compat
+        shell: bash
+        run: |
+          set -euo pipefail
+          package_dir="dist/${NODE_PACKAGE_NAME}"
+          binary_name="$(jq -er .binary.path "$package_dir/PRODUCT_NODE_MANIFEST.json")"
+          ./.github/scripts/verify-linux-nss-startup.sh \
+            --binary "$package_dir/$binary_name" --goarch "$NODE_GOARCH" \
+            --evidence "${RUNNER_TEMP}/product-node-nss-${NODE_GOARCH}"
+
+      - name: Preserve release Node startup evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: product-node-nss-startup_linux_${{ matrix.goarch }}
+          path: ${{ runner.temp }}/product-node-nss-${{ matrix.goarch }}/
+          if-no-files-found: warn
+          retention-days: 14
 
       - name: Stage architecture-specific artifact contract
         shell: bash
@@ -295,7 +318,8 @@ jobs:
             echo "- Package: \`${NODE_PACKAGE_NAME}.tar.gz\`"
             echo "- Legion engine import: \`yaklang-node-engine_${NODE_PACKAGE_VERSION}_${NODE_GOOS}_${NODE_GOARCH}.tar.gz\`"
             echo "- Target: \`linux/${NODE_GOARCH}\`"
-            echo "- Build tags: \`hids\`"
+            echo "- Build tags: \`$(jq -r '.recipe.build_tags' "dist/${NODE_PACKAGE_NAME}/PRODUCT_NODE_MANIFEST.json")\`"
+            echo "- C library: \`$(jq -r '.recipe.c_library + " " + .recipe.c_library_version' "dist/${NODE_PACKAGE_NAME}/PRODUCT_NODE_MANIFEST.json")\`"
             echo "- OSS index: \`${{ steps.oss-release.outputs.index_url }}\`"
             echo "- OSS index SHA256: \`${{ steps.oss-release.outputs.index_sha256 }}\`"
           } >>"$GITHUB_STEP_SUMMARY"

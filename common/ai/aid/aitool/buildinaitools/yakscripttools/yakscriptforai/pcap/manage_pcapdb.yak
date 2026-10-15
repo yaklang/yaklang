@@ -1,0 +1,68 @@
+__DESC__ = "Manage the persistent pcapdb library: list bounded catalog pages, count registered datasets, validate a dataset, export its exact capture, or delete an explicitly selected dataset without deleting source PCAP files."
+__VERBOSE_NAME__ = "Manage PCAP Databases"
+__VERBOSE_NAME_ZH__ = "管理 PCAP 流量库"
+__KEYWORDS__ = "pcap,pcapng,pcapdb,library,list,delete,export,validate,流量库,管理,列库,删除,导出,校验"
+__INPUT_CONSTRAINTS__ = '{"properties":{"op":{"enum":["list","count","validate","export","delete"]}},"allOf":[{"if":{"required":["op"],"properties":{"op":{"enum":["validate","export","delete"]}}},"then":{"required":["id"]}},{"if":{"required":["op"],"properties":{"op":{"const":"export"}}},"then":{"required":["output"]}}]}'
+__USAGE__ = <<<USAGE
+op=list(default)/count/validate/export/delete。业务结果在结构化 result 中，不能只看执行是否结束。
+list：分页列出登记摘要，limit=20、after=0、result_bytes=8192；after 为前页 next_cursor（数字登记 ID）。items[].dataset_id 才是后续工具的库 ID；items[].id 仅用于列库分页。不能将 ready 的目录页误认为每个子库都已校验。
+count：返回 registered_count，包含未就绪或无效的登记，不能解释为可用库数；与 list 不保证同一快照。
+validate：传 id；deep 默认 false，true 会读取所有捕获/消息/流 BLOB 并校验，可能耗时。检查 valid、busy、state 和 error；校验可修正登记状态。
+export：传 id 和 output（明确的本地目标文件路径），精确恢复整份 PCAP/PCAPNG；不覆盖已有文件，源捕获已删除时也可按 ID 导出。
+delete：仅在用户要求删除该库时调用，id 必须为 list/load 返回的精确 dataset_id，不接受文件路径或数字登记 ID。删除登记和包 BLOB 子库，保留原始 PCAP 及已导出文件；占用时返回 error.code=busy，不强制关闭其他 reader/writer。deleted=true 且 cleanup_pending=false 且 error=null 才是清理完成；中断/清理错误可用同一 id 重试，启动时也会恢复清理。少量删除标记及锁文件会保留。
+id 仅用于 validate/export/delete；output 仅用于 export；deep 仅用于 validate；分页/字节预算仅用于 list。切换 op 时重新选择参数，不能继承上次操作的参数。
+[[- if .FunctionCallMode -]]
+arguments 示例：
+```json
+{"op":"list","limit":20}
+```
+[[- else -]]
+文本流 action：
+```json
+{"@action":"directly_call_tool","directly_call_tool_name":"manage_pcapdb","directly_call_tool_params":{"op":"list","limit":20}}
+```
+[[- end -]]
+USAGE
+op = cli.String("op",cli.setDefault("list"),cli.setHelp("list/count/validate/export/delete"))
+id = cli.String("id",cli.setHelp("validate/export/delete 的精确 dataset_id；不是数字登记 ID 或文件路径"))
+output = cli.String("output",cli.setHelp("仅 export：明确的本地输出文件路径，不覆盖已有文件"))
+deep = cli.Bool("deep",cli.setHelp("仅 validate：读取全部 BLOB 深度校验；省略为 false"))
+limit = cli.Int("limit",cli.setDefault(20),cli.setHelp("仅 list：每页 1–1000 条"))
+after = cli.Int("after",cli.setDefault(0),cli.setHelp("仅 list：上一页 next_cursor，数字登记 ID"))
+resultBytes = cli.Int("result_bytes",cli.setDefault(8192),cli.setHelp("仅 list：紧凑结果 JSON 字节预算，4096–65536"))
+cli.check()
+assert op in ["list","count","validate","export","delete"], "Unsupported management op"
+assert (op in ["validate","export","delete"]) == (id!=""), "id is required only for validate/export/delete"
+assert (op=="export") == (output!=""), "output is required only for export"
+assert !deep || op=="validate", "deep is supported only by validate"
+assert limit>=1 && limit<=1000 && after>=0 && resultBytes>=4096 && resultBytes<=65536, "Invalid catalog page budget"
+if op!="list" {assert limit==20 && after==0 && resultBytes==8192, "Pagination/output budget is supported only by list"}
+if id!="" {assert re.Match("^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",id), "Use the exact dataset_id returned by list/load"}
+RESULT = nil
+switch op {
+case "list":
+    page,err=pcapdb.ListPCAPDatabasesPage(pcapdb.limit(limit),pcapdb.after(after),pcapdb.resultBytes(resultBytes))
+    if page==nil {die(err)}
+    RESULT=page
+case "count": RESULT={"registered_count":pcapdb.CountPCAPDatabases()~}
+case "validate":
+    validation=pcapdb.ValidatePCAPDatabase(id,deep)~
+    detailError=nil
+    if validation.Error!="" {
+        message=validation.Error
+        if len(message)>512 {message=message[:512]}
+        code="invalid"
+        if validation.Busy {code="busy"}
+        detailError={"code":code,"message":message,"retryable":validation.Busy}
+    }
+    RESULT={"dataset_id":id,"valid":validation.Valid,"busy":validation.Busy,
+        "state":validation.Metadata.State,"deep":deep,"schema_version":validation.Metadata.SchemaVersion,
+        "protocols_indexed":validation.Metadata.ProtocolsIndexed,"streams_indexed":validation.Metadata.StreamsIndexed,
+        "packet_count":validation.Metadata.PacketCount,"protocol_count":validation.Metadata.ProtocolCount,
+        "session_count":validation.Metadata.SessionCount,"stream_count":validation.Metadata.StreamCount,"error":detailError}
+case "export": RESULT={"dataset_id":id,"output":pcapdb.ExportFromPCAPDatabase(id,output)~}
+case "delete":
+    deleted,err=pcapdb.DeletePCAPDatabase(id)
+    if deleted==nil {die(err)}
+    RESULT=deleted
+}

@@ -539,7 +539,7 @@ func TestReActLoop_SkillsContext_VisibleInAllSubsequentCallbacks(t *testing.T) {
 				if strings.Contains(prompt, "SKILLS_CONTEXT") || strings.Contains(prompt, "AUTO_LOADED_SKILLS") {
 					mainCallsWithSkillsContext++
 				}
-				if strings.Contains(prompt, "=== Skill: recon ===") {
+				if skillPromptMarkerPresent(prompt, "recon") {
 					mainCallsWithSkillHeader++
 				}
 			}
@@ -576,7 +576,7 @@ func TestReActLoop_SkillsContext_VisibleInAllSubsequentCallbacks(t *testing.T) {
 
 	// ALL post-load main prompts must contain the loaded skill header
 	if mainCallsWithSkillHeader != len(postLoadPrompts) {
-		t.Errorf("'=== Skill: recon ===' should appear in ALL %d post-load main prompts, but only appeared in %d",
+		t.Errorf("loaded skill content should appear in ALL %d post-load main prompts, but only appeared in %d",
 			len(postLoadPrompts), mainCallsWithSkillHeader)
 	}
 
@@ -647,8 +647,8 @@ func TestReActLoop_SkillsContext_ContentPersistsAcrossMultipleIterations(t *test
 		if !strings.Contains(prompt, "SKILLS_CONTEXT") {
 			t.Errorf("iteration %d: SKILLS_CONTEXT missing from prompt", idx+1)
 		}
-		if !strings.Contains(prompt, "=== Skill: recon ===") {
-			t.Errorf("iteration %d: loaded skill header missing from prompt", idx+1)
+		if !skillPromptMarkerPresent(prompt, "recon") {
+			t.Errorf("iteration %d: loaded skill content missing from prompt", idx+1)
 		}
 		if !strings.Contains(prompt, "osint.md") {
 			t.Errorf("iteration %d: loaded resource osint.md missing from prompt", idx+1)

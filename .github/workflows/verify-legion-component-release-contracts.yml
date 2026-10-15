@@ -6,6 +6,10 @@ on:
       - ".github/scripts/build-legion-component-oss-index.sh"
       - ".github/scripts/build-legion-node-engine-import-bundle.sh"
       - ".github/scripts/build-legion-product-node.sh"
+      - ".github/scripts/build-legion-linux-musl.sh"
+      - ".github/scripts/test-build-legion-linux-musl.sh"
+      - ".github/scripts/test-build-legion-linux-musl-outputs.sh"
+      - ".github/scripts/verify-linux-nss-startup.sh"
       - ".github/scripts/package-legion-ai-session-runtime.sh"
       - ".github/scripts/sign-legion-node-release-index.go"
       - ".github/scripts/test-build-legion-component-oss-index.sh"
@@ -37,6 +41,15 @@ jobs:
       - name: Check out source commit
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
+      - name: Set up Go from go.mod
+        uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
+        with:
+          go-version-file: go.mod
+          cache: false
+
+      - name: Install the minimal static Runtime fixture compiler
+        run: sudo apt-get update && sudo apt-get install -y musl-tools
+
       - name: Check shell syntax and lint
         shell: bash
         run: |
@@ -45,6 +58,9 @@ jobs:
             .github/scripts/build-legion-component-oss-index.sh
             .github/scripts/build-legion-node-engine-import-bundle.sh
             .github/scripts/build-legion-product-node.sh
+            .github/scripts/build-legion-linux-musl.sh
+            .github/scripts/test-build-legion-linux-musl.sh
+            .github/scripts/test-build-legion-linux-musl-outputs.sh
             .github/scripts/package-legion-ai-session-runtime.sh
             .github/scripts/test-build-legion-component-oss-index.sh
             .github/scripts/test-build-legion-node-engine-import-bundle.sh
@@ -60,6 +76,8 @@ jobs:
         run: |
           set -euo pipefail
           ./.github/scripts/test-legion-component-workflow-contract.sh
+          ./.github/scripts/test-build-legion-linux-musl.sh
+          ./.github/scripts/test-build-legion-linux-musl-outputs.sh
           ./.github/scripts/test-build-legion-component-oss-index.sh
           ./.github/scripts/test-build-legion-node-engine-import-bundle.sh
           ./.github/scripts/test-package-legion-ai-session-runtime.sh
@@ -97,13 +115,8 @@ jobs:
           set -euo pipefail
           export GOTOOLCHAIN=local
           binary="${RUNNER_TEMP}/legion-smoke-node-${TARGET_ARCH}"
-          CGO_ENABLED=1 GOOS=linux GOARCH="$TARGET_ARCH" go build \
-            -trimpath \
-            -buildvcs=true \
-            -tags hids \
-            -ldflags '-s -w -buildid= -linkmode external -extldflags "-static"' \
-            -o "$binary" \
-            ./cmd/legion-smoke-node
+          ./.github/scripts/build-legion-linux-musl.sh \
+            --goarch "$TARGET_ARCH" --profile product --output "$binary"
           file "$binary" | grep -q "$FILE_MACHINE"
           file "$binary" | grep -q 'statically linked'
           if readelf -d "$binary" 2>/dev/null | grep -q '(NEEDED)'; then
@@ -134,13 +147,16 @@ jobs:
           set -euo pipefail
           image="local.invalid/yaklang/legion-ai-session-runtime:verify-${TARGET_ARCH}"
           [[ "$(docker image inspect --format '{{.Architecture}}' "$image")" == "$TARGET_ARCH" ]]
-          docker run --rm --entrypoint /bin/sh "$image" -ec \
-            'test -x /usr/local/bin/legion-session-runtime; ldd /usr/local/bin/legion-session-runtime' \
-            >"${RUNNER_TEMP}/runtime-${TARGET_ARCH}.ldd"
-          if grep -q 'not found' "${RUNNER_TEMP}/runtime-${TARGET_ARCH}.ldd"; then
-            echo "Runtime binary has unresolved shared libraries" >&2
-            exit 1
-          fi
+          inspect_dir="${RUNNER_TEMP}/runtime-inspect-${TARGET_ARCH}"
+          mkdir -p "$inspect_dir"
+          container_id="$(docker create "$image")"
+          trap 'docker rm -f "$container_id" >/dev/null 2>&1 || true' EXIT
+          docker cp "$container_id:/usr/local/bin/legion-session-runtime" "$inspect_dir/legion-session-runtime"
+          docker cp "$container_id:/usr/local/share/legion/session-runtime-musl-build.json" "$inspect_dir/musl-build.json"
+          ./.github/scripts/build-legion-linux-musl.sh --verify-binary \
+            "$inspect_dir/legion-session-runtime" "$TARGET_ARCH" runtime
+          jq -e '.c_library == "musl" and .link_mode == "external-static" and .builder_execution == "native"' \
+            "$inspect_dir/musl-build.json" >/dev/null
           docker save "$image" | gzip -n -1 \
             >"${RUNNER_TEMP}/runtime-${TARGET_ARCH}.docker.tar.gz"
           gzip -t "${RUNNER_TEMP}/runtime-${TARGET_ARCH}.docker.tar.gz"
@@ -189,11 +205,16 @@ jobs:
           set -euo pipefail
           export GOTOOLCHAIN=local
           binary="${RUNNER_TEMP}/legion-smoke-node-${TARGET_OS}-${TARGET_ARCH}"
-          CGO_ENABLED=1 GOOS="$TARGET_OS" GOARCH="$TARGET_ARCH" go build \
-            -trimpath \
-            -buildvcs=true \
-            -ldflags '-s -w -buildid=' \
-            -o "$binary" \
-            ./cmd/legion-smoke-node
+          if [[ "$TARGET_OS" == linux ]]; then
+            ./.github/scripts/build-legion-linux-musl.sh \
+              --goarch "$TARGET_ARCH" --profile portable --output "$binary"
+          else
+            CGO_ENABLED=1 GOOS="$TARGET_OS" GOARCH="$TARGET_ARCH" go build \
+              -trimpath \
+              -buildvcs=true \
+              -ldflags '-s -w -buildid=' \
+              -o "$binary" \
+              ./cmd/legion-smoke-node
+          fi
           file "$binary" | grep -Fq "$EXPECTED_FILE_FRAGMENT"
           go version -m "$binary"

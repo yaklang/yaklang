@@ -98,10 +98,15 @@ Yak 模块名称为 `pcapdb`，正确拼写为 **`GetOrCreatePCAPDatabase`**。�
 | `pcapdb.RebuildPCAPDatabase(datasetID, options...)` | `db, err` | 用库内捕获重新生成协议/session/stream 分析 |
 | `pcapdb.EnsureProtocolFieldIndexes(datasetID, paths...)` | `indexes, err` | 已解析库按路径加索引，不依赖来源文件，不重放捕获 |
 | `pcapdb.ExportFromPCAPDatabase(datasetID, output)` | `path, err` | 原样导出整个捕获；output 可省略，工具应显式给出目标 |
+| `pcapdb.DeletePCAPDatabase(datasetID)` | `deletion, err` | 精确 ID 删除登记和子库；占用时 busy，检查 Deleted、CleanupPending、Error |
 | `pcapdb.FingerprintFile(filename)` | `fingerprint, err` | 来源文件候选指纹；不是库深度校验 |
 | `pcapdb.ClosePCAPDatabases()` | `err` | context 绑定的 Yak 模块释放本执行全部句柄，并结束该模块作用域 |
 
 兼容接口 `ListPCAPDatabases()` 返回全部登记模型，没有结果字节预算；AI 工具应使用分页版本。
+
+内置流量分析工具为 `load_pcapfile`（导入）、`query_pcapdb`（查询/取证）、`manage_pcapdb`（`op=list/count/validate/export/delete`）。三个工具在脚本内使用 `pcapdb` 模块调用数据库 API。
+
+删除只接受精确 DatasetID，保留原始 PCAP 和导出文件，不删除登记路径以外的文件。当前版本的读池持有跨进程共享生命周期锁；删除取得独占生命周期锁和实例写锁，占用时返回 `ErrBusy`，不强制关闭其他连接。持久删除标记先于登记软删除和子库清理，启动会续做未完成清理；旧 ID 不会被登记恢复重新激活。检查 `err == nil && deletion.Deleted && !deletion.CleanupPending` 后再报告完成，同一 ID 可重试。为避免锁 inode 被替换，UUID 目录中的少量锁文件和删除标记保留。登记软删除时同时释放内容去重键，后续导入相同捕获会得到新 DatasetID。
 
 `validation.Valid=false` 或 `validation.Busy=true` 可以与 `err=nil` 同时出现。`Validate` 会同步状态，必要时记录 invalid/interrupted；它不是完全没有状态影响的查询。deep 校验遍历捕获及已启用分析的 BLOB、关联约束和 hash，代价随数据增长，不适合每一页查询都执行。
 
@@ -672,28 +677,17 @@ resultBytes 测量的是 pcapdb 的紧凑 encoding/json 结果，包括字符串
 | JSON/摘要含可疑文本 | 指定记录含该值，语义待核实 | 仅凭文本断定攻击成功 |
 | 读/校验报错 | 查询未完成/库不可用，保留错误 | 没命中 |
 
-## 11. 后续工具与 skill 的组织方式
+## 11. 核心工具与 skill 的组织方式
 
-### 11.1 脚本应按单次操作拆分
+### 11.1 三个核心脚本
 
-下表是建议的后续套件职责，**不是本包已附带的脚本清单**。可按实际产品合并少量相近的只读操作，但每个工具仍需明确输入/输出类型。
+现有 `pcap-analysis` Skill 使用以下三个内置 AI 工具。每次调用通过 query_type 或 op 选择一个明确操作，并重新选择该操作支持的参数。
 
-| 建议脚本 | 核心 API | 职责 |
+| 脚本 | 核心 API | 职责 |
 | --- | --- | --- |
-| import_pcap.yak | GetOrCreatePCAPDatabase | 显式导入与能力选择，返回 DatasetID 和状态摘要 |
-| list_pcap_databases.yak | ListPCAPDatabasesPage / Count | 分页选库；计数只表示登记数 |
-| validate_pcap_database.yak | ValidatePCAPDatabase | 轻量或 deep 校验，返回 Busy/Valid/状态摘要 |
-| query_packets.yak | QueryPacketsPage | 端点、时间和 session/stream 范围查包摘要 |
-| query_protocols.yak | QueryProtocolsPage | 实际协议、flow、已核实字段和关联范围搜索 |
-| discover_protocol_fields.yak | DiscoverProtocolFields | 受限发现路径/类型，保留采样覆盖信息 |
-| ensure_protocol_field_indexes.yak | EnsureProtocolFieldIndexes / ProtocolFieldIndexes | 显式索引维护，不隐式重建 |
-| query_sessions.yak | QuerySessionsPage | 查会话与重组完整性 |
-| query_streams.yak | QueryStreamsPage | 找某 session 的方向流 |
-| query_pcap_references.yak | 三类关联 Page | 显式区分消息→包、chunk→包、包→session |
-| read_pcap_preview.yak | ReadPacketPage / ReadProtocolPage / ReadStreamPage | 明确 record_type 的有限字节预览 |
-| read_protocol_details.yak | ProtocolDetailsPage | 单消息完整 JSON，过大则提示文件输出 |
-| export_pcap_content.yak | Export* / ExportFromPCAPDatabase | 明确 capture/packet/protocol/fields/stream 类型，返回路径与身份 |
-| rebuild_pcap_analysis.yak | RebuildPCAPDatabase | 明确维护操作和能力，完成后旧分析游标失效 |
+| load_pcapfile.yak | GetOrCreatePCAPDatabase | 导入/去重，建立协议与 session/stream 分析，返回 DatasetID、状态和计数 |
+| query_pcapdb.yak | 各类 Query/Discover/Details/Read/Reference Page | query_type 选择协议字段发现/检索、物理包、会话、方向流、详情、预览和关联；有结果预算 |
+| manage_pcapdb.yak | ListPage / Count / Validate / Export / Delete | op=list/count/validate/export/delete；发现、校验、导出和删除库 |
 
 start_sniff/end_sniff/list_net_interface_devices 等在线捕获工具属于另外的生命周期。完成捕获后将稳定文件交给 import；不要用 GetOrCreate 假装启动抓包。
 
@@ -703,11 +697,11 @@ start_sniff/end_sniff/list_net_interface_devices 等在线捕获工具属于另�
 
 1. 用 `__DESC__`、`__VERBOSE_NAME__`、`__VERBOSE_NAME_ZH__`、`__KEYWORDS__` 和 `__USAGE__` 定义能力与调用说明，不把尚未实现的搜索语法写入描述。
 2. 用 cli.String/cli.Int/cli.Bool、setRequired/setDefault/setHelp 和 cli.check 定义并核对输入；核实是否会丢失 64 位整数精度，给显式 null 与“参数没传”不同表示。
-3. 读取型工具要求 DatasetID；只有导入型工具接受 capture_path。固定目标使用 record_type 和相应 ID，拒绝混用 ID。
+3. 已有库优先使用 DatasetID。`query_pcapdb` 也可传 pcapfile 自动导入/复用，必须说明这种调用可能写入库，且 id/pcapfile 二选一；管理操作使用精确 DatasetID。记录 ID 的类型由 query_type 明确指定，拒绝混用。
 4. 声明支持的筛选项、时间单位、游标种类、预算上限和输出限制。开放任意 SQL、任意文件偏移或任意 query 字符串并不属于当前 API 契约。
 5. 在调用前校验参数并检查必要能力；native 校验作为第二道约束，不用修正/忽略用户输入掩盖语义变化。
 6. 开启执行 context，取得句柄后 defer Close；封装普通 err 与 Page.Error，设置有限重试。
-7. 选定一个输出通道。AI 专用输出可用 `yakit.AIOutput("%s", encodedResult)`；普通 CLI 可用 println。不要重复输出完整结果。
+7. 内置 AI 工具用 `RESULT = structuredResult` 返回业务语义，stdout/yakit.Info 只作观察日志；普通 CLI 可选 println。不要把日志结束当作查询成功，也不要重复输出完整结果。
 8. 对导入/重建/加索引/文件导出明确操作副作用和成本，查询工具不悄悄升级成维护工具。
 9. 给工具添加 mustpass 或相关 API 验证，确保元数据、参数和运行时返回结构一致。
 

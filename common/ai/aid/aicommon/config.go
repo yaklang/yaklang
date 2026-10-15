@@ -768,7 +768,7 @@ func newConfig(ctx context.Context) *Config {
 		ContextProviderManager:             NewContextProviderManager(),
 		AiAutoRetry:                        5,
 		AiTransactionAutoRetry:             5,
-		TimelineContentSizeLimit:           50 * 1024, // Default limit for 50k tokens
+		TimelineContentSizeLimit:           300 * 1024, // Default limit for 300k tokens
 		Guardian:                           NewAsyncGuardian(ctx, id),
 		PerTaskUserInteractiveLimitedTimes: 1, // Default to 1 time
 		EnablePlanAndExec:                  true,

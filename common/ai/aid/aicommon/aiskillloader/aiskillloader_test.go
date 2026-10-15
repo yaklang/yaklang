@@ -220,6 +220,7 @@ func TestSkillsContextManager_SearchSkills(t *testing.T) {
 		t.Fatalf("NewFSSkillLoader failed: %v", err)
 	}
 	mgr := NewSkillsContextManager(loader)
+	mgr.BindTimelineSink(newTestTimelineSink())
 
 	// Search by name
 	results, err := mgr.SearchSkills("deploy")
@@ -260,14 +261,12 @@ func TestSkillsContextManager_RenderStable_CatalogHiddenByDefault(t *testing.T) 
 	}
 
 	mgr := NewSkillsContextManager(loader)
+	mgr.BindTimelineSink(newTestTimelineSink())
 	rendered := mgr.RenderStable()
 
 	// 改造后: 默认隐藏 SKILL 目录, 零加载 + 目录不可见 → 整段不渲染.
 	if rendered != "" {
 		t.Fatalf("default render with no loaded skills and hidden catalog should be empty. Got:\n%s", rendered)
-	}
-	if mgr.IsCatalogVisible() {
-		t.Fatalf("catalog should be hidden by default")
 	}
 }
 
@@ -281,9 +280,9 @@ func TestSkillsContextManager_RenderStable_CatalogVisibleWhenSet(t *testing.T) {
 	}
 
 	mgr := NewSkillsContextManager(loader)
+	mgr.BindTimelineSink(newTestTimelineSink())
 	metas := loader.AllSkillMetas()
 	mgr.SetCatalogSkills(metas)
-	mgr.SetCatalogVisible(true)
 
 	rendered := mgr.RenderStable()
 	codeReviewIdx := strings.Index(rendered, "  - code-review:")
@@ -299,10 +298,9 @@ func TestSkillsContextManager_RenderStable_CatalogVisibleWhenSet(t *testing.T) {
 	}
 }
 
-// TestSkillsContextManager_RenderStable_DualSectionStructure 验证当有 catalog 或
-// 加载时 RenderStable 输出 "Currently Loaded" + "Relevant Skills" 双段结构.
-// 改造后: 零加载 + 目录隐藏 → 整段为空 (节约 token); 有 catalog 时才出现双段.
-func TestSkillsContextManager_RenderStable_DualSectionStructure(t *testing.T) {
+// TestSkillsContextManager_RenderStable_CatalogInSingleBlock 验证意图目录与技能
+// 正文共用一个技能块: 目录本身也是一条 skill item。
+func TestSkillsContextManager_RenderStable_CatalogInSingleBlock(t *testing.T) {
 	vfs := buildTestVFS()
 	loader, err := NewFSSkillLoader(vfs)
 	if err != nil {
@@ -310,24 +308,21 @@ func TestSkillsContextManager_RenderStable_DualSectionStructure(t *testing.T) {
 	}
 
 	mgr := NewSkillsContextManager(loader)
+	mgr.BindTimelineSink(newTestTimelineSink())
 	mgr.SetCatalogSkills(loader.AllSkillMetas())
 
 	rendered := mgr.RenderStable()
 	if !strings.Contains(rendered, "== Currently Loaded Skills ==") {
 		t.Fatalf("render should contain 'Currently Loaded Skills' header. Got:\n%s", rendered)
 	}
-	if !strings.Contains(rendered, "(none)") {
-		t.Fatalf("render should contain '(none)' under Currently Loaded. Got:\n%s", rendered)
-	}
 	if !strings.Contains(rendered, "Relevant Skills") {
 		t.Fatalf("render should contain 'Relevant Skills' catalog header when visible. Got:\n%s", rendered)
 	}
 }
 
-// TestSkillsContextManager_RenderStable_AvailableSectionByteStable 验证 0->1
-// 加载技能时, catalog 下半段保持字节稳定 (意图识别写入的目录不变 → 输出不变).
-// 关键词: SkillsContext, 字节稳定, catalog 不变
-func TestSkillsContextManager_RenderStable_AvailableSectionByteStable(t *testing.T) {
+// TestSkillsContextManager_RenderStable_CatalogAppendsNotRewrites 验证加载技能只
+// 追加新 item, 不会改写既有目录 item (缓存前缀保持字节稳定)。
+func TestSkillsContextManager_RenderStable_CatalogAppendsNotRewrites(t *testing.T) {
 	vfs := buildTestVFS()
 	loader, err := NewFSSkillLoader(vfs)
 	if err != nil {
@@ -335,6 +330,7 @@ func TestSkillsContextManager_RenderStable_AvailableSectionByteStable(t *testing
 	}
 
 	mgr := NewSkillsContextManager(loader)
+	mgr.BindTimelineSink(newTestTimelineSink())
 	mgr.SetCatalogSkills(loader.AllSkillMetas())
 	zeroLoaded := mgr.RenderStable()
 
@@ -350,12 +346,18 @@ func TestSkillsContextManager_RenderStable_AvailableSectionByteStable(t *testing
 		t.Fatalf("both renders should contain catalog header. zero=%q with=%q", zeroLoaded, withLoaded)
 	}
 
-	endTag := "<|SKILLS_CONTEXT_END_skills_context|>"
-	zeroCatalogSection := zeroLoaded[zeroCatalogIdx:strings.Index(zeroLoaded, endTag)]
-	withLoadedCatalogSection := withLoaded[withLoadedCatalogIdx:strings.Index(withLoaded, endTag)]
+	// 目录块自身必须以同一字节重复出现; 新增技能正文只能追加在它之后。
+	catalogTail := "Use loading_skills action to load any of these when needed."
+	zeroEnd := strings.Index(zeroLoaded, catalogTail)
+	withEnd := strings.Index(withLoaded, catalogTail)
+	if zeroEnd == -1 || withEnd == -1 {
+		t.Fatalf("both renders should contain the catalog hint line")
+	}
+	zeroCatalogSection := zeroLoaded[zeroCatalogIdx : zeroEnd+len(catalogTail)]
+	withLoadedCatalogSection := withLoaded[withLoadedCatalogIdx : withEnd+len(catalogTail)]
 
 	if zeroCatalogSection != withLoadedCatalogSection {
-		t.Fatalf("catalog section must be byte-stable across 0->1 load.\nzero:\n%s\nwith:\n%s",
+		t.Fatalf("catalog item must stay byte-identical after loading a skill; new content must be appended, not inserted before it.\nzero:\n%s\nwith:\n%s",
 			zeroCatalogSection, withLoadedCatalogSection)
 	}
 }
@@ -368,6 +370,7 @@ func TestSkillsContextManager_RenderStable_SortsLoadedSkillsAndViews(t *testing.
 	}
 
 	mgr := NewSkillsContextManager(loader)
+	mgr.BindTimelineSink(newTestTimelineSink())
 	if err := mgr.LoadSkill("deploy-app"); err != nil {
 		t.Fatalf("LoadSkill deploy-app failed: %v", err)
 	}
@@ -385,17 +388,15 @@ func TestSkillsContextManager_RenderStable_SortsLoadedSkillsAndViews(t *testing.
 	if codeReviewSkillIdx == -1 || deployAppSkillIdx == -1 {
 		t.Fatalf("stable render should contain both loaded skills. Got:\n%s", rendered)
 	}
-	if codeReviewSkillIdx > deployAppSkillIdx {
-		t.Fatalf("loaded skills should be rendered in stable alphabetical order. Got:\n%s", rendered)
+	// 单一技能块按 Timeline item 顺序 (加载顺序) 渲染, 保证冻结事务与渲染一致。
+	if deployAppSkillIdx > codeReviewSkillIdx {
+		t.Fatalf("loaded skills should be rendered in load order. Got:\n%s", rendered)
 	}
 
-	skillMDIdx := strings.Index(rendered, "File: SKILL.md (Skill: deploy-app)")
-	deployScriptIdx := strings.Index(rendered, "File: scripts/deploy.sh (Skill: deploy-app)")
+	skillMDIdx := strings.Index(rendered, "[SKILL.md:1-8/8 END]")
+	deployScriptIdx := strings.Index(rendered, "[scripts/deploy.sh:1-2/2 END]")
 	if skillMDIdx == -1 || deployScriptIdx == -1 {
-		t.Fatalf("stable render should contain both deploy-app view windows. Got:\n%s", rendered)
-	}
-	if skillMDIdx > deployScriptIdx {
-		t.Fatalf("deploy-app view windows should be rendered in stable path order. Got:\n%s", rendered)
+		t.Fatalf("stable render should contain both deploy-app content ranges. Got:\n%s", rendered)
 	}
 }
 
@@ -705,6 +706,7 @@ func TestGenerateNonce_Deterministic(t *testing.T) {
 
 func TestSkillsContextManager_NilLoader(t *testing.T) {
 	mgr := NewSkillsContextManager(nil)
+	mgr.BindTimelineSink(newTestTimelineSink())
 	if mgr.HasRegisteredSkills() {
 		t.Fatal("nil loader should report no skills")
 	}
@@ -722,6 +724,7 @@ func TestSkillsContextManager_LoadAndRender(t *testing.T) {
 	}
 
 	mgr := NewSkillsContextManager(loader)
+	mgr.BindTimelineSink(newTestTimelineSink())
 	if !mgr.HasRegisteredSkills() {
 		t.Fatal("manager should report skills available")
 	}
@@ -735,7 +738,7 @@ func TestSkillsContextManager_LoadAndRender(t *testing.T) {
 	// Explicitly surface the catalog (simulating intent recognition).
 	mgr.SetCatalogSkills(loader.AllSkillMetas())
 	rendered = mgr.Render("test_nonce")
-	if !strings.Contains(rendered, "SKILLS_CONTEXT_test_nonce") {
+	if !strings.Contains(rendered, "SKILLS_CONTEXT") {
 		t.Fatal("render should contain SKILLS_CONTEXT tags when catalog visible")
 	}
 	if !strings.Contains(rendered, "deploy-app") {
@@ -751,8 +754,8 @@ func TestSkillsContextManager_LoadAndRender(t *testing.T) {
 	if !strings.Contains(rendered, "=== Skill: deploy-app ===") {
 		t.Fatalf("rendered should contain full skill header, got: %s", rendered)
 	}
-	if !strings.Contains(rendered, "VIEW_WINDOW") {
-		t.Fatal("rendered should contain VIEW_WINDOW for SKILL.md content")
+	if !strings.Contains(rendered, "[SKILL.md:") || !strings.Contains(rendered, " END]") {
+		t.Fatal("rendered should contain the SKILL.md range, including END when the file is complete")
 	}
 }
 
@@ -760,6 +763,7 @@ func TestSkillsContextManager_LoadDuplicate(t *testing.T) {
 	vfs := buildTestVFS()
 	loader, _ := NewFSSkillLoader(vfs)
 	mgr := NewSkillsContextManager(loader)
+	mgr.BindTimelineSink(newTestTimelineSink())
 
 	if err := mgr.LoadSkill("deploy-app"); err != nil {
 		t.Fatalf("first LoadSkill failed: %v", err)
@@ -774,6 +778,7 @@ func TestSkillsContextManager_LoadNonexistent(t *testing.T) {
 	vfs := buildTestVFS()
 	loader, _ := NewFSSkillLoader(vfs)
 	mgr := NewSkillsContextManager(loader)
+	mgr.BindTimelineSink(newTestTimelineSink())
 
 	err := mgr.LoadSkill("nonexistent")
 	if err == nil {
@@ -781,10 +786,13 @@ func TestSkillsContextManager_LoadNonexistent(t *testing.T) {
 	}
 }
 
-func TestSkillsContextManager_FoldingOnOverflow(t *testing.T) {
+// manager 侧不再有 LRU 折叠预算; 技能正文体积由 Timeline 统一压缩控制,
+// 两个技能都会完整进入同一个技能块 (不做静默折叠)。
+func TestSkillsContextManager_NoManagerSideFolding(t *testing.T) {
 	vfs := buildTestVFS()
 	loader, _ := NewFSSkillLoader(vfs)
 	mgr := NewSkillsContextManager(loader)
+	mgr.BindTimelineSink(newTestTimelineSink())
 
 	mgr.SetMaxTokens(50)
 
@@ -796,13 +804,11 @@ func TestSkillsContextManager_FoldingOnOverflow(t *testing.T) {
 	}
 
 	rendered := mgr.Render("nonce")
-	// At least one skill should be folded
-	if !strings.Contains(rendered, "(folded)") {
-		t.Fatal("with small limit, at least one skill should be folded")
+	if strings.Contains(rendered, "(folded)") {
+		t.Fatal("manager must not fold skills behind the unified compression")
 	}
-	// HasTruncatedViews should be true due to folding
-	if !mgr.HasTruncatedViews() {
-		t.Fatal("HasTruncatedViews should be true when skills are folded")
+	if !strings.Contains(rendered, "=== Skill: deploy-app ===") || !strings.Contains(rendered, "=== Skill: code-review ===") {
+		t.Fatalf("both skills must be rendered in full, got:\n%s", rendered)
 	}
 }
 
@@ -810,6 +816,7 @@ func TestSkillsContextManager_ChangeViewOffset(t *testing.T) {
 	vfs := buildTestVFS()
 	loader, _ := NewFSSkillLoader(vfs)
 	mgr := NewSkillsContextManager(loader)
+	mgr.BindTimelineSink(newTestTimelineSink())
 
 	if err := mgr.LoadSkill("deploy-app"); err != nil {
 		t.Fatalf("LoadSkill failed: %v", err)
@@ -830,6 +837,7 @@ func TestSkillsContextManager_ChangeViewOffset_NewFile(t *testing.T) {
 	vfs := buildTestVFS()
 	loader, _ := NewFSSkillLoader(vfs)
 	mgr := NewSkillsContextManager(loader)
+	mgr.BindTimelineSink(newTestTimelineSink())
 
 	if err := mgr.LoadSkill("deploy-app"); err != nil {
 		t.Fatalf("LoadSkill failed: %v", err)
@@ -850,6 +858,7 @@ func TestSkillsContextManager_EmptyRender(t *testing.T) {
 	vfs := filesys.NewVirtualFs()
 	loader, _ := NewFSSkillLoader(vfs)
 	mgr := NewSkillsContextManager(loader)
+	mgr.BindTimelineSink(newTestTimelineSink())
 
 	rendered := mgr.Render("n")
 	if rendered != "" {
@@ -861,6 +870,7 @@ func TestSkillsContextManager_HasTruncatedViews_NoSkillsLoaded(t *testing.T) {
 	vfs := buildTestVFS()
 	loader, _ := NewFSSkillLoader(vfs)
 	mgr := NewSkillsContextManager(loader)
+	mgr.BindTimelineSink(newTestTimelineSink())
 
 	if mgr.HasTruncatedViews() {
 		t.Fatal("HasTruncatedViews should be false when no skills are loaded")
@@ -986,6 +996,7 @@ func TestResolveIncludes_SkillMDWithIncludes_LazyLoading(t *testing.T) {
 	}
 
 	mgr := NewSkillsContextManager(loader)
+	mgr.BindTimelineSink(newTestTimelineSink())
 	if err := mgr.LoadSkill("inc-skill"); err != nil {
 		t.Fatalf("LoadSkill failed: %v", err)
 	}
@@ -1136,6 +1147,7 @@ func TestDetectCrossSkillReferences_InRenderedOutput(t *testing.T) {
 	}
 
 	mgr := NewSkillsContextManager(loader)
+	mgr.BindTimelineSink(newTestTimelineSink())
 	if err := mgr.LoadSkill("xref-skill"); err != nil {
 		t.Fatalf("LoadSkill failed: %v", err)
 	}
@@ -1158,6 +1170,7 @@ func TestSkillsContextManager_LoadSkills(t *testing.T) {
 	vfs := buildTestVFS()
 	loader, _ := NewFSSkillLoader(vfs)
 	mgr := NewSkillsContextManager(loader)
+	mgr.BindTimelineSink(newTestTimelineSink())
 
 	results := mgr.LoadSkills([]string{"deploy-app", "code-review"})
 	if len(results) != 2 {
@@ -1180,6 +1193,7 @@ func TestSkillsContextManager_LoadSkills_PartialFailure(t *testing.T) {
 	vfs := buildTestVFS()
 	loader, _ := NewFSSkillLoader(vfs)
 	mgr := NewSkillsContextManager(loader)
+	mgr.BindTimelineSink(newTestTimelineSink())
 
 	results := mgr.LoadSkills([]string{"deploy-app", "nonexistent"})
 	if results["deploy-app"] != nil {
@@ -1198,6 +1212,7 @@ func TestSkillsContextManager_LoadSkills_EmptyNames(t *testing.T) {
 	vfs := buildTestVFS()
 	loader, _ := NewFSSkillLoader(vfs)
 	mgr := NewSkillsContextManager(loader)
+	mgr.BindTimelineSink(newTestTimelineSink())
 
 	results := mgr.LoadSkills([]string{"", "  ", "deploy-app"})
 	if len(results) != 1 {

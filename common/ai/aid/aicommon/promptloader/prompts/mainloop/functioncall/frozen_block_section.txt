@@ -1,6 +1,4 @@
-{{ if .ForcedSkills }}{{ .ForcedSkills }}
-
-{{ end }}{{ if .ToolInventory }}# Tool Inventory — 业务工具目录
+{{ if .ToolInventory }}# Tool Inventory — 业务工具目录
 下列只有业务工具名称和简介，不含完整参数 Schema，也不是原生函数列表。
 未看到完整 Schema：调用 `require_tool`，在 `arguments.require_tool_payload` 填业务工具名；它只加载定义，不生成参数、不执行。下一轮读取 `CACHE_TOOL_CALL` 后构造参数。已有完整 Schema 时直接复用。
 执行：原生函数名为 `directly_call_tool`，业务名称写入 `arguments.directly_call_tool_name`，业务参数写入 `arguments.directly_call_tool_params`。例如读取文件：函数名为 `directly_call_tool`，arguments 为 `{"identifier":"read_source","directly_call_tool_name":"read_file","directly_call_tool_params":{"file":"/absolute/path/source.txt"}}`；不要以 `read_file` 为原生函数名。
@@ -21,6 +19,8 @@
 {{ end }}
 > 此处为优先展示目录；完整能力范围可按需通过能力检索入口查询。
 {{ end }}
+
+{{ if .SkillInventory }}{{ .SkillInventory }}{{ end }}
 
 {{ if .ForgeInventory }}# AI Blueprint Inventory
 以下是当前可直接调用的 AI 蓝图列表：

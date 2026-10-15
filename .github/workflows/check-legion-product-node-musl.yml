@@ -1,0 +1,134 @@
+name: Check Linux musl Product Node
+
+on:
+  pull_request:
+    paths:
+      - ".github/scripts/build-legion-linux-musl.sh"
+      - ".github/scripts/build-legion-product-node.sh"
+      - ".github/scripts/verify-linux-nss-startup.sh"
+      - ".github/scripts/test-verify-linux-nss-startup.sh"
+      - ".github/workflows/check-legion-product-node-musl.yml"
+      - "cmd/legion-smoke-node/**"
+      - "common/hids/**"
+      - "common/pcapx/**"
+      - "scannode/**"
+      - "go.mod"
+      - "go.sum"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: check-legion-product-node-musl-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verifier-fixtures:
+    name: Check startup verifier rejection paths
+    runs-on: ubuntu-22.04
+    timeout-minutes: 5
+    steps:
+      - name: Check out source commit
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Check verifier shell syntax and lint
+        shell: bash
+        run: |
+          set -euo pipefail
+          scripts=(
+            .github/scripts/verify-linux-nss-startup.sh
+            .github/scripts/test-verify-linux-nss-startup.sh
+          )
+          bash -n "${scripts[@]}"
+          shellcheck "${scripts[@]}"
+
+      - name: Verify rejection of crashes and invalid artifacts
+        run: ./.github/scripts/test-verify-linux-nss-startup.sh
+
+  nodes:
+    name: Build and run Linux ${{ matrix.goarch }} musl Product Node
+    needs: verifier-fixtures
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - goarch: amd64
+            runner: ubuntu-22.04
+            binary_name: legion-smoke-node
+          - goarch: arm64
+            runner: ubuntu-24.04-arm
+            binary_name: legion-smoke-node_linux_arm64
+    env:
+      NODE_GOOS: linux
+      NODE_GOARCH: ${{ matrix.goarch }}
+      SOURCE_SHA: ${{ github.sha }}
+      PRODUCT_NODE_WORKFLOW_NAME: Check Linux musl Product Node
+    steps:
+      - name: Check out source commit
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go from go.mod
+        uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
+        with:
+          go-version-file: go.mod
+          cache: false
+
+      - name: Build musl Product Node with the release recipe
+        run: ./.github/scripts/build-legion-product-node.sh
+
+      - name: Verify local and unknown HIDS account identities with osusergo
+        env:
+          CGO_ENABLED: "0"
+          GOTOOLCHAIN: local
+        run: go test -tags hids,osusergo ./common/hids/enrich -run '^TestFileIdentity' -count=1
+
+      - name: Verify the package and its musl recipe
+        shell: bash
+        run: |
+          set -euo pipefail
+          package="legion-product-node_linux_${NODE_GOARCH}"
+          (cd dist && sha256sum -c "${package}.tar.gz.sha256")
+          (cd "dist/$package" && sha256sum -c SHA256SUMS)
+          jq -e \
+            --arg sha "$SOURCE_SHA" \
+            --arg arch "$NODE_GOARCH" '
+              .source.commit == $sha and .source.dirty == false and
+              .recipe.goos == "linux" and .recipe.goarch == $arch and
+              .recipe.c_library == "musl" and .recipe.cgo_enabled == true and
+              .recipe.link_mode == "external-static"
+            ' "dist/$package/PRODUCT_NODE_MANIFEST.json" >/dev/null
+
+      - name: Run the real Node on glibc 2.28 with and without HOME
+        env:
+          BINARY_NAME: ${{ matrix.binary_name }}
+        run: |
+          set -euo pipefail
+          ./.github/scripts/verify-linux-nss-startup.sh \
+            --binary "dist/legion-product-node_linux_${NODE_GOARCH}/${BINARY_NAME}" \
+            --goarch "$NODE_GOARCH" \
+            --evidence "${RUNNER_TEMP}/musl-nss-${NODE_GOARCH}"
+
+      - name: Record initialization verification scope
+        if: success()
+        run: |
+          {
+            echo "Linux/${NODE_GOARCH} musl Product Node passed the static artifact checks and all three glibc 2.28 NSS startup cases."
+            echo
+            echo 'These artifacts are validation packages. The test stops at the expected missing release identity rejection; registration, scan, and HIDS acceptance require separate checks.'
+          } >>"$GITHUB_STEP_SUMMARY"
+
+      - name: Preserve validation package and startup evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: musl-product-node-validation_linux_${{ matrix.goarch }}
+          path: |
+            dist/legion-product-node_linux_${{ matrix.goarch }}*
+            ${{ runner.temp }}/musl-nss-${{ matrix.goarch }}/
+          if-no-files-found: warn
+          retention-days: 7

@@ -47,8 +47,9 @@ func ConvertStartParamsToReActConfig(i *ypb.AIStartParams) []aicommon.ConfigOpti
 		opts = append(opts, aicommon.WithMaxIterationCount(maxIterations))
 	}
 
-	if i.GetTimelineContentSizeLimit() > 0 {
-		opts = append(opts, aicommon.WithTimelineContentLimit(int(i.GetTimelineContentSizeLimit())))
+	// 运行时上下文阈值: 旧字段会被前端默认值占用, 无法表达“使用服务端默认值”。
+	if i.GetRuntimeContextSizeLimit() > 0 {
+		opts = append(opts, aicommon.WithTimelineContentLimit(int(i.GetRuntimeContextSizeLimit())))
 	}
 
 	if i.UserInteractLimit > 0 {

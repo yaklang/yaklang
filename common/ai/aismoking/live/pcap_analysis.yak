@@ -1,0 +1,200 @@
+// Run from the repository root with a freshly built Yak containing this Skill.
+// YAKIT_HOME must be an isolated directory. Supply PCAP_SKILL_API_KEY and
+// PCAP_SKILL_MODEL via the environment, never on the command line or in results.
+// yak -c 'include "common/ai/aismoking/live/pcap_analysis.yak"'
+key = os.Getenv("PCAP_SKILL_API_KEY")
+model = os.Getenv("PCAP_SKILL_MODEL")
+assert key != "" && model != "", "Set PCAP_SKILL_API_KEY and PCAP_SKILL_MODEL"
+assert os.Getenv("YAKIT_HOME") != "", "Use an isolated YAKIT_HOME"
+provider = os.Getenv("PCAP_SKILL_PROVIDER")
+if provider == "" { provider = "aibalance" }
+root = os.Getenv("PCAP_SKILL_OUTPUT")
+assert root != "" && !file.IsExisted(file.Join(root,"summary.json")), "Choose a fresh PCAP_SKILL_OUTPUT"
+file.MkdirAll(root)~
+fixture = file.ReadFile("common/ai/aismoking/live/testdata/pcap_analysis.pcap")~
+source = file.Join(root,"proof.pcap")
+file.Save(source,fixture)~
+modelOptions = [ai.apiKey(key),ai.model(model),ai.timeout(90)]
+if os.Getenv("PCAP_SKILL_BASE_URL") != "" {
+    modelOptions = append(modelOptions,ai.baseURL(os.Getenv("PCAP_SKILL_BASE_URL")))
+}
+// Configure all three engine tiers with the selected real model. Runtime
+// auxiliaries may use their own defaults. No AI response or tool is mocked.
+cases = ["import_answer","id_reassembly","auto_file_fields","manage_lifecycle"]
+if os.Getenv("PCAP_SKILL_CASES") != "" { cases = str.SplitAndTrim(os.Getenv("PCAP_SKILL_CASES"),",") }
+summary = []
+for name in cases {
+    assert name in ["import_answer","id_reassembly","auto_file_fields","manage_lifecycle"], "Unknown smoke case"
+    exportPath=""
+    task = "请加载 pcap-analysis Skill，用这套 Skill 分析本地捕获 "+source+"。先导入保存流量库，再回答捕获总包数、HTTP 请求路径、Host 和响应状态码。引用 dataset_id 和消息 ID，明确计数单位。不进入 PLAN 或子任务，不调用其他工具。"
+    if name == "id_reassembly" {
+        entries = pcapdb.ListPCAPDatabases()~
+        assert len(entries) == 1, "Run import_answer first in this isolated profile"
+        datasetID = entries[0].DatasetID
+        file.Remove(source)~
+        task = "请加载 pcap-analysis Skill。原捕获文件已经删除，仅使用流量库 id="+datasetID+" 回答：TCP 会话是否完整、有无缺口？双向 stream 是哪些，读取有限预览并说明截断。HTTP 请求关联到哪些物理包？请用 sessions、streams、stream_data、protocol_packets 查询验证，不猜 ID。引用真实 ID 和完整性标记。不重新导入、不进入 PLAN 或子任务，不调用其他工具。"
+    }
+    if name == "auto_file_fields" {
+        source = file.Join(root,"auto.pcap")
+        file.Save(source,fixture)~
+        task = "请加载 pcap-analysis Skill，仅用 query_pcapdb，传 pcapfile="+source+" 自动选择流量库。先 fields 发现实际 HTTP 字段，再 details 核实请求路径对应的字符串字段，用该真实 field_path 做 eq 搜索 /pcap-skill-proof。回答命中的消息 ID 和路径。说明字段发现为采样，不能把页条数当全库计数。不进入 PLAN 或子任务，不调用其他工具。"
+    }
+    if name == "manage_lifecycle" {
+        file.Save(source,fixture)~
+        exportPath=file.Join(root,"managed-export.pcap")
+        task="请加载 pcap-analysis Skill。验证这个临时样本的完整生命周期，仅操作本测试捕获 "+source+"：先 load_pcapfile 导入；用 manage_pcapdb 的 list 找到实际 dataset_id；用 query_pcapdb 的 metadata 核实包数；用 manage_pcapdb 做轻量 validate，export 到 "+exportPath+"，然后 delete 刚才的这一个测试库，最后 list 确认它已不存在。用户在本条明确授权删除这个测试库，保留源捕获和导出文件。报告精确包数、ID、校验/删除状态及导出路径。只用 load_pcapfile、query_pcapdb、manage_pcapdb，不进入 PLAN 或子任务；切换查询类型或管理 op 时重新选参数。"
+    }
+    dir = file.Join(root,name)
+    file.MkdirAll(dir)~
+    file.Save(file.Join(dir,"task.txt"),task)~
+    mu = sync.NewMutex()
+    events, calls, answer, skillLoaded = [], json.loads("{}"), "", false
+    started = time.Now()
+    runErr = aim.InvokeReAct(task,
+        aim.aiConfig(provider,modelOptions...),
+        aim.qualityPriorityAIConfig(provider,modelOptions...),
+        aim.speedPriorityAIConfig(provider,modelOptions...),
+        aim.sessionID("pcap-skill-"+name+"-"+str.RandStr(12)),
+        aim.workdir(dir),aim.context(context.Seconds(300)),aim.timeout(300),
+        aim.maxIteration(24),aim.reviewPolicy("yolo"),aim.allowUserInteract(false),
+        aim.disableMCPServers(true),aim.disableAIForge(true),
+        aim.includeToolNames("load_pcapfile","query_pcapdb","manage_pcapdb"),
+        aim.onEvent(func(op,event){
+            mu.Lock()
+            defer mu.Unlock()
+            typ,content = string(event.Type),string(event.Content)
+            if typ == "reference_material" && "pcap-analysis" in content { skillLoaded = true }
+            if typ in ["reference_material","result","fail_react_task","tool_call_start","tool_call_param","tool_call_result","tool_call_error","tool_call_cancel"] {
+                events = append(events,{"type":typ,"content":content})
+                file.SaveJson(file.Join(dir,"events.json"),events)~
+            }
+            // result events are complete answer snapshots, not text deltas.
+            if typ == "result" { answer = json.loads(content).result }
+            if typ == "tool_call_start" {
+                data = json.loads(content)
+                calls[data.call_tool_id] = json.loads("{}")
+                calls[data.call_tool_id].tool = data.tool.name
+            }
+            if typ == "tool_call_param" {
+                data = json.loads(content)
+                if data.call_tool_id in calls { calls[data.call_tool_id].params = data.params }
+            }
+        }),
+    )
+    mu.Lock()
+    failed,counts,modes = [],{},[]
+    for _,call in calls {
+        if counts[call.tool] == nil { counts[call.tool]=0 }
+        counts[call.tool]++
+        if !(call.tool in ["load_pcapfile","query_pcapdb","manage_pcapdb"]) { failed=append(failed,"out_of_scope_tool") }
+        if call.params != nil && call.params.query_type != nil { modes=append(modes,call.params.query_type) }
+    }
+    if runErr != nil { failed=append(failed,"runtime_error") }
+    if !skillLoaded { failed=append(failed,"skill_load_not_observed") }
+    if answer == "" { failed=append(failed,"missing_final_answer") }
+    for event in events {
+        if event.type in ["tool_call_error","tool_call_cancel","fail_react_task"] { failed=append(failed,event.type) }
+        if event.type == "tool_call_result" {
+            data = json.loads(event.content)
+            if data.call_tool_id in calls && str.HasPrefix(data.result,"RESULT:\n") {
+                encoded = str.SplitN(str.TrimPrefix(data.result,"RESULT:\n"),"\n\nOBSERVATIONS:",2)[0]
+                semantic,decodeErr = json.New(encoded)
+                if decodeErr != nil { failed=append(failed,"invalid_semantic_result") } else {
+                    calls[data.call_tool_id].result = semantic.Value()
+                    if "error" in semantic.Value() && semantic.Value().error != nil { failed=append(failed,"query_business_error") }
+                }
+            }
+        }
+    }
+    if counts["query_pcapdb"] == nil { failed=append(failed,"missing_real_query") }
+    if name == "import_answer" {
+        if counts["load_pcapfile"] != 1 { failed=append(failed,"expected_one_import") }
+        for value in ["/pcap-skill-proof","skill.example","200","8"] {
+            if !(value in answer) { failed=append(failed,"answer_missing_"+value) }
+        }
+    }
+    if name == "id_reassembly" {
+        for mode in ["sessions","streams","stream_data","protocol_packets"] {
+            if !(mode in modes) { failed=append(failed,"missing_mode_"+mode) }
+        }
+        if counts["load_pcapfile"] != nil { failed=append(failed,"unexpected_reimport") }
+        completeSession,requestRefs,previewStreams = false,false,[]
+        for _,call in calls {
+            if call.result == nil { failed=append(failed,"missing_semantic_result"); continue }
+            if call.params.query_type == "sessions" {
+                for item in call.result.items {
+                    if item.complete && !item.has_gaps && !item.midstream && item.packet_count==8 { completeSession=true }
+                }
+            }
+            if call.params.query_type == "protocol_packets" {
+                ids=[]
+                for item in call.result.items { ids=append(ids,int(item.id)) }
+                if len(ids)==2 && 4 in ids && 5 in ids { requestRefs=true }
+            }
+            if call.params.query_type == "stream_data" {
+                for item in call.result.items {
+                    raw=codec.DecodeBase64(item.data)~
+                    previewBudget=128
+                    if call.params.preview_bytes!=nil {previewBudget=call.params.preview_bytes}
+                    if item.encoding!="base64" || len(raw)>previewBudget || item.truncated!=(len(raw)<item.total_bytes) {
+                        failed=append(failed,"incorrect_preview_metadata")
+                    }
+                    previewStreams=append(previewStreams,int(item.stream_id))
+                }
+            }
+        }
+        if !completeSession { failed=append(failed,"wrong_session_completeness") }
+        if !requestRefs { failed=append(failed,"missing_split_request_packet_refs") }
+        if !(1 in previewStreams && 2 in previewStreams) { failed=append(failed,"missing_directional_stream_previews") }
+    }
+    if name == "auto_file_fields" {
+        for mode in ["fields","details","protocols"] {
+            if !(mode in modes) { failed=append(failed,"missing_mode_"+mode) }
+        }
+        if !("/pcap-skill-proof" in answer) { failed=append(failed,"wrong_path") }
+        if counts["load_pcapfile"] != nil { failed=append(failed,"unexpected_explicit_import") }
+        paths,matched = [],false
+        for _,call in calls {
+            if call.params.query_type == "fields" && call.result != nil {
+                if !call.result.sampled { failed=append(failed,"missing_sampled_marker") }
+                for item in call.result.items { paths=append(paths,item.path) }
+            }
+        }
+        for _,call in calls {
+            if call.params.query_type == "protocols" && call.params.field_path in paths && call.params.field_value=="/pcap-skill-proof" && call.params.field_type in [nil,"string"] && call.params.field_op in [nil,"eq"] && call.result!=nil {
+                if len(call.result.items)==1 && call.result.items[0].id==1 { matched=true }
+            }
+        }
+        if !matched { failed=append(failed,"typed_search_not_grounded_in_discovered_path") }
+    }
+    if name == "manage_lifecycle" {
+        loadedID,deletedID,validated,emptyList,metadataOK="","",false,false,false
+        operations=[]
+        for _,call in calls {
+            if call.result==nil {failed=append(failed,"missing_semantic_result");continue}
+            if call.tool=="load_pcapfile" {loadedID=call.result.dataset_id}
+            if call.tool=="query_pcapdb" && call.params.query_type=="metadata" && call.result.packet_count==8 {metadataOK=true}
+            if call.tool!="manage_pcapdb" {continue}
+            operations=append(operations,call.params.op)
+            if call.params.op=="validate" && call.result.valid && !call.result.busy {validated=true}
+            if call.params.op=="list" && len(call.result.items)==0 && !call.result.has_more {emptyList=true}
+            if call.params.op=="delete" && call.result.deleted && !call.result.cleanup_pending {deletedID=call.result.dataset_id}
+        }
+        for op in ["list","validate","export","delete"] {if !(op in operations) {failed=append(failed,"missing_management_"+op)}}
+        if counts["load_pcapfile"]!=1 || loadedID=="" || deletedID!=loadedID || !validated || !metadataOK || !emptyList {failed=append(failed,"incorrect_library_lifecycle")}
+        if pcapdb.CountPCAPDatabases()~!=0 {failed=append(failed,"dataset_still_registered")}
+        original,sourceErr=file.ReadFile(source)
+        exported,exportErr=file.ReadFile(exportPath)
+        if sourceErr!=nil || exportErr!=nil || string(original)!=string(fixture) || string(exported)!=string(fixture) {failed=append(failed,"source_or_export_bytes_changed")}
+    }
+    pass = len(failed)==0
+    row = {"case":name,"pass":pass,"failed":failed,"skill_loaded":skillLoaded,
+        "model":model,"provider":provider,"seconds":time.Since(started).Seconds(),
+        "tool_counts":counts,"query_modes":modes,"calls":calls,"answer":answer}
+    file.SaveJson(file.Join(dir,"result.json"),row)~
+    summary=append(summary,row)
+    file.SaveJson(file.Join(root,"summary.json"),summary)~
+    printf("PCAP_SKILL case=%s pass=%v failures=%v seconds=%.1f\n",name,pass,failed,row.seconds)
+    mu.Unlock()
+}
+for row in summary { assert row.pass, "Real model smoke failed; inspect the bounded events and result.json" }

@@ -33,12 +33,13 @@ type InstanceManager struct {
 }
 
 type Database struct {
-	ID      string
-	manager *InstanceManager
-	db      *gorm.DB
-	path    string
-	mu      sync.RWMutex
-	closed  bool
+	ID         string
+	manager    *InstanceManager
+	db         *gorm.DB
+	path       string
+	mu         sync.RWMutex
+	closed     bool
+	readerLock *os.File
 	// Protected by manager.mu. Native Go callers retain their explicit owner;
 	// Yak handles borrow this pool and release it after the final borrower.
 	nativeOwner bool
@@ -61,6 +62,10 @@ func NewInstanceManager(profile *gorm.DB, libraryDir string) (*InstanceManager, 
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	m := &InstanceManager{profile: profile, ctx: ctx, cancel: cancel, root: root, instances: make(map[string]*Database), closeDone: make(chan struct{})}
+	if err = m.recoverDeletions(); err != nil {
+		cancel()
+		return nil, err
+	}
 	if err = m.recoverCatalog(); err != nil {
 		cancel()
 		return nil, err
@@ -71,6 +76,9 @@ func NewInstanceManager(profile *gorm.DB, libraryDir string) (*InstanceManager, 
 		return nil, err
 	}
 	for _, entry := range entries {
+		if errors.Is(checkNotDeleted(entry.DatabasePath), ErrNotFound) {
+			continue
+		}
 		result, err := m.Validate(context.Background(), entry.DatasetID, false)
 		if err != nil {
 			cancel()
@@ -106,6 +114,9 @@ func (m *InstanceManager) recoverCatalog() error {
 			continue
 		}
 		path := filepath.Join(m.root, id, "index.sqlite")
+		if errors.Is(checkNotDeleted(path), ErrNotFound) {
+			continue
+		}
 		if _, err := os.Stat(path); err != nil {
 			continue
 		}
@@ -118,6 +129,9 @@ func (m *InstanceManager) recoverCatalog() error {
 			return err
 		}
 		recoverOne := func() error {
+			if errors.Is(checkNotDeleted(path), ErrNotFound) {
+				return nil
+			}
 			var found PCAPFileDBMetadata
 			if err := m.profile.Where("dataset_id = ?", id).First(&found).Error; err == nil {
 				return nil
@@ -250,7 +264,7 @@ func (m *InstanceManager) resolveContext(ctx context.Context, identifier string)
 	var meta PCAPFileDBMetadata
 	err := scoped.Where("dataset_id = ?", identifier).First(&meta).Error
 	if err == nil {
-		return &meta, nil
+		return &meta, checkNotDeleted(meta.DatabasePath)
 	}
 	if !gorm.IsRecordNotFoundError(err) {
 		return nil, err
@@ -270,7 +284,7 @@ func (m *InstanceManager) resolveContext(ctx context.Context, identifier string)
 	if len(matches) != 1 {
 		return nil, ErrAmbiguous
 	}
-	return &matches[0], nil
+	return &matches[0], checkNotDeleted(matches[0].DatabasePath)
 }
 
 func datasetLockPath(meta *PCAPFileDBMetadata) string {
@@ -280,6 +294,12 @@ func (m *InstanceManager) saveCatalog(meta *PCAPFileDBMetadata) error {
 	var existing PCAPFileDBMetadata
 	err := m.profile.Unscoped().Where("dataset_id = ?", meta.DatasetID).First(&existing).Error
 	if err != nil && !gorm.IsRecordNotFoundError(err) {
+		return err
+	}
+	if existing.DeletedAt != nil {
+		return ErrNotFound
+	}
+	if err := checkNotDeleted(meta.DatabasePath); err != nil {
 		return err
 	}
 	// The manifest may carry a row ID from an earlier profile database. Resolve
@@ -392,6 +412,9 @@ func (m *InstanceManager) invalidCatalog(meta *PCAPFileDBMetadata, cause error) 
 }
 
 func (m *InstanceManager) validateLocked(ctx context.Context, catalog *PCAPFileDBMetadata, deep bool) (*ValidationResult, error) {
+	if err := checkNotDeleted(catalog.DatabasePath); err != nil {
+		return nil, err
+	}
 	if catalog.DatabaseType != "sqlite" {
 		return m.invalid(ctx, catalog, fmt.Errorf("pcapdb: unsupported database type %q", catalog.DatabaseType))
 	}
@@ -643,11 +666,11 @@ func (m *InstanceManager) openReady(meta *PCAPFileDBMetadata, leased ...bool) (*
 	if len(m.instances) >= 32 {
 		return nil, fmt.Errorf("pcapdb: 32 open datasets; close unused database handles")
 	}
-	db, err := openIndex(meta.DatabasePath, false, false)
+	db, readerLock, err := openReaderPool(m.ctx, meta.DatabasePath)
 	if err != nil {
 		return nil, err
 	}
-	instance := &Database{ID: meta.DatasetID, manager: m, db: db, path: meta.DatabasePath}
+	instance := &Database{ID: meta.DatasetID, manager: m, db: db, path: meta.DatabasePath, readerLock: readerLock}
 	instance.nativeOwner = len(leased) == 0 || !leased[0]
 	m.instances[meta.DatasetID] = instance
 	return instance, nil
@@ -723,6 +746,7 @@ func (d *Database) closePool(force, idleOnly bool) error {
 		defer d.manager.ops.Done()
 	}
 	d.closed = true
+	defer releaseFileLock(d.readerLock)
 	delete(d.manager.instances, d.ID)
 	err := d.db.Close()
 	d.mu.Unlock()

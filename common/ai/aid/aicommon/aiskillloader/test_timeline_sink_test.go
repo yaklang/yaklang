@@ -1,0 +1,174 @@
+package aiskillloader
+
+import (
+	"fmt"
+	"strings"
+	"sync"
+)
+
+// testTimelineSink 是测试用的 Timeline 替身: 记录 manager 追加的正文, 并按
+// 生产端语义渲染 "已冻结的单一技能块"。
+//
+// 生产环境由 aicommon.Timeline 提供该实现; 这里只用于验证 manager 的
+// "只加载/查看, 不托管正文" 契约。
+type testTimelineSink struct {
+	mu    sync.Mutex
+	items []*testTimelineSinkItem
+}
+
+type testTimelineSinkItem struct {
+	name    string
+	path    string
+	body    string
+	src     string
+	kind    string
+	start   int
+	end     int
+	total   int
+	deleted bool
+}
+
+func newTestTimelineSink() *testTimelineSink {
+	return &testTimelineSink{}
+}
+
+func (s *testTimelineSink) AppendSkillMetadata(name, content, source string) bool {
+	return s.appendPart(name, SkillContentKindMetadata, "", content, source, 0, 0, 0)
+}
+
+func (s *testTimelineSink) AppendSkillFileContent(name, path, content, source string, startLine, endLine, total int) bool {
+	return s.appendPart(name, SkillContentKindContent, path, content, source, startLine, endLine, total)
+}
+
+func (s *testTimelineSink) appendPart(name, kind, path, content, source string, startLine, endLine, total int) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for _, item := range s.items {
+		if !item.deleted && item.name == name && item.kind == kind && item.path == path &&
+			item.start == startLine && item.end == endLine && item.body == content {
+			return false
+		}
+	}
+	s.items = append(s.items, &testTimelineSinkItem{
+		name: name, kind: kind, path: path, body: content, src: source,
+		start: startLine, end: endLine, total: total,
+	})
+	return true
+}
+
+func (s *testTimelineSink) VisibleSkillParts(name string) []SkillContextPart {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	var parts []SkillContextPart
+	seen := map[string]bool{}
+	for _, item := range s.items {
+		if item.deleted || item.name == "__skill_catalog__" || (name != "" && item.name != name) {
+			continue
+		}
+		key := item.name + "\x00" + item.kind + "\x00" + item.path + "\x00" + fmt.Sprint(item.start) + "\x00" + fmt.Sprint(item.end)
+		if seen[key] {
+			continue
+		}
+		seen[key] = true
+		parts = append(parts, SkillContextPart{
+			Name: item.name, Kind: item.kind, Path: item.path,
+			StartLine: item.start, EndLine: item.end, Total: item.total,
+			ReachedEnd: item.total > 0 && item.end == item.total,
+		})
+	}
+	return parts
+}
+
+func (s *testTimelineSink) DeleteSkillContent(name string) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	removed := false
+	for _, item := range s.items {
+		if item.name == name && !item.deleted {
+			item.deleted = true
+			removed = true
+		}
+	}
+	return removed
+}
+
+func (s *testTimelineSink) DeleteSkillCatalog() bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	removed := false
+	for _, item := range s.items {
+		if item.name == "__skill_catalog__" && !item.deleted {
+			item.deleted = true
+			removed = true
+		}
+	}
+	return removed
+}
+
+func (s *testTimelineSink) HasSkillContentHistory(name string) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for _, item := range s.items {
+		if item.name == name {
+			return true
+		}
+	}
+	return false
+}
+
+func (s *testTimelineSink) AppendSkillCatalog(rendered string) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for _, item := range s.items {
+		if !item.deleted && item.name == "__skill_catalog__" && item.body == rendered {
+			return false
+		}
+	}
+	s.items = append(s.items, &testTimelineSinkItem{
+		name: "__skill_catalog__", body: rendered, src: "catalog",
+	})
+	return true
+}
+
+func (s *testTimelineSink) RenderSkillContentForPrompt() string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	var parts []string
+	for _, item := range s.items {
+		if item.deleted {
+			continue
+		}
+		if item.name == "__skill_catalog__" {
+			parts = append(parts, item.body)
+			continue
+		}
+		if item.kind == SkillContentKindMetadata || item.path == "" && item.kind != SkillContentKindContent {
+			parts = append(parts, fmt.Sprintf("=== Skill: %s ===\n[metadata]\n%s", item.name, item.body))
+			continue
+		}
+		if item.kind == SkillContentKindContent && item.end > 0 {
+			end := ""
+			if item.total > 0 && item.end == item.total {
+				end = " END"
+			}
+			parts = append(parts, fmt.Sprintf("=== Skill: %s ===\n[%s:%d-%d/%d%s]\n%s",
+				item.name, item.path, item.start, item.end, item.total, end, item.body))
+			continue
+		}
+		header := fmt.Sprintf("=== Skill: %s ===", item.name)
+		if item.path != "" && item.path != "SKILL.md" {
+			header = fmt.Sprintf("=== Skill: %s (%s) ===", item.name, item.path)
+		}
+		parts = append(parts, header+"\n"+item.body)
+	}
+	if len(parts) == 0 {
+		return ""
+	}
+	return "<|SKILLS_CONTEXT_test|>\n== Currently Loaded Skills ==\n\n" + strings.Join(parts, "\n") + "\n<|SKILLS_CONTEXT_END_test|>"
+}
+
+func (s *testTimelineSink) appendCount() int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return len(s.items)
+}

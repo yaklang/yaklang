@@ -8,19 +8,47 @@ trap 'rm -rf -- "$test_root"' EXIT
 
 source_sha="$(git -C "$repo_root" rev-parse HEAD)"
 case "$(uname -m)" in
-  x86_64) target_arch="amd64" ;;
-  aarch64|arm64) target_arch="arm64" ;;
+  x86_64) target_arch="amd64"; builder_digest=6d405dfc5fdf3a45df1529cf060b920041f52ce523487e0f36f02765af294a51 ;;
+  aarch64|arm64) target_arch="arm64"; builder_digest=7030196c59858ca8942e85aa2f68599240d58282ee35eb795609738a1e242c1f ;;
   *) echo "unsupported test host architecture: $(uname -m)" >&2; exit 1 ;;
 esac
 base_digest="$(printf 'b%.0s' {1..64})"
-builder_digest="$(printf 'c%.0s' {1..64})"
+builder_image="docker.io/library/golang:1.22.12-alpine3.21@sha256:$builder_digest"
 runtime_binary="$test_root/legion-session-runtime"
 runtime_ldd="$test_root/runtime.ldd"
+runtime_recipe="$test_root/musl-build.json"
 runtime_archive="$test_root/runtime.docker.tar.gz"
 runtime_image_tag="registry.example/legion-ai-session-runtime:fixture"
 runtime_archive_root="$test_root/runtime-archive"
-cp /bin/true "$runtime_binary"
-ldd "$runtime_binary" >"$runtime_ldd"
+# Exercise real ELF and Go build-information checks without compiling the full
+# Node. This fixture is local metadata evidence, not an official Node artifact.
+command -v musl-gcc >/dev/null || { echo 'musl-tools is required for the static Runtime fixture' >&2; exit 1; }
+cat >"$test_root/main.go" <<'GO'
+package main
+/*
+#include <features.h>
+#ifdef __GLIBC__
+#error the fixture requires musl
+#endif
+extern const char __libc_version[];
+static const char *version(void) { return __libc_version; }
+*/
+import "C"
+import "fmt"
+func main() { fmt.Println(C.GoString(C.version())) }
+GO
+CGO_ENABLED=1 GOOS=linux GOARCH="$target_arch" CC=musl-gcc GOTOOLCHAIN=local \
+  go build -trimpath -buildvcs=false -tags musl,netgo,osusergo,sqlite_omit_load_extension \
+    -ldflags '-s -w -buildid= -linkmode external -extldflags "-static"' \
+    -o "$runtime_binary" "$test_root/main.go"
+fixture_libc_version="$("$runtime_binary")"
+printf 'statically linked (musl); no dynamic dependencies\n' >"$runtime_ldd"
+jq -n --arg arch "$target_arch" --arg builder "$builder_image" \
+  --arg version "$fixture_libc_version" --arg go_version "$(GOTOOLCHAIN=local go version)" \
+  '{goos:"linux",goarch:$arch,builder_image:$builder,go_version:$go_version,
+    c_library:"musl",c_library_version:$version,c_compiler:"fixture musl-gcc",
+    cgo_enabled:true,link_mode:"external-static",builder_execution:"native",
+    build_tags:"musl,netgo,osusergo,sqlite_omit_load_extension"}' >"$runtime_recipe"
 mkdir -p "$runtime_archive_root/blobs/sha256"
 printf '{"architecture":"%s","fixture":true}\n' "$target_arch" \
   >"$runtime_archive_root/runtime-config.json"
@@ -56,13 +84,14 @@ run_packager() {
   RUNTIME_DIST_DIR="$output_dir" \
   RUNTIME_BINARY="$runtime_binary" \
   RUNTIME_LDD_FILE="$runtime_ldd" \
+  RUNTIME_MUSL_BUILD_METADATA="$runtime_recipe" \
   RUNTIME_IMAGE_REF="registry.example/legion-ai-session-runtime@sha256:$fake_digest" \
   RUNTIME_IMAGE_TAG="$runtime_image_tag" \
   RUNTIME_IMAGE_ARCHIVE="$archive" \
   RUNTIME_BASE_IMAGE="debian:bookworm-slim@sha256:$base_digest" \
-  RUNTIME_BUILDER_IMAGE="golang:1.22.12-bookworm@sha256:$builder_digest" \
+  RUNTIME_BUILDER_IMAGE="$builder_image" \
   RUNTIME_GOARCH="$target_arch" \
-  RUNTIME_GO_VERSION="go version go1.22.12 linux/$target_arch" \
+  RUNTIME_GO_VERSION="$(GOTOOLCHAIN=local go version)" \
   RUNTIME_CI_PROVIDER="fixture" \
   SESSION_RUNTIME_WORKFLOW_NAME="fixture" \
   "$packager"
@@ -98,7 +127,9 @@ jq -e \
     .recipe.goos == "linux" and
     .recipe.goarch == $target_arch and
     .recipe.cgo_enabled == true and
-    .recipe.link_mode == "dynamic-container" and
+    .recipe.link_mode == "external-static" and
+    .recipe.c_library == "musl" and
+    .recipe.build_tags == "musl,netgo,osusergo,sqlite_omit_load_extension" and
     .recipe.module_go_version == "1.22.12" and
     (.capabilities | index("ai.input.managed_attachment.v1")) != null and
     (.capabilities | index("ai.session.bind_epoch.v1")) != null and
@@ -119,6 +150,22 @@ jq -e \
     (.recipe.dockerfile_sha256 | test("^[0-9a-f]{64}$")) and
     (.recipe.dockerignore_sha256 | test("^[0-9a-f]{64}$"))
   ' "$manifest" >/dev/null
+
+mv "$runtime_binary" "$runtime_binary.static"
+cp /bin/true "$runtime_binary"
+if run_packager "$runtime_archive" "$test_root/dynamic-dist" >/dev/null 2>&1; then
+  echo 'Runtime packager accepted a dynamically linked binary labeled as musl static' >&2
+  exit 1
+fi
+mv "$runtime_binary.static" "$runtime_binary"
+
+cp "$runtime_recipe" "$runtime_recipe.original"
+jq '.c_library = "glibc"' "$runtime_recipe.original" >"$runtime_recipe"
+if run_packager "$runtime_archive" "$test_root/invalid-libc-dist" >/dev/null 2>&1; then
+  echo 'Runtime packager accepted a libc recipe that is not musl' >&2
+  exit 1
+fi
+mv "$runtime_recipe.original" "$runtime_recipe"
 
 untagged_archive="$test_root/runtime-untagged.docker.tar.gz"
 write_runtime_archive "$untagged_archive" untagged

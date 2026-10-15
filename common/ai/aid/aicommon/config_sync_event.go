@@ -32,13 +32,13 @@ const (
 	SYNC_TYPE_SESSION_SNAPSHOT            = "session_snapshot_sync"
 	SYNC_TYPE_TASK_SNAPSHOT               = "task_snapshot_sync"
 	SYNC_TYPE_CLOSE_BROWSER               = "close_browser_sync"
-	// SYNC_TYPE_LOAD_SKILL 是用户强制加载 SKILL 的 sync 事件.
+	// SYNC_TYPE_LOAD_SKILL 是用户显式指定加载 SKILL 的 sync 事件.
 	// 客户端发 AIInputEvent{IsSyncMessage:true, SyncType:"load_skill_sync",
-	// SyncJsonInput: `{"skill_names":["x","y"]}`}, 服务端把满内容加载进
-	// SkillsContextManager.ForcedSkills (进 frozen_block 顶部), 并在 timeline 写
-	// "user_loaded_skill" 条目. 响应 EmitSyncJSON 返回 loaded/failed/already_loaded.
+	// SyncJsonInput: `{"skill_names":["x","y"]}`}, 服务端把正文加载进 Timeline
+	// (来源标记 user-forced), 并在 timeline 写 "user_loaded_skill" 条目.
+	// 响应 EmitSyncJSON 返回 loaded/failed/already_loaded.
 	//
-	// 关键词: SYNC_TYPE_LOAD_SKILL, 用户强制加载, frozen_block, timeline
+	// 关键词: SYNC_TYPE_LOAD_SKILL, 用户指定加载, timeline, 来源标记
 	SYNC_TYPE_LOAD_SKILL = "load_skill_sync"
 
 	ProcessID           string = "process_id"

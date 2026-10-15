@@ -12,9 +12,14 @@ import (
 const (
 	TimelinePromotedTargetSemiDynamic1 = "semi-dynamic-1"
 	TimelinePromotedKindRecentTool     = "recent-tool-cache"
-	TimelinePromotedOperationUpsert    = "upsert"
-	TimelinePromotedOperationDelete    = "delete"
-	TimelinePromotedOperationReuse     = "reuse"
+	// TimelinePromotedKindSkillContent carries Skill SKILL.md / resource bodies
+	// that must follow the same Open -> freeze -> promote path as evidence.
+	//
+	// 关键词: skill content, 半动态正文统一, 先 Open 后冻结提升
+	TimelinePromotedKindSkillContent = "skill"
+	TimelinePromotedOperationUpsert  = "upsert"
+	TimelinePromotedOperationDelete  = "delete"
+	TimelinePromotedOperationReuse   = "reuse"
 )
 
 // PromotableTimelineItem is a control-plane timeline entry. It is persisted and
@@ -64,8 +69,10 @@ type PromotedTimelineEntry struct {
 	TargetSection string `json:"target_section"`
 	Key           string `json:"key"`
 	Payload       string `json:"payload"`
-	PayloadHash   string `json:"payload_hash"`
-	SourceItemID  int64  `json:"source_item_id"`
+	// For skill content, Payload is accumulated prompt text and PayloadHash
+	// identifies the last appended source payload, not the combined text.
+	PayloadHash  string `json:"payload_hash"`
+	SourceItemID int64  `json:"source_item_id"`
 	// LastUsedItemID is independent of the schema source. Older snapshots fall
 	// back to SourceItemID until their journal is replayed.
 	LastUsedItemID int64 `json:"last_used_item_id,omitempty"`
@@ -143,6 +150,12 @@ func (m *Timeline) PushPromotable(id int64, kind, targetSection, key, operation,
 	if m.idToTimelineItem.Have(id) {
 		return false
 	}
+	// Skill loading is idempotent only for the same still-live body. Different
+	// windows of one file remain independent history, not upserted versions.
+	if kind == TimelinePromotedKindSkillContent && operation == TimelinePromotedOperationUpsert &&
+		m.hasDuplicateSkillContentLocked(key, payload) {
+		return false
+	}
 	// Reuse is a reference, never a way to create or resurrect a cache entry.
 	// The caller must submit a full upsert if this returns false.
 	if operation == TimelinePromotedOperationReuse && !m.hasToolCacheBeforeLocked(id, key) {
@@ -195,6 +208,10 @@ func (m *Timeline) rebuildPromotedStateLocked(throughID int64) {
 		if entries == nil {
 			entries = make(map[string]*PromotedTimelineEntry)
 			kinds[control.Kind] = entries
+		}
+		if control.Kind == TimelinePromotedKindSkillContent {
+			appendPromotedSkillContent(entries, control)
+			continue
 		}
 		if control.Operation == TimelinePromotedOperationDelete {
 			delete(entries, control.Key)
@@ -251,6 +268,10 @@ func (m *Timeline) effectivePromotedEntries(targetSection, kind string) []*Promo
 		}
 		op, ok := item.value.(*PromotableTimelineItem)
 		if !ok || op == nil || op.TargetSection != targetSection || op.Kind != kind {
+			continue
+		}
+		if kind == TimelinePromotedKindSkillContent {
+			appendPromotedSkillContent(active, op)
 			continue
 		}
 		switch op.Operation {

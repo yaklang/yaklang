@@ -352,8 +352,8 @@ func OverlayAISessionStartParams(base, patch *ypb.AIStartParams) *ypb.AIStartPar
 	if patch.GetTimelineItemLimit() > 0 {
 		next.TimelineItemLimit = patch.GetTimelineItemLimit()
 	}
-	if patch.GetTimelineContentSizeLimit() > 0 {
-		next.TimelineContentSizeLimit = patch.GetTimelineContentSizeLimit()
+	if patch.GetRuntimeContextSizeLimit() > 0 {
+		next.RuntimeContextSizeLimit = patch.GetRuntimeContextSizeLimit()
 	}
 	if patch.GetUserInteractLimit() > 0 {
 		next.UserInteractLimit = patch.GetUserInteractLimit()

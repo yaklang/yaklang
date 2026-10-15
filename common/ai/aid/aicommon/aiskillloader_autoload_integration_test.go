@@ -1,12 +1,15 @@
 package aicommon
 
 import (
+	"context"
 	"strings"
 	"sync"
 	"testing"
 
-	"github.com/yaklang/gorm"
+	"github.com/stretchr/testify/require"
+
 	_ "github.com/mattn/go-sqlite3"
+	"github.com/yaklang/gorm"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon/aiskillloader"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils/filesys"
@@ -62,34 +65,33 @@ func TestAutoSkillLoader_Integration_WithContextManager(t *testing.T) {
 	}
 
 	mgr := aiskillloader.NewSkillsContextManager(loader)
+	cfg := NewConfig(context.Background(), WithDisableAutoSkills(true))
+	bindTestTimeline(mgr, cfg)
 
 	// Manager should detect available skills
 	if !mgr.HasRegisteredSkills() {
 		t.Fatal("manager should detect skills from AutoSkillLoader")
 	}
 
-	// Render catalog (default hidden; surface it like intent recognition does).
+	// Surface catalog (default hidden; intent recognition does this) and load a skill:
+	// 两者都先进 Timeline Open, 冻结后才进可缓存的单一技能块。
 	mgr.SetCatalogSkills(loader.AllSkillMetas())
-	rendered := mgr.Render("autoload_nonce")
-	if !strings.Contains(rendered, "deploy-app") {
-		t.Fatal("render should list deploy-app in catalog")
-	}
-	if !strings.Contains(rendered, "vuln-scan") {
-		t.Fatal("render should list vuln-scan in catalog")
-	}
-
-	// Load a skill
 	if err := mgr.LoadSkill("deploy-app"); err != nil {
 		t.Fatalf("LoadSkill failed: %v", err)
 	}
+	open := RenderTimelineFrozenOpen(cfg.GetTimeline()).Open
+	require.Contains(t, open, "deploy-app")
+	require.Contains(t, open, "vuln-scan")
+	require.Contains(t, open, "[skill deploy-app | SKILL.md:")
+	require.Contains(t, open, " END]")
 
-	rendered = mgr.Render("autoload_nonce")
-	if !strings.Contains(rendered, "=== Skill: deploy-app ===") {
-		t.Fatal("rendered should contain fully expanded deploy-app")
-	}
-	if !strings.Contains(rendered, "VIEW_WINDOW") {
-		t.Fatal("rendered should contain VIEW_WINDOW")
-	}
+	cfg.GetTimeline().FreezeAll()
+	rendered := mgr.Render("autoload_nonce")
+	require.Contains(t, rendered, "deploy-app")
+	require.Contains(t, rendered, "vuln-scan")
+	require.Contains(t, rendered, "=== Skill: deploy-app ===")
+	require.Contains(t, rendered, "[SKILL.md:")
+	require.Contains(t, rendered, " END]")
 }
 
 func TestAutoSkillLoader_Integration_PromptCompleteness(t *testing.T) {
@@ -98,22 +100,24 @@ func TestAutoSkillLoader_Integration_PromptCompleteness(t *testing.T) {
 		aiskillloader.WithAutoLoad_FileSystem(vfs),
 	)
 	mgr := aiskillloader.NewSkillsContextManager(loader)
+	cfg := NewConfig(context.Background(), WithDisableAutoSkills(true))
+	bindTestTimeline(mgr, cfg)
 
 	_ = mgr.LoadSkill("vuln-scan")
+	cfg.GetTimeline().FreezeAll()
 
-	nonce := "completeness_autoload"
-	rendered := mgr.Render(nonce)
+	rendered := mgr.Render("completeness_autoload")
 
 	requiredElements := []struct {
 		element     string
 		description string
 	}{
-		{"<|SKILLS_CONTEXT_" + nonce + "|>", "context start tag"},
-		{"<|SKILLS_CONTEXT_END_" + nonce + "|>", "context end tag"},
+		{"SKILLS_CONTEXT_", "context start tag"},
+		{"SKILLS_CONTEXT_END_", "context end tag"},
 		{"=== Skill: vuln-scan ===", "skill header"},
 		{"Description:", "skill description"},
-		{"<|VIEW_WINDOW_", "view window start tag"},
-		{"<|VIEW_WINDOW_END_", "view window end tag"},
+		{"[SKILL.md:", "skill file range"},
+		{" END]", "completed file range"},
 	}
 
 	for _, req := range requiredElements {
@@ -130,25 +134,26 @@ func TestAutoSkillLoader_Integration_FoldingWithManySkills(t *testing.T) {
 		aiskillloader.WithAutoLoad_FileSystem(vfs),
 	)
 	mgr := aiskillloader.NewSkillsContextManager(loader)
+	cfg := NewConfig(context.Background(), WithDisableAutoSkills(true))
+	bindTestTimeline(mgr, cfg)
 
+	// manager 侧折叠预算已删除: 正文体积由 Timeline 统一压缩控制。
 	mgr.SetMaxTokens(100)
 
 	_ = mgr.LoadSkill("deploy-app")
 	_ = mgr.LoadSkill("vuln-scan")
 	_ = mgr.LoadSkill("code-review")
+	cfg.GetTimeline().FreezeAll()
 
 	rendered := mgr.Render("fold_nonce")
-
-	// Tags must still be valid
-	if !strings.Contains(rendered, "<|SKILLS_CONTEXT_fold_nonce|>") {
-		t.Fatal("folded render must have start tag")
+	if !strings.Contains(rendered, "SKILLS_CONTEXT_") {
+		t.Fatal("render must have start tag")
 	}
-	if !strings.Contains(rendered, "<|SKILLS_CONTEXT_END_fold_nonce|>") {
-		t.Fatal("folded render must have end tag")
+	if !strings.Contains(rendered, "SKILLS_CONTEXT_END_") {
+		t.Fatal("render must have end tag")
 	}
-	// At least one should be folded
-	if !strings.Contains(rendered, "(folded)") {
-		t.Fatal("with small limit, some skills should be folded")
+	if strings.Contains(rendered, "(folded)") {
+		t.Fatal("manager must not fold skills behind the unified compression")
 	}
 }
 
@@ -177,6 +182,8 @@ func TestAutoSkillLoader_Integration_DBAndContextManager(t *testing.T) {
 	}
 
 	mgr := aiskillloader.NewSkillsContextManager(loader, aiskillloader.WithManagerDB(db))
+	cfg := NewConfig(context.Background(), WithDisableAutoSkills(true))
+	bindTestTimeline(mgr, cfg)
 
 	forge, err := yakit.GetAIForgeByNameAndTypes(db, "deploy-app", schema.FORGE_TYPE_SkillMD)
 	if err != nil {
@@ -209,6 +216,7 @@ func TestAutoSkillLoader_Integration_DBAndContextManager(t *testing.T) {
 	}
 
 	_ = mgr.LoadSkill("deploy-app")
+	cfg.GetTimeline().FreezeAll()
 	rendered := mgr.Render("db_nonce")
 	if !strings.Contains(rendered, "deploy-app") {
 		t.Fatal("rendered should contain deploy-app")
@@ -232,6 +240,8 @@ func TestAutoSkillLoader_Integration_BM25ResultsInContext(t *testing.T) {
 		aiskillloader.WithAutoLoad_Database(db),
 	)
 	mgr := aiskillloader.NewSkillsContextManager(loader, aiskillloader.WithManagerDB(db))
+	cfg := NewConfig(context.Background(), WithDisableAutoSkills(true))
+	bindTestTimeline(mgr, cfg)
 
 	// Search for skills via BM25
 	results, err := mgr.SearchKeywordBM25("vulnerability security", 5)
@@ -244,6 +254,7 @@ func TestAutoSkillLoader_Integration_BM25ResultsInContext(t *testing.T) {
 		_ = mgr.LoadSkill(meta.Name)
 	}
 
+	cfg.GetTimeline().FreezeAll()
 	rendered := mgr.Render("bm25_context_nonce")
 	if rendered == "" {
 		t.Fatal("rendered should not be empty after loading BM25 results")
@@ -262,6 +273,8 @@ func TestAutoSkillLoader_Integration_ConcurrentAccess(t *testing.T) {
 		aiskillloader.WithAutoLoad_FileSystem(vfs),
 	)
 	mgr := aiskillloader.NewSkillsContextManager(loader)
+	cfg := NewConfig(context.Background(), WithDisableAutoSkills(true))
+	bindTestTimeline(mgr, cfg)
 
 	var wg sync.WaitGroup
 	// Concurrent loads
@@ -299,10 +312,11 @@ func TestAutoSkillLoader_Integration_ConcurrentAccess(t *testing.T) {
 		}()
 	}
 	wg.Wait()
+	cfg.GetTimeline().FreezeAll()
 
 	// After all concurrent ops, system should be stable
 	rendered := mgr.Render("final_nonce")
-	if !strings.Contains(rendered, "<|SKILLS_CONTEXT_final_nonce|>") {
+	if !strings.Contains(rendered, "SKILLS_CONTEXT_") {
 		t.Fatal("render after concurrent access should have proper tags")
 	}
 }
@@ -324,6 +338,8 @@ func TestAutoSkillLoader_Integration_SearchByAIMock(t *testing.T) {
 		aiskillloader.WithAutoLoad_FileSystem(vfs),
 	)
 	mgr := aiskillloader.NewSkillsContextManager(loader, aiskillloader.WithManagerSearchAICallback(mockCb))
+	cfg := NewConfig(context.Background(), WithDisableAutoSkills(true))
+	bindTestTimeline(mgr, cfg)
 
 	results, err := mgr.SearchByAI("scan my code for security issues")
 	if err != nil {
@@ -359,6 +375,8 @@ func TestAutoSkillLoader_Integration_NilSafe(t *testing.T) {
 	// AutoSkillLoader with no sources should not panic when used with ContextManager
 	loader, _ := aiskillloader.NewAutoSkillLoader()
 	mgr := aiskillloader.NewSkillsContextManager(loader)
+	cfg := NewConfig(context.Background(), WithDisableAutoSkills(true))
+	bindTestTimeline(mgr, cfg)
 
 	if mgr.HasRegisteredSkills() {
 		t.Fatal("no skills should be registered")

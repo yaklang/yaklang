@@ -45,6 +45,13 @@ import (
 // 即为 schema 字面量. 找不到时返回空串, 调用方应视为 "未启用".
 //
 // 关键词: extractSchemaBlock, SCHEMA enum 精确判断, high-static 反污染对应测试侧调整
+// skillPromptMarkerPresent 判断 prompt 中是否包含该技能的可见内容:
+// 未冻结时是 Open 段的 [skill <name> | ...] 标签, 冻结提升后是 === Skill: <name> === 块。
+func skillPromptMarkerPresent(prompt, name string) bool {
+	return strings.Contains(prompt, "=== Skill: "+name+" ===") ||
+		strings.Contains(prompt, "[skill "+name+" |")
+}
+
 func extractSchemaBlock(prompt string) string {
 	const tag = "<|SCHEMA|>"
 	first := strings.Index(prompt, tag)
@@ -217,15 +224,12 @@ func TestReActLoop_Skills_PromptDifference(t *testing.T) {
 		if !strings.Contains(schemaBlock, "loading_skills") {
 			t.Error("loading_skills SHOULD appear in SCHEMA enum when skills are configured")
 		}
-		// 改造后: SKILL 目录默认隐藏 (节约 token), SKILLS_CONTEXT 段零加载时为空.
-		// 目录仅由意图识别 (SetCatalogSkills + SetCatalogVisible) 主动 surface.
-		// 这里验证「目录隐藏」契约: 注册了 skill 但未 surface 时, prompt 不应含
-		// SKILLS_CONTEXT 标签 / skill 名.
+		// 固定 Skill Inventory 在 FrozenBlock 展示名称；未加载时没有技能正文块。
 		if strings.Contains(capturedMainPrompt, "SKILLS_CONTEXT") {
-			t.Error("SKILLS_CONTEXT tag should NOT appear when catalog is hidden (default)")
+			t.Error("SKILLS_CONTEXT tag should NOT appear before any skill is loaded")
 		}
-		if strings.Contains(capturedMainPrompt, "test-skill") {
-			t.Error("'test-skill' should NOT appear when catalog is hidden (default)")
+		if !strings.Contains(capturedMainPrompt, "# Skill Inventory") || !strings.Contains(capturedMainPrompt, "  - test-skill:") {
+			t.Error("fixed Skill Inventory should list 'test-skill' before loading")
 		}
 	})
 }
@@ -311,7 +315,7 @@ func TestReActLoop_Skills_LoadedContentInPrompt(t *testing.T) {
 		}),
 	)
 
-	loop, err := reactloops.NewReActLoop("skill-content-test", reactIns)
+	loop, err := reactloops.NewReActLoop("skill-test", reactIns)
 	if err != nil {
 		t.Fatalf("failed to create loop: %v", err)
 	}
@@ -326,19 +330,21 @@ func TestReActLoop_Skills_LoadedContentInPrompt(t *testing.T) {
 	firstPrompt := mainPrompts[0]
 	secondPrompt := mainPrompts[1]
 
-	// 改造后: 目录默认隐藏, 首个 prompt (加载前) 不应含 skill 名 / SKILLS_CONTEXT.
-	if strings.Contains(firstPrompt, "test-skill") {
-		t.Error("First main prompt should NOT list 'test-skill' (catalog hidden by default)")
+	// 加载前只有固定目录，正文仍需按需加载进 Timeline。
+	if !strings.Contains(firstPrompt, "# Skill Inventory") || !strings.Contains(firstPrompt, "  - test-skill:") {
+		t.Error("First main prompt should list 'test-skill' in the fixed inventory")
+	}
+	if strings.Contains(firstPrompt, "SKILLS_CONTEXT") {
+		t.Error("First main prompt should NOT contain a loaded skill context block")
 	}
 
 	// Second prompt: should have the actual loaded skill body content.
-	// AI 自主加载 (loading_skills action) 现走 LoadAutoSkill, 渲染进 AUTO_LOADED_SKILLS
-	// 段 (semi_dynamic_2 尾部), 仍含满内容 (header + body).
+	// AI 自主加载先进入 Timeline Open；冻结后才进入 SemiDynamic1 技能块。
 	if !strings.Contains(secondPrompt, "This is a test skill") {
 		t.Error("Second main prompt should contain loaded skill body 'This is a test skill'")
 	}
-	if !strings.Contains(secondPrompt, "=== Skill: test-skill ===") {
-		t.Error("Second main prompt should contain skill header '=== Skill: test-skill ==='")
+	if !skillPromptMarkerPresent(secondPrompt, "test-skill") {
+		t.Error("Second main prompt should contain the loaded skill section")
 	}
 
 	t.Logf("Captured %d main prompts; verified skill content transition", len(mainPrompts))
@@ -422,11 +428,11 @@ description: A large skill for view offset testing
 	// Verify the loaded prompt contains truncation metadata (Total Lines, Current Offset)
 	if len(mainPrompts) >= 2 {
 		loadedPrompt := mainPrompts[1]
-		if !strings.Contains(loadedPrompt, "Total Lines") {
-			t.Error("Loaded large skill prompt should contain 'Total Lines' metadata")
+		if !strings.Contains(loadedPrompt, "[skill large-skill | SKILL.md:") {
+			t.Error("Loaded large skill prompt should contain the SKILL.md range")
 		}
-		if !strings.Contains(loadedPrompt, "Current Offset") {
-			t.Error("Loaded large skill prompt should contain 'Current Offset' metadata")
+		if strings.Contains(loadedPrompt, " END]") {
+			t.Error("truncated first range must not claim the file has ended")
 		}
 	}
 

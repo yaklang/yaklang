@@ -84,6 +84,7 @@ func TestManager_SearchKeywordBM25_WithDB(t *testing.T) {
 		t.Fatalf("failed to create database-backed autoloader: %v", err)
 	}
 	m := NewSkillsContextManager(loader, WithManagerDB(db))
+	m.BindTimelineSink(newTestTimelineSink())
 
 	results, err := m.SearchKeywordBM25("code review linters", 5)
 	if err != nil {
@@ -113,6 +114,7 @@ func TestManager_SearchByAI_Mock(t *testing.T) {
 			{SkillName: "top-skill", Reason: "deploy task"},
 		}, nil
 	}))
+	m.BindTimelineSink(newTestTimelineSink())
 	results, err := m.SearchByAI("deploy app to prod")
 	if err != nil {
 		t.Fatalf("SearchByAI failed: %v", err)
@@ -127,6 +129,7 @@ func TestManager_SearchByAI_Mock(t *testing.T) {
 
 func TestManager_GetCurrentSelectedSkills(t *testing.T) {
 	m := newSearchTestManager(t)
+	m.BindTimelineSink(newTestTimelineSink())
 	if err := m.LoadSkill("top-skill"); err != nil {
 		t.Fatalf("LoadSkill failed: %v", err)
 	}
@@ -171,6 +174,7 @@ func TestManager_DBLoaderIsLazy(t *testing.T) {
 	}
 
 	m := NewSkillsContextManager(loader, WithManagerDB(db))
+	m.BindTimelineSink(newTestTimelineSink())
 	results, err := m.SearchKeywordBM25("security scanning", 5)
 	if err != nil {
 		t.Fatalf("SearchKeywordBM25 failed: %v", err)
@@ -193,6 +197,8 @@ func TestDefaultSkillMetadataRespectsExplicitInvocation(t *testing.T) {
 		t.Fatal(err)
 	}
 	manager := NewSkillsContextManager(loader)
+	manager.BindTimelineSink(newTestTimelineSink())
+	manager.LoadDefaultSkills()
 	if !manager.IsAutoSkillLoadedAndUnfolded("default") {
 		t.Fatal("default skill was not loaded")
 	}

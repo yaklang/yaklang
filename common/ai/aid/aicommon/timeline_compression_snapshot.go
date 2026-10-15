@@ -131,6 +131,9 @@ func (m *Timeline) captureCompressionSnapshotLocked() (snapshot *timelineCompres
 			return nil, fmt.Errorf("invalid compression source item %d", id)
 		}
 		if isPromotableTimelineItem(item) || isTimelineUserInput(item) {
+			// Promoted state, including skill content, remains exact for now.
+			// It is excluded from the summarization candidate set; pending Open
+			// payloads are still measured by CompressBeforePrompt.
 			snapshot.ExactItemIDs = append(snapshot.ExactItemIDs, id)
 			if control := timelinePromotionForItem(item); control != nil && control.Kind == TimelinePromotedKindUserInput {
 				snapshot.UserContexts = append(snapshot.UserContexts, timelineCompressionUserContext{id, id <= snapshot.FrozenThroughID, control.Payload})

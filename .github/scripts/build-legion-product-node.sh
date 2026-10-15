@@ -18,7 +18,7 @@ log() {
   printf '[legion-product-node] %s\n' "$*"
 }
 
-for command in file git go gzip jq readelf sha256sum stat tar; do
+for command in file git gzip jq readelf sha256sum stat tar; do
   command -v "$command" >/dev/null 2>&1 || die "missing required command: $command"
 done
 
@@ -55,25 +55,26 @@ version="${NODE_PACKAGE_VERSION:-sha-${source_sha:0:12}}"
 [[ ! -e "$package_path" ]] || die "package archive already exists: $package_path"
 
 binary="$package_dir/$binary_name"
-build_tags="hids"
 module_go_version="$(awk '$1 == "go" { gsub(/\r/, "", $2); print $2; exit }' "$repo_root/go.mod")"
 [[ -n "$module_go_version" ]] || die "go.mod does not declare a Go version"
-toolchain_version="$(go env GOVERSION)"
-[[ "$toolchain_version" == "go$module_go_version" ]] || \
-  die "Go toolchain $toolchain_version does not match go.mod version go$module_go_version"
-mkdir -p "$package_dir"
 
-log "building ${target_os}/${target_arch} HIDS node from $source_sha with $(go version)"
-(
-  cd "$repo_root"
-  CGO_ENABLED=1 GOOS="$target_os" GOARCH="$target_arch" go build \
-    -trimpath \
-    -buildvcs=true \
-    -tags "$build_tags" \
-    -ldflags '-s -w -buildid= -linkmode external -extldflags "-static"' \
-    -o "$binary" \
-    ./cmd/legion-smoke-node
-)
+# Build outside the checkout before creating package outputs so CI source
+# identity remains clean, including when this checkout is a Git worktree.
+build_dir="$(mktemp -d "${RUNNER_TEMP:-${TMPDIR:-/tmp}}/legion-product-node-build.XXXXXX")"
+trap 'rm -rf "$build_dir"' EXIT
+log "building ${target_os}/${target_arch} HIDS node from $source_sha with the pinned musl recipe"
+"$repo_root/.github/scripts/build-legion-linux-musl.sh" \
+  --goarch "$target_arch" --profile product \
+  --output "$build_dir/$binary_name" --metadata "$build_dir/recipe.json"
+musl_recipe="$(jq -ce --arg arch "$target_arch" '
+  select(.c_library == "musl" and .cgo_enabled == true and
+    .link_mode == "external-static" and .goarch == $arch and
+    .build_tags == "hids,musl,netgo,osusergo,sqlite_omit_load_extension")
+' "$build_dir/recipe.json")" || die 'musl Node build recipe is invalid'
+build_tags="$(jq -er .build_tags <<<"$musl_recipe")"
+go_version="$(jq -er .go_version <<<"$musl_recipe")"
+mkdir -p "$package_dir"
+install -m 0755 "$build_dir/$binary_name" "$binary"
 
 file_description="$(file "$binary")"
 printf '%s\n' "$file_description"
@@ -104,10 +105,11 @@ jq -n \
   --arg source_sha "$source_sha" \
   --argjson source_dirty "$source_dirty" \
   --arg module_go_version "$module_go_version" \
-  --arg go_version "$(go version)" \
+  --arg go_version "$go_version" \
   --arg target_os "$target_os" \
   --arg target_arch "$target_arch" \
   --arg build_tags "$build_tags" \
+  --argjson musl_recipe "$musl_recipe" \
   --arg binary_name "$binary_name" \
   --arg binary_sha "$binary_sha" \
   --argjson binary_size "$binary_size" \
@@ -134,7 +136,7 @@ jq -n \
       workflow: $ci_workflow,
       actor: $ci_actor
     },
-    recipe: {
+    recipe: ($musl_recipe + {
       goos: $target_os,
       goarch: $target_arch,
       cgo_enabled: true,
@@ -142,7 +144,7 @@ jq -n \
       build_tags: $build_tags,
       module_go_version: $module_go_version,
       go_version: $go_version
-    },
+    }),
     capabilities: $capabilities,
     binary: {
       path: $binary_name,
