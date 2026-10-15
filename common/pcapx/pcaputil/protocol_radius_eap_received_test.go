@@ -250,7 +250,7 @@ func TestRADIUSEAPLegacyAttributeRefusalRecovery(t *testing.T) {
 	require.NoError(t, e)
 	defer s.Close("cleanup")
 	first := radiusPkt(1, 7, append(append(append(radiusAttr(1, []byte("alice")), radiusAttr(4, []byte{192, 0, 2, 9})...), radiusAttr(79, []byte{2, 0, 0, 10, 1, 'a', 'l', 'i', 'c', 'e'})...), radiusAttr(80, make([]byte, 16))...))
-	neighbor := radiusPkt(1, 8, radiusAttr(1, []byte("neighbor")))
+	neighbor := radiusPkt(1, 8, append(radiusAttr(1, []byte("neighbor")), radiusAttr(4, []byte{192, 0, 2, 9})...))
 	late := radiusPkt(2, 7, nil)
 	answer := radiusPkt(2, 8, nil)
 	out := s.Feed(0, time.Unix(100, 0), first)

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"github.com/gopacket/gopacket"
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/internal/trafficfixture"
 	"io"
 	"os"
 	"path/filepath"
@@ -27,12 +28,13 @@ type radiusEAPStep struct {
 	Profile, Completeness, Source, Destination string
 }
 type radiusEAPControl struct {
-	Name   string
-	Steps  []radiusEAPStep
-	Ports  [2]uint16
-	Legacy bool `json:"legacy_byte_applicable"`
-	Budget struct{ MaxMessageBytes, MaxCollectionElements int }
-	Close  struct {
+	Name          string
+	CaptureSource string `json:"capture_source"`
+	Steps         []radiusEAPStep
+	Ports         [2]uint16
+	Legacy        bool `json:"legacy_byte_applicable"`
+	Budget        struct{ MaxMessageBytes, MaxCollectionElements int }
+	Close         struct {
 		Profile     string
 		Outstanding int
 		Error       string
@@ -55,6 +57,7 @@ func radiusEAPControls(t *testing.T) []radiusEAPControl {
 			require.NotNil(t, w.Legacy, "independent compatibility answer")
 		}
 	}
+	radiusNASReconcileHistoricalEAP(t, x.Cases)
 	return x.Cases
 }
 func radiusEAPWant(t *testing.T, c radiusEAPControl, i int) map[string]any {
@@ -88,6 +91,29 @@ func radiusEAPWant(t *testing.T, c radiusEAPControl, i int) map[string]any {
 			d[i] = a.(string)
 		}
 		s["EAP Diagnostics"] = d
+	}
+	if e, ok := s["EAP"].(map[string]any); ok {
+		if v, ok := e["Method Count"].(float64); ok {
+			e["Method Count"] = int(v)
+		}
+		for _, k := range []string{"Vendor-Id", "Vendor-Type"} {
+			if v, ok := e[k].(float64); ok {
+				e[k] = uint32(v)
+			}
+		}
+		for _, k := range []string{"Desired Types", "Vendor Data"} {
+			if v, ok := e[k].(string); ok {
+				e[k] = radiusWire(t, v)
+			}
+		}
+		if rows, ok := e["Desired Expanded Types"].([]any); ok {
+			out := make([]map[string]any, 0, len(rows))
+			for _, r := range rows {
+				m := r.(map[string]any)
+				out = append(out, map[string]any{"Vendor-Id": uint32(m["Vendor-Id"].(float64)), "Vendor-Type": uint32(m["Vendor-Type"].(float64))})
+			}
+			e["Desired Expanded Types"] = out
+		}
 	}
 	if e, ok := s["EAP"].(map[string]any); ok {
 		for _, key := range []string{"Code", "Identifier", "Type", "Value Size"} {
@@ -166,6 +192,9 @@ func radiusEAPCheck(t *testing.T, c radiusEAPControl, events []*ProtocolEvent, c
 		}
 		if w.Error == "ResourceExceeded" {
 			status = "limited"
+		}
+		if w.Error == "UnsupportedFeature" {
+			status = "context-required"
 		}
 		require.Equal(t, status, e.Status)
 		require.Equal(t, w.Completeness, e.Completeness)
@@ -251,8 +280,9 @@ func radiusEAPBudget(c radiusEAPControl) ParserBudget {
 	}
 	return b
 }
-func TestRADIUSEAPNative(t *testing.T) {
-	for _, c := range radiusEAPControls(t) {
+func TestRADIUSEAPNative(t *testing.T) { radiusNativeCases(t, radiusEAPControls(t)) }
+func radiusNativeCases(t *testing.T, controls []radiusEAPControl) {
+	for _, c := range controls {
 		for _, d := range []bool{false, true} {
 			t.Run(fmt.Sprintf("%s/d%t", c.Name, d), func(t *testing.T) {
 				s, err := NewProtocolSessionWithOptions(radiusEAPBudget(c), WithSessionTransport("udp"), WithSessionPorts(c.Ports[0], c.Ports[1]))
@@ -292,15 +322,22 @@ func TestRADIUSEAPNative(t *testing.T) {
 	}
 }
 func TestRADIUSEAPMatrix(t *testing.T) {
-	for _, c := range radiusEAPControls(t) {
+	radiusCaptureCases(t, radiusEAPControls(t), "radius-eap", "RADIUS_EAP_TEST_ROOT", "RADIUS_EAP_EXPORT")
+}
+func radiusCaptureCases(t *testing.T, controls []radiusEAPControl, batch, rootEnv, exportEnv string) {
+	for _, c := range controls {
 		t.Run(c.Name, func(t *testing.T) {
 			raw := radiusEAPCapture(t, c)
-			if root := os.Getenv("RADIUS_EAP_EXPORT"); root != "" {
-				p := filepath.Join(root, "radius-eap")
+			if c.CaptureSource != "" {
+				historical, err := trafficfixture.ReadFile(c.CaptureSource)
+				require.NoError(t, err)
+				require.Equal(t, raw, historical, "exact historical capture reuse")
+			} else if root := os.Getenv(exportEnv); root != "" {
+				p := filepath.Join(root, batch)
 				require.NoError(t, os.MkdirAll(p, 0700))
 				require.NoError(t, os.WriteFile(filepath.Join(p, c.Name+".pcap"), raw, 0600))
 			} else {
-				require.Equal(t, raw, finsReadBatch(t, "radius-eap", "RADIUS_EAP_TEST_ROOT", c.Name+".pcap"))
+				require.Equal(t, raw, finsReadBatch(t, batch, rootEnv, c.Name+".pcap"))
 			}
 			for _, workers := range []int{1, 2, 4} {
 				for _, d := range []bool{false, true} {
@@ -396,10 +433,11 @@ func radiusEAPLegacyWant(t *testing.T, input map[string]any) map[string]any {
 	}
 	return out
 }
-func TestRADIUSEAPLegacy(t *testing.T) {
+func TestRADIUSEAPLegacy(t *testing.T) { radiusLegacyCases(t, radiusEAPControls(t), 47) }
+func radiusLegacyCases(t *testing.T, controls []radiusEAPControl, expected int) {
 	eligible := 0
-	defer func() { require.Equal(t, 47, eligible, "all independently admitted byte traces remain required") }()
-	for _, c := range radiusEAPControls(t) {
+	defer func() { require.Equal(t, expected, eligible, "all independently admitted byte traces remain required") }()
+	for _, c := range controls {
 		if !c.Legacy || c.Name == "accounting-forbidden-79-80" {
 			continue
 		}

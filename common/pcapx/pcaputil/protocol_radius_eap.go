@@ -8,7 +8,7 @@ import (
 
 // EAP-Message is assembled only from attributes of this one RADIUS message.
 // MAC bytes are observed, never verified or treated as an access decision.
-func radiusEAPFields(out map[string]any) (bool, error) {
+func radiusEAPFields(out map[string]any, max int) (bool, error) {
 	attrs := out["Attributes"].([]map[string]any)
 	code := out["Code"].(int)
 	wire := make([]byte, 0)
@@ -158,6 +158,17 @@ func radiusEAPFields(out map[string]any) (bool, error) {
 						if len(data) != 0 {
 							note("eap-notification-response-data", true)
 						}
+					}
+				case 3, 254:
+					dissected, err := radiusNAKFields(inner, ec, typ, data, max, note)
+					if err != nil {
+						if len(fatal)+len(info) > 0 {
+							out["EAP Diagnostics"] = append(fatal, info...)
+						}
+						if dissected && len(fatal) > 0 {
+							return true, protocolError(ErrMalformedMessage, "RADIUS/EAP normative constraints: %v", fatal)
+						}
+						return dissected, err
 					}
 				case 4:
 					inner["Type Name"] = "MD5-Challenge"

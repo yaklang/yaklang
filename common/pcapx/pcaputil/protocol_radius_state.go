@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/binary"
 	"fmt"
+	"net/netip"
 	"time"
 )
 
@@ -85,7 +86,7 @@ func radiusFields(raw []byte, max int) (map[string]any, error) {
 		v := raw[at+2 : at+sz]
 		at += sz
 		switch typ {
-		case 1, 2, 4, 5, 32:
+		case 1, 2, 4, 5, 32, 95:
 			if seen[typ] {
 				return nil, fmt.Errorf("radius: repeated singleton attribute %d", typ)
 			}
@@ -111,6 +112,17 @@ func radiusFields(raw []byte, max int) (map[string]any, error) {
 			if len(v) != 4 {
 				return nil, fmt.Errorf("radius: NAS-Port width")
 			}
+		case 95:
+			// RFC3162 section3 excludes NAS identity from these Access responses.
+			if code == 2 || code == 3 || code == 11 {
+				return nil, fmt.Errorf("radius: NAS-IPv6-Address forbidden in Access response")
+			}
+			if len(v) != 16 {
+				return nil, fmt.Errorf("radius: NAS-IPv6-Address width")
+			}
+			var address [16]byte
+			copy(address[:], v)
+			out["NAS-IPv6-Address"] = netip.AddrFrom16(address).String()
 		case 32:
 			if len(v) < 1 {
 				return nil, fmt.Errorf("radius: empty NAS-Identifier")
@@ -124,13 +136,18 @@ func radiusFields(raw []byte, max int) (map[string]any, error) {
 		}
 		attrs = append(attrs, map[string]any{"Type": typ, "Raw": bytes.Clone(v)})
 	}
+	// Identity is mandatory independently of EAP. Do not let an invalid
+	// request reserve an owner for a later response.
+	if code == 1 && !seen[4] && !seen[32] && !seen[95] {
+		return nil, fmt.Errorf("radius: Access-Request requires NAS identity")
+	}
 	if code == 4 {
 		if err := radiusAccountingComplete(out, seen); err != nil {
 			return nil, err
 		}
 	}
 	out["Attributes"], out["Attribute Count"] = attrs, len(attrs)
-	complete, err := radiusEAPFields(out)
+	complete, err := radiusEAPFields(out, max)
 	if err != nil {
 		if code != 4 {
 			for _, a := range attrs {

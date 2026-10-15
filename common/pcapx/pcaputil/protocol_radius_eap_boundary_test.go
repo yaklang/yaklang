@@ -9,7 +9,7 @@ import (
 func eapGuardCanonical(w []byte, user, reply, association string) map[string]any {
 	attrs := make([]map[string]any, 0)
 	if user != "" {
-		attrs = append(attrs, map[string]any{"Type": byte(1), "Raw": []byte(user)})
+		attrs = append(attrs, map[string]any{"Type": byte(1), "Raw": []byte(user)}, map[string]any{"Type": byte(4), "Raw": []byte{192, 0, 2, 9}})
 	}
 	name, role := "Access-Request", "request"
 	if w[0] == 2 {
@@ -18,6 +18,7 @@ func eapGuardCanonical(w []byte, user, reply, association string) map[string]any
 	m := map[string]any{"Packet Name": name, "Code": int(w[0]), "Identifier": int(w[1]), "Authenticator": []byte("0123456789abcdef"), "Packet Length": len(w), "Padding Bytes": 0, "Authentication": "not-verified", "Role": role, "Attributes": attrs, "Attribute Count": len(attrs)}
 	if user != "" {
 		m["User-Name"] = user
+		m["NAS-IP-Address"] = "192.0.2.9"
 	}
 	if reply != "" {
 		m["In Reply To"] = reply
@@ -30,7 +31,7 @@ func eapGuardCanonical(w []byte, user, reply, association string) map[string]any
 func eapGuardLegacy(w []byte, user string) map[string]any {
 	m := map[string]any{"Code": w[0], "Identifier": w[1], "Length": uint16(len(w)), "Authenticator": []byte("0123456789abcdef")}
 	if user != "" {
-		m["Attributes"] = []any{map[string]any{"Type": byte(1), "Length": byte(len(user) + 2), "User-Name": user}}
+		m["Attributes"] = []any{map[string]any{"Type": byte(1), "Length": byte(len(user) + 2), "User-Name": user}, map[string]any{"Type": byte(4), "Length": byte(6), "NAS-IP-Address": []byte{192, 0, 2, 9}}}
 	}
 	return m
 }
@@ -49,7 +50,7 @@ func TestRADIUSEAPIndependentRefusalBoundaryGuard(t *testing.T) {
 				attrs = append(attrs, 250, 1)
 			}
 			first := radiusPkt(1, 7, attrs)
-			neighbor := radiusPkt(1, 8, radiusAttr(1, []byte("neighbor")))
+			neighbor := radiusPkt(1, 8, append(radiusAttr(1, []byte("neighbor")), radiusAttr(4, []byte{192, 0, 2, 9})...))
 			late, answer := radiusPkt(2, 7, nil), radiusPkt(2, 8, nil)
 			o := s.Feed(0, time.Unix(100, 0), first)
 			require.NotNil(t, o.Err)

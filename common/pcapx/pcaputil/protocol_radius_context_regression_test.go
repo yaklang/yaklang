@@ -32,7 +32,7 @@ func TestRADIUSContextRegression(t *testing.T) {
 			first := feed(0, 100, q)
 			require.Equal(t, "Access-Request", first.Session["Packet Name"])
 			if scenario == "changed-request" {
-				feed(0, 101, radiusPkt(1, 7, radiusAttr(1, []byte("other"))))
+				feed(0, 101, radiusPkt(1, 7, append(radiusAttr(1, []byte("other")), radiusAttr(4, []byte{192, 0, 2, 1})...)))
 			}
 			if scenario == "completed-reuse" {
 				normal := feed(1, 101, radiusPkt(2, 7, nil))

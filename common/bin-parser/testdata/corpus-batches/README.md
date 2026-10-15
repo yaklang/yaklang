@@ -44,7 +44,7 @@ Run from the repository root:
 ```sh
 go run ./internal/trafficfixture/cmd/corpus test
 go test -json -count=1 -timeout=10m ./internal/trafficfixture/... ./common/bin-parser/... ./common/pcapx/... ./common/yak/cmd/yakcmds/shark-cli ./scripts/ci > traffic.jsonl
-go run ./internal/trafficfixture/cmd/corpus exec -- python3 @scripts/protocol-tests/check_go_test_json_v2.py traffic.jsonl --inventory @scripts/protocol-tests/required-tests-traffic-unified-v111.json --tier full
+go run ./internal/trafficfixture/cmd/corpus exec -- python3 @scripts/protocol-tests/check_go_test_json_v2.py traffic.jsonl --inventory @scripts/protocol-tests/required-tests-traffic-unified-v112.json --tier full
 ```
 
 The single `corpus` entry point uses the same bounded Go ZIP loader as tests.
@@ -83,7 +83,7 @@ their semantic coverage. The existing synthetic session keys are test inputs;
 production credentials, user private keys and material without redistribution
 permission belong in an external fixed-source download manifest.
 
-Current test requirements are sealed at `scripts/protocol-tests/required-tests-traffic-unified-v111.json`;
+Current test requirements are sealed at `scripts/protocol-tests/required-tests-traffic-unified-v112.json`;
 the historical inventories and all earlier batches remain unchanged.
 The supplemental small-corpus batch contains 26 minimal controls, their explicit
 expected facts, an offline generator and the compact pinned source manifest.
@@ -203,7 +203,7 @@ opaque selector bytes and one bounded Data value over Wrapper v1 TCP/UDP; object
 selector meaning, access permission and device operation are unverified. The
 original one-packet selective-access capture and original refused answer remain
 immutable; its now-supported answer is matched by exact input SHA and frame.
-The active inventory is `scripts/protocol-tests/required-tests-traffic-unified-v111.json`.
+The active inventory is `scripts/protocol-tests/required-tests-traffic-unified-v112.json`.
 
 The small-graph budget batch reuses accepted graph captures/answers and adds one
 249-byte UDP control for child count255 without child bytes. Its standalone proof
@@ -993,7 +993,7 @@ the normative answer; a missing numeric reference field is not a codec pass.
 Full/deferred, workers1/2/4, observers off/on, Feed chunks1/7/full, ownership,
 resources and close/refusal boundaries remain required.
 
-Current gate: `required-tests-traffic-unified-v111.json` with
+Current gate: `required-tests-traffic-unified-v112.json` with
 `check_go_test_json_v2.py`. The indexed validator preserves missing/unpassed,
 package invocation completion, descendant skips, failures and non-JSON checks;
 its mutation/differential harness is sealed with the material. Older checkers
@@ -1629,7 +1629,7 @@ userspace adapter; full kernel receiver/socket/timers and ECU endpoints do not.
 All161 preceding ZIPs remain byte-for-byte unchanged. Raw captures, dependencies,
 reference source/build output and process evidence stay outside Git.
 
-Current effective v111 inventory: 74,537 entries; 74,530 are mandatory for the full tier.
+Current effective v112 inventory: 75,713 entries; 75,706 are mandatory for the full tier.
 
 The opt-in `DynamicFlowControl` profile follows Linux v6.12 FC tuple updates (including WAIT without granting data). Disjoint address extensions or classical/FD carriers may share CAN IDs; unknown selectors cannot choose or mutate a conversation. Ambiguous selectors are rejected. Seven sealed cases exercise full/deferred, workers 1/2/4, and observer off/on, with exact fields, byte collections, contributor references, errors and resource ownership. The existing static FC profile remains unchanged. Pinned upstream FC and filter functions execute with declared userspace stubs; this is not a kernel/ECU endpoint. TShark 4.2.5 checks wire tuples and two complete payloads, but cannot independently reassemble the shared-address transcripts.
 
@@ -1724,3 +1724,5 @@ The Accounting observation batch adds RFC2866/2869 Request4/Response5 UDP parsin
 The EAP batch adds RFC3579/3748/1994 passive same-record RADIUS attributes79/80 and Start, Identity, Notification, MD5-Challenge, Success/Failure typed observations.50 controls require600 capture configurations and100 native UDP views;47 admitted legacy traces require full/deferred and chunks0/1/7. Public legacy fields remain independent from canonical Session and private query snapshots. Complete collection refusals preserve neighboring IDs only after a bounded, allocation-free outerTLV boundary check; malformed outer headers/TLVs never resynchronise by byte scanning. The existing775B tcpdump-radius capture is reused from its historical ZIP: all4 packets/519B remain required, with2 observed wire messages and2 RFC3579 mandatory attribute-combination refusals. Authentication, device acceptance, inner cross-round EAP owners, other EAP methods and legacy Accounting byte admission remain unverified or unimplemented.204 earlier ZIPs and original answers are unchanged.
 
 The Accounting byte batch reuses all49 historical controls and answers without copying their captures:47 compatibility traces require full/deferred and chunks0/1/7 (41 direct,6 with a separately charged39/20B primer), while UDP-padding and byte-limit cases retain separate byte-carrier expectations. Admission requires a complete Code4 with mandatory content after stronger signatures reject; freshCode5 and explicitTCP/RadSec are not admitted by that fallback. Complete semantic refusal preserves unrelated IDs only after exact bounded outerTLV proof. NAS-Port width/cardinality is verified by3 minimal independent captures and36 configurations; partialClose retains private typedNeedMore even after caller mutations. Coalesced messages, stream tails, oversize stop, exact fields/Session/IDs/order/queries and lifecycle are mandatory.205 older ZIPs and original answers are unchanged. Authentication, device outcomes, explicit TCP/RadSec, oversize byte discard/recovery and every unfinished original protocol/oracle requirement remain open.
+
+The NAS/NAK batch requires Access NAS4/32/95 identity, validates NAS95 width/singleton and excludes it from Access2/3/11 responses, with exact refused-ID retirement and neighbor preservation. Accounting95+NAS32 is observed;95-only substitution remains unproven. Legacy/Expanded EAP NAK exposes complete ordered alternatives and bounded count/vendor fields with typed normative errors, budget refusal and unsupported-method boundaries, without inferred innerFSM or authentication.56 traces include8 NAS-valid EAP positives; the unchanged exactretry capture is reused from historical EAP.40 missingNAS historical rows are typed normative refusals,1 earlierbudget remainsResource,11 reply-owner outcomes become ambiguous; the original50 controls and206 older ZIPs are unchanged. Full fields/Session/exact IDs/order/query ownership,56x12 capture configurations,55x6 compatibility views and close/resource release are required. Raw third-party collections, device authentication outcomes and every unfinished original requirement remain open.

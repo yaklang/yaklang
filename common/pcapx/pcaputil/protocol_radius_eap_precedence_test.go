@@ -27,8 +27,8 @@ func TestRADIUSEAPErrorPrecedence(t *testing.T) {
 				defer s.Close("cleanup")
 				s.(*captureSession).f.a.config.Deferred = deferred
 				ep := []byte{2, 1, 0, 6, c.typ, 'x'}
-				attrs := radiusAttr(79, ep)
-				wantedAttrs := []map[string]any{{"Type": byte(79), "Raw": ep}}
+				attrs := append(radiusAttr(4, []byte{192, 0, 2, 9}), radiusAttr(79, ep)...)
+				wantedAttrs := []map[string]any{{"Type": byte(4), "Raw": []byte{192, 0, 2, 9}}, {"Type": byte(79), "Raw": ep}}
 				diag := []string{}
 				if c.mac {
 					attrs = append(attrs, radiusAttr(80, make([]byte, 16))...)
@@ -44,7 +44,7 @@ func TestRADIUSEAPErrorPrecedence(t *testing.T) {
 					diag = append(diag, "eap-method-unimplemented")
 				}
 				wire := radiusPkt(1, 7, attrs)
-				want := map[string]any{"Packet Name": "Access-Request", "Code": 1, "Identifier": 7, "Packet Length": len(wire), "Padding Bytes": 0, "Authenticator": []byte("0123456789abcdef"), "Authentication": "not-verified", "Role": "request", "Attributes": wantedAttrs, "Attribute Count": len(wantedAttrs), "EAP": inner, "EAP Diagnostics": diag, "Observation Scope": "conversation"}
+				want := map[string]any{"Packet Name": "Access-Request", "Code": 1, "Identifier": 7, "Packet Length": len(wire), "Padding Bytes": 0, "Authenticator": []byte("0123456789abcdef"), "Authentication": "not-verified", "Role": "request", "Attributes": wantedAttrs, "Attribute Count": len(wantedAttrs), "EAP": inner, "EAP Diagnostics": diag, "Observation Scope": "conversation", "NAS-IP-Address": "192.0.2.9"}
 				if c.mac {
 					want["Message-Authenticator"] = make([]byte, 16)
 				}
@@ -73,7 +73,7 @@ func TestRADIUSEAPErrorPrecedence(t *testing.T) {
 				f, err = v.GetFields()
 				require.Nil(t, f)
 				rocTypedError(t, c.kind, err)
-				qwire := radiusPkt(1, 8, radiusAttr(1, []byte("neighbor")))
+				qwire := radiusPkt(1, 8, append(radiusAttr(1, []byte("neighbor")), radiusAttr(4, []byte{192, 0, 2, 9})...))
 				q := s.Feed(0, time.Unix(101, 0), qwire)
 				require.Nil(t, q.Err)
 				require.Len(t, q.Events, 1)

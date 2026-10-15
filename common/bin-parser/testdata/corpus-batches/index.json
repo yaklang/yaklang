@@ -104473,6 +104473,362 @@
         "common/pcapx/pcaputil/radius-accounting-byte/nas-port-width4-adjacent.pcap": "radius-accounting-byte/nas-port-width4-adjacent.pcap",
         "scripts/protocol-tests/required-tests-traffic-unified-v111.json": "required-tests-traffic-unified-v111.json"
       }
+    },
+    {
+      "id": "validation-radius-nas-nak",
+      "kind": "support",
+      "source_sha": "1c6712fb2ea16568ecdb00bbc6b678dbd3171a26",
+      "file": "validation-radius-nas-nak.zip",
+      "sha256": "efba25d299a1c744fce0c7d36a58a3b370c06bdb7b055d46796426e86cb9d73b",
+      "password": "bin-parser",
+      "members": {
+        "radius-nak-tools/nak-generate.py": {
+          "sha256": "1ca497cc2aa4c7c40494f74ef688aa33940881150d5c1fbfac1e7e4b4bcc4eae",
+          "bytes": 15553
+        },
+        "radius-nak-tools/nas95-generate.py": {
+          "sha256": "ee361d49ea33bb6f0db8622e9750b0691e26992cd9f2f48b17d437ed3f23c7f4",
+          "bytes": 9080
+        },
+        "radius-nak-tools/original-controls.json": {
+          "sha256": "c9954cfa23f3fb9c87785fb4f48de6ff2b3b95eb543406d11b3ad50b437e0fdb",
+          "bytes": 57144
+        },
+        "radius-nak-tools/positive-generate.py": {
+          "sha256": "bff6ba275b04490ac50e11f56ac48174ca7e28a504ae00906c24dc72c9e8e58a",
+          "bytes": 6664
+        },
+        "radius-nak-tools/response-generate.py": {
+          "sha256": "dc2dad3c776d4fc8e664f852fcbd063fc7a2e3092c70bf590d1cf5144029bd84",
+          "bytes": 6383
+        },
+        "radius-nak-tools/verify.py": {
+          "sha256": "a77746db25a92c3f3efeabba263a8fac7241910f5e3b080f42cf717d60741127",
+          "bytes": 5381
+        },
+        "radius-nak/access-missing-nas-isolation.pcap": {
+          "sha256": "692b1c3a8933305261c27182b7ac0aa62eac7259d16afda252a6a336555ac47f",
+          "bytes": 445
+        },
+        "radius-nak/accounting95-plus32.pcap": {
+          "sha256": "2b28782cd61cdfbb6f4d03c0016cd336f4ccbd0837a07eb8099d479988c8bb4f",
+          "bytes": 222
+        },
+        "radius-nak/byte64-resource-legal-neighbor.pcap": {
+          "sha256": "0b5a8299502f5e2e1368f6774e76b353cda4b0a9b6dd1066e4ea2feaea869334",
+          "bytes": 464
+        },
+        "radius-nak/capture-reuse.json": {
+          "sha256": "cdf8f624f5a93933f49451f5a996f7321f3a7d7ac0499388a5c3f96032ecb243",
+          "bytes": 236
+        },
+        "radius-nak/changed-live-id.pcap": {
+          "sha256": "23255c670fb8c8b96e1d48514c7901a00ed8ae3ce88ca6f53e915858977dbae9",
+          "bytes": 352
+        },
+        "radius-nak/controls.json": {
+          "sha256": "7952965eeff0bae7f0d2300b9f07a815cbcc4dfd03daca0f3349e1cfa7588ca6",
+          "bytes": 343446
+        },
+        "radius-nak/eap50-nas-disposition.json": {
+          "sha256": "793622b8ea5ba6472694a465bc876f304b01b16f68aeeecfb4246832d31ad822",
+          "bytes": 46001
+        },
+        "radius-nak/exact-retry.pcap": {
+          "sha256": "e28ed055d0916f18ddb66595c09fcb8f7aefc9a7afbb3503c065783aa342b64a",
+          "bytes": 352
+        },
+        "radius-nak/expanded-consecutive-fragments.pcap": {
+          "sha256": "9588f22f5ee8d3780d1046d0cf044eb09c939d5974d8e05f5fd394211c49920f",
+          "bytes": 265
+        },
+        "radius-nak/expanded-duplicate-preference.pcap": {
+          "sha256": "0392d6e7bc5e8c86f34131ff6cfb96cfe06729fd9e891d47b6b08b5733e9d670",
+          "bytes": 261
+        },
+        "radius-nak/expanded-empty.pcap": {
+          "sha256": "9381d0b918eeb4efaed6967fd5173ffc95ac8a9318221fb242ff8d3bc4096f5a",
+          "bytes": 143
+        },
+        "radius-nak/expanded-header-short.pcap": {
+          "sha256": "3fa8edf66207395c61efaf1d53c183704671d43c41cb83ceb6c04f5e810cbc00",
+          "bytes": 142
+        },
+        "radius-nak/expanded-inner-padding.pcap": {
+          "sha256": "2f9a0dcb7a469d0d499e39686bfdc7fe6bbad3543e653b80d8c0cacf7755c185",
+          "bytes": 255
+        },
+        "radius-nak/expanded-invalid-ietf.pcap": {
+          "sha256": "3fa0f36ee462c9d98f4a36a70ac7050eb7609df4e66980647e70421b42c589b3",
+          "bytes": 151
+        },
+        "radius-nak/expanded-list-budget.pcap": {
+          "sha256": "ab097458362b441e29da65d8f75478101b338ecb74981fe5b7690191aeccc724",
+          "bytes": 492
+        },
+        "radius-nak/expanded-long-ietf.pcap": {
+          "sha256": "6db5bc43af86e2dc852a1bfc7d9f7315fa0334f8a83050a5d94abbc04b83996d",
+          "bytes": 253
+        },
+        "radius-nak/expanded-marker.pcap": {
+          "sha256": "bab54f836b21ff378bf94b965183f3c8b0b12ed2d0490f8e386cf9610d6f51b3",
+          "bytes": 151
+        },
+        "radius-nak/expanded-no-alternative.pcap": {
+          "sha256": "caa8ef0d66ce374cb12a94258d2d3ac9a628524b7e0c1c6b05e17132baf5470b",
+          "bytes": 253
+        },
+        "radius-nak/expanded-other-method.pcap": {
+          "sha256": "acc405c86df5c6e20a0e2454eb9bef806cbb19581f1fa5cf906b26c9a53a508f",
+          "bytes": 149
+        },
+        "radius-nak/expanded-request.pcap": {
+          "sha256": "202ba3e254423dfeaac05ef8f2571d81f952bd8a25b80bf71651cd5b1b0d9bb6",
+          "bytes": 151
+        },
+        "radius-nak/expanded-rfc-example.pcap": {
+          "sha256": "aeb80aa6cdb654812bd01af1dcaf41465ee919d3d3a4b90b77edc9cf5a28d5c7",
+          "bytes": 261
+        },
+        "radius-nak/expanded-tail.pcap": {
+          "sha256": "f2a5ad5455c98935320f6b8a6d0744581530b0f20301c16638cf6ef5a8e7c40d",
+          "bytes": 152
+        },
+        "radius-nak/expanded-vendor-space.pcap": {
+          "sha256": "be8591f7c4120cd60baf8cf505b52d9c2e987abff433faae5b83cdfdccd23b82",
+          "bytes": 261
+        },
+        "radius-nak/expanded-zero-mixed.pcap": {
+          "sha256": "5523b8deea915abbc560b5483878091b8f5cde35bfacf34a9a82bd845b871379",
+          "bytes": 261
+        },
+        "radius-nak/fatal-before-unsupported.pcap": {
+          "sha256": "7faa625a19ca110ee57c1ce46cd570b12ef311d9693f0a3b1f0552e135e569d7",
+          "bytes": 131
+        },
+        "radius-nak/inner-id-not-owner.pcap": {
+          "sha256": "268a8fc08c321891a69291eba6c40a3c6ea82801896bfbb68e96066bc4141f53",
+          "bytes": 239
+        },
+        "radius-nak/legacy-compatibility.json": {
+          "sha256": "f53231cdc3427dd797bbe6d3f0cebf3a7fd45573f502701973e26380d11f3d43",
+          "bytes": 55047
+        },
+        "radius-nak/legacy-duplicate-preference.pcap": {
+          "sha256": "110ce209291f8e6c4666c5d74218aae98655126723bfa4afb382ddb4934d8890",
+          "bytes": 241
+        },
+        "radius-nak/legacy-empty.pcap": {
+          "sha256": "1225cccf36bd04b926591666c22c7ca8d5e2304ef5eb45f7ec94ccdc87c48274",
+          "bytes": 136
+        },
+        "radius-nak/legacy-inner-padding.pcap": {
+          "sha256": "8c3a28cb7cb81e8e495ea7090dcd378182650635fbba98ee55e1fdd6b37844e8",
+          "bytes": 241
+        },
+        "radius-nak/legacy-invalid-type1.pcap": {
+          "sha256": "bff7add4e7f1caaddf4499adec76790e26b8b3c8c8468adf9e8321258f224e85",
+          "bytes": 137
+        },
+        "radius-nak/legacy-invalid-type3.pcap": {
+          "sha256": "7062231a97907d569a5fe06062805a8b9c9c3011526c71168cbfcf6ba28936bb",
+          "bytes": 137
+        },
+        "radius-nak/legacy-list-budget.pcap": {
+          "sha256": "1346caf21e7439752ed7b90554548f68bfffcb0c21b0d961ebe64ca83120ace2",
+          "bytes": 457
+        },
+        "radius-nak/legacy-many-ordered.pcap": {
+          "sha256": "4908fbadbf4ece9ed2acb0b2ce25e7f0c3f14d10b7c4db9d0f9d5c76ba1e99d0",
+          "bytes": 242
+        },
+        "radius-nak/legacy-no-alternative.pcap": {
+          "sha256": "23b9e87ee473fa490a1caefeeb4886c23fd1c0e38886323dfe0bdd16189db8a9",
+          "bytes": 239
+        },
+        "radius-nak/legacy-one-method.pcap": {
+          "sha256": "d00c21481a7c76019d2f8b3215cced2c036daa6832b59675020fee50c8a05bfc",
+          "bytes": 239
+        },
+        "radius-nak/legacy-request.pcap": {
+          "sha256": "ed5f18a8f49bc29f8bf2fca9bb2b99500bb680ecf4ae698b4068f104e50f6352",
+          "bytes": 137
+        },
+        "radius-nak/legacy-zero-mixed.pcap": {
+          "sha256": "e05c690e2b85e6cb935391a775527dae7befbbedc03d096aef3a9b080282d7ec",
+          "bytes": 240
+        },
+        "radius-nak/legacy-zero-repeated.pcap": {
+          "sha256": "18f3cfbd47873a6593bfbdb55dcbef4241474615d8dbb508ee7c98e27381cb62",
+          "bytes": 240
+        },
+        "radius-nak/legal-eap-consecutive-three-fragments.pcap": {
+          "sha256": "9449f43362a94a4934c89234d853f5cb185e8fdc44feab3aaa79997d5cbcce8a",
+          "bytes": 842
+        },
+        "radius-nak/legal-eap-eap-start-empty-identity-request.pcap": {
+          "sha256": "f03fcafc7054c6d3c90dc94cbb5079e82f8a7640db25313243b903d6aa4ebbfe",
+          "bytes": 234
+        },
+        "radius-nak/legal-eap-identity-empty-response.pcap": {
+          "sha256": "80a6cc7350e2fc253b9d85152b3e92f09442fbedb783ba2f34bf4daa1b874feb",
+          "bytes": 238
+        },
+        "radius-nak/legal-eap-inner-padding-ignored.pcap": {
+          "sha256": "e30a7d769e1ff1fa31f9ffa275e5cda3d5b3b4fad6d11e292a4cc32ee4f3943d",
+          "bytes": 245
+        },
+        "radius-nak/legal-eap-md5-response-16.pcap": {
+          "sha256": "003adc7c59403e3b4bfe61a871110a9a3b38f16aa75b40f95eff6d521d2133dd",
+          "bytes": 259
+        },
+        "radius-nak/legal-eap-md5-response-empty-name.pcap": {
+          "sha256": "25d89a372218440e0b4099a71331b482cada50e30e1385d0e95da2cce16f0b36",
+          "bytes": 255
+        },
+        "radius-nak/legal-eap-notification-response-empty.pcap": {
+          "sha256": "5f0313bc4ee5fe622c33fe01031ea9f03a583dbef050e212057c19440f76c33f",
+          "bytes": 238
+        },
+        "radius-nak/nas-presence.json": {
+          "sha256": "689e9a2433edbc904264d65940c769dbed9cfca5e40d2cb566ce62510f56d113",
+          "bytes": 8034
+        },
+        "radius-nak/nas4-and95-coexist.pcap": {
+          "sha256": "a9787e9a329eb2a857c670527d83803a8a9115b475102b88d70122fddf1b6e28",
+          "bytes": 254
+        },
+        "radius-nak/nas95-duplicate.pcap": {
+          "sha256": "1ee93fa7faed8951ce13f787cee36ab71de8b86c4dd83e6e7ce7c74d207ecdf0",
+          "bytes": 481
+        },
+        "radius-nak/nas95-forbidden-access-response-11.pcap": {
+          "sha256": "1d57b2500aaba2338d2af26e7a1bafca3f3e0bbdb84320c3bbb81194dd445279",
+          "bytes": 576
+        },
+        "radius-nak/nas95-forbidden-access-response-2.pcap": {
+          "sha256": "f4fcb2591b7b6c99bd99a50e018ce99513aec7c86bd46a09442ca7d1b06282a5",
+          "bytes": 574
+        },
+        "radius-nak/nas95-forbidden-access-response-3.pcap": {
+          "sha256": "fd14614f38faf875c92896b5751ff05a79c7ccba5e58cf444881afd848ea46a9",
+          "bytes": 574
+        },
+        "radius-nak/nas95-ipv4-mapped-access.pcap": {
+          "sha256": "f7047acbd8d424d8273148592ff51c2c5d9d0542947b00d8a6465f7ca0a8070c",
+          "bytes": 248
+        },
+        "radius-nak/nas95-only-access.pcap": {
+          "sha256": "505d960348727df9d6c4ae790abcebb79c1c5b174149ee7b1f23b66d800824ba",
+          "bytes": 248
+        },
+        "radius-nak/nas95-width15.pcap": {
+          "sha256": "615dd3d7843e216072ea1bb2548bc9bb5190e60ee5b60c28ad61f38850b20141",
+          "bytes": 462
+        },
+        "radius-nak/nas95-width17.pcap": {
+          "sha256": "569916102feaaed50b49aa71b1f3e9e06ef02cdd458bb6c4975ebcdc9f9953f3",
+          "bytes": 464
+        },
+        "radius-nak/outer-fatal-before-inner-budget.pcap": {
+          "sha256": "23e19979298d8a78af2bfb0148858e41317e6f332628c09e2bb8523581a9e1c4",
+          "bytes": 439
+        },
+        "radius-nak/pending-close.pcap": {
+          "sha256": "4894e0049d324cd5e560b38e2c948ef6060703d6afadd381c912308c5a3edb1d",
+          "bytes": 137
+        },
+        "radius-nak/request-after-no-alternative.pcap": {
+          "sha256": "1427d83bc2cd8974ac8deb2e9938a34c1225e7ed768be739a8e130148ca65f96",
+          "bytes": 249
+        },
+        "radius-nak/source-pins.json": {
+          "sha256": "e2e6371c1d4d1575b1475ab5edbc778bc4dea8091f0f92013a5523f89c9fbc2d",
+          "bytes": 3853
+        },
+        "radius-nak/wrong-direction.pcap": {
+          "sha256": "11b927ad6f66b40ad06fea3bb5dd432af20bf85e156bd3b77540aed15556bbf2",
+          "bytes": 341
+        },
+        "required-tests-traffic-unified-v112.json": {
+          "sha256": "04b0ccae62e4d46f154732e658e53cd85086a9aac25efd0f9d6765c62aa1a124",
+          "bytes": 19037911
+        },
+        "validation/expected.json": {
+          "sha256": "9b73978cf79f10da843c7ffdbd3c31592a86e6e7e2d3728b515feb8aa36c61c7",
+          "bytes": 59873
+        }
+      },
+      "aliases": {
+        "common/pcapx/pcaputil/radius-nak-tools/nak-generate.py": "radius-nak-tools/nak-generate.py",
+        "common/pcapx/pcaputil/radius-nak-tools/nas95-generate.py": "radius-nak-tools/nas95-generate.py",
+        "common/pcapx/pcaputil/radius-nak-tools/original-controls.json": "radius-nak-tools/original-controls.json",
+        "common/pcapx/pcaputil/radius-nak-tools/positive-generate.py": "radius-nak-tools/positive-generate.py",
+        "common/pcapx/pcaputil/radius-nak-tools/response-generate.py": "radius-nak-tools/response-generate.py",
+        "common/pcapx/pcaputil/radius-nak-tools/verify.py": "radius-nak-tools/verify.py",
+        "common/pcapx/pcaputil/radius-nak/access-missing-nas-isolation.pcap": "radius-nak/access-missing-nas-isolation.pcap",
+        "common/pcapx/pcaputil/radius-nak/accounting95-plus32.pcap": "radius-nak/accounting95-plus32.pcap",
+        "common/pcapx/pcaputil/radius-nak/byte64-resource-legal-neighbor.pcap": "radius-nak/byte64-resource-legal-neighbor.pcap",
+        "common/pcapx/pcaputil/radius-nak/capture-reuse.json": "radius-nak/capture-reuse.json",
+        "common/pcapx/pcaputil/radius-nak/changed-live-id.pcap": "radius-nak/changed-live-id.pcap",
+        "common/pcapx/pcaputil/radius-nak/controls.json": "radius-nak/controls.json",
+        "common/pcapx/pcaputil/radius-nak/eap50-nas-disposition.json": "radius-nak/eap50-nas-disposition.json",
+        "common/pcapx/pcaputil/radius-nak/exact-retry.pcap": "radius-nak/exact-retry.pcap",
+        "common/pcapx/pcaputil/radius-nak/expanded-consecutive-fragments.pcap": "radius-nak/expanded-consecutive-fragments.pcap",
+        "common/pcapx/pcaputil/radius-nak/expanded-duplicate-preference.pcap": "radius-nak/expanded-duplicate-preference.pcap",
+        "common/pcapx/pcaputil/radius-nak/expanded-empty.pcap": "radius-nak/expanded-empty.pcap",
+        "common/pcapx/pcaputil/radius-nak/expanded-header-short.pcap": "radius-nak/expanded-header-short.pcap",
+        "common/pcapx/pcaputil/radius-nak/expanded-inner-padding.pcap": "radius-nak/expanded-inner-padding.pcap",
+        "common/pcapx/pcaputil/radius-nak/expanded-invalid-ietf.pcap": "radius-nak/expanded-invalid-ietf.pcap",
+        "common/pcapx/pcaputil/radius-nak/expanded-list-budget.pcap": "radius-nak/expanded-list-budget.pcap",
+        "common/pcapx/pcaputil/radius-nak/expanded-long-ietf.pcap": "radius-nak/expanded-long-ietf.pcap",
+        "common/pcapx/pcaputil/radius-nak/expanded-marker.pcap": "radius-nak/expanded-marker.pcap",
+        "common/pcapx/pcaputil/radius-nak/expanded-no-alternative.pcap": "radius-nak/expanded-no-alternative.pcap",
+        "common/pcapx/pcaputil/radius-nak/expanded-other-method.pcap": "radius-nak/expanded-other-method.pcap",
+        "common/pcapx/pcaputil/radius-nak/expanded-request.pcap": "radius-nak/expanded-request.pcap",
+        "common/pcapx/pcaputil/radius-nak/expanded-rfc-example.pcap": "radius-nak/expanded-rfc-example.pcap",
+        "common/pcapx/pcaputil/radius-nak/expanded-tail.pcap": "radius-nak/expanded-tail.pcap",
+        "common/pcapx/pcaputil/radius-nak/expanded-vendor-space.pcap": "radius-nak/expanded-vendor-space.pcap",
+        "common/pcapx/pcaputil/radius-nak/expanded-zero-mixed.pcap": "radius-nak/expanded-zero-mixed.pcap",
+        "common/pcapx/pcaputil/radius-nak/fatal-before-unsupported.pcap": "radius-nak/fatal-before-unsupported.pcap",
+        "common/pcapx/pcaputil/radius-nak/inner-id-not-owner.pcap": "radius-nak/inner-id-not-owner.pcap",
+        "common/pcapx/pcaputil/radius-nak/legacy-compatibility.json": "radius-nak/legacy-compatibility.json",
+        "common/pcapx/pcaputil/radius-nak/legacy-duplicate-preference.pcap": "radius-nak/legacy-duplicate-preference.pcap",
+        "common/pcapx/pcaputil/radius-nak/legacy-empty.pcap": "radius-nak/legacy-empty.pcap",
+        "common/pcapx/pcaputil/radius-nak/legacy-inner-padding.pcap": "radius-nak/legacy-inner-padding.pcap",
+        "common/pcapx/pcaputil/radius-nak/legacy-invalid-type1.pcap": "radius-nak/legacy-invalid-type1.pcap",
+        "common/pcapx/pcaputil/radius-nak/legacy-invalid-type3.pcap": "radius-nak/legacy-invalid-type3.pcap",
+        "common/pcapx/pcaputil/radius-nak/legacy-list-budget.pcap": "radius-nak/legacy-list-budget.pcap",
+        "common/pcapx/pcaputil/radius-nak/legacy-many-ordered.pcap": "radius-nak/legacy-many-ordered.pcap",
+        "common/pcapx/pcaputil/radius-nak/legacy-no-alternative.pcap": "radius-nak/legacy-no-alternative.pcap",
+        "common/pcapx/pcaputil/radius-nak/legacy-one-method.pcap": "radius-nak/legacy-one-method.pcap",
+        "common/pcapx/pcaputil/radius-nak/legacy-request.pcap": "radius-nak/legacy-request.pcap",
+        "common/pcapx/pcaputil/radius-nak/legacy-zero-mixed.pcap": "radius-nak/legacy-zero-mixed.pcap",
+        "common/pcapx/pcaputil/radius-nak/legacy-zero-repeated.pcap": "radius-nak/legacy-zero-repeated.pcap",
+        "common/pcapx/pcaputil/radius-nak/legal-eap-consecutive-three-fragments.pcap": "radius-nak/legal-eap-consecutive-three-fragments.pcap",
+        "common/pcapx/pcaputil/radius-nak/legal-eap-eap-start-empty-identity-request.pcap": "radius-nak/legal-eap-eap-start-empty-identity-request.pcap",
+        "common/pcapx/pcaputil/radius-nak/legal-eap-identity-empty-response.pcap": "radius-nak/legal-eap-identity-empty-response.pcap",
+        "common/pcapx/pcaputil/radius-nak/legal-eap-inner-padding-ignored.pcap": "radius-nak/legal-eap-inner-padding-ignored.pcap",
+        "common/pcapx/pcaputil/radius-nak/legal-eap-md5-response-16.pcap": "radius-nak/legal-eap-md5-response-16.pcap",
+        "common/pcapx/pcaputil/radius-nak/legal-eap-md5-response-empty-name.pcap": "radius-nak/legal-eap-md5-response-empty-name.pcap",
+        "common/pcapx/pcaputil/radius-nak/legal-eap-notification-response-empty.pcap": "radius-nak/legal-eap-notification-response-empty.pcap",
+        "common/pcapx/pcaputil/radius-nak/nas-presence.json": "radius-nak/nas-presence.json",
+        "common/pcapx/pcaputil/radius-nak/nas4-and95-coexist.pcap": "radius-nak/nas4-and95-coexist.pcap",
+        "common/pcapx/pcaputil/radius-nak/nas95-duplicate.pcap": "radius-nak/nas95-duplicate.pcap",
+        "common/pcapx/pcaputil/radius-nak/nas95-forbidden-access-response-11.pcap": "radius-nak/nas95-forbidden-access-response-11.pcap",
+        "common/pcapx/pcaputil/radius-nak/nas95-forbidden-access-response-2.pcap": "radius-nak/nas95-forbidden-access-response-2.pcap",
+        "common/pcapx/pcaputil/radius-nak/nas95-forbidden-access-response-3.pcap": "radius-nak/nas95-forbidden-access-response-3.pcap",
+        "common/pcapx/pcaputil/radius-nak/nas95-ipv4-mapped-access.pcap": "radius-nak/nas95-ipv4-mapped-access.pcap",
+        "common/pcapx/pcaputil/radius-nak/nas95-only-access.pcap": "radius-nak/nas95-only-access.pcap",
+        "common/pcapx/pcaputil/radius-nak/nas95-width15.pcap": "radius-nak/nas95-width15.pcap",
+        "common/pcapx/pcaputil/radius-nak/nas95-width17.pcap": "radius-nak/nas95-width17.pcap",
+        "common/pcapx/pcaputil/radius-nak/outer-fatal-before-inner-budget.pcap": "radius-nak/outer-fatal-before-inner-budget.pcap",
+        "common/pcapx/pcaputil/radius-nak/pending-close.pcap": "radius-nak/pending-close.pcap",
+        "common/pcapx/pcaputil/radius-nak/request-after-no-alternative.pcap": "radius-nak/request-after-no-alternative.pcap",
+        "common/pcapx/pcaputil/radius-nak/source-pins.json": "radius-nak/source-pins.json",
+        "common/pcapx/pcaputil/radius-nak/wrong-direction.pcap": "radius-nak/wrong-direction.pcap",
+        "scripts/protocol-tests/required-tests-traffic-unified-v112.json": "required-tests-traffic-unified-v112.json"
+      }
     }
   ],
   "schema_version": 1,

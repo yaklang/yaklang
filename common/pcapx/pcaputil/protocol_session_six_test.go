@@ -101,7 +101,7 @@ func TestProtocolSessionRADIUSAccessPairing(t *testing.T) {
 	s, err := NewProtocolSession(DefaultParserBudget())
 	require.NoError(t, err)
 	ts := time.Unix(1, 0)
-	req := radiusPkt(1, 7, append(radiusAttr(1, []byte("alice")), radiusAttr(2, make([]byte, 16))...))
+	req := radiusPkt(1, 7, append(append(radiusAttr(1, []byte("alice")), radiusAttr(2, make([]byte, 16))...), radiusAttr(4, []byte{192, 0, 2, 9})...))
 	p := s.Probe(req)
 	require.Equal(t, ProbeAccept, p.Verdict)
 	require.Equal(t, "radius", p.Protocol)
@@ -118,7 +118,7 @@ func TestProtocolSessionRADIUSAccessPairing(t *testing.T) {
 
 	s2, err := NewProtocolSession(DefaultParserBudget())
 	require.NoError(t, err)
-	require.Nil(t, s2.Feed(0, ts, radiusPkt(1, 9, radiusAttr(1, []byte("bob")))).Err)
+	require.Nil(t, s2.Feed(0, ts, radiusPkt(1, 9, append(radiusAttr(1, []byte("bob")), radiusAttr(4, []byte{192, 0, 2, 9})...))).Err)
 	r = s2.Feed(1, ts, radiusPkt(3, 9, nil))
 	require.Nil(t, r.Err, "%v", r.Err)
 	require.Equal(t, "Access-Reject", r.Events[0].Session["Packet Name"])
