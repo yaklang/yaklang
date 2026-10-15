@@ -1,0 +1,26 @@
+name: Check Git path case collisions
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check-paths:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+
+      - name: Test Git path collision checker
+        run: python3 -m unittest discover -s scripts/ci/tests -p 'test_git_path_case.py' -v
+
+      - name: Check all tracked files and parent directories
+        run: python3 scripts/ci/check_git_path_case.py
