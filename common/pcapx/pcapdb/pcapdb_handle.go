@@ -67,12 +67,12 @@ func (m *InstanceManager) acquire(parent context.Context, database *Database) (*
 			m.mu.Unlock()
 			return nil, errors.New("pcapdb: 32 open datasets; close unused database handles")
 		}
-		reader, err := openIndex(database.path, false, false)
+		reader, readerLock, err := openReaderPool(parent, database.path)
 		if err != nil {
 			m.mu.Unlock()
 			return nil, err
 		}
-		current = &Database{ID: database.ID, path: database.path, manager: m, db: reader}
+		current = &Database{ID: database.ID, path: database.path, manager: m, db: reader, readerLock: readerLock}
 		m.instances[database.ID] = current
 	}
 	current.leases++

@@ -44,6 +44,9 @@ func (m *InstanceManager) RebuildAnalysis(identifier string, options ...ImportOp
 		return nil, err
 	}
 	defer releaseFileLock(lock)
+	if err = checkNotDeleted(catalog.DatabasePath); err != nil {
+		return nil, err
+	}
 	reader, err := openIndex(catalog.DatabasePath, false, false)
 	if err != nil {
 		return nil, err

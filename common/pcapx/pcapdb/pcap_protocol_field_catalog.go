@@ -106,6 +106,9 @@ func (m *InstanceManager) EnsureProtocolFieldIndexes(ctx context.Context, identi
 		return nil, err
 	}
 	defer releaseFileLock(lock)
+	if err = checkNotDeleted(catalog.DatabasePath); err != nil {
+		return nil, err
+	}
 	writer, err := openIndex(catalog.DatabasePath, true, false)
 	if err != nil {
 		return nil, err

@@ -240,6 +240,13 @@ func exportsWithFactory(parent context.Context, factory func() (*InstanceManager
 		}
 		return manager.CountContext(ctx)
 	}
+	exports["DeletePCAPDatabase"] = func(id string) (*DeleteResult, error) {
+		manager, err := factory()
+		if err != nil {
+			return &DeleteResult{DatasetID: id, Error: resultError(err)}, err
+		}
+		return manager.Delete(ctx, id)
+	}
 	exports["ListPCAPDatabasesPage"] = func(options ...QueryOption) (*ResultPage[CatalogSummary], error) {
 		manager, err := factory()
 		if err != nil {
@@ -291,6 +298,7 @@ var Exports = map[string]any{
 	"CountPCAPDatabases":         CountPCAPDatabases,
 	"OpenPCAPDatabase":           OpenPCAPDatabase,
 	"ValidatePCAPDatabase":       ValidatePCAPDatabase,
+	"DeletePCAPDatabase":         DeletePCAPDatabase,
 	"ClosePCAPDatabases":         ClosePCAPDatabases,
 	"FingerprintFile":            FingerprintFile,
 	"withContext":                WithContext,
@@ -321,6 +329,14 @@ var Exports = map[string]any{
 	"fieldExists":                QueryFieldExists,
 	"fieldMissing":               QueryFieldMissing,
 	"withFields":                 QueryWithFields,
+}
+
+func DeletePCAPDatabase(id string) (*DeleteResult, error) {
+	manager, err := DefaultManager()
+	if err != nil {
+		return &DeleteResult{DatasetID: id, Error: resultError(err)}, err
+	}
+	return manager.Delete(context.Background(), id)
 }
 
 func EnsureProtocolFieldIndexes(identifier string, paths ...string) ([]ProtocolFieldIndex, error) {

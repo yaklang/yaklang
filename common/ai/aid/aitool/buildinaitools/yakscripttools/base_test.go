@@ -155,6 +155,33 @@ func TestRemoveRetiredBuiltInAIToolsPreservesCustomTools(t *testing.T) {
 	assert.Equal(t, preserved.IsBuiltin, false)
 }
 
+func TestPCAPCoreToolRename(t *testing.T) {
+	tools, err := loadAllYakScriptFromEmbedFS()
+	assert.NilError(t, err)
+	loaded := make(map[string]bool)
+	for _, tool := range tools {
+		loaded[tool.Name] = true
+	}
+	for _, name := range []string{"load_pcapfile", "pcapdb", "manage_pcapdb"} {
+		assert.Assert(t, loaded[name], "missing PCAP core tool %s", name)
+	}
+	assert.Assert(t, !loaded["query_pcap_in_db"])
+	db, err := utils.CreateTempTestDatabaseInMemory()
+	assert.NilError(t, err)
+	defer db.Close()
+	assert.NilError(t, db.AutoMigrate(&schema.AIYakTool{}).Error)
+	assert.NilError(t, db.Create(&schema.AIYakTool{Name: "query_pcap_in_db", IsBuiltin: true}).Error)
+	assert.NilError(t, removeRetiredBuiltInAITools(db))
+	var count int64
+	assert.NilError(t, db.Model(&schema.AIYakTool{}).Count(&count).Error)
+	assert.Equal(t, count, int64(0))
+	// Edited/user-owned scripts with the old name must not be removed on sync.
+	assert.NilError(t, db.Create(&schema.AIYakTool{Name: "query_pcap_in_db", Author: schema.AIResourceAuthorBuiltin, IsBuiltin: false}).Error)
+	assert.NilError(t, removeRetiredBuiltInAITools(db))
+	assert.NilError(t, db.Model(&schema.AIYakTool{}).Count(&count).Error)
+	assert.Equal(t, count, int64(1))
+}
+
 type failingAIToolFS struct {
 	FileSystemWithHash
 	content []byte
