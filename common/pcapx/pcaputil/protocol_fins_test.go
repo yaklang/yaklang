@@ -47,7 +47,7 @@ func finsReadBatch(t *testing.T, folder, env, n string) []byte {
 	return raw
 }
 func finsControls(t *testing.T) []finsControl {
-	return finsControlBatch(t, "fins-selected", "FINS_TEST_ROOT", "owned-fins-selected/v1", 81)
+	return finsOperationLegacyControls(t, finsControlBatch(t, "fins-selected", "FINS_TEST_ROOT", "owned-fins-selected/v1", 81))
 }
 func finsControlBatch(t *testing.T, folder, env, schema string, count int) []finsControl {
 	t.Helper()

@@ -1,6 +1,6 @@
 package pcaputil
 
-// Selected W342-E1-18 read-only layouts. Area codes describe a wire layout,
+// Selected W342-E1-18 literal memory layouts. Area codes describe a wire layout,
 // never an inferred PLC model, installed memory map or successful execution.
 func finsMemoryType(area byte, multiple bool) (string, int) {
 	switch area {
