@@ -49,6 +49,19 @@ func (m *Timeline) compressionCoolingDown(usage timelinePromptUsage) bool {
 	return usage.Fingerprint == m.compressionLastFailure || time.Now().Before(m.compressionRetryAfter)
 }
 
+// ClearCompressionBackoff drops the failure fingerprint and the retry delay.
+// The scheduler calls it when external evidence, such as a confirmed prompt
+// overflow, makes an immediate compression attempt worth trying again.
+func (m *Timeline) ClearCompressionBackoff() {
+	if m == nil {
+		return
+	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.compressionLastFailure = ""
+	m.compressionRetryAfter = time.Time{}
+}
+
 // Automatic retry policy belongs to the scheduler, never to a single round.
 func (m *Timeline) recordCompressionOutcome(options TimelineCompressionOptions, initial timelinePromptUsage, runErr error) {
 	if errors.Is(runErr, errTimelineCompressionLimitChanged) {
