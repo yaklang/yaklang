@@ -69,6 +69,10 @@ func radiusCodeName(code byte) string {
 		return "Access-Accept"
 	case 3:
 		return "Access-Reject"
+	case 4:
+		return "Accounting-Request"
+	case 5:
+		return "Accounting-Response"
 	case 11:
 		return "Access-Challenge"
 	default:

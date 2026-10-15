@@ -11,8 +11,9 @@ import (
 // Identifier matching observes a possible exchange. Without a shared secret it
 // does not verify the Response Authenticator, peer identity or access decision.
 type radiusKey struct {
-	dir int
-	id  byte
+	dir    int
+	id     byte
+	family byte
 }
 type radiusOwner struct {
 	digest, replyDigest         [32]byte
@@ -55,12 +56,12 @@ func radiusFields(raw []byte, max int) (map[string]any, error) {
 	padding := len(raw) - n
 	raw = raw[:n]
 	code := raw[0]
-	if code != 1 && code != 2 && code != 3 && code != 11 {
+	if code != 1 && code != 2 && code != 3 && code != 4 && code != 5 && code != 11 {
 		return nil, fmt.Errorf("radius: unsupported code %d", code)
 	}
 	out := map[string]any{"Packet Name": radiusCodeName(code), "Code": int(code), "Identifier": int(raw[1]), "Authenticator": bytes.Clone(raw[4:20]), "Packet Length": n, "Padding Bytes": padding, "Authentication": "not-verified"}
 	role := "response"
-	if code == 1 {
+	if radiusIsRequest(code) {
 		role = "request"
 	}
 	out["Role"] = role
@@ -111,7 +112,17 @@ func radiusFields(raw []byte, max int) (map[string]any, error) {
 			}
 			out["NAS-Identifier"] = string(v)
 		}
+		if code == 4 {
+			if err := radiusAccountingAttribute(out, seen, typ, v); err != nil {
+				return nil, err
+			}
+		}
 		attrs = append(attrs, map[string]any{"Type": typ, "Raw": bytes.Clone(v)})
+	}
+	if code == 4 {
+		if err := radiusAccountingComplete(out, seen); err != nil {
+			return nil, err
+		}
 	}
 	out["Attributes"], out["Attribute Count"] = attrs, len(attrs)
 	return out, nil
@@ -119,11 +130,8 @@ func radiusFields(raw []byte, max int) (map[string]any, error) {
 func (s *binRADIUS) observe(dir int, ts time.Time, wire []byte, id uint64, out map[string]any, limit int) (reply, transaction uint64) {
 	n := int(binary.BigEndian.Uint16(wire[2:4]))
 	wire = wire[:n]
-	key := radiusKey{dir, wire[1]}
-	response := wire[0] != 1
-	if response {
-		key.dir = 1 - dir
-	}
+	key := radiusIdentity(dir, wire)
+	response := !radiusIsRequest(wire[0])
 	digest := sha256.Sum256(wire)
 	if s.pending == nil {
 		s.pending = map[radiusKey]radiusOwner{}
@@ -135,7 +143,7 @@ func (s *binRADIUS) observe(dir int, ts time.Time, wire []byte, id uint64, out m
 			status = "ambiguous-identifier"
 			if !p.retired && ts.Sub(p.last) <= radiusObserverTTL {
 				if !p.completed || p.replied && p.replyDigest == digest {
-					out["In Reply To"] = "Access-Request"
+					out["In Reply To"] = radiusCodeName(key.family)
 					p.completed, p.replied, p.replyDigest = true, true, digest
 					s.pending[key] = p
 					return p.eventID, p.eventID
@@ -180,7 +188,7 @@ func (s *binRADIUS) consume(raw []byte, max int) (map[string]any, error) {
 		return nil, err
 	}
 	dir := 0
-	if raw[0] != 1 {
+	if !radiusIsRequest(raw[0]) {
 		dir = 1
 	}
 	s.observe(dir, time.Time{}, raw, 0, out, max)
@@ -192,10 +200,7 @@ func (s *binRADIUS) retire(dir int, w []byte, canAdd bool) {
 		s.invalidate()
 		return
 	}
-	key := radiusKey{dir, w[1]}
-	if w[0] != 1 {
-		key.dir = 1 - dir
-	}
+	key := radiusIdentity(dir, w)
 	p, known := s.pending[key]
 	if !known && !canAdd {
 		s.untracked = true
@@ -206,4 +211,41 @@ func (s *binRADIUS) retire(dir int, w []byte, canAdd bool) {
 	}
 	p.retired = true
 	s.pending[key] = p
+}
+
+// Access and Accounting share an eight-bit Identifier namespace on the wire,
+// but only the corresponding response Code family can own a request.
+func radiusIsRequest(code byte) bool { return code == 1 || code == 4 }
+func radiusProfile(code byte) string {
+	if code == 4 || code == 5 {
+		return "radius-accounting-observed"
+	}
+	return "radius-access-observed"
+}
+func radiusIdentity(dir int, w []byte) radiusKey {
+	family := byte(1)
+	if w[0] == 4 || w[0] == 5 {
+		family = 4
+	}
+	if !radiusIsRequest(w[0]) {
+		dir = 1 - dir
+	}
+	return radiusKey{dir: dir, id: w[1], family: family}
+}
+func (s *binRADIUS) profile() string {
+	access, accounting := false, false
+	for k := range s.pending {
+		if k.family == 4 {
+			accounting = true
+		} else {
+			access = true
+		}
+	}
+	if accounting && !access {
+		return "radius-accounting-observed"
+	}
+	if accounting {
+		return "radius-observed"
+	}
+	return "radius-access-observed"
 }

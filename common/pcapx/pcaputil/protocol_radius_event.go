@@ -8,7 +8,7 @@ import (
 
 func (f *binFlow) consumeRADIUS(dir int, e *ProtocolEvent, wire []byte, legacy ...map[string]any) error {
 	e.nativeRADIUSObservation = true
-	e.Profile, e.Completeness = "radius-access-observed", "message"
+	e.Profile, e.Completeness = radiusProfile(wire[0]), "message"
 	s := f.radius
 	if s == nil {
 		return protocolError(ErrContextRequired, "RADIUS observation state missing")
@@ -29,10 +29,7 @@ func (f *binFlow) consumeRADIUS(dir int, e *ProtocolEvent, wire []byte, legacy .
 		}
 		return err
 	}
-	key := radiusKey{dir, wire[1]}
-	if wire[0] != 1 {
-		key.dir = 1 - dir
-	}
+	key := radiusIdentity(dir, wire)
 	if _, known := s.pending[key]; !known && len(s.pending) >= f.a.budget.MaxCollectionElements {
 		s.untracked = true
 		return protocolError(ErrResourceExceeded, "RADIUS identity budget")
@@ -62,7 +59,7 @@ func radiusUDPKey(e *ProtocolEvent) binUDPKey {
 	return key
 }
 func radiusUDPHeader(w []byte) bool {
-	return len(w) >= 4 && (w[0] == 1 || w[0] == 2 || w[0] == 3 || w[0] == 11)
+	return len(w) >= 4 && (w[0] == 1 || w[0] == 2 || w[0] == 3 || w[0] == 4 || w[0] == 5 || w[0] == 11)
 }
 func (a *binParser) decodeRADIUSDatagram(e *ProtocolEvent, w []byte) bool {
 	a.udpMu.Lock()
@@ -83,23 +80,11 @@ func (a *binParser) decodeRADIUSDatagram(e *ProtocolEvent, w []byte) bool {
 	}
 	var err error
 	if el == nil {
-		if len(store.entries) >= sessionCollectionLimit(a.budget.MaxCollectionElements) {
-			err = protocolError(ErrResourceExceeded, "RADIUS UDP conversation budget")
-		} else {
-			first, second := e.Source, e.Destination
-			if first > second {
-				first, second = second, first
-			}
-			f := &binFlow{a: a, id: a.flows.Add(1), protocol: "radius", radius: &binRADIUS{untracked: a.radiusUntrackedRefusal}, endpoints: [2]string{first, second}}
-			if err = f.reserveSession(f.radius.storage()); err == nil {
-				el = store.lru.PushBack(&binUDPEntry{key: key, flow: f, touched: e.Timestamp})
-				store.entries[key] = el
-			}
-		}
+		el, err = a.newRADIUSUDPFlow(store, key, e)
 	}
-	e.Protocol, e.Profile, e.nativeRADIUSObservation, e.Completeness = "radius", "radius-access-observed", true, "message"
+	e.Protocol, e.Profile, e.nativeRADIUSObservation, e.Completeness = "radius", radiusProfile(w[0]), true, "message"
 	e.Admission = "wire-signature"
-	if udpEndpointPort(e.Source, 1812) || udpEndpointPort(e.Destination, 1812) {
+	if udpEndpointPort(e.Source, 1812) || udpEndpointPort(e.Destination, 1812) || udpEndpointPort(e.Source, 1813) || udpEndpointPort(e.Destination, 1813) {
 		e.Admission = "wire-and-port-hint"
 	}
 	if el == nil {
@@ -143,16 +128,30 @@ func (a *binParser) refuseRADIUSOversize(e *ProtocolEvent, w []byte) bool {
 			f = el.Value.(*binUDPEntry).flow
 		}
 	}
-	hinted := udpEndpointPort(e.Source, 1812) || udpEndpointPort(e.Destination, 1812)
+	hinted := udpEndpointPort(e.Source, 1812) || udpEndpointPort(e.Destination, 1812) || udpEndpointPort(e.Source, 1813) || udpEndpointPort(e.Destination, 1813)
 	if !radiusUDPHeader(w) || f == nil && !hinted {
 		return false
+	}
+	if f == nil {
+		// A message-byte refusal does not itself exhaust the bounded session budget.
+		// Retain only its known fixed-header identity when that separate budget permits.
+		if a.udpSessions == nil {
+			a.udpSessions = &binUDPStore{entries: map[binUDPKey]*list.Element{}}
+		}
+		if el, err := a.newRADIUSUDPFlow(a.udpSessions, key, e); err == nil {
+			f = el.Value.(*binUDPEntry).flow
+		}
 	}
 	if f != nil && f.radius != nil {
 		dir := 0
 		if e.Source != f.endpoints[0] {
 			dir = 1
 		}
-		f.radius.retire(dir, w, false)
+		canAdd := false
+		if _, known := f.radius.pending[radiusIdentity(dir, w)]; !known && len(f.radius.pending) < a.budget.MaxCollectionElements {
+			canAdd = f.reserveSession(f.radius.storage()+192) == nil
+		}
+		f.radius.retire(dir, w, canAdd)
 		e.FlowID = f.id
 		if e.Source != f.endpoints[0] {
 			e.Direction = 1
@@ -160,7 +159,7 @@ func (a *binParser) refuseRADIUSOversize(e *ProtocolEvent, w []byte) bool {
 	} else {
 		a.radiusUntrackedRefusal = true
 	}
-	e.Protocol, e.Profile, e.nativeRADIUSObservation = "radius", "radius-access-observed", true
+	e.Protocol, e.Profile, e.nativeRADIUSObservation = "radius", radiusProfile(w[0]), true
 	preview := w[:min(len(w), a.config.MaxMessageBytes)]
 	a.finishProtocolDatagram(e, preview, nil, protocolError(ErrResourceExceeded, "RADIUS UDP datagram exceeds message byte budget"))
 	e.ExpertCode = string(ErrResourceExceeded)
@@ -172,7 +171,7 @@ func radiusAdmittedDatagram(w []byte, src, dst string) bool {
 	if !radiusUDPHeader(w) {
 		return false
 	}
-	hinted := udpEndpointPort(src, 1812) || udpEndpointPort(dst, 1812)
+	hinted := udpEndpointPort(src, 1812) || udpEndpointPort(dst, 1812) || udpEndpointPort(src, 1813) || udpEndpointPort(dst, 1813)
 	n := int(binary.BigEndian.Uint16(w[2:4]))
 	if hinted {
 		return true
@@ -188,4 +187,23 @@ func radiusAdmittedDatagram(w []byte, src, dst string) bool {
 		at += int(w[at+1])
 	}
 	return true
+}
+
+// Caller holds udpMu. Conversation count and retained owner bytes are charged
+// separately from message bytes, including first-packet fixed-header refusals.
+func (a *binParser) newRADIUSUDPFlow(store *binUDPStore, key binUDPKey, e *ProtocolEvent) (*list.Element, error) {
+	if len(store.entries) >= sessionCollectionLimit(a.budget.MaxCollectionElements) {
+		return nil, protocolError(ErrResourceExceeded, "RADIUS UDP conversation budget")
+	}
+	first, second := e.Source, e.Destination
+	if first > second {
+		first, second = second, first
+	}
+	f := &binFlow{a: a, id: a.flows.Add(1), protocol: "radius", radius: &binRADIUS{untracked: a.radiusUntrackedRefusal}, endpoints: [2]string{first, second}}
+	if err := f.reserveSession(f.radius.storage()); err != nil {
+		return nil, err
+	}
+	el := store.lru.PushBack(&binUDPEntry{key: key, flow: f, touched: e.Timestamp})
+	store.entries[key] = el
+	return el, nil
 }

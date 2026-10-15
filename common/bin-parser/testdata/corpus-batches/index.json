@@ -103803,6 +103803,289 @@
         "common/pcapx/pcaputil/radius-context/attribute-budget.pcap": "radius-context/accept.pcap",
         "scripts/protocol-tests/required-tests-traffic-unified-v108.json": "required-tests-traffic-unified-v108.json"
       }
+    },
+    {
+      "id": "validation-radius-accounting",
+      "kind": "support",
+      "source_sha": "565e2758eb18457ac11bc91b70a45638ca6e6b9e",
+      "file": "validation-radius-accounting.zip",
+      "sha256": "b17cb36b0a2cf380d11461d22bf2181152fe2e2ad6430ef8bf29a5caa1e849ea",
+      "password": "bin-parser",
+      "members": {
+        "radius-accounting-tools/build_inputs.py": {
+          "sha256": "9792a9c6cf4e2d5271dc3e1ff85771fd93608aeb6cd9a6873bddea1af98bf388",
+          "bytes": 13173
+        },
+        "radius-accounting-tools/generate.py": {
+          "sha256": "150cddf23f07aca652d4cd78cad9ec5572b90ee1bb24c7703de3867c7d9b130a",
+          "bytes": 451
+        },
+        "radius-accounting-tools/source-pins.json": {
+          "sha256": "620a3e8c913d99bf372fc13dbe0dd2465dce5db64f22a6e2a4c75b893d90bb47",
+          "bytes": 391
+        },
+        "radius-accounting-tools/verify.py": {
+          "sha256": "efbfa29cd370d4a408cf2d58564895874df44ac8f5380c7b1939d8feb5a8bc98",
+          "bytes": 4673
+        },
+        "radius-accounting/access-reply-not-accounting-owner.pcap": {
+          "sha256": "c146e99f6e54d6bad3c7f754d82ff51728b353467c6581dc4e52934d6fea8762",
+          "bytes": 287
+        },
+        "radius-accounting/accounting-off.pcap": {
+          "sha256": "1b9070cbcf48aa937f877335da7fc758324541133fcefd4cf35f76b2b2a55d38",
+          "bytes": 209
+        },
+        "radius-accounting/accounting-on.pcap": {
+          "sha256": "1771095a356c08aa795cc339bde01608cb4231883c7851be896e4e3aa9cc6c29",
+          "bytes": 209
+        },
+        "radius-accounting/accounting-reply-not-access-owner.pcap": {
+          "sha256": "b1af51fe0a6b63c8f772f3768e0827b8ed3aa547baf8ae4d6713a42fc81c596e",
+          "bytes": 271
+        },
+        "radius-accounting/bad-width-40.pcap": {
+          "sha256": "5e2347ca57ba2da024a46199705e8fcb8f2a06c47eee44bfebf9f7f201de22d5",
+          "bytes": 130
+        },
+        "radius-accounting/bad-width-41.pcap": {
+          "sha256": "51fbaca9469222527e16dcf8135f7d75964a72dce3530aa399b81dcb622e0126",
+          "bytes": 136
+        },
+        "radius-accounting/bad-width-42.pcap": {
+          "sha256": "e86ee39b13b96b87322dbe332a09cfb487d6d38db0abe72bfaca8c86614113ca",
+          "bytes": 136
+        },
+        "radius-accounting/bad-width-43.pcap": {
+          "sha256": "3999fb1b46774afe389518236120b6a9ea5bc8bb72c9c69e6df2162bcf3b07eb",
+          "bytes": 136
+        },
+        "radius-accounting/bad-width-45.pcap": {
+          "sha256": "60f07f2739facf838c6a5fac8278e30216784262c6b87109d31f9e261e22499a",
+          "bytes": 136
+        },
+        "radius-accounting/bad-width-46.pcap": {
+          "sha256": "6ac78c459b8e97109d9287e3370cace477199c8918ca408485f871b66970bc62",
+          "bytes": 136
+        },
+        "radius-accounting/bad-width-47.pcap": {
+          "sha256": "24840616beea3135c77c843cb7f3320ca2893bbc338571cab83061a34ad978a8",
+          "bytes": 136
+        },
+        "radius-accounting/bad-width-48.pcap": {
+          "sha256": "eb27a8d3692114056c49e72c362a587de3893f71c149a4ff26382a00e7157c80",
+          "bytes": 136
+        },
+        "radius-accounting/bad-width-49.pcap": {
+          "sha256": "c5072c546300a51fcc1b3c06d7af6653705bd232c35a126936e171276c22d2a2",
+          "bytes": 136
+        },
+        "radius-accounting/bad-width-52.pcap": {
+          "sha256": "dca17328d8325c1201997559234e72ebf3b00f3ff711c10f6fc95f6c33ccf591",
+          "bytes": 136
+        },
+        "radius-accounting/bad-width-53.pcap": {
+          "sha256": "3246a25f36a5698b582ef2f82e8c1900b169021a9fd87067e0ae3e1620cdb1f1",
+          "bytes": 136
+        },
+        "radius-accounting/completed-reuse.pcap": {
+          "sha256": "f9ba86fddcb56d2979adcc862d7309f3cdc8fa33c8747c847e7d355fb9ceee41",
+          "bytes": 394
+        },
+        "radius-accounting/controls.json": {
+          "sha256": "78695a706b8a6f70a6ca0b2e6560128f7f792e2d0887a354b251840518b7b172",
+          "bytes": 270663
+        },
+        "radius-accounting/delay-changed-new-id.pcap": {
+          "sha256": "a52d1b39465cb19eb4bfd604050e348c61686157d1dfbfa39d7f02e7aeb447f5",
+          "bytes": 400
+        },
+        "radius-accounting/delay-changed-same-id.pcap": {
+          "sha256": "442e2ef729dc82c34fcace9fb95feac7f961e799f82ac92b0a093bd2ee6992f9",
+          "bytes": 322
+        },
+        "radius-accounting/duplicate-singleton-40.pcap": {
+          "sha256": "52bf37c3dcb6593fe2e8c27d04bdb9f7aa39d93663a63b1b88e24ab3b85b0eb4",
+          "bytes": 137
+        },
+        "radius-accounting/duplicate-singleton-44.pcap": {
+          "sha256": "8a88dad720cfc56e3846efb4dee4112b5e233f32c795d90367f408d526bc83b2",
+          "bytes": 146
+        },
+        "radius-accounting/duplicate-singleton-52.pcap": {
+          "sha256": "f98ffb913d5ad348e06defda9e73bb8873edf87f8dddd1fec93d119fe29866c2",
+          "bytes": 143
+        },
+        "radius-accounting/empty-session.pcap": {
+          "sha256": "d166dd17623a55fed023d33972b7580565b43941d171a3897b785ba909a6e412",
+          "bytes": 116
+        },
+        "radius-accounting/exact-retry.pcap": {
+          "sha256": "82f349bf6ddca63e99b3a089ad7da72538675bacd00e0fe2bf7bf23372ea8032",
+          "bytes": 316
+        },
+        "radius-accounting/forbidden-chap-challenge.pcap": {
+          "sha256": "45011ef03b9bc78f375d62f6e100600a76575997000809dc598312b09a434885",
+          "bytes": 150
+        },
+        "radius-accounting/forbidden-password.pcap": {
+          "sha256": "25049596f8d29afd13f89c3b2ee2815e06076a7be9cd881626b449d57df136e7",
+          "bytes": 149
+        },
+        "radius-accounting/forbidden-state.pcap": {
+          "sha256": "c959b6de6d638fc6fd3ed5d85d330c2b935edaa021fd0c44073f56a0ccc7d90e",
+          "bytes": 139
+        },
+        "radius-accounting/gigawords-on-start.pcap": {
+          "sha256": "6cc5e3e6901b8e1397a898891798ca4254875ec59b7183f5027ce407beb5b868",
+          "bytes": 137
+        },
+        "radius-accounting/high-only-no-total.pcap": {
+          "sha256": "525b96992cdebc3583e4d95f807ec24510ebcd5f0bcbe1bce54e491e2fa61e65",
+          "bytes": 221
+        },
+        "radius-accounting/interim.pcap": {
+          "sha256": "af54b6bfb630bb18aa3caa8fcaf1c32c5fbbfc078f75532a2a6f067278bf707b",
+          "bytes": 251
+        },
+        "radius-accounting/low-only-no-total.pcap": {
+          "sha256": "008165dc6589f87942e0987fb7061e2d355aace7f50dfb399cfaccc4e043ca12",
+          "bytes": 221
+        },
+        "radius-accounting/missing-nas.pcap": {
+          "sha256": "08db0baf651a4bf1d06594e73b95b7426089915471653b267d53eb77481cd081",
+          "bytes": 125
+        },
+        "radius-accounting/missing-session.pcap": {
+          "sha256": "e1c58e4adfacebbec8f6862ea04464f712cf46336e2d7fdb1e189ace031ffa82",
+          "bytes": 114
+        },
+        "radius-accounting/missing-status.pcap": {
+          "sha256": "0070273c3a6babf2cd353d71831bf27677bb73a628ac963208325c070d079e54",
+          "bytes": 125
+        },
+        "radius-accounting/nas-identifier-alternative.pcap": {
+          "sha256": "c817e5ccf8d748e02064ff1e3d313312d2845714716182d760501501546929ac",
+          "bytes": 216
+        },
+        "radius-accounting/opaque-session-id.pcap": {
+          "sha256": "477106fb5a7d705df01c56d64629a731bc90fd46bb14cba7cac1739fda7bcdfe",
+          "bytes": 198
+        },
+        "radius-accounting/orphan-response.pcap": {
+          "sha256": "88eb452332bd81f29914ffab48b43e942c74d889079a70ef225965d27636d1f2",
+          "bytes": 102
+        },
+        "radius-accounting/padding.pcap": {
+          "sha256": "2c5f1283ffd8965ce2d22e6a4d9bc2f0353dc70892885482aa849b403051a5f6",
+          "bytes": 212
+        },
+        "radius-accounting/pending-close.pcap": {
+          "sha256": "f8998946ca8a1ed032c4cc7e925793469eebe18c906854e8895c06101d8f2c1f",
+          "bytes": 131
+        },
+        "radius-accounting/same-id-access-accounting.pcap": {
+          "sha256": "a86b916b9e25112be346dd8a1bd5d0fb9fd91b5c64c15ffca543005d40a0e3a7",
+          "bytes": 378
+        },
+        "radius-accounting/start.pcap": {
+          "sha256": "6197c5a6ea7aa98f08ff6c974a9ff11a77d38f408b0aa7f075e4f46ad3e7d9bf",
+          "bytes": 209
+        },
+        "radius-accounting/stop-selected-complete.pcap": {
+          "sha256": "4888704d2da066c5318fc240877097d32027bd2c557840b05e6396f15d058a5d",
+          "bytes": 287
+        },
+        "radius-accounting/terminate-on-interim.pcap": {
+          "sha256": "f31ce9f4bde00d6a07acc4b4a0f0d1ce0084cbeb5f7ec79d7d2dd3326540edf6",
+          "bytes": 137
+        },
+        "radius-accounting/uint64-max.pcap": {
+          "sha256": "0e1378fe88e415b0c3188b718a8b42557df3cd52531f852999d45d1f0a90a9da",
+          "bytes": 233
+        },
+        "radius-accounting/unknown-authentic-literal.pcap": {
+          "sha256": "538251942f07aeb63e3c12b7b94985d99c56dd85b8186f477814dc23c0e0e4a6",
+          "bytes": 215
+        },
+        "radius-accounting/unknown-repeat-order.pcap": {
+          "sha256": "539ca4cce17e1c3996e8b2372879e57e1d63e3401b21c1ac9245a2ec5ac4cecc",
+          "bytes": 217
+        },
+        "radius-accounting/unknown-status-literal.pcap": {
+          "sha256": "20b04eb7e8ac5aca15012e24a4dec1bfec8a470b15520f944f41c133fc6ef8a1",
+          "bytes": 209
+        },
+        "radius-accounting/wrong-direction.pcap": {
+          "sha256": "61843be38293a3c77cd5e709bba2a63ed2a4c10a72f6e3790adfc08ad2679165",
+          "bytes": 287
+        },
+        "required-tests-traffic-unified-v109.json": {
+          "sha256": "70f77b6b40f0864ba587e08cb70ea60410a1322e476a8815aefbe5c0b1d0b281",
+          "bytes": 18409509
+        },
+        "validation/expected.json": {
+          "sha256": "96277779a934dfb23adb81c6a5dafb44512b739116aae475da008a4e418870ad",
+          "bytes": 56731
+        }
+      },
+      "aliases": {
+        "common/pcapx/pcaputil/radius-accounting-tools/build_inputs.py": "radius-accounting-tools/build_inputs.py",
+        "common/pcapx/pcaputil/radius-accounting-tools/generate.py": "radius-accounting-tools/generate.py",
+        "common/pcapx/pcaputil/radius-accounting-tools/source-pins.json": "radius-accounting-tools/source-pins.json",
+        "common/pcapx/pcaputil/radius-accounting-tools/verify.py": "radius-accounting-tools/verify.py",
+        "common/pcapx/pcaputil/radius-accounting/access-reply-not-accounting-owner.pcap": "radius-accounting/access-reply-not-accounting-owner.pcap",
+        "common/pcapx/pcaputil/radius-accounting/accounting-off.pcap": "radius-accounting/accounting-off.pcap",
+        "common/pcapx/pcaputil/radius-accounting/accounting-on.pcap": "radius-accounting/accounting-on.pcap",
+        "common/pcapx/pcaputil/radius-accounting/accounting-reply-not-access-owner.pcap": "radius-accounting/accounting-reply-not-access-owner.pcap",
+        "common/pcapx/pcaputil/radius-accounting/bad-width-40.pcap": "radius-accounting/bad-width-40.pcap",
+        "common/pcapx/pcaputil/radius-accounting/bad-width-41.pcap": "radius-accounting/bad-width-41.pcap",
+        "common/pcapx/pcaputil/radius-accounting/bad-width-42.pcap": "radius-accounting/bad-width-42.pcap",
+        "common/pcapx/pcaputil/radius-accounting/bad-width-43.pcap": "radius-accounting/bad-width-43.pcap",
+        "common/pcapx/pcaputil/radius-accounting/bad-width-45.pcap": "radius-accounting/bad-width-45.pcap",
+        "common/pcapx/pcaputil/radius-accounting/bad-width-46.pcap": "radius-accounting/bad-width-46.pcap",
+        "common/pcapx/pcaputil/radius-accounting/bad-width-47.pcap": "radius-accounting/bad-width-47.pcap",
+        "common/pcapx/pcaputil/radius-accounting/bad-width-48.pcap": "radius-accounting/bad-width-48.pcap",
+        "common/pcapx/pcaputil/radius-accounting/bad-width-49.pcap": "radius-accounting/bad-width-49.pcap",
+        "common/pcapx/pcaputil/radius-accounting/bad-width-52.pcap": "radius-accounting/bad-width-52.pcap",
+        "common/pcapx/pcaputil/radius-accounting/bad-width-53.pcap": "radius-accounting/bad-width-53.pcap",
+        "common/pcapx/pcaputil/radius-accounting/completed-reuse.pcap": "radius-accounting/completed-reuse.pcap",
+        "common/pcapx/pcaputil/radius-accounting/controls.json": "radius-accounting/controls.json",
+        "common/pcapx/pcaputil/radius-accounting/delay-changed-new-id.pcap": "radius-accounting/delay-changed-new-id.pcap",
+        "common/pcapx/pcaputil/radius-accounting/delay-changed-same-id.pcap": "radius-accounting/delay-changed-same-id.pcap",
+        "common/pcapx/pcaputil/radius-accounting/duplicate-singleton-40.pcap": "radius-accounting/duplicate-singleton-40.pcap",
+        "common/pcapx/pcaputil/radius-accounting/duplicate-singleton-44.pcap": "radius-accounting/duplicate-singleton-44.pcap",
+        "common/pcapx/pcaputil/radius-accounting/duplicate-singleton-52.pcap": "radius-accounting/duplicate-singleton-52.pcap",
+        "common/pcapx/pcaputil/radius-accounting/empty-session.pcap": "radius-accounting/empty-session.pcap",
+        "common/pcapx/pcaputil/radius-accounting/exact-retry.pcap": "radius-accounting/exact-retry.pcap",
+        "common/pcapx/pcaputil/radius-accounting/forbidden-chap-challenge.pcap": "radius-accounting/forbidden-chap-challenge.pcap",
+        "common/pcapx/pcaputil/radius-accounting/forbidden-password.pcap": "radius-accounting/forbidden-password.pcap",
+        "common/pcapx/pcaputil/radius-accounting/forbidden-state.pcap": "radius-accounting/forbidden-state.pcap",
+        "common/pcapx/pcaputil/radius-accounting/gigawords-on-start.pcap": "radius-accounting/gigawords-on-start.pcap",
+        "common/pcapx/pcaputil/radius-accounting/high-only-no-total.pcap": "radius-accounting/high-only-no-total.pcap",
+        "common/pcapx/pcaputil/radius-accounting/interim.pcap": "radius-accounting/interim.pcap",
+        "common/pcapx/pcaputil/radius-accounting/low-only-no-total.pcap": "radius-accounting/low-only-no-total.pcap",
+        "common/pcapx/pcaputil/radius-accounting/missing-nas.pcap": "radius-accounting/missing-nas.pcap",
+        "common/pcapx/pcaputil/radius-accounting/missing-session.pcap": "radius-accounting/missing-session.pcap",
+        "common/pcapx/pcaputil/radius-accounting/missing-status.pcap": "radius-accounting/missing-status.pcap",
+        "common/pcapx/pcaputil/radius-accounting/nas-identifier-alternative.pcap": "radius-accounting/nas-identifier-alternative.pcap",
+        "common/pcapx/pcaputil/radius-accounting/opaque-session-id.pcap": "radius-accounting/opaque-session-id.pcap",
+        "common/pcapx/pcaputil/radius-accounting/orphan-response.pcap": "radius-accounting/orphan-response.pcap",
+        "common/pcapx/pcaputil/radius-accounting/padding.pcap": "radius-accounting/padding.pcap",
+        "common/pcapx/pcaputil/radius-accounting/pending-close.pcap": "radius-accounting/pending-close.pcap",
+        "common/pcapx/pcaputil/radius-accounting/same-id-access-accounting.pcap": "radius-accounting/same-id-access-accounting.pcap",
+        "common/pcapx/pcaputil/radius-accounting/start.pcap": "radius-accounting/start.pcap",
+        "common/pcapx/pcaputil/radius-accounting/stop-selected-complete.pcap": "radius-accounting/stop-selected-complete.pcap",
+        "common/pcapx/pcaputil/radius-accounting/terminate-on-interim.pcap": "radius-accounting/terminate-on-interim.pcap",
+        "common/pcapx/pcaputil/radius-accounting/uint64-max.pcap": "radius-accounting/uint64-max.pcap",
+        "common/pcapx/pcaputil/radius-accounting/unknown-authentic-literal.pcap": "radius-accounting/unknown-authentic-literal.pcap",
+        "common/pcapx/pcaputil/radius-accounting/unknown-repeat-order.pcap": "radius-accounting/unknown-repeat-order.pcap",
+        "common/pcapx/pcaputil/radius-accounting/unknown-status-literal.pcap": "radius-accounting/unknown-status-literal.pcap",
+        "common/pcapx/pcaputil/radius-accounting/wrong-direction.pcap": "radius-accounting/wrong-direction.pcap",
+        "common/pcapx/pcaputil/radius-accounting/attribute-budget.pcap": "radius-accounting/stop-selected-complete.pcap",
+        "common/pcapx/pcaputil/radius-accounting/byte-budget.pcap": "radius-accounting/stop-selected-complete.pcap",
+        "scripts/protocol-tests/required-tests-traffic-unified-v109.json": "required-tests-traffic-unified-v109.json"
+      }
     }
   ],
   "schema_version": 1,
