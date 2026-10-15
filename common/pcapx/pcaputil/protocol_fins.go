@@ -248,16 +248,21 @@ func (s *binFINS) consume(w []byte, dir int, id uint64, now time.Time, b ParserB
 		return nil, 0, err
 	}
 	sid, cmd, response := w[9], binary.BigEndian.Uint16(w[10:12]), w[0]&0x40 != 0
-	if cmd != 0x0101 && cmd != 0x0501 {
+	if cmd != 0x0101 && cmd != 0x0501 && !finsServiceCommand(cmd) {
 		invalidate()
-		return nil, 0, finsErr(ErrUnsupportedFeature, "selected Memory Area Read/CPU Unit Data Read only")
+		return nil, 0, finsErr(ErrUnsupportedFeature, "selected memory/CPU/status/cycle/clock services only")
 	}
 	var p *finsPending
 	if response {
 		p = s.pending[1-dir][sid]
 	}
 	if !response {
-		if cmd == 0x0101 {
+		if finsServiceCommand(cmd) {
+			if err := finsServiceRequest(cmd, w, f); err != nil {
+				invalidate()
+				return nil, 0, err
+			}
+		} else if cmd == 0x0101 {
 			if len(w) != 18 {
 				invalidate()
 				return nil, 0, finsErr(ErrMalformedMessage, "DM read request exact length")
@@ -348,7 +353,11 @@ func (s *binFINS) consume(w []byte, dir int, id uint64, now time.Time, b ParserB
 		}
 		return f, reply, nil
 	}
-	if cmd == 0x0101 {
+	if finsServiceCommand(cmd) {
+		if err := finsServiceResponse(cmd, data, p, linked, f, b); err != nil {
+			return nil, 0, err
+		}
+	} else if cmd == 0x0101 {
 		if !linked {
 			return nil, 0, finsErr(ErrContextRequired, "DM response lacks exact reversed request/address/count context")
 		}

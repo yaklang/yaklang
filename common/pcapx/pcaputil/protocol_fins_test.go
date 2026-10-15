@@ -32,28 +32,34 @@ type finsControl struct {
 }
 
 func finsRead(t *testing.T, n string) []byte {
+	return finsReadBatch(t, "fins-selected", "FINS_TEST_ROOT", n)
+}
+func finsReadBatch(t *testing.T, folder, env, n string) []byte {
 	t.Helper()
 	var raw []byte
 	var err error
-	if root := os.Getenv("FINS_TEST_ROOT"); root != "" {
-		raw, err = os.ReadFile(filepath.Join(root, "fins-selected", n))
+	if root := os.Getenv(env); root != "" {
+		raw, err = os.ReadFile(filepath.Join(root, folder, n))
 	} else {
-		raw, err = trafficfixture.ReadFile("fins-selected/" + n)
+		raw, err = trafficfixture.ReadFile(folder + "/" + n)
 	}
 	require.NoError(t, err)
 	return raw
 }
 func finsControls(t *testing.T) []finsControl {
+	return finsControlBatch(t, "fins-selected", "FINS_TEST_ROOT", "owned-fins-selected/v1", 81)
+}
+func finsControlBatch(t *testing.T, folder, env, schema string, count int) []finsControl {
 	t.Helper()
 	var d struct {
 		Schema string
 		Cases  []finsControl
 	}
-	raw := finsRead(t, "controls.json")
+	raw := finsReadBatch(t, folder, env, "controls.json")
 	require.NoError(t, json.Unmarshal(raw, &d))
-	require.Equal(t, "owned-fins-selected/v1", d.Schema)
-	require.Len(t, d.Cases, 81)
-	if os.Getenv("FINS_TEST_ROOT") == "" {
+	require.Equal(t, schema, d.Schema)
+	require.Len(t, d.Cases, count)
+	if os.Getenv(env) == "" {
 		all, err := trafficfixture.AllExpectations()
 		require.NoError(t, err)
 		controlSHA := fmt.Sprintf("%x", sha256.Sum256(raw))
@@ -61,11 +67,11 @@ func finsControls(t *testing.T) []finsControl {
 			bound := 0
 			for _, batch := range all {
 				for _, input := range batch.Cases {
-					if input.ID != "fins-selected/"+c.ID {
+					if input.ID != folder+"/"+c.ID {
 						continue
 					}
 					require.Equal(t, c.SHA256, input.Input.SHA256)
-					require.Equal(t, "common/pcapx/pcaputil/fins-selected/"+c.Capture, input.Input.OriginalPath)
+					require.Equal(t, "common/pcapx/pcaputil/"+folder+"/"+c.Capture, input.Input.OriginalPath)
 					require.Equal(t, c.Packets, input.Facts.PacketCount)
 					for _, expectation := range input.Expectations {
 						var link struct {
@@ -83,9 +89,8 @@ func finsControls(t *testing.T) []finsControl {
 			require.Equal(t, 1, bound, c.ID)
 		}
 	}
-
 	for _, c := range d.Cases {
-		b := finsRead(t, c.Answer)
+		b := finsReadBatch(t, folder, env, c.Answer)
 		require.Equal(t, c.AnswerSHA, fmt.Sprintf("%x", sha256.Sum256(b)))
 		var a finsControl
 		require.NoError(t, json.Unmarshal(b, &a))
@@ -197,9 +202,12 @@ func finsAssert(t *testing.T, c finsControl, events []*ProtocolEvent, deferred b
 	}
 }
 func TestFINSSealedMatrix(t *testing.T) {
-	for _, c := range finsControls(t) {
+	finsSealedMatrix(t, "fins-selected", "FINS_TEST_ROOT", finsControls(t))
+}
+func finsSealedMatrix(t *testing.T, folder, env string, controls []finsControl) {
+	for _, c := range controls {
 		t.Run(c.ID, func(t *testing.T) {
-			raw := finsRead(t, c.Capture)
+			raw := finsReadBatch(t, folder, env, c.Capture)
 			require.Equal(t, c.SHA256, fmt.Sprintf("%x", sha256.Sum256(raw)))
 			discoveryMatrix(t, func(t *testing.T, workers int, deferred, observe bool) {
 				var extra []CaptureOption
@@ -235,7 +243,10 @@ func TestFINSSealedMatrix(t *testing.T) {
 	}
 }
 func TestFINSSealedSessionChunks(t *testing.T) {
-	for _, c := range finsControls(t) {
+	finsSealedChunks(t, finsControls(t))
+}
+func finsSealedChunks(t *testing.T, controls []finsControl) {
+	for _, c := range controls {
 		for _, deferred := range []bool{false, true} {
 			for _, chunk := range []int{1, 7, 64, 4096} {
 				if c.Transport == "udp" && chunk != 4096 {
