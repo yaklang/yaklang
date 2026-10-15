@@ -103,6 +103,9 @@ func syncCorePlugins(db *gorm.DB, plugins map[string]*builtinCorePlugin, resourc
 	if db == nil {
 		return fmt.Errorf("core plugin profile database is not initialized")
 	}
+	if plugins == nil {
+		return fmt.Errorf("core plugin definitions are not initialized")
+	}
 	hashes := make(map[string]string)
 	if raw := yakit.GetKey(db, corePluginItemHashesKey); raw != "" {
 		parsed := utils.MustUnmarshalJson[map[string]string]([]byte(raw))
@@ -114,7 +117,10 @@ func syncCorePlugins(db *gorm.DB, plugins map[string]*builtinCorePlugin, resourc
 		}
 	}
 	names := make([]string, 0, len(plugins))
-	for name := range plugins {
+	for name, plugin := range plugins {
+		if plugin == nil || plugin.YakScript == nil {
+			return fmt.Errorf("core plugin %q has no definition", name)
+		}
 		names = append(names, name)
 	}
 	var stored []schema.YakScript
