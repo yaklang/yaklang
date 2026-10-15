@@ -25,11 +25,23 @@ const (
 type PromptOverflowSource string
 
 const (
-	PromptOverflowSourceHTTP     PromptOverflowSource = "http"
-	PromptOverflowSourceJSON     PromptOverflowSource = "json"
-	PromptOverflowSourceSSE      PromptOverflowSource = "sse"
-	PromptOverflowSourceCallback PromptOverflowSource = "callback"
+	PromptOverflowSourceHTTP      PromptOverflowSource = "http"
+	PromptOverflowSourceJSON      PromptOverflowSource = "json"
+	PromptOverflowSourceSSE       PromptOverflowSource = "sse"
+	PromptOverflowSourceCallback  PromptOverflowSource = "callback"
+	PromptOverflowSourceAuxiliary PromptOverflowSource = "auxiliary"
 )
+
+// PromptOverflowAmbiguity is a provider error that is neither a confirmed
+// overflow nor a known unrelated failure. It contains only redacted error
+// fields and never the original prompt.
+type PromptOverflowAmbiguity struct {
+	HTTPStatus int
+	Code       string
+	Type       string
+	Message    string
+	Raw        string
+}
 
 // PromptOverflowEvidence contains provider facts, not local token estimates.
 // Unknown identities and token counts are left empty/zero.
@@ -322,6 +334,75 @@ func detectPromptOverflow(status int, body []byte, errText string, depth int) *P
 	}
 	ev.Raw = promptOverflowExcerpt(fields, ev.UpstreamMessage)
 	return ev
+}
+
+// DetectPromptOverflowAmbiguity reports a provider error that deterministic
+// rules cannot classify. Confirmed overflow, negative matches, transport
+// failures, and ordinary model output return nil. errText is only used to
+// avoid treating an already confirmed overflow as ambiguous.
+func DetectPromptOverflowAmbiguity(status int, body []byte, errText string) *PromptOverflowAmbiguity {
+	if DetectPromptOverflow(status, body, errText) != nil {
+		return nil
+	}
+	return promptOverflowAmbiguity(status, body, 0)
+}
+
+func promptOverflowAmbiguity(status int, body []byte, depth int) *PromptOverflowAmbiguity {
+	rejected := status == 400 || status == 413 || status == 422
+	if !rejected && status != 0 && (status < 200 || status >= 300) {
+		return nil
+	}
+	fields, envelope := extractProviderError(body, rejected)
+	if !envelope && depth < 3 {
+		for _, line := range strings.Split(string(body), "\n") {
+			line = strings.TrimSpace(line)
+			if !strings.HasPrefix(line, "data:") {
+				continue
+			}
+			payload := []byte(strings.TrimSpace(strings.TrimPrefix(line, "data:")))
+			if sample := promptOverflowAmbiguity(status, payload, depth+1); sample != nil {
+				return sample
+			}
+		}
+	}
+	if !envelope {
+		if !rejected || len(body) == 0 || json.Valid(body) {
+			return nil
+		}
+		fields.Message = string(body)
+	}
+	combined := fields.Code + " " + fields.Type + " " + fields.Message
+	if promptOverflowNegative.MatchString(combined) || promptOverflowBadParam.MatchString(fields.Message) {
+		return nil
+	}
+	switch strings.ToLower(fields.Param) {
+	case "temperature", "top_p", "tools", "tool_choice", "response_format":
+		return nil
+	}
+	fields.Message = promptOverflowSecrets.ReplaceAllString(strings.TrimSpace(fields.Message), "[REDACTED]")
+	fields.Message = clipOverflowRunes(fields.Message, 800)
+	if fields.Message == "" && strings.TrimSpace(fields.Code) == "" {
+		return nil
+	}
+	return &PromptOverflowAmbiguity{
+		HTTPStatus: status,
+		Code:       fields.Code,
+		Type:       fields.Type,
+		Message:    fields.Message,
+		Raw:        promptOverflowExcerpt(fields, ""),
+	}
+}
+
+func clipOverflowRunes(s string, maxRunes int) string {
+	if maxRunes <= 0 || utf8.RuneCountInString(s) <= maxRunes {
+		return s
+	}
+	end := 0
+	for runes := 0; end < len(s) && runes < maxRunes; runes++ {
+		_, size := utf8.DecodeRuneInString(s[end:])
+		end += size
+	}
+	return s[:end]
 }
 
 // promptOverflowAfterStream classifies a completed response body once.

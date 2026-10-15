@@ -156,3 +156,49 @@ func TestPromptOverflowGatewayNestingIsBounded(t *testing.T) {
 	}
 	require.Nil(t, DetectPromptOverflow(400, []byte(body), ""))
 }
+
+func TestDetectPromptOverflowAmbiguity(t *testing.T) {
+	ambiguous := []struct {
+		name, body string
+		status     int
+	}{
+		{"unknown_rejection", `{"error":{"code":"upstream_error","message":"the upstream worker rejected the request payload"}}`, 400},
+		{"sse_unknown_error", "data: " + `{"error":{"message":"worker refused the submitted payload"}}` + "\n\n", 200},
+		{"truncated_text", "upstream rejected payload before json completed", 422},
+	}
+	for _, tc := range ambiguous {
+		t.Run(tc.name, func(t *testing.T) {
+			sample := DetectPromptOverflowAmbiguity(tc.status, []byte(tc.body), "")
+			require.NotNil(t, sample)
+			require.Equal(t, tc.status, sample.HTTPStatus)
+			require.NotEmpty(t, sample.Message)
+			require.NotContains(t, sample.Message, "sk-")
+		})
+	}
+
+	rejected := []struct {
+		name, body string
+		status     int
+	}{
+		{"confirmed_overflow", `{"error":{"code":"context_length_exceeded","message":"prompt is too long"}}`, 400},
+		{"rate_limit", `{"error":{"code":"rate_limit_exceeded","message":"rate limit exceeded"}}`, 429},
+		{"authentication", `{"error":{"message":"invalid api key"}}`, 401},
+		{"bad_parameter", `{"error":{"message":"max_tokens is too large","param":"max_tokens"}}`, 400},
+		{"server_error", `{"error":{"message":"upstream failed"}}`, 500},
+		{"quoted_output", `{"choices":[{"message":{"content":"prompt is too long"}}]}`, 200},
+		{"empty", ``, 400},
+	}
+	for _, tc := range rejected {
+		t.Run(tc.name, func(t *testing.T) {
+			require.Nil(t, DetectPromptOverflowAmbiguity(tc.status, []byte(tc.body), ""))
+		})
+	}
+}
+
+func TestPromptOverflowAmbiguityRedactsAndClipsMessage(t *testing.T) {
+	body := `{"error":{"message":"upstream rejected api_key=sk-testsecret ` + strings.Repeat("甲", 900) + `"}}`
+	sample := DetectPromptOverflowAmbiguity(400, []byte(body), "")
+	require.NotNil(t, sample)
+	require.NotContains(t, sample.Message, "sk-testsecret")
+	require.LessOrEqual(t, utf8.RuneCountInString(sample.Message), 800)
+}

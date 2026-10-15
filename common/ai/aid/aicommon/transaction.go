@@ -184,7 +184,7 @@ func callAITransaction(
 			if isNonRetryableAIHTTPResponse(rsp) && !rsp.WaitForCallbackDone(transactionCtx) {
 				return transactionCtx.Err()
 			}
-			if overflowErr := ClassifyPromptTooLong(rsp, err); overflowErr != nil {
+			if overflowErr := classifyTransactionPromptOverflow(transactionCtx, c, rsp, err); overflowErr != nil {
 				err = overflowErr
 			}
 			// Transport failures do not reject model output. Never recycle an
@@ -247,7 +247,7 @@ func callAITransaction(
 		if ctxErr := transactionCtx.Err(); ctxErr != nil {
 			return ctxErr
 		}
-		if overflowErr := ClassifyPromptTooLong(rsp, nil); overflowErr != nil {
+		if overflowErr := classifyTransactionPromptOverflow(transactionCtx, c, rsp, nil); overflowErr != nil {
 			// A stream error is a provider failure, not malformed action output.
 			postHandlerErr = overflowErr
 		} else if rsp.GetHTTPStatusCode() >= 400 && rsp.GetHTTPStatusCode() != 429 {

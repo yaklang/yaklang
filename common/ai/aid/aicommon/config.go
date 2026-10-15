@@ -207,7 +207,8 @@ type Config struct {
 	AICallbacks *AICallbacks
 
 	// Optional per-runtime helper implementation; the default uses the registered LiteForge.
-	LiteForgeExecutor LiteForgeExecuteCallback
+	LiteForgeExecutor   LiteForgeExecuteCallback
+	promptOverflowJudge promptOverflowJudgeState
 
 	// userUsageCallback 由用户脚本通过 ai.usageCallback(...) 注册并经
 	// aiengine.WithAIConfig 透传. Tiered AI 路径
