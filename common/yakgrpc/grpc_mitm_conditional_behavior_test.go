@@ -3,6 +3,7 @@ package yakgrpc
 import (
 	"context"
 	"fmt"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"sync"
 	"testing"
 	"time"
@@ -63,6 +64,7 @@ func TestManualHijackManagerConditionalBehavior(t *testing.T) {
 }
 
 func TestGRPCMUSTPASS_MITM_ConditionalBehaviorPersistence(t *testing.T) {
+	yakit.GuardConfigurationForTest(t)
 	client, err := NewLocalClientWithTempDatabase(t)
 	require.NoError(t, err)
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -84,6 +86,7 @@ func TestGRPCMUSTPASS_MITM_ConditionalBehaviorPersistence(t *testing.T) {
 }
 
 func TestGRPCMUSTPASS_MITM_ConditionalBehavior(t *testing.T) {
+	yakit.GuardConfigurationForTest(t)
 	for _, version := range []string{"v1", "v2"} {
 		for _, persisted := range []bool{false, true} {
 			t.Run(fmt.Sprintf("%s/persisted=%v", version, persisted), func(t *testing.T) {

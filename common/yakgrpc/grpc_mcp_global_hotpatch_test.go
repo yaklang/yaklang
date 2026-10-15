@@ -3,6 +3,7 @@ package yakgrpc
 import (
 	"context"
 	"encoding/json"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -87,6 +88,7 @@ func setupGlobalHotPatchTemplate(t *testing.T, client ypb.YakClient, name string
 }
 
 func TestMCP_GlobalHotPatch_MITM_EnableDisableCycle(t *testing.T) {
+	yakit.GuardConfigurationForTest(t)
 	client, _, err := NewLocalClientAndServerWithTempDatabase(t)
 	require.NoError(t, err)
 
@@ -174,6 +176,7 @@ func TestMCP_GlobalHotPatch_MITM_EnableDisableCycle(t *testing.T) {
 }
 
 func TestMCP_GlobalHotPatch_WebFuzzer_EnableDisableCycle(t *testing.T) {
+	yakit.GuardConfigurationForTest(t)
 	client, _, err := NewLocalClientAndServerWithTempDatabase(t)
 	require.NoError(t, err)
 
@@ -239,6 +242,7 @@ func TestMCP_GlobalHotPatch_WebFuzzer_EnableDisableCycle(t *testing.T) {
 }
 
 func TestMCP_GlobalHotPatch_CreateAndEnableViaMCP(t *testing.T) {
+	yakit.GuardConfigurationForTest(t)
 	client, _, err := NewLocalClientAndServerWithTempDatabase(t)
 	require.NoError(t, err)
 
@@ -276,6 +280,7 @@ func TestMCP_GlobalHotPatch_CreateAndEnableViaMCP(t *testing.T) {
 }
 
 func TestMCP_GlobalHotPatch_QueryTemplateList(t *testing.T) {
+	yakit.GuardConfigurationForTest(t)
 	client, _, err := NewLocalClientAndServerWithTempDatabase(t)
 	require.NoError(t, err)
 

@@ -9,15 +9,19 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/utils/configtest"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
 func saveAndRestore(t *testing.T) {
 	t.Helper()
+	configtest.RequirePublicRuntime(t, consts.GetTieredAIConfig(), yakit.GetCachedAIGlobalConfig())
 	orig := consts.GetTieredAIConfig()
+	cached := yakit.GetCachedAIGlobalConfig()
 	t.Cleanup(func() {
 		consts.SetTieredAIConfig(orig)
+		yakit.SetCachedAIGlobalConfigForTest(cached)
 		ResetConfigLoaded()
 		ResetNetworkConfigGetter()
 		ResetAIGlobalConfigGetter()
@@ -143,6 +147,7 @@ func TestLoadTieredConfigFromNetworkConfig_NilConfig(t *testing.T) {
 
 // DB returns enabled config with performance policy.
 func TestEnsureConfigLoaded_DBEnabled(t *testing.T) {
+	yakit.GuardConfigurationForTest(t)
 	saveAndRestore(t)
 	setupTempYakitHome(t)
 
@@ -173,6 +178,7 @@ func TestEnsureConfigLoaded_DBEnabled(t *testing.T) {
 
 // The legacy disabled value is preserved but no longer disables routing.
 func TestEnsureConfigLoaded_LegacyDisabledFieldDoesNotDisableRouting(t *testing.T) {
+	yakit.GuardConfigurationForTest(t)
 	saveAndRestore(t)
 	setupTempYakitHome(t)
 
@@ -199,6 +205,7 @@ func TestEnsureConfigLoaded_LegacyDisabledFieldDoesNotDisableRouting(t *testing.
 
 // No DB config, no in-memory config -> built-in defaults should be loaded.
 func TestEnsureConfigLoaded_NoConfig_LoadsDefaults(t *testing.T) {
+	yakit.GuardConfigurationForTest(t)
 	saveAndRestore(t)
 	setupTempYakitHome(t)
 
@@ -232,6 +239,7 @@ func TestEnsureConfigLoaded_NoConfig_LoadsDefaults(t *testing.T) {
 // Config file on disk must be IGNORED by EnsureConfigLoaded.
 // Even when DB says disabled, a file saying enabled must not take effect.
 func TestEnsureConfigLoaded_ConfigFileIgnored(t *testing.T) {
+	yakit.GuardConfigurationForTest(t)
 	saveAndRestore(t)
 	yakitHome := setupTempYakitHome(t)
 	writeConfigFile(t, yakitHome, `
@@ -268,6 +276,7 @@ intelligent_configs:
 // In-memory config already loaded (e.g. by ConfigureNetWork during DB init).
 // EnsureConfigLoaded must not clobber it.
 func TestEnsureConfigLoaded_AlreadyLoaded(t *testing.T) {
+	yakit.GuardConfigurationForTest(t)
 	saveAndRestore(t)
 
 	SetAIGlobalConfigGetter(func() (*ypb.AIGlobalConfig, error) { return nil, nil })
@@ -289,6 +298,7 @@ func TestEnsureConfigLoaded_AlreadyLoaded(t *testing.T) {
 
 // AIGlobalConfig should take priority over GlobalNetworkConfig when present.
 func TestEnsureConfigLoaded_AIGlobalConfigPriority(t *testing.T) {
+	yakit.GuardConfigurationForTest(t)
 	saveAndRestore(t)
 	setupTempYakitHome(t)
 
@@ -337,6 +347,7 @@ func TestEnsureConfigLoaded_AIGlobalConfigPriority(t *testing.T) {
 
 // If AIGlobalConfig getter errors, fallback to GlobalNetworkConfig.
 func TestEnsureConfigLoaded_AIGlobalConfigErrorFallback(t *testing.T) {
+	yakit.GuardConfigurationForTest(t)
 	saveAndRestore(t)
 	setupTempYakitHome(t)
 
@@ -365,6 +376,7 @@ func TestEnsureConfigLoaded_AIGlobalConfigErrorFallback(t *testing.T) {
 }
 
 func TestEnsureConfigLoaded_NetworkConfigPersistsToDB(t *testing.T) {
+	yakit.GuardConfigurationForTest(t)
 	saveAndRestore(t)
 	setupTempYakitHome(t)
 
@@ -400,6 +412,7 @@ func TestEnsureConfigLoaded_NetworkConfigPersistsToDB(t *testing.T) {
 }
 
 func TestEnsureConfigLoaded_BackfillsModelNameFromExtraParams(t *testing.T) {
+	yakit.GuardConfigurationForTest(t)
 	saveAndRestore(t)
 	setupTempYakitHome(t)
 

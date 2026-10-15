@@ -33,6 +33,7 @@ func isCI() bool {
 }
 
 func TestAIGlobalConfig_GRPC_Local(t *testing.T) {
+	yakit.GuardConfigurationForTest(t)
 	preserveAIRuntimeConfig(t)
 
 	client, server, err := NewLocalClientAndServerWithTempDatabase(t)
@@ -140,6 +141,7 @@ func preserveAIRuntimeConfig(t *testing.T) {
 }
 
 func TestGetApiKey_ReplaceAPIKeys(t *testing.T) {
+	yakit.GuardConfigurationForTest(t)
 	preserveAIRuntimeConfig(t)
 	cached := &ypb.AIGlobalConfig{
 		Enabled: true, RoutingPolicy: "cost", DefaultModelId: "cache-sentinel", AIPresetPrompt: "preserve prompt",
@@ -272,6 +274,7 @@ func testReplaceAPIKeys(t *testing.T) {
 }
 
 func TestUpdateApiKey_ReplaceAllAPIKeys(t *testing.T) {
+	yakit.GuardConfigurationForTest(t)
 	preserveAIRuntimeConfig(t)
 
 	client, server, err := NewLocalClientAndServerWithTempDatabase(t)

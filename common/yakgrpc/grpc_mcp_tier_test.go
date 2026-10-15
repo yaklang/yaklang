@@ -216,6 +216,7 @@ func TestGRPC_StartMcpServer_TierDefaultCoreOnly(t *testing.T) {
 }
 
 func TestGRPC_StartMcpServer_ExplicitOptionalToolSetOverridesTierDisable(t *testing.T) {
+	yakit.GuardConfigurationForTest(t)
 	grpcSrv, err := NewServer()
 	require.NoError(t, err)
 	ctx := context.Background()
@@ -280,6 +281,7 @@ func TestGRPC_StartMcpServer_TierBothEnabled(t *testing.T) {
 }
 
 func TestGRPC_StartMcpServer_DisabledToolNotExposed(t *testing.T) {
+	yakit.GuardConfigurationForTest(t)
 	grpcSrv, err := NewServer()
 	require.NoError(t, err)
 	ctx := context.Background()
@@ -313,6 +315,7 @@ func TestGRPC_StartMcpServer_DisabledToolNotExposed(t *testing.T) {
 }
 
 func TestGRPC_GetMCPToolList_SourceSeparation(t *testing.T) {
+	yakit.GuardConfigurationForTest(t)
 	grpcSrv, err := NewServer()
 	require.NoError(t, err)
 	ctx := context.Background()
@@ -358,6 +361,7 @@ func TestGRPC_GetMCPToolList_SourceSeparation(t *testing.T) {
 }
 
 func TestGRPC_GetMCPToolList_AIToolHasParams(t *testing.T) {
+	yakit.GuardConfigurationForTest(t)
 	grpcSrv, err := NewServer()
 	require.NoError(t, err)
 	ctx := context.Background()
@@ -385,6 +389,7 @@ func TestGRPC_GetMCPToolList_AIToolHasParams(t *testing.T) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 func TestGRPCMUSTPASS_StartMcpServer_TierBridgeOnly(t *testing.T) {
+	yakit.GuardConfigurationForTest(t)
 	const remoteTool = "tier_bridge_echo"
 	srvName, bridgeCanonical, cleanup := seedBridgeMCPServerForTierTest(t, remoteTool)
 	defer cleanup()
@@ -408,6 +413,7 @@ func TestGRPCMUSTPASS_StartMcpServer_TierBridgeOnly(t *testing.T) {
 }
 
 func TestGRPCMUSTPASS_StartMcpServer_TierAllThreeSources(t *testing.T) {
+	yakit.GuardConfigurationForTest(t)
 	const remoteTool = "tier_all_three_tool"
 	srvName, bridgeCanonical, cleanup := seedBridgeMCPServerForTierTest(t, remoteTool)
 	defer cleanup()
@@ -430,6 +436,7 @@ func TestGRPCMUSTPASS_StartMcpServer_TierAllThreeSources(t *testing.T) {
 }
 
 func TestGRPCMUSTPASS_StartMcpServer_AIToolWithoutBridge(t *testing.T) {
+	yakit.GuardConfigurationForTest(t)
 	const remoteTool = "tier_ai_no_bridge_tool"
 	srvName, bridgeCanonical, cleanup := seedBridgeMCPServerForTierTest(t, remoteTool)
 	defer cleanup()
@@ -453,6 +460,7 @@ func TestGRPCMUSTPASS_StartMcpServer_AIToolWithoutBridge(t *testing.T) {
 }
 
 func TestGRPCMUSTPASS_StartMcpServer_DisabledBridgeToolNotExposed(t *testing.T) {
+	yakit.GuardConfigurationForTest(t)
 	const remoteTool = "tier_bridge_disable_me"
 	srvName, bridgeCanonical, cleanup := seedBridgeMCPServerForTierTest(t, remoteTool)
 	defer func() {
@@ -478,6 +486,7 @@ func TestGRPCMUSTPASS_StartMcpServer_DisabledBridgeToolNotExposed(t *testing.T) 
 }
 
 func TestGRPCMUSTPASS_StartMcpServer_DisabledAIToolNotExposed(t *testing.T) {
+	yakit.GuardConfigurationForTest(t)
 	const aitoolName = "now"
 	t.Cleanup(func() {
 		mustSetMCPToolEnabled(t, aitoolName, true)
@@ -504,6 +513,7 @@ func TestGRPCMUSTPASS_StartMcpServer_DisabledAIToolNotExposed(t *testing.T) {
 }
 
 func TestGRPCMUSTPASS_GetMCPToolListIncludesBrowserExtensionTools(t *testing.T) {
+	yakit.GuardConfigurationForTest(t)
 	manager, err := browser.NewExtensionBridgeManager(
 		browser.NewExtensionBridgeFileIdentityStore(t.TempDir()+"/identity.json"),
 		nil,
@@ -552,6 +562,7 @@ func TestGRPCMUSTPASS_GetMCPToolListIncludesBrowserExtensionTools(t *testing.T) 
 }
 
 func TestGRPCMUSTPASS_StartMcpServer_BrowserExtensionToolSet(t *testing.T) {
+	yakit.GuardConfigurationForTest(t)
 	client, server, err := NewLocalClientAndServerWithTempDatabase(t)
 	require.NoError(t, err)
 	manager, err := browser.NewExtensionBridgeManager(

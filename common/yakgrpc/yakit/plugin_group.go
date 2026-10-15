@@ -47,7 +47,7 @@ var pocBuiltInGroups = map[string]string{
 }
 
 func init() {
-	RegisterPostInitDatabaseFunction(func() error {
+	RegisterPostInitDatabaseFinalizer(func() error {
 		defer func() {
 			if err := recover(); err != nil {
 				log.Errorf("DeletePluginGroupsWithNonEmptyTemporaryId failed: %s", err)
@@ -102,7 +102,7 @@ func init() {
 
 		}
 		return nil
-	})
+	}, "initialize-builtin-plugin-groups")
 }
 
 func CreateOrUpdatePluginGroup(db *gorm.DB, hash string, i interface{}) error {

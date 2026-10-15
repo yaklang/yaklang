@@ -61,6 +61,7 @@ func mockedMCPToolCalling(i aicommon.AICallerConfigIf, req *aicommon.AIRequest, 
 }
 
 func TestReAct_MCPToolUse(t *testing.T) {
+	yakit.GuardConfigurationForTest(t)
 	// Generate a unique nonce for this test run - this is used to verify schema is properly included
 	nonce := ksuid.New().String()
 	log.Infof("Test nonce generated: %s", nonce)

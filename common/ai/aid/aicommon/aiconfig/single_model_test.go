@@ -1,6 +1,7 @@
 package aiconfig
 
 import (
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -9,6 +10,7 @@ import (
 )
 
 func TestSingleModelLoadingDoesNotBackfillUnusedTiers(t *testing.T) {
+	yakit.GuardConfigurationForTest(t)
 	saveAndRestore(t)
 	ResetConfigLoaded()
 	cfg := &ypb.AIGlobalConfig{SingleModelMode: true, IntelligentModels: []*ypb.AIModelConfig{{
@@ -28,6 +30,7 @@ func TestSingleModelLoadingDoesNotBackfillUnusedTiers(t *testing.T) {
 }
 
 func TestSingleModelCorruptStoredConfigFailsClosed(t *testing.T) {
+	yakit.GuardConfigurationForTest(t)
 	saveAndRestore(t)
 	ResetConfigLoaded()
 	consts.SetTieredAIConfig(&consts.TieredAIConfig{Enabled: true})

@@ -173,7 +173,7 @@ func TestGRPCMUSTPASS_SyntaxFlow_Result(t *testing.T) {
 }
 
 func TestGRPCMUSTPASS_SyntaxFlow_Notify(t *testing.T) {
-	yakit.InitialDatabase()
+	initializeTestDatabase()
 
 	local, err := NewLocalClient(true)
 	require.NoError(t, err)

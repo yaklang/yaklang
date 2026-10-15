@@ -2,6 +2,7 @@ package sessionruntime
 
 import (
 	"context"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -12,6 +13,7 @@ import (
 )
 
 func TestSingleModelStartParamsPolicy(t *testing.T) {
+	yakit.GuardConfigurationForTest(t)
 	aiconfig.EnsureConfigLoaded()
 	previous := consts.GetTieredAIConfig()
 	t.Cleanup(func() { consts.SetTieredAIConfig(previous) })
@@ -36,6 +38,7 @@ func TestSingleModelStartParamsPolicy(t *testing.T) {
 }
 
 func TestSingleModelStartParamsIgnoreDeprecatedModelSelection(t *testing.T) {
+	yakit.GuardConfigurationForTest(t)
 	aiconfig.EnsureConfigLoaded()
 	previous := consts.GetTieredAIConfig()
 	t.Cleanup(func() { consts.SetTieredAIConfig(previous) })

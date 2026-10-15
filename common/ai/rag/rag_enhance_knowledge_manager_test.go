@@ -2,6 +2,7 @@ package rag
 
 import (
 	"context"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"strings"
 	"testing"
 	"time"
@@ -14,6 +15,7 @@ import (
 )
 
 func TestRAGEnhanceManagerConstructorsOnCanceledQuery(t *testing.T) {
+	yakit.GuardConfigurationForTest(t)
 	db, err := utils.CreateTempTestDatabaseInMemory()
 	if err != nil {
 		t.Fatal(err)

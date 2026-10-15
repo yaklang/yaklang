@@ -3,6 +3,7 @@ package yakgrpc
 import (
 	"context"
 	"fmt"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"testing"
 
 	"github.com/davecgh/go-spew/spew"
@@ -51,6 +52,7 @@ func TestServer_GetSpaceEngineStatus(t *testing.T) {
 }
 
 func TestGRPCMUSTPASS_SpaceEngineCustomDomain(t *testing.T) {
+	yakit.GuardConfigurationForTest(t)
 	client, err := NewLocalClient(true)
 	if err != nil {
 		t.Fatal(err)

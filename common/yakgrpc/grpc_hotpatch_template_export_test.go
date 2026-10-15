@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"io"
 	"path/filepath"
 	"testing"
@@ -67,6 +68,7 @@ func drainHotPatchImportStream(t *testing.T, stream ypb.Yak_ImportHotPatchTempla
 }
 
 func TestGRPCMUSTPASS_HotPatchTemplate_Export_And_Import(t *testing.T) {
+	yakit.GuardConfigurationForTest(t)
 	client, _, err := NewLocalClientAndServerWithTempDatabase(t)
 	require.NoError(t, err)
 

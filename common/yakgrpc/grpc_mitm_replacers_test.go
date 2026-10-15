@@ -776,6 +776,7 @@ Content-Length: 4`))
 var defaultRule string
 
 func TestGRPCMUSTPASS_HookColorTimeout(t *testing.T) {
+	yakit.GuardConfigurationForTest(t)
 	err := yakit.SetKey(consts.GetGormProfileDatabase(), yakit.MITMReplacerKeyRecords, defaultRule)
 	if err != nil {
 		return
@@ -809,6 +810,7 @@ Host: www.example.com
 }
 
 func TestGRPCMUSTPASS_MITMV2_HookColorTimeout(t *testing.T) {
+	yakit.GuardConfigurationForTest(t)
 	err := yakit.SetKey(consts.GetGormProfileDatabase(), yakit.MITMReplacerKeyRecords, defaultRule)
 	if err != nil {
 		return
@@ -1841,6 +1843,7 @@ func TestGRPCMUSTPASS_QueryMITMReplacerRules(t *testing.T) {
 }
 
 func TestGRPCMUSTPASS_DeduplicateMITMReplacerRules(t *testing.T) {
+	yakit.GuardConfigurationForTest(t)
 	client, err := NewLocalClient()
 	require.NoError(t, err)
 	ctx := context.Background()
@@ -2031,6 +2034,7 @@ func TestMUSTPASS_ExactMatch_Hook(t *testing.T) {
 }
 
 func TestMITMReplaceRule_UseInlowhttp(t *testing.T) {
+	yakit.GuardConfigurationForTest(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
 	// Test data from user - this is a response

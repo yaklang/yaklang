@@ -2,6 +2,7 @@ package aicommon
 
 import (
 	"context"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"io"
 	"testing"
 
@@ -103,6 +104,7 @@ func pr5128AssertMode(t *testing.T, cfg *Config, observed chan pr5128ModelCall, 
 }
 
 func TestPR5128_ModeSnapshot_GlobalOffToOn(t *testing.T) {
+	yakit.GuardConfigurationForTest(t)
 	observed := pr5128ModeFixture(t, false)
 	old := pr5128NewModeConfig(t, WithSingleAIModelMode(false))
 	pr5128AssertMode(t, old, observed, false, "0")
@@ -112,6 +114,7 @@ func TestPR5128_ModeSnapshot_GlobalOffToOn(t *testing.T) {
 }
 
 func TestPR5128_ModeSnapshot_GlobalOnToOff(t *testing.T) {
+	yakit.GuardConfigurationForTest(t)
 	observed := pr5128ModeFixture(t, true)
 	old := pr5128NewModeConfig(t, WithSingleAIModelMode(false))
 	pr5128AssertMode(t, old, observed, true, "0")
@@ -121,6 +124,7 @@ func TestPR5128_ModeSnapshot_GlobalOnToOff(t *testing.T) {
 }
 
 func TestPR5128_ModeSnapshot_SessionOptInRemainsEnabled(t *testing.T) {
+	yakit.GuardConfigurationForTest(t)
 	observed := pr5128ModeFixture(t, false)
 	old := pr5128NewModeConfig(t, WithSingleAIModelMode(true))
 	pr5128AssertMode(t, old, observed, true, "0")
@@ -133,11 +137,13 @@ func TestPR5128_ModeSnapshot_SessionOptInRemainsEnabled(t *testing.T) {
 }
 
 func TestPR5128_ModeSnapshot_GlobalWinsAtConstruction(t *testing.T) {
+	yakit.GuardConfigurationForTest(t)
 	observed := pr5128ModeFixture(t, true)
 	pr5128AssertMode(t, pr5128NewModeConfig(t, WithSingleAIModelMode(false)), observed, true, "0")
 }
 
 func TestPR5128_TierRole_ModelConfigCanRefresh(t *testing.T) {
+	yakit.GuardConfigurationForTest(t)
 	observed := pr5128ModeFixture(t, false)
 	old := pr5128NewModeConfig(t)
 	pr5128AssertMode(t, old, observed, false, "0")
@@ -148,6 +154,7 @@ func TestPR5128_TierRole_ModelConfigCanRefresh(t *testing.T) {
 }
 
 func TestPR5128_ChildConfig_InheritsParentModeAcrossGlobalChange(t *testing.T) {
+	yakit.GuardConfigurationForTest(t)
 	for _, initial := range []bool{false, true} {
 		name := "off-to-on"
 		if initial {
