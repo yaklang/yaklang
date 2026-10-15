@@ -1,9 +1,7 @@
 package coreplugin
 
 import (
-	"encoding/json"
 	"fmt"
-	"strings"
 	"sync"
 	"time"
 
@@ -12,7 +10,6 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/yak/contextmenu"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/static_analyzer"
 	"github.com/yaklang/yaklang/common/yak/static_analyzer/information"
@@ -106,11 +103,14 @@ func syncCorePlugins(db *gorm.DB, plugins map[string]*builtinCorePlugin, resourc
 	if db == nil {
 		return fmt.Errorf("core plugin profile database is not initialized")
 	}
-	hashes := make(map[string]string)
+	hashes := make(schema.MapStringString)
 	if raw := yakit.GetKey(db, corePluginItemHashesKey); raw != "" {
-		if err := json.Unmarshal([]byte(raw), &hashes); err != nil {
+		if err := hashes.Scan(raw); err != nil {
 			return fmt.Errorf("read core plugin item hashes: %w", err)
 		}
+	}
+	if hashes == nil {
+		hashes = make(schema.MapStringString)
 	}
 	names := make([]string, 0, len(plugins))
 	for name := range plugins {
@@ -137,18 +137,7 @@ func syncCorePlugins(db *gorm.DB, plugins map[string]*builtinCorePlugin, resourc
 			if old.Uuid != "" {
 				plugin.Uuid = old.Uuid
 			}
-			// Preserve context-menu identities and migrated codec bindings.
-			if old.Type == schema.SCRIPT_TYPE_CONTEXT_MENU {
-				plugin.Type = old.Type
-			} else if old.Type == schema.SCRIPT_TYPE_CODEC && len(contextmenu.LegacyActionsForTags(old.Tags)) > 0 {
-				plugin.Type = old.Type
-				for _, tag := range []string{contextmenu.LegacyTagHistorySingle, contextmenu.LegacyTagHistoryMulti,
-					contextmenu.LegacyTagPacketContext, contextmenu.LegacyTagPacketMutate} {
-					if contextmenu.HasTag(old.Tags, tag) && !contextmenu.HasTag(plugin.Tags, tag) {
-						plugin.Tags = strings.Trim(plugin.Tags+","+tag, ",")
-					}
-				}
-			}
+			yakit.PreserveCoreContextMenuFields(&plugin, &old)
 		}
 		hash := corePluginItemHash(&plugin, definition.generateParam)
 		if found && hashes[name] == hash && corePluginItemHash(&old, definition.generateParam) == hash {
@@ -184,7 +173,7 @@ func syncCorePlugins(db *gorm.DB, plugins map[string]*builtinCorePlugin, resourc
 			delete(hashes, name)
 		}
 	}
-	rawHashes, err := json.Marshal(hashes)
+	rawHashes, err := hashes.Value()
 	if err != nil {
 		return err
 	}
@@ -218,7 +207,7 @@ func syncCorePlugins(db *gorm.DB, plugins map[string]*builtinCorePlugin, resourc
 				return fmt.Errorf("save core plugin %q: %w", plugin.ScriptName, err)
 			}
 		}
-		if err := yakit.SetKey(tx, corePluginItemHashesKey, string(rawHashes)); err != nil {
+		if err := yakit.SetKey(tx, corePluginItemHashesKey, rawHashes); err != nil {
 			return err
 		}
 		if resourceHash != "" {
