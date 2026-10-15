@@ -23,6 +23,7 @@ type ProtocolEvent struct {
 	nativeHARTIPObservation                  bool
 	nativeTLSObservation                     bool
 	nativeDTLSObservation                    bool
+	nativeSNMPObservation                    bool
 	nativeUnrecognizedUDP                    bool
 	nativeBACnetRead                         bool
 	nativeBACnetRoutedRead                   bool
@@ -105,7 +106,7 @@ func (e *ProtocolEvent) Decode() (result map[string]any, err error) {
 		}
 		// These native observations already retain their complete session
 		// context in the private field tree. Public projections are not authority.
-		ownedContext := e.nativeTLSObservation || e.nativeDTLSObservation || e.nativeHARTIPObservation || e.nativeENIPObservation || e.nativeFINSObservation || e.Protocol == "slmp" && (e.Profile == slmpTCPProfile || e.Profile == "slmp-binary-self-test") ||
+		ownedContext := e.nativeSNMPObservation || e.nativeTLSObservation || e.nativeDTLSObservation || e.nativeHARTIPObservation || e.nativeENIPObservation || e.nativeFINSObservation || e.Protocol == "slmp" && (e.Profile == slmpTCPProfile || e.Profile == "slmp-binary-self-test") ||
 			e.Transport == "ethernet" && (e.Protocol == "sv" && e.Profile == "iec61850-sv-raw-asdu" || e.Protocol == "ethercat" && e.Profile == "ethercat-datagram-chain")
 		if ownedContext && e.semanticFields != nil {
 			session = e.semanticFields
@@ -139,6 +140,16 @@ func (e *ProtocolEvent) Decode() (result map[string]any, err error) {
 			result = owned
 		}
 	}()
+	// SNMP keeps partial envelope metadata queryable on contextual refusals.
+	if e.nativeSNMPObservation {
+		if e.semanticFields != nil {
+			return map[string]any{"fields": cloneSession(e.semanticFields)}, nil
+		}
+		if e.sessionError != nil {
+			owned := *e.sessionError
+			return nil, &owned
+		}
+	}
 	// Native TLS/DTLS identity survives edits to every public projection,
 	// including a protocol name that would select a legacy cache below.
 	if e.nativeTLSObservation || e.nativeDTLSObservation {
@@ -265,7 +276,7 @@ func (e *ProtocolEvent) retainRuleEnvelope(result map[string]any) {
 }
 
 func (e *ProtocolEvent) ownsNativeFields() bool {
-	if e.nativeTLSObservation || e.nativeDTLSObservation || e.nativeHARTIPObservation || e.nativeENIPObservation || e.nativeFINSObservation || e.nativeDiagnosticError != "" {
+	if e.nativeSNMPObservation || e.nativeTLSObservation || e.nativeDTLSObservation || e.nativeHARTIPObservation || e.nativeENIPObservation || e.nativeFINSObservation || e.nativeDiagnosticError != "" {
 		return true
 	}
 	if e.nativeDoIPObservation {
@@ -525,6 +536,7 @@ type binParser struct {
 	pfcpUntrackedRefusal                                                       bool // udpMu; forgotten rejected identity cannot verify a newly admitted PFCP key
 	dlmsUntrackedRefusal                                                       bool // udpMu; no fresh HDLC association after an unretained admitted refusal
 	hartUntrackedRefusal                                                       bool // udpMu; unidentified refusals cannot start a fresh association
+	snmpUntrackedRefusal                                                       bool // udpMu; only newly untrackable SNMP conversations are conservative
 	finsUntrackedRefusal                                                       bool // udpMu; unretained identity cannot become a fresh generation
 	slmpUntrackedRefusal                                                       bool // udpMu; refused unretained SLMP identity has no verified generation
 	wrapperUntrackedRefusal                                                    bool // udpMu; missing Wrapper history cannot prove a fresh invoke generation
@@ -899,6 +911,9 @@ func (f *binFlow) event(dir int, raw []byte, status, detail string) *BinParserEv
 		e.Profile = "doip-routing-dsc"
 	}
 	f.eventEvidence(dir, e)
+	if f.protocol == "snmp" && f.binding == nil {
+		e.nativeSNMPObservation = true
+	}
 	if f.protocol == "tls" && f.binding == nil {
 		e.nativeTLSObservation = true
 	}
@@ -971,7 +986,7 @@ func (f *binFlow) stop(dir int, wire []byte, status, reason string) {
 	}
 	e := f.event(dir, preview, status, reason)
 	e.sessionError, f.lastSessionError = f.lastSessionError, nil
-	if e.nativeTLSObservation || e.nativeHARTIPObservation || e.nativeFINSObservation || e.nativeENIPObservation {
+	if e.nativeSNMPObservation || e.nativeTLSObservation || e.nativeHARTIPObservation || e.nativeFINSObservation || e.nativeENIPObservation {
 		if e.sessionError == nil {
 			kind := ErrMalformedMessage
 			switch status {
@@ -1424,7 +1439,7 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 					err = protocolError(ErrUnsupportedFeature, err.Error())
 				}
 				e.Status, e.sessionError = classifySessionError(err)
-				if ((e.Protocol == "iec104" || e.Protocol == "dnp3") || e.Entry == "MySQLPreparedFields" || e.Protocol == "mqtt" || e.nativeOPCUAObservation || e.nativeTLSObservation) && e.sessionError == nil {
+				if ((e.Protocol == "iec104" || e.Protocol == "dnp3") || e.Entry == "MySQLPreparedFields" || e.Protocol == "mqtt" || e.nativeOPCUAObservation || e.nativeTLSObservation || e.nativeSNMPObservation) && e.sessionError == nil {
 					// These legacy codecs also return wrapped context or
 					// grammar errors. Preserve their status/message privately so
 					// later queries cannot use a caller-supplied successful cache.
@@ -1522,11 +1537,13 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 			owned.SourceBytes.PacketRefs = append([]PacketReference(nil), e.SourceBytes.PacketRefs...)
 			tlsParent = &owned
 		}
+		// Recovery is engine policy, not a caller-editable event projection.
+		stopAfterFailure := failed && !recoverableHARTIP && !(e.Protocol == "fins" && finsRecoverable(e.sessionError)) && !recoverableDNP3 && !recoverableDoIP && !(e.Protocol == "slmp" && slmpTCPRecoverable(e.sessionError)) && !(e.Protocol == "dlms-wrapper" && dlmsRecoverableMessageError(e.sessionError)) && !(e.Protocol == "c37118" && c37118RecoverableMessageError(e.sessionError)) && !(e.Protocol == "dlms" && dlmsRecoverableMessageError(e.sessionError)) && !(e.Protocol == "roc-plus" && rocRecoverableMessageError(e.sessionError)) && !(e.Protocol == "genisys" && genisysRecoverableMessageError(e.sessionError)) && !((e.Protocol == "http2" || e.Protocol == "grpc" || e.Protocol == "doh") && e.Session["Error Scope"] == "stream")
 		a.emit(e)
 		if !failed {
 			f.deliverTLS(dir, tlsParent)
 		}
-		if failed && !recoverableHARTIP && !(e.Protocol == "fins" && finsRecoverable(e.sessionError)) && !recoverableDNP3 && !recoverableDoIP && !(e.Protocol == "slmp" && slmpTCPRecoverable(e.sessionError)) && !(e.Protocol == "dlms-wrapper" && dlmsRecoverableMessageError(e.sessionError)) && !(e.Protocol == "c37118" && c37118RecoverableMessageError(e.sessionError)) && !(e.Protocol == "dlms" && dlmsRecoverableMessageError(e.sessionError)) && !(e.Protocol == "roc-plus" && rocRecoverableMessageError(e.sessionError)) && !(e.Protocol == "genisys" && genisysRecoverableMessageError(e.sessionError)) && !((e.Protocol == "http2" || e.Protocol == "grpc" || e.Protocol == "doh") && e.Session["Error Scope"] == "stream") {
+		if stopAfterFailure {
 			if stateful {
 				f.invalidateSession(1 - dir)
 				f.closeSession()

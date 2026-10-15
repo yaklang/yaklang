@@ -44,7 +44,9 @@ func (a *binParser) refuseUDPOversizeAssociation(e *ProtocolEvent, w []byte, src
 	}
 	a.udpMu.Lock()
 	store := a.udpSessions
-	if store != nil {
+	// A denied SNMP datagram retires only its exact admitted key below.
+	// Its timestamp cannot expire other endpoint/domain observations.
+	if store != nil && protocol != "snmp" {
 		if e.Timestamp.After(store.clock) {
 			store.clock = e.Timestamp
 		}
@@ -71,7 +73,7 @@ func (a *binParser) refuseUDPOversizeAssociation(e *ProtocolEvent, w []byte, src
 		}
 	}
 	existing := store != nil && store.entries[key] != nil
-	if explicit == "" && !existing && protocol != "stun" && !(protocol == "slmp" && slmpUDPRefusalHint(w)) && !(protocol == "dlms-wrapper" && (src == 4059 || dst == 4059)) && !(protocol == "dlms" && (src == 4059 || dst == 4059) && dlmsUDPRefusalHint(w)) {
+	if explicit == "" && !existing && protocol != "stun" && !(protocol == "snmp" && (src == 161 || dst == 161 || src == 162 || dst == 162)) && !(protocol == "slmp" && slmpUDPRefusalHint(w)) && !(protocol == "dlms-wrapper" && (src == 4059 || dst == 4059)) && !(protocol == "dlms" && (src == 4059 || dst == 4059) && dlmsUDPRefusalHint(w)) {
 		a.udpMu.Unlock()
 		return false
 	}
@@ -85,6 +87,29 @@ func (a *binParser) refuseUDPOversizeAssociation(e *ProtocolEvent, w []byte, src
 	}
 	if protocol == "dlms-wrapper" && !existing && (explicit != "" || wrapperUDPRefusalHint(w)) {
 		a.wrapperUntrackedRefusal = true
+	}
+	if protocol == "snmp" && !existing {
+		if store == nil {
+			store = &binUDPStore{entries: map[binUDPKey]*list.Element{}}
+			a.udpSessions = store
+		}
+		// A denied first message is a real observation even without a parsed
+		// request ID. Retain a charged exact-key quarantine, not a fresh owner.
+		first, second := e.Source, e.Destination
+		if first > second {
+			first, second = second, first
+		}
+		f := &binFlow{a: a, id: a.flows.Add(1), endpoints: [2]string{first, second}, protocol: "snmp"}
+		if len(store.entries) < sessionCollectionLimit(a.budget.MaxCollectionElements) && f.reserveSession(512) == nil {
+			f.snmp = &binSNMP{blocked: true}
+			el := store.lru.PushBack(&binUDPEntry{key, f, e.Timestamp})
+			store.entries[key] = el
+			existing = true
+		} else {
+			// Existing contexts remain usable. A future unseen key cannot claim
+			// a completely observed history after an unretained refusal.
+			a.snmpUntrackedRefusal = true
+		}
 	}
 	if protocol == "stun" && !existing {
 		if store == nil {
@@ -141,10 +166,19 @@ func (a *binParser) refuseUDPOversizeAssociation(e *ProtocolEvent, w []byte, src
 			a.buffered.Add(retained - f.sessionBytes)
 			f.sessionBytes = retained
 		}
-		v.touched = store.clock
+		if protocol == "snmp" {
+			if e.Timestamp.After(v.touched) {
+				v.touched = e.Timestamp
+			}
+		} else {
+			v.touched = store.clock
+		}
 		store.lru.MoveToBack(el)
 	}
 	a.udpMu.Unlock()
+	if protocol == "snmp" {
+		e.nativeSNMPObservation = true
+	}
 	e.Protocol, e.Profile, e.Admission, e.Completeness = protocol, profile, "observed-conversation", "message"
 	if explicit != "" {
 		e.Admission = "explicit-decode-as"

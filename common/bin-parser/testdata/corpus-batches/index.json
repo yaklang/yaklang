@@ -101292,6 +101292,332 @@
         "common/pcapx/pcaputil/tls-dtls-context/expected.json": "validation/expected.json",
         "common/pcapx/pcaputil/tls-dtls-context/tls-parent-reused.json": "tls-dtls-context/tls-parent-reused.json"
       }
+    },
+    {
+      "id": "validation-snmp-clock",
+      "kind": "support",
+      "source_sha": "dae4fb51d9bd8b1687979d42497a5969a7abbf59",
+      "file": "validation-snmp-clock.zip",
+      "sha256": "5f3d906ef4420ef26fbfc4a34cd92f12fd6dd2a40c11b77e005a9a4b684440a7",
+      "password": "bin-parser",
+      "members": {
+        "required-tests-traffic-unified-v97.json": {
+          "sha256": "0a051ef4c2dc7eebd32116fcdf41e49423074222657e39f9311f39d9aecaff71",
+          "bytes": 16977882
+        },
+        "snmp-clock-tools/build.py": {
+          "sha256": "1d7dbad35accac2d1d48b5d9fc616c26130cabd98e599efd245e30415b6d0da0",
+          "bytes": 11454
+        },
+        "snmp-clock-tools/reference.py": {
+          "sha256": "c59e85f4b9e38c314a6e96f1b71c2dd2fdf535513866a9c7a55eb46ccd926639",
+          "bytes": 1935
+        },
+        "snmp-clock-tools/reused-model.json": {
+          "sha256": "a6d328e2e6291db442e6059d2ae555a3890074a9c311842292b0acfa3ae0773c",
+          "bytes": 383
+        },
+        "snmp-clock-tools/source-pins.json": {
+          "sha256": "f81bd0c53e3ff78b42452657c619e6a4b8e49f8b31a632114a224d956e6b3bcf",
+          "bytes": 671
+        },
+        "snmp-clock-tools/verify.py": {
+          "sha256": "70aeeb14acad9cbfad044f567d75c5486f44b49a1e6d8c84886736a8c2e1373d",
+          "bytes": 2420
+        },
+        "snmp-clock-tools/wire.py": {
+          "sha256": "efecbaf5e6e64f11e7851413ad00bd37074e33aff66d00e304692f4598333571",
+          "bytes": 1218
+        },
+        "snmp-clock/callback-recovery.pcapng": {
+          "sha256": "e655efe8c2fac0801a2955089b728f5968bf95c30f6c93373c473b9a252a2dfb",
+          "bytes": 608
+        },
+        "snmp-clock/callback.json": {
+          "sha256": "a1a22812a3e27654f1d3da72f6c2fa8ad5633994e44c43cd089b02ee0443f983",
+          "bytes": 3263
+        },
+        "snmp-clock/controls.json": {
+          "sha256": "a6234366382ecf9a868bb95765936b0680247aaba81e26b6d2562a34e867f164",
+          "bytes": 614849
+        },
+        "snmp-clock/expected.json": {
+          "sha256": "a5b4b44b9d505943bd6ccd3ef20f0be1b3fc967c9f55525069b3cbcde86d67ed",
+          "bytes": 56286
+        },
+        "snmp-clock/untracked-slot-message-refusal.pcapng": {
+          "sha256": "b76c2d1c815d81f7292b8ecbff2c1fd3a3dca72ac7d40659a652df6a0febc193",
+          "bytes": 1316
+        },
+        "snmp-clock/untracked-slot-normal.pcapng": {
+          "sha256": "ec68c1868a5034c0be7e0b1e5707442db61ecc13b728e5dccc409462852786eb",
+          "bytes": 1200
+        },
+        "snmp-clock/untracked-slot-refusal.pcapng": {
+          "sha256": "f767d8c826e4039bdc38d9c9cc64c14d354b565ab946e94676febf86f5d54c81",
+          "bytes": 1480
+        },
+        "snmp-clock/v0-tcp-older-than-first.pcapng": {
+          "sha256": "eaa410d50968f2da6ed26ae51b88ab2cd1fd583de92923fee9e2ba9106b829b0",
+          "bytes": 1088
+        },
+        "snmp-clock/v0-tcp-recent-retry.pcapng": {
+          "sha256": "19d6fd72abd6afcb2ae255a206182453b23946eb21b9b4cb51d5ae7830a7c8a0",
+          "bytes": 1088
+        },
+        "snmp-clock/v0-tcp-stale-retry.pcapng": {
+          "sha256": "e3ea40b8fc7a55557c0465d4da8a345af59fbbf2dd54b0252f3640431ee56f8d",
+          "bytes": 1088
+        },
+        "snmp-clock/v0-udp-exact-expiry.pcapng": {
+          "sha256": "8bfa316edbf4d9bf33221e9ec257abbdad3809be8c8eb1bcbeb902cb9639cb61",
+          "bytes": 284
+        },
+        "snmp-clock/v0-udp-foreign-budget.pcapng": {
+          "sha256": "ebb796170ee2775fc2d0a01c7ef9e1ae4e58fd925b8dd42140d94535584092c9",
+          "bytes": 820
+        },
+        "snmp-clock/v0-udp-foreign-first.pcapng": {
+          "sha256": "014ad4cf6a0bbcc45267fddaec4073be093f7d0b04b5100f95bc76c665d30cef",
+          "bytes": 544
+        },
+        "snmp-clock/v0-udp-foreign-future.pcapng": {
+          "sha256": "e87ea43b97737d1f8fd7877e0678aa13ec0e5cc0fa79aca3829cd889dd7434c1",
+          "bytes": 544
+        },
+        "snmp-clock/v0-udp-foreign-port.pcapng": {
+          "sha256": "ce66011de05f1ee87a4cf12446714adea1a3c8be23cc14d97a190774e4ca0016",
+          "bytes": 524
+        },
+        "snmp-clock/v0-udp-initial-budget.pcapng": {
+          "sha256": "4acdf1017e4bd497d988164597e6a3dd929c3b71280fbecad9e2c3306a22163e",
+          "bytes": 564
+        },
+        "snmp-clock/v0-udp-normal.pcapng": {
+          "sha256": "a85aad44d0d32caf45ca8bc0a6540153ef840028198cc2c4afb1990f52fc0502",
+          "bytes": 284
+        },
+        "snmp-clock/v0-udp-older-than-first.pcapng": {
+          "sha256": "180ab23415246d7eb8a8328570855abf974df022aef5e2e7561e9ac3bed75529",
+          "bytes": 752
+        },
+        "snmp-clock/v0-udp-own-budget.pcapng": {
+          "sha256": "046cc3c51658e1a624da7631c0ef0303434f8aad515660053d565b00ab8db7e7",
+          "bytes": 564
+        },
+        "snmp-clock/v0-udp-recent-retry.pcapng": {
+          "sha256": "2793eb777f4c6b979ca63e948ef81e694d9a02fd9e9e2c4510bdcb645f0c4150",
+          "bytes": 752
+        },
+        "snmp-clock/v0-udp-response-first-budget.pcapng": {
+          "sha256": "32853b7175df98e3d14afe71a6dc097d7c131a78c9a881473ba3a8e40645dbbf",
+          "bytes": 564
+        },
+        "snmp-clock/v0-udp-stale-retry.pcapng": {
+          "sha256": "e718ec59abd7f5e92bc2eb29f7b9fd9d122ebb94fbc5c0a7e6df8486c6c465e7",
+          "bytes": 752
+        },
+        "snmp-clock/v0-udp-within-window.pcapng": {
+          "sha256": "d982e4209d2dc49e6315298e48b0370164ef17ef6d0a022d8255a631227a95bc",
+          "bytes": 284
+        },
+        "snmp-clock/v1-tcp-older-than-first.pcapng": {
+          "sha256": "a3d092204c3d0826fee541c6cc2663bfaef51b2936439512adec6a37607e2bb9",
+          "bytes": 1088
+        },
+        "snmp-clock/v1-tcp-recent-retry.pcapng": {
+          "sha256": "ccc5d89cebae816afe30307e42d936f7448e66974d40215bb2870c5cd648d0fd",
+          "bytes": 1088
+        },
+        "snmp-clock/v1-tcp-stale-retry.pcapng": {
+          "sha256": "c08eb06b8f2c4d64c5d8e286e7e77ea0852d7625a503aa83aff4fa922b1200d2",
+          "bytes": 1088
+        },
+        "snmp-clock/v1-udp-exact-expiry.pcapng": {
+          "sha256": "19b5a848c10d23a89289d611f61ec389f910fe29d9d57403385d27b29aa87ce8",
+          "bytes": 284
+        },
+        "snmp-clock/v1-udp-foreign-budget.pcapng": {
+          "sha256": "3fb6ff37c7e733a65c0be141565830aa07cbe4612f38df675c938fd8f08005cc",
+          "bytes": 820
+        },
+        "snmp-clock/v1-udp-foreign-first.pcapng": {
+          "sha256": "8514bf4dd5a0d99b6ed30f8bd20f1b4eea350a3c790964397cd10bf34c579b08",
+          "bytes": 544
+        },
+        "snmp-clock/v1-udp-foreign-future.pcapng": {
+          "sha256": "fae3a03d34355739c87d162e319ce267b63ba31d989c03782c69abc50227c8c0",
+          "bytes": 544
+        },
+        "snmp-clock/v1-udp-foreign-port.pcapng": {
+          "sha256": "39e47227ec265909604bb7b92874aaed628a70df5a03fa87d3929fd89f5224e8",
+          "bytes": 524
+        },
+        "snmp-clock/v1-udp-initial-budget.pcapng": {
+          "sha256": "89ae38898e64ea83230712129a1150de4b18dc7cf7cbd55c5c272125db8f806f",
+          "bytes": 564
+        },
+        "snmp-clock/v1-udp-normal.pcapng": {
+          "sha256": "086f5c1eaeb1094072f4276f1a5a3591831b887bcab3282b9f4e2528cb759497",
+          "bytes": 284
+        },
+        "snmp-clock/v1-udp-older-than-first.pcapng": {
+          "sha256": "28141a84755c8c99ed12150e59e17ba0d1199956e356a68e582ec9fa0ad902d1",
+          "bytes": 752
+        },
+        "snmp-clock/v1-udp-own-budget.pcapng": {
+          "sha256": "26754385305b8df9d5d3e7c112fe967db26ec51e33deff02211c4f72e84d440b",
+          "bytes": 564
+        },
+        "snmp-clock/v1-udp-recent-retry.pcapng": {
+          "sha256": "9d93e97e931071374ac1ff1090ca438709f5db62fb398703dcadc3fad111c8cc",
+          "bytes": 752
+        },
+        "snmp-clock/v1-udp-response-first-budget.pcapng": {
+          "sha256": "c3e53d63f19afdf8bd73ad193e5ebf057aafe51e28da6766e07b15d6db652773",
+          "bytes": 564
+        },
+        "snmp-clock/v1-udp-stale-retry.pcapng": {
+          "sha256": "fa3612c8cf8e75b5bbc610d2d63f6f2d309380fd9dae2c663835453f68405b69",
+          "bytes": 752
+        },
+        "snmp-clock/v1-udp-within-window.pcapng": {
+          "sha256": "b11301b48749dc39b686142205bdae4bd2beb150498d168c46191411dc1af2b9",
+          "bytes": 284
+        },
+        "snmp-clock/v3-tcp-older-than-first.pcapng": {
+          "sha256": "8c218f53f43fb713c13c3d576eb00ed952b335f1fb0f0840b01497d43a4d6e76",
+          "bytes": 1328
+        },
+        "snmp-clock/v3-tcp-recent-retry.pcapng": {
+          "sha256": "8e277e4c938c42cc1463a0d2d86f437a3eaa71e681733cb4c46472631e5df631",
+          "bytes": 1328
+        },
+        "snmp-clock/v3-tcp-stale-retry.pcapng": {
+          "sha256": "8c3c061a6cd95d499c49f19220814a54d1d77dcec29e0b95ab52b6af8eba6b46",
+          "bytes": 1328
+        },
+        "snmp-clock/v3-udp-exact-expiry.pcapng": {
+          "sha256": "eac2014390324ac7fd8af5d155fb6eaadceba28a618c9f22b830e473e72f823f",
+          "bytes": 364
+        },
+        "snmp-clock/v3-udp-foreign-budget.pcapng": {
+          "sha256": "85ebbcc9dcc7234e563d17a975676a273e5866c61f1aa7a671471c12071a2986",
+          "bytes": 1024
+        },
+        "snmp-clock/v3-udp-foreign-first.pcapng": {
+          "sha256": "dc8a02511ad5365b861b2d1748afa415b5e02d5e3f3d4035d2bd8aa4d7141b6f",
+          "bytes": 704
+        },
+        "snmp-clock/v3-udp-foreign-future.pcapng": {
+          "sha256": "148ff8d1241df2e165ec7d769f8db72cfce4fc9ecfbe168a7a143822cc7b8d9f",
+          "bytes": 704
+        },
+        "snmp-clock/v3-udp-foreign-port.pcapng": {
+          "sha256": "90e91bc964e610cfcf84a1fbed9af9af7ea8f1e77c3092266c510be685f5b966",
+          "bytes": 684
+        },
+        "snmp-clock/v3-udp-initial-budget.pcapng": {
+          "sha256": "86ab071ba4d3fa09fc83f6e20a7b5625e463f5b3a62f16908f677d596fb4ca99",
+          "bytes": 688
+        },
+        "snmp-clock/v3-udp-normal.pcapng": {
+          "sha256": "6b6415e0fb0c85dae675d83d1dec78b703021291b49ac8f8fc0215a2638450cf",
+          "bytes": 364
+        },
+        "snmp-clock/v3-udp-older-than-first.pcapng": {
+          "sha256": "292a87ca47c495d89848318e83465c1ad4da5c2fa6844e9896c9a9a85724c947",
+          "bytes": 992
+        },
+        "snmp-clock/v3-udp-own-budget.pcapng": {
+          "sha256": "dba1412e1da64fd5ffd1688f50e78648f65ab31dcc886716911a8474cdb3b76e",
+          "bytes": 688
+        },
+        "snmp-clock/v3-udp-recent-retry.pcapng": {
+          "sha256": "39a1b65cce82e6e195d688725ca92304bf546f268347fa447f89658157fc8a13",
+          "bytes": 992
+        },
+        "snmp-clock/v3-udp-response-first-budget.pcapng": {
+          "sha256": "f8eea22a63fed9930b77a792df0aae12347aa7b5aeec23eb4f84e18645e9cd36",
+          "bytes": 688
+        },
+        "snmp-clock/v3-udp-stale-retry.pcapng": {
+          "sha256": "99e0d434a0892de59da452634d3e43446131ab10a2458326ac9cf83003843b0c",
+          "bytes": 992
+        },
+        "snmp-clock/v3-udp-within-window.pcapng": {
+          "sha256": "cfe4b8198547a3f415caf8f6d7fe37ef7a9033079663aee5b0bebb4953c03092",
+          "bytes": 364
+        },
+        "validation/expected.json": {
+          "sha256": "a5b4b44b9d505943bd6ccd3ef20f0be1b3fc967c9f55525069b3cbcde86d67ed",
+          "bytes": 56286
+        }
+      },
+      "aliases": {
+        "common/pcapx/pcaputil/snmp-clock-tools/build.py": "snmp-clock-tools/build.py",
+        "common/pcapx/pcaputil/snmp-clock-tools/reference.py": "snmp-clock-tools/reference.py",
+        "common/pcapx/pcaputil/snmp-clock-tools/reused-model.json": "snmp-clock-tools/reused-model.json",
+        "common/pcapx/pcaputil/snmp-clock-tools/source-pins.json": "snmp-clock-tools/source-pins.json",
+        "common/pcapx/pcaputil/snmp-clock-tools/verify.py": "snmp-clock-tools/verify.py",
+        "common/pcapx/pcaputil/snmp-clock-tools/wire.py": "snmp-clock-tools/wire.py",
+        "common/pcapx/pcaputil/snmp-clock/callback-recovery.pcapng": "snmp-clock/callback-recovery.pcapng",
+        "common/pcapx/pcaputil/snmp-clock/callback.json": "snmp-clock/callback.json",
+        "common/pcapx/pcaputil/snmp-clock/controls.json": "snmp-clock/controls.json",
+        "common/pcapx/pcaputil/snmp-clock/expected.json": "snmp-clock/expected.json",
+        "common/pcapx/pcaputil/snmp-clock/untracked-slot-message-refusal.pcapng": "snmp-clock/untracked-slot-message-refusal.pcapng",
+        "common/pcapx/pcaputil/snmp-clock/untracked-slot-normal.pcapng": "snmp-clock/untracked-slot-normal.pcapng",
+        "common/pcapx/pcaputil/snmp-clock/untracked-slot-refusal.pcapng": "snmp-clock/untracked-slot-refusal.pcapng",
+        "common/pcapx/pcaputil/snmp-clock/v0-tcp-older-than-first.pcapng": "snmp-clock/v0-tcp-older-than-first.pcapng",
+        "common/pcapx/pcaputil/snmp-clock/v0-tcp-recent-retry.pcapng": "snmp-clock/v0-tcp-recent-retry.pcapng",
+        "common/pcapx/pcaputil/snmp-clock/v0-tcp-stale-retry.pcapng": "snmp-clock/v0-tcp-stale-retry.pcapng",
+        "common/pcapx/pcaputil/snmp-clock/v0-udp-exact-expiry.pcapng": "snmp-clock/v0-udp-exact-expiry.pcapng",
+        "common/pcapx/pcaputil/snmp-clock/v0-udp-foreign-budget.pcapng": "snmp-clock/v0-udp-foreign-budget.pcapng",
+        "common/pcapx/pcaputil/snmp-clock/v0-udp-foreign-first.pcapng": "snmp-clock/v0-udp-foreign-first.pcapng",
+        "common/pcapx/pcaputil/snmp-clock/v0-udp-foreign-future.pcapng": "snmp-clock/v0-udp-foreign-future.pcapng",
+        "common/pcapx/pcaputil/snmp-clock/v0-udp-foreign-port.pcapng": "snmp-clock/v0-udp-foreign-port.pcapng",
+        "common/pcapx/pcaputil/snmp-clock/v0-udp-initial-budget.pcapng": "snmp-clock/v0-udp-initial-budget.pcapng",
+        "common/pcapx/pcaputil/snmp-clock/v0-udp-normal.pcapng": "snmp-clock/v0-udp-normal.pcapng",
+        "common/pcapx/pcaputil/snmp-clock/v0-udp-older-than-first.pcapng": "snmp-clock/v0-udp-older-than-first.pcapng",
+        "common/pcapx/pcaputil/snmp-clock/v0-udp-own-budget.pcapng": "snmp-clock/v0-udp-own-budget.pcapng",
+        "common/pcapx/pcaputil/snmp-clock/v0-udp-recent-retry.pcapng": "snmp-clock/v0-udp-recent-retry.pcapng",
+        "common/pcapx/pcaputil/snmp-clock/v0-udp-response-first-budget.pcapng": "snmp-clock/v0-udp-response-first-budget.pcapng",
+        "common/pcapx/pcaputil/snmp-clock/v0-udp-stale-retry.pcapng": "snmp-clock/v0-udp-stale-retry.pcapng",
+        "common/pcapx/pcaputil/snmp-clock/v0-udp-within-window.pcapng": "snmp-clock/v0-udp-within-window.pcapng",
+        "common/pcapx/pcaputil/snmp-clock/v1-tcp-older-than-first.pcapng": "snmp-clock/v1-tcp-older-than-first.pcapng",
+        "common/pcapx/pcaputil/snmp-clock/v1-tcp-recent-retry.pcapng": "snmp-clock/v1-tcp-recent-retry.pcapng",
+        "common/pcapx/pcaputil/snmp-clock/v1-tcp-stale-retry.pcapng": "snmp-clock/v1-tcp-stale-retry.pcapng",
+        "common/pcapx/pcaputil/snmp-clock/v1-udp-exact-expiry.pcapng": "snmp-clock/v1-udp-exact-expiry.pcapng",
+        "common/pcapx/pcaputil/snmp-clock/v1-udp-foreign-budget.pcapng": "snmp-clock/v1-udp-foreign-budget.pcapng",
+        "common/pcapx/pcaputil/snmp-clock/v1-udp-foreign-first.pcapng": "snmp-clock/v1-udp-foreign-first.pcapng",
+        "common/pcapx/pcaputil/snmp-clock/v1-udp-foreign-future.pcapng": "snmp-clock/v1-udp-foreign-future.pcapng",
+        "common/pcapx/pcaputil/snmp-clock/v1-udp-foreign-port.pcapng": "snmp-clock/v1-udp-foreign-port.pcapng",
+        "common/pcapx/pcaputil/snmp-clock/v1-udp-initial-budget.pcapng": "snmp-clock/v1-udp-initial-budget.pcapng",
+        "common/pcapx/pcaputil/snmp-clock/v1-udp-normal.pcapng": "snmp-clock/v1-udp-normal.pcapng",
+        "common/pcapx/pcaputil/snmp-clock/v1-udp-older-than-first.pcapng": "snmp-clock/v1-udp-older-than-first.pcapng",
+        "common/pcapx/pcaputil/snmp-clock/v1-udp-own-budget.pcapng": "snmp-clock/v1-udp-own-budget.pcapng",
+        "common/pcapx/pcaputil/snmp-clock/v1-udp-recent-retry.pcapng": "snmp-clock/v1-udp-recent-retry.pcapng",
+        "common/pcapx/pcaputil/snmp-clock/v1-udp-response-first-budget.pcapng": "snmp-clock/v1-udp-response-first-budget.pcapng",
+        "common/pcapx/pcaputil/snmp-clock/v1-udp-stale-retry.pcapng": "snmp-clock/v1-udp-stale-retry.pcapng",
+        "common/pcapx/pcaputil/snmp-clock/v1-udp-within-window.pcapng": "snmp-clock/v1-udp-within-window.pcapng",
+        "common/pcapx/pcaputil/snmp-clock/v3-tcp-older-than-first.pcapng": "snmp-clock/v3-tcp-older-than-first.pcapng",
+        "common/pcapx/pcaputil/snmp-clock/v3-tcp-recent-retry.pcapng": "snmp-clock/v3-tcp-recent-retry.pcapng",
+        "common/pcapx/pcaputil/snmp-clock/v3-tcp-stale-retry.pcapng": "snmp-clock/v3-tcp-stale-retry.pcapng",
+        "common/pcapx/pcaputil/snmp-clock/v3-udp-exact-expiry.pcapng": "snmp-clock/v3-udp-exact-expiry.pcapng",
+        "common/pcapx/pcaputil/snmp-clock/v3-udp-foreign-budget.pcapng": "snmp-clock/v3-udp-foreign-budget.pcapng",
+        "common/pcapx/pcaputil/snmp-clock/v3-udp-foreign-first.pcapng": "snmp-clock/v3-udp-foreign-first.pcapng",
+        "common/pcapx/pcaputil/snmp-clock/v3-udp-foreign-future.pcapng": "snmp-clock/v3-udp-foreign-future.pcapng",
+        "common/pcapx/pcaputil/snmp-clock/v3-udp-foreign-port.pcapng": "snmp-clock/v3-udp-foreign-port.pcapng",
+        "common/pcapx/pcaputil/snmp-clock/v3-udp-initial-budget.pcapng": "snmp-clock/v3-udp-initial-budget.pcapng",
+        "common/pcapx/pcaputil/snmp-clock/v3-udp-normal.pcapng": "snmp-clock/v3-udp-normal.pcapng",
+        "common/pcapx/pcaputil/snmp-clock/v3-udp-older-than-first.pcapng": "snmp-clock/v3-udp-older-than-first.pcapng",
+        "common/pcapx/pcaputil/snmp-clock/v3-udp-own-budget.pcapng": "snmp-clock/v3-udp-own-budget.pcapng",
+        "common/pcapx/pcaputil/snmp-clock/v3-udp-recent-retry.pcapng": "snmp-clock/v3-udp-recent-retry.pcapng",
+        "common/pcapx/pcaputil/snmp-clock/v3-udp-response-first-budget.pcapng": "snmp-clock/v3-udp-response-first-budget.pcapng",
+        "common/pcapx/pcaputil/snmp-clock/v3-udp-stale-retry.pcapng": "snmp-clock/v3-udp-stale-retry.pcapng",
+        "common/pcapx/pcaputil/snmp-clock/v3-udp-within-window.pcapng": "snmp-clock/v3-udp-within-window.pcapng",
+        "scripts/protocol-tests/required-tests-traffic-unified-v97.json": "required-tests-traffic-unified-v97.json"
+      }
     }
   ],
   "schema_version": 1,

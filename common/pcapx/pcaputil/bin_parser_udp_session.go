@@ -343,22 +343,16 @@ func (a *binParser) decodeSNMPDatagram(e *ProtocolEvent, w []byte, explicit stri
 	}
 	s := a.udpSessions
 	if s == nil {
-		s = &binUDPStore{entries: map[binUDPKey]*list.Element{}, clock: e.Timestamp}
+		s = &binUDPStore{entries: map[binUDPKey]*list.Element{}}
 		a.udpSessions = s
-	} else if e.Timestamp.After(s.clock) {
-		s.clock = e.Timestamp
-	}
-	for el := s.lru.Front(); el != nil; {
-		next := el.Next()
-		v := el.Value.(*binUDPEntry)
-		if v.flow.snmp != nil && s.clock.Sub(v.touched) >= 10*time.Minute {
-			// UDP idle is not a new generation. Release live request state,
-			// retain charged scoped identities and allow distinct unused IDs.
-			v.flow.retireSNMPUDP()
-		}
-		el = next
 	}
 	el := s.entries[key]
+	if el != nil {
+		entry := el.Value.(*binUDPEntry)
+		if entry.flow.snmp != nil && e.Timestamp.Sub(entry.touched) >= snmpPendingTTL {
+			entry.flow.retireSNMPUDP()
+		}
+	}
 	var err error
 	if el == nil {
 		if len(s.entries) >= sessionCollectionLimit(a.budget.MaxCollectionElements) {
@@ -368,16 +362,24 @@ func (a *binParser) decodeSNMPDatagram(e *ProtocolEvent, w []byte, explicit stri
 			if first > second {
 				first, second = second, first
 			}
-			f := &binFlow{a: a, id: a.flows.Add(1), protocol: "snmp", snmp: &binSNMP{pending: map[snmpPendingKey]snmpPendingRequest{}}, endpoints: [2]string{first, second}}
+			f := &binFlow{a: a, id: a.flows.Add(1), protocol: "snmp", snmp: &binSNMP{pending: map[snmpPendingKey]snmpPendingRequest{}, blocked: a.snmpUntrackedRefusal}, endpoints: [2]string{first, second}}
 			if err = f.reserveSession(512); err == nil {
-				el = s.lru.PushBack(&binUDPEntry{key: key, flow: f, touched: s.clock})
+				el = s.lru.PushBack(&binUDPEntry{key: key, flow: f, touched: e.Timestamp})
 				s.entries[key] = el
 			}
 		}
 	}
+	if el == nil && err != nil {
+		// Even a structurally valid first request existed on wire. If no
+		// charged identity fits, future unseen keys lack a verified history.
+		a.snmpUntrackedRefusal = true
+	}
+
 	if el != nil {
 		entry := el.Value.(*binUDPEntry)
-		entry.touched = s.clock
+		if e.Timestamp.After(entry.touched) {
+			entry.touched = e.Timestamp
+		}
 		s.lru.MoveToBack(el)
 		f := entry.flow
 		dir := 0
@@ -388,10 +390,10 @@ func (a *binParser) decodeSNMPDatagram(e *ProtocolEvent, w []byte, explicit stri
 		if f.snmp == nil {
 			err = protocolError(ErrContextRequired, "SNMP conversation context was closed")
 		} else {
-			f.snmp.expirePending(s.clock)
+			f.snmp.expirePending(e.Timestamp)
 			err = f.reserveSession(f.snmp.storage() + 512 + int64(len(w))*3)
 			if err == nil {
-				e.Session, err = f.snmp.consumeAt(w, sessionCollectionLimit(a.budget.MaxCollectionElements), dir, s.clock)
+				e.Session, err = f.snmp.consumeAt(w, sessionCollectionLimit(a.budget.MaxCollectionElements), dir, e.Timestamp)
 			} else {
 				f.snmp.invalidate()
 			}
@@ -400,6 +402,7 @@ func (a *binParser) decodeSNMPDatagram(e *ProtocolEvent, w []byte, explicit stri
 			e.Session["Observation Scope"] = "conversation"
 		}
 	}
+	e.nativeSNMPObservation = true
 	e.Protocol = "snmp"
 	e.Profile = "snmp-v" + probe.Version + "-native"
 	e.Admission = "wire-and-port-hint"

@@ -233,7 +233,7 @@ func (s *binSNMP) consumeAt(raw []byte, max int, direction int, observed time.Ti
 		return nil, protocolError(ErrUnsupportedVersion, "SNMP version is outside supported v1/v2c/v3")
 	}
 	if version == 0 || version == 1 {
-		return s.consumeCommunityMessage(msg, at, version, direction, max)
+		return s.consumeCommunityMessage(msg, at, version, direction, max, observed)
 	}
 	tag, header, at, err := snmpReadTLV(msg, at)
 	if err != nil || tag != 0x30 {
@@ -325,7 +325,7 @@ func (s *binSNMP) consumeAt(raw []byte, max int, direction int, observed time.Ti
 	info["Message ID"] = msgID
 	info["Security Context"] = "usm-user-unverified"
 	security := fmt.Sprintf("v3:%s:%s:%d", snmpSecurityFingerprint(engineID, user), snmpSecurityFingerprint(ctxEngine, ctxName), flags&(snmpFlagAuth|snmpFlagPriv))
-	return s.correlate(parsed.name, parsed.requestID, msgID, 3, direction, security, sha256.Sum256(pdu), info, max)
+	return s.correlate(parsed.name, parsed.requestID, msgID, 3, direction, security, sha256.Sum256(pdu), info, max, observed)
 }
 
 func (s *binSNMP) expirePending(observed time.Time) {
@@ -351,7 +351,7 @@ func (s *binSNMP) expirePending(observed time.Time) {
 	}
 }
 
-func (s *binSNMP) consumeCommunityMessage(msg []byte, at int, version int64, direction, max int) (map[string]any, error) {
+func (s *binSNMP) consumeCommunityMessage(msg []byte, at int, version int64, direction, max int, observed time.Time) (map[string]any, error) {
 	tag, community, next, err := snmpReadTLV(msg, at)
 	if err != nil || tag != 0x04 {
 		return nil, protocolError(ErrMalformedMessage, "SNMP expected community OCTET STRING")
@@ -391,10 +391,10 @@ func (s *binSNMP) consumeCommunityMessage(msg []byte, at int, version int64, dir
 		info["Error Status"] = parsed.status
 		info["Error Index"] = parsed.index
 	}
-	return s.correlate(parsed.name, parsed.requestID, 0, version, direction, security, sha256.Sum256(pdu), info, max)
+	return s.correlate(parsed.name, parsed.requestID, 0, version, direction, security, sha256.Sum256(pdu), info, max, observed)
 }
 
-func (s *binSNMP) correlate(name string, reqID, msgID, version int64, direction int, security string, digest [32]byte, info map[string]any, max int) (map[string]any, error) {
+func (s *binSNMP) correlate(name string, reqID, msgID, version int64, direction int, security string, digest [32]byte, info map[string]any, max int, observed time.Time) (map[string]any, error) {
 	if s.pending == nil {
 		s.pending = map[snmpPendingKey]snmpPendingRequest{}
 	}
@@ -417,7 +417,9 @@ func (s *binSNMP) correlate(name string, reqID, msgID, version int64, direction 
 		if h, used := s.history[key]; used {
 			p, active := s.pending[key]
 			if !h.retired && active && p.name == name && h.digest == digest {
-				p.lastSeen = s.clock
+				if observed.After(p.lastSeen) {
+					p.lastSeen = observed
+				}
 				s.pending[key] = p
 				info["Retransmission"], info["Outstanding"] = true, true
 				return info, nil
@@ -434,7 +436,7 @@ func (s *binSNMP) correlate(name string, reqID, msgID, version int64, direction 
 			return info, protocolError(ErrResourceExceeded, "SNMP retained request identities exceed budget")
 		}
 		s.history[key] = snmpIdentity{digest: digest}
-		s.pending[key] = snmpPendingRequest{name: name, lastSeen: s.clock}
+		s.pending[key] = snmpPendingRequest{name: name, lastSeen: observed}
 		info["Outstanding"] = true
 	case "Response", "Report":
 		key.direction = 1 - direction
