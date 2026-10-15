@@ -105120,6 +105120,352 @@
         "common/pcapx/pcaputil/radius-token/otp-word-checksum-invalid.pcap": "radius-token/otp-word-checksum-invalid.pcap",
         "scripts/protocol-tests/required-tests-traffic-unified-v113.json": "required-tests-traffic-unified-v113.json"
       }
+    },
+    {
+      "id": "validation-tls-record-eap-tls",
+      "kind": "support",
+      "source_sha": "a66c5541db50135b0232130717889f8231e233c7",
+      "file": "validation-tls-record-eap-tls.zip",
+      "sha256": "71fbb0b17d24ae9ba28d0f866f51c3c54fde52d9901d106249938716581b1213",
+      "password": "bin-parser",
+      "members": {
+        "radius-tls/controls.json": {
+          "sha256": "fa766fdb9bde289c22267e5d2105bc1dc904a60847bf991b79b2972559f63b6e",
+          "bytes": 282262
+        },
+        "radius-tls/legacy-compatibility.json": {
+          "sha256": "c418be03aedee8b9b35413d61c2d1fab5d6237327a958abd81772434b20a9d23",
+          "bytes": 40909
+        },
+        "radius-tls/tls-L-empty-not-ordinary-ACK.pcap": {
+          "sha256": "6f4f65a5741b3b6c9708ea2c323159a48e2cfb9bcad2b4c60637f77276013db3",
+          "bytes": 243
+        },
+        "radius-tls/tls-L-less-than-observed-data.pcap": {
+          "sha256": "0611a22084baa7629158d87e7079dc2a03f672a612cd5ab96e75431ccecbabae",
+          "bytes": 293
+        },
+        "radius-tls/tls-MAC-fatal-before-record-budget.pcap": {
+          "sha256": "45f130d4c444b87bc5d81d44700c24196fb81650f1a1068e29ee42c370172177",
+          "bytes": 460
+        },
+        "radius-tls/tls-alert-across-two-local-records.pcap": {
+          "sha256": "4f2be63f3873fd80eb4cb06fefcd80405ee6bfa32f298cf2d8877cd3c62ca799",
+          "bytes": 251
+        },
+        "radius-tls/tls-alert-partial-local-round-context.pcap": {
+          "sha256": "0b5633314ae8b21d3f7d15266afcfd7670f4d53cb1e95c1c50366fb2f7752a82",
+          "bytes": 245
+        },
+        "radius-tls/tls-application-bytes-opaque.pcap": {
+          "sha256": "345a7f8a89c0df4d250135303269986cf7dc1cf346934d034893fcc8903cf89b",
+          "bytes": 261
+        },
+        "radius-tls/tls-ccs-then-opaque-handshake.pcap": {
+          "sha256": "959138483076561fa2c3468342edd88b31d1f039ed3527c46c4ed2cf1be0968e",
+          "bytes": 253
+        },
+        "radius-tls/tls-certificate-semantic-pending.pcap": {
+          "sha256": "8b25c1bd88852ad72c58a5732599201df85f036a7fbc2564bc5688e2ea1e6fbe",
+          "bytes": 251
+        },
+        "radius-tls/tls-clienthello-L-complete.pcap": {
+          "sha256": "764b1229181ac48ace901bf4947ba00f47a351224dfbc9a1b53dbf9e066ef47f",
+          "bytes": 293
+        },
+        "radius-tls/tls-clienthello-unfragmented.pcap": {
+          "sha256": "475f6d72df68e7a1af3ca6ec781e5444f33b537c599d70993762919c06c243fc",
+          "bytes": 289
+        },
+        "radius-tls/tls-complete-L-hello-opaque-or-invalid.pcap": {
+          "sha256": "4c1c0324b2b50e8bfb3050182d992a2fbd1eb68a512a4051cf0b0d756d2037d9",
+          "bytes": 252
+        },
+        "radius-tls/tls-complete-L-record-length-invalid.pcap": {
+          "sha256": "c1488ea53601b4b5b2c542b5fb0adbb6f8d5d8ac609ca168d6b065f259cdbf3d",
+          "bytes": 249
+        },
+        "radius-tls/tls-continuation-M-no-L-context.pcap": {
+          "sha256": "c86ce48de8b28b35b9ae1651a94db0b94c5cfba2ec03da2a295b44f19c64d640",
+          "bytes": 246
+        },
+        "radius-tls/tls-empty-request-control.pcap": {
+          "sha256": "12b635bd6ba54b8447eef04e8a3b806fb02014c4080fb0b0e159d16425e13b9b",
+          "bytes": 241
+        },
+        "radius-tls/tls-empty-response-control.pcap": {
+          "sha256": "e062f7c2effb20569bb3e3e822c4cd09201d7c67bcd7b1ada1b97910b83d1669",
+          "bytes": 239
+        },
+        "radius-tls/tls-exact-outer-retry.pcap": {
+          "sha256": "a9b3d07393307e55491e5516508b7151386f3dce911e605491b620c4a3063903",
+          "bytes": 452
+        },
+        "radius-tls/tls-first-fragment-requires-State-context.pcap": {
+          "sha256": "a6e5b9ded4cc951ead2cab6a8200dd46a5b1784c485c1ec500e130680a5d5fae",
+          "bytes": 252
+        },
+        "radius-tls/tls-handshake-across-two-local-records.pcap": {
+          "sha256": "3fc014d2a2b5ea769ce73a5f94c9af0bb09d930135bc7663f446acb20eb1359c",
+          "bytes": 294
+        },
+        "radius-tls/tls-handshake-list-budget.pcap": {
+          "sha256": "55c214bce97a55ed91912e86fe3651dc7932059d75832b00c4dc71a9b48b3a08",
+          "bytes": 639
+        },
+        "radius-tls/tls-handshake-partial-local-round-context.pcap": {
+          "sha256": "901192b644084ff08492678c56375ee805b4f94443540659fc495d57aca37430",
+          "bytes": 250
+        },
+        "radius-tls/tls-header-L-length-truncated.pcap": {
+          "sha256": "9b5978cebc764a82b631dfdab4e43b3653bdf848af681e6b3f222200398c7f23",
+          "bytes": 241
+        },
+        "radius-tls/tls-header-flags-truncated.pcap": {
+          "sha256": "307f632295ca1495423052b101bcec558b7d2b89a2616d293e48710d55c81708",
+          "bytes": 238
+        },
+        "radius-tls/tls-hello-cipher-list-budget.pcap": {
+          "sha256": "09c4747e8de0dbc719fe97952046b3794acf45e9fec311ed913f798c90559fe4",
+          "bytes": 510
+        },
+        "radius-tls/tls-hello-extension-list-budget.pcap": {
+          "sha256": "39cc087ce7d2e7cfc9cb21aadde82f1e73af22aa3c87caac46fceb65dd8854cd",
+          "bytes": 522
+        },
+        "radius-tls/tls-inner-padding-ignored.pcap": {
+          "sha256": "12e8b10fb7c68fe9ec44761ce0d42fd2df2aebd6ff0f21bc38f67906cbc319d6",
+          "bytes": 295
+        },
+        "radius-tls/tls-interleaved-outer-ids-isolated.pcap": {
+          "sha256": "0a54707b83c53d3dbbcc496137f94098b875b57dd61838d1f7ba9003b573e3c1",
+          "bytes": 554
+        },
+        "radius-tls/tls-last-fragment-no-L-context.pcap": {
+          "sha256": "7577c0bb0d8b9aebb9c86d7e3d71a8112cf1669b0470266c139a80b86d4c1dcd",
+          "bytes": 246
+        },
+        "radius-tls/tls-no-L-missing-record-context.pcap": {
+          "sha256": "30d0071ce97f0b16f6a1fad7ed2af87283f516adcdf778215e8e96f2a2280d2b",
+          "bytes": 241
+        },
+        "radius-tls/tls-non-null-compression-context.pcap": {
+          "sha256": "7ecc3b163836bf266e5e041a39c1f010083685b65d8c057d595ae6169e84817a",
+          "bytes": 289
+        },
+        "radius-tls/tls-outer-id0-and-inner-id0.pcap": {
+          "sha256": "6b64a9eb3e2105ebcd484e5d2542e98eecc54bb2aa3bb434c165497d64e8138a",
+          "bytes": 289
+        },
+        "radius-tls/tls-outer-wrong-direction.pcap": {
+          "sha256": "875ddb088d6f2d306aac35bc73a46e6c0da20d4233c8f293536930b7b04e5c76",
+          "bytes": 391
+        },
+        "radius-tls/tls-pending-outer-close.pcap": {
+          "sha256": "73a0869e6d182301192f48adec4e277d1f61cd07fbfc70ae0478eed89ee28e70",
+          "bytes": 187
+        },
+        "radius-tls/tls-record-list-budget.pcap": {
+          "sha256": "ef96fe5181057a77833aecb87d419600a2c95b21c0085e2b30484553ec3a1f1f",
+          "bytes": 478
+        },
+        "radius-tls/tls-request-reserved-ignored.pcap": {
+          "sha256": "8898995ba20f1e8a474d99c00551dea37db044d2dc6d085886777b4053025207",
+          "bytes": 241
+        },
+        "radius-tls/tls-response-start-bit-is-reserved.pcap": {
+          "sha256": "7844b051a805af03128d482188071e9f0ed81e20973e9e41c06cb91aa218a7df",
+          "bytes": 239
+        },
+        "radius-tls/tls-serverhello-unfragmented.pcap": {
+          "sha256": "fdd4da007d4607cf8a60629c8aae72c813f7211253a8c1b0fec1e757accfa556",
+          "bytes": 288
+        },
+        "radius-tls/tls-single-alert.pcap": {
+          "sha256": "2dc60cd5f315403fd3f48aed6fd6613d7ebb3aa6aace9b580dc5e8081c6a9bbf",
+          "bytes": 246
+        },
+        "radius-tls/tls-start-request.pcap": {
+          "sha256": "bfb7ea3a4430ebba57841d930d0e7e29303c7e4d9780cd612cdc58667c5ee40e",
+          "bytes": 241
+        },
+        "radius-tls/tls-start-with-data.pcap": {
+          "sha256": "f0532a256248608c2248c0c381a7e2f97ba640b9a699fe8d0680c0616fe7d7a1",
+          "bytes": 291
+        },
+        "radius-tls/tls-two-alerts-one-record.pcap": {
+          "sha256": "16954894a8b577cf2a5d7be1f10fe4dc5247a9aecc7355031cf4000b54ac2c2d",
+          "bytes": 248
+        },
+        "radius-tls/tls-unknown-record-type.pcap": {
+          "sha256": "4693e8a4f029dd98c4b22e7fc551422b273aea50272b744422d8d50222c1fdff",
+          "bytes": 246
+        },
+        "required-tests-traffic-unified-v114.json": {
+          "sha256": "069b8b468f06aaab85938ee0249c401e1187b8b6ba76dea0eca1488b91f2f841",
+          "bytes": 19563058
+        },
+        "tls-alert/bad-ccs-empty.pcap": {
+          "sha256": "8da6fc46560f2510ad6f52e29ef5eb5337aa78402307f4d5a27d3a9468bc6d46",
+          "bytes": 708
+        },
+        "tls-alert/bad-ccs-value.pcap": {
+          "sha256": "0e7fdfcbe76669003e823d5261d196c9c8ad01c0607353f27966acd3c0afa268",
+          "bytes": 708
+        },
+        "tls-alert/both-directions-partial-close.pcap": {
+          "sha256": "257c0856e66e433e691e4c30ca6f61e7f66173689d2b686d068b3eb88d283d09",
+          "bytes": 632
+        },
+        "tls-alert/coalesced-two-ordered-alerts.pcap": {
+          "sha256": "893c7a67724937eaed861f1632cfd17529150e16dd7d016408e15285a2276b03",
+          "bytes": 559
+        },
+        "tls-alert/collection-refusal-no-pending-stop.pcap": {
+          "sha256": "0ac67baf24b9c55a0d151d5483db077d4b2f040cc99d721a312d71da54bfc457",
+          "bytes": 636
+        },
+        "tls-alert/collection-refusal-stops-whole-tls-session.pcap": {
+          "sha256": "f937f59948afac37032700f18e1f9d1dbf7b2c091e62e224b44638e3a12bd9d3",
+          "bytes": 788
+        },
+        "tls-alert/controls.json": {
+          "sha256": "3df84e8175d318d99cc4a743c9caad07564794283cb8970f14d5f911eb9d0c1e",
+          "bytes": 44339
+        },
+        "tls-alert/direction-separated-alert-halves.pcap": {
+          "sha256": "53b63cc8dec865a2eb0b9c16b195b13dfdd5fdb584d8513b0c418c9e609707ee",
+          "bytes": 784
+        },
+        "tls-alert/fragment-close-needmore.pcap": {
+          "sha256": "4ac5997a2d59c6bbeee9047cf0f81faf0dd39821900e46c1ca750120306f03fb",
+          "bytes": 556
+        },
+        "tls-alert/fragment-one-plus-one.pcap": {
+          "sha256": "d85f75ab55bc7b8c209d5fe34905dfe730bac5b05ce072a7087b56436ee52675",
+          "bytes": 632
+        },
+        "tls-alert/historical-disposition.json": {
+          "sha256": "20d0321091ba4f447c10a09c7fffcb94bb9ecae62aa5c0758ca3a7c5cd93077e",
+          "bytes": 2959
+        },
+        "tls-alert/known-tls13-coalesced-alert-rejected.pcap": {
+          "sha256": "9a8d05bf43fbfbedeec8ec085fa30fcab915bba5fa57397abeaca922836511f4",
+          "bytes": 813
+        },
+        "tls-alert/known-tls13-fragment-alert-rejected.pcap": {
+          "sha256": "9535cc5d4d22f0090f96420ab4dbd667bae221c184f902cd47c2bf09672456c5",
+          "bytes": 810
+        },
+        "tls-alert/known-tls13-protected-bytes-stay-opaque.pcap": {
+          "sha256": "1172eb66c6073b7bb5d93a1ef5c21acef44208aa4d1af5ad8ff3432ece86f2b6",
+          "bytes": 826
+        },
+        "tls-alert/same-epoch-different-type-interleave.pcap": {
+          "sha256": "87bd2ce5c90f377c846056128d089ee3fa67996ea9fb634a7660d482ccde2870",
+          "bytes": 711
+        },
+        "tls-alert/single-alert-compatible.pcap": {
+          "sha256": "f8c87e5a2020e7a4223c96f17ea21ecf3f1f3621cfaa9d720eec41fe9a56ba74",
+          "bytes": 557
+        },
+        "tls-alert/valid-ccs-pending-context-stops-whole-session.pcap": {
+          "sha256": "d3518a29389d3dd5990ad5a0d5cbd883445e2e86df480746a4dbacdb85da87a9",
+          "bytes": 860
+        },
+        "tls-record-tools/generate_alert_controls.py": {
+          "sha256": "7fd3e013783b200ad2e7b797836f033cf51079a32fb5bd3a69b9025336c4469c",
+          "bytes": 10144
+        },
+        "tls-record-tools/generate_eap_controls.py": {
+          "sha256": "1d158318ff5433df87e53c7844cfac2eff8f6fc27c640bef23977fa592d7a98c",
+          "bytes": 17845
+        },
+        "tls-record-tools/sources.json": {
+          "sha256": "37f83032ad546b5b6478f481600fb60074af8f080526833f9fa6169c0d277d1a",
+          "bytes": 1894
+        },
+        "tls-record-tools/validate_eap_model.py": {
+          "sha256": "d6a2cde7ac8d59b44269ca92e7359f099d3ea90a23e89cea6f7ceaecfe53a4cb",
+          "bytes": 3262
+        },
+        "tls-record-tools/verify.py": {
+          "sha256": "94cebd9f4691d4ae1bc44c5279bed5ace283afed4e76841f2043626dbeafa735",
+          "bytes": 3662
+        },
+        "validation/expected.json": {
+          "sha256": "31d3d44d4aef7d5707273f848944fe213e0f02e515659e741c987f4ef5883e7c",
+          "bytes": 66304
+        }
+      },
+      "aliases": {
+        "common/pcapx/pcaputil/radius-tls/controls.json": "radius-tls/controls.json",
+        "common/pcapx/pcaputil/radius-tls/legacy-compatibility.json": "radius-tls/legacy-compatibility.json",
+        "common/pcapx/pcaputil/radius-tls/tls-L-empty-not-ordinary-ACK.pcap": "radius-tls/tls-L-empty-not-ordinary-ACK.pcap",
+        "common/pcapx/pcaputil/radius-tls/tls-L-less-than-observed-data.pcap": "radius-tls/tls-L-less-than-observed-data.pcap",
+        "common/pcapx/pcaputil/radius-tls/tls-MAC-fatal-before-record-budget.pcap": "radius-tls/tls-MAC-fatal-before-record-budget.pcap",
+        "common/pcapx/pcaputil/radius-tls/tls-alert-across-two-local-records.pcap": "radius-tls/tls-alert-across-two-local-records.pcap",
+        "common/pcapx/pcaputil/radius-tls/tls-alert-partial-local-round-context.pcap": "radius-tls/tls-alert-partial-local-round-context.pcap",
+        "common/pcapx/pcaputil/radius-tls/tls-application-bytes-opaque.pcap": "radius-tls/tls-application-bytes-opaque.pcap",
+        "common/pcapx/pcaputil/radius-tls/tls-ccs-then-opaque-handshake.pcap": "radius-tls/tls-ccs-then-opaque-handshake.pcap",
+        "common/pcapx/pcaputil/radius-tls/tls-certificate-semantic-pending.pcap": "radius-tls/tls-certificate-semantic-pending.pcap",
+        "common/pcapx/pcaputil/radius-tls/tls-clienthello-L-complete.pcap": "radius-tls/tls-clienthello-L-complete.pcap",
+        "common/pcapx/pcaputil/radius-tls/tls-clienthello-unfragmented.pcap": "radius-tls/tls-clienthello-unfragmented.pcap",
+        "common/pcapx/pcaputil/radius-tls/tls-complete-L-hello-opaque-or-invalid.pcap": "radius-tls/tls-complete-L-hello-opaque-or-invalid.pcap",
+        "common/pcapx/pcaputil/radius-tls/tls-complete-L-record-length-invalid.pcap": "radius-tls/tls-complete-L-record-length-invalid.pcap",
+        "common/pcapx/pcaputil/radius-tls/tls-continuation-M-no-L-context.pcap": "radius-tls/tls-continuation-M-no-L-context.pcap",
+        "common/pcapx/pcaputil/radius-tls/tls-empty-request-control.pcap": "radius-tls/tls-empty-request-control.pcap",
+        "common/pcapx/pcaputil/radius-tls/tls-empty-response-control.pcap": "radius-tls/tls-empty-response-control.pcap",
+        "common/pcapx/pcaputil/radius-tls/tls-exact-outer-retry.pcap": "radius-tls/tls-exact-outer-retry.pcap",
+        "common/pcapx/pcaputil/radius-tls/tls-first-fragment-requires-State-context.pcap": "radius-tls/tls-first-fragment-requires-State-context.pcap",
+        "common/pcapx/pcaputil/radius-tls/tls-handshake-across-two-local-records.pcap": "radius-tls/tls-handshake-across-two-local-records.pcap",
+        "common/pcapx/pcaputil/radius-tls/tls-handshake-list-budget.pcap": "radius-tls/tls-handshake-list-budget.pcap",
+        "common/pcapx/pcaputil/radius-tls/tls-handshake-partial-local-round-context.pcap": "radius-tls/tls-handshake-partial-local-round-context.pcap",
+        "common/pcapx/pcaputil/radius-tls/tls-header-L-length-truncated.pcap": "radius-tls/tls-header-L-length-truncated.pcap",
+        "common/pcapx/pcaputil/radius-tls/tls-header-flags-truncated.pcap": "radius-tls/tls-header-flags-truncated.pcap",
+        "common/pcapx/pcaputil/radius-tls/tls-hello-cipher-list-budget.pcap": "radius-tls/tls-hello-cipher-list-budget.pcap",
+        "common/pcapx/pcaputil/radius-tls/tls-hello-extension-list-budget.pcap": "radius-tls/tls-hello-extension-list-budget.pcap",
+        "common/pcapx/pcaputil/radius-tls/tls-inner-padding-ignored.pcap": "radius-tls/tls-inner-padding-ignored.pcap",
+        "common/pcapx/pcaputil/radius-tls/tls-interleaved-outer-ids-isolated.pcap": "radius-tls/tls-interleaved-outer-ids-isolated.pcap",
+        "common/pcapx/pcaputil/radius-tls/tls-last-fragment-no-L-context.pcap": "radius-tls/tls-last-fragment-no-L-context.pcap",
+        "common/pcapx/pcaputil/radius-tls/tls-no-L-missing-record-context.pcap": "radius-tls/tls-no-L-missing-record-context.pcap",
+        "common/pcapx/pcaputil/radius-tls/tls-non-null-compression-context.pcap": "radius-tls/tls-non-null-compression-context.pcap",
+        "common/pcapx/pcaputil/radius-tls/tls-outer-id0-and-inner-id0.pcap": "radius-tls/tls-outer-id0-and-inner-id0.pcap",
+        "common/pcapx/pcaputil/radius-tls/tls-outer-wrong-direction.pcap": "radius-tls/tls-outer-wrong-direction.pcap",
+        "common/pcapx/pcaputil/radius-tls/tls-pending-outer-close.pcap": "radius-tls/tls-pending-outer-close.pcap",
+        "common/pcapx/pcaputil/radius-tls/tls-record-list-budget.pcap": "radius-tls/tls-record-list-budget.pcap",
+        "common/pcapx/pcaputil/radius-tls/tls-request-reserved-ignored.pcap": "radius-tls/tls-request-reserved-ignored.pcap",
+        "common/pcapx/pcaputil/radius-tls/tls-response-start-bit-is-reserved.pcap": "radius-tls/tls-response-start-bit-is-reserved.pcap",
+        "common/pcapx/pcaputil/radius-tls/tls-serverhello-unfragmented.pcap": "radius-tls/tls-serverhello-unfragmented.pcap",
+        "common/pcapx/pcaputil/radius-tls/tls-single-alert.pcap": "radius-tls/tls-single-alert.pcap",
+        "common/pcapx/pcaputil/radius-tls/tls-start-request.pcap": "radius-tls/tls-start-request.pcap",
+        "common/pcapx/pcaputil/radius-tls/tls-start-with-data.pcap": "radius-tls/tls-start-with-data.pcap",
+        "common/pcapx/pcaputil/radius-tls/tls-two-alerts-one-record.pcap": "radius-tls/tls-two-alerts-one-record.pcap",
+        "common/pcapx/pcaputil/radius-tls/tls-unknown-record-type.pcap": "radius-tls/tls-unknown-record-type.pcap",
+        "common/pcapx/pcaputil/tls-alert/bad-ccs-empty.pcap": "tls-alert/bad-ccs-empty.pcap",
+        "common/pcapx/pcaputil/tls-alert/bad-ccs-value.pcap": "tls-alert/bad-ccs-value.pcap",
+        "common/pcapx/pcaputil/tls-alert/both-directions-partial-close.pcap": "tls-alert/both-directions-partial-close.pcap",
+        "common/pcapx/pcaputil/tls-alert/coalesced-two-ordered-alerts.pcap": "tls-alert/coalesced-two-ordered-alerts.pcap",
+        "common/pcapx/pcaputil/tls-alert/collection-refusal-no-pending-stop.pcap": "tls-alert/collection-refusal-no-pending-stop.pcap",
+        "common/pcapx/pcaputil/tls-alert/collection-refusal-stops-whole-tls-session.pcap": "tls-alert/collection-refusal-stops-whole-tls-session.pcap",
+        "common/pcapx/pcaputil/tls-alert/controls.json": "tls-alert/controls.json",
+        "common/pcapx/pcaputil/tls-alert/direction-separated-alert-halves.pcap": "tls-alert/direction-separated-alert-halves.pcap",
+        "common/pcapx/pcaputil/tls-alert/fragment-close-needmore.pcap": "tls-alert/fragment-close-needmore.pcap",
+        "common/pcapx/pcaputil/tls-alert/fragment-one-plus-one.pcap": "tls-alert/fragment-one-plus-one.pcap",
+        "common/pcapx/pcaputil/tls-alert/historical-disposition.json": "tls-alert/historical-disposition.json",
+        "common/pcapx/pcaputil/tls-alert/known-tls13-coalesced-alert-rejected.pcap": "tls-alert/known-tls13-coalesced-alert-rejected.pcap",
+        "common/pcapx/pcaputil/tls-alert/known-tls13-fragment-alert-rejected.pcap": "tls-alert/known-tls13-fragment-alert-rejected.pcap",
+        "common/pcapx/pcaputil/tls-alert/known-tls13-protected-bytes-stay-opaque.pcap": "tls-alert/known-tls13-protected-bytes-stay-opaque.pcap",
+        "common/pcapx/pcaputil/tls-alert/same-epoch-different-type-interleave.pcap": "tls-alert/same-epoch-different-type-interleave.pcap",
+        "common/pcapx/pcaputil/tls-alert/single-alert-compatible.pcap": "tls-alert/single-alert-compatible.pcap",
+        "common/pcapx/pcaputil/tls-alert/valid-ccs-pending-context-stops-whole-session.pcap": "tls-alert/valid-ccs-pending-context-stops-whole-session.pcap",
+        "common/pcapx/pcaputil/tls-record-tools/generate_alert_controls.py": "tls-record-tools/generate_alert_controls.py",
+        "common/pcapx/pcaputil/tls-record-tools/generate_eap_controls.py": "tls-record-tools/generate_eap_controls.py",
+        "common/pcapx/pcaputil/tls-record-tools/sources.json": "tls-record-tools/sources.json",
+        "common/pcapx/pcaputil/tls-record-tools/validate_eap_model.py": "tls-record-tools/validate_eap_model.py",
+        "common/pcapx/pcaputil/tls-record-tools/verify.py": "tls-record-tools/verify.py",
+        "scripts/protocol-tests/required-tests-traffic-unified-v114.json": "required-tests-traffic-unified-v114.json"
+      }
     }
   ],
   "schema_version": 1,

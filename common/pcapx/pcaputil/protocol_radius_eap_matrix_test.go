@@ -133,6 +133,9 @@ func radiusEAPWant(t *testing.T, c radiusEAPControl, i int) map[string]any {
 			}
 			e["OTP Candidates"] = out
 		}
+		if tls, ok := e["TLS"].(map[string]any); ok {
+			radiusTLSWant(t, tls)
+		}
 		if rows, ok := e["Desired Expanded Types"].([]any); ok {
 			out := make([]map[string]any, 0, len(rows))
 			for _, r := range rows {
@@ -220,7 +223,7 @@ func radiusEAPCheck(t *testing.T, c radiusEAPControl, events []*ProtocolEvent, c
 		if w.Error == "ResourceExceeded" {
 			status = "limited"
 		}
-		if w.Error == "UnsupportedFeature" {
+		if w.Error == "UnsupportedFeature" || w.Error == "ContextRequired" {
 			status = "context-required"
 		}
 		require.Equal(t, status, e.Status)
@@ -540,6 +543,10 @@ func radiusEAPMutateStringLists(v any) {
 	case []any:
 		for _, child := range x {
 			radiusEAPMutateStringLists(child)
+		}
+	case []uint16:
+		for i := range x {
+			x[i] ^= 0xffff
 		}
 	case []string:
 		for i := range x {

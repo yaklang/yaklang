@@ -30,6 +30,7 @@ type tlsDTLSContextControl struct {
 	}
 	Owned []struct {
 		ID, Transport, Wire, SHA256, Error string
+		PartialAlert                       bool
 		Fields                             map[string]any
 	}
 }
@@ -41,6 +42,34 @@ func tlsDTLSControls(t *testing.T) tlsDTLSContextControl {
 	require.Equal(t, "owned-tls-dtls-context/v1", c.Schema)
 	require.Len(t, c.Clock, 10)
 	require.Len(t, c.Owned, 6)
+	// Keep the original archived answer intact. The new, separately pinned
+	// RFC5246 boundary sidecar supersedes only this exact one-octet input.
+	var sidecar struct {
+		Records map[string]struct {
+			InputSHA string `json:"input_sha256"`
+			Feed     struct {
+				Fields map[string]any `json:"fields_hexbytes"`
+			}
+		} `json:"records_by_input_sha256"`
+	}
+	require.NoError(t, json.Unmarshal(finsReadBatch(t, "tls-alert", "TLS_ALERT_TEST_ROOT", "historical-disposition.json"), &sidecar))
+	require.Len(t, sidecar.Records, 1)
+	correction := sidecar.Records["64666695579c8a8ac3a8ef2e5573990552739600a4ebeb498c2fb5d0bf8505a2"]
+	require.Equal(t, "64666695579c8a8ac3a8ef2e5573990552739600a4ebeb498c2fb5d0bf8505a2", correction.InputSHA)
+	corrected := 0
+	for i := range c.Owned {
+		v := &c.Owned[i]
+		if v.SHA256 == correction.InputSHA {
+			require.Equal(t, "tcp-bad-alert", v.ID)
+			require.Equal(t, "MalformedMessage", v.Error)
+			require.Equal(t, "150303000101", v.Wire)
+			v.Error = ""
+			v.Fields = correction.Feed.Fields
+			v.PartialAlert = true
+			corrected++
+		}
+	}
+	require.Equal(t, 1, corrected)
 	return c
 }
 func tlsDTLSPoison(e *ProtocolEvent, alias string) {
@@ -155,7 +184,29 @@ func TestTLSAndDTLSOwnedObservation(t *testing.T) {
 							tlsDTLSQuery(t, n, c.Fields, "")
 							tlsDTLSQuery(t, e, c.Fields, "")
 						}
-						require.Empty(t, s.Close("end"))
+						closed := s.Close("end")
+						if c.PartialAlert {
+							require.Len(t, closed, 2)
+							for dir, x := range closed {
+								require.Equal(t, dir, x.Direction)
+								require.Equal(t, "incomplete", x.Status)
+								require.Equal(t, "incomplete", x.Completeness)
+								require.Nil(t, x.Raw)
+								require.Zero(t, x.Length)
+								require.Equal(t, uint64(len(w)), x.Offset)
+								require.Equal(t, e.FlowID, x.FlowID)
+								require.Zero(t, x.TransactionID)
+								require.Zero(t, x.ResponseTo)
+								require.True(t, time.Unix(int64(dir+1), 0).Equal(x.Timestamp))
+								require.Equal(t, map[string]any{"Alert Buffered Bytes": 1}, x.Session)
+								tlsDTLSQuery(t, x, nil, "NeedMore")
+								tlsDTLSPoison(x, "radius")
+								tlsDTLSQuery(t, x, nil, "NeedMore")
+							}
+							require.Equal(t, uint64(2), s.Stats().Incomplete)
+						} else {
+							require.Empty(t, closed)
+						}
 						require.Empty(t, s.Close("again"))
 						require.Zero(t, s.Stats().BufferedBytes)
 					})
@@ -242,7 +293,35 @@ func TestTLSAndDTLSOwnedCaptureMatrix(t *testing.T) {
 			}
 			discoveryMatrix(t, func(t *testing.T, workers int, deferred, observe bool) {
 				events, stats := discoveryReplay(t, raw, workers, deferred, observe)
-				require.Len(t, events, 1)
+				expected := 1
+				if c.PartialAlert {
+					expected = 2
+				}
+				require.Len(t, events, expected)
+				if c.PartialAlert {
+					x := events[1]
+					require.Equal(t, "tls", x.Protocol)
+					require.Equal(t, "tcp", x.Transport)
+					require.Equal(t, 0, x.Direction)
+					require.Equal(t, "incomplete", x.Status)
+					require.Equal(t, "incomplete", x.Completeness)
+					require.Equal(t, events[0].FlowID, x.FlowID)
+					require.NotEqual(t, events[0].ID, x.ID)
+					require.Equal(t, uint64(len(w)), x.Offset)
+					require.Nil(t, x.Raw)
+					require.Zero(t, x.Length)
+					require.Zero(t, x.ResponseTo)
+					require.Zero(t, x.TransactionID)
+					// The archived capture helper sends one octet per packet after
+					// three handshake packets. Close uses the last directional
+					// input time; the record event uses its first octet time.
+					require.True(t, time.Unix(1700000000, int64(len(w)+2)*1234).Equal(x.Timestamp))
+					require.Equal(t, map[string]any{"Alert Buffered Bytes": 1}, x.Session)
+					tlsDTLSQuery(t, x, nil, "NeedMore")
+					tlsDTLSPoison(x, "radius")
+					tlsDTLSQuery(t, x, nil, "NeedMore")
+					require.Equal(t, uint64(1), stats.Incomplete)
+				}
 				e := events[0]
 				protocol := "tls"
 				src := "192.0.2.1:12345"

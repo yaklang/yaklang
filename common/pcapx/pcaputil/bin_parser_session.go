@@ -1253,6 +1253,18 @@ func (f *binFlow) finishSession(reason TrafficFlowCloseReason) {
 		emit(z.clientDir, map[string]any{"Outstanding": outstanding}, "ZooKeeper exchange ended with unmatched requests")
 	}
 	if tls := f.tls; tls != nil {
+		for dir, pending := range tls.alertPending {
+			if !pending {
+				continue
+			}
+			e := f.event(dir, nil, "incomplete", string(reason)+": TLS alert ended before its second byte")
+			e.Completeness = "incomplete"
+			e.sessionError = &ProtocolError{Kind: ErrNeedMore, Message: e.Summary}
+			e.Session = map[string]any{"Alert Buffered Bytes": 1}
+			e.semanticSession = cloneSession(e.Session)
+			f.a.incomplete.Add(1)
+			f.a.emit(e)
+		}
 		for dir, b := range tls.handshake {
 			if len(b) != 0 {
 				emit(dir, map[string]any{"Handshake Buffered Bytes": len(b)}, "TLS handshake ended before its declared length")

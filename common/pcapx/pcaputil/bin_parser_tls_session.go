@@ -78,6 +78,8 @@ type binTLS struct {
 	version, suite                         uint16
 	sni, alpn                              string
 	handshake                              [2][]byte
+	alert                                  [2]byte
+	alertPending                           [2]bool
 	seq                                    [2]uint64
 	app                                    [2]bool
 	ccs                                    [2]bool
@@ -158,6 +160,13 @@ func (f *binFlow) consumeTLS(dir int, e *ProtocolEvent) (map[string]any, error) 
 		if !bytes.Equal(plain, []byte{1}) {
 			return nil, protocolError(ErrMalformedMessage, "invalid TLS ChangeCipherSpec")
 		}
+		// The pending byte belongs to the previous cipher epoch. Without
+		// the missing old-epoch byte there is no safe concatenation with a
+		// subsequently decrypted alert. Do not invent a normative wire error.
+		if t.alertPending[dir] && t.version != 0x304 {
+			info["Alert Buffered Bytes"] = 1
+			return nil, protocolError(ErrContextRequired, "TLS alert fragment crosses a cipher-state transition")
+		}
 		if t.version != 0x304 {
 			t.ccs[dir] = true
 			t.seq[dir] = 0
@@ -205,10 +214,9 @@ func (f *binFlow) consumeTLS(dir int, e *ProtocolEvent) (map[string]any, error) 
 		t.plaintext = bytes.Clone(plain)
 		t.content = typ
 	} else if typ == 21 {
-		if len(plain) != 2 {
-			return nil, protocolError(ErrMalformedMessage, "invalid TLS alert length")
+		if err := t.observeAlert(dir, plain, info, f.a.budget.MaxCollectionElements); err != nil {
+			return nil, err
 		}
-		info["Alert Level"], info["Alert Description"] = plain[0], plain[1]
 	}
 	info["Negotiated Version"], info["Cipher Suite"], info["SNI"], info["ALPN"] = t.version, t.suite, t.sni, t.alpn
 	if err := f.reserveSession(t.storage()); err != nil {

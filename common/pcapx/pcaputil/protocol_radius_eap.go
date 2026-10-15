@@ -161,10 +161,12 @@ func radiusEAPFields(out map[string]any, max int) (bool, error) {
 					}
 				case 6:
 					radiusGTCFields(inner, ec, data, note)
-				case 3, 5, 254:
+				case 3, 5, 13, 254:
 					var dissected bool
 					var err error
-					if typ == 5 {
+					if typ == 13 {
+						dissected, err = radiusTLSFields(inner, ec, data, max, note)
+					} else if typ == 5 {
 						dissected, err = radiusOTPFields(inner, ec, data, max, note)
 					} else {
 						dissected, err = radiusNAKFields(inner, ec, typ, data, max, note)
