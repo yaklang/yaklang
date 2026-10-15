@@ -884,6 +884,7 @@ func attachLiveSourceTarget(cfg *Config, dir string) error {
 			return err
 		}
 	}
+	files = filterCompileExcludedSourceFiles(cfg.Config, files)
 	name := "source-target"
 	if n := strings.TrimSpace(cfg.GetProjectName()); n != "" {
 		name = n
@@ -892,6 +893,32 @@ func attachLiveSourceTarget(cfg *Config, dir string) error {
 	}
 	cfg.QueryTargets = append(cfg.QueryTargets, ssaapi.NewSourceQueryTarget(name, files))
 	return nil
+}
+
+// filterCompileExcludedSourceFiles drops files the compile exclude scope would
+// skip: user exclude patterns merged with the built-in defaults, honoring
+// WithCompileDisableDefaultExcludes — the same scope the compile walk applies.
+// The source stage loads the live directory directly instead of reading the
+// compiled program, so without this filter compile-excluded files re-enter the
+// scan through source-mode rules (e.g. *_test.go in a CI diff alerting via
+// source-go-listen-and-serve).
+func filterCompileExcludedSourceFiles(sc *ssaconfig.Config, files map[string]string) map[string]string {
+	if sc == nil || len(files) == 0 {
+		return files
+	}
+	var userExclude []string
+	if sc.SSACompile != nil {
+		userExclude = sc.SSACompile.ExcludeFiles
+	}
+	exclude := ssaconfig.BuildCompileExcludeFunc(userExclude, sc.GetCodeSourceLocalFile(), !sc.GetCompileDisableDefaultExcludes())
+	out := make(map[string]string, len(files))
+	for path, content := range files {
+		if exclude(path) {
+			continue
+		}
+		out[path] = content
+	}
+	return out
 }
 
 func inspectLiveSourceOptions(cfg *Config, emit func(ProductStage, float64, *RuleProcessInfoList)) []ssaconfig.Option {

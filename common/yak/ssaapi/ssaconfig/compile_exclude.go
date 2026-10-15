@@ -210,11 +210,33 @@ var DefaultCompileExcludeGlobs = []string{
 }
 
 // DefaultCompileExcludePatterns returns all built-in exclude globs, including directory names.
+//
+// Every "**/x" glob is also emitted in its root form "x": gobwas glob requires
+// "**/" to be followed by a separator, so "**/x" never matches a root-level
+// "x" — without the root form, a root-level *_test.go, *.min.js, ... would
+// slip past the excludes. Explicitly listed root forms and the directory-name
+// expansion below are deduplicated.
 func DefaultCompileExcludePatterns() []string {
-	patterns := make([]string, 0, len(DefaultCompileExcludeGlobs)+len(DefaultCompileExcludeDirNames)*4)
-	patterns = append(patterns, DefaultCompileExcludeGlobs...)
+	patterns := make([]string, 0, len(DefaultCompileExcludeGlobs)*2+len(DefaultCompileExcludeDirNames)*4)
+	seen := make(map[string]bool, cap(patterns))
+	add := func(pattern string) {
+		if pattern == "" || seen[pattern] {
+			return
+		}
+		seen[pattern] = true
+		patterns = append(patterns, pattern)
+	}
+	for _, pattern := range DefaultCompileExcludeGlobs {
+		add(pattern)
+		if root, ok := strings.CutPrefix(pattern, "**/"); ok {
+			add(root)
+		}
+	}
 	for _, dir := range DefaultCompileExcludeDirNames {
-		patterns = append(patterns, dir, dir+"/**", "**/"+dir, "**/"+dir+"/**")
+		add(dir)
+		add(dir + "/**")
+		add("**/" + dir)
+		add("**/" + dir + "/**")
 	}
 	return patterns
 }
