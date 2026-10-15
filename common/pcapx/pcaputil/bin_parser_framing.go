@@ -564,7 +564,7 @@ func (a *binParser) datagramFields(network gopacket.NetworkLayer, udp *layers.UD
 		}
 	}
 	if truncated || ci.CaptureLength < ci.Length || udp.Length < 8 || int(udp.Length) != len(wire)+8 {
-		if a.hartSelected(uint16(udp.SrcPort), uint16(udp.DstPort)) {
+		if a.hartSelected(uint16(udp.SrcPort), uint16(udp.DstPort), e, wire) {
 			a.decodeHARTIPDatagram(e, wire, protocolError(ErrNeedMore, "HART-IP truncated or invalid UDP carrier"))
 			a.emit(e)
 			return
@@ -611,7 +611,7 @@ func (a *binParser) datagramFields(network gopacket.NetworkLayer, udp *layers.UD
 		e.Status, e.Summary = "incomplete", "truncated or invalid UDP datagram"
 		a.incomplete.Add(1)
 	} else if len(wire) > a.config.MaxMessageBytes {
-		if a.hartSelected(uint16(udp.SrcPort), uint16(udp.DstPort)) {
+		if a.hartSelected(uint16(udp.SrcPort), uint16(udp.DstPort), e, wire) {
 			a.decodeHARTIPDatagram(e, wire, protocolError(ErrResourceExceeded, "HART-IP UDP byte budget"))
 			a.emit(e)
 			return

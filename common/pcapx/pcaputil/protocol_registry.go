@@ -175,7 +175,7 @@ func (a *binParser) decodeNativeDatagram(e *ProtocolEvent, w []byte, src, dst ui
 	if explicit == "bacnet-routed-read-property" {
 		return a.decodeBACnetReadDatagram(e, w, true)
 	}
-	if explicit == "hart-ip" || explicit == "" && (src == 5094 || dst == 5094) {
+	if a.hartSelected(src, dst, e, w) {
 		return a.decodeHARTIPDatagram(e, w, nil)
 	}
 	if explicit == "fins" {

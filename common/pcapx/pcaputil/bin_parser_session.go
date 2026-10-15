@@ -26,7 +26,7 @@ func (f *binFlow) detectDirection(dir int, wire []byte) {
 			return
 		}
 	}
-	if f.port(5094) {
+	if f.port(5094) && len(wire) > 0 && wire[0] == 1 {
 		f.protocol = "hart-ip"
 		f.hart = f.newHARTIP()
 		return

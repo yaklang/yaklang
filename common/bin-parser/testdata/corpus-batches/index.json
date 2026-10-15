@@ -101158,6 +101158,38 @@
         "common/pcapx/pcaputil/hart-ip-universal/controls.json": "hart-ip-universal/controls.json",
         "scripts/protocol-tests/required-tests-traffic-unified-v94.json": "required-tests-traffic-unified-v94.json"
       }
+    },
+    {
+      "id": "validation-hart-admission",
+      "kind": "support",
+      "source_sha": "9ea89185b486dfa7ea82fd4ef2382bdacece1fd5",
+      "file": "validation-hart-admission.zip",
+      "sha256": "bda810573727d79f0e60bb7e6d1ec4658e67088078583b8048c2bb1c74242dd3",
+      "password": "bin-parser",
+      "members": {
+        "hart-admission-tools/source-pin.json": {
+          "sha256": "fd44b0b8f792f8d52917e85d32589b8595b872eb033d9163f1a668e73810b1ed",
+          "bytes": 927
+        },
+        "hart-admission-tools/verify.py": {
+          "sha256": "881363beba641575a4a2282cb5d6e65e68eaaa660f920a07dd59b80633bada49",
+          "bytes": 2112
+        },
+        "hart-admission/controls.json": {
+          "sha256": "99f5ff15aa76f7d81af86b2e5e2a1508cb213b8753ec572415af3f96a1f9f81b",
+          "bytes": 1712
+        },
+        "required-tests-traffic-unified-v95.json": {
+          "sha256": "e8a6f962fca88f8b9b2cb06269ed26d38891c1d510800da9be1ead0ccd02a77c",
+          "bytes": 16708025
+        }
+      },
+      "aliases": {
+        "common/pcapx/pcaputil/hart-admission-tools/source-pin.json": "hart-admission-tools/source-pin.json",
+        "common/pcapx/pcaputil/hart-admission-tools/verify.py": "hart-admission-tools/verify.py",
+        "common/pcapx/pcaputil/hart-admission/controls.json": "hart-admission/controls.json",
+        "scripts/protocol-tests/required-tests-traffic-unified-v95.json": "required-tests-traffic-unified-v95.json"
+      }
     }
   ],
   "schema_version": 1,

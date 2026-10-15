@@ -436,12 +436,29 @@ func WithSessionHARTIP(port uint16) ProtocolSessionOption {
 		return nil
 	}
 }
-func (a *binParser) hartSelected(src, dst uint16) bool {
+func (a *binParser) hartSelected(src, dst uint16, e *ProtocolEvent, w []byte) bool {
 	v := a.datagramDecodeAs[dst]
 	if v == "" {
 		v = a.datagramDecodeAs[src]
 	}
-	return v == "hart-ip" || v == "" && (src == 5094 || dst == 5094)
+	if v != "" {
+		return v == "hart-ip"
+	}
+	if src != 5094 && dst != 5094 {
+		return false
+	}
+	if len(w) > 0 && w[0] == 1 {
+		return true
+	}
+	// An admitted conversation retains bounded affinity for later malformed
+	// datagrams. A port hint alone never overrides a distinct wire protocol.
+	if e == nil {
+		return false
+	}
+	key := hartIPDatagramKey(e)
+	a.udpMu.Lock()
+	defer a.udpMu.Unlock()
+	return a.udpSessions != nil && a.udpSessions.entries[key] != nil
 }
 
 // A datagram never borrows bytes or time from another datagram/conversation.
@@ -454,10 +471,7 @@ func (a *binParser) decodeHARTIPDatagram(e *ProtocolEvent, w []byte, inputErr er
 	if e.ID == 0 {
 		e.ID = a.ids.Add(1)
 	}
-	key := binUDPKey{"hart-ip/" + e.Source, "hart-ip/" + e.Destination, e.Domain}
-	if key.a > key.b {
-		key.a, key.b = key.b, key.a
-	}
+	key := hartIPDatagramKey(e)
 	a.udpMu.Lock()
 	if a.udpSessions == nil {
 		a.udpSessions = &binUDPStore{entries: make(map[binUDPKey]*list.Element), clock: e.Timestamp}
@@ -538,4 +552,12 @@ func (f *binFlow) newHARTIP() *binHARTIP {
 		p.client = f.tcpClientDir
 	}
 	return p
+}
+
+func hartIPDatagramKey(e *ProtocolEvent) binUDPKey {
+	key := binUDPKey{"hart-ip/" + e.Source, "hart-ip/" + e.Destination, e.Domain}
+	if key.a > key.b {
+		key.a, key.b = key.b, key.a
+	}
+	return key
 }

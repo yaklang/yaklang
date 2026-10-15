@@ -256,7 +256,7 @@ func NewDecryptedQUICSession(budget ParserBudget, source string) (ProtocolSessio
 }
 
 func (s *captureSession) Probe(data []byte) ProbeResult {
-	if s.transport == "udp" && s.f.a.hartSelected(s.f.ports[0], s.f.ports[1]) || s.transport != "udp" && (s.f.port(5094) || s.f.protocol == "hart-ip") {
+	if s.transport == "udp" && s.f.a.hartSelected(s.f.ports[0], s.f.ports[1], &ProtocolEvent{Source: s.f.endpoints[0], Destination: s.f.endpoints[1], Domain: s.f.domain}, data) || s.transport != "udp" && (s.f.protocol == "hart-ip" || s.f.port(5094) && len(data) > 0 && data[0] == 1) {
 		if s.closed {
 			return ProbeResult{Verdict: ProbeReject, Protocol: "hart-ip", Reason: "closed observation"}
 		}
