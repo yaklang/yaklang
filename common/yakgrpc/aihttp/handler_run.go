@@ -215,8 +215,8 @@ func mergeStartParams(req *ypb.AIStartParams, defaults aiAgentChatSettingPayload
 		if params.GetTimelineItemLimit() == 0 {
 			params.TimelineItemLimit = defaults.TimelineItemLimit
 		}
-		if params.GetTimelineContentSizeLimit() == 0 && defaults.TimelineContentSizeLimit > 0 {
-			params.TimelineContentSizeLimit = defaults.TimelineContentSizeLimit * 1024
+		if params.GetRuntimeContextSizeLimit() == 0 && defaults.RuntimeContextSizeLimit > 0 {
+			params.RuntimeContextSizeLimit = defaults.RuntimeContextSizeLimit
 		}
 		if params.GetUserInteractLimit() == 0 {
 			params.UserInteractLimit = defaults.UserInteractLimit

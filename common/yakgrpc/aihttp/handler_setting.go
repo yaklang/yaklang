@@ -96,6 +96,7 @@ func normalizeSettingPatchKeys(values map[string]any) {
 		"plan_user_interact_max_count":       "PlanUserInteractMaxCount",
 		"timeline_item_limit":                "TimelineItemLimit",
 		"timeline_content_size_limit":        "TimelineContentSizeLimit",
+		"runtime_context_size_limit":         "RuntimeContextSizeLimit",
 		"user_interact_limit":                "UserInteractLimit",
 		"timeline_session_id":                "TimelineSessionID",
 		"selected_provider_id":               "SelectedProviderID",

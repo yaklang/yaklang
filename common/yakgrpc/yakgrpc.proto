@@ -2294,7 +2294,14 @@ message AIStartParams {
 
   // 限制 Timeline 的最大条目和最大内容大小（bytes）
   int64 TimelineItemLimit = 28; // 已经废弃，功能不可用了，只需要关注 TimelineContentSizeLimit 就好
+  // Deprecated: 运行时的 Timeline 现在除了普通历史，还承载 Skill 正文、Evidence 等
+  // 运行时上下文，内容规模已经不同；而且前端会下发一个非零默认值，覆盖服务端默认阈值。
+  // 请改用 RuntimeContextSizeLimit。
   int64 TimelineContentSizeLimit = 29;
+  // 运行时上下文（普通历史、Skill 正文、Evidence 等）的压缩阈值。
+  // >0 时覆盖服务端默认阈值；<=0（含前端不传）时使用服务端默认值，保证携带运行时
+  // 上下文的时间线不会被过早压缩。
+  int64 RuntimeContextSizeLimit = 51;
 
   // 用户交互的最大次数限制,超过这个次数，AI 将不再被允许问用户问题
   int64 UserInteractLimit = 30;
