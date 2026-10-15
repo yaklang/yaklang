@@ -10,12 +10,12 @@
     },
     "decision": {
       "type": "string",
-      "enum": ["continue", "cancel"],
-      "description": "The decision for the tool execution. 'continue' means the tool should keep running, 'cancel' means the tool execution should be stopped."
+      "enum": ["continue", "cancel", "detach"],
+      "description": "The decision for the tool execution. 'continue' means the tool should keep running, 'cancel' means the tool execution should be stopped. 'detach' preserves this running execution in the background so the agent can continue; use only when runtime supports detachment."
     },
     "reason": {
       "type": "string",
-      "description": "A brief explanation for the decision, explaining why you chose to continue or cancel."
+      "description": "A brief explanation for the decision, explaining why you chose to continue, cancel or detach."
     },
     "progress_summary": {
       "type": "string",

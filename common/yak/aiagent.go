@@ -137,6 +137,7 @@ func yakTool2AITool(aitools []*schema.AIYakTool, invokeForgeHandle bool) []*aito
 			aitool.WithVerboseName(aiTool.VerboseName),
 			aitool.WithVerboseNameZh(aiTool.VerboseNameZh),
 			aitool.WithUsage(aiTool.Usage),
+			aitool.WithDefaultAsync(aiTool.DefaultAsync),
 			aitool.WithCallback(func(ctx context.Context, params aitool.InvokeParams, runtimeConfig *aitool.ToolRuntimeConfig, stdout io.Writer, stderr io.Writer) (any, error) {
 				ctx, cancel := context.WithCancel(ctx)
 				defer cancel()
@@ -234,6 +235,8 @@ func yakTool2AITool(aitools []*schema.AIYakTool, invokeForgeHandle bool) []*aito
 					)
 					bindMemorySearchToEngine(ae, ctx, runtimeConfig)
 					bindAIHistoryToEngine(ae, ctx, runtimeConfig)
+					bindAIDetachToEngine(ae, runtimeConfig)
+					bindAIToolSleep(ae, ctx)
 					bindDBHistoryToEngine(ae, ctx, runtimeConfig)
 					return nil
 				})

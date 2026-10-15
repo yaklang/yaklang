@@ -1,0 +1,63 @@
+{
+  "source_session": "3ba984ae-edab-4076-84e4-fc99ccb770f9",
+  "title": "Bash后台任务执行",
+  "prompt": "同步调用 bash 执行 `for ((i=0;i<75;i++)); do echo TICK; sleep 2; done; echo DONE`。这是一项健康、独立的后台工作，请在调用目的和预期中说明：运行中 review 可以将其转为异步继续执行。拿到异步回执后，输出一次 `AGENT_CONTINUES`，最后等待并核验原任务结果。",
+  "steps": [
+    {
+      "action": "require_tool",
+      "params": {
+        "identifier": "load_bash_schema",
+        "require_tool_payload": "bash"
+      }
+    },
+    {
+      "action": "directly_call_tool",
+      "params": {
+        "identifier": "bash_tick_75_sync",
+        "directly_call_reason": "同步执行该健康、独立的计时脚本（约150秒，75次TICK间隔2秒，末尾DONE）。调用目的：验证长时同步命令的转异步机制。预期：若 review 在运行中将其转为异步，会返回 execute_id 异步回执而非同步最终输出；此后输出 AGENT_CONTINUES 并等待核验原任务结果。timeout 设为 200 秒覆盖完整运行时长。",
+        "directly_call_tool_name": "bash",
+        "directly_call_tool_params": {
+          "accepted-exit-codes": "0",
+          "command": "for ((i=0;i<75;i++)); do echo TICK; sleep 2; done; echo DONE",
+          "shell": "bash",
+          "timeout": 200
+        }
+      }
+    },
+    {
+      "action": "directly_answer",
+      "params": {
+        "answer_payload": "AGENT_CONTINUES"
+      }
+    },
+    {
+      "action": "manage_async_execution_runtime",
+      "params": {
+        "identifier": "wait_bash_tick_exec",
+        "op": "wait",
+        "execute_id": "$exec1",
+        "timeout_seconds": 60
+      }
+    },
+    {
+      "action": "manage_async_execution_runtime",
+      "params": {
+        "execute_id": "$exec1",
+        "identifier": "wait_bash_tick_exec_2",
+        "op": "wait",
+        "timeout_seconds": 60
+      }
+    }
+  ],
+  "expected_cards": 1,
+  "expected_executions": [
+    {
+      "id": "$exec1",
+      "state": "completed",
+      "stdout_contains": [
+        "TICK",
+        "DONE"
+      ]
+    }
+  ]
+}

@@ -8,7 +8,8 @@ import (
 
 // Parameter groups contain explicit, independent tool calls in one directly_call_tool action.
 // Existing size/concurrency option names and persisted keys are retained; no mode
-// or parameter-generation concurrency remains. Outcomes settle before the next decision.
+// or parameter-generation concurrency remains. Sync outcomes settle before the
+// next decision; async outcomes carry submission receipts.
 const (
 	ConfigKeyToolBatchMaxCalls          = "tool_batch_max_calls"
 	ConfigKeyToolBatchInvokeConcurrency = "tool_batch_invoke_concurrency"
@@ -70,6 +71,10 @@ type ToolCallGroupCall struct {
 	Expectations string              `json:"expectations,omitempty"`
 	Reason       string              `json:"reason,omitempty"`
 
+	// Async returns a manager execution receipt instead of waiting for the result.
+	Async          bool `json:"async,omitempty"`
+	AsyncSpecified bool `json:"-"`
+
 	// ExecutionCallID is assigned by the runtime, never by the model. Keeping it
 	// on the request lets events, checkpoints and results identify one child.
 	ExecutionCallID string `json:"execution_call_id,omitempty"`
@@ -86,6 +91,7 @@ const (
 	ToolCallStageValidationFailed ToolCallStage = "validation_failed"
 	ToolCallStageInvokeFailed     ToolCallStage = "invoke_failed"
 	ToolCallStageCancelled        ToolCallStage = "cancelled"
+	ToolCallStageSubmitted        ToolCallStage = "submitted"
 	// ToolCallStageDone is a lifecycle state: the callback settled and returned
 	// a protocol-complete ToolResult. Inspect ExecutionStatus/Result for actual
 	// execution semantics and the task verifier for goal satisfaction.
@@ -95,6 +101,7 @@ const (
 type ToolCallOutcome struct {
 	Index           int                        `json:"index"`
 	CallID          string                     `json:"call_id,omitempty"`
+	ExecuteID       string                     `json:"execute_id,omitempty"`
 	RequestedTool   string                     `json:"requested_tool"`
 	FinalTool       string                     `json:"final_tool,omitempty"`
 	Stage           ToolCallStage              `json:"stage"`

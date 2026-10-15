@@ -352,6 +352,7 @@ func initYaklangLib() {
 
 	aiExports := ai.Exports
 	aiExports["MockAIService"] = rag.MockAIService
+	aiExports["Detach"] = func() (string, error) { return "", fmt.Errorf("ai.Detach requires an AI tool invocation") }
 	yaklang.Import("ai", aiExports)
 
 	yaklang.Import("aiagent", AIAgentExport)

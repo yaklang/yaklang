@@ -12,6 +12,7 @@ import (
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon/aiskillloader"
+	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/asyncexecmanager"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/schema"
@@ -111,6 +112,12 @@ type ReActLoop struct {
 	// execution state
 	taskMutex   *sync.Mutex
 	currentTask aicommon.AIStatefulTask
+
+	// Lazily bound to the owning task; guarded by onReleaseMutex.
+	// Direct calls and individual batch children can dispatch asynchronously.
+	asyncExecutionManager      *asyncexecmanager.Manager
+	asyncDirectAnswer          chan struct{}
+	asyncDirectAnswerRequested bool
 
 	// memory management
 	memorySizeLimit        int
@@ -330,8 +337,12 @@ func (r *ReActLoop) Release() {
 		return
 	}
 	r.released = true
+	manager := r.asyncExecutionManager
 	hooks := append([]func(){}, r.onRelease...)
 	r.onReleaseMutex.Unlock()
+	if manager != nil {
+		manager.Close()
+	}
 	defer func() {
 		r.actionExecutionMu.Lock()
 		defer r.actionExecutionMu.Unlock()
@@ -695,6 +706,7 @@ func NewReActLoop(name string, invoker aicommon.AIInvokeRuntime, options ...ReAc
 		loopAction_DirectlyAnswer,
 		loopAction_Finish,
 		loopAction_SaveEvidence,
+		loopAction_ManageAsyncExecutionRuntime,
 	} {
 		r.actions.Set(action.ActionType, withNativeActionDescription(action))
 	}

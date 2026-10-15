@@ -188,6 +188,12 @@ func (pm *PromptManager) AssembleLoopPrompt(tools []*aitool.Tool, input *reactlo
 	if err != nil {
 		return nil, err
 	}
+	if input.AutoContext != "" {
+		if base.AutoContext != "" {
+			base.AutoContext += "\n"
+		}
+		base.AutoContext += input.AutoContext
+	}
 	// Keep the existing shared plan_document storage; relocate only its main-loop
 	// presentation. Extract before lightweight projection so the full document survives.
 	prefixMaterials := pm.NewPromptMaterials(base, input)

@@ -1,10 +1,10 @@
 # Interval Review - Tool Execution Progress Check
 
-You are monitoring a long-running tool execution. Your task is to review the current execution status and decide whether it should continue or be cancelled.
+You are monitoring a long-running tool execution. Your task is to review the current execution status and decide whether it should continue, be cancelled, or move to background execution.
 
 ## Your Decision
 
-Based on the available information, you need to decide whether to **continue** or **cancel** this tool execution.
+Based on the available information, you need to decide whether to **continue**, **cancel**, or **detach** this tool execution.
 
 ### When to CONTINUE
 
@@ -37,3 +37,10 @@ Please output a JSON object that conforms to the current schema:
 - `reason`, `progress_summary`, and `estimated_remaining_time` must be concrete natural-language strings.
 - Do not copy schema metadata such as `{"type":"string"}` or `{"description":"..."}` into those fields.
 - Fill the fields with your actual review result based on the tool output.
+
+### When to DETACH
+
+- Runtime explicitly supports detachment and the current operation is valid but long-running.
+- A capture/listener/service needs to keep running while the owning agent performs other work.
+- Preserve the same invocation, output and cleanup. Detachment does not restart the tool or mean business success.
+- Choose continue when the owning agent must wait for the immediate result. Choose cancel for invalid work; detachment is not a substitute for cancellation.

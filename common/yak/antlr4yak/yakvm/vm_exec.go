@@ -162,6 +162,10 @@ func (v *Frame) execExWithContinueOption(isContinue bool) {
 
 		scopeBack := v.scope
 		returnVal := v.lastStackValue
+		if deferStack.Len() > 0 {
+			leaveCleanup := v.enterDeferredExecution()
+			defer leaveCleanup()
+		}
 		// 执行defer中的代码
 		for {
 			if deferStack.Len() <= 0 {

@@ -169,7 +169,12 @@ func (r *ReActLoop) getFilteredActions(disallowExit bool, actionOperators ...*Lo
 	}
 
 	var filteredValues []*LoopAction
+	var asyncManagement *LoopAction
 	for _, v := range values {
+		if v.ActionType == schema.AI_REACT_LOOP_ACTION_MANAGE_ASYNC_EXECUTION_RUNTIME {
+			asyncManagement = v
+			continue
+		}
 		if v.ActionType == nativeAdjustTodolistActionName && !r.functionCallMode {
 			continue
 		}
@@ -218,6 +223,12 @@ func (r *ReActLoop) getFilteredActions(disallowExit bool, actionOperators ...*Lo
 		}
 	}
 
+	// Owner-scoped management remains available during action narrowing so
+	// existing work can always be observed or stopped. GetAllActions has
+	// already applied the host's runtime action policy.
+	if asyncManagement != nil {
+		filteredValues = append(filteredValues, asyncManagement)
+	}
 	return filteredValues
 }
 
@@ -405,6 +416,7 @@ func (r *ReActLoop) generateLoopPrompt(
 		Schema:                   schema,
 		FunctionCallSchemas:      functionCallSchemas,
 		ExtraCapabilities:        extraCapabilities,
+		AutoContext:              r.renderAsyncExecutionContext(nonce),
 		PlanStatus:               planStatus,
 		TodoSnapshot:             todoSnapshot,
 		ReactiveData:             reactiveData,

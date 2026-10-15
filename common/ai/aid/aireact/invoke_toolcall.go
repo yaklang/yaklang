@@ -83,7 +83,9 @@ func (r *ReAct) executeToolCallInternal(ctx context.Context, toolName string, pa
 			}
 			params = reactloops.ApplyToolInvokeParamsMutators(currentLoop, toolName, params)
 		}
-		result, directlyAnswer, err := toolCaller.CallToolWithExistedParams(tool, params)
+		result, directlyAnswer, err := r.runDetachableToolCall(currentTask, toolCaller, toolName, func() (*aitool.ToolResult, bool, error) {
+			return toolCaller.CallToolWithExistedParams(tool, params)
+		})
 
 		if err != nil {
 			return nil, false, utils.Errorf("tool call failed: %w", err)
@@ -180,7 +182,7 @@ func (r *ReAct) newToolCallerForCall(ctx context.Context, currentTask aicommon.A
 		toolCallerOptions = append(toolCallerOptions, aicommon.WithToolCaller_Task(r.config.DefaultTask))
 	}
 
-	if currentLoop := r.GetCurrentLoop(); currentLoop != nil {
+	if currentLoop, _ := currentTask.GetReActLoop().(*reactloops.ReActLoop); currentLoop != nil {
 		if allow, guardMsg := reactloops.CheckToolInvokeGuard(currentLoop, toolName, nil); !allow {
 			return nil, utils.Error(guardMsg)
 		}
@@ -188,9 +190,10 @@ func (r *ReAct) newToolCallerForCall(ctx context.Context, currentTask aicommon.A
 	}
 
 	// Add callback handlers
+	baseEmitter := currentTask.GetEmitter()
 	toolCallerOptions = append(toolCallerOptions,
 		aicommon.WithToolCaller_OnStart(func(callToolId string) {
-			toolCaller.SetEmitter(currentTask.GetEmitter().AssociativeAIProcess(&schema.AiProcess{
+			toolCaller.SetEmitter(baseEmitter.AssociativeAIProcess(&schema.AiProcess{
 				ProcessId:   callToolId,
 				ProcessType: schema.AI_Call_Tool,
 			}))
@@ -218,6 +221,7 @@ func (r *ReAct) newToolCallerForCall(ctx context.Context, currentTask aicommon.A
 		}
 	}
 
+	toolCallerOptions = append(toolCallerOptions, aicommon.WithToolCaller_ResultID(r.config.AcquireId()))
 	toolCallerOptions = append(toolCallerOptions, opt...)
 
 	var err error
@@ -314,7 +318,9 @@ func (r *ReAct) DirectlyCallTool(ctx context.Context, toolName string, action *a
 	// real tool used for the actual invocation is still resolved later
 	// inside the prepare callback (loop-layer resolveTool).
 	r.tryFillVerboseNameForPlaceholder(directlyCallTool)
-	result, directlyAnswer, err := toolCaller.DirectlyCallTool(directlyCallTool, action, prepare)
+	result, directlyAnswer, err := r.runDetachableToolCall(currentTask, toolCaller, toolName, func() (*aitool.ToolResult, bool, error) {
+		return toolCaller.DirectlyCallTool(directlyCallTool, action, prepare)
+	})
 	if err != nil {
 		return nil, false, utils.Errorf("tool call failed: %w", err)
 	}

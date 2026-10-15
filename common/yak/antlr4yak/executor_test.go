@@ -4383,11 +4383,23 @@ wg.Wait()
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 
+	// The marshaller helper panics on execution errors. Cancellation must return
+	// that error after deferred wg.Done runs, rather than leave wg.Add blocked.
+	executionResult := make(chan any, 1)
 	go func() {
+		defer func() { executionResult <- recover() }()
 		_marshallerTestWithCtx(code, ctx, false)
 	}()
 
-	time.Sleep(5 * time.Second)
+	select {
+	case failure := <-executionResult:
+		err, ok := failure.(error)
+		if !ok || !errors.Is(err, context.DeadlineExceeded) {
+			t.Fatalf("expected deadline cancellation, got %v", failure)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("cancelled execution did not return; deferred wg.Done may be blocked")
+	}
 }
 
 func TestOrderedMap(t *testing.T) {

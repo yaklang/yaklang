@@ -1,0 +1,203 @@
+// Real aibalance / aim acceptance scenario; no scripted model responses.
+// Run from repository root with a fresh YAK_ASYNC_OUTPUT and isolated YAKIT_HOME.
+// YAK_ASYNC_API_KEY is runtime-only; never include it in artifacts.
+include "common/ai/aismoking/live/memory_capture.inc"
+root = os.Getenv("YAK_ASYNC_OUTPUT")
+key = os.Getenv("YAK_ASYNC_API_KEY")
+assert root != "" && key != "", "Set YAK_ASYNC_OUTPUT and YAK_ASYNC_API_KEY"
+assert os.Getenv("YAKIT_HOME") != "", "Use an isolated YAKIT_HOME for fixture registration"
+assert !file.IsExisted(file.Join(root,"summary.json")), "Choose a fresh output directory"
+file.MkdirAll(root)~
+model = os.Getenv("YAK_ASYNC_MODEL")
+if model == "" { model = "deepseek-v4.1-flash" }
+
+// A real Yak-backed tool exercises the ordinary conversion, invocation, capture
+// and cancellation path. It monitors only the local fixture HTTP service.
+source = `
+__DESC__ = "读取本地验收服务的状态，或持续采样该服务流量指标；支持一次性探测和故障注入。仅用于本地验收。"
+mode = cli.String("mode",cli.setRequired(true),cli.setHelp("collect 持续采样，instant 一次探测，fail 注入已知故障"))
+label = cli.String("label",cli.setRequired(true),cli.setHelp("本次执行唯一标记"))
+seconds = cli.Int("seconds",cli.setDefault(2),cli.setHelp("采样秒数，长任务用600，可通过管理action停止"))
+cli.check()
+dir = os.Getenv("YAK_ASYNC_CASE_DIR")
+assert mode in ["collect","instant","fail"] && seconds >= 1 && seconds <= 600, "Invalid fixture mode or duration"
+assert re.Match("^[a-z0-9_]+$",label) && dir != "", "Fixture labels must stay inside the case directory"
+printf("MONITOR_START label=%s mode=%s\n",label,mode)
+file.Save(file.Join(dir,label+".started"),mode)~
+defer func() {
+    file.Save(file.Join(dir,label+".cleaned"),"closed")~
+    printf("MONITOR_CLEANED label=%s\n",label)
+}()
+if mode == "fail" { panic("EXPECTED_MONITOR_FAILURE_"+label) }
+samples = 0
+for {
+    response = http.Get(os.Getenv("YAK_ASYNC_FIXTURE_URL"))~
+    data = string(io.ReadAll(response.Body)~)
+    response.Body.Close()
+    samples++
+    printf("MONITOR_SAMPLE label=%s sample=%d metrics=%s\n",label,samples,data)
+    if mode == "instant" || samples >= seconds { break }
+    time.Sleep(1)
+}
+RESULT = {"label":label,"mode":mode,"samples":samples,"status":"completed"}
+`
+tool = aiagent.ParseYakScriptToAiTools("async_monitor_fixture",source)
+assert tool != nil, "Fixture schema could not be parsed"
+db.SaveAIYakScript(tool)~
+file.Save(file.Join(root,"fixture-tool.yak"),source)~
+port = os.GetRandomAvailableTCPPort()
+fixtureURL = "http://"+str.HostPort("127.0.0.1",port)+"/metrics"
+os.Setenv("YAK_ASYNC_FIXTURE_URL",fixtureURL)
+fixtureCtx, closeFixture = context.WithCancel(context.New())
+defer closeFixture()
+go httpserver.Serve("127.0.0.1",port,httpserver.context(fixtureCtx),httpserver.handler(func(w,req) {
+    w.Header().Set("Content-Type","application/json")
+    w.Write(`{"service":"local-traffic-oracle","bytes_per_second":128,"connections":3}`)
+}))
+for i=0;i<100;i++ { r,e=http.Get(fixtureURL); if e==nil { r.Body.Close(); break }; time.Sleep(0.02) }
+
+tasks = {
+    "single": `先require_tool加载async_monitor_fixture。先同步调用mode=instant,label=sync_default，不设置async标志；然后单工具异步调用mode=collect,label=single_hold,seconds=600，async_directly_call_tool=true。提交回执不是执行成功。使用manage_async_execution_runtime依次list、inspect（核对MONITOR_SAMPLE）、wait(timeout_seconds=0，确认超时仍运行)、stop、wait(timeout_seconds=60，确认取消和清理)、inspect（核对输出）。再单工具异步启动mode=collect,label=single_complete,seconds=2，wait和inspect确认completed及result。最后inspect execute_id=exec-does-not-exist，确认可恢复的错误，不要重试这个不存在ID。中文报告给出每项实际状态。`,
+    "mixed": `先require_tool加载async_monitor_fixture。只用一次directly_call_tool_params_group提交三项，保持此顺序：mode=collect,label=mixed_a,seconds=600,async=true；mode=instant,label=mixed_sync，不写async；mode=collect,label=mixed_b,seconds=600,async=true。每项完整params、identifier与label相同、reason。不得改成串行调用。核对同步项真实结果和两项异步回执。list并分别inspect两项，stop mixed_a并wait到cancelled；inspect mixed_b确认仍running且输出属于mixed_b。stop_all，再wait mixed_b确认cancelled。然后单工具异步启动mode=collect,label=after_stop_all,seconds=2，wait和inspect确认completed，证明stop_all之后仍能提交。中文报告给出各项实际状态。`,
+    "capacity_failure": `先require_tool加载async_monitor_fixture。一次directly_call_tool_params_group提交五项mode=collect,seconds=600,label分别cap_1至cap_5，每项async=true，完整params，identifier与label相同。当前manager最多4个活动执行，核对四项回执、一项容量拒绝；不要重试拒绝项，不假设被拒绝的是哪一项。list，stop_all，然后分别wait所有已接收ID到cancelled。再单工具异步调用mode=fail,label=expected_failure；wait后inspect核对failed及EXPECTED_MONITOR_FAILURE和stderr。不要把预期故障当作需要修复或重试。中文报告说明容量拒绝与执行失败的区别。`,
+    "owner_release": `先require_tool加载async_monitor_fixture。单工具异步启动mode=collect,label=owner_hold,seconds=600。inspect确认已经出现MONITOR_SAMPLE，然后立即directly_answer并finish，不调用stop或stop_all，也不要wait。此项特意验证任务结束会取消任务所属后台资源。报告只能说明提交与运行已经确认，不能声称600秒采样已完成。`,
+}
+cases = ["single","mixed","capacity_failure","owner_release"]
+if os.Getenv("YAK_ASYNC_CASES") != "" { cases = str.SplitAndTrim(os.Getenv("YAK_ASYNC_CASES"),",") }
+summaries = []
+for name in cases {
+    assert name in tasks, "Unknown scenario"
+    dir = file.Join(root,name)
+    file.MkdirAll(dir)~
+    os.Setenv("YAK_ASYNC_CASE_DIR",dir)
+    task = "完成真实异步验收。仅用当前主循环、指定fixture工具及manage_async_execution_runtime。不进入PLAN、不创建子任务、不调用命令或其他工具。每阶段严格按顺序验证，多个管理操作可以分轮。保存最终中文结论，禁止凭猜测宣称成功。\n"+tasks[name]
+    file.Save(file.Join(dir,"task.txt"),task)~
+    mu = sync.NewMutex()
+    events, requests, responses, snapshots, wireRequests = [],[],[],[],[]
+    manager, config = nil,nil
+    running = true
+    wg = sync.NewWaitGroup()
+    captureRequest = func(packet,header,preview,usage) {
+        parts = str.SplitN(string(packet),"\r\n\r\n",2)
+        if len(parts)!=2 { return }
+        body,err = json.New(parts[1])
+        if err!=nil { return }
+        mu.Lock(); defer mu.Unlock()
+        wireRequests=append(wireRequests,body.Value())
+        file.SaveJson(file.Join(dir,"wire-requests.json"),wireRequests)~
+    }
+    captureResponse = func(reason,body) {
+        decoded = memoryDecodeResponse(string(body))
+        mu.Lock(); defer mu.Unlock()
+        responses=append(responses,decoded)
+        file.SaveJson(file.Join(dir,"responses.json"),responses)~
+        printf("LIVE_RESPONSE case=%s n=%d finish=%s tool_calls=%d\n",name,len(responses),reason,len(decoded.tool_calls))
+    }
+    captureEvent = func(op,event) {
+        typ = string(event.Type)
+        if typ in ["stream","stream_start","stream_end"] { return }
+        content = str.ReplaceAll(string(event.Content),key,"[REDACTED]")
+        mu.Lock(); defer mu.Unlock()
+        config = op.GetConfig()
+        events = append(events,{"type":typ,"node":event.NodeId,"content":content})
+        file.SaveJson(file.Join(dir,"events.json"),events)~
+        if manager == nil && "exec-" in content {
+            current = op.GetCurrentTask()
+            if current != nil && current.GetReActLoop()!=nil {
+                manager,_ = current.GetReActLoop().GetAsyncExecutionManager()
+            }
+        }
+    }
+    wg.Add(1)
+    go func() {
+        defer wg.Done()
+        for {
+            time.Sleep(0.25)
+            mu.Lock(); active,m = running,manager; mu.Unlock()
+            if !active { return }
+            if m == nil { continue }
+            summariesNow = m.List()
+            mu.Lock()
+            snapshots=append(snapshots,{"ts":time.Now().UnixMilli(),"executions":summariesNow})
+            file.SaveJson(file.Join(dir,"snapshots.json"),snapshots)~
+            mu.Unlock()
+        }
+    }()
+    native = os.Getenv("YAK_ASYNC_TEXT") != "1"
+    opts = [ai.apiKey(key),ai.model(model),ai.timeout(100),
+        ai.rawHTTPRequestResponseCallback(captureRequest),ai.finishReasonCallback(captureResponse),
+        func(c) { c.DisableProviderFallback=true }]
+    // Explicit callback keeps prompt/transport instrumentation attached to every
+    // caller; tiered callback reconstruction currently only forwards usage.
+    liveModel = func(callerConfig,request) {
+        mu.Lock()
+        sequence = len(requests)+1
+        requests=append(requests,{"caller":request.GetCallerLabel(),"prompt":request.GetPrompt()})
+        file.Save(file.Join(dir,sprintf("prompt-%03d.txt",sequence)),request.GetPrompt())~
+        file.SaveJson(file.Join(dir,"requests.json"),requests)~
+        mu.Unlock()
+        response = callerConfig.NewAIResponse()
+        response.SetModelInfo("aibalance",model)
+        go func() {
+            defer response.Close()
+            callOpts = append(opts,ai.type("aibalance"),
+                ai.onStream(func(reader) { response.EmitOutputStream(reader) }),
+                ai.onReasonStream(func(reader) { response.EmitReasonStream(reader) }),
+                func(c) {
+                    c.Context=request.GetContext()
+                    if request.IsToolCallArgumentsStreamEnabled() {
+                        c.ToolCallArgumentsStreamHandler=response.EmitOutputStream
+                    }
+                })
+            callOpts=append(callOpts,request.GetExtraSpecOpts()...)
+            callOpts=append(callOpts,func(c) {
+                originalFinish=c.FinishReasonCallback
+                ai.finishReasonCallback(func(reason,body) {
+                    if originalFinish!=nil { originalFinish(reason,body) }
+                    captureResponse(reason,body)
+                })(c)
+                ai.rawHTTPRequestResponseCallback(func(packet,header,preview,usage) {
+                    response.SetUsageInfo(usage)
+                    captureRequest(packet,header,preview,usage)
+                })(c)
+            })
+            _,callErr = ai.Chat(request.GetPrompt(),callOpts...)
+            if callErr!=nil { response.SetError(callErr) }
+        }()
+        return response,nil
+    }
+    started = time.Now()
+    err = aim.InvokeReAct(task,aim.aiCallback(liveModel),aim.speedPriorityAICallback(liveModel),aim.qualityPriorityAICallback(liveModel),
+        aim.sessionID("async-live-"+name+"-"+randstr(12)),aim.workdir(dir),
+        aim.context(context.Seconds(600)),aim.timeout(600),aim.maxIteration(40),
+        aim.reviewPolicy("yolo"),aim.allowUserInteract(false),aim.disableMCPServers(true),aim.disableAIForge(true),
+        aim.includeToolNames("async_monitor_fixture"),aim.onEvent(captureEvent),
+        aim.configOptions(aiagent.functionCallMode(native),func(c) {
+            c.DisableCreateDBRuntime,c.DisablePerception,c.DisableMemoryTriage,c.DisableIntervalReview=true,true,true,true
+            c.AiAutoRetry,c.AiTransactionAutoRetry=1,2
+            c.GetTimeline().SetTimelineBucketByteSize(-1)
+            return nil
+        }),func(c) { c.Stateless=true })
+    mu.Lock(); running=false; m=manager; mu.Unlock()
+    wg.Wait()
+    final = []
+    observations = []
+    if m != nil {
+        // Read retained state after normal task release; do not call Shutdown or
+        // StopAll here, which would mask a missing owner cancellation.
+        for row in m.List() {
+            settled,waitErr = m.Wait(context.Seconds(5),row.ID)
+            observation,inspectErr = m.Inspect(context.Seconds(2),row.ID)
+            final=append(final,settled)
+            observations=append(observations,{"execution":observation,"wait_error":sprintf("%v",waitErr),"inspect_error":sprintf("%v",inspectErr)})
+        }
+    }
+    file.SaveJson(file.Join(dir,"final-executions.json"),final)~
+    file.SaveJson(file.Join(dir,"observations.json"),observations)~
+    if config != nil { file.Save(file.Join(dir,"timeline.txt"),config.GetTimeline().Dump())~ }
+    result={"case":name,"model":model,"native":native,"seconds":time.Since(started).Seconds(),"runtime_error":str.ReplaceAll(sprintf("%v",err),key,"[REDACTED]"),"requests":len(requests),"responses":len(responses),"executions":len(final)}
+    file.SaveJson(file.Join(dir,"result.json"),result)~
+    summaries=append(summaries,result)
+    file.SaveJson(file.Join(root,"summary.json"),summaries)~
+    printf("LIVE_CASE case=%s seconds=%.2f requests=%d executions=%d error=%s\n",name,result.seconds,len(requests),len(final),result.runtime_error)
+}

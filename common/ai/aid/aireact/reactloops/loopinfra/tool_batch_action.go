@@ -136,6 +136,8 @@ func directlyCallToolBatchSchemaOption() aitool.ToolOption {
 			aitool.WithParam_Description("可选。该项 调用的预计耗时和回退策略。")),
 		aitool.WithStringParam("reason",
 			aitool.WithParam_Description("可选。直接展示在该工具卡片上；用简短短语说明这个 child 具体做什么，同名工具的不同调用也要分别描述，不能照搬整批任务的理由。")),
+		aitool.WithBoolParam("async", aitool.WithParam_Default(false),
+			aitool.WithParam_Description("可选的本项异步标记，省略时遵循工具默认策略；显式 false 同步等待，true 提交后台执行并返回本项 execute_id。同一批次可混合同步和异步调用。")),
 	)
 }
 
@@ -155,7 +157,7 @@ func toolBatchVerifierContext(loop *reactloops.ReActLoop) context.Context {
 // compatibility cache. Nested array members share field names there, so doing
 // so could combine tool_name from one item with params from another.
 func lookupCanonicalActionParam(action *aicommon.Action, key string) (any, bool) {
-	if action == nil {
+	if action == nil || strings.TrimSpace(key) == "" {
 		return nil, false
 	}
 	if value, ok := action.LookupCanonicalParam(key); ok {
@@ -248,6 +250,11 @@ func strictBatchString(item aitool.InvokeParams, field string, required bool) (s
 func rejectUnknownBatchFields(item aitool.InvokeParams, allowed map[string]struct{}) error {
 	unknown := make([]string, 0)
 	for key := range item {
+		// Empty protocol keys are model noise, not misspelled tool fields.
+		// Ignore them without promoting their values into the item's metadata.
+		if strings.TrimSpace(key) == "" {
+			continue
+		}
 		if _, ok := allowed[key]; !ok {
 			unknown = append(unknown, key)
 		}
@@ -301,6 +308,8 @@ func parseDirectToolBatchActionWithMetadata(loop *reactloops.ReActLoop, action *
 	if err != nil || !hasBatch {
 		return nil, hasBatch, err
 	}
+	// A redundant scalar async hint is harmless on a batch. Each child owns its
+	// flag; never inherit that top-level hint or read flattened sibling fields.
 	if hasAnyCanonicalActionParam(action, "directly_call_tool_name", "directly_call_tool_params") ||
 		(!allowMetadata && hasAnyCanonicalActionParam(action, "directly_call_identifier", "directly_call_expectations", "directly_call_reason")) {
 		return nil, true, utils.Errorf("%s cannot be combined with legacy directly_call_tool_* fields", directlyCallToolBatchField)
@@ -321,7 +330,7 @@ func parseDirectToolBatchActionWithMetadata(loop *reactloops.ReActLoop, action *
 		return nil, true, utils.Error("tool manager is unavailable")
 	}
 	allowed := map[string]struct{}{
-		"tool_name": {}, "params": {}, "identifier": {}, "expectations": {}, "reason": {},
+		"tool_name": {}, "params": {}, "identifier": {}, "expectations": {}, "reason": {}, "async": {},
 	}
 	identifiers := make(map[string]int)
 	request := &aicommon.ToolCallGroupRequest{Calls: make([]aicommon.ToolCallGroupCall, 0, len(items))}
@@ -329,6 +338,8 @@ func parseDirectToolBatchActionWithMetadata(loop *reactloops.ReActLoop, action *
 		if err := rejectUnknownBatchFields(item, allowed); err != nil {
 			return nil, true, utils.Wrapf(err, "%s[%d]", directlyCallToolBatchField, index)
 		}
+		async := normalizeDirectToolAsync(item["async"])
+		_, asyncSpecified := item["async"]
 		toolName, err := strictBatchString(item, "tool_name", true)
 		if err != nil {
 			return nil, true, utils.Wrapf(err, "%s[%d]", directlyCallToolBatchField, index)
@@ -375,12 +386,14 @@ func parseDirectToolBatchActionWithMetadata(loop *reactloops.ReActLoop, action *
 		}
 		reactloops.MaybeWarnBashBeforeEdit(loop, toolName)
 		request.Calls = append(request.Calls, aicommon.ToolCallGroupCall{
-			Index:        index,
-			ToolName:     toolName,
-			Params:       params,
-			Identifier:   identifier,
-			Expectations: expectations,
-			Reason:       reason,
+			Index:          index,
+			ToolName:       toolName,
+			Params:         params,
+			Identifier:     identifier,
+			Expectations:   expectations,
+			Reason:         reason,
+			Async:          async,
+			AsyncSpecified: asyncSpecified,
 		})
 	}
 	if allowMetadata {
@@ -489,9 +502,13 @@ func handleToolBatchActionResult(
 
 	outcomes := append([]aicommon.ToolCallOutcome(nil), result.Outcomes...)
 	sort.SliceStable(outcomes, func(i, j int) bool { return outcomes[i].Index < outcomes[j].Index })
-	var executionSucceeded, executionFailed, executionUnknown, protocolFailed, notRun int
+	var executionSucceeded, executionFailed, executionUnknown, protocolFailed, notRun, asyncSubmitted int
 	for i := range outcomes {
 		outcome := &outcomes[i]
+		if outcome.Stage == aicommon.ToolCallStageSubmitted {
+			asyncSubmitted++
+			continue
+		}
 		if outcome.Result == nil {
 			notRun++
 			continue
@@ -516,6 +533,11 @@ func handleToolBatchActionResult(
 		"Tool batch settled: %d calls; execution_succeeded=%d; execution_failed=%d; execution_unknown=%d; protocol_failed=%d; not_run=%d",
 		len(request.Calls), executionSucceeded, executionFailed, executionUnknown, protocolFailed, notRun,
 	)}
+	if asyncSubmitted > 0 {
+		lines[0] = fmt.Sprintf("Tool batch dispatch returned: %d calls; async_submitted=%d; execution_succeeded=%d; execution_failed=%d; execution_unknown=%d; protocol_failed=%d; not_run=%d",
+			len(request.Calls), asyncSubmitted, executionSucceeded, executionFailed, executionUnknown, protocolFailed, notRun)
+		lines = append(lines, "异步项仅返回提交回执；通过 manage_async_execution_runtime 的 inspect/wait/stop 查看、等待或停止，确认所需执行结束后再结束任务。")
+	}
 	executedToolCallCount := 0
 	for _, outcome := range outcomes {
 		// Result is assigned only after the ToolCaller returns from the plugin
@@ -565,6 +587,12 @@ func handleToolBatchActionResult(
 			status += ": " + outcome.Result.Error
 		}
 		lines = append(lines, fmt.Sprintf("%d. %s: %s", outcome.Index+1, toolName, status))
+		if outcome.Stage == aicommon.ToolCallStageSubmitted {
+			lines = append(lines, fmt.Sprintf("   execute_id: %q", outcome.ExecuteID))
+			if outcome.Index >= 0 && outcome.Index < len(request.Calls) {
+				lines = append(lines, fmt.Sprintf("   identifier: %q", request.Calls[outcome.Index].Identifier))
+			}
+		}
 		var reconsider *aicommon.ToolReviewReconsiderError
 		if errors.As(outcome.Err, &reconsider) {
 			lines = append(lines, reconsider.Feedback)

@@ -278,6 +278,7 @@ func TestPromptManager_AssembleLoopPrompt_SectionOrder(t *testing.T) {
 	result, err := react.promptManager.AssembleLoopPrompt([]*aitool.Tool{tool}, &reactloops.LoopPromptAssemblyInput{
 		Nonce:           "n123",
 		TaskInstruction: "follow task rules",
+		AutoContext:     "loop-owned async execution snapshot",
 		OutputExample:   "example output",
 		Schema:          `{"type":"object","properties":{"@action":{"type":"string"}}}`,
 		ReactiveData:    "reactive state",
@@ -436,6 +437,9 @@ func TestPromptManager_AssembleLoopPrompt_SectionOrder(t *testing.T) {
 	require.Equal(t, "section.dynamic.current_time", sections[5].Children[0].Key)
 	require.Equal(t, "section.dynamic.auto_context", sections[5].Children[1].Key)
 	require.Equal(t, "Auto Context", sections[5].Children[1].Label)
+	require.Contains(t, sections[5].Children[1].Content, "auto ctx body")
+	require.Contains(t, sections[5].Children[1].Content, "loop-owned async execution snapshot")
+	require.Contains(t, prompt[currentTimeIdx:dynamicEndIdx], "loop-owned async execution snapshot")
 	require.NotContains(t, sections[5].Content, "current user query")
 	require.Equal(t, reactloops.PromptSectionRoleDynamic, sections[5].Children[0].Role)
 

@@ -160,7 +160,7 @@ func (r *ReAct) _invokeToolCall_IntervalReviewWithContextForTaskAndEmitter(
 				reviewErr = fmt.Errorf("generate interval review prompt: %w", err)
 				return ""
 			}
-			return materials
+			return materials + fmt.Sprintf("\nRuntime supports detachment: %t. Choose detach only when supported; it preserves this execution and frees the owning agent.\n", aicommon.ToolDetachAvailable(ctx))
 		},
 		func(action *aicommon.Action) {
 			decision := action.GetString("decision")
@@ -179,6 +179,9 @@ func (r *ReAct) _invokeToolCall_IntervalReviewWithContextForTaskAndEmitter(
 					"interval review: tool [%s] should continue. Progress: %s. Reason: %s",
 					tool.Name, progressSummary, reviewReason,
 				)
+			case "detach":
+				shouldContinue = true
+				_, reviewErr = aicommon.DetachToolFromContext(ctx)
 			case "cancel":
 				shouldContinue = false
 				log.Warnf(
@@ -219,7 +222,9 @@ func (r *ReAct) _invokeToolCall_IntervalReviewWithContextForTaskAndEmitter(
 		),
 	)
 	if reviewErr != nil {
-		log.Errorf("interval review failed: %v", reviewErr)
+		if ctx.Err() == nil {
+			log.Errorf("interval review failed: %v", reviewErr)
+		}
 		return true, reviewErr
 	}
 	return shouldContinue, nil
@@ -266,7 +271,7 @@ func (r *ReAct) CreateIntervalReviewHandlerForTaskAndEmitter(task aicommon.AISta
 			reviewCount = fallbackReviewCount
 		}
 
-		if outputGuard.outputChanged(stdoutSnapshot, stderrSnapshot) {
+		if outputGuard.outputChanged(stdoutSnapshot, stderrSnapshot) && !aicommon.ToolDetachAvailable(ctx) {
 			log.Infof(
 				"interval review #%d: skip AI for tool [%s] (stdout/stderr still changing)",
 				reviewCount, intervalReviewToolName(tool),
