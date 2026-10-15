@@ -184,32 +184,31 @@ func (fs *irSourceFS) treeFor(anyPath string) (filesys_interface.FileSystem, err
 // saved chain (an incremental head) uses it, and any other program —
 // including a program name with ir_sources rows but no ir_program row —
 // is a single-layer chain over itself. No flavor check: "incremental"
-// exists only as chain length. The overlay loads every layer's tree
-// lazily through buildPlainProgramTree, resolves deletions through the
-// layers' file status maps, and fills bodies itself through the DB
-// loader.
+// exists only as chain length. Layer status (FileHashMap) rides on the
+// chain members; layers that recorded none keep nil.
 func buildProgramTree(progName string) (filesys_interface.FileSystem, error) {
 	prog, err := GetApplicationProgram(progName)
 	if err != nil && !gorm.IsRecordNotFoundError(err) {
 		return nil, err
 	}
-	layers := []string{progName}
+	chain := []string{progName}
 	if prog != nil && len(prog.OverlayLayers) > 0 {
-		layers = prog.OverlayLayers
+		chain = prog.OverlayLayers
 	}
-	layerProgs := GetApplicationPrograms(layers)
-	opts := []overlayOption{
-		withLayers(layers...),
-		withLayerTrees(buildPlainProgramTree),
-		withBodyLoader(readIrSourceFileContent),
+	layers := make([]overlayLayer, len(chain))
+	for i, name := range chain {
+		layers[i] = overlayLayer{name: name}
 	}
-	// Keep the recipe order: status layers resolve newest-first.
-	for _, layer := range layers {
-		if lp := layerProgs[layer]; lp != nil && len(lp.FileHashMap) > 0 {
-			opts = append(opts, withFileStatus(layer, lp.FileHashMap))
+	layerProgs := GetApplicationPrograms(chain)
+	for i := range layers {
+		if lp := layerProgs[layers[i].name]; lp != nil && len(lp.FileHashMap) > 0 {
+			layers[i].files = lp.FileHashMap
 		}
 	}
-	return newOverlayFS(opts...), nil
+	return &overlayFS{
+		layers:     layers,
+		layerCache: make(map[string]filesys_interface.FileSystem),
+	}, nil
 }
 
 // buildPlainProgramTree builds one layer's structure-only tree from its
