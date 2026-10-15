@@ -14,21 +14,6 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
-func init() {
-	db := consts.GetGormProfileDatabase()
-	// Drop the table first so that any stale schema from a previous run
-	// (e.g. leftover full_name NOT NULL column from MCPServerToolConfig) does
-	// not interfere. AutoMigrate re-creates it with the correct structure.
-	db.DropTableIfExists(&schema.MCPClientToolConfig{})
-	if err := db.AutoMigrate(
-		&schema.MCPServer{},
-		&schema.MCPServerToolConfig{},
-		&schema.MCPClientToolConfig{},
-	).Error; err != nil {
-		panic(err)
-	}
-}
-
 // newStreamableMCPServer spins up an in-process MCP server over Streamable HTTP
 // with the provided tools pre-registered. Callers must defer the returned close func.
 func newStreamableMCPServer(t *testing.T, tools ...*mcpmodel.Tool) (testServerURL string, close func()) {
@@ -72,6 +57,7 @@ func cleanupClientToolConfigs(toolNames ...string) {
 }
 
 func TestSeedMCPServer_CleanupRemovesMCPServerToolConfigs(t *testing.T) {
+	yakit.GuardConfigurationForTest(t)
 	const srvName = "grpc-test-cleanup-srv"
 	db := consts.GetGormProfileDatabase()
 
@@ -103,6 +89,7 @@ func TestSeedMCPServer_CleanupRemovesMCPServerToolConfigs(t *testing.T) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 func TestGRPC_SetMCPToolEnabled(t *testing.T) {
+	yakit.GuardConfigurationForTest(t)
 	grpcSrv, err := NewServer()
 	require.NoError(t, err)
 	ctx := context.Background()
@@ -155,6 +142,7 @@ func TestGRPC_SetMCPToolEnabled(t *testing.T) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 func TestGRPC_GetMCPToolList_BuiltinTools(t *testing.T) {
+	yakit.GuardConfigurationForTest(t)
 	grpcSrv, err := NewServer()
 	require.NoError(t, err)
 	ctx := context.Background()
@@ -181,6 +169,7 @@ func TestGRPC_GetMCPToolList_BuiltinTools(t *testing.T) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 func TestGRPC_GetMCPToolList_BridgeTools(t *testing.T) {
+	yakit.GuardConfigurationForTest(t)
 	toolAlpha := mcpmodel.NewTool("alpha", mcpmodel.WithDescription("Alpha tool description"))
 	toolBeta := mcpmodel.NewTool("beta", mcpmodel.WithDescription("Beta tool description"))
 
@@ -224,6 +213,7 @@ func TestGRPC_GetMCPToolList_BridgeTools(t *testing.T) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 func TestGRPC_GetMCPToolList_ForceSyncRemovesStaleTools(t *testing.T) {
+	yakit.GuardConfigurationForTest(t)
 	toolAlpha := mcpmodel.NewTool("alpha_stale", mcpmodel.WithDescription("Alpha"))
 	toolBeta := mcpmodel.NewTool("beta_stale", mcpmodel.WithDescription("Beta"))
 
@@ -272,6 +262,7 @@ func TestGRPC_GetMCPToolList_ForceSyncRemovesStaleTools(t *testing.T) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 func TestGRPC_GetMCPToolDetail(t *testing.T) {
+	yakit.GuardConfigurationForTest(t)
 	toolAlpha := mcpmodel.NewTool("detail_alpha", mcpmodel.WithDescription("Detail alpha desc"))
 
 	serverURL, closeServer := newStreamableMCPServer(t, toolAlpha)
@@ -325,6 +316,7 @@ func TestGRPC_GetMCPToolDetail(t *testing.T) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 func TestGRPC_GetMCPToolList_OnlyEnabledFiltersDisabled(t *testing.T) {
+	yakit.GuardConfigurationForTest(t)
 	toolA := mcpmodel.NewTool("en_tool_a", mcpmodel.WithDescription("Tool A"))
 	toolB := mcpmodel.NewTool("en_tool_b", mcpmodel.WithDescription("Tool B"))
 
@@ -372,6 +364,7 @@ func TestGRPC_GetMCPToolList_OnlyEnabledFiltersDisabled(t *testing.T) {
 // Keyword filter must match tool names and descriptions; unrelated tools must
 // not appear in the result.
 func TestGRPC_GetMCPToolList_KeywordSearch(t *testing.T) {
+	yakit.GuardConfigurationForTest(t)
 	toolFoo := mcpmodel.NewTool("kw_foo_tool", mcpmodel.WithDescription("foo unique description"))
 	toolBar := mcpmodel.NewTool("kw_bar_tool", mcpmodel.WithDescription("bar unique description"))
 
@@ -430,6 +423,7 @@ func TestGRPC_GetMCPToolList_KeywordSearch(t *testing.T) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 func TestGRPC_GetMCPToolList_PaginationConsistency(t *testing.T) {
+	yakit.GuardConfigurationForTest(t)
 	// Register 3 bridge tools.
 	tools := []*mcpmodel.Tool{
 		mcpmodel.NewTool("pg_tool_1", mcpmodel.WithDescription("pg1")),
@@ -485,6 +479,7 @@ func TestGRPC_GetMCPToolList_PaginationConsistency(t *testing.T) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 func TestGRPC_GetMCPToolDetail_BuiltinToolMeta(t *testing.T) {
+	yakit.GuardConfigurationForTest(t)
 	grpcSrv, err := NewServer()
 	require.NoError(t, err)
 	ctx := context.Background()
@@ -535,6 +530,7 @@ func TestGRPC_SetMCPToolEnabled_UnknownToolReturnsError(t *testing.T) {
 // down the external MCP server before the second call: the cached DB rows must
 // still be returned without error, and no network error should surface.
 func TestGRPC_GetMCPToolList_ForceSyncFalseServesCache(t *testing.T) {
+	yakit.GuardConfigurationForTest(t)
 	tool := mcpmodel.NewTool("cache_tool", mcpmodel.WithDescription("cache desc"))
 
 	serverURL, closeServer := newStreamableMCPServer(t, tool)
@@ -575,6 +571,7 @@ func TestGRPC_GetMCPToolList_ForceSyncFalseServesCache(t *testing.T) {
 // builtin row, then call GetMCPToolList. The stale row must not appear in the
 // response because DeleteStaleMCPClientBuiltinTools prunes it during sync.
 func TestGRPC_GetMCPToolList_PrunesStaleBuiltinRows(t *testing.T) {
+	yakit.GuardConfigurationForTest(t)
 	db := consts.GetGormProfileDatabase()
 
 	const staleName = "grpc_test_stale_builtin_tool_xyz"
@@ -604,6 +601,7 @@ func TestGRPC_GetMCPToolList_PrunesStaleBuiltinRows(t *testing.T) {
 //   - ForceSync=false still returns the stale cached row (no network).
 //   - ForceSync=true dials the server and prunes the deleted row.
 func TestGRPC_GetMCPToolList_BridgeToolRemovedRequiresForceSync(t *testing.T) {
+	yakit.GuardConfigurationForTest(t)
 	toolA := mcpmodel.NewTool("rm2_tool_a", mcpmodel.WithDescription("A"))
 	toolB := mcpmodel.NewTool("rm2_tool_b", mcpmodel.WithDescription("B"))
 
@@ -658,6 +656,7 @@ func TestGRPC_GetMCPToolList_BridgeToolRemovedRequiresForceSync(t *testing.T) {
 // When a remote server renames a tool, ForceSync=false returns the stale name
 // from cache; ForceSync=true performs the full diff and replaces the old row.
 func TestGRPC_GetMCPToolList_BridgeToolRenamedRequiresForceSync(t *testing.T) {
+	yakit.GuardConfigurationForTest(t)
 	oldTool := mcpmodel.NewTool("rename_old", mcpmodel.WithDescription("original"))
 
 	serverURL, closeServer := newStreamableMCPServer(t, oldTool)
@@ -719,6 +718,7 @@ func TestGRPC_GetMCPToolList_BridgeToolRenamedRequiresForceSync(t *testing.T) {
 // When a remote server exposes a new tool, ForceSync=false returns the old
 // cached list; ForceSync=true dials the server and picks up the new tool.
 func TestGRPC_GetMCPToolList_BridgeToolAddedRequiresForceSync(t *testing.T) {
+	yakit.GuardConfigurationForTest(t)
 	toolExisting := mcpmodel.NewTool("add2_existing", mcpmodel.WithDescription("existing"))
 
 	serverURL, closeServer := newStreamableMCPServer(t, toolExisting)

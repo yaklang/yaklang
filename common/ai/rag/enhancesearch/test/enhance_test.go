@@ -15,6 +15,7 @@ import (
 )
 
 func TestRewriteQuerySearch(t *testing.T) {
+	yakit.GuardConfigurationForTest(t)
 	yakit.LoadGlobalNetworkConfig()
 	query := "什么是yaklang"
 	handler := enhancesearch.NewDefaultSearchHandler()
@@ -27,6 +28,7 @@ func TestRewriteQuerySearch(t *testing.T) {
 }
 
 func TestSplitQuerySearch(t *testing.T) {
+	yakit.GuardConfigurationForTest(t)
 	yakit.LoadGlobalNetworkConfig()
 	query := "什么是yaklang"
 	handler := enhancesearch.NewDefaultSearchHandler()
@@ -38,6 +40,7 @@ func TestSplitQuerySearch(t *testing.T) {
 }
 
 func TestGeneralizeQuerySearch(t *testing.T) {
+	yakit.GuardConfigurationForTest(t)
 	yakit.LoadGlobalNetworkConfig()
 	query := "什么是yaklang"
 	handler := enhancesearch.NewDefaultSearchHandler()

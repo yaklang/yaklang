@@ -20,6 +20,7 @@ import (
 )
 
 func TestDefaultLocalClientDoesNotModifyInheritedInstallation(t *testing.T) {
+	yakit.GuardConfigurationForTest(t)
 	if os.Getenv("YAK_TEST_ISOLATION_CHILD") == "1" {
 		checkDefaultLocalClientIsolation(t)
 		return

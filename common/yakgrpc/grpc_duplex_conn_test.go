@@ -158,7 +158,7 @@ a`), "mitm", "http://example.com", "127.0.0.1")
 }
 
 func TestGRPCMUSTPASS_HTTPFlowSlowSQL(t *testing.T) {
-	yakit.InitialDatabase()
+	initializeTestDatabase()
 
 	client, err := NewLocalClient(true)
 	require.NoError(t, err, "create local client error")
@@ -264,7 +264,7 @@ func TestGRPCMUSTPASS_HTTPFlowSlowSQL(t *testing.T) {
 }
 
 func TestGRPCMUSTPASS_MITMSlowRuleHook(t *testing.T) {
-	yakit.InitialDatabase()
+	initializeTestDatabase()
 
 	client, err := NewLocalClient(true)
 	require.NoError(t, err, "create local client error")

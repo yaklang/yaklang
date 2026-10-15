@@ -43,7 +43,7 @@ import (
 )
 
 func init() {
-	yakit.InitialDatabase()
+	initializeTestDatabase()
 }
 
 func TestGRPCMUSTPASS_RawFuzztagBug(t *testing.T) {
@@ -1993,6 +1993,7 @@ Content-Length: 10000000` + "\r\n\r\n" + strings.Repeat("a", 10*1024)))
 }
 
 func TestCancelStringFuzzer(t *testing.T) {
+	yakit.GuardConfigurationForTest(t)
 	client, err := NewLocalClient()
 	require.NoError(t, err)
 

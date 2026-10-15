@@ -603,6 +603,7 @@ poc.Get("http://www.example.com", poc.proxy(mitmProxy))
 }
 
 func TestGRPCMUSTPASS_MITM_Proxy_StatusCard(t *testing.T) {
+	yakit.GuardConfigurationForTest(t)
 	name, clearFunc, err := yakit.CreateAndClearTemporaryYakScript("mitm", `
 yakit.AutoInitYakit()
 yakit.StatusCard("mitmId", "StatusCard")

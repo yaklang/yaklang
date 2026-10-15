@@ -1,6 +1,7 @@
 package consts
 
 import (
+	"github.com/yaklang/yaklang/common/utils/configtest"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -8,6 +9,7 @@ import (
 )
 
 func TestRoutingPolicyConstants(t *testing.T) {
+	configtest.RequirePublicRuntime(t, GetTieredAIConfig())
 	assert.Equal(t, RoutingPolicy("auto"), PolicyAuto)
 	assert.Equal(t, RoutingPolicy("performance"), PolicyPerformance)
 	assert.Equal(t, RoutingPolicy("cost"), PolicyCost)
@@ -15,6 +17,7 @@ func TestRoutingPolicyConstants(t *testing.T) {
 }
 
 func TestTieredAIConfig(t *testing.T) {
+	configtest.RequirePublicRuntime(t, GetTieredAIConfig())
 	// Save original state
 	original := GetTieredAIConfig()
 	defer SetTieredAIConfig(original)
@@ -48,6 +51,7 @@ func TestTieredAIConfig(t *testing.T) {
 }
 
 func TestGetTieredAIConfigs(t *testing.T) {
+	configtest.RequirePublicRuntime(t, GetTieredAIConfig())
 	// Save original state
 	original := GetTieredAIConfig()
 	defer SetTieredAIConfig(original)
@@ -94,6 +98,7 @@ func TestGetTieredAIConfigs(t *testing.T) {
 }
 
 func TestIsTieredAIFallbackDisabled(t *testing.T) {
+	configtest.RequirePublicRuntime(t, GetTieredAIConfig())
 	// Save original state
 	original := GetTieredAIConfig()
 	defer SetTieredAIConfig(original)
@@ -118,6 +123,7 @@ func TestIsTieredAIFallbackDisabled(t *testing.T) {
 }
 
 func TestGetTieredAIRoutingPolicyEmptyPolicy(t *testing.T) {
+	configtest.RequirePublicRuntime(t, GetTieredAIConfig())
 	// Save original state
 	original := GetTieredAIConfig()
 	defer SetTieredAIConfig(original)

@@ -2,6 +2,7 @@ package yakgrpc
 
 import (
 	"context"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -48,6 +49,7 @@ func TestEnsureMCPToolDescriptionI18nSkipsWhenAlreadySet(t *testing.T) {
 }
 
 func TestGRPC_GetMCPToolList_BuiltinDescriptionI18n(t *testing.T) {
+	yakit.GuardConfigurationForTest(t)
 	grpcSrv, err := NewServer()
 	require.NoError(t, err)
 	ctx := context.Background()

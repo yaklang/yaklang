@@ -251,6 +251,7 @@ func TestGRPC_Ai_Config_Health_Check_RequiresParsableCallToolAction(t *testing.T
 }
 
 func TestExecuteAIConfigHealthCheck_DoesNotFallbackToOtherProviders(t *testing.T) {
+	yakit.GuardConfigurationForTest(t)
 	const badProviderType = "grpc-ai-health-check-bad-provider"
 	const goodProviderType = "grpc-ai-health-check-good-provider"
 
@@ -305,6 +306,7 @@ func TestExecuteAIConfigHealthCheck_DoesNotFallbackToOtherProviders(t *testing.T
 }
 
 func TestExecuteAIConfigHealthCheck_DisableProviderFallback_OnlyTriggersRawCallbackOnce(t *testing.T) {
+	yakit.GuardConfigurationForTest(t)
 	const badProviderType = "grpc-ai-health-check-bad-provider-raw-callback"
 	const goodProviderType = "grpc-ai-health-check-good-provider-raw-callback"
 

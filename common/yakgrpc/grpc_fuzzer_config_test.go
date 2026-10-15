@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"io"
 	"strings"
@@ -17,6 +18,7 @@ import (
 )
 
 func TestGRPCMUSTPASS_FuzzerConfig(t *testing.T) {
+	yakit.GuardConfigurationForTest(t)
 	client, err := NewLocalClient()
 	require.NoError(t, err)
 

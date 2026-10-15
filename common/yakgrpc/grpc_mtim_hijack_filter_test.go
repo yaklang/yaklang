@@ -3,6 +3,7 @@ package yakgrpc
 import (
 	"context"
 	"fmt"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"reflect"
 	"sync"
 	"sync/atomic"
@@ -121,6 +122,7 @@ func TestGRPCMUSTPASS_MITM_HijackFilter(t *testing.T) {
 
 // TestGRPCMUSTPASS_MITMFilter_RuleName 测试 FilterDataItem.RuleName 在 MITM 过滤器和劫持过滤器中的持久化
 func TestGRPCMUSTPASS_MITMFilter_RuleName(t *testing.T) {
+	yakit.GuardConfigurationForTest(t)
 	local, err := NewLocalClientWithTempDatabase(t)
 	require.NoError(t, err)
 	ctx := utils.TimeoutContextSeconds(5)
@@ -158,6 +160,7 @@ func TestGRPCMUSTPASS_MITMFilter_RuleName(t *testing.T) {
 }
 
 func TestGRPCMUSTPASS_Get_Set_HijackFilter(t *testing.T) {
+	yakit.GuardConfigurationForTest(t)
 	local, err := NewLocalClientWithTempDatabase(t)
 	require.NoError(t, err)
 

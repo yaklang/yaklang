@@ -4,12 +4,13 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/yaklang/gorm"
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/segmentio/ksuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/gorm"
 	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/utils/configtest"
 )
 
 // newMCPSyncTestDB opens an in-memory SQLite database and migrates the
@@ -20,6 +21,7 @@ func newMCPSyncTestDB(t *testing.T) *gorm.DB {
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = db.Close() })
 	require.NoError(t, db.AutoMigrate(&schema.MCPServerToolConfig{}).Error)
+	configtest.RequirePristine(t, db, nil)
 	return db
 }
 

@@ -14,7 +14,6 @@ import (
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/thirdparty_bin"
 	"github.com/yaklang/yaklang/common/yak/c2ssa/preprocess"
-	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
@@ -195,7 +194,7 @@ func TestCHeaders_ImportDirectory(t *testing.T) {
 
 func TestCHeaders_DownloadOfficial(t *testing.T) {
 	// Init DB under ambient YAKIT_HOME first so t.TempDir cleanup is not blocked by sqlite.
-	require.NoError(t, yakit.CallPostInitDatabase())
+	initializeTestDatabase()
 	require.NoError(t, thirdparty_bin.EnsureInitialized())
 
 	withTempCHeadersHome(t)

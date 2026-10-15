@@ -89,6 +89,7 @@ func TestGRPCMUSTPASS_HTTP_Server_DebugPlugin_TestFlow(t *testing.T) {
 }
 
 func TestGRPCMUSTPASS_HTTP_Server_DebugPlugin_MITM_WithRawPacketAndPaths(t *testing.T) {
+	yakit.GuardConfigurationForTest(t)
 	client, err := NewLocalClient()
 	if err != nil {
 		panic(err)
@@ -333,6 +334,7 @@ mirrorFilteredHTTPFlow = func(isHttps, url, req, rsp, body) {
 //}
 
 func TestGRPCMUSTPASS_HTTP_Server_DebugPlugin_MITM(t *testing.T) {
+	yakit.GuardConfigurationForTest(t)
 	client, err := NewLocalClient()
 	if err != nil {
 		panic(err)
@@ -404,6 +406,7 @@ mirrorFilteredHTTPFlow = (https, url, req, rsp, body) => {
 }
 
 func TestGRPCMUSTPASS_HTTP_Server_DebugPlugin_MITM_WithURLTARGET(t *testing.T) {
+	yakit.GuardConfigurationForTest(t)
 	client, err := NewLocalClient()
 	if err != nil {
 		panic(err)

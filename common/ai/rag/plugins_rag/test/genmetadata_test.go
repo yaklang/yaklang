@@ -8,6 +8,7 @@ import (
 )
 
 func TestGenerateMetadata(t *testing.T) {
+	yakit.GuardConfigurationForTest(t)
 	yakit.LoadGlobalNetworkConfig()
 	res, err := plugins_rag.GenerateYakScriptMetadata(`
 host = cli.String("host")

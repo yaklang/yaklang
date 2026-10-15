@@ -936,6 +936,7 @@ for i in res {
 }
 
 func TestGRPCMUSTPASS_HTTP_DebugPlugin_Global_SaveHTTPFlow(t *testing.T) {
+	yakit.GuardConfigurationForTest(t)
 	client, err := NewLocalClient(true)
 	if err != nil {
 		t.Fatal(err)

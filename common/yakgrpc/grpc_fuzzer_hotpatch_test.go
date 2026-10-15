@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"io"
 	"net/http"
 	"strconv"
@@ -360,6 +361,7 @@ handle1 = s => {die("expected panic")}
 }
 
 func TestGRPCMUSTPASS_HTTPFuzzer_DisableHotPatch_DoesNotDisableGlobal(t *testing.T) {
+	yakit.GuardConfigurationForTest(t)
 	client, server, err := NewLocalClientAndServerWithTempDatabase(t)
 	require.NoError(t, err)
 

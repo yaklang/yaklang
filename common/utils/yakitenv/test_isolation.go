@@ -10,6 +10,12 @@ import (
 	"strings"
 )
 
+var testRoot string
+
+// TestRoot returns the private root allocated at process startup. Unlike
+// YAKIT_HOME it cannot be redirected by a later environment change.
+func TestRoot() string { return testRoot }
+
 // InTest reports whether this process was started as a Go test binary. Unlike
 // testing.Testing, it also works during package initialization.
 func InTest() bool {
@@ -52,6 +58,7 @@ func init() {
 	if err := os.Setenv("YAKIT_HOME", home); err != nil {
 		panic(fmt.Errorf("set isolated Yakit test home: %w", err))
 	}
+	testRoot = root
 	// Absolute paths and remote DSNs bypass YAKIT_HOME. Only discard inherited
 	// values here; tests may subsequently set their own fixture paths explicitly.
 	for _, key := range []string{

@@ -16,11 +16,7 @@ import (
 )
 
 func init() {
-	consts.GetGormProfileDatabase()
-	consts.GetGormProjectDatabase()
-	_ = yakit.CallPostInitDatabase()
-	// 确保 extracted_data 表存在（单独运行测试时可能未迁移）
-	_ = consts.GetGormProjectDatabase().AutoMigrate(&schema.ExtractedData{}).Error
+	initializeTestDatabase()
 }
 
 func TestMUSTPASS_MITM_Extracted(t *testing.T) {
