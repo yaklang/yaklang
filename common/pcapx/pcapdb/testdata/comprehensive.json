@@ -1,0 +1,886 @@
+{
+  "format": "pcapng",
+  "source_batch": "baseline-2fb090d177c3.zip",
+  "source_batch_sha256": "bff6a5a82336ac3d4f4d139b6d1ba75289be23ece04fae3c07c75032d63da017",
+  "source_commit": "2fb090d177c3bf52277f240b2dca05ea80216485",
+  "conversion": "Each complete source is a separate PCAPNG section. Classic PCAP records become enhanced packet blocks with original link type, timestamp precision, captured bytes and wire length. Existing PCAPNG sections are copied byte for byte; packet order is unchanged. No padding or repeated packets added to reach the compressed-size target.",
+  "compressed_bytes": 202940,
+  "expanded_bytes": 722388,
+  "compressed_sha256": "5e92b88a518c55f6a0274e3c08bcb5f25d15db10239d0e3ffb637c5f66ae9cf8",
+  "expanded_sha256": "539aec73795786eac69046a9e2ab9ef5e4eac5ac6925b9cd2c907e22b67ea980",
+  "sections": 24,
+  "interfaces": 27,
+  "packets": 3368,
+  "link_types": [
+    0,
+    1
+  ],
+  "packet_payload_sha256": "787b4d992548ac1d1eedf0ac8cc6fda2fa6d968b2fb2e2b9199cdb6411733ee5",
+  "packet_bytes": 604867,
+  "sources": [
+    {
+      "source": "common/bin-parser/testdata/protocol-corpus/captures/ndpi/ndpi-dns.pcap",
+      "member": "captures/common/bin-parser/testdata/protocol-corpus/captures/ndpi/ndpi-dns.pcap",
+      "sha256": "61276b4f63f00eba469b7cab626bca8a7f820f60a698169ca603fd73d40fe362",
+      "bytes": 493,
+      "first_packet_id": 1,
+      "sections": 1,
+      "interfaces": 1,
+      "packets": 4,
+      "link_types": [
+        1
+      ],
+      "packet_payload_sha256": "fe3e50475322beb13345ff159bc17545b95ee2ee50ee412d9fdac929059951c3",
+      "packet_bytes": 405,
+      "protocols": [
+        "DNS"
+      ],
+      "evidence_kinds": [
+        "upstream-positive"
+      ],
+      "license_evidence": [
+        {
+          "file": "common/bin-parser/testdata/protocol-corpus/manifest.json",
+          "repository": {
+            "id": "ndpi",
+            "repository": "ntop/nDPI",
+            "commit": "4cae778e7e8f846b34f11d4f8392504cdebd3db8",
+            "license": "LGPL-3.0",
+            "homepage": "https://github.com/ntop/nDPI",
+            "license_file": "licenses/ndpi-COPYING.txt",
+            "license_sha256": "9ccf26cfe845e0eb8bb58053e47366e7ab6b697ae010f7650978d4b71b7d1fc1"
+          },
+          "status": "源清单声明；上游版本及许可证文本已保留，样本单独授权未独立审查"
+        }
+      ]
+    },
+    {
+      "source": "common/bin-parser/testdata/protocol-corpus/captures/ndpi/ndpi-http.pcapng",
+      "member": "captures/common/bin-parser/testdata/protocol-corpus/captures/ndpi/ndpi-http.pcapng",
+      "sha256": "e0c7de05f6993a726cd08702755bc4da9d15728fff44dcef55a8384ffd930ae7",
+      "bytes": 2012,
+      "first_packet_id": 5,
+      "sections": 1,
+      "interfaces": 1,
+      "packets": 10,
+      "link_types": [
+        1
+      ],
+      "packet_payload_sha256": "e8844f6176b48f01f1320518ba5a468b7b673a7d4704b60e32365b52f1bb7442",
+      "packet_bytes": 1278,
+      "protocols": [
+        "HTTP/1.1"
+      ],
+      "evidence_kinds": [
+        "upstream-positive"
+      ],
+      "license_evidence": [
+        {
+          "file": "common/bin-parser/testdata/protocol-corpus/manifest.json",
+          "repository": {
+            "id": "ndpi",
+            "repository": "ntop/nDPI",
+            "commit": "4cae778e7e8f846b34f11d4f8392504cdebd3db8",
+            "license": "LGPL-3.0",
+            "homepage": "https://github.com/ntop/nDPI",
+            "license_file": "licenses/ndpi-COPYING.txt",
+            "license_sha256": "9ccf26cfe845e0eb8bb58053e47366e7ab6b697ae010f7650978d4b71b7d1fc1"
+          },
+          "status": "源清单声明；上游版本及许可证文本已保留，样本单独授权未独立审查"
+        }
+      ]
+    },
+    {
+      "source": "common/bin-parser/testdata/protocol-corpus/captures/ndpi/ndpi-ssh.pcap",
+      "member": "captures/common/bin-parser/testdata/protocol-corpus/captures/ndpi/ndpi-ssh.pcap",
+      "sha256": "581856f8ab7248ba785d6a98734296054a2290002ecfa298b0ae89a62c12c030",
+      "bytes": 60724,
+      "first_packet_id": 15,
+      "sections": 1,
+      "interfaces": 1,
+      "packets": 322,
+      "link_types": [
+        1
+      ],
+      "packet_payload_sha256": "1ee6d5a584869315ceb7ec373103fbcb59c838731193727bef8a67cc09f3ff3a",
+      "packet_bytes": 49563,
+      "protocols": [
+        "SSH"
+      ],
+      "evidence_kinds": [
+        "upstream-positive"
+      ],
+      "license_evidence": [
+        {
+          "file": "common/bin-parser/testdata/protocol-corpus/manifest.json",
+          "repository": {
+            "id": "ndpi",
+            "repository": "ntop/nDPI",
+            "commit": "4cae778e7e8f846b34f11d4f8392504cdebd3db8",
+            "license": "LGPL-3.0",
+            "homepage": "https://github.com/ntop/nDPI",
+            "license_file": "licenses/ndpi-COPYING.txt",
+            "license_sha256": "9ccf26cfe845e0eb8bb58053e47366e7ab6b697ae010f7650978d4b71b7d1fc1"
+          },
+          "status": "源清单声明；上游版本及许可证文本已保留，样本单独授权未独立审查"
+        }
+      ]
+    },
+    {
+      "source": "common/bin-parser/testdata/protocol-corpus/captures/ndpi/ndpi-mqtt.pcap",
+      "member": "captures/common/bin-parser/testdata/protocol-corpus/captures/ndpi/ndpi-mqtt.pcap",
+      "sha256": "7d6552eb815eead6eabe0adbaa13366b4863b4c1c54dbb6fa65dec68a9738465",
+      "bytes": 2092,
+      "first_packet_id": 337,
+      "sections": 1,
+      "interfaces": 1,
+      "packets": 9,
+      "link_types": [
+        1
+      ],
+      "packet_payload_sha256": "aa50a19a4b30e9fb67e9efbcf0072e22e0f9a10d78d6e387c1d7665982c58cd5",
+      "packet_bytes": 1481,
+      "protocols": [
+        "MQTT"
+      ],
+      "evidence_kinds": [
+        "upstream-positive"
+      ],
+      "license_evidence": [
+        {
+          "file": "common/bin-parser/testdata/protocol-corpus/manifest.json",
+          "repository": {
+            "id": "ndpi",
+            "repository": "ntop/nDPI",
+            "commit": "4cae778e7e8f846b34f11d4f8392504cdebd3db8",
+            "license": "LGPL-3.0",
+            "homepage": "https://github.com/ntop/nDPI",
+            "license_file": "licenses/ndpi-COPYING.txt",
+            "license_sha256": "9ccf26cfe845e0eb8bb58053e47366e7ab6b697ae010f7650978d4b71b7d1fc1"
+          },
+          "status": "源清单声明；上游版本及许可证文本已保留，样本单独授权未独立审查"
+        }
+      ]
+    },
+    {
+      "source": "common/bin-parser/testdata/protocol-corpus/captures/ndpi/ndpi-mysql.pcapng",
+      "member": "captures/common/bin-parser/testdata/protocol-corpus/captures/ndpi/ndpi-mysql.pcapng",
+      "sha256": "11e0988e75b471e25d4c1e3948b9357b77882e5710a492976f2c54d8cf2d98b7",
+      "bytes": 8544,
+      "first_packet_id": 346,
+      "sections": 1,
+      "interfaces": 1,
+      "packets": 41,
+      "link_types": [
+        1
+      ],
+      "packet_payload_sha256": "ce6484fb144f1a7b4302c2c731bb9c93cea51df50846960e929fa8b47264d262",
+      "packet_bytes": 7009,
+      "protocols": [
+        "MySQL"
+      ],
+      "evidence_kinds": [
+        "upstream-positive"
+      ],
+      "license_evidence": [
+        {
+          "file": "common/bin-parser/testdata/protocol-corpus/manifest.json",
+          "repository": {
+            "id": "ndpi",
+            "repository": "ntop/nDPI",
+            "commit": "4cae778e7e8f846b34f11d4f8392504cdebd3db8",
+            "license": "LGPL-3.0",
+            "homepage": "https://github.com/ntop/nDPI",
+            "license_file": "licenses/ndpi-COPYING.txt",
+            "license_sha256": "9ccf26cfe845e0eb8bb58053e47366e7ab6b697ae010f7650978d4b71b7d1fc1"
+          },
+          "status": "源清单声明；上游版本及许可证文本已保留，样本单独授权未独立审查"
+        }
+      ]
+    },
+    {
+      "source": "common/bin-parser/testdata/protocol-corpus/captures/ndpi/ndpi-modbus.pcap",
+      "member": "captures/common/bin-parser/testdata/protocol-corpus/captures/ndpi/ndpi-modbus.pcap",
+      "sha256": "9e055a2d15a8e447be131002137341ae5f8f8b91b64576cd2fdbd854e141373e",
+      "bytes": 8337,
+      "first_packet_id": 387,
+      "sections": 1,
+      "interfaces": 1,
+      "packets": 102,
+      "link_types": [
+        1
+      ],
+      "packet_payload_sha256": "d8e52d0d291b4e5a79ca4188ad872c58bf8eed3ee46fcf571f8416caf9b9f45f",
+      "packet_bytes": 6681,
+      "protocols": [
+        "Modbus TCP"
+      ],
+      "evidence_kinds": [
+        "upstream-positive"
+      ],
+      "license_evidence": [
+        {
+          "file": "common/bin-parser/testdata/protocol-corpus/manifest.json",
+          "repository": {
+            "id": "ndpi",
+            "repository": "ntop/nDPI",
+            "commit": "4cae778e7e8f846b34f11d4f8392504cdebd3db8",
+            "license": "LGPL-3.0",
+            "homepage": "https://github.com/ntop/nDPI",
+            "license_file": "licenses/ndpi-COPYING.txt",
+            "license_sha256": "9ccf26cfe845e0eb8bb58053e47366e7ab6b697ae010f7650978d4b71b7d1fc1"
+          },
+          "status": "源清单声明；上游版本及许可证文本已保留，样本单独授权未独立审查"
+        }
+      ]
+    },
+    {
+      "source": "common/bin-parser/testdata/protocol-corpus/captures/ndpi/ndpi-s7comm.pcap",
+      "member": "captures/common/bin-parser/testdata/protocol-corpus/captures/ndpi/ndpi-s7comm.pcap",
+      "sha256": "a157e52b27efc3555879cc6cf0c1ddc7932e9eff38eebd688c1d3e6efd12c253",
+      "bytes": 25924,
+      "first_packet_id": 489,
+      "sections": 1,
+      "interfaces": 1,
+      "packets": 193,
+      "link_types": [
+        1
+      ],
+      "packet_payload_sha256": "c179245b2e1cd421f930055c5ad7ce29731d595970dd2cd8ecaff38ffe6dfb27",
+      "packet_bytes": 19127,
+      "protocols": [
+        "Siemens S7comm"
+      ],
+      "evidence_kinds": [
+        "upstream-positive"
+      ],
+      "license_evidence": [
+        {
+          "file": "common/bin-parser/testdata/protocol-corpus/manifest.json",
+          "repository": {
+            "id": "ndpi",
+            "repository": "ntop/nDPI",
+            "commit": "4cae778e7e8f846b34f11d4f8392504cdebd3db8",
+            "license": "LGPL-3.0",
+            "homepage": "https://github.com/ntop/nDPI",
+            "license_file": "licenses/ndpi-COPYING.txt",
+            "license_sha256": "9ccf26cfe845e0eb8bb58053e47366e7ab6b697ae010f7650978d4b71b7d1fc1"
+          },
+          "status": "源清单声明；上游版本及许可证文本已保留，样本单独授权未独立审查"
+        }
+      ]
+    },
+    {
+      "source": "common/bin-parser/testdata/protocol-corpus/captures/ndpi/ndpi-enip-cip.pcap",
+      "member": "captures/common/bin-parser/testdata/protocol-corpus/captures/ndpi/ndpi-enip-cip.pcap",
+      "sha256": "972ecad7521cb5a0e67d6ef604a155fc77f7b9470f26932c4a7db7d6e3975389",
+      "bytes": 55708,
+      "first_packet_id": 682,
+      "sections": 1,
+      "interfaces": 3,
+      "packets": 268,
+      "link_types": [
+        1
+      ],
+      "packet_payload_sha256": "e88683202f7135e5ebcad5230c2b1a85f292bc0603e96790bd7cf98b172b806b",
+      "packet_bytes": 46394,
+      "protocols": [
+        "EtherNet/IP CIP explicit"
+      ],
+      "evidence_kinds": [
+        "upstream-positive"
+      ],
+      "license_evidence": [
+        {
+          "file": "common/bin-parser/testdata/protocol-corpus/manifest.json",
+          "repository": {
+            "id": "ndpi",
+            "repository": "ntop/nDPI",
+            "commit": "4cae778e7e8f846b34f11d4f8392504cdebd3db8",
+            "license": "LGPL-3.0",
+            "homepage": "https://github.com/ntop/nDPI",
+            "license_file": "licenses/ndpi-COPYING.txt",
+            "license_sha256": "9ccf26cfe845e0eb8bb58053e47366e7ab6b697ae010f7650978d4b71b7d1fc1"
+          },
+          "status": "源清单声明；上游版本及许可证文本已保留，样本单独授权未独立审查"
+        }
+      ]
+    },
+    {
+      "source": "common/bin-parser/testdata/protocol-corpus/captures/ndpi/ndpi-opcua.pcap",
+      "member": "captures/common/bin-parser/testdata/protocol-corpus/captures/ndpi/ndpi-opcua.pcap",
+      "sha256": "46eff2793ee3105a7d478fc425a99e4cea9946a16194a2c3d95876300b2cf197",
+      "bytes": 51698,
+      "first_packet_id": 950,
+      "sections": 1,
+      "interfaces": 1,
+      "packets": 381,
+      "link_types": [
+        0
+      ],
+      "packet_payload_sha256": "b1b1048cd3ab81a8b6fc6849d62672cb19b70458f4de9833e1a03a951dde343f",
+      "packet_bytes": 45578,
+      "protocols": [
+        "OPC UA"
+      ],
+      "evidence_kinds": [
+        "upstream-positive"
+      ],
+      "license_evidence": [
+        {
+          "file": "common/bin-parser/testdata/protocol-corpus/manifest.json",
+          "repository": {
+            "id": "ndpi",
+            "repository": "ntop/nDPI",
+            "commit": "4cae778e7e8f846b34f11d4f8392504cdebd3db8",
+            "license": "LGPL-3.0",
+            "homepage": "https://github.com/ntop/nDPI",
+            "license_file": "licenses/ndpi-COPYING.txt",
+            "license_sha256": "9ccf26cfe845e0eb8bb58053e47366e7ab6b697ae010f7650978d4b71b7d1fc1"
+          },
+          "status": "源清单声明；上游版本及许可证文本已保留，样本单独授权未独立审查"
+        }
+      ]
+    },
+    {
+      "source": "common/bin-parser/testdata/protocol-corpus/captures/ndpi/ndpi-smtp.pcap",
+      "member": "captures/common/bin-parser/testdata/protocol-corpus/captures/ndpi/ndpi-smtp.pcap",
+      "sha256": "7e0941d2c082f93355adc95d6facabfd555534dbd57382c9866df336216a8f74",
+      "bytes": 24701,
+      "first_packet_id": 1331,
+      "sections": 1,
+      "interfaces": 1,
+      "packets": 95,
+      "link_types": [
+        1
+      ],
+      "packet_payload_sha256": "8cb23425e4ed6ab9be1edf6b6c0c7eac8bf7ab6bb0860372e7b07c5070eea44e",
+      "packet_bytes": 23157,
+      "protocols": [
+        "SMTP"
+      ],
+      "evidence_kinds": [
+        "upstream-positive"
+      ],
+      "license_evidence": [
+        {
+          "file": "common/bin-parser/testdata/protocol-corpus/manifest.json",
+          "repository": {
+            "id": "ndpi",
+            "repository": "ntop/nDPI",
+            "commit": "4cae778e7e8f846b34f11d4f8392504cdebd3db8",
+            "license": "LGPL-3.0",
+            "homepage": "https://github.com/ntop/nDPI",
+            "license_file": "licenses/ndpi-COPYING.txt",
+            "license_sha256": "9ccf26cfe845e0eb8bb58053e47366e7ab6b697ae010f7650978d4b71b7d1fc1"
+          },
+          "status": "源清单声明；上游版本及许可证文本已保留，样本单独授权未独立审查"
+        }
+      ]
+    },
+    {
+      "source": "common/bin-parser/testdata/protocol-corpus/captures/ndpi/ndpi-ftp.pcap",
+      "member": "captures/common/bin-parser/testdata/protocol-corpus/captures/ndpi/ndpi-ftp.pcap",
+      "sha256": "7614bed7802c5838276f3c40166bba5c0c4321ca056a77251befbc901e76b383",
+      "bytes": 128942,
+      "first_packet_id": 1426,
+      "sections": 1,
+      "interfaces": 1,
+      "packets": 209,
+      "link_types": [
+        1
+      ],
+      "packet_payload_sha256": "e305d9e2c6f10188bd79661627ca31e0e17a08e1736a04ee38d28e430dc63af5",
+      "packet_bytes": 125574,
+      "protocols": [
+        "FTP"
+      ],
+      "evidence_kinds": [
+        "upstream-positive"
+      ],
+      "license_evidence": [
+        {
+          "file": "common/bin-parser/testdata/protocol-corpus/manifest.json",
+          "repository": {
+            "id": "ndpi",
+            "repository": "ntop/nDPI",
+            "commit": "4cae778e7e8f846b34f11d4f8392504cdebd3db8",
+            "license": "LGPL-3.0",
+            "homepage": "https://github.com/ntop/nDPI",
+            "license_file": "licenses/ndpi-COPYING.txt",
+            "license_sha256": "9ccf26cfe845e0eb8bb58053e47366e7ab6b697ae010f7650978d4b71b7d1fc1"
+          },
+          "status": "源清单声明；上游版本及许可证文本已保留，样本单独授权未独立审查"
+        }
+      ]
+    },
+    {
+      "source": "common/bin-parser/testdata/protocol-corpus/captures/ndpi/ndpi-snmp.pcap",
+      "member": "captures/common/bin-parser/testdata/protocol-corpus/captures/ndpi/ndpi-snmp.pcap",
+      "sha256": "4e6820e58cbd04f057b6c6ad7bbccd1f5535e23c88c97c1b69ad96ce1c9677ab",
+      "bytes": 17788,
+      "first_packet_id": 1635,
+      "sections": 1,
+      "interfaces": 1,
+      "packets": 72,
+      "link_types": [
+        1
+      ],
+      "packet_payload_sha256": "6c8657719894a2dcd63ef73af1ac5992e936e09f192f1eaa7ac46f790e885cdf",
+      "packet_bytes": 14435,
+      "protocols": [
+        "SNMP"
+      ],
+      "evidence_kinds": [
+        "upstream-positive"
+      ],
+      "license_evidence": [
+        {
+          "file": "common/bin-parser/testdata/protocol-corpus/manifest.json",
+          "repository": {
+            "id": "ndpi",
+            "repository": "ntop/nDPI",
+            "commit": "4cae778e7e8f846b34f11d4f8392504cdebd3db8",
+            "license": "LGPL-3.0",
+            "homepage": "https://github.com/ntop/nDPI",
+            "license_file": "licenses/ndpi-COPYING.txt",
+            "license_sha256": "9ccf26cfe845e0eb8bb58053e47366e7ab6b697ae010f7650978d4b71b7d1fc1"
+          },
+          "status": "源清单声明；上游版本及许可证文本已保留，样本单独授权未独立审查"
+        }
+      ]
+    },
+    {
+      "source": "common/bin-parser/testdata/protocol-corpus/captures/ndpi/ndpi-dcerpc.pcap",
+      "member": "captures/common/bin-parser/testdata/protocol-corpus/captures/ndpi/ndpi-dcerpc.pcap",
+      "sha256": "6fd0ffc3562c4381126026f80388ae247ab1527e07ce83132e48445f2d52db04",
+      "bytes": 7146,
+      "first_packet_id": 1707,
+      "sections": 1,
+      "interfaces": 1,
+      "packets": 16,
+      "link_types": [
+        1
+      ],
+      "packet_payload_sha256": "609a7505ca5ab6989843b97773f9975c5d98bd4d96f3cf4c72d0f7389f71abbd",
+      "packet_bytes": 6866,
+      "protocols": [
+        "DCE/RPC"
+      ],
+      "evidence_kinds": [
+        "upstream-positive"
+      ],
+      "license_evidence": [
+        {
+          "file": "common/bin-parser/testdata/protocol-corpus/manifest.json",
+          "repository": {
+            "id": "ndpi",
+            "repository": "ntop/nDPI",
+            "commit": "4cae778e7e8f846b34f11d4f8392504cdebd3db8",
+            "license": "LGPL-3.0",
+            "homepage": "https://github.com/ntop/nDPI",
+            "license_file": "licenses/ndpi-COPYING.txt",
+            "license_sha256": "9ccf26cfe845e0eb8bb58053e47366e7ab6b697ae010f7650978d4b71b7d1fc1"
+          },
+          "status": "源清单声明；上游版本及许可证文本已保留，样本单独授权未独立审查"
+        }
+      ]
+    },
+    {
+      "source": "common/bin-parser/testdata/protocol-corpus/captures/generated-local/gen-dhcpv6.pcap",
+      "member": "captures/common/bin-parser/testdata/protocol-corpus/captures/generated-local/gen-dhcpv6.pcap",
+      "sha256": "da354f0ef9c5eb63d4b87a668bcf6d5e983aa5c050c51d7088f081b6790d1a1d",
+      "bytes": 120,
+      "first_packet_id": 1723,
+      "sections": 1,
+      "interfaces": 1,
+      "packets": 1,
+      "link_types": [
+        1
+      ],
+      "packet_payload_sha256": "9ccdb788b479fe7e5b4faf4a0e05f97ec7e80e1d21ae2db05b913563af41a81a",
+      "packet_bytes": 80,
+      "protocols": [
+        "DHCPv6"
+      ],
+      "evidence_kinds": [
+        "generated-positive"
+      ],
+      "license_evidence": [
+        {
+          "file": "common/bin-parser/testdata/protocol-corpus/manifest.json",
+          "repository": {
+            "id": "generated-local",
+            "repository": "local/generated",
+            "commit": "a4153b185aa442f28211f01300067e95baa0c2dd",
+            "license": "CC0-1.0",
+            "homepage": "https://github.com/yaklang/yaklang",
+            "license_file": "licenses/generated-local-NOTICE.txt",
+            "license_sha256": "7cc6fc5124f32ad7fc67fb7aa7aed01cd12db8d5f73524f2257c654044a34e6d"
+          },
+          "status": "源清单声明；上游版本及许可证文本已保留，样本单独授权未独立审查"
+        }
+      ]
+    },
+    {
+      "source": "common/bin-parser/testdata/protocol-corpus/captures/generated-local/gen-icmpv6.pcap",
+      "member": "captures/common/bin-parser/testdata/protocol-corpus/captures/generated-local/gen-icmpv6.pcap",
+      "sha256": "30185eb4f19d6d5d78b4c9f2905db463c9ab41e6397d71e872faf09a5a66eac9",
+      "bytes": 106,
+      "first_packet_id": 1724,
+      "sections": 1,
+      "interfaces": 1,
+      "packets": 1,
+      "link_types": [
+        1
+      ],
+      "packet_payload_sha256": "905b67644fdcb789365d06d7ecc48664a2da5a45cd3aba852fde623d1af5d304",
+      "packet_bytes": 66,
+      "protocols": [
+        "ICMPv6"
+      ],
+      "evidence_kinds": [
+        "generated-positive"
+      ],
+      "license_evidence": [
+        {
+          "file": "common/bin-parser/testdata/protocol-corpus/manifest.json",
+          "repository": {
+            "id": "generated-local",
+            "repository": "local/generated",
+            "commit": "a4153b185aa442f28211f01300067e95baa0c2dd",
+            "license": "CC0-1.0",
+            "homepage": "https://github.com/yaklang/yaklang",
+            "license_file": "licenses/generated-local-NOTICE.txt",
+            "license_sha256": "7cc6fc5124f32ad7fc67fb7aa7aed01cd12db8d5f73524f2257c654044a34e6d"
+          },
+          "status": "源清单声明；上游版本及许可证文本已保留，样本单独授权未独立审查"
+        }
+      ]
+    },
+    {
+      "source": "common/bin-parser/testdata/protocol-corpus/captures/generated-local/gen-llmnr-mdns.pcap",
+      "member": "captures/common/bin-parser/testdata/protocol-corpus/captures/generated-local/gen-llmnr-mdns.pcap",
+      "sha256": "e5dc55b30dbe26b1dea4cd40eda3cac15c2335a5eaaaa1887aecf6827bc0bb7e",
+      "bytes": 204,
+      "first_packet_id": 1725,
+      "sections": 1,
+      "interfaces": 1,
+      "packets": 2,
+      "link_types": [
+        1
+      ],
+      "packet_payload_sha256": "18bded977ec08b89d4fd9b0f1d48c1e713d2754646cfe6313f9d85080c39b8aa",
+      "packet_bytes": 148,
+      "protocols": [
+        "LLMNR-MDNS collision"
+      ],
+      "evidence_kinds": [
+        "generated-positive"
+      ],
+      "license_evidence": [
+        {
+          "file": "common/bin-parser/testdata/protocol-corpus/manifest.json",
+          "repository": {
+            "id": "generated-local",
+            "repository": "local/generated",
+            "commit": "a4153b185aa442f28211f01300067e95baa0c2dd",
+            "license": "CC0-1.0",
+            "homepage": "https://github.com/yaklang/yaklang",
+            "license_file": "licenses/generated-local-NOTICE.txt",
+            "license_sha256": "7cc6fc5124f32ad7fc67fb7aa7aed01cd12db8d5f73524f2257c654044a34e6d"
+          },
+          "status": "源清单声明；上游版本及许可证文本已保留，样本单独授权未独立审查"
+        }
+      ]
+    },
+    {
+      "source": "common/bin-parser/testdata/protocol-corpus/captures/generated-local/gen-ieee8021q.pcap",
+      "member": "captures/common/bin-parser/testdata/protocol-corpus/captures/generated-local/gen-ieee8021q.pcap",
+      "sha256": "9ca7a295857d7c704ea74118f31cee8cff8d37376d1811b9e49f60ed23f212a0",
+      "bytes": 86,
+      "first_packet_id": 1727,
+      "sections": 1,
+      "interfaces": 1,
+      "packets": 1,
+      "link_types": [
+        1
+      ],
+      "packet_payload_sha256": "914823aae224778503312e0871764af94af15e4dfda1aef4e08d442e54da7935",
+      "packet_bytes": 46,
+      "protocols": [
+        "IEEE 802.1Q"
+      ],
+      "evidence_kinds": [
+        "generated-positive"
+      ],
+      "license_evidence": [
+        {
+          "file": "common/bin-parser/testdata/protocol-corpus/manifest.json",
+          "repository": {
+            "id": "generated-local",
+            "repository": "local/generated",
+            "commit": "a4153b185aa442f28211f01300067e95baa0c2dd",
+            "license": "CC0-1.0",
+            "homepage": "https://github.com/yaklang/yaklang",
+            "license_file": "licenses/generated-local-NOTICE.txt",
+            "license_sha256": "7cc6fc5124f32ad7fc67fb7aa7aed01cd12db8d5f73524f2257c654044a34e6d"
+          },
+          "status": "源清单声明；上游版本及许可证文本已保留，样本单独授权未独立审查"
+        }
+      ]
+    },
+    {
+      "source": "common/bin-parser/testdata/protocol-corpus/captures/generated-local/gen-geneve.pcap",
+      "member": "captures/common/bin-parser/testdata/protocol-corpus/captures/generated-local/gen-geneve.pcap",
+      "sha256": "ee57b586f67b3c56f9a1e4144224462d6b8e233d48c7d581056ee4380bd4d58c",
+      "bytes": 118,
+      "first_packet_id": 1728,
+      "sections": 1,
+      "interfaces": 1,
+      "packets": 1,
+      "link_types": [
+        1
+      ],
+      "packet_payload_sha256": "5dc2b33f921e082081b2d6c1551ae97010e89fb6a5664e04d275b7dd14fc72f8",
+      "packet_bytes": 78,
+      "protocols": [
+        "Geneve"
+      ],
+      "evidence_kinds": [
+        "generated-positive"
+      ],
+      "license_evidence": [
+        {
+          "file": "common/bin-parser/testdata/protocol-corpus/manifest.json",
+          "repository": {
+            "id": "generated-local",
+            "repository": "local/generated",
+            "commit": "a4153b185aa442f28211f01300067e95baa0c2dd",
+            "license": "CC0-1.0",
+            "homepage": "https://github.com/yaklang/yaklang",
+            "license_file": "licenses/generated-local-NOTICE.txt",
+            "license_sha256": "7cc6fc5124f32ad7fc67fb7aa7aed01cd12db8d5f73524f2257c654044a34e6d"
+          },
+          "status": "源清单声明；上游版本及许可证文本已保留，样本单独授权未独立审查"
+        }
+      ]
+    },
+    {
+      "source": "common/bin-parser/testdata/protocol-corpus/captures/generated-local/gen-jsonrpc.pcap",
+      "member": "captures/common/bin-parser/testdata/protocol-corpus/captures/generated-local/gen-jsonrpc.pcap",
+      "sha256": "6838e32b3cde439e567a24ae656b691c3ab9dfc56d4228536ad02f4c919c2bc2",
+      "bytes": 450,
+      "first_packet_id": 1729,
+      "sections": 1,
+      "interfaces": 1,
+      "packets": 4,
+      "link_types": [
+        1
+      ],
+      "packet_payload_sha256": "004dbabbe80fe23fb4e550b306d4d0a4741c01a60da74555c888f00c9b8295c8",
+      "packet_bytes": 362,
+      "protocols": [
+        "JSON-RPC 2.0"
+      ],
+      "evidence_kinds": [
+        "generated-positive"
+      ],
+      "license_evidence": [
+        {
+          "file": "common/bin-parser/testdata/protocol-corpus/manifest.json",
+          "repository": {
+            "id": "generated-local",
+            "repository": "local/generated",
+            "commit": "a4153b185aa442f28211f01300067e95baa0c2dd",
+            "license": "CC0-1.0",
+            "homepage": "https://github.com/yaklang/yaklang",
+            "license_file": "licenses/generated-local-NOTICE.txt",
+            "license_sha256": "7cc6fc5124f32ad7fc67fb7aa7aed01cd12db8d5f73524f2257c654044a34e6d"
+          },
+          "status": "源清单声明；上游版本及许可证文本已保留，样本单独授权未独立审查"
+        }
+      ]
+    },
+    {
+      "source": "common/bin-parser/testdata/protocol-corpus/captures/ndpi/ndpi-rtp.pcapng",
+      "member": "captures/common/bin-parser/testdata/protocol-corpus/captures/ndpi/ndpi-rtp.pcapng",
+      "sha256": "134b144010d7715963c51adbd677ad685a62b6014d6bd7e5bc077278204a51ff",
+      "bytes": 64212,
+      "first_packet_id": 1733,
+      "sections": 1,
+      "interfaces": 2,
+      "packets": 112,
+      "link_types": [
+        1
+      ],
+      "packet_payload_sha256": "bc313d2e554678a10520db698494d683af41b6b363fae0ef3326898d3420c72e",
+      "packet_bytes": 59807,
+      "protocols": [
+        "RTP (nDPI regression on dynamically assigned UDP ports)"
+      ],
+      "evidence_kinds": [
+        "upstream-positive"
+      ],
+      "license_evidence": [
+        {
+          "file": "common/bin-parser/testdata/protocol-corpus/manifest.json",
+          "repository": {
+            "id": "ndpi",
+            "repository": "ntop/nDPI",
+            "commit": "4cae778e7e8f846b34f11d4f8392504cdebd3db8",
+            "license": "LGPL-3.0",
+            "homepage": "https://github.com/ntop/nDPI",
+            "license_file": "licenses/ndpi-COPYING.txt",
+            "license_sha256": "9ccf26cfe845e0eb8bb58053e47366e7ab6b697ae010f7650978d4b71b7d1fc1"
+          },
+          "status": "源清单声明；上游版本及许可证文本已保留，样本单独授权未独立审查"
+        }
+      ]
+    },
+    {
+      "source": "common/bin-parser/testdata/protocol-corpus/captures/ndpi/ndpi-coap.pcap",
+      "member": "captures/common/bin-parser/testdata/protocol-corpus/captures/ndpi/ndpi-coap.pcap",
+      "sha256": "54c5e28aa9a0eda7312bc1de07924e9bb8fe37c3ffb4bd97c00de97818f5bd1e",
+      "bytes": 119939,
+      "first_packet_id": 1845,
+      "sections": 1,
+      "interfaces": 1,
+      "packets": 1082,
+      "link_types": [
+        1
+      ],
+      "packet_payload_sha256": "86f1c78cf02e8ea72af201ad38bcd1d18bd5098558a9414df8b419fab27ee763",
+      "packet_bytes": 102603,
+      "protocols": [
+        "CoAP"
+      ],
+      "evidence_kinds": [
+        "upstream-positive"
+      ],
+      "license_evidence": [
+        {
+          "file": "common/bin-parser/testdata/protocol-corpus/manifest.json",
+          "repository": {
+            "id": "ndpi",
+            "repository": "ntop/nDPI",
+            "commit": "4cae778e7e8f846b34f11d4f8392504cdebd3db8",
+            "license": "LGPL-3.0",
+            "homepage": "https://github.com/ntop/nDPI",
+            "license_file": "licenses/ndpi-COPYING.txt",
+            "license_sha256": "9ccf26cfe845e0eb8bb58053e47366e7ab6b697ae010f7650978d4b71b7d1fc1"
+          },
+          "status": "源清单声明；上游版本及许可证文本已保留，样本单独授权未独立审查"
+        }
+      ]
+    },
+    {
+      "source": "common/bin-parser/testdata/protocol-corpus/captures/ndpi/ndpi-sip.pcap",
+      "member": "captures/common/bin-parser/testdata/protocol-corpus/captures/ndpi/ndpi-sip.pcap",
+      "sha256": "e2ace90f2a0df341a28bec156278bc4ec7f1fc7351be2752bc924854f2d52145",
+      "bytes": 50975,
+      "first_packet_id": 2927,
+      "sections": 1,
+      "interfaces": 1,
+      "packets": 112,
+      "link_types": [
+        1
+      ],
+      "packet_payload_sha256": "b0fccac6b06a461f4fc1d695f81d798695c556266c69b808f9f8067871abbea5",
+      "packet_bytes": 49159,
+      "protocols": [
+        "SIP"
+      ],
+      "evidence_kinds": [
+        "upstream-positive"
+      ],
+      "license_evidence": [
+        {
+          "file": "common/bin-parser/testdata/protocol-corpus/manifest.json",
+          "repository": {
+            "id": "ndpi",
+            "repository": "ntop/nDPI",
+            "commit": "4cae778e7e8f846b34f11d4f8392504cdebd3db8",
+            "license": "LGPL-3.0",
+            "homepage": "https://github.com/ntop/nDPI",
+            "license_file": "licenses/ndpi-COPYING.txt",
+            "license_sha256": "9ccf26cfe845e0eb8bb58053e47366e7ab6b697ae010f7650978d4b71b7d1fc1"
+          },
+          "status": "源清单声明；上游版本及许可证文本已保留，样本单独授权未独立审查"
+        }
+      ]
+    },
+    {
+      "source": "common/bin-parser/testdata/protocol-corpus/captures/ndpi/ndpi-zabbix-agent.pcap",
+      "member": "captures/common/bin-parser/testdata/protocol-corpus/captures/ndpi/ndpi-zabbix-agent.pcap",
+      "sha256": "bc23d5332102bf32f052d9f12a1ad8d8309638bd8e28fc702e5649ae328a0ae4",
+      "bytes": 32732,
+      "first_packet_id": 3039,
+      "sections": 1,
+      "interfaces": 1,
+      "packets": 236,
+      "link_types": [
+        1
+      ],
+      "packet_payload_sha256": "f17d54f9fd256a0279241bd23d91bf102d0d619ce75e60fb3af1e9f7529c3f64",
+      "packet_bytes": 24571,
+      "protocols": [
+        "Zabbix agent protocol"
+      ],
+      "evidence_kinds": [
+        "upstream-positive"
+      ],
+      "license_evidence": [
+        {
+          "file": "common/bin-parser/testdata/protocol-corpus/manifest.json",
+          "repository": {
+            "id": "ndpi",
+            "repository": "ntop/nDPI",
+            "commit": "4cae778e7e8f846b34f11d4f8392504cdebd3db8",
+            "license": "LGPL-3.0",
+            "homepage": "https://github.com/ntop/nDPI",
+            "license_file": "licenses/ndpi-COPYING.txt",
+            "license_sha256": "9ccf26cfe845e0eb8bb58053e47366e7ab6b697ae010f7650978d4b71b7d1fc1"
+          },
+          "status": "源清单声明；上游版本及许可证文本已保留，样本单独授权未独立审查"
+        }
+      ]
+    },
+    {
+      "source": "common/bin-parser/testdata/protocol-corpus/captures/ndpi/ndpi-syslog.pcap",
+      "member": "captures/common/bin-parser/testdata/protocol-corpus/captures/ndpi/ndpi-syslog.pcap",
+      "sha256": "f53a4f5de002f385107fb0077d898107ce041e5e11105b53ea051b57156d1c4b",
+      "bytes": 21927,
+      "first_packet_id": 3275,
+      "sections": 1,
+      "interfaces": 1,
+      "packets": 94,
+      "link_types": [
+        1
+      ],
+      "packet_payload_sha256": "6b0bf4d1968efd2b39a63c9614f376352025a21f32d1c5197e0966d69e1fadba",
+      "packet_bytes": 20399,
+      "protocols": [
+        "Syslog"
+      ],
+      "evidence_kinds": [
+        "upstream-positive"
+      ],
+      "license_evidence": [
+        {
+          "file": "common/bin-parser/testdata/protocol-corpus/manifest.json",
+          "repository": {
+            "id": "ndpi",
+            "repository": "ntop/nDPI",
+            "commit": "4cae778e7e8f846b34f11d4f8392504cdebd3db8",
+            "license": "LGPL-3.0",
+            "homepage": "https://github.com/ntop/nDPI",
+            "license_file": "licenses/ndpi-COPYING.txt",
+            "license_sha256": "9ccf26cfe845e0eb8bb58053e47366e7ab6b697ae010f7650978d4b71b7d1fc1"
+          },
+          "status": "源清单声明；上游版本及许可证文本已保留，样本单独授权未独立审查"
+        }
+      ]
+    }
+  ]
+}

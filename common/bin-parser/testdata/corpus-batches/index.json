@@ -96092,6 +96092,87 @@
         "scripts/protocol-tests/required-tests-traffic-unified-v88.json": "required-tests-traffic-unified-v88.json",
         "common/pcapx/pcaputil/fins-memory-operations/legacy-overrides.json": "fins-memory-operations/legacy-overrides.json"
       }
+    },
+    {
+      "id": "validation-tcp-fin-completeness",
+      "kind": "validation",
+      "source_sha": "16b6fe99c6a63b51824a081586819e1d0c4c2a6f",
+      "file": "validation-tcp-fin-completeness.zip",
+      "sha256": "46a875b37431c3c358ada518a82a70a8b55930c5d763a15c9286b44c729ac0c5",
+      "password": "bin-parser",
+      "members": {
+        "required-tests-traffic-unified-v89.json": {
+          "sha256": "a55458521f4ecb5f85990ee31aa962a92f5b40f2e69ab2ff6dd84edef30e38b2",
+          "bytes": 23745698
+        },
+        "tcp-fin-completeness-tools/build.py": {
+          "sha256": "1c0855dbfe60e19a6ba7c1367532e5f4876d199c8f9024369bf3fe1c7ab048d2",
+          "bytes": 4854
+        },
+        "tcp-fin-completeness-tools/source-pin.json": {
+          "sha256": "a77b120dbb8cf7b3249daaced5692bac85115bc003eb44f5fa2eb24f21a573bc",
+          "bytes": 866
+        },
+        "tcp-fin-completeness-tools/verify.py": {
+          "sha256": "7a5571503718b942b0691c0c9ec9953f09c900544341bfb5c5bf15d16193cf31",
+          "bytes": 1637
+        },
+        "tcp-fin-completeness/captures/ipv4-linear-fin-recover-pending-recover.pcap": {
+          "sha256": "ff046bdff9152b82fbfb0d9b6e6830e89e36bfd6c81b8908477dd9a93979cfa3",
+          "bytes": 250
+        },
+        "tcp-fin-completeness/captures/ipv4-linear-fin-recover-pending-refused.pcap": {
+          "sha256": "e8d5dd0421e9bf35a67b4709d8d315d9fb1378b6eee9a944c142ed634341f55f",
+          "bytes": 173
+        },
+        "tcp-fin-completeness/captures/ipv4-wrap-fin-recover-pending-recover.pcap": {
+          "sha256": "6bf911d496ff6af2e5017f2065cf5189ff96ad8e097164fe307d9a8a465015bf",
+          "bytes": 250
+        },
+        "tcp-fin-completeness/captures/ipv4-wrap-fin-recover-pending-refused.pcap": {
+          "sha256": "6c9fc415d3ed0c78561f9b69b0274acb27a114aa73ebbdf5c8dff4e6067f62ed",
+          "bytes": 173
+        },
+        "tcp-fin-completeness/captures/ipv6-linear-fin-recover-pending-recover.pcap": {
+          "sha256": "80fda7717bb5876b34526db212a1383c7c042df64d3cb83f3fa9b8fec112b5ef",
+          "bytes": 310
+        },
+        "tcp-fin-completeness/captures/ipv6-linear-fin-recover-pending-refused.pcap": {
+          "sha256": "9c64fc6f672d35d89594ffeff957cc53e3ed2cca4749c2559228f9c848b6f05a",
+          "bytes": 213
+        },
+        "tcp-fin-completeness/captures/ipv6-wrap-fin-recover-pending-recover.pcap": {
+          "sha256": "9566ff511a644d4f4d295499cb2cc7d2e93b3b8d46896f240a13c32801273406",
+          "bytes": 310
+        },
+        "tcp-fin-completeness/captures/ipv6-wrap-fin-recover-pending-refused.pcap": {
+          "sha256": "a1210b5c0fe4b511c2ea3239a3253973efe482e261ec6ea213ac95390b6ef687",
+          "bytes": 213
+        },
+        "tcp-fin-completeness/controls.json": {
+          "sha256": "7592acd81ab439c00b9f90540601ec396f79d1c61f71c36acd8d7d1f7d561edb",
+          "bytes": 23072
+        },
+        "validation/expected.json": {
+          "sha256": "28e5ac713652b05ae593cb465b3eacd0304e170e9edd8317894398329127ba5a",
+          "bytes": 9215
+        }
+      },
+      "aliases": {
+        "common/pcapx/pcaputil/tcp-fin-completeness-tools/build.py": "tcp-fin-completeness-tools/build.py",
+        "common/pcapx/pcaputil/tcp-fin-completeness-tools/source-pin.json": "tcp-fin-completeness-tools/source-pin.json",
+        "common/pcapx/pcaputil/tcp-fin-completeness-tools/verify.py": "tcp-fin-completeness-tools/verify.py",
+        "common/pcapx/pcaputil/tcp-fin-completeness/captures/ipv4-linear-fin-recover-pending-recover.pcap": "tcp-fin-completeness/captures/ipv4-linear-fin-recover-pending-recover.pcap",
+        "common/pcapx/pcaputil/tcp-fin-completeness/captures/ipv4-linear-fin-recover-pending-refused.pcap": "tcp-fin-completeness/captures/ipv4-linear-fin-recover-pending-refused.pcap",
+        "common/pcapx/pcaputil/tcp-fin-completeness/captures/ipv4-wrap-fin-recover-pending-recover.pcap": "tcp-fin-completeness/captures/ipv4-wrap-fin-recover-pending-recover.pcap",
+        "common/pcapx/pcaputil/tcp-fin-completeness/captures/ipv4-wrap-fin-recover-pending-refused.pcap": "tcp-fin-completeness/captures/ipv4-wrap-fin-recover-pending-refused.pcap",
+        "common/pcapx/pcaputil/tcp-fin-completeness/captures/ipv6-linear-fin-recover-pending-recover.pcap": "tcp-fin-completeness/captures/ipv6-linear-fin-recover-pending-recover.pcap",
+        "common/pcapx/pcaputil/tcp-fin-completeness/captures/ipv6-linear-fin-recover-pending-refused.pcap": "tcp-fin-completeness/captures/ipv6-linear-fin-recover-pending-refused.pcap",
+        "common/pcapx/pcaputil/tcp-fin-completeness/captures/ipv6-wrap-fin-recover-pending-recover.pcap": "tcp-fin-completeness/captures/ipv6-wrap-fin-recover-pending-recover.pcap",
+        "common/pcapx/pcaputil/tcp-fin-completeness/captures/ipv6-wrap-fin-recover-pending-refused.pcap": "tcp-fin-completeness/captures/ipv6-wrap-fin-recover-pending-refused.pcap",
+        "common/pcapx/pcaputil/tcp-fin-completeness/controls.json": "tcp-fin-completeness/controls.json",
+        "scripts/protocol-tests/required-tests-traffic-unified-v89.json": "required-tests-traffic-unified-v89.json"
+      }
     }
   ],
   "schema_version": 1,

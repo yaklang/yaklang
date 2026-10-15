@@ -13,6 +13,10 @@ type TCPReassemblyOptions struct {
 	// a readable copy of the stream. Reassembled callbacks receive chunks of at
 	// most MaxFrameBytes. Read/GetBuffer return EOF in this mode. Consumers may
 	// retain callback frames; their memory is then owned by the consumer.
+	// AllowIncomplete retains delivered bytes and diagnostics instead of
+	// failing an offline replay on gaps/invalid segments/resource limits.
+	// Missing bytes are never concatenated; callers must inspect flow status.
+	AllowIncomplete         bool
 	Stream                  bool
 	MaxFrameBytes           int
 	MaxPendingBytes         int
