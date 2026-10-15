@@ -47,7 +47,8 @@ func (ref jobExecutionRef) scopedEventID(eventID string) string {
 }
 
 type jobEventPublisher struct {
-	node *node.NodeBase
+	node   *node.NodeBase
+	outbox *jobEventOutbox
 
 	mu      sync.Mutex
 	natsURL string
@@ -377,10 +378,6 @@ func (p *jobEventPublisher) publish(
 	if ref.NodeSessionID != "" && ref.NodeSessionID != session.SessionID {
 		return fmt.Errorf("job event belongs to a retired node session")
 	}
-	if err := p.ensureJetStream(session.NATSURL); err != nil {
-		return err
-	}
-
 	// The same Attempt may rebind after an old transport event was fenced.
 	// Keep retries idempotent inside one Bind without suppressing the new Bind.
 	eventID = ref.scopedEventID(eventID)
@@ -411,6 +408,12 @@ func (p *jobEventPublisher) publish(
 	}
 	if err != nil {
 		return fmt.Errorf("marshal job event: %w", err)
+	}
+	if p.outbox != nil && ref.NodeSessionID != "" && ref.EventNamespace == "" {
+		return p.outbox.enqueue(durableJobEvent{NodeID: p.node.CurrentNodeID(), Ref: ref, EventID: eventID, Subject: subject, Payload: raw, CreatedAt: time.Now().UTC(), Terminal: eventType == legionEventSucceeded || eventType == legionEventFailed || eventType == legionEventCancelled})
+	}
+	if err := p.ensureJetStream(session.NATSURL); err != nil {
+		return err
 	}
 	msg := nats.NewMsg(subject)
 	msg.Data = raw

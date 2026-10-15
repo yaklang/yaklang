@@ -28,37 +28,42 @@ type SessionTransport interface {
 
 // BootstrapRequest is sent once to create a short-lived node session.
 type BootstrapRequest struct {
-	EnrollmentToken          string            `json:"enrollment_token"`
-	ClaimedName              string            `json:"claimed_name"`
-	AgentInstallationID      string            `json:"agent_installation_id"`
-	HostIdentity             HostIdentity      `json:"host_identity"`
-	NodeType                 string            `json:"node_type"`
-	Kind                     string            `json:"kind"`
-	DockerEndpoint           string            `json:"docker_endpoint,omitempty"`
-	Version                  string            `json:"version"`
-	EngineReleaseID          string            `json:"engine_release_id,omitempty"`
-	EngineDigest             string            `json:"engine_digest,omitempty"`
-	Labels                   map[string]string `json:"labels"`
-	CapabilityKeys           []string          `json:"capability_keys"`
-	HeartbeatIntervalSeconds uint32            `json:"heartbeat_interval_seconds"`
+	PendingJobDeliveries     []PendingJobDelivery `json:"pending_job_deliveries,omitempty"`
+	EnrollmentToken          string               `json:"enrollment_token"`
+	ClaimedName              string               `json:"claimed_name"`
+	AgentInstallationID      string               `json:"agent_installation_id"`
+	HostIdentity             HostIdentity         `json:"host_identity"`
+	NodeType                 string               `json:"node_type"`
+	Kind                     string               `json:"kind"`
+	DockerEndpoint           string               `json:"docker_endpoint,omitempty"`
+	Version                  string               `json:"version"`
+	EngineReleaseID          string               `json:"engine_release_id,omitempty"`
+	EngineDigest             string               `json:"engine_digest,omitempty"`
+	Labels                   map[string]string    `json:"labels"`
+	CapabilityKeys           []string             `json:"capability_keys"`
+	HeartbeatIntervalSeconds uint32               `json:"heartbeat_interval_seconds"`
 	HostInfo
 }
 
 // SessionState is the session material returned by the platform.
 type SessionState struct {
-	NodeID                      string
-	SessionID                   string
-	SessionToken                string
-	NATSURL                     string
-	CommandSubject              string
-	EventSubjectPrefix          string
-	ExpiresAt                   time.Time
-	RuntimeHostCapacityAccepted bool
-	ResourcePolicyRequired      bool
+	JobDeliveryRecoverySupported bool
+	AcceptedJobDeliveryAttempts  []string
+	JobDeliveryReceipts          []JobDeliveryReceipt
+	NodeID                       string
+	SessionID                    string
+	SessionToken                 string
+	NATSURL                      string
+	CommandSubject               string
+	EventSubjectPrefix           string
+	ExpiresAt                    time.Time
+	RuntimeHostCapacityAccepted  bool
+	ResourcePolicyRequired       bool
 }
 
 // HeartbeatRequest keeps the node session alive and reports runtime state.
 type HeartbeatRequest struct {
+	PendingJobDeliveries     []PendingJobDelivery     `json:"pending_job_deliveries,omitempty"`
 	LifecycleState           string                   `json:"lifecycle_state"`
 	Version                  string                   `json:"version"`
 	RunningJobs              uint32                   `json:"running_jobs"`
@@ -148,30 +153,36 @@ func (t *httpTransport) Bootstrap(
 	request BootstrapRequest,
 ) (SessionState, error) {
 	var response struct {
-		NodeID                      string    `json:"node_id"`
-		NodeSessionID               string    `json:"node_session_id"`
-		SessionToken                string    `json:"session_token"`
-		NATSURL                     string    `json:"nats_url"`
-		CommandSubject              string    `json:"command_subject"`
-		EventSubjectPrefix          string    `json:"event_subject_prefix"`
-		ExpiresAt                   time.Time `json:"expires_at"`
-		ResourcePolicyRequired      bool      `json:"resource_policy_required"`
-		RuntimeHostCapacityAccepted bool      `json:"runtime_host_capacity_accepted"`
+		JobDeliveryRecoverySupported bool                 `json:"job_delivery_recovery_supported"`
+		AcceptedJobDeliveryAttempts  []string             `json:"accepted_job_delivery_attempts"`
+		JobDeliveryReceipts          []JobDeliveryReceipt `json:"job_delivery_receipts"`
+		NodeID                       string               `json:"node_id"`
+		NodeSessionID                string               `json:"node_session_id"`
+		SessionToken                 string               `json:"session_token"`
+		NATSURL                      string               `json:"nats_url"`
+		CommandSubject               string               `json:"command_subject"`
+		EventSubjectPrefix           string               `json:"event_subject_prefix"`
+		ExpiresAt                    time.Time            `json:"expires_at"`
+		ResourcePolicyRequired       bool                 `json:"resource_policy_required"`
+		RuntimeHostCapacityAccepted  bool                 `json:"runtime_host_capacity_accepted"`
 	}
 
 	if err := t.postJSON(ctx, bootstrapEndpointPath, "", request, &response); err != nil {
 		return SessionState{}, err
 	}
 	return SessionState{
-		NodeID:                      strings.TrimSpace(response.NodeID),
-		SessionID:                   response.NodeSessionID,
-		SessionToken:                response.SessionToken,
-		NATSURL:                     response.NATSURL,
-		CommandSubject:              response.CommandSubject,
-		EventSubjectPrefix:          response.EventSubjectPrefix,
-		ExpiresAt:                   response.ExpiresAt,
-		RuntimeHostCapacityAccepted: response.RuntimeHostCapacityAccepted,
-		ResourcePolicyRequired:      response.ResourcePolicyRequired,
+		JobDeliveryRecoverySupported: response.JobDeliveryRecoverySupported,
+		AcceptedJobDeliveryAttempts:  response.AcceptedJobDeliveryAttempts,
+		JobDeliveryReceipts:          response.JobDeliveryReceipts,
+		NodeID:                       strings.TrimSpace(response.NodeID),
+		SessionID:                    response.NodeSessionID,
+		SessionToken:                 response.SessionToken,
+		NATSURL:                      response.NATSURL,
+		CommandSubject:               response.CommandSubject,
+		EventSubjectPrefix:           response.EventSubjectPrefix,
+		ExpiresAt:                    response.ExpiresAt,
+		RuntimeHostCapacityAccepted:  response.RuntimeHostCapacityAccepted,
+		ResourcePolicyRequired:       response.ResourcePolicyRequired,
 	}, nil
 }
 

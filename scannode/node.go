@@ -193,6 +193,11 @@ func NewScanNode(cfg node.BaseConfig, options ...ScanNodeOption) (*ScanNode, err
 		}
 	}
 	agent.bridge = newLegionJobBridge(agent)
+	if err := agent.bridge.publisher.initializeOutbox(); err != nil {
+		base.Shutdown()
+		_ = agent.ssaGitScopeLock.Release()
+		return nil, err
+	}
 	return agent, nil
 }
 
@@ -285,6 +290,21 @@ func (s *ScanNode) Snapshot() node.RuntimeStatus {
 		RunningJobs:    s.invokeLimiter.activeCount(),
 		MaxRunningJobs: s.maxRunningJobs,
 		ActiveAttempts: s.manager.ActiveAttemptHeartbeats(time.Now().UTC()),
+	}
+	if s.bridge != nil && s.bridge.publisher != nil {
+		if box := s.bridge.publisher.outbox; box != nil && box.admissionError() != nil {
+			status.LifecycleState = "degraded"
+		}
+		seen := make(map[string]bool)
+		for _, a := range status.ActiveAttempts {
+			seen[a.AttemptID] = true
+		}
+		for _, a := range s.bridge.publisher.pendingHeartbeats() {
+			if !seen[a.AttemptID] {
+				status.ActiveAttempts = append(status.ActiveAttempts, a)
+				seen[a.AttemptID] = true
+			}
+		}
 	}
 	if s.hostResources != nil {
 		if capacity, err := s.hostResources.Snapshot(); err == nil {

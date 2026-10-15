@@ -23,7 +23,7 @@ func (n *NodeBase) bootstrapSession() error {
 	ctx, cancel := context.WithTimeout(n.rootCtx, n.requestTimeout)
 	defer cancel()
 
-	session, err := n.transport.Bootstrap(ctx, BootstrapRequest{
+	request := BootstrapRequest{
 		EnrollmentToken:          n.enrollmentToken,
 		ClaimedName:              n.DisplayName(),
 		AgentInstallationID:      n.AgentInstallationID(),
@@ -38,12 +38,22 @@ func (n *NodeBase) bootstrapSession() error {
 		CapabilityKeys:           cloneStringSlice(n.capabilityKeys),
 		HeartbeatIntervalSeconds: durationToWholeSeconds(n.heartbeatInterval),
 		HostInfo:                 n.hostInfoSnapshot(),
-	})
+	}
+	provider, hasDelivery := n.statusProvider.(JobDeliveryProvider)
+	if hasDelivery {
+		request.PendingJobDeliveries = provider.PendingJobDeliveries()
+	}
+	session, err := n.transport.Bootstrap(ctx, request)
 	if err != nil {
 		return err
 	}
 	if session.NodeID == "" {
 		return fmt.Errorf("bootstrap response node_id is required")
+	}
+	if hasDelivery {
+		if err := provider.AcceptJobDeliveryRecovery(session); err != nil {
+			return fmt.Errorf("recover job delivery: %w", err)
+		}
 	}
 	n.setCurrentNodeID(session.NodeID)
 

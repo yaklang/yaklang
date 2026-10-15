@@ -34,6 +34,9 @@ func (n *NodeBase) heartbeat() error {
 		RuntimeHostCapacity:      cloneRuntimeHostCapacity(status.RuntimeHostCapacity),
 		HostInfo:                 n.hostInfoSnapshot(),
 	}
+	if provider, ok := n.statusProvider.(JobDeliveryProvider); ok {
+		request.PendingJobDeliveries = provider.PendingJobDeliveries()
+	}
 	if transport, ok := n.transport.(ResourcePolicyTransport); ok {
 		response, err := transport.HeartbeatWithResponse(ctx, session, request)
 		if err != nil {
@@ -53,6 +56,11 @@ func (n *NodeBase) heartbeat() error {
 			}
 		} else if session.ResourcePolicyRequired {
 			return n.rejectHeartbeatPolicy(fmt.Errorf("required resource policy missing from heartbeat"))
+		}
+		if provider, ok := n.statusProvider.(JobDeliveryProvider); ok {
+			if err := provider.ApplyJobDeliveryReceipts(response.JobDeliveryReceipts); err != nil {
+				return err
+			}
 		}
 		return nil
 	}

@@ -15,7 +15,8 @@ type ResourcePolicy struct {
 	MaxRunningJobs              uint32 `json:"max_running_jobs"`
 }
 type HeartbeatResponse struct {
-	ResourcePolicy *ResourcePolicy `json:"resource_policy,omitempty"`
+	JobDeliveryReceipts []JobDeliveryReceipt `json:"job_delivery_receipts,omitempty"`
+	ResourcePolicy      *ResourcePolicy      `json:"resource_policy,omitempty"`
 }
 type ResourcePolicyApplier interface{ ApplyResourcePolicy(ResourcePolicy) error }
 

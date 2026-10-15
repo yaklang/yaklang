@@ -77,6 +77,30 @@ copied into either message.
 
 支持本系统扫描指纹直接上报，非常好用了。
 
+## Legion 扫描事件的本地持久化
+
+普通 `DispatchJobCommand` 的事件先写入 `<base-dir>/legion/job-outbox`，
+文件及目录权限分别为 `0600`、`0700`。成功入队前会同步文件、原子重命名并同步目录；
+发送器按落盘顺序回放原始 protobuf、EventID、CommandID、Attempt 和执行 Session。
+资产、风险等事件取得 JetStream 确认后移除；完成事件还要等待 HTTP 心跳中的平台落库回执。
+已完成命令的精简回执保留 24 小时，避免重启后的旧命令再次执行。
+
+节点重启时通过 bootstrap 声明已落盘的完成事件。配套 Legion 版本会验证同一安装身份、
+原执行绑定和最新 Attempt，并授予最多 15 分钟的投递恢复窗口。重连不能延长这个上限。
+恢复窗口由新 Session 的 HTTP 心跳维持，不修改原执行 Session；已有替代 Attempt 的结果会退入
+`retired/` 留作诊断。恢复的是事件投递，不会重新启动已结束的脚本。
+
+活动队列上限为 10,000 条、256 MiB protobuf、256 个 Attempt；单条上限为 8 MiB，
+实际发送仍受 NATS 服务端的消息大小限制。精简完成回执上限为 100,000 条。
+队列损坏会阻止启动；持久化 I/O 错误或容量耗尽会暂停新执行准入并报告 degraded。
+`retired/` 诊断文件需运维单独管理，不包含在活动队列容量内。
+
+日志 `job_delivery_backlog` 提供待确认事件数量、字节和最老等待时间，
+`job_delivery_receipt` 提供最终处置及从落盘到回执的时间。
+需要同时升级配套平台协议和数据库迁移；带未确认事件的节点遇到不支持恢复的旧平台会拒绝继续注册。
+当前运行验收范围为 Linux 本地文件系统与持久 JetStream；物理磁盘丢失、已产生替代 Attempt、
+任意外部副作用的恰好一次、AI managed-input 事件及多机房灾难恢复不在该保证内。
+
 
 
 

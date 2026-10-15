@@ -137,6 +137,11 @@ func (b *legionJobBridge) Run(ctx context.Context) {
 
 	go b.forwardCapabilityAlerts(ctx)
 	go b.forwardCapabilityObservations(ctx)
+	deliveryCtx, cancelDelivery := context.WithCancel(ctx)
+	var deliveryDone sync.WaitGroup
+	deliveryDone.Add(1)
+	go func() { defer deliveryDone.Done(); b.publisher.runDelivery(deliveryCtx) }()
+	defer func() { cancelDelivery(); deliveryDone.Wait() }()
 
 	for {
 		if ctx.Err() != nil {

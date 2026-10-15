@@ -53,6 +53,17 @@ func (b *legionJobBridge) handleDispatch(
 	if err != nil {
 		return termMessage(), err
 	}
+	if b.publisher != nil && b.publisher.outbox != nil {
+		if completed, matches := b.publisher.outbox.completedCommand(ref); completed {
+			if matches {
+				return ackSyncMessage(nil), nil
+			}
+			return termMessage(), nil
+		}
+		if err := b.publisher.outbox.admissionError(); err != nil {
+			return nakDelayedMessage(dispatchCapacityNakDelay), err
+		}
+	}
 	now := time.Now().UTC()
 	deadline := dispatchAdmissionDeadline(&command, b.heartbeatInterval(), now)
 	reservation, reserveResult := b.admissions().Reserve(sessionID, ref, identity, deadline)
