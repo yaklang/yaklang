@@ -1107,8 +1107,15 @@ func (f *binFlow) stop(dir int, wire []byte, status, reason string) {
 		preview = d.http.rawHeader
 	}
 	e := f.event(dir, preview, status, reason)
+	if f.radius != nil {
+		e.nativeRADIUSObservation = true
+		e.Profile = f.radius.profile()
+		if radiusUDPHeader(wire) {
+			e.Profile = radiusProfile(wire[0])
+		}
+	}
 	e.sessionError, f.lastSessionError = f.lastSessionError, nil
-	if e.nativeDNSStreamObservation || e.nativeDNSObservation || e.nativeATGObservation || e.nativeDLMSOrSLMPObservation || e.nativeTFTPObservation || e.nativeSIPObservation || e.nativeSTUNObservation || e.nativeSNMPObservation || e.nativeTLSObservation || e.nativeHARTIPObservation || e.nativeFINSObservation || e.nativeENIPObservation {
+	if e.nativeRADIUSObservation || e.nativeDNSStreamObservation || e.nativeDNSObservation || e.nativeATGObservation || e.nativeDLMSOrSLMPObservation || e.nativeTFTPObservation || e.nativeSIPObservation || e.nativeSTUNObservation || e.nativeSNMPObservation || e.nativeTLSObservation || e.nativeHARTIPObservation || e.nativeFINSObservation || e.nativeENIPObservation {
 		if e.sessionError == nil {
 			kind := ErrMalformedMessage
 			switch status {
@@ -1330,7 +1337,7 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 					if len(wire) < a.config.MaxMessageBytes && probeDLMSStream(wire, a.budget.MaxFrameBytes, a.config.ProbeBytes).Verdict == ProbeNeedMore {
 						break
 					}
-					if len(wire) < a.budget.MaxFrameBytes && (probeSLMPTCP(wire, min(a.budget.MaxFrameBytes, a.config.MaxMessageBytes), false).Verdict == ProbeNeedMore || wrapperIncompletePrefix(wire, a.budget.MaxFrameBytes) || f.captureTCP && probeDNSTCP(wire, a.budget.MaxFrameBytes).Verdict == ProbeNeedMore || needsMoreS7Prefix(wire, a.budget.MaxFrameBytes) || f.needsMoreSSHServerPreamble(dir, wire) || initialProtocolNeedMore(wire, a.budget.MaxFrameBytes).Verdict == ProbeNeedMore || needsMoreHTTPStartLine(wire) || f.needsMorePortProtocolPrefix(wire) || f.needsMoreBoundedText(wire) || f.needsMoreOpenWire(wire)) {
+					if len(wire) < a.budget.MaxFrameBytes && (probeSLMPTCP(wire, min(a.budget.MaxFrameBytes, a.config.MaxMessageBytes), false).Verdict == ProbeNeedMore || wrapperIncompletePrefix(wire, a.budget.MaxFrameBytes) || f.captureTCP && probeDNSTCP(wire, a.budget.MaxFrameBytes).Verdict == ProbeNeedMore || needsMoreS7Prefix(wire, a.budget.MaxFrameBytes) || f.needsMoreSSHServerPreamble(dir, wire) || initialProtocolNeedMore(wire, a.budget.MaxFrameBytes).Verdict == ProbeNeedMore || needsMoreHTTPStartLine(wire) || f.needsMorePortProtocolPrefix(wire) || f.needsMoreBoundedText(wire) || f.needsMoreOpenWire(wire) || !f.captureTCP && probeRADIUSAccountingByte(wire, min(a.budget.MaxFrameBytes, a.config.MaxMessageBytes)).Verdict == ProbeNeedMore) {
 						break
 					}
 					f.stop(dir, wire, "unrecognized", "TCP application protocol not recognized")
@@ -1558,7 +1565,7 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 			}
 			if err != nil && f.radius != nil && !e.nativeRADIUSObservation {
 				_, typed := classifySessionError(err)
-				if typed != nil && typed.Kind == ErrResourceExceeded {
+				if typed != nil && typed.Kind == ErrResourceExceeded || radiusCompleteByteFrame(e.Raw) {
 					if refused := f.consumeRADIUS(dir, e, e.Raw); refused != nil {
 						err = refused
 					} else {
@@ -1566,6 +1573,9 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 						f.radius.retire(dir, e.Raw, false)
 						e.ResponseTo, e.TransactionID = 0, 0
 						e.Session, e.semanticFields, e.semanticSession = nil, nil, nil
+						if typed == nil {
+							err = protocolError(ErrMalformedMessage, "%s", err)
+						}
 					}
 				}
 			}
@@ -1825,6 +1835,12 @@ func (f *binFlow) close(reason TrafficFlowCloseReason) {
 				continue
 			}
 			e := f.event(dir, d.buffer, "incomplete", string(reason)+": exact message boundary was not reached")
+			if f.radius != nil {
+				e.nativeRADIUSObservation = true
+				e.Profile, e.Completeness = f.radius.profile(), "incomplete"
+				e.sessionError = &ProtocolError{Kind: ErrNeedMore, Message: e.Summary}
+				e.Error = e.Summary
+			}
 			if e.nativeFINSObservation {
 				e.Completeness = "incomplete"
 				e.sessionError = &ProtocolError{Kind: ErrNeedMore, Message: e.Summary}

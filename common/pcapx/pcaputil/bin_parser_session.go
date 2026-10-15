@@ -188,6 +188,9 @@ func (f *binFlow) detectDirection(dir int, wire []byte) {
 	} else {
 		p = probeWireTransport(w, f.a.config.ProbeBytes, f.captureTCP)
 	}
+	if p.Verdict == ProbeReject && !f.captureTCP {
+		p = probeRADIUSAccountingByte(wire, min(f.a.budget.MaxFrameBytes, f.a.config.MaxMessageBytes))
+	}
 	if p.Verdict != ProbeAccept {
 		return
 	}

@@ -216,24 +216,34 @@ type radiusEAPFailure struct{ error }
 
 func (e *radiusEAPFailure) Unwrap() error { return e.error }
 
-// The outer Length has already framed exactly this record. Only collection
-// refusals and errors selected after complete outer-attribute parsing recover;
-// malformed outer headers/TLVs never acquire this application-level scope.
-func radiusRecoverableFrame(w []byte, err *ProtocolError, application bool) bool {
-	if len(w) < 20 || int(binary.BigEndian.Uint16(w[2:4])) != len(w) || len(w) > 4096 {
+// Only the complete, supported outer record can scope a semantic refusal.
+// An allocation-free bounded TLV walk prevents a budget or field refusal from
+// hiding a malformed tail. No byte scanning or inferred resynchronisation.
+func radiusCompleteByteFrame(w []byte) bool {
+	if len(w) < 20 || len(w) > 4096 || int(binary.BigEndian.Uint16(w[2:4])) != len(w) {
 		return false
 	}
-	if err != nil && err.Kind == ErrResourceExceeded {
-		// A collection limit can be reached before a later malformed TLV.
-		// Prove just the complete outer framing with a bounded, allocation-free
-		// walk (at most 4096 bytes), without interpreting denied attributes.
-		for at := 20; at < len(w); {
-			if len(w)-at < 2 || w[at+1] < 2 || int(w[at+1]) > len(w)-at {
-				return false
-			}
-			at += int(w[at+1])
-		}
-		return true
+	switch w[0] {
+	case 1, 2, 3, 4, 5, 11:
+	default:
+		return false
 	}
-	return application
+	for at := 20; at < len(w); {
+		if len(w)-at < 2 || w[at+1] < 2 || int(w[at+1]) > len(w)-at {
+			return false
+		}
+		at += int(w[at+1])
+	}
+	return true
+}
+func radiusRecoverableFrame(w []byte, err *ProtocolError, application bool) bool {
+	if err == nil || !radiusCompleteByteFrame(w) {
+		return false
+	}
+	switch err.Kind {
+	case ErrResourceExceeded, ErrMalformedMessage:
+		return true
+	default:
+		return application
+	}
 }

@@ -79,3 +79,47 @@ func radiusCodeName(code byte) string {
 		return fmt.Sprintf("Code %d", code)
 	}
 }
+
+// This compatibility byte carrier is not RADIUS over TCP or RadSec. A fresh
+// Code5 response has no sufficiently unique fingerprint. Only a complete Code4
+// record with mandatory Accounting content establishes its observed family.
+func probeRADIUSAccountingByte(w []byte, maxBytes int) ProbeResult {
+	if len(w) < 4 || w[0] != 4 {
+		return ProbeResult{Verdict: ProbeReject}
+	}
+	n := int(binary.BigEndian.Uint16(w[2:4]))
+	if n <= 20 || n > 4096 || n > maxBytes {
+		return ProbeResult{Verdict: ProbeReject}
+	}
+	nas, status, session := false, false, false
+	for at := 20; at < n; {
+		if len(w)-at < 2 {
+			if len(w) < n {
+				return probeNeed("radius", "accounting-byte", len(w), n)
+			}
+			return ProbeResult{Verdict: ProbeReject}
+		}
+		z := int(w[at+1])
+		if z < 2 || z > n-at {
+			return ProbeResult{Verdict: ProbeReject}
+		}
+		if z > len(w)-at {
+			return probeNeed("radius", "accounting-byte", len(w), n)
+		}
+		switch w[at] {
+		case 4:
+			nas = nas || z == 6
+		case 32:
+			nas = nas || z > 2
+		case 40:
+			status = status || z == 6
+		case 44:
+			session = session || z > 2
+		}
+		at += z
+	}
+	if !nas || !status || !session {
+		return ProbeResult{Verdict: ProbeReject}
+	}
+	return probeAccept("radius", "accounting-byte", 93)
+}

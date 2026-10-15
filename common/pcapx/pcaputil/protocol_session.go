@@ -412,7 +412,11 @@ func (s *captureSession) Probe(data []byte) ProbeResult {
 	if probe := probeOpenWire(input, s.f.a.budget.MaxFrameBytes); probe.Verdict != ProbeReject {
 		return probe
 	}
-	return probeWireTransport(data, limit, s.f.captureTCP)
+	p := probeWireTransport(data, limit, s.f.captureTCP)
+	if p.Verdict == ProbeReject && !s.f.captureTCP {
+		return probeRADIUSAccountingByte(input, min(s.f.a.budget.MaxFrameBytes, s.f.a.config.MaxMessageBytes))
+	}
+	return p
 }
 
 func (s *captureSession) Feed(direction int, ts time.Time, data []byte) FeedResult {

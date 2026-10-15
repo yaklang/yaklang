@@ -104402,6 +104402,77 @@
         "common/pcapx/pcaputil/radius-eap/wrong-direction-response.pcap": "radius-eap/wrong-direction-response.pcap",
         "scripts/protocol-tests/required-tests-traffic-unified-v110.json": "required-tests-traffic-unified-v110.json"
       }
+    },
+    {
+      "id": "validation-radius-accounting-byte",
+      "kind": "support",
+      "source_sha": "22e37ada13d6ae1d431979aa7a0ebbf67f51489b",
+      "file": "validation-radius-accounting-byte.zip",
+      "sha256": "5bdafd81f76d0171a3d33a42f9931220c0a84232db32c9fa360c1a39e6ea1667",
+      "password": "bin-parser",
+      "members": {
+        "radius-accounting-byte-tools/build_captures.py": {
+          "sha256": "fe75a9ab81490c1f9c068edc83ff5fcf2751e13970fef820a79a571cb0a01bad",
+          "bytes": 1436
+        },
+        "radius-accounting-byte-tools/build_nas_port.py": {
+          "sha256": "d3e40f7c06069ab969f933eb45e08dcdff56249ab529ab70be0b397d59b2a1e0",
+          "bytes": 5188
+        },
+        "radius-accounting-byte-tools/source-pins.json": {
+          "sha256": "dd9fc6dcba3a2bb0aca074e91ba35a54a31fe28e4ac2228973570119a379748e",
+          "bytes": 1331
+        },
+        "radius-accounting-byte-tools/verify.py": {
+          "sha256": "a8125aa9ec6c7224ef226b9cfd13db2adae20869629dec56a7d92fc3abf5c38e",
+          "bytes": 3860
+        },
+        "radius-accounting-byte/carrier49.json": {
+          "sha256": "fadc1518dcd939f7057ccc95d1a009825810522468d13919b2274f45e39e67d8",
+          "bytes": 31366
+        },
+        "radius-accounting-byte/controls.json": {
+          "sha256": "2913ac9e16632a28245343ccbe609b41f323deef7368ea323f75459fd35da302",
+          "bytes": 10456
+        },
+        "radius-accounting-byte/nas-port-controls.json": {
+          "sha256": "dcb7032149b53070727dae22ae20f588f18230220da5f70871280de717f57522",
+          "bytes": 13306
+        },
+        "radius-accounting-byte/nas-port-duplicate-refusal-neighbor.pcap": {
+          "sha256": "8c3d3b79a920e0e59a76191e3142fb3d2c14c870c7de35770288be4cdac2db0d",
+          "bytes": 412
+        },
+        "radius-accounting-byte/nas-port-width3-refusal-neighbor.pcap": {
+          "sha256": "ad71c9c0e9149b85fba5652bed1e48e323a7939f6ea7b6c442f81c4cb736d655",
+          "bytes": 405
+        },
+        "radius-accounting-byte/nas-port-width4-adjacent.pcap": {
+          "sha256": "5c590288e7709743c70e0d4ebf29c510c498eaa1bd1f1ef360b6d30ba70cdbfb",
+          "bytes": 215
+        },
+        "required-tests-traffic-unified-v111.json": {
+          "sha256": "8fe8402a1b63e11ebdb47bdefed764ffd41e645e4bd066debbd2987c318bab8e",
+          "bytes": 18754677
+        },
+        "validation/expected.json": {
+          "sha256": "cf855e66547529be485f8109b69e182722530d03d318739f29a1cd6b0d9ad662",
+          "bytes": 3648
+        }
+      },
+      "aliases": {
+        "common/pcapx/pcaputil/radius-accounting-byte-tools/build_captures.py": "radius-accounting-byte-tools/build_captures.py",
+        "common/pcapx/pcaputil/radius-accounting-byte-tools/build_nas_port.py": "radius-accounting-byte-tools/build_nas_port.py",
+        "common/pcapx/pcaputil/radius-accounting-byte-tools/source-pins.json": "radius-accounting-byte-tools/source-pins.json",
+        "common/pcapx/pcaputil/radius-accounting-byte-tools/verify.py": "radius-accounting-byte-tools/verify.py",
+        "common/pcapx/pcaputil/radius-accounting-byte/carrier49.json": "radius-accounting-byte/carrier49.json",
+        "common/pcapx/pcaputil/radius-accounting-byte/controls.json": "radius-accounting-byte/controls.json",
+        "common/pcapx/pcaputil/radius-accounting-byte/nas-port-controls.json": "radius-accounting-byte/nas-port-controls.json",
+        "common/pcapx/pcaputil/radius-accounting-byte/nas-port-duplicate-refusal-neighbor.pcap": "radius-accounting-byte/nas-port-duplicate-refusal-neighbor.pcap",
+        "common/pcapx/pcaputil/radius-accounting-byte/nas-port-width3-refusal-neighbor.pcap": "radius-accounting-byte/nas-port-width3-refusal-neighbor.pcap",
+        "common/pcapx/pcaputil/radius-accounting-byte/nas-port-width4-adjacent.pcap": "radius-accounting-byte/nas-port-width4-adjacent.pcap",
+        "scripts/protocol-tests/required-tests-traffic-unified-v111.json": "required-tests-traffic-unified-v111.json"
+      }
     }
   ],
   "schema_version": 1,

@@ -85,7 +85,7 @@ func radiusFields(raw []byte, max int) (map[string]any, error) {
 		v := raw[at+2 : at+sz]
 		at += sz
 		switch typ {
-		case 1, 2, 4, 32:
+		case 1, 2, 4, 5, 32:
 			if seen[typ] {
 				return nil, fmt.Errorf("radius: repeated singleton attribute %d", typ)
 			}
@@ -107,6 +107,10 @@ func radiusFields(raw []byte, max int) (map[string]any, error) {
 				return nil, fmt.Errorf("radius: NAS-IP-Address width")
 			}
 			out["NAS-IP-Address"] = fmt.Sprintf("%d.%d.%d.%d", v[0], v[1], v[2], v[3])
+		case 5:
+			if len(v) != 4 {
+				return nil, fmt.Errorf("radius: NAS-Port width")
+			}
 		case 32:
 			if len(v) < 1 {
 				return nil, fmt.Errorf("radius: empty NAS-Identifier")
