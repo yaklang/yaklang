@@ -9,6 +9,43 @@ import (
 	"github.com/yaklang/yaklang/common/utils/lowhttp/httpctx"
 )
 
+// responseHeaderCaptureWriter captures only the first header block, preserving
+// wire bytes (including partial headers on read errors). Like bytes.Buffer, it
+// must be used by one goroutine. Both CRLF and LF line endings are accepted.
+type responseHeaderCaptureWriter struct {
+	dst            *bytes.Buffer
+	lineLength     int
+	lastByte       byte
+	headerComplete bool
+}
+
+func (w *responseHeaderCaptureWriter) Write(p []byte) (int, error) {
+	if w.headerComplete {
+		return len(p), nil
+	}
+	end := len(p)
+	for i, b := range p {
+		if b == '\n' {
+			if w.lineLength == 0 || (w.lineLength == 1 && w.lastByte == '\r') {
+				w.headerComplete = true
+				end = i + 1
+				break
+			}
+			w.lineLength = 0
+		} else {
+			w.lineLength++
+		}
+		w.lastByte = b
+	}
+	_, _ = w.dst.Write(p[:end])
+	return len(p), nil
+}
+
+func (w *responseHeaderCaptureWriter) Reset() {
+	w.dst.Reset()
+	*w = responseHeaderCaptureWriter{dst: w.dst}
+}
+
 // responseRawCaptureWriter captures response raw bytes into dst and can auto-detect SSE by response headers.
 //
 // When autoDetectSSE is enabled and response headers include Content-Type: text/event-stream,
