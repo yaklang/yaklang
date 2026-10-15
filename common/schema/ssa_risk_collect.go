@@ -3,6 +3,7 @@ package schema
 import (
 	"strings"
 
+	"github.com/yaklang/gorm"
 	"github.com/yaklang/yaklang/common/utils"
 )
 
@@ -23,12 +24,13 @@ const (
 // Mode says which operation that is. The database matches an update or a
 // delete by the risk's runtime id and feature hash, not by its row id.
 // OldHash is the previous row hash so a report can drop its copy. Audit
-// persists the graph for a create or an update; other consumers ignore it.
+// persists the graph for a create or an update inside the consumer's
+// transaction; other consumers ignore it. The risk row never carries it.
 type RiskUpdateItem struct {
 	Mode    RiskUpdateMode
 	Risk    *SSARisk
 	OldHash string
-	Audit   func() error
+	Audit   []func(*gorm.DB) error
 }
 
 // RiskUpdateHandler consumes the decisions of one scan. A scan never writes a

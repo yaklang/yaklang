@@ -5,6 +5,7 @@ import (
 	"sync"
 
 	"github.com/google/uuid"
+	"github.com/yaklang/gorm"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 )
@@ -42,22 +43,21 @@ func (r *ScanRuntime) RegisterRiskUpdateHandler(handler schema.RiskUpdateHandler
 
 // SubmitRisk reports whether this runtime owns the decision, including a
 // dropped finding. Serialize decision and delivery together so concurrent
-// rules cannot deliver a cover before the decision it replaces.
-func (r *ScanRuntime) SubmitRisk(risk *schema.SSARisk) bool {
+// rules cannot deliver a cover before the decision it replaces. audits are
+// optional graph writers; they travel on the update item, never on the row.
+func (r *ScanRuntime) SubmitRisk(risk *schema.SSARisk, audits ...func(*gorm.DB) error) bool {
 	if r == nil || risk == nil || r.collect == nil {
 		return false
 	}
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	// The item is finished here. Handlers trust it and do not prepare,
-	// coalesce, or guess a mode from a zero id. The audit closure moves onto
-	// the item; this call does not wait for a handler to persist anything.
-	audit := risk.AuditSave
-	risk.AuditSave = nil
+	// coalesce, or guess a mode from a zero id. This call does not wait for a
+	// handler to persist anything.
 	prepareRiskRow(risk)
 	item, ok := r.collect.Submit(risk)
 	if ok {
-		item.Audit = audit
+		item.Audit = audits
 		for _, handler := range r.riskUpdateHandlers {
 			if err := handler.ApplyRiskUpdate(item); err != nil {
 				log.Errorf("apply risk update failed: %v", err)

@@ -3,6 +3,7 @@ package ssaapi
 import (
 	"context"
 
+	"github.com/yaklang/gorm"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
@@ -67,9 +68,10 @@ type queryConfig struct {
 	kind   schema.SyntaxflowResultKind
 	taskID string
 
-	// onRisk receives each risk this query builds. When it is set the query
-	// does not write the risk row itself.
-	onRisk func(*schema.SSARisk)
+	// onRisk receives each risk this query builds, plus the optional audit
+	// writers for that finding. When it is set the query does not write the
+	// risk row itself.
+	onRisk []func(*schema.SSARisk, ...func(*gorm.DB) error)
 
 	// noFinalize leaves the finished result to the caller: no risk is built
 	// and no consumer is notified. A rule that runs once per unit merges the
@@ -151,10 +153,10 @@ func QuerySyntaxflow(opt ...QueryOption) (*SyntaxFlowResult, error) {
 	for _, o := range opt {
 		o(config)
 	}
-	// A program carries the risk callback of its scan; an explicit query option
-	// wins so a caller can also drive a standalone program through one scan.
-	if config.onRisk == nil && config.program != nil && config.program.config != nil {
-		config.onRisk = config.program.config.onRisk
+	// A program carries the risk callbacks of its scan; explicit query options
+	// come first so a caller can also drive a standalone program through one scan.
+	if config.program != nil && config.program.config != nil {
+		config.onRisk = append(config.program.config.onRisk, config.onRisk...)
 	}
 	process := func(f float64, msg string) {
 		if callBack := config.GetSyntaxFlowProcessCallback(); callBack != nil {
@@ -481,21 +483,16 @@ func QueryWithTaskID(taskID string) QueryOption {
 	}
 }
 
-// QueryWithOnRisk registers the callback that receives each risk this query
-// builds. The query does not write those rows; the callback's owner decides
-// whether the finding is created or replaces an earlier one.
-func QueryWithOnRisk(fn func(*schema.SSARisk)) QueryOption {
+// QueryWithOnRisk registers another callback that receives each risk this
+// query builds. audits are optional writers for that finding's graph; the
+// callback's owner decides whether the finding is created or replaces an
+// earlier one, and runs those writers in its own transaction.
+func QueryWithOnRisk(fn func(*schema.SSARisk, ...func(*gorm.DB) error)) QueryOption {
 	return func(c *queryConfig) {
 		if c == nil || fn == nil {
 			return
 		}
-		prev := c.onRisk
-		c.onRisk = func(risk *schema.SSARisk) {
-			if prev != nil {
-				prev(risk)
-			}
-			fn(risk)
-		}
+		c.onRisk = append(c.onRisk, fn)
 	}
 }
 

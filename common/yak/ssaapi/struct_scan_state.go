@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/yaklang/gorm"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
@@ -27,9 +28,9 @@ type structScanState struct {
 	extraRaw      []string
 	rules         []*schema.SyntaxFlowRule
 	riskCB        func(*schema.SSARisk)
-	// onRisk is the scan's callback. When set, each finding is handed to it
+	// onRisk is the scan's callbacks. When set, each finding is handed to them
 	// and this compile does not write the risk row.
-	onRisk     func(*schema.SSARisk)
+	onRisk     []func(*schema.SSARisk, ...func(*gorm.DB) error)
 	taskID     string
 	timeout    time.Duration
 	workLimit  int64
@@ -99,7 +100,7 @@ func (c *Config) prepareStructScan(plan *UnitPlan) error {
 		return nil
 	}
 	s := c.structScan
-	if s.onRisk == nil {
+	if len(s.onRisk) == 0 {
 		s.onRisk = c.onRisk
 	}
 	if s.riskCB != nil && !s.wantsScan() {
@@ -385,7 +386,7 @@ func (s *structScanState) keepResults(found []*SyntaxFlowResult) {
 	if s == nil || len(found) == 0 {
 		return
 	}
-	if s.onRisk != nil || !s.saveToDB {
+	if len(s.onRisk) > 0 || !s.saveToDB {
 		s.mu.Lock()
 		s.results = append(s.results, found...)
 		s.mu.Unlock()

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/yaklang/gorm"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/diagnostics"
@@ -63,8 +64,8 @@ type Config struct {
 	diagnosticsRecorder *diagnostics.Recorder
 	structScan          *structScanState
 	// onRisk is called with each risk this compile's struct rules produce.
-	// Nil means the compile is outside a scan and keeps its previous behavior.
-	onRisk func(*schema.SSARisk)
+	// Empty means the compile is outside a scan and keeps its previous behavior.
+	onRisk []func(*schema.SSARisk, ...func(*gorm.DB) error)
 	// file performance recorder
 	filePerformanceRecorder *diagnostics.Recorder
 

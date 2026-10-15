@@ -183,7 +183,7 @@ func (r *SyntaxFlowResult) save(
 		errs = utils.JoinErrors(errs, err)
 	}
 	r.dbResult = result
-	if r.onRisk == nil {
+	if len(r.onRisk) == 0 {
 		// No scan handler is listening, so this result saves its own risks.
 		if err := SaveRisk(ssadb.GetDB(), r.GetRisks()...); err != nil {
 			// Keep findings available to stream consumers on a stale/read-only
