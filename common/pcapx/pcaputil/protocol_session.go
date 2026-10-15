@@ -173,6 +173,9 @@ func NewProtocolSessionWithOptions(budget ParserBudget, options ...ProtocolSessi
 		}
 	}
 	for _, profile := range s.f.a.datagramDecodeAs {
+		if profile == "hart-ip" && s.transport != "udp" {
+			return nil, fmt.Errorf("HART-IP DecodeAs requires UDP")
+		}
 		if profile == "fins" && s.transport != "udp" {
 			return nil, fmt.Errorf("FINS DecodeAs requires UDP")
 		}
@@ -253,6 +256,19 @@ func NewDecryptedQUICSession(budget ParserBudget, source string) (ProtocolSessio
 }
 
 func (s *captureSession) Probe(data []byte) ProbeResult {
+	if s.transport == "udp" && s.f.a.hartSelected(s.f.ports[0], s.f.ports[1]) || s.transport != "udp" && (s.f.port(5094) || s.f.protocol == "hart-ip") {
+		if s.closed {
+			return ProbeResult{Verdict: ProbeReject, Protocol: "hart-ip", Reason: "closed observation"}
+		}
+		if len(data) < 8 {
+			return probeNeed("hart-ip", "v1", len(data), 8)
+		}
+		n := int(binary.BigEndian.Uint16(data[6:8]))
+		if s.transport != "udp" && n >= 8 && len(data) < n {
+			return probeNeed("hart-ip", "v1", len(data), n)
+		}
+		return probeHARTIP(data)
+	}
 	if s.f.mms != nil && s.transport != "udp" {
 		n, err := mmsFrameSize(data, min(s.f.a.budget.MaxFrameBytes, s.f.a.config.MaxMessageBytes))
 		if err != nil {
@@ -502,7 +518,7 @@ func (f *binFlow) hasSession() bool {
 	if f.protocol == "nats" {
 		return true // NATS allocates its budgeted negotiation state at consumption.
 	}
-	return f.fins != nil || f.slmpTCP != nil || f.wrapper != nil || f.tls != nil || f.dnp3 != nil || f.c37118 != nil || f.goose != nil || f.syslog != nil || f.rfb != nil || f.diameter != nil || f.iec104 != nil || f.s7 != nil || f.opcua != nil || f.ipp != nil || f.rtsp != nil || f.stun != nil || f.h2 != nil || f.mysql != nil || f.pg != nil || f.ws != nil || f.ldap != nil || f.redis != nil || f.mqtt != nil || f.nats != nil || f.mongo != nil || f.kafka != nil || f.tds != nil || f.amqp != nil || f.smb2 != nil || f.dcerpc != nil || f.ssh != nil || f.nfs != nil || f.snmp != nil || f.rdp != nil || f.dot != nil || f.doh != nil || f.sip != nil || f.rtp != nil || f.quic != nil || f.smtp != nil || f.imap != nil || f.pop3 != nil || f.ftp != nil || f.tns != nil || f.socks5 != nil || f.scgi != nil || f.msgpackRPC != nil || f.textInternet != nil || f.radius != nil || f.dhcp != nil || f.ntp != nil || f.coap != nil || f.modbus != nil || f.memcached != nil || f.enip != nil || f.doip != nil || f.genisys != nil || f.dlms != nil || f.rocplus != nil || f.atg != nil || f.stratum != nil || f.gearman != nil || f.beanstalk != nil || f.zookeeper != nil || f.clickhouse != nil || f.stomp != nil
+	return f.hart != nil || f.fins != nil || f.slmpTCP != nil || f.wrapper != nil || f.tls != nil || f.dnp3 != nil || f.c37118 != nil || f.goose != nil || f.syslog != nil || f.rfb != nil || f.diameter != nil || f.iec104 != nil || f.s7 != nil || f.opcua != nil || f.ipp != nil || f.rtsp != nil || f.stun != nil || f.h2 != nil || f.mysql != nil || f.pg != nil || f.ws != nil || f.ldap != nil || f.redis != nil || f.mqtt != nil || f.nats != nil || f.mongo != nil || f.kafka != nil || f.tds != nil || f.amqp != nil || f.smb2 != nil || f.dcerpc != nil || f.ssh != nil || f.nfs != nil || f.snmp != nil || f.rdp != nil || f.dot != nil || f.doh != nil || f.sip != nil || f.rtp != nil || f.quic != nil || f.smtp != nil || f.imap != nil || f.pop3 != nil || f.ftp != nil || f.tns != nil || f.socks5 != nil || f.scgi != nil || f.msgpackRPC != nil || f.textInternet != nil || f.radius != nil || f.dhcp != nil || f.ntp != nil || f.coap != nil || f.modbus != nil || f.memcached != nil || f.enip != nil || f.doip != nil || f.genisys != nil || f.dlms != nil || f.rocplus != nil || f.atg != nil || f.stratum != nil || f.gearman != nil || f.beanstalk != nil || f.zookeeper != nil || f.clickhouse != nil || f.stomp != nil
 }
 
 func (f *binFlow) mailLike() bool {

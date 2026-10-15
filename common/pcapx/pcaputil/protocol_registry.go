@@ -11,6 +11,7 @@ type ProtocolProfile struct{ Protocol, Transport, Framing, Context string }
 
 func NativeProtocolProfiles() []ProtocolProfile {
 	return []ProtocolProfile{
+		{"hart-ip", "tcp/udp", "v1 initiate/close/keepalive and token-passing commands0/1/2/3", "observed primary-master session pairs; HART5/6/7 identity, IEEE32 values and selected three/four-variable layouts; exact counts/checksum/direction/logical address/command/sequence; bounded first-use history, retry and ambiguity quarantine; no authenticated/device success, TLSv2/direct-PDU/arbitrary HART command"},
 		{"enip", "tcp", "encapsulation-v1 RegisterSession and SendRRData selected ANSI simple-tag single-DINT read/write", "exact opaque8-byte RegisterSession echo; observed per-flow handle, direction, CIP service and first-use sender context; distinct-context pipelining, byte-identical active retries, ambiguous completed-context reuse refused; owned fields and typed refusals, bounded pending/history/high-water memory and incomplete Close; no physical write/authentication, connected IO, arbitrary CIP object/service or unobserved tag inference"},
 		{"fins", "tcp/explicit-udp", "W421 FINS/TCP0/1/2/3/6 and W342 CPU0501/selected bit/word Read0101 and mixed Read0104/Status0601/Cycle0620/Clock0701/Connection0502/MSG0920/Log2102/Write0102/Fill0103/Transfer0105/ParameterRead0201/ParameterWrite0202/ParameterClear0203/ProgramRead0306/ProgramWrite0307/ProgramClear0308", "owned literal node/header/end-code/CPU fields, selected CS/CJ/CP/NSJ bit/word layouts, ordered mixed descriptors and forced masks, selected status masks/modes/opaque error words, cycle100us ticks, BCD two-digit clock fields, bounded unit/model records, context-bound MSG/FAL raw messages and clear observation, selected error-log records including exact partial-range counts, selected bit/word write values and word fill/transfer descriptors with observed acknowledgements, fixed parameter-area layouts/count/last flags and498-word read/write limit with exact1104/1108 partial replies and context-bound empty acknowledgements, selected programFFFF/alignedBE32 address/BE16 byte count with992-byte read/996-byte write, exact program data and header echoes, observed00/10 clear parameters, and exact selected word counts; no inferred century/timezone or physical clock/timing truth; bounded first-use directional SID observation, reversed full logical endpoints and optional observed TCP node allocation; retry/reuse/expiry/refusal quarantine; no node-zero alias inference, device execution, authentication, routing validation, physical MSG clearing, physical memory modification or arbitrary memory schemas"},
 		{"bacnet-routed-read-property", "explicit-udp", "BACnet/IP NPDUv1 selected direct or routed ReadProperty", "bounded one-to-six-byte logical source/destination MAC observations, network and present-only hop count; reversed physical endpoints plus logical route addresses/domain/invoke/descriptor association; unknown/refused routes quarantine the physical relay pair; same primitive/terminal APDU scope as direct profile, no network services, broadcast peer inference, forwarded BVLC, segmentation, device/authentication or router-operation claim"},
@@ -93,7 +94,7 @@ func WithProtocolDecodeAs(transport string, port uint16, protocol string) Captur
 			return fmt.Errorf("DecodeAs requires UDP and a nonzero port")
 		}
 		switch protocol {
-		case "fins", "someip-sd", "someip-tp", "bacnet-routed-read-property", "bacnet-read-property", "dns", "mdns", "llmnr", "dhcp", "dhcpv6", "syslog", "snmp", "mqtt-sn", "bittorrent-dht", "bjnp", "rtp", "sip", "stun", "turn", "dtls", "mavlink", "nmea", "nmea-ais-multipart", "semtech-udp", "semtech-downlink-session", "rtps", "rtps-control", "rtps-wire", "rtps13-wire", "rtps13-parameters", "rtps20-rti-filter", "rtps-shape-fragments", "rtps-spdp-fragments", "bsap", "slmp", "dlms", "opendroneid", "opendroneid-system", "opendroneid-identity", "opendroneid-auth-pages", "c37118", "c37118-engineering", "knx", "pfcp", "dlms-wrapper", "doip":
+		case "hart-ip", "fins", "someip-sd", "someip-tp", "bacnet-routed-read-property", "bacnet-read-property", "dns", "mdns", "llmnr", "dhcp", "dhcpv6", "syslog", "snmp", "mqtt-sn", "bittorrent-dht", "bjnp", "rtp", "sip", "stun", "turn", "dtls", "mavlink", "nmea", "nmea-ais-multipart", "semtech-udp", "semtech-downlink-session", "rtps", "rtps-control", "rtps-wire", "rtps13-wire", "rtps13-parameters", "rtps20-rti-filter", "rtps-shape-fragments", "rtps-spdp-fragments", "bsap", "slmp", "dlms", "opendroneid", "opendroneid-system", "opendroneid-identity", "opendroneid-auth-pages", "c37118", "c37118-engineering", "knx", "pfcp", "dlms-wrapper", "doip":
 		default:
 			return fmt.Errorf("unsupported native DecodeAs profile")
 		}
@@ -173,6 +174,9 @@ func (a *binParser) decodeNativeDatagram(e *ProtocolEvent, w []byte, src, dst ui
 	}
 	if explicit == "bacnet-routed-read-property" {
 		return a.decodeBACnetReadDatagram(e, w, true)
+	}
+	if explicit == "hart-ip" || explicit == "" && (src == 5094 || dst == 5094) {
+		return a.decodeHARTIPDatagram(e, w, nil)
 	}
 	if explicit == "fins" {
 		return a.decodeFINSDatagram(e, w, nil)

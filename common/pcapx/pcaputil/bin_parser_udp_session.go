@@ -648,6 +648,14 @@ func (a *binParser) closeUDPSessions() {
 		for _, el := range s.entries {
 			v := el.Value.(*binUDPEntry)
 			f := v.flow
+			if p := f.hart; p != nil && len(p.pending) > 0 {
+				dir := max(p.client, 0)
+				summary := "HART-IP UDP outstanding observed requests"
+				e := &ProtocolEvent{FlowID: f.id, Timestamp: v.touched, Domain: v.key.domain, Transport: "udp", Source: f.endpoints[dir], Destination: f.endpoints[1-dir], Direction: dir, Protocol: "hart-ip", nativeHARTIPObservation: true, Profile: hartIPProfile, Status: "incomplete", Completeness: "incomplete", Summary: summary, Error: summary, Session: map[string]any{"Outstanding": len(p.pending)}, sessionError: &ProtocolError{Kind: ErrNeedMore, Message: summary}}
+				e.semanticSession = cloneSession(e.Session)
+				incomplete = append(incomplete, e)
+				a.incomplete.Add(1)
+			}
 			if state := f.fins; state != nil {
 				for dir, count := range state.counts() {
 					if count > 0 {

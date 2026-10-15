@@ -44,7 +44,7 @@ Run from the repository root:
 ```sh
 go run ./internal/trafficfixture/cmd/corpus test
 go test -json -count=1 -timeout=10m ./internal/trafficfixture/... ./common/bin-parser/... ./common/pcapx/... ./common/yak/cmd/yakcmds/shark-cli ./scripts/ci > traffic.jsonl
-go run ./internal/trafficfixture/cmd/corpus exec -- python3 @scripts/protocol-tests/check_go_test_json_v2.py traffic.jsonl --inventory @scripts/protocol-tests/required-tests-traffic-unified-v93.json --tier full
+go run ./internal/trafficfixture/cmd/corpus exec -- python3 @scripts/protocol-tests/check_go_test_json_v2.py traffic.jsonl --inventory @scripts/protocol-tests/required-tests-traffic-unified-v94.json --tier full
 ```
 
 The single `corpus` entry point uses the same bounded Go ZIP loader as tests.
@@ -83,7 +83,7 @@ their semantic coverage. The existing synthetic session keys are test inputs;
 production credentials, user private keys and material without redistribution
 permission belong in an external fixed-source download manifest.
 
-Current test requirements are sealed at `scripts/protocol-tests/required-tests-traffic-unified-v93.json`;
+Current test requirements are sealed at `scripts/protocol-tests/required-tests-traffic-unified-v94.json`;
 the historical inventories and all earlier batches remain unchanged.
 The supplemental small-corpus batch contains 26 minimal controls, their explicit
 expected facts, an offline generator and the compact pinned source manifest.
@@ -203,7 +203,7 @@ opaque selector bytes and one bounded Data value over Wrapper v1 TCP/UDP; object
 selector meaning, access permission and device operation are unverified. The
 original one-packet selective-access capture and original refused answer remain
 immutable; its now-supported answer is matched by exact input SHA and frame.
-The active inventory is `scripts/protocol-tests/required-tests-traffic-unified-v93.json`.
+The active inventory is `scripts/protocol-tests/required-tests-traffic-unified-v94.json`.
 
 The small-graph budget batch reuses accepted graph captures/answers and adds one
 249-byte UDP control for child count255 without child bytes. Its standalone proof
@@ -993,7 +993,7 @@ the normative answer; a missing numeric reference field is not a codec pass.
 Full/deferred, workers1/2/4, observers off/on, Feed chunks1/7/full, ownership,
 resources and close/refusal boundaries remain required.
 
-Current gate: `required-tests-traffic-unified-v93.json` with
+Current gate: `required-tests-traffic-unified-v94.json` with
 `check_go_test_json_v2.py`. The indexed validator preserves missing/unpassed,
 package invocation completion, descendant skips, failures and non-JSON checks;
 its mutation/differential harness is sealed with the material. Older checkers
@@ -1629,7 +1629,7 @@ userspace adapter; full kernel receiver/socket/timers and ECU endpoints do not.
 All161 preceding ZIPs remain byte-for-byte unchanged. Raw captures, dependencies,
 reference source/build output and process evidence stay outside Git.
 
-Current effective v93 inventory: 63,836 entries; 63,829 are mandatory for the full tier.
+Current effective v94 inventory: 66,214 entries; 66,207 are mandatory for the full tier.
 
 The opt-in `DynamicFlowControl` profile follows Linux v6.12 FC tuple updates (including WAIT without granting data). Disjoint address extensions or classical/FD carriers may share CAN IDs; unknown selectors cannot choose or mutate a conversation. Ambiguous selectors are rejected. Seven sealed cases exercise full/deferred, workers 1/2/4, and observer off/on, with exact fields, byte collections, contributor references, errors and resource ownership. The existing static FC profile remains unchanged. Pinned upstream FC and filter functions execute with declared userspace stubs; this is not a kernel/ECU endpoint. TShark 4.2.5 checks wire tuples and two complete payloads, but cannot independently reassemble the shared-address transcripts.
 
@@ -1686,3 +1686,5 @@ ENIPv1 TCP RegisterSession now requires an exact opaque8-byte context echo and o
 FINS W3420306/0307/0308 add passive program read/write/clear observations: FFFF program, aligned BE32 address and BE16 byte count,992-byte read/996-byte write bounds, command-specific last flags, exact data and echoed parameters. Read/write replies may self-describe literal fields without an invented request owner; an empty clear acknowledgement requires the observed00/10 clear request. Bytes are not decoded as PLC instructions, and acknowledgements do not prove CPU mode/protection, physical operations or atomic whole-program transfer. All187 prior archives are unchanged. The v92 inventory factors repeated requirement prose into `requirement_definitions` keyed by each row's `requirement` reference; resolving these references exactly preserves every preceding test/package/tier/requirement, without dropping checks or raising the25MiB loader bound.
 
 FINS UDP expiry uses this conversation's own monotonic observed timestamps. A future timestamp from another interface or endpoint cannot expire a timely request, extend a locally expired request, or overwrite incomplete-Close time. The30-second policy is an analyzer observation bound, not a device timeout guarantee. Twelve minimal PCAPNG controls reuse immutable parameter-area wire/answer models and retain complete bytes/fields/IDs/domain/references, own-clock boundary/backdating, retry, Close and ownership assertions. All188 preceding ZIPs remain unchanged.
+
+HART-IP v1 adds passive initiate/close/keepalive and token-passing universal commands0/1/2/3: HART5/6/7 identity, IEEE32 bit-preserving values and the source-fixed three/four-variable layouts. Exact total/token lengths, XOR, observed direction/logical address/command/messageID+sequence govern ownership. Identical active retries retain the first owner; completed/expired/refused reuse remains unverified, with bounded history. The30s per-conversation analysis window never uses foreign interface/endpoint time and does not assert a device deadline. Complete bounded v1 message refusals retire the matching key while retaining the next stream boundary; unknown versions/framing failures remain terminal. UDP5094 is admitted as a known carrier and nonstandard ports require explicit DecodeAs; generic rule bindings remain available. No authentication, physical operation, arbitrary HART commands, direct-PDU or TLSv2 claim. All189 prior ZIPs and every previous inventory tuple/description remain unchanged.

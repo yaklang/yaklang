@@ -26,6 +26,11 @@ func (f *binFlow) detectDirection(dir int, wire []byte) {
 			return
 		}
 	}
+	if f.port(5094) {
+		f.protocol = "hart-ip"
+		f.hart = f.newHARTIP()
+		return
+	}
 	if len(wire) > 0 && len(wire) < 4 && bytes.HasPrefix([]byte("FINS"), wire) {
 		return
 	}
@@ -155,6 +160,11 @@ func (f *binFlow) detectDirection(dir int, wire []byte) {
 	}
 	if f.captureTCP && f.port(11300) && probeBeanstalk(w, f.a.config.ProbeBytes).Verdict == ProbeAccept {
 		f.protocol, f.beanstalk = "beanstalkd", &binBeanstalk{client: dir}
+		return
+	}
+	if probeHARTIP(wire).Verdict == ProbeAccept {
+		f.protocol = "hart-ip"
+		f.hart = f.newHARTIP()
 		return
 	}
 	if probeENIP(w).Verdict == ProbeAccept {
@@ -830,6 +840,15 @@ func (f *binFlow) consumeSession(dir int, e *ProtocolEvent, result map[string]an
 			e.semanticFields = cloneSession(e.Session)
 			e.Profile, e.Completeness = "doip-routing-dsc", "message"
 		}
+	case "hart-ip":
+		if e.ID == 0 {
+			e.ID = f.a.ids.Add(1)
+		}
+		e.Session, e.ResponseTo, e.TransactionID, err = f.hart.consume(dir, e.Raw, e.ID, e.Timestamp, f.a.budget)
+		if err == nil {
+			e.semanticFields = cloneSession(e.Session)
+			e.Profile, e.Completeness = hartIPProfile, "message"
+		}
 	case "enip":
 		if e.ID == 0 {
 			e.ID = f.a.ids.Add(1)
@@ -1075,6 +1094,7 @@ func (f *binFlow) closeSession() {
 	f.diameter, f.iec104, f.s7, f.opcua = nil, nil, nil, nil
 	f.rfb = nil
 	f.enip = nil
+	f.hart = nil
 	f.atg = nil
 	f.doip = nil
 	f.genisys = nil
@@ -1108,6 +1128,15 @@ func (f *binFlow) closeSession() {
 
 func (f *binFlow) finishSession(reason TrafficFlowCloseReason) {
 	f.finishDNP3Transport(reason)
+	if p := f.hart; p != nil && len(p.pending) > 0 {
+		e := f.event(max(p.client, 0), nil, "incomplete", string(reason)+": HART-IP outstanding observed requests")
+		e.Session = map[string]any{"Outstanding": len(p.pending)}
+		e.semanticSession = cloneSession(e.Session)
+		e.sessionError = hartIPErr(ErrNeedMore, e.Summary).(*ProtocolError)
+		e.Error, e.Completeness = e.sessionError.Error(), "incomplete"
+		f.a.incomplete.Add(1)
+		f.a.emit(e)
+	}
 	if p := f.enip; p != nil {
 		n := len(p.pending)
 		if p.registerRequestSeen && !p.registered {

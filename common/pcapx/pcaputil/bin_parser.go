@@ -20,6 +20,7 @@ type ProtocolEvent struct {
 	nativeMMSObservation                     bool
 	nativeFINSObservation                    bool
 	nativeENIPObservation                    bool
+	nativeHARTIPObservation                  bool
 	nativeUnrecognizedUDP                    bool
 	nativeBACnetRead                         bool
 	nativeBACnetRoutedRead                   bool
@@ -102,7 +103,7 @@ func (e *ProtocolEvent) Decode() (result map[string]any, err error) {
 		}
 		// These native observations already retain their complete session
 		// context in the private field tree. Public projections are not authority.
-		ownedIndustrial := e.nativeENIPObservation || e.nativeFINSObservation || e.Protocol == "slmp" && (e.Profile == slmpTCPProfile || e.Profile == "slmp-binary-self-test") ||
+		ownedIndustrial := e.nativeHARTIPObservation || e.nativeENIPObservation || e.nativeFINSObservation || e.Protocol == "slmp" && (e.Profile == slmpTCPProfile || e.Profile == "slmp-binary-self-test") ||
 			e.Transport == "ethernet" && (e.Protocol == "sv" && e.Profile == "iec61850-sv-raw-asdu" || e.Protocol == "ethercat" && e.Profile == "ethercat-datagram-chain")
 		if ownedIndustrial && e.semanticFields != nil {
 			session = e.semanticFields
@@ -251,7 +252,7 @@ func (e *ProtocolEvent) retainRuleEnvelope(result map[string]any) {
 }
 
 func (e *ProtocolEvent) ownsNativeFields() bool {
-	if e.nativeENIPObservation || e.nativeFINSObservation || e.nativeDiagnosticError != "" {
+	if e.nativeHARTIPObservation || e.nativeENIPObservation || e.nativeFINSObservation || e.nativeDiagnosticError != "" {
 		return true
 	}
 	if e.nativeDoIPObservation {
@@ -510,6 +511,7 @@ type binParser struct {
 	stunUntrackedRefusal                                                       bool // constant-size quarantine when an admitted UDP key cannot be retained
 	pfcpUntrackedRefusal                                                       bool // udpMu; forgotten rejected identity cannot verify a newly admitted PFCP key
 	dlmsUntrackedRefusal                                                       bool // udpMu; no fresh HDLC association after an unretained admitted refusal
+	hartUntrackedRefusal                                                       bool // udpMu; unidentified refusals cannot start a fresh association
 	finsUntrackedRefusal                                                       bool // udpMu; unretained identity cannot become a fresh generation
 	slmpUntrackedRefusal                                                       bool // udpMu; refused unretained SLMP identity has no verified generation
 	wrapperUntrackedRefusal                                                    bool // udpMu; missing Wrapper history cannot prove a fresh invoke generation
@@ -753,6 +755,7 @@ type binFlow struct {
 	coap              *binCoAP
 	modbus            *binModbus
 	enip              *binENIP
+	hart              *binHARTIP
 	atg               *binATG
 	doip              *binDoIP
 	genisys           *binGenisys
@@ -883,6 +886,10 @@ func (f *binFlow) event(dir int, raw []byte, status, detail string) *BinParserEv
 		e.Profile = "doip-routing-dsc"
 	}
 	f.eventEvidence(dir, e)
+	if f.hart != nil {
+		e.nativeHARTIPObservation = true
+		e.Profile, e.Completeness = hartIPProfile, "message"
+	}
 	if f.enip != nil {
 		e.nativeENIPObservation = true
 		e.Profile, e.Completeness = "ethernet-ip-cip-explicit", "message"
@@ -948,7 +955,7 @@ func (f *binFlow) stop(dir int, wire []byte, status, reason string) {
 	}
 	e := f.event(dir, preview, status, reason)
 	e.sessionError, f.lastSessionError = f.lastSessionError, nil
-	if e.nativeFINSObservation || e.nativeENIPObservation {
+	if e.nativeHARTIPObservation || e.nativeFINSObservation || e.nativeENIPObservation {
 		if e.sessionError == nil {
 			kind := ErrMalformedMessage
 			switch status {
@@ -1300,7 +1307,7 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 				} else {
 					result, err = f.consumeTLS(dir, e)
 				}
-			} else if f.protocol == "fins" || f.protocol == "mms" || f.protocol == "slmp" || f.protocol == "redis" || f.protocol == "syslog" || f.protocol == "snmp" || f.protocol == "smb2" || f.protocol == "enip" || f.protocol == "doip" || f.protocol == "genisys" || f.protocol == "dlms-wrapper" || f.protocol == "dlms" || f.protocol == "c37118" || f.protocol == "roc-plus" || f.protocol == "atg" || f.memcached != nil || (e.Entry == "SSHIdentification" || e.Entry == "SSHPreIdentification") || f.protocol == "stratum" || f.protocol == "gearman" || f.protocol == "beanstalkd" || f.protocol == "scgi" || f.protocol == "msgpack-rpc" || f.protocol == "zookeeper" || f.protocol == "clickhouse" || f.protocol == "stomp" || f.protocol == "nats" || f.textInternet != nil || e.Entry == "MySQLPreparedFields" {
+			} else if f.protocol == "fins" || f.protocol == "mms" || f.protocol == "slmp" || f.protocol == "redis" || f.protocol == "syslog" || f.protocol == "snmp" || f.protocol == "smb2" || f.protocol == "hart-ip" || f.protocol == "enip" || f.protocol == "doip" || f.protocol == "genisys" || f.protocol == "dlms-wrapper" || f.protocol == "dlms" || f.protocol == "c37118" || f.protocol == "roc-plus" || f.protocol == "atg" || f.memcached != nil || (e.Entry == "SSHIdentification" || e.Entry == "SSHPreIdentification") || f.protocol == "stratum" || f.protocol == "gearman" || f.protocol == "beanstalkd" || f.protocol == "scgi" || f.protocol == "msgpack-rpc" || f.protocol == "zookeeper" || f.protocol == "clickhouse" || f.protocol == "stomp" || f.protocol == "nats" || f.textInternet != nil || e.Entry == "MySQLPreparedFields" {
 				result = map[string]any{}
 			} else if e.Protocol == "rtsp" && rtspAppleControlWire(e.Raw, a.budget.MaxCollectionElements) {
 				result = map[string]any{}
@@ -1340,7 +1347,7 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 				if (f.protocol == "fins" || f.protocol == "mms" || f.protocol == "dlms-wrapper" || f.protocol == "slmp") && e.Session != nil {
 					result = map[string]any{"fields": cloneSession(e.semanticFields)}
 				}
-				if (f.protocol == "enip" || f.protocol == "doip" || f.protocol == "genisys" || f.protocol == "dlms" || f.protocol == "c37118" || f.protocol == "roc-plus" || f.protocol == "atg" || f.memcached != nil) && e.Session != nil {
+				if (f.protocol == "hart-ip" || f.protocol == "enip" || f.protocol == "doip" || f.protocol == "genisys" || f.protocol == "dlms" || f.protocol == "c37118" || f.protocol == "roc-plus" || f.protocol == "atg" || f.memcached != nil) && e.Session != nil {
 					e.semanticFields = cloneSession(e.Session)
 					result = map[string]any{"fields": e.semanticFields}
 				}
@@ -1413,7 +1420,7 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 				}
 				e.Error = err.Error()
 			} else if a.config.Deferred {
-				if e.Protocol == "tls" || e.Protocol == "enip" || e.Protocol == "doip" || e.Protocol == "genisys" || e.Protocol == "dlms-wrapper" || e.Protocol == "dlms" || e.Protocol == "c37118" || e.Protocol == "roc-plus" || e.Protocol == "atg" || e.Protocol == "stratum" || e.Protocol == "gearman" || e.Protocol == "beanstalkd" || e.Protocol == "scgi" || e.Protocol == "msgpack-rpc" {
+				if e.Protocol == "tls" || e.Protocol == "hart-ip" || e.Protocol == "enip" || e.Protocol == "doip" || e.Protocol == "genisys" || e.Protocol == "dlms-wrapper" || e.Protocol == "dlms" || e.Protocol == "c37118" || e.Protocol == "roc-plus" || e.Protocol == "atg" || e.Protocol == "stratum" || e.Protocol == "gearman" || e.Protocol == "beanstalkd" || e.Protocol == "scgi" || e.Protocol == "msgpack-rpc" {
 					e.Structured = result
 				}
 			} else {
@@ -1428,7 +1435,7 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 				if (e.Protocol == "iec104" || e.Protocol == "dnp3") || e.Protocol == "goose" || e.Protocol == "mqtt" || e.nativeOPCUAObservation || e.Protocol == "websocket" && e.Session["OCPP"] != nil || e.Protocol == "rtp" && e.Transport != "udp" {
 					e.retainRuleEnvelope(result)
 				}
-				if e.nativeENIPObservation || e.Protocol == "tls" || e.Protocol == "redis" || e.Entry == "MySQLPreparedFields" || e.Protocol == "stun" || e.Protocol == "turn" || e.Protocol == "snmp" || e.Protocol == "slmp" || e.Protocol == "dlms-wrapper" || e.Protocol == "dlms" || e.Protocol == "c37118" {
+				if e.nativeHARTIPObservation || e.nativeENIPObservation || e.Protocol == "tls" || e.Protocol == "redis" || e.Entry == "MySQLPreparedFields" || e.Protocol == "stun" || e.Protocol == "turn" || e.Protocol == "snmp" || e.Protocol == "slmp" || e.Protocol == "dlms-wrapper" || e.Protocol == "dlms" || e.Protocol == "c37118" {
 					e.semanticFields = cloneSession(e.semanticFields)
 				}
 			}
@@ -1483,15 +1490,16 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 		d.pruneContributions(a)
 		wire = wire[n:]
 		failed := e.Error != ""
-		// Only CRC/length-validated complete link frames can carry this private
+		// Only complete frames with an independently retained boundary carry this private
 		// application-level refusal scope. Snapshot before public callbacks.
+		recoverableHARTIP := e.nativeHARTIPObservation && hartIPRecoverable(e.Raw, e.sessionError)
 		recoverableDoIP := e.Protocol == "doip" && e.doipAssociationRefusal
 		recoverableDNP3 := e.Protocol == "dnp3" && e.Session["Error Scope"] == "application"
 		a.emit(e)
 		if !failed {
 			f.deliverTLS(dir, e)
 		}
-		if failed && !(e.Protocol == "fins" && finsRecoverable(e.sessionError)) && !recoverableDNP3 && !recoverableDoIP && !(e.Protocol == "slmp" && slmpTCPRecoverable(e.sessionError)) && !(e.Protocol == "dlms-wrapper" && dlmsRecoverableMessageError(e.sessionError)) && !(e.Protocol == "c37118" && c37118RecoverableMessageError(e.sessionError)) && !(e.Protocol == "dlms" && dlmsRecoverableMessageError(e.sessionError)) && !(e.Protocol == "roc-plus" && rocRecoverableMessageError(e.sessionError)) && !(e.Protocol == "genisys" && genisysRecoverableMessageError(e.sessionError)) && !((e.Protocol == "http2" || e.Protocol == "grpc" || e.Protocol == "doh") && e.Session["Error Scope"] == "stream") {
+		if failed && !recoverableHARTIP && !(e.Protocol == "fins" && finsRecoverable(e.sessionError)) && !recoverableDNP3 && !recoverableDoIP && !(e.Protocol == "slmp" && slmpTCPRecoverable(e.sessionError)) && !(e.Protocol == "dlms-wrapper" && dlmsRecoverableMessageError(e.sessionError)) && !(e.Protocol == "c37118" && c37118RecoverableMessageError(e.sessionError)) && !(e.Protocol == "dlms" && dlmsRecoverableMessageError(e.sessionError)) && !(e.Protocol == "roc-plus" && rocRecoverableMessageError(e.sessionError)) && !(e.Protocol == "genisys" && genisysRecoverableMessageError(e.sessionError)) && !((e.Protocol == "http2" || e.Protocol == "grpc" || e.Protocol == "doh") && e.Session["Error Scope"] == "stream") {
 			if stateful {
 				f.invalidateSession(1 - dir)
 				f.closeSession()

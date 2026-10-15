@@ -204,6 +204,8 @@ func (f *binFlow) frameDirection(dir int, w []byte) (int, *binSpec, error) {
 				f.doip.refusedWire(dir, w)
 			}
 			return n, &binSpec{}, err
+		case "hart-ip":
+			return f.frameHARTIP(w)
 		case "enip":
 			return f.frameENIP(w)
 		case "stratum":
