@@ -178,6 +178,28 @@ func TimeoutContextSeconds(d float64) context.Context {
 	return TimeoutContext(FloatSecondDuration(d))
 }
 
+// StripProgramNamePrefix removes the "/prog/" or "/prog(timestamp)/" prefix an
+// editor url carries, so the same source keeps one identity when it is compiled
+// under another program name.
+func StripProgramNamePrefix(filePath, programName string) string {
+	if filePath == "" || programName == "" {
+		return filePath
+	}
+	trimmed := strings.TrimPrefix(filePath, "/")
+	parts := strings.Split(trimmed, "/")
+	if len(parts) == 0 {
+		return filePath
+	}
+	first := parts[0]
+	if first == programName || strings.HasPrefix(first, programName+"(") {
+		if len(parts) > 1 {
+			return "/" + strings.Join(parts[1:], "/")
+		}
+		return "/"
+	}
+	return filePath
+}
+
 func getMachineIdFilePath() string {
 	if home := os.Getenv("YAKIT_HOME"); home != "" {
 		return filepath.Join(home, ".ym-id")

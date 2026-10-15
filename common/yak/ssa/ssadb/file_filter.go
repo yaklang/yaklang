@@ -4,6 +4,7 @@ import (
 	"context"
 	"strings"
 
+	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/chanx"
 )
 
@@ -34,7 +35,7 @@ func BuildFilePathSet(files []string, programName string) map[string]struct{} {
 	for _, filePath := range files {
 		add(filePath)
 		if programName != "" {
-			add(StripProgramNamePrefix(filePath, programName))
+			add(utils.StripProgramNamePrefix(filePath, programName))
 		}
 	}
 	return set
@@ -53,7 +54,7 @@ func PathInFileSet(filePath string, set map[string]struct{}, programName string)
 		return true
 	}
 	if programName != "" {
-		stripped := NormalizeFilePath(StripProgramNamePrefix(filePath, programName))
+		stripped := NormalizeFilePath(utils.StripProgramNamePrefix(filePath, programName))
 		if _, ok := set[stripped]; ok {
 			return true
 		}
@@ -91,26 +92,6 @@ func NormalizeFilePath(filePath string) string {
 	}
 	if !strings.HasPrefix(filePath, "/") {
 		return "/" + filePath
-	}
-	return filePath
-}
-
-// StripProgramNamePrefix removes "/prog/" or "/prog(timestamp)/" prefix when present.
-func StripProgramNamePrefix(filePath, programName string) string {
-	if filePath == "" || programName == "" {
-		return filePath
-	}
-	path := strings.TrimPrefix(filePath, "/")
-	parts := strings.Split(path, "/")
-	if len(parts) == 0 {
-		return filePath
-	}
-	first := parts[0]
-	if first == programName || strings.HasPrefix(first, programName+"(") {
-		if len(parts) > 1 {
-			return "/" + strings.Join(parts[1:], "/")
-		}
-		return "/"
 	}
 	return filePath
 }

@@ -15,7 +15,7 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
-func TestScanProject_SameFeatureHashCoversAcrossModes(t *testing.T) {
+func TestScanProject_CoversModesWithoutMergingSiblingCalls(t *testing.T) {
 	dir := t.TempDir()
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "main.go"), []byte(`package main
 func run(cmd string) {
@@ -41,10 +41,15 @@ alert $call`}),
 		syntaxflow_scan.WithReporter(report),
 	)
 	require.NoError(t, err)
-	// Both calls disassemble to the same feature, so they are one finding.
-	// The ssa rule covers the struct rule because that feature hash matches.
-	require.Len(t, report.Risks, 1)
+	// Both calls share one feature hash, so the ssa rule of the following mode
+	// covers each of them. They sit at different statements, which the cover key
+	// carries, so each call keeps its own row.
+	require.Len(t, report.Risks, 2, "different statements must stay separate findings")
+	positions := make(map[string]struct{}, len(report.Risks))
 	for _, risk := range report.Risks {
-		require.Equal(t, string(schema.SFR_MODE_SSA), risk.ScanMode)
+		require.Equal(t, string(schema.SFR_MODE_SSA), risk.ScanMode,
+			"the later scan mode covers the earlier finding")
+		positions[risk.CodeRange] = struct{}{}
 	}
+	require.Len(t, positions, 2, "each sibling statement keeps its own position")
 }
