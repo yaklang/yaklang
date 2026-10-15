@@ -798,3 +798,11 @@ func TestJsondata(t *testing.T) {
 	log.Infof("%v", codec.AnyToString(c))
 
 }
+
+func TestCodeSourceCommitSurvivesJSON(t *testing.T) {
+	const commit = "0123456789012345678901234567890123456789"
+	c, err := LoadConfigFromJSON([]byte(`{"Mode":63,"CodeSource":{"kind":"git","url":"https://example.invalid/source.git","branch":"main","commit":"` + commit + `"}}`))
+	require.NoError(t, err)
+	require.Equal(t, commit, c.GetCodeSourceCommit())
+	require.Contains(t, c.CodeSource.ToJSONString(), `"commit":"`+commit+`"`)
+}
