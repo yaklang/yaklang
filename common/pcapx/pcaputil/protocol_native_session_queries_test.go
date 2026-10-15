@@ -1,6 +1,7 @@
 package pcaputil
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"testing"
@@ -304,6 +305,29 @@ func tlsAlertOwnedQueries(t *testing.T) {
 			s.(*captureSession).f.a.config.Deferred = deferred
 			wire, err := trafficfixture.ReadFile("testdata/tls-owned-queries/records/malformed.bin")
 			require.NoError(t, err)
+			// Preserve the immutable legacy bytes and answer. RFC5246 6.2.1
+			// permits this three-octet fragment (one Alert plus one pending
+			// octet); the old filename is not a normative malformed oracle.
+			require.Equal(t, []byte{21, 3, 3, 0, 3, 1, 0, 0}, wire)
+			neighbor, err := NewProtocolSession(DefaultParserBudget())
+			require.NoError(t, err)
+			neighbor.(*captureSession).f.a.config.Deferred = deferred
+			n := neighbor.Feed(0, time.Unix(1, 0), bytes.Clone(wire))
+			require.Nil(t, n.Err)
+			require.Len(t, n.Events, 1)
+			want := map[string]any{"Record Type": byte(21), "Record Version": uint16(0x303), "Record Length": 3, "Authentication Verified": false, "Certificate Trust": "not-evaluated", "Content Visibility": "cleartext", "Negotiated Version": uint16(0), "Cipher Suite": uint16(0), "SNI": "", "ALPN": "", "Alert Messages": []map[string]any{{"Level": byte(1), "Description": byte(0), "Raw": []byte{1, 0}}}, "Alert Buffered Bytes": 1}
+			require.Equal(t, want, n.Events[0].Session)
+			tlsAlertCheckQuery(t, n.Events[0], want, "")
+			pending := neighbor.Close("partial")
+			require.Len(t, pending, 1)
+			require.Equal(t, map[string]any{"Alert Buffered Bytes": 1}, pending[0].Session)
+			tlsDTLSQuery(t, pending[0], nil, "NeedMore")
+			require.Empty(t, neighbor.Close("again"))
+			require.Zero(t, neighbor.Stats().BufferedBytes)
+			// RFC5246 6.2.1 forbids zero-length Alert fragments. Keep every
+			// original private error/ownership assertion on an actual refusal.
+			wire = bytes.Clone(wire[:5])
+			wire[4] = 0
 			r := s.Feed(0, time.Unix(1, 0), wire)
 			require.NotNil(t, r.Err)
 			require.Equal(t, ErrMalformedMessage, r.Err.Kind)

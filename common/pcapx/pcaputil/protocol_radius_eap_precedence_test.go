@@ -8,7 +8,8 @@ import (
 )
 
 // A valid unknown method is unsupported; it cannot hide a simultaneous MUST
-// violation. These are boundary observations, not an implementation of EAP-TLS.
+// violation. These are boundary observations; the reserved test method deliberately stays
+// separate from the implemented EAP-TLS Type13 profile.
 func TestRADIUSEAPErrorPrecedence(t *testing.T) {
 	for _, c := range []struct {
 		name string
@@ -16,8 +17,8 @@ func TestRADIUSEAPErrorPrecedence(t *testing.T) {
 		mac  bool
 		kind string
 	}{
-		{"unknown-method-missing-mac", 13, false, "MalformedMessage"},
-		{"unknown-method-valid-mac", 13, true, "UnsupportedFeature"},
+		{"unknown-method-missing-mac", 255, false, "MalformedMessage"},
+		{"unknown-method-valid-mac", 255, true, "UnsupportedFeature"},
 		{"identity-missing-mac", 1, false, "MalformedMessage"},
 	} {
 		for _, deferred := range []bool{false, true} {
