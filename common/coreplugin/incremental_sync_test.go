@@ -138,6 +138,33 @@ func TestCorePluginSyncRollbackAndRetry(t *testing.T) {
 	require.Equal(t, "new:1", yakit.GetKey(db, corePluginEmbedKey))
 }
 
+func TestCorePluginItemHashStorage(t *testing.T) {
+	for _, raw := range []string{"null", "{"} {
+		t.Run(raw, func(t *testing.T) {
+			db := newCorePluginSyncDB(t)
+			require.NoError(t, yakit.SetKey(db, corePluginItemHashesKey, raw))
+			require.NoError(t, yakit.SetKey(db, corePluginEmbedKey, "previous"))
+			plugins := map[string]*builtinCorePlugin{"first": corePluginFixture("first")}
+			count := countCorePluginParses(t)
+			if raw == "{" {
+				require.ErrorContains(t, syncCorePlugins(db, plugins, "archive:1", true), "read core plugin item hashes")
+				require.Zero(t, count.Load())
+				require.Equal(t, "previous", yakit.GetKey(db, corePluginEmbedKey))
+				require.Equal(t, raw, yakit.GetKey(db, corePluginItemHashesKey))
+				var rows int
+				require.NoError(t, db.Model(&schema.YakScript{}).Count(&rows).Error)
+				require.Zero(t, rows)
+				require.NoError(t, yakit.SetKey(db, corePluginItemHashesKey, "{}"))
+			}
+			require.NoError(t, syncCorePlugins(db, plugins, "archive:1", true))
+			require.EqualValues(t, 1, count.Swap(0))
+			// The shared serializer must keep the existing KV format readable.
+			require.NoError(t, syncCorePlugins(db, plugins, "repacked:1", true))
+			require.Zero(t, count.Load())
+		})
+	}
+}
+
 func TestCorePluginEmbeddedMigrationAndHotSync(t *testing.T) {
 	db := newCorePluginSyncDB(t)
 	previousDB, previousPath := consts.GetGormProfileDatabase(), consts.GetCurrentProfileDatabasePath()
