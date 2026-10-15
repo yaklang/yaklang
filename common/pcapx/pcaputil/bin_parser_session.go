@@ -159,7 +159,7 @@ func (f *binFlow) detectDirection(dir int, wire []byte) {
 	}
 	if probeENIP(w).Verdict == ProbeAccept {
 		f.protocol = "enip"
-		f.enip = &binENIP{clientDir: dir, maxPending: f.a.budget.MaxCollectionElements}
+		f.enip = &binENIP{clientDir: dir, maxPending: f.a.budget.MaxCollectionElements, reserveMemory: f.reserveSession}
 		return
 	}
 	if f.captureTCP && f.port(4000) && probeSCGIRequest(wire) {
@@ -206,7 +206,7 @@ func (f *binFlow) detectDirection(dir int, wire []byte) {
 	case "doip":
 		f.protocol, f.doip = "doip", &binDoIP{clientDir: dir, maxPending: f.a.budget.MaxCollectionElements, reserveMemory: f.reserveSession}
 	case "enip":
-		f.protocol, f.enip = "enip", &binENIP{clientDir: dir, maxPending: f.a.budget.MaxCollectionElements}
+		f.protocol, f.enip = "enip", &binENIP{clientDir: dir, maxPending: f.a.budget.MaxCollectionElements, reserveMemory: f.reserveSession}
 	case "zookeeper":
 		clientDir := dir
 		if p.Version == "jute-connect-v0/ConnectResponse" {
@@ -831,7 +831,13 @@ func (f *binFlow) consumeSession(dir int, e *ProtocolEvent, result map[string]an
 			e.Profile, e.Completeness = "doip-routing-dsc", "message"
 		}
 	case "enip":
-		e.Session, err = f.enip.consume(dir, e.Raw, f.a.budget.MaxCollectionElements)
+		if e.ID == 0 {
+			e.ID = f.a.ids.Add(1)
+		}
+		if f.a.budget.MaxCollectionElements < 32 || f.a.budget.MaxRecursionDepth < 3 {
+			return protocolError(ErrResourceExceeded, "EtherNet/IP shared projection budget")
+		}
+		e.Session, e.ResponseTo, e.TransactionID, err = f.enip.consumeEvent(dir, e.Raw, e.ID, f.a.budget.MaxCollectionElements)
 		if err == nil {
 			e.semanticFields = cloneSession(e.Session)
 			e.Profile, e.Completeness = "ethernet-ip-cip-explicit", "message"
@@ -1102,6 +1108,21 @@ func (f *binFlow) closeSession() {
 
 func (f *binFlow) finishSession(reason TrafficFlowCloseReason) {
 	f.finishDNP3Transport(reason)
+	if p := f.enip; p != nil {
+		n := len(p.pending)
+		if p.registerRequestSeen && !p.registered {
+			n++
+		}
+		if n > 0 {
+			e := f.event(p.clientDir, nil, "incomplete", string(reason)+": EtherNet/IP outstanding observed requests at close")
+			e.Completeness = "incomplete"
+			e.Session = map[string]any{"Outstanding": n}
+			e.semanticSession = cloneSession(e.Session)
+			e.sessionError = &ProtocolError{Kind: ErrNeedMore, Message: e.Summary}
+			f.a.incomplete.Add(1)
+			f.a.emit(e)
+		}
+	}
 	if m := f.mms; m != nil && (len(m.pending[0])+len(m.pending[1])+len(m.fragment[0].events)+len(m.fragment[1].events) > 0) {
 		e := f.event(0, nil, "incomplete", string(reason)+": MMS outstanding requests/TSDU at close")
 		e.Completeness = "incomplete"

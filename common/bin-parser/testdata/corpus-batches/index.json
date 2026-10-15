@@ -98029,6 +98029,492 @@
         "common/pcapx/pcaputil/fins-parameter-area/controls.json": "fins-parameter-area/controls.json",
         "scripts/protocol-tests/required-tests-traffic-unified-v90.json": "required-tests-traffic-unified-v90.json"
       }
+    },
+    {
+      "id": "validation-enip-context",
+      "kind": "validation",
+      "source_sha": "05a82a77f351a514f77ad731e28a900fcdadafb5",
+      "file": "validation-enip-context.zip",
+      "sha256": "0ead7a7957168fa809ddaa7049f2df52a27c313801e84185deafd69c14c85b13",
+      "password": "bin-parser",
+      "members": {
+        "enip-context-tools/build.py": {
+          "sha256": "92681b14aea42c860c1341388f90306f6b1542a90c8139366928b75ca221cdaf",
+          "bytes": 6973
+        },
+        "enip-context-tools/carrier.py": {
+          "sha256": "ec19e4ce30d607e55560a9d97641c58c23bac961f43fe75acf9dcb4793eed60a",
+          "bytes": 1382
+        },
+        "enip-context-tools/historical-answer.json": {
+          "sha256": "e27a44b5b0cfc4e33bb1c04521aa0d6c4536388d85579175667315cd675b7e2e",
+          "bytes": 4800
+        },
+        "enip-context-tools/history.py": {
+          "sha256": "006904362c0304030024a8d160028d6e6f3562b994a2ca6d6011d398727f6ad8",
+          "bytes": 1900
+        },
+        "enip-context-tools/model.py": {
+          "sha256": "f2174a83a136908eefe99dfc35d70faba70d870c9f5c4f6587879594c029f6aa",
+          "bytes": 3179
+        },
+        "enip-context-tools/reference.py": {
+          "sha256": "31a1fccd0e7854f031ea98b7ebbc30d5081a964073d34d7169929053b20ed1b8",
+          "bytes": 4071
+        },
+        "enip-context-tools/source-pin.json": {
+          "sha256": "c9202d7b7402b41c7fac5f88fd13c0f01777723fc845f1a044e160ad970d245c",
+          "bytes": 1796
+        },
+        "enip-context-tools/verify.py": {
+          "sha256": "7c1c7060b998cf327c91201f7588e8268dcbe230a9deb8627422057f0a72922e",
+          "bytes": 3850
+        },
+        "enip-context/answers/CPF-count.json": {
+          "sha256": "89c4f954b45895001a1ca59cba0cb9cb8a3b9e1e77dc74d8d343ccfa4d81aecb",
+          "bytes": 1707
+        },
+        "enip-context/answers/CPF-null-address.json": {
+          "sha256": "76df85e41bcc72a4bb27ca97a0e1dcba7dc3ce756b34bc83b618c7086db976d5",
+          "bytes": 1728
+        },
+        "enip-context/answers/active-cookie-conflict.json": {
+          "sha256": "4ab7b23e641833e876eed9f358c75614b86714f72b8f84cff131b2d5ad93fd59",
+          "bytes": 2449
+        },
+        "enip-context/answers/active-identical-retry.json": {
+          "sha256": "2457073015f723b837de1dcea6aedaef0373f52a952104599e4c1bf5308e59cd",
+          "bytes": 3652
+        },
+        "enip-context/answers/active-write-conflict.json": {
+          "sha256": "72b7405f4775fa833ca8a6c638068ca0345bfe84e86635180c323e229c1f5da8",
+          "bytes": 2563
+        },
+        "enip-context/answers/completed-cookie-reuse.json": {
+          "sha256": "30fc02e78ce96d4135616bcbcf2790379f618be03604224219b8b50066006b5d",
+          "bytes": 3240
+        },
+        "enip-context/answers/completed-write-cookie-reuse.json": {
+          "sha256": "9ff0cbdce914033c9787850beeb3d058bbfcef8f42f9a6872b6e71df50912517",
+          "bytes": 3393
+        },
+        "enip-context/answers/high-session-handle.json": {
+          "sha256": "8ddfb391c22d93229a69febf8088e082cdd41f3b7787c67ccd31c49104333965",
+          "bytes": 2950
+        },
+        "enip-context/answers/last-cookie-byte-mismatch.json": {
+          "sha256": "2e62b7309c5ff272d66d19b9365fcc3f6005de06a65c906ae3effbee36986e7a",
+          "bytes": 2458
+        },
+        "enip-context/answers/long-symbol.json": {
+          "sha256": "44b57eafaecee10fa9f0aa82d47717514b32d392bcf1209b478394ed842440bd",
+          "bytes": 3912
+        },
+        "enip-context/answers/nonzero-options.json": {
+          "sha256": "49301fb7e540b597a9959372e3f79ee2ba36d50008608e5603a1621e39fac868",
+          "bytes": 1725
+        },
+        "enip-context/answers/opaque-cookie.json": {
+          "sha256": "b22931d113ac487ad760480a072330146e5140beff21079dbaa7257ede1e50a2",
+          "bytes": 2917
+        },
+        "enip-context/answers/peer-encapsulation-error.json": {
+          "sha256": "41f082d569161b677de12d50c23fe90491fc7a2f2b50360aaafdc11264c64bcb",
+          "bytes": 2406
+        },
+        "enip-context/answers/pipeline-incomplete.json": {
+          "sha256": "0a54e9d81fd4a6075bf2a156eb892394824e983ab7dbaa5ca9e9b97f2ebf859f",
+          "bytes": 2847
+        },
+        "enip-context/answers/pipeline-reverse.json": {
+          "sha256": "9264d9eb423818b7a834dd62c1837e93e86ae16bb06fcda31c170ab202be7dea",
+          "bytes": 4419
+        },
+        "enip-context/answers/read-bad-reserved.json": {
+          "sha256": "00c4294dde7c6549de88fcd168beccdc5a91d293a14efa2d13c96eef111836e5",
+          "bytes": 2435
+        },
+        "enip-context/answers/read-bad-status-count.json": {
+          "sha256": "40f66e5e023cc2baca8fb012aa02a72e27c0635be6555be81163ed191dca027a",
+          "bytes": 2435
+        },
+        "enip-context/answers/read-extra-DINT.json": {
+          "sha256": "810f238389dcfdd347028e1ed6bdf282fd65007b79acd70f550ef287b1fc317b",
+          "bytes": 2433
+        },
+        "enip-context/answers/read-match.json": {
+          "sha256": "ddc14e21d4dee3b1dac8cda2d5bcb06af8efb7c9e4555decf9a0fe4ac5502302",
+          "bytes": 2908
+        },
+        "enip-context/answers/read-maximum.json": {
+          "sha256": "f9d8ffd83f87d5a21edb90b3b7d950a059d814862d89ca6b7498e2be46346482",
+          "bytes": 2920
+        },
+        "enip-context/answers/read-minimum.json": {
+          "sha256": "5e1165b5bd61ba6e5ff67e306109233a3544a35236d038db7f99c14e7014380e",
+          "bytes": 2921
+        },
+        "enip-context/answers/read-peer-status.json": {
+          "sha256": "72b2abe644f8b8533f36c60d20dcf9063ec65e4b01765fc210649db0910f7de2",
+          "bytes": 2422
+        },
+        "enip-context/answers/read-short-DINT.json": {
+          "sha256": "1b835093d9b805bb43c8734576f1cbdbdb70075ea3f3ea894a6f56cd24039ba2",
+          "bytes": 2429
+        },
+        "enip-context/answers/read-wrong-type.json": {
+          "sha256": "ef4949cd1242efbb32ffdcd3ab766bc3c3cc28be10a9cebc9342ae6014b88195",
+          "bytes": 2431
+        },
+        "enip-context/answers/register-incomplete.json": {
+          "sha256": "218c0515dc8cd2d4bfefa76971191193385b13f88fbf666937ac8ce4e3c343cb",
+          "bytes": 850
+        },
+        "enip-context/answers/register-last-cookie-byte-mismatch.json": {
+          "sha256": "c41c4cdf19a338f3e43ad0f72fd8d00914557280a63b1b099dafe38654d56a31",
+          "bytes": 1147
+        },
+        "enip-context/answers/register-opaque-echo.json": {
+          "sha256": "54c479afd306315676dee13fa8db9c777aae166a3525dce28e7b32724d901ffe",
+          "bytes": 2938
+        },
+        "enip-context/answers/register-peer-error.json": {
+          "sha256": "32cba4134c8062a3ca82d6ed48ca8cb0221787adf0149764f8ea8e40435f493b",
+          "bytes": 1097
+        },
+        "enip-context/answers/register-wrong-echo.json": {
+          "sha256": "6202118b6d79e53e7222c3d0f7c87b530dbb15adb34ee16fe9fe4807a2f030a6",
+          "bytes": 1102
+        },
+        "enip-context/answers/reply-wrong-cookie.json": {
+          "sha256": "1d15c1da05e20e7c2bde0e3305c021cc529904ba97574f9af2754788535a639c",
+          "bytes": 2437
+        },
+        "enip-context/answers/request-from-peer.json": {
+          "sha256": "0133c95dfee4b658a9e6958d080735df8ce7c623cfc38433b0e5a60ce082ad90",
+          "bytes": 1730
+        },
+        "enip-context/answers/request-incomplete.json": {
+          "sha256": "b931ed6998db044903e7d89350984ded2e9204f8d751720fd02569a0832ff64a",
+          "bytes": 2141
+        },
+        "enip-context/answers/same-cookie-read-write.json": {
+          "sha256": "b3e478af6a4c871e687bf83990ed2e9fcda9fddc0d9c058b72806ea05258179e",
+          "bytes": 4576
+        },
+        "enip-context/answers/symbol-pad.json": {
+          "sha256": "30a51f082160c3456f2b9c9dbe30ad625b0772466d14c46144bbecb0418b6501",
+          "bytes": 1710
+        },
+        "enip-context/answers/write-ack-extra.json": {
+          "sha256": "ec04663e4e34e4efab69820135eea2e8fdb0f4e38df01143f67e6db4a95a130a",
+          "bytes": 2520
+        },
+        "enip-context/answers/write-negative.json": {
+          "sha256": "b2e1d2cbbfe04a0acc29c550ff6ea78b37057b1491502857349bff762f9d8a69",
+          "bytes": 3047
+        },
+        "enip-context/answers/write-reply-wrong-cookie.json": {
+          "sha256": "c96427e4f32707d084b8e2fb3c02c78eb570dfb4d40c8647993d12d8c92194b4",
+          "bytes": 2544
+        },
+        "enip-context/answers/wrong-direction-reply.json": {
+          "sha256": "ba00abefec0b05de22e332d653cb4b63aab33e594fa689555e6bb0c4d960aecf",
+          "bytes": 2446
+        },
+        "enip-context/answers/wrong-reply-handle.json": {
+          "sha256": "98e4b6dd801100a1d58bd00a2c3235f64a0fd8561877595ba9072e5491b3dc47",
+          "bytes": 2437
+        },
+        "enip-context/answers/wrong-service-reply.json": {
+          "sha256": "6af291d6d4c8d560c1c4dec37d001eb82901652760bd8470d36548e91f3c97c0",
+          "bytes": 2428
+        },
+        "enip-context/answers/wrong-session-handle.json": {
+          "sha256": "e624844fcec2851142308f916c157379d68658ad9e0f8a282268b354ef33b0d2",
+          "bytes": 1739
+        },
+        "enip-context/answers/zero-cookie.json": {
+          "sha256": "6c9555f298815eb85a2aeac2b2b7b0a75aa0149215a5f46e61d1b91c88438c83",
+          "bytes": 2911
+        },
+        "enip-context/captures/CPF-count.pcap": {
+          "sha256": "07f8133390d7fd068536b1edb98d8f8e4513a57975d40d91389dcaf006896177",
+          "bytes": 552
+        },
+        "enip-context/captures/CPF-null-address.pcap": {
+          "sha256": "058af60d6eccbf3b6302b6870b12b83af5696343e10dd82c5d0909ec503e5b6e",
+          "bytes": 552
+        },
+        "enip-context/captures/active-cookie-conflict.pcap": {
+          "sha256": "07c114061ae1322a60d52d919ad236fb07afb5c4ba88c5296afac32aed2ecb3f",
+          "bytes": 672
+        },
+        "enip-context/captures/active-identical-retry.pcap": {
+          "sha256": "666e2cf1796b3d444125c220320cec38d4d5ba21e247c2ec780bf471ba3b5935",
+          "bytes": 794
+        },
+        "enip-context/captures/active-write-conflict.pcap": {
+          "sha256": "66391e0f8ce0bb9c9de4cef4267aee805b654806d2370b5d361ce2a9217c509e",
+          "bytes": 686
+        },
+        "enip-context/captures/completed-cookie-reuse.pcap": {
+          "sha256": "3a99c7fbfd4ef88ac8ba7fbeca599964286d43f336597858e4944f1e365ed614",
+          "bytes": 792
+        },
+        "enip-context/captures/completed-write-cookie-reuse.pcap": {
+          "sha256": "38c060eb1b252d03370bc6de7893021c3b3329c6abeedb66243f96c01137627d",
+          "bytes": 798
+        },
+        "enip-context/captures/high-session-handle.pcap": {
+          "sha256": "6fd13a86964ce671773513074d1d948de2a72508108c9b108370a01c09069933",
+          "bytes": 672
+        },
+        "enip-context/captures/last-cookie-byte-mismatch.pcap": {
+          "sha256": "f3cde6283d66ae2da8c813146e463c9326ae900fd073990dc374f723ec866163",
+          "bytes": 672
+        },
+        "enip-context/captures/long-symbol.pcap": {
+          "sha256": "256613b09abeff7c0759f75e04f8b19916d78413af4df72ffcb53ab325c10064",
+          "bytes": 922
+        },
+        "enip-context/captures/nonzero-options.pcap": {
+          "sha256": "b085b336831bfe5f6e7dd223e5be8894edee9f8a73673dd3b61cb19966f1080d",
+          "bytes": 552
+        },
+        "enip-context/captures/opaque-cookie.pcap": {
+          "sha256": "30e6591ffb3e0c9951b1c835fd59a96d4e65c4956ec2f55af2661a0eb35d58c1",
+          "bytes": 672
+        },
+        "enip-context/captures/peer-encapsulation-error.pcap": {
+          "sha256": "4cc532411bca2db28c00fe8538fbb0e27bcd0a9d84707d6d17b49528b88924bf",
+          "bytes": 646
+        },
+        "enip-context/captures/pipeline-incomplete.pcap": {
+          "sha256": "8de454b1a05a735623560e7975f40b0f53c050a6c4e91991b4e5f4e1cd68bd06",
+          "bytes": 672
+        },
+        "enip-context/captures/pipeline-reverse.pcap": {
+          "sha256": "c516646329172c5b8b172444e4457cb47a53488153d5b04050f32e7590b0cbc7",
+          "bytes": 912
+        },
+        "enip-context/captures/read-bad-reserved.pcap": {
+          "sha256": "227005d59309b13a044d7a5076360c0e0cb3d77bda43ccaf9d6378415d412301",
+          "bytes": 672
+        },
+        "enip-context/captures/read-bad-status-count.pcap": {
+          "sha256": "f1d657cee1cccf986581c1a01cfc8edecf2c521aa539a815cf8a46dd1a148c9b",
+          "bytes": 666
+        },
+        "enip-context/captures/read-extra-DINT.pcap": {
+          "sha256": "10b7580fc9c4ae75e542d3b96b27e85ea3bb5d5346989ce7db093de5747ce9c5",
+          "bytes": 673
+        },
+        "enip-context/captures/read-match.pcap": {
+          "sha256": "2e535f3f6ceb825068fb779bd3c088ff5a21084d0a0088c3f83b1e3936566712",
+          "bytes": 672
+        },
+        "enip-context/captures/read-maximum.pcap": {
+          "sha256": "e2fe24847cb0cc7b43174b808c2318c4793ad77e090e6aa2cd2dd0f5002bc46c",
+          "bytes": 672
+        },
+        "enip-context/captures/read-minimum.pcap": {
+          "sha256": "0960511e5410a72671c8fe2a685207381a3abd22116c3441f0580feb77fb098a",
+          "bytes": 672
+        },
+        "enip-context/captures/read-peer-status.pcap": {
+          "sha256": "035c72eb695afb0d9477785077903c99ed57ae2486c2249fd801f413cd08b108",
+          "bytes": 666
+        },
+        "enip-context/captures/read-short-DINT.pcap": {
+          "sha256": "ae14ba4d07f345624e653f379cb6e4ef128a275cbd592f813cbe2efb70add4c2",
+          "bytes": 671
+        },
+        "enip-context/captures/read-wrong-type.pcap": {
+          "sha256": "2e9c908a81536b28a851ff789281c2c568eb8a7bb678678c4a6f712c315cd024",
+          "bytes": 672
+        },
+        "enip-context/captures/register-incomplete.pcap": {
+          "sha256": "b9a3a77716af2d61b6687c2751d1e0345377711723252bcefaf3993e96d5342c",
+          "bytes": 332
+        },
+        "enip-context/captures/register-last-cookie-byte-mismatch.pcap": {
+          "sha256": "b8c6dc3469a1cae06aeb2a7bf4e686847b718e5622b1e4312243d7d04a114b7d",
+          "bytes": 430
+        },
+        "enip-context/captures/register-opaque-echo.pcap": {
+          "sha256": "efd80dc2ef28549b880939d019e9fd3568dbe56577ca53830b6c3b0ee399a806",
+          "bytes": 672
+        },
+        "enip-context/captures/register-peer-error.pcap": {
+          "sha256": "e24474756a5bd00a6f9f288725f9552cd801792d30cf693ba7b154b90794d3c7",
+          "bytes": 426
+        },
+        "enip-context/captures/register-wrong-echo.pcap": {
+          "sha256": "5b3234697b6435908de0033ffebc3e61fadb79a2bc1aa589da759126aa4de1d7",
+          "bytes": 430
+        },
+        "enip-context/captures/reply-wrong-cookie.pcap": {
+          "sha256": "4a4a6ade02b8cd8d81dadece5294afbc27e2c51d1562422be65b6e102bfaaf51",
+          "bytes": 672
+        },
+        "enip-context/captures/request-from-peer.pcap": {
+          "sha256": "7f4a72e269ab168370fddf69befa8b038f548cf117404b79fa2bfef88161aedd",
+          "bytes": 552
+        },
+        "enip-context/captures/request-incomplete.pcap": {
+          "sha256": "d006e0307cc4a42c291d839418be3b089d99ba74a6dcdeac8b260473128418b3",
+          "bytes": 552
+        },
+        "enip-context/captures/same-cookie-read-write.pcap": {
+          "sha256": "4c31a5758abfa5bf87d47df93706bf74cc8ebe08c17b25268216a721d5f55c9a",
+          "bytes": 912
+        },
+        "enip-context/captures/symbol-pad.pcap": {
+          "sha256": "1539a547aba1ad50e992dc1e8acfc7235177379693482f11308711e7430a3bb6",
+          "bytes": 552
+        },
+        "enip-context/captures/write-ack-extra.pcap": {
+          "sha256": "67951c61c12ba493b1010d014d908dfbe924a44e374effefa3d384aa98929196",
+          "bytes": 673
+        },
+        "enip-context/captures/write-negative.pcap": {
+          "sha256": "fe2e8625bd1f47da866e8e2c89ea6338d36eb3acb9fb5f304b075254e0afa09b",
+          "bytes": 672
+        },
+        "enip-context/captures/write-reply-wrong-cookie.pcap": {
+          "sha256": "ed935cf11875feadee2a942ae2a3204471550209963dbb96e3cc8382c1a46483",
+          "bytes": 672
+        },
+        "enip-context/captures/wrong-direction-reply.pcap": {
+          "sha256": "8da3839cde83ea85d84b25f6d4da0c96f70a56a0c7ae896f53d64d5e3fe55e51",
+          "bytes": 672
+        },
+        "enip-context/captures/wrong-reply-handle.pcap": {
+          "sha256": "d5901b8936e33f4fcb300d78709fc28ebdb231b032b19f0c81f0828886dca877",
+          "bytes": 672
+        },
+        "enip-context/captures/wrong-service-reply.pcap": {
+          "sha256": "b9b6e228af1ce72a62214aae9f01b1d01cde8b5f12807a6879fa2cecaee8c1b4",
+          "bytes": 666
+        },
+        "enip-context/captures/wrong-session-handle.pcap": {
+          "sha256": "dde8e67a1a8bff1b514c8bf421ce644e1f10de8bcc31d6ebb58124c03357d622",
+          "bytes": 552
+        },
+        "enip-context/captures/zero-cookie.pcap": {
+          "sha256": "0ab01a5b7c00d86732cd74248a6a117855be9b5ba79352fa405341d85b4ec418",
+          "bytes": 672
+        },
+        "enip-context/controls.json": {
+          "sha256": "87282098ad372508993074498d8ff2ddcfe416d845347d2aa98fc1790787de2e",
+          "bytes": 125165
+        },
+        "required-tests-traffic-unified-v91.json": {
+          "sha256": "5dbd49d0428a51bc0d1b4c1d7337ce6b1fda82a109aa7466a17ffb2851e4d0f4",
+          "bytes": 25786311
+        },
+        "validation/expected.json": {
+          "sha256": "0f593b4b157a321c47165a5f7e94f1ff708f4a5507330184c4fda6312101388d",
+          "bytes": 50407
+        }
+      },
+      "aliases": {
+        "common/pcapx/pcaputil/enip-context-tools/build.py": "enip-context-tools/build.py",
+        "common/pcapx/pcaputil/enip-context-tools/carrier.py": "enip-context-tools/carrier.py",
+        "common/pcapx/pcaputil/enip-context-tools/historical-answer.json": "enip-context-tools/historical-answer.json",
+        "common/pcapx/pcaputil/enip-context-tools/history.py": "enip-context-tools/history.py",
+        "common/pcapx/pcaputil/enip-context-tools/model.py": "enip-context-tools/model.py",
+        "common/pcapx/pcaputil/enip-context-tools/reference.py": "enip-context-tools/reference.py",
+        "common/pcapx/pcaputil/enip-context-tools/source-pin.json": "enip-context-tools/source-pin.json",
+        "common/pcapx/pcaputil/enip-context-tools/verify.py": "enip-context-tools/verify.py",
+        "common/pcapx/pcaputil/enip-context/answers/CPF-count.json": "enip-context/answers/CPF-count.json",
+        "common/pcapx/pcaputil/enip-context/answers/CPF-null-address.json": "enip-context/answers/CPF-null-address.json",
+        "common/pcapx/pcaputil/enip-context/answers/active-cookie-conflict.json": "enip-context/answers/active-cookie-conflict.json",
+        "common/pcapx/pcaputil/enip-context/answers/active-identical-retry.json": "enip-context/answers/active-identical-retry.json",
+        "common/pcapx/pcaputil/enip-context/answers/active-write-conflict.json": "enip-context/answers/active-write-conflict.json",
+        "common/pcapx/pcaputil/enip-context/answers/completed-cookie-reuse.json": "enip-context/answers/completed-cookie-reuse.json",
+        "common/pcapx/pcaputil/enip-context/answers/completed-write-cookie-reuse.json": "enip-context/answers/completed-write-cookie-reuse.json",
+        "common/pcapx/pcaputil/enip-context/answers/high-session-handle.json": "enip-context/answers/high-session-handle.json",
+        "common/pcapx/pcaputil/enip-context/answers/last-cookie-byte-mismatch.json": "enip-context/answers/last-cookie-byte-mismatch.json",
+        "common/pcapx/pcaputil/enip-context/answers/long-symbol.json": "enip-context/answers/long-symbol.json",
+        "common/pcapx/pcaputil/enip-context/answers/nonzero-options.json": "enip-context/answers/nonzero-options.json",
+        "common/pcapx/pcaputil/enip-context/answers/opaque-cookie.json": "enip-context/answers/opaque-cookie.json",
+        "common/pcapx/pcaputil/enip-context/answers/peer-encapsulation-error.json": "enip-context/answers/peer-encapsulation-error.json",
+        "common/pcapx/pcaputil/enip-context/answers/pipeline-incomplete.json": "enip-context/answers/pipeline-incomplete.json",
+        "common/pcapx/pcaputil/enip-context/answers/pipeline-reverse.json": "enip-context/answers/pipeline-reverse.json",
+        "common/pcapx/pcaputil/enip-context/answers/read-bad-reserved.json": "enip-context/answers/read-bad-reserved.json",
+        "common/pcapx/pcaputil/enip-context/answers/read-bad-status-count.json": "enip-context/answers/read-bad-status-count.json",
+        "common/pcapx/pcaputil/enip-context/answers/read-extra-DINT.json": "enip-context/answers/read-extra-DINT.json",
+        "common/pcapx/pcaputil/enip-context/answers/read-match.json": "enip-context/answers/read-match.json",
+        "common/pcapx/pcaputil/enip-context/answers/read-maximum.json": "enip-context/answers/read-maximum.json",
+        "common/pcapx/pcaputil/enip-context/answers/read-minimum.json": "enip-context/answers/read-minimum.json",
+        "common/pcapx/pcaputil/enip-context/answers/read-peer-status.json": "enip-context/answers/read-peer-status.json",
+        "common/pcapx/pcaputil/enip-context/answers/read-short-DINT.json": "enip-context/answers/read-short-DINT.json",
+        "common/pcapx/pcaputil/enip-context/answers/read-wrong-type.json": "enip-context/answers/read-wrong-type.json",
+        "common/pcapx/pcaputil/enip-context/answers/register-incomplete.json": "enip-context/answers/register-incomplete.json",
+        "common/pcapx/pcaputil/enip-context/answers/register-last-cookie-byte-mismatch.json": "enip-context/answers/register-last-cookie-byte-mismatch.json",
+        "common/pcapx/pcaputil/enip-context/answers/register-opaque-echo.json": "enip-context/answers/register-opaque-echo.json",
+        "common/pcapx/pcaputil/enip-context/answers/register-peer-error.json": "enip-context/answers/register-peer-error.json",
+        "common/pcapx/pcaputil/enip-context/answers/register-wrong-echo.json": "enip-context/answers/register-wrong-echo.json",
+        "common/pcapx/pcaputil/enip-context/answers/reply-wrong-cookie.json": "enip-context/answers/reply-wrong-cookie.json",
+        "common/pcapx/pcaputil/enip-context/answers/request-from-peer.json": "enip-context/answers/request-from-peer.json",
+        "common/pcapx/pcaputil/enip-context/answers/request-incomplete.json": "enip-context/answers/request-incomplete.json",
+        "common/pcapx/pcaputil/enip-context/answers/same-cookie-read-write.json": "enip-context/answers/same-cookie-read-write.json",
+        "common/pcapx/pcaputil/enip-context/answers/symbol-pad.json": "enip-context/answers/symbol-pad.json",
+        "common/pcapx/pcaputil/enip-context/answers/write-ack-extra.json": "enip-context/answers/write-ack-extra.json",
+        "common/pcapx/pcaputil/enip-context/answers/write-negative.json": "enip-context/answers/write-negative.json",
+        "common/pcapx/pcaputil/enip-context/answers/write-reply-wrong-cookie.json": "enip-context/answers/write-reply-wrong-cookie.json",
+        "common/pcapx/pcaputil/enip-context/answers/wrong-direction-reply.json": "enip-context/answers/wrong-direction-reply.json",
+        "common/pcapx/pcaputil/enip-context/answers/wrong-reply-handle.json": "enip-context/answers/wrong-reply-handle.json",
+        "common/pcapx/pcaputil/enip-context/answers/wrong-service-reply.json": "enip-context/answers/wrong-service-reply.json",
+        "common/pcapx/pcaputil/enip-context/answers/wrong-session-handle.json": "enip-context/answers/wrong-session-handle.json",
+        "common/pcapx/pcaputil/enip-context/answers/zero-cookie.json": "enip-context/answers/zero-cookie.json",
+        "common/pcapx/pcaputil/enip-context/captures/CPF-count.pcap": "enip-context/captures/CPF-count.pcap",
+        "common/pcapx/pcaputil/enip-context/captures/CPF-null-address.pcap": "enip-context/captures/CPF-null-address.pcap",
+        "common/pcapx/pcaputil/enip-context/captures/active-cookie-conflict.pcap": "enip-context/captures/active-cookie-conflict.pcap",
+        "common/pcapx/pcaputil/enip-context/captures/active-identical-retry.pcap": "enip-context/captures/active-identical-retry.pcap",
+        "common/pcapx/pcaputil/enip-context/captures/active-write-conflict.pcap": "enip-context/captures/active-write-conflict.pcap",
+        "common/pcapx/pcaputil/enip-context/captures/completed-cookie-reuse.pcap": "enip-context/captures/completed-cookie-reuse.pcap",
+        "common/pcapx/pcaputil/enip-context/captures/completed-write-cookie-reuse.pcap": "enip-context/captures/completed-write-cookie-reuse.pcap",
+        "common/pcapx/pcaputil/enip-context/captures/high-session-handle.pcap": "enip-context/captures/high-session-handle.pcap",
+        "common/pcapx/pcaputil/enip-context/captures/last-cookie-byte-mismatch.pcap": "enip-context/captures/last-cookie-byte-mismatch.pcap",
+        "common/pcapx/pcaputil/enip-context/captures/long-symbol.pcap": "enip-context/captures/long-symbol.pcap",
+        "common/pcapx/pcaputil/enip-context/captures/nonzero-options.pcap": "enip-context/captures/nonzero-options.pcap",
+        "common/pcapx/pcaputil/enip-context/captures/opaque-cookie.pcap": "enip-context/captures/opaque-cookie.pcap",
+        "common/pcapx/pcaputil/enip-context/captures/peer-encapsulation-error.pcap": "enip-context/captures/peer-encapsulation-error.pcap",
+        "common/pcapx/pcaputil/enip-context/captures/pipeline-incomplete.pcap": "enip-context/captures/pipeline-incomplete.pcap",
+        "common/pcapx/pcaputil/enip-context/captures/pipeline-reverse.pcap": "enip-context/captures/pipeline-reverse.pcap",
+        "common/pcapx/pcaputil/enip-context/captures/read-bad-reserved.pcap": "enip-context/captures/read-bad-reserved.pcap",
+        "common/pcapx/pcaputil/enip-context/captures/read-bad-status-count.pcap": "enip-context/captures/read-bad-status-count.pcap",
+        "common/pcapx/pcaputil/enip-context/captures/read-extra-DINT.pcap": "enip-context/captures/read-extra-DINT.pcap",
+        "common/pcapx/pcaputil/enip-context/captures/read-match.pcap": "enip-context/captures/read-match.pcap",
+        "common/pcapx/pcaputil/enip-context/captures/read-maximum.pcap": "enip-context/captures/read-maximum.pcap",
+        "common/pcapx/pcaputil/enip-context/captures/read-minimum.pcap": "enip-context/captures/read-minimum.pcap",
+        "common/pcapx/pcaputil/enip-context/captures/read-peer-status.pcap": "enip-context/captures/read-peer-status.pcap",
+        "common/pcapx/pcaputil/enip-context/captures/read-short-DINT.pcap": "enip-context/captures/read-short-DINT.pcap",
+        "common/pcapx/pcaputil/enip-context/captures/read-wrong-type.pcap": "enip-context/captures/read-wrong-type.pcap",
+        "common/pcapx/pcaputil/enip-context/captures/register-incomplete.pcap": "enip-context/captures/register-incomplete.pcap",
+        "common/pcapx/pcaputil/enip-context/captures/register-last-cookie-byte-mismatch.pcap": "enip-context/captures/register-last-cookie-byte-mismatch.pcap",
+        "common/pcapx/pcaputil/enip-context/captures/register-opaque-echo.pcap": "enip-context/captures/register-opaque-echo.pcap",
+        "common/pcapx/pcaputil/enip-context/captures/register-peer-error.pcap": "enip-context/captures/register-peer-error.pcap",
+        "common/pcapx/pcaputil/enip-context/captures/register-wrong-echo.pcap": "enip-context/captures/register-wrong-echo.pcap",
+        "common/pcapx/pcaputil/enip-context/captures/reply-wrong-cookie.pcap": "enip-context/captures/reply-wrong-cookie.pcap",
+        "common/pcapx/pcaputil/enip-context/captures/request-from-peer.pcap": "enip-context/captures/request-from-peer.pcap",
+        "common/pcapx/pcaputil/enip-context/captures/request-incomplete.pcap": "enip-context/captures/request-incomplete.pcap",
+        "common/pcapx/pcaputil/enip-context/captures/same-cookie-read-write.pcap": "enip-context/captures/same-cookie-read-write.pcap",
+        "common/pcapx/pcaputil/enip-context/captures/symbol-pad.pcap": "enip-context/captures/symbol-pad.pcap",
+        "common/pcapx/pcaputil/enip-context/captures/write-ack-extra.pcap": "enip-context/captures/write-ack-extra.pcap",
+        "common/pcapx/pcaputil/enip-context/captures/write-negative.pcap": "enip-context/captures/write-negative.pcap",
+        "common/pcapx/pcaputil/enip-context/captures/write-reply-wrong-cookie.pcap": "enip-context/captures/write-reply-wrong-cookie.pcap",
+        "common/pcapx/pcaputil/enip-context/captures/wrong-direction-reply.pcap": "enip-context/captures/wrong-direction-reply.pcap",
+        "common/pcapx/pcaputil/enip-context/captures/wrong-reply-handle.pcap": "enip-context/captures/wrong-reply-handle.pcap",
+        "common/pcapx/pcaputil/enip-context/captures/wrong-service-reply.pcap": "enip-context/captures/wrong-service-reply.pcap",
+        "common/pcapx/pcaputil/enip-context/captures/wrong-session-handle.pcap": "enip-context/captures/wrong-session-handle.pcap",
+        "common/pcapx/pcaputil/enip-context/captures/zero-cookie.pcap": "enip-context/captures/zero-cookie.pcap",
+        "common/pcapx/pcaputil/enip-context/controls.json": "enip-context/controls.json",
+        "scripts/protocol-tests/required-tests-traffic-unified-v91.json": "required-tests-traffic-unified-v91.json"
+      }
     }
   ],
   "schema_version": 1,

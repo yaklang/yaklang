@@ -19,6 +19,7 @@ type ProtocolEvent struct {
 	nativeOPCUAObservation                   bool
 	nativeMMSObservation                     bool
 	nativeFINSObservation                    bool
+	nativeENIPObservation                    bool
 	nativeUnrecognizedUDP                    bool
 	nativeBACnetRead                         bool
 	nativeBACnetRoutedRead                   bool
@@ -101,7 +102,7 @@ func (e *ProtocolEvent) Decode() (result map[string]any, err error) {
 		}
 		// These native observations already retain their complete session
 		// context in the private field tree. Public projections are not authority.
-		ownedIndustrial := e.nativeFINSObservation || e.Protocol == "slmp" && (e.Profile == slmpTCPProfile || e.Profile == "slmp-binary-self-test") ||
+		ownedIndustrial := e.nativeENIPObservation || e.nativeFINSObservation || e.Protocol == "slmp" && (e.Profile == slmpTCPProfile || e.Profile == "slmp-binary-self-test") ||
 			e.Transport == "ethernet" && (e.Protocol == "sv" && e.Profile == "iec61850-sv-raw-asdu" || e.Protocol == "ethercat" && e.Profile == "ethercat-datagram-chain")
 		if ownedIndustrial && e.semanticFields != nil {
 			session = e.semanticFields
@@ -250,7 +251,7 @@ func (e *ProtocolEvent) retainRuleEnvelope(result map[string]any) {
 }
 
 func (e *ProtocolEvent) ownsNativeFields() bool {
-	if e.nativeFINSObservation || e.nativeDiagnosticError != "" {
+	if e.nativeENIPObservation || e.nativeFINSObservation || e.nativeDiagnosticError != "" {
 		return true
 	}
 	if e.nativeDoIPObservation {
@@ -882,6 +883,10 @@ func (f *binFlow) event(dir int, raw []byte, status, detail string) *BinParserEv
 		e.Profile = "doip-routing-dsc"
 	}
 	f.eventEvidence(dir, e)
+	if f.enip != nil {
+		e.nativeENIPObservation = true
+		e.Profile, e.Completeness = "ethernet-ip-cip-explicit", "message"
+	}
 	if f.fins != nil {
 		e.nativeFINSObservation = true
 		e.Profile, e.Completeness = finsProfile, "message"
@@ -943,7 +948,7 @@ func (f *binFlow) stop(dir int, wire []byte, status, reason string) {
 	}
 	e := f.event(dir, preview, status, reason)
 	e.sessionError, f.lastSessionError = f.lastSessionError, nil
-	if e.nativeFINSObservation {
+	if e.nativeFINSObservation || e.nativeENIPObservation {
 		if e.sessionError == nil {
 			kind := ErrMalformedMessage
 			switch status {
@@ -1423,7 +1428,7 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 				if (e.Protocol == "iec104" || e.Protocol == "dnp3") || e.Protocol == "goose" || e.Protocol == "mqtt" || e.nativeOPCUAObservation || e.Protocol == "websocket" && e.Session["OCPP"] != nil || e.Protocol == "rtp" && e.Transport != "udp" {
 					e.retainRuleEnvelope(result)
 				}
-				if e.Protocol == "tls" || e.Protocol == "redis" || e.Entry == "MySQLPreparedFields" || e.Protocol == "stun" || e.Protocol == "turn" || e.Protocol == "snmp" || e.Protocol == "slmp" || e.Protocol == "dlms-wrapper" || e.Protocol == "dlms" || e.Protocol == "c37118" {
+				if e.nativeENIPObservation || e.Protocol == "tls" || e.Protocol == "redis" || e.Entry == "MySQLPreparedFields" || e.Protocol == "stun" || e.Protocol == "turn" || e.Protocol == "snmp" || e.Protocol == "slmp" || e.Protocol == "dlms-wrapper" || e.Protocol == "dlms" || e.Protocol == "c37118" {
 					e.semanticFields = cloneSession(e.semanticFields)
 				}
 			}
