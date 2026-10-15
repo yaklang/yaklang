@@ -697,6 +697,7 @@ func dhcp6Options(w []byte, depth, limit int) ([]map[string]any, error) {
 		return nil, protocolError(ErrResourceExceeded, "DHCPv6 option depth")
 	}
 	var out []map[string]any
+	var clientSeen, serverSeen bool
 	for len(w) > 0 {
 		if len(w) < 4 {
 			return nil, fmt.Errorf("DHCPv6 option header")
@@ -712,6 +713,24 @@ func dhcp6Options(w []byte, depth, limit int) ([]map[string]any, error) {
 			return nil, protocolError(ErrResourceExceeded, "DHCPv6 option count")
 		}
 		o := map[string]any{"Code": code, "Raw": bytes.Clone(b)}
+		if code == 1 {
+			if clientSeen {
+				return nil, fmt.Errorf("DHCPv6 duplicate client identifier")
+			}
+			clientSeen = true
+		}
+		if code == 2 {
+			if serverSeen {
+				return nil, fmt.Errorf("DHCPv6 duplicate server identifier")
+			}
+			serverSeen = true
+		}
+		if code == 8 && n != 2 {
+			return nil, fmt.Errorf("DHCPv6 elapsed time width")
+		}
+		if code == 14 && n != 0 {
+			return nil, fmt.Errorf("DHCPv6 Rapid Commit width")
+		}
 		prefix := -1
 		switch code {
 		case 1, 2:

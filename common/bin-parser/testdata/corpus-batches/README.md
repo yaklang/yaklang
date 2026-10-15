@@ -44,7 +44,7 @@ Run from the repository root:
 ```sh
 go run ./internal/trafficfixture/cmd/corpus test
 go test -json -count=1 -timeout=10m ./internal/trafficfixture/... ./common/bin-parser/... ./common/pcapx/... ./common/yak/cmd/yakcmds/shark-cli ./scripts/ci > traffic.jsonl
-go run ./internal/trafficfixture/cmd/corpus exec -- python3 @scripts/protocol-tests/check_go_test_json_v2.py traffic.jsonl --inventory @scripts/protocol-tests/required-tests-traffic-unified-v106.json --tier full
+go run ./internal/trafficfixture/cmd/corpus exec -- python3 @scripts/protocol-tests/check_go_test_json_v2.py traffic.jsonl --inventory @scripts/protocol-tests/required-tests-traffic-unified-v107.json --tier full
 ```
 
 The single `corpus` entry point uses the same bounded Go ZIP loader as tests.
@@ -83,7 +83,7 @@ their semantic coverage. The existing synthetic session keys are test inputs;
 production credentials, user private keys and material without redistribution
 permission belong in an external fixed-source download manifest.
 
-Current test requirements are sealed at `scripts/protocol-tests/required-tests-traffic-unified-v106.json`;
+Current test requirements are sealed at `scripts/protocol-tests/required-tests-traffic-unified-v107.json`;
 the historical inventories and all earlier batches remain unchanged.
 The supplemental small-corpus batch contains 26 minimal controls, their explicit
 expected facts, an offline generator and the compact pinned source manifest.
@@ -203,7 +203,7 @@ opaque selector bytes and one bounded Data value over Wrapper v1 TCP/UDP; object
 selector meaning, access permission and device operation are unverified. The
 original one-packet selective-access capture and original refused answer remain
 immutable; its now-supported answer is matched by exact input SHA and frame.
-The active inventory is `scripts/protocol-tests/required-tests-traffic-unified-v106.json`.
+The active inventory is `scripts/protocol-tests/required-tests-traffic-unified-v107.json`.
 
 The small-graph budget batch reuses accepted graph captures/answers and adds one
 249-byte UDP control for child count255 without child bytes. Its standalone proof
@@ -993,7 +993,7 @@ the normative answer; a missing numeric reference field is not a codec pass.
 Full/deferred, workers1/2/4, observers off/on, Feed chunks1/7/full, ownership,
 resources and close/refusal boundaries remain required.
 
-Current gate: `required-tests-traffic-unified-v106.json` with
+Current gate: `required-tests-traffic-unified-v107.json` with
 `check_go_test_json_v2.py`. The indexed validator preserves missing/unpassed,
 package invocation completion, descendant skips, failures and non-JSON checks;
 its mutation/differential harness is sealed with the material. Older checkers
@@ -1629,7 +1629,7 @@ userspace adapter; full kernel receiver/socket/timers and ECU endpoints do not.
 All161 preceding ZIPs remain byte-for-byte unchanged. Raw captures, dependencies,
 reference source/build output and process evidence stay outside Git.
 
-Current effective v106 inventory: 71,385 entries; 71,378 are mandatory for the full tier.
+Current effective v107 inventory: 71,909 entries; 71,902 are mandatory for the full tier.
 
 The opt-in `DynamicFlowControl` profile follows Linux v6.12 FC tuple updates (including WAIT without granting data). Disjoint address extensions or classical/FD carriers may share CAN IDs; unknown selectors cannot choose or mutate a conversation. Ambiguous selectors are rejected. Seven sealed cases exercise full/deferred, workers 1/2/4, and observer off/on, with exact fields, byte collections, contributor references, errors and resource ownership. The existing static FC profile remains unchanged. Pinned upstream FC and filter functions execute with declared userspace stubs; this is not a kernel/ECU endpoint. TShark 4.2.5 checks wire tuples and two complete payloads, but cannot independently reassemble the shared-address transcripts.
 
@@ -1714,3 +1714,5 @@ DNS context controls preserve complete selected RFC1035/5452 fields while checki
 DHCP context controls reuse the fixed historical full wire/field goldens to construct twelve small IPv4/IPv6 captures. Foreign clients and the other IP family cannot advance a pending observer clock. Completed/expired identities remain charged until Close, and indistinguishable completed-ID reuse has zero precise links and explicit ambiguity. Native field, Session and typed refusal queries survive public protocol/cache/byte/result edits. The full/deferred workers1/2/4 observer matrix asserts all selected fields/types, complete message order, per-event links including zero, provenance, original aggregate capacity and Close release. Fixed RFC2131/2132 and RFC8415 literal answers plus a separate selected-wire model and actual pinned tshark id/type/payload facts are retained. These passive observations are not a full lease, server-selection, relay or authenticated device state machine; original oracle gaps remain open.
 
 The same DHCP batch adds eleven refusal scenarios using ten unique deterministic pcapng captures; marker-allocation pressure reuses the exact unknown-prefix capture by content hash. Pending/first rejected input, unrelated clients/interfaces, nonstandard DHCPv4 and unknown DHCPv6 DUID prefixes preserve conservative association. Bounded exact or domain/relay/XID history is charged; matching known candidates are quarantined even when the marker cannot fit, without corrupting retained separate owners.132 additional full/deferred workers1/2/4 observer views assert complete selected fields/Session/links/provenance/typed refusals, Raw previews, full denied byte counts and Close release. SourceBytes hashes retained Raw.200 earlier ZIPs are unchanged. The added unique-wire reference checks are separate from authenticated lease/endpoint or whole-original semantic truth.
+
+The native DHCP phase batch separates the transaction root from the observed request answered by each response: Offer/Advertise and Request/ACK/Reply retain explicit phase conditions. BOOTP role, identity singletons and fixed option widths are checked; selected-server mismatch and absent Rapid Commit cannot manufacture owners. Only exact/elapsed-only retransmission renews its phase; expired discovery replies and foreign servers do not age an active Request.33 logical controls reuse32 unique captures, with complete independent fields/types/Session/order/links,396 packet/message callback configurations,66 native datagram views and compact state/Close/ownership guards. Fixed RFC source pins and actual pinned tshark wire facts complement the passive-policy oracle.201 earlier ZIPs remain unchanged; real client/lease/allocation/authentication and whole-original semantics are not claimed.

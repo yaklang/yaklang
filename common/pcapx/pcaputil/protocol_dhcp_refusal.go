@@ -104,7 +104,7 @@ func (a *binParser) recordDHCPRefusal(e *ProtocolEvent, proto string, w []byte) 
 			s.pending[key] = p
 			return
 		}
-		cost := int64(len(key) + 128)
+		cost := int64(len(key) + dhcpPhaseRowOverhead)
 		if len(s.pending)+len(a.dns.pending) < a.budget.MaxCollectionElements && a.reserveEvidence(cost) {
 			s.pending[key] = dnsPending{ts: e.Timestamp, cost: cost, ambiguous: true, refused: true}
 			return

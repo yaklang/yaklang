@@ -225,13 +225,17 @@ func DecodeDNSMessage(w []byte, limit int) (map[string]any, error) {
 
 // DHCP keeps its established storage and accounting; DNS identity history is separate.
 type dnsPending struct {
-	completed, ambiguous, refused bool
-	id                            uint64
-	ts                            time.Time
-	flow                          uint64
-	cost                          int64
-	responders                    map[string]struct{}
+	completed, ambiguous, refused                          bool
+	phaseConflict, serverChosen, clientChosen, rapidCommit bool
+	queryType                                              byte
+	id, requestID, discoverID                              uint64
+	ts                                                     time.Time
+	cost                                                   int64
+	discoverSeconds                                        int64
+	discoverNanos                                          int32
+	queryHash, serverHash, clientHash                      [32]byte
 }
+
 type dnsCorrelation struct {
 	untracked4, untracked6 bool
 	pending                map[string]dnsPending

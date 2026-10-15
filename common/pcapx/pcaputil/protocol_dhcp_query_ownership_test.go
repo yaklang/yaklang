@@ -118,7 +118,13 @@ func testDHCPOwnedQueries(t *testing.T) {
 						ids[e.ID] = true
 						require.Equal(t, events[0].ID, e.TransactionID)
 						if i == 1 || i == 3 {
-							require.Equal(t, events[0].ID, e.ResponseTo)
+							// RFC2131 Table3/4: Offer answers Discover; ACK answers
+							// the observed Request, while TransactionID retains the root.
+							request := 0
+							if i == 3 {
+								request = 2
+							}
+							require.Equal(t, events[request].ID, e.ResponseTo)
 						} else {
 							require.Zero(t, e.ResponseTo)
 						}

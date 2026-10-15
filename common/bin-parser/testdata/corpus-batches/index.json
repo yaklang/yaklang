@@ -103258,6 +103258,364 @@
         "common/pcapx/pcaputil/dhcp-refusal/v6true-marker-budget.expected.json": "dhcp-refusal/v6true-duid-beyond-prefix.expected.json",
         "scripts/protocol-tests/required-tests-traffic-unified-v106.json": "required-tests-traffic-unified-v106.json"
       }
+    },
+    {
+      "id": "validation-dhcp-phase",
+      "kind": "support",
+      "source_sha": "1cdc4117fa2358d7b6e7b559cd861a0f9567c64d",
+      "file": "validation-dhcp-phase.zip",
+      "sha256": "3737654b68663e1c601f720f1bb378af6df1fbad240b55f5e4135811d441007a",
+      "password": "bin-parser",
+      "members": {
+        "dhcp-phase-tools/generate.py": {
+          "sha256": "8df295bdd864cf96fdc7fd0cfe2890cfd0e880103b0fe65ff053dbce73e4319c",
+          "bytes": 432
+        },
+        "dhcp-phase-tools/source-pins.json": {
+          "sha256": "7bb1a760acf3ace0512986f3affdb8704c3bdda15ad9fab35223f0a51681d8c8",
+          "bytes": 339
+        },
+        "dhcp-phase-tools/verify.py": {
+          "sha256": "1a1654d21ccb89cf5b9593547deceedb251b924cc1595cd618858f71706b916d",
+          "bytes": 4914
+        },
+        "dhcp-phase/v6false-backward-retry.expected.json": {
+          "sha256": "e4bcdf403f37b8b7e057728f29b7dd106856339814d0cb9339a7b3f391ad6f27",
+          "bytes": 2886
+        },
+        "dhcp-phase/v6false-backward-retry.pcap": {
+          "sha256": "6abdb09b48f93e200d2a23899d6becd86507dfff9aa772773e5b7e86466e2d3c",
+          "bytes": 930
+        },
+        "dhcp-phase/v6false-bootp-role-refused.expected.json": {
+          "sha256": "cc5a01251046abd37ae78b338a770189145f9217d5d5c2738f79d1eeda635397",
+          "bytes": 672
+        },
+        "dhcp-phase/v6false-bootp-role-refused.pcap": {
+          "sha256": "47388ecf66b527d576951393a79348eb5e1e8d666a80544d9da620ed0f0f40cf",
+          "bytes": 326
+        },
+        "dhcp-phase/v6false-changed-nonelapsed-query.expected.json": {
+          "sha256": "db25b17333d941c646eba760ae7cac65df6efc6dbc97a583f582fb3300fd497d",
+          "bytes": 2927
+        },
+        "dhcp-phase/v6false-changed-nonelapsed-query.pcap": {
+          "sha256": "48412c817c9757c1d158c8dad62f935e92673f5e76116f3996bb5394abcfba6b",
+          "bytes": 935
+        },
+        "dhcp-phase/v6false-discovery-retry-renewal.expected.json": {
+          "sha256": "507940d659e468461aaa50063b293d2a2049e4e9f45e0f15007cd03ec0d4b40a",
+          "bytes": 2891
+        },
+        "dhcp-phase/v6false-discovery-retry-renewal.pcap": {
+          "sha256": "4509f71de90e2a4af24a04fab08813f46b7a8448d96912683571a8ff5f952916",
+          "bytes": 930
+        },
+        "dhcp-phase/v6false-dora.expected.json": {
+          "sha256": "9bc6335bdeac32380988f42d131e398f1e3238ba16a449e6d6426dd3d64e077b",
+          "bytes": 3877
+        },
+        "dhcp-phase/v6false-dora.pcap": {
+          "sha256": "84298ca2cd3d78ab37e9115b051868beeac2f7f5ab197dfc5af92ed0e6496dd5",
+          "bytes": 1232
+        },
+        "dhcp-phase/v6false-elapsed-retry-renewal.expected.json": {
+          "sha256": "d8135725e3dac04181f3a564317169adea2463d30e5b07dc86f3f636ceeccf5a",
+          "bytes": 2887
+        },
+        "dhcp-phase/v6false-elapsed-retry-renewal.pcap": {
+          "sha256": "980fb0e670e206e9932156714e55892411f5aa108465495343969986bc9abe4d",
+          "bytes": 930
+        },
+        "dhcp-phase/v6false-exact-retry-renewal.expected.json": {
+          "sha256": "d0f5741c690185de1230ef7d3932359e2b629f7a3b4a7967f0f3b3283bef24fa",
+          "bytes": 2887
+        },
+        "dhcp-phase/v6false-exact-retry-renewal.pcap": {
+          "sha256": "18552833491dd80d51eddb9f7087e07402a5ff366313ec281acef5000069ae36",
+          "bytes": 930
+        },
+        "dhcp-phase/v6false-expired-offer-keeps-request.expected.json": {
+          "sha256": "8e9c6e0b516bf197d374c814c02ba33e7d7f89264e9bdf9e0126467379b893e6",
+          "bytes": 3875
+        },
+        "dhcp-phase/v6false-expired-offer-keeps-request.pcap": {
+          "sha256": "ee8447187c159065e0a54cca75afe437ca2dc822174949607fc6e8422dfcef83",
+          "bytes": 1232
+        },
+        "dhcp-phase/v6false-expired-response.expected.json": {
+          "sha256": "1a2d359e34d0b9c88d839ad19eb92e374fe6ade6eac23725100e541aa09d5e4a",
+          "bytes": 1936
+        },
+        "dhcp-phase/v6false-expired-response.pcap": {
+          "sha256": "20aa8227b80987e9fa13435802e423fe21ebe05813ce660330d047ede00e4aba",
+          "bytes": 628
+        },
+        "dhcp-phase/v6false-foreign-server-clock.expected.json": {
+          "sha256": "aec88242ffd55081dca27c60fa7d14d6b95041381156f5bfb6a1d24b8bfa06b7",
+          "bytes": 3083
+        },
+        "dhcp-phase/v6false-foreign-server-clock.pcap": {
+          "sha256": "e4963ebe7975061fb741e10a6d6f6bfbe887a48be0400d0ec8147684b0dc2511",
+          "bytes": 948
+        },
+        "dhcp-phase/v6false-future-response-does-not-age-timely-response.expected.json": {
+          "sha256": "7763fe444823c951fc20ecf0585deabf6976cef5b3f5625e3b288444fcecf957",
+          "bytes": 2924
+        },
+        "dhcp-phase/v6false-future-response-does-not-age-timely-response.pcap": {
+          "sha256": "c9c8ba8c0e9931b292e64f679e91e358a10b1babf4d987e92a64507a700810d8",
+          "bytes": 930
+        },
+        "dhcp-phase/v6false-mismatched-server-keeps-owner.expected.json": {
+          "sha256": "e4741df30e88415f9b3197f108e67576aff67208f5d27876f4bad6134243dc64",
+          "bytes": 3082
+        },
+        "dhcp-phase/v6false-mismatched-server-keeps-owner.pcap": {
+          "sha256": "ff132997b94849244651cdbeabe03c58292435c75359dda150fe61a8660c3d8b",
+          "bytes": 948
+        },
+        "dhcp-phase/v6false-missing-selected-server.expected.json": {
+          "sha256": "2431669cf66ffbfebfd4e86c7dfb90447288f57dd579501aa55daa54ec674495",
+          "bytes": 1999
+        },
+        "dhcp-phase/v6false-missing-selected-server.pcap": {
+          "sha256": "8a8f4d750f356cd90912a050970ab2785a88e70f71335a2b140423cb2bbcdf7a",
+          "bytes": 634
+        },
+        "dhcp-phase/v6false-ordinary.expected.json": {
+          "sha256": "9c1943f4bb9b8c73ee9631fd80e9e717649d659d01d3d713961935fdff995dd3",
+          "bytes": 1938
+        },
+        "dhcp-phase/v6false-ordinary.pcap": {
+          "sha256": "aff3770b11ee6f1e5a8ed5864c897aa02e4f66f8227f217cb67dc4bfe08dcc90",
+          "bytes": 628
+        },
+        "dhcp-phase/v6false-selected-server.expected.json": {
+          "sha256": "b4d3f383bc2dc08d7c85292f0c49ced5a213d9a71bd7836981378bef06180b18",
+          "bytes": 2044
+        },
+        "dhcp-phase/v6false-selected-server.pcap": {
+          "sha256": "2cd8ef38f2a18e0866e53e0f12ff5ce31ee2482c49ec265e13b83cfa17088ecc",
+          "bytes": 640
+        },
+        "dhcp-phase/v6true-backward-retry.expected.json": {
+          "sha256": "d18b33f38ab0020d119aaefa270dd0892625f4cc888d78514bc348bc470a8557",
+          "bytes": 4223
+        },
+        "dhcp-phase/v6true-backward-retry.pcap": {
+          "sha256": "92447cd64028e4984142a67503fbe20920a927eff73c7046a9fd5b11b095e327",
+          "bytes": 541
+        },
+        "dhcp-phase/v6true-changed-nonelapsed-query.expected.json": {
+          "sha256": "106b664104bf82f5d0644f8eb9427d9045fd50b2d270f1d76ebf8cd2b639571b",
+          "bytes": 4308
+        },
+        "dhcp-phase/v6true-changed-nonelapsed-query.pcap": {
+          "sha256": "62dd8088a1e84bbb573f17f6281e25224b4815fa39de08957e81e91349bb93a6",
+          "bytes": 546
+        },
+        "dhcp-phase/v6true-client-duplicate.expected.json": {
+          "sha256": "0aeba09b57cde03a6958247abb3b372b53b05279a6863094a6bd64a3547fd2f7",
+          "bytes": 418
+        },
+        "dhcp-phase/v6true-client-duplicate.pcap": {
+          "sha256": "3ae350807cc02885e24cdc12b6332ca633aaa7baf635ae5ed3c884f6900b4978",
+          "bytes": 219
+        },
+        "dhcp-phase/v6true-discovery-retry-renewal.expected.json": {
+          "sha256": "2b3d4110b6c5dd06241494f75216be89043016bbb2c07c9d04ee7707fcbeec9e",
+          "bytes": 3032
+        },
+        "dhcp-phase/v6true-discovery-retry-renewal.pcap": {
+          "sha256": "975a6996c984902556f6f38d5d0611cdd59efe3de520c1c7baceaa5125c6f711",
+          "bytes": 447
+        },
+        "dhcp-phase/v6true-elapsed-retry-renewal.expected.json": {
+          "sha256": "c805b8c77901b2e745308eb4c47912f4ef268c9be2c05ccdd0a614ceff7bd8b1",
+          "bytes": 4224
+        },
+        "dhcp-phase/v6true-elapsed-retry-renewal.pcap": {
+          "sha256": "57f0caa83893fe98b456a6ccad2a19df4cd93fff12c3d99f298cd58bb86d02db",
+          "bytes": 541
+        },
+        "dhcp-phase/v6true-elapsed-width.expected.json": {
+          "sha256": "f74d5d51234b1360e05ac120c1397d811a8d5d78c85559e1f781dd68779bd169",
+          "bytes": 384
+        },
+        "dhcp-phase/v6true-elapsed-width.pcap": {
+          "sha256": "622414dbbb5df833a26923b60e440bf53db5e665a42a178068fe2be14ea8caf9",
+          "bytes": 202
+        },
+        "dhcp-phase/v6true-exact-retry-renewal.expected.json": {
+          "sha256": "315bad054a54c3e2acd4c13a359c47f0c353b6ca0b7b8fecefdb1a6e36bb26b8",
+          "bytes": 4224
+        },
+        "dhcp-phase/v6true-exact-retry-renewal.pcap": {
+          "sha256": "5c6ae8e6f85deba14acf3e1dd553417204be4ed3c6d5c12d01788229f096d836",
+          "bytes": 541
+        },
+        "dhcp-phase/v6true-expired-response.expected.json": {
+          "sha256": "04f043656fe855d90754e95ab8663c0bd091e502499cb26c44bc3df161921fa3",
+          "bytes": 2772
+        },
+        "dhcp-phase/v6true-expired-response.pcap": {
+          "sha256": "53a0bae48bb78dc00604ce39f523212c852575994188206be8a54d6f1506069d",
+          "bytes": 364
+        },
+        "dhcp-phase/v6true-foreign-server-clock.expected.json": {
+          "sha256": "4b13945765ecf8126567618f910866cb32ef4d61ec2dc2d84288484d981ca132",
+          "bytes": 4095
+        },
+        "dhcp-phase/v6true-foreign-server-clock.pcap": {
+          "sha256": "cb292ccc52ad9c86c123f55f786d61d66d8edcb38f1dc96d151ea0bd73d91e92",
+          "bytes": 527
+        },
+        "dhcp-phase/v6true-future-response-does-not-age-timely-response.expected.json": {
+          "sha256": "4eeaa7ef571ff24ba66a217c9cc71ca1ace5a8dd6d6ad55f11221a64f39da847",
+          "bytes": 4095
+        },
+        "dhcp-phase/v6true-future-response-does-not-age-timely-response.pcap": {
+          "sha256": "1fb3599caeba6f088847254ab91b54936bd5400ca7f52eb8ef0a70df4d05f78c",
+          "bytes": 527
+        },
+        "dhcp-phase/v6true-mismatched-server-keeps-owner.expected.json": {
+          "sha256": "a507074ebab117c334a52d0294a7ea0f5003110462081cc781b67457e35e298a",
+          "bytes": 4094
+        },
+        "dhcp-phase/v6true-mismatched-server-keeps-owner.pcap": {
+          "sha256": "01c57332b06f3a3acccf4671b640eb36f8c4d83de897f475a0eced29693115c7",
+          "bytes": 527
+        },
+        "dhcp-phase/v6true-missing-selected-server.expected.json": {
+          "sha256": "f2771d6072e2ba4a7eaea0eeb1c4d0b7edecc93ae1265d47e67f99a88e530450",
+          "bytes": 2596
+        },
+        "dhcp-phase/v6true-missing-selected-server.pcap": {
+          "sha256": "c70df71e71548f701387c6eff40e3e1530748b73502d245d87d13c0802be272e",
+          "bytes": 346
+        },
+        "dhcp-phase/v6true-ordinary.expected.json": {
+          "sha256": "8572f23054308ccc5f50cba6dedc317c3c0ece7b075c0404eb0c27f2c63d8b4b",
+          "bytes": 2774
+        },
+        "dhcp-phase/v6true-ordinary.pcap": {
+          "sha256": "a9cdc7ddca03d17aab8f1aec6b7f750b705d7bd57e56a88e632c9d6e09c363f0",
+          "bytes": 364
+        },
+        "dhcp-phase/v6true-rapid-commit-false.expected.json": {
+          "sha256": "5a06b7032fd5f176b4cbc55172ee422c802179a441dab3bac8a8a7b04b82e5b9",
+          "bytes": 2182
+        },
+        "dhcp-phase/v6true-rapid-commit-false.pcap": {
+          "sha256": "791c785ad83c0b78bae2d9c8761dd160f127703e31bef3dc176943628e8eef6d",
+          "bytes": 317
+        },
+        "dhcp-phase/v6true-rapid-commit-true.expected.json": {
+          "sha256": "0000d1fa6765105ac4841328b6c6cc013a06a1b940fce571cc67ebb1b5bdc315",
+          "bytes": 2320
+        },
+        "dhcp-phase/v6true-rapid-commit-true.pcap": {
+          "sha256": "9645b1bb9b158d7320f322ec5789bb7659b788e15808242c4f43a7f6472b284a",
+          "bytes": 325
+        },
+        "dhcp-phase/v6true-rapid-width.expected.json": {
+          "sha256": "282b54f638e098776e121a124fe28e6dbf499088f2725a658319a9889e28a60d",
+          "bytes": 392
+        },
+        "dhcp-phase/v6true-rapid-width.pcap": {
+          "sha256": "b58f61cdd653255f80f9a87b87f3380850f82a7ed589e621cbf1fa063f33e13d",
+          "bytes": 206
+        },
+        "dhcp-phase/v6true-server-duplicate.expected.json": {
+          "sha256": "000bb7be6283883f93ab21fab056641d4d3730030f7bf748454143ae54f6176e",
+          "bytes": 418
+        },
+        "dhcp-phase/v6true-server-duplicate.pcap": {
+          "sha256": "ba3c57a7d2d323a8b48611796bc4faac0210da2f7c62936285d6cd01b182e801",
+          "bytes": 219
+        },
+        "required-tests-traffic-unified-v107.json": {
+          "sha256": "2c6cd72e00d5b2b9386de0956d7ae504edbd9497a1259b42438efd98bf09dae8",
+          "bytes": 18117229
+        },
+        "validation/expected.json": {
+          "sha256": "46069da403e01f9a2ef29678d10d5d08a4beb53115b0422e78597033559a48e2",
+          "bytes": 36360
+        }
+      },
+      "aliases": {
+        "common/pcapx/pcaputil/dhcp-phase-tools/generate.py": "dhcp-phase-tools/generate.py",
+        "common/pcapx/pcaputil/dhcp-phase-tools/source-pins.json": "dhcp-phase-tools/source-pins.json",
+        "common/pcapx/pcaputil/dhcp-phase-tools/verify.py": "dhcp-phase-tools/verify.py",
+        "common/pcapx/pcaputil/dhcp-phase/v6false-backward-retry.expected.json": "dhcp-phase/v6false-backward-retry.expected.json",
+        "common/pcapx/pcaputil/dhcp-phase/v6false-backward-retry.pcap": "dhcp-phase/v6false-backward-retry.pcap",
+        "common/pcapx/pcaputil/dhcp-phase/v6false-bootp-role-refused.expected.json": "dhcp-phase/v6false-bootp-role-refused.expected.json",
+        "common/pcapx/pcaputil/dhcp-phase/v6false-bootp-role-refused.pcap": "dhcp-phase/v6false-bootp-role-refused.pcap",
+        "common/pcapx/pcaputil/dhcp-phase/v6false-changed-nonelapsed-query.expected.json": "dhcp-phase/v6false-changed-nonelapsed-query.expected.json",
+        "common/pcapx/pcaputil/dhcp-phase/v6false-changed-nonelapsed-query.pcap": "dhcp-phase/v6false-changed-nonelapsed-query.pcap",
+        "common/pcapx/pcaputil/dhcp-phase/v6false-discovery-retry-renewal.expected.json": "dhcp-phase/v6false-discovery-retry-renewal.expected.json",
+        "common/pcapx/pcaputil/dhcp-phase/v6false-discovery-retry-renewal.pcap": "dhcp-phase/v6false-discovery-retry-renewal.pcap",
+        "common/pcapx/pcaputil/dhcp-phase/v6false-dora.expected.json": "dhcp-phase/v6false-dora.expected.json",
+        "common/pcapx/pcaputil/dhcp-phase/v6false-dora.pcap": "dhcp-phase/v6false-dora.pcap",
+        "common/pcapx/pcaputil/dhcp-phase/v6false-elapsed-retry-renewal.expected.json": "dhcp-phase/v6false-elapsed-retry-renewal.expected.json",
+        "common/pcapx/pcaputil/dhcp-phase/v6false-elapsed-retry-renewal.pcap": "dhcp-phase/v6false-elapsed-retry-renewal.pcap",
+        "common/pcapx/pcaputil/dhcp-phase/v6false-exact-retry-renewal.expected.json": "dhcp-phase/v6false-exact-retry-renewal.expected.json",
+        "common/pcapx/pcaputil/dhcp-phase/v6false-exact-retry-renewal.pcap": "dhcp-phase/v6false-exact-retry-renewal.pcap",
+        "common/pcapx/pcaputil/dhcp-phase/v6false-expired-offer-keeps-request.expected.json": "dhcp-phase/v6false-expired-offer-keeps-request.expected.json",
+        "common/pcapx/pcaputil/dhcp-phase/v6false-expired-offer-keeps-request.pcap": "dhcp-phase/v6false-expired-offer-keeps-request.pcap",
+        "common/pcapx/pcaputil/dhcp-phase/v6false-expired-response.expected.json": "dhcp-phase/v6false-expired-response.expected.json",
+        "common/pcapx/pcaputil/dhcp-phase/v6false-expired-response.pcap": "dhcp-phase/v6false-expired-response.pcap",
+        "common/pcapx/pcaputil/dhcp-phase/v6false-foreign-server-clock.expected.json": "dhcp-phase/v6false-foreign-server-clock.expected.json",
+        "common/pcapx/pcaputil/dhcp-phase/v6false-foreign-server-clock.pcap": "dhcp-phase/v6false-foreign-server-clock.pcap",
+        "common/pcapx/pcaputil/dhcp-phase/v6false-future-response-does-not-age-timely-response.expected.json": "dhcp-phase/v6false-future-response-does-not-age-timely-response.expected.json",
+        "common/pcapx/pcaputil/dhcp-phase/v6false-future-response-does-not-age-timely-response.pcap": "dhcp-phase/v6false-future-response-does-not-age-timely-response.pcap",
+        "common/pcapx/pcaputil/dhcp-phase/v6false-mismatched-server-keeps-owner.expected.json": "dhcp-phase/v6false-mismatched-server-keeps-owner.expected.json",
+        "common/pcapx/pcaputil/dhcp-phase/v6false-mismatched-server-keeps-owner.pcap": "dhcp-phase/v6false-mismatched-server-keeps-owner.pcap",
+        "common/pcapx/pcaputil/dhcp-phase/v6false-missing-selected-server.expected.json": "dhcp-phase/v6false-missing-selected-server.expected.json",
+        "common/pcapx/pcaputil/dhcp-phase/v6false-missing-selected-server.pcap": "dhcp-phase/v6false-missing-selected-server.pcap",
+        "common/pcapx/pcaputil/dhcp-phase/v6false-ordinary.expected.json": "dhcp-phase/v6false-ordinary.expected.json",
+        "common/pcapx/pcaputil/dhcp-phase/v6false-ordinary.pcap": "dhcp-phase/v6false-ordinary.pcap",
+        "common/pcapx/pcaputil/dhcp-phase/v6false-selected-server.expected.json": "dhcp-phase/v6false-selected-server.expected.json",
+        "common/pcapx/pcaputil/dhcp-phase/v6false-selected-server.pcap": "dhcp-phase/v6false-selected-server.pcap",
+        "common/pcapx/pcaputil/dhcp-phase/v6true-backward-retry.expected.json": "dhcp-phase/v6true-backward-retry.expected.json",
+        "common/pcapx/pcaputil/dhcp-phase/v6true-backward-retry.pcap": "dhcp-phase/v6true-backward-retry.pcap",
+        "common/pcapx/pcaputil/dhcp-phase/v6true-changed-nonelapsed-query.expected.json": "dhcp-phase/v6true-changed-nonelapsed-query.expected.json",
+        "common/pcapx/pcaputil/dhcp-phase/v6true-changed-nonelapsed-query.pcap": "dhcp-phase/v6true-changed-nonelapsed-query.pcap",
+        "common/pcapx/pcaputil/dhcp-phase/v6true-client-duplicate.expected.json": "dhcp-phase/v6true-client-duplicate.expected.json",
+        "common/pcapx/pcaputil/dhcp-phase/v6true-client-duplicate.pcap": "dhcp-phase/v6true-client-duplicate.pcap",
+        "common/pcapx/pcaputil/dhcp-phase/v6true-discovery-retry-renewal.expected.json": "dhcp-phase/v6true-discovery-retry-renewal.expected.json",
+        "common/pcapx/pcaputil/dhcp-phase/v6true-discovery-retry-renewal.pcap": "dhcp-phase/v6true-discovery-retry-renewal.pcap",
+        "common/pcapx/pcaputil/dhcp-phase/v6true-elapsed-retry-renewal.expected.json": "dhcp-phase/v6true-elapsed-retry-renewal.expected.json",
+        "common/pcapx/pcaputil/dhcp-phase/v6true-elapsed-retry-renewal.pcap": "dhcp-phase/v6true-elapsed-retry-renewal.pcap",
+        "common/pcapx/pcaputil/dhcp-phase/v6true-elapsed-width.expected.json": "dhcp-phase/v6true-elapsed-width.expected.json",
+        "common/pcapx/pcaputil/dhcp-phase/v6true-elapsed-width.pcap": "dhcp-phase/v6true-elapsed-width.pcap",
+        "common/pcapx/pcaputil/dhcp-phase/v6true-exact-retry-renewal.expected.json": "dhcp-phase/v6true-exact-retry-renewal.expected.json",
+        "common/pcapx/pcaputil/dhcp-phase/v6true-exact-retry-renewal.pcap": "dhcp-phase/v6true-exact-retry-renewal.pcap",
+        "common/pcapx/pcaputil/dhcp-phase/v6true-expired-response.expected.json": "dhcp-phase/v6true-expired-response.expected.json",
+        "common/pcapx/pcaputil/dhcp-phase/v6true-expired-response.pcap": "dhcp-phase/v6true-expired-response.pcap",
+        "common/pcapx/pcaputil/dhcp-phase/v6true-foreign-server-clock.expected.json": "dhcp-phase/v6true-foreign-server-clock.expected.json",
+        "common/pcapx/pcaputil/dhcp-phase/v6true-foreign-server-clock.pcap": "dhcp-phase/v6true-foreign-server-clock.pcap",
+        "common/pcapx/pcaputil/dhcp-phase/v6true-future-response-does-not-age-timely-response.expected.json": "dhcp-phase/v6true-future-response-does-not-age-timely-response.expected.json",
+        "common/pcapx/pcaputil/dhcp-phase/v6true-future-response-does-not-age-timely-response.pcap": "dhcp-phase/v6true-future-response-does-not-age-timely-response.pcap",
+        "common/pcapx/pcaputil/dhcp-phase/v6true-mismatched-server-keeps-owner.expected.json": "dhcp-phase/v6true-mismatched-server-keeps-owner.expected.json",
+        "common/pcapx/pcaputil/dhcp-phase/v6true-mismatched-server-keeps-owner.pcap": "dhcp-phase/v6true-mismatched-server-keeps-owner.pcap",
+        "common/pcapx/pcaputil/dhcp-phase/v6true-missing-selected-server.expected.json": "dhcp-phase/v6true-missing-selected-server.expected.json",
+        "common/pcapx/pcaputil/dhcp-phase/v6true-missing-selected-server.pcap": "dhcp-phase/v6true-missing-selected-server.pcap",
+        "common/pcapx/pcaputil/dhcp-phase/v6true-ordinary.expected.json": "dhcp-phase/v6true-ordinary.expected.json",
+        "common/pcapx/pcaputil/dhcp-phase/v6true-ordinary.pcap": "dhcp-phase/v6true-ordinary.pcap",
+        "common/pcapx/pcaputil/dhcp-phase/v6true-rapid-commit-false.expected.json": "dhcp-phase/v6true-rapid-commit-false.expected.json",
+        "common/pcapx/pcaputil/dhcp-phase/v6true-rapid-commit-false.pcap": "dhcp-phase/v6true-rapid-commit-false.pcap",
+        "common/pcapx/pcaputil/dhcp-phase/v6true-rapid-commit-true.expected.json": "dhcp-phase/v6true-rapid-commit-true.expected.json",
+        "common/pcapx/pcaputil/dhcp-phase/v6true-rapid-commit-true.pcap": "dhcp-phase/v6true-rapid-commit-true.pcap",
+        "common/pcapx/pcaputil/dhcp-phase/v6true-rapid-width.expected.json": "dhcp-phase/v6true-rapid-width.expected.json",
+        "common/pcapx/pcaputil/dhcp-phase/v6true-rapid-width.pcap": "dhcp-phase/v6true-rapid-width.pcap",
+        "common/pcapx/pcaputil/dhcp-phase/v6true-server-duplicate.expected.json": "dhcp-phase/v6true-server-duplicate.expected.json",
+        "common/pcapx/pcaputil/dhcp-phase/v6true-server-duplicate.pcap": "dhcp-phase/v6true-server-duplicate.pcap",
+        "common/pcapx/pcaputil/dhcp-phase/v6true-selected-server.pcap": "dhcp-phase/v6true-ordinary.pcap",
+        "common/pcapx/pcaputil/dhcp-phase/v6true-selected-server.expected.json": "dhcp-phase/v6true-ordinary.expected.json",
+        "scripts/protocol-tests/required-tests-traffic-unified-v107.json": "required-tests-traffic-unified-v107.json"
+      }
     }
   ],
   "schema_version": 1,
