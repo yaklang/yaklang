@@ -784,6 +784,7 @@ func (a *binParser) decodeDLMSDatagram(e *ProtocolEvent, w []byte, explicit bool
 		a.udpMu.Unlock()
 		return false
 	}
+	e.nativeDLMSOrSLMPObservation = true
 	e.Protocol, e.Profile, e.Admission, e.Completeness = "dlms", dlmsProfile(w), "wire-signature", "message"
 	if explicit {
 		e.Admission = "explicit-decode-as"
@@ -795,18 +796,13 @@ func (a *binParser) decodeDLMSDatagram(e *ProtocolEvent, w []byte, explicit bool
 		store = &binUDPStore{entries: make(map[binUDPKey]*list.Element), clock: e.Timestamp}
 		a.udpSessions = store
 	}
-	if e.Timestamp.After(store.clock) {
-		store.clock = e.Timestamp
-	}
-	for el := store.lru.Front(); el != nil; {
-		next := el.Next()
+	el := store.entries[key]
+	if el != nil {
 		v := el.Value.(*binUDPEntry)
-		if v.flow.dlms != nil && store.clock.Sub(v.touched) >= dlmsIdleTTL {
+		if e.Timestamp.Sub(v.touched) >= dlmsIdleTTL {
 			v.flow.retireDLMSUDP()
 		}
-		el = next
 	}
-	el := store.entries[key]
 	created := el == nil
 	f := &binFlow{a: a, dlms: &binDLMS{ambiguous: a.dlmsUntrackedRefusal}, endpoints: [2]string{e.Source, e.Destination}}
 	if el != nil {
@@ -818,7 +814,9 @@ func (a *binParser) decodeDLMSDatagram(e *ProtocolEvent, w []byte, explicit bool
 		} else {
 			e.Direction = 0
 		}
-		v.touched = store.clock
+		if e.Timestamp.After(v.touched) {
+			v.touched = e.Timestamp
+		}
 		store.lru.MoveToBack(el)
 	}
 	var m *dlmsMessage
@@ -846,7 +844,7 @@ func (a *binParser) decodeDLMSDatagram(e *ProtocolEvent, w []byte, explicit bool
 			e.Session, e.ResponseTo, err = f.consumeDecodedDLMS(e.Direction, w, e.ID, m)
 			if err == nil && created {
 				f.id = a.flows.Add(1)
-				store.entries[key] = store.lru.PushBack(&binUDPEntry{key, f, store.clock})
+				store.entries[key] = store.lru.PushBack(&binUDPEntry{key, f, e.Timestamp})
 				e.FlowID = f.id
 				created = false
 			}
@@ -872,7 +870,7 @@ func (a *binParser) decodeDLMSDatagram(e *ProtocolEvent, w []byte, explicit bool
 			err = dlmsError(ErrResourceExceeded, "UDP orphan ACSE conversation limit")
 		} else {
 			f.id, f.domain = a.flows.Add(1), e.Domain
-			store.entries[key] = store.lru.PushBack(&binUDPEntry{key, f, store.clock})
+			store.entries[key] = store.lru.PushBack(&binUDPEntry{key, f, e.Timestamp})
 			e.FlowID = f.id
 			created = false
 		}

@@ -49,32 +49,22 @@ func (a *binParser) refuseUDPOversizeAssociation(e *ProtocolEvent, w []byte, src
 	}
 	a.udpMu.Lock()
 	store := a.udpSessions
-	// A denied SNMP datagram retires only its exact admitted key below.
-	// Its timestamp cannot expire other endpoint/domain observations.
-	if store != nil && protocol != "snmp" && protocol != "stun" {
-		if e.Timestamp.After(store.clock) {
-			store.clock = e.Timestamp
-		}
-		for el := store.lru.Front(); el != nil; {
-			next := el.Next()
+	// Refused input can affect only its exact endpoint and capture domain.
+	// A timestamp carried by a foreign identity cannot age a retained owner.
+	if store != nil {
+		if el := store.entries[key]; el != nil {
 			v := el.Value.(*binUDPEntry)
-			applicable := protocol == "stun" && v.flow.stun != nil || protocol == "snmp" && v.flow.snmp != nil || protocol == "slmp" && v.flow.slmp != nil || protocol == "dlms-wrapper" && v.flow.wrapper != nil || protocol == "dlms" && v.flow.dlms != nil
-			if applicable && store.clock.Sub(v.touched) >= ttl {
+			if e.Timestamp.Sub(v.touched) >= ttl {
 				if v.flow.stun != nil {
-					v.flow.retireSTUNUDP(store.clock)
+					v.flow.retireSTUNUDP(e.Timestamp)
 				} else if v.flow.snmp != nil {
 					v.flow.retireSNMPUDP()
 				} else if v.flow.dlms != nil || v.flow.wrapper != nil {
 					v.flow.retireDLMSUDP()
 				} else if v.flow.slmp != nil {
 					v.flow.retireSLMPUDP()
-				} else {
-					v.flow.closeSession()
-					delete(store.entries, v.key)
-					store.lru.Remove(el)
 				}
 			}
-			el = next
 		}
 	}
 	existing := store != nil && store.entries[key] != nil
@@ -171,12 +161,8 @@ func (a *binParser) refuseUDPOversizeAssociation(e *ProtocolEvent, w []byte, src
 			a.buffered.Add(retained - f.sessionBytes)
 			f.sessionBytes = retained
 		}
-		if protocol == "snmp" || protocol == "stun" {
-			if e.Timestamp.After(v.touched) {
-				v.touched = e.Timestamp
-			}
-		} else {
-			v.touched = store.clock
+		if e.Timestamp.After(v.touched) {
+			v.touched = e.Timestamp
 		}
 		store.lru.MoveToBack(el)
 	}
@@ -186,6 +172,9 @@ func (a *binParser) refuseUDPOversizeAssociation(e *ProtocolEvent, w []byte, src
 	}
 	if protocol == "stun" {
 		e.nativeSTUNObservation = true
+	}
+	if protocol == "slmp" || protocol == "dlms" || protocol == "dlms-wrapper" {
+		e.nativeDLMSOrSLMPObservation = true
 	}
 	e.Protocol, e.Profile, e.Admission, e.Completeness = protocol, profile, "observed-conversation", "message"
 	if explicit != "" {

@@ -260,6 +260,7 @@ func (a *binParser) decodeSLMPDatagram(e *ProtocolEvent, w []byte, explicit bool
 		a.udpMu.Unlock()
 		return false
 	}
+	e.nativeDLMSOrSLMPObservation = true
 	e.Protocol, e.Profile, e.Admission, e.Completeness = "slmp", "slmp-binary-self-test", "wire-signature", "message"
 	if explicit {
 		e.Admission = "explicit-decode-as"
@@ -271,16 +272,12 @@ func (a *binParser) decodeSLMPDatagram(e *ProtocolEvent, w []byte, explicit bool
 		store = &binUDPStore{entries: make(map[binUDPKey]*list.Element), clock: e.Timestamp}
 		a.udpSessions = store
 	}
-	if e.Timestamp.After(store.clock) {
-		store.clock = e.Timestamp
-	}
-	for el := store.lru.Front(); el != nil; {
-		next := el.Next()
-		entry := el.Value.(*binUDPEntry)
-		if entry.flow.slmp != nil && store.clock.Sub(entry.touched) >= slmpIdleTTL {
-			entry.flow.retireSLMPUDP()
+	el := store.entries[key]
+	if el != nil {
+		v := el.Value.(*binUDPEntry)
+		if e.Timestamp.Sub(v.touched) >= slmpIdleTTL {
+			v.flow.retireSLMPUDP()
 		}
-		el = next
 	}
 	var m *slmpMessage
 	var err error
@@ -290,7 +287,6 @@ func (a *binParser) decodeSLMPDatagram(e *ProtocolEvent, w []byte, explicit bool
 	} else {
 		m, err = decodeSLMPMessage(w)
 	}
-	el := store.entries[key]
 	// With no observed flow, the subheader still identifies a response role.
 	// An existing flow uses its observed endpoint direction instead.
 	if slmpStart(w) && (w[0] == 0xd0 || w[0] == 0xd4) {
@@ -304,14 +300,16 @@ func (a *binParser) decodeSLMPDatagram(e *ProtocolEvent, w []byte, explicit bool
 		} else {
 			f := &binFlow{a: a, id: a.flows.Add(1), protocol: "slmp", slmp: &binSLMP{ambiguous: a.slmpUntrackedRefusal}, endpoints: [2]string{e.Source, e.Destination}}
 			if err = f.reserveSession(512 + int64(len(w))*3 + 64); err == nil {
-				el = store.lru.PushBack(&binUDPEntry{key, f, store.clock})
+				el = store.lru.PushBack(&binUDPEntry{key, f, e.Timestamp})
 				store.entries[key] = el
 			}
 		}
 	}
 	if el != nil {
 		entry := el.Value.(*binUDPEntry)
-		entry.touched = store.clock
+		if e.Timestamp.After(entry.touched) {
+			entry.touched = e.Timestamp
+		}
 		store.lru.MoveToBack(el)
 		f := entry.flow
 		if budgetExceeded && !f.slmp.retiredWire(w) {

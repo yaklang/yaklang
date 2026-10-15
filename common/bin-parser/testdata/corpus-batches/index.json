@@ -102387,6 +102387,187 @@
         "common/pcapx/pcaputil/tftp-file/wrong-DATA-direction.pcapng": "tftp-file/wrong-DATA-direction.pcapng",
         "scripts/protocol-tests/required-tests-traffic-unified-v101.json": "required-tests-traffic-unified-v101.json"
       }
+    },
+    {
+      "id": "validation-udp-context",
+      "kind": "support",
+      "source_sha": "66c47bd7f651a860cdead05710f1b8bda754b08c",
+      "file": "validation-udp-context.zip",
+      "sha256": "a8dd2122188f87921f692ce84c61901be662a6b6e59bb3630c9de37b5b2508aa",
+      "password": "bin-parser",
+      "members": {
+        "required-tests-traffic-unified-v102.json": {
+          "sha256": "b6630c4f62556a275827e86d87a217f379f76c0e2e99c77d82d3be3508d0b254",
+          "bytes": 17543245
+        },
+        "udp-context-tools/build.py": {
+          "sha256": "3ae41029256941d5af62dde86a18e0f827aa8b608f2d9da5f27ccfdd95d6b6f5",
+          "bytes": 6666
+        },
+        "udp-context-tools/fixed-fields.json": {
+          "sha256": "6069980b1cbdb826de62327acab37317e5318197bc661cc878186daa2f603a74",
+          "bytes": 4525
+        },
+        "udp-context-tools/verify.py": {
+          "sha256": "0c0a53398aa0c3f2ef67712b3d12bab4179e269410f8feee876e2a27d91a3dfe",
+          "bytes": 2756
+        },
+        "udp-context/HDLC-after-expiry.pcapng": {
+          "sha256": "63c12ca07328fd36fd554836d061d6ab8a2943ea4c83ee27066c5c90da5b6039",
+          "bytes": 248
+        },
+        "udp-context/HDLC-at-expiry.pcapng": {
+          "sha256": "a52d78e0e07caaf46bc106bebabab9475786d2f1af11586556f76763c2bbb778",
+          "bytes": 248
+        },
+        "udp-context/HDLC-backdated-reply.pcapng": {
+          "sha256": "976327d3dcb83fa2c85acfbeae26b2ec8e0445601316cf0bb062991f1f53b692",
+          "bytes": 248
+        },
+        "udp-context/HDLC-before-expiry.pcapng": {
+          "sha256": "84ee16397c317eea9b52a73fa9d59d70e222db70e3917cc0bac4d9e3e438a1e6",
+          "bytes": 248
+        },
+        "udp-context/HDLC-foreign-TFTP.pcapng": {
+          "sha256": "2495f9dc46195a6da1356c56ae36f886a7df04178f4c2536591e99250cf58fbf",
+          "bytes": 336
+        },
+        "udp-context/HDLC-foreign-byte-refusal.pcapng": {
+          "sha256": "9447ac6345331ed29704374175114ea471933b53a3ecaec91cd926be7fe85253",
+          "bytes": 608
+        },
+        "udp-context/HDLC-foreign-endpoint.pcapng": {
+          "sha256": "1c7117863565d42f96bb1dda460484ccd27ce86f46f4e1f83533308880028f8a",
+          "bytes": 352
+        },
+        "udp-context/HDLC-foreign-interface.pcapng": {
+          "sha256": "51aa9322a2cd8da873969c483d2b0bd37b61b7081073703237263d1b0a47addc",
+          "bytes": 372
+        },
+        "udp-context/HDLC-ordinary.pcapng": {
+          "sha256": "c364fc2609c29194baf2aae971113fc3c63868fb1930be5e4554f968bfbf88ee",
+          "bytes": 248
+        },
+        "udp-context/SLMP-after-expiry.pcapng": {
+          "sha256": "6e0e60456a2c25f0109f87e69525ab35cd6f68056c688ea498a84ee8cbb4d9a5",
+          "bytes": 236
+        },
+        "udp-context/SLMP-at-expiry.pcapng": {
+          "sha256": "9ed805edd538c8efaaa102a1413fd0628142c448a1b7953c596d9c62cd245887",
+          "bytes": 236
+        },
+        "udp-context/SLMP-backdated-reply.pcapng": {
+          "sha256": "8c9911a16c43b2c1cad5dfd225920a82c1c41b180406bd79957d1073cde9b2bf",
+          "bytes": 236
+        },
+        "udp-context/SLMP-before-expiry.pcapng": {
+          "sha256": "430366900ba18957f1b97c2e989ce142a47346ac4802b2ca38133e374d8c9465",
+          "bytes": 236
+        },
+        "udp-context/SLMP-foreign-TFTP.pcapng": {
+          "sha256": "d60ac401607bfbd07c100bab2434e8c4bcd19482d90d38f0a9874cd9473899b9",
+          "bytes": 324
+        },
+        "udp-context/SLMP-foreign-byte-refusal.pcapng": {
+          "sha256": "077f33034cdf43959555b740a4399bf802a9f80e211fbc91eccdcd21fb7048f1",
+          "bytes": 588
+        },
+        "udp-context/SLMP-foreign-endpoint.pcapng": {
+          "sha256": "7d62118196eeb421163909d8f78e62121f6e8cd11b7f405586b2bb7489ceb19b",
+          "bytes": 332
+        },
+        "udp-context/SLMP-foreign-interface.pcapng": {
+          "sha256": "249e662ce3a0b69637d0c7d461f1c81c7426e73cfe72d7129539a057e8077d5f",
+          "bytes": 352
+        },
+        "udp-context/SLMP-ordinary.pcapng": {
+          "sha256": "6d98be27e79193479abbca0703f433f5dc39b362783780ed5ebb24fe9d82be9b",
+          "bytes": 236
+        },
+        "udp-context/Wrapper-after-expiry.pcapng": {
+          "sha256": "d027257acbc5d02ef8a8c2d6906c7d4c17a01309c6c97c53a9a2f71df81f33a6",
+          "bytes": 232
+        },
+        "udp-context/Wrapper-at-expiry.pcapng": {
+          "sha256": "d787927ef81cf3000718b7fdc3502e6cb7253da96065557c8804ffba53d50939",
+          "bytes": 232
+        },
+        "udp-context/Wrapper-backdated-reply.pcapng": {
+          "sha256": "52760644f169e53629c67d2fd06e24fd496e2d9a95cecbc2e037d729b6b1036d",
+          "bytes": 232
+        },
+        "udp-context/Wrapper-before-expiry.pcapng": {
+          "sha256": "ad314343f331b7a8a0da7dec1fd415d32be5c52e4e8dadff837cc74d9ab72d70",
+          "bytes": 232
+        },
+        "udp-context/Wrapper-foreign-TFTP.pcapng": {
+          "sha256": "5d06f75eb95a2447d9deac8a6263f23e459d34f9b6785da5ae5adb09cbbf3354",
+          "bytes": 320
+        },
+        "udp-context/Wrapper-foreign-byte-refusal.pcapng": {
+          "sha256": "f924143ffd46df32873e662ad660488d73f3acf3e380e8a9b5a3831ce58a683f",
+          "bytes": 584
+        },
+        "udp-context/Wrapper-foreign-endpoint.pcapng": {
+          "sha256": "b0088bb657fcdb7b904fbea57a276bdc3f2fa70f56640fa30cfab8001a91988a",
+          "bytes": 328
+        },
+        "udp-context/Wrapper-foreign-interface.pcapng": {
+          "sha256": "f1aae98e150655cfcea3f39d295bcca3bc63accf73825afa5d9628b73b80e1a3",
+          "bytes": 348
+        },
+        "udp-context/Wrapper-ordinary.pcapng": {
+          "sha256": "5e8883bdf41875982e53d92af7315d4b0ae2d6d8818fa90c6803ac46ff1f5667",
+          "bytes": 232
+        },
+        "udp-context/controls.json": {
+          "sha256": "ea38a6fc7e28bb1371d5273dc4dfe89569306c9d45a50ae6b043fa8059d1f718",
+          "bytes": 143323
+        },
+        "udp-context/expected.json": {
+          "sha256": "de75e99478a1d966683eb0b4a3069ec92e04b17c70c868cb7bf875cda2445c40",
+          "bytes": 26110
+        },
+        "validation/expected.json": {
+          "sha256": "de75e99478a1d966683eb0b4a3069ec92e04b17c70c868cb7bf875cda2445c40",
+          "bytes": 26110
+        }
+      },
+      "aliases": {
+        "common/pcapx/pcaputil/udp-context-tools/build.py": "udp-context-tools/build.py",
+        "common/pcapx/pcaputil/udp-context-tools/fixed-fields.json": "udp-context-tools/fixed-fields.json",
+        "common/pcapx/pcaputil/udp-context-tools/verify.py": "udp-context-tools/verify.py",
+        "common/pcapx/pcaputil/udp-context/HDLC-after-expiry.pcapng": "udp-context/HDLC-after-expiry.pcapng",
+        "common/pcapx/pcaputil/udp-context/HDLC-at-expiry.pcapng": "udp-context/HDLC-at-expiry.pcapng",
+        "common/pcapx/pcaputil/udp-context/HDLC-backdated-reply.pcapng": "udp-context/HDLC-backdated-reply.pcapng",
+        "common/pcapx/pcaputil/udp-context/HDLC-before-expiry.pcapng": "udp-context/HDLC-before-expiry.pcapng",
+        "common/pcapx/pcaputil/udp-context/HDLC-foreign-TFTP.pcapng": "udp-context/HDLC-foreign-TFTP.pcapng",
+        "common/pcapx/pcaputil/udp-context/HDLC-foreign-byte-refusal.pcapng": "udp-context/HDLC-foreign-byte-refusal.pcapng",
+        "common/pcapx/pcaputil/udp-context/HDLC-foreign-endpoint.pcapng": "udp-context/HDLC-foreign-endpoint.pcapng",
+        "common/pcapx/pcaputil/udp-context/HDLC-foreign-interface.pcapng": "udp-context/HDLC-foreign-interface.pcapng",
+        "common/pcapx/pcaputil/udp-context/HDLC-ordinary.pcapng": "udp-context/HDLC-ordinary.pcapng",
+        "common/pcapx/pcaputil/udp-context/SLMP-after-expiry.pcapng": "udp-context/SLMP-after-expiry.pcapng",
+        "common/pcapx/pcaputil/udp-context/SLMP-at-expiry.pcapng": "udp-context/SLMP-at-expiry.pcapng",
+        "common/pcapx/pcaputil/udp-context/SLMP-backdated-reply.pcapng": "udp-context/SLMP-backdated-reply.pcapng",
+        "common/pcapx/pcaputil/udp-context/SLMP-before-expiry.pcapng": "udp-context/SLMP-before-expiry.pcapng",
+        "common/pcapx/pcaputil/udp-context/SLMP-foreign-TFTP.pcapng": "udp-context/SLMP-foreign-TFTP.pcapng",
+        "common/pcapx/pcaputil/udp-context/SLMP-foreign-byte-refusal.pcapng": "udp-context/SLMP-foreign-byte-refusal.pcapng",
+        "common/pcapx/pcaputil/udp-context/SLMP-foreign-endpoint.pcapng": "udp-context/SLMP-foreign-endpoint.pcapng",
+        "common/pcapx/pcaputil/udp-context/SLMP-foreign-interface.pcapng": "udp-context/SLMP-foreign-interface.pcapng",
+        "common/pcapx/pcaputil/udp-context/SLMP-ordinary.pcapng": "udp-context/SLMP-ordinary.pcapng",
+        "common/pcapx/pcaputil/udp-context/Wrapper-after-expiry.pcapng": "udp-context/Wrapper-after-expiry.pcapng",
+        "common/pcapx/pcaputil/udp-context/Wrapper-at-expiry.pcapng": "udp-context/Wrapper-at-expiry.pcapng",
+        "common/pcapx/pcaputil/udp-context/Wrapper-backdated-reply.pcapng": "udp-context/Wrapper-backdated-reply.pcapng",
+        "common/pcapx/pcaputil/udp-context/Wrapper-before-expiry.pcapng": "udp-context/Wrapper-before-expiry.pcapng",
+        "common/pcapx/pcaputil/udp-context/Wrapper-foreign-TFTP.pcapng": "udp-context/Wrapper-foreign-TFTP.pcapng",
+        "common/pcapx/pcaputil/udp-context/Wrapper-foreign-byte-refusal.pcapng": "udp-context/Wrapper-foreign-byte-refusal.pcapng",
+        "common/pcapx/pcaputil/udp-context/Wrapper-foreign-endpoint.pcapng": "udp-context/Wrapper-foreign-endpoint.pcapng",
+        "common/pcapx/pcaputil/udp-context/Wrapper-foreign-interface.pcapng": "udp-context/Wrapper-foreign-interface.pcapng",
+        "common/pcapx/pcaputil/udp-context/Wrapper-ordinary.pcapng": "udp-context/Wrapper-ordinary.pcapng",
+        "common/pcapx/pcaputil/udp-context/controls.json": "udp-context/controls.json",
+        "common/pcapx/pcaputil/udp-context/expected.json": "udp-context/expected.json",
+        "scripts/protocol-tests/required-tests-traffic-unified-v102.json": "required-tests-traffic-unified-v102.json"
+      }
     }
   ],
   "schema_version": 1,

@@ -485,25 +485,6 @@ func wrapperUDPRefusalHint(w []byte) bool {
 		(w[8] == 0xc0 || w[8] == 0xc4) && (w[9] == 1 || w[9] == 2 || w[9] == 3) && w[10]&0x30 == 0
 }
 
-func (a *binParser) expireWrapper(ts time.Time) {
-	a.udpMu.Lock()
-	defer a.udpMu.Unlock()
-	s := a.udpSessions
-	if s == nil {
-		return
-	}
-	if ts.After(s.clock) {
-		s.clock = ts
-	}
-	for el := s.lru.Front(); el != nil; {
-		next := el.Next()
-		v := el.Value.(*binUDPEntry)
-		if v.flow.wrapper != nil && s.clock.Sub(v.touched) >= wrapperIdleTTL {
-			v.flow.retireDLMSUDP()
-		}
-		el = next
-	}
-}
 func (a *binParser) decodeWrapperDatagram(e *ProtocolEvent, w []byte, src, dst uint16, explicit bool) bool {
 	ports := [2]uint16{src, dst}
 	// The registry supplies admission using real UDP ports. Explicit binding may
@@ -511,7 +492,7 @@ func (a *binParser) decodeWrapperDatagram(e *ProtocolEvent, w []byte, src, dst u
 	if !explicit && !wrapperPortStart(w, ports) && a.probeWrapperDatagram(w).Verdict != ProbeAccept {
 		return false
 	}
-	a.expireWrapper(e.Timestamp)
+	e.nativeDLMSOrSLMPObservation = true
 	e.Protocol, e.Profile, e.Admission, e.Completeness = "dlms-wrapper", wrapperProfile(w), "wire-signature", "message"
 	if explicit {
 		e.Admission = "explicit-decode-as"
@@ -529,6 +510,12 @@ func (a *binParser) decodeWrapperDatagram(e *ProtocolEvent, w []byte, src, dst u
 	var el *list.Element
 	if store != nil {
 		el = store.entries[key]
+		if el != nil {
+			v := el.Value.(*binUDPEntry)
+			if e.Timestamp.Sub(v.touched) >= wrapperIdleTTL {
+				v.flow.retireDLMSUDP()
+			}
+		}
 	}
 	f := &binFlow{a: a, wrapper: &binDLMSWrapper{blocked: a.wrapperUntrackedRefusal}, protocol: "dlms-wrapper"}
 	created := el == nil
@@ -540,7 +527,9 @@ func (a *binParser) decodeWrapperDatagram(e *ProtocolEvent, w []byte, src, dst u
 			e.Direction = 1
 		}
 		v := el.Value.(*binUDPEntry)
-		v.touched = store.clock
+		if e.Timestamp.After(v.touched) {
+			v.touched = e.Timestamp
+		}
 		store.lru.MoveToBack(el)
 	}
 	var err error
@@ -581,7 +570,7 @@ func (a *binParser) decodeWrapperDatagram(e *ProtocolEvent, w []byte, src, dst u
 				endpoints = [2]string{e.Destination, e.Source}
 			}
 			f.id, f.endpoints, f.domain = a.flows.Add(1), endpoints, e.Domain
-			store.entries[key] = store.lru.PushBack(&binUDPEntry{key, f, store.clock})
+			store.entries[key] = store.lru.PushBack(&binUDPEntry{key, f, e.Timestamp})
 			e.FlowID = f.id
 			created = false
 		}
