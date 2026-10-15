@@ -1,6 +1,8 @@
 package schema
 
 import (
+	"encoding/json"
+	"fmt"
 	"strings"
 
 	"github.com/yaklang/gorm"
@@ -78,26 +80,26 @@ func (c *RiskCollect) SetRuleLevelFunc(fn func(ruleName string) int) {
 	c.ruleLevel = fn
 }
 
-// Current returns the risk kept for this feature hash.
-func (c *RiskCollect) Current(feature string) *SSARisk {
-	if c == nil || c.data == nil {
+// Current returns the risk this scan keeps for the finding risk belongs to.
+func (c *RiskCollect) Current(risk *SSARisk) *SSARisk {
+	if c == nil || c.data == nil || risk == nil {
 		return nil
 	}
-	feature = strings.TrimSpace(feature)
-	if feature == "" {
+	key := coverKey(risk)
+	if key == "" {
 		return nil
 	}
-	risk, ok := c.data.Get(feature)
+	stored, ok := c.data.Get(key)
 	if !ok {
 		return nil
 	}
-	return risk
+	return stored
 }
 
 // Submit records in and returns the update the caller must publish.
 //
-// The key is RiskFeatureHash, the same identity diff and disposal use.
-// A feature hash this task has not seen yet is a create. One it already
+// The key is the scan-local cover key: the feature hash plus the source
+// position. A key this task has not seen yet is a create. One it already
 // keeps is an update, whether or not that row has been written. When the
 // incoming risk loses to the stored one no update is returned (ok=false),
 // which is how an earlier mode is dropped and how a lower-level rule is
@@ -108,7 +110,7 @@ func (c *RiskCollect) Submit(in *SSARisk) (RiskUpdateItem, bool) {
 	if c == nil || in == nil {
 		return item, false
 	}
-	key := strings.TrimSpace(in.RiskFeatureHash)
+	key := coverKey(in)
 	if key == "" {
 		return item, true
 	}
@@ -132,6 +134,46 @@ func (c *RiskCollect) Submit(in *SSARisk) (RiskUpdateItem, bool) {
 		return in, true
 	})
 	return item, accepted
+}
+
+// coverKey is the key one scan keeps a finding under: the cross-scan feature
+// hash plus the source position. The feature hash identifies a finding across
+// scans, so it must survive a file rename, an added comment and a line shift;
+// the position is what keeps two statements that share a value text in
+// separate rows inside one task. An empty feature hash has no key: such a
+// finding is always kept and never covers another one.
+func coverKey(risk *SSARisk) string {
+	feature := strings.TrimSpace(risk.RiskFeatureHash)
+	if feature == "" {
+		return ""
+	}
+	return utils.CalcSha1(feature, sourcePosition(risk))
+}
+
+// riskCodeRange is the position json the producer serializes into CodeRange.
+type riskCodeRange struct {
+	URL         string `json:"url"`
+	StartLine   int64  `json:"start_line"`
+	StartColumn int64  `json:"start_column"`
+	EndLine     int64  `json:"end_line"`
+	EndColumn   int64  `json:"end_column"`
+}
+
+// sourcePosition is where a finding sits, without the program name: one source
+// keeps one position when it is compiled under another program name, while two
+// sibling statements keep different ones.
+func sourcePosition(risk *SSARisk) string {
+	var codeRange riskCodeRange
+	if err := json.Unmarshal([]byte(risk.CodeRange), &codeRange); err != nil {
+		// A range that is not json still places the finding by its file.
+		return utils.StripProgramNamePrefix(risk.CodeSourceUrl, risk.ProgramName)
+	}
+	path := codeRange.URL
+	if path == "" {
+		path = risk.CodeSourceUrl
+	}
+	return fmt.Sprintf("%s#%d:%d-%d:%d", utils.StripProgramNamePrefix(path, risk.ProgramName),
+		codeRange.StartLine, codeRange.StartColumn, codeRange.EndLine, codeRange.EndColumn)
 }
 
 // better reports whether incoming should replace existing.
