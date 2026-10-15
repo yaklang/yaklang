@@ -5,6 +5,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/gorm"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
@@ -37,8 +38,8 @@ desc(title: "runtime program scan")
 println(* as $target)
 alert $target
 `,
-		ssaapi.QueryWithOnRisk(func(risk *schema.SSARisk) {
-			rt.SubmitRisk(risk)
+		ssaapi.QueryWithOnRisk(func(risk *schema.SSARisk, audits ...func(*gorm.DB) error) {
+			rt.SubmitRisk(risk, audits...)
 		}),
 		ssaapi.QueryWithMemory(),
 	)

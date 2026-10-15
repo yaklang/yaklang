@@ -71,26 +71,25 @@ type SSARisk struct {
 	RiskFeatureHash string `json:"risk_feature_hash" gorm:"index"`
 
 	SSAProjectID uint64 `json:"ssa_project_id" gorm:"index"`
-
-	// AuditSave persists this finding's graph. It is not a column. The result
-	// sets it before publishing; the scan moves it onto the update item and
-	// clears it so a report never observes the closure.
-	AuditSave func() error `json:"-" gorm:"-"`
 }
 
 func (*SSARisk) TableName() string {
 	return TableSSARisks
 }
 
+// CalcHash identifies one finding of one result. ResultUUID is enough;
+// an empty UUID is a valid input and does not need a second formula.
 func (s *SSARisk) CalcHash() string {
-	if s.ResultUUID != "" {
-		// Persisting the audit row must not invalidate a streamed risk hash.
-		return utils.CalcSha1(s.CodeSourceUrl, s.CodeRange, s.RuntimeId,
-			s.ProgramName, s.ResultUUID, s.Variable, s.Index, s.Title, s.RiskType)
-	}
-	// Keep the exact legacy hash for callers without a UUID.
 	return utils.CalcSha1(s.CodeSourceUrl, s.CodeRange, s.RuntimeId,
-		s.ProgramName, s.ResultID, s.Variable, s.Index, s.Title, s.RiskType)
+		s.ProgramName, s.ResultUUID, s.Variable, s.Index, s.Title, s.RiskType)
+}
+
+// CalcFeatureHash is the cover key shared by every scan mode of one finding.
+// disasm is the value text the producer already computed; this method does
+// not inspect SSA. Changing the rule is a different finding for diff history.
+func (s *SSARisk) CalcFeatureHash(disasm string) string {
+	return utils.CalcSha1(s.FunctionName, disasm, s.FromRule, s.Variable,
+		string(s.Severity), s.RiskType, s.Language, s.Title)
 }
 
 func SSARiskTypeVerbose(s string) string {
@@ -150,8 +149,9 @@ func (s *SSARisk) ToGRPCModel() *ypb.SSARisk {
 }
 
 // prepareForSave normalizes the row the same way for create and update so a
-// rewrite keeps a correct hash.
-func (s *SSARisk) prepareForSave() {
+// rewrite keeps a correct hash. FeatureText is the value text used by the
+// cover key; a blank text leaves an already computed feature hash alone.
+func (s *SSARisk) prepareForSave(featureText string) {
 	if s.RiskType == "" {
 		s.RiskType = "其他"
 	}
@@ -159,22 +159,30 @@ func (s *SSARisk) prepareForSave() {
 		s.ScanMode = "ssa"
 	}
 	s.Severity = ValidSeverityType(s.Severity)
+	if featureText != "" {
+		s.RiskFeatureHash = s.CalcFeatureHash(featureText)
+	}
 	s.Hash = s.CalcHash()
 }
 
 func (s *SSARisk) BeforeCreate(tx *gorm.DB) (err error) {
-	s.prepareForSave()
+	s.prepareForSave("")
 	return nil
 }
 
 func (s *SSARisk) BeforeUpdate(tx *gorm.DB) (err error) {
-	s.prepareForSave()
+	s.prepareForSave("")
 	return nil
 }
 
 // PrepareForSave normalizes the row for create or update outside gorm.
-func (s *SSARisk) PrepareForSave() {
-	s.prepareForSave()
+// featureText, when given, also computes the cover key.
+func (s *SSARisk) PrepareForSave(featureText ...string) {
+	text := ""
+	if len(featureText) > 0 {
+		text = featureText[0]
+	}
+	s.prepareForSave(text)
 }
 
 func (s *SSARisk) AfterCreate(tx *gorm.DB) (err error) {

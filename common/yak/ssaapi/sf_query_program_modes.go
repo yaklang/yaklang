@@ -54,8 +54,8 @@ func (p *Program) queryProgramStructRule(base *queryConfig, rule *schema.SyntaxF
 				QueryWithTaskID(base.taskID),
 				QueryWithSSAConfig(base.Config),
 			)
-			if base.onRisk != nil {
-				unitOpts = append(unitOpts, QueryWithOnRisk(base.onRisk))
+			for _, fn := range base.onRisk {
+				unitOpts = append(unitOpts, QueryWithOnRisk(fn))
 			}
 			for _, opt := range base.opts {
 				unitOpts = append(unitOpts, QueryWithSFOption(opt))

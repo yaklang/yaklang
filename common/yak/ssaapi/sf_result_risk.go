@@ -10,6 +10,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils/memedit"
 
 	"github.com/samber/lo"
+	"github.com/yaklang/gorm"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
@@ -146,14 +147,6 @@ func buildSSARisk(
 		}
 	}
 
-	// Preserve the existing cross-scan identity for diff and disposal history.
-	// Updating a rule is not the same finding in a comparison of two scans.
-	newSSARisk.RiskFeatureHash = utils.CalcSha1(
-		newSSARisk.FunctionName, value.String(), newSSARisk.FromRule,
-		newSSARisk.Variable, string(newSSARisk.Severity), newSSARisk.RiskType,
-		newSSARisk.Language, newSSARisk.Title,
-	)
-	newSSARisk.Hash = newSSARisk.CalcHash()
 	return newSSARisk
 }
 
@@ -229,7 +222,7 @@ func (r *SyntaxFlowResult) stageRisk(variable string, index int, value *Value) (
 			// would insert a second row under the same hash.
 			row := *prev
 			row.ResultID, row.RuntimeId = uint64(r.GetResultID()), r.TaskID
-			row.PrepareForSave()
+			row.PrepareForSave(riskFeatureText(value))
 			r.riskMap[name] = &row
 			return row.Hash, false
 		}
@@ -246,29 +239,39 @@ func (r *SyntaxFlowResult) stageRisk(variable string, index int, value *Value) (
 	ssaRisk.ResultUUID = r.GetResultUUID()
 	// The row hash covers the result identity, so it must be computed after
 	// those fields are set: the same finding reported by two results is two
-	// rows, and the unique index on hash must not collapse them.
-	ssaRisk.PrepareForSave()
+	// rows, and the unique index on hash must not collapse them. The cover key
+	// uses the value text and is computed in the same pass.
+	ssaRisk.PrepareForSave(riskFeatureText(value))
 	r.riskMap[name] = ssaRisk
-	if r.onRisk == nil {
+	if len(r.onRisk) == 0 {
 		return ssaRisk.Hash, false
 	}
+	var audits []func(*gorm.DB) error
 	if audit := r.auditSaver(value, variable, index, ssaRisk); audit != nil {
-		ssaRisk.AuditSave = audit
+		audits = []func(*gorm.DB) error{audit}
 		if r.auditHanded == nil {
 			r.auditHanded = map[string]struct{}{}
 		}
 		r.auditHanded[name] = struct{}{}
 	}
-	r.onRisk(ssaRisk)
-	ssaRisk.AuditSave = nil
+	for _, fn := range r.onRisk {
+		fn(ssaRisk, audits...)
+	}
 	_, owned := r.auditHanded[name]
 	return ssaRisk.Hash, owned
+}
+
+func riskFeatureText(value *Value) string {
+	if value == nil {
+		return ""
+	}
+	return value.String()
 }
 
 // auditSaver walks the graph immediately. The database saver later inserts
 // the rows; it must not walk again, because the rule may already have cleared
 // the value's analysis caches by then.
-func (r *SyntaxFlowResult) auditSaver(value *Value, variable string, index int, risk *schema.SSARisk) func() error {
+func (r *SyntaxFlowResult) auditSaver(value *Value, variable string, index int, risk *schema.SSARisk) func(*gorm.DB) error {
 	if r == nil || value == nil || risk == nil {
 		return nil
 	}
@@ -285,13 +288,12 @@ func (r *SyntaxFlowResult) auditSaver(value *Value, variable string, index int, 
 		OptionSaveValue_IsMemoryCompile(r.IsProgMemoryCompile()),
 	)
 	if err != nil {
-		return func() error { return err }
+		return func(*gorm.DB) error { return err }
 	}
 	if len(nodes) == 0 && len(edges) == 0 && len(sources) == 0 {
 		return nil
 	}
-	return func() error {
-		db := ssadb.GetDB()
+	return func(db *gorm.DB) error {
 		if db == nil {
 			return utils.Error("save audit: database is nil")
 		}

@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/yaklang/gorm"
 
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 
@@ -28,7 +29,7 @@ type SyntaxFlowResult struct {
 	resultUUID string
 	// onRisk receives each risk this result builds. When it is set the result
 	// does not write the risk row itself.
-	onRisk func(*schema.SSARisk)
+	onRisk []func(*schema.SSARisk, ...func(*gorm.DB) error)
 	// auditHanded records alert slots whose graph was given to onRisk. A later
 	// save of the same result must not write that graph again.
 	auditHanded map[string]struct{}

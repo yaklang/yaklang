@@ -5,7 +5,9 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/gorm"
 	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 )
 
@@ -175,6 +177,7 @@ func TestSaveRiskUpdates_KeepsDisposalAndOtherTasks(t *testing.T) {
 	})
 	saved := batchRisk("disposal-old", feature, string(schema.SFR_MODE_SOURCE), "old")
 	saved.RuntimeId = runtimeID
+	saved.Description = "old description"
 	saved.PrepareForSave()
 	require.NoError(t, SaveRisk(ssadb.GetDB(), saved))
 	require.NoError(t, ssadb.GetDB().Model(&schema.SSARisk{}).Where("id = ?", saved.ID).UpdateColumns(map[string]interface{}{
@@ -212,6 +215,7 @@ func TestSaveRiskUpdates_KeepsDisposalAndOtherTasks(t *testing.T) {
 	require.Equal(t, "kept", stored.Tags)
 	require.Equal(t, next.Hash, stored.Hash)
 	require.Equal(t, "new", stored.Title)
+	require.Empty(t, stored.Description, "a cover writes zero values of the new finding")
 
 	var untouched schema.SSARisk
 	require.NoError(t, ssadb.GetDB().Where("runtime_id = ?", otherID).First(&untouched).Error)
@@ -276,11 +280,11 @@ func TestRiskDBSaver_SubmitDoesNotWaitForAudit(t *testing.T) {
 	require.NoError(t, saver.ApplyRiskUpdate(schema.RiskUpdateItem{
 		Mode: schema.RiskUpdateCreate,
 		Risk: risk,
-		Audit: func() error {
+		Audit: []func(*gorm.DB) error{func(*gorm.DB) error {
 			close(started)
 			<-release
 			return nil
-		},
+		}},
 	}))
 	select {
 	case <-started:
@@ -301,4 +305,26 @@ func TestRiskDBSaver_SubmitDoesNotWaitForAudit(t *testing.T) {
 	}
 	close(release)
 	require.NoError(t, <-flushDone)
+}
+
+func TestSaveRiskUpdates_AuditErrorRollsBackTheRisk(t *testing.T) {
+	const runtimeID = "audit-rolls-back-risk"
+	t.Cleanup(func() {
+		ssadb.GetDB().Unscoped().Where("runtime_id = ?", runtimeID).Delete(&schema.SSARisk{})
+	})
+	risk := batchRisk("audit-rollback", "audit-rollback-feature", string(schema.SFR_MODE_SSA), "rollback")
+	risk.RuntimeId = runtimeID
+	risk.Description = ""
+	risk.PrepareForSave()
+	err := SaveRiskUpdates(ssadb.GetDB(), schema.RiskUpdateItem{
+		Mode: schema.RiskUpdateCreate,
+		Risk: risk,
+		Audit: []func(*gorm.DB) error{func(*gorm.DB) error {
+			return utils.Error("audit failed")
+		}},
+	})
+	require.Error(t, err)
+	var n int64
+	require.NoError(t, ssadb.GetDB().Model(&schema.SSARisk{}).Where("runtime_id = ?", runtimeID).Count(&n).Error)
+	require.Zero(t, n, "a failed audit writer rolls the risk insert back with it")
 }

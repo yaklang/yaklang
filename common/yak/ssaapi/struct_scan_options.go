@@ -4,6 +4,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/yaklang/gorm"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
@@ -63,21 +64,15 @@ func WithStructRuleCallback(cb func(*schema.SSARisk)) ssaconfig.Option {
 	})(cb)
 }
 
-// WithOnRisk registers the callback that receives each risk this compile's
-// struct rules produce. A scan passes the callback that submits into its
-// collect; the compile does not receive the scan's runtime.
-func WithOnRisk(fn func(*schema.SSARisk)) ssaconfig.Option {
-	return ssaconfig.SetOption("ssa/on_risk", func(c *Config, v func(*schema.SSARisk)) {
+// WithOnRisk registers another callback that receives each risk this
+// compile's struct rules produce. A scan passes the callback that submits
+// into its collect; the compile does not receive the scan's runtime.
+func WithOnRisk(fn func(*schema.SSARisk, ...func(*gorm.DB) error)) ssaconfig.Option {
+	return ssaconfig.SetOption("ssa/on_risk", func(c *Config, v func(*schema.SSARisk, ...func(*gorm.DB) error)) {
 		if v == nil {
 			return
 		}
-		prev := c.onRisk
-		c.onRisk = func(risk *schema.SSARisk) {
-			if prev != nil {
-				prev(risk)
-			}
-			v(risk)
-		}
+		c.onRisk = append(c.onRisk, v)
 	})(fn)
 }
 

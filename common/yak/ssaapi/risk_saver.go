@@ -1,6 +1,7 @@
 package ssaapi
 
 import (
+	"database/sql/driver"
 	"fmt"
 	"strings"
 	"sync"
@@ -163,8 +164,7 @@ func SaveRisk(db *gorm.DB, risks ...*schema.SSARisk) error {
 // SaveRiskUpdates runs each decision the way its mode says. The scan runtime
 // already prepared the risk and chose create, update, or delete. An update or
 // a delete matches runtime id plus feature hash, so another task's row is
-// left alone. The new audit graph is written after that transaction commits:
-// overlapping it with the transaction deadlocks SQLite's single writer.
+// left alone. Audit writers run in the same transaction as the risk rows.
 func SaveRiskUpdates(db *gorm.DB, updates ...schema.RiskUpdateItem) error {
 	if len(updates) == 0 {
 		return nil
@@ -176,11 +176,11 @@ func SaveRiskUpdates(db *gorm.DB, updates ...schema.RiskUpdateItem) error {
 	if err != nil {
 		return err
 	}
-	writeErr := db.Transaction(func(tx *gorm.DB) error {
+	return db.Transaction(func(tx *gorm.DB) error {
 		if err := deleteAuditByFeature(tx, batch.dropAudit); err != nil {
 			return err
 		}
-		if err := deleteAuditNodesByRiskHashes(tx, batch.hashAudit); err != nil {
+		if err := deleteAuditByRiskHashes(tx, batch.hashAudit); err != nil {
 			return err
 		}
 		if err := tx.CreateInBatches(batch.creates, riskBatchSize).Error; err != nil {
@@ -192,20 +192,11 @@ func SaveRiskUpdates(db *gorm.DB, updates ...schema.RiskUpdateItem) error {
 		if err := deleteRisksByHashes(tx, batch.dropHashes); err != nil {
 			return err
 		}
-		return deleteRisksByFeature(tx, batch.dropRisk)
-	})
-	var auditErr error
-	var wg sync.WaitGroup
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		if writeErr != nil {
-			return
+		if err := deleteRisksByFeature(tx, batch.dropRisk); err != nil {
+			return err
 		}
-		auditErr = runAuditSaves(batch.audits)
-	}()
-	wg.Wait()
-	return utils.JoinErrors(writeErr, auditErr)
+		return runAuditSaves(tx, batch.audits)
+	})
 }
 
 type featureKey struct {
@@ -220,22 +211,22 @@ type riskBatch struct {
 	dropRisk   []featureKey
 	dropHashes []string
 	hashAudit  []string
-	audits     []func() error
+	audits     [][]func(*gorm.DB) error
 }
 
 // batchRiskDecisions groups a batch by the mode on each item. It does not
-// change the risks or invent a mode. The last audit closure for one feature
-// is the one that gets saved.
+// change the risks or invent a mode. The last audit writers for one feature
+// are the ones that get saved.
 func batchRiskDecisions(updates []schema.RiskUpdateItem) (riskBatch, error) {
 	var batch riskBatch
 	batch.creates = make([]*schema.SSARisk, 0, len(updates))
-	jobs := make(map[string]func() error)
+	jobs := make(map[string][]func(*gorm.DB) error)
 	var order []string
-	put := func(key string, fn func() error) {
+	put := func(key string, fns []func(*gorm.DB) error) {
 		if _, ok := jobs[key]; !ok {
 			order = append(order, key)
 		}
-		jobs[key] = fn
+		jobs[key] = fns
 	}
 	for i, item := range updates {
 		switch item.Mode {
@@ -281,7 +272,7 @@ func batchRiskDecisions(updates []schema.RiskUpdateItem) (riskBatch, error) {
 		}
 	}
 	for _, key := range order {
-		if jobs[key] != nil {
+		if len(jobs[key]) > 0 {
 			batch.audits = append(batch.audits, jobs[key])
 		}
 	}
@@ -302,11 +293,21 @@ func featureOf(risk *schema.SSARisk) (featureKey, error) {
 	return key, nil
 }
 
-// updateRiskRows rewrites each row in place, matched by runtime id and feature
-// hash. SaveInBatches cannot: that pair is not unique (an empty feature hash
-// is inserted again, and existing databases already contain duplicates), and
-// its upsert would clear disposal, read and ignore marks.
+// riskUpdateSkip stays out of a cover rewrite. The pair that finds the row
+// is not a unique key, so SaveInBatches cannot do this update. Disposal and
+// the read/ignore marks belong to the existing row, not to the new finding.
+var riskUpdateSkip = map[string]bool{
+	"id": true, "created_at": true, "deleted_at": true,
+	"runtime_id": true, "risk_feature_hash": true,
+	"latest_disposal_status": true, "is_read": true, "ignore": true,
+	"tags": true, "upload_online": true,
+}
+
+// updateRiskRows rewrites every row of the batch in one statement per chunk,
+// matched by runtime id and feature hash. Zero values are written. The
+// columns come from the model, not from a hand-kept list.
 func updateRiskRows(db *gorm.DB, risks []*schema.SSARisk) error {
+	rows := make([]*schema.SSARisk, 0, len(risks))
 	for _, risk := range risks {
 		if risk == nil {
 			continue
@@ -316,52 +317,127 @@ func updateRiskRows(db *gorm.DB, risks []*schema.SSARisk) error {
 		if runtime == "" || feature == "" {
 			return utils.Errorf("update risk %q: runtime id and feature hash are required", risk.Hash)
 		}
-		cols, err := riskRewriteColumns(risk)
-		if err != nil {
-			return err
+		row := *risk
+		row.CWE = append(schema.StringArray(nil), risk.CWE...)
+		row.RuntimeId, row.RiskFeatureHash = runtime, feature
+		row.UpdatedAt = time.Now()
+		rows = append(rows, &row)
+	}
+	rows = dedupeRisksByFeature(rows)
+	if len(rows) == 0 {
+		return nil
+	}
+	columns, err := riskUpdateColumns(db)
+	if err != nil {
+		return err
+	}
+	// Two placeholders per column per row, plus two in the WHERE.
+	chunk := 30000 / (len(columns)*2 + 2)
+	if chunk > riskBatchSize {
+		chunk = riskBatchSize
+	}
+	if chunk < 1 {
+		chunk = 1
+	}
+	for start := 0; start < len(rows); start += chunk {
+		end := start + chunk
+		if end > len(rows) {
+			end = len(rows)
 		}
-		if err := db.Model(&schema.SSARisk{}).Where("runtime_id = ? AND risk_feature_hash = ?", runtime, feature).UpdateColumns(cols).Error; err != nil {
+		if err := updateRiskChunk(db, columns, rows[start:end]); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func riskRewriteColumns(risk *schema.SSARisk) (map[string]interface{}, error) {
-	cwe, err := risk.CWE.Value()
-	if err != nil {
-		return nil, err
+func riskUpdateColumns(db *gorm.DB) ([]*gorm.Field, error) {
+	scope := db.NewScope(&schema.SSARisk{})
+	var columns []*gorm.Field
+	for _, field := range scope.Fields() {
+		if !field.IsNormal || field.IsIgnored || field.IsPrimaryKey || riskUpdateSkip[field.DBName] {
+			continue
+		}
+		columns = append(columns, field)
 	}
-	return map[string]interface{}{
-		"hash":                  risk.Hash,
-		"title":                 risk.Title,
-		"title_verbose":         risk.TitleVerbose,
-		"description":           risk.Description,
-		"solution":              risk.Solution,
-		"risk_type":             risk.RiskType,
-		"details":               risk.Details,
-		"severity":              risk.Severity,
-		"language":              risk.Language,
-		"is_potential":          risk.IsPotential,
-		"cve":                   risk.CVE,
-		"cwe":                   cwe,
-		"cve_access_vector":     risk.CveAccessVector,
-		"cve_access_complexity": risk.CveAccessComplexity,
-		"from_rule":             risk.FromRule,
-		"scan_mode":             risk.ScanMode,
-		"program_name":          risk.ProgramName,
-		"code_source_url":       risk.CodeSourceUrl,
-		"code_range":            risk.CodeRange,
-		"code_fragment":         risk.CodeFragment,
-		"function_name":         risk.FunctionName,
-		"line":                  risk.Line,
-		"result_id":             risk.ResultID,
-		"result_uuid":           risk.ResultUUID,
-		"variable":              risk.Variable,
-		"index":                 risk.Index,
-		"ssa_project_id":        risk.SSAProjectID,
-		"updated_at":            time.Now(),
-	}, nil
+	if len(columns) == 0 {
+		return nil, utils.Error("update risk: model has no columns to write")
+	}
+	return columns, nil
+}
+
+func updateRiskChunk(db *gorm.DB, columns []*gorm.Field, risks []*schema.SSARisk) error {
+	scope := db.NewScope(&schema.SSARisk{})
+	var b strings.Builder
+	args := make([]interface{}, 0, len(columns)*len(risks)*2+len(risks)*2)
+	b.WriteString("UPDATE ")
+	b.WriteString(scope.QuotedTableName())
+	b.WriteString(" SET ")
+	for i, field := range columns {
+		if i > 0 {
+			b.WriteString(", ")
+		}
+		b.WriteString(scope.Quote(field.DBName))
+		b.WriteString(" = CASE")
+		for _, risk := range risks {
+			value, err := riskColumnValue(db, risk, field.DBName)
+			if err != nil {
+				return err
+			}
+			b.WriteString(" WHEN ")
+			b.WriteString(scope.Quote("runtime_id"))
+			b.WriteString(" = ? AND ")
+			b.WriteString(scope.Quote("risk_feature_hash"))
+			b.WriteString(" = ? THEN ?")
+			args = append(args, risk.RuntimeId, risk.RiskFeatureHash, value)
+		}
+		b.WriteString(" ELSE ")
+		b.WriteString(scope.Quote(field.DBName))
+		b.WriteString(" END")
+	}
+	b.WriteString(" WHERE ")
+	for i, risk := range risks {
+		if i > 0 {
+			b.WriteString(" OR ")
+		}
+		b.WriteString("(")
+		b.WriteString(scope.Quote("runtime_id"))
+		b.WriteString(" = ? AND ")
+		b.WriteString(scope.Quote("risk_feature_hash"))
+		b.WriteString(" = ?)")
+		args = append(args, risk.RuntimeId, risk.RiskFeatureHash)
+	}
+	return db.Exec(b.String(), args...).Error
+}
+
+func riskColumnValue(db *gorm.DB, risk *schema.SSARisk, column string) (interface{}, error) {
+	field, ok := db.NewScope(risk).FieldByName(column)
+	if !ok {
+		return nil, utils.Errorf("update risk: column %s is not on the model", column)
+	}
+	value := field.Field.Interface()
+	if valuer, ok := value.(driver.Valuer); ok {
+		converted, err := valuer.Value()
+		if err != nil {
+			return nil, err
+		}
+		return converted, nil
+	}
+	return value, nil
+}
+
+func dedupeRisksByFeature(risks []*schema.SSARisk) []*schema.SSARisk {
+	last := make(map[featureKey]int, len(risks))
+	for i, risk := range risks {
+		last[featureKey{risk.RuntimeId, risk.RiskFeatureHash}] = i
+	}
+	out := make([]*schema.SSARisk, 0, len(last))
+	for i, risk := range risks {
+		if last[featureKey{risk.RuntimeId, risk.RiskFeatureHash}] == i {
+			out = append(out, risk)
+		}
+	}
+	return out
 }
 
 func dedupeRisksByID(risks []*schema.SSARisk) []*schema.SSARisk {
@@ -449,67 +525,34 @@ func forEachChunk(values []string, fn func([]string) error) error {
 	return nil
 }
 
-func runAuditSaves(audits []func() error) error {
-	var err error
-	for _, audit := range audits {
-		if audit == nil {
-			continue
+func runAuditSaves(db *gorm.DB, groups [][]func(*gorm.DB) error) error {
+	for _, group := range groups {
+		for _, audit := range group {
+			if audit == nil {
+				continue
+			}
+			if err := audit(db); err != nil {
+				return err
+			}
 		}
-		err = utils.JoinErrors(err, audit())
 	}
-	return err
+	return nil
 }
 
 // deleteRisksByHashes removes rows a create decision named by the previous hash.
 func deleteRisksByHashes(db *gorm.DB, hashes []string) error {
-	hashes = uniqueStrings(hashes)
-	const chunk = 500
-	for start := 0; start < len(hashes); start += chunk {
-		end := start + chunk
-		if end > len(hashes) {
-			end = len(hashes)
-		}
+	return forEachChunk(uniqueStrings(hashes), func(part []string) error {
 		// Unscoped: a soft-deleted hash still occupies the unique index.
-		if err := db.Unscoped().Where("hash IN (?)", hashes[start:end]).Delete(&schema.SSARisk{}).Error; err != nil {
-			return err
-		}
-	}
-	return nil
+		return db.Unscoped().Where("hash IN (?)", part).Delete(&schema.SSARisk{}).Error
+	})
 }
 
-func deleteAuditNodesByRiskHashes(db *gorm.DB, hashes []string) error {
-	hashes = uniqueStrings(hashes)
-	if len(hashes) == 0 {
-		return nil
-	}
-	const chunk = 500
-	for start := 0; start < len(hashes); start += chunk {
-		end := start + chunk
-		if end > len(hashes) {
-			end = len(hashes)
-		}
-		var nodeIDs []string
-		if err := db.Model(&ssadb.AuditNode{}).Where("risk_hash IN (?)", hashes[start:end]).
-			Pluck("node_id", &nodeIDs).Error; err != nil {
-			return err
-		}
-		for i := 0; i < len(nodeIDs); i += chunk {
-			j := i + chunk
-			if j > len(nodeIDs) {
-				j = len(nodeIDs)
-			}
-			ids := nodeIDs[i:j]
-			// Edges refer to node ids; AuditEdge has no risk_hash column.
-			if err := db.Where("from_node IN (?) OR to_node IN (?)", ids, ids).
-				Delete(&ssadb.AuditEdge{}).Error; err != nil {
-				return err
-			}
-		}
-		if err := db.Where("risk_hash IN (?)", hashes[start:end]).Delete(&ssadb.AuditNode{}).Error; err != nil {
-			return err
-		}
-	}
-	return nil
+// deleteAuditByRiskHashes removes the graph stored under a row hash. Edges of
+// the same finding are removed by feature hash; nothing is loaded by node id.
+func deleteAuditByRiskHashes(db *gorm.DB, hashes []string) error {
+	return forEachChunk(uniqueStrings(hashes), func(part []string) error {
+		return db.Where("risk_hash IN (?)", part).Delete(&ssadb.AuditNode{}).Error
+	})
 }
 
 func uniqueStrings(values []string) []string {

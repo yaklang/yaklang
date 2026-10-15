@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/yaklang/gorm"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfpattern"
@@ -865,8 +866,8 @@ func structCompileOptions(cfg *Config) []ssaconfig.Option {
 	// not receive the runtime; the callback submits into its collect.
 	if cfg != nil && cfg.scanRuntime != nil {
 		rt := cfg.scanRuntime
-		opts = append(opts, ssaapi.WithOnRisk(func(risk *schema.SSARisk) {
-			rt.SubmitRisk(risk)
+		opts = append(opts, ssaapi.WithOnRisk(func(risk *schema.SSARisk, audits ...func(*gorm.DB) error) {
+			rt.SubmitRisk(risk, audits...)
 		}))
 	}
 	// Struct rules use the same final SyntaxFlow result-save guard as SSA rules.

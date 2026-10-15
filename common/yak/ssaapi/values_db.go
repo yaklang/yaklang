@@ -414,17 +414,18 @@ func saveAuditSources(db *gorm.DB, sources []*ssadb.IrSource) error {
 	if db == nil || len(sources) == 0 {
 		return nil
 	}
-	return utils.GormTransaction(db, func(tx *gorm.DB) error {
-		for _, source := range sources {
-			if source == nil {
-				continue
-			}
-			if err := tx.Save(source).Error; err != nil {
-				return utils.Errorf("save IrSource failed: %w", err)
-			}
+	rows := make([]*ssadb.IrSource, 0, len(sources))
+	for _, source := range sources {
+		if source != nil {
+			rows = append(rows, source)
 		}
-		return nil
-	})
+	}
+	// IrSource has no primary or unique key. Save also inserts these rows;
+	// CreateInBatches preserves that behavior without requiring a conflict key.
+	if err := db.CreateInBatches(rows, riskBatchSize).Error; err != nil {
+		return utils.Errorf("save IrSource failed: %w", err)
+	}
+	return nil
 }
 
 func newAuditDatabase(ctx context.Context, db *gorm.DB, size int) *auditDatabase {
@@ -450,17 +451,7 @@ func newAuditDatabase(ctx context.Context, db *gorm.DB, size int) *auditDatabase
 	}, dbcache.WithContext(ctx), dbcache.WithSaveSize(saveSize), queueSize, dbcache.WithName("AuditEdge"))
 
 	ret.editorSave = dbcache.NewSave[*ssadb.IrSource](func(ae []*ssadb.IrSource) error {
-		if len(ae) == 0 {
-			return nil
-		}
-		return utils.GormTransaction(db, func(tx *gorm.DB) error {
-			for _, e := range ae {
-				if err := tx.Save(e).Error; err != nil {
-					return utils.Errorf("save IrSource failed: %w", err)
-				}
-			}
-			return nil
-		})
+		return saveAuditSources(db, ae)
 	}, dbcache.WithContext(ctx), dbcache.WithSaveSize(size), queueSize, dbcache.WithName("SourceFile"))
 
 	return ret

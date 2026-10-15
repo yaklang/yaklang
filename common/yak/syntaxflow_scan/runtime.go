@@ -8,6 +8,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/yaklang/gorm"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils/diagnostics"
 
@@ -249,8 +250,8 @@ func (m *scanManager) Query(rule *schema.SyntaxFlowRule, target ssaapi.SyntaxFlo
 		)
 		if m.Config != nil && m.Config.scanRuntime != nil {
 			rt := m.Config.scanRuntime
-			option = append(option, ssaapi.QueryWithOnRisk(func(risk *schema.SSARisk) {
-				rt.SubmitRisk(risk)
+			option = append(option, ssaapi.QueryWithOnRisk(func(risk *schema.SSARisk, audits ...func(*gorm.DB) error) {
+				rt.SubmitRisk(risk, audits...)
 			}))
 		}
 		if workBudget != nil {
