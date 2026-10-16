@@ -312,13 +312,26 @@ func (c *Call) handlerReturnType() {
 			return
 		}
 	}
-	if utils.IsNil(funcTyp.ReturnType) {
+	// Finish publishes ReturnType under typeMu. Copy it out under the same
+	// lock; the pointer above can be observed while that field is written.
+	returnType := funcTyp.ReturnType
+	freeValue := funcTyp.FreeValue
+	if fun, isFunc := ToFunction(method); isFunc {
+		fun.typeMu.RLock()
+		if fun.Type != nil {
+			funcTyp = fun.Type
+			returnType = fun.Type.ReturnType
+			freeValue = fun.Type.FreeValue
+		}
+		fun.typeMu.RUnlock()
+	}
+	if utils.IsNil(returnType) {
 		log.Debugf("[ssa.Call.handlerReturnType] skip setting type for call %s: return type is nil", method.GetName())
 		return
 	}
 	// inference call instruction type
 	if c.IsDropError {
-		if retType, ok := funcTyp.ReturnType.(*ObjectType); ok {
+		if retType, ok := returnType.(*ObjectType); ok {
 			if retType.Combination && retType.FieldTypes[len(retType.FieldTypes)-1].GetTypeKind() == ErrorTypeKind {
 				if len(retType.FieldTypes) == 1 {
 					c.SetType(CreateNullType())
@@ -337,7 +350,7 @@ func (c *Call) handlerReturnType() {
 				}
 				return
 			}
-		} else if t, ok := funcTyp.ReturnType.(*BasicType); ok && t.Kind == ErrorTypeKind {
+		} else if t, ok := returnType.(*BasicType); ok && t.Kind == ErrorTypeKind {
 			// pass
 			c.SetType(CreateNullType())
 			for _, variable := range c.GetAllVariables() {
@@ -347,10 +360,10 @@ func (c *Call) handlerReturnType() {
 		}
 		c.NewError(Warn, SSATAG, FunctionContReturnError())
 	} else {
-		c.SetType(funcTyp.ReturnType)
+		c.SetType(returnType)
 	}
 	// handler free value
-	c.HandleFreeValue(funcTyp.FreeValue)
+	c.HandleFreeValue(freeValue)
 }
 
 // handler if method, set object for first argument

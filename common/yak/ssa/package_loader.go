@@ -3,6 +3,7 @@ package ssa
 import (
 	"runtime"
 	"strings"
+	"sync"
 
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/memedit"
@@ -161,6 +162,43 @@ func (app *Program) addDirPkgOwner(gid uint64, delta int) {
 		return
 	}
 	app.dirPkgDepth[gid] = n
+}
+
+// OccupyDirectoryPackage marks this goroutine as the prehandle owner of key
+// until release. The mark is not a dirPkgSlots entry: BuildDirectoryPackage
+// must still be able to compile a package that nobody is currently inside.
+// A gid of 0 cannot be told apart from other callers, so it does not occupy.
+func (app *Program) OccupyDirectoryPackage(key string) func() {
+	if app == nil || key == "" {
+		return func() {}
+	}
+	gid := currentGoroutineID()
+	if gid == 0 {
+		return func() {}
+	}
+	if _, loaded := app.dirPkgPrehandle.LoadOrStore(key, gid); loaded {
+		return func() {}
+	}
+	var once sync.Once
+	return func() {
+		once.Do(func() {
+			app.dirPkgPrehandle.Delete(key)
+		})
+	}
+}
+
+// DirectoryPackageInProgress reports whether another goroutine is inside
+// key's prehandle. The caller's own occupation is not in progress.
+func (app *Program) DirectoryPackageInProgress(key string) bool {
+	if app == nil || key == "" {
+		return false
+	}
+	actual, ok := app.dirPkgPrehandle.Load(key)
+	if !ok || actual == nil {
+		return false
+	}
+	gid, _ := actual.(uint64)
+	return gid != 0 && gid != currentGoroutineID()
 }
 
 func (b *FunctionBuilder) BuildDirectoryPackage(name []string, once bool) (*Program, error) {
