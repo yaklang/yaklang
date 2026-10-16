@@ -32,9 +32,10 @@ type scanManager struct {
 
 	// record {{
 	// task record
-	lock          sync.Mutex
-	taskRecorder  *schema.SyntaxFlowScanTask
-	snapshotSaver *taskSnapshotSaver
+	lock           sync.Mutex
+	taskRecorder   *schema.SyntaxFlowScanTask
+	snapshotSaver  *taskSnapshotSaver
+	taskConfigJSON []byte
 
 	// config {{
 	kind schema.SyntaxflowResultKind
@@ -215,7 +216,12 @@ func (m *scanManager) captureTaskSnapshot(withLevelCounts bool) *schema.SyntaxFl
 	m.taskRecorder.TotalQuery = m.GetTotalQuery()
 	m.taskRecorder.Kind = m.kind
 
-	m.taskRecorder.Config, _ = json.Marshal(m.Config)
+	// The scan config is fixed once execution starts. Re-encoding it on every
+	// progress write dominated the task-row update for rule-heavy scans.
+	if len(m.taskConfigJSON) == 0 {
+		m.taskConfigJSON, _ = json.Marshal(m.Config)
+	}
+	m.taskRecorder.Config = m.taskConfigJSON
 	m.taskRecorder.ProjectId = m.Config.GetProjectID()
 	if withLevelCounts && (m.status == schema.SYNTAXFLOWSCAN_DONE || m.status == schema.SYNTAXFLOWSCAN_PAUSED) {
 		levelCounts, errLC := yakit.GetSSARiskLevelCount(ssadb.GetDB(), &ypb.SSARisksFilter{
@@ -270,6 +276,7 @@ func (m *scanManager) RestoreTask() error {
 	}
 
 	m.Config.Config = config.Config
+	m.taskConfigJSON = nil
 	if err != nil {
 		return utils.Wrapf(err, "NewConfig from raw config failed")
 	}
