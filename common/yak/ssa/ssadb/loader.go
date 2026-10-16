@@ -158,8 +158,12 @@ func searchVariableWithFileFilter(db *gorm.DB, ctx context.Context, progName str
 		return filterLoaded(yieldIrCodes(ctx, progName, ids))
 	}
 
-	query := db.Model(&IrIndex{})
-	query = applyMatchCondition(query, progName, cache, matchMod, compareMode, value)
+	query, hasCandidates := applyMatchCondition(db.Model(&IrIndex{}), progName, cache, matchMod, compareMode, value)
+	if !hasCandidates {
+		// The name pool has already proved the result empty. Do not acquire a
+		// database connection to execute SELECT ... WHERE 1 = 0 per rule.
+		return emptyIrCodeChan()
+	}
 
 	if len(includeFiles) > 0 {
 		return yieldFromIrIndexWithIncludeFiles(query, ctx, progName, includeFiles)
@@ -170,7 +174,7 @@ func searchVariableWithFileFilter(db *gorm.DB, ctx context.Context, progName str
 	return yieldFromIrIndex(query, ctx, progName)
 }
 
-func applyMatchCondition(db *gorm.DB, progName string, cache *NameCache, mod MatchMode, compareMode CompareMode, value string) *gorm.DB {
+func applyMatchCondition(db *gorm.DB, progName string, cache *NameCache, mod MatchMode, compareMode CompareMode, value string) (*gorm.DB, bool) {
 	matchName := mod&NameMatch != 0
 	matchField := mod&KeyMatch != 0
 	if !matchName && !matchField {
@@ -179,7 +183,7 @@ func applyMatchCondition(db *gorm.DB, progName string, cache *NameCache, mod Mat
 
 	ids := cache.GetIDsByPattern(value, compareMode)
 	if len(ids) == 0 {
-		return db.Where("1 = 0")
+		return db, false
 	}
 
 	fields := []string{}
@@ -195,9 +199,9 @@ func applyMatchCondition(db *gorm.DB, progName string, cache *NameCache, mod Mat
 		for i, id := range ids {
 			uids[i] = uint64(id)
 		}
-		return bizhelper.ExactQueryMultipleUInt64ArrayOr(db, fields, uids)
+		return bizhelper.ExactQueryMultipleUInt64ArrayOr(db, fields, uids), true
 	}
-	return db
+	return db, true
 }
 
 func SearchIrCodeByOpcodes(db *gorm.DB, ctx context.Context, progName string, opcodes ...int) <-chan *IrCode {
