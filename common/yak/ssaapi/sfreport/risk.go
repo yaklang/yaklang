@@ -86,7 +86,7 @@ func NewRisk(ssarisk *schema.SSARisk, r *Report, value ...*ssaapi.Value) (*Risk,
 	var irSourceHashes []string
 	// Generate data flow paths if available
 	if r.ReportType == IRifyFullReportType || r.config.showDataflowPath {
-		if ssarisk.ResultID != 0 && ssarisk.Variable != "" {
+		if ssarisk.Variable != "" && (ssarisk.ResultID != 0 || len(value) > 0 && !utils.IsNil(value[0])) {
 			var err error
 			var dataFlowPath *DataFlowPath
 			dataFlowPath, irSourceHashes, err = GenerateDataFlowAnalysis(ssarisk, false, value...)

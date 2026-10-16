@@ -9,6 +9,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/gorm"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/sfreport"
@@ -63,6 +64,7 @@ class Crypt { void bad() throws Exception { Cipher.getInstance("AES/ECB/PKCS5Pad
 			opts := []ssaconfig.Option{
 				ssaconfig.WithCodeSourceKind(ssaconfig.CodeSourceLocal), ssaconfig.WithCodeSourceLocalFile(dir), ssaconfig.WithProjectRawLanguage("java"),
 				ssaconfig.WithSetProgramName(name), syntaxflow_scan.WithMode(syntaxflow_scan.StructMode),
+				ssaconfig.WithSyntaxFlowResultKind(ssaconfig.SFResultSaveDatabase),
 				ssaconfig.WithNoSaveRisk(noSaveRisk), ssaconfig.WithNoSaveTask(true),
 				ssaconfig.WithRuleInput(&ypb.SyntaxFlowRuleInput{Content: string(rule), Language: "java"}),
 			}
@@ -74,8 +76,8 @@ class Crypt { void bad() throws Exception { Cipher.getInstance("AES/ECB/PKCS5Pad
 				if r == nil || r.Result == nil {
 					return
 				}
-				if r.Result.RiskCount() > 0 {
-					require.Equal(t, !noSaveRisk, r.Result.IsDatabase(), "ordinary scans retain persisted results; no_save_risk stays in memory")
+				if noSaveRisk && r.Result.RiskCount() > 0 {
+					require.False(t, r.Result.IsDatabase(), "no_save_risk stays in memory")
 				}
 				part, err := sfreport.ConvertSingleResultToSSAResultParts(r.Result, sfreport.NewStreamPartsOptions())
 				require.NoError(t, err)
@@ -86,6 +88,13 @@ class Crypt { void bad() throws Exception { Cipher.getInstance("AES/ECB/PKCS5Pad
 			result, err := syntaxflow_scan.ScanProject(context.Background(), opts...)
 			require.NoError(t, err)
 			require.True(t, result.Succeeded)
+			var persisted int
+			require.NoError(t, ssadb.GetDB().Model(&schema.SSARisk{}).Where("program_name = ?", name).Count(&persisted).Error)
+			if noSaveRisk {
+				require.Zero(t, persisted)
+			} else {
+				require.Equal(t, wantRisks, persisted, "runtime persists ordinary findings before scan completes")
+			}
 			require.Equal(t, name, result.ProgramName)
 			var review syntaxflow_scan.StageOutcome
 			for _, stage := range result.Stages {

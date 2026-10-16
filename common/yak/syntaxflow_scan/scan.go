@@ -25,6 +25,10 @@ func Scan(ctx context.Context, option ...ssaconfig.Option) (retErr error) {
 		return err
 	}
 
+	if config.IsNoSaveTask() && (config.GetScanControlMode() == ssaconfig.ControlModeResume || config.GetScanControlMode() == ssaconfig.ControlModeStatus) {
+		return utils.Error("no_save_task does not support persisted task resume or status")
+	}
+
 	// The call that creates the runtime owns its consumers. A nested stage
 	// receives the runtime already and must not register a second report or
 	// database saver.
@@ -37,9 +41,6 @@ func Scan(ctx context.Context, option ...ssaconfig.Option) (retErr error) {
 		if !memory && !config.IsNoSaveRisk() {
 			rt.RegisterRiskUpdateHandler(ssaapi.NewRiskDBSaver())
 		}
-	}
-	if config.IsNoSaveTask() && (config.GetScanControlMode() == ssaconfig.ControlModeResume || config.GetScanControlMode() == ssaconfig.ControlModeStatus) {
-		return utils.Error("no_save_task does not support persisted task resume or status")
 	}
 
 	// Wire up debug/pprof output when debug_dir is set.
