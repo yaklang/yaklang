@@ -2,11 +2,14 @@ package compiler
 
 import (
 	"fmt"
+	"strconv"
+	"strings"
 
 	"github.com/yaklang/go-llvm"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/ssa2llvm/callframe"
 	"github.com/yaklang/yaklang/common/yak/ssa2llvm/runtime/abi"
+	"github.com/yaklang/yaklang/common/yak/ssa2llvm/runtime/tiers"
 )
 
 func (c *Compiler) getOrDeclareExternCallable(symbol string) llvm.Value {
@@ -79,19 +82,55 @@ func (c *Compiler) newRuntimeMethodDispatchSpec(inst *ssa.Call, fn *ssa.Function
 	if inst == nil || calleeVal == nil {
 		return contextCallSpec{}, false, nil
 	}
-	mc, ok := calleeVal.(ssa.MemberCall)
-	if !ok || !mc.IsMember() {
+
+	var obj ssa.Value
+	var methodName string
+
+	if mc, ok := calleeVal.(ssa.MemberCall); ok && mc.IsMember() {
+		obj = ssa.GetLatestObject(calleeVal)
+		key := ssa.GetLatestKey(calleeVal)
+		if obj == nil || key == nil {
+			return contextCallSpec{}, false, nil
+		}
+		// Numeric/dynamic keys (slice index, map lookup) yield a callable VALUE
+		// (e.g. fns[0] is a closure stored in the slice), not a method name.
+		// Only string-constant keys are method dispatches.
+		if key != nil && !c.memberKeyIsStringConst(key) {
+			return contextCallSpec{}, false, nil
+		}
+		methodName = c.resolveMemberKeyString(key)
+	} else if phi, ok := calleeVal.(*ssa.Phi); ok && phi != nil {
+		// A member call on a loop-carried object (e.g. freq.GetFirstFuzzHTTPRequest())
+		// is lowered by member_call_api as a synthetic phi whose name is "#<objID>.<method>".
+		name := phi.GetName()
+		if strings.HasPrefix(name, "#") {
+			if dot := strings.IndexByte(name, '.'); dot > 1 {
+				if objID, err := strconv.ParseInt(name[1:dot], 10, 64); err == nil && fn != nil {
+					if targetObj, ok := fn.GetValueById(objID); ok && targetObj != nil {
+						obj = targetObj
+						methodName = name[dot+1:]
+					}
+				}
+			}
+		}
+	} else {
 		return contextCallSpec{}, false, nil
 	}
 
-	obj := ssa.GetLatestObject(calleeVal)
-	key := ssa.GetLatestKey(calleeVal)
-	if obj == nil || key == nil {
+	if methodName == "" || obj == nil {
 		return contextCallSpec{}, false, nil
 	}
-	methodName := c.resolveMemberKeyString(key)
-	if methodName == "" {
+	// Map lookups yield values, not methods: a["c"] is a closure stored in
+	// the map. Yak still exposes a fixed set of map methods (m.Keys(),
+	// m.Values(), m.Has(), m.Set()) under those exact names.
+	if obj.GetType() != nil && obj.GetType().GetTypeKind() == ssa.MapTypeKind && !yakMapBuiltinMethod(methodName) {
 		return contextCallSpec{}, false, nil
+	}
+	// Shadow-method dispatch is used for both plain objects and yaklib module
+	// members (e.g. poc.RenderString). Record the yaklib dependency so tier
+	// selection and per-module DCE know the module is used.
+	if pkg := c.yaklibModuleNameFromObject(obj); pkg != "" {
+		c.recordYaklibDependency(pkg, methodName)
 	}
 
 	methodNamePtr := c.Builder.CreateGlobalStringPtr(methodName, fmt.Sprintf("yak_method_name_%d", inst.GetId()))
@@ -139,10 +178,38 @@ func (c *Compiler) compileCall(inst *ssa.Call) error {
 			}
 		}
 	}
-
 	switch c.instructionTag(inst.GetId()) {
 	case callLowerTagInternal:
 		if resolvedCallee, ok := callframe.ResolveDirectCallee(c.Program, fn, inst); ok && resolvedCallee != nil {
+			if len(resolvedCallee.ParameterMembers) > 0 || c.closureNeedsFreeValues(resolvedCallee) {
+				// Closure invocation: pass the materialized closure object so
+				// the runtime fills parameter members and free values from the
+				// captured slots (which are by-ref pointers). The call context
+				// only carries the user arguments.
+				closure, err := c.materializeCallableClosure(inst, resolvedCallee)
+				if err != nil {
+					return err
+				}
+				// Remember the materialized closure so SideEffect instructions
+				// after the call can read captured variables back from its
+				// free-value slots (e.g. `f(); count` where f mutates count).
+				if c.function != nil {
+					if c.function.materializedClosures == nil {
+						c.function.materializedClosures = make(map[int64]llvm.Value)
+					}
+					c.function.materializedClosures[inst.GetId()] = closure
+				}
+				spec := contextCallSpec{
+					inst:      inst,
+					kind:      abi.KindCallable,
+					target:    c.coerceToInt64(closure),
+					args:      ssaArgs(append([]int64{}, inst.Args...), false),
+					async:     inst.Async,
+					ctxName:   "yak_call_ctx",
+					errPrefix: "emitCallableContextCall",
+				}
+				return c.lowerResolvedContextCall(spec)
+			}
 			llvmFn, _ := c.getOrDeclareLLVMFunction(resolvedCallee)
 			spec, err := c.newCallableContextCallSpec(inst, llvmFn, c.callableContextArgs(inst, resolvedCallee), "yak_call_target")
 			if err != nil {
@@ -236,4 +303,34 @@ func (c *Compiler) compileCall(inst *ssa.Call) error {
 	}
 
 	return fmt.Errorf("compileCall: unable to resolve callee %q", calleeName)
+}
+
+// yakMapBuiltinMethod reports the yak map methods implemented on
+// runtimeOrderedMap. Other names stay value lookups so a stored closure
+// can still be called.
+func yakMapBuiltinMethod(name string) bool {
+	switch name {
+	case "Keys", "Values", "Has", "Set", "Len", "Get", "Delete":
+		return true
+	default:
+		return false
+	}
+}
+
+func (c *Compiler) yaklibModuleNameFromObject(obj ssa.Value) string {
+	if obj == nil {
+		return ""
+	}
+	name := obj.GetName()
+	if name == "" {
+		return ""
+	}
+	for _, tier := range tiers.All {
+		for _, mod := range tier.Modules {
+			if mod == name {
+				return name
+			}
+		}
+	}
+	return ""
 }

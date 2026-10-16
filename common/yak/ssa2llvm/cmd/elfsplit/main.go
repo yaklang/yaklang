@@ -23,10 +23,12 @@ import (
 )
 
 const (
-	elf64SymSize                = 24
-	elf64RelaSize               = 24
-	elf64ShdrSize               = 64
-	moduledataTextsectMapOffset = 0x150
+	elf64SymSize  = 24
+	elf64RelaSize = 24
+	elf64ShdrSize = 64
+	// Go 1.27 amd64 runtime.moduledata.textsectmap. Go 1.26 kept this slice at
+	// 0x150; 1.27 inserts typedesclen, itaboffset and itabsize ahead of it.
+	moduledataTextsectMapOffset = 0x168
 	moduledataTextsectMapLenOff = moduledataTextsectMapOffset + 8
 	moduledataTextsectMapCapOff = moduledataTextsectMapOffset + 16
 	textSectionMapEntrySize     = 24
@@ -768,7 +770,12 @@ func rewritePCRelativeBranches(
 				disp, hasDisp, isBranch = int64(v), true, true
 			case x86asm.Mem:
 				if v.Base == x86asm.RIP {
-					disp, hasDisp = v.Disp, true
+					// x86asm zero-extends Mem.Disp. A backward leaq/movq
+					// (closure bodies are emitted before the function that
+					// takes their address) therefore looks like a huge
+					// positive offset, fails the text-range check below, and
+					// keeps the pre-split displacement.
+					disp, hasDisp = signExtendDisp(v.Disp, inst.PCRel), true
 				}
 			}
 			if hasDisp {
@@ -1089,6 +1096,22 @@ func symbolByIndex(symbols []symMeta, index int) *symMeta {
 	return nil
 }
 
+// signExtendDisp corrects x86asm.Mem.Disp, which stores a RIP-relative
+// displacement as a zero-extended unsigned value. Rel operands are already
+// sign-extended and must not be passed here.
+func signExtendDisp(disp int64, width int) int64 {
+	switch width {
+	case 1:
+		return int64(int8(disp))
+	case 2:
+		return int64(int16(disp))
+	case 4:
+		return int64(int32(disp))
+	default:
+		return disp
+	}
+}
+
 func writePCRelativeValue(data []byte, offset uint64, width int, value int64) error {
 	if offset+uint64(width) > uint64(len(data)) {
 		return fmt.Errorf("PC-relative immediate out of bounds")
@@ -1169,10 +1192,12 @@ func buildModulePackageMap(modules []string) map[string][]string {
 			"encoding/gob",
 			"github.com/andybalholm/brotli",
 			"github.com/cloudflare/circl",
+			"github.com/denisenkom/go-mssqldb",
 			"github.com/go-sql-driver/mysql",
 			"github.com/gobwas/glob",
 			"github.com/gorilla/websocket",
 			"github.com/hpcloud/tail",
+			"github.com/sijms/go-ora/v2",
 			// kataras/golog and lestrrat/go-file-rotatelogs are deliberately
 			// absent: common/log imports them and common/log is base
 			// infrastructure that the AOT runtime itself uses from init
@@ -1185,6 +1210,7 @@ func buildModulePackageMap(modules []string) map[string][]string {
 			"github.com/quic-go/quic-go",
 			"github.com/yaklang/gorm",
 			"github.com/yaklang/javajive",
+			"go.mongodb.org/mongo-driver",
 			"github.com/yaklang/yaklang/common/ai/aispec",
 			"github.com/yaklang/yaklang/common/consts",
 			"github.com/yaklang/yaklang/common/cybertunnel",
@@ -1198,9 +1224,15 @@ func buildModulePackageMap(modules []string) map[string][]string {
 			"github.com/yaklang/yaklang/common/minimartian",
 			"github.com/yaklang/yaklang/common/mutate",
 			"github.com/yaklang/yaklang/common/netx",
+			// notify/drivers/feishu registers a protobuf file in its init,
+			// which reaches google.golang.org/protobuf in the shared
+			// closure below. Staying in the base .text would make that
+			// call hit the shared stub whenever shared is pruned.
+			"github.com/yaklang/yaklang/common/notify/drivers/feishu",
 			"github.com/yaklang/yaklang/common/pcapx",
 			"github.com/yaklang/yaklang/common/sca",
 			"github.com/yaklang/yaklang/common/schema",
+			"github.com/yaklang/yaklang/common/suricata/generate",
 			"github.com/yaklang/yaklang/common/third_party/utls",
 			"github.com/yaklang/yaklang/common/utils/bruteutils",
 			"github.com/yaklang/yaklang/common/utils/bufpipe",
@@ -1281,6 +1313,15 @@ func buildModulePackageMap(modules []string) map[string][]string {
 			"github.com/yaklang/yaklang/common/yakgrpc",
 			"github.com/yaklang/yaklang/common/yak/ssa/ssadb",
 			"github.com/yaklang/yaklang/common/yak/ssa/ssalog",
+			"github.com/yaklang/yaklang/common/yak/static_analyzer",
+			"github.com/yaklang/yaklang/common/coreplugin",
+			"github.com/yaklang/yaklang/common/rpa/core",
+			"github.com/yaklang/yaklang/common/thirdparty_bin",
+			"github.com/yaklang/yaklang/common/utils/pprofutils",
+			"github.com/yaklang/yaklang/common/aiforge",
+			"github.com/yaklang/yaklang/common/chaosmaker",
+			"github.com/yaklang/yaklang/common/rpa/implement",
+			"github.com/yaklang/yaklang/common/simulator",
 			"github.com/yaklang/yaklang/common/syntaxflow",
 			"github.com/yaklang/yaklang/common/yak/syntaxflow_scan",
 			"github.com/yaklang/yaklang/common/ai/ytoken",
@@ -1313,7 +1354,7 @@ func buildModulePackageMap(modules []string) map[string][]string {
 		"facades":    {"github.com/yaklang/yaklang/common/facades"},
 		"nuclei":     {"github.com/yaklang/yaklang/common/yak/httptpl"},
 		"httptpl":    {"github.com/yaklang/yaklang/common/yak/httptpl"},
-		"ai":         {"github.com/yaklang/yaklang/common/ai"},
+		"ai":         {"github.com/yaklang/yaklang/common/ai", "github.com/yaklang/yaklang/common/yak"},
 		"liteforge":  {"github.com/yaklang/yaklang/common/ai/aid/liteforge/liteforgeapp"},
 		"hids":       {"github.com/yaklang/yaklang/common/hids"},
 		"java":       {"github.com/yaklang/yaklang/common/yserx"},

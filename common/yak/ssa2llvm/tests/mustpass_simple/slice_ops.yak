@@ -1,0 +1,13 @@
+// Regression: slice expressions on yak slices. Covers negative indices
+// (a[-1], whose "-1" key must not be mangled by the tagged-pointer mask),
+// the [low:high] window copy (was an empty slice because make length came
+// from the pair count before Undefined read placeholders were filtered),
+// and the negative-step reverse form a[::-1].
+a = [1, 2, 3]
+assert a[0] == 1
+assert a[-1] == 3
+assert a[1:2] == [2]
+assert a[1:] == [2, 3]
+assert a[:2] == [1, 2]
+assert a[::-1] == [3, 2, 1]
+assert a[1:2:3] == [2]

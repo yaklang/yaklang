@@ -1,6 +1,7 @@
 package tests
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"os/exec"
@@ -8,6 +9,7 @@ import (
 	"sort"
 	"strings"
 	"testing"
+	"time"
 )
 
 // RepoRoot walks up from the current working directory until it finds go.mod.
@@ -252,7 +254,7 @@ func RunYakScriptFileWithCLI(t *testing.T, scriptPath string, env map[string]str
 
 	// Real CLI compile/run must match ordinary user flows (usable runtime
 	// archive + fresh rebuild), exactly like runSSA2LLVMCLI.
-	res := runSSA2LLVMCLIInDir(t, "", "compile", scriptAbs, "-o", bin, "-f", "", "-a")
+	res := runSSA2LLVMCLIInDirScratch(t, "compile", scriptAbs, "-o", bin, "-f", "", "-a")
 	if res.ExitCode != 0 {
 		t.Fatalf("ssa2llvm compile failed (exit %d):\n%s", res.ExitCode, res.Output)
 	}
@@ -264,4 +266,46 @@ func RunYakScriptFileWithCLI(t *testing.T, scriptPath string, env map[string]str
 		t.Fatalf("compiled binary %s failed (exit %d):\n%s", name, run.ExitCode, run.Output)
 	}
 	return run.Output
+}
+
+// RunYakScriptFileWithCLITimeout is like RunYakScriptFileWithCLI but runs the
+// compiled binary with a deadline so a hung script fails the subtest instead
+// of blocking the whole mustpass suite. The deadline starts when the binary
+// starts. Compile stays on the test process timeout; a cold link can take
+// most of a minute and must not consume the run budget.
+func RunYakScriptFileWithCLITimeout(t *testing.T, timeout time.Duration, scriptPath string, env map[string]string) string {
+	t.Helper()
+
+	scriptAbs, err := filepath.Abs(scriptPath)
+	if err != nil {
+		t.Fatalf("filepath.Abs(%q) failed: %v", scriptPath, err)
+	}
+
+	tmpDir := t.TempDir()
+	name := strings.TrimSuffix(filepath.Base(scriptAbs), filepath.Ext(scriptAbs))
+	bin := filepath.Join(tmpDir, name+".bin")
+
+	res := runSSA2LLVMCLIInDirScratch(t, "compile", scriptAbs, "-o", bin, "-f", "", "-a")
+	if res.ExitCode != 0 {
+		t.Fatalf("ssa2llvm compile failed (exit %d):\n%s", res.ExitCode, res.Output)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, bin)
+	cmd.Env = append([]string{}, os.Environ()...)
+	for k, v := range env {
+		cmd.Env = append(cmd.Env, fmt.Sprintf("%s=%s", k, v))
+	}
+	output, err := cmd.CombinedOutput()
+	if ctx.Err() != nil {
+		t.Fatalf("compiled binary %s timed out:\n%s", name, output)
+	}
+	if err != nil {
+		if exitErr, ok := err.(*exec.ExitError); ok {
+			t.Fatalf("compiled binary %s failed (exit %d):\n%s", name, exitErr.ExitCode(), output)
+		}
+		t.Fatalf("compiled binary %s failed: %v\n%s", name, err, output)
+	}
+	return string(output)
 }

@@ -56,8 +56,8 @@ func TestIR_LocalFunctionCallUsesUnifiedInvoke(t *testing.T) {
 	_, _, ir, err := compileToIRFromCodeWithExternBindings(code, "yak", nil)
 	require.NoError(t, err)
 	require.GreaterOrEqual(t, strings.Count(ir, "call void @"+abi.InvokeSymbol), 2)
-	require.Contains(t, ir, "@add")
-	require.NotContains(t, ir, "call void @add")
+	require.Contains(t, ir, "@"+abi.UserSymbolPrefix+"add")
+	require.NotContains(t, ir, "call void @"+abi.UserSymbolPrefix+"add")
 	requireIRAvoidsLegacyCallEntrypoints(t, ir)
 }
 
@@ -198,7 +198,7 @@ func TestIR_GoStmtCallableUsesAsyncInvoke(t *testing.T) {
 	_, _, ir, err := compileToIRFromCodeWithExternBindings(code, "yak", nil)
 	require.NoError(t, err)
 	requireIRContainsInOrder(t, ir,
-		"@f",
+		"@"+abi.UserSymbolPrefix+"f",
 		"store i64 1",
 		"call void @"+abi.InvokeSymbol,
 	)
@@ -226,7 +226,7 @@ func TestIR_AsyncSideEffectMemberReadAfterWait(t *testing.T) {
 	_, _, ir, err := compileToIRFromCodeWithExternBindings(code, "yak", nil)
 	require.NoError(t, err)
 	requireIRContainsInOrder(t, ir,
-		"ptr @yak_method_name_33",
+		"ptr @yak_method_name_",
 		"call void @"+abi.InvokeSymbol,
 		"call i64 @"+abi.RuntimeGetFieldSymbol,
 	)
@@ -265,9 +265,12 @@ func TestIR_MainWrapperUsesUnifiedInvoke(t *testing.T) {
 	requireIRContainsInOrder(t, ir,
 		"define i32 @main()",
 		"call void @"+abi.InvokeSymbol,
-		"call void @"+abi.RuntimeWaitAsyncSymbol,
 		"call void @"+abi.RuntimeGCSymbol,
 	)
+	// The wrapper must NOT wait for outstanding `go func` goroutines: the VM
+	// returns as soon as the main flow ends, and an unconditional wait hangs
+	// every script that leaves a serve loop running.
+	require.NotContains(t, ir, "call void @"+abi.RuntimeWaitAsyncSymbol)
 	requireIRAvoidsLegacyCallEntrypoints(t, ir)
 }
 

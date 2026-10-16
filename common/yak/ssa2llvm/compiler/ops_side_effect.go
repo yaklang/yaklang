@@ -5,6 +5,8 @@ import (
 
 	"github.com/yaklang/go-llvm"
 	"github.com/yaklang/yaklang/common/yak/ssa"
+	"github.com/yaklang/yaklang/common/yak/ssa2llvm/callframe"
+	"github.com/yaklang/yaklang/common/yak/ssa2llvm/runtime/abi"
 )
 
 func (c *Compiler) compileSideEffectInstruction(inst *ssa.SideEffect) error {
@@ -18,12 +20,28 @@ func (c *Compiler) compileSideEffectValue(inst *ssa.SideEffect) error {
 	if inst == nil {
 		return nil
 	}
+	// The closure object is stored once, immediately after make_callable.
+	// Every later read resolves the free-value slot from that alloca.
+	if c.function != nil && c.function.redirectedSlots != nil {
+		if _, ok := c.function.redirectedSlots[inst.GetId()]; ok {
+			return c.maybeEmitMemberSet(inst, inst, inst.GetId())
+		}
+	}
 	if inst.IsMember() && inst.GetObject() != nil && inst.GetKey() != nil {
-		objVal, err := c.getValue(inst, inst.GetObject().GetId())
+		// The side-effect writes at its definition site, which is the FIRST
+		// owner pair. GetObject() returns the latest owner: when the written
+		// value is later reused (e.g. params.language also feeds
+		// result["language"]), that latest owner is a forward reference and
+		// pulling it here would emit later calls before the write.
+		obj, key := c.firstOwnerObjectKey(inst)
+		if obj == nil || key == nil {
+			obj, key = inst.GetObject(), inst.GetKey()
+		}
+		objVal, err := c.getValue(inst, obj.GetId())
 		if err != nil {
 			return err
 		}
-		keyStr := c.resolveMemberKeyString(inst.GetKey())
+		keyStr := c.resolveMemberKeyString(key)
 		if keyStr == "" {
 			c.cacheValue(inst.GetId(), llvm.ConstInt(c.LLVMCtx.Int64Type(), 0, false))
 			return nil
@@ -32,14 +50,17 @@ func (c *Compiler) compileSideEffectValue(inst *ssa.SideEffect) error {
 			actualVal, err := c.getValue(inst, actualID)
 			if err == nil && !actualVal.IsNil() {
 				c.cacheValue(inst.GetId(), actualVal)
-				c.emitRuntimeSetField(objVal, keyStr, actualVal, c.assignedSSAValue(inst, actualID), inst.GetId())
+				c.emitRuntimeSetFieldByKey(inst, objVal, key, keyStr, actualVal, c.assignedSSAValue(inst, actualID), inst.GetId())
 				return c.maybeEmitMemberSet(inst, inst, inst.GetId())
 			}
 		}
-		c.cacheValue(inst.GetId(), c.emitRuntimeGetField(objVal, keyStr, inst.GetId()))
+		c.cacheValue(inst.GetId(), c.emitRuntimeGetFieldByKey(objVal, key, inst, inst.GetId()))
 		return c.maybeEmitMemberSet(inst, inst, inst.GetId())
 	}
-	if actual := c.resolveSideEffectActualValue(inst); actual != nil && actual.IsMember() && actual.GetObject() != nil && actual.GetKey() != nil {
+	// A member owned by the closure (runtime = s.runtimeId) is not a field of
+	// this function. Reading it here folds the foreign object to 0 and skips
+	// the by-ref slot the callback actually writes.
+	if actual := c.resolveSideEffectActualValue(inst); actual != nil && actual.IsMember() && actual.GetObject() != nil && actual.GetKey() != nil && valueBelongsToFunction(inst.GetFunc(), actual.GetId()) {
 		objVal, err := c.getValue(inst, actual.GetObject().GetId())
 		if err != nil {
 			return err
@@ -49,7 +70,7 @@ func (c *Compiler) compileSideEffectValue(inst *ssa.SideEffect) error {
 			c.cacheValue(inst.GetId(), llvm.ConstInt(c.LLVMCtx.Int64Type(), 0, false))
 			return nil
 		}
-		c.cacheValue(inst.GetId(), c.emitRuntimeGetField(objVal, keyStr, inst.GetId()))
+		c.cacheValue(inst.GetId(), c.emitRuntimeGetFieldByKey(objVal, actual.GetKey(), inst, inst.GetId()))
 		return c.maybeEmitMemberSet(inst, inst, inst.GetId())
 	}
 	if val, ok := c.getCachedValue(inst, inst.GetId()); ok && !val.IsNil() {
@@ -58,6 +79,50 @@ func (c *Compiler) compileSideEffectValue(inst *ssa.SideEffect) error {
 	actualID, err := c.resolveSideEffectActualID(inst)
 	if err != nil {
 		return err
+	}
+
+	// A side effect after a closure call (e.g. `f(); count` or
+	// `retry(100, f); count` where f mutates the captured count) refers to a
+	// value owned by the closure function. Resolve it through the closure's
+	// free-value slots instead of the cross-function fallback (which returns 0).
+	closureVal, closureIndex, closureByRef, closureOK := c.resolveClosureSideEffect(inst, actualID)
+	if closureOK {
+		if closureByRef {
+			// Redirect this side-effect's storage to the closure's heap
+			// free-value slot: reads at ANY later program point (including
+			// after the closure is invoked indirectly through a wrapper such
+			// as filesys.onFileStat -> Recursive) observe the final value.
+			// The closure object is parked in an entry-block alloca so it
+			// dominates every redirected use; the slot pointer itself is
+			// resolved lazily at each use site.
+			closureSlot := c.ensureRedirectedClosureAlloca(inst.GetId())
+			if !closureSlot.IsNil() {
+				c.storeInt64AfterDef(closureVal, closureSlot)
+			}
+			if c.function.redirectedSlots == nil {
+				c.function.redirectedSlots = make(map[int64]redirectedSlotSource)
+			}
+			c.function.redirectedSlots[inst.GetId()] = redirectedSlotSource{
+				closureSlot: closureSlot,
+				index:       int64(closureIndex),
+			}
+			if c.function.storedValues == nil {
+				c.function.storedValues = make(map[int64]struct{})
+			}
+			c.function.storedValues[inst.GetId()] = struct{}{}
+			return c.maybeEmitMemberSet(inst, inst, inst.GetId())
+		}
+		readFn, readType := c.getOrInsertRuntimeReadClosureFreeValue()
+		idx := llvm.ConstInt(c.LLVMCtx.Int64Type(), uint64(closureIndex), false)
+		byRefWord := llvm.ConstInt(c.LLVMCtx.Int64Type(), 0, false)
+		val := c.Builder.CreateCall(readType, readFn, []llvm.Value{
+			c.coerceToInt64(closureVal), idx, byRefWord,
+		}, fmt.Sprintf("yak_closure_fv_read_%d", inst.GetId()))
+		val = c.coerceToInt64(val)
+		if inst.GetId() > 0 {
+			c.cacheValue(inst.GetId(), val)
+		}
+		return c.maybeEmitMemberSet(inst, inst, inst.GetId())
 	}
 
 	actualVal, err := c.getValue(inst, actualID)
@@ -70,6 +135,170 @@ func (c *Compiler) compileSideEffectValue(inst *ssa.SideEffect) error {
 	}
 
 	return c.maybeEmitMemberSet(inst, inst, inst.GetId())
+}
+
+// resolveClosureSideEffect resolves a side-effect whose modified value belongs
+// to a closure function called at the side-effect's call site (either directly
+// as the call target or passed as a callback argument). It returns the
+// materialized closure object, the free-value binding index for the captured
+// variable, whether the capture is by-reference, and ok.
+func (c *Compiler) resolveClosureSideEffect(inst *ssa.SideEffect, actualID int64) (llvm.Value, uint64, bool, bool) {
+	if inst == nil || inst.CallSite <= 0 || actualID <= 0 || c.function == nil {
+		return llvm.Value{}, 0, false, false
+	}
+	fn := inst.GetFunc()
+	if fn == nil {
+		return llvm.Value{}, 0, false, false
+	}
+	valObj, ok := fn.GetValueById(actualID)
+	if !ok || valObj == nil {
+		return llvm.Value{}, 0, false, false
+	}
+	closureFn := valObj.GetFunc()
+	// An if/elif assignment inside the closure is a phi there. The front end
+	// copies that phi into the caller (edges still point at the closure's
+	// constants) and parks the copy on the entry block, which has no
+	// predecessor to select GET vs POST. The value that actually ran is in
+	// the closure's by-ref slot; use the closure that owns the edge values.
+	if phi, ok := valObj.(*ssa.Phi); ok && phi != nil && (closureFn == nil || closureFn == fn) {
+		for _, edgeID := range phi.Edge {
+			edge, ok := fn.GetValueById(edgeID)
+			if !ok || edge == nil {
+				continue
+			}
+			owner := edge.GetFunc()
+			if owner != nil && owner != fn {
+				closureFn = owner
+				break
+			}
+		}
+	}
+	if closureFn == nil || closureFn == fn {
+		return llvm.Value{}, 0, false, false
+	}
+	// The modified value's variable name comes from the side-effect
+	// instruction (e.g. `files` for `files = append(files, x)`), not from
+	// the modified value's id: that id is the closure-local result, which
+	// never equals the caller's free-value binding id. A later use such as
+	// `"got %v" % [count]` also binds a member name (`#210[1]`) on the same
+	// value. Map iteration would pick that member and miss the free value,
+	// so the parent read falls through to 0. Prefer the name the side effect
+	// was created with, then any binding that the closure actually captures.
+	modifyName := c.sideEffectCaptureName(inst, closureFn)
+	if modifyName == "" {
+		return llvm.Value{}, 0, false, false
+	}
+	index := -1
+	byRef := false
+	declared := callframe.OrderedFreeValueBindings(closureFn)
+	for i, binding := range declared {
+		if binding.Variable.GetName() != modifyName {
+			continue
+		}
+		index = i
+		byRef = c.freeValueCaptureMode(closureFn, binding) != freeValueCaptureByValue
+		break
+	}
+	if index < 0 {
+		for i, extra := range c.extraCaptures(closureFn) {
+			if extra.Name != modifyName {
+				continue
+			}
+			index = len(declared) + i
+			byRef = true
+			break
+		}
+	}
+	if index < 0 {
+		return llvm.Value{}, 0, false, false
+	}
+	// Direct closure target.
+	if c.function.materializedClosures != nil {
+		if closureVal, ok := c.function.materializedClosures[inst.CallSite]; ok && !closureVal.IsNil() {
+			return closureVal, uint64(index), byRef, true
+		}
+	}
+	// Closure passed as a callback argument (extern/yaklib callee).
+	if c.function.materializedClosureArgs != nil {
+		for _, closureVal := range c.function.materializedClosureArgs[inst.CallSite] {
+			if !closureVal.IsNil() {
+				return closureVal, uint64(index), byRef, true
+			}
+		}
+	}
+	return llvm.Value{}, 0, false, false
+}
+
+// sideEffectCaptureName picks the variable a closure actually captures.
+// inst.GetName() is the name passed to NewSideEffect. Later uses can add
+// other variable bindings (a format-list element) that are not captures.
+func (c *Compiler) sideEffectCaptureName(inst *ssa.SideEffect, closureFn *ssa.Function) string {
+	if inst == nil {
+		return ""
+	}
+	candidates := make([]string, 0, 4)
+	if name := inst.GetName(); name != "" {
+		candidates = append(candidates, name)
+	}
+	if last := inst.GetLastVariable(); last != nil && last.GetName() != "" {
+		candidates = append(candidates, last.GetName())
+	}
+	for name := range inst.GetAllVariables() {
+		if name != "" {
+			candidates = append(candidates, name)
+		}
+	}
+	for _, name := range candidates {
+		if c.closureCapturesName(closureFn, name) {
+			return name
+		}
+	}
+	if name := inst.GetName(); name != "" {
+		return name
+	}
+	if len(candidates) > 0 {
+		return candidates[0]
+	}
+	return ""
+}
+
+func (c *Compiler) closureCapturesName(fn *ssa.Function, name string) bool {
+	if fn == nil || name == "" {
+		return false
+	}
+	for _, binding := range callframe.OrderedFreeValueBindings(fn) {
+		if binding.Name == name {
+			return true
+		}
+	}
+	for _, extra := range c.extraCaptures(fn) {
+		if extra.Name == name {
+			return true
+		}
+	}
+	return false
+}
+
+func (c *Compiler) getOrInsertRuntimeGetClosureFreeSlot() (llvm.Value, llvm.Type) {
+	name := c.runtimeSymName(abi.RuntimeGetClosureFreeSlotSymbol)
+	fn := c.Mod.NamedFunction(name)
+	i64 := c.LLVMCtx.Int64Type()
+	fnType := llvm.FunctionType(i64, []llvm.Type{i64, i64}, false)
+	if fn.IsNil() {
+		fn = llvm.AddFunction(c.Mod, name, fnType)
+	}
+	return fn, fnType
+}
+
+func (c *Compiler) getOrInsertRuntimeReadClosureFreeValue() (llvm.Value, llvm.Type) {
+	name := c.runtimeSymName(abi.RuntimeReadClosureFreeValueSymbol)
+	fn := c.Mod.NamedFunction(name)
+	i64 := c.LLVMCtx.Int64Type()
+	fnType := llvm.FunctionType(i64, []llvm.Type{i64, i64, i64}, false)
+	if fn.IsNil() {
+		fn = llvm.AddFunction(c.Mod, name, fnType)
+	}
+	return fn, fnType
 }
 
 func (c *Compiler) isAsyncSideEffect(inst *ssa.SideEffect) bool {
@@ -114,15 +343,20 @@ func (c *Compiler) resolveSideEffectActualID(inst *ssa.SideEffect) (int64, error
 			idx := tmpl.FormalParameterIndex
 			if idx >= 0 && idx < len(callInst.Args) {
 				actualID = callInst.Args[idx]
-			} else {
-				return 0, fmt.Errorf("compileSideEffect: parameter index %d out of bounds for call %d (args=%d)", idx, callInst.GetId(), len(callInst.Args))
 			}
+			// idx beyond the call site's arguments (or a negative index for a
+			// receiver/free value) means this call simply does not carry the
+			// parameter: yak allows calling with fewer arguments than the
+			// callee declares, and a variadic tail is folded into one tuple
+			// argument. There is no actual value to resolve here, so keep the
+			// template and let the callers fall back instead of failing the
+			// whole compile.
 		case *ssa.ParameterMember:
 			if actual, ok := tmpl.GetActualCallParam(callInst); ok && actual != nil {
 				actualID = actual.GetId()
-			} else {
-				return 0, fmt.Errorf("compileSideEffect: failed to resolve actual call param for %s at call %d", tmpl.GetName(), callInst.GetId())
 			}
+			// Same as above: GetActualCallParam only fails when the call site
+			// has no argument at this parameter's position.
 		}
 	}
 	return actualID, nil
@@ -142,15 +376,4 @@ func (c *Compiler) resolveSideEffectActualValue(inst *ssa.SideEffect) ssa.Value 
 		return nil
 	}
 	return value
-}
-
-func coerceLLVMValueSliceToI64(c *Compiler, vals []llvm.Value) []llvm.Value {
-	if c == nil {
-		return vals
-	}
-	out := make([]llvm.Value, 0, len(vals))
-	for _, v := range vals {
-		out = append(out, c.coerceToInt64(v))
-	}
-	return out
 }
