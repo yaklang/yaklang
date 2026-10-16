@@ -19,6 +19,41 @@ type TestItem struct {
 	Data string
 }
 
+func TestSaverByteBudgetFlushesBeforeRowCount(t *testing.T) {
+	var mu sync.Mutex
+	var batches [][]int
+	saver := dbcache.NewSave(func(items []int) error {
+		mu.Lock()
+		batches = append(batches, append([]int(nil), items...))
+		mu.Unlock()
+		return nil
+	},
+		dbcache.WithSaveSize(1000),
+		dbcache.WithSaveTimeout(time.Hour),
+		dbcache.WithSaveByteBudget(100, func(n int) int { return n }),
+	)
+	for _, n := range []int{40, 40, 40, 30, 150, 20} {
+		saver.Save(n)
+	}
+	require.NoError(t, saver.Close())
+
+	mu.Lock()
+	defer mu.Unlock()
+	require.Equal(t, [][]int{{40, 40}, {40, 30}, {150}, {20}}, batches)
+	var got []int
+	for _, batch := range batches {
+		var sum int
+		for _, n := range batch {
+			sum += n
+		}
+		if len(batch) > 1 {
+			require.LessOrEqual(t, sum, 100)
+		}
+		got = append(got, batch...)
+	}
+	require.Equal(t, []int{40, 40, 40, 30, 150, 20}, got)
+}
+
 func TestNewSaver(t *testing.T) {
 	// Test with default options
 	savedItems := make([]TestItem, 0)
