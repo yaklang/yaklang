@@ -21,60 +21,16 @@ func (h *Graph[K]) DeleteBatchWithCommit(keys []K, commit func() error) (deleted
 	for _, key := range keys {
 		targets[key] = struct{}{}
 	}
-	originalLayers := h.Layers
-	type savedNode struct {
-		node      hnswspec.LayerNode[K]
-		neighbors map[K]hnswspec.LayerNode[K]
-	}
-	var saved []savedNode
-	removed := make([]map[K]hnswspec.LayerNode[K], len(h.Layers))
 	committed := false
 	if commit != nil {
-		// Repair may add reciprocal edges, so save every survivor's adjacency,
-		// without loading any vector or PQ code.
-		for _, layer := range h.Layers {
-			for key, node := range layer.Nodes {
-				if _, drop := targets[key]; drop {
-					continue
-				}
-				neighbors := make(map[K]hnswspec.LayerNode[K], len(node.GetNeighbors()))
-				for k, n := range node.GetNeighbors() {
-					neighbors[k] = n
-				}
-				saved = append(saved, savedNode{node, neighbors})
-			}
-		}
-		defer func() {
-			if committed {
-				return
-			}
-			h.Layers = originalLayers
-			for i, nodes := range removed {
-				for key, node := range nodes {
-					h.Layers[i].Nodes[key] = node
-				}
-			}
-			for _, state := range saved {
-				neighbors := state.node.GetNeighbors()
-				clear(neighbors)
-				for key, node := range state.neighbors {
-					neighbors[key] = node
-				}
-			}
-		}()
+		mutation := h.beginMutation()
+		defer func() { h.finishMutation(mutation, committed) }()
 	}
-
 	for i, layer := range h.Layers {
 		for key := range targets {
-			if node, ok := layer.Nodes[key]; ok {
-				if commit != nil {
-					if removed[i] == nil {
-						removed[i] = make(map[K]hnswspec.LayerNode[K])
-					}
-					removed[i][key] = node
-				}
-				delete(layer.Nodes, key)
+			if _, ok := layer.Nodes[key]; ok {
 				h.noteDelete(i, key)
+				delete(layer.Nodes, key)
 				deleted = true
 			}
 		}
@@ -84,6 +40,7 @@ func (h *Graph[K]) DeleteBatchWithCommit(keys []K, commit func() error) (deleted
 			changed := false
 			for key := range node.GetNeighbors() {
 				if _, drop := targets[key]; drop {
+					h.noteUpsert(i, node.GetKey())
 					node.RemoveNeighbor(key)
 					changed = true
 				}
@@ -94,8 +51,7 @@ func (h *Graph[K]) DeleteBatchWithCommit(keys []K, commit func() error) (deleted
 		}
 		// Every target and incoming edge in this layer is gone before repair.
 		for _, node := range affected {
-			node.Replenish(h.M, h.nodeDistance)
-			h.noteUpsert(i, node.GetKey())
+			h.replenish(i, node)
 		}
 	}
 	for len(h.Layers) > 0 && len(h.Layers[len(h.Layers)-1].Nodes) == 0 {

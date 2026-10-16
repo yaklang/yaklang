@@ -35,6 +35,7 @@ type graphLoadCall struct {
 	err            error
 	collectionUUID string
 	removed        bool
+	closing        bool
 }
 
 func NewGraphHNSWManager() *GraphHNSWManager {
@@ -46,9 +47,9 @@ func NewGraphHNSWManager() *GraphHNSWManager {
 
 func (gm *GraphHNSWManager) ClearCache() {
 	gm.lock.Lock()
-	wrapperList := make([]*GraphWrapper[string], 0, len(gm.cache))
-	for _, wrapper := range gm.cache {
-		wrapperList = append(wrapperList, wrapper)
+	wrappers := gm.cache
+	for key, wrapper := range wrappers {
+		gm.loading[key] = &graphLoadCall{done: make(chan struct{}), wrapper: wrapper, closing: true, collectionUUID: wrapper.collectionUUID}
 	}
 	gm.cache = make(map[string]*GraphWrapper[string])
 	for _, call := range gm.loading {
@@ -56,8 +57,20 @@ func (gm *GraphHNSWManager) ClearCache() {
 	}
 	gm.lock.Unlock()
 
-	for _, wrapper := range wrapperList {
+	gm.closeDetached(wrappers)
+}
+
+// Keep a closing entry until all accepted writes and the final snapshot have
+// drained. A concurrent reload must never create a second writer for that graph.
+func (gm *GraphHNSWManager) closeDetached(wrappers map[string]*GraphWrapper[string]) {
+	for key, wrapper := range wrappers {
 		wrapper.Close()
+		gm.lock.Lock()
+		if call := gm.loading[key]; call != nil && call.closing && call.wrapper == wrapper {
+			delete(gm.loading, key)
+			close(call.done)
+		}
+		gm.lock.Unlock()
 	}
 }
 
@@ -70,10 +83,11 @@ func graphCacheKey(db *gorm.DB, collection *schema.VectorStoreCollection) string
 // matching wrapper is removed rather than leaving a cross-database cache entry.
 func (gm *GraphHNSWManager) RemoveFromCache(collectionUUID string) {
 	gm.lock.Lock()
-	wrapperList := make([]*GraphWrapper[string], 0, 1)
+	wrappers := make(map[string]*GraphWrapper[string])
 	for cacheKey, wrapper := range gm.cache {
 		if wrapper.collectionUUID == collectionUUID {
-			wrapperList = append(wrapperList, wrapper)
+			wrappers[cacheKey] = wrapper
+			gm.loading[cacheKey] = &graphLoadCall{done: make(chan struct{}), wrapper: wrapper, closing: true, collectionUUID: collectionUUID}
 			delete(gm.cache, cacheKey)
 		}
 	}
@@ -84,9 +98,7 @@ func (gm *GraphHNSWManager) RemoveFromCache(collectionUUID string) {
 	}
 	gm.lock.Unlock()
 
-	for _, wrapper := range wrapperList {
-		wrapper.Close()
-	}
+	gm.closeDetached(wrappers)
 }
 
 // RemoveCollectionFromCache removes only the wrapper belonging to the given
@@ -97,18 +109,19 @@ func (gm *GraphHNSWManager) RemoveCollectionFromCache(db *gorm.DB, collection *s
 	cacheKey := graphCacheKey(db, collection)
 	wrapper := gm.cache[cacheKey]
 	delete(gm.cache, cacheKey)
+	if wrapper != nil {
+		gm.loading[cacheKey] = &graphLoadCall{done: make(chan struct{}), wrapper: wrapper, closing: true, collectionUUID: collection.UUID}
+	}
 	if call := gm.loading[cacheKey]; call != nil {
 		call.removed = true
 	}
 	gm.lock.Unlock()
 
 	if wrapper != nil {
-		wrapper.Close()
+		gm.closeDetached(map[string]*GraphWrapper[string]{cacheKey: wrapper})
 	}
 }
 
-// PersistIfCached writes a dirty in-memory HNSW graph before callers read the
-// database copy. Collections that are not loaded have no unsaved graph.
 func (gm *GraphHNSWManager) PersistIfCached(db *gorm.DB, collection *schema.VectorStoreCollection) error {
 	if collection == nil {
 		return nil
@@ -117,9 +130,23 @@ func (gm *GraphHNSWManager) PersistIfCached(db *gorm.DB, collection *schema.Vect
 	wrapper := gm.cache[graphCacheKey(db, collection)]
 	gm.lock.Unlock()
 	if wrapper == nil {
-		return nil
+		if err := ensureGraphDeltaTable(db); err != nil {
+			return err
+		}
+		var pending int64
+		if err := db.Model(&schema.VectorStoreGraphDelta{}).Where("collection_uuid = ?", collection.UUID).Count(&pending).Error; err != nil {
+			return err
+		}
+		if pending == 0 {
+			return nil
+		}
+		var err error
+		wrapper, err = gm.GetGraphWrapper(db, collection, LoadConfigFromCollectionInfo(collection))
+		if err != nil {
+			return err
+		}
 	}
-	return wrapper.queuePersist(false)
+	return wrapper.queuePersist(true)
 }
 
 func (gm *GraphHNSWManager) GetGraphWrapper(db *gorm.DB, collection *schema.VectorStoreCollection, collectionConfig *CollectionConfig) (*GraphWrapper[string], error) {
@@ -133,6 +160,9 @@ func (gm *GraphHNSWManager) GetGraphWrapper(db *gorm.DB, collection *schema.Vect
 		gm.lock.Unlock()
 		started := time.Now()
 		<-call.done
+		if call.closing {
+			return gm.GetGraphWrapper(db, collection, collectionConfig)
+		}
 		if elapsed := time.Since(started); elapsed > time.Second {
 			log.Warnf("RAG graph %q waited %s for concurrent collection load", collection.Name, elapsed)
 		}
@@ -178,94 +208,102 @@ func (gm *GraphHNSWManager) GetGraphWrapper(db *gorm.DB, collection *schema.Vect
 }
 
 func getGraphWrapperFromDB(db *gorm.DB, collection *schema.VectorStoreCollection, collectionConfig *CollectionConfig) (*GraphWrapper[string], error) {
-	collectionName := collection.Name
-	graphOptions := []hnsw.GraphOption[string]{
-		hnsw.WithHNSWParameters[string](collectionConfig.MaxNeighbors, collectionConfig.LayerGenerationFactor, collectionConfig.EfSearch),
-		hnsw.WithDistance[string](hnsw.GetDistanceFunc(collectionConfig.DistanceFuncType)),
-	}
-	if collectionConfig.EfConstruct > 0 {
-		graphOptions = append(graphOptions, hnsw.WithEfConstruction[string](collectionConfig.EfConstruct))
-	}
-	hnswGraph := NewHNSWGraph(collectionName, graphOptions...)
-
-	log.Infof("start to recover hnsw graph from db, collection name: %s", collectionName)
-	switch collectionConfig.buildGraphPolicy {
-	case Policy_None:
-		log.Info("build graph with no policy, skip load existed vectors")
-	case Policy_UseDBCanche:
-		fallthrough
-	default:
-		var err error
-		var isEmpty bool
-		deltas, deltaErr := loadGraphDeltas(db, collection.UUID)
-		if deltaErr != nil {
-			return nil, deltaErr
-		}
-		if len(collection.GraphBinary) == 0 && len(deltas) == 0 {
-			var count int64
-			if err := db.Model(&schema.VectorStoreDocument{}).Where("collection_id = ?", collection.ID).Count(&count).Error; err != nil {
-				return nil, utils.Wrap(err, "count vector documents before graph migration")
-			}
-			if count == 0 {
-				isEmpty = true
-			} else {
-				log.Warnf("detect old version vector store, start to migrate to new version")
-				err := migrateHNSWGraphWithTimeout(db, collection, collectionConfig, false)
-				if err != nil {
-					if errors.Is(err, graphNodesIsEmpty) {
-						isEmpty = true
-					} else {
-						return nil, utils.Errorf("migrate hnsw graph err: %v", err)
-					}
-				}
-			}
-		} else if len(collection.GraphBinary) == 0 {
-			isEmpty = true
-		}
-		if isEmpty {
-			hnswGraph = emptyHNSWGraph(collection)
-		} else {
-			hnswGraph, err = loadPersistedHNSWGraph(db, collection, collectionConfig)
-			if err != nil {
-				if collectionConfig.TryRebuildHNSWIndex {
-					hnswGraph, err = recoverCorruptedHNSWGraph(db, collection, collectionConfig, err)
-					if err != nil {
-						return nil, err
-					}
-				} else {
-					return nil, utils.Wrap(err, "parse hnsw graph from binary")
-				}
-			}
-		}
-	}
-	hnswGraph.EnableAdjacencyTracking()
-	if err := applyStoredGraphDeltas(db, collection, hnswGraph); err != nil {
+	if err := ensureGraphDeltaTable(db); err != nil {
 		return nil, err
 	}
-	wrapper := NewGraphWrapper(hnswGraph, collection.Name, collection.UUID)
-
-	if collectionConfig.EnableAutoUpdateGraphInfos {
-		persister := newGraphPersister(db, collection.UUID, collection.Name)
-		wrapper.persistLocked = func(force bool) error {
-			return persister.persist(wrapper, force)
-		}
-		wrapper.saveGraphDelta = func(tx *gorm.DB) error {
-			changes := wrapper.graph.TakeAdjacencyChanges()
-			if len(changes) == 0 {
-				return nil
+	// The caller's metadata may predate a cache eviction/compaction.
+	if err := db.First(collection, collection.ID).Error; err != nil {
+		return nil, err
+	}
+	graph := emptyHNSWGraph(collection)
+	if collectionConfig.buildGraphPolicy != Policy_None {
+		var err error
+		graph, err = restoreHNSWGraph(db, collection, collectionConfig)
+		if err != nil {
+			if !collectionConfig.TryRebuildHNSWIndex {
+				return nil, utils.Wrap(err, "restore hnsw snapshot and deltas")
 			}
-			return persister.insertDelta(tx, changes)
+			graph, err = recoverCorruptedHNSWGraph(db, collection, collectionConfig, err)
+			if err != nil {
+				return nil, err
+			}
 		}
-		wrapper.scheduleGraphSnapshot = func() {
+	}
+	persister, err := newGraphPersister(db, collection.UUID, collection.Name, collectionConfig)
+	if err != nil {
+		return nil, err
+	}
+	wrapper := NewGraphWrapper(graph, collection.Name, collection.UUID)
+	wrapper.persistLocked = func(force bool) error { return persister.persist(wrapper, force) }
+	wrapper.syncGraphSnapshot = func() bool {
+		return persister.syncBelow > 0 && graph.Len() < persister.syncBelow
+	}
+	wrapper.graphSnapshotSaved = func() {
+		persister.mu.Lock()
+		defer persister.mu.Unlock()
+		persister.needsSnapshot = false
+		persister.stopTimerLocked()
+	}
+	if collectionConfig.EnableAutoUpdateGraphInfos {
+		graph.EnableAdjacencyTracking()
+		wrapper.saveGraphDelta = func(tx *gorm.DB) error {
+			changes := graph.TakeAdjacencyChanges()
+			if err := persister.insertDelta(tx, changes); err != nil {
+				graph.RestoreAdjacencyChanges(changes)
+				return err
+			}
+			return nil
+		}
+		wrapper.commitMutation = func() error {
+			return utils.GormTransaction(db, wrapper.saveGraphDelta)
+		}
+		wrapper.afterMutation = func() { persister.afterMutation(wrapper) }
+		wrapper.scheduleGraphSnapshot = func() { persister.scheduleSnapshot(wrapper) }
+		if persister.needsSnapshot {
 			persister.scheduleSnapshot(wrapper)
 		}
-		wrapper.setOnLayerChange(func(Layers []*hnsw.Layer[string]) {
-			persister.noteMutation(wrapper)
-		})
 	}
 	return wrapper, nil
 }
 
+func restoreHNSWGraph(db *gorm.DB, collection *schema.VectorStoreCollection, config *CollectionConfig) (*hnsw.Graph[string], error) {
+	deltas, err := loadGraphDeltas(db, collection.UUID)
+	if err != nil {
+		return nil, err
+	}
+	if len(collection.GraphBinary) == 0 && len(deltas) == 0 {
+		var count int64
+		if err := db.Model(&schema.VectorStoreDocument{}).Where("collection_id = ?", collection.ID).Count(&count).Error; err != nil {
+			return nil, err
+		}
+		if count > 0 {
+			if err := migrateHNSWGraphWithTimeout(db, collection, config, false); err != nil {
+				return nil, err
+			}
+		}
+	}
+	graph := emptyHNSWGraph(collection)
+	if len(collection.GraphBinary) > 0 {
+		graph, err = loadPersistedHNSWGraph(db, collection, config, deltas...)
+		if err != nil {
+			return nil, err
+		}
+	} else if collection.EnablePQMode && len(collection.CodeBookBinary) > 0 {
+		codebook, err := hnsw.ImportCodebook(bytes.NewReader(collection.CodeBookBinary))
+		if err != nil {
+			return nil, err
+		}
+		graph.SetPQCodebook(codebook)
+		graph.SetPQQuantizer(pq.NewQuantizer(codebook))
+	}
+	if err := applyGraphDeltas(db, collection, graph, deltas, config.CacheSize); err != nil {
+		return nil, err
+	}
+	if graph.Len() > 0 && collection.Dimension > 0 && graph.Dims() != collection.Dimension {
+		return nil, utils.Errorf("restored graph dimension mismatch: %d != %d", graph.Dims(), collection.Dimension)
+	}
+	return graph, nil
+}
 func emptyHNSWGraph(collection *schema.VectorStoreCollection) *hnsw.Graph[string] {
 	graphOptions := []hnsw.GraphOption[string]{
 		hnsw.WithHNSWParameters[string](collection.M, collection.Ml, collection.EfSearch),
@@ -277,7 +315,7 @@ func emptyHNSWGraph(collection *schema.VectorStoreCollection) *hnsw.Graph[string
 	return NewHNSWGraph(collection.Name, graphOptions...)
 }
 
-func loadPersistedHNSWGraph(db *gorm.DB, collection *schema.VectorStoreCollection, collectionConfig *CollectionConfig) (graph *hnsw.Graph[string], err error) {
+func loadPersistedHNSWGraph(db *gorm.DB, collection *schema.VectorStoreCollection, collectionConfig *CollectionConfig, pending ...[]hnsw.AdjacencyChange[string]) (graph *hnsw.Graph[string], err error) {
 	defer func() {
 		if recovered := recover(); recovered != nil {
 			graph = nil
@@ -285,7 +323,15 @@ func loadPersistedHNSWGraph(db *gorm.DB, collection *schema.VectorStoreCollectio
 		}
 	}()
 
-	graph, err = parseHNSWGraphFromBinary(db, collection, collectionConfig, bytes.NewReader(collection.GraphBinary))
+	deleted := make(map[string]bool)
+	for _, changes := range pending {
+		for _, change := range changes {
+			if change.Layer == 0 {
+				deleted[change.Key] = change.Deleted
+			}
+		}
+	}
+	graph, err = parseHNSWGraphFromBinary(db, collection, collectionConfig, bytes.NewReader(collection.GraphBinary), deleted)
 	if err != nil {
 		return nil, utils.Wrap(err, "decode hnsw graph binary")
 	}
@@ -297,7 +343,7 @@ func loadPersistedHNSWGraph(db *gorm.DB, collection *schema.VectorStoreCollectio
 		graph.SetPQCodebook(codeBook)
 		graph.SetPQQuantizer(pq.NewQuantizer(codeBook))
 	}
-	if graph.Len() > 0 && collection.Dimension > 0 && graph.Dims() != collection.Dimension {
+	if len(pending) == 0 && graph.Len() > 0 && collection.Dimension > 0 && graph.Dims() != collection.Dimension {
 		return nil, utils.Errorf("persisted graph dimension mismatch: %d != %d", graph.Dims(), collection.Dimension)
 	}
 	return graph, nil
@@ -350,6 +396,9 @@ func recoverCorruptedHNSWGraph(db *gorm.DB, collection *schema.VectorStoreCollec
 func resetEmptyCorruptedGraph(db *gorm.DB, collection *schema.VectorStoreCollection, resetPQ bool) error {
 	err := utils.GormTransaction(db, func(tx *gorm.DB) error {
 		updates := map[string]interface{}{"graph_binary": []byte(nil)}
+		if err := clearGraphDeltas(tx, collection.UUID, 0); err != nil {
+			return err
+		}
 		if resetPQ {
 			updates["enable_pq_mode"] = false
 			updates["code_book_binary"] = []byte(nil)
@@ -400,6 +449,10 @@ type GraphWrapper[K cmp.Ordered] struct {
 	saveGraphDelta func(tx *gorm.DB) error
 	// scheduleGraphSnapshot folds committed deltas into the full graph binary later.
 	scheduleGraphSnapshot func()
+	commitMutation        func() error
+	afterMutation         func()
+	syncGraphSnapshot     func() bool
+	graphSnapshotSaved    func()
 }
 
 func NewGraphWrapper[K cmp.Ordered](graph *hnsw.Graph[K], collectionName, collectionUUID string) *GraphWrapper[K] {
@@ -418,6 +471,11 @@ func NewGraphWrapper[K cmp.Ordered](graph *hnsw.Graph[K], collectionName, collec
 func (gw *GraphWrapper[K]) start() {
 	defer func() {
 		gw.operationWG.Wait()
+		if gw.persistLocked != nil {
+			if err := gw.persistLocked(false); err != nil {
+				log.Errorf("persist hnsw graph before close: %v", err)
+			}
+		}
 		close(gw.done)
 	}()
 	for op := range gw.operationChannel.OutputChannel() {
@@ -450,9 +508,6 @@ func (gw *GraphWrapper[K]) submit(op *graphOp) bool {
 // retained forever by the global graph cache.
 func (gw *GraphWrapper[K]) Close() {
 	gw.closeOnce.Do(func() {
-		if err := gw.queuePersist(false); err != nil {
-			log.Errorf("persist hnsw graph binary before close: %v", err)
-		}
 		gw.closed.Store(true)
 		gw.operationChannel.Close()
 		<-gw.done
@@ -463,17 +518,25 @@ func (gw *GraphWrapper[K]) queuePersist(force bool) error {
 	if gw.persistLocked == nil {
 		return nil
 	}
-	done := make(chan error, 1)
+	done := make(chan struct{})
+	var err error
 	if !gw.submit(&graphOp{
 		opType: opTypeWrite,
 		desc:   "PersistGraphBinary",
 		fn: func() {
-			done <- gw.persistLocked(force)
+			defer close(done)
+			defer func() {
+				if recovered := recover(); recovered != nil {
+					err = fmt.Errorf("persist graph: %v", recovered)
+				}
+			}()
+			err = gw.persistLocked(force)
 		},
 	}) {
 		return errors.New("graph wrapper is closed")
 	}
-	return <-done
+	<-done
+	return err
 }
 
 func (gw *GraphWrapper[K]) executeGraphOpInLock(op *graphOp) {
@@ -540,8 +603,13 @@ func (gw *GraphWrapper[K]) Add(nodes ...hnsw.InputNode[K]) time.Duration {
 }
 
 func (gw *GraphWrapper[K]) AddWithError(nodes ...hnsw.InputNode[K]) (time.Duration, error) {
+	return gw.addWithCommit(nodes, gw.commitMutation)
+}
+
+func (gw *GraphWrapper[K]) addWithCommit(nodes []hnsw.InputNode[K], commit func() error) (time.Duration, error) {
 	done := make(chan struct{}, 1)
 	var pureUseTime time.Duration
+	var err error
 	if !gw.submit(&graphOp{
 		opType: opTypeWrite,
 		desc:   "Add",
@@ -549,14 +617,17 @@ func (gw *GraphWrapper[K]) AddWithError(nodes ...hnsw.InputNode[K]) (time.Durati
 		fn: func() {
 			start := time.Now()
 			defer close(done)
-			gw.graph.Add(nodes...)
+			err = gw.graph.AddWithCommit(nodes, commit)
 			pureUseTime = time.Since(start)
+			if err == nil && gw.afterMutation != nil {
+				gw.afterMutation()
+			}
 		},
 	}) {
 		return 0, errors.New("graph wrapper is closed")
 	}
 	<-done
-	return pureUseTime, nil
+	return pureUseTime, err
 }
 
 // Delete keeps the original public API. Internal persistence paths use
@@ -715,6 +786,14 @@ func (gw *GraphWrapper[K]) setOnLayerChange(handler func(Layers []*hnsw.Layer[K]
 }
 
 func updateDatabaseGraphInfoInLock(db *gorm.DB, uuid string, wrapper *GraphWrapper[string]) error {
+	updates, err := graphDatabaseUpdates(wrapper)
+	if err != nil {
+		return err
+	}
+	return writeGraphDatabaseUpdates(db, uuid, updates)
+}
+
+func graphDatabaseUpdates(wrapper *GraphWrapper[string]) (map[string]interface{}, error) {
 	var graphInfosBytes []byte
 	graphInfos, err := wrapper.exportHNSWGraphToBinaryInLock()
 	if err != nil {
@@ -722,31 +801,36 @@ func updateDatabaseGraphInfoInLock(db *gorm.DB, uuid string, wrapper *GraphWrapp
 			// HNSW graph is empty, set graph_binary to empty bytes
 			graphInfosBytes = []byte{}
 		} else {
-			return utils.Wrap(err, "export hnsw graph to binary")
+			return nil, utils.Wrap(err, "export hnsw graph to binary")
 		}
 	} else {
 		graphInfosBytes, err = io.ReadAll(graphInfos)
 		if err != nil {
-			return utils.Wrap(err, "read graph infos")
+			return nil, utils.Wrap(err, "read graph infos")
 		}
 	}
-	err = db.Model(&schema.VectorStoreCollection{}).Where("uuid = ?", uuid).Update("graph_binary", graphInfosBytes).Error
-	if err != nil {
-		return utils.Wrap(err, "update graph binary")
-	}
+	updates := map[string]interface{}{"graph_binary": graphInfosBytes}
 	if wrapper.IsPQEnabled() {
 		codebook, err := hnsw.ExportCodebook(wrapper.GetCodeBook())
 		if err != nil {
-			return utils.Wrap(err, "export codebook")
+			return nil, utils.Wrap(err, "export codebook")
 		}
 		codebookBytes, err := io.ReadAll(codebook)
 		if err != nil {
-			return utils.Wrap(err, "read codebook")
+			return nil, utils.Wrap(err, "read codebook")
 		}
-		err = db.Model(&schema.VectorStoreCollection{}).Where("uuid = ?", uuid).Update("code_book_binary", codebookBytes).Error
-		if err != nil {
-			return utils.Wrap(err, "update codebook")
-		}
+		updates["code_book_binary"] = codebookBytes
+	}
+	return updates, nil
+}
+
+func writeGraphDatabaseUpdates(db *gorm.DB, uuid string, updates map[string]interface{}) error {
+	result := db.Model(&schema.VectorStoreCollection{}).Where("uuid = ?", uuid).Updates(updates)
+	if result.Error != nil {
+		return utils.Wrap(result.Error, "update graph binary and codebook")
+	}
+	if result.RowsAffected != 1 {
+		return utils.Error("vector collection was deleted")
 	}
 	return nil
 }

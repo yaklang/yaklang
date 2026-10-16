@@ -9,6 +9,7 @@ import (
 	"os"
 
 	"github.com/google/uuid"
+	"github.com/yaklang/gorm"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
@@ -633,6 +634,9 @@ func importRAGDataToDB(ragData *RAGBinaryData, optFuncs ...RAGExportOptionFunc) 
 	if ragData.Collection == nil {
 		return utils.Error("collection data is missing")
 	}
+	if err := ensureGraphDeltaTable(db); err != nil {
+		return err
+	}
 
 	// 进度回调辅助函数
 	reportProgress := func(percent float64, message string, messageType string) {
@@ -665,6 +669,10 @@ func importRAGDataToDB(ragData *RAGBinaryData, optFuncs ...RAGExportOptionFunc) 
 		if !opts.OverwriteExisting {
 			return utils.Errorf("collection %s already exists", collectionName)
 		}
+		GraphWrapperManager.RemoveCollectionFromCache(db, existingCollection)
+		// Keep the destination identity, including when importing another
+		// collection's backup over it. Its pending deltas belong to this UUID.
+		collection.ID, collection.UUID = existingCollection.ID, existingCollection.UUID
 
 		// 删除现有数据
 		collectionID = existingCollection.ID
@@ -766,12 +774,18 @@ func importRAGDataToDB(ragData *RAGBinaryData, optFuncs ...RAGExportOptionFunc) 
 
 	// 导入HNSW索引（如果存在）
 	if len(ragData.Collection.GraphBinary) > 0 && !opts.RebuildHNSWIndex {
-		err := db.Model(&schema.VectorStoreCollection{}).Where("id = ?", collectionID).Update("graph_binary", ragData.Collection.GraphBinary).Error
+		err := utils.GormTransaction(db, func(tx *gorm.DB) error {
+			if err := tx.Model(&schema.VectorStoreCollection{}).Where("id = ?", collectionID).Updates(map[string]interface{}{
+				"graph_binary":     ragData.Collection.GraphBinary,
+				"code_book_binary": ragData.Collection.CodeBookBinary,
+				"enable_pq_mode":   ragData.Collection.EnablePQMode,
+			}).Error; err != nil {
+				return err
+			}
+			return clearGraphDeltas(tx, collection.UUID, 0)
+		})
 		if err != nil {
-			// HNSW索引导入失败不应该影响整个导入过程
-			log.Warnf("failed to import HNSW index: %v", err)
-		} else if err := clearGraphDeltas(db, collection.UUID, 0); err != nil {
-			log.Warnf("failed to clear hnsw graph deltas after import: %v", err)
+			return utils.Wrap(err, "import HNSW index and clear deltas")
 		}
 		reportProgress(95, "HNSW索引导入完成", "info")
 	} else {

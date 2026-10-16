@@ -238,6 +238,12 @@ func (n *StandardLayerNode[K]) Isolate(layerNodes map[K]LayerNode[K], m int, dis
 }
 
 func (n *StandardLayerNode[K]) Replenish(m int, distFunc DistanceFunc[K]) {
+	n.ReplenishWithChange(m, distFunc, nil)
+}
+
+// ReplenishWithChange reports each neighborhood before editing it, including
+// reciprocal edges. It is optional so existing LayerNode implementations work.
+func (n *StandardLayerNode[K]) ReplenishWithChange(m int, distFunc DistanceFunc[K], before func(LayerNode[K])) {
 	replenishStart := time.Now()
 	defer func() {
 		duration := time.Since(replenishStart)
@@ -249,6 +255,9 @@ func (n *StandardLayerNode[K]) Replenish(m int, distFunc DistanceFunc[K]) {
 
 	if len(n.neighbors) >= m {
 		return
+	}
+	if before != nil {
+		before(n)
 	}
 
 	// 收集候选节点（避免在迭代过程中修改map）
@@ -347,6 +356,9 @@ func (n *StandardLayerNode[K]) Replenish(m int, distFunc DistanceFunc[K]) {
 		if candidateNeighbors != nil && len(candidateNeighbors) < m {
 			// 只有在不会超过限制时才添加反向连接
 			if _, exists := candidateNeighbors[n.key]; !exists {
+				if before != nil {
+					before(candidate)
+				}
 				// 直接修改候选者的neighbors map，避免递归
 				candidateNeighbors[n.key] = n
 			}
@@ -495,8 +507,15 @@ func (n *PQLayerNode[K]) Isolate(layerNodes map[K]LayerNode[K], m int, distFunc 
 }
 
 func (n *PQLayerNode[K]) Replenish(m int, distFunc DistanceFunc[K]) {
+	n.ReplenishWithChange(m, distFunc, nil)
+}
+
+func (n *PQLayerNode[K]) ReplenishWithChange(m int, distFunc DistanceFunc[K], before func(LayerNode[K])) {
 	if len(n.neighbors) >= m {
 		return
+	}
+	if before != nil {
+		before(n)
 	}
 
 	// 收集候选节点（避免在迭代过程中修改map）
@@ -547,6 +566,9 @@ func (n *PQLayerNode[K]) Replenish(m int, distFunc DistanceFunc[K]) {
 		if candidateNeighbors != nil && len(candidateNeighbors) < m {
 			// 只有在不会超过限制时才添加反向连接
 			if _, exists := candidateNeighbors[n.key]; !exists {
+				if before != nil {
+					before(candidate)
+				}
 				// 直接修改候选者的neighbors map，避免递归
 				candidateNeighbors[n.key] = n
 			}

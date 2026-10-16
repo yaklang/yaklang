@@ -155,6 +155,27 @@ func (n *LazyLayerNode[K]) Isolate(neighbors map[K]LayerNode[K], m int, distFunc
 	node.Isolate(neighbors, m, distFunc)
 }
 
+func (n *LazyLayerNode[K]) ReplenishWithChange(m int, distFunc DistanceFunc[K], before func(LayerNode[K])) {
+	node := n.LoadNode()
+	if node == nil {
+		return
+	}
+	if tracked, ok := node.(interface {
+		ReplenishWithChange(int, DistanceFunc[K], func(LayerNode[K]))
+	}); ok {
+		tracked.ReplenishWithChange(m, distFunc, before)
+		return
+	}
+	// Report all nodes reachable by repair before calling a custom node.
+	before(n)
+	for _, neighbor := range node.GetNeighbors() {
+		for _, candidate := range neighbor.GetNeighbors() {
+			before(candidate)
+		}
+	}
+	node.Replenish(m, distFunc)
+}
+
 func (n *LazyLayerNode[K]) Replenish(m int, distFunc DistanceFunc[K]) {
 	node := n.LoadNode()
 	if node == nil {
