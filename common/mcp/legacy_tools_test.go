@@ -960,6 +960,38 @@ func legacyYakScriptToolCases() map[string][]legacyToolCase {
 				},
 			},
 			{
+				name: "create_plugin_parses_cli_parameters",
+				buildArgs: func(t *testing.T, _ *mcp.MCPServer) map[string]any {
+					return map[string]any{
+						"scriptName": uniqueName("mcp-save-form"),
+						"type":       "mitm",
+						"content": `target = cli.String("target", cli.setDefault("http://example.com"))
+cli.check()
+mirrorNewWebsitePath = func(isHttps, url, req, rsp, body) {}
+`,
+					}
+				},
+				timeout: 30 * time.Second,
+				validate: func(t *testing.T, text string, _ *rawmcp.CallToolResult) {
+					var script map[string]any
+					decodeToolResultJSON(t, text, &script)
+					name, _ := script["ScriptName"].(string)
+					require.NotEmpty(t, name)
+					t.Cleanup(func() {
+						_ = yakit.DeleteYakScriptByName(consts.GetGormProfileDatabase(), name)
+					})
+
+					// 保存的插件必须带上解析出的 CLI 参数，Yakit 才会渲染表单
+					params, ok := script["Params"].([]any)
+					require.Truef(t, ok, "saved plugin should carry params: %s", text)
+					require.NotEmptyf(t, params, "saved plugin should carry parsed cli params: %s", text)
+					param, ok := params[0].(map[string]any)
+					require.Truef(t, ok, "unexpected param shape: %#v", params[0])
+					assert.Equal(t, "target", param["Field"])
+					assert.Equal(t, "http://example.com", param["DefaultValue"])
+				},
+			},
+			{
 				name: "update_existing_plugin",
 				buildArgs: func(t *testing.T, srv *mcp.MCPServer) map[string]any {
 					name := uniqueName("mcp-save-upd")
