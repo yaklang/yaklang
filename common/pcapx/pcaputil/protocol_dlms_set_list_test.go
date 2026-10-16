@@ -15,7 +15,7 @@ func listControls(t *testing.T) []actionCase {
 	raw := finsReadBatch(t, "dlms-set-list", "DLMS_SET_LIST_TEST_ROOT", "controls.json")
 	require.NoError(t, json.Unmarshal(raw, &x))
 	require.Len(t, x.Cases, 43)
-	return setBlockHistoricalUpgrade(t, raw, x.Cases)
+	return gbtSetHistoricalUpgrade(t, raw, setBlockHistoricalUpgrade(t, raw, x.Cases), "dlms-set-list/controls.json")
 }
 func listCloseCheck(t *testing.T, c actionCase, es []*ProtocolEvent, transport, reason string) {
 	t.Helper()
@@ -115,8 +115,11 @@ func TestDLMSSetListNative(t *testing.T) {
 								at = end
 							}
 						}
+						flow := gbtSetHistoricalCarrierCheck(t, c, es, transport, false, false, 0)
 						listCheck(t, c, es, transport, false, d)
-						listCloseCheck(t, c, s.Close("action-test"), transport, "action-test")
+						closed := s.Close("action-test")
+						gbtSetHistoricalCarrierCheck(t, c, closed, transport, false, true, flow)
+						listCloseCheck(t, c, closed, transport, "action-test")
 						require.Empty(t, s.Close("again"))
 						require.Zero(t, s.Stats().BufferedBytes)
 						require.LessOrEqual(t, s.Stats().PeakBufferedBytes, int64(b.MaxBufferedBytes))
@@ -142,7 +145,9 @@ func TestDLMSSetListMatrix(t *testing.T) {
 			discoveryMatrix(t, func(t *testing.T, w int, d, o bool) {
 				es, stats := actionReplay(t, c, raw, w, d, o)
 				require.Len(t, es, len(c.Steps)+len(c.Close.Events))
+				flow := gbtSetHistoricalCarrierCheck(t, c, es[:len(c.Steps)], "udp", true, false, 0)
 				listCheck(t, c, es[:len(c.Steps)], "udp", true, d)
+				gbtSetHistoricalCarrierCheck(t, c, es[len(c.Steps):], "udp", true, true, flow)
 				listCloseCheck(t, c, es[len(c.Steps):], "udp", "")
 				require.EqualValues(t, len(c.Steps), stats.Messages)
 				require.EqualValues(t, len(c.Close.Events), stats.Incomplete)

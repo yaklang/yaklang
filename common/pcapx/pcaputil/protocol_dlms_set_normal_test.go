@@ -15,7 +15,7 @@ func setControls(t *testing.T) []actionCase {
 	raw := finsReadBatch(t, "dlms-set-normal", "DLMS_SET_TEST_ROOT", "controls.json")
 	require.NoError(t, json.Unmarshal(raw, &x))
 	require.Len(t, x.Cases, 33)
-	return setBlockHistoricalUpgrade(t, raw, setSelectiveLegacy(t, raw, x.Cases))
+	return gbtSetHistoricalUpgrade(t, raw, setBlockHistoricalUpgrade(t, raw, setSelectiveLegacy(t, raw, x.Cases)), "dlms-set-normal/controls.json")
 }
 func setCloseCheck(t *testing.T, c actionCase, es []*ProtocolEvent, transport, reason string) {
 	t.Helper()
@@ -112,8 +112,11 @@ func TestDLMSSetNormalNative(t *testing.T) {
 								at = end
 							}
 						}
+						flow := gbtSetHistoricalCarrierCheck(t, c, es, transport, false, false, 0)
 						actionCheck(t, c, es, transport, false, d)
-						setCloseCheck(t, c, s.Close("action-test"), transport, "action-test")
+						closed := s.Close("action-test")
+						gbtSetHistoricalCarrierCheck(t, c, closed, transport, false, true, flow)
+						setCloseCheck(t, c, closed, transport, "action-test")
 						require.Empty(t, s.Close("again"))
 						require.Zero(t, s.Stats().BufferedBytes)
 						require.LessOrEqual(t, s.Stats().PeakBufferedBytes, int64(b.MaxBufferedBytes))
@@ -130,7 +133,9 @@ func TestDLMSSetNormalMatrix(t *testing.T) {
 			discoveryMatrix(t, func(t *testing.T, w int, d, o bool) {
 				es, stats := actionReplay(t, c, raw, w, d, o)
 				require.Len(t, es, len(c.Steps)+len(c.Close.Events))
+				flow := gbtSetHistoricalCarrierCheck(t, c, es[:len(c.Steps)], "udp", true, false, 0)
 				actionCheck(t, c, es[:len(c.Steps)], "udp", true, d)
+				gbtSetHistoricalCarrierCheck(t, c, es[len(c.Steps):], "udp", true, true, flow)
 				setCloseCheck(t, c, es[len(c.Steps):], "udp", "")
 				require.EqualValues(t, len(c.Steps), stats.Messages)
 				require.EqualValues(t, len(c.Close.Events), stats.Incomplete)

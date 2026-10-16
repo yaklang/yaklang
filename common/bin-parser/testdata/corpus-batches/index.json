@@ -113651,6 +113651,48 @@
         "common/pcapx/pcaputil/dlms-wrapper-gbt-set/GBT-history10-cap9-refusal-not-byte-or-node-shadowed.tcp.pcap": "dlms-wrapper-gbt-set/GBT-history10-cap10-complete-empty-ACK-syntax.tcp.pcap",
         "scripts/protocol-tests/required-tests-traffic-unified-v146.json": "required-tests-traffic-unified-v146.json"
       }
+    },
+    {
+      "id": "validation-dlms-wrapper-gbt-set-historical-upgrade",
+      "kind": "support",
+      "source_sha": "20cd9300368a0e9f93db65bb3ef5f63c11ca8fbc",
+      "file": "validation-dlms-wrapper-gbt-set-historical-upgrade.zip",
+      "sha256": "506c58a2125c4e5cf9886b40edf56dbb111b131c3a35f9a1d890ada5829aea3f",
+      "password": "bin-parser",
+      "members": {
+        "dlms-wrapper-gbt-set-historical-tools/SOURCES.json": {
+          "bytes": 1693,
+          "sha256": "2f73cb2805fb47b31c3cffa7671e8b1b5ec06205b69b8c91c8397ff4c635c5ef"
+        },
+        "dlms-wrapper-gbt-set-historical-tools/generate.py": {
+          "bytes": 7303,
+          "sha256": "7efaa6525abb7b234f73bb3f6acd39ffd1c8c460f3ff029d2cb9e1537f8d11a8"
+        },
+        "dlms-wrapper-gbt-set-historical-tools/reference.json": {
+          "bytes": 18165,
+          "sha256": "5158038cd1353fde78376d5d3cd564456e598079823fc8d2ebbcbdcc0416389a"
+        },
+        "dlms-wrapper-gbt-set-historical-tools/verify.py": {
+          "bytes": 3776,
+          "sha256": "6c6ae4ef7afc5c2293c694cd6097f92e4814f04f8e9e5094677425b52f50a853"
+        },
+        "dlms-wrapper-gbt-set-historical/upgrades.json": {
+          "bytes": 91099,
+          "sha256": "af6d04aaf3bb93681554f0b8d333aa58ff8ec7a9ffc722e6cc7c71ca5daef95e"
+        },
+        "required-tests-traffic-unified-v147.json": {
+          "bytes": 25363916,
+          "sha256": "dc7ee616972706b22c6b9af5a7aca046520d1e3ee3c6e0b57cd650e5e7a92e9c"
+        }
+      },
+      "aliases": {
+        "common/pcapx/pcaputil/dlms-wrapper-gbt-set-historical-tools/SOURCES.json": "dlms-wrapper-gbt-set-historical-tools/SOURCES.json",
+        "common/pcapx/pcaputil/dlms-wrapper-gbt-set-historical-tools/generate.py": "dlms-wrapper-gbt-set-historical-tools/generate.py",
+        "common/pcapx/pcaputil/dlms-wrapper-gbt-set-historical-tools/reference.json": "dlms-wrapper-gbt-set-historical-tools/reference.json",
+        "common/pcapx/pcaputil/dlms-wrapper-gbt-set-historical-tools/verify.py": "dlms-wrapper-gbt-set-historical-tools/verify.py",
+        "common/pcapx/pcaputil/dlms-wrapper-gbt-set-historical/upgrades.json": "dlms-wrapper-gbt-set-historical/upgrades.json",
+        "scripts/protocol-tests/required-tests-traffic-unified-v147.json": "required-tests-traffic-unified-v147.json"
+      }
     }
   ],
   "schema_version": 1,
