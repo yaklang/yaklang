@@ -36,6 +36,7 @@ type actionCase struct {
 	Steps  []actionStep
 	Budget struct {
 		Collection int `json:"MaxCollectionElements"`
+		Depth      int `json:"MaxRecursionDepth"`
 	}
 	Close struct{ Events []actionClose }
 }
@@ -337,6 +338,9 @@ func actionReplay(t *testing.T, c actionCase, raw []byte, workers int, deferred,
 	require.NoError(t, err)
 	if c.Budget.Collection > 0 {
 		a.conf.binParser.budget.MaxCollectionElements = c.Budget.Collection
+	}
+	if c.Budget.Depth > 0 {
+		a.conf.binParser.budget.MaxRecursionDepth = c.Budget.Depth
 	}
 	r, err := NewCaptureReader(bytes.NewReader(raw))
 	require.NoError(t, err)

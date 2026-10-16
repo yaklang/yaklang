@@ -106535,6 +106535,223 @@
         "common/pcapx/pcaputil/dlms-action-normal/wrong-direction-preserves-real-request.pcap": "dlms-action-normal/wrong-direction-preserves-real-request.pcap",
         "scripts/protocol-tests/required-tests-traffic-unified-v122.json": "required-tests-traffic-unified-v122.json"
       }
+    },
+    {
+      "id": "validation-dlms-set-normal",
+      "kind": "support",
+      "source_sha": "2906339ab83731e24bdd29dcbdc8c6432c265918",
+      "file": "validation-dlms-set-normal.zip",
+      "sha256": "a2b5d0599ecb4d5f7cc356a7d4071d68a970794e6e4838c36bb33fe125382d9d",
+      "password": "bin-parser",
+      "members": {
+        "dlms-set-normal-tools/SOURCES.json": {
+          "sha256": "12975c34bbf592dc1604d2852072b0fe44183a3525c5d1b131c6fc9f416b0c2b",
+          "bytes": 3025
+        },
+        "dlms-set-normal-tools/generate-captures.py": {
+          "sha256": "c109f0d82e8e7660e211bdf7ab32754f57baf6d9fbddfe6782b1b5542a656b09",
+          "bytes": 1154
+        },
+        "dlms-set-normal-tools/generate-controls.py": {
+          "sha256": "57cf825194701cb6ebf9c7e73ab9b311f60db075773833b4ea585b0b59da2b55",
+          "bytes": 12666
+        },
+        "dlms-set-normal-tools/reference-variants.py": {
+          "sha256": "fe65206aa6098c8b68839122dce2951ef036155616444d086ff41178c9107bc5",
+          "bytes": 1324
+        },
+        "dlms-set-normal-tools/reference.py": {
+          "sha256": "d6e546dcd698aff288fe82f1836b1590cc4c0de08bfc8dee568d86f41fe875c0",
+          "bytes": 2295
+        },
+        "dlms-set-normal-tools/verify.py": {
+          "sha256": "69e9190fdf1c8eb0d8234445b96b4a5f417501c0e153528a82a95d443b3d1a80",
+          "bytes": 3227
+        },
+        "dlms-set-normal/C4-cannot-consume-Set-owner.pcap": {
+          "sha256": "3b193647865a29a22caab4c99ec370a05b9b92e96236a1318d2fc6a1fe8cb75f",
+          "bytes": 250
+        },
+        "dlms-set-normal/C5-cannot-consume-Action-owner.pcap": {
+          "sha256": "d754c2a965593a94335893119fd6a347d5d35cd81aef6d0bb9dee6f17221a53f",
+          "bytes": 249
+        },
+        "dlms-set-normal/C5-cannot-consume-Get-owner.pcap": {
+          "sha256": "6ce308c4dfe73a8f3e581a695d40a466cea77ec5f48a882aa70d68f57410ff39",
+          "bytes": 245
+        },
+        "dlms-set-normal/C7-cannot-consume-Set-owner.pcap": {
+          "sha256": "8afb31c736476c57bedc670067128f9e11ba375f20408b63208296b354cfdfad",
+          "bytes": 249
+        },
+        "dlms-set-normal/Data-node-budget2-rejects-three-nodes.pcap": {
+          "sha256": "42736cb40ced43bf0db463d6ecfced0e40ba9ec9a3b4f17ca9c88e12f4e74c3a",
+          "bytes": 111
+        },
+        "dlms-set-normal/GBT-inner-Set-request-not-implemented.pcap": {
+          "sha256": "125e04f1e0216d969c0f61d79eae3c1912c8d7ba49cb25869ec65d9b38ea616b",
+          "bytes": 115
+        },
+        "dlms-set-normal/GBT-inner-Set-response-not-implemented.pcap": {
+          "sha256": "0bbf326479508d11fc7740debe6ff08464a3941a7cc0b57a17f101ab44a42d66",
+          "bytes": 101
+        },
+        "dlms-set-normal/Get-block-cannot-consume-Set-owner.pcap": {
+          "sha256": "c42e96a59750683ecf6976bb396d2afbcd312d86148de8006deb81d03c32f362",
+          "bytes": 254
+        },
+        "dlms-set-normal/Get-next-cannot-consume-Set-owner.pcap": {
+          "sha256": "4a345214bc5b0e3fca41f7d9df212446633524661a676f6f0b54b98d5a39a983",
+          "bytes": 251
+        },
+        "dlms-set-normal/complete-WPDU-missing-required-Data.pcap": {
+          "sha256": "85adb781445741cdeaa1817adf8ad26907436950d78b9a0d7d1dfef024ffbb81",
+          "bytes": 103
+        },
+        "dlms-set-normal/complete-WPDU-truncated-inner-Data.pcap": {
+          "sha256": "84096963df900e4041d811513781f9c46bc25ae75d19dad5386046e643bd1bcc",
+          "bytes": 107
+        },
+        "dlms-set-normal/completed-Set-ID-reuse.pcap": {
+          "sha256": "fc20c7c88c95e7510df3dbfb7fcbf45695f3662ab2ffb626a5904709b946755b",
+          "bytes": 332
+        },
+        "dlms-set-normal/controls.json": {
+          "sha256": "e1c8eb45d4880a8e86984ee1a4f378eaa7b4566d496da7298694e8ed80cf53b6",
+          "bytes": 369889
+        },
+        "dlms-set-normal/cross-family-request-invoke-reuse.pcap": {
+          "sha256": "d9ac7a2afc21377b5208735d6fce1adf718ee202cc0ae099483f31fc3c8f9001",
+          "bytes": 329
+        },
+        "dlms-set-normal/denied-result3.pcap": {
+          "sha256": "850b9b7a134bc798b9817943e39770568d6a7da1816100a3a28042dea4593e21",
+          "bytes": 178
+        },
+        "dlms-set-normal/different-invokes-interleaved.pcap": {
+          "sha256": "a20a13a47e222b07e9b0101e3a4dc87aeed6392a630e4ab890aac73714a18e68",
+          "bytes": 329
+        },
+        "dlms-set-normal/exact-Set-retry-remains-ambiguous.pcap": {
+          "sha256": "b338db6e8a39b44e867b627c706342a33a8bc147c13f1b2e331fbfe0c0d85c76",
+          "bytes": 262
+        },
+        "dlms-set-normal/mixed-Set-Action-Close-original-event-order.pcap": {
+          "sha256": "506b5f1b569fc21b2ef767126e11009352b3aae0d7e0130ef6d9a6417742d27e",
+          "bytes": 189
+        },
+        "dlms-set-normal/normal-only-rejects-Set-first-block-choice.pcap": {
+          "sha256": "9d59bbf3ada590b3c939cbe4d836797ca83413aab9a3918485ac60b5ed635491",
+          "bytes": 111
+        },
+        "dlms-set-normal/normal-response-result-missing.pcap": {
+          "sha256": "c6399df62a6df0590dada045fda63dff0ec32ffd073d032adfe8aa3446550a62",
+          "bytes": 93
+        },
+        "dlms-set-normal/normal-response-trailing-byte.pcap": {
+          "sha256": "789dd1c978293eebe43ee5ee04a8000c67c751ea57f50eced537dff456247723",
+          "bytes": 95
+        },
+        "dlms-set-normal/official-octet-write-result0.pcap": {
+          "sha256": "1c743d3399cb51f8f7aeb5a4f3874eae0971492114f3034c1d415b0daeef3015",
+          "bytes": 178
+        },
+        "dlms-set-normal/official-structure-write-result0.pcap": {
+          "sha256": "974580082bee12cd8554eff5e4bbdd1dc2b5e44847974b262319adf5d7f57eb5",
+          "bytes": 181
+        },
+        "dlms-set-normal/official-uint8-write-result0.pcap": {
+          "sha256": "5f28d80f49fea6193797d9ad8f854edc9bb88f8c9b8c8a59e351128300757d41",
+          "bytes": 175
+        },
+        "dlms-set-normal/orphan-result.pcap": {
+          "sha256": "5d01fed21b479ff0e6f4909e1e180e2482042f6dbc01ce79797effd1fafd08f4",
+          "bytes": 94
+        },
+        "dlms-set-normal/pending-Set-private-Close.pcap": {
+          "sha256": "4efef92a38df57e542fb977fea0ac407ebb36370df7b4d73a81880eedf638df1",
+          "bytes": 108
+        },
+        "dlms-set-normal/selected-access-not-implemented.pcap": {
+          "sha256": "4b8ae8a37ed057468b1ab0db3f335b040f4eea03182fb6e5eb00934e61b9a7b2",
+          "bytes": 108
+        },
+        "dlms-set-normal/trailing-Data-byte.pcap": {
+          "sha256": "4d70c004355fd2c1cdd5ca47a29baee7f525db55a67b2266c1d04efd9d5507a2",
+          "bytes": 109
+        },
+        "dlms-set-normal/two-pending-Set-Close-sorted.pcap": {
+          "sha256": "e666ae62173bc266e633209d5c748d2d188f599c0a9176105df48407e81e056f",
+          "bytes": 189
+        },
+        "dlms-set-normal/unavailable-result9.pcap": {
+          "sha256": "861791bebd40eb63103050d85a03424c608585ea9ac90a1a93e631890e273e90",
+          "bytes": 178
+        },
+        "dlms-set-normal/wrong-direction-preserves-owner.pcap": {
+          "sha256": "f3c2b7150e4656fbb6f074c057bdcfe7fa15f488c548d83394de8f220422ffcf",
+          "bytes": 248
+        },
+        "dlms-set-normal/wrong-full-flags-Get-block-preserves-Set-owner.pcap": {
+          "sha256": "7a32ea3cd6622a97cfec292d393a737d165a74e81228ceca306e45df3a7cd20b",
+          "bytes": 254
+        },
+        "dlms-set-normal/wrong-full-flags-preserves-owner.pcap": {
+          "sha256": "7d43d90c8a61986941e64119bcbc9d6add9cc2c79643e70fe5875573df3d1c30",
+          "bytes": 248
+        },
+        "required-tests-traffic-unified-v123.json": {
+          "sha256": "e6f2692e24d4e517f9bfb07c9634f9163fe3e1d0434aca405d5bde1c16f1582b",
+          "bytes": 20298094
+        },
+        "validation/expected.json": {
+          "sha256": "618635517b74cb505865b4423259866fd68306bb4672ccaa963dd6cd28ade8c5",
+          "bytes": 40459
+        }
+      },
+      "aliases": {
+        "common/pcapx/pcaputil/dlms-set-normal-tools/SOURCES.json": "dlms-set-normal-tools/SOURCES.json",
+        "common/pcapx/pcaputil/dlms-set-normal-tools/generate-captures.py": "dlms-set-normal-tools/generate-captures.py",
+        "common/pcapx/pcaputil/dlms-set-normal-tools/generate-controls.py": "dlms-set-normal-tools/generate-controls.py",
+        "common/pcapx/pcaputil/dlms-set-normal-tools/reference-variants.py": "dlms-set-normal-tools/reference-variants.py",
+        "common/pcapx/pcaputil/dlms-set-normal-tools/reference.py": "dlms-set-normal-tools/reference.py",
+        "common/pcapx/pcaputil/dlms-set-normal-tools/verify.py": "dlms-set-normal-tools/verify.py",
+        "common/pcapx/pcaputil/dlms-set-normal/C4-cannot-consume-Set-owner.pcap": "dlms-set-normal/C4-cannot-consume-Set-owner.pcap",
+        "common/pcapx/pcaputil/dlms-set-normal/C5-cannot-consume-Action-owner.pcap": "dlms-set-normal/C5-cannot-consume-Action-owner.pcap",
+        "common/pcapx/pcaputil/dlms-set-normal/C5-cannot-consume-Get-owner.pcap": "dlms-set-normal/C5-cannot-consume-Get-owner.pcap",
+        "common/pcapx/pcaputil/dlms-set-normal/C7-cannot-consume-Set-owner.pcap": "dlms-set-normal/C7-cannot-consume-Set-owner.pcap",
+        "common/pcapx/pcaputil/dlms-set-normal/Data-node-budget2-rejects-three-nodes.pcap": "dlms-set-normal/Data-node-budget2-rejects-three-nodes.pcap",
+        "common/pcapx/pcaputil/dlms-set-normal/GBT-inner-Set-request-not-implemented.pcap": "dlms-set-normal/GBT-inner-Set-request-not-implemented.pcap",
+        "common/pcapx/pcaputil/dlms-set-normal/GBT-inner-Set-response-not-implemented.pcap": "dlms-set-normal/GBT-inner-Set-response-not-implemented.pcap",
+        "common/pcapx/pcaputil/dlms-set-normal/Get-block-cannot-consume-Set-owner.pcap": "dlms-set-normal/Get-block-cannot-consume-Set-owner.pcap",
+        "common/pcapx/pcaputil/dlms-set-normal/Get-next-cannot-consume-Set-owner.pcap": "dlms-set-normal/Get-next-cannot-consume-Set-owner.pcap",
+        "common/pcapx/pcaputil/dlms-set-normal/complete-WPDU-missing-required-Data.pcap": "dlms-set-normal/complete-WPDU-missing-required-Data.pcap",
+        "common/pcapx/pcaputil/dlms-set-normal/complete-WPDU-truncated-inner-Data.pcap": "dlms-set-normal/complete-WPDU-truncated-inner-Data.pcap",
+        "common/pcapx/pcaputil/dlms-set-normal/completed-Set-ID-reuse.pcap": "dlms-set-normal/completed-Set-ID-reuse.pcap",
+        "common/pcapx/pcaputil/dlms-set-normal/controls.json": "dlms-set-normal/controls.json",
+        "common/pcapx/pcaputil/dlms-set-normal/cross-family-request-invoke-reuse.pcap": "dlms-set-normal/cross-family-request-invoke-reuse.pcap",
+        "common/pcapx/pcaputil/dlms-set-normal/denied-result3.pcap": "dlms-set-normal/denied-result3.pcap",
+        "common/pcapx/pcaputil/dlms-set-normal/different-invokes-interleaved.pcap": "dlms-set-normal/different-invokes-interleaved.pcap",
+        "common/pcapx/pcaputil/dlms-set-normal/exact-Set-retry-remains-ambiguous.pcap": "dlms-set-normal/exact-Set-retry-remains-ambiguous.pcap",
+        "common/pcapx/pcaputil/dlms-set-normal/mixed-Set-Action-Close-original-event-order.pcap": "dlms-set-normal/mixed-Set-Action-Close-original-event-order.pcap",
+        "common/pcapx/pcaputil/dlms-set-normal/normal-only-rejects-Set-first-block-choice.pcap": "dlms-set-normal/normal-only-rejects-Set-first-block-choice.pcap",
+        "common/pcapx/pcaputil/dlms-set-normal/normal-response-result-missing.pcap": "dlms-set-normal/normal-response-result-missing.pcap",
+        "common/pcapx/pcaputil/dlms-set-normal/normal-response-trailing-byte.pcap": "dlms-set-normal/normal-response-trailing-byte.pcap",
+        "common/pcapx/pcaputil/dlms-set-normal/official-octet-write-result0.pcap": "dlms-set-normal/official-octet-write-result0.pcap",
+        "common/pcapx/pcaputil/dlms-set-normal/official-structure-write-result0.pcap": "dlms-set-normal/official-structure-write-result0.pcap",
+        "common/pcapx/pcaputil/dlms-set-normal/official-uint8-write-result0.pcap": "dlms-set-normal/official-uint8-write-result0.pcap",
+        "common/pcapx/pcaputil/dlms-set-normal/orphan-result.pcap": "dlms-set-normal/orphan-result.pcap",
+        "common/pcapx/pcaputil/dlms-set-normal/pending-Set-private-Close.pcap": "dlms-set-normal/pending-Set-private-Close.pcap",
+        "common/pcapx/pcaputil/dlms-set-normal/selected-access-not-implemented.pcap": "dlms-set-normal/selected-access-not-implemented.pcap",
+        "common/pcapx/pcaputil/dlms-set-normal/trailing-Data-byte.pcap": "dlms-set-normal/trailing-Data-byte.pcap",
+        "common/pcapx/pcaputil/dlms-set-normal/two-pending-Set-Close-sorted.pcap": "dlms-set-normal/two-pending-Set-Close-sorted.pcap",
+        "common/pcapx/pcaputil/dlms-set-normal/unavailable-result9.pcap": "dlms-set-normal/unavailable-result9.pcap",
+        "common/pcapx/pcaputil/dlms-set-normal/wrong-direction-preserves-owner.pcap": "dlms-set-normal/wrong-direction-preserves-owner.pcap",
+        "common/pcapx/pcaputil/dlms-set-normal/wrong-full-flags-Get-block-preserves-Set-owner.pcap": "dlms-set-normal/wrong-full-flags-Get-block-preserves-Set-owner.pcap",
+        "common/pcapx/pcaputil/dlms-set-normal/wrong-full-flags-preserves-owner.pcap": "dlms-set-normal/wrong-full-flags-preserves-owner.pcap",
+        "common/pcapx/pcaputil/dlms-set-normal/Data-recursion-budget2.pcap": "dlms-set-normal/Data-node-budget2-rejects-three-nodes.pcap",
+        "scripts/protocol-tests/required-tests-traffic-unified-v123.json": "required-tests-traffic-unified-v123.json"
+      }
     }
   ],
   "schema_version": 1,

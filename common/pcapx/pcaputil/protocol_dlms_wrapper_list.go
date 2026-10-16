@@ -331,6 +331,9 @@ func wrapperNormalAccess(w []byte) bool {
 	return len(w) > 20 && w[8] == 0xc0 && w[9] == 1 && w[20] == 1
 }
 func wrapperProfile(w []byte) string {
+	if wrapperIsSet(w) {
+		return "dlms-wrapper-v1-set-normal"
+	}
 	if wrapperIsAction(w) {
 		return "dlms-wrapper-v1-action-normal"
 	}
@@ -352,6 +355,9 @@ func wrapperProfile(w []byte) string {
 	return "dlms-wrapper-v1-get-normal"
 }
 func wrapperProbeVersion(w []byte) string {
+	if wrapperIsSet(w) {
+		return "v1-set-normal"
+	}
 	if wrapperIsAction(w) {
 		return "v1-action-normal"
 	}
@@ -385,7 +391,7 @@ func wrapperProjection(w []byte, n int) int64 {
 		}
 		return 32768 + 512*int64(n) + 2048*wrapperDataNodes + extra
 	}
-	if off := wrapperActionDataOffset(w); off >= 0 {
+	if off := wrapperOperationDataOffset(w); off >= 0 {
 		nodes := min(wrapperDataNodes, max(0, n-off))
 		return 32768 + 512*int64(n) + 2048*int64(nodes)
 	}

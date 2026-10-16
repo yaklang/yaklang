@@ -83,6 +83,9 @@ func decodeDLMSWrapperBudget(w []byte, limit, depth int) (*wrapperMessage, error
 	if p[0] == 0xe0 {
 		return decodeWrapperGBT(w, limit)
 	}
+	if p[0] == 0xc1 || p[0] == 0xc5 {
+		return decodeWrapperSet(w, limit, depth)
+	}
 	if p[0] == 0xc3 || p[0] == 0xc7 {
 		return decodeWrapperAction(w, limit, depth)
 	}
@@ -490,7 +493,7 @@ func wrapperUDPRefusalHint(w []byte) bool {
 	if wrapperIsGBT(w) {
 		return wrapperGBTRefusalHint(w)
 	}
-	if wrapperIsAction(w) {
+	if wrapperIsAction(w) || wrapperIsSet(w) {
 		return len(w) >= 11 && int(binary.BigEndian.Uint16(w[6:8])) == len(w)-8 && w[9] == 1 && w[10]&0x30 == 0
 	}
 	return len(w) >= 11 && w[0] == 0 && w[1] == 1 && int(binary.BigEndian.Uint16(w[6:8])) == len(w)-8 &&
@@ -656,7 +659,7 @@ func wrapperIncompletePrefix(w []byte, limit int) bool {
 		return false
 	}
 	n, err := wrapperFrameSize(w, limit)
-	return err == nil && n == 0 && (len(w) <= 8 || w[8] == 0xc0 || w[8] == 0xc4 || w[8] == 0xc3 || w[8] == 0xc7 || w[8] == 0xe0 || w[8] >= 0x60 && w[8] <= 0x64)
+	return err == nil && n == 0 && (len(w) <= 8 || w[8] == 0xc0 || w[8] == 0xc4 || w[8] == 0xc1 || w[8] == 0xc5 || w[8] == 0xc3 || w[8] == 0xc7 || w[8] == 0xe0 || w[8] >= 0x60 && w[8] <= 0x64)
 }
 func (a *binParser) probeWrapperDatagram(w []byte) ProbeResult {
 	n, err := wrapperFrameSize(w, min(a.budget.MaxFrameBytes, a.config.MaxMessageBytes))
@@ -670,6 +673,9 @@ func wrapperIsAction(w []byte) bool {
 	return len(w) > 8 && w[0] == 0 && w[1] == 1 && (w[8] == 0xc3 || w[8] == 0xc7)
 }
 func wrapperRequestCommand(command byte) byte {
+	if command == 0xc5 {
+		return 0xc1
+	}
 	if command == 0xc7 {
 		return 0xc3
 	}
@@ -793,16 +799,89 @@ func decodeWrapperAction(w []byte, limit, depth int) (*wrapperMessage, error) {
 
 // Per-request close diagnostics use deterministic observation order. Credits for
 // every retained key were admitted before insertion; Close does not infer a reply.
-func (s *binDLMSWrapper) pendingActions() []wrapperToken {
+func (s *binDLMSWrapper) pendingOperations() []wrapperToken {
 	keys := make([]wrapperToken, 0)
 	for key, p := range s.seen {
-		if p.pending && p.command == 0xc3 {
+		if p.pending && (p.command == 0xc1 || p.command == 0xc3) {
 			keys = append(keys, key)
 		}
 	}
 	sort.Slice(keys, func(i, j int) bool { return s.seen[keys[i]].id < s.seen[keys[j]].id })
 	return keys
 }
-func wrapperActionCloseFields(k wrapperToken) map[string]any {
-	return map[string]any{"Outstanding": 1, "source_wport": k.source, "destination_wport": k.destination, "invoke_id": k.invoke, "request_command": byte(0xc3)}
+func wrapperOperationCloseFields(k wrapperToken, command byte) map[string]any {
+	return map[string]any{"Outstanding": 1, "source_wport": k.source, "destination_wport": k.destination, "invoke_id": k.invoke, "request_command": command}
+}
+
+func wrapperIsSet(w []byte) bool {
+	return len(w) > 8 && w[0] == 0 && w[1] == 1 && (w[8] == 0xc1 || w[8] == 0xc5)
+}
+func wrapperOperationName(command byte) string {
+	if command == 0xc1 {
+		return "Set"
+	}
+	return "Action"
+}
+func wrapperOperationProfile(command byte) string {
+	if command == 0xc1 {
+		return "dlms-wrapper-v1-set-normal"
+	}
+	return "dlms-wrapper-v1-action-normal"
+}
+func wrapperOperationDataOffset(w []byte) int {
+	if wrapperIsSet(w) && len(w) > 20 && w[8] == 0xc1 && w[9] == 1 && w[20] == 0 {
+		return 21
+	}
+	return wrapperActionDataOffset(w)
+}
+
+// SET-normal observes a complete Data proposal and a literal access result.
+// It cannot establish authorization, object meaning or a successful device write.
+func decodeWrapperSet(w []byte, limit, depth int) (*wrapperMessage, error) {
+	bad := func(why string) (*wrapperMessage, error) { return nil, wrapperError(ErrMalformedMessage, why) }
+	unsupported := func(why string) (*wrapperMessage, error) { return nil, wrapperError(ErrUnsupportedFeature, why) }
+	p := w[8:]
+	if len(p) < 3 {
+		return bad("Set service header truncated")
+	}
+	if p[1] != 1 {
+		return unsupported("Set selected normal choice1 only")
+	}
+	if p[2]&0x30 != 0 {
+		return unsupported("Set reserved invoke flags outside pinned reference")
+	}
+	v, src, dst, n := binary.BigEndian.Uint16(w), binary.BigEndian.Uint16(w[2:]), binary.BigEndian.Uint16(w[4:]), len(p)
+	f := map[string]any{"wrapper_version": v, "source_wport": src, "destination_wport": dst, "payload_length": n, "wrapper_header_hex": hex.EncodeToString(w[:8]), "apdu_hex": hex.EncodeToString(p), "association_observed": false, "authentication_verified": false, "object_model_verified": false, "command": p[0], "service_choice": p[1], "invoke_id_and_priority": p[2], "invoke_id": p[2] & 15, "high_priority": p[2]&128 != 0, "confirmed_service": p[2]&64 != 0, "unused_flag_bits_raw": p[2] & 0x30}
+	f["operation_success_verified"] = false
+	m := &wrapperMessage{fields: f, source: src, destination: dst, command: p[0], invoke: p[2] & 15, flags: p[2], request: p[0] == 0xc1, confirmed: p[2]&64 != 0, choice: 1, count: 1}
+	if m.request {
+		if len(p) < 13 {
+			return bad("Set-normal descriptor truncated")
+		}
+		if int8(p[11]) <= 0 {
+			return unsupported("positive signed8 Set attribute profile")
+		}
+		if p[12] != 0 {
+			return unsupported("Set selective-access descriptor is not implemented")
+		}
+		f["kind"], f["class_id"], f["logical_name_hex"], f["logical_name"], f["attribute_id"], f["selective_access"] = "SetRequestNormal", binary.BigEndian.Uint16(p[3:5]), hex.EncodeToString(p[5:11]), fmt.Sprintf("%d.%d.%d.%d.%d.%d", p[5], p[6], p[7], p[8], p[9], p[10]), int8(p[11]), false
+		c := wrapperListCursor{wire: p, at: 13, maxDepth: depth}
+		data, err := c.data(limit, 0)
+		if err != nil {
+			return nil, err
+		}
+		if c.at != len(p) {
+			return bad("Set Data has trailing bytes")
+		}
+		f["data"] = data
+	} else {
+		if len(p) != 4 {
+			return bad("Set-normal result missing or trailing bytes")
+		}
+		if !wrapperActionResultKnown(p[3]) {
+			return unsupported("Set access result outside pinned enumeration")
+		}
+		f["kind"], f["data_access_result"], f["result_success"] = "SetResponseNormal", p[3], p[3] == 0
+	}
+	return m, nil
 }

@@ -1449,11 +1449,12 @@ func (f *binFlow) finishSession(reason TrafficFlowCloseReason) {
 				n++
 			}
 		}
-		for _, key := range w.pendingActions() {
-			e := f.event(key.dir, nil, "incomplete", string(reason)+": DLMS Wrapper Action ended with an unmatched request")
-			e.Profile = "dlms-wrapper-v1-action-normal"
+		for _, key := range w.pendingOperations() {
+			command := w.seen[key].command
+			e := f.event(key.dir, nil, "incomplete", string(reason)+": DLMS Wrapper "+wrapperOperationName(command)+" ended with an unmatched request")
+			e.Profile = wrapperOperationProfile(command)
 			e.nativeDLMSOrSLMPObservation = true
-			e.Session = wrapperActionCloseFields(key)
+			e.Session = wrapperOperationCloseFields(key, command)
 			e.semanticSession = cloneSession(e.Session)
 			e.sessionError = &ProtocolError{Kind: ErrNeedMore, Message: e.Summary}
 			e.Error = e.sessionError.Error()
