@@ -163,17 +163,21 @@ func hdlcOpTypes(t *testing.T, f map[string]any) {
 			require.Equal(t, false, s["operation_success_verified"])
 			require.Equal(t, false, s["authentication_verified"])
 
-			for _, k := range []string{"list_count", "value_count", "parameter_count"} {
+			for _, k := range []string{"list_count", "value_count", "parameter_count", "assembled_value_count"} {
 				if v, ok := s[k]; ok {
 					require.IsType(t, uint64(0), v)
 				}
 			}
-			for _, key := range []string{"descriptors", "values", "parameters", "results"} {
+			for _, key := range []string{"descriptors", "values", "parameters", "results", "assembled_values"} {
 				if v, ok := s[key]; ok {
 					items, ok := v.([]map[string]any)
 					require.True(t, ok)
 					for _, item := range items {
-						for _, k := range []string{"index", "apdu_offset", "encoded_length"} {
+						if key == "assembled_values" {
+							require.IsType(t, int(0), item["encoded_offset"])
+							require.NotContains(t, item, "apdu_offset")
+						}
+						for _, k := range []string{"index", "apdu_offset", "encoded_offset", "encoded_length"} {
 							if v, ok := item[k]; ok {
 								require.IsType(t, int(0), v)
 							}

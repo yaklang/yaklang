@@ -25,7 +25,7 @@ func decodeDLMSOperationInformation(m *dlmsMessage, p []byte, llc byte, limit, d
 	if len(p) < 3 {
 		return nil, dlmsError(ErrMalformedMessage, "operation service header is truncated")
 	}
-	if p[1] != 1 && !dlmsOperationListAPDU(p) && !dlmsSetBlockAPDU(p) && !dlmsActionUploadAPDU(p) && !dlmsActionDownloadAPDU(p) {
+	if p[1] != 1 && !dlmsOperationListAPDU(p) && !dlmsSetBlockAPDU(p) && !dlmsSetListBlockAPDU(p) && !dlmsActionUploadAPDU(p) && !dlmsActionDownloadAPDU(p) {
 		return nil, dlmsError(ErrUnsupportedFeature, "selected Set/Action normal or bounded list choice only")
 	}
 	if p[2]&0x30 != 0 {
@@ -78,6 +78,10 @@ func decodeDLMSOperationInformation(m *dlmsMessage, p []byte, llc byte, limit, d
 	}
 	if decoded.setBlock {
 		switch fields["kind"] {
+		case "SetRequestWithListAndFirstDataBlock":
+			form = " With List And First Data Block"
+		case "SetResponseLastDataBlockWithList":
+			form = " Last Data Block With List"
 		case "SetRequestWithFirstDataBlock":
 			form = " With First Data Block"
 		case "SetRequestWithDataBlock":
@@ -109,6 +113,9 @@ func decodeDLMSOperationInformation(m *dlmsMessage, p []byte, llc byte, limit, d
 }
 
 func dlmsOperationProjection(p []byte, n int) int64 {
+	if dlmsSetListBlockAPDU(p) {
+		return 32768 + 512*int64(n+wrapperBlockBytes) + 2048*wrapperDataNodes + 8192*wrapperListItems
+	}
 	if dlmsSetBlockAPDU(p) && p[0] == 0xc1 || dlmsActionUploadAPDU(p) && p[0] == 0xc3 || dlmsActionDownloadAPDU(p) && p[0] == 0xc7 {
 		// Reserve the complete bounded graph and joined/retained bytes before
 		// parsing selectors or assembling a final Data value.

@@ -47,6 +47,12 @@ func (f *binFlow) dlmsLinkAssembly(w []byte) bool {
 }
 
 func (f *binFlow) dlmsProjection(w []byte) int64 {
+	if f.dlms.setTransfer != nil && f.dlms.setTransfer.initial.choice == 5 {
+		p := dlmsAPDU(w)
+		if len(p) > 1 && p[0] == 0xc1 && p[1] == 3 {
+			return 32768 + 512*int64(len(w)+wrapperBlockBytes) + 2048*wrapperDataNodes + 8192*wrapperListItems
+		}
+	}
 	if f.dlms.fragments != nil && f.dlms.fragments.acseCommand != 0 || len(w) > 1 && w[1]&8 != 0 && dlmsACSEAPDU(dlmsAPDU(w)) {
 		// ACSE has no list/compact expansion. Its independently bounded BER pool
 		// still includes the assembled copy, literal frames and private projections.

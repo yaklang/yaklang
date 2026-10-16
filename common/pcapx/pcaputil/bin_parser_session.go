@@ -859,6 +859,7 @@ func (f *binFlow) consumeSession(dir int, e *ProtocolEvent, result map[string]an
 			e.ID = f.a.ids.Add(1)
 		}
 		operationSegment := f.dlmsOperationSegmentObservation(e.Raw)
+		setListBlockProfile := f.dlmsSetListBlockContext(e.Raw, dir)
 		e.Profile, e.Completeness = dlmsProfile(e.Raw), "message"
 		e.Session, e.ResponseTo, err = f.consumeDLMS(dir, e.Raw, e.ID)
 		if err == nil {
@@ -870,6 +871,9 @@ func (f *binFlow) consumeSession(dir int, e *ProtocolEvent, result map[string]an
 		}
 		if operationSegment != "" {
 			e.Profile = operationSegment
+		}
+		if setListBlockProfile {
+			e.Profile = "dlms-hdlc-set-list-block"
 		}
 	case "genisys":
 		e.Session, err = f.genisys.consume(dir, e.Raw, f.a.budget.MaxCollectionElements)
@@ -1534,8 +1538,8 @@ func (f *binFlow) finishSession(reason TrafficFlowCloseReason) {
 		} else if d.transfer != nil {
 			emit(d.transfer.initial.dir, map[string]any{"Outstanding": 1, "ObservedBlocks": d.transfer.blocks, "EncodedBytes": len(d.transfer.data)}, "DLMS HDLC exchange ended with an incomplete data-block transfer")
 		} else if d.setTransfer != nil {
-			e := f.event(d.setTransfer.initial.dir, nil, "incomplete", string(reason)+": DLMS HDLC Set-with-data-block ended with an unmatched request")
-			e.Profile = "dlms-hdlc-set-block"
+			e := f.event(d.setTransfer.initial.dir, nil, "incomplete", string(reason)+": DLMS HDLC "+d.setTransfer.closeName()+" ended with an unmatched request")
+			e.Profile = d.setTransfer.profile()
 			e.nativeDLMSOrSLMPObservation = true
 			e.Session = d.setTransfer.closeFields()
 			e.semanticSession = cloneSession(e.Session)

@@ -26,6 +26,10 @@ func (t *dlmsSetTransfer) closeFields() map[string]any {
 }
 func (f *binFlow) consumeDLMSSetBlock(dir int, wire []byte, id uint64, m *dlmsMessage) (map[string]any, uint64, error) {
 	s, b := f.dlms, m.block
+	choice := byte(2)
+	if f.dlmsSetListBlockContext(wire, dir) {
+		choice = 5
+	}
 	ctx := func(why string, retire bool) (map[string]any, uint64, error) {
 		if retire {
 			s.invalidate()
@@ -40,7 +44,7 @@ func (f *binFlow) consumeDLMSSetBlock(dir int, wire []byte, id uint64, m *dlmsMe
 	// handling, which may conservatively retire an actually missing exchange.
 	if !m.request && s.pending != nil {
 		p := s.pending
-		if p.kind != "SET" || p.choice != 2 || p.dir == dir || p.source != m.destination || p.destination != m.source || p.flags != m.flags {
+		if p.kind != "SET" || p.choice != choice || p.dir == dir || p.source != m.destination || p.destination != m.source || p.flags != m.flags {
 			return ctx("SET block response endpoint/service/full flags differ", false)
 		}
 	}
@@ -102,7 +106,7 @@ func (f *binFlow) consumeDLMSSetBlock(dir int, wire []byte, id uint64, m *dlmsMe
 		t.last = b.lastBlock
 		if !b.blockFirst {
 			s.next[dir], s.seqKnown[dir] = (m.ns+1)&7, true
-			s.pending = &dlmsPending{wire: bytes.Clone(wire), kind: "SET", dir: dir, source: m.source, destination: m.destination, id: id, invoke: m.invoke, ns: m.ns, flags: m.flags, choice: 2, count: 1}
+			s.pending = &dlmsPending{wire: bytes.Clone(wire), kind: "SET", dir: dir, source: m.source, destination: m.destination, id: id, invoke: m.invoke, ns: m.ns, flags: m.flags, choice: t.initial.choice, count: t.initial.count}
 			m.fields["Association"] = "observed-block-request"
 		}
 		return m.fields, 0, nil
@@ -111,13 +115,13 @@ func (f *binFlow) consumeDLMSSetBlock(dir int, wire []byte, id uint64, m *dlmsMe
 	if t == nil || p == nil {
 		return ctx("SET block response lacks immediately observed request", t != nil || s.clientKnown && (!s.seqKnown[dir] || m.ns == s.next[dir]))
 	}
-	if p.kind != "SET" || p.choice != 2 || p.dir == dir || p.source != m.destination || p.destination != m.source || p.flags != m.flags {
+	if p.kind != "SET" || p.choice != choice || p.dir == dir || p.source != m.destination || p.destination != m.source || p.flags != m.flags {
 		return ctx("SET block response endpoint/service/full flags differ", false)
 	}
 	if m.nr != (p.ns+1)&7 || s.seqKnown[dir] && m.ns != s.next[dir] {
 		return ctx("SET block response HDLC sequence differs", false)
 	}
-	if b.blockNumber != t.number || b.lastBlock != t.last {
+	if b.blockNumber != t.number || b.lastBlock != t.last || choice == 5 && b.lastBlock && (m.choice != 5 || m.count != t.initial.count) {
 		return ctx("SET block response phase/number differs", true)
 	}
 	s.next[dir], s.seqKnown[dir] = (m.ns+1)&7, true
@@ -130,6 +134,9 @@ func (f *binFlow) consumeDLMSSetBlock(dir int, wire []byte, id uint64, m *dlmsMe
 }
 
 func (f *binFlow) finishDLMSSetBlockData(t *dlmsSetTransfer, b *wrapperMessage, joined []byte, count int) error {
+	if t.initial.choice == 5 {
+		return f.finishDLMSSetListBlockData(t, b, joined, count)
+	}
 	c := wrapperListCursor{wire: joined, nodes: t.parameterNodes, maxDepth: f.a.budget.MaxRecursionDepth}
 	data, err := c.data(f.a.budget.MaxCollectionElements, 0)
 	if err == nil && c.at != len(joined) {

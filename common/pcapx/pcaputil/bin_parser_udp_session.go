@@ -797,8 +797,8 @@ func (a *binParser) closeUDPSessions() {
 				a.incomplete.Add(1)
 			} else if d != nil && d.setTransfer != nil {
 				dir := d.setTransfer.initial.dir
-				summary := "DLMS HDLC Set-with-data-block ended with an unmatched request"
-				incomplete = append(incomplete, &ProtocolEvent{FlowID: f.id, Timestamp: v.touched, Domain: v.key.domain, Transport: "udp", Source: f.endpoints[dir], Destination: f.endpoints[1-dir], Direction: dir, Protocol: "dlms", Profile: "dlms-hdlc-set-block", nativeDLMSOrSLMPObservation: true, Status: "incomplete", Completeness: "incomplete", Summary: summary, Session: d.setTransfer.closeFields(), Error: summary, sessionError: &ProtocolError{Kind: ErrNeedMore, Message: summary}})
+				summary := "DLMS HDLC " + d.setTransfer.closeName() + " ended with an unmatched request"
+				incomplete = append(incomplete, &ProtocolEvent{FlowID: f.id, Timestamp: v.touched, Domain: v.key.domain, Transport: "udp", Source: f.endpoints[dir], Destination: f.endpoints[1-dir], Direction: dir, Protocol: "dlms", Profile: d.setTransfer.profile(), nativeDLMSOrSLMPObservation: true, Status: "incomplete", Completeness: "incomplete", Summary: summary, Session: d.setTransfer.closeFields(), Error: summary, sessionError: &ProtocolError{Kind: ErrNeedMore, Message: summary}})
 				a.incomplete.Add(1)
 			} else if d != nil && d.actionTransfer != nil {
 				dir := d.actionTransfer.initial.dir
