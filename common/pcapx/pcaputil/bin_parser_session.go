@@ -860,6 +860,7 @@ func (f *binFlow) consumeSession(dir int, e *ProtocolEvent, result map[string]an
 		}
 		operationSegment := f.dlmsOperationSegmentObservation(e.Raw)
 		setListRequestSegment := f.dlmsSetListRequestSegmentObservation(e.Raw, dir)
+		setListResponseSegment := f.dlmsSetListResponseSegmentObservation(e.Raw, dir)
 		setListBlockProfile := f.dlmsSetListBlockContext(e.Raw, dir)
 		e.Profile, e.Completeness = dlmsProfile(e.Raw), "message"
 		e.Session, e.ResponseTo, err = f.consumeDLMS(dir, e.Raw, e.ID)
@@ -878,6 +879,9 @@ func (f *binFlow) consumeSession(dir int, e *ProtocolEvent, result map[string]an
 		}
 		if setListRequestSegment {
 			e.Profile = "dlms-hdlc-set-list-block-request-segmented"
+		}
+		if setListResponseSegment {
+			e.Profile = "dlms-hdlc-set-list-block-response-segmented"
 		}
 	case "genisys":
 		e.Session, err = f.genisys.consume(dir, e.Raw, f.a.budget.MaxCollectionElements)

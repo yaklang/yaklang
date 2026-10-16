@@ -25,6 +25,7 @@ type dlmsFragments struct {
 	operation           string
 	operationList       bool
 	setListRequest      bool
+	setListResponse     bool
 }
 
 func (s *binDLMS) fragmentCloseDirection() int {
@@ -240,6 +241,9 @@ func dlmsOperationSegmentResponseChoice(p *dlmsPending) byte {
 	return p.choice
 }
 func (t *dlmsFragments) operationSegmentProfile() string {
+	if t.setListResponse {
+		return "dlms-hdlc-set-list-block-response-segmented"
+	}
 	if t.setListRequest {
 		return "dlms-hdlc-set-list-block-request-segmented"
 	}
@@ -249,6 +253,9 @@ func (t *dlmsFragments) operationSegmentProfile() string {
 	return "dlms-hdlc-ln-operations-segmented"
 }
 func (t *dlmsFragments) serviceName() string {
+	if t.setListResponse {
+		return "Set With List And Data Block"
+	}
 	if t.setListRequest {
 		if t.nextRequest {
 			return "Set With Data Block"
@@ -264,6 +271,9 @@ func (t *dlmsFragments) serviceName() string {
 	return "Get"
 }
 func (t *dlmsFragments) operationCloseSummary() string {
+	if t.setListResponse {
+		return "DLMS HDLC exchange ended with incomplete segmented Set-with-list-and-data-block response"
+	}
 	if t.setListRequest {
 		return "DLMS HDLC exchange ended with incomplete segmented Set-with-list-and-data-block request"
 	}

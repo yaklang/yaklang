@@ -84,17 +84,18 @@ func probeDLMSStream(w []byte, frameLimit, probeLimit int) ProbeResult {
 }
 
 type dlmsMessage struct {
-	fields              map[string]any
-	kind                string
-	request             bool
-	source, destination uint32
-	invoke, ns, nr      byte
-	flags, choice       byte
-	count               int
-	block               *wrapperMessage
-	acse                *wrapperMessage
-	information         []byte
-	segmented           bool
+	fields                  map[string]any
+	kind                    string
+	request                 bool
+	source, destination     uint32
+	invoke, ns, nr          byte
+	flags, choice           byte
+	count                   int
+	block                   *wrapperMessage
+	acse                    *wrapperMessage
+	information             []byte
+	segmented               bool
+	setListResponseAssembly bool
 }
 
 func dlmsAddress(w []byte, at *int) (uint32, int, error) {
@@ -756,6 +757,9 @@ func (f *binFlow) consumeDecodedDLMS(dir int, w []byte, id uint64, m *dlmsMessag
 	if m.kind == "I" && (s.fragments != nil && s.fragments.setListRequest || s.fragments == nil && dlmsSetListRequestSegmentPrefix(m.information) && (m.information[4] == 5 || s.setTransfer != nil && s.setTransfer.initial.choice == 5)) {
 		return f.consumeDLMSSetListRequestSegments(dir, w, id, m)
 	}
+	if m.kind == "I" && (s.fragments != nil && s.fragments.setListResponse || s.fragments == nil && s.pending != nil && s.pending.kind == "SET" && s.pending.choice == 5 && len(m.information) >= 6 && bytes.Equal(m.information[:3], []byte{0xe6, 0xe7, 0})) {
+		return f.consumeDLMSSetListResponseSegments(dir, w, id, m)
+	}
 	if m.kind == "I" && s.fragments == nil && len(m.information) >= 4 && m.information[0] == 0xe6 && (m.information[1] == 0xe6 || m.information[1] == 0xe7) && m.information[2] == 0 && dlmsOperationAPDU(m.information[3:]) && !dlmsSelectedOperationSegmentPrefix(m.information) {
 		// A valid carrier can contain an unsupported foreign service/form.
 		// Its complete reply header is sufficient to exclude the observed
@@ -900,6 +904,7 @@ func (a *binParser) decodeDLMSDatagram(e *ProtocolEvent, w []byte, explicit bool
 	}
 	operationSegment := f.dlmsOperationSegmentObservation(w)
 	setListRequestSegment := f.dlmsSetListRequestSegmentObservation(w, e.Direction)
+	setListResponseSegment := f.dlmsSetListResponseSegmentObservation(w, e.Direction)
 	setListBlockProfile := f.dlmsSetListBlockContext(w, e.Direction)
 	var m *dlmsMessage
 	var err error
@@ -989,6 +994,9 @@ func (a *binParser) decodeDLMSDatagram(e *ProtocolEvent, w []byte, explicit bool
 	}
 	if setListRequestSegment {
 		e.Profile = "dlms-hdlc-set-list-block-request-segmented"
+	}
+	if setListResponseSegment {
+		e.Profile = "dlms-hdlc-set-list-block-response-segmented"
 	}
 	var resource *ProtocolError
 	if oversize || dlmsListAPDU(w) != nil && errors.As(err, &resource) && resource.Kind == ErrResourceExceeded {

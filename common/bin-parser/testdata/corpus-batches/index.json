@@ -112393,6 +112393,270 @@
         "common/pcapx/pcaputil/dlms-hdlc-set-list-request-segments/known-next-joined-information-cap37.tcp.pcap": "dlms-hdlc-set-list-request-segments/known-list-next3-request-information-two-frames.tcp.pcap",
         "scripts/protocol-tests/required-tests-traffic-unified-v141.json": "required-tests-traffic-unified-v141.json"
       }
+    },
+    {
+      "id": "validation-dlms-hdlc-set-list-response-segments",
+      "kind": "support",
+      "source_sha": "ae33090919896f98accff5aa446c2039eb9648b7",
+      "file": "validation-dlms-hdlc-set-list-response-segments.zip",
+      "sha256": "7368e39ba8b86135121f909ddf0b3653b62224120eace13e3ce34e54b1857441",
+      "password": "bin-parser",
+      "members": {
+        "dlms-hdlc-set-list-response-segments-tools/SOURCES.json": {
+          "bytes": 8377,
+          "sha256": "d3c01555901b510a5e61641947d17eb1507d9f84e577eb8bdc26ea8b4de74c1a"
+        },
+        "dlms-hdlc-set-list-response-segments-tools/data-grammar.py": {
+          "bytes": 6723,
+          "sha256": "bbb796a8ecdb94f8de4dd77668b006e9eb5c3a16ce4b2e7da2b0c8a722ba5a07"
+        },
+        "dlms-hdlc-set-list-response-segments-tools/generate-baseline.py": {
+          "bytes": 4003,
+          "sha256": "24ef88bc9bde140dfec7fd8c33567370de2986319509e5c0d02c959dea31927c"
+        },
+        "dlms-hdlc-set-list-response-segments-tools/generate-captures.py": {
+          "bytes": 1879,
+          "sha256": "b5233698670ff965d7adb9cf31639fcf025fad40bcdd47013b03161b03364a54"
+        },
+        "dlms-hdlc-set-list-response-segments-tools/generate-controls.py": {
+          "bytes": 13499,
+          "sha256": "1d17ff76d59922c25fc6e003493cd0f4cf0ddc9640b081965f1c68c2c12c3e88"
+        },
+        "dlms-hdlc-set-list-response-segments-tools/hdlc-model.py": {
+          "bytes": 4504,
+          "sha256": "ded37b7f68c794a1e414a9158c6d2afede5f9e923616df8ab1cb63dd0826ca8e"
+        },
+        "dlms-hdlc-set-list-response-segments-tools/reference-vectors.json": {
+          "bytes": 2809,
+          "sha256": "e49b76853764f384f7546c014d3990bcd7df67dda0ef0fb29cd49b3f4704685a"
+        },
+        "dlms-hdlc-set-list-response-segments-tools/reference.py": {
+          "bytes": 3243,
+          "sha256": "8260425890e471b74f2c2e4d8223ca66be741ea419096425bd55894153a23f65"
+        },
+        "dlms-hdlc-set-list-response-segments-tools/verify-captures.py": {
+          "bytes": 3482,
+          "sha256": "ae44fb066fc0734bbc012934741802f91ee0b74935b7ed5f99d7de48aa6c2525"
+        },
+        "dlms-hdlc-set-list-response-segments-tools/verify-reference.py": {
+          "bytes": 1608,
+          "sha256": "4a49b2a821ccdea8d0213f111242f982b4b527ce3c82c24b0530de26b8fe98ab"
+        },
+        "dlms-hdlc-set-list-response-segments-tools/verify.py": {
+          "bytes": 7061,
+          "sha256": "c65213844e4f8f214ab4a56bc1a813a67a1f82ce023e5aa7e4348ff78018657d"
+        },
+        "dlms-hdlc-set-list-response-segments/ACK-partial-exact-retry-does-not-append.tcp.pcap": {
+          "bytes": 987,
+          "sha256": "f91ed6e587367aa71c82e2ed85e4db2da942bcf33a4e4247d0468415d73f7b1c"
+        },
+        "dlms-hdlc-set-list-response-segments/ACK-partial-exact-retry-does-not-append.udp.pcap": {
+          "bytes": 681,
+          "sha256": "9fb67d557286a05ee808ebe734389cda4c116bc0b8afc3a1eda9009dbcd6f9e2"
+        },
+        "dlms-hdlc-set-list-response-segments/ACK-partial-private-Close-retains-request-direction.tcp.pcap": {
+          "bytes": 626,
+          "sha256": "7e20e4cdc6c761dc338c0f43630e8420a3174c222284094d2f92c5ce685d9567"
+        },
+        "dlms-hdlc-set-list-response-segments/ACK-partial-private-Close-retains-request-direction.udp.pcap": {
+          "bytes": 368,
+          "sha256": "d22ca856d08201a7b4aac12c2383be514e1c9a14b752930248360ca06c231c1e"
+        },
+        "dlms-hdlc-set-list-response-segments/assembled-ACK-wrong-block-number99-retires.tcp.pcap": {
+          "bytes": 899,
+          "sha256": "fe9df14a4200246ce676b7a9bc7600ed7363b60c32b5bcc3384109a06faca183"
+        },
+        "dlms-hdlc-set-list-response-segments/assembled-ACK-wrong-block-number99-retires.udp.pcap": {
+          "bytes": 605,
+          "sha256": "28042ff5351d71b855e85bc69435e2782b3deda1b0b511f1e25699e84dea613c"
+        },
+        "dlms-hdlc-set-list-response-segments/assembled-ACK-wrong-phase-terminal-before-last-retires.tcp.pcap": {
+          "bytes": 902,
+          "sha256": "92910611759ceab21fa04b712b35a030c7758fcea64db53ae271e1c9fe52214e"
+        },
+        "dlms-hdlc-set-list-response-segments/assembled-ACK-wrong-phase-terminal-before-last-retires.udp.pcap": {
+          "bytes": 608,
+          "sha256": "e474f76315ec3e327a6c6a59683ca7172ad93ca884ace671fec66d16cc91e61c"
+        },
+        "dlms-hdlc-set-list-response-segments/assembled-terminal-result-vector-truncated-Malformed-no-owner.tcp.pcap": {
+          "bytes": 993,
+          "sha256": "5720fff84f60233aafa1554d459770794023fb0827039c2e1fb34b30fe68f4e8"
+        },
+        "dlms-hdlc-set-list-response-segments/assembled-terminal-result-vector-truncated-Malformed-no-owner.udp.pcap": {
+          "bytes": 687,
+          "sha256": "19abbb96f0ee791a3026c47dfcc5c29b01f46973b7fa58698070a4884baccc14"
+        },
+        "dlms-hdlc-set-list-response-segments/assembled-terminal-valid-count-conflict-retires.tcp.pcap": {
+          "bytes": 992,
+          "sha256": "7643c9910c3c4c8974ee1035696545cb7b176f3a617c15d11d946269320ed71e"
+        },
+        "dlms-hdlc-set-list-response-segments/assembled-terminal-valid-count-conflict-retires.udp.pcap": {
+          "bytes": 686,
+          "sha256": "c10c7a355364b165b69d178bcf39f577d9b25e61d9aaa452e994817dff20a4f5"
+        },
+        "dlms-hdlc-set-list-response-segments/builtin-response-information-frame-count-64.tcp.pcap": {
+          "bytes": 6544,
+          "sha256": "4f3c7f2bef7b704f7565e4ded04041a806bbd243580ad46fcf1395b7c6143ae0"
+        },
+        "dlms-hdlc-set-list-response-segments/builtin-response-information-frame-count-64.udp.pcap": {
+          "bytes": 5530,
+          "sha256": "1da8aab7cdffa95c4d997091b7f5d74500af612effb60da04956ab3100a202b6"
+        },
+        "dlms-hdlc-set-list-response-segments/builtin-response-information-frame-count-65.tcp.pcap": {
+          "bytes": 6781,
+          "sha256": "d859dbdf267c47b15e5db65149a6cb69fbc9634277e76ebf9f798f8c41fac434"
+        },
+        "dlms-hdlc-set-list-response-segments/builtin-response-information-frame-count-65.udp.pcap": {
+          "bytes": 5743,
+          "sha256": "164673ffd07a1941c80001a0c342a71ee852e996acf15c7dabe4b788e4c7c1c9"
+        },
+        "dlms-hdlc-set-list-response-segments/controls.json": {
+          "bytes": 2476862,
+          "sha256": "750c518991502495586ec41eb974a45280473596e3ca68415c2ea92b4755bacd"
+        },
+        "dlms-hdlc-set-list-response-segments/foreign-initial-flags-direction-address-NR-NS-preserve.tcp.pcap": {
+          "bytes": 1591,
+          "sha256": "31ce9f521a3e2b7b726bc9d0c6fcba3cb1aa8ed51cc6badc8811c03d00ee6c95"
+        },
+        "dlms-hdlc-set-list-response-segments/foreign-initial-flags-direction-address-NR-NS-preserve.udp.pcap": {
+          "bytes": 1201,
+          "sha256": "3b7f0be9ab89fbd15264140cdfb4de6c536f26876f2499f91f57aac5557ef60e"
+        },
+        "dlms-hdlc-set-list-response-segments/foreign-single-terminal-normal-GET-responses-preserve-list-owner.tcp.pcap": {
+          "bytes": 1169,
+          "sha256": "d93dc45d1abf94371aacbd5c8911429d2ef3cce12520facfec844a707a2cb166"
+        },
+        "dlms-hdlc-set-list-response-segments/foreign-single-terminal-normal-GET-responses-preserve-list-owner.udp.pcap": {
+          "bytes": 839,
+          "sha256": "ff4183b8069924ae0bc435a12aeb2b7dc6f71c9b53a906a7e98de7b4148f6629"
+        },
+        "dlms-hdlc-set-list-response-segments/known-list-owner-foreign-segmented-GET-prefix-preserve.tcp.pcap": {
+          "bytes": 905,
+          "sha256": "77cbbd9364502993450fa41c6574388e4c6f78c7f74de6a4a66276568cf45439"
+        },
+        "dlms-hdlc-set-list-response-segments/known-list-owner-foreign-segmented-GET-prefix-preserve.udp.pcap": {
+          "bytes": 611,
+          "sha256": "87fd208dc3556aae1f69231e1dde47f3fd54af4a3e15cacf8000136a57ff564f"
+        },
+        "dlms-hdlc-set-list-response-segments/matching-response-continuation-NS-gap-retires.tcp.pcap": {
+          "bytes": 899,
+          "sha256": "fc620f699d0bcbcda1660ac98e2326c7aef1beaa4b3ba286b5bc5c8d4a30152c"
+        },
+        "dlms-hdlc-set-list-response-segments/matching-response-continuation-NS-gap-retires.udp.pcap": {
+          "bytes": 605,
+          "sha256": "7d59a937280fb6cbc2f42973c41c9bacdc07e5f1512765e04a0afa4e7e219721"
+        },
+        "dlms-hdlc-set-list-response-segments/request-and-response-information-segmented-continuous-chain.tcp.pcap": {
+          "bytes": 1166,
+          "sha256": "455be4334732a591407923745537b092c9f77922b6a36f2157763f2ac531b721"
+        },
+        "dlms-hdlc-set-list-response-segments/request-and-response-information-segmented-continuous-chain.udp.pcap": {
+          "bytes": 836,
+          "sha256": "2e99f102cef8e8bde53783c4aff048b7c64b191b0b2b959f1b9df05a99cdddc1"
+        },
+        "dlms-hdlc-set-list-response-segments/reuse-inputs.json": {
+          "bytes": 267,
+          "sha256": "122c5bc4a6fd6a9151748789ac458ef65d0a976ecf5974590777f74bc83a2680"
+        },
+        "dlms-hdlc-set-list-response-segments/segmented-ACK2-before-normal-next-and-terminal4.tcp.pcap": {
+          "bytes": 899,
+          "sha256": "ba13a88e2b3ccd0b299a22b8dd1c1245663b04528cae34fc1b15e0c3a8e5e19f"
+        },
+        "dlms-hdlc-set-list-response-segments/segmented-ACK2-before-normal-next-and-terminal4.udp.pcap": {
+          "bytes": 605,
+          "sha256": "255435518b72e71c158d4ed65f984704830cc6bd8986f49908f734696286c1ed"
+        },
+        "dlms-hdlc-set-list-response-segments/segmented-terminal-list4-after-normal-first-ACK-next.tcp.pcap": {
+          "bytes": 899,
+          "sha256": "657989d550e7a459118569ba246d462cc1931e41f92fb8f09afea6e18281fa4f"
+        },
+        "dlms-hdlc-set-list-response-segments/segmented-terminal-list4-after-normal-first-ACK-next.udp.pcap": {
+          "bytes": 605,
+          "sha256": "584f6ce465e1ffb26b50108b19ae8fec71a06be9a9d3d9dac05007641cf1958b"
+        },
+        "dlms-hdlc-set-list-response-segments/terminal-partial-exact-retry-does-not-append.tcp.pcap": {
+          "bytes": 987,
+          "sha256": "93883962a7cd61aaa9ae7a6bb8f8b5d402fbd4526a6ded5ff87d008d04981036"
+        },
+        "dlms-hdlc-set-list-response-segments/terminal-partial-exact-retry-does-not-append.udp.pcap": {
+          "bytes": 681,
+          "sha256": "7be7fec3b4cab81801b36e70b64b253a4a2f2112e68d862bec9cef248a82e51f"
+        },
+        "dlms-hdlc-set-list-response-segments/terminal-partial-private-Close-releases-response-and-proposal.tcp.pcap": {
+          "bytes": 812,
+          "sha256": "dc6a8da928e437c736193a0b9a1d4b226dd3e24090eb946550e112f230575842"
+        },
+        "dlms-hdlc-set-list-response-segments/terminal-partial-private-Close-releases-response-and-proposal.udp.pcap": {
+          "bytes": 530,
+          "sha256": "997e6e8a5e64072d27ffee1a498aea5760fa14e13186e43b05dace487f69db02"
+        },
+        "required-tests-traffic-unified-v142.json": {
+          "bytes": 24744990,
+          "sha256": "70f2e73a3d949e3eb1fc810c86d11639a2b6278793d08814f78bc0163dfd7955"
+        },
+        "validation/expected.json": {
+          "bytes": 55991,
+          "sha256": "03f8364ace69c8de66e117ffb7b242ffd7bd741999ee6e6c0b38211aa2191b41"
+        }
+      },
+      "aliases": {
+        "common/pcapx/pcaputil/dlms-hdlc-set-list-response-segments-tools/SOURCES.json": "dlms-hdlc-set-list-response-segments-tools/SOURCES.json",
+        "common/pcapx/pcaputil/dlms-hdlc-set-list-response-segments-tools/data-grammar.py": "dlms-hdlc-set-list-response-segments-tools/data-grammar.py",
+        "common/pcapx/pcaputil/dlms-hdlc-set-list-response-segments-tools/generate-baseline.py": "dlms-hdlc-set-list-response-segments-tools/generate-baseline.py",
+        "common/pcapx/pcaputil/dlms-hdlc-set-list-response-segments-tools/generate-captures.py": "dlms-hdlc-set-list-response-segments-tools/generate-captures.py",
+        "common/pcapx/pcaputil/dlms-hdlc-set-list-response-segments-tools/generate-controls.py": "dlms-hdlc-set-list-response-segments-tools/generate-controls.py",
+        "common/pcapx/pcaputil/dlms-hdlc-set-list-response-segments-tools/hdlc-model.py": "dlms-hdlc-set-list-response-segments-tools/hdlc-model.py",
+        "common/pcapx/pcaputil/dlms-hdlc-set-list-response-segments-tools/reference-vectors.json": "dlms-hdlc-set-list-response-segments-tools/reference-vectors.json",
+        "common/pcapx/pcaputil/dlms-hdlc-set-list-response-segments-tools/reference.py": "dlms-hdlc-set-list-response-segments-tools/reference.py",
+        "common/pcapx/pcaputil/dlms-hdlc-set-list-response-segments-tools/verify-captures.py": "dlms-hdlc-set-list-response-segments-tools/verify-captures.py",
+        "common/pcapx/pcaputil/dlms-hdlc-set-list-response-segments-tools/verify-reference.py": "dlms-hdlc-set-list-response-segments-tools/verify-reference.py",
+        "common/pcapx/pcaputil/dlms-hdlc-set-list-response-segments-tools/verify.py": "dlms-hdlc-set-list-response-segments-tools/verify.py",
+        "common/pcapx/pcaputil/dlms-hdlc-set-list-response-segments/ACK-partial-exact-retry-does-not-append.tcp.pcap": "dlms-hdlc-set-list-response-segments/ACK-partial-exact-retry-does-not-append.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-set-list-response-segments/ACK-partial-exact-retry-does-not-append.udp.pcap": "dlms-hdlc-set-list-response-segments/ACK-partial-exact-retry-does-not-append.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-set-list-response-segments/ACK-partial-private-Close-retains-request-direction.tcp.pcap": "dlms-hdlc-set-list-response-segments/ACK-partial-private-Close-retains-request-direction.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-set-list-response-segments/ACK-partial-private-Close-retains-request-direction.udp.pcap": "dlms-hdlc-set-list-response-segments/ACK-partial-private-Close-retains-request-direction.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-set-list-response-segments/assembled-ACK-wrong-block-number99-retires.tcp.pcap": "dlms-hdlc-set-list-response-segments/assembled-ACK-wrong-block-number99-retires.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-set-list-response-segments/assembled-ACK-wrong-block-number99-retires.udp.pcap": "dlms-hdlc-set-list-response-segments/assembled-ACK-wrong-block-number99-retires.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-set-list-response-segments/assembled-ACK-wrong-phase-terminal-before-last-retires.tcp.pcap": "dlms-hdlc-set-list-response-segments/assembled-ACK-wrong-phase-terminal-before-last-retires.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-set-list-response-segments/assembled-ACK-wrong-phase-terminal-before-last-retires.udp.pcap": "dlms-hdlc-set-list-response-segments/assembled-ACK-wrong-phase-terminal-before-last-retires.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-set-list-response-segments/assembled-terminal-result-vector-truncated-Malformed-no-owner.tcp.pcap": "dlms-hdlc-set-list-response-segments/assembled-terminal-result-vector-truncated-Malformed-no-owner.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-set-list-response-segments/assembled-terminal-result-vector-truncated-Malformed-no-owner.udp.pcap": "dlms-hdlc-set-list-response-segments/assembled-terminal-result-vector-truncated-Malformed-no-owner.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-set-list-response-segments/assembled-terminal-valid-count-conflict-retires.tcp.pcap": "dlms-hdlc-set-list-response-segments/assembled-terminal-valid-count-conflict-retires.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-set-list-response-segments/assembled-terminal-valid-count-conflict-retires.udp.pcap": "dlms-hdlc-set-list-response-segments/assembled-terminal-valid-count-conflict-retires.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-set-list-response-segments/builtin-response-information-frame-count-64.tcp.pcap": "dlms-hdlc-set-list-response-segments/builtin-response-information-frame-count-64.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-set-list-response-segments/builtin-response-information-frame-count-64.udp.pcap": "dlms-hdlc-set-list-response-segments/builtin-response-information-frame-count-64.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-set-list-response-segments/builtin-response-information-frame-count-65.tcp.pcap": "dlms-hdlc-set-list-response-segments/builtin-response-information-frame-count-65.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-set-list-response-segments/builtin-response-information-frame-count-65.udp.pcap": "dlms-hdlc-set-list-response-segments/builtin-response-information-frame-count-65.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-set-list-response-segments/controls.json": "dlms-hdlc-set-list-response-segments/controls.json",
+        "common/pcapx/pcaputil/dlms-hdlc-set-list-response-segments/foreign-initial-flags-direction-address-NR-NS-preserve.tcp.pcap": "dlms-hdlc-set-list-response-segments/foreign-initial-flags-direction-address-NR-NS-preserve.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-set-list-response-segments/foreign-initial-flags-direction-address-NR-NS-preserve.udp.pcap": "dlms-hdlc-set-list-response-segments/foreign-initial-flags-direction-address-NR-NS-preserve.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-set-list-response-segments/foreign-single-terminal-normal-GET-responses-preserve-list-owner.tcp.pcap": "dlms-hdlc-set-list-response-segments/foreign-single-terminal-normal-GET-responses-preserve-list-owner.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-set-list-response-segments/foreign-single-terminal-normal-GET-responses-preserve-list-owner.udp.pcap": "dlms-hdlc-set-list-response-segments/foreign-single-terminal-normal-GET-responses-preserve-list-owner.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-set-list-response-segments/known-list-owner-foreign-segmented-GET-prefix-preserve.tcp.pcap": "dlms-hdlc-set-list-response-segments/known-list-owner-foreign-segmented-GET-prefix-preserve.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-set-list-response-segments/known-list-owner-foreign-segmented-GET-prefix-preserve.udp.pcap": "dlms-hdlc-set-list-response-segments/known-list-owner-foreign-segmented-GET-prefix-preserve.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-set-list-response-segments/matching-response-continuation-NS-gap-retires.tcp.pcap": "dlms-hdlc-set-list-response-segments/matching-response-continuation-NS-gap-retires.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-set-list-response-segments/matching-response-continuation-NS-gap-retires.udp.pcap": "dlms-hdlc-set-list-response-segments/matching-response-continuation-NS-gap-retires.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-set-list-response-segments/request-and-response-information-segmented-continuous-chain.tcp.pcap": "dlms-hdlc-set-list-response-segments/request-and-response-information-segmented-continuous-chain.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-set-list-response-segments/request-and-response-information-segmented-continuous-chain.udp.pcap": "dlms-hdlc-set-list-response-segments/request-and-response-information-segmented-continuous-chain.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-set-list-response-segments/reuse-inputs.json": "dlms-hdlc-set-list-response-segments/reuse-inputs.json",
+        "common/pcapx/pcaputil/dlms-hdlc-set-list-response-segments/segmented-ACK2-before-normal-next-and-terminal4.tcp.pcap": "dlms-hdlc-set-list-response-segments/segmented-ACK2-before-normal-next-and-terminal4.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-set-list-response-segments/segmented-ACK2-before-normal-next-and-terminal4.udp.pcap": "dlms-hdlc-set-list-response-segments/segmented-ACK2-before-normal-next-and-terminal4.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-set-list-response-segments/segmented-terminal-list4-after-normal-first-ACK-next.tcp.pcap": "dlms-hdlc-set-list-response-segments/segmented-terminal-list4-after-normal-first-ACK-next.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-set-list-response-segments/segmented-terminal-list4-after-normal-first-ACK-next.udp.pcap": "dlms-hdlc-set-list-response-segments/segmented-terminal-list4-after-normal-first-ACK-next.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-set-list-response-segments/terminal-partial-exact-retry-does-not-append.tcp.pcap": "dlms-hdlc-set-list-response-segments/terminal-partial-exact-retry-does-not-append.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-set-list-response-segments/terminal-partial-exact-retry-does-not-append.udp.pcap": "dlms-hdlc-set-list-response-segments/terminal-partial-exact-retry-does-not-append.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-set-list-response-segments/terminal-partial-private-Close-releases-response-and-proposal.tcp.pcap": "dlms-hdlc-set-list-response-segments/terminal-partial-private-Close-releases-response-and-proposal.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-set-list-response-segments/terminal-partial-private-Close-releases-response-and-proposal.udp.pcap": "dlms-hdlc-set-list-response-segments/terminal-partial-private-Close-releases-response-and-proposal.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-set-list-response-segments/ACK-information-cap10.udp.pcap": "dlms-hdlc-set-list-response-segments/segmented-ACK2-before-normal-next-and-terminal4.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-set-list-response-segments/ACK-information-cap10.tcp.pcap": "dlms-hdlc-set-list-response-segments/segmented-ACK2-before-normal-next-and-terminal4.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-set-list-response-segments/ACK-information-cap9.udp.pcap": "dlms-hdlc-set-list-response-segments/segmented-ACK2-before-normal-next-and-terminal4.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-set-list-response-segments/ACK-information-cap9.tcp.pcap": "dlms-hdlc-set-list-response-segments/segmented-ACK2-before-normal-next-and-terminal4.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-set-list-response-segments/terminal-information-cap13.udp.pcap": "dlms-hdlc-set-list-response-segments/segmented-terminal-list4-after-normal-first-ACK-next.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-set-list-response-segments/terminal-information-cap13.tcp.pcap": "dlms-hdlc-set-list-response-segments/segmented-terminal-list4-after-normal-first-ACK-next.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-set-list-response-segments/terminal-information-cap12.udp.pcap": "dlms-hdlc-set-list-response-segments/segmented-terminal-list4-after-normal-first-ACK-next.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-set-list-response-segments/terminal-information-cap12.tcp.pcap": "dlms-hdlc-set-list-response-segments/segmented-terminal-list4-after-normal-first-ACK-next.tcp.pcap",
+        "scripts/protocol-tests/required-tests-traffic-unified-v142.json": "required-tests-traffic-unified-v142.json"
+      }
     }
   ],
   "schema_version": 1,
