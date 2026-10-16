@@ -181,3 +181,11 @@ func BenchmarkPristineProfileCheck(b *testing.B) {
 		}
 	}
 }
+
+func TestBuiltinCorePluginHashesDoNotMaskUserSettings(t *testing.T) {
+	db := testDB(t)
+	require.NoError(t, db.Create(&schema.GeneralStorage{Key: strconv.Quote("core-plugin-item-hashes"), Value: strconv.Quote(`{"builtin-plugin":"hash"}`)}).Error)
+	require.NoError(t, Check(db, nil))
+	require.NoError(t, db.Create(&schema.GeneralStorage{Key: "user-setting", Value: "private-test-sentinel"}).Error)
+	require.Error(t, Check(db, nil), "builtin metadata must not permit unrelated user configuration")
+}

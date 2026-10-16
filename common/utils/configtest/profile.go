@@ -123,7 +123,7 @@ func Check(db *gorm.DB, builtinNetwork any, fixtureRoots ...string) error {
 			}
 		case "_YAKLANG_ENGINE_VERSION", "GLOBAL_NETWORK_CONFIG_INIT", "__migrate_database__",
 			"cd336beba498c97738c275f6771efca3", "2b709ef7252a06a0c1cfbb952f77f976", "6ef3c850244a2b26ed0b163d1fda9600",
-			"core-plugin-ai-fields-version", "yakit.ai_session_meta.migrated.v1",
+			"core-plugin-ai-fields-version", "core-plugin-item-hashes", "yakit.ai_session_meta.migrated.v1",
 			"__yaklang_internal_payload_file_flag_repair_v1__", "yak_mcp_builtin_tier_defaults_v1":
 			// Internal bootstrap versions/hashes, not user settings.
 		default:
