@@ -111298,6 +111298,263 @@
         "common/pcapx/pcaputil/dlms-hdlc-operation-segments/segmented-SET-structure-depth5-refusal.tcp.pcap": "dlms-hdlc-operation-segments/segmented-SET-structure-depth6.tcp.pcap",
         "scripts/protocol-tests/required-tests-traffic-unified-v136.json": "required-tests-traffic-unified-v136.json"
       }
+    },
+    {
+      "id": "validation-dlms-hdlc-list-segments",
+      "kind": "support",
+      "source_sha": "d9d6aa0c907c345ebdae5f2874b3291cb8054d6d",
+      "file": "validation-dlms-hdlc-list-segments.zip",
+      "sha256": "f01b4846fbddc04131413da813e08fd754bb42c8b20bfa6e110260aeff9d989d",
+      "password": "bin-parser",
+      "members": {
+        "dlms-hdlc-list-segments-tools/FIELD-CONTRACT.json": {
+          "bytes": 3073,
+          "sha256": "c8279d7ca089d0f9455d4565ec85981da12091bd7496db8fd77e5c2a44c8c276"
+        },
+        "dlms-hdlc-list-segments-tools/SOURCES.json": {
+          "bytes": 3078,
+          "sha256": "5fd4a04a7d25adbc72287c677b6b6a4a371703ad66c2bcc7587ee9753b7ec456"
+        },
+        "dlms-hdlc-list-segments-tools/generate-captures.py": {
+          "bytes": 1866,
+          "sha256": "81b19348eb091219674db40416fd0ea9519d497000c8b040230cb7dafc3d144f"
+        },
+        "dlms-hdlc-list-segments-tools/generate-historical-upgrade.py": {
+          "bytes": 5862,
+          "sha256": "1958f76060c0811ec22a0bc40cc8eff60bf6dfddf7970075e9b3d4c3c8c1a456"
+        },
+        "dlms-hdlc-list-segments-tools/generate.py": {
+          "bytes": 7791,
+          "sha256": "8bf03d290bc891cdc622cbedbb692094fe5d983c08a0bc674ccd4622011f770b"
+        },
+        "dlms-hdlc-list-segments-tools/link-model.py": {
+          "bytes": 13828,
+          "sha256": "90e34a5028d40cb2772dfa7eaf5b94167fe351670c1e72aeab5246c596fef175"
+        },
+        "dlms-hdlc-list-segments-tools/list-data-model.py": {
+          "bytes": 11251,
+          "sha256": "058757186d3b128ec9253cd4bcd200c3d9f0bf4a4c8e0c46cde18802e452a8aa"
+        },
+        "dlms-hdlc-list-segments-tools/normal-data-model.py": {
+          "bytes": 1624,
+          "sha256": "03dbaaa0f3c564db04440c0fbee8742e407f825de889b7a6e0012a49e6a06f4e"
+        },
+        "dlms-hdlc-list-segments-tools/reference-vectors.json": {
+          "bytes": 4412,
+          "sha256": "fdb3cae88519817fb52555d13ab6cdcec16eb9bfe43ce93df983e403a30260c3"
+        },
+        "dlms-hdlc-list-segments-tools/reference.py": {
+          "bytes": 4961,
+          "sha256": "f243c0a3397930c9fc64fa1dd04be68583b473e9ff1ea038a42436ff8f3bd246"
+        },
+        "dlms-hdlc-list-segments-tools/verify-captures.py": {
+          "bytes": 3473,
+          "sha256": "55354090b00f6be677543f3ffb2476b57cc9c0656a57c9fe2859bcdb1d317aa5"
+        },
+        "dlms-hdlc-list-segments-tools/verify-historical-upgrade.py": {
+          "bytes": 2522,
+          "sha256": "793b7a1c6de76ecbaaccf365ea40369a1096e7a67b8544a5a048b493e854624d"
+        },
+        "dlms-hdlc-list-segments-tools/verify.py": {
+          "bytes": 4023,
+          "sha256": "38f5b0624e3e2cc089f27e0258c96d4085cf4249ca2f40d36d1ee99e8fae61c8"
+        },
+        "dlms-hdlc-list-segments/SET-list-prefix-and-complete-final-request-exact-retry.tcp.pcap": {
+          "bytes": 1096,
+          "sha256": "5afa6e06a6d8eb2ee9e5af37d950cc32f66e3cf385d2ebcdbb7af64b4d4c654a"
+        },
+        "dlms-hdlc-list-segments/SET-list-prefix-and-complete-final-request-exact-retry.udp.pcap": {
+          "bytes": 778,
+          "sha256": "dc273181c2e6d92694014660a6dcc43a3788923198499146eb902f764735ab4c"
+        },
+        "dlms-hdlc-list-segments/assembled-SET-list-trailing-Data-byte-retires.tcp.pcap": {
+          "bytes": 790,
+          "sha256": "a592a5a4dc2fc2e6bc08727180a99abeaa0e7854ae7f7cd73d55bc74b646ef24"
+        },
+        "dlms-hdlc-list-segments/assembled-SET-list-trailing-Data-byte-retires.udp.pcap": {
+          "bytes": 508,
+          "sha256": "b12de26ee6e77b93deacabedb56686201447fa8559338358e154f8f524516fc3"
+        },
+        "dlms-hdlc-list-segments/assembled-list-result-count-mismatch-retains-pending-Close.tcp.pcap": {
+          "bytes": 596,
+          "sha256": "d8db522c5128a69b60f364a03589bfe0cd8df7e7b9fcbd911d905df7a0d9db2e"
+        },
+        "dlms-hdlc-list-segments/assembled-list-result-count-mismatch-retains-pending-Close.udp.pcap": {
+          "bytes": 338,
+          "sha256": "cd0cf99d3ebd0acbeef2f50fcb40cdc7ec018e3d426da62065b89d2b9e773252"
+        },
+        "dlms-hdlc-list-segments/controls.json": {
+          "bytes": 654823,
+          "sha256": "212d6159bc12ff6d83a171d12591ecc700b49ee192a97cf7ee65606b706942af"
+        },
+        "dlms-hdlc-list-segments/historical-upgrade.json": {
+          "bytes": 20676,
+          "sha256": "0d3e8139844dcbe6127f9e8ec720294a6ae1a6a8fda7c0632d991919b5269b3f"
+        },
+        "dlms-hdlc-list-segments/known-Action-list-owner-foreign-normal-form-preserves.tcp.pcap": {
+          "bytes": 752,
+          "sha256": "f3643b786181a3389611e60ba9093d08dd9818e73282c8c36fb7c205b4302080"
+        },
+        "dlms-hdlc-list-segments/known-Action-list-owner-foreign-normal-form-preserves.udp.pcap": {
+          "bytes": 482,
+          "sha256": "2376cbc034a75a0a3c7fc913b24448dbf519923b933ccd5c0d2ccde066f4ff4d"
+        },
+        "dlms-hdlc-list-segments/known-GET-owner-foreign-Action-list-first-response-preserves.tcp.pcap": {
+          "bytes": 531,
+          "sha256": "1b01ba9a30624330db1ddaf72155f0323980371ebc8a11b0e4857fbe31efeb03"
+        },
+        "dlms-hdlc-list-segments/known-GET-owner-foreign-Action-list-first-response-preserves.udp.pcap": {
+          "bytes": 285,
+          "sha256": "8058cdbab2ab63b84a9557957873c70c1d19f57c0648c04f14e933664077e49b"
+        },
+        "dlms-hdlc-list-segments/known-SET-list-foreign-link-flags-preserve-prefix.tcp.pcap": {
+          "bytes": 1219,
+          "sha256": "aa6e24c8fdeea445adf6550b6806d08c7aa391a592e74fc8bb6fece448f968ab"
+        },
+        "dlms-hdlc-list-segments/known-SET-list-foreign-link-flags-preserve-prefix.udp.pcap": {
+          "bytes": 877,
+          "sha256": "e298066ccd926bdc7ba31d5588a870d28a63309bdd830a6e2ea6340776d36d6d"
+        },
+        "dlms-hdlc-list-segments/known-normal-Action-owner-foreign-list-form-preserves.tcp.pcap": {
+          "bytes": 532,
+          "sha256": "711ee3fad16a5afd81c056ba7c8827cd9c0e5c3fc7381e51b3afd35e85ac25ae"
+        },
+        "dlms-hdlc-list-segments/known-normal-Action-owner-foreign-list-form-preserves.udp.pcap": {
+          "bytes": 286,
+          "sha256": "9fd18a248e417cf2eec2734d1db5be327b57ab15f0ea890d803d133e960b75fe"
+        },
+        "dlms-hdlc-list-segments/list-structured-Data-output-depth6.tcp.pcap": {
+          "bytes": 793,
+          "sha256": "76e86ab4aa7800e658a2b2b560a2f2793c1f5c8d4542e247a6225089f9a044ae"
+        },
+        "dlms-hdlc-list-segments/list-structured-Data-output-depth6.udp.pcap": {
+          "bytes": 511,
+          "sha256": "aaaa07800f18df904e907a1eb14acabb9d276d552e3ad2f0351543bcd73e88d8"
+        },
+        "dlms-hdlc-list-segments/matching-list-request-continuation-NS-gap-retires.tcp.pcap": {
+          "bytes": 547,
+          "sha256": "193a53ddc9b2047ea7488b5dc4fcba01fd06be8a6d99e063c21dcfae488e7d1f"
+        },
+        "dlms-hdlc-list-segments/matching-list-request-continuation-NS-gap-retires.udp.pcap": {
+          "bytes": 301,
+          "sha256": "b36e9567ef69c57bcf25c7af69f3822c21a033686d46e9495562bfd30c709d31"
+        },
+        "dlms-hdlc-list-segments/official-writeList-three-request-segments.tcp.pcap": {
+          "bytes": 789,
+          "sha256": "4d3614777bf915a36c704619ffdf6cfe4324a40e2117ca96831b7ce799c53ef0"
+        },
+        "dlms-hdlc-list-segments/official-writeList-three-request-segments.udp.pcap": {
+          "bytes": 507,
+          "sha256": "d6bfc187c0bd0998e1d3bd0df35dad8b6b81497cf3e9cf0d1a798af877417f7c"
+        },
+        "dlms-hdlc-list-segments/partial-Action-list-response-private-Close.tcp.pcap": {
+          "bytes": 486,
+          "sha256": "c529e001a4e5341557e088e0f0eb4faa0ff6aff0583cc967ed86c85550c189f4"
+        },
+        "dlms-hdlc-list-segments/partial-Action-list-response-private-Close.udp.pcap": {
+          "bytes": 252,
+          "sha256": "eef6d84c1087b96bd55861524c78e4ee369f56d28f203487e97cfe996aadb82a"
+        },
+        "dlms-hdlc-list-segments/partial-SET-list-request-private-Close.tcp.pcap": {
+          "bytes": 423,
+          "sha256": "950550c32624e4cbfd6b1fc4e0995ae5d113d970087db835b732692ad11d4128"
+        },
+        "dlms-hdlc-list-segments/partial-SET-list-request-private-Close.udp.pcap": {
+          "bytes": 189,
+          "sha256": "88b4fbf754257e9a36b8795e689480b8011954017df6c9bdf7f61e696af7702d"
+        },
+        "dlms-hdlc-list-segments/primary-Action-list-generic-two-request-segments.tcp.pcap": {
+          "bytes": 628,
+          "sha256": "3e9b3c2977d29a340e6b41df63145614dd9e5bd5e13feca90e57683335329f04"
+        },
+        "dlms-hdlc-list-segments/primary-Action-list-generic-two-request-segments.udp.pcap": {
+          "bytes": 370,
+          "sha256": "af12ddbb6286210a78051be7a8488bef963c77e34faa248de9b5181af3eff555"
+        },
+        "dlms-hdlc-list-segments/primary-Action-list-generic-two-response-segments.tcp.pcap": {
+          "bytes": 665,
+          "sha256": "214cad7a07e53215cb2aa4508d2eb9799f52d9f950f924c0d20ed1c05260a192"
+        },
+        "dlms-hdlc-list-segments/primary-Action-list-generic-two-response-segments.udp.pcap": {
+          "bytes": 407,
+          "sha256": "7691dd3ee64340674a755a3d3a058c3ee4824e27c67fcd8daa5ad41f3ee43e2d"
+        },
+        "dlms-hdlc-list-segments/primary-SET-list-synthetic-two-response-segments.tcp.pcap": {
+          "bytes": 597,
+          "sha256": "f793229d4fdea92aa05942df6a3bcc762684e0d3a416ce86f29e7ef8a187d1ee"
+        },
+        "dlms-hdlc-list-segments/primary-SET-list-synthetic-two-response-segments.udp.pcap": {
+          "bytes": 339,
+          "sha256": "c3a6aefa4719655de5c550cce79a9abc7772d46db724d3dd5600e5f829ac5267"
+        },
+        "dlms-hdlc-list-segments/reuse-inputs.json": {
+          "bytes": 279,
+          "sha256": "2945868fcd39f5c405e9f816e2d7de3553d93deafc9888bcbb3ab29f493ddcd6"
+        },
+        "required-tests-traffic-unified-v137.json": {
+          "bytes": 23901647,
+          "sha256": "7f35a707aae7ff9bdfe32faa8a64f92614b4dfbc2b4d0807587b29c7e8c34d10"
+        },
+        "validation/expected.json": {
+          "bytes": 45594,
+          "sha256": "36f82b95f9ed67da9002fee1656694f9dce92e7d21b480af8d5414dafdb1ecf7"
+        }
+      },
+      "aliases": {
+        "common/pcapx/pcaputil/dlms-hdlc-list-segments-tools/FIELD-CONTRACT.json": "dlms-hdlc-list-segments-tools/FIELD-CONTRACT.json",
+        "common/pcapx/pcaputil/dlms-hdlc-list-segments-tools/SOURCES.json": "dlms-hdlc-list-segments-tools/SOURCES.json",
+        "common/pcapx/pcaputil/dlms-hdlc-list-segments-tools/generate-captures.py": "dlms-hdlc-list-segments-tools/generate-captures.py",
+        "common/pcapx/pcaputil/dlms-hdlc-list-segments-tools/generate-historical-upgrade.py": "dlms-hdlc-list-segments-tools/generate-historical-upgrade.py",
+        "common/pcapx/pcaputil/dlms-hdlc-list-segments-tools/generate.py": "dlms-hdlc-list-segments-tools/generate.py",
+        "common/pcapx/pcaputil/dlms-hdlc-list-segments-tools/link-model.py": "dlms-hdlc-list-segments-tools/link-model.py",
+        "common/pcapx/pcaputil/dlms-hdlc-list-segments-tools/list-data-model.py": "dlms-hdlc-list-segments-tools/list-data-model.py",
+        "common/pcapx/pcaputil/dlms-hdlc-list-segments-tools/normal-data-model.py": "dlms-hdlc-list-segments-tools/normal-data-model.py",
+        "common/pcapx/pcaputil/dlms-hdlc-list-segments-tools/reference-vectors.json": "dlms-hdlc-list-segments-tools/reference-vectors.json",
+        "common/pcapx/pcaputil/dlms-hdlc-list-segments-tools/reference.py": "dlms-hdlc-list-segments-tools/reference.py",
+        "common/pcapx/pcaputil/dlms-hdlc-list-segments-tools/verify-captures.py": "dlms-hdlc-list-segments-tools/verify-captures.py",
+        "common/pcapx/pcaputil/dlms-hdlc-list-segments-tools/verify-historical-upgrade.py": "dlms-hdlc-list-segments-tools/verify-historical-upgrade.py",
+        "common/pcapx/pcaputil/dlms-hdlc-list-segments-tools/verify.py": "dlms-hdlc-list-segments-tools/verify.py",
+        "common/pcapx/pcaputil/dlms-hdlc-list-segments/SET-list-prefix-and-complete-final-request-exact-retry.tcp.pcap": "dlms-hdlc-list-segments/SET-list-prefix-and-complete-final-request-exact-retry.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-list-segments/SET-list-prefix-and-complete-final-request-exact-retry.udp.pcap": "dlms-hdlc-list-segments/SET-list-prefix-and-complete-final-request-exact-retry.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-list-segments/assembled-SET-list-trailing-Data-byte-retires.tcp.pcap": "dlms-hdlc-list-segments/assembled-SET-list-trailing-Data-byte-retires.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-list-segments/assembled-SET-list-trailing-Data-byte-retires.udp.pcap": "dlms-hdlc-list-segments/assembled-SET-list-trailing-Data-byte-retires.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-list-segments/assembled-list-result-count-mismatch-retains-pending-Close.tcp.pcap": "dlms-hdlc-list-segments/assembled-list-result-count-mismatch-retains-pending-Close.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-list-segments/assembled-list-result-count-mismatch-retains-pending-Close.udp.pcap": "dlms-hdlc-list-segments/assembled-list-result-count-mismatch-retains-pending-Close.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-list-segments/controls.json": "dlms-hdlc-list-segments/controls.json",
+        "common/pcapx/pcaputil/dlms-hdlc-list-segments/historical-upgrade.json": "dlms-hdlc-list-segments/historical-upgrade.json",
+        "common/pcapx/pcaputil/dlms-hdlc-list-segments/known-Action-list-owner-foreign-normal-form-preserves.tcp.pcap": "dlms-hdlc-list-segments/known-Action-list-owner-foreign-normal-form-preserves.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-list-segments/known-Action-list-owner-foreign-normal-form-preserves.udp.pcap": "dlms-hdlc-list-segments/known-Action-list-owner-foreign-normal-form-preserves.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-list-segments/known-GET-owner-foreign-Action-list-first-response-preserves.tcp.pcap": "dlms-hdlc-list-segments/known-GET-owner-foreign-Action-list-first-response-preserves.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-list-segments/known-GET-owner-foreign-Action-list-first-response-preserves.udp.pcap": "dlms-hdlc-list-segments/known-GET-owner-foreign-Action-list-first-response-preserves.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-list-segments/known-SET-list-foreign-link-flags-preserve-prefix.tcp.pcap": "dlms-hdlc-list-segments/known-SET-list-foreign-link-flags-preserve-prefix.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-list-segments/known-SET-list-foreign-link-flags-preserve-prefix.udp.pcap": "dlms-hdlc-list-segments/known-SET-list-foreign-link-flags-preserve-prefix.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-list-segments/known-normal-Action-owner-foreign-list-form-preserves.tcp.pcap": "dlms-hdlc-list-segments/known-normal-Action-owner-foreign-list-form-preserves.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-list-segments/known-normal-Action-owner-foreign-list-form-preserves.udp.pcap": "dlms-hdlc-list-segments/known-normal-Action-owner-foreign-list-form-preserves.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-list-segments/list-structured-Data-output-depth6.tcp.pcap": "dlms-hdlc-list-segments/list-structured-Data-output-depth6.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-list-segments/list-structured-Data-output-depth6.udp.pcap": "dlms-hdlc-list-segments/list-structured-Data-output-depth6.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-list-segments/matching-list-request-continuation-NS-gap-retires.tcp.pcap": "dlms-hdlc-list-segments/matching-list-request-continuation-NS-gap-retires.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-list-segments/matching-list-request-continuation-NS-gap-retires.udp.pcap": "dlms-hdlc-list-segments/matching-list-request-continuation-NS-gap-retires.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-list-segments/official-writeList-three-request-segments.tcp.pcap": "dlms-hdlc-list-segments/official-writeList-three-request-segments.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-list-segments/official-writeList-three-request-segments.udp.pcap": "dlms-hdlc-list-segments/official-writeList-three-request-segments.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-list-segments/partial-Action-list-response-private-Close.tcp.pcap": "dlms-hdlc-list-segments/partial-Action-list-response-private-Close.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-list-segments/partial-Action-list-response-private-Close.udp.pcap": "dlms-hdlc-list-segments/partial-Action-list-response-private-Close.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-list-segments/partial-SET-list-request-private-Close.tcp.pcap": "dlms-hdlc-list-segments/partial-SET-list-request-private-Close.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-list-segments/partial-SET-list-request-private-Close.udp.pcap": "dlms-hdlc-list-segments/partial-SET-list-request-private-Close.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-list-segments/primary-Action-list-generic-two-request-segments.tcp.pcap": "dlms-hdlc-list-segments/primary-Action-list-generic-two-request-segments.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-list-segments/primary-Action-list-generic-two-request-segments.udp.pcap": "dlms-hdlc-list-segments/primary-Action-list-generic-two-request-segments.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-list-segments/primary-Action-list-generic-two-response-segments.tcp.pcap": "dlms-hdlc-list-segments/primary-Action-list-generic-two-response-segments.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-list-segments/primary-Action-list-generic-two-response-segments.udp.pcap": "dlms-hdlc-list-segments/primary-Action-list-generic-two-response-segments.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-list-segments/primary-SET-list-synthetic-two-response-segments.tcp.pcap": "dlms-hdlc-list-segments/primary-SET-list-synthetic-two-response-segments.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-list-segments/primary-SET-list-synthetic-two-response-segments.udp.pcap": "dlms-hdlc-list-segments/primary-SET-list-synthetic-two-response-segments.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-list-segments/reuse-inputs.json": "dlms-hdlc-list-segments/reuse-inputs.json",
+        "common/pcapx/pcaputil/dlms-hdlc-list-segments/list-information64-cap64.udp.pcap": "dlms-hdlc-list-segments/official-writeList-three-request-segments.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-list-segments/list-information64-cap64.tcp.pcap": "dlms-hdlc-list-segments/official-writeList-three-request-segments.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-list-segments/list-information64-cap63-refusal.udp.pcap": "dlms-hdlc-list-segments/official-writeList-three-request-segments.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-list-segments/list-information64-cap63-refusal.tcp.pcap": "dlms-hdlc-list-segments/official-writeList-three-request-segments.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-list-segments/list-structured-Data-output-depth5-refusal.udp.pcap": "dlms-hdlc-list-segments/list-structured-Data-output-depth6.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-list-segments/list-structured-Data-output-depth5-refusal.tcp.pcap": "dlms-hdlc-list-segments/list-structured-Data-output-depth6.tcp.pcap",
+        "scripts/protocol-tests/required-tests-traffic-unified-v137.json": "required-tests-traffic-unified-v137.json"
+      }
     }
   ],
   "schema_version": 1,

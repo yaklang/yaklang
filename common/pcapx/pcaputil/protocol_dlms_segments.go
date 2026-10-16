@@ -3,6 +3,7 @@ package pcaputil
 import (
 	"bytes"
 	"encoding/hex"
+	"errors"
 )
 
 // One selected normal/list or observed-transfer next request, or GET response
@@ -22,6 +23,7 @@ type dlmsFragments struct {
 	invoke, sequenceSet byte
 	acseCommand         byte
 	operation           string
+	operationList       bool
 }
 
 func (s *binDLMS) fragmentCloseDirection() int {
@@ -94,7 +96,7 @@ func (f *binFlow) consumeDLMSSegments(dir int, wire []byte, id uint64, m *dlmsMe
 	if t != nil && t.request || t == nil && m.segmented && m.request {
 		return f.consumeDLMSRequestSegments(dir, wire, id, m)
 	}
-	if p == nil || p.kind != "GET" && !(dlmsOperationKind(p.kind) && p.choice == 1) || dir == p.dir || m.source != p.destination || m.destination != p.source {
+	if p == nil || p.kind != "GET" && !(dlmsOperationKind(p.kind) && (p.choice == 1 || dlmsOperationListPending(p))) || dir == p.dir || m.source != p.destination || m.destination != p.source {
 		interrupt := p != nil && dir == p.dir && m.source == p.source && m.destination == p.destination
 		// A new peer I-frame after completion can belong to a missed request.
 		// Just rejecting this first fragment would let its replay bind to a
@@ -115,32 +117,32 @@ func (f *binFlow) consumeDLMSSegments(dir int, wire []byte, id uint64, m *dlmsMe
 			if p.kind == "ACTION" {
 				expected = 0xc7
 			}
-			if info[3] != expected || info[4] != 1 {
+			if info[3] != expected || info[4] != dlmsOperationSegmentResponseChoice(p) {
 				return ctx("segmented operation reply service/form differs from pending request", false)
 			}
 		}
-		if dlmsNormalOperationSegmentPrefix(info) {
+		if dlmsSelectedOperationSegmentPrefix(info) {
 			expected := byte(0xc5)
 			if p.kind == "ACTION" {
 				expected = 0xc7
 			}
-			if !dlmsOperationKind(p.kind) || info[1] != 0xe7 || info[3] != expected || p.choice != 1 {
+			if !dlmsOperationKind(p.kind) || info[1] != 0xe7 || info[3] != expected || info[4] != dlmsOperationSegmentResponseChoice(p) {
 				return ctx("segmented operation response differs from known pending service/form", false)
 			}
 		}
-		if !m.segmented || len(info) < 6 || !bytes.Equal(info[:3], []byte{0xe6, 0xe7, 0}) || info[3] != 0xc4 && !(operation != "" && dlmsNormalOperationSegmentPrefix(info)) {
+		if !m.segmented || len(info) < 6 || !bytes.Equal(info[:3], []byte{0xe6, 0xe7, 0}) || info[3] != 0xc4 && !(operation != "" && dlmsSelectedOperationSegmentPrefix(info)) {
 			s.invalidate()
 			return nil, 0, dlmsError(ErrUnsupportedFeature, "first response segment needs complete LLC and LN GET header")
 		}
 		choice, flags := info[4], info[5]
-		if choice != 1 && (operation != "" || choice != 2 && choice != 3) || flags&0x30 != 0 {
+		if operation == "" && choice != 1 && choice != 2 && choice != 3 || flags&0x30 != 0 {
 			s.invalidate()
 			return nil, 0, dlmsError(ErrMalformedMessage, "segmented GET choice/invoke flags invalid")
 		}
-		if flags != p.flags || choice != p.choice && (operation != "" || choice != 2) || m.nr != (p.ns+1)&7 || s.seqKnown[dir] && m.ns != s.next[dir] {
+		if flags != p.flags || operation == "" && choice != p.choice && choice != 2 || operation != "" && choice != dlmsOperationSegmentResponseChoice(p) || m.nr != (p.ns+1)&7 || s.seqKnown[dir] && m.ns != s.next[dir] {
 			return ctx("first response segment service/flags/sequence differ from observed request", false)
 		}
-		t = &dlmsFragments{operation: operation, dir: dir, source: m.source, destination: m.destination, first: m.ns, nr: m.nr}
+		t = &dlmsFragments{operation: operation, operationList: dlmsOperationListPending(p), dir: dir, source: m.source, destination: m.destination, first: m.ns, nr: m.nr}
 	} else {
 		if dir != t.dir || m.source != t.source || m.destination != t.destination || m.nr != t.nr {
 			return ctx("continuation direction/address/acknowledgement differ", false)
@@ -189,7 +191,14 @@ func (f *binFlow) consumeDLMSSegments(dir int, wire []byte, id uint64, m *dlmsMe
 	s.fragments = nil
 	fields, reply, err := f.consumeDecodedDLMS(dir, wire, id, decoded)
 	if err != nil {
-		s.invalidate()
+		// An assembled list response can have a valid body but a count that does
+		// not match the observed request. Drop only its fragment group, just as
+		// the complete unsegmented list policy preserves the pending owner. Never
+		// commit the refused server sequence or claim a later device progression.
+		var pe *ProtocolError
+		if !(t.operationList && s.pending == p && !s.ambiguous && errors.As(err, &pe) && pe.Kind == ErrContextRequired) {
+			s.invalidate()
+		}
 		return nil, 0, err
 	}
 	s.next[dir], s.seqKnown[dir] = (last+1)&7, true
@@ -198,16 +207,42 @@ func (f *binFlow) consumeDLMSSegments(dir int, wire []byte, id uint64, m *dlmsMe
 	return fields, reply, nil
 }
 
-// Only the complete normal service header selects this link-assembly MVP.
-// Pblocks, lists, ciphered APDUs and a bare command never establish it.
+// A complete normal service header selects the normal operation profile.
 func dlmsNormalOperationSegmentPrefix(info []byte) bool {
 	if len(info) < 6 || info[0] != 0xe6 || info[2] != 0 || info[4] != 1 {
 		return false
 	}
 	return info[1] == 0xe6 && (info[3] == 0xc1 || info[3] == 0xc3) || info[1] == 0xe7 && (info[3] == 0xc5 || info[3] == 0xc7)
 }
+func dlmsSelectedOperationSegmentPrefix(info []byte) bool {
+	if dlmsNormalOperationSegmentPrefix(info) {
+		return true
+	}
+	if len(info) < 6 || info[0] != 0xe6 || info[2] != 0 || !dlmsOperationListAPDU(info[3:]) {
+		return false
+	}
+	return info[1] == 0xe6 && (info[3] == 0xc1 || info[3] == 0xc3) || info[1] == 0xe7 && (info[3] == 0xc5 || info[3] == 0xc7)
+}
+func dlmsOperationListPending(p *dlmsPending) bool {
+	return p != nil && (p.kind == "SET" && p.choice == 4 || p.kind == "ACTION" && p.choice == 3)
+}
+func dlmsOperationSegmentResponseChoice(p *dlmsPending) byte {
+	if p.kind == "SET" && p.choice == 4 {
+		return 5
+	}
+	return p.choice
+}
+func (t *dlmsFragments) operationSegmentProfile() string {
+	if t.operationList {
+		return "dlms-hdlc-ln-operation-lists-segmented"
+	}
+	return "dlms-hdlc-ln-operations-segmented"
+}
 func (t *dlmsFragments) serviceName() string {
 	if t.operation != "" {
+		if t.operationList {
+			return t.operation + " With List"
+		}
 		return t.operation
 	}
 	return "Get"
@@ -217,27 +252,40 @@ func (t *dlmsFragments) operationCloseSummary() string {
 	if t.request {
 		direction = "request"
 	}
-	return "DLMS HDLC exchange ended with incomplete segmented " + t.operation + " " + direction
+	name := t.operation
+	if t.operationList {
+		name += "-with-list"
+	}
+	return "DLMS HDLC exchange ended with incomplete segmented " + name + " " + direction
 }
 
 // Snapshot only the selected observation, not successful semantic validation.
 // I-frame continuations inherit the already observed service even if refused;
 // RR and other controls retain their literal link profile.
-func (f *binFlow) dlmsOperationSegmentObservation(w []byte) bool {
+func (f *binFlow) dlmsOperationSegmentObservation(w []byte) string {
 	if len(w) < 8 || w[0] != 0x7e {
-		return false
+		return ""
 	}
 	at := 3
 	end := len(w) - 3
 	if _, _, err := dlmsAddress(w[:end], &at); err != nil {
-		return false
+		return ""
 	}
 	if _, _, err := dlmsAddress(w[:end], &at); err != nil || at >= end || w[at]&1 != 0 {
-		return false
+		return ""
 	}
 	if f.dlms != nil && f.dlms.fragments != nil && f.dlms.fragments.operation != "" {
-		return true
+		return f.dlms.fragments.operationSegmentProfile()
 	}
 	p := dlmsAPDU(w)
-	return w[1]&8 != 0 && len(p) >= 3 && dlmsOperationAPDU(p) && p[1] == 1
+	if w[1]&8 == 0 || len(p) < 3 || !dlmsOperationAPDU(p) {
+		return ""
+	}
+	if dlmsOperationListAPDU(p) {
+		return "dlms-hdlc-ln-operation-lists-segmented"
+	}
+	if p[1] == 1 {
+		return "dlms-hdlc-ln-operations-segmented"
+	}
+	return ""
 }

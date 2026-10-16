@@ -769,7 +769,7 @@ func (a *binParser) closeUDPSessions() {
 					profile, summary = "dlms-hdlc-segmented-request", "DLMS HDLC exchange ended with an incomplete segmented request"
 				}
 				if d.fragments.operation != "" {
-					profile, summary = "dlms-hdlc-ln-operations-segmented", d.fragments.operationCloseSummary()
+					profile, summary = d.fragments.operationSegmentProfile(), d.fragments.operationCloseSummary()
 				}
 				if d.fragments.acseCommand != 0 {
 					profile, summary = "dlms-hdlc-acse-segmented", "DLMS HDLC exchange ended with incomplete ACSE information"

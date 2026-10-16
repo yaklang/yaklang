@@ -13,9 +13,10 @@ import (
 func hdlcListControls(t *testing.T) []hdlcOpCase {
 	t.Helper()
 	var x struct{ Cases []hdlcOpCase }
-	require.NoError(t, json.Unmarshal(finsReadBatch(t, "dlms-hdlc-operation-lists", "DLMS_HDLC_OPERATION_LISTS_TEST_ROOT", "controls.json"), &x))
+	raw := finsReadBatch(t, "dlms-hdlc-operation-lists", "DLMS_HDLC_OPERATION_LISTS_TEST_ROOT", "controls.json")
+	require.NoError(t, json.Unmarshal(raw, &x))
 	require.Len(t, x.Cases, 46)
-	return x.Cases
+	return hdlcListSegmentHistoricalUpgrade(t, raw, x.Cases)
 }
 func TestDLMSHDLCOperationListsNative(t *testing.T) {
 	hdlcOpNative(t, hdlcListControls(t), 41000, 4059)

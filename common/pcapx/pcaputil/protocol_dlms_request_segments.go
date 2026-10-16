@@ -22,7 +22,7 @@ func (f *binFlow) consumeDLMSRequestSegments(dir int, wire []byte, id uint64, m 
 	if t == nil {
 		info := m.information
 		operation := ""
-		if dlmsNormalOperationSegmentPrefix(info) && info[1] == 0xe6 {
+		if dlmsSelectedOperationSegmentPrefix(info) && info[1] == 0xe6 {
 			if info[3] == 0xc1 {
 				operation = "Set"
 			} else {
@@ -52,7 +52,7 @@ func (f *binFlow) consumeDLMSRequestSegments(dir int, wire []byte, id uint64, m 
 		if s.clientKnown && dir != s.clientDir || s.seqKnown[dir] && m.ns != s.next[dir] || s.seqKnown[1-dir] && m.nr != s.next[1-dir] {
 			return fail(ErrContextRequired, "initial request direction/sequence differs from observed progression", false)
 		}
-		t = &dlmsFragments{operation: operation, request: true, nextRequest: nextRequest, invoke: info[5] & 15, dir: dir, source: m.source, destination: m.destination, first: m.ns, nr: m.nr}
+		t = &dlmsFragments{operation: operation, operationList: operation != "" && dlmsOperationListAPDU(info[3:]), request: true, nextRequest: nextRequest, invoke: info[5] & 15, dir: dir, source: m.source, destination: m.destination, first: m.ns, nr: m.nr}
 	} else {
 		if dir != t.dir || m.source != t.source || m.destination != t.destination || m.nr != t.nr {
 			return fail(ErrContextRequired, "request continuation direction/address/acknowledgement differ", false)

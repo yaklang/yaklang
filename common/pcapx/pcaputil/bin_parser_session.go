@@ -868,8 +868,8 @@ func (f *binFlow) consumeSession(dir int, e *ProtocolEvent, result map[string]an
 			}
 			e.semanticFields = cloneSession(e.Session)
 		}
-		if operationSegment {
-			e.Profile = "dlms-hdlc-ln-operations-segmented"
+		if operationSegment != "" {
+			e.Profile = operationSegment
 		}
 	case "genisys":
 		e.Session, err = f.genisys.consume(dir, e.Raw, f.a.budget.MaxCollectionElements)
@@ -1501,7 +1501,7 @@ func (f *binFlow) finishSession(reason TrafficFlowCloseReason) {
 		if d.fragments != nil {
 			if d.fragments.operation != "" {
 				e := f.event(d.fragmentCloseDirection(), nil, "incomplete", string(reason)+": "+d.fragments.operationCloseSummary())
-				e.Profile = "dlms-hdlc-ln-operations-segmented"
+				e.Profile = d.fragments.operationSegmentProfile()
 				e.nativeDLMSOrSLMPObservation = true
 				e.Session = d.fragmentCloseFields()
 				e.semanticSession = cloneSession(e.Session)
