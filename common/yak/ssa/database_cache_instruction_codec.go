@@ -136,8 +136,9 @@ func instruction2IrCode(inst Instruction, ir *ssadb.IrCode) {
 	if codeRange == nil {
 		if inner := inst.getAnInstruction(); inner != nil {
 			if fun := inner.fun; fun != nil && fun.GetRange() != nil {
+				// Do not write the instruction here. Two save workers marshal the
+				// same value, and SetRange races with the other worker's GetRange.
 				log.Debugf("Fallback, the %v is not set range, use its resident function instance' ", inst.GetName())
-				inst.SetRange(fun.GetRange())
 				codeRange = fun.GetRange()
 			}
 		}

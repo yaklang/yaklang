@@ -1,11 +1,21 @@
 package ssa
 
 func (p *Program) GetExportType(name string) (Type, bool) {
+	if p == nil {
+		return nil, false
+	}
+	p.exportMu.Lock()
+	defer p.exportMu.Unlock()
 	t, ok := p.ExportType[name]
 	return t, ok
 }
 
 func (p *Program) GetExportValue(name string) Value {
+	if p == nil {
+		return nil
+	}
+	p.exportMu.Lock()
+	defer p.exportMu.Unlock()
 	if v, ok := p.ExportValue[name]; ok {
 		return v
 	}
@@ -13,6 +23,11 @@ func (p *Program) GetExportValue(name string) Value {
 }
 
 func (p *Program) SetExportType(name string, t Type) {
+	if p == nil {
+		return
+	}
+	p.exportMu.Lock()
+	defer p.exportMu.Unlock()
 	if p.ExportType == nil {
 		p.ExportType = make(map[string]Type)
 	}
@@ -20,6 +35,11 @@ func (p *Program) SetExportType(name string, t Type) {
 }
 
 func (p *Program) SetExportValue(name string, v Value) {
+	if p == nil {
+		return
+	}
+	p.exportMu.Lock()
+	defer p.exportMu.Unlock()
 	if p.ExportValue == nil {
 		p.ExportValue = make(map[string]Value)
 	}

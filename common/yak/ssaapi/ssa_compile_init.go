@@ -13,6 +13,11 @@ import (
 func (c *Config) init(filesystem filesys_interface.FileSystem, fileSize int) (*ssa.Program, *ssa.FunctionBuilder, error) {
 	application := ssa.NewProgram(c.Config, c.databaseKind, ssa.Application, filesystem, c.programPath, fileSize)
 	application.Language = c.GetLanguage()
+	if application.Language == "" && c.LanguageBuilder != nil {
+		// Set once, before prehandler workers start. Build used to write this
+		// string while other workers read it in libraryNameForCompileUnit.
+		application.Language = c.LanguageBuilder.GetLanguage()
+	}
 	application.ProjectID = c.GetProjectID()
 	application.ProcessInfof = func(s string, v ...any) {
 		msg := fmt.Sprintf(s, v...)
@@ -37,10 +42,6 @@ func (c *Config) init(filesystem filesys_interface.FileSystem, fileSize int) (*s
 		if LanguageBuilder == nil {
 			return utils.Errorf("not support language %s", c.GetLanguage())
 		}
-		if application.Language == "" {
-			application.Language = LanguageBuilder.GetLanguage()
-		}
-
 		// get source code
 		if src == nil {
 			return fmt.Errorf("origin source code (MemEditor) is nil")

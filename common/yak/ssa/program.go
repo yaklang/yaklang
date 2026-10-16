@@ -158,10 +158,6 @@ func (prog *Program) createSubProgram(name string, kind ssadb.ProgramKind, path 
 	subProg.ExportType = make(map[string]Type)
 	subProg.ExportValue = make(map[string]Value)
 	subProg.ReExportTable = make(map[string]*ReExportInfo)
-
-	// up-down stream and application
-	prog.AddUpStream(subProg)
-	prog.Application.AddUpStream(subProg)
 	subProg.Application = prog.Application
 	if prog.Application != nil && prog.Application.Build != nil {
 		subProg.Build = prog.Application.Build
@@ -171,6 +167,16 @@ func (prog *Program) createSubProgram(name string, kind ssadb.ProgramKind, path 
 	subProg.Cache = prog.Cache
 	subProg.NameCache = prog.NameCache
 	subProg.fixImportCallback = make([]func(), 0)
+	if subProg.PkgName == "" {
+		subProg.PkgName = name
+	}
+
+	// Publish only after the fields above are set. Concurrent importers
+	// observe this library through UpStream.
+	prog.AddUpStream(subProg)
+	if prog.Application != nil {
+		prog.Application.AddUpStream(subProg)
+	}
 	return subProg
 }
 
@@ -211,14 +217,19 @@ func (prog *Program) IsVirtualImport() bool {
 }
 
 func (prog *Program) GetSubProgram(name string, path ...string) *Program {
-	child, ok := prog.UpStream.Get(name)
-	if !ok {
-		child = prog.createSubProgram(name, Library, path...)
-	}
-	return child
+	return prog.NewLibrary(name, path)
 }
 
 func (prog *Program) NewLibrary(name string, path []string) *Program {
+	app := prog.GetApplication()
+	if app == nil {
+		app = prog
+	}
+	app.libraryCreateMu.Lock()
+	defer app.libraryCreateMu.Unlock()
+	if existing, ok := app.UpStream.Get(name); ok && existing != nil {
+		return existing
+	}
 	return prog.createSubProgram(name, Library, path...)
 }
 
@@ -318,16 +329,34 @@ func (prog *Program) SetCacheExternInstance(name string, v Value) {
 
 // create or get main function builder
 func (prog *Program) GetAndCreateFunctionBuilder(pkgName string, funcName string) *FunctionBuilder {
+	if prog == nil {
+		return nil
+	}
+	// Publish the builder only. NewBuilder does not Emit, and this must
+	// not call fake import. The virtual function is also built under
+	// virtualEmitMu; take that one first (same order as withVirtualBuilder).
+	if funcName == string(VirtualFunctionName) {
+		prog.virtualEmitMu.Lock()
+		defer prog.virtualEmitMu.Unlock()
+	}
+	prog.builderMu.Lock()
+	defer prog.builderMu.Unlock()
+	return prog.getAndCreateFunctionBuilder(pkgName, funcName)
+}
+
+func (prog *Program) getAndCreateFunctionBuilder(pkgName string, funcName string) *FunctionBuilder {
 	prog.SetPackageName(pkgName)
 	fun := prog.GetAndCreateFunction(pkgName, funcName)
 	builder := fun.builder
 	if builder == nil {
 		builder = NewBuilder(prog.GetCurrentEditor(), fun, nil)
 	}
-
 	return builder
 }
 func (prog *Program) SetPackageName(name string) {
+	if prog == nil || prog.PkgName == name {
+		return
+	}
 	prog.PkgName = name
 }
 
