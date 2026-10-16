@@ -50,16 +50,6 @@ func isNonRetryableAIHTTPResponse(rsp *AIResponse) bool {
 	return status >= 400 && status < 500 && status != 408 && status != 409 && status != 425 && status != 429
 }
 
-func aiHTTPResponseError(rsp *AIResponse) error {
-	if overflowErr := ClassifyPromptTooLong(rsp, nil); overflowErr != nil {
-		return overflowErr
-	}
-	if err := rsp.GetError(); err != nil {
-		return err
-	}
-	return utils.Errorf("AI provider returned HTTP %d: %s", rsp.GetHTTPStatusCode(), rsp.GetHTTPResponseBody())
-}
-
 func CallAITransaction(
 	c AICallerConfigIf,
 	prompt string,
@@ -173,6 +163,11 @@ func callAITransaction(
 			return rec
 		}
 		rsp, err := callAi(aiReq)
+		// Observe asynchronous provider errors before classifying a nil callback error.
+		if err == nil && rsp != nil && !rsp.WaitForCallbackDone(transactionCtx) {
+			return transactionCtx.Err()
+		}
+		err = normalizeAIRateLimitError(rsp, err)
 		// A request-scoped cancellation is a terminal control signal, not an AI
 		// failure. Check it before classifying callAi errors so a task finishing
 		// while the provider is in flight cannot emit a misleading model-error
@@ -241,9 +236,6 @@ func callAITransaction(
 		// reason-stream goroutine). We can read it directly via
 		// GetPlainOutput / GetPlainReason after postHandler finishes — no
 		// custom capture hooks needed.
-		if !rsp.WaitForCallbackDone(transactionCtx) {
-			return transactionCtx.Err()
-		}
 		if ctxErr := transactionCtx.Err(); ctxErr != nil {
 			return ctxErr
 		}
