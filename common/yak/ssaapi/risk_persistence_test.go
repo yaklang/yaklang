@@ -173,3 +173,22 @@ func TestRiskSaverDropsOnlyCoveredAuditEdges(t *testing.T) {
 	require.NoError(t, db.Model(&ssadb.AuditNode{}).Where("id = ?", other.ID).Count(&n).Error)
 	require.Equal(t, int64(1), n)
 }
+
+func TestRiskUpdateFullBatchSQLParameterBudget(t *testing.T) {
+	runtimeID := uuid.NewString()
+	db := ssadb.GetDB()
+	t.Cleanup(func() { db.Unscoped().Where("runtime_id = ?", runtimeID).Delete(&schema.SSARisk{}) })
+	rows := make([]*schema.SSARisk, riskBatchSize)
+	for i := range rows {
+		rows[i] = batchRisk(fmt.Sprintf("full-batch-%d", i), fmt.Sprintf("feature-%d", i), "source", "source")
+		rows[i].RuntimeId = runtimeID
+	}
+	require.NoError(t, SaveRisk(db, rows...))
+	for _, row := range rows {
+		row.ScanMode = "ssa"
+	}
+	require.NoError(t, updateRiskRows(db, rows))
+	var count int64
+	require.NoError(t, db.Model(&schema.SSARisk{}).Where("runtime_id = ? AND scan_mode = ?", runtimeID, "ssa").Count(&count).Error)
+	require.EqualValues(t, riskBatchSize, count)
+}
