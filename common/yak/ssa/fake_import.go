@@ -15,8 +15,10 @@ func (p *Program) GenerateVirtualLib(packagePath string) (*Program, error) {
 }
 
 // withVirtualBuilder runs fn on this library's single @virtual builder.
-// The lock covers the emit. Do not call withVirtualBuilder or storeField on
-// this same library from inside fn: both take virtualEmitMu.
+// virtualEmitMu covers that builder's cursor and is not reentrant. fn must
+// not call withVirtualBuilder or GetAndCreateFunctionBuilder for @virtual
+// on this library. storeField does not take virtualEmitMu; it takes the
+// function's emitMu, which the same goroutine may reenter.
 func (lib *Program) withVirtualBuilder(fn func(*FunctionBuilder)) {
 	if lib == nil || fn == nil {
 		return
