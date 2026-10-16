@@ -3,6 +3,7 @@ package ssa
 import (
 	"context"
 	"sync"
+	"sync/atomic"
 
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/sca/dxtypes"
@@ -14,6 +15,7 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssa/ssautil"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	tl "github.com/yaklang/yaklang/common/yak/templateLanguage"
+	"golang.org/x/sync/singleflight"
 )
 
 type ErrorLogger interface {
@@ -280,9 +282,34 @@ type Program struct {
 	diagnosticsRecorder *diagnostics.Recorder
 
 	// TODO: this four map should need????!
-	editorStackMu  sync.RWMutex
-	editorStack    *omap.OrderedMap[string, *memedit.MemEditor]
-	fileListMu     sync.Mutex
+	editorStackMu sync.RWMutex
+	editorStack   *omap.OrderedMap[string, *memedit.MemEditor]
+	fileListMu    sync.Mutex
+	// libraryCreateMu serializes publication of a named library.
+	// Hold it only until UpStream is updated. Do not call Emit, fake import,
+	// or GetAndCreateFunctionBuilder while holding it.
+	// Lock order: libraryCreateMu -> fileListMu / editorStackMu.
+	libraryCreateMu sync.Mutex
+	// builderMu publishes a function's single FunctionBuilder.
+	// The critical section stops at NewBuilder; it does not Emit.
+	builderMu sync.Mutex
+	// exportMu guards ExportType and ExportValue only.
+	// Never call out of this package's map helpers while holding it.
+	exportMu sync.Mutex
+	// virtualImportGroup runs one materialization per type name.
+	// The callback builds on a private function, so it does not share a
+	// CurrentBlock and does not hold a mutex across Emit. Re-entering Do
+	// with the same key on the same goroutine deadlocks; CreateBlueprint
+	// must not call back into fake import for that same name.
+	virtualImportGroup singleflight.Group
+	// virtualEmitMu serializes Emit on this library's one @virtual builder.
+	// GetMagicMethod does not take it. storeField takes it only after the
+	// SafeMap slot is published, so member lowering does not lock it again.
+	virtualEmitMu sync.Mutex
+	// dirPkgSlots compiles one directory package at a time per name.
+	// The goroutine that owns the slot must not wait on it: a cycle imports
+	// the package again while it is still compiling. Everyone else waits.
+	dirPkgSlots    sync.Map
 	FileList       map[string]string // file-name and file hash
 	fileLineCounts *utils.SafeMapWithKey[string, int]
 	LineCount      int
@@ -383,6 +410,12 @@ type Function struct {
 	// Type
 	typeMu sync.RWMutex
 	Type   *FunctionType
+
+	// emitMu covers this function's builder cursor. Same-goroutine reentry
+	// (storeField -> GetMagicMethod -> storeField) does not lock again.
+	emitMu    sync.Mutex
+	emitOwner atomic.Uint64
+	emitDepth int
 
 	// just function parameter
 	Params      []int64 // parameter

@@ -42,7 +42,7 @@ func (c *Blueprint) registerMagicMethod(name BlueprintMagicMethodKind, val Value
 	if c.MagicMethod == nil {
 		c.MagicMethod = utils.NewSafeMapWithKey[BlueprintMagicMethodKind, Value]()
 	}
-	c.MagicMethod.Update(name, func(old Value, loaded bool) (Value, bool) {
+	_, loaded := c.MagicMethod.Update(name, func(old Value, loaded bool) (Value, bool) {
 		switch name {
 		case Constructor:
 			c.Constructor = val
@@ -68,6 +68,11 @@ func (c *Blueprint) registerMagicMethod(name BlueprintMagicMethodKind, val Value
 		}
 		return old, false
 	})
+	// storeField stays outside the SafeMap lock: it re-enters GetMagicMethod.
+	// Concurrent emits on a missing-import container are serialized by
+	// Program.virtualEmitMu inside storeField, so every registration still
+	// stores its member. Dropping a later storeField loses Go dataflow.
+	_ = loaded
 	switch name {
 	case Constructor:
 		c.storeField(c.Name, val, BluePrintMagicMethod)
@@ -76,6 +81,14 @@ func (c *Blueprint) registerMagicMethod(name BlueprintMagicMethodKind, val Value
 	case Destructor:
 	}
 	c.storeField(val.GetName(), val, BluePrintMagicMethod)
+}
+
+func (c *Blueprint) containerIsVirtual() bool {
+	if c == nil || utils.IsNil(c._container) {
+		return false
+	}
+	owner := c._container.GetFunc()
+	return owner != nil && owner.GetName() == string(VirtualFunctionName)
 }
 
 func (c *Blueprint) readMagicMethod(name BlueprintMagicMethodKind) Value {
