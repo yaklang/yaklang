@@ -101,6 +101,15 @@ func TestGuardRestoresCleanFixtureAfterMutatingTest(t *testing.T) {
 	require.True(t, baseline.UpdatedAt.Equal(rows[0].UpdatedAt))
 }
 
+func TestCorePluginItemHashesAreBootstrapMetadata(t *testing.T) {
+	db := testDB(t)
+	require.NoError(t, db.Create(&schema.GeneralStorage{
+		Key:   strconv.Quote("core-plugin-item-hashes"),
+		Value: strconv.Quote(`{"builtin":"hash"}`),
+	}).Error)
+	require.NoError(t, Check(db, nil))
+}
+
 func TestPristineCheckOnlyReadsAndDoesNotMigrate(t *testing.T) {
 	db := testDB(t)
 	changes := func() int {
