@@ -504,18 +504,22 @@ func (c *Config) parseProjectWithFSUnits(
 			language.AfterPreHandlerProject(builder)
 			language.Clearup()
 		}
+		// Java import links skipped while another worker owned the package
+		// run here, after every skeleton has released its builder and before
+		// prehandler mode is cleared. Directory compiles in that window still
+		// visit class bodies, and they no longer share a builder with a live
+		// prehandle worker. Other deferred work stays on the later pass.
+		if !prog.RunDeferredBuildsForUnitsMatching(unitKeys, nil, nil, func(id string) bool {
+			return strings.Contains(id, "java-static-import:")
+		}) {
+			return nil, ErrContextCancel
+		}
 		prog.SetPreHandler(false)
 		if holdSCCIR && !structScanOn && prog.Cache != nil {
 			prog.Cache.EnableInstructionSpill()
 		}
 		compilePhase = "f3_unit_build"
 		unitBuildStart := time.Now()
-		// Unit-end and batch-boundary instruction flushes enqueue ordinary
-		// instructions for asynchronous persistence. Boundary instructions stay
-		// resident for cross-unit resolution, while the completion callback logs
-		// the real post-eviction state. Incremental compile still skips both
-		// paths to preserve its overlay semantics.
-		// Skip both for incremental compile to preserve overlay.
 		flushThreshold := flushCompileUnitThreshold()
 		isIncremental := c.compileMode() != compileModeFull
 		flushedUnits := make(map[string]bool)
@@ -543,6 +547,11 @@ func (c *Config) parseProjectWithFSUnits(
 		) {
 			return nil, ErrContextCancel
 		}
+		// Unit-end and batch-boundary instruction flushes enqueue ordinary
+		// instructions for asynchronous persistence. Boundary instructions stay
+		// resident for cross-unit resolution, while the completion callback logs
+		// the real post-eviction state. Incremental compile still skips both
+		// paths to preserve its overlay semantics.
 		if c.isStop() {
 			return nil, ErrContextCancel
 		}

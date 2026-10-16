@@ -80,13 +80,13 @@ func (y *singleFileBuilder) visitCapturedImportDeclarations(decls []javaImportDe
 			}
 		}
 
-		// Skeleton PreHandler only needs the local type-name maps. Linking
-		// mutates the imported library's builder and editor stack; when units
-		// pre-handle in parallel that races. The deferred post-skeleton import
-		// task links types after every skeleton in the batch exists.
-		if static && !resolveStaticTypes && y.GetProgram() != nil && y.GetProgram().ConcurrentUnitBuildEnabled() {
-			continue
-		}
+		// A package occupied by another prehandle worker must not be compiled
+		// here: BuildDirectoryPackage enters that library's main builder.
+		// Names are already recorded. The deferred task links after the owner
+		// releases the slot. A package nobody is compiling is still compiled
+		// now, including a dependency that belongs to a later batch.
+		deferForeignPackage := !resolveStaticTypes && y.GetProgram() != nil && y.GetProgram().ConcurrentUnitBuildEnabled()
+		ownerBusy := false
 
 		var prog *ssa.Program
 		var className string
@@ -117,11 +117,28 @@ func (y *singleFileBuilder) visitCapturedImportDeclarations(decls []javaImportDe
 				}
 				return false
 			}
+			unitLibrary := false
 			for idx := classEnd - 1; idx > 0; idx-- {
 				pkgName := strings.Join(pkgNames[:idx], ".")
 				candidateClassName := strings.Join(pkgNames[idx:classEnd], ".")
+				// The post-skeleton link runs after the owner finished. The unit
+				// library already exists; compiling the directory again duplicates
+				// the class. hasFile is not existence.
+				if resolveStaticTypes {
+					if lib, _ := y.GetProgram().GetLibrary(pkgName); lib != nil {
+						unitLibrary = true
+						if tryLibrary(lib, candidateClassName, false) {
+							break
+						}
+						continue
+					}
+				}
 				if lib, ok := y.GetProgram().GetLibrary(pkgName); ok && tryLibrary(lib, candidateClassName, false) {
 					break
+				}
+				if deferForeignPackage && y.directoryPackageBusy(pkgName) {
+					ownerBusy = true
+					continue
 				}
 				if p, err := y.BuildDirectoryPackage(pkgNames[:idx], true); err == nil {
 					if tryLibrary(p, candidateClassName, false) {
@@ -131,7 +148,7 @@ func (y *singleFileBuilder) visitCapturedImportDeclarations(decls []javaImportDe
 					lastErr = err
 				}
 			}
-			if prog == nil {
+			if prog == nil && !ownerBusy && !unitLibrary {
 				for idx := classEnd - 1; idx > 0; idx-- {
 					pkgName := strings.Join(pkgNames[:idx], ".")
 					candidateClassName := strings.Join(pkgNames[idx:classEnd], ".")
@@ -156,12 +173,31 @@ func (y *singleFileBuilder) visitCapturedImportDeclarations(decls []javaImportDe
 			}
 		} else {
 			var lastErr error
+			unitLibrary := false
 			for idx := len(pkgNames) - 1; idx > 0; idx-- {
 				className = strings.Join(pkgNames[idx:], ".")
 				pkgName := strings.Join(pkgNames[:idx], ".")
+				// Post-skeleton: do not compile a package the unit scheduler
+				// already owns. A second build shows up as an extra typeName.
+				if resolveStaticTypes {
+					if lib, _ := y.GetProgram().GetLibrary(pkgName); lib != nil {
+						unitLibrary = true
+						if hasImportType(lib, className) {
+							prog = lib
+							break
+						}
+						continue
+					}
+				}
+				// hasFile, not mere existence. An empty unit library must not
+				// hide the directory compile that actually builds the class.
 				if lib, ok := y.GetProgram().GetLibrary(pkgName); ok && lib != nil {
 					prog = lib
 					break
+				}
+				if deferForeignPackage && y.directoryPackageBusy(pkgName) {
+					ownerBusy = true
+					continue
 				}
 				if p, err := y.BuildDirectoryPackage(pkgNames[:idx], true); err == nil {
 					prog = p
@@ -170,7 +206,7 @@ func (y *singleFileBuilder) visitCapturedImportDeclarations(decls []javaImportDe
 					lastErr = err
 				}
 			}
-			if prog == nil {
+			if prog == nil && !ownerBusy && !unitLibrary {
 				for idx := len(pkgNames) - 1; idx > 0; idx-- {
 					className = strings.Join(pkgNames[idx:], ".")
 					pkgName := strings.Join(pkgNames[:idx], ".")
@@ -185,7 +221,9 @@ func (y *singleFileBuilder) visitCapturedImportDeclarations(decls []javaImportDe
 			}
 		}
 		if prog == nil {
-			log.Warnf("Dependencies Missed: Import package %v but not found", pkgNames)
+			if !ownerBusy {
+				log.Warnf("Dependencies Missed: Import package %v but not found", pkgNames)
+			}
 			continue
 		}
 		prog.PushEditor(y.GetEditor())
@@ -197,6 +235,17 @@ func (y *singleFileBuilder) visitCapturedImportDeclarations(decls []javaImportDe
 		}
 		prog.PopEditor(false)
 	}
+}
+
+func (y *singleFileBuilder) directoryPackageBusy(pkgName string) bool {
+	if y == nil || pkgName == "" || y.GetProgram() == nil {
+		return false
+	}
+	app := y.GetProgram().GetApplication()
+	if app == nil {
+		app = y.GetProgram()
+	}
+	return app.DirectoryPackageInProgress(pkgName)
 }
 
 func newJavaImportDecl(raw javaparser.IImportDeclarationContext) (javaImportDecl, bool) {
@@ -230,8 +279,8 @@ func javaQualifiedNameParts(raw javaparser.IQualifiedNameContext) []string {
 	return result
 }
 
-// registerPostSkeletonImportTask schedules static import type linking for pass2
-// without capturing the whole file AST in the shared pipeline's top-level closure.
+// registerPostSkeletonImportTask schedules import linking for pass2, after the
+// parallel skeleton barrier, without retaining the whole file AST.
 func (y *singleFileBuilder) registerPostSkeletonImportTask(i *javaparser.CompilationUnitContext) {
 	if y == nil || i == nil {
 		return

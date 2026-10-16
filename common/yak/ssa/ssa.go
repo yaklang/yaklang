@@ -325,11 +325,18 @@ type Program struct {
 
 	Cache *ProgramCache
 
-	finished            bool
-	deferredBuildsMu    sync.Mutex
-	deferredBuilds      *omap.OrderedMap[string, *deferredBuildTask]
-	deferredBuildTotal  int
-	currentCompileUnit  string
+	finished           bool
+	deferredBuildsMu   sync.Mutex
+	deferredBuilds     *omap.OrderedMap[string, *deferredBuildTask]
+	deferredBuildTotal int
+	// compileUnitContexts maps the registering goroutine to its unit key.
+	// Values are immutable strings; EndCompileUnit removes the worker's entry.
+	// Load/Store/Delete finish before any deferred callback or Emit runs.
+	compileUnitContexts sync.Map
+	// dirPkgPrehandle maps a package name to the goroutine currently inside
+	// that library's skeleton. It is not a compile lock and is never held
+	// across Emit, a database call, or a directory-package wait.
+	dirPkgPrehandle     sync.Map
 	concurrentUnitBuild bool
 	CompileUnits        []*CompileUnit
 
