@@ -331,8 +331,10 @@ func updateRiskRows(db *gorm.DB, risks []*schema.SSARisk) error {
 	if err != nil {
 		return err
 	}
-	// Two placeholders per column per row, plus two in the WHERE.
-	chunk := 30000 / (len(columns)*2 + 2)
+	// WHEN runtime=? AND feature=? THEN ? is three placeholders per
+	// column per row, plus two more in the WHERE. The old divisor of two
+	// built a statement past SQLite's variable limit once a drain was large.
+	chunk := 30000 / (len(columns)*3 + 2)
 	if chunk > riskBatchSize {
 		chunk = riskBatchSize
 	}

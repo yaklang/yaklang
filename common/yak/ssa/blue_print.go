@@ -478,8 +478,35 @@ func (c *Blueprint) storeField(name string, val Value, _type BlueprintFieldKind)
 	}
 
 	container := c._container
-	builder := container.GetFunc().builder
+	fn := container.GetFunc()
+	unlock := fn.lockEmit()
+	defer unlock()
+	builder := fn.builder
 	createVariable(builder, builder.CreateMemberCallVariable(c._container, builder.EmitConstInstPlaceholder(name)))
+}
+
+// lockEmit serializes emits on this function's builder. The goroutine that
+// already holds it reenters; another goroutine waits. Unlock is the returned
+// function, and only the outermost call releases the mutex.
+func (f *Function) lockEmit() func() {
+	if f == nil {
+		return func() {}
+	}
+	gid := currentGoroutineID()
+	if gid != 0 && f.emitOwner.Load() == gid {
+		f.emitDepth++
+		return func() { f.emitDepth-- }
+	}
+	f.emitMu.Lock()
+	f.emitOwner.Store(gid)
+	f.emitDepth = 1
+	return func() {
+		f.emitDepth--
+		if f.emitDepth == 0 {
+			f.emitOwner.Store(0)
+			f.emitMu.Unlock()
+		}
+	}
 }
 
 func (b *Blueprint) InitializeWithContainer(con Value) error {
