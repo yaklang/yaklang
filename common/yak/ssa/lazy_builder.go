@@ -138,15 +138,22 @@ func (p *Program) LazyBuild() {
 	if function != nil {
 		function.Finish()
 	}
-	virtualFunction := p.GetFunction(string(VirtualFunctionName), "")
-	if virtualFunction != nil {
-		virtualFunction.Finish()
-	}
+	// Missing imports each own a function named @virtual so they do not
+	// share one CurrentBlock. Finish every one of them, not only the
+	// canonical map entry.
+	hasVirtual := false
+	p.Funcs.ForEach(func(_ string, fun *Function) bool {
+		if fun != nil && fun.GetName() == string(VirtualFunctionName) {
+			hasVirtual = true
+			fun.Finish()
+		}
+		return true
+	})
 	initFunction := p.GetFunction(string(InitFunctionName), "")
 	if initFunction != nil {
 		initFunction.Finish()
 	}
-	if function == nil && virtualFunction == nil && initFunction == nil {
+	if function == nil && !hasVirtual && initFunction == nil {
 		// Library/placeholder programs may legitimately contain no entry functions.
 		// Treat this as "nothing to finish" instead of an error log which is noisy in
 		// contexts like SyntaxFlow rule verification and language-server analysis.

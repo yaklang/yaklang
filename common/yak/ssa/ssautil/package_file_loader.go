@@ -2,6 +2,7 @@ package ssautil
 
 import (
 	"io/fs"
+	"sync"
 
 	"github.com/yaklang/yaklang/common/utils/memedit"
 
@@ -36,9 +37,12 @@ func WithCurrentPath(path string) PackageLoaderOption {
 }
 
 type PackageFileLoader struct {
-	fs           fi.FileSystem
-	currentPath  string
-	includePath  []string
+	fs          fi.FileSystem
+	currentPath string
+	includePath []string
+	// includedMu only covers includedPath. The compile that follows
+	// LoadDirectoryPackage stays outside this lock.
+	includedMu   sync.Mutex
 	includedPath map[string]struct{} // for include once
 	packagePath  []string
 	basePath     string
@@ -121,11 +125,17 @@ func (p *PackageFileLoader) getPath(want string, once bool, f func(fs.FileInfo) 
 		}
 		if f(info) {
 			if once {
+				p.includedMu.Lock()
 				if _, ok := p.includedPath[filePath]; ok {
+					p.includedMu.Unlock()
 					// only check included, in once = true
 					return "", utils.Errorf("file or directory %s already included", want)
 				}
+				if p.includedPath == nil {
+					p.includedPath = make(map[string]struct{})
+				}
 				p.includedPath[filePath] = struct{}{}
+				p.includedMu.Unlock()
 			}
 			return filePath, nil
 		}

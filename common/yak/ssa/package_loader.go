@@ -1,11 +1,35 @@
 package ssa
 
 import (
+	"runtime"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/memedit"
 )
+
+type dirPkgSlot struct {
+	gid  uint64
+	lib  *Program
+	err  error
+	done chan struct{}
+}
+
+func currentGoroutineID() uint64 {
+	var buf [64]byte
+	n := runtime.Stack(buf[:], false)
+	var id uint64
+	for _, c := range buf[:n] {
+		if c < '0' || c > '9' {
+			if id != 0 {
+				return id
+			}
+			continue
+		}
+		id = id*10 + uint64(c-'0')
+	}
+	return id
+}
 
 func (b *FunctionBuilder) includeProgramInStack(prog *Program) bool {
 	if b == nil || prog == nil {
@@ -84,7 +108,9 @@ func (b *FunctionBuilder) BuildFilePackage(filename string, once bool) error {
 	}
 
 	// 解析AST
-	ast, err := languageBuilder.ParseAST(editor.GetSourceCode(), nil)
+	// A nil cache uses the generated parser's global DFA, which is not
+	// safe for concurrent includes. One cache per parse, not a lock around it.
+	ast, err := languageBuilder.ParseAST(editor.GetSourceCode(), languageBuilder.GetAntlrCache())
 	if err != nil {
 		log.Debugf("[INCLUDE] 解析AST失败: %s, error: %v", filename, err)
 		return utils.Errorf("parse file %s error: %v", filename, err)
@@ -113,17 +139,55 @@ func (b *FunctionBuilder) BuildFilePackage(filename string, once bool) error {
 
 func (b *FunctionBuilder) BuildDirectoryPackage(name []string, once bool) (*Program, error) {
 	p := b.GetProgram()
+	if p == nil {
+		return nil, utils.Errorf("program is nil")
+	}
+	app := p.GetApplication()
+	if app == nil {
+		app = p
+	}
+	key := strings.Join(name, ".")
+	gid := currentGoroutineID()
+	slot := &dirPkgSlot{gid: gid, done: make(chan struct{})}
+	actual, loaded := app.dirPkgSlots.LoadOrStore(key, slot)
+	if loaded {
+		existing := actual.(*dirPkgSlot)
+		if existing.gid == gid {
+			// This compile is already on the stack. Waiting here deadlocks a cycle.
+			if existing.lib != nil {
+				return existing.lib, nil
+			}
+			return nil, utils.Errorf("directory package %s reentered before publish", key)
+		}
+		<-existing.done
+		return existing.lib, existing.err
+	}
+	// Do not publish an empty library first. Callers treat a non-nil
+	// return as the compiled package, and an empty placeholder hides
+	// the real one (rule checks then miss the class).
+	err := b.compileDirectoryPackage(name, once)
+	lib, _ := app.GetLibrary(key)
+	if lib == nil && err == nil {
+		err = utils.Errorf("Build package %v failed", name)
+	}
+	slot.lib = lib
+	slot.err = err
+	close(slot.done)
+	return lib, err
+}
 
+func (b *FunctionBuilder) compileDirectoryPackage(name []string, once bool) error {
+	p := b.GetProgram()
 	path := p.Loader.GetFilesysFileSystem().Join(name...)
 	ch, err := p.Loader.LoadDirectoryPackage(path, once)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	languageConfig := p.GetApplication().config
 	languageBuilder := languageConfig.LanguageBuilder
 	if languageBuilder == nil {
-		return nil, utils.Errorf("language builder is nil")
+		return utils.Errorf("language builder is nil")
 	}
 	app := p.GetApplication()
 	app.ProcessInfof("Build package %v", name)
@@ -136,7 +200,7 @@ func (b *FunctionBuilder) BuildDirectoryPackage(name []string, once bool) (*Prog
 			log.Errorf("Build with file loader failed: %s", err)
 			continue
 		}
-		ast, err := languageBuilder.ParseAST(string(raw), nil)
+		ast, err := languageBuilder.ParseAST(string(raw), languageBuilder.GetAntlrCache())
 		if err != nil {
 			log.Errorf("Parse file %s error: %v", v.FileName, err)
 			continue
@@ -155,10 +219,5 @@ func (b *FunctionBuilder) BuildDirectoryPackage(name []string, once bool) (*Prog
 			continue
 		}
 	}
-	// TODO: get program from name, but in some case, package name not same with path
-	if lib, _ := p.GetLibrary(strings.Join(name, ".")); lib != nil {
-		// lib.Finish()
-		return lib, nil
-	}
-	return nil, utils.Errorf("Build package %v failed", name)
+	return nil
 }
