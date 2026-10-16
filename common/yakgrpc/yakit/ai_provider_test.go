@@ -3,18 +3,21 @@ package yakit
 import (
 	"testing"
 
-	"github.com/yaklang/gorm"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/gorm"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/configtest"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
 func setupAIProviderTestDB(t *testing.T) *gorm.DB {
 	db, err := utils.CreateTempTestDatabaseInMemory()
 	require.NoError(t, err)
+	t.Cleanup(func() { _ = db.Close() })
 	require.NoError(t, db.AutoMigrate(&schema.GeneralStorage{}).Error)
+	configtest.RequirePristine(t, db, nil)
 	return db
 }
 

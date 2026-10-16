@@ -16,10 +16,12 @@ type SafeString struct {
 	// 缓存，懒加载。SafeString 可能被多个扫描 goroutine 共享（同一个
 	// MemEditor 的 safeSourceCode），缓存写入必须并发安全，否则 -race 会报
 	// data race（旧实现 isASCII/Len 直接写字段）。
-	asciiState atomic.Int32           // 0=未检查, 1=ASCII, 2=非ASCII
-	runeLen    atomic.Int64           // -1=未计算
-	runes      atomic.Pointer[[]rune] // 非 ASCII 时惰性物化的 rune 切片
-	runesOnce  sync.Once
+	asciiState  atomic.Int32           // 0=未检查, 1=ASCII, 2=非ASCII
+	runeLen     atomic.Int64           // -1=未计算
+	runes       atomic.Pointer[[]rune] // 非 ASCII 时惰性物化的 rune 切片
+	runesOnce   sync.Once
+	offsetsOnce sync.Once
+	runeOffsets atomic.Pointer[[]int]
 
 	strOnce  sync.Once
 	strCache atomic.Pointer[string] // String() 的惰性缓存，消除每次 string(s.bytes) 的拷贝
@@ -70,8 +72,28 @@ func (s *SafeString) runeIndexToByteOffset(idx int) int {
 		return idx
 	}
 
-	byteOffset := 0
-	for i := 0; i < idx && byteOffset < len(s.bytes); i++ {
+	// Repeated source-range reads must not decode the entire prefix each time.
+	// Sparse checkpoints bound each lookup to at most 63 UTF-8 decodes while
+	// using one int per 64 runes, rather than a second full rune-offset table.
+	const stride = 64
+	byteOffset, runeOffset := 0, 0
+	// Short prefixes are already bounded and need no index allocation.
+	if idx >= stride {
+		s.offsetsOnce.Do(func() {
+			offsets := make([]int, 0, (s.Len()+stride-1)/stride)
+			for runeIndex, offset := 0, 0; offset < len(s.bytes); runeIndex++ {
+				if runeIndex%stride == 0 {
+					offsets = append(offsets, offset)
+				}
+				_, size := utf8.DecodeRune(s.bytes[offset:])
+				offset += size
+			}
+			s.runeOffsets.Store(&offsets)
+		})
+		byteOffset = (*s.runeOffsets.Load())[idx/stride]
+		runeOffset = idx / stride * stride
+	}
+	for i := runeOffset; i < idx; i++ {
 		_, size := utf8.DecodeRune(s.bytes[byteOffset:])
 		byteOffset += size
 	}

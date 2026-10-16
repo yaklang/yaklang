@@ -4,19 +4,29 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/yaklang/gorm"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/gorm"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/configtest"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
 func setupAIGlobalConfigTestDB(t *testing.T) *gorm.DB {
+	t.Helper()
+	cached, tiered := GetCachedAIGlobalConfig(), consts.GetTieredAIConfig()
+	configtest.RequirePublicRuntime(t, cached, tiered)
+	t.Cleanup(func() {
+		setCachedAIGlobalConfig(cached)
+		consts.SetTieredAIConfig(tiered)
+	})
 	db, err := utils.CreateTempTestDatabaseInMemory()
 	require.NoError(t, err)
+	t.Cleanup(func() { _ = db.Close() })
 	require.NoError(t, db.AutoMigrate(&schema.GeneralStorage{}).Error)
+	configtest.RequirePristine(t, db, nil)
 	return db
 }
 
@@ -390,6 +400,7 @@ func TestGetAIGlobalConfig_RecoversDeprecatedProviders(t *testing.T) {
 	require.NoError(t, err)
 	defer db.Close()
 	require.NoError(t, db.AutoMigrate(&schema.GeneralStorage{}, &schema.AIThirdPartyConfig{}).Error)
+	configtest.RequirePristine(t, db, nil)
 
 	legacy := &schema.AIThirdPartyConfig{
 		Type:   "openai",
@@ -435,6 +446,7 @@ func TestGetAIGlobalConfig_RecoversOnlyWhenProviderInfoMissing(t *testing.T) {
 	require.NoError(t, err)
 	defer db.Close()
 	require.NoError(t, db.AutoMigrate(&schema.GeneralStorage{}, &schema.AIThirdPartyConfig{}).Error)
+	configtest.RequirePristine(t, db, nil)
 
 	legacy := &schema.AIThirdPartyConfig{
 		Type:   "openai",

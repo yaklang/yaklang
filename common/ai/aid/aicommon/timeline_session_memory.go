@@ -107,6 +107,16 @@ func (h *timelineSessionMemory) wait(ctx context.Context) error {
 }
 
 func (h *timelineSessionMemory) waitWithProgress(ctx context.Context, onWait func()) error {
+	return h.waitForCompletions(ctx, onWait, true)
+}
+
+// A reduction needs all earlier model output, not completion of external
+// observers. Finalization uses waitWithProgress to await delivery as well.
+func (h *timelineSessionMemory) waitForModelTail(ctx context.Context, onWait func()) error {
+	return h.waitForCompletions(ctx, onWait, false)
+}
+
+func (h *timelineSessionMemory) waitForCompletions(ctx context.Context, onWait func(), waitNotifications bool) error {
 	if h == nil {
 		return nil
 	}
@@ -135,7 +145,7 @@ func (h *timelineSessionMemory) waitWithProgress(ctx context.Context, onWait fun
 		if err := wait(completion.done); err != nil {
 			return err
 		}
-		if completion.notified != nil {
+		if waitNotifications && completion.notified != nil {
 			if err := wait(completion.notified); err != nil {
 				return err
 			}

@@ -14,9 +14,7 @@ import (
 )
 
 func init() {
-	consts.GetGormProfileDatabase()
-	consts.GetGormProjectDatabase()
-	_ = yakit.CallPostInitDatabase()
+	initializeTestDatabase()
 }
 
 func TestGRPCMUSTPASS_LANGUAGE_EXEC_YAK_SCRIPT_TRACEFLOW(t *testing.T) {

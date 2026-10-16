@@ -2,8 +2,11 @@ package aicommon
 
 import (
 	"errors"
-	"github.com/stretchr/testify/require"
+	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon/promptloader"
 )
 
 // The host-state unit tests cannot import aiforge from package aicommon.
@@ -30,12 +33,32 @@ func registerTimelineTestLiteForge(t testing.TB) {
 			}
 			return nil, errors.New("no test LiteForge adapter for this task")
 		}
-		cfg := NewConfig(req.Context, append([]ConfigOption{WithDisableAutoSkills(true)}, configOpts...)...)
-		if req.ActionName == CallerLabelTimelineCompress {
-			g := NewGeneralKVConfig(req.Options...)
-			require.True(t, g.GetLiteForgeDisableTimeline(), "the snapshot is the only history source")
-			require.Equal(t, timelineCompressionInstruction, g.GetLiteForgeStaticInstruction())
-		}
+		g := NewGeneralKVConfig(req.Options...)
+		require.True(t, g.GetLiteForgeDisableTimeline(), "the snapshot is the only history source")
+		// Instructions now live in the rendered prompt, not a separate option.
+		// Still verify that the complete instruction and output contract arrive.
+		source := promptloader.MustLoad("ai/aid/aicommon/prompts/timeline/compression.txt")
+		instruction, _, found := strings.Cut(source, "{{ .Capacity }}")
+		require.True(t, found, "the template must place its fixed instruction before the capacity")
+		require.True(t, strings.HasPrefix(prompt, instruction), "the request must contain the entire fixed instruction")
+		require.Equal(t, 1, strings.Count(prompt, strings.TrimSpace(instruction)), "the instruction must be supplied exactly once")
+		require.Equal(t, timelineCompressionSchema, req.OutputSchema)
+		require.Equal(t, 1, strings.Count(prompt, req.OutputSchema), "the complete output schema must be supplied exactly once")
+		// NewConfig SoftBinds whatever Timeline it owns and copies that config's
+		// content limit onto it. Production liteforge.Execute drops or copies a
+		// shared Timeline before construction. This adapter must do the same,
+		// or the helper's default 300K limit overwrites the parent halfway
+		// through compression.
+		configOpts = append([]ConfigOption{WithDisableAutoSkills(true)}, configOpts...)
+		configOpts = append(configOpts, func(cfg *Config) error {
+			if g.GetLiteForgeDisableTimeline() {
+				cfg.Timeline = nil
+			} else if cfg.Timeline != nil {
+				cfg.Timeline = cfg.Timeline.CopyReducibleTimelineWithMemory()
+			}
+			return nil
+		})
+		cfg := NewConfig(req.Context, configOpts...)
 		requestPrompt := prompt
 		if req.ResponseHandler == nil {
 			requestPrompt = NewGeneralKVConfig(req.Options...).GetLiteForgeStaticInstruction() + "\n" + prompt + "\n" + req.OutputSchema

@@ -41,6 +41,11 @@ func (r *ReActLoop) compressTimelineBeforePrompt(userInput, frozenUserContext, t
 	}()
 	_, err := provider.GetTimeline().CompressBeforePrompt(aicommon.TimelineCompressionOptions{
 		Context: ctx,
+		PromptOptions: aicommon.TimelinePromptOptions{
+			IncludeLatestModelReplay: true,
+			PromoteUserInput:         true,
+			UserInputOnly:            r.useSpeedPriorityAI,
+		},
 		OnProgress: func(stage aicommon.TimelineCompressionStage) {
 			if stage == lastStage || ctx.Err() != nil {
 				return
@@ -68,7 +73,7 @@ func (r *ReActLoop) compressTimelineBeforePrompt(userInput, frozenUserContext, t
 		if ctx.Err() != nil {
 			return ctx.Err()
 		}
-		log.Warnf("timeline compression before-prompt check failed; preserving complete history: %v", err)
+		log.Warnf("timeline optimization incomplete; keeping the current committed context: %v", err)
 	}
 	return nil
 }

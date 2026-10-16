@@ -13,33 +13,19 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/yaklang/gorm"
 	"github.com/yaklang/yaklang/common/consts"
 	mcpmodel "github.com/yaklang/yaklang/common/mcp/mcp-go/mcp"
 	rawserver "github.com/yaklang/yaklang/common/mcp/mcp-go/server"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/configtest"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
-func migrateMCPServerRelatedTables(db *gorm.DB) error {
-	return db.AutoMigrate(
-		&schema.MCPServer{},
-		&schema.MCPServerToolConfig{},
-		&schema.MCPClientToolConfig{},
-	).Error
-}
-
-func init() {
-	// 确保 MCP 相关表存在（Update/Delete 会联动 tool config 表）
-	db := consts.GetGormProfileDatabase()
-	_ = migrateMCPServerRelatedTables(db)
-}
-
 func TestMCPServerCRUD(t *testing.T) {
+	yakit.GuardConfigurationForTest(t)
 	db := consts.GetGormProfileDatabase()
-	require.NoError(t, migrateMCPServerRelatedTables(db))
 
 	// 清理可能存在的测试数据
 	db.Unscoped().Where("name LIKE ?", "test-%").Delete(&schema.MCPServer{})
@@ -291,8 +277,11 @@ func TestMCPServerDatabase(t *testing.T) {
 	if err != nil {
 		t.Fatalf("创建临时数据库失败: %v", err)
 	}
-	// 确保数据库表存在（UpdateMCPServer/DeleteMCPServer 会联动 tool config 表）
-	require.NoError(t, migrateMCPServerRelatedTables(db))
+	t.Cleanup(func() { _ = db.Close() })
+	configtest.RequirePristine(t, db, nil)
+	// This fixture has its own schema; the shared default DB is migrated once
+	// by consts instead of being rebuilt by each MCP test file.
+	require.NoError(t, db.AutoMigrate(&schema.MCPServer{}, &schema.MCPServerToolConfig{}, &schema.MCPClientToolConfig{}).Error)
 
 	// 测试数据库直接操作
 	t.Run("DirectDatabaseOperations", func(t *testing.T) {
@@ -407,8 +396,8 @@ func TestMCPServerDatabase(t *testing.T) {
 }
 
 func TestMCPServerPagination(t *testing.T) {
+	yakit.GuardConfigurationForTest(t)
 	db := consts.GetGormProfileDatabase()
-	require.NoError(t, migrateMCPServerRelatedTables(db))
 
 	// 创建多个测试服务器
 	servers := []*schema.MCPServer{

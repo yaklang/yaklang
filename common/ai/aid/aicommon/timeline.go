@@ -366,6 +366,17 @@ func (m *Timeline) SetTimelineContentLimit(contentSize int64) {
 	m.totalDumpContentLimit = contentSize
 }
 
+// GetTimelineContentLimit returns the threshold used by the pre-prompt
+// compression measurement.
+func (m *Timeline) GetTimelineContentLimit() int64 {
+	if m == nil {
+		return 0
+	}
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return m.totalDumpContentLimit
+}
+
 // SetTimelineBucketByteSize 设置 GroupByMinutes 在同一时间桶内的字节子桶预算。
 // n > 0 时使用该值；n == 0 时恢复默认（TimelineDumpDefaultBucketByteSize）；
 // n < 0 时禁用字节切分，仅按分钟时间桶分组（与旧行为一致）。

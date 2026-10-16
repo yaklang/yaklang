@@ -74,6 +74,7 @@ func TestSSEMCPServer_DeliversToolsListChangedToClient(t *testing.T) {
 }
 
 func TestRefreshAIToolsFromMCPServer_IncludesDynamicallyAddedTool(t *testing.T) {
+	yakit.GuardConfigurationForTest(t)
 	serverName := "test_refresh_" + utils.RandStringBytes(8)
 	db := consts.GetGormProfileDatabase()
 	require.NotNil(t, db)
@@ -136,6 +137,7 @@ func TestRefreshAIToolsFromMCPServer_IncludesDynamicallyAddedTool(t *testing.T) 
 }
 
 func TestMCPToolsListChangedState_ApplyRefresh(t *testing.T) {
+	yakit.GuardConfigurationForTest(t)
 	serverName := "test_apply_refresh_" + utils.RandStringBytes(8)
 	db := consts.GetGormProfileDatabase()
 	require.NotNil(t, db)

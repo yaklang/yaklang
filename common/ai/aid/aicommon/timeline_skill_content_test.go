@@ -2,6 +2,7 @@ package aicommon
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -41,8 +42,7 @@ func TestSkillContentNotDedupedBySkillName(t *testing.T) {
 	require.Contains(t, open, "RESOURCE_BODY")
 }
 
-// Skill bodies remain exact promoted state for now: they are not offered as
-// compression candidates. Compression must not summarize or retire them.
+// Skill bodies are separate original items, kept unless explicitly blacklisted.
 func TestSkillContentStaysExactDuringCompression(t *testing.T) {
 	cfg := NewConfig(context.Background(), WithDisableAutoSkills(true))
 	tl := cfg.GetTimeline()
@@ -53,16 +53,10 @@ func TestSkillContentStaysExactDuringCompression(t *testing.T) {
 
 	snapshot, err := tl.captureCompressionSnapshot()
 	require.NoError(t, err)
-	skillExact := false
-	for _, id := range snapshot.ExactItemIDs {
-		item, ok := tl.idToTimelineItem.Get(id)
-		require.True(t, ok)
-		op, ok := item.value.(*PromotableTimelineItem)
-		if ok && op != nil && op.Kind == TimelinePromotedKindSkillContent {
-			skillExact = true
-		}
-	}
-	require.True(t, skillExact, "skill body must stay in the exact item set")
+	require.Len(t, snapshot.PromotedItems, 1)
+	require.Equal(t, TimelinePromotedKindSkillContent, snapshot.PromotedItems[0].Kind)
+	require.Contains(t, snapshot.PromotedItems[0].PromptText, "CANDIDATE_BODY_SECRET")
+	require.NotContains(t, snapshot.ExactItemIDs, snapshot.PromotedItems[0].ID)
 	found := false
 	for _, item := range snapshot.Items {
 		if strings.Contains(item.PromptText, "CANDIDATE_BODY_SECRET") {
@@ -72,13 +66,15 @@ func TestSkillContentStaysExactDuringCompression(t *testing.T) {
 	require.False(t, found, "skill body must not be a compression candidate")
 }
 
-// Skill bodies are exact promoted state for now: compression summaries ordinary
-// history but must not retire or replace the skill body.
+// Skill bodies are exact promoted state: compression keeps them unless the
+// model blacklists the entry, so an untouched body survives the summary.
 func TestSkillContentSurvivesCompression(t *testing.T) {
 	registerTimelineTestLiteForge(t)
 	cfg := NewConfig(context.Background(), WithDisableAutoSkills(true),
 		WithSpeedPriorityAICallback(func(_ AICallerConfigIf, req *AIRequest) (*AIResponse, error) {
-			require.NotContains(t, req.GetPrompt(), "SKILL_SUMMARIZED_SECRET")
+			// The body is listed exactly once as a complete item; it is not
+			// duplicated into the ordinary history sections.
+			require.Equal(t, 1, strings.Count(req.GetPrompt(), "SKILL_SUMMARIZED_SECRET"))
 			rsp := NewUnboundAIResponse()
 			rsp.EmitOutputStream(strings.NewReader(compressionMockSummary("Ordinary history summarized.")))
 			rsp.Close()
@@ -153,46 +149,52 @@ func TestSkillContentPromotedAfterFreeze(t *testing.T) {
 	require.NotContains(t, RenderTimelineFrozenOpen(tl).Open, "SKILL_KEPT_SECRET")
 }
 
-// Pending exact skill content participates in the freeze threshold like other
-// promoted state, but the compression request itself must not receive it.
-func TestSkillContentPendingDeltaTriggersFreezeOnly(t *testing.T) {
+// Pending skill content is visible to the trigger and can be explicitly
+// retired when lossless freezing alone cannot meet the lower target.
+func TestSkillContentPendingDeltaTriggersCompression(t *testing.T) {
 	registerTimelineTestLiteForge(t)
 	requests := 0
+	var skillID int64
 	cfg := NewConfig(context.Background(), WithDisableAutoSkills(true),
 		WithSpeedPriorityAICallback(func(_ AICallerConfigIf, req *AIRequest) (*AIResponse, error) {
 			requests++
 			rsp := NewUnboundAIResponse()
-			rsp.EmitOutputStream(strings.NewReader(compressionMockSummary("unexpected")))
+			rsp.EmitOutputStream(strings.NewReader(compressionMockWithRetire("", fmt.Sprint(skillID))))
 			rsp.Close()
 			return rsp, nil
 		}))
 	tl := cfg.GetTimeline()
 	tl.SetTimelineBucketByteSize(-1)
-	skillID := cfg.AcquireId()
+	skillID = cfg.AcquireId()
 	require.True(t, tl.PushSkillFileContent(skillID, "demo-skill", "SKILL.md", "ONLY_SKILL_HISTORY_SECRET "+strings.Repeat("skill step detail ", 200), SkillContentSourceAuto, 1, 1, 1))
 
 	tl.SetTimelineContentLimit(1)
 	_, err := tl.CompressBeforePrompt(compressionTestOptions())
 	require.NoError(t, err)
-	require.Zero(t, requests, "exact skill content must not require an AI summary")
+	require.Equal(t, 1, requests, "decidable promoted content asks once")
 	require.GreaterOrEqual(t, tl.frozenThroughLocked(), skillID)
-	require.Contains(t, tl.RenderSkillContentForPrompt(), "ONLY_SKILL_HISTORY_SECRET")
+	require.NotContains(t, tl.RenderSkillContentForPrompt(), "ONLY_SKILL_HISTORY_SECRET")
 }
 
-// The rendered compression request must not expose exact skill bodies.
-func TestSkillContentAbsentFromCompressionRequest(t *testing.T) {
+// The rendered compression request lists the skill entry with its full
+// effective body, exactly once and never duplicated into ordinary sections.
+func TestSkillContentListedWithFullBodyInCompressionRequest(t *testing.T) {
 	registerTimelineTestLiteForge(t)
 	cfg := NewConfig(context.Background(), WithDisableAutoSkills(true))
 	tl := cfg.GetTimeline()
 	tl.SetTimelineBucketByteSize(-1)
 	tl.PushText(cfg.AcquireId(), "ORDINARY_HISTORY_SECRET "+strings.Repeat("ordinary detail ", 40))
-	require.True(t, tl.PushSkillFileContent(cfg.AcquireId(), "demo-skill", "references/api.md", "REQUEST_VISIBLE_SECRET", SkillContentSourceAuto, 1, 1, 1))
+	body := "SKILL_PREVIEW_HEAD " + strings.Repeat("skill body detail ", 80) + "SKILL_DEEP_SECRET"
+	require.True(t, tl.PushSkillFileContent(cfg.AcquireId(), "demo-skill", "references/api.md", body, SkillContentSourceAuto, 1, 1, 1))
 
 	snapshot, err := tl.captureCompressionSnapshot()
 	require.NoError(t, err)
 	prompt, err := renderCompressionSummaryPrompt(snapshot)
 	require.NoError(t, err)
-	require.NotContains(t, prompt, "REQUEST_VISIBLE_SECRET")
+	require.Len(t, snapshot.PromotedItems, 1)
+	skillID := snapshot.PromotedItems[0].ID
+	requireCompressionPromotedEntry(t, prompt, skillID, "kind=skill name=demo-skill:references/api.md:1-1 operation=upsert", "[skill demo-skill | references/api.md:1-1/1 END]\n"+body)
+	require.Equal(t, 1, strings.Count(prompt, "SKILL_DEEP_SECRET"))
 	require.Contains(t, prompt, "ORDINARY_HISTORY_SECRET")
 }
 
@@ -228,15 +230,15 @@ func TestForcedSkillContentStaysExact(t *testing.T) {
 	require.Contains(t, tl.RenderSkillContentForPrompt(), "FORCED_CANDIDATE_SECRET")
 }
 
-// A body already promoted into the cached prefix stays exact across later
-// compressions and is not offered to the summarizer.
-func TestPromotedSkillContentStaysExactAcrossCompression(t *testing.T) {
+// A body already promoted into the cached prefix is listed as a deletable
+// entry and is kept by default across later compressions.
+func TestPromotedSkillContentKeptByDefaultAcrossCompression(t *testing.T) {
 	registerTimelineTestLiteForge(t)
 	requests := 0
 	cfg := NewConfig(context.Background(), WithDisableAutoSkills(true),
 		WithSpeedPriorityAICallback(func(_ AICallerConfigIf, req *AIRequest) (*AIResponse, error) {
 			requests++
-			require.NotContains(t, req.GetPrompt(), "PROMOTED_SKILL_SECRET")
+			require.Equal(t, 1, strings.Count(req.GetPrompt(), "PROMOTED_SKILL_SECRET"))
 			rsp := NewUnboundAIResponse()
 			rsp.EmitOutputStream(strings.NewReader(compressionMockSummary("ordinary history summarized")))
 			rsp.Close()
@@ -251,8 +253,7 @@ func TestPromotedSkillContentStaysExactAcrossCompression(t *testing.T) {
 	tl.FreezeAll()
 	require.Contains(t, tl.RenderSkillContentForPrompt(), "PROMOTED_SKILL_SECRET")
 
-	tl.SetTimelineContentLimit(1)
-	_, err := tl.CompressBeforePrompt(compressionTestOptions())
+	_, err := tl.CompressOnce(compressionTestOptions())
 	require.NoError(t, err)
 	require.Equal(t, 1, requests, "ordinary history still triggers one compression")
 	require.Contains(t, tl.RenderSkillContentForPrompt(), "PROMOTED_SKILL_SECRET")

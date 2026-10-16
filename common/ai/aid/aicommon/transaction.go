@@ -51,6 +51,9 @@ func isNonRetryableAIHTTPResponse(rsp *AIResponse) bool {
 }
 
 func aiHTTPResponseError(rsp *AIResponse) error {
+	if overflowErr := ClassifyPromptTooLong(rsp, nil); overflowErr != nil {
+		return overflowErr
+	}
 	if err := rsp.GetError(); err != nil {
 		return err
 	}
@@ -113,6 +116,7 @@ func callAITransaction(
 	var lastRsp *AIResponse
 	var lastReq *AIRequest
 	var nonRetryableHTTPFailure bool
+	var promptOverflowFailure bool
 
 	// attemptHistory records every attempt (including 429 rate-limit retries) so
 	// that the final failure message can expose the full retry history to the
@@ -177,6 +181,12 @@ func callAITransaction(
 			return ctxErr
 		}
 		if err != nil {
+			if isNonRetryableAIHTTPResponse(rsp) && !rsp.WaitForCallbackDone(transactionCtx) {
+				return transactionCtx.Err()
+			}
+			if overflowErr := classifyTransactionPromptOverflow(transactionCtx, c, rsp, err); overflowErr != nil {
+				err = overflowErr
+			}
 			// Transport failures do not reject model output. Never recycle an
 			// older validation failure or provider/authentication body as advice.
 			retryCorrectionErr = nil
@@ -204,6 +214,10 @@ func callAITransaction(
 			i++
 			attemptHistory = append(attemptHistory, recordAttempt(i, err, rsp))
 			rspEmitter.EmitError("call ai api error (attempt %d/%d): %v", i, trcRetry, err)
+			if IsPromptTooLong(err) {
+				promptOverflowFailure = true
+				break
+			}
 			if isNonRetryableAIHTTPResponse(rsp) {
 				nonRetryableHTTPFailure = true
 				break
@@ -233,7 +247,10 @@ func callAITransaction(
 		if ctxErr := transactionCtx.Err(); ctxErr != nil {
 			return ctxErr
 		}
-		if rsp.GetHTTPStatusCode() >= 400 && rsp.GetHTTPStatusCode() != 429 {
+		if overflowErr := classifyTransactionPromptOverflow(transactionCtx, c, rsp, nil); overflowErr != nil {
+			// A stream error is a provider failure, not malformed action output.
+			postHandlerErr = overflowErr
+		} else if rsp.GetHTTPStatusCode() >= 400 && rsp.GetHTTPStatusCode() != 429 {
 			// An HTTP error body is not model output. Do not send it through
 			// action parsing and generate secondary "missing @action" errors.
 			postHandlerErr = aiHTTPResponseError(rsp)
@@ -262,6 +279,13 @@ func callAITransaction(
 			}
 			rspEmitter := bindEmitter(rsp)
 			rspEmitter.EmitError("ai transaction postHandler error (attempt %d/%d): %v", i, trcRetry, postHandlerErr)
+			if IsPromptTooLong(postHandlerErr) {
+				promptOverflowFailure = true
+				// A newer overflow must not be hidden by an earlier transient
+				// call error retained for ordinary transaction failures.
+				lastCallAiErr = postHandlerErr
+				break
+			}
 			if isNonRetryableAIHTTPResponse(rsp) {
 				nonRetryableHTTPFailure = true
 				break
@@ -340,6 +364,9 @@ func callAITransaction(
 	// error stays concise — callers that need the full retry history should
 	// consume the emitted events rather than parsing the error string.
 	if finalErr != nil {
+		if promptOverflowFailure {
+			return utils.Wrap(finalErr, "non-retryable AI prompt overflow")
+		}
 		if nonRetryableHTTPFailure {
 			return utils.Wrap(finalErr, "non-retryable AI HTTP request failure")
 		}

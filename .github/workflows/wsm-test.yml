@@ -9,6 +9,10 @@ on:
       - "common/yakgrpc/yakit/webshell.go"
       - ".github/workflows/wsm-test.yml"
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   setup-iis-aspnet-4_5:
     runs-on: windows-latest

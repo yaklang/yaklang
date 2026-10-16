@@ -175,3 +175,42 @@ func TestBearerRegexCompatibility(t *testing.T) {
 		require.NotEmpty(t, indices)
 	})
 }
+
+// FindAllMatchIndex answers "where did each match start and end", so it must
+// report one range per match and never the capture groups, and both engines
+// have to speak byte offsets.
+func TestFindAllMatchIndex(t *testing.T) {
+	t.Run("skips capture groups", func(t *testing.T) {
+		code := "needle one needle two"
+		reUtils := NewYakRegexpUtils(`(needle) (one|two)`)
+		indices, err := reUtils.FindAllMatchIndex(code)
+		require.NoError(t, err)
+		require.Equal(t, [][]int{{0, 10}, {11, 21}}, indices)
+	})
+
+	t.Run("regexp2 fallback reports byte offsets", func(t *testing.T) {
+		code := "中文yak-123"
+		reUtils := NewYakRegexpUtils(`(?<=yak-)\d+`, WithPriorityMode(RegexpMode2))
+		indices, err := reUtils.FindAllMatchIndex(code)
+		require.NoError(t, err)
+		require.Equal(t, [][]int{{10, 13}}, indices)
+		require.Equal(t, "123", code[indices[0][0]:indices[0][1]])
+	})
+
+	t.Run("both engines agree", func(t *testing.T) {
+		code := "中文123 abc 45"
+		for _, mode := range []regexpMode{RegexpMode1, RegexpMode2} {
+			reUtils := NewYakRegexpUtils(`\d+`, WithPriorityMode(mode))
+			indices, err := reUtils.FindAllMatchIndex(code)
+			require.NoError(t, err)
+			require.Equal(t, [][]int{{6, 9}, {14, 16}}, indices)
+		}
+	})
+
+	t.Run("zero width match keeps start equal to end", func(t *testing.T) {
+		reUtils := NewYakRegexpUtils(`^`)
+		indices, err := reUtils.FindAllMatchIndex("ab")
+		require.NoError(t, err)
+		require.Equal(t, [][]int{{0, 0}}, indices)
+	})
+}

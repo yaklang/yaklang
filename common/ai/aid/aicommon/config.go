@@ -207,7 +207,12 @@ type Config struct {
 	AICallbacks *AICallbacks
 
 	// Optional per-runtime helper implementation; the default uses the registered LiteForge.
-	LiteForgeExecutor LiteForgeExecuteCallback
+	LiteForgeExecutor   LiteForgeExecuteCallback
+	promptOverflowJudge promptOverflowJudgeState
+	promptOverflowLimit promptOverflowLimitState
+	// promptOverflowRetryMax bounds compress-and-retry rounds per iteration
+	// after a confirmed prompt overflow. 0 disables the retry.
+	promptOverflowRetryMax int
 
 	// userUsageCallback 由用户脚本通过 ai.usageCallback(...) 注册并经
 	// aiengine.WithAIConfig 透传. Tiered AI 路径
@@ -769,6 +774,7 @@ func newConfig(ctx context.Context) *Config {
 		AiAutoRetry:                        5,
 		AiTransactionAutoRetry:             5,
 		TimelineContentSizeLimit:           300 * 1024, // Default limit for 300k tokens
+		promptOverflowRetryMax:             promptOverflowDefaultRetryMax,
 		Guardian:                           NewAsyncGuardian(ctx, id),
 		PerTaskUserInteractiveLimitedTimes: 1, // Default to 1 time
 		EnablePlanAndExec:                  true,
@@ -1272,6 +1278,18 @@ func WithAITransactionAutoRetry(n int64) ConfigOption {
 		c.m.Lock()
 		c.AiTransactionAutoRetry = n
 		c.m.Unlock()
+		return nil
+	}
+}
+
+// WithPromptOverflowRetryMax bounds compress-and-retry rounds after a confirmed
+// prompt overflow. 0 disables the retry and keeps the previous behavior.
+func WithPromptOverflowRetryMax(n int) ConfigOption {
+	return func(c *Config) error {
+		if n < 0 {
+			return utils.Error("prompt overflow retry max must be >= 0")
+		}
+		c.promptOverflowRetryMax = n
 		return nil
 	}
 }

@@ -114,6 +114,7 @@ func (g *GatewayClient) BuildHTTPOptions() ([]poc.PocConfigOption, error) {
 }
 
 func TestAiApiPriority(t *testing.T) {
+	yakit.GuardConfigurationForTest(t)
 	client, err := NewLocalClientWithTempDatabase(t)
 	if err != nil {
 		t.Fatal(err)
@@ -217,6 +218,7 @@ func TestAiApiPriority(t *testing.T) {
 }
 
 func TestGRPCMUSTPASS_COMMON_THIRDPARTY_APP(t *testing.T) {
+	yakit.GuardConfigurationForTest(t)
 	client, err := NewLocalClient(true)
 	if err != nil {
 		t.Fatal(err)
@@ -243,6 +245,7 @@ func TestGRPCMUSTPASS_COMMON_THIRDPARTY_APP(t *testing.T) {
 }
 
 func TestGRPCMUSTPASS_COMMON_GLOBAL_NETWORK_DNS_CONFIG(t *testing.T) {
+	yakit.GuardConfigurationForTest(t)
 	client, err := NewLocalClient(true)
 	if err != nil {
 		panic(err)
@@ -286,6 +289,7 @@ func TestGRPCMUSTPASS_COMMON_GLOBAL_NETWORK_DNS_CONFIG(t *testing.T) {
 }
 
 func TestGRPCMUSTPASS_COMMON_RPOXY_FROM_ENV(t *testing.T) {
+	yakit.GuardConfigurationForTest(t)
 	client, err := NewLocalClient(true)
 	if err != nil {
 		panic(err)
@@ -349,6 +353,7 @@ try {
 }
 
 func TestGRPCMUSTPASS_COMMON_GLOBAL_RPOXY(t *testing.T) {
+	yakit.GuardConfigurationForTest(t)
 	client, err := NewLocalClient(true)
 	if err != nil {
 		panic(err)
@@ -409,6 +414,7 @@ try {
 }
 
 func TestGRPCMUSTPASS_COMMON_DISALLOW_ADDRESS(t *testing.T) {
+	yakit.GuardConfigurationForTest(t)
 	client, err := NewLocalClient(true)
 	if err != nil {
 		panic(err)
@@ -456,6 +462,7 @@ try {
 }
 
 func TestGRPCMUSTPASS_COMMON_DISALLOW_DOMAIN(t *testing.T) {
+	yakit.GuardConfigurationForTest(t)
 	client, err := NewLocalClient(true)
 	if err != nil {
 		panic(err)
@@ -527,6 +534,7 @@ func TestValidP12PassWord(t *testing.T) {
 }
 
 func TestGRPCMUSTPASS_COMMON_HTTPAuth(t *testing.T) {
+	yakit.GuardConfigurationForTest(t)
 	username, passwd := "test", "test"
 	host, port := utils.DebugMockHTTPHandlerFunc(func(w http.ResponseWriter, request *http.Request) {
 		u, p, ok := request.BasicAuth()
@@ -646,6 +654,7 @@ func TestGRPCMUSTPASS_COMMON_HTTPAuth(t *testing.T) {
 }
 
 func TestPluginScanLists(t *testing.T) {
+	yakit.GuardConfigurationForTest(t)
 	client, err := NewLocalClient()
 	require.Nil(t, err, "new local client error")
 
@@ -828,6 +837,7 @@ func TestGenThirdPartyConfigOption(t *testing.T) {
 }
 
 func TestLoadThirdPartyConfig(t *testing.T) {
+	yakit.GuardConfigurationForTest(t)
 	config := yakit.GetNetworkConfig()
 	bak := config.AppConfigs
 	defer func() {
@@ -886,6 +896,7 @@ func TestLoadThirdPartyConfig(t *testing.T) {
 }
 
 func TestCallPluginTimeout(t *testing.T) {
+	yakit.GuardConfigurationForTest(t)
 	client, err := NewLocalClient(true)
 	require.NoError(t, err)
 	original, err := client.GetGlobalNetworkConfig(context.Background(), &ypb.GetGlobalNetworkConfigRequest{})
@@ -936,6 +947,7 @@ func TestCallPluginTimeout(t *testing.T) {
 }
 
 func TestDisableHTTPFlowSlowQueryNotification(t *testing.T) {
+	yakit.GuardConfigurationForTest(t)
 	client, err := NewLocalClientWithTempDatabase(t)
 	require.NoError(t, err, "new local client error")
 

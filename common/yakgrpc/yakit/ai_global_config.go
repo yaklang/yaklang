@@ -29,6 +29,26 @@ var (
 	cachedAIGlobalConfigLock sync.RWMutex
 )
 
+// DefaultAIGlobalConfig constructs the public builtin model defaults. Bootstrap
+// and configuration-test preconditions share this definition.
+func DefaultAIGlobalConfig() *ypb.AIGlobalConfig {
+	model := func(name string) []*ypb.AIModelConfig {
+		return []*ypb.AIModelConfig{{
+			Provider: DefaultAIBalanceProviderConfig(), ModelName: name,
+			ExtraParams: []*ypb.KVPair{
+				{Key: consts.ModelExtraParamKey, Value: name},
+				{Key: consts.BuildinModelExtraParamKey, Value: "true"},
+			},
+		}}
+	}
+	return &ypb.AIGlobalConfig{
+		Enabled: true, RoutingPolicy: "balance",
+		IntelligentModels: model("memfit-standard-free"),
+		LightweightModels: model("memfit-light-free"),
+		VisionModels:      model("memfit-vision-free"),
+	}
+}
+
 func setCachedAIGlobalConfig(cfg *ypb.AIGlobalConfig) {
 	cachedAIGlobalConfigLock.Lock()
 	defer cachedAIGlobalConfigLock.Unlock()

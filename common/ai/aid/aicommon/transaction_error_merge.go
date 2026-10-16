@@ -16,11 +16,11 @@ func mergePostHandlerAndCallbackError(postHandlerErr, callbackErr error) error {
 	if postHandlerErr == nil {
 		return callbackErr
 	}
-	if isAICallbackInfrastructureError(callbackErr) {
+	if IsPromptTooLong(callbackErr) || isAICallbackInfrastructureError(callbackErr) {
 		return utils.Wrapf(callbackErr,
 			"ai call failed before response could be parsed (parse error: %v)", postHandlerErr)
 	}
-	return utils.Errorf("post handler: %v; ai callback: %v", postHandlerErr, callbackErr)
+	return utils.Errorf("post handler: %w; ai callback: %w", postHandlerErr, callbackErr)
 }
 
 func isAICallbackInfrastructureError(err error) bool {

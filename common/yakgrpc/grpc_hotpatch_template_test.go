@@ -19,6 +19,7 @@ import (
 )
 
 func TestHotPatchTemplate(t *testing.T) {
+	yakit.GuardConfigurationForTest(t)
 	local, err := NewLocalClient()
 	require.NoError(t, err)
 
@@ -228,6 +229,7 @@ func TestHotPatchTemplate(t *testing.T) {
 }
 
 func TestQueryHotPatchTemplateList_GlobalSortedByNewestCreatedFirst(t *testing.T) {
+	yakit.GuardConfigurationForTest(t)
 	client, server, err := NewLocalClientAndServerWithTempDatabase(t)
 	require.NoError(t, err)
 
@@ -266,6 +268,7 @@ func TestQueryHotPatchTemplateList_GlobalSortedByNewestCreatedFirst(t *testing.T
 }
 
 func TestGetHotPatchTemplateTags(t *testing.T) {
+	yakit.GuardConfigurationForTest(t)
 	client, _, err := NewLocalClientAndServerWithTempDatabase(t)
 	require.NoError(t, err)
 

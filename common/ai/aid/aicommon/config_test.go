@@ -2,6 +2,7 @@ package aicommon
 
 import (
 	"context"
+	"github.com/yaklang/yaklang/common/utils/configtest"
 	"testing"
 	"time"
 
@@ -20,6 +21,7 @@ func init() {
 }
 
 func TestConfig_Smoking(t *testing.T) {
+	configtest.RequirePublicRuntime(t, consts.GetTieredAIConfig())
 	originalTiered := consts.GetTieredAIConfig()
 	consts.SetTieredAIConfig(nil)
 	t.Cleanup(func() {

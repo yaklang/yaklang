@@ -43,6 +43,7 @@ const (
 	CallerLabelScanPlan                       = "scan_plan"
 	CallerLabelLLMRerank                      = "llm-rerank"
 	CallerLabelTimelineCompress               = "timeline-compress"
+	CallerLabelPromptOverflowClassify         = "prompt-overflow-classify"
 	CallerLabelGoalAcceptanceReview           = "goal-acceptance-review"
 	CallerLabelHttpFlowAnalyzeFinalizeSummary = "http_flow_analyze_finalize_summary"
 	CallerLabelSkillConflictResolver          = "skill-conflict-resolver"

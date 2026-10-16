@@ -24,6 +24,7 @@ type RegWrapperInterface interface {
 	FindAllStringSubmatch(s string) ([][]string, error)
 
 	FindAllSubmatchIndex(s string) ([][]int, error)
+	FindAllMatchIndex(s string) ([][]int, error)
 
 	ReplaceAll(src, repl []byte) ([]byte, error)
 	ReplaceAllString(src, repl string) (string, error)
@@ -147,6 +148,16 @@ func (r *RegexpWrapper) FindAllSubmatchIndex(s string) ([][]int, error) {
 		}
 	}
 	return ret, nil
+}
+
+// FindAllMatchIndex returns the byte range of every full match, one entry per
+// match. Unlike FindAllSubmatchIndex it never reports capture groups, so
+// callers that need "where did it match" get exactly one range per hit.
+func (r *RegexpWrapper) FindAllMatchIndex(s string) ([][]int, error) {
+	if r.getReg() == nil {
+		return nil, errors.New("regexp is nil")
+	}
+	return r.getReg().FindAllStringIndex(s, -1), nil
 }
 
 func (r *RegexpWrapper) ReplaceAll(src, repl []byte) ([]byte, error) {
@@ -330,6 +341,43 @@ func runeIndexToByteOffsets(s string) []int {
 	}
 	offsets = append(offsets, len(s))
 	return offsets
+}
+
+// FindAllMatchIndex returns the byte range of every full match, one entry per
+// match. Unlike FindAllSubmatchIndex it never reports capture groups, so
+// callers that need "where did it match" get exactly one range per hit.
+func (r *Regexp2Wrapper) FindAllMatchIndex(s string) ([][]int, error) {
+	if r.getReg() == nil {
+		return nil, errors.New("regexp is nil")
+	}
+	matchRes, err := r.getReg().FindStringMatch(s)
+	if err != nil {
+		return nil, err
+	}
+	// Group 0 (the embedded Capture of Match) reports rune indices; convert
+	// them so both engines hand back byte offsets, as elsewhere in this package.
+	byteOffsets := runeIndexToByteOffsets(s)
+	toByte := func(i int) int {
+		if i < 0 {
+			return -1
+		}
+		if i >= len(byteOffsets) {
+			return len(s)
+		}
+		return byteOffsets[i]
+	}
+	var results [][]int
+	for matchRes != nil {
+		results = append(results, []int{
+			toByte(matchRes.Index),
+			toByte(matchRes.Index + matchRes.Length),
+		})
+		matchRes, err = r.getReg().FindNextMatch(matchRes)
+		if err != nil {
+			return results, err
+		}
+	}
+	return results, nil
 }
 
 func (r *Regexp2Wrapper) FindStringSubmatch(s string) ([]string, error) {

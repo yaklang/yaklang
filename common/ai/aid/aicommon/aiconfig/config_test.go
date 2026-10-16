@@ -1,6 +1,7 @@
 package aiconfig
 
 import (
+	"github.com/yaklang/yaklang/common/utils/configtest"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -9,12 +10,14 @@ import (
 )
 
 func TestModelTierConstants(t *testing.T) {
+	configtest.RequirePublicRuntime(t, consts.GetTieredAIConfig())
 	assert.Equal(t, consts.ModelTier("intelligent"), consts.TierIntelligent)
 	assert.Equal(t, consts.ModelTier("lightweight"), consts.TierLightweight)
 	assert.Equal(t, consts.ModelTier("vision"), consts.TierVision)
 }
 
 func TestIsTieredAIConfig(t *testing.T) {
+	configtest.RequirePublicRuntime(t, consts.GetTieredAIConfig())
 	// Save original state
 	originalConfig := consts.GetTieredAIConfig()
 	originalLoaded := IsConfigLoaded()
@@ -47,6 +50,7 @@ func TestIsTieredAIConfig(t *testing.T) {
 }
 
 func TestGetCurrentPolicy(t *testing.T) {
+	configtest.RequirePublicRuntime(t, consts.GetTieredAIConfig())
 	// Save original state
 	originalConfig := consts.GetTieredAIConfig()
 	originalLoaded := configLoaded
@@ -71,6 +75,7 @@ func TestGetCurrentPolicy(t *testing.T) {
 }
 
 func TestAIConfigManager(t *testing.T) {
+	configtest.RequirePublicRuntime(t, consts.GetTieredAIConfig())
 	mgr := GetGlobalManager()
 	assert.NotNil(t, mgr)
 
@@ -80,6 +85,7 @@ func TestAIConfigManager(t *testing.T) {
 }
 
 func TestGetConfigsByTier(t *testing.T) {
+	configtest.RequirePublicRuntime(t, consts.GetTieredAIConfig())
 	// Save original state
 	originalConfig := consts.GetTieredAIConfig()
 	defer consts.SetTieredAIConfig(originalConfig)
@@ -121,6 +127,7 @@ func TestGetConfigsByTier(t *testing.T) {
 }
 
 func TestGetFirstConfig(t *testing.T) {
+	configtest.RequirePublicRuntime(t, consts.GetTieredAIConfig())
 	// Save original state
 	originalConfig := consts.GetTieredAIConfig()
 	defer consts.SetTieredAIConfig(originalConfig)
@@ -148,6 +155,7 @@ func TestGetFirstConfig(t *testing.T) {
 }
 
 func TestGetFirstConfigByTierAndProviderAndModel(t *testing.T) {
+	configtest.RequirePublicRuntime(t, consts.GetTieredAIConfig())
 	originalConfig := consts.GetTieredAIConfig()
 	defer consts.SetTieredAIConfig(originalConfig)
 
@@ -192,6 +200,7 @@ func TestGetFirstConfigByTierAndProviderAndModel(t *testing.T) {
 }
 
 func TestPromoteFirstConfigByTierAndProviderAndModel(t *testing.T) {
+	configtest.RequirePublicRuntime(t, consts.GetTieredAIConfig())
 	originalLoaded := configLoaded
 	originalGetAIGlobalConfig := getAIGlobalConfig
 	originalSaveAIGlobalConfigForManager := saveAIGlobalConfigForManager
@@ -239,6 +248,7 @@ func TestPromoteFirstConfigByTierAndProviderAndModel(t *testing.T) {
 }
 
 func TestPromoteFirstConfigByTierAndProviderAndModel_NotFound(t *testing.T) {
+	configtest.RequirePublicRuntime(t, consts.GetTieredAIConfig())
 	originalLoaded := configLoaded
 	originalGetAIGlobalConfig := getAIGlobalConfig
 	originalSaveAIGlobalConfigForManager := saveAIGlobalConfigForManager
@@ -279,6 +289,7 @@ func TestPromoteFirstConfigByTierAndProviderAndModel_NotFound(t *testing.T) {
 }
 
 func TestGetModelByPolicy(t *testing.T) {
+	configtest.RequirePublicRuntime(t, consts.GetTieredAIConfig())
 	// Save original state
 	originalConfig := consts.GetTieredAIConfig()
 	defer consts.SetTieredAIConfig(originalConfig)
@@ -320,6 +331,7 @@ func TestGetModelByPolicy(t *testing.T) {
 }
 
 func TestSelectTierByPolicy(t *testing.T) {
+	configtest.RequirePublicRuntime(t, consts.GetTieredAIConfig())
 	// Test performance policy (always intelligent)
 	assert.Equal(t, consts.TierIntelligent, SelectTierByPolicy(consts.PolicyPerformance, false))
 	assert.Equal(t, consts.TierIntelligent, SelectTierByPolicy(consts.PolicyPerformance, true))
@@ -338,6 +350,7 @@ func TestSelectTierByPolicy(t *testing.T) {
 }
 
 func TestIsComplexTask(t *testing.T) {
+	configtest.RequirePublicRuntime(t, consts.GetTieredAIConfig())
 	// Short simple prompts should not be complex
 	assert.False(t, IsComplexTask("hello"))
 	assert.False(t, IsComplexTask("what time is it"))

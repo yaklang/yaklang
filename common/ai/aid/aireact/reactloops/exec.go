@@ -700,7 +700,7 @@ LOOP:
 		// when the current iteration is below GoalMinIterations, causing finish to
 		// be removed from the schema. Idempotent via DisallowNextLoopExit's Once.
 		r.ApplyGoalModeGate(operator, iterationCount)
-		prompt, finalError = r.generateLoopPrompt(
+		buildInput := r.captureLoopPromptBuildInput(
 			nonce,
 			taskInput,
 			frozenUserContext,
@@ -708,35 +708,69 @@ LOOP:
 			r.GetCurrentMemoriesContent(),
 			operator,
 		)
-		if finalError != nil {
-			r.finishIterationLoopWithError(iterationCount, task, finalError)
-			log.Errorf("Failed to generate prompt: %v", finalError)
-			needSummary.SetTo(true)
-			return finalError
-		}
-		// Save prompt to file in debug mode
-		if r.isDebugModeEnabled() {
-			r.savePromptToFile(task, iterationCount, prompt)
-		}
-		// observation 已通过 emitter.EmitPromptProfile 走 prompt_profile 结构化事件
-		// 推送给前端 "上下文成分" 面板, 不再落盘 ASCII 副本以避免污染 task 目录.
-		// 关键词: prompt observation 不再落盘, EmitPromptProfile 现役路径
-
-		streamWg := new(sync.WaitGroup)
-		/* Generate AI Action */
-		loopCalls, stopReason, resultDescriptor, transactionErr := r.callAILoopTransaction(
-			streamWg, prompt, nonce, operator,
-			r.emitLoopGeneralOutput, r.emitLoopFunctionCallOutput,
+		// A confirmed prompt overflow is retried with a lower timeline content
+		// limit: rebuilding the prompt compresses the history against that limit,
+		// then the model is called again. The retry is bounded and stops as soon
+		// as one rebuild fails to shrink the prompt.
+		var (
+			loopCalls        []LoopCall
+			stopReason       LoopStopReason
+			resultDescriptor *LoopResultDescriptor
+			transactionErr   error
+			lastPromptTokens int
 		)
-		if resultDescriptor != nil {
-			log.Debugf("AI loop transaction stop=%s provider_finish=%q", stopReason, resultDescriptor.Snapshot().ProviderFinishReason)
-		}
-		streamWg.Wait()
-		if r.asyncReviewRequiresAnswer() {
-			r.clearCallsExecutionValues(loopCalls)
-			answerErr := r.answerAsyncReview(task)
-			r.finishIterationLoopWithError(iterationCount, task, answerErr)
-			return answerErr
+		retryMax := r.promptOverflowRetryMax()
+		for attempt := 0; ; attempt++ {
+			prompt, finalError = r.generateLoopPromptFromInput(buildInput)
+			if finalError != nil {
+				r.finishIterationLoopWithError(iterationCount, task, finalError)
+				log.Errorf("Failed to generate prompt: %v", finalError)
+				needSummary.SetTo(true)
+				return finalError
+			}
+			// observation 已通过 emitter.EmitPromptProfile 走 prompt_profile 结构化事件
+			// 推送给前端 "上下文成分" 面板, 不再落盘 ASCII 副本以避免污染 task 目录.
+			// 关键词: prompt observation 不再落盘, EmitPromptProfile 现役路径
+			promptTokens := aicommon.MeasureTokens(prompt)
+			if attempt > 0 && promptTokens >= lastPromptTokens*99/100 {
+				log.Warnf(
+					"prompt overflow retry made no progress (%d -> %d tokens), giving up: %v",
+					lastPromptTokens, promptTokens, transactionErr,
+				)
+				break
+			}
+			lastPromptTokens = promptTokens
+			// Save prompt to file in debug mode
+			if r.isDebugModeEnabled() {
+				r.savePromptToFile(task, iterationCount, prompt)
+			}
+
+			streamWg := new(sync.WaitGroup)
+			/* Generate AI Action */
+			loopCalls, stopReason, resultDescriptor, transactionErr = r.callAILoopTransaction(
+				streamWg, prompt, nonce, operator,
+				r.emitLoopGeneralOutput, r.emitLoopFunctionCallOutput,
+			)
+			if resultDescriptor != nil {
+				log.Debugf("AI loop transaction stop=%s provider_finish=%q", stopReason, resultDescriptor.Snapshot().ProviderFinishReason)
+			}
+			streamWg.Wait()
+			if r.asyncReviewRequiresAnswer() {
+				r.clearCallsExecutionValues(loopCalls)
+				answerErr := r.answerAsyncReview(task)
+				r.finishIterationLoopWithError(iterationCount, task, answerErr)
+				return answerErr
+			}
+			if transactionErr == nil {
+				break
+			}
+			if attempt >= retryMax || !aicommon.IsPromptTooLong(transactionErr) {
+				break
+			}
+			if !r.reduceTimelineLimitForPromptOverflow(transactionErr, prompt) {
+				break
+			}
+			log.Warnf("prompt overflow detected; compressing the context and retrying (retry %d/%d)", attempt+1, retryMax)
 		}
 		iterationModelThinking := strings.TrimSpace(r.takeModelThinkingForTimeline())
 		if transactionErr != nil {
