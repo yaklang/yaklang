@@ -1632,6 +1632,21 @@ func (f *binFlow) finishSession(reason TrafficFlowCloseReason) {
 			e.Error = e.Summary
 			f.a.incomplete.Add(1)
 			f.a.emit(e)
+		} else if d.pending != nil && d.pending.kind == "GET" && (d.pending.choice == 1 || d.pending.choice == 3) {
+			// A complete request still awaiting its response must keep the same
+			// typed, owned diagnostic contract as the other HDLC services.
+			e := f.event(d.pending.dir, nil, "incomplete", string(reason)+": DLMS HDLC exchange ended with an unmatched request")
+			e.Profile = "dlms-hdlc-get-normal"
+			if d.pending.choice == 3 {
+				e.Profile = "dlms-hdlc-get-list"
+			}
+			e.nativeDLMSOrSLMPObservation = true
+			e.Session = map[string]any{"Outstanding": 1}
+			e.semanticSession = cloneSession(e.Session)
+			e.sessionError = &ProtocolError{Kind: ErrNeedMore, Message: e.Summary}
+			e.Error = e.Summary
+			f.a.incomplete.Add(1)
+			f.a.emit(e)
 		} else if d.pending != nil {
 			emit(d.pending.dir, map[string]any{"Outstanding": 1}, "DLMS HDLC exchange ended with an unmatched request")
 		}

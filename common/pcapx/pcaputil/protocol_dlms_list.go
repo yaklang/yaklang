@@ -17,11 +17,11 @@ func dlmsAPDU(w []byte) []byte {
 	if _, _, err := dlmsAddress(w[:end], &at); err != nil {
 		return nil
 	}
-	if at >= end || w[at]&1 != 0 || end-at < 8 {
+	if at >= end || w[at]&1 != 0 || end-at < 7 {
 		return nil
 	}
 	p := w[at+6 : end] // control, HCS(2), LLC(3)
-	if len(p) < 2 || p[0] != 0xc0 && p[0] != 0xc4 && !dlmsOperationAPDU(p) && (p[0] < 0x60 || p[0] > 0x64) {
+	if len(p) == 0 || len(p) < 2 && !dlmsSNReadAPDU(p) || p[0] != 0xc0 && p[0] != 0xc4 && !dlmsSNReadAPDU(p) && !dlmsOperationAPDU(p) && (p[0] < 0x60 || p[0] > 0x64) {
 		return nil
 	}
 	return p
@@ -44,6 +44,9 @@ func dlmsActionDownloadAPDU(p []byte) bool {
 	return len(p) > 1 && (p[0] == 0xc3 || p[0] == 0xc7) && p[1] == 2
 }
 func dlmsProfile(w []byte) string {
+	if dlmsSNReadAPDU(dlmsAPDU(w)) {
+		return "dlms-hdlc-sn-read"
+	}
 	if dlmsSetListBlockAPDU(dlmsAPDU(w)) {
 		return "dlms-hdlc-set-list-block"
 	}
@@ -107,6 +110,11 @@ func dlmsObservedProfile(w []byte, fields map[string]any) string {
 }
 
 func dlmsProjection(w []byte) int64 {
+	if dlmsSNReadAPDU(dlmsAPDU(w)) {
+		// Include all owned rows and the shared compact/Data expansion pool,
+		// even when an octet payload happens to contain a Data tag byte.
+		return 32768 + 512*int64(len(w)) + 8192*wrapperSNReadItems + 2048*wrapperDataNodes
+	}
 	if p := dlmsAPDU(w); dlmsOperationAPDU(p) {
 		return dlmsOperationProjection(p, len(w))
 	}

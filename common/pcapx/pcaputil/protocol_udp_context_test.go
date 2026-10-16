@@ -58,16 +58,23 @@ func TestUDPForeignClockExistingAPI(t *testing.T) {
 					if foreign != "none" {
 						n = 3
 					}
-					if proto.name == "Wrapper" && (foreign == "SLMP-other-endpoint" || foreign == "SLMP-other-interface") {
+					if (proto.name == "Wrapper" || proto.name == "HDLC") && (foreign == "SLMP-other-endpoint" || foreign == "SLMP-other-interface") {
 						require.Len(t, es, n+1)
 						require.NotEqual(t, es[0].FlowID, es[1].FlowID)
 						require.Equal(t, es[1].FlowID, es[n].FlowID)
 						require.EqualValues(t, 1, stats.Incomplete)
-						name := "Wrapper-foreign-endpoint"
+						name := proto.name + "-foreign-endpoint"
 						if foreign == "SLMP-other-interface" {
-							name = "Wrapper-foreign-interface"
+							name = proto.name + "-foreign-interface"
 						}
-						wrapperCloseHistorical(t, es[n:], name, "common/pcapx/pcaputil/udp-context/"+name+".pcapng", "udp", false, "ctx-canceled")
+						if proto.name == "HDLC" {
+							for _, old := range es[:n] {
+								require.NotEqual(t, old.ID, es[n].ID)
+							}
+							hdlcGetCloseHistorical(t, es[n:], name, "common/pcapx/pcaputil/udp-context/"+name+".pcapng")
+						} else {
+							wrapperCloseHistorical(t, es[n:], name, "common/pcapx/pcaputil/udp-context/"+name+".pcapng", "udp", false, "ctx-canceled")
+						}
 						es = es[:n]
 					}
 					require.Len(t, es, n)

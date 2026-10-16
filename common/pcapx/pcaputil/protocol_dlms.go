@@ -96,6 +96,7 @@ type dlmsMessage struct {
 	information               []byte
 	segmented                 bool
 	setResponseAssemblyChoice byte
+	snRead                    bool
 }
 
 func dlmsAddress(w []byte, at *int) (uint32, int, error) {
@@ -236,6 +237,9 @@ func decodeDLMSInformation(m *dlmsMessage, info []byte, maxElements, depth int) 
 	}
 	f["LLC"] = bytes.Clone(info[:3])
 	p := info[3:]
+	if dlmsSNReadAPDU(p) {
+		return decodeDLMSSNRead(m, p, info[1], maxElements, depth)
+	}
 	if p[0] >= 0x60 && p[0] <= 0x64 {
 		return decodeDLMSACSEInformation(m, p, info[1], maxElements, depth)
 	}
@@ -507,6 +511,16 @@ func probeDLMS(w []byte, limit int) ProbeResult {
 	elements := 4096
 	list := dlmsListAPDU(w[:n])
 	apdu := dlmsAPDU(w[:n])
+	if len(apdu) > 1 && dlmsSNReadAPDU(apdu) {
+		// A cold SN response has no invoke owner to establish. Validate only
+		// the complete carrier here; reserve the bounded Data projections before
+		// decoding its semantics in the native session, never inside the probe.
+		m, err := decodeDLMSFrameBudget(w[:n], 0, 0, true)
+		if err == nil && m.kind == "I" && !m.segmented && len(m.information) >= 5 && m.information[0] == 0xe6 && m.information[2] == 0 && (m.information[1] == 0xe6 && apdu[0] == 5 || m.information[1] == 0xe7 && apdu[0] == 12) {
+			return probeAccept("dlms", "hdlc-sn-read", 98)
+		}
+		return ProbeResult{Verdict: ProbeReject}
+	}
 	if dlmsACSEAPDU(apdu) {
 		if dlmsACSEWireEvidence(w[:n]) {
 			version := "hdlc-acse"
@@ -736,6 +750,21 @@ func (f *binFlow) consumeDLMS(dir int, w []byte, id uint64) (map[string]any, uin
 func (f *binFlow) consumeDecodedDLMS(dir int, w []byte, id uint64, m *dlmsMessage) (map[string]any, uint64, error) {
 	s := f.dlms
 	s.operationProfile = ""
+	if m.snRead {
+		// A second distinct request on this same observed logical HDLC link
+		// cannot leave an older service owner trustworthy. SN still contributes
+		// only wire fields and never acquires that owner. Other logical links,
+		// opposite-direction observations and pure responses do not establish
+		// this conflict and must not be retired by this rule.
+		if p := s.pending; m.request && p != nil && p.dir == dir && p.source == m.source && p.destination == m.destination && !bytes.Equal(p.wire, w) {
+			s.invalidate()
+		}
+		// SN Read exposes wire observations, not a service owner. In particular
+		// it cannot acquire a live LN pending request, advance its HDLC sequence,
+		// establish an association epoch or restore trust in an ambiguous link.
+		m.fields["Association"] = "unverified-sn-read-observation"
+		return m.fields, 0, nil
+	}
 	if s.fragments != nil && s.fragments.acseCommand != 0 || s.fragments == nil && m.kind == "I" && dlmsACSESegmentPrefix(m.information) {
 		return f.consumeDLMSACSESegments(dir, w, id, m)
 	}
@@ -945,14 +974,18 @@ func (a *binParser) decodeDLMSDatagram(e *ProtocolEvent, w []byte, explicit bool
 	} else if err = f.reserveSession(f.dlms.storage() + f.dlmsProjection(w)); err == nil {
 		m, err = decodeDLMSFrameBudget(w, a.budget.MaxCollectionElements, a.budget.MaxRecursionDepth, f.dlmsLinkAssembly(w))
 	}
-	if created && m != nil && !m.request && m.kind != "S" && (m.acse == nil || !m.acse.acseAbort) && !dlmsAbortSegmentPrefix(m.information) {
+	if created && m != nil && !m.snRead && !m.request && m.kind != "S" && (m.acse == nil || !m.acse.acseAbort) && !dlmsAbortSegmentPrefix(m.information) {
 		e.Direction = 1
 		if m.acse != nil || dlmsACSESegmentPrefix(m.information) {
 			f.endpoints = [2]string{e.Destination, e.Source}
 		}
 	}
 	if err == nil {
-		if created && (m.kind == "S" || m.kind == "DM") {
+		if m.snRead {
+			// Observe without retaining a new UDP conversation or rewriting the
+			// caller's direction; an existing LN flow keeps its owner and charge.
+			e.Session, e.ResponseTo, err = f.consumeDecodedDLMS(e.Direction, w, e.ID, m)
+		} else if created && (m.kind == "S" || m.kind == "DM") {
 			e.Session, e.ResponseTo, err = f.dlms.consume(m, w, e.Direction, e.ID)
 		} else if created && !m.request && m.acse == nil && !dlmsACSESegmentPrefix(m.information) {
 			err = dlmsError(ErrContextRequired, "response lacks observed request context")
