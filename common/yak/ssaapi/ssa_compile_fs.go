@@ -7,6 +7,8 @@ import (
 	"math"
 	"os"
 	"runtime"
+	"slices"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -420,22 +422,28 @@ func (c *Config) parseProjectWithFSUnits(
 		var batchFiles []string
 		fileUnits := make(map[string]string, batch.files)
 		for _, unit := range batch.units {
-			if unit != nil {
-				batchFiles = append(batchFiles, unit.Files...)
-				for _, path := range unit.Files {
-					fileUnits[path] = unit.Key
-				}
+			if unit == nil {
+				continue
+			}
+			// batch.units is in dependency order, and a unit's pre-handler must
+			// see the packages it imports already registered. Only reorder files
+			// inside a unit: a batch-wide sort lets a later unit's file land
+			// ahead of the dependency it imports.
+			files := append([]string(nil), unit.Files...)
+			sort.Strings(files)
+			if c.GetCompileASTSequence() == ssareducer.ReverseOrder {
+				slices.Reverse(files)
+			}
+			batchFiles = append(batchFiles, files...)
+			for _, path := range files {
+				fileUnits[path] = unit.Key
 			}
 		}
 		// One bounded parser pool for the entire batch lets small packages use
 		// the available workers too, without multiplying the AST window by
-		// the number of units. Declaration registration remains ordered by
-		// the parser's configured delivery policy and owns its unit context.
-		order := c.GetCompileASTSequence()
-		if order == ssareducer.OutOfOrder || order == ssareducer.Order {
-			order = ssareducer.BoundedOrder
-		}
-		prefetchedFiles := c.getFileHandlerWithOrder(filesystem, batchFiles, preHandlerFileSet, order)
+		// the number of units. Delivery stays in the dependency order built
+		// above; each file still registers declarations on its own unit.
+		prefetchedFiles := c.getFileHandlerWithOrder(filesystem, batchFiles, preHandlerFileSet, ssareducer.BoundedOrder)
 		prog.SetPreHandler(true)
 		compilePhase = "f1_units"
 		if holdSCCIR && prog.Cache != nil {
