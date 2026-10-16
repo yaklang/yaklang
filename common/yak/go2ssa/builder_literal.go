@@ -737,6 +737,12 @@ func (b *astbuilder) buildFieldDecl(stmt *gol.FieldDeclContext, structTyp *ssa.O
 	var ssatyp ssa.Type = nil
 	if typ := stmt.Type_(); typ != nil {
 		ssatyp = b.buildType(typ.(*gol.Type_Context))
+		// buildType historically resolves *T to T. Preserve the indirection
+		// for named fields, as we already do for embedded fields below: a
+		// pointer's zero value is nil, not a recursively initialized T.
+		if ssatyp != nil && strings.HasPrefix(typ.GetText(), "*") {
+			ssatyp = goPointerType(ssatyp)
+		}
 	}
 
 	if idlist := stmt.IdentifierList(); idlist != nil {
@@ -940,9 +946,24 @@ func coverType(ityp, iwantTyp ssa.Type) {
 }
 
 func (b *astbuilder) GetDefaultValue(ityp ssa.Type) ssa.Value {
+	return b.getDefaultValue(ityp, make(map[ssa.Type]bool))
+}
+
+func (b *astbuilder) getDefaultValue(ityp ssa.Type, active map[ssa.Type]bool) ssa.Value {
 	if utils.IsNil(ityp) {
 		return b.EmitUndefined("default")
 	}
+	// Incomplete/imported type graphs may still contain a by-value cycle.
+	// Only guard this expansion path; caching zero values by type would alias
+	// independent mutable struct fields (and treating all repeats as cycles
+	// would truncate valid siblings of the same type).
+	if active[ityp] {
+		value := b.EmitUndefined("recursive-zero-value")
+		value.SetType(ityp)
+		return value
+	}
+	active[ityp] = true
+	defer delete(active, ityp)
 	switch ityp.GetTypeKind() {
 	case ssa.NumberTypeKind:
 		return b.EmitConstInst(0)
@@ -954,13 +975,13 @@ func (b *astbuilder) GetDefaultValue(ityp ssa.Type) ssa.Value {
 		return b.EmitUndefined("func")
 	case ssa.AliasTypeKind:
 		alias, _ := ssa.ToAliasType(ityp)
-		return b.GetDefaultValue(alias.GetType())
+		return b.getDefaultValue(alias.GetType(), active)
 	case ssa.StructTypeKind:
 		typ := goSelectorObjectType(ityp)
 		obj := b.InterfaceAddFieldBuild(len(typ.Keys), func(i int) ssa.Value {
 			return typ.Keys[i]
 		}, func(i int) ssa.Value {
-			return b.GetDefaultValue(typ.FieldTypes[i])
+			return b.getDefaultValue(typ.FieldTypes[i], active)
 		})
 		obj.SetType(ityp)
 		return obj
