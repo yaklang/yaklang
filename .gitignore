@@ -101,7 +101,8 @@ CLAUDE.md
 # In-checkout output staging must not alter Go's VCS dirty stamp.
 .legion-musl-build.*/
 
-# Go workspace local checksum cache (should not be tracked)
+# Local Go workspace files (not tracked; builds use go.mod/go.sum)
+/go.work
 /go.work.sum
 
 # gzip_embed assets generated before release builds
