@@ -67,12 +67,8 @@ func parse429Body(rsp *AIResponse) *aibalance429Body {
 	if rsp == nil {
 		return nil
 	}
-	body := rsp.GetHTTPResponseBody()
-	if len(body) == 0 {
-		return nil
-	}
 	var parsed aibalance429Body
-	if err := json.Unmarshal(body, &parsed); err != nil {
+	if err := json.Unmarshal(aiHTTPResponseBody(rsp), &parsed); err != nil {
 		return nil
 	}
 	return &parsed
