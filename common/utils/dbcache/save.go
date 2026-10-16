@@ -228,8 +228,58 @@ func (s *Save[T]) processBuffer() {
 
 	currentSaveSize := s.config.saveSize
 	items := make([]T, 0, currentSaveSize)
+	byteBudget := s.config.saveByteBudget
+	var sizeOf func(T) int
+	if byteBudget > 0 {
+		sizeOf, _ = s.config.saveByteSize.(func(T) int)
+		if sizeOf == nil {
+			byteBudget = 0
+		}
+	}
+	bytes := 0
 	for {
 		saveSize := s.config.saveSize
+		clearBatch := func() {
+			items = make([]T, 0, currentSaveSize)
+			bytes = 0
+		}
+		itemBytes := func(item T) int {
+			if sizeOf == nil {
+				return 1
+			}
+			n := sizeOf(item)
+			if n < 1 {
+				return 1
+			}
+			return n
+		}
+		appendItem := func(item T) {
+			n := itemBytes(item)
+			if byteBudget > 0 && len(items) > 0 && bytes+n > byteBudget {
+				save(items)
+				currentSaveSize = saveSize
+				clearBatch()
+			}
+			items = append(items, item)
+			bytes += n
+			if len(items) >= currentSaveSize || (byteBudget > 0 && bytes >= byteBudget) {
+				save(items)
+				if byteBudget <= 0 {
+					bufferSize := s.buffer.Len()
+					if bufferSize > currentSaveSize*2 {
+						currentSaveSize *= 10
+					} else if bufferSize > currentSaveSize {
+						currentSaveSize *= 5
+					} else if bufferSize <= saveSize {
+						currentSaveSize = saveSize
+					}
+				} else {
+					currentSaveSize = saveSize
+				}
+				clearBatch()
+				resetTimer(timer, saveTime)
+			}
+		}
 		select {
 		case <-s.ctx.Done():
 			save(items)
@@ -239,21 +289,17 @@ func (s *Save[T]) processBuffer() {
 			// everything still buffered before acking. Callers MUST NOT
 			// call Save concurrently with Flush.
 			save(items)
-			items = make([]T, 0, saveSize)
+			clearBatch()
 			for s.queued.Load() > 0 {
 				item, ok := <-s.buffer.OutputChannel()
 				if !ok {
 					break
 				}
 				s.queued.Add(-1)
-				items = append(items, item)
-				if len(items) >= currentSaveSize {
-					save(items)
-					items = make([]T, 0, saveSize)
-				}
+				appendItem(item)
 			}
 			save(items)
-			items = make([]T, 0, saveSize)
+			clearBatch()
 			resetTimer(timer, saveTime)
 			s.saveWG.Wait()
 			if req.err != nil {
@@ -266,31 +312,11 @@ func (s *Save[T]) processBuffer() {
 				return
 			}
 			s.queued.Add(-1)
-
-			items = append(items, item)
-
-			// If we've reached the SaveSize, save immediately
-			if len(items) >= currentSaveSize {
-				save(items)
-				bufferSize := s.buffer.Len()
-				if bufferSize > currentSaveSize*2 {
-					currentSaveSize *= 10
-				} else if bufferSize > currentSaveSize {
-					currentSaveSize *= 5
-				} else if bufferSize > saveSize {
-					// currentSaveSize = currentSaveSize
-					// pass
-				} else {
-					currentSaveSize = saveSize
-				}
-
-				items = make([]T, 0, currentSaveSize)
-				resetTimer(timer, saveTime)
-			}
+			appendItem(item)
 		case <-timer.C:
 			// Time's up, save whatever we have
 			save(items)
-			items = make([]T, 0, saveSize)
+			clearBatch()
 			resetTimer(timer, saveTime)
 		}
 	}

@@ -20,6 +20,10 @@ type config struct {
 	saveTimeout     time.Duration
 	saveParallelism int
 	persistLimit    int
+	// saveByteBudget flushes the current batch once another item would exceed
+	// it. saveByteSize is func(T) int stored as any because config is not generic.
+	saveByteBudget int
+	saveByteSize   any
 
 	// context
 	ctx context.Context
@@ -77,6 +81,19 @@ func WithSaveParallelism(parallelism int) Option {
 			parallelism = 1
 		}
 		c.saveParallelism = parallelism
+	}
+}
+
+// WithSaveByteBudget flushes a non-empty batch before appending an item
+// that would make the estimated payload larger than budget. A single item
+// larger than budget is still saved alone. budget <= 0 disables the check.
+func WithSaveByteBudget[T any](budget int, sizeOf func(T) int) Option {
+	return func(c *config) {
+		if budget < 0 {
+			budget = 0
+		}
+		c.saveByteBudget = budget
+		c.saveByteSize = sizeOf
 	}
 }
 
