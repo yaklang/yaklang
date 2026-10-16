@@ -213,7 +213,7 @@ func decodeDLMSFrameBudget(w []byte, maxElements, depth int, linkOnly bool) (*dl
 		// Preserve literal initial request direction for native session decoding.
 		// Never infer an endpoint role from continuation bytes in an existing chain.
 		m.request = len(info) >= 4 && bytes.Equal(info[:4], []byte{0xe6, 0xe6, 0, 0xc0})
-		if dlmsSelectedOperationSegmentPrefix(info) || dlmsSetRequestSegmentPrefix(info) {
+		if dlmsSelectedOperationSegmentPrefix(info) || dlmsSetRequestSegmentPrefix(info) || dlmsActionRequestSegmentPrefix(info) {
 			m.request = info[1] == 0xe6
 		}
 		if len(info) >= 4 && bytes.Equal(info[:3], []byte{0xe6, 0xe6, 0}) && dlmsACSEAPDU(info[3:]) {
@@ -493,6 +493,9 @@ func probeDLMS(w []byte, limit int) ProbeResult {
 			}
 			return probeAccept("dlms", "hdlc-set-list-block-request-segmented", 98)
 		}
+		if err == nil && m.kind == "I" && dlmsActionRequestSegmentPrefix(m.information) && m.information[4] == 4 && m.information[5]&0x30 == 0 {
+			return probeAccept("dlms", "hdlc-action-upload-request-segmented", 98)
+		}
 		if err == nil && m.kind == "I" && m.request && dlmsSelectedOperationSegmentPrefix(m.information) && m.information[5]&0x30 == 0 {
 			return probeAccept("dlms", "hdlc-ln-operations-segmented", 98)
 		}
@@ -757,6 +760,9 @@ func (f *binFlow) consumeDecodedDLMS(dir int, w []byte, id uint64, m *dlmsMessag
 	if (dlmsSequencedService(m.kind) || m.kind == "I") && s.hdlcEndpointRetired(dir, m.source, m.destination, m.request) {
 		return nil, 0, dlmsError(ErrContextRequired, "Get information belongs to retired association context")
 	}
+	if m.kind == "I" && (s.fragments != nil && s.fragments.actionRequestChoice != 0 || s.fragments == nil && dlmsActionRequestSegmentPrefix(m.information) && (m.information[4] == 4 || s.actionTransfer != nil && s.actionTransfer.initial.choice == 4)) {
+		return f.consumeDLMSActionRequestSegments(dir, w, id, m)
+	}
 	if m.kind == "I" && (s.fragments != nil && s.fragments.setRequestChoice != 0 || s.fragments == nil && dlmsSetRequestSegmentPrefix(m.information) && (m.information[4] == 2 || m.information[4] == 5 || s.setTransfer != nil && (s.setTransfer.initial.choice == 2 || s.setTransfer.initial.choice == 5))) {
 		return f.consumeDLMSSetRequestSegments(dir, w, id, m)
 	}
@@ -915,6 +921,7 @@ func (a *binParser) decodeDLMSDatagram(e *ProtocolEvent, w []byte, explicit bool
 		store.lru.MoveToBack(el)
 	}
 	operationSegment := f.dlmsOperationSegmentObservation(w)
+	actionRequestSegment := f.dlmsActionRequestSegmentObservation(w, e.Direction)
 	setRequestSegment := f.dlmsSetRequestSegmentObservation(w, e.Direction)
 	setResponseSegment := f.dlmsSetResponseSegmentObservation(w, e.Direction)
 	setListBlockProfile := f.dlmsSetListBlockContext(w, e.Direction)
@@ -1006,6 +1013,9 @@ func (a *binParser) decodeDLMSDatagram(e *ProtocolEvent, w []byte, explicit bool
 	}
 	if setRequestSegment != "" {
 		e.Profile = setRequestSegment
+	}
+	if actionRequestSegment != "" {
+		e.Profile = actionRequestSegment
 	}
 	if setResponseSegment != "" {
 		e.Profile = setResponseSegment

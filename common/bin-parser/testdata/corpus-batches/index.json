@@ -114183,6 +114183,202 @@
         "common/pcapx/pcaputil/dlms-wrapper-gbt-action-list/inner-list-Data-depth4-refusal.tcp.pcap": "dlms-wrapper-gbt-action-list/blocktail23-byte-cap22-refusal.tcp.pcap",
         "scripts/protocol-tests/required-tests-traffic-unified-v149.json": "required-tests-traffic-unified-v149.json"
       }
+    },
+    {
+      "id": "validation-dlms-hdlc-action-upload-request-segments",
+      "kind": "support",
+      "source_sha": "49d4d5f8644e0a916c59bb6849a320e74ad59efd",
+      "file": "validation-dlms-hdlc-action-upload-request-segments.zip",
+      "sha256": "8ac035f89b2f46cd0c8c6ddc831a949a86ce4b0554d84e981295f58afae4c969",
+      "password": "bin-parser",
+      "members": {
+        "dlms-hdlc-action-upload-request-segments-tools/SOURCES.json": {
+          "bytes": 3685,
+          "sha256": "1a1b70fd062edfcc7ab1ac4f90a04d78a6e4b58187b3d91cf36937e59b435044"
+        },
+        "dlms-hdlc-action-upload-request-segments-tools/action-grammar.py": {
+          "bytes": 5139,
+          "sha256": "b9abe4cc370f154324ba9a4360ac02a42ac6b491968b9228c10a256aa6d5a575"
+        },
+        "dlms-hdlc-action-upload-request-segments-tools/cold-probe-test.go": {
+          "bytes": 1391,
+          "sha256": "71abd22193f4285a4dfc8be1c220ebac7ef69a504b08898b453f30ae226b3023"
+        },
+        "dlms-hdlc-action-upload-request-segments-tools/data-model.py": {
+          "bytes": 1624,
+          "sha256": "03dbaaa0f3c564db04440c0fbee8742e407f825de889b7a6e0012a49e6a06f4e"
+        },
+        "dlms-hdlc-action-upload-request-segments-tools/generate-baseline.py": {
+          "bytes": 536,
+          "sha256": "c3ac45c4b3c337a3227fd8c7f2e029d87cb340c8f581290ad8cbb3eb1ed468b2"
+        },
+        "dlms-hdlc-action-upload-request-segments-tools/generate-captures.py": {
+          "bytes": 1947,
+          "sha256": "f3ac6ee375e67e716cbacef3e49695aa19d95e7a26dc1bd0380e087e197c0b0e"
+        },
+        "dlms-hdlc-action-upload-request-segments-tools/generate-cold-admission.py": {
+          "bytes": 2802,
+          "sha256": "f66e6c9a7d2e82da70cc1de34b34f5505fa42992f87a2c571e3e7783e4ecc350"
+        },
+        "dlms-hdlc-action-upload-request-segments-tools/generate.py": {
+          "bytes": 12255,
+          "sha256": "74fe6ca9fec05863c14bfa85557c8553099339433c5892e182f4b5d55165c594"
+        },
+        "dlms-hdlc-action-upload-request-segments-tools/rebuild-cold.py": {
+          "bytes": 361,
+          "sha256": "7707e15bbe909a5e3e48c50cc5cdae85a5f22c834908898b400f563c74528c0b"
+        },
+        "dlms-hdlc-action-upload-request-segments-tools/rebuild.py": {
+          "bytes": 343,
+          "sha256": "5e41df2136e227bd36e677a6f78d2f40b7082e0f457ee21612762518329df9dd"
+        },
+        "dlms-hdlc-action-upload-request-segments-tools/reference-vectors.json": {
+          "bytes": 81839,
+          "sha256": "f7553c4c1e335677451dde2746cd745c5ffa48095ab38f3a2a0a6864c098982e"
+        },
+        "dlms-hdlc-action-upload-request-segments-tools/verify-captures.py": {
+          "bytes": 3763,
+          "sha256": "3e094aa5560af0004e69533b2e593447922ab157dbc71d8c24c7678ab6e806ef"
+        },
+        "dlms-hdlc-action-upload-request-segments-tools/verify-cold-admission.py": {
+          "bytes": 1815,
+          "sha256": "6c92d2148c610754b16b27c98bcf28697952b72b7d5eae1697201b316f7875e4"
+        },
+        "dlms-hdlc-action-upload-request-segments-tools/verify.py": {
+          "bytes": 5125,
+          "sha256": "87d4e154c40eb5a3f6bf2f0d56185156c3d5de34e60109a2553a5bf1514230dc"
+        },
+        "dlms-hdlc-action-upload-request-segments/baseline-controls.json": {
+          "bytes": 137244,
+          "sha256": "e91466488a392414b513656311364b905ed7c158b246949cf14d0eaf843f272d"
+        },
+        "dlms-hdlc-action-upload-request-segments/both-request-groups-exact-retry-and-context-preserve.tcp.pcap": {
+          "bytes": 1754,
+          "sha256": "7a8b73d3e27790c97b64860e78f0a0744d33e56a6e565cfd2fa923ff798788c6"
+        },
+        "dlms-hdlc-action-upload-request-segments/both-request-groups-exact-retry-and-context-preserve.udp.pcap": {
+          "bytes": 1352,
+          "sha256": "9ea52545654810406fa975d53c3c0e78d8ef9d54bbde1e94726136fed5b86cc9"
+        },
+        "dlms-hdlc-action-upload-request-segments/changed-same-NS-prefix-repeat-retires.tcp.pcap": {
+          "bytes": 805,
+          "sha256": "8f3e636484cbc3aa141e051bf3e2baa92e08ea6d8f316e5953e5517b49cb8819"
+        },
+        "dlms-hdlc-action-upload-request-segments/changed-same-NS-prefix-repeat-retires.udp.pcap": {
+          "bytes": 523,
+          "sha256": "03b6460094324802796c23ea59b28c106d934a7da64e03453614329cfb38f13c"
+        },
+        "dlms-hdlc-action-upload-request-segments/cold-admission.json": {
+          "bytes": 10567,
+          "sha256": "992ca4b3275614f5efcdb099f79d15e030150655efcb0fc5236768a92e498123"
+        },
+        "dlms-hdlc-action-upload-request-segments/cold-case.json": {
+          "bytes": 6914,
+          "sha256": "7b266e591c16ba126097c2c82bc4cff4a731fe829d106785e03eb5b9d168eef2"
+        },
+        "dlms-hdlc-action-upload-request-segments/cold-first4-discovery-partial-only.tcp.pcap": {
+          "bytes": 336,
+          "sha256": "0d4885c695a0ebc27a138726955f38fada25c8c2b912c71bbe7d75dbf092909f"
+        },
+        "dlms-hdlc-action-upload-request-segments/cold-first4-discovery-partial-only.udp.pcap": {
+          "bytes": 114,
+          "sha256": "4d1930ce0e7bad188992e8333951a748fc6d9bcc2e14835b3bb15447d988142e"
+        },
+        "dlms-hdlc-action-upload-request-segments/controls.json": {
+          "bytes": 335228,
+          "sha256": "09237292210b586c9d45abb8cd8efa1c996dbed9cfc72bbe16d8daeaa37c5301"
+        },
+        "dlms-hdlc-action-upload-request-segments/first-information-cap34-Resource-releases-prefix.tcp.pcap": {
+          "bytes": 798,
+          "sha256": "9251244071d9bf528f4463095fb761d0abca8a8d0c417e9a1731ce3effc7e75b"
+        },
+        "dlms-hdlc-action-upload-request-segments/first-information-cap34-Resource-releases-prefix.udp.pcap": {
+          "bytes": 516,
+          "sha256": "8a0795f7e0638948723a6afea5c00405baf5ce50dbab39c65ffc3b0897034a77"
+        },
+        "dlms-hdlc-action-upload-request-segments/first4-request-information-two-frames-cap35.tcp.pcap": {
+          "bytes": 903,
+          "sha256": "3548b4c237e80607e79b0b8f216c032b82f64356b38774a08a43fea54f95efe2"
+        },
+        "dlms-hdlc-action-upload-request-segments/first4-request-information-two-frames-cap35.udp.pcap": {
+          "bytes": 609,
+          "sha256": "e4a95c70e6e79c8891602e7d67292980c0a580dc2af96dfde93d9241c97961bf"
+        },
+        "dlms-hdlc-action-upload-request-segments/knownnext-partial-private-Close-releases-both-layers.tcp.pcap": {
+          "bytes": 730,
+          "sha256": "dc9fefcf31074e61658f6421d5b77a32c094321989ba4336156e023070a18738"
+        },
+        "dlms-hdlc-action-upload-request-segments/knownnext-partial-private-Close-releases-both-layers.udp.pcap": {
+          "bytes": 460,
+          "sha256": "abb57779198284c002bbf96ab445a4f16ededa911ebfd23780cf5681c9bf34a3"
+        },
+        "dlms-hdlc-action-upload-request-segments/knownnext6-request-information-two-frames.tcp.pcap": {
+          "bytes": 903,
+          "sha256": "1eabfc253a7cf521d0b0722645de2c681fde8b350393fbad8c3c619e07133b37"
+        },
+        "dlms-hdlc-action-upload-request-segments/knownnext6-request-information-two-frames.udp.pcap": {
+          "bytes": 609,
+          "sha256": "1223a47b3d799df9efb80c1d89855202607f65d09ca1ebe326c466b7b8ab79a6"
+        },
+        "dlms-hdlc-action-upload-request-segments/matched-continuation-NS-gap-retires.tcp.pcap": {
+          "bytes": 798,
+          "sha256": "9fdad49be24f73c27687d35c83247d1003f229e63d0fe2c1d296e67ee13423ec"
+        },
+        "dlms-hdlc-action-upload-request-segments/matched-continuation-NS-gap-retires.udp.pcap": {
+          "bytes": 516,
+          "sha256": "82a089ffb8c8e83741feb03aea1adfd9c191e2c8e1a78ff27b51849ed7406194"
+        },
+        "dlms-hdlc-action-upload-request-segments/reuse-inputs.json": {
+          "bytes": 221,
+          "sha256": "eb522fa048973cbf27fdcc5982a5881d4e5b0dd2e067e03275f19cf699f3a8d9"
+        },
+        "required-tests-traffic-unified-v150.json": {
+          "bytes": 25792819,
+          "sha256": "70c292f22ba40804d85de83d9155b906bc84ce087243a9392c3e8b57883e425a"
+        },
+        "validation/expected.json": {
+          "bytes": 23107,
+          "sha256": "ecec3218cfcd580e9bdaf0dfb257e64b713d9fa5a1c6a7ac8da909418eedc816"
+        }
+      },
+      "aliases": {
+        "common/pcapx/pcaputil/dlms-hdlc-action-upload-request-segments-tools/SOURCES.json": "dlms-hdlc-action-upload-request-segments-tools/SOURCES.json",
+        "common/pcapx/pcaputil/dlms-hdlc-action-upload-request-segments-tools/action-grammar.py": "dlms-hdlc-action-upload-request-segments-tools/action-grammar.py",
+        "common/pcapx/pcaputil/dlms-hdlc-action-upload-request-segments-tools/cold-probe-test.go": "dlms-hdlc-action-upload-request-segments-tools/cold-probe-test.go",
+        "common/pcapx/pcaputil/dlms-hdlc-action-upload-request-segments-tools/data-model.py": "dlms-hdlc-action-upload-request-segments-tools/data-model.py",
+        "common/pcapx/pcaputil/dlms-hdlc-action-upload-request-segments-tools/generate-baseline.py": "dlms-hdlc-action-upload-request-segments-tools/generate-baseline.py",
+        "common/pcapx/pcaputil/dlms-hdlc-action-upload-request-segments-tools/generate-captures.py": "dlms-hdlc-action-upload-request-segments-tools/generate-captures.py",
+        "common/pcapx/pcaputil/dlms-hdlc-action-upload-request-segments-tools/generate-cold-admission.py": "dlms-hdlc-action-upload-request-segments-tools/generate-cold-admission.py",
+        "common/pcapx/pcaputil/dlms-hdlc-action-upload-request-segments-tools/generate.py": "dlms-hdlc-action-upload-request-segments-tools/generate.py",
+        "common/pcapx/pcaputil/dlms-hdlc-action-upload-request-segments-tools/rebuild-cold.py": "dlms-hdlc-action-upload-request-segments-tools/rebuild-cold.py",
+        "common/pcapx/pcaputil/dlms-hdlc-action-upload-request-segments-tools/rebuild.py": "dlms-hdlc-action-upload-request-segments-tools/rebuild.py",
+        "common/pcapx/pcaputil/dlms-hdlc-action-upload-request-segments-tools/reference-vectors.json": "dlms-hdlc-action-upload-request-segments-tools/reference-vectors.json",
+        "common/pcapx/pcaputil/dlms-hdlc-action-upload-request-segments-tools/verify-captures.py": "dlms-hdlc-action-upload-request-segments-tools/verify-captures.py",
+        "common/pcapx/pcaputil/dlms-hdlc-action-upload-request-segments-tools/verify-cold-admission.py": "dlms-hdlc-action-upload-request-segments-tools/verify-cold-admission.py",
+        "common/pcapx/pcaputil/dlms-hdlc-action-upload-request-segments-tools/verify.py": "dlms-hdlc-action-upload-request-segments-tools/verify.py",
+        "common/pcapx/pcaputil/dlms-hdlc-action-upload-request-segments/baseline-controls.json": "dlms-hdlc-action-upload-request-segments/baseline-controls.json",
+        "common/pcapx/pcaputil/dlms-hdlc-action-upload-request-segments/both-request-groups-exact-retry-and-context-preserve.tcp.pcap": "dlms-hdlc-action-upload-request-segments/both-request-groups-exact-retry-and-context-preserve.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-action-upload-request-segments/both-request-groups-exact-retry-and-context-preserve.udp.pcap": "dlms-hdlc-action-upload-request-segments/both-request-groups-exact-retry-and-context-preserve.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-action-upload-request-segments/changed-same-NS-prefix-repeat-retires.tcp.pcap": "dlms-hdlc-action-upload-request-segments/changed-same-NS-prefix-repeat-retires.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-action-upload-request-segments/changed-same-NS-prefix-repeat-retires.udp.pcap": "dlms-hdlc-action-upload-request-segments/changed-same-NS-prefix-repeat-retires.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-action-upload-request-segments/cold-admission.json": "dlms-hdlc-action-upload-request-segments/cold-admission.json",
+        "common/pcapx/pcaputil/dlms-hdlc-action-upload-request-segments/cold-case.json": "dlms-hdlc-action-upload-request-segments/cold-case.json",
+        "common/pcapx/pcaputil/dlms-hdlc-action-upload-request-segments/cold-first4-discovery-partial-only.tcp.pcap": "dlms-hdlc-action-upload-request-segments/cold-first4-discovery-partial-only.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-action-upload-request-segments/cold-first4-discovery-partial-only.udp.pcap": "dlms-hdlc-action-upload-request-segments/cold-first4-discovery-partial-only.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-action-upload-request-segments/controls.json": "dlms-hdlc-action-upload-request-segments/controls.json",
+        "common/pcapx/pcaputil/dlms-hdlc-action-upload-request-segments/first-information-cap34-Resource-releases-prefix.tcp.pcap": "dlms-hdlc-action-upload-request-segments/first-information-cap34-Resource-releases-prefix.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-action-upload-request-segments/first-information-cap34-Resource-releases-prefix.udp.pcap": "dlms-hdlc-action-upload-request-segments/first-information-cap34-Resource-releases-prefix.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-action-upload-request-segments/first4-request-information-two-frames-cap35.tcp.pcap": "dlms-hdlc-action-upload-request-segments/first4-request-information-two-frames-cap35.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-action-upload-request-segments/first4-request-information-two-frames-cap35.udp.pcap": "dlms-hdlc-action-upload-request-segments/first4-request-information-two-frames-cap35.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-action-upload-request-segments/knownnext-partial-private-Close-releases-both-layers.tcp.pcap": "dlms-hdlc-action-upload-request-segments/knownnext-partial-private-Close-releases-both-layers.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-action-upload-request-segments/knownnext-partial-private-Close-releases-both-layers.udp.pcap": "dlms-hdlc-action-upload-request-segments/knownnext-partial-private-Close-releases-both-layers.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-action-upload-request-segments/knownnext6-request-information-two-frames.tcp.pcap": "dlms-hdlc-action-upload-request-segments/knownnext6-request-information-two-frames.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-action-upload-request-segments/knownnext6-request-information-two-frames.udp.pcap": "dlms-hdlc-action-upload-request-segments/knownnext6-request-information-two-frames.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-action-upload-request-segments/matched-continuation-NS-gap-retires.tcp.pcap": "dlms-hdlc-action-upload-request-segments/matched-continuation-NS-gap-retires.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-action-upload-request-segments/matched-continuation-NS-gap-retires.udp.pcap": "dlms-hdlc-action-upload-request-segments/matched-continuation-NS-gap-retires.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-action-upload-request-segments/reuse-inputs.json": "dlms-hdlc-action-upload-request-segments/reuse-inputs.json",
+        "scripts/protocol-tests/required-tests-traffic-unified-v150.json": "required-tests-traffic-unified-v150.json"
+      }
     }
   ],
   "schema_version": 1,
