@@ -24,6 +24,9 @@ const (
 	// transaction + cgo overhead across more rows.
 	largeProjectInstructionSave = 16384
 	largeProjectPersistLimit    = 65536
+	// Estimated persisted string bytes, not RSS. A 16384-row IrCode batch can
+	// materialize a few hundred MiB, so a full row count is not a byte bound.
+	largeProjectInstructionByteBudget = 32 << 20
 	// Auxiliary (index/offset) and type stores share the same rationale: the
 	// per-batch flush owns one SQLite transaction, so larger batches directly
 	// cut transaction count. Bumped from 512/256 to 4096 after the run2 pprof

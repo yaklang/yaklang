@@ -188,6 +188,7 @@ func newInstructionStore(
 			dbcache.WithContext(cfg.GetContext()),
 			dbcache.WithSaveSize(instructionSaveSize),
 			dbcache.WithPersistLimit(persistLimit),
+			dbcache.WithSaveByteBudget(largeProjectInstructionByteBudget, instructionRecordBytes),
 			dbcache.WithSaveTimeout(saveTime),
 			dbcache.WithName("Instruction"),
 			dbcache.WithSkipEviction(func(inst Instruction) bool {
@@ -998,6 +999,21 @@ func (s *instructionStore) expandRelationPersistRecords(records []*instructionPe
 		walk(record)
 	}
 	return expanded
+}
+
+func instructionRecordBytes(rec *instructionPersistRecord) int {
+	if rec == nil || rec.IrCode == nil {
+		return 1
+	}
+	ir := rec.IrCode
+	n := len(ir.ProgramName) + len(ir.OpcodeName) + len(ir.OpcodeOperator) +
+		len(ir.Name) + len(ir.VerboseName) + len(ir.ShortVerboseName) +
+		len(ir.String) + len(ir.ReadableName) + len(ir.ReadableNameShort) +
+		len(ir.ExtraInformation)
+	if n < 1 {
+		n = 1
+	}
+	return n
 }
 
 func (s *instructionStore) saveInstructionPersistRecords(records []*instructionPersistRecord) error {
