@@ -21,6 +21,7 @@ var demo string
 var noAudioVideoData []byte
 
 func TestRAGFromYaklang(t *testing.T) {
+	yakit.GuardConfigurationForTest(t)
 	if utils.InGithubActions() {
 		t.Skip("skip github action")
 		return
@@ -58,6 +59,7 @@ rag.BuildIndexKnowledgeFromFile(kbName, filename)~
 // This test verifies that the system can gracefully handle videos without audio and fallback to
 // scene change detection + fixed interval frame extraction strategy
 func TestRAGFromYaklang_NoAudioVideo(t *testing.T) {
+	yakit.GuardConfigurationForTest(t)
 	if utils.InGithubActions() {
 		t.Skip("skip github action")
 		return

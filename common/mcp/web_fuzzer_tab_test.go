@@ -131,6 +131,7 @@ func TestWebFuzzerGroupToolSchemaEncouragesConciseColoredGroups(t *testing.T) {
 }
 
 func TestWebFuzzerTabManagementLifecycle(t *testing.T) {
+	yakit.GuardConfigurationForTest(t)
 	yakit.CallPostInitDatabase()
 	srv, err := NewMCPServer(WithEnableAllToolSets())
 	require.NoError(t, err)
@@ -249,6 +250,7 @@ func TestWebFuzzerTabManagementLifecycle(t *testing.T) {
 }
 
 func TestWebFuzzerTabGroupMembershipModesAndCascadeDelete(t *testing.T) {
+	yakit.GuardConfigurationForTest(t)
 	yakit.CallPostInitDatabase()
 	srv, err := NewMCPServer(WithEnableAllToolSets())
 	require.NoError(t, err)
@@ -322,6 +324,7 @@ func TestWebFuzzerTabGroupMembershipModesAndCascadeDelete(t *testing.T) {
 }
 
 func TestWebFuzzerTabInvalidMutationsAreAtomic(t *testing.T) {
+	yakit.GuardConfigurationForTest(t)
 	yakit.CallPostInitDatabase()
 	srv, err := NewMCPServer(WithEnableAllToolSets())
 	require.NoError(t, err)

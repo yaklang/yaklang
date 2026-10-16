@@ -3,24 +3,26 @@ package aicommon
 import (
 	"bytes"
 	"fmt"
-	"github.com/yaklang/yaklang/common/ai/aid/aicommon/promptloader"
-	"github.com/yaklang/yaklang/common/ai/aid/aiprojection"
 	"sort"
 	"strings"
 	"text/template"
+
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon/promptloader"
 )
-
-var timelineCompressionTemplate = promptloader.MustLoad("ai/aid/aicommon/prompts/timeline/compression.txt")
-
-var timelineCompressionInstruction = promptloader.MustLoad("ai/aid/aicommon/prompts/timeline/compression_instruction.txt")
 
 var timelineCompressionSchema = promptloader.MustLoad("ai/aid/aicommon/prompts/timeline/compression.json")
 
-// renderCompressionSummaryPrompt renders one complete reduction request. Native
-// replay is historical data here, not messages to execute/project in this helper.
-// Redact the process nonce on this request-only copy; stable data frames display
-// raw text without JSON escaping or executable projection envelopes.
-// The output schema is supplied once by the auxiliary scheduler.
+var compressionPromptTemplate = template.Must(template.New("timeline-compression").Parse(promptloader.MustLoad("ai/aid/aicommon/prompts/timeline/compression.txt")))
+
+type compressionPromptData struct {
+	Capacity string
+	Timeline string
+	Schema   string
+}
+
+// renderCompressionSummaryPrompt builds one reduction request from three parts:
+// the fixed instruction, a computed capacity section, and rendered Timeline
+// content. It never freezes, deletes, or commits anything.
 func renderCompressionSummaryPrompt(snapshot *timelineCompressionSnapshot) (string, error) {
 	if snapshot == nil {
 		return "", fmt.Errorf("invalid timeline compression snapshot")
@@ -29,85 +31,132 @@ func renderCompressionSummaryPrompt(snapshot *timelineCompressionSnapshot) (stri
 	if snapshot.Head != nil {
 		previous = snapshot.Head.Text
 	}
-	history := renderCompressionSnapshotItems(snapshot.Items)
-	if strings.TrimSpace(previous) == "" && strings.TrimSpace(history) == "" &&
+	if strings.TrimSpace(previous) == "" && strings.TrimSpace(renderCompressionSnapshotItems(snapshot.Items)) == "" &&
+		!snapshot.hasPromotedItems() &&
 		(!snapshot.FinalizingMemory || (len(snapshot.UserContexts) == 0 && strings.TrimSpace(snapshot.Evidence) == "")) {
 		return "", fmt.Errorf("timeline compression has no history to summarize")
 	}
-	var source strings.Builder
-	keys := []string{"user_query", "frozen_user_context", "todo"}
-	labels := map[string]string{"user_query": "ORIGINAL_USER_QUERY", "frozen_user_context": "FROZEN_USER_CONTEXT", "todo": "TODO"}
-	var extra []string
-	for key := range snapshot.RetainedContext {
-		// Framework instructions are not task history, including older callers.
-		if key == "task_instruction" {
-			continue
-		}
-		if _, known := labels[key]; !known {
-			extra = append(extra, key)
-		}
-	}
-	sort.Strings(extra)
-	keys = append(keys, extra...)
-	for _, key := range keys {
-		label := labels[key]
-		if label == "" {
-			label = "RETAINED_CONTEXT"
-		}
-		content := snapshot.RetainedContext[key]
-		if label == "RETAINED_CONTEXT" {
-			content = key + ":\n" + content
-		}
-		if key == "frozen_user_context" && content == "" {
-			for _, entry := range snapshot.UserContexts {
-				if entry.Frozen {
-					content += entry.Text + "\n"
-				}
-			}
-		}
-		source.WriteString(compressionSourceTag(label, content))
-	}
-	var openUser strings.Builder
-	for _, entry := range snapshot.UserContexts {
-		if !entry.Frozen {
-			fmt.Fprintf(&openUser, "# item=%d\n%s\n", entry.ID, entry.Text)
-		}
-	}
-	source.WriteString(compressionSourceTag("OPEN_USER_CONTEXT", openUser.String()))
-	source.WriteString(compressionSourceTag("SESSION_EVIDENCE", snapshot.Evidence))
-	source.WriteString(compressionSourceTag("SESSION_MEMORY_CANDIDATES", renderSessionMemoryCandidates(snapshot.SessionMemoryCandidates)))
-	source.WriteString(compressionSourceTag("PREVIOUS_SUMMARY", previous))
-	var frozen, open []timelineCompressionSnapshotItem
-	for _, item := range snapshot.Items {
-		if item.Frozen {
-			frozen = append(frozen, item)
-		} else {
-			open = append(open, item)
-		}
-	}
-	source.WriteString(compressionSourceTag("FROZEN_TIMELINE", renderCompressionSnapshotItems(frozen)))
-	source.WriteString(compressionSourceTag("OPEN_TIMELINE", renderCompressionSnapshotItems(open)))
-	tmpl, err := template.New("timeline-compression").Parse(timelineCompressionTemplate)
-	if err != nil {
-		return "", err
-	}
 	var buf bytes.Buffer
-	err = tmpl.Execute(&buf, struct {
-		Source string
-	}{source.String()})
-	if err != nil {
+	if err := compressionPromptTemplate.Execute(&buf, compressionPromptData{
+		Capacity: renderCompressionCapacity(snapshot),
+		Timeline: renderCompressionTimeline(snapshot),
+		Schema:   timelineCompressionSchema,
+	}); err != nil {
 		return "", err
 	}
 	return buf.String(), nil
 }
 
-// Plain-text data frames have stable content hashes, not authenticated replay
-// tags. Redacting historical projection nonces prevents their control envelopes
-// from becoming outgoing assistant/tool messages in the compression helper.
-func compressionSourceTag(label, content string) string {
-	content = aiprojection.RedactNonce(content)
-	hash := StablePromptNonce("timeline-compression", label, content)
-	return fmt.Sprintf("<|%s_%s|>\n%s\n<|%s_END_%s|>\n\n", label, hash, content, label, hash)
+func renderCompressionCapacity(snapshot *timelineCompressionSnapshot) string {
+	budget := snapshot.PromptBudget
+	target := snapshot.TargetTokens
+	if target == 0 {
+		target = budget.Target
+	}
+	ordinary, promoted := compressionCapacityParts(budget)
+	var b strings.Builder
+	b.WriteString("# 容量\n")
+	if budget.Current > 0 {
+		fmt.Fprintf(&b, "当前主模型 Timeline：%d tokens。\n", budget.Current)
+	}
+	if target > 0 {
+		fmt.Fprintf(&b, "目标：不超过 %d tokens。目标包含 summary、保留原文、仍保留的 promoted 正文和不可删除的用户输入。\n", target)
+	}
+	if budget.Current > 0 && target > 0 && budget.Current > target {
+		fmt.Fprintf(&b, "还需要减少：%d tokens。按这个缺口估算效果。\n", budget.Current-target)
+	}
+	if ordinary > 0 || promoted > 0 {
+		fmt.Fprintf(&b, "两个可优化部分：普通历史 %d tokens，promoted 内容 %d tokens。\n", ordinary, promoted)
+		b.WriteString("普通历史通过 summary 和 ratain_timeline_item_range 压缩。promoted 内容通过删除不再需要的 RETIRE_ID 压缩；用户输入不可删除。\n")
+	}
+	return strings.TrimRight(b.String(), "\n")
+}
+
+func compressionCapacityParts(budget timelineCompressionPromptBudget) (ordinary, promoted int64) {
+	for _, section := range budget.Sections {
+		switch section.Name {
+		case "frozen_timeline", "open_timeline":
+			ordinary += section.Tokens
+		case "recent_tools", "skill_content", "evidence":
+			promoted += section.Tokens
+		}
+	}
+	return ordinary, promoted
+}
+
+func renderCompressionTimeline(snapshot *timelineCompressionSnapshot) string {
+	var b strings.Builder
+	b.WriteString("# Timeline\n")
+	previous := ""
+	if snapshot.Head != nil {
+		previous = snapshot.Head.Text
+	}
+	writeCompressionPart(&b, "旧历史摘要", previous)
+	items := append([]timelineCompressionSnapshotItem(nil), snapshot.Items...)
+	for _, promoted := range snapshot.PromotedItems {
+		item := promoted.timelineCompressionSnapshotItem
+		item.PromptText = renderCompressionPromotedItem(promoted)
+		items = append(items, item)
+	}
+	sort.Slice(items, func(i, j int) bool { return items[i].ID < items[j].ID })
+	writeCompressionPart(&b, "历史条目", renderCompressionSnapshotItems(items))
+	writeCompressionPart(&b, "当前用户要求", compressionRetainedText(snapshot, "user_query"))
+	writeCompressionPart(&b, "用户输入", compressionUserText(snapshot))
+	writeCompressionPart(&b, "TODO", compressionRetainedText(snapshot, "todo"))
+	writeCompressionPart(&b, "其他保留上下文", compressionExtraContext(snapshot))
+	writeCompressionPart(&b, "本 session 的记忆候选", renderSessionMemoryCandidates(snapshot.SessionMemoryCandidates))
+	if !snapshot.hasEvidenceItems() {
+		writeCompressionPart(&b, "旧会话证据", snapshot.Evidence)
+	}
+	return strings.TrimRight(b.String(), "\n")
+}
+
+func writeCompressionPart(b *strings.Builder, title, content string) {
+	content = strings.TrimSpace(content)
+	if content == "" {
+		return
+	}
+	fmt.Fprintf(b, "## %s\n%s\n\n", title, content)
+}
+
+func compressionRetainedText(snapshot *timelineCompressionSnapshot, key string) string {
+	if snapshot.RetainedContext == nil {
+		return ""
+	}
+	return snapshot.RetainedContext[key]
+}
+
+func compressionUserText(snapshot *timelineCompressionSnapshot) string {
+	var b strings.Builder
+	retained := compressionRetainedText(snapshot, "frozen_user_context")
+	if retained != "" {
+		b.WriteString(retained)
+		b.WriteByte('\n')
+	}
+	for _, entry := range snapshot.UserContexts {
+		// The retained block already carries frozen user context.
+		if retained != "" && entry.Frozen {
+			continue
+		}
+		fmt.Fprintf(&b, "USER_INPUT_ID=%d 不可删除\n%s\n", entry.ID, entry.Text)
+	}
+	return b.String()
+}
+
+func compressionExtraContext(snapshot *timelineCompressionSnapshot) string {
+	known := map[string]bool{"user_query": true, "frozen_user_context": true, "todo": true, "task_instruction": true}
+	var keys []string
+	for key := range snapshot.RetainedContext {
+		if !known[key] {
+			keys = append(keys, key)
+		}
+	}
+	sort.Strings(keys)
+	var b strings.Builder
+	for _, key := range keys {
+		fmt.Fprintf(&b, "%s:\n%s\n", key, snapshot.RetainedContext[key])
+	}
+	return b.String()
 }
 
 // summarizeCompressionSnapshot schedules one complete reduction for the
@@ -138,13 +187,10 @@ func (m *Timeline) summarizeCompressionSnapshot(snapshot *timelineCompressionSna
 	if ctx == nil {
 		ctx = config.GetContext()
 	}
-	if limit.MaxInputTokens > 0 && TokenCountExceeds(timelineCompressionInstruction+"\n"+prompt+"\n"+timelineCompressionSchema, limit.MaxInputTokens) {
+	if limit.MaxInputTokens > 0 && TokenCountExceeds(prompt, limit.MaxInputTokens) {
 		return "", fmt.Errorf("timeline compression input exceeds safety limit %d; source preserved", limit.MaxInputTokens)
 	}
-	// Keep the complete output contract in the model prompt. The response
-	// handler uses ActionMaker's jsonextractor without enforcing that schema.
-	requestPrompt := aiprojection.CreateTag("PROMPT_SECTION", "system", timelineCompressionInstruction+"\n\n"+timelineCompressionSchema) +
-		aiprojection.CreateTag("PROMPT_SECTION", "user", prompt)
+	requestPrompt := prompt
 	ready, completion := m.startCompressionResponse(snapshot, limit, requestPrompt)
 	snapshot.MemoryCompletion = completion
 	select {
@@ -168,7 +214,8 @@ func (m *Timeline) summarizeCompressionSnapshot(snapshot *timelineCompressionSna
 		}
 		// Only summary and selection belong to the atomic Timeline commit.
 		snapshot.Output = &timelineCompressionOutput{Summary: output.Summary, RetainedRange: output.RetainedRange,
-			RetainedIDs: append([]int64(nil), output.RetainedIDs...)}
+			RetainedIDs:            append([]int64(nil), output.RetainedIDs...),
+			RetiredPromotedEntries: append([]int64(nil), output.RetiredPromotedEntries...)}
 		return output.Summary, nil
 	case <-ctx.Done():
 		return "", ctx.Err()

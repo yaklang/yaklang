@@ -18,14 +18,18 @@ func TestTimelineCompressionBeforePromptLifecycle(t *testing.T) {
 	calls := 0
 	bindCompressionMock(t, tl, func(req *AIRequest) (string, error) {
 		calls++
-		require.NotContains(t, req.GetPrompt(), "EXACT_BEFORE_PROMPT_SCHEMA")
+		// The exact schema stays out of the ordinary history sections; it is
+		// listed once as a retained promoted entry the model may delete.
+		require.Equal(t, 1, strings.Count(req.GetPrompt(), "EXACT_BEFORE_PROMPT_SCHEMA"))
+		requireCompressionPromotedEntry(t, req.GetPrompt(), 3,
+			"kind=recent-tool-cache name=probe operation=upsert", "[UPSERT] probe\nEXACT_BEFORE_PROMPT_SCHEMA")
 		if calls == 2 {
 			require.Contains(t, req.GetPrompt(), "FIRST_SUMMARY")
 			return compressionMockSummary("SECOND_SUMMARY"), nil
 		}
 		return compressionMockSummary("FIRST_SUMMARY"), nil
 	})
-	tl.SetTimelineContentLimit(200)
+	tl.SetTimelineContentLimit(500)
 	tl.SetTimelineBucketByteSize(1)
 	tl.PushText(1, "small history")
 	var stages []TimelineCompressionStage
@@ -53,7 +57,7 @@ func TestTimelineCompressionBeforePromptLifecycle(t *testing.T) {
 	require.NotNil(t, result)
 	require.Equal(t, 1, calls)
 	require.Equal(t, []TimelineCompressionStage{TimelineCompressionOptimizing}, stages)
-	require.EqualValues(t, 1, tl.FreezeSnapshot().Version)
+	require.EqualValues(t, 2, tl.FreezeSnapshot().Version, "lossless compaction and AI commit have separate receipts")
 	view := RenderTimelineFrozenOpen(tl)
 	require.Empty(t, view.Open)
 	require.Contains(t, view.Frozen, "FIRST_SUMMARY")
@@ -66,7 +70,7 @@ func TestTimelineCompressionBeforePromptLifecycle(t *testing.T) {
 	_, err = tl.CompressBeforePrompt(compressionTestOptions())
 	require.NoError(t, err)
 	require.Equal(t, 2, calls)
-	require.EqualValues(t, 2, tl.FreezeSnapshot().Version)
+	require.EqualValues(t, 3, tl.FreezeSnapshot().Version)
 	require.NotContains(t, RenderTimelineFrozenOpen(tl).Frozen, "FIRST_SUMMARY")
 }
 
@@ -109,14 +113,15 @@ func TestTimelineCompressionBeforePromptSharedWaitAndCancellation(t *testing.T) 
 	unblock := func() { once.Do(func() { close(release) }) }
 	t.Cleanup(unblock)
 	calls := 0
+	var enteredOnce sync.Once
 	bindCompressionMock(t, tl, func(*AIRequest) (string, error) {
 		calls++
-		close(entered)
+		enteredOnce.Do(func() { close(entered) })
 		<-release
 		return compressionMockSummary("summary"), nil
 	})
-	tl.SetTimelineContentLimit(1)
-	tl.PushText(1, "work completed")
+	tl.PushText(1, "work completed with enough detail to cross the compression limit")
+	tl.SetTimelineContentLimit(int64(mainTimelineTokens(tl) - 1))
 	done := make(chan error, 1)
 	go func() { _, err := tl.CompressBeforePrompt(compressionTestOptions()); done <- err }()
 	<-entered
@@ -156,16 +161,17 @@ func TestTimelineCompressionBeforePromptDoesNotRepeatCompletedSnapshot(t *testin
 	tl.PushText(1, "ordinary input")
 	checked, err := tl.buildCompressionSnapshot()
 	require.NoError(t, err)
-	checked.BeforePromptLimit = 1
 	_, err = tl.CompressBeforePrompt(compressionTestOptions())
 	require.NoError(t, err)
-	// Simulate a second before-prompt check that finished tokenization after the first
-	// already committed. It must recheck, not send the fresh head to AI again.
-	_, err = tl.compressOnce(compressionTestOptions(), checked)
-	require.ErrorIs(t, err, errTimelineCompressionBeforePromptChanged)
+	// Snapshot validity still belongs to the transaction. A later scheduler
+	// check measures afresh under the shared execution reservation.
+	tl.mu.Lock()
+	_, err = tl.validateCompressionSourceLocked(checked)
+	tl.mu.Unlock()
+	require.ErrorContains(t, err, "changed")
 	_, err = tl.CompressBeforePrompt(compressionTestOptions())
 	require.NoError(t, err)
-	require.Equal(t, 1, calls)
+	require.Equal(t, 2, calls, "a rendered result still over the tiny limit gets its own later round")
 }
 
 func TestTimelineCompressionBeforePromptWaitersShareFailure(t *testing.T) {

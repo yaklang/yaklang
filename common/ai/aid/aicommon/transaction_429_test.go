@@ -399,15 +399,15 @@ func TestCallAITransaction_PostHandlerErrorEmitsBoundAIInfo(t *testing.T) {
 }
 
 func TestIs429Response_Nil(t *testing.T) {
-	assert.False(t, is429Response(context.Background(), nil))
+	assert.False(t, waitForHeadersAndCheck429(context.Background(), nil))
 }
 
 func TestIs429Response_Non429(t *testing.T) {
 	rsp := make200Response()
-	assert.False(t, is429Response(context.Background(), rsp))
+	assert.False(t, waitForHeadersAndCheck429(context.Background(), rsp))
 }
 
 func TestIs429Response_429(t *testing.T) {
 	rsp := make429Response()
-	assert.True(t, is429Response(context.Background(), rsp))
+	assert.True(t, waitForHeadersAndCheck429(context.Background(), rsp))
 }

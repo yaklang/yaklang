@@ -39,6 +39,12 @@ func TestDefaultCompileExcludePatterns(t *testing.T) {
 	require.Contains(t, patterns, "**/composer.lock")
 	require.Contains(t, patterns, "**/*.nupkg")
 
+	// Root forms are generated for every nested glob: gobwas glob's "**/x"
+	// never matches a root-level "x", so the root form must exist too.
+	require.Contains(t, patterns, "*_test.go")
+	require.Contains(t, patterns, "*.min.js")
+	require.Contains(t, patterns, "composer.lock")
+
 	// Blanket archive exclusions must never appear in defaults: bundled
 	// runtime/dependency archives can be legitimate scan targets. Only
 	// test-related archives are excluded, by name or by test directory.
@@ -68,6 +74,11 @@ func TestBuildCompileExcludeFunc(t *testing.T) {
 		// a similarly-named production directory must stay untouched.
 		require.True(t, exclude("src/testing/service.go"))
 		require.False(t, exclude("src/contest/service.go"))
+		// Root-level test files: the root form of "**/x" must match too.
+		require.True(t, exclude("main_test.go"))
+		require.True(t, exclude("test_main.py"))
+		require.True(t, exclude("app.min.js"))
+		require.False(t, exclude("main.go"))
 	})
 
 	t.Run("aggregated test directories and fixtures", func(t *testing.T) {
@@ -146,6 +157,7 @@ func TestBuildCompileExcludeFunc(t *testing.T) {
 		require.False(t, exclude("composer.lock"))
 		require.False(t, exclude("node_modules/pkg/index.js"))
 		require.False(t, exclude("src/testdata/issue47704.go"))
+		require.False(t, exclude("service_test.go"))
 	})
 }
 

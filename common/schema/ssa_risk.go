@@ -57,12 +57,16 @@ type SSARisk struct {
 	RuntimeId string `json:"runtime_id" gorm:"index"`
 	// for query result
 	ResultID uint64 `json:"result_id"` // result
-	Variable string `json:"variable"`  // result/variable
-	Index    int64  `json:"index"`     // result/variable/index
+	// ResultUUID identifies the syntaxflow result that produced this risk even
+	// when the result was never persisted (in-memory scans have no row id).
+	// It is part of the row hash so findings of one scan stay distinguishable.
+	ResultUUID string `json:"result_uuid" gorm:"index"`
+	Variable   string `json:"variable"` // result/variable
+	Index      int64  `json:"index"`    // result/variable/index
 
 	// 最新处置状态
 	LatestDisposalStatus string `json:"latest_disposal_status" gorm:"index;default:'not_set'"`
-	// Risk 特征哈希，用于区分不同批次扫描的同一个漏洞
+	// Risk 特征哈希，用于区分不同批次扫描的同一个漏洞，也是同一次扫描里后一个模式覆盖前一个模式的键。
 	// 包含 SSA 信息(disam、function)、FileUrl、SfRule 信息(ruleId、variableName、level)
 	RiskFeatureHash string `json:"risk_feature_hash" gorm:"index"`
 
@@ -73,13 +77,19 @@ func (*SSARisk) TableName() string {
 	return TableSSARisks
 }
 
+// CalcHash identifies one finding of one result. ResultUUID is enough;
+// an empty UUID is a valid input and does not need a second formula.
 func (s *SSARisk) CalcHash() string {
-	return utils.CalcSha1(
-		s.CodeSourceUrl, s.CodeRange, // source code range
-		s.RuntimeId,                                    // syntaxflow scan task id
-		s.ProgramName, s.ResultID, s.Variable, s.Index, // syntaxflow result index
-		s.Title, s.RiskType, // risk info
-	)
+	return utils.CalcSha1(s.CodeSourceUrl, s.CodeRange, s.RuntimeId,
+		s.ProgramName, s.ResultUUID, s.Variable, s.Index, s.Title, s.RiskType)
+}
+
+// CalcFeatureHash is the cover key shared by every scan mode of one finding.
+// disasm is the value text the producer already computed; this method does
+// not inspect SSA. Changing the rule is a different finding for diff history.
+func (s *SSARisk) CalcFeatureHash(disasm string) string {
+	return utils.CalcSha1(s.FunctionName, disasm, s.FromRule, s.Variable,
+		string(s.Severity), s.RiskType, s.Language, s.Title)
 }
 
 func SSARiskTypeVerbose(s string) string {
@@ -126,6 +136,7 @@ func (s *SSARisk) ToGRPCModel() *ypb.SSARisk {
 		CveAccessComplexity:  s.CveAccessComplexity,
 		Tags:                 s.Tags,
 		ResultID:             s.ResultID,
+		ResultUUID:           s.ResultUUID,
 		IsRead:               s.IsRead,
 		Variable:             s.Variable,
 		Index:                s.Index,
@@ -137,7 +148,10 @@ func (s *SSARisk) ToGRPCModel() *ypb.SSARisk {
 	}
 }
 
-func (s *SSARisk) BeforeCreate(tx *gorm.DB) (err error) {
+// prepareForSave normalizes the row the same way for create and update so a
+// rewrite keeps a correct hash. FeatureText is the value text used by the
+// cover key; a blank text leaves an already computed feature hash alone.
+func (s *SSARisk) prepareForSave(featureText string) {
 	if s.RiskType == "" {
 		s.RiskType = "其他"
 	}
@@ -145,8 +159,30 @@ func (s *SSARisk) BeforeCreate(tx *gorm.DB) (err error) {
 		s.ScanMode = "ssa"
 	}
 	s.Severity = ValidSeverityType(s.Severity)
+	if featureText != "" {
+		s.RiskFeatureHash = s.CalcFeatureHash(featureText)
+	}
 	s.Hash = s.CalcHash()
+}
+
+func (s *SSARisk) BeforeCreate(tx *gorm.DB) (err error) {
+	s.prepareForSave("")
 	return nil
+}
+
+func (s *SSARisk) BeforeUpdate(tx *gorm.DB) (err error) {
+	s.prepareForSave("")
+	return nil
+}
+
+// PrepareForSave normalizes the row for create or update outside gorm.
+// featureText, when given, also computes the cover key.
+func (s *SSARisk) PrepareForSave(featureText ...string) {
+	text := ""
+	if len(featureText) > 0 {
+		text = featureText[0]
+	}
+	s.prepareForSave(text)
 }
 
 func (s *SSARisk) AfterCreate(tx *gorm.DB) (err error) {

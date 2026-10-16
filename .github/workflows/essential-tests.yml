@@ -1234,11 +1234,12 @@ jobs:
 
   cleanup-yak-artifact:
     needs: [prepare-yak, prepared-startup, test-local, test-prepared-yakgrpc, test-prepared-coreplugin]
-    if: always() && needs.prepare-yak.result == 'success'
+    if: always() && !cancelled() && needs.prepare-yak.result == 'success'
     runs-on: ubuntu-22.04
     # Hygiene only: deleting the shared binary and pruning caches reclaims
     # storage for the next run. A missing or already-expired entry is expected
-    # and must not turn a green run red.
+    # and must not turn a green run red. Skip when cancelled so an abandoned
+    # superseded run does not block runner slots or hold concurrency locks.
     continue-on-error: true
     timeout-minutes: 15
     permissions:
@@ -1310,7 +1311,10 @@ jobs:
       - test-local
       - test-prepared-yakgrpc
       - test-prepared-coreplugin
-    if: always()
+    # Aggregate test scope results across all test lanes. Runs on both success
+    # and test failure, but skips when cancelled so an abandoned superseded run
+    # immediately terminates and frees concurrency locks for the latest commit.
+    if: always() && !cancelled()
     runs-on: ubuntu-22.04
     steps:
       - name: Verify selected test scope

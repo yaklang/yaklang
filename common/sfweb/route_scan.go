@@ -56,11 +56,16 @@ func ypbToSyntaxFlowScanRisk(risk *ypb.SSARisk, result *ypb.SyntaxFlowResult) *S
 	if risk == nil {
 		return nil
 	}
+	timestamp := risk.CreatedAt
+	// A streamed risk is not a saved row yet, so GORM has not filled CreatedAt.
+	if timestamp <= 0 {
+		timestamp = time.Now().Unix()
+	}
 	return &SyntaxFlowScanRisk{
 		ResultID:    result.ResultID,
 		RuleName:    result.RuleName,
 		Severity:    risk.Severity,
-		Timestamp:   risk.CreatedAt,
+		Timestamp:   timestamp,
 		Title:       risk.Title,
 		Type:        risk.RiskType,
 		VarName:     risk.Variable,

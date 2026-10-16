@@ -2,6 +2,7 @@ package yakgrpc
 
 import (
 	"context"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"io"
 	"sync"
 	"testing"
@@ -16,6 +17,7 @@ import (
 )
 
 func TestInMemoryClient(t *testing.T) {
+	yakit.GuardConfigurationForTest(t)
 	t.Run("close waits for persistence", testInMemoryClientCloseWaitsForHandlers)
 	// Every instance owns its transport and database, even when created concurrently.
 	for i := 0; i < 4; i++ {

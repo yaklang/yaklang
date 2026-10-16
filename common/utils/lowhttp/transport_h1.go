@@ -224,7 +224,10 @@ func (t *h1Transport) roundTripDirect(ctx context.Context, tr *transportRequest,
 	reqIns := tr.reqIns
 	timeout := tr.timeout
 
+	// Only this goroutine owns responseRaw, including header-only capture in
+	// NoBodyBuffer mode. Stream callbacks must never read or write this buffer.
 	var responseRaw bytes.Buffer
+	resetResponseRaw := responseRaw.Reset
 	partial := &transportResult{remoteAddr: conn.RemoteAddr().String(), portIsOpen: true}
 	defer func() {
 		if resultErr != nil && result == nil {
@@ -306,11 +309,6 @@ func (t *h1Transport) roundTripDirect(ctx context.Context, tr *transportRequest,
 
 			packetReader := bufio.NewReader(reader)
 			responseHeader := bytes.NewBufferString("")
-			var responseHeaderWriter io.Writer = responseHeader
-			if option.NoBodyBuffer {
-				responseHeaderWriter = io.MultiWriter(responseHeaderWriter, &responseRaw)
-			}
-
 			var headerErr error
 			for {
 				line, err := utils.BufioReadLine(packetReader)
@@ -322,8 +320,8 @@ func (t *h1Transport) roundTripDirect(ctx context.Context, tr *transportRequest,
 					bodyWriter.Close()
 					break
 				}
-				responseHeaderWriter.Write(line)
-				responseHeaderWriter.Write([]byte("\r\n"))
+				responseHeader.Write(line)
+				responseHeader.WriteString("\r\n")
 				if len(line) == 0 {
 					go func() {
 						io.Copy(bodyWriter, packetReader)
@@ -343,7 +341,9 @@ func (t *h1Transport) roundTripDirect(ctx context.Context, tr *transportRequest,
 		}()
 
 		if option.NoBodyBuffer {
-			mirrorWriter = writer
+			headerCapture := &responseHeaderCaptureWriter{dst: &responseRaw}
+			resetResponseRaw = headerCapture.Reset
+			mirrorWriter = io.MultiWriter(headerCapture, writer)
 		} else {
 			rawWriter := io.Writer(&responseRaw)
 			if option.AutoDetectSSE {
@@ -402,7 +402,7 @@ func (t *h1Transport) roundTripDirect(ctx context.Context, tr *transportRequest,
 				authReq, authErr := auth.Authenticate(conn, tr.option)
 				if authErr == nil {
 					_, wErr := conn.Write(authReq)
-					responseRaw.Reset()
+					resetResponseRaw()
 					if wErr != nil {
 						return nil, errorspkg.Wrap(wErr, "write request failed")
 					}
@@ -493,8 +493,7 @@ func (t *h1Transport) roundTripDirect(ctx context.Context, tr *transportRequest,
 		_, _ = utils.ReadUntilStable(httpResponseReader, conn, 500*time.Millisecond, 300*time.Millisecond)
 	}
 
-	// Complete the stream handler before exposing responseRaw: with NoBodyBuffer
-	// it is the handler that writes the response headers into that buffer.
+	// Preserve the callback lifecycle: wait for the stream handler before return.
 	if finishStreamHandler != nil {
 		finishStreamHandler()
 	}

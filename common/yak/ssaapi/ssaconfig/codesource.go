@@ -86,6 +86,7 @@ type ProxyConfigInfo struct {
 
 // CodeSourceInfo 代码源配置信息
 type CodeSourceInfo struct {
+	Commit            string           `json:"commit,omitempty"`              // Exact Git commit to scan.
 	Kind              CodeSourceKind   `json:"kind"`                          // 源码获取方式: local/compression/jar/git/svn
 	LocalFile         string           `json:"local_file,omitempty"`          // 本地路径
 	URL               string           `json:"url,omitempty"`                 // 远程URL (git/svn/tar/jar)
@@ -187,6 +188,23 @@ func (c *Config) GetCodeSourceBranch() string {
 		return ""
 	}
 	return c.CodeSource.Branch
+}
+
+func (c *Config) GetCodeSourceCommit() string {
+	if c == nil || c.Mode&ModeCodeSource == 0 || c.CodeSource == nil {
+		return ""
+	}
+	return c.CodeSource.Commit
+}
+
+func WithCodeSourceCommit(commit string) Option {
+	return func(c *Config) error {
+		if err := c.ensureCodeSource("Code Source Commit"); err != nil {
+			return err
+		}
+		c.CodeSource.Commit = commit
+		return nil
+	}
 }
 
 func (c *Config) GetCodeSourcePath() string {

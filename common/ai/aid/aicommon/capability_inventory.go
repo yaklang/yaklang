@@ -45,6 +45,8 @@ type CapabilityInventoryNamedItem struct {
 	Category    string `json:"category,omitempty"`
 	// SkillLoadState is set for category "skill" only: "metadata" | "loaded".
 	SkillLoadState string `json:"skill_load_state,omitempty"`
+	// TokenCount is the visible Timeline body size of a loaded skill, not its file size.
+	TokenCount int `json:"token_count,omitempty"`
 }
 
 type CapabilityInventorySection struct {
@@ -163,6 +165,11 @@ func CapabilityInventoryPayloadFromItems(items []CapabilityInventoryItem, cfg *C
 		case "skill":
 			named := capabilityInventoryItemToNamed(item, "skill")
 			named.SkillLoadState = skillLoadStateFromItem(item)
+			if named.SkillLoadState == CapabilityInventorySkillLoadLoaded {
+				if data, ok := item.Data.(map[string]any); ok {
+					named.TokenCount = int(utils.InterfaceToFloat64(data["token_count"]))
+				}
+			}
 			if dynamic {
 				payload.Dynamic.Skills = append(payload.Dynamic.Skills, named)
 			} else {

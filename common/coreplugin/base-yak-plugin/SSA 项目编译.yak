@@ -2,6 +2,7 @@ yakit.AutoInitYakit()
 
 configJSON := cli.Text("config", cli.setRequired(true), cli.setVerboseName("SSA 配置"), cli.setHelp("SSA 项目的配置 JSON 字符串"))
 programNameFromParam := cli.Text("program_name", cli.setVerboseName("程序名称（可选）"), cli.setHelp("显式指定程序名称；不填则自动生成时间戳程序名"))
+baseProgramNameFromParam := cli.Text("base_program_name", cli.setVerboseName("基础程序名称（可选）"), cli.setHelp("显式指定增量编译的基础程序；不填则使用配置中的基础程序，配置也没有时自动以项目上一次编译的程序作为基础程序"))
 disableTimestampProgramName := cli.Bool("disable_timestamp_program_name", cli.setVerboseName("禁用程序名称时间戳（可选）"), cli.setHelp("默认 false；为 true 时不附加时间戳"))
 enableStructRule := cli.Bool("struct-rule", cli.setDefault(false), cli.setVerboseName("编译期语义检测"), cli.setHelp("默认关闭。仅编译；为 true 时才在编译单元上运行 struct 规则"))
 
@@ -53,6 +54,16 @@ yakit.Info("程序名称: %s", programName)
 // 从配置中读取增量编译设置
 enableIncrementalCompile = config.GetEnableIncrementalCompile()
 baseProgramName = config.GetBaseProgramName()
+
+// 显式 CLI 参数的基础程序优先于配置；指定后自动启用增量编译
+// （与 ssa.withBaseProgramName 的语义一致：设置基础程序名即增量编译）
+if baseProgramNameFromParam != "" {
+    baseProgramName = baseProgramNameFromParam
+    if !enableIncrementalCompile {
+        enableIncrementalCompile = true
+        yakit.Info("显式指定了基础程序，自动启用增量编译")
+    }
+}
 
 // 通过 projectName 从数据库中获取最新的 program name
 lastProgramName = ""

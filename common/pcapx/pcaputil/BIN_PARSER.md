@@ -172,6 +172,7 @@ See [session profiles and explicit limits](PROFILES.md) for the supported versio
 | Kerberos | Port 88 plus DER application tag; UDP messages or TCP records; existing native fields |
 | Memcached | Existing stats request/response and binary GET request profiles |
 | Cassandra | Existing CQL v4 OPTIONS / SUPPORTED / STARTUP profiles; later phases require further admission |
+| ISO 8583 | Two-byte little-endian carried card-originated message; complete envelope and published 1987/1993 element tree in ASCII or packed BCD. Weak length-prefixed candidate, so it is probed after every strong signature and only a fully decodable first message claims the flow |
 
 This is a useful capture/analysis foundation, **not Wireshark-equivalent protocol
 coverage**. Other TCP/UDP traffic yields bounded samples and counters. L2-only

@@ -468,7 +468,7 @@ func (e *ProtocolEvent) ownsNativeFields() bool {
 		return true
 	}
 	switch e.Protocol {
-	case "fins", "someip", "snmp", "dlms-wrapper", "dlms", "opendroneid", "c37118", "sv", "ethercat", "knx", "pfcp", "profinet-dcp", "mavlink", "rtps", "nmea", "semtech-udp":
+	case "fins", "someip", "snmp", "dlms-wrapper", "dlms", "opendroneid", "c37118", "sv", "ethercat", "knx", "pfcp", "profinet-dcp", "mavlink", "rtps", "nmea", "semtech-udp", "iso8583":
 		return true
 	}
 	return false
@@ -919,6 +919,7 @@ type binFlow struct {
 	wrapper           *binDLMSWrapper
 	dlms              *binDLMS
 	memcached         *binMemcached
+	iso8583           *iso8583Session
 	stratum           *binStratum
 	gearman           *binGearman
 	beanstalk         *binBeanstalk
@@ -1492,7 +1493,7 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 				} else {
 					result, err = f.consumeTLS(dir, e)
 				}
-			} else if f.protocol == "fins" || f.protocol == "mms" || f.protocol == "slmp" || f.protocol == "redis" || f.protocol == "syslog" || f.protocol == "snmp" || f.protocol == "smb2" || f.protocol == "hart-ip" || f.protocol == "enip" || f.protocol == "doip" || f.protocol == "genisys" || f.protocol == "dlms-wrapper" || f.protocol == "dlms" || f.protocol == "c37118" || f.protocol == "roc-plus" || f.protocol == "atg" || f.memcached != nil || (e.Entry == "SSHIdentification" || e.Entry == "SSHPreIdentification") || f.protocol == "stratum" || f.protocol == "gearman" || f.protocol == "beanstalkd" || f.protocol == "scgi" || f.protocol == "msgpack-rpc" || f.protocol == "zookeeper" || f.protocol == "clickhouse" || f.protocol == "stomp" || f.protocol == "nats" || f.textInternet != nil || e.Entry == "MySQLPreparedFields" {
+			} else if f.protocol == "iso8583" || f.protocol == "fins" || f.protocol == "mms" || f.protocol == "slmp" || f.protocol == "redis" || f.protocol == "syslog" || f.protocol == "snmp" || f.protocol == "smb2" || f.protocol == "hart-ip" || f.protocol == "enip" || f.protocol == "doip" || f.protocol == "genisys" || f.protocol == "dlms-wrapper" || f.protocol == "dlms" || f.protocol == "c37118" || f.protocol == "roc-plus" || f.protocol == "atg" || f.memcached != nil || (e.Entry == "SSHIdentification" || e.Entry == "SSHPreIdentification") || f.protocol == "stratum" || f.protocol == "gearman" || f.protocol == "beanstalkd" || f.protocol == "scgi" || f.protocol == "msgpack-rpc" || f.protocol == "zookeeper" || f.protocol == "clickhouse" || f.protocol == "stomp" || f.protocol == "nats" || f.textInternet != nil || e.Entry == "MySQLPreparedFields" {
 				result = map[string]any{}
 			} else if e.Protocol == "rtsp" && rtspAppleControlWire(e.Raw, a.budget.MaxCollectionElements) {
 				result = map[string]any{}
@@ -1567,6 +1568,9 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 				if f.textInternet != nil && e.Session != nil {
 					e.semanticFields = cloneSession(e.Session)
 					result = map[string]any{"fields": e.semanticFields}
+				}
+				if e.Protocol == "iso8583" && e.Session != nil {
+					result = map[string]any{"fields": cloneSession(e.semanticFields)}
 				}
 				if (e.Protocol == "ldap" || e.Entry == "LDAPProtectedRecord") && e.semanticFields != nil {
 					result = map[string]any{"fields": cloneSession(e.semanticFields)}

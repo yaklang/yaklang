@@ -19,6 +19,9 @@ import (
 )
 
 func TestGRPCMUSTPASS_MITM(t *testing.T) {
+	// The plugin registry is populated by post-init hooks, not NewLocalClient.
+	// A fresh isolated home cannot rely on plugins prepared by another process.
+	coreplugin.InitDBForTest()
 	var client, err = yakgrpc.NewLocalClient()
 	if err != nil {
 		t.Fatalf("start mitm local client failed: %s", err)
@@ -66,7 +69,6 @@ func TestGRPCMUSTPASS_MITM(t *testing.T) {
 	}
 
 	var wg sync.WaitGroup
-	wg.Add(1)
 
 	var (
 		started            bool
@@ -98,9 +100,10 @@ func TestGRPCMUSTPASS_MITM(t *testing.T) {
 		if !pluginStartLoading && started && strings.Contains(spew.Sdump(rsp), "Initializing MITM Plugin: 基础 XSS 检测") {
 			pluginStartLoading = true
 		}
-		if pluginStartLoading && strings.Contains(spew.Sdump(rsp), "初始化加载插件完成，加载成功【1】个") {
+		if pluginStartLoading && !pluginLoaded && strings.Contains(spew.Sdump(rsp), "初始化加载插件完成，加载成功【1】个") {
 			pluginLoaded = true
 			fmt.Println("==============================================")
+			wg.Add(1)
 			go func() {
 				defer func() {
 					cancel()

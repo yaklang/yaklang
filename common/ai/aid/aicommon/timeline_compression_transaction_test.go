@@ -17,6 +17,7 @@ import (
 
 func compressionTestOptions() TimelineCompressionOptions {
 	return TimelineCompressionOptions{MaxInputTokens: 100000, MaxSummaryTokens: 4096,
+		PromptOptions:   TimelinePromptOptions{PromoteUserInput: true},
 		RetainedContext: map[string]string{"user_query": "修复配置合并，保持公开接口兼容", "todo": "验证嵌套配置"}}
 }
 
@@ -299,7 +300,7 @@ func TestTimelineCompressionTransactionInvalidInput(t *testing.T) {
 	require.Error(t, err)
 	tl := NewTimeline(nil, nil)
 	_, err = tl.CompressOnce(compressionTestOptions())
-	require.ErrorContains(t, err, "no visible ordinary history")
+	require.ErrorContains(t, err, "no visible history")
 	require.False(t, tl.compressing)
 	require.Nil(t, tl.compressionSnapshot)
 	tl.PushText(1, "ordinary history")

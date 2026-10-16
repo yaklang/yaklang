@@ -103,6 +103,7 @@ func TestMITM_UploadFile(t *testing.T) {
 }
 
 func TestMITM_LargeRequestWireForward(t *testing.T) {
+	yakit.GuardConfigurationForTest(t)
 	// Wire forwarding must keep the full body even when History spill kicks in.
 	// Lower 「转储数据包大小」 below body size so spill is exercised.
 	// In CI, NewLocalClient dials the external yak grpc process: consts.Set*

@@ -1,10 +1,14 @@
 package ssaapi
 
 import (
+	"fmt"
 	"testing"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/gorm"
 	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 )
 
@@ -87,4 +91,53 @@ func TestBatchSaveAuditNodesAndEdgesIsEquivalencePreserving(t *testing.T) {
 	require.Equal(t, ssadb.EdgeType_Predecessor, edge.EdgeType)
 	require.Equal(t, int64(7), edge.AnalysisStep)
 	require.Equal(t, "label", edge.AnalysisLabel)
+}
+
+func TestBatchSaveAuditSources(t *testing.T) {
+	db := ssadb.GetDB()
+	program := uuid.NewString()
+	t.Cleanup(func() {
+		db.Where("program_name = ?", program).Delete(&ssadb.IrSource{})
+	})
+
+	require.NoError(t, saveAuditSources(db, nil))
+	require.NoError(t, saveAuditSources(db, []*ssadb.IrSource{nil}))
+	const count = riskBatchSize + 1
+	sources := make([]*ssadb.IrSource, 0, count+1)
+	sources = append(sources, nil)
+	for i := 0; i < count; i++ {
+		sources = append(sources, &ssadb.IrSource{
+			ProgramName:    program,
+			SourceCodeHash: fmt.Sprintf("%s-%d", program, i),
+			FolderPath:     "src",
+			FileName:       fmt.Sprintf("file-%d.yak", i),
+			QuotedCode:     `"println(123)"`,
+			IsBigFile:      i%2 == 0,
+		})
+	}
+	require.NoError(t, db.Transaction(func(tx *gorm.DB) error {
+		return saveAuditSources(tx, sources)
+	}))
+
+	var n int64
+	require.NoError(t, db.Model(&ssadb.IrSource{}).Where("program_name = ?", program).Count(&n).Error)
+	require.EqualValues(t, count, n, "all source rows cross the batch boundary")
+	var saved ssadb.IrSource
+	require.NoError(t, db.Where("program_name = ? AND file_name = ?", program, "file-500.yak").First(&saved).Error)
+	require.Equal(t, "/src", saved.FolderPath, "BeforeSave still normalizes every batch row")
+	require.Equal(t, `"println(123)"`, saved.QuotedCode)
+	require.True(t, saved.IsBigFile)
+
+	rollback := utils.Error("roll back source batch")
+	err := db.Transaction(func(tx *gorm.DB) error {
+		if err := saveAuditSources(tx, []*ssadb.IrSource{{
+			ProgramName: program, SourceCodeHash: "rolled-back", FileName: "rolled-back.yak",
+		}}); err != nil {
+			return err
+		}
+		return rollback
+	})
+	require.ErrorIs(t, err, rollback)
+	require.NoError(t, db.Model(&ssadb.IrSource{}).Where("program_name = ?", program).Count(&n).Error)
+	require.EqualValues(t, count, n, "a source batch stays in its caller's transaction")
 }

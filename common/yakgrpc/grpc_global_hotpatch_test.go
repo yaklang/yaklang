@@ -2,19 +2,22 @@ package yakgrpc
 
 import (
 	"context"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"path/filepath"
 	"testing"
 
-	"github.com/yaklang/gorm"
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/gorm"
 	"github.com/yaklang/yaklang/common/mutate"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/configtest"
 	"github.com/yaklang/yaklang/common/yak"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
 func TestGlobalHotPatchConfigCRUD(t *testing.T) {
+	yakit.GuardConfigurationForTest(t)
 	server, err := newLiteYakServerForHotPatchTests(t)
 	require.NoError(t, err)
 
@@ -131,6 +134,7 @@ func newLiteYakServerForHotPatchTests(t *testing.T) (*Server, error) {
 	if db := profileDB.AutoMigrate(&schema.GeneralStorage{}, &schema.HotPatchTemplate{}); db.Error != nil {
 		return nil, db.Error
 	}
+	configtest.RequirePristine(t, profileDB, nil, tmpDir)
 
 	return &Server{
 		profileDatabase: profileDB,

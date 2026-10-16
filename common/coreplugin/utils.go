@@ -77,6 +77,8 @@ type CorePluginInfo struct {
 // GetAllCorePluginWithType returns all registered core plugins with their type and content
 // This is exported for use in external test packages (coreplugin_test)
 func GetAllCorePluginWithType() []CorePluginInfo {
+	corePluginSyncMu.Lock()
+	defer corePluginSyncMu.Unlock()
 	var plugins []CorePluginInfo
 	for _, plugin := range buildInPlugin {
 		plugins = append(plugins, CorePluginInfo{

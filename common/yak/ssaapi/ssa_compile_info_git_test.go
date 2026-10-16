@@ -208,3 +208,40 @@ func readDirectoryNames(t *testing.T, dir string) []string {
 	}
 	return names
 }
+
+func TestGitSourcePinsHistoricalCommitAndRejectsMissingCommit(t *testing.T) {
+	source := createGitSourceRepository(t)
+	repository, err := git.PlainOpen(source)
+	require.NoError(t, err)
+	head, err := repository.Head()
+	require.NoError(t, err)
+	tree, err := repository.Worktree()
+	require.NoError(t, err)
+	require.NoError(t, os.WriteFile(filepath.Join(source, "main.yak"), []byte("println(99)\n"), 0600))
+	_, err = tree.Add("main.yak")
+	require.NoError(t, err)
+	_, err = tree.Commit("change source", &git.CommitOptions{Author: &object.Signature{Name: "CI fixture", Email: "ci@example.invalid", When: time.Unix(2, 0)}})
+	require.NoError(t, err)
+	for _, commit := range []string{head.Hash().String(), strings.Repeat("a", 40), "not-a-sha"} {
+		t.Run(commit, func(t *testing.T) {
+			root := t.TempDir()
+			t.Setenv(ssagitworkdir.WorkDirEnv, root)
+			t.Setenv(ssagitworkdir.MinFreeBytesEnv, "0")
+			cfg, err := ssaconfig.New(ssaconfig.ModeSSACompile, ssaconfig.WithCodeSourceKind(ssaconfig.CodeSourceGit), ssaconfig.WithCodeSourceURL(source), ssaconfig.WithCodeSourceCommit(commit))
+			require.NoError(t, err)
+			config := &Config{Config: cfg}
+			defer config.Cleanup()
+			local, err := cloneGitSourceDir(config)
+			if commit != head.Hash().String() {
+				require.Error(t, err)
+				require.Empty(t, readDirectoryNames(t, root))
+				return
+			}
+			require.NoError(t, err)
+			data, err := os.ReadFile(filepath.Join(local, "main.yak"))
+			require.NoError(t, err)
+			require.Contains(t, string(data), "40 + 2")
+			require.NotContains(t, string(data), "99")
+		})
+	}
+}

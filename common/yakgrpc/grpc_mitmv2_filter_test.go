@@ -819,6 +819,7 @@ mirrorHTTPFlow = func(isHttps /*bool*/, url /*string*/, req /*[]byte*/, rsp /*[]
 }
 
 func TestGRPCMUSTPASS_MITMV2_Filter_Set_Get(t *testing.T) {
+	yakit.GuardConfigurationForTest(t)
 	ctx := utils.TimeoutContextSeconds(5)
 	client, err := NewLocalClient()
 	require.NoError(t, err)
@@ -840,6 +841,7 @@ func TestGRPCMUSTPASS_MITMV2_Filter_Set_Get(t *testing.T) {
 }
 
 func TestGRPCMUSTPASS_MITMV2_Filter_Reset(t *testing.T) {
+	yakit.GuardConfigurationForTest(t)
 	ctx := utils.TimeoutContextSeconds(5)
 	client, err := NewLocalClient()
 	require.NoError(t, err)

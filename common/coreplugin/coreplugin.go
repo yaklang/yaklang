@@ -1,17 +1,14 @@
 package coreplugin
 
 import (
+	"errors"
+	"fmt"
+	"io/fs"
 	"strings"
 
 	uuid "github.com/google/uuid"
-	"github.com/yaklang/yaklang/common/consts"
-	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
-	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/utils/resources_monitor"
-	"github.com/yaklang/yaklang/common/yak/static_analyzer"
 	"github.com/yaklang/yaklang/common/yak/static_analyzer/information"
-	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 )
 
 var buildInPlugin = make(map[string]*schema.YakScript)
@@ -68,56 +65,43 @@ func withPluginEnableForAI(desc string, keywords string) pluginOption {
 	}
 }
 
-func registerBuildInPlugin(pluginType string, name string, opt ...pluginOption) {
-	codes := string(GetCorePluginData(name))
-	if len(codes) <= 0 {
-		return
+func loadCorePluginDefinitions() (map[string]*builtinCorePlugin, error) {
+	plugins := make(map[string]*builtinCorePlugin)
+	var loadErr error
+	registerBuildInPlugin := func(pluginType string, name string, opt ...pluginOption) {
+		codes, err := basePluginFS.ReadFile(fmt.Sprintf("base-yak-plugin/%s.yak", name))
+		if err != nil {
+			if !errors.Is(err, fs.ErrNotExist) {
+				loadErr = fmt.Errorf("read core plugin %q: %w", name, err)
+			}
+			return
+		}
+
+		config := &pluginConfig{}
+		for _, o := range opt {
+			o(config)
+		}
+
+		plugin := &schema.YakScript{
+			ScriptName:         name,
+			Type:               pluginType,
+			Content:            string(codes),
+			Help:               config.Help,
+			Author:             "yaklang.io",
+			Params:             "",
+			Tags:               strings.Join(config.Tags, ","),
+			OnlineContributors: strings.Join(config.Author, ","),
+			Uuid:               uuid.New().String(),
+			OnlineOfficial:     true,
+			IsCorePlugin:       true,
+			HeadImg:            `https://yaklang.oss-cn-beijing.aliyuncs.com/yaklang-avator-logo.png`,
+			Ignored:            config.Ignore,
+			EnableForAI:        config.EnableForAI,
+			AIDesc:             config.AIDesc,
+			AIKeywords:         config.AIKeywords,
+		}
+		plugins[name] = &builtinCorePlugin{YakScript: plugin, generateParam: config.EnableGenerateParam}
 	}
-
-	config := &pluginConfig{}
-	for _, o := range opt {
-		o(config)
-	}
-
-	plugin := &schema.YakScript{
-		ScriptName:         name,
-		Type:               pluginType,
-		Content:            codes,
-		Help:               config.Help,
-		Author:             "yaklang.io",
-		Params:             "",
-		Tags:               strings.Join(config.Tags, ","),
-		OnlineContributors: strings.Join(config.Author, ","),
-		Uuid:               uuid.New().String(),
-		OnlineOfficial:     true,
-		IsCorePlugin:       true,
-		HeadImg:            `https://yaklang.oss-cn-beijing.aliyuncs.com/yaklang-avator-logo.png`,
-		Ignored:            config.Ignore,
-		EnableForAI:        config.EnableForAI,
-		AIDesc:             config.AIDesc,
-		AIKeywords:         config.AIKeywords,
-	}
-	buildInPlugin[name] = plugin
-	OverWriteYakPlugin(plugin.ScriptName, plugin, config.EnableGenerateParam)
-}
-
-var BlackListCorePlugin = []string{
-	"启发式SQL注入检测",
-}
-
-func ClearBlackListPlugin(blackList []string) {
-	err := yakit.DeleteYakScriptByNames(consts.GetGormProfileDatabase(), blackList)
-	if err != nil {
-		log.Errorf("delete black list plugin failed: %s", err)
-	}
-}
-
-// corePluginEmbedKey 用于 yakit 存储 core plugin embed 同步状态，与 init 中 MonitorModifiedWithAction 一致
-const corePluginEmbedKey = "cd336beba498c97738c275f6771efca3"
-
-// syncCorePluginEmbedInternal 将内置 core plugin 从 embed 同步到数据库，不更新 hash（由调用方决定）
-func syncCorePluginEmbedInternal() error {
-	log.Debug("start to load core plugin")
 	registerBuildInPlugin(
 		"mitm",
 		"HTTP请求走私",
@@ -510,158 +494,5 @@ func syncCorePluginEmbedInternal() error {
 			"allow-custom-multiple-history-mutate",
 		}),
 	)
-	return nil
-}
-
-// ForceSyncCorePlugin 强制同步内置 core plugin 到数据库，忽略哈希检查（用于版本更新后修复导入失败等场景）
-func ForceSyncCorePlugin() error {
-	if err := syncCorePluginEmbedInternal(); err != nil {
-		return err
-	}
-	yakit.Set(corePluginEmbedKey, consts.ExistedCorePluginEmbedFSHash)
-	return nil
-}
-
-func init() {
-	yakit.RegisterPostInitDatabaseFunction(func() error {
-		ClearBlackListPlugin(BlackListCorePlugin)
-		return resources_monitor.NewEmbedResourcesMonitor(corePluginEmbedKey, consts.ExistedCorePluginEmbedFSHash).MonitorModifiedWithAction(func() string {
-			hash, _ := CorePluginHash()
-			return hash
-		}, syncCorePluginEmbedInternal)
-	}, "sync-core-plugin-for-yakit")
-
-	yakit.RegisterPostInitDatabaseFunction(func() error {
-		return syncCorePluginAIFields()
-	}, "sync-core-plugin-ai-fields")
-}
-
-// corePluginAIFieldsVersion is bumped whenever AI metadata for core plugins
-// changes in Go code. Since these changes don't touch the embedded .yak files,
-// the normal embed-FS hash check won't trigger a resync. This version string
-// forces a one-time full sync when incremented.
-const corePluginAIFieldsVersion = "v1"
-
-// syncCorePluginAIFields ensures AI metadata (enable_for_ai, ai_desc, ai_keywords)
-// is written to the database for core plugins. This runs independently from the
-// embed FS hash check, because AI field changes (in Go code) don't alter the
-// embedded .yak file content.
-func syncCorePluginAIFields() error {
-	key := "core-plugin-ai-fields-version"
-	if yakit.Get(key) == corePluginAIFieldsVersion {
-		return nil
-	}
-
-	log.Infof("core plugin AI fields version changed (want %s), forcing sync", corePluginAIFieldsVersion)
-
-	if len(buildInPlugin) == 0 {
-		if err := syncCorePluginEmbedInternal(); err != nil {
-			log.Warnf("sync core plugin embed for AI fields failed: %v", err)
-			return nil
-		}
-	} else {
-		db := consts.GetGormProfileDatabase()
-		if db == nil {
-			return nil
-		}
-		for name, plugin := range buildInPlugin {
-			if !plugin.EnableForAI {
-				continue
-			}
-			if err := db.Model(&schema.YakScript{}).Where("script_name = ?", name).UpdateColumns(map[string]interface{}{
-				"enable_for_ai": plugin.EnableForAI,
-				"ai_desc":       plugin.AIDesc,
-				"ai_keywords":   plugin.AIKeywords,
-			}).Error; err != nil {
-				log.Warnf("sync AI fields for core plugin %q failed: %v", name, err)
-			}
-		}
-	}
-
-	yakit.Set(key, corePluginAIFieldsVersion)
-	log.Infof("core plugin AI fields synced to version %s", corePluginAIFieldsVersion)
-	return nil
-}
-
-// only use for test
-func OverWriteCorePluginToLocal() {
-	for pluginName, instance := range buildInPlugin {
-		OverWriteYakPlugin(pluginName, instance, true)
-	}
-}
-
-func OverWriteYakPlugin(name string, scriptData *schema.YakScript, enableGenerateParam bool) {
-	var err error
-	generateParam := func(code, pluginType string) (string, string, error) {
-		if enableGenerateParam {
-			oldLevel := log.GetLevel()
-			log.SetLevel(log.ErrorLevel)
-			defer log.SetLevel(oldLevel)
-			prog, err := static_analyzer.SSAParse(code, pluginType)
-			if err != nil {
-				return "", "", err
-			}
-			params, envKey, err := information.GenerateParameterFromProgram(prog)
-			if err != nil {
-				return "", "", utils.Wrapf(err, "generate param for %s failed", name)
-			}
-			return params, envKey, nil
-		}
-		return "", "", nil
-	}
-	pluginHash := func(code string, headImg string, tags string, ignore bool, enableForAI bool, aiDesc string, aiKeywords string) string {
-		return utils.CalcSha1(string(code), headImg, tags, ignore, enableForAI, aiDesc, aiKeywords)
-	}
-
-	codeBytes := GetCorePluginData(name)
-	code := string(codeBytes)
-	if codeBytes == nil {
-		log.Errorf("fetch buildin-plugin: %v failed", name)
-		return
-	}
-	newestPluginHash := pluginHash(code, scriptData.HeadImg, scriptData.Tags, scriptData.Ignored, scriptData.EnableForAI, scriptData.AIDesc, scriptData.AIKeywords)
-
-	databasePlugins := yakit.QueryYakScriptByNames(consts.GetGormProfileDatabase(), name)
-	if len(databasePlugins) == 0 {
-		log.Infof("add core plugin %v to plugin database", name)
-		// 添加核心插件字段
-		scriptData.IsCorePlugin = true
-		// 生成参数
-		scriptData.Params, scriptData.PluginEnvKey, err = generateParam(code, scriptData.Type)
-		if err != nil {
-			log.Error(err)
-		}
-		err = yakit.CreateOrUpdateYakScriptByName(consts.GetGormProfileDatabase(), name, scriptData)
-		if err != nil {
-			log.Errorf("create/update yak script[%v] failed: %s", name, err)
-		}
-		return
-	}
-	databasePlugin := databasePlugins[0]
-	if scriptData.Type == schema.SCRIPT_TYPE_CONTEXT_MENU && databasePlugin.Uuid != "" {
-		// Context-menu bindings use the plugin UUID as their stable identity.
-		// A builtin code update must not turn into a different local action.
-		scriptData.Uuid = databasePlugin.Uuid
-	}
-	if databasePlugin.Content != "" && newestPluginHash == pluginHash(databasePlugin.Content, databasePlugin.HeadImg, databasePlugin.Tags, databasePlugin.Ignored, databasePlugin.EnableForAI, databasePlugin.AIDesc, databasePlugin.AIKeywords) && databasePlugin.IsCorePlugin {
-		log.Debugf("existed plugin's code is not changed, skip: %v", name)
-		return
-	} else {
-		// 生成参数
-		scriptData.Params, scriptData.PluginEnvKey, err = generateParam(string(codeBytes), scriptData.Type)
-		if err != nil {
-			log.Error(err)
-		}
-		err := yakit.DeleteYakScriptByIDs(consts.GetGormProfileDatabase(), int64(databasePlugin.ID))
-		if err != nil {
-			log.Warnf("delete legacy script reason: overrid")
-		}
-		log.Infof("start to override existed plugin: %v", name)
-		err = yakit.CreateOrUpdateYakScriptByName(consts.GetGormProfileDatabase(), name, scriptData)
-		if err != nil {
-			log.Errorf("override %v failed: %s", name, err)
-			return
-		}
-		log.Debugf("override buildin-plugin %v success", name)
-	}
+	return plugins, loadErr
 }

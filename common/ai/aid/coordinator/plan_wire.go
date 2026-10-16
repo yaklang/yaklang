@@ -198,6 +198,26 @@ func ParsePlan(data, document string, previous *Plan) (*Plan, error) {
 		}
 		old.walk(func(n *PlanNode) { oldIDs[n.Identifier] = n.TaskID })
 	}
+	// Explicit identifiers are never rewritten. Reserve all names as well so a
+	// generated suffix cannot steal another node's natural identifier.
+	reserved := map[string]bool{}
+	explicit := map[string]bool{}
+	var reserve func(*PlanNode)
+	reserve = func(n *PlanNode) {
+		if n == nil {
+			return
+		}
+		if n.Identifier != "" {
+			reserved[n.Identifier] = true
+			explicit[n.Identifier] = true
+		} else {
+			reserved[aicommon.SanitizeTaskName(n.Name)] = true
+		}
+		for _, child := range n.Subtasks {
+			reserve(child)
+		}
+	}
+	reserve(root)
 	refs := map[string]*PlanNode{}
 	ambiguous := map[string]bool{}
 	ids, identifiers := map[string]bool{}, map[string]bool{}
@@ -211,7 +231,15 @@ func ParsePlan(data, document string, previous *Plan) (*Plan, error) {
 			n.Tools = []string{}
 		}
 		if n.Identifier == "" {
-			n.Identifier = aicommon.SanitizeTaskName(n.Name)
+			base := aicommon.SanitizeTaskName(n.Name)
+			n.Identifier = base
+			if identifiers[base] || explicit[base] {
+				candidate := base + "-" + index
+				for suffix := 2; reserved[candidate] || identifiers[candidate]; suffix++ {
+					candidate = fmt.Sprintf("%s-%s-%d", base, index, suffix)
+				}
+				n.Identifier = candidate
+			}
 		}
 		if n.Identifier == "" || identifiers[n.Identifier] {
 			return fmt.Errorf("duplicate or empty semantic identifier %q", n.Identifier)

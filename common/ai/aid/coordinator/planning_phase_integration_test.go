@@ -398,6 +398,9 @@ func runPlanPhaseIntegration(t *testing.T, source string, native, explore bool) 
 		}
 		cfg.Timeline.FreezeAll()
 	}
+	// Engine-level callbacks are fallbacks when global tiered models are enabled.
+	// Pin every session tier to this scripted provider, including child agents.
+	opts = append(opts, aicommon.WithAICallback(model))
 	engine, err := aiengine.NewAIEngine(aiengine.WithPlanEngine("coordinator"), aiengine.WithMaxIteration(40), aiengine.WithTimeout(30), aiengine.WithReviewPolicy("yolo"), aiengine.WithAICallback(model), aiengine.WithOnEvent(event), aiengine.WithWorkdir(workdir), aiengine.WithExtOptions(opts...))
 	require.NoError(t, err)
 	defer engine.Close()

@@ -3,6 +3,9 @@ package ssaapi
 import (
 	"bytes"
 	"context"
+	"encoding/hex"
+	git "github.com/go-git/go-git/v5"
+	"github.com/go-git/go-git/v5/plumbing"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -239,6 +242,12 @@ func confinedExtractPath(dest, name string) (string, bool) {
 
 func cloneGitSourceDir(codeSource *Config) (string, error) {
 	process := codeSource.Processf
+	commit := strings.TrimSpace(codeSource.GetCodeSourceCommit())
+	if commit != "" {
+		if decoded, err := hex.DecodeString(commit); err != nil || len(decoded) != 20 {
+			return "", utils.Errorf("git commit must be a full 40-character SHA")
+		}
+	}
 	if codeSource.GetCodeSourceURL() == "" {
 		return "", utils.Errorf("git url is empty ")
 	}
@@ -270,6 +279,10 @@ func cloneGitSourceDir(codeSource *Config) (string, error) {
 		yakgit.WithRecuriveSubmodule(false),
 	)
 	opts = append(opts, shallowOpts...)
+	if commit != "" {
+		// A pinned revision may precede the branch tip, so its tree must be fetched.
+		opts = append(opts, yakgit.WithDepth(0))
+	}
 	if branch := strings.TrimSpace(codeSource.GetCodeSourceBranch()); branch != "" {
 		opts = append(opts, yakgit.WithBranch(branch))
 	}
@@ -291,6 +304,21 @@ func cloneGitSourceDir(codeSource *Config) (string, error) {
 		report,
 	); err != nil {
 		return "", ssagitworkdir.WrapCloneError(codeSource.GetContext(), local, err)
+	}
+
+	if commit != "" {
+		repository, err := git.PlainOpen(local)
+		if err != nil {
+			return "", utils.Errorf("open pinned git source: %v", err)
+		}
+		worktree, err := repository.Worktree()
+		if err != nil {
+			return "", utils.Errorf("open pinned git worktree: %v", err)
+		}
+		if err := worktree.Checkout(&git.CheckoutOptions{Hash: plumbing.NewHash(commit)}); err != nil {
+			return "", utils.Errorf("checkout requested git commit %s: %v", commit, err)
+		}
+		process(0, "checked out requested git commit %s", commit)
 	}
 
 	// DefaultConfig can fail after the clone but before ParseProject installs its

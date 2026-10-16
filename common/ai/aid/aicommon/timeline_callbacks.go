@@ -227,6 +227,10 @@ func (m *Timeline) compressionCallbackLocked(snapshot *timelineCompressionSnapsh
 		return nil
 	}
 	freeze := TimelineFreezeResult{Version: snapshot.FreezeVersion + 1, ThroughID: snapshot.ThroughID}
+	retired := make(map[int64]bool, len(result.RetiredIDs))
+	for _, id := range result.RetiredIDs {
+		retired[id] = true
+	}
 	if len(freezeCallbacks)+len(compressCallbacks) > 0 {
 		for _, id := range m.idToTimelineItem.Keys() {
 			if id <= snapshot.FrozenThroughID || id > snapshot.ThroughID {
@@ -234,7 +238,7 @@ func (m *Timeline) compressionCallbackLocked(snapshot *timelineCompressionSnapsh
 			}
 			if item, ok := m.idToTimelineItem.Get(id); ok && item != nil && !item.deleted {
 				freeze.NewlyFrozenIDs = append(freeze.NewlyFrozenIDs, id)
-				if control := timelinePromotionForItem(item); control != nil {
+				if control := timelinePromotionForItem(item); control != nil && !retired[id] {
 					freeze.Promotions = append(freeze.Promotions, *control)
 				}
 			}
@@ -255,6 +259,7 @@ func (m *Timeline) compressionCallbackLocked(snapshot *timelineCompressionSnapsh
 			compression := *result
 			compression.RetiredIDs = append([]int64(nil), result.RetiredIDs...)
 			compression.RetainedIDs = append([]int64(nil), result.RetainedIDs...)
+			compression.RetiredPromotedEntryIDs = append([]int64(nil), result.RetiredPromotedEntryIDs...)
 			invokeTimelineCallback(callback, TimelineCompressFreezeEvent{cloneTimelineFreezeResult(freeze), compression})
 		}
 		// Exact-only commits promote journals without asking AI for a summary.
@@ -264,7 +269,7 @@ func (m *Timeline) compressionCallbackLocked(snapshot *timelineCompressionSnapsh
 		for _, callback := range summaryCallbacks {
 			invokeTimelineCallback(callback, TimelineSummaryEvent{
 				ThroughID: result.ThroughID, Summary: strings.NewReader(result.Summary),
-				Prompt: snapshot.SummaryPrompt, Instruction: timelineCompressionInstruction,
+				Prompt:      snapshot.SummaryPrompt,
 				RetainedIDs: append([]int64(nil), result.RetainedIDs...), RetainedRange: result.RetainedRange,
 			})
 		}
@@ -289,7 +294,7 @@ func (m *Timeline) compressionCallbackLocked(snapshot *timelineCompressionSnapsh
 			}
 			for _, callback := range memoryCallbacks {
 				invokeTimelineCallback(callback, TimelineMemoryEvent{ThroughID: result.ThroughID,
-					Prompt: snapshot.SummaryPrompt, Instruction: timelineCompressionInstruction,
+					Prompt:         snapshot.SummaryPrompt,
 					MemoryEntities: cloneCompressionMemoryEntities(entities), Err: notifyErr})
 			}
 		}()

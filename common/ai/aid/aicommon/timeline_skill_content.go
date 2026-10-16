@@ -311,10 +311,14 @@ type SkillContextPart struct {
 	EndLine    int
 	Total      int
 	ReachedEnd bool
+	// TokenCount 累加该部分仍在 Open 或已提升的正文，不计渲染标签与目录。
+	TokenCount int
 }
 
 // VisibleSkillParts 返回目标技能当前仍可见的 metadata 和 content。
 // name 为空时返回全部技能。目录和已退休 item 不计入。
+// TokenCount 按可见正文逐条计量；同一范围的不同内容全部计入，冻结聚合丢弃的
+// 相邻同 hash 条目不计入。该查询不改变 journal、冻结状态或 promotedState。
 func (m *Timeline) VisibleSkillParts(name string) []SkillContextPart {
 	if m == nil {
 		return nil
@@ -325,7 +329,9 @@ func (m *Timeline) VisibleSkillParts(name string) []SkillContextPart {
 	ids := append([]int64(nil), m.idToTimelineItem.Keys()...)
 	sort.Slice(ids, func(i, j int) bool { return ids[i] < ids[j] })
 	var parts []SkillContextPart
-	seen := map[string]bool{}
+	index := map[string]int{}
+	frozenHashes := map[string]string{}
+	through := m.frozenThroughLocked()
 	for _, id := range ids {
 		item, ok := m.idToTimelineItem.Get(id)
 		if !ok || item == nil || item.deleted {
@@ -348,18 +354,32 @@ func (m *Timeline) VisibleSkillParts(name string) []SkillContextPart {
 			continue
 		}
 		identity := skillPartIdentity(payload)
-		if seen[identity] {
-			continue
+		position, found := index[identity]
+		if !found {
+			position = len(parts)
+			index[identity] = position
+			part := SkillContextPart{Name: payload.Name, Kind: payload.Kind, Path: payload.Path}
+			if payload.Range != nil {
+				part.StartLine = payload.Range.StartLine
+				part.EndLine = payload.Range.EndLine
+				part.Total = payload.Range.Total
+				part.ReachedEnd = payload.Range.ReachedEnd
+			}
+			parts = append(parts, part)
 		}
-		seen[identity] = true
-		part := SkillContextPart{Name: payload.Name, Kind: payload.Kind, Path: payload.Path}
-		if payload.Range != nil {
-			part.StartLine = payload.Range.StartLine
-			part.EndLine = payload.Range.EndLine
-			part.Total = payload.Range.Total
-			part.ReachedEnd = payload.Range.ReachedEnd
+		if id <= through {
+			// 与 appendPromotedSkillContent 一致：已冻结的相邻同 hash 只展示一次；
+			// Open 条目尚未聚合，不能提前按 hash 把它们从计量中移除。
+			hash := op.PayloadHash
+			if hash == "" {
+				hash = promotedPayloadHash(op.Payload)
+			}
+			if frozenHashes[identity] == hash {
+				continue
+			}
+			frozenHashes[identity] = hash
 		}
-		parts = append(parts, part)
+		parts[position].TokenCount += MeasureTokens(payload.Content)
 	}
 	sort.Slice(parts, func(i, j int) bool {
 		if parts[i].Name != parts[j].Name {
@@ -715,6 +735,7 @@ func (a *SkillContentTimelineAdapter) VisibleSkillParts(name string) []aiskilllo
 		out = append(out, aiskillloader.SkillContextPart{
 			Name: part.Name, Kind: part.Kind, Path: part.Path,
 			StartLine: part.StartLine, EndLine: part.EndLine, Total: part.Total, ReachedEnd: part.ReachedEnd,
+			TokenCount: part.TokenCount,
 		})
 	}
 	return out

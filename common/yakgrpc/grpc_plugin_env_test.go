@@ -11,6 +11,7 @@ import (
 )
 
 func TestGRPC_PluginEnv(t *testing.T) {
+	yakit.GuardConfigurationForTest(t)
 	client, err := NewLocalClient()
 	require.NoError(t, err)
 	ctx := utils.TimeoutContext(10 * time.Second)

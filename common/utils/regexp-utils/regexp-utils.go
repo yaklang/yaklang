@@ -172,6 +172,17 @@ func (m *YakRegexpUtils) FindAllSubmatchIndex(s string) ([][]int, error) {
 	return nil, utils.Errorf("yak regexp find fail: no usable regexp: %s", m.regexpRaw)
 }
 
+// FindAllMatchIndex returns the byte range of every full match: one entry per
+// match, with capture groups excluded. Use this instead of
+// FindAllSubmatchIndex when the caller needs the positions of the matches
+// themselves rather than of their submatches.
+func (m *YakRegexpUtils) FindAllMatchIndex(s string) ([][]int, error) {
+	if reg := m.getUsableRegexp(); reg != nil {
+		return reg.FindAllMatchIndex(s)
+	}
+	return nil, utils.Errorf("yak regexp find fail: no usable regexp: %s", m.regexpRaw)
+}
+
 func (m *YakRegexpUtils) FindAll(b []byte) ([][]byte, error) {
 	if reg := m.getUsableRegexp(); reg != nil {
 		return reg.FindAll(b)

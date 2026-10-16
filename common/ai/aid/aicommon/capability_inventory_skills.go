@@ -86,18 +86,30 @@ func lookupSkillMeta(loader aiskillloader.SkillLoader, name string) (*aiskillloa
 	return nil, nil
 }
 
-// BuildInventorySkillsFromManager mirrors prompt SKILLS_CONTEXT: registry metas
-// as metadata plus fully loaded skills as loaded.
+// BuildInventorySkillsFromManager lists registry metadata and the manager's
+// visible Timeline skills, including their current body token counts.
 func BuildInventorySkillsFromManager(mgr *aiskillloader.SkillsContextManager) []CapabilityInventoryNamedItem {
 	if mgr == nil {
 		return nil
 	}
-	loadedNames := make(map[string]struct{})
-	for _, meta := range mgr.GetCurrentSelectedSkills() {
-		if meta == nil || strings.TrimSpace(meta.Name) == "" {
+	items := BuildInventorySkillsFromLoaderWithEstimator(mgr.GetLoader(), nil, mgr.TokenEstimator())
+	index := make(map[string]int, len(items))
+	for i, item := range items {
+		index[item.Name] = i
+	}
+	for _, skill := range mgr.GetCurrentSelectedSkills() {
+		if skill == nil || skill.SkillMeta == nil || strings.TrimSpace(skill.Name) == "" {
 			continue
 		}
-		loadedNames[meta.Name] = struct{}{}
+		item := skillMetaToInventoryItem(skill.SkillMeta, CapabilityInventorySkillLoadLoaded)
+		item.TokenCount = skill.TokenCount
+		if i, found := index[item.Name]; found {
+			items[i] = item
+		} else {
+			index[item.Name] = len(items)
+			items = append(items, item)
+		}
 	}
-	return BuildInventorySkillsFromLoaderWithEstimator(mgr.GetLoader(), loadedNames, mgr.TokenEstimator())
+	sort.Slice(items, func(i, j int) bool { return items[i].Name < items[j].Name })
+	return items
 }

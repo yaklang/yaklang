@@ -223,6 +223,12 @@ func cassandraRequestEvidence(w []byte, maxBytes int) bool {
 }
 
 func initialProtocolNeedMore(w []byte, maxBytes int) ProbeResult {
+	// A split first ISO 8583 message has a length prefix that already exceeds the
+	// captured bytes. Hold only while the envelope is a valid MTI/bitmap prefix;
+	// a carrier that can never become a complete message rejects instead.
+	if p, _ := probeISO8583(w, maxBytes); p.Verdict == ProbeNeedMore {
+		return p
+	}
 	if p := probeDLMS(w, maxBytes); p.Verdict == ProbeNeedMore {
 		return p
 	}

@@ -6,6 +6,7 @@ import (
 	"math"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aiprojection"
@@ -15,15 +16,19 @@ import (
 // Selection references whole original items. Memory candidates are delivered
 // with the committed summary; compression does not write a memory database.
 type timelineCompressionOutput struct {
-	Summary        string
-	RetainedRange  string
-	RetainedIDs    []int64
-	MemoryEntities []any
+	Summary       string
+	RetainedRange string
+	RetainedIDs   []int64
+	// Original promoted item IDs explicitly blacklisted by the model. Missing,
+	// malformed or unknown IDs keep content by default.
+	RetiredPromotedEntries []int64
+	MemoryEntities         []any
 }
 
 func parseTimelineCompressionOutput(action *Action, snapshot *timelineCompressionSnapshot, summary string) *timelineCompressionOutput {
 	rawRange, _ := action.LookupCanonicalParam("ratain_timeline_item_range")
-	output := compressionSelection(snapshot, summary, rawRange)
+	rawRetire, _ := action.LookupCanonicalParam("retire_promoted_entries")
+	output := compressionSelection(snapshot, summary, rawRange, rawRetire)
 	// Optional extensions must not reject a usable summary. Normalize detached
 	// JSON data and admit valid candidates independently; never invent scores.
 	rawMemory, _ := action.LookupCanonicalParam("memory_entities")
@@ -41,14 +46,56 @@ func parseTimelineCompressionOutput(action *Action, snapshot *timelineCompressio
 	return output
 }
 
-func compressionSelection(snapshot *timelineCompressionSnapshot, summary string, rawRange any) *timelineCompressionOutput {
+func compressionSelection(snapshot *timelineCompressionSnapshot, summary string, rawRange any, rawRetire any) *timelineCompressionOutput {
 	output := &timelineCompressionOutput{Summary: strings.TrimSpace(summary), MemoryEntities: []any{}}
 	if text, ok := rawRange.(string); ok {
 		if ids, err := parseCompressionRetainedRange(text, snapshot.Items); err == nil {
 			output.RetainedRange, output.RetainedIDs = strings.TrimSpace(text), ids
 		}
 	}
+	output.RetiredPromotedEntries = parsePromotedRetirementSelection(snapshot, rawRetire)
 	return output
+}
+
+// parsePromotedRetirementSelection accepts only original promoted item IDs the
+// snapshot actually listed. Everything else is ignored per item: the blacklist
+// default is to keep, so a hallucinated or stale ID can never delete an item
+// the model did not see in this request.
+func parsePromotedRetirementSelection(snapshot *timelineCompressionSnapshot, raw any) []int64 {
+	if snapshot == nil {
+		return nil
+	}
+	offered := make(map[int64]bool, len(snapshot.PromotedItems))
+	for _, item := range snapshot.PromotedItems {
+		offered[item.ID] = true
+	}
+	selected := make(map[int64]bool)
+	add := func(value string) {
+		value = strings.TrimSpace(value)
+		if value == "" {
+			return
+		}
+		id, err := strconv.ParseInt(value, 10, 64)
+		if err != nil || id <= 0 || !offered[id] {
+			return
+		}
+		selected[id] = true
+	}
+	switch value := raw.(type) {
+	case string:
+		for _, part := range strings.Split(value, ",") {
+			add(part)
+		}
+	}
+	if len(selected) == 0 {
+		return nil
+	}
+	ids := make([]int64, 0, len(selected))
+	for id := range selected {
+		ids = append(ids, id)
+	}
+	sort.Slice(ids, func(i, j int) bool { return ids[i] < ids[j] })
+	return ids
 }
 
 func validCompressionMemoryEntity(value any) bool {

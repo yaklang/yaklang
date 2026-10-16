@@ -2,22 +2,22 @@ package syntaxflow_scan_test
 
 import (
 	"archive/zip"
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 	"testing"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
-	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	_ "github.com/yaklang/yaklang/common/yak/ssa_compile"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/sfreport"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 	"github.com/yaklang/yaklang/common/yak/syntaxflow_scan"
@@ -714,10 +714,10 @@ alert $call`,
 	)
 	require.NoError(t, err)
 	require.Greater(t, alerts, 0, "code-scan -p must struct-scan the loaded program")
-	require.Contains(t, stages, string(syntaxflow_scan.StageReview))
+	// A program input has no source path and nothing to compile, so the source
+	// and struct stages do not run on their own: their rules run with the
+	// program stage, which dispatches each rule by its mode.
 	require.Contains(t, stages, string(syntaxflow_scan.StageAnalyze))
-	// Inspect still runs after review, but live callbacks stay in product
-	// order so the cursor does not jump backward.
 	var sawInspect, sawReview, sawAnalyze bool
 	for _, outcome := range result.Stages {
 		switch outcome.Stage {
@@ -729,9 +729,85 @@ alert $call`,
 			sawAnalyze = true
 		}
 	}
-	require.True(t, sawInspect, "inspect must still run after a loaded-program review")
-	require.True(t, sawReview)
+	require.False(t, sawInspect, "the source stage is skipped without a source path")
+	require.False(t, sawReview, "the struct stage is skipped without a compile")
 	require.True(t, sawAnalyze)
+	require.ElementsMatch(t, []string{"inspect", "review"}, result.SkippedStages,
+		"the skipped stages stay visible in the project result")
+}
+
+// TestScanProject_ProgramInputRunsEveryModeThroughProgramQuery covers the
+// program input: there is no source path and nothing to compile, so the source
+// and struct stages are skipped and every rule runs in the program stage,
+// where Program.Query dispatches it by its own mode.
+func TestScanProject_ProgramInputRunsEveryModeThroughProgramQuery(t *testing.T) {
+	vf := filesys.NewVirtualFs()
+	vf.AddFile("main.go", `package main
+
+func run(cmd string) {
+	sink(cmd)
+}
+
+func sink(any) {}
+`)
+	vf.AddFile("leak.env", "AWS_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE\n")
+	progs, err := ssaapi.ParseProjectWithFS(vf,
+		ssaapi.WithLanguage(ssaconfig.GO),
+		ssaapi.WithProgramName(t.Name()),
+	)
+	require.NoError(t, err)
+	require.NotEmpty(t, progs)
+
+	seenRules := map[string]int{}
+	result, err := syntaxflow_scan.ScanProject(context.Background(),
+		ssaconfig.WithProgramNames(t.Name()),
+		syntaxflow_scan.WithMode(
+			syntaxflow_scan.SourceMode,
+			syntaxflow_scan.StructMode,
+			syntaxflow_scan.SSAMode,
+		),
+		ssaconfig.WithScanIgnoreLanguage(true),
+		ssaconfig.WithRuleInput(&ypb.SyntaxFlowRuleInput{
+			Content: `desc(mode: "source", language: general, title: "program source")
+${*}.pattern_regex(/AKIA[0-9A-Z]{16}/) as $hit
+alert $hit`,
+			Language: "general",
+		}),
+		ssaconfig.WithRuleInput(&ypb.SyntaxFlowRuleInput{
+			Content: `desc(mode: "struct", language: golang, title: "program struct")
+sink(* as $arg) as $call
+alert $call`,
+			Language: "golang",
+		}),
+		ssaconfig.WithRuleInput(&ypb.SyntaxFlowRuleInput{
+			Content: `desc(mode: "ssa", language: golang, title: "program ssa")
+sink(* as $arg) as $call
+alert $call`,
+			Language: "golang",
+		}),
+		syntaxflow_scan.WithScanResultCallback(func(r *syntaxflow_scan.ScanResult) {
+			if r == nil || r.Result == nil {
+				return
+			}
+			rule := r.Result.GetRule()
+			if rule == nil {
+				return
+			}
+			name := rule.RuleName
+			if name == "" {
+				name = rule.Title
+			}
+			seenRules[name]++
+		}),
+	)
+	require.NoError(t, err)
+
+	for _, title := range []string{"program source", "program struct", "program ssa"} {
+		require.Contains(t, seenRules, title,
+			"the program stage must run the %q rule", title)
+	}
+	require.ElementsMatch(t, []string{"inspect", "review"}, result.SkippedStages,
+		"a program input skips the source and struct stages")
 }
 
 func TestScanProject_NamedProgramFromDatabase(t *testing.T) {
@@ -887,39 +963,29 @@ alert $hit`,
 	require.Greater(t, alerts, 0)
 }
 
-// reportSpy stands in for a real report (sfreport.SarifReport) and records how
-// the project scan feeds it.
-type reportSpy struct {
-	saves    int
-	results  int
-	saveSeen []int
+// snapshotWriter counts each published document. Reset matches the report's
+// rewind contract, so the buffer always holds the latest complete snapshot.
+type snapshotWriter struct {
+	buf    bytes.Buffer
+	writes int
 }
 
-func (s *reportSpy) AddSyntaxFlowResult(result *ssaapi.SyntaxFlowResult) bool {
-	s.results++
-	return true
+func (w *snapshotWriter) Write(p []byte) (int, error) {
+	w.writes++
+	return w.buf.Write(p)
 }
 
-func (s *reportSpy) AddSyntaxFlowRisks(...*schema.SSARisk) {}
+func (w *snapshotWriter) Reset() { w.buf.Reset() }
 
-func (s *reportSpy) SetWriter(writer io.Writer) error { return nil }
-
-func (s *reportSpy) Save() error {
-	s.saves++
-	// Snapshot how many results had streamed in at the moment of each save, so
-	// the test can tell a mid-scan snapshot from the final one.
-	s.saveSeen = append(s.saveSeen, s.results)
-	return nil
-}
-
-// Results stream into one shared report as each stage runs; every stage saves a
-// snapshot of what it has so far, and the project saves the finished document
-// last. That is what keeps findings on disk when a later stage fails.
+// Findings reach the report as risk updates. Each stage saves a snapshot, and
+// the project saves the finished document last.
 func TestScanProject_SavesSnapshotPerStageThenFinal(t *testing.T) {
 	dir := t.TempDir()
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "app.py"), []byte("eval(user)\n"), 0o644))
 
-	spy := &reportSpy{}
+	report := sfreport.NewReport(sfreport.IRifyReportType)
+	out := &snapshotWriter{}
+	require.NoError(t, report.SetWriter(out))
 	_, err := syntaxflow_scan.ScanProject(context.Background(),
 		ssaconfig.WithCodeSourceKind(ssaconfig.CodeSourceLocal),
 		ssaconfig.WithCodeSourceLocalFile(dir),
@@ -932,18 +998,14 @@ ${*.py}.pattern_regex(/eval\s*\(/) as $hit
 alert $hit`,
 			Language: "python",
 		}),
-		syntaxflow_scan.WithReporter(spy),
+		syntaxflow_scan.WithReporter(report),
 		ssaconfig.WithScanIgnoreLanguage(true),
 	)
 	require.NoError(t, err)
 
-	require.Positive(t, spy.results, "stage results must stream into the report")
-	require.GreaterOrEqual(t, spy.saves, 2,
+	require.NotEmpty(t, report.Risks, "accepted findings must be in the report")
+	require.GreaterOrEqual(t, out.writes, 2,
 		"the stage must save a snapshot and the project must save the finished report")
-	require.Equal(t, spy.results, spy.saveSeen[len(spy.saveSeen)-1],
-		"the last save must carry every streamed result")
-	for i := 1; i < len(spy.saveSeen); i++ {
-		require.GreaterOrEqual(t, spy.saveSeen[i], spy.saveSeen[i-1],
-			"snapshots may only grow: a later save must never lose earlier findings")
-	}
+	require.NotEmpty(t, out.buf.Bytes())
+	require.Contains(t, out.buf.String(), "probe")
 }

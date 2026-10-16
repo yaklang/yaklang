@@ -59,7 +59,22 @@ func preserveCoreContextMenuFields(query *gorm.DB, script *schema.YakScript) {
 	}, true).First(&existing).Error; err != nil {
 		return
 	}
-	if existing.Type == schema.SCRIPT_TYPE_CODEC && len(contextmenu.LegacyActionsForTags(existing.Tags)) == 0 {
+	PreserveCoreContextMenuFields(script, &existing)
+}
+
+// PreserveCoreContextMenuFields retains builtin context-menu identities and
+// legacy codec bindings. Accept a loaded row so batch sync needs no extra query.
+func PreserveCoreContextMenuFields(script, existing *schema.YakScript) {
+	if script == nil || existing == nil || !existing.IsCorePlugin {
+		return
+	}
+	switch existing.Type {
+	case schema.SCRIPT_TYPE_CONTEXT_MENU:
+	case schema.SCRIPT_TYPE_CODEC:
+		if len(contextmenu.LegacyActionsForTags(existing.Tags)) == 0 {
+			return
+		}
+	default:
 		return
 	}
 	script.Type = existing.Type

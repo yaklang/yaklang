@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -25,8 +26,10 @@ func TestTimelineSessionMemoryAcrossCompressionsWithoutObservers(t *testing.T) {
 		require.NoError(t, err)
 	}
 	require.Len(t, prompts, 2)
-	require.Contains(t, prompts[1], "<|SESSION_MEMORY_CANDIDATES_")
-	require.Contains(t, prompts[1], candidate["content"])
+	require.NotContains(t, prompts[0], candidate["content"], "the first extraction must not claim a candidate that has not been produced yet")
+	require.Contains(t, prompts[1], "## 本 session 的记忆候选\n内容：\n"+candidate["content"].(string)+"\n",
+		"the next extraction must receive the previous candidate's full content as comparison material")
+	require.Equal(t, 1, strings.Count(prompts[1], candidate["content"].(string)), "candidate history must be supplied once, not echoed into ordinary history")
 	require.NotContains(t, prompts[1], "标题：")
 	for _, field := range []string{"tags：", "potential_questions：", "scores：", "# candidate="} {
 		require.NotContains(t, prompts[1], field, "session memory metadata must stay out of compression materials")

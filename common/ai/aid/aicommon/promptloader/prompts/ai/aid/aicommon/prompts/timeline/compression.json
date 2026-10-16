@@ -5,6 +5,7 @@
     "@action",
     "summary",
     "ratain_timeline_item_range",
+    "retire_promoted_entries",
     "memory_entities"
   ],
   "additionalProperties": false,
@@ -15,12 +16,16 @@
     },
     "summary": {
       "type": "string",
-      "minLength": 1,
-      "description": "合并旧摘要与未保留原文后的历史总结，说明进展、依据、问题和衔接线索。"
+      "minLength": 0,
+      "description": "合并旧摘要与未保留原文后的历史总结，说明进展、依据、问题和衔接线索。没有任何普通历史与旧摘要时可以为空字符串，本次只做条目删除决策。"
     },
     "ratain_timeline_item_range": {
       "type": "string",
       "description": "原样保留的普通 Timeline item ID，逗号分隔 ID 或闭区间，例如 12-18,23；空字符串表示无保留。"
+    },
+    "retire_promoted_entries": {
+      "type": "string",
+      "description": "本次判断不再需要的 promoted item 数字 ID，逗号分隔，不写区间。只使用历史条目中标注的 RETIRE_ID 数字，不写 RETIRE_ID 字样。仍需使用的条目应保留，不要求全部删除；空字符串表示本次不删除。只删除点名 ID。"
     },
     "memory_entities": {
       "type": "array",

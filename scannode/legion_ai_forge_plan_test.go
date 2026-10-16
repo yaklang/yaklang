@@ -80,3 +80,33 @@ func TestLegionForgePresetObservationPlanParsesWithoutModel(t *testing.T) {
 		})
 	}
 }
+
+func TestLegionForgePresetDuplicateTaskNames(t *testing.T) {
+	release := testLegionContextForgeRelease(t)
+	release.PlanPrompt = `{"@action":"plan","query":"-","main_task":"生成安全运营报告","main_task_goal":"读取当次输入的运营数据，按技能体内置结构输出报告。","tasks":[{"subtask_name":"生成安全运营报告","subtask_goal":"完整解析输入并输出报告，不编造数据。"}]}`
+	rehashLegionContextForgeRelease(t, release)
+	_, blueprint, params, err := buildContextForgeBlueprint(release, "report input")
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	opts := restrictedLegionForgeToolOptions(nil)
+	opts = append(opts, aicommon.WithAICallback(func(aicommon.AICallerConfigIf, *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+		t.Error("preset parsing must not invoke a model")
+		return nil, fmt.Errorf("unexpected model invocation")
+	}))
+	coordinator, err := blueprint.CreateCoordinatorWithQueryAndParams(ctx, "report input", params, opts...)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer coordinator.Close()
+	plan := blueprint.PlanMocker(coordinator.Session)
+	if plan == nil || plan.RootTask == nil || len(plan.RootTask.Subtasks) != 1 {
+		t.Fatal("preset task was lost")
+	}
+	root := plan.RootTask
+	if root.Name != root.Subtasks[0].Name || root.Identifier == root.Subtasks[0].Identifier {
+		t.Fatalf("duplicate names require distinct identifiers: %+v", root)
+	}
+}

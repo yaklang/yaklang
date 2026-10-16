@@ -304,6 +304,7 @@ assert rsp.Contains(token), "gzip + chunk failed"
 }
 
 func TestGRPCMUSTPASS_MITM_ALL(t *testing.T) {
+	yakit.GuardConfigurationForTest(t)
 	client, err := NewLocalClient() // 新建一个 yakit client
 	if err != nil {
 		t.Fatal(err)

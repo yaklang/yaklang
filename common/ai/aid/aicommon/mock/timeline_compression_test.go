@@ -16,7 +16,7 @@ import (
 // here; failure, concurrency, restore and precise state are covered by the
 // aicommon timeline_compression_* tests.
 func TestTimelineCompressionBeforePromptWithMockConfig(t *testing.T) {
-	for _, limit := range []int64{100, 100000} {
+	for _, limit := range []int64{1200, 100000} {
 		t.Run(fmt.Sprintf("limit_%d", limit), func(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
@@ -41,7 +41,7 @@ func TestTimelineCompressionBeforePromptWithMockConfig(t *testing.T) {
 				onResult(action)
 			}
 			for i := int64(1); i <= 20; i++ {
-				tl.PushText(i, strings.Repeat("original history ", 20))
+				tl.PushText(i, strings.Repeat("original history ", 100))
 			}
 			require.Len(t, tl.GetTimelineItemIDs(), 20)
 			require.Zero(t, calls, "writes must never call AI or freeze")

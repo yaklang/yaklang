@@ -213,6 +213,11 @@ configData = cli.Json("config_data",
           "default": false,
           "description": "启用增量编译模式。首次编译时作为基础程序；后续编译时基于基础程序进行差量编译，只编译变更的文件，提高编译速度。"
         },
+        "base_program_name": {
+          "title": "基础程序名称",
+          "type": "string",
+          "description": "增量编译的基础程序名称。可选；不提供时自动以项目上一次编译的程序作为基础程序（首次增量编译则当前编译即基础程序）。"
+        },
         "jar_recursive_parse": {
           "title": "Jar嵌套解析",
           "type": "boolean",

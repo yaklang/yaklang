@@ -8,6 +8,7 @@ import (
 )
 
 func TestWithEngine(t *testing.T) {
+	yakit.GuardConfigurationForTest(t)
 	cfg := yakit.GetNetworkConfig()
 	bak := cfg.AppConfigs
 	defer func() {

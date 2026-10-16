@@ -1,6 +1,7 @@
 package ssaapi
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -9,7 +10,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils/memedit"
 
 	"github.com/samber/lo"
-	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/gorm"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
@@ -146,19 +147,6 @@ func buildSSARisk(
 		}
 	}
 
-	newSSARisk.RiskFeatureHash = utils.CalcSha1(
-		// SSA Feature
-		newSSARisk.FunctionName,
-		value.String(),
-		// SyntaxFlow Rule Feature
-		newSSARisk.FromRule,
-		newSSARisk.Variable,
-		string(newSSARisk.Severity),
-		newSSARisk.RiskType,
-		newSSARisk.Language,
-		newSSARisk.Title,
-	)
-	newSSARisk.Hash = newSSARisk.CalcHash()
 	return newSSARisk
 }
 
@@ -182,6 +170,10 @@ func stableRiskFunctionName(value *Value) string {
 	return utils.EscapeInvalidUTF8Byte([]byte(rawName))
 }
 
+// ssaRiskName is the slot of one alert inside a single result: the alert
+// variable plus its index. GetRiskByValue and the stored RiskHashs map use it
+// to find that slot again. It is not the cover key. Covering the same finding
+// across scan modes uses RiskFeatureHash.
 func ssaRiskName(variable string, index int) string {
 	return fmt.Sprintf("%s-%d", variable, index)
 }
@@ -199,39 +191,120 @@ func (r *SyntaxFlowResult) GetRisks() []*schema.SSARisk {
 	return out
 }
 
-func (r *SyntaxFlowResult) SaveRisk(
-	variable string,
-	index int,
-	value *Value,
-	save bool,
-) string {
+// BuildRisk materializes one alert and publishes it once. Persistence belongs
+// to the registered handler, or to the direct Save caller's saver.
+func (r *SyntaxFlowResult) BuildRisk(variable string, index int, value *Value) string {
+	hash, _ := r.stageRisk(variable, index, value)
+	return hash
+}
+
+// stageRisk is BuildRisk plus whether the handler now owns the audit graph.
+// The second result is true only when this call attached that graph to the
+// published risk, so the caller must not write it again.
+func (r *SyntaxFlowResult) stageRisk(variable string, index int, value *Value) (string, bool) {
 	_, ok := r.GetAlertInfo(variable)
 	if !ok {
-		return ""
+		return "", false
+	}
+	name := ssaRiskName(variable, index)
+	// Building a risk is idempotent per alert slot: the same result may persist
+	// its values after the streaming path already materialized them.
+	if prev, exist := r.riskMap[name]; exist && prev != nil {
+		if r.auditHanded != nil {
+			if _, owned := r.auditHanded[name]; owned {
+				return prev.Hash, true
+			}
+		}
+		if prev.ResultID != uint64(r.GetResultID()) || prev.RuntimeId != r.TaskID {
+			// Saving a prebuilt memory result binds the numeric audit row id.
+			// Copy it: a scan handler may still be reading the published risk.
+			// The copy keeps the row id, so Save updates that row. Clearing it
+			// would insert a second row under the same hash.
+			row := *prev
+			row.ResultID, row.RuntimeId = uint64(r.GetResultID()), r.TaskID
+			row.PrepareForSave(riskFeatureText(value))
+			r.riskMap[name] = &row
+			return row.Hash, false
+		}
+		return prev.Hash, false
 	}
 	ssaRisk := buildSSARisk(r, variable, index, value)
 	if ssaRisk == nil {
-		return ""
+		return "", false
 	}
 
 	ssaRisk.SSAProjectID = r.GetProjectID()
 	ssaRisk.RuntimeId = r.TaskID
 	ssaRisk.ResultID = uint64(r.GetResultID())
-	if save {
-		err := yakit.CreateSSARisk(consts.GetGormSSAProjectDataBase(), ssaRisk)
-		if err != nil {
-			// Keep the risk in memory so the streaming path (EmitSSAResult →
-			// ssa-stream → platform artifact import) and in-process results
-			// still deliver it even when the local SSA IR DB is stale or
-			// read-only (e.g. missing a newly added column). The platform
-			// stores its own copy from the stream.
-			log.Errorf("save risk failed: %s", err)
-			r.riskMap[ssaRiskName(variable, index)] = ssaRisk
-			return ""
-		}
+	ssaRisk.ResultUUID = r.GetResultUUID()
+	// The row hash covers the result identity, so it must be computed after
+	// those fields are set: the same finding reported by two results is two
+	// rows, and the unique index on hash must not collapse them. The cover key
+	// uses the value text and is computed in the same pass.
+	ssaRisk.PrepareForSave(riskFeatureText(value))
+	r.riskMap[name] = ssaRisk
+	if len(r.onRisk) == 0 {
+		return ssaRisk.Hash, false
 	}
-	r.riskMap[ssaRiskName(variable, index)] = ssaRisk
-	return ssaRisk.Hash
+	var audits []func(*gorm.DB) error
+	if audit := r.auditSaver(value, variable, index, ssaRisk); audit != nil {
+		audits = []func(*gorm.DB) error{audit}
+		if r.auditHanded == nil {
+			r.auditHanded = map[string]struct{}{}
+		}
+		r.auditHanded[name] = struct{}{}
+	}
+	for _, fn := range r.onRisk {
+		fn(ssaRisk, audits...)
+	}
+	_, owned := r.auditHanded[name]
+	return ssaRisk.Hash, owned
+}
+
+func riskFeatureText(value *Value) string {
+	if value == nil {
+		return ""
+	}
+	return value.String()
+}
+
+// auditSaver walks the graph immediately. The database saver later inserts
+// the rows; it must not walk again, because the rule may already have cleared
+// the value's analysis caches by then.
+func (r *SyntaxFlowResult) auditSaver(value *Value, variable string, index int, risk *schema.SSARisk) func(*gorm.DB) error {
+	if r == nil || value == nil || risk == nil {
+		return nil
+	}
+	nodes, edges, sources, err := captureAuditGraph(context.Background(), value,
+		OptionSaveValue_TaskID(risk.RuntimeId),
+		OptionSaveValue_ResultID(uint(risk.ResultID)),
+		OptionSaveValue_RuleName(risk.FromRule),
+		OptionSaveValue_RuleTitle(risk.Title),
+		OptionSaveValue_ProgramName(risk.ProgramName),
+		OptionSaveValue_ResultVariable(variable),
+		OptionSaveValue_ResultIndex(uint(index)),
+		OptionSaveValue_ResultRiskHash(risk.Hash),
+		OptionSaveValue_ResultRiskFeatureHash(risk.RiskFeatureHash),
+		OptionSaveValue_IsMemoryCompile(r.IsProgMemoryCompile()),
+	)
+	if err != nil {
+		return func(*gorm.DB) error { return err }
+	}
+	if len(nodes) == 0 && len(edges) == 0 && len(sources) == 0 {
+		return nil
+	}
+	return func(db *gorm.DB) error {
+		if db == nil {
+			return utils.Error("save audit: database is nil")
+		}
+		if err := batchSaveAuditNodes(db, nodes); err != nil {
+			return err
+		}
+		if err := batchSaveAuditEdges(db, edges); err != nil {
+			return err
+		}
+		return saveAuditSources(db, sources)
+	}
 }
 
 func (r *SyntaxFlowResult) GetGRPCModelRisk() []*ypb.SSARisk {
@@ -245,14 +318,11 @@ func (r *SyntaxFlowResult) GetGRPCModelRisk() []*ypb.SSARisk {
 			r.getRisk(name)
 		}
 	}
-	// transform to grpc model
-	if len(r.riskGRPCCache) != len(r.riskMap) {
-		r.riskGRPCCache = lo.MapToSlice(r.riskMap, func(name string, risk *schema.SSARisk) *ypb.SSARisk {
-			return risk.ToGRPCModel()
-		})
-	}
-	// return
-	return r.riskGRPCCache
+	// Binding an audit row changes metadata but not the number of risks.
+	// Do not cache by map length: it would return stale ids and timestamps.
+	return lo.MapToSlice(r.riskMap, func(name string, risk *schema.SSARisk) *ypb.SSARisk {
+		return risk.ToGRPCModel()
+	})
 }
 
 func (r *SyntaxFlowResult) GetRiskByValue(variable string, i int) *schema.SSARisk {

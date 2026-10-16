@@ -62,6 +62,9 @@ func LoadResultByID(resultID uint, force ...bool) (*SyntaxFlowResult, error) {
 func loadResult(result *ssadb.AuditResult) (*SyntaxFlowResult, error) {
 	res := createEmptyResult()
 	res.dbResult = result
+	if result.ResultUUID != "" {
+		res.resultUUID = result.ResultUUID
+	}
 	var rule *schema.SyntaxFlowRule
 	if result.RuleName != "" {
 		// load rule from db
@@ -144,6 +147,7 @@ func (r *SyntaxFlowResult) save(
 	// result
 	result := ssadb.CreateResult(TaskIDs...)
 	r.id = result.ID
+	result.ResultUUID = r.GetResultUUID()
 	result.CheckMsg = r.GetCheckMsg()
 	result.Errors = r.GetErrors()
 
@@ -179,6 +183,14 @@ func (r *SyntaxFlowResult) save(
 		errs = utils.JoinErrors(errs, err)
 	}
 	r.dbResult = result
+	if len(r.onRisk) == 0 {
+		// No scan handler is listening, so this result saves its own risks.
+		if err := SaveRisk(ssadb.GetDB(), r.GetRisks()...); err != nil {
+			// Keep findings available to stream consumers on a stale/read-only
+			// local risk DB, as the original direct-save path did.
+			log.Errorf("save risks failed: %v", err)
+		}
+	}
 	return result.ID, errs
 }
 func (r *SyntaxFlowResult) CreateRisk() error {
@@ -188,7 +200,7 @@ func (r *SyntaxFlowResult) CreateRisk() error {
 
 	r.GetAlertValues().ForEach(func(i string, v Values) bool {
 		for index, v := range v {
-			r.SaveRisk(i, index, v, false)
+			r.BuildRisk(i, index, v)
 		}
 		return true
 	})
@@ -256,17 +268,25 @@ func (r *SyntaxFlowResult) saveValue(ctx context.Context, result *ssadb.AuditRes
 
 		// save variable that has value
 		for index, v := range values {
+			// The handler owns the graph when the risk was published with one.
+			// Writing it here as well would persist the covered graph twice.
+			hash, owned := r.stageRisk(name, index, v)
+			if owned {
+				continue
+			}
 			// Per-value opts, derived from the per-variable varOpts so index/hash
-			// don't leak across values. Build a fresh slice each iteration
-			// (SaveValue consumes opts and the loop reuses varOpts otherwise).
-			valueOpts := varOpts
-			hash := r.SaveRisk(name, index, v, true)
+			// don't leak across values. Copy the header: append reuses the backing
+			// array when it has spare capacity.
+			valueOpts := make([]SaveValueOption, len(varOpts), len(varOpts)+3)
+			copy(valueOpts, varOpts)
 			if hash != "" {
 				valueOpts = append(valueOpts, OptionSaveValue_ResultRiskHash(hash))
+				if prev := r.riskMap[ssaRiskName(name, index)]; prev != nil && prev.RiskFeatureHash != "" {
+					valueOpts = append(valueOpts, OptionSaveValue_ResultRiskFeatureHash(prev.RiskFeatureHash))
+				}
 			}
 			valueOpts = append(valueOpts, OptionSaveValue_ResultIndex(uint(index)))
-			e := SaveValue(v, valueOpts...)
-			err = utils.JoinErrors(err, e)
+			err = utils.JoinErrors(err, SaveValue(v, valueOpts...))
 		}
 	}
 

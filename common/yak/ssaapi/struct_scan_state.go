@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/yaklang/gorm"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
@@ -19,25 +20,30 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 )
 
-type structScanRuntime struct {
+// structScanState holds compile-unit rule frames, budgets and timing. It is
+// compiler state, not a second scan runtime: findings go to the scan callback.
+type structScanState struct {
 	enableBuiltin bool
 	extraDirs     []string
 	extraRaw      []string
 	rules         []*schema.SyntaxFlowRule
 	riskCB        func(*schema.SSARisk)
-	taskID        string
-	timeout       time.Duration
-	workLimit     int64
-	errs          []error
-	mu            sync.Mutex
-	results       []*SyntaxFlowResult
-	saveReady     bool
-	saveToDB      bool
-	saves         sync.WaitGroup
-	ranHashes     []string
-	ruleStats     map[string]*structRuleStat
-	skipped       bool
-	skipReason    string
+	// onRisk is the scan's callbacks. When set, each finding is handed to them
+	// and this compile does not write the risk row.
+	onRisk     []func(*schema.SSARisk, ...func(*gorm.DB) error)
+	taskID     string
+	timeout    time.Duration
+	workLimit  int64
+	errs       []error
+	mu         sync.Mutex
+	results    []*SyntaxFlowResult
+	saveReady  bool
+	saveToDB   bool
+	saves      sync.WaitGroup
+	ranHashes  []string
+	ruleStats  map[string]*structRuleStat
+	skipped    bool
+	skipReason string
 }
 
 // structRuleStat aggregates one struct-mode rule across compile units so
@@ -63,21 +69,21 @@ type StructScanRuleStat struct {
 	Error       string
 }
 
-func (s *structScanRuntime) enabled() bool {
+func (s *structScanState) enabled() bool {
 	if s == nil || s.skipped {
 		return false
 	}
 	return len(s.rules) > 0
 }
 
-func (s *structScanRuntime) wantsScan() bool {
+func (s *structScanState) wantsScan() bool {
 	if s == nil {
 		return false
 	}
 	return s.enableBuiltin || len(s.extraDirs) > 0 || len(s.extraRaw) > 0 || hasExplicitStructRules(s)
 }
 
-func hasExplicitStructRules(s *structScanRuntime) bool {
+func hasExplicitStructRules(s *structScanState) bool {
 	if s == nil {
 		return false
 	}
@@ -94,6 +100,9 @@ func (c *Config) prepareStructScan(plan *UnitPlan) error {
 		return nil
 	}
 	s := c.structScan
+	if len(s.onRisk) == 0 {
+		s.onRisk = c.onRisk
+	}
 	if s.riskCB != nil && !s.wantsScan() {
 		return utils.Errorf("withStructRuleCallback requires withStructRule(true|rule) or withStructRuleDir/Raw")
 	}
@@ -133,7 +142,7 @@ func (c *Config) prepareStructScan(plan *UnitPlan) error {
 
 // Match the normal scan manager's language selection. Unknown/mixed-language
 // programs retain all rules; source-mode filtering is handled separately.
-func (s *structScanRuntime) filterLanguage(language ssaconfig.Language, ignore bool) {
+func (s *structScanState) filterLanguage(language ssaconfig.Language, ignore bool) {
 	if ignore || language == "" || language == ssaconfig.General {
 		return
 	}
@@ -146,9 +155,9 @@ func (s *structScanRuntime) filterLanguage(language ssaconfig.Language, ignore b
 	s.rules = rules
 }
 
-func (c *Config) ensureStructScan() *structScanRuntime {
+func (c *Config) ensureStructScan() *structScanState {
 	if c.structScan == nil {
-		c.structScan = &structScanRuntime{
+		c.structScan = &structScanState{
 			taskID:    uuid.NewString(),
 			workLimit: ssaconfig.DefaultScanRuleWorkLimit,
 		}
@@ -156,7 +165,7 @@ func (c *Config) ensureStructScan() *structScanRuntime {
 	return c.structScan
 }
 
-func (s *structScanRuntime) resolveRules() error {
+func (s *structScanState) resolveRules() error {
 	if s == nil {
 		return nil
 	}
@@ -185,7 +194,7 @@ func (s *structScanRuntime) resolveRules() error {
 	return s.validateRules()
 }
 
-func (s *structScanRuntime) validateRules() error {
+func (s *structScanState) validateRules() error {
 	for _, rule := range s.rules {
 		if rule == nil {
 			continue
@@ -252,7 +261,7 @@ func compileStructRuleContent(raw string) (*schema.SyntaxFlowRule, error) {
 	return rule, nil
 }
 
-func (s *structScanRuntime) ScanStruct(progAPI *Program, unit *ssa.CompileUnit) {
+func (s *structScanState) ScanStruct(progAPI *Program, unit *ssa.CompileUnit) {
 	if s == nil || !s.enabled() || progAPI == nil || unit == nil {
 		return
 	}
@@ -295,6 +304,7 @@ func (s *structScanRuntime) ScanStruct(progAPI *Program, unit *ssa.CompileUnit) 
 			QueryWithStruct(unit),
 			QueryWithFrame(frame),
 			QueryWithMemory(),
+			QueryWithNoFinalize(),
 			QueryWithTaskID(s.taskID),
 			QueryWithContext(ruleCtx),
 			QueryWithWorkBudget(budget),
@@ -312,24 +322,10 @@ func (s *structScanRuntime) ScanStruct(progAPI *Program, unit *ssa.CompileUnit) 
 			continue
 		}
 		if res != nil {
+			s.publish(res)
 			found = append(found, res)
 			s.ranHashes = append(s.ranHashes, ruleContentHash(rule))
 			s.noteRule(rule, programName, start, end, int64(res.RiskCount()), nil)
-			if s.riskCB != nil {
-				risks := res.GetRisks()
-				if len(risks) == 0 {
-					for _, name := range res.GetAlertVariables() {
-						for index, val := range res.GetValues(name) {
-							if risk := buildSSARisk(res, name, index, val); risk != nil {
-								risks = append(risks, risk)
-							}
-						}
-					}
-				}
-				for _, risk := range risks {
-					s.riskCB(risk)
-				}
-			}
 			log.Infof("[struct_scan] package=%s rule=%s alerts=%d", unit.Key, rule.RuleName, len(res.GetAlertVariables()))
 		}
 		progAPI.ResetInterRuleState()
@@ -337,10 +333,25 @@ func (s *structScanRuntime) ScanStruct(progAPI *Program, unit *ssa.CompileUnit) 
 	s.keepResults(found)
 }
 
+// publish builds a result once and forwards its findings to the scan. Direct
+// compile saves can persist already-built risks, so they need no shadow path.
+func (s *structScanState) publish(res *SyntaxFlowResult) {
+	if s == nil || res == nil {
+		return
+	}
+	res.onRisk = s.onRisk
+	_ = res.CreateRisk()
+	if s.riskCB != nil {
+		for _, risk := range res.GetRisks() {
+			s.riskCB(risk)
+		}
+	}
+}
+
 // frameForRule builds an execution frame from the rule. Sync stores compiled
 // opcodes on the rule; Load uses those and does not parse. A rule that arrives
 // without opcodes is compiled once and the opcodes are written back onto it.
-func (s *structScanRuntime) frameForRule(rule *schema.SyntaxFlowRule) (*sfvm.SFFrame, error) {
+func (s *structScanState) frameForRule(rule *schema.SyntaxFlowRule) (*sfvm.SFFrame, error) {
 	if rule == nil {
 		return nil, utils.Error("nil struct rule")
 	}
@@ -360,7 +371,7 @@ func ruleContentHash(rule *schema.SyntaxFlowRule) string {
 
 // prepareSave records once whether this compile writes struct results.
 // Memory programs keep the result in memory. Database programs save it.
-func (s *structScanRuntime) prepareSave(prog *ssa.Program) {
+func (s *structScanState) prepareSave(prog *ssa.Program) {
 	if s == nil || s.saveReady {
 		return
 	}
@@ -368,14 +379,14 @@ func (s *structScanRuntime) prepareSave(prog *ssa.Program) {
 	s.saveToDB = prog != nil && prog.DatabaseKind != ssa.ProgramCacheMemory
 }
 
-// keepResults publishes one unit's results. Database compiles save them on
-// the side and drop the value graph; the handle stays so a later report can
-// read the persisted alerts.
-func (s *structScanRuntime) keepResults(found []*SyntaxFlowResult) {
+// keepResults stores one unit's results. A scan already received the risks
+// through its callback, so nothing is written here. A database compile that
+// is not part of a scan still saves the result on the side.
+func (s *structScanState) keepResults(found []*SyntaxFlowResult) {
 	if s == nil || len(found) == 0 {
 		return
 	}
-	if !s.saveToDB {
+	if len(s.onRisk) > 0 || !s.saveToDB {
 		s.mu.Lock()
 		s.results = append(s.results, found...)
 		s.mu.Unlock()
@@ -403,7 +414,7 @@ func (s *structScanRuntime) keepResults(found []*SyntaxFlowResult) {
 	}()
 }
 
-func (s *structScanRuntime) addErr(err error) {
+func (s *structScanState) addErr(err error) {
 	if s == nil || err == nil {
 		return
 	}
@@ -412,7 +423,7 @@ func (s *structScanRuntime) addErr(err error) {
 	s.mu.Unlock()
 }
 
-func (s *structScanRuntime) WaitSaves() {
+func (s *structScanState) WaitSaves() {
 	if s == nil {
 		return
 	}
@@ -470,7 +481,7 @@ func (p *Program) StructScanCounts() (rules int, results int) {
 	return rules, len(s.results)
 }
 
-func (s *structScanRuntime) noteRule(rule *schema.SyntaxFlowRule, programName string, start, end int64, riskCount int64, err error) {
+func (s *structScanState) noteRule(rule *schema.SyntaxFlowRule, programName string, start, end int64, riskCount int64, err error) {
 	if s == nil || rule == nil {
 		return
 	}

@@ -91,6 +91,7 @@ const (
 
 var (
 	__initializingDatabase    []*initializingCallback
+	__finalizingDatabase      []*initializingCallback
 	__mutexForInit            = new(sync.Mutex)
 	sqliteLargeDBTuneThrottle = utils.NewThrottle(60) // re-tune at most once per minute when slow writes appear
 
@@ -423,9 +424,19 @@ func MockMITMSlowRuleHook(duration time.Duration, hookType string, ruleCount int
 }
 
 func RegisterPostInitDatabaseFunction(f func() error, notes ...string) {
+	registerDatabaseInitializer(&__initializingDatabase, f, notes...)
+}
+
+// RegisterPostInitDatabaseFinalizer runs after all ordinary post-init callbacks.
+// Use it for derived records which require imported builtin data to exist.
+func RegisterPostInitDatabaseFinalizer(f func() error, notes ...string) {
+	registerDatabaseInitializer(&__finalizingDatabase, f, notes...)
+}
+
+func registerDatabaseInitializer(callbacks *[]*initializingCallback, f func() error, notes ...string) {
 	__mutexForInit.Lock()
 	defer __mutexForInit.Unlock()
-	__initializingDatabase = append(__initializingDatabase, &initializingCallback{
+	*callbacks = append(*callbacks, &initializingCallback{
 		Note: strings.Join(notes, ";"),
 		Fn: func() error {
 			defer func() {
@@ -465,7 +476,11 @@ func CallPostInitDatabase() error {
 		}
 	}()
 
-	for idx, f := range __initializingDatabase {
+	__mutexForInit.Lock()
+	callbacks := append([]*initializingCallback(nil), __initializingDatabase...)
+	callbacks = append(callbacks, __finalizingDatabase...)
+	__mutexForInit.Unlock()
+	for idx, f := range callbacks {
 		if f == nil || f.Fn == nil {
 			continue
 		}

@@ -33,6 +33,13 @@ type skillContextState struct {
 	ViewWindows map[string]*ViewWindow
 }
 
+// SkillContext 是当前 Timeline 中仍可见技能的只读查询结果。
+// 元信息来自 loader；TokenCount 来自 Timeline，不回写 SkillMeta 或独立缓存。
+type SkillContext struct {
+	*SkillMeta
+	TokenCount int `json:"token_count"`
+}
+
 // ManagerOption configures SkillsContextManager.
 type ManagerOption func(*SkillsContextManager)
 
@@ -56,8 +63,9 @@ func WithManagerMaxTokens(maxTokens int) ManagerOption {
 	return func(m *SkillsContextManager) {}
 }
 
-// WithManagerTokenEstimator sets an optional token estimator function.
+// WithManagerTokenEstimator sets an optional token estimator for skill metadata listings.
 // When nil (default), ytoken.CalcTokenCount is used.
+// Loaded content sizes come from Timeline and use its standard token measurement.
 func WithManagerTokenEstimator(estimator func(string) int) ManagerOption {
 	return func(m *SkillsContextManager) {
 		m.tokenEstimator = estimator
@@ -94,7 +102,7 @@ type SkillsContextManager struct {
 	// catalogSkills 是意图识别写入的「最相关 top-N」skill 元信息, 渲染为精简目录.
 	catalogSkills []*SkillMeta
 
-	// tokenEstimator overrides the default ytoken.CalcTokenCount for measuring size.
+	// tokenEstimator overrides ytoken.CalcTokenCount for metadata listing budgets.
 	// When nil, the built-in ytoken.CalcTokenCount is used.
 	tokenEstimator func(string) int
 
@@ -300,7 +308,8 @@ func (m *SkillsContextManager) SearchByAI(userNeed string) ([]*SkillMeta, error)
 
 // GetCurrentSelectedSkills 以目标 Timeline 的可见技能名单为准。
 // loader 和文件/窗口缓存仅补充元信息, 不决定技能是否仍在上下文中。
-func (m *SkillsContextManager) GetCurrentSelectedSkills() []*SkillMeta {
+// TokenCount 是该技能所有可见 metadata/content 部分的正文 token 之和。
+func (m *SkillsContextManager) GetCurrentSelectedSkills() []*SkillContext {
 	sink := m.timelineSink()
 	if sink == nil {
 		return nil
@@ -310,12 +319,15 @@ func (m *SkillsContextManager) GetCurrentSelectedSkills() []*SkillMeta {
 		return nil
 	}
 	names := make([]string, 0, len(parts))
-	seenNames := make(map[string]bool, len(parts))
+	tokenCounts := make(map[string]int, len(parts))
 	for _, part := range parts {
-		if part.Name != "" && !seenNames[part.Name] {
-			seenNames[part.Name] = true
+		if part.Name == "" {
+			continue
+		}
+		if _, found := tokenCounts[part.Name]; !found {
 			names = append(names, part.Name)
 		}
+		tokenCounts[part.Name] += part.TokenCount
 	}
 	metas := make(map[string]*SkillMeta, len(names))
 	m.mu.RLock()
@@ -333,7 +345,7 @@ func (m *SkillsContextManager) GetCurrentSelectedSkills() []*SkillMeta {
 			}
 		}
 	}
-	selected := make([]*SkillMeta, 0, len(names))
+	selected := make([]*SkillContext, 0, len(names))
 	for _, name := range names {
 		meta := metas[name]
 		if meta == nil {
@@ -344,7 +356,7 @@ func (m *SkillsContextManager) GetCurrentSelectedSkills() []*SkillMeta {
 		if meta == nil {
 			meta = &SkillMeta{Name: name}
 		}
-		selected = append(selected, meta)
+		selected = append(selected, &SkillContext{SkillMeta: meta, TokenCount: tokenCounts[name]})
 	}
 	return selected
 }
@@ -578,35 +590,11 @@ func (m *SkillsContextManager) GetSkillViewSummary(skillName string) string {
 	if skillName == "" {
 		return ""
 	}
-	if !m.skillContentVisibleInTimeline(skillName) {
+	sink := m.timelineSink()
+	if sink == nil {
 		return ""
 	}
-	if sink := m.timelineSink(); sink != nil {
-		if summary := renderSkillPartSummary(skillName, sink.VisibleSkillParts(skillName)); summary != "" {
-			return summary
-		}
-	}
-	m.mu.RLock()
-	state, ok := m.stateFor(skillName)
-	if !ok || state == nil {
-		m.mu.RUnlock()
-		return ""
-	}
-	windows := sortedViewWindows(state.ViewWindows)
-	m.mu.RUnlock()
-
-	var buf bytes.Buffer
-	buf.WriteString(fmt.Sprintf("Skill '%s' is loaded and ACTIVE in the skills context of your prompt. ", skillName))
-	buf.WriteString("View Windows:\n")
-	for _, vw := range windows {
-		truncInfo := ""
-		if vw.IsTruncatedFlag() {
-			truncInfo = " (truncated, use change_skill_view_offset to see more)"
-		}
-		buf.WriteString(fmt.Sprintf("  - %s: %d total lines, viewing from line %d%s\n",
-			vw.FilePath, vw.TotalLines(), vw.GetOffset(), truncInfo))
-	}
-	return buf.String()
+	return renderSkillPartSummary(skillName, sink.VisibleSkillParts(skillName))
 }
 
 func renderSkillPartSummary(skillName string, parts []SkillContextPart) string {
@@ -615,9 +603,14 @@ func renderSkillPartSummary(skillName string, parts []SkillContextPart) string {
 	}
 	var buf bytes.Buffer
 	fmt.Fprintf(&buf, "Skill '%s' is loaded and ACTIVE in the skills context of your prompt.\n", skillName)
+	totalTokens := 0
+	for _, part := range parts {
+		totalTokens += part.TokenCount
+	}
+	fmt.Fprintf(&buf, "Timeline content: %d tokens (metadata + content; Open and frozen).\n", totalTokens)
 	for _, part := range parts {
 		if part.Kind == SkillContentKindMetadata {
-			buf.WriteString("Metadata: loaded\n")
+			fmt.Fprintf(&buf, "Metadata: loaded (%d tokens)\n", part.TokenCount)
 		}
 	}
 	wrote := false
@@ -634,10 +627,10 @@ func renderSkillPartSummary(skillName string, parts []SkillContextPart) string {
 			end = " END"
 		}
 		if part.EndLine > 0 {
-			fmt.Fprintf(&buf, "  - %s:%d-%d/%d%s\n", part.Path, part.StartLine, part.EndLine, part.Total, end)
+			fmt.Fprintf(&buf, "  - %s:%d-%d/%d%s (%d tokens)\n", part.Path, part.StartLine, part.EndLine, part.Total, end, part.TokenCount)
 			continue
 		}
-		fmt.Fprintf(&buf, "  - %s\n", part.Path)
+		fmt.Fprintf(&buf, "  - %s (%d tokens)\n", part.Path, part.TokenCount)
 	}
 	return buf.String()
 }
@@ -790,25 +783,6 @@ func sortSkillMetasByName(metas []*SkillMeta) []*SkillMeta {
 		return leftName < rightName
 	})
 	return sorted
-}
-
-func sortedViewWindows(viewWindows map[string]*ViewWindow) []*ViewWindow {
-	if len(viewWindows) == 0 {
-		return nil
-	}
-	keys := make([]string, 0, len(viewWindows))
-	for key := range viewWindows {
-		keys = append(keys, key)
-	}
-	sort.Strings(keys)
-
-	result := make([]*ViewWindow, 0, len(keys))
-	for _, key := range keys {
-		if vw := viewWindows[key]; vw != nil {
-			result = append(result, vw)
-		}
-	}
-	return result
 }
 
 var crossSkillRefRegexp = regexp.MustCompile(`\.\.\/([a-zA-Z0-9][a-zA-Z0-9_-]*)\/`)

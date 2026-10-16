@@ -131,6 +131,7 @@ func TestQwenVLMaxLatest(t *testing.T) {
 }
 
 func TestAutoUpdateAiList(t *testing.T) {
+	yakit.GuardConfigurationForTest(t)
 	cfg := yakit.GetNetworkConfig()
 	if cfg == nil {
 		t.Fail()
@@ -304,6 +305,7 @@ func (t *fallbackControlGateway) CheckValid() error {
 var _ aispec.AIClient = &fallbackControlGateway{}
 
 func TestClientStreamExtInfo(t *testing.T) {
+	yakit.GuardConfigurationForTest(t)
 	cfg := yakit.GetNetworkConfig()
 	if cfg == nil {
 		t.Fail()
@@ -331,6 +333,7 @@ func TestClientStreamExtInfo(t *testing.T) {
 }
 
 func TestChat_DisableProviderFallback(t *testing.T) {
+	yakit.GuardConfigurationForTest(t)
 	cfg := yakit.GetNetworkConfig()
 	if cfg == nil {
 		// A fresh isolated profile has no legacy network settings yet.

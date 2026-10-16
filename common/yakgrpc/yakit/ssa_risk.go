@@ -134,6 +134,15 @@ func WithSSARiskResultID(resultID uint64) SSARiskFilterOption {
 	}
 }
 
+// WithSSARiskResultUUID adds the stable identity without changing numeric ID filters.
+func WithSSARiskResultUUID(resultUUID string) SSARiskFilterOption {
+	return func(sf *ypb.SSARisksFilter) {
+		if resultUUID = strings.TrimSpace(resultUUID); resultUUID != "" {
+			sf.ResultUUID = append(sf.ResultUUID, resultUUID)
+		}
+	}
+}
+
 func NewSSARiskFilter(opts ...SSARiskFilterOption) *ypb.SSARisksFilter {
 	filter := &ypb.SSARisksFilter{}
 	for _, opt := range opts {
@@ -215,6 +224,7 @@ func FilterSSARisk(db *gorm.DB, filter *ypb.SSARisksFilter) *gorm.DB {
 	db = bizhelper.ExactOrQueryStringArrayOr(db, "runtime_id", filter.GetRuntimeID())
 	db = bizhelper.ExactOrQueryStringArrayOr(db, "hash", filter.GetHash())
 	db = bizhelper.ExactQueryUint64ArrayOr(db, "result_id", filter.GetResultID())
+	db = bizhelper.ExactOrQueryStringArrayOr(db, "result_uuid", filter.GetResultUUID())
 	db = bizhelper.FuzzSearchWithStringArrayOrEx(db, []string{"tags"}, filter.GetTags(), false)
 	db = bizhelper.FuzzSearchEx(db, []string{"title", "title_verbose"}, filter.GetTitle(), false)
 	db = bizhelper.FuzzSearchEx(db, []string{

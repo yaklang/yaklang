@@ -20,26 +20,28 @@ type timelineCompressionSnapshot struct {
 	MemoryInputLimit        int
 	MemoryOutputLimit       int
 	Context                 context.Context `json:"-"`
-	BeforePromptFingerprint string          `json:"-"`
-	BeforePromptLimit       int64           `json:"-"`
+	TargetTokens            int64           // desired main-model Timeline size, not helper-output size
 	Head                    *TimelineCompressedHead
 	ThroughID               int64 // captured watermark, including exact state and tombstones
 	FrozenThroughID         int64
-	Items                   []timelineCompressionSnapshotItem // all live ordinary items, in ID order
-	ExactItemIDs            []int64                           // never candidates for summary/deletion
-	InputText               string                            // old head + ordinary Frozen/Open content
+	Items                   []timelineCompressionSnapshotItem // ordinary items, retained by whitelist
+	PromotedItems           []timelineCompressionPromotedItem // original promoted items, retired by blacklist
+	ExactItemIDs            []int64                           // protected items: user input and unknown kinds
+	ExactText               string                            // other protected item text, for threshold accounting
+	InputText               string                            // whole visible timeline text
 	InputTokens             int
 	RetainedContext         map[string]string // caller-owned prompt parts, copied before the AI request
 	SourceState             string            // live ordinary + exact journal entries through ThroughID
 	FreezeVersion           int64
 	Evidence                string // detached effective session evidence, including pending mutations
 	UserContexts            []timelineCompressionUserContext
-	SessionMemoryCandidates []any                          // completed session extractions, detached from listeners and storage
-	MemoryCompletion        *timelineCompressionCompletion `json:"-"`
-	Output                  *timelineCompressionOutput     `json:"-"`
-	SummaryPrompt           string                         `json:"-"` // actual rendered request source, runtime-only
-	CommittedFreeze         TimelineFreezeResult           `json:"-"` // detached receipt, populated only after validation
-	NotifyCommitted         func()                         `json:"-"` // observers captured at commit, called after unlock
+	SessionMemoryCandidates []any                           // completed session extractions, detached from listeners and storage
+	MemoryCompletion        *timelineCompressionCompletion  `json:"-"`
+	Output                  *timelineCompressionOutput      `json:"-"`
+	SummaryPrompt           string                          `json:"-"` // actual rendered request source, runtime-only
+	CommittedFreeze         TimelineFreezeResult            `json:"-"` // detached receipt, populated only after validation
+	NotifyCommitted         func()                          `json:"-"` // observers captured at commit, called after unlock
+	PromptBudget            timelineCompressionPromptBudget `json:"-"` // main-model occupancy captured with this snapshot
 }
 
 type timelineCompressionUserContext struct {
@@ -55,8 +57,33 @@ type timelineCompressionSnapshotItem struct {
 	PromptText string // detached, rendered prompt view; empty for omitted bookkeeping
 }
 
-// buildCompressionSnapshot includes the old summary and all ordinary Frozen/Open
-// history. There is no retained suffix or fixed compression ratio.
+// timelineCompressionPromotedItem is one original promoted journal item. The
+// snapshot never aggregates a key or replays promotedState: the item is the
+// unit the model selects and the commit retires.
+type timelineCompressionPromotedItem struct {
+	timelineCompressionSnapshotItem
+	Kind      string
+	Key       string
+	Operation string
+}
+
+// timelineCompressionPromptBudget is the main-model Timeline occupancy, using
+// the same projection that decides whether compression runs. Section token
+// counts are for the helper prompt; they are not a second budget enforcer.
+type timelineCompressionPromptBudget struct {
+	Current  int64
+	Target   int64
+	Limit    int64
+	Sections []timelineCompressionSectionUsage
+}
+
+type timelineCompressionSectionUsage struct {
+	Name   string
+	Tokens int64
+}
+
+// buildCompressionSnapshot includes the old summary and the original Frozen/Open
+// items. There is no retained suffix or fixed compression ratio.
 func (m *Timeline) buildCompressionSnapshot() (*timelineCompressionSnapshot, error) {
 	if m == nil {
 		return nil, fmt.Errorf("compression snapshot requires a timeline")
@@ -76,19 +103,73 @@ func prepareCompressionSnapshot(snapshot *timelineCompressionSnapshot) error {
 	if snapshot.Head != nil {
 		previous = snapshot.Head.Text
 	}
-	ordinary := renderCompressionSnapshotItems(snapshot.Items)
-	if strings.TrimSpace(previous) == "" && strings.TrimSpace(ordinary) == "" {
-		if !snapshot.FinalizingMemory || (len(snapshot.UserContexts) == 0 && strings.TrimSpace(snapshot.Evidence) == "") {
-			return fmt.Errorf("compression snapshot has no visible ordinary history")
-		}
-		ordinary = snapshot.Evidence
-		for _, entry := range snapshot.UserContexts {
-			ordinary += "\n" + entry.Text
+	parts := []string{previous, renderCompressionSnapshotItems(snapshot.Items),
+		renderCompressionPromotedItems(snapshot.PromotedItems), snapshot.ExactText}
+	for _, entry := range snapshot.UserContexts {
+		parts = append(parts, entry.Text)
+	}
+	// Evidence items are original promoted items. Legacy memory retries may only
+	// carry the detached reference view; count it once in that case.
+	if !snapshot.hasEvidenceItems() {
+		parts = append(parts, snapshot.Evidence)
+	}
+	snapshot.InputText = strings.TrimSpace(strings.Join(parts, "\n"))
+	snapshot.InputTokens = MeasureTokens(snapshot.InputText)
+	if !snapshot.hasCompressionInput() {
+		return fmt.Errorf("compression snapshot has no visible history")
+	}
+	return nil
+}
+
+// hasSummarySource distinguishes actual history from a promoted-only decision,
+// which may return an empty summary. User input is reference material, not an
+// ordinary compression candidate, except during explicit memory finalization.
+func (s *timelineCompressionSnapshot) hasSummarySource() bool {
+	if s == nil {
+		return false
+	}
+	if s.Head != nil && strings.TrimSpace(s.Head.Text) != "" {
+		return true
+	}
+	return strings.TrimSpace(renderCompressionSnapshotItems(s.Items)) != "" ||
+		(s.FinalizingMemory && (len(s.UserContexts) > 0 || strings.TrimSpace(s.Evidence) != ""))
+}
+
+func (s *timelineCompressionSnapshot) hasCompressionInput() bool {
+	return s != nil && (s.hasSummarySource() || len(s.PromotedItems) > 0)
+}
+
+func (s *timelineCompressionSnapshot) hasPromotedItems() bool {
+	return s != nil && len(s.PromotedItems) > 0
+}
+
+func (s *timelineCompressionSnapshot) hasEvidenceItems() bool {
+	if s == nil {
+		return false
+	}
+	for _, item := range s.PromotedItems {
+		if item.Kind == TimelinePromotedKindEvidence {
+			return true
 		}
 	}
-	snapshot.InputText = strings.TrimSpace(previous + "\n" + ordinary)
-	snapshot.InputTokens = MeasureTokens(snapshot.InputText)
-	return nil
+	return false
+}
+
+func (s *timelineCompressionSnapshot) hasNewPromotedEntries() bool {
+	if s == nil {
+		return false
+	}
+	for _, item := range s.PromotedItems {
+		if item.ID > s.FrozenThroughID {
+			return true
+		}
+	}
+	for _, id := range s.ExactItemIDs {
+		if id > s.FrozenThroughID {
+			return true
+		}
+	}
+	return false
 }
 
 // Copy under the read lock; tokenization happens after releasing it so writers
@@ -131,12 +212,35 @@ func (m *Timeline) captureCompressionSnapshotLocked() (snapshot *timelineCompres
 			return nil, fmt.Errorf("invalid compression source item %d", id)
 		}
 		if isPromotableTimelineItem(item) || isTimelineUserInput(item) {
-			// Promoted state, including skill content, remains exact for now.
-			// It is excluded from the summarization candidate set; pending Open
-			// payloads are still measured by CompressBeforePrompt.
-			snapshot.ExactItemIDs = append(snapshot.ExactItemIDs, id)
-			if control := timelinePromotionForItem(item); control != nil && control.Kind == TimelinePromotedKindUserInput {
+			control := timelinePromotionForItem(item)
+			if control == nil {
+				return nil, fmt.Errorf("invalid promoted compression source item %d", id)
+			}
+			switch {
+			case control.Kind == TimelinePromotedKindUserInput:
+				// User input is reference material: counted, never deletable.
+				snapshot.ExactItemIDs = append(snapshot.ExactItemIDs, id)
 				snapshot.UserContexts = append(snapshot.UserContexts, timelineCompressionUserContext{id, id <= snapshot.FrozenThroughID, control.Payload})
+			case isCompressionPromotedItem(control):
+				// One snapshot entry per original item: upsert/reuse/delete are
+				// all listed with their own IDs and complete text.
+				ts, ok := m.idToTs.Get(id)
+				if !ok {
+					return nil, fmt.Errorf("compression source item %d has no timestamp", id)
+				}
+				// PromptText is the original body only. RETIRE_ID frames are added
+				// when the helper prompt is rendered, after this lock is released.
+				snapshot.PromotedItems = append(snapshot.PromotedItems, timelineCompressionPromotedItem{
+					timelineCompressionSnapshotItem: timelineCompressionSnapshotItem{
+						ID: id, Timestamp: ts, Frozen: id <= snapshot.FrozenThroughID,
+						PromptText: compressionPromotedItemText(control),
+					},
+					Kind: control.Kind, Key: compressionPromotedItemKey(control), Operation: control.Operation,
+				})
+			default:
+				// Unknown kinds stay exact and only contribute to the threshold.
+				snapshot.ExactItemIDs = append(snapshot.ExactItemIDs, id)
+				snapshot.ExactText += "\n" + control.OpenPromptText()
 			}
 			continue
 		}
@@ -197,7 +301,7 @@ func (m *Timeline) captureCompressionSnapshotLocked() (snapshot *timelineCompres
 			if replayText != "" {
 				body = replayText
 			}
-			entry.PromptText = fmt.Sprintf("# item=%d timestamp_ms=%d [%s]\n%s",
+			entry.PromptText = fmt.Sprintf("ITEM_ID=%d timestamp_ms=%d [%s]\n%s",
 				id, ts, renderItemTypeVerbose(projected), body)
 		}
 		snapshot.Items = append(snapshot.Items, entry)

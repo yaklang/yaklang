@@ -3,10 +3,67 @@ package sfreport
 import (
 	"bytes"
 	"io"
+	"os"
+	"path/filepath"
 	"sync"
 
 	"github.com/yaklang/yaklang/common/utils"
 )
+
+// reportFlushEvery is how many findings a report collects before it rewrites
+// its snapshot. Writing every finding would be quadratic; writing only at the
+// end would leave nothing on disk when a long scan is interrupted.
+const reportFlushEvery = 500
+
+// writeReportSnapshot publishes one complete report document.
+//
+// A file destination is replaced atomically: the snapshot goes to a temporary
+// file in the same directory, is synced, and then renamed over the target, so
+// a reader never sees a half-written document. Other destinations are rewound
+// and overwritten (see rewindReportOutput).
+func writeReportSnapshot(w io.Writer, data []byte) error {
+	if w == nil {
+		return nil
+	}
+	if named, ok := w.(interface{ Name() string }); ok {
+		if path := named.Name(); path != "" && path != "/dev/stdout" && path != "stdout" {
+			if _, err := os.Stat(filepath.Dir(path)); err == nil {
+				return writeFileSnapshot(path, data)
+			}
+		}
+	}
+	if err := rewindReportOutput(w); err != nil {
+		return err
+	}
+	_, err := w.Write(data)
+	return err
+}
+
+// writeFileSnapshot writes data next to path and renames it in place.
+func writeFileSnapshot(path string, data []byte) error {
+	dir := filepath.Dir(path)
+	tmp, err := os.CreateTemp(dir, filepath.Base(path)+".tmp-*")
+	if err != nil {
+		return utils.Wrapf(err, "create report snapshot failed")
+	}
+	tmpName := tmp.Name()
+	defer os.Remove(tmpName)
+	if _, err := tmp.Write(data); err != nil {
+		tmp.Close()
+		return utils.Wrapf(err, "write report snapshot failed")
+	}
+	if err := tmp.Sync(); err != nil {
+		tmp.Close()
+		return utils.Wrapf(err, "sync report snapshot failed")
+	}
+	if err := tmp.Close(); err != nil {
+		return utils.Wrapf(err, "close report snapshot failed")
+	}
+	if err := os.Rename(tmpName, path); err != nil {
+		return utils.Wrapf(err, "publish report snapshot failed")
+	}
+	return nil
+}
 
 // rewindReportOutput makes a report writer ready to receive the whole document
 // from the beginning, so a save replaces the previous snapshot instead of

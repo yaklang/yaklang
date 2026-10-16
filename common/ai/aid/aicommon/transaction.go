@@ -11,7 +11,9 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-func is429Response(ctx context.Context, rsp *AIResponse) bool {
+// waitForHeadersAndCheck429 may block until headers arrive or ctx is cancelled.
+// Use only where the callback is expected to signal HTTP header readiness.
+func waitForHeadersAndCheck429(ctx context.Context, rsp *AIResponse) bool {
 	if rsp == nil {
 		return false
 	}
@@ -48,13 +50,6 @@ func isNonRetryableAIHTTPResponse(rsp *AIResponse) bool {
 	// Request/authentication errors cannot be repaired by replaying the same
 	// request. Keep transient timeout, conflict, early-data and rate limits.
 	return status >= 400 && status < 500 && status != 408 && status != 409 && status != 425 && status != 429
-}
-
-func aiHTTPResponseError(rsp *AIResponse) error {
-	if err := rsp.GetError(); err != nil {
-		return err
-	}
-	return utils.Errorf("AI provider returned HTTP %d: %s", rsp.GetHTTPStatusCode(), rsp.GetHTTPResponseBody())
 }
 
 func CallAITransaction(
@@ -113,6 +108,7 @@ func callAITransaction(
 	var lastRsp *AIResponse
 	var lastReq *AIRequest
 	var nonRetryableHTTPFailure bool
+	var promptOverflowFailure bool
 
 	// attemptHistory records every attempt (including 429 rate-limit retries) so
 	// that the final failure message can expose the full retry history to the
@@ -169,6 +165,11 @@ func callAITransaction(
 			return rec
 		}
 		rsp, err := callAi(aiReq)
+		// Observe asynchronous provider errors before classifying a nil callback error.
+		if err == nil && rsp != nil && !rsp.WaitForCallbackDone(transactionCtx) {
+			return transactionCtx.Err()
+		}
+		err = ensure429CallbackError(rsp, err)
 		// A request-scoped cancellation is a terminal control signal, not an AI
 		// failure. Check it before classifying callAi errors so a task finishing
 		// while the provider is in flight cannot emit a misleading model-error
@@ -177,6 +178,12 @@ func callAITransaction(
 			return ctxErr
 		}
 		if err != nil {
+			if isNonRetryableAIHTTPResponse(rsp) && !rsp.WaitForCallbackDone(transactionCtx) {
+				return transactionCtx.Err()
+			}
+			if overflowErr := classifyTransactionPromptOverflow(transactionCtx, c, rsp, err); overflowErr != nil {
+				err = overflowErr
+			}
 			// Transport failures do not reject model output. Never recycle an
 			// older validation failure or provider/authentication body as advice.
 			retryCorrectionErr = nil
@@ -185,7 +192,7 @@ func callAITransaction(
 			lastRsp = rsp
 			rspEmitter := bindEmitter(rsp)
 
-			if is429Response(transactionCtx, rsp) {
+			if waitForHeadersAndCheck429(transactionCtx, rsp) {
 				if is429Retryable(transactionCtx, rsp) {
 					// 频率限流/过载类：可重试，不消耗重试次数。
 					rspEmitter.EmitWarning("429 rate limit detected in transaction layer (seq=%d), will retry without counting attempt", getSeq())
@@ -204,6 +211,10 @@ func callAITransaction(
 			i++
 			attemptHistory = append(attemptHistory, recordAttempt(i, err, rsp))
 			rspEmitter.EmitError("call ai api error (attempt %d/%d): %v", i, trcRetry, err)
+			if IsPromptTooLong(err) {
+				promptOverflowFailure = true
+				break
+			}
 			if isNonRetryableAIHTTPResponse(rsp) {
 				nonRetryableHTTPFailure = true
 				break
@@ -227,13 +238,13 @@ func callAITransaction(
 		// reason-stream goroutine). We can read it directly via
 		// GetPlainOutput / GetPlainReason after postHandler finishes — no
 		// custom capture hooks needed.
-		if !rsp.WaitForCallbackDone(transactionCtx) {
-			return transactionCtx.Err()
-		}
 		if ctxErr := transactionCtx.Err(); ctxErr != nil {
 			return ctxErr
 		}
-		if rsp.GetHTTPStatusCode() >= 400 && rsp.GetHTTPStatusCode() != 429 {
+		if overflowErr := classifyTransactionPromptOverflow(transactionCtx, c, rsp, nil); overflowErr != nil {
+			// A stream error is a provider failure, not malformed action output.
+			postHandlerErr = overflowErr
+		} else if rsp.GetHTTPStatusCode() >= 400 && rsp.GetHTTPStatusCode() != 429 {
 			// An HTTP error body is not model output. Do not send it through
 			// action parsing and generate secondary "missing @action" errors.
 			postHandlerErr = aiHTTPResponseError(rsp)
@@ -262,6 +273,13 @@ func callAITransaction(
 			}
 			rspEmitter := bindEmitter(rsp)
 			rspEmitter.EmitError("ai transaction postHandler error (attempt %d/%d): %v", i, trcRetry, postHandlerErr)
+			if IsPromptTooLong(postHandlerErr) {
+				promptOverflowFailure = true
+				// A newer overflow must not be hidden by an earlier transient
+				// call error retained for ordinary transaction failures.
+				lastCallAiErr = postHandlerErr
+				break
+			}
 			if isNonRetryableAIHTTPResponse(rsp) {
 				nonRetryableHTTPFailure = true
 				break
@@ -340,6 +358,9 @@ func callAITransaction(
 	// error stays concise — callers that need the full retry history should
 	// consume the emitted events rather than parsing the error string.
 	if finalErr != nil {
+		if promptOverflowFailure {
+			return utils.Wrap(finalErr, "non-retryable AI prompt overflow")
+		}
 		if nonRetryableHTTPFailure {
 			return utils.Wrap(finalErr, "non-retryable AI HTTP request failure")
 		}

@@ -182,6 +182,19 @@ func (f *binFlow) detectDirection(dir int, wire []byte) {
 		f.msgpackRPC = &binMsgpackRPC{clientDir: dir, pending: make(map[uint32]string), maxPending: f.a.budget.MaxCollectionElements}
 		return
 	}
+	// ISO 8583 is a weak length-prefixed candidate: a TLS record or HTTP/2
+	// frame can open with bytes that look like a declared message length. Only
+	// claim the flow after every strong signature above has declined, and only
+	// when the declared length matches a complete, fully decodable message.
+	if p, bigEndian := probeISO8583(wire, min(f.a.budget.MaxFrameBytes, f.a.config.MaxMessageBytes)); p.Verdict == ProbeAccept {
+		client := dir
+		if f.tcpClientKnown {
+			client = f.tcpClientDir
+		}
+		f.protocol = "iso8583"
+		f.iso8583 = &iso8583Session{bigEndian: bigEndian, clientDir: client, clientKnown: f.tcpClientKnown}
+		return
+	}
 	var p ProbeResult
 	if f.probeFTPControlExchange(dir, wire) {
 		p = probeAccept("ftp", "rfc959", 99)
@@ -436,6 +449,15 @@ func (f *binFlow) consumeSession(dir int, e *ProtocolEvent, result map[string]an
 			} else {
 				e.TransactionID = f.slmpTCP.requestID(e.Raw, e.ID)
 			}
+		}
+	case "iso8583":
+		var fields map[string]any
+		fields, err = decodeISO8583Message(e.Raw[2:], f.a.budget)
+		if err == nil {
+			e.Session = fields
+			e.semanticFields = cloneSession(fields)
+			e.Profile, e.Completeness = iso8583Profile, "message"
+			e.Summary = fmt.Sprintf("ISO 8583 %v %v", fields["MTI"], fields["MTI Function"])
 		}
 	case "vnc":
 		e.Session, err = f.rfb.consume(dir, e.Raw, f.a.budget.MaxCollectionElements, f.a.budget.MaxMessageBytes)
@@ -1143,6 +1165,7 @@ func (f *binFlow) closeSession() {
 		f.memcached.close()
 		f.memcached = nil
 	}
+	f.iso8583 = nil
 	f.stratum = nil
 	f.gearman = nil
 	f.beanstalk = nil

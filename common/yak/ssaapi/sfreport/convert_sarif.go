@@ -1,6 +1,7 @@
 package sfreport
 
 import (
+	"bytes"
 	"io"
 	"path"
 	"strings"
@@ -74,6 +75,16 @@ type SarifReport struct {
 	// driver is run.Tool.Driver, kept for O(1) rule registration.
 	driver   *sarif.ToolComponent
 	ruleByID map[string]struct{}
+	// sarifResultByFeature is the index of an appended sarif.Result, keyed by
+	// the risk feature hash (the SARIF fingerprint). A later mode replaces that
+	// result instead of reporting the finding twice.
+	sarifResultByFeature map[string]int
+	// sinceFlush counts findings appended since the last snapshot, so a long
+	// scan publishes intermediate documents instead of only the final one.
+	sinceFlush int
+	// flusher writes intermediate snapshots in the background; a final Save()
+	// drains and stops it.
+	flusher *reportFlusher
 }
 
 // SarifContext accumulates the SARIF entities one result contributes (files,
@@ -159,10 +170,16 @@ func (r *SarifReport) Save() error {
 	if r.writer == nil {
 		return nil
 	}
-	if err := rewindReportOutput(r.writer); err != nil {
+	// A pending background snapshot would race this final document.
+	if flusher := r.currentFlusher(); flusher != nil {
+		flusher.stopAndWait()
+	}
+	var buf bytes.Buffer
+	if err := r.report.PrettyWrite(&buf); err != nil {
 		return err
 	}
-	return r.report.PrettyWrite(r.writer)
+	// A file destination is replaced atomically; other destinations are rewound.
+	return writeReportSnapshot(r.writer, buf.Bytes())
 }
 
 // Report exposes the accumulated document for callers that want to serialize
@@ -177,6 +194,7 @@ func (r *SarifReport) Report() *sarif.Report {
 func (r *SarifReport) appendResult(result *ssaapi.SyntaxFlowResult) {
 	SFRule := result.GetRule()
 	ruleID := sarifRuleID(SFRule)
+	added := 0
 
 	for risk := range result.YieldRisk() {
 		value, err := result.GetValue(risk.Variable, int(risk.Index))
@@ -208,8 +226,179 @@ func (r *SarifReport) appendResult(result *ssaapi.SyntaxFlowResult) {
 		}
 
 		r.registerRule(ruleID, SFRule, risk)
+		r.rememberSarifResult(risk)
 		r.run.Results = append(r.run.Results, res)
+		added++
 	}
+	r.noteFlush(added)
+}
+
+// noteFlush publishes an intermediate document once enough findings piled up.
+func (r *SarifReport) noteFlush(added int) {
+	if r == nil || added <= 0 {
+		return
+	}
+	r.sinceFlush += added
+	if reportFlushEvery <= 0 || r.sinceFlush < reportFlushEvery {
+		return
+	}
+	r.sinceFlush = 0
+	if r.writer == nil {
+		return
+	}
+	var buf bytes.Buffer
+	if err := r.report.PrettyWrite(&buf); err != nil {
+		log.Errorf("serialize sarif snapshot failed: %v", err)
+		return
+	}
+	r.flusherFor().submit(buf.Bytes())
+}
+
+// flusherFor returns the background writer of this report, creating it on
+// first use.
+func (r *SarifReport) flusherFor() *reportFlusher {
+	if r.flusher == nil {
+		r.flusher = newReportFlusher(r.writer)
+	}
+	return r.flusher
+}
+
+// currentFlusher returns the background writer without creating one.
+func (r *SarifReport) currentFlusher() *reportFlusher {
+	if r == nil {
+		return nil
+	}
+	return r.flusher
+}
+
+// rememberSarifResult records the slot a sarif.Result will occupy. Call it
+// immediately before appending that result.
+func (r *SarifReport) rememberSarifResult(risk *schema.SSARisk) {
+	if r == nil || risk == nil || r.run == nil {
+		return
+	}
+	key := sarifFeatureKey(risk)
+	if key == "" {
+		return
+	}
+	if r.sarifResultByFeature == nil {
+		r.sarifResultByFeature = map[string]int{}
+	}
+	r.sarifResultByFeature[key] = len(r.run.Results)
+}
+
+func sarifFeatureKey(risk *schema.SSARisk) string {
+	if risk == nil {
+		return ""
+	}
+	key := strings.TrimSpace(risk.RiskFeatureHash)
+	if key == "" {
+		key = strings.TrimSpace(risk.Hash)
+	}
+	return key
+}
+
+// ApplyRiskUpdate applies one decision. Create and update record the alert
+// and drop OldHash when the item names one. Delete only drops that alert.
+func (r *SarifReport) ApplyRiskUpdate(item schema.RiskUpdateItem) error {
+	if r == nil {
+		return nil
+	}
+	switch item.Mode {
+	case schema.RiskUpdateDelete:
+		r.removeSarifResult(strings.TrimSpace(item.OldHash))
+	case schema.RiskUpdateCreate, schema.RiskUpdateUpdate:
+		if item.OldHash != "" {
+			feature := sarifFeatureKey(item.Risk)
+			if feature == "" {
+				feature = strings.TrimSpace(item.OldHash)
+			}
+			r.removeSarifResult(feature)
+		}
+		r.appendRisk(item.Risk)
+	}
+	return nil
+}
+
+// appendRisk adds one alert from the risk itself. The scan does not hand over
+// the syntaxflow result, so there is no value to walk for a code flow.
+func (r *SarifReport) appendRisk(risk *schema.SSARisk) {
+	if r == nil || risk == nil || r.run == nil {
+		return
+	}
+	ruleName := riskRuleName(risk)
+	rule := &schema.SyntaxFlowRule{
+		RuleName:    ruleName,
+		Title:       risk.Title,
+		Severity:    risk.Severity,
+		Description: risk.Description,
+		Solution:    risk.Solution,
+	}
+	ruleID := sarifRuleID(rule)
+	res := sarif.NewRuleResult(ruleID).
+		WithMessage(sarif.NewTextMessage(sarifRiskMessage(risk))).
+		WithLevel(ToSarifLevel(risk.Severity)).
+		WithKind(sarifResultKind).
+		WithPartialFingerPrints(sarifFingerprint(risk))
+	if loc := locationFromRisk(risk); loc != nil {
+		res.WithLocations([]*sarif.Location{loc})
+	}
+	r.registerRule(ruleID, rule, risk)
+	r.rememberSarifResult(risk)
+	r.run.Results = append(r.run.Results, res)
+	r.noteFlush(1)
+}
+
+// locationFromRisk builds a physical location from the risk's file and line.
+// A risk without either still becomes an alert; it just has no region.
+func locationFromRisk(risk *schema.SSARisk) *sarif.Location {
+	if risk == nil {
+		return nil
+	}
+	uri := strings.TrimSpace(risk.CodeSourceUrl)
+	if uri == "" || risk.Line <= 0 {
+		return nil
+	}
+	return sarif.NewLocation().WithPhysicalLocation(
+		sarif.NewPhysicalLocation().
+			WithArtifactLocation(sarif.NewArtifactLocation().WithUri(uri)).
+			WithRegion(sarif.NewRegion().WithStartLine(int(risk.Line))),
+	)
+}
+
+// removeSarifResult drops the alert of a covered finding. The index is the
+// feature hash, which is also the SARIF fingerprint.
+func (r *SarifReport) removeSarifResult(feature string) {
+	feature = strings.TrimSpace(feature)
+	if feature == "" || r == nil || r.run == nil || r.sarifResultByFeature == nil {
+		return
+	}
+	idx, ok := r.sarifResultByFeature[feature]
+	delete(r.sarifResultByFeature, feature)
+	if !ok || idx < 0 || idx >= len(r.run.Results) {
+		return
+	}
+	last := len(r.run.Results) - 1
+	if idx != last {
+		moved := r.run.Results[last]
+		r.run.Results[idx] = moved
+		if key := sarifResultFeature(moved); key != "" {
+			r.sarifResultByFeature[key] = idx
+		}
+	}
+	r.run.Results = r.run.Results[:last]
+}
+
+func sarifResultFeature(res *sarif.Result) string {
+	if res == nil || res.PartialFingerprints == nil {
+		return ""
+	}
+	fp, ok := res.PartialFingerprints[SarifFingerprintKey]
+	if !ok {
+		return ""
+	}
+	text, _ := fp.(string)
+	return text
 }
 
 // registerRule appends the result rule to the driver once per rule ID.

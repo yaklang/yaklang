@@ -14,6 +14,7 @@ var Exports = map[string]interface{}{
 	"withCodeSourceLocalFile": WithCodeSourceLocalFile,
 	"withCodeSourceURL":       WithCodeSourceURL,
 	"withCodeSourceBranch":    WithCodeSourceBranch,
+	"withCodeSourceCommit":    WithCodeSourceCommit,
 	"withCodeSourcePath":      WithCodeSourcePath,
 	// Git/SVN 认证配置选项
 	"withCodeSourceAuthKind":       WithCodeSourceAuthKind,

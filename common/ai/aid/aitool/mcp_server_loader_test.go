@@ -33,6 +33,7 @@ func cleanupTestMCPServerFromProfileDB(serverNames ...string) {
 }
 
 func TestLoadAIToolFromMCPServers(t *testing.T) {
+	yakit.GuardConfigurationForTest(t)
 	// 测试服务器名称
 	serverName := "test_sse_server"
 
@@ -255,6 +256,7 @@ func TestLoadAIToolFromMCPServers_NotFound(t *testing.T) {
 
 // TestLoadAIToolFromMCPServers_Disabled 测试服务器被禁用的情况
 func TestLoadAIToolFromMCPServers_Disabled(t *testing.T) {
+	yakit.GuardConfigurationForTest(t)
 	serverName := "test_disabled_server"
 
 	// 清理函数
@@ -282,6 +284,7 @@ func TestLoadAIToolFromMCPServers_Disabled(t *testing.T) {
 
 // TestLoadAllEnabledAIToolsFromMCPServers 测试加载所有启用的 MCP 服务器的工具
 func TestLoadAllEnabledAIToolsFromMCPServers(t *testing.T) {
+	yakit.GuardConfigurationForTest(t)
 	// 测试服务器名称
 	serverName1 := "test_all_enabled_server_1"
 	serverName2 := "test_all_enabled_server_2"
@@ -456,6 +459,7 @@ func TestLoadAllEnabledAIToolsFromMCPServers(t *testing.T) {
 
 // TestLoadAllEnabledAIToolsFromMCPServers_Empty 测试没有启用的服务器时的情况
 func TestLoadAllEnabledAIToolsFromMCPServers_Empty(t *testing.T) {
+	yakit.GuardConfigurationForTest(t)
 	db := consts.GetGormProfileDatabase()
 	require.NotNil(t, db)
 

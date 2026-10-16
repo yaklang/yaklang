@@ -2,6 +2,7 @@ package aicommon
 
 import (
 	"context"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"io"
 	"strings"
 	"testing"
@@ -33,6 +34,7 @@ func (g *tieredSingleModeGateway) Chat(string, ...any) (string, error) {
 }
 
 func TestWithTieredAICallbackSingleModelOption(t *testing.T) {
+	yakit.GuardConfigurationForTest(t)
 	aiconfig.EnsureConfigLoaded()
 	previous := consts.GetTieredAIConfig()
 	t.Cleanup(func() { consts.SetTieredAIConfig(previous) })

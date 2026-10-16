@@ -49,7 +49,9 @@ func (f *VirtualFS) Base(s string) string {
 	return path.Base(s)
 }
 
-var _ fi.FileSystem = (*VirtualFS)(nil)
+var (
+	_ fi.FileSystem = (*VirtualFS)(nil)
+)
 
 func NewVirtualFs() *VirtualFS {
 	vs := &VirtualFS{

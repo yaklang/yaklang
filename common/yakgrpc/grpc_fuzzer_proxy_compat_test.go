@@ -9,6 +9,7 @@ import (
 )
 
 func TestBuildFuzzerProxyList_CompatEndpointIDInProxyField(t *testing.T) {
+	yakit.GuardConfigurationForTest(t)
 	oldCfg, err := yakit.GetGlobalProxyRulesConfig()
 	require.NoError(t, err)
 	defer func() {

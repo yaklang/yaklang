@@ -3,11 +3,12 @@ package yakit
 import (
 	"testing"
 
-	"github.com/yaklang/gorm"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/gorm"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/configtest"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
@@ -15,7 +16,9 @@ func newToolConfigDB(t *testing.T) *gorm.DB {
 	t.Helper()
 	db, err := utils.CreateTempTestDatabaseInMemory()
 	require.NoError(t, err)
+	t.Cleanup(func() { _ = db.Close() })
 	require.NoError(t, db.AutoMigrate(&schema.MCPClientToolConfig{}, &schema.GeneralStorage{}).Error)
+	configtest.RequirePristine(t, db, nil)
 	return db
 }
 

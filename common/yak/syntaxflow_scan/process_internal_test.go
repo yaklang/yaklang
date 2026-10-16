@@ -44,6 +44,23 @@ func TestUpdateRuleStatusFinishMarksFinished(t *testing.T) {
 	require.Equal(t, 1.0, info.Progress)
 }
 
+func TestRuleProgressSnapshotsAreImmutableAndMonotone(t *testing.T) {
+	pm := newProcessMonitor(context.Background(), time.Second, nil, nil, true)
+	pm.UpdateRuleStatus("prog", "multi-unit", .93, "first unit")
+	first := pm.snapshotInfoList(true)
+	require.Len(t, first.Rules, 1)
+	pm.UpdateRuleStatus("prog", "multi-unit", .75, "next unit")
+	second := pm.snapshotInfoList(true)
+	require.Equal(t, .93, second.Rules[0].Progress, "a new frame does not reset rule progress")
+	pm.UpdateRuleStatus("prog", "multi-unit", 1, "done")
+	require.Equal(t, .93, first.Rules[0].Progress, "published snapshots must not change")
+	require.False(t, first.Rules[0].Finished)
+	pm.UpdateRuleStatus("prog", "multi-unit", .5, "stale callback")
+	final := pm.snapshotInfoList(true)
+	require.Equal(t, 1.0, final.Rules[0].Progress)
+	require.True(t, final.Rules[0].Finished)
+}
+
 func TestSharedScanCallbackOptionsForwardRuleDetailAndDebugDir(t *testing.T) {
 	cfg, err := NewConfig(
 		WithProcessRuleDetail(true),
