@@ -276,10 +276,12 @@ func (f *Function) Finish() {
 		}
 	}
 
+	f.typeMu.Lock()
 	if f.Type == nil {
 		f.Type = NewFunctionType("", nil, nil, false)
 	}
 	funType := f.Type
+	f.typeMu.Unlock()
 
 	funType.Parameter = lo.Map(f.Params, func(id int64, _ int) Type {
 		p, ok := f.GetValueById(id)
