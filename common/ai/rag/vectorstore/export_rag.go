@@ -56,8 +56,8 @@ func ExportRAGToBinary(collectionName string, opts ...RAGExportOptionFunc) (io.R
 
 	reportProgress(0, "开始导出向量库数据", "info")
 
-	// 查询集合信息
-	collection, err := yakit.QueryRAGCollectionByName(db, collectionName)
+	// 查询集合信息。先刷出尚未写入的图，再读二进制。
+	collection, err := QueryCollectionForExport(db, collectionName)
 	if err != nil {
 		return nil, utils.Errorf("failed to get collection %s: %v", collectionName, err)
 	}
@@ -770,6 +770,8 @@ func importRAGDataToDB(ragData *RAGBinaryData, optFuncs ...RAGExportOptionFunc) 
 		if err != nil {
 			// HNSW索引导入失败不应该影响整个导入过程
 			log.Warnf("failed to import HNSW index: %v", err)
+		} else if err := clearGraphDeltas(db, collection.UUID, 0); err != nil {
+			log.Warnf("failed to clear hnsw graph deltas after import: %v", err)
 		}
 		reportProgress(95, "HNSW索引导入完成", "info")
 	} else {

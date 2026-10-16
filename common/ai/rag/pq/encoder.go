@@ -9,7 +9,8 @@ import (
 
 // Quantizer PQ量化器，用于编码和解码向量
 type Quantizer struct {
-	codebook *Codebook
+	codebook       *Codebook
+	centroidNormSq [][]float64
 }
 
 // NewQuantizer 创建新的量化器
@@ -17,9 +18,11 @@ func NewQuantizer(codebook *Codebook) *Quantizer {
 	if codebook == nil {
 		return nil
 	}
-	return &Quantizer{
+	quantizer := &Quantizer{
 		codebook: codebook,
 	}
+	quantizer.ensureCentroidNormSq()
+	return quantizer
 }
 
 // Encode 将高维向量编码为PQ码

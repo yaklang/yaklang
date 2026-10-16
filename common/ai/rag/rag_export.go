@@ -98,8 +98,8 @@ func ExportRAGToBinary(collectionName string, opts ...RAGSystemConfigOption) (io
 
 	reportProgress(0, "开始导出向量库数据", "info")
 
-	// 查询集合信息
-	collection, err := yakit.QueryRAGCollectionByName(db, collectionName)
+	// 查询集合信息。先刷出尚未写入的图，再读二进制。
+	collection, err := vectorstore.QueryCollectionForExport(db, collectionName)
 	if err != nil {
 		return nil, utils.Errorf("failed to get collection %s: %v", collectionName, err)
 	}

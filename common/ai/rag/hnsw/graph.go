@@ -430,6 +430,11 @@ type Graph[K cmp.Ordered] struct {
 	// OnLayersChange is called when the layers change.
 	OnLayersChange func(Layers []*Layer[K])
 
+	// trackAdjacency records neighborhood edits for incremental persistence.
+	trackAdjacency bool
+	// adjacencyDirty values are true when the node was removed from that layer.
+	adjacencyDirty map[adjacencyRef[K]]bool
+
 	// PQ optimization fields
 	// pqCodebook PQ码表，如果不为nil则启用PQ优化
 	pqCodebook *pq.Codebook
@@ -539,6 +544,93 @@ func (g *Graph[K]) configureNodeDistance(distance DistanceFunc) {
 			return g.pqAwareDistance(a, b, g.pqQuantizer)
 		}
 	}
+}
+
+// distanceAgainst builds one PQ lookup table for this query. Comparisons
+// between two PQ nodes still use the stored node distance.
+func (g *Graph[K]) distanceAgainst(query hnswspec.LayerNode[K]) (hnswspec.DistanceFunc[K], bool) {
+	if !g.IsPQEnabled() || g.pqQuantizer == nil || query == nil || query.IsPQEnabled() {
+		return g.nodeDistance, g.batchCosine
+	}
+	raw := query.GetVector()()
+	if len(raw) == 0 {
+		return g.nodeDistance, false
+	}
+	name, ok := distanceFuncToName(g.Distance)
+	if !ok {
+		return g.nodeDistance, false
+	}
+	switch name {
+	case "cosine":
+		return g.cosineADCDistance(raw), false
+	case "euclidean":
+		return g.euclideanADCDistance(raw), false
+	default:
+		return g.nodeDistance, false
+	}
+}
+
+func (g *Graph[K]) cosineADCDistance(raw []float32) hnswspec.DistanceFunc[K] {
+	vec64 := make([]float64, len(raw))
+	var queryNormSq float64
+	for i, value := range raw {
+		converted := float64(value)
+		vec64[i] = converted
+		queryNormSq += converted * converted
+	}
+	table, _, err := g.pqQuantizer.ComputeDotProductTable(vec64)
+	if err != nil {
+		log.Errorf("build pq cosine distance table: %v", err)
+		return g.nodeDistance
+	}
+	quantizer := g.pqQuantizer
+	fallback := g.nodeDistance
+	return func(a, b hnswspec.LayerNode[K]) float64 {
+		codes, ok := pqCodesFromPair(a, b)
+		if !ok {
+			return fallback(a, b)
+		}
+		distance, err := quantizer.CosineDistanceFromDotTable(codes, table, queryNormSq)
+		if err != nil {
+			return fallback(a, b)
+		}
+		return distance
+	}
+}
+
+func (g *Graph[K]) euclideanADCDistance(raw []float32) hnswspec.DistanceFunc[K] {
+	vec64 := make([]float64, len(raw))
+	for i, value := range raw {
+		vec64[i] = float64(value)
+	}
+	table, err := g.pqQuantizer.ComputeDistanceTable(vec64)
+	if err != nil {
+		log.Errorf("build pq euclidean distance table: %v", err)
+		return g.nodeDistance
+	}
+	quantizer := g.pqQuantizer
+	fallback := g.nodeDistance
+	return func(a, b hnswspec.LayerNode[K]) float64 {
+		codes, ok := pqCodesFromPair(a, b)
+		if !ok {
+			return fallback(a, b)
+		}
+		distance, err := quantizer.AsymmetricDistanceWithTable(codes, table)
+		if err != nil {
+			return fallback(a, b)
+		}
+		return distance
+	}
+}
+
+func pqCodesFromPair[K cmp.Ordered](a, b hnswspec.LayerNode[K]) ([]byte, bool) {
+	if a == nil || b == nil || a.IsPQEnabled() == b.IsPQEnabled() {
+		return nil, false
+	}
+	if a.IsPQEnabled() {
+		return a.GetPQCodes()
+	}
+	return b.GetPQCodes()
 }
 
 // GraphConfig defines the configuration parameters for creating an HNSW graph
@@ -882,6 +974,7 @@ func (g *Graph[K]) Add(nodes ...InputNode[K]) {
 		key := node.Key
 		vec := node.ToVector()
 		searchTarget := hnswspec.NewStandardLayerNode(key, vec)
+		nodeDistance, batchCosine := g.distanceAgainst(searchTarget)
 
 		if g.Has(key) {
 			g.Delete(key)
@@ -956,6 +1049,7 @@ func (g *Graph[K]) Add(nodes ...InputNode[K]) {
 			if layer.entry() == nil {
 				if i <= insertLevel {
 					layer.Nodes = map[K]hnswspec.LayerNode[K]{key: newNode}
+					g.noteUpsert(i, key)
 				}
 				continue
 			}
@@ -996,7 +1090,7 @@ func (g *Graph[K]) Add(nodes ...InputNode[K]) {
 				searchEf = max(g.EfConstruction, g.M)
 			}
 
-			neighborhood := search(searchPoint, searchK, searchEf, searchTarget, g.nodeDistance, nil, workspace, g.batchCosine)
+			neighborhood := search(searchPoint, searchK, searchEf, searchTarget, nodeDistance, nil, workspace, batchCosine)
 
 			if len(neighborhood) == 0 {
 				// This should not happen because the searchPoint itself
@@ -1011,6 +1105,7 @@ func (g *Graph[K]) Add(nodes ...InputNode[K]) {
 			if i <= insertLevel {
 				// Insert the new node into the layer.
 				layer.Nodes[key] = newNode
+				g.noteUpsert(i, key)
 				maxNeighbors := g.M
 				if i == 0 {
 					// The original HNSW design uses a denser base layer (M0=2*M).
@@ -1018,8 +1113,9 @@ func (g *Graph[K]) Add(nodes ...InputNode[K]) {
 				}
 				for _, candidate := range neighborhood {
 					// Create connections between the new node and the best nodes
-					candidate.node.AddNeighbor(newNode, maxNeighbors, g.nodeDistance)
-					newNode.AddNeighbor(candidate.node, maxNeighbors, g.nodeDistance)
+					candidate.node.AddNeighbor(newNode, maxNeighbors, nodeDistance)
+					newNode.AddNeighbor(candidate.node, maxNeighbors, nodeDistance)
+					g.noteUpsert(i, candidate.node.GetKey())
 				}
 			}
 		}
@@ -1097,6 +1193,7 @@ func (h *Graph[K]) search(near Vector, k int, filter FilterFunc[K]) []SearchResu
 		return nil
 	}
 	targetNode := hnswspec.NewStandardLayerNode(entryNode.GetKey(), near)
+	distance, batchCosine := h.distanceAgainst(targetNode)
 	workspace := h.acquireSearchWorkspace(max(h.EfSearch, k), k)
 	defer h.releaseSearchWorkspace(workspace)
 
@@ -1113,7 +1210,7 @@ func (h *Graph[K]) search(near Vector, k int, filter FilterFunc[K]) []SearchResu
 
 		// Descending hierarchies
 		if layer > 0 {
-			nodes := search(searchPoint, 1, 1, targetNode, h.nodeDistance, nil, workspace, h.batchCosine)
+			nodes := search(searchPoint, 1, 1, targetNode, distance, nil, workspace, batchCosine)
 			if len(nodes) == 0 {
 				log.Warnf("search returned no nodes at layer %d, this should not happen, continue to next layer directly", layer)
 				continue
@@ -1122,7 +1219,7 @@ func (h *Graph[K]) search(near Vector, k int, filter FilterFunc[K]) []SearchResu
 			continue
 		}
 
-		nodes := search(searchPoint, k, efSearch, targetNode, h.nodeDistance, filter, workspace, h.batchCosine)
+		nodes := search(searchPoint, k, efSearch, targetNode, distance, filter, workspace, batchCosine)
 		out := make([]SearchResult[K], 0, len(nodes))
 
 		for _, candidate := range nodes {
@@ -1533,6 +1630,7 @@ func (g *Graph[K]) TrainPQCodebookFromDataWithCallback(m, k int, callback func(k
 	g.pqCodebook = codebook
 	g.pqQuantizer = quantizer
 	g.pqAwareDistance = hnswspec.PQAwareCosineDistance[K]
+	g.batchCosine = false
 	g.nodeDistance = func(a, b hnswspec.LayerNode[K]) float64 {
 		return g.pqAwareDistance(a, b, g.pqQuantizer)
 	}

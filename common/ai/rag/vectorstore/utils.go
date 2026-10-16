@@ -491,6 +491,9 @@ func migrateHNSWGraphWithContext(ctx context.Context, db *gorm.DB, collection *s
 		if err := tx.Model(&schema.VectorStoreCollection{}).Where("id = ?", collection.ID).Updates(updates).Error; err != nil {
 			return utils.Wrap(err, "update graph binary")
 		}
+		if err := tx.Where("collection_uuid = ?", collection.UUID).Unscoped().Delete(&schema.VectorStoreGraphDelta{}).Error; err != nil {
+			return utils.Wrap(err, "clear hnsw graph deltas")
+		}
 		return nil
 	})
 	if err != nil {
@@ -509,7 +512,7 @@ func NewVectorStoreDatabase(path string) (*gorm.DB, error) {
 	if err != nil {
 		return db, err
 	}
-	db = db.AutoMigrate(&schema.KnowledgeBaseEntry{}, &schema.KnowledgeBaseInfo{}, &schema.VectorStoreCollection{}, &schema.VectorStoreDocument{})
+	db = db.AutoMigrate(&schema.KnowledgeBaseEntry{}, &schema.KnowledgeBaseInfo{}, &schema.VectorStoreCollection{}, &schema.VectorStoreDocument{}, &schema.VectorStoreGraphDelta{})
 
 	return db, nil
 }

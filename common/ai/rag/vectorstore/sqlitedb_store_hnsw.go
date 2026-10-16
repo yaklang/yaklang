@@ -139,13 +139,30 @@ func (s *SQLiteVectorStoreHNSW) GetEmbedder() EmbeddingClient {
 	return s.embedder
 }
 
+func pqSubspaceCount(dim int) int {
+	if dim <= 0 {
+		return 1
+	}
+	for _, subspaces := range []int{32, 16, 8, 4, 2, 1} {
+		if subspaces == 32 && dim < 512 {
+			continue
+		}
+		if dim%subspaces == 0 {
+			return subspaces
+		}
+	}
+	return 1
+}
+
 func (s *SQLiteVectorStoreHNSW) ConvertToPQMode() error {
 	nodeNum := s.hnsw.GetSize()
 	k := 256
 	if nodeNum < k {
 		k = nodeNum
 	}
-	_, err := s.hnsw.TrainPQCodebookFromDataWithCallback(16, k, func(key string, code []byte, vector []float64) (hnswspec.LayerNode[string], error) {
+	subspaces := pqSubspaceCount(s.collection.Dimension)
+	log.Infof("training pq codebook for collection %s: dimension=%d subspaces=%d centroids=%d", s.collection.Name, s.collection.Dimension, subspaces, k)
+	_, err := s.hnsw.TrainPQCodebookFromDataWithCallback(subspaces, k, func(key string, code []byte, vector []float64) (hnswspec.LayerNode[string], error) {
 		err := s.db.Model(&schema.VectorStoreDocument{}).Where("document_id = ? and collection_id = ?", key, s.collection.ID).Update("pq_code", code).Error
 		if err != nil {
 			return nil, utils.Wrap(err, "update pq code")
@@ -663,7 +680,11 @@ func (s *SQLiteVectorStoreHNSW) PersistGraph(ctx context.Context) error {
 		if err = s.requireWriteCollection(); err != nil {
 			return
 		}
-		err = updateDatabaseGraphInfoInLock(s.db, s.collection.UUID, s.hnsw)
+		if s.hnsw.persistLocked != nil {
+			err = s.hnsw.persistLocked(true)
+		} else {
+			err = updateDatabaseGraphInfoInLock(s.db, s.collection.UUID, s.hnsw)
+		}
 	}}) {
 		return errors.New("graph wrapper is closed")
 	}
@@ -800,24 +821,26 @@ func (s *SQLiteVectorStoreHNSW) DeleteWithTransactionCheck(check func(tx *gorm.D
 		return nil
 	}
 
-	// Serialize the survivor graph while all backing rows still exist. Keep
-	// both the graph snapshot and row deletion in the same transaction. A failed
-	// export/commit restores the in-memory topology and is returned to callers.
-	return s.hnsw.deleteWithPrecondition(ids, func() error {
+	// Row deletion and the adjacency delta commit together. A failed transaction
+	// restores the in-memory topology. The full graph snapshot is compacted later.
+	err := s.hnsw.deleteWithPrecondition(ids, func() error {
 		if check != nil {
 			return check(s.db)
 		}
 		return nil
 	}, func() error {
+		useDelta := s.hnsw.saveGraphDelta != nil
 		var binaryData []byte
-		reader, err := s.hnsw.exportHNSWGraphToBinaryInLock()
-		if err != nil && !errors.Is(err, graphNodesIsEmpty) {
-			return err
-		}
-		if reader != nil {
-			binaryData, err = io.ReadAll(reader)
-			if err != nil {
+		if !useDelta {
+			reader, err := s.hnsw.exportHNSWGraphToBinaryInLock()
+			if err != nil && !errors.Is(err, graphNodesIsEmpty) {
 				return err
+			}
+			if reader != nil {
+				binaryData, err = io.ReadAll(reader)
+				if err != nil {
+					return err
+				}
 			}
 		}
 		return utils.GormTransaction(s.db, func(tx *gorm.DB) error {
@@ -835,6 +858,19 @@ func (s *SQLiteVectorStoreHNSW) DeleteWithTransactionCheck(check func(tx *gorm.D
 					return utils.Wrap(err, "delete vector documents")
 				}
 			}
+			var remaining int64
+			if err := tx.Model(&schema.VectorStoreCollection{}).Where("id = ?", s.collection.ID).Count(&remaining).Error; err != nil {
+				return err
+			}
+			if remaining != 1 {
+				return utils.Error("vector collection was deleted")
+			}
+			if s.hnsw.saveGraphDelta != nil {
+				if err := s.hnsw.saveGraphDelta(tx); err != nil {
+					return err
+				}
+				return nil
+			}
 			result := tx.Model(&schema.VectorStoreCollection{}).
 				Where("id = ?", s.collection.ID).Update("graph_binary", binaryData)
 			if result.Error != nil {
@@ -846,6 +882,13 @@ func (s *SQLiteVectorStoreHNSW) DeleteWithTransactionCheck(check func(tx *gorm.D
 			return nil
 		})
 	})
+	if err != nil {
+		return err
+	}
+	if s.hnsw.scheduleGraphSnapshot != nil {
+		s.hnsw.scheduleGraphSnapshot()
+	}
+	return nil
 }
 
 func (s *SQLiteVectorStoreHNSW) GetName() string {
