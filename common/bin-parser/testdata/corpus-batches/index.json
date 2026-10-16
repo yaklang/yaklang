@@ -116832,6 +116832,387 @@
         "common/pcapx/pcaputil/dlms-sn-parameterized-wrapper/unselected-choice-SDK04-and-unequal-count-localUnsupported.udp.pcap": "dlms-sn-parameterized-wrapper/unselected-choice-SDK04-and-unequal-count-localUnsupported.udp.pcap",
         "scripts/protocol-tests/required-tests-traffic-unified-v159.json": "required-tests-traffic-unified-v159.json"
       }
+    },
+    {
+      "id": "validation-dlms-sn-read-service-block",
+      "kind": "support",
+      "source_sha": "3aff495c72e737d7023a405e5fcff70ea77d6dbd",
+      "file": "validation-dlms-sn-read-service-block.zip",
+      "sha256": "77deeffa7a3976f329f42e5fc96213bd22c76acdcf3d85c70c16a4fe6597b66b",
+      "password": "bin-parser",
+      "members": {
+        "dlms-sn-read-block-captures/changed-same-number-block-content-retires.tcp.pcap": {
+          "bytes": 662,
+          "sha256": "e3a0928493d4c4400f1755ab44109e5bdba0ac11b55fec076abb581ced6a73be"
+        },
+        "dlms-sn-read-block-captures/changed-same-number-block-content-retires.udp.pcap": {
+          "bytes": 392,
+          "sha256": "af299c66dd9bca58310c34ff90a3507349cf61efd719c811a92def905cb07e7c"
+        },
+        "dlms-sn-read-block-captures/cold-retained-response-first-block-Close.tcp.pcap": {
+          "bytes": 404,
+          "sha256": "9b1f4884c6a7bddf692ad286a0ba72c63429ae8b0efcfcbf28071a038e6a64be"
+        },
+        "dlms-sn-read-block-captures/cold-retained-response-first-block-Close.udp.pcap": {
+          "bytes": 170,
+          "sha256": "8af4231b0dacc13489dea461c8167343014bb70d1c489c6b864975dc70b1d130"
+        },
+        "dlms-sn-read-block-captures/exact-block-ACK-and-final-repeats-do-not-advance.tcp.pcap": {
+          "bytes": 916,
+          "sha256": "4b83eeccc30e117a71f499b82b72b83704b9795a76a514ae8a9e35725134a128"
+        },
+        "dlms-sn-read-block-captures/exact-block-ACK-and-final-repeats-do-not-advance.udp.pcap": {
+          "bytes": 610,
+          "sha256": "311ca28d9cf96436e602cadb4fed727d3de2ae7a4515343882691b01adb29ca7"
+        },
+        "dlms-sn-read-block-captures/fixed-compact-is-one-Data-with-owned-expanded-graph.tcp.pcap": {
+          "bytes": 577,
+          "sha256": "8049b5a8c1d62e071745cd9d5249c70dd0c2042398d5ce011462bf35416279cd"
+        },
+        "dlms-sn-read-block-captures/fixed-compact-is-one-Data-with-owned-expanded-graph.udp.pcap": {
+          "bytes": 319,
+          "sha256": "321f3804f9dcd206f80996e096c970b4505b23c8eae682f28ac66fd833da6f69"
+        },
+        "dlms-sn-read-block-captures/hard-block-count-64-positive.tcp.pcap": {
+          "bytes": 10991,
+          "sha256": "08a841244a8a3105b10a3405f808eba4aba85cca38848dda63a6aadaba364acd"
+        },
+        "dlms-sn-read-block-captures/hard-block-count-64-positive.udp.pcap": {
+          "bytes": 9245,
+          "sha256": "756edb47ce8331c4e815bced183a4d861f1c0abdc833be8e1853a52c7fd7cbfa"
+        },
+        "dlms-sn-read-block-captures/hard-block-count-65-Resource.tcp.pcap": {
+          "bytes": 11159,
+          "sha256": "843f679257f9db971486e4a70f1df40f83b0e87ac678d65e6e953d5c34421784"
+        },
+        "dlms-sn-read-block-captures/hard-block-count-65-Resource.udp.pcap": {
+          "bytes": 9389,
+          "sha256": "983702064746c2ab2b2b79f5f38190864e61bbf2a0d7d2d646ee7b712ad7742e"
+        },
+        "dlms-sn-read-block-captures/independent-LN-owner-and-SNgroup-Close.tcp.pcap": {
+          "bytes": 579,
+          "sha256": "1559dacb041021f9c8669ecd622555dea0008cab46fd141b7e8fcc5fc7b4ff24"
+        },
+        "dlms-sn-read-block-captures/independent-LN-owner-and-SNgroup-Close.udp.pcap": {
+          "bytes": 321,
+          "sha256": "e073924ae436733157efdeaf51e1168a6ffa1e132a7e816802dee69eeed13222"
+        },
+        "dlms-sn-read-block-captures/joined-Data-trailing-byte-Malformed-releases.tcp.pcap": {
+          "bytes": 656,
+          "sha256": "8e0afbbacca809795adf2979162bb899104fdaca01365b4fcf853273872622b0"
+        },
+        "dlms-sn-read-block-captures/joined-Data-trailing-byte-Malformed-releases.udp.pcap": {
+          "bytes": 386,
+          "sha256": "e6ae22fb50ed955d2488f1194dd6e4e67d2c5b8a9cdc06c9fd9561707a114704"
+        },
+        "dlms-sn-read-block-captures/long-count-ACK-completecount-truncated-number-Malformed.tcp.pcap": {
+          "bytes": 487,
+          "sha256": "2bc9233a10767c5406544ed5ba2a2d4c41e695e725a23a5ddf183c2420078f40"
+        },
+        "dlms-sn-read-block-captures/long-count-ACK-completecount-truncated-number-Malformed.udp.pcap": {
+          "bytes": 241,
+          "sha256": "c6bf625912d2ade4164943c4ba856e53a0eb6de9498fb18be678aee023271642"
+        },
+        "dlms-sn-read-block-captures/matching-wrong-ACK-number-retires-without-ASN-error.tcp.pcap": {
+          "bytes": 658,
+          "sha256": "c597b7292a2cac23fe7aa2694c72582bd345b5b88ec803cebdbd4cebd77b7392"
+        },
+        "dlms-sn-read-block-captures/matching-wrong-ACK-number-retires-without-ASN-error.udp.pcap": {
+          "bytes": 388,
+          "sha256": "7769717b65a953d85133a3417d1a9ca8436796adcf1db7f149e6deef9563eb4d"
+        },
+        "dlms-sn-read-block-captures/next-response-without-observed-ACK-retires.tcp.pcap": {
+          "bytes": 575,
+          "sha256": "1eb08867a9ba433e02837ca9a9ea8b7d5d4f76d86e7e8c9ba6cc8d82bf33cd6b"
+        },
+        "dlms-sn-read-block-captures/next-response-without-observed-ACK-retires.udp.pcap": {
+          "bytes": 317,
+          "sha256": "238d1f3964d7125cf7b1366debcc86a4cf921521465597f79c57f46d34de104d"
+        },
+        "dlms-sn-read-block-captures/nonminimal-definite-single-count-both-blocks-and-ACK.tcp.pcap": {
+          "bytes": 578,
+          "sha256": "7051d4e45fbab7fe569cad01d96fbe698cfbf8097b92c200cd2a46bafce11aba"
+        },
+        "dlms-sn-read-block-captures/nonminimal-definite-single-count-both-blocks-and-ACK.udp.pcap": {
+          "bytes": 320,
+          "sha256": "3da5ad937ed5bedaef32a4bb6022460449c4de8e01b35d4f9a4009dd18953c04"
+        },
+        "dlms-sn-read-block-captures/observed-echo-before-final-Close.tcp.pcap": {
+          "bytes": 574,
+          "sha256": "d34fd4936fcd5c7ad458b5d047571f06833d173d10ad239af8c34a18c0343327"
+        },
+        "dlms-sn-read-block-captures/observed-echo-before-final-Close.udp.pcap": {
+          "bytes": 316,
+          "sha256": "59c873fe27562cb0446c2de4c7a8a1b1a445a02605dbe2f1d96893260c7d3655"
+        },
+        "dlms-sn-read-block-captures/ordinary-SN-response-interleaving-preserves-active-wiregroup.tcp.pcap": {
+          "bytes": 658,
+          "sha256": "c8a453e9019c1e1f88f979f7d27fe6e1b0c9e335c85dee46cbd1cc0fa96eac82"
+        },
+        "dlms-sn-read-block-captures/ordinary-SN-response-interleaving-preserves-active-wiregroup.udp.pcap": {
+          "bytes": 388,
+          "sha256": "ae7f14817dbf291dd0b03484fce39b810165832344a5bdd428d17baac48dfd67"
+        },
+        "dlms-sn-read-block-captures/orphan-block-next-uploadACK-and-normal-SN-neighbor.tcp.pcap": {
+          "bytes": 654,
+          "sha256": "85d2e3e6dc3e7ace63c4c24ac1a77ba20dfbff206b680e7f86d86053e27cdea2"
+        },
+        "dlms-sn-read-block-captures/orphan-block-next-uploadACK-and-normal-SN-neighbor.udp.pcap": {
+          "bytes": 384,
+          "sha256": "25a234eb799300519d39c78580ef550be7abd62980b853ec0ec82730119bb643"
+        },
+        "dlms-sn-read-block-captures/outer-raw-length-truncation-invalidates-before-late-LN.tcp.pcap": {
+          "bytes": 582,
+          "sha256": "d3bf29655e26ab1f12fbcf79f1ec2c4e8f6112e7816d1ef5ce77699f8397f09a"
+        },
+        "dlms-sn-read-block-captures/outer-raw-length-truncation-invalidates-before-late-LN.udp.pcap": {
+          "bytes": 324,
+          "sha256": "731c74ab8c178386979ccb27a341100b307c0caae7ea8166bf61f3a3f19d2d13"
+        },
+        "dlms-sn-read-block-captures/raw-aggregate-1024-positive.tcp.pcap": {
+          "bytes": 1598,
+          "sha256": "f86be2061d101f3eac0c4f274a98bd190b805cc1ac85ef2ab471370b21e83eaa"
+        },
+        "dlms-sn-read-block-captures/raw-aggregate-1024-positive.udp.pcap": {
+          "bytes": 1340,
+          "sha256": "fbc4275c017ce761951e3296fd58165050920e0272dcdd1a32d5e7f73e40a73b"
+        },
+        "dlms-sn-read-block-captures/raw-aggregate-1025-Resource.tcp.pcap": {
+          "bytes": 1599,
+          "sha256": "2cba4095f66685c1d3f7913f25a33dcaa9736a300d81a84e76c4ea5c34caa8b9"
+        },
+        "dlms-sn-read-block-captures/raw-aggregate-1025-Resource.udp.pcap": {
+          "bytes": 1341,
+          "sha256": "939f9fbc8d994d9005e75c2a321babdde50f3161fce2315d6e6613f27d59fefb"
+        },
+        "dlms-sn-read-block-captures/reuse-inputs.json": {
+          "bytes": 371,
+          "sha256": "63432c16c82c11879ec7268d7bb04d010fb549f2ce8b49682bbfc24602dad816"
+        },
+        "dlms-sn-read-block-captures/shared-Data-root-and-three-scalars-node-cap4-positive.tcp.pcap": {
+          "bytes": 578,
+          "sha256": "d319af815bed34e913eeab9684721b988f41dea8205c4ba3c5e0ceb705efe8ee"
+        },
+        "dlms-sn-read-block-captures/shared-Data-root-and-three-scalars-node-cap4-positive.udp.pcap": {
+          "bytes": 320,
+          "sha256": "e14d0d42c36c44ed7686090d86e8f59daab394acc39e418235a2c19123fe01da"
+        },
+        "dlms-sn-read-block-captures/single-block-raw1025-Resource.tcp.pcap": {
+          "bytes": 1429,
+          "sha256": "1e3612e1d23cec0bb5e617a6ba0ca3b81f78a919c2d4eff89f3303f95b51c3d1"
+        },
+        "dlms-sn-read-block-captures/single-block-raw1025-Resource.udp.pcap": {
+          "bytes": 1195,
+          "sha256": "e9eaa4bec72c14dadb063d01e7e9f63ba9708af4dd38abc0dc97173957bd1b6c"
+        },
+        "dlms-sn-read-block-captures/single-last-exactrepeat-no-new-generation-ordinary-request-reset.tcp.pcap": {
+          "bytes": 760,
+          "sha256": "16ed358040004110cc9c55b4af0b30789412f80f824e27e8285cd2e140d326e5"
+        },
+        "dlms-sn-read-block-captures/single-last-exactrepeat-no-new-generation-ordinary-request-reset.udp.pcap": {
+          "bytes": 478,
+          "sha256": "faa99cda63d16ecf8bc340fde676e55cec28d0ca4da31dd174a8f23488d59990"
+        },
+        "dlms-sn-read-block-captures/structure-depth5-Resource-invalidates-pending-LN.tcp.pcap": {
+          "bytes": 751,
+          "sha256": "0f964fe18df071825ecaf506e2f774d6c1b02a850fa84d4dbe4602065520d56f"
+        },
+        "dlms-sn-read-block-captures/structure-depth5-Resource-invalidates-pending-LN.udp.pcap": {
+          "bytes": 469,
+          "sha256": "c6b5d7b2dbf4308324422784e1667cda3fd131f3bcec6703f0e5c2b1fde3d2e3"
+        },
+        "dlms-sn-read-block-captures/structure-depth6-positive.tcp.pcap": {
+          "bytes": 576,
+          "sha256": "78ecc2678c23d0d2ab636af913af33f1b37da5bdfb7ce0f57f7d9e44bc291642"
+        },
+        "dlms-sn-read-block-captures/structure-depth6-positive.udp.pcap": {
+          "bytes": 318,
+          "sha256": "6d8cff30bbf7ab94c4a0c69dc714c4ea9780477cdd3353c57b56d05b7412309f"
+        },
+        "dlms-sn-read-block-captures/two-block-octet-cut-preserves-existing-LN-owner.tcp.pcap": {
+          "bytes": 751,
+          "sha256": "a07f5d8959a2c20e49d39d3325b9f4a5de0bccf5dad5b5878765b92ebe6fd344"
+        },
+        "dlms-sn-read-block-captures/two-block-octet-cut-preserves-existing-LN-owner.udp.pcap": {
+          "bytes": 469,
+          "sha256": "d07497bfb52ef988a312854b667006a36cfcd0f31b208335d0971503e6022e10"
+        },
+        "dlms-sn-read-block-captures/wrong-caller-and-ports-preserve-group.tcp.pcap": {
+          "bytes": 834,
+          "sha256": "7a8a1330d35d2426f2e7bccdeef2e71615936d137099d22bcaaf472e69f72f6f"
+        },
+        "dlms-sn-read-block-captures/wrong-caller-and-ports-preserve-group.udp.pcap": {
+          "bytes": 540,
+          "sha256": "e63a180ffdbe52bd8e5ede8dad6151c32b179e63a559982896ea9aa27b2b18b3"
+        },
+        "dlms-sn-read-block-source/wire-group-baseline.json": {
+          "bytes": 38567,
+          "sha256": "66250dedcf1dc230470ceceb6017788db4fa9879110877bff05e5368b219af4a"
+        },
+        "dlms-sn-read-block-source/wire-group-boundaries.json": {
+          "bytes": 1134355,
+          "sha256": "1b6effc28df12144e908a62e28c9d040efe4aea2040d922bd38b33bcf6e10f3b"
+        },
+        "dlms-sn-read-block-source/wire-group-controls.json": {
+          "bytes": 268453,
+          "sha256": "53f4a4e6cd67f0c50edd406c08a440361634919fd184b591e10ebbbad847d554"
+        },
+        "dlms-sn-read-block-source/wire-group-supplement.json": {
+          "bytes": 86577,
+          "sha256": "e3c03e20455065c0633d884d13d5639e2880b75980f930a81fc4be9816689920"
+        },
+        "dlms-sn-read-block-tools/capture-checks.py": {
+          "bytes": 858,
+          "sha256": "773153f31c80ec4acb5cf5006a7dce3731b44f32ec55aff217550336216dd698"
+        },
+        "dlms-sn-read-block-tools/carrier.py": {
+          "bytes": 1215,
+          "sha256": "bdf106ef2372b348e5af5a2bc62abd8d70e37da87739216bfe05b7182fafe5e2"
+        },
+        "dlms-sn-read-block-tools/independent/SOURCES.json": {
+          "bytes": 6821,
+          "sha256": "68bcf99a29e75ca71f38b1d85ee923de79eb50ae6062dcfb27d1c178a854368d"
+        },
+        "dlms-sn-read-block-tools/independent/generate.py": {
+          "bytes": 7006,
+          "sha256": "2cc51729bcc554b7974fb587a88cfc6849105871342cfebbc0486eaa06188291"
+        },
+        "dlms-sn-read-block-tools/independent/group-model.py": {
+          "bytes": 9433,
+          "sha256": "d93544ab4726242e1e3f44c144e85980f2328365a6722f123285bac9108c0436"
+        },
+        "dlms-sn-read-block-tools/independent/outer-source.py": {
+          "bytes": 5985,
+          "sha256": "0b69840f2066124f48091301aea6247ec29fb86c4933d00055f60828296bd220"
+        },
+        "dlms-sn-read-block-tools/independent/read-body.py": {
+          "bytes": 4002,
+          "sha256": "9038061ed63630258c65a5b9e11e51888d414b290fea0aa2bd14743e2a7af4cd"
+        },
+        "dlms-sn-read-block-tools/independent/reference-vectors.json": {
+          "bytes": 4159,
+          "sha256": "59250557438767f0f7ff0a072b1decf3fe0f5768b75013142a5dfa608b0fe6c0"
+        },
+        "dlms-sn-read-block-tools/independent/supplement.py": {
+          "bytes": 2225,
+          "sha256": "f4be2dea60d69addbc57e54ce80e78a2d229a57fc8e7727482a5edc17836b3eb"
+        },
+        "dlms-sn-read-block-tools/independent/verify.py": {
+          "bytes": 6939,
+          "sha256": "d3068cc7f63c989fb7b762b639c8f1979b17cc2affc159ac29e7db307efd1e00"
+        },
+        "dlms-sn-read-block-tools/project.py": {
+          "bytes": 9969,
+          "sha256": "e4cd9c4bade4332d58051d2d712bdcf9d847a3a4e96b93cd3e900fb2dacce15c"
+        },
+        "dlms-sn-read-block-tools/verify-captures.py": {
+          "bytes": 3921,
+          "sha256": "afb76eaf0cdaf358445085aa8fb7af75705165b8b4931e1ef84224b3f74f95d3"
+        },
+        "dlms-sn-read-service-block/SOURCES.json": {
+          "bytes": 12226,
+          "sha256": "00479afb4a5c6a1f4c80b284d383a900ac4ba1d324be95b0739791f09bec25a4"
+        },
+        "dlms-sn-read-service-block/baseline-controls.json": {
+          "bytes": 166028,
+          "sha256": "b7701fc9344213bcaa443f0f06cae0f5de73c8047bc6f2fede312f0a8fae015f"
+        },
+        "dlms-sn-read-service-block/controls.json": {
+          "bytes": 7352589,
+          "sha256": "8b81bcf95895c6cce04c8ddbaab958bc3df734507a2e79abde2f806f8f8c2eeb"
+        },
+        "dlms-sn-read-service-block/historical-selected-block-diagnostic.json": {
+          "bytes": 4933,
+          "sha256": "0ff9f25d0e87efb35aa66ea4ff1157668cf4f3c3f3bea1ece6b5c5ef525928ec"
+        },
+        "dlms-sn-read-service-block/source-candidates.json": {
+          "bytes": 12419,
+          "sha256": "a6f7f7199b6d30d405318938eb349c58bd8e2a0cc50e5caaf88e5889c731315b"
+        },
+        "required-tests-traffic-unified-v160.json": {
+          "bytes": 21457516,
+          "sha256": "94a642fb9f91631ff815de5837fce61baeca312e1cfff4d52f8e81abccfa1caf"
+        },
+        "validation/expected.json": {
+          "bytes": 63635,
+          "sha256": "f0bfe4abf0ed304efe20b1f2a86dec5b41bb1d849684a38d2eac9923a8faf66b"
+        }
+      },
+      "aliases": {
+        "common/pcapx/pcaputil/dlms-sn-read-block-captures/changed-same-number-block-content-retires.tcp.pcap": "dlms-sn-read-block-captures/changed-same-number-block-content-retires.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-read-block-captures/changed-same-number-block-content-retires.udp.pcap": "dlms-sn-read-block-captures/changed-same-number-block-content-retires.udp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-read-block-captures/cold-retained-response-first-block-Close.tcp.pcap": "dlms-sn-read-block-captures/cold-retained-response-first-block-Close.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-read-block-captures/cold-retained-response-first-block-Close.udp.pcap": "dlms-sn-read-block-captures/cold-retained-response-first-block-Close.udp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-read-block-captures/exact-block-ACK-and-final-repeats-do-not-advance.tcp.pcap": "dlms-sn-read-block-captures/exact-block-ACK-and-final-repeats-do-not-advance.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-read-block-captures/exact-block-ACK-and-final-repeats-do-not-advance.udp.pcap": "dlms-sn-read-block-captures/exact-block-ACK-and-final-repeats-do-not-advance.udp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-read-block-captures/fixed-compact-is-one-Data-with-owned-expanded-graph.tcp.pcap": "dlms-sn-read-block-captures/fixed-compact-is-one-Data-with-owned-expanded-graph.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-read-block-captures/fixed-compact-is-one-Data-with-owned-expanded-graph.udp.pcap": "dlms-sn-read-block-captures/fixed-compact-is-one-Data-with-owned-expanded-graph.udp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-read-block-captures/hard-block-count-64-positive.tcp.pcap": "dlms-sn-read-block-captures/hard-block-count-64-positive.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-read-block-captures/hard-block-count-64-positive.udp.pcap": "dlms-sn-read-block-captures/hard-block-count-64-positive.udp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-read-block-captures/hard-block-count-65-Resource.tcp.pcap": "dlms-sn-read-block-captures/hard-block-count-65-Resource.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-read-block-captures/hard-block-count-65-Resource.udp.pcap": "dlms-sn-read-block-captures/hard-block-count-65-Resource.udp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-read-block-captures/independent-LN-owner-and-SNgroup-Close.tcp.pcap": "dlms-sn-read-block-captures/independent-LN-owner-and-SNgroup-Close.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-read-block-captures/independent-LN-owner-and-SNgroup-Close.udp.pcap": "dlms-sn-read-block-captures/independent-LN-owner-and-SNgroup-Close.udp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-read-block-captures/joined-Data-trailing-byte-Malformed-releases.tcp.pcap": "dlms-sn-read-block-captures/joined-Data-trailing-byte-Malformed-releases.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-read-block-captures/joined-Data-trailing-byte-Malformed-releases.udp.pcap": "dlms-sn-read-block-captures/joined-Data-trailing-byte-Malformed-releases.udp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-read-block-captures/long-count-ACK-completecount-truncated-number-Malformed.tcp.pcap": "dlms-sn-read-block-captures/long-count-ACK-completecount-truncated-number-Malformed.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-read-block-captures/long-count-ACK-completecount-truncated-number-Malformed.udp.pcap": "dlms-sn-read-block-captures/long-count-ACK-completecount-truncated-number-Malformed.udp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-read-block-captures/matching-wrong-ACK-number-retires-without-ASN-error.tcp.pcap": "dlms-sn-read-block-captures/matching-wrong-ACK-number-retires-without-ASN-error.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-read-block-captures/matching-wrong-ACK-number-retires-without-ASN-error.udp.pcap": "dlms-sn-read-block-captures/matching-wrong-ACK-number-retires-without-ASN-error.udp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-read-block-captures/next-response-without-observed-ACK-retires.tcp.pcap": "dlms-sn-read-block-captures/next-response-without-observed-ACK-retires.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-read-block-captures/next-response-without-observed-ACK-retires.udp.pcap": "dlms-sn-read-block-captures/next-response-without-observed-ACK-retires.udp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-read-block-captures/nonminimal-definite-single-count-both-blocks-and-ACK.tcp.pcap": "dlms-sn-read-block-captures/nonminimal-definite-single-count-both-blocks-and-ACK.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-read-block-captures/nonminimal-definite-single-count-both-blocks-and-ACK.udp.pcap": "dlms-sn-read-block-captures/nonminimal-definite-single-count-both-blocks-and-ACK.udp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-read-block-captures/observed-echo-before-final-Close.tcp.pcap": "dlms-sn-read-block-captures/observed-echo-before-final-Close.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-read-block-captures/observed-echo-before-final-Close.udp.pcap": "dlms-sn-read-block-captures/observed-echo-before-final-Close.udp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-read-block-captures/ordinary-SN-response-interleaving-preserves-active-wiregroup.tcp.pcap": "dlms-sn-read-block-captures/ordinary-SN-response-interleaving-preserves-active-wiregroup.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-read-block-captures/ordinary-SN-response-interleaving-preserves-active-wiregroup.udp.pcap": "dlms-sn-read-block-captures/ordinary-SN-response-interleaving-preserves-active-wiregroup.udp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-read-block-captures/orphan-block-next-uploadACK-and-normal-SN-neighbor.tcp.pcap": "dlms-sn-read-block-captures/orphan-block-next-uploadACK-and-normal-SN-neighbor.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-read-block-captures/orphan-block-next-uploadACK-and-normal-SN-neighbor.udp.pcap": "dlms-sn-read-block-captures/orphan-block-next-uploadACK-and-normal-SN-neighbor.udp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-read-block-captures/outer-raw-length-truncation-invalidates-before-late-LN.tcp.pcap": "dlms-sn-read-block-captures/outer-raw-length-truncation-invalidates-before-late-LN.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-read-block-captures/outer-raw-length-truncation-invalidates-before-late-LN.udp.pcap": "dlms-sn-read-block-captures/outer-raw-length-truncation-invalidates-before-late-LN.udp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-read-block-captures/raw-aggregate-1024-positive.tcp.pcap": "dlms-sn-read-block-captures/raw-aggregate-1024-positive.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-read-block-captures/raw-aggregate-1024-positive.udp.pcap": "dlms-sn-read-block-captures/raw-aggregate-1024-positive.udp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-read-block-captures/raw-aggregate-1025-Resource.tcp.pcap": "dlms-sn-read-block-captures/raw-aggregate-1025-Resource.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-read-block-captures/raw-aggregate-1025-Resource.udp.pcap": "dlms-sn-read-block-captures/raw-aggregate-1025-Resource.udp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-read-block-captures/reuse-inputs.json": "dlms-sn-read-block-captures/reuse-inputs.json",
+        "common/pcapx/pcaputil/dlms-sn-read-block-captures/shared-Data-root-and-three-scalars-node-cap4-positive.tcp.pcap": "dlms-sn-read-block-captures/shared-Data-root-and-three-scalars-node-cap4-positive.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-read-block-captures/shared-Data-root-and-three-scalars-node-cap4-positive.udp.pcap": "dlms-sn-read-block-captures/shared-Data-root-and-three-scalars-node-cap4-positive.udp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-read-block-captures/single-block-raw1025-Resource.tcp.pcap": "dlms-sn-read-block-captures/single-block-raw1025-Resource.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-read-block-captures/single-block-raw1025-Resource.udp.pcap": "dlms-sn-read-block-captures/single-block-raw1025-Resource.udp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-read-block-captures/single-last-exactrepeat-no-new-generation-ordinary-request-reset.tcp.pcap": "dlms-sn-read-block-captures/single-last-exactrepeat-no-new-generation-ordinary-request-reset.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-read-block-captures/single-last-exactrepeat-no-new-generation-ordinary-request-reset.udp.pcap": "dlms-sn-read-block-captures/single-last-exactrepeat-no-new-generation-ordinary-request-reset.udp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-read-block-captures/structure-depth5-Resource-invalidates-pending-LN.tcp.pcap": "dlms-sn-read-block-captures/structure-depth5-Resource-invalidates-pending-LN.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-read-block-captures/structure-depth5-Resource-invalidates-pending-LN.udp.pcap": "dlms-sn-read-block-captures/structure-depth5-Resource-invalidates-pending-LN.udp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-read-block-captures/structure-depth6-positive.tcp.pcap": "dlms-sn-read-block-captures/structure-depth6-positive.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-read-block-captures/structure-depth6-positive.udp.pcap": "dlms-sn-read-block-captures/structure-depth6-positive.udp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-read-block-captures/two-block-octet-cut-preserves-existing-LN-owner.tcp.pcap": "dlms-sn-read-block-captures/two-block-octet-cut-preserves-existing-LN-owner.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-read-block-captures/two-block-octet-cut-preserves-existing-LN-owner.udp.pcap": "dlms-sn-read-block-captures/two-block-octet-cut-preserves-existing-LN-owner.udp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-read-block-captures/wrong-caller-and-ports-preserve-group.tcp.pcap": "dlms-sn-read-block-captures/wrong-caller-and-ports-preserve-group.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-read-block-captures/wrong-caller-and-ports-preserve-group.udp.pcap": "dlms-sn-read-block-captures/wrong-caller-and-ports-preserve-group.udp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-read-block-source/wire-group-baseline.json": "dlms-sn-read-block-source/wire-group-baseline.json",
+        "common/pcapx/pcaputil/dlms-sn-read-block-source/wire-group-boundaries.json": "dlms-sn-read-block-source/wire-group-boundaries.json",
+        "common/pcapx/pcaputil/dlms-sn-read-block-source/wire-group-controls.json": "dlms-sn-read-block-source/wire-group-controls.json",
+        "common/pcapx/pcaputil/dlms-sn-read-block-source/wire-group-supplement.json": "dlms-sn-read-block-source/wire-group-supplement.json",
+        "common/pcapx/pcaputil/dlms-sn-read-block-tools/capture-checks.py": "dlms-sn-read-block-tools/capture-checks.py",
+        "common/pcapx/pcaputil/dlms-sn-read-block-tools/carrier.py": "dlms-sn-read-block-tools/carrier.py",
+        "common/pcapx/pcaputil/dlms-sn-read-block-tools/independent/SOURCES.json": "dlms-sn-read-block-tools/independent/SOURCES.json",
+        "common/pcapx/pcaputil/dlms-sn-read-block-tools/independent/generate.py": "dlms-sn-read-block-tools/independent/generate.py",
+        "common/pcapx/pcaputil/dlms-sn-read-block-tools/independent/group-model.py": "dlms-sn-read-block-tools/independent/group-model.py",
+        "common/pcapx/pcaputil/dlms-sn-read-block-tools/independent/outer-source.py": "dlms-sn-read-block-tools/independent/outer-source.py",
+        "common/pcapx/pcaputil/dlms-sn-read-block-tools/independent/read-body.py": "dlms-sn-read-block-tools/independent/read-body.py",
+        "common/pcapx/pcaputil/dlms-sn-read-block-tools/independent/reference-vectors.json": "dlms-sn-read-block-tools/independent/reference-vectors.json",
+        "common/pcapx/pcaputil/dlms-sn-read-block-tools/independent/supplement.py": "dlms-sn-read-block-tools/independent/supplement.py",
+        "common/pcapx/pcaputil/dlms-sn-read-block-tools/independent/verify.py": "dlms-sn-read-block-tools/independent/verify.py",
+        "common/pcapx/pcaputil/dlms-sn-read-block-tools/project.py": "dlms-sn-read-block-tools/project.py",
+        "common/pcapx/pcaputil/dlms-sn-read-block-tools/verify-captures.py": "dlms-sn-read-block-tools/verify-captures.py",
+        "common/pcapx/pcaputil/dlms-sn-read-service-block/SOURCES.json": "dlms-sn-read-service-block/SOURCES.json",
+        "common/pcapx/pcaputil/dlms-sn-read-service-block/baseline-controls.json": "dlms-sn-read-service-block/baseline-controls.json",
+        "common/pcapx/pcaputil/dlms-sn-read-service-block/controls.json": "dlms-sn-read-service-block/controls.json",
+        "common/pcapx/pcaputil/dlms-sn-read-service-block/historical-selected-block-diagnostic.json": "dlms-sn-read-service-block/historical-selected-block-diagnostic.json",
+        "common/pcapx/pcaputil/dlms-sn-read-service-block/source-candidates.json": "dlms-sn-read-service-block/source-candidates.json",
+        "scripts/protocol-tests/required-tests-traffic-unified-v160.json": "required-tests-traffic-unified-v160.json"
+      }
     }
   ],
   "schema_version": 1,

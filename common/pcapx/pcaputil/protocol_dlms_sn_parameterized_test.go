@@ -205,8 +205,11 @@ func TestDLMSSNParameterizedHistoricalBinding(t *testing.T) {
 		if i == r.CaseIndex {
 			require.Equal(t, r.Original, c.Steps[r.StepIndex])
 			c.Steps[r.StepIndex] = r.Step
+			next := snBlocksHistoricalItem(t)
+			require.Equal(t, next.Original, c.Steps[next.StepIndex])
+			c.Steps[next.StepIndex] = next.Step
 		}
-		require.Equal(t, c, got[i], "only the independently pinned metadata row may change; budgets, Close and every other field stay exact")
+		require.Equal(t, c, got[i], "only the independently pinned parameter/selected-block metadata rows may change; budgets, Close and every other field stay exact")
 	}
 	for _, tr := range []string{"udp", "tcp"} {
 		t.Run(tr, func(t *testing.T) {

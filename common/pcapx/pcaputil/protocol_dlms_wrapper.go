@@ -42,6 +42,7 @@ type wrapperMessage struct {
 	command                byte
 	count                  int
 	request, confirmed     bool
+	snServiceBlock         bool
 	snRead                 bool
 	snWrite                bool
 	blockNumber            uint32
@@ -87,6 +88,9 @@ func decodeDLMSWrapperBudget(w []byte, limit, depth int) (*wrapperMessage, error
 		return decodeWrapperSNWrite(w, limit, depth)
 	}
 	if p[0] == 0x05 || p[0] == 0x0c {
+		if wrapperIsSNServiceBlock(w) {
+			return decodeWrapperSNServiceBlock(w, limit)
+		}
 		return decodeWrapperSNRead(w, limit, depth)
 	}
 	if p[0] >= 0x60 && p[0] <= 0x64 {
@@ -325,6 +329,7 @@ type binDLMSWrapper struct {
 	seen         map[wrapperToken]*wrapperPending
 	associations map[wrapperAssociationKey]*wrapperAssociation
 	gbt          map[wrapperGBTKey]*wrapperGBTTransfer
+	snGroups     map[wrapperGBTKey]*wrapperSNGroup
 	blocked      bool
 }
 
@@ -335,6 +340,9 @@ func (s *binDLMSWrapper) storage() int64 {
 	}
 	for _, p := range s.gbt {
 		n += 512 + int64(cap(p.data)) + 128*int64(len(p.blocks))
+	}
+	for _, p := range s.snGroups {
+		n += 512 + int64(cap(p.data))
 	}
 	return n
 }
@@ -355,9 +363,17 @@ func (s *binDLMSWrapper) outstanding() int {
 			n++
 		}
 	}
+	for _, p := range s.snGroups {
+		if p.active {
+			n++
+		}
+	}
 	return n
 }
 func (s *binDLMSWrapper) invalidate() {
+	for _, p := range s.snGroups {
+		p.retire()
+	}
 	for _, p := range s.associations {
 		p.pending = false
 		p.ambiguous = true
@@ -437,6 +453,16 @@ func (f *binFlow) consumeWrapperReserved(dir int, w []byte, e *ProtocolEvent, fl
 		assoc = "unverified-sn-read-observation"
 		if m.snWrite {
 			assoc = "unverified-sn-write-observation"
+		}
+		if m.snServiceBlock {
+			assoc, err = f.consumeWrapperSNServiceBlock(s, m, dir, e, w)
+			if err != nil {
+				return err
+			}
+		} else {
+			if s.retireSNGroupForMessage(m, dir) {
+				assoc = "ordinary-sn-request-retired-wire-group"
+			}
 		}
 	} else if s.blocked {
 		assoc = "ambiguous-conversation"
@@ -541,6 +567,9 @@ const wrapperIdleTTL = 30 * time.Second
 // inspect the fixed Wrapper/service header here; this hint is not an accepted
 // descriptor, Data value, association or authenticated peer generation.
 func wrapperUDPRefusalHint(w []byte) bool {
+	if wrapperIsSNServiceBlock(w) {
+		return wrapperSNBlockRefusalHint(w)
+	}
 	if wrapperIsACSE(w) {
 		return wrapperACSERefusalHint(w)
 	}
@@ -629,7 +658,7 @@ func (a *binParser) decodeWrapperDatagram(e *ProtocolEvent, w []byte, src, dst u
 	// Incomplete/ambiguous ACSE requests retain a charged endpoint tombstone,
 	// even without pending eligibility. A later same-endpoint AARQ has no nonce
 	// with which to distinguish an old AARE from its own response.
-	if err == nil && created && (f.wrapper.outstanding() > 0 || len(f.wrapper.associations) > 0) {
+	if err == nil && created && (f.wrapper.outstanding() > 0 || len(f.wrapper.associations) > 0 || len(f.wrapper.snGroups) > 0) {
 		if store != nil && len(store.entries) >= sessionCollectionLimit(a.budget.MaxCollectionElements) {
 			err = wrapperError(ErrResourceExceeded, "UDP conversation limit")
 		} else {

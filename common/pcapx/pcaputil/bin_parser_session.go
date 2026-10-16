@@ -1551,6 +1551,19 @@ func (f *binFlow) finishSession(reason TrafficFlowCloseReason) {
 			f.a.emit(e)
 			n += count
 		}
+		for _, key := range w.unfinishedSNBlockKeys() {
+			p := w.snGroups[key]
+			e := f.event(key.dir, nil, "incomplete", string(reason)+": DLMS Wrapper SN Read wire group ended before complete Data")
+			e.Profile, e.Completeness = "dlms-wrapper-v1-sn-read-block", "incomplete"
+			e.nativeDLMSOrSLMPObservation = true
+			e.Session = map[string]any{"Buffered SN Groups": 1, "source_wport": key.source, "destination_wport": key.destination, "observed_block_count": p.blocks, "assembled_data_length": len(p.data), "block_number": p.last}
+			e.semanticSession = cloneSession(e.Session)
+			e.sessionError = &ProtocolError{Kind: ErrNeedMore, Message: e.Summary}
+			e.Error = e.sessionError.Error()
+			f.a.incomplete.Add(1)
+			f.a.emit(e)
+			n++
+		}
 		if left := w.outstanding() - n; left > 0 {
 			emit(0, map[string]any{"Outstanding": left}, "DLMS Wrapper exchange ended with unmatched observed requests")
 		}

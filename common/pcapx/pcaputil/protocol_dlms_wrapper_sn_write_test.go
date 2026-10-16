@@ -228,6 +228,9 @@ func snWriteMatrix(t *testing.T, cases []snWriteControl) {
 				if c.Folder == "dlms-hdlc-sn-write-resources" {
 					reuseFolder, reuseEnv = c.Folder, "DLMS_HDLC_SN_WRITE_TEST_ROOT"
 				}
+				if c.Folder == "dlms-sn-read-block-captures" {
+					reuseFolder, reuseEnv = c.Folder, "DLMS_SN_READ_BLOCK_TEST_ROOT"
+				}
 				if c.Folder == "dlms-sn-parameterized-wrapper" {
 					reuseFolder, reuseEnv = c.Folder, "DLMS_SN_PARAMETERIZED_TEST_ROOT"
 				}
@@ -238,7 +241,7 @@ func snWriteMatrix(t *testing.T, cases []snWriteControl) {
 				if p, ok := reuse[name]; ok {
 					require.True(t, strings.HasPrefix(p, "common/pcapx/pcaputil/"))
 					const prefix = "common/pcapx/pcaputil/"
-					if c.Folder == "dlms-sn-parameterized-wrapper" && strings.HasPrefix(p, prefix+c.Folder+"/") {
+					if (c.Folder == "dlms-sn-parameterized-wrapper" || c.Folder == "dlms-sn-read-block-captures") && strings.HasPrefix(p, prefix+c.Folder+"/") {
 						name := strings.TrimPrefix(p, prefix+c.Folder+"/")
 						require.NotContains(t, name, "/")
 						raw = finsReadBatch(t, c.Folder, reuseEnv, name)
