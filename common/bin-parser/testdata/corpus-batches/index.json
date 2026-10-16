@@ -109690,6 +109690,273 @@
         "common/pcapx/pcaputil/dlms-hdlc-set-block/aggregate-five-encoded-bytes-cap4-refused.tcp.pcap": "dlms-hdlc-set-block/aggregate-five-encoded-bytes-cap5.tcp.pcap",
         "scripts/protocol-tests/required-tests-traffic-unified-v130.json": "required-tests-traffic-unified-v130.json"
       }
+    },
+    {
+      "id": "validation-dlms-action-upload",
+      "kind": "support",
+      "source_sha": "27ace2316da43159476d3ba2932d8d0064545f5d",
+      "file": "validation-dlms-action-upload.zip",
+      "sha256": "90a761ddadd43ec7a4d95ca64bfa0058873f6b107acee2dd8dec2c0690bafeb9",
+      "password": "bin-parser",
+      "members": {
+        "dlms-action-upload-tools/SOURCES.json": {
+          "sha256": "553a0fd63378d261650cca5f3eee7e3d889912caa69eabc481596c7f8414334b",
+          "bytes": 2332
+        },
+        "dlms-action-upload-tools/build-depth.py": {
+          "sha256": "3c32e5d471ea21c0c225a5e77c9dd36980de7dc4ed8ee31c5c2c9c452c86c6ac",
+          "bytes": 2915
+        },
+        "dlms-action-upload-tools/build-extended.py": {
+          "sha256": "fe29d5cd8884797543bd1624e3926e10991e3c0856c445ea78e0ecdbd8212394",
+          "bytes": 1940
+        },
+        "dlms-action-upload-tools/data-model.py": {
+          "sha256": "03dbaaa0f3c564db04440c0fbee8742e407f825de889b7a6e0012a49e6a06f4e",
+          "bytes": 1624
+        },
+        "dlms-action-upload-tools/generate-captures.py": {
+          "sha256": "84ea0d7b110b20b199183c25ca7d0febbac0f7173bef423b7eae88cdd4b36393",
+          "bytes": 1813
+        },
+        "dlms-action-upload-tools/generate-close-carrier.py": {
+          "sha256": "d4691ada0d3adfbc8208e5af5db7942bed3eb95388a5706b85459420c058d53b",
+          "bytes": 1802
+        },
+        "dlms-action-upload-tools/generate-projection.py": {
+          "sha256": "6699f511a3a264f52e2edb054949e960e828326dddaa1fcc26a81aa874538d63",
+          "bytes": 5304
+        },
+        "dlms-action-upload-tools/generate.py": {
+          "sha256": "7640b357790fbceb1872f9a5d4924a7d7ae4a820945ca92f5c214ca8f3669765",
+          "bytes": 11691
+        },
+        "dlms-action-upload-tools/reference-check.py": {
+          "sha256": "9560815b2cfc5bb33476119ccbdeef7d334c60858da5d74bbf3c83fc65121180",
+          "bytes": 1187
+        },
+        "dlms-action-upload-tools/reference-vectors.json": {
+          "sha256": "8ec2f118c3310fdb0506f8f43223df064197e16a6652c127eca7c1bcd04a823e",
+          "bytes": 2853
+        },
+        "dlms-action-upload-tools/reference.py": {
+          "sha256": "1ee69966b3a518be465bbe0f348ea3f9e66ef1301200f428adbaab67292eed5b",
+          "bytes": 5008
+        },
+        "dlms-action-upload-tools/verify-captures.py": {
+          "sha256": "320332381d1ab43afa2e6d616a4cad8c374ef24201125cf75f84337c34a36fae",
+          "bytes": 2939
+        },
+        "dlms-action-upload-tools/verify-projection.py": {
+          "sha256": "5a8e3adffb964655f65b94cd7367ee56e303c903a7b1bfa23db21dac8d94b57e",
+          "bytes": 1839
+        },
+        "dlms-action-upload-tools/verify.py": {
+          "sha256": "3a7c75f43ca815949c0cfade11f98905a09322e1af1417409ab646e75f472d33",
+          "bytes": 2269
+        },
+        "dlms-action-upload/ACK-active-private-Close.tcp.pcap": {
+          "sha256": "c31647f90acef81ea778d1d7069b7c9f57d60a16ae0541deaf312f031287e7bb",
+          "bytes": 429
+        },
+        "dlms-action-upload/ACK-active-private-Close.udp.pcap": {
+          "sha256": "5accf839c2aa3feb309029388dc74ea5ecb4d69e1a8368f84407e60491f6c7d2",
+          "bytes": 195
+        },
+        "dlms-action-upload/aggregate-five-bytes-cap5.tcp.pcap": {
+          "sha256": "3d49faf277b9044b528d3f1df1bda058be41d0f4de331729d6045553f83b4d3c",
+          "bytes": 590
+        },
+        "dlms-action-upload/aggregate-five-bytes-cap5.udp.pcap": {
+          "sha256": "6ad59456817d2bf361ee884a0400e608b45344f4a5238b89c98550fba86dd8fa",
+          "bytes": 332
+        },
+        "dlms-action-upload/assembled-structure-depth6.tcp.pcap": {
+          "sha256": "c3aa9ef8b8c6b30a58fca25120aecc2d64bcb12a18350933393f4bded5fe9256",
+          "bytes": 591
+        },
+        "dlms-action-upload/assembled-structure-depth6.udp.pcap": {
+          "sha256": "f6686c407b6bf370266b1cbb6c3f0c0b7c1d9cc47d27c68ccef8b4e3ae5fc32a",
+          "bytes": 333
+        },
+        "dlms-action-upload/close-carrier-sidecar.json": {
+          "sha256": "fce9786858c7d9ef62aeb0b6bb568ffee21ae1bc53a4aa954d52b72dcc8ff3cd",
+          "bytes": 1468
+        },
+        "dlms-action-upload/complete-assembled-Data-trailing-byte.tcp.pcap": {
+          "sha256": "f6d254f2e5b29152a6b51c28362795c8e07f93bdd5dc864cc3c48bd0250b2449",
+          "bytes": 588
+        },
+        "dlms-action-upload/complete-assembled-Data-trailing-byte.udp.pcap": {
+          "sha256": "195c38be3450152d298557855287a58ce014dfd2ad975fc6c2bdfbd66b7ee6e2",
+          "bytes": 330
+        },
+        "dlms-action-upload/context-known-next-raw-length-truncated.tcp.pcap": {
+          "sha256": "c2f3b3480fe3476755c502b4e3af4dabdc6609c3b0367dee7a62104b3e12875b",
+          "bytes": 600
+        },
+        "dlms-action-upload/context-known-next-raw-length-truncated.udp.pcap": {
+          "sha256": "33c7afe508bba9c54e506c04a94e711b31355d2bb5fa92f55786c19033b71908",
+          "bytes": 342
+        },
+        "dlms-action-upload/controls.json": {
+          "sha256": "a513fe685f2fb87447befc0ef970bce9058111c1ca2250d37d16d8c362cc2a9c",
+          "bytes": 437923
+        },
+        "dlms-action-upload/early-normal-failure-preserves-wire-quarantines-transfer.tcp.pcap": {
+          "sha256": "68b335a9a23f0c77f6c11915ef7706918dde3b8d90d6a3c6e80b96a9dabad7f4",
+          "bytes": 609
+        },
+        "dlms-action-upload/early-normal-failure-preserves-wire-quarantines-transfer.udp.pcap": {
+          "sha256": "2ebc720fbd9d2773205081f6574a5d794875e559a344b0feacce9998d594367c",
+          "bytes": 351
+        },
+        "dlms-action-upload/exact-first-retry-quarantines-ACK-next-terminal.tcp.pcap": {
+          "sha256": "f460eeca14141b5da4272b8cf322894bf7fac1b6930449dd63813fc7dc9ed0fc",
+          "bytes": 721
+        },
+        "dlms-action-upload/exact-first-retry-quarantines-ACK-next-terminal.udp.pcap": {
+          "sha256": "8f672bc633d814d1050bc1b310a3e02c578fece533c9e53fe6925a92ceab3a52",
+          "bytes": 451
+        },
+        "dlms-action-upload/existing-Action-normal-neighbor.tcp.pcap": {
+          "sha256": "11c7569ace57e2436539ce125516868a9c65622dc8f2225e7da8a3b7ba969b90",
+          "bytes": 413
+        },
+        "dlms-action-upload/existing-Action-normal-neighbor.udp.pcap": {
+          "sha256": "d3302c2d304b501986f12a0cee62c164d4f115564461f4a3db16e853d871ccd3",
+          "bytes": 179
+        },
+        "dlms-action-upload/first-pending-private-Close.tcp.pcap": {
+          "sha256": "3185a8f3df3e16e3ef1c122242f6030bc8e8401d63298b3238e6f5cb480952c9",
+          "bytes": 344
+        },
+        "dlms-action-upload/first-pending-private-Close.udp.pcap": {
+          "sha256": "ffacba0a7d0e24a4d67ac8045700f9d5db23525871e567eaf21d75cb9151054b",
+          "bytes": 122
+        },
+        "dlms-action-upload/four-blocks-cap4.tcp.pcap": {
+          "sha256": "a77e7220464d9b89468ef9c9fca78b2ca3b495b364bd2b39d78ee1ad08f5611f",
+          "bytes": 931
+        },
+        "dlms-action-upload/four-blocks-cap4.udp.pcap": {
+          "sha256": "4d77d06aece2f1e98bd8d78f098a3b46451e5ccbeb2a97dc03e3d1c0c9cd4f5d",
+          "bytes": 625
+        },
+        "dlms-action-upload/missing-ACK-retires.tcp.pcap": {
+          "sha256": "13b4222fc64dc74c680c25da87e1b6dfabe8a61e657e2c88b18184ff6e9ab9b4",
+          "bytes": 526
+        },
+        "dlms-action-upload/missing-ACK-retires.udp.pcap": {
+          "sha256": "ca143b30a3dc68d73a79e9410cf7b1d66741b3ba40895245c3cfd677c55e22af",
+          "bytes": 280
+        },
+        "dlms-action-upload/official-two-pblock-upload.tcp.pcap": {
+          "sha256": "e6349732795f162f0f31b3fd2f464d2128ffa62a31a91324f0fbb5b0dd3c13d4",
+          "bytes": 611
+        },
+        "dlms-action-upload/official-two-pblock-upload.udp.pcap": {
+          "sha256": "64e0b939ad38c7d541541b30751e99289a834344280df9d70f966ab012906ae1",
+          "bytes": 353
+        },
+        "dlms-action-upload/projection.json": {
+          "sha256": "fcb64c323e1880819c1252ea44826cfdb271a88204eaadea1707a33b1a67c1bb",
+          "bytes": 67106
+        },
+        "dlms-action-upload/reuse-inputs.json": {
+          "sha256": "ca3d163bab055381827226140568f3bef7eaac187cebd76878e0b63e9e442356",
+          "bytes": 3
+        },
+        "dlms-action-upload/single-first-last-structure-and-return.tcp.pcap": {
+          "sha256": "e98955cc1327be1fd02b5f26c8aa0cc5f2602b596a3568d316ac637f44b4a8ae",
+          "bytes": 426
+        },
+        "dlms-action-upload/single-first-last-structure-and-return.udp.pcap": {
+          "sha256": "442b998b666c290f1aafb18d183380e033f6b661f0a93ba974e1e10256868711",
+          "bytes": 192
+        },
+        "dlms-action-upload/wrong-ACK-number-retires.tcp.pcap": {
+          "sha256": "52ce1312c3d08086aaa04c5010d4dcfdd5dcb902ccd9bae1fc0ae4cf86e1d7f3",
+          "bytes": 696
+        },
+        "dlms-action-upload/wrong-ACK-number-retires.udp.pcap": {
+          "sha256": "89800db2cfd839694214bb802a75e2c223bb7f9bbe17ee109ac6e51757321570",
+          "bytes": 426
+        },
+        "dlms-action-upload/wrong-flags-direction-wport-preserve-owner.tcp.pcap": {
+          "sha256": "c186ad6c575af5f37982dcebc0eebfdd8a3e82809eaa70cc7ef3921dcac416fd",
+          "bytes": 866
+        },
+        "dlms-action-upload/wrong-flags-direction-wport-preserve-owner.udp.pcap": {
+          "sha256": "fa26421289920614ad577fe09b6b57608b2436396775029e14da33adc5ea8675",
+          "bytes": 572
+        },
+        "required-tests-traffic-unified-v131.json": {
+          "sha256": "722f134e789068dfa7edd5e0626ce3899446b24de8fbe5377f63cf86e7c60e53",
+          "bytes": 22887365
+        },
+        "validation/expected.json": {
+          "sha256": "153cdbff9d1d0a670cb33bd6cb968ed6944b3bcd5ffdef9d694e7a181e41ee09",
+          "bytes": 48206
+        }
+      },
+      "aliases": {
+        "common/pcapx/pcaputil/dlms-action-upload-tools/SOURCES.json": "dlms-action-upload-tools/SOURCES.json",
+        "common/pcapx/pcaputil/dlms-action-upload-tools/build-depth.py": "dlms-action-upload-tools/build-depth.py",
+        "common/pcapx/pcaputil/dlms-action-upload-tools/build-extended.py": "dlms-action-upload-tools/build-extended.py",
+        "common/pcapx/pcaputil/dlms-action-upload-tools/data-model.py": "dlms-action-upload-tools/data-model.py",
+        "common/pcapx/pcaputil/dlms-action-upload-tools/generate-captures.py": "dlms-action-upload-tools/generate-captures.py",
+        "common/pcapx/pcaputil/dlms-action-upload-tools/generate-close-carrier.py": "dlms-action-upload-tools/generate-close-carrier.py",
+        "common/pcapx/pcaputil/dlms-action-upload-tools/generate-projection.py": "dlms-action-upload-tools/generate-projection.py",
+        "common/pcapx/pcaputil/dlms-action-upload-tools/generate.py": "dlms-action-upload-tools/generate.py",
+        "common/pcapx/pcaputil/dlms-action-upload-tools/reference-check.py": "dlms-action-upload-tools/reference-check.py",
+        "common/pcapx/pcaputil/dlms-action-upload-tools/reference-vectors.json": "dlms-action-upload-tools/reference-vectors.json",
+        "common/pcapx/pcaputil/dlms-action-upload-tools/reference.py": "dlms-action-upload-tools/reference.py",
+        "common/pcapx/pcaputil/dlms-action-upload-tools/verify-captures.py": "dlms-action-upload-tools/verify-captures.py",
+        "common/pcapx/pcaputil/dlms-action-upload-tools/verify-projection.py": "dlms-action-upload-tools/verify-projection.py",
+        "common/pcapx/pcaputil/dlms-action-upload-tools/verify.py": "dlms-action-upload-tools/verify.py",
+        "common/pcapx/pcaputil/dlms-action-upload/ACK-active-private-Close.tcp.pcap": "dlms-action-upload/ACK-active-private-Close.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-action-upload/ACK-active-private-Close.udp.pcap": "dlms-action-upload/ACK-active-private-Close.udp.pcap",
+        "common/pcapx/pcaputil/dlms-action-upload/aggregate-five-bytes-cap5.tcp.pcap": "dlms-action-upload/aggregate-five-bytes-cap5.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-action-upload/aggregate-five-bytes-cap5.udp.pcap": "dlms-action-upload/aggregate-five-bytes-cap5.udp.pcap",
+        "common/pcapx/pcaputil/dlms-action-upload/assembled-structure-depth6.tcp.pcap": "dlms-action-upload/assembled-structure-depth6.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-action-upload/assembled-structure-depth6.udp.pcap": "dlms-action-upload/assembled-structure-depth6.udp.pcap",
+        "common/pcapx/pcaputil/dlms-action-upload/close-carrier-sidecar.json": "dlms-action-upload/close-carrier-sidecar.json",
+        "common/pcapx/pcaputil/dlms-action-upload/complete-assembled-Data-trailing-byte.tcp.pcap": "dlms-action-upload/complete-assembled-Data-trailing-byte.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-action-upload/complete-assembled-Data-trailing-byte.udp.pcap": "dlms-action-upload/complete-assembled-Data-trailing-byte.udp.pcap",
+        "common/pcapx/pcaputil/dlms-action-upload/context-known-next-raw-length-truncated.tcp.pcap": "dlms-action-upload/context-known-next-raw-length-truncated.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-action-upload/context-known-next-raw-length-truncated.udp.pcap": "dlms-action-upload/context-known-next-raw-length-truncated.udp.pcap",
+        "common/pcapx/pcaputil/dlms-action-upload/controls.json": "dlms-action-upload/controls.json",
+        "common/pcapx/pcaputil/dlms-action-upload/early-normal-failure-preserves-wire-quarantines-transfer.tcp.pcap": "dlms-action-upload/early-normal-failure-preserves-wire-quarantines-transfer.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-action-upload/early-normal-failure-preserves-wire-quarantines-transfer.udp.pcap": "dlms-action-upload/early-normal-failure-preserves-wire-quarantines-transfer.udp.pcap",
+        "common/pcapx/pcaputil/dlms-action-upload/exact-first-retry-quarantines-ACK-next-terminal.tcp.pcap": "dlms-action-upload/exact-first-retry-quarantines-ACK-next-terminal.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-action-upload/exact-first-retry-quarantines-ACK-next-terminal.udp.pcap": "dlms-action-upload/exact-first-retry-quarantines-ACK-next-terminal.udp.pcap",
+        "common/pcapx/pcaputil/dlms-action-upload/existing-Action-normal-neighbor.tcp.pcap": "dlms-action-upload/existing-Action-normal-neighbor.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-action-upload/existing-Action-normal-neighbor.udp.pcap": "dlms-action-upload/existing-Action-normal-neighbor.udp.pcap",
+        "common/pcapx/pcaputil/dlms-action-upload/first-pending-private-Close.tcp.pcap": "dlms-action-upload/first-pending-private-Close.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-action-upload/first-pending-private-Close.udp.pcap": "dlms-action-upload/first-pending-private-Close.udp.pcap",
+        "common/pcapx/pcaputil/dlms-action-upload/four-blocks-cap4.tcp.pcap": "dlms-action-upload/four-blocks-cap4.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-action-upload/four-blocks-cap4.udp.pcap": "dlms-action-upload/four-blocks-cap4.udp.pcap",
+        "common/pcapx/pcaputil/dlms-action-upload/missing-ACK-retires.tcp.pcap": "dlms-action-upload/missing-ACK-retires.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-action-upload/missing-ACK-retires.udp.pcap": "dlms-action-upload/missing-ACK-retires.udp.pcap",
+        "common/pcapx/pcaputil/dlms-action-upload/official-two-pblock-upload.tcp.pcap": "dlms-action-upload/official-two-pblock-upload.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-action-upload/official-two-pblock-upload.udp.pcap": "dlms-action-upload/official-two-pblock-upload.udp.pcap",
+        "common/pcapx/pcaputil/dlms-action-upload/projection.json": "dlms-action-upload/projection.json",
+        "common/pcapx/pcaputil/dlms-action-upload/reuse-inputs.json": "dlms-action-upload/reuse-inputs.json",
+        "common/pcapx/pcaputil/dlms-action-upload/single-first-last-structure-and-return.tcp.pcap": "dlms-action-upload/single-first-last-structure-and-return.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-action-upload/single-first-last-structure-and-return.udp.pcap": "dlms-action-upload/single-first-last-structure-and-return.udp.pcap",
+        "common/pcapx/pcaputil/dlms-action-upload/wrong-ACK-number-retires.tcp.pcap": "dlms-action-upload/wrong-ACK-number-retires.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-action-upload/wrong-ACK-number-retires.udp.pcap": "dlms-action-upload/wrong-ACK-number-retires.udp.pcap",
+        "common/pcapx/pcaputil/dlms-action-upload/wrong-flags-direction-wport-preserve-owner.tcp.pcap": "dlms-action-upload/wrong-flags-direction-wport-preserve-owner.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-action-upload/wrong-flags-direction-wport-preserve-owner.udp.pcap": "dlms-action-upload/wrong-flags-direction-wport-preserve-owner.udp.pcap",
+        "common/pcapx/pcaputil/dlms-action-upload/aggregate-five-bytes-cap4.udp.pcap": "dlms-action-upload/aggregate-five-bytes-cap5.udp.pcap",
+        "common/pcapx/pcaputil/dlms-action-upload/aggregate-five-bytes-cap4.tcp.pcap": "dlms-action-upload/aggregate-five-bytes-cap5.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-action-upload/four-blocks-cap3.udp.pcap": "dlms-action-upload/four-blocks-cap4.udp.pcap",
+        "common/pcapx/pcaputil/dlms-action-upload/four-blocks-cap3.tcp.pcap": "dlms-action-upload/four-blocks-cap4.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-action-upload/assembled-structure-depth5.udp.pcap": "dlms-action-upload/assembled-structure-depth6.udp.pcap",
+        "common/pcapx/pcaputil/dlms-action-upload/assembled-structure-depth5.tcp.pcap": "dlms-action-upload/assembled-structure-depth6.tcp.pcap",
+        "scripts/protocol-tests/required-tests-traffic-unified-v131.json": "required-tests-traffic-unified-v131.json"
+      }
     }
   ],
   "schema_version": 1,
