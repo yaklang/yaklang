@@ -3,6 +3,7 @@ package ssadb
 import (
 	"context"
 	"database/sql"
+	"sort"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -57,26 +58,30 @@ func nativeGetOffsetsByValueIDs(db *gorm.DB, programName string, valueIDs []int6
 		chunk := clean[start:end]
 		placeholders := make([]string, len(chunk))
 		args := make([]any, 0, len(chunk)+1)
-		query := nativeOffsetSelect + ` WHERE deleted_at IS NULL AND value_id IN (`
+		// program_name must be the first equality. Putting value_id IN first, or
+		// adding ORDER BY id, makes SQLite scan idx_ir_offsets_program_name
+		// instead of ux_ir_offsets_program_value_file_range. Sort by id in memory.
+		query := nativeOffsetSelect + ` WHERE deleted_at IS NULL`
+		if program := strings.TrimSpace(programName); program != "" {
+			query += ` AND program_name = ?`
+			args = append(args, program)
+		}
+		query += ` AND value_id IN (`
 		for i, id := range chunk {
 			placeholders[i] = "?"
 			args = append(args, id)
 		}
 		query += joinPlaceholders(placeholders) + `)`
-		if program := strings.TrimSpace(programName); program != "" {
-			query += ` AND program_name = ?`
-			args = append(args, program)
-		}
-		query += ` ORDER BY id`
 		rows, err := queryOffsetRows(db, query, args...)
 		if err != nil {
 			return nil, err
 		}
 		all = append(all, rows...)
 	}
-	if all == nil {
+	if len(all) == 0 {
 		return []*IrOffset{}, nil
 	}
+	sort.Slice(all, func(i, j int) bool { return all[i].ID < all[j].ID })
 	return all, nil
 }
 
