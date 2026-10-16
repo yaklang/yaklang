@@ -114,6 +114,23 @@ func TestResolveFieldCollectionNegativeIndex(t *testing.T) {
 	}
 }
 
+func TestRuntimeResolveMapFunctionMember(t *testing.T) {
+	called := false
+	method, err := runtimeResolveMethod(map[string]any{
+		"Run": func(value string) string {
+			called = true
+			return value + "!"
+		},
+	}, "Run")
+	if err != nil {
+		t.Fatalf("resolve map function: %v", err)
+	}
+	result := method.Call([]reflect.Value{reflect.ValueOf("ok")})
+	if len(result) != 1 || result[0].String() != "ok!" || !called {
+		t.Fatalf("map function result = %#v, called=%v", result, called)
+	}
+}
+
 func TestRuntimeResolveStringMethods(t *testing.T) {
 	trim, err := runtimeResolveMethod("  Yak  ", "Trim")
 	if err != nil {

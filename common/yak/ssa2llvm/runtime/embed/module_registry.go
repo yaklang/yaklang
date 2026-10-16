@@ -168,6 +168,12 @@ var moduleRegistry = map[string]ModuleImportSpec{
 		ImportAlias:  "yakit",
 		ExportExpr:   "yakit.ReportExports",
 	},
+	"pcapdb": {
+		ModuleName:   "pcapdb",
+		GoImportPath: "github.com/yaklang/yaklang/common/pcapx/pcapdb",
+		ImportAlias:  "pcapdb",
+		ExportExpr:   "pcapdb.AOTExports",
+	},
 	"json": {
 		ModuleName: "json",
 		// AOT build only: stdlib-backed subset, keeps the monolithic yaklib out.

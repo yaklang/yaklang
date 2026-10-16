@@ -629,6 +629,19 @@ func (c *Compiler) resolveUndefinedScopeValue(inst *ssa.Undefined) ssa.Value {
 	return nil
 }
 
+func (c *Compiler) getOrInsertRuntimeGetModule() (llvm.Value, llvm.Type) {
+	name := c.runtimeSymName(abi.RuntimeGetModuleSymbol)
+	fn := c.Mod.NamedFunction(name)
+
+	retType := c.LLVMCtx.Int64Type()
+	i8Ptr := llvm.PointerType(c.LLVMCtx.Int8Type(), 0)
+	fnType := llvm.FunctionType(retType, []llvm.Type{i8Ptr}, false)
+	if fn.IsNil() {
+		fn = llvm.AddFunction(c.Mod, name, fnType)
+	}
+	return fn, fnType
+}
+
 func (c *Compiler) getOrInsertRuntimeGetField() (llvm.Value, llvm.Type) {
 	name := c.runtimeSymName(abi.RuntimeGetFieldSymbol)
 	fn := c.Mod.NamedFunction(name)

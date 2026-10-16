@@ -52,6 +52,7 @@ const (
 	InternalReleaseShadowSymbol       = "yak_internal_release_shadow"
 	RuntimeNewShadowSymbol            = "yak_runtime_new_shadow"
 	RuntimeGetFieldSymbol             = "yak_runtime_get_field"
+	RuntimeGetModuleSymbol            = "yak_runtime_get_module"
 	RuntimeSetFieldSymbol             = "yak_runtime_set_field"
 	RuntimeDumpSymbol                 = "yak_runtime_dump"
 	RuntimeDumpHandleSymbol           = "yak_runtime_dump_handle"

@@ -66,6 +66,41 @@ func runtimeResolveMethod(obj any, name string) (reflect.Value, error) {
 		return reflect.Value{}, fmt.Errorf("invalid object while resolving method %q", name)
 	}
 
+	// Yak modules and ordinary Yak objects are represented as string-keyed
+	// maps. A member call on an aliased module (for example
+	// `tools = pcapdb; tools.GetOrCreatePCAPDatabase(...)`) is a call to the
+	// function stored under that key, not a Go method on the map itself.
+	mapValue := value
+	for mapValue.IsValid() && mapValue.Kind() == reflect.Interface {
+		if mapValue.IsNil() {
+			break
+		}
+		mapValue = mapValue.Elem()
+	}
+	if mapValue.IsValid() && mapValue.Kind() == reflect.Map {
+		if key, ok := resolveMapKey(mapValue.Type().Key(), name); ok {
+			field := mapValue.MapIndex(key)
+			for field.IsValid() && field.Kind() == reflect.Interface {
+				if field.IsNil() {
+					break
+				}
+				field = field.Elem()
+			}
+			if field.IsValid() && field.Kind() == reflect.Func {
+				return field, nil
+			}
+		}
+	}
+
+	if om, ok := obj.(runtimeStringMap); ok {
+		if exported, exists := om.Get(name); exists && exported != nil {
+			field := reflect.ValueOf(exported)
+			if field.IsValid() && field.Kind() == reflect.Func {
+				return field, nil
+			}
+		}
+	}
+
 	if method := value.MethodByName(name); method.IsValid() {
 		return method, nil
 	}
