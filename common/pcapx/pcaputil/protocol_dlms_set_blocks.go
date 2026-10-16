@@ -35,6 +35,15 @@ func (f *binFlow) consumeDLMSSetBlock(dir int, wire []byte, id uint64, m *dlmsMe
 	if s.ambiguous {
 		return ctx("SET block lacks trustworthy conversation", false)
 	}
+	// A complete foreign service/endpoint/flags response cannot retire an
+	// unrelated known pending request. Check its owner before orphan transfer
+	// handling, which may conservatively retire an actually missing exchange.
+	if !m.request && s.pending != nil {
+		p := s.pending
+		if p.kind != "SET" || p.choice != 2 || p.dir == dir || p.source != m.destination || p.destination != m.source || p.flags != m.flags {
+			return ctx("SET block response endpoint/service/full flags differ", false)
+		}
+	}
 	t := s.setTransfer
 	if m.request {
 		if t != nil {

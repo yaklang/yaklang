@@ -46,7 +46,9 @@ func actionControls(t *testing.T) []actionCase {
 	require.NoError(t, json.Unmarshal(finsReadBatch(t, "dlms-action-normal", "DLMS_ACTION_TEST_ROOT", "controls.json"), &x))
 	require.Len(t, x.Cases, 20)
 	var extra struct{ Cases []actionCase }
-	require.NoError(t, json.Unmarshal(finsReadBatch(t, "dlms-action-normal", "DLMS_ACTION_TEST_ROOT", "supplemental.json"), &extra))
+	original := finsReadBatch(t, "dlms-action-normal", "DLMS_ACTION_TEST_ROOT", "supplemental.json")
+	require.NoError(t, json.Unmarshal(original, &extra))
+	extra.Cases = actionDownloadHistoricalUpgrade(t, original, extra.Cases)
 	require.Len(t, extra.Cases, 8)
 	return append(x.Cases, extra.Cases...)
 }
@@ -130,7 +132,7 @@ func actionCheck(t *testing.T, c actionCase, es []*ProtocolEvent, transport stri
 		require.Equal(t, a.At, e.Timestamp.Unix())
 		require.Equal(t, a.Length, e.Length)
 		if transport == "udp" {
-			if a.Session == nil || a.Session["Association"] == "unmatched-response" && len(c.Steps) == 1 {
+			if a.Session == nil || (a.Session["Association"] == "unmatched-response" || a.Session["Association"] == "unmatched-block-request") && len(c.Steps) == 1 {
 				require.Zero(t, e.FlowID)
 			} else {
 				require.NotZero(t, e.FlowID)
@@ -140,6 +142,9 @@ func actionCheck(t *testing.T, c actionCase, es []*ProtocolEvent, transport stri
 		require.Equal(t, owner(a.Transaction), e.TransactionID)
 		require.Equal(t, owner(a.Response), e.ResponseTo)
 		if transport == "tcp" {
+			if c.Name == "Action-next-is-not-Get-next" {
+				require.EqualValues(t, 1, e.FlowID)
+			}
 			require.Equal(t, offsets[a.Direction], e.Offset)
 			offsets[a.Direction] += uint64(len(w))
 		} else {
@@ -257,6 +262,10 @@ func TestDLMSActionNormalNative(t *testing.T) {
 								in := bytes.Clone(w[at:end])
 								o := s.Feed(a.Direction, time.Unix(a.At, 0), in)
 								clear(in)
+								if c.Name == "Action-next-is-not-Get-next" && transport == "tcp" {
+									require.Equal(t, end-at, o.Consumed)
+									require.Equal(t, end < len(w), o.NeedMore)
+								}
 								if at == 0 && end == len(w) {
 									if a.Error == "" {
 										require.Nil(t, o.Err)

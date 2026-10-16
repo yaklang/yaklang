@@ -110257,6 +110257,92 @@
         "common/pcapx/pcaputil/dlms-action-download/four-blocks-cap3.tcp.pcap": "dlms-action-download/four-blocks-cap4.tcp.pcap",
         "scripts/protocol-tests/required-tests-traffic-unified-v132.json": "required-tests-traffic-unified-v132.json"
       }
+    },
+    {
+      "id": "validation-dlms-response-ownership",
+      "kind": "support",
+      "source_sha": "17a9f8ebd9352173cde65e58921b34dbbd8a5bfe",
+      "file": "validation-dlms-response-ownership.zip",
+      "sha256": "808a706c5f257a32cae29c958e2489e17bf642e36499bbcdc876a566e5cad1fc",
+      "password": "bin-parser",
+      "members": {
+        "dlms-hdlc-response-guards/controls.json": {
+          "bytes": 65137,
+          "sha256": "e05f92cfbf7d3903f557236ddc0237cebf866f073e748d89c444a87291e4059a"
+        },
+        "dlms-hdlc-response-guards/known-Get-pending-foreign-SET-ACK-preserves-real-response.tcp.pcap": {
+          "bytes": 512,
+          "sha256": "798f2ec528b27872d3c9330afa6e4938947b7689dd6250486afe98af1b06811b"
+        },
+        "dlms-hdlc-response-guards/known-Get-pending-foreign-SET-ACK-preserves-real-response.udp.pcap": {
+          "bytes": 266,
+          "sha256": "690acdf5024734e525a2261b890576f4ac8053d5465533f14493ca9020aec578"
+        },
+        "dlms-hdlc-response-guards/known-SET-active-wrong-flags-and-Get-block-response-preserve.tcp.pcap": {
+          "bytes": 1013,
+          "sha256": "7f8da3aa7622a328409641dee16d42f4ed48fb09ae0ba719d3e5f46a16263fd9"
+        },
+        "dlms-hdlc-response-guards/known-SET-active-wrong-flags-and-Get-block-response-preserve.udp.pcap": {
+          "bytes": 707,
+          "sha256": "3f4eb1bd20043a842a72e60214195acadc7eeaafe344543cfa013414072a2dab"
+        },
+        "dlms-hdlc-response-guards/reuse-inputs.json": {
+          "bytes": 3,
+          "sha256": "ca3d163bab055381827226140568f3bef7eaac187cebd76878e0b63e9e442356"
+        },
+        "dlms-response-ownership-tools/generate-captures.py": {
+          "bytes": 1820,
+          "sha256": "3b4b2dd9c168109fb399465923b069b53438df55389e9832d9e42e726dca208f"
+        },
+        "dlms-response-ownership-tools/generate-guards.py": {
+          "bytes": 4054,
+          "sha256": "2c228d6aeac4fe1412b72390e259491c8a2ff959296164ac4a13bfc41f0dba93"
+        },
+        "dlms-response-ownership-tools/generate-historical-next-upgrade.py": {
+          "bytes": 5497,
+          "sha256": "4f30d5b546ddc25ee8134d5023c4a81dc788290acc2a7bc36d14df625e881ef2"
+        },
+        "dlms-response-ownership-tools/verify-historical-next-upgrade.py": {
+          "bytes": 5094,
+          "sha256": "cb8d380203f4130316cf7de3e9fea0bc777fbf42f37cc68d85ba8ebbe69d62d9"
+        },
+        "dlms-response-ownership-tools/verify.py": {
+          "bytes": 3378,
+          "sha256": "d4eaa8f01a7da7dd26379ab6ba586d76ae292ec0102de4f809577af88cd41471"
+        },
+        "dlms-response-ownership/historical-next-feature-upgrade.json": {
+          "bytes": 12952,
+          "sha256": "00961159319c81063a7c0e3736136ba7332637cd2def69ab0857ccbb7bd51c70"
+        },
+        "dlms-response-ownership/historical-next-tcp-six-projection.json": {
+          "bytes": 35329,
+          "sha256": "a521946be4fd07e3e201a9ebfcba966adf4b489ecb4f780c81eefbbd23e252f3"
+        },
+        "required-tests-traffic-unified-v133.json": {
+          "bytes": 23107559,
+          "sha256": "e613247ec2e75c3dda5e3255a5b68df82e475eef862df0572dfadc067fd0e922"
+        },
+        "validation/expected.json": {
+          "bytes": 6035,
+          "sha256": "9124cf6ab82a5eba5fa8999d6a96170596e00aa1d57f29026e33ad409d5f8913"
+        }
+      },
+      "aliases": {
+        "common/pcapx/pcaputil/dlms-hdlc-response-guards/controls.json": "dlms-hdlc-response-guards/controls.json",
+        "common/pcapx/pcaputil/dlms-hdlc-response-guards/known-Get-pending-foreign-SET-ACK-preserves-real-response.tcp.pcap": "dlms-hdlc-response-guards/known-Get-pending-foreign-SET-ACK-preserves-real-response.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-response-guards/known-Get-pending-foreign-SET-ACK-preserves-real-response.udp.pcap": "dlms-hdlc-response-guards/known-Get-pending-foreign-SET-ACK-preserves-real-response.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-response-guards/known-SET-active-wrong-flags-and-Get-block-response-preserve.tcp.pcap": "dlms-hdlc-response-guards/known-SET-active-wrong-flags-and-Get-block-response-preserve.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-response-guards/known-SET-active-wrong-flags-and-Get-block-response-preserve.udp.pcap": "dlms-hdlc-response-guards/known-SET-active-wrong-flags-and-Get-block-response-preserve.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-response-guards/reuse-inputs.json": "dlms-hdlc-response-guards/reuse-inputs.json",
+        "common/pcapx/pcaputil/dlms-response-ownership-tools/generate-captures.py": "dlms-response-ownership-tools/generate-captures.py",
+        "common/pcapx/pcaputil/dlms-response-ownership-tools/generate-guards.py": "dlms-response-ownership-tools/generate-guards.py",
+        "common/pcapx/pcaputil/dlms-response-ownership-tools/generate-historical-next-upgrade.py": "dlms-response-ownership-tools/generate-historical-next-upgrade.py",
+        "common/pcapx/pcaputil/dlms-response-ownership-tools/verify-historical-next-upgrade.py": "dlms-response-ownership-tools/verify-historical-next-upgrade.py",
+        "common/pcapx/pcaputil/dlms-response-ownership-tools/verify.py": "dlms-response-ownership-tools/verify.py",
+        "common/pcapx/pcaputil/dlms-response-ownership/historical-next-feature-upgrade.json": "dlms-response-ownership/historical-next-feature-upgrade.json",
+        "common/pcapx/pcaputil/dlms-response-ownership/historical-next-tcp-six-projection.json": "dlms-response-ownership/historical-next-tcp-six-projection.json",
+        "scripts/protocol-tests/required-tests-traffic-unified-v133.json": "required-tests-traffic-unified-v133.json"
+      }
     }
   ],
   "schema_version": 1,
