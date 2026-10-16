@@ -57,6 +57,9 @@ func hdlcSNReadCases(t *testing.T, name, pin string, count int) []hdlcSNReadCase
 		}
 		out[i] = hdlcSNReadCase{c, meta.Cases[i].Steps, meta.Cases[i].UDP, meta.Cases[i].TCP}
 	}
+	if name == "controls-safe-owner.json" && pin == "3bab1436ded0f609435ca0a0c6337f15274a6a04ee4f0c71949b5eb61a2dc704" {
+		return hdlcSNWriteUpgradeHistoricalRead(t, raw, out)
+	}
 	return out
 }
 func hdlcSNReadTypes(t *testing.T, f map[string]any) {
@@ -64,6 +67,17 @@ func hdlcSNReadTypes(t *testing.T, f map[string]any) {
 	hdlcOpTypes(t, f)
 	if sn, ok := f["SN Read"].(map[string]any); ok {
 		snReadTypes(t, sn)
+		for _, k := range []string{"wrapper_version", "source_wport", "destination_wport", "wrapper_header_hex", "invoke_id", "invoke_id_and_priority", "service_choice"} {
+			require.NotContains(t, sn, k)
+		}
+		for _, k := range []string{"Invoke ID", "Invoke ID and Priority", "High Priority", "Confirmed Service", "Outstanding"} {
+			require.NotContains(t, f, k)
+		}
+	}
+	if value, exists := f["SN Write"]; exists {
+		sn, ok := value.(map[string]any)
+		require.True(t, ok, "SN Write must retain its public map type")
+		snWriteTypes(t, sn)
 		for _, k := range []string{"wrapper_version", "source_wport", "destination_wport", "wrapper_header_hex", "invoke_id", "invoke_id_and_priority", "service_choice"} {
 			require.NotContains(t, sn, k)
 		}
@@ -132,6 +146,7 @@ func hdlcSNReadNative(t *testing.T, cases []hdlcSNReadCase, src, dst uint16) {
 						s.(*captureSession).f.a.config.Deferred = d
 						var es, saved []*ProtocolEvent
 						var flow uint64
+						eventIDs := make(map[uint64]bool)
 						for i, st := range c.Steps {
 							wire := wrapperWire(t, st.Wire)
 							require.Equal(t, st.SHA, fmt.Sprintf("%x", sha256.Sum256(wire)))
@@ -175,6 +190,8 @@ func hdlcSNReadNative(t *testing.T, cases []hdlcSNReadCase, src, dst uint16) {
 							}
 							e := stepEvents[0]
 							require.NotZero(t, e.ID)
+							require.False(t, eventIDs[e.ID], "event ID must be unique before public poisoning")
+							eventIDs[e.ID] = true
 							wantFlow := tc.Metadata[i]["native_udp_flow_nonzero"].(bool)
 							if tr == "tcp" {
 								wantFlow = true
@@ -210,6 +227,11 @@ func hdlcSNReadNative(t *testing.T, cases []hdlcSNReadCase, src, dst uint16) {
 						}
 						hdlcOpCheck(t, c, es, tr, false, d)
 						closed := s.Close("test-close")
+						for _, e := range closed {
+							require.NotZero(t, e.ID)
+							require.False(t, eventIDs[e.ID], "Close ID must be distinct from every Feed event")
+							eventIDs[e.ID] = true
+						}
 						hdlcGetCloseCheck(t, c, closed, tr, flow, false, "test-close")
 						require.Empty(t, s.Close("again"))
 						require.Zero(t, s.Stats().BufferedBytes)
@@ -246,6 +268,10 @@ func TestDLMSHDLCSNReadMatrix(t *testing.T) {
 	hdlcSNReadMatrix(t, hdlcSNReadControls(t), "dlms-hdlc-sn-read")
 }
 func hdlcSNReadMatrix(t *testing.T, cases []hdlcSNReadCase, batch string) {
+	env := "DLMS_HDLC_SN_READ_TEST_ROOT"
+	if batch == "dlms-hdlc-sn-write" || batch == "dlms-hdlc-sn-write-resources" {
+		env = "DLMS_HDLC_SN_WRITE_TEST_ROOT"
+	}
 	for _, tc := range cases {
 		for _, tr := range []string{"udp", "tcp"} {
 			t.Run(tc.Name+"/"+tr, func(t *testing.T) {
@@ -258,7 +284,7 @@ func hdlcSNReadMatrix(t *testing.T, cases []hdlcSNReadCase, batch string) {
 				}
 				name := c.Name + "." + tr + ".pcap"
 				var reuse map[string]string
-				require.NoError(t, json.Unmarshal(finsReadBatch(t, batch, "DLMS_HDLC_SN_READ_TEST_ROOT", "reuse-inputs.json"), &reuse))
+				require.NoError(t, json.Unmarshal(finsReadBatch(t, batch, env, "reuse-inputs.json"), &reuse))
 				var raw []byte
 				if alias, ok := reuse[name]; ok {
 					var err error
@@ -267,7 +293,7 @@ func hdlcSNReadMatrix(t *testing.T, cases []hdlcSNReadCase, batch string) {
 					raw, err = trafficfixture.ReadFile(strings.TrimPrefix(alias, prefix))
 					require.NoError(t, err)
 				} else {
-					raw = finsReadBatch(t, batch, "DLMS_HDLC_SN_READ_TEST_ROOT", name)
+					raw = finsReadBatch(t, batch, env, name)
 				}
 				expected := tc.UDPHash
 				if tr == "tcp" {
@@ -286,6 +312,12 @@ func hdlcSNReadMatrix(t *testing.T, cases []hdlcSNReadCase, batch string) {
 						}
 					}
 					require.Len(t, es, count+len(c.Close.Events))
+					eventIDs := make(map[uint64]bool)
+					for _, e := range es {
+						require.NotZero(t, e.ID)
+						require.False(t, eventIDs[e.ID], "capture Feed and Close IDs must all be distinct")
+						eventIDs[e.ID] = true
+					}
 					// The actual physical endpoints and packet references are independent
 					// of a cold UDP observation direction. Check them explicitly below.
 

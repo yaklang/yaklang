@@ -224,15 +224,19 @@ func snWriteMatrix(t *testing.T, cases []snWriteControl) {
 	for _, c := range cases {
 		for _, tr := range []string{"tcp", "udp"} {
 			t.Run(c.Name+"/"+tr, func(t *testing.T) {
+				reuseFolder, reuseEnv := "dlms-wrapper-sn-write", "DLMS_WRAPPER_SN_WRITE_TEST_ROOT"
+				if c.Folder == "dlms-hdlc-sn-write-resources" {
+					reuseFolder, reuseEnv = c.Folder, "DLMS_HDLC_SN_WRITE_TEST_ROOT"
+				}
 				var reuse map[string]string
-				require.NoError(t, json.Unmarshal(finsReadBatch(t, "dlms-wrapper-sn-write", "DLMS_WRAPPER_SN_WRITE_TEST_ROOT", "reuse-inputs.json"), &reuse))
+				require.NoError(t, json.Unmarshal(finsReadBatch(t, reuseFolder, reuseEnv, "reuse-inputs.json"), &reuse))
 				name := c.Name + "." + tr + ".pcap"
 				var raw []byte
 				if p, ok := reuse[name]; ok {
 					require.True(t, strings.HasPrefix(p, "common/pcapx/pcaputil/"))
 					raw = wrapperStructuredInput(t, p)
 				} else {
-					raw = finsReadBatch(t, c.Folder, "DLMS_WRAPPER_SN_WRITE_TEST_ROOT", name)
+					raw = finsReadBatch(t, c.Folder, reuseEnv, name)
 				}
 				want := c.UDPHash
 				if tr == "tcp" {

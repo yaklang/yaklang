@@ -21,7 +21,7 @@ func dlmsAPDU(w []byte) []byte {
 		return nil
 	}
 	p := w[at+6 : end] // control, HCS(2), LLC(3)
-	if len(p) == 0 || len(p) < 2 && !dlmsSNReadAPDU(p) || p[0] != 0xc0 && p[0] != 0xc4 && !dlmsSNReadAPDU(p) && !dlmsOperationAPDU(p) && (p[0] < 0x60 || p[0] > 0x64) {
+	if len(p) == 0 || len(p) < 2 && !(dlmsSNReadAPDU(p) || dlmsSNWriteAPDU(p)) || p[0] != 0xc0 && p[0] != 0xc4 && !(dlmsSNReadAPDU(p) || dlmsSNWriteAPDU(p)) && !dlmsOperationAPDU(p) && (p[0] < 0x60 || p[0] > 0x64) {
 		return nil
 	}
 	return p
@@ -44,6 +44,9 @@ func dlmsActionDownloadAPDU(p []byte) bool {
 	return len(p) > 1 && (p[0] == 0xc3 || p[0] == 0xc7) && p[1] == 2
 }
 func dlmsProfile(w []byte) string {
+	if dlmsSNWriteAPDU(dlmsAPDU(w)) {
+		return "dlms-hdlc-sn-write"
+	}
 	if dlmsSNReadAPDU(dlmsAPDU(w)) {
 		return "dlms-hdlc-sn-read"
 	}
@@ -110,6 +113,10 @@ func dlmsObservedProfile(w []byte, fields map[string]any) string {
 }
 
 func dlmsProjection(w []byte) int64 {
+	if dlmsSNWriteAPDU(dlmsAPDU(w)) {
+		// Separate descriptor and typed Data rows plus the shared bounded graph.
+		return 32768 + 512*int64(len(w)) + 16384*wrapperSNReadItems + 2048*wrapperDataNodes
+	}
 	if dlmsSNReadAPDU(dlmsAPDU(w)) {
 		// Include all owned rows and the shared compact/Data expansion pool,
 		// even when an octet payload happens to contain a Data tag byte.
