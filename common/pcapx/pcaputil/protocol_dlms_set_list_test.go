@@ -12,9 +12,10 @@ import (
 
 func listControls(t *testing.T) []actionCase {
 	var x struct{ Cases []actionCase }
-	require.NoError(t, json.Unmarshal(finsReadBatch(t, "dlms-set-list", "DLMS_SET_LIST_TEST_ROOT", "controls.json"), &x))
+	raw := finsReadBatch(t, "dlms-set-list", "DLMS_SET_LIST_TEST_ROOT", "controls.json")
+	require.NoError(t, json.Unmarshal(raw, &x))
 	require.Len(t, x.Cases, 43)
-	return x.Cases
+	return setBlockHistoricalUpgrade(t, raw, x.Cases)
 }
 func listCloseCheck(t *testing.T, c actionCase, es []*ProtocolEvent, transport, reason string) {
 	t.Helper()
@@ -29,7 +30,7 @@ func listCloseCheck(t *testing.T, c actionCase, es []*ProtocolEvent, transport, 
 		if a.Session["request_command"] == float64(195) {
 			profile = "dlms-wrapper-v1-action-normal"
 		}
-		require.Equal(t, profile, e.Profile)
+		require.Equal(t, setBlockHistoricalCloseProfile(c, profile), e.Profile)
 		require.Equal(t, "incomplete", e.Status)
 		require.Equal(t, "incomplete", e.Completeness)
 		require.Nil(t, e.Raw)

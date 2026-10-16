@@ -44,7 +44,7 @@ Run from the repository root:
 ```sh
 go run ./internal/trafficfixture/cmd/corpus test
 go test -json -count=1 -timeout=10m ./internal/trafficfixture/... ./common/bin-parser/... ./common/pcapx/... ./common/yak/cmd/yakcmds/shark-cli ./scripts/ci > traffic.jsonl
-go run ./internal/trafficfixture/cmd/corpus exec -- python3 @scripts/protocol-tests/check_go_test_json_v2.py traffic.jsonl --inventory @scripts/protocol-tests/required-tests-traffic-unified-v128.json --tier full
+go run ./internal/trafficfixture/cmd/corpus exec -- python3 @scripts/protocol-tests/check_go_test_json_v2.py traffic.jsonl --inventory @scripts/protocol-tests/required-tests-traffic-unified-v129.json --tier full
 ```
 
 The single `corpus` entry point uses the same bounded Go ZIP loader as tests.
@@ -83,7 +83,7 @@ their semantic coverage. The existing synthetic session keys are test inputs;
 production credentials, user private keys and material without redistribution
 permission belong in an external fixed-source download manifest.
 
-Current test requirements are sealed at `scripts/protocol-tests/required-tests-traffic-unified-v128.json`;
+Current test requirements are sealed at `scripts/protocol-tests/required-tests-traffic-unified-v129.json`;
 the historical inventories and all earlier batches remain unchanged.
 The supplemental small-corpus batch contains 26 minimal controls, their explicit
 expected facts, an offline generator and the compact pinned source manifest.
@@ -203,7 +203,7 @@ opaque selector bytes and one bounded Data value over Wrapper v1 TCP/UDP; object
 selector meaning, access permission and device operation are unverified. The
 original one-packet selective-access capture and original refused answer remain
 immutable; its now-supported answer is matched by exact input SHA and frame.
-The active inventory is `scripts/protocol-tests/required-tests-traffic-unified-v128.json`.
+The active inventory is `scripts/protocol-tests/required-tests-traffic-unified-v129.json`.
 
 The small-graph budget batch reuses accepted graph captures/answers and adds one
 249-byte UDP control for child count255 without child bytes. Its standalone proof
@@ -993,7 +993,7 @@ the normative answer; a missing numeric reference field is not a codec pass.
 Full/deferred, workers1/2/4, observers off/on, Feed chunks1/7/full, ownership,
 resources and close/refusal boundaries remain required.
 
-Current gate: `required-tests-traffic-unified-v128.json` with
+Current gate: `required-tests-traffic-unified-v129.json` with
 `check_go_test_json_v2.py`. The indexed validator preserves missing/unpassed,
 package invocation completion, descendant skips, failures and non-JSON checks;
 its mutation/differential harness is sealed with the material. Older checkers
@@ -1629,7 +1629,7 @@ userspace adapter; full kernel receiver/socket/timers and ECU endpoints do not.
 All161 preceding ZIPs remain byte-for-byte unchanged. Raw captures, dependencies,
 reference source/build output and process evidence stay outside Git.
 
-Current effective v128 inventory: 88,370 entries; 88,363 are mandatory for the full tier.
+Current effective v129 inventory: 89,018 entries; 89,011 are mandatory for the full tier.
 
 The opt-in `DynamicFlowControl` profile follows Linux v6.12 FC tuple updates (including WAIT without granting data). Disjoint address extensions or classical/FD carriers may share CAN IDs; unknown selectors cannot choose or mutate a conversation. Ambiguous selectors are rejected. Seven sealed cases exercise full/deferred, workers 1/2/4, and observer off/on, with exact fields, byte collections, contributor references, errors and resource ownership. The existing static FC profile remains unchanged. Pinned upstream FC and filter functions execute with declared userspace stubs; this is not a kernel/ECU endpoint. TShark 4.2.5 checks wire tuples and two complete payloads, but cannot independently reassemble the shared-address transcripts.
 
@@ -1760,3 +1760,5 @@ HDLC normal SET and Action observations expose complete service Data/results wit
 HDLC SET-list and Action-list observations expose complete ordered descriptors, Data and results, retaining literal wire service choices and private Set form normalization. Fixed official Set-list HDLC codecs and independent46-trace206-step model check exact owners, mismatches preserving pending, shared budgets, compact/scalar tag isolation, private typed list Close and ownership on both carriers. Action-list has fixed official grammar/model evidence, no successful official executable semantic codec or device claim. All221 historical ZIPs remain unchanged; operation segmentation/block/GBT/security and original oracle gaps remain pending.
 
 SET selective access on normal/list Wrapper and unsegmented HDLC exposes literal selector and complete parameter/value Data using shared node/depth pools, exact bounded ownership and private queries. Source-derived answers and actual official Data/generic framing vectors do not claim object-specific selector semantics or device writes. Exact-SHA four-key sidecar updates only one historically truncated negative classification; all222 prior ZIPs remain immutable. Block/GBT/authentication/cipher and original whole-input evidence gaps remain open.
+
+Wrapper SET DataBlock-SA first2/next3 and ACK2/terminal3 expose bounded complete Data proposals and exact root/current-message owners after observed ACK sequencing. Fixed client encoding and official response codecs plus independent18-trace77-step answers cover isolated node/count/encoded-byte and exact projection budgets, errors, ambiguity, private Close and ownership on both carriers. Two historical same-SHA legal first-last cases use strict full feature-upgrade sidecars, not error-only corrections. Original223 ZIPs remain immutable. HDLC/list-first/GBT/security/object/device outcomes and original oracle gaps remain pending.

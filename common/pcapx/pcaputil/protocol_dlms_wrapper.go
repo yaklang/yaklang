@@ -43,6 +43,8 @@ type wrapperMessage struct {
 	count                  int
 	request, confirmed     bool
 	blockNumber            uint32
+	setBlock, blockFirst   bool
+	setParameterNodes      int
 	blockData              []byte
 	lastBlock, blockError  bool
 	gbt                    bool
@@ -301,6 +303,8 @@ type wrapperPending struct {
 	pending, ambiguous    bool
 	idleRetired           bool
 	blockNumber           uint32
+	lastSetBlock          bool
+	setParameterNodes     int
 	blockData             []byte
 	blockActive, awaiting bool
 	replyID               uint64
@@ -379,7 +383,7 @@ func (f *binFlow) consumeWrapperReserved(dir int, w []byte, e *ProtocolEvent, fl
 	if wrapperIsACSE(w) && w[8] == 0x64 {
 		target += 256
 	} // Abort may retain both endpoint directions.
-	if wrapperIsBlock(w) {
+	if wrapperIsBlock(w) || wrapperIsSetBlock(w) {
 		target += wrapperBlockBytes
 	}
 	target = max(target, floor)
@@ -419,6 +423,11 @@ func (f *binFlow) consumeWrapperReserved(dir int, w []byte, e *ProtocolEvent, fl
 		assoc, err = f.consumeWrapperGBT(s, m, dir, e, w)
 		if err != nil {
 			s.invalidate()
+			return err
+		}
+	} else if m.setBlock {
+		assoc, err = f.consumeWrapperSetBlock(s, m, dir, e)
+		if err != nil {
 			return err
 		}
 	} else if m.choice == 2 {
@@ -503,7 +512,7 @@ func wrapperUDPRefusalHint(w []byte) bool {
 		return len(w) >= 11 && int(binary.BigEndian.Uint16(w[6:8])) == len(w)-8 && w[10]&0x30 == 0
 	}
 	if wrapperIsAction(w) || wrapperIsSet(w) {
-		return len(w) >= 11 && int(binary.BigEndian.Uint16(w[6:8])) == len(w)-8 && w[9] == 1 && w[10]&0x30 == 0
+		return len(w) >= 11 && int(binary.BigEndian.Uint16(w[6:8])) == len(w)-8 && (w[9] == 1 || wrapperIsSetBlock(w)) && w[10]&0x30 == 0
 	}
 	return len(w) >= 11 && w[0] == 0 && w[1] == 1 && int(binary.BigEndian.Uint16(w[6:8])) == len(w)-8 &&
 		(w[8] == 0xc0 || w[8] == 0xc4) && (w[9] == 1 || w[9] == 2 || w[9] == 3) && w[10]&0x30 == 0
@@ -843,6 +852,9 @@ func wrapperIsSet(w []byte) bool {
 	return len(w) > 8 && w[0] == 0 && w[1] == 1 && (w[8] == 0xc1 || w[8] == 0xc5)
 }
 func wrapperOperationName(command, choice byte) string {
+	if command == 0xc1 && choice == 2 {
+		return "Set-with-data-block"
+	}
 	if command == 0xc3 && choice == 3 {
 		return "Action-with-list"
 	}
@@ -855,6 +867,9 @@ func wrapperOperationName(command, choice byte) string {
 	return "Action"
 }
 func wrapperOperationProfile(command, choice byte) string {
+	if command == 0xc1 && choice == 2 {
+		return "dlms-wrapper-v1-set-block"
+	}
 	if command == 0xc3 && choice == 3 {
 		return "dlms-wrapper-v1-action-list"
 	}
@@ -887,7 +902,7 @@ func decodeWrapperSet(w []byte, limit, depth int) (*wrapperMessage, error) {
 	if len(p) < 3 {
 		return bad("Set service header truncated")
 	}
-	if p[1] != 1 && !wrapperIsSetList(w) {
+	if p[1] != 1 && !wrapperIsSetList(w) && !wrapperIsSetBlock(w) {
 		return unsupported("Set selected normal choice1 only")
 	}
 	if p[2]&0x30 != 0 {
@@ -897,6 +912,12 @@ func decodeWrapperSet(w []byte, limit, depth int) (*wrapperMessage, error) {
 	f := map[string]any{"wrapper_version": v, "source_wport": src, "destination_wport": dst, "payload_length": n, "wrapper_header_hex": hex.EncodeToString(w[:8]), "apdu_hex": hex.EncodeToString(p), "association_observed": false, "authentication_verified": false, "object_model_verified": false, "command": p[0], "service_choice": p[1], "invoke_id_and_priority": p[2], "invoke_id": p[2] & 15, "high_priority": p[2]&128 != 0, "confirmed_service": p[2]&64 != 0, "unused_flag_bits_raw": p[2] & 0x30}
 	f["operation_success_verified"] = false
 	m := &wrapperMessage{fields: f, source: src, destination: dst, command: p[0], invoke: p[2] & 15, flags: p[2], request: p[0] == 0xc1, confirmed: p[2]&64 != 0, choice: 1, count: 1}
+	if wrapperIsSetBlock(w) {
+		if err := decodeWrapperSetBlock(m, p, limit, depth); err != nil {
+			return nil, err
+		}
+		return m, nil
+	}
 	if wrapperIsSetList(w) {
 		m.choice = 4
 		if err := decodeWrapperSetList(m, p, limit, depth); err != nil {

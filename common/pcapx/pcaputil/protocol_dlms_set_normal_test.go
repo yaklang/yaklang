@@ -15,7 +15,7 @@ func setControls(t *testing.T) []actionCase {
 	raw := finsReadBatch(t, "dlms-set-normal", "DLMS_SET_TEST_ROOT", "controls.json")
 	require.NoError(t, json.Unmarshal(raw, &x))
 	require.Len(t, x.Cases, 33)
-	return setSelectiveLegacy(t, raw, x.Cases)
+	return setBlockHistoricalUpgrade(t, raw, setSelectiveLegacy(t, raw, x.Cases))
 }
 func setCloseCheck(t *testing.T, c actionCase, es []*ProtocolEvent, transport, reason string) {
 	t.Helper()
@@ -27,7 +27,7 @@ func setCloseCheck(t *testing.T, c actionCase, es []*ProtocolEvent, transport, r
 		if a.Session["request_command"] == float64(195) {
 			profile = "dlms-wrapper-v1-action-normal"
 		}
-		require.Equal(t, profile, e.Profile)
+		require.Equal(t, setBlockHistoricalCloseProfile(c, profile), e.Profile)
 		require.Equal(t, "incomplete", e.Status)
 		require.Equal(t, "incomplete", e.Completeness)
 		require.Nil(t, e.Raw)

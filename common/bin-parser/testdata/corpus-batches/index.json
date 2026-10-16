@@ -109121,6 +109121,283 @@
         "common/pcapx/pcaputil/dlms-set-selective/hdlc/normal-shared-four-nodes-cap3-isolated.tcp.pcap": "dlms-set-selective/hdlc/normal-parameter-structure-depth6.tcp.pcap",
         "scripts/protocol-tests/required-tests-traffic-unified-v128.json": "required-tests-traffic-unified-v128.json"
       }
+    },
+    {
+      "id": "validation-dlms-set-block",
+      "kind": "support",
+      "source_sha": "86ac1ac10fbe2f1637a2ba7a092a73ef8f98275c",
+      "file": "validation-dlms-set-block.zip",
+      "sha256": "aae2150c8bb5c1e572f29fc0823c5e21deb361efe1ada965e8af73dc0dd7f84c",
+      "password": "bin-parser",
+      "members": {
+        "dlms-set-block-tools/SOURCES.json": {
+          "sha256": "b563fe0911ed7ea4a890054d03d6b5f80dfc66369dc3760e934bbd4acafd6c8a",
+          "bytes": 1711
+        },
+        "dlms-set-block-tools/build-budget-extended.py": {
+          "sha256": "5d049263388959909104bcfa72ee1bf4ae311f2e4402f32e43c878d6c866314f",
+          "bytes": 3605
+        },
+        "dlms-set-block-tools/build-corrected.py": {
+          "sha256": "d37ece4498af2745395b4e986c067b21b409ad3bf1f6016fcffe89af4e8e7b91",
+          "bytes": 1825
+        },
+        "dlms-set-block-tools/build-extended.py": {
+          "sha256": "d7a82f41b1bb02cde0b7a1f45c76767e677fcdc38f7e99f9567d3bb468976049",
+          "bytes": 1690
+        },
+        "dlms-set-block-tools/data-model.py": {
+          "sha256": "d6966c9afaf596cbb557553012a3fdc12541246b00185da79efbba66ce0c5338",
+          "bytes": 2900
+        },
+        "dlms-set-block-tools/generate-controls.py": {
+          "sha256": "9dfb2a276db39d50c776ffceb153080c3b650c456b6ebabf50c10d07cbb2698f",
+          "bytes": 11550
+        },
+        "dlms-set-block-tools/generate-historical-upgrade.py": {
+          "sha256": "82a172b1dc433df367656c81f0f353675b8b17c3a669a3383b3cdb00f87479ab",
+          "bytes": 3640
+        },
+        "dlms-set-block-tools/generate-projection.py": {
+          "sha256": "c369d0ba721073c111d91519c8f87e3caa79ce2b2436988616c2ac8714e0d9bf",
+          "bytes": 1282
+        },
+        "dlms-set-block-tools/generate.py": {
+          "sha256": "21268f9509a9f0cbbe4f412f7339c222db1ba22ab86d506111003a11df7e11c1",
+          "bytes": 1494
+        },
+        "dlms-set-block-tools/projection-model.py": {
+          "sha256": "73ed6ce5a524101287c006b8f5daf9ae9d937f705e36a1f0da6e4cf6dfdd896e",
+          "bytes": 4738
+        },
+        "dlms-set-block-tools/reference-check.py": {
+          "sha256": "12c87393ab1a0ff7bcc766ef55bc1ec091b7fafd5bb505bdc5663465e159038c",
+          "bytes": 826
+        },
+        "dlms-set-block-tools/reference-vectors.json": {
+          "sha256": "f22e2f2f4d67ff8ca6b18a6b40560bacfcb5c34963ba2a7ee33b3be479a77790",
+          "bytes": 2326
+        },
+        "dlms-set-block-tools/reference.py": {
+          "sha256": "cdf1aa7fdd6037a2ca7288818fef0d2b919244875bf99286e592eaabaf7b6dd3",
+          "bytes": 3666
+        },
+        "dlms-set-block-tools/verify-captures.py": {
+          "sha256": "ab41d8606945b9d8b694f618d390cbbccd0ca37839b1b1de468fe80e9ec5b8aa",
+          "bytes": 2955
+        },
+        "dlms-set-block-tools/verify-projection.py": {
+          "sha256": "553d4f749adbb22adb70241645aaee3c56f39bf0dd8a2cb5c423ef90b3ac820f",
+          "bytes": 2737
+        },
+        "dlms-set-block-tools/verify.py": {
+          "sha256": "077e588510d2d49acb3066252197e0931372b7bc9122b58af1ccc5d3b8ddc613",
+          "bytes": 3596
+        },
+        "dlms-set-block/block-count-four-cap4.tcp.pcap": {
+          "sha256": "f1e6a53dcbb1ff87cb7579ba7f9bda72e261361df3db6ee9bea31a028b086956",
+          "bytes": 935
+        },
+        "dlms-set-block/block-count-four-cap4.udp.pcap": {
+          "sha256": "23848ab014df7adffba268527935c3f11e93790c6e8969969bc053aad0a6ed29",
+          "bytes": 629
+        },
+        "dlms-set-block/controls.json": {
+          "sha256": "321d44f92743b2a3fc3d56386ae5d6e995c4c1663281cc87637a0e6beee4b89a",
+          "bytes": 464262
+        },
+        "dlms-set-block/encoded-Data-five-bytes-cap5.tcp.pcap": {
+          "sha256": "6a3e5877fc9bcc23bdd51a1683f6a86505a8bb4308e29342f54815647c21711f",
+          "bytes": 594
+        },
+        "dlms-set-block/encoded-Data-five-bytes-cap5.udp.pcap": {
+          "sha256": "5c4192f20fc7e3a4d3c5b387a1bb0e9ee1676793b12c28e35986da2a8f8ea825",
+          "bytes": 336
+        },
+        "dlms-set-block/historical-upgrades.json": {
+          "sha256": "853979c8d47567d5eb9dd2b83a14f6b688f421c63827e5ea5c2544065ac76b8a",
+          "bytes": 22670
+        },
+        "dlms-set-block/literal-access-error-result.tcp.pcap": {
+          "sha256": "2c50f82cc833ee572f282f65a82858b36accf2fbeba20d32eccc02fbdeb407b3",
+          "bytes": 615
+        },
+        "dlms-set-block/literal-access-error-result.udp.pcap": {
+          "sha256": "67f16f14ea65a7a073df98b126d26735c39fc1de18e872227a397c121612bd02",
+          "bytes": 357
+        },
+        "dlms-set-block/malformed-assembled-Data-retires.tcp.pcap": {
+          "sha256": "62d2d35c2acd0a58c3460dcb4db27fc169ede364c9f0ddda6b1b81b7e67cd5aa",
+          "bytes": 592
+        },
+        "dlms-set-block/malformed-assembled-Data-retires.udp.pcap": {
+          "sha256": "1b19b5ae8f4cfeb53afd2e84928ed9c64bacfd631b15dd26533659203dbfb57c",
+          "bytes": 334
+        },
+        "dlms-set-block/missing-ACK-no-stitch.tcp.pcap": {
+          "sha256": "115e61ccc00e26956286ad2942e88710a53f10be7c4325796ceab06e31ac0c6a",
+          "bytes": 530
+        },
+        "dlms-set-block/missing-ACK-no-stitch.udp.pcap": {
+          "sha256": "ced09c805a93813f93660446d40a379421db9a112d0a0a7db6914f24b2b23f56",
+          "bytes": 284
+        },
+        "dlms-set-block/next-number3-gap-retires.tcp.pcap": {
+          "sha256": "abec70dcac3873a76e013ae499807aecb710e4c1440cc302f7b68bec016ce23b",
+          "bytes": 615
+        },
+        "dlms-set-block/next-number3-gap-retires.udp.pcap": {
+          "sha256": "230e718143c531b810c205b7bd6d4df4517cffd0cb81f90f7692866f31eb73eb",
+          "bytes": 357
+        },
+        "dlms-set-block/official-two-block-complete.tcp.pcap": {
+          "sha256": "86a3bcaa0548425ce5b297d13712d57a65c20e06f081627034c2d9ba9396b809",
+          "bytes": 615
+        },
+        "dlms-set-block/official-two-block-complete.udp.pcap": {
+          "sha256": "e89b34426e3f07992e887b44a28d12f50218fc22a79234cc9007c4ad0e09f5c0",
+          "bytes": 357
+        },
+        "dlms-set-block/orphan-next-wire-only.tcp.pcap": {
+          "sha256": "86efb2f9e8acdd79795292c13ed74036f91fadf38a6c1c55431b740994c336c7",
+          "bytes": 420
+        },
+        "dlms-set-block/orphan-next-wire-only.udp.pcap": {
+          "sha256": "8f0d73282adc25151582befcddbb54da2f09cf100c8f0d3b3481c5b0d90ffdd4",
+          "bytes": 186
+        },
+        "dlms-set-block/pending-first-private-Close.tcp.pcap": {
+          "sha256": "474e8def9f7beb10cd70bd2bb23e77d18d27057da91991100d14cf92aa86b374",
+          "bytes": 344
+        },
+        "dlms-set-block/pending-first-private-Close.udp.pcap": {
+          "sha256": "c3df4786cf621a2c9ff6673efdb442623503a89d0885b8cb3149d14fdaf70225",
+          "bytes": 122
+        },
+        "dlms-set-block/projection.json": {
+          "sha256": "c631d9e5da60d12e2a8efae0b2805d03700c8cdbeebcdd4505452458aaeecaa5",
+          "bytes": 67507
+        },
+        "dlms-set-block/repeated-first-never-append.tcp.pcap": {
+          "sha256": "344146b5a915f9d9cc597fb50dd9d5fa126f0c74f08b2dbfd6304c9a4603d84f",
+          "bytes": 725
+        },
+        "dlms-set-block/repeated-first-never-append.udp.pcap": {
+          "sha256": "6f089733071cebd997aa515dad2a76c62e65b350679b3216194ed07f47f7fb44",
+          "bytes": 455
+        },
+        "dlms-set-block/reuse-inputs.json": {
+          "sha256": "ca3d163bab055381827226140568f3bef7eaac187cebd76878e0b63e9e442356",
+          "bytes": 3
+        },
+        "dlms-set-block/shared-four-Data-nodes-cap4.tcp.pcap": {
+          "sha256": "28edb8cd5aa4e00beddb0a206c698c5fb1b16cb189b756fc21f6d6c18481e1dd",
+          "bytes": 598
+        },
+        "dlms-set-block/shared-four-Data-nodes-cap4.udp.pcap": {
+          "sha256": "6e384f94b88b4ff4ff86393d4f98d7e053942fb57762aaa280453d0973e01e43",
+          "bytes": 340
+        },
+        "dlms-set-block/single-first-last.tcp.pcap": {
+          "sha256": "6c4acd23e0a156f3d3cafb5b3451dc2fc8928d124ec7f1e8b4e5366b17093678",
+          "bytes": 419
+        },
+        "dlms-set-block/single-first-last.udp.pcap": {
+          "sha256": "33e490a2710dff73411837a8fa97ece4bfbc66a4839e46c353baa5e36a50059c",
+          "bytes": 185
+        },
+        "dlms-set-block/wrong-ACK-number99-retires.tcp.pcap": {
+          "sha256": "c384824887047bdcb3ab0b7bb9f7dc8bc389a81b7feb80a29453fddc0a8dba91",
+          "bytes": 700
+        },
+        "dlms-set-block/wrong-ACK-number99-retires.udp.pcap": {
+          "sha256": "92be8cf863e876c8f33cd6b5d0509bb931a64e3cbed61b2841eed997e40319e9",
+          "bytes": 430
+        },
+        "dlms-set-block/wrong-direction-wPorts-preserves.tcp.pcap": {
+          "sha256": "1f9a39d85b8dc48ff7dafe80b2c9ca985bf96d8a21fc48cd0ba5cc1ee3b373da",
+          "bytes": 785
+        },
+        "dlms-set-block/wrong-direction-wPorts-preserves.udp.pcap": {
+          "sha256": "33d8fe37d96539bfbe80090873ae5350178c233ed1d80702631d82aa1feff054",
+          "bytes": 503
+        },
+        "dlms-set-block/wrong-full-flags-first-preserves.tcp.pcap": {
+          "sha256": "7babc74052d7ab6036e68ed6b0fe5825a8f9dfadd6c38f6295f59b7c01dc3978",
+          "bytes": 725
+        },
+        "dlms-set-block/wrong-full-flags-first-preserves.udp.pcap": {
+          "sha256": "52f9b6720559c7d78f7b98c11939b59f487d14a2ee1285592e6081fc9cd843b5",
+          "bytes": 455
+        },
+        "required-tests-traffic-unified-v129.json": {
+          "sha256": "9d519a0da66789cdfe9c97408898df994ca4f2bc1ec8432beacf47a4e79ea6c3",
+          "bytes": 22523403
+        },
+        "validation/expected.json": {
+          "sha256": "49ba1743e750e3451d04abbfd2ed2f74fd2e25d6e8c5a677d248295db1bad0f9",
+          "bytes": 45923
+        }
+      },
+      "aliases": {
+        "common/pcapx/pcaputil/dlms-set-block-tools/SOURCES.json": "dlms-set-block-tools/SOURCES.json",
+        "common/pcapx/pcaputil/dlms-set-block-tools/build-budget-extended.py": "dlms-set-block-tools/build-budget-extended.py",
+        "common/pcapx/pcaputil/dlms-set-block-tools/build-corrected.py": "dlms-set-block-tools/build-corrected.py",
+        "common/pcapx/pcaputil/dlms-set-block-tools/build-extended.py": "dlms-set-block-tools/build-extended.py",
+        "common/pcapx/pcaputil/dlms-set-block-tools/data-model.py": "dlms-set-block-tools/data-model.py",
+        "common/pcapx/pcaputil/dlms-set-block-tools/generate-controls.py": "dlms-set-block-tools/generate-controls.py",
+        "common/pcapx/pcaputil/dlms-set-block-tools/generate-historical-upgrade.py": "dlms-set-block-tools/generate-historical-upgrade.py",
+        "common/pcapx/pcaputil/dlms-set-block-tools/generate-projection.py": "dlms-set-block-tools/generate-projection.py",
+        "common/pcapx/pcaputil/dlms-set-block-tools/generate.py": "dlms-set-block-tools/generate.py",
+        "common/pcapx/pcaputil/dlms-set-block-tools/projection-model.py": "dlms-set-block-tools/projection-model.py",
+        "common/pcapx/pcaputil/dlms-set-block-tools/reference-check.py": "dlms-set-block-tools/reference-check.py",
+        "common/pcapx/pcaputil/dlms-set-block-tools/reference-vectors.json": "dlms-set-block-tools/reference-vectors.json",
+        "common/pcapx/pcaputil/dlms-set-block-tools/reference.py": "dlms-set-block-tools/reference.py",
+        "common/pcapx/pcaputil/dlms-set-block-tools/verify-captures.py": "dlms-set-block-tools/verify-captures.py",
+        "common/pcapx/pcaputil/dlms-set-block-tools/verify-projection.py": "dlms-set-block-tools/verify-projection.py",
+        "common/pcapx/pcaputil/dlms-set-block-tools/verify.py": "dlms-set-block-tools/verify.py",
+        "common/pcapx/pcaputil/dlms-set-block/block-count-four-cap4.tcp.pcap": "dlms-set-block/block-count-four-cap4.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-set-block/block-count-four-cap4.udp.pcap": "dlms-set-block/block-count-four-cap4.udp.pcap",
+        "common/pcapx/pcaputil/dlms-set-block/controls.json": "dlms-set-block/controls.json",
+        "common/pcapx/pcaputil/dlms-set-block/encoded-Data-five-bytes-cap5.tcp.pcap": "dlms-set-block/encoded-Data-five-bytes-cap5.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-set-block/encoded-Data-five-bytes-cap5.udp.pcap": "dlms-set-block/encoded-Data-five-bytes-cap5.udp.pcap",
+        "common/pcapx/pcaputil/dlms-set-block/historical-upgrades.json": "dlms-set-block/historical-upgrades.json",
+        "common/pcapx/pcaputil/dlms-set-block/literal-access-error-result.tcp.pcap": "dlms-set-block/literal-access-error-result.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-set-block/literal-access-error-result.udp.pcap": "dlms-set-block/literal-access-error-result.udp.pcap",
+        "common/pcapx/pcaputil/dlms-set-block/malformed-assembled-Data-retires.tcp.pcap": "dlms-set-block/malformed-assembled-Data-retires.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-set-block/malformed-assembled-Data-retires.udp.pcap": "dlms-set-block/malformed-assembled-Data-retires.udp.pcap",
+        "common/pcapx/pcaputil/dlms-set-block/missing-ACK-no-stitch.tcp.pcap": "dlms-set-block/missing-ACK-no-stitch.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-set-block/missing-ACK-no-stitch.udp.pcap": "dlms-set-block/missing-ACK-no-stitch.udp.pcap",
+        "common/pcapx/pcaputil/dlms-set-block/next-number3-gap-retires.tcp.pcap": "dlms-set-block/next-number3-gap-retires.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-set-block/next-number3-gap-retires.udp.pcap": "dlms-set-block/next-number3-gap-retires.udp.pcap",
+        "common/pcapx/pcaputil/dlms-set-block/official-two-block-complete.tcp.pcap": "dlms-set-block/official-two-block-complete.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-set-block/official-two-block-complete.udp.pcap": "dlms-set-block/official-two-block-complete.udp.pcap",
+        "common/pcapx/pcaputil/dlms-set-block/orphan-next-wire-only.tcp.pcap": "dlms-set-block/orphan-next-wire-only.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-set-block/orphan-next-wire-only.udp.pcap": "dlms-set-block/orphan-next-wire-only.udp.pcap",
+        "common/pcapx/pcaputil/dlms-set-block/pending-first-private-Close.tcp.pcap": "dlms-set-block/pending-first-private-Close.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-set-block/pending-first-private-Close.udp.pcap": "dlms-set-block/pending-first-private-Close.udp.pcap",
+        "common/pcapx/pcaputil/dlms-set-block/projection.json": "dlms-set-block/projection.json",
+        "common/pcapx/pcaputil/dlms-set-block/repeated-first-never-append.tcp.pcap": "dlms-set-block/repeated-first-never-append.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-set-block/repeated-first-never-append.udp.pcap": "dlms-set-block/repeated-first-never-append.udp.pcap",
+        "common/pcapx/pcaputil/dlms-set-block/reuse-inputs.json": "dlms-set-block/reuse-inputs.json",
+        "common/pcapx/pcaputil/dlms-set-block/shared-four-Data-nodes-cap4.tcp.pcap": "dlms-set-block/shared-four-Data-nodes-cap4.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-set-block/shared-four-Data-nodes-cap4.udp.pcap": "dlms-set-block/shared-four-Data-nodes-cap4.udp.pcap",
+        "common/pcapx/pcaputil/dlms-set-block/single-first-last.tcp.pcap": "dlms-set-block/single-first-last.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-set-block/single-first-last.udp.pcap": "dlms-set-block/single-first-last.udp.pcap",
+        "common/pcapx/pcaputil/dlms-set-block/wrong-ACK-number99-retires.tcp.pcap": "dlms-set-block/wrong-ACK-number99-retires.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-set-block/wrong-ACK-number99-retires.udp.pcap": "dlms-set-block/wrong-ACK-number99-retires.udp.pcap",
+        "common/pcapx/pcaputil/dlms-set-block/wrong-direction-wPorts-preserves.tcp.pcap": "dlms-set-block/wrong-direction-wPorts-preserves.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-set-block/wrong-direction-wPorts-preserves.udp.pcap": "dlms-set-block/wrong-direction-wPorts-preserves.udp.pcap",
+        "common/pcapx/pcaputil/dlms-set-block/wrong-full-flags-first-preserves.tcp.pcap": "dlms-set-block/wrong-full-flags-first-preserves.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-set-block/wrong-full-flags-first-preserves.udp.pcap": "dlms-set-block/wrong-full-flags-first-preserves.udp.pcap",
+        "common/pcapx/pcaputil/dlms-set-block/shared-four-Data-nodes-cap3.udp.pcap": "dlms-set-block/shared-four-Data-nodes-cap4.udp.pcap",
+        "common/pcapx/pcaputil/dlms-set-block/shared-four-Data-nodes-cap3.tcp.pcap": "dlms-set-block/shared-four-Data-nodes-cap4.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-set-block/block-count-four-cap3-refused.udp.pcap": "dlms-set-block/block-count-four-cap4.udp.pcap",
+        "common/pcapx/pcaputil/dlms-set-block/block-count-four-cap3-refused.tcp.pcap": "dlms-set-block/block-count-four-cap4.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-set-block/encoded-Data-five-bytes-cap4-refused.udp.pcap": "dlms-set-block/encoded-Data-five-bytes-cap5.udp.pcap",
+        "common/pcapx/pcaputil/dlms-set-block/encoded-Data-five-bytes-cap4-refused.tcp.pcap": "dlms-set-block/encoded-Data-five-bytes-cap5.tcp.pcap",
+        "scripts/protocol-tests/required-tests-traffic-unified-v129.json": "required-tests-traffic-unified-v129.json"
+      }
     }
   ],
   "schema_version": 1,
