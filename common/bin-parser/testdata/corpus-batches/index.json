@@ -109957,6 +109957,306 @@
         "common/pcapx/pcaputil/dlms-action-upload/assembled-structure-depth5.tcp.pcap": "dlms-action-upload/assembled-structure-depth6.tcp.pcap",
         "scripts/protocol-tests/required-tests-traffic-unified-v131.json": "required-tests-traffic-unified-v131.json"
       }
+    },
+    {
+      "id": "validation-dlms-action-download",
+      "kind": "support",
+      "source_sha": "17a9f8ebd9352173cde65e58921b34dbbd8a5bfe",
+      "file": "validation-dlms-action-download.zip",
+      "sha256": "49f71668b91f82cadd056dfe766acbe5743a5d04043c4ea316afcf3cab1083c9",
+      "password": "bin-parser",
+      "members": {
+        "dlms-action-download-tools/FIELD-CONTRACT.json": {
+          "bytes": 1860,
+          "sha256": "c643d77699cc5819f6e0e55b052460d6fdf146757fd2e8b18d335b14ee7021dd"
+        },
+        "dlms-action-download-tools/SOURCES.json": {
+          "bytes": 2506,
+          "sha256": "78ff16cdfb4e158cef605f2b506782602b577372d407aff0abd91c9dd40d7a0b"
+        },
+        "dlms-action-download-tools/data-model.py": {
+          "bytes": 1624,
+          "sha256": "03dbaaa0f3c564db04440c0fbee8742e407f825de889b7a6e0012a49e6a06f4e"
+        },
+        "dlms-action-download-tools/generate-captures.py": {
+          "bytes": 1815,
+          "sha256": "384aca564ee75ffb28e88bbbf9a5acc49b280d0233f7858d4e5fc8fdd825a9e8"
+        },
+        "dlms-action-download-tools/generate-projection.py": {
+          "bytes": 6176,
+          "sha256": "f98ee011a86c87a3aeeb11b4d6ea8e95626e51442d0f5a740af8e48298c150d3"
+        },
+        "dlms-action-download-tools/generate.py": {
+          "bytes": 11892,
+          "sha256": "d3234db2f05d041493e48ba5d3f847f7f7a75c0b1ef6dc1009569b738b76123f"
+        },
+        "dlms-action-download-tools/reference-check.py": {
+          "bytes": 1115,
+          "sha256": "e6fbf78957ff67f3eac8bdf20c1af5313f5c4d18c68afea902fbbf25777f743c"
+        },
+        "dlms-action-download-tools/reference-projection-vectors.json": {
+          "bytes": 2715,
+          "sha256": "889cfdba5a6d3a47d7aff1b1a442cbf2370e55d4cc8d45668da452f10120960e"
+        },
+        "dlms-action-download-tools/reference-vectors.json": {
+          "bytes": 2713,
+          "sha256": "8bece585aaea89ce64ff4af6da97dd71c9fec7a18841d89712024a621cdb6b33"
+        },
+        "dlms-action-download-tools/reference.py": {
+          "bytes": 4649,
+          "sha256": "a1f1af2f19b2ca4aa6b46548636839c02d01aac6a423ab6b55ef9ef6e79d5128"
+        },
+        "dlms-action-download-tools/verify-captures.py": {
+          "bytes": 3504,
+          "sha256": "160b76c0e1c4f1c77284600778938019bccb9197c16f443856cb489dda8f2387"
+        },
+        "dlms-action-download-tools/verify-projection.py": {
+          "bytes": 1689,
+          "sha256": "39b67b0c284c04a84bf5fc307b74661f718bfdd3eb2f80dbf127f809ab08a235"
+        },
+        "dlms-action-download-tools/verify.py": {
+          "bytes": 1998,
+          "sha256": "fb780044957363bfba2b4178cf059f4c2da632819fec2376c813af3637b58add"
+        },
+        "dlms-action-download/aggregate-five-bytes-cap5.tcp.pcap": {
+          "bytes": 677,
+          "sha256": "6e596fe6fee0edaee63726c2ddbc10c5759de49790b6e03ea3ecda2ea89de3a7"
+        },
+        "dlms-action-download/aggregate-five-bytes-cap5.udp.pcap": {
+          "bytes": 407,
+          "sha256": "43eddaed9242ee20097e176253ac292dbf83b843fbf93c063594e32cc38ff011"
+        },
+        "dlms-action-download/assembled-Data-trailing-byte.tcp.pcap": {
+          "bytes": 675,
+          "sha256": "c684b4e2f2908e98bf27c33c85590d5fc6713319176a548b4d04c8bb8a32081d"
+        },
+        "dlms-action-download/assembled-Data-trailing-byte.udp.pcap": {
+          "bytes": 405,
+          "sha256": "f3d80f751337b88a00e6cc8bdd2742b778929292c97a3d2ad27600d51409ab83"
+        },
+        "dlms-action-download/controls.json": {
+          "bytes": 494497,
+          "sha256": "056a5866bd513e9bceb2ed0894960df1f773f7c61d6b64f45f0c55b30a4c4d42"
+        },
+        "dlms-action-download/download-cannot-consume-Get-root.tcp.pcap": {
+          "bytes": 609,
+          "sha256": "7807a6c21d79c7787c5dbcee520b596bfb01e1efeecdf034300a2ee609a1651f"
+        },
+        "dlms-action-download/download-cannot-consume-Get-root.udp.pcap": {
+          "bytes": 351,
+          "sha256": "2924a5edb62a6b24fc277f95a09af7ffbb9d427f6945f4da769ef4a47d301ea9"
+        },
+        "dlms-action-download/duplicate-first-response-quarantines.tcp.pcap": {
+          "bytes": 715,
+          "sha256": "1752edc09a84b9ffccb99974f6192d0aab88a798a1caa3f925289b0f3d04da11"
+        },
+        "dlms-action-download/duplicate-first-response-quarantines.udp.pcap": {
+          "bytes": 445,
+          "sha256": "4cf00067f3110a3c6da668863628aad94d3f3ea984d2fdced317bd51decf3120"
+        },
+        "dlms-action-download/existing-Action-normal-neighbor.tcp.pcap": {
+          "bytes": 413,
+          "sha256": "35b6d585941b41834a7a9b18aed40201e005b6cd1b48d95b2ba2da143f7c64d6"
+        },
+        "dlms-action-download/first-response-number99.tcp.pcap": {
+          "bytes": 615,
+          "sha256": "620b9744dc92c23a1f79066665df7c57fbabb193deb0b4a9538a48c1729d4330"
+        },
+        "dlms-action-download/first-response-number99.udp.pcap": {
+          "bytes": 357,
+          "sha256": "ec74e63807098dabce8db02ff7a57f9d2de3c53d057337fdbd223d0ec71d2646"
+        },
+        "dlms-action-download/four-blocks-cap4.tcp.pcap": {
+          "bytes": 1018,
+          "sha256": "593dee27a601036bd3a6e0973274514489f3d384b8b963a3f5db7a6f95f03023"
+        },
+        "dlms-action-download/four-blocks-cap4.udp.pcap": {
+          "bytes": 700,
+          "sha256": "1fbbba50e1139be08f276dd1b8b311e04af0316695e4c5c0937ce4806ac1771d"
+        },
+        "dlms-action-download/known-context-last-raw-truncated.tcp.pcap": {
+          "bytes": 686,
+          "sha256": "7b1b787933b40981c6ace5523c24470c1e88ff0d559f8cc88fdc6e80f22ceb25"
+        },
+        "dlms-action-download/known-context-last-raw-truncated.udp.pcap": {
+          "bytes": 416,
+          "sha256": "5d7d0d9f0309f4d7e2fda233385527d7505449380a538fd1578edf17a28e0def"
+        },
+        "dlms-action-download/missing-next-no-stitch.tcp.pcap": {
+          "bytes": 715,
+          "sha256": "fc4d09a76a688154dda54fc257cb6cdd223cc3b1a301a2f777f76d617223542d"
+        },
+        "dlms-action-download/missing-next-no-stitch.udp.pcap": {
+          "bytes": 445,
+          "sha256": "9148f4bd53986455834be752dcc5180eb2da52af5a5a4f1b6aae6f7fa748d5bc"
+        },
+        "dlms-action-download/next-awaiting-tail-private-Close.tcp.pcap": {
+          "bytes": 515,
+          "sha256": "9077431e021cae351c61f23eca301a1fdb3bd04d4713b9ae945ba9e6e92672d0"
+        },
+        "dlms-action-download/next-awaiting-tail-private-Close.udp.pcap": {
+          "bytes": 269,
+          "sha256": "415680ad91e673938f11bdee29346df875d36b188dac46aff35d3eb9b9fff3b8"
+        },
+        "dlms-action-download/official-decoder-and-receiverReady-two-block-download.tcp.pcap": {
+          "bytes": 615,
+          "sha256": "20d27d9e28050d6927e67bddaaf73dbdd29910cfbe41f65ba59d6797ff21deb4"
+        },
+        "dlms-action-download/official-decoder-and-receiverReady-two-block-download.udp.pcap": {
+          "bytes": 357,
+          "sha256": "b887a36d94947963b64be544f91755a0dd38b950208ae7aef20de57004bdb647"
+        },
+        "dlms-action-download/partial-download-private-Close.tcp.pcap": {
+          "bytes": 430,
+          "sha256": "3e419d1e05eb0f3d9ec89ac2d8904b41dde79b9480e294d90990ba14fafda33d"
+        },
+        "dlms-action-download/partial-download-private-Close.udp.pcap": {
+          "bytes": 196,
+          "sha256": "adbd981f04a9a4ccf11d58cf0c237aa7e5fee9635018535bd3b208b9fb0decc7"
+        },
+        "dlms-action-download/projection.json": {
+          "bytes": 69508,
+          "sha256": "b0ad36a753a12f33c9b37e7dcda140f534bea4e0b8b750c5f553934778b56f35"
+        },
+        "dlms-action-download/reuse-inputs.json": {
+          "bytes": 102,
+          "sha256": "e82a15eadb87195a734cb13051b361201e557fe2bd1409e258c9ddab2e77fa14"
+        },
+        "dlms-action-download/single-last-structure-depth5-refusal.tcp.pcap": {
+          "bytes": 506,
+          "sha256": "67b34f95554cc2de685c9a647bb2998211f8146132a7d1c41a2109434b813948"
+        },
+        "dlms-action-download/single-last-structure-depth5-refusal.udp.pcap": {
+          "bytes": 260,
+          "sha256": "0487a5c0540c8a1b1066f4b567af362b68e54622159614e037b20f7f556b0c2b"
+        },
+        "dlms-action-download/single-last-structure-depth6.tcp.pcap": {
+          "bytes": 423,
+          "sha256": "00b11cc3e91628f16e15e57a4de0d875e83fdc55c230449b8ba2feb06b4383af"
+        },
+        "dlms-action-download/single-last-structure-depth6.udp.pcap": {
+          "bytes": 189,
+          "sha256": "4d3d8cf36b76c13f1c4f8057d013837f9796841460d95861b8acbdd7e3c72897"
+        },
+        "dlms-action-download/wrong-flags-direction-wport-preserve-owner.tcp.pcap": {
+          "bytes": 1000,
+          "sha256": "6dc0188ad023e99277dc84a2745ab8601c8930ea4de14d4055489ee7eb83e07d"
+        },
+        "dlms-action-download/wrong-flags-direction-wport-preserve-owner.udp.pcap": {
+          "bytes": 694,
+          "sha256": "6d803c1768db88729a0b02d341d7a796ea510f2f6c216c8be66fbfd76bb225de"
+        },
+        "dlms-action-download/wrong-next-current-number99.tcp.pcap": {
+          "bytes": 700,
+          "sha256": "95bfa565fb5f99e557da03d3f2446e4baa4115da1cdb3a404709b1c97da84622"
+        },
+        "dlms-action-download/wrong-next-current-number99.udp.pcap": {
+          "bytes": 430,
+          "sha256": "d2ea9a0fc2d5ccdfbd0d321f1565239680c9126eda4147f3085259ff683aebde"
+        },
+        "dlms-hdlc-set-final-retry-tools/generate-captures.py": {
+          "bytes": 1820,
+          "sha256": "3dcb45d10bbbbb629caf1021014dd70fbc2415542cfcc55adcd0f0ee1e0fb708"
+        },
+        "dlms-hdlc-set-final-retry-tools/generate.py": {
+          "bytes": 3822,
+          "sha256": "2e70e2cc3989803d6bd45ab99910081d83a277f11afb0a19c0f2042a47c7491f"
+        },
+        "dlms-hdlc-set-final-retry/controls.json": {
+          "bytes": 107835,
+          "sha256": "366bff5c587bac871fbbcb43b360f3b9a947f8890293af967f20ab67d51db556"
+        },
+        "dlms-hdlc-set-final-retry/multi-last-exact-retry-keeps-assembled-Data.tcp.pcap": {
+          "bytes": 932,
+          "sha256": "177e7623cd1369331bd3df9731508c4a8a953356bd9f2908bffe1ded4a3f78e1"
+        },
+        "dlms-hdlc-set-final-retry/multi-last-exact-retry-keeps-assembled-Data.udp.pcap": {
+          "bytes": 638,
+          "sha256": "6ab17a9aec3045699a4a8c6819c234c8994476909b4c8b814d2ed1164853f057"
+        },
+        "dlms-hdlc-set-final-retry/reuse-inputs.json": {
+          "bytes": 3,
+          "sha256": "ca3d163bab055381827226140568f3bef7eaac187cebd76878e0b63e9e442356"
+        },
+        "dlms-hdlc-set-final-retry/single-first-last-exact-retry-keeps-assembled-Data.tcp.pcap": {
+          "bytes": 723,
+          "sha256": "6f04d9c411a3196d76df4dc11498283bc44bf624b170f2d8a9d05818e257d193"
+        },
+        "dlms-hdlc-set-final-retry/single-first-last-exact-retry-keeps-assembled-Data.udp.pcap": {
+          "bytes": 453,
+          "sha256": "657c6f9f209d1980005d4d4559d298bb7ba8f9347ceaa2edae30e62b598558ee"
+        },
+        "required-tests-traffic-unified-v132.json": {
+          "bytes": 23079431,
+          "sha256": "f1829af418da4700e6b7c50d29ba57b45732f4a904a6184dfff595bdd0245166"
+        },
+        "validation/expected.json": {
+          "bytes": 51752,
+          "sha256": "fbcdbf2c87d9fe78343ec7095097344a4755778d69b6103afbf7098b379f70ac"
+        }
+      },
+      "aliases": {
+        "common/pcapx/pcaputil/dlms-action-download-tools/FIELD-CONTRACT.json": "dlms-action-download-tools/FIELD-CONTRACT.json",
+        "common/pcapx/pcaputil/dlms-action-download-tools/SOURCES.json": "dlms-action-download-tools/SOURCES.json",
+        "common/pcapx/pcaputil/dlms-action-download-tools/data-model.py": "dlms-action-download-tools/data-model.py",
+        "common/pcapx/pcaputil/dlms-action-download-tools/generate-captures.py": "dlms-action-download-tools/generate-captures.py",
+        "common/pcapx/pcaputil/dlms-action-download-tools/generate-projection.py": "dlms-action-download-tools/generate-projection.py",
+        "common/pcapx/pcaputil/dlms-action-download-tools/generate.py": "dlms-action-download-tools/generate.py",
+        "common/pcapx/pcaputil/dlms-action-download-tools/reference-check.py": "dlms-action-download-tools/reference-check.py",
+        "common/pcapx/pcaputil/dlms-action-download-tools/reference-projection-vectors.json": "dlms-action-download-tools/reference-projection-vectors.json",
+        "common/pcapx/pcaputil/dlms-action-download-tools/reference-vectors.json": "dlms-action-download-tools/reference-vectors.json",
+        "common/pcapx/pcaputil/dlms-action-download-tools/reference.py": "dlms-action-download-tools/reference.py",
+        "common/pcapx/pcaputil/dlms-action-download-tools/verify-captures.py": "dlms-action-download-tools/verify-captures.py",
+        "common/pcapx/pcaputil/dlms-action-download-tools/verify-projection.py": "dlms-action-download-tools/verify-projection.py",
+        "common/pcapx/pcaputil/dlms-action-download-tools/verify.py": "dlms-action-download-tools/verify.py",
+        "common/pcapx/pcaputil/dlms-action-download/aggregate-five-bytes-cap5.tcp.pcap": "dlms-action-download/aggregate-five-bytes-cap5.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-action-download/aggregate-five-bytes-cap5.udp.pcap": "dlms-action-download/aggregate-five-bytes-cap5.udp.pcap",
+        "common/pcapx/pcaputil/dlms-action-download/assembled-Data-trailing-byte.tcp.pcap": "dlms-action-download/assembled-Data-trailing-byte.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-action-download/assembled-Data-trailing-byte.udp.pcap": "dlms-action-download/assembled-Data-trailing-byte.udp.pcap",
+        "common/pcapx/pcaputil/dlms-action-download/controls.json": "dlms-action-download/controls.json",
+        "common/pcapx/pcaputil/dlms-action-download/download-cannot-consume-Get-root.tcp.pcap": "dlms-action-download/download-cannot-consume-Get-root.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-action-download/download-cannot-consume-Get-root.udp.pcap": "dlms-action-download/download-cannot-consume-Get-root.udp.pcap",
+        "common/pcapx/pcaputil/dlms-action-download/duplicate-first-response-quarantines.tcp.pcap": "dlms-action-download/duplicate-first-response-quarantines.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-action-download/duplicate-first-response-quarantines.udp.pcap": "dlms-action-download/duplicate-first-response-quarantines.udp.pcap",
+        "common/pcapx/pcaputil/dlms-action-download/existing-Action-normal-neighbor.tcp.pcap": "dlms-action-download/existing-Action-normal-neighbor.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-action-download/first-response-number99.tcp.pcap": "dlms-action-download/first-response-number99.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-action-download/first-response-number99.udp.pcap": "dlms-action-download/first-response-number99.udp.pcap",
+        "common/pcapx/pcaputil/dlms-action-download/four-blocks-cap4.tcp.pcap": "dlms-action-download/four-blocks-cap4.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-action-download/four-blocks-cap4.udp.pcap": "dlms-action-download/four-blocks-cap4.udp.pcap",
+        "common/pcapx/pcaputil/dlms-action-download/known-context-last-raw-truncated.tcp.pcap": "dlms-action-download/known-context-last-raw-truncated.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-action-download/known-context-last-raw-truncated.udp.pcap": "dlms-action-download/known-context-last-raw-truncated.udp.pcap",
+        "common/pcapx/pcaputil/dlms-action-download/missing-next-no-stitch.tcp.pcap": "dlms-action-download/missing-next-no-stitch.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-action-download/missing-next-no-stitch.udp.pcap": "dlms-action-download/missing-next-no-stitch.udp.pcap",
+        "common/pcapx/pcaputil/dlms-action-download/next-awaiting-tail-private-Close.tcp.pcap": "dlms-action-download/next-awaiting-tail-private-Close.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-action-download/next-awaiting-tail-private-Close.udp.pcap": "dlms-action-download/next-awaiting-tail-private-Close.udp.pcap",
+        "common/pcapx/pcaputil/dlms-action-download/official-decoder-and-receiverReady-two-block-download.tcp.pcap": "dlms-action-download/official-decoder-and-receiverReady-two-block-download.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-action-download/official-decoder-and-receiverReady-two-block-download.udp.pcap": "dlms-action-download/official-decoder-and-receiverReady-two-block-download.udp.pcap",
+        "common/pcapx/pcaputil/dlms-action-download/partial-download-private-Close.tcp.pcap": "dlms-action-download/partial-download-private-Close.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-action-download/partial-download-private-Close.udp.pcap": "dlms-action-download/partial-download-private-Close.udp.pcap",
+        "common/pcapx/pcaputil/dlms-action-download/projection.json": "dlms-action-download/projection.json",
+        "common/pcapx/pcaputil/dlms-action-download/reuse-inputs.json": "dlms-action-download/reuse-inputs.json",
+        "common/pcapx/pcaputil/dlms-action-download/single-last-structure-depth5-refusal.tcp.pcap": "dlms-action-download/single-last-structure-depth5-refusal.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-action-download/single-last-structure-depth5-refusal.udp.pcap": "dlms-action-download/single-last-structure-depth5-refusal.udp.pcap",
+        "common/pcapx/pcaputil/dlms-action-download/single-last-structure-depth6.tcp.pcap": "dlms-action-download/single-last-structure-depth6.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-action-download/single-last-structure-depth6.udp.pcap": "dlms-action-download/single-last-structure-depth6.udp.pcap",
+        "common/pcapx/pcaputil/dlms-action-download/wrong-flags-direction-wport-preserve-owner.tcp.pcap": "dlms-action-download/wrong-flags-direction-wport-preserve-owner.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-action-download/wrong-flags-direction-wport-preserve-owner.udp.pcap": "dlms-action-download/wrong-flags-direction-wport-preserve-owner.udp.pcap",
+        "common/pcapx/pcaputil/dlms-action-download/wrong-next-current-number99.tcp.pcap": "dlms-action-download/wrong-next-current-number99.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-action-download/wrong-next-current-number99.udp.pcap": "dlms-action-download/wrong-next-current-number99.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-set-final-retry-tools/generate-captures.py": "dlms-hdlc-set-final-retry-tools/generate-captures.py",
+        "common/pcapx/pcaputil/dlms-hdlc-set-final-retry-tools/generate.py": "dlms-hdlc-set-final-retry-tools/generate.py",
+        "common/pcapx/pcaputil/dlms-hdlc-set-final-retry/controls.json": "dlms-hdlc-set-final-retry/controls.json",
+        "common/pcapx/pcaputil/dlms-hdlc-set-final-retry/multi-last-exact-retry-keeps-assembled-Data.tcp.pcap": "dlms-hdlc-set-final-retry/multi-last-exact-retry-keeps-assembled-Data.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-set-final-retry/multi-last-exact-retry-keeps-assembled-Data.udp.pcap": "dlms-hdlc-set-final-retry/multi-last-exact-retry-keeps-assembled-Data.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-set-final-retry/reuse-inputs.json": "dlms-hdlc-set-final-retry/reuse-inputs.json",
+        "common/pcapx/pcaputil/dlms-hdlc-set-final-retry/single-first-last-exact-retry-keeps-assembled-Data.tcp.pcap": "dlms-hdlc-set-final-retry/single-first-last-exact-retry-keeps-assembled-Data.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-set-final-retry/single-first-last-exact-retry-keeps-assembled-Data.udp.pcap": "dlms-hdlc-set-final-retry/single-first-last-exact-retry-keeps-assembled-Data.udp.pcap",
+        "common/pcapx/pcaputil/dlms-action-download/aggregate-five-bytes-cap4.udp.pcap": "dlms-action-download/aggregate-five-bytes-cap5.udp.pcap",
+        "common/pcapx/pcaputil/dlms-action-download/aggregate-five-bytes-cap4.tcp.pcap": "dlms-action-download/aggregate-five-bytes-cap5.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-action-download/four-blocks-cap3.udp.pcap": "dlms-action-download/four-blocks-cap4.udp.pcap",
+        "common/pcapx/pcaputil/dlms-action-download/four-blocks-cap3.tcp.pcap": "dlms-action-download/four-blocks-cap4.tcp.pcap",
+        "scripts/protocol-tests/required-tests-traffic-unified-v132.json": "required-tests-traffic-unified-v132.json"
+      }
     }
   ],
   "schema_version": 1,

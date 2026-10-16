@@ -44,6 +44,11 @@ func (f *binFlow) consumeDLMSSetBlock(dir int, wire []byte, id uint64, m *dlmsMe
 			}
 			if s.pending != nil {
 				if s.pending.dir == dir && bytes.Equal(s.pending.wire, wire) {
+					if b.lastBlock {
+						if err := f.finishDLMSSetBlockData(t, b, t.data, t.blocks); err != nil {
+							return nil, 0, err
+						}
+					}
 					m.fields["Association"] = "retransmitted-request"
 					return m.fields, 0, nil
 				}
@@ -75,24 +80,14 @@ func (f *binFlow) consumeDLMSSetBlock(dir int, wire []byte, id uint64, m *dlmsMe
 		copy(joined, t.data)
 		copy(joined[len(t.data):], b.blockData)
 		if b.lastBlock {
-			c := wrapperListCursor{wire: joined, nodes: t.parameterNodes, maxDepth: f.a.budget.MaxRecursionDepth}
-			data, err := c.data(f.a.budget.MaxCollectionElements, 0)
-			if err == nil && c.at != len(joined) {
-				err = dlmsError(ErrMalformedMessage, "assembled SET Data has trailing bytes")
-			}
-			if err != nil {
-				s.invalidate()
-				var pe *ProtocolError
-				if errors.As(err, &pe) {
-					err = dlmsError(pe.Kind, "SET data-block: "+pe.Message)
-				}
+			if err := f.finishDLMSSetBlockData(t, b, joined, t.blocks+1); err != nil {
 				return nil, 0, err
 			}
-			b.fields["transfer_complete"], b.fields["assembled_data"], b.fields["assembled_data_hex"], b.fields["observed_block_count"] = true, data, hex.EncodeToString(joined), t.blocks+1
-			t.data = nil
-		} else {
-			t.data = joined
 		}
+		// Keep the bounded encoded proposal until the terminal response. Exact
+		// final-fragment retries must expose the same complete Data without
+		// retaining any caller-visible map or changing the original reply owner.
+		t.data = joined
 		t.blocks++
 		t.number = b.blockNumber
 		t.last = b.lastBlock
@@ -123,4 +118,22 @@ func (f *binFlow) consumeDLMSSetBlock(dir int, wire []byte, id uint64, m *dlmsMe
 	}
 	m.fields["Association"] = "observed-response"
 	return m.fields, p.id, nil
+}
+
+func (f *binFlow) finishDLMSSetBlockData(t *dlmsSetTransfer, b *wrapperMessage, joined []byte, count int) error {
+	c := wrapperListCursor{wire: joined, nodes: t.parameterNodes, maxDepth: f.a.budget.MaxRecursionDepth}
+	data, err := c.data(f.a.budget.MaxCollectionElements, 0)
+	if err == nil && c.at != len(joined) {
+		err = dlmsError(ErrMalformedMessage, "assembled SET Data has trailing bytes")
+	}
+	if err != nil {
+		f.dlms.invalidate()
+		var pe *ProtocolError
+		if errors.As(err, &pe) {
+			err = dlmsError(pe.Kind, "SET data-block: "+pe.Message)
+		}
+		return err
+	}
+	b.fields["transfer_complete"], b.fields["assembled_data"], b.fields["assembled_data_hex"], b.fields["observed_block_count"] = true, data, hex.EncodeToString(joined), count
+	return nil
 }
