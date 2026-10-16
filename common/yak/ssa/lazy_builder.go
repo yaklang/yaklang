@@ -266,10 +266,13 @@ func (p *Program) forEachFunction(fn func(*Function)) {
 			if !ok || bp == nil {
 				continue
 			}
-			for _, value := range bp.MagicMethod {
-				if fun, ok := ToFunction(value); ok && fun != nil {
-					stack = append(stack, fun)
-				}
+			if bp.MagicMethod != nil {
+				bp.MagicMethod.ForEach(func(_ BlueprintMagicMethodKind, value Value) bool {
+					if fun, ok := ToFunction(value); ok && fun != nil {
+						stack = append(stack, fun)
+					}
+					return true
+				})
 			}
 			for _, fun := range bp.NormalMethod {
 				if fun != nil {
@@ -307,10 +310,13 @@ func (p *Program) forEachFunction(fn func(*Function)) {
 }
 
 func (c *Blueprint) BuildConstructorAndDestructor() {
-	for _, value := range c.MagicMethod {
-		if function, b := ToFunction(value); b {
-			function.Build()
-		}
+	if c.MagicMethod != nil {
+		c.MagicMethod.ForEach(func(_ BlueprintMagicMethodKind, value Value) bool {
+			if function, b := ToFunction(value); b {
+				function.Build()
+			}
+			return true
+		})
 	}
 	for _, m := range c.NormalMethod {
 		m.Build()

@@ -73,7 +73,10 @@ type Blueprint struct {
 	Kind         BlueprintKind
 	NormalMethod map[string]*Function
 	StaticMethod map[string]*Function
-	MagicMethod  map[BlueprintMagicMethodKind]Value
+	// MagicMethod is a SafeMap so concurrent builders can publish a slot
+	// without a package-level mutex. Callbacks and IR emission must stay
+	// outside SafeMap's lock; ForEach already drops the lock before its callback.
+	MagicMethod *utils.SafeMapWithKey[BlueprintMagicMethodKind, Value]
 
 	NormalMember map[string][]Value
 	StaticMember map[string][]Value
@@ -118,7 +121,7 @@ func NewBlueprint(name string) *Blueprint {
 
 		NormalMethod: make(map[string]*Function),
 		StaticMethod: make(map[string]*Function),
-		MagicMethod:  make(map[BlueprintMagicMethodKind]Value),
+		MagicMethod:  utils.NewSafeMapWithKey[BlueprintMagicMethodKind, Value](),
 
 		fullTypeName: make([]string, 0),
 		LazyBuilder:  NewLazyBuilder("Blueprint:" + name),
@@ -239,28 +242,31 @@ func (c *Blueprint) addParentBlueprintEx(parent *Blueprint, relation BlueprintRe
 	for name, f := range parent.StaticMethod {
 		c.RegisterStaticMethod(name, f, false)
 	}
-	for name, f := range parent.MagicMethod {
-		// RegisterMagicMethod intentionally keeps an existing placeholder in the
-		// map while moving the effective implementation into the dedicated slot.
-		// Inherit that effective implementation so a grandchild does not fall back
-		// to its parent's stale Undefined placeholder.
-		inherited := f
-		switch name {
-		case Constructor:
-			if !utils.IsNil(parent.Constructor) {
-				inherited = parent.Constructor
+	if parent.MagicMethod != nil {
+		parent.MagicMethod.ForEach(func(name BlueprintMagicMethodKind, f Value) bool {
+			// RegisterMagicMethod intentionally keeps an existing placeholder in the
+			// map while moving the effective implementation into the dedicated slot.
+			// Inherit that effective implementation so a grandchild does not fall back
+			// to its parent's stale Undefined placeholder.
+			inherited := f
+			switch name {
+			case Constructor:
+				if !utils.IsNil(parent.Constructor) {
+					inherited = parent.Constructor
+				}
+			case Destructor:
+				if !utils.IsNil(parent.Destructor) {
+					inherited = parent.Destructor
+				}
 			}
-		case Destructor:
-			if !utils.IsNil(parent.Destructor) {
-				inherited = parent.Destructor
-			}
-		}
-		// Keep the historical generic-Blueprint contract: inherited magic
-		// methods become the child's effective constructor/destructor, while
-		// RegisterMagicMethod links them to any child-local map entry. Several
-		// weak-language frontends rely on that conservative call-side-effect
-		// model. Signature-aware frontends can use relation-only inheritance.
-		c.RegisterMagicMethod(name, inherited)
+			// Keep the historical generic-Blueprint contract: inherited magic
+			// methods become the child's effective constructor/destructor, while
+			// RegisterMagicMethod links them to any child-local map entry. Several
+			// weak-language frontends rely on that conservative call-side-effect
+			// model. Signature-aware frontends can use relation-only inheritance.
+			c.RegisterMagicMethod(name, inherited)
+			return true
+		})
 	}
 	for name, values := range parent.NormalMember {
 		if len(c.NormalMember[name]) > 0 {
