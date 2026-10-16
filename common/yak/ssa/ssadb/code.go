@@ -126,7 +126,9 @@ func GetIrCodeItemById(db *gorm.DB, progName string, id int64) *IrCode {
 	// soft-delete semantics, custom scanners). Context timeout/cancel on the
 	// native path does not fall back to GORM (that would re-hang).
 	native, err := nativeGetIrCodeItemByIdErr(db, progName, id)
-	if native != nil {
+	if native != nil || err == nil {
+		// A successful native lookup may be empty. Retrying that normal miss
+		// through GORM doubles SQL traffic during compile-time lazy lookups.
 		return native
 	}
 	if nativeContextErr(err) {
