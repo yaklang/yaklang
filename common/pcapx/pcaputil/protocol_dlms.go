@@ -509,7 +509,7 @@ func probeDLMS(w []byte, limit int) ProbeResult {
 	m, e := decodeDLMS(w[:n], elements)
 	var pe *ProtocolError
 	if errors.As(e, &pe) && pe.Kind == ErrResourceExceeded {
-		if dlmsOperationAPDU(apdu) && len(apdu) > 1 && (apdu[1] == 1 || dlmsOperationListAPDU(apdu) || apdu[0] == 0xc1 && apdu[1] == 2) && (apdu[0] == 0xc1 || apdu[0] == 0xc3) {
+		if dlmsOperationAPDU(apdu) && len(apdu) > 1 && (apdu[1] == 1 || dlmsOperationListAPDU(apdu) || apdu[0] == 0xc1 && apdu[1] == 2 || apdu[0] == 0xc3 && apdu[1] == 4) && (apdu[0] == 0xc1 || apdu[0] == 0xc3) {
 			return probeAccept("dlms", "hdlc-ln-operations", 98)
 		}
 
@@ -558,6 +558,8 @@ type binDLMS struct {
 	seqKnown            [2]bool
 	transfer            *dlmsTransfer
 	setTransfer         *dlmsSetTransfer
+	actionTransfer      *dlmsSetTransfer
+	operationProfile    string
 	fragments           *dlmsFragments
 }
 
@@ -568,6 +570,8 @@ func (s *binDLMS) invalidate() {
 	s.pending = nil
 	s.transfer = nil
 	s.setTransfer = nil
+	s.actionTransfer = nil
+	s.operationProfile = ""
 	s.fragments = nil
 	s.ambiguous = true
 }
@@ -600,7 +604,7 @@ func (s *binDLMS) consume(m *dlmsMessage, w []byte, dir int, id uint64) (map[str
 		return m.fields, 0, nil
 	}
 	if m.request {
-		if s.transfer != nil || s.setTransfer != nil {
+		if s.transfer != nil || s.setTransfer != nil || s.actionTransfer != nil {
 			s.invalidate()
 			return ctx("distinct request interrupts observed data-block transfer")
 		}
@@ -690,6 +694,9 @@ func (s *binDLMS) storage() int64 {
 	if s.setTransfer != nil {
 		n += 128 + 2*int64(len(s.setTransfer.data))
 	}
+	if s.actionTransfer != nil {
+		n += 128 + 2*int64(len(s.actionTransfer.data))
+	}
 	if s.fragments != nil {
 		n += 128 + 2*int64(len(s.fragments.info)+len(s.fragments.wire))
 	}
@@ -712,6 +719,7 @@ func (f *binFlow) consumeDLMS(dir int, w []byte, id uint64) (map[string]any, uin
 }
 func (f *binFlow) consumeDecodedDLMS(dir int, w []byte, id uint64, m *dlmsMessage) (map[string]any, uint64, error) {
 	s := f.dlms
+	s.operationProfile = ""
 	if s.fragments != nil && s.fragments.acseCommand != 0 || s.fragments == nil && m.kind == "I" && dlmsACSESegmentPrefix(m.information) {
 		return f.consumeDLMSACSESegments(dir, w, id, m)
 	}
@@ -743,6 +751,17 @@ func (f *binFlow) consumeDecodedDLMS(dir int, w []byte, id uint64, m *dlmsMessag
 	if s.setTransfer != nil && (m.kind == "I" || m.request && dlmsSequencedService(m.kind) && !(m.block != nil && m.block.setBlock)) {
 		s.invalidate()
 		return nil, 0, dlmsError(ErrContextRequired, "distinct request interrupts observed SET data-block transfer")
+	}
+	if s.actionTransfer != nil && (m.kind == "I" || m.request && dlmsSequencedService(m.kind) && !(m.block != nil && m.block.actionUpload)) {
+		s.invalidate()
+		return nil, 0, dlmsError(ErrContextRequired, "distinct request interrupts observed Action pblock transfer")
+	}
+	if m.block != nil && (m.block.actionUpload || s.actionTransfer != nil && m.kind == "ACTION" && !m.request && m.choice == 1) {
+		if s.actionTransfer == nil && m.request && m.block.blockFirst && s.pending == nil && s.seenRequest[m.invoke]&(1<<m.ns) == 0 && int(s.seenCount) >= f.a.budget.MaxCollectionElements {
+			s.invalidate()
+			return nil, 0, dlmsError(ErrResourceExceeded, "retained invoke/sequence token limit")
+		}
+		return f.consumeDLMSActionUpload(dir, w, id, m)
 	}
 	if m.block != nil && m.block.setBlock {
 		if s.setTransfer == nil && m.request && m.block.blockFirst && s.pending == nil && s.seenRequest[m.invoke]&(1<<m.ns) == 0 && int(s.seenCount) >= f.a.budget.MaxCollectionElements {
@@ -800,7 +819,7 @@ func dlmsUDPRefusalHint(w []byte) bool {
 	}
 	p := w[at+3:]
 	if bytes.Equal(p[:3], []byte{0xe6, 0xe6, 0}) && (p[3] == 0xc1 || p[3] == 0xc3) {
-		return (p[4] == 1 || dlmsOperationListAPDU(p[3:]) || dlmsSetBlockAPDU(p[3:])) && p[5]&0x30 == 0
+		return (p[4] == 1 || dlmsOperationListAPDU(p[3:]) || dlmsSetBlockAPDU(p[3:]) || dlmsActionUploadAPDU(p[3:])) && p[5]&0x30 == 0
 	}
 	return bytes.Equal(p[:4], []byte{0xe6, 0xe6, 0, 0xc0}) && (p[4] == 1 || p[4] == 2 || p[4] == 3) && p[5]&0x30 == 0
 }
@@ -918,10 +937,19 @@ func (a *binParser) decodeDLMSDatagram(e *ProtocolEvent, w []byte, explicit bool
 		}
 		f.closeSession()
 	}
+	// Capture the current event marker under the same lock as its session.
+	// A later packet or Close must not replace this observation after unlock.
+	operationProfile := ""
+	if err == nil && f.dlms != nil {
+		operationProfile = f.dlms.operationProfile
+	}
 	a.udpMu.Unlock()
 	if err == nil {
 		e.semanticFields = cloneSession(e.Session)
 		e.Profile = dlmsObservedProfile(w, e.Session)
+		if operationProfile != "" {
+			e.Profile = operationProfile
+		}
 	}
 	var resource *ProtocolError
 	if oversize || dlmsListAPDU(w) != nil && errors.As(err, &resource) && resource.Kind == ErrResourceExceeded {

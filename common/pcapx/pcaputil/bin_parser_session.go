@@ -862,6 +862,9 @@ func (f *binFlow) consumeSession(dir int, e *ProtocolEvent, result map[string]an
 		e.Session, e.ResponseTo, err = f.consumeDLMS(dir, e.Raw, e.ID)
 		if err == nil {
 			e.Profile = dlmsObservedProfile(e.Raw, e.Session)
+			if f.dlms != nil && f.dlms.operationProfile != "" {
+				e.Profile = f.dlms.operationProfile
+			}
 			e.semanticFields = cloneSession(e.Session)
 		}
 	case "genisys":
@@ -1510,6 +1513,16 @@ func (f *binFlow) finishSession(reason TrafficFlowCloseReason) {
 			e.Profile = "dlms-hdlc-set-block"
 			e.nativeDLMSOrSLMPObservation = true
 			e.Session = d.setTransfer.closeFields()
+			e.semanticSession = cloneSession(e.Session)
+			e.sessionError = &ProtocolError{Kind: ErrNeedMore, Message: e.Summary}
+			e.Error = e.Summary
+			f.a.incomplete.Add(1)
+			f.a.emit(e)
+		} else if d.actionTransfer != nil {
+			e := f.event(d.actionTransfer.initial.dir, nil, "incomplete", string(reason)+": DLMS HDLC Action-with-pblock ended with an unmatched request")
+			e.Profile = "dlms-hdlc-action-upload"
+			e.nativeDLMSOrSLMPObservation = true
+			e.Session = d.actionTransfer.closeFields()
 			e.semanticSession = cloneSession(e.Session)
 			e.sessionError = &ProtocolError{Kind: ErrNeedMore, Message: e.Summary}
 			e.Error = e.Summary

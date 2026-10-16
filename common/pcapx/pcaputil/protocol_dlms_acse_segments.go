@@ -48,7 +48,7 @@ func (f *binFlow) consumeDLMSACSESegments(dir int, wire []byte, id uint64, m *dl
 		}
 		command := m.information[3]
 		request := command == 0x60
-		if s.transfer != nil || s.setTransfer != nil {
+		if s.transfer != nil || s.setTransfer != nil || s.actionTransfer != nil {
 			return fail(ErrContextRequired, "ACSE fragments overlap active Get transfer", true)
 		}
 		if request {

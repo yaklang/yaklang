@@ -54,7 +54,7 @@ func (s *binDLMS) consumeACSE(m *dlmsMessage, w []byte, dir int, id uint64, limi
 		return s.consumeLifecycle(m, w, dir, id, limit)
 	}
 	if m.request {
-		if s.transfer != nil || s.setTransfer != nil || s.fragments != nil {
+		if s.transfer != nil || s.setTransfer != nil || s.actionTransfer != nil || s.fragments != nil {
 			s.invalidate()
 			return ctx("ACSE interrupts active Get transfer")
 		}
