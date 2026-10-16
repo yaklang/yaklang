@@ -30,9 +30,13 @@ type dlmsFragments struct {
 	actionRequestChoice          byte
 	setRequestChoice             byte
 	setResponseChoice            byte
+	snCommand                    byte
 }
 
 func (s *binDLMS) fragmentCloseDirection() int {
+	if s.fragments.snCommand != 0 {
+		return s.fragments.dir
+	}
 	if s.pending != nil {
 		return s.pending.dir
 	}
@@ -245,6 +249,9 @@ func dlmsOperationSegmentResponseChoice(p *dlmsPending) byte {
 	return p.choice
 }
 func (t *dlmsFragments) operationSegmentProfile() string {
+	if t.snCommand != 0 {
+		return "dlms-hdlc-sn-information-segmented"
+	}
 	if t.actionDownloadRequestChoice != 0 {
 		return dlmsActionDownloadRequestSegmentProfile(t.actionDownloadRequestChoice)
 	}
@@ -269,6 +276,12 @@ func (t *dlmsFragments) operationSegmentProfile() string {
 	return "dlms-hdlc-ln-operations-segmented"
 }
 func (t *dlmsFragments) serviceName() string {
+	if t.snCommand != 0 {
+		if t.snCommand == 5 || t.snCommand == 12 {
+			return "SN Read"
+		}
+		return "SN Write"
+	}
 	if t.actionDownloadRequestChoice != 0 {
 		return "Action Next Pblock"
 	}
@@ -308,6 +321,13 @@ func (t *dlmsFragments) serviceName() string {
 	return "Get"
 }
 func (t *dlmsFragments) operationCloseSummary() string {
+	if t.snCommand != 0 {
+		direction := "response"
+		if t.request {
+			direction = "request"
+		}
+		return "DLMS HDLC exchange ended with incomplete segmented " + t.serviceName() + " " + direction
+	}
 	if t.actionDownloadRequestChoice != 0 {
 		return "DLMS HDLC exchange ended with incomplete segmented Action-download request"
 	}
@@ -357,6 +377,28 @@ func (f *binFlow) dlmsOperationSegmentObservation(w []byte) string {
 	}
 	if _, _, err := dlmsAddress(w[:end], &at); err != nil || at >= end || w[at]&1 != 0 {
 		return ""
+	}
+	if f.dlms != nil && f.dlms.fragments != nil && f.dlms.fragments.snCommand != 0 {
+		return "dlms-hdlc-sn-information-segmented"
+	}
+	if f.dlms != nil && f.dlms.fragments != nil {
+		t := f.dlms.fragments
+		// The information bytes of an observed GET group can literally contain
+		// another LLC/APDU signature. Classify by its retained first service header,
+		// never reinterpret a continuation payload as a different protocol root.
+		if dlmsSNSegmentHeader(dlmsSNInformationPrefix(w)) && t.operation == "" && t.acseCommand == 0 && len(t.info) >= 6 && t.info[0] == 0xe6 && t.info[2] == 0 && (t.info[3] == 0xc0 || t.info[3] == 0xc4) {
+			switch t.info[4] {
+			case 1:
+				return "dlms-hdlc-get-normal"
+			case 2:
+				return "dlms-hdlc-get-block"
+			case 3:
+				return "dlms-hdlc-get-list"
+			}
+		}
+	}
+	if (f.dlms == nil || f.dlms.fragments == nil) && w[1]&8 != 0 && dlmsSNSegmentHeader(dlmsSNInformationPrefix(w)) {
+		return "dlms-hdlc-sn-information-segmented"
 	}
 	if f.dlms != nil && f.dlms.fragments != nil && f.dlms.fragments.operation != "" {
 		return f.dlms.fragments.operationSegmentProfile()

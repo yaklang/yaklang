@@ -116190,6 +116190,312 @@
         "common/pcapx/pcaputil/dlms-hdlc-sn-write/structure-depth5-Resource-late-LN-unowned.udp.pcap": "dlms-hdlc-sn-write/structure-depth5-Resource-late-LN-unowned.udp.pcap",
         "scripts/protocol-tests/required-tests-traffic-unified-v157.json": "required-tests-traffic-unified-v157.json"
       }
+    },
+    {
+      "id": "validation-dlms-sn-information-segments",
+      "kind": "support",
+      "source_sha": "e10c9b3f62bafcdd8afe95d8d38a20b2b999447c",
+      "file": "validation-dlms-sn-information-segments.zip",
+      "sha256": "8424fc3e624c9a03f94ccdfe58d88b5f72b8c1bf902e867002d68776288f5403",
+      "password": "bin-parser",
+      "members": {
+        "dlms-sn-information-segments-hard/SNRead-response-hard-frame64-complete.tcp.pcap": {
+          "bytes": 5674,
+          "sha256": "0703bf58b8e0b5fc3007c029a5583ab09ef4282ca257b187a852ec9226fe5480"
+        },
+        "dlms-sn-information-segments-hard/SNRead-response-hard-frame64-complete.udp.pcap": {
+          "bytes": 4672,
+          "sha256": "549b60b03a0787fac31ce567aa043d96958d46f0dac37fea6ec63e01e858324c"
+        },
+        "dlms-sn-information-segments-hard/SNRead-response-hard-frame65-refusal-releases.tcp.pcap": {
+          "bytes": 5843,
+          "sha256": "47603a3853992e439898473240238a973f47119750c8d9a9db31551e139785e8"
+        },
+        "dlms-sn-information-segments-hard/SNRead-response-hard-frame65-refusal-releases.udp.pcap": {
+          "bytes": 4817,
+          "sha256": "42b5b496801a1837978f2c319acb44c8503513e05f883a9c8d4ebadc311b5152"
+        },
+        "dlms-sn-information-segments-hard/SNRead-response-information1027-complete.tcp.pcap": {
+          "bytes": 1610,
+          "sha256": "a0b71718022aa9250d087780f61dc3890b7bbe6180676a7102ff93deb2415648"
+        },
+        "dlms-sn-information-segments-hard/SNRead-response-information1027-complete.udp.pcap": {
+          "bytes": 1352,
+          "sha256": "18b2b0fa2ff163b3a3a3e6bf7ccc6c22659db1b86424dd05f57397834f431f9a"
+        },
+        "dlms-sn-information-segments-hard/SNRead-response-information1028-refusal-releases.tcp.pcap": {
+          "bytes": 1699,
+          "sha256": "e5759be9be7db6b92665325fcda55bb457fefbe892784c04f045953128b14e63"
+        },
+        "dlms-sn-information-segments-hard/SNRead-response-information1028-refusal-releases.udp.pcap": {
+          "bytes": 1429,
+          "sha256": "53730391fd727e3b55ae12c4c7c146875f35ff0f6ef4569b6193052340140f73"
+        },
+        "dlms-sn-information-segments-hard/reuse-inputs.json": {
+          "bytes": 3,
+          "sha256": "ca3d163bab055381827226140568f3bef7eaac187cebd76878e0b63e9e442356"
+        },
+        "dlms-sn-information-segments-lookalike/existing-GET-segmented-octets-containing-SN-header-are-continuation.tcp.pcap": {
+          "bytes": 590,
+          "sha256": "e2d104cba3ac7f5495ee3b15acc5317e806f77c2cef01f3d39310bb9de880c4c"
+        },
+        "dlms-sn-information-segments-lookalike/existing-GET-segmented-octets-containing-SN-header-are-continuation.udp.pcap": {
+          "bytes": 332,
+          "sha256": "7511469a107654d13565499aae7cbc68ab4560a0364ad53a5f254b05e407b443"
+        },
+        "dlms-sn-information-segments-lookalike/reuse-inputs.json": {
+          "bytes": 295,
+          "sha256": "f1e714168412f675498e7ff863c665d642d72f5665164e124238343641e2a604"
+        },
+        "dlms-sn-information-segments-tools/CONTRACT-CLARIFICATION.json": {
+          "bytes": 2246,
+          "sha256": "2e01c172db4c5c2b6bda6e58dd7c7c30e0f7d6d4ac1fa0f410e26d4945a3b61c"
+        },
+        "dlms-sn-information-segments-tools/SOURCES-HARD.json": {
+          "bytes": 4420,
+          "sha256": "a07bf745343d7846bd36ce17722c79a4f2eba43c8cb824669a0c00736a01a62c"
+        },
+        "dlms-sn-information-segments-tools/SOURCES-LOOKALIKE.json": {
+          "bytes": 3068,
+          "sha256": "33043aaf1df8edd2ed675aa14675437de91b4b72b39de1695c52c0834ec493b6"
+        },
+        "dlms-sn-information-segments-tools/SOURCES.json": {
+          "bytes": 8261,
+          "sha256": "32bad057d2bbc3dd4d11d09da9e492d2dbfe58c6c4dad3bc49326550b31988f8"
+        },
+        "dlms-sn-information-segments-tools/actual-memory-frames.json": {
+          "bytes": 1641,
+          "sha256": "d6c046b7e7f171ecfc2e33275e7fe6b7dd585e430c2fd72092060e148228394d"
+        },
+        "dlms-sn-information-segments-tools/carrier.py": {
+          "bytes": 10367,
+          "sha256": "f4427adbc4bea3bf0c80883f9916e99be4faeb8abc267a190235fc842a3399fa"
+        },
+        "dlms-sn-information-segments-tools/full.py": {
+          "bytes": 5087,
+          "sha256": "f2d5e6654d7c3ecf448d87bad0368dbf939567e7775a4f752ce68f7b7ede03dd"
+        },
+        "dlms-sn-information-segments-tools/generate.py": {
+          "bytes": 5726,
+          "sha256": "25721a5036f0f6b049864a2ef60978239a0e6f6e3bb784b9569ca18237d0742b"
+        },
+        "dlms-sn-information-segments-tools/hard.py": {
+          "bytes": 3512,
+          "sha256": "e3e4db6e15ca4d34e8c010d3ed81113367ca4b23a7cd905c8aa4334622f8f640"
+        },
+        "dlms-sn-information-segments-tools/lookalike-model-pins.json": {
+          "bytes": 525,
+          "sha256": "631fd189c5a2fcc651a12be0d0f5f0df47d99cd7e4be8b5ae78ef4e461bec1dc"
+        },
+        "dlms-sn-information-segments-tools/lookalike.py": {
+          "bytes": 4011,
+          "sha256": "d9e3e2a2b9a25d47d4fcb5846646043a5bb13a34f56885d630fa9cbbe5a63387"
+        },
+        "dlms-sn-information-segments-tools/model-pins.json": {
+          "bytes": 813,
+          "sha256": "356fe983d6c78845832a0fabc524a2f7a90f5b73b6feecc76fd19653e834d4a6"
+        },
+        "dlms-sn-information-segments-tools/read-body.py": {
+          "bytes": 4002,
+          "sha256": "9038061ed63630258c65a5b9e11e51888d414b290fea0aa2bd14743e2a7af4cd"
+        },
+        "dlms-sn-information-segments-tools/rebuild-hard.py": {
+          "bytes": 1016,
+          "sha256": "7f147ea8fb9d7aa2d9e7feea126124d962a001d76d33022a9b58e8202cb5c6fa"
+        },
+        "dlms-sn-information-segments-tools/rebuild-lookalike.py": {
+          "bytes": 1009,
+          "sha256": "f1aece548c260d4073ae7d0def1ec65c4197857ce6789c2d9610b5b6ae766fa7"
+        },
+        "dlms-sn-information-segments-tools/rebuild.py": {
+          "bytes": 1153,
+          "sha256": "30bba8d72288a5e75a51557b68e58b51319c73e48409cc671ec21b8160ed78ec"
+        },
+        "dlms-sn-information-segments-tools/reference-vectors.json": {
+          "bytes": 6734,
+          "sha256": "3d7c0f01b305e3524efa5dab640dd9ae4730fe7ed789ca9ef015a5c39b846b8d"
+        },
+        "dlms-sn-information-segments-tools/sn-body.py": {
+          "bytes": 572,
+          "sha256": "6e5106f1bebe23f04d38ec58953d227541bc366dd44a8f5796612e8a59239724"
+        },
+        "dlms-sn-information-segments-tools/verify-baseline.py": {
+          "bytes": 3016,
+          "sha256": "5ee44cf06846986362d9bd992e8b23fec6b4ba60f45c1e699c9c28765fb55eb5"
+        },
+        "dlms-sn-information-segments-tools/verify-captures.py": {
+          "bytes": 4204,
+          "sha256": "f10d0755165030993a1801453d09563de2e0d5f8e2ef7c13a3245a69c759a210"
+        },
+        "dlms-sn-information-segments-tools/verify-hard.py": {
+          "bytes": 6723,
+          "sha256": "c5d080d9eff0eec7aa5b2f8511717c3b6bd951751413dedb6b9baa59e292ccd8"
+        },
+        "dlms-sn-information-segments-tools/verify-lookalike.py": {
+          "bytes": 4515,
+          "sha256": "39b947953236d716e937792809304771aec6b85ce1a1697eb8e8c909b203a8a4"
+        },
+        "dlms-sn-information-segments-tools/verify.py": {
+          "bytes": 6643,
+          "sha256": "c55f1773f26e2667f2ca0303956442e081a66739154446d2f2b828a0d245e312"
+        },
+        "dlms-sn-information-segments-tools/write-body.py": {
+          "bytes": 5706,
+          "sha256": "4818c0264cb4819cf5d4715a855b4f3817acf26c0c6b15ff558aaa7d3b4aa094"
+        },
+        "dlms-sn-information-segments/Getprimed-SNRead-request-and-response-information-two-fragments.tcp.pcap": {
+          "bytes": 766,
+          "sha256": "d02193308c7585996fbfa22e55d6ac0f99bafa4ecb9236bf9be47552ef16aaf2"
+        },
+        "dlms-sn-information-segments/Getprimed-SNRead-request-and-response-information-two-fragments.udp.pcap": {
+          "bytes": 484,
+          "sha256": "0cca9bbd74c562d9f723276f4e533b73ff76bc492ed8280efaed5d384eafe289"
+        },
+        "dlms-sn-information-segments/SNRead-response-information10-cap10-positive.tcp.pcap": {
+          "bytes": 593,
+          "sha256": "0e605b63482d650181212f8f392b68a34aa060ae69c29c5ea6bdd932c4ea31ff"
+        },
+        "dlms-sn-information-segments/SNRead-response-information10-cap10-positive.udp.pcap": {
+          "bytes": 335,
+          "sha256": "1f3b34e0ce32058624e309506a16ad37f7032955df3852f893544409dea55221"
+        },
+        "dlms-sn-information-segments/SNRead-response-information10-cap9-Resource-UDPwire-recovery-TCPfatal.tcp.pcap": {
+          "bytes": 681,
+          "sha256": "02d033fec9c9939643d7bb51bba91318a09de4eba8f686a6a3a41b044dd0864d"
+        },
+        "dlms-sn-information-segments/SNRead-response-information10-cap9-Resource-UDPwire-recovery-TCPfatal.udp.pcap": {
+          "bytes": 411,
+          "sha256": "c0fe699079dabe6b571a36c41b9a24ebb433fcb1f62ca54496878f250d16b1fe"
+        },
+        "dlms-sn-information-segments/baseline-controls.json": {
+          "bytes": 72914,
+          "sha256": "203bc38549f57d2579b70621b39b1654913149eaed491dc9e2a05f11b7d48f53"
+        },
+        "dlms-sn-information-segments/changed-sameNS-prefix-conflict-retires-group.tcp.pcap": {
+          "bytes": 683,
+          "sha256": "906a01639e788067e4357e074d81e95ab36e79cf065c48dd721f855374e0191e"
+        },
+        "dlms-sn-information-segments/changed-sameNS-prefix-conflict-retires-group.udp.pcap": {
+          "bytes": 413,
+          "sha256": "048238a475abd9daf12d1dac7de89f20178c958a2b48b68a6c84f7eca3035b79"
+        },
+        "dlms-sn-information-segments/continuation-lookalike.json": {
+          "bytes": 45390,
+          "sha256": "fe848148e3f00adb2904797620fed4761032d387fd66d93c62c9785c3721e383"
+        },
+        "dlms-sn-information-segments/controls.json": {
+          "bytes": 336726,
+          "sha256": "45b769772414808e774269de75f9825a5af3ac47260f753d397d2de64d417617"
+        },
+        "dlms-sn-information-segments/exact-prefix-repeat-count-stable-partial-Close.tcp.pcap": {
+          "bytes": 595,
+          "sha256": "0f78b3960593b4c30b4af1ce90151b6f4c9bf9e3a794f76f1525a62c9b82b2e1"
+        },
+        "dlms-sn-information-segments/exact-prefix-repeat-count-stable-partial-Close.udp.pcap": {
+          "bytes": 337,
+          "sha256": "d333bf62376d2cb6b619772cc8ac242517bcc926c83a5691e15fdad07ac69109"
+        },
+        "dlms-sn-information-segments/foreign-SNresponse-preserves-LN-then-group-context-isolation.tcp.pcap": {
+          "bytes": 935,
+          "sha256": "8d2e0e3281a1c4d9b331444cbf1d58ff3a51daafbfbf964557967603132fdc81"
+        },
+        "dlms-sn-information-segments/foreign-SNresponse-preserves-LN-then-group-context-isolation.udp.pcap": {
+          "bytes": 629,
+          "sha256": "9d40105c1df01701b20b7994fbdfa90d07e65bcdc3d9b7ee74291fc5219b33f8"
+        },
+        "dlms-sn-information-segments/hard-boundaries.json": {
+          "bytes": 1007261,
+          "sha256": "3cabdf29e72d070ddf499cb88343bc7e412e7dd022e1cb6d4f48e6bad52735aa"
+        },
+        "dlms-sn-information-segments/matched-SNWrite-continuation-NSgap-retires-group.tcp.pcap": {
+          "bytes": 681,
+          "sha256": "1520bb7466c5daaf655973aec1b67298998e295ada2987bc10276138574a308d"
+        },
+        "dlms-sn-information-segments/matched-SNWrite-continuation-NSgap-retires-group.udp.pcap": {
+          "bytes": 411,
+          "sha256": "96287692341cd5ff7484996357beecc76f0e3db58af835e065d8e3382f8f0734"
+        },
+        "dlms-sn-information-segments/pending-LN-SNWrite-bidirectional-wiregroups-retire-oldowner.tcp.pcap": {
+          "bytes": 764,
+          "sha256": "77b328eed9c0d2137ed9871ebb16d185f7fd9f63de4854a7a2fda81304b82d52"
+        },
+        "dlms-sn-information-segments/pending-LN-SNWrite-bidirectional-wiregroups-retire-oldowner.udp.pcap": {
+          "bytes": 482,
+          "sha256": "4fa29ec829a798e61020198adaac4dc08a4140160467ae3cb0c4940f68a5260a"
+        },
+        "dlms-sn-information-segments/reuse-inputs.json": {
+          "bytes": 295,
+          "sha256": "f1e714168412f675498e7ff863c665d642d72f5665164e124238343641e2a604"
+        },
+        "required-tests-traffic-unified-v158.json": {
+          "bytes": 21034126,
+          "sha256": "0aa5d9362b4392d6f455586c2ac6e6150ca3a74e83c21cecb1e7232fc60359d8"
+        },
+        "validation/expected.json": {
+          "bytes": 34484,
+          "sha256": "d12e12a19223bf77385a6d9d4ed86515aa6f6ae649501382d763138a3f8885ed"
+        }
+      },
+      "aliases": {
+        "common/pcapx/pcaputil/dlms-sn-information-segments-hard/SNRead-response-hard-frame64-complete.tcp.pcap": "dlms-sn-information-segments-hard/SNRead-response-hard-frame64-complete.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-information-segments-hard/SNRead-response-hard-frame64-complete.udp.pcap": "dlms-sn-information-segments-hard/SNRead-response-hard-frame64-complete.udp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-information-segments-hard/SNRead-response-hard-frame65-refusal-releases.tcp.pcap": "dlms-sn-information-segments-hard/SNRead-response-hard-frame65-refusal-releases.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-information-segments-hard/SNRead-response-hard-frame65-refusal-releases.udp.pcap": "dlms-sn-information-segments-hard/SNRead-response-hard-frame65-refusal-releases.udp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-information-segments-hard/SNRead-response-information1027-complete.tcp.pcap": "dlms-sn-information-segments-hard/SNRead-response-information1027-complete.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-information-segments-hard/SNRead-response-information1027-complete.udp.pcap": "dlms-sn-information-segments-hard/SNRead-response-information1027-complete.udp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-information-segments-hard/SNRead-response-information1028-refusal-releases.tcp.pcap": "dlms-sn-information-segments-hard/SNRead-response-information1028-refusal-releases.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-information-segments-hard/SNRead-response-information1028-refusal-releases.udp.pcap": "dlms-sn-information-segments-hard/SNRead-response-information1028-refusal-releases.udp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-information-segments-hard/reuse-inputs.json": "dlms-sn-information-segments-hard/reuse-inputs.json",
+        "common/pcapx/pcaputil/dlms-sn-information-segments-lookalike/existing-GET-segmented-octets-containing-SN-header-are-continuation.tcp.pcap": "dlms-sn-information-segments-lookalike/existing-GET-segmented-octets-containing-SN-header-are-continuation.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-information-segments-lookalike/existing-GET-segmented-octets-containing-SN-header-are-continuation.udp.pcap": "dlms-sn-information-segments-lookalike/existing-GET-segmented-octets-containing-SN-header-are-continuation.udp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-information-segments-lookalike/reuse-inputs.json": "dlms-sn-information-segments-lookalike/reuse-inputs.json",
+        "common/pcapx/pcaputil/dlms-sn-information-segments-tools/CONTRACT-CLARIFICATION.json": "dlms-sn-information-segments-tools/CONTRACT-CLARIFICATION.json",
+        "common/pcapx/pcaputil/dlms-sn-information-segments-tools/SOURCES-HARD.json": "dlms-sn-information-segments-tools/SOURCES-HARD.json",
+        "common/pcapx/pcaputil/dlms-sn-information-segments-tools/SOURCES-LOOKALIKE.json": "dlms-sn-information-segments-tools/SOURCES-LOOKALIKE.json",
+        "common/pcapx/pcaputil/dlms-sn-information-segments-tools/SOURCES.json": "dlms-sn-information-segments-tools/SOURCES.json",
+        "common/pcapx/pcaputil/dlms-sn-information-segments-tools/actual-memory-frames.json": "dlms-sn-information-segments-tools/actual-memory-frames.json",
+        "common/pcapx/pcaputil/dlms-sn-information-segments-tools/carrier.py": "dlms-sn-information-segments-tools/carrier.py",
+        "common/pcapx/pcaputil/dlms-sn-information-segments-tools/full.py": "dlms-sn-information-segments-tools/full.py",
+        "common/pcapx/pcaputil/dlms-sn-information-segments-tools/generate.py": "dlms-sn-information-segments-tools/generate.py",
+        "common/pcapx/pcaputil/dlms-sn-information-segments-tools/hard.py": "dlms-sn-information-segments-tools/hard.py",
+        "common/pcapx/pcaputil/dlms-sn-information-segments-tools/lookalike-model-pins.json": "dlms-sn-information-segments-tools/lookalike-model-pins.json",
+        "common/pcapx/pcaputil/dlms-sn-information-segments-tools/lookalike.py": "dlms-sn-information-segments-tools/lookalike.py",
+        "common/pcapx/pcaputil/dlms-sn-information-segments-tools/model-pins.json": "dlms-sn-information-segments-tools/model-pins.json",
+        "common/pcapx/pcaputil/dlms-sn-information-segments-tools/read-body.py": "dlms-sn-information-segments-tools/read-body.py",
+        "common/pcapx/pcaputil/dlms-sn-information-segments-tools/rebuild-hard.py": "dlms-sn-information-segments-tools/rebuild-hard.py",
+        "common/pcapx/pcaputil/dlms-sn-information-segments-tools/rebuild-lookalike.py": "dlms-sn-information-segments-tools/rebuild-lookalike.py",
+        "common/pcapx/pcaputil/dlms-sn-information-segments-tools/rebuild.py": "dlms-sn-information-segments-tools/rebuild.py",
+        "common/pcapx/pcaputil/dlms-sn-information-segments-tools/reference-vectors.json": "dlms-sn-information-segments-tools/reference-vectors.json",
+        "common/pcapx/pcaputil/dlms-sn-information-segments-tools/sn-body.py": "dlms-sn-information-segments-tools/sn-body.py",
+        "common/pcapx/pcaputil/dlms-sn-information-segments-tools/verify-baseline.py": "dlms-sn-information-segments-tools/verify-baseline.py",
+        "common/pcapx/pcaputil/dlms-sn-information-segments-tools/verify-captures.py": "dlms-sn-information-segments-tools/verify-captures.py",
+        "common/pcapx/pcaputil/dlms-sn-information-segments-tools/verify-hard.py": "dlms-sn-information-segments-tools/verify-hard.py",
+        "common/pcapx/pcaputil/dlms-sn-information-segments-tools/verify-lookalike.py": "dlms-sn-information-segments-tools/verify-lookalike.py",
+        "common/pcapx/pcaputil/dlms-sn-information-segments-tools/verify.py": "dlms-sn-information-segments-tools/verify.py",
+        "common/pcapx/pcaputil/dlms-sn-information-segments-tools/write-body.py": "dlms-sn-information-segments-tools/write-body.py",
+        "common/pcapx/pcaputil/dlms-sn-information-segments/Getprimed-SNRead-request-and-response-information-two-fragments.tcp.pcap": "dlms-sn-information-segments/Getprimed-SNRead-request-and-response-information-two-fragments.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-information-segments/Getprimed-SNRead-request-and-response-information-two-fragments.udp.pcap": "dlms-sn-information-segments/Getprimed-SNRead-request-and-response-information-two-fragments.udp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-information-segments/SNRead-response-information10-cap10-positive.tcp.pcap": "dlms-sn-information-segments/SNRead-response-information10-cap10-positive.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-information-segments/SNRead-response-information10-cap10-positive.udp.pcap": "dlms-sn-information-segments/SNRead-response-information10-cap10-positive.udp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-information-segments/SNRead-response-information10-cap9-Resource-UDPwire-recovery-TCPfatal.tcp.pcap": "dlms-sn-information-segments/SNRead-response-information10-cap9-Resource-UDPwire-recovery-TCPfatal.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-information-segments/SNRead-response-information10-cap9-Resource-UDPwire-recovery-TCPfatal.udp.pcap": "dlms-sn-information-segments/SNRead-response-information10-cap9-Resource-UDPwire-recovery-TCPfatal.udp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-information-segments/baseline-controls.json": "dlms-sn-information-segments/baseline-controls.json",
+        "common/pcapx/pcaputil/dlms-sn-information-segments/changed-sameNS-prefix-conflict-retires-group.tcp.pcap": "dlms-sn-information-segments/changed-sameNS-prefix-conflict-retires-group.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-information-segments/changed-sameNS-prefix-conflict-retires-group.udp.pcap": "dlms-sn-information-segments/changed-sameNS-prefix-conflict-retires-group.udp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-information-segments/continuation-lookalike.json": "dlms-sn-information-segments/continuation-lookalike.json",
+        "common/pcapx/pcaputil/dlms-sn-information-segments/controls.json": "dlms-sn-information-segments/controls.json",
+        "common/pcapx/pcaputil/dlms-sn-information-segments/exact-prefix-repeat-count-stable-partial-Close.tcp.pcap": "dlms-sn-information-segments/exact-prefix-repeat-count-stable-partial-Close.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-information-segments/exact-prefix-repeat-count-stable-partial-Close.udp.pcap": "dlms-sn-information-segments/exact-prefix-repeat-count-stable-partial-Close.udp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-information-segments/foreign-SNresponse-preserves-LN-then-group-context-isolation.tcp.pcap": "dlms-sn-information-segments/foreign-SNresponse-preserves-LN-then-group-context-isolation.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-information-segments/foreign-SNresponse-preserves-LN-then-group-context-isolation.udp.pcap": "dlms-sn-information-segments/foreign-SNresponse-preserves-LN-then-group-context-isolation.udp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-information-segments/hard-boundaries.json": "dlms-sn-information-segments/hard-boundaries.json",
+        "common/pcapx/pcaputil/dlms-sn-information-segments/matched-SNWrite-continuation-NSgap-retires-group.tcp.pcap": "dlms-sn-information-segments/matched-SNWrite-continuation-NSgap-retires-group.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-information-segments/matched-SNWrite-continuation-NSgap-retires-group.udp.pcap": "dlms-sn-information-segments/matched-SNWrite-continuation-NSgap-retires-group.udp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-information-segments/pending-LN-SNWrite-bidirectional-wiregroups-retire-oldowner.tcp.pcap": "dlms-sn-information-segments/pending-LN-SNWrite-bidirectional-wiregroups-retire-oldowner.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-information-segments/pending-LN-SNWrite-bidirectional-wiregroups-retire-oldowner.udp.pcap": "dlms-sn-information-segments/pending-LN-SNWrite-bidirectional-wiregroups-retire-oldowner.udp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-information-segments/reuse-inputs.json": "dlms-sn-information-segments/reuse-inputs.json",
+        "scripts/protocol-tests/required-tests-traffic-unified-v158.json": "required-tests-traffic-unified-v158.json"
+      }
     }
   ],
   "schema_version": 1,

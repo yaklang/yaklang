@@ -65,6 +65,17 @@ func hdlcSNReadCases(t *testing.T, name, pin string, count int) []hdlcSNReadCase
 func hdlcSNReadTypes(t *testing.T, f map[string]any) {
 	t.Helper()
 	hdlcOpTypes(t, f)
+	if raw, exists := f["HDLC Segmentation"]; exists {
+		meta, ok := raw.(map[string]any)
+		require.True(t, ok, "segmentation must retain its public map type")
+		require.IsType(t, int(0), meta["observed_frames"])
+		require.IsType(t, false, meta["more"])
+		require.IsType(t, false, meta["complete"])
+		require.IsType(t, "", meta["information_hex"])
+		if value, exists := meta["assembled_information_hex"]; exists {
+			require.IsType(t, "", value)
+		}
+	}
 	if sn, ok := f["SN Read"].(map[string]any); ok {
 		snReadTypes(t, sn)
 		for _, k := range []string{"wrapper_version", "source_wport", "destination_wport", "wrapper_header_hex", "invoke_id", "invoke_id_and_priority", "service_choice"} {
@@ -94,6 +105,9 @@ func hdlcSNReadTypes(t *testing.T, f map[string]any) {
 	}
 	if v, ok := f["Data Type"]; ok {
 		require.IsType(t, byte(0), v)
+		if v == byte(9) {
+			require.IsType(t, []byte{}, f["Data Value"])
+		}
 		if v == byte(17) {
 			require.IsType(t, byte(0), f["Data Value"])
 		}
@@ -269,6 +283,9 @@ func TestDLMSHDLCSNReadMatrix(t *testing.T) {
 }
 func hdlcSNReadMatrix(t *testing.T, cases []hdlcSNReadCase, batch string) {
 	env := "DLMS_HDLC_SN_READ_TEST_ROOT"
+	if batch == "dlms-sn-information-segments" || batch == "dlms-sn-information-segments-hard" || batch == "dlms-sn-information-segments-lookalike" {
+		env = "DLMS_SN_SEGMENTS_TEST_ROOT"
+	}
 	if batch == "dlms-hdlc-sn-write" || batch == "dlms-hdlc-sn-write-resources" {
 		env = "DLMS_HDLC_SN_WRITE_TEST_ROOT"
 	}
@@ -290,8 +307,14 @@ func hdlcSNReadMatrix(t *testing.T, cases []hdlcSNReadCase, batch string) {
 					var err error
 					const prefix = "common/pcapx/pcaputil/"
 					require.True(t, strings.HasPrefix(alias, prefix))
-					raw, err = trafficfixture.ReadFile(strings.TrimPrefix(alias, prefix))
-					require.NoError(t, err)
+					if (batch == "dlms-sn-information-segments" || batch == "dlms-sn-information-segments-hard" || batch == "dlms-sn-information-segments-lookalike") && strings.HasPrefix(alias, prefix+batch+"/") {
+						name := strings.TrimPrefix(alias, prefix+batch+"/")
+						require.NotContains(t, name, "/")
+						raw = finsReadBatch(t, batch, env, name)
+					} else {
+						raw, err = trafficfixture.ReadFile(strings.TrimPrefix(alias, prefix))
+						require.NoError(t, err)
+					}
 				} else {
 					raw = finsReadBatch(t, batch, env, name)
 				}

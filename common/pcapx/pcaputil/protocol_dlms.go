@@ -757,6 +757,9 @@ func (f *binFlow) consumeDLMS(dir int, w []byte, id uint64) (map[string]any, uin
 func (f *binFlow) consumeDecodedDLMS(dir int, w []byte, id uint64, m *dlmsMessage) (map[string]any, uint64, error) {
 	s := f.dlms
 	s.operationProfile = ""
+	if s.fragments != nil && s.fragments.snCommand != 0 || m.kind == "I" && s.fragments == nil && m.segmented && dlmsSNSegmentHeader(m.information) {
+		return f.consumeDLMSSNSegments(dir, w, id, m)
+	}
 	if m.snRead || m.snWrite {
 		// A second distinct request on this same observed logical HDLC link
 		// cannot leave an older service owner trustworthy. SN still contributes

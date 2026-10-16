@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/stretchr/testify/require"
+	"strings"
 	"testing"
 	"time"
 )
@@ -50,11 +51,28 @@ func hdlcGetCloseCheck(t *testing.T, c hdlcOpCase, es []*ProtocolEvent, tr strin
 		if tr == "tcp" {
 			at, off, summary = w.TimeTCP, w.OffsetTCP, reason+": DLMS HDLC exchange ended with an unmatched request"
 		}
+		if w.Profile == "dlms-hdlc-sn-information-segmented" && tr == "tcp" {
+			require.Equal(t, "<reason>: "+w.SummaryUDP, w.SummaryTCP)
+			summary = strings.Replace(w.SummaryTCP, "<reason>", reason, 1)
+		}
 		require.Equal(t, time.Unix(at, 0), e.Timestamp)
 		require.Equal(t, off, e.Offset)
 		require.Equal(t, summary, e.Summary)
 		require.Equal(t, summary, e.Error)
-		require.Equal(t, map[string]any{"Outstanding": 1}, e.Session)
+		if w.Profile == "dlms-hdlc-sn-information-segmented" {
+			require.Len(t, w.Session, 3)
+			require.Len(t, e.Session, 3)
+			for _, key := range []string{"Outstanding", "ObservedFrames", "InformationBytes"} {
+				require.Contains(t, w.Session, key)
+				require.IsType(t, int(0), e.Session[key])
+			}
+			require.Equal(t, 1, e.Session["Outstanding"])
+			require.Positive(t, e.Session["ObservedFrames"])
+			require.Positive(t, e.Session["InformationBytes"])
+			hdlcOpEqual(t, w.Session, e.Session)
+		} else {
+			require.Equal(t, map[string]any{"Outstanding": 1}, e.Session)
+		}
 		for n := 0; n < 3; n++ {
 			f, err := e.GetFields()
 			require.Nil(t, f)
