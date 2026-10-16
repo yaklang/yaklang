@@ -44,7 +44,7 @@ Run from the repository root:
 ```sh
 go run ./internal/trafficfixture/cmd/corpus test
 go test -json -count=1 -timeout=10m ./internal/trafficfixture/... ./common/bin-parser/... ./common/pcapx/... ./common/yak/cmd/yakcmds/shark-cli ./scripts/ci > traffic.jsonl
-go run ./internal/trafficfixture/cmd/corpus exec -- python3 @scripts/protocol-tests/check_go_test_json_v2.py traffic.jsonl --inventory @scripts/protocol-tests/required-tests-traffic-unified-v145.json --tier full
+go run ./internal/trafficfixture/cmd/corpus exec -- python3 @scripts/protocol-tests/check_go_test_json_v2.py traffic.jsonl --inventory @scripts/protocol-tests/required-tests-traffic-unified-v146.json --tier full
 ```
 
 The single `corpus` entry point uses the same bounded Go ZIP loader as tests.
@@ -83,7 +83,7 @@ their semantic coverage. The existing synthetic session keys are test inputs;
 production credentials, user private keys and material without redistribution
 permission belong in an external fixed-source download manifest.
 
-Current test requirements are sealed at `scripts/protocol-tests/required-tests-traffic-unified-v145.json`;
+Current test requirements are sealed at `scripts/protocol-tests/required-tests-traffic-unified-v146.json`;
 the historical inventories and all earlier batches remain unchanged.
 The supplemental small-corpus batch contains 26 minimal controls, their explicit
 expected facts, an offline generator and the compact pinned source manifest.
@@ -203,7 +203,7 @@ opaque selector bytes and one bounded Data value over Wrapper v1 TCP/UDP; object
 selector meaning, access permission and device operation are unverified. The
 original one-packet selective-access capture and original refused answer remain
 immutable; its now-supported answer is matched by exact input SHA and frame.
-The active inventory is `scripts/protocol-tests/required-tests-traffic-unified-v145.json`.
+The active inventory is `scripts/protocol-tests/required-tests-traffic-unified-v146.json`.
 
 The small-graph budget batch reuses accepted graph captures/answers and adds one
 249-byte UDP control for child count255 without child bytes. Its standalone proof
@@ -993,7 +993,7 @@ the normative answer; a missing numeric reference field is not a codec pass.
 Full/deferred, workers1/2/4, observers off/on, Feed chunks1/7/full, ownership,
 resources and close/refusal boundaries remain required.
 
-Current gate: `required-tests-traffic-unified-v145.json` with
+Current gate: `required-tests-traffic-unified-v146.json` with
 `check_go_test_json_v2.py`. The indexed validator preserves missing/unpassed,
 package invocation completion, descendant skips, failures and non-JSON checks;
 its mutation/differential harness is sealed with the material. Older checkers
@@ -1629,7 +1629,7 @@ userspace adapter; full kernel receiver/socket/timers and ECU endpoints do not.
 All161 preceding ZIPs remain byte-for-byte unchanged. Raw captures, dependencies,
 reference source/build output and process evidence stay outside Git.
 
-Current effective v145 inventory: 98,426 entries; 98,419 are mandatory for the full tier.
+Current effective v146 inventory: 99,201 entries; 99,194 are mandatory for the full tier.
 
 The opt-in `DynamicFlowControl` profile follows Linux v6.12 FC tuple updates (including WAIT without granting data). Disjoint address extensions or classical/FD carriers may share CAN IDs; unknown selectors cannot choose or mutate a conversation. Ambiguous selectors are rejected. Seven sealed cases exercise full/deferred, workers 1/2/4, and observer off/on, with exact fields, byte collections, contributor references, errors and resource ownership. The existing static FC profile remains unchanged. Pinned upstream FC and filter functions execute with declared userspace stubs; this is not a kernel/ECU endpoint. TShark 4.2.5 checks wire tuples and two complete payloads, but cannot independently reassemble the shared-address transcripts.
 
@@ -1796,3 +1796,5 @@ A bounded owner-isolation fix rejects a foreign segmented GET response header wi
 Wrapper v1 TCP and native UDP Close now preserve ordinary pending Get and active GBT groups as separate incomplete observations, with exact direction/endpoints and private NeedMore errors. Twelve independent traces32steps check complete neighbors, caller reversal, concurrent request/response observations and ownership/release. Eight strictly bound historical Close metadata upgrades leave all240 original archives/answers unchanged. Existing Get service-block termination stays unchanged; no inner response, device action or authentication is inferred.
 
 The additional four Close bindings reuse two exact Get-list captures and two foreign endpoint/interface captures without storing them again. Default-budget admission leaves an unmatched second invoke; the custom frame-budget refusal still retires it. A foreign pending flow reports its own timestamp/domain/endpoints and cannot consume or expire the timely original flow. Original messages, fields, owners and answers remain unchanged.
+
+Plaintext Wrapper v1 complete SET normal/list APDUs can be carried by bounded GBT over TCP or explicit native UDP. Twenty-two independent traces267steps check full inner fields, exact invoke/direction/wPort/list correlation, resource/refusal/duplicate/conflict/Close and query ownership. The fixed Gurux encoder/receiver was executed in memory; aggregate response-code observations do not prove every result item or a device action. SET service blocks and Action in GBT remain unsupported. All242 historical archives and original answers remain immutable; source-bound type and carrier Raw errata preserve the API.

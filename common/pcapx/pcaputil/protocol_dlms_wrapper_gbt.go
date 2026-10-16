@@ -172,17 +172,17 @@ func (f *binFlow) consumeWrapperGBT(s *binDLMSWrapper, m *wrapperMessage, dir in
 	if !m.lastBlock {
 		return "observed-gbt-fragment", nil
 	}
-	// New Action-normal support is confined to direct Wrapper messages. A GBT
-	// transfer does not implicitly authorize a new inner-service implementation.
-	if len(p.data) > 0 && (p.data[0] == 0xc1 || p.data[0] == 0xc5 || p.data[0] == 0xc3 || p.data[0] == 0xc7) {
-		service := "Action"
-		if p.data[0] == 0xc1 || p.data[0] == 0xc5 {
-			service = "Set"
-		}
-		return "", wrapperError(ErrUnsupportedFeature, "GBT-wrapped "+service+" is not implemented")
+	// Admit complete plaintext Set-normal/list APDUs only. Service blocks
+	// retain their separately bounded transfer contract; GBT completion does
+	// not make other services or authenticated context observable.
+	if len(p.data) > 0 && (p.data[0] == 0xc3 || p.data[0] == 0xc7) {
+		return "", wrapperError(ErrUnsupportedFeature, "GBT-wrapped Action is not implemented")
 	}
-	// Reuse the exact existing complete Get decoder and invoke context, with
-	// its complete-message event as owner. No GBT ACK alone completes a Get.
+	if len(p.data) > 1 && (p.data[0] == 0xc1 && p.data[1] != 1 && p.data[1] != 4 || p.data[0] == 0xc5 && p.data[1] != 1 && p.data[1] != 5) {
+		return "", wrapperError(ErrUnsupportedFeature, "GBT-wrapped Set supports complete normal/list APDUs only")
+	}
+	// Reuse the existing complete decoder and invoke context with the final
+	// outer message event as owner. A GBT ACK alone never completes a service.
 	inner := make([]byte, 8, len(p.data)+8)
 	copy(inner, w[:8])
 	binary.BigEndian.PutUint16(inner[6:8], uint16(len(p.data)))
