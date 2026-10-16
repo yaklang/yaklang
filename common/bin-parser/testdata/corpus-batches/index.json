@@ -113968,6 +113968,221 @@
         "common/pcapx/pcaputil/dlms-wrapper-gbt-action/inner-parameter-depth4-refusal.tcp.pcap": "dlms-wrapper-gbt-action/per-block-byte12-cap11-refusal.tcp.pcap",
         "scripts/protocol-tests/required-tests-traffic-unified-v148.json": "required-tests-traffic-unified-v148.json"
       }
+    },
+    {
+      "id": "validation-dlms-wrapper-gbt-action-list",
+      "kind": "support",
+      "source_sha": "49d4d5f8644e0a916c59bb6849a320e74ad59efd",
+      "file": "validation-dlms-wrapper-gbt-action-list.zip",
+      "sha256": "204419e548707671f4096b1f7b2e163dae1ee43560759f62a9ca390d499fad49",
+      "password": "bin-parser",
+      "members": {
+        "dlms-wrapper-gbt-action-list-historical/upgrades.json": {
+          "bytes": 52781,
+          "sha256": "695e0e4926e01945b6091a1611bcab07ae5c7fb2ad86744d15b0ffc619553643"
+        },
+        "dlms-wrapper-gbt-action-list-tools/SOURCES.json": {
+          "bytes": 6699,
+          "sha256": "1f840c48f5194b0afae13bd5b1fcd5a5127b808ba32066a871ee83f749a2a877"
+        },
+        "dlms-wrapper-gbt-action-list-tools/gbt_core.py": {
+          "bytes": 12575,
+          "sha256": "a678272f289349b8be7e31791edd158ccc2c4e4ee13431dcfec6a2fcf56a0df6"
+        },
+        "dlms-wrapper-gbt-action-list-tools/generate-baseline.py": {
+          "bytes": 674,
+          "sha256": "3f224ba1ceb2b2dc120003594de55ca7cb3199dc28d49892c7b46c832a5a5a10"
+        },
+        "dlms-wrapper-gbt-action-list-tools/generate-captures.py": {
+          "bytes": 1871,
+          "sha256": "016820337c849fcb94163c507a131c9c3c29eda450ba05b6dc415836e56993cb"
+        },
+        "dlms-wrapper-gbt-action-list-tools/generate.py": {
+          "bytes": 10122,
+          "sha256": "0fa94c1010580e7badbc4998dd88b0552d7b42f308904f31bfa02515c3f8481d"
+        },
+        "dlms-wrapper-gbt-action-list-tools/history-upgrade/SOURCES.json": {
+          "bytes": 993,
+          "sha256": "9f7adeb4ccdb8fe61e85b7877dedc8e51e8e6d585d05803c0a8d7149c6a93fb6"
+        },
+        "dlms-wrapper-gbt-action-list-tools/history-upgrade/generate.py": {
+          "bytes": 8212,
+          "sha256": "e64df3d4ed418a94afe1bdf04817af24efdc7450026c8795ce9b4bd38cde7cf3"
+        },
+        "dlms-wrapper-gbt-action-list-tools/history-upgrade/reference.json": {
+          "bytes": 10522,
+          "sha256": "7399c60751d57d5ebda893fb43a76af7e0e4a9c7fd85eee0984d1d84394e15fd"
+        },
+        "dlms-wrapper-gbt-action-list-tools/history-upgrade/verify.py": {
+          "bytes": 3805,
+          "sha256": "c3639e93d81da911bfad08a0df7cb94083ecb3e0ae643b5987be387ee4ff55b3"
+        },
+        "dlms-wrapper-gbt-action-list-tools/normal_model.py": {
+          "bytes": 3828,
+          "sha256": "27a9851cafcad5b4ac56964b5e119f15a6f28dff4feee7142dd1e06ad25a30d9"
+        },
+        "dlms-wrapper-gbt-action-list-tools/rebuild.py": {
+          "bytes": 883,
+          "sha256": "be258747487960d0be3449c030e634e71db0486ce7bb59e98185c94802b05c1f"
+        },
+        "dlms-wrapper-gbt-action-list-tools/reference-vectors.json": {
+          "bytes": 54551,
+          "sha256": "c0c7a97534578badd8964ff99272fc7799b20f5dc3094502ebfaa35949fbae7d"
+        },
+        "dlms-wrapper-gbt-action-list-tools/verify-captures.py": {
+          "bytes": 4156,
+          "sha256": "760fbcf0a441ec1f809b761f34a6d2e5553ae79a138772a42977eb3780e7c2db"
+        },
+        "dlms-wrapper-gbt-action-list-tools/verify.py": {
+          "bytes": 7108,
+          "sha256": "a4ed199f1f98de8396692401f28dcc29aebdc7a5281928bfb6b98ee07d2e8b3d"
+        },
+        "dlms-wrapper-gbt-action-list/ActionResult17-Unsupported-not-return-access17.tcp.pcap": {
+          "bytes": 697,
+          "sha256": "5871741c53386f9e27ee72ba2fb202f3198818dc553c722dadaa80594f2cd6d6"
+        },
+        "dlms-wrapper-gbt-action-list/ActionResult17-Unsupported-not-return-access17.udp.pcap": {
+          "bytes": 427,
+          "sha256": "5ec2f1e8978d120e45d99e8acf6c89e479076969d3be53489d1f9e87400c22f4"
+        },
+        "dlms-wrapper-gbt-action-list/GBT-exact-first-final-and-completed-response-duplicate.tcp.pcap": {
+          "bytes": 1071,
+          "sha256": "8eec14bc7d083aab7e436c023dc7dc5d5d696ef6c45138edced43ae3e7e6fdd2"
+        },
+        "dlms-wrapper-gbt-action-list/GBT-exact-first-final-and-completed-response-duplicate.udp.pcap": {
+          "bytes": 753,
+          "sha256": "e7f9656f8478a16ab824ff8a42f6d8cd9d75475bcad2571f06294a3f8676178f"
+        },
+        "dlms-wrapper-gbt-action-list/baseline-controls.json": {
+          "bytes": 180249,
+          "sha256": "35fef57f82fff186c5c66a186c67013624242fdfa994bf8a64f42c7d8fb03dc2"
+        },
+        "dlms-wrapper-gbt-action-list/blocktail23-byte-cap22-refusal.tcp.pcap": {
+          "bytes": 604,
+          "sha256": "3a2fc77f51168807a450e92174326210e6a454e5c57650b9e946c8cfef6fd683"
+        },
+        "dlms-wrapper-gbt-action-list/blocktail23-byte-cap22-refusal.udp.pcap": {
+          "bytes": 346,
+          "sha256": "6d6421cc261117aca110fc4cec8a14402915219e58d7b971ea958697f85cc55d"
+        },
+        "dlms-wrapper-gbt-action-list/controls.json": {
+          "bytes": 681922,
+          "sha256": "7fbd49b7a8e07abe933955597a236cd6c2ae89574acbfb06397d9b973690aa66"
+        },
+        "dlms-wrapper-gbt-action-list/inner-invoke-flags-direction-ports-preserve-list-owner.tcp.pcap": {
+          "bytes": 955,
+          "sha256": "c4e6afdd724e463f26dfac472aa1e2cc42142c9a74be383996255745433985bf"
+        },
+        "dlms-wrapper-gbt-action-list/inner-invoke-flags-direction-ports-preserve-list-owner.udp.pcap": {
+          "bytes": 649,
+          "sha256": "c8c9079a915c5391446474cbc923655a80676b348796b640acd617dcbfcf06a2"
+        },
+        "dlms-wrapper-gbt-action-list/joined-parameter-list-trailing-byte-Malformed.tcp.pcap": {
+          "bytes": 605,
+          "sha256": "9823496ba49658cdc60f9b2d3c2647c8237c3c0340c3c1be09d8f7d46ae953c4"
+        },
+        "dlms-wrapper-gbt-action-list/joined-parameter-list-trailing-byte-Malformed.udp.pcap": {
+          "bytes": 347,
+          "sha256": "fea48d24c31f5fbf988991609c53f2601b2f7ced87d116dd3fe480accc236684"
+        },
+        "dlms-wrapper-gbt-action-list/known-Actionlist-pending-and-GBT-response-prefix-Close.tcp.pcap": {
+          "bytes": 605,
+          "sha256": "0eb3373c28607550af34006445d6aa3b99ea043fa0bfe7ce49cf621f49ed2963"
+        },
+        "dlms-wrapper-gbt-action-list/known-Actionlist-pending-and-GBT-response-prefix-Close.udp.pcap": {
+          "bytes": 347,
+          "sha256": "f486e5d642cdd3b243995c70fc0f9a3b3d66603785225942f5c88ef9e6e2a760"
+        },
+        "dlms-wrapper-gbt-action-list/list-Data-and-access17-returns.tcp.pcap": {
+          "bytes": 786,
+          "sha256": "5a6d9df093a60163c997efc9d7358af17d60278988921a2b93db36d9b13dcf61"
+        },
+        "dlms-wrapper-gbt-action-list/list-Data-and-access17-returns.udp.pcap": {
+          "bytes": 504,
+          "sha256": "5e5910fdd3020856076443fdb377277b85614facce521996117e288a7b3de34b"
+        },
+        "dlms-wrapper-gbt-action-list/normal-response-cannot-consume-list-owner.tcp.pcap": {
+          "bytes": 694,
+          "sha256": "bdceecb7cd19feb97422c9580a0ecf29423c24172a2891f61dccef6a8bc6caee"
+        },
+        "dlms-wrapper-gbt-action-list/normal-response-cannot-consume-list-owner.udp.pcap": {
+          "bytes": 424,
+          "sha256": "0d8e7aef2a7c32c9fcc01059955f2fdd379fe5178c1b45787f162e7f6709928a"
+        },
+        "dlms-wrapper-gbt-action-list/result-count-conflict-retires-list-owner.tcp.pcap": {
+          "bytes": 695,
+          "sha256": "5d480490ac7cf3b2d1369b0087fd061892f52d9ba970815c83a900584c2009a4"
+        },
+        "dlms-wrapper-gbt-action-list/result-count-conflict-retires-list-owner.udp.pcap": {
+          "bytes": 425,
+          "sha256": "32244d29da7a72159d944345a24ffce0908ba128026a19b464c15ab94a84d040"
+        },
+        "dlms-wrapper-gbt-action-list/reuse-inputs.json": {
+          "bytes": 237,
+          "sha256": "67682c9d1177c90cba847c61ceff2fbd2ea27792528a0fe4c5876bfa628785fb"
+        },
+        "dlms-wrapper-gbt-action-list/source-grammar-list-mixed-results-six-GBT-frames.tcp.pcap": {
+          "bytes": 781,
+          "sha256": "1f5f2ef72b754376ec7fc597d54ef3ed5bac0f76cb9345cf0bbed3490bb084f0"
+        },
+        "dlms-wrapper-gbt-action-list/source-grammar-list-mixed-results-six-GBT-frames.udp.pcap": {
+          "bytes": 499,
+          "sha256": "9bdfec761d4273b4f1de5923c069a3d060af2cd8e0fde44c44081cb037c042ec"
+        },
+        "required-tests-traffic-unified-v149.json": {
+          "bytes": 25680910,
+          "sha256": "cec99f3fc485d1cee0e5cee73432815f2b9b3cddc96b87d247bdc7c85c2f8506"
+        },
+        "validation/expected.json": {
+          "bytes": 32122,
+          "sha256": "110d7e407ad1910ffa814d4baa70456847d6b98c0930668ba22beff57e715cf9"
+        }
+      },
+      "aliases": {
+        "common/pcapx/pcaputil/dlms-wrapper-gbt-action-list-historical/upgrades.json": "dlms-wrapper-gbt-action-list-historical/upgrades.json",
+        "common/pcapx/pcaputil/dlms-wrapper-gbt-action-list-tools/SOURCES.json": "dlms-wrapper-gbt-action-list-tools/SOURCES.json",
+        "common/pcapx/pcaputil/dlms-wrapper-gbt-action-list-tools/gbt_core.py": "dlms-wrapper-gbt-action-list-tools/gbt_core.py",
+        "common/pcapx/pcaputil/dlms-wrapper-gbt-action-list-tools/generate-baseline.py": "dlms-wrapper-gbt-action-list-tools/generate-baseline.py",
+        "common/pcapx/pcaputil/dlms-wrapper-gbt-action-list-tools/generate-captures.py": "dlms-wrapper-gbt-action-list-tools/generate-captures.py",
+        "common/pcapx/pcaputil/dlms-wrapper-gbt-action-list-tools/generate.py": "dlms-wrapper-gbt-action-list-tools/generate.py",
+        "common/pcapx/pcaputil/dlms-wrapper-gbt-action-list-tools/history-upgrade/SOURCES.json": "dlms-wrapper-gbt-action-list-tools/history-upgrade/SOURCES.json",
+        "common/pcapx/pcaputil/dlms-wrapper-gbt-action-list-tools/history-upgrade/generate.py": "dlms-wrapper-gbt-action-list-tools/history-upgrade/generate.py",
+        "common/pcapx/pcaputil/dlms-wrapper-gbt-action-list-tools/history-upgrade/reference.json": "dlms-wrapper-gbt-action-list-tools/history-upgrade/reference.json",
+        "common/pcapx/pcaputil/dlms-wrapper-gbt-action-list-tools/history-upgrade/verify.py": "dlms-wrapper-gbt-action-list-tools/history-upgrade/verify.py",
+        "common/pcapx/pcaputil/dlms-wrapper-gbt-action-list-tools/normal_model.py": "dlms-wrapper-gbt-action-list-tools/normal_model.py",
+        "common/pcapx/pcaputil/dlms-wrapper-gbt-action-list-tools/rebuild.py": "dlms-wrapper-gbt-action-list-tools/rebuild.py",
+        "common/pcapx/pcaputil/dlms-wrapper-gbt-action-list-tools/reference-vectors.json": "dlms-wrapper-gbt-action-list-tools/reference-vectors.json",
+        "common/pcapx/pcaputil/dlms-wrapper-gbt-action-list-tools/verify-captures.py": "dlms-wrapper-gbt-action-list-tools/verify-captures.py",
+        "common/pcapx/pcaputil/dlms-wrapper-gbt-action-list-tools/verify.py": "dlms-wrapper-gbt-action-list-tools/verify.py",
+        "common/pcapx/pcaputil/dlms-wrapper-gbt-action-list/ActionResult17-Unsupported-not-return-access17.tcp.pcap": "dlms-wrapper-gbt-action-list/ActionResult17-Unsupported-not-return-access17.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-wrapper-gbt-action-list/ActionResult17-Unsupported-not-return-access17.udp.pcap": "dlms-wrapper-gbt-action-list/ActionResult17-Unsupported-not-return-access17.udp.pcap",
+        "common/pcapx/pcaputil/dlms-wrapper-gbt-action-list/GBT-exact-first-final-and-completed-response-duplicate.tcp.pcap": "dlms-wrapper-gbt-action-list/GBT-exact-first-final-and-completed-response-duplicate.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-wrapper-gbt-action-list/GBT-exact-first-final-and-completed-response-duplicate.udp.pcap": "dlms-wrapper-gbt-action-list/GBT-exact-first-final-and-completed-response-duplicate.udp.pcap",
+        "common/pcapx/pcaputil/dlms-wrapper-gbt-action-list/baseline-controls.json": "dlms-wrapper-gbt-action-list/baseline-controls.json",
+        "common/pcapx/pcaputil/dlms-wrapper-gbt-action-list/blocktail23-byte-cap22-refusal.tcp.pcap": "dlms-wrapper-gbt-action-list/blocktail23-byte-cap22-refusal.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-wrapper-gbt-action-list/blocktail23-byte-cap22-refusal.udp.pcap": "dlms-wrapper-gbt-action-list/blocktail23-byte-cap22-refusal.udp.pcap",
+        "common/pcapx/pcaputil/dlms-wrapper-gbt-action-list/controls.json": "dlms-wrapper-gbt-action-list/controls.json",
+        "common/pcapx/pcaputil/dlms-wrapper-gbt-action-list/inner-invoke-flags-direction-ports-preserve-list-owner.tcp.pcap": "dlms-wrapper-gbt-action-list/inner-invoke-flags-direction-ports-preserve-list-owner.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-wrapper-gbt-action-list/inner-invoke-flags-direction-ports-preserve-list-owner.udp.pcap": "dlms-wrapper-gbt-action-list/inner-invoke-flags-direction-ports-preserve-list-owner.udp.pcap",
+        "common/pcapx/pcaputil/dlms-wrapper-gbt-action-list/joined-parameter-list-trailing-byte-Malformed.tcp.pcap": "dlms-wrapper-gbt-action-list/joined-parameter-list-trailing-byte-Malformed.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-wrapper-gbt-action-list/joined-parameter-list-trailing-byte-Malformed.udp.pcap": "dlms-wrapper-gbt-action-list/joined-parameter-list-trailing-byte-Malformed.udp.pcap",
+        "common/pcapx/pcaputil/dlms-wrapper-gbt-action-list/known-Actionlist-pending-and-GBT-response-prefix-Close.tcp.pcap": "dlms-wrapper-gbt-action-list/known-Actionlist-pending-and-GBT-response-prefix-Close.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-wrapper-gbt-action-list/known-Actionlist-pending-and-GBT-response-prefix-Close.udp.pcap": "dlms-wrapper-gbt-action-list/known-Actionlist-pending-and-GBT-response-prefix-Close.udp.pcap",
+        "common/pcapx/pcaputil/dlms-wrapper-gbt-action-list/list-Data-and-access17-returns.tcp.pcap": "dlms-wrapper-gbt-action-list/list-Data-and-access17-returns.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-wrapper-gbt-action-list/list-Data-and-access17-returns.udp.pcap": "dlms-wrapper-gbt-action-list/list-Data-and-access17-returns.udp.pcap",
+        "common/pcapx/pcaputil/dlms-wrapper-gbt-action-list/normal-response-cannot-consume-list-owner.tcp.pcap": "dlms-wrapper-gbt-action-list/normal-response-cannot-consume-list-owner.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-wrapper-gbt-action-list/normal-response-cannot-consume-list-owner.udp.pcap": "dlms-wrapper-gbt-action-list/normal-response-cannot-consume-list-owner.udp.pcap",
+        "common/pcapx/pcaputil/dlms-wrapper-gbt-action-list/result-count-conflict-retires-list-owner.tcp.pcap": "dlms-wrapper-gbt-action-list/result-count-conflict-retires-list-owner.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-wrapper-gbt-action-list/result-count-conflict-retires-list-owner.udp.pcap": "dlms-wrapper-gbt-action-list/result-count-conflict-retires-list-owner.udp.pcap",
+        "common/pcapx/pcaputil/dlms-wrapper-gbt-action-list/reuse-inputs.json": "dlms-wrapper-gbt-action-list/reuse-inputs.json",
+        "common/pcapx/pcaputil/dlms-wrapper-gbt-action-list/source-grammar-list-mixed-results-six-GBT-frames.tcp.pcap": "dlms-wrapper-gbt-action-list/source-grammar-list-mixed-results-six-GBT-frames.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-wrapper-gbt-action-list/source-grammar-list-mixed-results-six-GBT-frames.udp.pcap": "dlms-wrapper-gbt-action-list/source-grammar-list-mixed-results-six-GBT-frames.udp.pcap",
+        "common/pcapx/pcaputil/dlms-wrapper-gbt-action-list/inner-list-Data-depth5-positive.udp.pcap": "dlms-wrapper-gbt-action-list/source-grammar-list-mixed-results-six-GBT-frames.udp.pcap",
+        "common/pcapx/pcaputil/dlms-wrapper-gbt-action-list/inner-list-Data-depth5-positive.tcp.pcap": "dlms-wrapper-gbt-action-list/source-grammar-list-mixed-results-six-GBT-frames.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-wrapper-gbt-action-list/inner-list-Data-depth4-refusal.udp.pcap": "dlms-wrapper-gbt-action-list/blocktail23-byte-cap22-refusal.udp.pcap",
+        "common/pcapx/pcaputil/dlms-wrapper-gbt-action-list/inner-list-Data-depth4-refusal.tcp.pcap": "dlms-wrapper-gbt-action-list/blocktail23-byte-cap22-refusal.tcp.pcap",
+        "scripts/protocol-tests/required-tests-traffic-unified-v149.json": "required-tests-traffic-unified-v149.json"
+      }
     }
   ],
   "schema_version": 1,

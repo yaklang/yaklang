@@ -44,7 +44,7 @@ Run from the repository root:
 ```sh
 go run ./internal/trafficfixture/cmd/corpus test
 go test -json -count=1 -timeout=10m ./internal/trafficfixture/... ./common/bin-parser/... ./common/pcapx/... ./common/yak/cmd/yakcmds/shark-cli ./scripts/ci > traffic.jsonl
-go run ./internal/trafficfixture/cmd/corpus exec -- python3 @scripts/protocol-tests/check_go_test_json_v2.py traffic.jsonl --inventory @scripts/protocol-tests/required-tests-traffic-unified-v148.json --tier full
+go run ./internal/trafficfixture/cmd/corpus exec -- python3 @scripts/protocol-tests/check_go_test_json_v2.py traffic.jsonl --inventory @scripts/protocol-tests/required-tests-traffic-unified-v149.json --tier full
 ```
 
 The single `corpus` entry point uses the same bounded Go ZIP loader as tests.
@@ -83,7 +83,7 @@ their semantic coverage. The existing synthetic session keys are test inputs;
 production credentials, user private keys and material without redistribution
 permission belong in an external fixed-source download manifest.
 
-Current test requirements are sealed at `scripts/protocol-tests/required-tests-traffic-unified-v148.json`;
+Current test requirements are sealed at `scripts/protocol-tests/required-tests-traffic-unified-v149.json`;
 the historical inventories and all earlier batches remain unchanged.
 The supplemental small-corpus batch contains 26 minimal controls, their explicit
 expected facts, an offline generator and the compact pinned source manifest.
@@ -203,7 +203,7 @@ opaque selector bytes and one bounded Data value over Wrapper v1 TCP/UDP; object
 selector meaning, access permission and device operation are unverified. The
 original one-packet selective-access capture and original refused answer remain
 immutable; its now-supported answer is matched by exact input SHA and frame.
-The active inventory is `scripts/protocol-tests/required-tests-traffic-unified-v148.json`.
+The active inventory is `scripts/protocol-tests/required-tests-traffic-unified-v149.json`.
 
 The small-graph budget batch reuses accepted graph captures/answers and adds one
 249-byte UDP control for child count255 without child bytes. Its standalone proof
@@ -993,7 +993,7 @@ the normative answer; a missing numeric reference field is not a codec pass.
 Full/deferred, workers1/2/4, observers off/on, Feed chunks1/7/full, ownership,
 resources and close/refusal boundaries remain required.
 
-Current gate: `required-tests-traffic-unified-v148.json` with
+Current gate: `required-tests-traffic-unified-v149.json` with
 `check_go_test_json_v2.py`. The indexed validator preserves missing/unpassed,
 package invocation completion, descendant skips, failures and non-JSON checks;
 its mutation/differential harness is sealed with the material. Older checkers
@@ -1629,7 +1629,7 @@ userspace adapter; full kernel receiver/socket/timers and ECU endpoints do not.
 All161 preceding ZIPs remain byte-for-byte unchanged. Raw captures, dependencies,
 reference source/build output and process evidence stay outside Git.
 
-Current effective v148 inventory: 99,884 entries; 99,877 are mandatory for the full tier.
+Current effective v149 inventory: 100,368 entries; 100,361 are mandatory for the full tier.
 
 The opt-in `DynamicFlowControl` profile follows Linux v6.12 FC tuple updates (including WAIT without granting data). Disjoint address extensions or classical/FD carriers may share CAN IDs; unknown selectors cannot choose or mutate a conversation. Ambiguous selectors are rejected. Seven sealed cases exercise full/deferred, workers 1/2/4, and observer off/on, with exact fields, byte collections, contributor references, errors and resource ownership. The existing static FC profile remains unchanged. Pinned upstream FC and filter functions execute with declared userspace stubs; this is not a kernel/ECU endpoint. TShark 4.2.5 checks wire tuples and two complete payloads, but cannot independently reassemble the shared-address transcripts.
 
@@ -1802,3 +1802,5 @@ Plaintext Wrapper v1 complete SET normal/list APDUs can be carried by bounded GB
 Four precise historic complete SET-in-GBT missing-capability witnesses now use hash-bound upgrade answers; original captures/answers remain unchanged. Complete requests own their event and pending Close; solitary replies remain unmatched with zero owners. Exact carrier endpoints/time/offset/Flow and recursive types are checked in addition to existing complete fields/query/Close/release assertions.
 
 Wrapper v1 complete plaintext Action-normal C3/C7 choice1 now passes through bounded GBT over TCP or explicit native UDP.18 independently specified traces95steps preserve optional Data, result versus return-access semantics, exact observed ownership, resources and typed Close. Two strictly hash-bound historical unsupported witnesses and the existing standalone public API boundary gain full positive answers; all prior archives and original answers stay immutable. Other Action forms, negotiated/authenticated context and device success are not added.
+
+Wrapper v1 complete plaintext Action-with-list C3/C7 choice3 now passes through bounded GBT over TCP or explicit native UDP.13 independently specified traces72steps preserve optional Data, result versus return-access semantics, exact observed ownership, resources and typed Close. Two strictly hash-bound historical unsupported witnesses gain full positive answers; all prior archives and original answers stay immutable. Action list-first/pblocks, negotiated/authenticated context and device success are not added.

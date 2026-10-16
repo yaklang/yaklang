@@ -18,12 +18,14 @@ type methodListCase struct {
 
 func methodListControls(t *testing.T) []methodListCase {
 	var x struct{ Cases []actionCase }
-	require.NoError(t, json.Unmarshal(finsReadBatch(t, "dlms-action-list", "DLMS_ACTION_LIST_TEST_ROOT", "controls.json"), &x))
+	original := finsReadBatch(t, "dlms-action-list", "DLMS_ACTION_LIST_TEST_ROOT", "controls.json")
+	updated := gbtActionListHistoricalDocument(t, original)
+	require.NoError(t, json.Unmarshal(updated, &x))
 	require.Len(t, x.Cases, 59)
 	var flow struct {
 		Cases []struct{ Steps []struct{ FlowID any } }
 	}
-	require.NoError(t, json.Unmarshal(finsReadBatch(t, "dlms-action-list", "DLMS_ACTION_LIST_TEST_ROOT", "controls.json"), &flow))
+	require.NoError(t, json.Unmarshal(updated, &flow))
 	require.Len(t, flow.Cases, len(x.Cases))
 	out := make([]methodListCase, len(x.Cases))
 	for i, c := range x.Cases {
@@ -135,8 +137,11 @@ func TestDLMSActionListNative(t *testing.T) {
 								at = end
 							}
 						}
+						flow := gbtActionListHistoricalCarrierCheck(t, c.actionCase, es, transport, false, false, 0)
 						methodListCheck(t, c, es, transport, false, d)
-						methodListCloseCheck(t, c, s.Close("action-test"), transport, "action-test")
+						closed := s.Close("action-test")
+						gbtActionListHistoricalCarrierCheck(t, c.actionCase, closed, transport, false, true, flow)
+						methodListCloseCheck(t, c, closed, transport, "action-test")
 						require.Empty(t, s.Close("again"))
 						require.Zero(t, s.Stats().BufferedBytes)
 						require.LessOrEqual(t, s.Stats().PeakBufferedBytes, int64(b.MaxBufferedBytes))
@@ -162,7 +167,9 @@ func TestDLMSActionListMatrix(t *testing.T) {
 			discoveryMatrix(t, func(t *testing.T, w int, d, o bool) {
 				es, stats := actionReplay(t, c.actionCase, raw, w, d, o)
 				require.Len(t, es, len(c.Steps)+len(c.Close.Events))
+				flow := gbtActionListHistoricalCarrierCheck(t, c.actionCase, es[:len(c.Steps)], "udp", true, false, 0)
 				methodListCheck(t, c, es[:len(c.Steps)], "udp", true, d)
+				gbtActionListHistoricalCarrierCheck(t, c.actionCase, es[len(c.Steps):], "udp", true, true, flow)
 				methodListCloseCheck(t, c, es[len(c.Steps):], "udp", "")
 				require.EqualValues(t, len(c.Steps), stats.Messages)
 				require.EqualValues(t, len(c.Close.Events), stats.Incomplete)
@@ -270,7 +277,14 @@ func methodListWireCheck(t *testing.T, c methodListCase, es []*ProtocolEvent, tr
 				require.Zero(t, want)
 				require.Zero(t, e.FlowID)
 			case string:
-				require.Equal(t, "same retained flow", want)
+				expectedLabel := "same retained flow"
+				// This one independently hash-bound upgraded witness uses a more
+				// explicit label for the same retained nonzero FlowID contract.
+				if c.Name == "GBT-inner-Action-list-request-unimplemented" {
+					require.Equal(t, "7ca87fca0d0071382f42cbe75d4411f045e2f39f2d395464d1024c8f4c0ce9f3", a.SHA)
+					expectedLabel = "same retained nonzero flow"
+				}
+				require.Equal(t, expectedLabel, want)
 				require.NotZero(t, e.FlowID)
 				require.Equal(t, es[0].FlowID, e.FlowID)
 			default:
