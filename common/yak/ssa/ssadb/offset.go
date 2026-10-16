@@ -64,10 +64,28 @@ func SaveIrOffsetBatch(db *gorm.DB, items []*IrOffset) error {
 	if r := db.CreateInBatches(items, irOffsetBatchChunk); r.Error != nil {
 		return r.Error
 	}
+	seen := make(map[string]struct{}, len(items))
+	for _, item := range items {
+		if item == nil {
+			continue
+		}
+		program := strings.TrimSpace(item.ProgramName)
+		if program == "" {
+			continue
+		}
+		if _, ok := seen[program]; ok {
+			continue
+		}
+		seen[program] = struct{}{}
+		invalidateOffsetCache(program)
+	}
 	return nil
 }
 
 func GetOffsetByVariable(name string, valueID int64, programName string) []*IrOffset {
+	if rows, ok := cachedOffsetsByVariable(programName, name, valueID); ok {
+		return rows
+	}
 	db := GetDB()
 	offsets, err := nativeGetOffsetsByVariable(db, name, valueID, programName)
 	if err == nil {

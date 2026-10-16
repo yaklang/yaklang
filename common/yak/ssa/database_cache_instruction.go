@@ -841,6 +841,8 @@ func (s *instructionStore) PreloadByIDsFast(ids []int64) {
 		return
 	}
 	ssadb.PreloadIrCodesByIdsFast(ssadb.GetDB(), s.program.Name, ids)
+	// Read mode only reaches this function. Failure leaves per-variable fallback intact.
+	_ = ssadb.PreloadOffsetsByValueIDs(ssadb.GetDB(), applicationProgramName(s.program), ids)
 	cache := ssadb.GetIrCodeCache(s.program.Name)
 	for _, id := range ids {
 		if id <= 0 {
