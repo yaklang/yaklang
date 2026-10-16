@@ -17,31 +17,6 @@ if marker in text:
     print(f"[yaklib] Go runtime already patched: {path}")
     raise SystemExit(0)
 
-old_addr = '''\t\tfor i, sect := range md.textsectmap {
-\t\t\t// For the last section, include the end address (etext), as it is included in the functab.
-\t\t\tif off >= sect.vaddr && off < sect.end || (i == len(md.textsectmap)-1 && off == sect.end) {
-\t\t\t\tres = sect.baseaddr + off - sect.vaddr
-\t\t\t\tbreak
-\t\t\t}
-\t\t}'''
-new_addr = '''\t\t// ssa2llvm: textsect binary search
-\t\tlo, hi := 0, len(md.textsectmap)-1
-\t\tfor lo <= hi {
-\t\t\tmid := lo + (hi-lo)/2
-\t\t\tsect := md.textsectmap[mid]
-\t\t\tif off < sect.vaddr {
-\t\t\t\thi = mid - 1
-\t\t\t\tcontinue
-\t\t\t}
-\t\t\t// For the last section, include the end address (etext), as it is included in the functab.
-\t\t\tif off >= sect.end && !(mid == len(md.textsectmap)-1 && off == sect.end) {
-\t\t\t\tlo = mid + 1
-\t\t\t\tcontinue
-\t\t\t}
-\t\t\tres = sect.baseaddr + off - sect.vaddr
-\t\t\tbreak
-\t\t}'''
-
 old_off = '''\t\tfor i, sect := range md.textsectmap {
 \t\t\tif sect.baseaddr > pc {
 \t\t\t\t// pc is not in any section.
@@ -57,7 +32,7 @@ old_off = '''\t\tfor i, sect := range md.textsectmap {
 \t\t\t\tbreak
 \t\t\t}
 \t\t}'''
-new_off = '''\t\tlo, hi := 0, len(md.textsectmap)
+new_off = '''\t\t// ssa2llvm: textsect binary search\n\t\tlo, hi := 0, len(md.textsectmap)
 \t\tfor lo < hi {
 \t\t\tmid := lo + (hi-lo)/2
 \t\t\tif md.textsectmap[mid].baseaddr <= pc {
@@ -84,9 +59,9 @@ new_off = '''\t\tlo, hi := 0, len(md.textsectmap)
 \t\t\treturn 0, false
 \t\t}'''
 
-if text.count(old_addr) != 1 or text.count(old_off) != 1:
-    raise SystemExit(f"[yaklib] unsupported Go runtime source: expected one textAddr and textOff loop in {path}")
+if text.count(old_off) != 1:
+    raise SystemExit(f"[yaklib] unsupported Go runtime source: expected one textOff loop in {path}")
 
-path.write_text(text.replace(old_addr, new_addr).replace(old_off, new_off))
+path.write_text(text.replace(old_off, new_off))
 print(f"[yaklib] patched Go runtime textsect lookups: {path}")
 PY

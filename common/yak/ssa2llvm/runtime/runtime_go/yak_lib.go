@@ -643,6 +643,32 @@ func yak_runtime_is_true(raw int64) int64 {
 	return 1
 }
 
+//export yak_runtime_get_module
+func yak_runtime_get_module(name *C.char) int64 {
+	defer recoverRuntimePanic()
+	moduleName := runtimeCStringToGoString(unsafe.Pointer(name))
+	if moduleName == "" {
+		return 0
+	}
+	runtimeYaklibRegistryMu.RLock()
+	exports, ok := runtimeYaklibModules[moduleName]
+	if ok {
+		// The registry map is mutable during startup; expose a stable map
+		// snapshot to Yak so aliases can resolve module members like ordinary
+		// object fields without racing registration.
+		snapshot := make(map[string]any, len(exports))
+		for key, value := range exports {
+			snapshot[key] = value
+		}
+		exports = snapshot
+	}
+	runtimeYaklibRegistryMu.RUnlock()
+	if !ok {
+		return 0
+	}
+	return int64(uintptr(newRuntimeShadow(exports)))
+}
+
 func runtimeValueToInt64(v reflect.Value) int64 {
 	if !v.IsValid() {
 		return 0
@@ -671,7 +697,13 @@ func runtimeValueToInt64(v reflect.Value) int64 {
 		// way the compiler emits a float constant and the way runtimeDecodeArg
 		// reads one back for a float64 parameter.
 		return int64(math.Float64bits(v.Float()))
-	case reflect.Ptr, reflect.Map, reflect.Slice, reflect.Array, reflect.Struct, reflect.String, reflect.Func, reflect.Chan:
+	case reflect.String:
+		// Normalize named Go string types (for example pcapdb.State) to the
+		// builtin string type before crossing the Yak ABI. Keeping the named
+		// type in the shadow makes string decoding/comparison see a foreign Go
+		// type and silently produce the zero value.
+		return int64(uintptr(newRuntimeShadow(v.String())))
+	case reflect.Ptr, reflect.Map, reflect.Slice, reflect.Array, reflect.Struct, reflect.Func, reflect.Chan:
 		if v.Kind() == reflect.Ptr && v.IsNil() {
 			return 0
 		}

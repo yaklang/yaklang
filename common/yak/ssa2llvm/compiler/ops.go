@@ -8,6 +8,7 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/ssa2llvm/callframe"
 	"github.com/yaklang/yaklang/common/yak/ssa2llvm/runtime/abi"
+	"github.com/yaklang/yaklang/common/yak/ssa2llvm/runtime/tiers"
 	"github.com/yaklang/yaklang/common/yak/yaklang"
 )
 
@@ -112,7 +113,8 @@ func (c *Compiler) getValue(contextInst ssa.Instruction, id int64) (llvm.Value, 
 		if undef, ok := valObj.(*ssa.Undefined); ok && undef != nil && undef.IsExtern() {
 			isExternUndef = true
 		}
-		if !isExternUndef && !c.valueHasLocalDependency(fn, valObj) {
+		_, isExternLib := ssa.ToExternLib(valObj)
+		if !isExternUndef && !isExternLib && !c.valueHasLocalDependency(fn, valObj) {
 			return llvm.ConstInt(c.LLVMCtx.Int64Type(), 0, false), nil
 		}
 	}
@@ -174,9 +176,23 @@ func (c *Compiler) getValue(contextInst ssa.Instruction, id int64) (llvm.Value, 
 		return val, nil
 	}
 
-	// ExternLib values are compile-time module handles; they are not runtime objects.
+	// ExternLib values are compile-time module handles. Materialize an
+	// immutable runtime export map so an imported module can be aliased and
+	// called through a variable (for example `tools = pcapdb`).
 	if extern, ok := ssa.ToExternLib(valObj); ok && extern != nil {
-		val := llvm.ConstInt(c.LLVMCtx.Int64Type(), 0, false)
+		moduleName := extern.LibraryName
+		if moduleName == "" {
+			moduleName = extern.GetName()
+		}
+		if moduleName == "" {
+			val := llvm.ConstInt(c.LLVMCtx.Int64Type(), 0, false)
+			c.cacheValue(id, val)
+			return c.finishGetValue(contextInst, id)
+		}
+		c.recordYaklibDependency(moduleName, "")
+		fn, fnType := c.getOrInsertRuntimeGetModule()
+		namePtr := c.Builder.CreateGlobalStringPtr(moduleName, fmt.Sprintf("yak_module_name_%d", id))
+		val := c.Builder.CreateCall(fnType, fn, []llvm.Value{namePtr}, "yak_module")
 		c.cacheValue(id, val)
 		return c.finishGetValue(contextInst, id)
 	}
@@ -253,6 +269,14 @@ func (c *Compiler) getValue(contextInst ssa.Instruction, id int64) (llvm.Value, 
 			isMember = true
 		}
 		if undef.IsExtern() {
+			if !isMember && isKnownYaklibModule(undef.GetName()) {
+				fn, fnType := c.getOrInsertRuntimeGetModule()
+				namePtr := c.Builder.CreateGlobalStringPtr(undef.GetName(), fmt.Sprintf("yak_module_name_%d", id))
+				val := c.Builder.CreateCall(fnType, fn, []llvm.Value{namePtr}, "yak_module")
+				c.recordYaklibDependency(undef.GetName(), "module")
+				c.cacheValue(id, val)
+				return val, nil
+			}
 			if isMember {
 				// fall through to MemberCall lowering
 			} else if pkg, key, ok := splitExternValueName(undef.GetName()); ok {
@@ -563,6 +587,17 @@ func (c *Compiler) compileBinOp(inst *ssa.BinOp, resultID int64) error {
 		return err
 	}
 	return nil
+}
+
+func isKnownYaklibModule(name string) bool {
+	for _, tier := range tiers.All {
+		for _, module := range tier.Modules {
+			if module == name {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func (c *Compiler) compileConst(inst *ssa.ConstInst) error {
