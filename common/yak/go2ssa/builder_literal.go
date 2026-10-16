@@ -737,6 +737,12 @@ func (b *astbuilder) buildFieldDecl(stmt *gol.FieldDeclContext, structTyp *ssa.O
 	var ssatyp ssa.Type = nil
 	if typ := stmt.Type_(); typ != nil {
 		ssatyp = b.buildType(typ.(*gol.Type_Context))
+		// buildType historically resolves *T to T. Preserve the indirection
+		// for named fields, as we already do for embedded fields below: a
+		// pointer's zero value is nil, not a recursively initialized T.
+		if ssatyp != nil && strings.HasPrefix(typ.GetText(), "*") {
+			ssatyp = goPointerType(ssatyp)
+		}
 	}
 
 	if idlist := stmt.IdentifierList(); idlist != nil {
