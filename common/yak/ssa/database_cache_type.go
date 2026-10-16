@@ -142,7 +142,7 @@ func (s *typeStore) flush() error {
 		// Snapshot String()/type metadata on this goroutine: some type
 		// String methods update recursion guards and caches. Only encoding
 		// these stable snapshots is safe to parallelize.
-		rows := marshalTypeSnapshots(s.programName, batch, s.concurrency)
+		rows := marshalTypeSnapshots(s.programName, batch, fingerprints, s.concurrency)
 		if err := saveBatch(rows); err != nil {
 			log.Errorf("save ir type batch failed: %v", err)
 			if firstErr == nil {
