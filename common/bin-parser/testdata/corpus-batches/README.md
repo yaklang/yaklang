@@ -44,7 +44,7 @@ Run from the repository root:
 ```sh
 go run ./internal/trafficfixture/cmd/corpus test
 go test -json -count=1 -timeout=10m ./internal/trafficfixture/... ./common/bin-parser/... ./common/pcapx/... ./common/yak/cmd/yakcmds/shark-cli ./scripts/ci > traffic.jsonl
-go run ./internal/trafficfixture/cmd/corpus exec -- python3 @scripts/protocol-tests/check_go_test_json_v2.py traffic.jsonl --inventory @scripts/protocol-tests/required-tests-traffic-unified-v153.json --tier full
+go run ./internal/trafficfixture/cmd/corpus exec -- python3 @scripts/protocol-tests/check_go_test_json_v2.py traffic.jsonl --inventory @scripts/protocol-tests/required-tests-traffic-unified-v154.json --tier full
 ```
 
 The single `corpus` entry point uses the same bounded Go ZIP loader as tests.
@@ -83,7 +83,7 @@ their semantic coverage. The existing synthetic session keys are test inputs;
 production credentials, user private keys and material without redistribution
 permission belong in an external fixed-source download manifest.
 
-Current test requirements are sealed at `scripts/protocol-tests/required-tests-traffic-unified-v153.json`;
+Current test requirements are sealed at `scripts/protocol-tests/required-tests-traffic-unified-v154.json`;
 the historical inventories and all earlier batches remain unchanged.
 The supplemental small-corpus batch contains 26 minimal controls, their explicit
 expected facts, an offline generator and the compact pinned source manifest.
@@ -203,7 +203,7 @@ opaque selector bytes and one bounded Data value over Wrapper v1 TCP/UDP; object
 selector meaning, access permission and device operation are unverified. The
 original one-packet selective-access capture and original refused answer remain
 immutable; its now-supported answer is matched by exact input SHA and frame.
-The active inventory is `scripts/protocol-tests/required-tests-traffic-unified-v153.json`.
+The active inventory is `scripts/protocol-tests/required-tests-traffic-unified-v154.json`.
 
 The small-graph budget batch reuses accepted graph captures/answers and adds one
 249-byte UDP control for child count255 without child bytes. Its standalone proof
@@ -993,7 +993,7 @@ the normative answer; a missing numeric reference field is not a codec pass.
 Full/deferred, workers1/2/4, observers off/on, Feed chunks1/7/full, ownership,
 resources and close/refusal boundaries remain required.
 
-Current gate: `required-tests-traffic-unified-v153.json` with
+Current gate: `required-tests-traffic-unified-v154.json` with
 `check_go_test_json_v2.py`. The indexed validator preserves missing/unpassed,
 package invocation completion, descendant skips, failures and non-JSON checks;
 its mutation/differential harness is sealed with the material. Older checkers
@@ -1629,7 +1629,7 @@ userspace adapter; full kernel receiver/socket/timers and ECU endpoints do not.
 All161 preceding ZIPs remain byte-for-byte unchanged. Raw captures, dependencies,
 reference source/build output and process evidence stay outside Git.
 
-Current effective v153 inventory: 101,882 entries; 101,875 are mandatory for the full tier.
+Current effective v154 inventory: 102,413 entries; 102,406 are mandatory for the full tier.
 
 The opt-in `DynamicFlowControl` profile follows Linux v6.12 FC tuple updates (including WAIT without granting data). Disjoint address extensions or classical/FD carriers may share CAN IDs; unknown selectors cannot choose or mutate a conversation. Ambiguous selectors are rejected. Seven sealed cases exercise full/deferred, workers 1/2/4, and observer off/on, with exact fields, byte collections, contributor references, errors and resource ownership. The existing static FC profile remains unchanged. Pinned upstream FC and filter functions execute with declared userspace stubs; this is not a kernel/ECU endpoint. TShark 4.2.5 checks wire tuples and two complete payloads, but cannot independently reassemble the shared-address transcripts.
 
@@ -1812,3 +1812,5 @@ Plaintext single-method HDLC Action upload ACK4/normal1 response information now
 Normal-root HDLC Action-download C7choice2 pblock response information now spans CRC/HCS-valid Iframes only under the reversed immediately observed ACTIONchoice1/nil-transfer or knownnextchoice2/current ACTION-transfer owner.8 independent66step traces plus one exact3counterClose checkpoint and one10step request+response fragmented upload roundtrip preserve complete fields, currentrequest ResponseTo/Tx0, original AXDR returnData, prefix retries, link/context/gap/conflict/resource isolation and truthful3or5counterClose. Fixed primary grammar/prior actual SDK completepblocks support newly authored splits; no device/security/negotiation or completed-response cache claim. Upload and download response features are jointly accepted/published; all prior archives remain immutable.
 
 Knownnext C3choice2 Action-download REQUEST information can span bounded CRC/HCS-valid Iframes only for a retained normal-root ACTION transfer without pending owner.8 independent63step traces and a9step both-direction fragmented download roundtrip preserve literal finalcarrier, complete NextPblock fields, actual finalrequest owner/NS acknowledged by responseNR, retries/guards/gaps/conflicts, isolated information10 budget10/budget9, typed5counterClose and private query/input ownership. Fixed grammar/prior actual reference bytes support authored splits; An additional pinned Gurux in-memory unsegmented G6 service-body/next-number check passed; it does not validate the new information splits. No cold-root/device/security/negotiation/completed-response cache claim. All249 prior ZIP remain immutable.
+
+Plaintext Wrapper v1 SN Read observes ordered variable-name choice2 requests and Data0/access-error1 results with selected 1..16 rows. Names retain all 16 address bits; fields, Data graphs and wide error codes have independent answers. These APDUs contain no invoke/priority/confirmed fields and create no SN owner. Valid SN leaves existing LN owners unchanged. Shared node/depth/count budgets, capture/native flow identity, typed errors, Close, and private input/query ownership are covered by 12 traces/63 steps plus 2 traces/8 steps refusing unselected GBT-carried SN. A reproduced unpublished-draft admission was closed before integration; it is not a released-runtime defect. Actual fixed SDK memory execution confirms the minimal service bytes only; complete row and session answers are independently authored. All 250 prior ZIP remain immutable.

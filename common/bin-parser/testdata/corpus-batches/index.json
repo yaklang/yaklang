@@ -114922,6 +114922,246 @@
         "common/pcapx/pcaputil/dlms-hdlc-action-download-request-segments/roundtrip-supplement.json": "dlms-hdlc-action-download-request-segments/roundtrip-supplement.json",
         "scripts/protocol-tests/required-tests-traffic-unified-v153.json": "required-tests-traffic-unified-v153.json"
       }
+    },
+    {
+      "id": "validation-dlms-wrapper-sn-read",
+      "kind": "support",
+      "source_sha": "b00b323c3a3f4c03d36a5aba221d73acd385de34",
+      "file": "validation-dlms-wrapper-sn-read.zip",
+      "sha256": "bb588f49ed993af49d8d97c13370ee051c511fc5f81b09b127dbc9fdd6848873",
+      "password": "bin-parser",
+      "members": {
+        "dlms-wrapper-sn-read-tools/REFERENCE-ACTUAL.json": {
+          "bytes": 1204,
+          "sha256": "f9646bdcebf45dbfda9f15721d28f2c4fd214142c917033e66bfebff74b6c583"
+        },
+        "dlms-wrapper-sn-read-tools/SOURCE-ADDENDUM.json": {
+          "bytes": 1464,
+          "sha256": "abb1516ab6d0a1acca8c4a0fe25040c73b5f3b80074a19f71901d7286ab06a6d"
+        },
+        "dlms-wrapper-sn-read-tools/SOURCES.json": {
+          "bytes": 4527,
+          "sha256": "1c241317edea8c57d991b4e64d9539b960f4fab642c46c9f40ec8ea2d8be140c"
+        },
+        "dlms-wrapper-sn-read-tools/generate-baseline.py": {
+          "bytes": 446,
+          "sha256": "e01cc172fd7c40bf50c58b0e5a9a6fc7586090736ef13d5359de28a386d184cf"
+        },
+        "dlms-wrapper-sn-read-tools/generate-gbt-supplement.py": {
+          "bytes": 3595,
+          "sha256": "f853f02e15e09f111b76b430dbd8d7f1ed9a3687bd5f76adadc00e8b45760d9b"
+        },
+        "dlms-wrapper-sn-read-tools/generate.py": {
+          "bytes": 17046,
+          "sha256": "fbe803c4a7c44a41a8fe07c0ae1d6aa045b6df3e56e6cd32c1cd77ebca3549e0"
+        },
+        "dlms-wrapper-sn-read-tools/rebuild.py": {
+          "bytes": 1643,
+          "sha256": "fcb526938fc86197b9fec1cb6be6639825b3f5dea9cecf8b73e094ce37901343"
+        },
+        "dlms-wrapper-sn-read-tools/reference-vectors.json": {
+          "bytes": 4159,
+          "sha256": "59250557438767f0f7ff0a072b1decf3fe0f5768b75013142a5dfa608b0fe6c0"
+        },
+        "dlms-wrapper-sn-read-tools/verify-captures.py": {
+          "bytes": 2078,
+          "sha256": "7755c3d1482f67f7fc70f63fba02b10963f2b10e3148f78c3c05accaa364a793"
+        },
+        "dlms-wrapper-sn-read-tools/verify-gbt-supplement.py": {
+          "bytes": 3267,
+          "sha256": "6fdf9116d346ec3f1f0a26a1411c28a5fc91e85e8593ea8c1801173a2abe1aa9"
+        },
+        "dlms-wrapper-sn-read-tools/verify.py": {
+          "bytes": 9301,
+          "sha256": "e84baca3556c373ec2d134e25d3deaa3cf929ef167839bf16ab444a69a286a08"
+        },
+        "dlms-wrapper-sn-read/GBT-inner-SN-request05-outside-direct-read-scope.tcp.pcap": {
+          "bytes": 586,
+          "sha256": "dcd8a2e0c89420ee260f2adf8e701a342179fe2244b01363cb620e4e8d050fff"
+        },
+        "dlms-wrapper-sn-read/GBT-inner-SN-request05-outside-direct-read-scope.udp.pcap": {
+          "bytes": 328,
+          "sha256": "b4aef77bb9b02d86c61ae5cee6a2a8b79ce30ec4c8611971fa5fe27d0c28e519"
+        },
+        "dlms-wrapper-sn-read/GBT-inner-SN-response0c-outside-direct-read-scope.tcp.pcap": {
+          "bytes": 585,
+          "sha256": "d8b3866286b217abe44cf86e8dec05e16124cee8873d1ae57a97d9ba193d4343"
+        },
+        "dlms-wrapper-sn-read/GBT-inner-SN-response0c-outside-direct-read-scope.udp.pcap": {
+          "bytes": 327,
+          "sha256": "29183507121626e25f9a0bc28ca32f01803f94ad2cadf605e25d62b48905a49b"
+        },
+        "dlms-wrapper-sn-read/LN-pending-private-Close-survives-valid-SN-observations.tcp.pcap": {
+          "bytes": 496,
+          "sha256": "04859b9a3a4e83107c895b7ab017ab5544dd5a3e2ae49efa48ac175578bddcc2"
+        },
+        "dlms-wrapper-sn-read/LN-pending-private-Close-survives-valid-SN-observations.udp.pcap": {
+          "bytes": 250,
+          "sha256": "9435bf7ffb56d656a632c14029e41b73f61dbeada36766bb67f41f498d1288e1"
+        },
+        "dlms-wrapper-sn-read/actual-SDK-two-name-mixed-result-repeat-wire-only.tcp.pcap": {
+          "bytes": 576,
+          "sha256": "34d3a19548f867dd85d3e04b06374b6f6b0610a894e922c383f04f0951824684"
+        },
+        "dlms-wrapper-sn-read/actual-SDK-two-name-mixed-result-repeat-wire-only.udp.pcap": {
+          "bytes": 318,
+          "sha256": "c125455660e369a7eaf536860952b7187216f5da73bdd61decad1d7f3d57df8c"
+        },
+        "dlms-wrapper-sn-read/baseline-controls.json": {
+          "bytes": 347654,
+          "sha256": "fdd6d2596604fcbea289ee594106d9827a81baaffbe8b14dc2bf5e3cb95577ae"
+        },
+        "dlms-wrapper-sn-read/complete-WPDU-truncation-and-trailing-Malformed-recoverable.tcp.pcap": {
+          "bytes": 904,
+          "sha256": "4903c2adcfbdb996206b8cc65a3cf185650fdc642ec188066c4542d3f356fc1d"
+        },
+        "dlms-wrapper-sn-read/complete-WPDU-truncation-and-trailing-Malformed-recoverable.udp.pcap": {
+          "bytes": 598,
+          "sha256": "c129ee1c62ee298d6102599cfec84409c6b8d2a1ca8407ec6869c3095e8f2005"
+        },
+        "dlms-wrapper-sn-read/controls.json": {
+          "bytes": 1194814,
+          "sha256": "7351c3e218e7add499689d78f4f7cc4103f74fdfe0e39cf8b1b46fdd7aeb10b1"
+        },
+        "dlms-wrapper-sn-read/existing-LN-Get-normal-complete-neighbor.tcp.pcap": {
+          "bytes": 409,
+          "sha256": "d62fad4344c625cf5a8daf2e3bc8bc1ed022a3d2e958e9533fb1476cbbcd1290"
+        },
+        "dlms-wrapper-sn-read/existing-LN-Get-normal-complete-neighbor.udp.pcap": {
+          "bytes": 175,
+          "sha256": "9da34f3392cf506d1d3fd6090b5d0ea154f783ee90bbb6719c7681f73a810e92"
+        },
+        "dlms-wrapper-sn-read/fixed-compact-and-scalar-payload13-not-type-tag.tcp.pcap": {
+          "bytes": 501,
+          "sha256": "bac5f2fbc8db1bd1feb2d76bcb95df210066ae5e00db39062e5478354824666f"
+        },
+        "dlms-wrapper-sn-read/fixed-compact-and-scalar-payload13-not-type-tag.udp.pcap": {
+          "bytes": 255,
+          "sha256": "430b4379d2552a903e4e1ebbb34f55d1a632629f00086bc8c5158170c1231bec"
+        },
+        "dlms-wrapper-sn-read/gbt-supplement.json": {
+          "bytes": 106833,
+          "sha256": "bc77182c122011ab4d5aab9c06f962309bf5806a28104590d92733e44db9fbea"
+        },
+        "dlms-wrapper-sn-read/nonminimal-definite-counts-preserved-without-association.tcp.pcap": {
+          "bytes": 407,
+          "sha256": "db77458388b2d3b1b66677e9ca59bdbd50bb6915c0b90e8ed025c150fd3a32f2"
+        },
+        "dlms-wrapper-sn-read/nonminimal-definite-counts-preserved-without-association.udp.pcap": {
+          "bytes": 173,
+          "sha256": "6e9b7090a528aeed0819182559d8f50bbe21d5f6eda14ce711b9c6c7a5c2b047"
+        },
+        "dlms-wrapper-sn-read/reuse-inputs.json": {
+          "bytes": 3,
+          "sha256": "ca3d163bab055381827226140568f3bef7eaac187cebd76878e0b63e9e442356"
+        },
+        "dlms-wrapper-sn-read/same-wPort-and-cross-wPort-SN-cannot-steal-LN-owner.tcp.pcap": {
+          "bytes": 918,
+          "sha256": "fa8bfefe10a0ec662e2a780558f375bf8eee4f3cacdc3b26d98d8e9afdf3abe5"
+        },
+        "dlms-wrapper-sn-read/same-wPort-and-cross-wPort-SN-cannot-steal-LN-owner.udp.pcap": {
+          "bytes": 612,
+          "sha256": "c25581dbc5da17971c0bbff08b01a0276ea1fab9c72ac65034b061faa785a286"
+        },
+        "dlms-wrapper-sn-read/shared-four-Data-nodes-and-rowcount-cap3-Resource.tcp.pcap": {
+          "bytes": 757,
+          "sha256": "2c15010d4adc23ddbf4557509f4ef693ad074d19c2534554f46b79c93c4cac20"
+        },
+        "dlms-wrapper-sn-read/shared-four-Data-nodes-and-rowcount-cap3-Resource.udp.pcap": {
+          "bytes": 475,
+          "sha256": "44da0f23ad1c7de4dd4829587cca52b1bb3a32a54f867af189cc84c9e7162114"
+        },
+        "dlms-wrapper-sn-read/shared-four-Data-nodes-cap4-depth6-positive.tcp.pcap": {
+          "bytes": 591,
+          "sha256": "0c3c7e4276940e43bc3b1cf7d5ffeaeb1cb69856e4d126e9252e61440661f586"
+        },
+        "dlms-wrapper-sn-read/shared-four-Data-nodes-cap4-depth6-positive.udp.pcap": {
+          "bytes": 333,
+          "sha256": "638765da01605555b2fe0338804f018a56ddba1b48e50707b3be7cbb155e46fa"
+        },
+        "dlms-wrapper-sn-read/structure-Data-depth5-Resource-and-late-SN-still-wire.tcp.pcap": {
+          "bytes": 665,
+          "sha256": "1c4f2687d9e29c0ced681d7bb9d6d55f220925ac29726eca9a9b20329c376a7c"
+        },
+        "dlms-wrapper-sn-read/structure-Data-depth5-Resource-and-late-SN-still-wire.udp.pcap": {
+          "bytes": 395,
+          "sha256": "16f9d45a25bc39b1271222a604cc1aa632136fc36cc4d5937595aba4ae868bf0"
+        },
+        "dlms-wrapper-sn-read/three-name-count-not-LN-list-wide-error17-18-19-and-bound16.tcp.pcap": {
+          "bytes": 649,
+          "sha256": "aa0284913f3a59df6103dca7b0a452770874ee28c9da4e659dd528070da1e9aa"
+        },
+        "dlms-wrapper-sn-read/three-name-count-not-LN-list-wide-error17-18-19-and-bound16.udp.pcap": {
+          "bytes": 391,
+          "sha256": "5375a10c939e50513ee815102804702ddef449b173c1f3ed1077b0d45b4de029"
+        },
+        "dlms-wrapper-sn-read/unsupported-forms-enum-empty-indefinite-and-hard17-Resource.tcp.pcap": {
+          "bytes": 1447,
+          "sha256": "b140a80bbd8a2841e76f96d373e3ad2f62f9ebc8876710848b6cf8fbf8da5bb9"
+        },
+        "dlms-wrapper-sn-read/unsupported-forms-enum-empty-indefinite-and-hard17-Resource.udp.pcap": {
+          "bytes": 1069,
+          "sha256": "7864a2474efac15d32bed11788f5fd88311e172b46fb7fa8cd82467779713bd4"
+        },
+        "required-tests-traffic-unified-v154.json": {
+          "bytes": 20344569,
+          "sha256": "b14b9d5bee4afdb6ea2644828b8b8a2ad4ea83e74554e770eaa1a5b554679598"
+        },
+        "validation/expected.json": {
+          "bytes": 42229,
+          "sha256": "122dfe5442c994f20a4691015eaf142d74bfa8d3589447719c6caba88ced3422"
+        }
+      },
+      "aliases": {
+        "common/pcapx/pcaputil/dlms-wrapper-sn-read-tools/REFERENCE-ACTUAL.json": "dlms-wrapper-sn-read-tools/REFERENCE-ACTUAL.json",
+        "common/pcapx/pcaputil/dlms-wrapper-sn-read-tools/SOURCE-ADDENDUM.json": "dlms-wrapper-sn-read-tools/SOURCE-ADDENDUM.json",
+        "common/pcapx/pcaputil/dlms-wrapper-sn-read-tools/SOURCES.json": "dlms-wrapper-sn-read-tools/SOURCES.json",
+        "common/pcapx/pcaputil/dlms-wrapper-sn-read-tools/generate-baseline.py": "dlms-wrapper-sn-read-tools/generate-baseline.py",
+        "common/pcapx/pcaputil/dlms-wrapper-sn-read-tools/generate-gbt-supplement.py": "dlms-wrapper-sn-read-tools/generate-gbt-supplement.py",
+        "common/pcapx/pcaputil/dlms-wrapper-sn-read-tools/generate.py": "dlms-wrapper-sn-read-tools/generate.py",
+        "common/pcapx/pcaputil/dlms-wrapper-sn-read-tools/rebuild.py": "dlms-wrapper-sn-read-tools/rebuild.py",
+        "common/pcapx/pcaputil/dlms-wrapper-sn-read-tools/reference-vectors.json": "dlms-wrapper-sn-read-tools/reference-vectors.json",
+        "common/pcapx/pcaputil/dlms-wrapper-sn-read-tools/verify-captures.py": "dlms-wrapper-sn-read-tools/verify-captures.py",
+        "common/pcapx/pcaputil/dlms-wrapper-sn-read-tools/verify-gbt-supplement.py": "dlms-wrapper-sn-read-tools/verify-gbt-supplement.py",
+        "common/pcapx/pcaputil/dlms-wrapper-sn-read-tools/verify.py": "dlms-wrapper-sn-read-tools/verify.py",
+        "common/pcapx/pcaputil/dlms-wrapper-sn-read/GBT-inner-SN-request05-outside-direct-read-scope.tcp.pcap": "dlms-wrapper-sn-read/GBT-inner-SN-request05-outside-direct-read-scope.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-wrapper-sn-read/GBT-inner-SN-request05-outside-direct-read-scope.udp.pcap": "dlms-wrapper-sn-read/GBT-inner-SN-request05-outside-direct-read-scope.udp.pcap",
+        "common/pcapx/pcaputil/dlms-wrapper-sn-read/GBT-inner-SN-response0c-outside-direct-read-scope.tcp.pcap": "dlms-wrapper-sn-read/GBT-inner-SN-response0c-outside-direct-read-scope.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-wrapper-sn-read/GBT-inner-SN-response0c-outside-direct-read-scope.udp.pcap": "dlms-wrapper-sn-read/GBT-inner-SN-response0c-outside-direct-read-scope.udp.pcap",
+        "common/pcapx/pcaputil/dlms-wrapper-sn-read/LN-pending-private-Close-survives-valid-SN-observations.tcp.pcap": "dlms-wrapper-sn-read/LN-pending-private-Close-survives-valid-SN-observations.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-wrapper-sn-read/LN-pending-private-Close-survives-valid-SN-observations.udp.pcap": "dlms-wrapper-sn-read/LN-pending-private-Close-survives-valid-SN-observations.udp.pcap",
+        "common/pcapx/pcaputil/dlms-wrapper-sn-read/actual-SDK-two-name-mixed-result-repeat-wire-only.tcp.pcap": "dlms-wrapper-sn-read/actual-SDK-two-name-mixed-result-repeat-wire-only.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-wrapper-sn-read/actual-SDK-two-name-mixed-result-repeat-wire-only.udp.pcap": "dlms-wrapper-sn-read/actual-SDK-two-name-mixed-result-repeat-wire-only.udp.pcap",
+        "common/pcapx/pcaputil/dlms-wrapper-sn-read/baseline-controls.json": "dlms-wrapper-sn-read/baseline-controls.json",
+        "common/pcapx/pcaputil/dlms-wrapper-sn-read/complete-WPDU-truncation-and-trailing-Malformed-recoverable.tcp.pcap": "dlms-wrapper-sn-read/complete-WPDU-truncation-and-trailing-Malformed-recoverable.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-wrapper-sn-read/complete-WPDU-truncation-and-trailing-Malformed-recoverable.udp.pcap": "dlms-wrapper-sn-read/complete-WPDU-truncation-and-trailing-Malformed-recoverable.udp.pcap",
+        "common/pcapx/pcaputil/dlms-wrapper-sn-read/controls.json": "dlms-wrapper-sn-read/controls.json",
+        "common/pcapx/pcaputil/dlms-wrapper-sn-read/existing-LN-Get-normal-complete-neighbor.tcp.pcap": "dlms-wrapper-sn-read/existing-LN-Get-normal-complete-neighbor.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-wrapper-sn-read/existing-LN-Get-normal-complete-neighbor.udp.pcap": "dlms-wrapper-sn-read/existing-LN-Get-normal-complete-neighbor.udp.pcap",
+        "common/pcapx/pcaputil/dlms-wrapper-sn-read/fixed-compact-and-scalar-payload13-not-type-tag.tcp.pcap": "dlms-wrapper-sn-read/fixed-compact-and-scalar-payload13-not-type-tag.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-wrapper-sn-read/fixed-compact-and-scalar-payload13-not-type-tag.udp.pcap": "dlms-wrapper-sn-read/fixed-compact-and-scalar-payload13-not-type-tag.udp.pcap",
+        "common/pcapx/pcaputil/dlms-wrapper-sn-read/gbt-supplement.json": "dlms-wrapper-sn-read/gbt-supplement.json",
+        "common/pcapx/pcaputil/dlms-wrapper-sn-read/nonminimal-definite-counts-preserved-without-association.tcp.pcap": "dlms-wrapper-sn-read/nonminimal-definite-counts-preserved-without-association.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-wrapper-sn-read/nonminimal-definite-counts-preserved-without-association.udp.pcap": "dlms-wrapper-sn-read/nonminimal-definite-counts-preserved-without-association.udp.pcap",
+        "common/pcapx/pcaputil/dlms-wrapper-sn-read/reuse-inputs.json": "dlms-wrapper-sn-read/reuse-inputs.json",
+        "common/pcapx/pcaputil/dlms-wrapper-sn-read/same-wPort-and-cross-wPort-SN-cannot-steal-LN-owner.tcp.pcap": "dlms-wrapper-sn-read/same-wPort-and-cross-wPort-SN-cannot-steal-LN-owner.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-wrapper-sn-read/same-wPort-and-cross-wPort-SN-cannot-steal-LN-owner.udp.pcap": "dlms-wrapper-sn-read/same-wPort-and-cross-wPort-SN-cannot-steal-LN-owner.udp.pcap",
+        "common/pcapx/pcaputil/dlms-wrapper-sn-read/shared-four-Data-nodes-and-rowcount-cap3-Resource.tcp.pcap": "dlms-wrapper-sn-read/shared-four-Data-nodes-and-rowcount-cap3-Resource.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-wrapper-sn-read/shared-four-Data-nodes-and-rowcount-cap3-Resource.udp.pcap": "dlms-wrapper-sn-read/shared-four-Data-nodes-and-rowcount-cap3-Resource.udp.pcap",
+        "common/pcapx/pcaputil/dlms-wrapper-sn-read/shared-four-Data-nodes-cap4-depth6-positive.tcp.pcap": "dlms-wrapper-sn-read/shared-four-Data-nodes-cap4-depth6-positive.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-wrapper-sn-read/shared-four-Data-nodes-cap4-depth6-positive.udp.pcap": "dlms-wrapper-sn-read/shared-four-Data-nodes-cap4-depth6-positive.udp.pcap",
+        "common/pcapx/pcaputil/dlms-wrapper-sn-read/structure-Data-depth5-Resource-and-late-SN-still-wire.tcp.pcap": "dlms-wrapper-sn-read/structure-Data-depth5-Resource-and-late-SN-still-wire.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-wrapper-sn-read/structure-Data-depth5-Resource-and-late-SN-still-wire.udp.pcap": "dlms-wrapper-sn-read/structure-Data-depth5-Resource-and-late-SN-still-wire.udp.pcap",
+        "common/pcapx/pcaputil/dlms-wrapper-sn-read/three-name-count-not-LN-list-wide-error17-18-19-and-bound16.tcp.pcap": "dlms-wrapper-sn-read/three-name-count-not-LN-list-wide-error17-18-19-and-bound16.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-wrapper-sn-read/three-name-count-not-LN-list-wide-error17-18-19-and-bound16.udp.pcap": "dlms-wrapper-sn-read/three-name-count-not-LN-list-wide-error17-18-19-and-bound16.udp.pcap",
+        "common/pcapx/pcaputil/dlms-wrapper-sn-read/unsupported-forms-enum-empty-indefinite-and-hard17-Resource.tcp.pcap": "dlms-wrapper-sn-read/unsupported-forms-enum-empty-indefinite-and-hard17-Resource.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-wrapper-sn-read/unsupported-forms-enum-empty-indefinite-and-hard17-Resource.udp.pcap": "dlms-wrapper-sn-read/unsupported-forms-enum-empty-indefinite-and-hard17-Resource.udp.pcap",
+        "common/pcapx/pcaputil/dlms-wrapper-sn-read-gbt-supplement/GBT-inner-SN-request05-outside-direct-read-scope.udp.pcap": "dlms-wrapper-sn-read/GBT-inner-SN-request05-outside-direct-read-scope.udp.pcap",
+        "common/pcapx/pcaputil/dlms-wrapper-sn-read-gbt-supplement/GBT-inner-SN-request05-outside-direct-read-scope.tcp.pcap": "dlms-wrapper-sn-read/GBT-inner-SN-request05-outside-direct-read-scope.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-wrapper-sn-read-gbt-supplement/GBT-inner-SN-response0c-outside-direct-read-scope.udp.pcap": "dlms-wrapper-sn-read/GBT-inner-SN-response0c-outside-direct-read-scope.udp.pcap",
+        "common/pcapx/pcaputil/dlms-wrapper-sn-read-gbt-supplement/GBT-inner-SN-response0c-outside-direct-read-scope.tcp.pcap": "dlms-wrapper-sn-read/GBT-inner-SN-response0c-outside-direct-read-scope.tcp.pcap",
+        "scripts/protocol-tests/required-tests-traffic-unified-v154.json": "required-tests-traffic-unified-v154.json"
+      }
     }
   ],
   "schema_version": 1,

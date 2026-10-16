@@ -317,7 +317,9 @@ func decodeWrapperList(m *wrapperMessage, p []byte, limit, depth int) error {
 	}
 	return nil
 }
-func wrapperIsList(w []byte) bool { return !wrapperIsGBT(w) && len(w) > 9 && w[9] == 3 }
+func wrapperIsList(w []byte) bool {
+	return !wrapperIsGBT(w) && !wrapperIsSNRead(w) && len(w) > 9 && w[9] == 3
+}
 func wrapperExtendedScalarTag(tag byte) bool {
 	return tag == 19 || tag == 4 || tag == 10 || tag == 12 || tag == 23 || tag == 24 || tag == 25 || tag == 26 || tag == 27
 }
@@ -331,6 +333,9 @@ func wrapperNormalAccess(w []byte) bool {
 	return len(w) > 20 && w[8] == 0xc0 && w[9] == 1 && w[20] == 1
 }
 func wrapperProfile(w []byte) string {
+	if wrapperIsSNRead(w) {
+		return "dlms-wrapper-v1-sn-read"
+	}
 	if wrapperIsSetListBlock(w) {
 		return "dlms-wrapper-v1-set-list-block"
 	}
@@ -373,6 +378,9 @@ func wrapperProfile(w []byte) string {
 	return "dlms-wrapper-v1-get-normal"
 }
 func wrapperProbeVersion(w []byte) string {
+	if wrapperIsSNRead(w) {
+		return "v1-sn-read"
+	}
 	if wrapperIsSetListBlock(w) {
 		return "v1-set-list-block"
 	}
@@ -412,6 +420,11 @@ func wrapperProbeVersion(w []byte) string {
 	return "v1-get-normal"
 }
 func wrapperProjection(w []byte, n int) int64 {
+	if wrapperIsSNRead(w) {
+		// Compact Data may expand a short repeated description into the full
+		// bounded node pool. Charge owned rows, graphs and projections first.
+		return 32768 + 512*int64(n) + 8192*wrapperSNReadItems + 2048*wrapperDataNodes
+	}
 	if wrapperIsSetListBlock(w) {
 		return 32768 + 512*int64(n+wrapperBlockBytes) + 2048*wrapperDataNodes + 8192*wrapperListItems
 	}
