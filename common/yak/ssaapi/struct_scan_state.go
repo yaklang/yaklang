@@ -650,6 +650,15 @@ func (p *Program) ScanProgramStruct(opts ...ssaconfig.Option) error {
 // scanOverlayStruct follows the same file ownership as overlay SSA queries:
 // unchanged base files plus each diff's final owned paths, excluding deletions.
 func (s *structScanState) scanOverlayStruct(result *Program, overlay *ProgramOverLay) error {
+	return walkOverlayStructUnits(overlay, func(source *Program, unit *ssa.CompileUnit, bound *structBound) error {
+		s.scanStruct(source, result, unit, bound)
+		return nil
+	})
+}
+
+// walkOverlayStructUnits shares the persisted visible-file boundary between
+// compile review and standalone struct queries, without combining libraries.
+func walkOverlayStructUnits(overlay *ProgramOverLay, visit func(*Program, *ssa.CompileUnit, *structBound) error) error {
 	scan := func(source *Program, visible func(string) bool) error {
 		if source == nil || source.Program == nil {
 			return nil
@@ -676,7 +685,9 @@ func (s *structScanState) scanOverlayStruct(result *Program, overlay *ProgramOve
 			// A partial library cannot use the whole-library fallback: its old
 			// definitions may include files now owned by another diff or deleted.
 			bound.lib = nil
-			s.scanStruct(source, result, &copyUnit, bound)
+			if err := visit(source, &copyUnit, bound); err != nil {
+				return err
+			}
 		}
 		return nil
 	}

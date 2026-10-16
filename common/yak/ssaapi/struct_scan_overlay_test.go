@@ -96,9 +96,27 @@ alert $uses
 			}
 			require.Nil(t, top.structBound, "the result identity must not retain the last source query boundary")
 			require.False(t, top.structScanActive)
+			direct, err := top.SyntaxFlowWithError(`
+desc(mode: "struct", language: "java")
+*?{opcode: function} as $definition
+$definition() as $callers
+$definition -> *?{opcode: call} as $uses
+alert $callers
+alert $uses
+`, QueryWithMemory())
+			require.NoError(t, err)
+			require.NotNil(t, direct)
+			require.Positive(t, direct.RiskCount())
+			for _, source := range sources {
+				require.Nil(t, source.structBound)
+				require.False(t, source.structScanActive)
+			}
+			require.Nil(t, top.structBound)
+			require.False(t, top.structScanActive)
 			for _, variable := range []string{"callers", "uses"} {
+				require.NotEmpty(t, direct.GetValues(variable), "%s must retain the live caller in direct Query", variable)
 				var paths []string
-				for _, result := range top.StructScanResults() {
+				for _, result := range append(top.StructScanResults(), direct) {
 					require.Equal(t, topName, result.GetProgramName())
 					for _, value := range result.GetValues(variable) {
 						require.NotNil(t, value.GetRange(), "%s: value=%s id=%d program=%s", variable, value.String(), value.GetId(), value.GetProgramName())
@@ -150,6 +168,9 @@ alert $call
 `), ssaconfig.WithNoSaveRisk(true))
 	require.ErrorContains(t, err, "incremental program overlay unavailable")
 	require.Empty(t, loaded.StructScanResults(), "a partial diff must not be reported as a successful complete review")
+	result, err := loaded.SyntaxFlowWithError("desc(mode: \"struct\", language: \"java\")\nprintln() as $call\nalert $call", QueryWithMemory())
+	require.ErrorContains(t, err, "incremental program overlay unavailable")
+	require.Nil(t, result)
 }
 
 func TestResilienceStructScanMissingPersistedSourceFailsClosed(t *testing.T) {
