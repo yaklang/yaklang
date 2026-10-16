@@ -331,6 +331,9 @@ func wrapperNormalAccess(w []byte) bool {
 	return len(w) > 20 && w[8] == 0xc0 && w[9] == 1 && w[20] == 1
 }
 func wrapperProfile(w []byte) string {
+	if wrapperIsSetList(w) {
+		return "dlms-wrapper-v1-set-list"
+	}
 	if wrapperIsSet(w) {
 		return "dlms-wrapper-v1-set-normal"
 	}
@@ -355,6 +358,9 @@ func wrapperProfile(w []byte) string {
 	return "dlms-wrapper-v1-get-normal"
 }
 func wrapperProbeVersion(w []byte) string {
+	if wrapperIsSetList(w) {
+		return "v1-set-list"
+	}
 	if wrapperIsSet(w) {
 		return "v1-set-normal"
 	}
@@ -379,6 +385,18 @@ func wrapperProbeVersion(w []byte) string {
 	return "v1-get-normal"
 }
 func wrapperProjection(w []byte, n int) int64 {
+	if wrapperIsSetList(w) {
+		items := min(wrapperListItems, max(0, n-12))
+		if w[8] == 0xc1 {
+			items = min(wrapperListItems, max(0, n-12)/10)
+		}
+		nodes := min(wrapperDataNodes, max(0, n-12))
+		if wrapperSetListContainsCompact(w) {
+			nodes = wrapperDataNodes
+		}
+		return 32768 + 512*int64(n) + 2048*int64(nodes) + 8192*int64(items)
+	}
+
 	if wrapperIsBlock(w) {
 		return 32768 + 512*int64(n+wrapperBlockBytes) + 2048*wrapperDataNodes
 	}
@@ -423,4 +441,89 @@ func wrapperProjection(w []byte, n int) int64 {
 	// A null child consumes at least one byte; no APDU retains more than256 nodes.
 	nodes := min(wrapperDataNodes, max(0, n-12))
 	return 32768 + 512*int64(n) + 8192*int64(items) + 2048*int64(nodes)
+}
+
+func wrapperIsSetList(w []byte) bool {
+	return wrapperIsSet(w) && len(w) > 9 && (w[8] == 0xc1 && w[9] == 4 || w[8] == 0xc5 && w[9] == 5)
+}
+
+// One cursor owns all Data nodes across the list. Descriptor/value/result maps
+// and maximum expansion are charged before allocation; counts cannot allocate
+// unbounded slices. The wire choice4->5 relation is separate from normal1.
+func decodeWrapperSetList(m *wrapperMessage, p []byte, limit, depth int) error {
+	c := wrapperListCursor{wire: p, at: 3, maxDepth: depth}
+	n, enc, err := c.count()
+	if err != nil {
+		return err
+	}
+	if n == 0 {
+		return wrapperError(ErrUnsupportedFeature, "empty Set list outside selected profile")
+	}
+	if n > uint64(min(limit, wrapperListItems)) {
+		return wrapperError(ErrResourceExceeded, "Set list count exceeds selected collection budget")
+	}
+	f := m.fields
+	m.count = int(n)
+	f["list_count"], f["list_count_encoding_hex"] = n, enc
+	if m.request {
+		items := make([]map[string]any, 0, int(n))
+		for i := 0; i < int(n); i++ {
+			start := c.at
+			w, e := c.take(10)
+			if e != nil {
+				return e
+			}
+			if int8(w[8]) <= 0 {
+				return wrapperError(ErrUnsupportedFeature, "positive signed8 Set list attribute profile")
+			}
+			if w[9] != 0 {
+				return wrapperError(ErrUnsupportedFeature, "Set list selective access is not implemented")
+			}
+			item := map[string]any{"index": i, "apdu_offset": start, "class_id": binary.BigEndian.Uint16(w), "logical_name_hex": hex.EncodeToString(w[2:8]), "logical_name": fmt.Sprintf("%d.%d.%d.%d.%d.%d", w[2], w[3], w[4], w[5], w[6], w[7]), "attribute_id": int8(w[8]), "selective_access": false, "access_selection_raw": w[9], "raw_hex": hex.EncodeToString(w), "encoded_length": 10}
+			items = append(items, item)
+		}
+		valuesN, valuesEnc, e := c.count()
+		if e != nil {
+			return e
+		}
+		if valuesN > uint64(min(limit, wrapperListItems)) {
+			return wrapperError(ErrResourceExceeded, "Set value count exceeds selected collection budget")
+		}
+		if valuesN != n {
+			return wrapperError(ErrUnsupportedFeature, "Set descriptor/value count relation outside verified equal-count profile")
+		}
+		values := make([]map[string]any, 0, int(n))
+		for i := 0; i < int(n); i++ {
+			start := c.at
+			data, e := c.data(limit, 0)
+			if e != nil {
+				return e
+			}
+			values = append(values, map[string]any{"index": i, "apdu_offset": start, "data": data, "raw_hex": hex.EncodeToString(p[start:c.at]), "encoded_length": c.at - start})
+		}
+		f["kind"], f["descriptors"], f["value_count"], f["value_count_encoding_hex"], f["values"] = "SetRequestWithList", items, valuesN, valuesEnc, values
+	} else {
+		results := make([]map[string]any, 0, int(n))
+		success := 0
+		for i := 0; i < int(n); i++ {
+			start := c.at
+			v, e := c.take(1)
+			if e != nil {
+				return e
+			}
+			if !wrapperActionResultKnown(v[0]) {
+				return wrapperError(ErrUnsupportedFeature, "Set list access result outside pinned enumeration")
+			}
+			ok := v[0] == 0
+			if ok {
+				success++
+			}
+			results = append(results, map[string]any{"index": i, "apdu_offset": start, "data_access_result": v[0], "result_success": ok, "raw_hex": hex.EncodeToString(v), "encoded_length": 1})
+		}
+		f["kind"], f["results"], f["success_item_count"], f["error_item_count"], f["result_success"] = "SetResponseWithList", results, success, int(n)-success, success == int(n)
+	}
+	if c.at != len(p) {
+		return wrapperError(ErrMalformedMessage, "Set list has unexplained trailing bytes")
+	}
+	return nil
 }

@@ -13,7 +13,7 @@ const wrapperBlockCount = 64
 
 func wrapperIsBlock(w []byte) bool { return !wrapperIsGBT(w) && len(w) > 9 && w[9] == 2 }
 func wrapperUsesDataGraph(w []byte) bool {
-	return wrapperOperationDataOffset(w) >= 0 || wrapperIsACSE(w) || wrapperIsGBT(w) || wrapperIsList(w) || wrapperIsBlock(w) || wrapperNormalExtendedData(w) || wrapperNormalDataGraph(w) || wrapperNormalAccess(w)
+	return wrapperIsSetList(w) || wrapperOperationDataOffset(w) >= 0 || wrapperIsACSE(w) || wrapperIsGBT(w) || wrapperIsList(w) || wrapperIsBlock(w) || wrapperNormalExtendedData(w) || wrapperNormalDataGraph(w) || wrapperNormalAccess(w)
 }
 
 func decodeWrapperBlock(m *wrapperMessage, p []byte, limit int) error {

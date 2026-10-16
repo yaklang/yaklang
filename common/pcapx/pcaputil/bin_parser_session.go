@@ -1451,10 +1451,10 @@ func (f *binFlow) finishSession(reason TrafficFlowCloseReason) {
 		}
 		for _, key := range w.pendingOperations() {
 			command := w.seen[key].command
-			e := f.event(key.dir, nil, "incomplete", string(reason)+": DLMS Wrapper "+wrapperOperationName(command)+" ended with an unmatched request")
-			e.Profile = wrapperOperationProfile(command)
+			e := f.event(key.dir, nil, "incomplete", string(reason)+": DLMS Wrapper "+wrapperOperationName(command, w.seen[key].choice)+" ended with an unmatched request")
+			e.Profile = wrapperOperationProfile(command, w.seen[key].choice)
 			e.nativeDLMSOrSLMPObservation = true
-			e.Session = wrapperOperationCloseFields(key, command)
+			e.Session = wrapperOperationCloseFields(key, command, w.seen[key].choice, w.seen[key].count)
 			e.semanticSession = cloneSession(e.Session)
 			e.sessionError = &ProtocolError{Kind: ErrNeedMore, Message: e.Summary}
 			e.Error = e.sessionError.Error()

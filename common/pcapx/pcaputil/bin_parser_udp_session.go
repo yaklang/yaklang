@@ -741,8 +741,8 @@ func (a *binParser) closeUDPSessions() {
 			if w := f.wrapper; w != nil {
 				for _, key := range w.pendingOperations() {
 					command := w.seen[key].command
-					summary := "DLMS Wrapper " + wrapperOperationName(command) + " ended with an unmatched request"
-					e := &ProtocolEvent{FlowID: f.id, Timestamp: v.touched, Domain: v.key.domain, Transport: "udp", Source: f.endpoints[key.dir], Destination: f.endpoints[1-key.dir], Direction: key.dir, Protocol: "dlms-wrapper", Profile: wrapperOperationProfile(command), nativeDLMSOrSLMPObservation: true, Status: "incomplete", Completeness: "incomplete", Summary: summary, Session: wrapperOperationCloseFields(key, command), sessionError: &ProtocolError{Kind: ErrNeedMore, Message: summary}}
+					summary := "DLMS Wrapper " + wrapperOperationName(command, w.seen[key].choice) + " ended with an unmatched request"
+					e := &ProtocolEvent{FlowID: f.id, Timestamp: v.touched, Domain: v.key.domain, Transport: "udp", Source: f.endpoints[key.dir], Destination: f.endpoints[1-key.dir], Direction: key.dir, Protocol: "dlms-wrapper", Profile: wrapperOperationProfile(command, w.seen[key].choice), nativeDLMSOrSLMPObservation: true, Status: "incomplete", Completeness: "incomplete", Summary: summary, Session: wrapperOperationCloseFields(key, command, w.seen[key].choice, w.seen[key].count), sessionError: &ProtocolError{Kind: ErrNeedMore, Message: summary}}
 					e.semanticSession = cloneSession(e.Session)
 					e.Error = e.sessionError.Error()
 					incomplete = append(incomplete, e)
