@@ -24,6 +24,7 @@ type dlmsFragments struct {
 	acseCommand                  byte
 	operation                    string
 	operationList                bool
+	actionDownloadRequestChoice  byte
 	actionDownloadResponseChoice byte
 	actionResponseChoice         byte
 	actionRequestChoice          byte
@@ -244,6 +245,9 @@ func dlmsOperationSegmentResponseChoice(p *dlmsPending) byte {
 	return p.choice
 }
 func (t *dlmsFragments) operationSegmentProfile() string {
+	if t.actionDownloadRequestChoice != 0 {
+		return dlmsActionDownloadRequestSegmentProfile(t.actionDownloadRequestChoice)
+	}
 	if t.actionDownloadResponseChoice != 0 {
 		return dlmsActionDownloadResponseSegmentProfile(t.actionDownloadResponseChoice)
 	}
@@ -265,6 +269,9 @@ func (t *dlmsFragments) operationSegmentProfile() string {
 	return "dlms-hdlc-ln-operations-segmented"
 }
 func (t *dlmsFragments) serviceName() string {
+	if t.actionDownloadRequestChoice != 0 {
+		return "Action Next Pblock"
+	}
 	if t.actionDownloadResponseChoice != 0 {
 		return "Action With Pblock"
 	}
@@ -301,6 +308,9 @@ func (t *dlmsFragments) serviceName() string {
 	return "Get"
 }
 func (t *dlmsFragments) operationCloseSummary() string {
+	if t.actionDownloadRequestChoice != 0 {
+		return "DLMS HDLC exchange ended with incomplete segmented Action-download request"
+	}
 	if t.actionDownloadResponseChoice != 0 {
 		return "DLMS HDLC exchange ended with incomplete segmented Action-download response"
 	}

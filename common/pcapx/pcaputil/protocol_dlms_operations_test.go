@@ -348,7 +348,12 @@ func hdlcOpCloseCheck(t *testing.T, c hdlcOpCase, es []*ProtocolEvent, transport
 		require.Equal(t, at, e.Timestamp.Unix())
 		require.Equal(t, offset, e.Offset)
 		hdlcOpEqual(t, w.Session, e.Session)
-		if w.Profile == "dlms-hdlc-action-download-response-segmented" {
+		if w.Profile == "dlms-hdlc-action-download-request-segmented" {
+			require.Len(t, e.Session, 5)
+			for _, key := range []string{"Outstanding", "ObservedFrames", "InformationBytes", "ObservedBlocks", "EncodedBytes"} {
+				require.IsType(t, int(0), e.Session[key])
+			}
+		} else if w.Profile == "dlms-hdlc-action-download-response-segmented" {
 			require.Contains(t, []int{3, 5}, len(w.Session))
 			require.Len(t, e.Session, len(w.Session))
 			for key := range w.Session {

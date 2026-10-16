@@ -760,6 +760,9 @@ func (f *binFlow) consumeDecodedDLMS(dir int, w []byte, id uint64, m *dlmsMessag
 	if (dlmsSequencedService(m.kind) || m.kind == "I") && s.hdlcEndpointRetired(dir, m.source, m.destination, m.request) {
 		return nil, 0, dlmsError(ErrContextRequired, "Get information belongs to retired association context")
 	}
+	if m.kind == "I" && (s.fragments != nil && s.fragments.actionDownloadRequestChoice != 0 || s.fragments == nil && s.transfer != nil && s.transfer.initial.kind == "ACTION" && dlmsActionDownloadRequestSegmentPrefix(m.information)) {
+		return f.consumeDLMSActionDownloadRequestSegments(dir, w, id, m)
+	}
 	if m.kind == "I" && (s.fragments != nil && s.fragments.actionRequestChoice != 0 || s.fragments == nil && dlmsActionRequestSegmentPrefix(m.information) && (m.information[4] == 4 || s.actionTransfer != nil && s.actionTransfer.initial.choice == 4)) {
 		return f.consumeDLMSActionRequestSegments(dir, w, id, m)
 	}
@@ -927,6 +930,7 @@ func (a *binParser) decodeDLMSDatagram(e *ProtocolEvent, w []byte, explicit bool
 		store.lru.MoveToBack(el)
 	}
 	operationSegment := f.dlmsOperationSegmentObservation(w)
+	actionDownloadRequestSegment := f.dlmsActionDownloadRequestSegmentObservation(w, e.Direction)
 	actionDownloadResponseSegment := f.dlmsActionDownloadResponseSegmentObservation(w, e.Direction)
 	actionResponseSegment := f.dlmsActionResponseSegmentObservation(w, e.Direction)
 	actionRequestSegment := f.dlmsActionRequestSegmentObservation(w, e.Direction)
@@ -1030,6 +1034,9 @@ func (a *binParser) decodeDLMSDatagram(e *ProtocolEvent, w []byte, explicit bool
 	}
 	if actionDownloadResponseSegment != "" {
 		e.Profile = actionDownloadResponseSegment
+	}
+	if actionDownloadRequestSegment != "" {
+		e.Profile = actionDownloadRequestSegment
 	}
 	if setResponseSegment != "" {
 		e.Profile = setResponseSegment
