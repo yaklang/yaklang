@@ -104,6 +104,67 @@ func tlsHello(body []byte, client bool, limits ...int) (*tlsHelloView, error) {
 	return h, nil
 }
 
+func tlsSNIName(v []byte) ([]byte, error) {
+	if len(v) < 5 || int(binary.BigEndian.Uint16(v)) != len(v)-2 || v[2] != 0 || int(binary.BigEndian.Uint16(v[3:])) != len(v)-5 {
+		return nil, protocolError(ErrMalformedMessage, "TLS SNI length")
+	}
+	return v[5:], nil
+}
+
+// Validate known extension grammar before applying a new inner collection cap.
+// Resource refusal must not hide an existing structural error in another entry.
+func tlsHelloExtensionStructure(h *tlsHelloView, client bool) error {
+	for _, kind := range h.order {
+		v := h.ext[kind]
+		switch kind {
+		case 0:
+			if client {
+				if _, err := tlsSNIName(v); err != nil {
+					return err
+				}
+			}
+		case 16:
+			if _, err := tlsALPNName(v, !client); err != nil {
+				return err
+			}
+		case 43:
+			if !client && len(v) != 2 {
+				return protocolError(ErrMalformedMessage, "TLS selected version length")
+			}
+		}
+	}
+	return nil
+}
+
+// tlsALPNName admits the complete vector before exposing its first name.
+// The client advertises a list; the server must select exactly one name.
+func tlsALPNName(v []byte, server bool, limits ...int) ([]byte, error) {
+	if len(v) < 3 || int(binary.BigEndian.Uint16(v)) != len(v)-2 {
+		return nil, protocolError(ErrMalformedMessage, "TLS ALPN vector")
+	}
+	var first []byte
+	count := 0
+	for p := 2; p < len(v); {
+		n := int(v[p])
+		p++
+		if n == 0 || n > len(v)-p {
+			return nil, protocolError(ErrMalformedMessage, "TLS ALPN length")
+		}
+		if count == 0 {
+			first = v[p : p+n]
+		}
+		count++
+		p += n
+	}
+	if server && count != 1 {
+		return nil, protocolError(ErrMalformedMessage, "TLS selected ALPN count")
+	}
+	if len(limits) > 0 && count > limits[0] {
+		return nil, protocolError(ErrResourceExceeded, "TLS ALPN protocol count")
+	}
+	return first, nil
+}
+
 func tlsContains16(v []byte, n uint16) bool {
 	for len(v) >= 2 {
 		if binary.BigEndian.Uint16(v) == n {
@@ -146,6 +207,14 @@ func (t *binTLS) observeHello(dir int, typ byte, body []byte, limits ...int) (bo
 		return false, err
 	}
 	bad := func(why string) (bool, error) { return false, protocolError(ErrMalformedMessage, "TLS retry: "+why) }
+	if err := tlsHelloExtensionStructure(h, typ == 1); err != nil {
+		return false, err
+	}
+	if alpn, present := h.ext[16]; present {
+		if _, err := tlsALPNName(alpn, typ == 2, limits...); err != nil {
+			return false, err
+		}
+	}
 	if typ == 1 {
 		if t.retrySeen {
 			if t.retryClientSeen || dir != t.client {
@@ -226,6 +295,29 @@ func (t *binTLS) observeHello(dir int, typ byte, body []byte, limits ...int) (bo
 		}
 		if binary.BigEndian.Uint16(body) > binary.BigEndian.Uint16(t.firstHello) {
 			return bad("ServerHello version exceeds observed client version")
+		}
+		if alpn, present := h.ext[16]; present {
+			selected, err := tlsALPNName(alpn, true, limits...)
+			if err != nil {
+				return false, err
+			}
+			offered, present := first.ext[16]
+			if !present {
+				return bad("ServerHello ALPN was not offered")
+			}
+			if _, err := tlsALPNName(offered, false, limits...); err != nil {
+				return false, err
+			}
+			found := false
+			for v := offered[2:]; len(v) > 0; {
+				n := int(v[0])
+				v = v[1:]
+				found = found || bytes.Equal(v[:n], selected)
+				v = v[n:]
+			}
+			if !found {
+				return bad("ServerHello ALPN was not offered")
+			}
 		}
 	}
 	if retry || t.retrySeen {

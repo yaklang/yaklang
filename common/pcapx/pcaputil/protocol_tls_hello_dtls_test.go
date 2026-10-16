@@ -34,6 +34,13 @@ func dtlsHelloCarrierTyped(t *testing.T, k string, v any) any {
 		}
 		return r
 	case []any:
+		if k == "Offered ALPN" {
+			r := make([]string, len(x))
+			for i, v := range x {
+				r[i] = v.(string)
+			}
+			return r
+		}
 		if k == "Cipher Suites" {
 			r := make([]uint16, len(x))
 			for i, v := range x {
@@ -150,7 +157,10 @@ func tlsHelloDTLSStats(t *testing.T, c tlsHelloDTLSCase, s ProtocolStats) {
 	tlsAlertCheckStats(t, s, map[string]uint64{"Messages": 1, "InputBytes": n, "MessageBytes": n, "UnclassifiedBytes": 0, "LimitedBytes": lim, "Incomplete": 0, "Malformed": 0})
 }
 func TestTLSHelloCollectionDTLSNative(t *testing.T) {
-	for _, c := range tlsHelloDTLSControls(t) {
+	tlsHelloDTLSNative(t, tlsHelloDTLSControls(t))
+}
+func tlsHelloDTLSNative(t *testing.T, controls []tlsHelloDTLSCase) {
+	for _, c := range controls {
 		t.Run(c.Name, func(t *testing.T) {
 			for _, d := range []bool{false, true} {
 				t.Run(fmt.Sprintf("d%t", d), func(t *testing.T) {
@@ -185,17 +195,20 @@ func TestTLSHelloCollectionDTLSNative(t *testing.T) {
 	}
 }
 func TestTLSHelloCollectionDTLSMatrix(t *testing.T) {
-	for _, c := range tlsHelloDTLSControls(t) {
+	tlsHelloDTLSMatrix(t, tlsHelloDTLSControls(t), "tls-hello-collection", "TLS_HELLO_COLLECTION")
+}
+func tlsHelloDTLSMatrix(t *testing.T, controls []tlsHelloDTLSCase, fixture, env string) {
+	for _, c := range controls {
 		t.Run(c.Name, func(t *testing.T) {
 			generated := t20UDPCapture(t, net.ParseIP("192.0.2.1"), net.ParseIP("192.0.2.2"), 41000, 4433, wrapperWire(t, c.Wire))
-			if dir := os.Getenv("TLS_HELLO_COLLECTION_EXPORT"); dir != "" {
-				p := filepath.Join(dir, "tls-hello-collection", "dtls", c.Name+".pcap")
+			if dir := os.Getenv(env + "_EXPORT"); dir != "" {
+				p := filepath.Join(dir, fixture, "dtls", c.Name+".pcap")
 				require.NoError(t, os.MkdirAll(filepath.Dir(p), 0700))
 				require.NoError(t, os.WriteFile(p, generated, 0600))
 			}
 			raw := generated
-			if os.Getenv("TLS_HELLO_COLLECTION_TEST_ROOT") == "" {
-				raw = finsReadBatch(t, "tls-hello-collection", "TLS_HELLO_COLLECTION_TEST_ROOT", "dtls/"+c.Name+".pcap")
+			if os.Getenv(env+"_TEST_ROOT") == "" {
+				raw = finsReadBatch(t, fixture, env+"_TEST_ROOT", "dtls/"+c.Name+".pcap")
 				require.Equal(t, generated, raw)
 			}
 			discoveryMatrix(t, func(t *testing.T, workers int, d, o bool) {

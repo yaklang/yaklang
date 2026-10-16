@@ -106188,6 +106188,147 @@
         "common/pcapx/pcaputil/tls-serverhello-selection/server-version-matches-client0302-normal.pcap": "tls-serverhello-selection/server-version-matches-client0302-normal.pcap",
         "scripts/protocol-tests/required-tests-traffic-unified-v120.json": "required-tests-traffic-unified-v120.json"
       }
+    },
+    {
+      "id": "validation-tls-alpn-contract",
+      "kind": "support",
+      "source_sha": "3d8f017e5a7128705fe07106555b149a7983727b",
+      "file": "validation-tls-alpn-contract.zip",
+      "sha256": "ebe6557aa05929337f38acfb71b73175970209c8ba1e8e3c9decc02347f688c1",
+      "password": "bin-parser",
+      "members": {
+        "required-tests-traffic-unified-v121.json": {
+          "sha256": "fb11f14472d279cae081877c08a1fce818a9b50841de644338010e9047acc55a",
+          "bytes": 19990213
+        },
+        "tls-alpn-contract-tools/budget-SOURCES.json": {
+          "sha256": "81c29572419a811d3c883aef664924501b935c2321fa955467fb29b6f6c5c60d",
+          "bytes": 1718
+        },
+        "tls-alpn-contract-tools/budget_generate.py": {
+          "sha256": "50ff8742e63fd8b28bfe068a8c8b57542ec044201d9e78c42a77b4fb9cfa83ca",
+          "bytes": 2942
+        },
+        "tls-alpn-contract-tools/dtls_generate.py": {
+          "sha256": "28d528b321872c935362a799acf5c3f6461573fccaca55f126b4718696a33829",
+          "bytes": 3775
+        },
+        "tls-alpn-contract-tools/framing_generate.py": {
+          "sha256": "ab275c2eb7c7e782f21a0a0ae56ceddecc6364fc0e12dca3738158dee326c8f8",
+          "bytes": 2983
+        },
+        "tls-alpn-contract-tools/selection-SOURCES.json": {
+          "sha256": "3fd4ca1dd3bb6215e3bd553e84d2da5badc1a37125033e5144852a76c41e2741",
+          "bytes": 1839
+        },
+        "tls-alpn-contract-tools/selection_generate.py": {
+          "sha256": "9220dd83d7bad5d2c1dbdaff39a7b8788e31c600a446a683cf3500c90ffb32d4",
+          "bytes": 3447
+        },
+        "tls-alpn-contract-tools/verify.py": {
+          "sha256": "f58c769de43acf6c50559ed6e5bd3732787a32bf56209708b51f307da02ab010",
+          "bytes": 5884
+        },
+        "tls-alpn-contract/budget-controls.json": {
+          "sha256": "51196827ed6d4e3c9b62137f8d8471e49a0b17b8d502e976362daa53c94d03bc",
+          "bytes": 5325
+        },
+        "tls-alpn-contract/budget-refusal-projection.json": {
+          "sha256": "df3c53d6f134c4b4c27b1bc250fe35aa4974b2bbc1096e7a38b00522d16bee25",
+          "bytes": 1774
+        },
+        "tls-alpn-contract/client-alpn-one-protocol-cap1-normal.pcap": {
+          "sha256": "a35dd72987bd8d9bed22968f90c33cf42ea6cb2b44fe1bffda3131503c133d4c",
+          "bytes": 611
+        },
+        "tls-alpn-contract/client-alpn-two-protocols-cap1.pcap": {
+          "sha256": "652c924777639d10a23d1d5502bc1f8ceef597b2ac7fdbf50534ae8b76ecc520",
+          "bytes": 760
+        },
+        "tls-alpn-contract/client-empty-second-name-above-cap.pcap": {
+          "sha256": "ea6d175a2bba3d8b68247e1c231d3bdb16508a1cdb78a9ffc10903bcc31d3788",
+          "bytes": 744
+        },
+        "tls-alpn-contract/client-truncated-second-name-above-cap.pcap": {
+          "sha256": "bef76c3af4bb0d8be23fe4af6057a96c541e4108cd7c25c1b41ed1d783b4c869",
+          "bytes": 760
+        },
+        "tls-alpn-contract/dtls/controls.json": {
+          "sha256": "e27931ccdf6bb7c26104ac668a6c0f808f327ee8b22165fd7cf911089cf41a1a",
+          "bytes": 5569
+        },
+        "tls-alpn-contract/dtls/dtls12-one-h2-ALPN-cap1-normal.pcap": {
+          "sha256": "fa2da32ce61075305c525bdbb0081c98a1cc3d65c1db70cb37dfc1d1ce8720a1",
+          "bytes": 160
+        },
+        "tls-alpn-contract/dtls/dtls12-two-ALPN-cap1-existingResource.pcap": {
+          "sha256": "e1248206eb2b4445f4253b8a85e42eb1fe30d9c79dba0ad82d16b308bc9f44f3",
+          "bytes": 169
+        },
+        "tls-alpn-contract/framing-controls.json": {
+          "sha256": "fb270640f5ca868c52d3f1352c187cb7b46eaa75253524873418942a3662bd05",
+          "bytes": 5933
+        },
+        "tls-alpn-contract/malformed-SNI-before-overlimit-ALPN.pcap": {
+          "sha256": "fa650937fbd9b6f3ed3ae819914ae7afaedff2a7c0a03ac9f3a4e66eb65fa10e",
+          "bytes": 788
+        },
+        "tls-alpn-contract/selection-controls.json": {
+          "sha256": "1b1a832203def061a916325a5dd1780b5d81608adcca6ce8a71d8f811cd48acc",
+          "bytes": 10709
+        },
+        "tls-alpn-contract/selection-refusal-projection.json": {
+          "sha256": "85d4529cf487ada1e6f2624baa3446e1b276067098477d62c29eece7b7337384",
+          "bytes": 1979
+        },
+        "tls-alpn-contract/server-only-http11-partial-observation.pcap": {
+          "sha256": "0a3c718417210faa3321aacee444821ed097f1f7416c9985c6e7d88fc1ba062a",
+          "bytes": 614
+        },
+        "tls-alpn-contract/server-selected-offered-h2-normal.pcap": {
+          "sha256": "dbdf534531e2fbf4a526b45d6f96f0db72379aa451fef96b9bd73cdf58e54ebc",
+          "bytes": 739
+        },
+        "tls-alpn-contract/server-selected-unoffered-http11.pcap": {
+          "sha256": "55e38b0dc9ea9a927cd3ecf18b93ea76a261bfb175b369e917dfc1407ca6fbb7",
+          "bytes": 879
+        },
+        "tls-alpn-contract/server-two-selected-names-before-cap.pcap": {
+          "sha256": "1cb2436d480d45b7366fc81488bb6e49f5b7cd06915a35f5cc8040ebe7c29627",
+          "bytes": 754
+        },
+        "validation/expected.json": {
+          "sha256": "e83b1388c44482ae7373dea233b0b48cb1160942fc52b7f70410fb779c3393bb",
+          "bytes": 13926
+        }
+      },
+      "aliases": {
+        "common/pcapx/pcaputil/tls-alpn-contract-tools/budget-SOURCES.json": "tls-alpn-contract-tools/budget-SOURCES.json",
+        "common/pcapx/pcaputil/tls-alpn-contract-tools/budget_generate.py": "tls-alpn-contract-tools/budget_generate.py",
+        "common/pcapx/pcaputil/tls-alpn-contract-tools/dtls_generate.py": "tls-alpn-contract-tools/dtls_generate.py",
+        "common/pcapx/pcaputil/tls-alpn-contract-tools/framing_generate.py": "tls-alpn-contract-tools/framing_generate.py",
+        "common/pcapx/pcaputil/tls-alpn-contract-tools/selection-SOURCES.json": "tls-alpn-contract-tools/selection-SOURCES.json",
+        "common/pcapx/pcaputil/tls-alpn-contract-tools/selection_generate.py": "tls-alpn-contract-tools/selection_generate.py",
+        "common/pcapx/pcaputil/tls-alpn-contract-tools/verify.py": "tls-alpn-contract-tools/verify.py",
+        "common/pcapx/pcaputil/tls-alpn-contract/budget-controls.json": "tls-alpn-contract/budget-controls.json",
+        "common/pcapx/pcaputil/tls-alpn-contract/budget-refusal-projection.json": "tls-alpn-contract/budget-refusal-projection.json",
+        "common/pcapx/pcaputil/tls-alpn-contract/client-alpn-one-protocol-cap1-normal.pcap": "tls-alpn-contract/client-alpn-one-protocol-cap1-normal.pcap",
+        "common/pcapx/pcaputil/tls-alpn-contract/client-alpn-two-protocols-cap1.pcap": "tls-alpn-contract/client-alpn-two-protocols-cap1.pcap",
+        "common/pcapx/pcaputil/tls-alpn-contract/client-empty-second-name-above-cap.pcap": "tls-alpn-contract/client-empty-second-name-above-cap.pcap",
+        "common/pcapx/pcaputil/tls-alpn-contract/client-truncated-second-name-above-cap.pcap": "tls-alpn-contract/client-truncated-second-name-above-cap.pcap",
+        "common/pcapx/pcaputil/tls-alpn-contract/dtls/controls.json": "tls-alpn-contract/dtls/controls.json",
+        "common/pcapx/pcaputil/tls-alpn-contract/dtls/dtls12-one-h2-ALPN-cap1-normal.pcap": "tls-alpn-contract/dtls/dtls12-one-h2-ALPN-cap1-normal.pcap",
+        "common/pcapx/pcaputil/tls-alpn-contract/dtls/dtls12-two-ALPN-cap1-existingResource.pcap": "tls-alpn-contract/dtls/dtls12-two-ALPN-cap1-existingResource.pcap",
+        "common/pcapx/pcaputil/tls-alpn-contract/framing-controls.json": "tls-alpn-contract/framing-controls.json",
+        "common/pcapx/pcaputil/tls-alpn-contract/malformed-SNI-before-overlimit-ALPN.pcap": "tls-alpn-contract/malformed-SNI-before-overlimit-ALPN.pcap",
+        "common/pcapx/pcaputil/tls-alpn-contract/selection-controls.json": "tls-alpn-contract/selection-controls.json",
+        "common/pcapx/pcaputil/tls-alpn-contract/selection-refusal-projection.json": "tls-alpn-contract/selection-refusal-projection.json",
+        "common/pcapx/pcaputil/tls-alpn-contract/server-only-http11-partial-observation.pcap": "tls-alpn-contract/server-only-http11-partial-observation.pcap",
+        "common/pcapx/pcaputil/tls-alpn-contract/server-selected-offered-h2-normal.pcap": "tls-alpn-contract/server-selected-offered-h2-normal.pcap",
+        "common/pcapx/pcaputil/tls-alpn-contract/server-selected-unoffered-http11.pcap": "tls-alpn-contract/server-selected-unoffered-http11.pcap",
+        "common/pcapx/pcaputil/tls-alpn-contract/server-two-selected-names-before-cap.pcap": "tls-alpn-contract/server-two-selected-names-before-cap.pcap",
+        "scripts/protocol-tests/required-tests-traffic-unified-v121.json": "required-tests-traffic-unified-v121.json"
+      }
     }
   ],
   "schema_version": 1,

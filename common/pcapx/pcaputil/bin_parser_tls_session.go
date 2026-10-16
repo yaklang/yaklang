@@ -283,7 +283,7 @@ func (t *binTLS) handshakeMessage(dir int, b []byte, authenticated bool, limits 
 			p += 3
 		}
 		if p < len(body) {
-			if err := t.extensions(body[p:], typ == 1); err != nil {
+			if err := t.extensions(body[p:], typ == 1, limits...); err != nil {
 				return nil, err
 			}
 		}
@@ -291,7 +291,7 @@ func (t *binTLS) handshakeMessage(dir int, b []byte, authenticated bool, limits 
 		if !authenticated {
 			return nil, protocolError(ErrMalformedMessage, "cleartext TLS EncryptedExtensions")
 		}
-		if err := t.extensions(body, false); err != nil {
+		if err := t.extensions(body, false, limits...); err != nil {
 			return nil, err
 		}
 	case 20:
@@ -327,7 +327,7 @@ func (t *binTLS) handshakeMessage(dir int, b []byte, authenticated bool, limits 
 	}
 	return m, nil
 }
-func (t *binTLS) extensions(b []byte, client bool) error {
+func (t *binTLS) extensions(b []byte, client bool, limits ...int) error {
 	if len(b) < 2 || int(binary.BigEndian.Uint16(b)) != len(b)-2 {
 		return protocolError(ErrMalformedMessage, "TLS extensions length")
 	}
@@ -355,31 +355,19 @@ func (t *binTLS) extensions(b []byte, client bool) error {
 			}
 		case 0:
 			if client {
-				if len(v) < 5 || int(binary.BigEndian.Uint16(v)) != len(v)-2 || v[2] != 0 || int(binary.BigEndian.Uint16(v[3:])) != len(v)-5 {
-					return protocolError(ErrMalformedMessage, "TLS SNI length")
+				name, err := tlsSNIName(v)
+				if err != nil {
+					return err
 				}
-				t.sni = string(v[5:])
+				t.sni = string(name)
 			}
 		case 16:
-			if len(v) < 3 || int(binary.BigEndian.Uint16(v)) != len(v)-2 {
-				return protocolError(ErrMalformedMessage, "TLS ALPN vector")
-			}
-			v = v[2:]
-			var protocols []string
-			for len(v) > 0 {
-				n := int(v[0])
-				v = v[1:]
-				if n == 0 || n > len(v) {
-					return protocolError(ErrMalformedMessage, "TLS ALPN length")
-				}
-				protocols = append(protocols, string(v[:n]))
-				v = v[n:]
+			selected, err := tlsALPNName(v, !client, limits...)
+			if err != nil {
+				return err
 			}
 			if !client {
-				if len(protocols) != 1 {
-					return protocolError(ErrMalformedMessage, "TLS selected ALPN count")
-				}
-				t.alpn = protocols[0]
+				t.alpn = string(selected)
 			}
 		}
 	}

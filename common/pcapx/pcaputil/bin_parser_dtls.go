@@ -444,11 +444,17 @@ func (s *binDTLS) message(f *binFlow, dir int, typ byte, b []byte) (map[string]a
 		if len(hello.order) > f.a.budget.MaxCollectionElements || len(hello.suites)/2 > f.a.budget.MaxCollectionElements {
 			return nil, protocolError(ErrResourceExceeded, "DTLS hello collection")
 		}
+		if err := tlsHelloExtensionStructure(hello, client); err != nil {
+			return nil, err
+		}
 		out["Hello Version"], out["Random"], out["Session ID"] = version, hex.EncodeToString(b[2:34]), hex.EncodeToString(hello.session)
 		// Extension vectors reuse the TLS syntax, not its handshake state machine.
 		t := &binTLS{}
 		if len(wire) > len(hello.prefix) {
-			if err := t.extensions(wire[len(hello.prefix):], client); err != nil {
+			if err := t.extensions(wire[len(hello.prefix):], client, f.a.budget.MaxCollectionElements); err != nil {
+				if typed, ok := err.(*ProtocolError); client && ok && typed.Kind == ErrResourceExceeded {
+					return nil, protocolError(ErrResourceExceeded, "DTLS offered ALPN")
+				}
 				return nil, err
 			}
 		}
