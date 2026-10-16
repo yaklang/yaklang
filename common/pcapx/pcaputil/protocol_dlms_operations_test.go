@@ -125,6 +125,24 @@ func hdlcOpTypes(t *testing.T, f map[string]any) {
 	for _, name := range []string{"Set", "Action"} {
 		if s, ok := f[name].(map[string]any); ok {
 			selectFieldTypes(t, s)
+			if v, ok := s["block_number"]; ok {
+				require.IsType(t, uint32(0), v)
+			}
+			if v, ok := s["raw_data_length"]; ok {
+				require.IsType(t, uint64(0), v)
+			}
+			if v, ok := s["observed_block_count"]; ok {
+				require.IsType(t, int(0), v)
+			}
+			for _, key := range []string{"last_block", "transfer_complete"} {
+				if v, ok := s[key]; ok {
+					require.IsType(t, false, v)
+				}
+			}
+			if v, ok := s["assembled_data"].(map[string]any); ok {
+				actionDataTypes(t, v)
+			}
+
 			for _, k := range []string{"wrapper_version", "source_wport", "destination_wport", "wrapper_header_hex"} {
 				require.NotContains(t, s, k)
 			}

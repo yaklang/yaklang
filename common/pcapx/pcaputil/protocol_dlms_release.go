@@ -294,6 +294,9 @@ func (s *binDLMS) retireHDLCEndpoint(dir int, src, dst uint32, limit int) error 
 	if p := s.transfer; p != nil && (p.initial.source == src && p.initial.destination == dst || p.initial.source == dst && p.initial.destination == src) {
 		s.transfer = nil
 	}
+	if p := s.setTransfer; p != nil && (p.initial.source == src && p.initial.destination == dst || p.initial.source == dst && p.initial.destination == src) {
+		s.setTransfer = nil
+	}
 	if p := s.fragments; p != nil && (p.source == src && p.destination == dst || p.source == dst && p.destination == src) {
 		s.fragments = nil
 	}

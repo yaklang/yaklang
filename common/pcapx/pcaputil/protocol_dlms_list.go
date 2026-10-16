@@ -41,6 +41,9 @@ func dlmsNormalAccess(p []byte) bool {
 	return len(p) >= 13 && p[0] == 0xc0 && p[1] == 1 && p[12] == 1
 }
 func dlmsProfile(w []byte) string {
+	if dlmsSetBlockAPDU(dlmsAPDU(w)) {
+		return "dlms-hdlc-set-block"
+	}
 	if dlmsOperationAPDU(dlmsAPDU(w)) {
 		return "dlms-hdlc-ln-operations"
 	}

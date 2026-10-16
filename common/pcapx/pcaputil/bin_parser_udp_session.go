@@ -70,7 +70,7 @@ func (f *binFlow) retireSNMPUDP() {
 // history or manufacture a fresh generation. An unfinished exchange still needs
 // quarantine because its peer progression was not completely observed.
 func (f *binFlow) retireDLMSUDP() {
-	if s := f.dlms; s != nil && (s.pending != nil || s.transfer != nil || s.fragments != nil) {
+	if s := f.dlms; s != nil && (s.pending != nil || s.transfer != nil || s.setTransfer != nil || s.fragments != nil) {
 		f.dlms.invalidate()
 	}
 	retained := int64(512)
@@ -782,6 +782,11 @@ func (a *binParser) closeUDPSessions() {
 				t := d.transfer
 				dir := t.initial.dir
 				incomplete = append(incomplete, &ProtocolEvent{FlowID: f.id, Timestamp: v.touched, Domain: v.key.domain, Transport: "udp", Source: f.endpoints[dir], Destination: f.endpoints[1-dir], Direction: dir, Protocol: "dlms", Profile: "dlms-hdlc-get-block", Status: "incomplete", Completeness: "incomplete", Summary: "DLMS HDLC exchange ended with an incomplete data-block transfer", Session: map[string]any{"Outstanding": 1, "ObservedBlocks": t.blocks, "EncodedBytes": len(t.data)}})
+				a.incomplete.Add(1)
+			} else if d != nil && d.setTransfer != nil {
+				dir := d.setTransfer.initial.dir
+				summary := "DLMS HDLC Set-with-data-block ended with an unmatched request"
+				incomplete = append(incomplete, &ProtocolEvent{FlowID: f.id, Timestamp: v.touched, Domain: v.key.domain, Transport: "udp", Source: f.endpoints[dir], Destination: f.endpoints[1-dir], Direction: dir, Protocol: "dlms", Profile: "dlms-hdlc-set-block", nativeDLMSOrSLMPObservation: true, Status: "incomplete", Completeness: "incomplete", Summary: summary, Session: d.setTransfer.closeFields(), Error: summary, sessionError: &ProtocolError{Kind: ErrNeedMore, Message: summary}})
 				a.incomplete.Add(1)
 			} else if d != nil && d.pending != nil && dlmsOperationKind(d.pending.kind) {
 				dir := d.pending.dir

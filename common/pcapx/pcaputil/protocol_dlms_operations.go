@@ -25,7 +25,7 @@ func decodeDLMSOperationInformation(m *dlmsMessage, p []byte, llc byte, limit, d
 	if len(p) < 3 {
 		return nil, dlmsError(ErrMalformedMessage, "operation service header is truncated")
 	}
-	if p[1] != 1 && !dlmsOperationListAPDU(p) {
+	if p[1] != 1 && !dlmsOperationListAPDU(p) && !dlmsSetBlockAPDU(p) {
 		return nil, dlmsError(ErrUnsupportedFeature, "selected Set/Action normal or bounded list choice only")
 	}
 	if p[2]&0x30 != 0 {
@@ -62,6 +62,9 @@ func decodeDLMSOperationInformation(m *dlmsMessage, p []byte, llc byte, limit, d
 		delete(fields, k)
 	}
 	m.invoke, m.flags, m.choice, m.count, m.request = decoded.invoke, decoded.flags, decoded.choice, decoded.count, request
+	if decoded.setBlock {
+		m.block = decoded
+	}
 	f := m.fields
 	f["Invoke ID and Priority"], f["Invoke ID"], f["High Priority"], f["Confirmed Service"] = m.flags, m.invoke, m.flags&128 != 0, m.flags&64 != 0
 	name := dlmsOperationName(m.kind)
@@ -73,11 +76,28 @@ func decodeDLMSOperationInformation(m *dlmsMessage, p []byte, llc byte, limit, d
 	if dlmsOperationListAPDU(p) {
 		form = " With List"
 	}
+	if decoded.setBlock {
+		switch fields["kind"] {
+		case "SetRequestWithFirstDataBlock":
+			form = " With First Data Block"
+		case "SetRequestWithDataBlock":
+			form = " With Data Block"
+		case "SetResponseDataBlock":
+			form = " Data Block"
+		case "SetResponseLastDataBlock":
+			form = " Last Data Block"
+		}
+	}
 	f["Frame Kind"], f[name] = name+" "+direction+form, fields
 	return m, nil
 }
 
 func dlmsOperationProjection(p []byte, n int) int64 {
+	if dlmsSetBlockAPDU(p) && p[0] == 0xc1 {
+		// Reserve the complete bounded graph and joined/retained bytes before
+		// parsing selectors or assembling a final Data value.
+		return 32768 + 512*int64(n+wrapperBlockBytes) + 2048*wrapperDataNodes
+	}
 	if dlmsOperationListAPDU(p) {
 		nodes := min(wrapperDataNodes, max(0, len(p)-4))
 		items := min(wrapperListItems, max(0, len(p)-4))

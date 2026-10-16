@@ -509,7 +509,7 @@ func probeDLMS(w []byte, limit int) ProbeResult {
 	m, e := decodeDLMS(w[:n], elements)
 	var pe *ProtocolError
 	if errors.As(e, &pe) && pe.Kind == ErrResourceExceeded {
-		if dlmsOperationAPDU(apdu) && len(apdu) > 1 && (apdu[1] == 1 || dlmsOperationListAPDU(apdu)) && (apdu[0] == 0xc1 || apdu[0] == 0xc3) {
+		if dlmsOperationAPDU(apdu) && len(apdu) > 1 && (apdu[1] == 1 || dlmsOperationListAPDU(apdu) || apdu[0] == 0xc1 && apdu[1] == 2) && (apdu[0] == 0xc1 || apdu[0] == 0xc3) {
 			return probeAccept("dlms", "hdlc-ln-operations", 98)
 		}
 
@@ -557,6 +557,7 @@ type binDLMS struct {
 	next                [2]byte
 	seqKnown            [2]bool
 	transfer            *dlmsTransfer
+	setTransfer         *dlmsSetTransfer
 	fragments           *dlmsFragments
 }
 
@@ -566,6 +567,7 @@ func (s *binDLMS) invalidate() {
 	// a subsequent request's ID. Retire the conversation, not just a live slot.
 	s.pending = nil
 	s.transfer = nil
+	s.setTransfer = nil
 	s.fragments = nil
 	s.ambiguous = true
 }
@@ -598,7 +600,7 @@ func (s *binDLMS) consume(m *dlmsMessage, w []byte, dir int, id uint64) (map[str
 		return m.fields, 0, nil
 	}
 	if m.request {
-		if s.transfer != nil {
+		if s.transfer != nil || s.setTransfer != nil {
 			s.invalidate()
 			return ctx("distinct request interrupts observed data-block transfer")
 		}
@@ -685,6 +687,9 @@ func (s *binDLMS) storage() int64 {
 	if s.transfer != nil {
 		n += 128 + 2*int64(len(s.transfer.data))
 	}
+	if s.setTransfer != nil {
+		n += 128 + 2*int64(len(s.setTransfer.data))
+	}
 	if s.fragments != nil {
 		n += 128 + 2*int64(len(s.fragments.info)+len(s.fragments.wire))
 	}
@@ -735,6 +740,17 @@ func (f *binFlow) consumeDecodedDLMS(dir int, w []byte, id uint64, m *dlmsMessag
 		s.invalidate()
 		return nil, 0, dlmsError(ErrUnsupportedFeature, "segmented Set/Action information is not implemented")
 	}
+	if s.setTransfer != nil && (m.kind == "I" || m.request && dlmsSequencedService(m.kind) && !(m.block != nil && m.block.setBlock)) {
+		s.invalidate()
+		return nil, 0, dlmsError(ErrContextRequired, "distinct request interrupts observed SET data-block transfer")
+	}
+	if m.block != nil && m.block.setBlock {
+		if s.setTransfer == nil && m.request && m.block.blockFirst && s.pending == nil && s.seenRequest[m.invoke]&(1<<m.ns) == 0 && int(s.seenCount) >= f.a.budget.MaxCollectionElements {
+			s.invalidate()
+			return nil, 0, dlmsError(ErrResourceExceeded, "retained invoke/sequence token limit")
+		}
+		return f.consumeDLMSSetBlock(dir, w, id, m)
+	}
 	if m.kind == "I" || s.fragments != nil {
 		return f.consumeDLMSSegments(dir, w, id, m)
 	}
@@ -784,7 +800,7 @@ func dlmsUDPRefusalHint(w []byte) bool {
 	}
 	p := w[at+3:]
 	if bytes.Equal(p[:3], []byte{0xe6, 0xe6, 0}) && (p[3] == 0xc1 || p[3] == 0xc3) {
-		return (p[4] == 1 || dlmsOperationListAPDU(p[3:])) && p[5]&0x30 == 0
+		return (p[4] == 1 || dlmsOperationListAPDU(p[3:]) || dlmsSetBlockAPDU(p[3:])) && p[5]&0x30 == 0
 	}
 	return bytes.Equal(p[:4], []byte{0xe6, 0xe6, 0, 0xc0}) && (p[4] == 1 || p[4] == 2 || p[4] == 3) && p[5]&0x30 == 0
 }

@@ -1482,6 +1482,16 @@ func (f *binFlow) finishSession(reason TrafficFlowCloseReason) {
 			}
 		} else if d.transfer != nil {
 			emit(d.transfer.initial.dir, map[string]any{"Outstanding": 1, "ObservedBlocks": d.transfer.blocks, "EncodedBytes": len(d.transfer.data)}, "DLMS HDLC exchange ended with an incomplete data-block transfer")
+		} else if d.setTransfer != nil {
+			e := f.event(d.setTransfer.initial.dir, nil, "incomplete", string(reason)+": DLMS HDLC Set-with-data-block ended with an unmatched request")
+			e.Profile = "dlms-hdlc-set-block"
+			e.nativeDLMSOrSLMPObservation = true
+			e.Session = d.setTransfer.closeFields()
+			e.semanticSession = cloneSession(e.Session)
+			e.sessionError = &ProtocolError{Kind: ErrNeedMore, Message: e.Summary}
+			e.Error = e.Summary
+			f.a.incomplete.Add(1)
+			f.a.emit(e)
 		} else if d.pending != nil && d.pending.kind == "ACSE" {
 			e := f.event(d.pending.dir, nil, "incomplete", string(reason)+": DLMS HDLC association ended with an unmatched request")
 			e.Profile = "dlms-hdlc-acse"
