@@ -96,18 +96,9 @@ func patchIrCodeIndex(db *gorm.DB) {
 		query string
 	}{
 		{
-			"idx_ir_codes_program_code",
-			`CREATE INDEX IF NOT EXISTS "idx_ir_codes_program_code" ON "` + TableIrCodes + `" ("program_name", "code_id");`,
-		},
-		{
 			"idx_ir_codes_program_opcode",
 			// composite index for program+opcode lookups
 			`CREATE INDEX IF NOT EXISTS "idx_ir_codes_program_opcode" ON "` + TableIrCodes + `" ("program_name", "opcode");`,
-		},
-		// 为 ir_types 表添加复合索引
-		{
-			"idx_ir_types_program_type",
-			`CREATE INDEX IF NOT EXISTS "idx_ir_types_program_type" ON "` + TableIrTypes + `" ("program_name", "type_id");`,
 		},
 		// 为 ir_indices 表添加复合索引以优化常见查询
 		{
@@ -132,6 +123,26 @@ func patchIrCodeIndex(db *gorm.DB) {
 	ensureUniqueIrCodesProgramCodeIndex(db)
 	ensureUniqueIrTypesProgramTypeIndex(db)
 	ensureUniqueIrOffsetsIndex(db)
+
+	// The canonical UNIQUE keys already provide these exact lookup orders.
+	// New databases must not maintain a second B-tree per row for the same
+	// columns. This is format-compatible: no table/column/IR ID changes and
+	// no DROP against existing databases, so storage versions stay unchanged.
+	// If a legacy database cannot establish the UNIQUE key, retain its old
+	// non-unique lookup coverage while batch writes use the existing fallback.
+	for _, lookup := range []struct {
+		table, unique, legacySQL string
+	}{
+		{TableIrCodes, "ux_ir_codes_program_code", `CREATE INDEX IF NOT EXISTS "idx_ir_codes_program_code" ON "` + TableIrCodes + `" ("program_name", "code_id");`},
+		{TableIrTypes, "ux_ir_types_program_type", `CREATE INDEX IF NOT EXISTS "idx_ir_types_program_type" ON "` + TableIrTypes + `" ("program_name", "type_id");`},
+	} {
+		if hasNamedIndex(db, lookup.table, lookup.unique) {
+			continue
+		}
+		if err := db.Exec(lookup.legacySQL).Error; err != nil {
+			log.Warnf("failed to preserve fallback lookup index for %s: %v", lookup.table, err)
+		}
+	}
 }
 
 // deleteDuplicateIrCodes removes every row except the oldest (MIN id) per
