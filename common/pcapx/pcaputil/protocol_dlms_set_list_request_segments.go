@@ -6,11 +6,11 @@ import (
 	"math/bits"
 )
 
-// SET-list service blocks can independently span bounded HDLC I frames.
+// Selected single/list SET service blocks can independently span bounded HDLC I frames.
 // Partial carriers never install service identity or a response owner.
 // Keep every literal frame independent; only a complete APDU installs pending
 // request context. A response must acknowledge the last request frame.
-func (f *binFlow) consumeDLMSSetListRequestSegments(dir int, wire []byte, id uint64, m *dlmsMessage) (map[string]any, uint64, error) {
+func (f *binFlow) consumeDLMSSetRequestSegments(dir int, wire []byte, id uint64, m *dlmsMessage) (map[string]any, uint64, error) {
 	s := f.dlms
 	fail := func(kind ProtocolErrorKind, why string, retire bool) (map[string]any, uint64, error) {
 		if retire {
@@ -21,18 +21,20 @@ func (f *binFlow) consumeDLMSSetListRequestSegments(dir int, wire []byte, id uin
 	t := s.fragments
 	if t == nil {
 		info := m.information
-		if !dlmsSetListRequestSegmentPrefix(info) {
+		if !dlmsSetRequestSegmentPrefix(info) {
 			return fail(ErrUnsupportedFeature, "first SET-list request segment needs complete LLC/service header", true)
 		}
 		if info[5]&0x30 != 0 {
 			return fail(ErrMalformedMessage, "segmented request invoke flags are reserved", true)
 		}
 		nextRequest := info[4] == 3
+		choice := info[4]
 		if nextRequest {
-			if s.setTransfer == nil || s.setTransfer.initial.choice != 5 {
+			if s.setTransfer == nil || (s.setTransfer.initial.choice != 5 && s.setTransfer.initial.choice != 2) {
 				return fail(ErrContextRequired, "segmented SET-next lacks observed list transfer", true)
 			}
 			p := &s.setTransfer.initial
+			choice = p.choice
 			if dir != p.dir || m.source != p.source || m.destination != p.destination || info[5] != p.flags {
 				return fail(ErrContextRequired, "segmented SET-next direction/address/full flags differ", false)
 			}
@@ -51,7 +53,7 @@ func (f *binFlow) consumeDLMSSetListRequestSegments(dir int, wire []byte, id uin
 		if s.seqKnown[dir] && m.ns != s.next[dir] {
 			return fail(ErrContextRequired, "initial SET-list request sequence differs", nextRequest)
 		}
-		t = &dlmsFragments{operation: "Set", setListRequest: true, request: true, nextRequest: nextRequest, invoke: info[5] & 15, dir: dir, source: m.source, destination: m.destination, first: m.ns, nr: m.nr}
+		t = &dlmsFragments{operation: "Set", setRequestChoice: choice, request: true, nextRequest: nextRequest, invoke: info[5] & 15, dir: dir, source: m.source, destination: m.destination, first: m.ns, nr: m.nr}
 	} else {
 		if dir != t.dir || m.source != t.source || m.destination != t.destination || m.nr != t.nr {
 			return fail(ErrContextRequired, "request continuation direction/address/acknowledgement differ", false)
@@ -120,45 +122,57 @@ func (f *binFlow) consumeDLMSSetListRequestSegments(dir int, wire []byte, id uin
 	return fields, reply, nil
 }
 
-func dlmsSetListRequestSegmentPrefix(info []byte) bool {
-	return len(info) >= 6 && info[0] == 0xe6 && info[1] == 0xe6 && info[2] == 0 && info[3] == 0xc1 && (info[4] == 5 || info[4] == 3)
+func dlmsSetRequestSegmentPrefix(info []byte) bool {
+	return len(info) >= 6 && info[0] == 0xe6 && info[1] == 0xe6 && info[2] == 0 && info[3] == 0xc1 && (info[4] == 2 || info[4] == 5 || info[4] == 3)
 }
 
 // Snapshot before consume/refusal can release the transfer. A shared next3 needs
 // matching literal endpoints/full flags or an already retained fragment chain.
-func (f *binFlow) dlmsSetListRequestSegmentObservation(w []byte, dir int) bool {
+func dlmsSetRequestSegmentProfile(choice byte) string {
+	if choice == 5 {
+		return "dlms-hdlc-set-list-block-request-segmented"
+	}
+	if choice == 2 {
+		return "dlms-hdlc-set-block-request-segmented"
+	}
+	return ""
+}
+func (f *binFlow) dlmsSetRequestSegmentObservation(w []byte, dir int) string {
 	if len(w) < 8 || w[0] != 0x7e {
-		return false
+		return ""
 	}
 	at, end := 3, len(w)-3
 	dst, _, err := dlmsAddress(w[:end], &at)
 	if err != nil {
-		return false
+		return ""
 	}
 	src, _, err := dlmsAddress(w[:end], &at)
 	if err != nil || at >= end || w[at]&1 != 0 {
-		return false
+		return ""
 	}
 	s := f.dlms
-	if s != nil && s.fragments != nil && s.fragments.setListRequest {
-		return true
+	if s != nil && s.fragments != nil && s.fragments.setRequestChoice != 0 {
+		return dlmsSetRequestSegmentProfile(s.fragments.setRequestChoice)
 	}
-	if s != nil && s.pending != nil && len(s.pending.requestInformation) > 0 && bytes.Equal(w, s.pending.wire) && dlmsSetListRequestSegmentPrefix(s.pending.requestInformation) {
-		return true
+	if s != nil && s.pending != nil && len(s.pending.requestInformation) > 0 && bytes.Equal(w, s.pending.wire) && dlmsSetRequestSegmentPrefix(s.pending.requestInformation) {
+		return dlmsSetRequestSegmentProfile(s.pending.choice)
 	}
 	if w[1]&8 == 0 {
-		return false
+		return ""
 	}
 	p := dlmsAPDU(w)
 	if len(p) < 3 || p[0] != 0xc1 {
-		return false
+		return ""
 	}
-	if p[1] == 5 {
-		return true
+	if p[1] == 2 || p[1] == 5 {
+		return dlmsSetRequestSegmentProfile(p[1])
 	}
-	if p[1] != 3 || s == nil || s.setTransfer == nil || s.setTransfer.initial.choice != 5 {
-		return false
+	if p[1] != 3 || s == nil || s.setTransfer == nil {
+		return ""
 	}
 	old := s.setTransfer.initial
-	return dir == old.dir && src == old.source && dst == old.destination && p[2] == old.flags
+	if dir == old.dir && src == old.source && dst == old.destination && p[2] == old.flags {
+		return dlmsSetRequestSegmentProfile(old.choice)
+	}
+	return ""
 }

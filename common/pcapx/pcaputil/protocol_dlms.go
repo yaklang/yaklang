@@ -84,18 +84,18 @@ func probeDLMSStream(w []byte, frameLimit, probeLimit int) ProbeResult {
 }
 
 type dlmsMessage struct {
-	fields                  map[string]any
-	kind                    string
-	request                 bool
-	source, destination     uint32
-	invoke, ns, nr          byte
-	flags, choice           byte
-	count                   int
-	block                   *wrapperMessage
-	acse                    *wrapperMessage
-	information             []byte
-	segmented               bool
-	setListResponseAssembly bool
+	fields                    map[string]any
+	kind                      string
+	request                   bool
+	source, destination       uint32
+	invoke, ns, nr            byte
+	flags, choice             byte
+	count                     int
+	block                     *wrapperMessage
+	acse                      *wrapperMessage
+	information               []byte
+	segmented                 bool
+	setResponseAssemblyChoice byte
 }
 
 func dlmsAddress(w []byte, at *int) (uint32, int, error) {
@@ -213,7 +213,7 @@ func decodeDLMSFrameBudget(w []byte, maxElements, depth int, linkOnly bool) (*dl
 		// Preserve literal initial request direction for native session decoding.
 		// Never infer an endpoint role from continuation bytes in an existing chain.
 		m.request = len(info) >= 4 && bytes.Equal(info[:4], []byte{0xe6, 0xe6, 0, 0xc0})
-		if dlmsSelectedOperationSegmentPrefix(info) || dlmsSetListRequestSegmentPrefix(info) {
+		if dlmsSelectedOperationSegmentPrefix(info) || dlmsSetRequestSegmentPrefix(info) {
 			m.request = info[1] == 0xe6
 		}
 		if len(info) >= 4 && bytes.Equal(info[:3], []byte{0xe6, 0xe6, 0}) && dlmsACSEAPDU(info[3:]) {
@@ -487,7 +487,10 @@ func probeDLMS(w []byte, limit int) ProbeResult {
 		if err == nil && m.kind == "I" && dlmsACSESegmentPrefix(m.information) {
 			return probeAccept("dlms", "hdlc-acse-segmented", 98)
 		}
-		if err == nil && m.kind == "I" && dlmsSetListRequestSegmentPrefix(m.information) && m.information[4] == 5 && m.information[5]&0x30 == 0 {
+		if err == nil && m.kind == "I" && dlmsSetRequestSegmentPrefix(m.information) && (m.information[4] == 2 || m.information[4] == 5) && m.information[5]&0x30 == 0 {
+			if m.information[4] == 2 {
+				return probeAccept("dlms", "hdlc-set-block-request-segmented", 98)
+			}
 			return probeAccept("dlms", "hdlc-set-list-block-request-segmented", 98)
 		}
 		if err == nil && m.kind == "I" && m.request && dlmsSelectedOperationSegmentPrefix(m.information) && m.information[5]&0x30 == 0 {
@@ -754,11 +757,11 @@ func (f *binFlow) consumeDecodedDLMS(dir int, w []byte, id uint64, m *dlmsMessag
 	if (dlmsSequencedService(m.kind) || m.kind == "I") && s.hdlcEndpointRetired(dir, m.source, m.destination, m.request) {
 		return nil, 0, dlmsError(ErrContextRequired, "Get information belongs to retired association context")
 	}
-	if m.kind == "I" && (s.fragments != nil && s.fragments.setListRequest || s.fragments == nil && dlmsSetListRequestSegmentPrefix(m.information) && (m.information[4] == 5 || s.setTransfer != nil && s.setTransfer.initial.choice == 5)) {
-		return f.consumeDLMSSetListRequestSegments(dir, w, id, m)
+	if m.kind == "I" && (s.fragments != nil && s.fragments.setRequestChoice != 0 || s.fragments == nil && dlmsSetRequestSegmentPrefix(m.information) && (m.information[4] == 2 || m.information[4] == 5 || s.setTransfer != nil && (s.setTransfer.initial.choice == 2 || s.setTransfer.initial.choice == 5))) {
+		return f.consumeDLMSSetRequestSegments(dir, w, id, m)
 	}
-	if m.kind == "I" && (s.fragments != nil && s.fragments.setListResponse || s.fragments == nil && s.pending != nil && s.pending.kind == "SET" && s.pending.choice == 5 && len(m.information) >= 6 && bytes.Equal(m.information[:3], []byte{0xe6, 0xe7, 0})) {
-		return f.consumeDLMSSetListResponseSegments(dir, w, id, m)
+	if m.kind == "I" && (s.fragments != nil && s.fragments.setResponseChoice != 0 || s.fragments == nil && s.pending != nil && s.pending.kind == "SET" && (s.pending.choice == 2 || s.pending.choice == 5) && len(m.information) >= 6 && bytes.Equal(m.information[:3], []byte{0xe6, 0xe7, 0})) {
+		return f.consumeDLMSSetResponseSegments(dir, w, id, m)
 	}
 	if m.kind == "I" && s.fragments == nil && len(m.information) >= 4 && m.information[0] == 0xe6 && (m.information[1] == 0xe6 || m.information[1] == 0xe7) && m.information[2] == 0 && dlmsOperationAPDU(m.information[3:]) && !dlmsSelectedOperationSegmentPrefix(m.information) {
 		// A valid carrier can contain an unsupported foreign service/form.
@@ -903,8 +906,8 @@ func (a *binParser) decodeDLMSDatagram(e *ProtocolEvent, w []byte, explicit bool
 		store.lru.MoveToBack(el)
 	}
 	operationSegment := f.dlmsOperationSegmentObservation(w)
-	setListRequestSegment := f.dlmsSetListRequestSegmentObservation(w, e.Direction)
-	setListResponseSegment := f.dlmsSetListResponseSegmentObservation(w, e.Direction)
+	setRequestSegment := f.dlmsSetRequestSegmentObservation(w, e.Direction)
+	setResponseSegment := f.dlmsSetResponseSegmentObservation(w, e.Direction)
 	setListBlockProfile := f.dlmsSetListBlockContext(w, e.Direction)
 	var m *dlmsMessage
 	var err error
@@ -992,11 +995,11 @@ func (a *binParser) decodeDLMSDatagram(e *ProtocolEvent, w []byte, explicit bool
 	if setListBlockProfile {
 		e.Profile = "dlms-hdlc-set-list-block"
 	}
-	if setListRequestSegment {
-		e.Profile = "dlms-hdlc-set-list-block-request-segmented"
+	if setRequestSegment != "" {
+		e.Profile = setRequestSegment
 	}
-	if setListResponseSegment {
-		e.Profile = "dlms-hdlc-set-list-block-response-segmented"
+	if setResponseSegment != "" {
+		e.Profile = setResponseSegment
 	}
 	var resource *ProtocolError
 	if oversize || dlmsListAPDU(w) != nil && errors.As(err, &resource) && resource.Kind == ErrResourceExceeded {

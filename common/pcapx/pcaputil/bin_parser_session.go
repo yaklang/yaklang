@@ -859,8 +859,8 @@ func (f *binFlow) consumeSession(dir int, e *ProtocolEvent, result map[string]an
 			e.ID = f.a.ids.Add(1)
 		}
 		operationSegment := f.dlmsOperationSegmentObservation(e.Raw)
-		setListRequestSegment := f.dlmsSetListRequestSegmentObservation(e.Raw, dir)
-		setListResponseSegment := f.dlmsSetListResponseSegmentObservation(e.Raw, dir)
+		setRequestSegment := f.dlmsSetRequestSegmentObservation(e.Raw, dir)
+		setResponseSegment := f.dlmsSetResponseSegmentObservation(e.Raw, dir)
 		setListBlockProfile := f.dlmsSetListBlockContext(e.Raw, dir)
 		e.Profile, e.Completeness = dlmsProfile(e.Raw), "message"
 		e.Session, e.ResponseTo, err = f.consumeDLMS(dir, e.Raw, e.ID)
@@ -877,11 +877,11 @@ func (f *binFlow) consumeSession(dir int, e *ProtocolEvent, result map[string]an
 		if setListBlockProfile {
 			e.Profile = "dlms-hdlc-set-list-block"
 		}
-		if setListRequestSegment {
-			e.Profile = "dlms-hdlc-set-list-block-request-segmented"
+		if setRequestSegment != "" {
+			e.Profile = setRequestSegment
 		}
-		if setListResponseSegment {
-			e.Profile = "dlms-hdlc-set-list-block-response-segmented"
+		if setResponseSegment != "" {
+			e.Profile = setResponseSegment
 		}
 	case "genisys":
 		e.Session, err = f.genisys.consume(dir, e.Raw, f.a.budget.MaxCollectionElements)

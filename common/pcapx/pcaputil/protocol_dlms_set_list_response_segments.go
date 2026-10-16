@@ -5,9 +5,9 @@ import (
 	"encoding/hex"
 )
 
-// Selected SET-list ACK/terminal response information frames retain the pending
+// Selected single/list SET ACK/terminal response information frames retain the pending
 // request until a complete bounded APDU is validated; no partial reply owner.
-func (f *binFlow) consumeDLMSSetListResponseSegments(dir int, wire []byte, id uint64, m *dlmsMessage) (map[string]any, uint64, error) {
+func (f *binFlow) consumeDLMSSetResponseSegments(dir int, wire []byte, id uint64, m *dlmsMessage) (map[string]any, uint64, error) {
 	s := f.dlms
 	ctx := func(why string, retire bool) (map[string]any, uint64, error) {
 		if retire {
@@ -23,7 +23,7 @@ func (f *binFlow) consumeDLMSSetListResponseSegments(dir int, wire []byte, id ui
 	if t != nil && t.request || t == nil && m.segmented && m.request {
 		return f.consumeDLMSRequestSegments(dir, wire, id, m)
 	}
-	if p == nil || p.kind != "SET" || p.choice != 5 || s.setTransfer == nil || s.setTransfer.initial.choice != 5 || dir == p.dir || m.source != p.destination || m.destination != p.source {
+	if p == nil || p.kind != "SET" || (p.choice != 5 && p.choice != 2) || s.setTransfer == nil || s.setTransfer.initial.choice != p.choice || dir == p.dir || m.source != p.destination || m.destination != p.source {
 		return ctx("SET-list response fragments require reversed observed list request", false)
 	}
 	if t == nil {
@@ -35,10 +35,10 @@ func (f *binFlow) consumeDLMSSetListResponseSegments(dir int, wire []byte, id ui
 			s.invalidate()
 			return nil, 0, dlmsError(ErrMalformedMessage, "segmented SET-list response reserved invoke flags")
 		}
-		if info[3] != 0xc5 || info[4] != 2 && info[4] != 4 || info[5] != p.flags || m.nr != (p.ns+1)&7 || s.seqKnown[dir] && m.ns != s.next[dir] {
+		if info[3] != 0xc5 || !dlmsSetSegmentReplyForm(p.choice, info[4]) || info[5] != p.flags || m.nr != (p.ns+1)&7 || s.seqKnown[dir] && m.ns != s.next[dir] {
 			return ctx("SET-list response fragment service/form/flags/sequence differs", false)
 		}
-		t = &dlmsFragments{operation: "Set", setListResponse: true, dir: dir, source: m.source, destination: m.destination, first: m.ns, nr: m.nr}
+		t = &dlmsFragments{operation: "Set", setResponseChoice: p.choice, dir: dir, source: m.source, destination: m.destination, first: m.ns, nr: m.nr}
 	} else {
 		if dir != t.dir || m.source != t.source || m.destination != t.destination || m.nr != t.nr {
 			return ctx("continuation direction/address/acknowledgement differ", false)
@@ -87,7 +87,7 @@ func (f *binFlow) consumeDLMSSetListResponseSegments(dir int, wire []byte, id ui
 	s.fragments = nil
 	// Only this fully checked private group may carry list identity across a
 	// final carrier without LLC/APDU. A foreign literal terminal3 cannot set it.
-	decoded.setListResponseAssembly = true
+	decoded.setResponseAssemblyChoice = p.choice
 	fields, reply, err := f.consumeDecodedDLMS(dir, wire, id, decoded)
 	if err != nil {
 		return failDLMSRequestAssembly(s, err)
@@ -98,33 +98,48 @@ func (f *binFlow) consumeDLMSSetListResponseSegments(dir int, wire []byte, id ui
 	return fields, reply, nil
 }
 
-func (f *binFlow) dlmsSetListResponseSegmentObservation(w []byte, dir int) bool {
+func dlmsSetSegmentReplyForm(choice, form byte) bool {
+	return form == 2 || choice == 2 && form == 3 || choice == 5 && form == 4
+}
+func dlmsSetResponseSegmentProfile(choice byte) string {
+	if choice == 5 {
+		return "dlms-hdlc-set-list-block-response-segmented"
+	}
+	if choice == 2 {
+		return "dlms-hdlc-set-block-response-segmented"
+	}
+	return ""
+}
+func (f *binFlow) dlmsSetResponseSegmentObservation(w []byte, dir int) string {
 	if len(w) < 8 || w[0] != 0x7e {
-		return false
+		return ""
 	}
 	at, end := 3, len(w)-3
 	dst, _, err := dlmsAddress(w[:end], &at)
 	if err != nil {
-		return false
+		return ""
 	}
 	src, _, err := dlmsAddress(w[:end], &at)
 	if err != nil || at >= end || w[at]&1 != 0 {
-		return false
+		return ""
 	}
 	s := f.dlms
-	if s != nil && s.fragments != nil && s.fragments.setListResponse {
-		return true
+	if s != nil && s.fragments != nil && s.fragments.setResponseChoice != 0 {
+		return dlmsSetResponseSegmentProfile(s.fragments.setResponseChoice)
 	}
 	p := dlmsAPDU(w)
 	if w[1]&8 == 0 || len(p) < 3 || p[0] != 0xc5 {
-		return false
+		return ""
 	}
 	if p[1] == 4 {
-		return true
+		return dlmsSetResponseSegmentProfile(5)
 	}
-	if p[1] != 2 || s == nil || s.pending == nil || s.pending.kind != "SET" || s.pending.choice != 5 {
-		return false
+	if s == nil || s.pending == nil || s.pending.kind != "SET" {
+		return ""
 	}
 	old := s.pending
-	return dir != old.dir && src == old.destination && dst == old.source && p[2] == old.flags
+	if (p[1] == 2 || p[1] == 3 && old.choice == 2) && dir != old.dir && src == old.destination && dst == old.source && p[2] == old.flags {
+		return dlmsSetResponseSegmentProfile(old.choice)
+	}
+	return ""
 }

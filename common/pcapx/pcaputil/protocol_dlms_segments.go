@@ -24,8 +24,8 @@ type dlmsFragments struct {
 	acseCommand         byte
 	operation           string
 	operationList       bool
-	setListRequest      bool
-	setListResponse     bool
+	setRequestChoice    byte
+	setResponseChoice   byte
 }
 
 func (s *binDLMS) fragmentCloseDirection() int {
@@ -241,11 +241,11 @@ func dlmsOperationSegmentResponseChoice(p *dlmsPending) byte {
 	return p.choice
 }
 func (t *dlmsFragments) operationSegmentProfile() string {
-	if t.setListResponse {
-		return "dlms-hdlc-set-list-block-response-segmented"
+	if t.setResponseChoice != 0 {
+		return dlmsSetResponseSegmentProfile(t.setResponseChoice)
 	}
-	if t.setListRequest {
-		return "dlms-hdlc-set-list-block-request-segmented"
+	if t.setRequestChoice != 0 {
+		return dlmsSetRequestSegmentProfile(t.setRequestChoice)
 	}
 	if t.operationList {
 		return "dlms-hdlc-ln-operation-lists-segmented"
@@ -253,12 +253,18 @@ func (t *dlmsFragments) operationSegmentProfile() string {
 	return "dlms-hdlc-ln-operations-segmented"
 }
 func (t *dlmsFragments) serviceName() string {
-	if t.setListResponse {
+	if t.setResponseChoice != 0 {
+		if t.setResponseChoice == 2 {
+			return "Set With Data Block"
+		}
 		return "Set With List And Data Block"
 	}
-	if t.setListRequest {
+	if t.setRequestChoice != 0 {
 		if t.nextRequest {
 			return "Set With Data Block"
+		}
+		if t.setRequestChoice == 2 {
+			return "Set With First Data Block"
 		}
 		return "Set With List And First Data Block"
 	}
@@ -271,10 +277,16 @@ func (t *dlmsFragments) serviceName() string {
 	return "Get"
 }
 func (t *dlmsFragments) operationCloseSummary() string {
-	if t.setListResponse {
+	if t.setResponseChoice != 0 {
+		if t.setResponseChoice == 2 {
+			return "DLMS HDLC exchange ended with incomplete segmented Set-with-data-block response"
+		}
 		return "DLMS HDLC exchange ended with incomplete segmented Set-with-list-and-data-block response"
 	}
-	if t.setListRequest {
+	if t.setRequestChoice != 0 {
+		if t.setRequestChoice == 2 {
+			return "DLMS HDLC exchange ended with incomplete segmented Set-with-data-block request"
+		}
 		return "DLMS HDLC exchange ended with incomplete segmented Set-with-list-and-data-block request"
 	}
 	direction := "response"

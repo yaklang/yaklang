@@ -27,8 +27,11 @@ func (t *dlmsSetTransfer) closeFields() map[string]any {
 func (f *binFlow) consumeDLMSSetBlock(dir int, wire []byte, id uint64, m *dlmsMessage) (map[string]any, uint64, error) {
 	s, b := f.dlms, m.block
 	choice := byte(2)
-	if f.dlmsSetListBlockContext(wire, dir) || m.setListResponseAssembly {
+	if f.dlmsSetListBlockContext(wire, dir) {
 		choice = 5
+	}
+	if m.setResponseAssemblyChoice != 0 {
+		choice = m.setResponseAssemblyChoice
 	}
 	ctx := func(why string, retire bool) (map[string]any, uint64, error) {
 		if retire {
