@@ -75,6 +75,7 @@ func deleteCache(progName string) {
 	if irTypeCaches != nil {
 		irTypeCaches.Delete(progName)
 	}
+	invalidateOffsetCache(progName)
 }
 
 func GetIrCodeCache(progName string) *utils.CacheExWithKey[int64, *IrCode] {
