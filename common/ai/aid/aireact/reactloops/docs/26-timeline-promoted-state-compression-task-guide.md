@@ -97,7 +97,7 @@ kind=recent-tool-cache name=read_file operation=upsert
 - `retire_promoted_entries` 是可选字符串，只接受本次列出的原始 promoted item ID，逗号分隔，不支持区间。缺失、空字符串、非法类型均不删；未知 ID 忽略。
 - 未点名的 promoted item 默认原样保留。不能从一个 ID 扩大到整个同名工具、技能或证据。
 - Skill 不同资源页独立选择；删除后按剩余原始 item 重建累计技能块。
-- Evidence 与其它 item 一样退休，不增加 Config/session 的第二条 post-commit 删除通道。它会改变当前 Timeline 重放出的证据账本。提示词要求按当前进度主动淘汰不再影响下一步的证据、工具和技能；用户输入不可删除。
+- Evidence 与其它 item 一样退休，不增加 Config/session 的第二条 post-commit 删除通道。它会改变当前 Timeline 重放出的证据账本。提示词先解释 Timeline 各段，再按当前任务、材料里已经写明的后续任务和容量缺口判断关联度。promoted 相对重要，可以淘汰但要慎重；工具缓存优先淘汰较旧且后续用不到的 Schema。summary 除普通历史外，还要概括本次淘汰的 promoted：技能写清名称以便重新加载，证据只留简要结论。用户输入不可删除。
 
 解析阶段已将删除名单限制在本次快照列出的 promoted item ID 中。提交直接使用该名单，不扩大或取消删除，不按同 key 的 REUSE、DELETE 或水位后新操作调整选择。未点名的原始 item 和水位后的新 item 不退休；删除后按剩余 journal 正常重放。
 

@@ -17,7 +17,7 @@
     "summary": {
       "type": "string",
       "minLength": 0,
-      "description": "合并旧摘要与未保留原文后的历史总结，说明进展、依据、问题和衔接线索。没有任何普通历史与旧摘要时可以为空字符串，本次只做条目删除决策。"
+      "description": "合并旧摘要与未保留的普通历史，写进展、依据、问题和衔接。若本次淘汰了 promoted 条目，末尾追加简要概括：技能写清名称和路径以便重新加载，证据只概括结论，工具缓存只写工具名且不写 Schema。没有普通历史、旧摘要，且本次不淘汰 promoted 时可以为空字符串。"
     },
     "ratain_timeline_item_range": {
       "type": "string",
@@ -25,7 +25,7 @@
     },
     "retire_promoted_entries": {
       "type": "string",
-      "description": "本次判断不再需要的 promoted item 数字 ID，逗号分隔，不写区间。只使用历史条目中标注的 RETIRE_ID 数字，不写 RETIRE_ID 字样。仍需使用的条目应保留，不要求全部删除；空字符串表示本次不删除。只删除点名 ID。"
+      "description": "本次淘汰的 promoted item 数字 ID，逗号分隔，不写区间。只使用历史条目里标注的 RETIRE_ID 数字。promoted 相对重要，默认保留；只淘汰与当前及后续任务关联弱、且能明显减小占用的条目。工具缓存更慎重，优先淘汰较旧且后续用不到的 Schema。空字符串表示不删除。只删除点名 ID。"
     },
     "memory_entities": {
       "type": "array",

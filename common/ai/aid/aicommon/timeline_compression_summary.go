@@ -67,7 +67,7 @@ func renderCompressionCapacity(snapshot *timelineCompressionSnapshot) string {
 	}
 	if ordinary > 0 || promoted > 0 {
 		fmt.Fprintf(&b, "两个可优化部分：普通历史 %d tokens，promoted 内容 %d tokens。\n", ordinary, promoted)
-		b.WriteString("普通历史通过 summary 和 ratain_timeline_item_range 压缩。promoted 内容通过删除不再需要的 RETIRE_ID 压缩；用户输入不可删除。\n")
+		b.WriteString("普通历史通过 summary 和 ratain_timeline_item_range 压缩。promoted 内容相对重要，只删除与当前及后续任务关联弱的 RETIRE_ID；用户输入不可删除。\n")
 	}
 	return strings.TrimRight(b.String(), "\n")
 }
