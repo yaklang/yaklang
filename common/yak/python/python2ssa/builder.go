@@ -493,7 +493,7 @@ func (b *singleFileBuilder) ensureBlueprintConstructorSlot(blueprint *ssa.Bluepr
 			constructor := b.EmitUndefined(blueprint.Name + "-constructor")
 			constructor.SetType(ssa.NewFunctionType(blueprint.Name+"-constructor", []ssa.Type{blueprint}, blueprint, true))
 			blueprint.Constructor = constructor
-			blueprint.MagicMethod[ssa.Constructor] = constructor
+			blueprint.MagicMethod.Set(ssa.Constructor, constructor)
 		}
 	}
 }

@@ -51,8 +51,10 @@ func TestBlueprintAddParentKeepsHistoricalParentEffectiveMagicMethods(t *testing
 
 	require.Equal(t, parentConstructor.GetId(), child.Constructor.GetId())
 	require.Equal(t, parentDestructor.GetId(), child.Destructor.GetId())
-	require.Equal(t, childConstructor.GetId(), child.MagicMethod[Constructor].GetId())
-	require.Equal(t, childDestructor.GetId(), child.MagicMethod[Destructor].GetId())
+	childCtor, _ := child.MagicMethod.Get(Constructor)
+	childDtor, _ := child.MagicMethod.Get(Destructor)
+	require.Equal(t, childConstructor.GetId(), childCtor.GetId())
+	require.Equal(t, childDestructor.GetId(), childDtor.GetId())
 	require.Equal(t, childConstructor.GetId(), parentConstructor.GetReference().GetId())
 	require.Equal(t, childDestructor.GetId(), parentDestructor.GetReference().GetId())
 	require.Contains(t, childConstructor.GetPointer(), Value(parentConstructor))
@@ -84,12 +86,13 @@ func TestBlueprintAddParentReplacesUndefinedMagicPlaceholder(t *testing.T) {
 	parent.RegisterMagicMethod(Constructor, parentConstructor)
 	placeholder := builder.EmitUndefined("child-constructor-placeholder")
 	child.Constructor = placeholder
-	child.MagicMethod[Constructor] = placeholder
+	child.MagicMethod.Set(Constructor, placeholder)
 
 	child.AddParentBlueprint(parent)
 
 	require.Equal(t, parentConstructor.GetId(), child.Constructor.GetId())
-	require.Equal(t, placeholder.GetId(), child.MagicMethod[Constructor].GetId())
+	got, _ := child.MagicMethod.Get(Constructor)
+	require.Equal(t, placeholder.GetId(), got.GetId())
 	require.Equal(t, placeholder.GetId(), parentConstructor.GetReference().GetId())
 }
 
@@ -102,14 +105,15 @@ func TestBlueprintAddParentUsesParentEffectiveMagicAfterChildPlaceholder(t *test
 	parent.RegisterMagicMethod(Constructor, parentConstructor)
 	placeholder := builder.EmitUndefined("child-constructor-placeholder")
 	child.Constructor = placeholder
-	child.MagicMethod[Constructor] = placeholder
+	child.MagicMethod.Set(Constructor, placeholder)
 	childConstructor := builder.NewFunc("child-constructor")
 	child.RegisterMagicMethod(Constructor, childConstructor)
 
 	child.AddParentBlueprint(parent)
 
 	require.Equal(t, parentConstructor.GetId(), child.Constructor.GetId())
-	require.Equal(t, placeholder.GetId(), child.MagicMethod[Constructor].GetId())
+	got, _ := child.MagicMethod.Get(Constructor)
+	require.Equal(t, placeholder.GetId(), got.GetId())
 	require.Equal(t, placeholder.GetId(), childConstructor.GetReference().GetId())
 	require.Equal(t, placeholder.GetId(), parentConstructor.GetReference().GetId())
 	require.Contains(t, placeholder.GetPointer(), Value(childConstructor))
@@ -128,7 +132,8 @@ func TestBlueprintMagicRegisteredAfterParentBecomesEffective(t *testing.T) {
 	child.RegisterMagicMethod(Constructor, childConstructor)
 
 	require.Equal(t, childConstructor.GetId(), child.Constructor.GetId())
-	require.Equal(t, parentConstructor.GetId(), child.MagicMethod[Constructor].GetId())
+	got, _ := child.MagicMethod.Get(Constructor)
+	require.Equal(t, parentConstructor.GetId(), got.GetId())
 	require.Equal(t, parentConstructor.GetId(), childConstructor.GetReference().GetId())
 	require.Contains(t, parentConstructor.GetPointer(), Value(childConstructor))
 }
@@ -158,10 +163,11 @@ func TestBlueprintRegisterMagicMethodGuardsNilSelfAndDuplicatePointers(t *testin
 		class.RegisterMagicMethod(Constructor, nil)
 	})
 
-	class.MagicMethod[Constructor] = nil
+	class.MagicMethod.Set(Constructor, nil)
 	class.RegisterMagicMethod(Constructor, method)
 	require.Equal(t, method.GetId(), class.Constructor.GetId())
-	require.Equal(t, method.GetId(), class.MagicMethod[Constructor].GetId())
+	got, _ := class.MagicMethod.Get(Constructor)
+	require.Equal(t, method.GetId(), got.GetId())
 
 	class.RegisterMagicMethod(Constructor, method)
 	require.Nil(t, method.GetReference(), "registering the same function must not create a self-reference")
@@ -185,7 +191,7 @@ func TestBlueprintAddParentInheritsConcreteMagicThroughPlaceholderParent(t *test
 	for _, blueprint := range []*Blueprint{child, grandchild} {
 		placeholder := builder.EmitUndefined(blueprint.Name + "-constructor-placeholder")
 		blueprint.Constructor = placeholder
-		blueprint.MagicMethod[Constructor] = placeholder
+		blueprint.MagicMethod.Set(Constructor, placeholder)
 	}
 
 	child.AddParentBlueprint(base)
