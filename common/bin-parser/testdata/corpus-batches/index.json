@@ -113021,6 +113021,117 @@
         "common/pcapx/pcaputil/dlms-hdlc-set-block-information-segments/terminal-response-information-cap10.tcp.pcap": "dlms-hdlc-set-block-information-segments/terminal-response-information-cap11.tcp.pcap",
         "scripts/protocol-tests/required-tests-traffic-unified-v143.json": "required-tests-traffic-unified-v143.json"
       }
+    },
+    {
+      "id": "validation-dlms-hdlc-action-upload-foreign-get-owner",
+      "kind": "support",
+      "source_sha": "af12fbd09f746581427a38e3ba0c88910debe5f2",
+      "file": "validation-dlms-hdlc-action-upload-foreign-get-owner.zip",
+      "sha256": "faffb9001e8885c33322fb2011728cf491dff950b572b3f4742b97d374d29f78",
+      "password": "bin-parser",
+      "members": {
+        "dlms-hdlc-action-upload-foreign-get-owner-tools/SOURCES.json": {
+          "bytes": 3928,
+          "sha256": "b9c833cc90bfe5df28d18eeb1030dafca6ef36654963c5a7efaa1ba4d757d57b"
+        },
+        "dlms-hdlc-action-upload-foreign-get-owner-tools/action-grammar.py": {
+          "bytes": 5005,
+          "sha256": "e091f7d411f54d21bcb2a738627a624b7076bbb41b0794e8daf7c9fa16d90cd1"
+        },
+        "dlms-hdlc-action-upload-foreign-get-owner-tools/data-model.py": {
+          "bytes": 1624,
+          "sha256": "03dbaaa0f3c564db04440c0fbee8742e407f825de889b7a6e0012a49e6a06f4e"
+        },
+        "dlms-hdlc-action-upload-foreign-get-owner-tools/generate-captures.py": {
+          "bytes": 1884,
+          "sha256": "5a30df10399bf5760f5199465c698395804e805504dac5862cc4c7ed725a480a"
+        },
+        "dlms-hdlc-action-upload-foreign-get-owner-tools/generate-direction-gate.py": {
+          "bytes": 1974,
+          "sha256": "2e8bfc729f0ddb13eb5aa3d307fb4b14e738b018e4fa0e8a2ed329ebd10e3030"
+        },
+        "dlms-hdlc-action-upload-foreign-get-owner-tools/generate.py": {
+          "bytes": 6513,
+          "sha256": "523c729adc65801216f0f6e6fdaa9b7260fab254570790a2512884c0120b253a"
+        },
+        "dlms-hdlc-action-upload-foreign-get-owner-tools/reference-vectors.json": {
+          "bytes": 565,
+          "sha256": "4352c9f57d42483b6b5df3dc48f943907604b2641c477c022199bb50cad75577"
+        },
+        "dlms-hdlc-action-upload-foreign-get-owner-tools/verify-captures.py": {
+          "bytes": 3562,
+          "sha256": "1ecaa9a744d20cc164dcfb1519f9f31be32a6e1dc23a7416c9d4aabf5f3939f0"
+        },
+        "dlms-hdlc-action-upload-foreign-get-owner-tools/verify-direction-gate.py": {
+          "bytes": 2975,
+          "sha256": "035d09f1d75a6b7e97f8befe94f8f304d18b1813a6c37ad785f6a324331fe684"
+        },
+        "dlms-hdlc-action-upload-foreign-get-owner-tools/verify.py": {
+          "bytes": 4929,
+          "sha256": "f8a62594ab172cfc3522287825048101e78b560d78a69ec11f63bf7811d12cc4"
+        },
+        "dlms-hdlc-action-upload-foreign-get-owner/Action-upload-complete-ACK-normal-neighbor.tcp.pcap": {
+          "bytes": 822,
+          "sha256": "50c982382320d7d98bcaeb3d38671c40f85362ff032c968a655e248a68d155d9"
+        },
+        "dlms-hdlc-action-upload-foreign-get-owner/Action-upload-complete-ACK-normal-neighbor.udp.pcap": {
+          "bytes": 540,
+          "sha256": "24db660b6c1b5133a99b1bf40966956484a8a42f1ea2dbff227f2f06e4b1981c"
+        },
+        "dlms-hdlc-action-upload-foreign-get-owner/Action-upload-foreign-GET-M1-same-direction-retires.tcp.pcap": {
+          "bytes": 624,
+          "sha256": "c19f22dbf04e04b4f135e632b5baee9152acc716c149c64fb105dc82d1aa49cd"
+        },
+        "dlms-hdlc-action-upload-foreign-get-owner/Action-upload-foreign-GET-M1-same-direction-retires.udp.pcap": {
+          "bytes": 366,
+          "sha256": "446b55c389f30dae5a4cda27f4c4900fc7659bb260c33e385356b8f3a9d44305"
+        },
+        "dlms-hdlc-action-upload-foreign-get-owner/Action-upload-knownowner-foreign-GET-M1-preserve.tcp.pcap": {
+          "bytes": 909,
+          "sha256": "04ef593f892c73b8c5b78c9753fba8bdfd2b264792d036a6b959f93e2c65fc17"
+        },
+        "dlms-hdlc-action-upload-foreign-get-owner/Action-upload-knownowner-foreign-GET-M1-preserve.udp.pcap": {
+          "bytes": 615,
+          "sha256": "602a33bfe35be422c29d1e0262d753ac624e6b9be1d5d9dce2b197e61875aa5d"
+        },
+        "dlms-hdlc-action-upload-foreign-get-owner/controls.json": {
+          "bytes": 126442,
+          "sha256": "b6a390ee725a42f13a4c448541ffb03467444d2d98958f9cb9a4665bbd154928"
+        },
+        "dlms-hdlc-action-upload-foreign-get-owner/reuse-inputs.json": {
+          "bytes": 3,
+          "sha256": "ca3d163bab055381827226140568f3bef7eaac187cebd76878e0b63e9e442356"
+        },
+        "required-tests-traffic-unified-v144.json": {
+          "bytes": 25087273,
+          "sha256": "f1c78caa3c4dff9e460d086be5d563f207988eca081fcfdfb70c5ee019c8e5c6"
+        },
+        "validation/expected.json": {
+          "bytes": 8246,
+          "sha256": "a13f46f804ec0bb076e5a1ac50fc91ef7a6343e5e0c62f3254af335bed667814"
+        }
+      },
+      "aliases": {
+        "common/pcapx/pcaputil/dlms-hdlc-action-upload-foreign-get-owner-tools/SOURCES.json": "dlms-hdlc-action-upload-foreign-get-owner-tools/SOURCES.json",
+        "common/pcapx/pcaputil/dlms-hdlc-action-upload-foreign-get-owner-tools/action-grammar.py": "dlms-hdlc-action-upload-foreign-get-owner-tools/action-grammar.py",
+        "common/pcapx/pcaputil/dlms-hdlc-action-upload-foreign-get-owner-tools/data-model.py": "dlms-hdlc-action-upload-foreign-get-owner-tools/data-model.py",
+        "common/pcapx/pcaputil/dlms-hdlc-action-upload-foreign-get-owner-tools/generate-captures.py": "dlms-hdlc-action-upload-foreign-get-owner-tools/generate-captures.py",
+        "common/pcapx/pcaputil/dlms-hdlc-action-upload-foreign-get-owner-tools/generate-direction-gate.py": "dlms-hdlc-action-upload-foreign-get-owner-tools/generate-direction-gate.py",
+        "common/pcapx/pcaputil/dlms-hdlc-action-upload-foreign-get-owner-tools/generate.py": "dlms-hdlc-action-upload-foreign-get-owner-tools/generate.py",
+        "common/pcapx/pcaputil/dlms-hdlc-action-upload-foreign-get-owner-tools/reference-vectors.json": "dlms-hdlc-action-upload-foreign-get-owner-tools/reference-vectors.json",
+        "common/pcapx/pcaputil/dlms-hdlc-action-upload-foreign-get-owner-tools/verify-captures.py": "dlms-hdlc-action-upload-foreign-get-owner-tools/verify-captures.py",
+        "common/pcapx/pcaputil/dlms-hdlc-action-upload-foreign-get-owner-tools/verify-direction-gate.py": "dlms-hdlc-action-upload-foreign-get-owner-tools/verify-direction-gate.py",
+        "common/pcapx/pcaputil/dlms-hdlc-action-upload-foreign-get-owner-tools/verify.py": "dlms-hdlc-action-upload-foreign-get-owner-tools/verify.py",
+        "common/pcapx/pcaputil/dlms-hdlc-action-upload-foreign-get-owner/Action-upload-complete-ACK-normal-neighbor.tcp.pcap": "dlms-hdlc-action-upload-foreign-get-owner/Action-upload-complete-ACK-normal-neighbor.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-action-upload-foreign-get-owner/Action-upload-complete-ACK-normal-neighbor.udp.pcap": "dlms-hdlc-action-upload-foreign-get-owner/Action-upload-complete-ACK-normal-neighbor.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-action-upload-foreign-get-owner/Action-upload-foreign-GET-M1-same-direction-retires.tcp.pcap": "dlms-hdlc-action-upload-foreign-get-owner/Action-upload-foreign-GET-M1-same-direction-retires.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-action-upload-foreign-get-owner/Action-upload-foreign-GET-M1-same-direction-retires.udp.pcap": "dlms-hdlc-action-upload-foreign-get-owner/Action-upload-foreign-GET-M1-same-direction-retires.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-action-upload-foreign-get-owner/Action-upload-knownowner-foreign-GET-M1-preserve.tcp.pcap": "dlms-hdlc-action-upload-foreign-get-owner/Action-upload-knownowner-foreign-GET-M1-preserve.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-action-upload-foreign-get-owner/Action-upload-knownowner-foreign-GET-M1-preserve.udp.pcap": "dlms-hdlc-action-upload-foreign-get-owner/Action-upload-knownowner-foreign-GET-M1-preserve.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-action-upload-foreign-get-owner/controls.json": "dlms-hdlc-action-upload-foreign-get-owner/controls.json",
+        "common/pcapx/pcaputil/dlms-hdlc-action-upload-foreign-get-owner/reuse-inputs.json": "dlms-hdlc-action-upload-foreign-get-owner/reuse-inputs.json",
+        "scripts/protocol-tests/required-tests-traffic-unified-v144.json": "required-tests-traffic-unified-v144.json"
+      }
     }
   ],
   "schema_version": 1,

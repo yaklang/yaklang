@@ -786,6 +786,15 @@ func (f *binFlow) consumeDecodedDLMS(dir int, w []byte, id uint64, m *dlmsMessag
 		s.invalidate()
 		return nil, 0, dlmsError(ErrContextRequired, "distinct request interrupts observed SET data-block transfer")
 	}
+	// A complete foreign GET response header cannot belong to the retained
+	// Action upload. Exclude it before retiring an unsupported I-frame chain;
+	// neither accept its body nor change the Action prefix or reply owner.
+	if s.actionTransfer != nil && s.fragments == nil && m.kind == "I" {
+		p, info := s.pending, m.information
+		if p != nil && p.kind == "ACTION" && p.choice == 4 && dir != p.dir && m.source == p.destination && m.destination == p.source && len(info) >= 6 && bytes.Equal(info[:4], []byte{0xe6, 0xe7, 0, 0xc4}) && info[4] >= 1 && info[4] <= 3 && info[5]&0x30 == 0 {
+			return nil, 0, dlmsError(ErrContextRequired, "segmented GET response differs from pending Action upload")
+		}
+	}
 	if s.actionTransfer != nil && (m.kind == "I" || m.request && dlmsSequencedService(m.kind) && !(m.block != nil && m.block.actionUpload)) {
 		s.invalidate()
 		return nil, 0, dlmsError(ErrContextRequired, "distinct request interrupts observed Action pblock transfer")
