@@ -114379,6 +114379,162 @@
         "common/pcapx/pcaputil/dlms-hdlc-action-upload-request-segments/reuse-inputs.json": "dlms-hdlc-action-upload-request-segments/reuse-inputs.json",
         "scripts/protocol-tests/required-tests-traffic-unified-v150.json": "required-tests-traffic-unified-v150.json"
       }
+    },
+    {
+      "id": "validation-dlms-hdlc-action-upload-response-segments",
+      "kind": "support",
+      "source_sha": "109e6ee6d4e725e8ad62c679228f8c9d9e0f4509",
+      "file": "validation-dlms-hdlc-action-upload-response-segments.zip",
+      "sha256": "d5492deb0889309fbf239134c4ac7cfb80b45066c8b3bd37c7883c1d3e57947e",
+      "password": "bin-parser",
+      "members": {
+        "dlms-hdlc-action-upload-response-segments-tools/SOURCES.json": {
+          "bytes": 3482,
+          "sha256": "b96fc1454db1a1d49abc39f4ab8dba2ff35a417bb062e3a078d1549f82031cf1"
+        },
+        "dlms-hdlc-action-upload-response-segments-tools/action-grammar.py": {
+          "bytes": 5139,
+          "sha256": "b9abe4cc370f154324ba9a4360ac02a42ac6b491968b9228c10a256aa6d5a575"
+        },
+        "dlms-hdlc-action-upload-response-segments-tools/data-model.py": {
+          "bytes": 1624,
+          "sha256": "03dbaaa0f3c564db04440c0fbee8742e407f825de889b7a6e0012a49e6a06f4e"
+        },
+        "dlms-hdlc-action-upload-response-segments-tools/generate-baseline.py": {
+          "bytes": 540,
+          "sha256": "09b6652859179c12c735ab2985a3dde0fe6da90794ce77c6e516104d8c321f00"
+        },
+        "dlms-hdlc-action-upload-response-segments-tools/generate-captures.py": {
+          "bytes": 1884,
+          "sha256": "81ed66033f32f2faade2f001fde5f1bf22dd5ee980939169291f60dd7a39e1df"
+        },
+        "dlms-hdlc-action-upload-response-segments-tools/generate.py": {
+          "bytes": 12494,
+          "sha256": "a475d992ae22d01406b46ea3c2e5e15b20e381f9adcb162b96246b485e5d757c"
+        },
+        "dlms-hdlc-action-upload-response-segments-tools/rebuild.py": {
+          "bytes": 338,
+          "sha256": "6bb9a5ddf102407bd46fa929d8b0312d91a7f51a1885d319f26e2facb8e8b21c"
+        },
+        "dlms-hdlc-action-upload-response-segments-tools/reference-vectors.json": {
+          "bytes": 110579,
+          "sha256": "3c29c7209fa3975cf760632ce3b77a4207d22d69308dd3123e649067c12da827"
+        },
+        "dlms-hdlc-action-upload-response-segments-tools/verify-captures.py": {
+          "bytes": 3659,
+          "sha256": "9840c6e18cad2c77e1a9ff007037e5d42ae54f9cd939137efca0b5e775933ff2"
+        },
+        "dlms-hdlc-action-upload-response-segments-tools/verify.py": {
+          "bytes": 5432,
+          "sha256": "53169cf52f9550a01061a1b1d30c7a50133bfc1424f4ac08715077fde0650df5"
+        },
+        "dlms-hdlc-action-upload-response-segments/ACK4-information-cap9-Resource-clears-both-layers.tcp.pcap": {
+          "bytes": 981,
+          "sha256": "81cc5572945253cc3576439a35028684523505c0f9b0587e92443976e989a111"
+        },
+        "dlms-hdlc-action-upload-response-segments/ACK4-information-cap9-Resource-clears-both-layers.udp.pcap": {
+          "bytes": 675,
+          "sha256": "790724ea7fece515d723519b9d26cf56a54aa1757d12fcd1721d145e1b7a65ca"
+        },
+        "dlms-hdlc-action-upload-response-segments/ACK4-segmented-cap10-prefix-retry-and-completed-tail-repeat.tcp.pcap": {
+          "bytes": 1062,
+          "sha256": "d92ae710d458b4174944fc9adea99bee4fb0f5a6260e9d7b21de334b83e66882"
+        },
+        "dlms-hdlc-action-upload-response-segments/ACK4-segmented-cap10-prefix-retry-and-completed-tail-repeat.udp.pcap": {
+          "bytes": 744,
+          "sha256": "c8bf6d2a3cb1d18d49e0b1fb927b054bbebd7ee8168edee9307eb6fc5e6cfa22"
+        },
+        "dlms-hdlc-action-upload-response-segments/baseline-controls.json": {
+          "bytes": 197648,
+          "sha256": "311083dd24e1af9d8ae40b9c976def6e61e9e7e4c8725ad5977649e8ed70bc63"
+        },
+        "dlms-hdlc-action-upload-response-segments/changed-same-NS-response-prefix-repeat-retires.tcp.pcap": {
+          "bytes": 900,
+          "sha256": "ba757feb2858f497e5a2cccfb2cbd2cf4c856dda540f3b4b13cf073de979f9d7"
+        },
+        "dlms-hdlc-action-upload-response-segments/changed-same-NS-response-prefix-repeat-retires.udp.pcap": {
+          "bytes": 606,
+          "sha256": "02c92a2813763998128e10ffe6659d14d891ac47add01188bc45a49a5a440862"
+        },
+        "dlms-hdlc-action-upload-response-segments/controls.json": {
+          "bytes": 402810,
+          "sha256": "61bb64065b60e2a69d2a600328ae2935d8211edf3d359005f246e6972836291e"
+        },
+        "dlms-hdlc-action-upload-response-segments/initial-and-continuation-link-flags-guards-preserve-real-owner.tcp.pcap": {
+          "bytes": 1602,
+          "sha256": "723db09e34e517b7cbad991081d79dc183826ffb38c5cd788081a3f67eedb37a"
+        },
+        "dlms-hdlc-action-upload-response-segments/initial-and-continuation-link-flags-guards-preserve-real-owner.udp.pcap": {
+          "bytes": 1212,
+          "sha256": "65549454f0235ac3c37ac4ed2307debf9b41d9d16b1fa04e8c4790896c65016c"
+        },
+        "dlms-hdlc-action-upload-response-segments/matching-response-continuation-NS-gap-retires.tcp.pcap": {
+          "bytes": 896,
+          "sha256": "c6081d9f94682ed5c99c9ff29cf662f0835b7454be0d34078db05bb85f8680a8"
+        },
+        "dlms-hdlc-action-upload-response-segments/matching-response-continuation-NS-gap-retires.udp.pcap": {
+          "bytes": 602,
+          "sha256": "33aae8b60d4050a942b3a87c181d36bbe544e2471def6c317d4021a4216d8333"
+        },
+        "dlms-hdlc-action-upload-response-segments/normalterminal1-returnG-segmented-prefix-exact-retry.tcp.pcap": {
+          "bytes": 998,
+          "sha256": "e914d25b39150d74a69fd9dcfe5136f70bd2e3e6fb50a1a270c7f2bb3c5d639a"
+        },
+        "dlms-hdlc-action-upload-response-segments/normalterminal1-returnG-segmented-prefix-exact-retry.udp.pcap": {
+          "bytes": 692,
+          "sha256": "15eb3ab09702937ecbf6768c313701aab2c4aaa2bdccb0393e32840218ba8d79"
+        },
+        "dlms-hdlc-action-upload-response-segments/reuse-inputs.json": {
+          "bytes": 251,
+          "sha256": "05a93fe72c8a550a9e2a1ba765416c91a23a779103221e5a8e13ad6246b72b25"
+        },
+        "dlms-hdlc-action-upload-response-segments/terminal-prefix-Close-uses-request-direction-and-three-counters.tcp.pcap": {
+          "bytes": 821,
+          "sha256": "5de61d72ef01a603e8bca27bceb00f4ee3e2b36543ad580b4b6d8252e0e3306f"
+        },
+        "dlms-hdlc-action-upload-response-segments/terminal-prefix-Close-uses-request-direction-and-three-counters.udp.pcap": {
+          "bytes": 539,
+          "sha256": "0b37b3fc850451f0a28f9347ef46f2e67baa805d29f95e999d7570dec0b23017"
+        },
+        "required-tests-traffic-unified-v151.json": {
+          "bytes": 25896216,
+          "sha256": "ff77343dd497e517bfd894748fe6d935af90c83d37b349124c4ef35107ff99cb"
+        },
+        "validation/expected.json": {
+          "bytes": 20757,
+          "sha256": "36030462763f7954bcabeab285e14babf71ea31d98512bbc758285b44a5f01bb"
+        }
+      },
+      "aliases": {
+        "common/pcapx/pcaputil/dlms-hdlc-action-upload-response-segments-tools/SOURCES.json": "dlms-hdlc-action-upload-response-segments-tools/SOURCES.json",
+        "common/pcapx/pcaputil/dlms-hdlc-action-upload-response-segments-tools/action-grammar.py": "dlms-hdlc-action-upload-response-segments-tools/action-grammar.py",
+        "common/pcapx/pcaputil/dlms-hdlc-action-upload-response-segments-tools/data-model.py": "dlms-hdlc-action-upload-response-segments-tools/data-model.py",
+        "common/pcapx/pcaputil/dlms-hdlc-action-upload-response-segments-tools/generate-baseline.py": "dlms-hdlc-action-upload-response-segments-tools/generate-baseline.py",
+        "common/pcapx/pcaputil/dlms-hdlc-action-upload-response-segments-tools/generate-captures.py": "dlms-hdlc-action-upload-response-segments-tools/generate-captures.py",
+        "common/pcapx/pcaputil/dlms-hdlc-action-upload-response-segments-tools/generate.py": "dlms-hdlc-action-upload-response-segments-tools/generate.py",
+        "common/pcapx/pcaputil/dlms-hdlc-action-upload-response-segments-tools/rebuild.py": "dlms-hdlc-action-upload-response-segments-tools/rebuild.py",
+        "common/pcapx/pcaputil/dlms-hdlc-action-upload-response-segments-tools/reference-vectors.json": "dlms-hdlc-action-upload-response-segments-tools/reference-vectors.json",
+        "common/pcapx/pcaputil/dlms-hdlc-action-upload-response-segments-tools/verify-captures.py": "dlms-hdlc-action-upload-response-segments-tools/verify-captures.py",
+        "common/pcapx/pcaputil/dlms-hdlc-action-upload-response-segments-tools/verify.py": "dlms-hdlc-action-upload-response-segments-tools/verify.py",
+        "common/pcapx/pcaputil/dlms-hdlc-action-upload-response-segments/ACK4-information-cap9-Resource-clears-both-layers.tcp.pcap": "dlms-hdlc-action-upload-response-segments/ACK4-information-cap9-Resource-clears-both-layers.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-action-upload-response-segments/ACK4-information-cap9-Resource-clears-both-layers.udp.pcap": "dlms-hdlc-action-upload-response-segments/ACK4-information-cap9-Resource-clears-both-layers.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-action-upload-response-segments/ACK4-segmented-cap10-prefix-retry-and-completed-tail-repeat.tcp.pcap": "dlms-hdlc-action-upload-response-segments/ACK4-segmented-cap10-prefix-retry-and-completed-tail-repeat.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-action-upload-response-segments/ACK4-segmented-cap10-prefix-retry-and-completed-tail-repeat.udp.pcap": "dlms-hdlc-action-upload-response-segments/ACK4-segmented-cap10-prefix-retry-and-completed-tail-repeat.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-action-upload-response-segments/baseline-controls.json": "dlms-hdlc-action-upload-response-segments/baseline-controls.json",
+        "common/pcapx/pcaputil/dlms-hdlc-action-upload-response-segments/changed-same-NS-response-prefix-repeat-retires.tcp.pcap": "dlms-hdlc-action-upload-response-segments/changed-same-NS-response-prefix-repeat-retires.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-action-upload-response-segments/changed-same-NS-response-prefix-repeat-retires.udp.pcap": "dlms-hdlc-action-upload-response-segments/changed-same-NS-response-prefix-repeat-retires.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-action-upload-response-segments/controls.json": "dlms-hdlc-action-upload-response-segments/controls.json",
+        "common/pcapx/pcaputil/dlms-hdlc-action-upload-response-segments/initial-and-continuation-link-flags-guards-preserve-real-owner.tcp.pcap": "dlms-hdlc-action-upload-response-segments/initial-and-continuation-link-flags-guards-preserve-real-owner.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-action-upload-response-segments/initial-and-continuation-link-flags-guards-preserve-real-owner.udp.pcap": "dlms-hdlc-action-upload-response-segments/initial-and-continuation-link-flags-guards-preserve-real-owner.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-action-upload-response-segments/matching-response-continuation-NS-gap-retires.tcp.pcap": "dlms-hdlc-action-upload-response-segments/matching-response-continuation-NS-gap-retires.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-action-upload-response-segments/matching-response-continuation-NS-gap-retires.udp.pcap": "dlms-hdlc-action-upload-response-segments/matching-response-continuation-NS-gap-retires.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-action-upload-response-segments/normalterminal1-returnG-segmented-prefix-exact-retry.tcp.pcap": "dlms-hdlc-action-upload-response-segments/normalterminal1-returnG-segmented-prefix-exact-retry.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-action-upload-response-segments/normalterminal1-returnG-segmented-prefix-exact-retry.udp.pcap": "dlms-hdlc-action-upload-response-segments/normalterminal1-returnG-segmented-prefix-exact-retry.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-action-upload-response-segments/reuse-inputs.json": "dlms-hdlc-action-upload-response-segments/reuse-inputs.json",
+        "common/pcapx/pcaputil/dlms-hdlc-action-upload-response-segments/terminal-prefix-Close-uses-request-direction-and-three-counters.tcp.pcap": "dlms-hdlc-action-upload-response-segments/terminal-prefix-Close-uses-request-direction-and-three-counters.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-action-upload-response-segments/terminal-prefix-Close-uses-request-direction-and-three-counters.udp.pcap": "dlms-hdlc-action-upload-response-segments/terminal-prefix-Close-uses-request-direction-and-three-counters.udp.pcap",
+        "scripts/protocol-tests/required-tests-traffic-unified-v151.json": "required-tests-traffic-unified-v151.json"
+      }
     }
   ],
   "schema_version": 1,

@@ -763,6 +763,9 @@ func (f *binFlow) consumeDecodedDLMS(dir int, w []byte, id uint64, m *dlmsMessag
 	if m.kind == "I" && (s.fragments != nil && s.fragments.actionRequestChoice != 0 || s.fragments == nil && dlmsActionRequestSegmentPrefix(m.information) && (m.information[4] == 4 || s.actionTransfer != nil && s.actionTransfer.initial.choice == 4)) {
 		return f.consumeDLMSActionRequestSegments(dir, w, id, m)
 	}
+	if m.kind == "I" && (s.fragments != nil && s.fragments.actionResponseChoice != 0 || s.fragments == nil && s.pending != nil && s.pending.kind == "ACTION" && s.pending.choice == 4 && s.actionTransfer != nil && len(m.information) >= 6 && bytes.Equal(m.information[:4], []byte{0xe6, 0xe7, 0, 0xc7}) && (m.information[4] == 1 || m.information[4] == 4)) {
+		return f.consumeDLMSActionResponseSegments(dir, w, id, m)
+	}
 	if m.kind == "I" && (s.fragments != nil && s.fragments.setRequestChoice != 0 || s.fragments == nil && dlmsSetRequestSegmentPrefix(m.information) && (m.information[4] == 2 || m.information[4] == 5 || s.setTransfer != nil && (s.setTransfer.initial.choice == 2 || s.setTransfer.initial.choice == 5))) {
 		return f.consumeDLMSSetRequestSegments(dir, w, id, m)
 	}
@@ -921,6 +924,7 @@ func (a *binParser) decodeDLMSDatagram(e *ProtocolEvent, w []byte, explicit bool
 		store.lru.MoveToBack(el)
 	}
 	operationSegment := f.dlmsOperationSegmentObservation(w)
+	actionResponseSegment := f.dlmsActionResponseSegmentObservation(w, e.Direction)
 	actionRequestSegment := f.dlmsActionRequestSegmentObservation(w, e.Direction)
 	setRequestSegment := f.dlmsSetRequestSegmentObservation(w, e.Direction)
 	setResponseSegment := f.dlmsSetResponseSegmentObservation(w, e.Direction)
@@ -1016,6 +1020,9 @@ func (a *binParser) decodeDLMSDatagram(e *ProtocolEvent, w []byte, explicit bool
 	}
 	if actionRequestSegment != "" {
 		e.Profile = actionRequestSegment
+	}
+	if actionResponseSegment != "" {
+		e.Profile = actionResponseSegment
 	}
 	if setResponseSegment != "" {
 		e.Profile = setResponseSegment

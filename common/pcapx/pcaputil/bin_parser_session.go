@@ -859,6 +859,7 @@ func (f *binFlow) consumeSession(dir int, e *ProtocolEvent, result map[string]an
 			e.ID = f.a.ids.Add(1)
 		}
 		operationSegment := f.dlmsOperationSegmentObservation(e.Raw)
+		actionResponseSegment := f.dlmsActionResponseSegmentObservation(e.Raw, dir)
 		actionRequestSegment := f.dlmsActionRequestSegmentObservation(e.Raw, dir)
 		setRequestSegment := f.dlmsSetRequestSegmentObservation(e.Raw, dir)
 		setResponseSegment := f.dlmsSetResponseSegmentObservation(e.Raw, dir)
@@ -883,6 +884,9 @@ func (f *binFlow) consumeSession(dir int, e *ProtocolEvent, result map[string]an
 		}
 		if actionRequestSegment != "" {
 			e.Profile = actionRequestSegment
+		}
+		if actionResponseSegment != "" {
+			e.Profile = actionResponseSegment
 		}
 		if setResponseSegment != "" {
 			e.Profile = setResponseSegment
