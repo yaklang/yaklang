@@ -74,9 +74,29 @@ func TestTypePersistenceParallelEncodingMatchesSerial(t *testing.T) {
 		typ.AddFullTypeName("pkg.Function")
 		snapshots[i] = snapshotTypePersistence(typ)
 	}
-	serial := marshalTypeSnapshots("p", snapshots, 1)
-	parallel := marshalTypeSnapshots("p", snapshots, 31)
+	serial := marshalTypeSnapshots("p", snapshots, nil, 1)
+	parallel := marshalTypeSnapshots("p", snapshots, nil, 31)
 	require.Equal(t, serial, parallel)
+}
+
+func TestTypePersistenceSharedPayloadKeepsDistinctIDs(t *testing.T) {
+	shared := typePersistenceSnapshot{id: 7, shape: typePersistenceNamed, kind: 3, name: "T", text: "T", fullNames: []string{"pkg.T"}}
+	twin := shared
+	twin.id = 8
+	different := shared
+	different.id = 9
+	different.name = "U"
+	different.text = "U"
+	rows := marshalTypeSnapshots("p", []typePersistenceSnapshot{shared, twin, different}, nil, 4)
+	require.Equal(t, []uint64{7, 8, 9}, []uint64{rows[0].TypeId, rows[1].TypeId, rows[2].TypeId})
+	require.Equal(t, rows[0].ExtraInformation, rows[1].ExtraInformation)
+	require.Equal(t, rows[0].String, rows[1].String)
+	require.Equal(t, rows[0].Kind, rows[1].Kind)
+	require.Equal(t, "U", rows[2].String)
+	require.NotEqual(t, rows[0].ExtraInformation, rows[2].ExtraInformation)
+	require.NotSame(t, rows[0], rows[1])
+	rows[0].ExtraInformation = "mutated"
+	require.NotEqual(t, "mutated", rows[1].ExtraInformation)
 }
 
 func TestTypePersistenceFingerprintDistinguishesFields(t *testing.T) {

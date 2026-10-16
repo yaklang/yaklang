@@ -121,40 +121,67 @@ func (s typePersistenceSnapshot) writeTo(ir *ssadb.IrType) {
 	irTypeJSONBufPool.Put(buf)
 }
 
-func marshalTypeSnapshots(program string, snapshots []typePersistenceSnapshot, concurrency int) []*ssadb.IrType {
+func marshalTypeSnapshots(program string, snapshots []typePersistenceSnapshot, fingerprints [][sha256.Size]byte, concurrency int) []*ssadb.IrType {
 	rows := make([]*ssadb.IrType, len(snapshots))
+	if len(snapshots) == 0 {
+		return rows
+	}
+	if len(fingerprints) != len(snapshots) {
+		fingerprints = make([][sha256.Size]byte, len(snapshots))
+		for i := range snapshots {
+			fingerprints[i] = snapshots[i].fingerprint()
+		}
+	}
+	// Same persisted payload can belong to different Type IDs. Encode it once
+	// and copy the immutable strings. Do not alias the row structs or change IDs.
+	first := make(map[[sha256.Size]byte]int, len(snapshots))
+	unique := make([]int, 0, len(snapshots))
+	for i, fp := range fingerprints {
+		if _, ok := first[fp]; ok {
+			continue
+		}
+		first[fp] = i
+		unique = append(unique, i)
+	}
 	if concurrency <= 0 {
 		concurrency = ssaconfig.DefaultCPUConcurrency()
 	}
-	// Small updates do not benefit from launching workers. Large updates use
-	// the configured CPU budget, with no fixed eight-core cap. Only this save
-	// batch is materialized; SQLite writes remain on the caller goroutine.
-	workers := min(concurrency, (len(snapshots)+63)/64)
+	workers := min(concurrency, (len(unique)+63)/64)
 	encode := func(i int) {
 		rows[i] = ssadb.EmptyIrType(program, uint64(snapshots[i].id))
 		snapshots[i].writeTo(rows[i])
 	}
 	if workers <= 1 {
-		for i := range snapshots {
+		for _, i := range unique {
 			encode(i)
 		}
-		return rows
-	}
-	var next atomic.Int64
-	var wg sync.WaitGroup
-	wg.Add(workers)
-	for range workers {
-		go func() {
-			defer wg.Done()
-			for {
-				i := int(next.Add(1) - 1)
-				if i >= len(snapshots) {
-					return
+	} else {
+		var next atomic.Int64
+		var wg sync.WaitGroup
+		wg.Add(workers)
+		for range workers {
+			go func() {
+				defer wg.Done()
+				for {
+					n := int(next.Add(1) - 1)
+					if n >= len(unique) {
+						return
+					}
+					encode(unique[n])
 				}
-				encode(i)
-			}
-		}()
+			}()
+		}
+		wg.Wait()
 	}
-	wg.Wait()
+	for i, fp := range fingerprints {
+		src := first[fp]
+		if src == i {
+			continue
+		}
+		encoded := rows[src]
+		row := ssadb.EmptyIrType(program, uint64(snapshots[i].id))
+		row.Kind, row.String, row.ExtraInformation = encoded.Kind, encoded.String, encoded.ExtraInformation
+		rows[i] = row
+	}
 	return rows
 }
