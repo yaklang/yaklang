@@ -113132,6 +113132,172 @@
         "common/pcapx/pcaputil/dlms-hdlc-action-upload-foreign-get-owner/reuse-inputs.json": "dlms-hdlc-action-upload-foreign-get-owner/reuse-inputs.json",
         "scripts/protocol-tests/required-tests-traffic-unified-v144.json": "required-tests-traffic-unified-v144.json"
       }
+    },
+    {
+      "id": "validation-dlms-wrapper-close",
+      "kind": "support",
+      "source_sha": "2d8bc58a3ee639026e351b8c5b0fa01932ee1aee",
+      "file": "validation-dlms-wrapper-close.zip",
+      "sha256": "1495d5d7d0e61237e56aab52ab0f96b9f7352ff18f009102a418eb0048b862d8",
+      "password": "bin-parser",
+      "members": {
+        "dlms-wrapper-close-tools/GET-PENDING-CONTRACT.json": {
+          "bytes": 1857,
+          "sha256": "3c42e14d78f7e0b48d1321a2824308548c8d25053714dea0d4d678116147bc57"
+        },
+        "dlms-wrapper-close-tools/SOURCES.json": {
+          "bytes": 4145,
+          "sha256": "17fdcbfe00a552841ee72ba7b1a6839c034c88ec9576fce9dc9b7a0c0f72285f"
+        },
+        "dlms-wrapper-close-tools/close-upgrade-inputs.json": {
+          "bytes": 8512,
+          "sha256": "a7581cca9ba19c52fa42ff0ec59aa941bda12122c37e3ec4d19bc051cd6da17e"
+        },
+        "dlms-wrapper-close-tools/gbt_get_pending_close_test.go": {
+          "bytes": 6201,
+          "sha256": "aedd1304a39c5678adcc1adee443588b4fe9932a16c604811355a814243ba7e4"
+        },
+        "dlms-wrapper-close-tools/generate-captures.py": {
+          "bytes": 1848,
+          "sha256": "46e64e809665b3712a39cdcd7eab0742012f6a2e01285ed5c8cb3d26d6bebf55"
+        },
+        "dlms-wrapper-close-tools/generate-direction.py": {
+          "bytes": 1630,
+          "sha256": "82b1e067a2ca1490378cc5c7e01157d75e14a5e526a7f3f35ad2c3f2fdab914c"
+        },
+        "dlms-wrapper-close-tools/generate-get-pending.py": {
+          "bytes": 4627,
+          "sha256": "2529d7b97280500ac9a306178442eb7e13d2680c8d6fa56a0abcd76dbfef59f2"
+        },
+        "dlms-wrapper-close-tools/generate.py": {
+          "bytes": 5542,
+          "sha256": "bdbb85a33db6865c95929a1f6f258e8e2cab0f62015ca2ccad4b379acd3d1579"
+        },
+        "dlms-wrapper-close-tools/history-reference.json": {
+          "bytes": 3594,
+          "sha256": "55420233b74a18876a64ffa658076f5871c66886a6e843fb15d0eb8fee6c84a2"
+        },
+        "dlms-wrapper-close-tools/reference-vectors.json": {
+          "bytes": 8699,
+          "sha256": "29b71c06b06b94a507738bb43c1ebf847faf21646979565271f59a925999e8ac"
+        },
+        "dlms-wrapper-close-tools/resolve-history-metadata.py": {
+          "bytes": 2550,
+          "sha256": "52818cb4d35782ea996977bb8f20c211df96c6898ad445cbac4dafdad6e93f87"
+        },
+        "dlms-wrapper-close-tools/scan-get-close-history.py": {
+          "bytes": 5421,
+          "sha256": "1b82abf2f1659c0de7b86352051fb8d945ac57a5a4503deecc8d092c1ad054ba"
+        },
+        "dlms-wrapper-close-tools/verify-captures.py": {
+          "bytes": 3183,
+          "sha256": "72956a80897981a298542adb917f6229aa68eb98c0b614fd8f259faec367db97"
+        },
+        "dlms-wrapper-close-tools/verify-get-pending.py": {
+          "bytes": 3548,
+          "sha256": "33b6a0b30b60e91bb23b9f55bbfb488aa3e33e57a2a0736612550871d607aa8a"
+        },
+        "dlms-wrapper-close/active-get-gbt-prefix-close-tcp-caller-reversed.pcap": {
+          "bytes": 410,
+          "sha256": "0eddd454e2c64961a71cb45cc69676b3d51132ff3eb7e86044b7741779decbde"
+        },
+        "dlms-wrapper-close/active-get-gbt-prefix-close-tcp.pcap": {
+          "bytes": 410,
+          "sha256": "f1f9e36f76ffd1b7641b17ba7fdecc3bcd6a5a51efff28f822fbf6b97c835f7c"
+        },
+        "dlms-wrapper-close/active-get-gbt-prefix-close-udp-caller-reversed.pcap": {
+          "bytes": 176,
+          "sha256": "edfc39ef835d81e599d4b933f5626a05b152a59c1514115dc39b1b96f27da6be"
+        },
+        "dlms-wrapper-close/active-get-gbt-prefix-close-udp.pcap": {
+          "bytes": 176,
+          "sha256": "12c164e79d0785bb55c4b966c8678adf7563530098a05294d024c1d181544f62"
+        },
+        "dlms-wrapper-close/complete-gbt-get-partial-response-pending-close-tcp.pcap": {
+          "bytes": 590,
+          "sha256": "f71cba71e69fa0c43a4718db2335cac4d221ed2982e68d68ff395cfaf1d70cda"
+        },
+        "dlms-wrapper-close/complete-gbt-get-partial-response-pending-close-udp.pcap": {
+          "bytes": 332,
+          "sha256": "06f909bf012beb371a452e6cd035ff681e3e4e62053c8a26ed8e1561ccfe2389"
+        },
+        "dlms-wrapper-close/complete-gbt-get-pending-close-tcp.pcap": {
+          "bytes": 502,
+          "sha256": "0635b9c2337af9af46bb13df9b1b1093408315e8d98915735fb0ea83d45d9f73"
+        },
+        "dlms-wrapper-close/complete-gbt-get-pending-close-udp.pcap": {
+          "bytes": 256,
+          "sha256": "fc0c86ecdb52c3bf6c60ad9f2fa1533b61b1f34c91c7ee0c1e02e376ff9d18e3"
+        },
+        "dlms-wrapper-close/complete-get-gbt-neighbor-tcp.pcap": {
+          "bytes": 594,
+          "sha256": "e309630377adb685ab3749925e7939bd1f59e3a34d1830b1127c717b34526779"
+        },
+        "dlms-wrapper-close/complete-get-gbt-neighbor-udp.pcap": {
+          "bytes": 336,
+          "sha256": "030858ff1ede7c9ed4f331d9b75b23330ef105ff16fb4fb550c97b59a89c0109"
+        },
+        "dlms-wrapper-close/controls.json": {
+          "bytes": 267339,
+          "sha256": "26f9f32f7f9228230d6da9cf547d5791974e1fdbe4896c938aecdc8e25638824"
+        },
+        "dlms-wrapper-close/direct-get-pending-close-tcp.pcap": {
+          "bytes": 325,
+          "sha256": "1232b4b054818f3d83fd502bb565c2971ca226cdf3539931050401c487b1767c"
+        },
+        "dlms-wrapper-close/direct-get-pending-close-udp.pcap": {
+          "bytes": 103,
+          "sha256": "4433f148568cf6570a92d770bf55958d5b8fb2b6221cb7a2a26592ebf3d9d7ba"
+        },
+        "dlms-wrapper-close/historical-close-upgrades.json": {
+          "bytes": 6025,
+          "sha256": "2ed6cfbc412029f88780a75e1ea8e847efc0c457b949630601e6dfcc87dc6421"
+        },
+        "dlms-wrapper-close/reuse-inputs.json": {
+          "bytes": 3,
+          "sha256": "ca3d163bab055381827226140568f3bef7eaac187cebd76878e0b63e9e442356"
+        },
+        "required-tests-traffic-unified-v145.json": {
+          "bytes": 25142507,
+          "sha256": "bc400dad2468b7c983dd3d3707831d2a150bc0928ae4a92ab4297e35aa4be837"
+        },
+        "validation/expected.json": {
+          "bytes": 14327,
+          "sha256": "f775d086a6bd5357f6884f9e2d0972c1bb20753659bb38f8ef908d5efff007bb"
+        }
+      },
+      "aliases": {
+        "common/pcapx/pcaputil/dlms-wrapper-close-tools/GET-PENDING-CONTRACT.json": "dlms-wrapper-close-tools/GET-PENDING-CONTRACT.json",
+        "common/pcapx/pcaputil/dlms-wrapper-close-tools/SOURCES.json": "dlms-wrapper-close-tools/SOURCES.json",
+        "common/pcapx/pcaputil/dlms-wrapper-close-tools/close-upgrade-inputs.json": "dlms-wrapper-close-tools/close-upgrade-inputs.json",
+        "common/pcapx/pcaputil/dlms-wrapper-close-tools/gbt_get_pending_close_test.go": "dlms-wrapper-close-tools/gbt_get_pending_close_test.go",
+        "common/pcapx/pcaputil/dlms-wrapper-close-tools/generate-captures.py": "dlms-wrapper-close-tools/generate-captures.py",
+        "common/pcapx/pcaputil/dlms-wrapper-close-tools/generate-direction.py": "dlms-wrapper-close-tools/generate-direction.py",
+        "common/pcapx/pcaputil/dlms-wrapper-close-tools/generate-get-pending.py": "dlms-wrapper-close-tools/generate-get-pending.py",
+        "common/pcapx/pcaputil/dlms-wrapper-close-tools/generate.py": "dlms-wrapper-close-tools/generate.py",
+        "common/pcapx/pcaputil/dlms-wrapper-close-tools/history-reference.json": "dlms-wrapper-close-tools/history-reference.json",
+        "common/pcapx/pcaputil/dlms-wrapper-close-tools/reference-vectors.json": "dlms-wrapper-close-tools/reference-vectors.json",
+        "common/pcapx/pcaputil/dlms-wrapper-close-tools/resolve-history-metadata.py": "dlms-wrapper-close-tools/resolve-history-metadata.py",
+        "common/pcapx/pcaputil/dlms-wrapper-close-tools/scan-get-close-history.py": "dlms-wrapper-close-tools/scan-get-close-history.py",
+        "common/pcapx/pcaputil/dlms-wrapper-close-tools/verify-captures.py": "dlms-wrapper-close-tools/verify-captures.py",
+        "common/pcapx/pcaputil/dlms-wrapper-close-tools/verify-get-pending.py": "dlms-wrapper-close-tools/verify-get-pending.py",
+        "common/pcapx/pcaputil/dlms-wrapper-close/active-get-gbt-prefix-close-tcp-caller-reversed.pcap": "dlms-wrapper-close/active-get-gbt-prefix-close-tcp-caller-reversed.pcap",
+        "common/pcapx/pcaputil/dlms-wrapper-close/active-get-gbt-prefix-close-tcp.pcap": "dlms-wrapper-close/active-get-gbt-prefix-close-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-wrapper-close/active-get-gbt-prefix-close-udp-caller-reversed.pcap": "dlms-wrapper-close/active-get-gbt-prefix-close-udp-caller-reversed.pcap",
+        "common/pcapx/pcaputil/dlms-wrapper-close/active-get-gbt-prefix-close-udp.pcap": "dlms-wrapper-close/active-get-gbt-prefix-close-udp.pcap",
+        "common/pcapx/pcaputil/dlms-wrapper-close/complete-gbt-get-partial-response-pending-close-tcp.pcap": "dlms-wrapper-close/complete-gbt-get-partial-response-pending-close-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-wrapper-close/complete-gbt-get-partial-response-pending-close-udp.pcap": "dlms-wrapper-close/complete-gbt-get-partial-response-pending-close-udp.pcap",
+        "common/pcapx/pcaputil/dlms-wrapper-close/complete-gbt-get-pending-close-tcp.pcap": "dlms-wrapper-close/complete-gbt-get-pending-close-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-wrapper-close/complete-gbt-get-pending-close-udp.pcap": "dlms-wrapper-close/complete-gbt-get-pending-close-udp.pcap",
+        "common/pcapx/pcaputil/dlms-wrapper-close/complete-get-gbt-neighbor-tcp.pcap": "dlms-wrapper-close/complete-get-gbt-neighbor-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-wrapper-close/complete-get-gbt-neighbor-udp.pcap": "dlms-wrapper-close/complete-get-gbt-neighbor-udp.pcap",
+        "common/pcapx/pcaputil/dlms-wrapper-close/controls.json": "dlms-wrapper-close/controls.json",
+        "common/pcapx/pcaputil/dlms-wrapper-close/direct-get-pending-close-tcp.pcap": "dlms-wrapper-close/direct-get-pending-close-tcp.pcap",
+        "common/pcapx/pcaputil/dlms-wrapper-close/direct-get-pending-close-udp.pcap": "dlms-wrapper-close/direct-get-pending-close-udp.pcap",
+        "common/pcapx/pcaputil/dlms-wrapper-close/historical-close-upgrades.json": "dlms-wrapper-close/historical-close-upgrades.json",
+        "common/pcapx/pcaputil/dlms-wrapper-close/reuse-inputs.json": "dlms-wrapper-close/reuse-inputs.json",
+        "scripts/protocol-tests/required-tests-traffic-unified-v145.json": "required-tests-traffic-unified-v145.json"
+      }
     }
   ],
   "schema_version": 1,

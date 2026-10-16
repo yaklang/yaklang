@@ -213,3 +213,37 @@ func (f *binFlow) consumeWrapperGBT(s *binDLMSWrapper, m *wrapperMessage, dir in
 	p.data = nil
 	return assoc, nil
 }
+
+// unfinishedGBTCounts reports only active, bounded transfer groups. Completed
+// APDUs and ambiguous histories do not create an additional Close observation.
+func (s *binDLMSWrapper) unfinishedGBTCounts() [2]int {
+	var counts [2]int
+	for key, p := range s.gbt {
+		if p.active {
+			counts[key.dir]++
+		}
+	}
+	return counts
+}
+
+// Pending Get requests and active GBT groups are separate observed records.
+// An incomplete response does not establish a reply to the inner request.
+func (s *binDLMSWrapper) unfinishedGetCounts() [2][3]int {
+	var counts [2][3]int
+	for key, p := range s.seen {
+		if p.pending && !p.blockActive && p.command == 0xc0 && p.choice >= 1 && p.choice <= 3 {
+			counts[key.dir][p.choice-1]++
+		}
+	}
+	return counts
+}
+func wrapperPendingGetProfile(choice byte) string {
+	switch choice {
+	case 2:
+		return "dlms-wrapper-v1-get-block"
+	case 3:
+		return "dlms-wrapper-v1-get-list"
+	default:
+		return "dlms-wrapper-v1-get-normal"
+	}
+}

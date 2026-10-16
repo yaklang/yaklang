@@ -176,7 +176,11 @@ func wrapperBlocksReplayConfigured(t *testing.T, cases []wrapperBlockControl, co
 				events, stats := discoveryReplay(t, wrapperStructuredInput(t, c.Alias), workers, deferred, observe, opts...)
 				if c.Close != 0 {
 					require.Len(t, events, len(c.Answers)+1)
-					assertWrapperStructuredClose(t, events[len(c.Answers):])
+					if c.Name == "historical-get-selective-access" {
+						wrapperCloseHistorical(t, events[len(c.Answers):], c.Name, c.Alias, c.Transport, true, "ctx-canceled")
+					} else {
+						assertWrapperStructuredClose(t, events[len(c.Answers):])
+					}
 					events = events[:len(c.Answers)]
 					require.EqualValues(t, 1, stats.Incomplete)
 				}
@@ -251,7 +255,11 @@ func wrapperBlocksOwnershipConfigured(t *testing.T, cases []wrapperBlockControl,
 					}
 					closed := s.Close("blocks")
 					if c.Close != 0 {
-						assertWrapperStructuredClose(t, closed)
+						if c.Name == "historical-get-selective-access" {
+							wrapperCloseHistorical(t, closed, c.Name, c.Alias, c.Transport, false, "blocks")
+						} else {
+							assertWrapperStructuredClose(t, closed)
+						}
 					} else {
 						require.Empty(t, closed)
 					}

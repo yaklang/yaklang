@@ -739,6 +739,30 @@ func (a *binParser) closeUDPSessions() {
 				}
 			}
 			if w := f.wrapper; w != nil {
+				for dir, choices := range w.unfinishedGetCounts() {
+					for choice, count := range choices {
+						if count == 0 {
+							continue
+						}
+						summary := "DLMS Wrapper exchange ended with unmatched observed requests"
+						e := &ProtocolEvent{FlowID: f.id, Timestamp: v.touched, Domain: v.key.domain, Transport: "udp", Source: f.endpoints[dir], Destination: f.endpoints[1-dir], Direction: dir, Protocol: "dlms-wrapper", Profile: wrapperPendingGetProfile(byte(choice + 1)), nativeDLMSOrSLMPObservation: true, Status: "incomplete", Completeness: "incomplete", Summary: summary, Session: map[string]any{"Outstanding": count}, sessionError: &ProtocolError{Kind: ErrNeedMore, Message: summary}}
+						e.semanticSession = cloneSession(e.Session)
+						e.Error = e.sessionError.Error()
+						incomplete = append(incomplete, e)
+						a.incomplete.Add(1)
+					}
+				}
+				for dir, count := range w.unfinishedGBTCounts() {
+					if count == 0 {
+						continue
+					}
+					summary := "DLMS Wrapper exchange ended with unmatched observed requests"
+					e := &ProtocolEvent{FlowID: f.id, Timestamp: v.touched, Domain: v.key.domain, Transport: "udp", Source: f.endpoints[dir], Destination: f.endpoints[1-dir], Direction: dir, Protocol: "dlms-wrapper", Profile: "dlms-wrapper-v1-gbt", nativeDLMSOrSLMPObservation: true, Status: "incomplete", Completeness: "incomplete", Summary: summary, Session: map[string]any{"Outstanding": count}, sessionError: &ProtocolError{Kind: ErrNeedMore, Message: summary}}
+					e.semanticSession = cloneSession(e.Session)
+					e.Error = e.sessionError.Error()
+					incomplete = append(incomplete, e)
+					a.incomplete.Add(1)
+				}
 				for _, key := range w.pendingOperations() {
 					command := w.seen[key].command
 					summary := "DLMS Wrapper " + wrapperOperationName(command, w.seen[key].choice) + " ended with an unmatched request"

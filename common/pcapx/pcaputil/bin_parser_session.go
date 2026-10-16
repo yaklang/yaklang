@@ -1505,6 +1505,36 @@ func (f *binFlow) finishSession(reason TrafficFlowCloseReason) {
 			f.a.emit(e)
 			n++
 		}
+		for dir, choices := range w.unfinishedGetCounts() {
+			for choice, count := range choices {
+				if count == 0 {
+					continue
+				}
+				e := f.event(dir, nil, "incomplete", string(reason)+": DLMS Wrapper exchange ended with unmatched observed requests")
+				e.Profile, e.Completeness = wrapperPendingGetProfile(byte(choice+1)), "incomplete"
+				e.Session = map[string]any{"Outstanding": count}
+				e.semanticSession = cloneSession(e.Session)
+				e.sessionError = &ProtocolError{Kind: ErrNeedMore, Message: e.Summary}
+				e.Error = e.sessionError.Error()
+				f.a.incomplete.Add(1)
+				f.a.emit(e)
+				n += count
+			}
+		}
+		for dir, count := range w.unfinishedGBTCounts() {
+			if count == 0 {
+				continue
+			}
+			e := f.event(dir, nil, "incomplete", string(reason)+": DLMS Wrapper exchange ended with unmatched observed requests")
+			e.Profile, e.Completeness = "dlms-wrapper-v1-gbt", "incomplete"
+			e.Session = map[string]any{"Outstanding": count}
+			e.semanticSession = cloneSession(e.Session)
+			e.sessionError = &ProtocolError{Kind: ErrNeedMore, Message: e.Summary}
+			e.Error = e.sessionError.Error()
+			f.a.incomplete.Add(1)
+			f.a.emit(e)
+			n += count
+		}
 		if left := w.outstanding() - n; left > 0 {
 			emit(0, map[string]any{"Outstanding": left}, "DLMS Wrapper exchange ended with unmatched observed requests")
 		}

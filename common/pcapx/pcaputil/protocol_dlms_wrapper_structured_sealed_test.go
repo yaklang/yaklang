@@ -214,11 +214,11 @@ func TestDLMSWrapperStructuredSealedMatrix(t *testing.T) {
 					options = append(options, WithProtocolDecodeAs("udp", 4059, "dlms-wrapper"))
 				}
 				events, stats := discoveryReplay(t, input, workers, deferred, observe, options...)
-				if c.Name == "structured-selection-cursor" {
-					require.Len(t, events, 2)
-					assertWrapperStructuredClose(t, events[1:])
+				if c.Name == "structured-selection-cursor" || c.Name == "wrong-count-udp" || c.Name == "wrong-flags-udp" {
+					require.Len(t, events, len(c.Answers)+1)
+					wrapperCloseHistorical(t, events[len(c.Answers):], c.Name, c.InputAlias, c.Transport, true, "ctx-canceled")
 					require.EqualValues(t, 1, stats.Incomplete)
-					events = events[:1]
+					events = events[:len(c.Answers)]
 				}
 				assertWrapperStructuredAnswers(t, c, events, false)
 				require.EqualValues(t, len(c.Answers), stats.Messages)
@@ -274,8 +274,8 @@ func TestDLMSWrapperStructuredBudgetsOwnership(t *testing.T) {
 					}
 					require.LessOrEqual(t, s.Stats().BufferedBytes, int64(wrapperStructuredBudget(c).MaxBufferedBytes))
 					closed := s.Close("structured")
-					if c.Name == "structured-selection-cursor" {
-						assertWrapperStructuredClose(t, closed)
+					if c.Name == "structured-selection-cursor" || c.Name == "wrong-count-udp" || c.Name == "wrong-flags-udp" {
+						wrapperCloseHistorical(t, closed, c.Name, c.InputAlias, c.Transport, false, "structured")
 					} else {
 						require.Empty(t, closed)
 					}
