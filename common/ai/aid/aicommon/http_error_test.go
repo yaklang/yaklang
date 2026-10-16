@@ -2,9 +2,10 @@ package aicommon
 
 import (
 	"fmt"
-	"github.com/stretchr/testify/require"
 	"io"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestAIHTTPResponseError(t *testing.T) {

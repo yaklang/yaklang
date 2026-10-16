@@ -10,9 +10,10 @@ import (
 	"strings"
 )
 
-// aiHTTPResponseBody accepts both raw chunk framing and already-decoded JSON
-// from provider callbacks. It never waits for data from a completed callback.
-func aiHTTPResponseBody(rsp *AIResponse) []byte {
+// decodeAIHTTPErrorBody decodes chunk framing when present, leaving already-decoded
+// JSON intact. Empty or malformed input is returned unchanged for diagnostics.
+// It reads only the currently available body and never waits for more data.
+func decodeAIHTTPErrorBody(rsp *AIResponse) []byte {
 	if rsp == nil {
 		return nil
 	}
@@ -27,12 +28,14 @@ func aiHTTPResponseBody(rsp *AIResponse) []byte {
 	return body
 }
 
-// aiHTTPResponseError describes a provider failure independently of retry policy.
+// aiHTTPResponseError constructs an error for a response already identified as
+// an HTTP failure. It preserves prompt-overflow classification and response
+// causes; it does not decide whether the caller should retry.
 func aiHTTPResponseError(rsp *AIResponse) error {
 	if overflowErr := ClassifyPromptTooLong(rsp, nil); overflowErr != nil {
 		return overflowErr
 	}
-	body := aiHTTPResponseBody(rsp)
+	body := decodeAIHTTPErrorBody(rsp)
 	message := strings.TrimSpace(string(body))
 	var envelope struct {
 		Error   json.RawMessage `json:"error"`
@@ -62,10 +65,10 @@ func aiHTTPResponseError(rsp *AIResponse) error {
 	return errors.New(description)
 }
 
-// normalizeAIRateLimitError bridges response-only rate limits to the existing
-// retry path without replacing callback errors. Unlike is429Response, it must
-// not wait for headers: completed non-HTTP callbacks may never provide them.
-func normalizeAIRateLimitError(rsp *AIResponse, err error) error {
+// ensure429CallbackError fills a missing callback error for a known HTTP 429.
+// Existing errors and all other statuses are returned unchanged. It never waits
+// for headers: completed non-HTTP callbacks may never provide them.
+func ensure429CallbackError(rsp *AIResponse, err error) error {
 	if err != nil || rsp.GetHTTPStatusCode() != 429 {
 		return err
 	}

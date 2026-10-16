@@ -165,7 +165,7 @@ func (c *Config) wrapper(i AICallbackType, tier consts.ModelTier) AICallbackType
 			for _idx := 0; _idx < maxAttempts; {
 				rsp, err = i(wrapCallerWithTierConsumption(outConfig, tier), request)
 				if is429, shouldRetry, done := c.handle429RateLimitContext(requestCtx, rsp); is429 {
-					err = normalizeAIRateLimitError(rsp, err)
+					err = ensure429CallbackError(rsp, err)
 					if done {
 						return nil, requestCtx.Err()
 					}
@@ -254,7 +254,7 @@ func (c *Config) wrapper(i AICallbackType, tier consts.ModelTier) AICallbackType
 		for _idx := 0; _idx < maxAttempts; {
 			rsp, err = i(wrapCallerWithTierConsumption(outConfig, tier), request)
 			if is429, shouldRetry, done := c.handle429RateLimitContext(requestCtx, rsp); is429 {
-				err = normalizeAIRateLimitError(rsp, err)
+				err = ensure429CallbackError(rsp, err)
 				if done {
 					return nil, requestCtx.Err()
 				}
