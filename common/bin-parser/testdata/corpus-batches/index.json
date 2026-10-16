@@ -105925,6 +105925,72 @@
         "common/pcapx/pcaputil/radius-tls-certificate/certificate-known-codec-depth7.pcap": "radius-tls-certificate/certificate-legacy12-leaf.pcap",
         "scripts/protocol-tests/required-tests-traffic-unified-v117.json": "required-tests-traffic-unified-v117.json"
       }
+    },
+    {
+      "id": "validation-tls-certificate-budget",
+      "kind": "support",
+      "source_sha": "eecdc4de26efbf4cb23d2ee616e00dab3a042373",
+      "file": "validation-tls-certificate-budget.zip",
+      "sha256": "df5d0048c9c647a2edc075f3d4551432ed9d40781cb7aaff23a3793383da3760",
+      "password": "bin-parser",
+      "members": {
+        "required-tests-traffic-unified-v118.json": {
+          "sha256": "a598e6aa5d290b235dace7b821ac645fd5f673fe31ed4d6daea7159b3d3eb8a1",
+          "bytes": 19858783
+        },
+        "tls-certificate-budget-tools/SOURCES.json": {
+          "sha256": "a39a66332e87aac69e375b0e38d4097bca20b4d3852696e561abae0c02c05560",
+          "bytes": 1756
+        },
+        "tls-certificate-budget-tools/generate.py": {
+          "sha256": "f447970c56a2d23f828e2df3ad9051ba751ad67b7546349cd0983c871ffa0433",
+          "bytes": 4414
+        },
+        "tls-certificate-budget-tools/generate_helper_vectors.py": {
+          "sha256": "7d19e0f9a69f16b363331e6102aceaee53c25585f58f95d6bef46c6f499a6392",
+          "bytes": 2105
+        },
+        "tls-certificate-budget-tools/verify.py": {
+          "sha256": "671d1df4a78f4aed3122ae07d9f38c50df1a0918bc56016fb621991d714ad169",
+          "bytes": 3690
+        },
+        "tls-certificate-budget/controls.json": {
+          "sha256": "5b4933d8547d5c11d8eb81a9a9da45a7784e8b23b592a0aa1429084804cacac5",
+          "bytes": 23692
+        },
+        "tls-certificate-budget/helper-vectors.json": {
+          "sha256": "b647c1d73315efa852b099729a172764f381d308019fb1ddb5ab39abbf042ef8",
+          "bytes": 19470
+        },
+        "tls-certificate-budget/one-certificate-cap1-normal.pcap": {
+          "sha256": "768372df31399531695e707da8d9d93611028f9106338adf0ebac88114e689b9",
+          "bytes": 1724
+        },
+        "tls-certificate-budget/refusal-projection.json": {
+          "sha256": "787a963679559d749a8fd80b27c743dc1077f3491e19daf84714777dcbda196e",
+          "bytes": 9768
+        },
+        "tls-certificate-budget/two-certificates-cap1-refusal.pcap": {
+          "sha256": "4c9b52c214f946f224319191495eb6766498672d7ad51774b5e862f2ec62ccc0",
+          "bytes": 4295
+        },
+        "validation/expected.json": {
+          "sha256": "9403321c9eb261d7a8d9e4e22a707d3c1a275897a80fa5a6c1902d46b406a70f",
+          "bytes": 2566
+        }
+      },
+      "aliases": {
+        "common/pcapx/pcaputil/tls-certificate-budget-tools/SOURCES.json": "tls-certificate-budget-tools/SOURCES.json",
+        "common/pcapx/pcaputil/tls-certificate-budget-tools/generate.py": "tls-certificate-budget-tools/generate.py",
+        "common/pcapx/pcaputil/tls-certificate-budget-tools/generate_helper_vectors.py": "tls-certificate-budget-tools/generate_helper_vectors.py",
+        "common/pcapx/pcaputil/tls-certificate-budget-tools/verify.py": "tls-certificate-budget-tools/verify.py",
+        "common/pcapx/pcaputil/tls-certificate-budget/controls.json": "tls-certificate-budget/controls.json",
+        "common/pcapx/pcaputil/tls-certificate-budget/helper-vectors.json": "tls-certificate-budget/helper-vectors.json",
+        "common/pcapx/pcaputil/tls-certificate-budget/one-certificate-cap1-normal.pcap": "tls-certificate-budget/one-certificate-cap1-normal.pcap",
+        "common/pcapx/pcaputil/tls-certificate-budget/refusal-projection.json": "tls-certificate-budget/refusal-projection.json",
+        "common/pcapx/pcaputil/tls-certificate-budget/two-certificates-cap1-refusal.pcap": "tls-certificate-budget/two-certificates-cap1-refusal.pcap",
+        "scripts/protocol-tests/required-tests-traffic-unified-v118.json": "required-tests-traffic-unified-v118.json"
+      }
     }
   ],
   "schema_version": 1,

@@ -522,7 +522,7 @@ func (s *binDTLS) message(f *binFlow, dir int, typ byte, b []byte) (map[string]a
 		}
 		out["Hello Version"], out["Cookie Bytes"] = version, len(b)-3
 	case 11:
-		certificates, err := tlsCertificates(b, false)
+		certificates, err := tlsCertificates(b, false, f.a.budget.MaxCollectionElements)
 		if err != nil {
 			return nil, err
 		}

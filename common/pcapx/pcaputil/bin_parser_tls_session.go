@@ -198,7 +198,7 @@ func (f *binFlow) consumeTLS(dir int, e *ProtocolEvent) (map[string]any, error) 
 					return nil, err
 				}
 			}
-			m, err := t.handshakeMessage(dir, b[:n], encrypted)
+			m, err := t.handshakeMessage(dir, b[:n], encrypted, f.a.budget.MaxCollectionElements)
 			if err != nil {
 				return nil, err
 			}
@@ -224,7 +224,7 @@ func (f *binFlow) consumeTLS(dir int, e *ProtocolEvent) (map[string]any, error) 
 	}
 	return map[string]any{"fields": info}, nil
 }
-func (t *binTLS) handshakeMessage(dir int, b []byte, authenticated bool) (map[string]any, error) {
+func (t *binTLS) handshakeMessage(dir int, b []byte, authenticated bool, limits ...int) (map[string]any, error) {
 	typ, body := b[0], b[4:]
 	m := map[string]any{"Type": typ, "Length": len(body), "Authenticated": authenticated}
 	if !authenticated && t.version == 0x304 && (t.finalHello || t.retrySeen && typ != 1 && typ != 2) {
@@ -319,7 +319,7 @@ func (t *binTLS) handshakeMessage(dir int, b []byte, authenticated bool) (map[st
 		// large chains remain bounded by the handshake message budget.
 		sum := sha256.Sum256(body)
 		m["Certificate Message SHA256"] = hex.EncodeToString(sum[:])
-		certs, err := tlsCertificates(body, t.version == 0x304)
+		certs, err := tlsCertificates(body, t.version == 0x304, limits...)
 		if err != nil {
 			return nil, err
 		}
@@ -548,7 +548,7 @@ func (f *binFlow) deliverTLS(dir int, parent *ProtocolEvent) {
 	t.child.feed(dir, plain, parent.Timestamp)
 }
 
-func tlsCertificates(b []byte, tls13 bool) ([]map[string]any, error) {
+func tlsCertificates(b []byte, tls13 bool, limits ...int) ([]map[string]any, error) {
 	bad := func() error { return protocolError(ErrMalformedMessage, "TLS certificate vector") }
 	if tls13 {
 		if len(b) < 1 || int(b[0]) > len(b)-1 {
@@ -560,9 +560,50 @@ func tlsCertificates(b []byte, tls13 bool) ([]map[string]any, error) {
 		return nil, bad()
 	}
 	b = b[3:]
+	max := 64
+	if len(limits) > 0 {
+		max = min(max, limits[0])
+	}
+	// Admission precedes hashing, X.509 parsing and result allocation. Preserve
+	// the existing hard64 ceiling and format/error behavior for callers without
+	// an explicit configured collection limit. Validate the same complete vector
+	// before the configured limit, preserving malformed-vector error priority.
+	// This bounds certificate entries,
+	// not a newly invented count of fixed ASN.1 structure fields.
+	count := 0
+	for scan := b; len(scan) > 0; {
+		if count >= 64 {
+			return nil, protocolError(ErrResourceExceeded, "TLS certificate count")
+		}
+		if len(scan) < 3 {
+			return nil, bad()
+		}
+		n := tlsU24(scan)
+		scan = scan[3:]
+		if n == 0 || n > len(scan) {
+			return nil, bad()
+		}
+		scan = scan[n:]
+		if tls13 {
+			if len(scan) < 2 {
+				return nil, bad()
+			}
+			n = int(binary.BigEndian.Uint16(scan))
+			scan = scan[2:]
+			if n > len(scan) {
+				return nil, bad()
+			}
+			scan = scan[n:]
+		}
+		count++
+	}
+
+	if count > max {
+		return nil, protocolError(ErrResourceExceeded, "TLS certificate count")
+	}
 	var out []map[string]any
 	for len(b) > 0 {
-		if len(out) >= 64 {
+		if len(out) >= max {
 			return nil, protocolError(ErrResourceExceeded, "TLS certificate count")
 		}
 		if len(b) < 3 {
