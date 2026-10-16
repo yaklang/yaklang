@@ -132,6 +132,18 @@ func (env *prehandleBatchEnv) prehandleFile(fileContent *ssareducer.FileContent)
 	}
 	owner.BeginCompileUnit(unitKey)
 	defer owner.EndCompileUnit()
+	// Hold this library's directory slot for the skeleton. An import on
+	// another worker must not compile it: that enters this builder
+	// (editor, build support, range and class registration). The slot is
+	// released with the file, before deferred import linking.
+	if env.prog.ConcurrentUnitBuildEnabled() && owner != env.prog && owner.Name != "" {
+		app := owner.GetApplication()
+		if app == nil {
+			app = owner
+		}
+		releasePackage := app.OccupyDirectoryPackage(owner.Name)
+		defer releasePackage()
+	}
 
 	if fileContent.Status == ssareducer.FileStatusFsError {
 		env.prog.RecordCompileDiagnostic("file", fileContent.Path, fmt.Sprint(fileContent.Err))
