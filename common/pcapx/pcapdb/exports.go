@@ -331,6 +331,13 @@ var Exports = map[string]any{
 	"withFields":                 QueryWithFields,
 }
 
+// AOTExports gives native Yak programs the same per-task lease semantics as
+// the embedded/plugin API. The plain Exports table returns the native
+// *Database handle directly, so two GetOrCreate calls share one closeable
+// instance; AOT scripts expect each returned handle to be independently
+// closable.
+var AOTExports = ExportsWithContext(context.Background())
+
 func DeletePCAPDatabase(id string) (*DeleteResult, error) {
 	manager, err := DefaultManager()
 	if err != nil {
