@@ -137,6 +137,32 @@ func (b *FunctionBuilder) BuildFilePackage(filename string, once bool) error {
 	return nil
 }
 
+func (app *Program) dirPkgOwnerDepth(gid uint64) int {
+	if app == nil || gid == 0 {
+		return 0
+	}
+	app.dirPkgDepthMu.Lock()
+	defer app.dirPkgDepthMu.Unlock()
+	return app.dirPkgDepth[gid]
+}
+
+func (app *Program) addDirPkgOwner(gid uint64, delta int) {
+	if app == nil || gid == 0 || delta == 0 {
+		return
+	}
+	app.dirPkgDepthMu.Lock()
+	defer app.dirPkgDepthMu.Unlock()
+	if app.dirPkgDepth == nil {
+		app.dirPkgDepth = make(map[uint64]int)
+	}
+	n := app.dirPkgDepth[gid] + delta
+	if n <= 0 {
+		delete(app.dirPkgDepth, gid)
+		return
+	}
+	app.dirPkgDepth[gid] = n
+}
+
 func (b *FunctionBuilder) BuildDirectoryPackage(name []string, once bool) (*Program, error) {
 	p := b.GetProgram()
 	if p == nil {
@@ -148,6 +174,10 @@ func (b *FunctionBuilder) BuildDirectoryPackage(name []string, once bool) (*Prog
 	}
 	key := strings.Join(name, ".")
 	gid := currentGoroutineID()
+	// depth is sampled before this call becomes an owner. A goroutine that
+	// already owns some directory package must not receive on another
+	// slot: the two owners can be compiling packages that import each other.
+	depth := app.dirPkgOwnerDepth(gid)
 	slot := &dirPkgSlot{gid: gid, done: make(chan struct{})}
 	actual, loaded := app.dirPkgSlots.LoadOrStore(key, slot)
 	if loaded {
@@ -159,12 +189,36 @@ func (b *FunctionBuilder) BuildDirectoryPackage(name []string, once bool) (*Prog
 			}
 			return nil, utils.Errorf("directory package %s reentered before publish", key)
 		}
+		if depth > 0 {
+			// The other goroutine owns this name and may be waiting on a
+			// package this goroutine owns. Do not wait. The in-project
+			// library was created before prehandle; hand that back. Otherwise
+			// the caller falls through to GetOrCreateLibrary.
+			if lib, _ := app.GetLibrary(key); lib != nil {
+				return lib, nil
+			}
+			return nil, utils.Errorf("directory package %s is being compiled by another goroutine", key)
+		}
 		<-existing.done
 		return existing.lib, existing.err
 	}
 	// Do not publish an empty library first. Callers treat a non-nil
 	// return as the compiled package, and an empty placeholder hides
 	// the real one (rule checks then miss the class).
+	// Only an owner increments depth, and only the outermost wait is a
+	// goroutine that owns nothing. Owners therefore cannot wait on each
+	// other, and every waiter is waiting for an owner that runs to close.
+	app.addDirPkgOwner(gid, 1)
+	published := false
+	defer func() {
+		if !published {
+			if slot.err == nil {
+				slot.err = utils.Errorf("directory package %s compile interrupted", key)
+			}
+			close(slot.done)
+		}
+		app.addDirPkgOwner(gid, -1)
+	}()
 	err := b.compileDirectoryPackage(name, once)
 	lib, _ := app.GetLibrary(key)
 	if lib == nil && err == nil {
@@ -172,6 +226,7 @@ func (b *FunctionBuilder) BuildDirectoryPackage(name []string, once bool) (*Prog
 	}
 	slot.lib = lib
 	slot.err = err
+	published = true
 	close(slot.done)
 	return lib, err
 }
