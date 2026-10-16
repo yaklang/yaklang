@@ -331,8 +331,9 @@ func updateRiskRows(db *gorm.DB, risks []*schema.SSARisk) error {
 	if err != nil {
 		return err
 	}
-	// Two placeholders per column per row, plus two in the WHERE.
-	chunk := 30000 / (len(columns)*2 + 2)
+	// Each CASE arm binds runtime id, feature hash and value (three per
+	// column per row), plus two per row in the WHERE.
+	chunk := 30000 / (len(columns)*3 + 2)
 	if chunk > riskBatchSize {
 		chunk = riskBatchSize
 	}
@@ -369,7 +370,7 @@ func riskUpdateColumns(db *gorm.DB) ([]*gorm.Field, error) {
 func updateRiskChunk(db *gorm.DB, columns []*gorm.Field, risks []*schema.SSARisk) error {
 	scope := db.NewScope(&schema.SSARisk{})
 	var b strings.Builder
-	args := make([]interface{}, 0, len(columns)*len(risks)*2+len(risks)*2)
+	args := make([]interface{}, 0, len(columns)*len(risks)*3+len(risks)*2)
 	b.WriteString("UPDATE ")
 	b.WriteString(scope.QuotedTableName())
 	b.WriteString(" SET ")
