@@ -111621,6 +111621,250 @@
         "common/pcapx/pcaputil/dlms-hdlc-list-foreign-pblock/reuse-inputs.json": "dlms-hdlc-list-foreign-pblock/reuse-inputs.json",
         "scripts/protocol-tests/required-tests-traffic-unified-v138.json": "required-tests-traffic-unified-v138.json"
       }
+    },
+    {
+      "id": "validation-dlms-wrapper-set-list-blocks",
+      "kind": "support",
+      "source_sha": "0fe39b41a086416c676edcee6ea591dda291ef5d",
+      "file": "validation-dlms-wrapper-set-list-blocks.zip",
+      "sha256": "e5f888319c6f21335f1f72d83ea487c1612e0488696279db9041b28197773abc",
+      "password": "bin-parser",
+      "members": {
+        "dlms-wrapper-set-list-blocks-tools/FIELD-CONTRACT.json": {
+          "bytes": 1951,
+          "sha256": "96629c0d5cc715ff96061a13f513b919933345f9dd32c2e4d67c6c5a0a4bc420"
+        },
+        "dlms-wrapper-set-list-blocks-tools/SOURCE-RESOLUTION.json": {
+          "bytes": 4019,
+          "sha256": "c8d4a191d601f1eca713406a855658da44eb8a5d999422914b66900a1b603b1e"
+        },
+        "dlms-wrapper-set-list-blocks-tools/SOURCES-v2.json": {
+          "bytes": 6885,
+          "sha256": "e72ff1367177e3e6832a7a94e107516cadf368a7f8ddc80bfdb086c76d815ecb"
+        },
+        "dlms-wrapper-set-list-blocks-tools/generate-captures.py": {
+          "bytes": 1871,
+          "sha256": "d2548d42f1f32c911c32b646ae6469e9ab2eec3d2d634ca324b20fd8c6fa42d1"
+        },
+        "dlms-wrapper-set-list-blocks-tools/generate-corrected-controls.py": {
+          "bytes": 1578,
+          "sha256": "f3def91ec0dae7b5eabcb56712a4e1cb67f76b4e65aa7d1e6c3a3cd9e75664ce"
+        },
+        "dlms-wrapper-set-list-blocks-tools/generate-full-controls.py": {
+          "bytes": 19265,
+          "sha256": "1eec3163824ee98225a6068de0cc90ea1b291213615027927f40e2dc1888fadf"
+        },
+        "dlms-wrapper-set-list-blocks-tools/reference-vectors.json": {
+          "bytes": 2626,
+          "sha256": "47750ade128514785c91974f68b08b4038f2bb1926237a149ae00469bd6275d0"
+        },
+        "dlms-wrapper-set-list-blocks-tools/reference.py": {
+          "bytes": 3798,
+          "sha256": "0d2394cd345ed883aa6227087d4dabefd7abd5fb632c3b8a40b26da1ab498e10"
+        },
+        "dlms-wrapper-set-list-blocks-tools/verify-captures.py": {
+          "bytes": 3238,
+          "sha256": "31abc6475a1d47a5cc8e68d0db9724430f89b36cae53c496c88a0452d440d3dd"
+        },
+        "dlms-wrapper-set-list-blocks-tools/verify-corrected-controls.py": {
+          "bytes": 1788,
+          "sha256": "266009d89eb4e8b7ccb561cd11a159cac16cdc8b3bf113379322f76cf282c5fa"
+        },
+        "dlms-wrapper-set-list-blocks-tools/verify-full-controls.py": {
+          "bytes": 4638,
+          "sha256": "9f148743ea1059f99a8360d853b05c67d0b7caaa307f5bbfa9579dc0c08039be"
+        },
+        "dlms-wrapper-set-list-blocks/ACK-awaiting-next-private-Close.tcp.pcap": {
+          "bytes": 430,
+          "sha256": "d6fa05b5555ba31ffa504aea4f8d91359555ac8fea0ceed3082d8496863f6e28"
+        },
+        "dlms-wrapper-set-list-blocks/ACK-awaiting-next-private-Close.udp.pcap": {
+          "bytes": 196,
+          "sha256": "375ded0b8614ec5cb7932bf5f20ee614302c0a67c90d282bb26533d7ed6e3f45"
+        },
+        "dlms-wrapper-set-list-blocks/actual-writeList-normal-neighbor.tcp.pcap": {
+          "bytes": 489,
+          "sha256": "a91b813f44aae57c44631046d984e919dab56894c6c4c72e47025e1d61245885"
+        },
+        "dlms-wrapper-set-list-blocks/actual-writeList-normal-neighbor.udp.pcap": {
+          "bytes": 255,
+          "sha256": "b6519d5db1263e68791ddb52f88ee8e8e90dc50141af7ddfbcfc8671693ff6b1"
+        },
+        "dlms-wrapper-set-list-blocks/assembled-structure-depth6.tcp.pcap": {
+          "bytes": 598,
+          "sha256": "6ae1c7507ce185cff4ffe48e0a8ede7a06652fe8cebfc1507970e3b165ff8925"
+        },
+        "dlms-wrapper-set-list-blocks/assembled-structure-depth6.udp.pcap": {
+          "bytes": 340,
+          "sha256": "0b03399d4bbb0f8943836597c16bc3601df1df65869e0b9d7aa677ac2ee8ad0d"
+        },
+        "dlms-wrapper-set-list-blocks/complete-WPDU-raw-length-truncated.tcp.pcap": {
+          "bytes": 606,
+          "sha256": "2e2caf1cbfabd0320a7b1119bde51a9a29736154a7118bb558be9485b3814106"
+        },
+        "dlms-wrapper-set-list-blocks/complete-WPDU-raw-length-truncated.udp.pcap": {
+          "bytes": 348,
+          "sha256": "d1c9938122cf7c0d38a100b9867a8542f9d4000482106f2acd7718f3726982ba"
+        },
+        "dlms-wrapper-set-list-blocks/controls.json": {
+          "bytes": 779588,
+          "sha256": "27454ccca31574767b7764c7455d9b03b4823fac4211603d957d79ecbe13dd4d"
+        },
+        "dlms-wrapper-set-list-blocks/duplicate-first-and-ACK-quarantine.tcp.pcap": {
+          "bytes": 1176,
+          "sha256": "75bbd7d848add39d813235260ecf7cf0073713db5ee8453a857cb57ae9bb055a"
+        },
+        "dlms-wrapper-set-list-blocks/duplicate-first-and-ACK-quarantine.udp.pcap": {
+          "bytes": 846,
+          "sha256": "11eca44d4b9e39f9d3e445e551657f6996fa6c1806306775d029c8af63db1551"
+        },
+        "dlms-wrapper-set-list-blocks/encoded-value-list-six-bytes-cap6.tcp.pcap": {
+          "bytes": 597,
+          "sha256": "2c5418deedb3ada0410e9532eff872099fc43bcdf9e63b4688c7b882513acf9d"
+        },
+        "dlms-wrapper-set-list-blocks/encoded-value-list-six-bytes-cap6.udp.pcap": {
+          "bytes": 339,
+          "sha256": "9d82f7303dd52140944dd901f81d77feda0200e0a6189385bbb45172e672d77f"
+        },
+        "dlms-wrapper-set-list-blocks/four-blocks-empty-prefix-cap4.tcp.pcap": {
+          "bytes": 938,
+          "sha256": "99f3988423a6f364a21316ef732e0cd8256cd90e6394072dc094fc605cdac7a7"
+        },
+        "dlms-wrapper-set-list-blocks/four-blocks-empty-prefix-cap4.udp.pcap": {
+          "bytes": 632,
+          "sha256": "7a43390f9540c976a35c73c504e4aed90b17c156514936091d8fb9051244f92c"
+        },
+        "dlms-wrapper-set-list-blocks/malformed-joined-trailing-releases.tcp.pcap": {
+          "bytes": 608,
+          "sha256": "424f44aed8e35271ba4c44b89428355f78bfe6774f50ca7dd1595ec381e200af"
+        },
+        "dlms-wrapper-set-list-blocks/malformed-joined-trailing-releases.udp.pcap": {
+          "bytes": 350,
+          "sha256": "df626bdd55b22374474738d23cacfe988eb71e3956f462818e54bef632fa4354"
+        },
+        "dlms-wrapper-set-list-blocks/orphan-next-literal-no-owner.tcp.pcap": {
+          "bytes": 411,
+          "sha256": "cb94fe9f3c452e38be0a9fb19cef66f378cec69b76cd2f2ea4ceab7df0743754"
+        },
+        "dlms-wrapper-set-list-blocks/orphan-next-literal-no-owner.udp.pcap": {
+          "bytes": 177,
+          "sha256": "41c33d7ed00971da3b0f8f59bd34a6d37c9ccf362520ed0d4d45dfd585edb536"
+        },
+        "dlms-wrapper-set-list-blocks/phase-number-reuse-quarantine.tcp.pcap": {
+          "bytes": 1840,
+          "sha256": "784436478a5cf794505034ed7090d0604584209143c470bf6f3ebf97bb02bb38"
+        },
+        "dlms-wrapper-set-list-blocks/phase-number-reuse-quarantine.udp.pcap": {
+          "bytes": 1426,
+          "sha256": "c8d9d9cc2000fd6a9577fa0a6d578b211dd39791a02292ca74022a64c4dd0fb9"
+        },
+        "dlms-wrapper-set-list-blocks/primary-source-single-first-last-list-block.tcp.pcap": {
+          "bytes": 435,
+          "sha256": "a9990309f9fe4cc0dd0c3495404c46c36effdc9482c47afc9cf99b28bb933d3b"
+        },
+        "dlms-wrapper-set-list-blocks/primary-source-single-first-last-list-block.udp.pcap": {
+          "bytes": 201,
+          "sha256": "680f7fe4f161da613b384d24c72735fc82f858c44d635da0f1e11b0f99a89981"
+        },
+        "dlms-wrapper-set-list-blocks/primary-source-two-list-blocks-mixed-results.tcp.pcap": {
+          "bytes": 607,
+          "sha256": "7402fe39bc3122c86f65e65e933682ece0954083fc300e9bc308de0da18b7723"
+        },
+        "dlms-wrapper-set-list-blocks/primary-source-two-list-blocks-mixed-results.udp.pcap": {
+          "bytes": 349,
+          "sha256": "d57eadf1e82334d5db92859ac99685df0c9a43181f761c17749b155656e09550"
+        },
+        "dlms-wrapper-set-list-blocks/reuse-inputs.json": {
+          "bytes": 3,
+          "sha256": "ca3d163bab055381827226140568f3bef7eaac187cebd76878e0b63e9e442356"
+        },
+        "dlms-wrapper-set-list-blocks/shared-selector-and-assembled-nodes-cap4.tcp.pcap": {
+          "bytes": 601,
+          "sha256": "f71bbf178afdc12f3c9abd000ee59e468fdc97917939d46877de2d0743359465"
+        },
+        "dlms-wrapper-set-list-blocks/shared-selector-and-assembled-nodes-cap4.udp.pcap": {
+          "bytes": 343,
+          "sha256": "5f86ce4ccbe69c8f36cb2e514e6003f29e31ac11cac3e1f74f6a48ae5fa9b690"
+        },
+        "dlms-wrapper-set-list-blocks/terminal-and-assembled-count-mismatch-retire.tcp.pcap": {
+          "bytes": 893,
+          "sha256": "e71a3dc24c87f107c3e906868c4f01f0bc18f152e38bc0635a4ae56ff42482af"
+        },
+        "dlms-wrapper-set-list-blocks/terminal-and-assembled-count-mismatch-retire.udp.pcap": {
+          "bytes": 599,
+          "sha256": "a3abdd3a51366aebb415594b08d59037dbfe459ffa079f9a4ac7fb9ab609deb5"
+        },
+        "dlms-wrapper-set-list-blocks/wrong-flags-direction-ports-preserve.tcp.pcap": {
+          "bytes": 973,
+          "sha256": "e29057e90f1846bfb017f0a517c6539bc771e4c4bffe867934c60ddf987099f8"
+        },
+        "dlms-wrapper-set-list-blocks/wrong-flags-direction-ports-preserve.udp.pcap": {
+          "bytes": 667,
+          "sha256": "b0db562900cc20768b2f57649b8eb3180a84a7baaf52d216b39aba3b1deed24e"
+        },
+        "required-tests-traffic-unified-v139.json": {
+          "bytes": 24111615,
+          "sha256": "1110603673fcb8348aa7b7705edf3d7e0339fd28f1a4400de33d3e9498627017"
+        },
+        "validation/expected.json": {
+          "bytes": 46806,
+          "sha256": "1f3a29f4faffc1f195de4cca35fb079f51d50744dcb11820ef2f6e44c030f3be"
+        }
+      },
+      "aliases": {
+        "common/pcapx/pcaputil/dlms-wrapper-set-list-blocks-tools/FIELD-CONTRACT.json": "dlms-wrapper-set-list-blocks-tools/FIELD-CONTRACT.json",
+        "common/pcapx/pcaputil/dlms-wrapper-set-list-blocks-tools/SOURCE-RESOLUTION.json": "dlms-wrapper-set-list-blocks-tools/SOURCE-RESOLUTION.json",
+        "common/pcapx/pcaputil/dlms-wrapper-set-list-blocks-tools/SOURCES-v2.json": "dlms-wrapper-set-list-blocks-tools/SOURCES-v2.json",
+        "common/pcapx/pcaputil/dlms-wrapper-set-list-blocks-tools/generate-captures.py": "dlms-wrapper-set-list-blocks-tools/generate-captures.py",
+        "common/pcapx/pcaputil/dlms-wrapper-set-list-blocks-tools/generate-corrected-controls.py": "dlms-wrapper-set-list-blocks-tools/generate-corrected-controls.py",
+        "common/pcapx/pcaputil/dlms-wrapper-set-list-blocks-tools/generate-full-controls.py": "dlms-wrapper-set-list-blocks-tools/generate-full-controls.py",
+        "common/pcapx/pcaputil/dlms-wrapper-set-list-blocks-tools/reference-vectors.json": "dlms-wrapper-set-list-blocks-tools/reference-vectors.json",
+        "common/pcapx/pcaputil/dlms-wrapper-set-list-blocks-tools/reference.py": "dlms-wrapper-set-list-blocks-tools/reference.py",
+        "common/pcapx/pcaputil/dlms-wrapper-set-list-blocks-tools/verify-captures.py": "dlms-wrapper-set-list-blocks-tools/verify-captures.py",
+        "common/pcapx/pcaputil/dlms-wrapper-set-list-blocks-tools/verify-corrected-controls.py": "dlms-wrapper-set-list-blocks-tools/verify-corrected-controls.py",
+        "common/pcapx/pcaputil/dlms-wrapper-set-list-blocks-tools/verify-full-controls.py": "dlms-wrapper-set-list-blocks-tools/verify-full-controls.py",
+        "common/pcapx/pcaputil/dlms-wrapper-set-list-blocks/ACK-awaiting-next-private-Close.tcp.pcap": "dlms-wrapper-set-list-blocks/ACK-awaiting-next-private-Close.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-wrapper-set-list-blocks/ACK-awaiting-next-private-Close.udp.pcap": "dlms-wrapper-set-list-blocks/ACK-awaiting-next-private-Close.udp.pcap",
+        "common/pcapx/pcaputil/dlms-wrapper-set-list-blocks/actual-writeList-normal-neighbor.tcp.pcap": "dlms-wrapper-set-list-blocks/actual-writeList-normal-neighbor.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-wrapper-set-list-blocks/actual-writeList-normal-neighbor.udp.pcap": "dlms-wrapper-set-list-blocks/actual-writeList-normal-neighbor.udp.pcap",
+        "common/pcapx/pcaputil/dlms-wrapper-set-list-blocks/assembled-structure-depth6.tcp.pcap": "dlms-wrapper-set-list-blocks/assembled-structure-depth6.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-wrapper-set-list-blocks/assembled-structure-depth6.udp.pcap": "dlms-wrapper-set-list-blocks/assembled-structure-depth6.udp.pcap",
+        "common/pcapx/pcaputil/dlms-wrapper-set-list-blocks/complete-WPDU-raw-length-truncated.tcp.pcap": "dlms-wrapper-set-list-blocks/complete-WPDU-raw-length-truncated.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-wrapper-set-list-blocks/complete-WPDU-raw-length-truncated.udp.pcap": "dlms-wrapper-set-list-blocks/complete-WPDU-raw-length-truncated.udp.pcap",
+        "common/pcapx/pcaputil/dlms-wrapper-set-list-blocks/controls.json": "dlms-wrapper-set-list-blocks/controls.json",
+        "common/pcapx/pcaputil/dlms-wrapper-set-list-blocks/duplicate-first-and-ACK-quarantine.tcp.pcap": "dlms-wrapper-set-list-blocks/duplicate-first-and-ACK-quarantine.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-wrapper-set-list-blocks/duplicate-first-and-ACK-quarantine.udp.pcap": "dlms-wrapper-set-list-blocks/duplicate-first-and-ACK-quarantine.udp.pcap",
+        "common/pcapx/pcaputil/dlms-wrapper-set-list-blocks/encoded-value-list-six-bytes-cap6.tcp.pcap": "dlms-wrapper-set-list-blocks/encoded-value-list-six-bytes-cap6.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-wrapper-set-list-blocks/encoded-value-list-six-bytes-cap6.udp.pcap": "dlms-wrapper-set-list-blocks/encoded-value-list-six-bytes-cap6.udp.pcap",
+        "common/pcapx/pcaputil/dlms-wrapper-set-list-blocks/four-blocks-empty-prefix-cap4.tcp.pcap": "dlms-wrapper-set-list-blocks/four-blocks-empty-prefix-cap4.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-wrapper-set-list-blocks/four-blocks-empty-prefix-cap4.udp.pcap": "dlms-wrapper-set-list-blocks/four-blocks-empty-prefix-cap4.udp.pcap",
+        "common/pcapx/pcaputil/dlms-wrapper-set-list-blocks/malformed-joined-trailing-releases.tcp.pcap": "dlms-wrapper-set-list-blocks/malformed-joined-trailing-releases.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-wrapper-set-list-blocks/malformed-joined-trailing-releases.udp.pcap": "dlms-wrapper-set-list-blocks/malformed-joined-trailing-releases.udp.pcap",
+        "common/pcapx/pcaputil/dlms-wrapper-set-list-blocks/orphan-next-literal-no-owner.tcp.pcap": "dlms-wrapper-set-list-blocks/orphan-next-literal-no-owner.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-wrapper-set-list-blocks/orphan-next-literal-no-owner.udp.pcap": "dlms-wrapper-set-list-blocks/orphan-next-literal-no-owner.udp.pcap",
+        "common/pcapx/pcaputil/dlms-wrapper-set-list-blocks/phase-number-reuse-quarantine.tcp.pcap": "dlms-wrapper-set-list-blocks/phase-number-reuse-quarantine.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-wrapper-set-list-blocks/phase-number-reuse-quarantine.udp.pcap": "dlms-wrapper-set-list-blocks/phase-number-reuse-quarantine.udp.pcap",
+        "common/pcapx/pcaputil/dlms-wrapper-set-list-blocks/primary-source-single-first-last-list-block.tcp.pcap": "dlms-wrapper-set-list-blocks/primary-source-single-first-last-list-block.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-wrapper-set-list-blocks/primary-source-single-first-last-list-block.udp.pcap": "dlms-wrapper-set-list-blocks/primary-source-single-first-last-list-block.udp.pcap",
+        "common/pcapx/pcaputil/dlms-wrapper-set-list-blocks/primary-source-two-list-blocks-mixed-results.tcp.pcap": "dlms-wrapper-set-list-blocks/primary-source-two-list-blocks-mixed-results.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-wrapper-set-list-blocks/primary-source-two-list-blocks-mixed-results.udp.pcap": "dlms-wrapper-set-list-blocks/primary-source-two-list-blocks-mixed-results.udp.pcap",
+        "common/pcapx/pcaputil/dlms-wrapper-set-list-blocks/reuse-inputs.json": "dlms-wrapper-set-list-blocks/reuse-inputs.json",
+        "common/pcapx/pcaputil/dlms-wrapper-set-list-blocks/shared-selector-and-assembled-nodes-cap4.tcp.pcap": "dlms-wrapper-set-list-blocks/shared-selector-and-assembled-nodes-cap4.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-wrapper-set-list-blocks/shared-selector-and-assembled-nodes-cap4.udp.pcap": "dlms-wrapper-set-list-blocks/shared-selector-and-assembled-nodes-cap4.udp.pcap",
+        "common/pcapx/pcaputil/dlms-wrapper-set-list-blocks/terminal-and-assembled-count-mismatch-retire.tcp.pcap": "dlms-wrapper-set-list-blocks/terminal-and-assembled-count-mismatch-retire.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-wrapper-set-list-blocks/terminal-and-assembled-count-mismatch-retire.udp.pcap": "dlms-wrapper-set-list-blocks/terminal-and-assembled-count-mismatch-retire.udp.pcap",
+        "common/pcapx/pcaputil/dlms-wrapper-set-list-blocks/wrong-flags-direction-ports-preserve.tcp.pcap": "dlms-wrapper-set-list-blocks/wrong-flags-direction-ports-preserve.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-wrapper-set-list-blocks/wrong-flags-direction-ports-preserve.udp.pcap": "dlms-wrapper-set-list-blocks/wrong-flags-direction-ports-preserve.udp.pcap",
+        "common/pcapx/pcaputil/dlms-wrapper-set-list-blocks/shared-selector-and-assembled-nodes-cap3.udp.pcap": "dlms-wrapper-set-list-blocks/shared-selector-and-assembled-nodes-cap4.udp.pcap",
+        "common/pcapx/pcaputil/dlms-wrapper-set-list-blocks/shared-selector-and-assembled-nodes-cap3.tcp.pcap": "dlms-wrapper-set-list-blocks/shared-selector-and-assembled-nodes-cap4.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-wrapper-set-list-blocks/assembled-structure-depth5.udp.pcap": "dlms-wrapper-set-list-blocks/assembled-structure-depth6.udp.pcap",
+        "common/pcapx/pcaputil/dlms-wrapper-set-list-blocks/assembled-structure-depth5.tcp.pcap": "dlms-wrapper-set-list-blocks/assembled-structure-depth6.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-wrapper-set-list-blocks/four-blocks-empty-prefix-cap3.udp.pcap": "dlms-wrapper-set-list-blocks/four-blocks-empty-prefix-cap4.udp.pcap",
+        "common/pcapx/pcaputil/dlms-wrapper-set-list-blocks/four-blocks-empty-prefix-cap3.tcp.pcap": "dlms-wrapper-set-list-blocks/four-blocks-empty-prefix-cap4.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-wrapper-set-list-blocks/encoded-value-list-six-bytes-cap5.udp.pcap": "dlms-wrapper-set-list-blocks/encoded-value-list-six-bytes-cap6.udp.pcap",
+        "common/pcapx/pcaputil/dlms-wrapper-set-list-blocks/encoded-value-list-six-bytes-cap5.tcp.pcap": "dlms-wrapper-set-list-blocks/encoded-value-list-six-bytes-cap6.tcp.pcap",
+        "scripts/protocol-tests/required-tests-traffic-unified-v139.json": "required-tests-traffic-unified-v139.json"
+      }
     }
   ],
   "schema_version": 1,

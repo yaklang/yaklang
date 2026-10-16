@@ -106,6 +106,10 @@ func (f *binFlow) consumeWrapperSetBlock(s *binDLMSWrapper, m *wrapperMessage, d
 		key = wrapperToken{1 - dir, m.destination, m.source, m.invoke}
 	}
 	p := s.seen[key]
+	if m.choice == 5 || p != nil && p.command == 0xc1 && p.choice == 5 {
+		return f.consumeWrapperSetListBlock(s, m, dir, e)
+	}
+
 	if p != nil && p.ambiguous {
 		return p.ambiguousAssociation(), nil
 	}
