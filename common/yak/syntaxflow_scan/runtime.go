@@ -101,6 +101,13 @@ func (m *scanManager) StartQuerySF(startIndex ...int64) error {
 			if taskIndex.Load() <= start {
 				continue
 			}
+			// Mode and language mismatches are known before the rule starts. Count
+			// them in the same task index, but do not spend a worker or a task-row
+			// write on each one. The scan's terminal SaveTask persists the totals.
+			if reason, skip := deterministicRuleSkip(m.ignoreLanguage(), rule, target); skip {
+				m.skipRule(queryTargetName(target), rule.RuleName, reason)
+				continue
+			}
 
 			swg.Add()
 			go func(rule *schema.SyntaxFlowRule, target ssaapi.SyntaxFlowQueryInstance) {
@@ -163,22 +170,35 @@ func ruleMatchesQueryTarget(rule *schema.SyntaxFlowRule, target ssaapi.SyntaxFlo
 	}
 }
 
+func (m *scanManager) ignoreLanguage() bool {
+	return m != nil && m.Config != nil && m.Config.GetScanIgnoreLanguage()
+}
+
+// deterministicRuleSkip reports mismatches that do not depend on other rules
+// having already run. Struct-already-ran stays in Query so a rule can observe
+// work finished by an earlier worker.
+func deterministicRuleSkip(ignoreLanguage bool, rule *schema.SyntaxFlowRule, target ssaapi.SyntaxFlowQueryInstance) (string, bool) {
+	if rule == nil || target == nil {
+		return "", false
+	}
+	if !ruleMatchesQueryTarget(rule, target) {
+		return "skipped: target-mode mismatch", true
+	}
+	if !ignoreLanguage && !rule.IsSourceMode() && rule.Language != ssaconfig.General && rule.Language != target.GetLanguage() {
+		return "skipped: language mismatch", true
+	}
+	return "", false
+}
+
 func (m *scanManager) Query(rule *schema.SyntaxFlowRule, target ssaapi.SyntaxFlowQueryInstance) {
 	targetName := queryTargetName(target)
-	if !ruleMatchesQueryTarget(rule, target) {
-		m.skipRule(targetName, rule.RuleName, "skipped: target-mode mismatch")
+	if reason, skip := deterministicRuleSkip(m.ignoreLanguage(), rule, target); skip {
+		m.skipRule(targetName, rule.RuleName, reason)
 		return
 	}
 	if rule.IsStructMode() {
 		if prog, ok := target.(*ssaapi.Program); ok && prog.StructRulesAlreadyRan(rule) {
 			m.skipRule(targetName, rule.RuleName, "skipped: struct already ran")
-			return
-		}
-	}
-	// 语言匹配检查（source 模式规则按文件 glob 过滤，不强制语言对齐）
-	if !m.Config.GetScanIgnoreLanguage() && !rule.IsSourceMode() {
-		if rule.Language != ssaconfig.General && rule.Language != target.GetLanguage() {
-			m.skipRule(targetName, rule.RuleName, "skipped: language mismatch")
 			return
 		}
 	}

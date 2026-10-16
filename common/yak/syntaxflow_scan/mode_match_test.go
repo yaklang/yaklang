@@ -52,6 +52,30 @@ alert $hit`,
 	require.False(t, failed, "source rule on SSA program must be skipped, not failed")
 }
 
+func TestDeterministicRuleSkip(t *testing.T) {
+	sourceTarget := ssaapi.NewSourceQueryTarget("src", map[string]string{"a.env": "x"})
+	prog, err := ssaapi.Parse("a = 1")
+	require.NoError(t, err)
+
+	structRule := &schema.SyntaxFlowRule{Mode: schema.SFR_MODE_STRUCT, RuleName: "struct"}
+	reason, skip := deterministicRuleSkip(false, structRule, sourceTarget)
+	require.True(t, skip)
+	require.Equal(t, "skipped: target-mode mismatch", reason)
+
+	javaRule := &schema.SyntaxFlowRule{Mode: schema.SFR_MODE_SSA, Language: ssaconfig.JAVA, RuleName: "java"}
+	reason, skip = deterministicRuleSkip(false, javaRule, prog)
+	require.True(t, skip)
+	require.Equal(t, "skipped: language mismatch", reason)
+	_, skip = deterministicRuleSkip(true, javaRule, prog)
+	require.False(t, skip, "ignore-language keeps a cross-language SSA rule runnable")
+
+	sourceRule := &schema.SyntaxFlowRule{Mode: schema.SFR_MODE_SOURCE, Language: ssaconfig.JAVA, RuleName: "source"}
+	_, skip = deterministicRuleSkip(false, sourceRule, sourceTarget)
+	require.False(t, skip, "source rules stay language-agnostic and are not pre-skipped")
+	_, skip = deterministicRuleSkip(false, nil, prog)
+	require.False(t, skip)
+}
+
 func TestRuleFilterModesInfersFromTargets(t *testing.T) {
 	cfg, err := NewConfig(WithSourceFiles("src", map[string]string{"a.txt": "x"}))
 	require.NoError(t, err)
