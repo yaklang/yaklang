@@ -86,11 +86,11 @@ func TestSkillContentHistoricalWindowsSurviveCompression(t *testing.T) {
 	require.True(t, tl.PushSkillFileContent(secondID, "demo-skill", "SKILL.md", "LATER_WINDOW", SkillContentSourceAuto, 1, 1, 1))
 	tl.FreezeAll()
 	bindCompressionMock(t, tl, func(req *AIRequest) (string, error) {
-		// Same identity does not aggregate compression candidates: both
-		// original reads and their full bodies are independently selectable.
-		// The catalog and the body banner each mention the name; the body itself is once.
-		requireCompressionPromotedEntry(t, req.GetPrompt(), firstID, "kind=skill name=demo-skill:SKILL.md:1-1 operation=upsert", "[skill demo-skill | SKILL.md:1-1/1 END]\nEARLIER_WINDOW")
-		requireCompressionPromotedEntry(t, req.GetPrompt(), secondID, "kind=skill name=demo-skill:SKILL.md:1-1 operation=upsert", "[skill demo-skill | SKILL.md:1-1/1 END]\nLATER_WINDOW")
+		// Same identity does not aggregate compression candidates: both original
+		// reads stay visible. Retirement is by skill name, so leaving the name
+		// unselected keeps every window.
+		require.Contains(t, req.GetPrompt(), "========== SKILL_NAME demo-skill ==========\nkind=skill skill_name=demo-skill part=demo-skill:SKILL.md:1-1 operation=upsert\n[skill demo-skill | SKILL.md:1-1/1 END]\nEARLIER_WINDOW\n========== END SKILL_NAME demo-skill ==========")
+		require.Contains(t, req.GetPrompt(), "========== SKILL_NAME demo-skill ==========\nkind=skill skill_name=demo-skill part=demo-skill:SKILL.md:1-1 operation=upsert\n[skill demo-skill | SKILL.md:1-1/1 END]\nLATER_WINDOW\n========== END SKILL_NAME demo-skill ==========")
 		return compressionMockSummary("Ordinary history summarized."), nil
 	})
 

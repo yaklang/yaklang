@@ -159,7 +159,7 @@ func TestSkillContentPendingDeltaTriggersCompression(t *testing.T) {
 		WithSpeedPriorityAICallback(func(_ AICallerConfigIf, req *AIRequest) (*AIResponse, error) {
 			requests++
 			rsp := NewUnboundAIResponse()
-			rsp.EmitOutputStream(strings.NewReader(compressionMockWithRetire("", fmt.Sprint(skillID))))
+			rsp.EmitOutputStream(strings.NewReader(compressionMockWithSelection("", "", "demo-skill")))
 			rsp.Close()
 			return rsp, nil
 		}))
@@ -193,7 +193,8 @@ func TestSkillContentListedWithFullBodyInCompressionRequest(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, snapshot.PromotedItems, 1)
 	skillID := snapshot.PromotedItems[0].ID
-	requireCompressionPromotedEntry(t, prompt, skillID, "kind=skill name=demo-skill:references/api.md:1-1 operation=upsert", "[skill demo-skill | references/api.md:1-1/1 END]\n"+body)
+	require.Contains(t, prompt, fmt.Sprintf("========== SKILL_NAME demo-skill ==========\nkind=skill skill_name=demo-skill part=demo-skill:references/api.md:1-1 operation=upsert\n[skill demo-skill | references/api.md:1-1/1 END]\n%s\n========== END SKILL_NAME demo-skill ==========", body))
+	require.NotContains(t, prompt, fmt.Sprintf("RETIRE_ID %d", skillID))
 	require.Equal(t, 1, strings.Count(prompt, "SKILL_DEEP_SECRET"))
 	require.Contains(t, prompt, "ORDINARY_HISTORY_SECRET")
 }

@@ -73,16 +73,18 @@ func TestTimelineCompressionBelowLimitAfterCompactionStillNeedsAI(t *testing.T) 
 		current := int64(mainTimelineTokens(tl))
 		target := max(int64(1), limit/timelineCompressionTargetDivisor)
 		require.Contains(t, req.GetPrompt(), fmt.Sprintf("当前主模型 Timeline：%d tokens。", current))
-		require.Contains(t, req.GetPrompt(), fmt.Sprintf("目标：不超过 %d tokens。", target))
-		require.Contains(t, req.GetPrompt(), fmt.Sprintf("还需要减少：%d tokens。", current-target))
+		require.Contains(t, req.GetPrompt(), fmt.Sprintf("目标：%d tokens。", target))
+		require.Contains(t, req.GetPrompt(), fmt.Sprintf("目前高于目标 %d tokens。", current-target))
+		require.Contains(t, req.GetPrompt(), "不是越小越好")
 		return compressionMockWithRetire("", "3"), nil
 	})
 	tl.SetTimelineContentLimit(limit)
 	result, err := tl.CompressBeforePrompt(compressionTestOptions())
 	require.NoError(t, err)
 	require.Equal(t, 1, calls)
-	require.Equal(t, []int64{1, 2, 3}, result.RetiredIDs)
-	require.LessOrEqual(t, int64(mainTimelineTokens(tl)), limit/timelineCompressionTargetDivisor)
+	require.Equal(t, []int64{1, 2}, result.RetiredIDs)
+	require.Contains(t, RenderTimelineFrozenOpen(tl).PromotedRecentTools, "SCHEMA_VERSION_3")
+	require.Greater(t, int64(mainTimelineTokens(tl)), limit/timelineCompressionTargetDivisor)
 }
 
 func TestTimelineCompressionOneAIRoundDoesNotContinueBelowTarget(t *testing.T) {

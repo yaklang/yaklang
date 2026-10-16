@@ -144,11 +144,19 @@ func (s *timelineCompressionSnapshot) hasPromotedItems() bool {
 }
 
 func (s *timelineCompressionSnapshot) hasEvidenceItems() bool {
+	return s.hasPromotedKind(TimelinePromotedKindEvidence)
+}
+
+func (s *timelineCompressionSnapshot) hasSkillItems() bool {
+	return s.hasPromotedKind(TimelinePromotedKindSkillContent)
+}
+
+func (s *timelineCompressionSnapshot) hasPromotedKind(kind string) bool {
 	if s == nil {
 		return false
 	}
 	for _, item := range s.PromotedItems {
-		if item.Kind == TimelinePromotedKindEvidence {
+		if item.Kind == kind {
 			return true
 		}
 	}

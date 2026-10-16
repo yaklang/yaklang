@@ -67,7 +67,9 @@ Skill 是追加阅读语义，不在这里折叠不同正文或不同范围。�
 | 类型 | 快照位置 | 选择方式 |
 | --- | --- | --- |
 | 普通历史 | `Items` | 普通原文保留白名单 |
-| tool-cache / skill / evidence | `PromotedItems` | 原始 item 删除黑名单 |
+| tool-cache | `PromotedItems` | 展示给模型，但本次不允许 AI 删除 |
+| skill | `PromotedItems` | `retire_skill_names` 按技能名展开为该技能全部原始 item ID |
+| evidence | `PromotedItems` | 原始 item ID 删除黑名单 |
 | user-input | `ExactItemIDs` + `UserContexts` | 不可删除，参与实际占用统计 |
 | 未知 kind / 未开放操作 | 精确保留 | 不可删除 |
 
@@ -78,13 +80,22 @@ Skill 是追加阅读语义，不在这里折叠不同正文或不同范围。�
 请求示例：
 
 ```text
-========== RETIRE_ID 310 ==========
+========== SKILL_NAME demo-skill ==========
+kind=skill skill_name=demo-skill part=demo-skill:SKILL.md:1-20 operation=upsert
+<该页技能正文>
+========== END SKILL_NAME demo-skill ==========
 
-========== RETIRE_ID 310 ==========
+========== RETIRE_ID 420 ==========
+kind=session-evidence name=e1 operation=upsert
+[UPSERT] e1
+<证据正文>
+========== END RETIRE_ID 420 ==========
+
+========== TOOL_CACHE read_file ==========
 kind=recent-tool-cache name=read_file operation=upsert
 [UPSERT] read_file
 <完整工具描述与参数 Schema>
-========== END RETIRE_ID 310 ==========
+========== END TOOL_CACHE read_file ==========
 ```
 
 正文全量，不做预览或条数截断。内部技能身份中的 NUL 分隔符不会直接渲染。Evidence 全文已在 promoted 项中出现时，不重复添加 `SESSION_EVIDENCE` 参考块；该字段仍用于旧记忆快照兼容和现有记忆指纹。
@@ -94,10 +105,12 @@ kind=recent-tool-cache name=read_file operation=upsert
 ## 5. 选择和提交
 
 - `ratain_timeline_item_range` 保留既有拼写，只解释普通 item ID：未选中的普通原文可由摘要替代。
-- `retire_promoted_entries` 是可选字符串，只接受本次列出的原始 promoted item ID，逗号分隔，不支持区间。缺失、空字符串、非法类型均不删；未知 ID 忽略。
-- 未点名的 promoted item 默认原样保留。不能从一个 ID 扩大到整个同名工具、技能或证据。
-- Skill 不同资源页独立选择；删除后按剩余原始 item 重建累计技能块。
-- Evidence 与其它 item 一样退休，不增加 Config/session 的第二条 post-commit 删除通道。它会改变当前 Timeline 重放出的证据账本。提示词先解释 Timeline 各段，再按当前任务、材料里已经写明的后续任务和容量缺口判断关联度。promoted 相对重要，可以淘汰但要慎重；工具缓存优先淘汰较旧且后续用不到的 Schema。summary 除普通历史外，还要概括本次淘汰的 promoted：技能写清名称以便重新加载，证据只留简要结论。用户输入不可删除。
+- `retire_skill_names` 是可选字符串，只接受本次展示的 skill_name，逗号分隔。一个名字展开为该技能全部原始 item，包括各资源页和 metadata。catalog 只匹配目录。缺失、空字符串、非法类型和未知名字均不删。
+- `retire_promoted_entries` 是可选字符串，只接受本次列出的证据 item ID，逗号分隔，不支持区间。技能 ID、工具缓存 ID、缺失、空字符串和非法类型均不删；未知 ID 忽略。
+- 工具缓存本次不允许 AI 删除，仍由无 AI 折叠去掉冗余操作。有限 LRU 另行处理。
+- 未点名的技能和证据默认原样保留。不能把一个证据 ID 扩大到同名证据，也不能用技能名前缀误伤其他技能。
+- 点名的技能删除后按剩余原始 item 重建累计技能块。
+- Evidence 退休不增加 Config/session 的第二条 post-commit 删除通道。它会改变当前 Timeline 重放出的证据账本。提示词先解释 Timeline 各段，再按当前任务、材料里已经写明的后续任务判断关联。容量目标是尽量靠近，不是越小越好；关键信息保留优先。summary 除普通历史外，还要概括本次淘汰的技能名和证据结论。用户输入不可删除。
 
 解析阶段已将删除名单限制在本次快照列出的 promoted item ID 中。提交直接使用该名单，不扩大或取消删除，不按同 key 的 REUSE、DELETE 或水位后新操作调整选择。未点名的原始 item 和水位后的新 item 不退休；删除后按剩余 journal 正常重放。
 

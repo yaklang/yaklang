@@ -47,12 +47,12 @@ func (m *Timeline) startCompressionResponse(snapshot *timelineCompressionSnapsho
 	if ctx == nil {
 		ctx = config.GetContext()
 	}
-	// A pass with deletable promoted entries must wait for the blacklist field
-	// before publishing early, otherwise the committed selection would silently
-	// miss the model's deletion decision. Passes without candidates keep the
-	// original summary+range publication.
-	requireRetireField := snapshot != nil && snapshot.hasPromotedItems()
-	deletionOnly := requireRetireField && snapshot != nil && !snapshot.hasSummarySource()
+	// Evidence and skills are separate decisions. Publish only after the field
+	// that can still delete something has arrived, so an early summary cannot
+	// drop a later blacklist. Tool cache has no deletion field.
+	requireEvidenceField := snapshot != nil && snapshot.hasEvidenceItems()
+	requireSkillField := snapshot != nil && snapshot.hasSkillItems()
+	deletionOnly := snapshot != nil && snapshot.hasPromotedItems() && !snapshot.hasSummarySource()
 	var publish sync.Once
 	var published *timelineCompressionOutput
 	go func() {
@@ -97,10 +97,14 @@ func (m *Timeline) startCompressionResponse(snapshot *timelineCompressionSnapsho
 						return
 					}
 					rawRetire, retireSeen := fields["retire_promoted_entries"]
-					if requireRetireField && !retireSeen {
+					rawSkills, skillsSeen := fields["retire_skill_names"]
+					if requireEvidenceField && !retireSeen {
 						return
 					}
-					output := compressionSelection(snapshot, summary, rawRange, rawRetire)
+					if requireSkillField && !skillsSeen {
+						return
+					}
+					output := compressionSelection(snapshot, summary, rawRange, rawRetire, rawSkills)
 					if validateCompressionSelection(output, snapshot, limit) != nil {
 						return
 					}

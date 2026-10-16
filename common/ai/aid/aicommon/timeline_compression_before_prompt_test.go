@@ -18,10 +18,10 @@ func TestTimelineCompressionBeforePromptLifecycle(t *testing.T) {
 	calls := 0
 	bindCompressionMock(t, tl, func(req *AIRequest) (string, error) {
 		calls++
-		// The exact schema stays out of the ordinary history sections; it is
-		// listed once as a retained promoted entry the model may delete.
+		// The exact schema stays out of the ordinary history sections. Tool cache
+		// is visible to the model and is not offered for deletion.
 		require.Equal(t, 1, strings.Count(req.GetPrompt(), "EXACT_BEFORE_PROMPT_SCHEMA"))
-		requireCompressionPromotedEntry(t, req.GetPrompt(), 3,
+		requireCompressionToolCacheEntry(t, req.GetPrompt(), "probe",
 			"kind=recent-tool-cache name=probe operation=upsert", "[UPSERT] probe\nEXACT_BEFORE_PROMPT_SCHEMA")
 		if calls == 2 {
 			require.Contains(t, req.GetPrompt(), "FIRST_SUMMARY")

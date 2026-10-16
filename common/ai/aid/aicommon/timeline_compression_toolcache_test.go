@@ -21,8 +21,8 @@ func TestTimelineToolCacheSurvivesHistoryCompression(t *testing.T) {
 		WithToolManager(buildinaitools.NewToolManager(buildinaitools.WithOnlyTools(tool))),
 		WithSpeedPriorityAICallback(func(_ AICallerConfigIf, req *AIRequest) (*AIResponse, error) {
 			requests++
-			// The entry is listed as a deletable candidate with its full
-			// effective body, exactly once.
+			// The entry stays visible with its full effective body, exactly once.
+			// This pass cannot delete tool cache.
 			require.Contains(t, req.GetPrompt(), "kind=recent-tool-cache name=compression_probe")
 			require.Contains(t, req.GetPrompt(), "Direct Params Schema")
 			require.Equal(t, 1, strings.Count(req.GetPrompt(), "EXACT_CACHE_SCHEMA"))
