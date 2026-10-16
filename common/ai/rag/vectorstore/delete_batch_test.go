@@ -6,6 +6,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/gorm"
@@ -14,7 +15,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-func batchDeleteStore(t *testing.T, n int) (*gorm.DB, *SQLiteVectorStoreHNSW, []string) {
+func batchDeleteStore(t *testing.T, n int, opts ...CollectionConfigFunc) (*gorm.DB, *SQLiteVectorStoreHNSW, []string) {
 	t.Helper()
 	db, err := utils.CreateTempTestDatabaseInMemory()
 	require.NoError(t, err)
@@ -26,7 +27,7 @@ func batchDeleteStore(t *testing.T, n int) (*gorm.DB, *SQLiteVectorStoreHNSW, []
 		return v, nil
 	})
 	store, err := NewSQLiteVectorStoreHNSW(t.Name(), "", "mock", 1024, embedder, db,
-		WithDisableEmbedCollectionInfo(true))
+		append(opts, WithDisableEmbedCollectionInfo(true))...)
 	require.NoError(t, err)
 	var ids []string
 	for i := 0; i < n; i++ {
@@ -36,7 +37,7 @@ func batchDeleteStore(t *testing.T, n int) (*gorm.DB, *SQLiteVectorStoreHNSW, []
 	}
 	// Exercise database-backed lazy vectors, as on process restart.
 	GraphWrapperManager.RemoveCollectionFromCache(db, store.collection)
-	store, err = LoadCollection(db, t.Name(), WithEmbeddingClient(embedder))
+	store, err = LoadCollection(db, t.Name(), append(opts, WithEmbeddingClient(embedder))...)
 	require.NoError(t, err)
 	t.Cleanup(func() { GraphWrapperManager.RemoveCollectionFromCache(db, store.collection) })
 	return db, store, ids
@@ -50,10 +51,12 @@ func TestMUSTPASS_DeleteBatchLazyVectors(t *testing.T) {
 			missing.Add(1)
 		}
 	})
-	beforeDeltas := countGraphDeltas(t, db, store.collection.UUID)
 	require.NoError(t, store.Delete(ids[:100]...))
 	require.Zero(t, missing.Load(), "repair/export read an already deleted vector")
-	require.EqualValues(t, beforeDeltas+1, countGraphDeltas(t, db, store.collection.UUID))
+	require.Zero(t, countGraphDeltas(t, db, store.collection.UUID))
+	var collection schema.VectorStoreCollection
+	require.NoError(t, db.First(&collection, store.collection.ID).Error)
+	require.Equal(t, 28, persistedBaseNodes(t, collection.GraphBinary))
 	GraphWrapperManager.RemoveCollectionFromCache(db, store.collection)
 	reloaded, err := LoadCollection(db, t.Name(), WithEmbeddingClient(store.embedder))
 	require.NoError(t, err)
@@ -68,7 +71,7 @@ func TestMUSTPASS_DeleteBatchLazyVectors(t *testing.T) {
 }
 
 func TestMUSTPASS_DeleteBatchRollback(t *testing.T) {
-	db, store, ids := batchDeleteStore(t, 24)
+	db, store, ids := batchDeleteStore(t, 24, WithGraphPersistence(0, time.Hour))
 	var before schema.VectorStoreCollection
 	require.NoError(t, db.First(&before, store.collection.ID).Error)
 	require.NoError(t, db.Exec(`CREATE TRIGGER fail_graph_save BEFORE INSERT ON rag_vector_graph_delta_v1

@@ -434,6 +434,7 @@ type Graph[K cmp.Ordered] struct {
 	trackAdjacency bool
 	// adjacencyDirty values are true when the node was removed from that layer.
 	adjacencyDirty map[adjacencyRef[K]]bool
+	mutation       *graphMutation[K]
 
 	// PQ optimization fields
 	// pqCodebook PQ码表，如果不为nil则启用PQ优化
@@ -950,11 +951,16 @@ func (g *Graph[K]) getNodeType() InputNodeType {
 // Add inserts nodes into the graph.
 // If another node with the same ID exists, it is replaced.
 func (g *Graph[K]) Add(nodes ...InputNode[K]) {
+	if err := g.add(nodes...); err != nil {
+		log.Errorf("add hnsw nodes: %v", err)
+	}
+}
+
+func (g *Graph[K]) add(nodes ...InputNode[K]) (err error) {
 	addStart := time.Now()
 	defer func() {
 		if r := recover(); r != nil {
-			log.Errorf("recover from panic when adding nodes: %v", r)
-			utils.PrintCurrentGoroutineRuntimeStack()
+			err = fmt.Errorf("panic when adding nodes: %v", r)
 		}
 		if g.OnLayersChange != nil {
 			g.OnLayersChange(g.Layers)
@@ -1048,8 +1054,8 @@ func (g *Graph[K]) Add(nodes ...InputNode[K]) {
 			// Handle empty layer case - only insert if i <= insertLevel
 			if layer.entry() == nil {
 				if i <= insertLevel {
-					layer.Nodes = map[K]hnswspec.LayerNode[K]{key: newNode}
 					g.noteUpsert(i, key)
+					layer.Nodes = map[K]hnswspec.LayerNode[K]{key: newNode}
 				}
 				continue
 			}
@@ -1104,8 +1110,8 @@ func (g *Graph[K]) Add(nodes ...InputNode[K]) {
 
 			if i <= insertLevel {
 				// Insert the new node into the layer.
-				layer.Nodes[key] = newNode
 				g.noteUpsert(i, key)
+				layer.Nodes[key] = newNode
 				maxNeighbors := g.M
 				if i == 0 {
 					// The original HNSW design uses a denser base layer (M0=2*M).
@@ -1113,9 +1119,9 @@ func (g *Graph[K]) Add(nodes ...InputNode[K]) {
 				}
 				for _, candidate := range neighborhood {
 					// Create connections between the new node and the best nodes
-					candidate.node.AddNeighbor(newNode, maxNeighbors, nodeDistance)
-					newNode.AddNeighbor(candidate.node, maxNeighbors, nodeDistance)
 					g.noteUpsert(i, candidate.node.GetKey())
+					candidate.node.AddNeighbor(newNode, maxNeighbors, g.nodeDistance)
+					newNode.AddNeighbor(candidate.node, maxNeighbors, g.nodeDistance)
 				}
 			}
 		}
@@ -1134,6 +1140,7 @@ func (g *Graph[K]) Add(nodes ...InputNode[K]) {
 		log.Warnf("HNSW slow add: nodes=%d, final_size=%d, duration=%v", len(nodes), g.Len(), totalAddTime)
 	}
 	log.Debugf("HNSW Add completed: %d nodes added, final graph size: %d, total time: %v", len(nodes), g.Len(), totalAddTime)
+	return nil
 }
 
 // Search finds the k nearest neighbors from the target node.
@@ -1184,6 +1191,9 @@ type SearchResult[T cmp.Ordered] struct {
 }
 
 func (h *Graph[K]) search(near Vector, k int, filter FilterFunc[K]) []SearchResult[K] {
+	if k <= 0 || h.IsEmpty() {
+		return nil
+	}
 	h.assertDims(near)
 	if len(h.Layers) == 0 {
 		return nil
@@ -1193,7 +1203,9 @@ func (h *Graph[K]) search(near Vector, k int, filter FilterFunc[K]) []SearchResu
 		return nil
 	}
 	targetNode := hnswspec.NewStandardLayerNode(entryNode.GetKey(), near)
+	k = min(k, h.Len())
 	distance, batchCosine := h.distanceAgainst(targetNode)
+
 	workspace := h.acquireSearchWorkspace(max(h.EfSearch, k), k)
 	defer h.releaseSearchWorkspace(workspace)
 
@@ -1241,6 +1253,25 @@ func (h *Graph[K]) search(near Vector, k int, filter FilterFunc[K]) []SearchResu
 			out = append(out, result)
 		}
 
+		if k == h.Len() && len(out) < h.Len() {
+			// A request for every result must include disconnected components.
+			// Keep traversal order for equal distances, including the historical
+			// order of connected nodes, and evaluate filters only once per node.
+			for key, node := range h.Layers[0].Nodes {
+				if workspace.visited[key] == workspace.visitGeneration {
+					continue
+				}
+				if filter != nil && !filter(key, node.GetVector()) {
+					continue
+				}
+				result := SearchResult[K]{Key: key, Distance: distance(node, targetNode), IsPQ: node.IsPQEnabled()}
+				if !result.IsPQ {
+					result.Value = node.GetVector()()
+				}
+				out = append(out, result)
+			}
+			slices.SortStableFunc(out, func(a, b SearchResult[K]) int { return cmp.Compare(a.Distance, b.Distance) })
+		}
 		return out
 	}
 
@@ -1571,169 +1602,84 @@ func (g *Graph[K]) TrainPQCodebookFromData(m, k int) (*pq.Codebook, error) {
 // 3. 更新所有节点使用新的PQ编码
 // 4. 设置图的PQ优化
 func (g *Graph[K]) TrainPQCodebookFromDataWithCallback(m, k int, callback func(key K, code []byte, vector []float64) (hnswspec.LayerNode[K], error)) (*pq.Codebook, error) {
-	if len(g.Layers) == 0 || len(g.Layers[0].Nodes) == 0 {
+	if g.IsEmpty() {
 		return nil, utils.Error("no data available for PQ training")
 	}
-
-	// 检查是否已有PQ启用
 	if g.IsPQEnabled() {
 		return nil, utils.Error("PQ is already enabled on this graph")
 	}
-
-	// 收集所有向量数据
-	var allVectors [][]float64
-	for _, layer := range g.Layers {
-		for _, node := range layer.Nodes {
-			vector := node.GetVector()()
-			// 转换 []float32 到 []float64
-			vec64 := make([]float64, len(vector))
-			for i, v := range vector {
-				vec64[i] = float64(v)
-			}
-			allVectors = append(allVectors, vec64)
-		}
+	if callback == nil {
+		return nil, utils.Error("PQ node callback is nil")
 	}
-
-	if len(allVectors) == 0 {
-		return nil, utils.Error("no vectors found for training")
+	// Train on each document once, without over-weighting upper-layer nodes.
+	keys := make([]K, 0, g.Len())
+	for key := range g.Layers[0].Nodes {
+		keys = append(keys, key)
 	}
-
-	// 检查向量维度一致性
-	dims := len(allVectors[0])
-	for _, vec := range allVectors {
-		if len(vec) != dims {
-			return nil, utils.Errorf("inconsistent vector dimensions: expected %d, got %d", dims, len(vec))
+	slices.Sort(keys)
+	vectors := make(map[K][]float64, len(keys))
+	data := make(chan []float64, len(keys))
+	dims := 0
+	for _, key := range keys {
+		raw := g.Layers[0].Nodes[key].GetVector()()
+		if dims == 0 {
+			dims = len(raw)
 		}
+		if len(raw) == 0 || len(raw) != dims {
+			return nil, utils.Error("inconsistent vector dimensions for PQ training")
+		}
+		vector := make([]float64, len(raw))
+		for i, value := range raw {
+			vector[i] = float64(value)
+		}
+		vectors[key] = vector
+		data <- vector
 	}
-
-	// 训练PQ码表
-	log.Infof("Training PQ codebook with %d vectors of dimension %d, M=%d, K=%d", len(allVectors), dims, m, k)
-
-	// 创建数据channel
-	dataChan := make(chan []float64, len(allVectors))
-	go func() {
-		defer close(dataChan)
-		for _, vec := range allVectors {
-			dataChan <- vec
-		}
-	}()
-
-	codebook, err := pq.Train(dataChan, pq.WithM(m), pq.WithK(k), pq.WithMaxIters(50))
+	close(data)
+	codebook, err := pq.Train(data, pq.WithM(m), pq.WithK(k), pq.WithMaxIters(50))
 	if err != nil {
 		return nil, utils.Wrap(err, "training PQ codebook")
 	}
-
-	// 创建量化器
 	quantizer := pq.NewQuantizer(codebook)
-
-	// 设置图的PQ优化
-	g.pqCodebook = codebook
-	g.pqQuantizer = quantizer
-	g.pqAwareDistance = hnswspec.PQAwareCosineDistance[K]
-	g.batchCosine = false
-	g.nodeDistance = func(a, b hnswspec.LayerNode[K]) float64 {
-		return g.pqAwareDistance(a, b, g.pqQuantizer)
-	}
-
-	// 更新所有现有节点为PQ节点
-	log.Infof("Converting %d nodes to PQ encoding", len(allVectors))
-	converted := 0
-
-	// 第一阶段：备份所有节点的邻居关系
-	type neighborBackup struct {
-		nodeKey   K
-		neighbors map[K]hnswspec.LayerNode[K]
-	}
-	var allBackups []neighborBackup
-
-	for _, layer := range g.Layers {
-		for key, node := range layer.Nodes {
-			// 备份当前节点的邻居关系
-			neighbors := make(map[K]hnswspec.LayerNode[K])
-			for neighborKey, neighbor := range node.GetNeighbors() {
-				neighbors[neighborKey] = neighbor
-			}
-			allBackups = append(allBackups, neighborBackup{
-				nodeKey:   key,
-				neighbors: neighbors,
-			})
+	codes := make(map[K][]byte, len(keys))
+	for _, key := range keys {
+		code, err := quantizer.Encode(vectors[key])
+		if err != nil {
+			return nil, err
 		}
+		codes[key] = code
 	}
-
-	// 第二阶段：替换所有节点为PQ节点
-	for _, layer := range g.Layers {
-		for key, node := range layer.Nodes {
-			// 获取原始向量
-			vector := node.GetVector()()
-			vec64 := make([]float64, len(vector))
-			for i, v := range vector {
-				vec64[i] = float64(v)
-			}
-
-			pqCodes, err := quantizer.Encode(vec64)
+	// Prepare replacements without modifying the live graph. A failed node
+	// callback must not leave a partially converted graph with PQ enabled.
+	layers := make([]*Layer[K], len(g.Layers))
+	for level, original := range g.Layers {
+		layer := &Layer[K]{Nodes: make(map[K]hnswspec.LayerNode[K], len(original.Nodes))}
+		layers[level] = layer
+		for key := range original.Nodes {
+			pqNode, err := callback(key, codes[key], vectors[key])
 			if err != nil {
-				log.Errorf("Encode vector failed: %v", err)
-				continue
+				return nil, utils.Wrap(err, "create PQ node")
 			}
-			// 创建PQ节点
-			pqNode, err := callback(key, pqCodes, vec64)
-			if err != nil {
-				log.Errorf("Create PQ node failed: %v", err)
-				continue
+			if pqNode == nil || pqNode.GetKey() != key {
+				return nil, utils.Error("invalid PQ node returned by callback")
 			}
-			var newNode hnswspec.LayerNode[K]
 			if g.nodeType == InputNodeTypeLazy {
-				newNode = hnswspec.NewLazyLayerNode(hnswspec.LazyNodeID(key), func(uid hnswspec.LazyNodeID) (hnswspec.LayerNode[K], error) {
-					return pqNode, nil
-				})
+				layer.Nodes[key] = hnswspec.NewLazyLayerNode[K](key, func(hnswspec.LazyNodeID) (hnswspec.LayerNode[K], error) { return pqNode, nil })
 			} else {
-				newNode = pqNode
-			}
-			// 替换节点
-			layer.Nodes[key] = newNode
-			converted++
-		}
-	}
-
-	// 第三阶段：恢复邻居关系
-	log.Infof("Restoring neighbor relationships for %d nodes", len(allBackups))
-	for _, backup := range allBackups {
-		// 获取替换后的新节点
-		var currentNode hnswspec.LayerNode[K]
-		found := false
-		for _, layer := range g.Layers {
-			if node, exists := layer.Nodes[backup.nodeKey]; exists {
-				currentNode = node
-				found = true
-				break
+				layer.Nodes[key] = pqNode
 			}
 		}
-
-		if !found {
-			log.Errorf("Failed to find replaced node with key %v", backup.nodeKey)
-			continue
-		}
-
-		// 恢复邻居关系
-		for neighborKey, _ := range backup.neighbors {
-			// 找到邻居节点的新版本
-			var neighborNode hnswspec.LayerNode[K]
-			neighborFound := false
-			for _, layer := range g.Layers {
-				if node, exists := layer.Nodes[neighborKey]; exists {
-					neighborNode = node
-					neighborFound = true
-					break
+		for key, originalNode := range original.Nodes {
+			for neighbor := range originalNode.GetNeighbors() {
+				replacement := layer.Nodes[neighbor]
+				if replacement == nil {
+					return nil, utils.Error("PQ conversion encountered a neighbor outside its layer")
 				}
-			}
-
-			if neighborFound {
-				// 使用AddSingleNeighbor恢复单向邻居关系
-				currentNode.AddSingleNeighbor(neighborNode)
+				layer.Nodes[key].AddSingleNeighbor(replacement)
 			}
 		}
 	}
-
-	log.Infof("Successfully converted %d/%d nodes to PQ encoding", converted, len(allVectors))
+	g.Layers, g.pqCodebook, g.pqQuantizer = layers, codebook, quantizer
+	g.configureNodeDistance(g.Distance)
 	return codebook, nil
 }

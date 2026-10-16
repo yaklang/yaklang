@@ -1,6 +1,7 @@
 package hnsw
 
 import (
+	"bytes"
 	"io"
 	"math"
 	"strconv"
@@ -499,25 +500,9 @@ func (p *Persistent[K]) BuildLazyGraph(dataLoader func(key K, data hnswspec.Lazy
 				if len(codes) != int(p.PQCodebook.PQCodeByteSize) {
 					return nil, utils.Errorf("pq code size mismatch: expected %d, got %d", p.PQCodebook.PQCodeByteSize, len(codes))
 				}
-				// 对于 PQ 模式，我们需要创建一个有效的向量来初始化节点
-				// 由于我们只有编码，我们创建一个虚拟向量
-				dummyVec := make([]float64, int(p.Dims))
-				for i := range dummyVec {
-					dummyVec[i] = 0.0 // 使用零向量作为占位符
-				}
-				dummyVec32 := make([]float32, len(dummyVec))
-				for i, v := range dummyVec {
-					dummyVec32[i] = float32(v)
-				}
-				vecFunc := func() []float32 { return dummyVec32 }
-
-				nodeObj, err := hnswspec.NewPQLayerNode(key, vecFunc, g.pqQuantizer)
-				if err != nil {
-					return nil, utils.Wrap(err, "create pq layer node")
-				}
-				// 注意：这里我们使用构造函数创建的节点，它的 PQ codes 已经根据输入向量计算
-				// 如果需要使用原始的 codes，我们需要在 hnswspec 中添加设置方法
-				nodes[uint32(offset)] = nodeObj
+				// Codes are already encoded; encoding a dummy vector would silently
+				// replace every persisted node with the same centroid selection.
+				nodes[uint32(offset)] = hnswspec.NewRawPQLayerNode(key, bytes.Clone(codes))
 			case ExportModeStandard:
 				vecFloat64, ok := node.Code.([]float64)
 				if !ok {
@@ -532,7 +517,7 @@ func (p *Persistent[K]) BuildLazyGraph(dataLoader func(key K, data hnswspec.Lazy
 				}
 				vec = func() []float32 { return vecFloat32 }
 				nodes[uint32(offset)] = hnswspec.NewStandardLayerNode(key, vec)
-			case ExportModeUID:
+			case ExportModeUID, ExportModeIntUID:
 				if dataLoader == nil {
 					return nil, utils.Error("data loader is nil")
 				}

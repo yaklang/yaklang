@@ -83,8 +83,18 @@ func ExportHNSWGraph[K cmp.Ordered](i *Graph[K]) (*Persistent[K], error) {
 
 	keyType := ""
 	var exportMode byte
+	convertUID := i.convertToUIDFunc
+	useUID := i.getNodeType() == InputNodeTypeLazy && convertUID != nil
 	for _k, val := range i.Layers[0].Nodes {
 		keyType = getKeyType(_k)
+		if useUID {
+			uid, err := convertUID(val)
+			if err != nil {
+				return nil, err
+			}
+			original := val
+			val = hnswspec.NewLazyLayerNode[K](uid, func(hnswspec.LazyNodeID) (hnswspec.LayerNode[K], error) { return original, nil })
+		}
 		switch ret := val.(type) {
 		case *hnswspec.PQLayerNode[K]:
 			exportMode = ExportModePQ
@@ -210,8 +220,16 @@ func ExportHNSWGraph[K cmp.Ordered](i *Graph[K]) (*Persistent[K], error) {
 				Key:  i.GetKey(),
 			})
 		case ExportModeUID, ExportModeIntUID, ExportModeStrUID:
+			data := i.GetData()
+			if useUID {
+				var err error
+				data, err = convertUID(i)
+				if err != nil {
+					return 0, err
+				}
+			}
 			pers.OffsetToKey = append(pers.OffsetToKey, &PersistentNode[K]{
-				Code: i.GetData(),
+				Code: data,
 				Key:  i.GetKey(),
 			})
 		default:

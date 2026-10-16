@@ -149,6 +149,7 @@ var ProjectTables = []interface{}{
 	// project level vector collection
 	&VectorStoreCollection{},
 	&VectorStoreDocument{},
+	&VectorStoreGraphDelta{},
 }
 
 func RegisterDatabaseSchema(key uint8, schema ...any) {

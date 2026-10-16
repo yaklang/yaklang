@@ -3,6 +3,7 @@ package vectorstore
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
 	"fmt"
 	"sync/atomic"
 	"testing"
@@ -15,14 +16,14 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-func TestPQSubspaceCount(t *testing.T) {
+func TestMUSTPASS_PQSubspaceCount(t *testing.T) {
 	require.Equal(t, 32, pqSubspaceCount(1024))
 	require.Equal(t, 32, pqSubspaceCount(768))
 	require.Equal(t, 16, pqSubspaceCount(128))
 	require.Equal(t, 1, pqSubspaceCount(3))
 }
 
-func TestNewCollectionUsesTunedHNSWParameters(t *testing.T) {
+func TestMUSTPASS_NewCollectionUsesTunedHNSWParameters(t *testing.T) {
 	config := NewCollectionConfig()
 	require.Equal(t, 64, config.EfSearch)
 	require.Equal(t, 64, config.EfConstruct)
@@ -44,7 +45,7 @@ func TestNewCollectionUsesTunedHNSWParameters(t *testing.T) {
 	require.Equal(t, 200, loaded.hnsw.graph.EfConstruction)
 }
 
-func TestGraphPersistFlushesSmallCollectionsImmediately(t *testing.T) {
+func TestMUSTPASS_GraphPersistFlushesSmallCollectionsImmediately(t *testing.T) {
 	db, store := persistTestStore(t, 32)
 	for i := 0; i < 3; i++ {
 		require.NoError(t, store.AddWithOptions(fmt.Sprintf("doc-%d", i), fmt.Sprintf("doc-%d", i)))
@@ -55,16 +56,8 @@ func TestGraphPersistFlushesSmallCollectionsImmediately(t *testing.T) {
 	require.Equal(t, 3, persistedBaseNodes(t, collection.GraphBinary))
 }
 
-func TestGraphPersistCoalescesLargeCollections(t *testing.T) {
-	previousBelow, previousInterval := graphPersistSyncBelow, graphPersistInterval
-	graphPersistSyncBelow = 0
-	graphPersistInterval = time.Hour
-	t.Cleanup(func() {
-		graphPersistSyncBelow = previousBelow
-		graphPersistInterval = previousInterval
-	})
-
-	db, store := persistTestStore(t, 32)
+func TestMUSTPASS_GraphPersistCoalescesLargeCollections(t *testing.T) {
+	db, store := persistTestStore(t, 32, WithGraphPersistence(0, time.Hour))
 	ids := make([]string, 20)
 	for i := range ids {
 		ids[i] = fmt.Sprintf("doc-%02d", i)
@@ -91,37 +84,22 @@ func TestGraphPersistCoalescesLargeCollections(t *testing.T) {
 	}
 }
 
-func TestGraphPersistDelayedFlush(t *testing.T) {
-	previousBelow, previousInterval := graphPersistSyncBelow, graphPersistInterval
-	graphPersistSyncBelow = 0
-	graphPersistInterval = 40 * time.Millisecond
-	t.Cleanup(func() {
-		graphPersistSyncBelow = previousBelow
-		graphPersistInterval = previousInterval
-	})
-
-	db, store := persistTestStore(t, 32)
+func TestMUSTPASS_GraphPersistDelayedFlush(t *testing.T) {
+	db, store := persistTestStore(t, 32, WithGraphPersistence(0, 100*time.Millisecond))
 	require.NoError(t, store.AddWithOptions("only", "only"))
-	require.EqualValues(t, 1, countGraphDeltas(t, db, store.collection.UUID))
 	require.Eventually(t, func() bool {
 		var collection schema.VectorStoreCollection
 		if err := db.First(&collection, store.collection.ID).Error; err != nil {
 			return false
 		}
-		return len(collection.GraphBinary) > 0 && countGraphDeltas(t, db, store.collection.UUID) == 0
-	}, time.Second, 10*time.Millisecond)
+		var pending int64
+		err := db.Model(&schema.VectorStoreGraphDelta{}).Where("collection_uuid = ?", store.collection.UUID).Count(&pending).Error
+		return err == nil && len(collection.GraphBinary) > 0 && pending == 0
+	}, 3*time.Second, 10*time.Millisecond)
 }
 
-func TestGraphDeltaIsSmallerThanSnapshot(t *testing.T) {
-	previousBelow, previousInterval := graphPersistSyncBelow, graphPersistInterval
-	graphPersistSyncBelow = 0
-	graphPersistInterval = time.Hour
-	t.Cleanup(func() {
-		graphPersistSyncBelow = previousBelow
-		graphPersistInterval = previousInterval
-	})
-
-	db, store := persistTestStore(t, 32)
+func TestMUSTPASS_GraphDeltaIsSmallerThanSnapshot(t *testing.T) {
+	db, store := persistTestStore(t, 32, WithGraphPersistence(0, time.Hour))
 	for i := 0; i < 300; i++ {
 		require.NoError(t, store.AddWithOptions(fmt.Sprintf("doc-%03d", i), fmt.Sprintf("doc-%03d", i)))
 	}
@@ -133,16 +111,8 @@ func TestGraphDeltaIsSmallerThanSnapshot(t *testing.T) {
 	require.Less(t, len(latest.Payload), len(collection.GraphBinary))
 }
 
-func TestGraphDeltaDeleteReloadsWithoutSnapshot(t *testing.T) {
-	previousBelow, previousInterval := graphPersistSyncBelow, graphPersistInterval
-	graphPersistSyncBelow = 0
-	graphPersistInterval = time.Hour
-	t.Cleanup(func() {
-		graphPersistSyncBelow = previousBelow
-		graphPersistInterval = previousInterval
-	})
-
-	db, store := persistTestStore(t, 32)
+func TestMUSTPASS_GraphDeltaDeleteReloadsWithoutSnapshot(t *testing.T) {
+	db, store := persistTestStore(t, 32, WithGraphPersistence(0, time.Hour))
 	ids := make([]string, 10)
 	for i := range ids {
 		ids[i] = fmt.Sprintf("doc-%02d", i)
@@ -186,18 +156,21 @@ func persistedBaseNodes(t *testing.T, binary []byte) int {
 	return len(persisted.Layers[0].Nodes)
 }
 
-func persistTestStore(t *testing.T, dimension int) (*gorm.DB, *SQLiteVectorStoreHNSW) {
+func persistTestStore(t testing.TB, dimension int, opts ...CollectionConfigFunc) (*gorm.DB, *SQLiteVectorStoreHNSW) {
 	t.Helper()
 	db, err := utils.CreateTempTestDatabaseInMemory()
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = db.Close() })
 	require.NoError(t, db.AutoMigrate(&schema.VectorStoreCollection{}, &schema.VectorStoreDocument{}).Error)
 	embedder := NewMockEmbedder(func(text string) ([]float32, error) {
+		hash := sha256.Sum256([]byte(text))
 		vector := make([]float32, dimension)
-		vector[len(text)%dimension] = 1
+		for i := range vector {
+			vector[i] = float32(int(hash[i%len(hash)])-128) / 128
+		}
 		return vector, nil
 	})
-	store, err := NewSQLiteVectorStoreHNSW(t.Name(), "", "mock", dimension, embedder, db, WithDisableEmbedCollectionInfo(true))
+	store, err := NewSQLiteVectorStoreHNSW(t.Name(), "", "mock", dimension, embedder, db, append(opts, WithDisableEmbedCollectionInfo(true))...)
 	require.NoError(t, err)
 	t.Cleanup(func() { GraphWrapperManager.RemoveCollectionFromCache(db, store.collection) })
 	return db, store

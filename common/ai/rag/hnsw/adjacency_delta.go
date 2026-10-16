@@ -36,7 +36,11 @@ func (g *Graph[K]) EnableAdjacencyTracking() {
 }
 
 func (g *Graph[K]) noteUpsert(layer int, key K) {
-	if g == nil || !g.trackAdjacency {
+	if g == nil {
+		return
+	}
+	g.saveAdjacency(layer, key)
+	if !g.trackAdjacency {
 		return
 	}
 	if g.adjacencyDirty == nil {
@@ -46,7 +50,11 @@ func (g *Graph[K]) noteUpsert(layer int, key K) {
 }
 
 func (g *Graph[K]) noteDelete(layer int, key K) {
-	if g == nil || !g.trackAdjacency {
+	if g == nil {
+		return
+	}
+	g.saveAdjacency(layer, key)
+	if !g.trackAdjacency {
 		return
 	}
 	if g.adjacencyDirty == nil {
@@ -111,63 +119,81 @@ func (g *Graph[K]) ApplyAdjacencyChanges(changes []AdjacencyChange[K], create fu
 	if g == nil || len(changes) == 0 {
 		return nil
 	}
+	// A caller may supply several mutations at once, including delete/reinsert
+	// cycles. Only the last neighborhood for a layer/key is authoritative.
+	latest := make(map[adjacencyRef[K]]AdjacencyChange[K], len(changes))
+	for _, change := range changes {
+		if change.Layer < 0 || change.Layer >= 1<<16 {
+			return fmt.Errorf("invalid hnsw adjacency layer %d", change.Layer)
+		}
+		latest[adjacencyRef[K]{layer: change.Layer, key: change.Key}] = change
+	}
 	tracking := g.trackAdjacency
 	g.trackAdjacency = false
 	defer func() { g.trackAdjacency = tracking }()
 
-	for _, change := range changes {
-		if !change.Deleted {
-			for len(g.Layers) <= change.Layer {
-				g.Layers = append(g.Layers, &Layer[K]{Nodes: map[K]hnswspec.LayerNode[K]{}})
+	deleted := make(map[int]map[K]struct{})
+	for ref, change := range latest {
+		if change.Deleted {
+			if ref.layer < len(g.Layers) && g.Layers[ref.layer] != nil {
+				delete(g.Layers[ref.layer].Nodes, ref.key)
+				if deleted[ref.layer] == nil {
+					deleted[ref.layer] = make(map[K]struct{})
+				}
+				deleted[ref.layer][ref.key] = struct{}{}
 			}
-			if _, ok := g.Layers[change.Layer].Nodes[change.Key]; ok {
-				continue
-			}
-			if create == nil {
-				return fmt.Errorf("hnsw adjacency delta references missing node %v", change.Key)
-			}
-			node, err := create(change.Key)
-			if err != nil {
-				return err
-			}
-			if g.Layers[change.Layer].Nodes == nil {
-				g.Layers[change.Layer].Nodes = map[K]hnswspec.LayerNode[K]{}
-			}
-			g.Layers[change.Layer].Nodes[change.Key] = node
-		}
-	}
-
-	for _, change := range changes {
-		if change.Layer < 0 || change.Layer >= len(g.Layers) || g.Layers[change.Layer] == nil {
 			continue
 		}
-		layer := g.Layers[change.Layer]
-		if change.Deleted {
-			delete(layer.Nodes, change.Key)
-			for _, node := range layer.Nodes {
-				if node != nil {
-					node.RemoveNeighbor(change.Key)
+		for len(g.Layers) <= ref.layer {
+			g.Layers = append(g.Layers, &Layer[K]{Nodes: make(map[K]hnswspec.LayerNode[K])})
+		}
+		if g.Layers[ref.layer] == nil {
+			g.Layers[ref.layer] = &Layer[K]{Nodes: make(map[K]hnswspec.LayerNode[K])}
+		}
+		layer := g.Layers[ref.layer]
+		if layer.Nodes[ref.key] != nil {
+			continue
+		}
+		if create == nil {
+			return fmt.Errorf("hnsw adjacency delta references missing node %v", ref.key)
+		}
+		node, err := create(ref.key)
+		if err != nil {
+			return err
+		}
+		if node == nil || node.GetKey() != ref.key {
+			return fmt.Errorf("invalid hnsw adjacency node %v", ref.key)
+		}
+		if layer.Nodes == nil {
+			layer.Nodes = make(map[K]hnswspec.LayerNode[K])
+		}
+		layer.Nodes[ref.key] = node
+	}
+	// Scan each affected layer once, rather than once per deleted node.
+	for level, keys := range deleted {
+		for _, node := range g.Layers[level].Nodes {
+			for key := range node.GetNeighbors() {
+				if _, drop := keys[key]; drop {
+					node.RemoveNeighbor(key)
 				}
 			}
+		}
+	}
+	for ref, change := range latest {
+		if change.Deleted {
 			continue
 		}
-		node := layer.Nodes[change.Key]
-		if node == nil {
-			continue
-		}
-		neighbors := node.GetNeighbors()
-		for key := range neighbors {
-			delete(neighbors, key)
-		}
-		for _, neighborKey := range change.Neighbors {
-			neighbor, ok := layer.Nodes[neighborKey]
-			if !ok || neighbor == nil || neighborKey == change.Key {
-				continue
+		layer := g.Layers[ref.layer]
+		node := layer.Nodes[ref.key]
+		clear(node.GetNeighbors())
+		for _, key := range change.Neighbors {
+			neighbor := layer.Nodes[key]
+			if neighbor == nil || key == ref.key {
+				return fmt.Errorf("invalid hnsw adjacency neighbor %v for node %v on layer %d", key, ref.key, ref.layer)
 			}
 			node.AddSingleNeighbor(neighbor)
 		}
 	}
-
 	for len(g.Layers) > 0 && (g.Layers[len(g.Layers)-1] == nil || len(g.Layers[len(g.Layers)-1].Nodes) == 0) {
 		g.Layers = g.Layers[:len(g.Layers)-1]
 	}

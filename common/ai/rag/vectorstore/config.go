@@ -29,6 +29,10 @@ type CollectionConfig struct {
 	LayerGenerationFactor float64
 	EfSearch              int
 	EfConstruct           int
+	// GraphPersistSyncBelow compacts small graphs after mutation; zero uses
+	// only background compaction. Each committed delta is durable either way.
+	GraphPersistSyncBelow int
+	GraphPersistInterval  time.Duration
 
 	EnablePQ                   bool
 	EnableAutoUpdateGraphInfos bool
@@ -69,6 +73,8 @@ func NewCollectionConfig(options ...CollectionConfigFunc) *CollectionConfig {
 		// ef_search and ef_construct values stored on its row.
 		EfSearch:                   64,
 		EfConstruct:                64,
+		GraphPersistSyncBelow:      1024,
+		GraphPersistInterval:       time.Second,
 		EnableAutoUpdateGraphInfos: true,
 		MaxChunkSize:               defaultMaxChunkSize,
 		Overlap:                    defaultChunkOverlap,
@@ -97,6 +103,8 @@ func LoadConfigFromCollectionInfo(collection *schema.VectorStoreCollection, opti
 		LayerGenerationFactor:      collection.Ml,
 		EfSearch:                   collection.EfSearch,
 		EfConstruct:                collection.EfConstruct,
+		GraphPersistSyncBelow:      1024,
+		GraphPersistInterval:       time.Second,
 		Description:                collection.Description,
 		EnablePQ:                   collection.EnablePQMode,
 		EnableAutoUpdateGraphInfos: true,
@@ -179,6 +187,18 @@ func (c *CollectionConfig) FixEmbeddingClient() error {
 }
 
 type CollectionConfigFunc func(config *CollectionConfig)
+
+// WithGraphPersistence tunes compaction without delaying durable delta writes.
+// syncBelow=0 disables synchronous compaction. A nonpositive interval uses 1s.
+func WithGraphPersistence(syncBelow int, interval time.Duration) CollectionConfigFunc {
+	if interval <= 0 {
+		interval = time.Second
+	}
+	return func(config *CollectionConfig) {
+		config.GraphPersistSyncBelow = max(0, syncBelow)
+		config.GraphPersistInterval = interval
+	}
+}
 
 func WithKeyAsUID(keyAsUID bool) CollectionConfigFunc {
 	return func(config *CollectionConfig) {
