@@ -90,7 +90,11 @@ func wrapperOwnedDataMatrix(t *testing.T, cases []wrapperBitsControl) {
 				if c.ExpectedCloseOutstanding != 0 {
 					require.Equal(t, 1, c.ExpectedCloseOutstanding)
 					require.Len(t, events, expectedEvents+1)
-					assertWrapperStructuredClose(t, events[expectedEvents:])
+					if c.Name == "text-selective-parameter" {
+						wrapperCloseHistorical(t, events[expectedEvents:], c.Name, c.InputAlias, c.Transport, true, "ctx-canceled")
+					} else {
+						assertWrapperStructuredClose(t, events[expectedEvents:])
+					}
 					require.Greater(t, events[expectedEvents].ID, events[expectedEvents-1].ID)
 					frameEvents = events[:expectedEvents]
 					require.EqualValues(t, 1, stats.Incomplete)
@@ -165,7 +169,11 @@ func wrapperOwnedDataBudgetsOwnership(t *testing.T, cases []wrapperBitsControl) 
 					}
 					closed := s.Close("bits")
 					if c.ExpectedCloseOutstanding != 0 {
-						assertWrapperStructuredClose(t, closed)
+						if c.Name == "text-selective-parameter" {
+							wrapperCloseHistorical(t, closed, c.Name, c.InputAlias, c.Transport, false, "bits")
+						} else {
+							assertWrapperStructuredClose(t, closed)
+						}
 					} else {
 						require.Empty(t, closed)
 					}

@@ -306,7 +306,7 @@ type wrapperCloseHistory struct {
 	Index                                   int    `json:"index0"`
 	CaptureSHA                              string `json:"capture_sha256"`
 	Profile, Transport, Source, Destination string
-	Direction                               int
+	Direction, Interface                    int
 	NativeTime                              int64  `json:"native_time_ns"`
 	NativeOffset                            uint64 `json:"native_offset"`
 	CaptureTime                             int64  `json:"capture_time_ns"`
@@ -320,7 +320,12 @@ func wrapperCloseHistoryItems(t *testing.T) []wrapperCloseHistory {
 	var doc struct{ Items []wrapperCloseHistory }
 	require.NoError(t, json.Unmarshal(raw, &doc))
 	require.Len(t, doc.Items, 4)
-	return doc.Items
+	supplement := finsReadBatch(t, "dlms-wrapper-close", "DLMS_WRAPPER_CLOSE_TEST_ROOT", "historical-close-upgrades-supplement.json")
+	require.Equal(t, "5ac6b61e9f99942f72bf3c4d340c8b7a6391d4b4f85a41b65dc920353860b504", fmt.Sprintf("%x", sha256.Sum256(supplement)))
+	var extra struct{ Items []wrapperCloseHistory }
+	require.NoError(t, json.Unmarshal(supplement, &extra))
+	require.Len(t, extra.Items, 4)
+	return append(doc.Items, extra.Items...)
 }
 func wrapperCloseHistorical(t *testing.T, es []*ProtocolEvent, name, alias, transport string, replay bool, reason string) {
 	t.Helper()
@@ -347,6 +352,7 @@ func wrapperCloseHistorical(t *testing.T, es []*ProtocolEvent, name, alias, tran
 	require.Equal(t, "incomplete", e.Status)
 	require.Equal(t, "incomplete", e.Completeness)
 	require.Equal(t, w.Direction, e.Direction)
+	require.Equal(t, CaptureDomain{Interface: w.Interface}, e.Domain)
 	require.Equal(t, w.Source, e.Source)
 	require.Equal(t, w.Destination, e.Destination)
 	at, off := w.NativeTime, w.NativeOffset
@@ -376,8 +382,18 @@ func TestDLMSWrapperCloseHistoricalBinding(t *testing.T) {
 		var doc struct{ Cases []map[string]any }
 		require.NoError(t, json.Unmarshal(raw, &doc))
 		c := doc.Cases[w.Index]
-		require.Equal(t, w.Name, c["name"])
-		require.Equal(t, w.InputAlias, c["input_alias"])
+		if w.MemberAlias == "udp-context/controls.json" {
+			require.Equal(t, w.Name, c["id"])
+		} else {
+			require.Equal(t, w.Name, c["name"])
+		}
+		if w.MemberAlias == "udp-context/controls.json" {
+			require.Equal(t, w.InputAlias, "common/pcapx/pcaputil/udp-context/"+c["capture"].(string))
+		} else if w.MemberAlias == "dlms-get-list/controls.json" {
+			require.Equal(t, w.InputAlias, "common/pcapx/pcaputil/dlms-get-list/"+c["original_path"].(string))
+		} else {
+			require.Equal(t, w.InputAlias, c["input_alias"])
+		}
 		cap := wrapperStructuredInput(t, w.InputAlias)
 		require.Equal(t, w.CaptureSHA, fmt.Sprintf("%x", sha256.Sum256(cap)))
 	}

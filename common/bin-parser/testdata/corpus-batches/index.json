@@ -113298,6 +113298,33 @@
         "common/pcapx/pcaputil/dlms-wrapper-close/reuse-inputs.json": "dlms-wrapper-close/reuse-inputs.json",
         "scripts/protocol-tests/required-tests-traffic-unified-v145.json": "required-tests-traffic-unified-v145.json"
       }
+    },
+    {
+      "id": "validation-dlms-wrapper-close-historical-supplement",
+      "kind": "support",
+      "source_sha": "160484544bbd6831ed0f64bd1418d234d027c165",
+      "file": "validation-dlms-wrapper-close-historical-supplement.zip",
+      "sha256": "1bd66a64f19641a988624946d3c70082be402e9fcd19d06e3034721905af73e9",
+      "password": "bin-parser",
+      "members": {
+        "dlms-wrapper-close-supplement-tools/SOURCES.json": {
+          "bytes": 494,
+          "sha256": "e95a0905a69d100a3a3082f4ef04e3b35f0921562836dedad7b4b419f84231f2"
+        },
+        "dlms-wrapper-close-supplement-tools/rebuild.py": {
+          "bytes": 4298,
+          "sha256": "642fc10ef59cd6a34e69357218c35add62d93c24a810a36cdddd8881ab5c352f"
+        },
+        "dlms-wrapper-close/historical-close-upgrades-supplement.json": {
+          "bytes": 5455,
+          "sha256": "5ac6b61e9f99942f72bf3c4d340c8b7a6391d4b4f85a41b65dc920353860b504"
+        }
+      },
+      "aliases": {
+        "common/pcapx/pcaputil/dlms-wrapper-close-supplement-tools/SOURCES.json": "dlms-wrapper-close-supplement-tools/SOURCES.json",
+        "common/pcapx/pcaputil/dlms-wrapper-close-supplement-tools/rebuild.py": "dlms-wrapper-close-supplement-tools/rebuild.py",
+        "common/pcapx/pcaputil/dlms-wrapper-close/historical-close-upgrades-supplement.json": "dlms-wrapper-close/historical-close-upgrades-supplement.json"
+      }
     }
   ],
   "schema_version": 1,

@@ -173,7 +173,20 @@ func TestUDPContextSealedMatrix(t *testing.T) {
 				flat.Events = append(flat.Events, w.tftpFileEvent)
 			}
 			discoveryMatrix(t, func(t *testing.T, workers int, deferred, observe bool) {
-				events, stats := tftpFileReplay(t, flat, raw, workers, deferred, observe)
+				foreignWrapper := c.ID == "Wrapper-foreign-endpoint" || c.ID == "Wrapper-foreign-interface"
+				replayCase := flat
+				if foreignWrapper {
+					replayCase.Events = append(append([]tftpFileEvent(nil), flat.Events...), tftpFileEvent{QueryError: "NeedMore", Session: map[string]any{"Outstanding": 1}})
+				}
+				events, stats := tftpFileReplay(t, replayCase, raw, workers, deferred, observe)
+				if foreignWrapper {
+					require.Len(t, events, len(c.Events)+1)
+					require.NotEqual(t, events[0].FlowID, events[1].FlowID)
+					require.Equal(t, events[1].FlowID, events[len(c.Events)].FlowID)
+					require.EqualValues(t, 1, stats.Incomplete)
+					wrapperCloseHistorical(t, events[len(c.Events):], c.ID, "common/pcapx/pcaputil/udp-context/"+c.Capture, "udp", true, "ctx-canceled")
+					events = events[:len(c.Events)]
+				}
 				udpContextCheck(t, c, events, deferred, true)
 				require.Zero(t, stats.BufferedBytes)
 				require.Zero(t, stats.CallbackPanics)

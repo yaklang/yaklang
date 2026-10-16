@@ -353,7 +353,14 @@ func TestDLMSWrapperGetListSealedMatrix(t *testing.T) {
 				if c.Targets.Outstanding != nil && c.Limits.Frame == 0 {
 					require.Equal(t, *c.Targets.Outstanding, outstanding)
 				}
-				if c.Transport == "tcp" && outstanding > 0 && !invalid {
+				if c.Name == "list-udp-refusal-blocks-pending" {
+					require.False(t, invalid)
+					require.Equal(t, 1, outstanding)
+					require.EqualValues(t, 1, stats.Incomplete)
+					require.Len(t, diagnostics, 1)
+					require.Equal(t, msgs[0].FlowID, diagnostics[0].FlowID)
+					wrapperCloseHistorical(t, diagnostics, c.Name, "common/pcapx/pcaputil/dlms-get-list/"+c.OriginalPath, c.Transport, true, "ctx-canceled")
+				} else if c.Transport == "tcp" && outstanding > 0 && !invalid {
 					require.Len(t, diagnostics, 1)
 					require.EqualValues(t, outstanding, diagnostics[0].Session["Outstanding"])
 				} else {
