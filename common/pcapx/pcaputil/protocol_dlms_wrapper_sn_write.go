@@ -38,15 +38,9 @@ func decodeWrapperSNWrite(w []byte, limit, depth int) (*wrapperMessage, error) {
 		}
 		row := map[string]any{"index": int(i), "apdu_offset": at}
 		if m.request {
-			if choice[0] != 2 {
-				return nil, wrapperError(ErrUnsupportedFeature, "SN Write selected variable-name choice2 only")
-			}
-			name, err := c.take(2)
-			if err != nil {
+			if err := wrapperSNAccess(&c, row, choice[0], limit); err != nil {
 				return nil, err
 			}
-			row["access_choice_raw"], row["access_choice"] = choice[0], "variable-name"
-			row["variable_name"], row["variable_name_hex"] = binary.BigEndian.Uint16(name), hex.EncodeToString(name)
 		} else {
 			row["result_choice_raw"] = choice[0]
 			switch choice[0] {

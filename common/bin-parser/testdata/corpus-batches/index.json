@@ -116496,6 +116496,342 @@
         "common/pcapx/pcaputil/dlms-sn-information-segments/reuse-inputs.json": "dlms-sn-information-segments/reuse-inputs.json",
         "scripts/protocol-tests/required-tests-traffic-unified-v158.json": "required-tests-traffic-unified-v158.json"
       }
+    },
+    {
+      "id": "validation-dlms-sn-parameterized-access",
+      "kind": "support",
+      "source_sha": "cfa1c064fc4918d13faac560b9df27ba554915a9",
+      "file": "validation-dlms-sn-parameterized-access.zip",
+      "sha256": "2dfa3469c895c7a1892492400ca21b6a94ae5ffcd8fc1baad855543db9bbcef5",
+      "password": "bin-parser",
+      "members": {
+        "dlms-sn-parameterized-access/baseline-controls.json": {
+          "bytes": 188836,
+          "sha256": "30095e2e2b6596d301716ab2501fd7f53332542c8971d674f98fcf2830922d64"
+        },
+        "dlms-sn-parameterized-access/controls.json": {
+          "bytes": 1194767,
+          "sha256": "74dedf7b7c3ff91c92bb988d6e5226ea9f3f4e0c774e064191617cc52a09691b"
+        },
+        "dlms-sn-parameterized-access/historical-parameterized-upgrade.json": {
+          "bytes": 15002,
+          "sha256": "0dea92eeaeb4c09402aa7891cd200a382cb0af008da43fe42d38cdc84c433da3"
+        },
+        "dlms-sn-parameterized-access/historical-wrapper-parameterized-upgrade.json": {
+          "bytes": 12226,
+          "sha256": "6a0dd2a6cdc3fd9e260bcbb726c41513c973883afdde2563f4ac53745e10b244"
+        },
+        "dlms-sn-parameterized-hdlc/Getprimed-parameterized-SNRead-request-response-information-groups-default-pool.tcp.pcap": {
+          "bytes": 764,
+          "sha256": "2f1e55c41ac931ac7aa7afbf543b95d522dca58c216ee8e76f94d7c9ef6410be"
+        },
+        "dlms-sn-parameterized-hdlc/Getprimed-parameterized-SNRead-request-response-information-groups-default-pool.udp.pcap": {
+          "bytes": 482,
+          "sha256": "02f1ab3038e659594e8e34504885b557de889be881672416b90d328b8ae43769"
+        },
+        "dlms-sn-parameterized-hdlc/Getprimed-parameterized-SNWrite-request-response-information-groups-default-pool.tcp.pcap": {
+          "bytes": 765,
+          "sha256": "d9afa16c7647f1bc33959261b5f0f674974f14382198ba58a52502d628d6045a"
+        },
+        "dlms-sn-parameterized-hdlc/Getprimed-parameterized-SNWrite-request-response-information-groups-default-pool.udp.pcap": {
+          "bytes": 483,
+          "sha256": "ac2f7f2b3a49caf1c25eb5470b6f96f97b134d67c14c015e1227a8a86d5162ad"
+        },
+        "dlms-sn-parameterized-hdlc/Write-parameter-and-value-shared4nodes-cap4-positive.tcp.pcap": {
+          "bytes": 420,
+          "sha256": "1b84cd2dbf4046f30b9181bf873451d2747d388d5abe21ec5361dfba0d4347fd"
+        },
+        "dlms-sn-parameterized-hdlc/Write-parameter-and-value-shared4nodes-cap4-positive.udp.pcap": {
+          "bytes": 186,
+          "sha256": "1973f2c1b28bfff493ffc937e90bb624444e326eda61000f714db4cbaa674fb9"
+        },
+        "dlms-sn-parameterized-hdlc/mixed-choice2-4-selectors0-255-ordered-parameters-values.tcp.pcap": {
+          "bytes": 634,
+          "sha256": "587b7beab3068d7c7b31c19f33fb8e216d9ac18b49b668b6cae1fcb9f0175a7c"
+        },
+        "dlms-sn-parameterized-hdlc/mixed-choice2-4-selectors0-255-ordered-parameters-values.udp.pcap": {
+          "bytes": 376,
+          "sha256": "ca3c758e0f65bcf740a7e3a14d0132653246f34c84a46411690838f9375b8970"
+        },
+        "dlms-sn-parameterized-hdlc/parameter-selector-Data-truncation-and-trailing-Malformed.tcp.pcap": {
+          "bytes": 1132,
+          "sha256": "bdc14bad9dbf5475028a0de35955d753b353e5fe1cbf60473e95024c49767336"
+        },
+        "dlms-sn-parameterized-hdlc/parameter-selector-Data-truncation-and-trailing-Malformed.udp.pcap": {
+          "bytes": 802,
+          "sha256": "4512e7b48ab314d7c2c039f5733dd321515f107f32b633b1402172af5753d8e8"
+        },
+        "dlms-sn-parameterized-hdlc/reuse-inputs.json": {
+          "bytes": 995,
+          "sha256": "2a5262a5b8b8e08e671ce0f586821c97124eeacdc76ea62c3aadb8b912092133"
+        },
+        "dlms-sn-parameterized-hdlc/single-parameterized-Read-and-normal-response.tcp.pcap": {
+          "bytes": 415,
+          "sha256": "7d8293be7fbd18ddaed87348368533fe42bbcf4466c6c57b76c276cec20e2de1"
+        },
+        "dlms-sn-parameterized-hdlc/single-parameterized-Read-and-normal-response.udp.pcap": {
+          "bytes": 181,
+          "sha256": "214657797bdc2e68e415dc82b470de46443dee0d65bc8517c617c1ac0c94a8e9"
+        },
+        "dlms-sn-parameterized-hdlc/single-parameterized-Write-and-successNULL-response.tcp.pcap": {
+          "bytes": 416,
+          "sha256": "93b3a2cb0051affb3cb6184d8544634386afccfadfe9baf1980e481c64f85f26"
+        },
+        "dlms-sn-parameterized-hdlc/single-parameterized-Write-and-successNULL-response.udp.pcap": {
+          "bytes": 182,
+          "sha256": "7dc761e134ab2207e0c67ccc3d2d16276ec0434d752cd0c7b13f516a1b5aee78"
+        },
+        "dlms-sn-parameterized-hdlc/source-derived-public-readRowsByEntry-parameter-Structure4.tcp.pcap": {
+          "bytes": 431,
+          "sha256": "fb174a617d60a656d085c64db2f825aca0951bba26cd44323e0a681cb176720a"
+        },
+        "dlms-sn-parameterized-hdlc/source-derived-public-readRowsByEntry-parameter-Structure4.udp.pcap": {
+          "bytes": 197,
+          "sha256": "902db6dd0abacebf4178d5f1818f553823c0e11544de8db32f297e7dbd420699"
+        },
+        "dlms-sn-parameterized-hdlc/two-Read-descriptor-parameters-shared4nodes-cap3-refusal.tcp.pcap": {
+          "bytes": 425,
+          "sha256": "e9f3b506d52055b1e4f19017e8db959e43000583f10a58d10762fdce28933bd9"
+        },
+        "dlms-sn-parameterized-hdlc/two-Read-descriptor-parameters-shared4nodes-cap3-refusal.udp.pcap": {
+          "bytes": 191,
+          "sha256": "94b7d855b0bd42e052d556eb3e8026452e376b6bbd820646cfea27866dfe12ef"
+        },
+        "dlms-sn-parameterized-hdlc/two-Read-descriptor-parameters-shared4nodes-cap4-positive.tcp.pcap": {
+          "bytes": 427,
+          "sha256": "bb566b833ce190322688c01e41f4a51763541c25dca72cac6e85a951a14da539"
+        },
+        "dlms-sn-parameterized-hdlc/two-Read-descriptor-parameters-shared4nodes-cap4-positive.udp.pcap": {
+          "bytes": 193,
+          "sha256": "b90c7b1f8a98e1b3fc78408062a2d94a5c47fb12c10b191f6f8324a4be470776"
+        },
+        "dlms-sn-parameterized-hdlc/unselected-choice-SDK04-and-unequal-count-localUnsupported.tcp.pcap": {
+          "bytes": 782,
+          "sha256": "8fbbe4715f383fb438222de3cdacc52b289adac382f7b73a92f8f3c14d4834af"
+        },
+        "dlms-sn-parameterized-hdlc/unselected-choice-SDK04-and-unequal-count-localUnsupported.udp.pcap": {
+          "bytes": 500,
+          "sha256": "452dfb0f28cd5783d612a5fda2a337f9757702b38ca91d73e897ee407d2757e3"
+        },
+        "dlms-sn-parameterized-tools/SOURCE-ADDENDUM.json": {
+          "bytes": 648,
+          "sha256": "b254c3789bae23ca2ffc98a2585363982adfc5b28fb9acfe10b2271cfe1ba071"
+        },
+        "dlms-sn-parameterized-tools/SOURCES.json": {
+          "bytes": 9060,
+          "sha256": "9f9e81006a54bd4cc7a0a60c08ef154895eb058d589b1c01f2c2e74ad999d2ea"
+        },
+        "dlms-sn-parameterized-tools/access.py": {
+          "bytes": 4354,
+          "sha256": "3166cdf13b9934650fdaa34051ba1d6365c6521028ab132898597e424c23e586"
+        },
+        "dlms-sn-parameterized-tools/actual-memory-parameterized-frames.json": {
+          "bytes": 825,
+          "sha256": "1a343aab4202fda2ea05095e433412e44e6f770eccf96a7ee9dee0fc9f55c67a"
+        },
+        "dlms-sn-parameterized-tools/carrier.py": {
+          "bytes": 10367,
+          "sha256": "f4427adbc4bea3bf0c80883f9916e99be4faeb8abc267a190235fc842a3399fa"
+        },
+        "dlms-sn-parameterized-tools/generate.py": {
+          "bytes": 7209,
+          "sha256": "c394c643c2859450952f62c1566d80d950b8b2b08121c754377763fd3004e010"
+        },
+        "dlms-sn-parameterized-tools/model-pins.json": {
+          "bytes": 725,
+          "sha256": "e0aea43de3e07063d7047e7e4a5f27e506ba06aff5ca214cb4dd2bd9de30113f"
+        },
+        "dlms-sn-parameterized-tools/read-body.py": {
+          "bytes": 4002,
+          "sha256": "9038061ed63630258c65a5b9e11e51888d414b290fea0aa2bd14743e2a7af4cd"
+        },
+        "dlms-sn-parameterized-tools/rebuild.py": {
+          "bytes": 592,
+          "sha256": "f88adaa5f35c9c85d8faa0d4c041fe9bf3bc7409d73a5a8ee241574d43afcd86"
+        },
+        "dlms-sn-parameterized-tools/reference-vectors.json": {
+          "bytes": 6734,
+          "sha256": "3d7c0f01b305e3524efa5dab640dd9ae4730fe7ed789ca9ef015a5c39b846b8d"
+        },
+        "dlms-sn-parameterized-tools/segments-model.py": {
+          "bytes": 5726,
+          "sha256": "25721a5036f0f6b049864a2ef60978239a0e6f6e3bb784b9569ca18237d0742b"
+        },
+        "dlms-sn-parameterized-tools/sn-body.py": {
+          "bytes": 572,
+          "sha256": "6e5106f1bebe23f04d38ec58953d227541bc366dd44a8f5796612e8a59239724"
+        },
+        "dlms-sn-parameterized-tools/verify-captures.py": {
+          "bytes": 5149,
+          "sha256": "9cbff292b1a8a49e0404aab9fd74a1a7de0d85e761f19a663b0bbc7c4ba3146c"
+        },
+        "dlms-sn-parameterized-tools/verify.py": {
+          "bytes": 5563,
+          "sha256": "86917c68351c5bf51ec27ffd8a54313da20ed6cb7414ff8580580848229b565a"
+        },
+        "dlms-sn-parameterized-tools/wrapper-model.py": {
+          "bytes": 18956,
+          "sha256": "ce205b17f1167e908599f9370e5ce91c091ece510800c88a600b856ba8b30b3e"
+        },
+        "dlms-sn-parameterized-tools/wrapper-reference-vectors.json": {
+          "bytes": 8496,
+          "sha256": "6194f251e03f6518a952ee05d40450a3ed08a3fb805fab2c8b3fcd3ead881353"
+        },
+        "dlms-sn-parameterized-tools/write-body.py": {
+          "bytes": 5706,
+          "sha256": "4818c0264cb4819cf5d4715a855b4f3817acf26c0c6b15ff558aaa7d3b4aa094"
+        },
+        "dlms-sn-parameterized-wrapper/Write-parameter-and-value-shared4nodes-cap4-positive.tcp.pcap": {
+          "bytes": 408,
+          "sha256": "7654e7f8ecd5109a5d0cc5c0d78354f1a958703d3cab93767e946116b590a281"
+        },
+        "dlms-sn-parameterized-wrapper/Write-parameter-and-value-shared4nodes-cap4-positive.udp.pcap": {
+          "bytes": 174,
+          "sha256": "740ec12860f19e9e740fdd7de39c996dd22a6f47fcce6b297121c9b25311330f"
+        },
+        "dlms-sn-parameterized-wrapper/mixed-choice2-4-selectors0-255-ordered-parameters-values.tcp.pcap": {
+          "bytes": 610,
+          "sha256": "0af4876670f1ea1caa38ba9c6c6b375742613d647fea76dbaa70a8ed4250b9b5"
+        },
+        "dlms-sn-parameterized-wrapper/mixed-choice2-4-selectors0-255-ordered-parameters-values.udp.pcap": {
+          "bytes": 352,
+          "sha256": "dea48dbd332c17362ac41fc66b844eee676585dc7af1e6dbdaa68543c7c4d4be"
+        },
+        "dlms-sn-parameterized-wrapper/parameter-selector-Data-truncation-and-trailing-Malformed.tcp.pcap": {
+          "bytes": 1072,
+          "sha256": "c3a40a23318f3375bef2bfb8201b278595b765a774df8abaacbd699d55e05a74"
+        },
+        "dlms-sn-parameterized-wrapper/parameter-selector-Data-truncation-and-trailing-Malformed.udp.pcap": {
+          "bytes": 742,
+          "sha256": "7981151bf352967b0de50ca26d182d8129833a83840d7392012c3b3bbd18a489"
+        },
+        "dlms-sn-parameterized-wrapper/reuse-inputs.json": {
+          "bytes": 1015,
+          "sha256": "52d50bccc6cd9e65ca4a4b567be12fa8379f3212225638899edbd0474275a235"
+        },
+        "dlms-sn-parameterized-wrapper/single-parameterized-Read-and-normal-response.tcp.pcap": {
+          "bytes": 403,
+          "sha256": "20c61fd71be74dfdf76c89c658bcdc31888b1b2fd682075f17248fb7ea160d49"
+        },
+        "dlms-sn-parameterized-wrapper/single-parameterized-Read-and-normal-response.udp.pcap": {
+          "bytes": 169,
+          "sha256": "65a7bcfa7d7023f5e69bb099b8f7de8155a3623b0126aa7bea590e6be6a3a1f9"
+        },
+        "dlms-sn-parameterized-wrapper/single-parameterized-Write-and-successNULL-response.tcp.pcap": {
+          "bytes": 404,
+          "sha256": "d0f3a563866a0d703280fe91a7bb73bb34ae8c8e1ed48bd68afd4e7b609a7370"
+        },
+        "dlms-sn-parameterized-wrapper/single-parameterized-Write-and-successNULL-response.udp.pcap": {
+          "bytes": 170,
+          "sha256": "584e93e31c0851959f7c447789e0a6494911aa9239fa7b855f6c2d944d97f8e8"
+        },
+        "dlms-sn-parameterized-wrapper/source-derived-public-readRowsByEntry-parameter-Structure4.tcp.pcap": {
+          "bytes": 419,
+          "sha256": "44d7d041c9b84c35aea12a6477a87de06f86cb0348cb1fab31216284553e08aa"
+        },
+        "dlms-sn-parameterized-wrapper/source-derived-public-readRowsByEntry-parameter-Structure4.udp.pcap": {
+          "bytes": 185,
+          "sha256": "42e7eee0dca0b4b8fbbdbc275668a0dc3e54d1a82432e61b45d3d2b759ed4047"
+        },
+        "dlms-sn-parameterized-wrapper/two-Read-descriptor-parameters-shared4nodes-cap3-refusal.tcp.pcap": {
+          "bytes": 413,
+          "sha256": "de171e67effab91feef19894772b129e87e0c70c475a48c3a244f5ba6dc8e29c"
+        },
+        "dlms-sn-parameterized-wrapper/two-Read-descriptor-parameters-shared4nodes-cap3-refusal.udp.pcap": {
+          "bytes": 179,
+          "sha256": "0fafc4c9e49be49e96d79010caf63909f30205f33ddb8665996e50686c2cce36"
+        },
+        "dlms-sn-parameterized-wrapper/two-Read-descriptor-parameters-shared4nodes-cap4-positive.tcp.pcap": {
+          "bytes": 415,
+          "sha256": "927599cdaf6800392858febcd50d91b4a3dc216b13bd2623e4cb309a3f834b2b"
+        },
+        "dlms-sn-parameterized-wrapper/two-Read-descriptor-parameters-shared4nodes-cap4-positive.udp.pcap": {
+          "bytes": 181,
+          "sha256": "94c1bc6ed171adb62ca7dd1153d00339dffe5777802ed8a28482c78b1491bb0d"
+        },
+        "dlms-sn-parameterized-wrapper/unselected-choice-SDK04-and-unequal-count-localUnsupported.tcp.pcap": {
+          "bytes": 746,
+          "sha256": "b6c3543fd6274b6dfc095233c5e45573e9abd459e04ccf018675972de908d781"
+        },
+        "dlms-sn-parameterized-wrapper/unselected-choice-SDK04-and-unequal-count-localUnsupported.udp.pcap": {
+          "bytes": 464,
+          "sha256": "2f6139a847615356663a4145193b247923caffb52b25f9f4a507db5ceddf14f3"
+        },
+        "required-tests-traffic-unified-v159.json": {
+          "bytes": 21255515,
+          "sha256": "65d27c2ffe1de8c3f90cff5c651772c821f65cf78919c672a9a810d6161de799"
+        },
+        "validation/expected.json": {
+          "bytes": 55289,
+          "sha256": "200cbcdff2318f3fa93c924989f3aca72edc2ab39594a830462ad37c958606dc"
+        }
+      },
+      "aliases": {
+        "common/pcapx/pcaputil/dlms-sn-parameterized-access/baseline-controls.json": "dlms-sn-parameterized-access/baseline-controls.json",
+        "common/pcapx/pcaputil/dlms-sn-parameterized-access/controls.json": "dlms-sn-parameterized-access/controls.json",
+        "common/pcapx/pcaputil/dlms-sn-parameterized-access/historical-parameterized-upgrade.json": "dlms-sn-parameterized-access/historical-parameterized-upgrade.json",
+        "common/pcapx/pcaputil/dlms-sn-parameterized-access/historical-wrapper-parameterized-upgrade.json": "dlms-sn-parameterized-access/historical-wrapper-parameterized-upgrade.json",
+        "common/pcapx/pcaputil/dlms-sn-parameterized-hdlc/Getprimed-parameterized-SNRead-request-response-information-groups-default-pool.tcp.pcap": "dlms-sn-parameterized-hdlc/Getprimed-parameterized-SNRead-request-response-information-groups-default-pool.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-parameterized-hdlc/Getprimed-parameterized-SNRead-request-response-information-groups-default-pool.udp.pcap": "dlms-sn-parameterized-hdlc/Getprimed-parameterized-SNRead-request-response-information-groups-default-pool.udp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-parameterized-hdlc/Getprimed-parameterized-SNWrite-request-response-information-groups-default-pool.tcp.pcap": "dlms-sn-parameterized-hdlc/Getprimed-parameterized-SNWrite-request-response-information-groups-default-pool.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-parameterized-hdlc/Getprimed-parameterized-SNWrite-request-response-information-groups-default-pool.udp.pcap": "dlms-sn-parameterized-hdlc/Getprimed-parameterized-SNWrite-request-response-information-groups-default-pool.udp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-parameterized-hdlc/Write-parameter-and-value-shared4nodes-cap4-positive.tcp.pcap": "dlms-sn-parameterized-hdlc/Write-parameter-and-value-shared4nodes-cap4-positive.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-parameterized-hdlc/Write-parameter-and-value-shared4nodes-cap4-positive.udp.pcap": "dlms-sn-parameterized-hdlc/Write-parameter-and-value-shared4nodes-cap4-positive.udp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-parameterized-hdlc/mixed-choice2-4-selectors0-255-ordered-parameters-values.tcp.pcap": "dlms-sn-parameterized-hdlc/mixed-choice2-4-selectors0-255-ordered-parameters-values.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-parameterized-hdlc/mixed-choice2-4-selectors0-255-ordered-parameters-values.udp.pcap": "dlms-sn-parameterized-hdlc/mixed-choice2-4-selectors0-255-ordered-parameters-values.udp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-parameterized-hdlc/parameter-selector-Data-truncation-and-trailing-Malformed.tcp.pcap": "dlms-sn-parameterized-hdlc/parameter-selector-Data-truncation-and-trailing-Malformed.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-parameterized-hdlc/parameter-selector-Data-truncation-and-trailing-Malformed.udp.pcap": "dlms-sn-parameterized-hdlc/parameter-selector-Data-truncation-and-trailing-Malformed.udp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-parameterized-hdlc/reuse-inputs.json": "dlms-sn-parameterized-hdlc/reuse-inputs.json",
+        "common/pcapx/pcaputil/dlms-sn-parameterized-hdlc/single-parameterized-Read-and-normal-response.tcp.pcap": "dlms-sn-parameterized-hdlc/single-parameterized-Read-and-normal-response.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-parameterized-hdlc/single-parameterized-Read-and-normal-response.udp.pcap": "dlms-sn-parameterized-hdlc/single-parameterized-Read-and-normal-response.udp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-parameterized-hdlc/single-parameterized-Write-and-successNULL-response.tcp.pcap": "dlms-sn-parameterized-hdlc/single-parameterized-Write-and-successNULL-response.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-parameterized-hdlc/single-parameterized-Write-and-successNULL-response.udp.pcap": "dlms-sn-parameterized-hdlc/single-parameterized-Write-and-successNULL-response.udp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-parameterized-hdlc/source-derived-public-readRowsByEntry-parameter-Structure4.tcp.pcap": "dlms-sn-parameterized-hdlc/source-derived-public-readRowsByEntry-parameter-Structure4.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-parameterized-hdlc/source-derived-public-readRowsByEntry-parameter-Structure4.udp.pcap": "dlms-sn-parameterized-hdlc/source-derived-public-readRowsByEntry-parameter-Structure4.udp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-parameterized-hdlc/two-Read-descriptor-parameters-shared4nodes-cap3-refusal.tcp.pcap": "dlms-sn-parameterized-hdlc/two-Read-descriptor-parameters-shared4nodes-cap3-refusal.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-parameterized-hdlc/two-Read-descriptor-parameters-shared4nodes-cap3-refusal.udp.pcap": "dlms-sn-parameterized-hdlc/two-Read-descriptor-parameters-shared4nodes-cap3-refusal.udp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-parameterized-hdlc/two-Read-descriptor-parameters-shared4nodes-cap4-positive.tcp.pcap": "dlms-sn-parameterized-hdlc/two-Read-descriptor-parameters-shared4nodes-cap4-positive.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-parameterized-hdlc/two-Read-descriptor-parameters-shared4nodes-cap4-positive.udp.pcap": "dlms-sn-parameterized-hdlc/two-Read-descriptor-parameters-shared4nodes-cap4-positive.udp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-parameterized-hdlc/unselected-choice-SDK04-and-unequal-count-localUnsupported.tcp.pcap": "dlms-sn-parameterized-hdlc/unselected-choice-SDK04-and-unequal-count-localUnsupported.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-parameterized-hdlc/unselected-choice-SDK04-and-unequal-count-localUnsupported.udp.pcap": "dlms-sn-parameterized-hdlc/unselected-choice-SDK04-and-unequal-count-localUnsupported.udp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-parameterized-tools/SOURCE-ADDENDUM.json": "dlms-sn-parameterized-tools/SOURCE-ADDENDUM.json",
+        "common/pcapx/pcaputil/dlms-sn-parameterized-tools/SOURCES.json": "dlms-sn-parameterized-tools/SOURCES.json",
+        "common/pcapx/pcaputil/dlms-sn-parameterized-tools/access.py": "dlms-sn-parameterized-tools/access.py",
+        "common/pcapx/pcaputil/dlms-sn-parameterized-tools/actual-memory-parameterized-frames.json": "dlms-sn-parameterized-tools/actual-memory-parameterized-frames.json",
+        "common/pcapx/pcaputil/dlms-sn-parameterized-tools/carrier.py": "dlms-sn-parameterized-tools/carrier.py",
+        "common/pcapx/pcaputil/dlms-sn-parameterized-tools/generate.py": "dlms-sn-parameterized-tools/generate.py",
+        "common/pcapx/pcaputil/dlms-sn-parameterized-tools/model-pins.json": "dlms-sn-parameterized-tools/model-pins.json",
+        "common/pcapx/pcaputil/dlms-sn-parameterized-tools/read-body.py": "dlms-sn-parameterized-tools/read-body.py",
+        "common/pcapx/pcaputil/dlms-sn-parameterized-tools/rebuild.py": "dlms-sn-parameterized-tools/rebuild.py",
+        "common/pcapx/pcaputil/dlms-sn-parameterized-tools/reference-vectors.json": "dlms-sn-parameterized-tools/reference-vectors.json",
+        "common/pcapx/pcaputil/dlms-sn-parameterized-tools/segments-model.py": "dlms-sn-parameterized-tools/segments-model.py",
+        "common/pcapx/pcaputil/dlms-sn-parameterized-tools/sn-body.py": "dlms-sn-parameterized-tools/sn-body.py",
+        "common/pcapx/pcaputil/dlms-sn-parameterized-tools/verify-captures.py": "dlms-sn-parameterized-tools/verify-captures.py",
+        "common/pcapx/pcaputil/dlms-sn-parameterized-tools/verify.py": "dlms-sn-parameterized-tools/verify.py",
+        "common/pcapx/pcaputil/dlms-sn-parameterized-tools/wrapper-model.py": "dlms-sn-parameterized-tools/wrapper-model.py",
+        "common/pcapx/pcaputil/dlms-sn-parameterized-tools/wrapper-reference-vectors.json": "dlms-sn-parameterized-tools/wrapper-reference-vectors.json",
+        "common/pcapx/pcaputil/dlms-sn-parameterized-tools/write-body.py": "dlms-sn-parameterized-tools/write-body.py",
+        "common/pcapx/pcaputil/dlms-sn-parameterized-wrapper/Write-parameter-and-value-shared4nodes-cap4-positive.tcp.pcap": "dlms-sn-parameterized-wrapper/Write-parameter-and-value-shared4nodes-cap4-positive.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-parameterized-wrapper/Write-parameter-and-value-shared4nodes-cap4-positive.udp.pcap": "dlms-sn-parameterized-wrapper/Write-parameter-and-value-shared4nodes-cap4-positive.udp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-parameterized-wrapper/mixed-choice2-4-selectors0-255-ordered-parameters-values.tcp.pcap": "dlms-sn-parameterized-wrapper/mixed-choice2-4-selectors0-255-ordered-parameters-values.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-parameterized-wrapper/mixed-choice2-4-selectors0-255-ordered-parameters-values.udp.pcap": "dlms-sn-parameterized-wrapper/mixed-choice2-4-selectors0-255-ordered-parameters-values.udp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-parameterized-wrapper/parameter-selector-Data-truncation-and-trailing-Malformed.tcp.pcap": "dlms-sn-parameterized-wrapper/parameter-selector-Data-truncation-and-trailing-Malformed.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-parameterized-wrapper/parameter-selector-Data-truncation-and-trailing-Malformed.udp.pcap": "dlms-sn-parameterized-wrapper/parameter-selector-Data-truncation-and-trailing-Malformed.udp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-parameterized-wrapper/reuse-inputs.json": "dlms-sn-parameterized-wrapper/reuse-inputs.json",
+        "common/pcapx/pcaputil/dlms-sn-parameterized-wrapper/single-parameterized-Read-and-normal-response.tcp.pcap": "dlms-sn-parameterized-wrapper/single-parameterized-Read-and-normal-response.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-parameterized-wrapper/single-parameterized-Read-and-normal-response.udp.pcap": "dlms-sn-parameterized-wrapper/single-parameterized-Read-and-normal-response.udp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-parameterized-wrapper/single-parameterized-Write-and-successNULL-response.tcp.pcap": "dlms-sn-parameterized-wrapper/single-parameterized-Write-and-successNULL-response.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-parameterized-wrapper/single-parameterized-Write-and-successNULL-response.udp.pcap": "dlms-sn-parameterized-wrapper/single-parameterized-Write-and-successNULL-response.udp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-parameterized-wrapper/source-derived-public-readRowsByEntry-parameter-Structure4.tcp.pcap": "dlms-sn-parameterized-wrapper/source-derived-public-readRowsByEntry-parameter-Structure4.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-parameterized-wrapper/source-derived-public-readRowsByEntry-parameter-Structure4.udp.pcap": "dlms-sn-parameterized-wrapper/source-derived-public-readRowsByEntry-parameter-Structure4.udp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-parameterized-wrapper/two-Read-descriptor-parameters-shared4nodes-cap3-refusal.tcp.pcap": "dlms-sn-parameterized-wrapper/two-Read-descriptor-parameters-shared4nodes-cap3-refusal.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-parameterized-wrapper/two-Read-descriptor-parameters-shared4nodes-cap3-refusal.udp.pcap": "dlms-sn-parameterized-wrapper/two-Read-descriptor-parameters-shared4nodes-cap3-refusal.udp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-parameterized-wrapper/two-Read-descriptor-parameters-shared4nodes-cap4-positive.tcp.pcap": "dlms-sn-parameterized-wrapper/two-Read-descriptor-parameters-shared4nodes-cap4-positive.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-parameterized-wrapper/two-Read-descriptor-parameters-shared4nodes-cap4-positive.udp.pcap": "dlms-sn-parameterized-wrapper/two-Read-descriptor-parameters-shared4nodes-cap4-positive.udp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-parameterized-wrapper/unselected-choice-SDK04-and-unequal-count-localUnsupported.tcp.pcap": "dlms-sn-parameterized-wrapper/unselected-choice-SDK04-and-unequal-count-localUnsupported.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-parameterized-wrapper/unselected-choice-SDK04-and-unequal-count-localUnsupported.udp.pcap": "dlms-sn-parameterized-wrapper/unselected-choice-SDK04-and-unequal-count-localUnsupported.udp.pcap",
+        "scripts/protocol-tests/required-tests-traffic-unified-v159.json": "required-tests-traffic-unified-v159.json"
+      }
     }
   ],
   "schema_version": 1,

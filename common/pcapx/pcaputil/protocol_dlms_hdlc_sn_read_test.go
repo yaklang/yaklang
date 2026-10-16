@@ -58,7 +58,8 @@ func hdlcSNReadCases(t *testing.T, name, pin string, count int) []hdlcSNReadCase
 		out[i] = hdlcSNReadCase{c, meta.Cases[i].Steps, meta.Cases[i].UDP, meta.Cases[i].TCP}
 	}
 	if name == "controls-safe-owner.json" && pin == "3bab1436ded0f609435ca0a0c6337f15274a6a04ee4f0c71949b5eb61a2dc704" {
-		return hdlcSNWriteUpgradeHistoricalRead(t, raw, out)
+		out = hdlcSNWriteUpgradeHistoricalRead(t, raw, out)
+		return snParameterizedUpgradeHistoricalRead(t, raw, out)
 	}
 	return out
 }
@@ -283,6 +284,9 @@ func TestDLMSHDLCSNReadMatrix(t *testing.T) {
 }
 func hdlcSNReadMatrix(t *testing.T, cases []hdlcSNReadCase, batch string) {
 	env := "DLMS_HDLC_SN_READ_TEST_ROOT"
+	if batch == "dlms-sn-parameterized-hdlc" {
+		env = "DLMS_SN_PARAMETERIZED_TEST_ROOT"
+	}
 	if batch == "dlms-sn-information-segments" || batch == "dlms-sn-information-segments-hard" || batch == "dlms-sn-information-segments-lookalike" {
 		env = "DLMS_SN_SEGMENTS_TEST_ROOT"
 	}
@@ -307,7 +311,7 @@ func hdlcSNReadMatrix(t *testing.T, cases []hdlcSNReadCase, batch string) {
 					var err error
 					const prefix = "common/pcapx/pcaputil/"
 					require.True(t, strings.HasPrefix(alias, prefix))
-					if (batch == "dlms-sn-information-segments" || batch == "dlms-sn-information-segments-hard" || batch == "dlms-sn-information-segments-lookalike") && strings.HasPrefix(alias, prefix+batch+"/") {
+					if (batch == "dlms-sn-information-segments" || batch == "dlms-sn-information-segments-hard" || batch == "dlms-sn-information-segments-lookalike" || batch == "dlms-sn-parameterized-hdlc") && strings.HasPrefix(alias, prefix+batch+"/") {
 						name := strings.TrimPrefix(alias, prefix+batch+"/")
 						require.NotContains(t, name, "/")
 						raw = finsReadBatch(t, batch, env, name)

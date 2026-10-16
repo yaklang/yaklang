@@ -128,12 +128,24 @@ func TestDLMSHDLCSNWriteHistoricalBinding(t *testing.T) {
 				require.NoError(t, err)
 				require.NoError(t, json.Unmarshal(b, &want))
 			}
-			require.Equal(t, want, got[i].Steps[j], "only the single selected typed row may change")
+			if i == 10 && j == 10 {
+				next := snParameterizedHistoryItem(t)
+				require.Equal(t, c.Steps[j], next.Original)
+				want = hdlcOpStep{} // JSON null must clear the old nonempty Error string.
+				b, err := json.Marshal(next.Step)
+				require.NoError(t, err)
+				require.NoError(t, json.Unmarshal(b, &want))
+			}
+			require.Equal(t, want, got[i].Steps[j], "only independently pinned historical upgrade rows may change")
 		}
 		require.Len(t, got[i].Metadata, len(c.Steps))
 		for j, s := range c.Steps {
 			if i == r.CaseIndex && j == r.StepIndex {
 				require.Equal(t, r.Step, got[i].Metadata[j])
+			} else if i == 10 && j == 10 {
+				next := snParameterizedHistoryItem(t)
+				require.Equal(t, s, next.Original)
+				require.Equal(t, next.Step, got[i].Metadata[j])
 			} else {
 				require.Equal(t, s, got[i].Metadata[j])
 			}

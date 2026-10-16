@@ -86,9 +86,9 @@ func snWriteQueries(t *testing.T, e *ProtocolEvent, w map[string]any, ids []uint
 		d, err := e.Decode()
 		require.NoError(t, err)
 		for _, k := range []string{"fields", "session"} {
-			if v, ok := d[k].(map[string]any); ok {
-				snWriteTypes(t, v)
-			}
+			v, ok := d[k].(map[string]any)
+			require.True(t, ok, "Decode.%s must retain its public map type", k)
+			snWriteTypes(t, v)
 		}
 		poisonWrapperStructured(f)
 		poisonWrapperStructured(d)
@@ -228,13 +228,23 @@ func snWriteMatrix(t *testing.T, cases []snWriteControl) {
 				if c.Folder == "dlms-hdlc-sn-write-resources" {
 					reuseFolder, reuseEnv = c.Folder, "DLMS_HDLC_SN_WRITE_TEST_ROOT"
 				}
+				if c.Folder == "dlms-sn-parameterized-wrapper" {
+					reuseFolder, reuseEnv = c.Folder, "DLMS_SN_PARAMETERIZED_TEST_ROOT"
+				}
 				var reuse map[string]string
 				require.NoError(t, json.Unmarshal(finsReadBatch(t, reuseFolder, reuseEnv, "reuse-inputs.json"), &reuse))
 				name := c.Name + "." + tr + ".pcap"
 				var raw []byte
 				if p, ok := reuse[name]; ok {
 					require.True(t, strings.HasPrefix(p, "common/pcapx/pcaputil/"))
-					raw = wrapperStructuredInput(t, p)
+					const prefix = "common/pcapx/pcaputil/"
+					if c.Folder == "dlms-sn-parameterized-wrapper" && strings.HasPrefix(p, prefix+c.Folder+"/") {
+						name := strings.TrimPrefix(p, prefix+c.Folder+"/")
+						require.NotContains(t, name, "/")
+						raw = finsReadBatch(t, c.Folder, reuseEnv, name)
+					} else {
+						raw = wrapperStructuredInput(t, p)
+					}
 				} else {
 					raw = finsReadBatch(t, c.Folder, reuseEnv, name)
 				}

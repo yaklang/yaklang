@@ -40,7 +40,7 @@ func snReadControls(t *testing.T) []snReadControl {
 	var d struct{ Cases []snReadControl }
 	require.NoError(t, json.Unmarshal(raw, &d))
 	require.Len(t, d.Cases, 12)
-	return d.Cases
+	return snParameterizedUpgradeHistoricalWrapper(t, raw, d.Cases)
 }
 func snReadStep(t *testing.T, given map[string]any, tr string) map[string]any {
 	t.Helper()
