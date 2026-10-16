@@ -124,6 +124,7 @@ func hdlcOpTypes(t *testing.T, f map[string]any) {
 	}
 	for _, name := range []string{"Set", "Action"} {
 		if s, ok := f[name].(map[string]any); ok {
+			selectFieldTypes(t, s)
 			for _, k := range []string{"wrapper_version", "source_wport", "destination_wport", "wrapper_header_hex"} {
 				require.NotContains(t, s, k)
 			}

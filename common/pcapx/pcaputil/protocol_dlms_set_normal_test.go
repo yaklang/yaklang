@@ -12,9 +12,10 @@ import (
 
 func setControls(t *testing.T) []actionCase {
 	var x struct{ Cases []actionCase }
-	require.NoError(t, json.Unmarshal(finsReadBatch(t, "dlms-set-normal", "DLMS_SET_TEST_ROOT", "controls.json"), &x))
+	raw := finsReadBatch(t, "dlms-set-normal", "DLMS_SET_TEST_ROOT", "controls.json")
+	require.NoError(t, json.Unmarshal(raw, &x))
 	require.Len(t, x.Cases, 33)
-	return x.Cases
+	return setSelectiveLegacy(t, raw, x.Cases)
 }
 func setCloseCheck(t *testing.T, c actionCase, es []*ProtocolEvent, transport, reason string) {
 	t.Helper()

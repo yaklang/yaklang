@@ -391,6 +391,14 @@ func wrapperProbeVersion(w []byte) string {
 	return "v1-get-normal"
 }
 func wrapperProjection(w []byte, n int) int64 {
+	if len(w) >= 21 && w[8] == 0xc1 && w[9] == 1 && w[20] == 1 {
+		nodes := min(wrapperDataNodes, max(0, n-22))
+		if wrapperSetNormalContainsCompact(w[8:]) {
+			nodes = wrapperDataNodes
+		}
+		return 32768 + 512*int64(n) + 2048*int64(nodes)
+	}
+
 	if wrapperIsActionList(w) {
 		items := min(wrapperListItems, max(0, n-12)/2)
 		if w[8] == 0xc3 {
@@ -493,10 +501,23 @@ func decodeWrapperSetList(m *wrapperMessage, p []byte, limit, depth int) error {
 			if int8(w[8]) <= 0 {
 				return wrapperError(ErrUnsupportedFeature, "positive signed8 Set list attribute profile")
 			}
-			if w[9] != 0 {
-				return wrapperError(ErrUnsupportedFeature, "Set list selective access is not implemented")
+			if w[9] > 1 {
+				return wrapperError(ErrUnsupportedFeature, "Set list optional access selection must be canonical0/1")
 			}
 			item := map[string]any{"index": i, "apdu_offset": start, "class_id": binary.BigEndian.Uint16(w), "logical_name_hex": hex.EncodeToString(w[2:8]), "logical_name": fmt.Sprintf("%d.%d.%d.%d.%d.%d", w[2], w[3], w[4], w[5], w[6], w[7]), "attribute_id": int8(w[8]), "selective_access": false, "access_selection_raw": w[9], "raw_hex": hex.EncodeToString(w), "encoded_length": 10}
+
+			if w[9] == 1 {
+				selector, e := c.take(1)
+				if e != nil {
+					return e
+				}
+				parameter, e := c.data(limit, 0)
+				if e != nil {
+					return e
+				}
+				item["selective_access"], item["access_selector"], item["access_parameters"], item["selector_semantics_verified"] = true, selector[0], parameter, false
+				item["raw_hex"], item["encoded_length"] = hex.EncodeToString(p[start:c.at]), c.at-start
+			}
 			items = append(items, item)
 		}
 		valuesN, valuesEnc, e := c.count()

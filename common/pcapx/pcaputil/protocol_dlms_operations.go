@@ -96,8 +96,11 @@ func dlmsOperationProjection(p []byte, n int) int64 {
 
 	at := -1
 	if len(p) > 1 && p[1] == 1 {
-		if p[0] == 0xc1 && len(p) > 12 && p[12] == 0 {
+		if p[0] == 0xc1 && len(p) > 12 && p[12] <= 1 {
 			at = 13
+			if p[12] == 1 {
+				at = 14
+			}
 		}
 		if p[0] == 0xc3 && len(p) > 12 && p[12] == 1 {
 			at = 13
@@ -110,9 +113,15 @@ func dlmsOperationProjection(p []byte, n int) int64 {
 	if at >= 0 {
 		nodes = min(wrapperDataNodes, max(0, len(p)-at))
 		probe := wrapperCompactProbe{wire: p, at: at}
-		if found, _ := probe.data(0); found {
+
+		found, complete := probe.data(0)
+		if !found && complete && p[0] == 0xc1 && len(p) > 12 && p[12] == 1 {
+			found, _ = probe.data(0)
+		}
+		if found {
 			nodes = wrapperDataNodes
 		}
+
 	}
 	return 32768 + 512*int64(n) + 2048*int64(nodes)
 }

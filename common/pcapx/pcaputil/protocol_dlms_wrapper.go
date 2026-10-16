@@ -867,8 +867,13 @@ func wrapperOperationProfile(command, choice byte) string {
 	return "dlms-wrapper-v1-action-normal"
 }
 func wrapperOperationDataOffset(w []byte) int {
-	if wrapperIsSet(w) && len(w) > 20 && w[8] == 0xc1 && w[9] == 1 && w[20] == 0 {
-		return 21
+	if wrapperIsSet(w) && len(w) > 20 && w[8] == 0xc1 && w[9] == 1 {
+		if w[20] == 0 {
+			return 21
+		}
+		if w[20] == 1 {
+			return 22
+		} // firstData is selector parameters; value follows it.
 	}
 	return wrapperActionDataOffset(w)
 }
@@ -906,11 +911,22 @@ func decodeWrapperSet(w []byte, limit, depth int) (*wrapperMessage, error) {
 		if int8(p[11]) <= 0 {
 			return unsupported("positive signed8 Set attribute profile")
 		}
-		if p[12] != 0 {
-			return unsupported("Set selective-access descriptor is not implemented")
+		if p[12] > 1 {
+			return unsupported("Set optional access selection must be canonical0/1")
 		}
-		f["kind"], f["class_id"], f["logical_name_hex"], f["logical_name"], f["attribute_id"], f["selective_access"] = "SetRequestNormal", binary.BigEndian.Uint16(p[3:5]), hex.EncodeToString(p[5:11]), fmt.Sprintf("%d.%d.%d.%d.%d.%d", p[5], p[6], p[7], p[8], p[9], p[10]), int8(p[11]), false
+		f["kind"], f["class_id"], f["logical_name_hex"], f["logical_name"], f["attribute_id"], f["selective_access"] = "SetRequestNormal", binary.BigEndian.Uint16(p[3:5]), hex.EncodeToString(p[5:11]), fmt.Sprintf("%d.%d.%d.%d.%d.%d", p[5], p[6], p[7], p[8], p[9], p[10]), int8(p[11]), p[12] == 1
 		c := wrapperListCursor{wire: p, at: 13, maxDepth: depth}
+		if p[12] == 1 {
+			selector, e := c.take(1)
+			if e != nil {
+				return nil, e
+			}
+			parameter, e := c.data(limit, 0)
+			if e != nil {
+				return nil, e
+			}
+			f["access_selection_raw"], f["access_selector"], f["access_parameters"], f["selector_semantics_verified"] = p[12], selector[0], parameter, false
+		}
 		data, err := c.data(limit, 0)
 		if err != nil {
 			return nil, err

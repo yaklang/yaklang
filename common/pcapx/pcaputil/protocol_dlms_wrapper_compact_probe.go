@@ -82,6 +82,10 @@ func (p *wrapperCompactProbe) data(level int) (compact, complete bool) {
 	return false, p.skip(int(n))
 }
 func wrapperContainsCompactData(w []byte) bool {
+	if len(w) >= 21 && w[8] == 0xc1 && w[9] == 1 && w[20] == 1 {
+		return wrapperSetNormalContainsCompact(w[8:])
+	}
+
 	if wrapperIsActionList(w) {
 		return wrapperActionListContainsCompact(w)
 	}
@@ -181,9 +185,26 @@ func wrapperSetListAPDUContainsCompact(w []byte) bool {
 		return false
 	}
 	for i := uint64(0); i < n; i++ {
-		if !p.skip(10) || p.wire[p.at-1] != 0 {
+
+		if !p.skip(10) {
 			return false
 		}
+		flag := p.wire[p.at-1]
+		if flag == 1 {
+			if !p.skip(1) {
+				return false
+			}
+			found, complete := p.data(0)
+			if found {
+				return true
+			}
+			if !complete {
+				return false
+			}
+		} else if flag != 0 {
+			return false
+		}
+
 	}
 	values, ok := p.count()
 	if !ok || values != n {
@@ -265,4 +286,29 @@ func wrapperActionListAPDUContainsCompact(w []byte) bool {
 		}
 	}
 	return false
+}
+
+// Walk both selector parameters and the following value without allocating.
+// A payload byte0x13 is skipped by the bounded Data walker, never a tag hint.
+func wrapperSetNormalContainsCompact(w []byte) bool {
+	if len(w) < 13 || w[0] != 0xc1 || w[1] != 1 {
+		return false
+	}
+	p := wrapperCompactProbe{wire: w, at: 13}
+	if w[12] == 1 {
+		if !p.skip(1) {
+			return false
+		}
+		found, complete := p.data(0)
+		if found {
+			return true
+		}
+		if !complete {
+			return false
+		}
+	} else if w[12] != 0 {
+		return false
+	}
+	found, _ := p.data(0)
+	return found
 }

@@ -108413,6 +108413,714 @@
         "common/pcapx/pcaputil/dlms-hdlc-operation-lists/Set-list-output-depth5.tcp.pcap": "dlms-hdlc-operation-lists/Set-shared-four-Data-nodes-cap4.tcp.pcap",
         "scripts/protocol-tests/required-tests-traffic-unified-v127.json": "required-tests-traffic-unified-v127.json"
       }
+    },
+    {
+      "id": "validation-dlms-set-selective",
+      "kind": "support",
+      "source_sha": "deb61526ae05609f653ec9303f00b2bce5d851bb",
+      "file": "validation-dlms-set-selective.zip",
+      "sha256": "82f2d5b23e7cdbe5e56f0a85fdf392a04616dd35a4ce8e50ab35c9fd6539797a",
+      "password": "bin-parser",
+      "members": {
+        "dlms-set-selective-tools/SOURCES.json": {
+          "sha256": "afb01409ea89276da76762d74666c38f6425b04d111f53b52c3ff59987dcd0b1",
+          "bytes": 5179
+        },
+        "dlms-set-selective-tools/build-extended.py": {
+          "sha256": "06b15cc44e1416a5232f907f07a04c49a09fbcbc6a0d655412b1c94c29707b26",
+          "bytes": 4017
+        },
+        "dlms-set-selective-tools/generate-controls.py": {
+          "sha256": "56b00b5c5bc623bdb99857d36bbb4eb3b38b7fcdd32ae2a4ab9589b082e89529",
+          "bytes": 10543
+        },
+        "dlms-set-selective-tools/generate.py": {
+          "sha256": "6e416c2ad0f9db29a7a07a5e456e422eec9154cd1c92740a7c952f2422b58ba2",
+          "bytes": 1327
+        },
+        "dlms-set-selective-tools/hdlc-observer-model.py": {
+          "sha256": "df65d697f1fe86c450ed847e560c67a51e2bdd96b73fc101a04b6433c68c4f8a",
+          "bytes": 9061
+        },
+        "dlms-set-selective-tools/reference-check.py": {
+          "sha256": "23d7e93dec192dc9ecd2c5ed663be8826ec52bd1cde102105fdefe3171816d6b",
+          "bytes": 3456
+        },
+        "dlms-set-selective-tools/reference-vectors.json": {
+          "sha256": "580599c636ea2e00d5c51620ae6316e612cfb6c5ad474ad791e32a1589b2cde6",
+          "bytes": 2271
+        },
+        "dlms-set-selective-tools/selection-model.py": {
+          "sha256": "d0411e30aaf49b4adf6914f8f301a7314811e3d3081ab64d20a685601942cf2a",
+          "bytes": 5640
+        },
+        "dlms-set-selective-tools/verify-captures.py": {
+          "sha256": "765026fb84daf75faa42073bc324ff9e144ccebb80d02c84a8642063d65ec5eb",
+          "bytes": 3487
+        },
+        "dlms-set-selective-tools/verify.py": {
+          "sha256": "23c5d4be99b815fa6c7108bb8be8c2a99eca61be2d95ca071a533a7030e92dea",
+          "bytes": 3032
+        },
+        "dlms-set-selective-tools/wrapper-observer-model.py": {
+          "sha256": "d992b8c1363418816bf98dc73838ca2e705735be419605955bb22b39499e1730",
+          "bytes": 10913
+        },
+        "dlms-set-selective/controls.json": {
+          "sha256": "1ce3aad977d5f0a462c4b1e2a5426d7c07bb56434b4ad604d65a1c5ecb74ed68",
+          "bytes": 2189028
+        },
+        "dlms-set-selective/hdlc/list-exact-request-retry-carrier-policy.tcp.pcap": {
+          "sha256": "88b6a0078f1606e3283fbdbafeb6f947512f2f6e86578da8bdfd72818e6a708c",
+          "bytes": 743
+        },
+        "dlms-set-selective/hdlc/list-exact-request-retry-carrier-policy.udp.pcap": {
+          "sha256": "524e0d6e7f9e075ce12eea2d0b88b280e4db982287e924933f5f04ee96f0242e",
+          "bytes": 473
+        },
+        "dlms-set-selective/hdlc/list-literal-error-result-observed.tcp.pcap": {
+          "sha256": "b3587d1f17370a2406a045004503b5ef12086d444f18cc82ee0033dc9a8e62c1",
+          "bytes": 627
+        },
+        "dlms-set-selective/hdlc/list-literal-error-result-observed.udp.pcap": {
+          "sha256": "ff66d295988f426791818334a0d357f000578d120b95ff681676c07b47e9b85c",
+          "bytes": 369
+        },
+        "dlms-set-selective/hdlc/list-optional2-unimplemented.tcp.pcap": {
+          "sha256": "09cb9eb74af800741d4874c536e6a20589312874cfe2cd9ed2615e65908e478d",
+          "bytes": 627
+        },
+        "dlms-set-selective/hdlc/list-optional2-unimplemented.udp.pcap": {
+          "sha256": "405c0216168d15c9283516538bde0b43a9f69dfb11f57c139d9116108d3dd967",
+          "bytes": 369
+        },
+        "dlms-set-selective/hdlc/list-parameter-compact.tcp.pcap": {
+          "sha256": "67dff2e29ea0ebb7264513dcd7c57a4fc0428c5942d560c4f066cb85ff38d942",
+          "bytes": 632
+        },
+        "dlms-set-selective/hdlc/list-parameter-compact.udp.pcap": {
+          "sha256": "2aaf764a44b11cd5cde80968d57337547ac07fb22d1b335e4f593c89fb2cd1ce",
+          "bytes": 374
+        },
+        "dlms-set-selective/hdlc/list-parameter-structure-depth6.tcp.pcap": {
+          "sha256": "3e11648a8c78959422c2de7684b35e1ee7eccf4b59d2ff68c3dc6c2ef329a936",
+          "bytes": 633
+        },
+        "dlms-set-selective/hdlc/list-parameter-structure-depth6.udp.pcap": {
+          "sha256": "935e85b011daf41db746e91025a91684542e96b5a38986b2af89200ba5630307",
+          "bytes": 375
+        },
+        "dlms-set-selective/hdlc/list-pending-private-Close.tcp.pcap": {
+          "sha256": "51eef78e3341992a309fe919d53eb43d57b5073739423df89ab65347ff57b008",
+          "bytes": 537
+        },
+        "dlms-set-selective/hdlc/list-pending-private-Close.udp.pcap": {
+          "sha256": "4dd26872a57bcc4bc4b5828eb43daf8322248fb2e11caef287d61b1d3d6b8493",
+          "bytes": 291
+        },
+        "dlms-set-selective/hdlc/list-result-count-carrier-policy.tcp.pcap": {
+          "sha256": "e10f1000162117218b33446fc95222a13b16ec14e84a52d8fd76bb888702a8a1",
+          "bytes": 716
+        },
+        "dlms-set-selective/hdlc/list-result-count-carrier-policy.udp.pcap": {
+          "sha256": "f40fb7cade12858d4d12e615371f595849c7f921e04dac2c0867eca34c2f4463",
+          "bytes": 446
+        },
+        "dlms-set-selective/hdlc/list-scalar-payload13-not-compact.tcp.pcap": {
+          "sha256": "c37309b6b586a5403893cb5bea565b82c41faa873c865ce4a99c95b3b25053d5",
+          "bytes": 629
+        },
+        "dlms-set-selective/hdlc/list-scalar-payload13-not-compact.udp.pcap": {
+          "sha256": "4cf63607b9c35524ec8bc7a057ac5fe6385cdbdea75a1abd9a7e351483e5b290",
+          "bytes": 371
+        },
+        "dlms-set-selective/hdlc/list-selected-scalars.tcp.pcap": {
+          "sha256": "66fbe891a62f9c650dc10f0cff26e12d61d843e45ed62bc487e9828c40ffd648",
+          "bytes": 627
+        },
+        "dlms-set-selective/hdlc/list-selected-scalars.udp.pcap": {
+          "sha256": "9ac77962c84b94d9320816cd5a595f7f62c4efe15d225a24361db958e3d8771f",
+          "bytes": 369
+        },
+        "dlms-set-selective/hdlc/list-truncated-parameter.tcp.pcap": {
+          "sha256": "46d27ab2139226bdca48c4614efdb31ee46403fc8691fce8f50e9ee5f3de1847",
+          "bytes": 611
+        },
+        "dlms-set-selective/hdlc/list-truncated-parameter.udp.pcap": {
+          "sha256": "18f372af3a3955bf18e8e6b55a15e9058971dd21e046af09ab07f79bc0490f75",
+          "bytes": 353
+        },
+        "dlms-set-selective/hdlc/list-truncated-value.tcp.pcap": {
+          "sha256": "a212d9bd64c1a131c8c764998db7fdb6ae9fa349922dfa3bcecbd93974e86988",
+          "bytes": 623
+        },
+        "dlms-set-selective/hdlc/list-truncated-value.udp.pcap": {
+          "sha256": "73716d600589cafc36501af81d55e1ab725ca5dff32cf92c2cf0b4fdbd4f56d8",
+          "bytes": 365
+        },
+        "dlms-set-selective/hdlc/list-unselected-adjacent.tcp.pcap": {
+          "sha256": "7f3c8175144a5e995ecdc8b5ce15e35d20aea53b0584011f29a3572c63495ec7",
+          "bytes": 624
+        },
+        "dlms-set-selective/hdlc/list-unselected-adjacent.udp.pcap": {
+          "sha256": "2313c5f3d1ce262795fb4c3f3f859dc839c9bf2af999486952c27cf36247bc31",
+          "bytes": 366
+        },
+        "dlms-set-selective/hdlc/list-value-compact.tcp.pcap": {
+          "sha256": "2dbb20689e52d5321d12d90dd3c17f66bdc8379e4c3c8bfe494e8a6226e0cfc7",
+          "bytes": 632
+        },
+        "dlms-set-selective/hdlc/list-value-compact.udp.pcap": {
+          "sha256": "3d1ca2175743153c4a09ad95c1f01e432e69c49f0d1e0511d7433b24cd794df5",
+          "bytes": 374
+        },
+        "dlms-set-selective/hdlc/list-wrongflags-preserves-owner.tcp.pcap": {
+          "sha256": "1b68d65b6be4cb89b25637b026ff1ea9145dbb66c37e065a209cc8e7df7c6152",
+          "bytes": 717
+        },
+        "dlms-set-selective/hdlc/list-wrongflags-preserves-owner.udp.pcap": {
+          "sha256": "cb8a6bb0b0bb2d2772b644bee767085e849e5332dfb40fcbcdc4d7df4e4a0c06",
+          "bytes": 447
+        },
+        "dlms-set-selective/hdlc/list-wrongform-carrier-policy.tcp.pcap": {
+          "sha256": "355f867c198b1758c8842697f2a41a3de21e347d01024298f64fbb68716f3620",
+          "bytes": 715
+        },
+        "dlms-set-selective/hdlc/list-wrongform-carrier-policy.udp.pcap": {
+          "sha256": "cfee60bfc77954689918d1324c6cc1959807426d8bb48c8b39b4f23cb24b8eb4",
+          "bytes": 445
+        },
+        "dlms-set-selective/hdlc/normal-exact-request-retry-carrier-policy.tcp.pcap": {
+          "sha256": "4f446f894e82922cb61426d0c359b963fdd17fce5fd4d11e559e24fcd8085c83",
+          "bytes": 713
+        },
+        "dlms-set-selective/hdlc/normal-exact-request-retry-carrier-policy.udp.pcap": {
+          "sha256": "84387cd21f3e49ed3d2262ae0292edfff65e706f902bfab201a0e3ae7eb39428",
+          "bytes": 443
+        },
+        "dlms-set-selective/hdlc/normal-literal-error-result-observed.tcp.pcap": {
+          "sha256": "751e7015e28fc29a23db6d5f79988555f038e197c460ccf89ca2feede4a2ba0c",
+          "bytes": 611
+        },
+        "dlms-set-selective/hdlc/normal-literal-error-result-observed.udp.pcap": {
+          "sha256": "2a555cf07227676b30c2b7544c27a8d4dfed95de55659c7571029478aa25f8f8",
+          "bytes": 353
+        },
+        "dlms-set-selective/hdlc/normal-optional2-unimplemented.tcp.pcap": {
+          "sha256": "e65ed817ecd28d8853ff6307f78b80bb7af3825a800763c9d492fc82d0c0a852",
+          "bytes": 611
+        },
+        "dlms-set-selective/hdlc/normal-optional2-unimplemented.udp.pcap": {
+          "sha256": "781a4758c51ac9f543e09fdf03089ab207c3293b1a60a9fa89584c22619ae2c1",
+          "bytes": 353
+        },
+        "dlms-set-selective/hdlc/normal-parameter-compact.tcp.pcap": {
+          "sha256": "7a59742d7002d85130af149c71cb3489231bc0a95102b9e431e595a47a09155d",
+          "bytes": 616
+        },
+        "dlms-set-selective/hdlc/normal-parameter-compact.udp.pcap": {
+          "sha256": "1c6a62a11a00801c107726d8cfba5b66b03529be1001bc8cb8797e753beae456",
+          "bytes": 358
+        },
+        "dlms-set-selective/hdlc/normal-parameter-structure-depth6.tcp.pcap": {
+          "sha256": "6cb1887c66348d65c464eaeb77969e25e2a8a210af494e6b4beff15eee97b05a",
+          "bytes": 617
+        },
+        "dlms-set-selective/hdlc/normal-parameter-structure-depth6.udp.pcap": {
+          "sha256": "e5626801f0a81efb85358928de8c4e42646c8017b2f47078e1a3944134e60282",
+          "bytes": 359
+        },
+        "dlms-set-selective/hdlc/normal-pending-private-Close.tcp.pcap": {
+          "sha256": "2bcf58579529652516e73aafa837b29e59f61b476360d0131041791f5ae498c5",
+          "bytes": 523
+        },
+        "dlms-set-selective/hdlc/normal-pending-private-Close.udp.pcap": {
+          "sha256": "735b920bcd24dd9b3885683bd9953de7a7b9423aa3b1ba8e4114d8a814717fd0",
+          "bytes": 277
+        },
+        "dlms-set-selective/hdlc/normal-scalar-payload13-not-compact.tcp.pcap": {
+          "sha256": "a36260784ac66d8c145e64a5f2b560df69f74ae617d0b561e71360b8884e8997",
+          "bytes": 613
+        },
+        "dlms-set-selective/hdlc/normal-scalar-payload13-not-compact.udp.pcap": {
+          "sha256": "5728cb9d3f842d12ff4ef928ff88303bf16561ef4b021d33b1f581e69ff34edc",
+          "bytes": 355
+        },
+        "dlms-set-selective/hdlc/normal-selected-scalars.tcp.pcap": {
+          "sha256": "a7746ced00bc04a052eb2c5bacddf5fba89ce075baad4234695cf28abce2a0c2",
+          "bytes": 611
+        },
+        "dlms-set-selective/hdlc/normal-selected-scalars.udp.pcap": {
+          "sha256": "b44eb76112810c12a31cbf3186de43a6fa2f5e8d2c81ec4a67fe8d0e1756d90e",
+          "bytes": 353
+        },
+        "dlms-set-selective/hdlc/normal-truncated-parameter.tcp.pcap": {
+          "sha256": "09b45d91ad7cae028a34d0efe03d8c4f3d408a3c382dd864ead70616e9c822d4",
+          "bytes": 608
+        },
+        "dlms-set-selective/hdlc/normal-truncated-parameter.udp.pcap": {
+          "sha256": "1af0ef56612bf52901e0963fb56fab47f9a924b9b4bcac1d671c305f71151675",
+          "bytes": 350
+        },
+        "dlms-set-selective/hdlc/normal-truncated-value.tcp.pcap": {
+          "sha256": "7eff60adf7d3401b2c8b4f7c3beae748d33e473266af810411f889aac330b2eb",
+          "bytes": 609
+        },
+        "dlms-set-selective/hdlc/normal-truncated-value.udp.pcap": {
+          "sha256": "3af3366ef644d100b098b6793575f6e519acd26124d60836cc59ac46fa84cb48",
+          "bytes": 351
+        },
+        "dlms-set-selective/hdlc/normal-unselected-adjacent.tcp.pcap": {
+          "sha256": "5d099e1a036222bf32dff5544f6356a9f23701ceffb0308fd1ffab7bc0b387f4",
+          "bytes": 608
+        },
+        "dlms-set-selective/hdlc/normal-unselected-adjacent.udp.pcap": {
+          "sha256": "2af0f65c5dd468f75284534e5c72699641e17fec4de1b751da35e55d166bbd62",
+          "bytes": 350
+        },
+        "dlms-set-selective/hdlc/normal-value-compact.tcp.pcap": {
+          "sha256": "6a6338b9124ee45c3ebeb1fa3a04bf1f6db2a52221c89759a984a6a8e9e91f61",
+          "bytes": 616
+        },
+        "dlms-set-selective/hdlc/normal-value-compact.udp.pcap": {
+          "sha256": "2a1c52d34d37148b3901ca3e010439a1ae341341a363b9e31b588738fc5a2caa",
+          "bytes": 358
+        },
+        "dlms-set-selective/hdlc/normal-wrongflags-preserves-owner.tcp.pcap": {
+          "sha256": "5369a712968658dba69c6c174f2100be91216692d1bab8b355d4e4505820c2d7",
+          "bytes": 699
+        },
+        "dlms-set-selective/hdlc/normal-wrongflags-preserves-owner.udp.pcap": {
+          "sha256": "35a8e9bf1a068e61c391c0e84b25d781bf51d80f576c72e998c45e8dd7b8a293",
+          "bytes": 429
+        },
+        "dlms-set-selective/hdlc/normal-wrongform-carrier-policy.tcp.pcap": {
+          "sha256": "0750e12f73417c64900e1e09a8540b5212349aea3edbc28193abf80f0bc176b4",
+          "bytes": 701
+        },
+        "dlms-set-selective/hdlc/normal-wrongform-carrier-policy.udp.pcap": {
+          "sha256": "160ff107ce5d37e442adfb7cdd71eee2b5ae6a0d6ea4bdc7f0260e28deee1677",
+          "bytes": 431
+        },
+        "dlms-set-selective/legacy-normal-update.json": {
+          "sha256": "a76a3f45488eda5fe03b370d7955a76f1e4571cc20db44755644e48d53d1983c",
+          "bytes": 2213
+        },
+        "dlms-set-selective/projection.json": {
+          "sha256": "964515e5c1be9b2480c238ef36d8aa6777a97c3dffb1ef31eb1e5d565b07f216",
+          "bytes": 1279
+        },
+        "dlms-set-selective/reuse-inputs.json": {
+          "sha256": "ca3d163bab055381827226140568f3bef7eaac187cebd76878e0b63e9e442356",
+          "bytes": 3
+        },
+        "dlms-set-selective/wrapper/list-exact-request-retry-carrier-policy.tcp.pcap": {
+          "sha256": "0d47b7ee1e6ace28b4ce54d739c0deae4b5f833f507f63490fe9419be3d41df4",
+          "bytes": 713
+        },
+        "dlms-set-selective/wrapper/list-exact-request-retry-carrier-policy.udp.pcap": {
+          "sha256": "bd56fccf2f48ad12a9c3f043299bb47cc3f8b9f91b5c12c1ba90d5eeed63f771",
+          "bytes": 443
+        },
+        "dlms-set-selective/wrapper/list-literal-error-result-observed.tcp.pcap": {
+          "sha256": "1e5afccf95e2a17230bd7c4e80f1741a4a56ba8487e04dc06b7d69858ddc3d9e",
+          "bytes": 603
+        },
+        "dlms-set-selective/wrapper/list-literal-error-result-observed.udp.pcap": {
+          "sha256": "578b4089fc6ed82911f241216da78acc95773ecd3bb4d49a25e524af4f03c51d",
+          "bytes": 345
+        },
+        "dlms-set-selective/wrapper/list-optional2-unimplemented.tcp.pcap": {
+          "sha256": "a6b1c14d00f111247cf9d6651e6e875860db7948a4188178f038edc1232783b5",
+          "bytes": 603
+        },
+        "dlms-set-selective/wrapper/list-optional2-unimplemented.udp.pcap": {
+          "sha256": "d70547ce58c8b0ec2b75e23bfbcd67654cfa5f7ab5456dd296bfa406919ca987",
+          "bytes": 345
+        },
+        "dlms-set-selective/wrapper/list-parameter-compact.tcp.pcap": {
+          "sha256": "fb53919658a45ef0e58355b6ff44b999a40675af8acbd2665be7571f86b6159c",
+          "bytes": 608
+        },
+        "dlms-set-selective/wrapper/list-parameter-compact.udp.pcap": {
+          "sha256": "3e98c05ebc6172cd97d3eacd0f8cb3a77e75290b050a25b2fe610081aceb0b9d",
+          "bytes": 350
+        },
+        "dlms-set-selective/wrapper/list-parameter-structure-depth6.tcp.pcap": {
+          "sha256": "777efb82de763b4de10430d63601bb51420883b190719af64191489d316bde08",
+          "bytes": 609
+        },
+        "dlms-set-selective/wrapper/list-parameter-structure-depth6.udp.pcap": {
+          "sha256": "d697caba6fd223ded47d3d1d3665441da6374de129010f478617b1ac1a483295",
+          "bytes": 351
+        },
+        "dlms-set-selective/wrapper/list-pending-private-Close.tcp.pcap": {
+          "sha256": "e8c7ee2c53d423070f047ff041ef75a202be4dc9dd14331b72f979294027e69a",
+          "bytes": 519
+        },
+        "dlms-set-selective/wrapper/list-pending-private-Close.udp.pcap": {
+          "sha256": "5ba2be2d77737f799993265959ba9ae93527deaf2853499c4ebe5253ff490172",
+          "bytes": 273
+        },
+        "dlms-set-selective/wrapper/list-result-count-carrier-policy.tcp.pcap": {
+          "sha256": "5dbe002f5b591480fec5319927da3ccd8522e9a1dd70d60a2c698812a9d4ad3b",
+          "bytes": 686
+        },
+        "dlms-set-selective/wrapper/list-result-count-carrier-policy.udp.pcap": {
+          "sha256": "6093646baec6fbc86de0b9a78314d8f6d495ded7629c4a8b28013e295455dd49",
+          "bytes": 416
+        },
+        "dlms-set-selective/wrapper/list-scalar-payload13-not-compact.tcp.pcap": {
+          "sha256": "177e356ad1db497a8a61ffd91f13baf8e5d72e0359d57a6db9812dff7b5a1185",
+          "bytes": 605
+        },
+        "dlms-set-selective/wrapper/list-scalar-payload13-not-compact.udp.pcap": {
+          "sha256": "f0a186e202985e338e064b9e088ebda8dc8e84d9dc6bdff2bc7caaf618b96adc",
+          "bytes": 347
+        },
+        "dlms-set-selective/wrapper/list-selected-scalars.tcp.pcap": {
+          "sha256": "d90737257a89cb1e7e869e929b1a0ed35826025389d2f6e2ecd24ed99aa73b28",
+          "bytes": 603
+        },
+        "dlms-set-selective/wrapper/list-selected-scalars.udp.pcap": {
+          "sha256": "4563b74ce0ef473d578fe5bed980fd7346d1ed242eaaa2f0fe88fbb98b59e40d",
+          "bytes": 345
+        },
+        "dlms-set-selective/wrapper/list-truncated-parameter.tcp.pcap": {
+          "sha256": "a703fb8908ff783a617a5622588a49d7998a9c59d129b471b610271552831be4",
+          "bytes": 587
+        },
+        "dlms-set-selective/wrapper/list-truncated-parameter.udp.pcap": {
+          "sha256": "58f62513727e80e8888fc0febdac806c5ee10cfb60b0539a1e42f32974938e4a",
+          "bytes": 329
+        },
+        "dlms-set-selective/wrapper/list-truncated-value.tcp.pcap": {
+          "sha256": "b46de30f8d5f83608b9bfa572111749818d7c9f85f54d9f12dd7694f413f2778",
+          "bytes": 599
+        },
+        "dlms-set-selective/wrapper/list-truncated-value.udp.pcap": {
+          "sha256": "30c46b663b3f4c00c084f7b5508450ac6e82511b69fd9c9873f933c36e122048",
+          "bytes": 341
+        },
+        "dlms-set-selective/wrapper/list-unselected-adjacent.tcp.pcap": {
+          "sha256": "9ba44032a4525259ffc76d359f68bfcdaf4503f4f9ae7905a1de6a52cfb3a90c",
+          "bytes": 600
+        },
+        "dlms-set-selective/wrapper/list-unselected-adjacent.udp.pcap": {
+          "sha256": "f3f1356b285ab186dfec8add378bd19d380daf76584fe68f033b7b8d82a05862",
+          "bytes": 342
+        },
+        "dlms-set-selective/wrapper/list-value-compact.tcp.pcap": {
+          "sha256": "bae1c7b4e6d12736c3501ae835a9ba47f615233efb7157a1a25ada783e21199e",
+          "bytes": 608
+        },
+        "dlms-set-selective/wrapper/list-value-compact.udp.pcap": {
+          "sha256": "42ca5b50d66571409902a97ca7bb58f294f943e140b8125675647bede66beb6e",
+          "bytes": 350
+        },
+        "dlms-set-selective/wrapper/list-wrongflags-preserves-owner.tcp.pcap": {
+          "sha256": "0aaac373c03a3bddc1b741fb7dc1e8b570e861beddee5f6e748997b9ecfb7a84",
+          "bytes": 687
+        },
+        "dlms-set-selective/wrapper/list-wrongflags-preserves-owner.udp.pcap": {
+          "sha256": "966a5d258d4ea2c1db50afc4bcc819e05c4b62ed0e0eaf9b9e60d6f475d34f47",
+          "bytes": 417
+        },
+        "dlms-set-selective/wrapper/list-wrongform-carrier-policy.tcp.pcap": {
+          "sha256": "f0790419be08971268b000e549ead5ed2a507621cb1360a7b6eea02a1b4c9ce1",
+          "bytes": 685
+        },
+        "dlms-set-selective/wrapper/list-wrongform-carrier-policy.udp.pcap": {
+          "sha256": "f1bf484d67b80f9ae573b1561fd1abf65ba3b8bf22e2c94eb250846c70cd5992",
+          "bytes": 415
+        },
+        "dlms-set-selective/wrapper/normal-exact-request-retry-carrier-policy.tcp.pcap": {
+          "sha256": "d085a3db84be89aeb53ebd0b413218610b155099dd2fb139c29d0411cb6abd0e",
+          "bytes": 683
+        },
+        "dlms-set-selective/wrapper/normal-exact-request-retry-carrier-policy.udp.pcap": {
+          "sha256": "7103e8a4899a4738150a8a30065ec938613d8f3b20806a338ead9babcbde1de7",
+          "bytes": 413
+        },
+        "dlms-set-selective/wrapper/normal-literal-error-result-observed.tcp.pcap": {
+          "sha256": "8d4b51bcd59c7be0988f1988fc6c286029955353b4883865b8cae1592df7139d",
+          "bytes": 587
+        },
+        "dlms-set-selective/wrapper/normal-literal-error-result-observed.udp.pcap": {
+          "sha256": "3786f29008652f1ee00bdc8554718a5cc32bd263edda87ac1507dd061f77b0e7",
+          "bytes": 329
+        },
+        "dlms-set-selective/wrapper/normal-optional2-unimplemented.tcp.pcap": {
+          "sha256": "57031ebc089dbbbfcabfa836511ccf4a3381ad9a8628120878c1c906d4b42108",
+          "bytes": 587
+        },
+        "dlms-set-selective/wrapper/normal-optional2-unimplemented.udp.pcap": {
+          "sha256": "4de10335eba6f1b1dda84648ef28cd9eec48f6eebd33bdc9453744124106f1e0",
+          "bytes": 329
+        },
+        "dlms-set-selective/wrapper/normal-parameter-compact.tcp.pcap": {
+          "sha256": "9addbf19b34521db709ec7666f90af2c30767ab14488244137ce4300b0bc3cd7",
+          "bytes": 592
+        },
+        "dlms-set-selective/wrapper/normal-parameter-compact.udp.pcap": {
+          "sha256": "19149dd8364d3928d75ce681d447a159b04a32809afb415c8bfc46cdb108a85a",
+          "bytes": 334
+        },
+        "dlms-set-selective/wrapper/normal-parameter-structure-depth6.tcp.pcap": {
+          "sha256": "e6ca03354cc533ebd61cbd1969800c583d6ad911458338132e14432227c6e567",
+          "bytes": 593
+        },
+        "dlms-set-selective/wrapper/normal-parameter-structure-depth6.udp.pcap": {
+          "sha256": "177be70b28a5a0f81503fd6827d58d3681ca83c7901726d67f1f82b932509b59",
+          "bytes": 335
+        },
+        "dlms-set-selective/wrapper/normal-pending-private-Close.tcp.pcap": {
+          "sha256": "aedee8846c75af97d104c4918b112cf6297e96d025a79a65ffa9fce3b76a3c1b",
+          "bytes": 505
+        },
+        "dlms-set-selective/wrapper/normal-pending-private-Close.udp.pcap": {
+          "sha256": "4cca689bed5d0e1baa091e3191cf7000e43588408a60d6098753ec63f7141c77",
+          "bytes": 259
+        },
+        "dlms-set-selective/wrapper/normal-scalar-payload13-not-compact.tcp.pcap": {
+          "sha256": "5ccd377f6f63d1eed29d8af8c67c650be06d6feff23c649bfef39221764aa41e",
+          "bytes": 589
+        },
+        "dlms-set-selective/wrapper/normal-scalar-payload13-not-compact.udp.pcap": {
+          "sha256": "783b07af060db74040f919c0df42505b61d3062aed05bdb16016f50ac2269e2c",
+          "bytes": 331
+        },
+        "dlms-set-selective/wrapper/normal-selected-scalars.tcp.pcap": {
+          "sha256": "af7e4348c20628291acd1eb62b7713c359e4b5b4638ce067c7d5d01c0c59c887",
+          "bytes": 587
+        },
+        "dlms-set-selective/wrapper/normal-selected-scalars.udp.pcap": {
+          "sha256": "29ad79298bffa1445d8ab68ee003be9684a71d1c8b1786018e8ffb06b429a488",
+          "bytes": 329
+        },
+        "dlms-set-selective/wrapper/normal-truncated-parameter.tcp.pcap": {
+          "sha256": "970c8bcfdf1d5de468e355792d8592327fea2acaeb7a04c8b964be853d3b3f66",
+          "bytes": 584
+        },
+        "dlms-set-selective/wrapper/normal-truncated-parameter.udp.pcap": {
+          "sha256": "95f706e009a0119d5ff9c4e0a653dc5c91c7000e438869c1916e3cd9df21ff42",
+          "bytes": 326
+        },
+        "dlms-set-selective/wrapper/normal-truncated-value.tcp.pcap": {
+          "sha256": "0cecd8fa3219582a67719cdc7f70c9b2a2d543528d42201a5bca7239b864a2da",
+          "bytes": 585
+        },
+        "dlms-set-selective/wrapper/normal-truncated-value.udp.pcap": {
+          "sha256": "596435afd599b59dd86b9bb21195516f673109f45944f5443949dec82fe1fdaa",
+          "bytes": 327
+        },
+        "dlms-set-selective/wrapper/normal-unselected-adjacent.tcp.pcap": {
+          "sha256": "2cf2f08d4f4ff99532c8d352b39505af4bf1d3032ffab4905ed57fae83720ade",
+          "bytes": 584
+        },
+        "dlms-set-selective/wrapper/normal-unselected-adjacent.udp.pcap": {
+          "sha256": "3acd5373142d242b78032c912809c09f812924c4e52a29e96d451dfc72343d0b",
+          "bytes": 326
+        },
+        "dlms-set-selective/wrapper/normal-value-compact.tcp.pcap": {
+          "sha256": "6a488f2da22c779d4dafbc221852cf7966c61547d566629603cf07c181a2b552",
+          "bytes": 592
+        },
+        "dlms-set-selective/wrapper/normal-value-compact.udp.pcap": {
+          "sha256": "9adc1962d38056446dacb1b765747b477c928ea84e54ad99172b26c157f26128",
+          "bytes": 334
+        },
+        "dlms-set-selective/wrapper/normal-wrongflags-preserves-owner.tcp.pcap": {
+          "sha256": "5405fde997856cce467192148b4dde23fb2356107d6af87409531f11dbc37112",
+          "bytes": 669
+        },
+        "dlms-set-selective/wrapper/normal-wrongflags-preserves-owner.udp.pcap": {
+          "sha256": "31ef0f0ada5fe22541ce6211d22c4885f6cba40b58cf40f5effb2b34b623eddb",
+          "bytes": 399
+        },
+        "dlms-set-selective/wrapper/normal-wrongform-carrier-policy.tcp.pcap": {
+          "sha256": "cf767a261ac70f2c2a283cd1e0b6e51506a5161c82a35c88705103eba238408f",
+          "bytes": 671
+        },
+        "dlms-set-selective/wrapper/normal-wrongform-carrier-policy.udp.pcap": {
+          "sha256": "9f6fa30751907d9cc80d1297272134f21ea97ca686b15ea47ee9c0a546691298",
+          "bytes": 401
+        },
+        "required-tests-traffic-unified-v128.json": {
+          "sha256": "3b244ad234c28ca8beae239704395cfe389f461b61453427d4692190481a44ce",
+          "bytes": 22358830
+        },
+        "validation/expected.json": {
+          "sha256": "5172e4d802ae7a0fcd9d8307a588514e8955db3146398a798c730b25bdc892b7",
+          "bytes": 202647
+        }
+      },
+      "aliases": {
+        "common/pcapx/pcaputil/dlms-set-selective-tools/SOURCES.json": "dlms-set-selective-tools/SOURCES.json",
+        "common/pcapx/pcaputil/dlms-set-selective-tools/build-extended.py": "dlms-set-selective-tools/build-extended.py",
+        "common/pcapx/pcaputil/dlms-set-selective-tools/generate-controls.py": "dlms-set-selective-tools/generate-controls.py",
+        "common/pcapx/pcaputil/dlms-set-selective-tools/generate.py": "dlms-set-selective-tools/generate.py",
+        "common/pcapx/pcaputil/dlms-set-selective-tools/hdlc-observer-model.py": "dlms-set-selective-tools/hdlc-observer-model.py",
+        "common/pcapx/pcaputil/dlms-set-selective-tools/reference-check.py": "dlms-set-selective-tools/reference-check.py",
+        "common/pcapx/pcaputil/dlms-set-selective-tools/reference-vectors.json": "dlms-set-selective-tools/reference-vectors.json",
+        "common/pcapx/pcaputil/dlms-set-selective-tools/selection-model.py": "dlms-set-selective-tools/selection-model.py",
+        "common/pcapx/pcaputil/dlms-set-selective-tools/verify-captures.py": "dlms-set-selective-tools/verify-captures.py",
+        "common/pcapx/pcaputil/dlms-set-selective-tools/verify.py": "dlms-set-selective-tools/verify.py",
+        "common/pcapx/pcaputil/dlms-set-selective-tools/wrapper-observer-model.py": "dlms-set-selective-tools/wrapper-observer-model.py",
+        "common/pcapx/pcaputil/dlms-set-selective/controls.json": "dlms-set-selective/controls.json",
+        "common/pcapx/pcaputil/dlms-set-selective/hdlc/list-exact-request-retry-carrier-policy.tcp.pcap": "dlms-set-selective/hdlc/list-exact-request-retry-carrier-policy.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-set-selective/hdlc/list-exact-request-retry-carrier-policy.udp.pcap": "dlms-set-selective/hdlc/list-exact-request-retry-carrier-policy.udp.pcap",
+        "common/pcapx/pcaputil/dlms-set-selective/hdlc/list-literal-error-result-observed.tcp.pcap": "dlms-set-selective/hdlc/list-literal-error-result-observed.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-set-selective/hdlc/list-literal-error-result-observed.udp.pcap": "dlms-set-selective/hdlc/list-literal-error-result-observed.udp.pcap",
+        "common/pcapx/pcaputil/dlms-set-selective/hdlc/list-optional2-unimplemented.tcp.pcap": "dlms-set-selective/hdlc/list-optional2-unimplemented.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-set-selective/hdlc/list-optional2-unimplemented.udp.pcap": "dlms-set-selective/hdlc/list-optional2-unimplemented.udp.pcap",
+        "common/pcapx/pcaputil/dlms-set-selective/hdlc/list-parameter-compact.tcp.pcap": "dlms-set-selective/hdlc/list-parameter-compact.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-set-selective/hdlc/list-parameter-compact.udp.pcap": "dlms-set-selective/hdlc/list-parameter-compact.udp.pcap",
+        "common/pcapx/pcaputil/dlms-set-selective/hdlc/list-parameter-structure-depth6.tcp.pcap": "dlms-set-selective/hdlc/list-parameter-structure-depth6.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-set-selective/hdlc/list-parameter-structure-depth6.udp.pcap": "dlms-set-selective/hdlc/list-parameter-structure-depth6.udp.pcap",
+        "common/pcapx/pcaputil/dlms-set-selective/hdlc/list-pending-private-Close.tcp.pcap": "dlms-set-selective/hdlc/list-pending-private-Close.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-set-selective/hdlc/list-pending-private-Close.udp.pcap": "dlms-set-selective/hdlc/list-pending-private-Close.udp.pcap",
+        "common/pcapx/pcaputil/dlms-set-selective/hdlc/list-result-count-carrier-policy.tcp.pcap": "dlms-set-selective/hdlc/list-result-count-carrier-policy.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-set-selective/hdlc/list-result-count-carrier-policy.udp.pcap": "dlms-set-selective/hdlc/list-result-count-carrier-policy.udp.pcap",
+        "common/pcapx/pcaputil/dlms-set-selective/hdlc/list-scalar-payload13-not-compact.tcp.pcap": "dlms-set-selective/hdlc/list-scalar-payload13-not-compact.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-set-selective/hdlc/list-scalar-payload13-not-compact.udp.pcap": "dlms-set-selective/hdlc/list-scalar-payload13-not-compact.udp.pcap",
+        "common/pcapx/pcaputil/dlms-set-selective/hdlc/list-selected-scalars.tcp.pcap": "dlms-set-selective/hdlc/list-selected-scalars.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-set-selective/hdlc/list-selected-scalars.udp.pcap": "dlms-set-selective/hdlc/list-selected-scalars.udp.pcap",
+        "common/pcapx/pcaputil/dlms-set-selective/hdlc/list-truncated-parameter.tcp.pcap": "dlms-set-selective/hdlc/list-truncated-parameter.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-set-selective/hdlc/list-truncated-parameter.udp.pcap": "dlms-set-selective/hdlc/list-truncated-parameter.udp.pcap",
+        "common/pcapx/pcaputil/dlms-set-selective/hdlc/list-truncated-value.tcp.pcap": "dlms-set-selective/hdlc/list-truncated-value.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-set-selective/hdlc/list-truncated-value.udp.pcap": "dlms-set-selective/hdlc/list-truncated-value.udp.pcap",
+        "common/pcapx/pcaputil/dlms-set-selective/hdlc/list-unselected-adjacent.tcp.pcap": "dlms-set-selective/hdlc/list-unselected-adjacent.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-set-selective/hdlc/list-unselected-adjacent.udp.pcap": "dlms-set-selective/hdlc/list-unselected-adjacent.udp.pcap",
+        "common/pcapx/pcaputil/dlms-set-selective/hdlc/list-value-compact.tcp.pcap": "dlms-set-selective/hdlc/list-value-compact.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-set-selective/hdlc/list-value-compact.udp.pcap": "dlms-set-selective/hdlc/list-value-compact.udp.pcap",
+        "common/pcapx/pcaputil/dlms-set-selective/hdlc/list-wrongflags-preserves-owner.tcp.pcap": "dlms-set-selective/hdlc/list-wrongflags-preserves-owner.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-set-selective/hdlc/list-wrongflags-preserves-owner.udp.pcap": "dlms-set-selective/hdlc/list-wrongflags-preserves-owner.udp.pcap",
+        "common/pcapx/pcaputil/dlms-set-selective/hdlc/list-wrongform-carrier-policy.tcp.pcap": "dlms-set-selective/hdlc/list-wrongform-carrier-policy.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-set-selective/hdlc/list-wrongform-carrier-policy.udp.pcap": "dlms-set-selective/hdlc/list-wrongform-carrier-policy.udp.pcap",
+        "common/pcapx/pcaputil/dlms-set-selective/hdlc/normal-exact-request-retry-carrier-policy.tcp.pcap": "dlms-set-selective/hdlc/normal-exact-request-retry-carrier-policy.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-set-selective/hdlc/normal-exact-request-retry-carrier-policy.udp.pcap": "dlms-set-selective/hdlc/normal-exact-request-retry-carrier-policy.udp.pcap",
+        "common/pcapx/pcaputil/dlms-set-selective/hdlc/normal-literal-error-result-observed.tcp.pcap": "dlms-set-selective/hdlc/normal-literal-error-result-observed.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-set-selective/hdlc/normal-literal-error-result-observed.udp.pcap": "dlms-set-selective/hdlc/normal-literal-error-result-observed.udp.pcap",
+        "common/pcapx/pcaputil/dlms-set-selective/hdlc/normal-optional2-unimplemented.tcp.pcap": "dlms-set-selective/hdlc/normal-optional2-unimplemented.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-set-selective/hdlc/normal-optional2-unimplemented.udp.pcap": "dlms-set-selective/hdlc/normal-optional2-unimplemented.udp.pcap",
+        "common/pcapx/pcaputil/dlms-set-selective/hdlc/normal-parameter-compact.tcp.pcap": "dlms-set-selective/hdlc/normal-parameter-compact.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-set-selective/hdlc/normal-parameter-compact.udp.pcap": "dlms-set-selective/hdlc/normal-parameter-compact.udp.pcap",
+        "common/pcapx/pcaputil/dlms-set-selective/hdlc/normal-parameter-structure-depth6.tcp.pcap": "dlms-set-selective/hdlc/normal-parameter-structure-depth6.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-set-selective/hdlc/normal-parameter-structure-depth6.udp.pcap": "dlms-set-selective/hdlc/normal-parameter-structure-depth6.udp.pcap",
+        "common/pcapx/pcaputil/dlms-set-selective/hdlc/normal-pending-private-Close.tcp.pcap": "dlms-set-selective/hdlc/normal-pending-private-Close.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-set-selective/hdlc/normal-pending-private-Close.udp.pcap": "dlms-set-selective/hdlc/normal-pending-private-Close.udp.pcap",
+        "common/pcapx/pcaputil/dlms-set-selective/hdlc/normal-scalar-payload13-not-compact.tcp.pcap": "dlms-set-selective/hdlc/normal-scalar-payload13-not-compact.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-set-selective/hdlc/normal-scalar-payload13-not-compact.udp.pcap": "dlms-set-selective/hdlc/normal-scalar-payload13-not-compact.udp.pcap",
+        "common/pcapx/pcaputil/dlms-set-selective/hdlc/normal-selected-scalars.tcp.pcap": "dlms-set-selective/hdlc/normal-selected-scalars.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-set-selective/hdlc/normal-selected-scalars.udp.pcap": "dlms-set-selective/hdlc/normal-selected-scalars.udp.pcap",
+        "common/pcapx/pcaputil/dlms-set-selective/hdlc/normal-truncated-parameter.tcp.pcap": "dlms-set-selective/hdlc/normal-truncated-parameter.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-set-selective/hdlc/normal-truncated-parameter.udp.pcap": "dlms-set-selective/hdlc/normal-truncated-parameter.udp.pcap",
+        "common/pcapx/pcaputil/dlms-set-selective/hdlc/normal-truncated-value.tcp.pcap": "dlms-set-selective/hdlc/normal-truncated-value.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-set-selective/hdlc/normal-truncated-value.udp.pcap": "dlms-set-selective/hdlc/normal-truncated-value.udp.pcap",
+        "common/pcapx/pcaputil/dlms-set-selective/hdlc/normal-unselected-adjacent.tcp.pcap": "dlms-set-selective/hdlc/normal-unselected-adjacent.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-set-selective/hdlc/normal-unselected-adjacent.udp.pcap": "dlms-set-selective/hdlc/normal-unselected-adjacent.udp.pcap",
+        "common/pcapx/pcaputil/dlms-set-selective/hdlc/normal-value-compact.tcp.pcap": "dlms-set-selective/hdlc/normal-value-compact.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-set-selective/hdlc/normal-value-compact.udp.pcap": "dlms-set-selective/hdlc/normal-value-compact.udp.pcap",
+        "common/pcapx/pcaputil/dlms-set-selective/hdlc/normal-wrongflags-preserves-owner.tcp.pcap": "dlms-set-selective/hdlc/normal-wrongflags-preserves-owner.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-set-selective/hdlc/normal-wrongflags-preserves-owner.udp.pcap": "dlms-set-selective/hdlc/normal-wrongflags-preserves-owner.udp.pcap",
+        "common/pcapx/pcaputil/dlms-set-selective/hdlc/normal-wrongform-carrier-policy.tcp.pcap": "dlms-set-selective/hdlc/normal-wrongform-carrier-policy.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-set-selective/hdlc/normal-wrongform-carrier-policy.udp.pcap": "dlms-set-selective/hdlc/normal-wrongform-carrier-policy.udp.pcap",
+        "common/pcapx/pcaputil/dlms-set-selective/legacy-normal-update.json": "dlms-set-selective/legacy-normal-update.json",
+        "common/pcapx/pcaputil/dlms-set-selective/projection.json": "dlms-set-selective/projection.json",
+        "common/pcapx/pcaputil/dlms-set-selective/reuse-inputs.json": "dlms-set-selective/reuse-inputs.json",
+        "common/pcapx/pcaputil/dlms-set-selective/wrapper/list-exact-request-retry-carrier-policy.tcp.pcap": "dlms-set-selective/wrapper/list-exact-request-retry-carrier-policy.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-set-selective/wrapper/list-exact-request-retry-carrier-policy.udp.pcap": "dlms-set-selective/wrapper/list-exact-request-retry-carrier-policy.udp.pcap",
+        "common/pcapx/pcaputil/dlms-set-selective/wrapper/list-literal-error-result-observed.tcp.pcap": "dlms-set-selective/wrapper/list-literal-error-result-observed.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-set-selective/wrapper/list-literal-error-result-observed.udp.pcap": "dlms-set-selective/wrapper/list-literal-error-result-observed.udp.pcap",
+        "common/pcapx/pcaputil/dlms-set-selective/wrapper/list-optional2-unimplemented.tcp.pcap": "dlms-set-selective/wrapper/list-optional2-unimplemented.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-set-selective/wrapper/list-optional2-unimplemented.udp.pcap": "dlms-set-selective/wrapper/list-optional2-unimplemented.udp.pcap",
+        "common/pcapx/pcaputil/dlms-set-selective/wrapper/list-parameter-compact.tcp.pcap": "dlms-set-selective/wrapper/list-parameter-compact.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-set-selective/wrapper/list-parameter-compact.udp.pcap": "dlms-set-selective/wrapper/list-parameter-compact.udp.pcap",
+        "common/pcapx/pcaputil/dlms-set-selective/wrapper/list-parameter-structure-depth6.tcp.pcap": "dlms-set-selective/wrapper/list-parameter-structure-depth6.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-set-selective/wrapper/list-parameter-structure-depth6.udp.pcap": "dlms-set-selective/wrapper/list-parameter-structure-depth6.udp.pcap",
+        "common/pcapx/pcaputil/dlms-set-selective/wrapper/list-pending-private-Close.tcp.pcap": "dlms-set-selective/wrapper/list-pending-private-Close.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-set-selective/wrapper/list-pending-private-Close.udp.pcap": "dlms-set-selective/wrapper/list-pending-private-Close.udp.pcap",
+        "common/pcapx/pcaputil/dlms-set-selective/wrapper/list-result-count-carrier-policy.tcp.pcap": "dlms-set-selective/wrapper/list-result-count-carrier-policy.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-set-selective/wrapper/list-result-count-carrier-policy.udp.pcap": "dlms-set-selective/wrapper/list-result-count-carrier-policy.udp.pcap",
+        "common/pcapx/pcaputil/dlms-set-selective/wrapper/list-scalar-payload13-not-compact.tcp.pcap": "dlms-set-selective/wrapper/list-scalar-payload13-not-compact.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-set-selective/wrapper/list-scalar-payload13-not-compact.udp.pcap": "dlms-set-selective/wrapper/list-scalar-payload13-not-compact.udp.pcap",
+        "common/pcapx/pcaputil/dlms-set-selective/wrapper/list-selected-scalars.tcp.pcap": "dlms-set-selective/wrapper/list-selected-scalars.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-set-selective/wrapper/list-selected-scalars.udp.pcap": "dlms-set-selective/wrapper/list-selected-scalars.udp.pcap",
+        "common/pcapx/pcaputil/dlms-set-selective/wrapper/list-truncated-parameter.tcp.pcap": "dlms-set-selective/wrapper/list-truncated-parameter.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-set-selective/wrapper/list-truncated-parameter.udp.pcap": "dlms-set-selective/wrapper/list-truncated-parameter.udp.pcap",
+        "common/pcapx/pcaputil/dlms-set-selective/wrapper/list-truncated-value.tcp.pcap": "dlms-set-selective/wrapper/list-truncated-value.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-set-selective/wrapper/list-truncated-value.udp.pcap": "dlms-set-selective/wrapper/list-truncated-value.udp.pcap",
+        "common/pcapx/pcaputil/dlms-set-selective/wrapper/list-unselected-adjacent.tcp.pcap": "dlms-set-selective/wrapper/list-unselected-adjacent.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-set-selective/wrapper/list-unselected-adjacent.udp.pcap": "dlms-set-selective/wrapper/list-unselected-adjacent.udp.pcap",
+        "common/pcapx/pcaputil/dlms-set-selective/wrapper/list-value-compact.tcp.pcap": "dlms-set-selective/wrapper/list-value-compact.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-set-selective/wrapper/list-value-compact.udp.pcap": "dlms-set-selective/wrapper/list-value-compact.udp.pcap",
+        "common/pcapx/pcaputil/dlms-set-selective/wrapper/list-wrongflags-preserves-owner.tcp.pcap": "dlms-set-selective/wrapper/list-wrongflags-preserves-owner.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-set-selective/wrapper/list-wrongflags-preserves-owner.udp.pcap": "dlms-set-selective/wrapper/list-wrongflags-preserves-owner.udp.pcap",
+        "common/pcapx/pcaputil/dlms-set-selective/wrapper/list-wrongform-carrier-policy.tcp.pcap": "dlms-set-selective/wrapper/list-wrongform-carrier-policy.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-set-selective/wrapper/list-wrongform-carrier-policy.udp.pcap": "dlms-set-selective/wrapper/list-wrongform-carrier-policy.udp.pcap",
+        "common/pcapx/pcaputil/dlms-set-selective/wrapper/normal-exact-request-retry-carrier-policy.tcp.pcap": "dlms-set-selective/wrapper/normal-exact-request-retry-carrier-policy.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-set-selective/wrapper/normal-exact-request-retry-carrier-policy.udp.pcap": "dlms-set-selective/wrapper/normal-exact-request-retry-carrier-policy.udp.pcap",
+        "common/pcapx/pcaputil/dlms-set-selective/wrapper/normal-literal-error-result-observed.tcp.pcap": "dlms-set-selective/wrapper/normal-literal-error-result-observed.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-set-selective/wrapper/normal-literal-error-result-observed.udp.pcap": "dlms-set-selective/wrapper/normal-literal-error-result-observed.udp.pcap",
+        "common/pcapx/pcaputil/dlms-set-selective/wrapper/normal-optional2-unimplemented.tcp.pcap": "dlms-set-selective/wrapper/normal-optional2-unimplemented.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-set-selective/wrapper/normal-optional2-unimplemented.udp.pcap": "dlms-set-selective/wrapper/normal-optional2-unimplemented.udp.pcap",
+        "common/pcapx/pcaputil/dlms-set-selective/wrapper/normal-parameter-compact.tcp.pcap": "dlms-set-selective/wrapper/normal-parameter-compact.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-set-selective/wrapper/normal-parameter-compact.udp.pcap": "dlms-set-selective/wrapper/normal-parameter-compact.udp.pcap",
+        "common/pcapx/pcaputil/dlms-set-selective/wrapper/normal-parameter-structure-depth6.tcp.pcap": "dlms-set-selective/wrapper/normal-parameter-structure-depth6.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-set-selective/wrapper/normal-parameter-structure-depth6.udp.pcap": "dlms-set-selective/wrapper/normal-parameter-structure-depth6.udp.pcap",
+        "common/pcapx/pcaputil/dlms-set-selective/wrapper/normal-pending-private-Close.tcp.pcap": "dlms-set-selective/wrapper/normal-pending-private-Close.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-set-selective/wrapper/normal-pending-private-Close.udp.pcap": "dlms-set-selective/wrapper/normal-pending-private-Close.udp.pcap",
+        "common/pcapx/pcaputil/dlms-set-selective/wrapper/normal-scalar-payload13-not-compact.tcp.pcap": "dlms-set-selective/wrapper/normal-scalar-payload13-not-compact.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-set-selective/wrapper/normal-scalar-payload13-not-compact.udp.pcap": "dlms-set-selective/wrapper/normal-scalar-payload13-not-compact.udp.pcap",
+        "common/pcapx/pcaputil/dlms-set-selective/wrapper/normal-selected-scalars.tcp.pcap": "dlms-set-selective/wrapper/normal-selected-scalars.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-set-selective/wrapper/normal-selected-scalars.udp.pcap": "dlms-set-selective/wrapper/normal-selected-scalars.udp.pcap",
+        "common/pcapx/pcaputil/dlms-set-selective/wrapper/normal-truncated-parameter.tcp.pcap": "dlms-set-selective/wrapper/normal-truncated-parameter.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-set-selective/wrapper/normal-truncated-parameter.udp.pcap": "dlms-set-selective/wrapper/normal-truncated-parameter.udp.pcap",
+        "common/pcapx/pcaputil/dlms-set-selective/wrapper/normal-truncated-value.tcp.pcap": "dlms-set-selective/wrapper/normal-truncated-value.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-set-selective/wrapper/normal-truncated-value.udp.pcap": "dlms-set-selective/wrapper/normal-truncated-value.udp.pcap",
+        "common/pcapx/pcaputil/dlms-set-selective/wrapper/normal-unselected-adjacent.tcp.pcap": "dlms-set-selective/wrapper/normal-unselected-adjacent.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-set-selective/wrapper/normal-unselected-adjacent.udp.pcap": "dlms-set-selective/wrapper/normal-unselected-adjacent.udp.pcap",
+        "common/pcapx/pcaputil/dlms-set-selective/wrapper/normal-value-compact.tcp.pcap": "dlms-set-selective/wrapper/normal-value-compact.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-set-selective/wrapper/normal-value-compact.udp.pcap": "dlms-set-selective/wrapper/normal-value-compact.udp.pcap",
+        "common/pcapx/pcaputil/dlms-set-selective/wrapper/normal-wrongflags-preserves-owner.tcp.pcap": "dlms-set-selective/wrapper/normal-wrongflags-preserves-owner.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-set-selective/wrapper/normal-wrongflags-preserves-owner.udp.pcap": "dlms-set-selective/wrapper/normal-wrongflags-preserves-owner.udp.pcap",
+        "common/pcapx/pcaputil/dlms-set-selective/wrapper/normal-wrongform-carrier-policy.tcp.pcap": "dlms-set-selective/wrapper/normal-wrongform-carrier-policy.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-set-selective/wrapper/normal-wrongform-carrier-policy.udp.pcap": "dlms-set-selective/wrapper/normal-wrongform-carrier-policy.udp.pcap",
+        "common/pcapx/pcaputil/dlms-set-selective/wrapper/normal-shared-Data-nodes-exact.udp.pcap": "dlms-set-selective/wrapper/normal-selected-scalars.udp.pcap",
+        "common/pcapx/pcaputil/dlms-set-selective/wrapper/normal-shared-Data-nodes-exact.tcp.pcap": "dlms-set-selective/wrapper/normal-selected-scalars.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-set-selective/wrapper/normal-shared-Data-nodes-refused.udp.pcap": "dlms-set-selective/wrapper/normal-selected-scalars.udp.pcap",
+        "common/pcapx/pcaputil/dlms-set-selective/wrapper/normal-shared-Data-nodes-refused.tcp.pcap": "dlms-set-selective/wrapper/normal-selected-scalars.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-set-selective/wrapper/normal-parameter-structure-depth5-refused.udp.pcap": "dlms-set-selective/wrapper/normal-parameter-structure-depth6.udp.pcap",
+        "common/pcapx/pcaputil/dlms-set-selective/wrapper/normal-parameter-structure-depth5-refused.tcp.pcap": "dlms-set-selective/wrapper/normal-parameter-structure-depth6.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-set-selective/wrapper/list-shared-Data-nodes-exact.udp.pcap": "dlms-set-selective/wrapper/list-selected-scalars.udp.pcap",
+        "common/pcapx/pcaputil/dlms-set-selective/wrapper/list-shared-Data-nodes-exact.tcp.pcap": "dlms-set-selective/wrapper/list-selected-scalars.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-set-selective/wrapper/list-shared-Data-nodes-refused.udp.pcap": "dlms-set-selective/wrapper/list-selected-scalars.udp.pcap",
+        "common/pcapx/pcaputil/dlms-set-selective/wrapper/list-shared-Data-nodes-refused.tcp.pcap": "dlms-set-selective/wrapper/list-selected-scalars.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-set-selective/wrapper/list-parameter-structure-depth5-refused.udp.pcap": "dlms-set-selective/wrapper/list-parameter-structure-depth6.udp.pcap",
+        "common/pcapx/pcaputil/dlms-set-selective/wrapper/list-parameter-structure-depth5-refused.tcp.pcap": "dlms-set-selective/wrapper/list-parameter-structure-depth6.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-set-selective/wrapper/normal-shared-four-nodes-cap4-isolated.udp.pcap": "dlms-set-selective/wrapper/normal-parameter-structure-depth6.udp.pcap",
+        "common/pcapx/pcaputil/dlms-set-selective/wrapper/normal-shared-four-nodes-cap4-isolated.tcp.pcap": "dlms-set-selective/wrapper/normal-parameter-structure-depth6.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-set-selective/wrapper/normal-shared-four-nodes-cap3-isolated.udp.pcap": "dlms-set-selective/wrapper/normal-parameter-structure-depth6.udp.pcap",
+        "common/pcapx/pcaputil/dlms-set-selective/wrapper/normal-shared-four-nodes-cap3-isolated.tcp.pcap": "dlms-set-selective/wrapper/normal-parameter-structure-depth6.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-set-selective/hdlc/normal-shared-Data-nodes-exact.udp.pcap": "dlms-set-selective/hdlc/normal-selected-scalars.udp.pcap",
+        "common/pcapx/pcaputil/dlms-set-selective/hdlc/normal-shared-Data-nodes-exact.tcp.pcap": "dlms-set-selective/hdlc/normal-selected-scalars.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-set-selective/hdlc/normal-shared-Data-nodes-refused.udp.pcap": "dlms-set-selective/hdlc/normal-selected-scalars.udp.pcap",
+        "common/pcapx/pcaputil/dlms-set-selective/hdlc/normal-shared-Data-nodes-refused.tcp.pcap": "dlms-set-selective/hdlc/normal-selected-scalars.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-set-selective/hdlc/normal-parameter-structure-depth5-refused.udp.pcap": "dlms-set-selective/hdlc/normal-parameter-structure-depth6.udp.pcap",
+        "common/pcapx/pcaputil/dlms-set-selective/hdlc/normal-parameter-structure-depth5-refused.tcp.pcap": "dlms-set-selective/hdlc/normal-parameter-structure-depth6.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-set-selective/hdlc/list-shared-Data-nodes-exact.udp.pcap": "dlms-set-selective/hdlc/list-selected-scalars.udp.pcap",
+        "common/pcapx/pcaputil/dlms-set-selective/hdlc/list-shared-Data-nodes-exact.tcp.pcap": "dlms-set-selective/hdlc/list-selected-scalars.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-set-selective/hdlc/list-shared-Data-nodes-refused.udp.pcap": "dlms-set-selective/hdlc/list-selected-scalars.udp.pcap",
+        "common/pcapx/pcaputil/dlms-set-selective/hdlc/list-shared-Data-nodes-refused.tcp.pcap": "dlms-set-selective/hdlc/list-selected-scalars.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-set-selective/hdlc/list-parameter-structure-depth5-refused.udp.pcap": "dlms-set-selective/hdlc/list-parameter-structure-depth6.udp.pcap",
+        "common/pcapx/pcaputil/dlms-set-selective/hdlc/list-parameter-structure-depth5-refused.tcp.pcap": "dlms-set-selective/hdlc/list-parameter-structure-depth6.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-set-selective/hdlc/normal-shared-four-nodes-cap4-isolated.udp.pcap": "dlms-set-selective/hdlc/normal-parameter-structure-depth6.udp.pcap",
+        "common/pcapx/pcaputil/dlms-set-selective/hdlc/normal-shared-four-nodes-cap4-isolated.tcp.pcap": "dlms-set-selective/hdlc/normal-parameter-structure-depth6.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-set-selective/hdlc/normal-shared-four-nodes-cap3-isolated.udp.pcap": "dlms-set-selective/hdlc/normal-parameter-structure-depth6.udp.pcap",
+        "common/pcapx/pcaputil/dlms-set-selective/hdlc/normal-shared-four-nodes-cap3-isolated.tcp.pcap": "dlms-set-selective/hdlc/normal-parameter-structure-depth6.tcp.pcap",
+        "scripts/protocol-tests/required-tests-traffic-unified-v128.json": "required-tests-traffic-unified-v128.json"
+      }
     }
   ],
   "schema_version": 1,
