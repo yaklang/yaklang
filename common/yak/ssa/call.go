@@ -286,8 +286,13 @@ func (c *Call) handlerReturnType() {
 	}
 	// For lazy-built functions (like TypeScript arrow functions), we need to build them first
 	// to ensure their Type is set before we try to get the return type
-	if fun, isFunc := ToFunction(method); isFunc && fun.Type == nil {
-		fun.buildOnLookup()
+	if fun, isFunc := ToFunction(method); isFunc {
+		fun.typeMu.RLock()
+		untyped := fun.Type == nil
+		fun.typeMu.RUnlock()
+		if untyped {
+			fun.buildOnLookup()
+		}
 	}
 	funcTyp, ok := ToFunctionType(method.GetType())
 	if !ok {

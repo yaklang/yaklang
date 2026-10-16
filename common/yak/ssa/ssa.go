@@ -303,13 +303,18 @@ type Program struct {
 	// must not call back into fake import for that same name.
 	virtualImportGroup singleflight.Group
 	// virtualEmitMu serializes Emit on this library's one @virtual builder.
-	// GetMagicMethod does not take it. storeField takes it only after the
-	// SafeMap slot is published, so member lowering does not lock it again.
+	// It is not reentrant. GetMagicMethod does not take it. storeField takes
+	// Function.emitMu instead. Do not call withVirtualBuilder or
+	// GetAndCreateFunctionBuilder(VirtualFunctionName) while holding it.
 	virtualEmitMu sync.Mutex
 	// dirPkgSlots compiles one directory package at a time per name.
-	// The goroutine that owns the slot must not wait on it: a cycle imports
-	// the package again while it is still compiling. Everyone else waits.
+	// The goroutine that owns a slot must not wait on any slot: two owners
+	// compiling packages that import each other would wait for each other.
+	// dirPkgDepthMu only guards dirPkgDepth. Never hold it across compile,
+	// Emit, or a receive on slot.done, and do not take it under another lock.
 	dirPkgSlots    sync.Map
+	dirPkgDepthMu  sync.Mutex
+	dirPkgDepth    map[uint64]int
 	FileList       map[string]string // file-name and file hash
 	fileLineCounts *utils.SafeMapWithKey[string, int]
 	LineCount      int
@@ -413,6 +418,8 @@ type Function struct {
 
 	// emitMu covers this function's builder cursor. Same-goroutine reentry
 	// (storeField -> GetMagicMethod -> storeField) does not lock again.
+	// Do not call withVirtualBuilder or GetAndCreateFunctionBuilder of the
+	// virtual function while holding it: those take virtualEmitMu first.
 	emitMu    sync.Mutex
 	emitOwner atomic.Uint64
 	emitDepth int
