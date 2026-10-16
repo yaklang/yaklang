@@ -15,7 +15,7 @@ type tlsHelloView struct {
 	order                   []uint16
 }
 
-func tlsHello(body []byte, client bool) (*tlsHelloView, error) {
+func tlsHello(body []byte, client bool, limits ...int) (*tlsHelloView, error) {
 	bad := func() (*tlsHelloView, error) { return nil, protocolError(ErrMalformedMessage, "TLS hello structure") }
 	if len(body) < 35 || body[34] > 32 {
 		return bad()
@@ -24,7 +24,7 @@ func tlsHello(body []byte, client bool) (*tlsHelloView, error) {
 	if p > len(body) {
 		return bad()
 	}
-	h := &tlsHelloView{session: body[35:p], ext: map[uint16][]byte{}}
+	h := &tlsHelloView{session: body[35:p]}
 	if client {
 		if p+2 > len(body) {
 			return bad()
@@ -54,12 +54,38 @@ func tlsHello(body []byte, client bool) (*tlsHelloView, error) {
 	}
 	h.prefix = body[:p]
 	if p == len(body) {
+		h.ext = map[uint16][]byte{}
 		return h, nil
 	}
 	if len(body)-p < 2 || int(binary.BigEndian.Uint16(body[p:])) != len(body)-p-2 {
 		return bad()
 	}
 	p += 2
+	if len(limits) > 0 {
+		// Validate the whole extension vector before admitting its collection.
+		// The fixed bitset detects duplicate 16-bit types without allocating
+		// the output map/order or retaining a rejected Hello as retry state.
+		var seen [1024]uint64
+		count := 0
+		for q := p; q < len(body); {
+			if len(body)-q < 4 {
+				return bad()
+			}
+			kind, n := binary.BigEndian.Uint16(body[q:]), int(binary.BigEndian.Uint16(body[q+2:]))
+			q += 4
+			bit := uint64(1) << (kind % 64)
+			if n > len(body)-q || seen[kind/64]&bit != 0 {
+				return bad()
+			}
+			seen[kind/64] |= bit
+			count++
+			q += n
+		}
+		if count > limits[0] {
+			return nil, protocolError(ErrResourceExceeded, "TLS hello extension count")
+		}
+	}
+	h.ext = map[uint16][]byte{}
 	for p < len(body) {
 		if len(body)-p < 4 {
 			return bad()
@@ -112,8 +138,8 @@ func tlsClientShares(v []byte) (map[uint16]bool, error) {
 
 // Validate the HRR branch separately from the final ServerHello. This remains a
 // passive record decoder, not a certificate or PSK-binder verifier (RFC 8446 4.1).
-func (t *binTLS) observeHello(dir int, typ byte, body []byte) (bool, error) {
-	h, err := tlsHello(body, typ == 1)
+func (t *binTLS) observeHello(dir int, typ byte, body []byte, limits ...int) (bool, error) {
+	h, err := tlsHello(body, typ == 1, limits...)
 	if err != nil {
 		return false, err
 	}
@@ -123,7 +149,7 @@ func (t *binTLS) observeHello(dir int, typ byte, body []byte) (bool, error) {
 			if t.retryClientSeen || dir != t.client {
 				return bad("unexpected ClientHello2")
 			}
-			first, err := tlsHello(t.firstHello, true)
+			first, err := tlsHello(t.firstHello, true, limits...)
 			if err != nil {
 				return false, err
 			}
@@ -184,7 +210,7 @@ func (t *binTLS) observeHello(dir int, typ byte, body []byte) (bool, error) {
 		if t.firstHello == nil || t.client < 0 {
 			return false, protocolError(ErrContextRequired, "TLS HRR requires first ClientHello")
 		}
-		first, err := tlsHello(t.firstHello, true)
+		first, err := tlsHello(t.firstHello, true, limits...)
 		if err != nil {
 			return false, err
 		}

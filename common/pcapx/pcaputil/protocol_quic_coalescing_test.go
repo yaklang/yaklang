@@ -232,16 +232,51 @@ func testQUICCoalescingMatrix(t *testing.T) {
 	}
 }
 
+// Reuse the independently protected historical PING/PADDING vector so cap2
+// tests outer coalescing rather than the unrelated RFC ClientHello extension list.
+func quicCoalescingBudgetInitial(t *testing.T) ([]byte, map[string]any, map[string]any) {
+	t.Helper()
+	raw, err := trafficfixture.ReadFile("quic-retirement/controls.json")
+	require.NoError(t, err)
+	var fixtures struct {
+		Cases []struct {
+			ID     string `json:"id"`
+			Events []struct {
+				Raw     string
+				Session map[string]any
+				Fields  map[string]any
+			}
+		}
+	}
+	require.NoError(t, json.Unmarshal(raw, &fixtures))
+	for _, c := range fixtures.Cases {
+		if c.ID != "fresh-CID-after-idle" {
+			continue
+		}
+		for _, e := range c.Events {
+			frames, _ := e.Session["Frames"].([]any)
+			if len(frames) != 2 || frames[0].(map[string]any)["Frame Type"] != "PING" || e.Session["Duplicate"] == true {
+				continue
+			}
+			wire, err := hex.DecodeString(e.Raw)
+			require.NoError(t, err)
+			require.Len(t, wire, 1200)
+			require.Equal(t, "9fbed178f0b40ec7ad6c3bc36a22639fbfb80db1b021280cbc05d07270cd5a56", fmt.Sprintf("%x", sha256.Sum256(wire)))
+			return wire, e.Session, e.Fields
+		}
+	}
+	t.Fatal("missing historical independent PING Initial control")
+	return nil, nil, nil
+}
+
 func testQUICCoalescingCollectionRefusal(t *testing.T) {
 	c := NewDefaultConfig()
 	require.NoError(t, WithOnProtocolMessage(func(*ProtocolEvent) {})(c))
 	require.NoError(t, c.prepareBinParser())
 	a := c.binParser
 	a.budget.MaxCollectionElements = 2
-	cli := rfc9001ClientInitial()
-	capture, err := trafficfixture.ReadFile("quic-coalescing/cases/different-CID.pcap")
-	require.NoError(t, err)
-	wrong := capture[1282:2482]
+	cli, expected, _ := quicCoalescingBudgetInitial(t)
+	wrong := rfc9001ClientInitial()
 	// CID mismatch cannot turn a collection refusal into a recoverable error.
 	wire := bytes.Join([][]byte{cli, cli, wrong, cli}, nil)
 	es, ok := a.decodeQUICDatagram(&ProtocolEvent{Transport: "udp", Source: "192.0.2.1:40000", Destination: "192.0.2.2:14443"}, wire)
@@ -249,6 +284,17 @@ func testQUICCoalescingCollectionRefusal(t *testing.T) {
 	require.Len(t, es, 3)
 	require.Empty(t, es[0].Error)
 	require.Empty(t, es[1].Error)
+	for i, e := range es[:2] {
+		want := cloneSession(expected)
+		want["Datagram Offset"] = i * len(cli)
+		if i == 1 {
+			want["Duplicate"] = true
+		}
+		require.Equal(t, cli, e.Raw)
+		rocEqualFields(t, want, e.Session)
+		_, err := e.GetFields()
+		require.NoError(t, err)
+	}
 	fields, err := es[2].GetFields()
 	rocTypedError(t, "ResourceExceeded", err)
 	require.Nil(t, fields)

@@ -179,7 +179,11 @@ func tlsCertificateBudgetCheckEvent(t *testing.T, e *ProtocolEvent, c tlsAlertCa
 	tlsCertificateBudgetQuery(t, e, want, w.Error)
 }
 func TestTLSCertificateBudgetNative(t *testing.T) {
-	for _, c := range tlsCertificateBudgetControls(t) {
+	tlsRecordBudgetNative(t, tlsCertificateBudgetControls(t))
+}
+
+func tlsRecordBudgetNative(t *testing.T, controls []tlsAlertCase) {
+	for _, c := range controls {
 		t.Run(c.Name, func(t *testing.T) {
 			for _, d := range []bool{false, true} {
 				for _, chunk := range []int{0, 1, 7} {
@@ -253,19 +257,23 @@ func TestTLSCertificateBudgetNative(t *testing.T) {
 	}
 }
 func TestTLSCertificateBudgetMatrix(t *testing.T) {
-	for _, c := range tlsCertificateBudgetControls(t) {
+	tlsRecordBudgetMatrix(t, tlsCertificateBudgetControls(t), "tls-certificate-budget", "TLS_CERTIFICATE_BUDGET")
+}
+
+func tlsRecordBudgetMatrix(t *testing.T, controls []tlsAlertCase, fixture, env string) {
+	for _, c := range controls {
 		t.Run(c.Name, func(t *testing.T) {
 			generated := tlsAlertCapture(t, c)
-			if dir := os.Getenv("TLS_CERTIFICATE_BUDGET_EXPORT"); dir != "" {
-				p := filepath.Join(dir, "tls-certificate-budget", c.Name+".pcap")
+			if dir := os.Getenv(env + "_EXPORT"); dir != "" {
+				p := filepath.Join(dir, fixture, c.Name+".pcap")
 				require.NoError(t, os.MkdirAll(filepath.Dir(p), 0700))
 				require.NoError(t, os.WriteFile(p, generated, 0600))
 			}
 			var raw []byte
-			if os.Getenv("TLS_CERTIFICATE_BUDGET_TEST_ROOT") != "" {
+			if os.Getenv(env+"_TEST_ROOT") != "" {
 				raw = generated
 			} else {
-				raw = finsReadBatch(t, "tls-certificate-budget", "TLS_CERTIFICATE_BUDGET_TEST_ROOT", c.Name+".pcap")
+				raw = finsReadBatch(t, fixture, env+"_TEST_ROOT", c.Name+".pcap")
 				require.Equal(t, generated, raw)
 			}
 			discoveryMatrix(t, func(t *testing.T, workers int, d, o bool) {

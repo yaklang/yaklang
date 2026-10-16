@@ -101,6 +101,7 @@ func (a *binParser) decodeQUICDatagram(base *ProtocolEvent, wire []byte) ([]*Pro
 		// datagram without pretending its coalesced packets were decoded.
 		e := *base
 		e.Protocol, e.Profile = "quic", "quic-v1-native"
+		e.nativeQUICObservation = true
 		e.Admission, e.Completeness = "observed-retired-CID", "datagram"
 		e.ID, e.Direction, e.FlowID = a.ids.Add(1), retiredDir, 0
 		e.ResponseTo, e.TransactionID = 0, 0
@@ -130,6 +131,7 @@ func (a *binParser) decodeQUICDatagram(base *ProtocolEvent, wire []byte) ([]*Pro
 		e := *base
 		e.Protocol = "quic"
 		e.Profile = "quic-v1-native"
+		e.nativeQUICObservation = true
 		e.Admission = "authenticated-wire-and-observed-CID"
 		// Native CID selection owns the association; a refused new candidate
 		// cannot inherit a carrier projection's unrelated flow identifier.
@@ -247,6 +249,9 @@ func (a *binParser) decodeQUICDatagram(base *ProtocolEvent, wire []byte) ([]*Pro
 		// The authenticated session already parsed this header. Preserve the wire
 		// field view without executing a YAML operator for every ciphertext octet.
 		e.nativeQUICWire = err == nil
+		// Query identity and passive context are private even on a refused
+		// native event; mutable public labels/caches cannot grant success.
+		e.semanticSession = cloneSession(e.Session)
 		a.finishProtocolDatagram(&e, raw, a.specs["application-layer.quic/QUIC"], err)
 		events = append(events, &e)
 		if e.sessionError != nil && e.sessionError.Kind == ErrResourceExceeded && el != nil {

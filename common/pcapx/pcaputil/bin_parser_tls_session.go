@@ -232,7 +232,7 @@ func (t *binTLS) handshakeMessage(dir int, b []byte, authenticated bool, limits 
 	}
 	switch typ {
 	case 1, 2:
-		retry, err := t.observeHello(dir, typ, body)
+		retry, err := t.observeHello(dir, typ, body, limits...)
 		if err != nil {
 			return nil, err
 		}

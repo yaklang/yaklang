@@ -433,8 +433,12 @@ func (s *binDTLS) message(f *binFlow, dir int, typ byte, b []byte) (map[string]a
 			out["Cookie Bytes"] = n
 			wire = append(bytes.Clone(b[:p]), b[p+1+n:]...)
 		}
-		hello, err := tlsHello(wire, client)
+		hello, err := tlsHello(wire, client, f.a.budget.MaxCollectionElements)
 		if err != nil {
+			if typed, ok := err.(*ProtocolError); ok && typed.Kind == ErrResourceExceeded {
+				// Keep the existing carrier-specific collection diagnostic.
+				return nil, protocolError(ErrResourceExceeded, "DTLS hello collection")
+			}
 			return nil, err
 		}
 		if len(hello.order) > f.a.budget.MaxCollectionElements || len(hello.suites)/2 > f.a.budget.MaxCollectionElements {

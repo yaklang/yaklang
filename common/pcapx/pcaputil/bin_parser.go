@@ -43,6 +43,7 @@ type ProtocolEvent struct {
 	semanticSession                          map[string]any
 	semanticMetadata                         any
 	ownedRuleEnvelope, hasRuleMetadata       bool
+	nativeQUICObservation                    bool
 	nativeQUICWire                           bool
 	nativeDoIPObservation                    bool
 	doipAssociationRefusal                   bool // private complete-frame refusal scope
@@ -153,6 +154,11 @@ func (e *ProtocolEvent) Decode() (result map[string]any, err error) {
 		if (e.nativeDLMSOrSLMPObservation || e.nativeSTUNObservation || e.nativeSIPObservation || e.nativeTFTPObservation) && e.semanticSession != nil {
 			session = e.semanticSession
 		}
+		// Native QUIC has distinct wire fields and passive Session context.
+		// Public protocol aliases must not replace the latter with the former.
+		if e.nativeQUICObservation && e.semanticSession != nil {
+			session = e.semanticSession
+		}
 		if err == nil && result != nil && session != nil {
 			owned := make(map[string]any, len(result)+1)
 			for k, v := range result {
@@ -162,6 +168,22 @@ func (e *ProtocolEvent) Decode() (result map[string]any, err error) {
 			result = owned
 		}
 	}()
+	// Native QUIC identity survives edits to all public labels and caches.
+	// A refused packet cannot become a successful rule decode, and accepted
+	// wire fields keep their legacy metadata envelope and private context.
+	if e.nativeQUICObservation {
+		if e.sessionError != nil {
+			owned := *e.sessionError
+			return nil, &owned
+		}
+		if e.semanticFields != nil {
+			return map[string]any{"fields": cloneSession(e.semanticFields), "metadata": nil}, nil
+		}
+		if e.nativeQUICWire {
+			fields, err := quicWireEnvelope(e.Raw)
+			return map[string]any{"fields": fields, "metadata": nil}, err
+		}
+	}
 	if e.nativeDNSStreamObservation {
 		if e.sessionError != nil {
 			owned := *e.sessionError
@@ -360,6 +382,9 @@ func (e *ProtocolEvent) retainRuleEnvelope(result map[string]any) {
 }
 
 func (e *ProtocolEvent) ownsNativeFields() bool {
+	if e.nativeQUICObservation {
+		return true
+	}
 	if e.nativeRADIUSObservation || e.nativeDHCPObservation || e.nativeDNSStreamObservation || e.nativeDNSObservation || e.nativeATGObservation || e.nativeDLMSOrSLMPObservation || e.nativeTFTPObservation || e.nativeSIPObservation || e.nativeSTUNObservation || e.nativeSNMPObservation || e.nativeTLSObservation || e.nativeDTLSObservation || e.nativeHARTIPObservation || e.nativeENIPObservation || e.nativeFINSObservation || e.nativeDiagnosticError != "" {
 		return true
 	}

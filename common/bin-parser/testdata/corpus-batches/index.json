@@ -105991,6 +105991,87 @@
         "common/pcapx/pcaputil/tls-certificate-budget/two-certificates-cap1-refusal.pcap": "tls-certificate-budget/two-certificates-cap1-refusal.pcap",
         "scripts/protocol-tests/required-tests-traffic-unified-v118.json": "required-tests-traffic-unified-v118.json"
       }
+    },
+    {
+      "id": "validation-tls-hello-collection",
+      "kind": "support",
+      "source_sha": "926452d2eac4cde4ba7ec23b3e48350455c443b3",
+      "file": "validation-tls-hello-collection.zip",
+      "sha256": "456366086a598b0343d41eb71cf16a9131a1540ec92eb4a4037a4cac280b0c91",
+      "password": "bin-parser",
+      "members": {
+        "required-tests-traffic-unified-v119.json": {
+          "sha256": "72f87c7c85069ce4dafa80af5d6a5fa167e5a7fbb2114acc098f8ededa45dc65",
+          "bytes": 19885327
+        },
+        "tls-hello-collection-tools/DTLS-SOURCES.json": {
+          "sha256": "462d2382afd9e2ece427879007b3a60b701c6c9c723d165feedea5b271e61b0a",
+          "bytes": 1825
+        },
+        "tls-hello-collection-tools/SOURCES.json": {
+          "sha256": "a37ae3128831dddba39e52433b90ffa13b808504fb29c6fa038440c4e77f8a24",
+          "bytes": 5845
+        },
+        "tls-hello-collection-tools/dtls_generate.py": {
+          "sha256": "1435b4271f9386f1dc81ef9f80912ceed15def5d6c0a9f36b51cb24f0da1822d",
+          "bytes": 3916
+        },
+        "tls-hello-collection-tools/generate.py": {
+          "sha256": "47b4ab01545ce93e49143554e1c078f38ef69788d759cefd8e8af77bb0ec382f",
+          "bytes": 3034
+        },
+        "tls-hello-collection-tools/verify.py": {
+          "sha256": "eb216c962b63571b1150ec080568591b6b6a8107676c138220c5d06212e572ca",
+          "bytes": 6106
+        },
+        "tls-hello-collection/controls.json": {
+          "sha256": "fdc1662e389e1433e53042841be569763d27ac6160f0b16ad14eb955cfbd8ce5",
+          "bytes": 5083
+        },
+        "tls-hello-collection/dtls/controls.json": {
+          "sha256": "20b6e1b3562a1aa68a7ad221057663dc19238513ec4e5d00f2b9a9079db2a558",
+          "bytes": 5625
+        },
+        "tls-hello-collection/dtls/dtls12-one-SNI-extension-cap1-normal.pcap": {
+          "sha256": "28032aa36aa713dfec0bbf8310d734b8c835592e0e5d536d6c1a5bdd95fdfc4e",
+          "bytes": 179
+        },
+        "tls-hello-collection/dtls/dtls12-two-extensions-cap1-existingResource.pcap": {
+          "sha256": "300bc4f37c5d8290286f2423c5eeee14da67e2b7b3a07b822bb0d1894a5314ec",
+          "bytes": 188
+        },
+        "tls-hello-collection/one-SNI-extension-cap1-normal.pcap": {
+          "sha256": "67fae3fc798f491ad802157a181ce10b77a8442e632c3a2acd7225af09fe354c",
+          "bytes": 630
+        },
+        "tls-hello-collection/refusal-projection.json": {
+          "sha256": "867f1c09ff662b27f9fcb0ae853177a742a2c786878ae32b326ee31457a51116",
+          "bytes": 2198
+        },
+        "tls-hello-collection/two-extensions-cap1-refusal.pcap": {
+          "sha256": "3af6e41481436120c85359a1d377354d7354c006c2e949c361fbda34923df45b",
+          "bytes": 798
+        },
+        "validation/expected.json": {
+          "sha256": "50159ef238d9e46c363e3cade07ccf19e17ee08109942dc4b38157e64ea0c8df",
+          "bytes": 5230
+        }
+      },
+      "aliases": {
+        "common/pcapx/pcaputil/tls-hello-collection-tools/DTLS-SOURCES.json": "tls-hello-collection-tools/DTLS-SOURCES.json",
+        "common/pcapx/pcaputil/tls-hello-collection-tools/SOURCES.json": "tls-hello-collection-tools/SOURCES.json",
+        "common/pcapx/pcaputil/tls-hello-collection-tools/dtls_generate.py": "tls-hello-collection-tools/dtls_generate.py",
+        "common/pcapx/pcaputil/tls-hello-collection-tools/generate.py": "tls-hello-collection-tools/generate.py",
+        "common/pcapx/pcaputil/tls-hello-collection-tools/verify.py": "tls-hello-collection-tools/verify.py",
+        "common/pcapx/pcaputil/tls-hello-collection/controls.json": "tls-hello-collection/controls.json",
+        "common/pcapx/pcaputil/tls-hello-collection/dtls/controls.json": "tls-hello-collection/dtls/controls.json",
+        "common/pcapx/pcaputil/tls-hello-collection/dtls/dtls12-one-SNI-extension-cap1-normal.pcap": "tls-hello-collection/dtls/dtls12-one-SNI-extension-cap1-normal.pcap",
+        "common/pcapx/pcaputil/tls-hello-collection/dtls/dtls12-two-extensions-cap1-existingResource.pcap": "tls-hello-collection/dtls/dtls12-two-extensions-cap1-existingResource.pcap",
+        "common/pcapx/pcaputil/tls-hello-collection/one-SNI-extension-cap1-normal.pcap": "tls-hello-collection/one-SNI-extension-cap1-normal.pcap",
+        "common/pcapx/pcaputil/tls-hello-collection/refusal-projection.json": "tls-hello-collection/refusal-projection.json",
+        "common/pcapx/pcaputil/tls-hello-collection/two-extensions-cap1-refusal.pcap": "tls-hello-collection/two-extensions-cap1-refusal.pcap",
+        "scripts/protocol-tests/required-tests-traffic-unified-v119.json": "required-tests-traffic-unified-v119.json"
+      }
     }
   ],
   "schema_version": 1,

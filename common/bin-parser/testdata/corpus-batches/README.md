@@ -44,7 +44,7 @@ Run from the repository root:
 ```sh
 go run ./internal/trafficfixture/cmd/corpus test
 go test -json -count=1 -timeout=10m ./internal/trafficfixture/... ./common/bin-parser/... ./common/pcapx/... ./common/yak/cmd/yakcmds/shark-cli ./scripts/ci > traffic.jsonl
-go run ./internal/trafficfixture/cmd/corpus exec -- python3 @scripts/protocol-tests/check_go_test_json_v2.py traffic.jsonl --inventory @scripts/protocol-tests/required-tests-traffic-unified-v118.json --tier full
+go run ./internal/trafficfixture/cmd/corpus exec -- python3 @scripts/protocol-tests/check_go_test_json_v2.py traffic.jsonl --inventory @scripts/protocol-tests/required-tests-traffic-unified-v119.json --tier full
 ```
 
 The single `corpus` entry point uses the same bounded Go ZIP loader as tests.
@@ -83,7 +83,7 @@ their semantic coverage. The existing synthetic session keys are test inputs;
 production credentials, user private keys and material without redistribution
 permission belong in an external fixed-source download manifest.
 
-Current test requirements are sealed at `scripts/protocol-tests/required-tests-traffic-unified-v118.json`;
+Current test requirements are sealed at `scripts/protocol-tests/required-tests-traffic-unified-v119.json`;
 the historical inventories and all earlier batches remain unchanged.
 The supplemental small-corpus batch contains 26 minimal controls, their explicit
 expected facts, an offline generator and the compact pinned source manifest.
@@ -203,7 +203,7 @@ opaque selector bytes and one bounded Data value over Wrapper v1 TCP/UDP; object
 selector meaning, access permission and device operation are unverified. The
 original one-packet selective-access capture and original refused answer remain
 immutable; its now-supported answer is matched by exact input SHA and frame.
-The active inventory is `scripts/protocol-tests/required-tests-traffic-unified-v118.json`.
+The active inventory is `scripts/protocol-tests/required-tests-traffic-unified-v119.json`.
 
 The small-graph budget batch reuses accepted graph captures/answers and adds one
 249-byte UDP control for child count255 without child bytes. Its standalone proof
@@ -993,7 +993,7 @@ the normative answer; a missing numeric reference field is not a codec pass.
 Full/deferred, workers1/2/4, observers off/on, Feed chunks1/7/full, ownership,
 resources and close/refusal boundaries remain required.
 
-Current gate: `required-tests-traffic-unified-v118.json` with
+Current gate: `required-tests-traffic-unified-v119.json` with
 `check_go_test_json_v2.py`. The indexed validator preserves missing/unpassed,
 package invocation completion, descendant skips, failures and non-JSON checks;
 its mutation/differential harness is sealed with the material. Older checkers
@@ -1629,7 +1629,7 @@ userspace adapter; full kernel receiver/socket/timers and ECU endpoints do not.
 All161 preceding ZIPs remain byte-for-byte unchanged. Raw captures, dependencies,
 reference source/build output and process evidence stay outside Git.
 
-Current effective v118 inventory: 78,933 entries; 78,926 are mandatory for the full tier.
+Current effective v119 inventory: 79,028 entries; 79,021 are mandatory for the full tier.
 
 The opt-in `DynamicFlowControl` profile follows Linux v6.12 FC tuple updates (including WAIT without granting data). Disjoint address extensions or classical/FD carriers may share CAN IDs; unknown selectors cannot choose or mutate a conversation. Ambiguous selectors are rejected. Seven sealed cases exercise full/deferred, workers 1/2/4, and observer off/on, with exact fields, byte collections, contributor references, errors and resource ownership. The existing static FC profile remains unchanged. Pinned upstream FC and filter functions execute with declared userspace stubs; this is not a kernel/ECU endpoint. TShark 4.2.5 checks wire tuples and two complete payloads, but cannot independently reassemble the shared-address transcripts.
 
@@ -1738,3 +1738,7 @@ The peer EAP-TLS batch adds a bounded ClientHello/record flight only after an in
 The observed Certificate batch adds selected TLS1.2/003c server X509 fields only in a same complete or independently owned State/ACK-reassembled flight. A single ServerHello, server role, selected legacy grammar and certificate format are required. RawPublicKey/OpenPGP, unknown cipher/format, absent or conflicting context and TLS1.3 never become guessed X509 fields; peer/noHello Unsupported compatibility remains. Client certificate format selection does not change server format. CCS/protected records stay opaque. Ordered certificate rows retain owned DER/hash/version/serial/names/Unix validity/algorithm/bits/DNS/IP/CA/extensions, with authenticationfalse and trustnot-evaluated. Count, full DER including known extension/RSA subcodecs, OID components and public recursion depth are checked before X509/list allocation; unknown extension payload/signatures remainopaque. Refusal exposes only justified partial fields and releases fragment data/history without changing neighboring owners or inventing associations.21 synthetic positive/negative controls cover full fields/types/session/order/owners/query/private errors, active mutation, byte/capture/native paths and resource/lifecycle behavior. Actual OpenSSL parses5 frozen publicDER fixtures and an independent model reconstructs exact wires/answers; runtime never verifies a certificate chain or endpoint. All211 historical ZIPs remain unchanged. Other versions/client profiles/ciphers/algorithms/nonX509/cryptographic/device semantics and original whole-input oracle gaps remain unfinished requirements.
 
 The TLS Certificate cardinality batch enforces the configured collection limit before constructing certificate rows or invoking X509 decoding. Complete vector framing keeps existing malformed-input precedence and the hard64 cap. Two TLS1.2 TCP controls prove cap1 rejects an ordered two-certificate chain while the adjacent one-certificate flow retains exact original fields, types, Session and query behavior. Refusal preserves whole-TLS stop/Close semantics and owned data. TLS12/13 helper vectors cover valid and malformed entry framing; TLS13 protected endpoint semantics, certificate trust and a new DER recursion policy are not claimed. Native byte chunk and capture worker/full/deferred/observer combinations retain complete message sets and statistics. Existing historical public DER fixtures are reused by frozen aliases; all212 prior ZIPs remain unchanged.
+
+The TLS Hello collection batch enforces configured extension cardinality before creating extension map/order or retaining Hello retry state. Full vector framing and duplicate detection precede the collection refusal. Independent complete ClientHello controls distinguish two valid extensions under cap1 from an adjacent single-extension normal flow. Client ALPN remains an offer, not a negotiated protocol. Native/capture full/deferred, workers1/2/4, observer and byte chunks0/1/7 preserve full messages/fields/Session/errors/owned data, zero association IDs and Close/resource behavior. Duplicate and truncated second entries under cap1 retain Malformed errors. Shared TLS/DTLS/QUIC Hello admission and existing HRR behavior are covered. No new inner-ALPN/cipher/DER-depth semantics or endpoint authentication is inferred. All213 historical ZIPs remain unchanged.
+
+Native QUIC queries retain private observation identity, wire fields, typed refusals and separate passive Session after public labels/caches or query results are edited. Decode preserves its fields/metadata:nil envelope. Configured inner Hello refusal cannot admit a flow or poison a fresh CID; outer coalescing refusal remains independently covered with the unchanged historical PING/PADDING Initial, preserving cap2, exact remainder, retirement and Close. No Initial packet protection result proves peer identity.
