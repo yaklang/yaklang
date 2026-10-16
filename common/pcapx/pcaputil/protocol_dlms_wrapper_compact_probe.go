@@ -86,6 +86,11 @@ func wrapperContainsCompactData(w []byte) bool {
 		return false
 	}
 	p := wrapperCompactProbe{wire: w}
+	if off := wrapperActionDataOffset(w); off >= 0 {
+		p.at = off
+		yes, _ := p.data(0)
+		return yes
+	}
 	if w[9] == 1 {
 		if w[8] == 0xc4 && w[11] == 0 {
 			p.at = 12

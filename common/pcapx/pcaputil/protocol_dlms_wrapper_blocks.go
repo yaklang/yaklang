@@ -13,7 +13,7 @@ const wrapperBlockCount = 64
 
 func wrapperIsBlock(w []byte) bool { return !wrapperIsGBT(w) && len(w) > 9 && w[9] == 2 }
 func wrapperUsesDataGraph(w []byte) bool {
-	return wrapperIsACSE(w) || wrapperIsGBT(w) || wrapperIsList(w) || wrapperIsBlock(w) || wrapperNormalExtendedData(w) || wrapperNormalDataGraph(w) || wrapperNormalAccess(w)
+	return wrapperActionDataOffset(w) >= 0 || wrapperIsACSE(w) || wrapperIsGBT(w) || wrapperIsList(w) || wrapperIsBlock(w) || wrapperNormalExtendedData(w) || wrapperNormalDataGraph(w) || wrapperNormalAccess(w)
 }
 
 func decodeWrapperBlock(m *wrapperMessage, p []byte, limit int) error {
@@ -86,6 +86,22 @@ func (p *wrapperPending) ambiguousAssociation() string {
 // ResponseTo. A repeated request/response or missing observed hop makes the
 // transfer ambiguous; never stitch bytes based on an invoke ID alone.
 func (f *binFlow) consumeWrapperBlock(s *binDLMSWrapper, m *wrapperMessage, dir int, e *ProtocolEvent, wire []byte) (string, error) {
+	// Get-next/data-block never consumes an observed Action invocation. Match
+	// the complete invoke flags before retiring a conflicting service family.
+	key := wrapperToken{dir, m.source, m.destination, m.invoke}
+	if !m.request {
+		key = wrapperToken{1 - dir, m.destination, m.source, m.invoke}
+	}
+	if p := s.seen[key]; p != nil && p.pending && p.command != 0xc0 {
+		if p.flags == m.flags {
+			p.ambiguousBlocks()
+			return "ambiguous-service", nil
+		}
+		if m.request {
+			return "unmatched-block-request", nil
+		}
+		return "unmatched-response", nil
+	}
 	if m.request {
 		p := s.seen[wrapperToken{dir, m.source, m.destination, m.invoke}]
 		if p == nil {

@@ -172,6 +172,11 @@ func (f *binFlow) consumeWrapperGBT(s *binDLMSWrapper, m *wrapperMessage, dir in
 	if !m.lastBlock {
 		return "observed-gbt-fragment", nil
 	}
+	// New Action-normal support is confined to direct Wrapper messages. A GBT
+	// transfer does not implicitly authorize a new inner-service implementation.
+	if len(p.data) > 0 && (p.data[0] == 0xc3 || p.data[0] == 0xc7) {
+		return "", wrapperError(ErrUnsupportedFeature, "GBT-wrapped Action is not implemented")
+	}
 	// Reuse the exact existing complete Get decoder and invoke context, with
 	// its complete-message event as owner. No GBT ACK alone completes a Get.
 	inner := make([]byte, 8, len(p.data)+8)

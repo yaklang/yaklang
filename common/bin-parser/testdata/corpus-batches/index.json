@@ -106329,6 +106329,212 @@
         "common/pcapx/pcaputil/tls-alpn-contract/server-two-selected-names-before-cap.pcap": "tls-alpn-contract/server-two-selected-names-before-cap.pcap",
         "scripts/protocol-tests/required-tests-traffic-unified-v121.json": "required-tests-traffic-unified-v121.json"
       }
+    },
+    {
+      "id": "validation-dlms-action-normal",
+      "kind": "support",
+      "source_sha": "c216f2c83bd2d951349b451eb02f971e391c9fc8",
+      "file": "validation-dlms-action-normal.zip",
+      "sha256": "54cf0cff70da272043c7bb955e4f2dc4f853e2724d30f7c14a1d871d2b7166cf",
+      "password": "bin-parser",
+      "members": {
+        "dlms-action-normal-tools/SOURCES.json": {
+          "sha256": "cd83fcf8f9abf73cdc0b7f0e902170be785dbbf669a174ff252fd83c69872180",
+          "bytes": 4590
+        },
+        "dlms-action-normal-tools/generate-captures.py": {
+          "sha256": "7d462292a9918e6e05ac86ba3333f5abdf5fe818be1bd8b7d274918993f7ee20",
+          "bytes": 1205
+        },
+        "dlms-action-normal-tools/generate-controls.py": {
+          "sha256": "301bf4a7ef24fe8622d002d1d1475341a76c9decf472a7760133fbe196c557a2",
+          "bytes": 9999
+        },
+        "dlms-action-normal-tools/generate-supplement-v2.py": {
+          "sha256": "70570d7fe2610bfa4332550e67cad9e940f86a99af0ff16c5e3d0e6df5c1489e",
+          "bytes": 7120
+        },
+        "dlms-action-normal-tools/reference-variants.py": {
+          "sha256": "d2d9569393f14ef28ca39b87ed91fce77c29c5bf9f77bd888f0e6bf2be9d12d4",
+          "bytes": 2230
+        },
+        "dlms-action-normal-tools/reference.py": {
+          "sha256": "1537b4ced318cd2fd3c206464c4fb4e11eef27fb64ee0f6c8bee4148c145b37b",
+          "bytes": 2323
+        },
+        "dlms-action-normal-tools/verify.py": {
+          "sha256": "2d2e635a7c00edd99c97db3ac13dd9b3dcba757894a435e73f59325e875d36af",
+          "bytes": 3811
+        },
+        "dlms-action-normal/Action-next-is-not-Get-next.pcap": {
+          "sha256": "b83b954e55ae7e56ad2be4b7298dbf19121f97e9bbc7f6689af244028244a923",
+          "bytes": 97
+        },
+        "dlms-action-normal/Action-owner-preserved-on-C4-block-wrong-full-flags.pcap": {
+          "sha256": "0bda6b73d9b7031e2bd9352b80370ab853962b1f35b7795c8c2fcbbab880f513",
+          "bytes": 255
+        },
+        "dlms-action-normal/Action-owner-rejects-C4-block-family-and-late-C7.pcap": {
+          "sha256": "ecedf7c6a2b15c6f98807a77dc79e63d14d3fd8b23241757815680a7410c38f1",
+          "bytes": 255
+        },
+        "dlms-action-normal/Action-owner-rejects-Get-next-family.pcap": {
+          "sha256": "5c5c854efbe123b56069f797757aaf9f8783dbdc59f2493c04b24b2dcd51bf47",
+          "bytes": 252
+        },
+        "dlms-action-normal/C4-cannot-consume-Action-owner.pcap": {
+          "sha256": "2f5f75214572c754a1431bb056940e7e55e8edbd78bad1042ea0e76a2da51a93",
+          "bytes": 251
+        },
+        "dlms-action-normal/C7-cannot-consume-Get-owner.pcap": {
+          "sha256": "000d36ce021e8a736fcbadbe771260ad832a1685c6d7a429a0fdda9ea84614ee",
+          "bytes": 246
+        },
+        "dlms-action-normal/GBT-wrapped-Action-request-not-implemented.pcap": {
+          "sha256": "b917406709beae9521514526a8a6c64e5043f93995c6072dde97764b322a02d2",
+          "bytes": 115
+        },
+        "dlms-action-normal/GBT-wrapped-Action-response-not-implemented.pcap": {
+          "sha256": "fc6dfe586e72c78e19727ff145e4ef8283d0b626e5707088ad38a6015e6d3994",
+          "bytes": 102
+        },
+        "dlms-action-normal/Get-owner-accepts-complete-C4-block.pcap": {
+          "sha256": "363287265b47c27b0c96d5aec340824a97446ed02972c57f5b910350696eabe1",
+          "bytes": 181
+        },
+        "dlms-action-normal/Get-owner-preserved-on-C7-wrong-full-flags.pcap": {
+          "sha256": "ac0a3912c9dbefabd84d963131870051ea6e6e155b294470d0f29a4672c944fb",
+          "bytes": 246
+        },
+        "dlms-action-normal/action-result-denied.pcap": {
+          "sha256": "e69bd285bac82e2436957d51b8612aea74bec4a556a66fdfa483bf6e3850f461",
+          "bytes": 179
+        },
+        "dlms-action-normal/completed-request-ID-reuse.pcap": {
+          "sha256": "55eded991ae89b3c5511c184a4f69b8e9a9ddeb394378d2581e29718bc192687",
+          "bytes": 334
+        },
+        "dlms-action-normal/controls.json": {
+          "sha256": "05adca170085b7d8a76a9cc7e97cc213dd152a57e495d3c35d6963e72f299d66",
+          "bytes": 260057
+        },
+        "dlms-action-normal/cross-service-request-ID-reuse.pcap": {
+          "sha256": "662958b8f6b89909f4debb75ca4e75e523f9b2f8ae6aaf027b3c918a1886b1e9",
+          "bytes": 330
+        },
+        "dlms-action-normal/different-invokes-interleaved.pcap": {
+          "sha256": "99f171e7d5b35f9621016d449e284e924450e7f3f1cf3deb8c5a4f8231aefe26",
+          "bytes": 329
+        },
+        "dlms-action-normal/exact-request-retry-remains-ambiguous.pcap": {
+          "sha256": "3ff3f05c05b998ac854ab16672b819dfd0fb8b486e6b08d9c5e3db2e70270535",
+          "bytes": 263
+        },
+        "dlms-action-normal/no-parameter-no-return.pcap": {
+          "sha256": "6fbbc2fe49b05ad71259eaddc772f5c580e42f980138765a2e0a8cdf642faaab",
+          "bytes": 174
+        },
+        "dlms-action-normal/noncanonical-optional-flag2.pcap": {
+          "sha256": "a4df0f58ef12293b1311d00f4b6f5e1391808a7f36a26d771021f0f7a3f6e24a",
+          "bytes": 108
+        },
+        "dlms-action-normal/octet-parameter-no-return.pcap": {
+          "sha256": "4f70a6945bf463d7f5cedf0d8466d94bc5da6d68f0e721d2d4bca0140a26c6b1",
+          "bytes": 179
+        },
+        "dlms-action-normal/octet-return.pcap": {
+          "sha256": "434e54ec81b51bf75c84d63091c91f11d51b7c4c0ca5b0d067f22229963cb8a8",
+          "bytes": 185
+        },
+        "dlms-action-normal/orphan-response.pcap": {
+          "sha256": "4b81e0fb16fb83ff11b68dcd8e25018a0aae4ac1bc0820f7c6f2622420b3e3c6",
+          "bytes": 95
+        },
+        "dlms-action-normal/parameter-node-budget.pcap": {
+          "sha256": "9a5cd19a95becebe0d96c1e929bdd33be11d2faf5be7e939aedd14955c16a92d",
+          "bytes": 111
+        },
+        "dlms-action-normal/pending-Action-Close.pcap": {
+          "sha256": "73efcc3856b3d04b90302c93ca7c7fc334848d4d35ee1ce8d80f0b2d59769ab7",
+          "bytes": 108
+        },
+        "dlms-action-normal/return-data-access-error.pcap": {
+          "sha256": "33b39945b537867b7193dee263bbef388e4ded2157b39b4731fe0f002a8a325e",
+          "bytes": 181
+        },
+        "dlms-action-normal/structure-parameter-and-return.pcap": {
+          "sha256": "c4d50f0d70445a2c60d5bd2652a59b3d5b26518bb7fb1bee412e0806979a500d",
+          "bytes": 191
+        },
+        "dlms-action-normal/supplemental.json": {
+          "sha256": "db709d3bd80d4a51be2cbc40f22d0a6e74961f8e2b2f9588012e83122f574487",
+          "bytes": 88575
+        },
+        "dlms-action-normal/trailing-parameter-byte.pcap": {
+          "sha256": "25720c4abf3c4ac51800f753925b15798c30f38d33a62d87c643f0e03bf59cdf",
+          "bytes": 109
+        },
+        "dlms-action-normal/truncated-parameter.pcap": {
+          "sha256": "82c89968a3779c130b64bc3b608fdac9e641bdd55507142cd34b427f655fe9b1",
+          "bytes": 107
+        },
+        "dlms-action-normal/two-pending-Action-Close-sorted.pcap": {
+          "sha256": "760be345d1be768caa24aadf5655c374f366d91087fd4943cecc4213645753e0",
+          "bytes": 187
+        },
+        "dlms-action-normal/wrong-direction-preserves-real-request.pcap": {
+          "sha256": "17904d8abca69c5d1c5ec54fb81bb6d90c86ed88a61c3051f45f2e5bdabf4c38",
+          "bytes": 250
+        },
+        "required-tests-traffic-unified-v122.json": {
+          "sha256": "44d45852dbac8f174d33d7521485d76ce24930bf7ae2df95c16ed421abbe75d7",
+          "bytes": 20133898
+        },
+        "validation/expected.json": {
+          "sha256": "728abfe963c038cb929f6d01b8001e84484b04cfbc50a8c5f8e69813e4a1cc70",
+          "bytes": 34439
+        }
+      },
+      "aliases": {
+        "common/pcapx/pcaputil/dlms-action-normal-tools/SOURCES.json": "dlms-action-normal-tools/SOURCES.json",
+        "common/pcapx/pcaputil/dlms-action-normal-tools/generate-captures.py": "dlms-action-normal-tools/generate-captures.py",
+        "common/pcapx/pcaputil/dlms-action-normal-tools/generate-controls.py": "dlms-action-normal-tools/generate-controls.py",
+        "common/pcapx/pcaputil/dlms-action-normal-tools/generate-supplement-v2.py": "dlms-action-normal-tools/generate-supplement-v2.py",
+        "common/pcapx/pcaputil/dlms-action-normal-tools/reference-variants.py": "dlms-action-normal-tools/reference-variants.py",
+        "common/pcapx/pcaputil/dlms-action-normal-tools/reference.py": "dlms-action-normal-tools/reference.py",
+        "common/pcapx/pcaputil/dlms-action-normal-tools/verify.py": "dlms-action-normal-tools/verify.py",
+        "common/pcapx/pcaputil/dlms-action-normal/Action-next-is-not-Get-next.pcap": "dlms-action-normal/Action-next-is-not-Get-next.pcap",
+        "common/pcapx/pcaputil/dlms-action-normal/Action-owner-preserved-on-C4-block-wrong-full-flags.pcap": "dlms-action-normal/Action-owner-preserved-on-C4-block-wrong-full-flags.pcap",
+        "common/pcapx/pcaputil/dlms-action-normal/Action-owner-rejects-C4-block-family-and-late-C7.pcap": "dlms-action-normal/Action-owner-rejects-C4-block-family-and-late-C7.pcap",
+        "common/pcapx/pcaputil/dlms-action-normal/Action-owner-rejects-Get-next-family.pcap": "dlms-action-normal/Action-owner-rejects-Get-next-family.pcap",
+        "common/pcapx/pcaputil/dlms-action-normal/C4-cannot-consume-Action-owner.pcap": "dlms-action-normal/C4-cannot-consume-Action-owner.pcap",
+        "common/pcapx/pcaputil/dlms-action-normal/C7-cannot-consume-Get-owner.pcap": "dlms-action-normal/C7-cannot-consume-Get-owner.pcap",
+        "common/pcapx/pcaputil/dlms-action-normal/GBT-wrapped-Action-request-not-implemented.pcap": "dlms-action-normal/GBT-wrapped-Action-request-not-implemented.pcap",
+        "common/pcapx/pcaputil/dlms-action-normal/GBT-wrapped-Action-response-not-implemented.pcap": "dlms-action-normal/GBT-wrapped-Action-response-not-implemented.pcap",
+        "common/pcapx/pcaputil/dlms-action-normal/Get-owner-accepts-complete-C4-block.pcap": "dlms-action-normal/Get-owner-accepts-complete-C4-block.pcap",
+        "common/pcapx/pcaputil/dlms-action-normal/Get-owner-preserved-on-C7-wrong-full-flags.pcap": "dlms-action-normal/Get-owner-preserved-on-C7-wrong-full-flags.pcap",
+        "common/pcapx/pcaputil/dlms-action-normal/action-result-denied.pcap": "dlms-action-normal/action-result-denied.pcap",
+        "common/pcapx/pcaputil/dlms-action-normal/completed-request-ID-reuse.pcap": "dlms-action-normal/completed-request-ID-reuse.pcap",
+        "common/pcapx/pcaputil/dlms-action-normal/controls.json": "dlms-action-normal/controls.json",
+        "common/pcapx/pcaputil/dlms-action-normal/cross-service-request-ID-reuse.pcap": "dlms-action-normal/cross-service-request-ID-reuse.pcap",
+        "common/pcapx/pcaputil/dlms-action-normal/different-invokes-interleaved.pcap": "dlms-action-normal/different-invokes-interleaved.pcap",
+        "common/pcapx/pcaputil/dlms-action-normal/exact-request-retry-remains-ambiguous.pcap": "dlms-action-normal/exact-request-retry-remains-ambiguous.pcap",
+        "common/pcapx/pcaputil/dlms-action-normal/no-parameter-no-return.pcap": "dlms-action-normal/no-parameter-no-return.pcap",
+        "common/pcapx/pcaputil/dlms-action-normal/noncanonical-optional-flag2.pcap": "dlms-action-normal/noncanonical-optional-flag2.pcap",
+        "common/pcapx/pcaputil/dlms-action-normal/octet-parameter-no-return.pcap": "dlms-action-normal/octet-parameter-no-return.pcap",
+        "common/pcapx/pcaputil/dlms-action-normal/octet-return.pcap": "dlms-action-normal/octet-return.pcap",
+        "common/pcapx/pcaputil/dlms-action-normal/orphan-response.pcap": "dlms-action-normal/orphan-response.pcap",
+        "common/pcapx/pcaputil/dlms-action-normal/parameter-node-budget.pcap": "dlms-action-normal/parameter-node-budget.pcap",
+        "common/pcapx/pcaputil/dlms-action-normal/pending-Action-Close.pcap": "dlms-action-normal/pending-Action-Close.pcap",
+        "common/pcapx/pcaputil/dlms-action-normal/return-data-access-error.pcap": "dlms-action-normal/return-data-access-error.pcap",
+        "common/pcapx/pcaputil/dlms-action-normal/structure-parameter-and-return.pcap": "dlms-action-normal/structure-parameter-and-return.pcap",
+        "common/pcapx/pcaputil/dlms-action-normal/supplemental.json": "dlms-action-normal/supplemental.json",
+        "common/pcapx/pcaputil/dlms-action-normal/trailing-parameter-byte.pcap": "dlms-action-normal/trailing-parameter-byte.pcap",
+        "common/pcapx/pcaputil/dlms-action-normal/truncated-parameter.pcap": "dlms-action-normal/truncated-parameter.pcap",
+        "common/pcapx/pcaputil/dlms-action-normal/two-pending-Action-Close-sorted.pcap": "dlms-action-normal/two-pending-Action-Close-sorted.pcap",
+        "common/pcapx/pcaputil/dlms-action-normal/wrong-direction-preserves-real-request.pcap": "dlms-action-normal/wrong-direction-preserves-real-request.pcap",
+        "scripts/protocol-tests/required-tests-traffic-unified-v122.json": "required-tests-traffic-unified-v122.json"
+      }
     }
   ],
   "schema_version": 1,

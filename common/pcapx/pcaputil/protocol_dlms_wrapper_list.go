@@ -331,6 +331,9 @@ func wrapperNormalAccess(w []byte) bool {
 	return len(w) > 20 && w[8] == 0xc0 && w[9] == 1 && w[20] == 1
 }
 func wrapperProfile(w []byte) string {
+	if wrapperIsAction(w) {
+		return "dlms-wrapper-v1-action-normal"
+	}
 	if wrapperIsACSE(w) {
 		if acseLifecycleAPDU(w[8:]) {
 			return "dlms-wrapper-v1-acse-lifecycle"
@@ -349,6 +352,9 @@ func wrapperProfile(w []byte) string {
 	return "dlms-wrapper-v1-get-normal"
 }
 func wrapperProbeVersion(w []byte) string {
+	if wrapperIsAction(w) {
+		return "v1-action-normal"
+	}
 	if wrapperIsACSE(w) {
 		if acseLifecycleAPDU(w[8:]) {
 			return "v1-acse-lifecycle"
@@ -378,6 +384,10 @@ func wrapperProjection(w []byte, n int) int64 {
 			extra = 8192 * int64(min(wrapperListItems, max(0, n-12)/2))
 		}
 		return 32768 + 512*int64(n) + 2048*wrapperDataNodes + extra
+	}
+	if off := wrapperActionDataOffset(w); off >= 0 {
+		nodes := min(wrapperDataNodes, max(0, n-off))
+		return 32768 + 512*int64(n) + 2048*int64(nodes)
 	}
 	if wrapperNormalDataGraph(w) || wrapperNormalAccess(w) {
 		// A complete normal response has12 non-Data bytes; a selected request

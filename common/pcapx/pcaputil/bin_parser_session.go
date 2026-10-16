@@ -1449,6 +1449,19 @@ func (f *binFlow) finishSession(reason TrafficFlowCloseReason) {
 				n++
 			}
 		}
+		for _, key := range w.pendingActions() {
+			e := f.event(key.dir, nil, "incomplete", string(reason)+": DLMS Wrapper Action ended with an unmatched request")
+			e.Profile = "dlms-wrapper-v1-action-normal"
+			e.nativeDLMSOrSLMPObservation = true
+			e.Session = wrapperActionCloseFields(key)
+			e.semanticSession = cloneSession(e.Session)
+			e.sessionError = &ProtocolError{Kind: ErrNeedMore, Message: e.Summary}
+			e.Error = e.sessionError.Error()
+			e.Completeness = "incomplete"
+			f.a.incomplete.Add(1)
+			f.a.emit(e)
+			n++
+		}
 		if left := w.outstanding() - n; left > 0 {
 			emit(0, map[string]any{"Outstanding": left}, "DLMS Wrapper exchange ended with unmatched observed requests")
 		}
