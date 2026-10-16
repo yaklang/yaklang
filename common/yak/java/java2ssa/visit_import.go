@@ -84,7 +84,7 @@ func (y *singleFileBuilder) visitCapturedImportDeclarations(decls []javaImportDe
 		// mutates the imported library's builder and editor stack; when units
 		// pre-handle in parallel that races. The deferred post-skeleton import
 		// task links types after every skeleton in the batch exists.
-		if !resolveStaticTypes && y.GetProgram() != nil && y.GetProgram().ConcurrentUnitBuildEnabled() {
+		if static && !resolveStaticTypes && y.GetProgram() != nil && y.GetProgram().ConcurrentUnitBuildEnabled() {
 			continue
 		}
 
