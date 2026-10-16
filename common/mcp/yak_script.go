@@ -115,7 +115,7 @@ func init() {
 		), handleExecYakScript),
 
 		WithTool(mcp.NewTool("save_yak_script",
-			mcp.WithDescription("Create or update a local Yakit plugin (YakScript). Runs yaklang engine static analysis first for yak/mitm/port-scan/codec/context-menu; blocking Error results refuse save and return readable issues for the AI to fix. Prefer: write code → static_analyze_yak_script → save_yak_script. Pass id>0 to update; omit id (or 0) to create."),
+			mcp.WithDescription("Create or update a local Yakit plugin (YakScript). Runs yaklang engine static analysis first for yak/mitm/port-scan/codec/context-menu; blocking Error results refuse save and return readable issues for the AI to fix. CLI parameters (the Yakit form), plugin env keys, risk info and tags are parsed from the content and saved automatically. Prefer: write code → static_analyze_yak_script → save_yak_script. Pass id>0 to update; omit id (or 0) to create."),
 			mcp.WithString("scriptName",
 				mcp.Description("Plugin name (unique). Required."),
 				mcp.Required(),
@@ -298,12 +298,61 @@ func handleSaveYakScript(s *MCPServer) server.ToolHandlerFunc {
 			}
 		}
 
+		if err := fillYakScriptInspectInformation(ctx, s, &req); err != nil {
+			return nil, err
+		}
+
 		rsp, err := s.grpcClient.SaveNewYakScript(ctx, &req)
 		if err != nil {
 			return nil, utils.Wrap(err, "failed to save yak script")
 		}
 		return NewCommonCallToolResult(rsp)
 	}
+}
+
+// yakScriptSourceTypes lists plugin types whose content is yaklang source, so plugin
+// information (CLI parameters, plugin env keys, risk info, tags) can be parsed from it.
+var yakScriptSourceTypes = map[string]struct{}{
+	"yak":          {},
+	"mitm":         {},
+	"port-scan":    {},
+	"codec":        {},
+	"context-menu": {},
+}
+
+// fillYakScriptInspectInformation parses plugin information from the script content and
+// merges it into the save request before persisting, which is what the Yakit editor does.
+// Yakit renders the plugin form from this information (e.g. cli.String("target") becomes a
+// form field); without parsing it here, plugins saved through MCP carry empty params and
+// Yakit shows no form for them.
+func fillYakScriptInspectInformation(ctx context.Context, s *MCPServer, req *ypb.SaveNewYakScriptRequest) error {
+	if _, ok := yakScriptSourceTypes[strings.TrimSpace(req.GetType())]; !ok {
+		// e.g. nuclei yaml is not yaklang source and has its own builtin params
+		return nil
+	}
+
+	rsp, err := s.grpcClient.YaklangInspectInformation(ctx, &ypb.YaklangInspectInformationRequest{
+		YakScriptType: req.GetType(),
+		YakScriptCode: req.GetContent(),
+	})
+	if err != nil {
+		return utils.Wrap(err, "failed to inspect yak script information")
+	}
+
+	// explicitly provided values win, the rest is derived from the script content
+	if len(req.GetParams()) == 0 {
+		req.Params = rsp.GetCliParameter()
+	}
+	if len(req.GetPluginEnvKey()) == 0 {
+		req.PluginEnvKey = rsp.GetPluginEnvKey()
+	}
+	if len(req.GetRiskInfo()) == 0 {
+		req.RiskInfo = rsp.GetRiskInfo()
+	}
+	if strings.TrimSpace(req.GetTags()) == "" {
+		req.Tags = strings.Join(rsp.GetTags(), ",")
+	}
+	return nil
 }
 
 // yakScriptAnalyzeIssue is an AI-friendly static-analysis finding (plain-text message, not []byte/base64).
