@@ -751,6 +751,21 @@ func (f *binFlow) consumeDecodedDLMS(dir int, w []byte, id uint64, m *dlmsMessag
 		return nil, 0, dlmsError(ErrContextRequired, "Get information belongs to retired association context")
 	}
 	if m.kind == "I" && s.fragments == nil && len(m.information) >= 4 && m.information[0] == 0xe6 && (m.information[1] == 0xe6 || m.information[1] == 0xe7) && m.information[2] == 0 && dlmsOperationAPDU(m.information[3:]) && !dlmsSelectedOperationSegmentPrefix(m.information) {
+		// A valid carrier can contain an unsupported foreign service/form.
+		// Its complete reply header is sufficient to exclude the observed
+		// normal/list owner; do that before the unsupported-chain retirement.
+		// This neither assembles the foreign pblock nor accepts its body.
+		p := s.pending
+		info := m.information
+		if p != nil && dir != p.dir && m.source == p.destination && m.destination == p.source && len(info) >= 6 && info[1] == 0xe7 && info[5]&0x30 == 0 && (info[3] == 0xc5 || info[3] == 0xc7) && (dlmsActionDownloadAPDU(info[3:]) || dlmsSetBlockAPDU(info[3:]) || dlmsActionUploadAPDU(info[3:])) {
+			expected := byte(0xc5)
+			if p.kind == "ACTION" {
+				expected = 0xc7
+			}
+			if p.kind == "GET" || dlmsOperationKind(p.kind) && (p.choice == 1 || dlmsOperationListPending(p)) && (info[3] != expected || info[4] != dlmsOperationSegmentResponseChoice(p)) {
+				return nil, 0, dlmsError(ErrContextRequired, "segmented operation reply service/form differs from pending request")
+			}
+		}
 		s.invalidate()
 		return nil, 0, dlmsError(ErrUnsupportedFeature, "segmented Set/Action information is not implemented")
 	}

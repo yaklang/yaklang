@@ -111555,6 +111555,72 @@
         "common/pcapx/pcaputil/dlms-hdlc-list-segments/list-structured-Data-output-depth5-refusal.tcp.pcap": "dlms-hdlc-list-segments/list-structured-Data-output-depth6.tcp.pcap",
         "scripts/protocol-tests/required-tests-traffic-unified-v137.json": "required-tests-traffic-unified-v137.json"
       }
+    },
+    {
+      "id": "validation-dlms-hdlc-list-foreign-pblock",
+      "kind": "support",
+      "source_sha": "6551b7377111935c576055b6c15d0527ce2d9a86",
+      "file": "validation-dlms-hdlc-list-foreign-pblock.zip",
+      "sha256": "2f4e22bd1d34db97f9176ad189e48e7cf764da8e7b2369c21aaec21523ad5cf4",
+      "password": "bin-parser",
+      "members": {
+        "dlms-hdlc-list-foreign-pblock-tools/SOURCES.json": {
+          "bytes": 605,
+          "sha256": "3d339b5bde856a8dded72308ba6fd4de5380393ae3fa2bcf54e7ac2627ab6342"
+        },
+        "dlms-hdlc-list-foreign-pblock-tools/generate-captures.py": {
+          "bytes": 1872,
+          "sha256": "d2c4fafc77052870d2952a58af729aa75f01cc9569ad30c01e805b8a44a678b0"
+        },
+        "dlms-hdlc-list-foreign-pblock-tools/generate-foreign-pblock-supplement.py": {
+          "bytes": 3968,
+          "sha256": "b67257dc261276fe437f5a69f8f2ae4bc7504d912dc001711493c3e936b3cb57"
+        },
+        "dlms-hdlc-list-foreign-pblock-tools/verify-captures.py": {
+          "bytes": 3135,
+          "sha256": "371db4225334eff054429f09de897785efc1723b5bb720d199dbee27bf5fb1d8"
+        },
+        "dlms-hdlc-list-foreign-pblock-tools/verify-foreign-pblock-supplement.py": {
+          "bytes": 1998,
+          "sha256": "9d378487cf9792b409777ee11356ed33f1978369c8e7a54af1d3ca3bf029ba44"
+        },
+        "dlms-hdlc-list-foreign-pblock/controls.json": {
+          "bytes": 25006,
+          "sha256": "29fb0b674dc57b31ba669471528fefd53473daf054f5ffa235689dee74922e7c"
+        },
+        "dlms-hdlc-list-foreign-pblock/known-GET-owner-foreign-Action-pblock-first-preserves.tcp.pcap": {
+          "bytes": 516,
+          "sha256": "3f2d2eb044504d8511459b073205f1aa59f04a38cd737821a2a5e56d732c3e07"
+        },
+        "dlms-hdlc-list-foreign-pblock/known-GET-owner-foreign-Action-pblock-first-preserves.udp.pcap": {
+          "bytes": 270,
+          "sha256": "0d3a80f9f5a7709800759a9f6f93212b98ebfd7616050ca94aab92b8779dba99"
+        },
+        "dlms-hdlc-list-foreign-pblock/reuse-inputs.json": {
+          "bytes": 239,
+          "sha256": "cb486139de99da57d85ae717124b795b3b73ad9ba7cee417a6466e1deb43a2ff"
+        },
+        "required-tests-traffic-unified-v138.json": {
+          "bytes": 23927374,
+          "sha256": "f341eff00366c93d10e4ca73d75c87d40109c0dfb3cf6f32a9da94ee4b7a6647"
+        },
+        "validation/expected.json": {
+          "bytes": 2761,
+          "sha256": "6e2bc2a91b88ea6b1ff3625225acf0f2cf22fcef4c1650e1ad2ad6a39a6be6e1"
+        }
+      },
+      "aliases": {
+        "common/pcapx/pcaputil/dlms-hdlc-list-foreign-pblock-tools/SOURCES.json": "dlms-hdlc-list-foreign-pblock-tools/SOURCES.json",
+        "common/pcapx/pcaputil/dlms-hdlc-list-foreign-pblock-tools/generate-captures.py": "dlms-hdlc-list-foreign-pblock-tools/generate-captures.py",
+        "common/pcapx/pcaputil/dlms-hdlc-list-foreign-pblock-tools/generate-foreign-pblock-supplement.py": "dlms-hdlc-list-foreign-pblock-tools/generate-foreign-pblock-supplement.py",
+        "common/pcapx/pcaputil/dlms-hdlc-list-foreign-pblock-tools/verify-captures.py": "dlms-hdlc-list-foreign-pblock-tools/verify-captures.py",
+        "common/pcapx/pcaputil/dlms-hdlc-list-foreign-pblock-tools/verify-foreign-pblock-supplement.py": "dlms-hdlc-list-foreign-pblock-tools/verify-foreign-pblock-supplement.py",
+        "common/pcapx/pcaputil/dlms-hdlc-list-foreign-pblock/controls.json": "dlms-hdlc-list-foreign-pblock/controls.json",
+        "common/pcapx/pcaputil/dlms-hdlc-list-foreign-pblock/known-GET-owner-foreign-Action-pblock-first-preserves.tcp.pcap": "dlms-hdlc-list-foreign-pblock/known-GET-owner-foreign-Action-pblock-first-preserves.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-list-foreign-pblock/known-GET-owner-foreign-Action-pblock-first-preserves.udp.pcap": "dlms-hdlc-list-foreign-pblock/known-GET-owner-foreign-Action-pblock-first-preserves.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-list-foreign-pblock/reuse-inputs.json": "dlms-hdlc-list-foreign-pblock/reuse-inputs.json",
+        "scripts/protocol-tests/required-tests-traffic-unified-v138.json": "required-tests-traffic-unified-v138.json"
+      }
     }
   ],
   "schema_version": 1,

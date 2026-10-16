@@ -27,19 +27,22 @@ func TestDLMSHDLCListSegmentsMatrix(t *testing.T) {
 	hdlcListSegmentsMatrix(t, hdlcListSegmentsControls(t))
 }
 func hdlcListSegmentsMatrix(t *testing.T, cases []hdlcOpCase) {
+	hdlcListSegmentsMatrixBatch(t, cases, "dlms-hdlc-list-segments", "DLMS_HDLC_LIST_SEGMENTS_TEST_ROOT")
+}
+func hdlcListSegmentsMatrixBatch(t *testing.T, cases []hdlcOpCase, batch, env string) {
 	for _, c := range cases {
 		for _, transport := range []string{"udp", "tcp"} {
 			t.Run(c.Name+"/"+transport, func(t *testing.T) {
 				var reuse map[string]string
-				require.NoError(t, json.Unmarshal(finsReadBatch(t, "dlms-hdlc-list-segments", "DLMS_HDLC_LIST_SEGMENTS_TEST_ROOT", "reuse-inputs.json"), &reuse))
+				require.NoError(t, json.Unmarshal(finsReadBatch(t, batch, env, "reuse-inputs.json"), &reuse))
 				name := c.Name + "." + transport + ".pcap"
 				raw := []byte(nil)
 				if path, ok := reuse[name]; ok {
 					parts := strings.SplitN(path, "/", 2)
 					require.Len(t, parts, 2)
-					raw = finsReadBatch(t, parts[0], "DLMS_HDLC_LIST_SEGMENTS_TEST_ROOT", parts[1])
+					raw = finsReadBatch(t, parts[0], env, parts[1])
 				} else {
-					raw = finsReadBatch(t, "dlms-hdlc-list-segments", "DLMS_HDLC_LIST_SEGMENTS_TEST_ROOT", name)
+					raw = finsReadBatch(t, batch, env, name)
 				}
 				discoveryMatrix(t, func(t *testing.T, w int, d, o bool) {
 					es, stats := hdlcOpReplay(t, c, raw, w, d, o, transport)
