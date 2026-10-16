@@ -8,6 +8,7 @@ import (
 	"github.com/gopacket/gopacket"
 	"github.com/stretchr/testify/require"
 	"io"
+	"strings"
 	"testing"
 	"time"
 )
@@ -48,7 +49,7 @@ func actionControls(t *testing.T) []actionCase {
 	var extra struct{ Cases []actionCase }
 	original := finsReadBatch(t, "dlms-action-normal", "DLMS_ACTION_TEST_ROOT", "supplemental.json")
 	require.NoError(t, json.Unmarshal(original, &extra))
-	extra.Cases = actionDownloadHistoricalUpgrade(t, original, extra.Cases)
+	extra.Cases = gbtActionHistoricalUpgrade(t, original, actionDownloadHistoricalUpgrade(t, original, extra.Cases), "dlms-action-normal/supplemental.json")
 	require.Len(t, extra.Cases, 8)
 	return append(x.Cases, extra.Cases...)
 }
@@ -283,8 +284,11 @@ func TestDLMSActionNormalNative(t *testing.T) {
 								at = end
 							}
 						}
+						flow := gbtActionHistoricalCarrierCheck(t, c, es, transport, false, false, 0)
 						actionCheck(t, c, es, transport, false, d)
-						actionCloseCheck(t, c, s.Close("action-test"), transport, "action-test")
+						closed := s.Close("action-test")
+						gbtActionHistoricalCarrierCheck(t, c, closed, transport, false, true, flow)
+						actionCloseCheck(t, c, closed, transport, "action-test")
 						require.Empty(t, s.Close("again"))
 						require.Zero(t, s.Stats().BufferedBytes)
 						require.LessOrEqual(t, s.Stats().PeakBufferedBytes, int64(b.MaxBufferedBytes))
@@ -319,12 +323,57 @@ func TestDLMSActionGetBlockServiceBoundary(t *testing.T) {
 func TestDLMSActionGBTBoundary(t *testing.T) {
 	s, err := NewProtocolSessionWithOptions(DefaultParserBudget(), WithSessionTransport("udp"), WithSessionPorts(41000, 4059))
 	require.NoError(t, err)
-	defer s.Close("test")
-	o := s.Feed(0, time.Unix(1, 0), wrapperWire(t, "0001001000010019e0810001000012c301c1000f0000280000ff01010903010203"))
+	defer s.Close("cleanup")
+	wire := wrapperWire(t, "0001001000010019e0810001000012c301c1000f0000280000ff01010903010203")
+	var c actionCase
+	for _, r := range gbtActionHistoricalRecords(t) {
+		if strings.Contains(r.Name, "request") {
+			require.NoError(t, json.Unmarshal(r.Case, &c))
+			require.Equal(t, r.InputSHA, fmt.Sprintf("%x", sha256.Sum256(wire)))
+		}
+	}
+	require.Len(t, c.Steps, 1)
+	require.Equal(t, c.Steps[0].Wire, fmt.Sprintf("%x", wire))
+	c.Name = "standalone-complete-Action-GBT-boundary"
+	// Keep this pre-existing regression's timestamp1; the independent captured
+	// witness is timestamp100. Only those expected native timestamps shift.
+	c.Steps[0].At = 1
+	require.Len(t, c.Close.Events, 1)
+	c.Close.Events[0].At = 1
+	o := s.Feed(0, time.Unix(1, 0), bytes.Clone(wire))
+	require.Nil(t, o.Err)
+	require.False(t, o.NeedMore)
+	require.Equal(t, len(wire), o.Consumed)
 	require.Len(t, o.Events, 1)
-	rocTypedError(t, "UnsupportedFeature", o.Err)
-	require.Zero(t, o.Events[0].ResponseTo)
-	require.Zero(t, o.Events[0].TransactionID)
+	e := o.Events[0]
+	require.NotZero(t, e.FlowID)
+	require.Equal(t, time.Unix(1, 0), e.Timestamp)
+	require.Equal(t, e.ID, e.TransactionID)
+	require.Zero(t, e.ResponseTo)
+	require.Equal(t, "192.0.2.1:41000", e.Source)
+	require.Equal(t, "192.0.2.2:4059", e.Destination)
+	require.Zero(t, e.Offset)
+	require.Equal(t, CaptureDomain{}, e.Domain)
+	f, err := e.GetFields()
+	require.NoError(t, err)
+	gbtActionTypes(t, f)
+	gbtActionTypes(t, e.Session)
+	snapshot := actionSnapshot(e)
+	actionPoison(e)
+	clear(wire)
+	actionCheck(t, c, []*ProtocolEvent{snapshot}, "udp", false, false)
+	closed := s.Close("boundary")
+	require.Len(t, closed, 1)
+	require.Equal(t, e.FlowID, closed[0].FlowID)
+	require.Equal(t, time.Unix(1, 0), closed[0].Timestamp)
+	require.Equal(t, CaptureDomain{}, closed[0].Domain)
+	require.Equal(t, "192.0.2.1:41000", closed[0].Source)
+	require.Equal(t, "192.0.2.2:4059", closed[0].Destination)
+	require.Zero(t, closed[0].Offset)
+	gbtActionTypes(t, closed[0].Session)
+	actionCloseCheck(t, c, closed, "udp", "boundary")
+	require.Empty(t, s.Close("again"))
+	require.Zero(t, s.Stats().BufferedBytes)
 }
 
 func actionReplay(t *testing.T, c actionCase, raw []byte, workers int, deferred, observe bool) ([]*ProtocolEvent, ProtocolStats) {
@@ -378,7 +427,9 @@ func TestDLMSActionNormalMatrix(t *testing.T) {
 			discoveryMatrix(t, func(t *testing.T, w int, d, o bool) {
 				es, stats := actionReplay(t, c, raw, w, d, o)
 				require.Len(t, es, len(c.Steps)+len(c.Close.Events))
+				flow := gbtActionHistoricalCarrierCheck(t, c, es[:len(c.Steps)], "udp", true, false, 0)
 				actionCheck(t, c, es[:len(c.Steps)], "udp", true, d)
+				gbtActionHistoricalCarrierCheck(t, c, es[len(c.Steps):], "udp", true, true, flow)
 				actionCloseCheck(t, c, es[len(c.Steps):], "udp", "")
 				require.EqualValues(t, len(c.Steps), stats.Messages)
 				require.EqualValues(t, len(c.Close.Events), stats.Incomplete)

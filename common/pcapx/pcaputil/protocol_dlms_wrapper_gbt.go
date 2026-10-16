@@ -172,11 +172,11 @@ func (f *binFlow) consumeWrapperGBT(s *binDLMSWrapper, m *wrapperMessage, dir in
 	if !m.lastBlock {
 		return "observed-gbt-fragment", nil
 	}
-	// Admit complete plaintext Set-normal/list APDUs only. Service blocks
+	// Admit complete plaintext Set-normal/list and Action-normal APDUs only. Service blocks
 	// retain their separately bounded transfer contract; GBT completion does
 	// not make other services or authenticated context observable.
-	if len(p.data) > 0 && (p.data[0] == 0xc3 || p.data[0] == 0xc7) {
-		return "", wrapperError(ErrUnsupportedFeature, "GBT-wrapped Action is not implemented")
+	if len(p.data) > 1 && (p.data[0] == 0xc3 || p.data[0] == 0xc7) && p.data[1] != 1 {
+		return "", wrapperError(ErrUnsupportedFeature, "GBT-wrapped Action supports complete normal APDUs only")
 	}
 	if len(p.data) > 1 && (p.data[0] == 0xc1 && p.data[1] != 1 && p.data[1] != 4 || p.data[0] == 0xc5 && p.data[1] != 1 && p.data[1] != 5) {
 		return "", wrapperError(ErrUnsupportedFeature, "GBT-wrapped Set supports complete normal/list APDUs only")
