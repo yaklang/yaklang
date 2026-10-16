@@ -111016,6 +111016,288 @@
         "common/pcapx/pcaputil/dlms-hdlc-action-download/single-last-structure-depth6.udp.pcap": "dlms-hdlc-action-download/single-last-structure-depth6.udp.pcap",
         "scripts/protocol-tests/required-tests-traffic-unified-v135.json": "required-tests-traffic-unified-v135.json"
       }
+    },
+    {
+      "id": "validation-dlms-hdlc-operation-segments",
+      "kind": "support",
+      "source_sha": "3723f2a1b9017118c6431c3a064e6e74cbe4ca70",
+      "file": "validation-dlms-hdlc-operation-segments.zip",
+      "sha256": "30aa36e76eaafdf125ec050404f292aab424183328fa18c6d2db44f89ed31959",
+      "password": "bin-parser",
+      "members": {
+        "dlms-hdlc-operation-segments-tools/FIELD-CONTRACT.json": {
+          "bytes": 3514,
+          "sha256": "825b9d543f4aeb59d573677188d9257ce20c65665f158892b18ba84b9f1f515a"
+        },
+        "dlms-hdlc-operation-segments-tools/SOURCES.json": {
+          "bytes": 3324,
+          "sha256": "dedf42fce6cfb17847af6f0cdb4d05888ef5e1cc40bdd9e4badd4a319234047a"
+        },
+        "dlms-hdlc-operation-segments-tools/data-model.py": {
+          "bytes": 1624,
+          "sha256": "03dbaaa0f3c564db04440c0fbee8742e407f825de889b7a6e0012a49e6a06f4e"
+        },
+        "dlms-hdlc-operation-segments-tools/generate-captures.py": {
+          "bytes": 1871,
+          "sha256": "aa7d16b66492d03745314375f5beef3dd5edaccd484e9ee8d45e814f73e7ed28"
+        },
+        "dlms-hdlc-operation-segments-tools/generate-historical-upgrade.py": {
+          "bytes": 5488,
+          "sha256": "b85ff5a72d602d4125b94eb25b519c401d4e34a5c8168ab6f9df506d9a20e1bc"
+        },
+        "dlms-hdlc-operation-segments-tools/generate-refusal-supplement.py": {
+          "bytes": 3854,
+          "sha256": "c6c747f43e54adac1db9c478f9d54c47a68285fce14e08ec4d2b583b27e4214b"
+        },
+        "dlms-hdlc-operation-segments-tools/generate.py": {
+          "bytes": 15928,
+          "sha256": "803c42f35e6d1fafd6c612b1ed8ddc0be0505e99c11ed7f07d2fdbf42a908772"
+        },
+        "dlms-hdlc-operation-segments-tools/reference-v2.py": {
+          "bytes": 4402,
+          "sha256": "46b900350f1153f4a6592bbe8df78e325c26767fafa62716efb920f27366b1eb"
+        },
+        "dlms-hdlc-operation-segments-tools/reference-vectors.json": {
+          "bytes": 7425,
+          "sha256": "8dbeab0bd45854c06b19880a3cc3cf795b95808379fb94763cbc3d4c32efed6b"
+        },
+        "dlms-hdlc-operation-segments-tools/verify-captures.py": {
+          "bytes": 3946,
+          "sha256": "dc95ea36e8e652503933ad3f9986962dae861acc113b96c751612b5fd3597636"
+        },
+        "dlms-hdlc-operation-segments-tools/verify-historical-upgrade.py": {
+          "bytes": 1745,
+          "sha256": "c59fd38e229fefafed928168d354d78a4b4b102e793453716f4d5f22ea5d44fa"
+        },
+        "dlms-hdlc-operation-segments-tools/verify-refusal-supplement.py": {
+          "bytes": 2058,
+          "sha256": "e32441cc3ce4a04241f7912bab76be4cdd98fb3d834fab76c815ce18f235a43a"
+        },
+        "dlms-hdlc-operation-segments-tools/verify.py": {
+          "bytes": 4377,
+          "sha256": "049781a3890fa5d205a9e255cc2fab6d910e220f7ec19f9508e3d9a8c775d284"
+        },
+        "dlms-hdlc-operation-segments/Action-continuation-HCS-and-FCS-corruption-retires.tcp.pcap": {
+          "bytes": 546,
+          "sha256": "9350670de8e0d86ab0fb5bb84899f13b742b0fbc64d8cbc7e2fa4ae07a95733a"
+        },
+        "dlms-hdlc-operation-segments/Action-continuation-HCS-and-FCS-corruption-retires.udp.pcap": {
+          "bytes": 300,
+          "sha256": "ce66ab871f59a28918acb2920c0706a1ea6c29730bb1caa0e0f3207a3896e902"
+        },
+        "dlms-hdlc-operation-segments/SET-prefix-and-complete-final-request-exact-retry.tcp.pcap": {
+          "bytes": 1130,
+          "sha256": "978a8b06c42a7e6aaf106bd7fe397cc718dd497d4c345e132c43ed726b037246"
+        },
+        "dlms-hdlc-operation-segments/SET-prefix-and-complete-final-request-exact-retry.udp.pcap": {
+          "bytes": 812,
+          "sha256": "b58a284f03e19c1342d9183a969eaaa51751c4011c536920bd32e8a402aa4fc4"
+        },
+        "dlms-hdlc-operation-segments/controls.json": {
+          "bytes": 499988,
+          "sha256": "fc692cf4d251d5bd37a338b866bcdac229178db0f08b85a7b68e6f7c6ba23fbd"
+        },
+        "dlms-hdlc-operation-segments/future-RR-ack-retires-prefix.tcp.pcap": {
+          "bytes": 511,
+          "sha256": "dc99015328c31926e236110a565fd4d54cc445327d05cc55af0e327bb20a33b8"
+        },
+        "dlms-hdlc-operation-segments/future-RR-ack-retires-prefix.udp.pcap": {
+          "bytes": 265,
+          "sha256": "46c23bbc0554cb603faa253396f9910c51a8f2bb3b916969bb6bd788afc175f1"
+        },
+        "dlms-hdlc-operation-segments/historical-upgrade.json": {
+          "bytes": 25902,
+          "sha256": "a74ef94bffcf48ab44950a1e99e6123917419ae6e994d1b2f03194001ee3d33c"
+        },
+        "dlms-hdlc-operation-segments/known-Action-owner-foreign-Get-and-Set-first-response-segments-preserve.tcp.pcap": {
+          "bytes": 596,
+          "sha256": "b963e9ccdeb7cbc6818eef8bcaf9c183033674c5d23f121be2079e7d00e34e9c"
+        },
+        "dlms-hdlc-operation-segments/known-Action-owner-foreign-Get-and-Set-first-response-segments-preserve.udp.pcap": {
+          "bytes": 338,
+          "sha256": "25990722eafe81928bee99988539d3aec3b13f64d1ca13bedae0d8bd92ae3a0c"
+        },
+        "dlms-hdlc-operation-segments/known-GET-owner-foreign-Action-first-response-segment-preserves.tcp.pcap": {
+          "bytes": 531,
+          "sha256": "e6481b4ce365fcc1ec613143cb2a09226ceb4a2acaba7ff39c6557b00c16246b"
+        },
+        "dlms-hdlc-operation-segments/known-GET-owner-foreign-Action-first-response-segment-preserves.udp.pcap": {
+          "bytes": 285,
+          "sha256": "75bb3b5067af8df52d26d7e23ecdf5edb7032a5123951f6605b31b35de868a0e"
+        },
+        "dlms-hdlc-operation-segments/matching-request-continuation-NS-gap-retires.tcp.pcap": {
+          "bytes": 545,
+          "sha256": "2ba16c219042188dc897c3d7afe708fc8920891aae56d13cba01bb13c9a6308a"
+        },
+        "dlms-hdlc-operation-segments/matching-request-continuation-NS-gap-retires.udp.pcap": {
+          "bytes": 299,
+          "sha256": "7e6fcfe8078fad6146ae4c7e2abd0c1ac9277b619b91d3f7329a1896bdd34d56"
+        },
+        "dlms-hdlc-operation-segments/normal-Action-unobserved-first-server-NS3.tcp.pcap": {
+          "bytes": 422,
+          "sha256": "969e77d0036587409ee3705e7371640b418e32d55b8a4ba1a7252caa2ca62930"
+        },
+        "dlms-hdlc-operation-segments/normal-Action-unobserved-first-server-NS3.udp.pcap": {
+          "bytes": 188,
+          "sha256": "0c157a475f924ac1ac6743aae4a35f9b947883933e5f068629a296dc420df7ff"
+        },
+        "dlms-hdlc-operation-segments/normal-SET-unobserved-first-server-NS3.tcp.pcap": {
+          "bytes": 421,
+          "sha256": "2cc654eaf20b044ce25e523d2e40613bdd3869d1eb2ad9d895b378ffafc3f88a"
+        },
+        "dlms-hdlc-operation-segments/normal-SET-unobserved-first-server-NS3.udp.pcap": {
+          "bytes": 187,
+          "sha256": "9e2cd735e20fe21420b69e37a7f5cfaa2a91494b7e92cb2fcfcf7820c75cdeaa"
+        },
+        "dlms-hdlc-operation-segments/official-Action-request-three-link-segments.tcp.pcap": {
+          "bytes": 806,
+          "sha256": "8223b94c7d7666862cea6e947a0b184981d77f3ed55a1c4f005822ac48272c3a"
+        },
+        "dlms-hdlc-operation-segments/official-Action-request-three-link-segments.udp.pcap": {
+          "bytes": 524,
+          "sha256": "0b471f87cee9ab62c37e7f81257db1bc67d24b67d747783a1f856492132cb28a"
+        },
+        "dlms-hdlc-operation-segments/official-SET-request-three-link-segments.tcp.pcap": {
+          "bytes": 805,
+          "sha256": "fef8f7008612e1147f1b2152733d7ec1ad5d260117faeda3dc9131418d091096"
+        },
+        "dlms-hdlc-operation-segments/official-SET-request-three-link-segments.udp.pcap": {
+          "bytes": 523,
+          "sha256": "a34ca29223c926bdb1736b62d679894e3088b3c9ad5b9e23d938dcb579a9294a"
+        },
+        "dlms-hdlc-operation-segments/official-generic-Action-response-three-link-segments.tcp.pcap": {
+          "bytes": 809,
+          "sha256": "f4ca57aa0d9b40c1effcb050e3b634f50789807d3773f944d0b5bda669198f98"
+        },
+        "dlms-hdlc-operation-segments/official-generic-Action-response-three-link-segments.udp.pcap": {
+          "bytes": 527,
+          "sha256": "cced50e270c502c06a644b32e9c05c16a9a6b8f0127b3cf893fbce020e6f7fb8"
+        },
+        "dlms-hdlc-operation-segments/partial-Action-response-private-Close.tcp.pcap": {
+          "bytes": 443,
+          "sha256": "61263be20be8484ff53c2ebb9805f6eba096312c3964ae8317b34c0540c513fa"
+        },
+        "dlms-hdlc-operation-segments/partial-Action-response-private-Close.udp.pcap": {
+          "bytes": 209,
+          "sha256": "2dcea8e802dcc4fe90d12bf0fd20ff15b7bdea76b487c15828e49e2f3f412458"
+        },
+        "dlms-hdlc-operation-segments/partial-SET-request-private-Close.tcp.pcap": {
+          "bytes": 423,
+          "sha256": "f0aa306cb67c1606b35a0d9cba4a5699b02545a33adf6ca1015d8cc291d5fb67"
+        },
+        "dlms-hdlc-operation-segments/partial-SET-request-private-Close.udp.pcap": {
+          "bytes": 189,
+          "sha256": "2c66b7dda80c38888067f181c7f23247f6ad88e8f8d08c708dc74709dd16a3aa"
+        },
+        "dlms-hdlc-operation-segments/primary-SET-response-synthetic-split-six-plus-one.tcp.pcap": {
+          "bytes": 581,
+          "sha256": "acea578a0069ed347b15f73eb8103f8e64698a5cba40f450aa2c6be35accf87e"
+        },
+        "dlms-hdlc-operation-segments/primary-SET-response-synthetic-split-six-plus-one.udp.pcap": {
+          "bytes": 323,
+          "sha256": "36f15e739e49fbc33974afd3a7bedc74a78c941b6d5bdb4abd63ad19c8b20b3c"
+        },
+        "dlms-hdlc-operation-segments/refusal-supplement.json": {
+          "bytes": 28561,
+          "sha256": "0196c1a0e42c81700b8c1b0a62cb82116920d5e8384967292da51785a9df4b83"
+        },
+        "dlms-hdlc-operation-segments/reuse-inputs.json": {
+          "bytes": 3,
+          "sha256": "ca3d163bab055381827226140568f3bef7eaac187cebd76878e0b63e9e442356"
+        },
+        "dlms-hdlc-operation-segments/segmented-SET-complete-APDU-Data-trailing-byte-retires.tcp.pcap": {
+          "bytes": 806,
+          "sha256": "0f5382549205f4e7fcea1623490d288bf04f51596126131e59dbe8a95e477f4c"
+        },
+        "dlms-hdlc-operation-segments/segmented-SET-complete-APDU-Data-trailing-byte-retires.udp.pcap": {
+          "bytes": 524,
+          "sha256": "ae5d4f42a8c97ec49156b6a5e8cefb5c1209f0981c239f8fa2e85a95f1b5bd7f"
+        },
+        "dlms-hdlc-operation-segments/segmented-SET-structure-depth6.tcp.pcap": {
+          "bytes": 809,
+          "sha256": "a001eaf2f4679bf6852a398b80523bca543a5525f489b14ec73e7fea9b33aac1"
+        },
+        "dlms-hdlc-operation-segments/segmented-SET-structure-depth6.udp.pcap": {
+          "bytes": 527,
+          "sha256": "98ca1eb436d150ca1a349487f312ceecc24e4da81e0b28371207b62a0012d374"
+        },
+        "dlms-hdlc-operation-segments/wrong-request-continuation-context-preserves-prefix.tcp.pcap": {
+          "bytes": 1144,
+          "sha256": "68bc95b0b3910248860116269df954c71fc3424d8afaed02e86c5f7815037c74"
+        },
+        "dlms-hdlc-operation-segments/wrong-request-continuation-context-preserves-prefix.udp.pcap": {
+          "bytes": 826,
+          "sha256": "f3b9f312de8d6c99599ac37bb37c7e6ba9ef307abda42fda51eaaa119a683d2c"
+        },
+        "required-tests-traffic-unified-v136.json": {
+          "bytes": 23714411,
+          "sha256": "362fb720cccef33c7e2fc84f4ca76cb16dc8c332121723f6ee082f1fb7c22261"
+        },
+        "validation/expected.json": {
+          "bytes": 51341,
+          "sha256": "70c310361f0060030d52e5e252700efcb5f67dce1908186d6130e20c5916e758"
+        }
+      },
+      "aliases": {
+        "common/pcapx/pcaputil/dlms-hdlc-operation-segments-tools/FIELD-CONTRACT.json": "dlms-hdlc-operation-segments-tools/FIELD-CONTRACT.json",
+        "common/pcapx/pcaputil/dlms-hdlc-operation-segments-tools/SOURCES.json": "dlms-hdlc-operation-segments-tools/SOURCES.json",
+        "common/pcapx/pcaputil/dlms-hdlc-operation-segments-tools/data-model.py": "dlms-hdlc-operation-segments-tools/data-model.py",
+        "common/pcapx/pcaputil/dlms-hdlc-operation-segments-tools/generate-captures.py": "dlms-hdlc-operation-segments-tools/generate-captures.py",
+        "common/pcapx/pcaputil/dlms-hdlc-operation-segments-tools/generate-historical-upgrade.py": "dlms-hdlc-operation-segments-tools/generate-historical-upgrade.py",
+        "common/pcapx/pcaputil/dlms-hdlc-operation-segments-tools/generate-refusal-supplement.py": "dlms-hdlc-operation-segments-tools/generate-refusal-supplement.py",
+        "common/pcapx/pcaputil/dlms-hdlc-operation-segments-tools/generate.py": "dlms-hdlc-operation-segments-tools/generate.py",
+        "common/pcapx/pcaputil/dlms-hdlc-operation-segments-tools/reference-v2.py": "dlms-hdlc-operation-segments-tools/reference-v2.py",
+        "common/pcapx/pcaputil/dlms-hdlc-operation-segments-tools/reference-vectors.json": "dlms-hdlc-operation-segments-tools/reference-vectors.json",
+        "common/pcapx/pcaputil/dlms-hdlc-operation-segments-tools/verify-captures.py": "dlms-hdlc-operation-segments-tools/verify-captures.py",
+        "common/pcapx/pcaputil/dlms-hdlc-operation-segments-tools/verify-historical-upgrade.py": "dlms-hdlc-operation-segments-tools/verify-historical-upgrade.py",
+        "common/pcapx/pcaputil/dlms-hdlc-operation-segments-tools/verify-refusal-supplement.py": "dlms-hdlc-operation-segments-tools/verify-refusal-supplement.py",
+        "common/pcapx/pcaputil/dlms-hdlc-operation-segments-tools/verify.py": "dlms-hdlc-operation-segments-tools/verify.py",
+        "common/pcapx/pcaputil/dlms-hdlc-operation-segments/Action-continuation-HCS-and-FCS-corruption-retires.tcp.pcap": "dlms-hdlc-operation-segments/Action-continuation-HCS-and-FCS-corruption-retires.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-operation-segments/Action-continuation-HCS-and-FCS-corruption-retires.udp.pcap": "dlms-hdlc-operation-segments/Action-continuation-HCS-and-FCS-corruption-retires.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-operation-segments/SET-prefix-and-complete-final-request-exact-retry.tcp.pcap": "dlms-hdlc-operation-segments/SET-prefix-and-complete-final-request-exact-retry.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-operation-segments/SET-prefix-and-complete-final-request-exact-retry.udp.pcap": "dlms-hdlc-operation-segments/SET-prefix-and-complete-final-request-exact-retry.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-operation-segments/controls.json": "dlms-hdlc-operation-segments/controls.json",
+        "common/pcapx/pcaputil/dlms-hdlc-operation-segments/future-RR-ack-retires-prefix.tcp.pcap": "dlms-hdlc-operation-segments/future-RR-ack-retires-prefix.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-operation-segments/future-RR-ack-retires-prefix.udp.pcap": "dlms-hdlc-operation-segments/future-RR-ack-retires-prefix.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-operation-segments/historical-upgrade.json": "dlms-hdlc-operation-segments/historical-upgrade.json",
+        "common/pcapx/pcaputil/dlms-hdlc-operation-segments/known-Action-owner-foreign-Get-and-Set-first-response-segments-preserve.tcp.pcap": "dlms-hdlc-operation-segments/known-Action-owner-foreign-Get-and-Set-first-response-segments-preserve.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-operation-segments/known-Action-owner-foreign-Get-and-Set-first-response-segments-preserve.udp.pcap": "dlms-hdlc-operation-segments/known-Action-owner-foreign-Get-and-Set-first-response-segments-preserve.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-operation-segments/known-GET-owner-foreign-Action-first-response-segment-preserves.tcp.pcap": "dlms-hdlc-operation-segments/known-GET-owner-foreign-Action-first-response-segment-preserves.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-operation-segments/known-GET-owner-foreign-Action-first-response-segment-preserves.udp.pcap": "dlms-hdlc-operation-segments/known-GET-owner-foreign-Action-first-response-segment-preserves.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-operation-segments/matching-request-continuation-NS-gap-retires.tcp.pcap": "dlms-hdlc-operation-segments/matching-request-continuation-NS-gap-retires.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-operation-segments/matching-request-continuation-NS-gap-retires.udp.pcap": "dlms-hdlc-operation-segments/matching-request-continuation-NS-gap-retires.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-operation-segments/normal-Action-unobserved-first-server-NS3.tcp.pcap": "dlms-hdlc-operation-segments/normal-Action-unobserved-first-server-NS3.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-operation-segments/normal-Action-unobserved-first-server-NS3.udp.pcap": "dlms-hdlc-operation-segments/normal-Action-unobserved-first-server-NS3.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-operation-segments/normal-SET-unobserved-first-server-NS3.tcp.pcap": "dlms-hdlc-operation-segments/normal-SET-unobserved-first-server-NS3.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-operation-segments/normal-SET-unobserved-first-server-NS3.udp.pcap": "dlms-hdlc-operation-segments/normal-SET-unobserved-first-server-NS3.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-operation-segments/official-Action-request-three-link-segments.tcp.pcap": "dlms-hdlc-operation-segments/official-Action-request-three-link-segments.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-operation-segments/official-Action-request-three-link-segments.udp.pcap": "dlms-hdlc-operation-segments/official-Action-request-three-link-segments.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-operation-segments/official-SET-request-three-link-segments.tcp.pcap": "dlms-hdlc-operation-segments/official-SET-request-three-link-segments.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-operation-segments/official-SET-request-three-link-segments.udp.pcap": "dlms-hdlc-operation-segments/official-SET-request-three-link-segments.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-operation-segments/official-generic-Action-response-three-link-segments.tcp.pcap": "dlms-hdlc-operation-segments/official-generic-Action-response-three-link-segments.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-operation-segments/official-generic-Action-response-three-link-segments.udp.pcap": "dlms-hdlc-operation-segments/official-generic-Action-response-three-link-segments.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-operation-segments/partial-Action-response-private-Close.tcp.pcap": "dlms-hdlc-operation-segments/partial-Action-response-private-Close.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-operation-segments/partial-Action-response-private-Close.udp.pcap": "dlms-hdlc-operation-segments/partial-Action-response-private-Close.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-operation-segments/partial-SET-request-private-Close.tcp.pcap": "dlms-hdlc-operation-segments/partial-SET-request-private-Close.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-operation-segments/partial-SET-request-private-Close.udp.pcap": "dlms-hdlc-operation-segments/partial-SET-request-private-Close.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-operation-segments/primary-SET-response-synthetic-split-six-plus-one.tcp.pcap": "dlms-hdlc-operation-segments/primary-SET-response-synthetic-split-six-plus-one.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-operation-segments/primary-SET-response-synthetic-split-six-plus-one.udp.pcap": "dlms-hdlc-operation-segments/primary-SET-response-synthetic-split-six-plus-one.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-operation-segments/refusal-supplement.json": "dlms-hdlc-operation-segments/refusal-supplement.json",
+        "common/pcapx/pcaputil/dlms-hdlc-operation-segments/reuse-inputs.json": "dlms-hdlc-operation-segments/reuse-inputs.json",
+        "common/pcapx/pcaputil/dlms-hdlc-operation-segments/segmented-SET-complete-APDU-Data-trailing-byte-retires.tcp.pcap": "dlms-hdlc-operation-segments/segmented-SET-complete-APDU-Data-trailing-byte-retires.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-operation-segments/segmented-SET-complete-APDU-Data-trailing-byte-retires.udp.pcap": "dlms-hdlc-operation-segments/segmented-SET-complete-APDU-Data-trailing-byte-retires.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-operation-segments/segmented-SET-structure-depth6.tcp.pcap": "dlms-hdlc-operation-segments/segmented-SET-structure-depth6.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-operation-segments/segmented-SET-structure-depth6.udp.pcap": "dlms-hdlc-operation-segments/segmented-SET-structure-depth6.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-operation-segments/wrong-request-continuation-context-preserves-prefix.tcp.pcap": "dlms-hdlc-operation-segments/wrong-request-continuation-context-preserves-prefix.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-operation-segments/wrong-request-continuation-context-preserves-prefix.udp.pcap": "dlms-hdlc-operation-segments/wrong-request-continuation-context-preserves-prefix.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-operation-segments/complete-information82-cap82.udp.pcap": "dlms-hdlc-operation-segments/official-SET-request-three-link-segments.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-operation-segments/complete-information82-cap82.tcp.pcap": "dlms-hdlc-operation-segments/official-SET-request-three-link-segments.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-operation-segments/complete-information82-cap81-refusal.udp.pcap": "dlms-hdlc-operation-segments/official-SET-request-three-link-segments.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-operation-segments/complete-information82-cap81-refusal.tcp.pcap": "dlms-hdlc-operation-segments/official-SET-request-three-link-segments.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-operation-segments/segmented-SET-structure-depth5-refusal.udp.pcap": "dlms-hdlc-operation-segments/segmented-SET-structure-depth6.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-operation-segments/segmented-SET-structure-depth5-refusal.tcp.pcap": "dlms-hdlc-operation-segments/segmented-SET-structure-depth6.tcp.pcap",
+        "scripts/protocol-tests/required-tests-traffic-unified-v136.json": "required-tests-traffic-unified-v136.json"
+      }
     }
   ],
   "schema_version": 1,

@@ -44,7 +44,7 @@ Run from the repository root:
 ```sh
 go run ./internal/trafficfixture/cmd/corpus test
 go test -json -count=1 -timeout=10m ./internal/trafficfixture/... ./common/bin-parser/... ./common/pcapx/... ./common/yak/cmd/yakcmds/shark-cli ./scripts/ci > traffic.jsonl
-go run ./internal/trafficfixture/cmd/corpus exec -- python3 @scripts/protocol-tests/check_go_test_json_v2.py traffic.jsonl --inventory @scripts/protocol-tests/required-tests-traffic-unified-v135.json --tier full
+go run ./internal/trafficfixture/cmd/corpus exec -- python3 @scripts/protocol-tests/check_go_test_json_v2.py traffic.jsonl --inventory @scripts/protocol-tests/required-tests-traffic-unified-v136.json --tier full
 ```
 
 The single `corpus` entry point uses the same bounded Go ZIP loader as tests.
@@ -83,7 +83,7 @@ their semantic coverage. The existing synthetic session keys are test inputs;
 production credentials, user private keys and material without redistribution
 permission belong in an external fixed-source download manifest.
 
-Current test requirements are sealed at `scripts/protocol-tests/required-tests-traffic-unified-v135.json`;
+Current test requirements are sealed at `scripts/protocol-tests/required-tests-traffic-unified-v136.json`;
 the historical inventories and all earlier batches remain unchanged.
 The supplemental small-corpus batch contains 26 minimal controls, their explicit
 expected facts, an offline generator and the compact pinned source manifest.
@@ -203,7 +203,7 @@ opaque selector bytes and one bounded Data value over Wrapper v1 TCP/UDP; object
 selector meaning, access permission and device operation are unverified. The
 original one-packet selective-access capture and original refused answer remain
 immutable; its now-supported answer is matched by exact input SHA and frame.
-The active inventory is `scripts/protocol-tests/required-tests-traffic-unified-v135.json`.
+The active inventory is `scripts/protocol-tests/required-tests-traffic-unified-v136.json`.
 
 The small-graph budget batch reuses accepted graph captures/answers and adds one
 249-byte UDP control for child count255 without child bytes. Its standalone proof
@@ -993,7 +993,7 @@ the normative answer; a missing numeric reference field is not a codec pass.
 Full/deferred, workers1/2/4, observers off/on, Feed chunks1/7/full, ownership,
 resources and close/refusal boundaries remain required.
 
-Current gate: `required-tests-traffic-unified-v135.json` with
+Current gate: `required-tests-traffic-unified-v136.json` with
 `check_go_test_json_v2.py`. The indexed validator preserves missing/unpassed,
 package invocation completion, descendant skips, failures and non-JSON checks;
 its mutation/differential harness is sealed with the material. Older checkers
@@ -1629,7 +1629,7 @@ userspace adapter; full kernel receiver/socket/timers and ECU endpoints do not.
 All161 preceding ZIPs remain byte-for-byte unchanged. Raw captures, dependencies,
 reference source/build output and process evidence stay outside Git.
 
-Current effective v135 inventory: 92,710 entries; 92,703 are mandatory for the full tier.
+Current effective v136 inventory: 93,412 entries; 93,405 are mandatory for the full tier.
 
 The opt-in `DynamicFlowControl` profile follows Linux v6.12 FC tuple updates (including WAIT without granting data). Disjoint address extensions or classical/FD carriers may share CAN IDs; unknown selectors cannot choose or mutate a conversation. Ambiguous selectors are rejected. Seven sealed cases exercise full/deferred, workers 1/2/4, and observer off/on, with exact fields, byte collections, contributor references, errors and resource ownership. The existing static FC profile remains unchanged. Pinned upstream FC and filter functions execute with declared userspace stubs; this is not a kernel/ECU endpoint. TShark 4.2.5 checks wire tuples and two complete payloads, but cannot independently reassemble the shared-address transcripts.
 
@@ -1774,3 +1774,5 @@ Known HDLC pending requests survive foreign SET block acknowledgements: service,
 Complete unsegmented plaintext HDLC Action parameter uploads (first4/next6, ACK4/normalterminal1) preserve current wire fields, bounded assembled Data/count, actual current-request ResponseTo and zero TransactionID. Exact final retries retain complete Data and the original reply owner. Full flags, endpoints, NS/NR, phase and number constrain ownership; foreign GET/SET/Action replies cannot consume the real pending exchange. Active prefix bytes stay charged across ACK, private Close, Abort/ACSE interruption and30-second UDP idle. Independent20 primary traces, three adjacent carrier/family controls and four native UDP exact byte/idle controls have complete positive/negative answers. Current-event terminal profile is copied under the UDP lock before publication; raw packet provenance remains independent of logical S/DM direction. Original229 ZIPs remain immutable. No method/device execution, authentication, list-first, segmented Action, response-download/GBT or whole-original semantic success is inferred.
 
 Complete unsegmented plaintext HDLC normal-root Action response pblocks2 and next2 now expose pure bounded AXDR Data, exact current fragment and complete assembled values. Native TransactionID remains zero; ResponseTo belongs to the actual current request. Service/form/fullflags/endpoints and observed NS/NR guard ownership before phase/number checks. Eighteen complete independent traces plus two known list/upload-owner foreign-form guards cover private Close across pending gaps, malformed Data, count/bytes/depth, retries and input/output/query ownership. The wrong-server-sequence negative includes a complete preceding GET exchange; unknown initial server sequence is not assumed. Only normal roots can start downloads; list-first/upload-to-download, segmentedAction, GBT/security and original whole-input oracle gaps remain pending. All230 prior archives stay immutable. No device execution, authorization or semantic server endpoint is inferred.
+
+Selected plaintext normal SET/Action HDLC information assembly preserves each independently checked carrier and only decodes a complete APDU. Partial requests install no owner; the final request event owns its exact response and final-frame retries. RR stays a literal link observation. Family/form/fullflags/logical endpoints and known NS/NR protect context before matched-gap retirement. Selected operation I-frame context is snapshotted before processing so refusal profiles retain observed service without treating arbitrary continuation bytes as a new header. Typed private three-counter Close, 1027 information-byte/64-frame ceilings further limited by caller budgets, depth, malformed assembled Data, per-frame CRC and all ownership rules remain bounded. Twenty independent traces plus a strict single historical SET-first-fragment sidecar keep all231 older archives/answers immutable; the other46 old cases, all input bytes and contexts remain unchanged. No pblock/list/security/GBT, negotiatedAA or device execution completion is implied.

@@ -59,9 +59,10 @@ type hdlcOpCase struct {
 
 func hdlcOpControls(t *testing.T) []hdlcOpCase {
 	var x struct{ Cases []hdlcOpCase }
-	require.NoError(t, json.Unmarshal(finsReadBatch(t, "dlms-hdlc-operations", "DLMS_HDLC_OPERATIONS_TEST_ROOT", "controls.json"), &x))
+	raw := finsReadBatch(t, "dlms-hdlc-operations", "DLMS_HDLC_OPERATIONS_TEST_ROOT", "controls.json")
+	require.NoError(t, json.Unmarshal(raw, &x))
 	require.Len(t, x.Cases, 47)
-	return x.Cases
+	return hdlcOperationSegmentHistoricalUpgrade(t, raw, x.Cases)
 }
 func hdlcOpCanonical(v any) any {
 	switch x := v.(type) {
@@ -343,12 +344,20 @@ func hdlcOpCloseCheck(t *testing.T, c hdlcOpCase, es []*ProtocolEvent, transport
 		require.Equal(t, at, e.Timestamp.Unix())
 		require.Equal(t, offset, e.Offset)
 		hdlcOpEqual(t, w.Session, e.Session)
-		require.IsType(t, byte(0), e.Session["Invoke ID"])
-		if v, ok := e.Session["Service Choice"]; ok {
-			require.IsType(t, byte(0), v)
-			require.IsType(t, uint64(0), e.Session["List Count"])
+		if w.Profile == "dlms-hdlc-ln-operations-segmented" {
+			require.Len(t, e.Session, 3)
+			for _, key := range []string{"Outstanding", "ObservedFrames", "InformationBytes"} {
+				require.IsType(t, int(0), e.Session[key])
+			}
+		} else {
+			require.IsType(t, byte(0), e.Session["Invoke ID"])
+			if v, ok := e.Session["Service Choice"]; ok {
+				require.IsType(t, byte(0), v)
+				require.IsType(t, uint64(0), e.Session["List Count"])
+			}
+			require.IsType(t, uint32(0), e.Session["Source Address"])
 		}
-		require.IsType(t, uint32(0), e.Session["Source Address"])
+
 		hdlcOpQueries(t, e, nil, "NeedMore")
 		actionPoison(e)
 		hdlcOpQueries(t, e, nil, "NeedMore")

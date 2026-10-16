@@ -858,6 +858,7 @@ func (f *binFlow) consumeSession(dir int, e *ProtocolEvent, result map[string]an
 		if e.ID == 0 {
 			e.ID = f.a.ids.Add(1)
 		}
+		operationSegment := f.dlmsOperationSegmentObservation(e.Raw)
 		e.Profile, e.Completeness = dlmsProfile(e.Raw), "message"
 		e.Session, e.ResponseTo, err = f.consumeDLMS(dir, e.Raw, e.ID)
 		if err == nil {
@@ -866,6 +867,9 @@ func (f *binFlow) consumeSession(dir int, e *ProtocolEvent, result map[string]an
 				e.Profile = f.dlms.operationProfile
 			}
 			e.semanticFields = cloneSession(e.Session)
+		}
+		if operationSegment {
+			e.Profile = "dlms-hdlc-ln-operations-segmented"
 		}
 	case "genisys":
 		e.Session, err = f.genisys.consume(dir, e.Raw, f.a.budget.MaxCollectionElements)
@@ -1495,7 +1499,17 @@ func (f *binFlow) finishSession(reason TrafficFlowCloseReason) {
 	}
 	if d := f.dlms; d != nil {
 		if d.fragments != nil {
-			if d.fragments.acseCommand != 0 {
+			if d.fragments.operation != "" {
+				e := f.event(d.fragmentCloseDirection(), nil, "incomplete", string(reason)+": "+d.fragments.operationCloseSummary())
+				e.Profile = "dlms-hdlc-ln-operations-segmented"
+				e.nativeDLMSOrSLMPObservation = true
+				e.Session = d.fragmentCloseFields()
+				e.semanticSession = cloneSession(e.Session)
+				e.sessionError = &ProtocolError{Kind: ErrNeedMore, Message: e.Summary}
+				e.Error = e.Summary
+				f.a.incomplete.Add(1)
+				f.a.emit(e)
+			} else if d.fragments.acseCommand != 0 {
 				e := f.event(d.fragmentCloseDirection(), nil, "incomplete", string(reason)+": DLMS HDLC exchange ended with incomplete ACSE information")
 				e.Profile = "dlms-hdlc-acse-segmented"
 				e.Session = d.fragmentCloseFields()

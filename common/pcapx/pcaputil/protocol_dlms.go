@@ -212,6 +212,9 @@ func decodeDLMSFrameBudget(w []byte, maxElements, depth int, linkOnly bool) (*dl
 		// Preserve literal initial request direction for native session decoding.
 		// Never infer an endpoint role from continuation bytes in an existing chain.
 		m.request = len(info) >= 4 && bytes.Equal(info[:4], []byte{0xe6, 0xe6, 0, 0xc0})
+		if dlmsNormalOperationSegmentPrefix(info) {
+			m.request = info[1] == 0xe6
+		}
 		if len(info) >= 4 && bytes.Equal(info[:3], []byte{0xe6, 0xe6, 0}) && dlmsACSEAPDU(info[3:]) {
 			m.request = info[3] == 0x60 || info[3] == 0x62
 		}
@@ -483,6 +486,9 @@ func probeDLMS(w []byte, limit int) ProbeResult {
 		if err == nil && m.kind == "I" && dlmsACSESegmentPrefix(m.information) {
 			return probeAccept("dlms", "hdlc-acse-segmented", 98)
 		}
+		if err == nil && m.kind == "I" && m.request && dlmsNormalOperationSegmentPrefix(m.information) && m.information[5]&0x30 == 0 {
+			return probeAccept("dlms", "hdlc-ln-operations-segmented", 98)
+		}
 		if err == nil && m.kind == "I" && m.request && len(m.information) >= 6 && (m.information[4] == 1 || m.information[4] == 3) && m.information[5]&0x30 == 0 {
 			return probeAccept("dlms", "hdlc-get-normal", 98)
 		}
@@ -744,7 +750,7 @@ func (f *binFlow) consumeDecodedDLMS(dir int, w []byte, id uint64, m *dlmsMessag
 	if (dlmsSequencedService(m.kind) || m.kind == "I") && s.hdlcEndpointRetired(dir, m.source, m.destination, m.request) {
 		return nil, 0, dlmsError(ErrContextRequired, "Get information belongs to retired association context")
 	}
-	if m.kind == "I" && s.fragments == nil && len(m.information) >= 4 && m.information[0] == 0xe6 && (m.information[1] == 0xe6 || m.information[1] == 0xe7) && m.information[2] == 0 && dlmsOperationAPDU(m.information[3:]) {
+	if m.kind == "I" && s.fragments == nil && len(m.information) >= 4 && m.information[0] == 0xe6 && (m.information[1] == 0xe6 || m.information[1] == 0xe7) && m.information[2] == 0 && dlmsOperationAPDU(m.information[3:]) && !dlmsNormalOperationSegmentPrefix(m.information) {
 		s.invalidate()
 		return nil, 0, dlmsError(ErrUnsupportedFeature, "segmented Set/Action information is not implemented")
 	}
@@ -871,6 +877,7 @@ func (a *binParser) decodeDLMSDatagram(e *ProtocolEvent, w []byte, explicit bool
 		}
 		store.lru.MoveToBack(el)
 	}
+	operationSegment := f.dlmsOperationSegmentObservation(w)
 	var m *dlmsMessage
 	var err error
 	oversize := len(w) > min(a.budget.MaxFrameBytes, a.config.MaxMessageBytes)
@@ -950,6 +957,9 @@ func (a *binParser) decodeDLMSDatagram(e *ProtocolEvent, w []byte, explicit bool
 		if operationProfile != "" {
 			e.Profile = operationProfile
 		}
+	}
+	if operationSegment {
+		e.Profile = "dlms-hdlc-ln-operations-segmented"
 	}
 	var resource *ProtocolError
 	if oversize || dlmsListAPDU(w) != nil && errors.As(err, &resource) && resource.Kind == ErrResourceExceeded {

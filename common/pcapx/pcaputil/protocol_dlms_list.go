@@ -78,6 +78,11 @@ func dlmsProfile(w []byte) string {
 // final carrier contains no LLC/service header. Partial/error envelopes retain
 // the literal-header profile without inventing a completed message.
 func dlmsObservedProfile(w []byte, fields map[string]any) string {
+	if meta, ok := fields["HDLC Segmentation"].(map[string]any); ok && meta != nil {
+		if k, ok := fields["Frame Kind"].(string); ok && (k == "Segmented Set Request" || k == "Segmented Set Response" || k == "Segmented Action Request" || k == "Segmented Action Response" || meta["complete"] == true && (k == "Set Request Normal" || k == "Set Response Normal" || k == "Action Request Normal" || k == "Action Response Normal")) {
+			return "dlms-hdlc-ln-operations-segmented"
+		}
+	}
 	if fields["ACSE Segmentation"] != nil {
 		return "dlms-hdlc-acse-segmented"
 	}

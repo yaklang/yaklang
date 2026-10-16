@@ -21,7 +21,15 @@ func (f *binFlow) consumeDLMSRequestSegments(dir int, wire []byte, id uint64, m 
 	t := s.fragments
 	if t == nil {
 		info := m.information
-		if len(info) < 6 || !bytes.Equal(info[:4], []byte{0xe6, 0xe6, 0, 0xc0}) || info[4] != 1 && info[4] != 2 && info[4] != 3 {
+		operation := ""
+		if dlmsNormalOperationSegmentPrefix(info) && info[1] == 0xe6 {
+			if info[3] == 0xc1 {
+				operation = "Set"
+			} else {
+				operation = "Action"
+			}
+		}
+		if len(info) < 6 || operation == "" && (!bytes.Equal(info[:4], []byte{0xe6, 0xe6, 0, 0xc0}) || info[4] != 1 && info[4] != 2 && info[4] != 3) {
 			return fail(ErrUnsupportedFeature, "first request segment needs complete LLC and selected GET header", true)
 		}
 		// Preserve the complete-APDU malformed boundary before comparing context:
@@ -29,7 +37,7 @@ func (f *binFlow) consumeDLMSRequestSegments(dir int, wire []byte, id uint64, m 
 		if info[5]&0x30 != 0 {
 			return fail(ErrMalformedMessage, "segmented request invoke flags are reserved", true)
 		}
-		nextRequest := info[4] == 2
+		nextRequest := operation == "" && info[4] == 2
 		// GET-next belongs to a completely observed block transfer. Partial request
 		// bytes cannot replace a pending hop or create missing initial context.
 		if s.pending != nil || s.transfer != nil && !nextRequest || nextRequest && s.transfer == nil {
@@ -44,13 +52,13 @@ func (f *binFlow) consumeDLMSRequestSegments(dir int, wire []byte, id uint64, m 
 		if s.clientKnown && dir != s.clientDir || s.seqKnown[dir] && m.ns != s.next[dir] || s.seqKnown[1-dir] && m.nr != s.next[1-dir] {
 			return fail(ErrContextRequired, "initial request direction/sequence differs from observed progression", false)
 		}
-		t = &dlmsFragments{request: true, nextRequest: nextRequest, invoke: info[5] & 15, dir: dir, source: m.source, destination: m.destination, first: m.ns, nr: m.nr}
+		t = &dlmsFragments{operation: operation, request: true, nextRequest: nextRequest, invoke: info[5] & 15, dir: dir, source: m.source, destination: m.destination, first: m.ns, nr: m.nr}
 	} else {
 		if dir != t.dir || m.source != t.source || m.destination != t.destination || m.nr != t.nr {
 			return fail(ErrContextRequired, "request continuation direction/address/acknowledgement differ", false)
 		}
 		if bytes.Equal(t.wire, wire) {
-			m.fields["Frame Kind"] = "Segmented Get Request"
+			m.fields["Frame Kind"] = "Segmented " + t.serviceName() + " Request"
 			m.fields["HDLC Segmentation"] = dlmsSegmentFields(m, t.count, false)
 			m.fields["Association"] = "retransmitted-request-segment"
 			return m.fields, 0, nil
@@ -77,7 +85,7 @@ func (f *binFlow) consumeDLMSRequestSegments(dir int, wire []byte, id uint64, m 
 	if m.segmented {
 		t.info, t.wire, t.last, t.count, t.sequenceSet = joined, bytes.Clone(wire), m.ns, count, mask
 		s.fragments = t
-		m.fields["Frame Kind"] = "Segmented Get Request"
+		m.fields["Frame Kind"] = "Segmented " + t.serviceName() + " Request"
 		m.fields["HDLC Segmentation"] = meta
 		m.fields["Association"] = "observed-request-segment"
 		return m.fields, 0, nil

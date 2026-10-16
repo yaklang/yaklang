@@ -21,6 +21,7 @@ type dlmsFragments struct {
 	nextRequest         bool
 	invoke, sequenceSet byte
 	acseCommand         byte
+	operation           string
 }
 
 func (s *binDLMS) fragmentCloseDirection() int {
@@ -93,7 +94,7 @@ func (f *binFlow) consumeDLMSSegments(dir int, wire []byte, id uint64, m *dlmsMe
 	if t != nil && t.request || t == nil && m.segmented && m.request {
 		return f.consumeDLMSRequestSegments(dir, wire, id, m)
 	}
-	if p == nil || p.kind != "GET" || dir == p.dir || m.source != p.destination || m.destination != p.source {
+	if p == nil || p.kind != "GET" && !(dlmsOperationKind(p.kind) && p.choice == 1) || dir == p.dir || m.source != p.destination || m.destination != p.source {
 		interrupt := p != nil && dir == p.dir && m.source == p.source && m.destination == p.destination
 		// A new peer I-frame after completion can belong to a missed request.
 		// Just rejecting this first fragment would let its replay bind to a
@@ -105,25 +106,47 @@ func (f *binFlow) consumeDLMSSegments(dir int, wire []byte, id uint64, m *dlmsMe
 	}
 	if t == nil {
 		info := m.information
-		if !m.segmented || len(info) < 6 || !bytes.Equal(info[:3], []byte{0xe6, 0xe7, 0}) || info[3] != 0xc4 {
+		operation := ""
+		if dlmsOperationKind(p.kind) {
+			operation = dlmsOperationName(p.kind)
+		}
+		if operation != "" && len(info) >= 6 && bytes.Equal(info[:3], []byte{0xe6, 0xe7, 0}) {
+			expected := byte(0xc5)
+			if p.kind == "ACTION" {
+				expected = 0xc7
+			}
+			if info[3] != expected || info[4] != 1 {
+				return ctx("segmented operation reply service/form differs from pending request", false)
+			}
+		}
+		if dlmsNormalOperationSegmentPrefix(info) {
+			expected := byte(0xc5)
+			if p.kind == "ACTION" {
+				expected = 0xc7
+			}
+			if !dlmsOperationKind(p.kind) || info[1] != 0xe7 || info[3] != expected || p.choice != 1 {
+				return ctx("segmented operation response differs from known pending service/form", false)
+			}
+		}
+		if !m.segmented || len(info) < 6 || !bytes.Equal(info[:3], []byte{0xe6, 0xe7, 0}) || info[3] != 0xc4 && !(operation != "" && dlmsNormalOperationSegmentPrefix(info)) {
 			s.invalidate()
 			return nil, 0, dlmsError(ErrUnsupportedFeature, "first response segment needs complete LLC and LN GET header")
 		}
 		choice, flags := info[4], info[5]
-		if choice != 1 && choice != 2 && choice != 3 || flags&0x30 != 0 {
+		if choice != 1 && (operation != "" || choice != 2 && choice != 3) || flags&0x30 != 0 {
 			s.invalidate()
 			return nil, 0, dlmsError(ErrMalformedMessage, "segmented GET choice/invoke flags invalid")
 		}
-		if flags != p.flags || choice != p.choice && choice != 2 || m.nr != (p.ns+1)&7 || s.seqKnown[dir] && m.ns != s.next[dir] {
+		if flags != p.flags || choice != p.choice && (operation != "" || choice != 2) || m.nr != (p.ns+1)&7 || s.seqKnown[dir] && m.ns != s.next[dir] {
 			return ctx("first response segment service/flags/sequence differ from observed request", false)
 		}
-		t = &dlmsFragments{dir: dir, source: m.source, destination: m.destination, first: m.ns, nr: m.nr}
+		t = &dlmsFragments{operation: operation, dir: dir, source: m.source, destination: m.destination, first: m.ns, nr: m.nr}
 	} else {
 		if dir != t.dir || m.source != t.source || m.destination != t.destination || m.nr != t.nr {
 			return ctx("continuation direction/address/acknowledgement differ", false)
 		}
 		if bytes.Equal(t.wire, wire) {
-			m.fields["Frame Kind"] = "Segmented Get Response"
+			m.fields["Frame Kind"] = "Segmented " + t.serviceName() + " Response"
 			m.fields["HDLC Segmentation"] = dlmsSegmentFields(m, t.count, false)
 			m.fields["Association"] = "retransmitted-response-segment"
 			return m.fields, 0, nil
@@ -148,7 +171,7 @@ func (f *binFlow) consumeDLMSSegments(dir int, wire []byte, id uint64, m *dlmsMe
 	if m.segmented {
 		t.info, t.wire, t.last, t.count = joined, bytes.Clone(wire), m.ns, count
 		s.fragments = t
-		m.fields["Frame Kind"] = "Segmented Get Response"
+		m.fields["Frame Kind"] = "Segmented " + t.serviceName() + " Response"
 		m.fields["HDLC Segmentation"] = meta
 		m.fields["Association"] = "observed-response-segment"
 		return m.fields, 0, nil
@@ -173,4 +196,48 @@ func (f *binFlow) consumeDLMSSegments(dir int, wire []byte, id uint64, m *dlmsMe
 	meta["assembled_information_hex"] = hex.EncodeToString(joined)
 	fields["HDLC Segmentation"] = meta
 	return fields, reply, nil
+}
+
+// Only the complete normal service header selects this link-assembly MVP.
+// Pblocks, lists, ciphered APDUs and a bare command never establish it.
+func dlmsNormalOperationSegmentPrefix(info []byte) bool {
+	if len(info) < 6 || info[0] != 0xe6 || info[2] != 0 || info[4] != 1 {
+		return false
+	}
+	return info[1] == 0xe6 && (info[3] == 0xc1 || info[3] == 0xc3) || info[1] == 0xe7 && (info[3] == 0xc5 || info[3] == 0xc7)
+}
+func (t *dlmsFragments) serviceName() string {
+	if t.operation != "" {
+		return t.operation
+	}
+	return "Get"
+}
+func (t *dlmsFragments) operationCloseSummary() string {
+	direction := "response"
+	if t.request {
+		direction = "request"
+	}
+	return "DLMS HDLC exchange ended with incomplete segmented " + t.operation + " " + direction
+}
+
+// Snapshot only the selected observation, not successful semantic validation.
+// I-frame continuations inherit the already observed service even if refused;
+// RR and other controls retain their literal link profile.
+func (f *binFlow) dlmsOperationSegmentObservation(w []byte) bool {
+	if len(w) < 8 || w[0] != 0x7e {
+		return false
+	}
+	at := 3
+	end := len(w) - 3
+	if _, _, err := dlmsAddress(w[:end], &at); err != nil {
+		return false
+	}
+	if _, _, err := dlmsAddress(w[:end], &at); err != nil || at >= end || w[at]&1 != 0 {
+		return false
+	}
+	if f.dlms != nil && f.dlms.fragments != nil && f.dlms.fragments.operation != "" {
+		return true
+	}
+	p := dlmsAPDU(w)
+	return w[1]&8 != 0 && len(p) >= 3 && dlmsOperationAPDU(p) && p[1] == 1
 }
