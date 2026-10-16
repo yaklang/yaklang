@@ -59,7 +59,8 @@ func hdlcSNReadCases(t *testing.T, name, pin string, count int) []hdlcSNReadCase
 	}
 	if name == "controls-safe-owner.json" && pin == "3bab1436ded0f609435ca0a0c6337f15274a6a04ee4f0c71949b5eb61a2dc704" {
 		out = hdlcSNWriteUpgradeHistoricalRead(t, raw, out)
-		return snParameterizedUpgradeHistoricalRead(t, raw, out)
+		out = snParameterizedUpgradeHistoricalRead(t, raw, out)
+		return hdlcSNBlocksUpgradeHistoricalRead(t, raw, out)
 	}
 	return out
 }
@@ -148,6 +149,8 @@ func hdlcSNReadNative(t *testing.T, cases []hdlcSNReadCase, src, dst uint16) {
 					}
 					t.Run(fmt.Sprintf("%s/%s/d%v/chunk%d", tc.Name, tr, d, chunk), func(t *testing.T) {
 						c := tc.hdlcOpCase
+						c.Steps = append([]hdlcOpStep(nil), c.Steps...)
+						ids := make([]uint64, len(c.Steps))
 						b := DefaultParserBudget()
 						if c.Budget.Collection > 0 {
 							b.MaxCollectionElements = c.Budget.Collection
@@ -204,6 +207,9 @@ func hdlcSNReadNative(t *testing.T, cases []hdlcSNReadCase, src, dst uint16) {
 								rocTypedError(t, st.Error, final)
 							}
 							e := stepEvents[0]
+							ids[i] = e.ID
+							st = hdlcSNBlockBindStep(t, st, ids)
+							c.Steps[i] = st
 							require.NotZero(t, e.ID)
 							require.False(t, eventIDs[e.ID], "event ID must be unique before public poisoning")
 							eventIDs[e.ID] = true
@@ -284,6 +290,9 @@ func TestDLMSHDLCSNReadMatrix(t *testing.T) {
 }
 func hdlcSNReadMatrix(t *testing.T, cases []hdlcSNReadCase, batch string) {
 	env := "DLMS_HDLC_SN_READ_TEST_ROOT"
+	if batch == "dlms-hdlc-sn-read-block" {
+		env = "DLMS_HDLC_SN_BLOCK_TEST_ROOT"
+	}
 	if batch == "dlms-sn-parameterized-hdlc" {
 		env = "DLMS_SN_PARAMETERIZED_TEST_ROOT"
 	}
@@ -311,7 +320,7 @@ func hdlcSNReadMatrix(t *testing.T, cases []hdlcSNReadCase, batch string) {
 					var err error
 					const prefix = "common/pcapx/pcaputil/"
 					require.True(t, strings.HasPrefix(alias, prefix))
-					if (batch == "dlms-sn-information-segments" || batch == "dlms-sn-information-segments-hard" || batch == "dlms-sn-information-segments-lookalike" || batch == "dlms-sn-parameterized-hdlc") && strings.HasPrefix(alias, prefix+batch+"/") {
+					if (batch == "dlms-hdlc-sn-read-block" || batch == "dlms-sn-information-segments" || batch == "dlms-sn-information-segments-hard" || batch == "dlms-sn-information-segments-lookalike" || batch == "dlms-sn-parameterized-hdlc") && strings.HasPrefix(alias, prefix+batch+"/") {
 						name := strings.TrimPrefix(alias, prefix+batch+"/")
 						require.NotContains(t, name, "/")
 						raw = finsReadBatch(t, batch, env, name)
@@ -329,6 +338,9 @@ func hdlcSNReadMatrix(t *testing.T, cases []hdlcSNReadCase, batch string) {
 				require.NotEmpty(t, expected)
 				require.Equal(t, expected, fmt.Sprintf("%x", sha256.Sum256(raw)))
 				discoveryMatrix(t, func(t *testing.T, w int, d, o bool) {
+					// Each configuration resolves a fresh immutable source case.
+					c := c
+					c.Steps = append([]hdlcOpStep(nil), c.Steps...)
 					es, stats := hdlcOpReplay(t, c, raw, w, d, o, tr)
 					count := len(c.Steps)
 					if tr == "tcp" {
@@ -339,6 +351,19 @@ func hdlcSNReadMatrix(t *testing.T, cases []hdlcSNReadCase, batch string) {
 						}
 					}
 					require.Len(t, es, count+len(c.Close.Events))
+					ids := make([]uint64, len(c.Steps))
+					at := 0
+					for i, st := range c.Steps {
+						if tr == "tcp" && st.TCPOverride != nil {
+							continue
+						}
+						ids[i] = es[at].ID
+						at++
+					}
+					for i, st := range c.Steps {
+						c.Steps[i] = hdlcSNBlockBindStep(t, st, ids)
+					}
+
 					eventIDs := make(map[uint64]bool)
 					for _, e := range es {
 						require.NotZero(t, e.ID)
@@ -396,4 +421,49 @@ func hdlcSNReadMatrix(t *testing.T, cases []hdlcSNReadCase, batch string) {
 			})
 		}
 	}
+}
+
+// Source answers contain logical event references, never absolute process IDs.
+// Resolve only these three documented observation keys; all other expected
+// fields and metadata remain exact, and old SN/other-service rows are untouched.
+func hdlcSNBlockBindStep(t *testing.T, st hdlcOpStep, ids []uint64) hdlcOpStep {
+	t.Helper()
+	if st.Profile != "dlms-hdlc-sn-read-block" || st.Fields == nil {
+		return st
+	}
+	var bind func(any) any
+	bind = func(v any) any {
+		switch x := v.(type) {
+		case map[string]any:
+			out := make(map[string]any, len(x))
+			for k, v := range x {
+				if k == "transfer_start_event" || k == "acknowledged_block_event" || k == "duplicate_of_event" {
+					n, ok := v.(float64)
+					require.True(t, ok, "source reference must be logical JSON number: %s", k)
+					index := int(n)
+					require.Equal(t, float64(index), n)
+					require.Greater(t, index, 0)
+					require.LessOrEqual(t, index, len(ids))
+					require.NotZero(t, ids[index-1])
+					out[k] = ids[index-1]
+				} else {
+					out[k] = bind(v)
+				}
+			}
+			return out
+		case []any:
+			out := make([]any, len(x))
+			for i, v := range x {
+				out[i] = bind(v)
+			}
+			return out
+		default:
+			return v
+		}
+	}
+	st.Fields = bind(st.Fields).(map[string]any)
+	if st.Session != nil {
+		st.Session = bind(st.Session).(map[string]any)
+	}
+	return st
 }

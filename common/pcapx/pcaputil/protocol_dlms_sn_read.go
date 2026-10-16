@@ -22,7 +22,13 @@ func decodeDLMSSNRead(m *dlmsMessage, p []byte, llc byte, limit, depth int) (*dl
 	wire[1] = 1
 	binary.BigEndian.PutUint16(wire[6:8], uint16(len(p)))
 	copy(wire[8:], p)
-	sn, err := decodeWrapperSNRead(wire, limit, depth)
+	var sn *wrapperMessage
+	var err error
+	if wrapperIsSNServiceBlock(wire) {
+		sn, err = decodeWrapperSNServiceBlock(wire, limit)
+	} else {
+		sn, err = decodeWrapperSNRead(wire, limit, depth)
+	}
 	if err != nil {
 		var pe *ProtocolError
 		if errors.As(err, &pe) {
@@ -34,6 +40,9 @@ func decodeDLMSSNRead(m *dlmsMessage, p []byte, llc byte, limit, depth int) (*dl
 		delete(sn.fields, key)
 	}
 	m.snRead, m.request, m.kind = true, request, "SN-READ"
+	if sn.snServiceBlock {
+		m.snBlock = sn
+	}
 	m.fields["Frame Kind"] = "SN Read Response"
 	if request {
 		m.fields["Frame Kind"] = "SN Read Request"

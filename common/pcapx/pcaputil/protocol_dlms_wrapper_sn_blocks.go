@@ -199,6 +199,12 @@ func (s *binDLMSWrapper) retireSNGroupForMessage(m *wrapperMessage, dir int) boo
 }
 
 func (f *binFlow) consumeWrapperSNServiceBlock(s *binDLMSWrapper, m *wrapperMessage, dir int, e *ProtocolEvent, w []byte) (string, error) {
+	return f.consumeSNServiceBlockReserved(s, m, dir, e, w, 0)
+}
+
+// The floor keeps other HDLC logical links and their LN/fragment state charged.
+// Wrapper uses zero; caller-specific addresses and link checks remain outside.
+func (f *binFlow) consumeSNServiceBlockReserved(s *binDLMSWrapper, m *wrapperMessage, dir int, e *ProtocolEvent, w []byte, floor int64) (string, error) {
 	if s.blocked {
 		return "unverified-sn-block-after-conversation-invalidation", nil
 	}
@@ -285,7 +291,7 @@ func (f *binFlow) consumeWrapperSNServiceBlock(s *binDLMSWrapper, m *wrapperMess
 	}
 	// Reserve retained storage plus the complete eventual owned Data graph
 	// before copying a byte. The old graph remains charged during replacement.
-	if err := f.reserveSession(s.storage() + wrapperProjection(w, len(w)) + 512 + 128*int64(total)); err != nil {
+	if err := f.reserveSession(floor + s.storage() + wrapperProjection(w, len(w)) + 512 + 128*int64(total)); err != nil {
 		s.invalidate()
 		return "", err
 	}

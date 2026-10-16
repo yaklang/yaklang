@@ -44,6 +44,9 @@ func dlmsActionDownloadAPDU(p []byte) bool {
 	return len(p) > 1 && (p[0] == 0xc3 || p[0] == 0xc7) && p[1] == 2
 }
 func dlmsProfile(w []byte) string {
+	if dlmsSNBlockWire(w) {
+		return "dlms-hdlc-sn-read-block"
+	}
 	if dlmsSNWriteAPDU(dlmsAPDU(w)) {
 		return "dlms-hdlc-sn-write"
 	}

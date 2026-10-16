@@ -55,11 +55,31 @@ func hdlcGetCloseCheck(t *testing.T, c hdlcOpCase, es []*ProtocolEvent, tr strin
 			require.Equal(t, "<reason>: "+w.SummaryUDP, w.SummaryTCP)
 			summary = strings.Replace(w.SummaryTCP, "<reason>", reason, 1)
 		}
+		if w.Profile == "dlms-hdlc-sn-read-block" && tr == "tcp" {
+			require.Equal(t, "test-close: "+w.SummaryUDP, w.SummaryTCP)
+			summary = strings.Replace(w.SummaryTCP, "test-close:", reason+":", 1)
+		}
 		require.Equal(t, time.Unix(at, 0), e.Timestamp)
 		require.Equal(t, off, e.Offset)
 		require.Equal(t, summary, e.Summary)
-		require.Equal(t, summary, e.Error)
-		if w.Profile == "dlms-hdlc-sn-information-segmented" {
+		expectedError := summary
+		if w.Profile == "dlms-hdlc-sn-read-block" {
+			expectedError = "NeedMore: " + summary
+		}
+		require.Equal(t, expectedError, e.Error)
+		if w.Profile == "dlms-hdlc-sn-read-block" {
+			require.Len(t, w.Session, 6)
+			require.Len(t, e.Session, 6)
+			for _, key := range []string{"Buffered SN Groups", "observed_block_count", "assembled_data_length"} {
+				require.IsType(t, int(0), e.Session[key])
+			}
+			for _, key := range []string{"source_address", "destination_address"} {
+				require.IsType(t, uint32(0), e.Session[key])
+			}
+			require.IsType(t, uint16(0), e.Session["block_number"])
+			require.Equal(t, 1, e.Session["Buffered SN Groups"])
+			hdlcOpEqual(t, w.Session, e.Session)
+		} else if w.Profile == "dlms-hdlc-sn-information-segmented" {
 			require.Len(t, w.Session, 3)
 			require.Len(t, e.Session, 3)
 			for _, key := range []string{"Outstanding", "ObservedFrames", "InformationBytes"} {

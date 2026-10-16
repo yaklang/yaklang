@@ -144,6 +144,11 @@ func (f *binFlow) consumeDLMSSNSegments(dir int, wire []byte, id uint64, m *dlms
 	}
 	// Decode the joined APDU against the final captured carrier; never fabricate
 	// a frame/CRC/Raw or convert a completed SN group into a service transaction.
+	// Service blocks carried inside an information-fragment group require a
+	// separate layered contract. Do not accidentally widen this complete-frame MVP.
+	if len(joined) >= 3 && dlmsSNServiceBlockAPDU(joined[3:]) {
+		return fail(ErrUnsupportedFeature, "SN service-block inside information group is not selected", true)
+	}
 	decoded, err := decodeDLMSInformation(m, joined, f.a.budget.MaxCollectionElements, f.a.budget.MaxRecursionDepth)
 	if err != nil {
 		s.invalidate()

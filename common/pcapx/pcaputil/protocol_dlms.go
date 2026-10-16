@@ -98,6 +98,7 @@ type dlmsMessage struct {
 	setResponseAssemblyChoice byte
 	snRead                    bool
 	snWrite                   bool
+	snBlock                   *wrapperMessage
 }
 
 func dlmsAddress(w []byte, at *int) (uint32, int, error) {
@@ -524,6 +525,9 @@ func probeDLMS(w []byte, limit int) ProbeResult {
 			if dlmsSNWriteAPDU(apdu) {
 				return probeAccept("dlms", "hdlc-sn-write", 98)
 			}
+			if dlmsSNServiceBlockAPDU(apdu) {
+				return probeAccept("dlms", "hdlc-sn-read-block", 98)
+			}
 			return probeAccept("dlms", "hdlc-sn-read", 98)
 		}
 		return ProbeResult{Verdict: ProbeReject}
@@ -598,6 +602,7 @@ type binDLMS struct {
 	actionTransfer      *dlmsSetTransfer
 	operationProfile    string
 	fragments           *dlmsFragments
+	snBlocks            map[dlmsSNBlockKey]*dlmsSNBlockLink
 }
 
 func (s *binDLMS) invalidate() {
@@ -609,6 +614,7 @@ func (s *binDLMS) invalidate() {
 	s.setTransfer = nil
 	s.actionTransfer = nil
 	s.operationProfile = ""
+	s.snBlocks = nil
 	s.fragments = nil
 	s.ambiguous = true
 }
@@ -722,6 +728,9 @@ func dlmsRequestEvidence(w []byte) bool {
 // fields and byte projections is reserved before it allocates either copy.
 func (s *binDLMS) storage() int64 {
 	n := int64(512) + 128*int64(len(s.acseSeen))
+	for _, p := range s.snBlocks {
+		n += 128 + p.wire.storage()
+	}
 	if s.pending != nil {
 		n += int64(len(s.pending.wire)+len(s.pending.requestInformation)) * 2
 	}
@@ -757,6 +766,7 @@ func (f *binFlow) consumeDLMS(dir int, w []byte, id uint64) (map[string]any, uin
 func (f *binFlow) consumeDecodedDLMS(dir int, w []byte, id uint64, m *dlmsMessage) (map[string]any, uint64, error) {
 	s := f.dlms
 	s.operationProfile = ""
+	s.observeSNBlockInterruption(m, dir)
 	if s.fragments != nil && s.fragments.snCommand != 0 || m.kind == "I" && s.fragments == nil && m.segmented && dlmsSNSegmentHeader(m.information) {
 		return f.consumeDLMSSNSegments(dir, w, id, m)
 	}
@@ -769,6 +779,10 @@ func (f *binFlow) consumeDecodedDLMS(dir int, w []byte, id uint64, m *dlmsMessag
 		if p := s.pending; m.request && p != nil && p.dir == dir && p.source == m.source && p.destination == m.destination && !bytes.Equal(p.wire, w) {
 			s.invalidate()
 		}
+		if m.snBlock != nil {
+			return f.consumeDLMSSNServiceBlock(dir, w, id, m)
+		}
+		s.retireOrdinarySNBlock(m, dir)
 		// SN exposes wire observations, not a service owner. In particular
 		// it cannot acquire a live LN pending request, advance its HDLC sequence,
 		// establish an association epoch or restore trust in an ambiguous link.
@@ -917,6 +931,9 @@ func dlmsUDPRefusalHint(w []byte) bool {
 	if end-at < 9 || w[at]&1 != 0 || dlmsCRC(w[1:at+1]) != binary.LittleEndian.Uint16(w[at+1:at+3]) {
 		return false
 	}
+	if dlmsSNBlockRefusalHint(w) {
+		return true
+	}
 	p := w[at+3:]
 	if bytes.Equal(p[:3], []byte{0xe6, 0xe6, 0}) && (p[3] == 0xc1 || p[3] == 0xc3) {
 		return (p[4] == 1 || dlmsOperationListAPDU(p[3:]) || dlmsSetBlockAPDU(p[3:]) || dlmsSetListBlockAPDU(p[3:]) || dlmsActionUploadAPDU(p[3:])) && p[5]&0x30 == 0
@@ -998,6 +1015,22 @@ func (a *binParser) decodeDLMSDatagram(e *ProtocolEvent, w []byte, explicit bool
 			// Observe without retaining a new UDP conversation or rewriting the
 			// caller's direction; an existing LN flow keeps its owner and charge.
 			e.Session, e.ResponseTo, err = f.consumeDecodedDLMS(e.Direction, w, e.ID, m)
+			if err == nil && created && len(f.dlms.snBlocks) > 0 {
+				if len(store.entries) >= sessionCollectionLimit(a.budget.MaxCollectionElements) {
+					err = dlmsError(ErrResourceExceeded, "UDP SN service-block conversation budget")
+				} else {
+					// Preserve native caller orientation. A captured cold response
+					// may instead be the first physical origin, with direction0.
+					f.endpoints = [2]string{e.Source, e.Destination}
+					if e.Direction == 1 {
+						f.endpoints = [2]string{e.Destination, e.Source}
+					}
+					f.id, f.domain = a.flows.Add(1), e.Domain
+					store.entries[key] = store.lru.PushBack(&binUDPEntry{key, f, e.Timestamp})
+					e.FlowID = f.id
+					created = false
+				}
+			}
 		} else if created && (m.kind == "S" || m.kind == "DM") {
 			e.Session, e.ResponseTo, err = f.dlms.consume(m, w, e.Direction, e.ID)
 		} else if created && !m.request && m.acse == nil && !dlmsACSESegmentPrefix(m.information) {
