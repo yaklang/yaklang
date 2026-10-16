@@ -110715,6 +110715,307 @@
         "common/pcapx/pcaputil/dlms-hdlc-action-upload/aggregate-five-encoded-bytes-cap4-refusal.tcp.pcap": "dlms-hdlc-action-upload/aggregate-five-encoded-bytes-cap5.tcp.pcap",
         "scripts/protocol-tests/required-tests-traffic-unified-v134.json": "required-tests-traffic-unified-v134.json"
       }
+    },
+    {
+      "id": "validation-dlms-hdlc-action-download",
+      "kind": "support",
+      "source_sha": "89c27cb20c37a1ab95bc9972574d209c7b9c7c5d",
+      "file": "validation-dlms-hdlc-action-download.zip",
+      "sha256": "69b4ac82b10ae0b0e592359494b892d4d081d1e5137f43401b606725122e101c",
+      "password": "bin-parser",
+      "members": {
+        "dlms-hdlc-action-download-tools/FIELD-CONTRACT.json": {
+          "bytes": 3074,
+          "sha256": "c496aa54550f27f382217bf9ebded9b21b5b785100de027c0a9f02dd5141a0aa"
+        },
+        "dlms-hdlc-action-download-tools/SOURCES.json": {
+          "bytes": 2503,
+          "sha256": "e9f611953b100e22e181f76211dab3ca75a81b368bc7f76b0e7cde62dbfbc432"
+        },
+        "dlms-hdlc-action-download-tools/data-model.py": {
+          "bytes": 1624,
+          "sha256": "03dbaaa0f3c564db04440c0fbee8742e407f825de889b7a6e0012a49e6a06f4e"
+        },
+        "dlms-hdlc-action-download-tools/generate-captures.py": {
+          "bytes": 1868,
+          "sha256": "5d7f9f8e3600fada41394645d138345dc6f5b6b660350159ca74a8b624305871"
+        },
+        "dlms-hdlc-action-download-tools/generate-corrected.py": {
+          "bytes": 2116,
+          "sha256": "4fbcfc2fd08df0648411b41ba0de40627da65b400d272b68d7a9c14a69f7e4f0"
+        },
+        "dlms-hdlc-action-download-tools/generate-foreign-form-supplement.py": {
+          "bytes": 4095,
+          "sha256": "aad2dde2b6789931bd91645cecf3e4e3970ce5d3496b8c3eb6dd4391de546f99"
+        },
+        "dlms-hdlc-action-download-tools/generate.py": {
+          "bytes": 14170,
+          "sha256": "bccf3685c441a696c8810aa789a0d9fc2763a65f0ece0fdfac40a9c57cc2c4b8"
+        },
+        "dlms-hdlc-action-download-tools/reference-check.py": {
+          "bytes": 706,
+          "sha256": "5176a47159b2def14133389a250a146126e1bef80fd10faf548f9fb3c1437555"
+        },
+        "dlms-hdlc-action-download-tools/reference-vectors.json": {
+          "bytes": 3170,
+          "sha256": "6448ab58820ffcea635d7e1b80006afba21af3741cb720a3eda93082c0425909"
+        },
+        "dlms-hdlc-action-download-tools/reference.py": {
+          "bytes": 4173,
+          "sha256": "d1258775c979f72a51cc4c4e42670577ce00481318769fedb634077bb520d059"
+        },
+        "dlms-hdlc-action-download-tools/verify-captures.py": {
+          "bytes": 3766,
+          "sha256": "c6dec8d3d8a1d3a1c25827edc7f02b614767ca134c1b717832194f39118273a9"
+        },
+        "dlms-hdlc-action-download-tools/verify-corrected.py": {
+          "bytes": 2911,
+          "sha256": "ea41d81c752d69eeeabf99a18a4b9507ebd0db3809e67acd21e0b78c6c70c53a"
+        },
+        "dlms-hdlc-action-download-tools/verify.py": {
+          "bytes": 4877,
+          "sha256": "fd60154dc4b12a2f4277f5cb62b0ebcc6c21f8d17f46b18a370317a21b93aab3"
+        },
+        "dlms-hdlc-action-download/assembled-Data-trailing-byte-malformed.tcp.pcap": {
+          "bytes": 708,
+          "sha256": "c3e457887bd556da2a6cc52dc3b00b78d6b0ce109bcc6de11870552a68270ce3"
+        },
+        "dlms-hdlc-action-download/assembled-Data-trailing-byte-malformed.udp.pcap": {
+          "bytes": 438,
+          "sha256": "f228a001d2938b9dc94341159fc9c58e64083d99bd8563920407f7299bd53875"
+        },
+        "dlms-hdlc-action-download/controls.json": {
+          "bytes": 625532,
+          "sha256": "3596bb5506c84513e74f980eaa746940a11ceba6c68f5908e14d31493b6a9d2a"
+        },
+        "dlms-hdlc-action-download/exact-root-and-next-request-retries.tcp.pcap": {
+          "bytes": 826,
+          "sha256": "d0702a1f46b3aad7385997a7d6bc076f989e08e60905120b13f06f5d18ab37ee"
+        },
+        "dlms-hdlc-action-download/exact-root-and-next-request-retries.udp.pcap": {
+          "bytes": 544,
+          "sha256": "c0e295561f25e7353dd1a7b92729070101768272592d35e207d082e7c850c87f"
+        },
+        "dlms-hdlc-action-download/existing-normal-Action-response-neighbor.tcp.pcap": {
+          "bytes": 422,
+          "sha256": "ba9a96df90df762d173178bbaa226a78e8fd4af04fdc181c922fa480cd8c7da4"
+        },
+        "dlms-hdlc-action-download/existing-normal-Action-response-neighbor.udp.pcap": {
+          "bytes": 188,
+          "sha256": "fdadb93ae7cea3596d45782728e9a03acad1bb10a704bad4884e085d65a6adf6"
+        },
+        "dlms-hdlc-action-download/first-response-pendingnil-private-Close.tcp.pcap": {
+          "bytes": 439,
+          "sha256": "60e474c0775420c0803f8c20e960b093054f49274f65c59552808301c51bb944"
+        },
+        "dlms-hdlc-action-download/first-response-pendingnil-private-Close.udp.pcap": {
+          "bytes": 205,
+          "sha256": "188ee1a55f9bdf77711b8ee7514956b3d3ae57b7c428d3d81d7688e75d3c9edb"
+        },
+        "dlms-hdlc-action-download/five-encoded-bytes-cap4-refusal.tcp.pcap": {
+          "bytes": 711,
+          "sha256": "cf3ab7a60d38ca568317875156f8793fc69f266f15693b0acf2941ad1661b6aa"
+        },
+        "dlms-hdlc-action-download/five-encoded-bytes-cap4-refusal.udp.pcap": {
+          "bytes": 441,
+          "sha256": "f9619d4e7e7de0aad99baec7b016a21f85d404c6328a3cc66f4bf49fc38f255e"
+        },
+        "dlms-hdlc-action-download/five-encoded-bytes-cap5.tcp.pcap": {
+          "bytes": 615,
+          "sha256": "1917837cbfef5481f32e2dff29aa8479e83660b8d248dd532da6946204b1f9f5"
+        },
+        "dlms-hdlc-action-download/five-encoded-bytes-cap5.udp.pcap": {
+          "bytes": 357,
+          "sha256": "7ea6fa7a706fd4013ac6378c395014961e51dcf7fff058db2f6566f1cb7e8bbc"
+        },
+        "dlms-hdlc-action-download/foreign-form-supplement.json": {
+          "bytes": 106895,
+          "sha256": "5cfacf65b67519cf58c8e309c53587e349d6ca5c590a9f90ab752eddd7448acc"
+        },
+        "dlms-hdlc-action-download/foreign-response-flags-NSNR-address-direction-preserve.tcp.pcap": {
+          "bytes": 1353,
+          "sha256": "63bd30533464731c36ece16d7137f34147e5d34c27fc5498ec937b5eb39af91e"
+        },
+        "dlms-hdlc-action-download/foreign-response-flags-NSNR-address-direction-preserve.udp.pcap": {
+          "bytes": 1011,
+          "sha256": "b8660674cb060319ffd9c62e406c2e4e4348cce3b4d196749973832e513bdc72"
+        },
+        "dlms-hdlc-action-download/four-response-blocks-cap3-refusal.tcp.pcap": {
+          "bytes": 1075,
+          "sha256": "913a533433230bfd12f58f739dbfefc669327e5cf35756b2ed2672ab1156e6a8"
+        },
+        "dlms-hdlc-action-download/four-response-blocks-cap3-refusal.udp.pcap": {
+          "bytes": 757,
+          "sha256": "1d934245eea3f69145f6fdcc620e4189509b68dd2faa2cb92fe20623f2e6af3a"
+        },
+        "dlms-hdlc-action-download/four-response-blocks-cap4.tcp.pcap": {
+          "bytes": 980,
+          "sha256": "0527fcb4bdb8ded105501d3e5f51edbfdd0d81298cd7614b06590db81801c976"
+        },
+        "dlms-hdlc-action-download/four-response-blocks-cap4.udp.pcap": {
+          "bytes": 674,
+          "sha256": "6b9a2c146ca20ffc620aa21c985d271dfc59766535b8acd224d11452e5343433"
+        },
+        "dlms-hdlc-action-download/known-Action-list-owner-preserved-on-foreign-response-pblock.tcp.pcap": {
+          "bytes": 721,
+          "sha256": "a78e91d04f2ec1dc6455e47d4413ffb85a7ef972305263ed578f5fe5eecd38c9"
+        },
+        "dlms-hdlc-action-download/known-Action-list-owner-preserved-on-foreign-response-pblock.udp.pcap": {
+          "bytes": 451,
+          "sha256": "e9cfd048e94cd8831d254be54ec5a4af04d0dcc67c2ee73c89521c35a2468dbb"
+        },
+        "dlms-hdlc-action-download/known-Action-upload-owner-preserved-on-foreign-response-pblock.tcp.pcap": {
+          "bytes": 1022,
+          "sha256": "9ca3361ea90dea9bc19886468e0237d258f611e38063b422afa0cf840d488d3b"
+        },
+        "dlms-hdlc-action-download/known-Action-upload-owner-preserved-on-foreign-response-pblock.udp.pcap": {
+          "bytes": 716,
+          "sha256": "501d72e163ba7dfdab8461094b0e1a31683108dfc88aaa66ccb0a3512bf8b53f"
+        },
+        "dlms-hdlc-action-download/known-Get-owner-foreign-pblock-then-orphan-next.tcp.pcap": {
+          "bytes": 702,
+          "sha256": "773ab78ebca69b3fa8f6a4da1432f4ec2f5e9285aef12fff7b094508ec63cdb4"
+        },
+        "dlms-hdlc-action-download/known-Get-owner-foreign-pblock-then-orphan-next.udp.pcap": {
+          "bytes": 432,
+          "sha256": "a497c502a022349437384f23d94cbee368d770727fb63a9c590afb9234a14887"
+        },
+        "dlms-hdlc-action-download/matched-link-server-block-number-gap-retires.tcp.pcap": {
+          "bytes": 742,
+          "sha256": "82ad8ff49c61bac31149ff6e1273eaf2d3b4aed6a7b2f3d77371f5580a50f9ec"
+        },
+        "dlms-hdlc-action-download/matched-link-server-block-number-gap-retires.udp.pcap": {
+          "bytes": 472,
+          "sha256": "8f9aca50440b2d4fa7940b4e0b1cb617c884671c3e4220574ea5a5effba569a1"
+        },
+        "dlms-hdlc-action-download/next-must-echo-received-block-number.tcp.pcap": {
+          "bytes": 636,
+          "sha256": "62b61e0eec04628a62cdbae53996e6550e45d7dcc5dc9145405a849aaa175a48"
+        },
+        "dlms-hdlc-action-download/next-must-echo-received-block-number.udp.pcap": {
+          "bytes": 378,
+          "sha256": "75f7a70505e82ace025d79163c5a82984f6178dabf9a5553b5cff663ec3e2b22"
+        },
+        "dlms-hdlc-action-download/next-request-awaits-response-private-Close.tcp.pcap": {
+          "bytes": 530,
+          "sha256": "f13133d4bbd318c9530115ddf1802d1e0f6f77ed7b24e23a6f0064d1d1d11df7"
+        },
+        "dlms-hdlc-action-download/next-request-awaits-response-private-Close.udp.pcap": {
+          "bytes": 284,
+          "sha256": "cf3b95aaf6cc1e4157cf9519446c7feeb6df8742769dfd604ad86852fbc70ed0"
+        },
+        "dlms-hdlc-action-download/next-wrong-flags-and-address-preserve.tcp.pcap": {
+          "bytes": 818,
+          "sha256": "b50a702738524130eae4510ed8fa6045cde4a153118d97e76feb08a21f031a71"
+        },
+        "dlms-hdlc-action-download/next-wrong-flags-and-address-preserve.udp.pcap": {
+          "bytes": 536,
+          "sha256": "9e90e9ea5c6c3c8ba4c7361d80e5961fd0f1424a9a29b9df520ee7c7d3463bbb"
+        },
+        "dlms-hdlc-action-download/official-two-pblock-download.tcp.pcap": {
+          "bytes": 636,
+          "sha256": "26c6aed0bc1123e49dcae7b9918263f56fcb89810fcff9a8179a5ea050688e07"
+        },
+        "dlms-hdlc-action-download/official-two-pblock-download.udp.pcap": {
+          "bytes": 378,
+          "sha256": "74b15e38af2c7f58cf7693e9bb7f682bdf05c45a5a835bdce752e440331672da"
+        },
+        "dlms-hdlc-action-download/response-without-immediately-observed-next-retires.tcp.pcap": {
+          "bytes": 742,
+          "sha256": "ba16d392a942d4bffb0f46071a3876e53b35240b9b560cc59350a2f0e04e2b29"
+        },
+        "dlms-hdlc-action-download/response-without-immediately-observed-next-retires.udp.pcap": {
+          "bytes": 472,
+          "sha256": "486ab7c0300c596607773023c1abee760236341b21a97f604dc5da911a7c71c4"
+        },
+        "dlms-hdlc-action-download/reuse-inputs.json": {
+          "bytes": 3,
+          "sha256": "ca3d163bab055381827226140568f3bef7eaac187cebd76878e0b63e9e442356"
+        },
+        "dlms-hdlc-action-download/single-last-structure-depth5-refusal.tcp.pcap": {
+          "bytes": 531,
+          "sha256": "d44204d774e8c80d8dec37c65ce838947e7a026b4344c58608cbe8febf9202f8"
+        },
+        "dlms-hdlc-action-download/single-last-structure-depth5-refusal.udp.pcap": {
+          "bytes": 285,
+          "sha256": "2404612d2f275159430c2cc31192fedeef00492526d4ec699b37ff55b00abd7c"
+        },
+        "dlms-hdlc-action-download/single-last-structure-depth6.tcp.pcap": {
+          "bytes": 432,
+          "sha256": "f3aa554a2b27719bb582db73126e5df6069baeae745a21ed92ab11ee912029bb"
+        },
+        "dlms-hdlc-action-download/single-last-structure-depth6.udp.pcap": {
+          "bytes": 198,
+          "sha256": "92de37adcba5797c062ee6773c8b3cb6cb7b5a69ecdb5e19c7950ac866869f3b"
+        },
+        "required-tests-traffic-unified-v135.json": {
+          "bytes": 23514391,
+          "sha256": "f1c5ba2504c53ebd7aa53dc1009acfbe30407f59f3b3aeb9061824753293a15e"
+        },
+        "validation/expected.json": {
+          "bytes": 49896,
+          "sha256": "8380453b677ce3c562d08f2c484f0c92d8a6d6fc2d1514859eae3acd29fd94c1"
+        }
+      },
+      "aliases": {
+        "common/pcapx/pcaputil/dlms-hdlc-action-download-tools/FIELD-CONTRACT.json": "dlms-hdlc-action-download-tools/FIELD-CONTRACT.json",
+        "common/pcapx/pcaputil/dlms-hdlc-action-download-tools/SOURCES.json": "dlms-hdlc-action-download-tools/SOURCES.json",
+        "common/pcapx/pcaputil/dlms-hdlc-action-download-tools/data-model.py": "dlms-hdlc-action-download-tools/data-model.py",
+        "common/pcapx/pcaputil/dlms-hdlc-action-download-tools/generate-captures.py": "dlms-hdlc-action-download-tools/generate-captures.py",
+        "common/pcapx/pcaputil/dlms-hdlc-action-download-tools/generate-corrected.py": "dlms-hdlc-action-download-tools/generate-corrected.py",
+        "common/pcapx/pcaputil/dlms-hdlc-action-download-tools/generate-foreign-form-supplement.py": "dlms-hdlc-action-download-tools/generate-foreign-form-supplement.py",
+        "common/pcapx/pcaputil/dlms-hdlc-action-download-tools/generate.py": "dlms-hdlc-action-download-tools/generate.py",
+        "common/pcapx/pcaputil/dlms-hdlc-action-download-tools/reference-check.py": "dlms-hdlc-action-download-tools/reference-check.py",
+        "common/pcapx/pcaputil/dlms-hdlc-action-download-tools/reference-vectors.json": "dlms-hdlc-action-download-tools/reference-vectors.json",
+        "common/pcapx/pcaputil/dlms-hdlc-action-download-tools/reference.py": "dlms-hdlc-action-download-tools/reference.py",
+        "common/pcapx/pcaputil/dlms-hdlc-action-download-tools/verify-captures.py": "dlms-hdlc-action-download-tools/verify-captures.py",
+        "common/pcapx/pcaputil/dlms-hdlc-action-download-tools/verify-corrected.py": "dlms-hdlc-action-download-tools/verify-corrected.py",
+        "common/pcapx/pcaputil/dlms-hdlc-action-download-tools/verify.py": "dlms-hdlc-action-download-tools/verify.py",
+        "common/pcapx/pcaputil/dlms-hdlc-action-download/assembled-Data-trailing-byte-malformed.tcp.pcap": "dlms-hdlc-action-download/assembled-Data-trailing-byte-malformed.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-action-download/assembled-Data-trailing-byte-malformed.udp.pcap": "dlms-hdlc-action-download/assembled-Data-trailing-byte-malformed.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-action-download/controls.json": "dlms-hdlc-action-download/controls.json",
+        "common/pcapx/pcaputil/dlms-hdlc-action-download/exact-root-and-next-request-retries.tcp.pcap": "dlms-hdlc-action-download/exact-root-and-next-request-retries.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-action-download/exact-root-and-next-request-retries.udp.pcap": "dlms-hdlc-action-download/exact-root-and-next-request-retries.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-action-download/existing-normal-Action-response-neighbor.tcp.pcap": "dlms-hdlc-action-download/existing-normal-Action-response-neighbor.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-action-download/existing-normal-Action-response-neighbor.udp.pcap": "dlms-hdlc-action-download/existing-normal-Action-response-neighbor.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-action-download/first-response-pendingnil-private-Close.tcp.pcap": "dlms-hdlc-action-download/first-response-pendingnil-private-Close.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-action-download/first-response-pendingnil-private-Close.udp.pcap": "dlms-hdlc-action-download/first-response-pendingnil-private-Close.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-action-download/five-encoded-bytes-cap4-refusal.tcp.pcap": "dlms-hdlc-action-download/five-encoded-bytes-cap4-refusal.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-action-download/five-encoded-bytes-cap4-refusal.udp.pcap": "dlms-hdlc-action-download/five-encoded-bytes-cap4-refusal.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-action-download/five-encoded-bytes-cap5.tcp.pcap": "dlms-hdlc-action-download/five-encoded-bytes-cap5.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-action-download/five-encoded-bytes-cap5.udp.pcap": "dlms-hdlc-action-download/five-encoded-bytes-cap5.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-action-download/foreign-form-supplement.json": "dlms-hdlc-action-download/foreign-form-supplement.json",
+        "common/pcapx/pcaputil/dlms-hdlc-action-download/foreign-response-flags-NSNR-address-direction-preserve.tcp.pcap": "dlms-hdlc-action-download/foreign-response-flags-NSNR-address-direction-preserve.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-action-download/foreign-response-flags-NSNR-address-direction-preserve.udp.pcap": "dlms-hdlc-action-download/foreign-response-flags-NSNR-address-direction-preserve.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-action-download/four-response-blocks-cap3-refusal.tcp.pcap": "dlms-hdlc-action-download/four-response-blocks-cap3-refusal.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-action-download/four-response-blocks-cap3-refusal.udp.pcap": "dlms-hdlc-action-download/four-response-blocks-cap3-refusal.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-action-download/four-response-blocks-cap4.tcp.pcap": "dlms-hdlc-action-download/four-response-blocks-cap4.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-action-download/four-response-blocks-cap4.udp.pcap": "dlms-hdlc-action-download/four-response-blocks-cap4.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-action-download/known-Action-list-owner-preserved-on-foreign-response-pblock.tcp.pcap": "dlms-hdlc-action-download/known-Action-list-owner-preserved-on-foreign-response-pblock.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-action-download/known-Action-list-owner-preserved-on-foreign-response-pblock.udp.pcap": "dlms-hdlc-action-download/known-Action-list-owner-preserved-on-foreign-response-pblock.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-action-download/known-Action-upload-owner-preserved-on-foreign-response-pblock.tcp.pcap": "dlms-hdlc-action-download/known-Action-upload-owner-preserved-on-foreign-response-pblock.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-action-download/known-Action-upload-owner-preserved-on-foreign-response-pblock.udp.pcap": "dlms-hdlc-action-download/known-Action-upload-owner-preserved-on-foreign-response-pblock.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-action-download/known-Get-owner-foreign-pblock-then-orphan-next.tcp.pcap": "dlms-hdlc-action-download/known-Get-owner-foreign-pblock-then-orphan-next.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-action-download/known-Get-owner-foreign-pblock-then-orphan-next.udp.pcap": "dlms-hdlc-action-download/known-Get-owner-foreign-pblock-then-orphan-next.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-action-download/matched-link-server-block-number-gap-retires.tcp.pcap": "dlms-hdlc-action-download/matched-link-server-block-number-gap-retires.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-action-download/matched-link-server-block-number-gap-retires.udp.pcap": "dlms-hdlc-action-download/matched-link-server-block-number-gap-retires.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-action-download/next-must-echo-received-block-number.tcp.pcap": "dlms-hdlc-action-download/next-must-echo-received-block-number.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-action-download/next-must-echo-received-block-number.udp.pcap": "dlms-hdlc-action-download/next-must-echo-received-block-number.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-action-download/next-request-awaits-response-private-Close.tcp.pcap": "dlms-hdlc-action-download/next-request-awaits-response-private-Close.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-action-download/next-request-awaits-response-private-Close.udp.pcap": "dlms-hdlc-action-download/next-request-awaits-response-private-Close.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-action-download/next-wrong-flags-and-address-preserve.tcp.pcap": "dlms-hdlc-action-download/next-wrong-flags-and-address-preserve.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-action-download/next-wrong-flags-and-address-preserve.udp.pcap": "dlms-hdlc-action-download/next-wrong-flags-and-address-preserve.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-action-download/official-two-pblock-download.tcp.pcap": "dlms-hdlc-action-download/official-two-pblock-download.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-action-download/official-two-pblock-download.udp.pcap": "dlms-hdlc-action-download/official-two-pblock-download.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-action-download/response-without-immediately-observed-next-retires.tcp.pcap": "dlms-hdlc-action-download/response-without-immediately-observed-next-retires.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-action-download/response-without-immediately-observed-next-retires.udp.pcap": "dlms-hdlc-action-download/response-without-immediately-observed-next-retires.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-action-download/reuse-inputs.json": "dlms-hdlc-action-download/reuse-inputs.json",
+        "common/pcapx/pcaputil/dlms-hdlc-action-download/single-last-structure-depth5-refusal.tcp.pcap": "dlms-hdlc-action-download/single-last-structure-depth5-refusal.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-action-download/single-last-structure-depth5-refusal.udp.pcap": "dlms-hdlc-action-download/single-last-structure-depth5-refusal.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-action-download/single-last-structure-depth6.tcp.pcap": "dlms-hdlc-action-download/single-last-structure-depth6.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-action-download/single-last-structure-depth6.udp.pcap": "dlms-hdlc-action-download/single-last-structure-depth6.udp.pcap",
+        "scripts/protocol-tests/required-tests-traffic-unified-v135.json": "required-tests-traffic-unified-v135.json"
+      }
     }
   ],
   "schema_version": 1,

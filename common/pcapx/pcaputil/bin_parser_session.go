@@ -1506,6 +1506,17 @@ func (f *binFlow) finishSession(reason TrafficFlowCloseReason) {
 			} else {
 				emit(d.fragmentCloseDirection(), d.fragmentCloseFields(), "DLMS HDLC exchange ended with incomplete segmented information")
 			}
+		} else if d.transfer != nil && d.transfer.initial.kind == "ACTION" {
+			p := &d.transfer.initial
+			e := f.event(p.dir, nil, "incomplete", string(reason)+": DLMS HDLC Action-download ended with an unmatched request")
+			e.Profile = "dlms-hdlc-action-download"
+			e.nativeDLMSOrSLMPObservation = true
+			e.Session = dlmsOperationCloseFields(p)
+			e.semanticSession = cloneSession(e.Session)
+			e.sessionError = &ProtocolError{Kind: ErrNeedMore, Message: e.Summary}
+			e.Error = e.Summary
+			f.a.incomplete.Add(1)
+			f.a.emit(e)
 		} else if d.transfer != nil {
 			emit(d.transfer.initial.dir, map[string]any{"Outstanding": 1, "ObservedBlocks": d.transfer.blocks, "EncodedBytes": len(d.transfer.data)}, "DLMS HDLC exchange ended with an incomplete data-block transfer")
 		} else if d.setTransfer != nil {

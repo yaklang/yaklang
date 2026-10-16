@@ -25,7 +25,7 @@ func decodeDLMSOperationInformation(m *dlmsMessage, p []byte, llc byte, limit, d
 	if len(p) < 3 {
 		return nil, dlmsError(ErrMalformedMessage, "operation service header is truncated")
 	}
-	if p[1] != 1 && !dlmsOperationListAPDU(p) && !dlmsSetBlockAPDU(p) && !dlmsActionUploadAPDU(p) {
+	if p[1] != 1 && !dlmsOperationListAPDU(p) && !dlmsSetBlockAPDU(p) && !dlmsActionUploadAPDU(p) && !dlmsActionDownloadAPDU(p) {
 		return nil, dlmsError(ErrUnsupportedFeature, "selected Set/Action normal or bounded list choice only")
 	}
 	if p[2]&0x30 != 0 {
@@ -62,7 +62,7 @@ func decodeDLMSOperationInformation(m *dlmsMessage, p []byte, llc byte, limit, d
 		delete(fields, k)
 	}
 	m.invoke, m.flags, m.choice, m.count, m.request = decoded.invoke, decoded.flags, decoded.choice, decoded.count, request
-	if decoded.setBlock || decoded.actionUpload || m.kind == "ACTION" && !request && decoded.choice == 1 {
+	if decoded.setBlock || decoded.actionUpload || decoded.actionDownload || m.kind == "ACTION" && !request && decoded.choice == 1 {
 		m.block = decoded
 	}
 	f := m.fields
@@ -98,12 +98,18 @@ func decodeDLMSOperationInformation(m *dlmsMessage, p []byte, llc byte, limit, d
 			form = " Next Pblock"
 		}
 	}
+	if decoded.actionDownload {
+		form = " With Pblock"
+		if request {
+			form = " Next Pblock"
+		}
+	}
 	f["Frame Kind"], f[name] = name+" "+direction+form, fields
 	return m, nil
 }
 
 func dlmsOperationProjection(p []byte, n int) int64 {
-	if dlmsSetBlockAPDU(p) && p[0] == 0xc1 || dlmsActionUploadAPDU(p) && p[0] == 0xc3 {
+	if dlmsSetBlockAPDU(p) && p[0] == 0xc1 || dlmsActionUploadAPDU(p) && p[0] == 0xc3 || dlmsActionDownloadAPDU(p) && p[0] == 0xc7 {
 		// Reserve the complete bounded graph and joined/retained bytes before
 		// parsing selectors or assembling a final Data value.
 		return 32768 + 512*int64(n+wrapperBlockBytes) + 2048*wrapperDataNodes

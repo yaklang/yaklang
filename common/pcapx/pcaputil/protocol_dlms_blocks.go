@@ -6,7 +6,7 @@ import (
 	"errors"
 )
 
-// One complete unsegmented HDLC LN GET transfer. The initial descriptor owns
+// One complete unsegmented HDLC LN GET or normal-root Action download. The initial descriptor owns
 // the interpretation of its assembled body; each observed request owns only
 // the next response identity. Native TransactionID remains zero.
 type dlmsTransfer struct {
@@ -16,17 +16,23 @@ type dlmsTransfer struct {
 	blocks  int
 }
 
-func dlmsBlockAPDU(p []byte) bool { return len(p) > 1 && (p[0] == 0xc0 || p[0] == 0xc4) && p[1] == 2 }
-func dlmsBlockError(err error) error {
+func dlmsBlockAPDU(p []byte) bool    { return len(p) > 1 && (p[0] == 0xc0 || p[0] == 0xc4) && p[1] == 2 }
+func dlmsBlockError(err error) error { return dlmsServiceBlockError("GET", err) }
+func dlmsServiceBlockError(service string, err error) error {
 	var pe *ProtocolError
 	if errors.As(err, &pe) {
-		return dlmsError(pe.Kind, "Get data-block: "+pe.Message)
+		prefix := "Get data-block: "
+		if service == "ACTION" {
+			prefix = "Action pblock: "
+		}
+		return dlmsError(pe.Kind, prefix+pe.Message)
 	}
 	return err
 }
 
 func (f *binFlow) consumeDLMSBlock(dir int, wire []byte, id uint64, m *dlmsMessage) (map[string]any, uint64, error) {
 	s, b := f.dlms, m.block
+	service := m.kind // The actual pending service, never an inferred shared invoke owner.
 	context := func(why string, retire bool) (map[string]any, uint64, error) {
 		if retire {
 			s.invalidate()
@@ -44,6 +50,9 @@ func (f *binFlow) consumeDLMSBlock(dir int, wire []byte, id uint64, m *dlmsMessa
 			return context("Get-next lacks observed initial request/block", true)
 		}
 		p := &t.initial
+		if p.kind != service {
+			return context("Get-next service differs from observed transfer", false)
+		}
 		if dir != p.dir || m.source != p.source || m.destination != p.destination || m.flags != p.flags {
 			return context("Get-next direction/address/full flags differ from initial request", false)
 		}
@@ -58,7 +67,7 @@ func (f *binFlow) consumeDLMSBlock(dir int, wire []byte, id uint64, m *dlmsMessa
 			return context("Get-next lacks consecutive observed block/sequence progression", true)
 		}
 		s.next[dir] = (m.ns + 1) & 7
-		s.pending = &dlmsPending{wire: bytes.Clone(wire), kind: "GET", dir: dir, source: m.source, destination: m.destination, id: id, invoke: m.invoke, ns: m.ns, flags: m.flags, choice: 2}
+		s.pending = &dlmsPending{wire: bytes.Clone(wire), kind: service, dir: dir, source: m.source, destination: m.destination, id: id, invoke: m.invoke, ns: m.ns, flags: m.flags, choice: 2}
 		m.fields["Association"] = "observed-block-request"
 		return m.fields, 0, nil
 	}
@@ -67,20 +76,23 @@ func (f *binFlow) consumeDLMSBlock(dir int, wire []byte, id uint64, m *dlmsMessa
 		retire := s.transfer != nil || s.clientKnown && (!s.seqKnown[dir] || m.ns == s.next[dir])
 		return context("data-block response lacks immediately observed request", retire)
 	}
-	if p.kind != "GET" || p.dir == dir || p.source != m.destination || p.destination != m.source || p.flags != m.flags {
+	if p.kind != service || p.dir == dir || p.source != m.destination || p.destination != m.source || p.flags != m.flags {
 		return context("data-block response endpoint/direction/full flags differ", false)
 	}
 	if m.nr != (p.ns+1)&7 || s.seqKnown[dir] && m.ns != s.next[dir] {
 		return context("data-block response HDLC sequence differs from observed request", false)
 	}
+	if service == "ACTION" && p.choice != 1 && p.choice != 2 {
+		return context("Action pblock form differs from observed request", false)
+	}
 	t := s.transfer
 	expected := uint32(1)
 	if t == nil {
-		if p.choice != 1 && p.choice != 3 {
+		if p.choice != 1 && (service != "GET" || p.choice != 3) {
 			return context("initial request service cannot define assembled result", true)
 		}
 	} else {
-		if p.choice != 2 || t.number == ^uint32(0) {
+		if p.choice != 2 || t.initial.kind != service || t.number == ^uint32(0) {
 			return context("data-block lacks observed Get-next", true)
 		}
 		expected = t.number + 1
@@ -111,12 +123,12 @@ func (f *binFlow) consumeDLMSBlock(dir int, wire []byte, id uint64, m *dlmsMessa
 	copy(joined, t.data)
 	copy(joined[len(t.data):], b.blockData)
 	if b.lastBlock {
-		if t.initial.choice == 3 {
+		if service == "GET" && t.initial.choice == 3 {
 			wp := &wrapperPending{choice: 3, count: t.initial.count, blocks: t.blocks}
 			matched, err := f.finishWrapperListBlock(wp, b, joined)
 			if err != nil {
 				s.invalidate()
-				return nil, 0, dlmsBlockError(err)
+				return nil, 0, dlmsServiceBlockError(service, err)
 			}
 			if !matched {
 				return context("assembled result count differs from observed descriptors", true)
@@ -129,7 +141,7 @@ func (f *binFlow) consumeDLMSBlock(dir int, wire []byte, id uint64, m *dlmsMessa
 			}
 			if err != nil {
 				s.invalidate()
-				return nil, 0, dlmsBlockError(err)
+				return nil, 0, dlmsServiceBlockError(service, err)
 			}
 			b.fields["transfer_complete"], b.fields["assembled_data"], b.fields["assembled_data_hex"], b.fields["observed_block_count"] = true, data, hex.EncodeToString(joined), t.blocks+1
 		}

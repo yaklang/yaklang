@@ -40,7 +40,13 @@ func dlmsNormalExtended(p []byte) bool {
 func dlmsNormalAccess(p []byte) bool {
 	return len(p) >= 13 && p[0] == 0xc0 && p[1] == 1 && p[12] == 1
 }
+func dlmsActionDownloadAPDU(p []byte) bool {
+	return len(p) > 1 && (p[0] == 0xc3 || p[0] == 0xc7) && p[1] == 2
+}
 func dlmsProfile(w []byte) string {
+	if dlmsActionDownloadAPDU(dlmsAPDU(w)) {
+		return "dlms-hdlc-action-download"
+	}
 	if dlmsActionUploadAPDU(dlmsAPDU(w)) {
 		return "dlms-hdlc-action-upload"
 	}

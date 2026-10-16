@@ -773,7 +773,7 @@ func (f *binFlow) consumeDecodedDLMS(dir int, w []byte, id uint64, m *dlmsMessag
 	if m.kind == "I" || s.fragments != nil {
 		return f.consumeDLMSSegments(dir, w, id, m)
 	}
-	if m.kind == "GET" && m.choice == 2 {
+	if (m.kind == "GET" || m.kind == "ACTION") && m.choice == 2 {
 		return f.consumeDLMSBlock(dir, w, id, m)
 	}
 	if m.request && dlmsSequencedService(m.kind) && s.pending == nil && s.seenRequest[m.invoke]&(1<<m.ns) == 0 && int(s.seenCount) >= f.a.budget.MaxCollectionElements {

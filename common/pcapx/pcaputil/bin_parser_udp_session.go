@@ -778,6 +778,12 @@ func (a *binParser) closeUDPSessions() {
 					e.Error = summary
 				}
 				a.incomplete.Add(1)
+			} else if d != nil && d.transfer != nil && d.transfer.initial.kind == "ACTION" {
+				p := &d.transfer.initial
+				dir := p.dir
+				summary := "DLMS HDLC Action-download ended with an unmatched request"
+				incomplete = append(incomplete, &ProtocolEvent{FlowID: f.id, Timestamp: v.touched, Domain: v.key.domain, Transport: "udp", Source: f.endpoints[dir], Destination: f.endpoints[1-dir], Direction: dir, Protocol: "dlms", Profile: "dlms-hdlc-action-download", nativeDLMSOrSLMPObservation: true, Status: "incomplete", Completeness: "incomplete", Summary: summary, Session: dlmsOperationCloseFields(p), Error: summary, sessionError: &ProtocolError{Kind: ErrNeedMore, Message: summary}})
+				a.incomplete.Add(1)
 			} else if d != nil && d.transfer != nil {
 				t := d.transfer
 				dir := t.initial.dir
