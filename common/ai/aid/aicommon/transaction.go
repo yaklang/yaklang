@@ -11,7 +11,9 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-func is429Response(ctx context.Context, rsp *AIResponse) bool {
+// waitForHeadersAndCheck429 may block until headers arrive or ctx is cancelled.
+// Use only where the callback is expected to signal HTTP header readiness.
+func waitForHeadersAndCheck429(ctx context.Context, rsp *AIResponse) bool {
 	if rsp == nil {
 		return false
 	}
@@ -167,7 +169,7 @@ func callAITransaction(
 		if err == nil && rsp != nil && !rsp.WaitForCallbackDone(transactionCtx) {
 			return transactionCtx.Err()
 		}
-		err = normalizeAIRateLimitError(rsp, err)
+		err = ensure429CallbackError(rsp, err)
 		// A request-scoped cancellation is a terminal control signal, not an AI
 		// failure. Check it before classifying callAi errors so a task finishing
 		// while the provider is in flight cannot emit a misleading model-error
@@ -190,7 +192,7 @@ func callAITransaction(
 			lastRsp = rsp
 			rspEmitter := bindEmitter(rsp)
 
-			if is429Response(transactionCtx, rsp) {
+			if waitForHeadersAndCheck429(transactionCtx, rsp) {
 				if is429Retryable(transactionCtx, rsp) {
 					// 频率限流/过载类：可重试，不消耗重试次数。
 					rspEmitter.EmitWarning("429 rate limit detected in transaction layer (seq=%d), will retry without counting attempt", getSeq())

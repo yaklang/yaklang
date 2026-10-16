@@ -102,19 +102,19 @@ func TestProviderFailureQuotaWithoutRequestWrapper(t *testing.T) {
 
 func TestProviderFailure429PreservesTransportCause(t *testing.T) {
 	for _, mode := range []string{"direct", "detached", "checkpoint"} {
-		for _, async := range []bool{false, true} {
-			t.Run(fmt.Sprintf("%s/async=%v", mode, async), func(t *testing.T) {
+		for _, responseError := range []bool{false, true} {
+			t.Run(fmt.Sprintf("%s/responseError=%v", mode, responseError), func(t *testing.T) {
 				cfg := NewTestConfig(context.Background())
 				cfg.AiAutoRetry = 1
 				cfg.aiRetryWaitFunc = func(context.Context, time.Duration) error { return nil }
 				cb := AICallbackType(func(AICallerConfigIf, *AIRequest) (*AIResponse, error) {
 					rsp := NewAIResponse(nil)
 					rsp.SetRawHTTPResponseData([]byte("HTTP/1.1 429 Too Many Requests\r\n\r\n"), []byte(`{"error":{"message":"daily quota"}}`))
-					if async {
+					if responseError {
 						rsp.SetError(io.ErrUnexpectedEOF)
 					}
 					rsp.Close()
-					if async {
+					if responseError {
 						return rsp, nil
 					}
 					return rsp, io.ErrUnexpectedEOF

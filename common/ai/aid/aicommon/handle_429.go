@@ -68,7 +68,7 @@ func parse429Body(rsp *AIResponse) *aibalance429Body {
 		return nil
 	}
 	var parsed aibalance429Body
-	if err := json.Unmarshal(aiHTTPResponseBody(rsp), &parsed); err != nil {
+	if err := json.Unmarshal(decodeAIHTTPErrorBody(rsp), &parsed); err != nil {
 		return nil
 	}
 	return &parsed
@@ -135,7 +135,7 @@ func parseRetryAfterSeconds(rsp *AIResponse, fallback int) int {
 //   - 有合理 Retry-After（< 3600）：限流/过载类，可重试。
 //   - 无 Retry-After 或大额 Retry-After（>= 3600）：额度耗尽类，不可重试。
 func is429Retryable(ctx context.Context, rsp *AIResponse) bool {
-	if !is429Response(ctx, rsp) {
+	if !waitForHeadersAndCheck429(ctx, rsp) {
 		return false
 	}
 	retryAfter := parseRetryAfterSeconds(rsp, 0)
