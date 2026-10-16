@@ -13,21 +13,22 @@ import (
 // A partial request does not install pending context; a partial response never
 // consumes the observed request's identity.
 type dlmsFragments struct {
-	info, wire           []byte
-	dir                  int
-	source, destination  uint32
-	first, last, nr      byte
-	count                int
-	request              bool
-	nextRequest          bool
-	invoke, sequenceSet  byte
-	acseCommand          byte
-	operation            string
-	operationList        bool
-	actionResponseChoice byte
-	actionRequestChoice  byte
-	setRequestChoice     byte
-	setResponseChoice    byte
+	info, wire                   []byte
+	dir                          int
+	source, destination          uint32
+	first, last, nr              byte
+	count                        int
+	request                      bool
+	nextRequest                  bool
+	invoke, sequenceSet          byte
+	acseCommand                  byte
+	operation                    string
+	operationList                bool
+	actionDownloadResponseChoice byte
+	actionResponseChoice         byte
+	actionRequestChoice          byte
+	setRequestChoice             byte
+	setResponseChoice            byte
 }
 
 func (s *binDLMS) fragmentCloseDirection() int {
@@ -243,6 +244,9 @@ func dlmsOperationSegmentResponseChoice(p *dlmsPending) byte {
 	return p.choice
 }
 func (t *dlmsFragments) operationSegmentProfile() string {
+	if t.actionDownloadResponseChoice != 0 {
+		return dlmsActionDownloadResponseSegmentProfile(t.actionDownloadResponseChoice)
+	}
 	if t.actionResponseChoice != 0 {
 		return dlmsActionResponseSegmentProfile(t.actionResponseChoice)
 	}
@@ -261,6 +265,9 @@ func (t *dlmsFragments) operationSegmentProfile() string {
 	return "dlms-hdlc-ln-operations-segmented"
 }
 func (t *dlmsFragments) serviceName() string {
+	if t.actionDownloadResponseChoice != 0 {
+		return "Action With Pblock"
+	}
 	if t.actionResponseChoice != 0 {
 		return "Action With Pblock"
 	}
@@ -294,6 +301,9 @@ func (t *dlmsFragments) serviceName() string {
 	return "Get"
 }
 func (t *dlmsFragments) operationCloseSummary() string {
+	if t.actionDownloadResponseChoice != 0 {
+		return "DLMS HDLC exchange ended with incomplete segmented Action-download response"
+	}
 	if t.actionResponseChoice != 0 {
 		return "DLMS HDLC exchange ended with incomplete segmented Action-with-pblock response"
 	}

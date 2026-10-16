@@ -763,6 +763,9 @@ func (f *binFlow) consumeDecodedDLMS(dir int, w []byte, id uint64, m *dlmsMessag
 	if m.kind == "I" && (s.fragments != nil && s.fragments.actionRequestChoice != 0 || s.fragments == nil && dlmsActionRequestSegmentPrefix(m.information) && (m.information[4] == 4 || s.actionTransfer != nil && s.actionTransfer.initial.choice == 4)) {
 		return f.consumeDLMSActionRequestSegments(dir, w, id, m)
 	}
+	if m.kind == "I" && (s.fragments != nil && s.fragments.actionDownloadResponseChoice != 0 || s.fragments == nil && s.pending != nil && s.pending.kind == "ACTION" && (s.pending.choice == 1 || s.pending.choice == 2) && len(m.information) >= 6 && bytes.Equal(m.information[:4], []byte{0xe6, 0xe7, 0, 0xc7}) && m.information[4] == 2) {
+		return f.consumeDLMSActionDownloadResponseSegments(dir, w, id, m)
+	}
 	if m.kind == "I" && (s.fragments != nil && s.fragments.actionResponseChoice != 0 || s.fragments == nil && s.pending != nil && s.pending.kind == "ACTION" && s.pending.choice == 4 && s.actionTransfer != nil && len(m.information) >= 6 && bytes.Equal(m.information[:4], []byte{0xe6, 0xe7, 0, 0xc7}) && (m.information[4] == 1 || m.information[4] == 4)) {
 		return f.consumeDLMSActionResponseSegments(dir, w, id, m)
 	}
@@ -924,6 +927,7 @@ func (a *binParser) decodeDLMSDatagram(e *ProtocolEvent, w []byte, explicit bool
 		store.lru.MoveToBack(el)
 	}
 	operationSegment := f.dlmsOperationSegmentObservation(w)
+	actionDownloadResponseSegment := f.dlmsActionDownloadResponseSegmentObservation(w, e.Direction)
 	actionResponseSegment := f.dlmsActionResponseSegmentObservation(w, e.Direction)
 	actionRequestSegment := f.dlmsActionRequestSegmentObservation(w, e.Direction)
 	setRequestSegment := f.dlmsSetRequestSegmentObservation(w, e.Direction)
@@ -1023,6 +1027,9 @@ func (a *binParser) decodeDLMSDatagram(e *ProtocolEvent, w []byte, explicit bool
 	}
 	if actionResponseSegment != "" {
 		e.Profile = actionResponseSegment
+	}
+	if actionDownloadResponseSegment != "" {
+		e.Profile = actionDownloadResponseSegment
 	}
 	if setResponseSegment != "" {
 		e.Profile = setResponseSegment
