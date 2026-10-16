@@ -785,7 +785,7 @@ func (a *binParser) closeUDPSessions() {
 				a.incomplete.Add(1)
 			} else if d != nil && d.pending != nil && dlmsOperationKind(d.pending.kind) {
 				dir := d.pending.dir
-				summary := "DLMS HDLC " + dlmsOperationName(d.pending.kind) + " ended with an unmatched request"
+				summary := "DLMS HDLC " + dlmsOperationCloseName(d.pending) + " ended with an unmatched request"
 				incomplete = append(incomplete, &ProtocolEvent{FlowID: f.id, Timestamp: v.touched, Domain: v.key.domain, Transport: "udp", Source: f.endpoints[dir], Destination: f.endpoints[1-dir], Direction: dir, Protocol: "dlms", Profile: "dlms-hdlc-ln-operations", nativeDLMSOrSLMPObservation: true, Status: "incomplete", Completeness: "incomplete", Summary: summary, Session: dlmsOperationCloseFields(d.pending), Error: summary, sessionError: &ProtocolError{Kind: ErrNeedMore, Message: summary}})
 				a.incomplete.Add(1)
 			} else if d != nil && d.pending != nil && d.pending.kind == "ACSE" {

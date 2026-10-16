@@ -1494,7 +1494,7 @@ func (f *binFlow) finishSession(reason TrafficFlowCloseReason) {
 			f.a.incomplete.Add(1)
 			f.a.emit(e)
 		} else if d.pending != nil && dlmsOperationKind(d.pending.kind) {
-			e := f.event(d.pending.dir, nil, "incomplete", string(reason)+": DLMS HDLC "+dlmsOperationName(d.pending.kind)+" ended with an unmatched request")
+			e := f.event(d.pending.dir, nil, "incomplete", string(reason)+": DLMS HDLC "+dlmsOperationCloseName(d.pending)+" ended with an unmatched request")
 			e.Profile = "dlms-hdlc-ln-operations"
 			e.nativeDLMSOrSLMPObservation = true
 			e.Session = dlmsOperationCloseFields(d.pending)

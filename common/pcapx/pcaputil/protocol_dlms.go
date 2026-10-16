@@ -509,7 +509,7 @@ func probeDLMS(w []byte, limit int) ProbeResult {
 	m, e := decodeDLMS(w[:n], elements)
 	var pe *ProtocolError
 	if errors.As(e, &pe) && pe.Kind == ErrResourceExceeded {
-		if dlmsOperationAPDU(apdu) && len(apdu) > 1 && apdu[1] == 1 && (apdu[0] == 0xc1 || apdu[0] == 0xc3) {
+		if dlmsOperationAPDU(apdu) && len(apdu) > 1 && (apdu[1] == 1 || dlmsOperationListAPDU(apdu)) && (apdu[0] == 0xc1 || apdu[0] == 0xc3) {
 			return probeAccept("dlms", "hdlc-ln-operations", 98)
 		}
 
@@ -784,7 +784,7 @@ func dlmsUDPRefusalHint(w []byte) bool {
 	}
 	p := w[at+3:]
 	if bytes.Equal(p[:3], []byte{0xe6, 0xe6, 0}) && (p[3] == 0xc1 || p[3] == 0xc3) {
-		return p[4] == 1 && p[5]&0x30 == 0
+		return (p[4] == 1 || dlmsOperationListAPDU(p[3:])) && p[5]&0x30 == 0
 	}
 	return bytes.Equal(p[:4], []byte{0xe6, 0xe6, 0, 0xc0}) && (p[4] == 1 || p[4] == 2 || p[4] == 3) && p[5]&0x30 == 0
 }

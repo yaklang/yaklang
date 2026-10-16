@@ -10,6 +10,9 @@ import (
 func dlmsOperationAPDU(p []byte) bool {
 	return len(p) > 0 && (p[0] == 0xc1 || p[0] == 0xc5 || p[0] == 0xc3 || p[0] == 0xc7)
 }
+func dlmsOperationListAPDU(p []byte) bool {
+	return len(p) > 1 && ((p[0] == 0xc1 && p[1] == 4) || (p[0] == 0xc5 && p[1] == 5) || ((p[0] == 0xc3 || p[0] == 0xc7) && p[1] == 3))
+}
 func dlmsOperationKind(kind string) bool    { return kind == "SET" || kind == "ACTION" }
 func dlmsSequencedService(kind string) bool { return kind == "GET" || dlmsOperationKind(kind) }
 func dlmsOperationName(kind string) string {
@@ -22,8 +25,8 @@ func decodeDLMSOperationInformation(m *dlmsMessage, p []byte, llc byte, limit, d
 	if len(p) < 3 {
 		return nil, dlmsError(ErrMalformedMessage, "operation service header is truncated")
 	}
-	if p[1] != 1 {
-		return nil, dlmsError(ErrUnsupportedFeature, "selected Set/Action normal choice1 only")
+	if p[1] != 1 && !dlmsOperationListAPDU(p) {
+		return nil, dlmsError(ErrUnsupportedFeature, "selected Set/Action normal or bounded list choice only")
 	}
 	if p[2]&0x30 != 0 {
 		return nil, dlmsError(ErrMalformedMessage, "invoke-id-and-priority reserved bits are nonzero")
@@ -66,11 +69,31 @@ func decodeDLMSOperationInformation(m *dlmsMessage, p []byte, llc byte, limit, d
 	if request {
 		direction = "Request"
 	}
-	f["Frame Kind"], f[name] = name+" "+direction+" Normal", fields
+	form := " Normal"
+	if dlmsOperationListAPDU(p) {
+		form = " With List"
+	}
+	f["Frame Kind"], f[name] = name+" "+direction+form, fields
 	return m, nil
 }
 
 func dlmsOperationProjection(p []byte, n int) int64 {
+	if dlmsOperationListAPDU(p) {
+		nodes := min(wrapperDataNodes, max(0, len(p)-4))
+		items := min(wrapperListItems, max(0, len(p)-4))
+		if p[0] == 0xc1 {
+			items = min(wrapperListItems, max(0, len(p)-4)/10)
+		} else if p[0] == 0xc3 {
+			items = min(wrapperListItems, max(0, len(p)-4)/9)
+		} else if p[0] == 0xc7 {
+			items = min(wrapperListItems, max(0, len(p)-4)/2)
+		}
+		if wrapperSetListAPDUContainsCompact(p) || wrapperActionListAPDUContainsCompact(p) {
+			nodes = wrapperDataNodes
+		}
+		return 32768 + 512*int64(n) + 2048*int64(nodes) + 8192*int64(items)
+	}
+
 	at := -1
 	if len(p) > 1 && p[1] == 1 {
 		if p[0] == 0xc1 && len(p) > 12 && p[12] == 0 {
@@ -94,5 +117,18 @@ func dlmsOperationProjection(p []byte, n int) int64 {
 	return 32768 + 512*int64(n) + 2048*int64(nodes)
 }
 func dlmsOperationCloseFields(p *dlmsPending) map[string]any {
-	return map[string]any{"Outstanding": 1, "Request Service": p.kind, "Invoke ID": p.invoke, "Source Address": p.source, "Destination Address": p.destination}
+	fields := map[string]any{"Outstanding": 1, "Request Service": p.kind, "Invoke ID": p.invoke, "Source Address": p.source, "Destination Address": p.destination}
+	if p.choice != 1 {
+		fields["Service Choice"] = p.choice
+		fields["List Count"] = uint64(p.count)
+	}
+	return fields
+}
+
+func dlmsOperationCloseName(p *dlmsPending) string {
+	name := dlmsOperationName(p.kind)
+	if p.choice != 1 {
+		return name + "-with-list"
+	}
+	return name
 }

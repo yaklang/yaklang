@@ -142,6 +142,41 @@ func hdlcOpTypes(t *testing.T, f map[string]any) {
 			}
 			require.Equal(t, false, s["operation_success_verified"])
 			require.Equal(t, false, s["authentication_verified"])
+
+			for _, k := range []string{"list_count", "value_count", "parameter_count"} {
+				if v, ok := s[k]; ok {
+					require.IsType(t, uint64(0), v)
+				}
+			}
+			for _, key := range []string{"descriptors", "values", "parameters", "results"} {
+				if v, ok := s[key]; ok {
+					items, ok := v.([]map[string]any)
+					require.True(t, ok)
+					for _, item := range items {
+						for _, k := range []string{"index", "apdu_offset", "encoded_length"} {
+							if v, ok := item[k]; ok {
+								require.IsType(t, int(0), v)
+							}
+						}
+						if v, ok := item["class_id"]; ok {
+							require.IsType(t, uint16(0), v)
+						}
+						for _, k := range []string{"method_id", "attribute_id"} {
+							if v, ok := item[k]; ok {
+								require.IsType(t, int8(0), v)
+							}
+						}
+						for _, k := range []string{"action_result", "data_access_result", "return_choice_raw", "access_selection_raw"} {
+							if v, ok := item[k]; ok {
+								require.IsType(t, byte(0), v)
+							}
+						}
+						if d, ok := item["data"].(map[string]any); ok {
+							actionDataTypes(t, d)
+						}
+					}
+				}
+			}
 			for _, k := range []string{"parameter", "data"} {
 				if d, ok := s[k].(map[string]any); ok {
 					actionDataTypes(t, d)
@@ -290,6 +325,10 @@ func hdlcOpCloseCheck(t *testing.T, c hdlcOpCase, es []*ProtocolEvent, transport
 		require.Equal(t, offset, e.Offset)
 		hdlcOpEqual(t, w.Session, e.Session)
 		require.IsType(t, byte(0), e.Session["Invoke ID"])
+		if v, ok := e.Session["Service Choice"]; ok {
+			require.IsType(t, byte(0), v)
+			require.IsType(t, uint64(0), e.Session["List Count"])
+		}
 		require.IsType(t, uint32(0), e.Session["Source Address"])
 		hdlcOpQueries(t, e, nil, "NeedMore")
 		actionPoison(e)

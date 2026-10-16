@@ -166,10 +166,16 @@ func wrapperListContainsCompact(w []byte) bool {
 }
 
 func wrapperSetListContainsCompact(w []byte) bool {
-	if !wrapperIsSetList(w) || w[8] != 0xc1 {
+	if !wrapperIsSetList(w) {
 		return false
 	}
-	p := wrapperCompactProbe{wire: w[8:], at: 3}
+	return wrapperSetListAPDUContainsCompact(w[8:])
+}
+func wrapperSetListAPDUContainsCompact(w []byte) bool {
+	if len(w) < 4 || w[0] != 0xc1 || w[1] != 4 {
+		return false
+	}
+	p := wrapperCompactProbe{wire: w, at: 3}
 	n, ok := p.count()
 	if !ok || n > uint64(wrapperListItems) {
 		return false
@@ -199,12 +205,18 @@ func wrapperActionListContainsCompact(w []byte) bool {
 	if !wrapperIsActionList(w) {
 		return false
 	}
-	p := wrapperCompactProbe{wire: w[8:], at: 3}
+	return wrapperActionListAPDUContainsCompact(w[8:])
+}
+func wrapperActionListAPDUContainsCompact(w []byte) bool {
+	if len(w) < 4 || (w[0] != 0xc3 && w[0] != 0xc7) || w[1] != 3 {
+		return false
+	}
+	p := wrapperCompactProbe{wire: w, at: 3}
 	n, ok := p.count()
 	if !ok || n > uint64(wrapperListItems) {
 		return false
 	}
-	if w[8] == 0xc3 {
+	if w[0] == 0xc3 {
 		if !p.skip(9 * int(n)) {
 			return false
 		}
