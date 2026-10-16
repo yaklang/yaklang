@@ -292,11 +292,13 @@ func (f *Function) Finish() {
 		return t
 	})
 	// 优先使用显式设置的返回类型（如 TypeScript 的类型注解）
-	// 否则从 return 语句中推导
+	// 否则从 return 语句中推导。推导不能持有 typeMu：它会读取别的
+	// 函数的类型。算完再在锁里发布，调用方才能原子地看到 ReturnType。
+	var computedReturn Type
 	if f.currentReturnType != nil {
-		funType.ReturnType = f.currentReturnType
+		computedReturn = f.currentReturnType
 	} else {
-		funType.ReturnType = handlerReturnType(lo.FilterMap(f.Return, func(i int64, _ int) (*Return, bool) {
+		computedReturn = handlerReturnType(lo.FilterMap(f.Return, func(i int64, _ int) (*Return, bool) {
 			inst, ok := f.GetValueById(i)
 			if !ok {
 				return nil, false
@@ -304,6 +306,9 @@ func (f *Function) Finish() {
 			return ToReturn(inst)
 		}), funType)
 	}
+	f.typeMu.Lock()
+	funType.ReturnType = computedReturn
+	f.typeMu.Unlock()
 	funType.IsVariadic = f.hasEllipsis
 	funType.This = f
 	funType.ParameterLen = f.ParamLength
@@ -333,7 +338,9 @@ func (f *Function) Finish() {
 			log.Warnf("free value %s is not a parameter", n)
 		}
 	}
+	f.typeMu.Lock()
 	funType.SetFreeValue(result)
+	f.typeMu.Unlock()
 	f.builder.SetReturnSideEffects()
 	ses := funType.SideEffects
 	tmpSideEffects := make(map[*Variable]*FunctionSideEffect)

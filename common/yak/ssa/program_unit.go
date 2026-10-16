@@ -43,32 +43,42 @@ func (prog *Program) LibraryFiles(name string) []string {
 	return files
 }
 
-// BeginCompileUnit marks the start of a compile unit so deferred file builds
-// capture this unitKey. Function/class LazyBuild is owned by the unit's
-// library Program (see ProgramForCompileUnit), not by this string.
+// BeginCompileUnit records the registering worker's unitKey. A Program may be
+// visited by another worker (for example through an import); that visitor must
+// not inherit or clear this worker's context. Only deferred task registration
+// consults this context, not instruction emission or the library body owner.
 func (prog *Program) BeginCompileUnit(unitKey string) {
 	if prog == nil {
 		return
 	}
-	prog.currentCompileUnit = unitKey
+	if unitKey == "" {
+		prog.EndCompileUnit()
+		return
+	}
+	prog.compileUnitContexts.Store(currentGoroutineID(), unitKey)
 }
 
 func (prog *Program) EndCompileUnit() {
 	if prog == nil {
 		return
 	}
-	prog.currentCompileUnit = ""
+	prog.compileUnitContexts.Delete(currentGoroutineID())
 }
 
 func (prog *Program) CurrentCompileUnit() string {
 	if prog == nil {
 		return ""
 	}
-	if prog.currentCompileUnit != "" {
-		return prog.currentCompileUnit
+	gid := currentGoroutineID()
+	if unit, ok := prog.compileUnitContexts.Load(gid); ok {
+		return unit.(string)
 	}
+	// Deferred helpers run with the application context restored on their own
+	// goroutine. Never fall back to another worker's active library context.
 	if app := prog.GetApplication(); app != nil && app != prog {
-		return app.currentCompileUnit
+		if unit, ok := app.compileUnitContexts.Load(gid); ok {
+			return unit.(string)
+		}
 	}
 	return ""
 }

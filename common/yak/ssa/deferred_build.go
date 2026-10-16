@@ -188,6 +188,26 @@ func (prog *Program) RunDeferredBuildsForUnitsWithUnitCallback(
 	afterEach func(index int, total int) bool,
 	afterUnit func(unitKey string) bool,
 ) bool {
+	return prog.runDeferredBuildsForUnits(unitKeys, afterEach, afterUnit, nil)
+}
+
+// RunDeferredBuildsForUnitsMatching is RunDeferredBuildsForUnitsWithUnitCallback
+// restricted to task ids accepted by matchID. A nil matchID accepts every id.
+func (prog *Program) RunDeferredBuildsForUnitsMatching(
+	unitKeys []string,
+	afterEach func(index int, total int) bool,
+	afterUnit func(unitKey string) bool,
+	matchID func(id string) bool,
+) bool {
+	return prog.runDeferredBuildsForUnits(unitKeys, afterEach, afterUnit, matchID)
+}
+
+func (prog *Program) runDeferredBuildsForUnits(
+	unitKeys []string,
+	afterEach func(index int, total int) bool,
+	afterUnit func(unitKey string) bool,
+	matchID func(id string) bool,
+) bool {
 	if prog == nil || len(unitKeys) == 0 {
 		return true
 	}
@@ -225,6 +245,9 @@ func (prog *Program) RunDeferredBuildsForUnitsWithUnitCallback(
 		if _, match := units[task.unitKey]; !match {
 			continue
 		}
+		if matchID != nil && !matchID(id) {
+			continue
+		}
 		total++
 		unitRemaining[task.unitKey]++
 		queue = append(queue, id)
@@ -245,14 +268,17 @@ func (prog *Program) RunDeferredBuildsForUnitsWithUnitCallback(
 		if _, match := units[task.unitKey]; !match {
 			continue
 		}
-		// 执行 task 期间恢复其所属编译单元上下文，task 内通过 CurrentCompileUnit()
-		// 取到的 unitKey 与注册时一致；执行完恢复原值。
-		previousUnit := app.currentCompileUnit
-		if task.unitKey != "" {
-			app.currentCompileUnit = task.unitKey
-		}
-		task.Build()
-		app.currentCompileUnit = previousUnit
+		// Restore only this goroutine's registration context. A task may visit
+		// another library or register more work, but must not overwrite a
+		// concurrent worker's context. Restore even if the task panics.
+		func() {
+			previousUnit := app.CurrentCompileUnit()
+			if task.unitKey != "" {
+				app.BeginCompileUnit(task.unitKey)
+			}
+			defer app.BeginCompileUnit(previousUnit)
+			task.Build()
+		}()
 		task.release()
 		app.deferredBuildsMu.Lock()
 		app.deferredBuilds.Delete(id)
@@ -266,6 +292,9 @@ func (prog *Program) RunDeferredBuildsForUnitsWithUnitCallback(
 				continue
 			}
 			if _, match := units[ntask.unitKey]; !match {
+				continue
+			}
+			if matchID != nil && !matchID(nid) {
 				continue
 			}
 			queued[nid] = struct{}{}

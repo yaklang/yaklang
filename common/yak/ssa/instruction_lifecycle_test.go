@@ -570,7 +570,7 @@ func TestRunDeferredBuildsForUnitsWithUnitCallback(t *testing.T) {
 	// Register deferred builds for two units: "unit-a" has 3 tasks, "unit-b" has 2.
 	// Tasks are registered in interleaved order to test that afterUnit fires
 	// only when a unit's remaining count hits zero.
-	// BeginCompileUnit sets currentCompileUnit, which RegisterDeferredBuild uses.
+	// BeginCompileUnit records this goroutine's unit, which RegisterDeferredBuild uses.
 
 	prog.BeginCompileUnit("unit-a")
 	prog.RegisterDeferredBuild(DeferredBuildKindHelper, "a1", func() {})
