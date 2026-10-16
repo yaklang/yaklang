@@ -103,6 +103,10 @@ func BuildCapabilityInventoryItems(cfg *Config, loop CapabilityInventoryLoopCont
 			// but keep consistent UI expectations by tagging as SemiDynamic.
 			pos = CapabilityInventoryPositionSemiDynamic
 		}
+		data := map[string]any{"skill_load_state": s.SkillLoadState}
+		if stage == CapabilityInventoryStageLoaded {
+			data["token_count"] = s.TokenCount
+		}
 		items = append(items, CapabilityInventoryItem{
 			Name:        s.Name,
 			VerboseName: s.VerboseName,
@@ -111,9 +115,7 @@ func BuildCapabilityInventoryItems(cfg *Config, loop CapabilityInventoryLoopCont
 			Stage:       stage,
 			Position:    pos,
 			IsFixed:     false,
-			Data: map[string]any{
-				"skill_load_state": s.SkillLoadState,
-			},
+			Data:        data,
 		})
 	}
 

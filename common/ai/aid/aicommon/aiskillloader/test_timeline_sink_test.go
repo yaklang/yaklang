@@ -60,20 +60,22 @@ func (s *testTimelineSink) VisibleSkillParts(name string) []SkillContextPart {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	var parts []SkillContextPart
-	seen := map[string]bool{}
+	index := map[string]int{}
 	for _, item := range s.items {
 		if item.deleted || item.name == "__skill_catalog__" || (name != "" && item.name != name) {
 			continue
 		}
 		key := item.name + "\x00" + item.kind + "\x00" + item.path + "\x00" + fmt.Sprint(item.start) + "\x00" + fmt.Sprint(item.end)
-		if seen[key] {
+		if position, found := index[key]; found {
+			parts[position].TokenCount += MeasureStringTokens(item.body, nil)
 			continue
 		}
-		seen[key] = true
+		index[key] = len(parts)
 		parts = append(parts, SkillContextPart{
 			Name: item.name, Kind: item.kind, Path: item.path,
 			StartLine: item.start, EndLine: item.end, Total: item.total,
 			ReachedEnd: item.total > 0 && item.end == item.total,
+			TokenCount: MeasureStringTokens(item.body, nil),
 		})
 	}
 	return parts

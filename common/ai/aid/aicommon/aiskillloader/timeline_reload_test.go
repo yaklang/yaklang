@@ -50,7 +50,8 @@ func (f *fakeSkillSink) appendPart(name, path, content, source string, start, en
 	f.visible[name] = true
 	f.lastBody[name] = content
 	f.lastSrc[name] = source
-	f.parts = append(f.parts, SkillContextPart{Name: name, Path: path, StartLine: start, EndLine: end})
+	f.parts = append(f.parts, SkillContextPart{Name: name, Path: path, StartLine: start, EndLine: end,
+		TokenCount: MeasureStringTokens(content, nil)})
 	return true
 }
 

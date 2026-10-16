@@ -25,6 +25,8 @@ type SkillContextPart struct {
 	EndLine    int
 	Total      int
 	ReachedEnd bool
+	// TokenCount 是该部分当前可见正文的 token 之和，不包含渲染标签或目录。
+	TokenCount int
 }
 
 // SkillContentSink 是 aiskillloader 侧对“运行时上下文 Timeline”的最小依赖。
@@ -35,7 +37,7 @@ type SkillContextPart struct {
 //   - AppendSkillFileContent 追加一个文件的一段行范围, 不替换其它范围。
 //   - AppendSkillCatalog 追加意图识别选出的技能目录。
 //   - DeleteSkillContent 退休该技能当前可见的正文, 不触碰冻结边界。
-//   - VisibleSkillParts 枚举目标 Timeline 中仍可见的元信息和文件范围,
+//   - VisibleSkillParts 枚举目标 Timeline 中仍可见的元信息、文件范围及正文 token 数,
 //     技能是否仍然可见由它派生, 不单独维护查询入口。
 //   - HasSkillContentHistory 判断是否存在加载历史, 包括已经退休的正文。
 //   - RenderSkillContentForPrompt 返回已冻结且被保留的单一技能块 (只读)。
