@@ -12,7 +12,7 @@ import (
 )
 
 func CreateCollection(db *gorm.DB, name string, description string, opts ...CollectionConfigFunc) (*SQLiteVectorStoreHNSW, error) {
-	db.AutoMigrate(&schema.VectorStoreCollection{}, &schema.VectorStoreDocument{})
+	db.AutoMigrate(&schema.VectorStoreCollection{}, &schema.VectorStoreDocument{}, &schema.VectorStoreGraphDelta{})
 	// 创建RAG配置
 	// 检查集合是否存在
 	if HasCollection(db, name) {

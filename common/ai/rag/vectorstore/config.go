@@ -60,13 +60,15 @@ type CollectionConfig struct {
 
 func NewCollectionConfig(options ...CollectionConfigFunc) *CollectionConfig {
 	defaultConfig := &CollectionConfig{
-		ModelName:                  "Qwen3-Embedding-0.6B-Q4_K_M",
-		Dimension:                  1024,
-		DistanceFuncType:           "cosine",
-		MaxNeighbors:               16,
-		LayerGenerationFactor:      0.25,
-		EfSearch:                   20,
-		EfConstruct:                200,
+		ModelName:             "Qwen3-Embedding-0.6B-Q4_K_M",
+		Dimension:             1024,
+		DistanceFuncType:      "cosine",
+		MaxNeighbors:          16,
+		LayerGenerationFactor: 0.25,
+		// New collections only. A collection loaded from the database keeps the
+		// ef_search and ef_construct values stored on its row.
+		EfSearch:                   64,
+		EfConstruct:                64,
 		EnableAutoUpdateGraphInfos: true,
 		MaxChunkSize:               defaultMaxChunkSize,
 		Overlap:                    defaultChunkOverlap,
@@ -352,6 +354,9 @@ func DeleteCollection(db *gorm.DB, name string) error {
 	if err != nil {
 		return utils.Errorf("get VectorStoreCollection failed: %s", err)
 	}
+	if err := ensureGraphDeltaTable(db); err != nil {
+		return utils.Errorf("migrate hnsw graph delta table failed: %s", err)
+	}
 
 	err = utils.GormTransaction(db, func(tx *gorm.DB) error {
 		// Child rows are both larger and more numerous. Delete them first while
@@ -360,6 +365,10 @@ func DeleteCollection(db *gorm.DB, name string) error {
 			Where("collection_id = ?", collection.ID).
 			Unscoped().Delete(&schema.VectorStoreDocument{}).Error; err != nil {
 			return utils.Errorf("delete VectorStoreDocument failed: %s", err)
+		}
+		if err := tx.Where("collection_uuid = ?", collection.UUID).
+			Unscoped().Delete(&schema.VectorStoreGraphDelta{}).Error; err != nil {
+			return utils.Errorf("delete hnsw graph deltas failed: %s", err)
 		}
 		if err := tx.Model(&schema.VectorStoreCollection{}).
 			Where("id = ?", collection.ID).

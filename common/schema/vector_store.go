@@ -201,6 +201,21 @@ type VectorStoreCollection struct {
 	ExportedAt time.Time `json:"exported_at"`
 }
 
+// VectorStoreGraphDelta is an incremental HNSW adjacency record.
+// The collection's graph_binary remains a full snapshot. Deltas newer than
+// that snapshot are replayed on load, then folded back in by a background compaction.
+type VectorStoreGraphDelta struct {
+	gorm.Model
+
+	CollectionUUID string `gorm:"index:idx_rag_graph_delta_uuid_seq;not null" json:"collection_uuid"`
+	Seq            uint64 `gorm:"index:idx_rag_graph_delta_uuid_seq;not null" json:"seq"`
+	Payload        []byte `gorm:"type:blob" json:"payload"`
+}
+
+func (v *VectorStoreGraphDelta) TableName() string {
+	return "rag_vector_graph_delta_v1"
+}
+
 func (v *VectorStoreCollection) BeforeSave() error {
 	if v.UUID == "" {
 		v.UUID = uuid.NewString()

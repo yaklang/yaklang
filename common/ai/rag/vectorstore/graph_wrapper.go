@@ -107,6 +107,21 @@ func (gm *GraphHNSWManager) RemoveCollectionFromCache(db *gorm.DB, collection *s
 	}
 }
 
+// PersistIfCached writes a dirty in-memory HNSW graph before callers read the
+// database copy. Collections that are not loaded have no unsaved graph.
+func (gm *GraphHNSWManager) PersistIfCached(db *gorm.DB, collection *schema.VectorStoreCollection) error {
+	if collection == nil {
+		return nil
+	}
+	gm.lock.Lock()
+	wrapper := gm.cache[graphCacheKey(db, collection)]
+	gm.lock.Unlock()
+	if wrapper == nil {
+		return nil
+	}
+	return wrapper.queuePersist(false)
+}
+
 func (gm *GraphHNSWManager) GetGraphWrapper(db *gorm.DB, collection *schema.VectorStoreCollection, collectionConfig *CollectionConfig) (*GraphWrapper[string], error) {
 	cacheKey := graphCacheKey(db, collection)
 	gm.lock.Lock()
@@ -182,7 +197,11 @@ func getGraphWrapperFromDB(db *gorm.DB, collection *schema.VectorStoreCollection
 	default:
 		var err error
 		var isEmpty bool
-		if len(collection.GraphBinary) == 0 {
+		deltas, deltaErr := loadGraphDeltas(db, collection.UUID)
+		if deltaErr != nil {
+			return nil, deltaErr
+		}
+		if len(collection.GraphBinary) == 0 && len(deltas) == 0 {
 			var count int64
 			if err := db.Model(&schema.VectorStoreDocument{}).Where("collection_id = ?", collection.ID).Count(&count).Error; err != nil {
 				return nil, utils.Wrap(err, "count vector documents before graph migration")
@@ -200,6 +219,8 @@ func getGraphWrapperFromDB(db *gorm.DB, collection *schema.VectorStoreCollection
 					}
 				}
 			}
+		} else if len(collection.GraphBinary) == 0 {
+			isEmpty = true
 		}
 		if isEmpty {
 			hnswGraph = emptyHNSWGraph(collection)
@@ -217,14 +238,29 @@ func getGraphWrapperFromDB(db *gorm.DB, collection *schema.VectorStoreCollection
 			}
 		}
 	}
+	hnswGraph.EnableAdjacencyTracking()
+	if err := applyStoredGraphDeltas(db, collection, hnswGraph); err != nil {
+		return nil, err
+	}
 	wrapper := NewGraphWrapper(hnswGraph, collection.Name, collection.UUID)
 
 	if collectionConfig.EnableAutoUpdateGraphInfos {
-		wrapper.setOnLayerChange(func(Layers []*hnsw.Layer[string]) {
-			err := updateDatabaseGraphInfoInLock(db, collection.UUID, wrapper)
-			if err != nil {
-				log.Errorf("update database graph info in lock err: %v", err)
+		persister := newGraphPersister(db, collection.UUID, collection.Name)
+		wrapper.persistLocked = func(force bool) error {
+			return persister.persist(wrapper, force)
+		}
+		wrapper.saveGraphDelta = func(tx *gorm.DB) error {
+			changes := wrapper.graph.TakeAdjacencyChanges()
+			if len(changes) == 0 {
+				return nil
 			}
+			return persister.insertDelta(tx, changes)
+		}
+		wrapper.scheduleGraphSnapshot = func() {
+			persister.scheduleSnapshot(wrapper)
+		}
+		wrapper.setOnLayerChange(func(Layers []*hnsw.Layer[string]) {
+			persister.noteMutation(wrapper)
 		})
 	}
 	return wrapper, nil
@@ -358,6 +394,12 @@ type GraphWrapper[K cmp.Ordered] struct {
 	singleOpWarnDuration time.Duration
 	collectionName       string
 	collectionUUID       string
+	// persistLocked runs on the graph goroutine. persistGraph queues that work.
+	persistLocked func(force bool) error
+	// saveGraphDelta persists the current adjacency delta inside the caller's transaction.
+	saveGraphDelta func(tx *gorm.DB) error
+	// scheduleGraphSnapshot folds committed deltas into the full graph binary later.
+	scheduleGraphSnapshot func()
 }
 
 func NewGraphWrapper[K cmp.Ordered](graph *hnsw.Graph[K], collectionName, collectionUUID string) *GraphWrapper[K] {
@@ -408,10 +450,30 @@ func (gw *GraphWrapper[K]) submit(op *graphOp) bool {
 // retained forever by the global graph cache.
 func (gw *GraphWrapper[K]) Close() {
 	gw.closeOnce.Do(func() {
+		if err := gw.queuePersist(false); err != nil {
+			log.Errorf("persist hnsw graph binary before close: %v", err)
+		}
 		gw.closed.Store(true)
 		gw.operationChannel.Close()
 		<-gw.done
 	})
+}
+
+func (gw *GraphWrapper[K]) queuePersist(force bool) error {
+	if gw.persistLocked == nil {
+		return nil
+	}
+	done := make(chan error, 1)
+	if !gw.submit(&graphOp{
+		opType: opTypeWrite,
+		desc:   "PersistGraphBinary",
+		fn: func() {
+			done <- gw.persistLocked(force)
+		},
+	}) {
+		return errors.New("graph wrapper is closed")
+	}
+	return <-done
 }
 
 func (gw *GraphWrapper[K]) executeGraphOpInLock(op *graphOp) {

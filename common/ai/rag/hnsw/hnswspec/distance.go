@@ -23,6 +23,13 @@ func PQAwareCosineDistance[K cmp.Ordered](a, b LayerNode[K], quantizer *pq.Quant
 		codesA, okA := a.GetPQCodes()
 		codesB, okB := b.GetPQCodes()
 		if okA && okB {
+			if quantizer != nil {
+				similarity, err := quantizer.SymmetricCosineSimilarity(codesA, codesB)
+				if err != nil {
+					return 1.0
+				}
+				return cosineSimilarityToDistance(similarity)
+			}
 			return PQCosineDistance(codesA, codesB, a, b)
 		}
 		// PQ节点但无法获取编码，返回最大距离
@@ -97,13 +104,15 @@ func cosineVectorAndNorm[K cmp.Ordered](node LayerNode[K]) ([]float32, float64, 
 	if provider, ok := node.(cosineVectorAndNormProvider); ok {
 		return provider.GetCosineVectorAndNorm()
 	}
-	isPQ := node.IsPQEnabled()
+	if node.IsPQEnabled() {
+		return nil, 0, true
+	}
 	if provider, ok := node.(vectorAndNormProvider); ok {
 		vector, norm := provider.GetVectorAndNorm()
-		return vector, norm, isPQ
+		return vector, norm, false
 	}
 	vector := node.GetVector()()
-	return vector, vectorNorm(vector, node), isPQ
+	return vector, vectorNorm(vector, node), false
 }
 
 func cosineDistanceNodes[K cmp.Ordered](a, b LayerNode[K], vecA, vecB []float32) float64 {
@@ -214,6 +223,13 @@ func PQAwareEuclideanDistance[K cmp.Ordered](a, b LayerNode[K], quantizer *pq.Qu
 		codesA, okA := a.GetPQCodes()
 		codesB, okB := b.GetPQCodes()
 		if okA && okB {
+			if quantizer != nil {
+				distance, err := quantizer.SymmetricEuclideanDistance(codesA, codesB)
+				if err != nil {
+					return math.Inf(1)
+				}
+				return distance
+			}
 			return PQEuclideanDistance(codesA, codesB, a, b)
 		}
 		// PQ节点但无法获取编码，返回最大距离
@@ -367,26 +383,15 @@ func PQAsymmetricDistance[K cmp.Ordered](queryVec []float32, dataNode LayerNode[
 		return math.Inf(1)
 	}
 
-	// 使用PQ解码功能：将PQ编码解码为近似向量，然后使用传统算法
 	if quantizer == nil {
 		return math.Inf(1)
 	}
-
-	// 解码PQ编码为近似向量
-	decodedVec64, err := quantizer.Decode(dataCodes)
+	query64 := float32To64(queryVec)
+	distance, err := quantizer.AsymmetricDistance(query64, dataCodes)
 	if err != nil {
-		// 解码失败，返回默认距离
 		return math.Inf(1)
 	}
-
-	// 转换为float32
-	decodedVec32 := make([]float32, len(decodedVec64))
-	for i, v := range decodedVec64 {
-		decodedVec32[i] = float32(v)
-	}
-
-	// 使用传统的欧氏距离算法
-	return euclideanDistanceRaw(queryVec, decodedVec32)
+	return distance
 }
 
 // PQAsymmetricCosineDistance 非对称PQ余弦距离（查询向量使用原始向量，数据向量使用PQ编码）
@@ -403,26 +408,32 @@ func PQAsymmetricCosineDistance[K cmp.Ordered](queryVec []float32, dataNode Laye
 		return 1.0
 	}
 
-	// 如果没有quantizer，回退到简单距离计算
 	if quantizer == nil {
-		return 0.5
-	}
-
-	// 解码PQ编码为近似向量
-	decodedVec64, err := quantizer.Decode(dataCodes)
-	if err != nil {
-		// 解码失败，返回默认距离
 		return 1.0
 	}
-
-	// 转换为float32
-	decodedVec32 := make([]float32, len(decodedVec64))
-	for i, v := range decodedVec64 {
-		decodedVec32[i] = float32(v)
+	query64 := float32To64(queryVec)
+	similarity, err := quantizer.AsymmetricCosineSimilarity(query64, dataCodes)
+	if err != nil {
+		return 1.0
 	}
+	return cosineSimilarityToDistance(similarity)
+}
 
-	// 使用传统的余弦距离算法
-	return cosineDistanceRaw(queryVec, decodedVec32)
+func float32To64(values []float32) []float64 {
+	converted := make([]float64, len(values))
+	for i, value := range values {
+		converted[i] = float64(value)
+	}
+	return converted
+}
+
+func cosineSimilarityToDistance(similarity float64) float64 {
+	if similarity > 1 {
+		similarity = 1
+	} else if similarity < -1 {
+		similarity = -1
+	}
+	return 1 - similarity
 }
 
 // pqAsymmetricDistanceImpl PQ非对称距离的具体实现

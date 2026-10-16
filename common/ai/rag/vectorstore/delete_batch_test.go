@@ -44,20 +44,16 @@ func batchDeleteStore(t *testing.T, n int) (*gorm.DB, *SQLiteVectorStoreHNSW, []
 
 func TestMUSTPASS_DeleteBatchLazyVectors(t *testing.T) {
 	db, store, ids := batchDeleteStore(t, 128)
-	var missing, saves atomic.Int64
+	var missing atomic.Int64
 	db.Callback().Query().After("gorm:query").Register("test:missing-vector", func(scope *gorm.Scope) {
 		if errors.Is(scope.DB().Error, gorm.ErrRecordNotFound) {
 			missing.Add(1)
 		}
 	})
-	db.Callback().Update().Before("gorm:update").Register("test:graph-saves", func(scope *gorm.Scope) {
-		if scope.TableName() == (&schema.VectorStoreCollection{}).TableName() {
-			saves.Add(1)
-		}
-	})
+	beforeDeltas := countGraphDeltas(t, db, store.collection.UUID)
 	require.NoError(t, store.Delete(ids[:100]...))
 	require.Zero(t, missing.Load(), "repair/export read an already deleted vector")
-	require.EqualValues(t, 1, saves.Load(), "batch must persist the graph only once")
+	require.EqualValues(t, beforeDeltas+1, countGraphDeltas(t, db, store.collection.UUID))
 	GraphWrapperManager.RemoveCollectionFromCache(db, store.collection)
 	reloaded, err := LoadCollection(db, t.Name(), WithEmbeddingClient(store.embedder))
 	require.NoError(t, err)
@@ -65,10 +61,7 @@ func TestMUSTPASS_DeleteBatchLazyVectors(t *testing.T) {
 		require.Equal(t, i >= 100, reloaded.Has(id))
 	}
 	require.NoError(t, reloaded.Delete(ids...))
-	var collection schema.VectorStoreCollection
-	require.NoError(t, db.First(&collection, store.collection.ID).Error)
-	require.Empty(t, collection.GraphBinary)
-	GraphWrapperManager.RemoveCollectionFromCache(db, &collection)
+	GraphWrapperManager.RemoveCollectionFromCache(db, store.collection)
 	reloaded, err = LoadCollection(db, t.Name(), WithEmbeddingClient(store.embedder))
 	require.NoError(t, err)
 	require.Zero(t, reloaded.hnsw.GetSize())
@@ -78,7 +71,7 @@ func TestMUSTPASS_DeleteBatchRollback(t *testing.T) {
 	db, store, ids := batchDeleteStore(t, 24)
 	var before schema.VectorStoreCollection
 	require.NoError(t, db.First(&before, store.collection.ID).Error)
-	require.NoError(t, db.Exec(`CREATE TRIGGER fail_graph_save BEFORE UPDATE ON rag_vector_collection_v1
+	require.NoError(t, db.Exec(`CREATE TRIGGER fail_graph_save BEFORE INSERT ON rag_vector_graph_delta_v1
 		BEGIN SELECT RAISE(ABORT, 'injected graph save failure'); END`).Error)
 	require.ErrorContains(t, store.Delete(ids[:12]...), "injected graph save failure")
 	for _, id := range ids {

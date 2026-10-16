@@ -74,6 +74,7 @@ func (h *Graph[K]) DeleteBatchWithCommit(keys []K, commit func() error) (deleted
 					removed[i][key] = node
 				}
 				delete(layer.Nodes, key)
+				h.noteDelete(i, key)
 				deleted = true
 			}
 		}
@@ -94,6 +95,7 @@ func (h *Graph[K]) DeleteBatchWithCommit(keys []K, commit func() error) (deleted
 		// Every target and incoming edge in this layer is gone before repair.
 		for _, node := range affected {
 			node.Replenish(h.M, h.nodeDistance)
+			h.noteUpsert(i, node.GetKey())
 		}
 	}
 	for len(h.Layers) > 0 && len(h.Layers[len(h.Layers)-1].Nodes) == 0 {
