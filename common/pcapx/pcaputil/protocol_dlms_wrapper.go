@@ -452,10 +452,10 @@ func (f *binFlow) consumeWrapperReserved(dir int, w []byte, e *ProtocolEvent, fl
 		} else if p != nil && p.pending && p.flags == m.flags && p.command != wrapperRequestCommand(m.command) {
 			p.ambiguousBlocks()
 			assoc = "ambiguous-service"
-		} else if p != nil && p.pending && p.flags == m.flags && p.command == 0xc1 && m.command == 0xc5 && p.choice != m.choice {
+		} else if p != nil && p.pending && p.flags == m.flags && (p.command == 0xc1 && m.command == 0xc5 || p.command == 0xc3 && m.command == 0xc7) && p.choice != m.choice {
 			p.ambiguousBlocks()
 			assoc = "ambiguous-service"
-		} else if p != nil && p.pending && p.flags == m.flags && p.command == 0xc1 && m.command == 0xc5 && p.choice == 4 && m.choice == 4 && p.count != m.count {
+		} else if p != nil && p.pending && p.flags == m.flags && (p.command == 0xc1 && m.command == 0xc5 && p.choice == 4 && m.choice == 4 || p.command == 0xc3 && m.command == 0xc7 && p.choice == 3 && m.choice == 3) && p.count != m.count {
 			p.ambiguousBlocks()
 			assoc = "ambiguous-result-count"
 		} else if p != nil && p.pending && p.blockActive && p.flags == m.flags && (m.choice == 1 || m.choice == 3) {
@@ -499,7 +499,7 @@ func wrapperUDPRefusalHint(w []byte) bool {
 	if wrapperIsGBT(w) {
 		return wrapperGBTRefusalHint(w)
 	}
-	if wrapperIsSetList(w) {
+	if wrapperIsSetList(w) || wrapperIsActionList(w) {
 		return len(w) >= 11 && int(binary.BigEndian.Uint16(w[6:8])) == len(w)-8 && w[10]&0x30 == 0
 	}
 	if wrapperIsAction(w) || wrapperIsSet(w) {
@@ -705,12 +705,18 @@ func wrapperActionDataOffset(w []byte) int {
 	}
 	return -1
 }
-func wrapperActionResultKnown(v byte) bool {
+func wrapperDataAccessResultKnown(v byte) bool {
 	switch v {
 	case 0, 1, 2, 3, 4, 9, 11, 12, 13, 14, 15, 16, 17, 18, 19, 250:
 		return true
 	}
 	return false
+}
+
+// Action-Result is distinct from Data-Access-Result: the long-SET codes
+// 17/18/19 are not Action result enumerators in pinned COSEM ASN.1.
+func wrapperActionResultKnown(v byte) bool {
+	return v != 17 && v != 18 && v != 19 && wrapperDataAccessResultKnown(v)
 }
 
 // Observe selected unciphered Action-normal envelopes, not method permission,
@@ -722,7 +728,7 @@ func decodeWrapperAction(w []byte, limit, depth int) (*wrapperMessage, error) {
 	if len(p) < 3 {
 		return bad("Action header truncated")
 	}
-	if p[1] != 1 {
+	if p[1] != 1 && !wrapperIsActionList(w) {
 		return unsupported("Action selected normal choice1 only")
 	}
 	if p[2]&0x30 != 0 {
@@ -732,6 +738,13 @@ func decodeWrapperAction(w []byte, limit, depth int) (*wrapperMessage, error) {
 	f := map[string]any{"wrapper_version": v, "source_wport": src, "destination_wport": dst, "payload_length": n, "wrapper_header_hex": hex.EncodeToString(w[:8]), "apdu_hex": hex.EncodeToString(p), "association_observed": false, "authentication_verified": false, "object_model_verified": false, "command": p[0], "service_choice": p[1], "invoke_id_and_priority": p[2], "invoke_id": p[2] & 15, "high_priority": p[2]&128 != 0, "confirmed_service": p[2]&64 != 0, "unused_flag_bits_raw": p[2] & 0x30}
 	m := &wrapperMessage{fields: f, source: src, destination: dst, command: p[0], invoke: p[2] & 15, flags: p[2], request: p[0] == 0xc3, confirmed: p[2]&64 != 0, choice: 1, count: 1}
 	f["operation_success_verified"] = false
+	if wrapperIsActionList(w) {
+		m.choice = 3
+		if err := decodeWrapperActionList(m, p, limit, depth); err != nil {
+			return nil, err
+		}
+		return m, nil
+	}
 	if m.request {
 		if len(p) < 13 {
 			return bad("Action-normal descriptor truncated")
@@ -794,7 +807,7 @@ func decodeWrapperAction(w []byte, limit, depth int) (*wrapperMessage, error) {
 				if len(p) != 7 {
 					return bad("Action return access result missing or trailing bytes")
 				}
-				if !wrapperActionResultKnown(p[6]) {
+				if !wrapperDataAccessResultKnown(p[6]) {
 					return unsupported("Action access result outside pinned enumeration")
 				}
 				f["return_choice"], f["data_access_result"] = "data-access-result", p[6]
@@ -820,8 +833,8 @@ func (s *binDLMSWrapper) pendingOperations() []wrapperToken {
 }
 func wrapperOperationCloseFields(k wrapperToken, command, choice byte, count int) map[string]any {
 	fields := map[string]any{"Outstanding": 1, "source_wport": k.source, "destination_wport": k.destination, "invoke_id": k.invoke, "request_command": command}
-	if command == 0xc1 && choice == 4 {
-		fields["service_choice"], fields["list_count"] = byte(4), uint64(count)
+	if command == 0xc1 && choice == 4 || command == 0xc3 && choice == 3 {
+		fields["service_choice"], fields["list_count"] = choice, uint64(count)
 	}
 	return fields
 }
@@ -830,6 +843,9 @@ func wrapperIsSet(w []byte) bool {
 	return len(w) > 8 && w[0] == 0 && w[1] == 1 && (w[8] == 0xc1 || w[8] == 0xc5)
 }
 func wrapperOperationName(command, choice byte) string {
+	if command == 0xc3 && choice == 3 {
+		return "Action-with-list"
+	}
 	if command == 0xc1 && choice == 4 {
 		return "Set-with-list"
 	}
@@ -839,6 +855,9 @@ func wrapperOperationName(command, choice byte) string {
 	return "Action"
 }
 func wrapperOperationProfile(command, choice byte) string {
+	if command == 0xc3 && choice == 3 {
+		return "dlms-wrapper-v1-action-list"
+	}
 	if command == 0xc1 && choice == 4 {
 		return "dlms-wrapper-v1-set-list"
 	}
@@ -904,7 +923,7 @@ func decodeWrapperSet(w []byte, limit, depth int) (*wrapperMessage, error) {
 		if len(p) != 4 {
 			return bad("Set-normal result missing or trailing bytes")
 		}
-		if !wrapperActionResultKnown(p[3]) {
+		if !wrapperDataAccessResultKnown(p[3]) {
 			return unsupported("Set access result outside pinned enumeration")
 		}
 		f["kind"], f["data_access_result"], f["result_success"] = "SetResponseNormal", p[3], p[3] == 0

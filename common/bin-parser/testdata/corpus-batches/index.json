@@ -107015,6 +107015,344 @@
         "common/pcapx/pcaputil/dlms-set-list/pending-list-private-Close.pcap": "dlms-set-list/announced-list-count2-cap1-refused.pcap",
         "scripts/protocol-tests/required-tests-traffic-unified-v124.json": "required-tests-traffic-unified-v124.json"
       }
+    },
+    {
+      "id": "validation-dlms-action-list",
+      "kind": "support",
+      "source_sha": "f1da55355ae6a9a70c5ef4a09bffe601c932b146",
+      "file": "validation-dlms-action-list.zip",
+      "sha256": "7f30131cb2a3563e5105239310d1199c86b96a297a04e63c89df1e93af089d66",
+      "password": "bin-parser",
+      "members": {
+        "dlms-action-list-tools/SOURCES.json": {
+          "sha256": "de2003bf8505ae5e1bfb6cd4474252bebb6e482e43a3006b3d4cc631ad3d667d",
+          "bytes": 1505
+        },
+        "dlms-action-list-tools/generate-captures.py": {
+          "sha256": "11c85ad5af9b4e2b510c9437e8f6b355af45596843e5cc4a8a572b653f3319a0",
+          "bytes": 1155
+        },
+        "dlms-action-list-tools/generate-controls.py": {
+          "sha256": "e4187c94006afaa4975def15f4f7d8ea258dc05a4e334b98bb8bf96fdcbade28",
+          "bytes": 25258
+        },
+        "dlms-action-list-tools/verify.py": {
+          "sha256": "f6b43fdf1d48dfe44910cae78b96fd2791b0107875ae25afc810135287d40cb3",
+          "bytes": 3525
+        },
+        "dlms-action-list/Action-list-and-first-block-unimplemented.pcap": {
+          "sha256": "e6c34f24aef9266601c75905f40b2ab972cbc4346aa1a0def361ea16692892d6",
+          "bytes": 95
+        },
+        "dlms-action-list/Action-list-response-cannot-consume-Get-list-owner.pcap": {
+          "sha256": "7ceede006d16066d50a24fe38247de52bc041b11ee8b8e5a8d10c93ae73ec115",
+          "bytes": 263
+        },
+        "dlms-action-list/Action-list-response-cannot-consume-Set-list-owner.pcap": {
+          "sha256": "1e576f415fae5b01bc2038b04a2f080266690d50e18b4648fc3ed5ff785b8660",
+          "bytes": 268
+        },
+        "dlms-action-list/GBT-inner-Action-list-request-unimplemented.pcap": {
+          "sha256": "bf5b87ce6220ab7544e34e4e4805abc0e6f9cb80cda83f19e1081fe892087894",
+          "bytes": 126
+        },
+        "dlms-action-list/GBT-inner-Action-list-response-unimplemented.pcap": {
+          "sha256": "c4e67b29bc4b57543403e121ad44409c1b7afb1a3ba88e0437ffb9299f821e43",
+          "bytes": 105
+        },
+        "dlms-action-list/Get-block-cannot-consume-Action-list-owner.pcap": {
+          "sha256": "5a01aae64ae6005be9aabff894f4e0c79f88eb1a22e341c6e158e0dddb41ddf8",
+          "bytes": 269
+        },
+        "dlms-action-list/Get-list-response-cannot-consume-Action-list-owner.pcap": {
+          "sha256": "f35813ab4cae8e76d27a931131f767b64480fdc712dde212e258aa043a0cdcb9",
+          "bytes": 268
+        },
+        "dlms-action-list/Get-next-cannot-consume-Action-list-owner.pcap": {
+          "sha256": "13db05cd3e07facf2090974b68d9a4f2620463654f4c880ede6e5a1ed0924ff6",
+          "bytes": 266
+        },
+        "dlms-action-list/Set-list-response-cannot-consume-Action-list-owner.pcap": {
+          "sha256": "878dfa1d51eb3283a8e955c294c2f01521c602d3a4179549db0f71cd46f49a29",
+          "bytes": 265
+        },
+        "dlms-action-list/all-Action-results-success.pcap": {
+          "sha256": "c8fa7674361b1497b5ed82bc8266567102a9efe10dad4d044fd39d1282a44a0d",
+          "bytes": 193
+        },
+        "dlms-action-list/complete-WPDU-missing-return-optional.pcap": {
+          "sha256": "97e1b3ddb23a4492310622799ef3faf192f581cd3358ce617b11025870d50ad4",
+          "bytes": 95
+        },
+        "dlms-action-list/complete-WPDU-truncated-method-descriptor.pcap": {
+          "sha256": "0d990fb603bf7a8186505d91c6c16d11b4efd4863165db438770955360b6a724",
+          "bytes": 95
+        },
+        "dlms-action-list/complete-WPDU-truncated-parameter-Data.pcap": {
+          "sha256": "b253963ffc09fc169699f010f1da64c0f6b1a927f067a30c8ffb1d68a53a65ba",
+          "bytes": 108
+        },
+        "dlms-action-list/complete-WPDU-truncated-return-Data.pcap": {
+          "sha256": "bf6cb4e46c7a65b9d77a72cf5b911a332bd1deb4a8b012b1509641d720d665a4",
+          "bytes": 101
+        },
+        "dlms-action-list/completed-Action-list-ID-reuse.pcap": {
+          "sha256": "860f39e23b036cd107126c93b908a363e9fa8f7bdb829773044dd96067e68878",
+          "bytes": 362
+        },
+        "dlms-action-list/controls.json": {
+          "sha256": "aec227f265e5f58537658bed647837a6cd3b14abeee86b344f6390c799a70793",
+          "bytes": 993106
+        },
+        "dlms-action-list/empty-Action-method-list-selected-unsupported.pcap": {
+          "sha256": "507d4e76fd9cb0f5fc6fb8b5ecb8a2868bcf0762b1a43367cf19f8332ff75292",
+          "bytes": 95
+        },
+        "dlms-action-list/empty-Action-result-list-selected-unsupported.pcap": {
+          "sha256": "f8f6e4880510ae703cbc49d5ca10db1cb34fa1dc94765c98b6263c01e7775b8c",
+          "bytes": 94
+        },
+        "dlms-action-list/exact-Action-list-retry-conservative-ambiguity.pcap": {
+          "sha256": "364c178e933d848770bc11f4ada16a517e2f5c588a320231d46629ccc29b6c12",
+          "bytes": 288
+        },
+        "dlms-action-list/interleaved-distinct-Action-list-invokes.pcap": {
+          "sha256": "9736808d5f726c911cd953bf2fb307dc9c93b58547b9a33e30e7c0ac95c1e18f",
+          "bytes": 347
+        },
+        "dlms-action-list/list-Action-result17-unsupported.pcap": {
+          "sha256": "7da37f982a25be481bbcd66775e78463e81ee3d3d8963135664421c06823457d",
+          "bytes": 96
+        },
+        "dlms-action-list/list-Action-result18-unsupported.pcap": {
+          "sha256": "d673c3efa80e315c0af2dfb21b80d20e242cfa4367ddd0c4c4a02c35944982d0",
+          "bytes": 96
+        },
+        "dlms-action-list/list-Action-result19-unsupported.pcap": {
+          "sha256": "cc9d4ea2ef3d2745af9b987365e9583d69aeb29eb8b4e53f1cb6f6f6c5be30f7",
+          "bytes": 96
+        },
+        "dlms-action-list/list-Action-result255-unsupported.pcap": {
+          "sha256": "00249ea6af7b5860ef5e8180791d7f1c6c908ffb7c907a68e0179114cd38e4a0",
+          "bytes": 96
+        },
+        "dlms-action-list/list-count2-cap1-refused.pcap": {
+          "sha256": "ac4a920fee9de3539411439e0e138125a0ef2647b5d115b788741ed2c53f6af9",
+          "bytes": 119
+        },
+        "dlms-action-list/list-response-cannot-consume-normal-owner.pcap": {
+          "sha256": "3dd92f15c50e2efaf55b5d82ca7dec962f5f2337cc9d0a5f77100441c7457afb",
+          "bytes": 253
+        },
+        "dlms-action-list/mixed-Action-list-normal-Set-list-normal-Close.pcap": {
+          "sha256": "013485c1dea7af00dc2ba9889cb9a338915a622e77b7d949a0489917c37ba723",
+          "bytes": 385
+        },
+        "dlms-action-list/noncanonical-return-optional2.pcap": {
+          "sha256": "28f64cd51e9e9b3c3d0996d3800ea5310555a7c072505280b62f593eb73149f5",
+          "bytes": 96
+        },
+        "dlms-action-list/normal-Action-result17-unsupported.pcap": {
+          "sha256": "0e617806b6007449f2deedf785169cce2815b87b8b2daed7d6a8343d23d11ef1",
+          "bytes": 179
+        },
+        "dlms-action-list/normal-Action-result18-unsupported.pcap": {
+          "sha256": "39068ca8610decfc802817b20e6ef755ec648bcb4eb3003cea0262f3f6b98786",
+          "bytes": 179
+        },
+        "dlms-action-list/normal-Action-result19-unsupported.pcap": {
+          "sha256": "881229724320efabf9d88a55fc84d24cedf465d6ee5354a6d2c9b49102fbb38c",
+          "bytes": 179
+        },
+        "dlms-action-list/normal-Set-access17-valid.pcap": {
+          "sha256": "846e5beadf7019a16df628a1200bd9bca2ad2b782841135cf1effa2ae0f2ba1a",
+          "bytes": 178
+        },
+        "dlms-action-list/normal-list-Action-request-ID-reuse.pcap": {
+          "sha256": "7367db496d45a4ee41c5165d8ef02683af20bdbaad9a9867099dbce4c8bea881",
+          "bytes": 348
+        },
+        "dlms-action-list/normal-response-cannot-consume-list-owner.pcap": {
+          "sha256": "ab0411de5adfa4fed5f69582d3fbece41561bd34932cca59b951332ef59f8c53",
+          "bytes": 264
+        },
+        "dlms-action-list/normal-return-access17-18-19-distinct-invokes.pcap": {
+          "sha256": "a531e33a2edfd67b271e8a6864f04c54f810c62452552df7c5d14a6a9a0df49c",
+          "bytes": 495
+        },
+        "dlms-action-list/normal-return-access17-valid.pcap": {
+          "sha256": "f8e3c4257350f0eaf1fc808768de4709b89676043cd8705d99dd004297dff9b4",
+          "bytes": 181
+        },
+        "dlms-action-list/one-method-list-remains-list.pcap": {
+          "sha256": "ba459c54461749285854a02068bab6f14b6f83fe7c0990b7c84922bdb80fe9e7",
+          "bytes": 177
+        },
+        "dlms-action-list/orphan-Action-list-response.pcap": {
+          "sha256": "1dde8a48900f65c1a4d58a842503837f9db63d279d875c58076b3b66d8f2028c",
+          "bytes": 98
+        },
+        "dlms-action-list/request-descriptor-parameter-count-unequal-selected-unsupported.pcap": {
+          "sha256": "8750ee5eba9c25345448a85e6e752c898f4437f7a325c92fcd6e7db49c6f07ad",
+          "bytes": 118
+        },
+        "dlms-action-list/request-list-trailing-byte.pcap": {
+          "sha256": "18945c13ba8c4bc3fabcb45763e4c564502e0f577a44f3ea25d7a38a9ea1f321",
+          "bytes": 120
+        },
+        "dlms-action-list/response-list-trailing-byte.pcap": {
+          "sha256": "11689b8ff14ab43eec73b298c104a9deb5aafa5a2cb0444029937bdadd594491",
+          "bytes": 99
+        },
+        "dlms-action-list/result-count-conflict-retires-owner.pcap": {
+          "sha256": "5444b2238cf9eae21dd608c1faaddcba4d0d1db76cff328b4aceaa02d8242363",
+          "bytes": 265
+        },
+        "dlms-action-list/return-Data-and-return-access17.pcap": {
+          "sha256": "66f67080ff76e795a717c7b8c5ce15db4ae9fc7aeb0ad5ff8e942b4735e5b1e5",
+          "bytes": 198
+        },
+        "dlms-action-list/return-access18-still-observed.pcap": {
+          "sha256": "1c5adabc4761fda91d92565d1446bac9d778edefa868552e69eca672eb003939",
+          "bytes": 195
+        },
+        "dlms-action-list/return-access19-still-observed.pcap": {
+          "sha256": "0294f6dd94af05662a0f59860a1d2606a950fd11f43acd0a9594238fa399fe23",
+          "bytes": 195
+        },
+        "dlms-action-list/reuse-inputs.json": {
+          "sha256": "ca3d163bab055381827226140568f3bef7eaac187cebd76878e0b63e9e442356",
+          "bytes": 3
+        },
+        "dlms-action-list/shared-parameter-Data-four-nodes-cap3-refused.pcap": {
+          "sha256": "1b7021f9bfdb5d9d6f0287ec78efef8da4a62bdd736cbd6ba034a7064b9be271",
+          "bytes": 123
+        },
+        "dlms-action-list/shared-return-Data-four-nodes-cap3-refused.pcap": {
+          "sha256": "2e46ae00ee2276d2bc5f790d2154490daef7721e5a9b4d095cb5dc203fd37fc5",
+          "bytes": 205
+        },
+        "dlms-action-list/source-grammar-octet-and-null-parameters.pcap": {
+          "sha256": "d91ebf931e766a0b7479080096d21eebed3e48bfbd02d1e6b4d1740bed919324",
+          "bytes": 193
+        },
+        "dlms-action-list/structured-parameter-and-return-Data.pcap": {
+          "sha256": "f2d5e8aa709ac423205d4909be24d9f9929dfb04026cf04d49ab7d5132e6e786",
+          "bytes": 209
+        },
+        "dlms-action-list/three-parameters-eight-nodes-cap7-refused.pcap": {
+          "sha256": "c7a815afd6edec4e7a2ef5b9329563898de536cd3f6997165b3146bfafcffc74",
+          "bytes": 142
+        },
+        "dlms-action-list/three-parameters-eight-nodes-cap8.pcap": {
+          "sha256": "31ddac0d4e9f1a078baee9fa79c2562ffac211f64ce27fe771030fb6fca5ed49",
+          "bytes": 218
+        },
+        "dlms-action-list/two-pending-Action-list-Close-event-order.pcap": {
+          "sha256": "7444fe275fc1923f1e7ba2535e5251dfc6bbe0f3a53d3a3db9f3e8c3b9bfbcae",
+          "bytes": 201
+        },
+        "dlms-action-list/unsupported-return-choice2.pcap": {
+          "sha256": "3322547162ecb1c333ccedc5f55da3d46e0f33c2f32b069a44b669e73162ec28",
+          "bytes": 98
+        },
+        "dlms-action-list/wrong-Wrapper-port-preserves-owner.pcap": {
+          "sha256": "cb43dea4fd19b560b73b7c6a0e5a8a57c8a17e816e922ec55c34087eac23a04f",
+          "bytes": 267
+        },
+        "dlms-action-list/wrong-direction-preserves-owner.pcap": {
+          "sha256": "7f1cb10e2736bea89b53540401d8dd346c777f7277271cdc14e099d1b689dfcc",
+          "bytes": 267
+        },
+        "dlms-action-list/wrong-full-flags-preserves-owner.pcap": {
+          "sha256": "ac14b0b33ee231031c038fc397406d4e102edf195c9a7b091065c05fa9ab608a",
+          "bytes": 267
+        },
+        "dlms-action-list/wrongflags-list-response-preserves-normal-owner.pcap": {
+          "sha256": "a624c1d0bea0ed026a733882e5e2071e05c667c16c3ce9d4728730cfe699487d",
+          "bytes": 253
+        },
+        "dlms-action-list/wrongflags-normal-response-preserves-list-owner.pcap": {
+          "sha256": "f3873858d1ecb898bc87a3e500d710f71ca1732a51578b3c9e0a78a9f30dba57",
+          "bytes": 264
+        },
+        "required-tests-traffic-unified-v125.json": {
+          "sha256": "6a4c52d82ac20863d388767131cf225add0e4ec66d695244f97340f2003e0778",
+          "bytes": 20797759
+        },
+        "validation/expected.json": {
+          "sha256": "8a3334b902843e29d272776e89974e9e7461890c6a2ad91907c077a3aa028421",
+          "bytes": 78255
+        }
+      },
+      "aliases": {
+        "common/pcapx/pcaputil/dlms-action-list-tools/SOURCES.json": "dlms-action-list-tools/SOURCES.json",
+        "common/pcapx/pcaputil/dlms-action-list-tools/generate-captures.py": "dlms-action-list-tools/generate-captures.py",
+        "common/pcapx/pcaputil/dlms-action-list-tools/generate-controls.py": "dlms-action-list-tools/generate-controls.py",
+        "common/pcapx/pcaputil/dlms-action-list-tools/verify.py": "dlms-action-list-tools/verify.py",
+        "common/pcapx/pcaputil/dlms-action-list/Action-list-and-first-block-unimplemented.pcap": "dlms-action-list/Action-list-and-first-block-unimplemented.pcap",
+        "common/pcapx/pcaputil/dlms-action-list/Action-list-response-cannot-consume-Get-list-owner.pcap": "dlms-action-list/Action-list-response-cannot-consume-Get-list-owner.pcap",
+        "common/pcapx/pcaputil/dlms-action-list/Action-list-response-cannot-consume-Set-list-owner.pcap": "dlms-action-list/Action-list-response-cannot-consume-Set-list-owner.pcap",
+        "common/pcapx/pcaputil/dlms-action-list/GBT-inner-Action-list-request-unimplemented.pcap": "dlms-action-list/GBT-inner-Action-list-request-unimplemented.pcap",
+        "common/pcapx/pcaputil/dlms-action-list/GBT-inner-Action-list-response-unimplemented.pcap": "dlms-action-list/GBT-inner-Action-list-response-unimplemented.pcap",
+        "common/pcapx/pcaputil/dlms-action-list/Get-block-cannot-consume-Action-list-owner.pcap": "dlms-action-list/Get-block-cannot-consume-Action-list-owner.pcap",
+        "common/pcapx/pcaputil/dlms-action-list/Get-list-response-cannot-consume-Action-list-owner.pcap": "dlms-action-list/Get-list-response-cannot-consume-Action-list-owner.pcap",
+        "common/pcapx/pcaputil/dlms-action-list/Get-next-cannot-consume-Action-list-owner.pcap": "dlms-action-list/Get-next-cannot-consume-Action-list-owner.pcap",
+        "common/pcapx/pcaputil/dlms-action-list/Set-list-response-cannot-consume-Action-list-owner.pcap": "dlms-action-list/Set-list-response-cannot-consume-Action-list-owner.pcap",
+        "common/pcapx/pcaputil/dlms-action-list/all-Action-results-success.pcap": "dlms-action-list/all-Action-results-success.pcap",
+        "common/pcapx/pcaputil/dlms-action-list/complete-WPDU-missing-return-optional.pcap": "dlms-action-list/complete-WPDU-missing-return-optional.pcap",
+        "common/pcapx/pcaputil/dlms-action-list/complete-WPDU-truncated-method-descriptor.pcap": "dlms-action-list/complete-WPDU-truncated-method-descriptor.pcap",
+        "common/pcapx/pcaputil/dlms-action-list/complete-WPDU-truncated-parameter-Data.pcap": "dlms-action-list/complete-WPDU-truncated-parameter-Data.pcap",
+        "common/pcapx/pcaputil/dlms-action-list/complete-WPDU-truncated-return-Data.pcap": "dlms-action-list/complete-WPDU-truncated-return-Data.pcap",
+        "common/pcapx/pcaputil/dlms-action-list/completed-Action-list-ID-reuse.pcap": "dlms-action-list/completed-Action-list-ID-reuse.pcap",
+        "common/pcapx/pcaputil/dlms-action-list/controls.json": "dlms-action-list/controls.json",
+        "common/pcapx/pcaputil/dlms-action-list/empty-Action-method-list-selected-unsupported.pcap": "dlms-action-list/empty-Action-method-list-selected-unsupported.pcap",
+        "common/pcapx/pcaputil/dlms-action-list/empty-Action-result-list-selected-unsupported.pcap": "dlms-action-list/empty-Action-result-list-selected-unsupported.pcap",
+        "common/pcapx/pcaputil/dlms-action-list/exact-Action-list-retry-conservative-ambiguity.pcap": "dlms-action-list/exact-Action-list-retry-conservative-ambiguity.pcap",
+        "common/pcapx/pcaputil/dlms-action-list/interleaved-distinct-Action-list-invokes.pcap": "dlms-action-list/interleaved-distinct-Action-list-invokes.pcap",
+        "common/pcapx/pcaputil/dlms-action-list/list-Action-result17-unsupported.pcap": "dlms-action-list/list-Action-result17-unsupported.pcap",
+        "common/pcapx/pcaputil/dlms-action-list/list-Action-result18-unsupported.pcap": "dlms-action-list/list-Action-result18-unsupported.pcap",
+        "common/pcapx/pcaputil/dlms-action-list/list-Action-result19-unsupported.pcap": "dlms-action-list/list-Action-result19-unsupported.pcap",
+        "common/pcapx/pcaputil/dlms-action-list/list-Action-result255-unsupported.pcap": "dlms-action-list/list-Action-result255-unsupported.pcap",
+        "common/pcapx/pcaputil/dlms-action-list/list-count2-cap1-refused.pcap": "dlms-action-list/list-count2-cap1-refused.pcap",
+        "common/pcapx/pcaputil/dlms-action-list/list-response-cannot-consume-normal-owner.pcap": "dlms-action-list/list-response-cannot-consume-normal-owner.pcap",
+        "common/pcapx/pcaputil/dlms-action-list/mixed-Action-list-normal-Set-list-normal-Close.pcap": "dlms-action-list/mixed-Action-list-normal-Set-list-normal-Close.pcap",
+        "common/pcapx/pcaputil/dlms-action-list/noncanonical-return-optional2.pcap": "dlms-action-list/noncanonical-return-optional2.pcap",
+        "common/pcapx/pcaputil/dlms-action-list/normal-Action-result17-unsupported.pcap": "dlms-action-list/normal-Action-result17-unsupported.pcap",
+        "common/pcapx/pcaputil/dlms-action-list/normal-Action-result18-unsupported.pcap": "dlms-action-list/normal-Action-result18-unsupported.pcap",
+        "common/pcapx/pcaputil/dlms-action-list/normal-Action-result19-unsupported.pcap": "dlms-action-list/normal-Action-result19-unsupported.pcap",
+        "common/pcapx/pcaputil/dlms-action-list/normal-Set-access17-valid.pcap": "dlms-action-list/normal-Set-access17-valid.pcap",
+        "common/pcapx/pcaputil/dlms-action-list/normal-list-Action-request-ID-reuse.pcap": "dlms-action-list/normal-list-Action-request-ID-reuse.pcap",
+        "common/pcapx/pcaputil/dlms-action-list/normal-response-cannot-consume-list-owner.pcap": "dlms-action-list/normal-response-cannot-consume-list-owner.pcap",
+        "common/pcapx/pcaputil/dlms-action-list/normal-return-access17-18-19-distinct-invokes.pcap": "dlms-action-list/normal-return-access17-18-19-distinct-invokes.pcap",
+        "common/pcapx/pcaputil/dlms-action-list/normal-return-access17-valid.pcap": "dlms-action-list/normal-return-access17-valid.pcap",
+        "common/pcapx/pcaputil/dlms-action-list/one-method-list-remains-list.pcap": "dlms-action-list/one-method-list-remains-list.pcap",
+        "common/pcapx/pcaputil/dlms-action-list/orphan-Action-list-response.pcap": "dlms-action-list/orphan-Action-list-response.pcap",
+        "common/pcapx/pcaputil/dlms-action-list/request-descriptor-parameter-count-unequal-selected-unsupported.pcap": "dlms-action-list/request-descriptor-parameter-count-unequal-selected-unsupported.pcap",
+        "common/pcapx/pcaputil/dlms-action-list/request-list-trailing-byte.pcap": "dlms-action-list/request-list-trailing-byte.pcap",
+        "common/pcapx/pcaputil/dlms-action-list/response-list-trailing-byte.pcap": "dlms-action-list/response-list-trailing-byte.pcap",
+        "common/pcapx/pcaputil/dlms-action-list/result-count-conflict-retires-owner.pcap": "dlms-action-list/result-count-conflict-retires-owner.pcap",
+        "common/pcapx/pcaputil/dlms-action-list/return-Data-and-return-access17.pcap": "dlms-action-list/return-Data-and-return-access17.pcap",
+        "common/pcapx/pcaputil/dlms-action-list/return-access18-still-observed.pcap": "dlms-action-list/return-access18-still-observed.pcap",
+        "common/pcapx/pcaputil/dlms-action-list/return-access19-still-observed.pcap": "dlms-action-list/return-access19-still-observed.pcap",
+        "common/pcapx/pcaputil/dlms-action-list/reuse-inputs.json": "dlms-action-list/reuse-inputs.json",
+        "common/pcapx/pcaputil/dlms-action-list/shared-parameter-Data-four-nodes-cap3-refused.pcap": "dlms-action-list/shared-parameter-Data-four-nodes-cap3-refused.pcap",
+        "common/pcapx/pcaputil/dlms-action-list/shared-return-Data-four-nodes-cap3-refused.pcap": "dlms-action-list/shared-return-Data-four-nodes-cap3-refused.pcap",
+        "common/pcapx/pcaputil/dlms-action-list/source-grammar-octet-and-null-parameters.pcap": "dlms-action-list/source-grammar-octet-and-null-parameters.pcap",
+        "common/pcapx/pcaputil/dlms-action-list/structured-parameter-and-return-Data.pcap": "dlms-action-list/structured-parameter-and-return-Data.pcap",
+        "common/pcapx/pcaputil/dlms-action-list/three-parameters-eight-nodes-cap7-refused.pcap": "dlms-action-list/three-parameters-eight-nodes-cap7-refused.pcap",
+        "common/pcapx/pcaputil/dlms-action-list/three-parameters-eight-nodes-cap8.pcap": "dlms-action-list/three-parameters-eight-nodes-cap8.pcap",
+        "common/pcapx/pcaputil/dlms-action-list/two-pending-Action-list-Close-event-order.pcap": "dlms-action-list/two-pending-Action-list-Close-event-order.pcap",
+        "common/pcapx/pcaputil/dlms-action-list/unsupported-return-choice2.pcap": "dlms-action-list/unsupported-return-choice2.pcap",
+        "common/pcapx/pcaputil/dlms-action-list/wrong-Wrapper-port-preserves-owner.pcap": "dlms-action-list/wrong-Wrapper-port-preserves-owner.pcap",
+        "common/pcapx/pcaputil/dlms-action-list/wrong-direction-preserves-owner.pcap": "dlms-action-list/wrong-direction-preserves-owner.pcap",
+        "common/pcapx/pcaputil/dlms-action-list/wrong-full-flags-preserves-owner.pcap": "dlms-action-list/wrong-full-flags-preserves-owner.pcap",
+        "common/pcapx/pcaputil/dlms-action-list/wrongflags-list-response-preserves-normal-owner.pcap": "dlms-action-list/wrongflags-list-response-preserves-normal-owner.pcap",
+        "common/pcapx/pcaputil/dlms-action-list/wrongflags-normal-response-preserves-list-owner.pcap": "dlms-action-list/wrongflags-normal-response-preserves-list-owner.pcap",
+        "common/pcapx/pcaputil/dlms-action-list/list-Data-recursion-budget2.pcap": "dlms-action-list/shared-parameter-Data-four-nodes-cap3-refused.pcap",
+        "common/pcapx/pcaputil/dlms-action-list/pending-Action-list-private-Close.pcap": "dlms-action-list/list-count2-cap1-refused.pcap",
+        "scripts/protocol-tests/required-tests-traffic-unified-v125.json": "required-tests-traffic-unified-v125.json"
+      }
     }
   ],
   "schema_version": 1,

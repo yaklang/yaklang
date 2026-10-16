@@ -82,6 +82,9 @@ func (p *wrapperCompactProbe) data(level int) (compact, complete bool) {
 	return false, p.skip(int(n))
 }
 func wrapperContainsCompactData(w []byte) bool {
+	if wrapperIsActionList(w) {
+		return wrapperActionListContainsCompact(w)
+	}
 	if wrapperIsSetList(w) {
 		return wrapperSetListContainsCompact(w)
 	}
@@ -181,6 +184,66 @@ func wrapperSetListContainsCompact(w []byte) bool {
 		return false
 	}
 	for i := uint64(0); i < n; i++ {
+		yes, complete := p.data(0)
+		if yes {
+			return true
+		}
+		if !complete {
+			return false
+		}
+	}
+	return false
+}
+
+func wrapperActionListContainsCompact(w []byte) bool {
+	if !wrapperIsActionList(w) {
+		return false
+	}
+	p := wrapperCompactProbe{wire: w[8:], at: 3}
+	n, ok := p.count()
+	if !ok || n > uint64(wrapperListItems) {
+		return false
+	}
+	if w[8] == 0xc3 {
+		if !p.skip(9 * int(n)) {
+			return false
+		}
+		count, ok := p.count()
+		if !ok || count != n {
+			return false
+		}
+		for i := uint64(0); i < n; i++ {
+			yes, complete := p.data(0)
+			if yes {
+				return true
+			}
+			if !complete {
+				return false
+			}
+		}
+		return false
+	}
+	for i := uint64(0); i < n; i++ {
+		if !p.skip(2) {
+			return false
+		}
+		present := p.wire[p.at-1]
+		if present == 0 {
+			continue
+		}
+		if present != 1 || !p.skip(1) {
+			return false
+		}
+		choice := p.wire[p.at-1]
+		if choice == 1 {
+			if !p.skip(1) {
+				return false
+			}
+			continue
+		}
+		if choice != 0 {
+			return false
+		}
 		yes, complete := p.data(0)
 		if yes {
 			return true

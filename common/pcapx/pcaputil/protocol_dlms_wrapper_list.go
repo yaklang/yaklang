@@ -331,6 +331,9 @@ func wrapperNormalAccess(w []byte) bool {
 	return len(w) > 20 && w[8] == 0xc0 && w[9] == 1 && w[20] == 1
 }
 func wrapperProfile(w []byte) string {
+	if wrapperIsActionList(w) {
+		return "dlms-wrapper-v1-action-list"
+	}
 	if wrapperIsSetList(w) {
 		return "dlms-wrapper-v1-set-list"
 	}
@@ -358,6 +361,9 @@ func wrapperProfile(w []byte) string {
 	return "dlms-wrapper-v1-get-normal"
 }
 func wrapperProbeVersion(w []byte) string {
+	if wrapperIsActionList(w) {
+		return "v1-action-list"
+	}
 	if wrapperIsSetList(w) {
 		return "v1-set-list"
 	}
@@ -385,6 +391,17 @@ func wrapperProbeVersion(w []byte) string {
 	return "v1-get-normal"
 }
 func wrapperProjection(w []byte, n int) int64 {
+	if wrapperIsActionList(w) {
+		items := min(wrapperListItems, max(0, n-12)/2)
+		if w[8] == 0xc3 {
+			items = min(wrapperListItems, max(0, n-12)/9)
+		}
+		nodes := min(wrapperDataNodes, max(0, n-12))
+		if wrapperActionListContainsCompact(w) {
+			nodes = wrapperDataNodes
+		}
+		return 32768 + 512*int64(n) + 2048*int64(nodes) + 8192*int64(items)
+	}
 	if wrapperIsSetList(w) {
 		items := min(wrapperListItems, max(0, n-12))
 		if w[8] == 0xc1 {
@@ -511,7 +528,7 @@ func decodeWrapperSetList(m *wrapperMessage, p []byte, limit, depth int) error {
 			if e != nil {
 				return e
 			}
-			if !wrapperActionResultKnown(v[0]) {
+			if !wrapperDataAccessResultKnown(v[0]) {
 				return wrapperError(ErrUnsupportedFeature, "Set list access result outside pinned enumeration")
 			}
 			ok := v[0] == 0
@@ -524,6 +541,116 @@ func decodeWrapperSetList(m *wrapperMessage, p []byte, limit, depth int) error {
 	}
 	if c.at != len(p) {
 		return wrapperError(ErrMalformedMessage, "Set list has unexplained trailing bytes")
+	}
+	return nil
+}
+
+// Action lists use a distinct wire shape from normal Action. A single cursor
+// bounds every parameter/return Data graph; null-data stays an observed Data.
+func wrapperIsActionList(w []byte) bool {
+	return wrapperIsAction(w) && len(w) > 9 && w[9] == 3
+}
+
+func decodeWrapperActionList(m *wrapperMessage, p []byte, limit, depth int) error {
+	c := wrapperListCursor{wire: p, at: 3, maxDepth: depth}
+	n, enc, err := c.count()
+	if err != nil {
+		return err
+	}
+	if n == 0 {
+		return wrapperError(ErrUnsupportedFeature, "empty Action list outside selected profile")
+	}
+	if n > uint64(min(limit, wrapperListItems)) {
+		return wrapperError(ErrResourceExceeded, "Action list count exceeds selected collection budget")
+	}
+	f := m.fields
+	m.count = int(n)
+	f["list_count"], f["list_count_encoding_hex"] = n, enc
+	if m.request {
+		descriptors := make([]map[string]any, 0, int(n))
+		for i := 0; i < int(n); i++ {
+			start := c.at
+			w, e := c.take(9)
+			if e != nil {
+				return e
+			}
+			if int8(w[8]) <= 0 {
+				return wrapperError(ErrUnsupportedFeature, "positive signed8 Action list method profile")
+			}
+			descriptors = append(descriptors, map[string]any{"index": i, "apdu_offset": start, "class_id": binary.BigEndian.Uint16(w), "logical_name_hex": hex.EncodeToString(w[2:8]), "logical_name": fmt.Sprintf("%d.%d.%d.%d.%d.%d", w[2], w[3], w[4], w[5], w[6], w[7]), "method_id": int8(w[8]), "raw_hex": hex.EncodeToString(w), "encoded_length": 9})
+		}
+		count, countEnc, e := c.count()
+		if e != nil {
+			return e
+		}
+		if count > uint64(min(limit, wrapperListItems)) {
+			return wrapperError(ErrResourceExceeded, "Action parameter count exceeds selected collection budget")
+		}
+		if count != n {
+			return wrapperError(ErrUnsupportedFeature, "Action descriptor/parameter count outside verified equal-count profile")
+		}
+		parameters := make([]map[string]any, 0, int(n))
+		for i := 0; i < int(n); i++ {
+			start := c.at
+			data, e := c.data(limit, 0)
+			if e != nil {
+				return e
+			}
+			parameters = append(parameters, map[string]any{"index": i, "apdu_offset": start, "data": data, "raw_hex": hex.EncodeToString(p[start:c.at]), "encoded_length": c.at - start})
+		}
+		f["kind"], f["descriptors"], f["parameter_count"], f["parameter_count_encoding_hex"], f["parameters"] = "ActionRequestWithList", descriptors, count, countEnc, parameters
+	} else {
+		results := make([]map[string]any, 0, int(n))
+		success := 0
+		for i := 0; i < int(n); i++ {
+			start := c.at
+			v, e := c.take(2)
+			if e != nil {
+				return e
+			}
+			if !wrapperActionResultKnown(v[0]) {
+				return wrapperError(ErrUnsupportedFeature, "Action result outside pinned enumeration")
+			}
+			if v[1] > 1 {
+				return wrapperError(ErrUnsupportedFeature, "Action return optional selected canonical0/1")
+			}
+			item := map[string]any{"index": i, "apdu_offset": start, "action_result": v[0], "action_result_success": v[0] == 0, "return_parameters_present": v[1] == 1}
+			if v[0] == 0 {
+				success++
+			}
+			if v[1] == 1 {
+				choice, e := c.take(1)
+				if e != nil {
+					return e
+				}
+				item["return_choice_raw"] = choice[0]
+				switch choice[0] {
+				case 0:
+					data, e := c.data(limit, 0)
+					if e != nil {
+						return e
+					}
+					item["return_choice"], item["data"] = "data", data
+				case 1:
+					access, e := c.take(1)
+					if e != nil {
+						return e
+					}
+					if !wrapperDataAccessResultKnown(access[0]) {
+						return wrapperError(ErrUnsupportedFeature, "Action access result outside pinned enumeration")
+					}
+					item["return_choice"], item["data_access_result"] = "data-access-result", access[0]
+				default:
+					return wrapperError(ErrUnsupportedFeature, "Action return result selected choices0/1")
+				}
+			}
+			item["raw_hex"], item["encoded_length"] = hex.EncodeToString(p[start:c.at]), c.at-start
+			results = append(results, item)
+		}
+		f["kind"], f["results"], f["success_item_count"], f["error_item_count"], f["action_result_success"] = "ActionResponseWithList", results, success, int(n)-success, success == int(n)
+	}
+	if c.at != len(p) {
+		return wrapperError(ErrMalformedMessage, "Action list has unexplained trailing bytes")
 	}
 	return nil
 }
