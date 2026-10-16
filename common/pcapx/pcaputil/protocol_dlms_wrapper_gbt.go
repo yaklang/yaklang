@@ -201,6 +201,9 @@ func (f *binFlow) consumeWrapperGBT(s *binDLMSWrapper, m *wrapperMessage, dir in
 	if decoded.snRead {
 		return "", wrapperError(ErrUnsupportedFeature, "GBT-wrapped SN Read is outside selected wire-only profile")
 	}
+	if decoded.snWrite {
+		return "", wrapperError(ErrUnsupportedFeature, "GBT-wrapped SN Write is outside selected wire-only profile")
+	}
 	if err = f.consumeWrapperReserved(dir, inner, e, charge); err != nil {
 		return "", err
 	}

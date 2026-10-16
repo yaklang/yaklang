@@ -43,6 +43,7 @@ type wrapperMessage struct {
 	count                  int
 	request, confirmed     bool
 	snRead                 bool
+	snWrite                bool
 	blockNumber            uint32
 	setBlock, blockFirst   bool
 	actionUpload           bool
@@ -81,6 +82,9 @@ func decodeDLMSWrapperBudget(w []byte, limit, depth int) (*wrapperMessage, error
 	p := w[8:]
 	if len(p) == 0 {
 		return unsupported("empty WPDU has no selected Get APDU")
+	}
+	if p[0] == 0x06 || p[0] == 0x0d {
+		return decodeWrapperSNWrite(w, limit, depth)
 	}
 	if p[0] == 0x05 || p[0] == 0x0c {
 		return decodeWrapperSNRead(w, limit, depth)
@@ -425,12 +429,15 @@ func (f *binFlow) consumeWrapperReserved(dir int, w []byte, e *ProtocolEvent, fl
 		return err
 	}
 	assoc := "unmatched-response"
-	if m.snRead {
-		// SN Read has no invoke identifier on wire. A reversed wPort, count or
+	if m.snRead || m.snWrite {
+		// SN Read and Write have no invoke identifier on wire. A reversed wPort, count or
 		// transport direction cannot prove a request/response or AA relation.
 		// Observe its complete fields without touching any LN owner or epoch.
 		e.TransactionID, e.ResponseTo = 0, 0
 		assoc = "unverified-sn-read-observation"
+		if m.snWrite {
+			assoc = "unverified-sn-write-observation"
+		}
 	} else if s.blocked {
 		assoc = "ambiguous-conversation"
 	} else if m.acse {
@@ -709,7 +716,7 @@ func wrapperIncompletePrefix(w []byte, limit int) bool {
 		return false
 	}
 	n, err := wrapperFrameSize(w, limit)
-	return err == nil && n == 0 && (len(w) <= 8 || w[8] == 0x05 || w[8] == 0x0c || w[8] == 0xc0 || w[8] == 0xc4 || w[8] == 0xc1 || w[8] == 0xc5 || w[8] == 0xc3 || w[8] == 0xc7 || w[8] == 0xe0 || w[8] >= 0x60 && w[8] <= 0x64)
+	return err == nil && n == 0 && (len(w) <= 8 || w[8] == 0x05 || w[8] == 0x0c || w[8] == 0x06 || w[8] == 0x0d || w[8] == 0xc0 || w[8] == 0xc4 || w[8] == 0xc1 || w[8] == 0xc5 || w[8] == 0xc3 || w[8] == 0xc7 || w[8] == 0xe0 || w[8] >= 0x60 && w[8] <= 0x64)
 }
 func (a *binParser) probeWrapperDatagram(w []byte) ProbeResult {
 	n, err := wrapperFrameSize(w, min(a.budget.MaxFrameBytes, a.config.MaxMessageBytes))

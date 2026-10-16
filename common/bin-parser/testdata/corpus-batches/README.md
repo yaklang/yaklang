@@ -44,7 +44,7 @@ Run from the repository root:
 ```sh
 go run ./internal/trafficfixture/cmd/corpus test
 go test -json -count=1 -timeout=10m ./internal/trafficfixture/... ./common/bin-parser/... ./common/pcapx/... ./common/yak/cmd/yakcmds/shark-cli ./scripts/ci > traffic.jsonl
-go run ./internal/trafficfixture/cmd/corpus exec -- python3 @scripts/protocol-tests/check_go_test_json_v2.py traffic.jsonl --inventory @scripts/protocol-tests/required-tests-traffic-unified-v155.json --tier full
+go run ./internal/trafficfixture/cmd/corpus exec -- python3 @scripts/protocol-tests/check_go_test_json_v2.py traffic.jsonl --inventory @scripts/protocol-tests/required-tests-traffic-unified-v156.json --tier full
 ```
 
 The single `corpus` entry point uses the same bounded Go ZIP loader as tests.
@@ -83,7 +83,7 @@ their semantic coverage. The existing synthetic session keys are test inputs;
 production credentials, user private keys and material without redistribution
 permission belong in an external fixed-source download manifest.
 
-Current test requirements are sealed at `scripts/protocol-tests/required-tests-traffic-unified-v155.json`;
+Current test requirements are sealed at `scripts/protocol-tests/required-tests-traffic-unified-v156.json`;
 the historical inventories and all earlier batches remain unchanged.
 The supplemental small-corpus batch contains 26 minimal controls, their explicit
 expected facts, an offline generator and the compact pinned source manifest.
@@ -203,7 +203,7 @@ opaque selector bytes and one bounded Data value over Wrapper v1 TCP/UDP; object
 selector meaning, access permission and device operation are unverified. The
 original one-packet selective-access capture and original refused answer remain
 immutable; its now-supported answer is matched by exact input SHA and frame.
-The active inventory is `scripts/protocol-tests/required-tests-traffic-unified-v155.json`.
+The active inventory is `scripts/protocol-tests/required-tests-traffic-unified-v156.json`.
 
 The small-graph budget batch reuses accepted graph captures/answers and adds one
 249-byte UDP control for child count255 without child bytes. Its standalone proof
@@ -993,7 +993,7 @@ the normative answer; a missing numeric reference field is not a codec pass.
 Full/deferred, workers1/2/4, observers off/on, Feed chunks1/7/full, ownership,
 resources and close/refusal boundaries remain required.
 
-Current gate: `required-tests-traffic-unified-v155.json` with
+Current gate: `required-tests-traffic-unified-v156.json` with
 `check_go_test_json_v2.py`. The indexed validator preserves missing/unpassed,
 package invocation completion, descendant skips, failures and non-JSON checks;
 its mutation/differential harness is sealed with the material. Older checkers
@@ -1629,7 +1629,7 @@ userspace adapter; full kernel receiver/socket/timers and ECU endpoints do not.
 All161 preceding ZIPs remain byte-for-byte unchanged. Raw captures, dependencies,
 reference source/build output and process evidence stay outside Git.
 
-Current effective v155 inventory: 103,394 entries; 103,387 are mandatory for the full tier.
+Current effective v156 inventory: 104,051 entries; 104,044 are mandatory for the full tier.
 
 The opt-in `DynamicFlowControl` profile follows Linux v6.12 FC tuple updates (including WAIT without granting data). Disjoint address extensions or classical/FD carriers may share CAN IDs; unknown selectors cannot choose or mutate a conversation. Ambiguous selectors are rejected. Seven sealed cases exercise full/deferred, workers 1/2/4, and observer off/on, with exact fields, byte collections, contributor references, errors and resource ownership. The existing static FC profile remains unchanged. Pinned upstream FC and filter functions execute with declared userspace stubs; this is not a kernel/ECU endpoint. TShark 4.2.5 checks wire tuples and two complete payloads, but cannot independently reassemble the shared-address transcripts.
 
@@ -1818,3 +1818,5 @@ Plaintext Wrapper v1 SN Read observes ordered variable-name choice2 requests and
 Complete, unsegmented plaintext HDLC I/LLC SN Read05/ReadResponse0c now expose ordered variable-name2 and Data0/access-error1 rows with shared bounded typed Data and literal carrier fields. SN has no invoke/owner: a distinct same-direction request on the same logical link retires an older LN request; different logical addresses, reverse observations and pure responses preserve the neighbor owner. Fifteen independent64step traces plus two bare-command traces8steps cover full/deferred native/capture, fields/types/Session/errors/IDs/budgets/ownership and Close. Ordinary pending GET normal/list now emits typed incomplete Close for TCP and UDP, including fully assembled information requests; six traces10steps plus an exact historical18+20B assembled case prove the lifecycle fix. SDK memory execution validates minimal SN wire only; owner/lifecycle gold is independently authored. All251 prior archives remain immutable;1 capture is reused by hash. No SN segmentation, AA/object/security/device/parameterized/block/write claim.
 
 Two exact historical UDP HDLC foreign-endpoint/interface captures now add the newly supported pending GET Close for their own foreign flow. Hash-bound sidecar answers preserve all original three events and their fields/owners, per-interface endpoints/time and source bytes. The strict matrix checks exactly one additional private NeedMore/Outstanding:int1 diagnostic, repeatClose0 and release; old captures and original answers remain immutable.
+
+Plaintext Wrapper v1 SN Write06 variable-name2 now exposes separate descriptor/Data counts and ordered bounded typed values; WriteResponse0d exposes success NULL0 or error1. Selected1..16 equal lists are a local observation bound. SN has no invoke or pairing owner; valid Wrapper SN preserves an independently observed LN neighbor. Complete inner SN Write in GBT remains explicitly unsupported. Fifteen independent84step traces and two GBT8step traces cover full/deferred native/captured configurations, complete fields/types/Session/IDs/errors/budgets/Close and ownership. Actual fixed memory-only Gurux single-write and generic response framing/receiver are checked; its actual writeList choice04 is retained as an unsupported parameterized negative, not patched into a positive.32 new minimal captures reuse2 historical neighbors by SHA; all252 prior archives remain immutable. No HDLC SN Write, parameterized/block/GBT write, AA/object/security/device execution claim.
