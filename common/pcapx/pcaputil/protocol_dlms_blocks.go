@@ -16,7 +16,7 @@ type dlmsTransfer struct {
 	blocks  int
 }
 
-func dlmsBlockAPDU(p []byte) bool { return len(p) > 1 && p[1] == 2 }
+func dlmsBlockAPDU(p []byte) bool { return len(p) > 1 && (p[0] == 0xc0 || p[0] == 0xc4) && p[1] == 2 }
 func dlmsBlockError(err error) error {
 	var pe *ProtocolError
 	if errors.As(err, &pe) {

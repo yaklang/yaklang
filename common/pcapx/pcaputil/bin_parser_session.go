@@ -1493,6 +1493,16 @@ func (f *binFlow) finishSession(reason TrafficFlowCloseReason) {
 			e.Error = e.Summary
 			f.a.incomplete.Add(1)
 			f.a.emit(e)
+		} else if d.pending != nil && dlmsOperationKind(d.pending.kind) {
+			e := f.event(d.pending.dir, nil, "incomplete", string(reason)+": DLMS HDLC "+dlmsOperationName(d.pending.kind)+" ended with an unmatched request")
+			e.Profile = "dlms-hdlc-ln-operations"
+			e.nativeDLMSOrSLMPObservation = true
+			e.Session = dlmsOperationCloseFields(d.pending)
+			e.semanticSession = cloneSession(e.Session)
+			e.sessionError = &ProtocolError{Kind: ErrNeedMore, Message: e.Summary}
+			e.Error = e.Summary
+			f.a.incomplete.Add(1)
+			f.a.emit(e)
 		} else if d.pending != nil {
 			emit(d.pending.dir, map[string]any{"Outstanding": 1}, "DLMS HDLC exchange ended with an unmatched request")
 		}

@@ -235,6 +235,9 @@ func decodeDLMSInformation(m *dlmsMessage, info []byte, maxElements, depth int) 
 	if p[0] >= 0x60 && p[0] <= 0x64 {
 		return decodeDLMSACSEInformation(m, p, info[1], maxElements, depth)
 	}
+	if dlmsOperationAPDU(p) {
+		return decodeDLMSOperationInformation(m, p, info[1], maxElements, depth)
+	}
 	if p[0] != 0xc0 && p[0] != 0xc4 {
 		return unsupported("APDU is outside unencrypted LN Get-normal")
 	}
@@ -498,7 +501,7 @@ func probeDLMS(w []byte, limit int) ProbeResult {
 		}
 		return ProbeResult{Verdict: ProbeReject}
 	}
-	if list != nil || dlmsBlockAPDU(apdu) || dlmsNormalExtended(apdu) || dlmsNormalAccess(apdu) {
+	if dlmsOperationAPDU(apdu) || list != nil || dlmsBlockAPDU(apdu) || dlmsNormalExtended(apdu) || dlmsNormalAccess(apdu) {
 		// Probe never admits unsolicited responses. Check frame integrity with
 		// a zero Data pool; selected requests expand only after reservation too.
 		elements = 0
@@ -506,6 +509,10 @@ func probeDLMS(w []byte, limit int) ProbeResult {
 	m, e := decodeDLMS(w[:n], elements)
 	var pe *ProtocolError
 	if errors.As(e, &pe) && pe.Kind == ErrResourceExceeded {
+		if dlmsOperationAPDU(apdu) && len(apdu) > 1 && apdu[1] == 1 && (apdu[0] == 0xc1 || apdu[0] == 0xc3) {
+			return probeAccept("dlms", "hdlc-ln-operations", 98)
+		}
+
 		if len(list) != 0 && list[0] == 0xc0 {
 			return probeAccept("dlms", "hdlc-get-list", 98)
 		}
@@ -515,6 +522,9 @@ func probeDLMS(w []byte, limit int) ProbeResult {
 	}
 	if e != nil || !m.request {
 		return ProbeResult{Verdict: ProbeReject}
+	}
+	if dlmsOperationAPDU(apdu) {
+		return probeAccept("dlms", "hdlc-ln-operations", 98)
 	}
 	return probeAccept("dlms", "hdlc-get-normal", 98)
 }
@@ -568,7 +578,7 @@ func (s *binDLMS) consume(m *dlmsMessage, w []byte, dir int, id uint64) (map[str
 		m.fields["Association"] = "unassociated-link-observation"
 		return m.fields, 0, nil
 	}
-	if m.kind == "GET" && s.hdlcEndpointRetired(dir, m.source, m.destination, m.request) {
+	if dlmsSequencedService(m.kind) && s.hdlcEndpointRetired(dir, m.source, m.destination, m.request) {
 		return ctx("Get belongs to retired association context")
 	}
 	if s.ambiguous {
@@ -607,7 +617,7 @@ func (s *binDLMS) consume(m *dlmsMessage, w []byte, dir int, id uint64) (map[str
 			s.invalidate()
 			return ctx("more than one distinct outstanding request")
 		}
-		if m.kind == "GET" {
+		if dlmsSequencedService(m.kind) {
 			if s.seenRequest[m.invoke]&(1<<m.ns) != 0 {
 				s.ambiguous = true
 				return ctx("invoke ID and HDLC send sequence reused in conversation")
@@ -632,7 +642,7 @@ func (s *binDLMS) consume(m *dlmsMessage, w []byte, dir int, id uint64) (map[str
 		return m.fields, 0, nil
 	}
 	p := s.pending
-	if p == nil && s.clientKnown && m.kind == "GET" && (!s.seqKnown[dir] || m.ns == s.next[dir]) {
+	if p == nil && s.clientKnown && dlmsSequencedService(m.kind) && (!s.seqKnown[dir] || m.ns == s.next[dir]) {
 		// An orphan at the next peer sequence can belong to a missed request.
 		// Repeating that response after a later request cannot establish a new
 		// binding. A prior-sequence duplicate still leaves adjacent traffic usable.
@@ -641,8 +651,8 @@ func (s *binDLMS) consume(m *dlmsMessage, w []byte, dir int, id uint64) (map[str
 	if p == nil || p.dir == dir || p.source != m.destination || p.destination != m.source {
 		return ctx("response lacks reversed observed endpoint/logical-address request")
 	}
-	if m.kind == "GET" {
-		if p.kind != "GET" || p.invoke != m.invoke || p.flags != m.flags || p.choice != m.choice || p.count != m.count || m.nr != (p.ns+1)&7 {
+	if dlmsSequencedService(m.kind) {
+		if p.kind != m.kind || p.invoke != m.invoke || p.flags != m.flags || p.choice != m.choice || p.count != m.count || m.nr != (p.ns+1)&7 {
 			return ctx("response service/invoke/acknowledgement differs from pending request")
 		}
 		if s.seqKnown[dir] && m.ns != s.next[dir] {
@@ -718,8 +728,12 @@ func (f *binFlow) consumeDecodedDLMS(dir int, w []byte, id uint64, m *dlmsMessag
 			m.fields["HDLC Segmentation"] = meta
 		}
 	}
-	if (m.kind == "GET" || m.kind == "I") && s.hdlcEndpointRetired(dir, m.source, m.destination, m.request) {
+	if (dlmsSequencedService(m.kind) || m.kind == "I") && s.hdlcEndpointRetired(dir, m.source, m.destination, m.request) {
 		return nil, 0, dlmsError(ErrContextRequired, "Get information belongs to retired association context")
+	}
+	if m.kind == "I" && s.fragments == nil && len(m.information) >= 4 && m.information[0] == 0xe6 && (m.information[1] == 0xe6 || m.information[1] == 0xe7) && m.information[2] == 0 && dlmsOperationAPDU(m.information[3:]) {
+		s.invalidate()
+		return nil, 0, dlmsError(ErrUnsupportedFeature, "segmented Set/Action information is not implemented")
 	}
 	if m.kind == "I" || s.fragments != nil {
 		return f.consumeDLMSSegments(dir, w, id, m)
@@ -727,7 +741,7 @@ func (f *binFlow) consumeDecodedDLMS(dir int, w []byte, id uint64, m *dlmsMessag
 	if m.kind == "GET" && m.choice == 2 {
 		return f.consumeDLMSBlock(dir, w, id, m)
 	}
-	if m.request && m.kind == "GET" && s.pending == nil && s.seenRequest[m.invoke]&(1<<m.ns) == 0 && int(s.seenCount) >= f.a.budget.MaxCollectionElements {
+	if m.request && dlmsSequencedService(m.kind) && s.pending == nil && s.seenRequest[m.invoke]&(1<<m.ns) == 0 && int(s.seenCount) >= f.a.budget.MaxCollectionElements {
 		s.ambiguous = true
 		return nil, 0, dlmsError(ErrResourceExceeded, "retained invoke/sequence token limit")
 	}
@@ -769,6 +783,9 @@ func dlmsUDPRefusalHint(w []byte) bool {
 		return false
 	}
 	p := w[at+3:]
+	if bytes.Equal(p[:3], []byte{0xe6, 0xe6, 0}) && (p[3] == 0xc1 || p[3] == 0xc3) {
+		return p[4] == 1 && p[5]&0x30 == 0
+	}
 	return bytes.Equal(p[:4], []byte{0xe6, 0xe6, 0, 0xc0}) && (p[4] == 1 || p[4] == 2 || p[4] == 3) && p[5]&0x30 == 0
 }
 

@@ -21,14 +21,14 @@ func dlmsAPDU(w []byte) []byte {
 		return nil
 	}
 	p := w[at+6 : end] // control, HCS(2), LLC(3)
-	if len(p) < 2 || p[0] != 0xc0 && p[0] != 0xc4 && (p[0] < 0x60 || p[0] > 0x64) {
+	if len(p) < 2 || p[0] != 0xc0 && p[0] != 0xc4 && !dlmsOperationAPDU(p) && (p[0] < 0x60 || p[0] > 0x64) {
 		return nil
 	}
 	return p
 }
 func dlmsListAPDU(w []byte) []byte {
 	p := dlmsAPDU(w)
-	if len(p) >= 2 && p[1] == 3 {
+	if len(p) >= 2 && (p[0] == 0xc0 || p[0] == 0xc4) && p[1] == 3 {
 		return p
 	}
 	return nil
@@ -41,6 +41,9 @@ func dlmsNormalAccess(p []byte) bool {
 	return len(p) >= 13 && p[0] == 0xc0 && p[1] == 1 && p[12] == 1
 }
 func dlmsProfile(w []byte) string {
+	if dlmsOperationAPDU(dlmsAPDU(w)) {
+		return "dlms-hdlc-ln-operations"
+	}
 	if dlmsACSEAPDU(dlmsAPDU(w)) {
 		if len(w) > 1 && w[1]&8 != 0 {
 			return "dlms-hdlc-acse-segmented"
@@ -81,6 +84,9 @@ func dlmsObservedProfile(w []byte, fields map[string]any) string {
 }
 
 func dlmsProjection(w []byte) int64 {
+	if p := dlmsAPDU(w); dlmsOperationAPDU(p) {
+		return dlmsOperationProjection(p, len(w))
+	}
 	if dlmsACSEAPDU(dlmsAPDU(w)) {
 		return 32768 + 512*int64(len(w))
 	}

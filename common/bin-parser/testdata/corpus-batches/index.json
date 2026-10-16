@@ -107353,6 +107353,559 @@
         "common/pcapx/pcaputil/dlms-action-list/pending-Action-list-private-Close.pcap": "dlms-action-list/list-count2-cap1-refused.pcap",
         "scripts/protocol-tests/required-tests-traffic-unified-v125.json": "required-tests-traffic-unified-v125.json"
       }
+    },
+    {
+      "id": "validation-dlms-hdlc-operations",
+      "kind": "support",
+      "source_sha": "f243cefd8f0aa2cf933ae2b2c922b42468d14634",
+      "file": "validation-dlms-hdlc-operations.zip",
+      "sha256": "c23c56d754ff8d00ec0ceead3a034458c8cf7525f982702addbd8a001ceff1da",
+      "password": "bin-parser",
+      "members": {
+        "dlms-hdlc-operations-tools/SOURCES.json": {
+          "sha256": "1bd20404db4c0a63b17256f51d90801b3a67bd7918b9c6cfd017ad7a771ec454",
+          "bytes": 2906
+        },
+        "dlms-hdlc-operations-tools/build-combined.py": {
+          "sha256": "851fcbbbf48cdeabb33bc6a4e7a09cd4c3cd390fb1750c39674061eeb45b4161",
+          "bytes": 4406
+        },
+        "dlms-hdlc-operations-tools/build-corrected-combined.py": {
+          "sha256": "425bc6999b701919d1fbdf2613c1a8ca25877cee6bb79e13da72a402004909f1",
+          "bytes": 4682
+        },
+        "dlms-hdlc-operations-tools/build-final-depth.py": {
+          "sha256": "15013f1a2f4d7538b8cc1791d253e10a8cf7bfc236606623963ca50ff64a1423",
+          "bytes": 5284
+        },
+        "dlms-hdlc-operations-tools/generate-captures.py": {
+          "sha256": "08a2abf961ae231575a852a57922eb106c43f8bfcce57ac5ea70cbfe834fbb09",
+          "bytes": 1727
+        },
+        "dlms-hdlc-operations-tools/generate-controls.py": {
+          "sha256": "73fe699c066dbbc45ea4ba14706e570de6143603391f84f3e178e147dda766ae",
+          "bytes": 17269
+        },
+        "dlms-hdlc-operations-tools/generate-reserved-flags.py": {
+          "sha256": "83d6b9f62115a97e564115015272e9e23a4047d46b3f3fdbcb97b65d24fd5feb",
+          "bytes": 1550
+        },
+        "dlms-hdlc-operations-tools/generate.py": {
+          "sha256": "9bc3d11445bf2c35f99976d4557a22d355d33da84d4f7e07379dd1b2d5d2807d",
+          "bytes": 1211
+        },
+        "dlms-hdlc-operations-tools/reference-check.py": {
+          "sha256": "6b239748dca719ade29a542d2406804ab0e6d871489a6a1a3dd8c281bae85e6c",
+          "bytes": 4876
+        },
+        "dlms-hdlc-operations-tools/reference-vectors.json": {
+          "sha256": "ae2e016a0858d5d6f817e20d677c75794ecd7d11d9a7d515d6d4673899e7a0ae",
+          "bytes": 3326
+        },
+        "dlms-hdlc-operations-tools/verify-captures.py": {
+          "sha256": "a42aa8787b8be4c50593c7f56a123ce6b1fa64c2181e281ef1c3f9fb9c501520",
+          "bytes": 2775
+        },
+        "dlms-hdlc-operations-tools/verify.py": {
+          "sha256": "b099779157daec0701751acbfb0f7e7048f621dad47411e14b2669851ab9e3d2",
+          "bytes": 3455
+        },
+        "dlms-hdlc-operations/Action-list-unimplemented.tcp.pcap": {
+          "sha256": "a9d8430afd8f943283efb01f8ca4ef2b81343cde31fe4864d458d830513054f9",
+          "bytes": 513
+        },
+        "dlms-hdlc-operations/Action-list-unimplemented.udp.pcap": {
+          "sha256": "09bba183a139d79d3950e8fc83f5d6e583c98522f016469a958f16824b6707a8",
+          "bytes": 267
+        },
+        "dlms-hdlc-operations/Action-no-parameter-source-grammar.tcp.pcap": {
+          "sha256": "8edd951e3ece545cff6a9bc110b030eaa326ec0e7db8cf190e5320974d1e20f4",
+          "bytes": 420
+        },
+        "dlms-hdlc-operations/Action-no-parameter-source-grammar.udp.pcap": {
+          "sha256": "72523c879c5bffaff7398f860543a1acd0ce733823d7a37baf57b8b24a963e31",
+          "bytes": 186
+        },
+        "dlms-hdlc-operations/Action-reserved-invoke-bits-known-carrier.tcp.pcap": {
+          "sha256": "27b5297361db5121baec60573cd2d95d54746a8e1b188619e6573e5f480bbfcb",
+          "bytes": 616
+        },
+        "dlms-hdlc-operations/Action-reserved-invoke-bits-known-carrier.udp.pcap": {
+          "sha256": "05333adf9132471a23476859146d89b6ed56fdb6301eb5d5db15902af61b7ec0",
+          "bytes": 358
+        },
+        "dlms-hdlc-operations/Action-response-wrong-LLC-retires.tcp.pcap": {
+          "sha256": "0cb2ab2a2b32d1b7f9bf34afb839fc64c37d1bacf7feb4c29fddc6885879f8d7",
+          "bytes": 514
+        },
+        "dlms-hdlc-operations/Action-response-wrong-LLC-retires.udp.pcap": {
+          "sha256": "67f108a35d9e88eb1c082917f7debba147eacf8da04807fe89131d66c0ad0405",
+          "bytes": 268
+        },
+        "dlms-hdlc-operations/Action-result17-unsupported.tcp.pcap": {
+          "sha256": "a433d5e3b5b8335a3bcde69ca7c8bf4ed4a880f03dd05c2d6b77bde8ad2d46c1",
+          "bytes": 514
+        },
+        "dlms-hdlc-operations/Action-result17-unsupported.udp.pcap": {
+          "sha256": "5293a83d0643884edf9b5b9f2d5792b002655898ea5c96b96fcb13c3bfd55467",
+          "bytes": 268
+        },
+        "dlms-hdlc-operations/Action-return-Data-truncated-retires.tcp.pcap": {
+          "sha256": "25bd2a83fdb8f289d5a10ca4ef99df6db0124257b73b3ebe0914e413e193ef81",
+          "bytes": 519
+        },
+        "dlms-hdlc-operations/Action-return-Data-truncated-retires.udp.pcap": {
+          "sha256": "c8ededdb688be84eaf78e115fdafb8da974be75d83b86b976b73bbfd80f04209",
+          "bytes": 273
+        },
+        "dlms-hdlc-operations/Action-return-three-nodes-cap2-retires.tcp.pcap": {
+          "sha256": "b24fa7cc3744c3cae1147dce9a2528480fb814af5abcaa0fdb9fc641941a577c",
+          "bytes": 523
+        },
+        "dlms-hdlc-operations/Action-return-three-nodes-cap2-retires.udp.pcap": {
+          "sha256": "48ecbde697edb8adf4f29af9fb5229dc0cd5f455adf6b64bba6e227052b4b231",
+          "bytes": 277
+        },
+        "dlms-hdlc-operations/Action-structure-return.tcp.pcap": {
+          "sha256": "96f6a3504417bca92e414dce7d59837c44ffa57027cfe52bb97d5a215f21cca2",
+          "bytes": 434
+        },
+        "dlms-hdlc-operations/Action-structure-return.udp.pcap": {
+          "sha256": "7502334454485111bb344cf81363ba9673b474347be20c1eb57d31b4da13e1b0",
+          "bytes": 200
+        },
+        "dlms-hdlc-operations/Context-retained-pending-Close-carrier-clock-difference.tcp.pcap": {
+          "sha256": "d369e0d603218a9381a115d0067e05d23c4c7f74726422e173b61da7245a916e",
+          "bytes": 424
+        },
+        "dlms-hdlc-operations/Context-retained-pending-Close-carrier-clock-difference.udp.pcap": {
+          "sha256": "b504749c030b13d026587fbcd406555538625baefc97522760eb6fe5ca733f06",
+          "bytes": 190
+        },
+        "dlms-hdlc-operations/Get-owner-preserved-on-Set-reply.tcp.pcap": {
+          "sha256": "3d3c11903ca167ec79ec34952d32fc02200308ae8e2ce6451705db07e37e38a7",
+          "bytes": 509
+        },
+        "dlms-hdlc-operations/Get-owner-preserved-on-Set-reply.udp.pcap": {
+          "sha256": "11eaa32d3779b6dcd3d9058b18b73fd8924b9458eec8efb03c11a4bb0a8c32b4",
+          "bytes": 263
+        },
+        "dlms-hdlc-operations/Set-Data-truncated-retires.tcp.pcap": {
+          "sha256": "c41515d3122aa21b5636cb017cd242bdadc050e7904f8a47a85fdb0b2d6cb58f",
+          "bytes": 525
+        },
+        "dlms-hdlc-operations/Set-Data-truncated-retires.udp.pcap": {
+          "sha256": "d0d65c2f48ca09f52ade3d4ea2cdbf950a31f51b96bd7c2e66b1a28e3fdb67ed",
+          "bytes": 279
+        },
+        "dlms-hdlc-operations/Set-list-unimplemented.tcp.pcap": {
+          "sha256": "29bc20199f68a48873d845e431fbb29e40b4897af2b2e88610265f65f492f2c9",
+          "bytes": 513
+        },
+        "dlms-hdlc-operations/Set-list-unimplemented.udp.pcap": {
+          "sha256": "9776f7f5174e6248a89c46094c731ba7f439b0b606505d7be56f2279b2fbf326",
+          "bytes": 267
+        },
+        "dlms-hdlc-operations/Set-owner-preserved-on-Get-reply.tcp.pcap": {
+          "sha256": "5e122dbc22df537c43afe83e005fa1453ff674cb00e6adf780acbcf1e59c4a3e",
+          "bytes": 514
+        },
+        "dlms-hdlc-operations/Set-owner-preserved-on-Get-reply.udp.pcap": {
+          "sha256": "6c547ab2f09665aeece0a81794364927f9b280e3ef35795e79a01f682a68cce7",
+          "bytes": 268
+        },
+        "dlms-hdlc-operations/Set-request-wrong-LLC-after-known-carrier.tcp.pcap": {
+          "sha256": "49da3f20d964b08e714c2694cc25226c08d5ba6f870d975a13b02a2e4d966e79",
+          "bytes": 526
+        },
+        "dlms-hdlc-operations/Set-request-wrong-LLC-after-known-carrier.udp.pcap": {
+          "sha256": "a795b611d690233be62b925c6ee89324a575012d9e884b0662f65734d0e1895c",
+          "bytes": 280
+        },
+        "dlms-hdlc-operations/Set-reserved-invoke-bits-known-carrier.tcp.pcap": {
+          "sha256": "12e263940d1a333f675e4f8ea4d8dcc7539aa58d54f1a06267fe2be4b47ad376",
+          "bytes": 614
+        },
+        "dlms-hdlc-operations/Set-reserved-invoke-bits-known-carrier.udp.pcap": {
+          "sha256": "fab1d77ead6066e0617a1da95b14130b40c12d42787d4f0f0507b2ccf10cee90",
+          "bytes": 356
+        },
+        "dlms-hdlc-operations/Set-structure-output-depth6-exact-positive.tcp.pcap": {
+          "sha256": "77f4c7d2caf372cd443f793b28b755963216380e13138e0d1151ae770272dbc6",
+          "bytes": 614
+        },
+        "dlms-hdlc-operations/Set-structure-output-depth6-exact-positive.udp.pcap": {
+          "sha256": "2ed1f5e50b1a6b397a20a85e9e9daea5bc1323e4b769ae7bae3c21dafc73bcb7",
+          "bytes": 356
+        },
+        "dlms-hdlc-operations/Set-structure-three-nodes-cap2-refused-after-known-carrier.tcp.pcap": {
+          "sha256": "9152baf793b0145b299f4b191de713aa165d8aa6b50841b8e93601fb753eb516",
+          "bytes": 614
+        },
+        "dlms-hdlc-operations/Set-structure-three-nodes-cap2-refused-after-known-carrier.udp.pcap": {
+          "sha256": "7d261e82a6df348e07387a53a9bb1e77c4bad627aaadb4e3cd360f4cd0c8210a",
+          "bytes": 356
+        },
+        "dlms-hdlc-operations/Set-then-Action-same-invoke-observed-next-sequence.tcp.pcap": {
+          "sha256": "b0d0a3a9556ba6c8b7e6e96cc176e3bb118f8a58d3e493ffbd202995b072243d",
+          "bytes": 615
+        },
+        "dlms-hdlc-operations/Set-then-Action-same-invoke-observed-next-sequence.udp.pcap": {
+          "sha256": "d4580227e4739b5764b4010599082b6a5770c45606da0b836e7a947795d7787b",
+          "bytes": 357
+        },
+        "dlms-hdlc-operations/bad-FCS.tcp.pcap": {
+          "sha256": "f4486d638b8cbd367c1c4e14b757a6d83319e1c89df0108a2d9b5df66874462b",
+          "bytes": 512
+        },
+        "dlms-hdlc-operations/bad-FCS.udp.pcap": {
+          "sha256": "d2a3c81604be052c8c851352bb296cec0d62493d932479b7aa767fdefae17a9f",
+          "bytes": 266
+        },
+        "dlms-hdlc-operations/bad-HCS-valid-FCS.tcp.pcap": {
+          "sha256": "9f02d34985b388be2870e423f3b3101e2696616fc6883851e5e81639f3013ac7",
+          "bytes": 512
+        },
+        "dlms-hdlc-operations/bad-HCS-valid-FCS.udp.pcap": {
+          "sha256": "7df8c637fa990f79e003770a22819dec2425ac1af9983495a36d05825c993d40",
+          "bytes": 266
+        },
+        "dlms-hdlc-operations/completed-request-invoke-plus-sequence-reuse-retires.tcp.pcap": {
+          "sha256": "1dde5a575fa4401920b07843b00e39ef5349f92fb9952956b4a1603ae96f96de",
+          "bytes": 614
+        },
+        "dlms-hdlc-operations/completed-request-invoke-plus-sequence-reuse-retires.udp.pcap": {
+          "sha256": "bc1d1776bf9e7b275111230971a5569f23fc4498e39c6bac7810984ba5af01cf",
+          "bytes": 356
+        },
+        "dlms-hdlc-operations/controls.json": {
+          "sha256": "8960817ecc3ed410dd700045fccb30a903d1d198e3ad26c885e0673ed8333be8",
+          "bytes": 912138
+        },
+        "dlms-hdlc-operations/distinct-pending-request-retires-conversation.tcp.pcap": {
+          "sha256": "703f49a960e433f37c840045c8a06f0e00906736a58fe8e32bb6121980dedd7c",
+          "bytes": 615
+        },
+        "dlms-hdlc-operations/distinct-pending-request-retires-conversation.udp.pcap": {
+          "sha256": "5ce2764d2c5fdbcc2c66eb7ea410f0a97872d73ffb7881f84d15c08a8c761b0b",
+          "bytes": 357
+        },
+        "dlms-hdlc-operations/exact-Action-request-retry-keeps-first-owner.tcp.pcap": {
+          "sha256": "e693a0a43ef6a5a6240c175299cbebf912e4cb5987377bc5584e291da976d675",
+          "bytes": 527
+        },
+        "dlms-hdlc-operations/exact-Action-request-retry-keeps-first-owner.udp.pcap": {
+          "sha256": "798429aa1d82e5c8136763749a0b9019633971cf093cb67334ebd9d8af0448a3",
+          "bytes": 281
+        },
+        "dlms-hdlc-operations/exact-Set-request-retry-keeps-first-owner.tcp.pcap": {
+          "sha256": "3db2526928c3477ced26c73d7b6d760dd53c24192ee6cdc3bc4d1d015d83f715",
+          "bytes": 526
+        },
+        "dlms-hdlc-operations/exact-Set-request-retry-keeps-first-owner.udp.pcap": {
+          "sha256": "bf534191282724446b49d2977f22e250e7231776028a2320793191caea35278f",
+          "bytes": 280
+        },
+        "dlms-hdlc-operations/next-sequence-orphan-retires-unobserved-generation.tcp.pcap": {
+          "sha256": "92705e5fe3292602d99499f1fce80c806a0a64b8a4bf2d9aff6b6e09de78b510",
+          "bytes": 704
+        },
+        "dlms-hdlc-operations/next-sequence-orphan-retires-unobserved-generation.udp.pcap": {
+          "sha256": "56d41e83c74afeb95dcb2449690805731f1dc37518eb5b09fd928ada88f5e2db",
+          "bytes": 434
+        },
+        "dlms-hdlc-operations/official-Action-octet-result0.tcp.pcap": {
+          "sha256": "5edbb0976d6ab891baa37bc0f3124134eaeed8cd24646bdbfd70ef69346de726",
+          "bytes": 425
+        },
+        "dlms-hdlc-operations/official-Action-octet-result0.udp.pcap": {
+          "sha256": "0d6da25242f53629cec5684b06374e0349a84f0f23d6ac16a3ca9b828074f8f5",
+          "bytes": 191
+        },
+        "dlms-hdlc-operations/official-Action-result3.tcp.pcap": {
+          "sha256": "3ca9e0ffda6adaf4dead51452f18611202374e0d7957a4a4e363bbaaf7e0e9db",
+          "bytes": 425
+        },
+        "dlms-hdlc-operations/official-Action-result3.udp.pcap": {
+          "sha256": "33a5d009b8ac5203300dd3914a565998268cfdf97d14493efaf6d1e7b0fa61e9",
+          "bytes": 191
+        },
+        "dlms-hdlc-operations/official-Action-return-access17.tcp.pcap": {
+          "sha256": "e31a36c6e69d3d02fd0bf56bb3da219e8a7d498f614e4ee7982f7e0adbd00667",
+          "bytes": 427
+        },
+        "dlms-hdlc-operations/official-Action-return-access17.udp.pcap": {
+          "sha256": "904cee4352cadcdb2cad57e00354b6533c94dfd0432144cc9ee2583c4ed9be3a",
+          "bytes": 193
+        },
+        "dlms-hdlc-operations/official-Action-return-uint8.tcp.pcap": {
+          "sha256": "9efe0d54fb65b061dffe3d4cf8e9874c8edad6e4ee12a9e89de77e292ed8e5fc",
+          "bytes": 428
+        },
+        "dlms-hdlc-operations/official-Action-return-uint8.udp.pcap": {
+          "sha256": "5f592f0b4c80dbd9417816287d07cfedd8c0c24b9a44dc66786a97cc3ba95213",
+          "bytes": 194
+        },
+        "dlms-hdlc-operations/official-Set-octet-result0.tcp.pcap": {
+          "sha256": "f9744c46acf31eecc7ac2ffb9ea135de80862f186442747b139797047385ead0",
+          "bytes": 424
+        },
+        "dlms-hdlc-operations/official-Set-octet-result0.udp.pcap": {
+          "sha256": "02de6c64659348cbfe3bf3d366fa7dc9a5f1625c562d6afc98bfdb5b081bfb38",
+          "bytes": 190
+        },
+        "dlms-hdlc-operations/official-Set-result17.tcp.pcap": {
+          "sha256": "e26b4bdf950c8b755a1716dfad29f0498859d2b82355030adca07f9712f3cb7f",
+          "bytes": 424
+        },
+        "dlms-hdlc-operations/official-Set-result17.udp.pcap": {
+          "sha256": "3b91d869a60a3007aa8c6434879a6d49eab0ce4f52c232b2a8d75bf95bcb3e98",
+          "bytes": 190
+        },
+        "dlms-hdlc-operations/official-Set-result3.tcp.pcap": {
+          "sha256": "1a4ff47baf817cad7b3886f587845d81e01d335854d7b3072a93fb3f05ca5497",
+          "bytes": 424
+        },
+        "dlms-hdlc-operations/official-Set-result3.udp.pcap": {
+          "sha256": "8fd5ec3012ea86c3e64814fa14ab1847369b45a2a45381c253d85e343b3a269a",
+          "bytes": 190
+        },
+        "dlms-hdlc-operations/official-Set-structure-result0.tcp.pcap": {
+          "sha256": "d691fc49b6c278a6508297eb90cf87f4bf3cc3adfd7d7e9edccc62ab45f5260c",
+          "bytes": 427
+        },
+        "dlms-hdlc-operations/official-Set-structure-result0.udp.pcap": {
+          "sha256": "6cd0475031a84068df5430cb22403a9c6289425a18a2807e382d3cb67276979d",
+          "bytes": 193
+        },
+        "dlms-hdlc-operations/old-Get-adjacent-preserved.tcp.pcap": {
+          "sha256": "a19f586688cafad0ba72412ea5a0a9b19ba0071d5c2cb0a6df6a93b7c6092c27",
+          "bytes": 421
+        },
+        "dlms-hdlc-operations/old-Get-adjacent-preserved.udp.pcap": {
+          "sha256": "257df6ed5cc14d9eae32691e7fddc3fe4247035acfc0b0fe0b01ce4eff9759a3",
+          "bytes": 187
+        },
+        "dlms-hdlc-operations/pending-Action-private-Close.tcp.pcap": {
+          "sha256": "e49723598cb8758a82136b542389b06dda4b98d006e9789342754131f42ab4a7",
+          "bytes": 336
+        },
+        "dlms-hdlc-operations/pending-Action-private-Close.udp.pcap": {
+          "sha256": "053f2200ae3a9b168d10dee5b3879d9e7490eafde4a14979561d4bf5256af22d",
+          "bytes": 114
+        },
+        "dlms-hdlc-operations/pending-Set-private-Close.tcp.pcap": {
+          "sha256": "87f24d4a2bc03927063ea5a1b12993d29c15bd52a5613060b7a89ada3323325c",
+          "bytes": 336
+        },
+        "dlms-hdlc-operations/pending-Set-private-Close.udp.pcap": {
+          "sha256": "a70375e4fade76c97564ce072d229a96ba3846bab3735d39782441e23964cdd1",
+          "bytes": 114
+        },
+        "dlms-hdlc-operations/prior-sequence-orphan-does-not-poison-next-owner.tcp.pcap": {
+          "sha256": "387c7acdee9386a2d6215ddce8aa0438e097e069619f7de3fb8491b40424bfe7",
+          "bytes": 703
+        },
+        "dlms-hdlc-operations/prior-sequence-orphan-does-not-poison-next-owner.udp.pcap": {
+          "sha256": "ad8456db0dd0fba6f1f1d44f36b841a2a0ceb5c4a0e3fcdd0da5908e60d79339",
+          "bytes": 433
+        },
+        "dlms-hdlc-operations/reuse-inputs.json": {
+          "sha256": "ca3d163bab055381827226140568f3bef7eaac187cebd76878e0b63e9e442356",
+          "bytes": 3
+        },
+        "dlms-hdlc-operations/segmented-Set-after-known-carrier-unimplemented.tcp.pcap": {
+          "sha256": "e15aebec82fd3dc680046d78e16c07049dc0fac63dbd5881b54ea987382b3a30",
+          "bytes": 526
+        },
+        "dlms-hdlc-operations/segmented-Set-after-known-carrier-unimplemented.udp.pcap": {
+          "sha256": "7b18663f78bdbce9a4420977457c70e720a33fa438ac53289bef4db3a6a408db",
+          "bytes": 280
+        },
+        "dlms-hdlc-operations/wrong-API-direction-reply-preserves-owner.tcp.pcap": {
+          "sha256": "3c43f872894fe02a0710ac2c0de8f03e3b8235f65d1fd66be1f248328aae4bef",
+          "bytes": 514
+        },
+        "dlms-hdlc-operations/wrong-API-direction-reply-preserves-owner.udp.pcap": {
+          "sha256": "682514589426e4b558da9f9ac6a0978a6efd27f80980f3039b3a2bcd2ba97a3d",
+          "bytes": 268
+        },
+        "dlms-hdlc-operations/wrong-NR-reply-preserves-owner.tcp.pcap": {
+          "sha256": "d08c07b341d6a982b150c5a8e8030e60e37b28cdffd7702f474afcc843189228",
+          "bytes": 512
+        },
+        "dlms-hdlc-operations/wrong-NR-reply-preserves-owner.udp.pcap": {
+          "sha256": "8474047652fe63b33c334c0d4aebf77e1d0b5042dd216d4be623dcf89cc0531a",
+          "bytes": 266
+        },
+        "dlms-hdlc-operations/wrong-NS-reply-preserves-owner.tcp.pcap": {
+          "sha256": "0faf65be21f37c2f9750c8024dbdbcfd2242b11a0f0aa5c1d997d3fb7d630259",
+          "bytes": 514
+        },
+        "dlms-hdlc-operations/wrong-NS-reply-preserves-owner.udp.pcap": {
+          "sha256": "3aa2826d570aa4c4b674654584a9a8912810e28a7679244a18a5415680097048",
+          "bytes": 268
+        },
+        "dlms-hdlc-operations/wrong-family-reply-preserves-Action-owner.tcp.pcap": {
+          "sha256": "12f275229b2bdac488653d16a686ce3640397ffcfb28d27fb8e5eab25ca0d7bc",
+          "bytes": 513
+        },
+        "dlms-hdlc-operations/wrong-family-reply-preserves-Action-owner.udp.pcap": {
+          "sha256": "abd61b27f9cd337059eb6454bdd82c5dab27c7553f668043920972414aa954e2",
+          "bytes": 267
+        },
+        "dlms-hdlc-operations/wrong-family-reply-preserves-Set-owner.tcp.pcap": {
+          "sha256": "0245471beb2c0330e72435f0818ba5d160c3758493db9db9847e04f98d4a5b9c",
+          "bytes": 513
+        },
+        "dlms-hdlc-operations/wrong-family-reply-preserves-Set-owner.udp.pcap": {
+          "sha256": "63a667214f8bb2aeefca0480666445bf0bda34d71c88bc960cea84d451b02f61",
+          "bytes": 267
+        },
+        "dlms-hdlc-operations/wrong-full-flags-reply-preserves-owner.tcp.pcap": {
+          "sha256": "4b0956b2efeeea1b3387e6c23d3fe180a7fde9819b75252011b4eca934d75e24",
+          "bytes": 512
+        },
+        "dlms-hdlc-operations/wrong-full-flags-reply-preserves-owner.udp.pcap": {
+          "sha256": "d1b113bc40a01cbe01689c86950403bd09dfaf12138c33b5bf59a3a2225a33e2",
+          "bytes": 266
+        },
+        "dlms-hdlc-operations/wrong-invoke-reply-preserves-owner.tcp.pcap": {
+          "sha256": "59ecad43ce5ecd91a9093d91bf54c93c550e690dbbdf81c95c9b85817f19308f",
+          "bytes": 512
+        },
+        "dlms-hdlc-operations/wrong-invoke-reply-preserves-owner.udp.pcap": {
+          "sha256": "b9f323e270f088e744e0334bdbf6ed5bac749f6bf7be499210b787c2d1034eff",
+          "bytes": 266
+        },
+        "dlms-hdlc-operations/wrong-logical-address-reply-preserves-owner.tcp.pcap": {
+          "sha256": "3e178b5230c81f9662075682c3ab9dc5ed5e1d31301277a0611ff47947342c41",
+          "bytes": 512
+        },
+        "dlms-hdlc-operations/wrong-logical-address-reply-preserves-owner.udp.pcap": {
+          "sha256": "f7d8ee02c1f7439f8cd6c44375013a9eedada75176f3d4164d4cb0daacff1481",
+          "bytes": 266
+        },
+        "required-tests-traffic-unified-v126.json": {
+          "sha256": "2c2d421302ea4805c1ad11e8c8f08facdc13593025a2b127f1e02884e455e6b8",
+          "bytes": 21230008
+        },
+        "validation/expected.json": {
+          "sha256": "4d03fea6ff7d337d52f902ecdacc5306792163e52940e54b31ee8c9ac00e40d0",
+          "bytes": 126785
+        }
+      },
+      "aliases": {
+        "common/pcapx/pcaputil/dlms-hdlc-operations-tools/SOURCES.json": "dlms-hdlc-operations-tools/SOURCES.json",
+        "common/pcapx/pcaputil/dlms-hdlc-operations-tools/build-combined.py": "dlms-hdlc-operations-tools/build-combined.py",
+        "common/pcapx/pcaputil/dlms-hdlc-operations-tools/build-corrected-combined.py": "dlms-hdlc-operations-tools/build-corrected-combined.py",
+        "common/pcapx/pcaputil/dlms-hdlc-operations-tools/build-final-depth.py": "dlms-hdlc-operations-tools/build-final-depth.py",
+        "common/pcapx/pcaputil/dlms-hdlc-operations-tools/generate-captures.py": "dlms-hdlc-operations-tools/generate-captures.py",
+        "common/pcapx/pcaputil/dlms-hdlc-operations-tools/generate-controls.py": "dlms-hdlc-operations-tools/generate-controls.py",
+        "common/pcapx/pcaputil/dlms-hdlc-operations-tools/generate-reserved-flags.py": "dlms-hdlc-operations-tools/generate-reserved-flags.py",
+        "common/pcapx/pcaputil/dlms-hdlc-operations-tools/generate.py": "dlms-hdlc-operations-tools/generate.py",
+        "common/pcapx/pcaputil/dlms-hdlc-operations-tools/reference-check.py": "dlms-hdlc-operations-tools/reference-check.py",
+        "common/pcapx/pcaputil/dlms-hdlc-operations-tools/reference-vectors.json": "dlms-hdlc-operations-tools/reference-vectors.json",
+        "common/pcapx/pcaputil/dlms-hdlc-operations-tools/verify-captures.py": "dlms-hdlc-operations-tools/verify-captures.py",
+        "common/pcapx/pcaputil/dlms-hdlc-operations-tools/verify.py": "dlms-hdlc-operations-tools/verify.py",
+        "common/pcapx/pcaputil/dlms-hdlc-operations/Action-list-unimplemented.tcp.pcap": "dlms-hdlc-operations/Action-list-unimplemented.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-operations/Action-list-unimplemented.udp.pcap": "dlms-hdlc-operations/Action-list-unimplemented.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-operations/Action-no-parameter-source-grammar.tcp.pcap": "dlms-hdlc-operations/Action-no-parameter-source-grammar.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-operations/Action-no-parameter-source-grammar.udp.pcap": "dlms-hdlc-operations/Action-no-parameter-source-grammar.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-operations/Action-reserved-invoke-bits-known-carrier.tcp.pcap": "dlms-hdlc-operations/Action-reserved-invoke-bits-known-carrier.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-operations/Action-reserved-invoke-bits-known-carrier.udp.pcap": "dlms-hdlc-operations/Action-reserved-invoke-bits-known-carrier.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-operations/Action-response-wrong-LLC-retires.tcp.pcap": "dlms-hdlc-operations/Action-response-wrong-LLC-retires.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-operations/Action-response-wrong-LLC-retires.udp.pcap": "dlms-hdlc-operations/Action-response-wrong-LLC-retires.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-operations/Action-result17-unsupported.tcp.pcap": "dlms-hdlc-operations/Action-result17-unsupported.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-operations/Action-result17-unsupported.udp.pcap": "dlms-hdlc-operations/Action-result17-unsupported.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-operations/Action-return-Data-truncated-retires.tcp.pcap": "dlms-hdlc-operations/Action-return-Data-truncated-retires.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-operations/Action-return-Data-truncated-retires.udp.pcap": "dlms-hdlc-operations/Action-return-Data-truncated-retires.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-operations/Action-return-three-nodes-cap2-retires.tcp.pcap": "dlms-hdlc-operations/Action-return-three-nodes-cap2-retires.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-operations/Action-return-three-nodes-cap2-retires.udp.pcap": "dlms-hdlc-operations/Action-return-three-nodes-cap2-retires.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-operations/Action-structure-return.tcp.pcap": "dlms-hdlc-operations/Action-structure-return.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-operations/Action-structure-return.udp.pcap": "dlms-hdlc-operations/Action-structure-return.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-operations/Context-retained-pending-Close-carrier-clock-difference.tcp.pcap": "dlms-hdlc-operations/Context-retained-pending-Close-carrier-clock-difference.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-operations/Context-retained-pending-Close-carrier-clock-difference.udp.pcap": "dlms-hdlc-operations/Context-retained-pending-Close-carrier-clock-difference.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-operations/Get-owner-preserved-on-Set-reply.tcp.pcap": "dlms-hdlc-operations/Get-owner-preserved-on-Set-reply.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-operations/Get-owner-preserved-on-Set-reply.udp.pcap": "dlms-hdlc-operations/Get-owner-preserved-on-Set-reply.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-operations/Set-Data-truncated-retires.tcp.pcap": "dlms-hdlc-operations/Set-Data-truncated-retires.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-operations/Set-Data-truncated-retires.udp.pcap": "dlms-hdlc-operations/Set-Data-truncated-retires.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-operations/Set-list-unimplemented.tcp.pcap": "dlms-hdlc-operations/Set-list-unimplemented.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-operations/Set-list-unimplemented.udp.pcap": "dlms-hdlc-operations/Set-list-unimplemented.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-operations/Set-owner-preserved-on-Get-reply.tcp.pcap": "dlms-hdlc-operations/Set-owner-preserved-on-Get-reply.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-operations/Set-owner-preserved-on-Get-reply.udp.pcap": "dlms-hdlc-operations/Set-owner-preserved-on-Get-reply.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-operations/Set-request-wrong-LLC-after-known-carrier.tcp.pcap": "dlms-hdlc-operations/Set-request-wrong-LLC-after-known-carrier.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-operations/Set-request-wrong-LLC-after-known-carrier.udp.pcap": "dlms-hdlc-operations/Set-request-wrong-LLC-after-known-carrier.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-operations/Set-reserved-invoke-bits-known-carrier.tcp.pcap": "dlms-hdlc-operations/Set-reserved-invoke-bits-known-carrier.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-operations/Set-reserved-invoke-bits-known-carrier.udp.pcap": "dlms-hdlc-operations/Set-reserved-invoke-bits-known-carrier.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-operations/Set-structure-output-depth6-exact-positive.tcp.pcap": "dlms-hdlc-operations/Set-structure-output-depth6-exact-positive.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-operations/Set-structure-output-depth6-exact-positive.udp.pcap": "dlms-hdlc-operations/Set-structure-output-depth6-exact-positive.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-operations/Set-structure-three-nodes-cap2-refused-after-known-carrier.tcp.pcap": "dlms-hdlc-operations/Set-structure-three-nodes-cap2-refused-after-known-carrier.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-operations/Set-structure-three-nodes-cap2-refused-after-known-carrier.udp.pcap": "dlms-hdlc-operations/Set-structure-three-nodes-cap2-refused-after-known-carrier.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-operations/Set-then-Action-same-invoke-observed-next-sequence.tcp.pcap": "dlms-hdlc-operations/Set-then-Action-same-invoke-observed-next-sequence.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-operations/Set-then-Action-same-invoke-observed-next-sequence.udp.pcap": "dlms-hdlc-operations/Set-then-Action-same-invoke-observed-next-sequence.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-operations/bad-FCS.tcp.pcap": "dlms-hdlc-operations/bad-FCS.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-operations/bad-FCS.udp.pcap": "dlms-hdlc-operations/bad-FCS.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-operations/bad-HCS-valid-FCS.tcp.pcap": "dlms-hdlc-operations/bad-HCS-valid-FCS.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-operations/bad-HCS-valid-FCS.udp.pcap": "dlms-hdlc-operations/bad-HCS-valid-FCS.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-operations/completed-request-invoke-plus-sequence-reuse-retires.tcp.pcap": "dlms-hdlc-operations/completed-request-invoke-plus-sequence-reuse-retires.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-operations/completed-request-invoke-plus-sequence-reuse-retires.udp.pcap": "dlms-hdlc-operations/completed-request-invoke-plus-sequence-reuse-retires.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-operations/controls.json": "dlms-hdlc-operations/controls.json",
+        "common/pcapx/pcaputil/dlms-hdlc-operations/distinct-pending-request-retires-conversation.tcp.pcap": "dlms-hdlc-operations/distinct-pending-request-retires-conversation.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-operations/distinct-pending-request-retires-conversation.udp.pcap": "dlms-hdlc-operations/distinct-pending-request-retires-conversation.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-operations/exact-Action-request-retry-keeps-first-owner.tcp.pcap": "dlms-hdlc-operations/exact-Action-request-retry-keeps-first-owner.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-operations/exact-Action-request-retry-keeps-first-owner.udp.pcap": "dlms-hdlc-operations/exact-Action-request-retry-keeps-first-owner.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-operations/exact-Set-request-retry-keeps-first-owner.tcp.pcap": "dlms-hdlc-operations/exact-Set-request-retry-keeps-first-owner.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-operations/exact-Set-request-retry-keeps-first-owner.udp.pcap": "dlms-hdlc-operations/exact-Set-request-retry-keeps-first-owner.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-operations/next-sequence-orphan-retires-unobserved-generation.tcp.pcap": "dlms-hdlc-operations/next-sequence-orphan-retires-unobserved-generation.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-operations/next-sequence-orphan-retires-unobserved-generation.udp.pcap": "dlms-hdlc-operations/next-sequence-orphan-retires-unobserved-generation.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-operations/official-Action-octet-result0.tcp.pcap": "dlms-hdlc-operations/official-Action-octet-result0.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-operations/official-Action-octet-result0.udp.pcap": "dlms-hdlc-operations/official-Action-octet-result0.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-operations/official-Action-result3.tcp.pcap": "dlms-hdlc-operations/official-Action-result3.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-operations/official-Action-result3.udp.pcap": "dlms-hdlc-operations/official-Action-result3.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-operations/official-Action-return-access17.tcp.pcap": "dlms-hdlc-operations/official-Action-return-access17.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-operations/official-Action-return-access17.udp.pcap": "dlms-hdlc-operations/official-Action-return-access17.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-operations/official-Action-return-uint8.tcp.pcap": "dlms-hdlc-operations/official-Action-return-uint8.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-operations/official-Action-return-uint8.udp.pcap": "dlms-hdlc-operations/official-Action-return-uint8.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-operations/official-Set-octet-result0.tcp.pcap": "dlms-hdlc-operations/official-Set-octet-result0.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-operations/official-Set-octet-result0.udp.pcap": "dlms-hdlc-operations/official-Set-octet-result0.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-operations/official-Set-result17.tcp.pcap": "dlms-hdlc-operations/official-Set-result17.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-operations/official-Set-result17.udp.pcap": "dlms-hdlc-operations/official-Set-result17.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-operations/official-Set-result3.tcp.pcap": "dlms-hdlc-operations/official-Set-result3.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-operations/official-Set-result3.udp.pcap": "dlms-hdlc-operations/official-Set-result3.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-operations/official-Set-structure-result0.tcp.pcap": "dlms-hdlc-operations/official-Set-structure-result0.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-operations/official-Set-structure-result0.udp.pcap": "dlms-hdlc-operations/official-Set-structure-result0.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-operations/old-Get-adjacent-preserved.tcp.pcap": "dlms-hdlc-operations/old-Get-adjacent-preserved.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-operations/old-Get-adjacent-preserved.udp.pcap": "dlms-hdlc-operations/old-Get-adjacent-preserved.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-operations/pending-Action-private-Close.tcp.pcap": "dlms-hdlc-operations/pending-Action-private-Close.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-operations/pending-Action-private-Close.udp.pcap": "dlms-hdlc-operations/pending-Action-private-Close.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-operations/pending-Set-private-Close.tcp.pcap": "dlms-hdlc-operations/pending-Set-private-Close.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-operations/pending-Set-private-Close.udp.pcap": "dlms-hdlc-operations/pending-Set-private-Close.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-operations/prior-sequence-orphan-does-not-poison-next-owner.tcp.pcap": "dlms-hdlc-operations/prior-sequence-orphan-does-not-poison-next-owner.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-operations/prior-sequence-orphan-does-not-poison-next-owner.udp.pcap": "dlms-hdlc-operations/prior-sequence-orphan-does-not-poison-next-owner.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-operations/reuse-inputs.json": "dlms-hdlc-operations/reuse-inputs.json",
+        "common/pcapx/pcaputil/dlms-hdlc-operations/segmented-Set-after-known-carrier-unimplemented.tcp.pcap": "dlms-hdlc-operations/segmented-Set-after-known-carrier-unimplemented.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-operations/segmented-Set-after-known-carrier-unimplemented.udp.pcap": "dlms-hdlc-operations/segmented-Set-after-known-carrier-unimplemented.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-operations/wrong-API-direction-reply-preserves-owner.tcp.pcap": "dlms-hdlc-operations/wrong-API-direction-reply-preserves-owner.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-operations/wrong-API-direction-reply-preserves-owner.udp.pcap": "dlms-hdlc-operations/wrong-API-direction-reply-preserves-owner.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-operations/wrong-NR-reply-preserves-owner.tcp.pcap": "dlms-hdlc-operations/wrong-NR-reply-preserves-owner.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-operations/wrong-NR-reply-preserves-owner.udp.pcap": "dlms-hdlc-operations/wrong-NR-reply-preserves-owner.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-operations/wrong-NS-reply-preserves-owner.tcp.pcap": "dlms-hdlc-operations/wrong-NS-reply-preserves-owner.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-operations/wrong-NS-reply-preserves-owner.udp.pcap": "dlms-hdlc-operations/wrong-NS-reply-preserves-owner.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-operations/wrong-family-reply-preserves-Action-owner.tcp.pcap": "dlms-hdlc-operations/wrong-family-reply-preserves-Action-owner.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-operations/wrong-family-reply-preserves-Action-owner.udp.pcap": "dlms-hdlc-operations/wrong-family-reply-preserves-Action-owner.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-operations/wrong-family-reply-preserves-Set-owner.tcp.pcap": "dlms-hdlc-operations/wrong-family-reply-preserves-Set-owner.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-operations/wrong-family-reply-preserves-Set-owner.udp.pcap": "dlms-hdlc-operations/wrong-family-reply-preserves-Set-owner.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-operations/wrong-full-flags-reply-preserves-owner.tcp.pcap": "dlms-hdlc-operations/wrong-full-flags-reply-preserves-owner.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-operations/wrong-full-flags-reply-preserves-owner.udp.pcap": "dlms-hdlc-operations/wrong-full-flags-reply-preserves-owner.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-operations/wrong-invoke-reply-preserves-owner.tcp.pcap": "dlms-hdlc-operations/wrong-invoke-reply-preserves-owner.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-operations/wrong-invoke-reply-preserves-owner.udp.pcap": "dlms-hdlc-operations/wrong-invoke-reply-preserves-owner.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-operations/wrong-logical-address-reply-preserves-owner.tcp.pcap": "dlms-hdlc-operations/wrong-logical-address-reply-preserves-owner.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-operations/wrong-logical-address-reply-preserves-owner.udp.pcap": "dlms-hdlc-operations/wrong-logical-address-reply-preserves-owner.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-operations/Set-structure-output-depth5-resource.udp.pcap": "dlms-hdlc-operations/Set-structure-output-depth6-exact-positive.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-operations/Set-structure-output-depth5-resource.tcp.pcap": "dlms-hdlc-operations/Set-structure-output-depth6-exact-positive.tcp.pcap",
+        "scripts/protocol-tests/required-tests-traffic-unified-v126.json": "required-tests-traffic-unified-v126.json"
+      }
     }
   ],
   "schema_version": 1,
