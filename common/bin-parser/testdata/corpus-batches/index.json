@@ -106072,6 +106072,122 @@
         "common/pcapx/pcaputil/tls-hello-collection/two-extensions-cap1-refusal.pcap": "tls-hello-collection/two-extensions-cap1-refusal.pcap",
         "scripts/protocol-tests/required-tests-traffic-unified-v119.json": "required-tests-traffic-unified-v119.json"
       }
+    },
+    {
+      "id": "validation-tls-serverhello-selection",
+      "kind": "support",
+      "source_sha": "7e0740707dff5c8b0d13e2fcb4d96bc93a423c42",
+      "file": "validation-tls-serverhello-selection.zip",
+      "sha256": "a0a592947a88d6185feada39c05e33f51a3d4a19f9e6e17142cd7d74f9377215",
+      "password": "bin-parser",
+      "members": {
+        "required-tests-traffic-unified-v120.json": {
+          "sha256": "a6d9f18e895be97269ca3cf4d5b9ab3b3e5b1dfd6089abe0ced6d123b35d8e56",
+          "bytes": 19931489
+        },
+        "tls-serverhello-selection-tools/NEGOTIATION-SOURCES.json": {
+          "sha256": "d5372a7b2978b526ee28f3247f497d5e64e67639db45193997980f9946088a65",
+          "bytes": 1895
+        },
+        "tls-serverhello-selection-tools/SOURCES.json": {
+          "sha256": "f32d5145a9afcb322c2f92717bac2dccc2afee4845e67150169d034767cf7348",
+          "bytes": 1544
+        },
+        "tls-serverhello-selection-tools/generate.py": {
+          "sha256": "af9c523d12be8db94b2990bcfb31bf6fbfea7f9cc95ee8a5f7af37f09bbc5557",
+          "bytes": 3796
+        },
+        "tls-serverhello-selection-tools/negotiation_generate.py": {
+          "sha256": "f34d8158595578f126614b634ff5731a2721c146c42a4e3900feb2732f8f339c",
+          "bytes": 3572
+        },
+        "tls-serverhello-selection-tools/partial_generate.py": {
+          "sha256": "25ccc322f42035a794e5e7dac9016a90b761ad88909639b5509438f7c03fed29",
+          "bytes": 1815
+        },
+        "tls-serverhello-selection-tools/verify.py": {
+          "sha256": "175cc30a1656295ecb8a51bc246878c425660d9d9e334d14155bf236fb683542",
+          "bytes": 5449
+        },
+        "tls-serverhello-selection/ServerHello-known-client-direction.pcap": {
+          "sha256": "c1084629cc9fb2fbf44760725bf8f0f4be06dc2318124fe7f7e69c401baef26d",
+          "bytes": 834
+        },
+        "tls-serverhello-selection/controls.json": {
+          "sha256": "676a7c5e97fad60b1c1243e1609c045ea190c9f56fbe1932b7f35512e5085fb3",
+          "bytes": 13001
+        },
+        "tls-serverhello-selection/negotiation-controls.json": {
+          "sha256": "7473ae6de7816eb2cb5190f619e52d246731b2d78070f830ae44f782614cdc10",
+          "bytes": 16625
+        },
+        "tls-serverhello-selection/negotiation-refusal-projections.json": {
+          "sha256": "aa6c4b16ee896c864efb217fbd2d7deeabfb7d97d3e8c0964c335984ef6d79db",
+          "bytes": 4237
+        },
+        "tls-serverhello-selection/partial-controls.json": {
+          "sha256": "9e7050bba54644cbc5e84763cabe787116ab3701a4af402f0197b22a029a129e",
+          "bytes": 2051
+        },
+        "tls-serverhello-selection/refusal-projections.json": {
+          "sha256": "2ddc37b71b8848be91104a1c60e2c39ddc63bc7d005fdb5feab9d190b3acd66b",
+          "bytes": 4189
+        },
+        "tls-serverhello-selection/server-only-offered003c-wire-with-no-client-context.pcap": {
+          "sha256": "9d71fc3d496a152ebc9efbc3afe705f7f7aec5b8c35836f5cfdb7ee8c834e5c7",
+          "bytes": 597
+        },
+        "tls-serverhello-selection/server-selected-offered-null-normal.pcap": {
+          "sha256": "77cf2dd493354915fa379aa4eea185fbcf078a579718580ab75c68eb8aa7c89b",
+          "bytes": 717
+        },
+        "tls-serverhello-selection/server-selected-offered003c-normal.pcap": {
+          "sha256": "fc653e1823c7dc9ec6bddfb7bf1ff41d628f4fab7d8ec646e8d70d84bf516f01",
+          "bytes": 717
+        },
+        "tls-serverhello-selection/server-selected-unoffered-compression1.pcap": {
+          "sha256": "ff741e2c8ae904b09c47897b82e11710da6b8063d0c3659d544e89b0176a7d50",
+          "bytes": 834
+        },
+        "tls-serverhello-selection/server-selected-unoffered009c.pcap": {
+          "sha256": "b80cb92903f17255d910af6faa623132da33bba7526a627eaa64ac4dc618159b",
+          "bytes": 834
+        },
+        "tls-serverhello-selection/server-version-above-observed-client0302.pcap": {
+          "sha256": "96fe469f41843fdcf17b2817dc673d86c3cc300e10a425e76760e822f3225797",
+          "bytes": 834
+        },
+        "tls-serverhello-selection/server-version-matches-client0302-normal.pcap": {
+          "sha256": "810d29acf733cdcc24c80ef4018ab28773843ea0ce1027bb78db903776439f8a",
+          "bytes": 717
+        },
+        "validation/expected.json": {
+          "sha256": "0b19330f55126f1e77a88a899f9f90aab54adda9d6b6f0ceca1153e9321e5574",
+          "bytes": 10523
+        }
+      },
+      "aliases": {
+        "common/pcapx/pcaputil/tls-serverhello-selection-tools/NEGOTIATION-SOURCES.json": "tls-serverhello-selection-tools/NEGOTIATION-SOURCES.json",
+        "common/pcapx/pcaputil/tls-serverhello-selection-tools/SOURCES.json": "tls-serverhello-selection-tools/SOURCES.json",
+        "common/pcapx/pcaputil/tls-serverhello-selection-tools/generate.py": "tls-serverhello-selection-tools/generate.py",
+        "common/pcapx/pcaputil/tls-serverhello-selection-tools/negotiation_generate.py": "tls-serverhello-selection-tools/negotiation_generate.py",
+        "common/pcapx/pcaputil/tls-serverhello-selection-tools/partial_generate.py": "tls-serverhello-selection-tools/partial_generate.py",
+        "common/pcapx/pcaputil/tls-serverhello-selection-tools/verify.py": "tls-serverhello-selection-tools/verify.py",
+        "common/pcapx/pcaputil/tls-serverhello-selection/ServerHello-known-client-direction.pcap": "tls-serverhello-selection/ServerHello-known-client-direction.pcap",
+        "common/pcapx/pcaputil/tls-serverhello-selection/controls.json": "tls-serverhello-selection/controls.json",
+        "common/pcapx/pcaputil/tls-serverhello-selection/negotiation-controls.json": "tls-serverhello-selection/negotiation-controls.json",
+        "common/pcapx/pcaputil/tls-serverhello-selection/negotiation-refusal-projections.json": "tls-serverhello-selection/negotiation-refusal-projections.json",
+        "common/pcapx/pcaputil/tls-serverhello-selection/partial-controls.json": "tls-serverhello-selection/partial-controls.json",
+        "common/pcapx/pcaputil/tls-serverhello-selection/refusal-projections.json": "tls-serverhello-selection/refusal-projections.json",
+        "common/pcapx/pcaputil/tls-serverhello-selection/server-only-offered003c-wire-with-no-client-context.pcap": "tls-serverhello-selection/server-only-offered003c-wire-with-no-client-context.pcap",
+        "common/pcapx/pcaputil/tls-serverhello-selection/server-selected-offered-null-normal.pcap": "tls-serverhello-selection/server-selected-offered-null-normal.pcap",
+        "common/pcapx/pcaputil/tls-serverhello-selection/server-selected-offered003c-normal.pcap": "tls-serverhello-selection/server-selected-offered003c-normal.pcap",
+        "common/pcapx/pcaputil/tls-serverhello-selection/server-selected-unoffered-compression1.pcap": "tls-serverhello-selection/server-selected-unoffered-compression1.pcap",
+        "common/pcapx/pcaputil/tls-serverhello-selection/server-selected-unoffered009c.pcap": "tls-serverhello-selection/server-selected-unoffered009c.pcap",
+        "common/pcapx/pcaputil/tls-serverhello-selection/server-version-above-observed-client0302.pcap": "tls-serverhello-selection/server-version-above-observed-client0302.pcap",
+        "common/pcapx/pcaputil/tls-serverhello-selection/server-version-matches-client0302-normal.pcap": "tls-serverhello-selection/server-version-matches-client0302-normal.pcap",
+        "scripts/protocol-tests/required-tests-traffic-unified-v120.json": "required-tests-traffic-unified-v120.json"
+      }
     }
   ],
   "schema_version": 1,

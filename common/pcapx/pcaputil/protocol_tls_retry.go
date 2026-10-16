@@ -9,10 +9,10 @@ import (
 var tlsRetryRandom = sha256.Sum256([]byte("HelloRetryRequest"))
 
 type tlsHelloView struct {
-	prefix, session, suites []byte
-	suite                   uint16
-	ext                     map[uint16][]byte
-	order                   []uint16
+	prefix, session, suites, compression []byte
+	suite                                uint16
+	ext                                  map[uint16][]byte
+	order                                []uint16
 }
 
 func tlsHello(body []byte, client bool, limits ...int) (*tlsHelloView, error) {
@@ -44,12 +44,14 @@ func tlsHello(body []byte, client bool, limits ...int) (*tlsHelloView, error) {
 		if n == 0 || n > len(body)-p {
 			return bad()
 		}
+		h.compression = body[p : p+n]
 		p += n
 	} else {
 		if len(body)-p < 3 {
 			return bad()
 		}
 		h.suite = binary.BigEndian.Uint16(body[p:])
+		h.compression = body[p+2 : p+3]
 		p += 3
 	}
 	h.prefix = body[:p]
@@ -206,6 +208,26 @@ func (t *binTLS) observeHello(dir int, typ byte, body []byte, limits ...int) (bo
 		return false, nil
 	}
 	retry := bytes.Equal(body[2:34], tlsRetryRandom[:])
+	if !retry && !t.retrySeen && t.firstHello != nil && t.client >= 0 {
+		// A complete owned ClientHello makes these observations provable.
+		// Server-only captures retain their existing partial-context behavior.
+		first, err := tlsHello(t.firstHello, true, limits...)
+		if err != nil {
+			return false, err
+		}
+		if dir == t.client {
+			return bad("ServerHello from observed client direction")
+		}
+		if !tlsContains16(first.suites, h.suite) {
+			return bad("ServerHello cipher was not offered")
+		}
+		if bytes.IndexByte(first.compression, h.compression[0]) < 0 {
+			return bad("ServerHello compression was not offered")
+		}
+		if binary.BigEndian.Uint16(body) > binary.BigEndian.Uint16(t.firstHello) {
+			return bad("ServerHello version exceeds observed client version")
+		}
+	}
 	if retry || t.retrySeen {
 		if t.firstHello == nil || t.client < 0 {
 			return false, protocolError(ErrContextRequired, "TLS HRR requires first ClientHello")
