@@ -69,6 +69,16 @@ func SaveIrOffsetBatch(db *gorm.DB, items []*IrOffset) error {
 
 func GetOffsetByVariable(name string, valueID int64, programName string) []*IrOffset {
 	db := GetDB()
+	offsets, err := nativeGetOffsetsByVariable(db, name, valueID, programName)
+	if err == nil {
+		return offsets
+	}
+	if nativeContextErr(err) {
+		// A timed-out read must not restart as an unbounded GORM query.
+		return nil
+	}
+	// Native queries use a fixed column list. Retain the former reader for
+	// legacy schemas/drivers that cannot satisfy it, as with native IR reads.
 	var ir []*IrOffset
 	query := db.Model(&IrOffset{}).Where("variable_name = ? and value_id = ?", name, valueID)
 	if p := strings.TrimSpace(programName); p != "" {
