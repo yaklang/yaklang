@@ -69,4 +69,6 @@ jobs:
       # a 32-core workstation, and each script has its own 90s runtime cap), so
       # 30m kills the run just before it finishes. A runner is slower than this
       # workstation, not faster.
-      run: go test -count=1 -timeout 60m -v ./common/yak/ssa2llvm/...
+      # Serial package builds avoid running several multi-GB Go/LLVM linkers
+      # at once; every test still runs uncached with the same runtime budgets.
+      run: bash scripts/ssa-test.sh -p 1 -count=1 -timeout 60m -v ./common/yak/ssa2llvm/...
