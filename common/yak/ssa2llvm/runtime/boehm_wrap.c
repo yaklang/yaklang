@@ -1,3 +1,6 @@
+//go:build ignore
+// +build ignore
+
 /* yak_boehm_wrap.c — linked into every AOT binary with
  * --wrap=GC_malloc --wrap=GC_gcollect.
  *
