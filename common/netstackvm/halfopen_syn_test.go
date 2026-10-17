@@ -34,7 +34,7 @@ func mockHalfOpen(t *testing.T, writer func(*HalfOpenSYN, []byte) error) *HalfOp
 	ctx, cancel := context.WithCancel(context.Background())
 	h := &HalfOpenSYN{ctx: ctx, cancel: cancel, stack: vm.stack, main: vm,
 		slots: make(chan struct{}, 16), limiter: rate.NewLimiter(rate.Inf, 1), done: make(chan struct{}),
-		retry: SYNRetryPolicy{3, time.Second, 10 * time.Millisecond, 40 * time.Millisecond}, flights: make(map[flightKey]*synFlight)}
+		retry: SYNRetryPolicy{3, time.Second, 10 * time.Millisecond, 40 * time.Millisecond}, flights: make(map[flightKey]*synFlight), udpFlights: make(map[flightKey]*udpFlight)}
 	drv := &PCAPEndpoint{Endpoint: vm.link, ctx: ctx, cancel: cancel, wg: new(sync.WaitGroup),
 		adaptor: &pcapAdaptor{linkType: layers.LinkTypeRaw, writer: func(b []byte) error { return writer(h, b) }}}
 	drv.SetPCAPOutboundFilter(func(pkt gopacket.Packet) bool { return h.allowOutbound(vm.MainNICID(), pkt) })
@@ -146,6 +146,132 @@ func TestHalfOpenNoResponseIsInconclusiveAndBudgetIsShared(t *testing.T) {
 	require.EqualValues(t, 3, writes.Load(), "send failure and response timeout use one attempt budget")
 }
 
+func TestProbeResponseBudgetBoundsRetries(t *testing.T) {
+	policy := SYNRetryPolicy{MaxAttempts: 3, SendTimeout: time.Second, ResponseTimeout: 50 * time.Millisecond, MaxResponseTimeout: 50 * time.Millisecond}
+	for _, budget := range []time.Duration{49 * time.Millisecond, 50 * time.Millisecond, 100 * time.Millisecond, 200 * time.Millisecond, 350 * time.Millisecond} {
+		t.Run(budget.String(), func(t *testing.T) {
+			var writes atomic.Int32
+			var sentAt time.Time
+			h := mockHalfOpen(t, func(*HalfOpenSYN, []byte) error {
+				if writes.Add(1) == 1 {
+					sentAt = time.Now()
+				}
+				return nil
+			})
+			_, err := h.ProbeSYN(ContextWithProbeBudget(context.Background(), budget), "192.0.2.20:80", WithSYNRetry(policy))
+			elapsed := time.Since(sentAt)
+			require.ErrorIs(t, err, ErrProbeNoResponse)
+			require.Less(t, elapsed, budget+45*time.Millisecond, "response retries ran past the shared budget")
+			if budget <= 60*time.Millisecond {
+				require.EqualValues(t, 1, writes.Load())
+				require.GreaterOrEqual(t, elapsed, budget-20*time.Millisecond)
+			} else {
+				require.GreaterOrEqual(t, writes.Load(), int32(2))
+			}
+		})
+	}
+}
+
+func TestProbeResponseBudgetRetriesInsideWindow(t *testing.T) {
+	var writes atomic.Int32
+	h := mockHalfOpen(t, func(*HalfOpenSYN, []byte) error {
+		writes.Add(1)
+		return nil
+	})
+	policy := SYNRetryPolicy{MaxAttempts: 3, SendTimeout: time.Second, ResponseTimeout: 40 * time.Millisecond, MaxResponseTimeout: 40 * time.Millisecond}
+	started := time.Now()
+	_, err := h.ProbeSYN(ContextWithProbeBudget(context.Background(), 500*time.Millisecond), "192.0.2.20:80", WithSYNRetry(policy))
+	elapsed := time.Since(started)
+	require.ErrorIs(t, err, ErrProbeNoResponse)
+	require.EqualValues(t, 3, writes.Load())
+	require.Less(t, elapsed, 250*time.Millisecond)
+}
+
+func TestProbeResponseBudgetStartsAfterSend(t *testing.T) {
+	var writes atomic.Int32
+	var sentAt time.Time
+	h := mockHalfOpen(t, func(*HalfOpenSYN, []byte) error {
+		if writes.Add(1) == 1 {
+			time.Sleep(80 * time.Millisecond)
+			sentAt = time.Now()
+		}
+		return nil
+	})
+	policy := SYNRetryPolicy{MaxAttempts: 3, SendTimeout: time.Second, ResponseTimeout: 50 * time.Millisecond, MaxResponseTimeout: 50 * time.Millisecond}
+	_, err := h.ProbeSYN(ContextWithProbeBudget(context.Background(), 50*time.Millisecond), "192.0.2.20:80", WithSYNRetry(policy))
+	waited := time.Since(sentAt)
+	require.ErrorIs(t, err, ErrProbeNoResponse)
+	require.EqualValues(t, 1, writes.Load())
+	require.GreaterOrEqual(t, waited, 30*time.Millisecond)
+	require.Less(t, waited, 95*time.Millisecond)
+}
+
+// policy200ms matches synscanx.tcpRetryPolicy(200ms): two attempts at 200/3 and 400/3.
+func policy200ms() SYNRetryPolicy {
+	unit := 200 * time.Millisecond / 3
+	return SYNRetryPolicy{MaxAttempts: 2, SendTimeout: 3 * time.Second, ResponseTimeout: unit, MaxResponseTimeout: unit * 2}
+}
+
+func TestProbeResponseBudgetSurvivesInitialRateQueue(t *testing.T) {
+	var writes atomic.Int32
+	var sentAt time.Time
+	h := mockHalfOpen(t, func(h *HalfOpenSYN, b []byte) error {
+		if writes.Add(1) == 1 {
+			sentAt = time.Now()
+			h.observeInbound(h.main.MainNICID(), synReply(t, b, nil))
+		}
+		return nil
+	})
+	h.limiter = rate.NewLimiter(1, 1)
+	require.True(t, h.limiter.Allow())
+	started := time.Now()
+	_, err := h.ProbeSYN(ContextWithProbeBudget(context.Background(), 50*time.Millisecond), "192.0.2.20:80", WithSYNRetry(policy200ms()))
+	require.NoError(t, err)
+	require.EqualValues(t, 1, writes.Load())
+	require.GreaterOrEqual(t, sentAt.Sub(started), 700*time.Millisecond)
+	require.Less(t, time.Since(sentAt), 300*time.Millisecond)
+}
+
+func TestProbeRetryRateQueueStaysInsideResponseBudget(t *testing.T) {
+	var writes atomic.Int32
+	var sentAt time.Time
+	h := mockHalfOpen(t, func(_ *HalfOpenSYN, _ []byte) error {
+		if writes.Add(1) == 1 {
+			sentAt = time.Now()
+		}
+		return nil
+	})
+	h.limiter = rate.NewLimiter(1, 1)
+	_, err := h.ProbeSYN(ContextWithProbeBudget(context.Background(), 200*time.Millisecond), "192.0.2.20:80", WithSYNRetry(policy200ms()))
+	elapsed := time.Since(sentAt)
+	require.ErrorIs(t, err, ErrProbeNoResponse)
+	require.EqualValues(t, 1, writes.Load())
+	require.GreaterOrEqual(t, elapsed, 150*time.Millisecond)
+	require.Less(t, elapsed, 450*time.Millisecond)
+}
+
+func TestProbeRetryRateQueueDeliversResponse(t *testing.T) {
+	var writes atomic.Int32
+	var sentAt time.Time
+	h := mockHalfOpen(t, func(h *HalfOpenSYN, b []byte) error {
+		if writes.Add(1) == 1 {
+			sentAt = time.Now()
+			raw := append([]byte(nil), b...)
+			time.AfterFunc(120*time.Millisecond, func() {
+				h.observeInbound(h.main.MainNICID(), synReply(t, raw, nil))
+			})
+		}
+		return nil
+	})
+	h.limiter = rate.NewLimiter(1, 1)
+	_, err := h.ProbeSYN(ContextWithProbeBudget(context.Background(), 200*time.Millisecond), "192.0.2.20:80", WithSYNRetry(policy200ms()))
+	elapsed := time.Since(sentAt)
+	require.NoError(t, err)
+	require.EqualValues(t, 1, writes.Load())
+	require.GreaterOrEqual(t, elapsed, 100*time.Millisecond)
+	require.Less(t, elapsed, 450*time.Millisecond)
+}
+
 func TestHalfOpenRejectsWrongResponses(t *testing.T) {
 	var writes atomic.Int32
 	h := mockHalfOpen(t, func(h *HalfOpenSYN, b []byte) error {
@@ -215,6 +341,40 @@ func TestHalfOpenContextCancelsReceiveAndAdmission(t *testing.T) {
 	require.EqualValues(t, 1, writes.Load())
 	p.Close()
 	require.NoError(t, h.Close())
+}
+
+func TestHalfOpenCloseCancelsRateWaitBeforeWrite(t *testing.T) {
+	var writes atomic.Int32
+	h := mockHalfOpen(t, func(_ *HalfOpenSYN, _ []byte) error { writes.Add(1); return nil })
+	lim := rate.NewLimiter(rate.Every(time.Hour), 1)
+	require.True(t, lim.Allow())
+	h.limiter = lim
+	p := startMockProbe(t, h)
+	done := make(chan error, 1)
+	go func() { _, err := p.ProbeSYNContext(context.Background()); done <- err }()
+	deadline := time.Now().Add(time.Second)
+	ready := false
+	for time.Now().Before(deadline) && !ready {
+		h.mu.Lock()
+		for _, flight := range h.flights {
+			if flight.frame != nil && !flight.sent {
+				ready = true
+			}
+		}
+		h.mu.Unlock()
+		time.Sleep(time.Millisecond)
+	}
+	require.True(t, ready, "SYN did not reach the rate limiter")
+	started := time.Now()
+	require.NoError(t, h.Close())
+	select {
+	case err := <-done:
+		require.ErrorIs(t, err, context.Canceled)
+		require.Less(t, time.Since(started), time.Second)
+	case <-time.After(time.Second):
+		t.Fatal("Close did not cancel the TCP rate wait")
+	}
+	require.Zero(t, writes.Load())
 }
 
 func TestHalfOpenContextCancelsRateWaitBeforeWrite(t *testing.T) {
@@ -722,13 +882,13 @@ func TestHalfOpenTransportPolicy(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			iface := &net.Interface{Name: tc.name, Flags: tc.flags}
-			err := validateHalfOpenTransport(iface, tc.link, false)
+			err := validateHalfOpenTransport(iface, nil, tc.link, false)
 			if tc.allowed {
 				require.NoError(t, err)
 			} else {
 				require.ErrorIs(t, err, ErrUnverifiedSYNTransport)
 			}
-			require.NoError(t, validateHalfOpenTransport(iface, tc.link, true))
+			require.NoError(t, validateHalfOpenTransport(iface, nil, tc.link, true))
 		})
 	}
 }
@@ -936,4 +1096,37 @@ func TestHalfOpenChecksumOffloadRequiresKernelEvidence(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestValidProbeReplyAcceptsSynAckPayload(t *testing.T) {
+	local := net.IPv4(192, 0, 2, 10).To4()
+	remote := net.IPv4(192, 0, 2, 20).To4()
+	syn := TCPSegment{LocalIP: local, LocalPort: 40000, RemoteIP: remote, RemotePort: 80, Seq: 10}
+	reply := TCPSegment{LocalIP: local, LocalPort: 40000, RemoteIP: remote, RemotePort: 80, Ack: 11, SYN: true, ACK: true, PSH: true, PayloadLen: 8}
+	require.True(t, validProbeReply(syn, reply))
+	reply.FIN = true
+	require.False(t, validProbeReply(syn, reply))
+}
+
+func TestOfferProbeReplyPrefersSynAckOverReset(t *testing.T) {
+	ch := make(chan probeReply, 1)
+	rst := probeReply{segment: TCPSegment{RST: true, ACK: true}}
+	synAck := probeReply{segment: TCPSegment{SYN: true, ACK: true}}
+	offerProbeReply(ch, rst)
+	offerProbeReply(ch, synAck)
+	got := <-ch
+	require.True(t, got.segment.SYN)
+	require.False(t, got.segment.RST)
+
+	offerProbeReply(ch, synAck)
+	offerProbeReply(ch, probeReply{unreachable: true})
+	got = <-ch
+	require.True(t, got.segment.SYN)
+	require.False(t, got.unreachable)
+}
+
+func TestNpcapLoopbackWithoutFlagIsAccepted(t *testing.T) {
+	iface := &net.Interface{Name: `\Device\NPF_Loopback`, Flags: net.FlagUp}
+	require.NoError(t, validateHalfOpenTransport(iface, net.IPv4(127, 0, 0, 1), layers.LinkTypeNull, false))
+	require.True(t, interfaceLooksLoopback(iface, net.IPv4(127, 0, 0, 1)))
 }

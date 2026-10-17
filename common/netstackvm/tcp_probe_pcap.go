@@ -3,10 +3,12 @@ package netstackvm
 import (
 	"context"
 	"fmt"
-	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/tcpip/transport/tcp"
 	"sync"
+	"time"
 
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/tcpip"
+	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/tcpip/transport/tcp"
 )
 
 type pcapProbeTransport struct {
@@ -51,14 +53,46 @@ func (t *pcapProbeTransport) sendSYN(ctx context.Context) (TCPSegment, error) {
 			t.session.mu.Unlock()
 		}
 	}
-	// Rate applies to all attempts, not just new targets. Burst=1 avoids a
-	// retry storm after a batch of response timers expires together.
-	if err := t.session.limiter.Wait(ctx); err != nil {
+	// Rate applies to every attempt. Burst=1 avoids a retry storm after a
+	// batch of response timers expires together. Only the queue before the
+	// first successful SYN may ignore the response budget. After that send,
+	// token waits and writes share the caller's deadline, and a reply that
+	// arrives while the retry is queued is delivered instead of another SYN.
+	t.session.mu.Lock()
+	alreadySent := t.flight.sent
+	t.session.mu.Unlock()
+	limitCtx := ctx
+	writeCtx := ctx
+	limitCancel := func() {}
+	writeCancel := func() {}
+	defer func() {
+		limitCancel()
+		writeCancel()
+	}()
+	if probeResponseBudget(ctx) > 0 && !alreadySent {
+		writeBudget := 3 * time.Second
+		if deadline, ok := ctx.Deadline(); ok {
+			if remain := time.Until(deadline); remain > 0 {
+				writeBudget = remain
+			}
+		}
+		var stop context.CancelFunc
+		limitCtx, stop = contextWithoutDeadline(ctx)
+		limitCancel = stop
+		if err := t.session.waitLimiter(limitCtx); err != nil {
+			return TCPSegment{}, err
+		}
+		writeCtx, writeCancel = context.WithTimeout(limitCtx, writeBudget)
+	} else if alreadySent {
+		if err := t.waitRetryToken(ctx); err != nil {
+			return TCPSegment{}, err
+		}
+	} else if err := t.session.waitLimiter(ctx); err != nil {
 		return TCPSegment{}, err
 	}
 	t.writeMu.Lock()
 	defer t.writeMu.Unlock()
-	if err := ctx.Err(); err != nil {
+	if err := writeCtx.Err(); err != nil {
 		return TCPSegment{}, err
 	}
 	h, f := t.session, t.flight
@@ -74,7 +108,7 @@ func (t *pcapProbeTransport) sendSYN(ctx context.Context) (TCPSegment, error) {
 	if t.vm.driver.readOnly.Load() {
 		err = ErrPassiveNetwork
 	} else {
-		err = t.vm.driver.writeFrameContext(ctx, t.frame.data, t.frame.linkType)
+		err = t.vm.driver.writeFrameContext(writeCtx, t.frame.data, t.frame.linkType)
 	}
 	h.mu.Lock()
 	// A declined gate is not a successful injection (writeFrame is also used
@@ -99,6 +133,83 @@ func (t *pcapProbeTransport) sendSYN(ctx context.Context) (TCPSegment, error) {
 	return cloneTCPSegment(t.frame.segment), nil
 }
 
+// errProbeResponseReady means a correlated reply arrived while this retry
+// was waiting for a rate token. The reply stays queued for Receive.
+var errProbeResponseReady = fmt.Errorf("tcp probe response arrived during retry")
+
+// waitRetryToken stays inside the caller deadline. The shared limiter refuses
+// a wait that would end after that deadline instead of blocking; this still
+// watches for a reply until the deadline, and does not send another SYN.
+func (t *pcapProbeTransport) waitRetryToken(ctx context.Context) error {
+	if err := t.takeQueuedReply(); err != nil {
+		return err
+	}
+	reservation := t.session.limiter.Reserve()
+	if !reservation.OK() {
+		return fmt.Errorf("SYN rate limiter rejected the retry")
+	}
+	delay := reservation.Delay()
+	if deadline, ok := ctx.Deadline(); ok && delay > time.Until(deadline) {
+		reservation.Cancel()
+		log.Debugf("tcp probe retry will not send because the rate token is after the response budget")
+		return t.waitForRetryResponse(ctx)
+	}
+	timer := time.NewTimer(delay)
+	defer timer.Stop()
+	select {
+	case reply := <-t.flight.replies:
+		reservation.Cancel()
+		offerProbeReply(t.flight.replies, reply)
+		log.Debugf("tcp probe retry found a response while waiting for a rate token")
+		return errProbeResponseReady
+	case <-timer.C:
+		if err := t.takeQueuedReply(); err != nil {
+			return err
+		}
+		return nil
+	case <-ctx.Done():
+		reservation.Cancel()
+		return t.replyOrContext(ctx)
+	case <-t.session.ctx.Done():
+		reservation.Cancel()
+		return t.replyOrContext(t.session.ctx)
+	}
+}
+
+func (t *pcapProbeTransport) waitForRetryResponse(ctx context.Context) error {
+	select {
+	case reply := <-t.flight.replies:
+		offerProbeReply(t.flight.replies, reply)
+		log.Debugf("tcp probe retry found a response while waiting for a rate token")
+		return errProbeResponseReady
+	case <-ctx.Done():
+		return t.replyOrContext(ctx)
+	case <-t.session.ctx.Done():
+		return t.replyOrContext(t.session.ctx)
+	}
+}
+
+func (t *pcapProbeTransport) takeQueuedReply() error {
+	select {
+	case reply := <-t.flight.replies:
+		offerProbeReply(t.flight.replies, reply)
+		log.Debugf("tcp probe retry found a response while waiting for a rate token")
+		return errProbeResponseReady
+	default:
+		return nil
+	}
+}
+
+func (t *pcapProbeTransport) replyOrContext(ctx context.Context) error {
+	if err := t.takeQueuedReply(); err != nil {
+		return err
+	}
+	if err := ctx.Err(); err != nil {
+		return context.Cause(ctx)
+	}
+	return context.DeadlineExceeded
+}
+
 func (t *pcapProbeTransport) receive(ctx context.Context) (TCPSegment, []byte, error) {
 	select {
 	case <-ctx.Done():
@@ -110,6 +221,9 @@ func (t *pcapProbeTransport) receive(ctx context.Context) (TCPSegment, []byte, e
 		}
 		return TCPSegment{}, nil, ctx.Err()
 	case r := <-t.flight.replies:
+		if r.unreachable {
+			return TCPSegment{}, nil, ErrProbeUnreachable
+		}
 		return r.segment, r.raw, nil
 	}
 }

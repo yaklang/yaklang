@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io"
 	"sort"
 	"strings"
 	"sync"
@@ -139,30 +138,84 @@ func (s *SQLiteVectorStoreHNSW) GetEmbedder() EmbeddingClient {
 	return s.embedder
 }
 
-func (s *SQLiteVectorStoreHNSW) ConvertToPQMode() error {
-	nodeNum := s.hnsw.GetSize()
-	k := 256
-	if nodeNum < k {
-		k = nodeNum
+func pqSubspaceCount(dim int) int {
+	if dim <= 0 {
+		return 1
 	}
-	_, err := s.hnsw.TrainPQCodebookFromDataWithCallback(16, k, func(key string, code []byte, vector []float64) (hnswspec.LayerNode[string], error) {
-		err := s.db.Model(&schema.VectorStoreDocument{}).Where("document_id = ? and collection_id = ?", key, s.collection.ID).Update("pq_code", code).Error
-		if err != nil {
-			return nil, utils.Wrap(err, "update pq code")
+	for _, subspaces := range []int{32, 16, 8, 4, 2, 1} {
+		if subspaces == 32 && dim < 512 {
+			continue
 		}
-		return hnswspec.NewRawPQLayerNode(key, code), nil
-	})
-	if err != nil {
-		return utils.Wrap(err, "train pq codebook from data")
+		if dim%subspaces == 0 {
+			return subspaces
+		}
 	}
-	s.collection.EnablePQMode = true
-	err = s.db.Save(s.collection).Error
-	if err != nil {
-		return utils.Wrap(err, "save collection")
-	}
-	return nil
+	return 1
 }
 
+func (s *SQLiteVectorStoreHNSW) ConvertToPQMode() error {
+	if err := s.requireWriteCollection(); err != nil {
+		return err
+	}
+	done := make(chan struct{})
+	var err error
+	if !s.hnsw.submit(&graphOp{opType: opTypeWrite, desc: "ConvertToPQMode", fn: func() {
+		defer close(done)
+		graph := s.hnsw.graph
+		originalLayers, originalBook, originalQuantizer := graph.Layers, graph.GetCodebook(), graph.GetPQQuantizer()
+		defer func() {
+			if recovered := recover(); recovered != nil {
+				err = fmt.Errorf("convert graph to PQ: %v", recovered)
+			}
+			if err != nil {
+				graph.Layers = originalLayers
+				graph.SetPQCodebook(originalBook)
+				graph.SetPQQuantizer(originalQuantizer)
+			}
+		}()
+		codes := make(map[string][]byte, graph.Len())
+		_, err = graph.TrainPQCodebookFromDataWithCallback(pqSubspaceCount(s.collection.Dimension), min(256, graph.Len()),
+			func(key string, code []byte, _ []float64) (hnswspec.LayerNode[string], error) {
+				codes[key] = code
+				return hnswspec.NewRawPQLayerNode(key, code), nil
+			})
+		if err != nil {
+			return
+		}
+		// Serialize lazy nodes before reserving a database connection. Commit the
+		// codebook, mode, codes and snapshot together, including pending deltas.
+		var updates map[string]interface{}
+		updates, err = graphDatabaseUpdates(s.hnsw)
+		if err != nil {
+			return
+		}
+		updates["enable_pq_mode"] = true
+		err = utils.GormTransaction(s.db, func(tx *gorm.DB) error {
+			for key, code := range codes {
+				result := tx.Model(&schema.VectorStoreDocument{}).Where("collection_id = ? AND document_id = ?", s.collection.ID, key).Update("pq_code", code)
+				if result.Error != nil {
+					return result.Error
+				}
+				if result.RowsAffected == 0 {
+					return utils.Errorf("PQ document %s was deleted", key)
+				}
+			}
+			if err := writeGraphDatabaseUpdates(tx, s.collection.UUID, updates); err != nil {
+				return err
+			}
+			return clearGraphDeltas(tx, s.collection.UUID, 0)
+		})
+		if err == nil {
+			s.collection.EnablePQMode = true
+			s.collection.GraphBinary = updates["graph_binary"].([]byte)
+			s.collection.CodeBookBinary = updates["code_book_binary"].([]byte)
+		}
+	}}) {
+		return errors.New("graph wrapper is closed")
+	}
+	<-done
+	return err
+}
 func (s *SQLiteVectorStoreHNSW) GetArchived() bool {
 	var collection schema.VectorStoreCollection
 	err := s.db.Model(&schema.VectorStoreCollection{}).Where("id = ?", s.collection.ID).Select("archived").First(&collection).Error
@@ -424,183 +477,82 @@ func (s *SQLiteVectorStoreHNSW) Add(docs ...*Document) error {
 	if err := s.requireWriteCollection(); err != nil {
 		return utils.Wrap(err, "require write vector store")
 	}
+	for _, doc := range docs {
+		if doc == nil || doc.ID == "" {
+			return utils.Error("document must have an ID")
+		}
+	}
 	docs, err := s.embedDocuments(docs...)
 	if err != nil {
 		return utils.Wrap(err, "embed documents")
 	}
-	docCount := len(docs)
-	defer func() {
-		if r := recover(); r != nil {
-			log.Errorf("recover from panic when adding docs: %v", r)
-			utils.PrintCurrentGoroutineRuntimeStack()
-		}
-	}()
-
-	var txInitTime, transactionDuration, nodeCreationTime, commitTime time.Duration
-	var totalDbQueryTime, totalDocUpdateTime, totalDocCreateTime time.Duration
-	var dbQueryCount, docUpdateCount, docCreateCount int
-	dbErr := func() error {
-		waitTxStart := time.Now()
-		tx := s.db.Begin()
-		if tx.Error != nil {
-			return utils.Wrap(tx.Error, "begin document transaction")
-		}
-		txInitTime = time.Since(waitTxStart)
-		for _, doc := range docs {
-
-			if doc.ID == "" {
-				tx.Rollback()
-				return utils.Errorf("文档必须有ID")
-			}
-
-			// 确保文档有嵌入向量
-			if len(doc.Embedding) == 0 {
-				tx.Rollback()
-				return utils.Errorf("文档 %s 必须有嵌入向量", doc.ID)
-			}
-
-			// 数据库查询时间 - 这是另一个潜在瓶颈
-			queryStartTime := time.Now()
-			existingDoc, err := yakit.GetRAGDocumentByCollectionIDAndKey(tx, s.collection.ID, doc.ID)
-			queryTime := time.Since(queryStartTime)
-			totalDbQueryTime += queryTime
-			dbQueryCount++
-
-			schemaDoc := s.toSchemaDocument(doc)
-			if existingDoc != nil {
-				// 更新现有文档
-				updateStartTime := time.Now()
-				existingDoc.Metadata = schemaDoc.Metadata
-				existingDoc.Embedding = schemaDoc.Embedding
-				existingDoc.Content = schemaDoc.Content
-				existingDoc.EntityID = schemaDoc.EntityID
-				existingDoc.RelatedEntities = schemaDoc.RelatedEntities
-				if err := yakit.UpdateRAGDocument(tx, existingDoc); err != nil {
-					tx.Rollback()
-					return utils.Errorf("更新文档失败: %v", err)
-				}
-				updateTime := time.Since(updateStartTime)
-				totalDocUpdateTime += updateTime
-				docUpdateCount++
-			} else if errors.Is(err, gorm.ErrRecordNotFound) {
-				// 创建新文档
-				createStartTime := time.Now()
-				if err := tx.Create(schemaDoc).Error; err != nil {
-					tx.Rollback()
-					return utils.Errorf("创建文档失败: %v", err)
-				}
-				createTime := time.Since(createStartTime)
-				totalDocCreateTime += createTime
-				docCreateCount++
-
-			} else {
-				// 其他错误
-				tx.Rollback()
-				return utils.Errorf("查询文档失败: %v", err)
-			}
-		}
-
-		// 记录节点创建时间
-		startCommitTime := time.Now()
-		err = tx.Commit().Error
-		commitTime = time.Since(startCommitTime)
-		if err != nil {
-			log.Errorf("transaction commit failed: %v", err)
-			return err
-		}
-		transactionDuration = time.Since(waitTxStart)
+	if len(docs) == 0 {
 		return nil
-	}()
-	if dbErr != nil {
-		return dbErr
 	}
-
-	nodeCreationStartTime := time.Now()
 	nodes := make([]hnsw.InputNode[string], len(docs))
 	for i, doc := range docs {
-		docVecCache := doc.Embedding
-		nodes[i] = hnsw.MakeInputNodeFromID(doc.ID, hnswspec.LazyNodeID(doc.ID), func(uid hnswspec.LazyNodeID) ([]float32, error) {
-			return docVecCache, nil
+		if len(doc.Embedding) == 0 {
+			return utils.Errorf("document %s must have an embedding", doc.ID)
+		}
+		vector := doc.Embedding
+		nodes[i] = hnsw.MakeInputNodeFromID(doc.ID, hnswspec.LazyNodeID(doc.ID), func(hnswspec.LazyNodeID) ([]float32, error) { return vector, nil })
+	}
+	started := time.Now()
+	// Serialize graph changes first, then open a short transaction. Documents
+	// and the adjacency delta become visible together; a failed commit restores
+	// only the neighborhoods touched by this insertion, including replacements.
+	duration, err := s.hnsw.addWithCommit(nodes, func() error {
+		return utils.GormTransaction(s.db, func(tx *gorm.DB) error {
+			var collection schema.VectorStoreCollection
+			if err := tx.Select("id, archived").First(&collection, s.collection.ID).Error; err != nil {
+				return utils.Wrap(err, "current vector store is unavailable")
+			}
+			if collection.Archived {
+				return utils.Error("current vector store is archived")
+			}
+			for _, doc := range docs {
+				schemaDoc := s.toSchemaDocument(doc)
+				if s.hnsw.graph.IsPQEnabled() {
+					vector := make([]float64, len(doc.Embedding))
+					for i, value := range doc.Embedding {
+						vector[i] = float64(value)
+					}
+					codes, err := s.hnsw.graph.GetPQQuantizer().Encode(vector)
+					if err != nil {
+						return err
+					}
+					schemaDoc.PQCode = codes
+				}
+				existing, err := yakit.GetRAGDocumentByCollectionIDAndKey(tx, s.collection.ID, doc.ID)
+				if errors.Is(err, gorm.ErrRecordNotFound) {
+					if err := tx.Create(schemaDoc).Error; err != nil {
+						return utils.Wrap(err, "create vector document")
+					}
+				} else if err != nil {
+					return utils.Wrap(err, "query vector document")
+				} else {
+					existing.Metadata, existing.Embedding, existing.Content = schemaDoc.Metadata, schemaDoc.Embedding, schemaDoc.Content
+					existing.EntityID, existing.RelatedEntities = schemaDoc.EntityID, schemaDoc.RelatedEntities
+					existing.PQCode, existing.DocumentType = schemaDoc.PQCode, schemaDoc.DocumentType
+					if err := yakit.UpdateRAGDocument(tx, existing); err != nil {
+						return utils.Wrap(err, "update vector document")
+					}
+				}
+			}
+			if s.hnsw.saveGraphDelta != nil {
+				return s.hnsw.saveGraphDelta(tx)
+			}
+			return nil
 		})
-	}
-	nodeCreationTime = time.Since(nodeCreationStartTime)
-
-	// HNSW 添加时间 - 这个操作不在事务中，但可能很耗时
-	hnswAddTime, err := s.hnsw.AddWithError(nodes...) // 纯粹的 add 使用的时间不加排队使用的的时间
+	})
 	if err != nil {
-		// A concurrent collection delete can commit after requireWriteCollection
-		// but before graph insertion. Remove any rows inserted after that delete
-		// so a stale store cannot recreate orphan documents.
-		documentIDs := make([]string, 0, len(docs))
-		for _, doc := range docs {
-			documentIDs = append(documentIDs, doc.ID)
-		}
-		cleanupErr := s.db.Model(&schema.VectorStoreDocument{}).
-			Where("collection_id = ? AND document_id IN (?)", s.collection.ID, documentIDs).
-			Unscoped().Delete(&schema.VectorStoreDocument{}).Error
-		if cleanupErr != nil {
-			return utils.Errorf("add graph failed: %v (cleanup orphan documents failed: %v)", err, cleanupErr)
-		}
-		return utils.Wrap(err, "add graph")
+		return utils.Wrap(err, "add graph and documents")
 	}
-
-	// 计算平均指标
-	var avgQueryTime, avgUpdateTime, avgCreateTime time.Duration
-	if dbQueryCount > 0 {
-		avgQueryTime = totalDbQueryTime / time.Duration(dbQueryCount)
+	if elapsed := time.Since(started); elapsed > time.Second {
+		log.Warnf("HNSW Add took %s for %d documents (graph and transaction: %s)", elapsed, len(docs), duration)
 	}
-	if docUpdateCount > 0 {
-		avgUpdateTime = totalDocUpdateTime / time.Duration(docUpdateCount)
-	}
-	if docCreateCount > 0 {
-		avgCreateTime = totalDocCreateTime / time.Duration(docCreateCount)
-	}
-
-	// 性能警告条件 - 包含事务持续时间检查
-	shouldWarn := totalDbQueryTime > time.Second ||
-		hnswAddTime > time.Second ||
-		transactionDuration > 10*time.Second || // 新增：事务持续时间警告
-		(docCount > 10 && avgQueryTime > 500*time.Millisecond)
-
-	if shouldWarn {
-		log.Warnf("HNSW Add performance breakdown - (%d docs), TxInit: %v, TransactionDuration: %v, NodeCreation: %v, TxCommit: %v, HNSW: %v", docCount, txInitTime, transactionDuration, nodeCreationTime, commitTime, hnswAddTime)
-
-		log.Warnf("Database operations summary - TotalDocs: %d, Queries: %d (total: %v, avg: %v), Updates: %d (total: %v, avg: %v), Creates: %d (total: %v, avg: %v)",
-			docCount, dbQueryCount, totalDbQueryTime, avgQueryTime, docUpdateCount, totalDocUpdateTime, avgUpdateTime, docCreateCount, totalDocCreateTime, avgCreateTime)
-
-		// 记录性能诊断信息
-		s._logPerformanceDiagnosticsNeedLock()
-
-		// 分析可能的性能瓶颈
-		if transactionDuration > 30*time.Second {
-			log.Warnf("CRITICAL: TRANSACTION DURATION TOO LONG: %v for %d documents - THIS MAY CAUSE SYSTEM-WIDE PERFORMANCE ISSUES", transactionDuration, docCount)
-			log.Warnf("RECOMMENDATION: Consider breaking large document batches into smaller chunks or using separate transactions per document")
-		}
-		if transactionDuration > 60*time.Second {
-			log.Errorf("SEVERE: Transaction lasted over 1 minute (%v) - likely blocking other database operations", transactionDuration)
-		}
-		if avgQueryTime > time.Second {
-			log.Warnf("DATABASE QUERY SLOW: average query time %v - possible index or database performance issue", avgQueryTime)
-		}
-		if hnswAddTime > 5*time.Second {
-			log.Warnf("HNSW INDEXING SLOW: %v for %d nodes - possible HNSW algorithm bottleneck", hnswAddTime, docCount)
-			log.Warnf("HNSW BOTTLENECK ANALYSIS: Check if collection has too many documents for current M/EfSearch parameters")
-		}
-
-		// 新增：事务效率分析
-		transactionEfficiency := float64(totalDbQueryTime+totalDocUpdateTime+totalDocCreateTime) / float64(transactionDuration)
-		if transactionDuration > 5*time.Second && transactionEfficiency < 0.5 {
-			log.Warnf("TRANSACTION INEFFICIENCY: Only %.1f%% of transaction time was spent on actual database operations", transactionEfficiency*100)
-			log.Warnf("ROOT CAUSE ANALYSIS: The bottleneck is likely in HNSW indexing, not database operations")
-		}
-	} else {
-		// 即使不警告，也记录基本统计信息用于监控
-		log.Debugf("HNSW Add completed - Total: (%d docs), TxDuration: %v, DB: %v, HNSW: %v", docCount, transactionDuration, totalDbQueryTime+totalDocUpdateTime+totalDocCreateTime, hnswAddTime)
-	}
-
 	return nil
 }
-
 func (s *SQLiteVectorStoreHNSW) FuzzSearch(ctx context.Context, query string, limit int) (<-chan SearchResult, error) {
 	filter := &yakit.VectorDocumentFilter{
 		CollectionUUID: s.collection.UUID,
@@ -663,7 +615,11 @@ func (s *SQLiteVectorStoreHNSW) PersistGraph(ctx context.Context) error {
 		if err = s.requireWriteCollection(); err != nil {
 			return
 		}
-		err = updateDatabaseGraphInfoInLock(s.db, s.collection.UUID, s.hnsw)
+		if s.hnsw.persistLocked != nil {
+			err = s.hnsw.persistLocked(true)
+		} else {
+			err = updateDatabaseGraphInfoInLock(s.db, s.collection.UUID, s.hnsw)
+		}
 	}}) {
 		return errors.New("graph wrapper is closed")
 	}
@@ -800,27 +756,24 @@ func (s *SQLiteVectorStoreHNSW) DeleteWithTransactionCheck(check func(tx *gorm.D
 		return nil
 	}
 
-	// Serialize the survivor graph while all backing rows still exist. Keep
-	// both the graph snapshot and row deletion in the same transaction. A failed
-	// export/commit restores the in-memory topology and is returned to callers.
-	return s.hnsw.deleteWithPrecondition(ids, func() error {
+	// Small graphs retain synchronous snapshot/rollback behavior. Large graphs
+	// commit row deletion with a delta and compact their full snapshot later.
+	err := s.hnsw.deleteWithPrecondition(ids, func() error {
 		if check != nil {
 			return check(s.db)
 		}
 		return nil
 	}, func() error {
-		var binaryData []byte
-		reader, err := s.hnsw.exportHNSWGraphToBinaryInLock()
-		if err != nil && !errors.Is(err, graphNodesIsEmpty) {
-			return err
-		}
-		if reader != nil {
-			binaryData, err = io.ReadAll(reader)
+		useDelta := s.hnsw.saveGraphDelta != nil && !(s.hnsw.syncGraphSnapshot != nil && s.hnsw.syncGraphSnapshot())
+		var updates map[string]interface{}
+		if !useDelta {
+			var err error
+			updates, err = graphDatabaseUpdates(s.hnsw)
 			if err != nil {
 				return err
 			}
 		}
-		return utils.GormTransaction(s.db, func(tx *gorm.DB) error {
+		err := utils.GormTransaction(s.db, func(tx *gorm.DB) error {
 			if check != nil {
 				if err := check(tx); err != nil {
 					return err
@@ -835,17 +788,39 @@ func (s *SQLiteVectorStoreHNSW) DeleteWithTransactionCheck(check func(tx *gorm.D
 					return utils.Wrap(err, "delete vector documents")
 				}
 			}
-			result := tx.Model(&schema.VectorStoreCollection{}).
-				Where("id = ?", s.collection.ID).Update("graph_binary", binaryData)
-			if result.Error != nil {
-				return result.Error
+			var remaining int64
+			if err := tx.Model(&schema.VectorStoreCollection{}).Where("id = ?", s.collection.ID).Count(&remaining).Error; err != nil {
+				return err
 			}
-			if result.RowsAffected != 1 {
+			if remaining != 1 {
 				return utils.Error("vector collection was deleted")
 			}
-			return nil
+			if useDelta {
+				if err := s.hnsw.saveGraphDelta(tx); err != nil {
+					return err
+				}
+				return nil
+			}
+			if err := writeGraphDatabaseUpdates(tx, s.collection.UUID, updates); err != nil {
+				return err
+			}
+			return clearGraphDeltas(tx, s.collection.UUID, 0)
 		})
+		if err == nil && !useDelta {
+			s.hnsw.graph.TakeAdjacencyChanges()
+			if s.hnsw.graphSnapshotSaved != nil {
+				s.hnsw.graphSnapshotSaved()
+			}
+		}
+		return err
 	})
+	if err != nil {
+		return err
+	}
+	if s.hnsw.scheduleGraphSnapshot != nil {
+		s.hnsw.scheduleGraphSnapshot()
+	}
+	return nil
 }
 
 func (s *SQLiteVectorStoreHNSW) GetName() string {

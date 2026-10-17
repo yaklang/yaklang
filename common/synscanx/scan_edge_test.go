@@ -7,6 +7,7 @@ import (
 	"net"
 	"runtime"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -99,9 +100,14 @@ func TestSubmitTargetMixesHostsPortsAndProtocols(t *testing.T) {
 	for target := range ch {
 		got = append(got, gotTarget{target.Host, target.Port, target.Mode})
 	}
-	hosts := utils.ParseStringToHosts("10.0.0.8/30,::1")
-	if len(hosts) < 5 {
-		t.Fatalf("host expansion = %v", hosts)
+	var hosts []string
+	for _, host := range utils.ParseStringToHosts("10.0.0.8/30,::1") {
+		if utils.IsIPv4(host) {
+			hosts = append(hosts, host)
+		}
+	}
+	if len(hosts) != 4 {
+		t.Fatalf("ipv4 host expansion = %v", hosts)
 	}
 	wantTCP := map[int]bool{80: true, 443: true}
 	seenHosts := map[string]bool{}
@@ -132,25 +138,33 @@ func TestSubmitTargetMixesHostsPortsAndProtocols(t *testing.T) {
 	}
 }
 
-func TestSendPacketMixesTCPProbeAndUDPQueue(t *testing.T) {
-	rec := &recordingProber{probe: func(_ context.Context, target string) (netstackvm.TCPSegment, error) {
-		if target == "10.0.0.8:80" {
-			return netstackvm.TCPSegment{RemoteIP: net.IPv4(10, 0, 0, 8), RemotePort: 80}, nil
-		}
-		return netstackvm.TCPSegment{}, netstackvm.ErrProbeNoResponse
-	}}
+func TestSendPacketMixesTCPAndUDPProbes(t *testing.T) {
+	rec := &recordingProber{
+		probe: func(_ context.Context, target string) (netstackvm.TCPSegment, error) {
+			if target == "10.0.0.8:80" {
+				return netstackvm.TCPSegment{RemoteIP: net.IPv4(10, 0, 0, 8), RemotePort: 80}, nil
+			}
+			return netstackvm.TCPSegment{}, netstackvm.ErrProbeNoResponse
+		},
+		udp: func(_ context.Context, target string, _ []byte) (netstackvm.UDPSegment, error) {
+			if target == "127.0.0.1:53" {
+				return netstackvm.UDPSegment{RemoteIP: net.IPv4(127, 0, 0, 1), RemotePort: 53}, nil
+			}
+			return netstackvm.UDPSegment{}, netstackvm.ErrUDPNoResponse
+		},
+	}
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
+	var opened []string
+	var openMu sync.Mutex
 	scanner := &Scannerx{
-		ctx:        ctx,
-		config:     &SynxConfig{Iface: &net.Interface{Name: "lo", Flags: net.FlagLoopback}, SourceIP: net.IPv4(127, 0, 0, 1), tcpProbeConcurrency: 2, tcpProbeTimeout: time.Second},
-		halfOpen:   rec,
-		PacketChan: make(chan []byte, 4),
-		LoopPacket: make(chan []byte, 4),
+		ctx:      ctx,
+		config:   &SynxConfig{Iface: &net.Interface{Name: "lo", Flags: net.FlagLoopback}, SourceIP: net.IPv4(127, 0, 0, 1), tcpProbeConcurrency: 2, tcpProbeTimeout: time.Second, waiting: time.Second},
+		halfOpen: rec,
 		OpenPortHandlers: func(ip net.IP, port int) {
-			if port != 80 || !ip.Equal(net.IPv4(10, 0, 0, 8)) {
-				t.Errorf("open %v:%d", ip, port)
-			}
+			openMu.Lock()
+			opened = append(opened, net.JoinHostPort(ip.String(), fmt.Sprintf("%d", port)))
+			openMu.Unlock()
 		},
 	}
 	ch := make(chan *SynxTarget, 4)
@@ -162,26 +176,19 @@ func TestSendPacketMixesTCPProbeAndUDPQueue(t *testing.T) {
 	scanner.sendPacket(ch)
 	rec.mu.Lock()
 	probed := append([]string(nil), rec.got...)
+	udpProbed := append([]string(nil), rec.udpGot...)
 	rec.mu.Unlock()
 	if len(probed) != 2 || probed[0] == probed[1] {
 		t.Fatalf("tcp probes = %v", probed)
 	}
-	udp := 0
-	for i := 0; i < 2; i++ {
-		select {
-		case pkt := <-scanner.LoopPacket:
-			if len(pkt) == 0 {
-				t.Fatal("empty udp packet")
-			}
-			udp++
-		case pkt := <-scanner.PacketChan:
-			t.Fatalf("udp went to the non-loopback queue (%d bytes)", len(pkt))
-		default:
-			t.Fatal("udp packet was not queued")
-		}
+	// 53 answers on the first datagram. 123 is silent and is retried once.
+	if len(udpProbed) != 3 {
+		t.Fatalf("udp probes = %v", udpProbed)
 	}
-	if udp != 2 {
-		t.Fatalf("queued udp = %d", udp)
+	openMu.Lock()
+	defer openMu.Unlock()
+	if len(opened) != 2 {
+		t.Fatalf("opened = %v", opened)
 	}
 }
 

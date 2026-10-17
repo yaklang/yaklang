@@ -183,25 +183,25 @@ func TestHNSWRecallRegression(t *testing.T) {
 	)
 	nodes := benchmarkVectors(count, dims, 42)
 	queries := benchmarkQueries(16, dims, 84)
-	graph := NewGraph[int](
-		WithDeterministicRng[int](42),
-		WithEfSearch[int](64),
-		WithEfConstruction[int](200),
-	)
-	graph.Add(nodes...)
-
-	matches := 0
-	for _, query := range queries {
-		exact := benchmarkExactTopK(nodes, query, k)
-		for _, result := range graph.SearchWithDistance(query, k) {
-			if _, ok := exact[result.Key]; ok {
-				matches++
+	for _, construction := range []int{64, 200} {
+		t.Run(fmt.Sprintf("efConstruction=%d", construction), func(t *testing.T) {
+			graph := NewGraph[int](WithDeterministicRng[int](42), WithEfSearch[int](64), WithEfConstruction[int](construction))
+			graph.Add(nodes...)
+			matches := 0
+			for _, query := range queries {
+				exact := benchmarkExactTopK(nodes, query, k)
+				for _, result := range graph.SearchWithDistance(query, k) {
+					if _, ok := exact[result.Key]; ok {
+						matches++
+					}
+				}
 			}
-		}
-	}
-	recall := float64(matches) / float64(len(queries)*k)
-	if recall < 0.9 {
-		t.Fatalf("recall@10 = %.3f, want at least 0.9", recall)
+			recall := float64(matches) / float64(len(queries)*k)
+			t.Logf("recall@10 = %.3f", recall)
+			if recall < 0.9 {
+				t.Fatalf("recall@10 = %.3f, want at least 0.9", recall)
+			}
+		})
 	}
 }
 

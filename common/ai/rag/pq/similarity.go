@@ -223,6 +223,81 @@ func (q *Quantizer) ComputeDotProductTable(queryVector []float64) ([][]float64, 
 	return dotProductTable, querySubNorms, nil
 }
 
+// CosineDistanceFromDotTable 用一次查询的点积表计算重建向量的余弦距离。
+// queryNormSq 是查询向量自身的范数平方。质心范数在量化器创建时算好。
+func (q *Quantizer) CosineDistanceFromDotTable(codes []byte, dotProductTable [][]float64, queryNormSq float64) (float64, error) {
+	if q.codebook == nil {
+		return 0, fmt.Errorf("quantizer not initialized with codebook")
+	}
+	if len(codes) != q.codebook.M || len(dotProductTable) != q.codebook.M {
+		return 0, fmt.Errorf("code length %d or table length %d does not match M %d", len(codes), len(dotProductTable), q.codebook.M)
+	}
+	q.ensureCentroidNormSq()
+
+	var dotProduct, dataNormSq float64
+	for m := 0; m < q.codebook.M; m++ {
+		centroidIndex := int(codes[m])
+		if centroidIndex < 0 || centroidIndex >= len(dotProductTable[m]) || centroidIndex >= len(q.centroidNormSq[m]) {
+			return 0, fmt.Errorf("invalid centroid index %d for sub-vector %d", centroidIndex, m)
+		}
+		dotProduct += dotProductTable[m][centroidIndex]
+		dataNormSq += q.centroidNormSq[m][centroidIndex]
+	}
+	if queryNormSq <= 0 || dataNormSq <= 0 {
+		return 1, nil
+	}
+	similarity := dotProduct / (math.Sqrt(queryNormSq) * math.Sqrt(dataNormSq))
+	if similarity > 1 {
+		similarity = 1
+	} else if similarity < -1 {
+		similarity = -1
+	}
+	return 1 - similarity, nil
+}
+
+// SymmetricEuclideanDistance 计算两个 PQ 码对应重建向量的欧氏距离。
+func (q *Quantizer) SymmetricEuclideanDistance(codes1, codes2 []byte) (float64, error) {
+	if q.codebook == nil {
+		return 0, fmt.Errorf("quantizer not initialized with codebook")
+	}
+	if len(codes1) != q.codebook.M || len(codes2) != q.codebook.M {
+		return 0, fmt.Errorf("codes length must be %d, got %d and %d", q.codebook.M, len(codes1), len(codes2))
+	}
+	var sum float64
+	for m := 0; m < q.codebook.M; m++ {
+		index1 := int(codes1[m])
+		index2 := int(codes2[m])
+		if index1 < 0 || index1 >= q.codebook.K || index2 < 0 || index2 >= q.codebook.K {
+			return 0, fmt.Errorf("invalid centroid indices: %d, %d", index1, index2)
+		}
+		centroid1 := q.codebook.Centroids[m][index1]
+		centroid2 := q.codebook.Centroids[m][index2]
+		for i := 0; i < len(centroid1) && i < len(centroid2); i++ {
+			diff := centroid1[i] - centroid2[i]
+			sum += diff * diff
+		}
+	}
+	return math.Sqrt(sum), nil
+}
+
+func (q *Quantizer) ensureCentroidNormSq() {
+	if q == nil || q.codebook == nil || q.centroidNormSq != nil {
+		return
+	}
+	norms := make([][]float64, q.codebook.M)
+	for m := 0; m < q.codebook.M; m++ {
+		norms[m] = make([]float64, q.codebook.K)
+		for k := 0; k < q.codebook.K && k < len(q.codebook.Centroids[m]); k++ {
+			var sum float64
+			for _, value := range q.codebook.Centroids[m][k] {
+				sum += value * value
+			}
+			norms[m][k] = sum
+		}
+	}
+	q.centroidNormSq = norms
+}
+
 // AsymmetricCosineSimilarityWithDotProductTable 使用预计算的点积表计算余弦相似度
 func (q *Quantizer) AsymmetricCosineSimilarityWithDotProductTable(codes []byte, dotProductTable [][]float64, querySubNorms []float64) (float64, error) {
 	if len(codes) != q.codebook.M {

@@ -174,7 +174,7 @@ func SplitDocumentsByMetadata(docs []Document, metadataKey string) map[any][]Doc
 
 type NodeOffsetToVectorFunc func(offset uint32) []float32
 
-func parseHNSWGraphFromBinary(db *gorm.DB, collection *schema.VectorStoreCollection, collectionConfig *CollectionConfig, graphBinaryReader io.Reader) (*hnsw.Graph[string], error) {
+func parseHNSWGraphFromBinary(db *gorm.DB, collection *schema.VectorStoreCollection, collectionConfig *CollectionConfig, graphBinaryReader io.Reader, deletedKeys ...map[string]bool) (*hnsw.Graph[string], error) {
 	started := time.Now()
 	var decodeCost, identifiersCost, buildCost time.Duration
 	defer func() {
@@ -227,7 +227,7 @@ func parseHNSWGraphFromBinary(db *gorm.DB, collection *schema.VectorStoreCollect
 		return nil, err
 	}
 	var refs map[any]graphDocumentRef
-	if persistent.ExportMode == hnsw.ExportModeUID || persistent.ExportMode == hnsw.ExportModeStrUID {
+	if persistent.ExportMode == hnsw.ExportModeUID || persistent.ExportMode == hnsw.ExportModeStrUID || persistent.ExportMode == hnsw.ExportModeIntUID {
 		stage = time.Now()
 		refs, err = loadGraphDocumentRefs(db, collectionID)
 		identifiersCost = time.Since(stage)
@@ -243,6 +243,11 @@ func parseHNSWGraphFromBinary(db *gorm.DB, collection *schema.VectorStoreCollect
 		}
 		ref, exists := refs[graphDocumentLookupKey(data)]
 		if !exists {
+			if len(deletedKeys) > 0 && deletedKeys[0][key] {
+				// A committed deletion can outlive the older base snapshot.
+				// Replay removes this placeholder before dimension checks/search.
+				return hnswspec.NewStandardLayerNode(key, func() []float32 { return nil }), nil
+			}
 			return nil, gorm.ErrRecordNotFound
 		}
 		uidStr := ref.id
@@ -370,6 +375,9 @@ func MigrateHNSWGraphWithContext(ctx context.Context, db *gorm.DB, collection *s
 }
 
 func migrateHNSWGraphWithContext(ctx context.Context, db *gorm.DB, collection *schema.VectorStoreCollection, resetPQ bool) error {
+	if err := ensureGraphDeltaTable(db); err != nil {
+		return err
+	}
 	cacheMinSize := 100000
 	cacheMaxSize := cacheMinSize + 2000
 	cache := map[hnswspec.LazyNodeID][]float32{}
@@ -491,6 +499,9 @@ func migrateHNSWGraphWithContext(ctx context.Context, db *gorm.DB, collection *s
 		if err := tx.Model(&schema.VectorStoreCollection{}).Where("id = ?", collection.ID).Updates(updates).Error; err != nil {
 			return utils.Wrap(err, "update graph binary")
 		}
+		if err := tx.Where("collection_uuid = ?", collection.UUID).Unscoped().Delete(&schema.VectorStoreGraphDelta{}).Error; err != nil {
+			return utils.Wrap(err, "clear hnsw graph deltas")
+		}
 		return nil
 	})
 	if err != nil {
@@ -509,7 +520,7 @@ func NewVectorStoreDatabase(path string) (*gorm.DB, error) {
 	if err != nil {
 		return db, err
 	}
-	db = db.AutoMigrate(&schema.KnowledgeBaseEntry{}, &schema.KnowledgeBaseInfo{}, &schema.VectorStoreCollection{}, &schema.VectorStoreDocument{})
+	db = db.AutoMigrate(&schema.KnowledgeBaseEntry{}, &schema.KnowledgeBaseInfo{}, &schema.VectorStoreCollection{}, &schema.VectorStoreDocument{}, &schema.VectorStoreGraphDelta{})
 
 	return db, nil
 }

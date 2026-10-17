@@ -73,24 +73,30 @@ func newHostPortGuard(limit int) *hostPortGuard {
 	}
 }
 
-// observe 记录 host 的一次端口出现, 返回 true 表示已触发熔断 (该主机端口数达到
-// limit, 或之前已经触发过). 一旦触发, 后续对任何主机的 observe 都返回 true,
-// 保证上层能稳定地走到"强制停止"分支.
+// observe 记录 host 的一次开放端口. 返回 true 只表示这台主机达到了阈值.
+// 其它主机继续扫描, 避免一台 tarpit 取消整次任务.
 func (g *hostPortGuard) observe(host string) bool {
 	if g == nil || g.limit <= 0 {
 		return false
 	}
 	g.mu.Lock()
 	defer g.mu.Unlock()
-	if g.tripped {
-		return true
-	}
 	g.count[host]++
 	if g.count[host] >= g.limit {
 		g.tripped = true
 		return true
 	}
 	return false
+}
+
+// skipping reports whether this host already reached the open-port threshold.
+func (g *hostPortGuard) skipping(host string) bool {
+	if g == nil || g.limit <= 0 {
+		return false
+	}
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	return g.count[host] >= g.limit
 }
 
 func openPortGuardLimit(config *fp.Config) int {
@@ -140,12 +146,14 @@ func sendMatchResultOrDrop(ctx context.Context, outC chan<- *fp.MatchResult, res
 // // 全连接扫描本机常见端口，对开放端口打印指纹与 CPE 信息
 // ch, err = servicescan.Scan("127.0.0.1", "22,80,443,3306")
 // die(err) // 启动失败时停止脚本
-// for result := range ch {
-//     if result.IsOpen() { // IsOpen 判断端口是否开放
-//         println(result.String())  // 可读摘要，含服务名与版本
-//         println(result.GetCPEs()) // CPE 列表
-//     }
-// }
+//
+//	for result := range ch {
+//	    if result.IsOpen() { // IsOpen 判断端口是否开放
+//	        println(result.String())  // 可读摘要，含服务名与版本
+//	        println(result.GetCPEs()) // CPE 列表
+//	    }
+//	}
+//
 // ```
 // <|EXAMPLE_END|>
 //
@@ -153,15 +161,19 @@ func sendMatchResultOrDrop(ctx context.Context, outC chan<- *fp.MatchResult, res
 // ```
 // // 目标端口较多时调大并发，并设置单个探测包超时
 // ch, err = servicescan.Scan("192.168.1.1/24", "1-1000",
-//     servicescan.concurrent(50),   // 50 个并发
-//     servicescan.probeTimeout(5),  // 单个探测包 5 秒超时
+//
+//	servicescan.concurrent(50),   // 50 个并发
+//	servicescan.probeTimeout(5),  // 单个探测包 5 秒超时
+//
 // )
 // die(err)
-// for result := range ch {
-//     if result.IsOpen() {
-//         println(result.String())
-//     }
-// }
+//
+//	for result := range ch {
+//	    if result.IsOpen() {
+//	        println(result.String())
+//	    }
+//	}
+//
 // ```
 // <|EXAMPLE_END|>
 //
@@ -170,11 +182,13 @@ func sendMatchResultOrDrop(ctx context.Context, outC chan<- *fp.MatchResult, res
 // // 只跑 Web 指纹规则，扫描常见 Web 端口
 // ch, err = servicescan.Scan("127.0.0.1", "80,443,8080,8443", servicescan.web())
 // die(err)
-// for result := range ch {
-//     if result.IsOpen() {
-//         println(result.String())
-//     }
-// }
+//
+//	for result := range ch {
+//	    if result.IsOpen() {
+//	        println(result.String())
+//	    }
+//	}
+//
 // ```
 // <|EXAMPLE_END|>
 func scanFingerprint(target string, port string, opts ...fp.ConfigOption) (chan *fp.MatchResult, error) {
@@ -197,10 +211,12 @@ func scanFingerprint(target string, port string, opts ...fp.ConfigOption) (chan 
 // // 同步扫描单个 host:port，直接拿到一个结果(端口关闭也会返回结果、不报错)
 // result, err = servicescan.ScanOne("127.0.0.1", 80, servicescan.probeTimeout(5))
 // die(err)
-// if result.IsOpen() {
-//     println(result.String())  // 可读摘要
-//     println(result.GetCPEs()) // CPE 列表
-// }
+//
+//	if result.IsOpen() {
+//	    println(result.String())  // 可读摘要
+//	    println(result.GetCPEs()) // CPE 列表
+//	}
+//
 // ```
 // <|EXAMPLE_END|>
 func scanOneFingerprint(target string, port int, opts ...fp.ConfigOption) (*fp.MatchResult, error) {
@@ -255,13 +271,12 @@ func _scanFingerprint(ctx context.Context, config *fp.Config, concurrent int, ho
 	guardLimit := openPortGuardLimit(config)
 	guard := newHostPortGuard(guardLimit)
 
-	// tripGuard 在 inner goroutine 判定端口开放后调用, 命中阈值则强制停止整条流.
-	// 调用方可通过 servicescan.openPortGuardLimit() 调整阈值, 或通过
-	// servicescan.disableOpenPortGuard() 显式关闭该保护.
+	// tripGuard 在 inner goroutine 判定端口开放后调用. 命中阈值后只跳过这台主机
+	// 的后续端口, 其它主机继续. 调用方可通过 servicescan.openPortGuardLimit()
+	// 调整阈值, 或通过 servicescan.disableOpenPortGuard() 显式关闭该保护.
 	tripGuard := func(h string) {
 		if guard.observe(h) {
-			log.Errorf("host [%s] reached scan-port safety threshold (%d open ports in one scan); likely a tarpit/firewall responding on all ports, force stopping the scan to keep the system healthy", h, guardLimit)
-			scanCancel()
+			log.Errorf("host [%s] reached scan-port safety threshold (%d open ports in one scan); likely a tarpit/firewall responding on all ports, skipping the rest of this host", h, guardLimit)
 		}
 	}
 
@@ -274,9 +289,10 @@ func _scanFingerprint(ctx context.Context, config *fp.Config, concurrent int, ho
 		// 关键词: scanCancel 时机, 不能在派发结束时取消, 在途结果保护
 		swg := utils.NewSizedWaitGroup(concurrent)
 		portsInt := utils.ParseStringToPorts(port)
+		hostsRaw := utils.ParseStringToHosts(host)
 	dispatch:
 		for _, p := range portsInt {
-			for _, hRaw := range utils.ParseStringToHosts(host) {
+			for _, hRaw := range hostsRaw {
 				// ctx 短路: cancel / 熔断后立即停止派发, 不再继续遍历端口与打印日志.
 				if scanCtx.Err() != nil {
 					break dispatch
@@ -295,10 +311,9 @@ func _scanFingerprint(ctx context.Context, config *fp.Config, concurrent int, ho
 							}
 							proto, portWithoutProto := utils.ParsePortToProtoPort(buildinPort) // 这里将协议和端口分开，便于后面打印日志
 							addr := utils.HostPort(buildinHost, buildinPort)
-							if filter.Exist(addr) {
+							if !filter.Insert(addr) {
 								return
 							}
-							filter.Insert(addr)
 							log.Debugf("start task to scan: [%s://%s]", proto, utils.HostPort(buildinHost, portWithoutProto))
 							result, err := matcher.MatchWithContext(scanCtx, buildinHost, buildinPort)
 							if err != nil {
@@ -323,6 +338,9 @@ func _scanFingerprint(ctx context.Context, config *fp.Config, concurrent int, ho
 					}
 				}
 
+				if guard.skipping(h) {
+					continue
+				}
 				swg.Add()
 				rawPort := p
 				rawHost := h
@@ -332,14 +350,13 @@ func _scanFingerprint(ctx context.Context, config *fp.Config, concurrent int, ho
 					fingerprintInFlight.Add(1)
 					defer fingerprintInFlight.Add(-1)
 
-					if scanCtx.Err() != nil {
+					if scanCtx.Err() != nil || guard.skipping(rawHost) {
 						return
 					}
 					addr := utils.HostPort(rawHost, rawPort)
-					if filter.Exist(addr) {
+					if !filter.Insert(addr) {
 						return
 					}
-					filter.Insert(addr)
 
 					//log.Infof("start task to scan: [%s://%s]", proto, utils.HostPort(rawHost, portWithoutProto))
 					result, err := matcher.MatchWithContext(scanCtx, rawHost, rawPort)
@@ -383,11 +400,13 @@ func _scanFingerprint(ctx context.Context, config *fp.Config, concurrent int, ho
 // die(err)
 // fpResults, err = servicescan.ScanFromPing(pingResult, "22,80,443,3389")
 // die(err)
-// for result := range fpResults {
-//     if result.IsOpen() {
-//         println(result.String())
-//     }
-// }
+//
+//	for result := range fpResults {
+//	    if result.IsOpen() {
+//	        println(result.String())
+//	    }
+//	}
+//
 // ```
 // <|EXAMPLE_END|>
 func _scanFromPingUtils(res chan *pingutil.PingResult, ports string, opts ...fp.ConfigOption) (chan *fp.MatchResult, error) {
@@ -434,9 +453,11 @@ func _scanFromPingUtils(res chan *pingutil.PingResult, ports string, opts ...fp.
 // die(err)
 // fpResults, err = servicescan.ScanFromSynResult(synResult)
 // die(err)
-// for result := range fpResults {
-//     println(result.String())
-// }
+//
+//	for result := range fpResults {
+//	    println(result.String())
+//	}
+//
 // ```
 // <|EXAMPLE_END|>
 //
@@ -447,12 +468,38 @@ func _scanFromPingUtils(res chan *pingutil.PingResult, ports string, opts ...fp.
 // die(err)
 // fpResults, err = servicescan.ScanFromSpaceEngine(res)
 // die(err)
-// for result := range fpResults {
-//     println(result.String())
-// }
+//
+//	for result := range fpResults {
+//	    println(result.String())
+//	}
+//
 // ```
 // <|EXAMPLE_END|>
 //
+// synScanProbeTarget separates the service port from the transport.
+// explicit is set only when the result carries Protocol or the historical
+// UDP port encoding. A bare host:port keeps the caller's transport options.
+func synScanProbeTarget(res *synscan.SynScanResult) (proto string, port int, explicit bool) {
+	if res == nil {
+		return "", 0, false
+	}
+	proto = strings.ToLower(strings.TrimSpace(res.Protocol))
+	port = res.Port
+	encoded, decoded := utils.ParsePortToProtoPort(port)
+	switch proto {
+	case "udp", "tcp":
+		if encoded == "udp" {
+			port = decoded
+		}
+		return proto, port, true
+	default:
+		if encoded == "udp" {
+			return "udp", decoded, true
+		}
+		return "", port, false
+	}
+}
+
 // Context 契约 (重要):
 //   - 通过 servicescan.ctx() 注入的 ctx 会被本函数下游 inner goroutine 用作
 //     "发送结果时的退出信号". 调用方在停止 range outC 之前应当 cancel ctx,
@@ -463,7 +510,29 @@ func _scanFromPingUtils(res chan *pingutil.PingResult, ports string, opts ...fp.
 //
 // 关键词: _scanFromTargetStream ctx 契约, outC goroutine 泄漏防护
 func _scanFromTargetStream(res interface{}, opts ...fp.ConfigOption) (chan *fp.MatchResult, error) {
+	config := fp.NewConfig(opts...)
+	concurrent := config.PoolSize
+	ctx := config.Ctx
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	matcher, err := fp.NewDefaultFingerprintMatcher(config)
+	if err != nil {
+		return nil, err
+	}
+
 	synResults := make(chan *synscan.SynScanResult, 1000)
+	emitTarget := func(result *synscan.SynScanResult) bool {
+		if ctx.Err() != nil {
+			return false
+		}
+		select {
+		case <-ctx.Done():
+			return false
+		case synResults <- result:
+			return true
+		}
+	}
 
 	// 生成扫描结果
 	go func() {
@@ -471,49 +540,73 @@ func _scanFromTargetStream(res interface{}, opts ...fp.ConfigOption) (chan *fp.M
 
 		switch ret := res.(type) {
 		case chan *synscan.SynScanResult:
-			for r := range ret {
-				synResults <- r
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				case r, ok := <-ret:
+					if !ok || !emitTarget(r) {
+						return
+					}
+				}
 			}
 		case []interface{}:
 			for _, r := range ret {
 				switch subResult := r.(type) {
 				case *synscan.SynScanResult:
-					synResults <- subResult
+					if !emitTarget(subResult) {
+						return
+					}
 				case synscan.SynScanResult:
-					synResults <- &subResult
+					if !emitTarget(&subResult) {
+						return
+					}
 				case string:
 					host, port, err := utils.ParseStringToHostPort(subResult)
 					if err != nil {
 						continue
 					}
-					synResults <- &synscan.SynScanResult{
+					if !emitTarget(&synscan.SynScanResult{
 						Host: host,
 						Port: port,
+					}) {
+						return
 					}
 				case *base.NetSpaceEngineResult:
 					host, port, err := utils.ParseStringToHostPort(subResult.Addr)
 					if err != nil {
 						continue
 					}
-					synResults <- &synscan.SynScanResult{
+					if !emitTarget(&synscan.SynScanResult{
 						Host: host,
 						Port: port,
+					}) {
+						return
 					}
 				}
 			}
 		case []*synscan.SynScanResult:
 			for _, r := range ret {
-				synResults <- r
+				if !emitTarget(r) {
+					return
+				}
 			}
 		case chan *base.NetSpaceEngineResult:
-			for r := range ret {
-				host, port, err := utils.ParseStringToHostPort(r.Addr)
-				if err != nil {
-					continue
-				}
-				synResults <- &synscan.SynScanResult{
-					Host: host,
-					Port: port,
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				case r, ok := <-ret:
+					if !ok {
+						return
+					}
+					host, port, err := utils.ParseStringToHostPort(r.Addr)
+					if err != nil {
+						continue
+					}
+					if !emitTarget(&synscan.SynScanResult{Host: host, Port: port}) {
+						return
+					}
 				}
 			}
 		case []*base.NetSpaceEngineResult:
@@ -522,8 +615,10 @@ func _scanFromTargetStream(res interface{}, opts ...fp.ConfigOption) (chan *fp.M
 				if err != nil {
 					continue
 				}
-				synResults <- &synscan.SynScanResult{
+				if !emitTarget(&synscan.SynScanResult{
 					Host: host, Port: port,
+				}) {
+					return
 				}
 			}
 		case []string:
@@ -532,28 +627,17 @@ func _scanFromTargetStream(res interface{}, opts ...fp.ConfigOption) (chan *fp.M
 				if err != nil {
 					continue
 				}
-				synResults <- &synscan.SynScanResult{
+				if !emitTarget(&synscan.SynScanResult{
 					Host: host,
 					Port: port,
+				}) {
+					return
 				}
 			}
 		default:
 			log.Errorf("not a valid param: %v", reflect.TypeOf(res))
 		}
 	}()
-
-	// 扫描
-	config := fp.NewConfig(opts...)
-	concurrent := config.PoolSize
-	ctx := config.Ctx
-	if config.Ctx == nil {
-		ctx = context.Background()
-	}
-
-	matcher, err := fp.NewDefaultFingerprintMatcher(config)
-	if err != nil {
-		return nil, err
-	}
 
 	if matcher.Config.PoolSize > 0 {
 		concurrent = matcher.Config.PoolSize
@@ -582,8 +666,7 @@ func _scanFromTargetStream(res interface{}, opts ...fp.ConfigOption) (chan *fp.M
 	guard := newHostPortGuard(guardLimit)
 	tripGuard := func(h string) {
 		if guard.observe(h) {
-			log.Errorf("host [%s] reached scan-port safety threshold (%d open ports in one scan); likely a tarpit/firewall responding on all ports, force stopping the scan to keep the system healthy", h, guardLimit)
-			scanCancel()
+			log.Errorf("host [%s] reached scan-port safety threshold (%d open ports in one scan); likely a tarpit/firewall responding on all ports, skipping the rest of this host", h, guardLimit)
 		}
 	}
 
@@ -593,7 +676,18 @@ func _scanFromTargetStream(res interface{}, opts ...fp.ConfigOption) (chan *fp.M
 		// 熔断命中时主动调用, 以及 swg.Wait 之后调用以释放派生 ctx.
 		// 关键词: scanCancel 时机, 在途结果保护
 		swg := utils.NewSizedWaitGroup(concurrent)
-		for synRes := range synResults {
+	dispatch:
+		for {
+			var synRes *synscan.SynScanResult
+			select {
+			case <-scanCtx.Done():
+				break dispatch
+			case result, ok := <-synResults:
+				if !ok {
+					break dispatch
+				}
+				synRes = result
+			}
 			// ctx 短路: 历史 bug 的根因之一是这个派发循环从不检查 ctx. cancel 后
 			// MatchWithContext / sendMatchResultOrDrop 虽然会快速返回, 但
 			// "start task to scan" 日志在调用 MatchWithContext 之前就打印了, 循环
@@ -601,21 +695,40 @@ func _scanFromTargetStream(res interface{}, opts ...fp.ConfigOption) (chan *fp.M
 			if scanCtx.Err() != nil {
 				break
 			}
-			swg.Add()
-			rawPort := synRes.Port
+			if synRes == nil || guard.skipping(synRes.Host) {
+				continue
+			}
+			if err := swg.AddWithContext(scanCtx); err != nil {
+				break
+			}
 			rawHost := synRes.Host
-			proto, portWithoutProto := utils.ParsePortToProtoPort(rawPort) // 这里将协议和端口分开，便于后面打印日志
+			proto, portWithoutProto, explicitProto := synScanProbeTarget(synRes)
+			callerProtos := append([]fp.TransportProto(nil), matcher.Config.TransportProtos...)
 			go func() {
 				defer swg.Done()
 				fingerprintInFlight.Add(1)
 				defer fingerprintInFlight.Add(-1)
 
 				// 派发到真正执行之间也可能已 cancel, 再次短路, 避免无谓的日志与扫描.
-				if scanCtx.Err() != nil {
+				if scanCtx.Err() != nil || guard.skipping(rawHost) {
 					return
 				}
-				log.Debugf("start task to scan: [%s://%s]", proto, utils.HostPort(rawHost, portWithoutProto))
-				result, err := matcher.MatchWithContext(scanCtx, rawHost, rawPort)
+				shown := proto
+				if shown == "" {
+					shown = "configured"
+				}
+				log.Debugf("start task to scan: [%s://%s]", shown, utils.HostPort(rawHost, portWithoutProto))
+				// 每个目标复制一份传输配置，避免 UDP 探测改写共享 matcher。
+				// 只有结果带了协议，或端口仍是旧的 UDP 编码时，才覆盖调用方的协议选项。
+				transportOpt := fp.WithTransportProtos(callerProtos...)
+				if explicitProto {
+					transport := fp.TCP
+					if proto == "udp" {
+						transport = fp.UDP
+					}
+					transportOpt = fp.WithTransportProtos(transport)
+				}
+				result, err := matcher.MatchWithContext(scanCtx, rawHost, portWithoutProto, transportOpt)
 				if err != nil {
 					log.Errorf("failed to scan [%s://%s]: %v", proto, utils.HostPort(rawHost, portWithoutProto), err)
 					return

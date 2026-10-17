@@ -6,26 +6,83 @@ import (
 	"fmt"
 	"math"
 	"net"
+	"runtime/debug"
 	"strconv"
 	"time"
 
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/netstackvm"
-	"github.com/yaklang/yaklang/common/utils"
 )
 
-// halfOpenSYN is the only TCP send path. Probe is HalfOpenSYN.ProbeSYN:
-// one call admits, sends, retries, validates the reply and releases the probe.
-// The scanner does not assemble SYNs or write them through the legacy pcap queue.
+// halfOpenSYN is the only packet path. TCP calls HalfOpenSYN.ProbeSYN and UDP
+// calls HalfOpenSYN.ProbeUDP. One call admits, sends, waits and releases.
+// The scanner does not assemble frames or write them through a pcap queue.
 type halfOpenSYN interface {
 	Probe(context.Context, string) (netstackvm.TCPSegment, error)
+	ProbeUDP(context.Context, string, []byte) (netstackvm.UDPSegment, error)
 	Close() error
 }
 
-type netstackSYN struct{ *netstackvm.HalfOpenSYN }
+type netstackSYN struct {
+	*netstackvm.HalfOpenSYN
+	retry netstackvm.SYNRetryPolicy
+}
 
 func (h *netstackSYN) Probe(ctx context.Context, target string) (netstackvm.TCPSegment, error) {
-	return h.ProbeSYN(ctx, target)
+	if h.retry == (netstackvm.SYNRetryPolicy{}) {
+		return h.ProbeSYN(ctx, target)
+	}
+	return h.ProbeSYN(ctx, target, netstackvm.WithSYNRetry(h.retry))
+}
+
+// tcpRetryPolicy spreads a caller budget across response waits at 1:2:4.
+// The default policy stays in place when the caller did not set a budget.
+// Each wait is at least 50ms, and the waits that are actually scheduled fit
+// inside the budget. A budget that cannot hold the next wait becomes one attempt.
+func tcpRetryPolicy(budget time.Duration) netstackvm.SYNRetryPolicy {
+	policy := netstackvm.DefaultSYNRetryPolicy()
+	if budget <= 0 {
+		return policy
+	}
+	const minUnit = 50 * time.Millisecond
+	if budget < minUnit {
+		policy.MaxAttempts = 1
+		policy.ResponseTimeout = budget
+		policy.MaxResponseTimeout = budget
+		return policy
+	}
+	weights := []int{1, 2, 4}
+	attempts := 1
+	for n := 2; n <= len(weights); n++ {
+		sum := 0
+		for i := 0; i < n; i++ {
+			sum += weights[i]
+		}
+		if budget/time.Duration(sum) < minUnit {
+			break
+		}
+		attempts = n
+	}
+	sum := 0
+	for i := 0; i < attempts; i++ {
+		sum += weights[i]
+	}
+	unit := budget / time.Duration(sum)
+	if attempts == 1 || unit < minUnit {
+		unit = budget
+		attempts = 1
+	}
+	maxWait := unit * time.Duration(weights[attempts-1])
+	if maxWait > budget {
+		maxWait = budget
+	}
+	if maxWait < unit {
+		maxWait = unit
+	}
+	policy.MaxAttempts = attempts
+	policy.ResponseTimeout = unit
+	policy.MaxResponseTimeout = maxWait
+	return policy
 }
 
 const (
@@ -44,32 +101,58 @@ const (
 func synPacketRate(cfg *SynxConfig) (packetsPerSecond, inFlight int) {
 	packetsPerSecond = defaultSYNPacketsPerSecond
 	inFlight = defaultTCPProbeConcurrency
-	if cfg == nil {
-		return
+	explicitConcurrency := false
+	budget := 4 * time.Second
+	if cfg != nil {
+		explicitConcurrency = cfg.tcpProbeConcurrency > 0
+		if explicitConcurrency {
+			inFlight = cfg.tcpProbeConcurrency
+		}
+		if cfg.tcpProbeTimeout > 0 {
+			budget = cfg.tcpProbeTimeout
+		}
+		if cfg.rateLimitDelayMs > 0 {
+			gap := cfg.rateLimitDelayGap
+			if gap < 1 {
+				gap = 1
+			}
+			var rate float64
+			if gap <= 1 {
+				rate = 1000.0 / cfg.rateLimitDelayMs
+			} else {
+				// rateLimit(ms, count): count packets per ms milliseconds.
+				rate = float64(gap) * 1000.0 / cfg.rateLimitDelayMs
+			}
+			switch {
+			case rate < 1:
+				packetsPerSecond = 1
+			case rate > maxSYNPacketsPerSecond:
+				packetsPerSecond = maxSYNPacketsPerSecond
+			default:
+				packetsPerSecond = int(math.Round(rate))
+				if packetsPerSecond < 1 {
+					packetsPerSecond = 1
+				}
+			}
+		}
 	}
-	if cfg.tcpProbeConcurrency > 0 {
-		inFlight = cfg.tcpProbeConcurrency
+	// A filtered port holds its slot for the whole response budget. Size the
+	// window from the packet rate unless the caller set concurrency explicitly.
+	if !explicitConcurrency {
+		seconds := int((budget + time.Second - 1) / time.Second)
+		if seconds < 1 {
+			seconds = 1
+		}
+		need := packetsPerSecond * seconds
+		if need > inFlight {
+			inFlight = need
+		}
 	}
 	if inFlight > maxTCPProbeConcurrency {
 		inFlight = maxTCPProbeConcurrency
 	}
 	if inFlight < 1 {
 		inFlight = 1
-	}
-	if cfg.rateLimitDelayMs <= 0 {
-		return
-	}
-	rate := 1000.0 / cfg.rateLimitDelayMs
-	switch {
-	case rate < 1:
-		packetsPerSecond = 1
-	case rate > maxSYNPacketsPerSecond:
-		packetsPerSecond = maxSYNPacketsPerSecond
-	default:
-		packetsPerSecond = int(math.Round(rate))
-		if packetsPerSecond < 1 {
-			packetsPerSecond = 1
-		}
 	}
 	return
 }
@@ -84,20 +167,25 @@ func (s *Scannerx) probeTCP(ctx context.Context, target *SynxTarget) (netstackvm
 	if s.config != nil && s.config.tcpProbeTimeout > 0 {
 		timeout = s.config.tcpProbeTimeout
 	}
+	// The deadline is visible to callers. ProbeSYN starts the response clock
+	// after a rate token, so queue time is not part of that budget.
 	probeCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
-	return s.halfOpen.Probe(probeCtx, net.JoinHostPort(target.Host, strconv.Itoa(target.Port)))
+	return s.halfOpen.Probe(netstackvm.ContextWithProbeBudget(probeCtx, timeout), net.JoinHostPort(target.Host, strconv.Itoa(target.Port)))
 }
 
 func quietProbeErr(err error) bool {
 	return err == nil ||
 		errors.Is(err, netstackvm.ErrProbeNoResponse) ||
 		errors.Is(err, netstackvm.ErrProbeRefused) ||
+		errors.Is(err, netstackvm.ErrUDPNoResponse) ||
+		errors.Is(err, netstackvm.ErrUDPUnreachable) ||
+		errors.Is(err, netstackvm.ErrProbeUnreachable) ||
 		errors.Is(err, context.Canceled) ||
 		errors.Is(err, context.DeadlineExceeded)
 }
 
-func (s *Scannerx) runTCPProbes(targets <-chan *SynxTarget) {
+func (s *Scannerx) runProbes(targets <-chan *SynxTarget) {
 	for {
 		select {
 		case <-s.ctx.Done():
@@ -106,33 +194,88 @@ func (s *Scannerx) runTCPProbes(targets <-chan *SynxTarget) {
 			if !ok {
 				return
 			}
-			ack, err := s.probeTCP(s.ctx, target)
-			if err != nil {
-				if !quietProbeErr(err) {
-					log.Debugf("synscanx probe %s:%d failed: %v", target.Host, target.Port, err)
-				}
+			if target == nil {
 				continue
 			}
-			// Scanner callbacks stay here. netstackvm only returns the segment.
-			if s.ctx.Err() == nil && s.OpenPortHandlers != nil && ack.RemoteIP != nil {
-				s.OpenPortHandlers(ack.RemoteIP, int(ack.RemotePort))
-			}
+			s.probeOne(target)
 		}
 	}
 }
 
-func (s *Scannerx) notePorts(ports string) {
-	s.keepPacketWriter = portsIncludeUDP(ports)
+func (s *Scannerx) probeOne(target *SynxTarget) {
+	// A target can wait in the dispatcher after submission. Recheck the host
+	// cap here so queued work does not keep probing a host that already hit it.
+	if target == nil || s.openPortLimitReached(target.Host) {
+		return
+	}
+	defer func() {
+		if err := recover(); err != nil {
+			log.Errorf("synscanx probe %s:%d panic: %v\n%s", target.Host, target.Port, err, debug.Stack())
+		}
+	}()
+	if target.Mode == UDP {
+		s.finishUDPProbe(target)
+		return
+	}
+	s.finishTCPProbe(target)
 }
 
-func portsIncludeUDP(ports string) bool {
-	for _, port := range utils.ParseStringToPorts(ports) {
-		proto, _ := utils.ParsePortToProtoPort(port)
-		if proto == "udp" {
-			return true
+func (s *Scannerx) finishTCPProbe(target *SynxTarget) {
+	ack, err := s.probeTCP(s.ctx, target)
+	if err != nil {
+		if !quietProbeErr(err) {
+			log.Debugf("synscanx probe %s:%d failed: %v", target.Host, target.Port, err)
+		}
+		return
+	}
+	// Scanner callbacks stay here. netstackvm only returns the segment.
+	if s.ctx.Err() == nil && ack.RemoteIP != nil {
+		s.reportOpen(ack.RemoteIP, int(ack.RemotePort), "tcp")
+	}
+}
+
+func (s *Scannerx) probeUDP(ctx context.Context, target *SynxTarget) (netstackvm.UDPSegment, error) {
+	if s == nil || s.halfOpen == nil || target == nil || target.Host == "" || target.Port < 1 || target.Port > 65535 {
+		return netstackvm.UDPSegment{}, fmt.Errorf("synscanx: invalid UDP probe")
+	}
+	timeout := 5 * time.Second
+	if s.config != nil && s.config.waiting > 0 {
+		timeout = s.config.waiting
+	}
+	payload := udpProbePayload(target.Port)
+	targetText := net.JoinHostPort(target.Host, strconv.Itoa(target.Port))
+	var last netstackvm.UDPSegment
+	var err error
+	// One retry covers a single lost datagram. Each attempt gets the full wait
+	// unless the parent context is already done.
+	for attempt := 0; attempt < 2; attempt++ {
+		if err = ctx.Err(); err != nil {
+			return last, err
+		}
+		// The context deadline lets a fake or a caller observe this attempt.
+		// ProbeUDP starts the same budget again after the rate limiter, so
+		// queue time is not counted as response time.
+		probeCtx, cancel := context.WithTimeout(ctx, timeout)
+		last, err = s.halfOpen.ProbeUDP(netstackvm.ContextWithProbeBudget(probeCtx, timeout), targetText, payload)
+		cancel()
+		if !errors.Is(err, netstackvm.ErrUDPNoResponse) {
+			return last, err
 		}
 	}
-	return false
+	return last, err
+}
+
+func (s *Scannerx) finishUDPProbe(target *SynxTarget) {
+	reply, err := s.probeUDP(s.ctx, target)
+	if err != nil {
+		if !quietProbeErr(err) {
+			log.Debugf("synscanx udp probe %s:%d failed: %v", target.Host, target.Port, err)
+		}
+		return
+	}
+	if s.ctx.Err() == nil && reply.RemoteIP != nil {
+		s.reportOpen(reply.RemoteIP, int(reply.RemotePort), "udp")
+	}
 }
 
 func (s *Scannerx) startHalfOpen(ctx context.Context) error {
@@ -144,13 +287,17 @@ func (s *Scannerx) startHalfOpen(ctx context.Context) error {
 		Iface:            s.config.Iface,
 		SourceIP:         s.config.SourceIP,
 		Gateway:          s.config.GatewayIP,
-		MaxInFlight:      inFlight,
+		MaxInFlight:      inFlight * 2,
 		PacketsPerSecond: packetsPerSecond,
 	})
 	if err != nil {
 		return err
 	}
-	s.halfOpen = &netstackSYN{session}
-	log.Debugf("synscanx TCP ProbeSYN on %s (%d in flight, %d SYN/s)", s.config.Iface.Name, inFlight, packetsPerSecond)
+	wrapped := &netstackSYN{HalfOpenSYN: session}
+	if s.config.tcpProbeTimeout > 0 {
+		wrapped.retry = tcpRetryPolicy(s.config.tcpProbeTimeout)
+	}
+	s.halfOpen = wrapped
+	log.Debugf("synscanx netstackvm probes on %s (%d in flight, %d pkt/s)", s.config.Iface.Name, inFlight, packetsPerSecond)
 	return nil
 }

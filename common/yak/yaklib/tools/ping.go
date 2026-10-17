@@ -38,7 +38,7 @@ func NewDefaultPingConfig() *_pingConfig {
 		timeout:            5 * time.Second,
 		scanCClass:         false,
 		concurrent:         50,
-		tcpPingPort:        "22,80,443",
+		tcpPingPort:        utils.DefaultHostAlivePorts,
 	}
 }
 

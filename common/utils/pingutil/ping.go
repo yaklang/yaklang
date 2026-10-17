@@ -62,9 +62,9 @@ func PingAutoConfig(ip string, opts ...PingConfigOpt) *PingResult {
 	}()
 
 	testPorts := utils.ParseStringToPorts(defaultTcpPort)
-	if len(testPorts) > 5 {
-		testPorts = testPorts[:5]
-		log.Infof("tcp-ping[%s] too many ports, only test first 5 most", defaultTcpPort)
+	if len(testPorts) > 8 {
+		testPorts = testPorts[:8]
+		log.Infof("tcp-ping[%s] too many ports, only test first 8", defaultTcpPort)
 	}
 
 	var icmpErr error

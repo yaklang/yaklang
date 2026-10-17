@@ -126,6 +126,11 @@ func (m *MatchResult) Merge(f *MatchResult) {
 	if f.Fingerprint == nil {
 		return
 	}
+	// A placeholder fingerprint has an empty protocol. Keep the protocol from
+	// the real result so Tidy does not later record a UDP service as TCP.
+	if m.Fingerprint.Proto == "" {
+		m.Fingerprint.Proto = f.Fingerprint.Proto
+	}
 	m.Fingerprint.CPEs = utils2.RemoveRepeatedWithStringSlice(append(m.Fingerprint.CPEs, f.Fingerprint.CPEs...))
 	if f.Fingerprint.ServiceName != "" && m.Fingerprint.ServiceName == "" {
 		m.Fingerprint.Banner = f.Fingerprint.Banner
@@ -424,6 +429,63 @@ func GetMatchResultDatabaseCache(addr string) *MatchResult {
 	}
 	SetMatchResultDatabaseCache(originAddr, &m)
 	return &m
+}
+
+// fingerprintCacheProto is the transport that actually decides this match.
+// An encoded UDP port stays UDP even when the config also allows TCP.
+// A config that allows both is its own bucket, so it cannot satisfy a
+// later single-protocol lookup.
+func fingerprintCacheProto(portProto string, config *Config) string {
+	if portProto == "udp" {
+		return "udp"
+	}
+	udp := config != nil && config.CanScanUDP()
+	tcp := config == nil || config.CanScanTCP()
+	switch {
+	case udp && tcp:
+		return "tcp+udp"
+	case udp:
+		return "udp"
+	default:
+		return "tcp"
+	}
+}
+
+func fingerprintCacheAddr(host string, port int, proto string) string {
+	return proto + "://" + utils.HostPort(host, port)
+}
+
+func cacheResultMatches(result *MatchResult, proto string) bool {
+	if result == nil || proto == "" {
+		return false
+	}
+	if proto == "tcp+udp" {
+		return true
+	}
+	got := result.GetProto()
+	if proto == "udp" {
+		return got == UDP
+	}
+	return got == TCP || got == ""
+}
+
+// cachedMatchResult reads the protocol-specific key, then a legacy host:port
+// entry. A legacy hit is used only when its protocol still matches. Old
+// entries that omit the protocol therefore cannot answer a UDP lookup.
+func cachedMatchResult(get func(string) *MatchResult, key, legacy, proto string) *MatchResult {
+	if get == nil {
+		return nil
+	}
+	if result := get(key); cacheResultMatches(result, proto) {
+		return result
+	}
+	if legacy == "" || legacy == key {
+		return nil
+	}
+	if result := get(legacy); cacheResultMatches(result, proto) {
+		return result
+	}
+	return nil
 }
 
 func GetMatchResultCache(addr string) *MatchResult {

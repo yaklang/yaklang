@@ -17,10 +17,11 @@ var (
 	// ErrProbeChecksum accompanies ErrProbeNoResponse when correlated replies
 	// were rejected for invalid checksums. Capture offload is one possible cause;
 	// this is not permission to accept the reply or classify the port as closed.
-	ErrProbeChecksum = errors.New("correlated TCP reply checksum invalid; check capture offload or packet corruption")
-	ErrProbeRefused  = errors.New("TCP probe received a matching reset")
-	ErrProbeSend     = errors.New("TCP probe could not send SYN")
-	ErrHalfOpenACK   = errors.New("ACK is disabled for a half-open probe")
+	ErrProbeChecksum    = errors.New("correlated TCP reply checksum invalid; check capture offload or packet corruption")
+	ErrProbeRefused     = errors.New("TCP probe received a matching reset")
+	ErrProbeUnreachable = errors.New("TCP probe received ICMP unreachable")
+	ErrProbeSend        = errors.New("TCP probe could not send SYN")
+	ErrHalfOpenACK      = errors.New("ACK is disabled for a half-open probe")
 )
 
 // SYNRetryPolicy bounds the whole probe, including failed local sends.
@@ -185,6 +186,9 @@ func (p *TCPProbe) sendWithRetry(ctx context.Context) (TCPSegment, error) {
 		sendCtx, cancel := context.WithTimeout(ctx, p.retry.SendTimeout)
 		seg, err := p.transport.sendSYN(sendCtx)
 		cancel()
+		if errors.Is(err, errProbeResponseReady) {
+			return TCPSegment{}, err
+		}
 		if ctx.Err() != nil {
 			return TCPSegment{}, context.Cause(ctx)
 		}
@@ -220,7 +224,25 @@ func (p *TCPProbe) ReceiveSYNACKContext(ctx context.Context) (TCPSegment, error)
 		return TCPSegment{}, err
 	}
 	for {
-		rxCtx, rxCancel := context.WithTimeout(ctx, p.retry.delay(p.attempts, rand.Float64()))
+		delay := p.retry.delay(p.attempts, rand.Float64())
+		// The caller deadline is one shared response window. A wait that
+		// already uses the time left is the last attempt; another SYN would
+		// land after the budget.
+		finalWait := false
+		if deadline, ok := ctx.Deadline(); ok {
+			remaining := time.Until(deadline)
+			if remaining <= 0 {
+				if err := ctx.Err(); err != nil {
+					return TCPSegment{}, context.Cause(ctx)
+				}
+				return TCPSegment{}, context.DeadlineExceeded
+			}
+			if remaining <= delay {
+				delay = remaining
+				finalWait = true
+			}
+		}
+		rxCtx, rxCancel := context.WithTimeout(ctx, delay)
 		var seg TCPSegment
 		var raw []byte
 		for {
@@ -253,6 +275,12 @@ func (p *TCPProbe) ReceiveSYNACKContext(ctx context.Context) (TCPSegment, error)
 		if !errors.Is(err, context.DeadlineExceeded) {
 			return TCPSegment{}, err
 		}
+		if finalWait {
+			if errors.Is(err, ErrProbeChecksum) {
+				return TCPSegment{}, fmt.Errorf("%w: %w", context.DeadlineExceeded, ErrProbeChecksum)
+			}
+			return TCPSegment{}, context.DeadlineExceeded
+		}
 		if p.attempts >= p.retry.MaxAttempts {
 			if errors.Is(err, ErrProbeChecksum) {
 				return TCPSegment{}, fmt.Errorf("%w after %d attempts: %w", ErrProbeNoResponse, p.attempts, ErrProbeChecksum)
@@ -260,13 +288,18 @@ func (p *TCPProbe) ReceiveSYNACKContext(ctx context.Context) (TCPSegment, error)
 			return TCPSegment{}, fmt.Errorf("%w after %d attempts", ErrProbeNoResponse, p.attempts)
 		}
 		if _, err = p.sendWithRetry(ctx); err != nil {
+			if errors.Is(err, errProbeResponseReady) {
+				continue
+			}
 			return TCPSegment{}, err
 		}
 	}
 }
 
 func validProbeReply(syn, reply TCPSegment) bool {
-	if !sameIPv4(syn.LocalIP, reply.LocalIP) || !sameIPv4(syn.RemoteIP, reply.RemoteIP) || syn.LocalPort != reply.LocalPort || syn.RemotePort != reply.RemotePort || !reply.ACK || reply.Ack != syn.Seq+1 || reply.FIN || reply.PSH || reply.URG || reply.PayloadLen != 0 {
+	// PSH, URG and a payload can appear on a SYN-ACK (TCP Fast Open and some
+	// stacks). FIN is not an open handshake.
+	if !sameIPv4(syn.LocalIP, reply.LocalIP) || !sameIPv4(syn.RemoteIP, reply.RemoteIP) || syn.LocalPort != reply.LocalPort || syn.RemotePort != reply.RemotePort || !reply.ACK || reply.Ack != syn.Seq+1 || reply.FIN {
 		return false
 	}
 	return (reply.SYN && !reply.RST) || (reply.RST && !reply.SYN)

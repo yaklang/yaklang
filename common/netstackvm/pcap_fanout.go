@@ -63,7 +63,7 @@ func NewPCAPAdaptor(device string, mtu int32, promisc bool) (*pcapAdaptor, error
 		go p.background()
 	}
 	id := ksuid.New().String()
-	ch := make(chan gopacket.Packet, 1000)
+	ch := make(chan gopacket.Packet, 8192)
 	p.m.Lock()
 	p.chans[id] = ch
 	p.m.Unlock()

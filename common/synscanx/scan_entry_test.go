@@ -4,8 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/gopacket/gopacket"
-	"github.com/gopacket/gopacket/layers"
 	"github.com/yaklang/yaklang/common/netstackvm"
 	"net"
 	"os"
@@ -113,7 +111,7 @@ func TestSubmitTargetEmitsPlannedTCPTargets(t *testing.T) {
 		}
 		got = append(got, target.Host+":"+itoa(target.Port))
 	}
-	want := []string{"10.0.0.1:80", "10.0.0.1:443", "10.0.0.2:80", "10.0.0.2:443"}
+	want := []string{"10.0.0.1:80", "10.0.0.2:80", "10.0.0.1:443", "10.0.0.2:443"}
 	if len(got) != len(want) {
 		t.Fatalf("targets = %v", got)
 	}
@@ -143,8 +141,15 @@ func TestSubmitTargetStopsWhenOpenPortCapAlreadyHit(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for range ch {
-		t.Fatal("submit continued after the open-port cap was already reached")
+	var got []string
+	for target := range ch {
+		if target.Host == "10.0.0.1" {
+			t.Fatalf("capped host was still submitted: %+v", target)
+		}
+		got = append(got, target.Host+":"+itoa(target.Port))
+	}
+	if len(got) != 2 || got[0] != "10.0.0.2:80" || got[1] != "10.0.0.2:81" {
+		t.Fatalf("targets = %v", got)
 	}
 }
 
@@ -235,20 +240,13 @@ func TestConcurrentBelowTenStillHasBurst(t *testing.T) {
 	}
 }
 
-func TestPortsIncludeUDP(t *testing.T) {
-	if portsIncludeUDP("80,443") {
-		t.Fatal("tcp ports were treated as udp")
-	}
-	if !portsIncludeUDP("80,U:53") {
-		t.Fatal("udp port was missed")
-	}
-}
-
 type recordingProber struct {
 	mu       sync.Mutex
 	got      []string
+	udpGot   []string
 	contexts []context.Context
 	probe    func(context.Context, string) (netstackvm.TCPSegment, error)
+	udp      func(context.Context, string, []byte) (netstackvm.UDPSegment, error)
 }
 
 func (r *recordingProber) Probe(ctx context.Context, target string) (netstackvm.TCPSegment, error) {
@@ -262,6 +260,19 @@ func (r *recordingProber) Probe(ctx context.Context, target string) (netstackvm.
 	}
 	return netstackvm.TCPSegment{}, nil
 }
+
+func (r *recordingProber) ProbeUDP(ctx context.Context, target string, payload []byte) (netstackvm.UDPSegment, error) {
+	r.mu.Lock()
+	r.udpGot = append(r.udpGot, target)
+	r.contexts = append(r.contexts, ctx)
+	fn := r.udp
+	r.mu.Unlock()
+	if fn != nil {
+		return fn(ctx, target, payload)
+	}
+	return netstackvm.UDPSegment{}, netstackvm.ErrUDPNoResponse
+}
+
 func (r *recordingProber) Close() error { return nil }
 
 func TestSendPacketUsesIndependentSynchronousProbes(t *testing.T) {
@@ -367,11 +378,11 @@ func TestSendPacketBoundsWorkersAndCancelsPendingProbes(t *testing.T) {
 
 func TestSynPacketRateFollowsYakLimits(t *testing.T) {
 	pps, inFlight := synPacketRate(nil)
-	if pps != defaultSYNPacketsPerSecond || inFlight != defaultTCPProbeConcurrency {
+	if pps != defaultSYNPacketsPerSecond || inFlight != 4000 {
 		t.Fatalf("nil config = %d pps, %d in flight", pps, inFlight)
 	}
 	pps, inFlight = synPacketRate(NewDefaultConfig())
-	if pps != 1000 || inFlight != 256 {
+	if pps != 1000 || inFlight != 4000 {
 		t.Fatalf("default = %d pps, %d in flight", pps, inFlight)
 	}
 
@@ -409,7 +420,6 @@ func TestTCPSubmitDoesNotBlockOnLegacyLimiter(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 300*time.Millisecond)
 	defer cancel()
 	s.ctx = ctx
-	s.limiter = rate.NewLimiter(rate.Every(time.Hour), 1)
 	start := time.Now()
 	ch, err := s.SubmitTarget("10.0.0.8", "80,81,82")
 	if err != nil {
@@ -431,10 +441,8 @@ func TestSendPacketSkipsTCPWithoutSession(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	scanner := &Scannerx{
-		ctx:        ctx,
-		config:     &SynxConfig{},
-		PacketChan: make(chan []byte, 1),
-		LoopPacket: make(chan []byte, 1),
+		ctx:    ctx,
+		config: &SynxConfig{},
 	}
 	ch := make(chan *SynxTarget, 2)
 	ch <- nil
@@ -445,12 +453,7 @@ func TestSendPacketSkipsTCPWithoutSession(t *testing.T) {
 	select {
 	case <-done:
 	case <-time.After(time.Second):
-		t.Fatal("TCP target blocked in the legacy packet queue")
-	}
-	select {
-	case pkt := <-scanner.PacketChan:
-		t.Fatalf("legacy TCP packet of %d bytes", len(pkt))
-	default:
+		t.Fatal("TCP target blocked without a session")
 	}
 }
 
@@ -646,7 +649,6 @@ func newPlanScanner(t *testing.T) *Scannerx {
 		config:        &SynxConfig{shuffle: false, Ctx: ctx},
 		ports:         utils.NewPortsFilter(),
 		ipOpenPortMap: &sync.Map{},
-		limiter:       rate.NewLimiter(rate.Limit(1e6), 1<<20),
 	}
 }
 
@@ -664,33 +666,29 @@ func itoa(n int) string {
 	return string(buf[i:])
 }
 
-func TestUDPCaptureCannotBypassTCPProbeValidation(t *testing.T) {
-	reported := 0
-	s := &Scannerx{halfOpen: &recordingProber{}, OpenPortHandlers: func(net.IP, int) { reported++ }}
-	buf := gopacket.NewSerializeBuffer()
-	ip := &layers.IPv4{Version: 4, TTL: 64, Protocol: layers.IPProtocolTCP, SrcIP: net.IPv4(192, 0, 2, 20), DstIP: net.IPv4(192, 0, 2, 10)}
-	tcp := &layers.TCP{SrcPort: 80, DstPort: 40000, SYN: true, ACK: true, Ack: 123}
-	if err := tcp.SetNetworkLayerForChecksum(ip); err != nil {
-		t.Fatal(err)
+func TestUDPOpenComesFromProbeReply(t *testing.T) {
+	rec := &recordingProber{udp: func(_ context.Context, target string, _ []byte) (netstackvm.UDPSegment, error) {
+		if target == "10.0.0.8:53" {
+			return netstackvm.UDPSegment{RemoteIP: net.IPv4(10, 0, 0, 8), RemotePort: 53}, nil
+		}
+		return netstackvm.UDPSegment{}, netstackvm.ErrUDPNoResponse
+	}}
+	var opened []int
+	scanner := &Scannerx{
+		ctx:      context.Background(),
+		halfOpen: rec,
+		config:   &SynxConfig{tcpProbeConcurrency: 1, waiting: time.Second},
+		OpenPortHandlers: func(_ net.IP, port int) {
+			opened = append(opened, port)
+		},
 	}
-	if err := gopacket.SerializeLayers(buf, gopacket.SerializeOptions{FixLengths: true, ComputeChecksums: true}, ip, tcp); err != nil {
-		t.Fatal(err)
-	}
-	s.handlePacket(gopacket.NewPacket(buf.Bytes(), layers.LayerTypeIPv4, gopacket.Default))
-	if reported != 0 {
-		t.Fatal("uncorrelated TCP escaped via the UDP capture")
-	}
-	ip.Protocol = layers.IPProtocolUDP
-	udp := &layers.UDP{SrcPort: 53, DstPort: 40000}
-	if err := udp.SetNetworkLayerForChecksum(ip); err != nil {
-		t.Fatal(err)
-	}
-	if err := gopacket.SerializeLayers(buf, gopacket.SerializeOptions{FixLengths: true, ComputeChecksums: true}, ip, udp); err != nil {
-		t.Fatal(err)
-	}
-	s.handlePacket(gopacket.NewPacket(buf.Bytes(), layers.LayerTypeIPv4, gopacket.Default))
-	if reported != 1 {
-		t.Fatal("UDP result path was lost")
+	ch := make(chan *SynxTarget, 2)
+	ch <- &SynxTarget{Host: "10.0.0.8", Port: 53, Mode: UDP}
+	ch <- &SynxTarget{Host: "10.0.0.8", Port: 123, Mode: UDP}
+	close(ch)
+	scanner.sendPacket(ch)
+	if len(opened) != 1 || opened[0] != 53 {
+		t.Fatalf("opened = %v", opened)
 	}
 }
 

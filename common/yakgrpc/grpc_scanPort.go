@@ -247,7 +247,7 @@ func (s *Server) PortScan(req *ypb.PortScanRequest, stream ypb.Yak_PortScanServe
 	if req.GetHostAlivePorts() != "" {
 		reqParams.ExecParams = append(reqParams.ExecParams, &ypb.KVPair{Key: "host-alive-ports", Value: fmt.Sprint(req.GetHostAlivePorts())})
 	} else {
-		reqParams.ExecParams = append(reqParams.ExecParams, &ypb.KVPair{Key: "host-alive-ports", Value: "22,80,443"})
+		reqParams.ExecParams = append(reqParams.ExecParams, &ypb.KVPair{Key: "host-alive-ports", Value: utils.DefaultHostAlivePorts})
 	}
 
 	if req.GetBasicCrawlerEnableJSParser() {

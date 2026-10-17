@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net"
 	"strconv"
+	"strings"
 	"sync"
 
 	"github.com/gopacket/gopacket"
@@ -41,10 +42,11 @@ type HalfOpenSYNConfig struct {
 	AllowUnverifiedTransport bool
 }
 
-// HalfOpenSYN emits TCP SYNs from a writable netstackvm capture and reports
-// SYN-ACKs without completing the handshake.
+// HalfOpenSYN emits TCP SYNs and UDP datagrams from a writable netstackvm
+// capture. SYN-ACKs are reported without completing the handshake. UDP replies
+// are reported without being delivered into gVisor.
 //
-// Each scan uses TCPProbe with a real-interface transport and a SYN-only gate.
+// Each scan uses one session. TCP is ProbeSYN. UDP is ProbeUDP.
 type HalfOpenSYN struct {
 	ctx    context.Context
 	cancel context.CancelFunc
@@ -65,7 +67,8 @@ type HalfOpenSYN struct {
 	allowUnverifiedTransport bool
 	gateway                  net.IP
 
-	flights map[flightKey]*synFlight
+	flights    map[flightKey]*synFlight
+	udpFlights map[flightKey]*udpFlight
 }
 
 type flightKey struct {
@@ -77,8 +80,9 @@ type flightKey struct {
 }
 
 type probeReply struct {
-	segment TCPSegment
-	raw     []byte
+	segment     TCPSegment
+	raw         []byte
+	unreachable bool
 }
 type synFrame struct {
 	segment  TCPSegment
@@ -170,7 +174,8 @@ func OpenHalfOpenSYN(ctx context.Context, cfg HalfOpenSYNConfig) (*HalfOpenSYN, 
 		stack:                    stackIns,
 		gateway:                  ipv4Only(cfg.Gateway),
 		flights:                  make(map[flightKey]*synFlight),
-		mainIsLoopback:           cfg.Iface.Flags&net.FlagLoopback != 0,
+		udpFlights:               make(map[flightKey]*udpFlight),
+		mainIsLoopback:           interfaceLooksLoopback(cfg.Iface, src),
 		allowUnverifiedTransport: cfg.AllowUnverifiedTransport,
 	}
 	h.main, err = h.openEntry(cfg.Iface, src, subnet.Mask, h.gateway, ifaceNeedsResolution(cfg.Iface))
@@ -210,6 +215,10 @@ func (h *HalfOpenSYN) openEntry(iface *net.Interface, ip net.IP, mask net.IPMask
 		WithPCAPReadOnly(true),
 		WithDisableForwarding(true),
 		WithPcapCapabilities(caps),
+		// Promiscuous capture on a physical NIC pulls every frame into the
+		// fanout and drops the SYN-ACK we are waiting for. Loopback capture
+		// still needs it; replies there are not always addressed to our MAC.
+		WithPcapPromisc(interfaceLooksLoopback(iface, ip)),
 	}
 	if len(iface.HardwareAddr) == 6 {
 		opts = append(opts, WithMainNICLinkAddress(iface.HardwareAddr.String()))
@@ -218,7 +227,7 @@ func (h *HalfOpenSYN) openEntry(iface *net.Interface, ip net.IP, mask net.IPMask
 	if err != nil {
 		return nil, err
 	}
-	if err := validateHalfOpenTransport(iface, vm.driver.adaptor.linkType, h.allowUnverifiedTransport); err != nil {
+	if err := validateHalfOpenTransport(iface, ip, vm.driver.adaptor.linkType, h.allowUnverifiedTransport); err != nil {
 		vm.Close()
 		return nil, err
 	}
@@ -263,8 +272,22 @@ func (h *HalfOpenSYN) openEntry(iface *net.Interface, ip net.IP, mask net.IPMask
 	return vm, nil
 }
 
-func validateHalfOpenTransport(iface *net.Interface, link layers.LinkType, allowUnverified bool) error {
-	if iface.Flags&net.FlagLoopback != 0 || allowUnverified {
+func interfaceLooksLoopback(iface *net.Interface, ip net.IP) bool {
+	if ip != nil && ip.IsLoopback() {
+		return true
+	}
+	if iface == nil {
+		return false
+	}
+	if iface.Flags&net.FlagLoopback != 0 {
+		return true
+	}
+	name := strings.ToLower(iface.Name)
+	return strings.Contains(name, "loopback") || strings.Contains(name, "npf_loopback")
+}
+
+func validateHalfOpenTransport(iface *net.Interface, ip net.IP, link layers.LinkType, allowUnverified bool) error {
+	if interfaceLooksLoopback(iface, ip) || allowUnverified {
 		return nil
 	}
 	if link != layers.LinkTypeEthernet || iface.Flags&net.FlagPointToPoint != 0 {
@@ -385,15 +408,37 @@ func (h *HalfOpenSYN) StartTCPProbe(ctx context.Context, target string, options 
 // own batch concurrency and give each call its own context. Use StartTCPProbe
 // instead when individual steps or a longer-lived probe are needed.
 func (h *HalfOpenSYN) ProbeSYN(ctx context.Context, target string, options ...TCPProbeOption) (TCPSegment, error) {
-	probe, err := h.StartTCPProbe(ctx, target, options...)
+	// A response budget must not expire while this probe waits for a rate token.
+	// Cancellation still aborts the probe. Callers that set only a deadline keep
+	// the previous behavior.
+	runCtx := ctx
+	budget := probeResponseBudget(ctx)
+	if budget > 0 {
+		var stop context.CancelFunc
+		runCtx, stop = contextWithoutDeadline(ctx)
+		defer stop()
+	}
+	probe, err := h.StartTCPProbe(runCtx, target, options...)
 	if err != nil {
 		return TCPSegment{}, err
 	}
 	defer probe.Close()
-	if _, err = probe.ProbeSYNContext(ctx); err != nil {
+	if _, err = probe.ProbeSYNContext(runCtx); err != nil {
 		return TCPSegment{}, err
 	}
-	return probe.ReceiveSYNACKContext(ctx)
+	// Retries share one response window that starts after the SYN is sent.
+	// Time spent waiting for the first rate token is not part of it.
+	recvCtx := runCtx
+	if budget > 0 {
+		var stopRecv context.CancelFunc
+		recvCtx, stopRecv = context.WithTimeout(runCtx, budget)
+		defer stopRecv()
+	}
+	seg, err := probe.ReceiveSYNACKContext(recvCtx)
+	if budget > 0 && errors.Is(err, context.DeadlineExceeded) {
+		return TCPSegment{}, fmt.Errorf("%w: %w", ErrProbeNoResponse, err)
+	}
+	return seg, err
 }
 
 func (h *HalfOpenSYN) Close() error {
@@ -445,12 +490,15 @@ func packetFlightKey(nic tcpip.NICID, ip *layers.IPv4, tcp *layers.TCP, inbound 
 	return flightKey{nic, ip4key(ip.SrcIP), uint16(tcp.SrcPort), ip4key(ip.DstIP), uint16(tcp.DstPort)}
 }
 
-// captureStackFrame never writes TCP. Automatic retransmits and abort RSTs
-// stay here; only the probe retry controller can authorize a SYN write.
+// captureStackFrame never writes TCP or UDP. Automatic retransmits and abort
+// RSTs stay here; only the probe controller can authorize a SYN or a UDP datagram.
 func (h *HalfOpenSYN) captureStackFrame(vm *NetStackVirtualMachineEntry, data []byte, lt gopacket.LayerType) error {
 	packet := gopacket.NewPacket(data, lt, gopacket.Default)
 	if packet.Layer(layers.LayerTypeARP) != nil {
 		return vm.driver.writeFrame(data, lt)
+	}
+	if h.captureUDPFrame(vm, packet, data, lt) {
+		return nil
 	}
 	ip, tcp, ok := ipv4TCP(packet)
 	if !ok || !tcp.SYN || tcp.ACK || tcp.RST || tcp.FIN {
@@ -482,6 +530,9 @@ func (h *HalfOpenSYN) allowOutbound(nic tcpip.NICID, packet gopacket.Packet) boo
 	if packet.Layer(layers.LayerTypeARP) != nil {
 		return h.ctx.Err() == nil
 	}
+	if ip, udpLayer, ok := ipv4UDP(packet); ok {
+		return h.allowUDP(nic, ip, udpLayer)
+	}
 	ip, tcp, ok := ipv4TCP(packet)
 	if !ok || !tcp.SYN || tcp.ACK || tcp.RST || tcp.FIN || tcp.PSH || tcp.URG || len(tcp.Payload) != 0 {
 		return false
@@ -502,6 +553,15 @@ func (h *HalfOpenSYN) observeInbound(nic tcpip.NICID, packet gopacket.Packet) bo
 	}
 	if packet.Layer(layers.LayerTypeARP) != nil {
 		return h.ctx.Err() == nil
+	}
+	if ip, udpLayer, ok := ipv4UDP(packet); ok {
+		h.observeUDP(nic, packet, ip, udpLayer)
+		return false
+	}
+	if packet.Layer(layers.LayerTypeICMPv4) != nil {
+		h.observeUDPUnreachable(nic, packet)
+		h.observeTCPUnreachable(nic, packet)
+		return false
 	}
 	ip, tcp, ok := ipv4TCP(packet)
 	if !ok || !tcp.ACK || (!tcp.SYN && !tcp.RST) || ip.FragOffset != 0 || ip.Flags&layers.IPv4MoreFragments != 0 || packet.Metadata().Truncated {
@@ -528,12 +588,52 @@ func (h *HalfOpenSYN) observeInbound(nic tcpip.NICID, packet gopacket.Packet) bo
 			return false
 		}
 	}
-	select {
-	case f.replies <- probeReply{seg, raw}:
-	default:
-	}
+	offerProbeReply(f.replies, probeReply{segment: seg, raw: raw})
 	// No TCP response ever enters gVisor, including RSTs.
 	return false
+}
+
+func (h *HalfOpenSYN) observeTCPUnreachable(nic tcpip.NICID, packet gopacket.Packet) {
+	key, ok := unreachableTCPKey(nic, packet)
+	if !ok {
+		return
+	}
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	f := h.flights[key]
+	if f == nil || f.ctx.Err() != nil || h.ctx.Err() != nil || f.frame == nil || (!f.sent && !f.sending) {
+		return
+	}
+	offerProbeReply(f.replies, probeReply{unreachable: true})
+}
+
+// offerProbeReply keeps a SYN-ACK when the one-slot reply queue already holds
+// a RST or an ICMP unreachable. A later RST must not hide an open port.
+func offerProbeReply(ch chan probeReply, reply probeReply) {
+	select {
+	case ch <- reply:
+		return
+	default:
+	}
+	select {
+	case old := <-ch:
+		if synOpenReply(old) && !synOpenReply(reply) {
+			select {
+			case ch <- old:
+			default:
+			}
+			return
+		}
+	default:
+	}
+	select {
+	case ch <- reply:
+	default:
+	}
+}
+
+func synOpenReply(reply probeReply) bool {
+	return !reply.unreachable && reply.segment.SYN && reply.segment.ACK && !reply.segment.RST
 }
 
 func ipv4TCP(packet gopacket.Packet) (*layers.IPv4, *layers.TCP, bool) {
@@ -559,6 +659,27 @@ func addConnectedRoute(vm *NetStackVirtualMachineEntry, ip net.IP, mask net.IPMa
 		MTU:         uint32(vm.mtu),
 	})
 	return nil
+}
+
+// waitLimiter applies the shared packet rate and also stops when the session
+// is closed. The caller context alone would keep Close blocked in wg.Wait
+// until a slow reservation finished.
+func (h *HalfOpenSYN) waitLimiter(ctx context.Context) error {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	if err := h.ctx.Err(); err != nil {
+		return err
+	}
+	waitCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	stop := context.AfterFunc(h.ctx, cancel)
+	defer stop()
+	err := h.limiter.Wait(waitCtx)
+	if h.ctx.Err() != nil {
+		return h.ctx.Err()
+	}
+	return err
 }
 
 func ifaceNeedsResolution(iface *net.Interface) bool {

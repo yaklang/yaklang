@@ -33,7 +33,7 @@ import (
 //
 // <|EXAMPLE_START|> 自定义发包后的等待时间
 // ```
-// // SYN 扫描是批量发包后统一等待回包，wait 设置等待秒数(网络差可调大以减少漏报)
+// // wait 是每个 UDP 探测等待应答的最长时间。TCP 半开探测使用自己的超时。
 // res, err = synscan.Scan("192.168.1.1/24", "1-65535", synscan.wait(5))
 // die(err)
 // for result := range res {
@@ -46,7 +46,7 @@ import (
 // ```
 // // 控制发包速率，并把开放端口写入文件，每行带 tcp:// 前缀便于后续处理
 // res, err = synscan.Scan("10.0.0.0/24", "80,443",
-//     synscan.rateLimit(1, 1000),          // 每 1 毫秒最多发送 1000 个包
+//     synscan.rateLimit(1, 1000),          // 每 1 毫秒发送 1000 个包，上限每秒 100000
 //     synscan.outputFile("open_ports.txt"),
 //     synscan.outputPrefix("tcp://"),
 // )
@@ -220,6 +220,7 @@ var SynxPortScanExports = map[string]interface{}{
 	"excludeHosts":       synscanx.WithExcludeHosts,
 	"excludePorts":       synscanx.WithExcludePorts,
 	"wait":               synscanx.WithWaiting,
+	"tcpTimeout":         synscanx.WithTCPProbeTimeoutSeconds,
 	"outputFile":         synscanx.WithOutputFile,
 	"outputPrefix":       synscanx.WithOutputFilePrefix,
 	"initHostFilter":     synscanx.WithInitFilterHosts,
