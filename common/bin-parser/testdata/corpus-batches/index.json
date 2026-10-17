@@ -124425,6 +124425,292 @@
         "common/pcapx/pcaputil/dlms-sn-read-upload-information-source/tools/write-source.py": "dlms-sn-read-upload-information-source/tools/write-source.py",
         "scripts/protocol-tests/required-tests-traffic-unified-v181.json": "required-tests-traffic-unified-v181.json"
       }
+    },
+    {
+      "id": "validation-dlms-sn-cold-gbt-information",
+      "kind": "support",
+      "source_sha": "9964a6049d59de0d785252857702544909707a5c",
+      "file": "validation-dlms-sn-cold-gbt-information.zip",
+      "sha256": "1bd68822c90207e64f756c27dde623fb7aaccd0b6054b671e41fa2df08df4371",
+      "password": "bin-parser",
+      "members": {
+        "dlms-sn-cold-gbt-information-source/capture-index.json": {
+          "bytes": 1413,
+          "sha256": "ef684fba1235f3a631ba309ed16d52ee2ada3ee309aadf0ab736d0e7015687f5"
+        },
+        "dlms-sn-cold-gbt-information-source/captures/cold-first-request-LLCe6-E0-WriteQ7-direct-echo-final-Q7.tcp.pcap": {
+          "bytes": 604,
+          "sha256": "62882db3b6ee94ca2eacc66ab78ae45cd590e2df1d973469b2cab356f48428b0"
+        },
+        "dlms-sn-cold-gbt-information-source/captures/cold-first-request-LLCe6-E0-WriteQ7-direct-echo-final-Q7.udp.pcap": {
+          "bytes": 346,
+          "sha256": "653c29c69fce6e497185e68bd7da06d648169dca4bbc54b1fd8d033f2fcf133f"
+        },
+        "dlms-sn-cold-gbt-information-source/captures/cold-first-response-E0-information-cap20-direct-Q5-final-R2.tcp.pcap": {
+          "bytes": 599,
+          "sha256": "c573fc9ec2ddaa077c479c1c4ffd87412ca01123856e8d906276c0be98aceb3c"
+        },
+        "dlms-sn-cold-gbt-information-source/captures/cold-first-response-E0-information-cap20-direct-Q5-final-R2.udp.pcap": {
+          "bytes": 341,
+          "sha256": "21537244065c5008c0a251cb2b26154105216235b095cb08d11638603668913a"
+        },
+        "dlms-sn-cold-gbt-information-source/captures/reuse-inputs.json": {
+          "bytes": 3,
+          "sha256": "ca3d163bab055381827226140568f3bef7eaac187cebd76878e0b63e9e442356"
+        },
+        "dlms-sn-cold-gbt-information-source/cold-gbt-baseline-controls.json": {
+          "bytes": 82105,
+          "sha256": "824a49ebcbd363fffd567ad1531ff19f9f2f70f054b9395a35a4bc907528adcb"
+        },
+        "dlms-sn-cold-gbt-information-source/cold-gbt-captured-controls.json": {
+          "bytes": 48604,
+          "sha256": "c7f36c883b6ae8cf4534791c7b6c06be23c3e8828d79c1e61d2a2ad93006c660"
+        },
+        "dlms-sn-cold-gbt-information-source/cold-gbt-controls.json": {
+          "bytes": 184488,
+          "sha256": "ef6d3752d51d5afd0ef93e556d901020ec97e69ec99bf272e059fcd86e452105"
+        },
+        "dlms-sn-cold-gbt-information-source/cold-gbt-probe-controls.json": {
+          "bytes": 3141,
+          "sha256": "7a58f90d0fab2165f78233215b33e9d1e6a02934fe40dc44d61b2816656d915c"
+        },
+        "dlms-sn-cold-gbt-information-source/cold-gbt-request-captured-controls.json": {
+          "bytes": 59053,
+          "sha256": "9cfa3cba49f7dc74bffde0234cb3ee8643da5b1c50dac1de3e359ee194780dc2"
+        },
+        "dlms-sn-cold-gbt-information-source/cold-gbt-request-controls.json": {
+          "bytes": 58471,
+          "sha256": "5e9b4af83c873c3c963cd7c21e9dbe3a3bcd64e49c3ac801022d386fd6ae0183"
+        },
+        "dlms-sn-cold-gbt-information-source/request-capture-index.json": {
+          "bytes": 1488,
+          "sha256": "35275df1e7cb8db0ed62aabdcf47973892e24e2a02e0202dac71af5dee4c5374"
+        },
+        "dlms-sn-cold-gbt-information-source/source-and-material-pins.json": {
+          "bytes": 8584,
+          "sha256": "8d3d7e8c072f59c3516a9d7297bac0699400a754a994879c84e5ac458f4cbe3a"
+        },
+        "dlms-sn-cold-gbt-information-source/tools/capture-model.py": {
+          "bytes": 1297,
+          "sha256": "436e6ddf8641e7b1cc1140a18b869addadd19fb25e23a5932cb686dcad22fa78"
+        },
+        "dlms-sn-cold-gbt-information-source/tools/frozen-pins.json": {
+          "bytes": 3038,
+          "sha256": "63d242c494d8f7026cb4806d34bbc245217da02560fd5dec7363ed440b9b8838"
+        },
+        "dlms-sn-cold-gbt-information-source/tools/frozen/MODEL-LICENSE.json": {
+          "bytes": 642,
+          "sha256": "b60d358a596443dc8c577b460f1460c757b64b5a85f538defd1390b9796c577d"
+        },
+        "dlms-sn-cold-gbt-information-source/tools/frozen/base/hdlc-reference.json": {
+          "bytes": 2402,
+          "sha256": "69b33f59438b54e25e0209287112464b1d6c1e802c975e7bb9dc2ed8fc7280b0"
+        },
+        "dlms-sn-cold-gbt-information-source/tools/frozen/base/hdlc.py": {
+          "bytes": 2011,
+          "sha256": "7f4394c9b7536c86c2f31e1dd26b3e8b2b003dd4d280e98f582e1300f53e3358"
+        },
+        "dlms-sn-cold-gbt-information-source/tools/frozen/base/model.py": {
+          "bytes": 11762,
+          "sha256": "e3f1d7d4ad5968ced482dae9e655aa1eb1e96f9ba3c94ed9090370eb38662144"
+        },
+        "dlms-sn-cold-gbt-information-source/tools/frozen/base/phase/access.py": {
+          "bytes": 4354,
+          "sha256": "3166cdf13b9934650fdaa34051ba1d6365c6521028ab132898597e424c23e586"
+        },
+        "dlms-sn-cold-gbt-information-source/tools/frozen/base/phase/block-grammar.py": {
+          "bytes": 5985,
+          "sha256": "0b69840f2066124f48091301aea6247ec29fb86c4933d00055f60828296bd220"
+        },
+        "dlms-sn-cold-gbt-information-source/tools/frozen/base/phase/compose.py": {
+          "bytes": 15710,
+          "sha256": "f4590e419ee263e9c957ec9e75c551ce89dcf81b378bf4ce115ce5e11cefd87b"
+        },
+        "dlms-sn-cold-gbt-information-source/tools/frozen/base/phase/composition-pins.json": {
+          "bytes": 1489,
+          "sha256": "9e0492525bf27a37c96b07bb545956618e7041de4fce6823681033bfb5fbd507"
+        },
+        "dlms-sn-cold-gbt-information-source/tools/frozen/base/phase/gbt-core.py": {
+          "bytes": 12575,
+          "sha256": "a678272f289349b8be7e31791edd158ccc2c4e4ee13431dcfec6a2fcf56a0df6"
+        },
+        "dlms-sn-cold-gbt-information-source/tools/frozen/base/phase/legacy.py": {
+          "bytes": 9729,
+          "sha256": "d5a9c60619214a8a0ac68cb2159bf089992795de9059eb010a1287d5f8c72e35"
+        },
+        "dlms-sn-cold-gbt-information-source/tools/frozen/base/phase/model-pins.json": {
+          "bytes": 354,
+          "sha256": "641a27a880d7ef22b9678b92b0e9a3e4af9dac3dbd9d7b49be8fb14a9b4d88fb"
+        },
+        "dlms-sn-cold-gbt-information-source/tools/frozen/base/phase/ordinary.py": {
+          "bytes": 9776,
+          "sha256": "b19b8043b6d3defeb32ff2a3a5caf67102299118852c6859c2d1a78847fbb51a"
+        },
+        "dlms-sn-cold-gbt-information-source/tools/frozen/base/phase/rebuild.py": {
+          "bytes": 884,
+          "sha256": "49e676495fb763e85409db61eed1724d9f688d8b01bf6ca76769c9d686c170dc"
+        },
+        "dlms-sn-cold-gbt-information-source/tools/frozen/base/phase/reference-vectors.json": {
+          "bytes": 10296,
+          "sha256": "1c7119b36f10a8b7c329cc3c346b3792f3421a19c5fc0b2594fa284b7cfa5874"
+        },
+        "dlms-sn-cold-gbt-information-source/tools/frozen/base/phase/upload/access.py": {
+          "bytes": 4392,
+          "sha256": "70f03ceffb0556b966d04829dc89384c20b73bc6104c8ed637e5ed0b97d8bc7e"
+        },
+        "dlms-sn-cold-gbt-information-source/tools/frozen/base/phase/upload/download-outer.py": {
+          "bytes": 5985,
+          "sha256": "0b69840f2066124f48091301aea6247ec29fb86c4933d00055f60828296bd220"
+        },
+        "dlms-sn-cold-gbt-information-source/tools/frozen/base/phase/upload/download-reference-vectors.json": {
+          "bytes": 4159,
+          "sha256": "59250557438767f0f7ff0a072b1decf3fe0f5768b75013142a5dfa608b0fe6c0"
+        },
+        "dlms-sn-cold-gbt-information-source/tools/frozen/base/phase/upload/model.py": {
+          "bytes": 15781,
+          "sha256": "609ba979ea49fc353ccd92fadf99edbc5100e4f1637eaa4444fcace579c903dc"
+        },
+        "dlms-sn-cold-gbt-information-source/tools/frozen/base/phase/upload/read-body.py": {
+          "bytes": 4002,
+          "sha256": "9038061ed63630258c65a5b9e11e51888d414b290fea0aa2bd14743e2a7af4cd"
+        },
+        "dlms-sn-cold-gbt-information-source/tools/frozen/base/phase/upload/reference-vectors.json": {
+          "bytes": 6734,
+          "sha256": "3d7c0f01b305e3524efa5dab640dd9ae4730fe7ed789ca9ef015a5c39b846b8d"
+        },
+        "dlms-sn-cold-gbt-information-source/tools/frozen/base/phase/upload/source-outer.py": {
+          "bytes": 8836,
+          "sha256": "4505d905a3a96b22ac3f91e00033d4146c3bf5e75794a2ad25f60b5e3e7145a1"
+        },
+        "dlms-sn-cold-gbt-information-source/tools/frozen/base/phase/upload/write-body.py": {
+          "bytes": 5706,
+          "sha256": "4818c0264cb4819cf5d4715a855b4f3817acf26c0c6b15ff558aaa7d3b4aa094"
+        },
+        "dlms-sn-cold-gbt-information-source/tools/frozen/base/phase/upload/write-source.py": {
+          "bytes": 8800,
+          "sha256": "46e574590d006649212a255cd2fc85d226165f0ce27f5cc7a01f88211720de0a"
+        },
+        "dlms-sn-cold-gbt-information-source/tools/frozen/base/phase/verify.py": {
+          "bytes": 6343,
+          "sha256": "f164e4ce57fb860f955c123ce691d0013474c50b7c668f6a780f2f6c28560334"
+        },
+        "dlms-sn-cold-gbt-information-source/tools/frozen/base/phase/write-body.py": {
+          "bytes": 5706,
+          "sha256": "4818c0264cb4819cf5d4715a855b4f3817acf26c0c6b15ff558aaa7d3b4aa094"
+        },
+        "dlms-sn-cold-gbt-information-source/tools/frozen/base/reused-pins.json": {
+          "bytes": 2218,
+          "sha256": "89958cf0dd81834899b822c647d71deddcc59d94d043c36b2835995a3eadcf65"
+        },
+        "dlms-sn-cold-gbt-information-source/tools/frozen/generate.py": {
+          "bytes": 11290,
+          "sha256": "9bacf18f3d471ac23ab77c365e398b12f8f1e4f49836bce6a746fb766b4d2fa2"
+        },
+        "dlms-sn-cold-gbt-information-source/tools/frozen/hdlc-reference.json": {
+          "bytes": 2402,
+          "sha256": "69b33f59438b54e25e0209287112464b1d6c1e802c975e7bb9dc2ed8fc7280b0"
+        },
+        "dlms-sn-cold-gbt-information-source/tools/frozen/hdlc.py": {
+          "bytes": 2011,
+          "sha256": "7f4394c9b7536c86c2f31e1dd26b3e8b2b003dd4d280e98f582e1300f53e3358"
+        },
+        "dlms-sn-cold-gbt-information-source/tools/frozen/model-pins.json": {
+          "bytes": 2949,
+          "sha256": "592d18b246d7915babe548ffcdc272087428c1bd1dc068e3d19a85e89fd0c03d"
+        },
+        "dlms-sn-cold-gbt-information-source/tools/frozen/verify.py": {
+          "bytes": 4596,
+          "sha256": "da218c885a5be5b3358d27d71ae7f7f592740078c5275165c9ea8fa90cec4a3d"
+        },
+        "dlms-sn-cold-gbt-information-source/tools/generate.py": {
+          "bytes": 10533,
+          "sha256": "85dc93bdd31bdc005440600c90ba2079af0a78e0327806b452663d7e6f25e301"
+        },
+        "dlms-sn-cold-gbt-information-source/tools/request-captures.py": {
+          "bytes": 2571,
+          "sha256": "03b8136b4fe779720691126ede57007d114ee480e5eaab6ee20633259fdfd523"
+        },
+        "dlms-sn-cold-gbt-information-source/tools/request-generate.py": {
+          "bytes": 2545,
+          "sha256": "5c1c998354e9acf8585585fc41e51a3c56448a540fa1d93f2c78bdcaf4d2bb25"
+        },
+        "dlms-sn-cold-gbt-information-source/tools/verify-all.py": {
+          "bytes": 4656,
+          "sha256": "cdb159cacb733f8131f7c0951be7c67a9b67e3ea2a45475067d95375ba538af4"
+        },
+        "dlms-sn-cold-gbt-information-source/tools/verify-request-captures.py": {
+          "bytes": 3560,
+          "sha256": "461a7b77527e602e9a72f8f0a7a7431407aaa44a5ff041501f9eef97d4739ca4"
+        },
+        "dlms-sn-cold-gbt-information-source/tools/verify.py": {
+          "bytes": 3778,
+          "sha256": "e15834ea0ae534595135963015b9a8625a866af27722cdfdc9e16e3e0eaed4cc"
+        },
+        "required-tests-traffic-unified-v182.json": {
+          "bytes": 24263380,
+          "sha256": "7722c4cffc3708e376f02c3bb46b971a40f709a2aaa2b05579df13281b49f2ab"
+        },
+        "validation/expected.json": {
+          "bytes": 6081,
+          "sha256": "ec021af274f22a49d95ae4b5cc2479738b27fa2747f8c84b56eac705e35bb2d6"
+        }
+      },
+      "aliases": {
+        "common/pcapx/pcaputil/dlms-sn-cold-gbt-information-source/capture-index.json": "dlms-sn-cold-gbt-information-source/capture-index.json",
+        "common/pcapx/pcaputil/dlms-sn-cold-gbt-information-source/captures/cold-first-request-LLCe6-E0-WriteQ7-direct-echo-final-Q7.tcp.pcap": "dlms-sn-cold-gbt-information-source/captures/cold-first-request-LLCe6-E0-WriteQ7-direct-echo-final-Q7.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-cold-gbt-information-source/captures/cold-first-request-LLCe6-E0-WriteQ7-direct-echo-final-Q7.udp.pcap": "dlms-sn-cold-gbt-information-source/captures/cold-first-request-LLCe6-E0-WriteQ7-direct-echo-final-Q7.udp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-cold-gbt-information-source/captures/cold-first-response-E0-information-cap20-direct-Q5-final-R2.tcp.pcap": "dlms-sn-cold-gbt-information-source/captures/cold-first-response-E0-information-cap20-direct-Q5-final-R2.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-cold-gbt-information-source/captures/cold-first-response-E0-information-cap20-direct-Q5-final-R2.udp.pcap": "dlms-sn-cold-gbt-information-source/captures/cold-first-response-E0-information-cap20-direct-Q5-final-R2.udp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-cold-gbt-information-source/captures/reuse-inputs.json": "dlms-sn-cold-gbt-information-source/captures/reuse-inputs.json",
+        "common/pcapx/pcaputil/dlms-sn-cold-gbt-information-source/cold-gbt-baseline-controls.json": "dlms-sn-cold-gbt-information-source/cold-gbt-baseline-controls.json",
+        "common/pcapx/pcaputil/dlms-sn-cold-gbt-information-source/cold-gbt-captured-controls.json": "dlms-sn-cold-gbt-information-source/cold-gbt-captured-controls.json",
+        "common/pcapx/pcaputil/dlms-sn-cold-gbt-information-source/cold-gbt-controls.json": "dlms-sn-cold-gbt-information-source/cold-gbt-controls.json",
+        "common/pcapx/pcaputil/dlms-sn-cold-gbt-information-source/cold-gbt-probe-controls.json": "dlms-sn-cold-gbt-information-source/cold-gbt-probe-controls.json",
+        "common/pcapx/pcaputil/dlms-sn-cold-gbt-information-source/cold-gbt-request-captured-controls.json": "dlms-sn-cold-gbt-information-source/cold-gbt-request-captured-controls.json",
+        "common/pcapx/pcaputil/dlms-sn-cold-gbt-information-source/cold-gbt-request-controls.json": "dlms-sn-cold-gbt-information-source/cold-gbt-request-controls.json",
+        "common/pcapx/pcaputil/dlms-sn-cold-gbt-information-source/request-capture-index.json": "dlms-sn-cold-gbt-information-source/request-capture-index.json",
+        "common/pcapx/pcaputil/dlms-sn-cold-gbt-information-source/source-and-material-pins.json": "dlms-sn-cold-gbt-information-source/source-and-material-pins.json",
+        "common/pcapx/pcaputil/dlms-sn-cold-gbt-information-source/tools/capture-model.py": "dlms-sn-cold-gbt-information-source/tools/capture-model.py",
+        "common/pcapx/pcaputil/dlms-sn-cold-gbt-information-source/tools/frozen-pins.json": "dlms-sn-cold-gbt-information-source/tools/frozen-pins.json",
+        "common/pcapx/pcaputil/dlms-sn-cold-gbt-information-source/tools/frozen/MODEL-LICENSE.json": "dlms-sn-cold-gbt-information-source/tools/frozen/MODEL-LICENSE.json",
+        "common/pcapx/pcaputil/dlms-sn-cold-gbt-information-source/tools/frozen/base/hdlc-reference.json": "dlms-sn-cold-gbt-information-source/tools/frozen/base/hdlc-reference.json",
+        "common/pcapx/pcaputil/dlms-sn-cold-gbt-information-source/tools/frozen/base/hdlc.py": "dlms-sn-cold-gbt-information-source/tools/frozen/base/hdlc.py",
+        "common/pcapx/pcaputil/dlms-sn-cold-gbt-information-source/tools/frozen/base/model.py": "dlms-sn-cold-gbt-information-source/tools/frozen/base/model.py",
+        "common/pcapx/pcaputil/dlms-sn-cold-gbt-information-source/tools/frozen/base/phase/access.py": "dlms-sn-cold-gbt-information-source/tools/frozen/base/phase/access.py",
+        "common/pcapx/pcaputil/dlms-sn-cold-gbt-information-source/tools/frozen/base/phase/block-grammar.py": "dlms-sn-cold-gbt-information-source/tools/frozen/base/phase/block-grammar.py",
+        "common/pcapx/pcaputil/dlms-sn-cold-gbt-information-source/tools/frozen/base/phase/compose.py": "dlms-sn-cold-gbt-information-source/tools/frozen/base/phase/compose.py",
+        "common/pcapx/pcaputil/dlms-sn-cold-gbt-information-source/tools/frozen/base/phase/composition-pins.json": "dlms-sn-cold-gbt-information-source/tools/frozen/base/phase/composition-pins.json",
+        "common/pcapx/pcaputil/dlms-sn-cold-gbt-information-source/tools/frozen/base/phase/gbt-core.py": "dlms-sn-cold-gbt-information-source/tools/frozen/base/phase/gbt-core.py",
+        "common/pcapx/pcaputil/dlms-sn-cold-gbt-information-source/tools/frozen/base/phase/legacy.py": "dlms-sn-cold-gbt-information-source/tools/frozen/base/phase/legacy.py",
+        "common/pcapx/pcaputil/dlms-sn-cold-gbt-information-source/tools/frozen/base/phase/model-pins.json": "dlms-sn-cold-gbt-information-source/tools/frozen/base/phase/model-pins.json",
+        "common/pcapx/pcaputil/dlms-sn-cold-gbt-information-source/tools/frozen/base/phase/ordinary.py": "dlms-sn-cold-gbt-information-source/tools/frozen/base/phase/ordinary.py",
+        "common/pcapx/pcaputil/dlms-sn-cold-gbt-information-source/tools/frozen/base/phase/rebuild.py": "dlms-sn-cold-gbt-information-source/tools/frozen/base/phase/rebuild.py",
+        "common/pcapx/pcaputil/dlms-sn-cold-gbt-information-source/tools/frozen/base/phase/reference-vectors.json": "dlms-sn-cold-gbt-information-source/tools/frozen/base/phase/reference-vectors.json",
+        "common/pcapx/pcaputil/dlms-sn-cold-gbt-information-source/tools/frozen/base/phase/upload/access.py": "dlms-sn-cold-gbt-information-source/tools/frozen/base/phase/upload/access.py",
+        "common/pcapx/pcaputil/dlms-sn-cold-gbt-information-source/tools/frozen/base/phase/upload/download-outer.py": "dlms-sn-cold-gbt-information-source/tools/frozen/base/phase/upload/download-outer.py",
+        "common/pcapx/pcaputil/dlms-sn-cold-gbt-information-source/tools/frozen/base/phase/upload/download-reference-vectors.json": "dlms-sn-cold-gbt-information-source/tools/frozen/base/phase/upload/download-reference-vectors.json",
+        "common/pcapx/pcaputil/dlms-sn-cold-gbt-information-source/tools/frozen/base/phase/upload/model.py": "dlms-sn-cold-gbt-information-source/tools/frozen/base/phase/upload/model.py",
+        "common/pcapx/pcaputil/dlms-sn-cold-gbt-information-source/tools/frozen/base/phase/upload/read-body.py": "dlms-sn-cold-gbt-information-source/tools/frozen/base/phase/upload/read-body.py",
+        "common/pcapx/pcaputil/dlms-sn-cold-gbt-information-source/tools/frozen/base/phase/upload/reference-vectors.json": "dlms-sn-cold-gbt-information-source/tools/frozen/base/phase/upload/reference-vectors.json",
+        "common/pcapx/pcaputil/dlms-sn-cold-gbt-information-source/tools/frozen/base/phase/upload/source-outer.py": "dlms-sn-cold-gbt-information-source/tools/frozen/base/phase/upload/source-outer.py",
+        "common/pcapx/pcaputil/dlms-sn-cold-gbt-information-source/tools/frozen/base/phase/upload/write-body.py": "dlms-sn-cold-gbt-information-source/tools/frozen/base/phase/upload/write-body.py",
+        "common/pcapx/pcaputil/dlms-sn-cold-gbt-information-source/tools/frozen/base/phase/upload/write-source.py": "dlms-sn-cold-gbt-information-source/tools/frozen/base/phase/upload/write-source.py",
+        "common/pcapx/pcaputil/dlms-sn-cold-gbt-information-source/tools/frozen/base/phase/verify.py": "dlms-sn-cold-gbt-information-source/tools/frozen/base/phase/verify.py",
+        "common/pcapx/pcaputil/dlms-sn-cold-gbt-information-source/tools/frozen/base/phase/write-body.py": "dlms-sn-cold-gbt-information-source/tools/frozen/base/phase/write-body.py",
+        "common/pcapx/pcaputil/dlms-sn-cold-gbt-information-source/tools/frozen/base/reused-pins.json": "dlms-sn-cold-gbt-information-source/tools/frozen/base/reused-pins.json",
+        "common/pcapx/pcaputil/dlms-sn-cold-gbt-information-source/tools/frozen/generate.py": "dlms-sn-cold-gbt-information-source/tools/frozen/generate.py",
+        "common/pcapx/pcaputil/dlms-sn-cold-gbt-information-source/tools/frozen/hdlc-reference.json": "dlms-sn-cold-gbt-information-source/tools/frozen/hdlc-reference.json",
+        "common/pcapx/pcaputil/dlms-sn-cold-gbt-information-source/tools/frozen/hdlc.py": "dlms-sn-cold-gbt-information-source/tools/frozen/hdlc.py",
+        "common/pcapx/pcaputil/dlms-sn-cold-gbt-information-source/tools/frozen/model-pins.json": "dlms-sn-cold-gbt-information-source/tools/frozen/model-pins.json",
+        "common/pcapx/pcaputil/dlms-sn-cold-gbt-information-source/tools/frozen/verify.py": "dlms-sn-cold-gbt-information-source/tools/frozen/verify.py",
+        "common/pcapx/pcaputil/dlms-sn-cold-gbt-information-source/tools/generate.py": "dlms-sn-cold-gbt-information-source/tools/generate.py",
+        "common/pcapx/pcaputil/dlms-sn-cold-gbt-information-source/tools/request-captures.py": "dlms-sn-cold-gbt-information-source/tools/request-captures.py",
+        "common/pcapx/pcaputil/dlms-sn-cold-gbt-information-source/tools/request-generate.py": "dlms-sn-cold-gbt-information-source/tools/request-generate.py",
+        "common/pcapx/pcaputil/dlms-sn-cold-gbt-information-source/tools/verify-all.py": "dlms-sn-cold-gbt-information-source/tools/verify-all.py",
+        "common/pcapx/pcaputil/dlms-sn-cold-gbt-information-source/tools/verify-request-captures.py": "dlms-sn-cold-gbt-information-source/tools/verify-request-captures.py",
+        "common/pcapx/pcaputil/dlms-sn-cold-gbt-information-source/tools/verify.py": "dlms-sn-cold-gbt-information-source/tools/verify.py",
+        "scripts/protocol-tests/required-tests-traffic-unified-v182.json": "required-tests-traffic-unified-v182.json"
+      }
     }
   ],
   "schema_version": 1,

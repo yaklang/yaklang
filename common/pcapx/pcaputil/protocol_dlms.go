@@ -504,6 +504,12 @@ func dlmsSNColdInformationPrefix(m *dlmsMessage) bool {
 	return request == (m.information[1] == 0xe6)
 }
 
+// The first CRC/HCS-valid LLC/E0 carrier identifies only a bounded passive
+// information group. It does not identify an inner SN service or a peer owner.
+func dlmsSNColdGBTInformationPrefix(m *dlmsMessage) bool {
+	return m != nil && m.kind == "I" && m.segmented && dlmsSNGBTInformation(m.information)
+}
+
 func probeDLMS(w []byte, limit int) ProbeResult {
 	if len(w) == 0 || w[0] != 0x7e {
 		return ProbeResult{Verdict: ProbeReject}
@@ -522,6 +528,9 @@ func probeDLMS(w []byte, limit int) ProbeResult {
 		m, err := decodeDLMSFrameBudget(w[:n], 0, 0, true)
 		if err == nil && dlmsSNColdInformationPrefix(m) {
 			return probeAccept("dlms", "hdlc-sn-information-segmented", 98)
+		}
+		if err == nil && dlmsSNColdGBTInformationPrefix(m) {
+			return probeAccept("dlms", "hdlc-sn-gbt-information-segmented", 98)
 		}
 		if err == nil && m.kind == "I" && dlmsACSESegmentPrefix(m.information) {
 			return probeAccept("dlms", "hdlc-acse-segmented", 98)
@@ -1080,6 +1089,9 @@ func (a *binParser) decodeDLMSDatagram(e *ProtocolEvent, w []byte, explicit bool
 	} else if err = f.reserveSession(f.dlms.storage() + f.dlmsProjection(w)); err == nil {
 		m, err = decodeDLMSFrameBudget(w, a.budget.MaxCollectionElements, a.budget.MaxRecursionDepth, f.dlmsLinkAssembly(w))
 	}
+	// Retained assemblers own all opaque continuation bytes. Only a fresh
+	// CRC/HCS-valid E0 first carrier may enter the existing GBT assembler here.
+	coldGBTInformation := created && err == nil && dlmsSNColdGBTInformationPrefix(m)
 	// Only a newly observed UDP conversation may derive SN direction from a
 	// first information header. Retained assemblers own opaque continuations,
 	// even when their bytes resemble a standalone SN LLC/service prefix.
@@ -1089,19 +1101,19 @@ func (a *binParser) decodeDLMSDatagram(e *ProtocolEvent, w []byte, explicit bool
 		m.snWrite = m.information[3] == 6 || m.information[3] == 13
 	}
 
-	if created && m != nil && !m.snRead && !m.snWrite && m.snGBT == nil && !m.request && m.kind != "S" && (m.acse == nil || !m.acse.acseAbort) && !dlmsAbortSegmentPrefix(m.information) {
+	if created && m != nil && !coldGBTInformation && !m.snRead && !m.snWrite && m.snGBT == nil && !m.request && m.kind != "S" && (m.acse == nil || !m.acse.acseAbort) && !dlmsAbortSegmentPrefix(m.information) {
 		e.Direction = 1
 		if m.acse != nil || dlmsACSESegmentPrefix(m.information) {
 			f.endpoints = [2]string{e.Destination, e.Source}
 		}
 	}
 	if err == nil {
-		if m.snRead || m.snWrite || m.snGBT != nil {
+		if m.snRead || m.snWrite || m.snGBT != nil || coldGBTInformation {
 			// Complete SN observations need no new owner. Information groups and
 			// service phases retain their bounded flow with the literal caller direction;
 			// an existing LN flow keeps its owner and charge.
 			e.Session, e.ResponseTo, err = f.consumeDecodedDLMS(e.Direction, w, e.ID, m)
-			if err == nil && created && (len(f.dlms.snBlocks) > 0 || len(f.dlms.snGBT) > 0 || f.dlms.fragments != nil && f.dlms.fragments.snCommand != 0) {
+			if err == nil && created && (len(f.dlms.snBlocks) > 0 || len(f.dlms.snGBT) > 0 || f.dlms.fragments != nil && (f.dlms.fragments.snCommand != 0 || f.dlms.fragments.snGBT)) {
 				if len(store.entries) >= sessionCollectionLimit(a.budget.MaxCollectionElements) {
 					err = dlmsError(ErrResourceExceeded, "UDP SN service-block conversation budget")
 				} else {

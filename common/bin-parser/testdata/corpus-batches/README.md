@@ -44,7 +44,7 @@ Run from the repository root:
 ```sh
 go run ./internal/trafficfixture/cmd/corpus test
 go test -json -count=1 -timeout=10m ./internal/trafficfixture/... ./common/bin-parser/... ./common/pcapx/... ./common/yak/cmd/yakcmds/shark-cli ./scripts/ci > traffic.jsonl
-go run ./internal/trafficfixture/cmd/corpus exec -- python3 @scripts/protocol-tests/check_go_test_json_v2.py traffic.jsonl --inventory @scripts/protocol-tests/required-tests-traffic-unified-v181.json --tier full
+go run ./internal/trafficfixture/cmd/corpus exec -- python3 @scripts/protocol-tests/check_go_test_json_v2.py traffic.jsonl --inventory @scripts/protocol-tests/required-tests-traffic-unified-v182.json --tier full
 ```
 
 The single `corpus` entry point uses the same bounded Go ZIP loader as tests.
@@ -83,7 +83,7 @@ their semantic coverage. The existing synthetic session keys are test inputs;
 production credentials, user private keys and material without redistribution
 permission belong in an external fixed-source download manifest.
 
-Current test requirements are sealed at `scripts/protocol-tests/required-tests-traffic-unified-v181.json`;
+Current test requirements are sealed at `scripts/protocol-tests/required-tests-traffic-unified-v182.json`;
 the historical inventories and all earlier batches remain unchanged.
 The supplemental small-corpus batch contains 26 minimal controls, their explicit
 expected facts, an offline generator and the compact pinned source manifest.
@@ -203,7 +203,7 @@ opaque selector bytes and one bounded Data value over Wrapper v1 TCP/UDP; object
 selector meaning, access permission and device operation are unverified. The
 original one-packet selective-access capture and original refused answer remain
 immutable; its now-supported answer is matched by exact input SHA and frame.
-The active inventory is `scripts/protocol-tests/required-tests-traffic-unified-v181.json`.
+The active inventory is `scripts/protocol-tests/required-tests-traffic-unified-v182.json`.
 
 The small-graph budget batch reuses accepted graph captures/answers and adds one
 249-byte UDP control for child count255 without child bytes. Its standalone proof
@@ -993,7 +993,7 @@ the normative answer; a missing numeric reference field is not a codec pass.
 Full/deferred, workers1/2/4, observers off/on, Feed chunks1/7/full, ownership,
 resources and close/refusal boundaries remain required.
 
-Current gate: `required-tests-traffic-unified-v181.json` with
+Current gate: `required-tests-traffic-unified-v182.json` with
 `check_go_test_json_v2.py`. The indexed validator preserves missing/unpassed,
 package invocation completion, descendant skips, failures and non-JSON checks;
 its mutation/differential harness is sealed with the material. Older checkers
@@ -1629,7 +1629,7 @@ userspace adapter; full kernel receiver/socket/timers and ECU endpoints do not.
 All161 preceding ZIPs remain byte-for-byte unchanged. Raw captures, dependencies,
 reference source/build output and process evidence stay outside Git.
 
-Current effective v181 inventory: 119,496 entries; 119,489 are mandatory for the full tier.
+Current effective v182 inventory: 119,643 entries; 119,636 are mandatory for the full tier.
 
 The opt-in `DynamicFlowControl` profile follows Linux v6.12 FC tuple updates (including WAIT without granting data). Disjoint address extensions or classical/FD carriers may share CAN IDs; unknown selectors cannot choose or mutate a conversation. Ambiguous selectors are rejected. Seven sealed cases exercise full/deferred, workers 1/2/4, and observer off/on, with exact fields, byte collections, contributor references, errors and resource ownership. The existing static FC profile remains unchanged. Pinned upstream FC and filter functions execute with declared userspace stubs; this is not a kernel/ECU endpoint. TShark 4.2.5 checks wire tuples and two complete payloads, but cannot independently reassemble the shared-address transcripts.
 
@@ -1870,3 +1870,5 @@ The ordinary-SN Wrapper GBT capability also upgrades the exact two historical Re
 The cold SN information regression archive removes the LN primer: complete CRC/HCS and literal LLC/command direction admit known SN first information frames; bounded UDP information state survives until continuation or resource/lifecycle cleanup. Complete fields, Session, actual references, byte ownership, no invented owner, positive/reject neighbours and budget refusal are verified. This fixes admission/retention, not Read upload/R3 or cold GBT completion, negotiated AA or device execution. All276 preceding ZIPs remain byte-identical.
 
 `validation-dlms-sn-read-upload-information.zip` adds count1 SN Read Q6 raw-block upload and R3 UInt16 echoes across validated HDLC information groups, including a no-LN-primer cold group. Complete first LLC/service/count1/choice, contextual Read body, firstNS/finalNS, distinct-carrier retry identity, full typed Fields/Session/real event references, wrong context preservation, cap12/11 refusal, Close6+fragment3 and ownership stay explicit. Fourteen new authored captures total8512B; two identical historical complete-M0 captures are reused. A pinned sidecar upgrades only the former Read information Unsupported trace, preserving the already upgraded Write trace and ordinary Read neighbour. Original capture bytes/answers and all277 earlier ZIPs remain unchanged. Bare-final cache, initial prefix splitting, GBT/nested information completion, negotiated windows/AA/security/device and original wholeinput oracle gaps remain unfinished.
+
+`validation-dlms-sn-cold-gbt-information.zip` extends the existing bounded HDLC information/GBT/SN phase profiles to a first CRC/HCS-valid complete LLC/E0 information carrier without an LN primer. Classification remains local to a fresh UDP conversation; all retained assemblers keep opaque-continuation ownership. Cold response ReadR2 and request WriteQ7 complete chains preserve full fields/Session, real event references and zero business IDs. Positive/negative controls cover full UInt32/caller/NR isolation, cap20/19, exact three-counter fragment and six-key service Close, ownership and side-effect-free Probe. Four new authored captures total1890B; response TCP has actual SYNorigin1, request TCP SYNorigin0, with physical endpoints/offsets independent of public Direction. All278 earlier ZIPs remain byte-identical. Initial discriminator splitting, full windows, bare-final retry semantics, AA/security/device proof and original whole-input oracles remain unfinished.

@@ -32,6 +32,7 @@ func hdlcGetCloseCheckEndpoints(t *testing.T, c hdlcOpCase, es []*ProtocolEvent,
 	for i, e := range es {
 		w := c.Close.Events[i]
 		snBlock := w.Profile == "dlms-hdlc-sn-read-block" || w.Profile == "dlms-hdlc-sn-read-upload" || w.Profile == "dlms-hdlc-sn-write-upload"
+		snGBTInformation := w.Profile == "dlms-hdlc-sn-gbt-information-segmented"
 		dir := w.Direction
 		if reverse {
 			dir = 1 - dir
@@ -60,7 +61,7 @@ func hdlcGetCloseCheckEndpoints(t *testing.T, c hdlcOpCase, es []*ProtocolEvent,
 			require.Equal(t, "<reason>: "+w.SummaryUDP, w.SummaryTCP)
 			summary = strings.Replace(w.SummaryTCP, "<reason>", reason, 1)
 		}
-		if snBlock && tr == "tcp" {
+		if (snBlock || snGBTInformation) && tr == "tcp" {
 			require.Equal(t, "test-close: "+w.SummaryUDP, w.SummaryTCP)
 			summary = strings.Replace(w.SummaryTCP, "test-close:", reason+":", 1)
 		}
@@ -88,7 +89,7 @@ func hdlcGetCloseCheckEndpoints(t *testing.T, c hdlcOpCase, es []*ProtocolEvent,
 			require.IsType(t, uint16(0), e.Session["block_number"])
 			require.Equal(t, 1, e.Session["Buffered SN Groups"])
 			hdlcOpEqual(t, w.Session, e.Session)
-		} else if w.Profile == "dlms-hdlc-sn-information-segmented" {
+		} else if w.Profile == "dlms-hdlc-sn-information-segmented" || snGBTInformation {
 			require.Len(t, w.Session, 3)
 			require.Len(t, e.Session, 3)
 			for _, key := range []string{"Outstanding", "ObservedFrames", "InformationBytes"} {

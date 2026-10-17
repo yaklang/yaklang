@@ -299,6 +299,9 @@ func hdlcSNReadMatrixTransports(t *testing.T, cases []hdlcSNReadCase, batch stri
 }
 func hdlcSNReadMatrixChecked(t *testing.T, cases []hdlcSNReadCase, batch string, transports []string, check func(*testing.T, *ProtocolEvent, hdlcOpStep, map[string]any)) {
 	env := "DLMS_HDLC_SN_READ_TEST_ROOT"
+	if batch == "dlms-sn-cold-gbt-information-source/captures" {
+		env = "DLMS_SN_COLD_GBT_INFORMATION_ROOT"
+	}
 	if batch == "dlms-sn-read-upload-information-source/captures" {
 		env = "DLMS_SN_READ_UPLOAD_INFORMATION_ROOT"
 	}
@@ -349,7 +352,7 @@ func hdlcSNReadMatrixChecked(t *testing.T, cases []hdlcSNReadCase, batch string,
 				for i := range c.Steps {
 					if tr == "udp" {
 						c.Steps[i].Direction = int(tc.Metadata[i]["capture_udp_direction"].(float64))
-					} else if batch == "dlms-hdlc-sn-upload" {
+					} else if batch == "dlms-hdlc-sn-upload" || batch == "dlms-sn-cold-gbt-information-source/captures" {
 						if direction, ok := tc.Metadata[i]["capture_tcp_direction"]; ok {
 							c.Steps[i].Direction = int(direction.(float64))
 						}
