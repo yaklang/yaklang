@@ -1,11 +1,32 @@
 package ssadb
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/gorm"
 )
+
+// The preload must keep the (program_name, value_id) unique index as its
+// driver: program first, no SQL-side ORDER BY. Reordering these predicates
+// silently falls back to a full program scan (ARTEX: max offset read 399ms ->
+// 21.8s). Result correctness alone does not catch that regression.
+func TestOffsetBatchQueryKeepsValueIndexPlan(t *testing.T) {
+	query, args := offsetBatchQuery(" p1 ", []int64{7, 8})
+	require.Equal(t, nativeOffsetSelect+` WHERE deleted_at IS NULL AND program_name = ? AND value_id IN (?,?)`, query)
+	require.Equal(t, []any{"p1", int64(7), int64(8)}, args)
+	programAt := strings.Index(query, "program_name = ?")
+	valueAt := strings.Index(query, "value_id IN")
+	require.Greater(t, programAt, 0, "program_name must be an equality predicate")
+	require.Less(t, programAt, valueAt, "program_name must precede the value_id IN list")
+	require.NotContains(t, query, "ORDER BY", "in-memory id sort replaces SQL-side ordering")
+
+	// An empty program keeps the historical cross-program lookup.
+	crossProgram, crossArgs := offsetBatchQuery("", []int64{7})
+	require.Equal(t, nativeOffsetSelect+` WHERE deleted_at IS NULL AND value_id IN (?)`, crossProgram)
+	require.Equal(t, []any{int64(7)}, crossArgs)
+}
 
 func TestOffsetPreloadMatchesPerVariableReads(t *testing.T) {
 	db := setupA2LoaderDB(t)
