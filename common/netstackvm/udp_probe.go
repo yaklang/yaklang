@@ -205,6 +205,19 @@ func (h *HalfOpenSYN) acquireProbe(ctx context.Context) (func(), error) {
 		return nil, h.ctx.Err()
 	case h.slots <- struct{}{}:
 	}
+	// Close can win the select race. Do not start a probe on a session that
+	// has already begun shutdown.
+	h.mu.Lock()
+	closed := h.closed || h.ctx.Err() != nil
+	h.mu.Unlock()
+	if closed {
+		<-h.slots
+		h.wg.Done()
+		if err := h.ctx.Err(); err != nil {
+			return nil, err
+		}
+		return nil, errHalfOpenClosed
+	}
 	return func() {
 		<-h.slots
 		h.wg.Done()
@@ -229,6 +242,9 @@ func (h *HalfOpenSYN) injectUDP(ctx context.Context, vm *NetStackVirtualMachineE
 	h.mu.Lock()
 	if f.permit && err == nil {
 		err = fmt.Errorf("%w: injection was declined", ErrUDPSend)
+	}
+	if err != nil && !errors.Is(err, ErrUDPSend) {
+		err = fmt.Errorf("%w: %w", ErrUDPSend, err)
 	}
 	f.permit = false
 	f.sending = false
