@@ -81,6 +81,10 @@ func dlmsSNBlockCloseSummary(key dlmsSNBlockKey) string {
 	return "DLMS HDLC SN Read wire group ended before complete Data"
 }
 func (f *binFlow) consumeDLMSSNServiceBlock(dir int, w []byte, id uint64, m *dlmsMessage) (map[string]any, uint64, error) {
+	if m.snInformationSpan {
+		floor := f.dlms.storage() + dlmsProjection(w) + m.snInformationCharge
+		return f.consumeDLMSSNServiceBlockContext(dir, w, id, m, floor, f.a.budget.MaxRecursionDepth, m.snCarrierDigest[:])
+	}
 	return f.consumeDLMSSNServiceBlockContext(dir, w, id, m, -1, f.a.budget.MaxRecursionDepth, w)
 }
 

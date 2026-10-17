@@ -53,6 +53,9 @@ func TestDLMSSNInformationCountNative(t *testing.T) {
 	snInformationCountNative(t, snInformationCountLoad(t, "controls.json", "fea77c50d4857cc2156ce5b26df78630cb37e5ccd724e53c803694622ce3ffd8", 17), 41000, 4059)
 }
 func snInformationCountNative(t *testing.T, cases []hdlcSNReadCase, src, dst uint16) {
+	snInformationCountNativeWithIDSeed(t, cases, src, dst, 0)
+}
+func snInformationCountNativeWithIDSeed(t *testing.T, cases []hdlcSNReadCase, src, dst uint16, seed uint64) {
 	for _, tc := range cases {
 		for _, tr := range []string{"udp", "tcp"} {
 			for _, d := range []bool{false, true} {
@@ -75,6 +78,7 @@ func snInformationCountNative(t *testing.T, cases []hdlcSNReadCase, src, dst uin
 						require.NoError(t, err)
 						defer s.Close("cleanup")
 						s.(*captureSession).f.a.config.Deferred = d
+						s.(*captureSession).f.a.ids.Store(seed)
 						var es, saved []*ProtocolEvent
 						var flow uint64
 						eventIDs := make(map[uint64]bool)
@@ -126,6 +130,7 @@ func snInformationCountNative(t *testing.T, cases []hdlcSNReadCase, src, dst uin
 							st = hdlcSNBlockBindStep(t, st, ids)
 							c.Steps[i] = st
 							require.NotZero(t, e.ID)
+							require.Greater(t, e.ID, seed, "event IDs must exceed the fixture allocator seed")
 							require.False(t, eventIDs[e.ID], "event ID must be unique before public poisoning")
 							eventIDs[e.ID] = true
 							wantFlow := tc.Metadata[i]["native_udp_flow_nonzero"].(bool)
@@ -169,6 +174,7 @@ func snInformationCountNative(t *testing.T, cases []hdlcSNReadCase, src, dst uin
 						closed := s.Close("test-close")
 						for _, e := range closed {
 							require.NotZero(t, e.ID)
+							require.Greater(t, e.ID, seed, "event IDs must exceed the fixture allocator seed")
 							require.False(t, eventIDs[e.ID], "Close ID must be distinct from every Feed event")
 							eventIDs[e.ID] = true
 						}

@@ -44,7 +44,7 @@ Run from the repository root:
 ```sh
 go run ./internal/trafficfixture/cmd/corpus test
 go test -json -count=1 -timeout=10m ./internal/trafficfixture/... ./common/bin-parser/... ./common/pcapx/... ./common/yak/cmd/yakcmds/shark-cli ./scripts/ci > traffic.jsonl
-go run ./internal/trafficfixture/cmd/corpus exec -- python3 @scripts/protocol-tests/check_go_test_json_v2.py traffic.jsonl --inventory @scripts/protocol-tests/required-tests-traffic-unified-v177.json --tier full
+go run ./internal/trafficfixture/cmd/corpus exec -- python3 @scripts/protocol-tests/check_go_test_json_v2.py traffic.jsonl --inventory @scripts/protocol-tests/required-tests-traffic-unified-v178.json --tier full
 ```
 
 The single `corpus` entry point uses the same bounded Go ZIP loader as tests.
@@ -83,7 +83,7 @@ their semantic coverage. The existing synthetic session keys are test inputs;
 production credentials, user private keys and material without redistribution
 permission belong in an external fixed-source download manifest.
 
-Current test requirements are sealed at `scripts/protocol-tests/required-tests-traffic-unified-v177.json`;
+Current test requirements are sealed at `scripts/protocol-tests/required-tests-traffic-unified-v178.json`;
 the historical inventories and all earlier batches remain unchanged.
 The supplemental small-corpus batch contains 26 minimal controls, their explicit
 expected facts, an offline generator and the compact pinned source manifest.
@@ -203,7 +203,7 @@ opaque selector bytes and one bounded Data value over Wrapper v1 TCP/UDP; object
 selector meaning, access permission and device operation are unverified. The
 original one-packet selective-access capture and original refused answer remain
 immutable; its now-supported answer is matched by exact input SHA and frame.
-The active inventory is `scripts/protocol-tests/required-tests-traffic-unified-v177.json`.
+The active inventory is `scripts/protocol-tests/required-tests-traffic-unified-v178.json`.
 
 The small-graph budget batch reuses accepted graph captures/answers and adds one
 249-byte UDP control for child count255 without child bytes. Its standalone proof
@@ -993,7 +993,7 @@ the normative answer; a missing numeric reference field is not a codec pass.
 Full/deferred, workers1/2/4, observers off/on, Feed chunks1/7/full, ownership,
 resources and close/refusal boundaries remain required.
 
-Current gate: `required-tests-traffic-unified-v177.json` with
+Current gate: `required-tests-traffic-unified-v178.json` with
 `check_go_test_json_v2.py`. The indexed validator preserves missing/unpassed,
 package invocation completion, descendant skips, failures and non-JSON checks;
 its mutation/differential harness is sealed with the material. Older checkers
@@ -1629,7 +1629,7 @@ userspace adapter; full kernel receiver/socket/timers and ECU endpoints do not.
 All161 preceding ZIPs remain byte-for-byte unchanged. Raw captures, dependencies,
 reference source/build output and process evidence stay outside Git.
 
-Current effective v177 inventory: 118,598 entries; 118,591 are mandatory for the full tier.
+Current effective v178 inventory: 118,855 entries; 118,848 are mandatory for the full tier.
 
 The opt-in `DynamicFlowControl` profile follows Linux v6.12 FC tuple updates (including WAIT without granting data). Disjoint address extensions or classical/FD carriers may share CAN IDs; unknown selectors cannot choose or mutate a conversation. Ambiguous selectors are rejected. Seven sealed cases exercise full/deferred, workers 1/2/4, and observer off/on, with exact fields, byte collections, contributor references, errors and resource ownership. The existing static FC profile remains unchanged. Pinned upstream FC and filter functions execute with declared userspace stubs; this is not a kernel/ECU endpoint. TShark 4.2.5 checks wire tuples and two complete payloads, but cannot independently reassemble the shared-address transcripts.
 
@@ -1862,3 +1862,5 @@ The ordinary-SN Wrapper GBT capability also upgrades the exact two historical Re
 `validation-dlms-hdlc-sn-multiresult-segments.zip` adds bounded joined HDLC SN Read/Write multiresult observations and prevents opaque SN and LN GET continuation tails resembling LLC/E0 from being dispatched as standalone GBT. Independent ordinary Data9 and multiresult cases check exact complete fields, actual final Raw, no fabricated owner, caller/full32/NR/NS isolation, first-block-row list selection, strict truncation/resource/single-result-block errors and Close/ownership. All272 historical archives/answers stay immutable. First LLC splitting, nested envelopes, full per-row block assembly and official endpoint/AA/device proof remain open.
 
 `validation-dlms-ln-assembled-retry.zip` protects exact final-frame retry of an assembled LN normal SET request when its opaque Data9 tail resembles standalone LLC/E0. Only a retained private assembled request, the same caller and whole final-wire equality permit the existing cached decode. Wrong-caller and CRC-valid changed-wire controls keep strict ContextRequired; the subsequent real retry and response keep the original complete-request event owner. The archive contains independent complete answers, six minimal authored captures and portable generators/verifiers; all273 earlier archives stay immutable.
+
+`validation-dlms-sn-download-information.zip` adds count1 SN ReadResponse12/DataBlockResult2 download phases and ReadRequest5/BlockNumberAccess5 echoes over validated HDLC information groups. It preserves literal final-frame Raw, complete typed fields and Session, actual complete-event references, whole-carrier-chain identity, caller/fullUInt32/NR/NS isolation, byte reservations, exact errors, ownership and Close. Fourteen minimal authored captures total9468B; full/deferred workers1/2/4 and observer variants use independent complete answers. All274 prior ZIP batches and answers remain immutable. Bare-final retry caching, upload/R3, initial discriminator splitting, AA and device execution remain open.

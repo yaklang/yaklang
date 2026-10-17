@@ -2,6 +2,7 @@ package pcaputil
 
 import (
 	"bytes"
+	"crypto/sha256"
 	"encoding/hex"
 	"errors"
 )
@@ -14,6 +15,17 @@ func dlmsSNSegmentHeader(info []byte) bool {
 		return false
 	}
 	return dlmsSNReadAPDU(info[3:]) || dlmsSNWriteAPDU(info[3:])
+}
+
+// A complete LLC/service/count/choice prefix proves this information group
+// carries the existing download service-block or its block-number echo. Upload
+// acknowledgements and multiresults keep their separate contracts.
+func dlmsSNBlockInformationPrefix(info []byte) bool {
+	if !dlmsSNSegmentHeader(info) {
+		return false
+	}
+	n, at, ok := wrapperSNDefinitePrefix(info, 4)
+	return ok && n == 1 && at < len(info) && (info[3] == 12 && info[at] == 2 || info[3] == 5 && info[at] == 5)
 }
 func dlmsSNInformationPrefix(w []byte) []byte {
 	// Classification only; the public event still requires complete CRC validation.
@@ -88,6 +100,7 @@ func (f *binFlow) consumeDLMSSNSegments(dir int, wire []byte, id uint64, m *dlms
 			s.invalidate() // A distinct same-link request retires the old owner permanently.
 		}
 		t = &dlmsFragments{snCommand: command, operation: "SN", request: request, dir: dir, source: m.source, destination: m.destination, first: m.ns, nr: m.nr}
+		t.snServiceBlockInformation = dlmsSNBlockInformationPrefix(info)
 	} else {
 		if m.kind != "I" {
 			if m.kind == "S" && dir != t.dir && m.source == t.destination && m.destination == t.source {
@@ -140,10 +153,17 @@ func (f *binFlow) consumeDLMSSNSegments(dir int, wire []byte, id uint64, m *dlms
 			return nil, 0, err
 		}
 	}
+	digest := t.snCarrierDigest
+	if t.snServiceBlockInformation {
+		digest = sha256.Sum256(wire)
+		if t.count > 0 {
+			digest = dlmsSNInformationDigest(t.snCarrierDigest, wire)
+		}
+	}
 	count := t.count + 1
 	meta := dlmsSegmentFields(m, count, !m.segmented)
 	if m.segmented {
-		t.info, t.wire, t.last, t.count = joined, bytes.Clone(wire), m.ns, count
+		t.info, t.wire, t.last, t.count, t.snCarrierDigest = joined, bytes.Clone(wire), m.ns, count, digest
 		s.fragments = t
 		direction := "response"
 		title := "Response"
@@ -165,7 +185,7 @@ func (f *binFlow) consumeDLMSSNSegments(dir int, wire []byte, id uint64, m *dlms
 		n, _, ok := wrapperSNDefinitePrefix(joined, 4)
 		multi = ok && n >= 2
 	}
-	if !multi && len(joined) >= 3 && (dlmsSNServiceBlockAPDU(joined[3:]) || dlmsSNUploadAPDUProfile(joined[3:]) != "") {
+	if !multi && !t.snServiceBlockInformation && len(joined) >= 3 && (dlmsSNServiceBlockAPDU(joined[3:]) || dlmsSNUploadAPDUProfile(joined[3:]) != "") {
 		return fail(ErrUnsupportedFeature, "SN service-block inside information group is not selected", true)
 	}
 	// Only this validated, bounded information group opts in after joining.
@@ -180,6 +200,13 @@ func (f *binFlow) consumeDLMSSNSegments(dir int, wire []byte, id uint64, m *dlms
 	// arbitrary bytes in the literal last carrier. Public Raw/header fields
 	// continue to describe that actual carrier unchanged.
 	decoded.information = joined
+	if t.snServiceBlockInformation {
+		decoded.snInformationSpan = true
+		decoded.snInformationFirstNS = t.first
+		decoded.snCarrierDigest = digest
+		// The old prefix and joined copy stay live during bounded service decoding.
+		decoded.snInformationCharge = 32 + 2*int64(len(t.info)+len(t.wire)+len(joined))
+	}
 	s.fragments = nil
 	fields, reply, err := f.consumeDecodedDLMS(dir, wire, id, decoded)
 	if err != nil {

@@ -299,6 +299,9 @@ func hdlcSNReadMatrixTransports(t *testing.T, cases []hdlcSNReadCase, batch stri
 }
 func hdlcSNReadMatrixChecked(t *testing.T, cases []hdlcSNReadCase, batch string, transports []string, check func(*testing.T, *ProtocolEvent, hdlcOpStep, map[string]any)) {
 	env := "DLMS_HDLC_SN_READ_TEST_ROOT"
+	if batch == "dlms-sn-serviceblock-information-source/captures" {
+		env = "DLMS_SN_BLOCK_INFORMATION_ROOT"
+	}
 	if batch == "dlms-ln-assembled-retry-source/captures" {
 		env = "DLMS_LN_ASSEMBLED_RETRY_ROOT"
 	}
@@ -494,7 +497,20 @@ func hdlcSNReadMatrixChecked(t *testing.T, cases []hdlcSNReadCase, batch string,
 // fields and metadata remain exact, and old SN/other-service rows are untouched.
 func hdlcSNBlockBindStep(t *testing.T, st hdlcOpStep, ids []uint64) hdlcOpStep {
 	t.Helper()
-	if (st.Profile != "dlms-hdlc-sn-read-block" && st.Profile != "dlms-hdlc-sn-read-upload" && st.Profile != "dlms-hdlc-sn-write-upload" && st.Profile != "dlms-hdlc-sn-gbt") || st.Fields == nil {
+	// Completed single-service phases retain their information-carrier profile.
+	// Only these documented SN service references are logical gold ordinals;
+	// ordinary/partial information observations have no business owner to bind.
+	segmentedService := false
+	if st.Profile == "dlms-hdlc-sn-information-segmented" {
+		if sn, ok := st.Fields["SN Read"].(map[string]any); ok {
+			for _, key := range []string{"transfer_start_event", "acknowledged_block_event", "duplicate_of_event"} {
+				if _, ok := sn[key]; ok {
+					segmentedService = true
+				}
+			}
+		}
+	}
+	if !segmentedService && (st.Profile != "dlms-hdlc-sn-read-block" && st.Profile != "dlms-hdlc-sn-read-upload" && st.Profile != "dlms-hdlc-sn-write-upload" && st.Profile != "dlms-hdlc-sn-gbt") || st.Fields == nil {
 		return st
 	}
 	var bind func(any) any

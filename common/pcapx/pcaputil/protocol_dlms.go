@@ -766,7 +766,7 @@ func (s *binDLMS) storage() int64 {
 	}
 	if s.fragments != nil {
 		n += 128 + 2*int64(len(s.fragments.info)+len(s.fragments.wire))
-		if s.fragments.snGBT {
+		if s.fragments.snGBT || s.fragments.snServiceBlockInformation {
 			n += 32
 		}
 	}
@@ -817,6 +817,12 @@ func (f *binFlow) consumeDecodedDLMS(dir int, w []byte, id uint64, m *dlmsMessag
 		// Only the GBT handler can prove that a complete selected inner phase
 		// preserves this SN group. Every other E0 still interrupts it there.
 		return f.consumeDLMSSNGBT(dir, w, id, m)
+	}
+	// Selected service-block information groups retain their separate service
+	// phase while the existing bounded information assembler validates each
+	// carrier. Other observations still run the unchanged interruption policy.
+	if s.fragments != nil && s.fragments.snServiceBlockInformation || m.kind == "I" && s.fragments == nil && m.segmented && dlmsSNBlockInformationPrefix(m.information) {
+		return f.consumeDLMSSNSegments(dir, w, id, m)
 	}
 	s.observeSNBlockInterruption(m, dir)
 	if s.fragments != nil && s.fragments.snCommand != 0 || m.kind == "I" && s.fragments == nil && m.segmented && dlmsSNSegmentHeader(m.information) {

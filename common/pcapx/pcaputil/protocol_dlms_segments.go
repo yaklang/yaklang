@@ -32,6 +32,7 @@ type dlmsFragments struct {
 	setResponseChoice            byte
 	snCommand                    byte
 	snGBT                        bool
+	snServiceBlockInformation    bool
 	snCarrierDigest              [32]byte
 }
 

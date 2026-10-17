@@ -123566,6 +123566,202 @@
         "scripts/protocol-tests/required-tests-traffic-unified-v177.json": "required-tests-traffic-unified-v177.json",
         "common/pcapx/pcaputil/dlms-ln-assembled-retry-source/captures/reuse-inputs.json": "dlms-ln-assembled-retry-captures/reuse-inputs.json"
       }
+    },
+    {
+      "id": "validation-dlms-sn-download-information",
+      "kind": "support",
+      "source_sha": "da10a6a8792768548b691629d9d166777cd1a0b5",
+      "file": "validation-dlms-sn-download-information.zip",
+      "sha256": "16febe0ef15c280520ab7ec3d6b7b1c7209d0c2c466014d011117fb53b7957f2",
+      "password": "bin-parser",
+      "members": {
+        "dlms-sn-serviceblock-information-source/baseline-controls.json": {
+          "bytes": 153282,
+          "sha256": "e90c3364be1ebd3c3de6c7600ce75adfbc218b360da40f2516d1c9fec6ddf251"
+        },
+        "dlms-sn-serviceblock-information-source/capture-index-v2.json": {
+          "bytes": 14039,
+          "sha256": "68ee7ad03e4dfda687f9ec2b7c00891a41023046ad328b4b64b409911ad0ef32"
+        },
+        "dlms-sn-serviceblock-information-source/captured-baseline-controls.json": {
+          "bytes": 153681,
+          "sha256": "2318c8746efe9b611dd8f062787be21c60b6a7d7373b31bfad35a3e23cf6ddb5"
+        },
+        "dlms-sn-serviceblock-information-source/captured-controls-v2.json": {
+          "bytes": 317837,
+          "sha256": "d4fd261b5c624565f36bc51c571bc38720bb51a3e165072c0f60510a94fe0c3c"
+        },
+        "dlms-sn-serviceblock-information-source/captures/direct-first-echo-then-fragmented-final-R2.tcp.pcap": {
+          "bytes": 779,
+          "sha256": "f8bbc53fb74feecc5ff5908fd0d54449b71118a9af971b0082bdf409cad9623a"
+        },
+        "dlms-sn-serviceblock-information-source/captures/direct-first-echo-then-fragmented-final-R2.udp.pcap": {
+          "bytes": 497,
+          "sha256": "0e76374b252cccefb34230b41575e9f888bac6f4c224ebeb406220ce0af155f8"
+        },
+        "dlms-sn-serviceblock-information-source/captures/direct-first-fragmented-Q5-echo-then-direct-final.tcp.pcap": {
+          "bytes": 779,
+          "sha256": "e52a82fc90e7e01108c8ec0a08ca73221e2885f121e6b40dc85acccf608b706f"
+        },
+        "dlms-sn-serviceblock-information-source/captures/direct-first-fragmented-Q5-echo-then-direct-final.udp.pcap": {
+          "bytes": 497,
+          "sha256": "dd3838637a5eacba8820f2909887728048ebff4d1295eaf7419c95bfc9ec7c55"
+        },
+        "dlms-sn-serviceblock-information-source/captures/existing-complete-M0-single-result-download-neighbor.tcp.pcap": {
+          "bytes": 698,
+          "sha256": "65e47fd5cf4a4b5092cd02ab802a69b5e41f5571816c083e74c39211ae1c4c22"
+        },
+        "dlms-sn-serviceblock-information-source/captures/existing-complete-M0-single-result-download-neighbor.udp.pcap": {
+          "bytes": 428,
+          "sha256": "053f449fdfd73e302af365245bc007f6d0e59e5b755bc8d65c3c40c91f0114b2"
+        },
+        "dlms-sn-serviceblock-information-source/captures/fragmented-first-R2-cap13-then-direct-echo-final.tcp.pcap": {
+          "bytes": 779,
+          "sha256": "c5a0a4c18a5ca2b20d6a52fa9344ee58b1e8ee5c2a2ed3f371085e7394dfc21e"
+        },
+        "dlms-sn-serviceblock-information-source/captures/fragmented-first-R2-cap13-then-direct-echo-final.udp.pcap": {
+          "bytes": 497,
+          "sha256": "5c37be4adcaf8acf986c1bc06dfe6b298986849c6ea2dc37a4af53f66c07d78f"
+        },
+        "dlms-sn-serviceblock-information-source/captures/identical-first-R2-information-cap12-Resource-release.tcp.pcap": {
+          "bytes": 596,
+          "sha256": "85e77a79a0f912cb22cf371cea97219a4d152603c73b535c013c8134d5e22621"
+        },
+        "dlms-sn-serviceblock-information-source/captures/identical-first-R2-information-cap12-Resource-release.udp.pcap": {
+          "bytes": 338,
+          "sha256": "e48675791f626ba357c16c4b7b2028759c98a9c3166d20d44f5483dd07ae84c6"
+        },
+        "dlms-sn-serviceblock-information-source/captures/reuse-inputs.json": {
+          "bytes": 3,
+          "sha256": "ca3d163bab055381827226140568f3bef7eaac187cebd76878e0b63e9e442356"
+        },
+        "dlms-sn-serviceblock-information-source/captures/whole-chain-exact-reobservation-and-same-final-different-prefix-retirement.tcp.pcap": {
+          "bytes": 991,
+          "sha256": "7eca55f95281f985409104823dc74823b5d8a77a34c69c271806e0cc3b69f40b"
+        },
+        "dlms-sn-serviceblock-information-source/captures/whole-chain-exact-reobservation-and-same-final-different-prefix-retirement.udp.pcap": {
+          "bytes": 685,
+          "sha256": "625071901de8fae7fd8e43b41a55f4409fcab42e158c65d22e19f796bbf9a21d"
+        },
+        "dlms-sn-serviceblock-information-source/captures/wrong-caller-full32-NR-preserve-both-layers-then-Close6-plus3.tcp.pcap": {
+          "bytes": 1117,
+          "sha256": "d35a34c260f72d29e1bcc71653d1df5c87dfee3a88b9d773848707e183d00862"
+        },
+        "dlms-sn-serviceblock-information-source/captures/wrong-caller-full32-NR-preserve-both-layers-then-Close6-plus3.udp.pcap": {
+          "bytes": 787,
+          "sha256": "82fdfa2af8b034bf89892fdf31bdd93cd208b9a3fcea661476c8a0571dc57d8f"
+        },
+        "dlms-sn-serviceblock-information-source/full-controls-v2.json": {
+          "bytes": 317240,
+          "sha256": "7d6234320cba67c3eaee56bdfa81890da6b87a6cd6c34d582c8fe11dd07d6221"
+        },
+        "dlms-sn-serviceblock-information-source/full-tools-v2/base/group-model.py": {
+          "bytes": 9433,
+          "sha256": "d93544ab4726242e1e3f44c144e85980f2328365a6722f123285bac9108c0436"
+        },
+        "dlms-sn-serviceblock-information-source/full-tools-v2/base/hdlc-reference.json": {
+          "bytes": 2402,
+          "sha256": "69b33f59438b54e25e0209287112464b1d6c1e802c975e7bb9dc2ed8fc7280b0"
+        },
+        "dlms-sn-serviceblock-information-source/full-tools-v2/base/model.py": {
+          "bytes": 12354,
+          "sha256": "5ac19b71b8cf8031cadf28fc17bd2bbfd76380937f1af121f7287e4e3fbadad8"
+        },
+        "dlms-sn-serviceblock-information-source/full-tools-v2/base/outer-source.py": {
+          "bytes": 5985,
+          "sha256": "0b69840f2066124f48091301aea6247ec29fb86c4933d00055f60828296bd220"
+        },
+        "dlms-sn-serviceblock-information-source/full-tools-v2/base/read-body.py": {
+          "bytes": 4002,
+          "sha256": "9038061ed63630258c65a5b9e11e51888d414b290fea0aa2bd14743e2a7af4cd"
+        },
+        "dlms-sn-serviceblock-information-source/full-tools-v2/base/reference-vectors.json": {
+          "bytes": 4159,
+          "sha256": "59250557438767f0f7ff0a072b1decf3fe0f5768b75013142a5dfa608b0fe6c0"
+        },
+        "dlms-sn-serviceblock-information-source/full-tools-v2/capture-model.py": {
+          "bytes": 1297,
+          "sha256": "436e6ddf8641e7b1cc1140a18b869addadd19fb25e23a5932cb686dcad22fa78"
+        },
+        "dlms-sn-serviceblock-information-source/full-tools-v2/generate.py": {
+          "bytes": 5751,
+          "sha256": "5c1fd4ef7dd2f7d9d6bfe23d577d370210fcf99fbfb541ca9dc6536e2dc10226"
+        },
+        "dlms-sn-serviceblock-information-source/full-tools-v2/model-pins.json": {
+          "bytes": 649,
+          "sha256": "bf8b28d8d440a2bf7cc7d4d6028b72134e5eb05042d793378893d4d3f3df4a3b"
+        },
+        "dlms-sn-serviceblock-information-source/full-tools-v2/model.py": {
+          "bytes": 6749,
+          "sha256": "a6f12ce7e2d1c396712ed4b5ba0265ce1e900c2b8b70fe60fd858b8d568b0d48"
+        },
+        "dlms-sn-serviceblock-information-source/full-tools-v2/project.py": {
+          "bytes": 3681,
+          "sha256": "5178e0822de4dcba0dc6eff208cbbe3bfa538d9444588b8da25d339993883360"
+        },
+        "dlms-sn-serviceblock-information-source/full-tools-v2/projection-pins.json": {
+          "bytes": 596,
+          "sha256": "6a7431ee80635d3d817fcd97b13d988b4a2e9c9921448f5889e062af57e29bb9"
+        },
+        "dlms-sn-serviceblock-information-source/full-tools-v2/verify-captures.py": {
+          "bytes": 3125,
+          "sha256": "ca91d94ef923df04336d749387d76eaaaa99800188a125d474387b62686315f6"
+        },
+        "dlms-sn-serviceblock-information-source/full-tools-v2/verify.py": {
+          "bytes": 2526,
+          "sha256": "bc7b35de5913449eff0a261582edced18d7d34aff7b523c11c00275746cf26b1"
+        },
+        "dlms-sn-serviceblock-information-source/source-manifest.json": {
+          "bytes": 2739,
+          "sha256": "8333fe252067c541c86225df2773f254c14f7b662fe1a91e3c8731f7dbb24a4e"
+        },
+        "required-tests-traffic-unified-v178.json": {
+          "bytes": 24076595,
+          "sha256": "a8b24e0e7158e9b75c020b84094667216dccebc6b4788a8f033fa52903c2da79"
+        },
+        "validation/expected.json": {
+          "bytes": 20321,
+          "sha256": "6a4502a3cbb95bd0ab998c74374c017ec7357e3477be064184bae82e10396d29"
+        }
+      },
+      "aliases": {
+        "common/pcapx/pcaputil/dlms-sn-serviceblock-information-source/baseline-controls.json": "dlms-sn-serviceblock-information-source/baseline-controls.json",
+        "common/pcapx/pcaputil/dlms-sn-serviceblock-information-source/capture-index-v2.json": "dlms-sn-serviceblock-information-source/capture-index-v2.json",
+        "common/pcapx/pcaputil/dlms-sn-serviceblock-information-source/captured-baseline-controls.json": "dlms-sn-serviceblock-information-source/captured-baseline-controls.json",
+        "common/pcapx/pcaputil/dlms-sn-serviceblock-information-source/captured-controls-v2.json": "dlms-sn-serviceblock-information-source/captured-controls-v2.json",
+        "common/pcapx/pcaputil/dlms-sn-serviceblock-information-source/captures/direct-first-echo-then-fragmented-final-R2.tcp.pcap": "dlms-sn-serviceblock-information-source/captures/direct-first-echo-then-fragmented-final-R2.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-serviceblock-information-source/captures/direct-first-echo-then-fragmented-final-R2.udp.pcap": "dlms-sn-serviceblock-information-source/captures/direct-first-echo-then-fragmented-final-R2.udp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-serviceblock-information-source/captures/direct-first-fragmented-Q5-echo-then-direct-final.tcp.pcap": "dlms-sn-serviceblock-information-source/captures/direct-first-fragmented-Q5-echo-then-direct-final.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-serviceblock-information-source/captures/direct-first-fragmented-Q5-echo-then-direct-final.udp.pcap": "dlms-sn-serviceblock-information-source/captures/direct-first-fragmented-Q5-echo-then-direct-final.udp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-serviceblock-information-source/captures/existing-complete-M0-single-result-download-neighbor.tcp.pcap": "dlms-sn-serviceblock-information-source/captures/existing-complete-M0-single-result-download-neighbor.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-serviceblock-information-source/captures/existing-complete-M0-single-result-download-neighbor.udp.pcap": "dlms-sn-serviceblock-information-source/captures/existing-complete-M0-single-result-download-neighbor.udp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-serviceblock-information-source/captures/fragmented-first-R2-cap13-then-direct-echo-final.tcp.pcap": "dlms-sn-serviceblock-information-source/captures/fragmented-first-R2-cap13-then-direct-echo-final.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-serviceblock-information-source/captures/fragmented-first-R2-cap13-then-direct-echo-final.udp.pcap": "dlms-sn-serviceblock-information-source/captures/fragmented-first-R2-cap13-then-direct-echo-final.udp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-serviceblock-information-source/captures/identical-first-R2-information-cap12-Resource-release.tcp.pcap": "dlms-sn-serviceblock-information-source/captures/identical-first-R2-information-cap12-Resource-release.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-serviceblock-information-source/captures/identical-first-R2-information-cap12-Resource-release.udp.pcap": "dlms-sn-serviceblock-information-source/captures/identical-first-R2-information-cap12-Resource-release.udp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-serviceblock-information-source/captures/reuse-inputs.json": "dlms-sn-serviceblock-information-source/captures/reuse-inputs.json",
+        "common/pcapx/pcaputil/dlms-sn-serviceblock-information-source/captures/whole-chain-exact-reobservation-and-same-final-different-prefix-retirement.tcp.pcap": "dlms-sn-serviceblock-information-source/captures/whole-chain-exact-reobservation-and-same-final-different-prefix-retirement.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-serviceblock-information-source/captures/whole-chain-exact-reobservation-and-same-final-different-prefix-retirement.udp.pcap": "dlms-sn-serviceblock-information-source/captures/whole-chain-exact-reobservation-and-same-final-different-prefix-retirement.udp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-serviceblock-information-source/captures/wrong-caller-full32-NR-preserve-both-layers-then-Close6-plus3.tcp.pcap": "dlms-sn-serviceblock-information-source/captures/wrong-caller-full32-NR-preserve-both-layers-then-Close6-plus3.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-serviceblock-information-source/captures/wrong-caller-full32-NR-preserve-both-layers-then-Close6-plus3.udp.pcap": "dlms-sn-serviceblock-information-source/captures/wrong-caller-full32-NR-preserve-both-layers-then-Close6-plus3.udp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-serviceblock-information-source/full-controls-v2.json": "dlms-sn-serviceblock-information-source/full-controls-v2.json",
+        "common/pcapx/pcaputil/dlms-sn-serviceblock-information-source/full-tools-v2/base/group-model.py": "dlms-sn-serviceblock-information-source/full-tools-v2/base/group-model.py",
+        "common/pcapx/pcaputil/dlms-sn-serviceblock-information-source/full-tools-v2/base/hdlc-reference.json": "dlms-sn-serviceblock-information-source/full-tools-v2/base/hdlc-reference.json",
+        "common/pcapx/pcaputil/dlms-sn-serviceblock-information-source/full-tools-v2/base/model.py": "dlms-sn-serviceblock-information-source/full-tools-v2/base/model.py",
+        "common/pcapx/pcaputil/dlms-sn-serviceblock-information-source/full-tools-v2/base/outer-source.py": "dlms-sn-serviceblock-information-source/full-tools-v2/base/outer-source.py",
+        "common/pcapx/pcaputil/dlms-sn-serviceblock-information-source/full-tools-v2/base/read-body.py": "dlms-sn-serviceblock-information-source/full-tools-v2/base/read-body.py",
+        "common/pcapx/pcaputil/dlms-sn-serviceblock-information-source/full-tools-v2/base/reference-vectors.json": "dlms-sn-serviceblock-information-source/full-tools-v2/base/reference-vectors.json",
+        "common/pcapx/pcaputil/dlms-sn-serviceblock-information-source/full-tools-v2/capture-model.py": "dlms-sn-serviceblock-information-source/full-tools-v2/capture-model.py",
+        "common/pcapx/pcaputil/dlms-sn-serviceblock-information-source/full-tools-v2/generate.py": "dlms-sn-serviceblock-information-source/full-tools-v2/generate.py",
+        "common/pcapx/pcaputil/dlms-sn-serviceblock-information-source/full-tools-v2/model-pins.json": "dlms-sn-serviceblock-information-source/full-tools-v2/model-pins.json",
+        "common/pcapx/pcaputil/dlms-sn-serviceblock-information-source/full-tools-v2/model.py": "dlms-sn-serviceblock-information-source/full-tools-v2/model.py",
+        "common/pcapx/pcaputil/dlms-sn-serviceblock-information-source/full-tools-v2/project.py": "dlms-sn-serviceblock-information-source/full-tools-v2/project.py",
+        "common/pcapx/pcaputil/dlms-sn-serviceblock-information-source/full-tools-v2/projection-pins.json": "dlms-sn-serviceblock-information-source/full-tools-v2/projection-pins.json",
+        "common/pcapx/pcaputil/dlms-sn-serviceblock-information-source/full-tools-v2/verify-captures.py": "dlms-sn-serviceblock-information-source/full-tools-v2/verify-captures.py",
+        "common/pcapx/pcaputil/dlms-sn-serviceblock-information-source/full-tools-v2/verify.py": "dlms-sn-serviceblock-information-source/full-tools-v2/verify.py",
+        "common/pcapx/pcaputil/dlms-sn-serviceblock-information-source/source-manifest.json": "dlms-sn-serviceblock-information-source/source-manifest.json",
+        "scripts/protocol-tests/required-tests-traffic-unified-v178.json": "required-tests-traffic-unified-v178.json"
+      }
     }
   ],
   "schema_version": 1,
