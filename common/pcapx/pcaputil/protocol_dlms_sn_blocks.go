@@ -81,6 +81,12 @@ func dlmsSNBlockCloseSummary(key dlmsSNBlockKey) string {
 	return "DLMS HDLC SN Read wire group ended before complete Data"
 }
 func (f *binFlow) consumeDLMSSNServiceBlock(dir int, w []byte, id uint64, m *dlmsMessage) (map[string]any, uint64, error) {
+	return f.consumeDLMSSNServiceBlockContext(dir, w, id, m, -1, f.a.budget.MaxRecursionDepth, w)
+}
+
+// Complete containing APDUs use the same full UInt32 SN group and HDLC sequence
+// contract as direct phases. A containing floor includes outer shadows/graphs.
+func (f *binFlow) consumeDLMSSNServiceBlockContext(dir int, syntax []byte, id uint64, m *dlmsMessage, containingFloor int64, depth int, identity []byte) (map[string]any, uint64, error) {
 	s := f.dlms
 	key := dlmsSNBlockMessageKey(m, dir)
 	s.operationProfile = dlmsSNBlockProfile(key)
@@ -111,7 +117,7 @@ func (f *binFlow) consumeDLMSSNServiceBlock(dir int, w []byte, id uint64, m *dlm
 		return m.fields, 0, nil
 	}
 	if group != nil && !group.ambiguous {
-		hash := sha256.Sum256(w)
+		hash := sha256.Sum256(identity)
 		exact := !echo && group.lastHash == hash || echo && group.ackEvent != 0 && group.ackHash == hash
 		// Without an observed echo, NR cannot be judged against an echo NS.
 		// Let the shared phase guard retire that missing-context case first.
@@ -132,12 +138,16 @@ func (f *binFlow) consumeDLMSSNServiceBlock(dir int, w []byte, id uint64, m *dlm
 		return nil, 0, dlmsError(ErrResourceExceeded, "SN service-block logical link budget")
 	}
 	// Other links, LN pending bytes, ACSE and information fragments stay charged.
-	floor := s.storage() + 128
+	floor := s.storage()
+	if containingFloor >= 0 {
+		floor = containingFloor
+	}
+	floor += 128
 	if !created {
 		floor -= 128 + link.wire.storage()
 	}
 	event := &ProtocolEvent{ID: id}
-	association, err := f.consumeSNServiceBlockReserved(link.wire, body, dir, event, w, floor)
+	association, err := f.consumeSNServiceBlockContext(link.wire, body, dir, event, syntax, floor, depth, identity)
 	if err != nil {
 		s.invalidate()
 		var pe *ProtocolError

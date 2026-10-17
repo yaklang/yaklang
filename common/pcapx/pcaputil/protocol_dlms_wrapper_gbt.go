@@ -83,6 +83,15 @@ func (f *binFlow) consumeWrapperGBT(s *binDLMSWrapper, m *wrapperMessage, dir in
 	return f.consumeWrapperGBTReserved(s, m, dir, e, w, 0, nil)
 }
 func (f *binFlow) consumeWrapperGBTReserved(s *binDLMSWrapper, m *wrapperMessage, dir int, e *ProtocolEvent, w []byte, floor int64, identity []byte) (string, error) {
+	return f.consumeWrapperGBTContext(s, m, dir, e, w, floor, identity, nil)
+}
+
+// A selected complete HDLC SN phase is admitted by its full-address owner.
+// The callback shares the direct SN group and receives every charged outer
+// projection plus the actual final carrier, never a synthetic duplicate.
+type dlmsSNGBTPhaseConsumer func(*wrapperMessage, []byte, int64, int, []byte) (string, error)
+
+func (f *binFlow) consumeWrapperGBTContext(s *binDLMSWrapper, m *wrapperMessage, dir int, e *ProtocolEvent, w []byte, floor int64, identity []byte, snConsumer dlmsSNGBTPhaseConsumer) (string, error) {
 	hdlc := identity != nil
 	key := wrapperGBTKey{dir, m.source, m.destination}
 	p := s.gbt[key]
@@ -218,7 +227,7 @@ func (f *binFlow) consumeWrapperGBTReserved(s *binDLMSWrapper, m *wrapperMessage
 		// Only a selected Wrapper SN phase can contribute to an
 		// existing SN wire group. GBT completion proves availability of this
 		// one inner APDU, not completion or ownership of the SN Data group.
-		if decoded.snServiceBlock && hdlc {
+		if decoded.snServiceBlock && hdlc && snConsumer == nil {
 			return "", wrapperError(ErrUnsupportedFeature, "GBT-wrapped SN service blocks require a separate observed transfer context")
 		}
 		assoc := "unverified-sn-read-observation"
@@ -231,7 +240,11 @@ func (f *binFlow) consumeWrapperGBTReserved(s *binDLMSWrapper, m *wrapperMessage
 			// and the extra nesting level remain covered. Hash the final
 			// actual carrier, not the synthetic inner Wrapper envelope.
 			innerFloor := floor + wrapperProjection(w, len(w)) + wrapperProjection(inner, len(inner))
-			assoc, err = f.consumeSNServiceBlockContext(s, decoded, dir, e, inner, innerFloor, f.a.budget.MaxRecursionDepth-1, w)
+			if hdlc {
+				assoc, err = snConsumer(decoded, inner, innerFloor+s.storage(), f.a.budget.MaxRecursionDepth-1, identity)
+			} else {
+				assoc, err = f.consumeSNServiceBlockContext(s, decoded, dir, e, inner, innerFloor, f.a.budget.MaxRecursionDepth-1, identity)
+			}
 			if err != nil {
 				return "", err
 			}

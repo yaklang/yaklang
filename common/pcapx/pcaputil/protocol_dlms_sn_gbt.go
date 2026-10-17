@@ -14,11 +14,57 @@ type dlmsSNGBTKey struct {
 	dir                 int
 	source, destination uint32
 }
+type dlmsSNGBTPhase struct{ selected, upload, write bool }
 type dlmsSNGBTLink struct {
 	wire              *binDLMSWrapper
 	lastDir           int
 	ns, nr            byte
 	observed, retired bool
+	// Only two bounded direction flags. Full identity/event stay in existing
+	// GBT block history; the shared SN group must still name that exact phase.
+	phase [2]dlmsSNGBTPhase
+}
+
+func (s *binDLMS) snGBTPhaseCurrent(key dlmsSNGBTKey, mode dlmsSNGBTPhase, b wrapperGBTBlock) bool {
+	if !mode.selected {
+		return false
+	}
+	k := dlmsSNBlockKey{dir: key.dir, source: key.source, destination: key.destination, upload: mode.upload, write: mode.write}
+	if !mode.upload {
+		k.dir, k.source, k.destination = 1-key.dir, key.destination, key.source
+	}
+	l := s.snBlocks[k]
+	if l == nil || l.interrupted {
+		return false
+	}
+	p := l.wire.snGroups[dlmsSNBlockShadowKey(k)]
+	return p != nil && p.active && !p.ambiguous && ((p.lastEvent == b.event && p.lastHash == b.hash) || (p.ackEvent == b.event && p.ackHash == b.hash))
+}
+
+// Only bounded definite-header evidence can delay old direct-SN interruption.
+// No Data is decoded or copied here. Partial/ordinary/ACK-only E0 retains the
+// original pre-admission retirement, so its released prefix cannot inflate the
+// completed ordinary APDU's budget. A candidate is not accepted until callback.
+func dlmsSNGBTSinglePhaseCandidate(m *wrapperMessage) bool {
+	if !m.lastBlock || m.gbtNumber != 1 || len(m.blockData) < 2 {
+		return false
+	}
+	p := m.blockData
+	n, at, ok := wrapperSNDefinitePrefix(p, 1)
+	if !ok || n != 1 || at >= len(p) {
+		return false
+	}
+	switch p[0] {
+	case 5:
+		return p[at] == 5 || p[at] == 6
+	case 12:
+		return p[at] == 2 || p[at] == 3
+	case 6:
+		return p[at] == 7
+	case 13:
+		return p[at] == 2
+	}
+	return false
 }
 
 func dlmsSNGBTInformation(info []byte) bool {
@@ -88,6 +134,12 @@ func (f *binFlow) consumeDLMSSNGBT(dir int, w []byte, id uint64, m *dlmsMessage)
 	if s.hasLNContext() {
 		return nil, 0, dlmsError(ErrContextRequired, "SN GBT cannot consume an observed LN owner or information group")
 	}
+	selectedPhase := false
+	defer func() {
+		if !selectedPhase {
+			s.observeSNBlockInterruption(m, dir)
+		}
+	}()
 	if s.ambiguous {
 		m.fields["Association"] = "ambiguous-gbt-hdlc-link"
 		return m.fields, 0, nil
@@ -128,7 +180,13 @@ func (f *binFlow) consumeDLMSSNGBT(dir int, w []byte, id uint64, m *dlmsMessage)
 	if p != nil {
 		if b, ok := p.blocks[m.snGBT.gbtNumber]; ok {
 			exact = b.hash == sha256.Sum256(w)
+			if exact && s.snGBTPhaseCurrent(key, l.phase[dir], b) {
+				selectedPhase = true
+			}
 		}
+	}
+	if !selectedPhase && (exact || !dlmsSNGBTSinglePhaseCandidate(m.snGBT)) {
+		s.observeSNBlockInterruption(m, dir)
 	}
 	if l.observed && !exact && (dir == l.lastDir || m.ns != l.nr || m.nr != (l.ns+1)&7) {
 		l.retire()
@@ -152,7 +210,23 @@ func (f *binFlow) consumeDLMSSNGBT(dir int, w []byte, id uint64, m *dlmsMessage)
 		floor -= 128 + l.wire.storage()
 	}
 	event := &ProtocolEvent{ID: id}
-	assoc, err := f.consumeWrapperGBTReserved(l.wire, m.snGBT, dir, event, dlmsSNGBTEnvelope(m.information[3:]), floor, w)
+	phaseConsumer := func(body *wrapperMessage, syntax []byte, containingFloor int64, depth int, identity []byte) (string, error) {
+		phase := *m
+		phase.request, phase.snBlock, phase.fields = body.request, body, make(map[string]any)
+		selectedPhase = true
+		s.observeSNBlockInterruption(&phase, dir)
+		fields, _, err := f.consumeDLMSSNServiceBlockContext(dir, syntax, id, &phase, containingFloor, depth, identity)
+		s.operationProfile = "dlms-hdlc-sn-gbt"
+		if err != nil {
+			return "", err
+		}
+		mode := dlmsSNGBTPhase{selected: true, upload: body.snUpload, write: body.snUpload && body.snWrite}
+		if s.snGBTPhaseCurrent(key, mode, wrapperGBTBlock{hash: sha256.Sum256(identity), event: id}) {
+			l.phase[dir] = mode
+		}
+		return fields["Association"].(string), nil
+	}
+	assoc, err := f.consumeWrapperGBTContext(l.wire, m.snGBT, dir, event, dlmsSNGBTEnvelope(m.information[3:]), floor, w, phaseConsumer)
 	if err != nil {
 		s.invalidate()
 		var pe *ProtocolError

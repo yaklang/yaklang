@@ -109,6 +109,9 @@ func hdlcSNGBTErrorOwnership(t *testing.T, e *ProtocolEvent, kind string) {
 	}
 }
 func hdlcSNGBTPublicAPINative(t *testing.T, cases []hdlcOpCase) {
+	hdlcSNGBTPublicAPINativeWithChecks(t, cases, hdlcSNGBTTypes, hdlcSNGBTErrorOwnership, hdlcSNGBTCloseCheck)
+}
+func hdlcSNGBTPublicAPINativeWithChecks(t *testing.T, cases []hdlcOpCase, typeCheck func(*testing.T, map[string]any), errorCheck func(*testing.T, *ProtocolEvent, string), closeCheck func(*testing.T, hdlcOpCase, []*ProtocolEvent, string, string)) {
 	for _, original := range cases {
 		for _, tr := range []string{"tcp", "udp"} {
 			for _, deferred := range []bool{false, true} {
@@ -193,27 +196,32 @@ func hdlcSNGBTPublicAPINative(t *testing.T, cases []hdlcOpCase) {
 							if st.Error == "ContextRequired" {
 								require.Equal(t, "DLMS HDLC SN GBT cannot consume an observed LN owner or information group", last.Message)
 							}
-							if st.Error == "MalformedMessage" {
-								require.Equal(t, "DLMS HDLC SN GBT: SN LLC direction differs from command", last.Message)
-							}
+							// Exact message policy belongs to the supplied errorCheck; the
+							// published default checker retains its original LLC assertion.
 							bound := hdlcSNGBTBind(st, ids)
 							c.Steps[i] = bound
 							if st.Error != "" {
+								// Bind the separately owned FeedResult message to the independently
+								// classified event before poisoning either returned error object.
+								_, queryErr := e.GetFields()
+								var ownedError *ProtocolError
+								require.ErrorAs(t, queryErr, &ownedError)
+								require.Equal(t, ownedError.Message, last.Message)
 								last.Kind, last.Message = ErrNeedMore, "caller mutation"
-								hdlcSNGBTErrorOwnership(t, e, st.Error)
+								errorCheck(t, e, st.Error)
 							}
 							hdlcOpQueries(t, e, bound.Fields, bound.Error)
 							if st.Error == "" {
 								f, err := e.GetFields()
 								require.NoError(t, err)
-								hdlcSNGBTTypes(t, f)
-								hdlcSNGBTTypes(t, e.Session)
+								typeCheck(t, f)
+								typeCheck(t, e.Session)
 								d, err := e.Decode()
 								require.NoError(t, err)
 								for _, key := range []string{"fields", "session"} {
 									v, ok := d[key].(map[string]any)
 									require.True(t, ok)
-									hdlcSNGBTTypes(t, v)
+									typeCheck(t, v)
 								}
 							}
 							snapshots = append(snapshots, actionSnapshot(e))
@@ -233,7 +241,7 @@ func hdlcSNGBTPublicAPINative(t *testing.T, cases []hdlcOpCase) {
 								require.NotEqual(t, closed[j].ID, ce.ID)
 							}
 						}
-						hdlcSNGBTCloseCheck(t, c, closed, tr, "test-close")
+						closeCheck(t, c, closed, tr, "test-close")
 						require.Empty(t, s.Close("repeat"))
 						require.Zero(t, s.Stats().BufferedBytes)
 						require.EqualValues(t, len(c.Close.Events), s.Stats().Incomplete)

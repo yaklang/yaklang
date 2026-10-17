@@ -120438,6 +120438,442 @@
         "common/pcapx/pcaputil/dlms-sn-upload-gbt/historical-upload-GBT-upgrades.json": "dlms-sn-upload-gbt/historical-upload-GBT-upgrades.json",
         "scripts/protocol-tests/required-tests-traffic-unified-v169.json": "required-tests-traffic-unified-v169.json"
       }
+    },
+    {
+      "id": "validation-dlms-hdlc-sn-service-gbt",
+      "kind": "support",
+      "source_sha": "d2515a7332aeb17d4b29bc6a06a046e89a8b25b5",
+      "file": "validation-dlms-hdlc-sn-service-gbt.zip",
+      "sha256": "bc12d5357d7743fa0b595b9023d49e030f01e6b458bbba5c68afa014c3c473e7",
+      "password": "bin-parser",
+      "members": {
+        "dlms-hdlc-sn-service-gbt-captures/Getprimed-GBT-first-ReadQ6-direct-R3-and-final-Q6.tcp.pcap": {
+          "bytes": 703,
+          "sha256": "e423f8e6c8d1f1ff364b8122b25dc314e991688171fdab46a3feb8f112cb1668"
+        },
+        "dlms-hdlc-sn-service-gbt-captures/Getprimed-GBT-first-ReadQ6-direct-R3-and-final-Q6.udp.pcap": {
+          "bytes": 433,
+          "sha256": "cfa3f7b379b2c468638ec2bfb14100a1e82815962e75d34ba791b81b3e420321"
+        },
+        "dlms-hdlc-sn-service-gbt-captures/Getprimed-GBT-first-SN-ReadR2-direct-Q5-and-final-R2.tcp.pcap": {
+          "bytes": 705,
+          "sha256": "934814f9ffc0cce1ca74a63f3f5e2956e0ac813bbb3c854d74b90fe010ab53c7"
+        },
+        "dlms-hdlc-sn-service-gbt-captures/Getprimed-GBT-first-SN-ReadR2-direct-Q5-and-final-R2.udp.pcap": {
+          "bytes": 435,
+          "sha256": "6a368be5f1b1d907c907d1c5c2fca6fddc13d055feda10ebf79c906ba5844649"
+        },
+        "dlms-hdlc-sn-service-gbt-captures/Getprimed-direct-ReadQ6-GBT-ReadR3-echo-final-ReadQ6.tcp.pcap": {
+          "bytes": 703,
+          "sha256": "77f5463fce5c27dfc76c11da7f2c13957d08591b5bdeadc4fb1c2c608986d5c5"
+        },
+        "dlms-hdlc-sn-service-gbt-captures/Getprimed-direct-ReadQ6-GBT-ReadR3-echo-final-ReadQ6.udp.pcap": {
+          "bytes": 433,
+          "sha256": "0ef32b3297531a428e88db2f64927f371a1600618fed6a899cd89940dc77cc61"
+        },
+        "dlms-hdlc-sn-service-gbt-captures/Getprimed-direct-ReadR2-GBT-ReadQ5-echo-final-ReadR2.tcp.pcap": {
+          "bytes": 705,
+          "sha256": "94f7564b8b7ac87ff86fe00f769a831bd70d3cdee13ab4c68a5452942252427a"
+        },
+        "dlms-hdlc-sn-service-gbt-captures/Getprimed-direct-ReadR2-GBT-ReadQ5-echo-final-ReadR2.udp.pcap": {
+          "bytes": 435,
+          "sha256": "7c2e483f9b1b68f84cbdb5d9afe985a84305f5b4dd2e07f521b1689f1b7845fd"
+        },
+        "dlms-hdlc-sn-service-gbt-captures/Getprimed-direct-WriteQ7-GBT-WriteR2-echo-final-WriteQ7.tcp.pcap": {
+          "bytes": 710,
+          "sha256": "150b6874647cbe2d8bcc2850c8a22a173580ccd84f4bc1cc6bd182fbcedc300c"
+        },
+        "dlms-hdlc-sn-service-gbt-captures/Getprimed-direct-WriteQ7-GBT-WriteR2-echo-final-WriteQ7.udp.pcap": {
+          "bytes": 440,
+          "sha256": "98372f07674f2fcd058d4d0a077a3c895834f273d5e1632a7b2d68b5f3365f4d"
+        },
+        "dlms-hdlc-sn-service-gbt-captures/Getprimed-direct-WriteQ7-echo-R2-GBT-final-Q7.tcp.pcap": {
+          "bytes": 710,
+          "sha256": "24838ac1bf5608662d3d7bc53b7339c337959315f4ee6b9d041c479748ad73c0"
+        },
+        "dlms-hdlc-sn-service-gbt-captures/Getprimed-direct-WriteQ7-echo-R2-GBT-final-Q7.udp.pcap": {
+          "bytes": 440,
+          "sha256": "014f20211a3a872649121e4149fa3f660a42def04ebc86341c7304f6a4455a22"
+        },
+        "dlms-hdlc-sn-service-gbt-captures/Getprimed-direct-first-ReadR2-Q5-GBT-final-ReadR2.tcp.pcap": {
+          "bytes": 705,
+          "sha256": "dc0f3401a12341a130627584639a785d0d700067e5c3dcbbb47518c34cf4348e"
+        },
+        "dlms-hdlc-sn-service-gbt-captures/Getprimed-direct-first-ReadR2-Q5-GBT-final-ReadR2.udp.pcap": {
+          "bytes": 435,
+          "sha256": "c13ea6d0a638a9e1002e6bddcd6da04bdb8bb04a633cd6baecf37b3dc2021f4c"
+        },
+        "dlms-hdlc-sn-service-gbt-captures/active-direct-Q6-prefix-then-ordinary-singlelast-E0-ReadResponse.tcp.pcap": {
+          "bytes": 610,
+          "sha256": "5b01eb03f653adb9569a4a5bf2c66b91f30c3c6ce22fba02e77e4a9973672ab3"
+        },
+        "dlms-hdlc-sn-service-gbt-captures/active-direct-Q6-prefix-then-ordinary-singlelast-E0-ReadResponse.udp.pcap": {
+          "bytes": 352,
+          "sha256": "9ceead2815e253357b01c006262d2821d6dd48a5b43bbfcdb3ae24a1e4d57612"
+        },
+        "dlms-hdlc-sn-service-gbt-captures/completed-GBT-active-inner-Read-download-response-Close.tcp.pcap": {
+          "bytes": 522,
+          "sha256": "b556d2f08fa9ad2295bba6c95e6a8de4d03b6235b32e728660cb899f0ce4007b"
+        },
+        "dlms-hdlc-sn-service-gbt-captures/completed-GBT-active-inner-Read-download-response-Close.udp.pcap": {
+          "bytes": 276,
+          "sha256": "d0a311d5500bcafb576b4d0721db1df899ea9b431bce9c0036acbd2fda99b02a"
+        },
+        "dlms-hdlc-sn-service-gbt-captures/completed-GBT-active-inner-Read-upload-Close.tcp.pcap": {
+          "bytes": 521,
+          "sha256": "c7ee579df5c88d7b6ca54f57da8bdec3e82d0a7c11e4215ab3e2dc17bb0dd83a"
+        },
+        "dlms-hdlc-sn-service-gbt-captures/completed-GBT-active-inner-Read-upload-Close.udp.pcap": {
+          "bytes": 275,
+          "sha256": "0faa9a7c148d345e8a84619a904230f75f17346d75e33a0c37561755707a486a"
+        },
+        "dlms-hdlc-sn-service-gbt-captures/direct-ReadQ6-then-same-APDU-in-GBT-is-changed-real-carrier.tcp.pcap": {
+          "bytes": 796,
+          "sha256": "92a42f8ab1b4772ea124e981e4bdc9cf2887aeaca5cc45f6c4da60307a30c13e"
+        },
+        "dlms-hdlc-sn-service-gbt-captures/direct-ReadQ6-then-same-APDU-in-GBT-is-changed-real-carrier.udp.pcap": {
+          "bytes": 514,
+          "sha256": "e3fa0f2757892db71288bc0d1ab1554cd851e8b1dda19f247ead582b113bdfdb"
+        },
+        "dlms-hdlc-sn-service-gbt-captures/exact-repeat-of-selected-completed-E0-does-not-interrupt-active-inner-SN.tcp.pcap": {
+          "bytes": 803,
+          "sha256": "1d88803a52a0c0750df271934fe06be10bd210befe4a2235b81c8852e6665925"
+        },
+        "dlms-hdlc-sn-service-gbt-captures/exact-repeat-of-selected-completed-E0-does-not-interrupt-active-inner-SN.udp.pcap": {
+          "bytes": 521,
+          "sha256": "49ead07e64a372d62ae5b0a6f6f8e1321f38cdc20c063f15239141e14f9fcfd2"
+        },
+        "dlms-hdlc-sn-service-gbt-captures/final-Read-joined-Data-trailing-byte-in-GBT-is-Malformed.tcp.pcap": {
+          "bytes": 706,
+          "sha256": "04e4d3c6663f3adf69a6fec241d979892cba4b4da5214ee8bd8a2f91e6a429bc"
+        },
+        "dlms-hdlc-sn-service-gbt-captures/final-Read-joined-Data-trailing-byte-in-GBT-is-Malformed.udp.pcap": {
+          "bytes": 436,
+          "sha256": "4b80afcba295188d6412d487daa6f3722dee35b08b018fc1f4010e99cdfcf55b"
+        },
+        "dlms-hdlc-sn-service-gbt-captures/fullUInt32-wrong-echo-address-keeps-Read-upload.tcp.pcap": {
+          "bytes": 795,
+          "sha256": "f424a31aae16578e29bfaf14c7451632e7d20df63872f9dff8e800cbc9b574a3"
+        },
+        "dlms-hdlc-sn-service-gbt-captures/fullUInt32-wrong-echo-address-keeps-Read-upload.udp.pcap": {
+          "bytes": 513,
+          "sha256": "9d4d6e5fc74bf76cb5010f282341b6a6c6cf235b606cbc830e728f234f079a23"
+        },
+        "dlms-hdlc-sn-service-gbt-captures/live-LN-GET-refuses-GBT-SNphase-without-losing-owner.tcp.pcap": {
+          "bytes": 522,
+          "sha256": "2379362bc6579ac659c300d4f5bf49fcd3794fa1afc3db72ca099a5dc810403c"
+        },
+        "dlms-hdlc-sn-service-gbt-captures/live-LN-GET-refuses-GBT-SNphase-without-losing-owner.udp.pcap": {
+          "bytes": 276,
+          "sha256": "507b8bea6167dbb1d742d74e61351054a134f0a4a749a81d5ce7f31406af8d30"
+        },
+        "dlms-hdlc-sn-service-gbt-captures/matching-Read-upload-echo-NR-conflict-retires-inner.tcp.pcap": {
+          "bytes": 703,
+          "sha256": "5e5c3e1d2b96b68e6d69744f982ca553f13f56ff1a6650d7f3e73897a08e2df7"
+        },
+        "dlms-hdlc-sn-service-gbt-captures/matching-Read-upload-echo-NR-conflict-retires-inner.udp.pcap": {
+          "bytes": 433,
+          "sha256": "5d0529ab639781c15193c6879d893c536b203e416e84e60d25c500bd0e8b6f08"
+        },
+        "dlms-hdlc-sn-service-gbt-captures/ordinary-E0-exact-repeat-cannot-protect-later-active-SN-upload.tcp.pcap": {
+          "bytes": 888,
+          "sha256": "eecaa4429d55d96dbd822a8afcc95bcfc7c49329475809fd51de1594bf32b5db"
+        },
+        "dlms-hdlc-sn-service-gbt-captures/ordinary-E0-exact-repeat-cannot-protect-later-active-SN-upload.udp.pcap": {
+          "bytes": 594,
+          "sha256": "b6fc5591769d97b20c882b16f716e12a3c5d139932ccfbcd73fe1bea12d29926"
+        },
+        "dlms-hdlc-sn-service-gbt-captures/reuse-inputs.json": {
+          "bytes": 679,
+          "sha256": "6fc1d16934814379ddfd3f3569ac3011bfb0b3af0da108a4649ade65574a0c4d"
+        },
+        "dlms-hdlc-sn-service-gbt-captures/singlelast-GBT-Write-parameter-Structure-global-depth7.tcp.pcap": {
+          "bytes": 535,
+          "sha256": "18f431681ea7eb9b4c71214e096966fb7a7086843d48edfc53094dc8215192ba"
+        },
+        "dlms-hdlc-sn-service-gbt-captures/singlelast-GBT-Write-parameter-Structure-global-depth7.udp.pcap": {
+          "bytes": 289,
+          "sha256": "f0c1c916c3285b842ce89bfaea2714c2d33cca8a2e3fc7418872aec12d3d57e9"
+        },
+        "dlms-hdlc-sn-service-gbt-captures/stale-selected-E0-block-repeat-cannot-protect-newer-active-SN-phase.tcp.pcap": {
+          "bytes": 983,
+          "sha256": "fc895e49f1bf524e90f57610e6dcd4846f13cff26900962823958661b671997d"
+        },
+        "dlms-hdlc-sn-service-gbt-captures/stale-selected-E0-block-repeat-cannot-protect-newer-active-SN-phase.udp.pcap": {
+          "bytes": 677,
+          "sha256": "8bb2b750f44eabd59ccb09c4a088d97b570cb6b01a6a5b64f1a401c487855e44"
+        },
+        "dlms-hdlc-sn-service-gbt-source/SOURCES.json": {
+          "bytes": 12600,
+          "sha256": "d021ca7bc86c17a7b10a8036ff97857551b36e71f367282cb04b2799089d86c5"
+        },
+        "dlms-hdlc-sn-service-gbt-source/baseline-controls.json": {
+          "bytes": 57508,
+          "sha256": "98bab43c3bb949eb41f2767da91432b87b58afe77e08ae8a2a20769f84053261"
+        },
+        "dlms-hdlc-sn-service-gbt-source/budget-order-witness.json": {
+          "bytes": 18762,
+          "sha256": "3a6da8ea3d2cab9e9f3657843cb2081f5a28948f68ff936221492e6012d64e91"
+        },
+        "dlms-hdlc-sn-service-gbt-source/controls.json": {
+          "bytes": 256518,
+          "sha256": "3f6854c5e2b4bd440b6a493dcdfdba7b99ec8c0871fdca4ea248946518a7a9c6"
+        },
+        "dlms-hdlc-sn-service-gbt-source/echo-supplement.json": {
+          "bytes": 72971,
+          "sha256": "442356d6946531cbf570742323b1b1f611d083cee0945618bf540233e67f4987"
+        },
+        "dlms-hdlc-sn-service-gbt-source/exact-selected-carrier-repeat-supplement.json": {
+          "bytes": 28851,
+          "sha256": "c008792858c11d514999cfe0b1de1027e0056fa0f8e2d6dde483a648be975a96"
+        },
+        "dlms-hdlc-sn-service-gbt-source/repeat-gate-negative-supplement.json": {
+          "bytes": 65912,
+          "sha256": "4f1dac44050b0ddfc2b31c35c0d6a0529a6d546d7c5091262654a930a2bd3aa1"
+        },
+        "dlms-hdlc-sn-service-gbt-tools/capture-checks.py": {
+          "bytes": 858,
+          "sha256": "773153f31c80ec4acb5cf5006a7dce3731b44f32ec55aff217550336216dd698"
+        },
+        "dlms-hdlc-sn-service-gbt-tools/carrier.py": {
+          "bytes": 1215,
+          "sha256": "9e8b93483f75943e6a3e1a022ac30be38172c49afe461f4e7b758bdf18b4ab4c"
+        },
+        "dlms-hdlc-sn-service-gbt-tools/independent/budget-order-witness.py": {
+          "bytes": 3596,
+          "sha256": "e15bc64695935e7a966b8cff49688a346b2c540ebce92ce179e69096a48cf1da"
+        },
+        "dlms-hdlc-sn-service-gbt-tools/independent/candidates.py": {
+          "bytes": 7067,
+          "sha256": "39129defb2d300280acccb1b335335b6b63533856517b0a8268f6436dd5eeed5"
+        },
+        "dlms-hdlc-sn-service-gbt-tools/independent/echo-supplement.py": {
+          "bytes": 1759,
+          "sha256": "d0134f04f487a5be50d2cb23939cc264ef49b2689eb195033aa648b928c2bdfc"
+        },
+        "dlms-hdlc-sn-service-gbt-tools/independent/hdlc-reference.json": {
+          "bytes": 2402,
+          "sha256": "69b33f59438b54e25e0209287112464b1d6c1e802c975e7bb9dc2ed8fc7280b0"
+        },
+        "dlms-hdlc-sn-service-gbt-tools/independent/hdlc.py": {
+          "bytes": 2011,
+          "sha256": "7f4394c9b7536c86c2f31e1dd26b3e8b2b003dd4d280e98f582e1300f53e3358"
+        },
+        "dlms-hdlc-sn-service-gbt-tools/independent/model.py": {
+          "bytes": 11538,
+          "sha256": "4df169cbddb559a0122e260743d7f53fc188b2766a845ab68fce9d8693d06508"
+        },
+        "dlms-hdlc-sn-service-gbt-tools/independent/phase/access.py": {
+          "bytes": 4354,
+          "sha256": "3166cdf13b9934650fdaa34051ba1d6365c6521028ab132898597e424c23e586"
+        },
+        "dlms-hdlc-sn-service-gbt-tools/independent/phase/block-grammar.py": {
+          "bytes": 5985,
+          "sha256": "0b69840f2066124f48091301aea6247ec29fb86c4933d00055f60828296bd220"
+        },
+        "dlms-hdlc-sn-service-gbt-tools/independent/phase/compose.py": {
+          "bytes": 15710,
+          "sha256": "f4590e419ee263e9c957ec9e75c551ce89dcf81b378bf4ce115ce5e11cefd87b"
+        },
+        "dlms-hdlc-sn-service-gbt-tools/independent/phase/composition-pins.json": {
+          "bytes": 1489,
+          "sha256": "9e0492525bf27a37c96b07bb545956618e7041de4fce6823681033bfb5fbd507"
+        },
+        "dlms-hdlc-sn-service-gbt-tools/independent/phase/gbt-core.py": {
+          "bytes": 12575,
+          "sha256": "a678272f289349b8be7e31791edd158ccc2c4e4ee13431dcfec6a2fcf56a0df6"
+        },
+        "dlms-hdlc-sn-service-gbt-tools/independent/phase/legacy.py": {
+          "bytes": 9729,
+          "sha256": "d5a9c60619214a8a0ac68cb2159bf089992795de9059eb010a1287d5f8c72e35"
+        },
+        "dlms-hdlc-sn-service-gbt-tools/independent/phase/model-pins.json": {
+          "bytes": 354,
+          "sha256": "641a27a880d7ef22b9678b92b0e9a3e4af9dac3dbd9d7b49be8fb14a9b4d88fb"
+        },
+        "dlms-hdlc-sn-service-gbt-tools/independent/phase/ordinary.py": {
+          "bytes": 9776,
+          "sha256": "b19b8043b6d3defeb32ff2a3a5caf67102299118852c6859c2d1a78847fbb51a"
+        },
+        "dlms-hdlc-sn-service-gbt-tools/independent/phase/rebuild.py": {
+          "bytes": 884,
+          "sha256": "49e676495fb763e85409db61eed1724d9f688d8b01bf6ca76769c9d686c170dc"
+        },
+        "dlms-hdlc-sn-service-gbt-tools/independent/phase/reference-vectors.json": {
+          "bytes": 10296,
+          "sha256": "1c7119b36f10a8b7c329cc3c346b3792f3421a19c5fc0b2594fa284b7cfa5874"
+        },
+        "dlms-hdlc-sn-service-gbt-tools/independent/phase/upload/access.py": {
+          "bytes": 4392,
+          "sha256": "70f03ceffb0556b966d04829dc89384c20b73bc6104c8ed637e5ed0b97d8bc7e"
+        },
+        "dlms-hdlc-sn-service-gbt-tools/independent/phase/upload/download-outer.py": {
+          "bytes": 5985,
+          "sha256": "0b69840f2066124f48091301aea6247ec29fb86c4933d00055f60828296bd220"
+        },
+        "dlms-hdlc-sn-service-gbt-tools/independent/phase/upload/download-reference-vectors.json": {
+          "bytes": 4159,
+          "sha256": "59250557438767f0f7ff0a072b1decf3fe0f5768b75013142a5dfa608b0fe6c0"
+        },
+        "dlms-hdlc-sn-service-gbt-tools/independent/phase/upload/model.py": {
+          "bytes": 15781,
+          "sha256": "609ba979ea49fc353ccd92fadf99edbc5100e4f1637eaa4444fcace579c903dc"
+        },
+        "dlms-hdlc-sn-service-gbt-tools/independent/phase/upload/read-body.py": {
+          "bytes": 4002,
+          "sha256": "9038061ed63630258c65a5b9e11e51888d414b290fea0aa2bd14743e2a7af4cd"
+        },
+        "dlms-hdlc-sn-service-gbt-tools/independent/phase/upload/reference-vectors.json": {
+          "bytes": 6734,
+          "sha256": "3d7c0f01b305e3524efa5dab640dd9ae4730fe7ed789ca9ef015a5c39b846b8d"
+        },
+        "dlms-hdlc-sn-service-gbt-tools/independent/phase/upload/source-outer.py": {
+          "bytes": 8836,
+          "sha256": "4505d905a3a96b22ac3f91e00033d4146c3bf5e75794a2ad25f60b5e3e7145a1"
+        },
+        "dlms-hdlc-sn-service-gbt-tools/independent/phase/upload/write-body.py": {
+          "bytes": 5706,
+          "sha256": "4818c0264cb4819cf5d4715a855b4f3817acf26c0c6b15ff558aaa7d3b4aa094"
+        },
+        "dlms-hdlc-sn-service-gbt-tools/independent/phase/upload/write-source.py": {
+          "bytes": 8800,
+          "sha256": "46e574590d006649212a255cd2fc85d226165f0ce27f5cc7a01f88211720de0a"
+        },
+        "dlms-hdlc-sn-service-gbt-tools/independent/phase/verify.py": {
+          "bytes": 6343,
+          "sha256": "f164e4ce57fb860f955c123ce691d0013474c50b7c668f6a780f2f6c28560334"
+        },
+        "dlms-hdlc-sn-service-gbt-tools/independent/phase/write-body.py": {
+          "bytes": 5706,
+          "sha256": "4818c0264cb4819cf5d4715a855b4f3817acf26c0c6b15ff558aaa7d3b4aa094"
+        },
+        "dlms-hdlc-sn-service-gbt-tools/independent/rebuild.py": {
+          "bytes": 767,
+          "sha256": "6b6f6a2aa5c2465d2394cc642b1b0d279d8994cde5e415e6413745f5f2fd6b49"
+        },
+        "dlms-hdlc-sn-service-gbt-tools/independent/repeat-negative-supplement.py": {
+          "bytes": 6781,
+          "sha256": "3e5d869f5d8ab8cf16ef5a7e3b99884be3dfcda5316d8d757e4a055c14020789"
+        },
+        "dlms-hdlc-sn-service-gbt-tools/independent/repeat-supplement.py": {
+          "bytes": 3322,
+          "sha256": "01c87ecc44203def78a685d146ebd8a2d13b227d283cc50acb6d44b57d6ade6a"
+        },
+        "dlms-hdlc-sn-service-gbt-tools/independent/reused-pins.json": {
+          "bytes": 2218,
+          "sha256": "89958cf0dd81834899b822c647d71deddcc59d94d043c36b2835995a3eadcf65"
+        },
+        "dlms-hdlc-sn-service-gbt-tools/independent/verify.py": {
+          "bytes": 5419,
+          "sha256": "5a76fface93a40bc0bd27d0e727632993792cd1560993b925d969b590aaaa2f0"
+        },
+        "dlms-hdlc-sn-service-gbt-tools/project.py": {
+          "bytes": 1726,
+          "sha256": "ea2c8d144ce97ec235465b6b7048d0229fbbe37729f8165a83a8571e95dcc8e3"
+        },
+        "dlms-hdlc-sn-service-gbt-tools/verify-captures.py": {
+          "bytes": 3425,
+          "sha256": "03d81ee9cd59a99f6269c2227c2b2f45c15a8a60745ec9e794d71a2eb8468519"
+        },
+        "dlms-hdlc-sn-service-gbt/captured-controls.json": {
+          "bytes": 441829,
+          "sha256": "92519d6ca3ab9ad2da9c33ef298bd973e22b8d602a2accc6675283f2d1c64bf3"
+        },
+        "required-tests-traffic-unified-v170.json": {
+          "bytes": 22898311,
+          "sha256": "1e1a66bc5f1d76cf72eb26dd8a44f38c81f55ef854381f4bf3d69c7a7316703f"
+        },
+        "validation/expected.json": {
+          "bytes": 54137,
+          "sha256": "95d5713991ab956e6aa7cde5893cd0521b9d2bc8e02cd80d4db9ec2b07600ee6"
+        }
+      },
+      "aliases": {
+        "common/pcapx/pcaputil/dlms-hdlc-sn-service-gbt-captures/Getprimed-GBT-first-ReadQ6-direct-R3-and-final-Q6.tcp.pcap": "dlms-hdlc-sn-service-gbt-captures/Getprimed-GBT-first-ReadQ6-direct-R3-and-final-Q6.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-service-gbt-captures/Getprimed-GBT-first-ReadQ6-direct-R3-and-final-Q6.udp.pcap": "dlms-hdlc-sn-service-gbt-captures/Getprimed-GBT-first-ReadQ6-direct-R3-and-final-Q6.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-service-gbt-captures/Getprimed-GBT-first-SN-ReadR2-direct-Q5-and-final-R2.tcp.pcap": "dlms-hdlc-sn-service-gbt-captures/Getprimed-GBT-first-SN-ReadR2-direct-Q5-and-final-R2.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-service-gbt-captures/Getprimed-GBT-first-SN-ReadR2-direct-Q5-and-final-R2.udp.pcap": "dlms-hdlc-sn-service-gbt-captures/Getprimed-GBT-first-SN-ReadR2-direct-Q5-and-final-R2.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-service-gbt-captures/Getprimed-direct-ReadQ6-GBT-ReadR3-echo-final-ReadQ6.tcp.pcap": "dlms-hdlc-sn-service-gbt-captures/Getprimed-direct-ReadQ6-GBT-ReadR3-echo-final-ReadQ6.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-service-gbt-captures/Getprimed-direct-ReadQ6-GBT-ReadR3-echo-final-ReadQ6.udp.pcap": "dlms-hdlc-sn-service-gbt-captures/Getprimed-direct-ReadQ6-GBT-ReadR3-echo-final-ReadQ6.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-service-gbt-captures/Getprimed-direct-ReadR2-GBT-ReadQ5-echo-final-ReadR2.tcp.pcap": "dlms-hdlc-sn-service-gbt-captures/Getprimed-direct-ReadR2-GBT-ReadQ5-echo-final-ReadR2.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-service-gbt-captures/Getprimed-direct-ReadR2-GBT-ReadQ5-echo-final-ReadR2.udp.pcap": "dlms-hdlc-sn-service-gbt-captures/Getprimed-direct-ReadR2-GBT-ReadQ5-echo-final-ReadR2.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-service-gbt-captures/Getprimed-direct-WriteQ7-GBT-WriteR2-echo-final-WriteQ7.tcp.pcap": "dlms-hdlc-sn-service-gbt-captures/Getprimed-direct-WriteQ7-GBT-WriteR2-echo-final-WriteQ7.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-service-gbt-captures/Getprimed-direct-WriteQ7-GBT-WriteR2-echo-final-WriteQ7.udp.pcap": "dlms-hdlc-sn-service-gbt-captures/Getprimed-direct-WriteQ7-GBT-WriteR2-echo-final-WriteQ7.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-service-gbt-captures/Getprimed-direct-WriteQ7-echo-R2-GBT-final-Q7.tcp.pcap": "dlms-hdlc-sn-service-gbt-captures/Getprimed-direct-WriteQ7-echo-R2-GBT-final-Q7.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-service-gbt-captures/Getprimed-direct-WriteQ7-echo-R2-GBT-final-Q7.udp.pcap": "dlms-hdlc-sn-service-gbt-captures/Getprimed-direct-WriteQ7-echo-R2-GBT-final-Q7.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-service-gbt-captures/Getprimed-direct-first-ReadR2-Q5-GBT-final-ReadR2.tcp.pcap": "dlms-hdlc-sn-service-gbt-captures/Getprimed-direct-first-ReadR2-Q5-GBT-final-ReadR2.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-service-gbt-captures/Getprimed-direct-first-ReadR2-Q5-GBT-final-ReadR2.udp.pcap": "dlms-hdlc-sn-service-gbt-captures/Getprimed-direct-first-ReadR2-Q5-GBT-final-ReadR2.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-service-gbt-captures/active-direct-Q6-prefix-then-ordinary-singlelast-E0-ReadResponse.tcp.pcap": "dlms-hdlc-sn-service-gbt-captures/active-direct-Q6-prefix-then-ordinary-singlelast-E0-ReadResponse.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-service-gbt-captures/active-direct-Q6-prefix-then-ordinary-singlelast-E0-ReadResponse.udp.pcap": "dlms-hdlc-sn-service-gbt-captures/active-direct-Q6-prefix-then-ordinary-singlelast-E0-ReadResponse.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-service-gbt-captures/completed-GBT-active-inner-Read-download-response-Close.tcp.pcap": "dlms-hdlc-sn-service-gbt-captures/completed-GBT-active-inner-Read-download-response-Close.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-service-gbt-captures/completed-GBT-active-inner-Read-download-response-Close.udp.pcap": "dlms-hdlc-sn-service-gbt-captures/completed-GBT-active-inner-Read-download-response-Close.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-service-gbt-captures/completed-GBT-active-inner-Read-upload-Close.tcp.pcap": "dlms-hdlc-sn-service-gbt-captures/completed-GBT-active-inner-Read-upload-Close.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-service-gbt-captures/completed-GBT-active-inner-Read-upload-Close.udp.pcap": "dlms-hdlc-sn-service-gbt-captures/completed-GBT-active-inner-Read-upload-Close.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-service-gbt-captures/direct-ReadQ6-then-same-APDU-in-GBT-is-changed-real-carrier.tcp.pcap": "dlms-hdlc-sn-service-gbt-captures/direct-ReadQ6-then-same-APDU-in-GBT-is-changed-real-carrier.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-service-gbt-captures/direct-ReadQ6-then-same-APDU-in-GBT-is-changed-real-carrier.udp.pcap": "dlms-hdlc-sn-service-gbt-captures/direct-ReadQ6-then-same-APDU-in-GBT-is-changed-real-carrier.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-service-gbt-captures/exact-repeat-of-selected-completed-E0-does-not-interrupt-active-inner-SN.tcp.pcap": "dlms-hdlc-sn-service-gbt-captures/exact-repeat-of-selected-completed-E0-does-not-interrupt-active-inner-SN.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-service-gbt-captures/exact-repeat-of-selected-completed-E0-does-not-interrupt-active-inner-SN.udp.pcap": "dlms-hdlc-sn-service-gbt-captures/exact-repeat-of-selected-completed-E0-does-not-interrupt-active-inner-SN.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-service-gbt-captures/final-Read-joined-Data-trailing-byte-in-GBT-is-Malformed.tcp.pcap": "dlms-hdlc-sn-service-gbt-captures/final-Read-joined-Data-trailing-byte-in-GBT-is-Malformed.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-service-gbt-captures/final-Read-joined-Data-trailing-byte-in-GBT-is-Malformed.udp.pcap": "dlms-hdlc-sn-service-gbt-captures/final-Read-joined-Data-trailing-byte-in-GBT-is-Malformed.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-service-gbt-captures/fullUInt32-wrong-echo-address-keeps-Read-upload.tcp.pcap": "dlms-hdlc-sn-service-gbt-captures/fullUInt32-wrong-echo-address-keeps-Read-upload.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-service-gbt-captures/fullUInt32-wrong-echo-address-keeps-Read-upload.udp.pcap": "dlms-hdlc-sn-service-gbt-captures/fullUInt32-wrong-echo-address-keeps-Read-upload.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-service-gbt-captures/live-LN-GET-refuses-GBT-SNphase-without-losing-owner.tcp.pcap": "dlms-hdlc-sn-service-gbt-captures/live-LN-GET-refuses-GBT-SNphase-without-losing-owner.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-service-gbt-captures/live-LN-GET-refuses-GBT-SNphase-without-losing-owner.udp.pcap": "dlms-hdlc-sn-service-gbt-captures/live-LN-GET-refuses-GBT-SNphase-without-losing-owner.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-service-gbt-captures/matching-Read-upload-echo-NR-conflict-retires-inner.tcp.pcap": "dlms-hdlc-sn-service-gbt-captures/matching-Read-upload-echo-NR-conflict-retires-inner.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-service-gbt-captures/matching-Read-upload-echo-NR-conflict-retires-inner.udp.pcap": "dlms-hdlc-sn-service-gbt-captures/matching-Read-upload-echo-NR-conflict-retires-inner.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-service-gbt-captures/ordinary-E0-exact-repeat-cannot-protect-later-active-SN-upload.tcp.pcap": "dlms-hdlc-sn-service-gbt-captures/ordinary-E0-exact-repeat-cannot-protect-later-active-SN-upload.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-service-gbt-captures/ordinary-E0-exact-repeat-cannot-protect-later-active-SN-upload.udp.pcap": "dlms-hdlc-sn-service-gbt-captures/ordinary-E0-exact-repeat-cannot-protect-later-active-SN-upload.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-service-gbt-captures/reuse-inputs.json": "dlms-hdlc-sn-service-gbt-captures/reuse-inputs.json",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-service-gbt-captures/singlelast-GBT-Write-parameter-Structure-global-depth7.tcp.pcap": "dlms-hdlc-sn-service-gbt-captures/singlelast-GBT-Write-parameter-Structure-global-depth7.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-service-gbt-captures/singlelast-GBT-Write-parameter-Structure-global-depth7.udp.pcap": "dlms-hdlc-sn-service-gbt-captures/singlelast-GBT-Write-parameter-Structure-global-depth7.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-service-gbt-captures/stale-selected-E0-block-repeat-cannot-protect-newer-active-SN-phase.tcp.pcap": "dlms-hdlc-sn-service-gbt-captures/stale-selected-E0-block-repeat-cannot-protect-newer-active-SN-phase.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-service-gbt-captures/stale-selected-E0-block-repeat-cannot-protect-newer-active-SN-phase.udp.pcap": "dlms-hdlc-sn-service-gbt-captures/stale-selected-E0-block-repeat-cannot-protect-newer-active-SN-phase.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-service-gbt-source/SOURCES.json": "dlms-hdlc-sn-service-gbt-source/SOURCES.json",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-service-gbt-source/baseline-controls.json": "dlms-hdlc-sn-service-gbt-source/baseline-controls.json",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-service-gbt-source/budget-order-witness.json": "dlms-hdlc-sn-service-gbt-source/budget-order-witness.json",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-service-gbt-source/controls.json": "dlms-hdlc-sn-service-gbt-source/controls.json",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-service-gbt-source/echo-supplement.json": "dlms-hdlc-sn-service-gbt-source/echo-supplement.json",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-service-gbt-source/exact-selected-carrier-repeat-supplement.json": "dlms-hdlc-sn-service-gbt-source/exact-selected-carrier-repeat-supplement.json",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-service-gbt-source/repeat-gate-negative-supplement.json": "dlms-hdlc-sn-service-gbt-source/repeat-gate-negative-supplement.json",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-service-gbt-tools/capture-checks.py": "dlms-hdlc-sn-service-gbt-tools/capture-checks.py",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-service-gbt-tools/carrier.py": "dlms-hdlc-sn-service-gbt-tools/carrier.py",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-service-gbt-tools/independent/budget-order-witness.py": "dlms-hdlc-sn-service-gbt-tools/independent/budget-order-witness.py",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-service-gbt-tools/independent/candidates.py": "dlms-hdlc-sn-service-gbt-tools/independent/candidates.py",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-service-gbt-tools/independent/echo-supplement.py": "dlms-hdlc-sn-service-gbt-tools/independent/echo-supplement.py",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-service-gbt-tools/independent/hdlc-reference.json": "dlms-hdlc-sn-service-gbt-tools/independent/hdlc-reference.json",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-service-gbt-tools/independent/hdlc.py": "dlms-hdlc-sn-service-gbt-tools/independent/hdlc.py",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-service-gbt-tools/independent/model.py": "dlms-hdlc-sn-service-gbt-tools/independent/model.py",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-service-gbt-tools/independent/phase/access.py": "dlms-hdlc-sn-service-gbt-tools/independent/phase/access.py",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-service-gbt-tools/independent/phase/block-grammar.py": "dlms-hdlc-sn-service-gbt-tools/independent/phase/block-grammar.py",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-service-gbt-tools/independent/phase/compose.py": "dlms-hdlc-sn-service-gbt-tools/independent/phase/compose.py",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-service-gbt-tools/independent/phase/composition-pins.json": "dlms-hdlc-sn-service-gbt-tools/independent/phase/composition-pins.json",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-service-gbt-tools/independent/phase/gbt-core.py": "dlms-hdlc-sn-service-gbt-tools/independent/phase/gbt-core.py",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-service-gbt-tools/independent/phase/legacy.py": "dlms-hdlc-sn-service-gbt-tools/independent/phase/legacy.py",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-service-gbt-tools/independent/phase/model-pins.json": "dlms-hdlc-sn-service-gbt-tools/independent/phase/model-pins.json",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-service-gbt-tools/independent/phase/ordinary.py": "dlms-hdlc-sn-service-gbt-tools/independent/phase/ordinary.py",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-service-gbt-tools/independent/phase/rebuild.py": "dlms-hdlc-sn-service-gbt-tools/independent/phase/rebuild.py",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-service-gbt-tools/independent/phase/reference-vectors.json": "dlms-hdlc-sn-service-gbt-tools/independent/phase/reference-vectors.json",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-service-gbt-tools/independent/phase/upload/access.py": "dlms-hdlc-sn-service-gbt-tools/independent/phase/upload/access.py",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-service-gbt-tools/independent/phase/upload/download-outer.py": "dlms-hdlc-sn-service-gbt-tools/independent/phase/upload/download-outer.py",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-service-gbt-tools/independent/phase/upload/download-reference-vectors.json": "dlms-hdlc-sn-service-gbt-tools/independent/phase/upload/download-reference-vectors.json",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-service-gbt-tools/independent/phase/upload/model.py": "dlms-hdlc-sn-service-gbt-tools/independent/phase/upload/model.py",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-service-gbt-tools/independent/phase/upload/read-body.py": "dlms-hdlc-sn-service-gbt-tools/independent/phase/upload/read-body.py",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-service-gbt-tools/independent/phase/upload/reference-vectors.json": "dlms-hdlc-sn-service-gbt-tools/independent/phase/upload/reference-vectors.json",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-service-gbt-tools/independent/phase/upload/source-outer.py": "dlms-hdlc-sn-service-gbt-tools/independent/phase/upload/source-outer.py",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-service-gbt-tools/independent/phase/upload/write-body.py": "dlms-hdlc-sn-service-gbt-tools/independent/phase/upload/write-body.py",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-service-gbt-tools/independent/phase/upload/write-source.py": "dlms-hdlc-sn-service-gbt-tools/independent/phase/upload/write-source.py",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-service-gbt-tools/independent/phase/verify.py": "dlms-hdlc-sn-service-gbt-tools/independent/phase/verify.py",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-service-gbt-tools/independent/phase/write-body.py": "dlms-hdlc-sn-service-gbt-tools/independent/phase/write-body.py",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-service-gbt-tools/independent/rebuild.py": "dlms-hdlc-sn-service-gbt-tools/independent/rebuild.py",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-service-gbt-tools/independent/repeat-negative-supplement.py": "dlms-hdlc-sn-service-gbt-tools/independent/repeat-negative-supplement.py",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-service-gbt-tools/independent/repeat-supplement.py": "dlms-hdlc-sn-service-gbt-tools/independent/repeat-supplement.py",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-service-gbt-tools/independent/reused-pins.json": "dlms-hdlc-sn-service-gbt-tools/independent/reused-pins.json",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-service-gbt-tools/independent/verify.py": "dlms-hdlc-sn-service-gbt-tools/independent/verify.py",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-service-gbt-tools/project.py": "dlms-hdlc-sn-service-gbt-tools/project.py",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-service-gbt-tools/verify-captures.py": "dlms-hdlc-sn-service-gbt-tools/verify-captures.py",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-service-gbt/captured-controls.json": "dlms-hdlc-sn-service-gbt/captured-controls.json",
+        "scripts/protocol-tests/required-tests-traffic-unified-v170.json": "required-tests-traffic-unified-v170.json"
+      }
     }
   ],
   "schema_version": 1,

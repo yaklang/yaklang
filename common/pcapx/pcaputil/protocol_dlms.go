@@ -789,10 +789,12 @@ func (f *binFlow) consumeDecodedDLMS(dir int, w []byte, id uint64, m *dlmsMessag
 		}
 	}
 	s.observeSNGBTInterruption(m, dir)
-	s.observeSNBlockInterruption(m, dir)
 	if m.snGBT != nil {
+		// Only the GBT handler can prove that a complete selected inner phase
+		// preserves this SN group. Every other E0 still interrupts it there.
 		return f.consumeDLMSSNGBT(dir, w, id, m)
 	}
+	s.observeSNBlockInterruption(m, dir)
 	if s.fragments != nil && s.fragments.snCommand != 0 || m.kind == "I" && s.fragments == nil && m.segmented && dlmsSNSegmentHeader(m.information) {
 		return f.consumeDLMSSNSegments(dir, w, id, m)
 	}
