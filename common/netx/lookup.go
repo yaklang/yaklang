@@ -3,6 +3,7 @@ package netx
 import (
 	"context"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/yaklang/yaklang/common/log"
@@ -243,4 +244,38 @@ func lookupFirstWithContext(parent context.Context, host string, opt ...DNSOptio
 	default:
 		return ""
 	}
+}
+
+// lookupAllWithContext collects every address the configured resolvers report.
+// Unlike lookupFirstWithContext it does not stop at the first answer, so a
+// dialer can fall through a blackholed address family.
+func lookupAllWithContext(parent context.Context, host string, opt ...DNSOption) []string {
+	ctx, cancel := context.WithTimeout(parent, 30*time.Second)
+	defer cancel()
+	if ctx.Err() != nil {
+		return nil
+	}
+	var mu sync.Mutex
+	ips := make([]string, 0, 4)
+	seen := make(map[string]struct{})
+	opt = append(append([]DNSOption{}, opt...), WithDNSCallback(func(dnsType, domain, ip, fromServer, method string) {
+		if ip == "" {
+			return
+		}
+		mu.Lock()
+		defer mu.Unlock()
+		if _, ok := seen[ip]; ok {
+			return
+		}
+		seen[ip] = struct{}{}
+		ips = append(ips, ip)
+	}), WithDNSContext(ctx))
+	if err := reliableLookupHost(host, opt...); err != nil {
+		log.Errorf("reliable lookup host %s failed: %v", host, err)
+	}
+	mu.Lock()
+	defer mu.Unlock()
+	out := make([]string, len(ips))
+	copy(out, ips)
+	return out
 }
