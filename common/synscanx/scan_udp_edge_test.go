@@ -550,3 +550,304 @@ func TestLoopbackUDPHostAliasesCollapse(t *testing.T) {
 		t.Fatalf("alias results = %v", got)
 	}
 }
+
+func TestQueuedTCPIsProbedAfterUDPReleasesTheSlot(t *testing.T) {
+	slot := make(chan struct{}, 1)
+	hold := make(chan struct{})
+	var tcpCalls atomic.Int32
+	rec := &recordingProber{}
+	rec.udp = func(ctx context.Context, _ string, _ []byte) (netstackvm.UDPSegment, error) {
+		select {
+		case slot <- struct{}{}:
+		case <-ctx.Done():
+			return netstackvm.UDPSegment{}, ctx.Err()
+		}
+		select {
+		case <-hold:
+		case <-ctx.Done():
+		}
+		<-slot
+		return netstackvm.UDPSegment{}, netstackvm.ErrUDPNoResponse
+	}
+	rec.probe = func(ctx context.Context, _ string) (netstackvm.TCPSegment, error) {
+		tcpCalls.Add(1)
+		select {
+		case slot <- struct{}{}:
+		case <-ctx.Done():
+			return netstackvm.TCPSegment{}, ctx.Err()
+		}
+		<-slot
+		return netstackvm.TCPSegment{RemoteIP: net.IPv4(10, 0, 0, 8), RemotePort: 80}, nil
+	}
+	var opened atomic.Int32
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	scanner := &Scannerx{
+		ctx:      ctx,
+		halfOpen: rec,
+		config:   &SynxConfig{tcpProbeConcurrency: 1, tcpProbeTimeout: 80 * time.Millisecond, waiting: time.Second},
+		OpenPortHandlers: func(net.IP, int) {
+			opened.Add(1)
+		},
+	}
+	ch := make(chan *SynxTarget, 2)
+	ch <- &SynxTarget{Host: "10.0.0.8", Port: 9, Mode: UDP}
+	ch <- &SynxTarget{Host: "10.0.0.8", Port: 80, Mode: TCP}
+	close(ch)
+	done := make(chan struct{})
+	go func() { scanner.sendPacket(ch); close(done) }()
+	time.Sleep(200 * time.Millisecond)
+	if tcpCalls.Load() != 0 {
+		t.Fatal("tcp probe started before the udp slot was released")
+	}
+	close(hold)
+	select {
+	case <-done:
+	case <-time.After(time.Second):
+		t.Fatal("mixed scan did not finish")
+	}
+	if tcpCalls.Load() != 1 || opened.Load() != 1 {
+		t.Fatalf("tcp calls %d opened %d", tcpCalls.Load(), opened.Load())
+	}
+}
+
+func TestQueuedUDPIsProbedAfterTCPReleasesTheSlot(t *testing.T) {
+	slot := make(chan struct{}, 1)
+	hold := make(chan struct{})
+	var udpCalls atomic.Int32
+	rec := &recordingProber{}
+	rec.probe = func(ctx context.Context, _ string) (netstackvm.TCPSegment, error) {
+		select {
+		case slot <- struct{}{}:
+		case <-ctx.Done():
+			return netstackvm.TCPSegment{}, ctx.Err()
+		}
+		select {
+		case <-hold:
+		case <-ctx.Done():
+		}
+		<-slot
+		return netstackvm.TCPSegment{}, netstackvm.ErrProbeNoResponse
+	}
+	rec.udp = func(ctx context.Context, _ string, _ []byte) (netstackvm.UDPSegment, error) {
+		udpCalls.Add(1)
+		select {
+		case slot <- struct{}{}:
+		case <-ctx.Done():
+			return netstackvm.UDPSegment{}, ctx.Err()
+		}
+		<-slot
+		return netstackvm.UDPSegment{RemoteIP: net.IPv4(10, 0, 0, 8), RemotePort: 9}, nil
+	}
+	var opened atomic.Int32
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	scanner := &Scannerx{
+		ctx:      ctx,
+		halfOpen: rec,
+		config:   &SynxConfig{tcpProbeConcurrency: 1, tcpProbeTimeout: time.Second, waiting: 80 * time.Millisecond},
+		OpenPortHandlers: func(net.IP, int) {
+			opened.Add(1)
+		},
+	}
+	ch := make(chan *SynxTarget, 2)
+	ch <- &SynxTarget{Host: "10.0.0.8", Port: 80, Mode: TCP}
+	ch <- &SynxTarget{Host: "10.0.0.8", Port: 9, Mode: UDP}
+	close(ch)
+	done := make(chan struct{})
+	go func() { scanner.sendPacket(ch); close(done) }()
+	time.Sleep(200 * time.Millisecond)
+	if udpCalls.Load() != 0 {
+		t.Fatal("udp probe started before the tcp slot was released")
+	}
+	close(hold)
+	select {
+	case <-done:
+	case <-time.After(time.Second):
+		t.Fatal("mixed scan did not finish")
+	}
+	if udpCalls.Load() != 1 || opened.Load() != 1 {
+		t.Fatalf("udp calls %d opened %d", udpCalls.Load(), opened.Load())
+	}
+}
+
+func TestLoopbackQueuedTCPSurvivesSilentUDP(t *testing.T) {
+	loop := loopbackScannerIface(t)
+	stubLoopbackRoute(t, loop)
+	silent := listenUDPLocal(t, nil)
+	ln := listenLocal(t)
+	tcpPort := ln.Addr().(*net.TCPAddr).Port
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	scanner := &Scannerx{
+		ctx:    ctx,
+		cancel: cancel,
+		config: &SynxConfig{
+			Ctx:                 ctx,
+			Iface:               loop,
+			SourceIP:            net.IPv4(127, 0, 0, 1),
+			tcpProbeConcurrency: 1,
+			tcpProbeTimeout:     200 * time.Millisecond,
+			waiting:             700 * time.Millisecond,
+		},
+	}
+	if err := scanner.startHalfOpen(ctx); err != nil {
+		t.Skipf("packet capture is not available: %v", err)
+	}
+	t.Cleanup(func() {
+		if scanner.halfOpen != nil {
+			_ = scanner.halfOpen.Close()
+		}
+	})
+	var opened atomic.Int32
+	scanner.OpenPortHandlers = func(_ net.IP, port int) {
+		if port == tcpPort {
+			opened.Add(1)
+			return
+		}
+		t.Errorf("unexpected open port %d", port)
+	}
+	ch := make(chan *SynxTarget, 2)
+	ch <- &SynxTarget{Host: "127.0.0.1", Port: silent, Mode: UDP}
+	ch <- &SynxTarget{Host: "127.0.0.1", Port: tcpPort, Mode: TCP}
+	close(ch)
+	scanner.sendPacket(ch)
+	if opened.Load() != 1 {
+		t.Fatalf("queued tcp open count = %d", opened.Load())
+	}
+	acceptNone(t, ln)
+}
+
+func TestQueuedMixedBurstKeepsLaterDeadlines(t *testing.T) {
+	slot := make(chan struct{}, 1)
+	hold := make(chan struct{})
+	var tcpCalls, udpCalls atomic.Int32
+	rec := &recordingProber{}
+	rec.udp = func(ctx context.Context, target string, _ []byte) (netstackvm.UDPSegment, error) {
+		n := udpCalls.Add(1)
+		select {
+		case slot <- struct{}{}:
+		case <-ctx.Done():
+			return netstackvm.UDPSegment{}, ctx.Err()
+		}
+		if n == 1 {
+			select {
+			case <-hold:
+			case <-ctx.Done():
+			}
+		}
+		<-slot
+		if target == "10.0.0.8:9" {
+			return netstackvm.UDPSegment{RemoteIP: net.IPv4(10, 0, 0, 8), RemotePort: 9}, nil
+		}
+		return netstackvm.UDPSegment{}, netstackvm.ErrUDPNoResponse
+	}
+	rec.probe = func(ctx context.Context, target string) (netstackvm.TCPSegment, error) {
+		tcpCalls.Add(1)
+		deadline, ok := ctx.Deadline()
+		if !ok {
+			t.Error("queued tcp probe has no deadline")
+		} else if remain := time.Until(deadline); remain < 50*time.Millisecond {
+			t.Errorf("queued tcp deadline already consumed: %s", remain)
+		}
+		select {
+		case slot <- struct{}{}:
+		case <-ctx.Done():
+			return netstackvm.TCPSegment{}, ctx.Err()
+		}
+		<-slot
+		_, portText, _ := strings.Cut(target, ":")
+		port, err := strconv.Atoi(portText)
+		if err != nil {
+			t.Errorf("bad tcp target %s", target)
+		}
+		return netstackvm.TCPSegment{RemoteIP: net.IPv4(10, 0, 0, 8), RemotePort: uint16(port)}, nil
+	}
+	var opened atomic.Int32
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	scanner := &Scannerx{
+		ctx:      ctx,
+		halfOpen: rec,
+		config:   &SynxConfig{tcpProbeConcurrency: 1, tcpProbeTimeout: 80 * time.Millisecond, waiting: time.Second},
+		OpenPortHandlers: func(net.IP, int) {
+			opened.Add(1)
+		},
+	}
+	ch := make(chan *SynxTarget, 6)
+	ch <- &SynxTarget{Host: "10.0.0.8", Port: 7, Mode: UDP}
+	ch <- &SynxTarget{Host: "10.0.0.8", Port: 80, Mode: TCP}
+	ch <- &SynxTarget{Host: "10.0.0.8", Port: 9, Mode: UDP}
+	ch <- &SynxTarget{Host: "10.0.0.8", Port: 81, Mode: TCP}
+	ch <- &SynxTarget{Host: "10.0.0.8", Port: 10, Mode: UDP}
+	ch <- &SynxTarget{Host: "10.0.0.8", Port: 82, Mode: TCP}
+	close(ch)
+	done := make(chan struct{})
+	go func() { scanner.sendPacket(ch); close(done) }()
+	time.Sleep(200 * time.Millisecond)
+	if tcpCalls.Load() != 0 || udpCalls.Load() != 1 {
+		t.Fatalf("during hold tcp=%d udp=%d", tcpCalls.Load(), udpCalls.Load())
+	}
+	close(hold)
+	select {
+	case <-done:
+	case <-time.After(time.Second):
+		t.Fatal("queued burst did not finish")
+	}
+	if tcpCalls.Load() != 3 || udpCalls.Load() != 3 || opened.Load() != 4 {
+		t.Fatalf("tcp %d udp %d opened %d", tcpCalls.Load(), udpCalls.Load(), opened.Load())
+	}
+}
+
+func TestLoopbackSilentQueueThenOpenPorts(t *testing.T) {
+	loop := loopbackScannerIface(t)
+	stubLoopbackRoute(t, loop)
+	silentA := listenUDPLocal(t, nil)
+	silentB := listenUDPLocal(t, nil)
+	echo := listenUDPLocal(t, func([]byte) ([]byte, time.Duration) {
+		return []byte("pong"), 0
+	})
+	ln := listenLocal(t)
+	tcpPort := ln.Addr().(*net.TCPAddr).Port
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	scanner := &Scannerx{
+		ctx:    ctx,
+		cancel: cancel,
+		config: &SynxConfig{
+			Ctx:                 ctx,
+			Iface:               loop,
+			SourceIP:            net.IPv4(127, 0, 0, 1),
+			tcpProbeConcurrency: 1,
+			tcpProbeTimeout:     150 * time.Millisecond,
+			waiting:             300 * time.Millisecond,
+		},
+	}
+	if err := scanner.startHalfOpen(ctx); err != nil {
+		t.Skipf("packet capture is not available: %v", err)
+	}
+	t.Cleanup(func() {
+		if scanner.halfOpen != nil {
+			_ = scanner.halfOpen.Close()
+		}
+	})
+	var opened atomic.Int32
+	scanner.OpenPortHandlers = func(_ net.IP, port int) {
+		if port == tcpPort || port == echo {
+			opened.Add(1)
+			return
+		}
+		t.Errorf("unexpected open port %d", port)
+	}
+	ch := make(chan *SynxTarget, 4)
+	ch <- &SynxTarget{Host: "127.0.0.1", Port: silentA, Mode: UDP}
+	ch <- &SynxTarget{Host: "127.0.0.1", Port: silentB, Mode: UDP}
+	ch <- &SynxTarget{Host: "127.0.0.1", Port: echo, Mode: UDP}
+	ch <- &SynxTarget{Host: "127.0.0.1", Port: tcpPort, Mode: TCP}
+	close(ch)
+	scanner.sendPacket(ch)
+	if opened.Load() != 2 {
+		t.Fatalf("queued open count = %d", opened.Load())
+	}
+	acceptNone(t, ln)
+}

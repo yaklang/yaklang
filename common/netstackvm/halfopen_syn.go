@@ -578,6 +578,27 @@ func addConnectedRoute(vm *NetStackVirtualMachineEntry, ip net.IP, mask net.IPMa
 	return nil
 }
 
+// waitLimiter applies the shared packet rate and also stops when the session
+// is closed. The caller context alone would keep Close blocked in wg.Wait
+// until a slow reservation finished.
+func (h *HalfOpenSYN) waitLimiter(ctx context.Context) error {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	if err := h.ctx.Err(); err != nil {
+		return err
+	}
+	waitCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	stop := context.AfterFunc(h.ctx, cancel)
+	defer stop()
+	err := h.limiter.Wait(waitCtx)
+	if h.ctx.Err() != nil {
+		return h.ctx.Err()
+	}
+	return err
+}
+
 func ifaceNeedsResolution(iface *net.Interface) bool {
 	if iface == nil || iface.Flags&net.FlagLoopback != 0 || iface.Flags&net.FlagPointToPoint != 0 {
 		return false

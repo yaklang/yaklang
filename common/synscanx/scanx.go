@@ -531,24 +531,21 @@ func (s *Scannerx) Scan(targetCh <-chan *SynxTarget) (chan *synscan.SynScanResul
 }
 
 func (s *Scannerx) sendPacket(targetCh <-chan *SynxTarget) {
-	// Worker count matches the session admission limit. Each worker blocks in
-	// ProbeSYN or ProbeUDP until that target is finished, so outstanding probes
-	// stay bounded by the session slots.
+	// One worker per session slot, shared by TCP and UDP. A worker blocks in
+	// ProbeSYN or ProbeUDP until that target is finished, and the per-target
+	// deadline starts only then. A queued target does not spend its deadline
+	// while the other protocol holds the slot.
 	_, inFlight := synPacketRate(s.config)
-	var tcpTargets chan *SynxTarget
-	var udpTargets chan *SynxTarget
+	var probeTargets chan *SynxTarget
 	var workers sync.WaitGroup
 	if s.halfOpen != nil {
-		tcpTargets = make(chan *SynxTarget)
-		udpTargets = make(chan *SynxTarget)
+		probeTargets = make(chan *SynxTarget)
 		for i := 0; i < inFlight; i++ {
-			workers.Add(2)
-			go func() { defer workers.Done(); s.runTCPProbes(tcpTargets) }()
-			go func() { defer workers.Done(); s.runUDPProbes(udpTargets) }()
+			workers.Add(1)
+			go func() { defer workers.Done(); s.runProbes(probeTargets) }()
 		}
 		defer func() {
-			close(tcpTargets)
-			close(udpTargets)
+			close(probeTargets)
 			workers.Wait()
 		}()
 	}
@@ -568,25 +565,15 @@ func (s *Scannerx) sendPacket(targetCh <-chan *SynxTarget) {
 			host := target.Host
 			port := target.Port
 			switch target.Mode {
-			case TCP:
-				if tcpTargets == nil {
-					log.Debugf("synscanx: skip TCP %s:%d, half-open session is not open", host, port)
+			case TCP, UDP:
+				if probeTargets == nil {
+					log.Debugf("synscanx: skip %s:%d, half-open session is not open", host, port)
 					continue
 				}
 				select {
 				case <-s.ctx.Done():
 					return
-				case tcpTargets <- target:
-				}
-			case UDP:
-				if udpTargets == nil {
-					log.Debugf("synscanx: skip UDP %s:%d, half-open session is not open", host, port)
-					continue
-				}
-				select {
-				case <-s.ctx.Done():
-					return
-				case udpTargets <- target:
+				case probeTargets <- target:
 				}
 			default:
 				log.Debugf("synscanx: skip %s:%d, unsupported mode %d", host, port, target.Mode)

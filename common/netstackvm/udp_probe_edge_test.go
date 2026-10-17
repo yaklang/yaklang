@@ -3,6 +3,7 @@ package netstackvm
 import (
 	"bytes"
 	"context"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"net"
@@ -14,6 +15,7 @@ import (
 	"github.com/gopacket/gopacket"
 	"github.com/gopacket/gopacket/layers"
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/tcpip/checksum"
 	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/tcpip/header"
 	"golang.org/x/time/rate"
 )
@@ -331,6 +333,171 @@ func TestProbeUDPConcurrentRepliesDoNotCross(t *testing.T) {
 	h.mu.Unlock()
 }
 
+func TestProbeUDPCloseCancelsRateWait(t *testing.T) {
+	h := mockHalfOpen(t, func(*HalfOpenSYN, []byte) error { return nil })
+	lim := rate.NewLimiter(rate.Every(time.Hour), 1)
+	require.True(t, lim.Allow())
+	h.limiter = lim
+	done := make(chan error, 1)
+	go func() {
+		_, err := h.ProbeUDP(context.Background(), "192.0.2.20:9", []byte{1})
+		done <- err
+	}()
+	deadline := time.Now().Add(time.Second)
+	ready := false
+	for time.Now().Before(deadline) && !ready {
+		h.mu.Lock()
+		for _, flight := range h.udpFlights {
+			if flight.frame != nil && !flight.sent {
+				ready = true
+			}
+		}
+		h.mu.Unlock()
+		time.Sleep(time.Millisecond)
+	}
+	require.True(t, ready, "probe did not reach the rate limiter")
+	started := time.Now()
+	require.NoError(t, h.Close())
+	select {
+	case err := <-done:
+		require.ErrorIs(t, err, context.Canceled)
+		require.Less(t, time.Since(started), time.Second)
+	case <-time.After(time.Second):
+		t.Fatal("Close did not cancel the UDP rate wait")
+	}
+}
+
+func TestProbeUDPCloseCancelsEveryRateWait(t *testing.T) {
+	h := mockHalfOpen(t, func(*HalfOpenSYN, []byte) error { return nil })
+	h.slots = make(chan struct{}, 4)
+	lim := rate.NewLimiter(rate.Every(time.Hour), 1)
+	require.True(t, lim.Allow())
+	h.limiter = lim
+	errs := make(chan error, 4)
+	var wg sync.WaitGroup
+	for port := 9; port < 13; port++ {
+		wg.Add(1)
+		go func(port int) {
+			defer wg.Done()
+			_, err := h.ProbeUDP(context.Background(), fmt.Sprintf("192.0.2.20:%d", port), []byte{1})
+			errs <- err
+		}(port)
+	}
+	deadline := time.Now().Add(time.Second)
+	ready := 0
+	for time.Now().Before(deadline) && ready < 4 {
+		ready = 0
+		h.mu.Lock()
+		for _, flight := range h.udpFlights {
+			if flight.frame != nil && !flight.sent {
+				ready++
+			}
+		}
+		h.mu.Unlock()
+		time.Sleep(time.Millisecond)
+	}
+	require.Equal(t, 4, ready)
+	started := time.Now()
+	require.NoError(t, h.Close())
+	wg.Wait()
+	require.Less(t, time.Since(started), time.Second)
+	for i := 0; i < 4; i++ {
+		require.ErrorIs(t, <-errs, context.Canceled)
+	}
+}
+
+func TestProbeUDPCorruptUnreachableDoesNotHideReply(t *testing.T) {
+	h := mockHalfOpen(t, func(session *HalfOpenSYN, b []byte) error {
+		parsed := gopacket.NewPacket(b, layers.LayerTypeIPv4, gopacket.Default)
+		ip, udpLayer, ok := ipv4UDP(parsed)
+		require.True(t, ok)
+		require.False(t, session.observeInbound(session.main.MainNICID(), corruptICMPChecksum(t, icmpUnreachable(t, ip, udpLayer, layers.ICMPv4CodePort))))
+		require.False(t, session.observeInbound(session.main.MainNICID(), corruptIPv4Checksum(t, icmpUnreachable(t, ip, udpLayer, layers.ICMPv4CodePort))))
+		require.False(t, session.observeInbound(session.main.MainNICID(), udpReply(t, ip, udpLayer, []byte("ok"))))
+		return nil
+	})
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	got, err := h.ProbeUDP(ctx, "192.0.2.20:11", []byte{1})
+	require.NoError(t, err)
+	require.Equal(t, []byte("ok"), got.Payload)
+	require.Equal(t, uint16(11), got.RemotePort)
+}
+
+func TestProbeUDPUnreachableDecoysDoNotHideReply(t *testing.T) {
+	h := mockHalfOpen(t, func(session *HalfOpenSYN, b []byte) error {
+		parsed := gopacket.NewPacket(b, layers.LayerTypeIPv4, gopacket.Default)
+		ip, udpLayer, ok := ipv4UDP(parsed)
+		require.True(t, ok)
+		nic := session.main.MainNICID()
+		for _, decoy := range []gopacket.Packet{
+			icmpUnreachable(t, ip, udpLayer, layers.ICMPv4CodeHost),
+			truncatedICMPUnreachable(t, ip, udpLayer),
+			fragmentedICMPUnreachable(t, ip, udpLayer),
+			oversizedICMPUnreachable(t, ip, udpLayer),
+		} {
+			require.False(t, session.observeInbound(nic, decoy))
+		}
+		require.False(t, session.observeInbound(nic, udpReply(t, ip, udpLayer, []byte("ok"))))
+		return nil
+	})
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	got, err := h.ProbeUDP(ctx, "192.0.2.20:11", []byte{1})
+	require.NoError(t, err)
+	require.Equal(t, []byte("ok"), got.Payload)
+}
+
+func TestProbeUDPOptionsQuoteStillClosesThePort(t *testing.T) {
+	h := mockHalfOpen(t, func(session *HalfOpenSYN, b []byte) error {
+		parsed := gopacket.NewPacket(b, layers.LayerTypeIPv4, gopacket.Default)
+		ip, udpLayer, ok := ipv4UDP(parsed)
+		require.True(t, ok)
+		require.False(t, session.observeInbound(session.main.MainNICID(), optionsICMPUnreachable(t, ip, udpLayer)))
+		return nil
+	})
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	_, err := h.ProbeUDP(ctx, "192.0.2.20:11", []byte{1, 2})
+	require.ErrorIs(t, err, ErrUDPUnreachable)
+}
+
+func TestUnreachableUDPKeyRejectsDeclaredLengthPastCapture(t *testing.T) {
+	pkt := icmpUnreachable(t, &layers.IPv4{SrcIP: net.ParseIP("192.0.2.10"), DstIP: net.ParseIP("192.0.2.20")}, &layers.UDP{SrcPort: 40000, DstPort: 11}, layers.ICMPv4CodePort)
+	ipLayer := pkt.Layer(layers.LayerTypeIPv4).(*layers.IPv4)
+	hdr := header.IPv4(ipLayer.Contents)
+	hdr.SetTotalLength(4000)
+	recomputeIPv4Checksum(ipLayer.Contents)
+	pkt.Metadata().Truncated = false
+	require.NotPanics(t, func() {
+		_, ok := unreachableUDPKey(1, pkt)
+		require.False(t, ok)
+	})
+	short := make([]byte, header.IPv4MinimumSize)
+	short[0] = (header.IPv4Version << 4) | 15
+	bogus := gopacket.NewPacket(short, layers.LayerTypeIPv4, gopacket.Default)
+	bogus.Metadata().Truncated = false
+	require.NotPanics(t, func() {
+		_, ok := unreachableUDPKey(1, bogus)
+		require.False(t, ok)
+	})
+}
+
+func TestProbeUDPMinimalICMPQuoteClosesThePort(t *testing.T) {
+	h := mockHalfOpen(t, func(session *HalfOpenSYN, b []byte) error {
+		parsed := gopacket.NewPacket(b, layers.LayerTypeIPv4, gopacket.Default)
+		ip, udpLayer, ok := ipv4UDP(parsed)
+		require.True(t, ok)
+		require.False(t, session.observeInbound(session.main.MainNICID(), minimalICMPUnreachable(t, ip, udpLayer)))
+		return nil
+	})
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	_, err := h.ProbeUDP(ctx, "192.0.2.20:11", []byte{1, 2})
+	require.ErrorIs(t, err, ErrUDPUnreachable)
+	require.NotErrorIs(t, err, ErrUDPNoResponse)
+}
+
 func TestProbeUDPCloseRacesWithAdmission(t *testing.T) {
 	h := mockHalfOpen(t, func(*HalfOpenSYN, []byte) error { return nil })
 	h.slots = make(chan struct{}, 2)
@@ -391,6 +558,105 @@ func corruptUDPChecksum(t *testing.T, pkt gopacket.Packet) gopacket.Packet {
 	require.Less(t, off+1, len(raw))
 	raw[off] ^= 0xff
 	return gopacket.NewPacket(raw, layers.LayerTypeIPv4, gopacket.Default)
+}
+
+func corruptICMPChecksum(t *testing.T, pkt gopacket.Packet) gopacket.Packet {
+	t.Helper()
+	raw := append([]byte(nil), pkt.Data()...)
+	hdr := header.IPv4(raw)
+	require.True(t, hdr.IsChecksumValid())
+	off := int(hdr.HeaderLength()) + 2
+	require.Less(t, off+1, len(raw))
+	raw[off] ^= 0xff
+	return gopacket.NewPacket(raw, layers.LayerTypeIPv4, gopacket.Default)
+}
+
+func corruptIPv4Checksum(t *testing.T, pkt gopacket.Packet) gopacket.Packet {
+	t.Helper()
+	raw := append([]byte(nil), pkt.Data()...)
+	hdr := header.IPv4(raw)
+	require.True(t, hdr.IsChecksumValid())
+	raw[10] ^= 0xff
+	return gopacket.NewPacket(raw, layers.LayerTypeIPv4, gopacket.Default)
+}
+
+func recomputeIPv4Checksum(raw []byte) {
+	hdr := header.IPv4(raw)
+	hdr.SetChecksum(0)
+	hdr.SetChecksum(^checksum.Checksum(raw[:hdr.HeaderLength()], 0))
+}
+
+func truncatedICMPUnreachable(t *testing.T, ip *layers.IPv4, udpLayer *layers.UDP) gopacket.Packet {
+	t.Helper()
+	full := icmpUnreachable(t, ip, udpLayer, layers.ICMPv4CodePort)
+	raw := full.Data()
+	hdr := header.IPv4(raw)
+	quoteAt := int(hdr.HeaderLength()) + header.ICMPv4MinimumSize
+	quoteEnd := quoteAt + header.IPv4MinimumSize - 1
+	require.Less(t, quoteEnd, len(raw))
+	replyIP := &layers.IPv4{Version: 4, TTL: 64, Protocol: layers.IPProtocolICMPv4, SrcIP: ip.DstIP, DstIP: ip.SrcIP}
+	icmp := &layers.ICMPv4{TypeCode: layers.CreateICMPv4TypeCode(layers.ICMPv4TypeDestinationUnreachable, layers.ICMPv4CodePort)}
+	return mustPacket(t, layers.LinkTypeRaw, replyIP, icmp, gopacket.Payload(append([]byte(nil), raw[quoteAt:quoteEnd]...)))
+}
+
+func fragmentedICMPUnreachable(t *testing.T, ip *layers.IPv4, udpLayer *layers.UDP) gopacket.Packet {
+	t.Helper()
+	pkt := icmpUnreachable(t, ip, udpLayer, layers.ICMPv4CodePort)
+	raw := append([]byte(nil), pkt.Data()...)
+	hdr := header.IPv4(raw)
+	hdr.SetFlagsFragmentOffset(header.IPv4FlagMoreFragments, 0)
+	recomputeIPv4Checksum(raw)
+	require.True(t, header.IPv4(raw).IsChecksumValid())
+	return gopacket.NewPacket(raw, layers.LayerTypeIPv4, gopacket.Default)
+}
+
+func oversizedICMPUnreachable(t *testing.T, ip *layers.IPv4, udpLayer *layers.UDP) gopacket.Packet {
+	t.Helper()
+	pkt := icmpUnreachable(t, ip, udpLayer, layers.ICMPv4CodePort)
+	raw := append([]byte(nil), pkt.Data()...)
+	hdr := header.IPv4(raw)
+	hdr.SetTotalLength(4000)
+	recomputeIPv4Checksum(raw)
+	require.True(t, header.IPv4(raw).IsChecksumValid())
+	require.False(t, header.IPv4(raw).IsValid(len(raw)))
+	parsed := gopacket.NewPacket(raw, layers.LayerTypeIPv4, gopacket.Default)
+	parsed.Metadata().Truncated = false
+	return parsed
+}
+
+func optionsICMPUnreachable(t *testing.T, ip *layers.IPv4, udpLayer *layers.UDP) gopacket.Packet {
+	t.Helper()
+	const hlen = 24
+	quote := make([]byte, hlen+header.ICMPv4MinimumErrorPayloadSize)
+	quote[0] = (header.IPv4Version << 4) | (hlen / header.IPv4IHLStride)
+	binary.BigEndian.PutUint16(quote[2:], uint16(len(quote)))
+	quote[8] = 64
+	quote[9] = uint8(header.UDPProtocolNumber)
+	copy(quote[12:16], ip.SrcIP.To4())
+	copy(quote[16:20], ip.DstIP.To4())
+	for i := 20; i < hlen; i++ {
+		quote[i] = 1
+	}
+	recomputeIPv4Checksum(quote)
+	require.True(t, header.IPv4(quote).IsChecksumValid())
+	binary.BigEndian.PutUint16(quote[hlen:], uint16(udpLayer.SrcPort))
+	binary.BigEndian.PutUint16(quote[hlen+2:], uint16(udpLayer.DstPort))
+	replyIP := &layers.IPv4{Version: 4, TTL: 64, Protocol: layers.IPProtocolICMPv4, SrcIP: ip.DstIP, DstIP: ip.SrcIP}
+	icmp := &layers.ICMPv4{TypeCode: layers.CreateICMPv4TypeCode(layers.ICMPv4TypeDestinationUnreachable, layers.ICMPv4CodePort)}
+	return mustPacket(t, layers.LinkTypeRaw, replyIP, icmp, gopacket.Payload(quote))
+}
+
+func minimalICMPUnreachable(t *testing.T, ip *layers.IPv4, udpLayer *layers.UDP) gopacket.Packet {
+	t.Helper()
+	full := icmpUnreachable(t, ip, udpLayer, layers.ICMPv4CodePort)
+	raw := full.Data()
+	hdr := header.IPv4(raw)
+	quoteAt := int(hdr.HeaderLength()) + header.ICMPv4MinimumSize
+	quoteEnd := quoteAt + header.IPv4MinimumSize + header.ICMPv4MinimumErrorPayloadSize
+	require.LessOrEqual(t, quoteEnd, len(raw))
+	replyIP := &layers.IPv4{Version: 4, TTL: 64, Protocol: layers.IPProtocolICMPv4, SrcIP: ip.DstIP, DstIP: ip.SrcIP}
+	icmp := &layers.ICMPv4{TypeCode: layers.CreateICMPv4TypeCode(layers.ICMPv4TypeDestinationUnreachable, layers.ICMPv4CodePort)}
+	return mustPacket(t, layers.LinkTypeRaw, replyIP, icmp, gopacket.Payload(append([]byte(nil), raw[quoteAt:quoteEnd]...)))
 }
 
 func icmpUnreachable(t *testing.T, ip *layers.IPv4, udpLayer *layers.UDP, code uint8) gopacket.Packet {
