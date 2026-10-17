@@ -20,13 +20,14 @@ func (s *Scannerx) excludedHost(host string) bool {
 }
 
 func (s *Scannerx) excludedPort(port int) bool {
-	if s.config.excludePorts != nil {
-		if s.config.excludePorts.Contains(port) {
-			return true
-		}
+	if s.config == nil || s.config.excludePorts == nil {
+		return false
 	}
-
-	return false
+	// Submit encodes a UDP port as port<<12. The exclude filter stores the service port.
+	if port > 65535 {
+		port = port >> 12
+	}
+	return s.config.excludePorts.Contains(port)
 }
 
 func (s *Scannerx) GetNonExcludedPorts(ports string) []int {

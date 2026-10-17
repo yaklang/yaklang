@@ -34,7 +34,7 @@ func mockHalfOpen(t *testing.T, writer func(*HalfOpenSYN, []byte) error) *HalfOp
 	ctx, cancel := context.WithCancel(context.Background())
 	h := &HalfOpenSYN{ctx: ctx, cancel: cancel, stack: vm.stack, main: vm,
 		slots: make(chan struct{}, 16), limiter: rate.NewLimiter(rate.Inf, 1), done: make(chan struct{}),
-		retry: SYNRetryPolicy{3, time.Second, 10 * time.Millisecond, 40 * time.Millisecond}, flights: make(map[flightKey]*synFlight)}
+		retry: SYNRetryPolicy{3, time.Second, 10 * time.Millisecond, 40 * time.Millisecond}, flights: make(map[flightKey]*synFlight), udpFlights: make(map[flightKey]*udpFlight)}
 	drv := &PCAPEndpoint{Endpoint: vm.link, ctx: ctx, cancel: cancel, wg: new(sync.WaitGroup),
 		adaptor: &pcapAdaptor{linkType: layers.LinkTypeRaw, writer: func(b []byte) error { return writer(h, b) }}}
 	drv.SetPCAPOutboundFilter(func(pkt gopacket.Packet) bool { return h.allowOutbound(vm.MainNICID(), pkt) })
