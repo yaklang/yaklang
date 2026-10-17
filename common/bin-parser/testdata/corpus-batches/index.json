@@ -123563,13 +123563,8 @@
         "common/pcapx/pcaputil/dlms-ln-assembled-retry-source/package-tools/model-pins.json": "dlms-ln-assembled-retry-source/package-tools/model-pins.json",
         "common/pcapx/pcaputil/dlms-ln-assembled-retry-source/package-tools/operation-model.py": "dlms-ln-assembled-retry-source/package-tools/operation-model.py",
         "common/pcapx/pcaputil/dlms-ln-assembled-retry-captures/reuse-inputs.json": "dlms-ln-assembled-retry-captures/reuse-inputs.json",
-        "common/pcapx/pcaputil/dlms-ln-assembled-retry-captures/SET-assembled-exact-final-retry-opaque-E0.udp.pcap": "dlms-ln-assembled-retry-source/captures/SET-assembled-exact-final-retry-opaque-E0.udp.pcap",
-        "common/pcapx/pcaputil/dlms-ln-assembled-retry-captures/SET-assembled-exact-final-retry-opaque-E0.tcp.pcap": "dlms-ln-assembled-retry-source/captures/SET-assembled-exact-final-retry-opaque-E0.tcp.pcap",
-        "common/pcapx/pcaputil/dlms-ln-assembled-retry-captures/SET-assembled-exact-final-retry-ordinary-opaque.udp.pcap": "dlms-ln-assembled-retry-source/captures/SET-assembled-exact-final-retry-ordinary-opaque.udp.pcap",
-        "common/pcapx/pcaputil/dlms-ln-assembled-retry-captures/SET-assembled-exact-final-retry-ordinary-opaque.tcp.pcap": "dlms-ln-assembled-retry-source/captures/SET-assembled-exact-final-retry-ordinary-opaque.tcp.pcap",
-        "common/pcapx/pcaputil/dlms-ln-assembled-retry-captures/known-assembled-SET-retry-excludes-wrong-caller-and-changed-wire.udp.pcap": "dlms-ln-assembled-retry-source/captures/known-assembled-SET-retry-excludes-wrong-caller-and-changed-wire.udp.pcap",
-        "common/pcapx/pcaputil/dlms-ln-assembled-retry-captures/known-assembled-SET-retry-excludes-wrong-caller-and-changed-wire.tcp.pcap": "dlms-ln-assembled-retry-source/captures/known-assembled-SET-retry-excludes-wrong-caller-and-changed-wire.tcp.pcap",
-        "scripts/protocol-tests/required-tests-traffic-unified-v177.json": "required-tests-traffic-unified-v177.json"
+        "scripts/protocol-tests/required-tests-traffic-unified-v177.json": "required-tests-traffic-unified-v177.json",
+        "common/pcapx/pcaputil/dlms-ln-assembled-retry-source/captures/reuse-inputs.json": "dlms-ln-assembled-retry-captures/reuse-inputs.json"
       }
     }
   ],

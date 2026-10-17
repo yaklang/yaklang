@@ -299,7 +299,7 @@ func hdlcSNReadMatrixTransports(t *testing.T, cases []hdlcSNReadCase, batch stri
 }
 func hdlcSNReadMatrixChecked(t *testing.T, cases []hdlcSNReadCase, batch string, transports []string, check func(*testing.T, *ProtocolEvent, hdlcOpStep, map[string]any)) {
 	env := "DLMS_HDLC_SN_READ_TEST_ROOT"
-	if batch == "dlms-ln-assembled-retry-captures" {
+	if batch == "dlms-ln-assembled-retry-source/captures" {
 		env = "DLMS_LN_ASSEMBLED_RETRY_ROOT"
 	}
 	if batch == "dlms-ln-opaque-continuation-captures" {

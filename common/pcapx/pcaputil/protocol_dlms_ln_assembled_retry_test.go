@@ -56,7 +56,7 @@ func TestDLMSLNAssembledOpaqueRetryNative(t *testing.T) {
 	snInformationCountNative(t, lnAssembledRetryLoad(t, "captured-controls.json", "f84eab12832c9ff7fb502dc598aaf6f03565372e689773ea1543552753cfddb8", 3), 41000, 4059)
 }
 func TestDLMSLNAssembledOpaqueRetryMatrix(t *testing.T) {
-	hdlcSNReadMatrixChecked(t, lnAssembledRetryLoad(t, "captured-controls.json", "f84eab12832c9ff7fb502dc598aaf6f03565372e689773ea1543552753cfddb8", 3), "dlms-ln-assembled-retry-captures", []string{"tcp", "udp"}, func(t *testing.T, e *ProtocolEvent, st hdlcOpStep, meta map[string]any) {
+	hdlcSNReadMatrixChecked(t, lnAssembledRetryLoad(t, "captured-controls.json", "f84eab12832c9ff7fb502dc598aaf6f03565372e689773ea1543552753cfddb8", 3), "dlms-ln-assembled-retry-source/captures", []string{"tcp", "udp"}, func(t *testing.T, e *ProtocolEvent, st hdlcOpStep, meta map[string]any) {
 		require.Equal(t, meta["public_error"], e.Error)
 		if st.Error != "" {
 			snMultiOwnedDiagnosis(t, e, st.Error, meta["error_message"].(string))
