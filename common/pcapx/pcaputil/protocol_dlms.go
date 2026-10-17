@@ -99,6 +99,7 @@ type dlmsMessage struct {
 	snRead                    bool
 	snWrite                   bool
 	snBlock                   *wrapperMessage
+	snGBT                     *wrapperMessage
 }
 
 func dlmsAddress(w []byte, at *int) (uint32, int, error) {
@@ -239,6 +240,9 @@ func decodeDLMSInformation(m *dlmsMessage, info []byte, maxElements, depth int) 
 	}
 	f["LLC"] = bytes.Clone(info[:3])
 	p := info[3:]
+	if len(p) > 0 && p[0] == 0xe0 {
+		return decodeDLMSSNGBT(m, p, info[1], maxElements, depth)
+	}
 	if dlmsSNWriteAPDU(p) {
 		return decodeDLMSSNWrite(m, p, info[1], maxElements, depth)
 	}
@@ -603,6 +607,7 @@ type binDLMS struct {
 	operationProfile    string
 	fragments           *dlmsFragments
 	snBlocks            map[dlmsSNBlockKey]*dlmsSNBlockLink
+	snGBT               map[dlmsSNGBTKey]*dlmsSNGBTLink
 }
 
 func (s *binDLMS) invalidate() {
@@ -615,6 +620,7 @@ func (s *binDLMS) invalidate() {
 	s.actionTransfer = nil
 	s.operationProfile = ""
 	s.snBlocks = nil
+	s.snGBT = nil
 	s.fragments = nil
 	s.ambiguous = true
 }
@@ -728,6 +734,9 @@ func dlmsRequestEvidence(w []byte) bool {
 // fields and byte projections is reserved before it allocates either copy.
 func (s *binDLMS) storage() int64 {
 	n := int64(512) + 128*int64(len(s.acseSeen))
+	for _, l := range s.snGBT {
+		n += 128 + l.wire.storage()
+	}
 	for _, p := range s.snBlocks {
 		n += 128 + p.wire.storage()
 	}
@@ -766,7 +775,24 @@ func (f *binFlow) consumeDLMS(dir int, w []byte, id uint64) (map[string]any, uin
 func (f *binFlow) consumeDecodedDLMS(dir int, w []byte, id uint64, m *dlmsMessage) (map[string]any, uint64, error) {
 	s := f.dlms
 	s.operationProfile = ""
+	if dlmsSNGBTInformation(m.information) && !m.segmented {
+		if s.hasLNContext() {
+			return nil, 0, dlmsError(ErrContextRequired, "SN GBT cannot consume an observed LN owner or information group")
+		}
+		if m.snGBT == nil {
+			var err error
+			m, err = decodeDLMSInformation(m, m.information, f.a.budget.MaxCollectionElements, f.a.budget.MaxRecursionDepth)
+			if err != nil {
+				s.invalidate()
+				return nil, 0, err
+			}
+		}
+	}
+	s.observeSNGBTInterruption(m, dir)
 	s.observeSNBlockInterruption(m, dir)
+	if m.snGBT != nil {
+		return f.consumeDLMSSNGBT(dir, w, id, m)
+	}
 	if s.fragments != nil && s.fragments.snCommand != 0 || m.kind == "I" && s.fragments == nil && m.segmented && dlmsSNSegmentHeader(m.information) {
 		return f.consumeDLMSSNSegments(dir, w, id, m)
 	}
@@ -931,7 +957,7 @@ func dlmsUDPRefusalHint(w []byte) bool {
 	if end-at < 9 || w[at]&1 != 0 || dlmsCRC(w[1:at+1]) != binary.LittleEndian.Uint16(w[at+1:at+3]) {
 		return false
 	}
-	if dlmsSNBlockRefusalHint(w) || dlmsSNUploadRefusalHint(w) {
+	if dlmsSNBlockRefusalHint(w) || dlmsSNUploadRefusalHint(w) || dlmsSNGBTRefusalHint(w) {
 		return true
 	}
 	p := w[at+3:]
@@ -1004,18 +1030,18 @@ func (a *binParser) decodeDLMSDatagram(e *ProtocolEvent, w []byte, explicit bool
 	} else if err = f.reserveSession(f.dlms.storage() + f.dlmsProjection(w)); err == nil {
 		m, err = decodeDLMSFrameBudget(w, a.budget.MaxCollectionElements, a.budget.MaxRecursionDepth, f.dlmsLinkAssembly(w))
 	}
-	if created && m != nil && !m.snRead && !m.snWrite && !m.request && m.kind != "S" && (m.acse == nil || !m.acse.acseAbort) && !dlmsAbortSegmentPrefix(m.information) {
+	if created && m != nil && !m.snRead && !m.snWrite && m.snGBT == nil && !m.request && m.kind != "S" && (m.acse == nil || !m.acse.acseAbort) && !dlmsAbortSegmentPrefix(m.information) {
 		e.Direction = 1
 		if m.acse != nil || dlmsACSESegmentPrefix(m.information) {
 			f.endpoints = [2]string{e.Destination, e.Source}
 		}
 	}
 	if err == nil {
-		if m.snRead || m.snWrite {
+		if m.snRead || m.snWrite || m.snGBT != nil {
 			// Observe without retaining a new UDP conversation or rewriting the
 			// caller's direction; an existing LN flow keeps its owner and charge.
 			e.Session, e.ResponseTo, err = f.consumeDecodedDLMS(e.Direction, w, e.ID, m)
-			if err == nil && created && len(f.dlms.snBlocks) > 0 {
+			if err == nil && created && (len(f.dlms.snBlocks) > 0 || len(f.dlms.snGBT) > 0) {
 				if len(store.entries) >= sessionCollectionLimit(a.budget.MaxCollectionElements) {
 					err = dlmsError(ErrResourceExceeded, "UDP SN service-block conversation budget")
 				} else {

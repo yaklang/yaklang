@@ -1569,6 +1569,17 @@ func (f *binFlow) finishSession(reason TrafficFlowCloseReason) {
 		}
 	}
 	if d := f.dlms; d != nil {
+		for _, key := range d.unfinishedSNGBTKeys() {
+			e := f.event(key.dir, nil, "incomplete", string(reason)+": DLMS HDLC SN GBT observation ended before complete APDU")
+			e.Profile, e.Completeness = "dlms-hdlc-sn-gbt", "incomplete"
+			e.nativeDLMSOrSLMPObservation = true
+			e.Session = d.snGBTCloseFields(key)
+			e.semanticSession = cloneSession(e.Session)
+			e.sessionError = &ProtocolError{Kind: ErrNeedMore, Message: e.Summary}
+			e.Error = e.sessionError.Error()
+			f.a.incomplete.Add(1)
+			f.a.emit(e)
+		}
 		for _, key := range d.unfinishedSNBlockKeys() {
 			e := f.event(key.dir, nil, "incomplete", string(reason)+": "+dlmsSNBlockCloseSummary(key))
 			e.Profile, e.Completeness = dlmsSNBlockProfile(key), "incomplete"

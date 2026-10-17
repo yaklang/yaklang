@@ -80,6 +80,10 @@ type wrapperGBTTransfer struct {
 }
 
 func (f *binFlow) consumeWrapperGBT(s *binDLMSWrapper, m *wrapperMessage, dir int, e *ProtocolEvent, w []byte) (string, error) {
+	return f.consumeWrapperGBTReserved(s, m, dir, e, w, 0, nil)
+}
+func (f *binFlow) consumeWrapperGBTReserved(s *binDLMSWrapper, m *wrapperMessage, dir int, e *ProtocolEvent, w []byte, floor int64, identity []byte) (string, error) {
+	hdlc := identity != nil
 	key := wrapperGBTKey{dir, m.source, m.destination}
 	p := s.gbt[key]
 	peer := s.gbt[wrapperGBTKey{1 - dir, m.destination, m.source}]
@@ -92,7 +96,7 @@ func (f *binFlow) consumeWrapperGBT(s *binDLMSWrapper, m *wrapperMessage, dir in
 	if total > wrapperGBTBytes {
 		return "", wrapperError(ErrResourceExceeded, "GBT transfer byte budget exceeded")
 	}
-	charge := s.storage() + wrapperProjection(w, len(w)) + 512 + 128*int64(total)
+	charge := floor + s.storage() + wrapperProjection(w, len(w)) + 512 + 128*int64(total)
 	if err := f.reserveSession(charge); err != nil {
 		return "", err
 	}
@@ -125,7 +129,10 @@ func (f *binFlow) consumeWrapperGBT(s *binDLMSWrapper, m *wrapperMessage, dir in
 		p.data = nil
 		return "unverified-gbt-acknowledgement", nil
 	}
-	h := sha256.Sum256(w)
+	if identity == nil {
+		identity = w
+	}
+	h := sha256.Sum256(identity)
 	if old, ok := p.blocks[m.gbtNumber]; ok {
 		if old.hash == h {
 			m.fields["duplicate_of_event"] = old.event
@@ -187,7 +194,7 @@ func (f *binFlow) consumeWrapperGBT(s *binDLMSWrapper, m *wrapperMessage, dir in
 	copy(inner, w[:8])
 	binary.BigEndian.PutUint16(inner[6:8], uint16(len(p.data)))
 	inner = append(inner, p.data...)
-	charge = s.storage() + wrapperProjection(w, len(w)) + 2*wrapperProjection(inner, len(inner)) + 512 + 128*int64(total)
+	charge = floor + s.storage() + wrapperProjection(w, len(w)) + 2*wrapperProjection(inner, len(inner)) + 512 + 128*int64(total)
 	if err := f.reserveSession(charge); err != nil {
 		return "", err
 	}
@@ -199,6 +206,12 @@ func (f *binFlow) consumeWrapperGBT(s *binDLMSWrapper, m *wrapperMessage, dir in
 		return "", wrapperError(ErrUnsupportedFeature, "nested GBT APDU is not an unciphered Get")
 	}
 	if decoded.snRead || decoded.snWrite {
+		if hdlc {
+			info := dlmsSNInformationPrefix(identity)
+			if len(info) < 4 || decoded.request != (info[1] == 0xe6) {
+				return "", wrapperError(ErrMalformedMessage, "SN LLC direction differs from command")
+			}
+		}
 		// Reassembled SN APDUs carry no invoke or business owner. The wrapper
 		// used by the bounded decoder is internal: expose only the literal
 		// assembled APDU and its typed values, never a reconstructed header.
@@ -223,6 +236,9 @@ func (f *binFlow) consumeWrapperGBT(s *binDLMSWrapper, m *wrapperMessage, dir in
 		m.fields["transfer_complete"] = true
 		p.completed, p.active, p.data = true, false, nil
 		return assoc, nil
+	}
+	if hdlc {
+		return "", wrapperError(ErrUnsupportedFeature, "HDLC GBT requires a complete ordinary SN APDU")
 	}
 	if err = f.consumeWrapperReserved(dir, inner, e, charge); err != nil {
 		return "", err

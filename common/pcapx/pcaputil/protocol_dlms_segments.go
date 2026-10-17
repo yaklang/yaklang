@@ -53,7 +53,7 @@ func (s *binDLMS) fragmentCloseFields() map[string]any {
 }
 
 func (f *binFlow) dlmsLinkAssembly(w []byte) bool {
-	return f.dlms.fragments != nil || f.dlms.pending != nil && len(f.dlms.pending.requestInformation) > 0 && bytes.Equal(f.dlms.pending.wire, w) || len(w) >= 3 && w[1]&8 != 0
+	return dlmsSNGBTWire(w) && f.dlms.hasLNContext() || f.dlms.fragments != nil || f.dlms.pending != nil && len(f.dlms.pending.requestInformation) > 0 && bytes.Equal(f.dlms.pending.wire, w) || len(w) >= 3 && w[1]&8 != 0
 }
 
 func (f *binFlow) dlmsProjection(w []byte) int64 {

@@ -70,7 +70,7 @@ func (f *binFlow) retireSNMPUDP() {
 // history or manufacture a fresh generation. An unfinished exchange still needs
 // quarantine because its peer progression was not completely observed.
 func (f *binFlow) retireDLMSUDP() {
-	if s := f.dlms; s != nil && (s.pending != nil || s.transfer != nil || s.setTransfer != nil || s.actionTransfer != nil || s.fragments != nil || s.hasActiveSNBlocks()) {
+	if s := f.dlms; s != nil && (s.pending != nil || s.transfer != nil || s.setTransfer != nil || s.actionTransfer != nil || s.fragments != nil || s.hasActiveSNBlocks() || s.hasActiveSNGBT()) {
 		f.dlms.invalidate()
 	}
 	retained := int64(512)
@@ -796,6 +796,14 @@ func (a *binParser) closeUDPSessions() {
 			}
 
 			if d := f.dlms; d != nil {
+				for _, key := range d.unfinishedSNGBTKeys() {
+					summary := "DLMS HDLC SN GBT observation ended before complete APDU"
+					e := &ProtocolEvent{FlowID: f.id, Timestamp: v.touched, Domain: v.key.domain, Transport: "udp", Source: f.endpoints[key.dir], Destination: f.endpoints[1-key.dir], Direction: key.dir, Protocol: "dlms", Profile: "dlms-hdlc-sn-gbt", nativeDLMSOrSLMPObservation: true, Status: "incomplete", Completeness: "incomplete", Summary: summary, Session: d.snGBTCloseFields(key), sessionError: &ProtocolError{Kind: ErrNeedMore, Message: summary}}
+					e.Error = e.sessionError.Error()
+					e.semanticSession = cloneSession(e.Session)
+					a.incomplete.Add(1)
+					incomplete = append(incomplete, e)
+				}
 				for _, key := range d.unfinishedSNBlockKeys() {
 					summary := dlmsSNBlockCloseSummary(key)
 					e := &ProtocolEvent{FlowID: f.id, Timestamp: v.touched, Domain: v.key.domain, Transport: "udp", Source: f.endpoints[key.dir], Destination: f.endpoints[1-key.dir], Direction: key.dir, Protocol: "dlms", Profile: dlmsSNBlockProfile(key), nativeDLMSOrSLMPObservation: true, Status: "incomplete", Completeness: "incomplete", Summary: summary, Session: d.snBlockCloseFields(key), sessionError: &ProtocolError{Kind: ErrNeedMore, Message: summary}}
