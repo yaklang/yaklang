@@ -10,6 +10,9 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
+// startRouteGroup opens one capture session. Tests replace it.
+var startRouteGroup = scanOne
+
 // Scan is the single SYN/UDP scan entry used by the Yak synscan library and
 // the synscan CLIs. The older synscan.Scanner plus hybridscan path is gone.
 func Scan(ctx context.Context, targets, ports string, opts ...SynxConfigOption) (chan *synscan.SynScanResult, error) {
@@ -142,37 +145,122 @@ func partitionScanTargets(targets string) []routeGroup {
 }
 
 func scanRouteGroups(groups []routeGroup, ports string, config *SynxConfig) (chan *synscan.SynScanResult, error) {
+	if config == nil {
+		return nil, errors.New("synscanx: missing scan config")
+	}
+	if config.Ctx == nil {
+		config.Ctx = context.Background()
+	}
+	if err := config.Ctx.Err(); err != nil {
+		return nil, err
+	}
+
+	// Groups stay sequential. The first successful open happens before this
+	// function returns, so a total startup failure is an error rather than an
+	// empty result channel. Later groups start only after the previous one
+	// finishes, which keeps capture sessions from stacking.
+	var failed []error
+	var first <-chan *synscan.SynScanResult
+	next := len(groups)
+	for i, group := range groups {
+		if err := config.Ctx.Err(); err != nil {
+			return nil, err
+		}
+		ch, err := openRouteGroup(group, ports, config, false)
+		if err != nil {
+			log.Errorf("synscanx: %v", err)
+			failed = append(failed, err)
+			continue
+		}
+		first = ch
+		next = i + 1
+		break
+	}
+	if first == nil {
+		if err := config.Ctx.Err(); err != nil {
+			return nil, err
+		}
+		return nil, errors.Errorf("synscanx: every route group failed: %s", joinErrors(failed))
+	}
+	config.addRouteGroupErrors(failed)
+
 	merged := make(chan *synscan.SynScanResult, 1024)
+	rest := append([]routeGroup(nil), groups[next:]...)
 	go func() {
 		defer close(merged)
-		succeeded := 0
-		for i, group := range groups {
+		if !forwardRouteResults(config.Ctx, merged, first) {
+			return
+		}
+		var later []error
+		for _, group := range rest {
 			if config.Ctx.Err() != nil {
-				return
+				break
 			}
-			cfg := *config
-			cfg.appendOutput = i > 0 && config.outputFile != ""
-			ch, err := scanOne(group.sample, strings.Join(group.hosts, ","), ports, &cfg)
+			ch, err := openRouteGroup(group, ports, config, true)
 			if err != nil {
-				log.Errorf("synscanx: route group %s failed: %v", group.sample, err)
+				log.Errorf("synscanx: %v", err)
+				later = append(later, err)
 				continue
 			}
-			succeeded++
-			for result := range ch {
-				select {
-				case <-config.Ctx.Done():
-					for range ch {
-					}
-					return
-				case merged <- result:
-				}
+			if !forwardRouteResults(config.Ctx, merged, ch) {
+				break
 			}
 		}
-		if succeeded == 0 {
-			log.Errorf("synscanx: every route group failed")
-		}
+		config.addRouteGroupErrors(later)
 	}()
 	return merged, nil
+}
+
+func openRouteGroup(group routeGroup, ports string, config *SynxConfig, appendOutput bool) (<-chan *synscan.SynScanResult, error) {
+	cfg := *config
+	cfg.appendOutput = appendOutput && config.outputFile != ""
+	ch, err := startRouteGroup(group.sample, strings.Join(group.hosts, ","), ports, &cfg)
+	if err != nil {
+		return nil, errors.Errorf("route group %s: %v", group.sample, err)
+	}
+	if ch == nil {
+		return nil, errors.Errorf("route group %s: scan returned no result channel", group.sample)
+	}
+	return ch, nil
+}
+
+func forwardRouteResults(ctx context.Context, dst chan<- *synscan.SynScanResult, src <-chan *synscan.SynScanResult) bool {
+	for {
+		select {
+		case <-ctx.Done():
+			go drainSynResults(src)
+			return false
+		case result, ok := <-src:
+			if !ok {
+				return true
+			}
+			select {
+			case <-ctx.Done():
+				go drainSynResults(src)
+				return false
+			case dst <- result:
+			}
+		}
+	}
+}
+
+func drainSynResults(ch <-chan *synscan.SynScanResult) {
+	if ch == nil {
+		return
+	}
+	for range ch {
+	}
+}
+
+func joinErrors(errs []error) string {
+	if len(errs) == 0 {
+		return "no route group started"
+	}
+	text := errs[0].Error()
+	for _, err := range errs[1:] {
+		text += "; " + err.Error()
+	}
+	return text
 }
 
 // chooseRouteSample picks a non-loopback address when the target list has one,

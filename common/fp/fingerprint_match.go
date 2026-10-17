@@ -84,6 +84,15 @@ func (f *Matcher) MatchWithContext(ctx context.Context, host string, port int, o
 	}
 
 	if proto == "udp" {
+		// Encoded UDP ports used to overwrite the matcher's shared transport
+		// list. A later TCP target on the same matcher then dialed UDP.
+		if config == f.Config {
+			copied := NewConfig()
+			if err := copier.Copy(copied, f.Config); err != nil {
+				return nil, errors.Errorf("copy config failed: %s", err)
+			}
+			config = copied
+		}
 		config.TransportProtos = []TransportProto{UDP}
 	}
 
