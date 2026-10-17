@@ -45,6 +45,7 @@ func TestDistYakCommandConsumesSSADatabaseEnv(t *testing.T) {
 	t.Cleanup(func() {
 		t.Setenv(consts.ENV_SSA_DATABASE_RAW, original)
 		consts.SetSSADatabaseInfo(originalRaw)
+		consts.SetSSADatabaseSkipMigrate(false)
 	})
 
 	const fakeDSN = "postgres://testuser:testpass@127.0.0.1:5436/ssa_ir_test?sslmode=disable"
@@ -58,5 +59,23 @@ func TestDistYakCommandConsumesSSADatabaseEnv(t *testing.T) {
 	if raw != fakeDSN {
 		t.Fatalf("expected SSA DB raw to be %q, got %q (env var was not consumed)", fakeDSN, raw)
 	}
+	if got := os.Getenv(consts.ENV_SSA_DATABASE_RAW); got != "" {
+		t.Fatalf("SSA DSN remained visible to dispatched script: %q", got)
+	}
 }
 
+func TestApplySSADatabaseFromEnvConsumesSkipMigrate(t *testing.T) {
+	_, originalRaw := consts.GetSSADataBaseInfo()
+	t.Cleanup(func() { consts.SetSSADatabaseInfo(originalRaw) })
+	t.Setenv(consts.ENV_SSA_DATABASE_RAW, "postgres://scan@db.example/company_1")
+	t.Setenv(consts.ENV_SSA_DB_SKIP_MIGRATE, "1")
+	t.Cleanup(func() { consts.SetSSADatabaseSkipMigrate(false) })
+
+	applySSADatabaseFromEnv()
+	if !consts.SSADatabaseSkipMigrate() {
+		t.Fatal("skip-migrate policy was not retained after consuming the environment")
+	}
+	if os.Getenv(consts.ENV_SSA_DATABASE_RAW) != "" || os.Getenv(consts.ENV_SSA_DB_SKIP_MIGRATE) != "" {
+		t.Fatal("SSA database policy remained visible to dispatched script")
+	}
+}

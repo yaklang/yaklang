@@ -6,6 +6,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 )
 
@@ -117,4 +118,13 @@ func TestMarshalDataFlowPath_FullContainsDotGraph(t *testing.T) {
 		require.Len(t, out.Nodes, 1)
 		assert.Nil(t, out.Nodes[0].CodeRange)
 	})
+}
+
+func TestMemoryRiskDataflowWithoutValueFailsClosed(t *testing.T) {
+	for _, risk := range []*schema.SSARisk{nil, {Variable: "call"}, {}} {
+		flow, files, err := GenerateDataFlowAnalysis(risk, false)
+		require.Error(t, err)
+		require.Nil(t, flow)
+		require.Empty(t, files)
+	}
 }

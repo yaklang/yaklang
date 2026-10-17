@@ -47,10 +47,11 @@ type exportedRuleArchive struct {
 type ssaRuleSyncEventPublisher struct {
 	node *node.NodeBase
 
-	mu      sync.Mutex
-	natsURL string
-	conn    *nats.Conn
-	js      nats.JetStreamContext
+	mu         sync.Mutex
+	natsURL    string
+	sessionKey string
+	conn       *nats.Conn
+	js         nats.JetStreamContext
 }
 
 func newSSARuleSyncEventPublisher(base *node.NodeBase) *ssaRuleSyncEventPublisher {
@@ -66,6 +67,7 @@ func (p *ssaRuleSyncEventPublisher) Close() {
 	p.conn = nil
 	p.js = nil
 	p.natsURL = ""
+	p.sessionKey = ""
 }
 
 func (b *legionJobBridge) handleSSARuleSyncExport(ctx context.Context, raw []byte) error {
@@ -114,7 +116,7 @@ func (p *ssaRuleSyncEventPublisher) PublishReady(
 	if !ok {
 		return ErrNodeSessionNotReady
 	}
-	if err := p.ensureJetStream(session.NATSURL); err != nil {
+	if err := p.ensureJetStream(session); err != nil {
 		return err
 	}
 
@@ -164,7 +166,7 @@ func (p *ssaRuleSyncEventPublisher) PublishFailed(
 	if !ok {
 		return ErrNodeSessionNotReady
 	}
-	if err := p.ensureJetStream(session.NATSURL); err != nil {
+	if err := p.ensureJetStream(session); err != nil {
 		return err
 	}
 
@@ -190,10 +192,7 @@ func (p *ssaRuleSyncEventPublisher) publish(
 		CausationId:   ref.CommandID,
 		CorrelationId: ref.NodeID + ":ssa-rule-sync",
 		EmittedAt:     timestamppb.New(time.Now().UTC()),
-		Node: &nodev1.NodeRef{
-			NodeId:        p.node.CurrentNodeID(),
-			NodeSessionId: session.SessionID,
-		},
+		Node:          nodeRefForSession(p.node.CurrentNodeID(), session),
 	}
 	if err := attachSSARuleSyncMetadata(message, metadata); err != nil {
 		return err
@@ -209,7 +208,11 @@ func (p *ssaRuleSyncEventPublisher) publish(
 	if js == nil {
 		return fmt.Errorf("jetstream context is not ready")
 	}
-	msg := nats.NewMsg(jobEventSubject(session.EventSubjectPrefix, eventType))
+	subject, err := sessionScopedOutboundSubject(session, jobEventSubject(session.EventSubjectPrefix, eventType))
+	if err != nil {
+		return err
+	}
+	msg := nats.NewMsg(subject)
 	msg.Data = raw
 	if _, err := js.PublishMsg(msg, nats.MsgId(eventID)); err != nil {
 		return fmt.Errorf("publish SSA rule sync event %s: %w", eventType, err)
@@ -218,18 +221,29 @@ func (p *ssaRuleSyncEventPublisher) publish(
 	return nil
 }
 
-func (p *ssaRuleSyncEventPublisher) ensureJetStream(natsURL string) error {
+func (p *ssaRuleSyncEventPublisher) ensureJetStream(session node.SessionState) error {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
+	if err := validateCompanyNATSSession(session, time.Now()); err != nil {
+		if p.conn != nil {
+			p.conn.Close()
+		}
+		p.conn = nil
+		p.js = nil
+		p.sessionKey = ""
+		return err
+	}
+	key := natsSessionConnectionKey(session)
 	// Let NATS manage transient reconnects; replace only a terminal connection.
-	if p.js != nil && p.conn != nil && !p.conn.IsClosed() && p.natsURL == natsURL {
+	if p.js != nil && p.conn != nil && !p.conn.IsClosed() && ((p.sessionKey != "" && p.sessionKey == key) ||
+		(p.sessionKey == "" && session.CompanyID == "" && p.natsURL == session.NATSURL)) {
 		return nil
 	}
 	if p.conn != nil {
 		p.conn.Close()
 	}
-	conn, err := nats.Connect(natsURL, nats.Name("yak-node-ssa-rule-sync-"+p.node.CurrentNodeID()))
+	conn, err := connectNATSForSession(session, "yak-node-ssa-rule-sync-"+p.node.CurrentNodeID())
 	if err != nil {
 		return fmt.Errorf("connect SSA rule sync nats: %w", err)
 	}
@@ -240,7 +254,8 @@ func (p *ssaRuleSyncEventPublisher) ensureJetStream(natsURL string) error {
 	}
 	p.conn = conn
 	p.js = js
-	p.natsURL = natsURL
+	p.natsURL = session.NATSURL
+	p.sessionKey = key
 	return nil
 }
 

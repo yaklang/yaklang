@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
 
 	"github.com/google/uuid"
 
@@ -20,7 +21,8 @@ import (
 const EmbedSfBuildInRuleKey = "e18179b8cbbea727589cd210c8204306"
 
 const (
-	ENV_SSA_DATABASE_RAW = "SSA_DATABASE_RAW"
+	ENV_SSA_DATABASE_RAW        = "SSA_DATABASE_RAW"
+	ENV_SSA_DATABASE_COMPANY_ID = "SSA_DATABASE_COMPANY_ID"
 	// ENV_SSA_DB_SKIP_MIGRATE disables SSA DB AutoMigrate/patches for this process.
 	// This is useful when using a read-only SSA-IR DB DSN on scan-only nodes.
 	ENV_SSA_DB_SKIP_MIGRATE = "SSA_DB_SKIP_MIGRATE"
@@ -36,6 +38,8 @@ var (
 	SSA_PROJECT_DB_RAW     = "default-yakssa.db"
 	SSA_PROJECT_DB_DIALECT = SQLiteExtend
 	ssaDatabase            *gorm.DB
+	ssaDatabaseSkipMigrate atomic.Bool
+	ssaDatabaseCompanyID   atomic.Value
 )
 
 const (
@@ -98,6 +102,14 @@ func SetSSADatabaseInfo(raw string) {
 	SSA_PROJECT_DB_RAW = connectionDetails
 }
 
+func SetSSADatabaseSkipMigrate(skip bool) {
+	ssaDatabaseSkipMigrate.Store(skip)
+}
+
+func SSADatabaseSkipMigrate() bool {
+	return ssaDatabaseSkipMigrate.Load() || utils.InterfaceToBoolean(os.Getenv(ENV_SSA_DB_SKIP_MIGRATE))
+}
+
 func SetGormSSAProjectDatabaseByInfo(raw string) error {
 	SetSSADatabaseInfo(raw)
 	db, err := CreateSSAProjectDatabaseRaw(raw)
@@ -116,14 +128,24 @@ func CreateSSAProjectDatabaseRaw(raw string) (*gorm.DB, error) {
 }
 
 func CreateSSAProjectDatabase(dialect, path string) (*gorm.DB, error) {
+	companyID, _ := ssaDatabaseCompanyID.Load().(string)
+	if companyID != "" && (dialect != Postgres || !SSADatabaseSkipMigrate()) {
+		return nil, fmt.Errorf("company SSA database requires PostgreSQL and disabled migration")
+	}
 	options := ssaDatabaseOpenOptions()
 	db, err := createAndConfigDatabaseWithOptions(path, options, dialect)
 	if err != nil {
 		return nil, err
 	}
+	if companyID != "" {
+		if err := CheckCompanySSAIRBinding(db, companyID); err != nil {
+			_ = db.Close()
+			return nil, err
+		}
+	}
 	// SSA-IR DB may be accessed with a read-only credential (scan-only nodes).
 	// In that case, AutoMigrate would fail even if the schema already exists.
-	if !utils.InterfaceToBoolean(os.Getenv(ENV_SSA_DB_SKIP_MIGRATE)) {
+	if !SSADatabaseSkipMigrate() {
 		schema.AutoMigrate(db, schema.KEY_SCHEMA_SSA_DATABASE)
 		schema.ApplyPatches(db, schema.KEY_SCHEMA_SSA_DATABASE)
 	}

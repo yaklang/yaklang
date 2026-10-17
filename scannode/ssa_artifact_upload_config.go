@@ -2,6 +2,7 @@ package scannode
 
 import (
 	"fmt"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -18,11 +19,50 @@ const scannodeInternalParamPrefix = "_scannode_"
 // injects these into the script input JSON; scannode extracts them and
 // forwards as env vars to the distyak child process.
 const (
+	scannodeCompanyIDParamKey          = "_scannode_company_id"
+	scannodeTaskIDParamKey             = "_scannode_task_id"
+	scannodeAttemptIDParamKey          = "_scannode_attempt_id"
+	scannodeSSATicketRequiredParamKey  = "_scannode_ssa_ticket_required"
 	scannodeSSADatabaseRawParamKey     = "_scannode_ssa_database_raw"
 	scannodeSSASkipMigrateParamKey     = "_scannode_ssa_skip_migrate"
 	scannodeSSADatabaseBackendParamKey = "_scannode_ssa_database_backend"
 	scannodeSSASqliteKeyParamKey       = "_scannode_ssa_sqlite_key"
 )
+
+func validateCompanyDispatchParams(sessionCompanyID, taskID, attemptID string, params map[string]interface{}) error {
+	if strings.TrimSpace(sessionCompanyID) == "" {
+		return nil
+	}
+	if strings.TrimSpace(toString(params[scannodeCompanyIDParamKey])) != strings.TrimSpace(sessionCompanyID) {
+		return fmt.Errorf("company dispatch company_id does not match the node session")
+	}
+	if strings.TrimSpace(toString(params[scannodeTaskIDParamKey])) != strings.TrimSpace(taskID) {
+		return fmt.Errorf("company dispatch task_id does not match the assigned job")
+	}
+	if strings.TrimSpace(toString(params[scannodeAttemptIDParamKey])) != strings.TrimSpace(attemptID) {
+		return fmt.Errorf("company dispatch attempt_id does not match the assigned attempt")
+	}
+	for _, key := range []string{
+		"_scannode_ssa_sts_access_key",
+		"_scannode_ssa_sts_secret_key",
+		"_scannode_ssa_sts_session_token",
+	} {
+		if strings.TrimSpace(toString(params[key])) != "" {
+			return fmt.Errorf("company dispatch must not contain static artifact credentials")
+		}
+	}
+	ssaDispatch := toString(params[scannodeSSADatabaseRawParamKey]) != "" || toString(params[scannodeSSADatabaseBackendParamKey]) != "" || toBool(params[scannodeSSATicketRequiredParamKey])
+	if !ssaDispatch {
+		return nil
+	}
+	if !toBool(params[scannodeSSATicketRequiredParamKey]) {
+		return fmt.Errorf("company dispatch requires node-session artifact tickets")
+	}
+	if !toBool(params[scannodeSSASkipMigrateParamKey]) {
+		return fmt.Errorf("company dispatch must disable SSA IR auto migration")
+	}
+	return nil
+}
 
 const ssaIRSQLiteDirName = "ssa-ir-sqlite"
 
@@ -45,6 +85,55 @@ func extractSSADatabaseEnv(params map[string]interface{}) []string {
 		env = append(env, fmt.Sprintf("%s=1", consts.ENV_SSA_DB_SKIP_MIGRATE))
 	}
 	return env
+}
+
+func takeScanNodeInternalParams(params map[string]interface{}) map[string]interface{} {
+	internal := make(map[string]interface{})
+	for key, value := range params {
+		if strings.HasPrefix(key, scannodeInternalParamPrefix) {
+			internal[key] = value
+			delete(params, key)
+		}
+	}
+	return internal
+}
+
+func resolveCompanyBoundSSADatabaseEnv(s *ScanNode, params map[string]interface{}, debugDir, runtimeID string) ([]string, string, error) {
+	if s == nil || s.node == nil {
+		return nil, "", fmt.Errorf("scannode session is unavailable")
+	}
+	session, ok := s.node.GetSessionState()
+	if expectedCompany := strings.TrimSpace(toString(params[scannodeCompanyIDParamKey])); expectedCompany != "" && (!ok || session.CompanyID != expectedCompany) {
+		return nil, "", fmt.Errorf("company dispatch session is no longer active")
+	}
+	if !ok || strings.TrimSpace(session.CompanyID) == "" {
+		env, sqlitePath := resolveSSADatabaseEnv(s, params, debugDir, runtimeID)
+		return env, sqlitePath, nil
+	}
+	if toString(params[scannodeSSADatabaseRawParamKey]) == "" && !toBool(params[scannodeSSATicketRequiredParamKey]) && toString(params[scannodeSSADatabaseBackendParamKey]) == "" {
+		return nil, "", nil
+	}
+	if isSQLiteSSABackend(params) {
+		return nil, "", fmt.Errorf("company node requires a dedicated PostgreSQL SSA IR database")
+	}
+	dsn := strings.TrimSpace(toString(params[scannodeSSADatabaseRawParamKey]))
+	parsed, err := url.Parse(dsn)
+	if err != nil || (parsed.Scheme != "postgres" && parsed.Scheme != "postgresql") || parsed.Host == "" || strings.Trim(parsed.Path, "/") == "" {
+		return nil, "", fmt.Errorf("company node requires a valid PostgreSQL SSA IR DSN")
+	}
+	companyParams := make(map[string]interface{}, len(params)+1)
+	for key, value := range params {
+		companyParams[key] = value
+	}
+	// Company schemas are initialized and versioned by operations. Nodes never
+	// run AutoMigrate, including compilation workers with DML credentials.
+	companyParams[scannodeSSASkipMigrateParamKey] = true
+	env := extractSSADatabaseEnv(companyParams)
+	if len(env) == 0 {
+		return nil, "", fmt.Errorf("company node SSA IR DSN is missing")
+	}
+	env = append(env, fmt.Sprintf("%s=%s", consts.ENV_SSA_DATABASE_COMPANY_ID, session.CompanyID))
+	return env, "", nil
 }
 
 func isSQLiteSSABackend(params map[string]interface{}) bool {

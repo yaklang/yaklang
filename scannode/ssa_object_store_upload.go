@@ -31,13 +31,14 @@ type ssaObjectStoreUploadSession struct {
 	updateCredentials func(objectStoreCredentials)
 	closeUploader     func()
 
-	endpoint         string
-	bucket           string
-	region           string
-	virtualHostStyle bool
-	onRetry          func()
-	credentialMu     sync.Mutex
-	credentialGen    uint64
+	endpoint             string
+	bucket               string
+	region               string
+	virtualHostStyle     bool
+	authorizedAttemptDir string
+	onRetry              func()
+	credentialMu         sync.Mutex
+	credentialGen        uint64
 }
 
 func newSSAObjectStoreUploadSession(provider ssaUploadConfigProvider, onRetry func()) (*ssaObjectStoreUploadSession, error) {
@@ -58,15 +59,16 @@ func newSSAObjectStoreUploadSession(provider ssaUploadConfigProvider, onRetry fu
 	}
 	client.onRetry = onRetry
 	return &ssaObjectStoreUploadSession{
-		provider:          provider,
-		uploader:          client,
-		updateCredentials: client.setCredentials,
-		closeUploader:     client.Close,
-		endpoint:          endpoint.String(),
-		bucket:            strings.TrimSpace(cfg.Bucket),
-		region:            normalizedSSARegion(cfg.Region),
-		virtualHostStyle:  cfg.VirtualHostStyle,
-		onRetry:           onRetry,
+		provider:             provider,
+		uploader:             client,
+		updateCredentials:    client.setCredentials,
+		closeUploader:        client.Close,
+		endpoint:             endpoint.String(),
+		bucket:               strings.TrimSpace(cfg.Bucket),
+		region:               normalizedSSARegion(cfg.Region),
+		virtualHostStyle:     cfg.VirtualHostStyle,
+		authorizedAttemptDir: cfg.authorizedAttemptDir,
+		onRetry:              onRetry,
 	}, nil
 }
 
@@ -88,7 +90,7 @@ func (s *ssaObjectStoreUploadSession) refreshCredentials(force bool) error {
 	if err != nil {
 		return err
 	}
-	if endpoint.String() != s.endpoint || strings.TrimSpace(cfg.Bucket) != s.bucket || normalizedSSARegion(cfg.Region) != s.region || cfg.VirtualHostStyle != s.virtualHostStyle {
+	if endpoint.String() != s.endpoint || strings.TrimSpace(cfg.Bucket) != s.bucket || normalizedSSARegion(cfg.Region) != s.region || cfg.VirtualHostStyle != s.virtualHostStyle || cfg.authorizedAttemptDir != s.authorizedAttemptDir {
 		return fmt.Errorf("upload target changed during STS refresh")
 	}
 	s.updateCredentials(credentialsFromSSAConfig(cfg))
@@ -154,6 +156,9 @@ func (s *ssaObjectStoreUploadSession) upload(ctx context.Context, body io.Reader
 	}
 	if err := validateSSAObjectKey(objectKey); err != nil {
 		return stats, err
+	}
+	if s.authorizedAttemptDir != "" && !strings.HasPrefix(objectKey, s.authorizedAttemptDir+"/") {
+		return stats, fmt.Errorf("artifact object key is outside the authorized attempt")
 	}
 	partSize := readSSAMultipartPartSize()
 	if size >= 0 {

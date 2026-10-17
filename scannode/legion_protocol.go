@@ -245,6 +245,8 @@ const (
 	legionAssetKindTCPOpenPort        = "tcp_open_port"
 	legionAssetKindServiceFingerprint = "service_fingerprint"
 	legionArtifactKindSSAResultV1     = "ssa_result_v1"
+	ssaArtifactTicketKindIR           = "ssa_ir"
+	ssaArtifactTicketKindDebug        = "debug"
 
 	legionRiskKindVulnerability = "vulnerability"
 	legionRiskKindWeakPassword  = "weak_password"

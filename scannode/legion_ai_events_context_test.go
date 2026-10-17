@@ -101,7 +101,7 @@ func TestResilienceAISessionConcurrentReconnectHonorsWaiterDeadline(t *testing.T
 	defer cancelConnect()
 	first := make(chan error, 1)
 	go func() {
-		_, err := publisher.jetStreamForContext(connecting, url)
+		_, err := publisher.jetStreamForContext(connecting, node.SessionState{NATSURL: url})
 		first <- err
 	}()
 	select {
@@ -113,7 +113,7 @@ func TestResilienceAISessionConcurrentReconnectHonorsWaiterDeadline(t *testing.T
 	defer cancel()
 	second := make(chan error, 1)
 	go func() {
-		_, err := publisher.jetStreamForContext(ctx, url)
+		_, err := publisher.jetStreamForContext(ctx, node.SessionState{NATSURL: url})
 		second <- err
 	}()
 	select {
@@ -162,5 +162,24 @@ func TestResilienceAISessionInitialDeadlineDoesNotCancelAutoReconnect(t *testing
 	}
 	if err := conn.FlushTimeout(time.Second); err != nil {
 		t.Fatalf("recovered transport cannot exchange PING/PONG: %v", err)
+	}
+}
+
+// A legacy cached connection must not bypass company credential checks when the
+// context-aware publisher is reused after enrollment or session revocation.
+func TestResilienceAISessionContextRejectsInvalidCompanySession(t *testing.T) {
+	publisher := newAISessionEventPublisher(&node.NodeBase{})
+	publisher.conn = newReconnectingEventTestConn(t)
+	publisher.js = &aiFakeJetStreamContext{}
+	publisher.natsURL = "tls://127.0.0.1:1"
+	t.Cleanup(publisher.Close)
+	_, err := publisher.jetStreamForContext(context.Background(), node.SessionState{
+		CompanyID: "company-1", SessionID: "session-1", NATSURL: publisher.natsURL,
+	})
+	if err == nil {
+		t.Fatal("invalid company credentials reused a legacy cached connection")
+	}
+	if publisher.conn != nil || publisher.js != nil {
+		t.Fatal("invalid company session retained the cached transport")
 	}
 }

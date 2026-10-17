@@ -43,10 +43,11 @@ func (ref jobExecutionRef) scopedEventID(eventID string) string {
 type jobEventPublisher struct {
 	node *node.NodeBase
 
-	mu      sync.Mutex
-	natsURL string
-	conn    *nats.Conn
-	js      nats.JetStreamContext
+	mu         sync.Mutex
+	natsURL    string
+	sessionKey string
+	conn       *nats.Conn
+	js         nats.JetStreamContext
 }
 
 func newJobEventPublisher(base *node.NodeBase) *jobEventPublisher {
@@ -365,24 +366,24 @@ func (p *jobEventPublisher) publish(
 	if !ok {
 		return fmt.Errorf("node session is not ready")
 	}
-	if err := p.ensureJetStream(session.NATSURL); err != nil {
+	if err := p.ensureJetStream(session); err != nil {
 		return err
 	}
 
 	// The same Attempt may rebind after an old transport event was fenced.
 	// Keep retries idempotent inside one Bind without suppressing the new Bind.
 	eventID = ref.scopedEventID(eventID)
-	subject := jobEventSubject(session.EventSubjectPrefix, eventType)
+	subject, err := sessionScopedOutboundSubject(session, jobEventSubject(session.EventSubjectPrefix, eventType))
+	if err != nil {
+		return err
+	}
 	metadata := &nodev1.EventMetadata{
 		EventId:       eventID,
 		EventType:     eventType,
 		CausationId:   ref.CommandID,
 		CorrelationId: ref.AttemptID,
 		EmittedAt:     timestamppb.New(time.Now().UTC()),
-		Node: &nodev1.NodeRef{
-			NodeId:        p.node.CurrentNodeID(),
-			NodeSessionId: session.SessionID,
-		},
+		Node:          nodeRefForSession(p.node.CurrentNodeID(), session),
 	}
 	if err := attachEventMetadata(message, metadata); err != nil {
 		return err
@@ -474,17 +475,23 @@ func sanitizeJobEventUTF8(message proto.Message) {
 	cleanValue(reflect.ValueOf(message))
 }
 
-func (p *jobEventPublisher) ensureJetStream(natsURL string) error {
+func (p *jobEventPublisher) ensureJetStream(session node.SessionState) error {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
+	if err := validateCompanyNATSSession(session, time.Now()); err != nil {
+		p.closeLocked()
+		return err
+	}
+	key := natsSessionConnectionKey(session)
 	// Let NATS manage transient reconnects; replace only a terminal connection.
-	if p.js != nil && p.conn != nil && !p.conn.IsClosed() && p.natsURL == natsURL {
+	if p.js != nil && p.conn != nil && !p.conn.IsClosed() && ((p.sessionKey != "" && p.sessionKey == key) ||
+		(p.sessionKey == "" && session.CompanyID == "" && p.natsURL == session.NATSURL)) {
 		return nil
 	}
 	p.closeLocked()
 
-	conn, err := nats.Connect(natsURL, nats.Name("yak-node-events-"+p.node.CurrentNodeID()))
+	conn, err := connectNATSForSession(session, "yak-node-events-"+p.node.CurrentNodeID())
 	if err != nil {
 		return fmt.Errorf("connect event nats: %w", err)
 	}
@@ -495,7 +502,8 @@ func (p *jobEventPublisher) ensureJetStream(natsURL string) error {
 	}
 	p.conn = conn
 	p.js = js
-	p.natsURL = natsURL
+	p.natsURL = session.NATSURL
+	p.sessionKey = key
 	return nil
 }
 
@@ -506,6 +514,7 @@ func (p *jobEventPublisher) closeLocked() {
 	p.conn = nil
 	p.js = nil
 	p.natsURL = ""
+	p.sessionKey = ""
 }
 
 func (p *jobEventPublisher) jobRef(ref jobExecutionRef) *jobv1.JobRef {

@@ -22,6 +22,7 @@ import (
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/subprocess"
 	ssaconfig "github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssagitworkdir"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -86,6 +87,14 @@ func (s *ScanNode) executeScriptTask(
 		s,
 	)
 	keyValues := s.parseScriptParams(input.ScriptJSONParam)
+	internalParams := takeScanNodeInternalParams(keyValues)
+	if session, ok := s.node.GetSessionState(); ok {
+		if err := validateCompanyDispatchParams(session.CompanyID, input.TaskID, task.AttemptID, internalParams); err != nil {
+			return nil, err
+		}
+	} else if strings.TrimSpace(toString(internalParams[scannodeCompanyIDParamKey])) != "" {
+		return nil, fmt.Errorf("company dispatch session is no longer active")
+	}
 	// plugin_bundle_path is a platform-owned local capability. Never honor a
 	// job-provided path, even when no immutable bundle reference was dispatched.
 	delete(keyValues, "plugin_bundle_path")
@@ -114,13 +123,17 @@ func (s *ScanNode) executeScriptTask(
 	if pluginBundlePath != "" {
 		keyValues["plugin_bundle_path"] = pluginBundlePath
 	}
-	reporter.ssaUploadCfg = extractSSAArtifactUploadConfig(keyValues)
+	companyID := ""
+	if session, ok := s.node.GetSessionState(); ok {
+		companyID = session.CompanyID
+	}
+	reporter.ssaUploadCfg = scriptSSAArtifactUploadConfig(companyID, internalParams)
 	reporter.ssaCollector = NewSSAArtifactCollectorWithContext(taskCtx, input.TaskID, input.RuntimeID, input.SubTaskID)
 	if reporter.ssaCollector != nil {
 		defer reporter.ssaCollector.Cleanup()
 		if reporter.ssaUploadCfg != nil &&
 			strings.TrimSpace(input.ScriptLabels["chain.next_compile"]) == "true" {
-			provider := s.buildSSAArtifactUploadConfigProvider(taskCtx, reporter, reporter.ssaUploadCfg)
+			provider := s.buildSSAArtifactUploadConfigProvider(taskCtx, reporter, reporter.ssaUploadCfg, ssaArtifactTicketKindIR)
 			if err := reporter.ssaCollector.EnableContinuousUploadWithFlushInterval(
 				normalizeArtifactCodec(reporter.ssaUploadCfg.Codec),
 				provider,
@@ -187,7 +200,10 @@ func (s *ScanNode) executeScriptTask(
 		params = s.buildScriptParams(yakitServer.Addr(), input.RuntimeID, keyValues)
 	}
 
-	ssaDBEnv, sqliteLivePath := resolveSSADatabaseEnv(s, keyValues, debugDir, input.RuntimeID)
+	ssaDBEnv, sqliteLivePath, err := resolveCompanyBoundSSADatabaseEnv(s, internalParams, debugDir, input.RuntimeID)
+	if err != nil {
+		return nil, err
+	}
 	ssaDBCleanup := func() {}
 	if s.needIsolateSSARuntimeDB() {
 		ssaOverride := environmentValueFromEntries(ssaDBEnv, consts.ENV_SSA_DATABASE_RAW)
@@ -195,12 +211,15 @@ func (s *ScanNode) executeScriptTask(
 		if environmentValueFromEntries(ssaDBEnv, consts.ENV_SSA_DB_SKIP_MIGRATE) != "" {
 			isolatedEnv = append(isolatedEnv, fmt.Sprintf("%s=1", consts.ENV_SSA_DB_SKIP_MIGRATE))
 		}
+		if companyID := environmentValueFromEntries(ssaDBEnv, consts.ENV_SSA_DATABASE_COMPANY_ID); companyID != "" {
+			isolatedEnv = append(isolatedEnv, consts.ENV_SSA_DATABASE_COMPANY_ID+"="+companyID)
+		}
 		ssaDBEnv = isolatedEnv
 		ssaDBCleanup = cleanup
 	}
 	defer ssaDBCleanup()
 	if preparedSnapshot != nil {
-		ssaDBEnv = append(ssaDBEnv, "YAKIT_HOME="+preparedSnapshot.taskYakitHome)
+		ssaDBEnv = append(ssaDBEnv, ruleSnapshotDatabaseEnv(preparedSnapshot.taskYakitHome)...)
 	}
 
 	// Register a defer to finalize debug artifacts (analysis + zip) on both
@@ -976,7 +995,9 @@ func (s *ScanNode) executeScript(
 	log.Infof("yak %v %v", scriptFile, params)
 
 	cmd := exec.CommandContext(ctx, scanNodePath, append(baseCmd, params...)...)
-	env := replaceEnvironmentValue(os.Environ(), "YAKIT_HOME", os.Getenv("YAKIT_HOME"))
+	configureScriptProcessCancellation(cmd)
+	env := removeEnvironmentValues(os.Environ(), consts.ENV_SSA_DATABASE_RAW, consts.ENV_SSA_DB_SKIP_MIGRATE, consts.ENV_SSA_DATABASE_COMPANY_ID)
+	env = replaceEnvironmentValue(env, "YAKIT_HOME", os.Getenv("YAKIT_HOME"))
 	env = replaceEnvironmentValue(env, "YAK_RUNTIME_ID", runtimeID)
 	for _, item := range extraEnv {
 		key, value, ok := strings.Cut(item, "=")
@@ -1064,6 +1085,24 @@ func replaceEnvironmentValue(env []string, key string, value string) []string {
 		replaced = append(replaced, item)
 	}
 	return append(replaced, prefix+value)
+}
+
+func removeEnvironmentValues(env []string, keys ...string) []string {
+	blocked := make(map[string]struct{}, len(keys))
+	for _, key := range keys {
+		blocked[strings.TrimSpace(key)] = struct{}{}
+	}
+	filtered := make([]string, 0, len(env))
+	for _, item := range env {
+		key, _, ok := strings.Cut(item, "=")
+		if ok {
+			if _, exists := blocked[key]; exists {
+				continue
+			}
+		}
+		filtered = append(filtered, item)
+	}
+	return filtered
 }
 
 // scriptEnvWithDebugLogLevel copies base env entries and forces LOG_LEVEL=debug
@@ -1197,6 +1236,25 @@ func redactSSAUploadErrorMessage(err error, cfg *SSAArtifactUploadConfig) string
 	return message
 }
 
+// Called only after validateCompanyDispatchParams authenticates the scheduler's
+// company/job/attempt tuple. Company storage credentials come from node tickets.
+func scriptSSAArtifactUploadConfig(companyID string, params map[string]interface{}) *SSAArtifactUploadConfig {
+	cfg := extractSSAArtifactUploadConfig(params)
+	if strings.TrimSpace(companyID) != "" {
+		// Generic Scan Center scripts have no SSA artifact intent. An empty
+		// SSA upload config would still request a ticket on finalization.
+		if !toBool(params[scannodeSSATicketRequiredParamKey]) {
+			return nil
+		}
+		codec := "zstd"
+		if cfg != nil && strings.TrimSpace(cfg.Codec) != "" {
+			codec = cfg.Codec
+		}
+		return &SSAArtifactUploadConfig{Codec: codec}
+	}
+	return cfg
+}
+
 func (s *ScanNode) finalizeSSAArtifactUpload(
 	ctx context.Context,
 	reporter *ScannerAgentReporter,
@@ -1215,7 +1273,7 @@ func (s *ScanNode) finalizeSSAArtifactUpload(
 		return nil
 	}
 
-	provider := s.buildSSAArtifactUploadConfigProvider(ctx, reporter, cfg)
+	provider := s.buildSSAArtifactUploadConfigProvider(ctx, reporter, cfg, ssaArtifactTicketKindIR)
 	build, err := reporter.ssaCollector.FinalizeUploadWithProviderContext(
 		ctx,
 		normalizeArtifactCodec(cfg.Codec),
@@ -1330,6 +1388,7 @@ func (s *ScanNode) buildSSAArtifactUploadConfigProvider(
 	ctx context.Context,
 	reporter *ScannerAgentReporter,
 	baseCfg *SSAArtifactUploadConfig,
+	artifactKind string,
 ) ssaUploadConfigProvider {
 	if baseCfg == nil {
 		return nil
@@ -1337,8 +1396,13 @@ func (s *ScanNode) buildSSAArtifactUploadConfigProvider(
 
 	current := *baseCfg
 	taskID := ""
+	attemptID := ""
 	if reporter != nil {
 		taskID = strings.TrimSpace(reporter.TaskId)
+		attemptID = strings.TrimSpace(reporter.RuntimeId)
+		if reporter.executionRef != nil && strings.TrimSpace(reporter.executionRef.AttemptID) != "" {
+			attemptID = strings.TrimSpace(reporter.executionRef.AttemptID)
+		}
 	}
 
 	var mu sync.Mutex
@@ -1358,27 +1422,22 @@ func (s *ScanNode) buildSSAArtifactUploadConfigProvider(
 			return nil, utils.Errorf("ssa artifact task id missing")
 		}
 
-		objectKey := strings.TrimSpace(current.ObjectKey)
-		if objectKey == "" {
-			return nil, utils.Errorf("ssa artifact object key missing")
-		}
-
 		refreshCtx := ctx
 		if refreshCtx == nil {
 			refreshCtx = context.Background()
 		}
-		fresh, err := s.fetchSSAArtifactUploadTicket(refreshCtx, taskID, objectKey)
+		fresh, err := s.fetchSSAArtifactUploadTicket(refreshCtx, taskID, attemptID, artifactKind)
 		if err != nil {
 			return nil, err
 		}
 		if fresh == nil {
 			return nil, utils.Errorf("empty upload ticket")
 		}
-		if strings.TrimSpace(fresh.ObjectKey) == "" {
-			fresh.ObjectKey = objectKey
-		}
 		if strings.TrimSpace(fresh.Codec) == "" {
 			fresh.Codec = current.Codec
+		}
+		if current.authorizedAttemptDir != "" && (fresh.authorizedAttemptDir != current.authorizedAttemptDir || fresh.ObjectKey != current.ObjectKey) {
+			return nil, utils.Errorf("upload ticket target changed during refresh")
 		}
 		current = *fresh
 
@@ -1471,6 +1530,12 @@ func buildSSAArtifactMetricsPayload(event *SSAArtifactReadyEvent) ([]byte, error
 	// Start with the upload metrics from the collector (upload_ms, ticket_fetch_ms, etc.)
 	if len(event.Metrics) > 0 {
 		_ = json.Unmarshal(event.Metrics, &merged)
+	}
+	// Preserve the engine's compiled program even when no finding was streamed.
+	// This is current-attempt artifact evidence, not a launch/client label.
+	delete(merged, "program_name")
+	if program := strings.TrimSpace(event.ProgramName); program != "" {
+		merged["program_name"] = program
 	}
 	// Add risk/file/flow counts
 	if len(event.SourceStatistics) > 0 && json.Valid(event.SourceStatistics) {
@@ -1650,4 +1715,12 @@ func (s *ScanNode) publishDebugZip(
 	}
 
 	log.Infof("[debug] zip published: key=%s size=%d", objKey, zipSize)
+}
+
+// Reuse the engine process-group boundary so cancellation also stops tools
+// spawned by the distyak child, rather than leaving them running after revoke.
+func configureScriptProcessCancellation(cmd *exec.Cmd) {
+	subprocess.ConfigureProcessGroup(cmd)
+	cmd.Cancel = func() error { subprocess.KillProcessGroup(cmd); return nil }
+	cmd.WaitDelay = 5 * time.Second
 }

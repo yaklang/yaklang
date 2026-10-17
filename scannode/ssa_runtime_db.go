@@ -15,7 +15,15 @@ import (
 const ssaRuntimeDBDirName = "ssa-runtime-db"
 
 func (s *ScanNode) needIsolateSSARuntimeDB() bool {
-	if s == nil || s.invokeLimiter == nil {
+	if s == nil {
+		return false
+	}
+	if s.node != nil {
+		if session, ok := s.node.GetSessionState(); ok && session.CompanyID != "" {
+			return true
+		}
+	}
+	if s.invokeLimiter == nil {
 		return false
 	}
 	// Unlimited and explicitly parallel Nodes must never let child processes

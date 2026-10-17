@@ -241,6 +241,7 @@ func TestRuntimeHostCommandAuthenticationRejectsTampering(t *testing.T) {
 		resources:      runtimeHostTestResourceCollector(t),
 	}
 	session := node.SessionState{NodeID: "node-1", SessionID: "node-session-1"}
+	executor.sessionProvider = func() (node.SessionState, bool) { return session, true }
 	if err := executor.validateCommand(command, session); err != nil {
 		t.Fatalf("validateCommand() rejected signed command: %v", err)
 	}
@@ -264,6 +265,7 @@ func TestRuntimeHostAcceptsPinnedContainerAPIOriginDistinctFromHostBootstrap(t *
 		resources:      runtimeHostTestResourceCollector(t),
 	}
 	session := node.SessionState{NodeID: "node-1", SessionID: "node-session-1"}
+	executor.sessionProvider = func() (node.SessionState, bool) { return session, true }
 	if err := executor.validateCommand(command, session); err != nil {
 		t.Fatalf("validateCommand() rejected the pinned container API origin: %v", err)
 	}
