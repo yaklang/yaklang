@@ -13,10 +13,11 @@ import (
 )
 
 const (
-	// Go 1.27 amd64 runtime.moduledata.textsectmap. Go 1.26 kept this slice at
-	// 0x150; 1.27 inserts typedesclen, itaboffset and itabsize ahead of it.
-	// ftab/minpc/text stay at 0x80/0xa0/0xb0. Each textsect is still 24 bytes.
-	moduledataTextsectMapOff = 0x168
+	// Go 1.26 amd64 runtime.moduledata.textsectmap. The CI toolchain is
+	// Go 1.26.5; Go 1.27 inserts typedesclen, itaboffset and itabsize ahead of
+	// this slice. ftab/minpc/text stay at 0x80/0xa0/0xb0. Each textsect is
+	// still 24 bytes.
+	moduledataTextsectMapOff = 0x150
 	moduledataTextsectMapLen = moduledataTextsectMapOff + 8
 	moduledataTextsectMapCap = moduledataTextsectMapOff + 16
 	moduledataTextsectMapEnd = moduledataTextsectMapOff + 24
@@ -102,6 +103,9 @@ func SortFinalTextMap(path string) error {
 	if maxOff > 0xffffffff {
 		return fmt.Errorf("%s md=%#x symbol=%v", formatTextMapEndOverflow(raw, sections, mapPtr, entries, maxOff), md, fromSymbol)
 	}
+	if err := installFinalTextAddrMap(raw, sections, mapPtr, entries); err != nil {
+		return err
+	}
 	sort.SliceStable(entries, func(i, j int) bool {
 		return entries[i].baseaddr < entries[j].baseaddr
 	})
@@ -163,6 +167,52 @@ func SortFinalTextMap(path string) error {
 	if err := os.WriteFile(path, raw, 0o644); err != nil {
 		return fmt.Errorf("write sorted textsectmap: %w", err)
 	}
+	return nil
+}
+
+// installFinalTextAddrMap installs the independent virtual-order index used
+// by patched runtime.textAddr. A normal Go runtime has no such symbol; retain
+// compatibility with historical archives while the build script requires both
+// runtime lookup patches for newly built ones.
+func installFinalTextAddrMap(raw []byte, sections []elfSection, mapPtr uint64, entries []textsectFinalEntry) error {
+	syms, err := elfSymbolsNamed(raw, sections, "runtime.ssa2llvmTextAddrMap")
+	if err != nil {
+		return err
+	}
+	sym, ok := preferredSymbol(syms, len(sections))
+	if !ok {
+		return nil
+	}
+	if sym.size < 24 {
+		return fmt.Errorf("final virtual text map header too small: %d", sym.size)
+	}
+	headerOff, err := symbolFileOffset(raw, sections, sym)
+	if err != nil {
+		return fmt.Errorf("locate virtual text map header: %w", err)
+	}
+	size := uint64(len(entries)) * textsectEntrySize
+	copyPtr := mapPtr + size
+	copyOff, err := vmaToFileOffset(raw, sections, copyPtr)
+	if err != nil {
+		return fmt.Errorf("locate virtual text map storage: %w", err)
+	}
+	lastOff, err := vmaToFileOffset(raw, sections, copyPtr+size-1)
+	if err != nil || lastOff != copyOff+int(size)-1 {
+		return fmt.Errorf("virtual text map storage not reserved (rebuild libyak with current elfsplit)")
+	}
+	virtual := append([]textsectFinalEntry(nil), entries...)
+	sort.SliceStable(virtual, func(i, j int) bool {
+		return virtual[i].vaddr < virtual[j].vaddr
+	})
+	for i, entry := range virtual {
+		off := copyOff + i*textsectEntrySize
+		binary.LittleEndian.PutUint64(raw[off:], entry.vaddr)
+		binary.LittleEndian.PutUint64(raw[off+8:], entry.end)
+		binary.LittleEndian.PutUint64(raw[off+16:], entry.baseaddr)
+	}
+	binary.LittleEndian.PutUint64(raw[headerOff:], copyPtr)
+	binary.LittleEndian.PutUint64(raw[headerOff+8:], uint64(len(entries)))
+	binary.LittleEndian.PutUint64(raw[headerOff+16:], uint64(len(entries)))
 	return nil
 }
 

@@ -88,6 +88,15 @@ func TestRewriteBackwardRIPRelativeLEACrossSection(t *testing.T) {
 	}
 }
 
+func TestModuledataTextsectMapUsesGo126Layout(t *testing.T) {
+	if moduledataTextsectMapOffset != 0x150 {
+		t.Fatalf("textsectmap offset=%#x, want Go 1.26 offset %#x", moduledataTextsectMapOffset, 0x150)
+	}
+	if moduledataTextsectMapLenOff != 0x158 || moduledataTextsectMapCapOff != 0x160 {
+		t.Fatalf("textsectmap header offsets are inconsistent: len=%#x cap=%#x", moduledataTextsectMapLenOff, moduledataTextsectMapCapOff)
+	}
+}
+
 func TestClassifyPackage(t *testing.T) {
 	tests := []struct {
 		sym  string
