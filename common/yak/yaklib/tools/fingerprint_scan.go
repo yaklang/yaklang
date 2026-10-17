@@ -73,24 +73,30 @@ func newHostPortGuard(limit int) *hostPortGuard {
 	}
 }
 
-// observe 记录 host 的一次端口出现, 返回 true 表示已触发熔断 (该主机端口数达到
-// limit, 或之前已经触发过). 一旦触发, 后续对任何主机的 observe 都返回 true,
-// 保证上层能稳定地走到"强制停止"分支.
+// observe 记录 host 的一次开放端口. 返回 true 只表示这台主机达到了阈值.
+// 其它主机继续扫描, 避免一台 tarpit 取消整次任务.
 func (g *hostPortGuard) observe(host string) bool {
 	if g == nil || g.limit <= 0 {
 		return false
 	}
 	g.mu.Lock()
 	defer g.mu.Unlock()
-	if g.tripped {
-		return true
-	}
 	g.count[host]++
 	if g.count[host] >= g.limit {
 		g.tripped = true
 		return true
 	}
 	return false
+}
+
+// skipping reports whether this host already reached the open-port threshold.
+func (g *hostPortGuard) skipping(host string) bool {
+	if g == nil || g.limit <= 0 {
+		return false
+	}
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	return g.count[host] >= g.limit
 }
 
 func openPortGuardLimit(config *fp.Config) int {
@@ -255,13 +261,12 @@ func _scanFingerprint(ctx context.Context, config *fp.Config, concurrent int, ho
 	guardLimit := openPortGuardLimit(config)
 	guard := newHostPortGuard(guardLimit)
 
-	// tripGuard 在 inner goroutine 判定端口开放后调用, 命中阈值则强制停止整条流.
-	// 调用方可通过 servicescan.openPortGuardLimit() 调整阈值, 或通过
-	// servicescan.disableOpenPortGuard() 显式关闭该保护.
+	// tripGuard 在 inner goroutine 判定端口开放后调用. 命中阈值后只跳过这台主机
+	// 的后续端口, 其它主机继续. 调用方可通过 servicescan.openPortGuardLimit()
+	// 调整阈值, 或通过 servicescan.disableOpenPortGuard() 显式关闭该保护.
 	tripGuard := func(h string) {
 		if guard.observe(h) {
-			log.Errorf("host [%s] reached scan-port safety threshold (%d open ports in one scan); likely a tarpit/firewall responding on all ports, force stopping the scan to keep the system healthy", h, guardLimit)
-			scanCancel()
+			log.Errorf("host [%s] reached scan-port safety threshold (%d open ports in one scan); likely a tarpit/firewall responding on all ports, skipping the rest of this host", h, guardLimit)
 		}
 	}
 
@@ -274,9 +279,10 @@ func _scanFingerprint(ctx context.Context, config *fp.Config, concurrent int, ho
 		// 关键词: scanCancel 时机, 不能在派发结束时取消, 在途结果保护
 		swg := utils.NewSizedWaitGroup(concurrent)
 		portsInt := utils.ParseStringToPorts(port)
+		hostsRaw := utils.ParseStringToHosts(host)
 	dispatch:
 		for _, p := range portsInt {
-			for _, hRaw := range utils.ParseStringToHosts(host) {
+			for _, hRaw := range hostsRaw {
 				// ctx 短路: cancel / 熔断后立即停止派发, 不再继续遍历端口与打印日志.
 				if scanCtx.Err() != nil {
 					break dispatch
@@ -295,10 +301,9 @@ func _scanFingerprint(ctx context.Context, config *fp.Config, concurrent int, ho
 							}
 							proto, portWithoutProto := utils.ParsePortToProtoPort(buildinPort) // 这里将协议和端口分开，便于后面打印日志
 							addr := utils.HostPort(buildinHost, buildinPort)
-							if filter.Exist(addr) {
+							if !filter.Insert(addr) {
 								return
 							}
-							filter.Insert(addr)
 							log.Debugf("start task to scan: [%s://%s]", proto, utils.HostPort(buildinHost, portWithoutProto))
 							result, err := matcher.MatchWithContext(scanCtx, buildinHost, buildinPort)
 							if err != nil {
@@ -323,6 +328,9 @@ func _scanFingerprint(ctx context.Context, config *fp.Config, concurrent int, ho
 					}
 				}
 
+				if guard.skipping(h) {
+					continue
+				}
 				swg.Add()
 				rawPort := p
 				rawHost := h
@@ -332,14 +340,13 @@ func _scanFingerprint(ctx context.Context, config *fp.Config, concurrent int, ho
 					fingerprintInFlight.Add(1)
 					defer fingerprintInFlight.Add(-1)
 
-					if scanCtx.Err() != nil {
+					if scanCtx.Err() != nil || guard.skipping(rawHost) {
 						return
 					}
 					addr := utils.HostPort(rawHost, rawPort)
-					if filter.Exist(addr) {
+					if !filter.Insert(addr) {
 						return
 					}
-					filter.Insert(addr)
 
 					//log.Infof("start task to scan: [%s://%s]", proto, utils.HostPort(rawHost, portWithoutProto))
 					result, err := matcher.MatchWithContext(scanCtx, rawHost, rawPort)
@@ -582,8 +589,7 @@ func _scanFromTargetStream(res interface{}, opts ...fp.ConfigOption) (chan *fp.M
 	guard := newHostPortGuard(guardLimit)
 	tripGuard := func(h string) {
 		if guard.observe(h) {
-			log.Errorf("host [%s] reached scan-port safety threshold (%d open ports in one scan); likely a tarpit/firewall responding on all ports, force stopping the scan to keep the system healthy", h, guardLimit)
-			scanCancel()
+			log.Errorf("host [%s] reached scan-port safety threshold (%d open ports in one scan); likely a tarpit/firewall responding on all ports, skipping the rest of this host", h, guardLimit)
 		}
 	}
 
@@ -601,6 +607,9 @@ func _scanFromTargetStream(res interface{}, opts ...fp.ConfigOption) (chan *fp.M
 			if scanCtx.Err() != nil {
 				break
 			}
+			if synRes == nil || guard.skipping(synRes.Host) {
+				continue
+			}
 			swg.Add()
 			rawPort := synRes.Port
 			rawHost := synRes.Host
@@ -611,7 +620,7 @@ func _scanFromTargetStream(res interface{}, opts ...fp.ConfigOption) (chan *fp.M
 				defer fingerprintInFlight.Add(-1)
 
 				// 派发到真正执行之间也可能已 cancel, 再次短路, 避免无谓的日志与扫描.
-				if scanCtx.Err() != nil {
+				if scanCtx.Err() != nil || guard.skipping(rawHost) {
 					return
 				}
 				log.Debugf("start task to scan: [%s://%s]", proto, utils.HostPort(rawHost, portWithoutProto))

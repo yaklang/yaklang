@@ -51,7 +51,8 @@ func TestUDPUnreachableAndSilenceDoNotOpen(t *testing.T) {
 	}
 	rec.mu.Lock()
 	defer rec.mu.Unlock()
-	if len(rec.udpGot) != 2 {
+	// Unreachable is final. Silence is sent a second time.
+	if len(rec.udpGot) != 3 {
 		t.Fatalf("udp probes = %v", rec.udpGot)
 	}
 }
@@ -552,31 +553,19 @@ func TestLoopbackUDPHostAliasesCollapse(t *testing.T) {
 }
 
 func TestQueuedTCPIsProbedAfterUDPReleasesTheSlot(t *testing.T) {
-	slot := make(chan struct{}, 1)
 	hold := make(chan struct{})
 	var tcpCalls atomic.Int32
 	rec := &recordingProber{}
 	rec.udp = func(ctx context.Context, _ string, _ []byte) (netstackvm.UDPSegment, error) {
 		select {
-		case slot <- struct{}{}:
+		case <-hold:
 		case <-ctx.Done():
 			return netstackvm.UDPSegment{}, ctx.Err()
 		}
-		select {
-		case <-hold:
-		case <-ctx.Done():
-		}
-		<-slot
 		return netstackvm.UDPSegment{}, netstackvm.ErrUDPNoResponse
 	}
 	rec.probe = func(ctx context.Context, _ string) (netstackvm.TCPSegment, error) {
 		tcpCalls.Add(1)
-		select {
-		case slot <- struct{}{}:
-		case <-ctx.Done():
-			return netstackvm.TCPSegment{}, ctx.Err()
-		}
-		<-slot
 		return netstackvm.TCPSegment{RemoteIP: net.IPv4(10, 0, 0, 8), RemotePort: 80}, nil
 	}
 	var opened atomic.Int32
@@ -597,8 +586,8 @@ func TestQueuedTCPIsProbedAfterUDPReleasesTheSlot(t *testing.T) {
 	done := make(chan struct{})
 	go func() { scanner.sendPacket(ch); close(done) }()
 	time.Sleep(200 * time.Millisecond)
-	if tcpCalls.Load() != 0 {
-		t.Fatal("tcp probe started before the udp slot was released")
+	if tcpCalls.Load() != 1 || opened.Load() != 1 {
+		t.Fatalf("tcp did not run while udp was held: calls %d opened %d", tcpCalls.Load(), opened.Load())
 	}
 	close(hold)
 	select {
@@ -612,31 +601,19 @@ func TestQueuedTCPIsProbedAfterUDPReleasesTheSlot(t *testing.T) {
 }
 
 func TestQueuedUDPIsProbedAfterTCPReleasesTheSlot(t *testing.T) {
-	slot := make(chan struct{}, 1)
 	hold := make(chan struct{})
 	var udpCalls atomic.Int32
 	rec := &recordingProber{}
 	rec.probe = func(ctx context.Context, _ string) (netstackvm.TCPSegment, error) {
 		select {
-		case slot <- struct{}{}:
+		case <-hold:
 		case <-ctx.Done():
 			return netstackvm.TCPSegment{}, ctx.Err()
 		}
-		select {
-		case <-hold:
-		case <-ctx.Done():
-		}
-		<-slot
 		return netstackvm.TCPSegment{}, netstackvm.ErrProbeNoResponse
 	}
 	rec.udp = func(ctx context.Context, _ string, _ []byte) (netstackvm.UDPSegment, error) {
 		udpCalls.Add(1)
-		select {
-		case slot <- struct{}{}:
-		case <-ctx.Done():
-			return netstackvm.UDPSegment{}, ctx.Err()
-		}
-		<-slot
 		return netstackvm.UDPSegment{RemoteIP: net.IPv4(10, 0, 0, 8), RemotePort: 9}, nil
 	}
 	var opened atomic.Int32
@@ -657,8 +634,8 @@ func TestQueuedUDPIsProbedAfterTCPReleasesTheSlot(t *testing.T) {
 	done := make(chan struct{})
 	go func() { scanner.sendPacket(ch); close(done) }()
 	time.Sleep(200 * time.Millisecond)
-	if udpCalls.Load() != 0 {
-		t.Fatal("udp probe started before the tcp slot was released")
+	if udpCalls.Load() != 1 || opened.Load() != 1 {
+		t.Fatalf("udp did not run while tcp was held: calls %d opened %d", udpCalls.Load(), opened.Load())
 	}
 	close(hold)
 	select {
@@ -719,24 +696,18 @@ func TestLoopbackQueuedTCPSurvivesSilentUDP(t *testing.T) {
 }
 
 func TestQueuedMixedBurstKeepsLaterDeadlines(t *testing.T) {
-	slot := make(chan struct{}, 1)
 	hold := make(chan struct{})
 	var tcpCalls, udpCalls atomic.Int32
 	rec := &recordingProber{}
 	rec.udp = func(ctx context.Context, target string, _ []byte) (netstackvm.UDPSegment, error) {
 		n := udpCalls.Add(1)
-		select {
-		case slot <- struct{}{}:
-		case <-ctx.Done():
-			return netstackvm.UDPSegment{}, ctx.Err()
-		}
 		if n == 1 {
 			select {
 			case <-hold:
 			case <-ctx.Done():
+				return netstackvm.UDPSegment{}, ctx.Err()
 			}
 		}
-		<-slot
 		if target == "10.0.0.8:9" {
 			return netstackvm.UDPSegment{RemoteIP: net.IPv4(10, 0, 0, 8), RemotePort: 9}, nil
 		}
@@ -750,12 +721,6 @@ func TestQueuedMixedBurstKeepsLaterDeadlines(t *testing.T) {
 		} else if remain := time.Until(deadline); remain < 50*time.Millisecond {
 			t.Errorf("queued tcp deadline already consumed: %s", remain)
 		}
-		select {
-		case slot <- struct{}{}:
-		case <-ctx.Done():
-			return netstackvm.TCPSegment{}, ctx.Err()
-		}
-		<-slot
 		_, portText, _ := strings.Cut(target, ":")
 		port, err := strconv.Atoi(portText)
 		if err != nil {
@@ -785,7 +750,7 @@ func TestQueuedMixedBurstKeepsLaterDeadlines(t *testing.T) {
 	done := make(chan struct{})
 	go func() { scanner.sendPacket(ch); close(done) }()
 	time.Sleep(200 * time.Millisecond)
-	if tcpCalls.Load() != 0 || udpCalls.Load() != 1 {
+	if tcpCalls.Load() != 3 || udpCalls.Load() != 1 {
 		t.Fatalf("during hold tcp=%d udp=%d", tcpCalls.Load(), udpCalls.Load())
 	}
 	close(hold)
@@ -794,7 +759,8 @@ func TestQueuedMixedBurstKeepsLaterDeadlines(t *testing.T) {
 	case <-time.After(time.Second):
 		t.Fatal("queued burst did not finish")
 	}
-	if tcpCalls.Load() != 3 || udpCalls.Load() != 3 || opened.Load() != 4 {
+	// Silent UDP targets are retried once. The open UDP target is not.
+	if tcpCalls.Load() != 3 || udpCalls.Load() != 5 || opened.Load() != 4 {
 		t.Fatalf("tcp %d udp %d opened %d", tcpCalls.Load(), udpCalls.Load(), opened.Load())
 	}
 }

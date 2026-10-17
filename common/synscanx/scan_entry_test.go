@@ -111,7 +111,7 @@ func TestSubmitTargetEmitsPlannedTCPTargets(t *testing.T) {
 		}
 		got = append(got, target.Host+":"+itoa(target.Port))
 	}
-	want := []string{"10.0.0.1:80", "10.0.0.1:443", "10.0.0.2:80", "10.0.0.2:443"}
+	want := []string{"10.0.0.1:80", "10.0.0.2:80", "10.0.0.1:443", "10.0.0.2:443"}
 	if len(got) != len(want) {
 		t.Fatalf("targets = %v", got)
 	}
@@ -141,8 +141,15 @@ func TestSubmitTargetStopsWhenOpenPortCapAlreadyHit(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for range ch {
-		t.Fatal("submit continued after the open-port cap was already reached")
+	var got []string
+	for target := range ch {
+		if target.Host == "10.0.0.1" {
+			t.Fatalf("capped host was still submitted: %+v", target)
+		}
+		got = append(got, target.Host+":"+itoa(target.Port))
+	}
+	if len(got) != 2 || got[0] != "10.0.0.2:80" || got[1] != "10.0.0.2:81" {
+		t.Fatalf("targets = %v", got)
 	}
 }
 
@@ -371,11 +378,11 @@ func TestSendPacketBoundsWorkersAndCancelsPendingProbes(t *testing.T) {
 
 func TestSynPacketRateFollowsYakLimits(t *testing.T) {
 	pps, inFlight := synPacketRate(nil)
-	if pps != defaultSYNPacketsPerSecond || inFlight != defaultTCPProbeConcurrency {
+	if pps != defaultSYNPacketsPerSecond || inFlight != 4000 {
 		t.Fatalf("nil config = %d pps, %d in flight", pps, inFlight)
 	}
 	pps, inFlight = synPacketRate(NewDefaultConfig())
-	if pps != 1000 || inFlight != 256 {
+	if pps != 1000 || inFlight != 4000 {
 		t.Fatalf("default = %d pps, %d in flight", pps, inFlight)
 	}
 

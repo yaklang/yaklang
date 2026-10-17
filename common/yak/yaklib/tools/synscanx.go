@@ -46,7 +46,7 @@ import (
 // ```
 // // 控制发包速率，并把开放端口写入文件，每行带 tcp:// 前缀便于后续处理
 // res, err = synscan.Scan("10.0.0.0/24", "80,443",
-//     synscan.rateLimit(1, 1000),          // 每 1 毫秒最多发送 1000 个包
+//     synscan.rateLimit(1, 1000),          // 每 1 毫秒发送 1000 个包，上限每秒 100000
 //     synscan.outputFile("open_ports.txt"),
 //     synscan.outputPrefix("tcp://"),
 // )
@@ -220,6 +220,7 @@ var SynxPortScanExports = map[string]interface{}{
 	"excludeHosts":       synscanx.WithExcludeHosts,
 	"excludePorts":       synscanx.WithExcludePorts,
 	"wait":               synscanx.WithWaiting,
+	"tcpTimeout":         synscanx.WithTCPProbeTimeoutSeconds,
 	"outputFile":         synscanx.WithOutputFile,
 	"outputPrefix":       synscanx.WithOutputFilePrefix,
 	"initHostFilter":     synscanx.WithInitFilterHosts,

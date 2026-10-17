@@ -6,8 +6,9 @@ import (
 )
 
 type SynScanResult struct {
-	Host string
-	Port int
+	Host     string
+	Port     int
+	Protocol string
 }
 
 func (s *SynScanResult) Show() {
@@ -21,5 +22,9 @@ func (s *SynScanResult) String() string {
 	if s == nil {
 		return ""
 	}
-	return fmt.Sprintf("OPEN: %-20s from synscan", utils.HostPort(s.Host, s.Port))
+	target := utils.HostPort(s.Host, s.Port)
+	if s.Protocol == "udp" {
+		target = "udp://" + target
+	}
+	return fmt.Sprintf("OPEN: %-20s from synscan", target)
 }

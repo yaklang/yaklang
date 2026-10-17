@@ -756,13 +756,13 @@ func TestHalfOpenTransportPolicy(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			iface := &net.Interface{Name: tc.name, Flags: tc.flags}
-			err := validateHalfOpenTransport(iface, tc.link, false)
+			err := validateHalfOpenTransport(iface, nil, tc.link, false)
 			if tc.allowed {
 				require.NoError(t, err)
 			} else {
 				require.ErrorIs(t, err, ErrUnverifiedSYNTransport)
 			}
-			require.NoError(t, validateHalfOpenTransport(iface, tc.link, true))
+			require.NoError(t, validateHalfOpenTransport(iface, nil, tc.link, true))
 		})
 	}
 }
@@ -970,4 +970,37 @@ func TestHalfOpenChecksumOffloadRequiresKernelEvidence(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestValidProbeReplyAcceptsSynAckPayload(t *testing.T) {
+	local := net.IPv4(192, 0, 2, 10).To4()
+	remote := net.IPv4(192, 0, 2, 20).To4()
+	syn := TCPSegment{LocalIP: local, LocalPort: 40000, RemoteIP: remote, RemotePort: 80, Seq: 10}
+	reply := TCPSegment{LocalIP: local, LocalPort: 40000, RemoteIP: remote, RemotePort: 80, Ack: 11, SYN: true, ACK: true, PSH: true, PayloadLen: 8}
+	require.True(t, validProbeReply(syn, reply))
+	reply.FIN = true
+	require.False(t, validProbeReply(syn, reply))
+}
+
+func TestOfferProbeReplyPrefersSynAckOverReset(t *testing.T) {
+	ch := make(chan probeReply, 1)
+	rst := probeReply{segment: TCPSegment{RST: true, ACK: true}}
+	synAck := probeReply{segment: TCPSegment{SYN: true, ACK: true}}
+	offerProbeReply(ch, rst)
+	offerProbeReply(ch, synAck)
+	got := <-ch
+	require.True(t, got.segment.SYN)
+	require.False(t, got.segment.RST)
+
+	offerProbeReply(ch, synAck)
+	offerProbeReply(ch, probeReply{unreachable: true})
+	got = <-ch
+	require.True(t, got.segment.SYN)
+	require.False(t, got.unreachable)
+}
+
+func TestNpcapLoopbackWithoutFlagIsAccepted(t *testing.T) {
+	iface := &net.Interface{Name: `\Device\NPF_Loopback`, Flags: net.FlagUp}
+	require.NoError(t, validateHalfOpenTransport(iface, net.IPv4(127, 0, 0, 1), layers.LinkTypeNull, false))
+	require.True(t, interfaceLooksLoopback(iface, net.IPv4(127, 0, 0, 1)))
 }

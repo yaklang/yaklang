@@ -110,6 +110,9 @@ func (t *pcapProbeTransport) receive(ctx context.Context) (TCPSegment, []byte, e
 		}
 		return TCPSegment{}, nil, ctx.Err()
 	case r := <-t.flight.replies:
+		if r.unreachable {
+			return TCPSegment{}, nil, ErrProbeUnreachable
+		}
 		return r.segment, r.raw, nil
 	}
 }

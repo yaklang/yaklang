@@ -276,24 +276,24 @@ func GetExtYakitLibByClient(client *YakitClient) map[string]interface{} {
 		client = emptyVirtualClient
 	}
 	YakitExports := map[string]interface{}{
-		"Info":                client.YakitInfo,
-		"Debug":               client.YakitDebug,
-		"Warn":                client.YakitWarn,
-		"Error":               client.YakitError,
-		"Text":                client.YakitTextBlock,
-		"Success":             client.YakitSuccess,
-		"Code":                client.YakitCode,
-		"Markdown":            client.YakitMarkdown,
-		"Report":              client.YakitReport,
-		"File":                client.YakitFile,
-		"Output":              client.Output,
-		"AIOutput":            client.AIOutput,
-		"AIAgentSession":      client.AIAgentSession,
-		"SetProgress":         client.YakitSetProgress,
-		"SetProgressEx":       client.YakitSetProgressEx,
-		"Stream":              client.Stream,
-		"SSAStream":           client.SSAStream,
-		"EmitSSAResult":  client.EmitSSAResult,
+		"Info":            client.YakitInfo,
+		"Debug":           client.YakitDebug,
+		"Warn":            client.YakitWarn,
+		"Error":           client.YakitError,
+		"Text":            client.YakitTextBlock,
+		"Success":         client.YakitSuccess,
+		"Code":            client.YakitCode,
+		"Markdown":        client.YakitMarkdown,
+		"Report":          client.YakitReport,
+		"File":            client.YakitFile,
+		"Output":          client.Output,
+		"AIOutput":        client.AIOutput,
+		"AIAgentSession":  client.AIAgentSession,
+		"SetProgress":     client.YakitSetProgress,
+		"SetProgressEx":   client.YakitSetProgressEx,
+		"Stream":          client.Stream,
+		"SSAStream":       client.SSAStream,
+		"EmitSSAResult":   client.EmitSSAResult,
 		"GetGitHubAPIKey": getGitHubAPIKey,
 		"GetGiteeAPIKey":  getGiteeAPIKey,
 	}
@@ -968,10 +968,14 @@ func NewPortFromSpaceEngineResult(f *base.NetSpaceEngineResult) *schema.Port {
 }
 
 func NewPortFromSynScanResult(f *synscan.SynScanResult) *schema.Port {
+	proto := f.Protocol
+	if proto == "" {
+		proto = "tcp"
+	}
 	return &schema.Port{
 		Host:  f.Host,
 		Port:  f.Port,
-		Proto: "tcp",
+		Proto: proto,
 		State: "open",
 	}
 }

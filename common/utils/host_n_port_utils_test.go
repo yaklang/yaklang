@@ -1,10 +1,12 @@
 package utils
 
 import (
-	"github.com/davecgh/go-spew/spew"
-	"github.com/stretchr/testify/assert"
+	"fmt"
 	"net"
 	"testing"
+
+	"github.com/davecgh/go-spew/spew"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestParseHostToString(t *testing.T) {
@@ -324,5 +326,34 @@ func TestHostContains(t *testing.T) {
 	for _, c := range cases {
 		res := HostContains(c.input, c.target)
 		assert.Equal(t, c.result, res, "input: %v,%v exclude: %v", c.input, c.target, c.result)
+	}
+}
+
+func TestUDPPortEncodingDoesNotCollideWithTCP(t *testing.T) {
+	for port := 1; port <= 65535; port++ {
+		encoded := EncodeUDPPort(port)
+		proto, service := ParsePortToProtoPort(encoded)
+		if proto != "udp" || service != port {
+			t.Fatalf("udp %d encoded %d decoded %s %d", port, encoded, proto, service)
+		}
+		tcpProto, tcpPort := ParsePortToProtoPort(port)
+		if tcpProto != "tcp" || tcpPort != port {
+			t.Fatalf("tcp %d decoded as %s %d", port, tcpProto, tcpPort)
+		}
+		if encoded == port {
+			t.Fatalf("udp %d collided with tcp %d", port, port)
+		}
+	}
+	parsed := ParseStringToPorts("U:1,U:15,U:16,U:53,4096")
+	got := map[string]int{}
+	for _, port := range parsed {
+		proto, service := ParsePortToProtoPort(port)
+		got[fmt.Sprintf("%s:%d", proto, service)]++
+	}
+	if got["udp:1"] != 1 || got["udp:15"] != 1 || got["udp:16"] != 1 || got["udp:53"] != 1 || got["tcp:4096"] != 1 {
+		t.Fatalf("parsed = %#v", got)
+	}
+	if _, service := ParsePortToProtoPort(53 << 12); service != 53 {
+		t.Fatalf("historical udp 53 encoding was not preserved")
 	}
 }

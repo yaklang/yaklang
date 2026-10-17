@@ -4,6 +4,8 @@ import (
 	"context"
 	"net"
 	"time"
+
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 type PingConfig struct {
@@ -23,7 +25,7 @@ func NewPingConfig() *PingConfig {
 	return &PingConfig{
 		Ctx:                       context.Background(),
 		timeout:                   5 * time.Second,
-		defaultTcpPort:            "22,80,443",
+		defaultTcpPort:            utils.DefaultHostAlivePorts,
 		linkAddressResolveTimeout: 2 * time.Second,
 	}
 }

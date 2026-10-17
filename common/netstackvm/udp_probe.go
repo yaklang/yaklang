@@ -325,10 +325,7 @@ func (h *HalfOpenSYN) observeUDP(nic tcpip.NICID, packet gopacket.Packet, ip *la
 		RemotePort: uint16(udpLayer.SrcPort),
 		Payload:    append([]byte(nil), udpLayer.Payload...),
 	}
-	select {
-	case f.results <- udpResult{segment: seg}:
-	default:
-	}
+	offerUDPResult(f.results, udpResult{segment: seg})
 }
 
 func (h *HalfOpenSYN) observeUDPUnreachable(nic tcpip.NICID, packet gopacket.Packet) {
@@ -342,16 +339,31 @@ func (h *HalfOpenSYN) observeUDPUnreachable(nic tcpip.NICID, packet gopacket.Pac
 	if f == nil || f.ctx.Err() != nil || h.ctx.Err() != nil || f.frame == nil || (!f.sent && !f.sending) {
 		return
 	}
-	select {
-	case f.results <- udpResult{unreachable: true}:
-	default:
-	}
+	offerUDPResult(f.results, udpResult{unreachable: true})
 }
 
 // unreachableUDPKey accepts a port-unreachable only when the outer IPv4 and
 // ICMP checksums are valid. The quoted datagram may be the RFC 792 minimum:
 // the IPv4 header plus the first 8 bytes of UDP.
 func unreachableUDPKey(nic tcpip.NICID, packet gopacket.Packet) (flightKey, bool) {
+	return unreachableTransportKey(nic, packet, header.UDPProtocolNumber, func(code header.ICMPv4Code) bool {
+		return code == header.ICMPv4PortUnreachable
+	})
+}
+
+func unreachableTCPKey(nic tcpip.NICID, packet gopacket.Packet) (flightKey, bool) {
+	return unreachableTransportKey(nic, packet, header.TCPProtocolNumber, func(code header.ICMPv4Code) bool {
+		switch code {
+		case header.ICMPv4NetUnreachable, header.ICMPv4HostUnreachable, header.ICMPv4ProtoUnreachable, header.ICMPv4PortUnreachable,
+			header.ICMPv4NetProhibited, header.ICMPv4HostProhibited, header.ICMPv4AdminProhibited:
+			return true
+		default:
+			return false
+		}
+	})
+}
+
+func unreachableTransportKey(nic tcpip.NICID, packet gopacket.Packet, proto tcpip.TransportProtocolNumber, accept func(header.ICMPv4Code) bool) (flightKey, bool) {
 	if packet == nil || packet.Metadata().Truncated {
 		return flightKey{}, false
 	}
@@ -379,13 +391,17 @@ func unreachableUDPKey(nic tcpip.NICID, packet gopacket.Packet) (flightKey, bool
 		return flightKey{}, false
 	}
 	icmpHdr := header.ICMPv4(icmpBytes)
-	if icmpHdr.Type() != header.ICMPv4DstUnreachable || icmpHdr.Code() != header.ICMPv4PortUnreachable {
+	if icmpHdr.Type() != header.ICMPv4DstUnreachable || !accept(icmpHdr.Code()) {
 		return flightKey{}, false
 	}
-	return quotedUDPKey(nic, icmpHdr.Payload())
+	return quotedTransportKey(nic, icmpHdr.Payload(), proto)
 }
 
 func quotedUDPKey(nic tcpip.NICID, quote []byte) (flightKey, bool) {
+	return quotedTransportKey(nic, quote, header.UDPProtocolNumber)
+}
+
+func quotedTransportKey(nic tcpip.NICID, quote []byte, proto tcpip.TransportProtocolNumber) (flightKey, bool) {
 	if len(quote) < header.IPv4MinimumSize+header.ICMPv4MinimumErrorPayloadSize {
 		return flightKey{}, false
 	}
@@ -394,7 +410,7 @@ func quotedUDPKey(nic tcpip.NICID, quote []byte) (flightKey, bool) {
 	if hlen < header.IPv4MinimumSize || hlen > header.IPv4MaximumHeaderSize || len(quote) < hlen+header.ICMPv4MinimumErrorPayloadSize {
 		return flightKey{}, false
 	}
-	if quote[0]>>4 != header.IPv4Version || ip.TransportProtocol() != header.UDPProtocolNumber {
+	if quote[0]>>4 != header.IPv4Version || ip.TransportProtocol() != proto {
 		return flightKey{}, false
 	}
 	if ip.More() || ip.FragmentOffset() != 0 {
@@ -445,6 +461,32 @@ func udpChecksumValid(ip header.IPv4) bool {
 	}
 	sum := header.PseudoHeaderChecksum(header.UDPProtocolNumber, ip.SourceAddress(), ip.DestinationAddress(), u.Length())
 	return checksum.Checksum(u[:n], sum) == 0xffff
+}
+
+// offerUDPResult keeps a datagram when an ICMP unreachable is already queued,
+// and lets a datagram replace that unreachable. A 1-slot channel otherwise
+// drops whichever packet arrives second.
+func offerUDPResult(ch chan udpResult, res udpResult) {
+	select {
+	case ch <- res:
+		return
+	default:
+	}
+	select {
+	case old := <-ch:
+		if !old.unreachable && res.unreachable {
+			select {
+			case ch <- old:
+			default:
+			}
+			return
+		}
+	default:
+	}
+	select {
+	case ch <- res:
+	default:
+	}
 }
 
 func parsePort(text string) (int, error) {
