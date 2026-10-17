@@ -13,6 +13,7 @@ import (
 type dlmsSNBlockKey struct {
 	dir                 int
 	source, destination uint32
+	upload, write       bool
 }
 type dlmsSNBlockLink struct {
 	wire                           *binDLMSWrapper
@@ -35,20 +36,54 @@ func dlmsSNBlockWire(w []byte) bool {
 	return len(info) >= 4 && info[0] == 0xe6 && info[2] == 0 && (info[1] == 0xe6 || info[1] == 0xe7) && dlmsSNServiceBlockAPDU(info[3:])
 }
 func dlmsSNBlockMessageKey(m *dlmsMessage, dir int) dlmsSNBlockKey {
-	if m.request {
-		return dlmsSNBlockKey{1 - dir, m.destination, m.source}
+	upload, write := false, false
+	if m.snBlock != nil {
+		upload, write = m.snBlock.snUpload, m.snBlock.snUpload && m.snBlock.snWrite
 	}
-	return dlmsSNBlockKey{dir, m.source, m.destination}
+	key := dlmsSNBlockKey{dir, m.source, m.destination, upload, write}
+	echo := m.request != upload
+	if echo {
+		key.dir, key.source, key.destination = 1-dir, m.destination, m.source
+	}
+	return key
 }
 func (s *binDLMS) retireOrdinarySNBlock(m *dlmsMessage, dir int) {
-	if m.request {
-		delete(s.snBlocks, dlmsSNBlockMessageKey(m, dir))
+	if !m.request {
+		return
 	}
+	for key := range s.snBlocks {
+		down := !key.upload && key.dir == 1-dir && key.source == m.destination && key.destination == m.source
+		up := key.upload && key.dir == dir && key.source == m.source && key.destination == m.destination
+		if down || up {
+			delete(s.snBlocks, key)
+		}
+	}
+}
+func dlmsSNBlockShadowKey(key dlmsSNBlockKey) wrapperSNKey {
+	return wrapperSNKey{wrapperGBTKey{key.dir, 0, 0}, key.upload, key.write}
+}
+func dlmsSNBlockProfile(key dlmsSNBlockKey) string {
+	if key.upload {
+		if key.write {
+			return "dlms-hdlc-sn-write-upload"
+		}
+		return "dlms-hdlc-sn-read-upload"
+	}
+	return "dlms-hdlc-sn-read-block"
+}
+func dlmsSNBlockCloseSummary(key dlmsSNBlockKey) string {
+	if key.upload {
+		if key.write {
+			return "DLMS HDLC SN Write upload wire group ended before complete request body"
+		}
+		return "DLMS HDLC SN Read upload wire group ended before complete request body"
+	}
+	return "DLMS HDLC SN Read wire group ended before complete Data"
 }
 func (f *binFlow) consumeDLMSSNServiceBlock(dir int, w []byte, id uint64, m *dlmsMessage) (map[string]any, uint64, error) {
 	s := f.dlms
-	s.operationProfile = "dlms-hdlc-sn-read-block"
 	key := dlmsSNBlockMessageKey(m, dir)
+	s.operationProfile = dlmsSNBlockProfile(key)
 	link := s.snBlocks[key]
 	created := link == nil
 	if created {
@@ -56,9 +91,18 @@ func (f *binFlow) consumeDLMSSNServiceBlock(dir int, w []byte, id uint64, m *dlm
 	}
 	// The shadow has exactly one already-separated UInt32 logical link. Its zero
 	// synthetic Wrapper ports never escape or identify the real HDLC context.
-	wk := wrapperSNKey{wrapperGBTKey{dir, 0, 0}, false, false}
-	if m.request {
-		wk.dir = 1 - dir
+	wk := dlmsSNBlockShadowKey(key)
+	echo := m.request != m.snBlock.snUpload
+	// Wrong caller/address must not consume or interrupt the matching mode's
+	// existing group. Each logical link owns its shadow, so classify an absent
+	// link against the observed same-mode context before invoking that shadow.
+	if created && key.upload && (echo || m.snBlock.blockNumber != 1) {
+		for other := range s.snBlocks {
+			if other.upload == key.upload && other.write == key.write {
+				m.fields["Association"] = "unmatched-sn-block-context"
+				return m.fields, 0, nil
+			}
+		}
 	}
 	group := link.wire.snGroups[wk]
 	body := m.snBlock
@@ -68,12 +112,12 @@ func (f *binFlow) consumeDLMSSNServiceBlock(dir int, w []byte, id uint64, m *dlm
 	}
 	if group != nil && !group.ambiguous {
 		hash := sha256.Sum256(w)
-		exact := !m.request && group.lastHash == hash || m.request && group.ackEvent != 0 && group.ackHash == hash
+		exact := !echo && group.lastHash == hash || echo && group.ackEvent != 0 && group.ackHash == hash
 		// Without an observed echo, NR cannot be judged against an echo NS.
 		// Let the shared phase guard retire that missing-context case first.
-		if !exact && group.active && (m.request || group.acked) {
+		if !exact && group.active && (echo || group.acked) {
 			good := m.ns == (link.responseNS+1)&7 && m.nr == (link.echoNS+1)&7
-			if m.request {
+			if echo {
 				good = m.ns == link.responseNR && m.nr == (link.responseNS+1)&7
 			}
 			if !good {
@@ -83,7 +127,7 @@ func (f *binFlow) consumeDLMSSNServiceBlock(dir int, w []byte, id uint64, m *dlm
 			}
 		}
 	}
-	if created && !m.request && body.blockNumber == 1 && !s.ambiguous && len(s.snBlocks) >= sessionCollectionLimit(f.a.budget.MaxCollectionElements) {
+	if created && !echo && body.blockNumber == 1 && !s.ambiguous && len(s.snBlocks) >= sessionCollectionLimit(f.a.budget.MaxCollectionElements) {
 		s.invalidate()
 		return nil, 0, dlmsError(ErrResourceExceeded, "SN service-block logical link budget")
 	}
@@ -109,9 +153,9 @@ func (f *binFlow) consumeDLMSSNServiceBlock(dir int, w []byte, id uint64, m *dlm
 		s.snBlocks[key] = link
 	}
 	switch association {
-	case "unverified-sn-data-block", "unverified-sn-wire-group-complete":
+	case "unverified-sn-data-block", "unverified-sn-wire-group-complete", "unverified-sn-upload-block", "unverified-sn-upload-wire-group-complete", "unverified-sn-write-upload-block", "unverified-sn-write-upload-wire-group-complete":
 		link.responseNS, link.responseNR = m.ns, m.nr
-	case "unverified-sn-block-number-access":
+	case "unverified-sn-block-number-access", "unverified-sn-upload-echo", "unverified-sn-write-upload-echo":
 		link.echoNS = m.ns
 	}
 	m.fields["Association"] = association
@@ -160,13 +204,25 @@ func (s *binDLMS) unfinishedSNBlockKeys() []dlmsSNBlockKey {
 		if a.source != b.source {
 			return a.source < b.source
 		}
-		return a.destination < b.destination
+		if a.destination != b.destination {
+			return a.destination < b.destination
+		}
+		if a.upload != b.upload {
+			return !a.upload && b.upload
+		}
+		return !a.write && b.write
 	})
 	return out
 }
 func (s *binDLMS) snBlockCloseFields(key dlmsSNBlockKey) map[string]any {
-	p := s.snBlocks[key].wire.snGroups[wrapperSNKey{wrapperGBTKey{key.dir, 0, 0}, false, false}]
-	return map[string]any{"Buffered SN Groups": 1, "source_address": key.source, "destination_address": key.destination, "observed_block_count": p.blocks, "assembled_data_length": len(p.data), "block_number": p.last}
+	p := s.snBlocks[key].wire.snGroups[dlmsSNBlockShadowKey(key)]
+	fields := map[string]any{"Buffered SN Groups": 1, "source_address": key.source, "destination_address": key.destination, "observed_block_count": p.blocks, "block_number": p.last}
+	length := "assembled_data_length"
+	if key.upload {
+		length = "assembled_body_length"
+	}
+	fields[length] = len(p.data)
+	return fields
 }
 
 // This complete-frame MVP requires an uninterrupted observed service-block /
@@ -175,11 +231,11 @@ func (s *binDLMS) snBlockCloseFields(key dlmsSNBlockKey) map[string]any {
 // cycle); do not assemble across them or reinterpret old LN sequence history.
 // Full supervisory/window and interleaved service support remain pending.
 func (s *binDLMS) observeSNBlockInterruption(m *dlmsMessage, dir int) {
-	if m.snBlock != nil {
-		return
-	}
 	for key, l := range s.snBlocks {
-		p := l.wire.snGroups[wrapperSNKey{wrapperGBTKey{key.dir, 0, 0}, false, false}]
+		if m.snBlock != nil && m.snBlock.snUpload == key.upload && (m.snBlock.snUpload && m.snBlock.snWrite) == key.write {
+			continue
+		}
+		p := l.wire.snGroups[dlmsSNBlockShadowKey(key)]
 		if p == nil || !p.active {
 			continue
 		}

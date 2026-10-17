@@ -289,7 +289,13 @@ func TestDLMSHDLCSNReadMatrix(t *testing.T) {
 	hdlcSNReadMatrix(t, hdlcSNReadControls(t), "dlms-hdlc-sn-read")
 }
 func hdlcSNReadMatrix(t *testing.T, cases []hdlcSNReadCase, batch string) {
+	hdlcSNReadMatrixTransports(t, cases, batch, []string{"udp", "tcp"})
+}
+func hdlcSNReadMatrixTransports(t *testing.T, cases []hdlcSNReadCase, batch string, transports []string) {
 	env := "DLMS_HDLC_SN_READ_TEST_ROOT"
+	if batch == "dlms-hdlc-sn-upload" {
+		env = "DLMS_HDLC_SN_UPLOAD_TEST_ROOT"
+	}
 	if batch == "dlms-hdlc-sn-read-block" {
 		env = "DLMS_HDLC_SN_BLOCK_TEST_ROOT"
 	}
@@ -303,13 +309,17 @@ func hdlcSNReadMatrix(t *testing.T, cases []hdlcSNReadCase, batch string) {
 		env = "DLMS_HDLC_SN_WRITE_TEST_ROOT"
 	}
 	for _, tc := range cases {
-		for _, tr := range []string{"udp", "tcp"} {
+		for _, tr := range transports {
 			t.Run(tc.Name+"/"+tr, func(t *testing.T) {
 				c := tc.hdlcOpCase
 				c.Steps = append([]hdlcOpStep(nil), c.Steps...)
 				for i := range c.Steps {
 					if tr == "udp" {
 						c.Steps[i].Direction = int(tc.Metadata[i]["capture_udp_direction"].(float64))
+					} else if batch == "dlms-hdlc-sn-upload" {
+						if direction, ok := tc.Metadata[i]["capture_tcp_direction"]; ok {
+							c.Steps[i].Direction = int(direction.(float64))
+						}
 					}
 				}
 				name := c.Name + "." + tr + ".pcap"
@@ -320,7 +330,7 @@ func hdlcSNReadMatrix(t *testing.T, cases []hdlcSNReadCase, batch string) {
 					var err error
 					const prefix = "common/pcapx/pcaputil/"
 					require.True(t, strings.HasPrefix(alias, prefix))
-					if (batch == "dlms-hdlc-sn-read-block" || batch == "dlms-sn-information-segments" || batch == "dlms-sn-information-segments-hard" || batch == "dlms-sn-information-segments-lookalike" || batch == "dlms-sn-parameterized-hdlc") && strings.HasPrefix(alias, prefix+batch+"/") {
+					if (batch == "dlms-hdlc-sn-upload" || batch == "dlms-hdlc-sn-read-block" || batch == "dlms-sn-information-segments" || batch == "dlms-sn-information-segments-hard" || batch == "dlms-sn-information-segments-lookalike" || batch == "dlms-sn-parameterized-hdlc") && strings.HasPrefix(alias, prefix+batch+"/") {
 						name := strings.TrimPrefix(alias, prefix+batch+"/")
 						require.NotContains(t, name, "/")
 						raw = finsReadBatch(t, batch, env, name)
@@ -348,6 +358,11 @@ func hdlcSNReadMatrix(t *testing.T, cases []hdlcSNReadCase, batch string) {
 							if st.TCPOverride != nil {
 								count--
 							}
+						}
+					}
+					if len(es) != count+len(c.Close.Events) {
+						for i, e := range es {
+							t.Logf("capture diagnostic event%d: profile=%s direction=%d status=%s error=%s session=%#v", i, e.Profile, e.Direction, e.Status, e.Error, e.Session)
 						}
 					}
 					require.Len(t, es, count+len(c.Close.Events))
@@ -382,6 +397,20 @@ func hdlcSNReadMatrix(t *testing.T, cases []hdlcSNReadCase, batch string) {
 						e := es[idx]
 						require.Equal(t, tc.Metadata[i]["source"], e.Source)
 						require.Equal(t, tc.Metadata[i]["destination"], e.Destination)
+						if want, ok := tc.Metadata[i]["public_error"]; ok {
+							require.Equal(t, want, e.Error)
+							if st.Error != "" {
+								for _, query := range []func() error{
+									func() error { _, err := e.GetFields(); return err },
+									func() error { _, err := e.Decode(); return err },
+								} {
+									var pe *ProtocolError
+									require.ErrorAs(t, query(), &pe)
+									require.Equal(t, st.Error, string(pe.Kind))
+									require.Equal(t, tc.Metadata[i]["query_error_message"], pe.Message)
+								}
+							}
+						}
 						require.Equal(t, CaptureDomain{}, e.Domain)
 						require.Len(t, e.SourceBytes.PacketRefs, 1)
 						refKey := "PacketRef_udp"
@@ -392,9 +421,9 @@ func hdlcSNReadMatrix(t *testing.T, cases []hdlcSNReadCase, batch string) {
 						require.Equal(t, e.Domain, e.SourceBytes.PacketRefs[0].Domain)
 						idx++
 						require.NotZero(t, e.ID)
-						wantFlow := tc.Metadata[i]["captured_udp_flow_nonzero"].(bool)
-						if tr == "tcp" {
-							wantFlow = true
+						wantFlow := true
+						if tr == "udp" {
+							wantFlow = tc.Metadata[i]["captured_udp_flow_nonzero"].(bool)
 						}
 						if wantFlow {
 							require.NotZero(t, e.FlowID)
@@ -414,7 +443,13 @@ func hdlcSNReadMatrix(t *testing.T, cases []hdlcSNReadCase, batch string) {
 						}
 					}
 					hdlcOpCheck(t, c, es[:count], tr, false, d)
-					hdlcGetCloseCheck(t, c, es[count:], tr, flow, false, "ctx-canceled")
+					if batch == "dlms-hdlc-sn-upload" && len(tc.Steps) > 0 && tc.Steps[0].Direction != c.Steps[0].Direction {
+						// Capture direction is relative to its observed initiator, independently
+						// of native Feed caller numbering. Keep literal physical endpoints.
+						hdlcGetCloseCheckEndpoints(t, c, es[count:], tr, flow, true, "ctx-canceled", []string{"192.0.2.2:4059", "192.0.2.1:41000"})
+					} else {
+						hdlcGetCloseCheck(t, c, es[count:], tr, flow, false, "ctx-canceled")
+					}
 					require.EqualValues(t, count, stats.Messages)
 					require.EqualValues(t, len(c.Close.Events), stats.Incomplete)
 				})
@@ -428,7 +463,7 @@ func hdlcSNReadMatrix(t *testing.T, cases []hdlcSNReadCase, batch string) {
 // fields and metadata remain exact, and old SN/other-service rows are untouched.
 func hdlcSNBlockBindStep(t *testing.T, st hdlcOpStep, ids []uint64) hdlcOpStep {
 	t.Helper()
-	if st.Profile != "dlms-hdlc-sn-read-block" || st.Fields == nil {
+	if (st.Profile != "dlms-hdlc-sn-read-block" && st.Profile != "dlms-hdlc-sn-read-upload" && st.Profile != "dlms-hdlc-sn-write-upload") || st.Fields == nil {
 		return st
 	}
 	var bind func(any) any

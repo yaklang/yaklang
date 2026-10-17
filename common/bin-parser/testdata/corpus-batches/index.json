@@ -118551,6 +118551,502 @@
         "common/pcapx/pcaputil/dlms-sn-write-upload/lifecycle-controls.json": "dlms-sn-write-upload/lifecycle-controls.json",
         "scripts/protocol-tests/required-tests-traffic-unified-v163.json": "required-tests-traffic-unified-v163.json"
       }
+    },
+    {
+      "id": "validation-dlms-hdlc-sn-upload",
+      "kind": "support",
+      "source_sha": "6120e6c3f1e33a9b0fb985dbe4947bf171224322",
+      "file": "validation-dlms-hdlc-sn-upload.zip",
+      "sha256": "6a0940bcea18c68b5de1373c22c57dd8166988a1052ad5e00629077034c8197c",
+      "password": "bin-parser",
+      "members": {
+        "dlms-hdlc-sn-upload-source/CONTRACT.json": {
+          "bytes": 3610,
+          "sha256": "c91c18b6f4f57133dbe9241bedebcb3299a21581a22da1cc49181a7c099234ef"
+        },
+        "dlms-hdlc-sn-upload-source/SOURCES.json": {
+          "bytes": 10708,
+          "sha256": "84274a312f98d6b0dc35731d7528355c2b4cf40c76dc944fbcc10d31abc6e433"
+        },
+        "dlms-hdlc-sn-upload-source/TYPES.json": {
+          "bytes": 2162,
+          "sha256": "36b43a8ca5b29abadb87602ced7936cd94823d8afa84224f4b4418ebb8c05f2e"
+        },
+        "dlms-hdlc-sn-upload-source/baseline-controls.json": {
+          "bytes": 69570,
+          "sha256": "9801737c465ffc8f867d902db4ee41533b06c9b85607a2ae7c40eb6fa32d5830"
+        },
+        "dlms-hdlc-sn-upload-source/carrier-controls.json": {
+          "bytes": 241247,
+          "sha256": "04509cdda9c58f0caff919e8b8413cc591df71261e48ad30055af4a80d07c391"
+        },
+        "dlms-hdlc-sn-upload-source/controls.json": {
+          "bytes": 255521,
+          "sha256": "ae0f3786f5f7bde8127157e8fc1c11a438e32e86694c016897652f4b653de126"
+        },
+        "dlms-hdlc-sn-upload-source/information-boundary-supplement.json": {
+          "bytes": 38844,
+          "sha256": "8437f62477cc627660ad3480db4a2786393d3e5ba3d26b55ac7ec872b2385e87"
+        },
+        "dlms-hdlc-sn-upload-source/tcp-requester-conflict.json": {
+          "bytes": 28956,
+          "sha256": "036a576955fb011755703b4d12eeb1cefbb7019d3589e7a3428f595c7ce45d11"
+        },
+        "dlms-hdlc-sn-upload-tools/bind-carrier.py": {
+          "bytes": 2128,
+          "sha256": "e51ae3e3f15eba8b6be08ed959bcaba76029147a8d1452bd42d74c84443bb6f5"
+        },
+        "dlms-hdlc-sn-upload-tools/bind-tcp-conflict.py": {
+          "bytes": 997,
+          "sha256": "10abc3b33a92af9d7e9fdf3717e257413c9338709f07fa921390b15185cbe044"
+        },
+        "dlms-hdlc-sn-upload-tools/capture-checks.py": {
+          "bytes": 858,
+          "sha256": "773153f31c80ec4acb5cf5006a7dce3731b44f32ec55aff217550336216dd698"
+        },
+        "dlms-hdlc-sn-upload-tools/carrier.py": {
+          "bytes": 1290,
+          "sha256": "b2cd21b9a8cfc12f12d69bfb291b5c31111094fc2d445b7e49548597cf1e7d33"
+        },
+        "dlms-hdlc-sn-upload-tools/carrier/REUSED-PINS.json": {
+          "bytes": 3369,
+          "sha256": "c62e69dd2a1a7259884f888162035758fe7adcb081264cbfb09fbed8b3f30dd1"
+        },
+        "dlms-hdlc-sn-upload-tools/carrier/access.py": {
+          "bytes": 4392,
+          "sha256": "70f03ceffb0556b966d04829dc89384c20b73bc6104c8ed637e5ed0b97d8bc7e"
+        },
+        "dlms-hdlc-sn-upload-tools/carrier/download-outer.py": {
+          "bytes": 5985,
+          "sha256": "0b69840f2066124f48091301aea6247ec29fb86c4933d00055f60828296bd220"
+        },
+        "dlms-hdlc-sn-upload-tools/carrier/download-reference-vectors.json": {
+          "bytes": 4159,
+          "sha256": "59250557438767f0f7ff0a072b1decf3fe0f5768b75013142a5dfa608b0fe6c0"
+        },
+        "dlms-hdlc-sn-upload-tools/carrier/generate.py": {
+          "bytes": 5849,
+          "sha256": "37bfdc55747ea7c8794656f59cdc605a19fbd7168c62536265006298292745df"
+        },
+        "dlms-hdlc-sn-upload-tools/carrier/hdlc-reference.json": {
+          "bytes": 2402,
+          "sha256": "69b33f59438b54e25e0209287112464b1d6c1e802c975e7bb9dc2ed8fc7280b0"
+        },
+        "dlms-hdlc-sn-upload-tools/carrier/hdlc.py": {
+          "bytes": 2011,
+          "sha256": "7f4394c9b7536c86c2f31e1dd26b3e8b2b003dd4d280e98f582e1300f53e3358"
+        },
+        "dlms-hdlc-sn-upload-tools/carrier/read-body.py": {
+          "bytes": 4002,
+          "sha256": "9038061ed63630258c65a5b9e11e51888d414b290fea0aa2bd14743e2a7af4cd"
+        },
+        "dlms-hdlc-sn-upload-tools/carrier/reference-vectors.json": {
+          "bytes": 6734,
+          "sha256": "3d7c0f01b305e3524efa5dab640dd9ae4730fe7ed789ca9ef015a5c39b846b8d"
+        },
+        "dlms-hdlc-sn-upload-tools/carrier/source-outer.py": {
+          "bytes": 8836,
+          "sha256": "4505d905a3a96b22ac3f91e00033d4146c3bf5e75794a2ad25f60b5e3e7145a1"
+        },
+        "dlms-hdlc-sn-upload-tools/carrier/upload-model.py": {
+          "bytes": 13412,
+          "sha256": "b81eb6d1975356d5fba75853959aec7745d4fbbd391bdab8de562609de18f891"
+        },
+        "dlms-hdlc-sn-upload-tools/carrier/verify.py": {
+          "bytes": 3498,
+          "sha256": "7ab43ff94ac22d79a387652259415b668a92907febdc23ff7ea118c894f10d24"
+        },
+        "dlms-hdlc-sn-upload-tools/carrier/wrapper-model.py": {
+          "bytes": 15781,
+          "sha256": "609ba979ea49fc353ccd92fadf99edbc5100e4f1637eaa4444fcace579c903dc"
+        },
+        "dlms-hdlc-sn-upload-tools/carrier/write-body.py": {
+          "bytes": 5706,
+          "sha256": "4818c0264cb4819cf5d4715a855b4f3817acf26c0c6b15ff558aaa7d3b4aa094"
+        },
+        "dlms-hdlc-sn-upload-tools/carrier/write-source.py": {
+          "bytes": 8800,
+          "sha256": "46e574590d006649212a255cd2fc85d226165f0ce27f5cc7a01f88211720de0a"
+        },
+        "dlms-hdlc-sn-upload-tools/history/SOURCES.json": {
+          "bytes": 3632,
+          "sha256": "26056c5bee1f31d794b624088b125d4fe72b63c08193aceb95adba53eca07a7d"
+        },
+        "dlms-hdlc-sn-upload-tools/history/build.py": {
+          "bytes": 7677,
+          "sha256": "f19070887595403190546c05986eed03a46c0a1de266e5481a0bb843e0265482"
+        },
+        "dlms-hdlc-sn-upload-tools/history/verify.py": {
+          "bytes": 1769,
+          "sha256": "794e08de02b6460122f1b9e3f8bcca1ac77f677c90631b84f35b8331d5dd5b12"
+        },
+        "dlms-hdlc-sn-upload-tools/independent/REUSED-PINS.json": {
+          "bytes": 2918,
+          "sha256": "748debeba0f9472ee73e3d065f985670fd3971f355424ff2c0f27829cbb15de2"
+        },
+        "dlms-hdlc-sn-upload-tools/independent/access.py": {
+          "bytes": 4392,
+          "sha256": "70f03ceffb0556b966d04829dc89384c20b73bc6104c8ed637e5ed0b97d8bc7e"
+        },
+        "dlms-hdlc-sn-upload-tools/independent/download-outer.py": {
+          "bytes": 5985,
+          "sha256": "0b69840f2066124f48091301aea6247ec29fb86c4933d00055f60828296bd220"
+        },
+        "dlms-hdlc-sn-upload-tools/independent/download-reference-vectors.json": {
+          "bytes": 4159,
+          "sha256": "59250557438767f0f7ff0a072b1decf3fe0f5768b75013142a5dfa608b0fe6c0"
+        },
+        "dlms-hdlc-sn-upload-tools/independent/generate.py": {
+          "bytes": 13412,
+          "sha256": "b81eb6d1975356d5fba75853959aec7745d4fbbd391bdab8de562609de18f891"
+        },
+        "dlms-hdlc-sn-upload-tools/independent/hdlc-reference.json": {
+          "bytes": 2402,
+          "sha256": "69b33f59438b54e25e0209287112464b1d6c1e802c975e7bb9dc2ed8fc7280b0"
+        },
+        "dlms-hdlc-sn-upload-tools/independent/hdlc.py": {
+          "bytes": 2011,
+          "sha256": "7f4394c9b7536c86c2f31e1dd26b3e8b2b003dd4d280e98f582e1300f53e3358"
+        },
+        "dlms-hdlc-sn-upload-tools/independent/information-boundary.py": {
+          "bytes": 3892,
+          "sha256": "6901436c876bb34d7549bfef18a259b13768e5db0d70cb719014a3c15646b38e"
+        },
+        "dlms-hdlc-sn-upload-tools/independent/read-body.py": {
+          "bytes": 4002,
+          "sha256": "9038061ed63630258c65a5b9e11e51888d414b290fea0aa2bd14743e2a7af4cd"
+        },
+        "dlms-hdlc-sn-upload-tools/independent/rebuild.py": {
+          "bytes": 374,
+          "sha256": "f14f55d2d9e511a8349e85ede7479e2f0580923316b9bb3b1b0869bb464e1436"
+        },
+        "dlms-hdlc-sn-upload-tools/independent/reference-vectors.json": {
+          "bytes": 6734,
+          "sha256": "3d7c0f01b305e3524efa5dab640dd9ae4730fe7ed789ca9ef015a5c39b846b8d"
+        },
+        "dlms-hdlc-sn-upload-tools/independent/source-outer.py": {
+          "bytes": 8836,
+          "sha256": "4505d905a3a96b22ac3f91e00033d4146c3bf5e75794a2ad25f60b5e3e7145a1"
+        },
+        "dlms-hdlc-sn-upload-tools/independent/verify-information-boundary.py": {
+          "bytes": 1368,
+          "sha256": "ac44cc9a4076ac9d1e974f02fa6c53917bd4600e9b4f4ea8dc1f87f8aacd2106"
+        },
+        "dlms-hdlc-sn-upload-tools/independent/verify.py": {
+          "bytes": 3936,
+          "sha256": "8e2000f450636f38bfff9b5aa6437fadae0741e03e66d926bdbe315f90cee30b"
+        },
+        "dlms-hdlc-sn-upload-tools/independent/wrapper-model.py": {
+          "bytes": 15781,
+          "sha256": "609ba979ea49fc353ccd92fadf99edbc5100e4f1637eaa4444fcace579c903dc"
+        },
+        "dlms-hdlc-sn-upload-tools/independent/write-body.py": {
+          "bytes": 5706,
+          "sha256": "4818c0264cb4819cf5d4715a855b4f3817acf26c0c6b15ff558aaa7d3b4aa094"
+        },
+        "dlms-hdlc-sn-upload-tools/independent/write-source.py": {
+          "bytes": 8800,
+          "sha256": "46e574590d006649212a255cd2fc85d226165f0ce27f5cc7a01f88211720de0a"
+        },
+        "dlms-hdlc-sn-upload-tools/project.py": {
+          "bytes": 1262,
+          "sha256": "71aeb02c772ef66f28476d2e035967c994c14612cc07f776610686d21d17e5f2"
+        },
+        "dlms-hdlc-sn-upload-tools/tcp-requester/SOURCES.json": {
+          "bytes": 21730,
+          "sha256": "1d596a1810e1f92f97d3bfed4e7c2ec957f930334f3bbc2db07925b69628133d"
+        },
+        "dlms-hdlc-sn-upload-tools/tcp-requester/build.py": {
+          "bytes": 8226,
+          "sha256": "1d41b0d473d06dea7ab3b81facfb4cad1b3540b0cc2980d7c71cd179bcedefb0"
+        },
+        "dlms-hdlc-sn-upload-tools/tcp-requester/verify.py": {
+          "bytes": 2026,
+          "sha256": "2a22aca45d71de58dbe7906eb8c2f82382eff2fc8bd9688a06e0af8018f2fb5b"
+        },
+        "dlms-hdlc-sn-upload-tools/verify-captures.py": {
+          "bytes": 4881,
+          "sha256": "e490fe3bada780bd2420e45ae18547207535388d2d5f2b68b3d33236eb4e0f26"
+        },
+        "dlms-hdlc-sn-upload/Read-missing-echo-retires.tcp.pcap": {
+          "bytes": 696,
+          "sha256": "3c53674530a34e0d6b7ec3117028dbc0e97c37eb18bb4ac3253cf674ef0dd34e"
+        },
+        "dlms-hdlc-sn-upload/Read-missing-echo-retires.udp.pcap": {
+          "bytes": 426,
+          "sha256": "08b78ba373ac5a498629e9b39c418577e064d5dd08aae574960da0bc9f024bf4"
+        },
+        "dlms-hdlc-sn-upload/Read-recent-duplicates-wrong-address-caller-and-active-Close.tcp.pcap": {
+          "bytes": 966,
+          "sha256": "5b8430386b0e65c313a95a3a6534d35952dd3d64b22ef233d593d3d932ed07ef"
+        },
+        "dlms-hdlc-sn-upload/Read-recent-duplicates-wrong-address-caller-and-active-Close.udp.pcap": {
+          "bytes": 660,
+          "sha256": "f827e3e868e3f2ca64704e1b84be64b792bd0a3a0020e06d5364957842dfd5d0"
+        },
+        "dlms-hdlc-sn-upload/Read-truncated-Q6-body-is-Malformed.tcp.pcap": {
+          "bytes": 602,
+          "sha256": "0bd1b4e8a5f17b2e5e9830dbabd19c30962b702564979ccd1231ceb81c9d05c6"
+        },
+        "dlms-hdlc-sn-upload/Read-truncated-Q6-body-is-Malformed.udp.pcap": {
+          "bytes": 344,
+          "sha256": "d7004d17de7340eb926ae288d6613582d49200c8441a9d37065c029f6066934b"
+        },
+        "dlms-hdlc-sn-upload/Read-upload-in-information-group-is-Unsupported.tcp.pcap": {
+          "bytes": 595,
+          "sha256": "cef39ca621d1134837af1cfa6ba7ff4cbb6bef0d0f1258e21d5c476e96ba000c"
+        },
+        "dlms-hdlc-sn-upload/Read-upload-in-information-group-is-Unsupported.udp.pcap": {
+          "bytes": 337,
+          "sha256": "ff34aaec0287fec9de644948ba6c11997a8b838c176fcf612dd95ec99b7d64e8"
+        },
+        "dlms-hdlc-sn-upload/Read-upload-two-block-complete.tcp.pcap": {
+          "bytes": 785,
+          "sha256": "9f7a538f0f63e3af30ef345e022e7eb9115af8bbf525bd9a76cdc671aa88c4e6"
+        },
+        "dlms-hdlc-sn-upload/Read-upload-two-block-complete.udp.pcap": {
+          "bytes": 503,
+          "sha256": "370d53138d83ca363ecb99e58f7540619822a7146e125aaed9bbc58bebbb6aeb"
+        },
+        "dlms-hdlc-sn-upload/SYN0-conflicts-with-GET-requester1-then-blocked-Write-upload.tcp.pcap": {
+          "bytes": 607,
+          "sha256": "6caaad08ed9917de56df09831054c8a888848f42d0eded749e25a1312d4f3982"
+        },
+        "dlms-hdlc-sn-upload/Write-changed-same-number-retires.tcp.pcap": {
+          "bytes": 800,
+          "sha256": "765ba5e0bc272ac4f69e0149ec96e6e2122de262a4c2d6aeddae1ad1f3d59a66"
+        },
+        "dlms-hdlc-sn-upload/Write-changed-same-number-retires.udp.pcap": {
+          "bytes": 518,
+          "sha256": "e56f8f06756dd629aa9332a6b44531b8ceec9a7a9ece051ed2a6fd0470994a21"
+        },
+        "dlms-hdlc-sn-upload/Write-echo-NR-conflict-retires.tcp.pcap": {
+          "bytes": 703,
+          "sha256": "de771a43c32aa94bc08bff7fc2ebacf1a3395262e3da42e5ed4d762567df9e47"
+        },
+        "dlms-hdlc-sn-upload/Write-echo-NR-conflict-retires.udp.pcap": {
+          "bytes": 433,
+          "sha256": "cd4a89674427b4026a85d390294f20a97d84d89ca61f10d19dc52b149c9e2569"
+        },
+        "dlms-hdlc-sn-upload/Write-singlelast-outer-node-plus-value-cap1.tcp.pcap": {
+          "bytes": 608,
+          "sha256": "b3c1433997f3a40b15423e6f8e069832cd9c412145d4cc9d54b82bd42b3aad54"
+        },
+        "dlms-hdlc-sn-upload/Write-singlelast-outer-node-plus-value-cap1.udp.pcap": {
+          "bytes": 350,
+          "sha256": "00c62e87a4e41ec9a2cdf46f97f9983e8d4e6e98eb162a9addcc2c8ccdfda5a8"
+        },
+        "dlms-hdlc-sn-upload/Write-singlelast-outer-node-plus-value-cap2.tcp.pcap": {
+          "bytes": 521,
+          "sha256": "7c63cdd72ea6028936de4460d7a5a9cee8a311b35011ccbd37c9a71ae318db4e"
+        },
+        "dlms-hdlc-sn-upload/Write-singlelast-outer-node-plus-value-cap2.udp.pcap": {
+          "bytes": 275,
+          "sha256": "4e93a2618ecd314101d68dfab33de841f208bcfd39e53aeb5f57a970a9401298"
+        },
+        "dlms-hdlc-sn-upload/Write-upload-in-information-group-is-Unsupported.tcp.pcap": {
+          "bytes": 599,
+          "sha256": "6907b15f602b92296921164ac67f575a505326f55f826161251d63731a8afa65"
+        },
+        "dlms-hdlc-sn-upload/Write-upload-in-information-group-is-Unsupported.udp.pcap": {
+          "bytes": 341,
+          "sha256": "404bc0965846bf6915522e466454230d5a8511eee6f85dce118de8d504c538a9"
+        },
+        "dlms-hdlc-sn-upload/Write-upload-two-block-complete.tcp.pcap": {
+          "bytes": 790,
+          "sha256": "18b797a1965c72f317b11ef679dc8920a4cc884b4e0529f198e4f0f968cb91c1"
+        },
+        "dlms-hdlc-sn-upload/Write-upload-two-block-complete.udp.pcap": {
+          "bytes": 508,
+          "sha256": "200c67d09c1b0892e04cc1da6db76c7b9612ab477380d7735ba2ceba5bf07b63"
+        },
+        "dlms-hdlc-sn-upload/baseline-controls.json": {
+          "bytes": 71129,
+          "sha256": "cd25ed2f86a4be2e6cd399d89b17f879cbf0fcc09b1478a1ce5b1729cf8ac9c9"
+        },
+        "dlms-hdlc-sn-upload/carrier-boundary-controls.json": {
+          "bytes": 137080,
+          "sha256": "e5954b43a5fe745b5791a305bb999a75e306cff5c1e6770128359b5863ceb8d6"
+        },
+        "dlms-hdlc-sn-upload/carrier-controls.json": {
+          "bytes": 241247,
+          "sha256": "04509cdda9c58f0caff919e8b8413cc591df71261e48ad30055af4a80d07c391"
+        },
+        "dlms-hdlc-sn-upload/controls.json": {
+          "bytes": 261210,
+          "sha256": "5dde41f21a5c9c477cc43cf11c896c473de53f55d57f98dfa61faa711b6044c3"
+        },
+        "dlms-hdlc-sn-upload/historical-upload-echo-upgrades.json": {
+          "bytes": 432126,
+          "sha256": "9d788a23acfd58e0869ae07e1acef471abf65a3657e26e934358aa55182352f3"
+        },
+        "dlms-hdlc-sn-upload/information-boundary-supplement.json": {
+          "bytes": 40343,
+          "sha256": "3cddf7b150c0e11afdec9fa704a0db6c7351bca554684d7c76f08ca05fa9a399"
+        },
+        "dlms-hdlc-sn-upload/ordinary-SN-Read-information-group-neighbor.tcp.pcap": {
+          "bytes": 680,
+          "sha256": "fec615bcbb9eb734d76f3a424214493d1a70b35870d5566792f576ab8e4bd8e8"
+        },
+        "dlms-hdlc-sn-upload/ordinary-SN-Read-information-group-neighbor.udp.pcap": {
+          "bytes": 410,
+          "sha256": "79c1ef8908f09d26125aafb7aecc7d7f0b3b00c87f24255a954b3e4814db5438"
+        },
+        "dlms-hdlc-sn-upload/other-I-frame-interrupts-active-upload.tcp.pcap": {
+          "bytes": 690,
+          "sha256": "c0c29e9bdace738ac99e37b9fde692b35928cb55a4df8882b1e37c6e9449b813"
+        },
+        "dlms-hdlc-sn-upload/other-I-frame-interrupts-active-upload.udp.pcap": {
+          "bytes": 420,
+          "sha256": "44ee0004510ba66e2762140e155cdc1830e00120393b9b118efced567abc7e08"
+        },
+        "dlms-hdlc-sn-upload/reuse-inputs.json": {
+          "bytes": 275,
+          "sha256": "12a33b675647d270bbca7be3386375595e8c3903b21e2892a16910f2220c11a0"
+        },
+        "dlms-hdlc-sn-upload/reverse-caller-Write-upload-active-Close.tcp.pcap": {
+          "bytes": 607,
+          "sha256": "5bb7044eb0669e1e949d0775fbd2cd241cc3aeba7dcbabe8ddfe977dccdee74e"
+        },
+        "dlms-hdlc-sn-upload/reverse-caller-Write-upload-active-Close.udp.pcap": {
+          "bytes": 349,
+          "sha256": "53520c5a7fe20d5159417eda81c628288ba1f77c836dfb6975ac05596904cfce"
+        },
+        "dlms-hdlc-sn-upload/same-link-Q6-retires-pending-LN.tcp.pcap": {
+          "bytes": 514,
+          "sha256": "617a64f7e904618e6b3c9a1b09b50bd7403fe9543c85e290a01c9c4872f9f79f"
+        },
+        "dlms-hdlc-sn-upload/same-link-Q6-retires-pending-LN.udp.pcap": {
+          "bytes": 268,
+          "sha256": "0a630af0b0dc00592a8f70abb4cb9174b02051850c63f88aa1d3411286305724"
+        },
+        "dlms-hdlc-sn-upload/tcp-requester-conflict-controls.json": {
+          "bytes": 29279,
+          "sha256": "3ad33a52d9ab87f855b27ff08a5de75bd640deb72e914e33f7616d37b4a4d630"
+        },
+        "dlms-hdlc-sn-upload/two-UInt32-logical-keys-context-cap1.tcp.pcap": {
+          "bytes": 699,
+          "sha256": "0ce2ec01e3d172f1abb30ffed0603659c08e690179ce559b41b2a93679f7452f"
+        },
+        "dlms-hdlc-sn-upload/two-UInt32-logical-keys-context-cap1.udp.pcap": {
+          "bytes": 429,
+          "sha256": "5fb40ad5155f4becff253203ac72f43a5ab5812d506e28adc319b4f23af46846"
+        },
+        "dlms-hdlc-sn-upload/two-UInt32-logical-keys-context-cap2.tcp.pcap": {
+          "bytes": 791,
+          "sha256": "8c8be4f3897afeb3ebf8b9dda4df52f25e4c94af37b423b66ccbf86dbd82eb77"
+        },
+        "dlms-hdlc-sn-upload/two-UInt32-logical-keys-context-cap2.udp.pcap": {
+          "bytes": 509,
+          "sha256": "7aa3b5fb950277ad2559ab346cbb9e79fb081b282c6ee7bc11dd387407816484"
+        },
+        "required-tests-traffic-unified-v164.json": {
+          "bytes": 22141318,
+          "sha256": "9d806f442b6cccaa1b836f0d8c942321073c7424fdfe10ecd82ef4509131d050"
+        },
+        "validation/expected.json": {
+          "bytes": 43907,
+          "sha256": "60caa592547bd0d69bbcd780333e238b40ec853217935c25dc5d09994ffe2b5f"
+        }
+      },
+      "aliases": {
+        "common/pcapx/pcaputil/dlms-hdlc-sn-upload-source/CONTRACT.json": "dlms-hdlc-sn-upload-source/CONTRACT.json",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-upload-source/SOURCES.json": "dlms-hdlc-sn-upload-source/SOURCES.json",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-upload-source/TYPES.json": "dlms-hdlc-sn-upload-source/TYPES.json",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-upload-source/baseline-controls.json": "dlms-hdlc-sn-upload-source/baseline-controls.json",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-upload-source/carrier-controls.json": "dlms-hdlc-sn-upload-source/carrier-controls.json",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-upload-source/controls.json": "dlms-hdlc-sn-upload-source/controls.json",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-upload-source/information-boundary-supplement.json": "dlms-hdlc-sn-upload-source/information-boundary-supplement.json",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-upload-source/tcp-requester-conflict.json": "dlms-hdlc-sn-upload-source/tcp-requester-conflict.json",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-upload-tools/bind-carrier.py": "dlms-hdlc-sn-upload-tools/bind-carrier.py",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-upload-tools/bind-tcp-conflict.py": "dlms-hdlc-sn-upload-tools/bind-tcp-conflict.py",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-upload-tools/capture-checks.py": "dlms-hdlc-sn-upload-tools/capture-checks.py",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-upload-tools/carrier.py": "dlms-hdlc-sn-upload-tools/carrier.py",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-upload-tools/carrier/REUSED-PINS.json": "dlms-hdlc-sn-upload-tools/carrier/REUSED-PINS.json",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-upload-tools/carrier/access.py": "dlms-hdlc-sn-upload-tools/carrier/access.py",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-upload-tools/carrier/download-outer.py": "dlms-hdlc-sn-upload-tools/carrier/download-outer.py",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-upload-tools/carrier/download-reference-vectors.json": "dlms-hdlc-sn-upload-tools/carrier/download-reference-vectors.json",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-upload-tools/carrier/generate.py": "dlms-hdlc-sn-upload-tools/carrier/generate.py",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-upload-tools/carrier/hdlc-reference.json": "dlms-hdlc-sn-upload-tools/carrier/hdlc-reference.json",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-upload-tools/carrier/hdlc.py": "dlms-hdlc-sn-upload-tools/carrier/hdlc.py",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-upload-tools/carrier/read-body.py": "dlms-hdlc-sn-upload-tools/carrier/read-body.py",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-upload-tools/carrier/reference-vectors.json": "dlms-hdlc-sn-upload-tools/carrier/reference-vectors.json",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-upload-tools/carrier/source-outer.py": "dlms-hdlc-sn-upload-tools/carrier/source-outer.py",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-upload-tools/carrier/upload-model.py": "dlms-hdlc-sn-upload-tools/carrier/upload-model.py",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-upload-tools/carrier/verify.py": "dlms-hdlc-sn-upload-tools/carrier/verify.py",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-upload-tools/carrier/wrapper-model.py": "dlms-hdlc-sn-upload-tools/carrier/wrapper-model.py",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-upload-tools/carrier/write-body.py": "dlms-hdlc-sn-upload-tools/carrier/write-body.py",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-upload-tools/carrier/write-source.py": "dlms-hdlc-sn-upload-tools/carrier/write-source.py",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-upload-tools/history/SOURCES.json": "dlms-hdlc-sn-upload-tools/history/SOURCES.json",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-upload-tools/history/build.py": "dlms-hdlc-sn-upload-tools/history/build.py",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-upload-tools/history/verify.py": "dlms-hdlc-sn-upload-tools/history/verify.py",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-upload-tools/independent/REUSED-PINS.json": "dlms-hdlc-sn-upload-tools/independent/REUSED-PINS.json",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-upload-tools/independent/access.py": "dlms-hdlc-sn-upload-tools/independent/access.py",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-upload-tools/independent/download-outer.py": "dlms-hdlc-sn-upload-tools/independent/download-outer.py",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-upload-tools/independent/download-reference-vectors.json": "dlms-hdlc-sn-upload-tools/independent/download-reference-vectors.json",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-upload-tools/independent/generate.py": "dlms-hdlc-sn-upload-tools/independent/generate.py",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-upload-tools/independent/hdlc-reference.json": "dlms-hdlc-sn-upload-tools/independent/hdlc-reference.json",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-upload-tools/independent/hdlc.py": "dlms-hdlc-sn-upload-tools/independent/hdlc.py",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-upload-tools/independent/information-boundary.py": "dlms-hdlc-sn-upload-tools/independent/information-boundary.py",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-upload-tools/independent/read-body.py": "dlms-hdlc-sn-upload-tools/independent/read-body.py",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-upload-tools/independent/rebuild.py": "dlms-hdlc-sn-upload-tools/independent/rebuild.py",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-upload-tools/independent/reference-vectors.json": "dlms-hdlc-sn-upload-tools/independent/reference-vectors.json",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-upload-tools/independent/source-outer.py": "dlms-hdlc-sn-upload-tools/independent/source-outer.py",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-upload-tools/independent/verify-information-boundary.py": "dlms-hdlc-sn-upload-tools/independent/verify-information-boundary.py",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-upload-tools/independent/verify.py": "dlms-hdlc-sn-upload-tools/independent/verify.py",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-upload-tools/independent/wrapper-model.py": "dlms-hdlc-sn-upload-tools/independent/wrapper-model.py",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-upload-tools/independent/write-body.py": "dlms-hdlc-sn-upload-tools/independent/write-body.py",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-upload-tools/independent/write-source.py": "dlms-hdlc-sn-upload-tools/independent/write-source.py",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-upload-tools/project.py": "dlms-hdlc-sn-upload-tools/project.py",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-upload-tools/tcp-requester/SOURCES.json": "dlms-hdlc-sn-upload-tools/tcp-requester/SOURCES.json",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-upload-tools/tcp-requester/build.py": "dlms-hdlc-sn-upload-tools/tcp-requester/build.py",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-upload-tools/tcp-requester/verify.py": "dlms-hdlc-sn-upload-tools/tcp-requester/verify.py",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-upload-tools/verify-captures.py": "dlms-hdlc-sn-upload-tools/verify-captures.py",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-upload/Read-missing-echo-retires.tcp.pcap": "dlms-hdlc-sn-upload/Read-missing-echo-retires.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-upload/Read-missing-echo-retires.udp.pcap": "dlms-hdlc-sn-upload/Read-missing-echo-retires.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-upload/Read-recent-duplicates-wrong-address-caller-and-active-Close.tcp.pcap": "dlms-hdlc-sn-upload/Read-recent-duplicates-wrong-address-caller-and-active-Close.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-upload/Read-recent-duplicates-wrong-address-caller-and-active-Close.udp.pcap": "dlms-hdlc-sn-upload/Read-recent-duplicates-wrong-address-caller-and-active-Close.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-upload/Read-truncated-Q6-body-is-Malformed.tcp.pcap": "dlms-hdlc-sn-upload/Read-truncated-Q6-body-is-Malformed.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-upload/Read-truncated-Q6-body-is-Malformed.udp.pcap": "dlms-hdlc-sn-upload/Read-truncated-Q6-body-is-Malformed.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-upload/Read-upload-in-information-group-is-Unsupported.tcp.pcap": "dlms-hdlc-sn-upload/Read-upload-in-information-group-is-Unsupported.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-upload/Read-upload-in-information-group-is-Unsupported.udp.pcap": "dlms-hdlc-sn-upload/Read-upload-in-information-group-is-Unsupported.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-upload/Read-upload-two-block-complete.tcp.pcap": "dlms-hdlc-sn-upload/Read-upload-two-block-complete.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-upload/Read-upload-two-block-complete.udp.pcap": "dlms-hdlc-sn-upload/Read-upload-two-block-complete.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-upload/SYN0-conflicts-with-GET-requester1-then-blocked-Write-upload.tcp.pcap": "dlms-hdlc-sn-upload/SYN0-conflicts-with-GET-requester1-then-blocked-Write-upload.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-upload/Write-changed-same-number-retires.tcp.pcap": "dlms-hdlc-sn-upload/Write-changed-same-number-retires.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-upload/Write-changed-same-number-retires.udp.pcap": "dlms-hdlc-sn-upload/Write-changed-same-number-retires.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-upload/Write-echo-NR-conflict-retires.tcp.pcap": "dlms-hdlc-sn-upload/Write-echo-NR-conflict-retires.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-upload/Write-echo-NR-conflict-retires.udp.pcap": "dlms-hdlc-sn-upload/Write-echo-NR-conflict-retires.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-upload/Write-singlelast-outer-node-plus-value-cap1.tcp.pcap": "dlms-hdlc-sn-upload/Write-singlelast-outer-node-plus-value-cap1.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-upload/Write-singlelast-outer-node-plus-value-cap1.udp.pcap": "dlms-hdlc-sn-upload/Write-singlelast-outer-node-plus-value-cap1.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-upload/Write-singlelast-outer-node-plus-value-cap2.tcp.pcap": "dlms-hdlc-sn-upload/Write-singlelast-outer-node-plus-value-cap2.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-upload/Write-singlelast-outer-node-plus-value-cap2.udp.pcap": "dlms-hdlc-sn-upload/Write-singlelast-outer-node-plus-value-cap2.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-upload/Write-upload-in-information-group-is-Unsupported.tcp.pcap": "dlms-hdlc-sn-upload/Write-upload-in-information-group-is-Unsupported.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-upload/Write-upload-in-information-group-is-Unsupported.udp.pcap": "dlms-hdlc-sn-upload/Write-upload-in-information-group-is-Unsupported.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-upload/Write-upload-two-block-complete.tcp.pcap": "dlms-hdlc-sn-upload/Write-upload-two-block-complete.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-upload/Write-upload-two-block-complete.udp.pcap": "dlms-hdlc-sn-upload/Write-upload-two-block-complete.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-upload/baseline-controls.json": "dlms-hdlc-sn-upload/baseline-controls.json",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-upload/carrier-boundary-controls.json": "dlms-hdlc-sn-upload/carrier-boundary-controls.json",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-upload/carrier-controls.json": "dlms-hdlc-sn-upload/carrier-controls.json",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-upload/controls.json": "dlms-hdlc-sn-upload/controls.json",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-upload/historical-upload-echo-upgrades.json": "dlms-hdlc-sn-upload/historical-upload-echo-upgrades.json",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-upload/information-boundary-supplement.json": "dlms-hdlc-sn-upload/information-boundary-supplement.json",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-upload/ordinary-SN-Read-information-group-neighbor.tcp.pcap": "dlms-hdlc-sn-upload/ordinary-SN-Read-information-group-neighbor.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-upload/ordinary-SN-Read-information-group-neighbor.udp.pcap": "dlms-hdlc-sn-upload/ordinary-SN-Read-information-group-neighbor.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-upload/other-I-frame-interrupts-active-upload.tcp.pcap": "dlms-hdlc-sn-upload/other-I-frame-interrupts-active-upload.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-upload/other-I-frame-interrupts-active-upload.udp.pcap": "dlms-hdlc-sn-upload/other-I-frame-interrupts-active-upload.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-upload/reuse-inputs.json": "dlms-hdlc-sn-upload/reuse-inputs.json",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-upload/reverse-caller-Write-upload-active-Close.tcp.pcap": "dlms-hdlc-sn-upload/reverse-caller-Write-upload-active-Close.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-upload/reverse-caller-Write-upload-active-Close.udp.pcap": "dlms-hdlc-sn-upload/reverse-caller-Write-upload-active-Close.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-upload/same-link-Q6-retires-pending-LN.tcp.pcap": "dlms-hdlc-sn-upload/same-link-Q6-retires-pending-LN.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-upload/same-link-Q6-retires-pending-LN.udp.pcap": "dlms-hdlc-sn-upload/same-link-Q6-retires-pending-LN.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-upload/tcp-requester-conflict-controls.json": "dlms-hdlc-sn-upload/tcp-requester-conflict-controls.json",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-upload/two-UInt32-logical-keys-context-cap1.tcp.pcap": "dlms-hdlc-sn-upload/two-UInt32-logical-keys-context-cap1.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-upload/two-UInt32-logical-keys-context-cap1.udp.pcap": "dlms-hdlc-sn-upload/two-UInt32-logical-keys-context-cap1.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-upload/two-UInt32-logical-keys-context-cap2.tcp.pcap": "dlms-hdlc-sn-upload/two-UInt32-logical-keys-context-cap2.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-upload/two-UInt32-logical-keys-context-cap2.udp.pcap": "dlms-hdlc-sn-upload/two-UInt32-logical-keys-context-cap2.udp.pcap",
+        "scripts/protocol-tests/required-tests-traffic-unified-v164.json": "required-tests-traffic-unified-v164.json"
+      }
     }
   ],
   "schema_version": 1,

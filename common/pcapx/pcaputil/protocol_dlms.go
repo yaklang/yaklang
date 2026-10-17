@@ -931,7 +931,7 @@ func dlmsUDPRefusalHint(w []byte) bool {
 	if end-at < 9 || w[at]&1 != 0 || dlmsCRC(w[1:at+1]) != binary.LittleEndian.Uint16(w[at+1:at+3]) {
 		return false
 	}
-	if dlmsSNBlockRefusalHint(w) {
+	if dlmsSNBlockRefusalHint(w) || dlmsSNUploadRefusalHint(w) {
 		return true
 	}
 	p := w[at+3:]

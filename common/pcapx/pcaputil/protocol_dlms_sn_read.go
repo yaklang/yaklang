@@ -26,6 +26,8 @@ func decodeDLMSSNRead(m *dlmsMessage, p []byte, llc byte, limit, depth int) (*dl
 	var err error
 	if wrapperIsSNServiceBlock(wire) {
 		sn, err = decodeWrapperSNServiceBlock(wire, limit)
+	} else if wrapperIsSNUpload(wire) {
+		sn, err = decodeWrapperSNUpload(wire, limit)
 	} else {
 		sn, err = decodeWrapperSNRead(wire, limit, depth)
 	}

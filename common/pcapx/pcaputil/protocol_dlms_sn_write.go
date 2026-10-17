@@ -22,7 +22,13 @@ func decodeDLMSSNWrite(m *dlmsMessage, p []byte, llc byte, limit, depth int) (*d
 	wire[1] = 1
 	binary.BigEndian.PutUint16(wire[6:8], uint16(len(p)))
 	copy(wire[8:], p)
-	sn, err := decodeWrapperSNWrite(wire, limit, depth)
+	var sn *wrapperMessage
+	var err error
+	if wrapperIsSNWriteUpload(wire) {
+		sn, err = decodeWrapperSNWriteUpload(wire, limit, depth)
+	} else {
+		sn, err = decodeWrapperSNWrite(wire, limit, depth)
+	}
 	if err != nil {
 		var pe *ProtocolError
 		if errors.As(err, &pe) {
@@ -34,6 +40,9 @@ func decodeDLMSSNWrite(m *dlmsMessage, p []byte, llc byte, limit, depth int) (*d
 		delete(sn.fields, key)
 	}
 	m.snWrite, m.request, m.kind = true, request, "SN-WRITE"
+	if sn.snServiceBlock {
+		m.snBlock = sn
+	}
 	m.fields["Frame Kind"] = "SN Write Response"
 	if request {
 		m.fields["Frame Kind"] = "SN Write Request"

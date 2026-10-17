@@ -41,6 +41,9 @@ func hdlcSNWriteCases(t *testing.T, name, pin string, count int) []hdlcSNReadCas
 		}
 		out[i] = hdlcSNReadCase{c, meta.Cases[i].Steps, meta.Cases[i].UDP, meta.Cases[i].TCP}
 	}
+	if name == "controls.json" {
+		return hdlcSNUploadUpgradeHistoricalWrite(t, raw, out)
+	}
 	return out
 }
 func hdlcSNWriteControls(t *testing.T) []hdlcSNReadCase {

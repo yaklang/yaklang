@@ -22,11 +22,16 @@ func hdlcGetCloseCases(t *testing.T) []hdlcOpCase {
 }
 
 func hdlcGetCloseCheck(t *testing.T, c hdlcOpCase, es []*ProtocolEvent, tr string, flow uint64, reverse bool, reason string) {
+	hdlcGetCloseCheckEndpoints(t, c, es, tr, flow, reverse, reason, []string{"192.0.2.1:41000", "192.0.2.2:4059"})
+}
+
+func hdlcGetCloseCheckEndpoints(t *testing.T, c hdlcOpCase, es []*ProtocolEvent, tr string, flow uint64, reverse bool, reason string, ends []string) {
 	t.Helper()
 	require.Len(t, es, len(c.Close.Events))
-	ends := []string{"192.0.2.1:41000", "192.0.2.2:4059"}
+	require.Len(t, ends, 2)
 	for i, e := range es {
 		w := c.Close.Events[i]
+		snBlock := w.Profile == "dlms-hdlc-sn-read-block" || w.Profile == "dlms-hdlc-sn-read-upload" || w.Profile == "dlms-hdlc-sn-write-upload"
 		dir := w.Direction
 		if reverse {
 			dir = 1 - dir
@@ -55,7 +60,7 @@ func hdlcGetCloseCheck(t *testing.T, c hdlcOpCase, es []*ProtocolEvent, tr strin
 			require.Equal(t, "<reason>: "+w.SummaryUDP, w.SummaryTCP)
 			summary = strings.Replace(w.SummaryTCP, "<reason>", reason, 1)
 		}
-		if w.Profile == "dlms-hdlc-sn-read-block" && tr == "tcp" {
+		if snBlock && tr == "tcp" {
 			require.Equal(t, "test-close: "+w.SummaryUDP, w.SummaryTCP)
 			summary = strings.Replace(w.SummaryTCP, "test-close:", reason+":", 1)
 		}
@@ -63,14 +68,18 @@ func hdlcGetCloseCheck(t *testing.T, c hdlcOpCase, es []*ProtocolEvent, tr strin
 		require.Equal(t, off, e.Offset)
 		require.Equal(t, summary, e.Summary)
 		expectedError := summary
-		if w.Profile == "dlms-hdlc-sn-read-block" {
+		if snBlock {
 			expectedError = "NeedMore: " + summary
 		}
 		require.Equal(t, expectedError, e.Error)
-		if w.Profile == "dlms-hdlc-sn-read-block" {
+		if snBlock {
 			require.Len(t, w.Session, 6)
 			require.Len(t, e.Session, 6)
-			for _, key := range []string{"Buffered SN Groups", "observed_block_count", "assembled_data_length"} {
+			lengthKey := "assembled_data_length"
+			if w.Profile != "dlms-hdlc-sn-read-block" {
+				lengthKey = "assembled_body_length"
+			}
+			for _, key := range []string{"Buffered SN Groups", "observed_block_count", lengthKey} {
 				require.IsType(t, int(0), e.Session[key])
 			}
 			for _, key := range []string{"source_address", "destination_address"} {

@@ -1570,8 +1570,8 @@ func (f *binFlow) finishSession(reason TrafficFlowCloseReason) {
 	}
 	if d := f.dlms; d != nil {
 		for _, key := range d.unfinishedSNBlockKeys() {
-			e := f.event(key.dir, nil, "incomplete", string(reason)+": DLMS HDLC SN Read wire group ended before complete Data")
-			e.Profile, e.Completeness = "dlms-hdlc-sn-read-block", "incomplete"
+			e := f.event(key.dir, nil, "incomplete", string(reason)+": "+dlmsSNBlockCloseSummary(key))
+			e.Profile, e.Completeness = dlmsSNBlockProfile(key), "incomplete"
 			e.nativeDLMSOrSLMPObservation = true
 			e.Session = d.snBlockCloseFields(key)
 			e.semanticSession = cloneSession(e.Session)

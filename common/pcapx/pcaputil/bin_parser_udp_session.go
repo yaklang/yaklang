@@ -797,8 +797,8 @@ func (a *binParser) closeUDPSessions() {
 
 			if d := f.dlms; d != nil {
 				for _, key := range d.unfinishedSNBlockKeys() {
-					summary := "DLMS HDLC SN Read wire group ended before complete Data"
-					e := &ProtocolEvent{FlowID: f.id, Timestamp: v.touched, Domain: v.key.domain, Transport: "udp", Source: f.endpoints[key.dir], Destination: f.endpoints[1-key.dir], Direction: key.dir, Protocol: "dlms", Profile: "dlms-hdlc-sn-read-block", nativeDLMSOrSLMPObservation: true, Status: "incomplete", Completeness: "incomplete", Summary: summary, Session: d.snBlockCloseFields(key), sessionError: &ProtocolError{Kind: ErrNeedMore, Message: summary}}
+					summary := dlmsSNBlockCloseSummary(key)
+					e := &ProtocolEvent{FlowID: f.id, Timestamp: v.touched, Domain: v.key.domain, Transport: "udp", Source: f.endpoints[key.dir], Destination: f.endpoints[1-key.dir], Direction: key.dir, Protocol: "dlms", Profile: dlmsSNBlockProfile(key), nativeDLMSOrSLMPObservation: true, Status: "incomplete", Completeness: "incomplete", Summary: summary, Session: d.snBlockCloseFields(key), sessionError: &ProtocolError{Kind: ErrNeedMore, Message: summary}}
 					e.semanticSession = cloneSession(e.Session)
 					e.Error = e.sessionError.Error()
 					incomplete = append(incomplete, e)
