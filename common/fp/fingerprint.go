@@ -27,15 +27,20 @@ import (
 type RuleBlock struct {
 	Probe   *NmapProbe
 	Matched []*NmapMatch
+
+	// prefilterOnce 为这一组 nmap 规则编译一次 minirehs 数据库.
+	// 命中只说明“可能匹配”, 捕获组仍由 pcre2-lite 确认.
+	prefilterOnce sync.Once
+	prefilter     *nmapPrefilter
 }
 
 type Matcher struct {
 	Config  *Config
 	matcher *fingerprint.Matcher
 
-	// ruleBlockCache 缓存「同一 Config、同一端口」的探针规则块.
-	// GetRuleBlockByConfig 会遍历全部指纹规则, 端口扫描对每个目标都调用一次,
-	// C 段扫描时相同端口会重复计算上万次, 把 CPU 打满.
+	// ruleBlockCache 按端口、传输协议和规则选择条件缓存探针块.
+	// 服务扫描会给每个目标复制一份配置, 指针相同才能命中的缓存对这条路径无效,
+	// 相同端口就会反复遍历全部规则.
 	ruleBlockCache sync.Map
 }
 
@@ -45,18 +50,71 @@ type cachedRuleBlocks struct {
 	ok     bool
 }
 
-// ruleBlocks 返回端口对应的探针规则. config 与 Matcher 上的 Config 是同一个对象时走缓存.
-func (f *Matcher) ruleBlocks(port int, config *Config) (*RuleBlock, []*RuleBlock, bool) {
-	if f != nil && config != nil && config == f.Config {
-		if v, ok := f.ruleBlockCache.Load(port); ok {
-			cached := v.(cachedRuleBlocks)
-			return cached.empty, cached.blocks, cached.ok
+type ruleCacheKey struct {
+	port      int
+	transport string
+	active    bool
+	rarity    int
+	probesMax int
+	rules     uint64
+}
+
+func transportCacheKey(config *Config) string {
+	if config == nil {
+		return ""
+	}
+	var b strings.Builder
+	for _, proto := range config.TransportProtos {
+		b.WriteString(string(proto))
+		b.WriteByte(',')
+	}
+	return b.String()
+}
+
+func rulesCacheStamp(rules map[*NmapProbe][]*NmapMatch) uint64 {
+	// 每条探针先折成独立哈希，再用异或合并。异或对顺序不敏感，
+	// map 的遍历顺序不会让同一个规则集得到不同的缓存键。
+	var sum uint64
+	for probe, matches := range rules {
+		if probe == nil {
+			continue
 		}
+		hash := uint64(14695981039346656037)
+		for i := 0; i < len(probe.Name); i++ {
+			hash ^= uint64(probe.Name[i])
+			hash *= 1099511628211
+		}
+		hash ^= uint64(probe.Index)*0x9E3779B185EBCA87 + uint64(len(probe.Payload))<<8
+		hash ^= uint64(probe.Rarity)<<17 + uint64(len(probe.Proto))<<9 + uint64(len(matches))
+		sum ^= hash
+	}
+	return sum ^ uint64(len(rules))
+}
+
+// ruleBlocks 返回端口对应的探针规则. 缓存键包含传输协议和规则选择条件,
+// 因此每个目标一份配置副本时仍然可以复用同一端口的规则块.
+func (f *Matcher) ruleBlocks(port int, config *Config) (*RuleBlock, []*RuleBlock, bool) {
+	if config == nil && f != nil {
+		config = f.Config
+	}
+	if f == nil || config == nil {
+		empty, blocks, ok := GetRuleBlockByConfig(port, config)
+		return empty, blocks, ok
+	}
+	key := ruleCacheKey{
+		port:      port,
+		transport: transportCacheKey(config),
+		active:    config.ActiveMode,
+		rarity:    config.RarityMax,
+		probesMax: config.ProbesMax,
+		rules:     rulesCacheStamp(config.GetFingerprintRules()),
+	}
+	if cached, ok := f.ruleBlockCache.Load(key); ok {
+		item := cached.(cachedRuleBlocks)
+		return item.empty, item.blocks, item.ok
 	}
 	empty, blocks, ok := GetRuleBlockByConfig(port, config)
-	if f != nil && config != nil && config == f.Config {
-		f.ruleBlockCache.Store(port, cachedRuleBlocks{empty: empty, blocks: blocks, ok: ok})
-	}
+	f.ruleBlockCache.Store(key, cachedRuleBlocks{empty: empty, blocks: blocks, ok: ok})
 	return empty, blocks, ok
 }
 

@@ -39,10 +39,12 @@ type Config struct {
 	// 默认每一个 Probe 的超时时间
 	ProbeTimeout time.Duration
 
-	// 发送 Probe 的数量限制，默认值为 5
+	// 发送 Probe 的数量限制，默认值为 10。
+	// 服务匹配正则由 minirehs 预编译后一次筛选，再用 pcre2-lite 确认捕获组，
+	// 因此可以提高参与指纹的数量，同时用同样的并发把这些探测一次发出。
 	ProbesMax int
 
-	// 发送 Probe 的并发量，默认值为 5
+	// 发送 Probe 的并发量，默认值为 10
 	ProbesConcurrentMax int
 
 	// 指定规则
@@ -453,9 +455,9 @@ func NewConfig(options ...ConfigOption) *Config {
 		TransportProtos:           []TransportProto{TCP},
 		ActiveMode:                true,
 		RarityMax:                 5,
-		ProbesMax:                 5,
+		ProbesMax:                 10,
 		ProbeTimeout:              5 * time.Second,
-		ProbesConcurrentMax:       5,
+		ProbesConcurrentMax:       10,
 		OnlyEnableWebFingerprint:  false,
 		DisableWebFingerprint:     false,
 		ForceEnableAllFingerprint: false,
@@ -501,7 +503,7 @@ func (c *Config) GetFingerprintRules() map[*NmapProbe][]*NmapMatch {
 	return c.FingerprintRules
 }
 
-// maxProbes servicescan 的配置选项，在主动模式发包的基础上设置本次扫描使用的最大探测包数量，默认值为 5
+// maxProbes servicescan 的配置选项，在主动模式发包的基础上设置本次扫描使用的最大探测包数量，默认值为 10
 // 参数:
 //   - m: 最大探测包数量
 //
@@ -523,7 +525,7 @@ func (c *Config) GetFingerprintRules() map[*NmapProbe][]*NmapMatch {
 // ```
 func WithProbesMax(m int) ConfigOption {
 	if m <= 0 {
-		m = 5
+		m = 10
 	}
 
 	return func(config *Config) {
@@ -550,7 +552,7 @@ func ParseStringToProto(protos ...interface{}) []TransportProto {
 	return ret
 }
 
-// maxProbesConcurrent servicescan 的配置选项，设置本次扫描发送 Probe 的并发量，默认值为 5
+// maxProbesConcurrent servicescan 的配置选项，设置本次扫描发送 Probe 的并发量，默认值为 10
 // 参数:
 //   - m: 并发量
 //
@@ -573,7 +575,7 @@ func ParseStringToProto(protos ...interface{}) []TransportProto {
 // ```
 func WithProbesConcurrentMax(m int) ConfigOption {
 	if m <= 0 {
-		m = 5
+		m = 10
 	}
 
 	return func(config *Config) {
