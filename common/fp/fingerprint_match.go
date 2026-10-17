@@ -210,7 +210,7 @@ func (f *Matcher) MatchWithContext(ctx context.Context, host string, port int, o
 		serviceName := result.GetServiceName()
 		f.log("service name detected: %v", serviceName)
 
-		if f.Config.DisableWebFingerprint {
+		if f.Config.DisableWebFingerprint || result.GetProto() == UDP || config.CanOnlyScanUDP() {
 			return result, nil
 		}
 
@@ -229,7 +229,13 @@ func (f *Matcher) MatchWithContext(ctx context.Context, host string, port int, o
 	}
 
 	var matchResult *MatchResult
-	if config.OnlyEnableWebFingerprint {
+	// A UDP-only target must not dial TCP first. Web ports such as 8080 would
+	// otherwise report closed, or merge the UDP banner into an empty protocol
+	// that Tidy records as TCP.
+	if proto == "udp" || config.CanOnlyScanUDP() {
+		f.log("service-detect first for udp %v", utils2.HostPort(host, port))
+		matchResult, err = serviceFirst()
+	} else if config.OnlyEnableWebFingerprint {
 		f.log("web-detect first for: %v", utils2.HostPort(host, port))
 		matchResult, err = webFirst()
 	} else {
@@ -251,7 +257,7 @@ func (f *Matcher) MatchWithContext(ctx context.Context, host string, port int, o
 	}
 
 	// if port open, check tls...
-	if matchResult.State == OPEN && matchResult.Fingerprint != nil && (len(matchResult.Fingerprint.TLSInspectResults) == 0 && !matchResult.Fingerprint.CheckedTLS) {
+	if matchResult.State == OPEN && matchResult.Fingerprint != nil && matchResult.GetProto() != UDP && (len(matchResult.Fingerprint.TLSInspectResults) == 0 && !matchResult.Fingerprint.CheckedTLS) {
 		f.log("start TLS inspection for %v", utils2.HostPort(host, port))
 		matchResult.Fingerprint.TLSInspectResults, _ = netx.TLSInspectTimeout(utils2.HostPort(host, port), 5)
 		f.log("TLS inspection completed")

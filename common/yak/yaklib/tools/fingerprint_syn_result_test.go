@@ -199,6 +199,107 @@ func scanSynBanner(t *testing.T, ctx context.Context, rules string, res *synscan
 	return strings.Join(banners, ",")
 }
 
+func TestUDPWebPortKeepsProtocol(t *testing.T) {
+	port := listenUDPWebPort(t)
+	rules := fmt.Sprintf(`Probe UDP UdpBanner q|probe|
+rarity 1
+ports %d
+match udp-fixture m|^udp-banner$|
+`, port)
+	res := &synscan.SynScanResult{Host: "127.0.0.1", Port: port, Protocol: "udp"}
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+	for _, tc := range []struct {
+		name       string
+		disableWeb bool
+		cache      bool
+	}{
+		{name: "web-on", disableWeb: false, cache: false},
+		{name: "web-off", disableWeb: true, cache: false},
+		{name: "web-on-cache", disableWeb: false, cache: true},
+		{name: "web-off-cache", disableWeb: true, cache: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			first := scanSynResult(t, ctx, rules, res, tc.disableWeb, tc.cache)
+			if !udpWebResult(first) {
+				t.Fatalf("first result state=%s proto=%s banner=%q reason=%s", first.State, first.GetProto(), first.GetBanner(), first.Reason)
+			}
+			if !tc.cache {
+				return
+			}
+			second := scanSynResult(t, ctx, rules, res, tc.disableWeb, true)
+			if !udpWebResult(second) {
+				t.Fatalf("cached result state=%s proto=%s banner=%q reason=%s", second.State, second.GetProto(), second.GetBanner(), second.Reason)
+			}
+		})
+	}
+}
+
+func udpWebResult(result *fp.MatchResult) bool {
+	return result != nil && result.IsOpen() && result.GetProto() == fp.UDP && result.Fingerprint != nil && strings.Contains(result.Fingerprint.Banner, "udp-banner")
+}
+
+func scanSynResult(t *testing.T, ctx context.Context, rules string, res *synscan.SynScanResult, disableWeb, cache bool) *fp.MatchResult {
+	t.Helper()
+	in := make(chan *synscan.SynScanResult, 1)
+	in <- res
+	close(in)
+	opts := []fp.ConfigOption{
+		fp.WithCtx(ctx),
+		fp.WithTransportProtos(fp.TCP),
+		fp.WithNmapRule(rules),
+		fp.WithActiveMode(true),
+		fp.WithProbeTimeout(time.Second),
+		fp.WithProbesMax(2),
+		fp.WithCache(cache),
+	}
+	if disableWeb {
+		opts = append(opts, fp.WithDisableWebFingerprint(true))
+	}
+	out, err := _scanFromTargetStream(in, opts...)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var found *fp.MatchResult
+	for result := range out {
+		found = result
+	}
+	if found == nil {
+		t.Fatal("missing fingerprint result")
+	}
+	return found
+}
+
+func listenUDPWebPort(t *testing.T) int {
+	t.Helper()
+	for _, port := range []int{8080, 8081, 8082, 8083, 8084, 8085, 8088, 8000, 8001, 8888, 1900} {
+		udp, err := net.ListenUDP("udp", &net.UDPAddr{IP: net.IPv4(127, 0, 0, 1), Port: port})
+		if err != nil {
+			continue
+		}
+		tcp, err := net.DialTimeout("tcp", net.JoinHostPort("127.0.0.1", fmt.Sprint(port)), 200*time.Millisecond)
+		if err == nil {
+			_ = tcp.Close()
+			_ = udp.Close()
+			continue
+		}
+		t.Cleanup(func() { _ = udp.Close() })
+		go func() {
+			buf := make([]byte, 64)
+			for {
+				_, remote, err := udp.ReadFromUDP(buf)
+				if err != nil {
+					return
+				}
+				_, _ = udp.WriteToUDP([]byte("udp-banner"), remote)
+			}
+		}()
+		return port
+	}
+	t.Fatal("no free udp web port")
+	return 0
+}
+
 func listenUDPBanner(t *testing.T) int {
 	t.Helper()
 	conn, err := net.ListenUDP("udp", &net.UDPAddr{IP: net.IPv4(127, 0, 0, 1)})
