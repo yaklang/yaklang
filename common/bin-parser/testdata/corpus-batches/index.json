@@ -121414,6 +121414,532 @@
         "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-information/captured-controls.json": "dlms-hdlc-sn-gbt-information/captured-controls.json",
         "scripts/protocol-tests/required-tests-traffic-unified-v171.json": "required-tests-traffic-unified-v171.json"
       }
+    },
+    {
+      "id": "validation-dlms-hdlc-sn-gbt-split-header-complete",
+      "kind": "support",
+      "source_sha": "32404c793e048c84faf0f420c08cd4707e68d47f",
+      "file": "validation-dlms-hdlc-sn-gbt-split-header-complete.zip",
+      "sha256": "f46080313f5465f29e33f7e5bb38f3d26080c063f8cca63fa9a35a8d8b33bf1d",
+      "password": "bin-parser",
+      "members": {
+        "dlms-hdlc-sn-gbt-split-header-captures/Close-before-fixed-header-complete-three-counters.tcp.pcap": {
+          "bytes": 506,
+          "sha256": "3dc771367189f0215cfc1d83f8cfaa3383238d2a609c0c36fa62de92e44a28c5"
+        },
+        "dlms-hdlc-sn-gbt-split-header-captures/Close-before-fixed-header-complete-three-counters.udp.pcap": {
+          "bytes": 260,
+          "sha256": "a64d7cc284bb7ae9d3c74d092a3c60270cbca37849ad24207676f266795667f4"
+        },
+        "dlms-hdlc-sn-gbt-split-header-captures/Close-with-first82-length-octet-still-pending.tcp.pcap": {
+          "bytes": 513,
+          "sha256": "d965c007eddb1f0b577eb6de306c7f561ecfdca5a2164a304dc40075a1b0c933"
+        },
+        "dlms-hdlc-sn-gbt-split-header-captures/Close-with-first82-length-octet-still-pending.udp.pcap": {
+          "bytes": 267,
+          "sha256": "9178c871e69f266c2e5cc68a1355732ae227e163afa3a09d9ea969b452309ef1"
+        },
+        "dlms-hdlc-sn-gbt-split-header-captures/M0-before-fixed-header-complete-is-Malformed.tcp.pcap": {
+          "bytes": 591,
+          "sha256": "45e595fd045093988b1372e124408ff026ff2e734a8e93f9f0b9aaefbd36d590"
+        },
+        "dlms-hdlc-sn-gbt-split-header-captures/M0-before-fixed-header-complete-is-Malformed.udp.pcap": {
+          "bytes": 333,
+          "sha256": "f44a42a0c901a2f5d9fdf90cd7abcbc478ff3cfccb5133f8c30c058bcd490076"
+        },
+        "dlms-hdlc-sn-gbt-split-header-captures/M0-inside82-determinant-is-Malformed.tcp.pcap": {
+          "bytes": 594,
+          "sha256": "f680b1a04077d2c8d69e013a8496136d1e5cc692362618844714afe8e0d87318"
+        },
+        "dlms-hdlc-sn-gbt-split-header-captures/M0-inside82-determinant-is-Malformed.udp.pcap": {
+          "bytes": 336,
+          "sha256": "cf0f38e01369d2cef9a152a6f946dc23f9a7299c5e7661a21618c4e9eaa4e542"
+        },
+        "dlms-hdlc-sn-gbt-split-header-captures/definite-width3-declared65536-Resource-on-later-M1-count-completion.tcp.pcap": {
+          "bytes": 596,
+          "sha256": "d839d02833a3aafbf61b32692e87238f825a518df03db922397713b79e46c7e5"
+        },
+        "dlms-hdlc-sn-gbt-split-header-captures/definite-width3-declared65536-Resource-on-later-M1-count-completion.udp.pcap": {
+          "bytes": 338,
+          "sha256": "297afd4658efb94c21d4045715fd025b1cb47aa60e0f3ebc3ecd6db87751d5de"
+        },
+        "dlms-hdlc-sn-gbt-split-header-captures/definite-width4-declared4294967295-Resource-on-later-M1-count-completion.tcp.pcap": {
+          "bytes": 597,
+          "sha256": "286a3017f090e0d7c6f742adac42fdf3a5b044c175fdaae9003a27a6463c46bf"
+        },
+        "dlms-hdlc-sn-gbt-split-header-captures/definite-width4-declared4294967295-Resource-on-later-M1-count-completion.udp.pcap": {
+          "bytes": 339,
+          "sha256": "f4db60e393aa23eb5b89a92777dc3912030353c987adacaefeecbbaca19392d4"
+        },
+        "dlms-hdlc-sn-gbt-split-header-captures/fixed-E0-header-first-information-cut4.tcp.pcap": {
+          "bytes": 786,
+          "sha256": "51114362cbe10a1e36f0d8154ec52c692cc3c340a5b7af96221ed38b4c35be3a"
+        },
+        "dlms-hdlc-sn-gbt-split-header-captures/fixed-E0-header-first-information-cut4.udp.pcap": {
+          "bytes": 504,
+          "sha256": "f41601b271e99da3dbc179379e448455f448c1c062c6bc23047a8c923e23a67b"
+        },
+        "dlms-hdlc-sn-gbt-split-header-captures/fixed-E0-header-first-information-cut5.tcp.pcap": {
+          "bytes": 786,
+          "sha256": "d0b2b656f1930de1e0e85362987108bec79e40b0813a220f5f975620e28e2f6d"
+        },
+        "dlms-hdlc-sn-gbt-split-header-captures/fixed-E0-header-first-information-cut5.udp.pcap": {
+          "bytes": 504,
+          "sha256": "6ceec00d54174eab424a46bc6e33ea0eab25954a9105bb84f03bae014ba1c478"
+        },
+        "dlms-hdlc-sn-gbt-split-header-captures/fixed-E0-header-first-information-cut6.tcp.pcap": {
+          "bytes": 786,
+          "sha256": "84150cf1d314b9c33243cac146369e741b0a6fd3a24f3e8b08c7d8077ce765c1"
+        },
+        "dlms-hdlc-sn-gbt-split-header-captures/fixed-E0-header-first-information-cut6.udp.pcap": {
+          "bytes": 504,
+          "sha256": "73484d343d155981f363a212bd694343932c4eef03e03ccbd846bd5dab35cefc"
+        },
+        "dlms-hdlc-sn-gbt-split-header-captures/fixed-E0-header-first-information-cut7.tcp.pcap": {
+          "bytes": 786,
+          "sha256": "288449cb25906f726ff47597013d850ceabf710f72f782c0daf45c927174ae0d"
+        },
+        "dlms-hdlc-sn-gbt-split-header-captures/fixed-E0-header-first-information-cut7.udp.pcap": {
+          "bytes": 504,
+          "sha256": "518cd57a3b3ecb89b600708e09a7e02009aed5ed95d4a3517bb092b1217de960"
+        },
+        "dlms-hdlc-sn-gbt-split-header-captures/fixed-E0-header-first-information-cut8.tcp.pcap": {
+          "bytes": 786,
+          "sha256": "0178db7c5487612ac6c8160d456b826e7aaaedd25113d84eaf7e3a1e1b8f1a2c"
+        },
+        "dlms-hdlc-sn-gbt-split-header-captures/fixed-E0-header-first-information-cut8.udp.pcap": {
+          "bytes": 504,
+          "sha256": "9fb8d105ce552857a4bc694d7dc0df62e7f7ad037b6e4e65e417eb1d9d420157"
+        },
+        "dlms-hdlc-sn-gbt-split-header-captures/fixed-E0-header-first-information-cut9.tcp.pcap": {
+          "bytes": 786,
+          "sha256": "941bc154d0ec54175e13d42c20a3f195a0dce12fc1621c01386499770423eb02"
+        },
+        "dlms-hdlc-sn-gbt-split-header-captures/fixed-E0-header-first-information-cut9.udp.pcap": {
+          "bytes": 504,
+          "sha256": "88711ec7af9f78a329eba1b03faf41f2b7ec53ee670ebf4cb2a4fabd08e2a707"
+        },
+        "dlms-hdlc-sn-gbt-split-header-captures/header-crosses-three-Iframes-before-one-E0-phase.tcp.pcap": {
+          "bytes": 867,
+          "sha256": "e33dad201b8c1187d460c8382a06a39dac254135594e70d9c5a39ea4ecd2340e"
+        },
+        "dlms-hdlc-sn-gbt-split-header-captures/header-crosses-three-Iframes-before-one-E0-phase.udp.pcap": {
+          "bytes": 573,
+          "sha256": "d6802ecb45b44130367b40ecb1423f026d3ca00991079916e272ff8befec4f72"
+        },
+        "dlms-hdlc-sn-gbt-split-header-captures/literal80-recognized-in-nonfinal-continuation-remains-Unsupported.tcp.pcap": {
+          "bytes": 603,
+          "sha256": "66a97ab2be597ce44f31a79f1bbadf612beb3f3032422dd4e98de0679351eda6"
+        },
+        "dlms-hdlc-sn-gbt-split-header-captures/literal80-recognized-in-nonfinal-continuation-remains-Unsupported.udp.pcap": {
+          "bytes": 345,
+          "sha256": "ea37506e0778146f2e6c2e0bb3030a82b1626ad2ffdbfc6143e16ac6f0280966"
+        },
+        "dlms-hdlc-sn-gbt-split-header-captures/local-nonminimal-definite-width1-count-split-completes-SN-phase.tcp.pcap": {
+          "bytes": 787,
+          "sha256": "231a2ec8c20e01ea58470b1dcb006cab7e7396004d61129f0184d9a620c61b7f"
+        },
+        "dlms-hdlc-sn-gbt-split-header-captures/local-nonminimal-definite-width1-count-split-completes-SN-phase.udp.pcap": {
+          "bytes": 505,
+          "sha256": "3aedd69bf1e0af27cf3df8b166bb1218b83851eeefd5e397ecfc2b46f4f450b9"
+        },
+        "dlms-hdlc-sn-gbt-split-header-captures/local-nonminimal-definite-width3-count-split-completes-SN-phase.tcp.pcap": {
+          "bytes": 789,
+          "sha256": "c62e4c5a9330496ff2173955165fb38d6b83799566c185deb1203bc6d932ec7b"
+        },
+        "dlms-hdlc-sn-gbt-split-header-captures/local-nonminimal-definite-width3-count-split-completes-SN-phase.udp.pcap": {
+          "bytes": 507,
+          "sha256": "92f2f52fe68c076b6088bbcebf5eff18a5224945b54ebaf1352c23b0836085de"
+        },
+        "dlms-hdlc-sn-gbt-split-header-captures/local-nonminimal-definite-width4-count-split-completes-SN-phase.tcp.pcap": {
+          "bytes": 790,
+          "sha256": "99a3833f78364e25ca8eec9e99ec65bc52ead173b81b68ee54f7a7605dafca4e"
+        },
+        "dlms-hdlc-sn-gbt-split-header-captures/local-nonminimal-definite-width4-count-split-completes-SN-phase.udp.pcap": {
+          "bytes": 508,
+          "sha256": "d58402b25c765c5fb6bd15a9c7ff914640027336a6043184f5832a879e2d3e4c"
+        },
+        "dlms-hdlc-sn-gbt-split-header-captures/local-nonminimal-width4-complete-first-count-existing-neighbor.tcp.pcap": {
+          "bytes": 790,
+          "sha256": "e63fdfc7e9f0358c956d85a8eab89159dc52c10a0eddeaf0d75ee4430cd6e5f1"
+        },
+        "dlms-hdlc-sn-gbt-split-header-captures/local-nonminimal-width4-complete-first-count-existing-neighbor.udp.pcap": {
+          "bytes": 508,
+          "sha256": "3a1a7f08d3a5cfdf2f87a3e456aaa75d19e1896f1275cb0763656474f172865c"
+        },
+        "dlms-hdlc-sn-gbt-split-header-captures/minimal82-E0-count-first-information-cut10.tcp.pcap": {
+          "bytes": 864,
+          "sha256": "ac5e45b9761edf546fdf72d1fd550d8aa649c79d38a1f426c2c7912aca5a01d2"
+        },
+        "dlms-hdlc-sn-gbt-split-header-captures/minimal82-E0-count-first-information-cut10.udp.pcap": {
+          "bytes": 606,
+          "sha256": "af9a38e601b41ac5525192f318e970a26b9d40a74277070139c53b879d124e8d"
+        },
+        "dlms-hdlc-sn-gbt-split-header-captures/minimal82-E0-count-first-information-cut11.tcp.pcap": {
+          "bytes": 864,
+          "sha256": "1dbd13a98353dae961272ed21ca029aa566afe2e55ffe1a4590be1c8ea22f1dc"
+        },
+        "dlms-hdlc-sn-gbt-split-header-captures/minimal82-E0-count-first-information-cut11.udp.pcap": {
+          "bytes": 606,
+          "sha256": "9a44ddff6e0930ac01b58a3786dbf27080a41fb7a17c463d16967c6cfe95f78b"
+        },
+        "dlms-hdlc-sn-gbt-split-header-captures/minimal82-E0-count-first-information-cut12.tcp.pcap": {
+          "bytes": 864,
+          "sha256": "1a35f7f65393b027da61f4461658eb3d4ffc8846f02f7adeea087ef10b906f3c"
+        },
+        "dlms-hdlc-sn-gbt-split-header-captures/minimal82-E0-count-first-information-cut12.udp.pcap": {
+          "bytes": 606,
+          "sha256": "4cf8ea0a11741b259486bbe299ff5c51ada3e38bdc0a6f1edf188dac72b72e9f"
+        },
+        "dlms-hdlc-sn-gbt-split-header-captures/missing-middle-NS-gap-retires-4B-header.tcp.pcap": {
+          "bytes": 599,
+          "sha256": "22cf62dcb558e98e0e0405f959ed0178c66899610a5d32df3fd3ed7b2eb50fea"
+        },
+        "dlms-hdlc-sn-gbt-split-header-captures/missing-middle-NS-gap-retires-4B-header.udp.pcap": {
+          "bytes": 341,
+          "sha256": "c00e0e4a1b9c9812b61e0af20775844518738d6a2f52c044672acbcdae1dff41"
+        },
+        "dlms-hdlc-sn-gbt-split-header-captures/pending-definite-width3-count-Close-without-invented-length.tcp.pcap": {
+          "bytes": 514,
+          "sha256": "6424abc1a43ce5ce37813057f9ce85600e8804e4930c260cc6f4c8ccf85c86be"
+        },
+        "dlms-hdlc-sn-gbt-split-header-captures/pending-definite-width3-count-Close-without-invented-length.udp.pcap": {
+          "bytes": 268,
+          "sha256": "b7e0e007f0b2dd737ff7c9ce3d5702da7e396771883b141a7176d4e34c2b7c25"
+        },
+        "dlms-hdlc-sn-gbt-split-header-captures/pending-definite-width4-count-Close-without-invented-length.tcp.pcap": {
+          "bytes": 515,
+          "sha256": "7a6d9c8207dc8362323586a234f5b37af1a5b92dfbe9231cc8edcc64422ee3d2"
+        },
+        "dlms-hdlc-sn-gbt-split-header-captures/pending-definite-width4-count-Close-without-invented-length.udp.pcap": {
+          "bytes": 269,
+          "sha256": "393557ff0dc375d2141d52b7b27782e5bb4ced6fa9ff5186e8b86934c9203e30"
+        },
+        "dlms-hdlc-sn-gbt-split-header-captures/reuse-inputs.json": {
+          "bytes": 1353,
+          "sha256": "8092241a2b15f42a1b635c2bc8f129a9ac48f672c14a92f4c333051d2ed3b440"
+        },
+        "dlms-hdlc-sn-gbt-split-header-captures/width5-recognized-in-nonfinal-continuation-remains-Unsupported.tcp.pcap": {
+          "bytes": 608,
+          "sha256": "21d8b8781684f1163f36003bae168657621fdc6ce4789dd41d51465430076956"
+        },
+        "dlms-hdlc-sn-gbt-split-header-captures/width5-recognized-in-nonfinal-continuation-remains-Unsupported.udp.pcap": {
+          "bytes": 350,
+          "sha256": "747c842f991f33940ec88ee47bf24b4d8fa8d82af61cfbec589497afebed3f7d"
+        },
+        "dlms-hdlc-sn-gbt-split-header-captures/wrong-direction-address-NR-do-not-consume-4B-header.tcp.pcap": {
+          "bytes": 1080,
+          "sha256": "6ee2f774cb109348967d573b99bea51a77fcd4cc0409f9bda282f348d468b463"
+        },
+        "dlms-hdlc-sn-gbt-split-header-captures/wrong-direction-address-NR-do-not-consume-4B-header.udp.pcap": {
+          "bytes": 762,
+          "sha256": "2c8ea798582c988e8b0d7464b55855b88d285a2467ae51f32e94050c5bea785c"
+        },
+        "dlms-hdlc-sn-gbt-split-header-source/CAPTURED-COUNT-EXPANSION-PROOF.json": {
+          "bytes": 19698,
+          "sha256": "aa263ff9140656f83144e223eb12892f9b557630e2f1756cf732691fac83f852"
+        },
+        "dlms-hdlc-sn-gbt-split-header-source/COUNT-KIND-EXPANSION-PROOF.json": {
+          "bytes": 23240,
+          "sha256": "5519c102666e0a25842190f012f6dc3ff6be6712447cff1d8d3cf574abde0279"
+        },
+        "dlms-hdlc-sn-gbt-split-header-source/SOURCES.json": {
+          "bytes": 4019,
+          "sha256": "298c26ec1dd798232241045f39964700fb15bb460711ff506a003917b4803ecf"
+        },
+        "dlms-hdlc-sn-gbt-split-header-source/baseline-controls.json": {
+          "bytes": 62656,
+          "sha256": "8e8fa3f260b3649bc4e282642cf428a331de26b5056bc06dbbb282f8d01fb9d7"
+        },
+        "dlms-hdlc-sn-gbt-split-header-source/captured-controls-expanded.json": {
+          "bytes": 546638,
+          "sha256": "5a18153d43f98c0b7e0a4565935b1e4da087625dfefee4f178ac3f89ddcaa341"
+        },
+        "dlms-hdlc-sn-gbt-split-header-source/count-kind-expanded-controls.json": {
+          "bytes": 49493,
+          "sha256": "6a99d9cc8d95c0703583edff72c6e31792a73ca1ab5324943b313acf452266e0"
+        },
+        "dlms-hdlc-sn-gbt-split-header-source/full-controls.json": {
+          "bytes": 417756,
+          "sha256": "efa38f4980158a783d97f7a06a8b36686ae567fe9d575aa6059907112d795912"
+        },
+        "dlms-hdlc-sn-gbt-split-header-source/width-controls.json": {
+          "bytes": 146474,
+          "sha256": "ad420927623df5353fc6044a96f4caa91a3113561d0da608e2404451eab267ab"
+        },
+        "dlms-hdlc-sn-gbt-split-header-tools/capture-checks.py": {
+          "bytes": 858,
+          "sha256": "773153f31c80ec4acb5cf5006a7dce3731b44f32ec55aff217550336216dd698"
+        },
+        "dlms-hdlc-sn-gbt-split-header-tools/carrier.py": {
+          "bytes": 1215,
+          "sha256": "9e8b93483f75943e6a3e1a022ac30be38172c49afe461f4e7b758bdf18b4ab4c"
+        },
+        "dlms-hdlc-sn-gbt-split-header-tools/independent/count-kind-tools/expand-captured.py": {
+          "bytes": 5439,
+          "sha256": "f7d55e3936f425d7109570c8583a2229960afd155895973bc1790727b5cb0cb5"
+        },
+        "dlms-hdlc-sn-gbt-split-header-tools/independent/count-kind-tools/expand.py": {
+          "bytes": 7658,
+          "sha256": "7996d68168bb4e81c4017039843ca7a5354afbc5aeabe537bacce809a941e9fc"
+        },
+        "dlms-hdlc-sn-gbt-split-header-tools/independent/package-tools/base/hdlc-reference.json": {
+          "bytes": 2402,
+          "sha256": "69b33f59438b54e25e0209287112464b1d6c1e802c975e7bb9dc2ed8fc7280b0"
+        },
+        "dlms-hdlc-sn-gbt-split-header-tools/independent/package-tools/base/hdlc.py": {
+          "bytes": 2011,
+          "sha256": "7f4394c9b7536c86c2f31e1dd26b3e8b2b003dd4d280e98f582e1300f53e3358"
+        },
+        "dlms-hdlc-sn-gbt-split-header-tools/independent/package-tools/base/model.py": {
+          "bytes": 12762,
+          "sha256": "98c916e3de269646a186c9a61dcc2f72fcd4bffa71d9d91f462a30d2a94f7739"
+        },
+        "dlms-hdlc-sn-gbt-split-header-tools/independent/package-tools/base/phase/access.py": {
+          "bytes": 4354,
+          "sha256": "3166cdf13b9934650fdaa34051ba1d6365c6521028ab132898597e424c23e586"
+        },
+        "dlms-hdlc-sn-gbt-split-header-tools/independent/package-tools/base/phase/block-grammar.py": {
+          "bytes": 5985,
+          "sha256": "0b69840f2066124f48091301aea6247ec29fb86c4933d00055f60828296bd220"
+        },
+        "dlms-hdlc-sn-gbt-split-header-tools/independent/package-tools/base/phase/compose.py": {
+          "bytes": 15710,
+          "sha256": "f4590e419ee263e9c957ec9e75c551ce89dcf81b378bf4ce115ce5e11cefd87b"
+        },
+        "dlms-hdlc-sn-gbt-split-header-tools/independent/package-tools/base/phase/composition-pins.json": {
+          "bytes": 1489,
+          "sha256": "9e0492525bf27a37c96b07bb545956618e7041de4fce6823681033bfb5fbd507"
+        },
+        "dlms-hdlc-sn-gbt-split-header-tools/independent/package-tools/base/phase/gbt-core.py": {
+          "bytes": 12575,
+          "sha256": "a678272f289349b8be7e31791edd158ccc2c4e4ee13431dcfec6a2fcf56a0df6"
+        },
+        "dlms-hdlc-sn-gbt-split-header-tools/independent/package-tools/base/phase/legacy.py": {
+          "bytes": 9729,
+          "sha256": "d5a9c60619214a8a0ac68cb2159bf089992795de9059eb010a1287d5f8c72e35"
+        },
+        "dlms-hdlc-sn-gbt-split-header-tools/independent/package-tools/base/phase/model-pins.json": {
+          "bytes": 354,
+          "sha256": "641a27a880d7ef22b9678b92b0e9a3e4af9dac3dbd9d7b49be8fb14a9b4d88fb"
+        },
+        "dlms-hdlc-sn-gbt-split-header-tools/independent/package-tools/base/phase/ordinary.py": {
+          "bytes": 9776,
+          "sha256": "b19b8043b6d3defeb32ff2a3a5caf67102299118852c6859c2d1a78847fbb51a"
+        },
+        "dlms-hdlc-sn-gbt-split-header-tools/independent/package-tools/base/phase/rebuild.py": {
+          "bytes": 884,
+          "sha256": "49e676495fb763e85409db61eed1724d9f688d8b01bf6ca76769c9d686c170dc"
+        },
+        "dlms-hdlc-sn-gbt-split-header-tools/independent/package-tools/base/phase/reference-vectors.json": {
+          "bytes": 10296,
+          "sha256": "1c7119b36f10a8b7c329cc3c346b3792f3421a19c5fc0b2594fa284b7cfa5874"
+        },
+        "dlms-hdlc-sn-gbt-split-header-tools/independent/package-tools/base/phase/upload/access.py": {
+          "bytes": 4392,
+          "sha256": "70f03ceffb0556b966d04829dc89384c20b73bc6104c8ed637e5ed0b97d8bc7e"
+        },
+        "dlms-hdlc-sn-gbt-split-header-tools/independent/package-tools/base/phase/upload/download-outer.py": {
+          "bytes": 5985,
+          "sha256": "0b69840f2066124f48091301aea6247ec29fb86c4933d00055f60828296bd220"
+        },
+        "dlms-hdlc-sn-gbt-split-header-tools/independent/package-tools/base/phase/upload/download-reference-vectors.json": {
+          "bytes": 4159,
+          "sha256": "59250557438767f0f7ff0a072b1decf3fe0f5768b75013142a5dfa608b0fe6c0"
+        },
+        "dlms-hdlc-sn-gbt-split-header-tools/independent/package-tools/base/phase/upload/model.py": {
+          "bytes": 15781,
+          "sha256": "609ba979ea49fc353ccd92fadf99edbc5100e4f1637eaa4444fcace579c903dc"
+        },
+        "dlms-hdlc-sn-gbt-split-header-tools/independent/package-tools/base/phase/upload/read-body.py": {
+          "bytes": 4002,
+          "sha256": "9038061ed63630258c65a5b9e11e51888d414b290fea0aa2bd14743e2a7af4cd"
+        },
+        "dlms-hdlc-sn-gbt-split-header-tools/independent/package-tools/base/phase/upload/reference-vectors.json": {
+          "bytes": 6734,
+          "sha256": "3d7c0f01b305e3524efa5dab640dd9ae4730fe7ed789ca9ef015a5c39b846b8d"
+        },
+        "dlms-hdlc-sn-gbt-split-header-tools/independent/package-tools/base/phase/upload/source-outer.py": {
+          "bytes": 8836,
+          "sha256": "4505d905a3a96b22ac3f91e00033d4146c3bf5e75794a2ad25f60b5e3e7145a1"
+        },
+        "dlms-hdlc-sn-gbt-split-header-tools/independent/package-tools/base/phase/upload/write-body.py": {
+          "bytes": 5706,
+          "sha256": "4818c0264cb4819cf5d4715a855b4f3817acf26c0c6b15ff558aaa7d3b4aa094"
+        },
+        "dlms-hdlc-sn-gbt-split-header-tools/independent/package-tools/base/phase/upload/write-source.py": {
+          "bytes": 8800,
+          "sha256": "46e574590d006649212a255cd2fc85d226165f0ce27f5cc7a01f88211720de0a"
+        },
+        "dlms-hdlc-sn-gbt-split-header-tools/independent/package-tools/base/phase/verify.py": {
+          "bytes": 6343,
+          "sha256": "f164e4ce57fb860f955c123ce691d0013474c50b7c668f6a780f2f6c28560334"
+        },
+        "dlms-hdlc-sn-gbt-split-header-tools/independent/package-tools/base/phase/write-body.py": {
+          "bytes": 5706,
+          "sha256": "4818c0264cb4819cf5d4715a855b4f3817acf26c0c6b15ff558aaa7d3b4aa094"
+        },
+        "dlms-hdlc-sn-gbt-split-header-tools/independent/package-tools/base/reused-pins.json": {
+          "bytes": 2218,
+          "sha256": "89958cf0dd81834899b822c647d71deddcc59d94d043c36b2835995a3eadcf65"
+        },
+        "dlms-hdlc-sn-gbt-split-header-tools/independent/package-tools/generate.py": {
+          "bytes": 12475,
+          "sha256": "8a5a84c0bf03d989989f24b31122258c14d86f6a52d743888df1f0ec10cd25e8"
+        },
+        "dlms-hdlc-sn-gbt-split-header-tools/independent/package-tools/hdlc-reference.json": {
+          "bytes": 2402,
+          "sha256": "69b33f59438b54e25e0209287112464b1d6c1e802c975e7bb9dc2ed8fc7280b0"
+        },
+        "dlms-hdlc-sn-gbt-split-header-tools/independent/package-tools/hdlc.py": {
+          "bytes": 2011,
+          "sha256": "7f4394c9b7536c86c2f31e1dd26b3e8b2b003dd4d280e98f582e1300f53e3358"
+        },
+        "dlms-hdlc-sn-gbt-split-header-tools/independent/package-tools/model-pins.json": {
+          "bytes": 2857,
+          "sha256": "1055ae107050fb1599d15a1eebf1efed9aea87fd1037f5ca465776050d1d4870"
+        },
+        "dlms-hdlc-sn-gbt-split-header-tools/independent/package-tools/verify.py": {
+          "bytes": 5563,
+          "sha256": "cb51510f6e822dfc314932a762ebc0e5413ac1968b2d75fa1ae715969f395848"
+        },
+        "dlms-hdlc-sn-gbt-split-header-tools/independent/width-tools/generate.py": {
+          "bytes": 6806,
+          "sha256": "b9eaf57efd8db50cff82baf9950d69b9828659cde92e7145b203606dc619257b"
+        },
+        "dlms-hdlc-sn-gbt-split-header-tools/project-width.py": {
+          "bytes": 1344,
+          "sha256": "6b5ed5d52af47b9a28830584c491ffc3a61d16f46bdb969dc3123ec67319937f"
+        },
+        "dlms-hdlc-sn-gbt-split-header-tools/project.py": {
+          "bytes": 1332,
+          "sha256": "ace01c6abc051f377fc357984d672edb7dbda8ee5de8a4fed5a5676204807496"
+        },
+        "dlms-hdlc-sn-gbt-split-header-tools/verify-captures.py": {
+          "bytes": 4239,
+          "sha256": "ce32f1807aa73f63a7f8bd31b34a32218c93450722ca2931c7d0d44aed1f7bbc"
+        },
+        "dlms-hdlc-sn-gbt-split-header/captured-controls.json": {
+          "bytes": 419773,
+          "sha256": "f20f95f560afdab1647460cd8eefcd6326a8c1d4ad7f6b2bae650f7ba8c44d65"
+        },
+        "dlms-hdlc-sn-gbt-split-header/width-captured-controls.json": {
+          "bytes": 143779,
+          "sha256": "2f52fbd479b6b873d778662db2f92177b0ca0b27ddd23206cf32b0f6f2810641"
+        },
+        "required-tests-traffic-unified-v172.json": {
+          "bytes": 23382544,
+          "sha256": "07972e8554cddce0b804be76260f41ff1185be37b9381d35fad52112ae472c4a"
+        },
+        "validation/expected.json": {
+          "bytes": 70368,
+          "sha256": "7124ae57e044056468618b334f333739c8a2b11dd3fa60ebfbb462d64361e96e"
+        }
+      },
+      "aliases": {
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-split-header-captures/Close-before-fixed-header-complete-three-counters.tcp.pcap": "dlms-hdlc-sn-gbt-split-header-captures/Close-before-fixed-header-complete-three-counters.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-split-header-captures/Close-before-fixed-header-complete-three-counters.udp.pcap": "dlms-hdlc-sn-gbt-split-header-captures/Close-before-fixed-header-complete-three-counters.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-split-header-captures/Close-with-first82-length-octet-still-pending.tcp.pcap": "dlms-hdlc-sn-gbt-split-header-captures/Close-with-first82-length-octet-still-pending.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-split-header-captures/Close-with-first82-length-octet-still-pending.udp.pcap": "dlms-hdlc-sn-gbt-split-header-captures/Close-with-first82-length-octet-still-pending.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-split-header-captures/M0-before-fixed-header-complete-is-Malformed.tcp.pcap": "dlms-hdlc-sn-gbt-split-header-captures/M0-before-fixed-header-complete-is-Malformed.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-split-header-captures/M0-before-fixed-header-complete-is-Malformed.udp.pcap": "dlms-hdlc-sn-gbt-split-header-captures/M0-before-fixed-header-complete-is-Malformed.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-split-header-captures/M0-inside82-determinant-is-Malformed.tcp.pcap": "dlms-hdlc-sn-gbt-split-header-captures/M0-inside82-determinant-is-Malformed.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-split-header-captures/M0-inside82-determinant-is-Malformed.udp.pcap": "dlms-hdlc-sn-gbt-split-header-captures/M0-inside82-determinant-is-Malformed.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-split-header-captures/definite-width3-declared65536-Resource-on-later-M1-count-completion.tcp.pcap": "dlms-hdlc-sn-gbt-split-header-captures/definite-width3-declared65536-Resource-on-later-M1-count-completion.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-split-header-captures/definite-width3-declared65536-Resource-on-later-M1-count-completion.udp.pcap": "dlms-hdlc-sn-gbt-split-header-captures/definite-width3-declared65536-Resource-on-later-M1-count-completion.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-split-header-captures/definite-width4-declared4294967295-Resource-on-later-M1-count-completion.tcp.pcap": "dlms-hdlc-sn-gbt-split-header-captures/definite-width4-declared4294967295-Resource-on-later-M1-count-completion.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-split-header-captures/definite-width4-declared4294967295-Resource-on-later-M1-count-completion.udp.pcap": "dlms-hdlc-sn-gbt-split-header-captures/definite-width4-declared4294967295-Resource-on-later-M1-count-completion.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-split-header-captures/fixed-E0-header-first-information-cut4.tcp.pcap": "dlms-hdlc-sn-gbt-split-header-captures/fixed-E0-header-first-information-cut4.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-split-header-captures/fixed-E0-header-first-information-cut4.udp.pcap": "dlms-hdlc-sn-gbt-split-header-captures/fixed-E0-header-first-information-cut4.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-split-header-captures/fixed-E0-header-first-information-cut5.tcp.pcap": "dlms-hdlc-sn-gbt-split-header-captures/fixed-E0-header-first-information-cut5.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-split-header-captures/fixed-E0-header-first-information-cut5.udp.pcap": "dlms-hdlc-sn-gbt-split-header-captures/fixed-E0-header-first-information-cut5.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-split-header-captures/fixed-E0-header-first-information-cut6.tcp.pcap": "dlms-hdlc-sn-gbt-split-header-captures/fixed-E0-header-first-information-cut6.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-split-header-captures/fixed-E0-header-first-information-cut6.udp.pcap": "dlms-hdlc-sn-gbt-split-header-captures/fixed-E0-header-first-information-cut6.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-split-header-captures/fixed-E0-header-first-information-cut7.tcp.pcap": "dlms-hdlc-sn-gbt-split-header-captures/fixed-E0-header-first-information-cut7.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-split-header-captures/fixed-E0-header-first-information-cut7.udp.pcap": "dlms-hdlc-sn-gbt-split-header-captures/fixed-E0-header-first-information-cut7.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-split-header-captures/fixed-E0-header-first-information-cut8.tcp.pcap": "dlms-hdlc-sn-gbt-split-header-captures/fixed-E0-header-first-information-cut8.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-split-header-captures/fixed-E0-header-first-information-cut8.udp.pcap": "dlms-hdlc-sn-gbt-split-header-captures/fixed-E0-header-first-information-cut8.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-split-header-captures/fixed-E0-header-first-information-cut9.tcp.pcap": "dlms-hdlc-sn-gbt-split-header-captures/fixed-E0-header-first-information-cut9.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-split-header-captures/fixed-E0-header-first-information-cut9.udp.pcap": "dlms-hdlc-sn-gbt-split-header-captures/fixed-E0-header-first-information-cut9.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-split-header-captures/header-crosses-three-Iframes-before-one-E0-phase.tcp.pcap": "dlms-hdlc-sn-gbt-split-header-captures/header-crosses-three-Iframes-before-one-E0-phase.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-split-header-captures/header-crosses-three-Iframes-before-one-E0-phase.udp.pcap": "dlms-hdlc-sn-gbt-split-header-captures/header-crosses-three-Iframes-before-one-E0-phase.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-split-header-captures/literal80-recognized-in-nonfinal-continuation-remains-Unsupported.tcp.pcap": "dlms-hdlc-sn-gbt-split-header-captures/literal80-recognized-in-nonfinal-continuation-remains-Unsupported.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-split-header-captures/literal80-recognized-in-nonfinal-continuation-remains-Unsupported.udp.pcap": "dlms-hdlc-sn-gbt-split-header-captures/literal80-recognized-in-nonfinal-continuation-remains-Unsupported.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-split-header-captures/local-nonminimal-definite-width1-count-split-completes-SN-phase.tcp.pcap": "dlms-hdlc-sn-gbt-split-header-captures/local-nonminimal-definite-width1-count-split-completes-SN-phase.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-split-header-captures/local-nonminimal-definite-width1-count-split-completes-SN-phase.udp.pcap": "dlms-hdlc-sn-gbt-split-header-captures/local-nonminimal-definite-width1-count-split-completes-SN-phase.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-split-header-captures/local-nonminimal-definite-width3-count-split-completes-SN-phase.tcp.pcap": "dlms-hdlc-sn-gbt-split-header-captures/local-nonminimal-definite-width3-count-split-completes-SN-phase.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-split-header-captures/local-nonminimal-definite-width3-count-split-completes-SN-phase.udp.pcap": "dlms-hdlc-sn-gbt-split-header-captures/local-nonminimal-definite-width3-count-split-completes-SN-phase.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-split-header-captures/local-nonminimal-definite-width4-count-split-completes-SN-phase.tcp.pcap": "dlms-hdlc-sn-gbt-split-header-captures/local-nonminimal-definite-width4-count-split-completes-SN-phase.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-split-header-captures/local-nonminimal-definite-width4-count-split-completes-SN-phase.udp.pcap": "dlms-hdlc-sn-gbt-split-header-captures/local-nonminimal-definite-width4-count-split-completes-SN-phase.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-split-header-captures/local-nonminimal-width4-complete-first-count-existing-neighbor.tcp.pcap": "dlms-hdlc-sn-gbt-split-header-captures/local-nonminimal-width4-complete-first-count-existing-neighbor.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-split-header-captures/local-nonminimal-width4-complete-first-count-existing-neighbor.udp.pcap": "dlms-hdlc-sn-gbt-split-header-captures/local-nonminimal-width4-complete-first-count-existing-neighbor.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-split-header-captures/minimal82-E0-count-first-information-cut10.tcp.pcap": "dlms-hdlc-sn-gbt-split-header-captures/minimal82-E0-count-first-information-cut10.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-split-header-captures/minimal82-E0-count-first-information-cut10.udp.pcap": "dlms-hdlc-sn-gbt-split-header-captures/minimal82-E0-count-first-information-cut10.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-split-header-captures/minimal82-E0-count-first-information-cut11.tcp.pcap": "dlms-hdlc-sn-gbt-split-header-captures/minimal82-E0-count-first-information-cut11.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-split-header-captures/minimal82-E0-count-first-information-cut11.udp.pcap": "dlms-hdlc-sn-gbt-split-header-captures/minimal82-E0-count-first-information-cut11.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-split-header-captures/minimal82-E0-count-first-information-cut12.tcp.pcap": "dlms-hdlc-sn-gbt-split-header-captures/minimal82-E0-count-first-information-cut12.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-split-header-captures/minimal82-E0-count-first-information-cut12.udp.pcap": "dlms-hdlc-sn-gbt-split-header-captures/minimal82-E0-count-first-information-cut12.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-split-header-captures/missing-middle-NS-gap-retires-4B-header.tcp.pcap": "dlms-hdlc-sn-gbt-split-header-captures/missing-middle-NS-gap-retires-4B-header.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-split-header-captures/missing-middle-NS-gap-retires-4B-header.udp.pcap": "dlms-hdlc-sn-gbt-split-header-captures/missing-middle-NS-gap-retires-4B-header.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-split-header-captures/pending-definite-width3-count-Close-without-invented-length.tcp.pcap": "dlms-hdlc-sn-gbt-split-header-captures/pending-definite-width3-count-Close-without-invented-length.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-split-header-captures/pending-definite-width3-count-Close-without-invented-length.udp.pcap": "dlms-hdlc-sn-gbt-split-header-captures/pending-definite-width3-count-Close-without-invented-length.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-split-header-captures/pending-definite-width4-count-Close-without-invented-length.tcp.pcap": "dlms-hdlc-sn-gbt-split-header-captures/pending-definite-width4-count-Close-without-invented-length.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-split-header-captures/pending-definite-width4-count-Close-without-invented-length.udp.pcap": "dlms-hdlc-sn-gbt-split-header-captures/pending-definite-width4-count-Close-without-invented-length.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-split-header-captures/reuse-inputs.json": "dlms-hdlc-sn-gbt-split-header-captures/reuse-inputs.json",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-split-header-captures/width5-recognized-in-nonfinal-continuation-remains-Unsupported.tcp.pcap": "dlms-hdlc-sn-gbt-split-header-captures/width5-recognized-in-nonfinal-continuation-remains-Unsupported.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-split-header-captures/width5-recognized-in-nonfinal-continuation-remains-Unsupported.udp.pcap": "dlms-hdlc-sn-gbt-split-header-captures/width5-recognized-in-nonfinal-continuation-remains-Unsupported.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-split-header-captures/wrong-direction-address-NR-do-not-consume-4B-header.tcp.pcap": "dlms-hdlc-sn-gbt-split-header-captures/wrong-direction-address-NR-do-not-consume-4B-header.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-split-header-captures/wrong-direction-address-NR-do-not-consume-4B-header.udp.pcap": "dlms-hdlc-sn-gbt-split-header-captures/wrong-direction-address-NR-do-not-consume-4B-header.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-split-header-source/CAPTURED-COUNT-EXPANSION-PROOF.json": "dlms-hdlc-sn-gbt-split-header-source/CAPTURED-COUNT-EXPANSION-PROOF.json",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-split-header-source/COUNT-KIND-EXPANSION-PROOF.json": "dlms-hdlc-sn-gbt-split-header-source/COUNT-KIND-EXPANSION-PROOF.json",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-split-header-source/SOURCES.json": "dlms-hdlc-sn-gbt-split-header-source/SOURCES.json",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-split-header-source/baseline-controls.json": "dlms-hdlc-sn-gbt-split-header-source/baseline-controls.json",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-split-header-source/captured-controls-expanded.json": "dlms-hdlc-sn-gbt-split-header-source/captured-controls-expanded.json",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-split-header-source/count-kind-expanded-controls.json": "dlms-hdlc-sn-gbt-split-header-source/count-kind-expanded-controls.json",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-split-header-source/full-controls.json": "dlms-hdlc-sn-gbt-split-header-source/full-controls.json",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-split-header-source/width-controls.json": "dlms-hdlc-sn-gbt-split-header-source/width-controls.json",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-split-header-tools/capture-checks.py": "dlms-hdlc-sn-gbt-split-header-tools/capture-checks.py",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-split-header-tools/carrier.py": "dlms-hdlc-sn-gbt-split-header-tools/carrier.py",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-split-header-tools/independent/count-kind-tools/expand-captured.py": "dlms-hdlc-sn-gbt-split-header-tools/independent/count-kind-tools/expand-captured.py",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-split-header-tools/independent/count-kind-tools/expand.py": "dlms-hdlc-sn-gbt-split-header-tools/independent/count-kind-tools/expand.py",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-split-header-tools/independent/package-tools/base/hdlc-reference.json": "dlms-hdlc-sn-gbt-split-header-tools/independent/package-tools/base/hdlc-reference.json",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-split-header-tools/independent/package-tools/base/hdlc.py": "dlms-hdlc-sn-gbt-split-header-tools/independent/package-tools/base/hdlc.py",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-split-header-tools/independent/package-tools/base/model.py": "dlms-hdlc-sn-gbt-split-header-tools/independent/package-tools/base/model.py",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-split-header-tools/independent/package-tools/base/phase/access.py": "dlms-hdlc-sn-gbt-split-header-tools/independent/package-tools/base/phase/access.py",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-split-header-tools/independent/package-tools/base/phase/block-grammar.py": "dlms-hdlc-sn-gbt-split-header-tools/independent/package-tools/base/phase/block-grammar.py",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-split-header-tools/independent/package-tools/base/phase/compose.py": "dlms-hdlc-sn-gbt-split-header-tools/independent/package-tools/base/phase/compose.py",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-split-header-tools/independent/package-tools/base/phase/composition-pins.json": "dlms-hdlc-sn-gbt-split-header-tools/independent/package-tools/base/phase/composition-pins.json",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-split-header-tools/independent/package-tools/base/phase/gbt-core.py": "dlms-hdlc-sn-gbt-split-header-tools/independent/package-tools/base/phase/gbt-core.py",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-split-header-tools/independent/package-tools/base/phase/legacy.py": "dlms-hdlc-sn-gbt-split-header-tools/independent/package-tools/base/phase/legacy.py",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-split-header-tools/independent/package-tools/base/phase/model-pins.json": "dlms-hdlc-sn-gbt-split-header-tools/independent/package-tools/base/phase/model-pins.json",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-split-header-tools/independent/package-tools/base/phase/ordinary.py": "dlms-hdlc-sn-gbt-split-header-tools/independent/package-tools/base/phase/ordinary.py",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-split-header-tools/independent/package-tools/base/phase/rebuild.py": "dlms-hdlc-sn-gbt-split-header-tools/independent/package-tools/base/phase/rebuild.py",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-split-header-tools/independent/package-tools/base/phase/reference-vectors.json": "dlms-hdlc-sn-gbt-split-header-tools/independent/package-tools/base/phase/reference-vectors.json",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-split-header-tools/independent/package-tools/base/phase/upload/access.py": "dlms-hdlc-sn-gbt-split-header-tools/independent/package-tools/base/phase/upload/access.py",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-split-header-tools/independent/package-tools/base/phase/upload/download-outer.py": "dlms-hdlc-sn-gbt-split-header-tools/independent/package-tools/base/phase/upload/download-outer.py",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-split-header-tools/independent/package-tools/base/phase/upload/download-reference-vectors.json": "dlms-hdlc-sn-gbt-split-header-tools/independent/package-tools/base/phase/upload/download-reference-vectors.json",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-split-header-tools/independent/package-tools/base/phase/upload/model.py": "dlms-hdlc-sn-gbt-split-header-tools/independent/package-tools/base/phase/upload/model.py",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-split-header-tools/independent/package-tools/base/phase/upload/read-body.py": "dlms-hdlc-sn-gbt-split-header-tools/independent/package-tools/base/phase/upload/read-body.py",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-split-header-tools/independent/package-tools/base/phase/upload/reference-vectors.json": "dlms-hdlc-sn-gbt-split-header-tools/independent/package-tools/base/phase/upload/reference-vectors.json",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-split-header-tools/independent/package-tools/base/phase/upload/source-outer.py": "dlms-hdlc-sn-gbt-split-header-tools/independent/package-tools/base/phase/upload/source-outer.py",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-split-header-tools/independent/package-tools/base/phase/upload/write-body.py": "dlms-hdlc-sn-gbt-split-header-tools/independent/package-tools/base/phase/upload/write-body.py",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-split-header-tools/independent/package-tools/base/phase/upload/write-source.py": "dlms-hdlc-sn-gbt-split-header-tools/independent/package-tools/base/phase/upload/write-source.py",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-split-header-tools/independent/package-tools/base/phase/verify.py": "dlms-hdlc-sn-gbt-split-header-tools/independent/package-tools/base/phase/verify.py",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-split-header-tools/independent/package-tools/base/phase/write-body.py": "dlms-hdlc-sn-gbt-split-header-tools/independent/package-tools/base/phase/write-body.py",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-split-header-tools/independent/package-tools/base/reused-pins.json": "dlms-hdlc-sn-gbt-split-header-tools/independent/package-tools/base/reused-pins.json",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-split-header-tools/independent/package-tools/generate.py": "dlms-hdlc-sn-gbt-split-header-tools/independent/package-tools/generate.py",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-split-header-tools/independent/package-tools/hdlc-reference.json": "dlms-hdlc-sn-gbt-split-header-tools/independent/package-tools/hdlc-reference.json",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-split-header-tools/independent/package-tools/hdlc.py": "dlms-hdlc-sn-gbt-split-header-tools/independent/package-tools/hdlc.py",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-split-header-tools/independent/package-tools/model-pins.json": "dlms-hdlc-sn-gbt-split-header-tools/independent/package-tools/model-pins.json",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-split-header-tools/independent/package-tools/verify.py": "dlms-hdlc-sn-gbt-split-header-tools/independent/package-tools/verify.py",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-split-header-tools/independent/width-tools/generate.py": "dlms-hdlc-sn-gbt-split-header-tools/independent/width-tools/generate.py",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-split-header-tools/project-width.py": "dlms-hdlc-sn-gbt-split-header-tools/project-width.py",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-split-header-tools/project.py": "dlms-hdlc-sn-gbt-split-header-tools/project.py",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-split-header-tools/verify-captures.py": "dlms-hdlc-sn-gbt-split-header-tools/verify-captures.py",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-split-header/captured-controls.json": "dlms-hdlc-sn-gbt-split-header/captured-controls.json",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-split-header/width-captured-controls.json": "dlms-hdlc-sn-gbt-split-header/width-captured-controls.json",
+        "scripts/protocol-tests/required-tests-traffic-unified-v172.json": "required-tests-traffic-unified-v172.json"
+      }
     }
   ],
   "schema_version": 1,

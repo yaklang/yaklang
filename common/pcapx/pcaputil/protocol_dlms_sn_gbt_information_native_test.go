@@ -322,7 +322,7 @@ func hdlcSNGBTInformationNative(t *testing.T, cases []hdlcOpCase, meta map[strin
 }
 
 func TestDLMSHDLCSNGBTInformationCountNative(t *testing.T) {
-	c, m := hdlcSNGBTInformationLoad(t, "count-kind-controls.json", "fbd5379e9981d0c905f5acf5794b5860e409f0a82844827ac41d0346822c2e0c", 6)
+	c, m := hdlcSNGBTSplitHeaderLoad(t, "count-kind-expanded-controls.json", "6a99d9cc8d95c0703583edff72c6e31792a73ca1ab5324943b313acf452266e0", 6)
 	hdlcSNGBTInformationNative(t, c, m)
 }
 func TestDLMSHDLCSNGBTInformationReadModesNative(t *testing.T) {

@@ -38,29 +38,6 @@ func (f *binFlow) consumeDLMSSNGBTInformation(dir int, wire []byte, id uint64, m
 			return fail(ErrContextRequired, "SN GBT information group cannot consume an observed LN owner", false)
 		}
 		info := m.information
-		// The selected first fragment must contain the complete outer header/count.
-		// The declared data can cross subsequent CRC-validated information frames.
-		if len(info) < 10 {
-			return fail(ErrUnsupportedFeature, "first SN GBT information segment needs complete E0 header/count", true)
-		}
-		if info[9] > 0x80 && info[9]&127 <= 4 && len(info) < 10+int(info[9]&127) {
-			return fail(ErrUnsupportedFeature, "first SN GBT information segment needs complete E0 header/count", true)
-		}
-		c := wrapperListCursor{wire: info[3:], at: 6}
-		n, _, err := c.count()
-		if err != nil {
-			var pe *ProtocolError
-			if errors.As(err, &pe) {
-				if pe.Kind == ErrNeedMore {
-					return fail(ErrUnsupportedFeature, "first SN GBT information segment needs complete E0 header/count", true)
-				}
-				return fail(pe.Kind, "SN GBT information segment count invalid", true)
-			}
-			return fail(ErrMalformedMessage, "SN GBT information segment count invalid", true)
-		}
-		if n > uint64(min(wrapperBlockBytes+3, f.a.budget.MaxCollectionElements)) {
-			return fail(ErrResourceExceeded, "SN GBT information declared data exceeds selected/caller pool", true)
-		}
 		t = &dlmsFragments{snGBT: true, operation: "SN GBT", request: info[1] == 0xe6, dir: dir, source: m.source, destination: m.destination, first: m.ns, nr: m.nr}
 	} else {
 		if m.kind != "I" {
@@ -106,6 +83,30 @@ func (f *binFlow) consumeDLMSSNGBTInformation(dir int, wire []byte, id uint64, m
 	joined := make([]byte, len(t.info)+len(m.information))
 	copy(joined, t.info)
 	copy(joined[len(t.info):], m.information)
+	// No inner fields are published while an E0 header/count is incomplete.
+	// The bounded accumulated prefix is enough for a nonfinal observation;
+	// a final carrier still uses the unchanged complete-APDU decoder below.
+	countReady := len(joined) >= 10
+	if countReady && joined[9] > 0x80 {
+		width := int(joined[9] & 0x7f)
+		if width <= 4 && len(joined) < 10+width {
+			countReady = false
+		}
+	}
+	if m.segmented && countReady {
+		c := wrapperListCursor{wire: joined[3:], at: 6}
+		n, _, err := c.count()
+		if err != nil {
+			var pe *ProtocolError
+			if errors.As(err, &pe) {
+				return fail(pe.Kind, "SN GBT information segment count invalid", true)
+			} else {
+				return fail(ErrMalformedMessage, "SN GBT information segment count invalid", true)
+			}
+		} else if n > uint64(min(wrapperBlockBytes+3, f.a.budget.MaxCollectionElements)) {
+			return fail(ErrResourceExceeded, "SN GBT information declared data exceeds selected/caller pool", true)
+		}
+	}
 	digest := sha256.Sum256(wire)
 	if t.count > 0 {
 		digest = dlmsSNInformationDigest(t.snCarrierDigest, wire)

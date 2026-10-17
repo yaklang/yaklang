@@ -10,8 +10,8 @@ import (
 )
 
 func TestDLMSHDLCSNGBTInformationMatrix(t *testing.T) {
-	raw := finsReadBatch(t, "dlms-hdlc-sn-gbt-information", "DLMS_HDLC_SN_GBT_INFORMATION_ROOT", "captured-controls.json")
-	require.Equal(t, "5f4a94e6a825b58f366872e6ece233ad6a97b40d0f5aa50666cec895b411c231", fmt.Sprintf("%x", sha256.Sum256(raw)))
+	raw := finsReadBatch(t, "dlms-hdlc-sn-gbt-split-header-source", "DLMS_HDLC_SN_GBT_SPLIT_HEADER_ROOT", "captured-controls-expanded.json")
+	require.Equal(t, "5a18153d43f98c0b7e0a4565935b1e4da087625dfefee4f178ac3f89ddcaa341", fmt.Sprintf("%x", sha256.Sum256(raw)))
 	var d struct{ Cases []hdlcOpCase }
 	require.NoError(t, json.Unmarshal(raw, &d))
 	require.Len(t, d.Cases, 29)
