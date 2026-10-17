@@ -151,6 +151,9 @@ func scanRouteGroups(groups []routeGroup, ports string, config *SynxConfig) (cha
 	if config.Ctx == nil {
 		config.Ctx = context.Background()
 	}
+	if config.routeGroups == nil {
+		config.routeGroups = &routeGroupState{}
+	}
 	if err := config.Ctx.Err(); err != nil {
 		return nil, err
 	}

@@ -477,26 +477,26 @@ func _scanFromPingUtils(res chan *pingutil.PingResult, ports string, opts ...fp.
 // <|EXAMPLE_END|>
 //
 // synScanProbeTarget separates the service port from the transport.
-// New synscan results keep the service port and set Protocol. Older results
-// still encode UDP as a port above 65535. An explicit Protocol wins, and an
-// encoded port is decoded so the matcher dials the real service port.
-func synScanProbeTarget(res *synscan.SynScanResult) (proto string, port int) {
+// explicit is set only when the result carries Protocol or the historical
+// UDP port encoding. A bare host:port keeps the caller's transport options.
+func synScanProbeTarget(res *synscan.SynScanResult) (proto string, port int, explicit bool) {
 	if res == nil {
-		return "tcp", 0
+		return "", 0, false
 	}
 	proto = strings.ToLower(strings.TrimSpace(res.Protocol))
 	port = res.Port
 	encoded, decoded := utils.ParsePortToProtoPort(port)
 	switch proto {
-	case "":
-		return encoded, decoded
 	case "udp", "tcp":
 		if encoded == "udp" {
 			port = decoded
 		}
-		return proto, port
+		return proto, port, true
 	default:
-		return encoded, decoded
+		if encoded == "udp" {
+			return "udp", decoded, true
+		}
+		return "", port, false
 	}
 }
 
@@ -652,7 +652,8 @@ func _scanFromTargetStream(res interface{}, opts ...fp.ConfigOption) (chan *fp.M
 			}
 			swg.Add()
 			rawHost := synRes.Host
-			proto, portWithoutProto := synScanProbeTarget(synRes)
+			proto, portWithoutProto, explicitProto := synScanProbeTarget(synRes)
+			callerProtos := append([]fp.TransportProto(nil), matcher.Config.TransportProtos...)
 			go func() {
 				defer swg.Done()
 				fingerprintInFlight.Add(1)
@@ -662,15 +663,22 @@ func _scanFromTargetStream(res interface{}, opts ...fp.ConfigOption) (chan *fp.M
 				if scanCtx.Err() != nil || guard.skipping(rawHost) {
 					return
 				}
-				log.Debugf("start task to scan: [%s://%s]", proto, utils.HostPort(rawHost, portWithoutProto))
-				// 每个目标单独复制传输配置。syn 结果里的 Protocol 是 udp 时，
-				// 数字端口本身不再编码协议；若直接复用 matcher 的共享配置，
-				// UDP 探测会改掉后续 TCP 目标的传输层。
-				transport := fp.TCP
-				if proto == "udp" {
-					transport = fp.UDP
+				shown := proto
+				if shown == "" {
+					shown = "configured"
 				}
-				result, err := matcher.MatchWithContext(scanCtx, rawHost, portWithoutProto, fp.WithTransportProtos(transport))
+				log.Debugf("start task to scan: [%s://%s]", shown, utils.HostPort(rawHost, portWithoutProto))
+				// 每个目标复制一份传输配置，避免 UDP 探测改写共享 matcher。
+				// 只有结果带了协议，或端口仍是旧的 UDP 编码时，才覆盖调用方的协议选项。
+				transportOpt := fp.WithTransportProtos(callerProtos...)
+				if explicitProto {
+					transport := fp.TCP
+					if proto == "udp" {
+						transport = fp.UDP
+					}
+					transportOpt = fp.WithTransportProtos(transport)
+				}
+				result, err := matcher.MatchWithContext(scanCtx, rawHost, portWithoutProto, transportOpt)
 				if err != nil {
 					log.Errorf("failed to scan [%s://%s]: %v", proto, utils.HostPort(rawHost, portWithoutProto), err)
 					return

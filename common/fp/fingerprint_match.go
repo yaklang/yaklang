@@ -96,17 +96,17 @@ func (f *Matcher) MatchWithContext(ctx context.Context, host string, port int, o
 		config.TransportProtos = []TransportProto{UDP}
 	}
 
+	cacheProto := fingerprintCacheProto(proto, config)
+	cacheKey := fingerprintCacheAddr(host, port, cacheProto)
 	if config.EnableCache {
-		result := GetMatchResultCache(addr)
-		if result != nil {
+		if result := cachedMatchResult(GetMatchResultCache, cacheKey, addr, cacheProto); result != nil {
 			f.reportFinished(result)
 			return result, nil
 		}
 	}
 
 	if config.EnableDatabaseCache {
-		result := GetMatchResultDatabaseCache(addr)
-		if result != nil {
+		if result := cachedMatchResult(GetMatchResultDatabaseCache, cacheKey, addr, cacheProto); result != nil {
 			f.reportFinished(result)
 			return result, nil
 		}
@@ -262,11 +262,11 @@ func (f *Matcher) MatchWithContext(ctx context.Context, host string, port int, o
 	if matchResult.State == OPEN {
 		if config.EnableCache {
 			f.log("saving result to memory cache")
-			SetMatchResultCache(addr, matchResult)
+			SetMatchResultCache(cacheKey, matchResult)
 		}
 		if config.EnableDatabaseCache {
 			f.log("saving result to database cache")
-			SetMatchResultDatabaseCache(addr, matchResult)
+			SetMatchResultDatabaseCache(cacheKey, matchResult)
 		}
 	}
 	f.reportFinished(matchResult)

@@ -412,7 +412,8 @@ func (h *HalfOpenSYN) ProbeSYN(ctx context.Context, target string, options ...TC
 	// Cancellation still aborts the probe. Callers that set only a deadline keep
 	// the previous behavior.
 	runCtx := ctx
-	if probeResponseBudget(ctx) > 0 {
+	budget := probeResponseBudget(ctx)
+	if budget > 0 {
 		var stop context.CancelFunc
 		runCtx, stop = contextWithoutDeadline(ctx)
 		defer stop()
@@ -425,7 +426,19 @@ func (h *HalfOpenSYN) ProbeSYN(ctx context.Context, target string, options ...TC
 	if _, err = probe.ProbeSYNContext(runCtx); err != nil {
 		return TCPSegment{}, err
 	}
-	return probe.ReceiveSYNACKContext(runCtx)
+	// Retries share one response window that starts after the SYN is sent.
+	// Time spent waiting for the first rate token is not part of it.
+	recvCtx := runCtx
+	if budget > 0 {
+		var stopRecv context.CancelFunc
+		recvCtx, stopRecv = context.WithTimeout(runCtx, budget)
+		defer stopRecv()
+	}
+	seg, err := probe.ReceiveSYNACKContext(recvCtx)
+	if budget > 0 && errors.Is(err, context.DeadlineExceeded) {
+		return TCPSegment{}, fmt.Errorf("%w: %w", ErrProbeNoResponse, err)
+	}
+	return seg, err
 }
 
 func (h *HalfOpenSYN) Close() error {

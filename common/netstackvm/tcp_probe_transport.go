@@ -221,7 +221,25 @@ func (p *TCPProbe) ReceiveSYNACKContext(ctx context.Context) (TCPSegment, error)
 		return TCPSegment{}, err
 	}
 	for {
-		rxCtx, rxCancel := context.WithTimeout(ctx, p.retry.delay(p.attempts, rand.Float64()))
+		delay := p.retry.delay(p.attempts, rand.Float64())
+		// The caller deadline is one shared response window. A wait that
+		// already uses the time left is the last attempt; another SYN would
+		// land after the budget.
+		finalWait := false
+		if deadline, ok := ctx.Deadline(); ok {
+			remaining := time.Until(deadline)
+			if remaining <= 0 {
+				if err := ctx.Err(); err != nil {
+					return TCPSegment{}, context.Cause(ctx)
+				}
+				return TCPSegment{}, context.DeadlineExceeded
+			}
+			if remaining <= delay {
+				delay = remaining
+				finalWait = true
+			}
+		}
+		rxCtx, rxCancel := context.WithTimeout(ctx, delay)
 		var seg TCPSegment
 		var raw []byte
 		for {
@@ -253,6 +271,12 @@ func (p *TCPProbe) ReceiveSYNACKContext(ctx context.Context) (TCPSegment, error)
 		}
 		if !errors.Is(err, context.DeadlineExceeded) {
 			return TCPSegment{}, err
+		}
+		if finalWait {
+			if errors.Is(err, ErrProbeChecksum) {
+				return TCPSegment{}, fmt.Errorf("%w: %w", context.DeadlineExceeded, ErrProbeChecksum)
+			}
+			return TCPSegment{}, context.DeadlineExceeded
 		}
 		if p.attempts >= p.retry.MaxAttempts {
 			if errors.Is(err, ErrProbeChecksum) {

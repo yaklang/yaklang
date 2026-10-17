@@ -128,15 +128,26 @@ func TestRouteCacheReplacesExpiredError(t *testing.T) {
 }
 
 func TestTCPRetryPolicyStaysValidForShortBudgets(t *testing.T) {
-	for _, budget := range []time.Duration{time.Millisecond, 20 * time.Millisecond, 49 * time.Millisecond, 50 * time.Millisecond} {
-		policy := tcpRetryPolicy(budget)
-		if policy.MaxAttempts < 1 || policy.MaxAttempts > 10 || policy.SendTimeout <= 0 || policy.ResponseTimeout <= 0 || policy.MaxResponseTimeout < policy.ResponseTimeout {
-			t.Fatalf("budget %s policy %+v is invalid", budget, policy)
+	cases := []struct {
+		budget   time.Duration
+		attempts int
+	}{
+		{time.Millisecond, 1},
+		{20 * time.Millisecond, 1},
+		{49 * time.Millisecond, 1},
+		{50 * time.Millisecond, 1},
+		{100 * time.Millisecond, 1},
+		{150 * time.Millisecond, 2},
+		{200 * time.Millisecond, 2},
+		{350 * time.Millisecond, 3},
+	}
+	for _, tc := range cases {
+		policy := tcpRetryPolicy(tc.budget)
+		if policy.MaxAttempts != tc.attempts || policy.SendTimeout <= 0 || policy.ResponseTimeout <= 0 || policy.MaxResponseTimeout < policy.ResponseTimeout || policy.MaxResponseTimeout > tc.budget {
+			t.Fatalf("budget %s policy %+v", tc.budget, policy)
 		}
-		if budget < 50*time.Millisecond {
-			if policy.MaxAttempts != 1 || policy.ResponseTimeout != budget || policy.MaxResponseTimeout != budget {
-				t.Fatalf("budget %s policy %+v", budget, policy)
-			}
+		if tc.budget < 50*time.Millisecond && (policy.ResponseTimeout != tc.budget || policy.MaxResponseTimeout != tc.budget) {
+			t.Fatalf("short budget %s policy %+v", tc.budget, policy)
 		}
 	}
 }
