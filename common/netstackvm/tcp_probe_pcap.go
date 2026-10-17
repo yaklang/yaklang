@@ -53,7 +53,7 @@ func (t *pcapProbeTransport) sendSYN(ctx context.Context) (TCPSegment, error) {
 	}
 	// Rate applies to all attempts, not just new targets. Burst=1 avoids a
 	// retry storm after a batch of response timers expires together.
-	if err := t.session.limiter.Wait(ctx); err != nil {
+	if err := t.session.waitLimiter(ctx); err != nil {
 		return TCPSegment{}, err
 	}
 	t.writeMu.Lock()

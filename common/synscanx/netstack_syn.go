@@ -99,7 +99,7 @@ func quietProbeErr(err error) bool {
 		errors.Is(err, context.DeadlineExceeded)
 }
 
-func (s *Scannerx) runTCPProbes(targets <-chan *SynxTarget) {
+func (s *Scannerx) runProbes(targets <-chan *SynxTarget) {
 	for {
 		select {
 		case <-s.ctx.Done():
@@ -108,18 +108,26 @@ func (s *Scannerx) runTCPProbes(targets <-chan *SynxTarget) {
 			if !ok {
 				return
 			}
-			ack, err := s.probeTCP(s.ctx, target)
-			if err != nil {
-				if !quietProbeErr(err) {
-					log.Debugf("synscanx probe %s:%d failed: %v", target.Host, target.Port, err)
-				}
+			if target != nil && target.Mode == UDP {
+				s.finishUDPProbe(target)
 				continue
 			}
-			// Scanner callbacks stay here. netstackvm only returns the segment.
-			if s.ctx.Err() == nil && s.OpenPortHandlers != nil && ack.RemoteIP != nil {
-				s.OpenPortHandlers(ack.RemoteIP, int(ack.RemotePort))
-			}
+			s.finishTCPProbe(target)
 		}
+	}
+}
+
+func (s *Scannerx) finishTCPProbe(target *SynxTarget) {
+	ack, err := s.probeTCP(s.ctx, target)
+	if err != nil {
+		if !quietProbeErr(err) {
+			log.Debugf("synscanx probe %s:%d failed: %v", target.Host, target.Port, err)
+		}
+		return
+	}
+	// Scanner callbacks stay here. netstackvm only returns the segment.
+	if s.ctx.Err() == nil && s.OpenPortHandlers != nil && ack.RemoteIP != nil {
+		s.OpenPortHandlers(ack.RemoteIP, int(ack.RemotePort))
 	}
 }
 
@@ -136,26 +144,16 @@ func (s *Scannerx) probeUDP(ctx context.Context, target *SynxTarget) (netstackvm
 	return s.halfOpen.ProbeUDP(probeCtx, net.JoinHostPort(target.Host, strconv.Itoa(target.Port)), udpProbePayload(target.Port))
 }
 
-func (s *Scannerx) runUDPProbes(targets <-chan *SynxTarget) {
-	for {
-		select {
-		case <-s.ctx.Done():
-			return
-		case target, ok := <-targets:
-			if !ok {
-				return
-			}
-			reply, err := s.probeUDP(s.ctx, target)
-			if err != nil {
-				if !quietProbeErr(err) {
-					log.Debugf("synscanx udp probe %s:%d failed: %v", target.Host, target.Port, err)
-				}
-				continue
-			}
-			if s.ctx.Err() == nil && s.OpenPortHandlers != nil && reply.RemoteIP != nil {
-				s.OpenPortHandlers(reply.RemoteIP, int(reply.RemotePort))
-			}
+func (s *Scannerx) finishUDPProbe(target *SynxTarget) {
+	reply, err := s.probeUDP(s.ctx, target)
+	if err != nil {
+		if !quietProbeErr(err) {
+			log.Debugf("synscanx udp probe %s:%d failed: %v", target.Host, target.Port, err)
 		}
+		return
+	}
+	if s.ctx.Err() == nil && s.OpenPortHandlers != nil && reply.RemoteIP != nil {
+		s.OpenPortHandlers(reply.RemoteIP, int(reply.RemotePort))
 	}
 }
 

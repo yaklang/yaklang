@@ -217,6 +217,40 @@ func TestHalfOpenContextCancelsReceiveAndAdmission(t *testing.T) {
 	require.NoError(t, h.Close())
 }
 
+func TestHalfOpenCloseCancelsRateWaitBeforeWrite(t *testing.T) {
+	var writes atomic.Int32
+	h := mockHalfOpen(t, func(_ *HalfOpenSYN, _ []byte) error { writes.Add(1); return nil })
+	lim := rate.NewLimiter(rate.Every(time.Hour), 1)
+	require.True(t, lim.Allow())
+	h.limiter = lim
+	p := startMockProbe(t, h)
+	done := make(chan error, 1)
+	go func() { _, err := p.ProbeSYNContext(context.Background()); done <- err }()
+	deadline := time.Now().Add(time.Second)
+	ready := false
+	for time.Now().Before(deadline) && !ready {
+		h.mu.Lock()
+		for _, flight := range h.flights {
+			if flight.frame != nil && !flight.sent {
+				ready = true
+			}
+		}
+		h.mu.Unlock()
+		time.Sleep(time.Millisecond)
+	}
+	require.True(t, ready, "SYN did not reach the rate limiter")
+	started := time.Now()
+	require.NoError(t, h.Close())
+	select {
+	case err := <-done:
+		require.ErrorIs(t, err, context.Canceled)
+		require.Less(t, time.Since(started), time.Second)
+	case <-time.After(time.Second):
+		t.Fatal("Close did not cancel the TCP rate wait")
+	}
+	require.Zero(t, writes.Load())
+}
+
 func TestHalfOpenContextCancelsRateWaitBeforeWrite(t *testing.T) {
 	var writes atomic.Int32
 	h := mockHalfOpen(t, func(_ *HalfOpenSYN, _ []byte) error { writes.Add(1); return nil })

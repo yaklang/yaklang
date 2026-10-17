@@ -3,6 +3,7 @@ package netstackvm
 import (
 	"bytes"
 	"context"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"net"
@@ -160,7 +161,7 @@ func (h *HalfOpenSYN) ProbeUDP(ctx context.Context, target string, payload []byt
 	h.mu.Lock()
 	f.frame = frame
 	h.mu.Unlock()
-	if err := h.limiter.Wait(ctx); err != nil {
+	if err := h.waitLimiter(ctx); err != nil {
 		return UDPSegment{}, err
 	}
 	if err := h.injectUDP(ctx, vm, f); err != nil {
@@ -331,19 +332,13 @@ func (h *HalfOpenSYN) observeUDP(nic tcpip.NICID, packet gopacket.Packet, ip *la
 }
 
 func (h *HalfOpenSYN) observeUDPUnreachable(nic tcpip.NICID, packet gopacket.Packet) {
-	icmpLayer := packet.Layer(layers.LayerTypeICMPv4)
-	icmp, ok := icmpLayer.(*layers.ICMPv4)
-	if !ok || icmp.TypeCode.Type() != layers.ICMPv4TypeDestinationUnreachable || icmp.TypeCode.Code() != layers.ICMPv4CodePort {
-		return
-	}
-	quoted := gopacket.NewPacket(icmp.Payload, layers.LayerTypeIPv4, gopacket.Default)
-	ip, udpLayer, ok := ipv4UDP(quoted)
-	if !ok || ip.FragOffset != 0 || ip.Flags&layers.IPv4MoreFragments != 0 {
+	key, ok := unreachableUDPKey(nic, packet)
+	if !ok {
 		return
 	}
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	f := h.udpFlights[udpPacketKey(nic, ip, udpLayer, false)]
+	f := h.udpFlights[key]
 	if f == nil || f.ctx.Err() != nil || h.ctx.Err() != nil || f.frame == nil || (!f.sent && !f.sending) {
 		return
 	}
@@ -351,6 +346,72 @@ func (h *HalfOpenSYN) observeUDPUnreachable(nic tcpip.NICID, packet gopacket.Pac
 	case f.results <- udpResult{unreachable: true}:
 	default:
 	}
+}
+
+// unreachableUDPKey accepts a port-unreachable only when the outer IPv4 and
+// ICMP checksums are valid. The quoted datagram may be the RFC 792 minimum:
+// the IPv4 header plus the first 8 bytes of UDP.
+func unreachableUDPKey(nic tcpip.NICID, packet gopacket.Packet) (flightKey, bool) {
+	if packet == nil || packet.Metadata().Truncated {
+		return flightKey{}, false
+	}
+	ipLayer, ok := packet.Layer(layers.LayerTypeIPv4).(*layers.IPv4)
+	if !ok || ipLayer == nil || ipLayer.FragOffset != 0 || ipLayer.Flags&layers.IPv4MoreFragments != 0 {
+		return flightKey{}, false
+	}
+	raw := append(append([]byte(nil), ipLayer.Contents...), ipLayer.Payload...)
+	if len(raw) < header.IPv4MinimumSize {
+		return flightKey{}, false
+	}
+	iphdr := header.IPv4(raw)
+	// IsValid before any header-length slice. A declared IHL or total length
+	// past the captured bytes must not be treated as a matching unreachable.
+	if !iphdr.IsValid(len(raw)) || !iphdr.IsChecksumValid() {
+		return flightKey{}, false
+	}
+	icmpLen := int(iphdr.PayloadLength())
+	icmpBytes := iphdr.Payload()
+	if icmpLen < header.ICMPv4MinimumSize || icmpLen > len(icmpBytes) {
+		return flightKey{}, false
+	}
+	icmpBytes = icmpBytes[:icmpLen]
+	if checksum.Checksum(icmpBytes, 0) != 0xffff {
+		return flightKey{}, false
+	}
+	icmpHdr := header.ICMPv4(icmpBytes)
+	if icmpHdr.Type() != header.ICMPv4DstUnreachable || icmpHdr.Code() != header.ICMPv4PortUnreachable {
+		return flightKey{}, false
+	}
+	return quotedUDPKey(nic, icmpHdr.Payload())
+}
+
+func quotedUDPKey(nic tcpip.NICID, quote []byte) (flightKey, bool) {
+	if len(quote) < header.IPv4MinimumSize+header.ICMPv4MinimumErrorPayloadSize {
+		return flightKey{}, false
+	}
+	ip := header.IPv4(quote)
+	hlen := int(ip.HeaderLength())
+	if hlen < header.IPv4MinimumSize || hlen > header.IPv4MaximumHeaderSize || len(quote) < hlen+header.ICMPv4MinimumErrorPayloadSize {
+		return flightKey{}, false
+	}
+	if quote[0]>>4 != header.IPv4Version || ip.TransportProtocol() != header.UDPProtocolNumber {
+		return flightKey{}, false
+	}
+	if ip.More() || ip.FragmentOffset() != 0 {
+		return flightKey{}, false
+	}
+	src := ip.SourceAddressSlice()
+	dst := ip.DestinationAddressSlice()
+	if len(src) != net.IPv4len || len(dst) != net.IPv4len {
+		return flightKey{}, false
+	}
+	return flightKey{
+		nic:        nic,
+		local:      ip4key(src),
+		port:       binary.BigEndian.Uint16(quote[hlen:]),
+		remote:     ip4key(dst),
+		remotePort: binary.BigEndian.Uint16(quote[hlen+2:]),
+	}, true
 }
 
 func ipv4UDP(packet gopacket.Packet) (*layers.IPv4, *layers.UDP, bool) {
