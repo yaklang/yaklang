@@ -126,6 +126,11 @@ func (m *MatchResult) Merge(f *MatchResult) {
 	if f.Fingerprint == nil {
 		return
 	}
+	// A placeholder fingerprint has an empty protocol. Keep the protocol from
+	// the real result so Tidy does not later record a UDP service as TCP.
+	if m.Fingerprint.Proto == "" {
+		m.Fingerprint.Proto = f.Fingerprint.Proto
+	}
 	m.Fingerprint.CPEs = utils2.RemoveRepeatedWithStringSlice(append(m.Fingerprint.CPEs, f.Fingerprint.CPEs...))
 	if f.Fingerprint.ServiceName != "" && m.Fingerprint.ServiceName == "" {
 		m.Fingerprint.Banner = f.Fingerprint.Banner

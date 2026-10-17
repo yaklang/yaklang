@@ -38,6 +38,34 @@ match local m|^banner$|
 	}
 }
 
+func TestMergeKeepsUDPProtocol(t *testing.T) {
+	base := &MatchResult{
+		Target: "127.0.0.1",
+		Port:   8080,
+		State:  CLOSED,
+		Fingerprint: &FingerprintInfo{
+			IP:   "127.0.0.1",
+			Port: 8080,
+		},
+	}
+	base.Merge(&MatchResult{
+		Target: "127.0.0.1",
+		Port:   8080,
+		State:  OPEN,
+		Fingerprint: &FingerprintInfo{
+			IP:          "127.0.0.1",
+			Port:        8080,
+			Proto:       UDP,
+			Banner:      "udp-banner",
+			ServiceName: "udp-fixture",
+		},
+	})
+	base.Tidy()
+	if base.State != OPEN || base.GetProto() != UDP || !strings.Contains(base.Fingerprint.Banner, "udp-banner") {
+		t.Fatalf("merged proto=%s state=%s banner=%q", base.GetProto(), base.State, base.Fingerprint.Banner)
+	}
+}
+
 func TestLegacyFingerprintCacheDoesNotCrossProtocol(t *testing.T) {
 	const port = 9
 	legacy := utils.HostPort("127.0.0.1", port)

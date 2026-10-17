@@ -206,6 +206,72 @@ func TestProbeResponseBudgetStartsAfterSend(t *testing.T) {
 	require.Less(t, waited, 95*time.Millisecond)
 }
 
+// policy200ms matches synscanx.tcpRetryPolicy(200ms): two attempts at 200/3 and 400/3.
+func policy200ms() SYNRetryPolicy {
+	unit := 200 * time.Millisecond / 3
+	return SYNRetryPolicy{MaxAttempts: 2, SendTimeout: 3 * time.Second, ResponseTimeout: unit, MaxResponseTimeout: unit * 2}
+}
+
+func TestProbeResponseBudgetSurvivesInitialRateQueue(t *testing.T) {
+	var writes atomic.Int32
+	var sentAt time.Time
+	h := mockHalfOpen(t, func(h *HalfOpenSYN, b []byte) error {
+		if writes.Add(1) == 1 {
+			sentAt = time.Now()
+			h.observeInbound(h.main.MainNICID(), synReply(t, b, nil))
+		}
+		return nil
+	})
+	h.limiter = rate.NewLimiter(1, 1)
+	require.True(t, h.limiter.Allow())
+	started := time.Now()
+	_, err := h.ProbeSYN(ContextWithProbeBudget(context.Background(), 50*time.Millisecond), "192.0.2.20:80", WithSYNRetry(policy200ms()))
+	require.NoError(t, err)
+	require.EqualValues(t, 1, writes.Load())
+	require.GreaterOrEqual(t, sentAt.Sub(started), 700*time.Millisecond)
+	require.Less(t, time.Since(sentAt), 300*time.Millisecond)
+}
+
+func TestProbeRetryRateQueueStaysInsideResponseBudget(t *testing.T) {
+	var writes atomic.Int32
+	var sentAt time.Time
+	h := mockHalfOpen(t, func(_ *HalfOpenSYN, _ []byte) error {
+		if writes.Add(1) == 1 {
+			sentAt = time.Now()
+		}
+		return nil
+	})
+	h.limiter = rate.NewLimiter(1, 1)
+	_, err := h.ProbeSYN(ContextWithProbeBudget(context.Background(), 200*time.Millisecond), "192.0.2.20:80", WithSYNRetry(policy200ms()))
+	elapsed := time.Since(sentAt)
+	require.ErrorIs(t, err, ErrProbeNoResponse)
+	require.EqualValues(t, 1, writes.Load())
+	require.GreaterOrEqual(t, elapsed, 150*time.Millisecond)
+	require.Less(t, elapsed, 450*time.Millisecond)
+}
+
+func TestProbeRetryRateQueueDeliversResponse(t *testing.T) {
+	var writes atomic.Int32
+	var sentAt time.Time
+	h := mockHalfOpen(t, func(h *HalfOpenSYN, b []byte) error {
+		if writes.Add(1) == 1 {
+			sentAt = time.Now()
+			raw := append([]byte(nil), b...)
+			time.AfterFunc(120*time.Millisecond, func() {
+				h.observeInbound(h.main.MainNICID(), synReply(t, raw, nil))
+			})
+		}
+		return nil
+	})
+	h.limiter = rate.NewLimiter(1, 1)
+	_, err := h.ProbeSYN(ContextWithProbeBudget(context.Background(), 200*time.Millisecond), "192.0.2.20:80", WithSYNRetry(policy200ms()))
+	elapsed := time.Since(sentAt)
+	require.NoError(t, err)
+	require.EqualValues(t, 1, writes.Load())
+	require.GreaterOrEqual(t, elapsed, 100*time.Millisecond)
+	require.Less(t, elapsed, 450*time.Millisecond)
+}
+
 func TestHalfOpenRejectsWrongResponses(t *testing.T) {
 	var writes atomic.Int32
 	h := mockHalfOpen(t, func(h *HalfOpenSYN, b []byte) error {

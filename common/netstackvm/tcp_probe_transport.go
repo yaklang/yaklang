@@ -186,6 +186,9 @@ func (p *TCPProbe) sendWithRetry(ctx context.Context) (TCPSegment, error) {
 		sendCtx, cancel := context.WithTimeout(ctx, p.retry.SendTimeout)
 		seg, err := p.transport.sendSYN(sendCtx)
 		cancel()
+		if errors.Is(err, errProbeResponseReady) {
+			return TCPSegment{}, err
+		}
 		if ctx.Err() != nil {
 			return TCPSegment{}, context.Cause(ctx)
 		}
@@ -285,6 +288,9 @@ func (p *TCPProbe) ReceiveSYNACKContext(ctx context.Context) (TCPSegment, error)
 			return TCPSegment{}, fmt.Errorf("%w after %d attempts", ErrProbeNoResponse, p.attempts)
 		}
 		if _, err = p.sendWithRetry(ctx); err != nil {
+			if errors.Is(err, errProbeResponseReady) {
+				continue
+			}
 			return TCPSegment{}, err
 		}
 	}
