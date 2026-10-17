@@ -16,7 +16,7 @@ disableOpenPortGuard = cli.Bool("disable-open-port-guard", cli.setDefault(false)
 skippedHostAliveScan = cli.Bool("skipped-host-alive-scan")
 hostAliveConcurrent = cli.Int("host-alive-concurrent", cli.setDefault(20), cli.setRequired(false))
 hostAliveTimeout = cli.Float("host-alive-timeout", cli.setDefault(5.0), cli.setRequired(false))
-hostAliveTCPPorts = cli.String("host-alive-ports", cli.setDefault("22,80,443,3389,445,8080,8443"), cli.setRequired(false))
+hostAliveTCPPorts = cli.String("host-alive-ports", cli.setDefault("22,80,443"), cli.setRequired(false))
 
 
 active = cli.Bool("active")
