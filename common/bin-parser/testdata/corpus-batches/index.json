@@ -120874,6 +120874,546 @@
         "common/pcapx/pcaputil/dlms-hdlc-sn-service-gbt/captured-controls.json": "dlms-hdlc-sn-service-gbt/captured-controls.json",
         "scripts/protocol-tests/required-tests-traffic-unified-v170.json": "required-tests-traffic-unified-v170.json"
       }
+    },
+    {
+      "id": "validation-dlms-hdlc-sn-gbt-information",
+      "kind": "support",
+      "source_sha": "bd806f2eb36ce1a792bc8635e8af4a2bf1b6130d",
+      "file": "validation-dlms-hdlc-sn-gbt-information.zip",
+      "sha256": "3c3d4bfafe0126b7c2ea34d2f0796d1326ea6672bd82d0473630a2df9464a514",
+      "password": "bin-parser",
+      "members": {
+        "dlms-hdlc-sn-gbt-information-captures/Getprimed-direct-WriteQ7-echo-two-information-frames-E0-final-Q7.tcp.pcap": {
+          "bytes": 791,
+          "sha256": "bd10779ed550a0e5807f4c3349fc24713d53704da96faa830b3945a8870894eb"
+        },
+        "dlms-hdlc-sn-gbt-information-captures/Getprimed-direct-WriteQ7-echo-two-information-frames-E0-final-Q7.udp.pcap": {
+          "bytes": 509,
+          "sha256": "f6a3605bac3d73ca03598b5f62240b82ae7ce295eb32b7d064778c0f70bd9737"
+        },
+        "dlms-hdlc-sn-gbt-information-captures/Getprimed-two-information-frames-E0-first-ReadR2-direct-echo-final.tcp.pcap": {
+          "bytes": 786,
+          "sha256": "a3ab81518252ff68d896d964036fc57bdcc1445deb0b698ff9fba5695aee895f"
+        },
+        "dlms-hdlc-sn-gbt-information-captures/Getprimed-two-information-frames-E0-first-ReadR2-direct-echo-final.udp.pcap": {
+          "bytes": 504,
+          "sha256": "459a3b511c685ba3256b401eded6c9a4434dbe9a8c58b12afc8e50be2453f2bd"
+        },
+        "dlms-hdlc-sn-gbt-information-captures/Read-Q5-download-echo-in-two-information-fragments.tcp.pcap": {
+          "bytes": 786,
+          "sha256": "9a7b63c9283a6eaededf5133532374c6d228d9e605af303bf1b1f2e002258af2"
+        },
+        "dlms-hdlc-sn-gbt-information-captures/Read-Q5-download-echo-in-two-information-fragments.udp.pcap": {
+          "bytes": 504,
+          "sha256": "2be7233a335db14f32e9e6a4bcf158ffaa33fe3cfe40cb0bf6e28c6c2bd0e166"
+        },
+        "dlms-hdlc-sn-gbt-information-captures/Read-Q6-final-phase-in-two-information-fragments.tcp.pcap": {
+          "bytes": 784,
+          "sha256": "9d7109b34d0e7195ee5d986fcce81b5a26f50fb6264a81c5e4cf159922c096aa"
+        },
+        "dlms-hdlc-sn-gbt-information-captures/Read-Q6-final-phase-in-two-information-fragments.udp.pcap": {
+          "bytes": 502,
+          "sha256": "c407388512ddd3a53b225c48652a9c61ebd3c24d464cd411db22fc6bd09437d8"
+        },
+        "dlms-hdlc-sn-gbt-information-captures/Read-Q6-first-phase-in-two-information-fragments.tcp.pcap": {
+          "bytes": 784,
+          "sha256": "7c23606f656a04976f5d1edc8718aa208d50c54a0c67b43b453872b1aa422746"
+        },
+        "dlms-hdlc-sn-gbt-information-captures/Read-Q6-first-phase-in-two-information-fragments.udp.pcap": {
+          "bytes": 502,
+          "sha256": "7de31341c7f292cb4eb068744538ff8c0429f4e1afee62506877e5e597a83b00"
+        },
+        "dlms-hdlc-sn-gbt-information-captures/Read-R3-upload-echo-in-two-information-fragments.tcp.pcap": {
+          "bytes": 784,
+          "sha256": "6aad60ae8fb213a85839bac4e0515c8671f5b34820e238986909c08ce2af4361"
+        },
+        "dlms-hdlc-sn-gbt-information-captures/Read-R3-upload-echo-in-two-information-fragments.udp.pcap": {
+          "bytes": 502,
+          "sha256": "dc550b1c5f291d04acb2d9c7d81e450ea548787cb8f0fd068e1db1a9f8f6e245"
+        },
+        "dlms-hdlc-sn-gbt-information-captures/absolute-information-pool-1027-accepts-complete-Data9.tcp.pcap": {
+          "bytes": 1610,
+          "sha256": "8b20b79219ef6ebe3cf8a2535597199924e98d673a4a0d5f59d73af5b0f433db"
+        },
+        "dlms-hdlc-sn-gbt-information-captures/absolute-information-pool-1027-accepts-complete-Data9.udp.pcap": {
+          "bytes": 1352,
+          "sha256": "3be89f5be50e056b73e0781822f8b38403df5c8a90a72a8c974193e7db2b1ae0"
+        },
+        "dlms-hdlc-sn-gbt-information-captures/absolute-information-pool-1028-Resource-before-innerphase.tcp.pcap": {
+          "bytes": 1611,
+          "sha256": "9340ef18279d255d336fc72bc889edb012d7cbdf54aa681b4008ea738ad5d116"
+        },
+        "dlms-hdlc-sn-gbt-information-captures/absolute-information-pool-1028-Resource-before-innerphase.udp.pcap": {
+          "bytes": 1353,
+          "sha256": "f94e7b00562663fbf41a67551dc524985becc6ccc088e6ce31b63120137e9c4f"
+        },
+        "dlms-hdlc-sn-gbt-information-captures/active-Write-upload-then-partial-outer-Close-SN6-before-fragment3.tcp.pcap": {
+          "bytes": 701,
+          "sha256": "6bd015d3f5531ccedd1800a0316f6344ae73d1c4fd904d2a804352a2d1852648"
+        },
+        "dlms-hdlc-sn-gbt-information-captures/active-Write-upload-then-partial-outer-Close-SN6-before-fragment3.udp.pcap": {
+          "bytes": 431,
+          "sha256": "fd542adc02b55db82ee18dbd7fa487deb01c82ef1d0c0a90a8343db9bf516d1c"
+        },
+        "dlms-hdlc-sn-gbt-information-captures/exact-first-fragment-repeat-no-count-or-digest-advance.tcp.pcap": {
+          "bytes": 880,
+          "sha256": "360561fa4746becb934752f0eddb7683c35df588e76185049863521869ba487f"
+        },
+        "dlms-hdlc-sn-gbt-information-captures/exact-first-fragment-repeat-no-count-or-digest-advance.udp.pcap": {
+          "bytes": 586,
+          "sha256": "2de305c6ca5e40c2c35220d673c86ccb210abac670827fa9fa55452b42c6272c"
+        },
+        "dlms-hdlc-sn-gbt-information-captures/fullUInt32-server65537-four-octets-information-group.tcp.pcap": {
+          "bytes": 798,
+          "sha256": "1369e7598a989bc09b149e0c05a11145100e01e0862c8071202354a43ddb31b8"
+        },
+        "dlms-hdlc-sn-gbt-information-captures/fullUInt32-server65537-four-octets-information-group.udp.pcap": {
+          "bytes": 516,
+          "sha256": "f6d74c3b6e689e45004d4d1adc102bb54d63302b40fd1d0e082b62061dbb92b8"
+        },
+        "dlms-hdlc-sn-gbt-information-captures/identical-final-carrier-different-first-Data-aaadbeef.tcp.pcap": {
+          "bytes": 606,
+          "sha256": "8705db505221e227aa4fbfc53e82303cfa7295a27ace0055cc9a5850fe066f26"
+        },
+        "dlms-hdlc-sn-gbt-information-captures/identical-final-carrier-different-first-Data-aaadbeef.udp.pcap": {
+          "bytes": 348,
+          "sha256": "2f658bcace59a25817430c8973370b2eadfa6cbb5371c08cfff747f5a1e598d0"
+        },
+        "dlms-hdlc-sn-gbt-information-captures/identical-final-carrier-different-first-Data-deadbeef.tcp.pcap": {
+          "bytes": 606,
+          "sha256": "c465cfc32b0e380eff58ba3506ab42ebeebeb271eb99168d65c7d15e8d92ab5c"
+        },
+        "dlms-hdlc-sn-gbt-information-captures/identical-final-carrier-different-first-Data-deadbeef.udp.pcap": {
+          "bytes": 348,
+          "sha256": "62997e86fee13f4b54ebda3657b00e5f184e89d2ce5a3832853b18e98426cef2"
+        },
+        "dlms-hdlc-sn-gbt-information-captures/information-pool19-rejects-final20-before-innerphase.tcp.pcap": {
+          "bytes": 603,
+          "sha256": "1c97b5370724ba2031fdf261878bb7d26a4101139d53c6cd1d185845485c53fe"
+        },
+        "dlms-hdlc-sn-gbt-information-captures/information-pool19-rejects-final20-before-innerphase.udp.pcap": {
+          "bytes": 345,
+          "sha256": "97f4b446d42df0f5e5296228d0ca02192dd5793fd29b8308d1ac92c1a9d315ff"
+        },
+        "dlms-hdlc-sn-gbt-information-captures/joined-Write-request-under-response-LLC-is-Malformed.tcp.pcap": {
+          "bytes": 609,
+          "sha256": "3542a715060313715b4e7bc065d00e1b1bc95296f79b5cb57f56fcca7a52074f"
+        },
+        "dlms-hdlc-sn-gbt-information-captures/joined-Write-request-under-response-LLC-is-Malformed.udp.pcap": {
+          "bytes": 351,
+          "sha256": "4aab07ec8d4895bda5f207f2a073f3658135b77eae35f27af1407f36150f95ba"
+        },
+        "dlms-hdlc-sn-gbt-information-captures/literal80-M0-complete-old-decoder-comparison.tcp.pcap": {
+          "bytes": 515,
+          "sha256": "97b236bfec4b832229743e1bcf062e8738c0cec14519fdd6d82d9e71312d1a6a"
+        },
+        "dlms-hdlc-sn-gbt-information-captures/literal80-M0-complete-old-decoder-comparison.udp.pcap": {
+          "bytes": 269,
+          "sha256": "49f8fbf342783d089574de46d444fb4ad34ab22cba3dc039e11feabb5c861260"
+        },
+        "dlms-hdlc-sn-gbt-information-captures/literal80-M1-first-information-fragment.tcp.pcap": {
+          "bytes": 515,
+          "sha256": "674b01f48926dde42bc1e3e5569448963586054700251213e1c8cc49602dcffa"
+        },
+        "dlms-hdlc-sn-gbt-information-captures/literal80-M1-first-information-fragment.udp.pcap": {
+          "bytes": 269,
+          "sha256": "e5ebc55a323ccf53305505c80ccdf9d65a7f58ed2ce2b6b6a904f71a4316ffed"
+        },
+        "dlms-hdlc-sn-gbt-information-captures/live-LN-owner-refuses-new-E0-prefix-and-real-reply-retained.tcp.pcap": {
+          "bytes": 515,
+          "sha256": "c6a85c7e138df11ea88c4cf7bc0eda7c0e6a5a14a63e055b2551c7e98077670b"
+        },
+        "dlms-hdlc-sn-gbt-information-captures/live-LN-owner-refuses-new-E0-prefix-and-real-reply-retained.udp.pcap": {
+          "bytes": 269,
+          "sha256": "6e8b3bc47f2c9cd970a3450768dc642a3f01edc1bda4969c6e12280f862fe651"
+        },
+        "dlms-hdlc-sn-gbt-information-captures/matching-link-NS-gap-retires-information-group.tcp.pcap": {
+          "bytes": 603,
+          "sha256": "90c56a36bf3120042e73dff30a12faccfd039a91e39101b8f2ee1b8c544b8234"
+        },
+        "dlms-hdlc-sn-gbt-information-captures/matching-link-NS-gap-retires-information-group.udp.pcap": {
+          "bytes": 345,
+          "sha256": "e25e5199dea9a01518605bf066142af37518017e1e015783f073209d8919ee9f"
+        },
+        "dlms-hdlc-sn-gbt-information-captures/partial-response-information-Close-three-typed-counters.tcp.pcap": {
+          "bytes": 515,
+          "sha256": "9d58a5521b858ec4468ead7b80f129a6bd50c60a129da146c616a96c52c4fc27"
+        },
+        "dlms-hdlc-sn-gbt-information-captures/partial-response-information-Close-three-typed-counters.udp.pcap": {
+          "bytes": 269,
+          "sha256": "9b17bc8f7e5eca66168f646a69cf235021117fb2f9256fb681b1de3705ee603a"
+        },
+        "dlms-hdlc-sn-gbt-information-captures/reuse-inputs.json": {
+          "bytes": 697,
+          "sha256": "6f90223d1e6132de1920fdd62ec0f9459ffff7e9beae46e25e8643d208072f6f"
+        },
+        "dlms-hdlc-sn-gbt-information-captures/same-NS-changed-prefix-is-not-exactrepeat-and-retires.tcp.pcap": {
+          "bytes": 609,
+          "sha256": "7bd24c0f28d703aed4d776c379e9aa25ffbf27862990f8e21f97334060ae222a"
+        },
+        "dlms-hdlc-sn-gbt-information-captures/same-NS-changed-prefix-is-not-exactrepeat-and-retires.udp.pcap": {
+          "bytes": 351,
+          "sha256": "10ac7069ddea89ace11cc0b0eb868e811e78131750cc4c0fed6da38288aa00e7"
+        },
+        "dlms-hdlc-sn-gbt-information-captures/same-session-completed-A-then-different-prefix-B-same-final-must-retire.tcp.pcap": {
+          "bytes": 791,
+          "sha256": "6fc10fc2d1ce963d2bc438fab27161a93da6787cd92cd5c15a1c29112b146686"
+        },
+        "dlms-hdlc-sn-gbt-information-captures/same-session-completed-A-then-different-prefix-B-same-final-must-retire.udp.pcap": {
+          "bytes": 509,
+          "sha256": "2b0278035353335517016da3bf4bab0eddf05035131986566a4fdfd1d3c25d6c"
+        },
+        "dlms-hdlc-sn-gbt-information-captures/width1-count-value-entirely-in-next-fragment.tcp.pcap": {
+          "bytes": 512,
+          "sha256": "0ea6e3b8922ef38eb1828246f3a894ffad819b54a3bfaeb7d2cf9ec8c9ca7a48"
+        },
+        "dlms-hdlc-sn-gbt-information-captures/width1-count-value-entirely-in-next-fragment.udp.pcap": {
+          "bytes": 266,
+          "sha256": "aebc57b4052fc9daff4c6e89cda0f5cee56aedb21b3875f6c642595938ae457d"
+        },
+        "dlms-hdlc-sn-gbt-information-captures/width2-count-value-partly-in-next-fragment.tcp.pcap": {
+          "bytes": 513,
+          "sha256": "2c741f4fe66399798fa91b569bba2f59caf2973f620b426dc8b64d7dd892595f"
+        },
+        "dlms-hdlc-sn-gbt-information-captures/width2-count-value-partly-in-next-fragment.udp.pcap": {
+          "bytes": 267,
+          "sha256": "727079f0a158d14b83bfd8ea01d62be1b75ebddcdaf0a6774a628bfc504acae3"
+        },
+        "dlms-hdlc-sn-gbt-information-captures/width5-definite10-M0-complete-old-decoder-comparison.tcp.pcap": {
+          "bytes": 520,
+          "sha256": "c6abd6e1cf1ed7caa291b71b58325fe5518c8f936f21ae98b4e35c2b72e122fe"
+        },
+        "dlms-hdlc-sn-gbt-information-captures/width5-definite10-M0-complete-old-decoder-comparison.udp.pcap": {
+          "bytes": 274,
+          "sha256": "38d3e5039e38ee2f0b44a91ceb2722d1eeb5f6f0cacf4b6ddca62528ec72b795"
+        },
+        "dlms-hdlc-sn-gbt-information-captures/width5-definite10-M1-first-information-fragment.tcp.pcap": {
+          "bytes": 520,
+          "sha256": "ecd21b19ece6667f4e35261170563ca042ed0d9fed458110965bfe4a181a07f2"
+        },
+        "dlms-hdlc-sn-gbt-information-captures/width5-definite10-M1-first-information-fragment.udp.pcap": {
+          "bytes": 274,
+          "sha256": "6896edc0932e1f5dc9f3a729e08fc042db3f9c2c1e4cbae4ae0667f014d7ccba"
+        },
+        "dlms-hdlc-sn-gbt-information-captures/wrong-caller-address-NR-preserve-prefix-before-correct-tail.tcp.pcap": {
+          "bytes": 1053,
+          "sha256": "75ffc217d2695addec9729b24ab7ac50acbbb3005f0c1709298cd8f27773b9e4"
+        },
+        "dlms-hdlc-sn-gbt-information-captures/wrong-caller-address-NR-preserve-prefix-before-correct-tail.udp.pcap": {
+          "bytes": 735,
+          "sha256": "05f2d2ed6492a68e5fc7c1895b83980ab8a9e25ca1c620b26ba23f3f087a41c0"
+        },
+        "dlms-hdlc-sn-gbt-information-source/SOURCES.json": {
+          "bytes": 2416,
+          "sha256": "55746802b1b7282bf83d915117a0b59b44fcac2244cc045551d49cc7706a99f2"
+        },
+        "dlms-hdlc-sn-gbt-information-source/baseline-controls.json": {
+          "bytes": 63648,
+          "sha256": "210aee339d958f6461f988d500d0a08c02940f2f5f5d83435911eb871f724068"
+        },
+        "dlms-hdlc-sn-gbt-information-source/count-kind-controls.json": {
+          "bytes": 44043,
+          "sha256": "fbd5379e9981d0c905f5acf5794b5860e409f0a82844827ac41d0346822c2e0c"
+        },
+        "dlms-hdlc-sn-gbt-information-source/full-controls.json": {
+          "bytes": 284117,
+          "sha256": "c2a45190a86c00e4a12404182e04d3efb10d77e424752be94c3f2d61415a60b9"
+        },
+        "dlms-hdlc-sn-gbt-information-source/information-hard-pool-supplement.json": {
+          "bytes": 82045,
+          "sha256": "0e0b7c3fc5901bd8b1f11bd07d19789259e20a12a8a872bd78999b1fb9c1de2c"
+        },
+        "dlms-hdlc-sn-gbt-information-source/read-mode-supplement.json": {
+          "bytes": 107260,
+          "sha256": "79c322a25dfa2556564d92fa0dac71f2ef7b6d78d5a5d683a3811942328cdb97"
+        },
+        "dlms-hdlc-sn-gbt-information-source/same-session-identity-supplement.json": {
+          "bytes": 25502,
+          "sha256": "65f886c45dfe91d74782dd08246abf8ff1a50619ef4ef4fcb08500c005a2ac30"
+        },
+        "dlms-hdlc-sn-gbt-information-tools/capture-checks.py": {
+          "bytes": 858,
+          "sha256": "773153f31c80ec4acb5cf5006a7dce3731b44f32ec55aff217550336216dd698"
+        },
+        "dlms-hdlc-sn-gbt-information-tools/carrier.py": {
+          "bytes": 1215,
+          "sha256": "9e8b93483f75943e6a3e1a022ac30be38172c49afe461f4e7b758bdf18b4ab4c"
+        },
+        "dlms-hdlc-sn-gbt-information-tools/independent/package-tools-frozen/MODEL-LICENSE.json": {
+          "bytes": 642,
+          "sha256": "b60d358a596443dc8c577b460f1460c757b64b5a85f538defd1390b9796c577d"
+        },
+        "dlms-hdlc-sn-gbt-information-tools/independent/package-tools-frozen/base/hdlc-reference.json": {
+          "bytes": 2402,
+          "sha256": "69b33f59438b54e25e0209287112464b1d6c1e802c975e7bb9dc2ed8fc7280b0"
+        },
+        "dlms-hdlc-sn-gbt-information-tools/independent/package-tools-frozen/base/hdlc.py": {
+          "bytes": 2011,
+          "sha256": "7f4394c9b7536c86c2f31e1dd26b3e8b2b003dd4d280e98f582e1300f53e3358"
+        },
+        "dlms-hdlc-sn-gbt-information-tools/independent/package-tools-frozen/base/model.py": {
+          "bytes": 11762,
+          "sha256": "e3f1d7d4ad5968ced482dae9e655aa1eb1e96f9ba3c94ed9090370eb38662144"
+        },
+        "dlms-hdlc-sn-gbt-information-tools/independent/package-tools-frozen/base/phase/access.py": {
+          "bytes": 4354,
+          "sha256": "3166cdf13b9934650fdaa34051ba1d6365c6521028ab132898597e424c23e586"
+        },
+        "dlms-hdlc-sn-gbt-information-tools/independent/package-tools-frozen/base/phase/block-grammar.py": {
+          "bytes": 5985,
+          "sha256": "0b69840f2066124f48091301aea6247ec29fb86c4933d00055f60828296bd220"
+        },
+        "dlms-hdlc-sn-gbt-information-tools/independent/package-tools-frozen/base/phase/compose.py": {
+          "bytes": 15710,
+          "sha256": "f4590e419ee263e9c957ec9e75c551ce89dcf81b378bf4ce115ce5e11cefd87b"
+        },
+        "dlms-hdlc-sn-gbt-information-tools/independent/package-tools-frozen/base/phase/composition-pins.json": {
+          "bytes": 1489,
+          "sha256": "9e0492525bf27a37c96b07bb545956618e7041de4fce6823681033bfb5fbd507"
+        },
+        "dlms-hdlc-sn-gbt-information-tools/independent/package-tools-frozen/base/phase/gbt-core.py": {
+          "bytes": 12575,
+          "sha256": "a678272f289349b8be7e31791edd158ccc2c4e4ee13431dcfec6a2fcf56a0df6"
+        },
+        "dlms-hdlc-sn-gbt-information-tools/independent/package-tools-frozen/base/phase/legacy.py": {
+          "bytes": 9729,
+          "sha256": "d5a9c60619214a8a0ac68cb2159bf089992795de9059eb010a1287d5f8c72e35"
+        },
+        "dlms-hdlc-sn-gbt-information-tools/independent/package-tools-frozen/base/phase/model-pins.json": {
+          "bytes": 354,
+          "sha256": "641a27a880d7ef22b9678b92b0e9a3e4af9dac3dbd9d7b49be8fb14a9b4d88fb"
+        },
+        "dlms-hdlc-sn-gbt-information-tools/independent/package-tools-frozen/base/phase/ordinary.py": {
+          "bytes": 9776,
+          "sha256": "b19b8043b6d3defeb32ff2a3a5caf67102299118852c6859c2d1a78847fbb51a"
+        },
+        "dlms-hdlc-sn-gbt-information-tools/independent/package-tools-frozen/base/phase/rebuild.py": {
+          "bytes": 884,
+          "sha256": "49e676495fb763e85409db61eed1724d9f688d8b01bf6ca76769c9d686c170dc"
+        },
+        "dlms-hdlc-sn-gbt-information-tools/independent/package-tools-frozen/base/phase/reference-vectors.json": {
+          "bytes": 10296,
+          "sha256": "1c7119b36f10a8b7c329cc3c346b3792f3421a19c5fc0b2594fa284b7cfa5874"
+        },
+        "dlms-hdlc-sn-gbt-information-tools/independent/package-tools-frozen/base/phase/upload/access.py": {
+          "bytes": 4392,
+          "sha256": "70f03ceffb0556b966d04829dc89384c20b73bc6104c8ed637e5ed0b97d8bc7e"
+        },
+        "dlms-hdlc-sn-gbt-information-tools/independent/package-tools-frozen/base/phase/upload/download-outer.py": {
+          "bytes": 5985,
+          "sha256": "0b69840f2066124f48091301aea6247ec29fb86c4933d00055f60828296bd220"
+        },
+        "dlms-hdlc-sn-gbt-information-tools/independent/package-tools-frozen/base/phase/upload/download-reference-vectors.json": {
+          "bytes": 4159,
+          "sha256": "59250557438767f0f7ff0a072b1decf3fe0f5768b75013142a5dfa608b0fe6c0"
+        },
+        "dlms-hdlc-sn-gbt-information-tools/independent/package-tools-frozen/base/phase/upload/model.py": {
+          "bytes": 15781,
+          "sha256": "609ba979ea49fc353ccd92fadf99edbc5100e4f1637eaa4444fcace579c903dc"
+        },
+        "dlms-hdlc-sn-gbt-information-tools/independent/package-tools-frozen/base/phase/upload/read-body.py": {
+          "bytes": 4002,
+          "sha256": "9038061ed63630258c65a5b9e11e51888d414b290fea0aa2bd14743e2a7af4cd"
+        },
+        "dlms-hdlc-sn-gbt-information-tools/independent/package-tools-frozen/base/phase/upload/reference-vectors.json": {
+          "bytes": 6734,
+          "sha256": "3d7c0f01b305e3524efa5dab640dd9ae4730fe7ed789ca9ef015a5c39b846b8d"
+        },
+        "dlms-hdlc-sn-gbt-information-tools/independent/package-tools-frozen/base/phase/upload/source-outer.py": {
+          "bytes": 8836,
+          "sha256": "4505d905a3a96b22ac3f91e00033d4146c3bf5e75794a2ad25f60b5e3e7145a1"
+        },
+        "dlms-hdlc-sn-gbt-information-tools/independent/package-tools-frozen/base/phase/upload/write-body.py": {
+          "bytes": 5706,
+          "sha256": "4818c0264cb4819cf5d4715a855b4f3817acf26c0c6b15ff558aaa7d3b4aa094"
+        },
+        "dlms-hdlc-sn-gbt-information-tools/independent/package-tools-frozen/base/phase/upload/write-source.py": {
+          "bytes": 8800,
+          "sha256": "46e574590d006649212a255cd2fc85d226165f0ce27f5cc7a01f88211720de0a"
+        },
+        "dlms-hdlc-sn-gbt-information-tools/independent/package-tools-frozen/base/phase/verify.py": {
+          "bytes": 6343,
+          "sha256": "f164e4ce57fb860f955c123ce691d0013474c50b7c668f6a780f2f6c28560334"
+        },
+        "dlms-hdlc-sn-gbt-information-tools/independent/package-tools-frozen/base/phase/write-body.py": {
+          "bytes": 5706,
+          "sha256": "4818c0264cb4819cf5d4715a855b4f3817acf26c0c6b15ff558aaa7d3b4aa094"
+        },
+        "dlms-hdlc-sn-gbt-information-tools/independent/package-tools-frozen/base/reused-pins.json": {
+          "bytes": 2218,
+          "sha256": "89958cf0dd81834899b822c647d71deddcc59d94d043c36b2835995a3eadcf65"
+        },
+        "dlms-hdlc-sn-gbt-information-tools/independent/package-tools-frozen/generate.py": {
+          "bytes": 11290,
+          "sha256": "9bacf18f3d471ac23ab77c365e398b12f8f1e4f49836bce6a746fb766b4d2fa2"
+        },
+        "dlms-hdlc-sn-gbt-information-tools/independent/package-tools-frozen/hdlc-reference.json": {
+          "bytes": 2402,
+          "sha256": "69b33f59438b54e25e0209287112464b1d6c1e802c975e7bb9dc2ed8fc7280b0"
+        },
+        "dlms-hdlc-sn-gbt-information-tools/independent/package-tools-frozen/hdlc.py": {
+          "bytes": 2011,
+          "sha256": "7f4394c9b7536c86c2f31e1dd26b3e8b2b003dd4d280e98f582e1300f53e3358"
+        },
+        "dlms-hdlc-sn-gbt-information-tools/independent/package-tools-frozen/model-pins.json": {
+          "bytes": 2949,
+          "sha256": "592d18b246d7915babe548ffcdc272087428c1bd1dc068e3d19a85e89fd0c03d"
+        },
+        "dlms-hdlc-sn-gbt-information-tools/independent/package-tools-frozen/verify.py": {
+          "bytes": 4596,
+          "sha256": "da218c885a5be5b3358d27d71ae7f7f592740078c5275165c9ea8fa90cec4a3d"
+        },
+        "dlms-hdlc-sn-gbt-information-tools/independent/package-tools/count-kind-full.py": {
+          "bytes": 3821,
+          "sha256": "907246d06a3168b7cd6e4c94bd75e459fe241425e9559eb3028a4fb40054f348"
+        },
+        "dlms-hdlc-sn-gbt-information-tools/independent/package-tools/information-hard-pool-supplement.py": {
+          "bytes": 7378,
+          "sha256": "ea7844f97c08e8e2f2699a7564fe9ac2ccb789b76c3b8c79b3c56bbd1203d67e"
+        },
+        "dlms-hdlc-sn-gbt-information-tools/independent/package-tools/read-mode-supplement.py": {
+          "bytes": 3943,
+          "sha256": "d5e5e500d858e40e935b53dbcd7afca6f49903e26732197ae62b1c5a1b0e28a7"
+        },
+        "dlms-hdlc-sn-gbt-information-tools/independent/package-tools/same-session-identity-supplement.py": {
+          "bytes": 4283,
+          "sha256": "8c45060442671aa55d331cf77feb3479450e967c16aa13974a497eb9aa67a79b"
+        },
+        "dlms-hdlc-sn-gbt-information-tools/project.py": {
+          "bytes": 1740,
+          "sha256": "d35142de41514f18065df48cf6decbc473825342ca1d778652a43d9d13f99c06"
+        },
+        "dlms-hdlc-sn-gbt-information-tools/supplement-tool-pins.json": {
+          "bytes": 4152,
+          "sha256": "e3be72266b92e2b265b6ff2adc093655d09e4a541a807f55aeba2f0b7bc81201"
+        },
+        "dlms-hdlc-sn-gbt-information-tools/verify-captures.py": {
+          "bytes": 3932,
+          "sha256": "db896a12e3dc945f1d9b6eaa21759cc6920b74f62fe748277638604182abde5e"
+        },
+        "dlms-hdlc-sn-gbt-information/captured-controls.json": {
+          "bytes": 540627,
+          "sha256": "5f4a94e6a825b58f366872e6ece233ad6a97b40d0f5aa50666cec895b411c231"
+        },
+        "dlms-hdlc-sn-service-gbt-source/baseline-controls.json": {
+          "bytes": 57508,
+          "sha256": "98bab43c3bb949eb41f2767da91432b87b58afe77e08ae8a2a20769f84053261"
+        },
+        "required-tests-traffic-unified-v171.json": {
+          "bytes": 23138792,
+          "sha256": "8e35092bda46dd15dff2afaf05c4b2d3c7bbf55a8ff134999382e8ddbfe38f6e"
+        },
+        "validation/expected.json": {
+          "bytes": 76038,
+          "sha256": "e5dc7e0d904b23cdf72771a9aa036b0ff739e7520fd8b4a861416c60e62c67f6"
+        }
+      },
+      "aliases": {
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-information-captures/Getprimed-direct-WriteQ7-echo-two-information-frames-E0-final-Q7.tcp.pcap": "dlms-hdlc-sn-gbt-information-captures/Getprimed-direct-WriteQ7-echo-two-information-frames-E0-final-Q7.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-information-captures/Getprimed-direct-WriteQ7-echo-two-information-frames-E0-final-Q7.udp.pcap": "dlms-hdlc-sn-gbt-information-captures/Getprimed-direct-WriteQ7-echo-two-information-frames-E0-final-Q7.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-information-captures/Getprimed-two-information-frames-E0-first-ReadR2-direct-echo-final.tcp.pcap": "dlms-hdlc-sn-gbt-information-captures/Getprimed-two-information-frames-E0-first-ReadR2-direct-echo-final.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-information-captures/Getprimed-two-information-frames-E0-first-ReadR2-direct-echo-final.udp.pcap": "dlms-hdlc-sn-gbt-information-captures/Getprimed-two-information-frames-E0-first-ReadR2-direct-echo-final.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-information-captures/Read-Q5-download-echo-in-two-information-fragments.tcp.pcap": "dlms-hdlc-sn-gbt-information-captures/Read-Q5-download-echo-in-two-information-fragments.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-information-captures/Read-Q5-download-echo-in-two-information-fragments.udp.pcap": "dlms-hdlc-sn-gbt-information-captures/Read-Q5-download-echo-in-two-information-fragments.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-information-captures/Read-Q6-final-phase-in-two-information-fragments.tcp.pcap": "dlms-hdlc-sn-gbt-information-captures/Read-Q6-final-phase-in-two-information-fragments.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-information-captures/Read-Q6-final-phase-in-two-information-fragments.udp.pcap": "dlms-hdlc-sn-gbt-information-captures/Read-Q6-final-phase-in-two-information-fragments.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-information-captures/Read-Q6-first-phase-in-two-information-fragments.tcp.pcap": "dlms-hdlc-sn-gbt-information-captures/Read-Q6-first-phase-in-two-information-fragments.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-information-captures/Read-Q6-first-phase-in-two-information-fragments.udp.pcap": "dlms-hdlc-sn-gbt-information-captures/Read-Q6-first-phase-in-two-information-fragments.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-information-captures/Read-R3-upload-echo-in-two-information-fragments.tcp.pcap": "dlms-hdlc-sn-gbt-information-captures/Read-R3-upload-echo-in-two-information-fragments.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-information-captures/Read-R3-upload-echo-in-two-information-fragments.udp.pcap": "dlms-hdlc-sn-gbt-information-captures/Read-R3-upload-echo-in-two-information-fragments.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-information-captures/absolute-information-pool-1027-accepts-complete-Data9.tcp.pcap": "dlms-hdlc-sn-gbt-information-captures/absolute-information-pool-1027-accepts-complete-Data9.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-information-captures/absolute-information-pool-1027-accepts-complete-Data9.udp.pcap": "dlms-hdlc-sn-gbt-information-captures/absolute-information-pool-1027-accepts-complete-Data9.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-information-captures/absolute-information-pool-1028-Resource-before-innerphase.tcp.pcap": "dlms-hdlc-sn-gbt-information-captures/absolute-information-pool-1028-Resource-before-innerphase.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-information-captures/absolute-information-pool-1028-Resource-before-innerphase.udp.pcap": "dlms-hdlc-sn-gbt-information-captures/absolute-information-pool-1028-Resource-before-innerphase.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-information-captures/active-Write-upload-then-partial-outer-Close-SN6-before-fragment3.tcp.pcap": "dlms-hdlc-sn-gbt-information-captures/active-Write-upload-then-partial-outer-Close-SN6-before-fragment3.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-information-captures/active-Write-upload-then-partial-outer-Close-SN6-before-fragment3.udp.pcap": "dlms-hdlc-sn-gbt-information-captures/active-Write-upload-then-partial-outer-Close-SN6-before-fragment3.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-information-captures/exact-first-fragment-repeat-no-count-or-digest-advance.tcp.pcap": "dlms-hdlc-sn-gbt-information-captures/exact-first-fragment-repeat-no-count-or-digest-advance.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-information-captures/exact-first-fragment-repeat-no-count-or-digest-advance.udp.pcap": "dlms-hdlc-sn-gbt-information-captures/exact-first-fragment-repeat-no-count-or-digest-advance.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-information-captures/fullUInt32-server65537-four-octets-information-group.tcp.pcap": "dlms-hdlc-sn-gbt-information-captures/fullUInt32-server65537-four-octets-information-group.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-information-captures/fullUInt32-server65537-four-octets-information-group.udp.pcap": "dlms-hdlc-sn-gbt-information-captures/fullUInt32-server65537-four-octets-information-group.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-information-captures/identical-final-carrier-different-first-Data-aaadbeef.tcp.pcap": "dlms-hdlc-sn-gbt-information-captures/identical-final-carrier-different-first-Data-aaadbeef.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-information-captures/identical-final-carrier-different-first-Data-aaadbeef.udp.pcap": "dlms-hdlc-sn-gbt-information-captures/identical-final-carrier-different-first-Data-aaadbeef.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-information-captures/identical-final-carrier-different-first-Data-deadbeef.tcp.pcap": "dlms-hdlc-sn-gbt-information-captures/identical-final-carrier-different-first-Data-deadbeef.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-information-captures/identical-final-carrier-different-first-Data-deadbeef.udp.pcap": "dlms-hdlc-sn-gbt-information-captures/identical-final-carrier-different-first-Data-deadbeef.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-information-captures/information-pool19-rejects-final20-before-innerphase.tcp.pcap": "dlms-hdlc-sn-gbt-information-captures/information-pool19-rejects-final20-before-innerphase.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-information-captures/information-pool19-rejects-final20-before-innerphase.udp.pcap": "dlms-hdlc-sn-gbt-information-captures/information-pool19-rejects-final20-before-innerphase.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-information-captures/joined-Write-request-under-response-LLC-is-Malformed.tcp.pcap": "dlms-hdlc-sn-gbt-information-captures/joined-Write-request-under-response-LLC-is-Malformed.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-information-captures/joined-Write-request-under-response-LLC-is-Malformed.udp.pcap": "dlms-hdlc-sn-gbt-information-captures/joined-Write-request-under-response-LLC-is-Malformed.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-information-captures/literal80-M0-complete-old-decoder-comparison.tcp.pcap": "dlms-hdlc-sn-gbt-information-captures/literal80-M0-complete-old-decoder-comparison.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-information-captures/literal80-M0-complete-old-decoder-comparison.udp.pcap": "dlms-hdlc-sn-gbt-information-captures/literal80-M0-complete-old-decoder-comparison.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-information-captures/literal80-M1-first-information-fragment.tcp.pcap": "dlms-hdlc-sn-gbt-information-captures/literal80-M1-first-information-fragment.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-information-captures/literal80-M1-first-information-fragment.udp.pcap": "dlms-hdlc-sn-gbt-information-captures/literal80-M1-first-information-fragment.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-information-captures/live-LN-owner-refuses-new-E0-prefix-and-real-reply-retained.tcp.pcap": "dlms-hdlc-sn-gbt-information-captures/live-LN-owner-refuses-new-E0-prefix-and-real-reply-retained.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-information-captures/live-LN-owner-refuses-new-E0-prefix-and-real-reply-retained.udp.pcap": "dlms-hdlc-sn-gbt-information-captures/live-LN-owner-refuses-new-E0-prefix-and-real-reply-retained.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-information-captures/matching-link-NS-gap-retires-information-group.tcp.pcap": "dlms-hdlc-sn-gbt-information-captures/matching-link-NS-gap-retires-information-group.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-information-captures/matching-link-NS-gap-retires-information-group.udp.pcap": "dlms-hdlc-sn-gbt-information-captures/matching-link-NS-gap-retires-information-group.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-information-captures/partial-response-information-Close-three-typed-counters.tcp.pcap": "dlms-hdlc-sn-gbt-information-captures/partial-response-information-Close-three-typed-counters.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-information-captures/partial-response-information-Close-three-typed-counters.udp.pcap": "dlms-hdlc-sn-gbt-information-captures/partial-response-information-Close-three-typed-counters.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-information-captures/reuse-inputs.json": "dlms-hdlc-sn-gbt-information-captures/reuse-inputs.json",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-information-captures/same-NS-changed-prefix-is-not-exactrepeat-and-retires.tcp.pcap": "dlms-hdlc-sn-gbt-information-captures/same-NS-changed-prefix-is-not-exactrepeat-and-retires.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-information-captures/same-NS-changed-prefix-is-not-exactrepeat-and-retires.udp.pcap": "dlms-hdlc-sn-gbt-information-captures/same-NS-changed-prefix-is-not-exactrepeat-and-retires.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-information-captures/same-session-completed-A-then-different-prefix-B-same-final-must-retire.tcp.pcap": "dlms-hdlc-sn-gbt-information-captures/same-session-completed-A-then-different-prefix-B-same-final-must-retire.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-information-captures/same-session-completed-A-then-different-prefix-B-same-final-must-retire.udp.pcap": "dlms-hdlc-sn-gbt-information-captures/same-session-completed-A-then-different-prefix-B-same-final-must-retire.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-information-captures/width1-count-value-entirely-in-next-fragment.tcp.pcap": "dlms-hdlc-sn-gbt-information-captures/width1-count-value-entirely-in-next-fragment.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-information-captures/width1-count-value-entirely-in-next-fragment.udp.pcap": "dlms-hdlc-sn-gbt-information-captures/width1-count-value-entirely-in-next-fragment.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-information-captures/width2-count-value-partly-in-next-fragment.tcp.pcap": "dlms-hdlc-sn-gbt-information-captures/width2-count-value-partly-in-next-fragment.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-information-captures/width2-count-value-partly-in-next-fragment.udp.pcap": "dlms-hdlc-sn-gbt-information-captures/width2-count-value-partly-in-next-fragment.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-information-captures/width5-definite10-M0-complete-old-decoder-comparison.tcp.pcap": "dlms-hdlc-sn-gbt-information-captures/width5-definite10-M0-complete-old-decoder-comparison.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-information-captures/width5-definite10-M0-complete-old-decoder-comparison.udp.pcap": "dlms-hdlc-sn-gbt-information-captures/width5-definite10-M0-complete-old-decoder-comparison.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-information-captures/width5-definite10-M1-first-information-fragment.tcp.pcap": "dlms-hdlc-sn-gbt-information-captures/width5-definite10-M1-first-information-fragment.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-information-captures/width5-definite10-M1-first-information-fragment.udp.pcap": "dlms-hdlc-sn-gbt-information-captures/width5-definite10-M1-first-information-fragment.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-information-captures/wrong-caller-address-NR-preserve-prefix-before-correct-tail.tcp.pcap": "dlms-hdlc-sn-gbt-information-captures/wrong-caller-address-NR-preserve-prefix-before-correct-tail.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-information-captures/wrong-caller-address-NR-preserve-prefix-before-correct-tail.udp.pcap": "dlms-hdlc-sn-gbt-information-captures/wrong-caller-address-NR-preserve-prefix-before-correct-tail.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-information-source/SOURCES.json": "dlms-hdlc-sn-gbt-information-source/SOURCES.json",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-information-source/baseline-controls.json": "dlms-hdlc-sn-gbt-information-source/baseline-controls.json",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-information-source/count-kind-controls.json": "dlms-hdlc-sn-gbt-information-source/count-kind-controls.json",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-information-source/full-controls.json": "dlms-hdlc-sn-gbt-information-source/full-controls.json",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-information-source/information-hard-pool-supplement.json": "dlms-hdlc-sn-gbt-information-source/information-hard-pool-supplement.json",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-information-source/read-mode-supplement.json": "dlms-hdlc-sn-gbt-information-source/read-mode-supplement.json",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-information-source/same-session-identity-supplement.json": "dlms-hdlc-sn-gbt-information-source/same-session-identity-supplement.json",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-information-tools/capture-checks.py": "dlms-hdlc-sn-gbt-information-tools/capture-checks.py",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-information-tools/carrier.py": "dlms-hdlc-sn-gbt-information-tools/carrier.py",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-information-tools/independent/package-tools-frozen/MODEL-LICENSE.json": "dlms-hdlc-sn-gbt-information-tools/independent/package-tools-frozen/MODEL-LICENSE.json",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-information-tools/independent/package-tools-frozen/base/hdlc-reference.json": "dlms-hdlc-sn-gbt-information-tools/independent/package-tools-frozen/base/hdlc-reference.json",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-information-tools/independent/package-tools-frozen/base/hdlc.py": "dlms-hdlc-sn-gbt-information-tools/independent/package-tools-frozen/base/hdlc.py",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-information-tools/independent/package-tools-frozen/base/model.py": "dlms-hdlc-sn-gbt-information-tools/independent/package-tools-frozen/base/model.py",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-information-tools/independent/package-tools-frozen/base/phase/access.py": "dlms-hdlc-sn-gbt-information-tools/independent/package-tools-frozen/base/phase/access.py",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-information-tools/independent/package-tools-frozen/base/phase/block-grammar.py": "dlms-hdlc-sn-gbt-information-tools/independent/package-tools-frozen/base/phase/block-grammar.py",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-information-tools/independent/package-tools-frozen/base/phase/compose.py": "dlms-hdlc-sn-gbt-information-tools/independent/package-tools-frozen/base/phase/compose.py",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-information-tools/independent/package-tools-frozen/base/phase/composition-pins.json": "dlms-hdlc-sn-gbt-information-tools/independent/package-tools-frozen/base/phase/composition-pins.json",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-information-tools/independent/package-tools-frozen/base/phase/gbt-core.py": "dlms-hdlc-sn-gbt-information-tools/independent/package-tools-frozen/base/phase/gbt-core.py",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-information-tools/independent/package-tools-frozen/base/phase/legacy.py": "dlms-hdlc-sn-gbt-information-tools/independent/package-tools-frozen/base/phase/legacy.py",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-information-tools/independent/package-tools-frozen/base/phase/model-pins.json": "dlms-hdlc-sn-gbt-information-tools/independent/package-tools-frozen/base/phase/model-pins.json",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-information-tools/independent/package-tools-frozen/base/phase/ordinary.py": "dlms-hdlc-sn-gbt-information-tools/independent/package-tools-frozen/base/phase/ordinary.py",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-information-tools/independent/package-tools-frozen/base/phase/rebuild.py": "dlms-hdlc-sn-gbt-information-tools/independent/package-tools-frozen/base/phase/rebuild.py",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-information-tools/independent/package-tools-frozen/base/phase/reference-vectors.json": "dlms-hdlc-sn-gbt-information-tools/independent/package-tools-frozen/base/phase/reference-vectors.json",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-information-tools/independent/package-tools-frozen/base/phase/upload/access.py": "dlms-hdlc-sn-gbt-information-tools/independent/package-tools-frozen/base/phase/upload/access.py",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-information-tools/independent/package-tools-frozen/base/phase/upload/download-outer.py": "dlms-hdlc-sn-gbt-information-tools/independent/package-tools-frozen/base/phase/upload/download-outer.py",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-information-tools/independent/package-tools-frozen/base/phase/upload/download-reference-vectors.json": "dlms-hdlc-sn-gbt-information-tools/independent/package-tools-frozen/base/phase/upload/download-reference-vectors.json",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-information-tools/independent/package-tools-frozen/base/phase/upload/model.py": "dlms-hdlc-sn-gbt-information-tools/independent/package-tools-frozen/base/phase/upload/model.py",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-information-tools/independent/package-tools-frozen/base/phase/upload/read-body.py": "dlms-hdlc-sn-gbt-information-tools/independent/package-tools-frozen/base/phase/upload/read-body.py",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-information-tools/independent/package-tools-frozen/base/phase/upload/reference-vectors.json": "dlms-hdlc-sn-gbt-information-tools/independent/package-tools-frozen/base/phase/upload/reference-vectors.json",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-information-tools/independent/package-tools-frozen/base/phase/upload/source-outer.py": "dlms-hdlc-sn-gbt-information-tools/independent/package-tools-frozen/base/phase/upload/source-outer.py",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-information-tools/independent/package-tools-frozen/base/phase/upload/write-body.py": "dlms-hdlc-sn-gbt-information-tools/independent/package-tools-frozen/base/phase/upload/write-body.py",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-information-tools/independent/package-tools-frozen/base/phase/upload/write-source.py": "dlms-hdlc-sn-gbt-information-tools/independent/package-tools-frozen/base/phase/upload/write-source.py",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-information-tools/independent/package-tools-frozen/base/phase/verify.py": "dlms-hdlc-sn-gbt-information-tools/independent/package-tools-frozen/base/phase/verify.py",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-information-tools/independent/package-tools-frozen/base/phase/write-body.py": "dlms-hdlc-sn-gbt-information-tools/independent/package-tools-frozen/base/phase/write-body.py",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-information-tools/independent/package-tools-frozen/base/reused-pins.json": "dlms-hdlc-sn-gbt-information-tools/independent/package-tools-frozen/base/reused-pins.json",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-information-tools/independent/package-tools-frozen/generate.py": "dlms-hdlc-sn-gbt-information-tools/independent/package-tools-frozen/generate.py",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-information-tools/independent/package-tools-frozen/hdlc-reference.json": "dlms-hdlc-sn-gbt-information-tools/independent/package-tools-frozen/hdlc-reference.json",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-information-tools/independent/package-tools-frozen/hdlc.py": "dlms-hdlc-sn-gbt-information-tools/independent/package-tools-frozen/hdlc.py",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-information-tools/independent/package-tools-frozen/model-pins.json": "dlms-hdlc-sn-gbt-information-tools/independent/package-tools-frozen/model-pins.json",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-information-tools/independent/package-tools-frozen/verify.py": "dlms-hdlc-sn-gbt-information-tools/independent/package-tools-frozen/verify.py",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-information-tools/independent/package-tools/count-kind-full.py": "dlms-hdlc-sn-gbt-information-tools/independent/package-tools/count-kind-full.py",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-information-tools/independent/package-tools/information-hard-pool-supplement.py": "dlms-hdlc-sn-gbt-information-tools/independent/package-tools/information-hard-pool-supplement.py",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-information-tools/independent/package-tools/read-mode-supplement.py": "dlms-hdlc-sn-gbt-information-tools/independent/package-tools/read-mode-supplement.py",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-information-tools/independent/package-tools/same-session-identity-supplement.py": "dlms-hdlc-sn-gbt-information-tools/independent/package-tools/same-session-identity-supplement.py",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-information-tools/project.py": "dlms-hdlc-sn-gbt-information-tools/project.py",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-information-tools/supplement-tool-pins.json": "dlms-hdlc-sn-gbt-information-tools/supplement-tool-pins.json",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-information-tools/verify-captures.py": "dlms-hdlc-sn-gbt-information-tools/verify-captures.py",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-information/captured-controls.json": "dlms-hdlc-sn-gbt-information/captured-controls.json",
+        "scripts/protocol-tests/required-tests-traffic-unified-v171.json": "required-tests-traffic-unified-v171.json"
+      }
     }
   ],
   "schema_version": 1,

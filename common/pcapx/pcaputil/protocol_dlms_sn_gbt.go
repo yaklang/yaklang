@@ -174,12 +174,20 @@ func (f *binFlow) consumeDLMSSNGBT(dir int, w []byte, id uint64, m *dlmsMessage)
 		}
 		return nil, 0, dlmsError(ErrUnsupportedFeature, "SN GBT requires observed window-one alternation")
 	}
+	identity := w
+	if m.snInformationSpan {
+		identity = m.snCarrierDigest[:]
+	}
+	firstNS := m.ns
+	if m.snInformationSpan {
+		firstNS = m.snInformationFirstNS
+	}
 	wk := wrapperGBTKey{dir, 0, 0}
 	p := l.wire.gbt[wk]
 	exact := false
 	if p != nil {
 		if b, ok := p.blocks[m.snGBT.gbtNumber]; ok {
-			exact = b.hash == sha256.Sum256(w)
+			exact = b.hash == sha256.Sum256(identity)
 			if exact && s.snGBTPhaseCurrent(key, l.phase[dir], b) {
 				selectedPhase = true
 			}
@@ -188,7 +196,7 @@ func (f *binFlow) consumeDLMSSNGBT(dir int, w []byte, id uint64, m *dlmsMessage)
 	if !selectedPhase && (exact || !dlmsSNGBTSinglePhaseCandidate(m.snGBT)) {
 		s.observeSNBlockInterruption(m, dir)
 	}
-	if l.observed && !exact && (dir == l.lastDir || m.ns != l.nr || m.nr != (l.ns+1)&7) {
+	if l.observed && !exact && (dir == l.lastDir || firstNS != l.nr || m.nr != (l.ns+1)&7) {
 		l.retire()
 		m.fields["Association"] = "retired-sn-hdlc-gbt-sequence-conflict"
 		return m.fields, 0, nil
@@ -205,7 +213,7 @@ func (f *binFlow) consumeDLMSSNGBT(dir int, w []byte, id uint64, m *dlmsMessage)
 	}
 	// The full UInt32 key owns one private shadow; no truncated address appears
 	// as a Wrapper port. Other logical links and ordinary state stay charged.
-	floor := s.storage() + 128 + dlmsProjection(w)
+	floor := s.storage() + 128 + dlmsProjection(w) + m.snInformationCharge
 	if !created {
 		floor -= 128 + l.wire.storage()
 	}
@@ -226,7 +234,7 @@ func (f *binFlow) consumeDLMSSNGBT(dir int, w []byte, id uint64, m *dlmsMessage)
 		}
 		return fields["Association"].(string), nil
 	}
-	assoc, err := f.consumeWrapperGBTContext(l.wire, m.snGBT, dir, event, dlmsSNGBTEnvelope(m.information[3:]), floor, w, phaseConsumer)
+	assoc, err := f.consumeWrapperGBTCarrier(l.wire, m.snGBT, dir, event, dlmsSNGBTEnvelope(m.information[3:]), floor, identity, phaseConsumer, m.snCarrierLLC)
 	if err != nil {
 		s.invalidate()
 		var pe *ProtocolError

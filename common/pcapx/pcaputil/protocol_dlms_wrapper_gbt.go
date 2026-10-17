@@ -92,6 +92,12 @@ func (f *binFlow) consumeWrapperGBTReserved(s *binDLMSWrapper, m *wrapperMessage
 type dlmsSNGBTPhaseConsumer func(*wrapperMessage, []byte, int64, int, []byte) (string, error)
 
 func (f *binFlow) consumeWrapperGBTContext(s *binDLMSWrapper, m *wrapperMessage, dir int, e *ProtocolEvent, w []byte, floor int64, identity []byte, snConsumer dlmsSNGBTPhaseConsumer) (string, error) {
+	return f.consumeWrapperGBTCarrier(s, m, dir, e, w, floor, identity, snConsumer, 0)
+}
+
+// Carrier fingerprints and the validated first LLC are independent for an
+// information-fragment group. Ordinary complete frames keep the old fallback.
+func (f *binFlow) consumeWrapperGBTCarrier(s *binDLMSWrapper, m *wrapperMessage, dir int, e *ProtocolEvent, w []byte, floor int64, identity []byte, snConsumer dlmsSNGBTPhaseConsumer, firstLLC byte) (string, error) {
 	hdlc := identity != nil
 	key := wrapperGBTKey{dir, m.source, m.destination}
 	p := s.gbt[key]
@@ -216,8 +222,14 @@ func (f *binFlow) consumeWrapperGBTContext(s *binDLMSWrapper, m *wrapperMessage,
 	}
 	if decoded.snRead || decoded.snWrite {
 		if hdlc {
-			info := dlmsSNInformationPrefix(identity)
-			if len(info) < 4 || decoded.request != (info[1] == 0xe6) {
+			llc := firstLLC
+			if llc == 0 {
+				info := dlmsSNInformationPrefix(identity)
+				if len(info) >= 4 {
+					llc = info[1]
+				}
+			}
+			if llc != 0xe6 && llc != 0xe7 || decoded.request != (llc == 0xe6) {
 				return "", wrapperError(ErrMalformedMessage, "SN LLC direction differs from command")
 			}
 		}

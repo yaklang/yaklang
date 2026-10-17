@@ -100,6 +100,11 @@ type dlmsMessage struct {
 	snWrite                   bool
 	snBlock                   *wrapperMessage
 	snGBT                     *wrapperMessage
+	snInformationSpan         bool
+	snInformationFirstNS      byte
+	snCarrierDigest           [32]byte
+	snInformationCharge       int64
+	snCarrierLLC              byte
 }
 
 func dlmsAddress(w []byte, at *int) (uint32, int, error) {
@@ -754,6 +759,9 @@ func (s *binDLMS) storage() int64 {
 	}
 	if s.fragments != nil {
 		n += 128 + 2*int64(len(s.fragments.info)+len(s.fragments.wire))
+		if s.fragments.snGBT {
+			n += 32
+		}
 	}
 	return n
 }
@@ -775,6 +783,9 @@ func (f *binFlow) consumeDLMS(dir int, w []byte, id uint64) (map[string]any, uin
 func (f *binFlow) consumeDecodedDLMS(dir int, w []byte, id uint64, m *dlmsMessage) (map[string]any, uint64, error) {
 	s := f.dlms
 	s.operationProfile = ""
+	if s.fragments != nil && s.fragments.snGBT || m.kind == "I" && s.fragments == nil && m.segmented && dlmsSNGBTInformation(m.information) {
+		return f.consumeDLMSSNGBTInformation(dir, w, id, m)
+	}
 	if dlmsSNGBTInformation(m.information) && !m.segmented {
 		if s.hasLNContext() {
 			return nil, 0, dlmsError(ErrContextRequired, "SN GBT cannot consume an observed LN owner or information group")
@@ -1124,7 +1135,7 @@ func (a *binParser) decodeDLMSDatagram(e *ProtocolEvent, w []byte, explicit bool
 			e.Profile = operationProfile
 		}
 	}
-	if operationSegment != "" {
+	if operationSegment != "" && (err != nil || operationSegment != "dlms-hdlc-sn-gbt-information-segmented") {
 		e.Profile = operationSegment
 	}
 	if setListBlockProfile {

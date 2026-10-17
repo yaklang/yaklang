@@ -31,6 +31,8 @@ type dlmsFragments struct {
 	setRequestChoice             byte
 	setResponseChoice            byte
 	snCommand                    byte
+	snGBT                        bool
+	snCarrierDigest              [32]byte
 }
 
 func (s *binDLMS) fragmentCloseDirection() int {
@@ -249,6 +251,9 @@ func dlmsOperationSegmentResponseChoice(p *dlmsPending) byte {
 	return p.choice
 }
 func (t *dlmsFragments) operationSegmentProfile() string {
+	if t.snGBT {
+		return "dlms-hdlc-sn-gbt-information-segmented"
+	}
 	if t.snCommand != 0 {
 		return "dlms-hdlc-sn-information-segmented"
 	}
@@ -377,6 +382,9 @@ func (f *binFlow) dlmsOperationSegmentObservation(w []byte) string {
 	}
 	if _, _, err := dlmsAddress(w[:end], &at); err != nil || at >= end || w[at]&1 != 0 {
 		return ""
+	}
+	if f.dlms != nil && f.dlms.fragments != nil && f.dlms.fragments.snGBT || (f.dlms == nil || f.dlms.fragments == nil) && w[1]&8 != 0 && dlmsSNGBTInformation(dlmsSNInformationPrefix(w)) {
+		return "dlms-hdlc-sn-gbt-information-segmented"
 	}
 	if f.dlms != nil && f.dlms.fragments != nil && f.dlms.fragments.snCommand != 0 {
 		return "dlms-hdlc-sn-information-segmented"

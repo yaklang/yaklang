@@ -122,9 +122,13 @@ func (f *binFlow) consumeDLMSSNServiceBlockContext(dir int, syntax []byte, id ui
 		// Without an observed echo, NR cannot be judged against an echo NS.
 		// Let the shared phase guard retire that missing-context case first.
 		if !exact && group.active && (echo || group.acked) {
-			good := m.ns == (link.responseNS+1)&7 && m.nr == (link.echoNS+1)&7
+			firstNS := m.ns
+			if m.snInformationSpan {
+				firstNS = m.snInformationFirstNS
+			}
+			good := firstNS == (link.responseNS+1)&7 && m.nr == (link.echoNS+1)&7
 			if echo {
-				good = m.ns == link.responseNR && m.nr == (link.responseNS+1)&7
+				good = firstNS == link.responseNR && m.nr == (link.responseNS+1)&7
 			}
 			if !good {
 				group.retire()

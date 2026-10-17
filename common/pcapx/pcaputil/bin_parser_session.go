@@ -875,7 +875,7 @@ func (f *binFlow) consumeSession(dir int, e *ProtocolEvent, result map[string]an
 			}
 			e.semanticFields = cloneSession(e.Session)
 		}
-		if operationSegment != "" {
+		if operationSegment != "" && (err != nil || operationSegment != "dlms-hdlc-sn-gbt-information-segmented") {
 			e.Profile = operationSegment
 		}
 		if setListBlockProfile {
