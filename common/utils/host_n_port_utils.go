@@ -213,8 +213,7 @@ func ParseStringToPorts(ports string) []int {
 const udpLowPortSpace = 1 << 28
 
 // DefaultHostAlivePorts are the TCP ports tried after ICMP does not answer.
-// Keep the established three-port default; callers can configure other ports.
-const DefaultHostAlivePorts = "22,80,443"
+const DefaultHostAlivePorts = "22,80,443,3889"
 
 // EncodeUDPPort stores a UDP service port in the shared port integer space.
 // Ports >= 16 keep port<<12. Ports 1-15 use a flag above that range so they

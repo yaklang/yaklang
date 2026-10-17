@@ -9,6 +9,11 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func TestDefaultHostAlivePorts(t *testing.T) {
+	ports := ParseStringToPorts(DefaultHostAlivePorts)
+	assert.Equal(t, []int{22, 80, 443, 3889}, ports)
+}
+
 func TestParseHostToString(t *testing.T) {
 	cases := map[string]string{
 		"baidu.com":       "baidu.com",
