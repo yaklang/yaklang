@@ -124154,6 +124154,277 @@
         "common/pcapx/pcaputil/dlms-sn-cold-information-source/tools/write-source.py": "dlms-sn-cold-information-source/tools/write-source.py",
         "scripts/protocol-tests/required-tests-traffic-unified-v180.json": "required-tests-traffic-unified-v180.json"
       }
+    },
+    {
+      "id": "validation-dlms-sn-read-upload-information",
+      "kind": "support",
+      "source_sha": "600e8c447fd135993050f4e296930e17c0a0385c",
+      "file": "validation-dlms-sn-read-upload-information.zip",
+      "sha256": "cea0b5432e1b420792fd68b7641feb044bbe31a4d5e7feb106e5653655af97e2",
+      "password": "bin-parser",
+      "members": {
+        "dlms-sn-read-upload-information-source/baseline-controls.json": {
+          "bytes": 183610,
+          "sha256": "c96e3c482c6137a67f80ff6f83be0155176ce8c072d76cd94d7df13cf3daef3c"
+        },
+        "dlms-sn-read-upload-information-source/capture-index.json": {
+          "bytes": 13781,
+          "sha256": "caaabf692526b7b26afd858a377aa32c9be704c1007554d25bbce79617f5a887"
+        },
+        "dlms-sn-read-upload-information-source/captured-baseline-controls.json": {
+          "bytes": 183992,
+          "sha256": "6709f5fa3bbf743ed5424e039e3444599a509524f4a2494c01044356089f0a14"
+        },
+        "dlms-sn-read-upload-information-source/captured-controls.json": {
+          "bytes": 325487,
+          "sha256": "8b18b243a624eb78e91ef1711f0749a888336132ec0ca454ad38ff4f739685ee"
+        },
+        "dlms-sn-read-upload-information-source/captures/cold-singlelast-ReadQ6-two-information-carriers-no-LN-primer.tcp.pcap": {
+          "bytes": 410,
+          "sha256": "cc3e7386d3d0625b1bcb769211ae58babf1aadb7a2bf90a76013a3cd2bd821ce"
+        },
+        "dlms-sn-read-upload-information-source/captures/cold-singlelast-ReadQ6-two-information-carriers-no-LN-primer.udp.pcap": {
+          "bytes": 176,
+          "sha256": "194e28f1e0074596558538b437a794672b5ef9087649236e9a542493f5842a67"
+        },
+        "dlms-sn-read-upload-information-source/captures/direct-first-echo-fragmented-final-Q6.tcp.pcap": {
+          "bytes": 777,
+          "sha256": "65a261dbed178579c587f5b2feadb3ce401d5bf4a1b2703348ab3fd76d3a482d"
+        },
+        "dlms-sn-read-upload-information-source/captures/direct-first-echo-fragmented-final-Q6.udp.pcap": {
+          "bytes": 495,
+          "sha256": "3ecae936d5f49f96f7f889530d175fd27b665a2aac8691d33423f31d7e0a337e"
+        },
+        "dlms-sn-read-upload-information-source/captures/direct-first-fragmented-ReadR3-echo-direct-final.tcp.pcap": {
+          "bytes": 777,
+          "sha256": "7fec438edfaee023161207a917d7da30da8818df977d139b0a0c677f60d6c15c"
+        },
+        "dlms-sn-read-upload-information-source/captures/direct-first-fragmented-ReadR3-echo-direct-final.udp.pcap": {
+          "bytes": 495,
+          "sha256": "e22ef397047e42d3a1d380872d1a158de44bb465a9c013ffedb7c170958d1e9c"
+        },
+        "dlms-sn-read-upload-information-source/captures/fragmented-first-Q6-cap12-direct-echo-final.tcp.pcap": {
+          "bytes": 777,
+          "sha256": "0670e12cdb015d2ae01f1baadd0a8dbc2f82247b0ef93f726146276e0fd1a607"
+        },
+        "dlms-sn-read-upload-information-source/captures/fragmented-first-Q6-cap12-direct-echo-final.udp.pcap": {
+          "bytes": 495,
+          "sha256": "325b642d2fd2a97e1e333c4fa21f0d4747c794f330255250c1e4ca1cdf3726a0"
+        },
+        "dlms-sn-read-upload-information-source/captures/identical-first-Q6-information-cap11-Resource-release.tcp.pcap": {
+          "bytes": 595,
+          "sha256": "b260df4a67e01e3a16e138ade5201a8526fef58d2443eb9f66a46cbc4bf38e7d"
+        },
+        "dlms-sn-read-upload-information-source/captures/identical-first-Q6-information-cap11-Resource-release.udp.pcap": {
+          "bytes": 337,
+          "sha256": "5b36b658068a57e629d231840f970b454f751b2a97f7acde7381829ad7fefe3e"
+        },
+        "dlms-sn-read-upload-information-source/captures/reuse-inputs.json": {
+          "bytes": 325,
+          "sha256": "de27584b73ca07bbd087b9b03d397ba96ec8617f221e4289c68da5993b368d3b"
+        },
+        "dlms-sn-read-upload-information-source/captures/whole-chain-repeat-and-same-final-different-prefix-retirement.tcp.pcap": {
+          "bytes": 949,
+          "sha256": "58cecd31eb186d037010ec71f8fef039e125b6bf8cca3278788c45d227f83f23"
+        },
+        "dlms-sn-read-upload-information-source/captures/whole-chain-repeat-and-same-final-different-prefix-retirement.udp.pcap": {
+          "bytes": 643,
+          "sha256": "b11c83e89fb2f94d9fa5be5b7b8aca31b13eff73e823af82dd1e698d0427bf2a"
+        },
+        "dlms-sn-read-upload-information-source/captures/wrong-caller-full32-NR-preserve-active-upload-plus-fragment-Close.tcp.pcap": {
+          "bytes": 946,
+          "sha256": "b8d7db7c01c3c4f414feb1f40065599d7e9d68ab8e48839c106d071fddc03523"
+        },
+        "dlms-sn-read-upload-information-source/captures/wrong-caller-full32-NR-preserve-active-upload-plus-fragment-Close.udp.pcap": {
+          "bytes": 640,
+          "sha256": "4eca177c07affddcf19edf9477c0edc1659410e698fe8c2e42b6785a3d8df089"
+        },
+        "dlms-sn-read-upload-information-source/cold-capture-index.json": {
+          "bytes": 1112,
+          "sha256": "0c1654b8142c2c531f88334f75fc8aace14978555ecdaa66b442c209ee764d20"
+        },
+        "dlms-sn-read-upload-information-source/cold-read-captured-controls.json": {
+          "bytes": 24919,
+          "sha256": "3da544501eb96064976c3e25f5824bd6a93fbf11397e9a65a78ad3942e95d22a"
+        },
+        "dlms-sn-read-upload-information-source/cold-read-controls.json": {
+          "bytes": 26348,
+          "sha256": "4c4541a157ce4b5d43f60bcf3c746cd93794593b3b474634a156dac5af71a4d5"
+        },
+        "dlms-sn-read-upload-information-source/full-controls.json": {
+          "bytes": 325620,
+          "sha256": "43a9b856802bcd998bd4ae027bfb5f5d2c50a6ed78967b67f21dee9cdbebde57"
+        },
+        "dlms-sn-read-upload-information-source/historical-read-information-upgrade.json": {
+          "bytes": 67668,
+          "sha256": "c1f0bb38cb4e8bb4636dd9b63b10b78b9fe61640d3755b3d80a0eeebbbf741ce"
+        },
+        "dlms-sn-read-upload-information-source/source-manifest.json": {
+          "bytes": 6719,
+          "sha256": "1c16ce4e3c6b146c2175c9e775d82c8941f6e7f30df164a27ab98281710d5147"
+        },
+        "dlms-sn-read-upload-information-source/tools/access.py": {
+          "bytes": 4392,
+          "sha256": "70f03ceffb0556b966d04829dc89384c20b73bc6104c8ed637e5ed0b97d8bc7e"
+        },
+        "dlms-sn-read-upload-information-source/tools/capture-model.py": {
+          "bytes": 1297,
+          "sha256": "436e6ddf8641e7b1cc1140a18b869addadd19fb25e23a5932cb686dcad22fa78"
+        },
+        "dlms-sn-read-upload-information-source/tools/cold-capture-index.json": {
+          "bytes": 1112,
+          "sha256": "0c1654b8142c2c531f88334f75fc8aace14978555ecdaa66b442c209ee764d20"
+        },
+        "dlms-sn-read-upload-information-source/tools/cold-generate.py": {
+          "bytes": 5135,
+          "sha256": "4aa00f284624d9aed6ea284c13e91b8856e750c029cdbd860268f381170a4620"
+        },
+        "dlms-sn-read-upload-information-source/tools/combination-pins.json": {
+          "bytes": 2055,
+          "sha256": "961b2c8e6846c393eab07e58a92ba7cde77e22bf1ece86399e61791eb0e112d2"
+        },
+        "dlms-sn-read-upload-information-source/tools/direct-model.py": {
+          "bytes": 9093,
+          "sha256": "3f93e5870f498ce664d1f2f6fdae174702117b23e34a69297949ada7160ec95c"
+        },
+        "dlms-sn-read-upload-information-source/tools/download-outer.py": {
+          "bytes": 5985,
+          "sha256": "0b69840f2066124f48091301aea6247ec29fb86c4933d00055f60828296bd220"
+        },
+        "dlms-sn-read-upload-information-source/tools/download-reference-vectors.json": {
+          "bytes": 4159,
+          "sha256": "59250557438767f0f7ff0a072b1decf3fe0f5768b75013142a5dfa608b0fe6c0"
+        },
+        "dlms-sn-read-upload-information-source/tools/generate.py": {
+          "bytes": 6528,
+          "sha256": "8867d4e93e81a2e22cc3e85ecd81e684d3e54efea2ce82ba58ebc21608a0e35e"
+        },
+        "dlms-sn-read-upload-information-source/tools/hdlc-reference.json": {
+          "bytes": 2402,
+          "sha256": "69b33f59438b54e25e0209287112464b1d6c1e802c975e7bb9dc2ed8fc7280b0"
+        },
+        "dlms-sn-read-upload-information-source/tools/hdlc.py": {
+          "bytes": 2054,
+          "sha256": "3523546c00949e02a14c9546f12bdeee09bd2e4f82bfbd1685d69bb8f689038e"
+        },
+        "dlms-sn-read-upload-information-source/tools/historical.py": {
+          "bytes": 5722,
+          "sha256": "0f9fb350e3e805e848f2e09e339695d5b402248d3224360349edc4cd555e4836"
+        },
+        "dlms-sn-read-upload-information-source/tools/model-pins.json": {
+          "bytes": 1254,
+          "sha256": "7edd921c1bd687388a19702cd179d4c5d7afc5b1fc6a24ef25b6cb75740b8e4f"
+        },
+        "dlms-sn-read-upload-information-source/tools/model.py": {
+          "bytes": 7866,
+          "sha256": "ca9d3c7a39b1f3ebacefdd6da3d989ae46f62bd297abcc1381b169c4f05106ec"
+        },
+        "dlms-sn-read-upload-information-source/tools/project.py": {
+          "bytes": 3647,
+          "sha256": "719e0ef31cdaf05e452d411e820e0d8ed3adb1d0689046af211ddd62c0f460a8"
+        },
+        "dlms-sn-read-upload-information-source/tools/projection-pins.json": {
+          "bytes": 430,
+          "sha256": "c2243ef6cafadde55f9f184728bdeefccd62bcac4f06e39c5eacbcaa5cb75a2f"
+        },
+        "dlms-sn-read-upload-information-source/tools/read-body.py": {
+          "bytes": 4002,
+          "sha256": "9038061ed63630258c65a5b9e11e51888d414b290fea0aa2bd14743e2a7af4cd"
+        },
+        "dlms-sn-read-upload-information-source/tools/reference-vectors.json": {
+          "bytes": 6734,
+          "sha256": "3d7c0f01b305e3524efa5dab640dd9ae4730fe7ed789ca9ef015a5c39b846b8d"
+        },
+        "dlms-sn-read-upload-information-source/tools/source-outer.py": {
+          "bytes": 8836,
+          "sha256": "4505d905a3a96b22ac3f91e00033d4146c3bf5e75794a2ad25f60b5e3e7145a1"
+        },
+        "dlms-sn-read-upload-information-source/tools/verify-all.py": {
+          "bytes": 7059,
+          "sha256": "eb2de8b01b92484d20a2f0f20f9468f78d6822af6fcaef4e25613d11b6b891bb"
+        },
+        "dlms-sn-read-upload-information-source/tools/verify-captures.py": {
+          "bytes": 3266,
+          "sha256": "55a5db6a917e82b15e36515b2760c78a75820377e4eea57229494a31ec10eaf8"
+        },
+        "dlms-sn-read-upload-information-source/tools/verify.py": {
+          "bytes": 4671,
+          "sha256": "0ef822e630848e43e2a54ca1e79914003765b83853ac2e99dadccb52fcc4d84d"
+        },
+        "dlms-sn-read-upload-information-source/tools/wrapper-model.py": {
+          "bytes": 15781,
+          "sha256": "609ba979ea49fc353ccd92fadf99edbc5100e4f1637eaa4444fcace579c903dc"
+        },
+        "dlms-sn-read-upload-information-source/tools/write-body.py": {
+          "bytes": 5706,
+          "sha256": "4818c0264cb4819cf5d4715a855b4f3817acf26c0c6b15ff558aaa7d3b4aa094"
+        },
+        "dlms-sn-read-upload-information-source/tools/write-source.py": {
+          "bytes": 8800,
+          "sha256": "46e574590d006649212a255cd2fc85d226165f0ce27f5cc7a01f88211720de0a"
+        },
+        "required-tests-traffic-unified-v181.json": {
+          "bytes": 24228364,
+          "sha256": "ef424faa20684b06c238e7fcb822c8dfa359200c2878e54629a630bf9c28d329"
+        },
+        "validation/expected.json": {
+          "bytes": 20739,
+          "sha256": "98c5ead2c24b4954652998a6bbddc8cda4716c6951e96637ff585548ec9c61e1"
+        }
+      },
+      "aliases": {
+        "common/pcapx/pcaputil/dlms-sn-read-upload-information-source/baseline-controls.json": "dlms-sn-read-upload-information-source/baseline-controls.json",
+        "common/pcapx/pcaputil/dlms-sn-read-upload-information-source/capture-index.json": "dlms-sn-read-upload-information-source/capture-index.json",
+        "common/pcapx/pcaputil/dlms-sn-read-upload-information-source/captured-baseline-controls.json": "dlms-sn-read-upload-information-source/captured-baseline-controls.json",
+        "common/pcapx/pcaputil/dlms-sn-read-upload-information-source/captured-controls.json": "dlms-sn-read-upload-information-source/captured-controls.json",
+        "common/pcapx/pcaputil/dlms-sn-read-upload-information-source/captures/cold-singlelast-ReadQ6-two-information-carriers-no-LN-primer.tcp.pcap": "dlms-sn-read-upload-information-source/captures/cold-singlelast-ReadQ6-two-information-carriers-no-LN-primer.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-read-upload-information-source/captures/cold-singlelast-ReadQ6-two-information-carriers-no-LN-primer.udp.pcap": "dlms-sn-read-upload-information-source/captures/cold-singlelast-ReadQ6-two-information-carriers-no-LN-primer.udp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-read-upload-information-source/captures/direct-first-echo-fragmented-final-Q6.tcp.pcap": "dlms-sn-read-upload-information-source/captures/direct-first-echo-fragmented-final-Q6.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-read-upload-information-source/captures/direct-first-echo-fragmented-final-Q6.udp.pcap": "dlms-sn-read-upload-information-source/captures/direct-first-echo-fragmented-final-Q6.udp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-read-upload-information-source/captures/direct-first-fragmented-ReadR3-echo-direct-final.tcp.pcap": "dlms-sn-read-upload-information-source/captures/direct-first-fragmented-ReadR3-echo-direct-final.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-read-upload-information-source/captures/direct-first-fragmented-ReadR3-echo-direct-final.udp.pcap": "dlms-sn-read-upload-information-source/captures/direct-first-fragmented-ReadR3-echo-direct-final.udp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-read-upload-information-source/captures/fragmented-first-Q6-cap12-direct-echo-final.tcp.pcap": "dlms-sn-read-upload-information-source/captures/fragmented-first-Q6-cap12-direct-echo-final.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-read-upload-information-source/captures/fragmented-first-Q6-cap12-direct-echo-final.udp.pcap": "dlms-sn-read-upload-information-source/captures/fragmented-first-Q6-cap12-direct-echo-final.udp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-read-upload-information-source/captures/identical-first-Q6-information-cap11-Resource-release.tcp.pcap": "dlms-sn-read-upload-information-source/captures/identical-first-Q6-information-cap11-Resource-release.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-read-upload-information-source/captures/identical-first-Q6-information-cap11-Resource-release.udp.pcap": "dlms-sn-read-upload-information-source/captures/identical-first-Q6-information-cap11-Resource-release.udp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-read-upload-information-source/captures/reuse-inputs.json": "dlms-sn-read-upload-information-source/captures/reuse-inputs.json",
+        "common/pcapx/pcaputil/dlms-sn-read-upload-information-source/captures/whole-chain-repeat-and-same-final-different-prefix-retirement.tcp.pcap": "dlms-sn-read-upload-information-source/captures/whole-chain-repeat-and-same-final-different-prefix-retirement.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-read-upload-information-source/captures/whole-chain-repeat-and-same-final-different-prefix-retirement.udp.pcap": "dlms-sn-read-upload-information-source/captures/whole-chain-repeat-and-same-final-different-prefix-retirement.udp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-read-upload-information-source/captures/wrong-caller-full32-NR-preserve-active-upload-plus-fragment-Close.tcp.pcap": "dlms-sn-read-upload-information-source/captures/wrong-caller-full32-NR-preserve-active-upload-plus-fragment-Close.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-read-upload-information-source/captures/wrong-caller-full32-NR-preserve-active-upload-plus-fragment-Close.udp.pcap": "dlms-sn-read-upload-information-source/captures/wrong-caller-full32-NR-preserve-active-upload-plus-fragment-Close.udp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-read-upload-information-source/cold-capture-index.json": "dlms-sn-read-upload-information-source/cold-capture-index.json",
+        "common/pcapx/pcaputil/dlms-sn-read-upload-information-source/cold-read-captured-controls.json": "dlms-sn-read-upload-information-source/cold-read-captured-controls.json",
+        "common/pcapx/pcaputil/dlms-sn-read-upload-information-source/cold-read-controls.json": "dlms-sn-read-upload-information-source/cold-read-controls.json",
+        "common/pcapx/pcaputil/dlms-sn-read-upload-information-source/full-controls.json": "dlms-sn-read-upload-information-source/full-controls.json",
+        "common/pcapx/pcaputil/dlms-sn-read-upload-information-source/historical-read-information-upgrade.json": "dlms-sn-read-upload-information-source/historical-read-information-upgrade.json",
+        "common/pcapx/pcaputil/dlms-sn-read-upload-information-source/source-manifest.json": "dlms-sn-read-upload-information-source/source-manifest.json",
+        "common/pcapx/pcaputil/dlms-sn-read-upload-information-source/tools/access.py": "dlms-sn-read-upload-information-source/tools/access.py",
+        "common/pcapx/pcaputil/dlms-sn-read-upload-information-source/tools/capture-model.py": "dlms-sn-read-upload-information-source/tools/capture-model.py",
+        "common/pcapx/pcaputil/dlms-sn-read-upload-information-source/tools/cold-capture-index.json": "dlms-sn-read-upload-information-source/tools/cold-capture-index.json",
+        "common/pcapx/pcaputil/dlms-sn-read-upload-information-source/tools/cold-generate.py": "dlms-sn-read-upload-information-source/tools/cold-generate.py",
+        "common/pcapx/pcaputil/dlms-sn-read-upload-information-source/tools/combination-pins.json": "dlms-sn-read-upload-information-source/tools/combination-pins.json",
+        "common/pcapx/pcaputil/dlms-sn-read-upload-information-source/tools/direct-model.py": "dlms-sn-read-upload-information-source/tools/direct-model.py",
+        "common/pcapx/pcaputil/dlms-sn-read-upload-information-source/tools/download-outer.py": "dlms-sn-read-upload-information-source/tools/download-outer.py",
+        "common/pcapx/pcaputil/dlms-sn-read-upload-information-source/tools/download-reference-vectors.json": "dlms-sn-read-upload-information-source/tools/download-reference-vectors.json",
+        "common/pcapx/pcaputil/dlms-sn-read-upload-information-source/tools/generate.py": "dlms-sn-read-upload-information-source/tools/generate.py",
+        "common/pcapx/pcaputil/dlms-sn-read-upload-information-source/tools/hdlc-reference.json": "dlms-sn-read-upload-information-source/tools/hdlc-reference.json",
+        "common/pcapx/pcaputil/dlms-sn-read-upload-information-source/tools/hdlc.py": "dlms-sn-read-upload-information-source/tools/hdlc.py",
+        "common/pcapx/pcaputil/dlms-sn-read-upload-information-source/tools/historical.py": "dlms-sn-read-upload-information-source/tools/historical.py",
+        "common/pcapx/pcaputil/dlms-sn-read-upload-information-source/tools/model-pins.json": "dlms-sn-read-upload-information-source/tools/model-pins.json",
+        "common/pcapx/pcaputil/dlms-sn-read-upload-information-source/tools/model.py": "dlms-sn-read-upload-information-source/tools/model.py",
+        "common/pcapx/pcaputil/dlms-sn-read-upload-information-source/tools/project.py": "dlms-sn-read-upload-information-source/tools/project.py",
+        "common/pcapx/pcaputil/dlms-sn-read-upload-information-source/tools/projection-pins.json": "dlms-sn-read-upload-information-source/tools/projection-pins.json",
+        "common/pcapx/pcaputil/dlms-sn-read-upload-information-source/tools/read-body.py": "dlms-sn-read-upload-information-source/tools/read-body.py",
+        "common/pcapx/pcaputil/dlms-sn-read-upload-information-source/tools/reference-vectors.json": "dlms-sn-read-upload-information-source/tools/reference-vectors.json",
+        "common/pcapx/pcaputil/dlms-sn-read-upload-information-source/tools/source-outer.py": "dlms-sn-read-upload-information-source/tools/source-outer.py",
+        "common/pcapx/pcaputil/dlms-sn-read-upload-information-source/tools/verify-all.py": "dlms-sn-read-upload-information-source/tools/verify-all.py",
+        "common/pcapx/pcaputil/dlms-sn-read-upload-information-source/tools/verify-captures.py": "dlms-sn-read-upload-information-source/tools/verify-captures.py",
+        "common/pcapx/pcaputil/dlms-sn-read-upload-information-source/tools/verify.py": "dlms-sn-read-upload-information-source/tools/verify.py",
+        "common/pcapx/pcaputil/dlms-sn-read-upload-information-source/tools/wrapper-model.py": "dlms-sn-read-upload-information-source/tools/wrapper-model.py",
+        "common/pcapx/pcaputil/dlms-sn-read-upload-information-source/tools/write-body.py": "dlms-sn-read-upload-information-source/tools/write-body.py",
+        "common/pcapx/pcaputil/dlms-sn-read-upload-information-source/tools/write-source.py": "dlms-sn-read-upload-information-source/tools/write-source.py",
+        "scripts/protocol-tests/required-tests-traffic-unified-v181.json": "required-tests-traffic-unified-v181.json"
+      }
     }
   ],
   "schema_version": 1,

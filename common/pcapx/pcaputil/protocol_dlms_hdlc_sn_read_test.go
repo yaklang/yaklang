@@ -299,6 +299,9 @@ func hdlcSNReadMatrixTransports(t *testing.T, cases []hdlcSNReadCase, batch stri
 }
 func hdlcSNReadMatrixChecked(t *testing.T, cases []hdlcSNReadCase, batch string, transports []string, check func(*testing.T, *ProtocolEvent, hdlcOpStep, map[string]any)) {
 	env := "DLMS_HDLC_SN_READ_TEST_ROOT"
+	if batch == "dlms-sn-read-upload-information-source/captures" {
+		env = "DLMS_SN_READ_UPLOAD_INFORMATION_ROOT"
+	}
 	if batch == "dlms-sn-cold-information-source/captures" {
 		env = "DLMS_SN_COLD_INFORMATION_ROOT"
 	}

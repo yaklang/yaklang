@@ -35,6 +35,7 @@ func hdlcSNUploadControls(t *testing.T, boundary bool) []hdlcSNReadCase {
 	}
 	if boundary {
 		out = snWriteUploadInformationUpgrade(t, raw, out)
+		out = snReadUploadInformationUpgrade(t, raw, out)
 	}
 	return out
 }

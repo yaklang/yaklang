@@ -44,7 +44,7 @@ Run from the repository root:
 ```sh
 go run ./internal/trafficfixture/cmd/corpus test
 go test -json -count=1 -timeout=10m ./internal/trafficfixture/... ./common/bin-parser/... ./common/pcapx/... ./common/yak/cmd/yakcmds/shark-cli ./scripts/ci > traffic.jsonl
-go run ./internal/trafficfixture/cmd/corpus exec -- python3 @scripts/protocol-tests/check_go_test_json_v2.py traffic.jsonl --inventory @scripts/protocol-tests/required-tests-traffic-unified-v180.json --tier full
+go run ./internal/trafficfixture/cmd/corpus exec -- python3 @scripts/protocol-tests/check_go_test_json_v2.py traffic.jsonl --inventory @scripts/protocol-tests/required-tests-traffic-unified-v181.json --tier full
 ```
 
 The single `corpus` entry point uses the same bounded Go ZIP loader as tests.
@@ -83,7 +83,7 @@ their semantic coverage. The existing synthetic session keys are test inputs;
 production credentials, user private keys and material without redistribution
 permission belong in an external fixed-source download manifest.
 
-Current test requirements are sealed at `scripts/protocol-tests/required-tests-traffic-unified-v180.json`;
+Current test requirements are sealed at `scripts/protocol-tests/required-tests-traffic-unified-v181.json`;
 the historical inventories and all earlier batches remain unchanged.
 The supplemental small-corpus batch contains 26 minimal controls, their explicit
 expected facts, an offline generator and the compact pinned source manifest.
@@ -203,7 +203,7 @@ opaque selector bytes and one bounded Data value over Wrapper v1 TCP/UDP; object
 selector meaning, access permission and device operation are unverified. The
 original one-packet selective-access capture and original refused answer remain
 immutable; its now-supported answer is matched by exact input SHA and frame.
-The active inventory is `scripts/protocol-tests/required-tests-traffic-unified-v180.json`.
+The active inventory is `scripts/protocol-tests/required-tests-traffic-unified-v181.json`.
 
 The small-graph budget batch reuses accepted graph captures/answers and adds one
 249-byte UDP control for child count255 without child bytes. Its standalone proof
@@ -993,7 +993,7 @@ the normative answer; a missing numeric reference field is not a codec pass.
 Full/deferred, workers1/2/4, observers off/on, Feed chunks1/7/full, ownership,
 resources and close/refusal boundaries remain required.
 
-Current gate: `required-tests-traffic-unified-v180.json` with
+Current gate: `required-tests-traffic-unified-v181.json` with
 `check_go_test_json_v2.py`. The indexed validator preserves missing/unpassed,
 package invocation completion, descendant skips, failures and non-JSON checks;
 its mutation/differential harness is sealed with the material. Older checkers
@@ -1629,7 +1629,7 @@ userspace adapter; full kernel receiver/socket/timers and ECU endpoints do not.
 All161 preceding ZIPs remain byte-for-byte unchanged. Raw captures, dependencies,
 reference source/build output and process evidence stay outside Git.
 
-Current effective v180 inventory: 119,204 entries; 119,197 are mandatory for the full tier.
+Current effective v181 inventory: 119,496 entries; 119,489 are mandatory for the full tier.
 
 The opt-in `DynamicFlowControl` profile follows Linux v6.12 FC tuple updates (including WAIT without granting data). Disjoint address extensions or classical/FD carriers may share CAN IDs; unknown selectors cannot choose or mutate a conversation. Ambiguous selectors are rejected. Seven sealed cases exercise full/deferred, workers 1/2/4, and observer off/on, with exact fields, byte collections, contributor references, errors and resource ownership. The existing static FC profile remains unchanged. Pinned upstream FC and filter functions execute with declared userspace stubs; this is not a kernel/ECU endpoint. TShark 4.2.5 checks wire tuples and two complete payloads, but cannot independently reassemble the shared-address transcripts.
 
@@ -1823,7 +1823,7 @@ Plaintext Wrapper v1 SN Write06 variable-name2 now exposes separate descriptor/D
 
 Complete unsegmented CRC/HCS HDLC SN Write06 variable-name2 with separate Data sequence and WriteResponse0d success NULL0/error1 now expose ordered typed fields and literal carrier headers. Local1..16 equal lists are observer bounds; no synthetic Wrapper/invoke/owner or device success. Same caller direction and ordered logical addresses distinct SN request retires an older LN owner; other link/opposite caller/pure response preserves the neighbor. Sixteen independent86step traces cover full/deferred native/captured configurations, fields/Session/types/IDs/errors/budget/Close and ownership. A strict one-step historical supplement updates only a formerly unsupported06 frame that lacks mandatory Data count to known Malformed/SNWrite; all original15cases/other15steps/Close and bytes remain intact.36 new minimal captures (20,744B) reuse4 historical logical inputs;42 total logical capture uses include2 exact historical rejection inputs and8 canonical resource captures. Four resource traces retain a live pending GET before the refusal, with same-budget normal neighbors;64 native and192 captured configurations prove no late-response misassociation, all field/Session/ID/error/Close/ownership checks retained; all253 prior archives remain immutable. Fixed memory-only Gurux single-write, actual list04 negative and generic response/receiver bind minimal HDLC wire, not device semantics. No SN information segmentation, parameterized/block/GBT write or AA/object/security claim.
 
-The bounded SN information-group batch adds source-pinned normal, negative and resource-boundary answers for existing DLMS carrier contexts, plus a regression for known GET continuations whose opaque bytes resemble an SN header. Its26 new minimal captures total37,218B and reuse historical neighbors; all254 preceding archives remain immutable. Cold group discovery, arbitrary first-header cuts, completed-final replay, concurrent groups and SN AA/object/device semantics remain unimplemented.
+The bounded SN information-group batch adds source-pinned normal, negative and resource-boundary answers for existing DLMS carrier contexts, plus a regression for known GET continuations whose opaque bytes resemble an SN header. Its26 new minimal captures total37,218B and reuse historical neighbors; all254 preceding archives remain immutable. That earlier snapshot did not implement cold group discovery, arbitrary first-header cuts, completed-final replay, concurrent groups or SN AA/object/device semantics; the current profiles below add selected cold SN information admission.
 
 SN parameterized-access adds literal name/selector/typed parameter observations to existing Read and Write carrier profiles. Forty new minimal captures total 17,890 B, reusing four historical and eight within-batch capture uses. Two exact source/member/case/step-bound sidecars upgrade formerly unselected valid Read bytes; original ZIPs and answers remain immutable. Write values and all parameters share one Data budget. No selector/object/device semantics or new admission/owner policy is inferred.
 
@@ -1868,3 +1868,5 @@ The ordinary-SN Wrapper GBT capability also upgrades the exact two historical Re
 `validation-dlms-sn-write-upload-information.zip` adds count1 SN Write Q7 upload blocks and Write R2 block-number echoes across validated HDLC information groups. It preserves first/final NS, whole-carrier-chain retry identity, full addresses/caller/direction, complete typed fields/Session, actual complete event references, literal final Raw, budgets, independent Close and ownership. Twelve new authored captures total8020B; two identical historical M0 captures are reused. A strictly pinned independent sidecar upgrades only the former Write information Unsupported trace to a complete positive with an unfinished-upload Close; its case identity, all input bytes, original answers and captures remain immutable, while the other two boundary cases retain their entire original expectations. All275 earlier ZIPs remain byte-identical. Read upload/R3 information groups, initial discriminator splitting, bare-final retry cache, AA and device execution remain unfinished.
 
 The cold SN information regression archive removes the LN primer: complete CRC/HCS and literal LLC/command direction admit known SN first information frames; bounded UDP information state survives until continuation or resource/lifecycle cleanup. Complete fields, Session, actual references, byte ownership, no invented owner, positive/reject neighbours and budget refusal are verified. This fixes admission/retention, not Read upload/R3 or cold GBT completion, negotiated AA or device execution. All276 preceding ZIPs remain byte-identical.
+
+`validation-dlms-sn-read-upload-information.zip` adds count1 SN Read Q6 raw-block upload and R3 UInt16 echoes across validated HDLC information groups, including a no-LN-primer cold group. Complete first LLC/service/count1/choice, contextual Read body, firstNS/finalNS, distinct-carrier retry identity, full typed Fields/Session/real event references, wrong context preservation, cap12/11 refusal, Close6+fragment3 and ownership stay explicit. Fourteen new authored captures total8512B; two identical historical complete-M0 captures are reused. A pinned sidecar upgrades only the former Read information Unsupported trace, preserving the already upgraded Write trace and ordinary Read neighbour. Original capture bytes/answers and all277 earlier ZIPs remain unchanged. Bare-final cache, initial prefix splitting, GBT/nested information completion, negotiated windows/AA/security/device and original wholeinput oracle gaps remain unfinished.
