@@ -409,6 +409,9 @@ func spDataSetCapturedMatrix(t *testing.T, source func(*testing.T, string) []byt
 	if profile == "sparkplug-dataset" {
 		raw = spDataSetCommandLegacyCapturedAnswers(t, raw)
 	}
+	if profile == "sparkplug-template" {
+		raw = spTemplatePartialLegacyAnswers(t, raw)
+	}
 	var g struct {
 		Profiles map[string]struct {
 			Events []struct {

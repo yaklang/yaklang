@@ -125193,7 +125193,9 @@
         "common/pcapx/pcaputil/testdata/sparkplug-command-null-rebirth/tools/candidates.py": "sparkplug-dataset/tools/candidates.py",
         "common/pcapx/pcaputil/testdata/sparkplug-command-null-rebirth/tools/generate-node-state.py": "sparkplug-dataset/tools/generate-node-state.py",
         "common/pcapx/pcaputil/testdata/sparkplug-template/tools/candidates.py": "sparkplug-dataset/tools/candidates.py",
-        "common/pcapx/pcaputil/testdata/sparkplug-template/tools/generate-node-state.py": "sparkplug-dataset/tools/generate-node-state.py"
+        "common/pcapx/pcaputil/testdata/sparkplug-template/tools/generate-node-state.py": "sparkplug-dataset/tools/generate-node-state.py",
+        "common/pcapx/pcaputil/testdata/sparkplug-template-partial/tools/candidates.py": "sparkplug-dataset/tools/candidates.py",
+        "common/pcapx/pcaputil/testdata/sparkplug-template-partial/tools/generate-node-state.py": "sparkplug-dataset/tools/generate-node-state.py"
       }
     },
     {
@@ -125497,7 +125499,8 @@
         "scripts/protocol-tests/required-tests-traffic-unified-v184.json": "required-tests-traffic-unified-v184.json",
         "common/pcapx/pcaputil/testdata/sparkplug-arrays/tools/verify-carriers.py": "sparkplug-dataset-commands/tools/verify-carriers.py",
         "common/pcapx/pcaputil/testdata/sparkplug-command-null-rebirth/tools/verify-carriers.py": "sparkplug-dataset-commands/tools/verify-carriers.py",
-        "common/pcapx/pcaputil/testdata/sparkplug-template/tools/verify-carriers.py": "sparkplug-dataset-commands/tools/verify-carriers.py"
+        "common/pcapx/pcaputil/testdata/sparkplug-template/tools/verify-carriers.py": "sparkplug-dataset-commands/tools/verify-carriers.py",
+        "common/pcapx/pcaputil/testdata/sparkplug-template-partial/tools/verify-carriers.py": "sparkplug-dataset-commands/tools/verify-carriers.py"
       }
     },
     {
@@ -126355,7 +126358,8 @@
         "common/pcapx/pcaputil/testdata/sparkplug-command-null-rebirth/tools/verify.py": "sparkplug-command-null-rebirth/tools/verify.py",
         "common/pcapx/pcaputil/testdata/sparkplug-command-null-rebirth/tools/wire.py": "sparkplug-command-null-rebirth/tools/wire.py",
         "scripts/protocol-tests/required-tests-traffic-unified-v186.json": "required-tests-traffic-unified-v186.json",
-        "common/pcapx/pcaputil/testdata/sparkplug-template/tools/wire.py": "sparkplug-command-null-rebirth/tools/wire.py"
+        "common/pcapx/pcaputil/testdata/sparkplug-template/tools/wire.py": "sparkplug-command-null-rebirth/tools/wire.py",
+        "common/pcapx/pcaputil/testdata/sparkplug-template-partial/tools/wire.py": "sparkplug-command-null-rebirth/tools/wire.py"
       }
     },
     {
@@ -126716,7 +126720,235 @@
         "common/pcapx/pcaputil/testdata/sparkplug-template/tools/verify-parameters.py": "sparkplug-template/tools/verify-parameters.py",
         "common/pcapx/pcaputil/testdata/sparkplug-template/tools/verify-resource.py": "sparkplug-template/tools/verify-resource.py",
         "common/pcapx/pcaputil/testdata/sparkplug-template/tools/verify.py": "sparkplug-template/tools/verify.py",
-        "scripts/protocol-tests/required-tests-traffic-unified-v187.json": "required-tests-traffic-unified-v187.json"
+        "scripts/protocol-tests/required-tests-traffic-unified-v187.json": "required-tests-traffic-unified-v187.json",
+        "common/pcapx/pcaputil/testdata/sparkplug-template-partial/LICENSE.txt": "sparkplug-template/LICENSE.txt",
+        "common/pcapx/pcaputil/testdata/sparkplug-template-partial/tools/generate.py": "sparkplug-template/tools/generate.py"
+      }
+    },
+    {
+      "id": "validation-sparkplug-template-partial",
+      "kind": "support",
+      "source_sha": "2df42acffd599119e6d2113ae889dc45b84c95f6",
+      "file": "validation-sparkplug-template-partial.zip",
+      "sha256": "a96a7aebb1cda79dc217c14be119ef14e10c7e1ba35952cd87ca6f567e2c99c1",
+      "password": "bin-parser",
+      "members": {
+        "required-tests-traffic-unified-v188.json": {
+          "sha256": "fe6d947296bf3bad16de3f587f43f02d9bee748fbf938b0c4d4908b015933a9e",
+          "bytes": 26083629
+        },
+        "sparkplug-template-partial/NONEMPTY-BOUNDARY-NOTE.json": {
+          "sha256": "0c6d4f28aa42325b27972d7e4d805afe4583b83da0ce88c3241e414440eef7b9",
+          "bytes": 408
+        },
+        "sparkplug-template-partial/NULL-MEMBER-SOURCE-PROOF.json": {
+          "sha256": "67399c6fc1a47e43fbb489d56ba73304e3d46c5c5bca866038c8b8ae4228652a",
+          "bytes": 2999
+        },
+        "sparkplug-template-partial/SOURCE-FEASIBILITY.json": {
+          "sha256": "21a1c131e902298f126b37e406ba064109ae7aa6b5327013e1a434d36bd99cc5",
+          "bytes": 5970
+        },
+        "sparkplug-template-partial/answers.json": {
+          "sha256": "422972146821b33437bbf5b35c5decbd0b753c9c176bfdc324a14916b61abf5f",
+          "bytes": 63891
+        },
+        "sparkplug-template-partial/baseline-controls.json": {
+          "sha256": "781110e9fdc751a41f4f2b29cb0671402d1daadd1644539638516021c2235a5a",
+          "bytes": 71532
+        },
+        "sparkplug-template-partial/capture-materials.json": {
+          "sha256": "2163bdbcc5e7f5694f0a44244e0bf8acce8891ba7af9b8265f2b470ccf74092c",
+          "bytes": 86872
+        },
+        "sparkplug-template-partial/captures/Rebirth-new-Birth-cannot-borrow-old-definition.pcap": {
+          "sha256": "35355405e5e6763988c867d94ce457ecd9ed2c142096afb60a3a747c76536091",
+          "bytes": 2026
+        },
+        "sparkplug-template-partial/captures/declared-member-type-mismatch-retires-producer-context.pcap": {
+          "sha256": "8c23a28d1b67de6ec3c77135267d7ef3cf76c251df70cd3a87897249814233ad",
+          "bytes": 1125
+        },
+        "sparkplug-template-partial/captures/member-type-comes-from-own-instance-reference.pcap": {
+          "sha256": "2fd1b68e6d2830b37341bda4ec0ffb1cf2c387c702ea0dfdc242899cec63e908",
+          "bytes": 1438
+        },
+        "sparkplug-template-partial/captures/missing-member-name-is-not-positional-inference.pcap": {
+          "sha256": "f1bc63fec3f91a3ba90763ce8827f72c33bb8abb950653ad96c3324954ce4390",
+          "bytes": 1116
+        },
+        "sparkplug-template-partial/captures/partial-explicit-membertype-then-inherited-datatype.pcap": {
+          "sha256": "06ad330bb89507e5c124df18f268e949b5e9c9641ee29c913079ad4215605f23",
+          "bytes": 1313
+        },
+        "sparkplug-template-partial/captures/unknown-member-refusal-retires-producer-context.pcap": {
+          "sha256": "1e246b9ded056a490c617508b96e5bc738d4898106bd8b7b17480d67b422f439",
+          "bytes": 1124
+        },
+        "sparkplug-template-partial/historical-partial-Data-upgrade.json": {
+          "sha256": "edc99648173d4b4fcaee09cd1a5b8d8494d9ba59450f373cf21051cf6a6c0774",
+          "bytes": 46696
+        },
+        "sparkplug-template-partial/history-proof.json": {
+          "sha256": "8717b83bb25147222f184d02a8c84d9358bb27760de3ef66e49241d576cc5708",
+          "bytes": 3639
+        },
+        "sparkplug-template-partial/native-source-bindings.json": {
+          "sha256": "3dc08963540ac6645904e7e5f638d6d0f9695e67722f4693a54f0374510b7410",
+          "bytes": 1371
+        },
+        "sparkplug-template-partial/null-member-controls.json": {
+          "sha256": "85ad68fd60778fcf8522c5faa976e004f65b025fba0602045e282ea1c548fa20",
+          "bytes": 80497
+        },
+        "sparkplug-template-partial/partial-controls.json": {
+          "sha256": "d054523c849d59d30949e53cb8728ea57e24e4fe95dfe3055344a17d9f5dea8f",
+          "bytes": 205745
+        },
+        "sparkplug-template-partial/portable-pins.json": {
+          "sha256": "686aae3ff11ddebf559eb4f78e0e4d5aa3b49997a9743de588d721eb2fd794d0",
+          "bytes": 7618
+        },
+        "sparkplug-template-partial/records/0b07b2a468730100a41729441d5b6435b52044ab4278269f961304e4e309e639.bin": {
+          "sha256": "0b07b2a468730100a41729441d5b6435b52044ab4278269f961304e4e309e639",
+          "bytes": 97
+        },
+        "sparkplug-template-partial/records/13d772f2dce7ca8d157485d533875d362c45162658af6d3e7375b374db5660fe.bin": {
+          "sha256": "13d772f2dce7ca8d157485d533875d362c45162658af6d3e7375b374db5660fe",
+          "bytes": 98
+        },
+        "sparkplug-template-partial/records/13fd2b7c47ffcd9f8dc91c4be24b03ab21f540bf4a2dd15d7a562ae4987ba3af.bin": {
+          "sha256": "13fd2b7c47ffcd9f8dc91c4be24b03ab21f540bf4a2dd15d7a562ae4987ba3af",
+          "bytes": 96
+        },
+        "sparkplug-template-partial/records/20fa939186c4646e173a6c2dbf25544ce9dafd89ba90132fd2c4f3bbf1d496d4.bin": {
+          "sha256": "20fa939186c4646e173a6c2dbf25544ce9dafd89ba90132fd2c4f3bbf1d496d4",
+          "bytes": 423
+        },
+        "sparkplug-template-partial/records/22e122bc35c692baf2af9a873cd7b435af7d005a9606dfcc89facbfba89ab7f3.bin": {
+          "sha256": "22e122bc35c692baf2af9a873cd7b435af7d005a9606dfcc89facbfba89ab7f3",
+          "bytes": 98
+        },
+        "sparkplug-template-partial/records/5cbe03e46ac9a3d91060c21c45d16311fc0213f20c0ecaaa4f46d90aa4f0ec37.bin": {
+          "sha256": "5cbe03e46ac9a3d91060c21c45d16311fc0213f20c0ecaaa4f46d90aa4f0ec37",
+          "bytes": 116
+        },
+        "sparkplug-template-partial/records/6a15592f369b688f56dbcf2cf8756af85c636569a07c16d5e571a4c9ec5cad52.bin": {
+          "sha256": "6a15592f369b688f56dbcf2cf8756af85c636569a07c16d5e571a4c9ec5cad52",
+          "bytes": 97
+        },
+        "sparkplug-template-partial/records/71690cce62d1bff3a03f5ddea0d5b3f79e942a1a0242184ea7218b2a34760c0a.bin": {
+          "sha256": "71690cce62d1bff3a03f5ddea0d5b3f79e942a1a0242184ea7218b2a34760c0a",
+          "bytes": 89
+        },
+        "sparkplug-template-partial/records/810d5354cf4098c8ba6bf5d2ac58e838e16696971c02a0ad375401a4b93b4034.bin": {
+          "sha256": "810d5354cf4098c8ba6bf5d2ac58e838e16696971c02a0ad375401a4b93b4034",
+          "bytes": 96
+        },
+        "sparkplug-template-partial/records/91d416ea95b0f1c7c8d99423808ca2100a41b67de925c5adf6b5abac6ac66fc9.bin": {
+          "sha256": "91d416ea95b0f1c7c8d99423808ca2100a41b67de925c5adf6b5abac6ac66fc9",
+          "bytes": 97
+        },
+        "sparkplug-template-partial/records/ab62f2ee3732e7383afe54b513775edb17e2ea7cbead9690527efada7a8ae027.bin": {
+          "sha256": "ab62f2ee3732e7383afe54b513775edb17e2ea7cbead9690527efada7a8ae027",
+          "bytes": 98
+        },
+        "sparkplug-template-partial/records/ace834a0eed4bd2ad0509eb056290c849f60bb44b885491d7f61e80e7ea77b93.bin": {
+          "sha256": "ace834a0eed4bd2ad0509eb056290c849f60bb44b885491d7f61e80e7ea77b93",
+          "bytes": 98
+        },
+        "sparkplug-template-partial/records/bf943dd184a8d75a1e7d11e4596c3235df916487326f6a973c5194f5e767a004.bin": {
+          "sha256": "bf943dd184a8d75a1e7d11e4596c3235df916487326f6a973c5194f5e767a004",
+          "bytes": 96
+        },
+        "sparkplug-template-partial/records/c359358e11392e0c4884a7dd6fef5fd1a94d7f41538860e8cfe2f0ce6c80f45b.bin": {
+          "sha256": "c359358e11392e0c4884a7dd6fef5fd1a94d7f41538860e8cfe2f0ce6c80f45b",
+          "bytes": 96
+        },
+        "sparkplug-template-partial/source-bindings.json": {
+          "sha256": "9ce1aa012e3e9b34cba3580da3bba731019654791b79e4578e27c3aeb999c1db",
+          "bytes": 8223
+        },
+        "sparkplug-template-partial/source-manifest.json": {
+          "sha256": "9e12502d1b42e1756f4d425138f5106982c3edab5260b287ad7fb34baee5678a",
+          "bytes": 1674
+        },
+        "sparkplug-template-partial/tools/generate-carriers.py": {
+          "sha256": "9c5d69e5aa4f11baab522f95a2daed2ffe9c81d1e1854e51576e8ada4916e7d1",
+          "bytes": 8729
+        },
+        "sparkplug-template-partial/tools/generate-legacy.py": {
+          "sha256": "88f14e543948b183a6e97bf146497b114356ae24a16c211db032cffed3cbcb11",
+          "bytes": 4518
+        },
+        "sparkplug-template-partial/tools/generate-null.py": {
+          "sha256": "f1bfb59da76114578b5e7d0ed5e0235a4064ffbc23cb5ef21eac70f8e36f8295",
+          "bytes": 4651
+        },
+        "sparkplug-template-partial/tools/generate-partial.py": {
+          "sha256": "c19e5db85807c52423397b34089e566041ae82840014e54efe4ace297c2dbaa6",
+          "bytes": 10972
+        },
+        "sparkplug-template-partial/tools/verify-all.py": {
+          "sha256": "ccc57a741fe183c4835124be71dbea8b3f31200ddabfd3826ec71c1e693d363a",
+          "bytes": 3168
+        },
+        "sparkplug-template-partial/tools/verify-null.py": {
+          "sha256": "6ceadff2c74ed69e2ac90964ad38dd343594772d369afa3692ab1d7f8486304d",
+          "bytes": 3346
+        },
+        "sparkplug-template-partial/tools/verify.py": {
+          "sha256": "7f92ae71bbc696fde3abc2cf95d3a4a4b307b60b71c4c50c22f42f90a8900936",
+          "bytes": 5045
+        },
+        "validation/expected.json": {
+          "sha256": "c6144f7cd38103f90042e1fd551ab9d7fa711f24213468860e5a95c320981cde",
+          "bytes": 8544
+        }
+      },
+      "aliases": {
+        "common/pcapx/pcaputil/testdata/sparkplug-template-partial/NONEMPTY-BOUNDARY-NOTE.json": "sparkplug-template-partial/NONEMPTY-BOUNDARY-NOTE.json",
+        "common/pcapx/pcaputil/testdata/sparkplug-template-partial/NULL-MEMBER-SOURCE-PROOF.json": "sparkplug-template-partial/NULL-MEMBER-SOURCE-PROOF.json",
+        "common/pcapx/pcaputil/testdata/sparkplug-template-partial/SOURCE-FEASIBILITY.json": "sparkplug-template-partial/SOURCE-FEASIBILITY.json",
+        "common/pcapx/pcaputil/testdata/sparkplug-template-partial/answers.json": "sparkplug-template-partial/answers.json",
+        "common/pcapx/pcaputil/testdata/sparkplug-template-partial/baseline-controls.json": "sparkplug-template-partial/baseline-controls.json",
+        "common/pcapx/pcaputil/testdata/sparkplug-template-partial/capture-materials.json": "sparkplug-template-partial/capture-materials.json",
+        "common/pcapx/pcaputil/testdata/sparkplug-template-partial/captures/Rebirth-new-Birth-cannot-borrow-old-definition.pcap": "sparkplug-template-partial/captures/Rebirth-new-Birth-cannot-borrow-old-definition.pcap",
+        "common/pcapx/pcaputil/testdata/sparkplug-template-partial/captures/declared-member-type-mismatch-retires-producer-context.pcap": "sparkplug-template-partial/captures/declared-member-type-mismatch-retires-producer-context.pcap",
+        "common/pcapx/pcaputil/testdata/sparkplug-template-partial/captures/member-type-comes-from-own-instance-reference.pcap": "sparkplug-template-partial/captures/member-type-comes-from-own-instance-reference.pcap",
+        "common/pcapx/pcaputil/testdata/sparkplug-template-partial/captures/missing-member-name-is-not-positional-inference.pcap": "sparkplug-template-partial/captures/missing-member-name-is-not-positional-inference.pcap",
+        "common/pcapx/pcaputil/testdata/sparkplug-template-partial/captures/partial-explicit-membertype-then-inherited-datatype.pcap": "sparkplug-template-partial/captures/partial-explicit-membertype-then-inherited-datatype.pcap",
+        "common/pcapx/pcaputil/testdata/sparkplug-template-partial/captures/unknown-member-refusal-retires-producer-context.pcap": "sparkplug-template-partial/captures/unknown-member-refusal-retires-producer-context.pcap",
+        "common/pcapx/pcaputil/testdata/sparkplug-template-partial/historical-partial-Data-upgrade.json": "sparkplug-template-partial/historical-partial-Data-upgrade.json",
+        "common/pcapx/pcaputil/testdata/sparkplug-template-partial/history-proof.json": "sparkplug-template-partial/history-proof.json",
+        "common/pcapx/pcaputil/testdata/sparkplug-template-partial/native-source-bindings.json": "sparkplug-template-partial/native-source-bindings.json",
+        "common/pcapx/pcaputil/testdata/sparkplug-template-partial/null-member-controls.json": "sparkplug-template-partial/null-member-controls.json",
+        "common/pcapx/pcaputil/testdata/sparkplug-template-partial/partial-controls.json": "sparkplug-template-partial/partial-controls.json",
+        "common/pcapx/pcaputil/testdata/sparkplug-template-partial/portable-pins.json": "sparkplug-template-partial/portable-pins.json",
+        "common/pcapx/pcaputil/testdata/sparkplug-template-partial/records/0b07b2a468730100a41729441d5b6435b52044ab4278269f961304e4e309e639.bin": "sparkplug-template-partial/records/0b07b2a468730100a41729441d5b6435b52044ab4278269f961304e4e309e639.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-template-partial/records/13d772f2dce7ca8d157485d533875d362c45162658af6d3e7375b374db5660fe.bin": "sparkplug-template-partial/records/13d772f2dce7ca8d157485d533875d362c45162658af6d3e7375b374db5660fe.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-template-partial/records/13fd2b7c47ffcd9f8dc91c4be24b03ab21f540bf4a2dd15d7a562ae4987ba3af.bin": "sparkplug-template-partial/records/13fd2b7c47ffcd9f8dc91c4be24b03ab21f540bf4a2dd15d7a562ae4987ba3af.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-template-partial/records/20fa939186c4646e173a6c2dbf25544ce9dafd89ba90132fd2c4f3bbf1d496d4.bin": "sparkplug-template-partial/records/20fa939186c4646e173a6c2dbf25544ce9dafd89ba90132fd2c4f3bbf1d496d4.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-template-partial/records/22e122bc35c692baf2af9a873cd7b435af7d005a9606dfcc89facbfba89ab7f3.bin": "sparkplug-template-partial/records/22e122bc35c692baf2af9a873cd7b435af7d005a9606dfcc89facbfba89ab7f3.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-template-partial/records/5cbe03e46ac9a3d91060c21c45d16311fc0213f20c0ecaaa4f46d90aa4f0ec37.bin": "sparkplug-template-partial/records/5cbe03e46ac9a3d91060c21c45d16311fc0213f20c0ecaaa4f46d90aa4f0ec37.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-template-partial/records/6a15592f369b688f56dbcf2cf8756af85c636569a07c16d5e571a4c9ec5cad52.bin": "sparkplug-template-partial/records/6a15592f369b688f56dbcf2cf8756af85c636569a07c16d5e571a4c9ec5cad52.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-template-partial/records/71690cce62d1bff3a03f5ddea0d5b3f79e942a1a0242184ea7218b2a34760c0a.bin": "sparkplug-template-partial/records/71690cce62d1bff3a03f5ddea0d5b3f79e942a1a0242184ea7218b2a34760c0a.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-template-partial/records/810d5354cf4098c8ba6bf5d2ac58e838e16696971c02a0ad375401a4b93b4034.bin": "sparkplug-template-partial/records/810d5354cf4098c8ba6bf5d2ac58e838e16696971c02a0ad375401a4b93b4034.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-template-partial/records/91d416ea95b0f1c7c8d99423808ca2100a41b67de925c5adf6b5abac6ac66fc9.bin": "sparkplug-template-partial/records/91d416ea95b0f1c7c8d99423808ca2100a41b67de925c5adf6b5abac6ac66fc9.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-template-partial/records/ab62f2ee3732e7383afe54b513775edb17e2ea7cbead9690527efada7a8ae027.bin": "sparkplug-template-partial/records/ab62f2ee3732e7383afe54b513775edb17e2ea7cbead9690527efada7a8ae027.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-template-partial/records/ace834a0eed4bd2ad0509eb056290c849f60bb44b885491d7f61e80e7ea77b93.bin": "sparkplug-template-partial/records/ace834a0eed4bd2ad0509eb056290c849f60bb44b885491d7f61e80e7ea77b93.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-template-partial/records/bf943dd184a8d75a1e7d11e4596c3235df916487326f6a973c5194f5e767a004.bin": "sparkplug-template-partial/records/bf943dd184a8d75a1e7d11e4596c3235df916487326f6a973c5194f5e767a004.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-template-partial/records/c359358e11392e0c4884a7dd6fef5fd1a94d7f41538860e8cfe2f0ce6c80f45b.bin": "sparkplug-template-partial/records/c359358e11392e0c4884a7dd6fef5fd1a94d7f41538860e8cfe2f0ce6c80f45b.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-template-partial/source-bindings.json": "sparkplug-template-partial/source-bindings.json",
+        "common/pcapx/pcaputil/testdata/sparkplug-template-partial/source-manifest.json": "sparkplug-template-partial/source-manifest.json",
+        "common/pcapx/pcaputil/testdata/sparkplug-template-partial/tools/generate-carriers.py": "sparkplug-template-partial/tools/generate-carriers.py",
+        "common/pcapx/pcaputil/testdata/sparkplug-template-partial/tools/generate-legacy.py": "sparkplug-template-partial/tools/generate-legacy.py",
+        "common/pcapx/pcaputil/testdata/sparkplug-template-partial/tools/generate-null.py": "sparkplug-template-partial/tools/generate-null.py",
+        "common/pcapx/pcaputil/testdata/sparkplug-template-partial/tools/generate-partial.py": "sparkplug-template-partial/tools/generate-partial.py",
+        "common/pcapx/pcaputil/testdata/sparkplug-template-partial/tools/verify-all.py": "sparkplug-template-partial/tools/verify-all.py",
+        "common/pcapx/pcaputil/testdata/sparkplug-template-partial/tools/verify-null.py": "sparkplug-template-partial/tools/verify-null.py",
+        "common/pcapx/pcaputil/testdata/sparkplug-template-partial/tools/verify.py": "sparkplug-template-partial/tools/verify.py",
+        "scripts/protocol-tests/required-tests-traffic-unified-v188.json": "required-tests-traffic-unified-v188.json"
       }
     }
   ],

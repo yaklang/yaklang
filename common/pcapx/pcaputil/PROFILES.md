@@ -636,8 +636,9 @@ independently of metric order; output order remains the wire order. Definitions
 require explicit is_definition=true and no template_ref. Instances require an
 explicit false flag and the observed definition, with unique named Basic1–14
 members and explicit Basic1–14 parameters. Version is optional; when both sides
-supply it, this selected observer requires equality. Complete instance members
-and parameters are required for Birth and for the selected NDATA profile.
+supply it, this selected observer requires equality. Complete instance members are required for Birth. The later nonempty partial
+NDATA profile below permits named member subsets; parameters remain explicit
+and complete.
 Each member retains its name, datatype and exact typed value; parameters retain
 name, type and exact typed value. Signed widths, uint64, float32/64, Boolean,
 UTF-8 String/Text and uint64 UTC-millisecond DateTime stay distinct.
@@ -662,9 +663,42 @@ whole/1/3/17 chunking, with 20 authored minimal captures across workers1/2/4 and
 observation callbacks on/off. Canonical Basic1–14 and compatible UInt32 parameter
 controls are native-only and do not duplicate those captures.
 
-Partial NDATA member updates, default parameter inheritance, nested Template,
+Empty or child-alias NDATA, default parameter inheritance, nested Template,
 device/command Template, naming conventions beyond literal observed names,
 Properties, host-wide registry/reconnect, endpoint/device execution and complete
 Sparkplug conformance remain open. Unsupported observations do not complete
 those original requirements. Source-derived semantics, actual TShark carrier
 checks and generic replay consistency are separate evidence categories.
+
+
+### Sparkplug Template nonempty partial Data and literal-null members
+
+Node NDATA may contain only a nonempty subset of the Template's Basic members.
+The observer preserves their wire order and outputs only those actually received;
+it never fills an omitted member from a prior instance value or a definition's
+value. Every child retains its explicit name. When DATA omits a datatype, that
+name resolves it against this instance's actual observed definition. Unknown
+names and an explicit incompatible Basic datatype are refused, with producer
+context invalidated. A definition from a different instance/reference cannot be
+borrowed. Birth remains complete and explicitly typed; parameters remain complete
+and explicit. A later complete update after a valid partial update remains valid.
+
+A Basic child is a Metric and may carry literal is_null=true without any value
+oneof. Its public value is nil, including when the corresponding definition has
+a non-null value. Null plus a value is refused, clears producer context and makes
+later Data require an actual new Birth. The public value key remains present;
+parameter values do not gain a null alternative. Complete Session/type/raw/error,
+sequence, query ownership, retained history and Close assertions distinguish null
+from missing fields and from implicit defaults.
+
+This extends precisely two semantic projections in one pinned historical Template
+case: the now-accepted partial Data and its subsequent valid Data. Original source
+and captured answers, bytes, capture metadata and the other nineteen profiles are
+unchanged; the capability sidecar binds their original and new complete forms.
+Six minimal captures and native-only null positive/negative traces exercise the
+same API with full/deferred chunking and all capture configurations.
+
+Empty member sets, child aliases, parameter defaults, nested/device/command
+Template, host-wide naming/registry and endpoint execution remain uncompleted.
+Their requirements are retained; this finite observer does not guess them or
+establish complete Sparkplug/device conformance.

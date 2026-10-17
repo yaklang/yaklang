@@ -178,14 +178,27 @@ func sparkTemplateProject(p map[string]any, d *sparkTemplateDef, birth bool, max
 		if _, aliased := m["alias"]; aliased || m["is_historical"] == true || m["is_transient"] == true || m["unknown_hex"] != nil {
 			return fail("Template nested metric context needs an independent structured profile", "unsupported")
 		}
-		if !typed || typ < 1 || typ > 14 {
+		// Keep the pre-existing unselected structured-type boundary before
+		// instance comparison; partial Basic observations do not upgrade nesting.
+		if typed && (typ < 1 || typ > 14) {
 			return fail("Template members require Basic datatypes", "unsupported")
 		}
 		if !definition {
-			want, ok := d.members[name]
-			if !ok || typ != want {
+			want, known := d.members[name]
+			if !known {
 				return fail("Template member datatype differs from definition", "refused")
 			}
+			// DATA SHOULD omit datatype. Resolve it only by the explicit name
+			// in this instance's actually observed definition, never position.
+			if !typed && !birth {
+				typ, typed = want, true
+			}
+			if typed && typ != want {
+				return fail("Template member datatype differs from definition", "refused")
+			}
+		}
+		if !typed || typ < 1 || typ > 14 {
+			return fail("Template members require Basic datatypes", "unsupported")
 		}
 		value, why := sparkValue(m, typ, maxDepth, maxFields)
 		if why != "" {
@@ -199,11 +212,11 @@ func sparkTemplateProject(p map[string]any, d *sparkTemplateDef, birth bool, max
 		schema.members[name] = typ
 		metrics = append(metrics, map[string]any{"name": name, "datatype": typ, "value": value})
 	}
-	if !definition && len(schema.members) != len(d.members) {
-		if !birth {
-			return fail("Template partial Data requires an independent structured profile", "unsupported")
-		}
+	if !definition && birth && len(schema.members) != len(d.members) {
 		return fail("Template instance members differ from definition", "refused")
+	}
+	if !definition && !birth && len(metrics) == 0 {
+		return fail("Template empty Data needs an independent structured profile", "unsupported")
 	}
 	for _, p := range ps {
 		name, named := p["name"].(string)

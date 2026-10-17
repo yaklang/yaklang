@@ -100,11 +100,17 @@ func spTemplateTypes(t *testing.T, session map[string]any) {
 		require.True(t, ok)
 		for _, child := range children {
 			require.Len(t, child, 3)
+			require.Contains(t, child, "value")
 			_, ok = child["name"].(string)
 			require.True(t, ok)
 			typ, ok := child["datatype"].(uint64)
 			require.True(t, ok)
-			spTemplateBasicType(t, typ, child["value"])
+			// A Metric child may explicitly observe is_null; exact source gold
+			// still requires nil and the retained wire carries the null flag.
+			// Parameters below have no null flag and retain strict Basic types.
+			if child["value"] != nil {
+				spTemplateBasicType(t, typ, child["value"])
+			}
 		}
 		params, ok := v["parameters"].([]map[string]any)
 		require.True(t, ok)
@@ -122,6 +128,7 @@ func spTemplateTypes(t *testing.T, session map[string]any) {
 func TestSparkplugTemplateCompleteContextExistingAPI(t *testing.T) {
 	raw := spTemplateSource(t, "full-controls.json")
 	require.Equal(t, "9b54c5bc25649a8b0e57bc3fd46366f2845658005a7d4a1dea5a76568ab07e6d", fmt.Sprintf("%x", sha256.Sum256(raw)))
+	raw = spTemplatePartialLegacyGold(t, raw)
 	var gold struct {
 		Cases []struct {
 			Name  string          `json:"name"`
