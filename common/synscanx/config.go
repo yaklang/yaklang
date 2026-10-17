@@ -191,7 +191,7 @@ func WithOutputFilePrefix(prefix string) SynxConfigOption {
 	}
 }
 
-// wait syn scan 的配置选项，设置等待扫描目标回包的最大时间
+// wait syn scan 的配置选项，设置每个 UDP 探测等待应答的最长时间。TCP 半开探测使用自己的超时。
 // 参数:
 //   - sec: 等待时间，单位为秒
 //

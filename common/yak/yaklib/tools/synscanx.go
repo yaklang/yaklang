@@ -33,7 +33,7 @@ import (
 //
 // <|EXAMPLE_START|> 自定义发包后的等待时间
 // ```
-// // SYN 扫描是批量发包后统一等待回包，wait 设置等待秒数(网络差可调大以减少漏报)
+// // wait 是每个 UDP 探测等待应答的最长时间。TCP 半开探测使用自己的超时。
 // res, err = synscan.Scan("192.168.1.1/24", "1-65535", synscan.wait(5))
 // die(err)
 // for result := range res {
