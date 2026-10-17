@@ -56,22 +56,7 @@ func nativeGetOffsetsByValueIDs(db *gorm.DB, programName string, valueIDs []int6
 			end = len(clean)
 		}
 		chunk := clean[start:end]
-		placeholders := make([]string, len(chunk))
-		args := make([]any, 0, len(chunk)+1)
-		// program_name must be the first equality. Putting value_id IN first, or
-		// adding ORDER BY id, makes SQLite scan idx_ir_offsets_program_name
-		// instead of ux_ir_offsets_program_value_file_range. Sort by id in memory.
-		query := nativeOffsetSelect + ` WHERE deleted_at IS NULL`
-		if program := strings.TrimSpace(programName); program != "" {
-			query += ` AND program_name = ?`
-			args = append(args, program)
-		}
-		query += ` AND value_id IN (`
-		for i, id := range chunk {
-			placeholders[i] = "?"
-			args = append(args, id)
-		}
-		query += joinPlaceholders(placeholders) + `)`
+		query, args := offsetBatchQuery(programName, chunk)
 		rows, err := queryOffsetRows(db, query, args...)
 		if err != nil {
 			return nil, err
@@ -83,6 +68,26 @@ func nativeGetOffsetsByValueIDs(db *gorm.DB, programName string, valueIDs []int6
 	}
 	sort.Slice(all, func(i, j int) bool { return all[i].ID < all[j].ID })
 	return all, nil
+}
+
+// offsetBatchQuery builds one read-mode batch statement. program_name must be
+// the first equality. Putting value_id IN first, or adding ORDER BY id, makes
+// SQLite scan idx_ir_offsets_program_name instead of
+// ux_ir_offsets_program_value_file_range; callers sort by id in memory.
+func offsetBatchQuery(programName string, valueIDs []int64) (string, []any) {
+	query := nativeOffsetSelect + ` WHERE deleted_at IS NULL`
+	args := make([]any, 0, len(valueIDs)+1)
+	if program := strings.TrimSpace(programName); program != "" {
+		query += ` AND program_name = ?`
+		args = append(args, program)
+	}
+	placeholders := make([]string, len(valueIDs))
+	for i, id := range valueIDs {
+		placeholders[i] = "?"
+		args = append(args, id)
+	}
+	query += ` AND value_id IN (` + joinPlaceholders(placeholders) + `)`
+	return query, args
 }
 
 func compactPositiveIDs(ids []int64) []int64 {
