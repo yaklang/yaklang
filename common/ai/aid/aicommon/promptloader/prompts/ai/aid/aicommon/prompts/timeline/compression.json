@@ -5,6 +5,7 @@
     "@action",
     "summary",
     "ratain_timeline_item_range",
+    "retire_skill_names",
     "retire_promoted_entries",
     "memory_entities"
   ],
@@ -17,7 +18,11 @@
     "summary": {
       "type": "string",
       "minLength": 0,
-      "description": "合并旧摘要与未保留原文后的历史总结，说明进展、依据、问题和衔接线索。没有任何普通历史与旧摘要时可以为空字符串，本次只做条目删除决策。"
+      "description": "合并旧摘要与未保留的普通历史，写进展、依据、问题和衔接。若本次淘汰了技能或证据，末尾追加简要概括：技能只写 skill_name 以便重新加载，证据只概括结论。工具缓存本次不淘汰，不要写成已卸下。没有普通历史、旧摘要，且本次不淘汰技能或证据时可以为空字符串。"
+    },
+    "retire_skill_names": {
+      "type": "string",
+      "description": "要整份淘汰的技能名，逗号分隔。只写 SKILL_NAME 块上的 skill_name，不写路径、行号或 part。一个名字会淘汰该技能的全部分页和 metadata。catalog 表示技能目录。空字符串表示不淘汰技能。未知名字忽略。"
     },
     "ratain_timeline_item_range": {
       "type": "string",
@@ -25,7 +30,7 @@
     },
     "retire_promoted_entries": {
       "type": "string",
-      "description": "本次判断不再需要的 promoted item 数字 ID，逗号分隔，不写区间。只使用历史条目中标注的 RETIRE_ID 数字，不写 RETIRE_ID 字样。仍需使用的条目应保留，不要求全部删除；空字符串表示本次不删除。只删除点名 ID。"
+      "description": "本次淘汰的证据 RETIRE_ID，逗号分隔，不写区间。只使用 session-evidence 块上的数字。技能用 retire_skill_names，不要把技能或工具缓存的数字写在这里。空字符串表示不删除证据。只删除点名的证据 ID。"
     },
     "memory_entities": {
       "type": "array",

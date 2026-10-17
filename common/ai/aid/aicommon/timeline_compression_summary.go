@@ -60,14 +60,14 @@ func renderCompressionCapacity(snapshot *timelineCompressionSnapshot) string {
 		fmt.Fprintf(&b, "当前主模型 Timeline：%d tokens。\n", budget.Current)
 	}
 	if target > 0 {
-		fmt.Fprintf(&b, "目标：不超过 %d tokens。目标包含 summary、保留原文、仍保留的 promoted 正文和不可删除的用户输入。\n", target)
+		fmt.Fprintf(&b, "目标：%d tokens。尽量靠近这个数：不要明显低于它，也尽量不要高于它。不是越小越好。关键信息保留良好优先于继续压低。目标包含 summary、保留原文、仍保留的技能和证据、不可删除的工具缓存和用户输入。\n", target)
 	}
 	if budget.Current > 0 && target > 0 && budget.Current > target {
-		fmt.Fprintf(&b, "还需要减少：%d tokens。按这个缺口估算效果。\n", budget.Current-target)
+		fmt.Fprintf(&b, "目前高于目标 %d tokens。只消化大约这个差额，使结果落在目标附近。\n", budget.Current-target)
 	}
 	if ordinary > 0 || promoted > 0 {
 		fmt.Fprintf(&b, "两个可优化部分：普通历史 %d tokens，promoted 内容 %d tokens。\n", ordinary, promoted)
-		b.WriteString("普通历史通过 summary 和 ratain_timeline_item_range 压缩。promoted 内容通过删除不再需要的 RETIRE_ID 压缩；用户输入不可删除。\n")
+		b.WriteString("普通历史通过 summary 和 ratain_timeline_item_range 调整到目标附近。技能按 skill_name 整份淘汰，证据按 RETIRE_ID 淘汰。工具缓存本次不能删除。用户输入不可删除。\n")
 	}
 	return strings.TrimRight(b.String(), "\n")
 }

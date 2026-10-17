@@ -28,7 +28,8 @@ type timelineCompressionOutput struct {
 func parseTimelineCompressionOutput(action *Action, snapshot *timelineCompressionSnapshot, summary string) *timelineCompressionOutput {
 	rawRange, _ := action.LookupCanonicalParam("ratain_timeline_item_range")
 	rawRetire, _ := action.LookupCanonicalParam("retire_promoted_entries")
-	output := compressionSelection(snapshot, summary, rawRange, rawRetire)
+	rawSkills, _ := action.LookupCanonicalParam("retire_skill_names")
+	output := compressionSelection(snapshot, summary, rawRange, rawRetire, rawSkills)
 	// Optional extensions must not reject a usable summary. Normalize detached
 	// JSON data and admit valid candidates independently; never invent scores.
 	rawMemory, _ := action.LookupCanonicalParam("memory_entities")
@@ -46,28 +47,32 @@ func parseTimelineCompressionOutput(action *Action, snapshot *timelineCompressio
 	return output
 }
 
-func compressionSelection(snapshot *timelineCompressionSnapshot, summary string, rawRange any, rawRetire any) *timelineCompressionOutput {
+func compressionSelection(snapshot *timelineCompressionSnapshot, summary string, rawRange any, rawRetire any, rawSkills any) *timelineCompressionOutput {
 	output := &timelineCompressionOutput{Summary: strings.TrimSpace(summary), MemoryEntities: []any{}}
 	if text, ok := rawRange.(string); ok {
 		if ids, err := parseCompressionRetainedRange(text, snapshot.Items); err == nil {
 			output.RetainedRange, output.RetainedIDs = strings.TrimSpace(text), ids
 		}
 	}
-	output.RetiredPromotedEntries = parsePromotedRetirementSelection(snapshot, rawRetire)
+	output.RetiredPromotedEntries = sortedCompressionIDs(append(
+		parsePromotedRetirementSelection(snapshot, rawRetire),
+		parseSkillRetirementSelection(snapshot, rawSkills)...))
 	return output
 }
 
-// parsePromotedRetirementSelection accepts only original promoted item IDs the
-// snapshot actually listed. Everything else is ignored per item: the blacklist
-// default is to keep, so a hallucinated or stale ID can never delete an item
-// the model did not see in this request.
+// parsePromotedRetirementSelection accepts only evidence item IDs listed in
+// this snapshot. Skill names and tool-cache IDs are not accepted here: skills
+// resolve through parseSkillRetirementSelection, and tool cache is not
+// deletable by the model. Unknown IDs are ignored per item.
 func parsePromotedRetirementSelection(snapshot *timelineCompressionSnapshot, raw any) []int64 {
 	if snapshot == nil {
 		return nil
 	}
 	offered := make(map[int64]bool, len(snapshot.PromotedItems))
 	for _, item := range snapshot.PromotedItems {
-		offered[item.ID] = true
+		if item.Kind == TimelinePromotedKindEvidence {
+			offered[item.ID] = true
+		}
 	}
 	selected := make(map[int64]bool)
 	add := func(value string) {
@@ -85,6 +90,52 @@ func parsePromotedRetirementSelection(snapshot *timelineCompressionSnapshot, raw
 	case string:
 		for _, part := range strings.Split(value, ",") {
 			add(part)
+		}
+	}
+	if len(selected) == 0 {
+		return nil
+	}
+	ids := make([]int64, 0, len(selected))
+	for id := range selected {
+		ids = append(ids, id)
+	}
+	sort.Slice(ids, func(i, j int) bool { return ids[i] < ids[j] })
+	return ids
+}
+
+// parseSkillRetirementSelection resolves skill names to every original item of
+// those skills. A name matches the skill_name exactly, or a part label copied
+// with that name as its prefix. Unknown names and tool-cache names delete nothing.
+func parseSkillRetirementSelection(snapshot *timelineCompressionSnapshot, raw any) []int64 {
+	text, ok := raw.(string)
+	if snapshot == nil || !ok || strings.TrimSpace(text) == "" {
+		return nil
+	}
+	var requested []string
+	for _, part := range strings.Split(text, ",") {
+		name := strings.TrimSpace(part)
+		if name == skillCatalogKey {
+			name = "catalog"
+		}
+		if name == "" || name == "SKILL_NAME" {
+			continue
+		}
+		requested = append(requested, name)
+	}
+	if len(requested) == 0 {
+		return nil
+	}
+	selected := make(map[int64]bool)
+	for _, item := range snapshot.PromotedItems {
+		actual := compressionSkillRetirementName(item)
+		if actual == "" {
+			continue
+		}
+		for _, name := range requested {
+			if name == actual || strings.HasPrefix(name, actual+":") || strings.HasPrefix(name, actual+" ") {
+				selected[item.ID] = true
+				break
+			}
 		}
 	}
 	if len(selected) == 0 {

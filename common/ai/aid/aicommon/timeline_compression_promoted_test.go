@@ -11,8 +11,12 @@ import (
 )
 
 func compressionMockWithRetire(summary, retire string) string {
+	return compressionMockWithSelection(summary, retire, "")
+}
+
+func compressionMockWithSelection(summary, retire, skills string) string {
 	payload, _ := json.Marshal(map[string]any{"@action": "timeline-summary", "summary": summary,
-		"ratain_timeline_item_range": "", "retire_promoted_entries": retire, "memory_entities": []any{}})
+		"ratain_timeline_item_range": "", "retire_skill_names": skills, "retire_promoted_entries": retire, "memory_entities": []any{}})
 	return string(payload)
 }
 
@@ -21,6 +25,13 @@ func requireCompressionPromotedEntry(t testing.TB, prompt string, id int64, meta
 	entry := fmt.Sprintf("========== RETIRE_ID %d ==========\n%s\n%s\n========== END RETIRE_ID %d ==========",
 		id, metadata, strings.TrimRight(body, "\n"), id)
 	require.Equal(t, 1, strings.Count(prompt, entry), "item %d must associate its ID and metadata with its complete original body", id)
+}
+
+func requireCompressionToolCacheEntry(t testing.TB, prompt, name, metadata, body string) {
+	t.Helper()
+	entry := fmt.Sprintf("========== TOOL_CACHE %s ==========\n%s\n%s\n========== END TOOL_CACHE %s ==========",
+		name, metadata, strings.TrimRight(body, "\n"), name)
+	require.Equal(t, 1, strings.Count(prompt, entry), "tool %s must stay visible without a retirement id", name)
 }
 
 func pushCompressionTool(t *testing.T, tl *Timeline, id int64, key, operation, payload string) {
@@ -95,16 +106,16 @@ func TestTimelineCompressionPromotedRetiresOnlyNamedItems(t *testing.T) {
 	require.True(t, tl.PushPromotable(7, TimelinePromotedKindEvidence, TimelinePromotedTargetSemiDynamic1,
 		"e1", TimelinePromotedOperationUpsert, `{"id":"e1","content":"CURRENT_EVIDENCE"}`))
 	bindCompressionMock(t, tl, func(*AIRequest) (string, error) {
-		return compressionMockWithRetire("summary", "2,4,6"), nil
+		return compressionMockWithSelection("summary", "2,6", "demo"), nil
 	})
 	result, err := tl.CompressOnce(compressionTestOptions())
 	require.NoError(t, err)
-	require.Equal(t, []int64{1, 2, 4, 6}, result.RetiredIDs)
-	require.Equal(t, []int64{2, 4, 6}, result.RetiredPromotedEntryIDs)
+	require.Equal(t, []int64{1, 4, 5, 6}, result.RetiredIDs)
+	require.Equal(t, []int64{4, 5, 6}, result.RetiredPromotedEntryIDs)
 	view := RenderTimelineFrozenOpen(tl)
 	require.Contains(t, view.PromotedRecentTools, "CURRENT_SCHEMA")
 	require.NotContains(t, view.PromotedRecentTools, "OLD_SCHEMA")
-	require.Contains(t, view.SkillsContext, "READ_B")
+	require.NotContains(t, view.SkillsContext, "READ_B")
 	require.NotContains(t, view.SkillsContext, "READ_A")
 	require.Contains(t, view.EvidenceSemiDynamic, "CURRENT_EVIDENCE")
 	require.NotContains(t, view.EvidenceSemiDynamic, "OLD_EVIDENCE")
@@ -122,12 +133,9 @@ func TestTimelineCompressionPromotedDeletesExactIDs(t *testing.T) {
 		newOp        string
 		wantRetired  []int64
 	}{
-		{"delete-source-keeps-reuse", "1", []string{"upsert", "reuse"}, "", []int64{1}},
-		{"remove-source-and-reuse", "1,2", []string{"upsert", "reuse"}, "", []int64{1, 2}},
-		{"delete-latest-keeps-old-schema", "2", []string{"upsert", "upsert"}, "", []int64{2}},
+		{"delete-latest-keeps-old-evidence", "2", []string{"upsert", "upsert"}, "", []int64{2}},
 		{"delete-tombstone-keeps-source", "2", []string{"upsert", "delete"}, "", []int64{2}},
 		{"remove-dead-chain", "1,2", []string{"upsert", "delete"}, "", []int64{1, 2}},
-		{"later-reuse-does-not-cancel", "1", []string{"upsert"}, "reuse", []int64{1}},
 		{"later-upsert-does-not-cancel", "1", []string{"upsert"}, "upsert", []int64{1}},
 		{"later-delete-does-not-cancel", "1", []string{"upsert"}, "delete", []int64{1}},
 		{"later-id-is-not-a-candidate", "1,2", []string{"upsert"}, "upsert", []int64{1}},
@@ -137,19 +145,21 @@ func TestTimelineCompressionPromotedDeletesExactIDs(t *testing.T) {
 			for i, op := range tc.ops {
 				payload := ""
 				if op == TimelinePromotedOperationUpsert {
-					payload = fmt.Sprintf("SCHEMA_%d", i)
+					payload = fmt.Sprintf(`{"id":"e1","content":"BODY_%d"}`, i)
 				}
-				pushCompressionTool(t, tl, int64(i+1), "alpha", op, payload)
+				require.True(t, tl.PushPromotable(int64(i+1), TimelinePromotedKindEvidence, TimelinePromotedTargetSemiDynamic1,
+					"e1", op, payload))
 			}
 			var receipt TimelineCompressFreezeEvent
 			tl.RegisterCompressFreezeCallback("actual-result", func(event TimelineCompressFreezeEvent) { receipt = event })
 			bindCompressionMock(t, tl, func(*AIRequest) (string, error) {
 				if tc.newOp != "" {
 					payload := ""
-					if tc.newOp == "upsert" {
-						payload = "NEW_SCHEMA"
+					if tc.newOp == TimelinePromotedOperationUpsert {
+						payload = `{"id":"e1","content":"NEW_BODY"}`
 					}
-					pushCompressionTool(t, tl, int64(len(tc.ops)+1), "alpha", tc.newOp, payload)
+					require.True(t, tl.PushPromotable(int64(len(tc.ops)+1), TimelinePromotedKindEvidence, TimelinePromotedTargetSemiDynamic1,
+						"e1", tc.newOp, payload))
 				}
 				return compressionMockWithRetire("", tc.retire), nil
 			})
@@ -167,8 +177,11 @@ func TestTimelineCompressionPromotedDeletesExactIDs(t *testing.T) {
 				require.True(t, ok)
 				require.Equal(t, retired[id], item.deleted, "item %d must only be retired when named", id)
 			}
-			if tc.newOp != "" {
-				require.Contains(t, RenderTimelineFrozenOpen(tl).Open, strings.ToUpper(tc.newOp))
+			if tc.newOp == TimelinePromotedOperationUpsert {
+				require.Contains(t, RenderTimelineFrozenOpen(tl).Open, "NEW_BODY")
+			}
+			if tc.newOp == TimelinePromotedOperationDelete {
+				require.Contains(t, RenderTimelineFrozenOpen(tl).Open, "TOMBSTONE")
 			}
 		})
 	}
@@ -178,10 +191,7 @@ func TestTimelineCompressionPromotedRebuildsFromRemainingItems(t *testing.T) {
 	for _, tc := range []struct {
 		kind, key, oldPayload, newPayload string
 	}{
-		{TimelinePromotedKindRecentTool, "alpha", "OLD_BODY", "NEW_BODY"},
 		{TimelinePromotedKindEvidence, "e1", `{"id":"e1","content":"OLD_BODY"}`, `{"id":"e1","content":"NEW_BODY"}`},
-		{TimelinePromotedKindSkillContent, skillPartIdentity(skillContentPayload{Name: "demo"}),
-			`{"name":"demo","content":"OLD_BODY"}`, `{"name":"demo","content":"NEW_BODY"}`},
 	} {
 		for _, operation := range []string{TimelinePromotedOperationUpsert, TimelinePromotedOperationDelete} {
 			t.Run(tc.kind+"/"+operation, func(t *testing.T) {
@@ -221,12 +231,36 @@ func TestTimelineCompressionPromotedSelectionDefaultsToKeep(t *testing.T) {
 		ExactItemIDs: []int64{3},
 		PromotedItems: []timelineCompressionPromotedItem{{
 			timelineCompressionSnapshotItem: timelineCompressionSnapshotItem{ID: 2},
+			Kind:                            TimelinePromotedKindEvidence,
+		}, {
+			timelineCompressionSnapshotItem: timelineCompressionSnapshotItem{ID: 3},
+			Kind:                            TimelinePromotedKindRecentTool, Key: "alpha",
+		}, {
+			timelineCompressionSnapshotItem: timelineCompressionSnapshotItem{ID: 4},
+			Kind:                            TimelinePromotedKindSkillContent, Key: "demo\x00content\x00SKILL.md\x001\x001",
+		}, {
+			timelineCompressionSnapshotItem: timelineCompressionSnapshotItem{ID: 5},
+			Kind:                            TimelinePromotedKindSkillContent, Key: "demo\x00metadata",
+		}, {
+			timelineCompressionSnapshotItem: timelineCompressionSnapshotItem{ID: 6},
+			Kind:                            TimelinePromotedKindSkillContent, Key: "other\x00content\x00SKILL.md\x001\x001",
+		}, {
+			timelineCompressionSnapshotItem: timelineCompressionSnapshotItem{ID: 7},
+			Kind:                            TimelinePromotedKindSkillContent, Key: skillCatalogKey,
 		}},
 	}
-	for _, raw := range []any{nil, "", "bad", "2-3", 2, []any{"2"}, "1,3,99"} {
+	for _, raw := range []any{nil, "", "bad", "2-3", 2, []any{"2"}, "1,3,4,99"} {
 		require.Empty(t, parsePromotedRetirementSelection(snapshot, raw), "raw=%v", raw)
 	}
-	require.Equal(t, []int64{2}, parsePromotedRetirementSelection(snapshot, "2,2,bad,99"))
+	require.Equal(t, []int64{2}, parsePromotedRetirementSelection(snapshot, "2,2,3,4,bad,99"))
+	require.Equal(t, []int64{4, 5}, parseSkillRetirementSelection(snapshot, "demo"))
+	require.Equal(t, []int64{4, 5}, parseSkillRetirementSelection(snapshot, "demo:SKILL.md:1-1"))
+	require.Equal(t, []int64{6}, parseSkillRetirementSelection(snapshot, "other"))
+	require.Equal(t, []int64{7}, parseSkillRetirementSelection(snapshot, "catalog"))
+	require.Equal(t, []int64{7}, parseSkillRetirementSelection(snapshot, skillCatalogKey))
+	require.Empty(t, parseSkillRetirementSelection(snapshot, "de"))
+	require.Empty(t, parseSkillRetirementSelection(snapshot, "alpha"))
+	require.Empty(t, parseSkillRetirementSelection(snapshot, "demo-skill"))
 }
 
 func TestTimelineCompressionCompactionPreservesEffectiveToolsAndEvidence(t *testing.T) {
@@ -291,11 +325,14 @@ func TestTimelineCompressionPromptShowsOccupancyAndRetireIDs(t *testing.T) {
 		target := max(int64(1), limit/timelineCompressionTargetDivisor)
 		require.Greater(t, rendered, target)
 		require.Contains(t, prompt, fmt.Sprintf("当前主模型 Timeline：%d tokens", rendered))
-		require.Contains(t, prompt, fmt.Sprintf("目标：不超过 %d tokens", target))
-		require.Contains(t, prompt, fmt.Sprintf("还需要减少：%d tokens", rendered-target))
+		require.Contains(t, prompt, fmt.Sprintf("目标：%d tokens。", target))
+		require.Contains(t, prompt, fmt.Sprintf("目前高于目标 %d tokens。", rendered-target))
+		require.Contains(t, prompt, "不是越小越好")
 		require.Contains(t, prompt, fmt.Sprintf("两个可优化部分：普通历史 %d tokens，promoted 内容 %d tokens。", ordinary, promoted))
-		requireCompressionPromotedEntry(t, prompt, 1, "kind=recent-tool-cache name=alpha operation=upsert", "[UPSERT] alpha\n"+schema)
-		requireCompressionPromotedEntry(t, prompt, 2, "kind=recent-tool-cache name=obsolete operation=upsert", "[UPSERT] obsolete\n"+obsoleteSchema)
+		requireCompressionToolCacheEntry(t, prompt, "alpha", "kind=recent-tool-cache name=alpha operation=upsert", "[UPSERT] alpha\n"+schema)
+		requireCompressionToolCacheEntry(t, prompt, "obsolete", "kind=recent-tool-cache name=obsolete operation=upsert", "[UPSERT] obsolete\n"+obsoleteSchema)
+		require.NotContains(t, prompt, "========== RETIRE_ID 1 ==========")
+		require.NotContains(t, prompt, "========== RETIRE_ID 2 ==========")
 		require.Contains(t, prompt, "ordinary history still needs a summary")
 		require.Contains(t, prompt, "USER_INPUT_ID=4 不可删除\n[current task user input] [task:task]:\nKEEP_USER")
 		require.NotContains(t, prompt, "========== RETIRE_ID 4 ==========", "protected user input must not be offered for retirement")
@@ -307,11 +344,11 @@ func TestTimelineCompressionPromptShowsOccupancyAndRetireIDs(t *testing.T) {
 	result, err := tl.CompressBeforePrompt(compressionTestOptions())
 	require.NoError(t, err)
 	require.NotNil(t, result)
-	require.Equal(t, []int64{2}, result.RetiredPromotedEntryIDs)
-	require.Equal(t, []int64{2, 3}, result.RetiredIDs)
+	require.Empty(t, result.RetiredPromotedEntryIDs)
+	require.Equal(t, []int64{3}, result.RetiredIDs)
 	require.Equal(t, "summary", result.Summary)
 	after := RenderTimelineFrozenOpenWithOptions(tl, compressionTestOptions().PromptOptions)
-	require.Contains(t, after.PromotedRecentTools, schema, "unselected promoted content must survive")
-	require.NotContains(t, after.PromotedRecentTools, obsoleteSchema)
+	require.Contains(t, after.PromotedRecentTools, schema, "tool cache cannot be retired by the model")
+	require.Contains(t, after.PromotedRecentTools, obsoleteSchema, "tool cache cannot be retired by the model")
 	require.Contains(t, after.PromotedUserInputHistory, "KEEP_USER")
 }

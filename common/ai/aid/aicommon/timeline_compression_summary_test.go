@@ -36,11 +36,11 @@ func TestTimelineCompressionSummaryPrompt(t *testing.T) {
 	require.NotContains(t, prompt, "TASK_INSTRUCTION")
 	// Promotion does not remove an original from the compression source.
 	requireCompressionPromotedEntry(t, prompt, 15, "kind=session-evidence name=e1 operation=upsert", "[UPSERT] e1\nEXACT_EVIDENCE")
-	requireCompressionPromotedEntry(t, prompt, 245, "kind=recent-tool-cache name=alpha operation=upsert", "[UPSERT] alpha\nEXACT_SCHEMA")
+	requireCompressionToolCacheEntry(t, prompt, "alpha", "kind=recent-tool-cache name=alpha operation=upsert", "[UPSERT] alpha\nEXACT_SCHEMA")
 	require.Less(t, strings.Index(prompt, "ITEM_ID=10 "), strings.Index(prompt, "========== RETIRE_ID 15 =========="))
 	require.Less(t, strings.Index(prompt, "========== END RETIRE_ID 15 =========="), strings.Index(prompt, "ITEM_ID=20 "))
-	require.Less(t, strings.Index(prompt, "ITEM_ID=240 "), strings.Index(prompt, "========== RETIRE_ID 245 =========="))
-	require.Less(t, strings.Index(prompt, "========== END RETIRE_ID 245 =========="), strings.Index(prompt, "ITEM_ID=250 "))
+	require.Less(t, strings.Index(prompt, "ITEM_ID=240 "), strings.Index(prompt, "========== TOOL_CACHE alpha =========="))
+	require.Less(t, strings.Index(prompt, "========== END TOOL_CACHE alpha =========="), strings.Index(prompt, "ITEM_ID=250 "))
 	require.Equal(t, 1, strings.Count(prompt, "EXACT_EVIDENCE"))
 	require.Equal(t, 1, strings.Count(prompt, "EXACT_SCHEMA"))
 	require.NotContains(t, prompt, aiprojection.Nonce())
@@ -63,7 +63,7 @@ func TestTimelineCompressionSummaryPrompt(t *testing.T) {
 	deletionOnly, err := renderCompressionSummaryPrompt(snapshot)
 	require.NoError(t, err)
 	requireCompressionPromotedEntry(t, deletionOnly, 15, "kind=session-evidence name=e1 operation=upsert", "[UPSERT] e1\nEXACT_EVIDENCE")
-	requireCompressionPromotedEntry(t, deletionOnly, 245, "kind=recent-tool-cache name=alpha operation=upsert", "[UPSERT] alpha\nEXACT_SCHEMA")
+	requireCompressionToolCacheEntry(t, deletionOnly, "alpha", "kind=recent-tool-cache name=alpha operation=upsert", "[UPSERT] alpha\nEXACT_SCHEMA")
 	require.NotContains(t, deletionOnly, "OLD_SUMMARY")
 	require.NotContains(t, deletionOnly, "ITEM_ID=10 ")
 	// Without any decidable content the request must not be rendered.

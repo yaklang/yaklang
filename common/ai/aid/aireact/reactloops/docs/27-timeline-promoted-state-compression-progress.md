@@ -19,9 +19,9 @@
 
 无 AI 折叠只处理 recent-tool-cache 和 Evidence 的冗余操作。Skill 是追加语义，不自动折叠。
 
-promoted 压缩项逐条来自 timeline item。`retire_promoted_entries` 只删点名 ID；缺失、空值和非法值默认保留。解析后直接执行合法 ID 名单，不按同 key 的操作扩大或取消删除，之后从剩余 item 重建 state。水位后的新 item 不在本次候选中，用户输入不可删除。已移除 `planCompressionPromotedRetirementLocked` 和辅助重放函数；事务来源校验继续保留。
+promoted 压缩项逐条来自 timeline item。证据仍由 `retire_promoted_entries` 按点名 ID 删除；技能由 `retire_skill_names` 解析成该技能的全部原始 ID。工具缓存 ID 不会被 AI 删除。缺失、空值和非法值默认保留。解析后直接执行合法 ID 名单，不按同 key 的操作扩大或取消删除，之后从剩余 item 重建 state。水位后的新 item 不在本次候选中，用户输入不可删除。已移除 `planCompressionPromotedRetirementLocked` 和辅助重放函数；事务来源校验继续保留。
 
-辅助请求由三部分组成：固定核心指令、计算出的容量、渲染后的 Timeline。容量只按两类给出占用：普通历史一共多少，promoted 内容一共多少。不给每条单独标 token。promoted item 和普通历史放在同一历史条目区，用 RETIRE_ID 标识可选择的条目；提示词要求逐项判断，不把该标识解释为必须删除。用户输入不可删除。解析和提交语义不变：没点名的 ID 仍保留。
+辅助请求由三部分组成：固定核心指令、计算出的容量、渲染后的 Timeline。容量只按两类给出占用：普通历史一共多少，promoted 内容一共多少。不给每条单独标 token。普通历史、技能、证据和工具缓存放在同一历史条目区，但只有证据使用 RETIRE_ID，技能使用 SKILL_NAME，工具缓存只展示、不可删除。提示词要求结果靠近容量目标，而不是越小越好，并按当前任务和已写明的后续任务判断关联度。summary 在普通历史之外，还概括本次淘汰的技能名和证据结论。解析和提交语义不变：没点名的技能和证据仍保留。用户输入不可删除。
 
 辅助请求的默认输入安全上限是 512K，不截断输入。摘要与保留材料仍受 16K 输出安全检查。
 
