@@ -283,7 +283,9 @@ func RunYakScriptFileWithCLITimeout(t *testing.T, timeout time.Duration, scriptP
 
 	tmpDir := t.TempDir()
 	name := strings.TrimSuffix(filepath.Base(scriptAbs), filepath.Ext(scriptAbs))
-	bin := filepath.Join(tmpDir, name+".bin")
+	// Only execute the fixed artifact generated inside this private directory;
+	// the source script's name never becomes part of the executable path.
+	bin := filepath.Join(tmpDir, "script.bin")
 
 	res := runSSA2LLVMCLIInDirScratch(t, "compile", scriptAbs, "-o", bin, "-f", "", "-a")
 	if res.ExitCode != 0 {

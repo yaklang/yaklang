@@ -34,11 +34,15 @@ func TestMustPass_SSA2LLVM_Simple(t *testing.T) {
 	sort.Strings(names)
 	require.NotEmpty(t, names, "mustpass_simple must contain at least one .yak regression case")
 
+	home := t.TempDir()
+	env := map[string]string{"YAKIT_HOME": home}
+	primeMustPassYakitHome(t, home, env)
+
 	for _, name := range names {
 		name := name
 		t.Run(name, func(t *testing.T) {
 			script := filepath.Join(simpleDir, name)
-			output := RunYakScriptFileWithCLITimeout(t, 90*time.Second, script, nil)
+			output := RunYakScriptFileWithCLITimeout(t, 90*time.Second, script, env)
 			if strings.Contains(output, "panic") {
 				t.Fatalf("ssa2llvm run of %s produced a runtime panic:\n%s", name, output)
 			}
