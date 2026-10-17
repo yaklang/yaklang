@@ -146,12 +146,14 @@ func sendMatchResultOrDrop(ctx context.Context, outC chan<- *fp.MatchResult, res
 // // 全连接扫描本机常见端口，对开放端口打印指纹与 CPE 信息
 // ch, err = servicescan.Scan("127.0.0.1", "22,80,443,3306")
 // die(err) // 启动失败时停止脚本
-// for result := range ch {
-//     if result.IsOpen() { // IsOpen 判断端口是否开放
-//         println(result.String())  // 可读摘要，含服务名与版本
-//         println(result.GetCPEs()) // CPE 列表
-//     }
-// }
+//
+//	for result := range ch {
+//	    if result.IsOpen() { // IsOpen 判断端口是否开放
+//	        println(result.String())  // 可读摘要，含服务名与版本
+//	        println(result.GetCPEs()) // CPE 列表
+//	    }
+//	}
+//
 // ```
 // <|EXAMPLE_END|>
 //
@@ -159,15 +161,19 @@ func sendMatchResultOrDrop(ctx context.Context, outC chan<- *fp.MatchResult, res
 // ```
 // // 目标端口较多时调大并发，并设置单个探测包超时
 // ch, err = servicescan.Scan("192.168.1.1/24", "1-1000",
-//     servicescan.concurrent(50),   // 50 个并发
-//     servicescan.probeTimeout(5),  // 单个探测包 5 秒超时
+//
+//	servicescan.concurrent(50),   // 50 个并发
+//	servicescan.probeTimeout(5),  // 单个探测包 5 秒超时
+//
 // )
 // die(err)
-// for result := range ch {
-//     if result.IsOpen() {
-//         println(result.String())
-//     }
-// }
+//
+//	for result := range ch {
+//	    if result.IsOpen() {
+//	        println(result.String())
+//	    }
+//	}
+//
 // ```
 // <|EXAMPLE_END|>
 //
@@ -176,11 +182,13 @@ func sendMatchResultOrDrop(ctx context.Context, outC chan<- *fp.MatchResult, res
 // // 只跑 Web 指纹规则，扫描常见 Web 端口
 // ch, err = servicescan.Scan("127.0.0.1", "80,443,8080,8443", servicescan.web())
 // die(err)
-// for result := range ch {
-//     if result.IsOpen() {
-//         println(result.String())
-//     }
-// }
+//
+//	for result := range ch {
+//	    if result.IsOpen() {
+//	        println(result.String())
+//	    }
+//	}
+//
 // ```
 // <|EXAMPLE_END|>
 func scanFingerprint(target string, port string, opts ...fp.ConfigOption) (chan *fp.MatchResult, error) {
@@ -203,10 +211,12 @@ func scanFingerprint(target string, port string, opts ...fp.ConfigOption) (chan 
 // // 同步扫描单个 host:port，直接拿到一个结果(端口关闭也会返回结果、不报错)
 // result, err = servicescan.ScanOne("127.0.0.1", 80, servicescan.probeTimeout(5))
 // die(err)
-// if result.IsOpen() {
-//     println(result.String())  // 可读摘要
-//     println(result.GetCPEs()) // CPE 列表
-// }
+//
+//	if result.IsOpen() {
+//	    println(result.String())  // 可读摘要
+//	    println(result.GetCPEs()) // CPE 列表
+//	}
+//
 // ```
 // <|EXAMPLE_END|>
 func scanOneFingerprint(target string, port int, opts ...fp.ConfigOption) (*fp.MatchResult, error) {
@@ -390,11 +400,13 @@ func _scanFingerprint(ctx context.Context, config *fp.Config, concurrent int, ho
 // die(err)
 // fpResults, err = servicescan.ScanFromPing(pingResult, "22,80,443,3389")
 // die(err)
-// for result := range fpResults {
-//     if result.IsOpen() {
-//         println(result.String())
-//     }
-// }
+//
+//	for result := range fpResults {
+//	    if result.IsOpen() {
+//	        println(result.String())
+//	    }
+//	}
+//
 // ```
 // <|EXAMPLE_END|>
 func _scanFromPingUtils(res chan *pingutil.PingResult, ports string, opts ...fp.ConfigOption) (chan *fp.MatchResult, error) {
@@ -441,9 +453,11 @@ func _scanFromPingUtils(res chan *pingutil.PingResult, ports string, opts ...fp.
 // die(err)
 // fpResults, err = servicescan.ScanFromSynResult(synResult)
 // die(err)
-// for result := range fpResults {
-//     println(result.String())
-// }
+//
+//	for result := range fpResults {
+//	    println(result.String())
+//	}
+//
 // ```
 // <|EXAMPLE_END|>
 //
@@ -454,12 +468,38 @@ func _scanFromPingUtils(res chan *pingutil.PingResult, ports string, opts ...fp.
 // die(err)
 // fpResults, err = servicescan.ScanFromSpaceEngine(res)
 // die(err)
-// for result := range fpResults {
-//     println(result.String())
-// }
+//
+//	for result := range fpResults {
+//	    println(result.String())
+//	}
+//
 // ```
 // <|EXAMPLE_END|>
 //
+// synScanProbeTarget separates the service port from the transport.
+// New synscan results keep the service port and set Protocol. Older results
+// still encode UDP as a port above 65535. An explicit Protocol wins, and an
+// encoded port is decoded so the matcher dials the real service port.
+func synScanProbeTarget(res *synscan.SynScanResult) (proto string, port int) {
+	if res == nil {
+		return "tcp", 0
+	}
+	proto = strings.ToLower(strings.TrimSpace(res.Protocol))
+	port = res.Port
+	encoded, decoded := utils.ParsePortToProtoPort(port)
+	switch proto {
+	case "":
+		return encoded, decoded
+	case "udp", "tcp":
+		if encoded == "udp" {
+			port = decoded
+		}
+		return proto, port
+	default:
+		return encoded, decoded
+	}
+}
+
 // Context 契约 (重要):
 //   - 通过 servicescan.ctx() 注入的 ctx 会被本函数下游 inner goroutine 用作
 //     "发送结果时的退出信号". 调用方在停止 range outC 之前应当 cancel ctx,
@@ -611,9 +651,8 @@ func _scanFromTargetStream(res interface{}, opts ...fp.ConfigOption) (chan *fp.M
 				continue
 			}
 			swg.Add()
-			rawPort := synRes.Port
 			rawHost := synRes.Host
-			proto, portWithoutProto := utils.ParsePortToProtoPort(rawPort) // 这里将协议和端口分开，便于后面打印日志
+			proto, portWithoutProto := synScanProbeTarget(synRes)
 			go func() {
 				defer swg.Done()
 				fingerprintInFlight.Add(1)
@@ -624,7 +663,14 @@ func _scanFromTargetStream(res interface{}, opts ...fp.ConfigOption) (chan *fp.M
 					return
 				}
 				log.Debugf("start task to scan: [%s://%s]", proto, utils.HostPort(rawHost, portWithoutProto))
-				result, err := matcher.MatchWithContext(scanCtx, rawHost, rawPort)
+				// 每个目标单独复制传输配置。syn 结果里的 Protocol 是 udp 时，
+				// 数字端口本身不再编码协议；若直接复用 matcher 的共享配置，
+				// UDP 探测会改掉后续 TCP 目标的传输层。
+				transport := fp.TCP
+				if proto == "udp" {
+					transport = fp.UDP
+				}
+				result, err := matcher.MatchWithContext(scanCtx, rawHost, portWithoutProto, fp.WithTransportProtos(transport))
 				if err != nil {
 					log.Errorf("failed to scan [%s://%s]: %v", proto, utils.HostPort(rawHost, portWithoutProto), err)
 					return

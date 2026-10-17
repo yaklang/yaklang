@@ -2,12 +2,14 @@ package synscanx
 
 import (
 	"context"
+	"net"
+	"sync"
+	"time"
+
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/synscan"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/hostsparser"
-	"net"
-	"time"
 )
 
 type SynxConfig struct {
@@ -39,6 +41,9 @@ type SynxConfig struct {
 	callback           func(result *synscan.SynScanResult)
 	submitTaskCallback func(i string)
 
+	routeGroupMu     sync.Mutex
+	routeGroupErrors []error
+
 	// 发包
 	Iface     *net.Interface
 	GatewayIP net.IP
@@ -49,6 +54,30 @@ type SynxConfig struct {
 
 	// Fetch Gateway Hardware Address TimeoutSeconds
 	FetchGatewayHardwareAddressTimeout time.Duration
+}
+
+func (s *SynxConfig) addRouteGroupErrors(errs []error) {
+	if s == nil || len(errs) == 0 {
+		return
+	}
+	s.routeGroupMu.Lock()
+	s.routeGroupErrors = append(s.routeGroupErrors, errs...)
+	s.routeGroupMu.Unlock()
+}
+
+// RouteGroupErrors returns startup failures from route groups that did not
+// open a capture session. A scan with no successful group returns those
+// failures from Scan instead. A scan that opened at least one group still
+// returns its results; callers can read this after the result channel closes.
+func (s *SynxConfig) RouteGroupErrors() []error {
+	if s == nil {
+		return nil
+	}
+	s.routeGroupMu.Lock()
+	defer s.routeGroupMu.Unlock()
+	out := make([]error, len(s.routeGroupErrors))
+	copy(out, s.routeGroupErrors)
+	return out
 }
 
 func (s *SynxConfig) callCallback(r *synscan.SynScanResult) {

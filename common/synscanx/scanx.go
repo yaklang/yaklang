@@ -113,14 +113,14 @@ func getRoute(sampleIP string) (*net.Interface, net.IP, net.IP, error) {
 	if routeCache.entries == nil {
 		routeCache.entries = make(map[string]routeCacheEntry)
 	}
-	entry, ok := routeCache.entries[sampleIP]
-	routeCache.Unlock()
-	if ok && time.Since(entry.at) < routeCacheTTL {
+	if entry, ok := routeCache.entries[sampleIP]; ok && time.Since(entry.at) < routeCacheTTL {
+		routeCache.Unlock()
 		return entry.iface, entry.gatewayIP, entry.srcIP, entry.err
 	}
+	routeCache.Unlock()
 
 	iface, gatewayIP, srcIP, err := routeLookup(time.Second*2, sampleIP)
-	entry = routeCacheEntry{
+	fresh := routeCacheEntry{
 		iface:     iface,
 		gatewayIP: gatewayIP,
 		srcIP:     srcIP,
@@ -129,13 +129,15 @@ func getRoute(sampleIP string) (*net.Interface, net.IP, net.IP, error) {
 	}
 
 	routeCache.Lock()
-	if existing, ok := routeCache.entries[sampleIP]; ok {
-		routeCache.Unlock()
+	defer routeCache.Unlock()
+	// Another caller may have refreshed this key while the lookup ran.
+	// Reuse that entry only when it is still inside the TTL. An expired
+	// success or failure must be replaced, or a route change is ignored forever.
+	if existing, ok := routeCache.entries[sampleIP]; ok && time.Since(existing.at) < routeCacheTTL {
 		return existing.iface, existing.gatewayIP, existing.srcIP, existing.err
 	}
-	routeCache.entries[sampleIP] = entry
-	routeCache.Unlock()
-	return iface, gatewayIP, srcIP, err
+	routeCache.entries[sampleIP] = fresh
+	return fresh.iface, fresh.gatewayIP, fresh.srcIP, fresh.err
 }
 
 func NewScannerx(ctx context.Context, sample string, config *SynxConfig) (*Scannerx, error) {
