@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math"
 	"net"
+	"runtime/debug"
 	"strconv"
 	"time"
 
@@ -164,13 +165,25 @@ func (s *Scannerx) runProbes(targets <-chan *SynxTarget) {
 			if !ok {
 				return
 			}
-			if target != nil && target.Mode == UDP {
-				s.finishUDPProbe(target)
+			if target == nil {
 				continue
 			}
-			s.finishTCPProbe(target)
+			s.probeOne(target)
 		}
 	}
+}
+
+func (s *Scannerx) probeOne(target *SynxTarget) {
+	defer func() {
+		if err := recover(); err != nil {
+			log.Errorf("synscanx probe %s:%d panic: %v\n%s", target.Host, target.Port, err, debug.Stack())
+		}
+	}()
+	if target.Mode == UDP {
+		s.finishUDPProbe(target)
+		return
+	}
+	s.finishTCPProbe(target)
 }
 
 func (s *Scannerx) finishTCPProbe(target *SynxTarget) {
@@ -205,8 +218,11 @@ func (s *Scannerx) probeUDP(ctx context.Context, target *SynxTarget) (netstackvm
 		if err = ctx.Err(); err != nil {
 			return last, err
 		}
+		// The context deadline lets a fake or a caller observe this attempt.
+		// ProbeUDP starts the same budget again after the rate limiter, so
+		// queue time is not counted as response time.
 		probeCtx, cancel := context.WithTimeout(ctx, timeout)
-		last, err = s.halfOpen.ProbeUDP(probeCtx, targetText, payload)
+		last, err = s.halfOpen.ProbeUDP(netstackvm.ContextWithProbeBudget(probeCtx, timeout), targetText, payload)
 		cancel()
 		if !errors.Is(err, netstackvm.ErrUDPNoResponse) {
 			return last, err
