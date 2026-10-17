@@ -229,6 +229,16 @@ func decodeDLMSFrameBudget(w []byte, maxElements, depth int, linkOnly bool) (*dl
 		if len(info) >= 4 && bytes.Equal(info[:3], []byte{0xe6, 0xe6, 0}) && dlmsACSEAPDU(info[3:]) {
 			m.request = info[3] == 0x60 || info[3] == 0x62
 		}
+		// A CRC-valid first SN information carrier states its literal LLC/service
+		// direction, not an LN invoke owner. Continuations remain assembler-owned.
+		if m.segmented && dlmsSNSegmentHeader(info) {
+			request := info[3] == 5 || info[3] == 6
+			if request == (info[1] == 0xe6) {
+				m.request = request
+				m.snRead = info[3] == 5 || info[3] == 12
+				m.snWrite = info[3] == 6 || info[3] == 13
+			}
+		}
 		return m, nil
 	}
 	return decodeDLMSInformationSelected(m, info, maxElements, depth, !m.segmented)
@@ -509,6 +519,9 @@ func probeDLMS(w []byte, limit int) ProbeResult {
 	}
 	if w[1]&8 != 0 {
 		m, err := decodeDLMSFrameBudget(w[:n], 0, 0, true)
+		if err == nil && m.kind == "I" && (m.snRead || m.snWrite) {
+			return probeAccept("dlms", "hdlc-sn-information-segmented", 98)
+		}
 		if err == nil && m.kind == "I" && dlmsACSESegmentPrefix(m.information) {
 			return probeAccept("dlms", "hdlc-acse-segmented", 98)
 		}
@@ -1074,10 +1087,11 @@ func (a *binParser) decodeDLMSDatagram(e *ProtocolEvent, w []byte, explicit bool
 	}
 	if err == nil {
 		if m.snRead || m.snWrite || m.snGBT != nil {
-			// Observe without retaining a new UDP conversation or rewriting the
-			// caller's direction; an existing LN flow keeps its owner and charge.
+			// Complete SN observations need no new owner. Information groups and
+			// service phases retain their bounded flow with the literal caller direction;
+			// an existing LN flow keeps its owner and charge.
 			e.Session, e.ResponseTo, err = f.consumeDecodedDLMS(e.Direction, w, e.ID, m)
-			if err == nil && created && (len(f.dlms.snBlocks) > 0 || len(f.dlms.snGBT) > 0) {
+			if err == nil && created && (len(f.dlms.snBlocks) > 0 || len(f.dlms.snGBT) > 0 || f.dlms.fragments != nil && f.dlms.fragments.snCommand != 0) {
 				if len(store.entries) >= sessionCollectionLimit(a.budget.MaxCollectionElements) {
 					err = dlmsError(ErrResourceExceeded, "UDP SN service-block conversation budget")
 				} else {

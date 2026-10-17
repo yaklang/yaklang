@@ -123988,6 +123988,172 @@
         "common/pcapx/pcaputil/dlms-sn-write-upload-information-source/tools/write-source.py": "dlms-sn-write-upload-information-source/tools/write-source.py",
         "scripts/protocol-tests/required-tests-traffic-unified-v179.json": "required-tests-traffic-unified-v179.json"
       }
+    },
+    {
+      "id": "validation-dlms-sn-cold-information",
+      "kind": "support",
+      "source_sha": "25887d30d21c364d00dda7db8894f869b1c697a1",
+      "file": "validation-dlms-sn-cold-information.zip",
+      "sha256": "46cf208fd583f40656f06bf596ec6f83aac30c823032dc0e5a00aaa8d09ac375",
+      "password": "bin-parser",
+      "members": {
+        "dlms-sn-cold-information-source/capture-index.json": {
+          "bytes": 1116,
+          "sha256": "28f48865f479d8f2d2b79904c38280b68a217440251b57becab09aefa8dabc5d"
+        },
+        "dlms-sn-cold-information-source/captures/cold-singlelast-WriteQ7-two-information-carriers-no-LN-primer.tcp.pcap": {
+          "bytes": 415,
+          "sha256": "7e3bf366f426dfd94b6cfba56a048a1bbb532424bf2e387f95966739082243fc"
+        },
+        "dlms-sn-cold-information-source/captures/cold-singlelast-WriteQ7-two-information-carriers-no-LN-primer.udp.pcap": {
+          "bytes": 181,
+          "sha256": "000680dc627bb50f5839a17b0ab8c4b8c762cefab0d5d75529f9b5d7800924c1"
+        },
+        "dlms-sn-cold-information-source/captures/reuse-inputs.json": {
+          "bytes": 3,
+          "sha256": "ca3d163bab055381827226140568f3bef7eaac187cebd76878e0b63e9e442356"
+        },
+        "dlms-sn-cold-information-source/cold-captured-controls.json": {
+          "bytes": 29904,
+          "sha256": "5a58d523fa9964b983713842be6dc307f01e5ffc1d705aabbb062d5c8e0e6195"
+        },
+        "dlms-sn-cold-information-source/cold-controls.json": {
+          "bytes": 33300,
+          "sha256": "3e815c0a42658a8436e8ced80021b5a6aef16a84195daa98e14dbf8b1b987f02"
+        },
+        "dlms-sn-cold-information-source/cold-probe-command-controls.json": {
+          "bytes": 6255,
+          "sha256": "eecce968590f8623478c5e33c9393d20df707ada72e4dff4276c3602ea818442"
+        },
+        "dlms-sn-cold-information-source/cold-probe-controls.json": {
+          "bytes": 3960,
+          "sha256": "438d32543fbb334798f67ccf72cafae5b8eff326a94bfd57633ba350c3a90e44"
+        },
+        "dlms-sn-cold-information-source/cold-resource-controls.json": {
+          "bytes": 55229,
+          "sha256": "15df0fb46d26ea7e7ab33b2b40fc846d2a1b2ba76e267dc79147b122a472b993"
+        },
+        "dlms-sn-cold-information-source/native-udp-close-direction-controls.json": {
+          "bytes": 33180,
+          "sha256": "82cfaad56dfa5e0f3d7424d9bf450907099184d868c8c5d88a2102fc474f470f"
+        },
+        "dlms-sn-cold-information-source/source-manifest.json": {
+          "bytes": 5803,
+          "sha256": "a20f7adf6e53143763a38cef7a1633ae49de8740c68aefdf0676287d1845e417"
+        },
+        "dlms-sn-cold-information-source/tools/access.py": {
+          "bytes": 4392,
+          "sha256": "70f03ceffb0556b966d04829dc89384c20b73bc6104c8ed637e5ed0b97d8bc7e"
+        },
+        "dlms-sn-cold-information-source/tools/capture-model.py": {
+          "bytes": 1297,
+          "sha256": "436e6ddf8641e7b1cc1140a18b869addadd19fb25e23a5932cb686dcad22fa78"
+        },
+        "dlms-sn-cold-information-source/tools/direct-model.py": {
+          "bytes": 9093,
+          "sha256": "3f93e5870f498ce664d1f2f6fdae174702117b23e34a69297949ada7160ec95c"
+        },
+        "dlms-sn-cold-information-source/tools/download-outer.py": {
+          "bytes": 5985,
+          "sha256": "0b69840f2066124f48091301aea6247ec29fb86c4933d00055f60828296bd220"
+        },
+        "dlms-sn-cold-information-source/tools/download-reference-vectors.json": {
+          "bytes": 4159,
+          "sha256": "59250557438767f0f7ff0a072b1decf3fe0f5768b75013142a5dfa608b0fe6c0"
+        },
+        "dlms-sn-cold-information-source/tools/generate.py": {
+          "bytes": 8950,
+          "sha256": "9ee7fdcae9cf229e241d8d9a9680e088640d1a35c13209e7a27b52f7dea68186"
+        },
+        "dlms-sn-cold-information-source/tools/hdlc-reference.json": {
+          "bytes": 2402,
+          "sha256": "69b33f59438b54e25e0209287112464b1d6c1e802c975e7bb9dc2ed8fc7280b0"
+        },
+        "dlms-sn-cold-information-source/tools/hdlc.py": {
+          "bytes": 2054,
+          "sha256": "3523546c00949e02a14c9546f12bdeee09bd2e4f82bfbd1685d69bb8f689038e"
+        },
+        "dlms-sn-cold-information-source/tools/model-pins.json": {
+          "bytes": 1254,
+          "sha256": "238920c0caf145542a7c303b98f0c5565d826b870baa9f965558bb60c0f88860"
+        },
+        "dlms-sn-cold-information-source/tools/model.py": {
+          "bytes": 7869,
+          "sha256": "9df71b6e52491ecfe6ed738fff1593af496ca70c3b9df972ec4a8556f02e5d5e"
+        },
+        "dlms-sn-cold-information-source/tools/read-body.py": {
+          "bytes": 4002,
+          "sha256": "9038061ed63630258c65a5b9e11e51888d414b290fea0aa2bd14743e2a7af4cd"
+        },
+        "dlms-sn-cold-information-source/tools/reference-vectors.json": {
+          "bytes": 6734,
+          "sha256": "3d7c0f01b305e3524efa5dab640dd9ae4730fe7ed789ca9ef015a5c39b846b8d"
+        },
+        "dlms-sn-cold-information-source/tools/source-outer.py": {
+          "bytes": 8836,
+          "sha256": "4505d905a3a96b22ac3f91e00033d4146c3bf5e75794a2ad25f60b5e3e7145a1"
+        },
+        "dlms-sn-cold-information-source/tools/verify-captures.py": {
+          "bytes": 2949,
+          "sha256": "5690359c2097f42a56ac3734d4dcb88c8a1355001a00ea6f0639ac6758c0457c"
+        },
+        "dlms-sn-cold-information-source/tools/verify.py": {
+          "bytes": 2830,
+          "sha256": "67cc7b4241acfae4cb075239cc04d0890d888010a3f44c5f0b5f1b126cf08fb1"
+        },
+        "dlms-sn-cold-information-source/tools/wrapper-model.py": {
+          "bytes": 15781,
+          "sha256": "609ba979ea49fc353ccd92fadf99edbc5100e4f1637eaa4444fcace579c903dc"
+        },
+        "dlms-sn-cold-information-source/tools/write-body.py": {
+          "bytes": 5706,
+          "sha256": "4818c0264cb4819cf5d4715a855b4f3817acf26c0c6b15ff558aaa7d3b4aa094"
+        },
+        "dlms-sn-cold-information-source/tools/write-source.py": {
+          "bytes": 8800,
+          "sha256": "46e574590d006649212a255cd2fc85d226165f0ce27f5cc7a01f88211720de0a"
+        },
+        "required-tests-traffic-unified-v180.json": {
+          "bytes": 24158513,
+          "sha256": "4d026dd1524cb94c48cceb8bda9bc870e70177f599e6628ed8008b93f701cf21"
+        },
+        "validation/expected.json": {
+          "bytes": 2703,
+          "sha256": "7ab77f528b9db3ee4f13efb95368f710bac7d06ab9af8b540c5e84821b897ecb"
+        }
+      },
+      "aliases": {
+        "common/pcapx/pcaputil/dlms-sn-cold-information-source/capture-index.json": "dlms-sn-cold-information-source/capture-index.json",
+        "common/pcapx/pcaputil/dlms-sn-cold-information-source/captures/cold-singlelast-WriteQ7-two-information-carriers-no-LN-primer.tcp.pcap": "dlms-sn-cold-information-source/captures/cold-singlelast-WriteQ7-two-information-carriers-no-LN-primer.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-cold-information-source/captures/cold-singlelast-WriteQ7-two-information-carriers-no-LN-primer.udp.pcap": "dlms-sn-cold-information-source/captures/cold-singlelast-WriteQ7-two-information-carriers-no-LN-primer.udp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-cold-information-source/captures/reuse-inputs.json": "dlms-sn-cold-information-source/captures/reuse-inputs.json",
+        "common/pcapx/pcaputil/dlms-sn-cold-information-source/cold-captured-controls.json": "dlms-sn-cold-information-source/cold-captured-controls.json",
+        "common/pcapx/pcaputil/dlms-sn-cold-information-source/cold-controls.json": "dlms-sn-cold-information-source/cold-controls.json",
+        "common/pcapx/pcaputil/dlms-sn-cold-information-source/cold-probe-command-controls.json": "dlms-sn-cold-information-source/cold-probe-command-controls.json",
+        "common/pcapx/pcaputil/dlms-sn-cold-information-source/cold-probe-controls.json": "dlms-sn-cold-information-source/cold-probe-controls.json",
+        "common/pcapx/pcaputil/dlms-sn-cold-information-source/cold-resource-controls.json": "dlms-sn-cold-information-source/cold-resource-controls.json",
+        "common/pcapx/pcaputil/dlms-sn-cold-information-source/native-udp-close-direction-controls.json": "dlms-sn-cold-information-source/native-udp-close-direction-controls.json",
+        "common/pcapx/pcaputil/dlms-sn-cold-information-source/source-manifest.json": "dlms-sn-cold-information-source/source-manifest.json",
+        "common/pcapx/pcaputil/dlms-sn-cold-information-source/tools/access.py": "dlms-sn-cold-information-source/tools/access.py",
+        "common/pcapx/pcaputil/dlms-sn-cold-information-source/tools/capture-model.py": "dlms-sn-cold-information-source/tools/capture-model.py",
+        "common/pcapx/pcaputil/dlms-sn-cold-information-source/tools/direct-model.py": "dlms-sn-cold-information-source/tools/direct-model.py",
+        "common/pcapx/pcaputil/dlms-sn-cold-information-source/tools/download-outer.py": "dlms-sn-cold-information-source/tools/download-outer.py",
+        "common/pcapx/pcaputil/dlms-sn-cold-information-source/tools/download-reference-vectors.json": "dlms-sn-cold-information-source/tools/download-reference-vectors.json",
+        "common/pcapx/pcaputil/dlms-sn-cold-information-source/tools/generate.py": "dlms-sn-cold-information-source/tools/generate.py",
+        "common/pcapx/pcaputil/dlms-sn-cold-information-source/tools/hdlc-reference.json": "dlms-sn-cold-information-source/tools/hdlc-reference.json",
+        "common/pcapx/pcaputil/dlms-sn-cold-information-source/tools/hdlc.py": "dlms-sn-cold-information-source/tools/hdlc.py",
+        "common/pcapx/pcaputil/dlms-sn-cold-information-source/tools/model-pins.json": "dlms-sn-cold-information-source/tools/model-pins.json",
+        "common/pcapx/pcaputil/dlms-sn-cold-information-source/tools/model.py": "dlms-sn-cold-information-source/tools/model.py",
+        "common/pcapx/pcaputil/dlms-sn-cold-information-source/tools/read-body.py": "dlms-sn-cold-information-source/tools/read-body.py",
+        "common/pcapx/pcaputil/dlms-sn-cold-information-source/tools/reference-vectors.json": "dlms-sn-cold-information-source/tools/reference-vectors.json",
+        "common/pcapx/pcaputil/dlms-sn-cold-information-source/tools/source-outer.py": "dlms-sn-cold-information-source/tools/source-outer.py",
+        "common/pcapx/pcaputil/dlms-sn-cold-information-source/tools/verify-captures.py": "dlms-sn-cold-information-source/tools/verify-captures.py",
+        "common/pcapx/pcaputil/dlms-sn-cold-information-source/tools/verify.py": "dlms-sn-cold-information-source/tools/verify.py",
+        "common/pcapx/pcaputil/dlms-sn-cold-information-source/tools/wrapper-model.py": "dlms-sn-cold-information-source/tools/wrapper-model.py",
+        "common/pcapx/pcaputil/dlms-sn-cold-information-source/tools/write-body.py": "dlms-sn-cold-information-source/tools/write-body.py",
+        "common/pcapx/pcaputil/dlms-sn-cold-information-source/tools/write-source.py": "dlms-sn-cold-information-source/tools/write-source.py",
+        "scripts/protocol-tests/required-tests-traffic-unified-v180.json": "required-tests-traffic-unified-v180.json"
+      }
     }
   ],
   "schema_version": 1,
