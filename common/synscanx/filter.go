@@ -125,6 +125,19 @@ func resolveScanHosts(hosts []string) []string {
 	return flat
 }
 
+// lookupHostIPv4 is the resolver used by the result-host filter. Tests replace it.
+var lookupHostIPv4 = lookupIPv4
+
+// looksLikeIPv4Range reports addresses such as 10.0.0.1-10.0.0.20 and 1.1.1.1-3.
+// A hostname that merely contains a hyphen is not a range.
+func looksLikeIPv4Range(part string) bool {
+	if strings.Count(part, "-") != 1 {
+		return false
+	}
+	left, _, _ := strings.Cut(part, "-")
+	return net.ParseIP(left) != nil
+}
+
 func lookupIPv4(host string) []string {
 	var out []string
 	for _, ip := range netx.LookupAll(host, netx.WithTimeout(3*time.Second)) {
@@ -152,14 +165,16 @@ func hostResultFilter(raw string) *utils.HostsFilter {
 			filter.AddCIDR(part)
 			continue
 		}
-		if net.ParseIP(part) == nil && strings.Count(part, "-") == 0 {
+		if net.ParseIP(part) != nil || looksLikeIPv4Range(part) {
 			filter.Add(part)
-			for _, ip := range lookupIPv4(part) {
-				filter.Add(ip)
-			}
 			continue
 		}
+		// A domain, including names that contain hyphens. Results are IPs, so
+		// the name alone never matches.
 		filter.Add(part)
+		for _, ip := range lookupHostIPv4(part) {
+			filter.Add(ip)
+		}
 	}
 	return filter
 }

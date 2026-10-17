@@ -3,8 +3,10 @@ package netstackvm
 import (
 	"context"
 	"fmt"
-	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/tcpip/transport/tcp"
 	"sync"
+	"time"
+
+	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/tcpip/transport/tcp"
 
 	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/tcpip"
 )
@@ -53,12 +55,33 @@ func (t *pcapProbeTransport) sendSYN(ctx context.Context) (TCPSegment, error) {
 	}
 	// Rate applies to all attempts, not just new targets. Burst=1 avoids a
 	// retry storm after a batch of response timers expires together.
-	if err := t.session.waitLimiter(ctx); err != nil {
+	// A response budget means this ctx deadline is only the write window.
+	// The rate queue waits on the scan lifetime instead.
+	limitCtx := ctx
+	writeCtx := ctx
+	limitCancel := func() {}
+	writeCancel := func() {}
+	writeBudget := 3 * time.Second
+	budgeted := probeResponseBudget(ctx) > 0
+	if budgeted {
+		if deadline, ok := ctx.Deadline(); ok {
+			if remain := time.Until(deadline); remain > 0 {
+				writeBudget = remain
+			}
+		}
+		limitCtx, limitCancel = contextWithoutDeadline(ctx)
+	}
+	defer func() { limitCancel() }()
+	if err := t.session.waitLimiter(limitCtx); err != nil {
 		return TCPSegment{}, err
 	}
+	if budgeted {
+		writeCtx, writeCancel = context.WithTimeout(limitCtx, writeBudget)
+	}
+	defer func() { writeCancel() }()
 	t.writeMu.Lock()
 	defer t.writeMu.Unlock()
-	if err := ctx.Err(); err != nil {
+	if err := writeCtx.Err(); err != nil {
 		return TCPSegment{}, err
 	}
 	h, f := t.session, t.flight
@@ -74,7 +97,7 @@ func (t *pcapProbeTransport) sendSYN(ctx context.Context) (TCPSegment, error) {
 	if t.vm.driver.readOnly.Load() {
 		err = ErrPassiveNetwork
 	} else {
-		err = t.vm.driver.writeFrameContext(ctx, t.frame.data, t.frame.linkType)
+		err = t.vm.driver.writeFrameContext(writeCtx, t.frame.data, t.frame.linkType)
 	}
 	h.mu.Lock()
 	// A declined gate is not a successful injection (writeFrame is also used
