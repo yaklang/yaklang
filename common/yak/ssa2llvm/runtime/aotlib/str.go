@@ -3,6 +3,7 @@ package aotlib
 import (
 	"crypto/rand"
 	"crypto/tls"
+	"errors"
 	"fmt"
 	"math/big"
 	"net"
@@ -121,10 +122,18 @@ func StrIsTLSServer(addr string) (bool, error) {
 		return false, err
 	}
 	defer conn.Close()
-	tlsConn := tls.Client(conn, &tls.Config{InsecureSkipVerify: true})
+	host, _, err := net.SplitHostPort(addr)
+	if err != nil {
+		return false, err
+	}
+	// Keep normal certificate verification enabled. A certificate-verification
+	// failure still proves the peer speaks TLS, but is not authentication and
+	// must never be used to authorize an application request.
+	tlsConn := tls.Client(conn, &tls.Config{ServerName: host})
 	_ = tlsConn.SetDeadline(time.Now().Add(3 * time.Second))
 	if err := tlsConn.Handshake(); err != nil {
-		return false, nil
+		var certificateError *tls.CertificateVerificationError
+		return errors.As(err, &certificateError), nil
 	}
 	return true, nil
 }
@@ -146,25 +155,25 @@ func StrParseStringToUrls(targets ...string) []string {
 // StringsExports mirrors the str module's export table (the AOT-supported
 // subset). Entries match common/yak/yaklib.StringsExport signatures.
 var StringsExports = map[string]any{
-	"Split":               StrSplit,
-	"Trim":                StrTrim,
-	"TrimSpace":           StrTrimSpace,
-	"Join":                StrJoin,
-	"ToLower":             StrToLower,
-	"ToUpper":             StrToUpper,
-	"HasPrefix":           StrHasPrefix,
-	"HasSuffix":           StrHasSuffix,
-	"Contains":            StrContains,
-	"Replace":             StrReplace,
-	"Repeat":              StrRepeat,
-	"Index":               StrIndex,
-	"Len":                 StrLen,
-	"ReplaceAll":          StrReplaceAll,
-	"PathJoin":            StrPathJoin,
-	"MatchAllOfSubString": StrMatchAllOfSubString,
-	"Count":               StrCount,
-	"RandStr":             StrRandStr,
-	"HostPort":            StrHostPort,
+	"Split":                 StrSplit,
+	"Trim":                  StrTrim,
+	"TrimSpace":             StrTrimSpace,
+	"Join":                  StrJoin,
+	"ToLower":               StrToLower,
+	"ToUpper":               StrToUpper,
+	"HasPrefix":             StrHasPrefix,
+	"HasSuffix":             StrHasSuffix,
+	"Contains":              StrContains,
+	"Replace":               StrReplace,
+	"Repeat":                StrRepeat,
+	"Index":                 StrIndex,
+	"Len":                   StrLen,
+	"ReplaceAll":            StrReplaceAll,
+	"PathJoin":              StrPathJoin,
+	"MatchAllOfSubString":   StrMatchAllOfSubString,
+	"Count":                 StrCount,
+	"RandStr":               StrRandStr,
+	"HostPort":              StrHostPort,
 	"ParseStringToHostPort": StrParseStringToHostPort,
 	"ExtractHostPort":       StrExtractHostPort,
 	"IsTLSServer":           StrIsTLSServer,
