@@ -299,6 +299,9 @@ func hdlcSNReadMatrixTransports(t *testing.T, cases []hdlcSNReadCase, batch stri
 }
 func hdlcSNReadMatrixChecked(t *testing.T, cases []hdlcSNReadCase, batch string, transports []string, check func(*testing.T, *ProtocolEvent, hdlcOpStep, map[string]any)) {
 	env := "DLMS_HDLC_SN_READ_TEST_ROOT"
+	if batch == "dlms-sn-write-upload-information-source/captures" {
+		env = "DLMS_SN_WRITE_UPLOAD_INFORMATION_ROOT"
+	}
 	if batch == "dlms-sn-serviceblock-information-source/captures" {
 		env = "DLMS_SN_BLOCK_INFORMATION_ROOT"
 	}
@@ -502,10 +505,12 @@ func hdlcSNBlockBindStep(t *testing.T, st hdlcOpStep, ids []uint64) hdlcOpStep {
 	// ordinary/partial information observations have no business owner to bind.
 	segmentedService := false
 	if st.Profile == "dlms-hdlc-sn-information-segmented" {
-		if sn, ok := st.Fields["SN Read"].(map[string]any); ok {
-			for _, key := range []string{"transfer_start_event", "acknowledged_block_event", "duplicate_of_event"} {
-				if _, ok := sn[key]; ok {
-					segmentedService = true
+		for _, service := range []string{"SN Read", "SN Write"} {
+			if sn, ok := st.Fields[service].(map[string]any); ok {
+				for _, key := range []string{"transfer_start_event", "acknowledged_block_event", "duplicate_of_event"} {
+					if _, ok := sn[key]; ok {
+						segmentedService = true
+					}
 				}
 			}
 		}

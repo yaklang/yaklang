@@ -33,6 +33,9 @@ func hdlcSNUploadControls(t *testing.T, boundary bool) []hdlcSNReadCase {
 		require.Len(t, meta.Cases[i].Steps, len(c.Steps))
 		out[i] = hdlcSNReadCase{hdlcOpCase: c, Metadata: meta.Cases[i].Steps, UDPHash: meta.Cases[i].UDP, TCPHash: meta.Cases[i].TCP}
 	}
+	if boundary {
+		out = snWriteUploadInformationUpgrade(t, raw, out)
+	}
 	return out
 }
 func TestDLMSHDLCSNUploadNative(t *testing.T) {

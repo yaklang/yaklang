@@ -18,14 +18,14 @@ func dlmsSNSegmentHeader(info []byte) bool {
 }
 
 // A complete LLC/service/count/choice prefix proves this information group
-// carries the existing download service-block or its block-number echo. Upload
-// acknowledgements and multiresults keep their separate contracts.
+// carries a selected download or Write upload phase, or its block-number echo.
+// Read upload and multiresults keep their separate contracts.
 func dlmsSNBlockInformationPrefix(info []byte) bool {
 	if !dlmsSNSegmentHeader(info) {
 		return false
 	}
 	n, at, ok := wrapperSNDefinitePrefix(info, 4)
-	return ok && n == 1 && at < len(info) && (info[3] == 12 && info[at] == 2 || info[3] == 5 && info[at] == 5)
+	return ok && n == 1 && at < len(info) && (info[3] == 12 && info[at] == 2 || info[3] == 5 && info[at] == 5 || info[3] == 6 && info[at] == 7 || info[3] == 13 && info[at] == 2)
 }
 func dlmsSNInformationPrefix(w []byte) []byte {
 	// Classification only; the public event still requires complete CRC validation.
