@@ -39,6 +39,18 @@ func (c *Compiler) emitLoopExitPhiWriteback(fn *ssa.Function, exitBlockID int64)
 	if fn == nil || exitBlockID <= 0 || c.function == nil {
 		return
 	}
+	// Resolving the latch value may lazily materialize a definition in its
+	// source block. Keep the break's insertion point intact; otherwise the
+	// branch for the break is emitted into that source block instead of the
+	// block containing the Jump.
+	savedBB := c.currentInsertBlock()
+	savedActive := c.function.activeBlockID
+	defer func() {
+		c.function.activeBlockID = savedActive
+		if !savedBB.IsNil() {
+			c.restoreInsertPoint(savedBB)
+		}
+	}()
 	for _, blockID := range fn.Blocks {
 		blockVal, ok := fn.GetValueById(blockID)
 		if !ok {
@@ -399,6 +411,159 @@ func (c *Compiler) callReturnsPointer(call *ssa.Call, fn *ssa.Function) bool {
 	}
 }
 
+// phiEdgeStoreBlock returns the block that should store one incoming phi
+// edge. When a loop-carried phi is placed after the loop body, the front end
+// can attach the initial edge to a body predecessor. Storing that edge there
+// resets the value on every iteration, so it belongs in the loop preheader.
+func phiEdgeStoreBlock(fn *ssa.Function, predID, edgeValID int64) int64 {
+	if preheaderID, ok := loopPreheaderForPhiInitial(fn, predID, edgeValID); ok {
+		return preheaderID
+	}
+	return predID
+}
+
+func loopPreheaderForPhiInitial(fn *ssa.Function, predID, edgeValID int64) (int64, bool) {
+	if fn == nil || predID <= 0 || edgeValID <= 0 {
+		return 0, false
+	}
+	edgeObj, ok := fn.GetValueById(edgeValID)
+	if !ok || edgeObj == nil {
+		return 0, false
+	}
+	// Only a constant is safe to replay from the preheader. Moving a
+	// closure or call there stores the result before its defining
+	// instruction and fails LLVM dominance.
+	if _, isConst := edgeObj.(*ssa.ConstInst); !isConst {
+		return 0, false
+	}
+	edgeInst, ok := edgeObj.(ssa.Instruction)
+	if !ok || edgeInst == nil || edgeInst.GetBlock() == nil {
+		return 0, false
+	}
+	defID := edgeInst.GetBlock().GetId()
+	if defID <= 0 {
+		return 0, false
+	}
+	for _, blockID := range fn.Blocks {
+		blockVal, ok := fn.GetValueById(blockID)
+		if !ok {
+			continue
+		}
+		block, ok := ssa.ToBasicBlock(blockVal)
+		if !ok || block == nil {
+			continue
+		}
+		for _, instID := range block.Insts {
+			loopVal, ok := fn.GetInstructionById(instID)
+			loop, isLoop := loopVal.(*ssa.Loop)
+			if !ok || !isLoop || loop == nil || loop.GetBlock() == nil {
+				continue
+			}
+			headerID := loop.GetBlock().GetId()
+			if headerID <= 0 || defID == headerID {
+				continue
+			}
+			if !blockReachableInLoop(fn, loop.Body, predID, loop.Exit) {
+				continue
+			}
+			if blockReachableInLoop(fn, loop.Body, defID, loop.Exit) {
+				continue
+			}
+			headerVal, ok := fn.GetValueById(headerID)
+			headerBlock, ok := ssa.ToBasicBlock(headerVal)
+			if !ok || headerBlock == nil {
+				return headerID, true
+			}
+			for _, preheaderID := range headerBlock.Preds {
+				if !blockReachableInLoop(fn, loop.Body, preheaderID, loop.Exit) {
+					return preheaderID, true
+				}
+			}
+			return headerID, true
+		}
+	}
+	return 0, false
+}
+
+// missingPhiEdgeCarries reports that a phi edge points at a value the front
+// end deleted while flattening a loop. The predecessor is inside the loop and
+// another edge is the initializer from outside it, so the deleted edge is the
+// unchanged loop value, not a zero.
+func missingPhiEdgeCarries(fn *ssa.Function, phi *ssa.Phi, predID int64) bool {
+	if fn == nil || phi == nil || predID <= 0 {
+		return false
+	}
+	for _, blockID := range fn.Blocks {
+		blockVal, ok := fn.GetValueById(blockID)
+		if !ok {
+			continue
+		}
+		block, ok := ssa.ToBasicBlock(blockVal)
+		if !ok || block == nil {
+			continue
+		}
+		for _, instID := range block.Insts {
+			loopVal, ok := fn.GetInstructionById(instID)
+			loop, isLoop := loopVal.(*ssa.Loop)
+			if !ok || !isLoop || loop == nil {
+				continue
+			}
+			if !blockReachableInLoop(fn, loop.Body, predID, loop.Exit) {
+				continue
+			}
+			for _, edgeID := range phi.Edge {
+				edgeObj, ok := fn.GetValueById(edgeID)
+				if !ok || edgeObj == nil {
+					continue
+				}
+				edgeInst, ok := edgeObj.(ssa.Instruction)
+				if !ok || edgeInst == nil || edgeInst.GetBlock() == nil {
+					continue
+				}
+				if !blockReachableInLoop(fn, loop.Body, edgeInst.GetBlock().GetId(), loop.Exit) {
+					return true
+				}
+			}
+		}
+	}
+	return false
+}
+
+func blockReachableInLoop(fn *ssa.Function, startID, targetID, exitID int64) bool {
+	if fn == nil || startID <= 0 || targetID <= 0 {
+		return false
+	}
+	seen := map[int64]struct{}{}
+	var visit func(int64) bool
+	visit = func(id int64) bool {
+		if id == targetID {
+			return true
+		}
+		if id <= 0 || id == exitID {
+			return false
+		}
+		if _, ok := seen[id]; ok {
+			return false
+		}
+		seen[id] = struct{}{}
+		value, ok := fn.GetValueById(id)
+		if !ok {
+			return false
+		}
+		block, ok := ssa.ToBasicBlock(value)
+		if !ok || block == nil {
+			return false
+		}
+		for _, nextID := range block.Succs {
+			if visit(nextID) {
+				return true
+			}
+		}
+		return false
+	}
+	return visit(startID)
+}
+
 // resolvePhi stores incoming edge values into each predecessor's outgoing slot store.
 func (c *Compiler) resolvePhi(inst *ssa.Phi) error {
 	if inst == nil {
@@ -427,7 +592,6 @@ func (c *Compiler) resolvePhi(inst *ssa.Phi) error {
 	if !ok {
 		return fmt.Errorf("resolvePhi: value %d is not *ssa.BasicBlock", blockID)
 	}
-
 	edges := inst.Edge
 	preds := bbSsa.Preds
 	if len(preds) == 0 {
@@ -464,6 +628,9 @@ func (c *Compiler) resolvePhi(inst *ssa.Phi) error {
 		}
 		edgeObj, ok := fn.GetValueById(edgeValID)
 		if !ok || edgeObj == nil {
+			if missingPhiEdgeCarries(fn, inst, predBlockID) {
+				return c.loadSSAValue(inst.GetId())
+			}
 			return zero
 		}
 		if undef, ok := edgeObj.(*ssa.Undefined); ok && undef != nil {
@@ -545,7 +712,7 @@ func (c *Compiler) resolvePhi(inst *ssa.Phi) error {
 			if edgeValID == 0 && i < len(edges) {
 				edgeValID = edges[i]
 			}
-			emitPredStore(predBlockID, edgeValID)
+			emitPredStore(phiEdgeStoreBlock(fn, predBlockID, edgeValID), edgeValID)
 		}
 		// try/catch phis carry one edge per scope branch, but the catch body is
 		// not a CFG predecessor of the done block. The extra edges are the
