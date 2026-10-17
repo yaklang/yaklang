@@ -144,9 +144,14 @@ type jsonDumpConfig struct {
 	noEscapeHTML bool
 }
 
-type jsonIndentOption string
+// jsonIndentOption is a struct, not a named string. The Yak ABI collapses
+// every named string to a plain string, which made json.withIndent a value
+// JsonDumps could no longer recognize.
+type jsonIndentOption struct {
+	indent string
+}
 
-func (o jsonIndentOption) apply(c *jsonDumpConfig) { c.indent = string(o) }
+func (o jsonIndentOption) apply(c *jsonDumpConfig) { c.indent = o.indent }
 
 type jsonNoEscapeHTMLOption struct{}
 
@@ -154,7 +159,7 @@ func (jsonNoEscapeHTMLOption) apply(c *jsonDumpConfig) { c.noEscapeHTML = true }
 
 // JsonWithIndent returns a json.dumps option that sets the indent string.
 func JsonWithIndent(indent interface{}) interface{} {
-	return jsonIndentOption(fmt.Sprint(indent))
+	return jsonIndentOption{indent: fmt.Sprint(indent)}
 }
 
 // JsonNoEscapeHTML returns a json.dumps option that disables HTML escaping.
