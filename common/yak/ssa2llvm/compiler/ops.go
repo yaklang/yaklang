@@ -76,6 +76,16 @@ func (c *Compiler) getValue(contextInst ssa.Instruction, id int64) (llvm.Value, 
 	// These values can be referenced in multiple blocks, so do not cache the load.
 	if c != nil && c.function != nil && c.function.exceptionValueIDs != nil {
 		if _, ok := c.function.exceptionValueIDs[id]; ok {
+			// The catch binding tracks the live panic word. recover() clears
+			// it, so neither the value cache nor a slot materialized before the
+			// recover call may satisfy a later read.
+			delete(c.Values, id)
+			if c.function.valueSlots != nil {
+				delete(c.function.valueSlots, id)
+			}
+			if c.function.storedValues != nil {
+				delete(c.function.storedValues, id)
+			}
 			return c.loadContextPanic(fmt.Sprintf("yak_exc_%d", id))
 		}
 	}
