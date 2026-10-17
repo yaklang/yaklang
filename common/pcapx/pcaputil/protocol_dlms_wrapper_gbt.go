@@ -198,11 +198,31 @@ func (f *binFlow) consumeWrapperGBT(s *binDLMSWrapper, m *wrapperMessage, dir in
 	if decoded.gbt {
 		return "", wrapperError(ErrUnsupportedFeature, "nested GBT APDU is not an unciphered Get")
 	}
-	if decoded.snRead {
-		return "", wrapperError(ErrUnsupportedFeature, "GBT-wrapped SN Read is outside selected wire-only profile")
-	}
-	if decoded.snWrite {
-		return "", wrapperError(ErrUnsupportedFeature, "GBT-wrapped SN Write is outside selected wire-only profile")
+	if decoded.snRead || decoded.snWrite {
+		// Reassembled SN APDUs carry no invoke or business owner. The wrapper
+		// used by the bounded decoder is internal: expose only the literal
+		// assembled APDU and its typed values, never a reconstructed header.
+		// Inner service blocks need their own observed phase/echo context and
+		// cannot inherit it from a completed GBT transfer.
+		if decoded.snServiceBlock {
+			return "", wrapperError(ErrUnsupportedFeature, "GBT-wrapped SN service blocks require a separate observed transfer context")
+		}
+		assoc := "unverified-sn-read-observation"
+		if decoded.snWrite {
+			assoc = "unverified-sn-write-observation"
+		}
+		if s.retireSNGroupForMessage(decoded, dir) {
+			assoc = "ordinary-sn-request-retired-wire-group"
+		}
+		e.TransactionID, e.ResponseTo = 0, 0
+		for _, key := range []string{"wrapper_version", "source_wport", "destination_wport", "wrapper_header_hex"} {
+			delete(decoded.fields, key)
+		}
+		m.fields["assembled_sn_apdu"] = cloneSession(decoded.fields)
+		m.fields["assembled_sn_apdu_hex"] = hex.EncodeToString(p.data)
+		m.fields["transfer_complete"] = true
+		p.completed, p.active, p.data = true, false, nil
+		return assoc, nil
 	}
 	if err = f.consumeWrapperReserved(dir, inner, e, charge); err != nil {
 		return "", err

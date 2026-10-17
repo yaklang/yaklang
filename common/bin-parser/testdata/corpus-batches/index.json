@@ -119047,6 +119047,392 @@
         "common/pcapx/pcaputil/dlms-hdlc-sn-upload/two-UInt32-logical-keys-context-cap2.udp.pcap": "dlms-hdlc-sn-upload/two-UInt32-logical-keys-context-cap2.udp.pcap",
         "scripts/protocol-tests/required-tests-traffic-unified-v164.json": "required-tests-traffic-unified-v164.json"
       }
+    },
+    {
+      "id": "validation-dlms-wrapper-sn-gbt",
+      "kind": "support",
+      "source_sha": "dac3c8db91ef21d1620d37d3c51814c5e7d397a2",
+      "file": "validation-dlms-wrapper-sn-gbt.zip",
+      "sha256": "905b6b793b33813a798a2c17d4a03c1dd8ec54149cdbd04d795545d3d4ae5197",
+      "password": "bin-parser",
+      "members": {
+        "dlms-sn-gbt-captures/existing-Get-GBT-complete-neighbor.tcp.pcap": {
+          "bytes": 594,
+          "sha256": "f029e3563beb9f141167f467770c6798fc07ad48c2c7e96f721e53915c20a841"
+        },
+        "dlms-sn-gbt-captures/fresh-conversation-reject-ReadQ6.tcp.pcap": {
+          "bytes": 330,
+          "sha256": "f135e45c7d10ab66471c900a0558ddf946a387c68a7c1d246b499dbf9046bf37"
+        },
+        "dlms-sn-gbt-captures/fresh-conversation-reject-ReadQ6.udp.pcap": {
+          "bytes": 108,
+          "sha256": "2048e7099076a01a22c56773df821216c0fcc3d4b51c9948b90a762778c31634"
+        },
+        "dlms-sn-gbt-captures/fresh-conversation-reject-ReadR2.tcp.pcap": {
+          "bytes": 328,
+          "sha256": "0c00af11071e7d5c9efe923c63853e40d05358d98b31ebb2257ad26b3877dc9e"
+        },
+        "dlms-sn-gbt-captures/fresh-conversation-reject-ReadR2.udp.pcap": {
+          "bytes": 106,
+          "sha256": "57ba1d6b69df8bba6b3410107a5931858a143c094381268f2beba52f49dc8a29"
+        },
+        "dlms-sn-gbt-captures/fresh-conversation-reject-WriteQ7.tcp.pcap": {
+          "bytes": 335,
+          "sha256": "9c008a3e67305b60eeb5c0e66de2b53223e5ea353baf863b7f68d47475bbef93"
+        },
+        "dlms-sn-gbt-captures/fresh-conversation-reject-WriteQ7.udp.pcap": {
+          "bytes": 113,
+          "sha256": "d3cebbb9832d7d48e019a4be1aff764379ad53c94f7f314e943fab0fb4f4c2f9"
+        },
+        "dlms-sn-gbt-captures/fresh-conversation-reject-WriteR2.tcp.pcap": {
+          "bytes": 324,
+          "sha256": "47e092a9ea1bda1bcbc978fb41c20806ed74ec52ba09ad5bc36aab0a08da2d8a"
+        },
+        "dlms-sn-gbt-captures/fresh-conversation-reject-WriteR2.udp.pcap": {
+          "bytes": 102,
+          "sha256": "2b7e04b3dc7e5cb3764515416b765c0a95b422e3739fce8c3b68c934e0a23532"
+        },
+        "dlms-sn-gbt-captures/fresh-conversation-reject-ciphered-unselected.tcp.pcap": {
+          "bytes": 322,
+          "sha256": "21a51801b38a35e9b3600d4f872d8c2dda20362d6f76d4449b53c83cf328a0ba"
+        },
+        "dlms-sn-gbt-captures/fresh-conversation-reject-ciphered-unselected.udp.pcap": {
+          "bytes": 100,
+          "sha256": "33aa075481f3ac66bce5f907921220cfa3c48f30c3081ddab7f2da3d90897ed5"
+        },
+        "dlms-sn-gbt-captures/fresh-conversation-reject-nested-GBT.tcp.pcap": {
+          "bytes": 331,
+          "sha256": "0a6815e2c07b7c03d78ab1dffe5cf3e8d3511e916f8b9b9f8fa18d3a6529e377"
+        },
+        "dlms-sn-gbt-captures/fresh-conversation-reject-nested-GBT.udp.pcap": {
+          "bytes": 109,
+          "sha256": "b711ae1ad5ccf9397332f318a190cb71a0de626ac48a894f063d93173e11a87e"
+        },
+        "dlms-sn-gbt-captures/independent-LN-GET-owner-survives-complete-GBT-SN-Read.tcp.pcap": {
+          "bytes": 597,
+          "sha256": "6567d2eb8e3ad01b2b4036e006aee67a085bef8881008a0507ef2777ecfa641f"
+        },
+        "dlms-sn-gbt-captures/independent-LN-GET-owner-survives-complete-GBT-SN-Read.udp.pcap": {
+          "bytes": 339,
+          "sha256": "47e035a786f3f1db23d6b003474ab4432a3730d2b82d52e94dd6bff7750d9da3"
+        },
+        "dlms-sn-gbt-captures/independent-LN-GET-owner-survives-complete-GBT-SN-Write.tcp.pcap": {
+          "bytes": 604,
+          "sha256": "8f67a66499c14f0458d5735445547253d915e70f9624042192a4d85d5a213972"
+        },
+        "dlms-sn-gbt-captures/independent-LN-GET-owner-survives-complete-GBT-SN-Write.udp.pcap": {
+          "bytes": 346,
+          "sha256": "2af766f6b05f344895d0a3e2e164a522dbd40dbde3b7d02ef2756c474200e4cd"
+        },
+        "dlms-sn-gbt-captures/inner-Read-service-block-explicitly-unselected.tcp.pcap": {
+          "bytes": 499,
+          "sha256": "05d79c3fb72dd6ff9190077838c176450e2bc7ce79ddfdf85b7e9a66a5b8bb2b"
+        },
+        "dlms-sn-gbt-captures/inner-Read-service-block-explicitly-unselected.udp.pcap": {
+          "bytes": 253,
+          "sha256": "3c34cfcc1448c2e18ac4f65304e554928f6d8a975e1149e6c11087e94bec8fa6"
+        },
+        "dlms-sn-gbt-captures/inner-Write-Data-depth4-Resource-retires-LN-and-GBT.tcp.pcap": {
+          "bytes": 502,
+          "sha256": "e2928435c314d7d58477948a1865ff225390e467778441012f63c5502d3b8766"
+        },
+        "dlms-sn-gbt-captures/inner-Write-Data-depth4-Resource-retires-LN-and-GBT.udp.pcap": {
+          "bytes": 256,
+          "sha256": "6a945325dfa1b6a87547bab2ec37eca2ab73ae06eabbc9fbfcee703a94ed7bdf"
+        },
+        "dlms-sn-gbt-captures/inner-Write-successNULL-trailing-byte-Malformed.tcp.pcap": {
+          "bytes": 498,
+          "sha256": "70bfd2544b26959ac4be7403cff9e8372ff0a1c3f197632ba069e4ac97892277"
+        },
+        "dlms-sn-gbt-captures/inner-Write-successNULL-trailing-byte-Malformed.udp.pcap": {
+          "bytes": 252,
+          "sha256": "cead2e9a54b9e33dc12e0810e6cffdb5674fcd26885f00ea8364bbe44edc4a40"
+        },
+        "dlms-sn-gbt-captures/known-LN-pending-plus-active-GBT-response-private-Close.tcp.pcap": {
+          "bytes": 412,
+          "sha256": "43c1246240c55cc0a807fe113ab59671d6e5b6fe7c43f801ebd755edc34eb465"
+        },
+        "dlms-sn-gbt-captures/known-LN-pending-plus-active-GBT-response-private-Close.udp.pcap": {
+          "bytes": 178,
+          "sha256": "8f8bf97db2e1e72b99b3707abbec71b4dae46cc65ffe8711372f93115479ac28"
+        },
+        "dlms-sn-gbt-captures/ordinary-SN-Read-variable-and-parameterized-six-GBT-frames.tcp.pcap": {
+          "bytes": 762,
+          "sha256": "b109da72bd28f39aa91c70ebea3f0553843b8f142dad3504070f594d8a7ee6f1"
+        },
+        "dlms-sn-gbt-captures/ordinary-SN-Read-variable-and-parameterized-six-GBT-frames.udp.pcap": {
+          "bytes": 480,
+          "sha256": "e9a18262f69b34b6118dd14184683a5bc6fe725723a562590a4f358797f1967f"
+        },
+        "dlms-sn-gbt-captures/ordinary-SN-Write-mixed-access-and-wide-error-six-GBT-frames.tcp.pcap": {
+          "bytes": 769,
+          "sha256": "651f26273b71c73185da5ff44e1f371b0328b1cacdbac32595aa21883fbb3659"
+        },
+        "dlms-sn-gbt-captures/ordinary-SN-Write-mixed-access-and-wide-error-six-GBT-frames.udp.pcap": {
+          "bytes": 487,
+          "sha256": "dfdfe03281b9c46cc130f45e9c4ade91c3c5d660a8c7a3d3f57f5901cb880f93"
+        },
+        "dlms-sn-gbt-captures/recent-and-completed-GBT-exact-repeats-no-SN-owner.tcp.pcap": {
+          "bytes": 1033,
+          "sha256": "8f5619cf5d1cf945d68978b16a2d95a41751836bdb6f1ff2ba14cb2418f07f21"
+        },
+        "dlms-sn-gbt-captures/recent-and-completed-GBT-exact-repeats-no-SN-owner.udp.pcap": {
+          "bytes": 715,
+          "sha256": "c540b1443dcacb4cad702e0102b44707fd0893dd633b2270210fe1db025a63c7"
+        },
+        "dlms-sn-gbt-captures/reuse-inputs.json": {
+          "bytes": 477,
+          "sha256": "fe91277ba2429dfbba38f3d056848885ad8c48554bf0d6c6cd7731654ab4127d"
+        },
+        "dlms-sn-gbt-captures/unknown-ACK-and-following-request-tail-quarantine.tcp.pcap": {
+          "bytes": 500,
+          "sha256": "93fa8552df8d79bf9d188dd672be13029215f36a786ad6fde93f44469a42845e"
+        },
+        "dlms-sn-gbt-captures/unknown-ACK-and-following-request-tail-quarantine.udp.pcap": {
+          "bytes": 254,
+          "sha256": "22c779c2377efda823a0e8925d9bef9d07e88549cceada7011dd86e119d9c329"
+        },
+        "dlms-sn-gbt-source/SOURCE-ASSESSMENT.json": {
+          "bytes": 3102,
+          "sha256": "c7025dd98ff5a57075fcdc3f0763c00db3d65f34dae809888962c520cade2ead"
+        },
+        "dlms-sn-gbt-source/SOURCES.json": {
+          "bytes": 7397,
+          "sha256": "3e9f3cb9358bb44ff6959f8779aaa174d3b512f7d6e36657226c63e466489e75"
+        },
+        "dlms-sn-gbt-source/baseline-controls.json": {
+          "bytes": 158657,
+          "sha256": "00cbbd68fbcd332829b74c0c27cf07fab1643ebd67dc83f39f7014838f844e9a"
+        },
+        "dlms-sn-gbt-source/controls.json": {
+          "bytes": 415700,
+          "sha256": "0dd4e538b4354de6520cf20162cd117f2f1479925e21d48a1d4df6b3e9bb7dd4"
+        },
+        "dlms-sn-gbt-source/depth-boundary-supplement.json": {
+          "bytes": 28904,
+          "sha256": "c1cb64a55e40b4b87b94bb7cf00dc90e7ada27383549dc5adf1751bb96fb2143"
+        },
+        "dlms-sn-gbt-tools/capture-checks.py": {
+          "bytes": 858,
+          "sha256": "773153f31c80ec4acb5cf5006a7dce3731b44f32ec55aff217550336216dd698"
+        },
+        "dlms-sn-gbt-tools/carrier.py": {
+          "bytes": 1215,
+          "sha256": "bdf106ef2372b348e5af5a2bc62abd8d70e37da87739216bfe05b7182fafe5e2"
+        },
+        "dlms-sn-gbt-tools/depth/SOURCES.json": {
+          "bytes": 3208,
+          "sha256": "9165d12db5ea401bfae4e8e7e59dadc0e5b129ec1b063157018d11e3659f1ba5"
+        },
+        "dlms-sn-gbt-tools/depth/access.py": {
+          "bytes": 4354,
+          "sha256": "3166cdf13b9934650fdaa34051ba1d6365c6521028ab132898597e424c23e586"
+        },
+        "dlms-sn-gbt-tools/depth/build.py": {
+          "bytes": 2338,
+          "sha256": "3fd95cf1f19949c95c2848fa06e1737d5a5029b5fff917bab8b3132d94b1c794"
+        },
+        "dlms-sn-gbt-tools/depth/candidate-model.py": {
+          "bytes": 9776,
+          "sha256": "b19b8043b6d3defeb32ff2a3a5caf67102299118852c6859c2d1a78847fbb51a"
+        },
+        "dlms-sn-gbt-tools/depth/gbt-core.py": {
+          "bytes": 12575,
+          "sha256": "a678272f289349b8be7e31791edd158ccc2c4e4ee13431dcfec6a2fcf56a0df6"
+        },
+        "dlms-sn-gbt-tools/depth/model-pins.json": {
+          "bytes": 354,
+          "sha256": "979fd12543829169aec9fead69f2f795f5a04057224960f858b30c2a8b81cb86"
+        },
+        "dlms-sn-gbt-tools/depth/reference-vectors.json": {
+          "bytes": 10360,
+          "sha256": "a76ffabe34390fd68e35fc7117c2808bc61c046b2f06a6324317222f2194dec8"
+        },
+        "dlms-sn-gbt-tools/depth/verify.py": {
+          "bytes": 1731,
+          "sha256": "1381728c5bcd1155480761759d6e697f17db7724a39497ff8cb1ac87c0bebed0"
+        },
+        "dlms-sn-gbt-tools/depth/write-body.py": {
+          "bytes": 5706,
+          "sha256": "4818c0264cb4819cf5d4715a855b4f3817acf26c0c6b15ff558aaa7d3b4aa094"
+        },
+        "dlms-sn-gbt-tools/history/SOURCES.json": {
+          "bytes": 3085,
+          "sha256": "c9146f2cbb91c95af8f2374bff2b87995e4f408ab1dc7e48a84a2c5f4689b07e"
+        },
+        "dlms-sn-gbt-tools/history/access.py": {
+          "bytes": 4354,
+          "sha256": "3166cdf13b9934650fdaa34051ba1d6365c6521028ab132898597e424c23e586"
+        },
+        "dlms-sn-gbt-tools/history/build.py": {
+          "bytes": 6725,
+          "sha256": "7af25b73f0f42bb8c98045cc289f0d35fa206f9a78161588619af7e45fdb6447"
+        },
+        "dlms-sn-gbt-tools/history/candidate-model.py": {
+          "bytes": 9776,
+          "sha256": "b19b8043b6d3defeb32ff2a3a5caf67102299118852c6859c2d1a78847fbb51a"
+        },
+        "dlms-sn-gbt-tools/history/gbt-core.py": {
+          "bytes": 12575,
+          "sha256": "a678272f289349b8be7e31791edd158ccc2c4e4ee13431dcfec6a2fcf56a0df6"
+        },
+        "dlms-sn-gbt-tools/history/model-pins.json": {
+          "bytes": 354,
+          "sha256": "979fd12543829169aec9fead69f2f795f5a04057224960f858b30c2a8b81cb86"
+        },
+        "dlms-sn-gbt-tools/history/reference-vectors.json": {
+          "bytes": 10360,
+          "sha256": "a76ffabe34390fd68e35fc7117c2808bc61c046b2f06a6324317222f2194dec8"
+        },
+        "dlms-sn-gbt-tools/history/verify.py": {
+          "bytes": 2532,
+          "sha256": "cd31ba62e2ab293e0a835afbc7ab68eb94e31c4c082cc2674160e058346d0512"
+        },
+        "dlms-sn-gbt-tools/history/write-body.py": {
+          "bytes": 5706,
+          "sha256": "4818c0264cb4819cf5d4715a855b4f3817acf26c0c6b15ff558aaa7d3b4aa094"
+        },
+        "dlms-sn-gbt-tools/independent/access.py": {
+          "bytes": 4354,
+          "sha256": "3166cdf13b9934650fdaa34051ba1d6365c6521028ab132898597e424c23e586"
+        },
+        "dlms-sn-gbt-tools/independent/gbt-core.py": {
+          "bytes": 12575,
+          "sha256": "a678272f289349b8be7e31791edd158ccc2c4e4ee13431dcfec6a2fcf56a0df6"
+        },
+        "dlms-sn-gbt-tools/independent/generate.py": {
+          "bytes": 9776,
+          "sha256": "b19b8043b6d3defeb32ff2a3a5caf67102299118852c6859c2d1a78847fbb51a"
+        },
+        "dlms-sn-gbt-tools/independent/model-pins.json": {
+          "bytes": 354,
+          "sha256": "979fd12543829169aec9fead69f2f795f5a04057224960f858b30c2a8b81cb86"
+        },
+        "dlms-sn-gbt-tools/independent/rebuild.py": {
+          "bytes": 501,
+          "sha256": "63a8d118f8809233ba4ad5769370187f399c5fcafb69fa66ce445005e4a87e2a"
+        },
+        "dlms-sn-gbt-tools/independent/reference-vectors.json": {
+          "bytes": 10360,
+          "sha256": "a76ffabe34390fd68e35fc7117c2808bc61c046b2f06a6324317222f2194dec8"
+        },
+        "dlms-sn-gbt-tools/independent/verify.py": {
+          "bytes": 4308,
+          "sha256": "d1a8cb38ad6af0dd34ecd68af7633041b47316c28389812cd2c1da8817b04642"
+        },
+        "dlms-sn-gbt-tools/independent/write-body.py": {
+          "bytes": 5706,
+          "sha256": "4818c0264cb4819cf5d4715a855b4f3817acf26c0c6b15ff558aaa7d3b4aa094"
+        },
+        "dlms-sn-gbt-tools/project-depth.py": {
+          "bytes": 1289,
+          "sha256": "71447b9876e829e85393b2514b47ca6b5630a909418ca97f6af001f5b72c1535"
+        },
+        "dlms-sn-gbt-tools/project.py": {
+          "bytes": 1506,
+          "sha256": "7fbcef54044f1f46c8bf689408b75c1be1f49b6e29964dde9c910a35008b8544"
+        },
+        "dlms-sn-gbt-tools/verify-captures.py": {
+          "bytes": 3376,
+          "sha256": "6b67dc365cc9beb70674e5c7b1f723632568df61fb85e7c3fc8ed9fc75cb6438"
+        },
+        "dlms-sn-gbt/captured-controls.json": {
+          "bytes": 423290,
+          "sha256": "aef7acd931dddd1f2277df3e06a1d1d7debc76de333bbc427a04abc60a148df2"
+        },
+        "dlms-sn-gbt/captured-depth-controls.json": {
+          "bytes": 29481,
+          "sha256": "db075f3982770e545ff8624f49116748798060f24592094f9c863441419fda07"
+        },
+        "dlms-sn-gbt/historical-gbt-sn-write-upgrades.json": {
+          "bytes": 485935,
+          "sha256": "a4c30eded8ba319ae34b62f6f0103e32dbde0ef9bd7593a0bbfa69d27956c931"
+        },
+        "required-tests-traffic-unified-v165.json": {
+          "bytes": 22283716,
+          "sha256": "62e0f50e7b450b052bcd24355ff07c4dc45cf2db70e0119710888e247b5b76c3"
+        },
+        "validation/expected.json": {
+          "bytes": 41196,
+          "sha256": "bba5ade4b536a788b25895703d95949190cea5b61b0343f754f08409875dad46"
+        }
+      },
+      "aliases": {
+        "common/pcapx/pcaputil/dlms-sn-gbt-captures/existing-Get-GBT-complete-neighbor.tcp.pcap": "dlms-sn-gbt-captures/existing-Get-GBT-complete-neighbor.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-gbt-captures/fresh-conversation-reject-ReadQ6.tcp.pcap": "dlms-sn-gbt-captures/fresh-conversation-reject-ReadQ6.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-gbt-captures/fresh-conversation-reject-ReadQ6.udp.pcap": "dlms-sn-gbt-captures/fresh-conversation-reject-ReadQ6.udp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-gbt-captures/fresh-conversation-reject-ReadR2.tcp.pcap": "dlms-sn-gbt-captures/fresh-conversation-reject-ReadR2.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-gbt-captures/fresh-conversation-reject-ReadR2.udp.pcap": "dlms-sn-gbt-captures/fresh-conversation-reject-ReadR2.udp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-gbt-captures/fresh-conversation-reject-WriteQ7.tcp.pcap": "dlms-sn-gbt-captures/fresh-conversation-reject-WriteQ7.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-gbt-captures/fresh-conversation-reject-WriteQ7.udp.pcap": "dlms-sn-gbt-captures/fresh-conversation-reject-WriteQ7.udp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-gbt-captures/fresh-conversation-reject-WriteR2.tcp.pcap": "dlms-sn-gbt-captures/fresh-conversation-reject-WriteR2.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-gbt-captures/fresh-conversation-reject-WriteR2.udp.pcap": "dlms-sn-gbt-captures/fresh-conversation-reject-WriteR2.udp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-gbt-captures/fresh-conversation-reject-ciphered-unselected.tcp.pcap": "dlms-sn-gbt-captures/fresh-conversation-reject-ciphered-unselected.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-gbt-captures/fresh-conversation-reject-ciphered-unselected.udp.pcap": "dlms-sn-gbt-captures/fresh-conversation-reject-ciphered-unselected.udp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-gbt-captures/fresh-conversation-reject-nested-GBT.tcp.pcap": "dlms-sn-gbt-captures/fresh-conversation-reject-nested-GBT.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-gbt-captures/fresh-conversation-reject-nested-GBT.udp.pcap": "dlms-sn-gbt-captures/fresh-conversation-reject-nested-GBT.udp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-gbt-captures/independent-LN-GET-owner-survives-complete-GBT-SN-Read.tcp.pcap": "dlms-sn-gbt-captures/independent-LN-GET-owner-survives-complete-GBT-SN-Read.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-gbt-captures/independent-LN-GET-owner-survives-complete-GBT-SN-Read.udp.pcap": "dlms-sn-gbt-captures/independent-LN-GET-owner-survives-complete-GBT-SN-Read.udp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-gbt-captures/independent-LN-GET-owner-survives-complete-GBT-SN-Write.tcp.pcap": "dlms-sn-gbt-captures/independent-LN-GET-owner-survives-complete-GBT-SN-Write.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-gbt-captures/independent-LN-GET-owner-survives-complete-GBT-SN-Write.udp.pcap": "dlms-sn-gbt-captures/independent-LN-GET-owner-survives-complete-GBT-SN-Write.udp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-gbt-captures/inner-Read-service-block-explicitly-unselected.tcp.pcap": "dlms-sn-gbt-captures/inner-Read-service-block-explicitly-unselected.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-gbt-captures/inner-Read-service-block-explicitly-unselected.udp.pcap": "dlms-sn-gbt-captures/inner-Read-service-block-explicitly-unselected.udp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-gbt-captures/inner-Write-Data-depth4-Resource-retires-LN-and-GBT.tcp.pcap": "dlms-sn-gbt-captures/inner-Write-Data-depth4-Resource-retires-LN-and-GBT.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-gbt-captures/inner-Write-Data-depth4-Resource-retires-LN-and-GBT.udp.pcap": "dlms-sn-gbt-captures/inner-Write-Data-depth4-Resource-retires-LN-and-GBT.udp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-gbt-captures/inner-Write-successNULL-trailing-byte-Malformed.tcp.pcap": "dlms-sn-gbt-captures/inner-Write-successNULL-trailing-byte-Malformed.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-gbt-captures/inner-Write-successNULL-trailing-byte-Malformed.udp.pcap": "dlms-sn-gbt-captures/inner-Write-successNULL-trailing-byte-Malformed.udp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-gbt-captures/known-LN-pending-plus-active-GBT-response-private-Close.tcp.pcap": "dlms-sn-gbt-captures/known-LN-pending-plus-active-GBT-response-private-Close.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-gbt-captures/known-LN-pending-plus-active-GBT-response-private-Close.udp.pcap": "dlms-sn-gbt-captures/known-LN-pending-plus-active-GBT-response-private-Close.udp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-gbt-captures/ordinary-SN-Read-variable-and-parameterized-six-GBT-frames.tcp.pcap": "dlms-sn-gbt-captures/ordinary-SN-Read-variable-and-parameterized-six-GBT-frames.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-gbt-captures/ordinary-SN-Read-variable-and-parameterized-six-GBT-frames.udp.pcap": "dlms-sn-gbt-captures/ordinary-SN-Read-variable-and-parameterized-six-GBT-frames.udp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-gbt-captures/ordinary-SN-Write-mixed-access-and-wide-error-six-GBT-frames.tcp.pcap": "dlms-sn-gbt-captures/ordinary-SN-Write-mixed-access-and-wide-error-six-GBT-frames.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-gbt-captures/ordinary-SN-Write-mixed-access-and-wide-error-six-GBT-frames.udp.pcap": "dlms-sn-gbt-captures/ordinary-SN-Write-mixed-access-and-wide-error-six-GBT-frames.udp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-gbt-captures/recent-and-completed-GBT-exact-repeats-no-SN-owner.tcp.pcap": "dlms-sn-gbt-captures/recent-and-completed-GBT-exact-repeats-no-SN-owner.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-gbt-captures/recent-and-completed-GBT-exact-repeats-no-SN-owner.udp.pcap": "dlms-sn-gbt-captures/recent-and-completed-GBT-exact-repeats-no-SN-owner.udp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-gbt-captures/reuse-inputs.json": "dlms-sn-gbt-captures/reuse-inputs.json",
+        "common/pcapx/pcaputil/dlms-sn-gbt-captures/unknown-ACK-and-following-request-tail-quarantine.tcp.pcap": "dlms-sn-gbt-captures/unknown-ACK-and-following-request-tail-quarantine.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-gbt-captures/unknown-ACK-and-following-request-tail-quarantine.udp.pcap": "dlms-sn-gbt-captures/unknown-ACK-and-following-request-tail-quarantine.udp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-gbt-source/SOURCE-ASSESSMENT.json": "dlms-sn-gbt-source/SOURCE-ASSESSMENT.json",
+        "common/pcapx/pcaputil/dlms-sn-gbt-source/SOURCES.json": "dlms-sn-gbt-source/SOURCES.json",
+        "common/pcapx/pcaputil/dlms-sn-gbt-source/baseline-controls.json": "dlms-sn-gbt-source/baseline-controls.json",
+        "common/pcapx/pcaputil/dlms-sn-gbt-source/controls.json": "dlms-sn-gbt-source/controls.json",
+        "common/pcapx/pcaputil/dlms-sn-gbt-source/depth-boundary-supplement.json": "dlms-sn-gbt-source/depth-boundary-supplement.json",
+        "common/pcapx/pcaputil/dlms-sn-gbt-tools/capture-checks.py": "dlms-sn-gbt-tools/capture-checks.py",
+        "common/pcapx/pcaputil/dlms-sn-gbt-tools/carrier.py": "dlms-sn-gbt-tools/carrier.py",
+        "common/pcapx/pcaputil/dlms-sn-gbt-tools/depth/SOURCES.json": "dlms-sn-gbt-tools/depth/SOURCES.json",
+        "common/pcapx/pcaputil/dlms-sn-gbt-tools/depth/access.py": "dlms-sn-gbt-tools/depth/access.py",
+        "common/pcapx/pcaputil/dlms-sn-gbt-tools/depth/build.py": "dlms-sn-gbt-tools/depth/build.py",
+        "common/pcapx/pcaputil/dlms-sn-gbt-tools/depth/candidate-model.py": "dlms-sn-gbt-tools/depth/candidate-model.py",
+        "common/pcapx/pcaputil/dlms-sn-gbt-tools/depth/gbt-core.py": "dlms-sn-gbt-tools/depth/gbt-core.py",
+        "common/pcapx/pcaputil/dlms-sn-gbt-tools/depth/model-pins.json": "dlms-sn-gbt-tools/depth/model-pins.json",
+        "common/pcapx/pcaputil/dlms-sn-gbt-tools/depth/reference-vectors.json": "dlms-sn-gbt-tools/depth/reference-vectors.json",
+        "common/pcapx/pcaputil/dlms-sn-gbt-tools/depth/verify.py": "dlms-sn-gbt-tools/depth/verify.py",
+        "common/pcapx/pcaputil/dlms-sn-gbt-tools/depth/write-body.py": "dlms-sn-gbt-tools/depth/write-body.py",
+        "common/pcapx/pcaputil/dlms-sn-gbt-tools/history/SOURCES.json": "dlms-sn-gbt-tools/history/SOURCES.json",
+        "common/pcapx/pcaputil/dlms-sn-gbt-tools/history/access.py": "dlms-sn-gbt-tools/history/access.py",
+        "common/pcapx/pcaputil/dlms-sn-gbt-tools/history/build.py": "dlms-sn-gbt-tools/history/build.py",
+        "common/pcapx/pcaputil/dlms-sn-gbt-tools/history/candidate-model.py": "dlms-sn-gbt-tools/history/candidate-model.py",
+        "common/pcapx/pcaputil/dlms-sn-gbt-tools/history/gbt-core.py": "dlms-sn-gbt-tools/history/gbt-core.py",
+        "common/pcapx/pcaputil/dlms-sn-gbt-tools/history/model-pins.json": "dlms-sn-gbt-tools/history/model-pins.json",
+        "common/pcapx/pcaputil/dlms-sn-gbt-tools/history/reference-vectors.json": "dlms-sn-gbt-tools/history/reference-vectors.json",
+        "common/pcapx/pcaputil/dlms-sn-gbt-tools/history/verify.py": "dlms-sn-gbt-tools/history/verify.py",
+        "common/pcapx/pcaputil/dlms-sn-gbt-tools/history/write-body.py": "dlms-sn-gbt-tools/history/write-body.py",
+        "common/pcapx/pcaputil/dlms-sn-gbt-tools/independent/access.py": "dlms-sn-gbt-tools/independent/access.py",
+        "common/pcapx/pcaputil/dlms-sn-gbt-tools/independent/gbt-core.py": "dlms-sn-gbt-tools/independent/gbt-core.py",
+        "common/pcapx/pcaputil/dlms-sn-gbt-tools/independent/generate.py": "dlms-sn-gbt-tools/independent/generate.py",
+        "common/pcapx/pcaputil/dlms-sn-gbt-tools/independent/model-pins.json": "dlms-sn-gbt-tools/independent/model-pins.json",
+        "common/pcapx/pcaputil/dlms-sn-gbt-tools/independent/rebuild.py": "dlms-sn-gbt-tools/independent/rebuild.py",
+        "common/pcapx/pcaputil/dlms-sn-gbt-tools/independent/reference-vectors.json": "dlms-sn-gbt-tools/independent/reference-vectors.json",
+        "common/pcapx/pcaputil/dlms-sn-gbt-tools/independent/verify.py": "dlms-sn-gbt-tools/independent/verify.py",
+        "common/pcapx/pcaputil/dlms-sn-gbt-tools/independent/write-body.py": "dlms-sn-gbt-tools/independent/write-body.py",
+        "common/pcapx/pcaputil/dlms-sn-gbt-tools/project-depth.py": "dlms-sn-gbt-tools/project-depth.py",
+        "common/pcapx/pcaputil/dlms-sn-gbt-tools/project.py": "dlms-sn-gbt-tools/project.py",
+        "common/pcapx/pcaputil/dlms-sn-gbt-tools/verify-captures.py": "dlms-sn-gbt-tools/verify-captures.py",
+        "common/pcapx/pcaputil/dlms-sn-gbt/captured-controls.json": "dlms-sn-gbt/captured-controls.json",
+        "common/pcapx/pcaputil/dlms-sn-gbt/captured-depth-controls.json": "dlms-sn-gbt/captured-depth-controls.json",
+        "common/pcapx/pcaputil/dlms-sn-gbt/historical-gbt-sn-write-upgrades.json": "dlms-sn-gbt/historical-gbt-sn-write-upgrades.json",
+        "scripts/protocol-tests/required-tests-traffic-unified-v165.json": "required-tests-traffic-unified-v165.json"
+      }
     }
   ],
   "schema_version": 1,

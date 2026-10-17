@@ -44,7 +44,7 @@ Run from the repository root:
 ```sh
 go run ./internal/trafficfixture/cmd/corpus test
 go test -json -count=1 -timeout=10m ./internal/trafficfixture/... ./common/bin-parser/... ./common/pcapx/... ./common/yak/cmd/yakcmds/shark-cli ./scripts/ci > traffic.jsonl
-go run ./internal/trafficfixture/cmd/corpus exec -- python3 @scripts/protocol-tests/check_go_test_json_v2.py traffic.jsonl --inventory @scripts/protocol-tests/required-tests-traffic-unified-v164.json --tier full
+go run ./internal/trafficfixture/cmd/corpus exec -- python3 @scripts/protocol-tests/check_go_test_json_v2.py traffic.jsonl --inventory @scripts/protocol-tests/required-tests-traffic-unified-v165.json --tier full
 ```
 
 The single `corpus` entry point uses the same bounded Go ZIP loader as tests.
@@ -83,7 +83,7 @@ their semantic coverage. The existing synthetic session keys are test inputs;
 production credentials, user private keys and material without redistribution
 permission belong in an external fixed-source download manifest.
 
-Current test requirements are sealed at `scripts/protocol-tests/required-tests-traffic-unified-v164.json`;
+Current test requirements are sealed at `scripts/protocol-tests/required-tests-traffic-unified-v165.json`;
 the historical inventories and all earlier batches remain unchanged.
 The supplemental small-corpus batch contains 26 minimal controls, their explicit
 expected facts, an offline generator and the compact pinned source manifest.
@@ -203,7 +203,7 @@ opaque selector bytes and one bounded Data value over Wrapper v1 TCP/UDP; object
 selector meaning, access permission and device operation are unverified. The
 original one-packet selective-access capture and original refused answer remain
 immutable; its now-supported answer is matched by exact input SHA and frame.
-The active inventory is `scripts/protocol-tests/required-tests-traffic-unified-v164.json`.
+The active inventory is `scripts/protocol-tests/required-tests-traffic-unified-v165.json`.
 
 The small-graph budget batch reuses accepted graph captures/answers and adds one
 249-byte UDP control for child count255 without child bytes. Its standalone proof
@@ -993,7 +993,7 @@ the normative answer; a missing numeric reference field is not a codec pass.
 Full/deferred, workers1/2/4, observers off/on, Feed chunks1/7/full, ownership,
 resources and close/refusal boundaries remain required.
 
-Current gate: `required-tests-traffic-unified-v164.json` with
+Current gate: `required-tests-traffic-unified-v165.json` with
 `check_go_test_json_v2.py`. The indexed validator preserves missing/unpassed,
 package invocation completion, descendant skips, failures and non-JSON checks;
 its mutation/differential harness is sealed with the material. Older checkers
@@ -1629,7 +1629,7 @@ userspace adapter; full kernel receiver/socket/timers and ECU endpoints do not.
 All161 preceding ZIPs remain byte-for-byte unchanged. Raw captures, dependencies,
 reference source/build output and process evidence stay outside Git.
 
-Current effective v164 inventory: 110,544 entries; 110,537 are mandatory for the full tier.
+Current effective v165 inventory: 111,186 entries; 111,179 are mandatory for the full tier.
 
 The opt-in `DynamicFlowControl` profile follows Linux v6.12 FC tuple updates (including WAIT without granting data). Disjoint address extensions or classical/FD carriers may share CAN IDs; unknown selectors cannot choose or mutate a conversation. Ambiguous selectors are rejected. Seven sealed cases exercise full/deferred, workers 1/2/4, and observer off/on, with exact fields, byte collections, contributor references, errors and resource ownership. The existing static FC profile remains unchanged. Pinned upstream FC and filter functions execute with declared userspace stubs; this is not a kernel/ECU endpoint. TShark 4.2.5 checks wire tuples and two complete payloads, but cannot independently reassemble the shared-address transcripts.
 
@@ -1836,3 +1836,5 @@ Wrapper SN Read upload adds bounded plaintext Q6 blocks and reverse R3 echoes, r
 Wrapper SN Write upload adds plaintext Q7 access descriptors with a separate single Data9 raw container and reverse R2 UInt16 echoes. The assembled literal Write body retains descriptor/value offsets, shared parameter/value node limits and three-mode context isolation. Forty-two new unique authored captures total63,704B; two historical and four within-batch uses are reused. All259 previous ZIPs/answers remain immutable. This joins the Read upload/common completed-echo correction in one final publication batch. Fixed unmodified reference execution proves partial ACK/raw joining then raises its existing TypeError; it does not prove complete receiver, AA/object/device success.
 
 Complete-M0 HDLC SN Read/Write upload observes CRC/HCS-valid Q6/R3 and Q7/separate-Data9/R2 blocks and assembles literal bounded request bodies. Full UInt32 logical links and observed caller/NS/NR constrain uninterrupted echo alternation; no synthetic Wrapper header, business owner or successful device operation is inferred. Thirty-five new minimal authored captures total19,333B, with two exact historical capture uses reused. An observed-SYN requester contradiction remains a TCP-only negative beside the direction-consistent reverse-caller positive; native/UDP role learning is tested separately. All260 prior ZIPs and original answers are immutable. Full link/window/interleaving, service blocks inside information groups, AA/auth/security/object/device semantics and missing original input oracles remain open.
+
+Observed Wrapper GBT can reconstruct ordinary SN Read/Write APDUs with complete typed fields, zero SN business ownership and separate observed block ACK references. Full original byte/session/resource/Close ownership assertions remain. Thirty-three new unique authored captures total12,938B; one historical capture and two within-batch duplicates are reused after all261 historical archives are checked. Pinned receiver/server source supports dispatch; normal SN sender/conformance/AA/device interoperability and the locally blocked SDK receiver execution remain unproved. Historical ZIPs and original answers stay immutable; two exact historical SN Write GBT steps gain separate capability supplements.
