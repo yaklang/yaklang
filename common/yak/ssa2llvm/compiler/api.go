@@ -11,6 +11,7 @@ import (
 	"github.com/yaklang/go-llvm"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/ssa2llvm/obfuscation"
 	"github.com/yaklang/yaklang/common/yak/ssa2llvm/profile"
 	"github.com/yaklang/yaklang/common/yak/ssa2llvm/runtime/abi"
@@ -337,6 +338,12 @@ func compileInputWithConfig(cfg *CompileConfig) (*ssaapi.Program, *Compiler, str
 	if err != nil {
 		return nil, nil, "", utils.Errorf("SSA parse failed: %v", err)
 	}
+	capturedFunctionIDs := map[int64]struct{}{}
+	progBundle.Program.EachFunction(func(fn *ssa.Function) {
+		if fn != nil && len(fn.FreeValues) > 0 {
+			capturedFunctionIDs[fn.GetId()] = struct{}{}
+		}
+	})
 	obfCtx := &obfuscation.Context{
 		SSA:           progBundle.Program,
 		EntryFunction: cfg.EntryFunctionName,
@@ -377,6 +384,7 @@ func compileInputWithConfig(cfg *CompileConfig) (*ssaapi.Program, *Compiler, str
 		WithExternBindings(cfg.ExternBindings),
 		WithInstructionTags(obfCtx.InstrTags),
 		WithRuntimeSymManifest(cfg.RuntimeSymManifest),
+		WithCapturedFunctionIDs(capturedFunctionIDs),
 	)
 	if len(obfCtx.FunctionWrappers) > 0 {
 		compilerOpts = append(compilerOpts, WithFunctionWrappers(obfCtx.FunctionWrappers))

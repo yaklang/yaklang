@@ -72,6 +72,13 @@ func (c *Compiler) addMainWrapperToModule(entryFunc string, printEntryResult boo
 	if err := c.initInvokeContext(ctxI64, abi.KindCallable, target, 0); err != nil {
 		return err
 	}
+	callable, err := c.materializeEntryCallable(entry, mainFn, entryBB, ctxI8)
+	if err != nil {
+		return fmt.Errorf("materialize entry callable: %w", err)
+	}
+	if err := c.storeCtxWordFrom(ctxI64, abi.WordTarget, callable); err != nil {
+		return err
+	}
 
 	c.emitRuntimeInvoke(ctxI8)
 	ret, err := c.loadCtxWordFrom(ctxI64, abi.WordRet, "yak_entry_ret")

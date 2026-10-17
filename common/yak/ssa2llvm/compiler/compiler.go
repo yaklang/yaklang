@@ -77,6 +77,11 @@ type Compiler struct {
 	extraCaptureCache     map[int64][]extraCapture
 	extraCaptureComputing map[int64]bool
 
+	// capturedFunctionIDs records functions that had free values before an
+	// obfuscator merged other functions into them. The merged function's
+	// FreeValues map is no longer a reliable signal for the entry wrapper.
+	capturedFunctionIDs map[int64]struct{}
+
 	function *functionCompileContext
 }
 
@@ -135,6 +140,18 @@ func (c *Compiler) runtimeSymName(canonical string) string {
 }
 
 // NewCompiler initializes a new Compiler instance.
+func WithCapturedFunctionIDs(ids map[int64]struct{}) CompilerOption {
+	return func(c *Compiler) {
+		if len(ids) == 0 {
+			return
+		}
+		c.capturedFunctionIDs = make(map[int64]struct{}, len(ids))
+		for id := range ids {
+			c.capturedFunctionIDs[id] = struct{}{}
+		}
+	}
+}
+
 func NewCompiler(ctx context.Context, prog *ssa.Program, opts ...CompilerOption) *Compiler {
 	c := llvm.NewContext()
 	comp := &Compiler{
