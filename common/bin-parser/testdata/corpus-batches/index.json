@@ -121940,6 +121940,302 @@
         "common/pcapx/pcaputil/dlms-hdlc-sn-gbt-split-header/width-captured-controls.json": "dlms-hdlc-sn-gbt-split-header/width-captured-controls.json",
         "scripts/protocol-tests/required-tests-traffic-unified-v172.json": "required-tests-traffic-unified-v172.json"
       }
+    },
+    {
+      "id": "validation-dlms-wrapper-sn-multiresult",
+      "kind": "support",
+      "source_sha": "5be32faa651b20f4eeb27f57a0a494b17edf1e88",
+      "file": "validation-dlms-wrapper-sn-multiresult.zip",
+      "sha256": "851a6bfa8a8c5293fe9cb3ce123f5baebc9d28aa9fa98ecb557b9fabf69d2ef6",
+      "password": "bin-parser",
+      "members": {
+        "dlms-sn-multiresult-captures/Read-all-definite-widths-sharedData4nodes-plus-opaque1-variant0.tcp.pcap": {
+          "bytes": 427,
+          "sha256": "0a0a7f9b015740897de0a80f7a6c5f1d5c9033870e9afea2afe925d1a511f02b"
+        },
+        "dlms-sn-multiresult-captures/Read-all-definite-widths-sharedData4nodes-plus-opaque1-variant0.udp.pcap": {
+          "bytes": 193,
+          "sha256": "32f2ecb8d7556c2065d9a357ee158927046a0e567c4d642e93e76d32aa6b3fc4"
+        },
+        "dlms-sn-multiresult-captures/Write-successNULL-error19-blocknumber0-variant0.tcp.pcap": {
+          "bytes": 406,
+          "sha256": "545118ee2e73a628796a00de384ef926f525ea0ffd62fa748302cf8e98babe8d"
+        },
+        "dlms-sn-multiresult-captures/Write-successNULL-error19-blocknumber0-variant0.udp.pcap": {
+          "bytes": 172,
+          "sha256": "e67bb68a71e61885699e4d66404cfd173bd9cf88963db886dcbbd5f8dbe79075"
+        },
+        "dlms-sn-multiresult-captures/canonical-three-mode-LN-and-reverse-preservation.tcp.pcap": {
+          "bytes": 1024,
+          "sha256": "294991595dca030417fd9754edfcd0be076c2c6e89a219e2b12a5d5e66fd9cdf"
+        },
+        "dlms-sn-multiresult-captures/canonical-three-mode-LN-and-reverse-preservation.udp.pcap": {
+          "bytes": 706,
+          "sha256": "87ad2e5b6e815d39240bb087a5d15882afd5bdfb5bc303141294509443c79f77"
+        },
+        "dlms-sn-multiresult-captures/last-raw-declared2-only1-Malformed-variant0.tcp.pcap": {
+          "bytes": 409,
+          "sha256": "ec40ac49a04fd544f6cd5cf6f8014332453d2e88553581ede954b29dd4d4bc28"
+        },
+        "dlms-sn-multiresult-captures/last-raw-declared2-only1-Malformed-variant0.udp.pcap": {
+          "bytes": 175,
+          "sha256": "83a964c11378158415f038fb279b532748f1c198060d8c4640698a22d20084c3"
+        },
+        "dlms-sn-multiresult-captures/noncanonical-last2-Unsupported-variant0.tcp.pcap": {
+          "bytes": 409,
+          "sha256": "6633e19927cc38881d9ed1abb77c64b938ff5865a9b60156d7cffd9ee088a95d"
+        },
+        "dlms-sn-multiresult-captures/noncanonical-last2-Unsupported-variant0.udp.pcap": {
+          "bytes": 175,
+          "sha256": "03a039aa7ecd5915b290530743ada81052d2c31455f0fa2dfa1b64891b2a0f4d"
+        },
+        "dlms-sn-multiresult-captures/opaque-aggregate1024-caller1024-and1023-variant0.tcp.pcap": {
+          "bytes": 1438,
+          "sha256": "e767f0c7434c0f472dc1ff74671072e62ca799f3c12d7f02e5f220db826fe73b"
+        },
+        "dlms-sn-multiresult-captures/opaque-aggregate1024-caller1024-and1023-variant0.udp.pcap": {
+          "bytes": 1204,
+          "sha256": "89397c8c1db729d3851e3b45ad062c467dfcde504009b9b01dd5e0ea9452b0b1"
+        },
+        "dlms-sn-multiresult-captures/opaque-aggregate1025-absolute1024-refusal-variant0.tcp.pcap": {
+          "bytes": 1439,
+          "sha256": "7f618d5435655b77c72cd5860a064d94fb58b9f5d0455bdda2edd07e6c1f3814"
+        },
+        "dlms-sn-multiresult-captures/opaque-aggregate1025-absolute1024-refusal-variant0.udp.pcap": {
+          "bytes": 1205,
+          "sha256": "729476b53e0be84453e10a89062e8fbeb54642984183a23bc1e84ddb6cb3713f"
+        },
+        "dlms-sn-multiresult-captures/raw-count-width5-Unsupported-variant0.tcp.pcap": {
+          "bytes": 414,
+          "sha256": "799fa66d9adefafe4fdc8cb68276adf5279baa8dc03b228697258a3a2b121a9d"
+        },
+        "dlms-sn-multiresult-captures/raw-count-width5-Unsupported-variant0.udp.pcap": {
+          "bytes": 180,
+          "sha256": "b34b7b6841827d9f7a5906a578935567c650d857963aabfda9ea55233c809c91"
+        },
+        "dlms-sn-multiresult-captures/reuse-inputs.json": {
+          "bytes": 2343,
+          "sha256": "c06aa7ece04c0532a7222185b9f5b9a0b52534db9c9cef935f7d2aa3c9faf1af"
+        },
+        "dlms-sn-multiresult-captures/successNULL-does-not-eat-extra-trailing0-variant0.tcp.pcap": {
+          "bytes": 405,
+          "sha256": "16c3d66dc9ce02f9bee4a88599e2ceb9e4e119f356b1f4cc6eaec3ef3209008a"
+        },
+        "dlms-sn-multiresult-captures/successNULL-does-not-eat-extra-trailing0-variant0.udp.pcap": {
+          "bytes": 171,
+          "sha256": "2f7b48406628e762abbaf5cd5132f4b9efad506d4eda6000970aad7c38ce0515"
+        },
+        "dlms-sn-multiresult-captures/total16-blocknumber-rows-local-boundary-variant0.tcp.pcap": {
+          "bytes": 448,
+          "sha256": "61258b509c205833f702052fede65a8e2e8a981534262b44a82c0933a615aa32"
+        },
+        "dlms-sn-multiresult-captures/total16-blocknumber-rows-local-boundary-variant0.udp.pcap": {
+          "bytes": 214,
+          "sha256": "26020328c59bc6680599ef55d99db5da9762ca505b951b1129f40cc72637c85c"
+        },
+        "dlms-sn-multiresult-captures/total17-rows-Resource-variant0.tcp.pcap": {
+          "bytes": 451,
+          "sha256": "56c3e6077179169f85db66949cca926a95f858fa9edb6899893362e39838a2aa"
+        },
+        "dlms-sn-multiresult-captures/total17-rows-Resource-variant0.udp.pcap": {
+          "bytes": 217,
+          "sha256": "105ed9541c3d8ff32d47686bf047bdf79c2e5875949f54d1ad66e0ac0fa1465e"
+        },
+        "dlms-sn-multiresult-captures/unknown-error-enum20-Unsupported-variant0.tcp.pcap": {
+          "bytes": 405,
+          "sha256": "2b20e89e74cbe768b1b9359330fc486e3c9b3da560ac006dcaa6c142a7277696"
+        },
+        "dlms-sn-multiresult-captures/unknown-error-enum20-Unsupported-variant0.udp.pcap": {
+          "bytes": 171,
+          "sha256": "3331e3c958c59a8ce9a1c1fc32283eed3f6fc27641c178d2ba5c8ccf8a1b7323"
+        },
+        "dlms-sn-multiresult-captures/unknown-result-choice4-Unsupported-variant0.tcp.pcap": {
+          "bytes": 404,
+          "sha256": "ddf0b29c7c7b69afad976f5a5777d28b34db93e1d664e881d07ae4a405e65975"
+        },
+        "dlms-sn-multiresult-captures/unknown-result-choice4-Unsupported-variant0.udp.pcap": {
+          "bytes": 170,
+          "sha256": "d74fc980efbb62243b976be2d1a503af3019b12728d17a7ed5c95e52e87fc5f1"
+        },
+        "dlms-sn-multiresult-context-tools/carrier-model.py": {
+          "bytes": 17046,
+          "sha256": "fbe803c4a7c44a41a8fe07c0ae1d6aa045b6df3e56e6cd32c1cd77ebca3549e0"
+        },
+        "dlms-sn-multiresult-context-tools/pins.json": {
+          "bytes": 922,
+          "sha256": "2998f893dd673af2518f87e8b6364e59001ba47c86606a4feb13747bef4d368a"
+        },
+        "dlms-sn-multiresult-context-tools/project.py": {
+          "bytes": 4923,
+          "sha256": "5db5e94e8320d4d580c780ada24ee2bdd475e316131fa2a95d5d6e54a805c9fa"
+        },
+        "dlms-sn-multiresult-context-tools/source-tcp.json": {
+          "bytes": 110820,
+          "sha256": "ee0efed53584607283958d432847d1aa8ad138ad7deb39a0143a95b82f1bfddf"
+        },
+        "dlms-sn-multiresult-context-tools/source-udp.json": {
+          "bytes": 157236,
+          "sha256": "86dc9a531669120ab61b20d36713a33dd8216eaee99c12566b2f611c3b8cf725"
+        },
+        "dlms-sn-multiresult-context-tools/verify.py": {
+          "bytes": 2291,
+          "sha256": "12ca300f4059da36107fa06bfff738470518cac7280104b2d354acf09500c049"
+        },
+        "dlms-sn-multiresult-source/ADOPTED-CONTRACT-v2.json": {
+          "bytes": 6458,
+          "sha256": "a0bf8a237d01b75d65a0ab7dd974d4cf090e53d5fef59012b0971431f0a669ed"
+        },
+        "dlms-sn-multiresult-source/PUBLIC-SOURCE-PINS.json": {
+          "bytes": 3111,
+          "sha256": "c22ed5c075188c8c3d0b3dcff245e524e5af3b5764ea909a5642576e010c6098"
+        },
+        "dlms-sn-multiresult-source/SOURCES.json": {
+          "bytes": 2460,
+          "sha256": "7c622421e98f0f702d7865bc3148518c24a868cdb8e4be5726e5fd8be65d1ea3"
+        },
+        "dlms-sn-multiresult-source/contract-vectors.json": {
+          "bytes": 49332,
+          "sha256": "8afc3cff91b6b12ea135c9c8a1b606c5208cd43f6dca4e0f9f97d4d7ed008b68"
+        },
+        "dlms-sn-multiresult-source/controls.json": {
+          "bytes": 861527,
+          "sha256": "6cbd4623ac896cfa2ec23212d3ab39c4af2178c1e4fece7fda2a0b7a8fc0e519"
+        },
+        "dlms-sn-multiresult-source/literal-candidates.json": {
+          "bytes": 11153,
+          "sha256": "b954edb8d07c1adda82cbab222e30368cdd530c4bcc7bd0b39e553bb0c1334ff"
+        },
+        "dlms-sn-multiresult-source/state-trace.json": {
+          "bytes": 23993,
+          "sha256": "8fe565dd26ac1fa4facf9daef9ab29b442d48346d01c343d4b9ec164c23eda60"
+        },
+        "dlms-sn-multiresult-source/three-mode-captured-controls.json": {
+          "bytes": 198783,
+          "sha256": "8a6e615d81d1a7b6b176577cbdcb7b6a1aa15e20a6a66ddd690bf662f9d287f1"
+        },
+        "dlms-sn-multiresult-source/three-mode-state-udp-projection.json": {
+          "bytes": 157236,
+          "sha256": "86dc9a531669120ab61b20d36713a33dd8216eaee99c12566b2f611c3b8cf725"
+        },
+        "dlms-sn-multiresult-source/three-mode-state.json": {
+          "bytes": 110820,
+          "sha256": "ee0efed53584607283958d432847d1aa8ad138ad7deb39a0143a95b82f1bfddf"
+        },
+        "dlms-sn-multiresult-tools/carrier-model.py": {
+          "bytes": 17046,
+          "sha256": "fbe803c4a7c44a41a8fe07c0ae1d6aa045b6df3e56e6cd32c1cd77ebca3549e0"
+        },
+        "dlms-sn-multiresult-tools/contract-vectors.py": {
+          "bytes": 12121,
+          "sha256": "47d7f0ae3e850d08722fa58ca1ceacd26e29b6331221d8ab6fa88302cdd7702f"
+        },
+        "dlms-sn-multiresult-tools/generate-full.py": {
+          "bytes": 7840,
+          "sha256": "041016328a3c89e895f84ddaf7b73240a705137e33f51b1d49e3866ac9dc9e7a"
+        },
+        "dlms-sn-multiresult-tools/generate.py": {
+          "bytes": 216,
+          "sha256": "28fdb4a836c8ebc73f1b65c51673cfb0ab49bf70828a5351040f9f22b60fea07"
+        },
+        "dlms-sn-multiresult-tools/literal-candidates.py": {
+          "bytes": 6996,
+          "sha256": "77970a32d9ed7c8c2634f1c047249efa6f3c2a09377a5984d764ee8d7c922728"
+        },
+        "dlms-sn-multiresult-tools/model-pins.json": {
+          "bytes": 1527,
+          "sha256": "0561bb56580e938f5b7b553e265d3759770ff41e148708c7f6206e94353157a3"
+        },
+        "dlms-sn-multiresult-tools/rebuild.py": {
+          "bytes": 1002,
+          "sha256": "b0bcef2590f4f5f915b35f8135b3a76fb8b7d1db3b53be2bf12547d378810182"
+        },
+        "dlms-sn-multiresult-tools/reference-vectors.json": {
+          "bytes": 4159,
+          "sha256": "59250557438767f0f7ff0a072b1decf3fe0f5768b75013142a5dfa608b0fe6c0"
+        },
+        "dlms-sn-multiresult-tools/single-outer.py": {
+          "bytes": 5985,
+          "sha256": "0b69840f2066124f48091301aea6247ec29fb86c4933d00055f60828296bd220"
+        },
+        "dlms-sn-multiresult-tools/state-trace.py": {
+          "bytes": 4806,
+          "sha256": "4824af4210eb115f11e78221edb650eddc121e8487ba76d93917569cd36bea67"
+        },
+        "dlms-sn-multiresult-tools/verify-captures.py": {
+          "bytes": 2695,
+          "sha256": "eeeb2fce9c697ece5f4532ac5f5c0e62d739b28e2969db535c4591da4e44fe40"
+        },
+        "dlms-sn-multiresult-tools/verify.py": {
+          "bytes": 3795,
+          "sha256": "3829edac434ae7ebd7340158a0ca595cbe6200f1f1527b76f3a666957643659c"
+        },
+        "required-tests-traffic-unified-v173.json": {
+          "bytes": 23565159,
+          "sha256": "8b41262c4da5e89066ba158d2594404bee01b856185d4292043d2a76ec55ebc3"
+        },
+        "validation/expected.json": {
+          "bytes": 33153,
+          "sha256": "15a17ad5dd1dde864a9ccc87886e874c47535a2f3ef52ac8db2732aa0e54c071"
+        }
+      },
+      "aliases": {
+        "common/pcapx/pcaputil/dlms-sn-multiresult-captures/Read-all-definite-widths-sharedData4nodes-plus-opaque1-variant0.tcp.pcap": "dlms-sn-multiresult-captures/Read-all-definite-widths-sharedData4nodes-plus-opaque1-variant0.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-multiresult-captures/Read-all-definite-widths-sharedData4nodes-plus-opaque1-variant0.udp.pcap": "dlms-sn-multiresult-captures/Read-all-definite-widths-sharedData4nodes-plus-opaque1-variant0.udp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-multiresult-captures/Write-successNULL-error19-blocknumber0-variant0.tcp.pcap": "dlms-sn-multiresult-captures/Write-successNULL-error19-blocknumber0-variant0.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-multiresult-captures/Write-successNULL-error19-blocknumber0-variant0.udp.pcap": "dlms-sn-multiresult-captures/Write-successNULL-error19-blocknumber0-variant0.udp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-multiresult-captures/canonical-three-mode-LN-and-reverse-preservation.tcp.pcap": "dlms-sn-multiresult-captures/canonical-three-mode-LN-and-reverse-preservation.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-multiresult-captures/canonical-three-mode-LN-and-reverse-preservation.udp.pcap": "dlms-sn-multiresult-captures/canonical-three-mode-LN-and-reverse-preservation.udp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-multiresult-captures/last-raw-declared2-only1-Malformed-variant0.tcp.pcap": "dlms-sn-multiresult-captures/last-raw-declared2-only1-Malformed-variant0.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-multiresult-captures/last-raw-declared2-only1-Malformed-variant0.udp.pcap": "dlms-sn-multiresult-captures/last-raw-declared2-only1-Malformed-variant0.udp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-multiresult-captures/noncanonical-last2-Unsupported-variant0.tcp.pcap": "dlms-sn-multiresult-captures/noncanonical-last2-Unsupported-variant0.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-multiresult-captures/noncanonical-last2-Unsupported-variant0.udp.pcap": "dlms-sn-multiresult-captures/noncanonical-last2-Unsupported-variant0.udp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-multiresult-captures/opaque-aggregate1024-caller1024-and1023-variant0.tcp.pcap": "dlms-sn-multiresult-captures/opaque-aggregate1024-caller1024-and1023-variant0.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-multiresult-captures/opaque-aggregate1024-caller1024-and1023-variant0.udp.pcap": "dlms-sn-multiresult-captures/opaque-aggregate1024-caller1024-and1023-variant0.udp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-multiresult-captures/opaque-aggregate1025-absolute1024-refusal-variant0.tcp.pcap": "dlms-sn-multiresult-captures/opaque-aggregate1025-absolute1024-refusal-variant0.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-multiresult-captures/opaque-aggregate1025-absolute1024-refusal-variant0.udp.pcap": "dlms-sn-multiresult-captures/opaque-aggregate1025-absolute1024-refusal-variant0.udp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-multiresult-captures/raw-count-width5-Unsupported-variant0.tcp.pcap": "dlms-sn-multiresult-captures/raw-count-width5-Unsupported-variant0.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-multiresult-captures/raw-count-width5-Unsupported-variant0.udp.pcap": "dlms-sn-multiresult-captures/raw-count-width5-Unsupported-variant0.udp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-multiresult-captures/reuse-inputs.json": "dlms-sn-multiresult-captures/reuse-inputs.json",
+        "common/pcapx/pcaputil/dlms-sn-multiresult-captures/successNULL-does-not-eat-extra-trailing0-variant0.tcp.pcap": "dlms-sn-multiresult-captures/successNULL-does-not-eat-extra-trailing0-variant0.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-multiresult-captures/successNULL-does-not-eat-extra-trailing0-variant0.udp.pcap": "dlms-sn-multiresult-captures/successNULL-does-not-eat-extra-trailing0-variant0.udp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-multiresult-captures/total16-blocknumber-rows-local-boundary-variant0.tcp.pcap": "dlms-sn-multiresult-captures/total16-blocknumber-rows-local-boundary-variant0.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-multiresult-captures/total16-blocknumber-rows-local-boundary-variant0.udp.pcap": "dlms-sn-multiresult-captures/total16-blocknumber-rows-local-boundary-variant0.udp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-multiresult-captures/total17-rows-Resource-variant0.tcp.pcap": "dlms-sn-multiresult-captures/total17-rows-Resource-variant0.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-multiresult-captures/total17-rows-Resource-variant0.udp.pcap": "dlms-sn-multiresult-captures/total17-rows-Resource-variant0.udp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-multiresult-captures/unknown-error-enum20-Unsupported-variant0.tcp.pcap": "dlms-sn-multiresult-captures/unknown-error-enum20-Unsupported-variant0.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-multiresult-captures/unknown-error-enum20-Unsupported-variant0.udp.pcap": "dlms-sn-multiresult-captures/unknown-error-enum20-Unsupported-variant0.udp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-multiresult-captures/unknown-result-choice4-Unsupported-variant0.tcp.pcap": "dlms-sn-multiresult-captures/unknown-result-choice4-Unsupported-variant0.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-multiresult-captures/unknown-result-choice4-Unsupported-variant0.udp.pcap": "dlms-sn-multiresult-captures/unknown-result-choice4-Unsupported-variant0.udp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-multiresult-context-tools/carrier-model.py": "dlms-sn-multiresult-context-tools/carrier-model.py",
+        "common/pcapx/pcaputil/dlms-sn-multiresult-context-tools/pins.json": "dlms-sn-multiresult-context-tools/pins.json",
+        "common/pcapx/pcaputil/dlms-sn-multiresult-context-tools/project.py": "dlms-sn-multiresult-context-tools/project.py",
+        "common/pcapx/pcaputil/dlms-sn-multiresult-context-tools/source-tcp.json": "dlms-sn-multiresult-context-tools/source-tcp.json",
+        "common/pcapx/pcaputil/dlms-sn-multiresult-context-tools/source-udp.json": "dlms-sn-multiresult-context-tools/source-udp.json",
+        "common/pcapx/pcaputil/dlms-sn-multiresult-context-tools/verify.py": "dlms-sn-multiresult-context-tools/verify.py",
+        "common/pcapx/pcaputil/dlms-sn-multiresult-source/ADOPTED-CONTRACT-v2.json": "dlms-sn-multiresult-source/ADOPTED-CONTRACT-v2.json",
+        "common/pcapx/pcaputil/dlms-sn-multiresult-source/PUBLIC-SOURCE-PINS.json": "dlms-sn-multiresult-source/PUBLIC-SOURCE-PINS.json",
+        "common/pcapx/pcaputil/dlms-sn-multiresult-source/SOURCES.json": "dlms-sn-multiresult-source/SOURCES.json",
+        "common/pcapx/pcaputil/dlms-sn-multiresult-source/contract-vectors.json": "dlms-sn-multiresult-source/contract-vectors.json",
+        "common/pcapx/pcaputil/dlms-sn-multiresult-source/controls.json": "dlms-sn-multiresult-source/controls.json",
+        "common/pcapx/pcaputil/dlms-sn-multiresult-source/literal-candidates.json": "dlms-sn-multiresult-source/literal-candidates.json",
+        "common/pcapx/pcaputil/dlms-sn-multiresult-source/state-trace.json": "dlms-sn-multiresult-source/state-trace.json",
+        "common/pcapx/pcaputil/dlms-sn-multiresult-source/three-mode-captured-controls.json": "dlms-sn-multiresult-source/three-mode-captured-controls.json",
+        "common/pcapx/pcaputil/dlms-sn-multiresult-source/three-mode-state-udp-projection.json": "dlms-sn-multiresult-source/three-mode-state-udp-projection.json",
+        "common/pcapx/pcaputil/dlms-sn-multiresult-source/three-mode-state.json": "dlms-sn-multiresult-source/three-mode-state.json",
+        "common/pcapx/pcaputil/dlms-sn-multiresult-tools/carrier-model.py": "dlms-sn-multiresult-tools/carrier-model.py",
+        "common/pcapx/pcaputil/dlms-sn-multiresult-tools/contract-vectors.py": "dlms-sn-multiresult-tools/contract-vectors.py",
+        "common/pcapx/pcaputil/dlms-sn-multiresult-tools/generate-full.py": "dlms-sn-multiresult-tools/generate-full.py",
+        "common/pcapx/pcaputil/dlms-sn-multiresult-tools/generate.py": "dlms-sn-multiresult-tools/generate.py",
+        "common/pcapx/pcaputil/dlms-sn-multiresult-tools/literal-candidates.py": "dlms-sn-multiresult-tools/literal-candidates.py",
+        "common/pcapx/pcaputil/dlms-sn-multiresult-tools/model-pins.json": "dlms-sn-multiresult-tools/model-pins.json",
+        "common/pcapx/pcaputil/dlms-sn-multiresult-tools/rebuild.py": "dlms-sn-multiresult-tools/rebuild.py",
+        "common/pcapx/pcaputil/dlms-sn-multiresult-tools/reference-vectors.json": "dlms-sn-multiresult-tools/reference-vectors.json",
+        "common/pcapx/pcaputil/dlms-sn-multiresult-tools/single-outer.py": "dlms-sn-multiresult-tools/single-outer.py",
+        "common/pcapx/pcaputil/dlms-sn-multiresult-tools/state-trace.py": "dlms-sn-multiresult-tools/state-trace.py",
+        "common/pcapx/pcaputil/dlms-sn-multiresult-tools/verify-captures.py": "dlms-sn-multiresult-tools/verify-captures.py",
+        "common/pcapx/pcaputil/dlms-sn-multiresult-tools/verify.py": "dlms-sn-multiresult-tools/verify.py",
+        "scripts/protocol-tests/required-tests-traffic-unified-v173.json": "required-tests-traffic-unified-v173.json"
+      }
     }
   ],
   "schema_version": 1,

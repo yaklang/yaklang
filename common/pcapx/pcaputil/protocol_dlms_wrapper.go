@@ -44,6 +44,7 @@ type wrapperMessage struct {
 	request, confirmed     bool
 	snServiceBlock         bool
 	snUpload               bool
+	snMultiResult          bool
 	snRead                 bool
 	snWrite                bool
 	blockNumber            uint32
@@ -446,7 +447,16 @@ func (f *binFlow) consumeWrapperReserved(dir int, w []byte, e *ProtocolEvent, fl
 		s.invalidate()
 		return wrapperError(ErrResourceExceeded, "field depth exceeds recursion budget")
 	}
-	m, err := decodeDLMSWrapperBudget(w, f.a.budget.MaxCollectionElements, f.a.budget.MaxRecursionDepth)
+	var m *wrapperMessage
+	var err error
+	if floor == 0 && wrapperSNMultiEnvelope(w) {
+		m, err = decodeWrapperSNMultiResult(w, f.a.budget.MaxCollectionElements, f.a.budget.MaxRecursionDepth)
+		if m != nil && m.snMultiResult {
+			e.Profile = "dlms-wrapper-v1-sn-multiresult"
+		}
+	} else {
+		m, err = decodeDLMSWrapperBudget(w, f.a.budget.MaxCollectionElements, f.a.budget.MaxRecursionDepth)
+	}
 	if err != nil {
 		s.invalidate()
 		return err
@@ -461,7 +471,10 @@ func (f *binFlow) consumeWrapperReserved(dir int, w []byte, e *ProtocolEvent, fl
 		if m.snWrite {
 			assoc = "unverified-sn-write-observation"
 		}
-		if m.snServiceBlock {
+		if m.snMultiResult {
+			s.retireSNMultiResult(m, dir)
+			assoc = "unverified-sn-multiresult-observation"
+		} else if m.snServiceBlock {
 			assoc, err = f.consumeWrapperSNServiceBlock(s, m, dir, e, w)
 			if err != nil {
 				return err
