@@ -130,6 +130,9 @@ func decodeSNUploadBody(body []byte, limit, depth int) (map[string]any, error) {
 	return f, nil
 }
 func wrapperSNGroupProfile(key wrapperSNKey) string {
+	if key.write {
+		return "dlms-wrapper-v1-sn-write-upload"
+	}
 	if key.upload {
 		return "dlms-wrapper-v1-sn-read-upload"
 	}
@@ -137,6 +140,9 @@ func wrapperSNGroupProfile(key wrapperSNKey) string {
 }
 
 func wrapperSNGroupCloseSummary(key wrapperSNKey) string {
+	if key.write {
+		return "DLMS Wrapper SN Write upload wire group ended before complete request body"
+	}
 	if key.upload {
 		return "DLMS Wrapper SN Read upload wire group ended before complete request body"
 	}

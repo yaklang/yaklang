@@ -333,6 +333,9 @@ func wrapperNormalAccess(w []byte) bool {
 	return len(w) > 20 && w[8] == 0xc0 && w[9] == 1 && w[20] == 1
 }
 func wrapperProfile(w []byte) string {
+	if wrapperIsSNWriteUpload(w) {
+		return "dlms-wrapper-v1-sn-write-upload"
+	}
 	if wrapperIsSNUpload(w) {
 		return "dlms-wrapper-v1-sn-read-upload"
 	}
@@ -387,6 +390,9 @@ func wrapperProfile(w []byte) string {
 	return "dlms-wrapper-v1-get-normal"
 }
 func wrapperProbeVersion(w []byte) string {
+	if wrapperIsSNWriteUpload(w) {
+		return "v1-sn-write-upload"
+	}
 	if wrapperIsSNUpload(w) {
 		return "v1-sn-read-upload"
 	}

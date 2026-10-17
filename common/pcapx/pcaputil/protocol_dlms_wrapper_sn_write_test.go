@@ -41,6 +41,9 @@ func snWriteCases(t *testing.T, name, pin string, count int) []snWriteControl {
 	for i, c := range d.Cases {
 		out[i] = snWriteControl{c, h.Cases[i].UDP, h.Cases[i].TCP, map[bool]string{true: "dlms-wrapper-sn-write-gbt-supplement", false: "dlms-wrapper-sn-write"}[name == "gbt-supplement.json"]}
 	}
+	if name == "controls.json" {
+		out = snWriteUploadUpgradeHistoricalWrite(t, raw, out)
+	}
 	return out
 }
 func snWriteTypes(t *testing.T, v any) {
@@ -228,6 +231,9 @@ func snWriteMatrix(t *testing.T, cases []snWriteControl) {
 				if c.Folder == "dlms-hdlc-sn-write-resources" {
 					reuseFolder, reuseEnv = c.Folder, "DLMS_HDLC_SN_WRITE_TEST_ROOT"
 				}
+				if c.Folder == "dlms-sn-write-upload-captures" {
+					reuseFolder, reuseEnv = c.Folder, "DLMS_SN_WRITE_UPLOAD_TEST_ROOT"
+				}
 				if c.Folder == "dlms-sn-upload-captures" {
 					reuseFolder, reuseEnv = c.Folder, "DLMS_SN_UPLOAD_TEST_ROOT"
 				}
@@ -244,7 +250,7 @@ func snWriteMatrix(t *testing.T, cases []snWriteControl) {
 				if p, ok := reuse[name]; ok {
 					require.True(t, strings.HasPrefix(p, "common/pcapx/pcaputil/"))
 					const prefix = "common/pcapx/pcaputil/"
-					if (c.Folder == "dlms-sn-parameterized-wrapper" || c.Folder == "dlms-sn-read-block-captures" || c.Folder == "dlms-sn-upload-captures") && strings.HasPrefix(p, prefix+c.Folder+"/") {
+					if (c.Folder == "dlms-sn-parameterized-wrapper" || c.Folder == "dlms-sn-read-block-captures" || c.Folder == "dlms-sn-upload-captures" || c.Folder == "dlms-sn-write-upload-captures") && strings.HasPrefix(p, prefix+c.Folder+"/") {
 						name := strings.TrimPrefix(p, prefix+c.Folder+"/")
 						require.NotContains(t, name, "/")
 						raw = finsReadBatch(t, c.Folder, reuseEnv, name)

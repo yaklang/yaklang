@@ -118165,6 +118165,392 @@
         "common/pcapx/pcaputil/dlms-sn-upload-captures/wrong-context-does-not-consume-echo.udp.pcap": "dlms-sn-upload-captures/wrong-context-does-not-consume-echo.udp.pcap",
         "scripts/protocol-tests/required-tests-traffic-unified-v162.json": "required-tests-traffic-unified-v162.json"
       }
+    },
+    {
+      "id": "validation-dlms-sn-write-upload",
+      "kind": "support",
+      "source_sha": "20a8b8bfb505ffb4cfd5ae2bd804616fd33e3970",
+      "file": "validation-dlms-sn-write-upload.zip",
+      "sha256": "1176764d374b1933a781a5e9d05212d92446ae14a6dfe8719a20c4a4580765e5",
+      "password": "bin-parser",
+      "members": {
+        "dlms-sn-write-upload-captures/LN-owner-preserved-across-Write-upload.tcp.pcap": {
+          "bytes": 673,
+          "sha256": "7253b531d26bdef74506eb3b4bcfe63de40767869e7f03d13f5e85829a29724c"
+        },
+        "dlms-sn-write-upload-captures/LN-owner-preserved-across-Write-upload.udp.pcap": {
+          "bytes": 403,
+          "sha256": "47bf702434bc4633fb0cc20bc5a0a567ada6b1d1fbbfaddd5dba7d981a73bb7c"
+        },
+        "dlms-sn-write-upload-captures/Write-aggregate-raw-1024.tcp.pcap": {
+          "bytes": 1519,
+          "sha256": "47a39370091ed1e7fa4d8e78a52ec18b10361290e5c2cf6a13a409a39e8578f9"
+        },
+        "dlms-sn-write-upload-captures/Write-aggregate-raw-1024.udp.pcap": {
+          "bytes": 1273,
+          "sha256": "330a945b6e3f885e4fe1baa366ca5173a3016531537b299a62c4329a29cc3e02"
+        },
+        "dlms-sn-write-upload-captures/Write-aggregate-raw-1025.tcp.pcap": {
+          "bytes": 1601,
+          "sha256": "edf542bbc96de84fdb5003b91aaaed1f9bb2415daf7762f4acb0e5daddba0cba"
+        },
+        "dlms-sn-write-upload-captures/Write-aggregate-raw-1025.udp.pcap": {
+          "bytes": 1343,
+          "sha256": "efec477d643d36810190e2577d759b79ef39dd127aa66f2a21a066c5ed75e2ee"
+        },
+        "dlms-sn-write-upload-captures/Write-block-history-64.tcp.pcap": {
+          "bytes": 11038,
+          "sha256": "a5c5be663f139b969421c550072d876a616738d941baa841a47e9a5c8061417c"
+        },
+        "dlms-sn-write-upload-captures/Write-block-history-64.udp.pcap": {
+          "bytes": 9304,
+          "sha256": "e6fe5fcf8616e1002b0d1f7c3ae5f81662562e2c4160fe8428a0c54e761965e4"
+        },
+        "dlms-sn-write-upload-captures/Write-block-history-65.tcp.pcap": {
+          "bytes": 11289,
+          "sha256": "191afc6c845d39e2c3396aaca2a049c2b1a66d3443007eb29e64830f941261a2"
+        },
+        "dlms-sn-write-upload-captures/Write-block-history-65.udp.pcap": {
+          "bytes": 9519,
+          "sha256": "2286983b9f0a740c5a503503e317c583bc3e5f865539c73fefa5510eacd1c2c8"
+        },
+        "dlms-sn-write-upload-captures/Write-number-gap-after-echo.tcp.pcap": {
+          "bytes": 498,
+          "sha256": "2eeeadd4636da5470c8e017c2894642fa79fc13161cb6e85c6521e8e244619e7"
+        },
+        "dlms-sn-write-upload-captures/Write-number-gap-after-echo.udp.pcap": {
+          "bytes": 252,
+          "sha256": "552bb8b549cb95c75c33817210b413de8c4d49223bca565a337d2791fb80fa84"
+        },
+        "dlms-sn-write-upload-captures/changed-repeat-retires-Write-group.tcp.pcap": {
+          "bytes": 589,
+          "sha256": "3f407781e26fc64f7105b45c1e1bba91dcb4e6ab93bce96d5ec5d1b9551d8d20"
+        },
+        "dlms-sn-write-upload-captures/changed-repeat-retires-Write-group.udp.pcap": {
+          "bytes": 331,
+          "sha256": "1f69616a616de1485fe935226c35b798fc1e7288c86f12ba8fbb27a7d4796e8b"
+        },
+        "dlms-sn-write-upload-captures/completed-Write-nonexact-echo-retires.tcp.pcap": {
+          "bytes": 672,
+          "sha256": "f60b5acad341a39a0457ec057758e20a2ef6e65f26902fa7a4a2ff7a618ce3c1"
+        },
+        "dlms-sn-write-upload-captures/completed-Write-nonexact-echo-retires.udp.pcap": {
+          "bytes": 402,
+          "sha256": "d90baad6a83a9ff5a636e845853e03936c405c31439b7efcb7d7cc443575188b"
+        },
+        "dlms-sn-write-upload-captures/joined-Write-body-trailing-invalidates-LN.tcp.pcap": {
+          "bytes": 674,
+          "sha256": "41fc74c8713233c33e31f5363d7afc0dc556fb5f0c0c34395ac415c5ca65674a"
+        },
+        "dlms-sn-write-upload-captures/joined-Write-body-trailing-invalidates-LN.udp.pcap": {
+          "bytes": 404,
+          "sha256": "2f24f1cf5c14dda6e4cbd57ebbfadb5b87bf28a374ca7b141e3ed00d57a9c150"
+        },
+        "dlms-sn-write-upload-captures/missing-Write-echo-retires-before-next.tcp.pcap": {
+          "bytes": 498,
+          "sha256": "f47b590e7b27d908c6f37ebf0bb1192487112f22ec52b0b2a0ee800735fded75"
+        },
+        "dlms-sn-write-upload-captures/missing-Write-echo-retires-before-next.udp.pcap": {
+          "bytes": 252,
+          "sha256": "f0b21fe3cc7aa1e67d364057b3cf30ca126e1d2aaaf8ef55c49476e9304f4402"
+        },
+        "dlms-sn-write-upload-captures/outer-Write-container-format-errors-still-distinct.tcp.pcap": {
+          "bytes": 913,
+          "sha256": "190c5f6342ece27de1ff73273c486bab43621eb457d2f1da1c627eb6ecf7bc78"
+        },
+        "dlms-sn-write-upload-captures/outer-Write-container-format-errors-still-distinct.udp.pcap": {
+          "bytes": 607,
+          "sha256": "9bf13d5da280320e353ce0724bcb4b3850f6ba69f74be4fb6a92d8bd43a887e1"
+        },
+        "dlms-sn-write-upload-captures/outer-plus-parameter-and-value-five-nodes-cap4.tcp.pcap": {
+          "bytes": 586,
+          "sha256": "d1df801d940bb62199501810b2c83cec8bcfe0ae827e00edc996e710d017a129"
+        },
+        "dlms-sn-write-upload-captures/outer-plus-parameter-and-value-five-nodes-cap4.udp.pcap": {
+          "bytes": 328,
+          "sha256": "891afc3ebf0ca7620b2d2361f8200f3e1f3375ced786c753fec38ffc7ca36edd"
+        },
+        "dlms-sn-write-upload-captures/outer-plus-parameter-and-value-five-nodes-cap5.tcp.pcap": {
+          "bytes": 505,
+          "sha256": "e1448f365d7a0483149ddd44c08f569475d2e08de8b22f3834840f334aa6ea37"
+        },
+        "dlms-sn-write-upload-captures/outer-plus-parameter-and-value-five-nodes-cap5.udp.pcap": {
+          "bytes": 259,
+          "sha256": "0f550727b7dc667931747b3d693b1f31f88b4e86cfca25da0aca345a2796f7bc"
+        },
+        "dlms-sn-write-upload-captures/recent-repeats-request-boundary-and-active-Close.tcp.pcap": {
+          "bytes": 1105,
+          "sha256": "0b3af560e20a23ade3802a27bbae866e8f949816fe9ccc07c007a0ef22124b37"
+        },
+        "dlms-sn-write-upload-captures/recent-repeats-request-boundary-and-active-Close.udp.pcap": {
+          "bytes": 775,
+          "sha256": "65ef63f038dc84b5071a58c5a8eeb65eccb82962be9fe88eda3a98939e981732"
+        },
+        "dlms-sn-write-upload-captures/reuse-inputs.json": {
+          "bytes": 845,
+          "sha256": "8bd787023d9090f0da720d3418eb3f0055589e9c689e4158e3fe55cff66bcf26"
+        },
+        "dlms-sn-write-upload-captures/same-tuple-three-mode-context-cap2.tcp.pcap": {
+          "bytes": 601,
+          "sha256": "994b31e8494a8ff1d2ee31cb980c9ef1fa02dee7b2143c4f9758c876bca4062b"
+        },
+        "dlms-sn-write-upload-captures/same-tuple-three-mode-context-cap2.udp.pcap": {
+          "bytes": 343,
+          "sha256": "b781c423826fefde680a2533165862881d6397939394044977916a9094ccd956"
+        },
+        "dlms-sn-write-upload-captures/same-tuple-three-mode-context-cap3.tcp.pcap": {
+          "bytes": 507,
+          "sha256": "f8870c0373d467283d586a984465d2d15ac034b8062a1439e986420eecc8c08f"
+        },
+        "dlms-sn-write-upload-captures/same-tuple-three-mode-context-cap3.udp.pcap": {
+          "bytes": 261,
+          "sha256": "766d4ad254f8102ab363a2b1ad4e13f3d70e86b1562e116299aea19d4daa9e2f"
+        },
+        "dlms-sn-write-upload-captures/single-last-Write-body.tcp.pcap": {
+          "bytes": 409,
+          "sha256": "fed84f7bc52d069a4705cdd7457175a7cc9936d1946b21b6a0962d44055699f4"
+        },
+        "dlms-sn-write-upload-captures/single-last-Write-body.udp.pcap": {
+          "bytes": 175,
+          "sha256": "950eed5930398c9532446e605fc126ccd4bd2b59dc9e69d2b81bde1b40021de0"
+        },
+        "dlms-sn-write-upload-captures/singlelast-outer-plus-value-cap1.tcp.pcap": {
+          "bytes": 584,
+          "sha256": "8fe7b0ab53bcf1aca0661fce176ee89db5628c3418ed64de2f2f8be02ebcf3f5"
+        },
+        "dlms-sn-write-upload-captures/singlelast-outer-plus-value-cap1.udp.pcap": {
+          "bytes": 326,
+          "sha256": "1af6208d508a122467de306c6406c0c8edcba5975d020d042aeb50c3f84cf532"
+        },
+        "dlms-sn-write-upload-captures/singlelast-outer-plus-value-cap2.tcp.pcap": {
+          "bytes": 503,
+          "sha256": "67068944f4b5caaf5e76d8b54ca5f71dfe2eee3de6c370746c57d93aa4c5f8d1"
+        },
+        "dlms-sn-write-upload-captures/singlelast-outer-plus-value-cap2.udp.pcap": {
+          "bytes": 257,
+          "sha256": "61570742425e4af64b384cdac0af4db35129c0fc94a4e951ebfa972cb7d73f46"
+        },
+        "dlms-sn-write-upload-captures/two-block-Write-body-and-unpaired-success.tcp.pcap": {
+          "bytes": 579,
+          "sha256": "8bfac6fba2d9300f4068e168ff25e581acc2df4b3fb687c81b7b3892a3cf79df"
+        },
+        "dlms-sn-write-upload-captures/two-block-Write-body-and-unpaired-success.udp.pcap": {
+          "bytes": 321,
+          "sha256": "fad5f884d0bdd3714b8e0c4fd70036cefcc415f914c422eed69ad0fd01a03093"
+        },
+        "dlms-sn-write-upload-captures/wrong-Write-context-preserves-original.tcp.pcap": {
+          "bytes": 754,
+          "sha256": "74a2491380c195033e8943a364e060a7b36d1fc4dccafdbb12ac5f1bc295e4c1"
+        },
+        "dlms-sn-write-upload-captures/wrong-Write-context-preserves-original.udp.pcap": {
+          "bytes": 472,
+          "sha256": "f239a204e138e5c82094dc8762cd7b9c1946c1717b03dd16acb1f3ae18c6d705"
+        },
+        "dlms-sn-write-upload-source/BASELINE-CANDIDATES.json": {
+          "bytes": 8836,
+          "sha256": "0be56458f16964ebf0c5158387dc2e5a0ececbeafa3ab3c68d894971d53a55ef"
+        },
+        "dlms-sn-write-upload-source/CANDIDATES.json": {
+          "bytes": 23166,
+          "sha256": "f028cd91034362a35aa7e9fcdc8c4aaed7d3e7ada0a1fb6b21db1fb4d040d412"
+        },
+        "dlms-sn-write-upload-source/REFERENCE-ADDENDUM.json": {
+          "bytes": 1547,
+          "sha256": "32e9744585a38f1258a543049a0f1d12243dc44c6d342543ddbeabc2b3d4b2c8"
+        },
+        "dlms-sn-write-upload-source/SOURCE-EVIDENCE.json": {
+          "bytes": 5999,
+          "sha256": "5bd06863f290774438c3f28945f21a3888fd6e2d85f61f57aa78f4ac1451296f"
+        },
+        "dlms-sn-write-upload-source/source-controls.json": {
+          "bytes": 1538607,
+          "sha256": "7ee7bb5d9556a1c6b1496d1cc4e1703c4da4bb9b9f8484b2c21b027bbcfeccf2"
+        },
+        "dlms-sn-write-upload-tools/SOURCES.json": {
+          "bytes": 9568,
+          "sha256": "0e6a3c64cf8aa31da4008d7b06ef3d007f1af28ee847842f60e97347b58d57fb"
+        },
+        "dlms-sn-write-upload-tools/access.py": {
+          "bytes": 4392,
+          "sha256": "70f03ceffb0556b966d04829dc89384c20b73bc6104c8ed637e5ed0b97d8bc7e"
+        },
+        "dlms-sn-write-upload-tools/capture-checks.py": {
+          "bytes": 858,
+          "sha256": "773153f31c80ec4acb5cf5006a7dce3731b44f32ec55aff217550336216dd698"
+        },
+        "dlms-sn-write-upload-tools/carrier.py": {
+          "bytes": 1215,
+          "sha256": "bdf106ef2372b348e5af5a2bc62abd8d70e37da87739216bfe05b7182fafe5e2"
+        },
+        "dlms-sn-write-upload-tools/download-outer.py": {
+          "bytes": 5985,
+          "sha256": "0b69840f2066124f48091301aea6247ec29fb86c4933d00055f60828296bd220"
+        },
+        "dlms-sn-write-upload-tools/download-reference-vectors.json": {
+          "bytes": 4159,
+          "sha256": "59250557438767f0f7ff0a072b1decf3fe0f5768b75013142a5dfa608b0fe6c0"
+        },
+        "dlms-sn-write-upload-tools/generate.py": {
+          "bytes": 8875,
+          "sha256": "a2fc7d4f2188f0b7773a45adaf0e456c92a4edf8f68b1ed777a6e09fe1d80e5d"
+        },
+        "dlms-sn-write-upload-tools/history/SOURCES.json": {
+          "bytes": 2376,
+          "sha256": "a875f053936e4a3f7da6ed9d31b9e95f8906c6446c91cf65240bb4a28742711a"
+        },
+        "dlms-sn-write-upload-tools/history/build.py": {
+          "bytes": 6891,
+          "sha256": "b197b2b46868075920753d3e14594b6ed23e6fd96f94db849ffd9c3c6d33a418"
+        },
+        "dlms-sn-write-upload-tools/history/verify.py": {
+          "bytes": 2178,
+          "sha256": "8dab36e825b16c007fc89efc43068fab2cf975d0f45020fe0bba44bd6b6c5427"
+        },
+        "dlms-sn-write-upload-tools/lifecycle.py": {
+          "bytes": 3360,
+          "sha256": "f4f182e42f43820582582de7d5af41f6811d79c565c73ee002df42114bd8de1c"
+        },
+        "dlms-sn-write-upload-tools/model.py": {
+          "bytes": 15781,
+          "sha256": "609ba979ea49fc353ccd92fadf99edbc5100e4f1637eaa4444fcace579c903dc"
+        },
+        "dlms-sn-write-upload-tools/pins.json": {
+          "bytes": 1899,
+          "sha256": "4397b8addd6045fc32c76fc672608b8e2046b3d011142b40bf84af552945c368"
+        },
+        "dlms-sn-write-upload-tools/read-body.py": {
+          "bytes": 4002,
+          "sha256": "9038061ed63630258c65a5b9e11e51888d414b290fea0aa2bd14743e2a7af4cd"
+        },
+        "dlms-sn-write-upload-tools/rebuild.py": {
+          "bytes": 466,
+          "sha256": "325f98b44c5f5fd7f34715288b4e377157be4b732ca7004068a8bf01ed802e87"
+        },
+        "dlms-sn-write-upload-tools/reference-vectors.json": {
+          "bytes": 6734,
+          "sha256": "3d7c0f01b305e3524efa5dab640dd9ae4730fe7ed789ca9ef015a5c39b846b8d"
+        },
+        "dlms-sn-write-upload-tools/source-outer.py": {
+          "bytes": 8836,
+          "sha256": "4505d905a3a96b22ac3f91e00033d4146c3bf5e75794a2ad25f60b5e3e7145a1"
+        },
+        "dlms-sn-write-upload-tools/verify-captures.py": {
+          "bytes": 3466,
+          "sha256": "89abe4efbf0c24ae4af6e797662c045edcb09961978f90f82281ead850f62c80"
+        },
+        "dlms-sn-write-upload-tools/verify.py": {
+          "bytes": 6271,
+          "sha256": "17c025bad58a459c92bacae440ceaf7cf8fa7efcdbb0482c5ea104fa11a7f55e"
+        },
+        "dlms-sn-write-upload-tools/write-body.py": {
+          "bytes": 5706,
+          "sha256": "4818c0264cb4819cf5d4715a855b4f3817acf26c0c6b15ff558aaa7d3b4aa094"
+        },
+        "dlms-sn-write-upload-tools/write-source.py": {
+          "bytes": 8800,
+          "sha256": "46e574590d006649212a255cd2fc85d226165f0ce27f5cc7a01f88211720de0a"
+        },
+        "dlms-sn-write-upload/full-baseline-controls.json": {
+          "bytes": 209745,
+          "sha256": "c9f3b776b768eb94b4ab6229e83ce9afac03f44b17b567a6a8dbad832c45a5a1"
+        },
+        "dlms-sn-write-upload/full-controls.json": {
+          "bytes": 8194402,
+          "sha256": "e1f3e7ad9e8088c8769c6153fa614778f29ddb768c750041e3b31f9a20448df8"
+        },
+        "dlms-sn-write-upload/historical-write-upload-echo-upgrade.json": {
+          "bytes": 458383,
+          "sha256": "8664d67004cf52460a1fbdf0ea65f3a0d5d6bdf5ca704d079bb02caaba0936b4"
+        },
+        "dlms-sn-write-upload/lifecycle-controls.json": {
+          "bytes": 86590,
+          "sha256": "ec611a9fee8dbd961c99a1283cf090993aa38a97904b34f4862af203b7ebf0d4"
+        },
+        "required-tests-traffic-unified-v163.json": {
+          "bytes": 21996261,
+          "sha256": "0a0f67437565fa52941c04f1de5e82962bd1a7a9a759a85e61861091e09aed31"
+        },
+        "validation/expected.json": {
+          "bytes": 54507,
+          "sha256": "25eba321aefab6268b78748b1cff3e50c02cfa4b78bd1d7af33c5d89b64909ba"
+        }
+      },
+      "aliases": {
+        "common/pcapx/pcaputil/dlms-sn-write-upload-captures/LN-owner-preserved-across-Write-upload.tcp.pcap": "dlms-sn-write-upload-captures/LN-owner-preserved-across-Write-upload.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-write-upload-captures/LN-owner-preserved-across-Write-upload.udp.pcap": "dlms-sn-write-upload-captures/LN-owner-preserved-across-Write-upload.udp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-write-upload-captures/Write-aggregate-raw-1024.tcp.pcap": "dlms-sn-write-upload-captures/Write-aggregate-raw-1024.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-write-upload-captures/Write-aggregate-raw-1024.udp.pcap": "dlms-sn-write-upload-captures/Write-aggregate-raw-1024.udp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-write-upload-captures/Write-aggregate-raw-1025.tcp.pcap": "dlms-sn-write-upload-captures/Write-aggregate-raw-1025.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-write-upload-captures/Write-aggregate-raw-1025.udp.pcap": "dlms-sn-write-upload-captures/Write-aggregate-raw-1025.udp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-write-upload-captures/Write-block-history-64.tcp.pcap": "dlms-sn-write-upload-captures/Write-block-history-64.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-write-upload-captures/Write-block-history-64.udp.pcap": "dlms-sn-write-upload-captures/Write-block-history-64.udp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-write-upload-captures/Write-block-history-65.tcp.pcap": "dlms-sn-write-upload-captures/Write-block-history-65.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-write-upload-captures/Write-block-history-65.udp.pcap": "dlms-sn-write-upload-captures/Write-block-history-65.udp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-write-upload-captures/Write-number-gap-after-echo.tcp.pcap": "dlms-sn-write-upload-captures/Write-number-gap-after-echo.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-write-upload-captures/Write-number-gap-after-echo.udp.pcap": "dlms-sn-write-upload-captures/Write-number-gap-after-echo.udp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-write-upload-captures/changed-repeat-retires-Write-group.tcp.pcap": "dlms-sn-write-upload-captures/changed-repeat-retires-Write-group.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-write-upload-captures/changed-repeat-retires-Write-group.udp.pcap": "dlms-sn-write-upload-captures/changed-repeat-retires-Write-group.udp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-write-upload-captures/completed-Write-nonexact-echo-retires.tcp.pcap": "dlms-sn-write-upload-captures/completed-Write-nonexact-echo-retires.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-write-upload-captures/completed-Write-nonexact-echo-retires.udp.pcap": "dlms-sn-write-upload-captures/completed-Write-nonexact-echo-retires.udp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-write-upload-captures/joined-Write-body-trailing-invalidates-LN.tcp.pcap": "dlms-sn-write-upload-captures/joined-Write-body-trailing-invalidates-LN.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-write-upload-captures/joined-Write-body-trailing-invalidates-LN.udp.pcap": "dlms-sn-write-upload-captures/joined-Write-body-trailing-invalidates-LN.udp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-write-upload-captures/missing-Write-echo-retires-before-next.tcp.pcap": "dlms-sn-write-upload-captures/missing-Write-echo-retires-before-next.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-write-upload-captures/missing-Write-echo-retires-before-next.udp.pcap": "dlms-sn-write-upload-captures/missing-Write-echo-retires-before-next.udp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-write-upload-captures/outer-Write-container-format-errors-still-distinct.tcp.pcap": "dlms-sn-write-upload-captures/outer-Write-container-format-errors-still-distinct.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-write-upload-captures/outer-Write-container-format-errors-still-distinct.udp.pcap": "dlms-sn-write-upload-captures/outer-Write-container-format-errors-still-distinct.udp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-write-upload-captures/outer-plus-parameter-and-value-five-nodes-cap4.tcp.pcap": "dlms-sn-write-upload-captures/outer-plus-parameter-and-value-five-nodes-cap4.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-write-upload-captures/outer-plus-parameter-and-value-five-nodes-cap4.udp.pcap": "dlms-sn-write-upload-captures/outer-plus-parameter-and-value-five-nodes-cap4.udp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-write-upload-captures/outer-plus-parameter-and-value-five-nodes-cap5.tcp.pcap": "dlms-sn-write-upload-captures/outer-plus-parameter-and-value-five-nodes-cap5.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-write-upload-captures/outer-plus-parameter-and-value-five-nodes-cap5.udp.pcap": "dlms-sn-write-upload-captures/outer-plus-parameter-and-value-five-nodes-cap5.udp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-write-upload-captures/recent-repeats-request-boundary-and-active-Close.tcp.pcap": "dlms-sn-write-upload-captures/recent-repeats-request-boundary-and-active-Close.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-write-upload-captures/recent-repeats-request-boundary-and-active-Close.udp.pcap": "dlms-sn-write-upload-captures/recent-repeats-request-boundary-and-active-Close.udp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-write-upload-captures/reuse-inputs.json": "dlms-sn-write-upload-captures/reuse-inputs.json",
+        "common/pcapx/pcaputil/dlms-sn-write-upload-captures/same-tuple-three-mode-context-cap2.tcp.pcap": "dlms-sn-write-upload-captures/same-tuple-three-mode-context-cap2.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-write-upload-captures/same-tuple-three-mode-context-cap2.udp.pcap": "dlms-sn-write-upload-captures/same-tuple-three-mode-context-cap2.udp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-write-upload-captures/same-tuple-three-mode-context-cap3.tcp.pcap": "dlms-sn-write-upload-captures/same-tuple-three-mode-context-cap3.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-write-upload-captures/same-tuple-three-mode-context-cap3.udp.pcap": "dlms-sn-write-upload-captures/same-tuple-three-mode-context-cap3.udp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-write-upload-captures/single-last-Write-body.tcp.pcap": "dlms-sn-write-upload-captures/single-last-Write-body.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-write-upload-captures/single-last-Write-body.udp.pcap": "dlms-sn-write-upload-captures/single-last-Write-body.udp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-write-upload-captures/singlelast-outer-plus-value-cap1.tcp.pcap": "dlms-sn-write-upload-captures/singlelast-outer-plus-value-cap1.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-write-upload-captures/singlelast-outer-plus-value-cap1.udp.pcap": "dlms-sn-write-upload-captures/singlelast-outer-plus-value-cap1.udp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-write-upload-captures/singlelast-outer-plus-value-cap2.tcp.pcap": "dlms-sn-write-upload-captures/singlelast-outer-plus-value-cap2.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-write-upload-captures/singlelast-outer-plus-value-cap2.udp.pcap": "dlms-sn-write-upload-captures/singlelast-outer-plus-value-cap2.udp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-write-upload-captures/two-block-Write-body-and-unpaired-success.tcp.pcap": "dlms-sn-write-upload-captures/two-block-Write-body-and-unpaired-success.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-write-upload-captures/two-block-Write-body-and-unpaired-success.udp.pcap": "dlms-sn-write-upload-captures/two-block-Write-body-and-unpaired-success.udp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-write-upload-captures/wrong-Write-context-preserves-original.tcp.pcap": "dlms-sn-write-upload-captures/wrong-Write-context-preserves-original.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-write-upload-captures/wrong-Write-context-preserves-original.udp.pcap": "dlms-sn-write-upload-captures/wrong-Write-context-preserves-original.udp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-write-upload-source/BASELINE-CANDIDATES.json": "dlms-sn-write-upload-source/BASELINE-CANDIDATES.json",
+        "common/pcapx/pcaputil/dlms-sn-write-upload-source/CANDIDATES.json": "dlms-sn-write-upload-source/CANDIDATES.json",
+        "common/pcapx/pcaputil/dlms-sn-write-upload-source/REFERENCE-ADDENDUM.json": "dlms-sn-write-upload-source/REFERENCE-ADDENDUM.json",
+        "common/pcapx/pcaputil/dlms-sn-write-upload-source/SOURCE-EVIDENCE.json": "dlms-sn-write-upload-source/SOURCE-EVIDENCE.json",
+        "common/pcapx/pcaputil/dlms-sn-write-upload-source/source-controls.json": "dlms-sn-write-upload-source/source-controls.json",
+        "common/pcapx/pcaputil/dlms-sn-write-upload-tools/SOURCES.json": "dlms-sn-write-upload-tools/SOURCES.json",
+        "common/pcapx/pcaputil/dlms-sn-write-upload-tools/access.py": "dlms-sn-write-upload-tools/access.py",
+        "common/pcapx/pcaputil/dlms-sn-write-upload-tools/capture-checks.py": "dlms-sn-write-upload-tools/capture-checks.py",
+        "common/pcapx/pcaputil/dlms-sn-write-upload-tools/carrier.py": "dlms-sn-write-upload-tools/carrier.py",
+        "common/pcapx/pcaputil/dlms-sn-write-upload-tools/download-outer.py": "dlms-sn-write-upload-tools/download-outer.py",
+        "common/pcapx/pcaputil/dlms-sn-write-upload-tools/download-reference-vectors.json": "dlms-sn-write-upload-tools/download-reference-vectors.json",
+        "common/pcapx/pcaputil/dlms-sn-write-upload-tools/generate.py": "dlms-sn-write-upload-tools/generate.py",
+        "common/pcapx/pcaputil/dlms-sn-write-upload-tools/history/SOURCES.json": "dlms-sn-write-upload-tools/history/SOURCES.json",
+        "common/pcapx/pcaputil/dlms-sn-write-upload-tools/history/build.py": "dlms-sn-write-upload-tools/history/build.py",
+        "common/pcapx/pcaputil/dlms-sn-write-upload-tools/history/verify.py": "dlms-sn-write-upload-tools/history/verify.py",
+        "common/pcapx/pcaputil/dlms-sn-write-upload-tools/lifecycle.py": "dlms-sn-write-upload-tools/lifecycle.py",
+        "common/pcapx/pcaputil/dlms-sn-write-upload-tools/model.py": "dlms-sn-write-upload-tools/model.py",
+        "common/pcapx/pcaputil/dlms-sn-write-upload-tools/pins.json": "dlms-sn-write-upload-tools/pins.json",
+        "common/pcapx/pcaputil/dlms-sn-write-upload-tools/read-body.py": "dlms-sn-write-upload-tools/read-body.py",
+        "common/pcapx/pcaputil/dlms-sn-write-upload-tools/rebuild.py": "dlms-sn-write-upload-tools/rebuild.py",
+        "common/pcapx/pcaputil/dlms-sn-write-upload-tools/reference-vectors.json": "dlms-sn-write-upload-tools/reference-vectors.json",
+        "common/pcapx/pcaputil/dlms-sn-write-upload-tools/source-outer.py": "dlms-sn-write-upload-tools/source-outer.py",
+        "common/pcapx/pcaputil/dlms-sn-write-upload-tools/verify-captures.py": "dlms-sn-write-upload-tools/verify-captures.py",
+        "common/pcapx/pcaputil/dlms-sn-write-upload-tools/verify.py": "dlms-sn-write-upload-tools/verify.py",
+        "common/pcapx/pcaputil/dlms-sn-write-upload-tools/write-body.py": "dlms-sn-write-upload-tools/write-body.py",
+        "common/pcapx/pcaputil/dlms-sn-write-upload-tools/write-source.py": "dlms-sn-write-upload-tools/write-source.py",
+        "common/pcapx/pcaputil/dlms-sn-write-upload/full-baseline-controls.json": "dlms-sn-write-upload/full-baseline-controls.json",
+        "common/pcapx/pcaputil/dlms-sn-write-upload/full-controls.json": "dlms-sn-write-upload/full-controls.json",
+        "common/pcapx/pcaputil/dlms-sn-write-upload/historical-write-upload-echo-upgrade.json": "dlms-sn-write-upload/historical-write-upload-echo-upgrade.json",
+        "common/pcapx/pcaputil/dlms-sn-write-upload/lifecycle-controls.json": "dlms-sn-write-upload/lifecycle-controls.json",
+        "scripts/protocol-tests/required-tests-traffic-unified-v163.json": "required-tests-traffic-unified-v163.json"
+      }
     }
   ],
   "schema_version": 1,

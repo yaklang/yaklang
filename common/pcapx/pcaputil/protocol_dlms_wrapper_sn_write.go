@@ -13,8 +13,12 @@ func wrapperIsSNWrite(w []byte) bool {
 }
 
 func decodeWrapperSNWrite(w []byte, limit, depth int) (*wrapperMessage, error) {
+	return decodeWrapperSNWriteReserved(w, limit, depth, 0)
+}
+
+func decodeWrapperSNWriteReserved(w []byte, limit, depth, reservedNodes int) (*wrapperMessage, error) {
 	p := w[8:]
-	c := wrapperListCursor{wire: p, at: 1, maxDepth: depth}
+	c := wrapperListCursor{wire: p, at: 1, maxDepth: depth, nodes: reservedNodes}
 	n, enc, err := c.count()
 	if err != nil {
 		return nil, err

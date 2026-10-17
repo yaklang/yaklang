@@ -154,6 +154,7 @@ func decodeWrapperSNServiceBlock(w []byte, limit int) (*wrapperMessage, error) {
 type wrapperSNKey struct {
 	wrapperGBTKey
 	upload bool
+	write  bool
 }
 
 type wrapperSNGroup struct {
@@ -189,7 +190,10 @@ func (s *binDLMSWrapper) unfinishedSNBlockKeys() []wrapperSNKey {
 		if a.destination != b.destination {
 			return a.destination < b.destination
 		}
-		return !a.upload && b.upload
+		if a.upload != b.upload {
+			return !a.upload && b.upload
+		}
+		return !a.write && b.write
 	})
 	return out
 }
@@ -198,16 +202,19 @@ func (s *binDLMSWrapper) retireSNGroupForMessage(m *wrapperMessage, dir int) boo
 	if !m.request {
 		return false
 	}
-	k := wrapperSNKey{wrapperGBTKey{1 - dir, m.destination, m.source}, false}
+	k := wrapperSNKey{wrapperGBTKey{1 - dir, m.destination, m.source}, false, false}
 	// A new complete SN request is an explicit observation boundary, but is
 	// not itself retained or treated as a service owner. Removing a group here
 	// does not revive a conversation retired by a resource/idle failure.
 	_, existed := s.snGroups[k]
 	delete(s.snGroups, k)
-	uploadKey := wrapperSNKey{wrapperGBTKey{dir, m.source, m.destination}, true}
+	uploadKey := wrapperSNKey{wrapperGBTKey{dir, m.source, m.destination}, true, false}
 	_, uploadExists := s.snGroups[uploadKey]
 	delete(s.snGroups, uploadKey)
-	return existed || uploadExists
+	writeUploadKey := wrapperSNKey{wrapperGBTKey{dir, m.source, m.destination}, true, true}
+	_, writeUploadExists := s.snGroups[writeUploadKey]
+	delete(s.snGroups, writeUploadKey)
+	return existed || uploadExists || writeUploadExists
 }
 
 func (f *binFlow) consumeWrapperSNServiceBlock(s *binDLMSWrapper, m *wrapperMessage, dir int, e *ProtocolEvent, w []byte) (string, error) {
@@ -221,7 +228,7 @@ func (f *binFlow) consumeSNServiceBlockReserved(s *binDLMSWrapper, m *wrapperMes
 		return "unverified-sn-block-after-conversation-invalidation", nil
 	}
 	echo := m.request != m.snUpload
-	key := wrapperSNKey{wrapperGBTKey{dir, m.source, m.destination}, m.snUpload}
+	key := wrapperSNKey{wrapperGBTKey{dir, m.source, m.destination}, m.snUpload, m.snUpload && m.snWrite}
 	if echo {
 		key.wrapperGBTKey = wrapperGBTKey{1 - dir, m.destination, m.source}
 	}
@@ -233,6 +240,9 @@ func (f *binFlow) consumeSNServiceBlockReserved(s *binDLMSWrapper, m *wrapperMes
 				return "unmatched-sn-block-context", nil
 			}
 			if m.snUpload {
+				if m.snWrite {
+					return "orphan-sn-write-upload-echo", nil
+				}
 				return "orphan-sn-upload-echo", nil
 			}
 			return "orphan-sn-block-number-access", nil
@@ -263,6 +273,9 @@ func (f *binFlow) consumeSNServiceBlockReserved(s *binDLMSWrapper, m *wrapperMes
 		p.acked, p.ackHash, p.ackEvent = true, h, e.ID
 		m.fields["acknowledged_block_event"] = p.lastEvent
 		if m.snUpload {
+			if m.snWrite {
+				return "unverified-sn-write-upload-echo", nil
+			}
 			return "unverified-sn-upload-echo", nil
 		}
 		return "unverified-sn-block-number-access", nil
@@ -296,6 +309,9 @@ func (f *binFlow) consumeSNServiceBlockReserved(s *binDLMSWrapper, m *wrapperMes
 			return "unmatched-sn-block-context", nil
 		}
 		if m.snUpload {
+			if m.snWrite {
+				return "orphan-sn-write-upload-block", nil
+			}
 			return "orphan-sn-upload-block", nil
 		}
 		return "orphan-sn-data-block", nil
@@ -329,7 +345,11 @@ func (f *binFlow) consumeSNServiceBlockReserved(s *binDLMSWrapper, m *wrapperMes
 	if m.lastBlock {
 		var err error
 		if m.snUpload {
-			data, err = decodeSNUploadBody(joined, f.a.budget.MaxCollectionElements, f.a.budget.MaxRecursionDepth)
+			if m.snWrite {
+				data, err = decodeSNWriteUploadBody(joined, f.a.budget.MaxCollectionElements, f.a.budget.MaxRecursionDepth)
+			} else {
+				data, err = decodeSNUploadBody(joined, f.a.budget.MaxCollectionElements, f.a.budget.MaxRecursionDepth)
+			}
 		} else {
 			c := wrapperListCursor{wire: joined, maxDepth: f.a.budget.MaxRecursionDepth}
 			data, err = c.data(f.a.budget.MaxCollectionElements, 0)
@@ -366,12 +386,18 @@ func (f *binFlow) consumeSNServiceBlockReserved(s *binDLMSWrapper, m *wrapperMes
 		}
 		p.data = nil
 		if m.snUpload {
+			if m.snWrite {
+				return "unverified-sn-write-upload-wire-group-complete", nil
+			}
 			return "unverified-sn-upload-wire-group-complete", nil
 		}
 		return "unverified-sn-wire-group-complete", nil
 	}
 	p.data = joined
 	if m.snUpload {
+		if m.snWrite {
+			return "unverified-sn-write-upload-block", nil
+		}
 		return "unverified-sn-upload-block", nil
 	}
 	return "unverified-sn-data-block", nil

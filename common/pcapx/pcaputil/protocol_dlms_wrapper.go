@@ -86,6 +86,9 @@ func decodeDLMSWrapperBudget(w []byte, limit, depth int) (*wrapperMessage, error
 		return unsupported("empty WPDU has no selected Get APDU")
 	}
 	if p[0] == 0x06 || p[0] == 0x0d {
+		if wrapperIsSNWriteUpload(w) {
+			return decodeWrapperSNWriteUpload(w, limit, depth)
+		}
 		return decodeWrapperSNWrite(w, limit, depth)
 	}
 	if p[0] == 0x05 || p[0] == 0x0c {
@@ -571,6 +574,9 @@ const wrapperIdleTTL = 30 * time.Second
 // inspect the fixed Wrapper/service header here; this hint is not an accepted
 // descriptor, Data value, association or authenticated peer generation.
 func wrapperUDPRefusalHint(w []byte) bool {
+	if wrapperIsSNWriteUpload(w) {
+		return wrapperSNWriteUploadRefusalHint(w)
+	}
 	if wrapperIsSNUpload(w) {
 		return wrapperSNUploadRefusalHint(w)
 	}
