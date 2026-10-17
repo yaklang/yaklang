@@ -30,7 +30,7 @@ func snGBTIndependentControls(t *testing.T) []snWriteControl {
 		require.NotEmpty(t, controls.Steps)
 		out = append(out, snWriteControl{snReadControl: controls})
 	}
-	return snServiceGBTUpgradeHistorical(t, raw, out)
+	return snUploadGBTUpgradeHistorical(t, raw, snServiceGBTUpgradeHistorical(t, raw, out))
 }
 func TestDLMSWrapperSNGBTNative(t *testing.T) { snWriteNative(t, snGBTIndependentControls(t)) }
 
@@ -51,7 +51,7 @@ func snGBTCapturedControls(t *testing.T) []snWriteControl {
 		require.NotEmpty(t, control.Steps)
 		out = append(out, snWriteControl{control, c["sha256"].(string), c["tcp_sha256"].(string), "dlms-sn-gbt-captures"})
 	}
-	return snServiceGBTUpgradeHistorical(t, raw, out)
+	return snUploadGBTUpgradeHistorical(t, raw, snServiceGBTUpgradeHistorical(t, raw, out))
 }
 func TestDLMSWrapperSNGBTMatrix(t *testing.T) { snWriteMatrix(t, snGBTCapturedControls(t)) }
 

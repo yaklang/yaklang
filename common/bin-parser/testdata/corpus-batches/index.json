@@ -120112,6 +120112,332 @@
         "common/pcapx/pcaputil/dlms-sn-service-gbt/historical-SN-R2-Q5-in-GBT-upgrades.json": "dlms-sn-service-gbt/historical-SN-R2-Q5-in-GBT-upgrades.json",
         "scripts/protocol-tests/required-tests-traffic-unified-v168.json": "required-tests-traffic-unified-v168.json"
       }
+    },
+    {
+      "id": "validation-dlms-wrapper-sn-upload-gbt",
+      "kind": "support",
+      "source_sha": "a656e0437f02e560d233bdec5a4e91a2b72d3ac8",
+      "file": "validation-dlms-wrapper-sn-upload-gbt.zip",
+      "sha256": "b5fb5d883e5e3d81dd7f6d6bc22421190fb043ca5ce77c88b7dd127e7d6946d6",
+      "password": "bin-parser",
+      "members": {
+        "dlms-sn-upload-gbt-captures/Read-R3-echo-in-GBT-contributes-only-one-SN-phase.tcp.pcap": {
+          "bytes": 673,
+          "sha256": "4bf8fc6ba76ad786522bde3767cbad70c8c1a48ae647ac648dd8df48224b2ce0"
+        },
+        "dlms-sn-upload-gbt-captures/Read-R3-echo-in-GBT-contributes-only-one-SN-phase.udp.pcap": {
+          "bytes": 403,
+          "sha256": "2784628738705c4917ade283ca20091d8cebee981fc1cd94b7593f592d73c20c"
+        },
+        "dlms-sn-upload-gbt-captures/Read-final-Q6-in-GBT-after-direct-first-and-R3-echo.tcp.pcap": {
+          "bytes": 673,
+          "sha256": "f34adaf7fdb1e7025471957b3575269576cd5c42336ad591295e293325e232f5"
+        },
+        "dlms-sn-upload-gbt-captures/Read-final-Q6-in-GBT-after-direct-first-and-R3-echo.udp.pcap": {
+          "bytes": 403,
+          "sha256": "8619b10850eeb5add74abeac77b81e22ccf5b5fe1fbf51ba28755cf81b7b8131"
+        },
+        "dlms-sn-upload-gbt-captures/Read-first-Q6-in-GBT-then-direct-R3-echo-and-Q6-body-complete.tcp.pcap": {
+          "bytes": 673,
+          "sha256": "8317510c8c23127ee1834c8bd3e833ce99d8ee5bb1db743de19d6b31acef9d4c"
+        },
+        "dlms-sn-upload-gbt-captures/Read-first-Q6-in-GBT-then-direct-R3-echo-and-Q6-body-complete.udp.pcap": {
+          "bytes": 403,
+          "sha256": "9967867b6f1c030bc1c4f6a502b87c18fe0e36540fdc0e3dadc9673f188b7340"
+        },
+        "dlms-sn-upload-gbt-captures/Read-parameter-Structure-via-GBT-global-depth7.tcp.pcap": {
+          "bytes": 512,
+          "sha256": "c9493819117fa7754f2a39f107cd735debee9a12b137868302f02a1a155d2145"
+        },
+        "dlms-sn-upload-gbt-captures/Read-parameter-Structure-via-GBT-global-depth7.udp.pcap": {
+          "bytes": 266,
+          "sha256": "9d0bf312cb3944c3acf81bb5300d4515f7d5cbd670edc0cce87e92c9f0939b3d"
+        },
+        "dlms-sn-upload-gbt-captures/Write-R2-echo-in-GBT-contributes-only-one-SN-phase.tcp.pcap": {
+          "bytes": 680,
+          "sha256": "58c28061c84ce83f982d99c1531426ac363f2612ef2c462d86369be71e705efd"
+        },
+        "dlms-sn-upload-gbt-captures/Write-R2-echo-in-GBT-contributes-only-one-SN-phase.udp.pcap": {
+          "bytes": 410,
+          "sha256": "752476f6933c9b7c6c9ff34a88caeaa8a26ad80971047aca243f4fcb5f862d77"
+        },
+        "dlms-sn-upload-gbt-captures/Write-bn3-in-GBT-after-echo1-retires-only-SN-group.tcp.pcap": {
+          "bytes": 770,
+          "sha256": "50afe3ee551c1cb2331226846ef79af52ec9f45e5de898b400032a286d5245fb"
+        },
+        "dlms-sn-upload-gbt-captures/Write-bn3-in-GBT-after-echo1-retires-only-SN-group.udp.pcap": {
+          "bytes": 488,
+          "sha256": "06f4695cb5287d98461369e03150dcb6be62c8eb6099e60d14ba7b952853089e"
+        },
+        "dlms-sn-upload-gbt-captures/Write-final-Q7-in-GBT-after-direct-first-and-R2-echo.tcp.pcap": {
+          "bytes": 680,
+          "sha256": "5bd23b4b59db32124f1419bf8fe1d55c8156f60a85720da20cd6301839ef9f01"
+        },
+        "dlms-sn-upload-gbt-captures/Write-final-Q7-in-GBT-after-direct-first-and-R2-echo.udp.pcap": {
+          "bytes": 410,
+          "sha256": "31c922e1ef6d0f7be7c36444b8a43de0bddefd2560da475e9137911fbfbc0fed"
+        },
+        "dlms-sn-upload-gbt-captures/Write-final-joined-body-trailing00-in-GBT-Malformed-retires-all.tcp.pcap": {
+          "bytes": 681,
+          "sha256": "61ad2277a4035f48bac41925c83d8bb8f0bd70117eed0d34090f3fe8f8baf50c"
+        },
+        "dlms-sn-upload-gbt-captures/Write-final-joined-body-trailing00-in-GBT-Malformed-retires-all.udp.pcap": {
+          "bytes": 411,
+          "sha256": "d197635f895bf4d8edd7a24620972089218ccb1f9ba5db712533096a9395f22b"
+        },
+        "dlms-sn-upload-gbt-captures/Write-first-Q7-across-two-GBT-blocks-with-real-outer-ACK.tcp.pcap": {
+          "bytes": 850,
+          "sha256": "90c96d823e83f8639252cd193301fd6258ba3280f6cc4e9923cc0569cc6d0593"
+        },
+        "dlms-sn-upload-gbt-captures/Write-first-Q7-across-two-GBT-blocks-with-real-outer-ACK.udp.pcap": {
+          "bytes": 556,
+          "sha256": "456d6f21aef3b706ed29bda1472e2b68c9b578d71c933e2275dd01d41d5b73b1"
+        },
+        "dlms-sn-upload-gbt-captures/Write-parameter-Structure-via-GBT-global-depth7.tcp.pcap": {
+          "bytes": 517,
+          "sha256": "3ee88d0113e77ee69cfb28f2e7f82706f84ebd6eec86f77e4907646ddb18d491"
+        },
+        "dlms-sn-upload-gbt-captures/Write-parameter-Structure-via-GBT-global-depth7.udp.pcap": {
+          "bytes": 271,
+          "sha256": "018f3fe8beaf90e281149d7a59255b1414a3770d7ba033982e14eb37d04ce99b"
+        },
+        "dlms-sn-upload-gbt-captures/completed-GBT-leaves-active-Read-upload-own-Close.tcp.pcap": {
+          "bytes": 503,
+          "sha256": "2f57e84de0eeff438e0bc870b119689228471a8d96cba6b52f2681805b6bf1c2"
+        },
+        "dlms-sn-upload-gbt-captures/completed-GBT-leaves-active-Read-upload-own-Close.udp.pcap": {
+          "bytes": 257,
+          "sha256": "d8f1618db5ee80bcbc271c63fbc5d1168a5a8b4a97b3c941db4fd81c0eb553e7"
+        },
+        "dlms-sn-upload-gbt-captures/completed-GBT-leaves-active-Write-upload-own-Close.tcp.pcap": {
+          "bytes": 507,
+          "sha256": "039d201742bd2f4a8021d239337ced7cf4f8fa33e5ce642cac4025fba6df8fb1"
+        },
+        "dlms-sn-upload-gbt-captures/completed-GBT-leaves-active-Write-upload-own-Close.udp.pcap": {
+          "bytes": 261,
+          "sha256": "e301712a539017677eb9d87c3e2ac32bf47ffcdbf2d1d9e78f7517169c44292f"
+        },
+        "dlms-sn-upload-gbt-captures/missing-Read-R3-echo-retires-SN-not-LN.tcp.pcap": {
+          "bytes": 673,
+          "sha256": "9a5027dcfb18e596681f9b4e9adbe7419e801478f322bdb5e5e995dd5d49f9b2"
+        },
+        "dlms-sn-upload-gbt-captures/missing-Read-R3-echo-retires-SN-not-LN.udp.pcap": {
+          "bytes": 403,
+          "sha256": "eae972701d1ac39226b6cc663d15807f0c2f484673d9c520c6e5f6ce738a6e86"
+        },
+        "dlms-sn-upload-gbt-captures/reuse-inputs.json": {
+          "bytes": 989,
+          "sha256": "adc542ad5342079bcfeb91aa2554026747d03081c68605507b0f1b5273aee07a"
+        },
+        "dlms-sn-upload-gbt-captures/same-Read-Q6-APDU-direct-versus-GBT-is-not-exact-wire-retry.tcp.pcap": {
+          "bytes": 760,
+          "sha256": "0de2d7485ffb0b465e258c9ae330b6113bfe0fa9e7420a353eacee44f7305fa2"
+        },
+        "dlms-sn-upload-gbt-captures/same-Read-Q6-APDU-direct-versus-GBT-is-not-exact-wire-retry.udp.pcap": {
+          "bytes": 478,
+          "sha256": "11a7f392c5818404de85fb9d311bb066bcc9fce413bb7e21236da25e15044442"
+        },
+        "dlms-sn-upload-gbt-captures/wrong-mode-caller-and-wport-echo-cannot-consume-Read-prefix.tcp.pcap": {
+          "bytes": 922,
+          "sha256": "5c797372e073c132585ceb0bc1479febdaf501a3eb3dec629aadb11b4a8a99ed"
+        },
+        "dlms-sn-upload-gbt-captures/wrong-mode-caller-and-wport-echo-cannot-consume-Read-prefix.udp.pcap": {
+          "bytes": 616,
+          "sha256": "7e665fd8a9f698ee2e0e592e45de5ed12fba29cf76e6f9e724b3e00b4224b896"
+        },
+        "dlms-sn-upload-gbt-source/SOURCES.json": {
+          "bytes": 10845,
+          "sha256": "6736133df80586b5d2c06911d152126fc7aa6cf5e0c5b6a3c567b88525a3d2cd"
+        },
+        "dlms-sn-upload-gbt-source/baseline-controls.json": {
+          "bytes": 115667,
+          "sha256": "a30ec4e04287b5dfaaae041f5e05be885b2a5504d09870a6afe429338f954a4b"
+        },
+        "dlms-sn-upload-gbt-source/controls.json": {
+          "bytes": 730852,
+          "sha256": "26c9cc56ec540d778963aa93d79be738c6b259ea93b6aa0ea99c31f04f7b98fc"
+        },
+        "dlms-sn-upload-gbt-tools/capture-checks.py": {
+          "bytes": 858,
+          "sha256": "773153f31c80ec4acb5cf5006a7dce3731b44f32ec55aff217550336216dd698"
+        },
+        "dlms-sn-upload-gbt-tools/carrier.py": {
+          "bytes": 1215,
+          "sha256": "bdf106ef2372b348e5af5a2bc62abd8d70e37da87739216bfe05b7182fafe5e2"
+        },
+        "dlms-sn-upload-gbt-tools/independent/access.py": {
+          "bytes": 4354,
+          "sha256": "3166cdf13b9934650fdaa34051ba1d6365c6521028ab132898597e424c23e586"
+        },
+        "dlms-sn-upload-gbt-tools/independent/block-grammar.py": {
+          "bytes": 5985,
+          "sha256": "0b69840f2066124f48091301aea6247ec29fb86c4933d00055f60828296bd220"
+        },
+        "dlms-sn-upload-gbt-tools/independent/compose.py": {
+          "bytes": 15710,
+          "sha256": "f4590e419ee263e9c957ec9e75c551ce89dcf81b378bf4ce115ce5e11cefd87b"
+        },
+        "dlms-sn-upload-gbt-tools/independent/composition-pins.json": {
+          "bytes": 1489,
+          "sha256": "9e0492525bf27a37c96b07bb545956618e7041de4fce6823681033bfb5fbd507"
+        },
+        "dlms-sn-upload-gbt-tools/independent/gbt-core.py": {
+          "bytes": 12575,
+          "sha256": "a678272f289349b8be7e31791edd158ccc2c4e4ee13431dcfec6a2fcf56a0df6"
+        },
+        "dlms-sn-upload-gbt-tools/independent/legacy.py": {
+          "bytes": 9729,
+          "sha256": "d5a9c60619214a8a0ac68cb2159bf089992795de9059eb010a1287d5f8c72e35"
+        },
+        "dlms-sn-upload-gbt-tools/independent/model-pins.json": {
+          "bytes": 354,
+          "sha256": "641a27a880d7ef22b9678b92b0e9a3e4af9dac3dbd9d7b49be8fb14a9b4d88fb"
+        },
+        "dlms-sn-upload-gbt-tools/independent/ordinary.py": {
+          "bytes": 9776,
+          "sha256": "b19b8043b6d3defeb32ff2a3a5caf67102299118852c6859c2d1a78847fbb51a"
+        },
+        "dlms-sn-upload-gbt-tools/independent/rebuild.py": {
+          "bytes": 884,
+          "sha256": "49e676495fb763e85409db61eed1724d9f688d8b01bf6ca76769c9d686c170dc"
+        },
+        "dlms-sn-upload-gbt-tools/independent/reference-vectors.json": {
+          "bytes": 10296,
+          "sha256": "1c7119b36f10a8b7c329cc3c346b3792f3421a19c5fc0b2594fa284b7cfa5874"
+        },
+        "dlms-sn-upload-gbt-tools/independent/upload/access.py": {
+          "bytes": 4392,
+          "sha256": "70f03ceffb0556b966d04829dc89384c20b73bc6104c8ed637e5ed0b97d8bc7e"
+        },
+        "dlms-sn-upload-gbt-tools/independent/upload/download-outer.py": {
+          "bytes": 5985,
+          "sha256": "0b69840f2066124f48091301aea6247ec29fb86c4933d00055f60828296bd220"
+        },
+        "dlms-sn-upload-gbt-tools/independent/upload/download-reference-vectors.json": {
+          "bytes": 4159,
+          "sha256": "59250557438767f0f7ff0a072b1decf3fe0f5768b75013142a5dfa608b0fe6c0"
+        },
+        "dlms-sn-upload-gbt-tools/independent/upload/model.py": {
+          "bytes": 15781,
+          "sha256": "609ba979ea49fc353ccd92fadf99edbc5100e4f1637eaa4444fcace579c903dc"
+        },
+        "dlms-sn-upload-gbt-tools/independent/upload/read-body.py": {
+          "bytes": 4002,
+          "sha256": "9038061ed63630258c65a5b9e11e51888d414b290fea0aa2bd14743e2a7af4cd"
+        },
+        "dlms-sn-upload-gbt-tools/independent/upload/reference-vectors.json": {
+          "bytes": 6734,
+          "sha256": "3d7c0f01b305e3524efa5dab640dd9ae4730fe7ed789ca9ef015a5c39b846b8d"
+        },
+        "dlms-sn-upload-gbt-tools/independent/upload/source-outer.py": {
+          "bytes": 8836,
+          "sha256": "4505d905a3a96b22ac3f91e00033d4146c3bf5e75794a2ad25f60b5e3e7145a1"
+        },
+        "dlms-sn-upload-gbt-tools/independent/upload/write-body.py": {
+          "bytes": 5706,
+          "sha256": "4818c0264cb4819cf5d4715a855b4f3817acf26c0c6b15ff558aaa7d3b4aa094"
+        },
+        "dlms-sn-upload-gbt-tools/independent/upload/write-source.py": {
+          "bytes": 8800,
+          "sha256": "46e574590d006649212a255cd2fc85d226165f0ce27f5cc7a01f88211720de0a"
+        },
+        "dlms-sn-upload-gbt-tools/independent/verify.py": {
+          "bytes": 6343,
+          "sha256": "f164e4ce57fb860f955c123ce691d0013474c50b7c668f6a780f2f6c28560334"
+        },
+        "dlms-sn-upload-gbt-tools/independent/write-body.py": {
+          "bytes": 5706,
+          "sha256": "4818c0264cb4819cf5d4715a855b4f3817acf26c0c6b15ff558aaa7d3b4aa094"
+        },
+        "dlms-sn-upload-gbt-tools/project.py": {
+          "bytes": 1476,
+          "sha256": "9749cd589afcb013b39f65832923aed92107f47644e18473ba10eccac7fa58c0"
+        },
+        "dlms-sn-upload-gbt-tools/verify-captures.py": {
+          "bytes": 3952,
+          "sha256": "a900590a5615b40783f82b6e97b0ebadc0adaf210b0ec4fe837bb07563065ddb"
+        },
+        "dlms-sn-upload-gbt/captured-controls.json": {
+          "bytes": 730813,
+          "sha256": "0e33f5bd28e462bd0ed43d2a2982e90e8e65179be979052da38f5c55186d6dfd"
+        },
+        "dlms-sn-upload-gbt/historical-upload-GBT-upgrades.json": {
+          "bytes": 254391,
+          "sha256": "6f15de363f696d3065096e3e933df4497d7ab518af2ad0d84baa76958521ae6c"
+        },
+        "required-tests-traffic-unified-v169.json": {
+          "bytes": 22717480,
+          "sha256": "42ecaadc2d9a6d7024facef0e981c604f2b297ce5b9fadcfcf96966f0a5338fa"
+        },
+        "validation/expected.json": {
+          "bytes": 39195,
+          "sha256": "66034edd90ef7a68ec74e835627a4631f486ad04bc68a5ffe7547a5012480a02"
+        }
+      },
+      "aliases": {
+        "common/pcapx/pcaputil/dlms-sn-upload-gbt-captures/Read-R3-echo-in-GBT-contributes-only-one-SN-phase.tcp.pcap": "dlms-sn-upload-gbt-captures/Read-R3-echo-in-GBT-contributes-only-one-SN-phase.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-upload-gbt-captures/Read-R3-echo-in-GBT-contributes-only-one-SN-phase.udp.pcap": "dlms-sn-upload-gbt-captures/Read-R3-echo-in-GBT-contributes-only-one-SN-phase.udp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-upload-gbt-captures/Read-final-Q6-in-GBT-after-direct-first-and-R3-echo.tcp.pcap": "dlms-sn-upload-gbt-captures/Read-final-Q6-in-GBT-after-direct-first-and-R3-echo.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-upload-gbt-captures/Read-final-Q6-in-GBT-after-direct-first-and-R3-echo.udp.pcap": "dlms-sn-upload-gbt-captures/Read-final-Q6-in-GBT-after-direct-first-and-R3-echo.udp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-upload-gbt-captures/Read-first-Q6-in-GBT-then-direct-R3-echo-and-Q6-body-complete.tcp.pcap": "dlms-sn-upload-gbt-captures/Read-first-Q6-in-GBT-then-direct-R3-echo-and-Q6-body-complete.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-upload-gbt-captures/Read-first-Q6-in-GBT-then-direct-R3-echo-and-Q6-body-complete.udp.pcap": "dlms-sn-upload-gbt-captures/Read-first-Q6-in-GBT-then-direct-R3-echo-and-Q6-body-complete.udp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-upload-gbt-captures/Read-parameter-Structure-via-GBT-global-depth7.tcp.pcap": "dlms-sn-upload-gbt-captures/Read-parameter-Structure-via-GBT-global-depth7.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-upload-gbt-captures/Read-parameter-Structure-via-GBT-global-depth7.udp.pcap": "dlms-sn-upload-gbt-captures/Read-parameter-Structure-via-GBT-global-depth7.udp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-upload-gbt-captures/Write-R2-echo-in-GBT-contributes-only-one-SN-phase.tcp.pcap": "dlms-sn-upload-gbt-captures/Write-R2-echo-in-GBT-contributes-only-one-SN-phase.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-upload-gbt-captures/Write-R2-echo-in-GBT-contributes-only-one-SN-phase.udp.pcap": "dlms-sn-upload-gbt-captures/Write-R2-echo-in-GBT-contributes-only-one-SN-phase.udp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-upload-gbt-captures/Write-bn3-in-GBT-after-echo1-retires-only-SN-group.tcp.pcap": "dlms-sn-upload-gbt-captures/Write-bn3-in-GBT-after-echo1-retires-only-SN-group.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-upload-gbt-captures/Write-bn3-in-GBT-after-echo1-retires-only-SN-group.udp.pcap": "dlms-sn-upload-gbt-captures/Write-bn3-in-GBT-after-echo1-retires-only-SN-group.udp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-upload-gbt-captures/Write-final-Q7-in-GBT-after-direct-first-and-R2-echo.tcp.pcap": "dlms-sn-upload-gbt-captures/Write-final-Q7-in-GBT-after-direct-first-and-R2-echo.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-upload-gbt-captures/Write-final-Q7-in-GBT-after-direct-first-and-R2-echo.udp.pcap": "dlms-sn-upload-gbt-captures/Write-final-Q7-in-GBT-after-direct-first-and-R2-echo.udp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-upload-gbt-captures/Write-final-joined-body-trailing00-in-GBT-Malformed-retires-all.tcp.pcap": "dlms-sn-upload-gbt-captures/Write-final-joined-body-trailing00-in-GBT-Malformed-retires-all.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-upload-gbt-captures/Write-final-joined-body-trailing00-in-GBT-Malformed-retires-all.udp.pcap": "dlms-sn-upload-gbt-captures/Write-final-joined-body-trailing00-in-GBT-Malformed-retires-all.udp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-upload-gbt-captures/Write-first-Q7-across-two-GBT-blocks-with-real-outer-ACK.tcp.pcap": "dlms-sn-upload-gbt-captures/Write-first-Q7-across-two-GBT-blocks-with-real-outer-ACK.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-upload-gbt-captures/Write-first-Q7-across-two-GBT-blocks-with-real-outer-ACK.udp.pcap": "dlms-sn-upload-gbt-captures/Write-first-Q7-across-two-GBT-blocks-with-real-outer-ACK.udp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-upload-gbt-captures/Write-parameter-Structure-via-GBT-global-depth7.tcp.pcap": "dlms-sn-upload-gbt-captures/Write-parameter-Structure-via-GBT-global-depth7.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-upload-gbt-captures/Write-parameter-Structure-via-GBT-global-depth7.udp.pcap": "dlms-sn-upload-gbt-captures/Write-parameter-Structure-via-GBT-global-depth7.udp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-upload-gbt-captures/completed-GBT-leaves-active-Read-upload-own-Close.tcp.pcap": "dlms-sn-upload-gbt-captures/completed-GBT-leaves-active-Read-upload-own-Close.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-upload-gbt-captures/completed-GBT-leaves-active-Read-upload-own-Close.udp.pcap": "dlms-sn-upload-gbt-captures/completed-GBT-leaves-active-Read-upload-own-Close.udp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-upload-gbt-captures/completed-GBT-leaves-active-Write-upload-own-Close.tcp.pcap": "dlms-sn-upload-gbt-captures/completed-GBT-leaves-active-Write-upload-own-Close.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-upload-gbt-captures/completed-GBT-leaves-active-Write-upload-own-Close.udp.pcap": "dlms-sn-upload-gbt-captures/completed-GBT-leaves-active-Write-upload-own-Close.udp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-upload-gbt-captures/missing-Read-R3-echo-retires-SN-not-LN.tcp.pcap": "dlms-sn-upload-gbt-captures/missing-Read-R3-echo-retires-SN-not-LN.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-upload-gbt-captures/missing-Read-R3-echo-retires-SN-not-LN.udp.pcap": "dlms-sn-upload-gbt-captures/missing-Read-R3-echo-retires-SN-not-LN.udp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-upload-gbt-captures/reuse-inputs.json": "dlms-sn-upload-gbt-captures/reuse-inputs.json",
+        "common/pcapx/pcaputil/dlms-sn-upload-gbt-captures/same-Read-Q6-APDU-direct-versus-GBT-is-not-exact-wire-retry.tcp.pcap": "dlms-sn-upload-gbt-captures/same-Read-Q6-APDU-direct-versus-GBT-is-not-exact-wire-retry.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-upload-gbt-captures/same-Read-Q6-APDU-direct-versus-GBT-is-not-exact-wire-retry.udp.pcap": "dlms-sn-upload-gbt-captures/same-Read-Q6-APDU-direct-versus-GBT-is-not-exact-wire-retry.udp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-upload-gbt-captures/wrong-mode-caller-and-wport-echo-cannot-consume-Read-prefix.tcp.pcap": "dlms-sn-upload-gbt-captures/wrong-mode-caller-and-wport-echo-cannot-consume-Read-prefix.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-upload-gbt-captures/wrong-mode-caller-and-wport-echo-cannot-consume-Read-prefix.udp.pcap": "dlms-sn-upload-gbt-captures/wrong-mode-caller-and-wport-echo-cannot-consume-Read-prefix.udp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-upload-gbt-source/SOURCES.json": "dlms-sn-upload-gbt-source/SOURCES.json",
+        "common/pcapx/pcaputil/dlms-sn-upload-gbt-source/baseline-controls.json": "dlms-sn-upload-gbt-source/baseline-controls.json",
+        "common/pcapx/pcaputil/dlms-sn-upload-gbt-source/controls.json": "dlms-sn-upload-gbt-source/controls.json",
+        "common/pcapx/pcaputil/dlms-sn-upload-gbt-tools/capture-checks.py": "dlms-sn-upload-gbt-tools/capture-checks.py",
+        "common/pcapx/pcaputil/dlms-sn-upload-gbt-tools/carrier.py": "dlms-sn-upload-gbt-tools/carrier.py",
+        "common/pcapx/pcaputil/dlms-sn-upload-gbt-tools/independent/access.py": "dlms-sn-upload-gbt-tools/independent/access.py",
+        "common/pcapx/pcaputil/dlms-sn-upload-gbt-tools/independent/block-grammar.py": "dlms-sn-upload-gbt-tools/independent/block-grammar.py",
+        "common/pcapx/pcaputil/dlms-sn-upload-gbt-tools/independent/compose.py": "dlms-sn-upload-gbt-tools/independent/compose.py",
+        "common/pcapx/pcaputil/dlms-sn-upload-gbt-tools/independent/composition-pins.json": "dlms-sn-upload-gbt-tools/independent/composition-pins.json",
+        "common/pcapx/pcaputil/dlms-sn-upload-gbt-tools/independent/gbt-core.py": "dlms-sn-upload-gbt-tools/independent/gbt-core.py",
+        "common/pcapx/pcaputil/dlms-sn-upload-gbt-tools/independent/legacy.py": "dlms-sn-upload-gbt-tools/independent/legacy.py",
+        "common/pcapx/pcaputil/dlms-sn-upload-gbt-tools/independent/model-pins.json": "dlms-sn-upload-gbt-tools/independent/model-pins.json",
+        "common/pcapx/pcaputil/dlms-sn-upload-gbt-tools/independent/ordinary.py": "dlms-sn-upload-gbt-tools/independent/ordinary.py",
+        "common/pcapx/pcaputil/dlms-sn-upload-gbt-tools/independent/rebuild.py": "dlms-sn-upload-gbt-tools/independent/rebuild.py",
+        "common/pcapx/pcaputil/dlms-sn-upload-gbt-tools/independent/reference-vectors.json": "dlms-sn-upload-gbt-tools/independent/reference-vectors.json",
+        "common/pcapx/pcaputil/dlms-sn-upload-gbt-tools/independent/upload/access.py": "dlms-sn-upload-gbt-tools/independent/upload/access.py",
+        "common/pcapx/pcaputil/dlms-sn-upload-gbt-tools/independent/upload/download-outer.py": "dlms-sn-upload-gbt-tools/independent/upload/download-outer.py",
+        "common/pcapx/pcaputil/dlms-sn-upload-gbt-tools/independent/upload/download-reference-vectors.json": "dlms-sn-upload-gbt-tools/independent/upload/download-reference-vectors.json",
+        "common/pcapx/pcaputil/dlms-sn-upload-gbt-tools/independent/upload/model.py": "dlms-sn-upload-gbt-tools/independent/upload/model.py",
+        "common/pcapx/pcaputil/dlms-sn-upload-gbt-tools/independent/upload/read-body.py": "dlms-sn-upload-gbt-tools/independent/upload/read-body.py",
+        "common/pcapx/pcaputil/dlms-sn-upload-gbt-tools/independent/upload/reference-vectors.json": "dlms-sn-upload-gbt-tools/independent/upload/reference-vectors.json",
+        "common/pcapx/pcaputil/dlms-sn-upload-gbt-tools/independent/upload/source-outer.py": "dlms-sn-upload-gbt-tools/independent/upload/source-outer.py",
+        "common/pcapx/pcaputil/dlms-sn-upload-gbt-tools/independent/upload/write-body.py": "dlms-sn-upload-gbt-tools/independent/upload/write-body.py",
+        "common/pcapx/pcaputil/dlms-sn-upload-gbt-tools/independent/upload/write-source.py": "dlms-sn-upload-gbt-tools/independent/upload/write-source.py",
+        "common/pcapx/pcaputil/dlms-sn-upload-gbt-tools/independent/verify.py": "dlms-sn-upload-gbt-tools/independent/verify.py",
+        "common/pcapx/pcaputil/dlms-sn-upload-gbt-tools/independent/write-body.py": "dlms-sn-upload-gbt-tools/independent/write-body.py",
+        "common/pcapx/pcaputil/dlms-sn-upload-gbt-tools/project.py": "dlms-sn-upload-gbt-tools/project.py",
+        "common/pcapx/pcaputil/dlms-sn-upload-gbt-tools/verify-captures.py": "dlms-sn-upload-gbt-tools/verify-captures.py",
+        "common/pcapx/pcaputil/dlms-sn-upload-gbt/captured-controls.json": "dlms-sn-upload-gbt/captured-controls.json",
+        "common/pcapx/pcaputil/dlms-sn-upload-gbt/historical-upload-GBT-upgrades.json": "dlms-sn-upload-gbt/historical-upload-GBT-upgrades.json",
+        "scripts/protocol-tests/required-tests-traffic-unified-v169.json": "required-tests-traffic-unified-v169.json"
+      }
     }
   ],
   "schema_version": 1,

@@ -215,10 +215,10 @@ func (f *binFlow) consumeWrapperGBTReserved(s *binDLMSWrapper, m *wrapperMessage
 		// Reassembled SN APDUs carry no invoke or business owner. The wrapper
 		// used by the bounded decoder is internal: expose only the literal
 		// assembled APDU and its typed values, never a reconstructed header.
-		// Only the ordinary Wrapper download phase can contribute to an
+		// Only a selected Wrapper SN phase can contribute to an
 		// existing SN wire group. GBT completion proves availability of this
 		// one inner APDU, not completion or ownership of the SN Data group.
-		if decoded.snServiceBlock && (hdlc || decoded.snUpload || decoded.snWrite) {
+		if decoded.snServiceBlock && hdlc {
 			return "", wrapperError(ErrUnsupportedFeature, "GBT-wrapped SN service blocks require a separate observed transfer context")
 		}
 		assoc := "unverified-sn-read-observation"
