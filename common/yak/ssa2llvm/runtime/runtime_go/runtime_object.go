@@ -86,7 +86,7 @@ func runtimeResolveMethod(obj any, name string) (reflect.Value, error) {
 				}
 				field = field.Elem()
 			}
-			if field.IsValid() && field.Kind() == reflect.Func {
+			if field.IsValid() && (field.Kind() == reflect.Func || runtimeValueIsCallableClosure(field.Interface())) {
 				return field, nil
 			}
 		}
@@ -95,7 +95,7 @@ func runtimeResolveMethod(obj any, name string) (reflect.Value, error) {
 	if om, ok := obj.(runtimeStringMap); ok {
 		if exported, exists := om.Get(name); exists && exported != nil {
 			field := reflect.ValueOf(exported)
-			if field.IsValid() && field.Kind() == reflect.Func {
+			if field.IsValid() && (field.Kind() == reflect.Func || runtimeValueIsCallableClosure(exported)) {
 				return field, nil
 			}
 		}
@@ -383,6 +383,37 @@ type runtimeCallableClosure struct {
 	fn               uint64
 	paramMemberCount int
 	freeValues       []uint64
+}
+
+func runtimeValueIsCallableClosure(value any) bool {
+	_, ok := runtimeCallableClosureValue(value)
+	return ok
+}
+
+// callRuntimeCallableClosure invokes a yak closure recovered from an object
+// field. The raw arguments are the user arguments; the closure carries its
+// own function address and captured values.
+func callRuntimeCallableClosure(closure runtimeCallableClosure, rawArgs []uint64, ellipsis bool) (int64, error) {
+	if closure.fn == 0 {
+		return 0, fmt.Errorf("callable closure has no function")
+	}
+	_ = ellipsis
+	argc := len(rawArgs)
+	outArgc := argc + closure.paramMemberCount + len(closure.freeValues)
+	words := make([]uint64, abi.HeaderWords+outArgc*2)
+	ctx := unsafe.Pointer(&words[0])
+	ctxInit(ctx, abi.KindCallable, closure.fn, outArgc)
+	for index, raw := range rawArgs {
+		runtimeStoreCallableContextArg(ctx, outArgc, index, raw)
+	}
+	for i := 0; i < closure.paramMemberCount; i++ {
+		runtimeStoreCallableContextArg(ctx, outArgc, argc+i, 0)
+	}
+	for i, capture := range closure.freeValues {
+		runtimeStoreCallableContextArg(ctx, outArgc, argc+closure.paramMemberCount+i, capture)
+	}
+	C.yak_invoke_callable(C.uintptr_t(closure.fn), ctx)
+	return int64(ctxLoadWord(ctx, abi.WordRet)), nil
 }
 
 func runtimeDecodeArg(raw uint64, targetType reflect.Type) (reflect.Value, error) {
@@ -1503,6 +1534,11 @@ func callRuntimeShadowMethod(objPtr unsafe.Pointer, methodName string, rawArgs [
 	method, err := runtimeResolveMethod(handle.Value(), methodName)
 	if err != nil {
 		return 0, err
+	}
+	if closure, ok := runtimeCallableClosureValue(method.Interface()); ok {
+		// A closure stored in an object field is not a Go function.
+		// callRuntimeValue cannot reflect it, so use the closure ABI directly.
+		return callRuntimeCallableClosure(closure, rawArgs, ellipsis)
 	}
 
 	return callRuntimeValue(method, rawArgs, ellipsis)
