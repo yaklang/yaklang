@@ -510,7 +510,29 @@ func synScanProbeTarget(res *synscan.SynScanResult) (proto string, port int, exp
 //
 // 关键词: _scanFromTargetStream ctx 契约, outC goroutine 泄漏防护
 func _scanFromTargetStream(res interface{}, opts ...fp.ConfigOption) (chan *fp.MatchResult, error) {
+	config := fp.NewConfig(opts...)
+	concurrent := config.PoolSize
+	ctx := config.Ctx
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	matcher, err := fp.NewDefaultFingerprintMatcher(config)
+	if err != nil {
+		return nil, err
+	}
+
 	synResults := make(chan *synscan.SynScanResult, 1000)
+	emitTarget := func(result *synscan.SynScanResult) bool {
+		if ctx.Err() != nil {
+			return false
+		}
+		select {
+		case <-ctx.Done():
+			return false
+		case synResults <- result:
+			return true
+		}
+	}
 
 	// 生成扫描结果
 	go func() {
@@ -518,49 +540,73 @@ func _scanFromTargetStream(res interface{}, opts ...fp.ConfigOption) (chan *fp.M
 
 		switch ret := res.(type) {
 		case chan *synscan.SynScanResult:
-			for r := range ret {
-				synResults <- r
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				case r, ok := <-ret:
+					if !ok || !emitTarget(r) {
+						return
+					}
+				}
 			}
 		case []interface{}:
 			for _, r := range ret {
 				switch subResult := r.(type) {
 				case *synscan.SynScanResult:
-					synResults <- subResult
+					if !emitTarget(subResult) {
+						return
+					}
 				case synscan.SynScanResult:
-					synResults <- &subResult
+					if !emitTarget(&subResult) {
+						return
+					}
 				case string:
 					host, port, err := utils.ParseStringToHostPort(subResult)
 					if err != nil {
 						continue
 					}
-					synResults <- &synscan.SynScanResult{
+					if !emitTarget(&synscan.SynScanResult{
 						Host: host,
 						Port: port,
+					}) {
+						return
 					}
 				case *base.NetSpaceEngineResult:
 					host, port, err := utils.ParseStringToHostPort(subResult.Addr)
 					if err != nil {
 						continue
 					}
-					synResults <- &synscan.SynScanResult{
+					if !emitTarget(&synscan.SynScanResult{
 						Host: host,
 						Port: port,
+					}) {
+						return
 					}
 				}
 			}
 		case []*synscan.SynScanResult:
 			for _, r := range ret {
-				synResults <- r
+				if !emitTarget(r) {
+					return
+				}
 			}
 		case chan *base.NetSpaceEngineResult:
-			for r := range ret {
-				host, port, err := utils.ParseStringToHostPort(r.Addr)
-				if err != nil {
-					continue
-				}
-				synResults <- &synscan.SynScanResult{
-					Host: host,
-					Port: port,
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				case r, ok := <-ret:
+					if !ok {
+						return
+					}
+					host, port, err := utils.ParseStringToHostPort(r.Addr)
+					if err != nil {
+						continue
+					}
+					if !emitTarget(&synscan.SynScanResult{Host: host, Port: port}) {
+						return
+					}
 				}
 			}
 		case []*base.NetSpaceEngineResult:
@@ -569,8 +615,10 @@ func _scanFromTargetStream(res interface{}, opts ...fp.ConfigOption) (chan *fp.M
 				if err != nil {
 					continue
 				}
-				synResults <- &synscan.SynScanResult{
+				if !emitTarget(&synscan.SynScanResult{
 					Host: host, Port: port,
+				}) {
+					return
 				}
 			}
 		case []string:
@@ -579,28 +627,17 @@ func _scanFromTargetStream(res interface{}, opts ...fp.ConfigOption) (chan *fp.M
 				if err != nil {
 					continue
 				}
-				synResults <- &synscan.SynScanResult{
+				if !emitTarget(&synscan.SynScanResult{
 					Host: host,
 					Port: port,
+				}) {
+					return
 				}
 			}
 		default:
 			log.Errorf("not a valid param: %v", reflect.TypeOf(res))
 		}
 	}()
-
-	// 扫描
-	config := fp.NewConfig(opts...)
-	concurrent := config.PoolSize
-	ctx := config.Ctx
-	if config.Ctx == nil {
-		ctx = context.Background()
-	}
-
-	matcher, err := fp.NewDefaultFingerprintMatcher(config)
-	if err != nil {
-		return nil, err
-	}
 
 	if matcher.Config.PoolSize > 0 {
 		concurrent = matcher.Config.PoolSize
@@ -639,7 +676,18 @@ func _scanFromTargetStream(res interface{}, opts ...fp.ConfigOption) (chan *fp.M
 		// 熔断命中时主动调用, 以及 swg.Wait 之后调用以释放派生 ctx.
 		// 关键词: scanCancel 时机, 在途结果保护
 		swg := utils.NewSizedWaitGroup(concurrent)
-		for synRes := range synResults {
+	dispatch:
+		for {
+			var synRes *synscan.SynScanResult
+			select {
+			case <-scanCtx.Done():
+				break dispatch
+			case result, ok := <-synResults:
+				if !ok {
+					break dispatch
+				}
+				synRes = result
+			}
 			// ctx 短路: 历史 bug 的根因之一是这个派发循环从不检查 ctx. cancel 后
 			// MatchWithContext / sendMatchResultOrDrop 虽然会快速返回, 但
 			// "start task to scan" 日志在调用 MatchWithContext 之前就打印了, 循环
@@ -650,7 +698,9 @@ func _scanFromTargetStream(res interface{}, opts ...fp.ConfigOption) (chan *fp.M
 			if synRes == nil || guard.skipping(synRes.Host) {
 				continue
 			}
-			swg.Add()
+			if err := swg.AddWithContext(scanCtx); err != nil {
+				break
+			}
 			rawHost := synRes.Host
 			proto, portWithoutProto, explicitProto := synScanProbeTarget(synRes)
 			callerProtos := append([]fp.TransportProto(nil), matcher.Config.TransportProtos...)
