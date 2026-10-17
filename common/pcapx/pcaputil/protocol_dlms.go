@@ -795,8 +795,11 @@ func (f *binFlow) consumeDecodedDLMS(dir int, w []byte, id uint64, m *dlmsMessag
 	}
 	// A retained information group owns its continuation bytes. Only an
 	// undecoded complete I-frame can select the standalone LLC/E0 path;
-	// an already decoded service must not reinterpret its opaque tail.
-	if m.kind == "I" && s.fragments == nil && dlmsSNGBTInformation(m.information) && !m.segmented {
+	// an already decoded service or an exact cached request retry must not
+	// reinterpret its opaque tail. The same bounded request is decoded below.
+	p := s.pending
+	cachedRequestRetry := p != nil && len(p.requestInformation) > 0 && dir == p.dir && bytes.Equal(p.wire, w)
+	if m.kind == "I" && s.fragments == nil && !cachedRequestRetry && dlmsSNGBTInformation(m.information) && !m.segmented {
 		if s.hasLNContext() {
 			return nil, 0, dlmsError(ErrContextRequired, "SN GBT cannot consume an observed LN owner or information group")
 		}

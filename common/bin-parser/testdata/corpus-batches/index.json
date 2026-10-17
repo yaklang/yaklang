@@ -123434,6 +123434,143 @@
         "common/pcapx/pcaputil/dlms-ln-opaque-continuation-tools/write-body.py": "dlms-ln-opaque-continuation-tools/write-body.py",
         "scripts/protocol-tests/required-tests-traffic-unified-v176.json": "required-tests-traffic-unified-v176.json"
       }
+    },
+    {
+      "id": "validation-dlms-ln-assembled-retry",
+      "kind": "support",
+      "source_sha": "a4f4206da1530456208843f0152c8a27e9c4f945",
+      "file": "validation-dlms-ln-assembled-retry.zip",
+      "sha256": "3e90141a01db3d871ab6c47312d4744dde1ba60bec40671a646e277f1133a6f1",
+      "password": "bin-parser",
+      "members": {
+        "dlms-ln-assembled-retry-source/NEGATIVE-SOURCE-REVIEW.json": {
+          "bytes": 6260,
+          "sha256": "e735a1750c8a39a97334318634128414cc1a83eb83d49f40fb51ccaebfc7319b"
+        },
+        "dlms-ln-assembled-retry-source/SOURCE-NOTE.json": {
+          "bytes": 5421,
+          "sha256": "8f4f5d6d017916fc7a68dd4c5fa4bed05f03df82b00481a7683e953c2b1b0011"
+        },
+        "dlms-ln-assembled-retry-source/capture-index.json": {
+          "bytes": 6338,
+          "sha256": "1e99c0a2d45c9e595b7519a506b1d761106513dd2a59b30664440f5ca087aeeb"
+        },
+        "dlms-ln-assembled-retry-source/captured-controls.json": {
+          "bytes": 129604,
+          "sha256": "f84eab12832c9ff7fb502dc598aaf6f03565372e689773ea1543552753cfddb8"
+        },
+        "dlms-ln-assembled-retry-source/captures/SET-assembled-exact-final-retry-opaque-E0.tcp.pcap": {
+          "bytes": 613,
+          "sha256": "2ff1f648925362bcb8989c1745e9e1cf835601624714e0093885d3f27cb158aa"
+        },
+        "dlms-ln-assembled-retry-source/captures/SET-assembled-exact-final-retry-opaque-E0.udp.pcap": {
+          "bytes": 355,
+          "sha256": "ccfda97f45b187bd03c4d540d3a68ab275866fcb83a133a5b133dd97ff65421f"
+        },
+        "dlms-ln-assembled-retry-source/captures/SET-assembled-exact-final-retry-ordinary-opaque.tcp.pcap": {
+          "bytes": 613,
+          "sha256": "ea7721189e4eda76d41f71dae51ed161c7e242e35d0cdbc1371c2dadbd1b02a5"
+        },
+        "dlms-ln-assembled-retry-source/captures/SET-assembled-exact-final-retry-ordinary-opaque.udp.pcap": {
+          "bytes": 355,
+          "sha256": "26c067e63cb9a4ffc60f655c7eaf1576aac77d5e606f74976b337e2196c16ddb"
+        },
+        "dlms-ln-assembled-retry-source/captures/known-assembled-SET-retry-excludes-wrong-caller-and-changed-wire.tcp.pcap": {
+          "bytes": 805,
+          "sha256": "f82d32a166b74203368d4fb886290b83bf3699f150f4d46aaa27941d98dfe2eb"
+        },
+        "dlms-ln-assembled-retry-source/captures/known-assembled-SET-retry-excludes-wrong-caller-and-changed-wire.udp.pcap": {
+          "bytes": 523,
+          "sha256": "7e899631ac7400f718f6137a96abb2cd240eb4bf8aa0292d025f2081b1d79926"
+        },
+        "dlms-ln-assembled-retry-source/controls.json": {
+          "bytes": 77674,
+          "sha256": "649a95bb7887ce7258095a4789cacf5acb9a2a686ecc2a4a55b21908894c8a2b"
+        },
+        "dlms-ln-assembled-retry-source/negative-controls.json": {
+          "bytes": 52382,
+          "sha256": "46da012024b60bb710be60d93012690985bf51976d51915ecb6f6db79fb2cd48"
+        },
+        "dlms-ln-assembled-retry-source/negative-tools/capture-model.py": {
+          "bytes": 1297,
+          "sha256": "436e6ddf8641e7b1cc1140a18b869addadd19fb25e23a5932cb686dcad22fa78"
+        },
+        "dlms-ln-assembled-retry-source/negative-tools/capture-verifier-pins.json": {
+          "bytes": 1086,
+          "sha256": "45856b51a80274fae65bf20bed0a4f0907b576159224cea60162fe41b719dcbb"
+        },
+        "dlms-ln-assembled-retry-source/negative-tools/generate.py": {
+          "bytes": 6353,
+          "sha256": "77d39a726254607f45fadf0913a9c9990989ff822fbc77fbb1b7a40109b74617"
+        },
+        "dlms-ln-assembled-retry-source/negative-tools/pins.json": {
+          "bytes": 402,
+          "sha256": "cb5d948f11c170b1d0ac0abe754d33448a7306d59237534d2765c9266a348947"
+        },
+        "dlms-ln-assembled-retry-source/negative-tools/verify-captures.py": {
+          "bytes": 5179,
+          "sha256": "b9f79fd8908b6567babe51ea604e1ffccff5f7a3020c4e069dd4d5cdbc895f27"
+        },
+        "dlms-ln-assembled-retry-source/package-tools/data-model.py": {
+          "bytes": 1624,
+          "sha256": "03dbaaa0f3c564db04440c0fbee8742e407f825de889b7a6e0012a49e6a06f4e"
+        },
+        "dlms-ln-assembled-retry-source/package-tools/generate.py": {
+          "bytes": 3166,
+          "sha256": "76e7b69b330fc47b8e8dc45cab927154459b550b6cc8ecd811bca5c8150e3b00"
+        },
+        "dlms-ln-assembled-retry-source/package-tools/model-pins.json": {
+          "bytes": 182,
+          "sha256": "4b2794d9f16e71c3e5f2bd7595beaee1087b0e869f729f82f34d7fe7ea88d8ab"
+        },
+        "dlms-ln-assembled-retry-source/package-tools/operation-model.py": {
+          "bytes": 15928,
+          "sha256": "803c42f35e6d1fafd6c612b1ed8ddc0be0505e99c11ed7f07d2fdbf42a908772"
+        },
+        "dlms-ln-assembled-retry-captures/reuse-inputs.json": {
+          "bytes": 3,
+          "sha256": "ca3d163bab055381827226140568f3bef7eaac187cebd76878e0b63e9e442356"
+        },
+        "required-tests-traffic-unified-v177.json": {
+          "bytes": 24016197,
+          "sha256": "6a4eb35b0c94d7cfdd827ba3bdd7e1051df8c16300a3ef5bd6a32ed51639f53b"
+        },
+        "validation/expected.json": {
+          "bytes": 8259,
+          "sha256": "f353a09567658afb0b00accd6138d556312c09b47bd2f57e89ab8577259a8ad0"
+        }
+      },
+      "aliases": {
+        "common/pcapx/pcaputil/dlms-ln-assembled-retry-source/NEGATIVE-SOURCE-REVIEW.json": "dlms-ln-assembled-retry-source/NEGATIVE-SOURCE-REVIEW.json",
+        "common/pcapx/pcaputil/dlms-ln-assembled-retry-source/SOURCE-NOTE.json": "dlms-ln-assembled-retry-source/SOURCE-NOTE.json",
+        "common/pcapx/pcaputil/dlms-ln-assembled-retry-source/capture-index.json": "dlms-ln-assembled-retry-source/capture-index.json",
+        "common/pcapx/pcaputil/dlms-ln-assembled-retry-source/captured-controls.json": "dlms-ln-assembled-retry-source/captured-controls.json",
+        "common/pcapx/pcaputil/dlms-ln-assembled-retry-source/captures/SET-assembled-exact-final-retry-opaque-E0.tcp.pcap": "dlms-ln-assembled-retry-source/captures/SET-assembled-exact-final-retry-opaque-E0.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-ln-assembled-retry-source/captures/SET-assembled-exact-final-retry-opaque-E0.udp.pcap": "dlms-ln-assembled-retry-source/captures/SET-assembled-exact-final-retry-opaque-E0.udp.pcap",
+        "common/pcapx/pcaputil/dlms-ln-assembled-retry-source/captures/SET-assembled-exact-final-retry-ordinary-opaque.tcp.pcap": "dlms-ln-assembled-retry-source/captures/SET-assembled-exact-final-retry-ordinary-opaque.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-ln-assembled-retry-source/captures/SET-assembled-exact-final-retry-ordinary-opaque.udp.pcap": "dlms-ln-assembled-retry-source/captures/SET-assembled-exact-final-retry-ordinary-opaque.udp.pcap",
+        "common/pcapx/pcaputil/dlms-ln-assembled-retry-source/captures/known-assembled-SET-retry-excludes-wrong-caller-and-changed-wire.tcp.pcap": "dlms-ln-assembled-retry-source/captures/known-assembled-SET-retry-excludes-wrong-caller-and-changed-wire.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-ln-assembled-retry-source/captures/known-assembled-SET-retry-excludes-wrong-caller-and-changed-wire.udp.pcap": "dlms-ln-assembled-retry-source/captures/known-assembled-SET-retry-excludes-wrong-caller-and-changed-wire.udp.pcap",
+        "common/pcapx/pcaputil/dlms-ln-assembled-retry-source/controls.json": "dlms-ln-assembled-retry-source/controls.json",
+        "common/pcapx/pcaputil/dlms-ln-assembled-retry-source/negative-controls.json": "dlms-ln-assembled-retry-source/negative-controls.json",
+        "common/pcapx/pcaputil/dlms-ln-assembled-retry-source/negative-tools/capture-model.py": "dlms-ln-assembled-retry-source/negative-tools/capture-model.py",
+        "common/pcapx/pcaputil/dlms-ln-assembled-retry-source/negative-tools/capture-verifier-pins.json": "dlms-ln-assembled-retry-source/negative-tools/capture-verifier-pins.json",
+        "common/pcapx/pcaputil/dlms-ln-assembled-retry-source/negative-tools/generate.py": "dlms-ln-assembled-retry-source/negative-tools/generate.py",
+        "common/pcapx/pcaputil/dlms-ln-assembled-retry-source/negative-tools/pins.json": "dlms-ln-assembled-retry-source/negative-tools/pins.json",
+        "common/pcapx/pcaputil/dlms-ln-assembled-retry-source/negative-tools/verify-captures.py": "dlms-ln-assembled-retry-source/negative-tools/verify-captures.py",
+        "common/pcapx/pcaputil/dlms-ln-assembled-retry-source/package-tools/data-model.py": "dlms-ln-assembled-retry-source/package-tools/data-model.py",
+        "common/pcapx/pcaputil/dlms-ln-assembled-retry-source/package-tools/generate.py": "dlms-ln-assembled-retry-source/package-tools/generate.py",
+        "common/pcapx/pcaputil/dlms-ln-assembled-retry-source/package-tools/model-pins.json": "dlms-ln-assembled-retry-source/package-tools/model-pins.json",
+        "common/pcapx/pcaputil/dlms-ln-assembled-retry-source/package-tools/operation-model.py": "dlms-ln-assembled-retry-source/package-tools/operation-model.py",
+        "common/pcapx/pcaputil/dlms-ln-assembled-retry-captures/reuse-inputs.json": "dlms-ln-assembled-retry-captures/reuse-inputs.json",
+        "common/pcapx/pcaputil/dlms-ln-assembled-retry-captures/SET-assembled-exact-final-retry-opaque-E0.udp.pcap": "dlms-ln-assembled-retry-source/captures/SET-assembled-exact-final-retry-opaque-E0.udp.pcap",
+        "common/pcapx/pcaputil/dlms-ln-assembled-retry-captures/SET-assembled-exact-final-retry-opaque-E0.tcp.pcap": "dlms-ln-assembled-retry-source/captures/SET-assembled-exact-final-retry-opaque-E0.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-ln-assembled-retry-captures/SET-assembled-exact-final-retry-ordinary-opaque.udp.pcap": "dlms-ln-assembled-retry-source/captures/SET-assembled-exact-final-retry-ordinary-opaque.udp.pcap",
+        "common/pcapx/pcaputil/dlms-ln-assembled-retry-captures/SET-assembled-exact-final-retry-ordinary-opaque.tcp.pcap": "dlms-ln-assembled-retry-source/captures/SET-assembled-exact-final-retry-ordinary-opaque.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-ln-assembled-retry-captures/known-assembled-SET-retry-excludes-wrong-caller-and-changed-wire.udp.pcap": "dlms-ln-assembled-retry-source/captures/known-assembled-SET-retry-excludes-wrong-caller-and-changed-wire.udp.pcap",
+        "common/pcapx/pcaputil/dlms-ln-assembled-retry-captures/known-assembled-SET-retry-excludes-wrong-caller-and-changed-wire.tcp.pcap": "dlms-ln-assembled-retry-source/captures/known-assembled-SET-retry-excludes-wrong-caller-and-changed-wire.tcp.pcap",
+        "scripts/protocol-tests/required-tests-traffic-unified-v177.json": "required-tests-traffic-unified-v177.json"
+      }
     }
   ],
   "schema_version": 1,
