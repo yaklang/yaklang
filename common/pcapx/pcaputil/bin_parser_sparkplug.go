@@ -138,24 +138,14 @@ func sparkGroup(w []byte, group protowire.Number, depth, maxDepth, maxFields int
 }
 
 func sparkDecode(w []byte, maxDepth, maxFields int) (map[string]any, error) {
-	count := 0
-	// Validate nested Metric envelopes in the allocation-free first pass.
-	err := sparkWalk(w, 1, maxDepth, maxFields, &count, func(n protowire.Number, typ protowire.Type, v []byte) error {
-		_, _, tag := protowire.ConsumeTag(v)
-		v = v[tag:]
-		if n == 2 && typ == protowire.BytesType {
-			b, _ := protowire.ConsumeBytes(v)
-			return sparkWalk(b, 2, maxDepth, maxFields, &count, nil)
-		}
-		return nil
-	})
+	_, err := sparkPreflight(w, maxDepth, maxFields)
 	if err != nil {
 		return nil, err
 	}
 	fields := map[string]any{}
 	metrics := []map[string]any{}
 	unknown := []byte{}
-	count = 0
+	count := 0
 	err = sparkWalk(w, 1, maxDepth, maxFields, &count, func(n protowire.Number, typ protowire.Type, v []byte) error {
 		raw := v
 		_, _, tag := protowire.ConsumeTag(v)
@@ -221,9 +211,10 @@ func sparkDecodeMetric(w []byte, maxDepth, maxFields int) (map[string]any, error
 			unknown = append(unknown, raw...)
 			return nil
 		}
-		// Proto2 optional fields and the value oneof use the last correctly
-		// typed occurrence. A known field with the wrong wire type is unknown.
-		if n >= 10 {
+		// Scalar oneofs replace the prior member. Repeated occurrences of the
+		// same message-valued DataSet member merge their encoded bodies; a
+		// different correctly typed oneof clears them. Wrong wire types stay unknown.
+		if n >= 10 && !(n == 17 && fields["dataset_value"] != nil) {
 			for k := protowire.Number(10); k <= 19; k++ {
 				delete(fields, names[k])
 			}
@@ -251,6 +242,9 @@ func sparkDecodeMetric(w []byte, maxDepth, maxFields int) (map[string]any, error
 					return fmt.Errorf("Sparkplug invalid UTF-8 metric string")
 				}
 				fields[name] = string(b)
+			} else if n == 17 {
+				prior, _ := fields[name].([]byte)
+				fields[name] = append(prior, b...)
 			} else {
 				fields[name] = append([]byte(nil), b...)
 			}
@@ -263,12 +257,12 @@ func sparkDecodeMetric(w []byte, maxDepth, maxFields int) (map[string]any, error
 	return fields, err
 }
 
-func sparkValue(m map[string]any, typ uint64) (any, string) {
+func sparkValue(m map[string]any, typ uint64, maxDepth, maxFields int) (any, string) {
 	if m["metadata"] != nil || m["properties"] != nil {
 		return nil, "metadata/properties need an independent structured profile"
 	}
 	switch typ {
-	case 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 17:
+	case 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17:
 	default:
 		return nil, "datatype needs an independent structured profile"
 	}
@@ -279,6 +273,13 @@ func sparkValue(m map[string]any, typ uint64) (any, string) {
 			}
 		}
 		return nil, ""
+	}
+	if typ == 16 {
+		w, ok := m["dataset_value"].([]byte)
+		if !ok {
+			return nil, "datatype/value mismatch"
+		}
+		return sparkDataSet(w, maxDepth, maxFields)
 	}
 	name := ""
 	switch typ {
@@ -417,13 +418,13 @@ func (m *binMQTT) sparkPublish(dir int, topic string, payload []byte, flags byte
 		return refuse("body needs an independent structured profile", "unsupported")
 	}
 	if verb == "DBIRTH" || verb == "DDATA" || verb == "DDEATH" {
-		return m.sparkDevicePublish(v, verb, p, refuse)
+		return m.sparkDevicePublish(v, verb, p, refuse, maxDepth, maxFields)
 	}
 	if verb == "DCMD" {
 		if dir == m.client {
 			return refuse("DCMD must target the observed producer", "refused")
 		}
-		return m.sparkDeviceCommand(v, p, refuse)
+		return m.sparkDeviceCommand(v, p, refuse, maxDepth, maxFields)
 	}
 	if verb == "NCMD" {
 		if _, present := p["seq"]; present {
@@ -434,7 +435,7 @@ func (m *binMQTT) sparkPublish(dir int, topic string, payload []byte, flags byte
 		}
 		metrics, _ := p["metrics"].([]map[string]any)
 		if len(metrics) != 1 || metrics[0]["name"] != "Node Control/Rebirth" {
-			return m.sparkNodeCommand(v, p, refuse)
+			return m.sparkNodeCommand(v, p, refuse, maxDepth, maxFields)
 		}
 		if p["timestamp"] == nil {
 			return refuse("selected NCMD requires timestamp and one Rebirth metric", "unsupported")
@@ -442,7 +443,7 @@ func (m *binMQTT) sparkPublish(dir int, topic string, payload []byte, flags byte
 		metric := metrics[0]
 		_, aliased := metric["alias"]
 		typ, typed := metric["datatype"].(uint64)
-		value, reason := sparkValue(metric, 11)
+		value, reason := sparkValue(metric, 11, maxDepth, maxFields)
 		if metric["name"] != "Node Control/Rebirth" || aliased || typed && typ != 11 || reason != "" || value != true {
 			return refuse("NCMD Rebirth requires unaliased Boolean true", "refused")
 		}
@@ -524,7 +525,7 @@ func (m *binMQTT) sparkPublish(dir int, topic string, payload []byte, flags byte
 			typ = def.typ
 		}
 		seen[name] = true
-		value, reason := sparkValue(metric, typ)
+		value, reason := sparkValue(metric, typ, maxDepth, maxFields)
 		if reason != "" {
 			status := "refused"
 			if strings.Contains(reason, "independent structured profile") {
@@ -569,7 +570,7 @@ func (s *sparkNode) withDevices() *sparkNode {
 	return &n
 }
 
-func (m *binMQTT) sparkDevicePublish(v map[string]any, verb string, p map[string]any, refuse func(string, string) (map[string]any, *sparkNode, error)) (map[string]any, *sparkNode, error) {
+func (m *binMQTT) sparkDevicePublish(v map[string]any, verb string, p map[string]any, refuse func(string, string) (map[string]any, *sparkNode, error), maxDepth, maxFields int) (map[string]any, *sparkNode, error) {
 	id := v["Device ID"].(string)
 	if !m.spark.born {
 		return refuse("NBIRTH metric definitions were not observed", "context-required")
@@ -664,7 +665,7 @@ func (m *binMQTT) sparkDevicePublish(v map[string]any, verb string, p map[string
 			typ = def.typ
 		}
 		seen[name] = true
-		value, reason := sparkValue(metric, typ)
+		value, reason := sparkValue(metric, typ, maxDepth, maxFields)
 		if reason != "" {
 			status := "refused"
 			if strings.Contains(reason, "independent structured profile") {
@@ -684,7 +685,7 @@ func (m *binMQTT) sparkDevicePublish(v map[string]any, verb string, p map[string
 // A command observation proves only compatible fields against a live observed
 // DBIRTH. It never changes producer sequence, definitions, or measured values,
 // and never claims that an output write succeeded at a device.
-func (m *binMQTT) sparkDeviceCommand(v map[string]any, p map[string]any, refuse func(string, string) (map[string]any, *sparkNode, error)) (map[string]any, *sparkNode, error) {
+func (m *binMQTT) sparkDeviceCommand(v map[string]any, p map[string]any, refuse func(string, string) (map[string]any, *sparkNode, error), maxDepth, maxFields int) (map[string]any, *sparkNode, error) {
 	if _, present := p["seq"]; present {
 		return refuse("DCMD excludes sequence number", "refused")
 	}
@@ -719,7 +720,12 @@ func (m *binMQTT) sparkDeviceCommand(v map[string]any, p map[string]any, refuse 
 		if metric["is_null"] == true {
 			return refuse("null command values need an independent write profile", "unsupported")
 		}
-		value, reason := sparkValue(metric, def.typ)
+		// Structured command validation is a separate profile. A DataSet
+		// birth never implicitly authorizes interpreting a command as data.
+		if def.typ == 16 {
+			return refuse("datatype needs an independent structured profile", "unsupported")
+		}
+		value, reason := sparkValue(metric, def.typ, maxDepth, maxFields)
 		if reason != "" {
 			status := "refused"
 			if strings.Contains(reason, "independent structured profile") {
@@ -733,7 +739,7 @@ func (m *binMQTT) sparkDeviceCommand(v map[string]any, p map[string]any, refuse 
 	return v, m.spark, nil
 }
 
-func (m *binMQTT) sparkNodeCommand(v map[string]any, p map[string]any, refuse func(string, string) (map[string]any, *sparkNode, error)) (map[string]any, *sparkNode, error) {
+func (m *binMQTT) sparkNodeCommand(v map[string]any, p map[string]any, refuse func(string, string) (map[string]any, *sparkNode, error), maxDepth, maxFields int) (map[string]any, *sparkNode, error) {
 	if !m.spark.born {
 		return refuse("NBIRTH metric definitions were not observed", "context-required")
 	}
@@ -764,7 +770,12 @@ func (m *binMQTT) sparkNodeCommand(v map[string]any, p map[string]any, refuse fu
 		if metric["is_null"] == true {
 			return refuse("null command values need an independent write profile", "unsupported")
 		}
-		value, reason := sparkValue(metric, def.typ)
+		// Structured command validation is a separate profile. A DataSet
+		// birth never implicitly authorizes interpreting a command as data.
+		if def.typ == 16 {
+			return refuse("datatype needs an independent structured profile", "unsupported")
+		}
+		value, reason := sparkValue(metric, def.typ, maxDepth, maxFields)
 		if reason != "" {
 			status := "refused"
 			if strings.Contains(reason, "independent structured profile") {

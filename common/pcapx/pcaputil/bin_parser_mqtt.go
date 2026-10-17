@@ -166,6 +166,13 @@ func (m *binMQTT) consume(dir int, raw []byte, result map[string]any, maxElement
 			return nil, err
 		}
 		if strings.HasPrefix(willTopic, "spBv1.0/") {
+			// Reserve the new DataSet public graph before allocating it. The
+			// allocation-free pass is global across metrics, rows and packed types.
+			if cost, checkErr := sparkPreflight(willBody, maxDepth, maxElements); checkErr == nil && cost > 0 {
+				if err := reserve(m.retainedBytes() + cost); err != nil {
+					return nil, err
+				}
+			}
 			v, key, verb, err := sparkObservation(willTopic, willBody, maxDepth, maxElements)
 			if err != nil {
 				return nil, err
@@ -257,6 +264,13 @@ func (m *binMQTT) consume(dir int, raw []byte, result map[string]any, maxElement
 			payload, err := mqttPublishPayload(body, qos, m.level)
 			if err != nil {
 				return nil, err
+			}
+			// Reserve the new DataSet public graph before allocating it. The
+			// allocation-free pass is global across metrics, rows and packed types.
+			if cost, checkErr := sparkPreflight(payload, maxDepth, maxElements); checkErr == nil && cost > 0 {
+				if err := reserve(m.retainedBytes() + cost); err != nil {
+					return nil, err
+				}
 			}
 			sparkView, nextSpark, err = m.sparkPublish(dir, topic, payload, flags, maxDepth, maxElements)
 			if err != nil {
