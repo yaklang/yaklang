@@ -565,7 +565,7 @@ The complete source-derived positive/negative matrix covers all fourteen Basic t
 
 ### Sparkplug 3.0 selected DataSet command observations
 
-NCMD and DCMD may expose the same complete Basic1–14 scalar-column DataSet values as Birth/Data, against this connection's live observed NBIRTH and, for DCMD, matching DBIRTH. The reverse caller must target the observed producer. Where Birth defined an alias, commands use alias-only; a metric born without an alias can use its name. Omitted datatype inherits16 and explicitly equal16 is accepted; repeating datatype is a normative SHOULD NOT, not an invented MUST NOT. Payload timestamp is required; metric timestamp is optional. The existing passive observer policy excludes command sequence numbers; this is not a universal normative prohibition on command seq.
+NCMD and DCMD may expose the same complete Basic1–14 scalar-column DataSet values as Birth/Data, against this connection's live observed NBIRTH and, for DCMD, matching DBIRTH. The reverse caller must target the observed producer. Where Birth defined an alias, commands use alias-only; a metric born without an alias can use its name. Omitted datatype inherits16 and explicitly equal16 is accepted; repeating datatype is a normative SHOULD NOT, not an invented MUST NOT. Payload timestamp is required; metric timestamp is optional. Sparkplug3.0 sections6.4.23/24 prohibit Payload.seq in NCMD/DCMD with MUST NOT; the existing observer enforces this requirement. The newer source erratum corrects the earlier explanatory wording without rewriting historical materials.
 
 A successful observation is matched with Operation=command-observed and owned complete typed Metrics.Value/raw fields. It never advances producer sequence, edits definitions or measured values, fabricates TransactionID/ResponseTo, or claims writability, ACK or device execution. Wrong direction, missing Birth, unknown alias, mixed alias/name, type mismatch, missing payload timestamp, invalid row width, incompatible/empty cells and nested wire truncation retain precise existing statuses/reasons and do not invalidate producer definitions. Semantic refusals preserve decoded Payload; preflight syntax failure does not fabricate one. A typed nesting-resource failure instead retains the existing whole-MQTT-session stop and release semantics: the same depth5 cell is rejected with depth4 after a legal depth3 zero-row Birth, and later Feed returns FatalSessionError with no events; depth5 is the exact same-wire normal neighbour.
 
@@ -601,3 +601,28 @@ selected range, null/mixed-Rebirth commands, inherited DataSet schema,
 Template/Properties, endpoint execution and other earlier requirements remain
 unverified or unimplemented. Passive compatibility does not prove device writes,
 writability, acknowledgments or full Sparkplug conformance.
+
+
+### Sparkplug null commands and mixed Rebirth
+
+Selected live-context node/device commands can observe a literal whole-metric
+null with no value oneof for an already supported datatype. This is a compatible
+passive observation, not a claim that a device permits or executes a null write.
+Null with any value oneof stays refused. Definitions, producer sequence and
+measured values are not modified by ordinary null commands or refusals.
+
+An NCMD may contain a valid unaliased Boolean-true Node Control/Rebirth alongside
+other compatible metrics. The observer validates every metric before retiring
+any context; an invalid companion cannot cause a partial transition. A valid
+mixed command preserves complete metric order and reports rebirth-requested,
+then requires an actually observed new Birth before later Data can match.
+No ACK, writability or device execution is inferred. Full native tests include
+DataSet16 and Int32Array24 whole-null/refusal/next-Data examples; the ten default
+captures remain distinct from these four native-only structured controls.
+
+Source clarification: Sparkplug3.0 sections6.4.23/24 prohibit Payload.seq in
+NCMD/DCMD with MUST NOT. Earlier wording describing this only as a conservative
+local policy was incorrect. The runtime prohibition stays unchanged; an archived
+source erratum preserves the correction without rewriting historical ZIPs.
+One exact historical command-null event's capability projection is upgraded over
+pinned original bytes/answers; all other historical observations are unchanged.

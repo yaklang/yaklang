@@ -178,6 +178,10 @@ func testSparkplugSealedMatrix(t *testing.T, directory string, count int) {
 	}
 	raw, err := trafficfixture.ReadFile("testdata/" + directory + "/answers.json")
 	require.NoError(t, err)
+	if directory == "sparkplug-commands" {
+		raw = spNullCommandLegacyAnswers(t, raw)
+	}
+
 	d := json.NewDecoder(bytes.NewReader(raw))
 	d.UseNumber()
 	require.NoError(t, d.Decode(&answers))

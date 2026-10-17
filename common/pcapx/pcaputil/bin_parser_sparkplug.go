@@ -731,9 +731,6 @@ func (m *binMQTT) sparkDeviceCommand(v map[string]any, p map[string]any, refuse 
 		if typ, typed := metric["datatype"].(uint64); typed && typ != def.typ {
 			return refuse("DCMD datatype differs from DBIRTH", "refused")
 		}
-		if metric["is_null"] == true {
-			return refuse("null command values need an independent write profile", "unsupported")
-		}
 		value, reason := sparkValue(metric, def.typ, maxDepth, maxFields)
 		if reason != "" {
 			status := "refused"
@@ -757,6 +754,7 @@ func (m *binMQTT) sparkNodeCommand(v map[string]any, p map[string]any, refuse fu
 		return refuse("NCMD requires timestamp and at least one metric", "refused")
 	}
 	values := []map[string]any{}
+	rebirth := false
 	for _, metric := range ms {
 		name, named := metric["name"].(string)
 		alias, aliased := metric["alias"].(uint64)
@@ -767,7 +765,14 @@ func (m *binMQTT) sparkNodeCommand(v map[string]any, p map[string]any, refuse fu
 			name = m.spark.aliases[alias]
 		}
 		if name == "Node Control/Rebirth" {
-			return refuse("mixed Rebirth commands need an independent command profile", "unsupported")
+			typ, typed := metric["datatype"].(uint64)
+			value, reason := sparkValue(metric, 11, maxDepth, maxFields)
+			if aliased || typed && typ != 11 || reason != "" || value != true {
+				return refuse("NCMD Rebirth requires unaliased Boolean true", "refused")
+			}
+			values = append(values, map[string]any{"Name": name, "Datatype": uint64(11), "Value": true})
+			rebirth = true
+			continue
 		}
 		def, known := m.spark.metrics[name]
 		if !known {
@@ -775,9 +780,6 @@ func (m *binMQTT) sparkNodeCommand(v map[string]any, p map[string]any, refuse fu
 		}
 		if typ, typed := metric["datatype"].(uint64); typed && typ != def.typ {
 			return refuse("NCMD datatype differs from NBIRTH", "refused")
-		}
-		if metric["is_null"] == true {
-			return refuse("null command values need an independent write profile", "unsupported")
 		}
 		value, reason := sparkValue(metric, def.typ, maxDepth, maxFields)
 		if reason != "" {
@@ -788,6 +790,12 @@ func (m *binMQTT) sparkNodeCommand(v map[string]any, p map[string]any, refuse fu
 			return refuse(reason, status)
 		}
 		values = append(values, map[string]any{"Name": name, "Datatype": def.typ, "Value": value})
+	}
+	// Validate every companion before retiring any live definitions. A rejected
+	// command is an observation, not a partial state transition.
+	if rebirth {
+		v["Context Status"], v["bdSeq"], v["Metrics"] = "rebirth-requested", m.spark.bdSeq, values
+		return v, &sparkNode{key: m.spark.key, bdSeq: m.spark.bdSeq}, nil
 	}
 	v["Context Status"], v["Operation"], v["bdSeq"], v["Metrics"] = "matched", "command-observed", m.spark.bdSeq, values
 	return v, m.spark, nil

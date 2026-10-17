@@ -125189,7 +125189,9 @@
         "common/pcapx/pcaputil/testdata/sparkplug-dataset-commands/tools/candidates.py": "sparkplug-dataset/tools/candidates.py",
         "common/pcapx/pcaputil/testdata/sparkplug-dataset-commands/tools/generate-node-state.py": "sparkplug-dataset/tools/generate-node-state.py",
         "common/pcapx/pcaputil/testdata/sparkplug-arrays/tools/candidates.py": "sparkplug-dataset/tools/candidates.py",
-        "common/pcapx/pcaputil/testdata/sparkplug-arrays/tools/generate-node-state.py": "sparkplug-dataset/tools/generate-node-state.py"
+        "common/pcapx/pcaputil/testdata/sparkplug-arrays/tools/generate-node-state.py": "sparkplug-dataset/tools/generate-node-state.py",
+        "common/pcapx/pcaputil/testdata/sparkplug-command-null-rebirth/tools/candidates.py": "sparkplug-dataset/tools/candidates.py",
+        "common/pcapx/pcaputil/testdata/sparkplug-command-null-rebirth/tools/generate-node-state.py": "sparkplug-dataset/tools/generate-node-state.py"
       }
     },
     {
@@ -125491,7 +125493,8 @@
         "common/pcapx/pcaputil/testdata/sparkplug-dataset-commands/tools/verify-all.py": "sparkplug-dataset-commands/tools/verify-all.py",
         "common/pcapx/pcaputil/testdata/sparkplug-dataset-commands/tools/verify-carriers.py": "sparkplug-dataset-commands/tools/verify-carriers.py",
         "scripts/protocol-tests/required-tests-traffic-unified-v184.json": "required-tests-traffic-unified-v184.json",
-        "common/pcapx/pcaputil/testdata/sparkplug-arrays/tools/verify-carriers.py": "sparkplug-dataset-commands/tools/verify-carriers.py"
+        "common/pcapx/pcaputil/testdata/sparkplug-arrays/tools/verify-carriers.py": "sparkplug-dataset-commands/tools/verify-carriers.py",
+        "common/pcapx/pcaputil/testdata/sparkplug-command-null-rebirth/tools/verify-carriers.py": "sparkplug-dataset-commands/tools/verify-carriers.py"
       }
     },
     {
@@ -126048,6 +126051,307 @@
         "common/pcapx/pcaputil/testdata/sparkplug-arrays/tools/verify-full.py": "sparkplug-arrays/tools/verify-full.py",
         "common/pcapx/pcaputil/testdata/sparkplug-arrays/tools/verify.py": "sparkplug-arrays/tools/verify.py",
         "scripts/protocol-tests/required-tests-traffic-unified-v185.json": "required-tests-traffic-unified-v185.json"
+      }
+    },
+    {
+      "id": "validation-sparkplug-command-null-rebirth",
+      "kind": "support",
+      "source_sha": "c87fd067312889290b4593427229623915cf2be8",
+      "file": "validation-sparkplug-command-null-rebirth.zip",
+      "sha256": "8c71a516dfb81c08859aeb103efe3495f84897b9494afcfec3ada9d1feec59b4",
+      "password": "bin-parser",
+      "members": {
+        "required-tests-traffic-unified-v186.json": {
+          "sha256": "c3dee079314e7ddc7b5213b9b53bc31f867597ee143b6911011e86d6f3364a20",
+          "bytes": 25520308
+        },
+        "sparkplug-command-null-rebirth/LICENSE.txt": {
+          "sha256": "bdbfaf906f27dfef68054c9c1387786425dddd4f5b52ff12b8879ae8baf91fab",
+          "bytes": 274
+        },
+        "sparkplug-command-null-rebirth/SOURCE-SEQ-ERRATUM.json": {
+          "sha256": "29907798495fdb6b98e7a7ab3179851698b85db2be5ba89bf557cbf9ca677fd5",
+          "bytes": 1000
+        },
+        "sparkplug-command-null-rebirth/answers.json": {
+          "sha256": "8a9b2e1e1a8b57eb093213ef6cac4a48e98f2976f0a29ac8cec9b6f883665263",
+          "bytes": 87030
+        },
+        "sparkplug-command-null-rebirth/baseline-controls.json": {
+          "sha256": "130b5364f3d2d34add3de64cb29ab084edf4ed88c5d0676c40b06443fabe89c7",
+          "bytes": 60356
+        },
+        "sparkplug-command-null-rebirth/capture-materials.json": {
+          "sha256": "5a048146494696df851557f5831b0c28d3b16aafb118e7bab439f0472ab6527b",
+          "bytes": 103196
+        },
+        "sparkplug-command-null-rebirth/captures/device-null-alias-command-and-nextData.pcap": {
+          "sha256": "b96fff317470db5b65af1b5226696e879fe85ea30aaf3985025d531ee1a4273b",
+          "bytes": 989
+        },
+        "sparkplug-command-null-rebirth/captures/device-null-name-command-and-nextData.pcap": {
+          "sha256": "0a309d3d5f7c1f99bab2a77e6380b3e9c5211085d344e6cdb7d907a55a799390",
+          "bytes": 1009
+        },
+        "sparkplug-command-null-rebirth/captures/device-null-refusals-preserve-producer-state.pcap": {
+          "sha256": "ec6881fa8f476652b6067dc84b0f562dd5753b59f338138fe836ff1f53bbd4ea",
+          "bytes": 1630
+        },
+        "sparkplug-command-null-rebirth/captures/invalid-Rebirth-values-and-alias-preserve-definition.pcap": {
+          "sha256": "6b6927bce857764dc8e684707d00e0a519809cc0b4cc185166d0f58927de284a",
+          "bytes": 1222
+        },
+        "sparkplug-command-null-rebirth/captures/mixed-Rebirth-first-requires-actual-newBirth.pcap": {
+          "sha256": "e17528a96af8fc4191f9108b8377fa2e16b7b0c48554b5501440f0b6f8dedf8a",
+          "bytes": 1170
+        },
+        "sparkplug-command-null-rebirth/captures/mixed-Rebirth-invalid-companion-is-transactional.pcap": {
+          "sha256": "3417793d91e53f11a05c1f68b23e20d35f0fe2b4f72e259c9754010a8b406d97",
+          "bytes": 978
+        },
+        "sparkplug-command-null-rebirth/captures/mixed-Rebirth-last-requires-actual-newBirth.pcap": {
+          "sha256": "5de36337cced11a3ff5e3ead8dda23a50992aca5d65da165bcd6dd385297ae63",
+          "bytes": 1170
+        },
+        "sparkplug-command-null-rebirth/captures/node-null-alias-command-and-nextData.pcap": {
+          "sha256": "5038cb5caaab820ba30203fb1a802b2fbee2f63af56db949755939f8d84ab486",
+          "bytes": 845
+        },
+        "sparkplug-command-null-rebirth/captures/node-null-name-command-and-nextData.pcap": {
+          "sha256": "42a8a92d6d7ba390359cdae6ad74019fb0638e9a42d9aaa2fa8c3230d8391d3b",
+          "bytes": 865
+        },
+        "sparkplug-command-null-rebirth/captures/node-null-refusals-preserve-producer-state.pcap": {
+          "sha256": "a83158caa0b60f3ad204c9586275b343c8f4a1a304c4b50d4287d173f763c099",
+          "bytes": 1483
+        },
+        "sparkplug-command-null-rebirth/historical-null-command-upgrade.json": {
+          "sha256": "22ef6e515ad94c0867e85aa4afbad8e93c0c7a175917f826ad6f12c3cad44f33",
+          "bytes": 11345
+        },
+        "sparkplug-command-null-rebirth/null-rebirth-controls.json": {
+          "sha256": "1db9abb9d85db7dca85c400ece12b690939d367b833746cc2c37257ef103e342",
+          "bytes": 272594
+        },
+        "sparkplug-command-null-rebirth/portable-pins.json": {
+          "sha256": "ab5443e238c7e5915f1d545b9d1e85e4cc9f8f98d5e4b7d523cd08b6cce109cc",
+          "bytes": 10443
+        },
+        "sparkplug-command-null-rebirth/records/043db811c86f6796a0dab7f75018f32e1eae45912ec64c601022d7ed99e040a3.bin": {
+          "sha256": "043db811c86f6796a0dab7f75018f32e1eae45912ec64c601022d7ed99e040a3",
+          "bytes": 45
+        },
+        "sparkplug-command-null-rebirth/records/07d709f0c58ea51bcbd727025953a2866e7136cede16eb30172032fefe7c325d.bin": {
+          "sha256": "07d709f0c58ea51bcbd727025953a2866e7136cede16eb30172032fefe7c325d",
+          "bytes": 33
+        },
+        "sparkplug-command-null-rebirth/records/07d99b6b3aa86cf36c08721627bde051c05555510b418d1dd14a24edb1242ed8.bin": {
+          "sha256": "07d99b6b3aa86cf36c08721627bde051c05555510b418d1dd14a24edb1242ed8",
+          "bytes": 35
+        },
+        "sparkplug-command-null-rebirth/records/093c9f8ffb49afc84eef0256b6ab580fc8a7db8b03176e31c6e911fba21f110d.bin": {
+          "sha256": "093c9f8ffb49afc84eef0256b6ab580fc8a7db8b03176e31c6e911fba21f110d",
+          "bytes": 56
+        },
+        "sparkplug-command-null-rebirth/records/1fb61ac208a77f53d3979280ccb2a8a0418d1ce899e16009c4cea54fc1e66d09.bin": {
+          "sha256": "1fb61ac208a77f53d3979280ccb2a8a0418d1ce899e16009c4cea54fc1e66d09",
+          "bytes": 112
+        },
+        "sparkplug-command-null-rebirth/records/3354cfbcb06eedc6b62a5528bd91bf1e4c3647d42657e5abbb49c31719d2897c.bin": {
+          "sha256": "3354cfbcb06eedc6b62a5528bd91bf1e4c3647d42657e5abbb49c31719d2897c",
+          "bytes": 44
+        },
+        "sparkplug-command-null-rebirth/records/359d1cf66b190d64bc8e4a8bd50be101681fc236e1ae13a8205c542127420e3b.bin": {
+          "sha256": "359d1cf66b190d64bc8e4a8bd50be101681fc236e1ae13a8205c542127420e3b",
+          "bytes": 57
+        },
+        "sparkplug-command-null-rebirth/records/498223754d90aea22b129e97000c413d21e2cf350eee18675b9c4b23b21a28d5.bin": {
+          "sha256": "498223754d90aea22b129e97000c413d21e2cf350eee18675b9c4b23b21a28d5",
+          "bytes": 37
+        },
+        "sparkplug-command-null-rebirth/records/4acbec58d19810c3c179325dfdc4eddcc825af8a08c4e65dd9591c923d1dddd7.bin": {
+          "sha256": "4acbec58d19810c3c179325dfdc4eddcc825af8a08c4e65dd9591c923d1dddd7",
+          "bytes": 61
+        },
+        "sparkplug-command-null-rebirth/records/58740103b50b4babf33b6a90726bca87660139aa946f54b7d020a270fb4fd66a.bin": {
+          "sha256": "58740103b50b4babf33b6a90726bca87660139aa946f54b7d020a270fb4fd66a",
+          "bytes": 34
+        },
+        "sparkplug-command-null-rebirth/records/615229f57ed8dccab99c046c23b4a0181910d47dfe97c564f4bccd8b5979ca4e.bin": {
+          "sha256": "615229f57ed8dccab99c046c23b4a0181910d47dfe97c564f4bccd8b5979ca4e",
+          "bytes": 46
+        },
+        "sparkplug-command-null-rebirth/records/793052a041c057be6d221f85705b26f252cc8256cb68ea9afaad3d939cc90a02.bin": {
+          "sha256": "793052a041c057be6d221f85705b26f252cc8256cb68ea9afaad3d939cc90a02",
+          "bytes": 59
+        },
+        "sparkplug-command-null-rebirth/records/857449755dc9d6ff47fb29d5af1e0a592e97aa48966ada7db6e56b07d40123ad.bin": {
+          "sha256": "857449755dc9d6ff47fb29d5af1e0a592e97aa48966ada7db6e56b07d40123ad",
+          "bytes": 35
+        },
+        "sparkplug-command-null-rebirth/records/8c00219a4b4e7f13ad9e1be82881dd012eda4c9d4462ec2239efed68917181de.bin": {
+          "sha256": "8c00219a4b4e7f13ad9e1be82881dd012eda4c9d4462ec2239efed68917181de",
+          "bytes": 44
+        },
+        "sparkplug-command-null-rebirth/records/97ac574e0bb1406239d021a28d1a91c23499473b0587720eab61181fc6a9fb2b.bin": {
+          "sha256": "97ac574e0bb1406239d021a28d1a91c23499473b0587720eab61181fc6a9fb2b",
+          "bytes": 37
+        },
+        "sparkplug-command-null-rebirth/records/99e5fb1a897a222654cce033c1cdbd5a804638843b9d9bcfec30a54a6bd78a50.bin": {
+          "sha256": "99e5fb1a897a222654cce033c1cdbd5a804638843b9d9bcfec30a54a6bd78a50",
+          "bytes": 54
+        },
+        "sparkplug-command-null-rebirth/records/9f80a8e992cfb887fc08fb04b8bfd930b61b3b67a1333e197a7ff1e72a0714d0.bin": {
+          "sha256": "9f80a8e992cfb887fc08fb04b8bfd930b61b3b67a1333e197a7ff1e72a0714d0",
+          "bytes": 55
+        },
+        "sparkplug-command-null-rebirth/records/ab1f50fa20554734a25ebf33747b312fffcf1384e0e243d07f438cfa024f50e2.bin": {
+          "sha256": "ab1f50fa20554734a25ebf33747b312fffcf1384e0e243d07f438cfa024f50e2",
+          "bytes": 37
+        },
+        "sparkplug-command-null-rebirth/records/aec5579933f3e0c4c3362b9b0ee5fcc3222d093b1d30369e64fdbb016b60cc59.bin": {
+          "sha256": "aec5579933f3e0c4c3362b9b0ee5fcc3222d093b1d30369e64fdbb016b60cc59",
+          "bytes": 55
+        },
+        "sparkplug-command-null-rebirth/records/b2bb30bce7bcd064f1fa4373b017ad85af082c390ef0dc7e4e72b2413d647923.bin": {
+          "sha256": "b2bb30bce7bcd064f1fa4373b017ad85af082c390ef0dc7e4e72b2413d647923",
+          "bytes": 36
+        },
+        "sparkplug-command-null-rebirth/records/c56f22141265a97abab259eecee44b2842d96d72d6e488eeaa37680cda7daea7.bin": {
+          "sha256": "c56f22141265a97abab259eecee44b2842d96d72d6e488eeaa37680cda7daea7",
+          "bytes": 43
+        },
+        "sparkplug-command-null-rebirth/records/c6a9f991ec9fe3007f90adc3146bb4bb2f6eaef6b4c05728cbee2880a774d1f4.bin": {
+          "sha256": "c6a9f991ec9fe3007f90adc3146bb4bb2f6eaef6b4c05728cbee2880a774d1f4",
+          "bytes": 61
+        },
+        "sparkplug-command-null-rebirth/records/ce50c213de69ea5d5f882e1c1cc8aee2f6f344d7ee91962e5618ec9ba98884c8.bin": {
+          "sha256": "ce50c213de69ea5d5f882e1c1cc8aee2f6f344d7ee91962e5618ec9ba98884c8",
+          "bytes": 35
+        },
+        "sparkplug-command-null-rebirth/records/d8eb92bf97b006e5a1a606424570a0904572c47764b017ca3a587d9d171b3fe1.bin": {
+          "sha256": "d8eb92bf97b006e5a1a606424570a0904572c47764b017ca3a587d9d171b3fe1",
+          "bytes": 48
+        },
+        "sparkplug-command-null-rebirth/records/dad29461205bdb71d6152cc8bed091d974ddd9b51b4210a848929e3ec2e65753.bin": {
+          "sha256": "dad29461205bdb71d6152cc8bed091d974ddd9b51b4210a848929e3ec2e65753",
+          "bytes": 63
+        },
+        "sparkplug-command-null-rebirth/records/f59594fa5f04bc31428ba5c374b6517e81a0ad5bcfc42866a8201e4be494526c.bin": {
+          "sha256": "f59594fa5f04bc31428ba5c374b6517e81a0ad5bcfc42866a8201e4be494526c",
+          "bytes": 61
+        },
+        "sparkplug-command-null-rebirth/records/fad679e5259b327725f05141e4755c4c56a1528b4c51ef7cdb506b71032a1978.bin": {
+          "sha256": "fad679e5259b327725f05141e4755c4c56a1528b4c51ef7cdb506b71032a1978",
+          "bytes": 114
+        },
+        "sparkplug-command-null-rebirth/source-bindings.json": {
+          "sha256": "51e9b177aef5ec6e61a0931f829f16616e4a848bacefbc030f1d42f5afa43cbf",
+          "bytes": 14340
+        },
+        "sparkplug-command-null-rebirth/source-manifest.json": {
+          "sha256": "0c3f1756ff2200c4dbd4a49dd8af90677ac4637ed25ee48328a35f31e9f17689",
+          "bytes": 3012
+        },
+        "sparkplug-command-null-rebirth/structured-null-controls.json": {
+          "sha256": "0f2e2bf57f9adcf3bfd20331f5b0552bba44913cc113bcd4d555f6c5646550c2",
+          "bytes": 106220
+        },
+        "sparkplug-command-null-rebirth/tools/generate-carriers.py": {
+          "sha256": "899a526c982c99d5b63d4cc696faee19acf823276f7a5dc587afcee8875616ae",
+          "bytes": 8234
+        },
+        "sparkplug-command-null-rebirth/tools/generate-structured-null.py": {
+          "sha256": "7f94729c314a483fc7aceacc533614e1acc12806a62a6221fd928dfd6ece50a7",
+          "bytes": 4550
+        },
+        "sparkplug-command-null-rebirth/tools/generate.py": {
+          "sha256": "fc2a11dffd2f7286cf4e429f8e1e2272d46d3c1c714d3b1f1d7a4606538c9d59",
+          "bytes": 9040
+        },
+        "sparkplug-command-null-rebirth/tools/legacy-upgrade.py": {
+          "sha256": "eab2c9295e84f02984544236a6385b282e9e85c3653b9eafba5a5b9989a3499c",
+          "bytes": 4064
+        },
+        "sparkplug-command-null-rebirth/tools/verify-all.py": {
+          "sha256": "5f60b8f3ebfec49c4b4c748885807c54d3c07450082623df83d2d13b2ba8cbb1",
+          "bytes": 3572
+        },
+        "sparkplug-command-null-rebirth/tools/verify-structured-null.py": {
+          "sha256": "657e7d3f61f2019cda054749a70f6704da43f0712b1613498659e35f0e7b1daf",
+          "bytes": 4607
+        },
+        "sparkplug-command-null-rebirth/tools/verify.py": {
+          "sha256": "389f574696fcf8d0c89ad111e03398592f781f8b2c14cdc02eddb19ced8e9c45",
+          "bytes": 5472
+        },
+        "sparkplug-command-null-rebirth/tools/wire.py": {
+          "sha256": "4f469067c137c6c5d3d02b8d15d7040fc2c0606e52eefb74d9f9f865ec9432de",
+          "bytes": 1955
+        },
+        "validation/expected.json": {
+          "sha256": "3693d02b0f11fa2cfcb4f048b6e6bee2ad84000b242d5b3b4c071658ce0eb082",
+          "bytes": 14129
+        }
+      },
+      "aliases": {
+        "common/pcapx/pcaputil/testdata/sparkplug-command-null-rebirth/LICENSE.txt": "sparkplug-command-null-rebirth/LICENSE.txt",
+        "common/pcapx/pcaputil/testdata/sparkplug-command-null-rebirth/SOURCE-SEQ-ERRATUM.json": "sparkplug-command-null-rebirth/SOURCE-SEQ-ERRATUM.json",
+        "common/pcapx/pcaputil/testdata/sparkplug-command-null-rebirth/answers.json": "sparkplug-command-null-rebirth/answers.json",
+        "common/pcapx/pcaputil/testdata/sparkplug-command-null-rebirth/baseline-controls.json": "sparkplug-command-null-rebirth/baseline-controls.json",
+        "common/pcapx/pcaputil/testdata/sparkplug-command-null-rebirth/capture-materials.json": "sparkplug-command-null-rebirth/capture-materials.json",
+        "common/pcapx/pcaputil/testdata/sparkplug-command-null-rebirth/captures/device-null-alias-command-and-nextData.pcap": "sparkplug-command-null-rebirth/captures/device-null-alias-command-and-nextData.pcap",
+        "common/pcapx/pcaputil/testdata/sparkplug-command-null-rebirth/captures/device-null-name-command-and-nextData.pcap": "sparkplug-command-null-rebirth/captures/device-null-name-command-and-nextData.pcap",
+        "common/pcapx/pcaputil/testdata/sparkplug-command-null-rebirth/captures/device-null-refusals-preserve-producer-state.pcap": "sparkplug-command-null-rebirth/captures/device-null-refusals-preserve-producer-state.pcap",
+        "common/pcapx/pcaputil/testdata/sparkplug-command-null-rebirth/captures/invalid-Rebirth-values-and-alias-preserve-definition.pcap": "sparkplug-command-null-rebirth/captures/invalid-Rebirth-values-and-alias-preserve-definition.pcap",
+        "common/pcapx/pcaputil/testdata/sparkplug-command-null-rebirth/captures/mixed-Rebirth-first-requires-actual-newBirth.pcap": "sparkplug-command-null-rebirth/captures/mixed-Rebirth-first-requires-actual-newBirth.pcap",
+        "common/pcapx/pcaputil/testdata/sparkplug-command-null-rebirth/captures/mixed-Rebirth-invalid-companion-is-transactional.pcap": "sparkplug-command-null-rebirth/captures/mixed-Rebirth-invalid-companion-is-transactional.pcap",
+        "common/pcapx/pcaputil/testdata/sparkplug-command-null-rebirth/captures/mixed-Rebirth-last-requires-actual-newBirth.pcap": "sparkplug-command-null-rebirth/captures/mixed-Rebirth-last-requires-actual-newBirth.pcap",
+        "common/pcapx/pcaputil/testdata/sparkplug-command-null-rebirth/captures/node-null-alias-command-and-nextData.pcap": "sparkplug-command-null-rebirth/captures/node-null-alias-command-and-nextData.pcap",
+        "common/pcapx/pcaputil/testdata/sparkplug-command-null-rebirth/captures/node-null-name-command-and-nextData.pcap": "sparkplug-command-null-rebirth/captures/node-null-name-command-and-nextData.pcap",
+        "common/pcapx/pcaputil/testdata/sparkplug-command-null-rebirth/captures/node-null-refusals-preserve-producer-state.pcap": "sparkplug-command-null-rebirth/captures/node-null-refusals-preserve-producer-state.pcap",
+        "common/pcapx/pcaputil/testdata/sparkplug-command-null-rebirth/historical-null-command-upgrade.json": "sparkplug-command-null-rebirth/historical-null-command-upgrade.json",
+        "common/pcapx/pcaputil/testdata/sparkplug-command-null-rebirth/null-rebirth-controls.json": "sparkplug-command-null-rebirth/null-rebirth-controls.json",
+        "common/pcapx/pcaputil/testdata/sparkplug-command-null-rebirth/portable-pins.json": "sparkplug-command-null-rebirth/portable-pins.json",
+        "common/pcapx/pcaputil/testdata/sparkplug-command-null-rebirth/records/043db811c86f6796a0dab7f75018f32e1eae45912ec64c601022d7ed99e040a3.bin": "sparkplug-command-null-rebirth/records/043db811c86f6796a0dab7f75018f32e1eae45912ec64c601022d7ed99e040a3.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-command-null-rebirth/records/07d709f0c58ea51bcbd727025953a2866e7136cede16eb30172032fefe7c325d.bin": "sparkplug-command-null-rebirth/records/07d709f0c58ea51bcbd727025953a2866e7136cede16eb30172032fefe7c325d.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-command-null-rebirth/records/07d99b6b3aa86cf36c08721627bde051c05555510b418d1dd14a24edb1242ed8.bin": "sparkplug-command-null-rebirth/records/07d99b6b3aa86cf36c08721627bde051c05555510b418d1dd14a24edb1242ed8.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-command-null-rebirth/records/093c9f8ffb49afc84eef0256b6ab580fc8a7db8b03176e31c6e911fba21f110d.bin": "sparkplug-command-null-rebirth/records/093c9f8ffb49afc84eef0256b6ab580fc8a7db8b03176e31c6e911fba21f110d.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-command-null-rebirth/records/1fb61ac208a77f53d3979280ccb2a8a0418d1ce899e16009c4cea54fc1e66d09.bin": "sparkplug-command-null-rebirth/records/1fb61ac208a77f53d3979280ccb2a8a0418d1ce899e16009c4cea54fc1e66d09.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-command-null-rebirth/records/3354cfbcb06eedc6b62a5528bd91bf1e4c3647d42657e5abbb49c31719d2897c.bin": "sparkplug-command-null-rebirth/records/3354cfbcb06eedc6b62a5528bd91bf1e4c3647d42657e5abbb49c31719d2897c.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-command-null-rebirth/records/359d1cf66b190d64bc8e4a8bd50be101681fc236e1ae13a8205c542127420e3b.bin": "sparkplug-command-null-rebirth/records/359d1cf66b190d64bc8e4a8bd50be101681fc236e1ae13a8205c542127420e3b.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-command-null-rebirth/records/498223754d90aea22b129e97000c413d21e2cf350eee18675b9c4b23b21a28d5.bin": "sparkplug-command-null-rebirth/records/498223754d90aea22b129e97000c413d21e2cf350eee18675b9c4b23b21a28d5.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-command-null-rebirth/records/4acbec58d19810c3c179325dfdc4eddcc825af8a08c4e65dd9591c923d1dddd7.bin": "sparkplug-command-null-rebirth/records/4acbec58d19810c3c179325dfdc4eddcc825af8a08c4e65dd9591c923d1dddd7.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-command-null-rebirth/records/58740103b50b4babf33b6a90726bca87660139aa946f54b7d020a270fb4fd66a.bin": "sparkplug-command-null-rebirth/records/58740103b50b4babf33b6a90726bca87660139aa946f54b7d020a270fb4fd66a.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-command-null-rebirth/records/615229f57ed8dccab99c046c23b4a0181910d47dfe97c564f4bccd8b5979ca4e.bin": "sparkplug-command-null-rebirth/records/615229f57ed8dccab99c046c23b4a0181910d47dfe97c564f4bccd8b5979ca4e.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-command-null-rebirth/records/793052a041c057be6d221f85705b26f252cc8256cb68ea9afaad3d939cc90a02.bin": "sparkplug-command-null-rebirth/records/793052a041c057be6d221f85705b26f252cc8256cb68ea9afaad3d939cc90a02.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-command-null-rebirth/records/857449755dc9d6ff47fb29d5af1e0a592e97aa48966ada7db6e56b07d40123ad.bin": "sparkplug-command-null-rebirth/records/857449755dc9d6ff47fb29d5af1e0a592e97aa48966ada7db6e56b07d40123ad.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-command-null-rebirth/records/8c00219a4b4e7f13ad9e1be82881dd012eda4c9d4462ec2239efed68917181de.bin": "sparkplug-command-null-rebirth/records/8c00219a4b4e7f13ad9e1be82881dd012eda4c9d4462ec2239efed68917181de.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-command-null-rebirth/records/97ac574e0bb1406239d021a28d1a91c23499473b0587720eab61181fc6a9fb2b.bin": "sparkplug-command-null-rebirth/records/97ac574e0bb1406239d021a28d1a91c23499473b0587720eab61181fc6a9fb2b.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-command-null-rebirth/records/99e5fb1a897a222654cce033c1cdbd5a804638843b9d9bcfec30a54a6bd78a50.bin": "sparkplug-command-null-rebirth/records/99e5fb1a897a222654cce033c1cdbd5a804638843b9d9bcfec30a54a6bd78a50.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-command-null-rebirth/records/9f80a8e992cfb887fc08fb04b8bfd930b61b3b67a1333e197a7ff1e72a0714d0.bin": "sparkplug-command-null-rebirth/records/9f80a8e992cfb887fc08fb04b8bfd930b61b3b67a1333e197a7ff1e72a0714d0.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-command-null-rebirth/records/ab1f50fa20554734a25ebf33747b312fffcf1384e0e243d07f438cfa024f50e2.bin": "sparkplug-command-null-rebirth/records/ab1f50fa20554734a25ebf33747b312fffcf1384e0e243d07f438cfa024f50e2.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-command-null-rebirth/records/aec5579933f3e0c4c3362b9b0ee5fcc3222d093b1d30369e64fdbb016b60cc59.bin": "sparkplug-command-null-rebirth/records/aec5579933f3e0c4c3362b9b0ee5fcc3222d093b1d30369e64fdbb016b60cc59.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-command-null-rebirth/records/b2bb30bce7bcd064f1fa4373b017ad85af082c390ef0dc7e4e72b2413d647923.bin": "sparkplug-command-null-rebirth/records/b2bb30bce7bcd064f1fa4373b017ad85af082c390ef0dc7e4e72b2413d647923.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-command-null-rebirth/records/c56f22141265a97abab259eecee44b2842d96d72d6e488eeaa37680cda7daea7.bin": "sparkplug-command-null-rebirth/records/c56f22141265a97abab259eecee44b2842d96d72d6e488eeaa37680cda7daea7.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-command-null-rebirth/records/c6a9f991ec9fe3007f90adc3146bb4bb2f6eaef6b4c05728cbee2880a774d1f4.bin": "sparkplug-command-null-rebirth/records/c6a9f991ec9fe3007f90adc3146bb4bb2f6eaef6b4c05728cbee2880a774d1f4.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-command-null-rebirth/records/ce50c213de69ea5d5f882e1c1cc8aee2f6f344d7ee91962e5618ec9ba98884c8.bin": "sparkplug-command-null-rebirth/records/ce50c213de69ea5d5f882e1c1cc8aee2f6f344d7ee91962e5618ec9ba98884c8.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-command-null-rebirth/records/d8eb92bf97b006e5a1a606424570a0904572c47764b017ca3a587d9d171b3fe1.bin": "sparkplug-command-null-rebirth/records/d8eb92bf97b006e5a1a606424570a0904572c47764b017ca3a587d9d171b3fe1.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-command-null-rebirth/records/dad29461205bdb71d6152cc8bed091d974ddd9b51b4210a848929e3ec2e65753.bin": "sparkplug-command-null-rebirth/records/dad29461205bdb71d6152cc8bed091d974ddd9b51b4210a848929e3ec2e65753.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-command-null-rebirth/records/f59594fa5f04bc31428ba5c374b6517e81a0ad5bcfc42866a8201e4be494526c.bin": "sparkplug-command-null-rebirth/records/f59594fa5f04bc31428ba5c374b6517e81a0ad5bcfc42866a8201e4be494526c.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-command-null-rebirth/records/fad679e5259b327725f05141e4755c4c56a1528b4c51ef7cdb506b71032a1978.bin": "sparkplug-command-null-rebirth/records/fad679e5259b327725f05141e4755c4c56a1528b4c51ef7cdb506b71032a1978.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-command-null-rebirth/source-bindings.json": "sparkplug-command-null-rebirth/source-bindings.json",
+        "common/pcapx/pcaputil/testdata/sparkplug-command-null-rebirth/source-manifest.json": "sparkplug-command-null-rebirth/source-manifest.json",
+        "common/pcapx/pcaputil/testdata/sparkplug-command-null-rebirth/structured-null-controls.json": "sparkplug-command-null-rebirth/structured-null-controls.json",
+        "common/pcapx/pcaputil/testdata/sparkplug-command-null-rebirth/tools/generate-carriers.py": "sparkplug-command-null-rebirth/tools/generate-carriers.py",
+        "common/pcapx/pcaputil/testdata/sparkplug-command-null-rebirth/tools/generate-structured-null.py": "sparkplug-command-null-rebirth/tools/generate-structured-null.py",
+        "common/pcapx/pcaputil/testdata/sparkplug-command-null-rebirth/tools/generate.py": "sparkplug-command-null-rebirth/tools/generate.py",
+        "common/pcapx/pcaputil/testdata/sparkplug-command-null-rebirth/tools/legacy-upgrade.py": "sparkplug-command-null-rebirth/tools/legacy-upgrade.py",
+        "common/pcapx/pcaputil/testdata/sparkplug-command-null-rebirth/tools/verify-all.py": "sparkplug-command-null-rebirth/tools/verify-all.py",
+        "common/pcapx/pcaputil/testdata/sparkplug-command-null-rebirth/tools/verify-structured-null.py": "sparkplug-command-null-rebirth/tools/verify-structured-null.py",
+        "common/pcapx/pcaputil/testdata/sparkplug-command-null-rebirth/tools/verify.py": "sparkplug-command-null-rebirth/tools/verify.py",
+        "common/pcapx/pcaputil/testdata/sparkplug-command-null-rebirth/tools/wire.py": "sparkplug-command-null-rebirth/tools/wire.py",
+        "scripts/protocol-tests/required-tests-traffic-unified-v186.json": "required-tests-traffic-unified-v186.json"
       }
     }
   ],
