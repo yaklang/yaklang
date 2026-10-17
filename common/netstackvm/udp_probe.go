@@ -27,6 +27,55 @@ var (
 	ErrUDPSend = errors.New("UDP probe could not send")
 )
 
+type probeBudgetKey struct{}
+
+// ContextWithProbeBudget keeps ctx as the scan lifetime and records how long
+// to wait for a reply after the datagram is sent. Queueing for the shared
+// packet rate does not consume that budget.
+func ContextWithProbeBudget(ctx context.Context, budget time.Duration) context.Context {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	if budget <= 0 {
+		return ctx
+	}
+	return context.WithValue(ctx, probeBudgetKey{}, budget)
+}
+
+func probeResponseBudget(ctx context.Context) time.Duration {
+	if ctx == nil {
+		return 0
+	}
+	budget, _ := ctx.Value(probeBudgetKey{}).(time.Duration)
+	if budget < 0 {
+		return 0
+	}
+	return budget
+}
+
+// contextWithoutDeadline keeps cancellation and drops a deadline. The packet
+// rate queue must stop when the scan is cancelled, without spending the
+// response budget while it waits for a token.
+func contextWithoutDeadline(ctx context.Context) (context.Context, context.CancelFunc) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	out, cancel := context.WithCancel(context.WithoutCancel(ctx))
+	if err := ctx.Err(); err != nil && !errors.Is(err, context.DeadlineExceeded) {
+		cancel()
+		return out, cancel
+	}
+	stop := context.AfterFunc(ctx, func() {
+		if err := ctx.Err(); err != nil && !errors.Is(err, context.DeadlineExceeded) {
+			cancel()
+		}
+	})
+	return out, func() {
+		stop()
+		cancel()
+	}
+}
+
 // UDPSegment is one UDP datagram observed on the probe's own stack.
 // Local is this endpoint and remote is the peer.
 type UDPSegment struct {
@@ -161,26 +210,64 @@ func (h *HalfOpenSYN) ProbeUDP(ctx context.Context, target string, payload []byt
 	h.mu.Lock()
 	f.frame = frame
 	h.mu.Unlock()
-	if err := h.waitLimiter(ctx); err != nil {
+	// A response budget starts after a rate token is granted. The flight keeps
+	// the detached context so a deadline that began at enqueue cannot cancel
+	// the send or drop the reply.
+	budget := probeResponseBudget(ctx)
+	limitCtx := ctx
+	limitCancel := func() {}
+	if budget > 0 {
+		limitCtx, limitCancel = contextWithoutDeadline(ctx)
+		h.mu.Lock()
+		f.ctx = limitCtx
+		h.mu.Unlock()
+	}
+	defer limitCancel()
+	stopLimit := context.AfterFunc(h.ctx, limitCancel)
+	defer stopLimit()
+	err = h.waitLimiter(limitCtx)
+	if err != nil {
+		if h.ctx.Err() != nil {
+			return UDPSegment{}, h.ctx.Err()
+		}
 		return UDPSegment{}, err
 	}
-	if err := h.injectUDP(ctx, vm, f); err != nil {
+	if err = h.injectUDP(limitCtx, vm, f); err != nil {
 		return UDPSegment{}, err
 	}
+	respParent := ctx
+	if budget > 0 {
+		respParent = context.WithoutCancel(ctx)
+	}
+	respCtx, respCancel := context.WithCancel(respParent)
+	defer respCancel()
+	if budget > 0 {
+		timer := time.AfterFunc(budget, respCancel)
+		defer timer.Stop()
+	}
+	stopResp := context.AfterFunc(h.ctx, respCancel)
+	defer stopResp()
+	stopCaller := context.AfterFunc(ctx, func() {
+		if err := ctx.Err(); err != nil && !errors.Is(err, context.DeadlineExceeded) {
+			respCancel()
+		}
+	})
+	defer stopCaller()
 	select {
-	case <-ctx.Done():
+	case <-respCtx.Done():
 		h.mu.Lock()
 		bad := f.badChecksum
 		h.mu.Unlock()
 		if bad {
 			return UDPSegment{}, fmt.Errorf("%w: %w", ErrUDPNoResponse, ErrProbeChecksum)
 		}
-		if errors.Is(ctx.Err(), context.Canceled) {
-			return UDPSegment{}, ctx.Err()
+		if h.ctx.Err() != nil {
+			return UDPSegment{}, h.ctx.Err()
+		}
+		if err := ctx.Err(); err != nil && !errors.Is(err, context.DeadlineExceeded) {
+			return UDPSegment{}, err
 		}
 		return UDPSegment{}, ErrUDPNoResponse
-	case <-h.ctx.Done():
-		return UDPSegment{}, h.ctx.Err()
 	case res := <-f.results:
 		if res.unreachable {
 			return UDPSegment{}, ErrUDPUnreachable

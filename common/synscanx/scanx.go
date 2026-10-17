@@ -471,7 +471,14 @@ func (s *Scannerx) Scan(targetCh <-chan *SynxTarget) (chan *synscan.SynScanResul
 	}
 
 	resultFilter := filter.NewFilter()
-	defer resultFilter.Close()
+	// Scan returns as soon as the probe loop is running. The filter has to
+	// stay alive until that loop finishes, and still be closed if startup fails.
+	filterOwnedByScan := true
+	defer func() {
+		if filterOwnedByScan {
+			resultFilter.Close()
+		}
+	}()
 
 	var hostsFilter *utils.HostsFilter
 	var portsFilter *utils.PortsFilter
@@ -549,7 +556,9 @@ func (s *Scannerx) Scan(targetCh <-chan *SynxTarget) (chan *synscan.SynScanResul
 		return nil, fmt.Errorf("synscanx netstackvm: %w", err)
 	}
 	// 异步执行扫描流程
+	filterOwnedByScan = false
 	go func() {
+		defer resultFilter.Close()
 		defer func() {
 			if err := recover(); err != nil {
 				utils.PrintCurrentGoroutineRuntimeStack()
