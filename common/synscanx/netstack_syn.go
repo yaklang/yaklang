@@ -35,11 +35,10 @@ func (h *netstackSYN) Probe(ctx context.Context, target string) (netstackvm.TCPS
 	return h.ProbeSYN(ctx, target, netstackvm.WithSYNRetry(h.retry))
 }
 
-// tcpRetryPolicy spreads a caller budget across three response waits at 1:2:4.
+// tcpRetryPolicy spreads a caller budget across response waits at 1:2:4.
 // The default policy stays in place when the caller did not set a budget.
-// A budget shorter than one 50ms wait cannot be split without making
-// MaxResponseTimeout smaller than ResponseTimeout, which the probe rejects
-// before sending. That budget is one attempt instead.
+// Each wait is at least 50ms, and the waits that are actually scheduled fit
+// inside the budget. A budget that cannot hold the next wait becomes one attempt.
 func tcpRetryPolicy(budget time.Duration) netstackvm.SYNRetryPolicy {
 	policy := netstackvm.DefaultSYNRetryPolicy()
 	if budget <= 0 {
@@ -52,20 +51,35 @@ func tcpRetryPolicy(budget time.Duration) netstackvm.SYNRetryPolicy {
 		policy.MaxResponseTimeout = budget
 		return policy
 	}
-	unit := budget / 7
-	if unit < minUnit {
-		unit = minUnit
+	weights := []int{1, 2, 4}
+	attempts := 1
+	for n := 2; n <= len(weights); n++ {
+		sum := 0
+		for i := 0; i < n; i++ {
+			sum += weights[i]
+		}
+		if budget/time.Duration(sum) < minUnit {
+			break
+		}
+		attempts = n
 	}
-	maxWait := unit * 4
+	sum := 0
+	for i := 0; i < attempts; i++ {
+		sum += weights[i]
+	}
+	unit := budget / time.Duration(sum)
+	if attempts == 1 || unit < minUnit {
+		unit = budget
+		attempts = 1
+	}
+	maxWait := unit * time.Duration(weights[attempts-1])
 	if maxWait > budget {
 		maxWait = budget
 	}
 	if maxWait < unit {
-		policy.MaxAttempts = 1
-		policy.ResponseTimeout = budget
-		policy.MaxResponseTimeout = budget
-		return policy
+		maxWait = unit
 	}
+	policy.MaxAttempts = attempts
 	policy.ResponseTimeout = unit
 	policy.MaxResponseTimeout = maxWait
 	return policy

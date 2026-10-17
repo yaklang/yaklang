@@ -146,6 +146,66 @@ func TestHalfOpenNoResponseIsInconclusiveAndBudgetIsShared(t *testing.T) {
 	require.EqualValues(t, 3, writes.Load(), "send failure and response timeout use one attempt budget")
 }
 
+func TestProbeResponseBudgetBoundsRetries(t *testing.T) {
+	policy := SYNRetryPolicy{MaxAttempts: 3, SendTimeout: time.Second, ResponseTimeout: 50 * time.Millisecond, MaxResponseTimeout: 50 * time.Millisecond}
+	for _, budget := range []time.Duration{49 * time.Millisecond, 50 * time.Millisecond, 100 * time.Millisecond, 200 * time.Millisecond, 350 * time.Millisecond} {
+		t.Run(budget.String(), func(t *testing.T) {
+			var writes atomic.Int32
+			var sentAt time.Time
+			h := mockHalfOpen(t, func(*HalfOpenSYN, []byte) error {
+				if writes.Add(1) == 1 {
+					sentAt = time.Now()
+				}
+				return nil
+			})
+			_, err := h.ProbeSYN(ContextWithProbeBudget(context.Background(), budget), "192.0.2.20:80", WithSYNRetry(policy))
+			elapsed := time.Since(sentAt)
+			require.ErrorIs(t, err, ErrProbeNoResponse)
+			require.Less(t, elapsed, budget+45*time.Millisecond, "response retries ran past the shared budget")
+			if budget <= 60*time.Millisecond {
+				require.EqualValues(t, 1, writes.Load())
+				require.GreaterOrEqual(t, elapsed, budget-20*time.Millisecond)
+			} else {
+				require.GreaterOrEqual(t, writes.Load(), int32(2))
+			}
+		})
+	}
+}
+
+func TestProbeResponseBudgetRetriesInsideWindow(t *testing.T) {
+	var writes atomic.Int32
+	h := mockHalfOpen(t, func(*HalfOpenSYN, []byte) error {
+		writes.Add(1)
+		return nil
+	})
+	policy := SYNRetryPolicy{MaxAttempts: 3, SendTimeout: time.Second, ResponseTimeout: 40 * time.Millisecond, MaxResponseTimeout: 40 * time.Millisecond}
+	started := time.Now()
+	_, err := h.ProbeSYN(ContextWithProbeBudget(context.Background(), 500*time.Millisecond), "192.0.2.20:80", WithSYNRetry(policy))
+	elapsed := time.Since(started)
+	require.ErrorIs(t, err, ErrProbeNoResponse)
+	require.EqualValues(t, 3, writes.Load())
+	require.Less(t, elapsed, 250*time.Millisecond)
+}
+
+func TestProbeResponseBudgetStartsAfterSend(t *testing.T) {
+	var writes atomic.Int32
+	var sentAt time.Time
+	h := mockHalfOpen(t, func(*HalfOpenSYN, []byte) error {
+		if writes.Add(1) == 1 {
+			time.Sleep(80 * time.Millisecond)
+			sentAt = time.Now()
+		}
+		return nil
+	})
+	policy := SYNRetryPolicy{MaxAttempts: 3, SendTimeout: time.Second, ResponseTimeout: 50 * time.Millisecond, MaxResponseTimeout: 50 * time.Millisecond}
+	_, err := h.ProbeSYN(ContextWithProbeBudget(context.Background(), 50*time.Millisecond), "192.0.2.20:80", WithSYNRetry(policy))
+	waited := time.Since(sentAt)
+	require.ErrorIs(t, err, ErrProbeNoResponse)
+	require.EqualValues(t, 1, writes.Load())
+	require.GreaterOrEqual(t, waited, 30*time.Millisecond)
+	require.Less(t, waited, 95*time.Millisecond)
+}
+
 func TestHalfOpenRejectsWrongResponses(t *testing.T) {
 	var writes atomic.Int32
 	h := mockHalfOpen(t, func(h *HalfOpenSYN, b []byte) error {

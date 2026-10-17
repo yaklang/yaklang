@@ -41,8 +41,9 @@ type SynxConfig struct {
 	callback           func(result *synscan.SynScanResult)
 	submitTaskCallback func(i string)
 
-	routeGroupMu     sync.Mutex
-	routeGroupErrors []error
+	// routeGroups is a pointer so copying SynxConfig for each route does not
+	// copy a mutex. Every copy shares the startup-failure list.
+	routeGroups *routeGroupState
 
 	// 发包
 	Iface     *net.Interface
@@ -56,13 +57,18 @@ type SynxConfig struct {
 	FetchGatewayHardwareAddressTimeout time.Duration
 }
 
+type routeGroupState struct {
+	mu     sync.Mutex
+	errors []error
+}
+
 func (s *SynxConfig) addRouteGroupErrors(errs []error) {
-	if s == nil || len(errs) == 0 {
+	if s == nil || s.routeGroups == nil || len(errs) == 0 {
 		return
 	}
-	s.routeGroupMu.Lock()
-	s.routeGroupErrors = append(s.routeGroupErrors, errs...)
-	s.routeGroupMu.Unlock()
+	s.routeGroups.mu.Lock()
+	s.routeGroups.errors = append(s.routeGroups.errors, errs...)
+	s.routeGroups.mu.Unlock()
 }
 
 // RouteGroupErrors returns startup failures from route groups that did not
@@ -73,10 +79,13 @@ func (s *SynxConfig) RouteGroupErrors() []error {
 	if s == nil {
 		return nil
 	}
-	s.routeGroupMu.Lock()
-	defer s.routeGroupMu.Unlock()
-	out := make([]error, len(s.routeGroupErrors))
-	copy(out, s.routeGroupErrors)
+	if s.routeGroups == nil {
+		return nil
+	}
+	s.routeGroups.mu.Lock()
+	defer s.routeGroups.mu.Unlock()
+	out := make([]error, len(s.routeGroups.errors))
+	copy(out, s.routeGroups.errors)
 	return out
 }
 
@@ -126,6 +135,7 @@ func NewDefaultConfig() *SynxConfig {
 		shuffle:                            true,
 		FetchGatewayHardwareAddressTimeout: 3 * time.Second,
 		Ctx:                                context.Background(),
+		routeGroups:                        &routeGroupState{},
 	}
 }
 
