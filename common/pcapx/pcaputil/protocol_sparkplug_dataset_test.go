@@ -670,6 +670,7 @@ func TestSparkplugDataSetPackedTypesGlobalBudget(t *testing.T) {
 // Keep the selected public types explicit without weakening the shared oracle.
 func spDataSetTypes(t *testing.T, session map[string]any) {
 	t.Helper()
+	spArrayDraftTyped(t, session)
 	raw, present := session["Sparkplug"]
 	if !present {
 		return

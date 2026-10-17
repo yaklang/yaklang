@@ -272,7 +272,7 @@ func (m *binMQTT) consume(dir int, raw []byte, result map[string]any, maxElement
 					return nil, err
 				}
 			}
-			sparkView, nextSpark, err = m.sparkPublish(dir, topic, payload, flags, maxDepth, maxElements)
+			sparkView, nextSpark, err = m.sparkPublish(dir, topic, payload, flags, maxDepth, maxElements, reserve)
 			if err != nil {
 				return nil, err
 			}

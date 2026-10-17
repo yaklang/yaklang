@@ -570,3 +570,34 @@ NCMD and DCMD may expose the same complete Basic1–14 scalar-column DataSet val
 A successful observation is matched with Operation=command-observed and owned complete typed Metrics.Value/raw fields. It never advances producer sequence, edits definitions or measured values, fabricates TransactionID/ResponseTo, or claims writability, ACK or device execution. Wrong direction, missing Birth, unknown alias, mixed alias/name, type mismatch, missing payload timestamp, invalid row width, incompatible/empty cells and nested wire truncation retain precise existing statuses/reasons and do not invalidate producer definitions. Semantic refusals preserve decoded Payload; preflight syntax failure does not fabricate one. A typed nesting-resource failure instead retains the existing whole-MQTT-session stop and release semantics: the same depth5 cell is rejected with depth4 after a legal depth3 zero-row Birth, and later Feed returns FatalSessionError with no events; depth5 is the exact same-wire normal neighbour.
 
 Independent source-derived command/negative answers and exact old-command projection sidecars preserve every original capture and non-target event. Full/deferred native chunking, complete Session/types/fields/direction/offset/order/zero business IDs, earlier event/query/input ownership after later commands/Data/Close, and 11 captures across workers1/2/4 and observation on/off are checked. Native custom depth4/5 controls are separate from default capture replay. Fixed Sparkplug3.0/Tahu schema evidence, actual protoc wire syntax and actual TShark carrier checks remain distinct from device execution. Null commands, mixed Rebirth commands, omitted/inherited DataSet schema, arrays, Template/Properties, capture-wide host/reconnect semantics and all other retained requirements remain unfinished.
+
+
+### Sparkplug 3.0 selected array observations
+
+Selected node/device Birth, Data and compatible reverse-direction NCMD/DCMD
+observations support datatype22..34 arrays under the existing live observed
+Will/CONNACK/Birth and alias/name/type conditions. Signed/unsigned integer cells
+retain int64/uint64, Float/Double retain float32/float64, Boolean retains bool,
+String retains string, and selected DateTime retains uint64 UTC milliseconds in
+the nonnegative int64 range. Numeric bytes use little endian. Boolean uses a
+four-byte little-endian element count and MSB-first bits; unused padding bits
+carry no elements. Strings use UTF-8 NUL-terminated elements. Present-empty bytes
+and arrays remain distinct from absent values and whole-metric null.
+
+Shape errors are explicit passive refusals. Invalid commands preserve producer
+definitions and sequence; invalid producer observations invalidate their own
+context. Array elements across all metrics share the message's collection pool
+with known protobuf fields. The typed graph is reserved before element allocation;
+resource rejection stops this MQTT session, late Feed returns FatalSessionError,
+and Close releases retained resources and remains idempotent. Complete public
+fields, raw bytes, Session, direction, order, IDs, query/input ownership and old
+snapshots remain checked across full/deferred decoding and capture workers1/2/4.
+
+The fixed Sparkplug3.0 prose and Tahu v1.0.22 Java codec resolve inconsistent PDF
+examples. Actual fixed Python numeric/DateTime reference execution is separate
+from its known Boolean/String encoding contradictions; those contradictions do
+not provide the expected answers. Nonfinite float behavior, DateTime outside the
+selected range, null/mixed-Rebirth commands, inherited DataSet schema,
+Template/Properties, endpoint execution and other earlier requirements remain
+unverified or unimplemented. Passive compatibility does not prove device writes,
+writability, acknowledgments or full Sparkplug conformance.

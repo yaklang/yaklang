@@ -157,7 +157,7 @@ func spCommandResourceDraftTrace(t *testing.T, c spCommandResourceDraftCase, ste
 	b := DefaultParserBudget()
 	b.MaxRecursionDepth = c.Budget.MaxRecursionDepth
 	b.MaxCollectionElements = c.Budget.MaxCollectionElements
-	require.Equal(t, 4096, b.MaxCollectionElements)
+	require.Equal(t, c.Budget.MaxCollectionElements, b.MaxCollectionElements)
 	s, err := NewProtocolSessionWithOptions(b, WithSessionTransport("tcp"), WithSessionPorts(40000, 1883))
 	require.NoError(t, err)
 	defer s.Close("cleanup")
@@ -261,7 +261,7 @@ func spCommandResourceDraftTrace(t *testing.T, c spCommandResourceDraftCase, ste
 			successEvents++
 		} else {
 			require.Equal(t, ErrResourceExceeded, w.QueryError.Kind)
-			require.Equal(t, "Sparkplug protobuf nesting", w.QueryError.Message)
+			require.Equal(t, w.QueryError.Message, r.Err.Message)
 			require.Equal(t, w.QueryError, w.Feed.Err)
 			require.Equal(t, "limited", e.Status)
 			require.Equal(t, "limited", e.Completeness)

@@ -1,6 +1,7 @@
 package pcaputil
 
 import (
+	"bytes"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -246,7 +247,7 @@ func sparkDecodeMetric(w []byte, maxDepth, maxFields int) (map[string]any, error
 				prior, _ := fields[name].([]byte)
 				fields[name] = append(prior, b...)
 			} else {
-				fields[name] = append([]byte(nil), b...)
+				fields[name] = bytes.Clone(b)
 			}
 		}
 		return nil
@@ -262,7 +263,7 @@ func sparkValue(m map[string]any, typ uint64, maxDepth, maxFields int) (any, str
 		return nil, "metadata/properties need an independent structured profile"
 	}
 	switch typ {
-	case 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17:
+	case 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34:
 	default:
 		return nil, "datatype needs an independent structured profile"
 	}
@@ -274,6 +275,14 @@ func sparkValue(m map[string]any, typ uint64, maxDepth, maxFields int) (any, str
 		}
 		return nil, ""
 	}
+	if typ >= 22 && typ <= 34 {
+		w, ok := m["bytes_value"].([]byte)
+		if !ok {
+			return nil, "datatype/value mismatch"
+		}
+		return sparkArrayValue(w, typ)
+	}
+
 	if typ == 16 {
 		w, ok := m["dataset_value"].([]byte)
 		if !ok {
@@ -386,7 +395,7 @@ func sparkBDSeq(p map[string]any) (uint64, bool) {
 
 // Preview is transactional with MQTT pending IDs/topic aliases: the caller
 // reserves the combined prospective state before committing either layer.
-func (m *binMQTT) sparkPublish(dir int, topic string, payload []byte, flags byte, maxDepth, maxFields int) (map[string]any, *sparkNode, error) {
+func (m *binMQTT) sparkPublish(dir int, topic string, payload []byte, flags byte, maxDepth, maxFields int, reserve func(int64) error) (map[string]any, *sparkNode, error) {
 	v, key, verb, err := sparkObservation(topic, payload, maxDepth, maxFields)
 	if err != nil {
 		return nil, nil, err
@@ -417,6 +426,11 @@ func (m *binMQTT) sparkPublish(dir int, topic string, payload []byte, flags byte
 	if p["body"] != nil {
 		return refuse("body needs an independent structured profile", "unsupported")
 	}
+	device, _ := v["Device ID"].(string)
+	if err := m.sparkArrayGraph(p, verb, device, payload, maxDepth, maxFields, reserve); err != nil {
+		return nil, nil, err
+	}
+
 	if verb == "DBIRTH" || verb == "DDATA" || verb == "DDEATH" {
 		return m.sparkDevicePublish(v, verb, p, refuse, maxDepth, maxFields)
 	}

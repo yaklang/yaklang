@@ -159,7 +159,7 @@ func sparkDataSetCell(w []byte, typ uint64, maxDepth, maxFields int, count *int)
 // including overwritten oneofs. Packed type elements count individually. Cost
 // is a conservative high-water allowance for the new public graph and snapshots;
 // declarations never drive allocations. Unknown length-delimited fields stay opaque.
-func sparkPreflight(w []byte, maxDepth, maxFields int) (int64, error) {
+func sparkPreflightWithCount(w []byte, maxDepth, maxFields int) (int64, int, error) {
 	count := 0
 	var cost int64
 	var walk func([]byte, int, int) error
@@ -211,5 +211,10 @@ func sparkPreflight(w []byte, maxDepth, maxFields int) (int64, error) {
 		})
 	}
 	err := walk(w, 1, 0)
+	return cost, count, err
+}
+
+func sparkPreflight(w []byte, maxDepth, maxFields int) (int64, error) {
+	cost, _, err := sparkPreflightWithCount(w, maxDepth, maxFields)
 	return cost, err
 }
