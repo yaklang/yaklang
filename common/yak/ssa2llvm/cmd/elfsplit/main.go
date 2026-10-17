@@ -26,9 +26,10 @@ const (
 	elf64SymSize  = 24
 	elf64RelaSize = 24
 	elf64ShdrSize = 64
-	// Go 1.27 amd64 runtime.moduledata.textsectmap. Go 1.26 kept this slice at
-	// 0x150; 1.27 inserts typedesclen, itaboffset and itabsize ahead of it.
-	moduledataTextsectMapOffset = 0x168
+	// Go 1.26 amd64 runtime.moduledata.textsectmap. Go 1.27 inserts
+	// typedesclen, itaboffset and itabsize ahead of it. The final binary patch
+	// uses the same Go 1.26 layout as the CI toolchain.
+	moduledataTextsectMapOffset = 0x150
 	moduledataTextsectMapLenOff = moduledataTextsectMapOffset + 8
 	moduledataTextsectMapCapOff = moduledataTextsectMapOffset + 16
 	textSectionMapEntrySize     = 24
@@ -564,9 +565,15 @@ func main() {
 
 	textMapEntries := buildTextMapEntries(keepChunks, modGroups, modules, textSym.idx, originalTextSize, etextSym.idx)
 	textMapData, textMapRelas := encodeTextMap(textMapEntries)
+	// Reserve a second map for textAddr's virtual-offset lookup. The first
+	// map is sorted by physical address after link; its vaddrs are unordered.
+	// Leave the copy zero until unused-module relocations have been pruned and
+	// lld has resolved all addresses. Keep the original symbol size so the
+	// moduledata slice still describes exactly the first map.
+	textMapStorage := append(append([]byte(nil), textMapData...), make([]byte, len(textMapData))...)
 	newSections = append(newSections, newSec{
 		name: textSectionMapSectionName, typ: uint32(elf.SHT_PROGBITS),
-		flags: uint64(elf.SHF_ALLOC | elf.SHF_WRITE), data: textMapData, align: 8,
+		flags: uint64(elf.SHF_ALLOC | elf.SHF_WRITE), data: textMapStorage, align: 8,
 	})
 	newSections = append(newSections, newSec{
 		name: textSectionMapRelocName, typ: uint32(elf.SHT_RELA), data: textMapRelas,

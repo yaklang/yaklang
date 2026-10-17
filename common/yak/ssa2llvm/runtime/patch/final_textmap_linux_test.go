@@ -21,8 +21,8 @@ func TestSortFinalTextMapUsesModuleSymbol(t *testing.T) {
 		textVA   = 0x600000
 		etextVA  = 0x601000
 		mapOff   = 0
-		decoyOff = 72
-		ftabOff  = 160
+		decoyOff = 144
+		ftabOff  = 224
 		mapLen   = 3
 		decoyEnd = uint64(0x25a6c0000cc620)
 	)
@@ -92,17 +92,40 @@ func TestSortFinalTextMapUsesModuleSymbol(t *testing.T) {
 			t.Fatalf("entry %d baseaddr %#x, want %#x", i, gotBase, base)
 		}
 	}
+	virtualHeader := 64 + 0x20
+	if ptr := binary.LittleEndian.Uint64(got[virtualHeader:]); ptr != dataVA+mapLen*textsectEntrySize {
+		t.Fatalf("virtual map ptr %#x", ptr)
+	}
+	for i, field := range []int{8, 16} {
+		if n := binary.LittleEndian.Uint64(got[virtualHeader+field:]); n != mapLen {
+			t.Fatalf("virtual map len/cap[%d] %d", i, n)
+		}
+	}
+	for i, want := range entries {
+		off := dataFile + mapLen*textsectEntrySize + i*textsectEntrySize
+		for j, value := range want {
+			if n := binary.LittleEndian.Uint64(got[off+j*8:]); n != value {
+				t.Fatalf("virtual entry[%d][%d] %#x want %#x", i, j, n, value)
+			}
+		}
+	}
 	ftabSentinel := dataFile + ftabOff + functabEntrySize
 	if entry := binary.LittleEndian.Uint32(got[ftabSentinel:]); entry != 0x3f {
 		t.Fatalf("ftab sentinel entryoff %#x", entry)
+	}
+	// Go 1.26 stores typelinks immediately after textsectmap. The old
+	// Go-1.27 offset overwrote that header and later made reflect/gob crash
+	// with an invalid nameOff, so keep the adjacent field as a decoy check.
+	if gotDecoy := binary.LittleEndian.Uint64(got[dataFile+decoyOff+8:]); gotDecoy != decoyEnd {
+		t.Fatalf("adjacent moduledata field was modified: %#x", gotDecoy)
 	}
 }
 
 func buildTextMapELF(t *testing.T, moduleVA, dataVA uint64, module, data []byte) []byte {
 	t.Helper()
 	shstr := "\x00.go.module\x00.data\x00.strtab\x00.symtab\x00.shstrtab\x00"
-	strtab := "\x00runtime.firstmoduledata\x00runtime.textsectionmap\x00"
-	sym := make([]byte, elf64SymSize*3)
+	strtab := "\x00runtime.firstmoduledata\x00runtime.textsectionmap\x00runtime.ssa2llvmTextAddrMap\x00"
+	sym := make([]byte, elf64SymSize*4)
 	putSym := func(i int, nameOff uint32, shndx uint16, value, size uint64) {
 		off := i * elf64SymSize
 		binary.LittleEndian.PutUint32(sym[off:], nameOff)
@@ -113,6 +136,7 @@ func buildTextMapELF(t *testing.T, moduleVA, dataVA uint64, module, data []byte)
 	}
 	putSym(1, 1, 1, moduleVA+0x100, 0x200)
 	putSym(2, 1+uint32(len("runtime.firstmoduledata"))+1, 2, dataVA, 3*textsectEntrySize)
+	putSym(3, 1+uint32(len("runtime.firstmoduledata"))+1+uint32(len("runtime.textsectionmap"))+1, 1, moduleVA+0x20, 24)
 
 	chunks := [][]byte{module, data, []byte(strtab), sym, []byte(shstr)}
 	off := 64

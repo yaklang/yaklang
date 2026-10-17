@@ -64,8 +64,9 @@ esac
 # in this toolchain's GOROOT (marker below). Refuse to build a runtime that
 # still has the linear scan.
 GOROOT_SYMTAB="$(go env GOROOT)/src/runtime/symtab.go"
-if ! grep -q 'ssa2llvm: textsect binary search' "${GOROOT_SYMTAB}"; then
-  echo "[yaklib] ERROR: ${GOROOT_SYMTAB} is missing the textsect binary-search patch" >&2
+if ! grep -q 'ssa2llvm: textsect binary search' "${GOROOT_SYMTAB}" ||
+   ! grep -q 'ssa2llvm: virtual textsect binary search' "${GOROOT_SYMTAB}"; then
+  echo "[yaklib] ERROR: ${GOROOT_SYMTAB} must have both physical and virtual textsect binary-search patches" >&2
   exit 1
 fi
 
