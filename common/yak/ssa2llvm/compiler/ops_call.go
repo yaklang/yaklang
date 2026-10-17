@@ -276,7 +276,10 @@ func (c *Compiler) compileCall(inst *ssa.Call) error {
 		return c.lowerResolvedContextCall(spec)
 	}
 
-	if c.shouldUseYaklibDispatch(calleeName) {
+	// A global builtin such as set/get must not hide a closure stored
+	// under the same name. `a.set(2)` reads the object field first; only a
+	// bare `set(...)` reaches the global dispatch below.
+	if c.shouldUseYaklibDispatch(calleeName) && !c.calleeIsObjectMember(calleeVal) {
 		return c.lowerYaklibDispatchCall(inst, calleeName)
 	}
 
@@ -303,6 +306,18 @@ func (c *Compiler) compileCall(inst *ssa.Call) error {
 	}
 
 	return fmt.Errorf("compileCall: unable to resolve callee %q", calleeName)
+}
+
+// calleeIsObjectMember reports a call whose callee is a field of an
+// object (`a.set`), as opposed to a bare global (`set`).
+func (c *Compiler) calleeIsObjectMember(calleeVal ssa.Value) bool {
+	if calleeVal == nil {
+		return false
+	}
+	if mc, ok := calleeVal.(ssa.MemberCall); ok && mc.IsMember() {
+		return mc.GetObject() != nil
+	}
+	return false
 }
 
 // yakMapBuiltinMethod reports the yak map methods implemented on

@@ -888,7 +888,15 @@ func (c *Compiler) emitRuntimeSetFieldByKey(contextInst ssa.Instruction, objVal 
 			intVal := c.coerceToInt64(val)
 			flags := uint64(0)
 			ssaVal = c.effectiveRuntimeFieldValue(ssaVal)
-			if ssaVal != nil && c.ssaValueIsPointer(ssaVal, ssaVal.GetFunc()) {
+			if ssaVal != nil && c.ssaValueIsFunction(ssaVal) {
+				if owner := ssaVal.GetFunc(); owner != nil {
+					if ssaFn, ok := c.functionValueForArg(owner, ssaVal.GetId()); ok && ssaFn != nil && !ssaFn.IsExtern() {
+						if closure, err := c.materializeCallableClosure(contextInst, ssaFn); err == nil {
+							intVal = c.coerceToInt64(closure)
+						}
+					}
+				}
+			} else if ssaVal != nil && c.ssaValueIsPointer(ssaVal, ssaVal.GetFunc()) {
 				tag := llvm.ConstInt(c.LLVMCtx.Int64Type(), yakTaggedPointerMask, false)
 				intVal = c.Builder.CreateOr(intVal, tag, "yak_set_field_arg_tag")
 			}
