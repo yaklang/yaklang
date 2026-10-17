@@ -12,7 +12,7 @@ import (
 // 关键词: hostPortGuard 熔断单测, scan port 单主机端口阈值, tarpit 防护
 
 // TestMUSTPASS_HostPortGuard_TripsOnLimit 验证同一主机达到 limit 时触发熔断,
-// 且触发后对任意主机的 observe 都返回 true (上层能稳定走到强制停止分支).
+// 其它主机继续计数, 一台 tarpit 不会取消整次扫描.
 func TestMUSTPASS_HostPortGuard_TripsOnLimit(t *testing.T) {
 	g := newHostPortGuard(3)
 
@@ -25,9 +25,11 @@ func TestMUSTPASS_HostPortGuard_TripsOnLimit(t *testing.T) {
 	if !g.observe("1.1.1.1") {
 		t.Fatal("third observe should trip at limit=3")
 	}
-	// 触发后, 对其他主机也应当返回 true, 让上层一致地停止.
-	if !g.observe("2.2.2.2") {
-		t.Fatal("after tripped, observe on any host should return true")
+	if !g.skipping("1.1.1.1") {
+		t.Fatal("tripped host should be skipped")
+	}
+	if g.observe("2.2.2.2") || g.skipping("2.2.2.2") {
+		t.Fatal("another host should keep scanning")
 	}
 }
 

@@ -187,7 +187,7 @@ func ParseStringToPorts(ports string) []int {
 			for i := low; i <= high; i++ {
 				port := int(i)
 				if proto == "udp" {
-					port <<= 12
+					port = EncodeUDPPort(port)
 				}
 				lports = append(lports, port)
 			}
@@ -198,7 +198,7 @@ func ParseStringToPorts(ports string) []int {
 			}
 			p := int(port)
 			if proto == "udp" {
-				p <<= 12
+				p = EncodeUDPPort(p)
 			}
 			lports = append(lports, p)
 		}
@@ -208,7 +208,32 @@ func ParseStringToPorts(ports string) []int {
 	return lports
 }
 
+// udpLowPortSpace marks UDP ports 1-15. The historical encoding is port<<12,
+// which is only unambiguous for port >= 16 because 1<<12 is TCP 4096.
+const udpLowPortSpace = 1 << 28
+
+// DefaultHostAlivePorts are the TCP ports tried after ICMP does not answer.
+// 3389, 445, 8080 and 8443 are included so a host that only exposes those
+// services is not treated as down.
+const DefaultHostAlivePorts = "22,80,443,3389,445,8080,8443"
+
+// EncodeUDPPort stores a UDP service port in the shared port integer space.
+// Ports >= 16 keep port<<12. Ports 1-15 use a flag above that range so they
+// cannot collide with a TCP port.
+func EncodeUDPPort(port int) int {
+	if port < 16 {
+		if port < 0 {
+			return port
+		}
+		return udpLowPortSpace | port
+	}
+	return port << 12
+}
+
 func ParsePortToProtoPort(port int) (string, int) {
+	if port >= udpLowPortSpace && port < udpLowPortSpace+(1<<16) {
+		return "udp", port & 0xFFFF
+	}
 	if port > 65535 {
 		return "udp", port >> 12
 	}
@@ -698,7 +723,7 @@ func HostPort(host string, port interface{}) string {
 
 func ProtoHostPort(proto string, host string, port int) string {
 	if proto == "udp" {
-		port = port << 12
+		port = EncodeUDPPort(port)
 	}
 	return HostPort(host, port)
 }
@@ -971,10 +996,7 @@ func (f *PortsFilter) createAction(ports string) {
 func (f *PortsFilter) Add(block ...string) {
 	for _, b := range block {
 		for _, sub := range ParseStringToPorts(b) {
-			// support udp
-			if sub > 65535 {
-				sub = sub >> 12
-			}
+			_, sub = ParsePortToProtoPort(sub)
 			f.createAction(strconv.Itoa(sub))
 		}
 	}

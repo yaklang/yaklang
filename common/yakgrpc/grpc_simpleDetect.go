@@ -350,7 +350,7 @@ func (s *Server) SimpleDetect(req *ypb.RecordPortScanRequest, stream ypb.Yak_Sim
 	if reqPortScan.GetHostAlivePorts() != "" {
 		reqParams.ExecParams = append(reqParams.ExecParams, &ypb.KVPair{Key: "host-alive-ports", Value: fmt.Sprint(reqPortScan.GetHostAlivePorts())})
 	} else {
-		reqParams.ExecParams = append(reqParams.ExecParams, &ypb.KVPair{Key: "host-alive-ports", Value: "22,80,443"})
+		reqParams.ExecParams = append(reqParams.ExecParams, &ypb.KVPair{Key: "host-alive-ports", Value: utils.DefaultHostAlivePorts})
 	}
 
 	return s.DebugPlugin(reqParams, stream)

@@ -17,10 +17,11 @@ var (
 	// ErrProbeChecksum accompanies ErrProbeNoResponse when correlated replies
 	// were rejected for invalid checksums. Capture offload is one possible cause;
 	// this is not permission to accept the reply or classify the port as closed.
-	ErrProbeChecksum = errors.New("correlated TCP reply checksum invalid; check capture offload or packet corruption")
-	ErrProbeRefused  = errors.New("TCP probe received a matching reset")
-	ErrProbeSend     = errors.New("TCP probe could not send SYN")
-	ErrHalfOpenACK   = errors.New("ACK is disabled for a half-open probe")
+	ErrProbeChecksum    = errors.New("correlated TCP reply checksum invalid; check capture offload or packet corruption")
+	ErrProbeRefused     = errors.New("TCP probe received a matching reset")
+	ErrProbeUnreachable = errors.New("TCP probe received ICMP unreachable")
+	ErrProbeSend        = errors.New("TCP probe could not send SYN")
+	ErrHalfOpenACK      = errors.New("ACK is disabled for a half-open probe")
 )
 
 // SYNRetryPolicy bounds the whole probe, including failed local sends.
@@ -266,7 +267,9 @@ func (p *TCPProbe) ReceiveSYNACKContext(ctx context.Context) (TCPSegment, error)
 }
 
 func validProbeReply(syn, reply TCPSegment) bool {
-	if !sameIPv4(syn.LocalIP, reply.LocalIP) || !sameIPv4(syn.RemoteIP, reply.RemoteIP) || syn.LocalPort != reply.LocalPort || syn.RemotePort != reply.RemotePort || !reply.ACK || reply.Ack != syn.Seq+1 || reply.FIN || reply.PSH || reply.URG || reply.PayloadLen != 0 {
+	// PSH, URG and a payload can appear on a SYN-ACK (TCP Fast Open and some
+	// stacks). FIN is not an open handshake.
+	if !sameIPv4(syn.LocalIP, reply.LocalIP) || !sameIPv4(syn.RemoteIP, reply.RemoteIP) || syn.LocalPort != reply.LocalPort || syn.RemotePort != reply.RemotePort || !reply.ACK || reply.Ack != syn.Seq+1 || reply.FIN {
 		return false
 	}
 	return (reply.SYN && !reply.RST) || (reply.RST && !reply.SYN)

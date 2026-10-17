@@ -100,9 +100,14 @@ func TestSubmitTargetMixesHostsPortsAndProtocols(t *testing.T) {
 	for target := range ch {
 		got = append(got, gotTarget{target.Host, target.Port, target.Mode})
 	}
-	hosts := utils.ParseStringToHosts("10.0.0.8/30,::1")
-	if len(hosts) < 5 {
-		t.Fatalf("host expansion = %v", hosts)
+	var hosts []string
+	for _, host := range utils.ParseStringToHosts("10.0.0.8/30,::1") {
+		if utils.IsIPv4(host) {
+			hosts = append(hosts, host)
+		}
+	}
+	if len(hosts) != 4 {
+		t.Fatalf("ipv4 host expansion = %v", hosts)
 	}
 	wantTCP := map[int]bool{80: true, 443: true}
 	seenHosts := map[string]bool{}
@@ -176,7 +181,8 @@ func TestSendPacketMixesTCPAndUDPProbes(t *testing.T) {
 	if len(probed) != 2 || probed[0] == probed[1] {
 		t.Fatalf("tcp probes = %v", probed)
 	}
-	if len(udpProbed) != 2 {
+	// 53 answers on the first datagram. 123 is silent and is retried once.
+	if len(udpProbed) != 3 {
 		t.Fatalf("udp probes = %v", udpProbed)
 	}
 	openMu.Lock()

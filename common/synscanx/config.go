@@ -24,6 +24,8 @@ type SynxConfig struct {
 
 	rateLimitDelayMs  float64
 	rateLimitDelayGap int // 每隔多少数据包 delay 一次？
+	// appendOutput keeps an existing output file when a later route group runs.
+	appendOutput bool
 
 	RuntimeId string
 
@@ -33,7 +35,7 @@ type SynxConfig struct {
 
 	excludePorts *utils.PortsFilter
 
-	maxOpenPorts       uint16 // 单个 IP 允许的最大开放端口数
+	maxOpenPorts       int // 单个 IP 允许的最大开放端口数
 	callback           func(result *synscan.SynScanResult)
 	submitTaskCallback func(i string)
 
@@ -88,9 +90,10 @@ func (s *SynxConfig) callSubmitTaskCallback(r string) {
 func NewDefaultConfig() *SynxConfig {
 	return &SynxConfig{
 		waiting: 5 * time.Second,
-		// 这个限速器每秒可以允许最多 1000 个请求，短时间内可以允许突发的 150 个请求
+		// 1 packet per millisecond is 1000 packets per second. rateLimit's
+		// second argument raises that count; the capture path does not burst.
 		rateLimitDelayMs:                   1,
-		rateLimitDelayGap:                  150,
+		rateLimitDelayGap:                  1,
 		shuffle:                            true,
 		FetchGatewayHardwareAddressTimeout: 3 * time.Second,
 		Ctx:                                context.Background(),
@@ -120,7 +123,12 @@ func WithMaxOpenPorts(max int) SynxConfigOption {
 		if max <= 0 {
 			max = 65535
 		}
-		config.maxOpenPorts = uint16(max)
+		// A host can expose TCP and UDP. Values above that are not a uint16
+		// wrap; they stay as written up to the cap below.
+		if max > 65535*2 {
+			max = 65535 * 2
+		}
+		config.maxOpenPorts = max
 	}
 }
 
@@ -191,7 +199,7 @@ func WithOutputFilePrefix(prefix string) SynxConfigOption {
 	}
 }
 
-// wait syn scan 的配置选项，设置每个 UDP 探测等待应答的最长时间。TCP 半开探测使用自己的超时。
+// wait syn scan 的配置选项，设置 UDP 应答等待时间，并作为 TCP 探测的总时间预算。TCP 的重试间隔会按这个预算拉开，高延迟链路上的 SYN-ACK 不会被固定的 2 秒上限截掉。已经设置过 tcpTimeout 时，这里不再覆盖它。
 // 参数:
 //   - sec: 等待时间，单位为秒
 //
@@ -212,6 +220,9 @@ func WithWaiting(sec float64) SynxConfigOption {
 		config.waiting = utils.FloatSecondDuration(sec)
 		if config.waiting <= 0 {
 			config.waiting = 5 * time.Second
+		}
+		if config.tcpProbeTimeout <= 0 {
+			config.tcpProbeTimeout = config.waiting
 		}
 	}
 }
@@ -309,13 +320,9 @@ func WithConcurrent(count int) SynxConfigOption {
 		// limit; the delay below is the sustained SYN rate passed to netstackvm.
 		config.tcpProbeConcurrency = count
 		config.rateLimitDelayMs = float64(time.Second) / float64(count) / float64(time.Millisecond)
-		// count/10 is 0 for concurrent(1)..concurrent(9). A zero burst limiter
-		// rejects every UDP packet, so a small concurrency silently scans nothing.
-		gap := count / 10
-		if gap < 1 {
-			gap = 1
-		}
-		config.rateLimitDelayGap = gap
+		// Gap 1 keeps the rate equal to one packet per delay. A larger gap is
+		// the rateLimit(ms, count) packet count, not a burst.
+		config.rateLimitDelayGap = 1
 		log.Debugf("rate limit delay ms: %v(ms)", config.rateLimitDelayMs)
 		log.Debugf("rate limit delay gap: %v", config.rateLimitDelayGap)
 	}
@@ -443,7 +450,18 @@ func WithIface(iface string) SynxConfigOption {
 
 func WithRuntimeId(id string) SynxConfigOption {
 	return func(config *SynxConfig) {
-		config.outputFilePrefix = id
+		config.RuntimeId = id
+	}
+}
+
+// tcpTimeout sets the total TCP probe budget in seconds, including retries.
+// Non-positive values keep the built-in retry policy (about 3.5s of response waits).
+func WithTCPProbeTimeoutSeconds(sec float64) SynxConfigOption {
+	return func(config *SynxConfig) {
+		config.tcpProbeTimeout = utils.FloatSecondDuration(sec)
+		if config.tcpProbeTimeout <= 0 {
+			config.tcpProbeTimeout = defaultTCPProbeTimeout
+		}
 	}
 }
 

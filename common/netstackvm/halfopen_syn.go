@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net"
 	"strconv"
+	"strings"
 	"sync"
 
 	"github.com/gopacket/gopacket"
@@ -79,8 +80,9 @@ type flightKey struct {
 }
 
 type probeReply struct {
-	segment TCPSegment
-	raw     []byte
+	segment     TCPSegment
+	raw         []byte
+	unreachable bool
 }
 type synFrame struct {
 	segment  TCPSegment
@@ -173,7 +175,7 @@ func OpenHalfOpenSYN(ctx context.Context, cfg HalfOpenSYNConfig) (*HalfOpenSYN, 
 		gateway:                  ipv4Only(cfg.Gateway),
 		flights:                  make(map[flightKey]*synFlight),
 		udpFlights:               make(map[flightKey]*udpFlight),
-		mainIsLoopback:           cfg.Iface.Flags&net.FlagLoopback != 0,
+		mainIsLoopback:           interfaceLooksLoopback(cfg.Iface, src),
 		allowUnverifiedTransport: cfg.AllowUnverifiedTransport,
 	}
 	h.main, err = h.openEntry(cfg.Iface, src, subnet.Mask, h.gateway, ifaceNeedsResolution(cfg.Iface))
@@ -213,6 +215,10 @@ func (h *HalfOpenSYN) openEntry(iface *net.Interface, ip net.IP, mask net.IPMask
 		WithPCAPReadOnly(true),
 		WithDisableForwarding(true),
 		WithPcapCapabilities(caps),
+		// Promiscuous capture on a physical NIC pulls every frame into the
+		// fanout and drops the SYN-ACK we are waiting for. Loopback capture
+		// still needs it; replies there are not always addressed to our MAC.
+		WithPcapPromisc(interfaceLooksLoopback(iface, ip)),
 	}
 	if len(iface.HardwareAddr) == 6 {
 		opts = append(opts, WithMainNICLinkAddress(iface.HardwareAddr.String()))
@@ -221,7 +227,7 @@ func (h *HalfOpenSYN) openEntry(iface *net.Interface, ip net.IP, mask net.IPMask
 	if err != nil {
 		return nil, err
 	}
-	if err := validateHalfOpenTransport(iface, vm.driver.adaptor.linkType, h.allowUnverifiedTransport); err != nil {
+	if err := validateHalfOpenTransport(iface, ip, vm.driver.adaptor.linkType, h.allowUnverifiedTransport); err != nil {
 		vm.Close()
 		return nil, err
 	}
@@ -266,8 +272,22 @@ func (h *HalfOpenSYN) openEntry(iface *net.Interface, ip net.IP, mask net.IPMask
 	return vm, nil
 }
 
-func validateHalfOpenTransport(iface *net.Interface, link layers.LinkType, allowUnverified bool) error {
-	if iface.Flags&net.FlagLoopback != 0 || allowUnverified {
+func interfaceLooksLoopback(iface *net.Interface, ip net.IP) bool {
+	if ip != nil && ip.IsLoopback() {
+		return true
+	}
+	if iface == nil {
+		return false
+	}
+	if iface.Flags&net.FlagLoopback != 0 {
+		return true
+	}
+	name := strings.ToLower(iface.Name)
+	return strings.Contains(name, "loopback") || strings.Contains(name, "npf_loopback")
+}
+
+func validateHalfOpenTransport(iface *net.Interface, ip net.IP, link layers.LinkType, allowUnverified bool) error {
+	if interfaceLooksLoopback(iface, ip) || allowUnverified {
 		return nil
 	}
 	if link != layers.LinkTypeEthernet || iface.Flags&net.FlagPointToPoint != 0 {
@@ -518,6 +538,7 @@ func (h *HalfOpenSYN) observeInbound(nic tcpip.NICID, packet gopacket.Packet) bo
 	}
 	if packet.Layer(layers.LayerTypeICMPv4) != nil {
 		h.observeUDPUnreachable(nic, packet)
+		h.observeTCPUnreachable(nic, packet)
 		return false
 	}
 	ip, tcp, ok := ipv4TCP(packet)
@@ -545,12 +566,52 @@ func (h *HalfOpenSYN) observeInbound(nic tcpip.NICID, packet gopacket.Packet) bo
 			return false
 		}
 	}
-	select {
-	case f.replies <- probeReply{seg, raw}:
-	default:
-	}
+	offerProbeReply(f.replies, probeReply{segment: seg, raw: raw})
 	// No TCP response ever enters gVisor, including RSTs.
 	return false
+}
+
+func (h *HalfOpenSYN) observeTCPUnreachable(nic tcpip.NICID, packet gopacket.Packet) {
+	key, ok := unreachableTCPKey(nic, packet)
+	if !ok {
+		return
+	}
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	f := h.flights[key]
+	if f == nil || f.ctx.Err() != nil || h.ctx.Err() != nil || f.frame == nil || (!f.sent && !f.sending) {
+		return
+	}
+	offerProbeReply(f.replies, probeReply{unreachable: true})
+}
+
+// offerProbeReply keeps a SYN-ACK when the one-slot reply queue already holds
+// a RST or an ICMP unreachable. A later RST must not hide an open port.
+func offerProbeReply(ch chan probeReply, reply probeReply) {
+	select {
+	case ch <- reply:
+		return
+	default:
+	}
+	select {
+	case old := <-ch:
+		if synOpenReply(old) && !synOpenReply(reply) {
+			select {
+			case ch <- old:
+			default:
+			}
+			return
+		}
+	default:
+	}
+	select {
+	case ch <- reply:
+	default:
+	}
+}
+
+func synOpenReply(reply probeReply) bool {
+	return !reply.unreachable && reply.segment.SYN && reply.segment.ACK && !reply.segment.RST
 }
 
 func ipv4TCP(packet gopacket.Packet) (*layers.IPv4, *layers.TCP, bool) {
