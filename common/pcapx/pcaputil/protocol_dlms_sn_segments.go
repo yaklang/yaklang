@@ -37,6 +37,30 @@ func (f *binFlow) consumeDLMSSNSegments(dir int, wire []byte, id uint64, m *dlms
 		}
 		return nil, 0, dlmsError(kind, why)
 	}
+	checkCount := func(info []byte) error {
+		if len(info) < 5 {
+			return nil
+		}
+		if info[4] > 0x80 && info[4]&127 <= 4 && len(info) < 5+int(info[4]&127) {
+			return nil
+		}
+		c := wrapperListCursor{wire: info[3:], at: 1}
+		n, _, err := c.count()
+		if err != nil {
+			var pe *ProtocolError
+			if errors.As(err, &pe) {
+				return dlmsError(pe.Kind, "SN segment count is outside selected forms")
+			}
+			return dlmsError(ErrMalformedMessage, "SN segment count invalid")
+		}
+		if n == 0 {
+			return dlmsError(ErrUnsupportedFeature, "SN segments select nonempty lists only")
+		}
+		if n > uint64(min(f.a.budget.MaxCollectionElements, wrapperSNReadItems)) {
+			return dlmsError(ErrResourceExceeded, "SN segment list exceeds selected collection budget")
+		}
+		return nil
+	}
 	t := s.fragments
 	if t == nil {
 		info := m.information
@@ -48,28 +72,11 @@ func (f *binFlow) consumeDLMSSNSegments(dir int, wire []byte, id uint64, m *dlms
 		if request && info[1] != 0xe6 || !request && info[1] != 0xe7 {
 			return fail(ErrMalformedMessage, "SN segment LLC direction differs from command", true)
 		}
-		// A valid APDU count may itself cross frames. That remains an unsupported
-		// observation boundary, not evidence that the complete APDU is malformed.
-		if len(info) < 5 {
-			return fail(ErrUnsupportedFeature, "first SN segment needs complete list count", true)
-		}
-		if info[4] > 0x80 && info[4]&127 <= 4 && len(info) < 5+int(info[4]&127) {
-			return fail(ErrUnsupportedFeature, "first SN segment needs complete list count", true)
-		}
-		c := wrapperListCursor{wire: info[3:], at: 1}
-		n, _, err := c.count()
-		if err != nil {
-			var pe *ProtocolError
-			if errors.As(err, &pe) {
-				return fail(pe.Kind, "SN segment count is outside selected forms", true)
-			}
-			return fail(ErrMalformedMessage, "SN segment count invalid", true)
-		}
-		if n == 0 {
-			return fail(ErrUnsupportedFeature, "SN segments select nonempty lists only", true)
-		}
-		if n > uint64(min(f.a.budget.MaxCollectionElements, wrapperSNReadItems)) {
-			return fail(ErrResourceExceeded, "SN segment list exceeds selected collection budget", true)
+		// A complete LLC/command is observed. A nonfinal determinant may cross
+		// CRC-valid information frames; no list/owner fields are decoded yet.
+		if err := checkCount(info); err != nil {
+			s.invalidate()
+			return nil, 0, err
 		}
 		if s.transfer != nil || s.setTransfer != nil || s.actionTransfer != nil {
 			return fail(ErrContextRequired, "SN group conflicts with retained service transfer", false)
@@ -127,6 +134,12 @@ func (f *binFlow) consumeDLMSSNSegments(dir int, wire []byte, id uint64, m *dlms
 	joined := make([]byte, len(t.info)+len(m.information))
 	copy(joined, t.info)
 	copy(joined[len(t.info):], m.information)
+	if m.segmented && t.count > 0 {
+		if err := checkCount(joined); err != nil {
+			s.invalidate()
+			return nil, 0, err
+		}
+	}
 	count := t.count + 1
 	meta := dlmsSegmentFields(m, count, !m.segmented)
 	if m.segmented {

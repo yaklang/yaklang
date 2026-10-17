@@ -122236,6 +122236,422 @@
         "common/pcapx/pcaputil/dlms-sn-multiresult-tools/verify.py": "dlms-sn-multiresult-tools/verify.py",
         "scripts/protocol-tests/required-tests-traffic-unified-v173.json": "required-tests-traffic-unified-v173.json"
       }
+    },
+    {
+      "id": "validation-dlms-sn-information-count",
+      "kind": "support",
+      "source_sha": "d0c10bb3a7bfdd95fcd057843570c92dd72e3f45",
+      "file": "validation-dlms-sn-information-count.zip",
+      "sha256": "947090f612feb11b6049a371c7a33830da5b10fc0a80594f74048a179e8bfb29",
+      "password": "bin-parser",
+      "members": {
+        "dlms-sn-information-count-captures/M0-with-width2-count-still-truncated-is-Malformed.tcp.pcap": {
+          "bytes": 589,
+          "sha256": "8a27498164683149635b843e87998ddfd654c6c2a93a5733c019e880a80c0d2f"
+        },
+        "dlms-sn-information-count-captures/M0-with-width2-count-still-truncated-is-Malformed.udp.pcap": {
+          "bytes": 331,
+          "sha256": "a5e04aa4942d67ae70401e9bee76e1927535928e7fae348cbbfea4db66b2bdcc"
+        },
+        "dlms-sn-information-count-captures/command05-first4-width1-count-crosses-Iframes.tcp.pcap": {
+          "bytes": 673,
+          "sha256": "6f824b08d5da2a19b79ff3ffefe28ef5be1b27df40cf920f672c86079e32ab3b"
+        },
+        "dlms-sn-information-count-captures/command05-first4-width1-count-crosses-Iframes.udp.pcap": {
+          "bytes": 403,
+          "sha256": "99aec1699e34f28e8f19f76d32ced478ad69df0540b884ad4031f012401d7472"
+        },
+        "dlms-sn-information-count-captures/command05-first4-width2-count-crosses-Iframes.tcp.pcap": {
+          "bytes": 674,
+          "sha256": "7f775cf62c0bbdf4081cf37859f91b17dac32057ece6e625eda3b66187c80a46"
+        },
+        "dlms-sn-information-count-captures/command05-first4-width2-count-crosses-Iframes.udp.pcap": {
+          "bytes": 404,
+          "sha256": "1709454688e7a77526d2e33486b6f0c1943e6ec70a0c806dd43bd23627615420"
+        },
+        "dlms-sn-information-count-captures/command06-first4-width1-count-crosses-Iframes.tcp.pcap": {
+          "bytes": 676,
+          "sha256": "8018b904ef70016d15619a1f1c06b23a50cf4d98e8a597fa46383d214766ad21"
+        },
+        "dlms-sn-information-count-captures/command06-first4-width1-count-crosses-Iframes.udp.pcap": {
+          "bytes": 406,
+          "sha256": "6fdca946c7d4ea419204d443972e0b60107f8f4ade5524c7873dc37a03f7d676"
+        },
+        "dlms-sn-information-count-captures/command06-first4-width2-count-crosses-Iframes.tcp.pcap": {
+          "bytes": 677,
+          "sha256": "c64b685db81a4786bb261fe20ecea5985332fc19b1e3832295459020c22111a5"
+        },
+        "dlms-sn-information-count-captures/command06-first4-width2-count-crosses-Iframes.udp.pcap": {
+          "bytes": 407,
+          "sha256": "28670b4fa82f9ab971334b028c092219beea78e70c31df450613b4897ac8bdac"
+        },
+        "dlms-sn-information-count-captures/command0c-first4-width1-count-crosses-Iframes.tcp.pcap": {
+          "bytes": 673,
+          "sha256": "9197502d85e36e48b433775f5f9bd8b3b0926deea6c0dc9e8ff312a445565e1d"
+        },
+        "dlms-sn-information-count-captures/command0c-first4-width1-count-crosses-Iframes.udp.pcap": {
+          "bytes": 403,
+          "sha256": "efb5f7bb0a4c440b709dda1e17948a7776482dfb57e8d6bca5c0cf765c8dff73"
+        },
+        "dlms-sn-information-count-captures/command0c-first4-width2-count-crosses-Iframes.tcp.pcap": {
+          "bytes": 674,
+          "sha256": "d842ef625e6f2203581d0797827d10a375d78d3f63f190cd1e20aca89a4f3c18"
+        },
+        "dlms-sn-information-count-captures/command0c-first4-width2-count-crosses-Iframes.udp.pcap": {
+          "bytes": 404,
+          "sha256": "1055ed853d287e5dfa8bac3068f15ffe24ef8e923dd74c03aff336c28d671975"
+        },
+        "dlms-sn-information-count-captures/command0d-first4-width1-count-crosses-Iframes.tcp.pcap": {
+          "bytes": 671,
+          "sha256": "7340f6ab33b454fba5803120857dbfe6d102ff49078608c26403449bcf65502a"
+        },
+        "dlms-sn-information-count-captures/command0d-first4-width1-count-crosses-Iframes.udp.pcap": {
+          "bytes": 401,
+          "sha256": "692c0ea2f58a273e03fdeb7558bb13a859ea7907c053ea73ace404722398049c"
+        },
+        "dlms-sn-information-count-captures/command0d-first4-width2-count-crosses-Iframes.tcp.pcap": {
+          "bytes": 672,
+          "sha256": "3fad9114c06ddf8db65ed90e38195badb694731714fb93a1606515a28e58f5e3"
+        },
+        "dlms-sn-information-count-captures/command0d-first4-width2-count-crosses-Iframes.udp.pcap": {
+          "bytes": 402,
+          "sha256": "49c53fdf2cfc1d696e85095a000ed8ba7ac0c0a9c441738a8ed957273117b6c4"
+        },
+        "dlms-sn-information-count-captures/hard17-count-completes-on-M1.tcp.pcap": {
+          "bytes": 588,
+          "sha256": "3fe69b4387b53f5788d0c47740ac0688a55723cc6a2e9e809858b25341232584"
+        },
+        "dlms-sn-information-count-captures/hard17-count-completes-on-M1.udp.pcap": {
+          "bytes": 330,
+          "sha256": "bcfb564c84d3af937c132d23740b49f272db24892796c7f5af5b52ff48d694b6"
+        },
+        "dlms-sn-information-count-captures/literal80-known-invalid-on-M1-after-first4.tcp.pcap": {
+          "bytes": 588,
+          "sha256": "176f398a9dcb93327acf086c48b220a2842e9bea8ffe9209f49d709c3d21b64e"
+        },
+        "dlms-sn-information-count-captures/literal80-known-invalid-on-M1-after-first4.udp.pcap": {
+          "bytes": 330,
+          "sha256": "4a7ed614e66dec060a71d29c65cd4cb6799f3e8b4a003aa2c1ad3cd76245af60"
+        },
+        "dlms-sn-information-count-captures/opposite-response-first4-Context-preserves-pending-LN.tcp.pcap": {
+          "bytes": 759,
+          "sha256": "715f0dc4efa12221095501353a3c2abdebf25e9c1437b8827dadb949888bd5c1"
+        },
+        "dlms-sn-information-count-captures/opposite-response-first4-Context-preserves-pending-LN.udp.pcap": {
+          "bytes": 477,
+          "sha256": "044e5d9e84d0e3e45b4e31854669e14dd97fece0ce757ac24a1ebc9d512190e9"
+        },
+        "dlms-sn-information-count-captures/partial-count-retry-and-wrong-caller-do-not-consume-prefix-Close.tcp.pcap": {
+          "bytes": 675,
+          "sha256": "07ac4d685bab1921a5da6c7eab64cb36ead6bee109bf035b7653093d3428ee0e"
+        },
+        "dlms-sn-information-count-captures/partial-count-retry-and-wrong-caller-do-not-consume-prefix-Close.udp.pcap": {
+          "bytes": 405,
+          "sha256": "098d41a6f420d1863625ef6270dfc7e5f5bd23b3b7b70c66f73cd4d041839acd"
+        },
+        "dlms-sn-information-count-captures/reuse-inputs.json": {
+          "bytes": 295,
+          "sha256": "ffdeca7eec5c98e8c45fcc5197923e32e0ee533d8fb2d3d3116e436834d9f800"
+        },
+        "dlms-sn-information-count-captures/same-link-first4-request-retires-pending-LN-before-count.tcp.pcap": {
+          "bytes": 673,
+          "sha256": "0ef415d96acde0468905d79061ccd648ba3ceb4cacda9b801375b28c7ded843e"
+        },
+        "dlms-sn-information-count-captures/same-link-first4-request-retires-pending-LN-before-count.udp.pcap": {
+          "bytes": 403,
+          "sha256": "5042347f4d2017bc4e2d8a0824df71fb0c737cf857fa9b686aca4ed2f700dcb2"
+        },
+        "dlms-sn-information-count-captures/width3-announces65536-M1-count-ready-is-Resource.tcp.pcap": {
+          "bytes": 591,
+          "sha256": "366fb79568d13f4bb1098b21b34ae5771f0b08a31bddd25ba042094f3227a444"
+        },
+        "dlms-sn-information-count-captures/width3-announces65536-M1-count-ready-is-Resource.udp.pcap": {
+          "bytes": 333,
+          "sha256": "b61a7cba18e47813d2e69e6a58c7d87ce3de3529d488eb1b83edb45fe89f24ef"
+        },
+        "dlms-sn-information-count-captures/width3-count-complete-in-first-Read-neighbor.tcp.pcap": {
+          "bytes": 594,
+          "sha256": "bbf1dfdca56a31e0c154c8d1759382e57862b03a37592d291d20146f66453232"
+        },
+        "dlms-sn-information-count-captures/width3-count-complete-in-first-Read-neighbor.udp.pcap": {
+          "bytes": 336,
+          "sha256": "d2d1356b62e81ace6f6d3ce9eb2ba0b7bbbea33b9663b9cfe6cf7e115c350479"
+        },
+        "dlms-sn-information-count-captures/width3-nonminimal-one-Read-count-crosses-three-Iframes.tcp.pcap": {
+          "bytes": 675,
+          "sha256": "376bd5551da199054d46545da5aa1fb3828e9f7a3cefa3b472b0bec4c03eb172"
+        },
+        "dlms-sn-information-count-captures/width3-nonminimal-one-Read-count-crosses-three-Iframes.udp.pcap": {
+          "bytes": 405,
+          "sha256": "743b42ec2879402f263ccaf0d4fda1cf56d176492d00c8270cb45c354c6e848d"
+        },
+        "dlms-sn-information-count-captures/width3-one-count-byte-missing-Close-three-counters.tcp.pcap": {
+          "bytes": 590,
+          "sha256": "434b2175fbe30f79a1b0f0a1b4d03b3ba36d982d49e31ac7d27597fb4a97f671"
+        },
+        "dlms-sn-information-count-captures/width3-one-count-byte-missing-Close-three-counters.udp.pcap": {
+          "bytes": 332,
+          "sha256": "aa699dbbbc58b60f0be86055a988b6665b87e4adbebd96bacaabe718de468f77"
+        },
+        "dlms-sn-information-count-captures/width4-announcesMaxUInt32-M1-count-ready-is-Resource.tcp.pcap": {
+          "bytes": 592,
+          "sha256": "1e53c4cb995546bbaf879daef969a566257a262b1fd31dc2f6dfaa460de0e3de"
+        },
+        "dlms-sn-information-count-captures/width4-announcesMaxUInt32-M1-count-ready-is-Resource.udp.pcap": {
+          "bytes": 334,
+          "sha256": "e089ec6d10f6d556fc37570cb11ed50897c68196f823a535773efe8e2281ca07"
+        },
+        "dlms-sn-information-count-captures/width4-count-complete-in-first-Write-neighbor.tcp.pcap": {
+          "bytes": 598,
+          "sha256": "f41108a19bce452a94e927ad9a70f02cffadd09a71c23564c0f8e8320e4b137f"
+        },
+        "dlms-sn-information-count-captures/width4-count-complete-in-first-Write-neighbor.udp.pcap": {
+          "bytes": 340,
+          "sha256": "ced4923ab2d1fcc490caa07e07d8093e9447d060eb30d01c463ac92dae9bfa3e"
+        },
+        "dlms-sn-information-count-captures/width4-nonminimal-one-Write-count-crosses-three-Iframes.tcp.pcap": {
+          "bytes": 679,
+          "sha256": "3f946cace3bf68360064c9fbbe63f09513f38c767cfc15013c473bd28b3ec3a3"
+        },
+        "dlms-sn-information-count-captures/width4-nonminimal-one-Write-count-crosses-three-Iframes.udp.pcap": {
+          "bytes": 409,
+          "sha256": "6bd041269c7b214b25952e7dfa6484c0f63790f7a57a1b2f7257da2a36316ce8"
+        },
+        "dlms-sn-information-count-captures/width4-one-count-byte-missing-Close-three-counters.tcp.pcap": {
+          "bytes": 591,
+          "sha256": "ef508eeae9666bf9ad8f95a03cbc198351a68976ba451a742b145907423c3867"
+        },
+        "dlms-sn-information-count-captures/width4-one-count-byte-missing-Close-three-counters.udp.pcap": {
+          "bytes": 333,
+          "sha256": "30decdad783ccf2858fddc7d4891f1dde512aff6beec7cdbe29e9e0a95a0ac1c"
+        },
+        "dlms-sn-information-count-captures/width5-known-invalid-on-M1-after-first4.tcp.pcap": {
+          "bytes": 588,
+          "sha256": "f02290d99c5611e680480fa3b3e023d299eb6d462f84c7cba0fefab8bafac9be"
+        },
+        "dlms-sn-information-count-captures/width5-known-invalid-on-M1-after-first4.udp.pcap": {
+          "bytes": 330,
+          "sha256": "9eba3538bba507e85baca880589b37f67b7614b87833d3d58364822649b5f2c1"
+        },
+        "dlms-sn-information-count-captures/zero-count-completes-on-M1.tcp.pcap": {
+          "bytes": 588,
+          "sha256": "50d7640a36e18d150f9bccfbcb4836c3e06bf489d7731f4a6cb2666e52be5bd2"
+        },
+        "dlms-sn-information-count-captures/zero-count-completes-on-M1.udp.pcap": {
+          "bytes": 330,
+          "sha256": "a40f63beb73460c6e5c5bd2ee55e187d9e78e5a69029d5e9949cc30af0974a48"
+        },
+        "dlms-sn-information-count-source/ADOPTED-CONTRACT.json": {
+          "bytes": 2661,
+          "sha256": "a8a2de0170a26a2850bd31b223c322beb0b7e665d22f126d798bc25a0e1c7448"
+        },
+        "dlms-sn-information-count-source/SOURCES.json": {
+          "bytes": 8892,
+          "sha256": "254d10d6c767f99b20e34411cf062080ddbcdf409b8d72384a7ca7ccce86785d"
+        },
+        "dlms-sn-information-count-source/WIDTH-SOURCE-PROOF.json": {
+          "bytes": 13471,
+          "sha256": "f8830cbb97aa60232b3cb520757f9730e22af594d4554e100f85ac845b4b34ce"
+        },
+        "dlms-sn-information-count-source/baseline-controls.json": {
+          "bytes": 109743,
+          "sha256": "ee6ead096bacc7a45f8174a6a657f5810417bb034d2bcc16cd2b286508697b42"
+        },
+        "dlms-sn-information-count-source/controls.json": {
+          "bytes": 633653,
+          "sha256": "fea77c50d4857cc2156ce5b26df78630cb37e5ccd724e53c803694622ce3ffd8"
+        },
+        "dlms-sn-information-count-source/width-capture-index.json": {
+          "bytes": 5263,
+          "sha256": "cc9bf28cc4434ccd2786946673cddfe99a0d8f50fbd9a5677697106251f81a44"
+        },
+        "dlms-sn-information-count-source/width-controls.json": {
+          "bytes": 288758,
+          "sha256": "f6507db73394e9a0a08b74c786d1187cb254bae1ed49bd2e8558526e0690972c"
+        },
+        "dlms-sn-information-count-tools/carrier.py": {
+          "bytes": 10367,
+          "sha256": "f4427adbc4bea3bf0c80883f9916e99be4faeb8abc267a190235fc842a3399fa"
+        },
+        "dlms-sn-information-count-tools/generate.py": {
+          "bytes": 12162,
+          "sha256": "97b092ed5e4a086633e1c6644bd75c5210f4cff7a34d42b7ad72cc3695db9b82"
+        },
+        "dlms-sn-information-count-tools/model-pins.json": {
+          "bytes": 1090,
+          "sha256": "9f500e503fe6deed274cacce7d54fcce60dbcd9e618166e1f664d0f361e07478"
+        },
+        "dlms-sn-information-count-tools/read-body.py": {
+          "bytes": 4002,
+          "sha256": "9038061ed63630258c65a5b9e11e51888d414b290fea0aa2bd14743e2a7af4cd"
+        },
+        "dlms-sn-information-count-tools/rebuild.py": {
+          "bytes": 879,
+          "sha256": "8aad99f07307097086c32996679e0865c897cdbdba64d9d4bd1eb0f062f3a46d"
+        },
+        "dlms-sn-information-count-tools/reference-vectors.json": {
+          "bytes": 6734,
+          "sha256": "3d7c0f01b305e3524efa5dab640dd9ae4730fe7ed789ca9ef015a5c39b846b8d"
+        },
+        "dlms-sn-information-count-tools/reused-pins.json": {
+          "bytes": 1082,
+          "sha256": "84cd8d5be5efe35d1ffe3c65839eb2a0d93aa5e96e4c3ecea060bcb11af50da6"
+        },
+        "dlms-sn-information-count-tools/sn-body.py": {
+          "bytes": 572,
+          "sha256": "6e5106f1bebe23f04d38ec58953d227541bc366dd44a8f5796612e8a59239724"
+        },
+        "dlms-sn-information-count-tools/verify-captures.py": {
+          "bytes": 2840,
+          "sha256": "be3339960d4fc377980147b4b2554b86e9065d3197dbb551a30c1b8422e63d98"
+        },
+        "dlms-sn-information-count-tools/verify.py": {
+          "bytes": 4621,
+          "sha256": "37ee8e3124c190677869a52c65346a2fee4773163a03779434309811861b7bae"
+        },
+        "dlms-sn-information-count-tools/write-body.py": {
+          "bytes": 5706,
+          "sha256": "4818c0264cb4819cf5d4715a855b4f3817acf26c0c6b15ff558aaa7d3b4aa094"
+        },
+        "dlms-sn-information-count-width-tools/base/carrier.py": {
+          "bytes": 10367,
+          "sha256": "f4427adbc4bea3bf0c80883f9916e99be4faeb8abc267a190235fc842a3399fa"
+        },
+        "dlms-sn-information-count-width-tools/base/generate.py": {
+          "bytes": 12162,
+          "sha256": "97b092ed5e4a086633e1c6644bd75c5210f4cff7a34d42b7ad72cc3695db9b82"
+        },
+        "dlms-sn-information-count-width-tools/base/model-pins.json": {
+          "bytes": 1090,
+          "sha256": "9f500e503fe6deed274cacce7d54fcce60dbcd9e618166e1f664d0f361e07478"
+        },
+        "dlms-sn-information-count-width-tools/base/read-body.py": {
+          "bytes": 4002,
+          "sha256": "9038061ed63630258c65a5b9e11e51888d414b290fea0aa2bd14743e2a7af4cd"
+        },
+        "dlms-sn-information-count-width-tools/base/rebuild.py": {
+          "bytes": 879,
+          "sha256": "8aad99f07307097086c32996679e0865c897cdbdba64d9d4bd1eb0f062f3a46d"
+        },
+        "dlms-sn-information-count-width-tools/base/reference-vectors.json": {
+          "bytes": 6734,
+          "sha256": "3d7c0f01b305e3524efa5dab640dd9ae4730fe7ed789ca9ef015a5c39b846b8d"
+        },
+        "dlms-sn-information-count-width-tools/base/reused-pins.json": {
+          "bytes": 1082,
+          "sha256": "84cd8d5be5efe35d1ffe3c65839eb2a0d93aa5e96e4c3ecea060bcb11af50da6"
+        },
+        "dlms-sn-information-count-width-tools/base/sn-body.py": {
+          "bytes": 572,
+          "sha256": "6e5106f1bebe23f04d38ec58953d227541bc366dd44a8f5796612e8a59239724"
+        },
+        "dlms-sn-information-count-width-tools/base/verify.py": {
+          "bytes": 4621,
+          "sha256": "37ee8e3124c190677869a52c65346a2fee4773163a03779434309811861b7bae"
+        },
+        "dlms-sn-information-count-width-tools/base/write-body.py": {
+          "bytes": 5706,
+          "sha256": "4818c0264cb4819cf5d4715a855b4f3817acf26c0c6b15ff558aaa7d3b4aa094"
+        },
+        "dlms-sn-information-count-width-tools/generate.py": {
+          "bytes": 5363,
+          "sha256": "05c8ed9e825a367b9a25655180b03e0b40a93f548181657cf4c23da0d95977f1"
+        },
+        "dlms-sn-information-count-width-tools/model-pins.json": {
+          "bytes": 1304,
+          "sha256": "58cf691b78dd041354ec8aa840e22303c5f985f3827495c762de0294833dc104"
+        },
+        "required-tests-traffic-unified-v174.json": {
+          "bytes": 23764430,
+          "sha256": "cbb55152569a7486d18d7a4afeefbb9a52b38f6ab1351ea42aa9d4a919ccc49e"
+        },
+        "validation/expected.json": {
+          "bytes": 63573,
+          "sha256": "59ca13fd4f928ddd58658e3dcbc6095db28862d69dbf1e013d5a56f7e089d30d"
+        }
+      },
+      "aliases": {
+        "common/pcapx/pcaputil/dlms-sn-information-count-captures/M0-with-width2-count-still-truncated-is-Malformed.tcp.pcap": "dlms-sn-information-count-captures/M0-with-width2-count-still-truncated-is-Malformed.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-information-count-captures/M0-with-width2-count-still-truncated-is-Malformed.udp.pcap": "dlms-sn-information-count-captures/M0-with-width2-count-still-truncated-is-Malformed.udp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-information-count-captures/command05-first4-width1-count-crosses-Iframes.tcp.pcap": "dlms-sn-information-count-captures/command05-first4-width1-count-crosses-Iframes.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-information-count-captures/command05-first4-width1-count-crosses-Iframes.udp.pcap": "dlms-sn-information-count-captures/command05-first4-width1-count-crosses-Iframes.udp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-information-count-captures/command05-first4-width2-count-crosses-Iframes.tcp.pcap": "dlms-sn-information-count-captures/command05-first4-width2-count-crosses-Iframes.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-information-count-captures/command05-first4-width2-count-crosses-Iframes.udp.pcap": "dlms-sn-information-count-captures/command05-first4-width2-count-crosses-Iframes.udp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-information-count-captures/command06-first4-width1-count-crosses-Iframes.tcp.pcap": "dlms-sn-information-count-captures/command06-first4-width1-count-crosses-Iframes.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-information-count-captures/command06-first4-width1-count-crosses-Iframes.udp.pcap": "dlms-sn-information-count-captures/command06-first4-width1-count-crosses-Iframes.udp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-information-count-captures/command06-first4-width2-count-crosses-Iframes.tcp.pcap": "dlms-sn-information-count-captures/command06-first4-width2-count-crosses-Iframes.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-information-count-captures/command06-first4-width2-count-crosses-Iframes.udp.pcap": "dlms-sn-information-count-captures/command06-first4-width2-count-crosses-Iframes.udp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-information-count-captures/command0c-first4-width1-count-crosses-Iframes.tcp.pcap": "dlms-sn-information-count-captures/command0c-first4-width1-count-crosses-Iframes.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-information-count-captures/command0c-first4-width1-count-crosses-Iframes.udp.pcap": "dlms-sn-information-count-captures/command0c-first4-width1-count-crosses-Iframes.udp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-information-count-captures/command0c-first4-width2-count-crosses-Iframes.tcp.pcap": "dlms-sn-information-count-captures/command0c-first4-width2-count-crosses-Iframes.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-information-count-captures/command0c-first4-width2-count-crosses-Iframes.udp.pcap": "dlms-sn-information-count-captures/command0c-first4-width2-count-crosses-Iframes.udp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-information-count-captures/command0d-first4-width1-count-crosses-Iframes.tcp.pcap": "dlms-sn-information-count-captures/command0d-first4-width1-count-crosses-Iframes.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-information-count-captures/command0d-first4-width1-count-crosses-Iframes.udp.pcap": "dlms-sn-information-count-captures/command0d-first4-width1-count-crosses-Iframes.udp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-information-count-captures/command0d-first4-width2-count-crosses-Iframes.tcp.pcap": "dlms-sn-information-count-captures/command0d-first4-width2-count-crosses-Iframes.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-information-count-captures/command0d-first4-width2-count-crosses-Iframes.udp.pcap": "dlms-sn-information-count-captures/command0d-first4-width2-count-crosses-Iframes.udp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-information-count-captures/hard17-count-completes-on-M1.tcp.pcap": "dlms-sn-information-count-captures/hard17-count-completes-on-M1.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-information-count-captures/hard17-count-completes-on-M1.udp.pcap": "dlms-sn-information-count-captures/hard17-count-completes-on-M1.udp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-information-count-captures/literal80-known-invalid-on-M1-after-first4.tcp.pcap": "dlms-sn-information-count-captures/literal80-known-invalid-on-M1-after-first4.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-information-count-captures/literal80-known-invalid-on-M1-after-first4.udp.pcap": "dlms-sn-information-count-captures/literal80-known-invalid-on-M1-after-first4.udp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-information-count-captures/opposite-response-first4-Context-preserves-pending-LN.tcp.pcap": "dlms-sn-information-count-captures/opposite-response-first4-Context-preserves-pending-LN.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-information-count-captures/opposite-response-first4-Context-preserves-pending-LN.udp.pcap": "dlms-sn-information-count-captures/opposite-response-first4-Context-preserves-pending-LN.udp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-information-count-captures/partial-count-retry-and-wrong-caller-do-not-consume-prefix-Close.tcp.pcap": "dlms-sn-information-count-captures/partial-count-retry-and-wrong-caller-do-not-consume-prefix-Close.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-information-count-captures/partial-count-retry-and-wrong-caller-do-not-consume-prefix-Close.udp.pcap": "dlms-sn-information-count-captures/partial-count-retry-and-wrong-caller-do-not-consume-prefix-Close.udp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-information-count-captures/reuse-inputs.json": "dlms-sn-information-count-captures/reuse-inputs.json",
+        "common/pcapx/pcaputil/dlms-sn-information-count-captures/same-link-first4-request-retires-pending-LN-before-count.tcp.pcap": "dlms-sn-information-count-captures/same-link-first4-request-retires-pending-LN-before-count.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-information-count-captures/same-link-first4-request-retires-pending-LN-before-count.udp.pcap": "dlms-sn-information-count-captures/same-link-first4-request-retires-pending-LN-before-count.udp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-information-count-captures/width3-announces65536-M1-count-ready-is-Resource.tcp.pcap": "dlms-sn-information-count-captures/width3-announces65536-M1-count-ready-is-Resource.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-information-count-captures/width3-announces65536-M1-count-ready-is-Resource.udp.pcap": "dlms-sn-information-count-captures/width3-announces65536-M1-count-ready-is-Resource.udp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-information-count-captures/width3-count-complete-in-first-Read-neighbor.tcp.pcap": "dlms-sn-information-count-captures/width3-count-complete-in-first-Read-neighbor.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-information-count-captures/width3-count-complete-in-first-Read-neighbor.udp.pcap": "dlms-sn-information-count-captures/width3-count-complete-in-first-Read-neighbor.udp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-information-count-captures/width3-nonminimal-one-Read-count-crosses-three-Iframes.tcp.pcap": "dlms-sn-information-count-captures/width3-nonminimal-one-Read-count-crosses-three-Iframes.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-information-count-captures/width3-nonminimal-one-Read-count-crosses-three-Iframes.udp.pcap": "dlms-sn-information-count-captures/width3-nonminimal-one-Read-count-crosses-three-Iframes.udp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-information-count-captures/width3-one-count-byte-missing-Close-three-counters.tcp.pcap": "dlms-sn-information-count-captures/width3-one-count-byte-missing-Close-three-counters.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-information-count-captures/width3-one-count-byte-missing-Close-three-counters.udp.pcap": "dlms-sn-information-count-captures/width3-one-count-byte-missing-Close-three-counters.udp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-information-count-captures/width4-announcesMaxUInt32-M1-count-ready-is-Resource.tcp.pcap": "dlms-sn-information-count-captures/width4-announcesMaxUInt32-M1-count-ready-is-Resource.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-information-count-captures/width4-announcesMaxUInt32-M1-count-ready-is-Resource.udp.pcap": "dlms-sn-information-count-captures/width4-announcesMaxUInt32-M1-count-ready-is-Resource.udp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-information-count-captures/width4-count-complete-in-first-Write-neighbor.tcp.pcap": "dlms-sn-information-count-captures/width4-count-complete-in-first-Write-neighbor.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-information-count-captures/width4-count-complete-in-first-Write-neighbor.udp.pcap": "dlms-sn-information-count-captures/width4-count-complete-in-first-Write-neighbor.udp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-information-count-captures/width4-nonminimal-one-Write-count-crosses-three-Iframes.tcp.pcap": "dlms-sn-information-count-captures/width4-nonminimal-one-Write-count-crosses-three-Iframes.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-information-count-captures/width4-nonminimal-one-Write-count-crosses-three-Iframes.udp.pcap": "dlms-sn-information-count-captures/width4-nonminimal-one-Write-count-crosses-three-Iframes.udp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-information-count-captures/width4-one-count-byte-missing-Close-three-counters.tcp.pcap": "dlms-sn-information-count-captures/width4-one-count-byte-missing-Close-three-counters.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-information-count-captures/width4-one-count-byte-missing-Close-three-counters.udp.pcap": "dlms-sn-information-count-captures/width4-one-count-byte-missing-Close-three-counters.udp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-information-count-captures/width5-known-invalid-on-M1-after-first4.tcp.pcap": "dlms-sn-information-count-captures/width5-known-invalid-on-M1-after-first4.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-information-count-captures/width5-known-invalid-on-M1-after-first4.udp.pcap": "dlms-sn-information-count-captures/width5-known-invalid-on-M1-after-first4.udp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-information-count-captures/zero-count-completes-on-M1.tcp.pcap": "dlms-sn-information-count-captures/zero-count-completes-on-M1.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-information-count-captures/zero-count-completes-on-M1.udp.pcap": "dlms-sn-information-count-captures/zero-count-completes-on-M1.udp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-information-count-source/ADOPTED-CONTRACT.json": "dlms-sn-information-count-source/ADOPTED-CONTRACT.json",
+        "common/pcapx/pcaputil/dlms-sn-information-count-source/SOURCES.json": "dlms-sn-information-count-source/SOURCES.json",
+        "common/pcapx/pcaputil/dlms-sn-information-count-source/WIDTH-SOURCE-PROOF.json": "dlms-sn-information-count-source/WIDTH-SOURCE-PROOF.json",
+        "common/pcapx/pcaputil/dlms-sn-information-count-source/baseline-controls.json": "dlms-sn-information-count-source/baseline-controls.json",
+        "common/pcapx/pcaputil/dlms-sn-information-count-source/controls.json": "dlms-sn-information-count-source/controls.json",
+        "common/pcapx/pcaputil/dlms-sn-information-count-source/width-capture-index.json": "dlms-sn-information-count-source/width-capture-index.json",
+        "common/pcapx/pcaputil/dlms-sn-information-count-source/width-controls.json": "dlms-sn-information-count-source/width-controls.json",
+        "common/pcapx/pcaputil/dlms-sn-information-count-tools/carrier.py": "dlms-sn-information-count-tools/carrier.py",
+        "common/pcapx/pcaputil/dlms-sn-information-count-tools/generate.py": "dlms-sn-information-count-tools/generate.py",
+        "common/pcapx/pcaputil/dlms-sn-information-count-tools/model-pins.json": "dlms-sn-information-count-tools/model-pins.json",
+        "common/pcapx/pcaputil/dlms-sn-information-count-tools/read-body.py": "dlms-sn-information-count-tools/read-body.py",
+        "common/pcapx/pcaputil/dlms-sn-information-count-tools/rebuild.py": "dlms-sn-information-count-tools/rebuild.py",
+        "common/pcapx/pcaputil/dlms-sn-information-count-tools/reference-vectors.json": "dlms-sn-information-count-tools/reference-vectors.json",
+        "common/pcapx/pcaputil/dlms-sn-information-count-tools/reused-pins.json": "dlms-sn-information-count-tools/reused-pins.json",
+        "common/pcapx/pcaputil/dlms-sn-information-count-tools/sn-body.py": "dlms-sn-information-count-tools/sn-body.py",
+        "common/pcapx/pcaputil/dlms-sn-information-count-tools/verify-captures.py": "dlms-sn-information-count-tools/verify-captures.py",
+        "common/pcapx/pcaputil/dlms-sn-information-count-tools/verify.py": "dlms-sn-information-count-tools/verify.py",
+        "common/pcapx/pcaputil/dlms-sn-information-count-tools/write-body.py": "dlms-sn-information-count-tools/write-body.py",
+        "common/pcapx/pcaputil/dlms-sn-information-count-width-tools/base/carrier.py": "dlms-sn-information-count-width-tools/base/carrier.py",
+        "common/pcapx/pcaputil/dlms-sn-information-count-width-tools/base/generate.py": "dlms-sn-information-count-width-tools/base/generate.py",
+        "common/pcapx/pcaputil/dlms-sn-information-count-width-tools/base/model-pins.json": "dlms-sn-information-count-width-tools/base/model-pins.json",
+        "common/pcapx/pcaputil/dlms-sn-information-count-width-tools/base/read-body.py": "dlms-sn-information-count-width-tools/base/read-body.py",
+        "common/pcapx/pcaputil/dlms-sn-information-count-width-tools/base/rebuild.py": "dlms-sn-information-count-width-tools/base/rebuild.py",
+        "common/pcapx/pcaputil/dlms-sn-information-count-width-tools/base/reference-vectors.json": "dlms-sn-information-count-width-tools/base/reference-vectors.json",
+        "common/pcapx/pcaputil/dlms-sn-information-count-width-tools/base/reused-pins.json": "dlms-sn-information-count-width-tools/base/reused-pins.json",
+        "common/pcapx/pcaputil/dlms-sn-information-count-width-tools/base/sn-body.py": "dlms-sn-information-count-width-tools/base/sn-body.py",
+        "common/pcapx/pcaputil/dlms-sn-information-count-width-tools/base/verify.py": "dlms-sn-information-count-width-tools/base/verify.py",
+        "common/pcapx/pcaputil/dlms-sn-information-count-width-tools/base/write-body.py": "dlms-sn-information-count-width-tools/base/write-body.py",
+        "common/pcapx/pcaputil/dlms-sn-information-count-width-tools/generate.py": "dlms-sn-information-count-width-tools/generate.py",
+        "common/pcapx/pcaputil/dlms-sn-information-count-width-tools/model-pins.json": "dlms-sn-information-count-width-tools/model-pins.json",
+        "scripts/protocol-tests/required-tests-traffic-unified-v174.json": "required-tests-traffic-unified-v174.json"
+      }
     }
   ],
   "schema_version": 1,

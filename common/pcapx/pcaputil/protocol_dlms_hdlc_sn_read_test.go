@@ -292,7 +292,13 @@ func hdlcSNReadMatrix(t *testing.T, cases []hdlcSNReadCase, batch string) {
 	hdlcSNReadMatrixTransports(t, cases, batch, []string{"udp", "tcp"})
 }
 func hdlcSNReadMatrixTransports(t *testing.T, cases []hdlcSNReadCase, batch string, transports []string) {
+	hdlcSNReadMatrixChecked(t, cases, batch, transports, nil)
+}
+func hdlcSNReadMatrixChecked(t *testing.T, cases []hdlcSNReadCase, batch string, transports []string, check func(*testing.T, *ProtocolEvent, hdlcOpStep, map[string]any)) {
 	env := "DLMS_HDLC_SN_READ_TEST_ROOT"
+	if batch == "dlms-sn-information-count-captures" {
+		env = "DLMS_SN_INFORMATION_COUNT_ROOT"
+	}
 	if batch == "dlms-hdlc-sn-upload" {
 		env = "DLMS_HDLC_SN_UPLOAD_TEST_ROOT"
 	}
@@ -330,7 +336,7 @@ func hdlcSNReadMatrixTransports(t *testing.T, cases []hdlcSNReadCase, batch stri
 					var err error
 					const prefix = "common/pcapx/pcaputil/"
 					require.True(t, strings.HasPrefix(alias, prefix))
-					if (batch == "dlms-hdlc-sn-upload" || batch == "dlms-hdlc-sn-read-block" || batch == "dlms-sn-information-segments" || batch == "dlms-sn-information-segments-hard" || batch == "dlms-sn-information-segments-lookalike" || batch == "dlms-sn-parameterized-hdlc") && strings.HasPrefix(alias, prefix+batch+"/") {
+					if (batch == "dlms-sn-information-count-captures" || batch == "dlms-hdlc-sn-upload" || batch == "dlms-hdlc-sn-read-block" || batch == "dlms-sn-information-segments" || batch == "dlms-sn-information-segments-hard" || batch == "dlms-sn-information-segments-lookalike" || batch == "dlms-sn-parameterized-hdlc") && strings.HasPrefix(alias, prefix+batch+"/") {
 						name := strings.TrimPrefix(alias, prefix+batch+"/")
 						require.NotContains(t, name, "/")
 						raw = finsReadBatch(t, batch, env, name)
@@ -443,6 +449,16 @@ func hdlcSNReadMatrixTransports(t *testing.T, cases []hdlcSNReadCase, batch stri
 						}
 					}
 					hdlcOpCheck(t, c, es[:count], tr, false, d)
+					if check != nil {
+						index := 0
+						for i, st := range c.Steps {
+							if tr == "tcp" && st.TCPOverride != nil {
+								continue
+							}
+							check(t, es[index], st, tc.Metadata[i])
+							index++
+						}
+					}
 					if batch == "dlms-hdlc-sn-upload" && len(tc.Steps) > 0 && tc.Steps[0].Direction != c.Steps[0].Direction {
 						// Capture direction is relative to its observed initiator, independently
 						// of native Feed caller numbering. Keep literal physical endpoints.

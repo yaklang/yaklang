@@ -44,7 +44,7 @@ Run from the repository root:
 ```sh
 go run ./internal/trafficfixture/cmd/corpus test
 go test -json -count=1 -timeout=10m ./internal/trafficfixture/... ./common/bin-parser/... ./common/pcapx/... ./common/yak/cmd/yakcmds/shark-cli ./scripts/ci > traffic.jsonl
-go run ./internal/trafficfixture/cmd/corpus exec -- python3 @scripts/protocol-tests/check_go_test_json_v2.py traffic.jsonl --inventory @scripts/protocol-tests/required-tests-traffic-unified-v173.json --tier full
+go run ./internal/trafficfixture/cmd/corpus exec -- python3 @scripts/protocol-tests/check_go_test_json_v2.py traffic.jsonl --inventory @scripts/protocol-tests/required-tests-traffic-unified-v174.json --tier full
 ```
 
 The single `corpus` entry point uses the same bounded Go ZIP loader as tests.
@@ -83,7 +83,7 @@ their semantic coverage. The existing synthetic session keys are test inputs;
 production credentials, user private keys and material without redistribution
 permission belong in an external fixed-source download manifest.
 
-Current test requirements are sealed at `scripts/protocol-tests/required-tests-traffic-unified-v173.json`;
+Current test requirements are sealed at `scripts/protocol-tests/required-tests-traffic-unified-v174.json`;
 the historical inventories and all earlier batches remain unchanged.
 The supplemental small-corpus batch contains 26 minimal controls, their explicit
 expected facts, an offline generator and the compact pinned source manifest.
@@ -203,7 +203,7 @@ opaque selector bytes and one bounded Data value over Wrapper v1 TCP/UDP; object
 selector meaning, access permission and device operation are unverified. The
 original one-packet selective-access capture and original refused answer remain
 immutable; its now-supported answer is matched by exact input SHA and frame.
-The active inventory is `scripts/protocol-tests/required-tests-traffic-unified-v173.json`.
+The active inventory is `scripts/protocol-tests/required-tests-traffic-unified-v174.json`.
 
 The small-graph budget batch reuses accepted graph captures/answers and adds one
 249-byte UDP control for child count255 without child bytes. Its standalone proof
@@ -993,7 +993,7 @@ the normative answer; a missing numeric reference field is not a codec pass.
 Full/deferred, workers1/2/4, observers off/on, Feed chunks1/7/full, ownership,
 resources and close/refusal boundaries remain required.
 
-Current gate: `required-tests-traffic-unified-v173.json` with
+Current gate: `required-tests-traffic-unified-v174.json` with
 `check_go_test_json_v2.py`. The indexed validator preserves missing/unpassed,
 package invocation completion, descendant skips, failures and non-JSON checks;
 its mutation/differential harness is sealed with the material. Older checkers
@@ -1629,7 +1629,7 @@ userspace adapter; full kernel receiver/socket/timers and ECU endpoints do not.
 All161 preceding ZIPs remain byte-for-byte unchanged. Raw captures, dependencies,
 reference source/build output and process evidence stay outside Git.
 
-Current effective v173 inventory: 116,686 entries; 116,679 are mandatory for the full tier.
+Current effective v174 inventory: 117,565 entries; 117,558 are mandatory for the full tier.
 
 The opt-in `DynamicFlowControl` profile follows Linux v6.12 FC tuple updates (including WAIT without granting data). Disjoint address extensions or classical/FD carriers may share CAN IDs; unknown selectors cannot choose or mutate a conversation. Ambiguous selectors are rejected. Seven sealed cases exercise full/deferred, workers 1/2/4, and observer off/on, with exact fields, byte collections, contributor references, errors and resource ownership. The existing static FC profile remains unchanged. Pinned upstream FC and filter functions execute with declared userspace stubs; this is not a kernel/ECU endpoint. TShark 4.2.5 checks wire tuples and two complete payloads, but cannot independently reassemble the shared-address transcripts.
 
@@ -1854,3 +1854,5 @@ The ordinary-SN Wrapper GBT capability also upgrades the exact two historical Re
 `validation-dlms-hdlc-sn-gbt-split-header-complete.zip` supports an E0 fixed header/count across CRC-valid information carriers after a complete LLC+E0 first4B. Thirty independent cases/142steps include every fixed-header cut4..9, minimal82 count cuts, three carriers, exact M1 Unsupported/M0 Malformed, wrong-context preservation, gaps, pending Close and caller pools. Definite81/83/84 n10 positives describe existing local nonminimal compatibility, not official interop; lateM1 width3 count65536/width4 count4294967295 rejects Resource before declared-size allocation. Sixty logical captures use52 new authored inputs/30,298B, four historical and four within-batch reuses. v172 adds1,049 names and explicitly rebinds804 existing Count/Matrix requirement references without dropping any name/tier. Original6/29 answers remain immutable; independently reconstructed expanded answers change only2 partial/count cases and Close, preserving other4/27 cases and all wires/capture SHA/budgets. Full semantic peer/AA/device and firstLLC/tag splitting remain unproven.
 
 `validation-dlms-wrapper-sn-multiresult.zip` adds bounded outer Wrapper1 SN response multiresult observations: ordered Read Data/error/opaque DataBlockResult/UInt16 block-number and Write success/error/UInt16 block-number. Eighteen independent syntax/budget cases and one nine-step LN/three-SN-mode/reverse-caller state trace assert native and captured TCP/UDP full fields, Session, real references, exact errors and ownership. Captured workers1/2/4 full/deferred observers off/on use 38 logical/26 new authored captures (13,032B); 12 uses are reused by content hash. Original 269 archives are unchanged. Opaque raw is not reassembled into an invented multiresult service body; successful AA/device/official endpoint interop remains unverified.
+
+`validation-dlms-sn-information-count.zip` adds bounded ordinary SN HDLC count-readiness after a complete first LLC+command: list-count bytes can span valid Iframes while known invalid forms and M0 terminal truncation retain exact diagnostics. Twenty-five independent cases cover Read/Write requests/responses, count widths1..4, correct fields/Session/references, LN/requester isolation, retransmission, exact errors, ownership and Close. Captured workers1/2/4 full/deferred observers off/on cover50 logical inputs; content dedup stores48 new authored captures/24,336B and reuses2 historical inputs. All270 previous archives and answers are unchanged. Width3/nonminimal forms are explicit local compatibility, not official service codec/AA/device evidence.
