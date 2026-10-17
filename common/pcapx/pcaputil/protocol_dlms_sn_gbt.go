@@ -123,7 +123,9 @@ func (s *binDLMS) observeSNGBTInterruption(m *dlmsMessage, dir int) {
 	}
 	for k, l := range s.snGBT {
 		same := k.dir == dir && k.source == m.source && k.destination == m.destination || k.dir == 1-dir && k.source == m.destination && k.destination == m.source
-		if same && l.wire.unfinishedGBTCounts() != [2]int{} {
+		// A block-bearing multiresult is an unknown generation boundary for
+		// this same observed link, including a completed GBT fingerprint.
+		if same && (l.wire.unfinishedGBTCounts() != [2]int{} || m.snMultiResult) {
 			l.retire()
 		}
 	}

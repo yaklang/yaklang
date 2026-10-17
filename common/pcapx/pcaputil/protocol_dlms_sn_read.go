@@ -10,7 +10,7 @@ func dlmsSNReadAPDU(p []byte) bool { return len(p) > 0 && (p[0] == 5 || p[0] == 
 
 // Reuse the bounded SN A-XDR cursor without projecting synthetic Wrapper
 // carrier fields. The enclosing CRC-checked HDLC frame and LLC remain literal.
-func decodeDLMSSNRead(m *dlmsMessage, p []byte, llc byte, limit, depth int) (*dlmsMessage, error) {
+func decodeDLMSSNRead(m *dlmsMessage, p []byte, llc byte, limit, depth int, allowSNMulti bool) (*dlmsMessage, error) {
 	request := p[0] == 5
 	if request && llc != 0xe6 || !request && llc != 0xe7 {
 		return nil, dlmsError(ErrMalformedMessage, "SN Read LLC direction differs from command")
@@ -24,7 +24,9 @@ func decodeDLMSSNRead(m *dlmsMessage, p []byte, llc byte, limit, depth int) (*dl
 	copy(wire[8:], p)
 	var sn *wrapperMessage
 	var err error
-	if wrapperIsSNServiceBlock(wire) {
+	if allowSNMulti && wrapperSNMultiEnvelope(wire) {
+		sn, err = decodeWrapperSNMultiResult(wire, limit, depth)
+	} else if wrapperIsSNServiceBlock(wire) {
 		sn, err = decodeWrapperSNServiceBlock(wire, limit)
 	} else if wrapperIsSNUpload(wire) {
 		sn, err = decodeWrapperSNUpload(wire, limit)
@@ -42,6 +44,7 @@ func decodeDLMSSNRead(m *dlmsMessage, p []byte, llc byte, limit, depth int) (*dl
 		delete(sn.fields, key)
 	}
 	m.snRead, m.request, m.kind = true, request, "SN-READ"
+	m.snMultiResult = sn.snMultiResult
 	if sn.snServiceBlock {
 		m.snBlock = sn
 	}

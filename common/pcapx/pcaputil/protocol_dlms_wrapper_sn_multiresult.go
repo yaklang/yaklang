@@ -5,9 +5,10 @@ import (
 	"encoding/hex"
 )
 
-// This entry is used only by an actual outer Wrapper observation. The shared
-// complete decoder remains unchanged for HDLC, assembled GBT and single-result
-// service blocks. A row list carries no invoke or per-row transfer owner.
+// Explicit selected outer Wrapper or complete M0 HDLC observations use this
+// bounded syntax decoder. The default shared decoder for joined information,
+// nested GBT and single-result service blocks stays unchanged. A row list
+// carries no invoke or per-row transfer owner.
 func wrapperSNMultiEnvelope(w []byte) bool {
 	if len(w) < 10 || w[0] != 0 || w[1] != 1 || int(binary.BigEndian.Uint16(w[6:8])) != len(w)-8 || w[8] != 12 && w[8] != 13 {
 		return false

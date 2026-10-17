@@ -96,6 +96,7 @@ type dlmsMessage struct {
 	information               []byte
 	segmented                 bool
 	setResponseAssemblyChoice byte
+	snMultiResult             bool
 	snRead                    bool
 	snWrite                   bool
 	snBlock                   *wrapperMessage
@@ -230,10 +231,16 @@ func decodeDLMSFrameBudget(w []byte, maxElements, depth int, linkOnly bool) (*dl
 		}
 		return m, nil
 	}
-	return decodeDLMSInformation(m, info, maxElements, depth)
+	return decodeDLMSInformationSelected(m, info, maxElements, depth, !m.segmented)
 }
 
 func decodeDLMSInformation(m *dlmsMessage, info []byte, maxElements, depth int) (*dlmsMessage, error) {
+	return decodeDLMSInformationSelected(m, info, maxElements, depth, false)
+}
+
+// Only an actual complete M0 carrier opts in. Joined information and nested
+// envelopes keep the shared complete decoder contract unless selected separately.
+func decodeDLMSInformationSelected(m *dlmsMessage, info []byte, maxElements, depth int, allowSNMulti bool) (*dlmsMessage, error) {
 	bad := func(s string) (*dlmsMessage, error) { return nil, dlmsError(ErrMalformedMessage, s) }
 	unsupported := func(s string) (*dlmsMessage, error) { return nil, dlmsError(ErrUnsupportedFeature, s) }
 	f := m.fields
@@ -249,10 +256,10 @@ func decodeDLMSInformation(m *dlmsMessage, info []byte, maxElements, depth int) 
 		return decodeDLMSSNGBT(m, p, info[1], maxElements, depth)
 	}
 	if dlmsSNWriteAPDU(p) {
-		return decodeDLMSSNWrite(m, p, info[1], maxElements, depth)
+		return decodeDLMSSNWrite(m, p, info[1], maxElements, depth, allowSNMulti)
 	}
 	if dlmsSNReadAPDU(p) {
-		return decodeDLMSSNRead(m, p, info[1], maxElements, depth)
+		return decodeDLMSSNRead(m, p, info[1], maxElements, depth, allowSNMulti)
 	}
 	if p[0] >= 0x60 && p[0] <= 0x64 {
 		return decodeDLMSACSEInformation(m, p, info[1], maxElements, depth)
@@ -828,6 +835,10 @@ func (f *binFlow) consumeDecodedDLMS(dir int, w []byte, id uint64, m *dlmsMessag
 		m.fields["Association"] = "unverified-sn-read-observation"
 		if m.snWrite {
 			m.fields["Association"] = "unverified-sn-write-observation"
+		}
+		if m.snMultiResult {
+			s.operationProfile = "dlms-hdlc-sn-multiresult"
+			m.fields["Association"] = "unverified-sn-multiresult-observation"
 		}
 		return m.fields, 0, nil
 	}

@@ -66,6 +66,9 @@ func hdlcSNReadCases(t *testing.T, name, pin string, count int) []hdlcSNReadCase
 }
 func hdlcSNReadTypes(t *testing.T, f map[string]any) {
 	t.Helper()
+	if f["GBT"] != nil {
+		hdlcSNGBTTypes(t, f)
+	}
 	hdlcOpTypes(t, f)
 	if raw, exists := f["HDLC Segmentation"]; exists {
 		meta, ok := raw.(map[string]any)
@@ -296,6 +299,9 @@ func hdlcSNReadMatrixTransports(t *testing.T, cases []hdlcSNReadCase, batch stri
 }
 func hdlcSNReadMatrixChecked(t *testing.T, cases []hdlcSNReadCase, batch string, transports []string, check func(*testing.T, *ProtocolEvent, hdlcOpStep, map[string]any)) {
 	env := "DLMS_HDLC_SN_READ_TEST_ROOT"
+	if batch == "dlms-hdlc-sn-multiresult-captures" {
+		env = "DLMS_HDLC_SN_MULTIRESULT_ROOT"
+	}
 	if batch == "dlms-sn-information-count-captures" {
 		env = "DLMS_SN_INFORMATION_COUNT_ROOT"
 	}
@@ -336,7 +342,7 @@ func hdlcSNReadMatrixChecked(t *testing.T, cases []hdlcSNReadCase, batch string,
 					var err error
 					const prefix = "common/pcapx/pcaputil/"
 					require.True(t, strings.HasPrefix(alias, prefix))
-					if (batch == "dlms-sn-information-count-captures" || batch == "dlms-hdlc-sn-upload" || batch == "dlms-hdlc-sn-read-block" || batch == "dlms-sn-information-segments" || batch == "dlms-sn-information-segments-hard" || batch == "dlms-sn-information-segments-lookalike" || batch == "dlms-sn-parameterized-hdlc") && strings.HasPrefix(alias, prefix+batch+"/") {
+					if (batch == "dlms-hdlc-sn-multiresult-captures" || batch == "dlms-sn-information-count-captures" || batch == "dlms-hdlc-sn-upload" || batch == "dlms-hdlc-sn-read-block" || batch == "dlms-sn-information-segments" || batch == "dlms-sn-information-segments-hard" || batch == "dlms-sn-information-segments-lookalike" || batch == "dlms-sn-parameterized-hdlc") && strings.HasPrefix(alias, prefix+batch+"/") {
 						name := strings.TrimPrefix(alias, prefix+batch+"/")
 						require.NotContains(t, name, "/")
 						raw = finsReadBatch(t, batch, env, name)
@@ -479,7 +485,7 @@ func hdlcSNReadMatrixChecked(t *testing.T, cases []hdlcSNReadCase, batch string,
 // fields and metadata remain exact, and old SN/other-service rows are untouched.
 func hdlcSNBlockBindStep(t *testing.T, st hdlcOpStep, ids []uint64) hdlcOpStep {
 	t.Helper()
-	if (st.Profile != "dlms-hdlc-sn-read-block" && st.Profile != "dlms-hdlc-sn-read-upload" && st.Profile != "dlms-hdlc-sn-write-upload") || st.Fields == nil {
+	if (st.Profile != "dlms-hdlc-sn-read-block" && st.Profile != "dlms-hdlc-sn-read-upload" && st.Profile != "dlms-hdlc-sn-write-upload" && st.Profile != "dlms-hdlc-sn-gbt") || st.Fields == nil {
 		return st
 	}
 	var bind func(any) any

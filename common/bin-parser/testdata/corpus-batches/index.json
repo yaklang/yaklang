@@ -122652,6 +122652,457 @@
         "common/pcapx/pcaputil/dlms-sn-information-count-width-tools/model-pins.json": "dlms-sn-information-count-width-tools/model-pins.json",
         "scripts/protocol-tests/required-tests-traffic-unified-v174.json": "required-tests-traffic-unified-v174.json"
       }
+    },
+    {
+      "id": "validation-dlms-hdlc-sn-multiresult",
+      "kind": "support",
+      "source_sha": "4468a930378e66df552d68a71fc1b48392315c4e",
+      "file": "validation-dlms-hdlc-sn-multiresult.zip",
+      "sha256": "ecd28edd8878e2f6812278d77aafc34c43591c073516c8d59e865a0e48c6833e",
+      "password": "bin-parser",
+      "members": {
+        "dlms-hdlc-sn-multiresult-captures/Getprimed-complete-M0-Read-Data-error-opaqueR2-R3-literal.tcp.pcap": {
+          "bytes": 522,
+          "sha256": "29da0c9efaa2a49c66edbd64e0cb2c13ee5ed45523e82255ed2037856af494a0"
+        },
+        "dlms-hdlc-sn-multiresult-captures/Getprimed-complete-M0-Read-Data-error-opaqueR2-R3-literal.udp.pcap": {
+          "bytes": 276,
+          "sha256": "8d518000de5e2f150a438e553db4073b4dd4bf8f5b4e40d0493b9714bc2be0d8"
+        },
+        "dlms-hdlc-sn-multiresult-captures/Getprimed-complete-M0-Write-NULL-error-R2-literal.tcp.pcap": {
+          "bytes": 513,
+          "sha256": "3e7e87d0816a25e8cb1b645fa12a8bb4016793b01bda4f75702d3a1fc59f7d7a"
+        },
+        "dlms-hdlc-sn-multiresult-captures/Getprimed-complete-M0-Write-NULL-error-R2-literal.udp.pcap": {
+          "bytes": 267,
+          "sha256": "8fd2abffa0696f93dfd1be74483eba0e5f6d711a245d84c8ae4a10b53ce7ef71"
+        },
+        "dlms-hdlc-sn-multiresult-captures/completed-GBT-exact-neighbor-then-multi-unknown-boundary-retires-link.tcp.pcap": {
+          "bytes": 810,
+          "sha256": "51f9d41f123d66366f3af65cda638d2d29b1f332ae39632eb07c7324df7c9919"
+        },
+        "dlms-hdlc-sn-multiresult-captures/completed-GBT-exact-neighbor-then-multi-unknown-boundary-retires-link.udp.pcap": {
+          "bytes": 528,
+          "sha256": "010e65e700f1cbaef583cebb8a9ff0bfd418ec69eba2c243c9793d97ca536458"
+        },
+        "dlms-hdlc-sn-multiresult-captures/completed-GBT-multi-opposite-caller-unswapped-logical-pair-preserves-fingerprint.tcp.pcap": {
+          "bytes": 714,
+          "sha256": "d995e7c65b08f2e3206ea003d1701e45bb3db436acf494c1c5f0e486a80093bd"
+        },
+        "dlms-hdlc-sn-multiresult-captures/completed-GBT-multi-opposite-caller-unswapped-logical-pair-preserves-fingerprint.udp.pcap": {
+          "bytes": 444,
+          "sha256": "864e2cc0393e4bdb0636190aac5f887f5419455c8f146c010ff6277b19134106"
+        },
+        "dlms-hdlc-sn-multiresult-captures/completed-SN-fullUInt32-low16-alias-multi-preserves-other-link-fingerprint.tcp.pcap": {
+          "bytes": 717,
+          "sha256": "1de16141068a1232cde5c4f33198aadc3af148e97ba340b1e2d5d97961a9903d"
+        },
+        "dlms-hdlc-sn-multiresult-captures/completed-SN-fullUInt32-low16-alias-multi-preserves-other-link-fingerprint.udp.pcap": {
+          "bytes": 447,
+          "sha256": "c79b3efaea0ff54dc23f8c772c7e91df94d38c8c68b39108962953c4002640d8"
+        },
+        "dlms-hdlc-sn-multiresult-captures/completed-SN-last-exact-neighbor-then-multi-unknown-boundary-retires-fingerprint.tcp.pcap": {
+          "bytes": 810,
+          "sha256": "378346cd156fa54c86f6aea3ca913689261b2be134b2194e03d7af57dcfd187f"
+        },
+        "dlms-hdlc-sn-multiresult-captures/completed-SN-last-exact-neighbor-then-multi-unknown-boundary-retires-fingerprint.udp.pcap": {
+          "bytes": 528,
+          "sha256": "e431a9ea0bb9592ecd703b891a3bcb1e18aeb658bede61145432e7e1ca2293e6"
+        },
+        "dlms-hdlc-sn-multiresult-captures/noncanonical-last-truncated-raw-and-extra-NULL-remain-exact-errors.tcp.pcap": {
+          "bytes": 794,
+          "sha256": "31a103e539d03862f3c9eaeb71ffdc0bfd7f18bf20768a74cc74007835ad149c"
+        },
+        "dlms-hdlc-sn-multiresult-captures/noncanonical-last-truncated-raw-and-extra-NULL-remain-exact-errors.udp.pcap": {
+          "bytes": 512,
+          "sha256": "0c6967f878600bdacbf580e12cfef68f60ee814ecb06c4aba0c9a9623b6165d3"
+        },
+        "dlms-hdlc-sn-multiresult-captures/opaque-total1024-success-then1025-Resource-no-raw-decoding.tcp.pcap": {
+          "bytes": 2670,
+          "sha256": "65490388385293928942ab814b57e8f3211985ecc3b03cce0ab07941c487256d"
+        },
+        "dlms-hdlc-sn-multiresult-captures/opaque-total1024-success-then1025-Resource-no-raw-decoding.udp.pcap": {
+          "bytes": 2412,
+          "sha256": "831049df72f64e547bab15812fe1950678302b3b28fb9cf7a73036be90311b95"
+        },
+        "dlms-hdlc-sn-multiresult-captures/pure-multiresult-response-preserves-LN-owner-and-sequence.tcp.pcap": {
+          "bytes": 522,
+          "sha256": "37c2b9801782e7c1094d81a1660694d89a75f45e0a5e5e9b8f6edd0646aea352"
+        },
+        "dlms-hdlc-sn-multiresult-captures/pure-multiresult-response-preserves-LN-owner-and-sequence.udp.pcap": {
+          "bytes": 276,
+          "sha256": "092e08fab986f4c9e92dc5d2dcaf24c9d72f9ac657cadfc25fdcde90ea0cf3e9"
+        },
+        "dlms-hdlc-sn-multiresult-captures/reuse-inputs.json": {
+          "bytes": 591,
+          "sha256": "47b1e081c97f5fa4b57aa9eb48768ccd39a9f8eeacfa65f6fdcab2327024b4e4"
+        },
+        "dlms-hdlc-sn-multiresult-captures/shared-Data-across-two-rows-cap4.tcp.pcap": {
+          "bytes": 520,
+          "sha256": "365831a59bed78a7271a119f4ae9d4e7826ba55a49ffdd75a55c24411df89590"
+        },
+        "dlms-hdlc-sn-multiresult-captures/shared-Data-across-two-rows-cap4.udp.pcap": {
+          "bytes": 274,
+          "sha256": "1e68706abc9fdad7fb8ed3a011b7afef95dab6d8efee9776edac775c9455a165"
+        },
+        "dlms-hdlc-sn-multiresult-context-tools/generate.py": {
+          "bytes": 5519,
+          "sha256": "e48545df5939569aa3486d410445f6df9fd0e559ebac3ef214670cee267bda96"
+        },
+        "dlms-hdlc-sn-multiresult-context-tools/model-pins.json": {
+          "bytes": 2108,
+          "sha256": "aa69d7d17aa6d36df61011422cfaa88fe8d113d8e204f05eaf74952fca602477"
+        },
+        "dlms-hdlc-sn-multiresult-context-tools/state/base/group-model.py": {
+          "bytes": 9433,
+          "sha256": "d93544ab4726242e1e3f44c144e85980f2328365a6722f123285bac9108c0436"
+        },
+        "dlms-hdlc-sn-multiresult-context-tools/state/base/hdlc-reference.json": {
+          "bytes": 2402,
+          "sha256": "69b33f59438b54e25e0209287112464b1d6c1e802c975e7bb9dc2ed8fc7280b0"
+        },
+        "dlms-hdlc-sn-multiresult-context-tools/state/base/model.py": {
+          "bytes": 12119,
+          "sha256": "7a71f394f3ea8ebad6c336bd87e3bb39120243234cdb148947ced9bea86ad68c"
+        },
+        "dlms-hdlc-sn-multiresult-context-tools/state/base/outer-source.py": {
+          "bytes": 5985,
+          "sha256": "0b69840f2066124f48091301aea6247ec29fb86c4933d00055f60828296bd220"
+        },
+        "dlms-hdlc-sn-multiresult-context-tools/state/base/read-body.py": {
+          "bytes": 4002,
+          "sha256": "9038061ed63630258c65a5b9e11e51888d414b290fea0aa2bd14743e2a7af4cd"
+        },
+        "dlms-hdlc-sn-multiresult-context-tools/state/base/reference-vectors.json": {
+          "bytes": 4159,
+          "sha256": "59250557438767f0f7ff0a072b1decf3fe0f5768b75013142a5dfa608b0fe6c0"
+        },
+        "dlms-hdlc-sn-multiresult-context-tools/state/capture.py": {
+          "bytes": 1252,
+          "sha256": "b144cd5a2730dcdc969e3b3cfe633d8f7a99c42412be8fef998189b0de74446a"
+        },
+        "dlms-hdlc-sn-multiresult-context-tools/state/gbt/access.py": {
+          "bytes": 4354,
+          "sha256": "3166cdf13b9934650fdaa34051ba1d6365c6521028ab132898597e424c23e586"
+        },
+        "dlms-hdlc-sn-multiresult-context-tools/state/gbt/gbt-core.py": {
+          "bytes": 12575,
+          "sha256": "a678272f289349b8be7e31791edd158ccc2c4e4ee13431dcfec6a2fcf56a0df6"
+        },
+        "dlms-hdlc-sn-multiresult-context-tools/state/gbt/generate.py": {
+          "bytes": 9118,
+          "sha256": "275a99432bc3256117443579acea5083aeba240fe96faf60718a4cfb3fd2c7ce"
+        },
+        "dlms-hdlc-sn-multiresult-context-tools/state/gbt/hdlc-reference.json": {
+          "bytes": 2402,
+          "sha256": "69b33f59438b54e25e0209287112464b1d6c1e802c975e7bb9dc2ed8fc7280b0"
+        },
+        "dlms-hdlc-sn-multiresult-context-tools/state/gbt/hdlc.py": {
+          "bytes": 2011,
+          "sha256": "7f4394c9b7536c86c2f31e1dd26b3e8b2b003dd4d280e98f582e1300f53e3358"
+        },
+        "dlms-hdlc-sn-multiresult-context-tools/state/gbt/model-pins.json": {
+          "bytes": 354,
+          "sha256": "b8c000b381b73c3689e3a9f03f59561c954ec918946fcdd94530e744a36b17c2"
+        },
+        "dlms-hdlc-sn-multiresult-context-tools/state/gbt/reference-vectors.json": {
+          "bytes": 10245,
+          "sha256": "1521ac06738d1434575076efe326713fae86a3409ce635daf87547ec029e4303"
+        },
+        "dlms-hdlc-sn-multiresult-context-tools/state/gbt/sn-gbt-model.py": {
+          "bytes": 9776,
+          "sha256": "b19b8043b6d3defeb32ff2a3a5caf67102299118852c6859c2d1a78847fbb51a"
+        },
+        "dlms-hdlc-sn-multiresult-context-tools/state/gbt/write-body.py": {
+          "bytes": 5706,
+          "sha256": "4818c0264cb4819cf5d4715a855b4f3817acf26c0c6b15ff558aaa7d3b4aa094"
+        },
+        "dlms-hdlc-sn-multiresult-context-tools/state/generate.py": {
+          "bytes": 8919,
+          "sha256": "e78bec380c49489830dcde30310c71e314e204af70dec5a68b0c8a9124cc265f"
+        },
+        "dlms-hdlc-sn-multiresult-context-tools/state/model-pins.json": {
+          "bytes": 2096,
+          "sha256": "e1ecb49f90c149b9838e2fa70fceac29a513806f7397412177029b934bea5b45"
+        },
+        "dlms-hdlc-sn-multiresult-context-tools/state/reused-pins.json": {
+          "bytes": 1173,
+          "sha256": "7c633ef1b35f56e85e852b0d0270631e171a492bc04c59b830335d47415c255c"
+        },
+        "dlms-hdlc-sn-multiresult-context-tools/state/verify.py": {
+          "bytes": 2649,
+          "sha256": "738470d27ed138ca0a0824c637a6ba72a8d72a85517abe6f34a6ca3b22c439c8"
+        },
+        "dlms-hdlc-sn-multiresult-context-tools/verify.py": {
+          "bytes": 2778,
+          "sha256": "0bc8edbf040320b88a6bc59be9d09a548a6b412fa9df1a67becbe6dc7fb5bde7"
+        },
+        "dlms-hdlc-sn-multiresult-source/ADOPTED-CONTRACT.json": {
+          "bytes": 2472,
+          "sha256": "cf6f5330ace82948922bf3c7e4fb689697e5a7cbf9bdb1a673d44e9eab77d053"
+        },
+        "dlms-hdlc-sn-multiresult-source/COMPLETED-STATE-SOURCE-PROOF.json": {
+          "bytes": 4486,
+          "sha256": "b5017ec3ec34eda1a4abf16d2c031103f266ca7b5285c03d19da7d9c7ec52214"
+        },
+        "dlms-hdlc-sn-multiresult-source/CONTEXT-SOURCE-PROOF.json": {
+          "bytes": 3596,
+          "sha256": "f6d452552cf3a6551308e5915b684176d0a98ff4af6f0dfacf1e07f0e3528125"
+        },
+        "dlms-hdlc-sn-multiresult-source/SOURCES.json": {
+          "bytes": 7641,
+          "sha256": "2cadf4fb49f296919a31a14d306a9110402986b075406664d2a57a6051f75dea"
+        },
+        "dlms-hdlc-sn-multiresult-source/baseline-controls.json": {
+          "bytes": 81218,
+          "sha256": "d2cda3869333a73e38c09e4c6b28a67dedb8a11bfcf280d285c3cbea53ec2705"
+        },
+        "dlms-hdlc-sn-multiresult-source/completed-capture-index.json": {
+          "bytes": 668,
+          "sha256": "2582f072b0c105210c80ea02c341ce73751e1e78d53dc1890bab351497dd5f00"
+        },
+        "dlms-hdlc-sn-multiresult-source/completed-gbt-state-controls.json": {
+          "bytes": 61552,
+          "sha256": "cc16624a990b1543d3a44fa54e0a846e353c9f8956e3b34e88c8225c66e2491b"
+        },
+        "dlms-hdlc-sn-multiresult-source/completed-state-controls.json": {
+          "bytes": 62774,
+          "sha256": "a7e83a0f19494245fe75045952f82df6ff270baae8397a09871f65a6f158e3ae"
+        },
+        "dlms-hdlc-sn-multiresult-source/context-capture-index.json": {
+          "bytes": 673,
+          "sha256": "a752ed21302a6c1e452fbb9784faac26936fdcfa27cb39ed513d11575cb32e8f"
+        },
+        "dlms-hdlc-sn-multiresult-source/context-controls.json": {
+          "bytes": 104220,
+          "sha256": "5592db48911da71fb4f5bf35eda9cee0982e8501d8966907be3a42cd67ad8a70"
+        },
+        "dlms-hdlc-sn-multiresult-source/controls.json": {
+          "bytes": 281284,
+          "sha256": "9d7c29c96a6eb9afc97b2235457cb77e05b56e45aaa677ea146eb12fe9a83d7b"
+        },
+        "dlms-hdlc-sn-multiresult-state-tools/base/group-model.py": {
+          "bytes": 9433,
+          "sha256": "d93544ab4726242e1e3f44c144e85980f2328365a6722f123285bac9108c0436"
+        },
+        "dlms-hdlc-sn-multiresult-state-tools/base/hdlc-reference.json": {
+          "bytes": 2402,
+          "sha256": "69b33f59438b54e25e0209287112464b1d6c1e802c975e7bb9dc2ed8fc7280b0"
+        },
+        "dlms-hdlc-sn-multiresult-state-tools/base/model.py": {
+          "bytes": 12119,
+          "sha256": "7a71f394f3ea8ebad6c336bd87e3bb39120243234cdb148947ced9bea86ad68c"
+        },
+        "dlms-hdlc-sn-multiresult-state-tools/base/outer-source.py": {
+          "bytes": 5985,
+          "sha256": "0b69840f2066124f48091301aea6247ec29fb86c4933d00055f60828296bd220"
+        },
+        "dlms-hdlc-sn-multiresult-state-tools/base/read-body.py": {
+          "bytes": 4002,
+          "sha256": "9038061ed63630258c65a5b9e11e51888d414b290fea0aa2bd14743e2a7af4cd"
+        },
+        "dlms-hdlc-sn-multiresult-state-tools/base/reference-vectors.json": {
+          "bytes": 4159,
+          "sha256": "59250557438767f0f7ff0a072b1decf3fe0f5768b75013142a5dfa608b0fe6c0"
+        },
+        "dlms-hdlc-sn-multiresult-state-tools/capture.py": {
+          "bytes": 1252,
+          "sha256": "b144cd5a2730dcdc969e3b3cfe633d8f7a99c42412be8fef998189b0de74446a"
+        },
+        "dlms-hdlc-sn-multiresult-state-tools/gbt/access.py": {
+          "bytes": 4354,
+          "sha256": "3166cdf13b9934650fdaa34051ba1d6365c6521028ab132898597e424c23e586"
+        },
+        "dlms-hdlc-sn-multiresult-state-tools/gbt/gbt-core.py": {
+          "bytes": 12575,
+          "sha256": "a678272f289349b8be7e31791edd158ccc2c4e4ee13431dcfec6a2fcf56a0df6"
+        },
+        "dlms-hdlc-sn-multiresult-state-tools/gbt/generate.py": {
+          "bytes": 9118,
+          "sha256": "275a99432bc3256117443579acea5083aeba240fe96faf60718a4cfb3fd2c7ce"
+        },
+        "dlms-hdlc-sn-multiresult-state-tools/gbt/hdlc-reference.json": {
+          "bytes": 2402,
+          "sha256": "69b33f59438b54e25e0209287112464b1d6c1e802c975e7bb9dc2ed8fc7280b0"
+        },
+        "dlms-hdlc-sn-multiresult-state-tools/gbt/hdlc.py": {
+          "bytes": 2011,
+          "sha256": "7f4394c9b7536c86c2f31e1dd26b3e8b2b003dd4d280e98f582e1300f53e3358"
+        },
+        "dlms-hdlc-sn-multiresult-state-tools/gbt/model-pins.json": {
+          "bytes": 354,
+          "sha256": "b8c000b381b73c3689e3a9f03f59561c954ec918946fcdd94530e744a36b17c2"
+        },
+        "dlms-hdlc-sn-multiresult-state-tools/gbt/reference-vectors.json": {
+          "bytes": 10245,
+          "sha256": "1521ac06738d1434575076efe326713fae86a3409ce635daf87547ec029e4303"
+        },
+        "dlms-hdlc-sn-multiresult-state-tools/gbt/sn-gbt-model.py": {
+          "bytes": 9776,
+          "sha256": "b19b8043b6d3defeb32ff2a3a5caf67102299118852c6859c2d1a78847fbb51a"
+        },
+        "dlms-hdlc-sn-multiresult-state-tools/gbt/write-body.py": {
+          "bytes": 5706,
+          "sha256": "4818c0264cb4819cf5d4715a855b4f3817acf26c0c6b15ff558aaa7d3b4aa094"
+        },
+        "dlms-hdlc-sn-multiresult-state-tools/generate.py": {
+          "bytes": 8919,
+          "sha256": "e78bec380c49489830dcde30310c71e314e204af70dec5a68b0c8a9124cc265f"
+        },
+        "dlms-hdlc-sn-multiresult-state-tools/model-pins.json": {
+          "bytes": 2096,
+          "sha256": "e1ecb49f90c149b9838e2fa70fceac29a513806f7397412177029b934bea5b45"
+        },
+        "dlms-hdlc-sn-multiresult-state-tools/reused-pins.json": {
+          "bytes": 1173,
+          "sha256": "7c633ef1b35f56e85e852b0d0270631e171a492bc04c59b830335d47415c255c"
+        },
+        "dlms-hdlc-sn-multiresult-state-tools/verify.py": {
+          "bytes": 2649,
+          "sha256": "738470d27ed138ca0a0824c637a6ba72a8d72a85517abe6f34a6ca3b22c439c8"
+        },
+        "dlms-hdlc-sn-multiresult-tools/carrier.py": {
+          "bytes": 10367,
+          "sha256": "f4427adbc4bea3bf0c80883f9916e99be4faeb8abc267a190235fc842a3399fa"
+        },
+        "dlms-hdlc-sn-multiresult-tools/generate.py": {
+          "bytes": 7967,
+          "sha256": "1bdda95b0c031a49d850babac1a0bfb11b41c7a06512c45234511784efd21994"
+        },
+        "dlms-hdlc-sn-multiresult-tools/model-pins.json": {
+          "bytes": 1099,
+          "sha256": "4ec7a92996c2f7ae57af826018c80efe90128ecf14060daff0a4231edfabea39"
+        },
+        "dlms-hdlc-sn-multiresult-tools/multi-body.py": {
+          "bytes": 12121,
+          "sha256": "47d7f0ae3e850d08722fa58ca1ceacd26e29b6331221d8ab6fa88302cdd7702f"
+        },
+        "dlms-hdlc-sn-multiresult-tools/read-body.py": {
+          "bytes": 4002,
+          "sha256": "9038061ed63630258c65a5b9e11e51888d414b290fea0aa2bd14743e2a7af4cd"
+        },
+        "dlms-hdlc-sn-multiresult-tools/reference-vectors.json": {
+          "bytes": 6734,
+          "sha256": "3d7c0f01b305e3524efa5dab640dd9ae4730fe7ed789ca9ef015a5c39b846b8d"
+        },
+        "dlms-hdlc-sn-multiresult-tools/reused-pins.json": {
+          "bytes": 1260,
+          "sha256": "191946d762220fb3eb868e38014d433482204303af08e96565f05951798b6b4d"
+        },
+        "dlms-hdlc-sn-multiresult-tools/sn-body.py": {
+          "bytes": 572,
+          "sha256": "6e5106f1bebe23f04d38ec58953d227541bc366dd44a8f5796612e8a59239724"
+        },
+        "dlms-hdlc-sn-multiresult-tools/verify-captures.py": {
+          "bytes": 3983,
+          "sha256": "f736ea31bb53e133f789915702eec0f2bc62c99b2f576afbeb9bec15d874cde7"
+        },
+        "dlms-hdlc-sn-multiresult-tools/verify.py": {
+          "bytes": 4026,
+          "sha256": "d10ec039bf3abd9d9c5ea4bb2c86605e226c6c2de9f7e88ae6160213bd785f92"
+        },
+        "dlms-hdlc-sn-multiresult-tools/write-body.py": {
+          "bytes": 5706,
+          "sha256": "4818c0264cb4819cf5d4715a855b4f3817acf26c0c6b15ff558aaa7d3b4aa094"
+        },
+        "required-tests-traffic-unified-v175.json": {
+          "bytes": 23869094,
+          "sha256": "2757be628916ff342460ce4ffeafecf400812b234e83445db27a8cb21d312dbf"
+        },
+        "validation/expected.json": {
+          "bytes": 27929,
+          "sha256": "f0541f26d33c507420c5942705d9164664f9aa66d0dfc55df0c11996c95758c9"
+        }
+      },
+      "aliases": {
+        "common/pcapx/pcaputil/dlms-hdlc-sn-multiresult-captures/Getprimed-complete-M0-Read-Data-error-opaqueR2-R3-literal.tcp.pcap": "dlms-hdlc-sn-multiresult-captures/Getprimed-complete-M0-Read-Data-error-opaqueR2-R3-literal.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-multiresult-captures/Getprimed-complete-M0-Read-Data-error-opaqueR2-R3-literal.udp.pcap": "dlms-hdlc-sn-multiresult-captures/Getprimed-complete-M0-Read-Data-error-opaqueR2-R3-literal.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-multiresult-captures/Getprimed-complete-M0-Write-NULL-error-R2-literal.tcp.pcap": "dlms-hdlc-sn-multiresult-captures/Getprimed-complete-M0-Write-NULL-error-R2-literal.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-multiresult-captures/Getprimed-complete-M0-Write-NULL-error-R2-literal.udp.pcap": "dlms-hdlc-sn-multiresult-captures/Getprimed-complete-M0-Write-NULL-error-R2-literal.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-multiresult-captures/completed-GBT-exact-neighbor-then-multi-unknown-boundary-retires-link.tcp.pcap": "dlms-hdlc-sn-multiresult-captures/completed-GBT-exact-neighbor-then-multi-unknown-boundary-retires-link.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-multiresult-captures/completed-GBT-exact-neighbor-then-multi-unknown-boundary-retires-link.udp.pcap": "dlms-hdlc-sn-multiresult-captures/completed-GBT-exact-neighbor-then-multi-unknown-boundary-retires-link.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-multiresult-captures/completed-GBT-multi-opposite-caller-unswapped-logical-pair-preserves-fingerprint.tcp.pcap": "dlms-hdlc-sn-multiresult-captures/completed-GBT-multi-opposite-caller-unswapped-logical-pair-preserves-fingerprint.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-multiresult-captures/completed-GBT-multi-opposite-caller-unswapped-logical-pair-preserves-fingerprint.udp.pcap": "dlms-hdlc-sn-multiresult-captures/completed-GBT-multi-opposite-caller-unswapped-logical-pair-preserves-fingerprint.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-multiresult-captures/completed-SN-fullUInt32-low16-alias-multi-preserves-other-link-fingerprint.tcp.pcap": "dlms-hdlc-sn-multiresult-captures/completed-SN-fullUInt32-low16-alias-multi-preserves-other-link-fingerprint.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-multiresult-captures/completed-SN-fullUInt32-low16-alias-multi-preserves-other-link-fingerprint.udp.pcap": "dlms-hdlc-sn-multiresult-captures/completed-SN-fullUInt32-low16-alias-multi-preserves-other-link-fingerprint.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-multiresult-captures/completed-SN-last-exact-neighbor-then-multi-unknown-boundary-retires-fingerprint.tcp.pcap": "dlms-hdlc-sn-multiresult-captures/completed-SN-last-exact-neighbor-then-multi-unknown-boundary-retires-fingerprint.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-multiresult-captures/completed-SN-last-exact-neighbor-then-multi-unknown-boundary-retires-fingerprint.udp.pcap": "dlms-hdlc-sn-multiresult-captures/completed-SN-last-exact-neighbor-then-multi-unknown-boundary-retires-fingerprint.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-multiresult-captures/noncanonical-last-truncated-raw-and-extra-NULL-remain-exact-errors.tcp.pcap": "dlms-hdlc-sn-multiresult-captures/noncanonical-last-truncated-raw-and-extra-NULL-remain-exact-errors.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-multiresult-captures/noncanonical-last-truncated-raw-and-extra-NULL-remain-exact-errors.udp.pcap": "dlms-hdlc-sn-multiresult-captures/noncanonical-last-truncated-raw-and-extra-NULL-remain-exact-errors.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-multiresult-captures/opaque-total1024-success-then1025-Resource-no-raw-decoding.tcp.pcap": "dlms-hdlc-sn-multiresult-captures/opaque-total1024-success-then1025-Resource-no-raw-decoding.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-multiresult-captures/opaque-total1024-success-then1025-Resource-no-raw-decoding.udp.pcap": "dlms-hdlc-sn-multiresult-captures/opaque-total1024-success-then1025-Resource-no-raw-decoding.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-multiresult-captures/pure-multiresult-response-preserves-LN-owner-and-sequence.tcp.pcap": "dlms-hdlc-sn-multiresult-captures/pure-multiresult-response-preserves-LN-owner-and-sequence.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-multiresult-captures/pure-multiresult-response-preserves-LN-owner-and-sequence.udp.pcap": "dlms-hdlc-sn-multiresult-captures/pure-multiresult-response-preserves-LN-owner-and-sequence.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-multiresult-captures/reuse-inputs.json": "dlms-hdlc-sn-multiresult-captures/reuse-inputs.json",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-multiresult-captures/shared-Data-across-two-rows-cap4.tcp.pcap": "dlms-hdlc-sn-multiresult-captures/shared-Data-across-two-rows-cap4.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-multiresult-captures/shared-Data-across-two-rows-cap4.udp.pcap": "dlms-hdlc-sn-multiresult-captures/shared-Data-across-two-rows-cap4.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-multiresult-context-tools/generate.py": "dlms-hdlc-sn-multiresult-context-tools/generate.py",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-multiresult-context-tools/model-pins.json": "dlms-hdlc-sn-multiresult-context-tools/model-pins.json",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-multiresult-context-tools/state/base/group-model.py": "dlms-hdlc-sn-multiresult-context-tools/state/base/group-model.py",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-multiresult-context-tools/state/base/hdlc-reference.json": "dlms-hdlc-sn-multiresult-context-tools/state/base/hdlc-reference.json",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-multiresult-context-tools/state/base/model.py": "dlms-hdlc-sn-multiresult-context-tools/state/base/model.py",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-multiresult-context-tools/state/base/outer-source.py": "dlms-hdlc-sn-multiresult-context-tools/state/base/outer-source.py",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-multiresult-context-tools/state/base/read-body.py": "dlms-hdlc-sn-multiresult-context-tools/state/base/read-body.py",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-multiresult-context-tools/state/base/reference-vectors.json": "dlms-hdlc-sn-multiresult-context-tools/state/base/reference-vectors.json",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-multiresult-context-tools/state/capture.py": "dlms-hdlc-sn-multiresult-context-tools/state/capture.py",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-multiresult-context-tools/state/gbt/access.py": "dlms-hdlc-sn-multiresult-context-tools/state/gbt/access.py",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-multiresult-context-tools/state/gbt/gbt-core.py": "dlms-hdlc-sn-multiresult-context-tools/state/gbt/gbt-core.py",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-multiresult-context-tools/state/gbt/generate.py": "dlms-hdlc-sn-multiresult-context-tools/state/gbt/generate.py",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-multiresult-context-tools/state/gbt/hdlc-reference.json": "dlms-hdlc-sn-multiresult-context-tools/state/gbt/hdlc-reference.json",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-multiresult-context-tools/state/gbt/hdlc.py": "dlms-hdlc-sn-multiresult-context-tools/state/gbt/hdlc.py",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-multiresult-context-tools/state/gbt/model-pins.json": "dlms-hdlc-sn-multiresult-context-tools/state/gbt/model-pins.json",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-multiresult-context-tools/state/gbt/reference-vectors.json": "dlms-hdlc-sn-multiresult-context-tools/state/gbt/reference-vectors.json",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-multiresult-context-tools/state/gbt/sn-gbt-model.py": "dlms-hdlc-sn-multiresult-context-tools/state/gbt/sn-gbt-model.py",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-multiresult-context-tools/state/gbt/write-body.py": "dlms-hdlc-sn-multiresult-context-tools/state/gbt/write-body.py",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-multiresult-context-tools/state/generate.py": "dlms-hdlc-sn-multiresult-context-tools/state/generate.py",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-multiresult-context-tools/state/model-pins.json": "dlms-hdlc-sn-multiresult-context-tools/state/model-pins.json",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-multiresult-context-tools/state/reused-pins.json": "dlms-hdlc-sn-multiresult-context-tools/state/reused-pins.json",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-multiresult-context-tools/state/verify.py": "dlms-hdlc-sn-multiresult-context-tools/state/verify.py",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-multiresult-context-tools/verify.py": "dlms-hdlc-sn-multiresult-context-tools/verify.py",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-multiresult-source/ADOPTED-CONTRACT.json": "dlms-hdlc-sn-multiresult-source/ADOPTED-CONTRACT.json",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-multiresult-source/COMPLETED-STATE-SOURCE-PROOF.json": "dlms-hdlc-sn-multiresult-source/COMPLETED-STATE-SOURCE-PROOF.json",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-multiresult-source/CONTEXT-SOURCE-PROOF.json": "dlms-hdlc-sn-multiresult-source/CONTEXT-SOURCE-PROOF.json",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-multiresult-source/SOURCES.json": "dlms-hdlc-sn-multiresult-source/SOURCES.json",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-multiresult-source/baseline-controls.json": "dlms-hdlc-sn-multiresult-source/baseline-controls.json",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-multiresult-source/completed-capture-index.json": "dlms-hdlc-sn-multiresult-source/completed-capture-index.json",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-multiresult-source/completed-gbt-state-controls.json": "dlms-hdlc-sn-multiresult-source/completed-gbt-state-controls.json",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-multiresult-source/completed-state-controls.json": "dlms-hdlc-sn-multiresult-source/completed-state-controls.json",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-multiresult-source/context-capture-index.json": "dlms-hdlc-sn-multiresult-source/context-capture-index.json",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-multiresult-source/context-controls.json": "dlms-hdlc-sn-multiresult-source/context-controls.json",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-multiresult-source/controls.json": "dlms-hdlc-sn-multiresult-source/controls.json",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-multiresult-state-tools/base/group-model.py": "dlms-hdlc-sn-multiresult-state-tools/base/group-model.py",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-multiresult-state-tools/base/hdlc-reference.json": "dlms-hdlc-sn-multiresult-state-tools/base/hdlc-reference.json",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-multiresult-state-tools/base/model.py": "dlms-hdlc-sn-multiresult-state-tools/base/model.py",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-multiresult-state-tools/base/outer-source.py": "dlms-hdlc-sn-multiresult-state-tools/base/outer-source.py",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-multiresult-state-tools/base/read-body.py": "dlms-hdlc-sn-multiresult-state-tools/base/read-body.py",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-multiresult-state-tools/base/reference-vectors.json": "dlms-hdlc-sn-multiresult-state-tools/base/reference-vectors.json",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-multiresult-state-tools/capture.py": "dlms-hdlc-sn-multiresult-state-tools/capture.py",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-multiresult-state-tools/gbt/access.py": "dlms-hdlc-sn-multiresult-state-tools/gbt/access.py",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-multiresult-state-tools/gbt/gbt-core.py": "dlms-hdlc-sn-multiresult-state-tools/gbt/gbt-core.py",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-multiresult-state-tools/gbt/generate.py": "dlms-hdlc-sn-multiresult-state-tools/gbt/generate.py",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-multiresult-state-tools/gbt/hdlc-reference.json": "dlms-hdlc-sn-multiresult-state-tools/gbt/hdlc-reference.json",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-multiresult-state-tools/gbt/hdlc.py": "dlms-hdlc-sn-multiresult-state-tools/gbt/hdlc.py",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-multiresult-state-tools/gbt/model-pins.json": "dlms-hdlc-sn-multiresult-state-tools/gbt/model-pins.json",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-multiresult-state-tools/gbt/reference-vectors.json": "dlms-hdlc-sn-multiresult-state-tools/gbt/reference-vectors.json",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-multiresult-state-tools/gbt/sn-gbt-model.py": "dlms-hdlc-sn-multiresult-state-tools/gbt/sn-gbt-model.py",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-multiresult-state-tools/gbt/write-body.py": "dlms-hdlc-sn-multiresult-state-tools/gbt/write-body.py",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-multiresult-state-tools/generate.py": "dlms-hdlc-sn-multiresult-state-tools/generate.py",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-multiresult-state-tools/model-pins.json": "dlms-hdlc-sn-multiresult-state-tools/model-pins.json",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-multiresult-state-tools/reused-pins.json": "dlms-hdlc-sn-multiresult-state-tools/reused-pins.json",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-multiresult-state-tools/verify.py": "dlms-hdlc-sn-multiresult-state-tools/verify.py",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-multiresult-tools/carrier.py": "dlms-hdlc-sn-multiresult-tools/carrier.py",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-multiresult-tools/generate.py": "dlms-hdlc-sn-multiresult-tools/generate.py",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-multiresult-tools/model-pins.json": "dlms-hdlc-sn-multiresult-tools/model-pins.json",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-multiresult-tools/multi-body.py": "dlms-hdlc-sn-multiresult-tools/multi-body.py",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-multiresult-tools/read-body.py": "dlms-hdlc-sn-multiresult-tools/read-body.py",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-multiresult-tools/reference-vectors.json": "dlms-hdlc-sn-multiresult-tools/reference-vectors.json",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-multiresult-tools/reused-pins.json": "dlms-hdlc-sn-multiresult-tools/reused-pins.json",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-multiresult-tools/sn-body.py": "dlms-hdlc-sn-multiresult-tools/sn-body.py",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-multiresult-tools/verify-captures.py": "dlms-hdlc-sn-multiresult-tools/verify-captures.py",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-multiresult-tools/verify.py": "dlms-hdlc-sn-multiresult-tools/verify.py",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-multiresult-tools/write-body.py": "dlms-hdlc-sn-multiresult-tools/write-body.py",
+        "scripts/protocol-tests/required-tests-traffic-unified-v175.json": "required-tests-traffic-unified-v175.json"
+      }
     }
   ],
   "schema_version": 1,

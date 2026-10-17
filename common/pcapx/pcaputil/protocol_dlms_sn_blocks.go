@@ -250,7 +250,9 @@ func (s *binDLMS) observeSNBlockInterruption(m *dlmsMessage, dir int) {
 			continue
 		}
 		p := l.wire.snGroups[dlmsSNBlockShadowKey(key)]
-		if p == nil || !p.active {
+		// A valid complete new multiresult cannot name the old transfer row.
+		// Retire completed fingerprints too, keeping a bounded tombstone.
+		if p == nil || !p.active && !m.snMultiResult {
 			continue
 		}
 		matched := dir == key.dir && m.source == key.source && m.destination == key.destination || dir != key.dir && m.source == key.destination && m.destination == key.source
