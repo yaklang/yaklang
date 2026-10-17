@@ -225,9 +225,19 @@ func newRuntimeIterator(value any, inNext bool) (runtimeIterator, error) {
 			if !candidate.IsValid() {
 				continue
 			}
-			if m := candidate.MethodByName("ToSlice"); m.IsValid() && m.Type().NumIn() == 0 && m.Type().NumOut() == 1 && m.Type().Out(0).Kind() == reflect.Slice {
-				res := m.Call(nil)
-				return &runtimeSliceIterator{value: res[0], inNext: inNext}, nil
+			// Enumerate the method set instead of accepting a caller-provided
+			// method name. This preserves support for containers with different
+			// ToSlice return types without using dynamic method-name lookup.
+			for methodIndex := 0; methodIndex < candidate.NumMethod(); methodIndex++ {
+				method := candidate.Type().Method(methodIndex)
+				if method.Name != "ToSlice" {
+					continue
+				}
+				m := candidate.Method(methodIndex)
+				if m.Type().NumIn() == 0 && m.Type().NumOut() == 1 && m.Type().Out(0).Kind() == reflect.Slice {
+					res := m.Call(nil)
+					return &runtimeSliceIterator{value: res[0], inNext: inNext}, nil
+				}
 			}
 		}
 		return nil, fmt.Errorf("cannot iterate over %T", value)
