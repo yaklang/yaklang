@@ -702,3 +702,59 @@ Empty member sets, child aliases, parameter defaults, nested/device/command
 Template, host-wide naming/registry and endpoint execution remain uncompleted.
 Their requirements are retained; this finite observer does not guess them or
 establish complete Sparkplug/device conformance.
+
+
+### Sparkplug device Template observations
+
+The selected Template19 observer also accepts DBIRTH and DDATA instances under
+an actual live node whose NBIRTH contains the referenced definition. Definitions
+are still legal only in NBIRTH. DBIRTH requires the complete explicit Basic1–14
+member set. DDATA permits a nonempty named Basic subset with an omitted datatype
+resolved from that instance's observed definition, without filling omitted values.
+Literal Basic child-null remains nil; parameters remain complete and explicit.
+
+Each device retains its own metric name, alias and observed template reference.
+DDATA cannot replace that reference or borrow another device's metric state. Two
+devices can use the same metric name with distinct references and aliases. The
+producer's node sequence is shared across NBIRTH, DBIRTH, DDATA and DDEATH.
+DDEATH removes that device's live context; a fresh DBIRTH is required. New NBIRTH,
+producer refusal and Rebirth prevent reuse of old device or definition state.
+Prospective DBIRTH state commits only after the complete message validates;
+retained-byte accounting includes each device's literal template references.
+
+Six authored captures with complete independent answers check 74 ordered
+messages, full/deferred workers1/2/4 and observer callbacks on/off. Native traces
+also check whole/1/3/17 chunking, exact fields48 normal versus47 ResourceExceeded,
+late FatalSessionError, zero buffering, idempotent Close and input/query/history
+ownership. Existing ordinary scalar-device behavior stays covered. These are
+passive observations, not evidence that a device executed or accepted a command.
+
+Empty/default/nested Template, child aliases, partial/parameter/whole-null
+Template commands, Properties and complete endpoint/SDK interoperability remain
+uncompleted. The
+older sections' device limitation is superseded only by this explicitly bounded
+DBIRTH/DDATA observer; all other original unfinished requirements remain open.
+
+
+### Sparkplug complete Template command observations
+
+NCMD and DCMD may observe a complete explicit Basic1–14 Template instance with
+an empty parameter set, under the target node's or device's actual Birth metric.
+The command cannot publish a definition or target a definition metric as an
+instance. Its literal template_ref must equal that target's observed Birth
+instance reference. This exact-reference rule is a conservative association
+contract, not an invented normative MUST. Node definitions remain the only
+schema source; a same-shaped but different observed schema cannot substitute.
+
+A successful value is marked command-observed and neither advances producer
+sequence nor changes metric definitions, aliases, instance references or measured
+values. A rejected command preserves producer context. Subsequent NDATA/DDATA
+continue at their actual next producer sequence. Existing transactional mixed
+Rebirth validates all companion values before retiring context. No observed
+command proves device execution or acknowledgment.
+
+Nonempty command parameters and partial Template member sets remain unsupported
+profile boundaries, not declarations that the standard forbids them. Full typed
+Birth/Data parameter handling and nonempty partial Data remain supported under
+the earlier profiles. Whole-Template null, defaults, nested templates, child
+aliases and complete endpoint semantics remain open requirements.

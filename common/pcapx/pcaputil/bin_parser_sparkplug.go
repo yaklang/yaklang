@@ -46,8 +46,8 @@ func (s *sparkNode) retainedBytes() int64 {
 
 	for id, d := range s.devices {
 		n += int64(128 + len(id) + 64*len(d.aliases))
-		for name := range d.metrics {
-			n += int64(96 + len(name))
+		for name, def := range d.metrics {
+			n += int64(96 + len(name) + len(def.templateRef))
 		}
 	}
 	return n + int64(64*len(s.aliases))
@@ -701,8 +701,11 @@ func (m *binMQTT) sparkDevicePublish(v map[string]any, verb string, p map[string
 		}
 		seen[name] = true
 		value, reason := sparkValue(metric, typ, maxDepth, maxFields)
+		status := "refused"
+		if typ == 19 {
+			value, reason, status = sparkTemplateDeviceValue(metric, name, verb, next, definition, maxDepth, maxFields)
+		}
 		if reason != "" {
-			status := "refused"
 			if strings.Contains(reason, "independent structured profile") {
 				status = "unsupported"
 			}
@@ -753,8 +756,11 @@ func (m *binMQTT) sparkDeviceCommand(v map[string]any, p map[string]any, refuse 
 			return refuse("DCMD datatype differs from DBIRTH", "refused")
 		}
 		value, reason := sparkValue(metric, def.typ, maxDepth, maxFields)
+		status := "refused"
+		if def.typ == 19 {
+			value, reason, status = sparkTemplateCommandValue(metric, m.spark, def, maxDepth, maxFields)
+		}
 		if reason != "" {
-			status := "refused"
 			if strings.Contains(reason, "independent structured profile") {
 				status = "unsupported"
 			}
@@ -803,8 +809,11 @@ func (m *binMQTT) sparkNodeCommand(v map[string]any, p map[string]any, refuse fu
 			return refuse("NCMD datatype differs from NBIRTH", "refused")
 		}
 		value, reason := sparkValue(metric, def.typ, maxDepth, maxFields)
+		status := "refused"
+		if def.typ == 19 {
+			value, reason, status = sparkTemplateCommandValue(metric, m.spark, def, maxDepth, maxFields)
+		}
 		if reason != "" {
-			status := "refused"
 			if strings.Contains(reason, "independent structured profile") {
 				status = "unsupported"
 			}

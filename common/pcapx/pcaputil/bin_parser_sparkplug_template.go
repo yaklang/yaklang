@@ -361,3 +361,58 @@ func sparkTemplateParameterValue(p map[string]any, typ uint64, maxDepth, maxFiel
 	}
 	return nil, "Template parameter defaults need an independent structured profile"
 }
+
+// Device instances use this node's definitions, but their observed reference
+// belongs to their own DeviceID/name record. Never borrow node metric state.
+func sparkTemplateDeviceValue(metric map[string]any, name, verb string, node *sparkNode, device *sparkDevice, maxDepth, maxFields int) (any, string, string) {
+	p, why, status := sparkTemplateMetric(metric, maxDepth, maxFields)
+	if why != "" {
+		return nil, why, status
+	}
+	if p["is_definition"] == true {
+		return nil, "Template definitions are only valid in NBIRTH", "refused"
+	}
+	ref, _ := p["template_ref"].(string)
+	if verb == "DDATA" && device.metrics[name].templateRef != ref {
+		return nil, "Template reference differs from instance DBIRTH", "refused"
+	}
+	value, _, why, status := sparkTemplateProject(p, node.templates[ref], verb == "DBIRTH", maxDepth, maxFields)
+	if why != "" {
+		return nil, why, status
+	}
+	if verb == "DBIRTH" {
+		d := device.metrics[name]
+		d.templateRef = ref
+		device.metrics[name] = d
+	}
+	return value, "", ""
+}
+
+// A command observes a complete compatible value; it cannot redefine a schema
+// or replace its target's observed instance reference. It owns no producer state.
+func sparkTemplateCommandValue(metric map[string]any, node *sparkNode, def sparkMetricDef, maxDepth, maxFields int) (any, string, string) {
+	p, why, status := sparkTemplateMetric(metric, maxDepth, maxFields)
+	if why != "" {
+		return nil, why, status
+	}
+	if p["is_definition"] == true {
+		return nil, "Template definitions are only valid in NBIRTH", "refused"
+	}
+	if def.templateDefinition {
+		return nil, "Template definition metric cannot carry a command", "refused"
+	}
+	ref, _ := p["template_ref"].(string)
+	if ref != def.templateRef {
+		return nil, "Template reference differs from observed command instance", "refused"
+	}
+	if parameters, _ := p["parameters"].([]map[string]any); len(parameters) != 0 {
+		return nil, "Template command parameters need an independent structured profile", "unsupported"
+	}
+	value, _, why, status := sparkTemplateProject(p, node.templates[ref], true, maxDepth, maxFields)
+	if why == "Template instance members differ from definition" {
+		// The selected command observer requires a complete instance. Data's
+		// subset rule alone is not proof of a partial command's semantics.
+		return nil, "Template command partial members need an independent structured profile", "unsupported"
+	}
+	return value, why, status
+}

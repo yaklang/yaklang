@@ -125195,7 +125195,9 @@
         "common/pcapx/pcaputil/testdata/sparkplug-template/tools/candidates.py": "sparkplug-dataset/tools/candidates.py",
         "common/pcapx/pcaputil/testdata/sparkplug-template/tools/generate-node-state.py": "sparkplug-dataset/tools/generate-node-state.py",
         "common/pcapx/pcaputil/testdata/sparkplug-template-partial/tools/candidates.py": "sparkplug-dataset/tools/candidates.py",
-        "common/pcapx/pcaputil/testdata/sparkplug-template-partial/tools/generate-node-state.py": "sparkplug-dataset/tools/generate-node-state.py"
+        "common/pcapx/pcaputil/testdata/sparkplug-template-partial/tools/generate-node-state.py": "sparkplug-dataset/tools/generate-node-state.py",
+        "common/pcapx/pcaputil/testdata/sparkplug-template-device/tools/candidates.py": "sparkplug-dataset/tools/candidates.py",
+        "common/pcapx/pcaputil/testdata/sparkplug-template-device/tools/generate-node-state.py": "sparkplug-dataset/tools/generate-node-state.py"
       }
     },
     {
@@ -125500,7 +125502,8 @@
         "common/pcapx/pcaputil/testdata/sparkplug-arrays/tools/verify-carriers.py": "sparkplug-dataset-commands/tools/verify-carriers.py",
         "common/pcapx/pcaputil/testdata/sparkplug-command-null-rebirth/tools/verify-carriers.py": "sparkplug-dataset-commands/tools/verify-carriers.py",
         "common/pcapx/pcaputil/testdata/sparkplug-template/tools/verify-carriers.py": "sparkplug-dataset-commands/tools/verify-carriers.py",
-        "common/pcapx/pcaputil/testdata/sparkplug-template-partial/tools/verify-carriers.py": "sparkplug-dataset-commands/tools/verify-carriers.py"
+        "common/pcapx/pcaputil/testdata/sparkplug-template-partial/tools/verify-carriers.py": "sparkplug-dataset-commands/tools/verify-carriers.py",
+        "common/pcapx/pcaputil/testdata/sparkplug-template-device/tools/verify-carriers.py": "sparkplug-dataset-commands/tools/verify-carriers.py"
       }
     },
     {
@@ -126359,7 +126362,8 @@
         "common/pcapx/pcaputil/testdata/sparkplug-command-null-rebirth/tools/wire.py": "sparkplug-command-null-rebirth/tools/wire.py",
         "scripts/protocol-tests/required-tests-traffic-unified-v186.json": "required-tests-traffic-unified-v186.json",
         "common/pcapx/pcaputil/testdata/sparkplug-template/tools/wire.py": "sparkplug-command-null-rebirth/tools/wire.py",
-        "common/pcapx/pcaputil/testdata/sparkplug-template-partial/tools/wire.py": "sparkplug-command-null-rebirth/tools/wire.py"
+        "common/pcapx/pcaputil/testdata/sparkplug-template-partial/tools/wire.py": "sparkplug-command-null-rebirth/tools/wire.py",
+        "common/pcapx/pcaputil/testdata/sparkplug-template-device/tools/wire.py": "sparkplug-command-null-rebirth/tools/wire.py"
       }
     },
     {
@@ -126722,7 +126726,9 @@
         "common/pcapx/pcaputil/testdata/sparkplug-template/tools/verify.py": "sparkplug-template/tools/verify.py",
         "scripts/protocol-tests/required-tests-traffic-unified-v187.json": "required-tests-traffic-unified-v187.json",
         "common/pcapx/pcaputil/testdata/sparkplug-template-partial/LICENSE.txt": "sparkplug-template/LICENSE.txt",
-        "common/pcapx/pcaputil/testdata/sparkplug-template-partial/tools/generate.py": "sparkplug-template/tools/generate.py"
+        "common/pcapx/pcaputil/testdata/sparkplug-template-partial/tools/generate.py": "sparkplug-template/tools/generate.py",
+        "common/pcapx/pcaputil/testdata/sparkplug-template-device/LICENSE.txt": "sparkplug-template/LICENSE.txt",
+        "common/pcapx/pcaputil/testdata/sparkplug-template-device/tools/generate.py": "sparkplug-template/tools/generate.py"
       }
     },
     {
@@ -126948,7 +126954,430 @@
         "common/pcapx/pcaputil/testdata/sparkplug-template-partial/tools/verify-all.py": "sparkplug-template-partial/tools/verify-all.py",
         "common/pcapx/pcaputil/testdata/sparkplug-template-partial/tools/verify-null.py": "sparkplug-template-partial/tools/verify-null.py",
         "common/pcapx/pcaputil/testdata/sparkplug-template-partial/tools/verify.py": "sparkplug-template-partial/tools/verify.py",
-        "scripts/protocol-tests/required-tests-traffic-unified-v188.json": "required-tests-traffic-unified-v188.json"
+        "scripts/protocol-tests/required-tests-traffic-unified-v188.json": "required-tests-traffic-unified-v188.json",
+        "common/pcapx/pcaputil/testdata/sparkplug-template-device/tools/generate-null.py": "sparkplug-template-partial/tools/generate-null.py",
+        "common/pcapx/pcaputil/testdata/sparkplug-template-device/tools/generate-partial.py": "sparkplug-template-partial/tools/generate-partial.py"
+      }
+    },
+    {
+      "id": "validation-sparkplug-template-device-commands",
+      "kind": "support",
+      "source_sha": "464adea43dc7212921426ea56617ff84192b2606",
+      "file": "validation-sparkplug-template-device-commands.zip",
+      "sha256": "d922a372fa8fb9ae07cc03328599326e7833b2b1a2d7d20394d8861a462960b7",
+      "password": "bin-parser",
+      "members": {
+        "required-tests-traffic-unified-v189.json": {
+          "sha256": "5b8613afce3cb8f9cf45a54e4347562fe018d9f244e0e77218f72c2150d5c5b8",
+          "bytes": 24831597
+        },
+        "sparkplug-template-device/ADOPTED-CONTRACT.json": {
+          "sha256": "cedaa978cd4ab273dd24533cade8e593590dcb576fcdd79d29d6615217d53ec3",
+          "bytes": 3092
+        },
+        "sparkplug-template-device/COMMAND-ADOPTED-CONTRACT.json": {
+          "sha256": "dc0a824e05822b400b45977904880a3438e6848542ae846aba87f71380a4a48c",
+          "bytes": 2605
+        },
+        "sparkplug-template-device/COMMAND-BOUNDARY-ADOPTED-CONTRACT.json": {
+          "sha256": "ebc12a33fb9a09c511071c7f16ec8ced5ad24b26db55957af7b4194808c8cbda",
+          "bytes": 2527
+        },
+        "sparkplug-template-device/COMMAND-SOURCE-PROOF.json": {
+          "sha256": "be093eadf623b59bff0e27b0d10a7cadf3eddb2e93f13585aa9e5216d52faad3",
+          "bytes": 6200
+        },
+        "sparkplug-template-device/COMMAND-TYPES-SOURCE-CONTRACT.json": {
+          "sha256": "685be7e584e3881ba6104a5b604d1487c134aa5113dc91bc8088feac1b7a429a",
+          "bytes": 4278
+        },
+        "sparkplug-template-device/RESOURCE-SOURCE-PROOF.json": {
+          "sha256": "06b0d616f5cab9f24c5cfcb3f5af85e576cc189e31357d56050c4af9efd94ee0",
+          "bytes": 21606
+        },
+        "sparkplug-template-device/SOURCE-FEASIBILITY.json": {
+          "sha256": "23a6e0b3f426640fc0e56d5579b87b51b65ec3648d19788ce5a412eeb0265101",
+          "bytes": 9932
+        },
+        "sparkplug-template-device/answers.json": {
+          "sha256": "02f83e9f3b0638ca755e859de97dce79de85ff887720c39f1d5c27b4c5445b08",
+          "bytes": 185519
+        },
+        "sparkplug-template-device/baseline-controls.json": {
+          "sha256": "9c667833491e547427f3131a809b6ef08b2018c917999b432544db14eacdee2e",
+          "bytes": 79548
+        },
+        "sparkplug-template-device/capture-materials.json": {
+          "sha256": "a17770383d35839742e4b77bbb5e14f5f332e540db8f1c0368122fb3aaba8dc9",
+          "bytes": 103149
+        },
+        "sparkplug-template-device/captures/DDEATH-stales-device-and-new-node-Birth-restores.pcap": {
+          "sha256": "8d76047742f1a8eac496bad35d7e6d13e38dcc4a11ca9d753789f759d70e386c",
+          "bytes": 2422
+        },
+        "sparkplug-template-device/captures/Template-commands-definition-refusal.pcap": {
+          "sha256": "727738de1ada86b173d2d845de91dc615ab3613bc0ec4f1c5964d7f3719cbbae",
+          "bytes": 1683
+        },
+        "sparkplug-template-device/captures/Template-commands-normal.pcap": {
+          "sha256": "7f9fc42f9a933173a658ea817dc07bdbfd8fce0fcff4ba34dfb13594e6e97e10",
+          "bytes": 1705
+        },
+        "sparkplug-template-device/captures/Template-commands-same-shaped-other-reference-refusal.pcap": {
+          "sha256": "95860cc28c94b054c6592b7db606050d4dbfa88c8970c36760e897b7b1ed24f1",
+          "bytes": 1705
+        },
+        "sparkplug-template-device/captures/device-full-partial-null-and-node-sequence-neighbor.pcap": {
+          "sha256": "0307a970aeabe6d91f7430436732148777deb5f629b2956f472628a5e8fe2fb2",
+          "bytes": 1569
+        },
+        "sparkplug-template-device/captures/missing-node-definition-and-wrong-device-never-borrow.pcap": {
+          "sha256": "e46ff3071e9ea481e7166577740b434681c812313fb6fe6fd0604fa15fffe435",
+          "bytes": 2334
+        },
+        "sparkplug-template-device/captures/node-Rebirth-and-new-Birth-clear-device-template-definitions.pcap": {
+          "sha256": "dda5804dd2e93c3785d537d041a44ff9c15ae326e7c4791078a48c5ce130d332",
+          "bytes": 3077
+        },
+        "sparkplug-template-device/captures/two-devices-same-name-private-alias-and-definition-isolation.pcap": {
+          "sha256": "2665b29173364b18408aef93eff008bf0da4f7b92ddc7a4153838d89e2eb1f53",
+          "bytes": 2749
+        },
+        "sparkplug-template-device/captures/unknownref-device-definition-and-incomplete-Birth-refused.pcap": {
+          "sha256": "758f2ec0563ba13b21f855083747196ec18c4527c0d77675c6dcde5aa12dd4a5",
+          "bytes": 3329
+        },
+        "sparkplug-template-device/command-boundary-controls.json": {
+          "sha256": "9cd36c44243dde6ef9aafbc2cba60f2fd941b14e20d0379ed8514c98183a57ca",
+          "bytes": 95860
+        },
+        "sparkplug-template-device/command-controls.json": {
+          "sha256": "185e4200125a16d53f1df65d7e6706a71176d6d291d6a1e5a3201fce4e165308",
+          "bytes": 141183
+        },
+        "sparkplug-template-device/command-source-bindings.json": {
+          "sha256": "bf5631285f559e441d2afeb29e3d35f8d33a236485bed79ef27d7c9467dccbf8",
+          "bytes": 5439
+        },
+        "sparkplug-template-device/command-types-controls.json": {
+          "sha256": "bd5cf270970685133268b1f31d906f06914abac0af0a8d06435ac5e48ce690ac",
+          "bytes": 193645
+        },
+        "sparkplug-template-device/device-controls.json": {
+          "sha256": "eae487a016a8c690a60f16d24ef1dcfd535db0213729ff3bf5dd01d72bbddae2",
+          "bytes": 450503
+        },
+        "sparkplug-template-device/history-proof.json": {
+          "sha256": "7db7e9bba5d0c2fac54580ef0a1052dbb848215b5ddca1d6e65512c60e8f50cb",
+          "bytes": 2434
+        },
+        "sparkplug-template-device/native-source-bindings.json": {
+          "sha256": "2e029dc8854e87186647a848ec65132d3cd9f26e8eee0e9d3938de891a9cfe49",
+          "bytes": 3397
+        },
+        "sparkplug-template-device/portable-pins.json": {
+          "sha256": "cb57d86202066f2756f331707d44489c7114cfb66bce45b1e427460fbe906164",
+          "bytes": 15026
+        },
+        "sparkplug-template-device/records/032fa3b8f3cba54c11f1faad4ed286ddb2f8a32c0552232f3f7acb2c543a1a2b.bin": {
+          "sha256": "032fa3b8f3cba54c11f1faad4ed286ddb2f8a32c0552232f3f7acb2c543a1a2b",
+          "bytes": 102
+        },
+        "sparkplug-template-device/records/0614e2a7f04cc6da57df5a88fde5f890b75a016518190e5d48cbce11d079a27a.bin": {
+          "sha256": "0614e2a7f04cc6da57df5a88fde5f890b75a016518190e5d48cbce11d079a27a",
+          "bytes": 100
+        },
+        "sparkplug-template-device/records/0769fb684a8bea636d89baa2d908c504ee13c3591bde2e1c3d9312a65db17c16.bin": {
+          "sha256": "0769fb684a8bea636d89baa2d908c504ee13c3591bde2e1c3d9312a65db17c16",
+          "bytes": 99
+        },
+        "sparkplug-template-device/records/10a6e57581a9042c9da107fa523d3804eb9bdaeac48c611c86edb1d3bfb680fe.bin": {
+          "sha256": "10a6e57581a9042c9da107fa523d3804eb9bdaeac48c611c86edb1d3bfb680fe",
+          "bytes": 34
+        },
+        "sparkplug-template-device/records/14fc2022db896e2def09e36aacd3f64a09875af7e2a5a4d84d6b6223ad65f2cc.bin": {
+          "sha256": "14fc2022db896e2def09e36aacd3f64a09875af7e2a5a4d84d6b6223ad65f2cc",
+          "bytes": 105
+        },
+        "sparkplug-template-device/records/18073a3a44b370cb71e7b442988d3931a52284f7ff5701c2612be8e41c9d11c8.bin": {
+          "sha256": "18073a3a44b370cb71e7b442988d3931a52284f7ff5701c2612be8e41c9d11c8",
+          "bytes": 204
+        },
+        "sparkplug-template-device/records/26c05afd340d4ceaf2c1d20a2d04bfd7b4ccbb74ef8587724f0d42e33889c6f2.bin": {
+          "sha256": "26c05afd340d4ceaf2c1d20a2d04bfd7b4ccbb74ef8587724f0d42e33889c6f2",
+          "bytes": 272
+        },
+        "sparkplug-template-device/records/387714639a954232522fbb778918eec38d4c62cfc120911b72ee35a718852f50.bin": {
+          "sha256": "387714639a954232522fbb778918eec38d4c62cfc120911b72ee35a718852f50",
+          "bytes": 100
+        },
+        "sparkplug-template-device/records/3adac4effb4dc178557357ee0d846d7ebe1410a1d9fb080e89e54d97c37882fb.bin": {
+          "sha256": "3adac4effb4dc178557357ee0d846d7ebe1410a1d9fb080e89e54d97c37882fb",
+          "bytes": 104
+        },
+        "sparkplug-template-device/records/3dbe27e55651a97579e9bd77163a3975ec13322319e3536b62d03a1a04fd2c44.bin": {
+          "sha256": "3dbe27e55651a97579e9bd77163a3975ec13322319e3536b62d03a1a04fd2c44",
+          "bytes": 99
+        },
+        "sparkplug-template-device/records/420b2f2fc10ec1ac5e48cdb7ce3ec8911520ef6d11510d99dd87d1e4b5fafd01.bin": {
+          "sha256": "420b2f2fc10ec1ac5e48cdb7ce3ec8911520ef6d11510d99dd87d1e4b5fafd01",
+          "bytes": 123
+        },
+        "sparkplug-template-device/records/43c269edc404be31b6fa8f6f60c845d5d190cccaccd1de644c4ea19ca41fb0c9.bin": {
+          "sha256": "43c269edc404be31b6fa8f6f60c845d5d190cccaccd1de644c4ea19ca41fb0c9",
+          "bytes": 134
+        },
+        "sparkplug-template-device/records/466c88df9a40e07e36cac5eb6c1d0dffddd25b09b46b3e0913f1d6b4e7dc6ee7.bin": {
+          "sha256": "466c88df9a40e07e36cac5eb6c1d0dffddd25b09b46b3e0913f1d6b4e7dc6ee7",
+          "bytes": 99
+        },
+        "sparkplug-template-device/records/4bc565e116831c0bac9e8673de37825534a0e2df98383bf6f7bf819e6009cfc7.bin": {
+          "sha256": "4bc565e116831c0bac9e8673de37825534a0e2df98383bf6f7bf819e6009cfc7",
+          "bytes": 131
+        },
+        "sparkplug-template-device/records/5510ead004d861ba5d880c6938853d508b2d414970ad692544050cc1865d3763.bin": {
+          "sha256": "5510ead004d861ba5d880c6938853d508b2d414970ad692544050cc1865d3763",
+          "bytes": 115
+        },
+        "sparkplug-template-device/records/5e6c9ca2775a39c83904dc4aa12707b960ed260cf5bb3d148bf91b22f4cb5ed9.bin": {
+          "sha256": "5e6c9ca2775a39c83904dc4aa12707b960ed260cf5bb3d148bf91b22f4cb5ed9",
+          "bytes": 99
+        },
+        "sparkplug-template-device/records/61935f116e65ba83bbfe3e211256399ecf8e28580e6adefe7368af3296acd204.bin": {
+          "sha256": "61935f116e65ba83bbfe3e211256399ecf8e28580e6adefe7368af3296acd204",
+          "bytes": 123
+        },
+        "sparkplug-template-device/records/6cfcc937cb1a542d80809f9f62f818f0997852ce0411777d228d3a4adffc576b.bin": {
+          "sha256": "6cfcc937cb1a542d80809f9f62f818f0997852ce0411777d228d3a4adffc576b",
+          "bytes": 134
+        },
+        "sparkplug-template-device/records/6d17669fed3347d77e3e3ce7947228d92c2697ac9bc612c820a9efdf06c2cf1d.bin": {
+          "sha256": "6d17669fed3347d77e3e3ce7947228d92c2697ac9bc612c820a9efdf06c2cf1d",
+          "bytes": 99
+        },
+        "sparkplug-template-device/records/6ddfd9ccebd841723a72626f8d4779502cd4d89305be529bd2054a3fc78d490d.bin": {
+          "sha256": "6ddfd9ccebd841723a72626f8d4779502cd4d89305be529bd2054a3fc78d490d",
+          "bytes": 102
+        },
+        "sparkplug-template-device/records/70ec58786a194d951d37c89698e33e945fa544dd184a018da55a17334492739f.bin": {
+          "sha256": "70ec58786a194d951d37c89698e33e945fa544dd184a018da55a17334492739f",
+          "bytes": 93
+        },
+        "sparkplug-template-device/records/78252fc36c7d7f8a39013db8af157d41aacdac12afaebd6da7d9a7fa86d9d26e.bin": {
+          "sha256": "78252fc36c7d7f8a39013db8af157d41aacdac12afaebd6da7d9a7fa86d9d26e",
+          "bytes": 122
+        },
+        "sparkplug-template-device/records/7d9cdf6039aa4a24e2a3a6dedab886821ddb914e630189b38449a5b138f927d0.bin": {
+          "sha256": "7d9cdf6039aa4a24e2a3a6dedab886821ddb914e630189b38449a5b138f927d0",
+          "bytes": 101
+        },
+        "sparkplug-template-device/records/7e9a1a61784c1e735adb962e70f36622f31b263c56dc69b2b4de0620e11d1e69.bin": {
+          "sha256": "7e9a1a61784c1e735adb962e70f36622f31b263c56dc69b2b4de0620e11d1e69",
+          "bytes": 100
+        },
+        "sparkplug-template-device/records/8a8780818e4d1b8016fa25273202e4e212244bfeefa51e18948f79032b6c0077.bin": {
+          "sha256": "8a8780818e4d1b8016fa25273202e4e212244bfeefa51e18948f79032b6c0077",
+          "bytes": 313
+        },
+        "sparkplug-template-device/records/92d2b11ba79576e5e4475d278c762dd86fd8575555f33b74958b986a9abcc735.bin": {
+          "sha256": "92d2b11ba79576e5e4475d278c762dd86fd8575555f33b74958b986a9abcc735",
+          "bytes": 99
+        },
+        "sparkplug-template-device/records/998345f3c53405b05145cb0df31ef3ffbeee092e9c94d8b487113eb633c2fd20.bin": {
+          "sha256": "998345f3c53405b05145cb0df31ef3ffbeee092e9c94d8b487113eb633c2fd20",
+          "bytes": 101
+        },
+        "sparkplug-template-device/records/9f3fa48649afa32906538fdd4de248cf1baae2b3ef4707ad9afc81f6017c5ef6.bin": {
+          "sha256": "9f3fa48649afa32906538fdd4de248cf1baae2b3ef4707ad9afc81f6017c5ef6",
+          "bytes": 99
+        },
+        "sparkplug-template-device/records/a67fc4e9f55a17d28b5bbd09cb28ac5e7478796c69921a3ab403a0d769880293.bin": {
+          "sha256": "a67fc4e9f55a17d28b5bbd09cb28ac5e7478796c69921a3ab403a0d769880293",
+          "bytes": 90
+        },
+        "sparkplug-template-device/records/a6cfe67ba1a74af547c98884f230ef0ce7f776379b95de1c82539eda750ac9c5.bin": {
+          "sha256": "a6cfe67ba1a74af547c98884f230ef0ce7f776379b95de1c82539eda750ac9c5",
+          "bytes": 114
+        },
+        "sparkplug-template-device/records/b4f00363ca5b695aac4375cf8dffcf8180e1921041d96be68338fb4a052ff9c7.bin": {
+          "sha256": "b4f00363ca5b695aac4375cf8dffcf8180e1921041d96be68338fb4a052ff9c7",
+          "bytes": 101
+        },
+        "sparkplug-template-device/records/ba35f6b91b0d5fa2dec64ec6a6bb6cedcd48f7b16c9854800a4f7b8cbd604237.bin": {
+          "sha256": "ba35f6b91b0d5fa2dec64ec6a6bb6cedcd48f7b16c9854800a4f7b8cbd604237",
+          "bytes": 112
+        },
+        "sparkplug-template-device/records/bb1f01f2af37ed570b31e7ff58ddb596cfc89f994856736c79fe66856e4338f1.bin": {
+          "sha256": "bb1f01f2af37ed570b31e7ff58ddb596cfc89f994856736c79fe66856e4338f1",
+          "bytes": 111
+        },
+        "sparkplug-template-device/records/cf708f453b079093ebd942fedafd745f18d29f1e66f12c51311d9c9975601911.bin": {
+          "sha256": "cf708f453b079093ebd942fedafd745f18d29f1e66f12c51311d9c9975601911",
+          "bytes": 101
+        },
+        "sparkplug-template-device/records/d029b516a9b4c67ac03eb7162632088e8a6e4d22000bbdec1d50e54fe6f98568.bin": {
+          "sha256": "d029b516a9b4c67ac03eb7162632088e8a6e4d22000bbdec1d50e54fe6f98568",
+          "bytes": 101
+        },
+        "sparkplug-template-device/records/d466f074d012caab32e990f859664e86b3b0bd0d1b7e043c1a875ee2a5e30f9a.bin": {
+          "sha256": "d466f074d012caab32e990f859664e86b3b0bd0d1b7e043c1a875ee2a5e30f9a",
+          "bytes": 99
+        },
+        "sparkplug-template-device/records/dccf87d3e451c1d871e6c7487c3d82ed65387dace89b1e26612dc7e898db7d58.bin": {
+          "sha256": "dccf87d3e451c1d871e6c7487c3d82ed65387dace89b1e26612dc7e898db7d58",
+          "bytes": 100
+        },
+        "sparkplug-template-device/records/f296496930b0546c50f405fcf33099bbf68e0f0d5d71b5f8c68e4c4dde474530.bin": {
+          "sha256": "f296496930b0546c50f405fcf33099bbf68e0f0d5d71b5f8c68e4c4dde474530",
+          "bytes": 104
+        },
+        "sparkplug-template-device/records/f3d035bdf7303ef1e032577152bd6910cde2df32c4bf1af8188091affa7e0fb7.bin": {
+          "sha256": "f3d035bdf7303ef1e032577152bd6910cde2df32c4bf1af8188091affa7e0fb7",
+          "bytes": 43
+        },
+        "sparkplug-template-device/resource-controls.json": {
+          "sha256": "0b91618ebfbd19cf1dd3ba22ffa76e4fd0b6524d3cea91795e9bfe6c2c287627",
+          "bytes": 102727
+        },
+        "sparkplug-template-device/source-bindings.json": {
+          "sha256": "7f1a242a5407da187db422c22ef8f5d648c02286caccebf802684e708a3b67c3",
+          "bytes": 16482
+        },
+        "sparkplug-template-device/source-manifest.json": {
+          "sha256": "b8bd87a95a857ab366cb6f4145d7b1ade7ee5dfd735ff83e25497fc5c102c75a",
+          "bytes": 6773
+        },
+        "sparkplug-template-device/tools/generate-carriers.py": {
+          "sha256": "9948e9578c0d1d2b416ed5e23a7c660fc7d66061fa9e8d33249901f8327e235a",
+          "bytes": 8823
+        },
+        "sparkplug-template-device/tools/generate-command-boundaries.py": {
+          "sha256": "cea8f116fe0d8c40883f47b36d569807a6788f6e052e5ea79c34e6dc757e9715",
+          "bytes": 4159
+        },
+        "sparkplug-template-device/tools/generate-command-types.py": {
+          "sha256": "5cef88260c60da6c58ce1c69f46f7ae91ea13038e21bc7aebdb7a3e4e799fdeb",
+          "bytes": 5415
+        },
+        "sparkplug-template-device/tools/generate-command.py": {
+          "sha256": "705baa09f8a896dfdf27900772d83948b5481f3109f85cfa3dd441cdab7067bd",
+          "bytes": 5418
+        },
+        "sparkplug-template-device/tools/generate-device.py": {
+          "sha256": "69bd0cf14f023f40b031af2100b5f6298e16c835bf290eced2afc852ce9e6c39",
+          "bytes": 12575
+        },
+        "sparkplug-template-device/tools/generate-resource.py": {
+          "sha256": "d273550f83bfec8be6592f125b995f9b6b939620ef4f3b8be7d71c0b990901d3",
+          "bytes": 4552
+        },
+        "sparkplug-template-device/tools/verify-all.py": {
+          "sha256": "21a34de889c9a6c3da5c166ba5be758617fc346c0660ddf4eec28f7a23620c44",
+          "bytes": 5454
+        },
+        "sparkplug-template-device/tools/verify-command-boundaries.py": {
+          "sha256": "f59f5ef5f26b86cd5b59a464a307762ef0d41e17fd0a7358e7ff0d9f89479758",
+          "bytes": 3160
+        },
+        "sparkplug-template-device/tools/verify-command-types.py": {
+          "sha256": "84561ea545ef902414f1819b34acee1399e5fbea3b640cb2f6285964368c792e",
+          "bytes": 4198
+        },
+        "sparkplug-template-device/tools/verify-command.py": {
+          "sha256": "ba40208abbdbae16ef6942d85a65aaacf3086eaa458f4f015b57836ee89147e6",
+          "bytes": 4113
+        },
+        "sparkplug-template-device/tools/verify.py": {
+          "sha256": "89eecea2ef07e1782fd589222b315cbe748e76a7aa6b330790b9eeda13d0c569",
+          "bytes": 8138
+        },
+        "validation/expected.json": {
+          "sha256": "95bd48401363e2281c4e3e0c2008270decf3d9c2a49d9d43aff67d596d4dbf51",
+          "bytes": 12744
+        }
+      },
+      "aliases": {
+        "common/pcapx/pcaputil/testdata/sparkplug-template-device/ADOPTED-CONTRACT.json": "sparkplug-template-device/ADOPTED-CONTRACT.json",
+        "common/pcapx/pcaputil/testdata/sparkplug-template-device/COMMAND-ADOPTED-CONTRACT.json": "sparkplug-template-device/COMMAND-ADOPTED-CONTRACT.json",
+        "common/pcapx/pcaputil/testdata/sparkplug-template-device/COMMAND-BOUNDARY-ADOPTED-CONTRACT.json": "sparkplug-template-device/COMMAND-BOUNDARY-ADOPTED-CONTRACT.json",
+        "common/pcapx/pcaputil/testdata/sparkplug-template-device/COMMAND-SOURCE-PROOF.json": "sparkplug-template-device/COMMAND-SOURCE-PROOF.json",
+        "common/pcapx/pcaputil/testdata/sparkplug-template-device/COMMAND-TYPES-SOURCE-CONTRACT.json": "sparkplug-template-device/COMMAND-TYPES-SOURCE-CONTRACT.json",
+        "common/pcapx/pcaputil/testdata/sparkplug-template-device/RESOURCE-SOURCE-PROOF.json": "sparkplug-template-device/RESOURCE-SOURCE-PROOF.json",
+        "common/pcapx/pcaputil/testdata/sparkplug-template-device/SOURCE-FEASIBILITY.json": "sparkplug-template-device/SOURCE-FEASIBILITY.json",
+        "common/pcapx/pcaputil/testdata/sparkplug-template-device/answers.json": "sparkplug-template-device/answers.json",
+        "common/pcapx/pcaputil/testdata/sparkplug-template-device/baseline-controls.json": "sparkplug-template-device/baseline-controls.json",
+        "common/pcapx/pcaputil/testdata/sparkplug-template-device/capture-materials.json": "sparkplug-template-device/capture-materials.json",
+        "common/pcapx/pcaputil/testdata/sparkplug-template-device/captures/DDEATH-stales-device-and-new-node-Birth-restores.pcap": "sparkplug-template-device/captures/DDEATH-stales-device-and-new-node-Birth-restores.pcap",
+        "common/pcapx/pcaputil/testdata/sparkplug-template-device/captures/Template-commands-definition-refusal.pcap": "sparkplug-template-device/captures/Template-commands-definition-refusal.pcap",
+        "common/pcapx/pcaputil/testdata/sparkplug-template-device/captures/Template-commands-normal.pcap": "sparkplug-template-device/captures/Template-commands-normal.pcap",
+        "common/pcapx/pcaputil/testdata/sparkplug-template-device/captures/Template-commands-same-shaped-other-reference-refusal.pcap": "sparkplug-template-device/captures/Template-commands-same-shaped-other-reference-refusal.pcap",
+        "common/pcapx/pcaputil/testdata/sparkplug-template-device/captures/device-full-partial-null-and-node-sequence-neighbor.pcap": "sparkplug-template-device/captures/device-full-partial-null-and-node-sequence-neighbor.pcap",
+        "common/pcapx/pcaputil/testdata/sparkplug-template-device/captures/missing-node-definition-and-wrong-device-never-borrow.pcap": "sparkplug-template-device/captures/missing-node-definition-and-wrong-device-never-borrow.pcap",
+        "common/pcapx/pcaputil/testdata/sparkplug-template-device/captures/node-Rebirth-and-new-Birth-clear-device-template-definitions.pcap": "sparkplug-template-device/captures/node-Rebirth-and-new-Birth-clear-device-template-definitions.pcap",
+        "common/pcapx/pcaputil/testdata/sparkplug-template-device/captures/two-devices-same-name-private-alias-and-definition-isolation.pcap": "sparkplug-template-device/captures/two-devices-same-name-private-alias-and-definition-isolation.pcap",
+        "common/pcapx/pcaputil/testdata/sparkplug-template-device/captures/unknownref-device-definition-and-incomplete-Birth-refused.pcap": "sparkplug-template-device/captures/unknownref-device-definition-and-incomplete-Birth-refused.pcap",
+        "common/pcapx/pcaputil/testdata/sparkplug-template-device/command-boundary-controls.json": "sparkplug-template-device/command-boundary-controls.json",
+        "common/pcapx/pcaputil/testdata/sparkplug-template-device/command-controls.json": "sparkplug-template-device/command-controls.json",
+        "common/pcapx/pcaputil/testdata/sparkplug-template-device/command-source-bindings.json": "sparkplug-template-device/command-source-bindings.json",
+        "common/pcapx/pcaputil/testdata/sparkplug-template-device/command-types-controls.json": "sparkplug-template-device/command-types-controls.json",
+        "common/pcapx/pcaputil/testdata/sparkplug-template-device/device-controls.json": "sparkplug-template-device/device-controls.json",
+        "common/pcapx/pcaputil/testdata/sparkplug-template-device/history-proof.json": "sparkplug-template-device/history-proof.json",
+        "common/pcapx/pcaputil/testdata/sparkplug-template-device/native-source-bindings.json": "sparkplug-template-device/native-source-bindings.json",
+        "common/pcapx/pcaputil/testdata/sparkplug-template-device/portable-pins.json": "sparkplug-template-device/portable-pins.json",
+        "common/pcapx/pcaputil/testdata/sparkplug-template-device/records/032fa3b8f3cba54c11f1faad4ed286ddb2f8a32c0552232f3f7acb2c543a1a2b.bin": "sparkplug-template-device/records/032fa3b8f3cba54c11f1faad4ed286ddb2f8a32c0552232f3f7acb2c543a1a2b.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-template-device/records/0614e2a7f04cc6da57df5a88fde5f890b75a016518190e5d48cbce11d079a27a.bin": "sparkplug-template-device/records/0614e2a7f04cc6da57df5a88fde5f890b75a016518190e5d48cbce11d079a27a.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-template-device/records/0769fb684a8bea636d89baa2d908c504ee13c3591bde2e1c3d9312a65db17c16.bin": "sparkplug-template-device/records/0769fb684a8bea636d89baa2d908c504ee13c3591bde2e1c3d9312a65db17c16.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-template-device/records/10a6e57581a9042c9da107fa523d3804eb9bdaeac48c611c86edb1d3bfb680fe.bin": "sparkplug-template-device/records/10a6e57581a9042c9da107fa523d3804eb9bdaeac48c611c86edb1d3bfb680fe.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-template-device/records/14fc2022db896e2def09e36aacd3f64a09875af7e2a5a4d84d6b6223ad65f2cc.bin": "sparkplug-template-device/records/14fc2022db896e2def09e36aacd3f64a09875af7e2a5a4d84d6b6223ad65f2cc.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-template-device/records/18073a3a44b370cb71e7b442988d3931a52284f7ff5701c2612be8e41c9d11c8.bin": "sparkplug-template-device/records/18073a3a44b370cb71e7b442988d3931a52284f7ff5701c2612be8e41c9d11c8.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-template-device/records/26c05afd340d4ceaf2c1d20a2d04bfd7b4ccbb74ef8587724f0d42e33889c6f2.bin": "sparkplug-template-device/records/26c05afd340d4ceaf2c1d20a2d04bfd7b4ccbb74ef8587724f0d42e33889c6f2.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-template-device/records/387714639a954232522fbb778918eec38d4c62cfc120911b72ee35a718852f50.bin": "sparkplug-template-device/records/387714639a954232522fbb778918eec38d4c62cfc120911b72ee35a718852f50.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-template-device/records/3adac4effb4dc178557357ee0d846d7ebe1410a1d9fb080e89e54d97c37882fb.bin": "sparkplug-template-device/records/3adac4effb4dc178557357ee0d846d7ebe1410a1d9fb080e89e54d97c37882fb.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-template-device/records/3dbe27e55651a97579e9bd77163a3975ec13322319e3536b62d03a1a04fd2c44.bin": "sparkplug-template-device/records/3dbe27e55651a97579e9bd77163a3975ec13322319e3536b62d03a1a04fd2c44.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-template-device/records/420b2f2fc10ec1ac5e48cdb7ce3ec8911520ef6d11510d99dd87d1e4b5fafd01.bin": "sparkplug-template-device/records/420b2f2fc10ec1ac5e48cdb7ce3ec8911520ef6d11510d99dd87d1e4b5fafd01.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-template-device/records/43c269edc404be31b6fa8f6f60c845d5d190cccaccd1de644c4ea19ca41fb0c9.bin": "sparkplug-template-device/records/43c269edc404be31b6fa8f6f60c845d5d190cccaccd1de644c4ea19ca41fb0c9.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-template-device/records/466c88df9a40e07e36cac5eb6c1d0dffddd25b09b46b3e0913f1d6b4e7dc6ee7.bin": "sparkplug-template-device/records/466c88df9a40e07e36cac5eb6c1d0dffddd25b09b46b3e0913f1d6b4e7dc6ee7.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-template-device/records/4bc565e116831c0bac9e8673de37825534a0e2df98383bf6f7bf819e6009cfc7.bin": "sparkplug-template-device/records/4bc565e116831c0bac9e8673de37825534a0e2df98383bf6f7bf819e6009cfc7.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-template-device/records/5510ead004d861ba5d880c6938853d508b2d414970ad692544050cc1865d3763.bin": "sparkplug-template-device/records/5510ead004d861ba5d880c6938853d508b2d414970ad692544050cc1865d3763.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-template-device/records/5e6c9ca2775a39c83904dc4aa12707b960ed260cf5bb3d148bf91b22f4cb5ed9.bin": "sparkplug-template-device/records/5e6c9ca2775a39c83904dc4aa12707b960ed260cf5bb3d148bf91b22f4cb5ed9.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-template-device/records/61935f116e65ba83bbfe3e211256399ecf8e28580e6adefe7368af3296acd204.bin": "sparkplug-template-device/records/61935f116e65ba83bbfe3e211256399ecf8e28580e6adefe7368af3296acd204.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-template-device/records/6cfcc937cb1a542d80809f9f62f818f0997852ce0411777d228d3a4adffc576b.bin": "sparkplug-template-device/records/6cfcc937cb1a542d80809f9f62f818f0997852ce0411777d228d3a4adffc576b.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-template-device/records/6d17669fed3347d77e3e3ce7947228d92c2697ac9bc612c820a9efdf06c2cf1d.bin": "sparkplug-template-device/records/6d17669fed3347d77e3e3ce7947228d92c2697ac9bc612c820a9efdf06c2cf1d.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-template-device/records/6ddfd9ccebd841723a72626f8d4779502cd4d89305be529bd2054a3fc78d490d.bin": "sparkplug-template-device/records/6ddfd9ccebd841723a72626f8d4779502cd4d89305be529bd2054a3fc78d490d.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-template-device/records/70ec58786a194d951d37c89698e33e945fa544dd184a018da55a17334492739f.bin": "sparkplug-template-device/records/70ec58786a194d951d37c89698e33e945fa544dd184a018da55a17334492739f.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-template-device/records/78252fc36c7d7f8a39013db8af157d41aacdac12afaebd6da7d9a7fa86d9d26e.bin": "sparkplug-template-device/records/78252fc36c7d7f8a39013db8af157d41aacdac12afaebd6da7d9a7fa86d9d26e.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-template-device/records/7d9cdf6039aa4a24e2a3a6dedab886821ddb914e630189b38449a5b138f927d0.bin": "sparkplug-template-device/records/7d9cdf6039aa4a24e2a3a6dedab886821ddb914e630189b38449a5b138f927d0.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-template-device/records/7e9a1a61784c1e735adb962e70f36622f31b263c56dc69b2b4de0620e11d1e69.bin": "sparkplug-template-device/records/7e9a1a61784c1e735adb962e70f36622f31b263c56dc69b2b4de0620e11d1e69.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-template-device/records/8a8780818e4d1b8016fa25273202e4e212244bfeefa51e18948f79032b6c0077.bin": "sparkplug-template-device/records/8a8780818e4d1b8016fa25273202e4e212244bfeefa51e18948f79032b6c0077.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-template-device/records/92d2b11ba79576e5e4475d278c762dd86fd8575555f33b74958b986a9abcc735.bin": "sparkplug-template-device/records/92d2b11ba79576e5e4475d278c762dd86fd8575555f33b74958b986a9abcc735.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-template-device/records/998345f3c53405b05145cb0df31ef3ffbeee092e9c94d8b487113eb633c2fd20.bin": "sparkplug-template-device/records/998345f3c53405b05145cb0df31ef3ffbeee092e9c94d8b487113eb633c2fd20.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-template-device/records/9f3fa48649afa32906538fdd4de248cf1baae2b3ef4707ad9afc81f6017c5ef6.bin": "sparkplug-template-device/records/9f3fa48649afa32906538fdd4de248cf1baae2b3ef4707ad9afc81f6017c5ef6.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-template-device/records/a67fc4e9f55a17d28b5bbd09cb28ac5e7478796c69921a3ab403a0d769880293.bin": "sparkplug-template-device/records/a67fc4e9f55a17d28b5bbd09cb28ac5e7478796c69921a3ab403a0d769880293.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-template-device/records/a6cfe67ba1a74af547c98884f230ef0ce7f776379b95de1c82539eda750ac9c5.bin": "sparkplug-template-device/records/a6cfe67ba1a74af547c98884f230ef0ce7f776379b95de1c82539eda750ac9c5.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-template-device/records/b4f00363ca5b695aac4375cf8dffcf8180e1921041d96be68338fb4a052ff9c7.bin": "sparkplug-template-device/records/b4f00363ca5b695aac4375cf8dffcf8180e1921041d96be68338fb4a052ff9c7.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-template-device/records/ba35f6b91b0d5fa2dec64ec6a6bb6cedcd48f7b16c9854800a4f7b8cbd604237.bin": "sparkplug-template-device/records/ba35f6b91b0d5fa2dec64ec6a6bb6cedcd48f7b16c9854800a4f7b8cbd604237.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-template-device/records/bb1f01f2af37ed570b31e7ff58ddb596cfc89f994856736c79fe66856e4338f1.bin": "sparkplug-template-device/records/bb1f01f2af37ed570b31e7ff58ddb596cfc89f994856736c79fe66856e4338f1.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-template-device/records/cf708f453b079093ebd942fedafd745f18d29f1e66f12c51311d9c9975601911.bin": "sparkplug-template-device/records/cf708f453b079093ebd942fedafd745f18d29f1e66f12c51311d9c9975601911.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-template-device/records/d029b516a9b4c67ac03eb7162632088e8a6e4d22000bbdec1d50e54fe6f98568.bin": "sparkplug-template-device/records/d029b516a9b4c67ac03eb7162632088e8a6e4d22000bbdec1d50e54fe6f98568.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-template-device/records/d466f074d012caab32e990f859664e86b3b0bd0d1b7e043c1a875ee2a5e30f9a.bin": "sparkplug-template-device/records/d466f074d012caab32e990f859664e86b3b0bd0d1b7e043c1a875ee2a5e30f9a.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-template-device/records/dccf87d3e451c1d871e6c7487c3d82ed65387dace89b1e26612dc7e898db7d58.bin": "sparkplug-template-device/records/dccf87d3e451c1d871e6c7487c3d82ed65387dace89b1e26612dc7e898db7d58.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-template-device/records/f296496930b0546c50f405fcf33099bbf68e0f0d5d71b5f8c68e4c4dde474530.bin": "sparkplug-template-device/records/f296496930b0546c50f405fcf33099bbf68e0f0d5d71b5f8c68e4c4dde474530.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-template-device/records/f3d035bdf7303ef1e032577152bd6910cde2df32c4bf1af8188091affa7e0fb7.bin": "sparkplug-template-device/records/f3d035bdf7303ef1e032577152bd6910cde2df32c4bf1af8188091affa7e0fb7.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-template-device/resource-controls.json": "sparkplug-template-device/resource-controls.json",
+        "common/pcapx/pcaputil/testdata/sparkplug-template-device/source-bindings.json": "sparkplug-template-device/source-bindings.json",
+        "common/pcapx/pcaputil/testdata/sparkplug-template-device/source-manifest.json": "sparkplug-template-device/source-manifest.json",
+        "common/pcapx/pcaputil/testdata/sparkplug-template-device/tools/generate-carriers.py": "sparkplug-template-device/tools/generate-carriers.py",
+        "common/pcapx/pcaputil/testdata/sparkplug-template-device/tools/generate-command-boundaries.py": "sparkplug-template-device/tools/generate-command-boundaries.py",
+        "common/pcapx/pcaputil/testdata/sparkplug-template-device/tools/generate-command-types.py": "sparkplug-template-device/tools/generate-command-types.py",
+        "common/pcapx/pcaputil/testdata/sparkplug-template-device/tools/generate-command.py": "sparkplug-template-device/tools/generate-command.py",
+        "common/pcapx/pcaputil/testdata/sparkplug-template-device/tools/generate-device.py": "sparkplug-template-device/tools/generate-device.py",
+        "common/pcapx/pcaputil/testdata/sparkplug-template-device/tools/generate-resource.py": "sparkplug-template-device/tools/generate-resource.py",
+        "common/pcapx/pcaputil/testdata/sparkplug-template-device/tools/verify-all.py": "sparkplug-template-device/tools/verify-all.py",
+        "common/pcapx/pcaputil/testdata/sparkplug-template-device/tools/verify-command-boundaries.py": "sparkplug-template-device/tools/verify-command-boundaries.py",
+        "common/pcapx/pcaputil/testdata/sparkplug-template-device/tools/verify-command-types.py": "sparkplug-template-device/tools/verify-command-types.py",
+        "common/pcapx/pcaputil/testdata/sparkplug-template-device/tools/verify-command.py": "sparkplug-template-device/tools/verify-command.py",
+        "common/pcapx/pcaputil/testdata/sparkplug-template-device/tools/verify.py": "sparkplug-template-device/tools/verify.py",
+        "scripts/protocol-tests/required-tests-traffic-unified-v189.json": "required-tests-traffic-unified-v189.json"
       }
     }
   ],
