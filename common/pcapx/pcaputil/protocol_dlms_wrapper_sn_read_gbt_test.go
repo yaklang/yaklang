@@ -11,8 +11,8 @@ import (
 	"time"
 )
 
-// Completing a GBT carrier must not silently expand a separately selected
-// wire-only SN profile. This uses the public API against the unguarded draft.
+// Complete ordinary SN over GBT is a typed wire observation without business
+// ownership. Preserve the pre-existing LN request and its true late reply.
 func TestDLMSWrapperSNReadGBTBoundary(t *testing.T) {
 	for _, command := range []byte{5, 12} {
 		for _, tr := range []string{"tcp", "udp"} {
@@ -24,10 +24,15 @@ func TestDLMSWrapperSNReadGBTBoundary(t *testing.T) {
 					s.(*captureSession).f.a.config.Deferred = d
 					normal := snReadControls(t)[2]
 					qwire := wrapperWire(t, normal.Steps[0]["input_hex"].(string))
-					q := s.Feed(0, time.Unix(100, 0), qwire)
+					qinput := append([]byte(nil), qwire...)
+					q := s.Feed(0, time.Unix(100, 0), qinput)
+					clear(qinput)
 					require.Nil(t, q.Err)
+					require.Equal(t, len(qwire), q.Consumed)
+					require.False(t, q.NeedMore)
 					require.Len(t, q.Events, 1)
 					qe := q.Events[0]
+					qid := qe.ID
 					f, err := qe.GetFields()
 					require.NoError(t, err)
 					wrapperCloseEqual(t, f, normal.Steps[0]["GetFields"])
@@ -52,35 +57,35 @@ func TestDLMSWrapperSNReadGBTBoundary(t *testing.T) {
 					binary.BigEndian.PutUint16(w[4:], dst)
 					binary.BigEndian.PutUint16(w[6:], uint16(len(p)))
 					copy(w[8:], p)
-					rejected := s.Feed(dir, time.Unix(101, 0), w)
-					require.Len(t, rejected.Events, 1)
-					e := rejected.Events[0]
-					rocTypedError(t, "UnsupportedFeature", rejected.Err)
-					require.Equal(t, flow, e.FlowID)
-					require.Equal(t, "dlms-wrapper-v1-gbt", e.Profile)
-					require.Equal(t, w, e.Raw)
-					require.Nil(t, e.Session)
-					require.Zero(t, e.TransactionID)
-					require.Zero(t, e.ResponseTo)
-					snReadQueryError(t, e, "UnsupportedFeature")
-					wrapperClosePoison(e)
-					snReadQueryError(t, e, "UnsupportedFeature")
-					late := s.Feed(1, time.Unix(102, 0), wrapperWire(t, normal.Steps[1]["input_hex"].(string)))
+					control := snGBTLegacyBoundaryCase(t, command)
+					require.Equal(t, control.Steps[0]["input_sha256"], fmt.Sprintf("%x", sha256.Sum256(qwire)))
+					input := append([]byte(nil), w...)
+					observed := s.Feed(dir, time.Unix(101, 0), input)
+					clear(input)
+					require.Nil(t, observed.Err)
+					require.Equal(t, len(w), observed.Consumed)
+					require.False(t, observed.NeedMore)
+					require.Len(t, observed.Events, 1)
+					e := observed.Events[0]
+					eid := e.ID
+					snGBTLegacyBoundaryEvent(t, e, control.Steps[1], tr, d, flow, []uint64{qid, eid}, w)
+					lateWire := wrapperWire(t, normal.Steps[1]["input_hex"].(string))
+					lateInput := append([]byte(nil), lateWire...)
+					late := s.Feed(1, time.Unix(102, 0), lateInput)
+					clear(lateInput)
 					require.Nil(t, late.Err)
+					require.Equal(t, len(lateWire), late.Consumed)
+					require.False(t, late.NeedMore)
 					require.Len(t, late.Events, 1)
 					le := late.Events[0]
-					lf, err := le.GetFields()
-					require.NoError(t, err)
-					wrapperCloseEqual(t, lf, normal.Steps[1]["GetFields"])
-					ls := cloneSession(lf)
-					ls["Association"], ls["Outstanding"] = "ambiguous-conversation", 0
-					wrapperCloseEqual(t, le.Session, ls)
-					require.Zero(t, le.TransactionID)
-					require.Zero(t, le.ResponseTo)
-					require.Equal(t, flow, le.FlowID)
+					require.Equal(t, qid, le.TransactionID)
+					require.Equal(t, qid, le.ResponseTo)
+					snGBTLegacyBoundaryEvent(t, le, control.Steps[2], tr, d, flow, []uint64{qid, eid, le.ID}, lateWire)
+					snGBTLegacyBoundaryEvent(t, qe, control.Steps[0], tr, d, flow, []uint64{qid}, qwire)
 					require.Empty(t, s.Close("GBT-boundary"))
 					require.Empty(t, s.Close("again"))
 					require.Zero(t, s.Stats().BufferedBytes)
+					require.Zero(t, s.Stats().Incomplete)
 				})
 			}
 		}
@@ -94,7 +99,7 @@ func snReadGBTSuppControls(t *testing.T) []snReadControl {
 	var d struct{ Cases []snReadControl }
 	require.NoError(t, json.Unmarshal(raw, &d))
 	require.Len(t, d.Cases, 2)
-	return d.Cases
+	return snGBTUpgradeHistoricalRead(t, raw, d.Cases)
 }
 func TestDLMSWrapperSNReadGBTNative(t *testing.T) {
 	for _, c := range snReadGBTSuppControls(t) {

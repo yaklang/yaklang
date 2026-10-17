@@ -117,6 +117,7 @@ func snGBTUpgradeHistoricalWrite(t *testing.T, raw []byte, out []snWriteControl)
 	return out
 }
 func TestDLMSWrapperSNGBTHistoricalBinding(t *testing.T) {
+	snGBTCheckReadHistoricalBinding(t)
 	for _, r := range snGBTHistoricalRecords(t) {
 		raw := wrapperStructuredInput(t, "common/pcapx/pcaputil/"+r["original_member"].(string))
 		require.Equal(t, r["original_member_sha256"], fmt.Sprintf("%x", sha256.Sum256(raw)))

@@ -119433,6 +119433,88 @@
         "common/pcapx/pcaputil/dlms-sn-gbt/historical-gbt-sn-write-upgrades.json": "dlms-sn-gbt/historical-gbt-sn-write-upgrades.json",
         "scripts/protocol-tests/required-tests-traffic-unified-v165.json": "required-tests-traffic-unified-v165.json"
       }
+    },
+    {
+      "id": "validation-dlms-wrapper-sn-gbt-legacy",
+      "kind": "support",
+      "source_sha": "7cae6429edf0fad683cdf6cf27c6ccf5755f7cfc",
+      "file": "validation-dlms-wrapper-sn-gbt-legacy.zip",
+      "sha256": "b149a0a561c74fe8ccff72f69a26d6b6f93c427dffa31fc2de2c0d1f48d822cb",
+      "password": "bin-parser",
+      "members": {
+        "dlms-sn-gbt-legacy-tools/SOURCES.json": {
+          "bytes": 12015,
+          "sha256": "9d68ce5c6a5a61c284f7ba65ebabf08326128873e4171785362593cf37053f90"
+        },
+        "dlms-sn-gbt-legacy-tools/independent/access.py": {
+          "bytes": 4354,
+          "sha256": "3166cdf13b9934650fdaa34051ba1d6365c6521028ab132898597e424c23e586"
+        },
+        "dlms-sn-gbt-legacy-tools/independent/build.py": {
+          "bytes": 8428,
+          "sha256": "8f74b6cf369c772974442b5fb0bd899658b087182394125df684d267307de8ee"
+        },
+        "dlms-sn-gbt-legacy-tools/independent/candidate-model.py": {
+          "bytes": 9776,
+          "sha256": "b19b8043b6d3defeb32ff2a3a5caf67102299118852c6859c2d1a78847fbb51a"
+        },
+        "dlms-sn-gbt-legacy-tools/independent/gbt-core.py": {
+          "bytes": 12575,
+          "sha256": "a678272f289349b8be7e31791edd158ccc2c4e4ee13431dcfec6a2fcf56a0df6"
+        },
+        "dlms-sn-gbt-legacy-tools/independent/model-pins.json": {
+          "bytes": 354,
+          "sha256": "979fd12543829169aec9fead69f2f795f5a04057224960f858b30c2a8b81cb86"
+        },
+        "dlms-sn-gbt-legacy-tools/independent/rebuild.py": {
+          "bytes": 606,
+          "sha256": "b808d3dc40c22b917712d66e286cda082bbd552864b7c6f675ade95f88efbc6e"
+        },
+        "dlms-sn-gbt-legacy-tools/independent/reference-vectors.json": {
+          "bytes": 10360,
+          "sha256": "a76ffabe34390fd68e35fc7117c2808bc61c046b2f06a6324317222f2194dec8"
+        },
+        "dlms-sn-gbt-legacy-tools/independent/verify.py": {
+          "bytes": 3678,
+          "sha256": "60345be593a5f70fa03c60ee220ab609d56683d402d0b5fc121e3dd749bcea04"
+        },
+        "dlms-sn-gbt-legacy-tools/independent/write-body.py": {
+          "bytes": 5706,
+          "sha256": "4818c0264cb4819cf5d4715a855b4f3817acf26c0c6b15ff558aaa7d3b4aa094"
+        },
+        "dlms-sn-gbt-legacy-tools/verify-captures.py": {
+          "bytes": 2146,
+          "sha256": "80949c31d4500c04cb51a294ef196d4d0e8c2d2ee55f1e9af454c38990c6f02b"
+        },
+        "dlms-sn-gbt-legacy/historical-gbt-sn-read-upgrades.json": {
+          "bytes": 450354,
+          "sha256": "2d2a2a1d7da7b5424a2eb6b34d2367f772cf62e05b2b9806f25eaf3233a67c3d"
+        },
+        "dlms-sn-gbt-legacy/inline-gbt-sn-boundary-upgrades.json": {
+          "bytes": 415732,
+          "sha256": "859ca7f04f6b625637eaed20a65a7a1932ea54d215578bf735f7b9c62f1a7e0d"
+        },
+        "required-tests-traffic-unified-v166.json": {
+          "bytes": 22285357,
+          "sha256": "b09c85208b4eeff5e481d244d6d860e3c9ae7a2da473fd505a72295a768ce3bb"
+        }
+      },
+      "aliases": {
+        "common/pcapx/pcaputil/dlms-sn-gbt-legacy-tools/SOURCES.json": "dlms-sn-gbt-legacy-tools/SOURCES.json",
+        "common/pcapx/pcaputil/dlms-sn-gbt-legacy-tools/independent/access.py": "dlms-sn-gbt-legacy-tools/independent/access.py",
+        "common/pcapx/pcaputil/dlms-sn-gbt-legacy-tools/independent/build.py": "dlms-sn-gbt-legacy-tools/independent/build.py",
+        "common/pcapx/pcaputil/dlms-sn-gbt-legacy-tools/independent/candidate-model.py": "dlms-sn-gbt-legacy-tools/independent/candidate-model.py",
+        "common/pcapx/pcaputil/dlms-sn-gbt-legacy-tools/independent/gbt-core.py": "dlms-sn-gbt-legacy-tools/independent/gbt-core.py",
+        "common/pcapx/pcaputil/dlms-sn-gbt-legacy-tools/independent/model-pins.json": "dlms-sn-gbt-legacy-tools/independent/model-pins.json",
+        "common/pcapx/pcaputil/dlms-sn-gbt-legacy-tools/independent/rebuild.py": "dlms-sn-gbt-legacy-tools/independent/rebuild.py",
+        "common/pcapx/pcaputil/dlms-sn-gbt-legacy-tools/independent/reference-vectors.json": "dlms-sn-gbt-legacy-tools/independent/reference-vectors.json",
+        "common/pcapx/pcaputil/dlms-sn-gbt-legacy-tools/independent/verify.py": "dlms-sn-gbt-legacy-tools/independent/verify.py",
+        "common/pcapx/pcaputil/dlms-sn-gbt-legacy-tools/independent/write-body.py": "dlms-sn-gbt-legacy-tools/independent/write-body.py",
+        "common/pcapx/pcaputil/dlms-sn-gbt-legacy-tools/verify-captures.py": "dlms-sn-gbt-legacy-tools/verify-captures.py",
+        "common/pcapx/pcaputil/dlms-sn-gbt-legacy/historical-gbt-sn-read-upgrades.json": "dlms-sn-gbt-legacy/historical-gbt-sn-read-upgrades.json",
+        "common/pcapx/pcaputil/dlms-sn-gbt-legacy/inline-gbt-sn-boundary-upgrades.json": "dlms-sn-gbt-legacy/inline-gbt-sn-boundary-upgrades.json",
+        "scripts/protocol-tests/required-tests-traffic-unified-v166.json": "required-tests-traffic-unified-v166.json"
+      }
     }
   ],
   "schema_version": 1,
