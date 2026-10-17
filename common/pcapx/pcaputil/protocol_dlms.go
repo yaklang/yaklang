@@ -229,16 +229,6 @@ func decodeDLMSFrameBudget(w []byte, maxElements, depth int, linkOnly bool) (*dl
 		if len(info) >= 4 && bytes.Equal(info[:3], []byte{0xe6, 0xe6, 0}) && dlmsACSEAPDU(info[3:]) {
 			m.request = info[3] == 0x60 || info[3] == 0x62
 		}
-		// A CRC-valid first SN information carrier states its literal LLC/service
-		// direction, not an LN invoke owner. Continuations remain assembler-owned.
-		if m.segmented && dlmsSNSegmentHeader(info) {
-			request := info[3] == 5 || info[3] == 6
-			if request == (info[1] == 0xe6) {
-				m.request = request
-				m.snRead = info[3] == 5 || info[3] == 12
-				m.snWrite = info[3] == 6 || info[3] == 13
-			}
-		}
 		return m, nil
 	}
 	return decodeDLMSInformationSelected(m, info, maxElements, depth, !m.segmented)
@@ -503,6 +493,17 @@ func dlmsScalar(w []byte, limit int) (any, error) {
 	}
 	panic("unreachable scalar")
 }
+
+// This classification is valid only for a CRC/HCS-validated first carrier.
+// It must not mark a retained information group's opaque continuation as SN.
+func dlmsSNColdInformationPrefix(m *dlmsMessage) bool {
+	if m == nil || m.kind != "I" || !m.segmented || !dlmsSNSegmentHeader(m.information) {
+		return false
+	}
+	request := m.information[3] == 5 || m.information[3] == 6
+	return request == (m.information[1] == 0xe6)
+}
+
 func probeDLMS(w []byte, limit int) ProbeResult {
 	if len(w) == 0 || w[0] != 0x7e {
 		return ProbeResult{Verdict: ProbeReject}
@@ -519,7 +520,7 @@ func probeDLMS(w []byte, limit int) ProbeResult {
 	}
 	if w[1]&8 != 0 {
 		m, err := decodeDLMSFrameBudget(w[:n], 0, 0, true)
-		if err == nil && m.kind == "I" && (m.snRead || m.snWrite) {
+		if err == nil && dlmsSNColdInformationPrefix(m) {
 			return probeAccept("dlms", "hdlc-sn-information-segmented", 98)
 		}
 		if err == nil && m.kind == "I" && dlmsACSESegmentPrefix(m.information) {
@@ -1079,6 +1080,15 @@ func (a *binParser) decodeDLMSDatagram(e *ProtocolEvent, w []byte, explicit bool
 	} else if err = f.reserveSession(f.dlms.storage() + f.dlmsProjection(w)); err == nil {
 		m, err = decodeDLMSFrameBudget(w, a.budget.MaxCollectionElements, a.budget.MaxRecursionDepth, f.dlmsLinkAssembly(w))
 	}
+	// Only a newly observed UDP conversation may derive SN direction from a
+	// first information header. Retained assemblers own opaque continuations,
+	// even when their bytes resemble a standalone SN LLC/service prefix.
+	if created && err == nil && dlmsSNColdInformationPrefix(m) {
+		m.request = m.information[3] == 5 || m.information[3] == 6
+		m.snRead = m.information[3] == 5 || m.information[3] == 12
+		m.snWrite = m.information[3] == 6 || m.information[3] == 13
+	}
+
 	if created && m != nil && !m.snRead && !m.snWrite && m.snGBT == nil && !m.request && m.kind != "S" && (m.acse == nil || !m.acse.acseAbort) && !dlmsAbortSegmentPrefix(m.information) {
 		e.Direction = 1
 		if m.acse != nil || dlmsACSESegmentPrefix(m.information) {
