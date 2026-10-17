@@ -332,12 +332,9 @@ func (s *Scannerx) SubmitTarget(targets, ports string) (<-chan *SynxTarget, erro
 			}
 			// Pace and admission live in the netstackvm session for TCP and UDP.
 			// The cap is per host: later hosts are still submitted.
-			if s.config.maxOpenPorts > 0 && s.ipOpenPortMap != nil {
-				v, ok := s.ipOpenPortMap.Load(host)
-				if ok && openCount(v) >= s.config.maxOpenPorts {
-					skipHost = host
-					continue
-				}
+			if s.openPortLimitReached(host) {
+				skipHost = host
+				continue
 			}
 
 			s.callOnSubmitTask(host, p)
@@ -405,11 +402,8 @@ func (s *Scannerx) SubmitTargetFromPing(res chan string, ports string) <-chan *S
 					if proto == "udp" {
 						target.Mode = UDP
 					}
-					if s.config.maxOpenPorts > 0 && s.ipOpenPortMap != nil {
-						v, ok := s.ipOpenPortMap.Load(host)
-						if ok && openCount(v) >= s.config.maxOpenPorts {
-							break
-						}
+					if s.openPortLimitReached(host) {
+						break
 					}
 					s.callOnSubmitTask(host, p)
 					select {
@@ -438,6 +432,14 @@ func openCount(v interface{}) int {
 	default:
 		return int(toUint16(v))
 	}
+}
+
+func (s *Scannerx) openPortLimitReached(host string) bool {
+	if s.config == nil || s.config.maxOpenPorts <= 0 || s.ipOpenPortMap == nil {
+		return false
+	}
+	v, ok := s.ipOpenPortMap.Load(host)
+	return ok && openCount(v) >= s.config.maxOpenPorts
 }
 
 func (s *Scannerx) reportOpen(ip net.IP, port int, proto string) {
@@ -522,6 +524,13 @@ func (s *Scannerx) Scan(targetCh <-chan *SynxTarget) (chan *synscan.SynScanResul
 			}
 			if s.config.maxOpenPorts > 0 && s.ipOpenPortMap != nil {
 				v, _ := s.ipOpenPortMap.LoadOrStore(host.String(), 0)
+				// Admission checks cannot stop probes that were already in flight.
+				// Check and increment under the result lock before any callback or
+				// output so concurrent TCP/UDP replies share the same host cap.
+				if openCount(v) >= s.config.maxOpenPorts {
+					openPortLock.Unlock()
+					return
+				}
 				s.ipOpenPortMap.Store(host.String(), openCount(v)+1)
 			}
 			ipCountMap[host.String()] = struct{}{}

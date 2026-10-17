@@ -203,6 +203,11 @@ func (s *Scannerx) runProbes(targets <-chan *SynxTarget) {
 }
 
 func (s *Scannerx) probeOne(target *SynxTarget) {
+	// A target can wait in the dispatcher after submission. Recheck the host
+	// cap here so queued work does not keep probing a host that already hit it.
+	if target == nil || s.openPortLimitReached(target.Host) {
+		return
+	}
 	defer func() {
 		if err := recover(); err != nil {
 			log.Errorf("synscanx probe %s:%d panic: %v\n%s", target.Host, target.Port, err, debug.Stack())
