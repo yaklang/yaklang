@@ -138,6 +138,10 @@ func TestIndustrialLinkSealedReplay(t *testing.T) {
 								rocTypedError(t, a.Error, e.sessionError)
 								require.Nil(t, f)
 								require.Nil(t, e.Session)
+								e.Session = map[string]any{"caller": "forged-success"}
+								decoded, decodeErr := e.Decode()
+								rocTypedError(t, a.Error, decodeErr)
+								require.Nil(t, decoded)
 								require.Equal(t, e.Status, e.Completeness)
 								if a.Error == "NeedMore" {
 									require.EqualValues(t, 1, stats.Incomplete)
@@ -169,6 +173,7 @@ func TestIndustrialLinkSealedReplay(t *testing.T) {
 							tree, err := e.Decode()
 							require.NoError(t, err)
 							rocEqualFields(t, a.Fields, protocolFields(tree))
+							testExactObservationSessionQueries(t, e, a.Fields)
 						})
 					}
 				}

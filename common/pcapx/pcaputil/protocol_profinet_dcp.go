@@ -405,6 +405,9 @@ func (a *binParser) decodeDCPEthernet(frame []byte, evidence captureEvidence, ci
 		e.Source = link["source_mac"].(string)
 		e.Destination = link["destination_mac"].(string)
 	}
+	if len(w) >= 3 && binary.BigEndian.Uint16(w) >= 0xfefc && binary.BigEndian.Uint16(w) <= 0xfeff && (w[2] == 3 || w[2] == 4 || w[2] == 6) {
+		e.Profile, e.Admission = dcpServicesProfile, "ether-type-and-selected-service-profile"
+	}
 	a.input.Add(uint64(len(w)))
 	temp := &binFlow{a: a}
 	defer temp.closeSession()
@@ -421,7 +424,11 @@ func (a *binParser) decodeDCPEthernet(frame []byte, evidence captureEvidence, ci
 	if err == nil {
 		err = temp.reserveSession(32768 + 512*int64(len(frame)))
 		if err == nil {
-			fields, err = decodeDCPIdentify(w, a.budget.MaxCollectionElements)
+			if e.Profile == dcpServicesProfile {
+				fields, err = decodeDCPServices(w, a.budget.MaxCollectionElements)
+			} else {
+				fields, err = decodeDCPIdentify(w, a.budget.MaxCollectionElements)
+			}
 			if err == nil {
 				fields["ethernet"] = link
 				e.Session = cloneSession(fields)
@@ -431,7 +438,9 @@ func (a *binParser) decodeDCPEthernet(frame []byte, evidence captureEvidence, ci
 	}
 	err = a.dcpCandidate(e, w, tags, fields, err)
 	if err != nil {
-		e.Session, e.semanticFields = nil, nil
+		e.Session, e.semanticFields, e.semanticSession = nil, nil, nil
+	} else {
+		e.semanticSession = cloneSession(e.Session)
 	}
 	raw := w
 	var typed *ProtocolError

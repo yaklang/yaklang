@@ -4,14 +4,18 @@ import (
 	"bytes"
 	"container/list"
 	"encoding/binary"
+	"encoding/hex"
+	"errors"
 	"fmt"
 	"strconv"
 	"time"
 )
 
 // Selected unciphered LN Get-normal and HDLC link controls, carried as complete
-// HDLC frames through a TCP/UDP tunnel. This is not the IEC IP wrapper profile.
-// ACSE, authentication, ciphering, segmentation, lists and block transfer remain
+// HDLC frames through a TCP/UDP tunnel, plus bounded LN Get-with-list.
+// Selected response information segmentation requires observed request context;
+// initial normal/list request information may establish it only after assembly.
+// Authentication, ciphering, ACSE/link-negotiation segmentation and GBT remain
 // explicit unsupported boundaries. Values and link identities are unverified.
 func dlmsError(k ProtocolErrorKind, why string) error { return protocolError(k, "DLMS HDLC %s", why) }
 func dlmsCRC(w []byte) uint16 {
@@ -58,12 +62,50 @@ func dlmsFrameSize(w []byte, limit int) (int, error) {
 	return n, nil
 }
 
+// dlmsIdlePrefix removes only consecutive flags at a stream frame boundary,
+// preserving the last flag as the actual opening byte. It never scans past
+// arbitrary bytes, reconstructs a shared flag, or changes datagram framing.
+func dlmsIdlePrefix(w []byte) int {
+	n := 0
+	for n+1 < len(w) && w[n] == 0x7e && w[n+1] == 0x7e {
+		n++
+	}
+	return n
+}
+
+func probeDLMSStream(w []byte, frameLimit, probeLimit int) ProbeResult {
+	// Before identity is established, idle fill is part of the bounded probe
+	// window. Admission still requires a complete CRC-valid supported request.
+	n := dlmsIdlePrefix(w[:min(len(w), probeLimit+1)])
+	if n >= probeLimit {
+		return ProbeResult{Verdict: ProbeReject}
+	}
+	return probeDLMS(w[n:], frameLimit)
+}
+
 type dlmsMessage struct {
-	fields              map[string]any
-	kind                string
-	request             bool
-	source, destination uint32
-	invoke, ns, nr      byte
+	fields                    map[string]any
+	kind                      string
+	request                   bool
+	source, destination       uint32
+	invoke, ns, nr            byte
+	flags, choice             byte
+	count                     int
+	block                     *wrapperMessage
+	acse                      *wrapperMessage
+	information               []byte
+	segmented                 bool
+	setResponseAssemblyChoice byte
+	snMultiResult             bool
+	snRead                    bool
+	snWrite                   bool
+	snBlock                   *wrapperMessage
+	snGBT                     *wrapperMessage
+	snInformationSpan         bool
+	snInformationFirstNS      byte
+	snCarrierDigest           [32]byte
+	snInformationCharge       int64
+	snCarrierLLC              byte
 }
 
 func dlmsAddress(w []byte, at *int) (uint32, int, error) {
@@ -87,6 +129,12 @@ func dlmsAddress(w []byte, at *int) (uint32, int, error) {
 	return 0, 0, dlmsError(ErrMalformedMessage, "address exceeds four octets or lacks terminator")
 }
 func decodeDLMS(w []byte, maxElements int) (*dlmsMessage, error) {
+	return decodeDLMSBudget(w, maxElements, DefaultParserBudget().MaxRecursionDepth)
+}
+func decodeDLMSBudget(w []byte, maxElements, depth int) (*dlmsMessage, error) {
+	return decodeDLMSFrameBudget(w, maxElements, depth, false)
+}
+func decodeDLMSFrameBudget(w []byte, maxElements, depth int, linkOnly bool) (*dlmsMessage, error) {
 	bad := func(s string) (*dlmsMessage, error) { return nil, dlmsError(ErrMalformedMessage, s) }
 	unsupported := func(s string) (*dlmsMessage, error) { return nil, dlmsError(ErrUnsupportedFeature, s) }
 	n, err := dlmsFrameSize(w, 2049)
@@ -116,7 +164,7 @@ func decodeDLMS(w []byte, maxElements int) (*dlmsMessage, error) {
 	}
 	cf := w[at]
 	at++
-	m := &dlmsMessage{source: src, destination: dest}
+	m := &dlmsMessage{source: src, destination: dest, count: 1, choice: 1}
 	f := map[string]any{"Observation": "unverified-dlms-hdlc-wire-values", "Frame Format": format, "Frame Length": len(w) - 2, "Destination Address": dest, "Source Address": src, "Destination Address Octets": ds, "Source Address Octets": ss, "Control": cf, "Poll/Final": cf&0x10 != 0, "FCS": fcs}
 	m.fields = f
 	var info []byte
@@ -131,8 +179,9 @@ func decodeDLMS(w []byte, maxElements int) (*dlmsMessage, error) {
 		f["HCS"] = hcs
 		info = w[at+2 : end]
 	}
-	if format&0x800 != 0 {
-		return unsupported("segmented information is outside this profile")
+	m.information, m.segmented = info, format&0x800 != 0
+	if m.segmented && (!linkOnly || cf&1 != 0) {
+		return unsupported("segmented information requires native conversation assembly")
 	}
 	if cf&3 == 3 {
 		names := map[byte]string{0x83: "SNRM", 0x63: "UA", 0x43: "DISC", 0x0f: "DM"}
@@ -159,6 +208,7 @@ func decodeDLMS(w []byte, maxElements int) (*dlmsMessage, error) {
 			return bad("supervisory frame has information")
 		}
 		m.kind = "S"
+		m.nr = cf >> 5
 		f["Frame Kind"] = "supervisory"
 		f["Supervisory Function"] = []string{"RR", "RNR", "REJ", "SREJ"}[(cf>>2)&3]
 		f["Receive Sequence"] = cf >> 5
@@ -168,6 +218,32 @@ func decodeDLMS(w []byte, maxElements int) (*dlmsMessage, error) {
 	m.nr = cf >> 5
 	f["Send Sequence"] = m.ns
 	f["Receive Sequence"] = m.nr
+	if linkOnly {
+		m.kind = "I"
+		// Preserve literal initial request direction for native session decoding.
+		// Never infer an endpoint role from continuation bytes in an existing chain.
+		m.request = len(info) >= 4 && bytes.Equal(info[:4], []byte{0xe6, 0xe6, 0, 0xc0})
+		if dlmsSelectedOperationSegmentPrefix(info) || dlmsSetRequestSegmentPrefix(info) || dlmsActionRequestSegmentPrefix(info) {
+			m.request = info[1] == 0xe6
+		}
+		if len(info) >= 4 && bytes.Equal(info[:3], []byte{0xe6, 0xe6, 0}) && dlmsACSEAPDU(info[3:]) {
+			m.request = info[3] == 0x60 || info[3] == 0x62
+		}
+		return m, nil
+	}
+	return decodeDLMSInformationSelected(m, info, maxElements, depth, !m.segmented)
+}
+
+func decodeDLMSInformation(m *dlmsMessage, info []byte, maxElements, depth int) (*dlmsMessage, error) {
+	return decodeDLMSInformationSelected(m, info, maxElements, depth, false)
+}
+
+// Only an actual complete M0 carrier opts in. Joined information and nested
+// envelopes keep the shared complete decoder contract unless selected separately.
+func decodeDLMSInformationSelected(m *dlmsMessage, info []byte, maxElements, depth int, allowSNMulti bool) (*dlmsMessage, error) {
+	bad := func(s string) (*dlmsMessage, error) { return nil, dlmsError(ErrMalformedMessage, s) }
+	unsupported := func(s string) (*dlmsMessage, error) { return nil, dlmsError(ErrUnsupportedFeature, s) }
+	f := m.fields
 	if len(info) < 4 {
 		return bad("information frame LLC/APDU is truncated")
 	}
@@ -176,34 +252,78 @@ func decodeDLMS(w []byte, maxElements int) (*dlmsMessage, error) {
 	}
 	f["LLC"] = bytes.Clone(info[:3])
 	p := info[3:]
+	if len(p) > 0 && p[0] == 0xe0 {
+		return decodeDLMSSNGBT(m, p, info[1], maxElements, depth)
+	}
+	if dlmsSNWriteAPDU(p) {
+		return decodeDLMSSNWrite(m, p, info[1], maxElements, depth, allowSNMulti)
+	}
+	if dlmsSNReadAPDU(p) {
+		return decodeDLMSSNRead(m, p, info[1], maxElements, depth, allowSNMulti)
+	}
+	if p[0] >= 0x60 && p[0] <= 0x64 {
+		return decodeDLMSACSEInformation(m, p, info[1], maxElements, depth)
+	}
+	if dlmsOperationAPDU(p) {
+		return decodeDLMSOperationInformation(m, p, info[1], maxElements, depth)
+	}
 	if p[0] != 0xc0 && p[0] != 0xc4 {
 		return unsupported("APDU is outside unencrypted LN Get-normal")
 	}
 	if len(p) < 3 {
 		return bad("Get service header is truncated")
 	}
-	if p[1] != 1 {
-		return unsupported("Get list/block form is outside this profile")
+	if p[1] != 1 && p[1] != 2 && p[1] != 3 {
+		return unsupported("Get service choice is outside this profile")
 	}
 	if p[2]&0x30 != 0 {
 		return bad("invoke-id-and-priority reserved bits are nonzero")
 	}
 	m.invoke = p[2] & 15
+	m.flags, m.choice = p[2], p[1]
 	m.request = p[0] == 0xc0
 	m.kind = "GET"
 	f["Invoke ID and Priority"] = p[2]
 	f["Invoke ID"] = m.invoke
 	f["High Priority"] = p[2]&0x80 != 0
 	f["Confirmed Service"] = p[2]&0x40 != 0
+	if p[1] == 2 {
+		if m.request && info[1] != 0xe6 || !m.request && info[1] != 0xe7 {
+			return bad("Get-block LLC direction differs from command")
+		}
+		b := &wrapperMessage{fields: make(map[string]any), request: m.request}
+		if err := decodeWrapperBlock(b, p, maxElements); err != nil {
+			return nil, dlmsBlockError(err)
+		}
+		m.block = b
+		f["Get Block"] = b.fields
+		f["Frame Kind"] = "Get Response With Data Block"
+		if m.request {
+			f["Frame Kind"] = "Get Request Next"
+		}
+		return m, nil
+	}
+	if p[1] == 3 {
+		if m.request && info[1] != 0xe6 || !m.request && info[1] != 0xe7 {
+			return bad("Get-list LLC direction differs from command")
+		}
+		if err := dlmsListFields(m, p, maxElements, depth); err != nil {
+			return nil, err
+		}
+		return m, nil
+	}
 	if m.request {
 		if info[1] != 0xe6 {
 			return bad("Get request uses response LLC")
 		}
-		if len(p) != 13 {
-			return bad("Get-normal descriptor length differs from complete APDU")
+		if len(p) < 13 {
+			return bad("Get-normal descriptor is truncated")
 		}
-		if p[12] != 0 {
-			return unsupported("selective access is outside this profile")
+		if p[12] != 0 && p[12] != 1 {
+			return unsupported("selected optional access selection0/1")
+		}
+		if p[12] == 0 && len(p) != 13 {
+			return bad("Get-normal descriptor has trailing bytes")
 		}
 		if p[11] == 0 || p[11] > 127 {
 			return unsupported("attribute outside positive signed8 profile")
@@ -212,7 +332,22 @@ func decodeDLMS(w []byte, maxElements int) (*dlmsMessage, error) {
 		f["Class ID"] = binary.BigEndian.Uint16(p[3:5])
 		f["Logical Name"] = fmt.Sprintf("%d.%d.%d.%d.%d.%d", p[5], p[6], p[7], p[8], p[9], p[10])
 		f["Attribute ID"] = int8(p[11])
-		f["Selective Access"] = false
+		f["Selective Access"] = p[12] == 1
+		if p[12] == 1 {
+			if len(p) < 14 {
+				return bad("Get-normal access selector is missing")
+			}
+			parameter, err := dlmsNormalDataAt(p, 14, maxElements, depth)
+			if err != nil {
+				return nil, err
+			}
+			// Only observe the selector and its complete Data parameter. Object
+			// semantics, permissions and negotiated access are not established.
+			f["Access Selection Raw"] = p[12]
+			f["Access Selector"] = p[13]
+			f["Access Parameters"] = parameter
+			f["Selector Semantics Verified"] = false
+		}
 	} else {
 		if info[1] != 0xe7 {
 			return bad("Get response uses request LLC")
@@ -232,7 +367,14 @@ func decodeDLMS(w []byte, maxElements int) (*dlmsMessage, error) {
 			f["Result Choice"] = "data-access-result"
 			f["Data Access Result"] = p[4]
 		} else if p[3] == 0 {
-			v, e := dlmsScalar(p[4:], maxElements)
+			var v any
+			var e error
+			if dlmsNormalExtended(p) {
+				v, e = dlmsNormalData(p, maxElements, depth)
+			} else {
+				// Existing scalar/octet public representations remain unchanged.
+				v, e = dlmsScalar(p[4:], maxElements)
+			}
 			if e != nil {
 				return nil, e
 			}
@@ -351,6 +493,23 @@ func dlmsScalar(w []byte, limit int) (any, error) {
 	}
 	panic("unreachable scalar")
 }
+
+// This classification is valid only for a CRC/HCS-validated first carrier.
+// It must not mark a retained information group's opaque continuation as SN.
+func dlmsSNColdInformationPrefix(m *dlmsMessage) bool {
+	if m == nil || m.kind != "I" || !m.segmented || !dlmsSNSegmentHeader(m.information) {
+		return false
+	}
+	request := m.information[3] == 5 || m.information[3] == 6
+	return request == (m.information[1] == 0xe6)
+}
+
+// The first CRC/HCS-valid LLC/E0 carrier identifies only a bounded passive
+// information group. It does not identify an inner SN service or a peer owner.
+func dlmsSNColdGBTInformationPrefix(m *dlmsMessage) bool {
+	return m != nil && m.kind == "I" && m.segmented && dlmsSNGBTInformation(m.information)
+}
+
 func probeDLMS(w []byte, limit int) ProbeResult {
 	if len(w) == 0 || w[0] != 0x7e {
 		return ProbeResult{Verdict: ProbeReject}
@@ -365,23 +524,111 @@ func probeDLMS(w []byte, limit int) ProbeResult {
 	if n == 0 {
 		return probeNeed("dlms", "hdlc-get-normal", len(w), max(3, len(w)+1))
 	}
-	m, e := decodeDLMS(w[:n], 4096)
+	if w[1]&8 != 0 {
+		m, err := decodeDLMSFrameBudget(w[:n], 0, 0, true)
+		if err == nil && dlmsSNColdInformationPrefix(m) {
+			return probeAccept("dlms", "hdlc-sn-information-segmented", 98)
+		}
+		if err == nil && dlmsSNColdGBTInformationPrefix(m) {
+			return probeAccept("dlms", "hdlc-sn-gbt-information-segmented", 98)
+		}
+		if err == nil && m.kind == "I" && dlmsACSESegmentPrefix(m.information) {
+			return probeAccept("dlms", "hdlc-acse-segmented", 98)
+		}
+		if err == nil && m.kind == "I" && dlmsSetRequestSegmentPrefix(m.information) && (m.information[4] == 2 || m.information[4] == 5) && m.information[5]&0x30 == 0 {
+			if m.information[4] == 2 {
+				return probeAccept("dlms", "hdlc-set-block-request-segmented", 98)
+			}
+			return probeAccept("dlms", "hdlc-set-list-block-request-segmented", 98)
+		}
+		if err == nil && m.kind == "I" && dlmsActionRequestSegmentPrefix(m.information) && m.information[4] == 4 && m.information[5]&0x30 == 0 {
+			return probeAccept("dlms", "hdlc-action-upload-request-segmented", 98)
+		}
+		if err == nil && m.kind == "I" && m.request && dlmsSelectedOperationSegmentPrefix(m.information) && m.information[5]&0x30 == 0 {
+			return probeAccept("dlms", "hdlc-ln-operations-segmented", 98)
+		}
+		if err == nil && m.kind == "I" && m.request && len(m.information) >= 6 && bytes.Equal(m.information[:4], []byte{0xe6, 0xe6, 0, 0xc0}) && (m.information[4] == 1 || m.information[4] == 3) && m.information[5]&0x30 == 0 {
+			return probeAccept("dlms", "hdlc-get-normal", 98)
+		}
+		return ProbeResult{Verdict: ProbeReject}
+	}
+	elements := 4096
+	list := dlmsListAPDU(w[:n])
+	apdu := dlmsAPDU(w[:n])
+	if len(apdu) > 1 && (dlmsSNReadAPDU(apdu) || dlmsSNWriteAPDU(apdu)) {
+		// A cold SN response has no invoke owner to establish. Validate only
+		// the complete carrier here; reserve the bounded Data projections before
+		// decoding its semantics in the native session, never inside the probe.
+		m, err := decodeDLMSFrameBudget(w[:n], 0, 0, true)
+		if err == nil && m.kind == "I" && !m.segmented && len(m.information) >= 5 && m.information[0] == 0xe6 && m.information[2] == 0 && (m.information[1] == 0xe6 && (apdu[0] == 5 || apdu[0] == 6) || m.information[1] == 0xe7 && (apdu[0] == 12 || apdu[0] == 13)) {
+			if dlmsSNWriteAPDU(apdu) {
+				return probeAccept("dlms", "hdlc-sn-write", 98)
+			}
+			if dlmsSNServiceBlockAPDU(apdu) {
+				return probeAccept("dlms", "hdlc-sn-read-block", 98)
+			}
+			return probeAccept("dlms", "hdlc-sn-read", 98)
+		}
+		return ProbeResult{Verdict: ProbeReject}
+	}
+	if dlmsACSEAPDU(apdu) {
+		if dlmsACSEWireEvidence(w[:n]) {
+			version := "hdlc-acse"
+			if acseLifecycleAPDU(apdu) {
+				version = "hdlc-acse-lifecycle"
+			}
+			return probeAccept("dlms", version, 98)
+		}
+		return ProbeResult{Verdict: ProbeReject}
+	}
+	if dlmsOperationAPDU(apdu) || list != nil || dlmsBlockAPDU(apdu) || dlmsNormalExtended(apdu) || dlmsNormalAccess(apdu) {
+		// Probe never admits unsolicited responses. Check frame integrity with
+		// a zero Data pool; selected requests expand only after reservation too.
+		elements = 0
+	}
+	m, e := decodeDLMS(w[:n], elements)
+	var pe *ProtocolError
+	if errors.As(e, &pe) && pe.Kind == ErrResourceExceeded {
+		if dlmsOperationAPDU(apdu) && len(apdu) > 1 && (apdu[1] == 1 || dlmsOperationListAPDU(apdu) || apdu[0] == 0xc1 && (apdu[1] == 2 || apdu[1] == 5) || apdu[0] == 0xc3 && apdu[1] == 4) && (apdu[0] == 0xc1 || apdu[0] == 0xc3) {
+			return probeAccept("dlms", "hdlc-ln-operations", 98)
+		}
+
+		if len(list) != 0 && list[0] == 0xc0 {
+			return probeAccept("dlms", "hdlc-get-list", 98)
+		}
+		if dlmsNormalAccess(apdu) {
+			return probeAccept("dlms", "hdlc-get-normal", 98)
+		}
+	}
 	if e != nil || !m.request {
 		return ProbeResult{Verdict: ProbeReject}
+	}
+	if dlmsOperationAPDU(apdu) {
+		return probeAccept("dlms", "hdlc-ln-operations", 98)
 	}
 	return probeAccept("dlms", "hdlc-get-normal", 98)
 }
 
 type dlmsPending struct {
-	wire                []byte
-	kind                string
-	dir                 int
-	source, destination uint32
-	id                  uint64
-	invoke, ns          byte
+	wire                  []byte
+	requestInformation    []byte // bounded owned APDU for an exact final-frame retry
+	requestFrames         int
+	kind                  string
+	acseInfo              bool
+	acseCommand           byte
+	acseLowAuthentication bool
+	acseConformance       uint32
+	acseMaxPDU            uint16
+	dir                   int
+	source, destination   uint32
+	id                    uint64
+	invoke, ns            byte
+	flags, choice         byte
+	count                 int
 }
 type binDLMS struct {
 	pending             *dlmsPending
+	acseSeen            map[dlmsACSEKey]dlmsACSEHistory
 	clientKnown         bool
 	clientDir           int
 	ambiguous, usedLink bool
@@ -389,31 +636,62 @@ type binDLMS struct {
 	seenCount           uint16
 	next                [2]byte
 	seqKnown            [2]bool
+	transfer            *dlmsTransfer
+	setTransfer         *dlmsSetTransfer
+	actionTransfer      *dlmsSetTransfer
+	operationProfile    string
+	fragments           *dlmsFragments
+	snBlocks            map[dlmsSNBlockKey]*dlmsSNBlockLink
+	snGBT               map[dlmsSNGBTKey]*dlmsSNGBTLink
 }
 
 func (s *binDLMS) invalidate() {
-	if s.pending != nil {
-		s.pending = nil
-		s.ambiguous = true
-	}
+	// A refused exchange is unobserved even between two completed requests.
+	// Keeping only the old sequence history would let its late response acquire
+	// a subsequent request's ID. Retire the conversation, not just a live slot.
+	s.pending = nil
+	s.transfer = nil
+	s.setTransfer = nil
+	s.actionTransfer = nil
+	s.operationProfile = ""
+	s.snBlocks = nil
+	s.snGBT = nil
+	s.fragments = nil
+	s.ambiguous = true
 }
 func (s *binDLMS) consume(m *dlmsMessage, w []byte, dir int, id uint64) (map[string]any, uint64, error) {
 	ctx := func(why string) (map[string]any, uint64, error) { return nil, 0, dlmsError(ErrContextRequired, why) }
 	if m.kind == "DM" {
 		// A disconnect-mode observation ends the association, even though its
 		// wire fields remain useful. Late replies must not reuse the old slot.
-		s.pending, s.ambiguous = nil, true
+		s.invalidate()
 		m.fields["Association"] = "unassociated-link-observation"
 		return m.fields, 0, nil
+	}
+	if dlmsSequencedService(m.kind) && s.hdlcEndpointRetired(dir, m.source, m.destination, m.request) {
+		return ctx("Get belongs to retired association context")
 	}
 	if s.ambiguous {
 		return ctx("ambiguous/reused exchange requires new conversation")
 	}
 	if m.kind == "S" {
+		if s.clientKnown && s.seqKnown[1-dir] {
+			advance := (m.nr - s.next[1-dir]) & 7
+			if advance > 0 && advance <= 4 {
+				// Future (or half-space ambiguous) modulo8 acknowledgements expose
+				// a hidden exchange. Old acknowledgements do not reopen or advance
+				// request identity; preserve their literal link observation.
+				s.invalidate()
+			}
+		}
 		m.fields["Association"] = "unassociated-link-observation"
 		return m.fields, 0, nil
 	}
 	if m.request {
+		if s.transfer != nil || s.setTransfer != nil || s.actionTransfer != nil {
+			s.invalidate()
+			return ctx("distinct request interrupts observed data-block transfer")
+		}
 		if s.clientKnown && dir != s.clientDir {
 			return ctx("request contradicts observed requester direction")
 		}
@@ -429,7 +707,7 @@ func (s *binDLMS) consume(m *dlmsMessage, w []byte, dir int, id uint64) (map[str
 			s.invalidate()
 			return ctx("more than one distinct outstanding request")
 		}
-		if m.kind == "GET" {
+		if dlmsSequencedService(m.kind) {
 			if s.seenRequest[m.invoke]&(1<<m.ns) != 0 {
 				s.ambiguous = true
 				return ctx("invoke ID and HDLC send sequence reused in conversation")
@@ -449,16 +727,22 @@ func (s *binDLMS) consume(m *dlmsMessage, w []byte, dir int, id uint64) (map[str
 			}
 			s.usedLink = true
 		}
-		s.pending = &dlmsPending{bytes.Clone(w), m.kind, dir, m.source, m.destination, id, m.invoke, m.ns}
+		s.pending = &dlmsPending{wire: bytes.Clone(w), kind: m.kind, dir: dir, source: m.source, destination: m.destination, id: id, invoke: m.invoke, ns: m.ns, flags: m.flags, choice: m.choice, count: m.count}
 		m.fields["Association"] = "observed-request"
 		return m.fields, 0, nil
 	}
 	p := s.pending
+	if p == nil && s.clientKnown && dlmsSequencedService(m.kind) && (!s.seqKnown[dir] || m.ns == s.next[dir]) {
+		// An orphan at the next peer sequence can belong to a missed request.
+		// Repeating that response after a later request cannot establish a new
+		// binding. A prior-sequence duplicate still leaves adjacent traffic usable.
+		s.invalidate()
+	}
 	if p == nil || p.dir == dir || p.source != m.destination || p.destination != m.source {
 		return ctx("response lacks reversed observed endpoint/logical-address request")
 	}
-	if m.kind == "GET" {
-		if p.kind != "GET" || p.invoke != m.invoke || m.nr != (p.ns+1)&7 {
+	if dlmsSequencedService(m.kind) {
+		if p.kind != m.kind || p.invoke != m.invoke || p.flags != m.flags || p.choice != m.choice || p.count != m.count || m.nr != (p.ns+1)&7 {
 			return ctx("response service/invoke/acknowledgement differs from pending request")
 		}
 		if s.seqKnown[dir] && m.ns != s.next[dir] {
@@ -478,35 +762,233 @@ func (s *binDLMS) consume(m *dlmsMessage, w []byte, dir int, id uint64) (map[str
 }
 
 func dlmsRequestEvidence(w []byte) bool {
-	m, err := decodeDLMS(w, 4096)
-	return err == nil && m.request
+	return probeDLMS(w, 2049).Verdict == ProbeAccept
 }
 
 // Fixed direction/sequence/ID state plus an owned pending wire copy. Parsing
 // fields and byte projections is reserved before it allocates either copy.
 func (s *binDLMS) storage() int64 {
-	n := int64(512)
+	n := int64(512) + 128*int64(len(s.acseSeen))
+	for _, l := range s.snGBT {
+		n += 128 + l.wire.storage()
+	}
+	for _, p := range s.snBlocks {
+		n += 128 + p.wire.storage()
+	}
 	if s.pending != nil {
-		n += int64(len(s.pending.wire)) * 2
+		n += int64(len(s.pending.wire)+len(s.pending.requestInformation)) * 2
+	}
+	if s.transfer != nil {
+		n += 128 + 2*int64(len(s.transfer.data))
+	}
+	if s.setTransfer != nil {
+		n += 128 + 2*int64(len(s.setTransfer.data))
+	}
+	if s.actionTransfer != nil {
+		n += 128 + 2*int64(len(s.actionTransfer.data))
+	}
+	if s.fragments != nil {
+		n += 128 + 2*int64(len(s.fragments.info)+len(s.fragments.wire))
+		if s.fragments.snGBT || s.fragments.snServiceBlockInformation {
+			n += 32
+		}
 	}
 	return n
 }
 func (f *binFlow) consumeDLMS(dir int, w []byte, id uint64) (map[string]any, uint64, error) {
 	s := f.dlms
-	if err := f.reserveSession(s.storage() + int64(len(w))*6); err != nil {
+	if err := f.reserveSession(s.storage() + f.dlmsProjection(w)); err != nil {
 		// Refusing memory cannot hide an on-wire exchange from the association
 		// state. Retire the old slot before any later response can use it.
 		s.invalidate()
 		return nil, 0, err
 	}
-	m, err := decodeDLMS(w, f.a.budget.MaxCollectionElements)
+	m, err := decodeDLMSFrameBudget(w, f.a.budget.MaxCollectionElements, f.a.budget.MaxRecursionDepth, f.dlmsLinkAssembly(w))
 	if err != nil {
 		s.invalidate()
 		return nil, 0, err
 	}
-	if m.request && m.kind == "GET" && s.pending == nil && s.seenRequest[m.invoke]&(1<<m.ns) == 0 && int(s.seenCount) >= f.a.budget.MaxCollectionElements {
+	return f.consumeDecodedDLMS(dir, w, id, m)
+}
+func (f *binFlow) consumeDecodedDLMS(dir int, w []byte, id uint64, m *dlmsMessage) (map[string]any, uint64, error) {
+	s := f.dlms
+	s.operationProfile = ""
+	if s.fragments != nil && s.fragments.snGBT || m.kind == "I" && s.fragments == nil && m.segmented && dlmsSNGBTInformation(m.information) {
+		return f.consumeDLMSSNGBTInformation(dir, w, id, m)
+	}
+	// A retained information group owns its continuation bytes. Only an
+	// undecoded complete I-frame can select the standalone LLC/E0 path;
+	// an already decoded service or an exact cached request retry must not
+	// reinterpret its opaque tail. The same bounded request is decoded below.
+	p := s.pending
+	cachedRequestRetry := p != nil && len(p.requestInformation) > 0 && dir == p.dir && bytes.Equal(p.wire, w)
+	if m.kind == "I" && s.fragments == nil && !cachedRequestRetry && dlmsSNGBTInformation(m.information) && !m.segmented {
+		if s.hasLNContext() {
+			return nil, 0, dlmsError(ErrContextRequired, "SN GBT cannot consume an observed LN owner or information group")
+		}
+		if m.snGBT == nil {
+			var err error
+			m, err = decodeDLMSInformation(m, m.information, f.a.budget.MaxCollectionElements, f.a.budget.MaxRecursionDepth)
+			if err != nil {
+				s.invalidate()
+				return nil, 0, err
+			}
+		}
+	}
+	s.observeSNGBTInterruption(m, dir)
+	if m.snGBT != nil {
+		// Only the GBT handler can prove that a complete selected inner phase
+		// preserves this SN group. Every other E0 still interrupts it there.
+		return f.consumeDLMSSNGBT(dir, w, id, m)
+	}
+	// Selected service-block information groups retain their separate service
+	// phase while the existing bounded information assembler validates each
+	// carrier. Other observations still run the unchanged interruption policy.
+	if s.fragments != nil && s.fragments.snServiceBlockInformation || m.kind == "I" && s.fragments == nil && m.segmented && dlmsSNBlockInformationPrefix(m.information) {
+		return f.consumeDLMSSNSegments(dir, w, id, m)
+	}
+	s.observeSNBlockInterruption(m, dir)
+	if s.fragments != nil && s.fragments.snCommand != 0 || m.kind == "I" && s.fragments == nil && m.segmented && dlmsSNSegmentHeader(m.information) {
+		return f.consumeDLMSSNSegments(dir, w, id, m)
+	}
+	if m.snRead || m.snWrite {
+		// A second distinct request on this same observed logical HDLC link
+		// cannot leave an older service owner trustworthy. SN still contributes
+		// only wire fields and never acquires that owner. Other logical links,
+		// opposite-direction observations and pure responses do not establish
+		// this conflict and must not be retired by this rule.
+		if p := s.pending; m.request && p != nil && p.dir == dir && p.source == m.source && p.destination == m.destination && !bytes.Equal(p.wire, w) {
+			s.invalidate()
+		}
+		if m.snBlock != nil {
+			return f.consumeDLMSSNServiceBlock(dir, w, id, m)
+		}
+		s.retireOrdinarySNBlock(m, dir)
+		// SN exposes wire observations, not a service owner. In particular
+		// it cannot acquire a live LN pending request, advance its HDLC sequence,
+		// establish an association epoch or restore trust in an ambiguous link.
+		m.fields["Association"] = "unverified-sn-read-observation"
+		if m.snWrite {
+			m.fields["Association"] = "unverified-sn-write-observation"
+		}
+		if m.snMultiResult {
+			s.operationProfile = "dlms-hdlc-sn-multiresult"
+			m.fields["Association"] = "unverified-sn-multiresult-observation"
+		}
+		return m.fields, 0, nil
+	}
+	if s.fragments != nil && s.fragments.acseCommand != 0 || s.fragments == nil && m.kind == "I" && dlmsACSESegmentPrefix(m.information) {
+		return f.consumeDLMSACSESegments(dir, w, id, m)
+	}
+	if p := s.pending; p != nil && len(p.requestInformation) > 0 && dir == p.dir && bytes.Equal(p.wire, w) {
+		// CRC/header validation and the full request projection were reserved before
+		// this decode. Rebuild private fields from the retained bounded APDU, never
+		// from caller-visible maps. The first complete event keeps reply ownership.
+		var err error
+		m, err = decodeDLMSInformation(m, p.requestInformation, f.a.budget.MaxCollectionElements, f.a.budget.MaxRecursionDepth)
+		if err != nil {
+			s.invalidate()
+			return nil, 0, err
+		}
+		meta := dlmsSegmentFields(m, p.requestFrames, true)
+		meta["assembled_information_hex"] = hex.EncodeToString(p.requestInformation)
+		if m.acse != nil {
+			m.fields["ACSE Segmentation"] = meta
+		} else {
+			m.fields["HDLC Segmentation"] = meta
+		}
+	}
+	if (dlmsSequencedService(m.kind) || m.kind == "I") && s.hdlcEndpointRetired(dir, m.source, m.destination, m.request) {
+		return nil, 0, dlmsError(ErrContextRequired, "Get information belongs to retired association context")
+	}
+	if m.kind == "I" && (s.fragments != nil && s.fragments.actionDownloadRequestChoice != 0 || s.fragments == nil && s.transfer != nil && s.transfer.initial.kind == "ACTION" && dlmsActionDownloadRequestSegmentPrefix(m.information)) {
+		return f.consumeDLMSActionDownloadRequestSegments(dir, w, id, m)
+	}
+	if m.kind == "I" && (s.fragments != nil && s.fragments.actionRequestChoice != 0 || s.fragments == nil && dlmsActionRequestSegmentPrefix(m.information) && (m.information[4] == 4 || s.actionTransfer != nil && s.actionTransfer.initial.choice == 4)) {
+		return f.consumeDLMSActionRequestSegments(dir, w, id, m)
+	}
+	if m.kind == "I" && (s.fragments != nil && s.fragments.actionDownloadResponseChoice != 0 || s.fragments == nil && s.pending != nil && s.pending.kind == "ACTION" && (s.pending.choice == 1 || s.pending.choice == 2) && len(m.information) >= 6 && bytes.Equal(m.information[:4], []byte{0xe6, 0xe7, 0, 0xc7}) && m.information[4] == 2) {
+		return f.consumeDLMSActionDownloadResponseSegments(dir, w, id, m)
+	}
+	if m.kind == "I" && (s.fragments != nil && s.fragments.actionResponseChoice != 0 || s.fragments == nil && s.pending != nil && s.pending.kind == "ACTION" && s.pending.choice == 4 && s.actionTransfer != nil && len(m.information) >= 6 && bytes.Equal(m.information[:4], []byte{0xe6, 0xe7, 0, 0xc7}) && (m.information[4] == 1 || m.information[4] == 4)) {
+		return f.consumeDLMSActionResponseSegments(dir, w, id, m)
+	}
+	if m.kind == "I" && (s.fragments != nil && s.fragments.setRequestChoice != 0 || s.fragments == nil && dlmsSetRequestSegmentPrefix(m.information) && (m.information[4] == 2 || m.information[4] == 5 || s.setTransfer != nil && (s.setTransfer.initial.choice == 2 || s.setTransfer.initial.choice == 5))) {
+		return f.consumeDLMSSetRequestSegments(dir, w, id, m)
+	}
+	if m.kind == "I" && (s.fragments != nil && s.fragments.setResponseChoice != 0 || s.fragments == nil && s.pending != nil && s.pending.kind == "SET" && (s.pending.choice == 2 || s.pending.choice == 5) && len(m.information) >= 6 && bytes.Equal(m.information[:3], []byte{0xe6, 0xe7, 0})) {
+		return f.consumeDLMSSetResponseSegments(dir, w, id, m)
+	}
+	if m.kind == "I" && s.fragments == nil && len(m.information) >= 4 && m.information[0] == 0xe6 && (m.information[1] == 0xe6 || m.information[1] == 0xe7) && m.information[2] == 0 && dlmsOperationAPDU(m.information[3:]) && !dlmsSelectedOperationSegmentPrefix(m.information) {
+		// A valid carrier can contain an unsupported foreign service/form.
+		// Its complete reply header is sufficient to exclude the observed
+		// normal/list owner; do that before the unsupported-chain retirement.
+		// This neither assembles the foreign pblock nor accepts its body.
+		p := s.pending
+		info := m.information
+		if p != nil && dir != p.dir && m.source == p.destination && m.destination == p.source && len(info) >= 6 && info[1] == 0xe7 && info[5]&0x30 == 0 && (info[3] == 0xc5 || info[3] == 0xc7) && (dlmsActionDownloadAPDU(info[3:]) || dlmsSetBlockAPDU(info[3:]) || dlmsSetListBlockAPDU(info[3:]) || dlmsActionUploadAPDU(info[3:])) {
+			expected := byte(0xc5)
+			if p.kind == "ACTION" {
+				expected = 0xc7
+			}
+			if p.kind == "GET" || dlmsOperationKind(p.kind) && (p.choice == 1 || dlmsOperationListPending(p)) && (info[3] != expected || info[4] != dlmsOperationSegmentResponseChoice(p)) {
+				return nil, 0, dlmsError(ErrContextRequired, "segmented operation reply service/form differs from pending request")
+			}
+		}
+		s.invalidate()
+		return nil, 0, dlmsError(ErrUnsupportedFeature, "segmented Set/Action information is not implemented")
+	}
+	if s.setTransfer != nil && (m.kind == "I" || m.request && dlmsSequencedService(m.kind) && !(m.block != nil && m.block.setBlock)) {
+		s.invalidate()
+		return nil, 0, dlmsError(ErrContextRequired, "distinct request interrupts observed SET data-block transfer")
+	}
+	// A complete foreign GET response header cannot belong to the retained
+	// Action upload. Exclude it before retiring an unsupported I-frame chain;
+	// neither accept its body nor change the Action prefix or reply owner.
+	if s.actionTransfer != nil && s.fragments == nil && m.kind == "I" {
+		p, info := s.pending, m.information
+		if p != nil && p.kind == "ACTION" && p.choice == 4 && dir != p.dir && m.source == p.destination && m.destination == p.source && len(info) >= 6 && bytes.Equal(info[:4], []byte{0xe6, 0xe7, 0, 0xc4}) && info[4] >= 1 && info[4] <= 3 && info[5]&0x30 == 0 {
+			return nil, 0, dlmsError(ErrContextRequired, "segmented GET response differs from pending Action upload")
+		}
+	}
+	if s.actionTransfer != nil && (m.kind == "I" || m.request && dlmsSequencedService(m.kind) && !(m.block != nil && m.block.actionUpload)) {
+		s.invalidate()
+		return nil, 0, dlmsError(ErrContextRequired, "distinct request interrupts observed Action pblock transfer")
+	}
+	if m.block != nil && (m.block.actionUpload || s.actionTransfer != nil && m.kind == "ACTION" && !m.request && m.choice == 1) {
+		if s.actionTransfer == nil && m.request && m.block.blockFirst && s.pending == nil && s.seenRequest[m.invoke]&(1<<m.ns) == 0 && int(s.seenCount) >= f.a.budget.MaxCollectionElements {
+			s.invalidate()
+			return nil, 0, dlmsError(ErrResourceExceeded, "retained invoke/sequence token limit")
+		}
+		return f.consumeDLMSActionUpload(dir, w, id, m)
+	}
+	if m.block != nil && m.block.setBlock {
+		if s.setTransfer == nil && m.request && m.block.blockFirst && s.pending == nil && s.seenRequest[m.invoke]&(1<<m.ns) == 0 && int(s.seenCount) >= f.a.budget.MaxCollectionElements {
+			s.invalidate()
+			return nil, 0, dlmsError(ErrResourceExceeded, "retained invoke/sequence token limit")
+		}
+		return f.consumeDLMSSetBlock(dir, w, id, m)
+	}
+	if m.kind == "I" || s.fragments != nil {
+		return f.consumeDLMSSegments(dir, w, id, m)
+	}
+	if (m.kind == "GET" || m.kind == "ACTION") && m.choice == 2 {
+		return f.consumeDLMSBlock(dir, w, id, m)
+	}
+	if m.request && dlmsSequencedService(m.kind) && s.pending == nil && s.seenRequest[m.invoke]&(1<<m.ns) == 0 && int(s.seenCount) >= f.a.budget.MaxCollectionElements {
 		s.ambiguous = true
 		return nil, 0, dlmsError(ErrResourceExceeded, "retained invoke/sequence token limit")
+	}
+	if m.acse != nil {
+		fields, response, err := s.consumeACSE(m, w, dir, id, f.a.budget.MaxCollectionElements)
+		if m.acse.acseRelease || m.acse.acseAbort {
+			retained := s.storage() + dlmsProjection(w)
+			if retained < f.sessionBytes {
+				f.a.buffered.Add(retained - f.sessionBytes)
+				f.sessionBytes = retained
+			}
+		}
+		return fields, response, err
 	}
 	return s.consume(m, w, dir, id)
 }
@@ -518,6 +1000,32 @@ func dlmsRecoverableMessageError(err error) bool {
 
 const dlmsIdleTTL = 30 * time.Second
 
+// Admission for an oversized initial UDP request examines only the bounded
+// format/address/control/HCS/LLC/service header, never its APDU body or FCS.
+// This is a refusal hint on the DLMS port, not successful semantic validation.
+func dlmsUDPRefusalHint(w []byte) bool {
+	if len(w) < 17 || w[0] != 0x7e || w[len(w)-1] != 0x7e || binary.BigEndian.Uint16(w[1:3])>>12 != 0xa || int(binary.BigEndian.Uint16(w[1:3])&0x7ff)+2 != len(w) {
+		return false
+	}
+	at, end := 3, len(w)-3
+	for i := 0; i < 2; i++ {
+		if _, _, err := dlmsAddress(w[:end], &at); err != nil {
+			return false
+		}
+	}
+	if end-at < 9 || w[at]&1 != 0 || dlmsCRC(w[1:at+1]) != binary.LittleEndian.Uint16(w[at+1:at+3]) {
+		return false
+	}
+	if dlmsSNBlockRefusalHint(w) || dlmsSNUploadRefusalHint(w) || dlmsSNGBTRefusalHint(w) {
+		return true
+	}
+	p := w[at+3:]
+	if bytes.Equal(p[:3], []byte{0xe6, 0xe6, 0}) && (p[3] == 0xc1 || p[3] == 0xc3) {
+		return (p[4] == 1 || dlmsOperationListAPDU(p[3:]) || dlmsSetBlockAPDU(p[3:]) || dlmsSetListBlockAPDU(p[3:]) || dlmsActionUploadAPDU(p[3:])) && p[5]&0x30 == 0
+	}
+	return bytes.Equal(p[:4], []byte{0xe6, 0xe6, 0, 0xc0}) && (p[4] == 1 || p[4] == 2 || p[4] == 3) && p[5]&0x30 == 0
+}
+
 func (a *binParser) decodeDLMSDatagram(e *ProtocolEvent, w []byte, explicit bool) bool {
 	key := binUDPKey{"dlms/" + e.Source, "dlms/" + e.Destination, e.Domain}
 	if key.a > key.b {
@@ -526,11 +1034,12 @@ func (a *binParser) decodeDLMSDatagram(e *ProtocolEvent, w []byte, explicit bool
 	a.udpMu.Lock()
 	store := a.udpSessions
 	existing := store != nil && store.entries[key] != nil
-	if !explicit && !(len(w) > 0 && w[0] == 0x7e && (existing || dlmsRequestEvidence(w))) {
+	if !explicit && !(len(w) > 0 && w[0] == 0x7e && (existing || dlmsRequestEvidence(w) || dlmsACSEWireEvidence(w))) {
 		a.udpMu.Unlock()
 		return false
 	}
-	e.Protocol, e.Profile, e.Admission, e.Completeness = "dlms", "dlms-hdlc-get-normal", "wire-signature", "message"
+	e.nativeDLMSOrSLMPObservation = true
+	e.Protocol, e.Profile, e.Admission, e.Completeness = "dlms", dlmsProfile(w), "wire-signature", "message"
 	if explicit {
 		e.Admission = "explicit-decode-as"
 	}
@@ -541,67 +1050,179 @@ func (a *binParser) decodeDLMSDatagram(e *ProtocolEvent, w []byte, explicit bool
 		store = &binUDPStore{entries: make(map[binUDPKey]*list.Element), clock: e.Timestamp}
 		a.udpSessions = store
 	}
-	if e.Timestamp.After(store.clock) {
-		store.clock = e.Timestamp
-	}
-	for el := store.lru.Front(); el != nil; {
-		next := el.Next()
-		v := el.Value.(*binUDPEntry)
-		if v.flow.dlms != nil && store.clock.Sub(v.touched) >= dlmsIdleTTL {
-			v.flow.closeSession()
-			delete(store.entries, v.key)
-			store.lru.Remove(el)
-		}
-		el = next
-	}
 	el := store.entries[key]
+	if el != nil {
+		v := el.Value.(*binUDPEntry)
+		if e.Timestamp.Sub(v.touched) >= dlmsIdleTTL {
+			v.flow.retireDLMSUDP()
+		}
+	}
+	created := el == nil
+	f := &binFlow{a: a, dlms: &binDLMS{ambiguous: a.dlmsUntrackedRefusal}, endpoints: [2]string{e.Source, e.Destination}}
+	if el != nil {
+		v := el.Value.(*binUDPEntry)
+		f = v.flow
+		e.FlowID = f.id
+		if e.Source != f.endpoints[0] {
+			e.Direction = 1
+		} else {
+			e.Direction = 0
+		}
+		if e.Timestamp.After(v.touched) {
+			v.touched = e.Timestamp
+		}
+		store.lru.MoveToBack(el)
+	}
+	operationSegment := f.dlmsOperationSegmentObservation(w)
+	actionDownloadRequestSegment := f.dlmsActionDownloadRequestSegmentObservation(w, e.Direction)
+	actionDownloadResponseSegment := f.dlmsActionDownloadResponseSegmentObservation(w, e.Direction)
+	actionResponseSegment := f.dlmsActionResponseSegmentObservation(w, e.Direction)
+	actionRequestSegment := f.dlmsActionRequestSegmentObservation(w, e.Direction)
+	setRequestSegment := f.dlmsSetRequestSegmentObservation(w, e.Direction)
+	setResponseSegment := f.dlmsSetResponseSegmentObservation(w, e.Direction)
+	setListBlockProfile := f.dlmsSetListBlockContext(w, e.Direction)
 	var m *dlmsMessage
 	var err error
-	oversize := len(w) > a.budget.MaxFrameBytes
+	oversize := len(w) > min(a.budget.MaxFrameBytes, a.config.MaxMessageBytes)
 	if oversize {
 		err = dlmsError(ErrResourceExceeded, "frame exceeds byte budget")
-	} else {
-		m, err = decodeDLMS(w, a.budget.MaxCollectionElements)
+	} else if err = f.reserveSession(f.dlms.storage() + f.dlmsProjection(w)); err == nil {
+		m, err = decodeDLMSFrameBudget(w, a.budget.MaxCollectionElements, a.budget.MaxRecursionDepth, f.dlmsLinkAssembly(w))
 	}
-	if m != nil && !m.request && m.kind != "S" {
+	// Retained assemblers own all opaque continuation bytes. Only a fresh
+	// CRC/HCS-valid E0 first carrier may enter the existing GBT assembler here.
+	coldGBTInformation := created && err == nil && dlmsSNColdGBTInformationPrefix(m)
+	// Only a newly observed UDP conversation may derive SN direction from a
+	// first information header. Retained assemblers own opaque continuations,
+	// even when their bytes resemble a standalone SN LLC/service prefix.
+	if created && err == nil && dlmsSNColdInformationPrefix(m) {
+		m.request = m.information[3] == 5 || m.information[3] == 6
+		m.snRead = m.information[3] == 5 || m.information[3] == 12
+		m.snWrite = m.information[3] == 6 || m.information[3] == 13
+	}
+
+	if created && m != nil && !coldGBTInformation && !m.snRead && !m.snWrite && m.snGBT == nil && !m.request && m.kind != "S" && (m.acse == nil || !m.acse.acseAbort) && !dlmsAbortSegmentPrefix(m.information) {
 		e.Direction = 1
+		if m.acse != nil || dlmsACSESegmentPrefix(m.information) {
+			f.endpoints = [2]string{e.Destination, e.Source}
+		}
 	}
-	if err == nil && el == nil {
-		if m.kind == "S" || m.kind == "DM" {
-			e.Session, e.ResponseTo, err = (&binDLMS{}).consume(m, w, e.Direction, e.ID)
-		} else if !m.request {
+	if err == nil {
+		if m.snRead || m.snWrite || m.snGBT != nil || coldGBTInformation {
+			// Complete SN observations need no new owner. Information groups and
+			// service phases retain their bounded flow with the literal caller direction;
+			// an existing LN flow keeps its owner and charge.
+			e.Session, e.ResponseTo, err = f.consumeDecodedDLMS(e.Direction, w, e.ID, m)
+			if err == nil && created && (len(f.dlms.snBlocks) > 0 || len(f.dlms.snGBT) > 0 || f.dlms.fragments != nil && (f.dlms.fragments.snCommand != 0 || f.dlms.fragments.snGBT)) {
+				if len(store.entries) >= sessionCollectionLimit(a.budget.MaxCollectionElements) {
+					err = dlmsError(ErrResourceExceeded, "UDP SN service-block conversation budget")
+				} else {
+					// Preserve native caller orientation. A captured cold response
+					// may instead be the first physical origin, with direction0.
+					f.endpoints = [2]string{e.Source, e.Destination}
+					if e.Direction == 1 {
+						f.endpoints = [2]string{e.Destination, e.Source}
+					}
+					f.id, f.domain = a.flows.Add(1), e.Domain
+					store.entries[key] = store.lru.PushBack(&binUDPEntry{key, f, e.Timestamp})
+					e.FlowID = f.id
+					created = false
+				}
+			}
+		} else if created && (m.kind == "S" || m.kind == "DM") {
+			e.Session, e.ResponseTo, err = f.dlms.consume(m, w, e.Direction, e.ID)
+		} else if created && !m.request && m.acse == nil && !dlmsACSESegmentPrefix(m.information) {
 			err = dlmsError(ErrContextRequired, "response lacks observed request context")
-		} else if len(store.entries) >= sessionCollectionLimit(a.budget.MaxCollectionElements) {
+		} else if created && len(store.entries) >= sessionCollectionLimit(a.budget.MaxCollectionElements) {
 			err = dlmsError(ErrResourceExceeded, "UDP conversation limit")
 		} else {
-			f := &binFlow{a: a, id: a.flows.Add(1), protocol: "dlms", dlms: &binDLMS{}, endpoints: [2]string{e.Source, e.Destination}}
-			if err = f.reserveSession(512 + int64(len(w))*6); err == nil {
-				el = store.lru.PushBack(&binUDPEntry{key, f, store.clock})
-				store.entries[key] = el
+			e.Session, e.ResponseTo, err = f.consumeDecodedDLMS(e.Direction, w, e.ID, m)
+			if err == nil && created {
+				f.id = a.flows.Add(1)
+				store.entries[key] = store.lru.PushBack(&binUDPEntry{key, f, e.Timestamp})
+				e.FlowID = f.id
+				created = false
 			}
 		}
 	}
-	if el != nil {
-		v := el.Value.(*binUDPEntry)
-		v.touched = store.clock
-		store.lru.MoveToBack(el)
-		f := v.flow
-		e.FlowID = f.id
-		e.Direction = 0
-		if e.Source != f.endpoints[0] {
-			e.Direction = 1
-		}
-		if err != nil {
+	if err != nil {
+		var pe *ProtocolError
+		// Byte/semantic refusals hide an exchange from observation: retire its old
+		// pending wire. Context mismatch preserves the adjacent exact reply behavior.
+		if m == nil || errors.As(err, &pe) && pe.Kind == ErrResourceExceeded {
 			f.dlms.invalidate()
-		} else {
-			e.Session, e.ResponseTo, err = f.consumeDLMS(e.Direction, w, e.ID)
 		}
+		e.Session, e.ResponseTo = nil, 0
+		if f.dlms.storage() < f.sessionBytes {
+			a.buffered.Add(f.dlms.storage() - f.sessionBytes)
+			f.sessionBytes = f.dlms.storage()
+		}
+	}
+	if created && m != nil && (m.acse != nil || dlmsACSESegmentPrefix(m.information)) && len(f.dlms.acseSeen) > 0 && err != nil {
+		// A parsed orphan may retain only a bounded logical-address/sequence
+		// refusal token. It remains an error with no fields or request link.
+		if len(store.entries) >= sessionCollectionLimit(a.budget.MaxCollectionElements) {
+			err = dlmsError(ErrResourceExceeded, "UDP orphan ACSE conversation limit")
+		} else {
+			f.id, f.domain = a.flows.Add(1), e.Domain
+			store.entries[key] = store.lru.PushBack(&binUDPEntry{key, f, e.Timestamp})
+			e.FlowID = f.id
+			created = false
+		}
+	}
+	if created {
+		var pe *ProtocolError
+		if errors.As(err, &pe) && pe.Kind == ErrResourceExceeded {
+			// No charged endpoint marker was retained. A retry/late reply cannot
+			// prove a new HDLC generation. Keep a constant-size capture marker;
+			// already retained independent keys keep their observed context.
+			a.dlmsUntrackedRefusal = true
+		}
+		f.closeSession()
+	}
+	// Capture the current event marker under the same lock as its session.
+	// A later packet or Close must not replace this observation after unlock.
+	operationProfile := ""
+	if err == nil && f.dlms != nil {
+		operationProfile = f.dlms.operationProfile
 	}
 	a.udpMu.Unlock()
 	if err == nil {
 		e.semanticFields = cloneSession(e.Session)
+		e.Profile = dlmsObservedProfile(w, e.Session)
+		if operationProfile != "" {
+			e.Profile = operationProfile
+		}
 	}
-	if oversize {
+	if operationSegment != "" && (err != nil || operationSegment != "dlms-hdlc-sn-gbt-information-segmented") {
+		e.Profile = operationSegment
+	}
+	if setListBlockProfile {
+		e.Profile = "dlms-hdlc-set-list-block"
+	}
+	if setRequestSegment != "" {
+		e.Profile = setRequestSegment
+	}
+	if actionRequestSegment != "" {
+		e.Profile = actionRequestSegment
+	}
+	if actionResponseSegment != "" {
+		e.Profile = actionResponseSegment
+	}
+	if actionDownloadResponseSegment != "" {
+		e.Profile = actionDownloadResponseSegment
+	}
+	if actionDownloadRequestSegment != "" {
+		e.Profile = actionDownloadRequestSegment
+	}
+	if setResponseSegment != "" {
+		e.Profile = setResponseSegment
+	}
+	var resource *ProtocolError
+	if oversize || dlmsListAPDU(w) != nil && errors.As(err, &resource) && resource.Kind == ErrResourceExceeded {
+		// finishProtocolDatagram only sees retained Raw. Denied input still
+		// belongs in the byte ledger even when copying it is disallowed.
+		a.limited.Add(uint64(len(w)))
 		w = nil
 	}
 	a.finishProtocolDatagram(e, w, nil, err)

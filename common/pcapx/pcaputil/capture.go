@@ -85,6 +85,9 @@ func Start(opt ...CaptureOption) (resultErr error) {
 	if conf.Filename != "" && conf.BPFFilter == "" && conf.onNetInterfaceCreated == nil && !conf.EnableCache && conf.captureBuffer == 0 && len(conf.DeviceAdapter) == 0 && len(conf.Device) == 0 {
 		return replayFileWithConfig(conf.Filename, conf)
 	}
+	if conf.normalizePcapLength {
+		return errors.New("legacy PCAP length normalization requires offline replay")
+	}
 	if err := conf.prepareBinParser(); err != nil {
 		return err
 	}

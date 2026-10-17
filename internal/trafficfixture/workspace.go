@@ -41,6 +41,81 @@ func Verify() error {
 // source dependencies needed to build their Go generators. Callers own its
 // lifetime. Normal traffic tests continue reading ZIPs without extraction.
 func Export(directory string) error {
+	names, err := Names()
+	if err != nil {
+		return err
+	}
+	return exportNames(directory, names)
+}
+
+// ExportTools materializes all archived tools, inputs and answers, but only
+// requested versions of the large unified test inventories. The immutable
+// ZIPs/index remain present, so omitted historical inventories remain readable
+// through ReadFile. The standalone inventory checker receives only its script
+// and explicitly requested inventory; it has no other archived dependencies.
+// This preserves the existing expanded workspace budget.
+func ExportTools(directory string, requested []string) error {
+	names, err := Names()
+	if err != nil {
+		return err
+	}
+	for _, name := range requested {
+		if !validName(name) {
+			return fmt.Errorf("trafficfixture: invalid requested export path %q", name)
+		}
+	}
+	if standaloneInventoryRequest(requested) {
+		known := map[string]bool{}
+		for _, name := range names {
+			known[name] = true
+		}
+		if known[requested[0]] && known[requested[1]] {
+			return exportNames(directory, requested)
+		}
+	}
+	selected := make([]string, 0, len(names))
+	for _, name := range names {
+		include := !strings.HasPrefix(filepath.Base(name), "required-tests-traffic-unified-v")
+		for _, req := range requested {
+			if name == req || strings.HasPrefix(name, req+"/") {
+				include = true
+			}
+		}
+		if include {
+			selected = append(selected, name)
+		}
+	}
+	return exportNames(directory, selected)
+}
+
+// Only this exact two-file invocation is dependency-free. Generators, prefix
+// requests and additional supporting inputs retain the ordinary tool workspace.
+func standaloneInventoryRequest(requested []string) bool {
+	if len(requested) != 2 {
+		return false
+	}
+	const checker = "scripts/protocol-tests/check_go_test_json_v2.py"
+	const prefix = "scripts/protocol-tests/required-tests-traffic-unified-v"
+	a, b := requested[0], requested[1]
+	if b == checker {
+		a, b = b, a
+	}
+	if a != checker || !strings.HasPrefix(b, prefix) || !strings.HasSuffix(b, ".json") {
+		return false
+	}
+	version := strings.TrimSuffix(strings.TrimPrefix(b, prefix), ".json")
+	if version == "" {
+		return false
+	}
+	for _, digit := range version {
+		if digit < '0' || digit > '9' {
+			return false
+		}
+	}
+	return true
+}
+
+func exportNames(directory string, names []string) error {
 	c, err := load()
 	if err != nil {
 		return err
@@ -52,10 +127,6 @@ func Export(directory string) error {
 	entries, err := os.ReadDir(directory)
 	if err != nil || len(entries) != 0 {
 		return fmt.Errorf("trafficfixture: export directory must be empty")
-	}
-	names, err := Names()
-	if err != nil {
-		return err
 	}
 	const maxWorkspace = 384 << 20
 	var total int64
@@ -92,7 +163,10 @@ func Export(directory string) error {
 		return nil
 	}
 	for _, name := range names {
-		loc := c.aliases[name]
+		loc, ok := c.aliases[name]
+		if !ok {
+			return fmt.Errorf("trafficfixture: unknown export alias %q", name)
+		}
 		data, err := readMember(loc.batch, loc.member)
 		if err != nil {
 			return err

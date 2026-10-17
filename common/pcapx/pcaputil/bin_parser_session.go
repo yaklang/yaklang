@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"sort"
+	"strconv"
 )
 
 const binH2Preface = "PRI * HTTP/2.0\r\n\r\nSM\r\n\r\n"
@@ -15,6 +16,26 @@ func (f *binFlow) detectDirection(dir int, wire []byte) {
 	// identity until its data TPDU arrives; keep its bounded prefix away from
 	// weak length-prefixed DNS detection. An actual RDP negotiation is decisive.
 	if f.detectBinding(wire) {
+		return
+	}
+	for _, port := range f.a.config.MMSISOPorts {
+		if f.port(port) {
+			f.protocol, f.mms = "mms", newBinMMS()
+			f.mms.values = f.a.config.DecodeMMSServiceValues
+			f.mms.validateDescriptions = f.a.config.ValidateMMSDescriptions
+			return
+		}
+	}
+	if f.port(5094) && len(wire) > 0 && wire[0] == 1 {
+		f.protocol = "hart-ip"
+		f.hart = f.newHARTIP()
+		return
+	}
+	if len(wire) > 0 && len(wire) < 4 && bytes.HasPrefix([]byte("FINS"), wire) {
+		return
+	}
+	if len(wire) >= 4 && bytes.Equal(wire[:4], []byte("FINS")) {
+		f.protocol, f.fins = "fins", &binFINS{clientKnown: f.tcpClientKnown, clientDir: f.tcpClientDir}
 		return
 	}
 	if p := probeSLMPTCP(wire, min(f.a.budget.MaxFrameBytes, f.a.config.MaxMessageBytes), f.port(5000)); p.Verdict == ProbeAccept {
@@ -51,7 +72,7 @@ func (f *binFlow) detectDirection(dir int, wire []byte) {
 	} else if p.Verdict == ProbeNeedMore {
 		return
 	}
-	if p := probeDLMS(wire, f.a.budget.MaxFrameBytes); p.Verdict == ProbeAccept {
+	if p := probeDLMSStream(wire, f.a.budget.MaxFrameBytes, f.a.config.ProbeBytes); p.Verdict == ProbeAccept {
 		f.protocol, f.dlms = "dlms", &binDLMS{clientDir: f.tcpClientDir, clientKnown: f.tcpClientKnown}
 		return
 	} else if p.Verdict == ProbeNeedMore {
@@ -68,13 +89,19 @@ func (f *binFlow) detectDirection(dir int, wire []byte) {
 		return
 	}
 	if p := probeDoIP(wire, f.a.budget.MaxFrameBytes); p.Verdict == ProbeAccept {
-		f.protocol, f.doip = "doip", &binDoIP{clientDir: dir, maxPending: f.a.budget.MaxCollectionElements}
+		f.protocol, f.doip = "doip", &binDoIP{clientDir: dir, maxPending: f.a.budget.MaxCollectionElements, reserveMemory: f.reserveSession}
 		return
 	} else if p.Verdict == ProbeNeedMore {
 		return
 	}
 	f.detect(wire)
 	if f.binding != nil || f.protocol != "" {
+		// The legacy detector recognizes MQTT 3.1.1 before generic native
+		// probing. Give that validated CONNECT the same bounded session path
+		// while preserving explicit bindings and the legacy MQTT 3.1 profile.
+		if f.binding == nil && f.protocol == "mqtt" && f.level == 4 {
+			f.mqtt = &binMQTT{client: dir, level: 4, pending: [2]map[uint16]mqttPending{{}, {}}, aliases: [2]map[uint16]string{{}, {}}}
+		}
 		return
 	}
 	if f.captureTCP && probeDNSTCP(wire, f.a.budget.MaxFrameBytes).Verdict == ProbeAccept {
@@ -135,9 +162,14 @@ func (f *binFlow) detectDirection(dir int, wire []byte) {
 		f.protocol, f.beanstalk = "beanstalkd", &binBeanstalk{client: dir}
 		return
 	}
+	if probeHARTIP(wire).Verdict == ProbeAccept {
+		f.protocol = "hart-ip"
+		f.hart = f.newHARTIP()
+		return
+	}
 	if probeENIP(w).Verdict == ProbeAccept {
 		f.protocol = "enip"
-		f.enip = &binENIP{clientDir: dir, maxPending: f.a.budget.MaxCollectionElements}
+		f.enip = &binENIP{clientDir: dir, maxPending: f.a.budget.MaxCollectionElements, reserveMemory: f.reserveSession}
 		return
 	}
 	if f.captureTCP && f.port(4000) && probeSCGIRequest(wire) {
@@ -169,6 +201,9 @@ func (f *binFlow) detectDirection(dir int, wire []byte) {
 	} else {
 		p = probeWireTransport(w, f.a.config.ProbeBytes, f.captureTCP)
 	}
+	if p.Verdict == ProbeReject && !f.captureTCP {
+		p = probeRADIUSAccountingByte(wire, min(f.a.budget.MaxFrameBytes, f.a.config.MaxMessageBytes))
+	}
 	if p.Verdict != ProbeAccept {
 		return
 	}
@@ -195,9 +230,9 @@ func (f *binFlow) detectDirection(dir int, wire []byte) {
 	case "roc-plus":
 		f.protocol, f.rocplus = "roc-plus", &binROCPlus{clientDir: f.tcpClientDir, clientKnown: f.tcpClientKnown}
 	case "doip":
-		f.protocol, f.doip = "doip", &binDoIP{clientDir: dir, maxPending: f.a.budget.MaxCollectionElements}
+		f.protocol, f.doip = "doip", &binDoIP{clientDir: dir, maxPending: f.a.budget.MaxCollectionElements, reserveMemory: f.reserveSession}
 	case "enip":
-		f.protocol, f.enip = "enip", &binENIP{clientDir: dir, maxPending: f.a.budget.MaxCollectionElements}
+		f.protocol, f.enip = "enip", &binENIP{clientDir: dir, maxPending: f.a.budget.MaxCollectionElements, reserveMemory: f.reserveSession}
 	case "zookeeper":
 		clientDir := dir
 		if p.Version == "jute-connect-v0/ConnectResponse" {
@@ -227,7 +262,7 @@ func (f *binFlow) detectDirection(dir int, wire []byte) {
 	case "s7comm":
 		f.protocol, f.s7 = "s7comm", &binS7{}
 	case "opcua":
-		f.protocol, f.opcua = "opcua", &binOPCUA{}
+		f.protocol, f.opcua = "opcua", &binOPCUA{read: f.a.config.DecodeOPCUARead, browse: f.a.config.DecodeOPCUABrowse, write: f.a.config.DecodeOPCUAWrite, next: f.a.config.DecodeOPCUABrowseNext, call: f.a.config.DecodeOPCUACall, arrays: f.a.config.DecodeOPCUAVariantArrays || f.a.config.DecodeOPCUAStructuredValues, structured: f.a.config.DecodeOPCUAStructuredValues}
 	case "rtsp":
 		f.protocol, f.rtsp = "rtsp", &binRTSP{}
 	case "stun":
@@ -249,7 +284,11 @@ func (f *binFlow) detectDirection(dir int, wire []byte) {
 		}
 		f.protocol, f.ws = "websocket", &binWebSocket{client: client, phase: wsPhaseFromProbe(w)}
 	case "mqtt":
-		f.protocol, f.mqtt = "mqtt", &binMQTT{client: dir, level: 5, pending: [2]map[uint16]string{{}, {}}, aliases: [2]map[uint16]string{{}, {}}}
+		level := byte(5)
+		if probeMQTT(w, f.a.config.ProbeBytes).Version == "3.1.1" {
+			level = 4
+		}
+		f.protocol, f.mqtt = "mqtt", &binMQTT{client: dir, level: level, pending: [2]map[uint16]mqttPending{{}, {}}, aliases: [2]map[uint16]string{{}, {}}}
 	case "mongodb":
 		f.protocol, f.mongo = "mongodb", &binMongo{pending: map[uint32]string{}}
 	case "kafka":
@@ -297,7 +336,7 @@ func (f *binFlow) detectDirection(dir int, wire []byte) {
 	case "tns":
 		f.protocol, f.tns = "tns", &binTNS{}
 	case "radius":
-		f.protocol, f.radius = "radius", &binRADIUS{pending: map[uint8]string{}}
+		f.protocol, f.radius = "radius", &binRADIUS{}
 	case "dhcp":
 		f.protocol, f.dhcp = "dhcp", &binDHCP{pending: map[uint32]string{}}
 	case "ntp":
@@ -307,7 +346,18 @@ func (f *binFlow) detectDirection(dir int, wire []byte) {
 	case "modbus":
 		f.protocol, f.modbus = "modbus", &binModbus{pending: map[uint16]modbusRequest{}, maxPending: f.a.budget.MaxCollectionElements}
 	case "dnp3":
-		f.protocol, f.dnp3 = "dnp3", &binDNP3{pending: map[uint32]string{}}
+		cfg := f.a.config
+		events := cfg.DecodeDNP3CounterEvents || cfg.DecodeDNP3EventCountReads || cfg.DecodeDNP3BinaryEvents || cfg.DecodeDNP3AnalogEvents
+		counters := cfg.DecodeDNP3CounterPoints || events
+		typed := cfg.DecodeDNP3TypedStaticReads || counters || cfg.DecodeDNP3StaticStatusPoints
+		direct := cfg.DecodeDNP3DirectStaticReads || typed
+		f.protocol, f.dnp3 = "dnp3", &binDNP3{
+			pending: map[dnp3RequestKey]dnp3Request{}, maxPending: f.a.budget.MaxCollectionElements,
+			reserve: f.reserveSession, maxDepth: f.a.budget.MaxRecursionDepth,
+			readPoints: cfg.DecodeDNP3ReadPoints || direct, directReads: direct, typedReads: typed,
+			counterPoints: counters, counterEvents: events, eventCountReads: cfg.DecodeDNP3EventCountReads || cfg.DecodeDNP3BinaryEvents || cfg.DecodeDNP3AnalogEvents, binaryEvents: cfg.DecodeDNP3BinaryEvents || cfg.DecodeDNP3AnalogEvents, analogEvents: cfg.DecodeDNP3AnalogEvents, statusPoints: cfg.DecodeDNP3StaticStatusPoints,
+			transportFragments: cfg.DecodeDNP3TransportFragments, maxApplication: cfg.MaxMessageBytes,
+		}
 	case "c37118":
 		f.protocol, f.c37118 = "c37118", &binC37118{}
 	case "syslog":
@@ -365,6 +415,27 @@ func (f *binFlow) needsMoreOpenWire(wire []byte) bool {
 func (f *binFlow) consumeSession(dir int, e *ProtocolEvent, result map[string]any) error {
 	var err error
 	switch f.protocol {
+	case "mms":
+		e.Session, err = f.consumeMMSISO(dir, e)
+		if err == nil {
+			e.semanticFields = cloneSession(e.Session)
+			e.semanticSession = cloneSession(e.Session)
+		}
+	case "fins":
+		if e.ID == 0 {
+			e.ID = f.a.ids.Add(1)
+		}
+		e.Profile, e.Completeness = finsProfile, "message"
+		e.Session, e.ResponseTo, err = f.fins.consumeTCP(e.Raw, dir, e.ID, e.Timestamp, f.a.budget)
+		if err == nil {
+			e.semanticFields, e.semanticSession = cloneSession(e.Session), cloneSession(e.Session)
+			e.TransactionID = e.ResponseTo
+			if e.TransactionID == 0 {
+				if inner, ok := e.Session["fins"].(map[string]any); ok {
+					e.TransactionID, _ = inner["observed_request_id"].(uint64)
+				}
+			}
+		}
 	case "slmp":
 		if e.ID == 0 {
 			e.ID = f.a.ids.Add(1)
@@ -397,7 +468,54 @@ func (f *binFlow) consumeSession(dir int, e *ProtocolEvent, result map[string]an
 	case "s7comm":
 		e.Session, err = f.s7.consume(dir, e.Raw, f.a.budget.MaxCollectionElements, f.a.budget.MaxMessageBytes)
 	case "opcua":
-		e.Session, err = f.opcua.consume(dir, e.Raw, f.a.budget.MaxCollectionElements, f.a.budget.MaxMessageBytes)
+		e.nativeOPCUAObservation = f.opcua.selected()
+		if f.opcua.selected() && e.ID == 0 {
+			e.ID = f.a.ids.Add(1)
+		}
+		e.Session, err = f.opcua.consumeEvent(dir, e, f.a.budget.MaxCollectionElements, f.a.budget.MaxMessageBytes)
+		if f.opcua.selected() {
+			e.Profile = f.opcua.observationProfile()
+			if e.Session["Read"] != nil {
+				e.Profile = "opcua-read-scalar"
+			} else if e.Session["Browse"] != nil {
+				e.Profile = "opcua-browse"
+			} else if e.Session["Write"] != nil {
+				e.Profile = "opcua-write"
+			} else if e.Session["BrowseNext"] != nil {
+				e.Profile = "opcua-browsenext"
+			} else if e.Session["Call"] != nil {
+				e.Profile = "opcua-call"
+			}
+			if f.opcua.structured {
+				switch e.Profile {
+				case "opcua-read-scalar":
+					e.Profile = "opcua-read-values"
+				case "opcua-write":
+					e.Profile = "opcua-write-values"
+				case "opcua-call":
+					e.Profile = "opcua-call-values"
+				case "opcua-browse":
+					e.Profile = "opcua-browse-values"
+				case "opcua-browsenext":
+					e.Profile = "opcua-browsenext-values"
+				}
+			} else if f.opcua.arrays {
+				switch e.Profile {
+				case "opcua-read-scalar":
+					e.Profile = "opcua-read-variants"
+				case "opcua-write":
+					e.Profile = "opcua-write-variants"
+				case "opcua-call":
+					e.Profile = "opcua-call-variants"
+				}
+			}
+			if err == nil {
+				e.semanticFields = cloneSession(e.Session)
+				if result != nil {
+					result["fields"] = e.semanticFields
+				}
+			}
+		}
 	case "rtsp":
 		e.Session, err = f.rtsp.consume(dir, e.Raw, e.Timestamp, f.a.budget.MaxCollectionElements)
 		if err == nil && e.Session["Profile"] == "apple-control" {
@@ -459,6 +577,9 @@ func (f *binFlow) consumeSession(dir int, e *ProtocolEvent, result map[string]an
 	case "mysql":
 		if e.Entry == "MySQLPreparedFields" {
 			e.Session, err = f.consumeMySQLPrepared(dir, e)
+			// Columns/row names can reference retained statement metadata.
+			// The event is caller-owned and must not expose that live state.
+			e.Session = cloneSession(e.Session)
 		} else {
 			e.Session, err = f.mysql.consume(dir, e.Raw, e.Entry, result)
 		}
@@ -492,6 +613,14 @@ func (f *binFlow) consumeSession(dir int, e *ProtocolEvent, result map[string]an
 	case "websocket":
 		if e.Entry == "WebSocket" {
 			e.Session, err = f.ws.consume(dir, e.Raw)
+			if err == nil {
+				err = f.consumeOCPP(dir, e)
+			}
+			if err == nil && e.Session["OCPP"] != nil {
+				if fields, ok := result["fields"].(map[string]any); ok {
+					fields["OCPP"] = cloneSessionValue(e.Session["OCPP"])
+				}
+			}
 		} else {
 			e.Session = map[string]any{
 				"Protocol Transition": "http->websocket",
@@ -499,7 +628,14 @@ func (f *binFlow) consumeSession(dir int, e *ProtocolEvent, result map[string]an
 			}
 		}
 	case "mqtt":
-		e.Session, err = f.mqtt.consume(dir, e.Raw, result)
+		e.Session, err = f.mqtt.consume(dir, e.Raw, result, f.a.budget.MaxCollectionElements, f.a.budget.MaxRecursionDepth, f.reserveSession)
+		if err == nil && e.Session["Sparkplug"] != nil {
+			// Preserve every native MQTT field and its wire span. The carried
+			// application observation is additive and owns its query projection.
+			if fields, ok := result["fields"].(map[string]any); ok {
+				fields["Sparkplug"] = cloneSessionValue(e.Session["Sparkplug"])
+			}
+		}
 	case "nats":
 		err = f.consumeNATS(e, dir)
 	case "mongodb":
@@ -578,7 +714,7 @@ func (f *binFlow) consumeSession(dir int, e *ProtocolEvent, result map[string]an
 	case "tns":
 		e.Session, err = f.tns.consume(e.Raw)
 	case "radius":
-		e.Session, err = f.radius.consume(e.Raw, f.a.budget.MaxCollectionElements)
+		err = f.consumeRADIUS(dir, e, e.Raw, result)
 	case "dhcp":
 		e.Session, err = f.dhcp.consume(e.Raw)
 	case "ntp":
@@ -588,10 +724,86 @@ func (f *binFlow) consumeSession(dir int, e *ProtocolEvent, result map[string]an
 	case "modbus":
 		e.Session, err = f.modbus.consume(dir, e.Raw)
 	case "dnp3":
-		e.Session, err = f.dnp3.consume(e.Raw)
+		if f.dnp3.readPoints {
+			e.Profile = "dnp3-read-points"
+		}
+		e.Session, err = f.dnp3.consume(dir, e.Raw)
+		if f.dnp3.transportFragments {
+			e.Profile = "dnp3-transport"
+			if f.dnp3.readPoints {
+				e.Profile = "dnp3-read-points-transport"
+			}
+		}
+		if f.dnp3.directReads {
+			e.Profile = "dnp3-direct-static-read"
+			if f.dnp3.transportFragments {
+				e.Profile += "-transport"
+			}
+		}
+		if f.dnp3.typedReads {
+			e.Profile = "dnp3-typed-static-read"
+			if f.dnp3.transportFragments {
+				e.Profile += "-transport"
+			}
+		}
+		if f.dnp3.counterPoints {
+			e.Profile = "dnp3-counter-points"
+			if f.dnp3.transportFragments {
+				e.Profile += "-transport"
+			}
+		}
+		if f.dnp3.counterEvents {
+			e.Profile = "dnp3-counter-events"
+			if f.dnp3.transportFragments {
+				e.Profile += "-transport"
+			}
+		}
+		if f.dnp3.eventCountReads {
+			e.Profile = "dnp3-event-count-read"
+			if f.dnp3.transportFragments {
+				e.Profile += "-transport"
+			}
+		}
+		if f.dnp3.statusPoints {
+			e.Profile = "dnp3-static-status"
+			if f.dnp3.transportFragments {
+				e.Profile += "-transport"
+			}
+		}
+		if f.dnp3.binaryEvents {
+			e.Profile = "dnp3-binary-events"
+			if f.dnp3.transportFragments {
+				e.Profile += "-transport"
+			}
+		}
+		if f.dnp3.analogEvents {
+			e.Profile = "dnp3-analog-events"
+			if f.dnp3.transportFragments {
+				e.Profile += "-transport"
+			}
+		}
+		if err == nil && (f.dnp3.readPoints || f.dnp3.transportFragments) {
+			fields := cloneSession(protocolFields(result))
+			for _, key := range []string{"Objects", "Class Selectors", "Class Context", "Read Selectors", "Read Context", "Read Coverage", "Transport State", "Transport Sequence", "Transport FIR", "Transport FIN", "Transport Segments", "Transport Bytes", "Application Data"} {
+				if v, ok := e.Session[key]; ok {
+					fields[key] = cloneSessionValue(v)
+				}
+			}
+			result["fields"] = fields
+		}
+
 	case "c37118":
-		e.Profile = "c37118-v1-v2-cfg2-data"
-		e.Session, err = f.consumeC37118(dir, e.Raw)
+		f.advanceC37118ContinuationClock(dir)
+		e.Profile = f.c37118Profile(dir, e.Raw)
+		var collected bool
+		e.Session, err, collected = f.consumeC37118Continuation(dir, e.Raw)
+		if collected {
+			if !f.c37118EngineeringEnabled() {
+				e.Profile = "c37118-v2-cfg3-continuation-data"
+			}
+		} else {
+			e.Session, err = f.consumeC37118(dir, e.Raw)
+		}
 	case "goose":
 		e.Session, err = f.goose.consume(e.Raw)
 	case "memcached":
@@ -603,25 +815,89 @@ func (f *binFlow) consumeSession(dir int, e *ProtocolEvent, result map[string]an
 			}
 		}
 	case "atg":
-		e.Session, err = f.atg.consume(dir, e.Raw)
+		if e.ID == 0 {
+			e.ID = f.a.ids.Add(1)
+		}
+		e.nativeATGObservation = true
+		e.Profile = "atg-tls450-i201"
+		if len(e.Raw) >= 5 && string(e.Raw[1:5]) == "i202" {
+			e.Profile = "atg-tls450-i202"
+		}
+		e.Session, err = f.atg.consume(dir, e.Raw, e.ID)
+		if err == nil {
+			if id, ok := e.Session["Observed Request ID"].(uint64); ok {
+				e.TransactionID = id
+				if e.Session["Role"] == "response" {
+					e.ResponseTo = id
+				}
+			}
+		}
 		if err == nil {
 			e.semanticFields = cloneSession(e.Session)
 			e.Profile, e.Completeness = "atg-tls450-i201", "message"
+			deliveryCandidates := false
+			if candidates, ok := e.Session["Candidate Requests"].([]map[string]any); ok && len(candidates) > 0 {
+				deliveryCandidates = true
+				for _, c := range candidates {
+					if c["Function"] != "i202" {
+						deliveryCandidates = false
+					}
+				}
+			}
+			if deliveryCandidates || e.Session["Function"] == "i202" || e.Session["In Reply To"] == "In-Tank Delivery Request" {
+				e.Profile = "atg-tls450-i202"
+			}
 		}
 	case "dlms-wrapper":
 		if e.ID == 0 {
 			e.ID = f.a.ids.Add(1)
 		}
-		e.Profile, e.Completeness = "dlms-wrapper-v1-get-normal", "message"
+		e.Profile, e.Completeness = wrapperProfile(e.Raw), "message"
 		err = f.consumeWrapper(dir, e.Raw, e)
 	case "dlms":
 		if e.ID == 0 {
 			e.ID = f.a.ids.Add(1)
 		}
-		e.Profile, e.Completeness = "dlms-hdlc-get-normal", "message"
+		operationSegment := f.dlmsOperationSegmentObservation(e.Raw)
+		actionDownloadRequestSegment := f.dlmsActionDownloadRequestSegmentObservation(e.Raw, dir)
+		actionDownloadResponseSegment := f.dlmsActionDownloadResponseSegmentObservation(e.Raw, dir)
+		actionResponseSegment := f.dlmsActionResponseSegmentObservation(e.Raw, dir)
+		actionRequestSegment := f.dlmsActionRequestSegmentObservation(e.Raw, dir)
+		setRequestSegment := f.dlmsSetRequestSegmentObservation(e.Raw, dir)
+		setResponseSegment := f.dlmsSetResponseSegmentObservation(e.Raw, dir)
+		setListBlockProfile := f.dlmsSetListBlockContext(e.Raw, dir)
+		e.Profile, e.Completeness = dlmsProfile(e.Raw), "message"
 		e.Session, e.ResponseTo, err = f.consumeDLMS(dir, e.Raw, e.ID)
 		if err == nil {
+			e.Profile = dlmsObservedProfile(e.Raw, e.Session)
+			if f.dlms != nil && f.dlms.operationProfile != "" {
+				e.Profile = f.dlms.operationProfile
+			}
 			e.semanticFields = cloneSession(e.Session)
+		}
+		if operationSegment != "" && (err != nil || operationSegment != "dlms-hdlc-sn-gbt-information-segmented") {
+			e.Profile = operationSegment
+		}
+		if setListBlockProfile {
+			e.Profile = "dlms-hdlc-set-list-block"
+		}
+		if setRequestSegment != "" {
+			e.Profile = setRequestSegment
+		}
+		if actionRequestSegment != "" {
+			e.Profile = actionRequestSegment
+		}
+		if actionResponseSegment != "" {
+			e.Profile = actionResponseSegment
+		}
+		if actionDownloadResponseSegment != "" {
+			e.Profile = actionDownloadResponseSegment
+		}
+		if actionDownloadRequestSegment != "" {
+			e.Profile = actionDownloadRequestSegment
+		}
+		if setResponseSegment != "" {
+			e.Profile = setResponseSegment
 		}
 	case "genisys":
 		e.Session, err = f.genisys.consume(dir, e.Raw, f.a.budget.MaxCollectionElements)
@@ -640,13 +916,35 @@ func (f *binFlow) consumeSession(dir int, e *ProtocolEvent, result map[string]an
 			e.Profile, e.Completeness = "roc-plus-tcp-clock-2022", "message"
 		}
 	case "doip":
-		e.Session, err = f.doip.consume(dir, e.Raw)
+		e.Profile = "doip-routing-dsc"
+		e.nativeDoIPObservation = true
+		if e.ID == 0 {
+			e.ID = f.a.ids.Add(1)
+		}
+		e.Session, err = f.doip.consumeEvent(dir, e.Raw, e.ID)
+		e.doipAssociationRefusal = f.doip.associationRefusal
 		if err == nil {
+			e.ResponseTo = f.doip.replyTo
 			e.semanticFields = cloneSession(e.Session)
 			e.Profile, e.Completeness = "doip-routing-dsc", "message"
 		}
+	case "hart-ip":
+		if e.ID == 0 {
+			e.ID = f.a.ids.Add(1)
+		}
+		e.Session, e.ResponseTo, e.TransactionID, err = f.hart.consume(dir, e.Raw, e.ID, e.Timestamp, f.a.budget)
+		if err == nil {
+			e.semanticFields = cloneSession(e.Session)
+			e.Profile, e.Completeness = hartIPProfile, "message"
+		}
 	case "enip":
-		e.Session, err = f.enip.consume(dir, e.Raw, f.a.budget.MaxCollectionElements)
+		if e.ID == 0 {
+			e.ID = f.a.ids.Add(1)
+		}
+		if f.a.budget.MaxCollectionElements < 32 || f.a.budget.MaxRecursionDepth < 3 {
+			return protocolError(ErrResourceExceeded, "EtherNet/IP shared projection budget")
+		}
+		e.Session, e.ResponseTo, e.TransactionID, err = f.enip.consumeEvent(dir, e.Raw, e.ID, f.a.budget.MaxCollectionElements)
 		if err == nil {
 			e.semanticFields = cloneSession(e.Session)
 			e.Profile, e.Completeness = "ethernet-ip-cip-explicit", "message"
@@ -862,11 +1160,13 @@ func (f *binFlow) invalidateSession(dir int) {
 }
 
 func (f *binFlow) closeSession() {
+	f.mms = nil
 	f.releaseDoH()
 	if f.protocol == "dns" || f.protocol == "dot" {
 		f.a.closeDNSFlow(f.id)
 	}
 	f.httpMethods, f.httpWSKeys, f.httpWSExtensions = nil, nil, nil
+	f.httpWSProtocols = nil
 	f.httpIDs, f.httpTimes = nil, nil
 	f.httpUpgrades, f.httpDoH, f.httpIPP = nil, nil, nil
 	f.httpUpgradeIssues = nil
@@ -882,14 +1182,18 @@ func (f *binFlow) closeSession() {
 	f.diameter, f.iec104, f.s7, f.opcua = nil, nil, nil, nil
 	f.rfb = nil
 	f.enip = nil
+	f.hart = nil
 	f.atg = nil
 	f.doip = nil
 	f.genisys = nil
 	f.rocplus = nil
 	f.bsap = nil
 	f.pfcp = nil
+	f.semtech = nil
+	f.bacnetRead = nil
 	f.slmp = nil
 	f.slmpTCP = nil
+	f.fins = nil
 	f.dlms = nil
 	f.wrapper = nil
 	if f.memcached != nil {
@@ -912,11 +1216,92 @@ func (f *binFlow) closeSession() {
 }
 
 func (f *binFlow) finishSession(reason TrafficFlowCloseReason) {
+	f.finishDNP3Transport(reason)
+	if p := f.hart; p != nil && len(p.pending) > 0 {
+		e := f.event(max(p.client, 0), nil, "incomplete", string(reason)+": HART-IP outstanding observed requests")
+		e.Session = map[string]any{"Outstanding": len(p.pending)}
+		e.semanticSession = cloneSession(e.Session)
+		e.sessionError = hartIPErr(ErrNeedMore, e.Summary).(*ProtocolError)
+		e.Error, e.Completeness = e.sessionError.Error(), "incomplete"
+		f.a.incomplete.Add(1)
+		f.a.emit(e)
+	}
+	if p := f.enip; p != nil {
+		n := len(p.pending)
+		if p.registerRequestSeen && !p.registered {
+			n++
+		}
+		if n > 0 {
+			e := f.event(p.clientDir, nil, "incomplete", string(reason)+": EtherNet/IP outstanding observed requests at close")
+			e.Completeness = "incomplete"
+			e.Session = map[string]any{"Outstanding": n}
+			e.semanticSession = cloneSession(e.Session)
+			e.sessionError = &ProtocolError{Kind: ErrNeedMore, Message: e.Summary}
+			f.a.incomplete.Add(1)
+			f.a.emit(e)
+		}
+	}
+	if m := f.mms; m != nil && (len(m.pending[0])+len(m.pending[1])+len(m.fragment[0].events)+len(m.fragment[1].events) > 0) {
+		e := f.event(0, nil, "incomplete", string(reason)+": MMS outstanding requests/TSDU at close")
+		e.Completeness = "incomplete"
+		e.sessionError = &ProtocolError{Kind: ErrNeedMore, Message: e.Summary}
+		e.Session = map[string]any{"Observed Context": m.snapshot()}
+		e.semanticSession = cloneSession(e.Session)
+		f.a.incomplete.Add(1)
+		f.a.emit(e)
+	}
+
 	emit := func(dir int, session map[string]any, why string) {
 		e := f.event(dir, nil, "incomplete", string(reason)+": "+why)
 		e.Session = session
 		f.a.incomplete.Add(1)
 		f.a.emit(e)
+	}
+	if u := f.opcua; u != nil && u.selected() && (len(u.appPending) > 0 || len(u.chunks) > 0) {
+		e := f.event(0, nil, "incomplete", string(reason)+": OPC UA selected observation ended with outstanding requests/chunks")
+		e.Profile = u.observationProfile()
+		e.nativeOPCUAObservation = true
+		e.sessionError = &ProtocolError{Kind: ErrNeedMore, Message: e.Summary}
+		e.Session = map[string]any{"Buffered Secure Messages": len(u.chunks)}
+		reads, browses, writes, nexts, calls := 0, 0, 0, 0, 0
+		for _, p := range u.appPending {
+			if p.service == 631 {
+				reads++
+			} else if p.service == 527 {
+				browses++
+			} else if p.service == 673 {
+				writes++
+			} else if p.service == 533 {
+				nexts++
+			} else if p.service == 712 {
+				calls++
+			}
+		}
+		if u.read {
+			e.Session["Outstanding Read Requests"] = reads
+		}
+		if u.browse {
+			e.Session["Outstanding Browse Requests"] = browses
+		}
+		if u.write {
+			e.Session["Outstanding Write Requests"] = writes
+		}
+		if u.next {
+			e.Session["Outstanding BrowseNext Requests"] = nexts
+		}
+		if u.call {
+			e.Session["Outstanding Call Requests"] = calls
+		}
+		f.a.incomplete.Add(1)
+		f.a.emit(e)
+	}
+	if c := f.c37118; c != nil {
+		for dir, p := range c.continuation {
+			if p != nil {
+				emit(dir, map[string]any{"Configuration Fragments": p.count, "Configuration Image Bytes": len(p.image), "Cumulative CRC Validated": false}, "C37.118 CFG-3 ended before final continuation")
+				c.continuation[dir] = nil
+			}
+		}
 	}
 	if z := f.zookeeper; z != nil && (len(z.pending) > 0 || z.pingOutstanding) {
 		outstanding := len(z.pending)
@@ -926,6 +1311,18 @@ func (f *binFlow) finishSession(reason TrafficFlowCloseReason) {
 		emit(z.clientDir, map[string]any{"Outstanding": outstanding}, "ZooKeeper exchange ended with unmatched requests")
 	}
 	if tls := f.tls; tls != nil {
+		for dir, pending := range tls.alertPending {
+			if !pending {
+				continue
+			}
+			e := f.event(dir, nil, "incomplete", string(reason)+": TLS alert ended before its second byte")
+			e.Completeness = "incomplete"
+			e.sessionError = &ProtocolError{Kind: ErrNeedMore, Message: e.Summary}
+			e.Session = map[string]any{"Alert Buffered Bytes": 1}
+			e.semanticSession = cloneSession(e.Session)
+			f.a.incomplete.Add(1)
+			f.a.emit(e)
+		}
 		for dir, b := range tls.handshake {
 			if len(b) != 0 {
 				emit(dir, map[string]any{"Handshake Buffered Bytes": len(b)}, "TLS handshake ended before its declared length")
@@ -1026,8 +1423,26 @@ func (f *binFlow) finishSession(reason TrafficFlowCloseReason) {
 	if n := f.tns; n != nil && n.pending > 0 {
 		emit(0, map[string]any{"Outstanding": n.pending}, "TNS exchange ended with unmatched Connect")
 	}
-	if r := f.radius; r != nil && len(r.pending) > 0 {
-		emit(0, map[string]any{"Outstanding": len(r.pending)}, "RADIUS exchange ended with unmatched Identifiers")
+	if r := f.radius; r != nil {
+		groups, buffered := r.tlsRounds.unfinished()
+		if r.outstanding() > 0 || groups > 0 {
+			detail := string(reason) + ": RADIUS unmatched observed Identifiers"
+			if groups > 0 {
+				detail += " or observed TLS fragments"
+			}
+			e := f.event(0, nil, "incomplete", detail)
+			e.nativeRADIUSObservation, e.Profile, e.Completeness = true, r.profile(), "incomplete"
+			e.Session = map[string]any{"Outstanding": r.outstanding()}
+			if groups > 0 {
+				e.Session["TLS Fragment Groups"] = groups
+				e.Session["TLS Fragment Buffered Bytes"] = buffered
+			}
+			e.semanticSession = cloneSession(e.Session)
+			e.sessionError = &ProtocolError{Kind: ErrNeedMore, Message: e.Summary}
+			e.Error = e.Summary
+			f.a.incomplete.Add(1)
+			f.a.emit(e)
+		}
 	}
 	if d := f.dhcp; d != nil && len(d.pending) > 0 {
 		emit(0, map[string]any{"Outstanding": len(d.pending)}, "DHCP exchange ended with unmatched xids")
@@ -1039,22 +1454,251 @@ func (f *binFlow) finishSession(reason TrafficFlowCloseReason) {
 		emit(m.clientDir, map[string]any{"Outstanding": m.outstanding()}, "Memcached exchange ended with unmatched requests")
 	}
 	if a := f.atg; a != nil && a.outstanding() > 0 {
-		emit(a.clientDir, map[string]any{"Outstanding": a.outstanding()}, "ATG exchange ended with unmatched requests")
+		e := f.event(a.clientDir, nil, "incomplete", string(reason)+": ATG exchange ended with unmatched requests")
+		e.Session = map[string]any{"Outstanding": a.outstanding()}
+		e.semanticSession = cloneSession(e.Session)
+		e.sessionError = &ProtocolError{Kind: ErrNeedMore, Message: e.Summary}
+		e.Error, e.Completeness = e.sessionError.Error(), "incomplete"
+		e.ExpertCode = string(ErrNeedMore)
+		e.Profile = "atg-tls450-i201"
+		if a.pending[0].function == '2' {
+			e.Profile = "atg-tls450-i202"
+		}
+		f.a.incomplete.Add(1)
+		f.a.emit(e)
+	}
+	if s := f.fins; s != nil {
+		for dir, count := range s.counts() {
+			if count > 0 {
+				e := f.event(dir, nil, "incomplete", string(reason)+": FINS unmatched observed requests")
+				e.Session = map[string]any{"Outstanding": count}
+				e.semanticSession = cloneSession(e.Session)
+				e.sessionError = &ProtocolError{Kind: ErrNeedMore, Message: e.Summary}
+				e.Error, e.Completeness = e.Summary, "incomplete"
+				f.a.incomplete.Add(1)
+				f.a.emit(e)
+			}
+		}
 	}
 	if s := f.slmpTCP; s != nil && s.outstanding() > 0 {
 		emit(s.clientDir, map[string]any{"Outstanding": s.outstanding()}, "SLMP TCP exchange ended with unmatched observed requests")
 	}
 	if w := f.wrapper; w != nil && w.outstanding() > 0 {
-		emit(0, map[string]any{"Outstanding": w.outstanding()}, "DLMS Wrapper exchange ended with unmatched observed requests")
+		n := 0
+		for key, p := range w.associations {
+			if p.pending && p.lowAuthentication {
+				e := f.event(key.dir, nil, "incomplete", string(reason)+": DLMS Wrapper LOW association ended with an unmatched request")
+				e.Profile = "dlms-wrapper-v1-acse"
+				e.Session = map[string]any{"Outstanding": 1, "source_wport": key.source, "destination_wport": key.destination}
+				e.sessionError = &ProtocolError{Kind: ErrNeedMore, Message: e.Summary}
+				e.Error = e.Summary
+				f.a.incomplete.Add(1)
+				f.a.emit(e)
+				n++
+			}
+			if p.releasePending {
+				e := f.event(key.dir, nil, "incomplete", string(reason)+": DLMS Wrapper release ended with an unmatched request")
+				e.Profile = "dlms-wrapper-v1-acse-lifecycle"
+				e.Session = map[string]any{"Outstanding": 1, "source_wport": key.source, "destination_wport": key.destination}
+				e.sessionError = &ProtocolError{Kind: ErrNeedMore, Message: e.Summary}
+				e.Error = e.Summary
+				f.a.incomplete.Add(1)
+				f.a.emit(e)
+				n++
+			}
+		}
+		for _, key := range w.pendingOperations() {
+			command := w.seen[key].command
+			e := f.event(key.dir, nil, "incomplete", string(reason)+": DLMS Wrapper "+wrapperOperationName(command, w.seen[key].choice)+" ended with an unmatched request")
+			e.Profile = wrapperOperationProfile(command, w.seen[key].choice)
+			e.nativeDLMSOrSLMPObservation = true
+			e.Session = wrapperOperationCloseFields(key, command, w.seen[key].choice, w.seen[key].count)
+			e.semanticSession = cloneSession(e.Session)
+			e.sessionError = &ProtocolError{Kind: ErrNeedMore, Message: e.Summary}
+			e.Error = e.sessionError.Error()
+			e.Completeness = "incomplete"
+			f.a.incomplete.Add(1)
+			f.a.emit(e)
+			n++
+		}
+		for dir, choices := range w.unfinishedGetCounts() {
+			for choice, count := range choices {
+				if count == 0 {
+					continue
+				}
+				e := f.event(dir, nil, "incomplete", string(reason)+": DLMS Wrapper exchange ended with unmatched observed requests")
+				e.Profile, e.Completeness = wrapperPendingGetProfile(byte(choice+1)), "incomplete"
+				e.Session = map[string]any{"Outstanding": count}
+				e.semanticSession = cloneSession(e.Session)
+				e.sessionError = &ProtocolError{Kind: ErrNeedMore, Message: e.Summary}
+				e.Error = e.sessionError.Error()
+				f.a.incomplete.Add(1)
+				f.a.emit(e)
+				n += count
+			}
+		}
+		for dir, count := range w.unfinishedGBTCounts() {
+			if count == 0 {
+				continue
+			}
+			e := f.event(dir, nil, "incomplete", string(reason)+": DLMS Wrapper exchange ended with unmatched observed requests")
+			e.Profile, e.Completeness = "dlms-wrapper-v1-gbt", "incomplete"
+			e.Session = map[string]any{"Outstanding": count}
+			e.semanticSession = cloneSession(e.Session)
+			e.sessionError = &ProtocolError{Kind: ErrNeedMore, Message: e.Summary}
+			e.Error = e.sessionError.Error()
+			f.a.incomplete.Add(1)
+			f.a.emit(e)
+			n += count
+		}
+		for _, key := range w.unfinishedSNBlockKeys() {
+			p := w.snGroups[key]
+			e := f.event(key.dir, nil, "incomplete", string(reason)+": "+wrapperSNGroupCloseSummary(key))
+			e.Profile, e.Completeness = wrapperSNGroupProfile(key), "incomplete"
+			e.nativeDLMSOrSLMPObservation = true
+			e.Session = wrapperSNGroupCloseFields(key, p)
+			e.semanticSession = cloneSession(e.Session)
+			e.sessionError = &ProtocolError{Kind: ErrNeedMore, Message: e.Summary}
+			e.Error = e.sessionError.Error()
+			f.a.incomplete.Add(1)
+			f.a.emit(e)
+			n++
+		}
+		if left := w.outstanding() - n; left > 0 {
+			emit(0, map[string]any{"Outstanding": left}, "DLMS Wrapper exchange ended with unmatched observed requests")
+		}
 	}
-	if d := f.dlms; d != nil && d.pending != nil {
-		emit(d.pending.dir, map[string]any{"Outstanding": 1}, "DLMS HDLC exchange ended with an unmatched request")
+	if d := f.dlms; d != nil {
+		for _, key := range d.unfinishedSNGBTKeys() {
+			e := f.event(key.dir, nil, "incomplete", string(reason)+": DLMS HDLC SN GBT observation ended before complete APDU")
+			e.Profile, e.Completeness = "dlms-hdlc-sn-gbt", "incomplete"
+			e.nativeDLMSOrSLMPObservation = true
+			e.Session = d.snGBTCloseFields(key)
+			e.semanticSession = cloneSession(e.Session)
+			e.sessionError = &ProtocolError{Kind: ErrNeedMore, Message: e.Summary}
+			e.Error = e.sessionError.Error()
+			f.a.incomplete.Add(1)
+			f.a.emit(e)
+		}
+		for _, key := range d.unfinishedSNBlockKeys() {
+			e := f.event(key.dir, nil, "incomplete", string(reason)+": "+dlmsSNBlockCloseSummary(key))
+			e.Profile, e.Completeness = dlmsSNBlockProfile(key), "incomplete"
+			e.nativeDLMSOrSLMPObservation = true
+			e.Session = d.snBlockCloseFields(key)
+			e.semanticSession = cloneSession(e.Session)
+			e.sessionError = &ProtocolError{Kind: ErrNeedMore, Message: e.Summary}
+			e.Error = e.sessionError.Error()
+			f.a.incomplete.Add(1)
+			f.a.emit(e)
+		}
+	}
+	if d := f.dlms; d != nil {
+		if d.fragments != nil {
+			if d.fragments.operation != "" {
+				e := f.event(d.fragmentCloseDirection(), nil, "incomplete", string(reason)+": "+d.fragments.operationCloseSummary())
+				e.Profile = d.fragments.operationSegmentProfile()
+				e.nativeDLMSOrSLMPObservation = true
+				e.Session = d.fragmentCloseFields()
+				e.semanticSession = cloneSession(e.Session)
+				e.sessionError = &ProtocolError{Kind: ErrNeedMore, Message: e.Summary}
+				e.Error = e.Summary
+				f.a.incomplete.Add(1)
+				f.a.emit(e)
+			} else if d.fragments.acseCommand != 0 {
+				e := f.event(d.fragmentCloseDirection(), nil, "incomplete", string(reason)+": DLMS HDLC exchange ended with incomplete ACSE information")
+				e.Profile = "dlms-hdlc-acse-segmented"
+				e.Session = d.fragmentCloseFields()
+				e.sessionError = &ProtocolError{Kind: ErrNeedMore, Message: e.Summary}
+				e.Error = e.Summary
+				f.a.incomplete.Add(1)
+				f.a.emit(e)
+			} else {
+				emit(d.fragmentCloseDirection(), d.fragmentCloseFields(), "DLMS HDLC exchange ended with incomplete segmented information")
+			}
+		} else if d.transfer != nil && d.transfer.initial.kind == "ACTION" {
+			p := &d.transfer.initial
+			e := f.event(p.dir, nil, "incomplete", string(reason)+": DLMS HDLC Action-download ended with an unmatched request")
+			e.Profile = "dlms-hdlc-action-download"
+			e.nativeDLMSOrSLMPObservation = true
+			e.Session = dlmsOperationCloseFields(p)
+			e.semanticSession = cloneSession(e.Session)
+			e.sessionError = &ProtocolError{Kind: ErrNeedMore, Message: e.Summary}
+			e.Error = e.Summary
+			f.a.incomplete.Add(1)
+			f.a.emit(e)
+		} else if d.transfer != nil {
+			emit(d.transfer.initial.dir, map[string]any{"Outstanding": 1, "ObservedBlocks": d.transfer.blocks, "EncodedBytes": len(d.transfer.data)}, "DLMS HDLC exchange ended with an incomplete data-block transfer")
+		} else if d.setTransfer != nil {
+			e := f.event(d.setTransfer.initial.dir, nil, "incomplete", string(reason)+": DLMS HDLC "+d.setTransfer.closeName()+" ended with an unmatched request")
+			e.Profile = d.setTransfer.profile()
+			e.nativeDLMSOrSLMPObservation = true
+			e.Session = d.setTransfer.closeFields()
+			e.semanticSession = cloneSession(e.Session)
+			e.sessionError = &ProtocolError{Kind: ErrNeedMore, Message: e.Summary}
+			e.Error = e.Summary
+			f.a.incomplete.Add(1)
+			f.a.emit(e)
+		} else if d.actionTransfer != nil {
+			e := f.event(d.actionTransfer.initial.dir, nil, "incomplete", string(reason)+": DLMS HDLC Action-with-pblock ended with an unmatched request")
+			e.Profile = "dlms-hdlc-action-upload"
+			e.nativeDLMSOrSLMPObservation = true
+			e.Session = d.actionTransfer.closeFields()
+			e.semanticSession = cloneSession(e.Session)
+			e.sessionError = &ProtocolError{Kind: ErrNeedMore, Message: e.Summary}
+			e.Error = e.Summary
+			f.a.incomplete.Add(1)
+			f.a.emit(e)
+		} else if d.pending != nil && d.pending.kind == "ACSE" {
+			e := f.event(d.pending.dir, nil, "incomplete", string(reason)+": DLMS HDLC association ended with an unmatched request")
+			e.Profile = "dlms-hdlc-acse"
+			if d.pending.acseCommand == 0x62 {
+				e.Profile = "dlms-hdlc-acse-lifecycle"
+			}
+			e.Session = map[string]any{"Outstanding": 1}
+			e.sessionError = &ProtocolError{Kind: ErrNeedMore, Message: e.Summary}
+			e.Error = e.Summary
+			f.a.incomplete.Add(1)
+			f.a.emit(e)
+		} else if d.pending != nil && dlmsOperationKind(d.pending.kind) {
+			e := f.event(d.pending.dir, nil, "incomplete", string(reason)+": DLMS HDLC "+dlmsOperationCloseName(d.pending)+" ended with an unmatched request")
+			e.Profile = "dlms-hdlc-ln-operations"
+			e.nativeDLMSOrSLMPObservation = true
+			e.Session = dlmsOperationCloseFields(d.pending)
+			e.semanticSession = cloneSession(e.Session)
+			e.sessionError = &ProtocolError{Kind: ErrNeedMore, Message: e.Summary}
+			e.Error = e.Summary
+			f.a.incomplete.Add(1)
+			f.a.emit(e)
+		} else if d.pending != nil && d.pending.kind == "GET" && (d.pending.choice == 1 || d.pending.choice == 3) {
+			// A complete request still awaiting its response must keep the same
+			// typed, owned diagnostic contract as the other HDLC services.
+			e := f.event(d.pending.dir, nil, "incomplete", string(reason)+": DLMS HDLC exchange ended with an unmatched request")
+			e.Profile = "dlms-hdlc-get-normal"
+			if d.pending.choice == 3 {
+				e.Profile = "dlms-hdlc-get-list"
+			}
+			e.nativeDLMSOrSLMPObservation = true
+			e.Session = map[string]any{"Outstanding": 1}
+			e.semanticSession = cloneSession(e.Session)
+			e.sessionError = &ProtocolError{Kind: ErrNeedMore, Message: e.Summary}
+			e.Error = e.Summary
+			f.a.incomplete.Add(1)
+			f.a.emit(e)
+		} else if d.pending != nil {
+			emit(d.pending.dir, map[string]any{"Outstanding": 1}, "DLMS HDLC exchange ended with an unmatched request")
+		}
 	}
 	if r := f.rocplus; r != nil && r.pending != nil {
 		emit(r.clientDir, map[string]any{"Outstanding": 1}, "ROC Plus clock exchange ended with an unmatched request")
 	}
 	if d := f.doip; d != nil && d.outstanding() > 0 {
-		emit(d.clientDir, map[string]any{"Outstanding": d.outstanding()}, "DoIP exchange ended with unmatched requests")
+		e := f.event(d.clientDir, nil, "incomplete", string(reason)+": DoIP exchange ended with unmatched requests")
+		e.Profile, e.Completeness = "doip-routing-dsc", "incomplete"
+		e.Session = map[string]any{"Outstanding": d.outstanding()}
+		e.sessionError = &ProtocolError{Kind: ErrNeedMore, Message: e.Summary}
+		e.Error = e.sessionError.Error()
+		f.a.incomplete.Add(1)
+		f.a.emit(e)
 	}
 	if m := f.modbus; m != nil && len(m.pending) > 0 {
 		emit(0, map[string]any{"Outstanding": len(m.pending)}, "Modbus exchange ended with unmatched Transaction IDs")
@@ -1125,9 +1769,17 @@ func cloneSessionValue(v any) any {
 			out[i] = cloneSessionValue(v)
 		}
 		return out
+	case []bool:
+		return cloneScalarValues(x)
+	case []int:
+		return cloneScalarValues(x)
 	case []int32:
 		return cloneScalarValues(x)
 	case []uint16:
+		return cloneScalarValues(x)
+	case []uint32:
+		return cloneScalarValues(x)
+	case []PacketReference:
 		return cloneScalarValues(x)
 	case []uint64:
 		return cloneScalarValues(x)
@@ -1135,6 +1787,15 @@ func cloneSessionValue(v any) any {
 		return cloneScalarValues(x)
 	case []byte:
 		return bytes.Clone(x)
+	case [][]byte:
+		if x == nil {
+			return [][]byte(nil)
+		}
+		out := make([][]byte, len(x))
+		for i, v := range x {
+			out[i] = cloneScalarValues(v)
+		}
+		return out
 	default:
 		return v
 	}
@@ -1183,10 +1844,22 @@ func sessionSnapshotSize(v any, byteCapacity bool) int {
 			n += sessionSnapshotSize(v, byteCapacity)
 		}
 		return n
+	case []bool:
+		return 24 + len(x)
+	case []int:
+		return 24 + len(x)*(strconv.IntSize/8)
 	case []int32:
 		return 24 + len(x)*4
 	case []uint16:
 		return 24 + len(x)*2
+	case []uint32:
+		return 24 + len(x)*4
+	case []PacketReference:
+		n := 24 + len(x)*64
+		for _, ref := range x {
+			n += len(ref.Domain.Encapsulation)
+		}
+		return n
 	case []uint64:
 		return 24 + len(x)*8
 	case []string:
@@ -1202,6 +1875,12 @@ func sessionSnapshotSize(v any, byteCapacity bool) int {
 			return cap(x) + 24
 		}
 		return len(x) + 24
+	case [][]byte:
+		n := 24
+		for _, v := range x {
+			n += sessionSnapshotSize(v, byteCapacity)
+		}
+		return n
 	case nil:
 		return 0
 	default:
@@ -1210,5 +1889,5 @@ func sessionSnapshotSize(v any, byteCapacity bool) int {
 }
 
 func protocolHistoryBytes(e *ProtocolEvent) int {
-	return len(e.Raw) + sessionSnapshotSize(e.Session, false) + sessionSnapshotSize(e.semanticFields, false) + len(e.SourceBytes.PacketRefs)*64 + len(e.SourceBytes.ParentPDUs)*8
+	return len(e.Raw) + sessionSnapshotSize(e.Session, false) + sessionSnapshotSize(e.semanticFields, false) + sessionSnapshotSize(e.semanticSession, false) + sessionSnapshotSize(e.semanticMetadata, false) + len(e.SourceBytes.PacketRefs)*64 + len(e.SourceBytes.ParentPDUs)*8
 }

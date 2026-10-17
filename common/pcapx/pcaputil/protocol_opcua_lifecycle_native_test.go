@@ -16,6 +16,11 @@ import (
 )
 
 func TestOPCUANativeRenewalAndMultiChunk(t *testing.T) {
+	t.Run("ReadScalar", opcuaReadScalarAll)
+	t.Run("Browse", opcuaBrowseAll)
+	t.Run("Write", opcuaWriteAll)
+	t.Run("BrowseNext", opcuaBrowseNextAll)
+	t.Run("Call", opcuaCallAll)
 	root := "../../bin-parser/testdata/protocol-native/opcua-lifecycle"
 	raw, err := trafficfixture.ReadFile(filepath.Join(root, "manifest.json"))
 	require.NoError(t, err)

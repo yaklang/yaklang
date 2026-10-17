@@ -6,14 +6,17 @@ import (
 	"strconv"
 )
 
-// ATG scope: Veeder-Root TLS-450 computer-format i201TT inventory queries,
-// checksum-protected replies and the documented command rejection response.
+// ATG scope: Veeder-Root TLS-450 computer-format i201TT inventory and
+// i202TT version1 delivery queries, checksum-protected replies and rejection.
 // Display format, passwords, changed ETX, writes and other commands are outside
-// this profile. Measurement units and gauge identity are not inferred.
+// these profiles. Measurement units and gauge identity are not inferred.
 func probeATG(w []byte, limit int) ProbeResult {
-	prefix := []byte{1, 'i', '2', '0', '1'}
+	prefix := []byte{1, 'i', '2', '0'}
 	n := min(len(w), len(prefix))
 	if !bytes.Equal(w[:n], prefix[:n]) {
+		return ProbeResult{Verdict: ProbeReject}
+	}
+	if len(w) > 4 && w[4] != '1' && w[4] != '2' {
 		return ProbeResult{Verdict: ProbeReject}
 	}
 	if len(w) < 7 {
@@ -25,20 +28,37 @@ func probeATG(w []byte, limit int) ProbeResult {
 	if limit < 7 {
 		return ProbeResult{Verdict: ProbeReject, Protocol: "atg"}
 	}
-	return ProbeResult{Verdict: ProbeAccept, Protocol: "atg", Version: "TLS450-i201-computer"}
+	return ProbeResult{Verdict: ProbeAccept, Protocol: "atg", Version: "TLS450-i20" + string(w[4]) + "-computer"}
 }
 
-type atgPending struct{ dir, tank byte }
+type atgPending struct{ dir, tank, function byte }
 type binATG struct {
-	clientDir   int
-	clientKnown bool
-	maxElements int
-	pending     [16]atgPending
-	count       int
+	clientDir, maxElements, count int
+	ids                           [16]uint64
+	seen                          [2][2]uint64
+	pending                       [16]atgPending
+	ambiguous                     uint16
+	clientKnown                   bool
 }
 
 func (s *binATG) sessionBytes() int64 { return 256 }
 func (s *binATG) outstanding() int    { return s.count }
+func (s *binATG) candidates(indices []int) []map[string]any {
+	out := make([]map[string]any, 0, len(indices))
+	for _, i := range indices {
+		out = append(out, map[string]any{"Function": "i20" + string(s.pending[i].function), "Tank Selector": int(s.pending[i].tank), "Observed Request ID": s.ids[i]})
+	}
+	return out
+}
+func (s *binATG) remove(i int) {
+	copy(s.pending[i:], s.pending[i+1:s.count])
+	copy(s.ids[i:], s.ids[i+1:s.count])
+	low := s.ambiguous & ((uint16(1) << i) - 1)
+	s.ambiguous = low | ((s.ambiguous >> (i + 1)) << i)
+	s.count--
+	s.pending[s.count] = atgPending{}
+	s.ids[s.count] = 0
+}
 
 func atgMalformed(reason string) error { return protocolError(ErrMalformedMessage, "ATG %s", reason) }
 
@@ -60,7 +80,7 @@ func atgFrameSize(w []byte, request bool, maxBytes int) (int, error) {
 			return 0, nil
 		}
 		if probeATG(w[:7], 7).Verdict != ProbeAccept {
-			return 0, protocolError(ErrUnsupportedFeature, "ATG command outside i201TT computer profile")
+			return 0, protocolError(ErrUnsupportedFeature, "ATG command outside selected inventory/delivery computer profile")
 		}
 		return 7, nil
 	}
@@ -170,6 +190,9 @@ func decodeATGInventory(w []byte, maxElements int) (map[string]any, error) {
 		f["Packet Name"] = "Command Rejected"
 		return f, nil
 	}
+	if len(w) >= 24 && bytes.Equal(w[1:5], []byte("i202")) && bytes.Equal(w[len(w)-7:len(w)-5], []byte("&&")) {
+		return decodeATGDeliveryBody(w, f, maxElements)
+	}
 	if len(w) < 24 || !bytes.Equal(w[1:5], []byte("i201")) || !bytes.Equal(w[len(w)-7:len(w)-5], []byte("&&")) {
 		return nil, protocolError(ErrUnsupportedFeature, "ATG response outside i201TT computer profile")
 	}
@@ -244,13 +267,16 @@ func decodeATGInventory(w []byte, maxElements int) (map[string]any, error) {
 	return f, nil
 }
 
-func (s *binATG) consume(dir int, w []byte) (map[string]any, error) {
+// The wire carries a function and tank selector, but no transaction sequence.
+// Repeated selectors and untagged rejections retain unresolved candidates rather
+// than inventing a FIFO owner. This history is bounded within the original state charge.
+func (s *binATG) consume(dir int, w []byte, evidence ...uint64) (map[string]any, error) {
 	if !s.clientKnown {
 		return nil, protocolError(ErrContextRequired, "ATG requires observed client direction")
 	}
 	if dir == s.clientDir {
 		if len(w) != 7 || probeATG(w, 7).Verdict != ProbeAccept {
-			return nil, protocolError(ErrUnsupportedFeature, "ATG command outside i201TT")
+			return nil, protocolError(ErrUnsupportedFeature, "ATG command outside selected read-only profile")
 		}
 		if s.count >= len(s.pending) || s.count >= s.maxElements {
 			return nil, protocolError(ErrResourceExceeded, "ATG pending queries exceed budget")
@@ -259,9 +285,37 @@ func (s *binATG) consume(dir int, w []byte) (map[string]any, error) {
 		if e != nil {
 			return nil, e
 		}
-		s.pending[s.count] = atgPending{byte(dir), byte(tank)}
+		id := uint64(0)
+		if len(evidence) > 0 {
+			id = evidence[0]
+		}
+		fn := int(w[4] - '1')
+		word, bit := tank/64, uint(tank%64)
+		amb := s.seen[fn][word]&(uint64(1)<<bit) != 0
+		s.seen[fn][word] |= uint64(1) << bit
+		if amb {
+			for i := 0; i < s.count; i++ {
+				if s.pending[i].function == w[4] && int(s.pending[i].tank) == tank {
+					s.ambiguous |= uint16(1) << i
+				}
+			}
+			s.ambiguous |= uint16(1) << s.count
+		}
+		s.pending[s.count] = atgPending{dir: byte(dir), tank: byte(tank), function: w[4]}
+		s.ids[s.count] = id
 		s.count++
-		return map[string]any{"Packet Name": "In-Tank Inventory Request", "Function": "i201", "Tank Selector": tank, "Role": "request", "Outstanding Requests": s.count, "Context Level": "observed"}, nil
+		name, function := "In-Tank Inventory Request", "i201"
+		if w[4] == '2' {
+			name, function = "In-Tank Delivery Request", "i202"
+		}
+		out := map[string]any{"Packet Name": name, "Function": function, "Tank Selector": tank, "Role": "request", "Outstanding Requests": s.count, "Context Level": "observed"}
+		if w[4] == '2' || amb {
+			out["Association"], out["Observed Request ID"] = "observed-request", id
+			if amb {
+				out["Association"], out["Observed Request ID"] = "ambiguous-query", uint64(0)
+			}
+		}
+		return out, nil
 	}
 	f, e := decodeATGInventory(w, s.maxElements)
 	if e != nil {
@@ -270,13 +324,39 @@ func (s *binATG) consume(dir int, w []byte) (map[string]any, error) {
 	if s.count == 0 {
 		return nil, protocolError(ErrContextRequired, "ATG response has no observed query")
 	}
-	if f["Packet Name"] != "Command Rejected" && f["Tank Selector"] != int(s.pending[0].tank) {
-		return nil, atgMalformed("response command differs from oldest query")
+	reject := f["Packet Name"] == "Command Rejected"
+	matches := make([]int, 0, s.count)
+	for i := 0; i < s.count; i++ {
+		if reject || (f["Tank Selector"] == int(s.pending[i].tank) && len(w) > 4 && w[4] == s.pending[i].function) {
+			matches = append(matches, i)
+		}
 	}
-	f["Role"], f["Association"], f["In Reply To"], f["Request Tank Selector"] = "response", "matched", "In-Tank Inventory Request", int(s.pending[0].tank)
-	copy(s.pending[:], s.pending[1:s.count])
-	s.count--
-	s.pending[s.count] = atgPending{}
+	if len(matches) == 0 {
+		if w[4] == '2' || s.pending[0].function == '2' {
+			return nil, protocolError(ErrContextRequired, "ATG delivery reply lacks observed function/tank context")
+		}
+		return nil, atgMalformed("response command differs from observed queries")
+	}
+	i := matches[0]
+	amb := len(matches) > 1 || s.ambiguous&(uint16(1)<<i) != 0
+	f["Role"], f["Association"] = "response", "matched"
+	if reject && amb {
+		for n := 0; n < s.count; n++ {
+			s.ambiguous |= uint16(1) << n
+		}
+		f["In Reply To"] = "unobserved"
+	} else {
+		f["In Reply To"], f["Request Tank Selector"] = "In-Tank Inventory Request", int(s.pending[i].tank)
+		if s.pending[i].function == '2' {
+			f["In Reply To"], f["Request Function"], f["Observed Request ID"] = "In-Tank Delivery Request", "i202", s.ids[i]
+		}
+	}
+	if amb {
+		f["Association"], f["Observed Request ID"] = "ambiguous-response", uint64(0)
+		f["Candidate Requests"] = s.candidates(matches)
+	} else {
+		s.remove(i)
+	}
 	f["Outstanding Requests"] = s.count
 	return f, nil
 }

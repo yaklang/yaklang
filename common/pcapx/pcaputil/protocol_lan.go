@@ -5,11 +5,10 @@ import (
 	"encoding/binary"
 	"fmt"
 	"net"
-	"time"
 )
 
 // DHCP leases are observations, not proof of address ownership. Broadcast
-// discovery can receive several offers; correlations remain available until TTL.
+// discovery can receive several offers; active observations age locally while charged identity history survives until Close.
 func decodeDHCP4(w []byte, limit int) (map[string]any, error) {
 	if len(w) < 240 || binary.BigEndian.Uint32(w[236:240]) != dhcpCookie || w[0] < 1 || w[0] > 2 || w[2] == 0 || w[2] > 16 {
 		return nil, fmt.Errorf("DHCP header")
@@ -64,6 +63,12 @@ func decodeDHCP4(w []byte, limit int) (map[string]any, error) {
 		return nil, fmt.Errorf("DHCP message type")
 	}
 	typ := opts[53][0]
+	if typ >= 1 && typ <= 8 {
+		response := typ == 2 || typ == 5 || typ == 6
+		if response != (w[0] == 2) {
+			return nil, fmt.Errorf("DHCP BOOTP op/message type mismatch")
+		}
+	}
 	out := map[string]any{"Message Type": typ, "Packet Name": dhcpMsgName(typ), "Xid": binary.BigEndian.Uint32(w[4:8]), "CHADDR": bytes.Clone(w[28 : 28+int(w[2])]), "Client IP": net.IP(w[12:16]).String(), "Offered IP": net.IP(w[16:20]).String(), "Relay IP": net.IP(w[24:28]).String(), "Observation": "unverified-lease", "Options Overload": overload}
 	for _, opt := range []struct {
 		code byte
@@ -125,43 +130,7 @@ func (a *binParser) dhcpObservation(e *ProtocolEvent) {
 	}
 	identity := fmt.Sprintf("%x", info["CHADDR"])
 	key := fmt.Sprintf("dhcp/%v/%v/%s/%v", e.Domain, info["Relay IP"], identity, info["Xid"])
-	a.dnsMu.Lock()
-	defer a.dnsMu.Unlock()
-	s := &a.dns
-	if s.pending == nil {
-		s.pending = map[string]dnsPending{}
-	}
-	if e.Timestamp.After(s.clock) {
-		s.clock = e.Timestamp
-	}
-	for k, v := range s.pending {
-		if s.clock.Sub(v.ts) > 30*time.Second {
-			delete(s.pending, k)
-			a.buffered.Add(-v.cost)
-		}
-	}
-	if e.ID == 0 {
-		e.ID = a.ids.Add(1)
-	}
-	if typ == 1 || typ == 3 || typ == 8 {
-		if p, ok := s.pending[key]; ok {
-			e.TransactionID = p.id
-		} else if len(s.pending) < a.budget.MaxCollectionElements && a.reserveEvidence(int64(len(key)+128)) {
-			s.pending[key] = dnsPending{id: e.ID, ts: e.Timestamp, cost: int64(len(key) + 128)}
-			e.TransactionID = e.ID
-		}
-	} else if typ == 2 || typ == 5 || typ == 6 {
-		if p, ok := s.pending[key]; ok {
-			e.ResponseTo = p.id
-			e.TransactionID = p.id
-			info["Association"] = "observed-client-xid"
-			if typ == 5 || typ == 6 {
-				e.Completeness = "transaction"
-			}
-		} else {
-			info["Association"] = "missing-request"
-		}
-	}
+	a.observeDHCPPhase(e, info, key, "", typ, false)
 }
 
 func (a *binParser) dhcp6Observation(e *ProtocolEvent) {
@@ -197,38 +166,5 @@ func (a *binParser) dhcp6Observation(e *ProtocolEvent) {
 	}
 	key := fmt.Sprintf("dhcp6/%v/%s/%x/%v", e.Domain, relay, client, info["Transaction ID"])
 	typ, _ := info["Message Type"].(byte)
-	a.dnsMu.Lock()
-	defer a.dnsMu.Unlock()
-	s := &a.dns
-	if s.pending == nil {
-		s.pending = map[string]dnsPending{}
-	}
-	if e.Timestamp.After(s.clock) {
-		s.clock = e.Timestamp
-	}
-	for k, v := range s.pending {
-		if s.clock.Sub(v.ts) > 30*time.Second {
-			delete(s.pending, k)
-			a.buffered.Add(-v.cost)
-		}
-	}
-	if e.ID == 0 {
-		e.ID = a.ids.Add(1)
-	}
-	if typ == 2 || typ == 7 {
-		if p, ok := s.pending[key]; ok {
-			e.ResponseTo, e.TransactionID = p.id, p.id
-			e.Session["Association"] = "observed-client-xid"
-			e.Completeness = "transaction"
-		} else {
-			e.Session["Association"] = "missing-request"
-		}
-	} else if typ != 10 {
-		if p, ok := s.pending[key]; ok {
-			e.TransactionID = p.id
-		} else if len(s.pending) < a.budget.MaxCollectionElements && a.reserveEvidence(int64(len(key)+128)) {
-			s.pending[key] = dnsPending{id: e.ID, ts: e.Timestamp, cost: int64(len(key) + 128)}
-			e.TransactionID = e.ID
-		}
-	}
+	a.observeDHCPPhase(e, info, key, relay, typ, true)
 }

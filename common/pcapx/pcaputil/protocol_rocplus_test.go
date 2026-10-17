@@ -92,11 +92,7 @@ func rocInput(t *testing.T, c rocControl) ([]byte, rocAnswer) {
 }
 func rocEqualFields(t *testing.T, want map[string]any, got map[string]any) {
 	t.Helper()
-	b, err := json.Marshal(got)
-	require.NoError(t, err)
-	var normalized map[string]any
-	require.NoError(t, json.Unmarshal(b, &normalized))
-	require.Equal(t, want, normalized)
+	requireExactProtocolFields(t, want, got)
 }
 func rocTypedError(t *testing.T, kind string, err error) {
 	t.Helper()
@@ -107,6 +103,7 @@ func rocTypedError(t *testing.T, kind string, err error) {
 	var pe *ProtocolError
 	require.Error(t, err)
 	require.True(t, errors.As(err, &pe))
+	require.NotNil(t, pe, "expected a non-nil typed protocol error")
 	require.Equal(t, kind, string(pe.Kind))
 }
 func rocCheckEvents(t *testing.T, want rocAnswer, events []*ProtocolEvent, endpoints bool) {

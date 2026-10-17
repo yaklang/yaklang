@@ -64,7 +64,13 @@ func execute(ctx context.Context, args []string) error {
 		return err
 	}
 	defer os.RemoveAll(workspace)
-	if err := trafficfixture.Export(workspace); err != nil {
+	requested := []string{}
+	for _, arg := range args[1:] {
+		if strings.HasPrefix(arg, "@") {
+			requested = append(requested, strings.TrimPrefix(arg, "@"))
+		}
+	}
+	if err := trafficfixture.ExportTools(workspace, requested); err != nil {
 		return err
 	}
 	if args[0] == "test" {

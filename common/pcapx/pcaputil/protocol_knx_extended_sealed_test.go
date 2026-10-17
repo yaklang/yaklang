@@ -158,6 +158,10 @@ func TestKNXExtendedSealedDatagramMatrix(t *testing.T) {
 						rocTypedError(t, *c.Error, err)
 						require.Nil(t, f)
 						require.Empty(t, e.Session)
+						e.Session = map[string]any{"kind": "forged-success"}
+						decoded, decodeErr := e.Decode()
+						rocTypedError(t, *c.Error, decodeErr)
+						require.Nil(t, decoded)
 						continue
 					}
 					require.NoError(t, err)
@@ -170,6 +174,18 @@ func TestKNXExtendedSealedDatagramMatrix(t *testing.T) {
 					}
 					require.Equal(t, status, e.Status)
 					n++
+					// SRP4 returns typed integer vectors. Replacing a map entry
+					// alone does not exercise ownership of their backing arrays.
+					for _, view := range []map[string]any{f, e.Session} {
+						rows, _ := view["srps"].([]map[string]any)
+						for _, row := range rows {
+							for _, key := range []string{"requested_dib_octets", "zero_octet_positions"} {
+								if vector, ok := row[key].([]int); ok && len(vector) > 0 {
+									vector[0] = 999999
+								}
+							}
+						}
+					}
 					f["kind"] = "caller change"
 					e.Session["kind"] = "caller change"
 					if e.Fields != nil {
@@ -182,6 +198,15 @@ func TestKNXExtendedSealedDatagramMatrix(t *testing.T) {
 					f, err = e.GetFields()
 					require.NoError(t, err)
 					rocEqualFields(t, c.Messages[at].Fields, f)
+					decoded, err := e.Decode()
+					require.NoError(t, err)
+					rocEqualFields(t, c.Messages[at].Fields, decoded["fields"].(map[string]any))
+					rocEqualFields(t, c.Messages[at].Fields, decoded["session"].(map[string]any))
+					clear(decoded["session"].(map[string]any))
+					e.Session = nil
+					decoded, err = e.Decode()
+					require.NoError(t, err)
+					rocEqualFields(t, c.Messages[at].Fields, decoded["session"].(map[string]any))
 				}
 				require.Equal(t, len(c.Messages), n)
 				if d {

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"path"
+	"slices"
 	"strings"
 )
 
@@ -76,6 +77,17 @@ func AllExpectations() ([]*FrozenExpectations, error) {
 	if err != nil {
 		return nil, err
 	}
+	c.expectationsOnce.Do(func() { c.expectations, c.expectationsErr = readAllExpectations(c) })
+	if c.expectationsErr != nil {
+		return nil, c.expectationsErr
+	}
+	return cloneExpectations(c.expectations), nil
+}
+
+// Archives and aliases are the immutable, hash-verified snapshot loaded by
+// load(). Validate each answer inventory once, but never share its mutable
+// projections with test callers.
+func readAllExpectations(c *corpus) ([]*FrozenExpectations, error) {
 	var results []*FrozenExpectations
 	ids := map[string]bool{}
 	for _, b := range c.index.Batches {
@@ -143,4 +155,49 @@ func isCapture(name string) bool {
 		return true
 	}
 	return false
+}
+
+func cloneExpectations(source []*FrozenExpectations) []*FrozenExpectations {
+	out := make([]*FrozenExpectations, len(source))
+	for i, answers := range source {
+		owned := *answers
+		owned.Cases = make([]FrozenCase, len(answers.Cases))
+		for j, item := range answers.Cases {
+			copy := item
+			copy.Missing = slices.Clone(item.Missing)
+			if item.Facts.Representative != nil {
+				frame := *item.Facts.Representative
+				copy.Facts.Representative = &frame
+			}
+			if item.Expectations != nil {
+				copy.Expectations = make([]Expectation, len(item.Expectations))
+			}
+			for k, expected := range item.Expectations {
+				e := expected
+				if expected.Frame != nil {
+					frame := *expected.Frame
+					e.Frame = &frame
+				}
+				e.Selection = slices.Clone(expected.Selection)
+				e.PayloadConstraints = slices.Clone(expected.PayloadConstraints)
+				e.Expected.RequiredFields = slices.Clone(expected.Expected.RequiredFields)
+				if expected.Expected.Values != nil {
+					e.Expected.Values = make(map[string]json.RawMessage, len(expected.Expected.Values))
+					for key, value := range expected.Expected.Values {
+						e.Expected.Values[key] = slices.Clone(value)
+					}
+				}
+				if expected.Expected.EventCounts != nil {
+					e.Expected.EventCounts = make(map[string]int, len(expected.Expected.EventCounts))
+					for key, value := range expected.Expected.EventCounts {
+						e.Expected.EventCounts[key] = value
+					}
+				}
+				copy.Expectations[k] = e
+			}
+			owned.Cases[j] = copy
+		}
+		out[i] = &owned
+	}
+	return out
 }

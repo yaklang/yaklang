@@ -172,6 +172,10 @@ func TestDoIPDiscoverySealedDatagramMatrix(t *testing.T) {
 						rocTypedError(t, *c.Error, err)
 						require.Nil(t, f)
 						require.Empty(t, e.Session)
+						e.Session = map[string]any{"Authentication Verified": true}
+						tree, decodeErr := e.Decode()
+						rocTypedError(t, *c.Error, decodeErr)
+						require.Nil(t, tree)
 						continue
 					}
 					require.NoError(t, err)
@@ -199,6 +203,38 @@ func TestDoIPDiscoverySealedDatagramMatrix(t *testing.T) {
 					f, err = e.GetFields()
 					require.NoError(t, err)
 					rocEqualFields(t, c.Messages[at].Fields, f)
+					// Discovery cannot prove authentication or vehicle identity.
+					wantSession := map[string]any{"Association": "unassociated-discovery", "Authentication Verified": false, "Vehicle Identity Verified": false}
+					for _, replacement := range []map[string]any{
+						{"Association": "verified", "Authentication Verified": true, "Vehicle Identity Verified": true},
+						nil,
+					} {
+						e.Session = replacement
+						tree, decodeErr := e.Decode()
+						require.NoError(t, decodeErr)
+						rocEqualFields(t, c.Messages[at].Fields, protocolFields(tree))
+						querySession, ok := tree["session"].(map[string]any)
+						require.True(t, ok)
+						rocEqualFields(t, wantSession, querySession)
+						mutateRTPSQuery(querySession)
+					}
+					e.Session = cloneSession(wantSession)
+					inspector, inspectorErr := NewProtocolInspector(2, 1<<20)
+					require.NoError(t, inspectorErr)
+					inspector.OnEvent(e)
+					rows := inspector.Rows("", 0)
+					require.Len(t, rows, 1)
+					require.Nil(t, rows[0].Session)
+					for query := 0; query < 2; query++ {
+						detail, detailErr := inspector.Details(rows[0].ID)
+						require.NoError(t, detailErr)
+						detail.Session = map[string]any{"Authentication Verified": true}
+						tree, decodeErr := detail.Decode()
+						require.NoError(t, decodeErr)
+						rocEqualFields(t, c.Messages[at].Fields, protocolFields(tree))
+						rocEqualFields(t, wantSession, tree["session"].(map[string]any))
+						mutateRTPSQuery(tree)
+					}
 					accepted++
 				}
 				require.Equal(t, len(c.Messages), accepted)

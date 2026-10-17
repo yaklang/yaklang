@@ -52,10 +52,13 @@ type location struct {
 	member string
 }
 type corpus struct {
-	root     string
-	index    Index
-	indexRaw []byte
-	aliases  map[string]location
+	expectationsOnce sync.Once
+	expectations     []*FrozenExpectations
+	expectationsErr  error
+	root             string
+	index            Index
+	indexRaw         []byte
+	aliases          map[string]location
 }
 
 var loaded struct {

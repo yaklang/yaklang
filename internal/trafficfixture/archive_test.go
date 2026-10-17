@@ -12,6 +12,7 @@ import (
 )
 
 func TestFrozenBatchIntegrity(t *testing.T) {
+	t.Run("standalone-inventory-workspace", workspaceStandaloneInventory)
 	c, err := load()
 	if err != nil {
 		t.Fatal(err)
