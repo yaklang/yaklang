@@ -140,9 +140,11 @@ func (s *Scannerx) probeTCP(ctx context.Context, target *SynxTarget) (netstackvm
 	if s.config != nil && s.config.tcpProbeTimeout > 0 {
 		timeout = s.config.tcpProbeTimeout
 	}
+	// The deadline is visible to callers. ProbeSYN starts the response clock
+	// after a rate token, so queue time is not part of that budget.
 	probeCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
-	return s.halfOpen.Probe(probeCtx, net.JoinHostPort(target.Host, strconv.Itoa(target.Port)))
+	return s.halfOpen.Probe(netstackvm.ContextWithProbeBudget(probeCtx, timeout), net.JoinHostPort(target.Host, strconv.Itoa(target.Port)))
 }
 
 func quietProbeErr(err error) bool {

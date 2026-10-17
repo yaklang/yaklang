@@ -230,6 +230,37 @@ func TestLiveLoopbackMatrix(t *testing.T) {
 	}
 }
 
+func TestLiveTCPOpenPortSurvivesRateQueue(t *testing.T) {
+	loop := loopbackScannerIface(t)
+	stubLoopbackRoute(t, loop)
+	closed := reserveClosedPorts(t, 1)[0]
+	ln := listenTCP(t, net.IPv4(127, 0, 0, 1))
+	open := ln.Addr().(*net.TCPAddr).Port
+	if open < closed {
+		t.Skipf("open port %d is below closed port %d", open, closed)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
+	defer cancel()
+	// One packet per second, and a TCP budget shorter than that gap. The open
+	// port is second, so it has to wait for a token before its response clock starts.
+	results, err := Scan(ctx, "127.0.0.1", fmt.Sprintf("%d,%d", closed, open),
+		WithShuffle(false),
+		WithConcurrent(1),
+		WithTCPProbeTimeout(200*time.Millisecond),
+	)
+	if err != nil {
+		t.Skipf("packet capture is not available: %v", err)
+	}
+	got := collectLive(t, ctx, results)
+	if !hasLive(got, "127.0.0.1", open, "tcp") {
+		t.Fatalf("open port waited out of its budget: %+v", got)
+	}
+	if hasLive(got, "127.0.0.1", closed, "tcp") {
+		t.Fatalf("closed port reported: %+v", got)
+	}
+	acceptNone(t, ln)
+}
+
 func TestLiveCancelUnblocksSilentUDP(t *testing.T) {
 	loop := loopbackScannerIface(t)
 	stubLoopbackRoute(t, loop)

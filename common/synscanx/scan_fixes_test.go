@@ -166,6 +166,31 @@ func TestOutputFileTruncatesOnOpen(t *testing.T) {
 	}
 }
 
+func TestHostFilterResolvesHyphenatedDomain(t *testing.T) {
+	if !looksLikeIPv4Range("10.0.0.1-10.0.0.20") || !looksLikeIPv4Range("1.1.1.1-3") {
+		t.Fatal("ip range was not recognized")
+	}
+	if looksLikeIPv4Range("my-host.example.com") || looksLikeIPv4Range("a-b-c.example.com") {
+		t.Fatal("hostname was treated as an ip range")
+	}
+	previous := lookupHostIPv4
+	lookupHostIPv4 = func(host string) []string {
+		if host != "my-host.example.com" {
+			t.Errorf("resolved %s", host)
+		}
+		return []string{"203.0.113.9"}
+	}
+	defer func() { lookupHostIPv4 = previous }()
+
+	filter := hostResultFilter("my-host.example.com,10.0.0.0/30")
+	if filter == nil || !filter.Contains("203.0.113.9") || !filter.Contains("10.0.0.1") {
+		t.Fatal("hyphenated domain or cidr was not accepted")
+	}
+	if filter.Contains("203.0.113.10") {
+		t.Fatal("unrelated address matched the domain filter")
+	}
+}
+
 func targetMode(target *SynxTarget) string {
 	name := "tcp"
 	if target.Mode == UDP {

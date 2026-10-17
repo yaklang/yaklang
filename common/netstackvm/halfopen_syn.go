@@ -408,15 +408,24 @@ func (h *HalfOpenSYN) StartTCPProbe(ctx context.Context, target string, options 
 // own batch concurrency and give each call its own context. Use StartTCPProbe
 // instead when individual steps or a longer-lived probe are needed.
 func (h *HalfOpenSYN) ProbeSYN(ctx context.Context, target string, options ...TCPProbeOption) (TCPSegment, error) {
-	probe, err := h.StartTCPProbe(ctx, target, options...)
+	// A response budget must not expire while this probe waits for a rate token.
+	// Cancellation still aborts the probe. Callers that set only a deadline keep
+	// the previous behavior.
+	runCtx := ctx
+	if probeResponseBudget(ctx) > 0 {
+		var stop context.CancelFunc
+		runCtx, stop = contextWithoutDeadline(ctx)
+		defer stop()
+	}
+	probe, err := h.StartTCPProbe(runCtx, target, options...)
 	if err != nil {
 		return TCPSegment{}, err
 	}
 	defer probe.Close()
-	if _, err = probe.ProbeSYNContext(ctx); err != nil {
+	if _, err = probe.ProbeSYNContext(runCtx); err != nil {
 		return TCPSegment{}, err
 	}
-	return probe.ReceiveSYNACKContext(ctx)
+	return probe.ReceiveSYNACKContext(runCtx)
 }
 
 func (h *HalfOpenSYN) Close() error {
