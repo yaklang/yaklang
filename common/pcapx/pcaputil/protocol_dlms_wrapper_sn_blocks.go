@@ -150,6 +150,12 @@ func decodeWrapperSNServiceBlock(w []byte, limit int) (*wrapperMessage, error) {
 	return m, nil
 }
 
+// Upload and response download must remain separate even if a peer changes role.
+type wrapperSNKey struct {
+	wrapperGBTKey
+	upload bool
+}
+
 type wrapperSNGroup struct {
 	last                       uint16
 	blocks                     int
@@ -165,8 +171,8 @@ func (p *wrapperSNGroup) retire() {
 	p.active, p.acked, p.completed, p.ambiguous = false, false, false, true
 }
 
-func (s *binDLMSWrapper) unfinishedSNBlockKeys() []wrapperGBTKey {
-	var out []wrapperGBTKey
+func (s *binDLMSWrapper) unfinishedSNBlockKeys() []wrapperSNKey {
+	var out []wrapperSNKey
 	for k, p := range s.snGroups {
 		if p.active {
 			out = append(out, k)
@@ -180,7 +186,10 @@ func (s *binDLMSWrapper) unfinishedSNBlockKeys() []wrapperGBTKey {
 		if a.source != b.source {
 			return a.source < b.source
 		}
-		return a.destination < b.destination
+		if a.destination != b.destination {
+			return a.destination < b.destination
+		}
+		return !a.upload && b.upload
 	})
 	return out
 }
@@ -189,13 +198,16 @@ func (s *binDLMSWrapper) retireSNGroupForMessage(m *wrapperMessage, dir int) boo
 	if !m.request {
 		return false
 	}
-	k := wrapperGBTKey{1 - dir, m.destination, m.source}
+	k := wrapperSNKey{wrapperGBTKey{1 - dir, m.destination, m.source}, false}
 	// A new complete SN request is an explicit observation boundary, but is
 	// not itself retained or treated as a service owner. Removing a group here
 	// does not revive a conversation retired by a resource/idle failure.
 	_, existed := s.snGroups[k]
 	delete(s.snGroups, k)
-	return existed
+	uploadKey := wrapperSNKey{wrapperGBTKey{dir, m.source, m.destination}, true}
+	_, uploadExists := s.snGroups[uploadKey]
+	delete(s.snGroups, uploadKey)
+	return existed || uploadExists
 }
 
 func (f *binFlow) consumeWrapperSNServiceBlock(s *binDLMSWrapper, m *wrapperMessage, dir int, e *ProtocolEvent, w []byte) (string, error) {
@@ -208,16 +220,20 @@ func (f *binFlow) consumeSNServiceBlockReserved(s *binDLMSWrapper, m *wrapperMes
 	if s.blocked {
 		return "unverified-sn-block-after-conversation-invalidation", nil
 	}
-	key := wrapperGBTKey{dir, m.source, m.destination}
-	if m.request {
-		key = wrapperGBTKey{1 - dir, m.destination, m.source}
+	echo := m.request != m.snUpload
+	key := wrapperSNKey{wrapperGBTKey{dir, m.source, m.destination}, m.snUpload}
+	if echo {
+		key.wrapperGBTKey = wrapperGBTKey{1 - dir, m.destination, m.source}
 	}
 	p := s.snGroups[key]
 	h := sha256.Sum256(w)
-	if m.request {
+	if echo {
 		if p == nil {
 			if len(s.snGroups) != 0 {
 				return "unmatched-sn-block-context", nil
+			}
+			if m.snUpload {
+				return "orphan-sn-upload-echo", nil
 			}
 			return "orphan-sn-block-number-access", nil
 		}
@@ -229,6 +245,7 @@ func (f *binFlow) consumeSNServiceBlockReserved(s *binDLMSWrapper, m *wrapperMes
 			return "duplicate-wire", nil
 		}
 		if !p.active {
+			p.retire()
 			return "retired-sn-completed-generation-uncertain", nil
 		}
 		if uint16(m.blockNumber) != p.last {
@@ -245,6 +262,9 @@ func (f *binFlow) consumeSNServiceBlockReserved(s *binDLMSWrapper, m *wrapperMes
 		}
 		p.acked, p.ackHash, p.ackEvent = true, h, e.ID
 		m.fields["acknowledged_block_event"] = p.lastEvent
+		if m.snUpload {
+			return "unverified-sn-upload-echo", nil
+		}
 		return "unverified-sn-block-number-access", nil
 	}
 	if p != nil {
@@ -275,6 +295,9 @@ func (f *binFlow) consumeSNServiceBlockReserved(s *binDLMSWrapper, m *wrapperMes
 		if len(s.snGroups) != 0 {
 			return "unmatched-sn-block-context", nil
 		}
+		if m.snUpload {
+			return "orphan-sn-upload-block", nil
+		}
 		return "orphan-sn-data-block", nil
 	}
 	total, blocks := len(m.blockData), 1
@@ -304,11 +327,15 @@ func (f *binFlow) consumeSNServiceBlockReserved(s *binDLMSWrapper, m *wrapperMes
 	}
 	var data map[string]any
 	if m.lastBlock {
-		c := wrapperListCursor{wire: joined, maxDepth: f.a.budget.MaxRecursionDepth}
 		var err error
-		data, err = c.data(f.a.budget.MaxCollectionElements, 0)
-		if err == nil && c.at != len(joined) {
-			err = wrapperError(ErrMalformedMessage, "SN service-block single Data has trailing bytes")
+		if m.snUpload {
+			data, err = decodeSNUploadBody(joined, f.a.budget.MaxCollectionElements, f.a.budget.MaxRecursionDepth)
+		} else {
+			c := wrapperListCursor{wire: joined, maxDepth: f.a.budget.MaxRecursionDepth}
+			data, err = c.data(f.a.budget.MaxCollectionElements, 0)
+			if err == nil && c.at != len(joined) {
+				err = wrapperError(ErrMalformedMessage, "SN service-block single Data has trailing bytes")
+			}
 		}
 		if err != nil {
 			s.invalidate()
@@ -317,7 +344,7 @@ func (f *binFlow) consumeSNServiceBlockReserved(s *binDLMSWrapper, m *wrapperMes
 	}
 	if p == nil {
 		if s.snGroups == nil {
-			s.snGroups = make(map[wrapperGBTKey]*wrapperSNGroup)
+			s.snGroups = make(map[wrapperSNKey]*wrapperSNGroup)
 		}
 		p = &wrapperSNGroup{start: e.ID}
 		s.snGroups[key] = p
@@ -325,12 +352,27 @@ func (f *binFlow) consumeSNServiceBlockReserved(s *binDLMSWrapper, m *wrapperMes
 	p.last, p.blocks, p.lastHash, p.lastEvent = uint16(m.blockNumber), blocks, h, e.ID
 	p.active, p.acked, p.completed = !m.lastBlock, false, m.lastBlock
 	m.fields["transfer_start_event"], m.fields["observed_block_count"] = p.start, blocks
-	m.fields["assembled_data_length"] = total
+	if m.snUpload {
+		m.fields["assembled_body_length"] = total
+	} else {
+		m.fields["assembled_data_length"] = total
+	}
 	if m.lastBlock {
-		m.fields["transfer_complete"], m.fields["assembled_data_hex"], m.fields["assembled_data"] = true, hex.EncodeToString(joined), data
+		m.fields["transfer_complete"] = true
+		if m.snUpload {
+			m.fields["assembled_request_body_hex"], m.fields["assembled_request_body"] = hex.EncodeToString(joined), data
+		} else {
+			m.fields["assembled_data_hex"], m.fields["assembled_data"] = hex.EncodeToString(joined), data
+		}
 		p.data = nil
+		if m.snUpload {
+			return "unverified-sn-upload-wire-group-complete", nil
+		}
 		return "unverified-sn-wire-group-complete", nil
 	}
 	p.data = joined
+	if m.snUpload {
+		return "unverified-sn-upload-block", nil
+	}
 	return "unverified-sn-data-block", nil
 }

@@ -43,6 +43,7 @@ type wrapperMessage struct {
 	count                  int
 	request, confirmed     bool
 	snServiceBlock         bool
+	snUpload               bool
 	snRead                 bool
 	snWrite                bool
 	blockNumber            uint32
@@ -88,6 +89,9 @@ func decodeDLMSWrapperBudget(w []byte, limit, depth int) (*wrapperMessage, error
 		return decodeWrapperSNWrite(w, limit, depth)
 	}
 	if p[0] == 0x05 || p[0] == 0x0c {
+		if wrapperIsSNUpload(w) {
+			return decodeWrapperSNUpload(w, limit)
+		}
 		if wrapperIsSNServiceBlock(w) {
 			return decodeWrapperSNServiceBlock(w, limit)
 		}
@@ -329,7 +333,7 @@ type binDLMSWrapper struct {
 	seen         map[wrapperToken]*wrapperPending
 	associations map[wrapperAssociationKey]*wrapperAssociation
 	gbt          map[wrapperGBTKey]*wrapperGBTTransfer
-	snGroups     map[wrapperGBTKey]*wrapperSNGroup
+	snGroups     map[wrapperSNKey]*wrapperSNGroup
 	blocked      bool
 }
 
@@ -567,6 +571,9 @@ const wrapperIdleTTL = 30 * time.Second
 // inspect the fixed Wrapper/service header here; this hint is not an accepted
 // descriptor, Data value, association or authenticated peer generation.
 func wrapperUDPRefusalHint(w []byte) bool {
+	if wrapperIsSNUpload(w) {
+		return wrapperSNUploadRefusalHint(w)
+	}
 	if wrapperIsSNServiceBlock(w) {
 		return wrapperSNBlockRefusalHint(w)
 	}

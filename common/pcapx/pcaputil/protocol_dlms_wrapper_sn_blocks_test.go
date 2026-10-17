@@ -25,6 +25,7 @@ func snBlockControls(t *testing.T, native bool) []snWriteControl {
 	require.NoError(t, json.Unmarshal(raw, &h))
 	require.Len(t, d.Cases, 26)
 	require.Len(t, h.Cases, 26)
+	d.Cases = snUploadUpgradeHistoricalDownload(t, raw, d.Cases)
 	out := make([]snWriteControl, len(d.Cases))
 	for i, c := range d.Cases {
 		if native {

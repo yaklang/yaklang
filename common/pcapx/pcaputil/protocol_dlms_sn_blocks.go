@@ -56,7 +56,7 @@ func (f *binFlow) consumeDLMSSNServiceBlock(dir int, w []byte, id uint64, m *dlm
 	}
 	// The shadow has exactly one already-separated UInt32 logical link. Its zero
 	// synthetic Wrapper ports never escape or identify the real HDLC context.
-	wk := wrapperGBTKey{dir, 0, 0}
+	wk := wrapperSNKey{wrapperGBTKey{dir, 0, 0}, false}
 	if m.request {
 		wk.dir = 1 - dir
 	}
@@ -165,7 +165,7 @@ func (s *binDLMS) unfinishedSNBlockKeys() []dlmsSNBlockKey {
 	return out
 }
 func (s *binDLMS) snBlockCloseFields(key dlmsSNBlockKey) map[string]any {
-	p := s.snBlocks[key].wire.snGroups[wrapperGBTKey{key.dir, 0, 0}]
+	p := s.snBlocks[key].wire.snGroups[wrapperSNKey{wrapperGBTKey{key.dir, 0, 0}, false}]
 	return map[string]any{"Buffered SN Groups": 1, "source_address": key.source, "destination_address": key.destination, "observed_block_count": p.blocks, "assembled_data_length": len(p.data), "block_number": p.last}
 }
 
@@ -179,7 +179,7 @@ func (s *binDLMS) observeSNBlockInterruption(m *dlmsMessage, dir int) {
 		return
 	}
 	for key, l := range s.snBlocks {
-		p := l.wire.snGroups[wrapperGBTKey{key.dir, 0, 0}]
+		p := l.wire.snGroups[wrapperSNKey{wrapperGBTKey{key.dir, 0, 0}, false}]
 		if p == nil || !p.active {
 			continue
 		}

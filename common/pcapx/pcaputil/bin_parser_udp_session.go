@@ -765,8 +765,8 @@ func (a *binParser) closeUDPSessions() {
 				}
 				for _, key := range w.unfinishedSNBlockKeys() {
 					p := w.snGroups[key]
-					summary := "DLMS Wrapper SN Read wire group ended before complete Data"
-					e := &ProtocolEvent{FlowID: f.id, Timestamp: v.touched, Domain: v.key.domain, Transport: "udp", Source: f.endpoints[key.dir], Destination: f.endpoints[1-key.dir], Direction: key.dir, Protocol: "dlms-wrapper", Profile: "dlms-wrapper-v1-sn-read-block", nativeDLMSOrSLMPObservation: true, Status: "incomplete", Completeness: "incomplete", Summary: summary, Session: map[string]any{"Buffered SN Groups": 1, "source_wport": key.source, "destination_wport": key.destination, "observed_block_count": p.blocks, "assembled_data_length": len(p.data), "block_number": p.last}, sessionError: &ProtocolError{Kind: ErrNeedMore, Message: summary}}
+					summary := wrapperSNGroupCloseSummary(key)
+					e := &ProtocolEvent{FlowID: f.id, Timestamp: v.touched, Domain: v.key.domain, Transport: "udp", Source: f.endpoints[key.dir], Destination: f.endpoints[1-key.dir], Direction: key.dir, Protocol: "dlms-wrapper", Profile: wrapperSNGroupProfile(key), nativeDLMSOrSLMPObservation: true, Status: "incomplete", Completeness: "incomplete", Summary: summary, Session: wrapperSNGroupCloseFields(key, p), sessionError: &ProtocolError{Kind: ErrNeedMore, Message: summary}}
 					e.semanticSession = cloneSession(e.Session)
 					e.Error = e.sessionError.Error()
 					incomplete = append(incomplete, e)

@@ -11,7 +11,7 @@ func snReadTypes(t *testing.T, value any) {
 	case map[string]any:
 		for k, x := range v {
 			switch k {
-			case "parameter", "assembled_data":
+			case "parameter", "assembled_data", "assembled_request_body":
 				require.IsType(t, map[string]any{}, x, k)
 			case "descriptors", "results", "elements", "rows":
 				require.IsType(t, []map[string]any{}, x, k)
@@ -23,7 +23,7 @@ func snReadTypes(t *testing.T, value any) {
 				require.IsType(t, int8(0), x, k)
 			case "block_data_length", "raw_data_length", "list_count", "value_count", "parameter_count", "length", "contents_length":
 				require.IsType(t, uint64(0), x, k)
-			case "payload_length", "observed_block_count", "Buffered SN Groups", "assembled_data_length", "Outstanding", "index", "apdu_offset", "encoded_length", "success_item_count", "error_item_count", "data_item_count", "row_count", "description_node_count", "value_node_count", "contents_offset":
+			case "assembled_body_length", "body_length", "body_offset", "payload_length", "observed_block_count", "Buffered SN Groups", "assembled_data_length", "Outstanding", "index", "apdu_offset", "encoded_length", "success_item_count", "error_item_count", "data_item_count", "row_count", "description_node_count", "value_node_count", "contents_offset":
 				require.IsType(t, int(0), x, k)
 			case "transfer_start_event", "acknowledged_block_event", "duplicate_of_event":
 				require.IsType(t, uint64(0), x, k)
