@@ -42,7 +42,14 @@ func asCValue(v llvm.Value) C.LLVMValueRef {
 }
 
 func instructionParentBlock(v llvm.Value) llvm.BasicBlock {
-	if v.IsNil() || C.LLVMGetValueKind(asCValue(v)) != C.LLVMInstructionValueKind {
+	if v.IsNil() {
+		return llvm.BasicBlock{}
+	}
+	// Use a dynamic type check, not LLVMInstructionValueKind: a newer
+	// llvm-c header may assign a different enum value than libLLVM-18.
+	// LLVMGetInstructionParent itself requires an Instruction and must not
+	// be called on constants or function arguments.
+	if C.LLVMIsAInstruction(asCValue(v)) == nil {
 		return llvm.BasicBlock{}
 	}
 	bb := C.LLVMGetInstructionParent(asCValue(v))
