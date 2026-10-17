@@ -40,15 +40,17 @@ func TestMustPass_SSA2LLVM_AllScripts(t *testing.T) {
 	// Same environment as the yakvm mustpass suite: a live vulinbox server.
 	addr, err := vulinbox.NewVulinServer(context.Background())
 	require.NoError(t, err, "vulinbox must start for mustpass scripts")
+	home := t.TempDir()
 	env := map[string]string{
 		"VULINBOX":      addr,
 		"VULINBOX_HOST": utils.ExtractHostPort(addr),
-		"YAKIT_HOME":    t.TempDir(),
+		"YAKIT_HOME":    home,
 	}
 	// Scripts reference VULINBOX directly (f`${VULINBOX}/...`); yak.Execute
 	// injects it as a var, so the AOT CLI must see it at compile time too.
 	t.Setenv("VULINBOX", addr)
 	t.Setenv("VULINBOX_HOST", utils.ExtractHostPort(addr))
+	primeMustPassYakitHome(t, home, env)
 
 	for _, name := range names {
 		name := name
@@ -60,4 +62,24 @@ func TestMustPass_SSA2LLVM_AllScripts(t *testing.T) {
 			}
 		})
 	}
+}
+
+// primeMustPassYakitHome fills the shared profile database once.
+// A cold CallPostInitDatabase parses the embedded AI tools and core plugins
+// locally (73 tools changed, 49 plugins changed; measured 5m22s, no network).
+// The same binary against that home then spends about 3s in post-init.
+// Each script below keeps the 90s run budget; this prime is the one-time cost.
+func primeMustPassYakitHome(t *testing.T, home string, env map[string]string) {
+	t.Helper()
+	script := filepath.Join(t.TempDir(), "prime-yakit.yak")
+	// log is not in the core or net tiers, so this binary links the runtime
+	// that opens the real yakit database during startup.
+	err := os.WriteFile(script, []byte("log.Info(\"prime yakit database\")\n"), 0o644)
+	require.NoError(t, err)
+	started := time.Now()
+	output := RunYakScriptFileWithCLITimeout(t, 8*time.Minute, script, env)
+	if strings.Contains(output, "panic") {
+		t.Fatalf("yakit prime panicked:\n%s", output)
+	}
+	t.Logf("primed YAKIT_HOME %s in %s", home, time.Since(started))
 }
