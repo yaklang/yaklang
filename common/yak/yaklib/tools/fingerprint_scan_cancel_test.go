@@ -9,6 +9,7 @@ package tools
 
 import (
 	"context"
+	"fmt"
 	"net"
 	"sync/atomic"
 	"testing"
@@ -105,5 +106,45 @@ func TestMUSTPASS_Fingerprint_ScanFromTargetStream_CancelStopsDispatch(t *testin
 		}
 	case <-time.After(15 * time.Second):
 		t.Fatal("outC did not close after pre-canceled ctx; dispatch loop ignores ctx")
+	}
+}
+
+func TestMUSTPASS_Fingerprint_ScanCancelUnblocksFullPool(t *testing.T) {
+	host, port, closeFn := startTarpitListener(t)
+	defer closeFn()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	cfg := fp.NewConfig(
+		fp.WithCtx(ctx),
+		fp.WithPoolSize(1),
+		fp.WithProbeTimeout(20*time.Second),
+		fp.WithDisableWebFingerprint(true),
+		fp.WithActiveMode(true),
+	)
+	outC, err := _scanFingerprint(ctx, cfg, 1, host, fmt.Sprintf("%d,9,11,13,15", port))
+	if err != nil {
+		t.Fatalf("_scanFingerprint returned error: %v", err)
+	}
+
+	deadline := time.Now().Add(8 * time.Second)
+	for GetInFlightFingerprintScans() == 0 && time.Now().Before(deadline) {
+		time.Sleep(20 * time.Millisecond)
+	}
+	if GetInFlightFingerprintScans() == 0 {
+		t.Fatal("fingerprint scan did not start")
+	}
+	cancel()
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		for range outC {
+		}
+	}()
+	select {
+	case <-done:
+	case <-time.After(8 * time.Second):
+		t.Fatal("cancelled scan stayed blocked on the worker pool or an open probe")
 	}
 }

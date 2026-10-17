@@ -301,7 +301,9 @@ func _scanFingerprint(ctx context.Context, config *fp.Config, concurrent int, ho
 				if h != hRaw {
 					buildinHost, buildinPort, _ := utils.ParseStringToHostPort(hRaw)
 					if buildinPort > 0 {
-						swg.Add()
+						if err := swg.AddWithContext(scanCtx); err != nil {
+							break dispatch
+						}
 						go func() {
 							defer swg.Done()
 							fingerprintInFlight.Add(1)
@@ -341,7 +343,9 @@ func _scanFingerprint(ctx context.Context, config *fp.Config, concurrent int, ho
 				if guard.skipping(h) {
 					continue
 				}
-				swg.Add()
+				if err := swg.AddWithContext(scanCtx); err != nil {
+					break dispatch
+				}
 				rawPort := p
 				rawHost := h
 				proto, portWithoutProto := utils.ParsePortToProtoPort(p) // 这里将协议和端口分开，便于后面打印日志
@@ -410,26 +414,59 @@ func _scanFingerprint(ctx context.Context, config *fp.Config, concurrent int, ho
 // ```
 // <|EXAMPLE_END|>
 func _scanFromPingUtils(res chan *pingutil.PingResult, ports string, opts ...fp.ConfigOption) (chan *fp.MatchResult, error) {
+	config := fp.NewConfig(opts...)
+	ctx := config.Ctx
+	if ctx == nil {
+		ctx = context.Background()
+	}
 	synResults := make(chan *synscan.SynScanResult, 1000)
 	portsInt := utils.ParseStringToPorts(ports)
 	go func() {
 		defer close(synResults)
-		for result := range res {
-			if !result.Ok {
-				log.Debugf("%v is may not alive.", result.IP)
-				continue
+		if res == nil {
+			return
+		}
+		emit := func(host string, port int) bool {
+			select {
+			case <-ctx.Done():
+				return false
+			case synResults <- &synscan.SynScanResult{Host: host, Port: port}:
+				return true
 			}
+		}
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case result, ok := <-res:
+				if !ok {
+					return
+				}
+				if result == nil || !result.Ok {
+					if result != nil {
+						log.Debugf("%v is may not alive.", result.IP)
+					}
+					continue
+				}
 
-			hostRaw, portRaw, _ := utils.ParseStringToHostPort(result.IP)
-			if portRaw > 0 {
-				synResults <- &synscan.SynScanResult{Host: hostRaw, Port: portRaw}
-			}
-
-			// log.Errorf("%v is alive", result.IP)
-			for _, port := range portsInt {
-				synResults <- &synscan.SynScanResult{
-					Host: result.IP,
-					Port: port,
+				host := result.IP
+				embeddedPort := 0
+				if parsedHost, parsedPort, err := utils.ParseStringToHostPort(result.IP); parsedHost != "" {
+					host = parsedHost
+					if err == nil && parsedPort > 0 {
+						embeddedPort = parsedPort
+					}
+				}
+				if embeddedPort > 0 && !emit(host, embeddedPort) {
+					return
+				}
+				for _, port := range portsInt {
+					if embeddedPort > 0 && port == embeddedPort {
+						continue
+					}
+					if !emit(host, port) {
+						return
+					}
 				}
 			}
 		}
