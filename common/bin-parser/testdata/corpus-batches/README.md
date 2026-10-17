@@ -203,7 +203,7 @@ opaque selector bytes and one bounded Data value over Wrapper v1 TCP/UDP; object
 selector meaning, access permission and device operation are unverified. The
 original one-packet selective-access capture and original refused answer remain
 immutable; its now-supported answer is matched by exact input SHA and frame.
-The active inventory is `scripts/protocol-tests/required-tests-traffic-unified-v186.json`.
+The active inventory is `scripts/protocol-tests/required-tests-traffic-unified-v187.json`.
 
 The small-graph budget batch reuses accepted graph captures/answers and adds one
 249-byte UDP control for child count255 without child bytes. Its standalone proof
@@ -993,7 +993,7 @@ the normative answer; a missing numeric reference field is not a codec pass.
 Full/deferred, workers1/2/4, observers off/on, Feed chunks1/7/full, ownership,
 resources and close/refusal boundaries remain required.
 
-Current gate: `required-tests-traffic-unified-v186.json` with
+Current gate: `required-tests-traffic-unified-v187.json` with
 `check_go_test_json_v2.py`. The indexed validator preserves missing/unpassed,
 package invocation completion, descendant skips, failures and non-JSON checks;
 its mutation/differential harness is sealed with the material. Older checkers
@@ -1629,7 +1629,7 @@ userspace adapter; full kernel receiver/socket/timers and ECU endpoints do not.
 All161 preceding ZIPs remain byte-for-byte unchanged. Raw captures, dependencies,
 reference source/build output and process evidence stay outside Git.
 
-Current effective v186 inventory: 125,016 entries; 125,009 are mandatory for the full tier.
+Current effective v187 inventory: 126,715 entries; 126,708 are mandatory for the full tier.
 
 The opt-in `DynamicFlowControl` profile follows Linux v6.12 FC tuple updates (including WAIT without granting data). Disjoint address extensions or classical/FD carriers may share CAN IDs; unknown selectors cannot choose or mutate a conversation. Ambiguous selectors are rejected. Seven sealed cases exercise full/deferred, workers 1/2/4, and observer off/on, with exact fields, byte collections, contributor references, errors and resource ownership. The existing static FC profile remains unchanged. Pinned upstream FC and filter functions execute with declared userspace stubs; this is not a kernel/ECU endpoint. TShark 4.2.5 checks wire tuples and two complete payloads, but cannot independently reassemble the shared-address transcripts.
 
@@ -1880,3 +1880,5 @@ The cold SN information regression archive removes the LN primer: complete CRC/H
 `validation-sparkplug-arrays.zip` adds selected Sparkplug3.0 datatype22..34 node/device Birth/Data/compatible command arrays, typed values, global protobuf-plus-element budgets and strict present-empty Bytes17 preservation. Thirty-six authored minimal captures contain127 messages and235 packets. Forty-five genuinely new raw contents total7538B;72 logical messages reuse historical bytes. Three exact historical tools totaling16227B receive new aliases without duplicate physical members. Native aggregate-cap33 rejection and cap34 normal controls are separate from default replay. All281 historical ZIPs and original answers remain unchanged. Fixed normative/code evidence and authored independent gold are distinct from carrier or replay consistency; finite-number/DateTime support limits and unfinished full-protocol/device requirements remain explicit in PROFILES.md.
 
 `validation-sparkplug-command-null-rebirth.zip` adds selected literal whole-null NCMD/DCMD observations and transactional mixed-Rebirth validation under existing observed context. Ten captures contain73 messages and103 packets;27 genuinely new raw contents total1397B,31 logical messages reuse historical bytes. Four additional native-only DataSet16/Int32Array24 cases contain26 steps and8 new unique contents totaling543B, stored only in gold, with no extra captures or duplicate raw bins. Three identical historical tools totaling16227B are reused by aliases. All282 old ZIPs and answers remain immutable; only the one exact old command-null event4 capability projection has a pinned adapter. A source erratum correctly records the normative NCMD/DCMD MUST NOT seq requirement; the runtime prohibition is unchanged. No device write/ACK or full-protocol claim is made.
+
+`validation-sparkplug-template.zip` adds selected Sparkplug3.0 node Template19 named definitions, literal-reference complete Birth/Data instances, Basic1..14 members and explicit parameters, typed values, message-oneof merge and transactional registry lifecycle. Twenty authored minimal captures contain90 messages and150 packets;22 genuinely new raw contents total5138B. Native-only exact fields55/56 and depth3/4 controls and8 parameter cases32steps include canonical UInt32 int3 and bounded fixed-Java long4 compatibility, overflow/wrongoneof/default distinctions;16 additional unique native contents total3768B remain only in their gold. Four identical historical tools totaling18182B receive aliases without duplicate physical members. All283 oldZIPs/answers remain immutable. PartialData/defaults/nested/device/commandTemplate, Properties and original unmet protocol/endpoint requirements remain open; source-derived semantics, actual carrier checks and generic replay parity are separate.

@@ -195,6 +195,12 @@ func sparkPreflightWithCount(w []byte, maxDepth, maxFields int) (int64, int, err
 				next = 1
 			case kind == 1 && n == 17:
 				next = 2
+			case kind == 1 && n == 18:
+				next = 5
+			case kind == 5 && n == 2:
+				next = 1
+			case kind == 5 && n == 3:
+				next = 6
 			case kind == 2 && n == 4:
 				next = 3
 			case kind == 3 && n == 1:
@@ -204,7 +210,7 @@ func sparkPreflightWithCount(w []byte, maxDepth, maxFields int) (int64, int, err
 				return nil
 			}
 			b, _ := protowire.ConsumeBytes(v)
-			if next == 2 {
+			if next == 2 || next == 5 {
 				cost += 512 + 8*int64(len(b))
 			}
 			return walk(b, depth+1, next)

@@ -16,17 +16,20 @@ import (
 // are independent of the birth/metric sequence. A broker-forwarded publication
 // cannot borrow this connection's client Will to prove another node's birth.
 type sparkMetricDef struct {
-	typ uint64
+	typ                uint64
+	templateRef        string
+	templateDefinition bool
 }
 
 type sparkNode struct {
-	key     string
-	bdSeq   uint64
-	born    bool
-	seq     uint64
-	metrics map[string]sparkMetricDef
-	aliases map[uint64]string
-	devices map[string]*sparkDevice
+	key       string
+	bdSeq     uint64
+	born      bool
+	seq       uint64
+	metrics   map[string]sparkMetricDef
+	aliases   map[uint64]string
+	devices   map[string]*sparkDevice
+	templates map[string]*sparkTemplateDef
 }
 
 func (s *sparkNode) retainedBytes() int64 {
@@ -34,9 +37,13 @@ func (s *sparkNode) retainedBytes() int64 {
 		return 0
 	}
 	n := int64(128 + len(s.key))
-	for name := range s.metrics {
-		n += int64(96 + len(name))
+	for name, def := range s.metrics {
+		n += int64(96 + len(name) + len(def.templateRef))
 	}
+	for name, d := range s.templates {
+		n += int64(64+len(name)) + d.retainedBytes()
+	}
+
 	for id, d := range s.devices {
 		n += int64(128 + len(id) + 64*len(d.aliases))
 		for name := range d.metrics {
@@ -215,7 +222,8 @@ func sparkDecodeMetric(w []byte, maxDepth, maxFields int) (map[string]any, error
 		// Scalar oneofs replace the prior member. Repeated occurrences of the
 		// same message-valued DataSet member merge their encoded bodies; a
 		// different correctly typed oneof clears them. Wrong wire types stay unknown.
-		if n >= 10 && !(n == 17 && fields["dataset_value"] != nil) {
+		_, priorMessage := fields[name]
+		if n >= 10 && !((n == 17 || n == 18) && priorMessage) {
 			for k := protowire.Number(10); k <= 19; k++ {
 				delete(fields, names[k])
 			}
@@ -243,8 +251,11 @@ func sparkDecodeMetric(w []byte, maxDepth, maxFields int) (map[string]any, error
 					return fmt.Errorf("Sparkplug invalid UTF-8 metric string")
 				}
 				fields[name] = string(b)
-			} else if n == 17 {
+			} else if n == 17 || n == 18 {
 				prior, _ := fields[name].([]byte)
+				if prior == nil {
+					prior = []byte{}
+				}
 				fields[name] = append(prior, b...)
 			} else {
 				fields[name] = bytes.Clone(b)
@@ -492,6 +503,13 @@ func (m *binMQTT) sparkPublish(dir int, topic string, payload []byte, flags byte
 			return refuse("NDATA sequence gap requires a new NBIRTH", "refused")
 		}
 	}
+	if verb == "NBIRTH" {
+		defs, why, status := sparkTemplateBirthDefinitions(metrics, maxDepth, maxFields)
+		if why != "" {
+			return refuse(why, status)
+		}
+		next.templates = defs
+	}
 	values := []map[string]any{}
 	rebirth := false
 	seen := map[string]bool{}
@@ -540,8 +558,11 @@ func (m *binMQTT) sparkPublish(dir int, topic string, payload []byte, flags byte
 		}
 		seen[name] = true
 		value, reason := sparkValue(metric, typ, maxDepth, maxFields)
+		status := "refused"
+		if typ == 19 {
+			value, reason, status = sparkTemplateNodeValue(metric, name, verb, next, maxDepth, maxFields)
+		}
 		if reason != "" {
-			status := "refused"
 			if strings.Contains(reason, "independent structured profile") {
 				status = "unsupported"
 			}

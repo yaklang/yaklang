@@ -669,6 +669,7 @@ func TestSparkplugDataSetPackedTypesGlobalBudget(t *testing.T) {
 // JSON equality alone would accept positive int/uint/float substitutions.
 // Keep the selected public types explicit without weakening the shared oracle.
 func spDataSetTypes(t *testing.T, session map[string]any) {
+	spTemplateTypes(t, session)
 	t.Helper()
 	spArrayDraftTyped(t, session)
 	raw, present := session["Sparkplug"]

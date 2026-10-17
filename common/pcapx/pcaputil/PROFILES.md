@@ -25,8 +25,8 @@ Additional native profiles and their exact message/carrier boundaries are regist
 | Redis | RESP2 + RESP3 | nested collections, attributes, pushes, pipeline, binary-safe bulk and bounded context | streamed strings and aggregates |
 | gRPC | HTTP/2 mapping | Cross-DATA framing, unary/bidi, trailers, identity/gzip messages | No protobuf schema names; unsupported compression stays explicit |
 | MQTT | Observed 3.1.1 and 5.0 TCP connections after CONNECT | Exact binary/empty PUBLISH payloads; directional QoS 1/2 identifiers and terminal reuse; post-PUBREL PUBLISH refused, 3.1.1 byte-exact PUBLISH retry identity and repeated PUBREC/PUBREL preserve the latest observed phase; second CONNECT, fresh PUBLISH/cross-control identifier collisions and reversed subscription controls refused; byte-exact subscription retry identity and ordered per-filter ACK results with cardinality checks; bounded retained state and owned fields; 5.0 properties/reason codes/topic aliases | Broker delivery, cross-connection session resume, complete DUP/retry semantics, remaining Sparkplug command/structured/reconnect profiles and MQTT-SN; legacy 3.1 remains a separate field profile |
-| Sparkplug B selected node scalars | 3.0.0 / MQTT 3.1.1 or 5.0 TCP | Will/NBIRTH/NDATA/NDEATH, unaliased NCMD Rebirth and selected scalar NCMD observations; scalar protobuf fields, alias zero, signed widths, sequence wrap, observed producer Will/CONNACK association; application refusals remain MQTT observations | STATE, mixed Rebirth commands, other structured/array values (DataSet Birth/Data/command observations below), metadata/properties, capture-wide reconnect/forwarded-host state and endpoint conformance remain pending |
-| Sparkplug B selected device scalars | 3.0.0 / MQTT 3.1.1 or 5.0 TCP after observed node birth | DBIRTH/DDATA/DDEATH and selected scalar DCMD observations; per-device definitions, node-wide unique aliases, shared node/device sequence, same-name isolation, stale aliases retained after death, transactional resource refusal, owned fields | Output writability/execution, null commands, other structured/array values (DataSet Birth/Data/command observations below), metadata/properties, reconnect generations, host/endpoint semantics remain pending |
+| Sparkplug B selected node scalars | 3.0.0 / MQTT 3.1.1 or 5.0 TCP | Will/NBIRTH/NDATA/NDEATH, unaliased NCMD Rebirth and selected scalar NCMD observations; scalar protobuf fields, alias zero, signed widths, sequence wrap, observed producer Will/CONNACK association; application refusals remain MQTT observations | STATE, additional command/structured profiles (selected DataSet, arrays, null/mixed Rebirth and node Template observations below), metadata/properties, capture-wide reconnect/forwarded-host state and endpoint conformance remain pending |
+| Sparkplug B selected device scalars | 3.0.0 / MQTT 3.1.1 or 5.0 TCP after observed node birth | DBIRTH/DDATA/DDEATH and selected scalar DCMD observations; per-device definitions, node-wide unique aliases, shared node/device sequence, same-name isolation, stale aliases retained after death, transactional resource refusal, owned fields | Output writability/execution, further structured values (selected DataSet, arrays and null commands below; device Template remains pending), metadata/properties, reconnect generations, host/endpoint semantics remain pending |
 | MongoDB | OP_MSG + OP_COMPRESSED | kind 0/1 sequence, requestID correlation, snappy/zlib decompress | other opcodes; unknown compressor |
 | Kafka | Bounded ApiVersions / Metadata / Produce / Fetch profiles | Correlation IDs, legacy and selected flexible versions, none/gzip record batches | Version whitelist below; unsupported APIs and codecs remain explicit |
 | SMB | SMB2 + SMB3 negotiate | Compound, MessageId pairing, Session/Tree/FileId, Create/Read/Write/Close, transform Encrypted boundary | SMB Direct; encrypted body without keys |
@@ -626,3 +626,45 @@ local policy was incorrect. The runtime prohibition stays unchanged; an archived
 source erratum preserves the correction without rewriting historical ZIPs.
 One exact historical command-null event's capability projection is upgraded over
 pinned original bytes/answers; all other historical observations are unchanged.
+
+
+### Sparkplug 3.0 selected Template definition and instance observations
+
+Datatype19 uses Metric.template_value field18. Within one observed producer
+NBIRTH, named definitions and literal template_ref instances are resolved
+independently of metric order; output order remains the wire order. Definitions
+require explicit is_definition=true and no template_ref. Instances require an
+explicit false flag and the observed definition, with unique named Basic1–14
+members and explicit Basic1–14 parameters. Version is optional; when both sides
+supply it, this selected observer requires equality. Complete instance members
+and parameters are required for Birth and for the selected NDATA profile.
+Each member retains its name, datatype and exact typed value; parameters retain
+name, type and exact typed value. Signed widths, uint64, float32/64, Boolean,
+UTF-8 String/Text and uint64 UTC-millisecond DateTime stay distinct.
+
+Parameter UInt32 canonically uses int_value3. The fixed Tahu1.0.22 Java codec
+also writes and accepts long_value4; the observer accepts that explicit form
+only through 0xffffffff. This is source-reviewed compatibility, not an executed
+SDK or endpoint claim. A wrong explicit value oneof is refused; an absent value
+remains a separately unsupported default-inheritance requirement. Parameter
+oneofs use last correctly typed scalar value; repeated Template message18
+occurrences merge, while another correctly typed value oneof clears the old
+member. Wrong wire types remain unknown and cannot clear known values.
+
+Definitions are committed only after a complete valid Birth. New Birth,
+producer error and Rebirth cannot borrow an older registry. The global protobuf
+field/depth preflight includes all nested members and parameters before graph
+allocation; exact fields55/56 and depth3/4 refusal/normal cases retain terminal
+resource errors, later stopped feeds and idempotent Close with zero buffering.
+Full/deferred public Feed, ordered metadata/Session, zero business IDs, exact
+numeric/container types and input/output/query ownership are checked under
+whole/1/3/17 chunking, with 20 authored minimal captures across workers1/2/4 and
+observation callbacks on/off. Canonical Basic1–14 and compatible UInt32 parameter
+controls are native-only and do not duplicate those captures.
+
+Partial NDATA member updates, default parameter inheritance, nested Template,
+device/command Template, naming conventions beyond literal observed names,
+Properties, host-wide registry/reconnect, endpoint/device execution and complete
+Sparkplug conformance remain open. Unsupported observations do not complete
+those original requirements. Source-derived semantics, actual TShark carrier
+checks and generic replay consistency are separate evidence categories.

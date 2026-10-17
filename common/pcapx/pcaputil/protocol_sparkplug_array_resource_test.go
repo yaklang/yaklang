@@ -65,10 +65,17 @@ func TestSparkplugArrayAggregateElementBudgetExistingAPI(t *testing.T) {
 
 func spArrayAggregateLimitedChunksDraft(t *testing.T, c spCommandResourceDraftCase, chunk int, deferred bool) {
 	t.Helper()
+	require.Equal(t, 33, c.Budget.MaxCollectionElements)
+	spSparkplugAggregateLimitedChunks(t, c, chunk, deferred, 3)
+}
+
+// The independent negative chooses the exact message that crosses the shared
+// protobuf budget. All accepted history and the terminal event remain checked.
+func spSparkplugAggregateLimitedChunks(t *testing.T, c spCommandResourceDraftCase, chunk int, deferred bool, prefix int) {
+	t.Helper()
 	b := DefaultParserBudget()
 	b.MaxRecursionDepth = c.Budget.MaxRecursionDepth
 	b.MaxCollectionElements = c.Budget.MaxCollectionElements
-	require.Equal(t, 33, b.MaxCollectionElements)
 	var steps []spCommandResourceDraftStep
 	spCommandResourceDraftDecode(t, c.Steps, &steps)
 	s, err := NewProtocolSessionWithOptions(b, WithSessionTransport("tcp"), WithSessionPorts(40000, 1883))
@@ -84,9 +91,8 @@ func spArrayAggregateLimitedChunksDraft(t *testing.T, c spCommandResourceDraftCa
 		}
 	}
 	var totalInput uint64
-	// Prefix is exactly accepted CONNECT/CONNACK/NBIRTH. Chunking below changes
-	// only the first nonempty array NDATA, avoiding unrelated prefix test count.
-	for _, w := range steps[:3] {
+	// Retain the accepted prefix; chunk only the independently selected limited message.
+	for _, w := range steps[:prefix] {
 		wire, err := hex.DecodeString(w.Input)
 		require.NoError(t, err)
 		require.Equal(t, w.SHA, fmt.Sprintf("%x", sha256.Sum256(wire)))
@@ -138,7 +144,9 @@ func spArrayAggregateLimitedChunksDraft(t *testing.T, c spCommandResourceDraftCa
 		spDataSetPoison(fields)
 		recheck()
 	}
-	w := steps[3]
+	w := steps[prefix]
+	require.NotNil(t, w.QueryError)
+	require.Equal(t, ErrResourceExceeded, w.QueryError.Kind)
 	wire, err := hex.DecodeString(w.Input)
 	require.NoError(t, err)
 	require.Equal(t, w.SHA, fmt.Sprintf("%x", sha256.Sum256(wire)))
@@ -165,7 +173,7 @@ func spArrayAggregateLimitedChunksDraft(t *testing.T, c spCommandResourceDraftCa
 			require.Len(t, r.Events, 1)
 			require.NotNil(t, r.Err)
 			require.Equal(t, ErrResourceExceeded, r.Err.Kind)
-			require.Equal(t, "Sparkplug array elements", r.Err.Message)
+			require.Equal(t, w.QueryError.Message, r.Err.Message)
 			resource = r.Events[0]
 			r.Err.Kind, r.Err.Message = ErrMalformedMessage, "poison returned Feed error"
 		}
@@ -192,16 +200,16 @@ func spArrayAggregateLimitedChunksDraft(t *testing.T, c spCommandResourceDraftCa
 	require.Equal(t, "limited", e.Status)
 	require.Equal(t, "limited", e.Completeness)
 	require.Equal(t, string(ErrResourceExceeded), e.ExpertCode)
-	require.Equal(t, "ResourceExceeded: Sparkplug array elements", e.Error)
+	require.Equal(t, w.QueryError.Error(), e.Error)
 	require.Equal(t, "mqtt", e.Summary)
 	require.Nil(t, e.Session)
 	require.Nil(t, e.Fields)
-	history = append(history, spCommandResourceDraftHistory{event: e, err: &ProtocolError{Kind: ErrResourceExceeded, Message: "Sparkplug array elements"}})
+	history = append(history, spCommandResourceDraftHistory{event: e, err: &ProtocolError{Kind: w.QueryError.Kind, Message: w.QueryError.Message}})
 	recheck()
 	require.Zero(t, s.Stats().BufferedBytes)
 	// Both directions are stopped. No late compatible command or Data may
 	// silently re-create the definitions or recover this exact session.
-	for _, late := range steps[4:] {
+	for _, late := range steps[prefix+1:] {
 		wire, err := hex.DecodeString(late.Input)
 		require.NoError(t, err)
 		r := s.Feed(late.Direction, time.Unix(late.Time, 0), wire)
@@ -218,7 +226,7 @@ func spArrayAggregateLimitedChunksDraft(t *testing.T, c spCommandResourceDraftCa
 	}
 	stats := s.Stats()
 	require.Equal(t, totalInput, stats.InputBytes)
-	require.Equal(t, uint64(4), stats.Messages)
+	require.Equal(t, uint64(prefix+1), stats.Messages)
 	require.Equal(t, uint64(len(wire)), stats.LimitedBytes)
 	require.Empty(t, s.Close("complete"))
 	require.Zero(t, s.Stats().BufferedBytes)
