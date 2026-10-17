@@ -385,12 +385,16 @@ func TestSaveToDatabaseFlushesInstructionSaverBeforeTypes(t *testing.T) {
 	prog.Cache.FlushCompileUnit("unit-a")
 
 	// Capture concurrent saver output without changing the shared logger level
-	// while its background workers are running.
+	// while its background workers are running. The level must still be pinned:
+	// a narrow `-run` selection skips the sibling flush tests that used to leave
+	// the process at Info, and step0/step1 are Info lines.
 	var logBuf flushLogBuffer
 	yaklog.SetOutput(&logBuf)
+	yaklog.SetLevel(yaklog.InfoLevel)
 	defer func() {
 		prog.Cache.CloseWithoutSave()
 		yaklog.SetOutput(os.Stdout)
+		yaklog.SetLevel(yaklog.InfoLevel)
 	}()
 
 	err = prog.Cache.SaveToDatabase()
