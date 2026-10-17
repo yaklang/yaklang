@@ -125185,7 +125185,310 @@
         "common/pcapx/pcaputil/sparkplug-dataset-source/tools/verify-all.py": "sparkplug-dataset/tools/verify-all.py",
         "common/pcapx/pcaputil/testdata/sparkplug-dataset/tools/verify-carriers.py": "sparkplug-dataset/tools/verify-carriers.py",
         "common/pcapx/pcaputil/sparkplug-dataset-source/tools/verify-carriers.py": "sparkplug-dataset/tools/verify-carriers.py",
-        "scripts/protocol-tests/required-tests-traffic-unified-v183.json": "required-tests-traffic-unified-v183.json"
+        "scripts/protocol-tests/required-tests-traffic-unified-v183.json": "required-tests-traffic-unified-v183.json",
+        "common/pcapx/pcaputil/testdata/sparkplug-dataset-commands/tools/candidates.py": "sparkplug-dataset/tools/candidates.py",
+        "common/pcapx/pcaputil/testdata/sparkplug-dataset-commands/tools/generate-node-state.py": "sparkplug-dataset/tools/generate-node-state.py"
+      }
+    },
+    {
+      "id": "validation-sparkplug-dataset-commands",
+      "kind": "support",
+      "source_sha": "e1a0fc922e4cc4841593f5f5de5b4283b1e4df0f",
+      "file": "validation-sparkplug-dataset-commands.zip",
+      "sha256": "cc64ca04a9b3e75a7f2100df052a0e62752e005b143b1160d5c29f2273432f45",
+      "password": "bin-parser",
+      "members": {
+        "required-tests-traffic-unified-v184.json": {
+          "bytes": 24771418,
+          "sha256": "540fe62f497d745043e30a04f4771833a01b551ca07364e0b4bb855d53586624"
+        },
+        "sparkplug-dataset-commands/LICENSE.txt": {
+          "bytes": 292,
+          "sha256": "1b0e833bb1cbb41ae00c94a11d15384b6c8aa6bbd37ab22f2bc4177ab86bd685"
+        },
+        "sparkplug-dataset-commands/answers.json": {
+          "bytes": 111469,
+          "sha256": "dcd4c0908619fd6aaeaf15da153302282d4b27b3a3014035d9d8512961bf3846"
+        },
+        "sparkplug-dataset-commands/capture-materials.json": {
+          "bytes": 109498,
+          "sha256": "7b2b765df031f1814ca134be215e86a660048645edbca5ade28d73b8aceb7745"
+        },
+        "sparkplug-dataset-commands/captures/device-alias-only-metricTime-explicit16.pcap": {
+          "bytes": 1111,
+          "sha256": "3d85ef4bc543c0a101d1be102d9096c58290e5f99133ac97111f0b6d19b369c7"
+        },
+        "sparkplug-dataset-commands/captures/device-invalid-cells-preserve-zeroRows-Birth.pcap": {
+          "bytes": 1630,
+          "sha256": "5757d56d0d96269af90e9e2af3299a1003e9431a899f8f1e9e8991483f0c80d3"
+        },
+        "sparkplug-dataset-commands/captures/device-metadata-refusals-preserve-state.pcap": {
+          "bytes": 2019,
+          "sha256": "4e5abad31ef615a59dbf311cb6b47eb49b09711b0693a3d0c051e852690d12a2"
+        },
+        "sparkplug-dataset-commands/captures/device-missing-Birth-then-observed-Birth.pcap": {
+          "bytes": 1254,
+          "sha256": "cda4b8c1ccf94744c6d86b31207616a0aee93c8a60628a777c755bcb33bcaae9"
+        },
+        "sparkplug-dataset-commands/captures/device-name-only-unaliased-Birth-noMetricTime-inherit16.pcap": {
+          "bytes": 1110,
+          "sha256": "a36d696eae3d4d99f4056b5ddb15689f5c18af66bee89fb9f5cd871631957039"
+        },
+        "sparkplug-dataset-commands/captures/node-alias-only-noMetricTime-inherit16.pcap": {
+          "bytes": 970,
+          "sha256": "5f185ee5f3ba61653699eb340bff2a343f8826fd74805f90aaee843dc2e43f63"
+        },
+        "sparkplug-dataset-commands/captures/node-invalid-cells-preserve-zeroRows-Birth.pcap": {
+          "bytes": 1489,
+          "sha256": "bf56b5db90047a92b6e686400538a3f1e6789e3dda378347b4ef06dbd834ae02"
+        },
+        "sparkplug-dataset-commands/captures/node-metadata-refusals-preserve-state.pcap": {
+          "bytes": 1875,
+          "sha256": "4df4c14d267c7cf3100134d62a59ede648eed2d4f6184496c7393d01e685baf7"
+        },
+        "sparkplug-dataset-commands/captures/node-missing-Birth-then-observed-Birth.pcap": {
+          "bytes": 1120,
+          "sha256": "84a511f307b08abf05f5286fa249d64e9cbe70f62a437c8498bb5a06f03ca7d2"
+        },
+        "sparkplug-dataset-commands/captures/node-name-only-unaliased-Birth-metricTime-explicit16.pcap": {
+          "bytes": 987,
+          "sha256": "955fa272f3c62af3ab9ef291423da81e2c995428df772549a1263cf2a7a75892"
+        },
+        "sparkplug-dataset-commands/captures/ordinary-DataSet-Birth-and-Data-neighbor.pcap": {
+          "bytes": 820,
+          "sha256": "73bfd88f496ee4baa45f3d16b4237207100715571206f175ea86f29037fa1cde"
+        },
+        "sparkplug-dataset-commands/command-controls.json": {
+          "bytes": 289396,
+          "sha256": "c1a53e50013f3581f71236a7ca95251b477455b0acac87bd050ec235fb6246ef"
+        },
+        "sparkplug-dataset-commands/historical-command-upgrade-corrected-parent.json": {
+          "bytes": 21274,
+          "sha256": "757e2446e76b2d51519d748bbd384fde390065a806850e3a27718c5bc35e76bb"
+        },
+        "sparkplug-dataset-commands/invalid-cell-controls.json": {
+          "bytes": 130081,
+          "sha256": "a26a2173355d52ab22f69224ae2d8bace63d532cfced760dc6405367345328f3"
+        },
+        "sparkplug-dataset-commands/portable-pins.json": {
+          "bytes": 2567,
+          "sha256": "457913dd1acc8523200cb5047a6047d33aed96432cde9c69224e9a5e1a3d9aff"
+        },
+        "sparkplug-dataset-commands/records/0499003719a14b04ef9561588344be42b9dac8e0d3e4a4aa53ac007eb5c7eef3.bin": {
+          "bytes": 82,
+          "sha256": "0499003719a14b04ef9561588344be42b9dac8e0d3e4a4aa53ac007eb5c7eef3"
+        },
+        "sparkplug-dataset-commands/records/0566680ed4532ba843086e83221fbd43a54a60ba1db4098331eab50cc9cdd475.bin": {
+          "bytes": 112,
+          "sha256": "0566680ed4532ba843086e83221fbd43a54a60ba1db4098331eab50cc9cdd475"
+        },
+        "sparkplug-dataset-commands/records/06a14aadf3be7f3ae45adfce6ee84acb08baf34d53fd8c368775595e05c68624.bin": {
+          "bytes": 76,
+          "sha256": "06a14aadf3be7f3ae45adfce6ee84acb08baf34d53fd8c368775595e05c68624"
+        },
+        "sparkplug-dataset-commands/records/09d864798d190d63c20bd8ef249653c5e088d4ce67ce2ab948084497c090cd87.bin": {
+          "bytes": 66,
+          "sha256": "09d864798d190d63c20bd8ef249653c5e088d4ce67ce2ab948084497c090cd87"
+        },
+        "sparkplug-dataset-commands/records/0e5c8111852bf243794d6207ee13b7b86d8f0ffcaf6e4f8051a388525f363aac.bin": {
+          "bytes": 86,
+          "sha256": "0e5c8111852bf243794d6207ee13b7b86d8f0ffcaf6e4f8051a388525f363aac"
+        },
+        "sparkplug-dataset-commands/records/17950b7db1a40da3e11acfa4f7c71d96689aea7f141598bf3e906f998f673b3b.bin": {
+          "bytes": 62,
+          "sha256": "17950b7db1a40da3e11acfa4f7c71d96689aea7f141598bf3e906f998f673b3b"
+        },
+        "sparkplug-dataset-commands/records/1f1e5ce60fbe9c82bae968bc5e0964e9abf90aa37446b32a210d449e185dcafc.bin": {
+          "bytes": 94,
+          "sha256": "1f1e5ce60fbe9c82bae968bc5e0964e9abf90aa37446b32a210d449e185dcafc"
+        },
+        "sparkplug-dataset-commands/records/2c35ea64a4146c7a45125c2bc42dbb9c9bc074b6998e4776146ef6d269109bd9.bin": {
+          "bytes": 83,
+          "sha256": "2c35ea64a4146c7a45125c2bc42dbb9c9bc074b6998e4776146ef6d269109bd9"
+        },
+        "sparkplug-dataset-commands/records/2de15ee433fa64d31ef66e2bfeac9d107f2a92dda13fe4aeb697424671d43022.bin": {
+          "bytes": 75,
+          "sha256": "2de15ee433fa64d31ef66e2bfeac9d107f2a92dda13fe4aeb697424671d43022"
+        },
+        "sparkplug-dataset-commands/records/34c2c6923e02106260b18d914869106e034e7de6774546dad0404be5a8a34330.bin": {
+          "bytes": 87,
+          "sha256": "34c2c6923e02106260b18d914869106e034e7de6774546dad0404be5a8a34330"
+        },
+        "sparkplug-dataset-commands/records/36d9a38bfb6e421a62f0630c07f46383e2aa8bf916b4c1eaa651a4760458d7ad.bin": {
+          "bytes": 82,
+          "sha256": "36d9a38bfb6e421a62f0630c07f46383e2aa8bf916b4c1eaa651a4760458d7ad"
+        },
+        "sparkplug-dataset-commands/records/5caee0677b9b025c3b4c2eb2d362ed381a75bc3a0c9178d03336fab3e136b2d3.bin": {
+          "bytes": 76,
+          "sha256": "5caee0677b9b025c3b4c2eb2d362ed381a75bc3a0c9178d03336fab3e136b2d3"
+        },
+        "sparkplug-dataset-commands/records/69bb61808d16da08cb02fd39d40cf4c205a9003d906159260f733e8f5876df54.bin": {
+          "bytes": 129,
+          "sha256": "69bb61808d16da08cb02fd39d40cf4c205a9003d906159260f733e8f5876df54"
+        },
+        "sparkplug-dataset-commands/records/78d2cf2a313aed07d709bb857ea864f3e078f24535dc9919de4db7b0ff523ac7.bin": {
+          "bytes": 154,
+          "sha256": "78d2cf2a313aed07d709bb857ea864f3e078f24535dc9919de4db7b0ff523ac7"
+        },
+        "sparkplug-dataset-commands/records/9cf4a13946df1c44c7c02cc7d3df31cec6767b71f29f5db3386a46b26bd412e1.bin": {
+          "bytes": 87,
+          "sha256": "9cf4a13946df1c44c7c02cc7d3df31cec6767b71f29f5db3386a46b26bd412e1"
+        },
+        "sparkplug-dataset-commands/records/9ed4cec5fe84340342e3f830c2fb87bd28d7fb890240de19a5560214166ce636.bin": {
+          "bytes": 73,
+          "sha256": "9ed4cec5fe84340342e3f830c2fb87bd28d7fb890240de19a5560214166ce636"
+        },
+        "sparkplug-dataset-commands/records/9f098909415891a3852b70eed8b7cb919c30fdad699ee6672b3bcb59fce9e6a2.bin": {
+          "bytes": 60,
+          "sha256": "9f098909415891a3852b70eed8b7cb919c30fdad699ee6672b3bcb59fce9e6a2"
+        },
+        "sparkplug-dataset-commands/records/abdd44242e51fd7f3f9f0e00e3b5679c557e199bd32376867437ae9f9b8fdb64.bin": {
+          "bytes": 89,
+          "sha256": "abdd44242e51fd7f3f9f0e00e3b5679c557e199bd32376867437ae9f9b8fdb64"
+        },
+        "sparkplug-dataset-commands/records/ac01e843a2f18bd852323fc86929664f2bae65ee62f8d6bf45ce1bdc66880dab.bin": {
+          "bytes": 66,
+          "sha256": "ac01e843a2f18bd852323fc86929664f2bae65ee62f8d6bf45ce1bdc66880dab"
+        },
+        "sparkplug-dataset-commands/records/b9b1e6707fdee35733148a5dccb87950088ffba028f2343dc7924b845b31834f.bin": {
+          "bytes": 64,
+          "sha256": "b9b1e6707fdee35733148a5dccb87950088ffba028f2343dc7924b845b31834f"
+        },
+        "sparkplug-dataset-commands/records/bb49de8450666d462a0e278ef1a9c8133b734d7873eb026252d460854ecabeb5.bin": {
+          "bytes": 81,
+          "sha256": "bb49de8450666d462a0e278ef1a9c8133b734d7873eb026252d460854ecabeb5"
+        },
+        "sparkplug-dataset-commands/records/c6c4c62a0e17b6d61ef493b0151c62dcf7197cc0ae5cb8db7c8c4e1537dabe24.bin": {
+          "bytes": 84,
+          "sha256": "c6c4c62a0e17b6d61ef493b0151c62dcf7197cc0ae5cb8db7c8c4e1537dabe24"
+        },
+        "sparkplug-dataset-commands/records/c6f3f9ff2bc1a1bc0aedeff21b9c7ebf200ed13be4169a3639420258882814dc.bin": {
+          "bytes": 84,
+          "sha256": "c6f3f9ff2bc1a1bc0aedeff21b9c7ebf200ed13be4169a3639420258882814dc"
+        },
+        "sparkplug-dataset-commands/records/d3d5b19dede2c0ea2ef889023bc451804f56ef080181c7bced530d582c13ceb2.bin": {
+          "bytes": 84,
+          "sha256": "d3d5b19dede2c0ea2ef889023bc451804f56ef080181c7bced530d582c13ceb2"
+        },
+        "sparkplug-dataset-commands/records/e4d8ebe859ef610699907d70159923ea2ccff556ed89be95292536808d610cb7.bin": {
+          "bytes": 82,
+          "sha256": "e4d8ebe859ef610699907d70159923ea2ccff556ed89be95292536808d610cb7"
+        },
+        "sparkplug-dataset-commands/records/f17d8a2340b24e66e2efb510f43e0e1a98349c6b16d3360934028ba7a9287759.bin": {
+          "bytes": 100,
+          "sha256": "f17d8a2340b24e66e2efb510f43e0e1a98349c6b16d3360934028ba7a9287759"
+        },
+        "sparkplug-dataset-commands/records/f33c637d402399243ce37324833f1e420f6be7f972d54d5c53de894a05b0c227.bin": {
+          "bytes": 80,
+          "sha256": "f33c637d402399243ce37324833f1e420f6be7f972d54d5c53de894a05b0c227"
+        },
+        "sparkplug-dataset-commands/records/f4fe149685a22d9cac877ccf6fe868fe74ecf9d5add393604a47c7734baeaafb.bin": {
+          "bytes": 68,
+          "sha256": "f4fe149685a22d9cac877ccf6fe868fe74ecf9d5add393604a47c7734baeaafb"
+        },
+        "sparkplug-dataset-commands/records/f8f1d0c8261179f5425a38dc56c7a7894361cf2e625ffb64254812b4ad1a89cc.bin": {
+          "bytes": 91,
+          "sha256": "f8f1d0c8261179f5425a38dc56c7a7894361cf2e625ffb64254812b4ad1a89cc"
+        },
+        "sparkplug-dataset-commands/records/fe22abd79a5b1e9548b5b0eb6e5e556937691c907318b0cd82e20aaadd8d9c9a.bin": {
+          "bytes": 78,
+          "sha256": "fe22abd79a5b1e9548b5b0eb6e5e556937691c907318b0cd82e20aaadd8d9c9a"
+        },
+        "sparkplug-dataset-commands/source-bindings.json": {
+          "bytes": 15772,
+          "sha256": "75c91be7509eddfc84b27555e956e02e11a77c528b680cbacb9de09a726a419f"
+        },
+        "sparkplug-dataset-commands/source-manifest.json": {
+          "bytes": 3218,
+          "sha256": "66ca39bf9980473649ebd2b08da04fce6f5d0c7392feb4050d68380303eeba04"
+        },
+        "sparkplug-dataset-commands/tools/generate-carriers.py": {
+          "bytes": 8506,
+          "sha256": "ab4aada6ba80c7ce923b4c838284285f8222ab963aa4f2993a5ac19f5d5537ab"
+        },
+        "sparkplug-dataset-commands/tools/generate-invalid-cells.py": {
+          "bytes": 7030,
+          "sha256": "597c0bcb8777f670b8d76f747d73414dbe2146cfdd96a250d90bbdf229825abc"
+        },
+        "sparkplug-dataset-commands/tools/generate.py": {
+          "bytes": 9305,
+          "sha256": "19fd09a8be62890aaf04b3696c3b620456cfd0cc610f6f08a925982a8a27de92"
+        },
+        "sparkplug-dataset-commands/tools/legacy-upgrade-corrected-parent.py": {
+          "bytes": 3561,
+          "sha256": "c9ef09f5d93738838e3212a3e5a8135ce4cc66f31cd6452470d1a57dfb727ee8"
+        },
+        "sparkplug-dataset-commands/tools/verify-all.py": {
+          "bytes": 3420,
+          "sha256": "e6de647e8987d289fc2439c40138fcfec28628200b37c87665b0348c3bc018b6"
+        },
+        "sparkplug-dataset-commands/tools/verify-carriers.py": {
+          "bytes": 3160,
+          "sha256": "f57359419809f7745dbb503d7e9f6df5ef65817dd5802842f8856d631c799279"
+        },
+        "validation/expected.json": {
+          "bytes": 15229,
+          "sha256": "73385f6e558fbf768ece1858f5059e8eed7f2720f9cb7f2ec471d8aad38690ce"
+        }
+      },
+      "aliases": {
+        "common/pcapx/pcaputil/testdata/sparkplug-dataset-commands/LICENSE.txt": "sparkplug-dataset-commands/LICENSE.txt",
+        "common/pcapx/pcaputil/testdata/sparkplug-dataset-commands/answers.json": "sparkplug-dataset-commands/answers.json",
+        "common/pcapx/pcaputil/testdata/sparkplug-dataset-commands/capture-materials.json": "sparkplug-dataset-commands/capture-materials.json",
+        "common/pcapx/pcaputil/testdata/sparkplug-dataset-commands/captures/device-alias-only-metricTime-explicit16.pcap": "sparkplug-dataset-commands/captures/device-alias-only-metricTime-explicit16.pcap",
+        "common/pcapx/pcaputil/testdata/sparkplug-dataset-commands/captures/device-invalid-cells-preserve-zeroRows-Birth.pcap": "sparkplug-dataset-commands/captures/device-invalid-cells-preserve-zeroRows-Birth.pcap",
+        "common/pcapx/pcaputil/testdata/sparkplug-dataset-commands/captures/device-metadata-refusals-preserve-state.pcap": "sparkplug-dataset-commands/captures/device-metadata-refusals-preserve-state.pcap",
+        "common/pcapx/pcaputil/testdata/sparkplug-dataset-commands/captures/device-missing-Birth-then-observed-Birth.pcap": "sparkplug-dataset-commands/captures/device-missing-Birth-then-observed-Birth.pcap",
+        "common/pcapx/pcaputil/testdata/sparkplug-dataset-commands/captures/device-name-only-unaliased-Birth-noMetricTime-inherit16.pcap": "sparkplug-dataset-commands/captures/device-name-only-unaliased-Birth-noMetricTime-inherit16.pcap",
+        "common/pcapx/pcaputil/testdata/sparkplug-dataset-commands/captures/node-alias-only-noMetricTime-inherit16.pcap": "sparkplug-dataset-commands/captures/node-alias-only-noMetricTime-inherit16.pcap",
+        "common/pcapx/pcaputil/testdata/sparkplug-dataset-commands/captures/node-invalid-cells-preserve-zeroRows-Birth.pcap": "sparkplug-dataset-commands/captures/node-invalid-cells-preserve-zeroRows-Birth.pcap",
+        "common/pcapx/pcaputil/testdata/sparkplug-dataset-commands/captures/node-metadata-refusals-preserve-state.pcap": "sparkplug-dataset-commands/captures/node-metadata-refusals-preserve-state.pcap",
+        "common/pcapx/pcaputil/testdata/sparkplug-dataset-commands/captures/node-missing-Birth-then-observed-Birth.pcap": "sparkplug-dataset-commands/captures/node-missing-Birth-then-observed-Birth.pcap",
+        "common/pcapx/pcaputil/testdata/sparkplug-dataset-commands/captures/node-name-only-unaliased-Birth-metricTime-explicit16.pcap": "sparkplug-dataset-commands/captures/node-name-only-unaliased-Birth-metricTime-explicit16.pcap",
+        "common/pcapx/pcaputil/testdata/sparkplug-dataset-commands/captures/ordinary-DataSet-Birth-and-Data-neighbor.pcap": "sparkplug-dataset-commands/captures/ordinary-DataSet-Birth-and-Data-neighbor.pcap",
+        "common/pcapx/pcaputil/testdata/sparkplug-dataset-commands/command-controls.json": "sparkplug-dataset-commands/command-controls.json",
+        "common/pcapx/pcaputil/testdata/sparkplug-dataset-commands/historical-command-upgrade-corrected-parent.json": "sparkplug-dataset-commands/historical-command-upgrade-corrected-parent.json",
+        "common/pcapx/pcaputil/testdata/sparkplug-dataset-commands/invalid-cell-controls.json": "sparkplug-dataset-commands/invalid-cell-controls.json",
+        "common/pcapx/pcaputil/testdata/sparkplug-dataset-commands/portable-pins.json": "sparkplug-dataset-commands/portable-pins.json",
+        "common/pcapx/pcaputil/testdata/sparkplug-dataset-commands/records/0499003719a14b04ef9561588344be42b9dac8e0d3e4a4aa53ac007eb5c7eef3.bin": "sparkplug-dataset-commands/records/0499003719a14b04ef9561588344be42b9dac8e0d3e4a4aa53ac007eb5c7eef3.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-dataset-commands/records/0566680ed4532ba843086e83221fbd43a54a60ba1db4098331eab50cc9cdd475.bin": "sparkplug-dataset-commands/records/0566680ed4532ba843086e83221fbd43a54a60ba1db4098331eab50cc9cdd475.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-dataset-commands/records/06a14aadf3be7f3ae45adfce6ee84acb08baf34d53fd8c368775595e05c68624.bin": "sparkplug-dataset-commands/records/06a14aadf3be7f3ae45adfce6ee84acb08baf34d53fd8c368775595e05c68624.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-dataset-commands/records/09d864798d190d63c20bd8ef249653c5e088d4ce67ce2ab948084497c090cd87.bin": "sparkplug-dataset-commands/records/09d864798d190d63c20bd8ef249653c5e088d4ce67ce2ab948084497c090cd87.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-dataset-commands/records/0e5c8111852bf243794d6207ee13b7b86d8f0ffcaf6e4f8051a388525f363aac.bin": "sparkplug-dataset-commands/records/0e5c8111852bf243794d6207ee13b7b86d8f0ffcaf6e4f8051a388525f363aac.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-dataset-commands/records/17950b7db1a40da3e11acfa4f7c71d96689aea7f141598bf3e906f998f673b3b.bin": "sparkplug-dataset-commands/records/17950b7db1a40da3e11acfa4f7c71d96689aea7f141598bf3e906f998f673b3b.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-dataset-commands/records/1f1e5ce60fbe9c82bae968bc5e0964e9abf90aa37446b32a210d449e185dcafc.bin": "sparkplug-dataset-commands/records/1f1e5ce60fbe9c82bae968bc5e0964e9abf90aa37446b32a210d449e185dcafc.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-dataset-commands/records/2c35ea64a4146c7a45125c2bc42dbb9c9bc074b6998e4776146ef6d269109bd9.bin": "sparkplug-dataset-commands/records/2c35ea64a4146c7a45125c2bc42dbb9c9bc074b6998e4776146ef6d269109bd9.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-dataset-commands/records/2de15ee433fa64d31ef66e2bfeac9d107f2a92dda13fe4aeb697424671d43022.bin": "sparkplug-dataset-commands/records/2de15ee433fa64d31ef66e2bfeac9d107f2a92dda13fe4aeb697424671d43022.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-dataset-commands/records/34c2c6923e02106260b18d914869106e034e7de6774546dad0404be5a8a34330.bin": "sparkplug-dataset-commands/records/34c2c6923e02106260b18d914869106e034e7de6774546dad0404be5a8a34330.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-dataset-commands/records/36d9a38bfb6e421a62f0630c07f46383e2aa8bf916b4c1eaa651a4760458d7ad.bin": "sparkplug-dataset-commands/records/36d9a38bfb6e421a62f0630c07f46383e2aa8bf916b4c1eaa651a4760458d7ad.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-dataset-commands/records/5caee0677b9b025c3b4c2eb2d362ed381a75bc3a0c9178d03336fab3e136b2d3.bin": "sparkplug-dataset-commands/records/5caee0677b9b025c3b4c2eb2d362ed381a75bc3a0c9178d03336fab3e136b2d3.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-dataset-commands/records/69bb61808d16da08cb02fd39d40cf4c205a9003d906159260f733e8f5876df54.bin": "sparkplug-dataset-commands/records/69bb61808d16da08cb02fd39d40cf4c205a9003d906159260f733e8f5876df54.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-dataset-commands/records/78d2cf2a313aed07d709bb857ea864f3e078f24535dc9919de4db7b0ff523ac7.bin": "sparkplug-dataset-commands/records/78d2cf2a313aed07d709bb857ea864f3e078f24535dc9919de4db7b0ff523ac7.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-dataset-commands/records/9cf4a13946df1c44c7c02cc7d3df31cec6767b71f29f5db3386a46b26bd412e1.bin": "sparkplug-dataset-commands/records/9cf4a13946df1c44c7c02cc7d3df31cec6767b71f29f5db3386a46b26bd412e1.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-dataset-commands/records/9ed4cec5fe84340342e3f830c2fb87bd28d7fb890240de19a5560214166ce636.bin": "sparkplug-dataset-commands/records/9ed4cec5fe84340342e3f830c2fb87bd28d7fb890240de19a5560214166ce636.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-dataset-commands/records/9f098909415891a3852b70eed8b7cb919c30fdad699ee6672b3bcb59fce9e6a2.bin": "sparkplug-dataset-commands/records/9f098909415891a3852b70eed8b7cb919c30fdad699ee6672b3bcb59fce9e6a2.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-dataset-commands/records/abdd44242e51fd7f3f9f0e00e3b5679c557e199bd32376867437ae9f9b8fdb64.bin": "sparkplug-dataset-commands/records/abdd44242e51fd7f3f9f0e00e3b5679c557e199bd32376867437ae9f9b8fdb64.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-dataset-commands/records/ac01e843a2f18bd852323fc86929664f2bae65ee62f8d6bf45ce1bdc66880dab.bin": "sparkplug-dataset-commands/records/ac01e843a2f18bd852323fc86929664f2bae65ee62f8d6bf45ce1bdc66880dab.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-dataset-commands/records/b9b1e6707fdee35733148a5dccb87950088ffba028f2343dc7924b845b31834f.bin": "sparkplug-dataset-commands/records/b9b1e6707fdee35733148a5dccb87950088ffba028f2343dc7924b845b31834f.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-dataset-commands/records/bb49de8450666d462a0e278ef1a9c8133b734d7873eb026252d460854ecabeb5.bin": "sparkplug-dataset-commands/records/bb49de8450666d462a0e278ef1a9c8133b734d7873eb026252d460854ecabeb5.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-dataset-commands/records/c6c4c62a0e17b6d61ef493b0151c62dcf7197cc0ae5cb8db7c8c4e1537dabe24.bin": "sparkplug-dataset-commands/records/c6c4c62a0e17b6d61ef493b0151c62dcf7197cc0ae5cb8db7c8c4e1537dabe24.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-dataset-commands/records/c6f3f9ff2bc1a1bc0aedeff21b9c7ebf200ed13be4169a3639420258882814dc.bin": "sparkplug-dataset-commands/records/c6f3f9ff2bc1a1bc0aedeff21b9c7ebf200ed13be4169a3639420258882814dc.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-dataset-commands/records/d3d5b19dede2c0ea2ef889023bc451804f56ef080181c7bced530d582c13ceb2.bin": "sparkplug-dataset-commands/records/d3d5b19dede2c0ea2ef889023bc451804f56ef080181c7bced530d582c13ceb2.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-dataset-commands/records/e4d8ebe859ef610699907d70159923ea2ccff556ed89be95292536808d610cb7.bin": "sparkplug-dataset-commands/records/e4d8ebe859ef610699907d70159923ea2ccff556ed89be95292536808d610cb7.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-dataset-commands/records/f17d8a2340b24e66e2efb510f43e0e1a98349c6b16d3360934028ba7a9287759.bin": "sparkplug-dataset-commands/records/f17d8a2340b24e66e2efb510f43e0e1a98349c6b16d3360934028ba7a9287759.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-dataset-commands/records/f33c637d402399243ce37324833f1e420f6be7f972d54d5c53de894a05b0c227.bin": "sparkplug-dataset-commands/records/f33c637d402399243ce37324833f1e420f6be7f972d54d5c53de894a05b0c227.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-dataset-commands/records/f4fe149685a22d9cac877ccf6fe868fe74ecf9d5add393604a47c7734baeaafb.bin": "sparkplug-dataset-commands/records/f4fe149685a22d9cac877ccf6fe868fe74ecf9d5add393604a47c7734baeaafb.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-dataset-commands/records/f8f1d0c8261179f5425a38dc56c7a7894361cf2e625ffb64254812b4ad1a89cc.bin": "sparkplug-dataset-commands/records/f8f1d0c8261179f5425a38dc56c7a7894361cf2e625ffb64254812b4ad1a89cc.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-dataset-commands/records/fe22abd79a5b1e9548b5b0eb6e5e556937691c907318b0cd82e20aaadd8d9c9a.bin": "sparkplug-dataset-commands/records/fe22abd79a5b1e9548b5b0eb6e5e556937691c907318b0cd82e20aaadd8d9c9a.bin",
+        "common/pcapx/pcaputil/testdata/sparkplug-dataset-commands/source-bindings.json": "sparkplug-dataset-commands/source-bindings.json",
+        "common/pcapx/pcaputil/testdata/sparkplug-dataset-commands/source-manifest.json": "sparkplug-dataset-commands/source-manifest.json",
+        "common/pcapx/pcaputil/testdata/sparkplug-dataset-commands/tools/generate-carriers.py": "sparkplug-dataset-commands/tools/generate-carriers.py",
+        "common/pcapx/pcaputil/testdata/sparkplug-dataset-commands/tools/generate-invalid-cells.py": "sparkplug-dataset-commands/tools/generate-invalid-cells.py",
+        "common/pcapx/pcaputil/testdata/sparkplug-dataset-commands/tools/generate.py": "sparkplug-dataset-commands/tools/generate.py",
+        "common/pcapx/pcaputil/testdata/sparkplug-dataset-commands/tools/legacy-upgrade-corrected-parent.py": "sparkplug-dataset-commands/tools/legacy-upgrade-corrected-parent.py",
+        "common/pcapx/pcaputil/testdata/sparkplug-dataset-commands/tools/verify-all.py": "sparkplug-dataset-commands/tools/verify-all.py",
+        "common/pcapx/pcaputil/testdata/sparkplug-dataset-commands/tools/verify-carriers.py": "sparkplug-dataset-commands/tools/verify-carriers.py",
+        "scripts/protocol-tests/required-tests-traffic-unified-v184.json": "required-tests-traffic-unified-v184.json"
       }
     }
   ],

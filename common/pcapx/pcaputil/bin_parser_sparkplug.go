@@ -720,11 +720,6 @@ func (m *binMQTT) sparkDeviceCommand(v map[string]any, p map[string]any, refuse 
 		if metric["is_null"] == true {
 			return refuse("null command values need an independent write profile", "unsupported")
 		}
-		// Structured command validation is a separate profile. A DataSet
-		// birth never implicitly authorizes interpreting a command as data.
-		if def.typ == 16 {
-			return refuse("datatype needs an independent structured profile", "unsupported")
-		}
 		value, reason := sparkValue(metric, def.typ, maxDepth, maxFields)
 		if reason != "" {
 			status := "refused"
@@ -769,11 +764,6 @@ func (m *binMQTT) sparkNodeCommand(v map[string]any, p map[string]any, refuse fu
 		}
 		if metric["is_null"] == true {
 			return refuse("null command values need an independent write profile", "unsupported")
-		}
-		// Structured command validation is a separate profile. A DataSet
-		// birth never implicitly authorizes interpreting a command as data.
-		if def.typ == 16 {
-			return refuse("datatype needs an independent structured profile", "unsupported")
 		}
 		value, reason := sparkValue(metric, def.typ, maxDepth, maxFields)
 		if reason != "" {

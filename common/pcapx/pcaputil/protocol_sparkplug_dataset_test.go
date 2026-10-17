@@ -112,11 +112,15 @@ type spDataSetStep struct {
 }
 
 func spDataSetStateTrace(t *testing.T, steps []spDataSetStep) {
+	spDataSetStateTraceBudget(t, steps, DefaultParserBudget())
+}
+
+func spDataSetStateTraceBudget(t *testing.T, steps []spDataSetStep, budget ParserBudget) {
 	t.Helper()
 	for _, mode := range []bool{false, true} {
 		for _, chunk := range []int{0, 1, 3, 17} {
 			t.Run(fmt.Sprintf("d%v/chunk%d", mode, chunk), func(t *testing.T) {
-				s, err := NewProtocolSessionWithOptions(DefaultParserBudget(), WithSessionTransport("tcp"), WithSessionPorts(40000, 1883))
+				s, err := NewProtocolSessionWithOptions(budget, WithSessionTransport("tcp"), WithSessionPorts(40000, 1883))
 				require.NoError(t, err)
 				defer s.Close("cleanup")
 				s.(*captureSession).f.a.config.Deferred = mode
@@ -382,8 +386,12 @@ func TestSparkplugDataSetCellSessionsExistingAPI(t *testing.T) {
 }
 
 func TestSparkplugDataSetCapturedMatrix(t *testing.T) {
-	bound := spDataSetSource(t, "source-bindings.json")
-	require.Equal(t, "df422a396267c4d2582507dcfebe31be6136596400a9a90090a0ccac5206a6b7", fmt.Sprintf("%x", sha256.Sum256(bound)))
+	spDataSetCapturedMatrix(t, spDataSetSource, "sparkplug-dataset", "df422a396267c4d2582507dcfebe31be6136596400a9a90090a0ccac5206a6b7", 25)
+}
+
+func spDataSetCapturedMatrix(t *testing.T, source func(*testing.T, string) []byte, profile, bindingHash string, cases int) {
+	bound := source(t, "source-bindings.json")
+	require.Equal(t, bindingHash, fmt.Sprintf("%x", sha256.Sum256(bound)))
 	var bindings struct {
 		AnswersSHA string `json:"answers_sha256"`
 		Captures   []struct {
@@ -395,9 +403,12 @@ func TestSparkplugDataSetCapturedMatrix(t *testing.T) {
 		}
 	}
 	require.NoError(t, json.Unmarshal(bound, &bindings))
-	require.Len(t, bindings.Captures, 25)
-	raw := spDataSetSource(t, "answers.json")
+	require.Len(t, bindings.Captures, cases)
+	raw := source(t, "answers.json")
 	require.Equal(t, bindings.AnswersSHA, fmt.Sprintf("%x", sha256.Sum256(raw)))
+	if profile == "sparkplug-dataset" {
+		raw = spDataSetCommandLegacyCapturedAnswers(t, raw)
+	}
 	var g struct {
 		Profiles map[string]struct {
 			Events []struct {
@@ -410,10 +421,10 @@ func TestSparkplugDataSetCapturedMatrix(t *testing.T) {
 	d := json.NewDecoder(bytes.NewReader(raw))
 	d.UseNumber()
 	require.NoError(t, d.Decode(&g))
-	require.Len(t, g.Profiles, 25)
+	require.Len(t, g.Profiles, cases)
 	for name, p := range g.Profiles {
 		t.Run(name, func(t *testing.T) {
-			cap := spDataSetSource(t, "captures/"+name+".pcap")
+			cap := source(t, "captures/"+name+".pcap")
 			var expectedSHA string
 			var expectedBytes, expectedPackets int
 			var payloads []string
@@ -468,9 +479,9 @@ func TestSparkplugDataSetCapturedMatrix(t *testing.T) {
 							for i, e := range events {
 								w := p.Events[i]
 								var wire []byte
-								prefix := "common/pcapx/pcaputil/testdata/sparkplug-dataset/"
+								prefix := "common/pcapx/pcaputil/testdata/" + profile + "/"
 								if strings.HasPrefix(w.Record, prefix) {
-									wire = spDataSetSource(t, strings.TrimPrefix(w.Record, prefix))
+									wire = source(t, strings.TrimPrefix(w.Record, prefix))
 								} else {
 									var err error
 									wire, err = trafficfixture.ReadFile(strings.TrimPrefix(w.Record, "common/pcapx/pcaputil/"))
@@ -559,7 +570,7 @@ func TestSparkplugDataSetCapturedMatrix(t *testing.T) {
 }
 
 func TestSparkplugDataSetCommandBoundaryExistingAPI(t *testing.T) {
-	spDataSetCaseFile(t, "command-boundary-controls.json", "ef875a8fe1e36580ced720f4bb94652d79731459ce0ae043e0c7af9a49c4baf4", 2)
+	spDataSetCommandLegacyCases(t)
 }
 func TestSparkplugDataSetOriginalCandidatesExistingAPI(t *testing.T) {
 	spDataSetCaseFile(t, "addon-controls.json", "dad520bf2e8364eacc041f4115e3628467b4de8e19fc98e0ad2172ab9a692d8e", 8)

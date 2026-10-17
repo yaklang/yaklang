@@ -44,7 +44,7 @@ Run from the repository root:
 ```sh
 go run ./internal/trafficfixture/cmd/corpus test
 go test -json -count=1 -timeout=10m ./internal/trafficfixture/... ./common/bin-parser/... ./common/pcapx/... ./common/yak/cmd/yakcmds/shark-cli ./scripts/ci > traffic.jsonl
-go run ./internal/trafficfixture/cmd/corpus exec -- python3 @scripts/protocol-tests/check_go_test_json_v2.py traffic.jsonl --inventory @scripts/protocol-tests/required-tests-traffic-unified-v183.json --tier full
+go run ./internal/trafficfixture/cmd/corpus exec -- python3 @scripts/protocol-tests/check_go_test_json_v2.py traffic.jsonl --inventory @scripts/protocol-tests/required-tests-traffic-unified-v184.json --tier full
 ```
 
 The single `corpus` entry point uses the same bounded Go ZIP loader as tests.
@@ -83,7 +83,7 @@ their semantic coverage. The existing synthetic session keys are test inputs;
 production credentials, user private keys and material without redistribution
 permission belong in an external fixed-source download manifest.
 
-Current test requirements are sealed at `scripts/protocol-tests/required-tests-traffic-unified-v183.json`;
+Current test requirements are sealed at `scripts/protocol-tests/required-tests-traffic-unified-v184.json`;
 the historical inventories and all earlier batches remain unchanged.
 The supplemental small-corpus batch contains 26 minimal controls, their explicit
 expected facts, an offline generator and the compact pinned source manifest.
@@ -203,7 +203,7 @@ opaque selector bytes and one bounded Data value over Wrapper v1 TCP/UDP; object
 selector meaning, access permission and device operation are unverified. The
 original one-packet selective-access capture and original refused answer remain
 immutable; its now-supported answer is matched by exact input SHA and frame.
-The active inventory is `scripts/protocol-tests/required-tests-traffic-unified-v183.json`.
+The active inventory is `scripts/protocol-tests/required-tests-traffic-unified-v184.json`.
 
 The small-graph budget batch reuses accepted graph captures/answers and adds one
 249-byte UDP control for child count255 without child bytes. Its standalone proof
@@ -993,7 +993,7 @@ the normative answer; a missing numeric reference field is not a codec pass.
 Full/deferred, workers1/2/4, observers off/on, Feed chunks1/7/full, ownership,
 resources and close/refusal boundaries remain required.
 
-Current gate: `required-tests-traffic-unified-v183.json` with
+Current gate: `required-tests-traffic-unified-v184.json` with
 `check_go_test_json_v2.py`. The indexed validator preserves missing/unpassed,
 package invocation completion, descendant skips, failures and non-JSON checks;
 its mutation/differential harness is sealed with the material. Older checkers
@@ -1629,7 +1629,7 @@ userspace adapter; full kernel receiver/socket/timers and ECU endpoints do not.
 All161 preceding ZIPs remain byte-for-byte unchanged. Raw captures, dependencies,
 reference source/build output and process evidence stay outside Git.
 
-Current effective v183 inventory: 120,903 entries; 120,896 are mandatory for the full tier.
+Current effective v184 inventory: 121,813 entries; 121,806 are mandatory for the full tier.
 
 The opt-in `DynamicFlowControl` profile follows Linux v6.12 FC tuple updates (including WAIT without granting data). Disjoint address extensions or classical/FD carriers may share CAN IDs; unknown selectors cannot choose or mutate a conversation. Ambiguous selectors are rejected. Seven sealed cases exercise full/deferred, workers 1/2/4, and observer off/on, with exact fields, byte collections, contributor references, errors and resource ownership. The existing static FC profile remains unchanged. Pinned upstream FC and filter functions execute with declared userspace stubs; this is not a kernel/ECU endpoint. TShark 4.2.5 checks wire tuples and two complete payloads, but cannot independently reassemble the shared-address transcripts.
 
@@ -1873,4 +1873,6 @@ The cold SN information regression archive removes the LN primer: complete CRC/H
 
 `validation-dlms-sn-cold-gbt-information.zip` extends the existing bounded HDLC information/GBT/SN phase profiles to a first CRC/HCS-valid complete LLC/E0 information carrier without an LN primer. Classification remains local to a fresh UDP conversation; all retained assemblers keep opaque-continuation ownership. Cold response ReadR2 and request WriteQ7 complete chains preserve full fields/Session, real event references and zero business IDs. Positive/negative controls cover full UInt32/caller/NR isolation, cap20/19, exact three-counter fragment and six-key service Close, ownership and side-effect-free Probe. Four new authored captures total1890B; response TCP has actual SYNorigin1, request TCP SYNorigin0, with physical endpoints/offsets independent of public Direction. All278 earlier ZIPs remain byte-identical. Initial discriminator splitting, full windows, bare-final retry semantics, AA/security/device proof and original whole-input oracles remain unfinished.
 
-`validation-sparkplug-dataset.zip` adds selected Sparkplug3.0 DataSet node/device Birth/Data: explicit nonzero-column headers, Basic1..14 scalar rows, packed/unpacked type lists, protobuf message-oneof merge/reset, exact error/context/ownership and resource limits. 25 authored minimal captures contain83 messages; 32 new unique raw message records total4048B, while28 logical records reuse historical member hashes. Columns/types equality is normative; complete rectangular rows and explicit header are selected profile policy. Zero-row complete tables and whole-metric null are distinguished from empty cells. Structured commands remain unsupported without losing data definitions. All279 previous ZIPs and rules remain unchanged. Full source/transport/device conformance and all original uncompleted requirements are not implied.
+`validation-sparkplug-dataset.zip` adds selected Sparkplug3.0 DataSet node/device Birth/Data: explicit nonzero-column headers, Basic1..14 scalar rows, packed/unpacked type lists, protobuf message-oneof merge/reset, exact error/context/ownership and resource limits. 25 authored minimal captures contain83 messages; 32 new unique raw message records total4048B, while28 logical records reuse historical member hashes. Columns/types equality is normative; complete rectangular rows and explicit header are selected profile policy. Zero-row complete tables and whole-metric null are distinguished from empty cells. This original batch preserved structured commands as unsupported; the separately versioned command-observation batch below upgrades only the two pinned command projections. All279 previous ZIPs and rules remain unchanged. Full source/transport/device conformance and all original uncompleted requirements are not implied.
+
+`validation-sparkplug-dataset-commands.zip` adds selected Sparkplug3.0 self-contained DataSet NCMD/DCMD passive compatible-value observations under live observed node/device Birth, optional metric timestamp, alias/name/type rules and preserved producer sequence/definitions. Complete source-derived positive and negative answers include malformed cells and exact depth4-stop/depth5-normal adjacent controls. Eleven minimal captures contain81 messages and114 packets;30 new unique raw contents total2535B, while38 logical records reuse historical bytes. Two exact historical rebuilder contents are reused by additional aliases, not duplicate files. All280 old ZIPs/answers remain unchanged; only the two exact historical command projections have a pinned capability adapter. No device write/execution/ACK, null-command, inherited-header, array or full-Sparkplug claim.
