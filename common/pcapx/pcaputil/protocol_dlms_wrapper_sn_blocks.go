@@ -224,6 +224,13 @@ func (f *binFlow) consumeWrapperSNServiceBlock(s *binDLMSWrapper, m *wrapperMess
 // The floor keeps other HDLC logical links and their LN/fragment state charged.
 // Wrapper uses zero; caller-specific addresses and link checks remain outside.
 func (f *binFlow) consumeSNServiceBlockReserved(s *binDLMSWrapper, m *wrapperMessage, dir int, e *ProtocolEvent, w []byte, floor int64) (string, error) {
+	return f.consumeSNServiceBlockContext(s, m, dir, e, w, floor, f.a.budget.MaxRecursionDepth, w)
+}
+
+// A containing APDU reserves its own projection depth and actual carrier
+// identity. Decode/charge the literal inner bytes without calling a direct
+// envelope an exact wire duplicate of a distinct GBT carrier.
+func (f *binFlow) consumeSNServiceBlockContext(s *binDLMSWrapper, m *wrapperMessage, dir int, e *ProtocolEvent, w []byte, floor int64, maxDepth int, identity []byte) (string, error) {
 	if s.blocked {
 		return "unverified-sn-block-after-conversation-invalidation", nil
 	}
@@ -233,7 +240,7 @@ func (f *binFlow) consumeSNServiceBlockReserved(s *binDLMSWrapper, m *wrapperMes
 		key.wrapperGBTKey = wrapperGBTKey{1 - dir, m.destination, m.source}
 	}
 	p := s.snGroups[key]
-	h := sha256.Sum256(w)
+	h := sha256.Sum256(identity)
 	if echo {
 		if p == nil {
 			if len(s.snGroups) != 0 {
@@ -346,12 +353,12 @@ func (f *binFlow) consumeSNServiceBlockReserved(s *binDLMSWrapper, m *wrapperMes
 		var err error
 		if m.snUpload {
 			if m.snWrite {
-				data, err = decodeSNWriteUploadBody(joined, f.a.budget.MaxCollectionElements, f.a.budget.MaxRecursionDepth)
+				data, err = decodeSNWriteUploadBody(joined, f.a.budget.MaxCollectionElements, maxDepth)
 			} else {
-				data, err = decodeSNUploadBody(joined, f.a.budget.MaxCollectionElements, f.a.budget.MaxRecursionDepth)
+				data, err = decodeSNUploadBody(joined, f.a.budget.MaxCollectionElements, maxDepth)
 			}
 		} else {
-			c := wrapperListCursor{wire: joined, maxDepth: f.a.budget.MaxRecursionDepth}
+			c := wrapperListCursor{wire: joined, maxDepth: maxDepth}
 			data, err = c.data(f.a.budget.MaxCollectionElements, 0)
 			if err == nil && c.at != len(joined) {
 				err = wrapperError(ErrMalformedMessage, "SN service-block single Data has trailing bytes")

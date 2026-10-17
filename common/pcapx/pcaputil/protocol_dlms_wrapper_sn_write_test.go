@@ -235,6 +235,9 @@ func snWriteMatrix(t *testing.T, cases []snWriteControl) {
 		for _, tr := range []string{"tcp", "udp"} {
 			t.Run(c.Name+"/"+tr, func(t *testing.T) {
 				reuseFolder, reuseEnv := "dlms-wrapper-sn-write", "DLMS_WRAPPER_SN_WRITE_TEST_ROOT"
+				if c.Folder == "dlms-sn-service-gbt-captures" {
+					reuseFolder, reuseEnv = c.Folder, "DLMS_SN_SERVICE_GBT_ROOT"
+				}
 				if c.Folder == "dlms-sn-gbt-captures" {
 					reuseFolder, reuseEnv = c.Folder, "DLMS_SN_GBT_TEST_ROOT"
 				}
@@ -260,7 +263,7 @@ func snWriteMatrix(t *testing.T, cases []snWriteControl) {
 				if p, ok := reuse[name]; ok {
 					require.True(t, strings.HasPrefix(p, "common/pcapx/pcaputil/"))
 					const prefix = "common/pcapx/pcaputil/"
-					if (c.Folder == "dlms-sn-gbt-captures" || c.Folder == "dlms-sn-parameterized-wrapper" || c.Folder == "dlms-sn-read-block-captures" || c.Folder == "dlms-sn-upload-captures" || c.Folder == "dlms-sn-write-upload-captures") && strings.HasPrefix(p, prefix+c.Folder+"/") {
+					if (c.Folder == "dlms-sn-service-gbt-captures" || c.Folder == "dlms-sn-gbt-captures" || c.Folder == "dlms-sn-parameterized-wrapper" || c.Folder == "dlms-sn-read-block-captures" || c.Folder == "dlms-sn-upload-captures" || c.Folder == "dlms-sn-write-upload-captures") && strings.HasPrefix(p, prefix+c.Folder+"/") {
 						name := strings.TrimPrefix(p, prefix+c.Folder+"/")
 						require.NotContains(t, name, "/")
 						raw = finsReadBatch(t, c.Folder, reuseEnv, name)

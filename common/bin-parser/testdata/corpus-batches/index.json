@@ -119836,6 +119836,282 @@
         "common/pcapx/pcaputil/dlms-hdlc-sn-gbt/captured-controls.json": "dlms-hdlc-sn-gbt/captured-controls.json",
         "scripts/protocol-tests/required-tests-traffic-unified-v167.json": "required-tests-traffic-unified-v167.json"
       }
+    },
+    {
+      "id": "validation-dlms-wrapper-sn-service-gbt",
+      "kind": "support",
+      "source_sha": "16475e0e507b94b39c01f93b5fd011331fc57053",
+      "file": "validation-dlms-wrapper-sn-service-gbt.zip",
+      "sha256": "b708c21260fb07068bf4dd9ff781e1f3abab76c3bf15a53cc5f77f21b9202026",
+      "password": "bin-parser",
+      "members": {
+        "dlms-sn-service-gbt-captures/SN-Q5-echo-via-one-GBT-container-between-direct-blocks.tcp.pcap": {
+          "bytes": 675,
+          "sha256": "7c894b60782bd6d6fb72e03c9a9eb8b8bb4e54fb22648629fbc03a54833f72e7"
+        },
+        "dlms-sn-service-gbt-captures/SN-Q5-echo-via-one-GBT-container-between-direct-blocks.udp.pcap": {
+          "bytes": 405,
+          "sha256": "e0d4d5029f22d085630bd8cb196df13809be91b884f0cbc9144a65bf9ac82023"
+        },
+        "dlms-sn-service-gbt-captures/completed-GBT-prefix-retains-only-inner-SN-active-Close.tcp.pcap": {
+          "bytes": 504,
+          "sha256": "2e7eb0dca03b418eaf35063a52352c01f558bfbed20f675ffbabe92923ec45c0"
+        },
+        "dlms-sn-service-gbt-captures/completed-GBT-prefix-retains-only-inner-SN-active-Close.udp.pcap": {
+          "bytes": 258,
+          "sha256": "9edd981cecb4b5b924607585f5cafca2a7c7847c8f2be74516dcf937b9ebd287"
+        },
+        "dlms-sn-service-gbt-captures/final-SN-R2-via-one-GBT-container-after-direct-prefix-and-echo.tcp.pcap": {
+          "bytes": 675,
+          "sha256": "f55882c1e0076c98d2926546b9a4c8d843c0fac59c90eda68c46710d91863653"
+        },
+        "dlms-sn-service-gbt-captures/final-SN-R2-via-one-GBT-container-after-direct-prefix-and-echo.udp.pcap": {
+          "bytes": 405,
+          "sha256": "1e77f0b72c9855d16ea0a4d692038ea4cfed2be0b013fc21fb887ee59b824503"
+        },
+        "dlms-sn-service-gbt-captures/first-SN-R2-via-two-GBT-blocks-and-real-outer-ACK-then-direct-echo-final.tcp.pcap": {
+          "bytes": 845,
+          "sha256": "05d9ffba743ade3a40549a84fb79c13eefaec049090e17c598d6aac0d22ae926"
+        },
+        "dlms-sn-service-gbt-captures/first-SN-R2-via-two-GBT-blocks-and-real-outer-ACK-then-direct-echo-final.udp.pcap": {
+          "bytes": 551,
+          "sha256": "ad0a12a5a12079b904a22c8733c34d922350b67c629dfd03a283ed9556d26a6a"
+        },
+        "dlms-sn-service-gbt-captures/inner-Structure3-Data-global-depth7-positive.tcp.pcap": {
+          "bytes": 509,
+          "sha256": "1c05601a7fa10c7b86f5c748d88861b392a96267c43a24e5751cc6d187fdcd8f"
+        },
+        "dlms-sn-service-gbt-captures/inner-Structure3-Data-global-depth7-positive.udp.pcap": {
+          "bytes": 263,
+          "sha256": "18c873e33ea6884ed19f05f9ac611cb3fb2899b130e86d09b30013ca60f4be7b"
+        },
+        "dlms-sn-service-gbt-captures/inner-joined-single-Data-trailing-byte-Malformed-retires-LN-and-GBT.tcp.pcap": {
+          "bytes": 504,
+          "sha256": "89b030ef64f1d24caf5ea30703f4f2369f11f84400d69606a7c28e56c1c18f78"
+        },
+        "dlms-sn-service-gbt-captures/inner-joined-single-Data-trailing-byte-Malformed-retires-LN-and-GBT.udp.pcap": {
+          "bytes": 258,
+          "sha256": "bcda92703c26a0ea16161d63ff8761d512526e00481ca8313794be986d9b1e6e"
+        },
+        "dlms-sn-service-gbt-captures/missing-SN-echo-retires-group-without-guessing-GBT-ACK-as-SN-echo.tcp.pcap": {
+          "bytes": 675,
+          "sha256": "cd3630e06fc09ba73797dfbac7d78871901364d7e162aa2fd343dab4758c01f7"
+        },
+        "dlms-sn-service-gbt-captures/missing-SN-echo-retires-group-without-guessing-GBT-ACK-as-SN-echo.udp.pcap": {
+          "bytes": 405,
+          "sha256": "92bc3afb7afa8fde61b4de2056cbfcb56d356a474789f0476fceb4f42114a1a7"
+        },
+        "dlms-sn-service-gbt-captures/ordinary-SN-GBT-complete-neighbor-no-service-block-group.tcp.pcap": {
+          "bytes": 499,
+          "sha256": "0daa23b280b401a4f6654f88fc8363bb747f14f3dea0e59234927c192a040194"
+        },
+        "dlms-sn-service-gbt-captures/ordinary-SN-GBT-complete-neighbor-no-service-block-group.udp.pcap": {
+          "bytes": 253,
+          "sha256": "2a0ff9b3953515397c65f8689f5648d71b8a4e1d719a2b1801529c60896364b9"
+        },
+        "dlms-sn-service-gbt-captures/reuse-inputs.json": {
+          "bytes": 1535,
+          "sha256": "95510879ea399d35ae776b81fbd8fd61e1d3354643ad8da22c5d67515c468c62"
+        },
+        "dlms-sn-service-gbt-captures/same-SN-APDU-direct-then-GBT-is-not-an-exact-carrier-repeat.tcp.pcap": {
+          "bytes": 763,
+          "sha256": "25d0f1d5ab16d98d925bc73bcfdc54f6afa9ac86cb8668ff6c91484149dc54e0"
+        },
+        "dlms-sn-service-gbt-captures/same-SN-APDU-direct-then-GBT-is-not-an-exact-carrier-repeat.udp.pcap": {
+          "bytes": 481,
+          "sha256": "7e5677e657e1f2b84d70e790dd81d56e7cd927c7513692b9392dea2e4503650d"
+        },
+        "dlms-sn-service-gbt-captures/singlelast-R2-in-GBT-completes-one-Data-and-preserves-LN-owner.tcp.pcap": {
+          "bytes": 503,
+          "sha256": "8c3ae169a3105ad5ceae95ea30dc10cdf313e18c610a3a2f2cc14490e338edc7"
+        },
+        "dlms-sn-service-gbt-captures/singlelast-R2-in-GBT-completes-one-Data-and-preserves-LN-owner.udp.pcap": {
+          "bytes": 257,
+          "sha256": "080df36d229349b060c06f2dc07582024fb1b77d822728f4b4ae4928d91d2484"
+        },
+        "dlms-sn-service-gbt-captures/wrong-SN-number-after-observed-echo-retires-inner-group-only.tcp.pcap": {
+          "bytes": 763,
+          "sha256": "8cc530bd25e8a109557e7cf0bd416ea487cd30e43d953723738e75873297f85f"
+        },
+        "dlms-sn-service-gbt-captures/wrong-SN-number-after-observed-echo-retires-inner-group-only.udp.pcap": {
+          "bytes": 481,
+          "sha256": "951ff4624a7a97b671514b03a90277d78e19969df608f1a81af539696d4fa959"
+        },
+        "dlms-sn-service-gbt-captures/wrong-caller-and-wport-echo-preserve-prefix-then-real-echo-final.tcp.pcap": {
+          "bytes": 841,
+          "sha256": "5f313a9e02672ad06877c2d380f3895639d97892d6246dd205d26ced88a05dd6"
+        },
+        "dlms-sn-service-gbt-captures/wrong-caller-and-wport-echo-preserve-prefix-then-real-echo-final.udp.pcap": {
+          "bytes": 547,
+          "sha256": "47f720bd3a1a590563f3ec41f314649f56b1e65b61973e3be1acc594a031a880"
+        },
+        "dlms-sn-service-gbt-source/SOURCES.json": {
+          "bytes": 13461,
+          "sha256": "b8e42abe7e8ebac8710a4c88c4ba4afc8850ca194f209485f96de70d09d1865f"
+        },
+        "dlms-sn-service-gbt-source/baseline-controls.json": {
+          "bytes": 127713,
+          "sha256": "7460db2e6829dac1b878ee38ee93773ef411de51a478bf049961cf9e52eafda2"
+        },
+        "dlms-sn-service-gbt-source/controls.json": {
+          "bytes": 461115,
+          "sha256": "550c56f1b21cdbae0cc5be9825c78219737926f75afe958013881b04704a7e26"
+        },
+        "dlms-sn-service-gbt-source/cross-carrier-identity-supplement.json": {
+          "bytes": 48697,
+          "sha256": "b661f5d5839cf2463953c4671c8e0c23618e95a09353d1b44770d874f7888967"
+        },
+        "dlms-sn-service-gbt-source/depth-trailing-supplement.json": {
+          "bytes": 87976,
+          "sha256": "64232e18320505fdf785ac81a77a96420a0b9f06a88b9e1b5d8891d50609e3b5"
+        },
+        "dlms-sn-service-gbt-tools/capture-checks.py": {
+          "bytes": 858,
+          "sha256": "773153f31c80ec4acb5cf5006a7dce3731b44f32ec55aff217550336216dd698"
+        },
+        "dlms-sn-service-gbt-tools/carrier.py": {
+          "bytes": 1215,
+          "sha256": "bdf106ef2372b348e5af5a2bc62abd8d70e37da87739216bfe05b7182fafe5e2"
+        },
+        "dlms-sn-service-gbt-tools/independent/access.py": {
+          "bytes": 4354,
+          "sha256": "3166cdf13b9934650fdaa34051ba1d6365c6521028ab132898597e424c23e586"
+        },
+        "dlms-sn-service-gbt-tools/independent/block-grammar.py": {
+          "bytes": 5985,
+          "sha256": "0b69840f2066124f48091301aea6247ec29fb86c4933d00055f60828296bd220"
+        },
+        "dlms-sn-service-gbt-tools/independent/boundaries.py": {
+          "bytes": 3805,
+          "sha256": "89b8b58abf5e6903db57fe351f3af0951a7d9bd8c999ace626339bb050854aff"
+        },
+        "dlms-sn-service-gbt-tools/independent/compose.py": {
+          "bytes": 15580,
+          "sha256": "f64aa5e3d4faf606bba8f0ea41f47cc277d242a32c5a68507078705ed455eb8b"
+        },
+        "dlms-sn-service-gbt-tools/independent/composition-pins.json": {
+          "bytes": 618,
+          "sha256": "c0ec7d8ad7b49fe7e714895ad7e858e2bf0d5eb2780364cab1615600cd887ae1"
+        },
+        "dlms-sn-service-gbt-tools/independent/gbt-core.py": {
+          "bytes": 12575,
+          "sha256": "a678272f289349b8be7e31791edd158ccc2c4e4ee13431dcfec6a2fcf56a0df6"
+        },
+        "dlms-sn-service-gbt-tools/independent/legacy-complete.py": {
+          "bytes": 7071,
+          "sha256": "cbfade9c2788af966354809233dcde6ec3e78a66bca1579b97285574ef03c019"
+        },
+        "dlms-sn-service-gbt-tools/independent/legacy.py": {
+          "bytes": 8380,
+          "sha256": "778a881d7cfbf1f03abc00af077b2e5c6f10f125d7dedc49e43d395f60844019"
+        },
+        "dlms-sn-service-gbt-tools/independent/model-pins.json": {
+          "bytes": 354,
+          "sha256": "979fd12543829169aec9fead69f2f795f5a04057224960f858b30c2a8b81cb86"
+        },
+        "dlms-sn-service-gbt-tools/independent/ordinary.py": {
+          "bytes": 9776,
+          "sha256": "b19b8043b6d3defeb32ff2a3a5caf67102299118852c6859c2d1a78847fbb51a"
+        },
+        "dlms-sn-service-gbt-tools/independent/rebuild-complete.py": {
+          "bytes": 1759,
+          "sha256": "9deb1527470a39e90b0dd9094c489962e47f35027aaac4f4165d3ca152920910"
+        },
+        "dlms-sn-service-gbt-tools/independent/rebuild.py": {
+          "bytes": 725,
+          "sha256": "45dc7017d3916e46857dda07f4ce04847e41fef086457b52019692c523c7d72d"
+        },
+        "dlms-sn-service-gbt-tools/independent/reference-vectors.json": {
+          "bytes": 10360,
+          "sha256": "a76ffabe34390fd68e35fc7117c2808bc61c046b2f06a6324317222f2194dec8"
+        },
+        "dlms-sn-service-gbt-tools/independent/verify.py": {
+          "bytes": 5745,
+          "sha256": "7dd57b1846e1106754544898c2007013da08eb8fcfcf69544adb24191d56329c"
+        },
+        "dlms-sn-service-gbt-tools/independent/write-body.py": {
+          "bytes": 5706,
+          "sha256": "4818c0264cb4819cf5d4715a855b4f3817acf26c0c6b15ff558aaa7d3b4aa094"
+        },
+        "dlms-sn-service-gbt-tools/project.py": {
+          "bytes": 1579,
+          "sha256": "bb9d3b36fe0185b56fa4a509ea5042e8def4845cfe1baf7921b944353998997c"
+        },
+        "dlms-sn-service-gbt-tools/verify-captures.py": {
+          "bytes": 3984,
+          "sha256": "e37533b910ed861b5118b17ec18e1672ec6a321a2c83733ec835248a7a53988a"
+        },
+        "dlms-sn-service-gbt/captured-controls.json": {
+          "bytes": 547196,
+          "sha256": "721d5bbaed130968cc6e012d059c060938b575215226468f0406317452c676b1"
+        },
+        "dlms-sn-service-gbt/historical-SN-R2-Q5-in-GBT-upgrades.json": {
+          "bytes": 166196,
+          "sha256": "33412aa1e743018ab841fb5b604f47e44c09ff036a74a4261bac76f05fe4ab54"
+        },
+        "required-tests-traffic-unified-v168.json": {
+          "bytes": 22565971,
+          "sha256": "8ca27368888b60f4fa7b015d6892d9665774e4d862e03b6ab94ba55dcd50e98d"
+        },
+        "validation/expected.json": {
+          "bytes": 32505,
+          "sha256": "878ef4e7de19fcbf39527d2ce239252a17ce7b0926eeb63d3ba6472603830c37"
+        }
+      },
+      "aliases": {
+        "common/pcapx/pcaputil/dlms-sn-service-gbt-captures/SN-Q5-echo-via-one-GBT-container-between-direct-blocks.tcp.pcap": "dlms-sn-service-gbt-captures/SN-Q5-echo-via-one-GBT-container-between-direct-blocks.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-service-gbt-captures/SN-Q5-echo-via-one-GBT-container-between-direct-blocks.udp.pcap": "dlms-sn-service-gbt-captures/SN-Q5-echo-via-one-GBT-container-between-direct-blocks.udp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-service-gbt-captures/completed-GBT-prefix-retains-only-inner-SN-active-Close.tcp.pcap": "dlms-sn-service-gbt-captures/completed-GBT-prefix-retains-only-inner-SN-active-Close.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-service-gbt-captures/completed-GBT-prefix-retains-only-inner-SN-active-Close.udp.pcap": "dlms-sn-service-gbt-captures/completed-GBT-prefix-retains-only-inner-SN-active-Close.udp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-service-gbt-captures/final-SN-R2-via-one-GBT-container-after-direct-prefix-and-echo.tcp.pcap": "dlms-sn-service-gbt-captures/final-SN-R2-via-one-GBT-container-after-direct-prefix-and-echo.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-service-gbt-captures/final-SN-R2-via-one-GBT-container-after-direct-prefix-and-echo.udp.pcap": "dlms-sn-service-gbt-captures/final-SN-R2-via-one-GBT-container-after-direct-prefix-and-echo.udp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-service-gbt-captures/first-SN-R2-via-two-GBT-blocks-and-real-outer-ACK-then-direct-echo-final.tcp.pcap": "dlms-sn-service-gbt-captures/first-SN-R2-via-two-GBT-blocks-and-real-outer-ACK-then-direct-echo-final.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-service-gbt-captures/first-SN-R2-via-two-GBT-blocks-and-real-outer-ACK-then-direct-echo-final.udp.pcap": "dlms-sn-service-gbt-captures/first-SN-R2-via-two-GBT-blocks-and-real-outer-ACK-then-direct-echo-final.udp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-service-gbt-captures/inner-Structure3-Data-global-depth7-positive.tcp.pcap": "dlms-sn-service-gbt-captures/inner-Structure3-Data-global-depth7-positive.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-service-gbt-captures/inner-Structure3-Data-global-depth7-positive.udp.pcap": "dlms-sn-service-gbt-captures/inner-Structure3-Data-global-depth7-positive.udp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-service-gbt-captures/inner-joined-single-Data-trailing-byte-Malformed-retires-LN-and-GBT.tcp.pcap": "dlms-sn-service-gbt-captures/inner-joined-single-Data-trailing-byte-Malformed-retires-LN-and-GBT.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-service-gbt-captures/inner-joined-single-Data-trailing-byte-Malformed-retires-LN-and-GBT.udp.pcap": "dlms-sn-service-gbt-captures/inner-joined-single-Data-trailing-byte-Malformed-retires-LN-and-GBT.udp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-service-gbt-captures/missing-SN-echo-retires-group-without-guessing-GBT-ACK-as-SN-echo.tcp.pcap": "dlms-sn-service-gbt-captures/missing-SN-echo-retires-group-without-guessing-GBT-ACK-as-SN-echo.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-service-gbt-captures/missing-SN-echo-retires-group-without-guessing-GBT-ACK-as-SN-echo.udp.pcap": "dlms-sn-service-gbt-captures/missing-SN-echo-retires-group-without-guessing-GBT-ACK-as-SN-echo.udp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-service-gbt-captures/ordinary-SN-GBT-complete-neighbor-no-service-block-group.tcp.pcap": "dlms-sn-service-gbt-captures/ordinary-SN-GBT-complete-neighbor-no-service-block-group.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-service-gbt-captures/ordinary-SN-GBT-complete-neighbor-no-service-block-group.udp.pcap": "dlms-sn-service-gbt-captures/ordinary-SN-GBT-complete-neighbor-no-service-block-group.udp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-service-gbt-captures/reuse-inputs.json": "dlms-sn-service-gbt-captures/reuse-inputs.json",
+        "common/pcapx/pcaputil/dlms-sn-service-gbt-captures/same-SN-APDU-direct-then-GBT-is-not-an-exact-carrier-repeat.tcp.pcap": "dlms-sn-service-gbt-captures/same-SN-APDU-direct-then-GBT-is-not-an-exact-carrier-repeat.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-service-gbt-captures/same-SN-APDU-direct-then-GBT-is-not-an-exact-carrier-repeat.udp.pcap": "dlms-sn-service-gbt-captures/same-SN-APDU-direct-then-GBT-is-not-an-exact-carrier-repeat.udp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-service-gbt-captures/singlelast-R2-in-GBT-completes-one-Data-and-preserves-LN-owner.tcp.pcap": "dlms-sn-service-gbt-captures/singlelast-R2-in-GBT-completes-one-Data-and-preserves-LN-owner.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-service-gbt-captures/singlelast-R2-in-GBT-completes-one-Data-and-preserves-LN-owner.udp.pcap": "dlms-sn-service-gbt-captures/singlelast-R2-in-GBT-completes-one-Data-and-preserves-LN-owner.udp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-service-gbt-captures/wrong-SN-number-after-observed-echo-retires-inner-group-only.tcp.pcap": "dlms-sn-service-gbt-captures/wrong-SN-number-after-observed-echo-retires-inner-group-only.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-service-gbt-captures/wrong-SN-number-after-observed-echo-retires-inner-group-only.udp.pcap": "dlms-sn-service-gbt-captures/wrong-SN-number-after-observed-echo-retires-inner-group-only.udp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-service-gbt-captures/wrong-caller-and-wport-echo-preserve-prefix-then-real-echo-final.tcp.pcap": "dlms-sn-service-gbt-captures/wrong-caller-and-wport-echo-preserve-prefix-then-real-echo-final.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-service-gbt-captures/wrong-caller-and-wport-echo-preserve-prefix-then-real-echo-final.udp.pcap": "dlms-sn-service-gbt-captures/wrong-caller-and-wport-echo-preserve-prefix-then-real-echo-final.udp.pcap",
+        "common/pcapx/pcaputil/dlms-sn-service-gbt-source/SOURCES.json": "dlms-sn-service-gbt-source/SOURCES.json",
+        "common/pcapx/pcaputil/dlms-sn-service-gbt-source/baseline-controls.json": "dlms-sn-service-gbt-source/baseline-controls.json",
+        "common/pcapx/pcaputil/dlms-sn-service-gbt-source/controls.json": "dlms-sn-service-gbt-source/controls.json",
+        "common/pcapx/pcaputil/dlms-sn-service-gbt-source/cross-carrier-identity-supplement.json": "dlms-sn-service-gbt-source/cross-carrier-identity-supplement.json",
+        "common/pcapx/pcaputil/dlms-sn-service-gbt-source/depth-trailing-supplement.json": "dlms-sn-service-gbt-source/depth-trailing-supplement.json",
+        "common/pcapx/pcaputil/dlms-sn-service-gbt-tools/capture-checks.py": "dlms-sn-service-gbt-tools/capture-checks.py",
+        "common/pcapx/pcaputil/dlms-sn-service-gbt-tools/carrier.py": "dlms-sn-service-gbt-tools/carrier.py",
+        "common/pcapx/pcaputil/dlms-sn-service-gbt-tools/independent/access.py": "dlms-sn-service-gbt-tools/independent/access.py",
+        "common/pcapx/pcaputil/dlms-sn-service-gbt-tools/independent/block-grammar.py": "dlms-sn-service-gbt-tools/independent/block-grammar.py",
+        "common/pcapx/pcaputil/dlms-sn-service-gbt-tools/independent/boundaries.py": "dlms-sn-service-gbt-tools/independent/boundaries.py",
+        "common/pcapx/pcaputil/dlms-sn-service-gbt-tools/independent/compose.py": "dlms-sn-service-gbt-tools/independent/compose.py",
+        "common/pcapx/pcaputil/dlms-sn-service-gbt-tools/independent/composition-pins.json": "dlms-sn-service-gbt-tools/independent/composition-pins.json",
+        "common/pcapx/pcaputil/dlms-sn-service-gbt-tools/independent/gbt-core.py": "dlms-sn-service-gbt-tools/independent/gbt-core.py",
+        "common/pcapx/pcaputil/dlms-sn-service-gbt-tools/independent/legacy-complete.py": "dlms-sn-service-gbt-tools/independent/legacy-complete.py",
+        "common/pcapx/pcaputil/dlms-sn-service-gbt-tools/independent/legacy.py": "dlms-sn-service-gbt-tools/independent/legacy.py",
+        "common/pcapx/pcaputil/dlms-sn-service-gbt-tools/independent/model-pins.json": "dlms-sn-service-gbt-tools/independent/model-pins.json",
+        "common/pcapx/pcaputil/dlms-sn-service-gbt-tools/independent/ordinary.py": "dlms-sn-service-gbt-tools/independent/ordinary.py",
+        "common/pcapx/pcaputil/dlms-sn-service-gbt-tools/independent/rebuild-complete.py": "dlms-sn-service-gbt-tools/independent/rebuild-complete.py",
+        "common/pcapx/pcaputil/dlms-sn-service-gbt-tools/independent/rebuild.py": "dlms-sn-service-gbt-tools/independent/rebuild.py",
+        "common/pcapx/pcaputil/dlms-sn-service-gbt-tools/independent/reference-vectors.json": "dlms-sn-service-gbt-tools/independent/reference-vectors.json",
+        "common/pcapx/pcaputil/dlms-sn-service-gbt-tools/independent/verify.py": "dlms-sn-service-gbt-tools/independent/verify.py",
+        "common/pcapx/pcaputil/dlms-sn-service-gbt-tools/independent/write-body.py": "dlms-sn-service-gbt-tools/independent/write-body.py",
+        "common/pcapx/pcaputil/dlms-sn-service-gbt-tools/project.py": "dlms-sn-service-gbt-tools/project.py",
+        "common/pcapx/pcaputil/dlms-sn-service-gbt-tools/verify-captures.py": "dlms-sn-service-gbt-tools/verify-captures.py",
+        "common/pcapx/pcaputil/dlms-sn-service-gbt/captured-controls.json": "dlms-sn-service-gbt/captured-controls.json",
+        "common/pcapx/pcaputil/dlms-sn-service-gbt/historical-SN-R2-Q5-in-GBT-upgrades.json": "dlms-sn-service-gbt/historical-SN-R2-Q5-in-GBT-upgrades.json",
+        "scripts/protocol-tests/required-tests-traffic-unified-v168.json": "required-tests-traffic-unified-v168.json"
+      }
     }
   ],
   "schema_version": 1,

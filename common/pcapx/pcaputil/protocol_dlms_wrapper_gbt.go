@@ -215,16 +215,27 @@ func (f *binFlow) consumeWrapperGBTReserved(s *binDLMSWrapper, m *wrapperMessage
 		// Reassembled SN APDUs carry no invoke or business owner. The wrapper
 		// used by the bounded decoder is internal: expose only the literal
 		// assembled APDU and its typed values, never a reconstructed header.
-		// Inner service blocks need their own observed phase/echo context and
-		// cannot inherit it from a completed GBT transfer.
-		if decoded.snServiceBlock {
+		// Only the ordinary Wrapper download phase can contribute to an
+		// existing SN wire group. GBT completion proves availability of this
+		// one inner APDU, not completion or ownership of the SN Data group.
+		if decoded.snServiceBlock && (hdlc || decoded.snUpload || decoded.snWrite) {
 			return "", wrapperError(ErrUnsupportedFeature, "GBT-wrapped SN service blocks require a separate observed transfer context")
 		}
 		assoc := "unverified-sn-read-observation"
 		if decoded.snWrite {
 			assoc = "unverified-sn-write-observation"
 		}
-		if s.retireSNGroupForMessage(decoded, dir) {
+		if decoded.snServiceBlock {
+			// Keep the outer graph charged while the shared SN consumer
+			// admits its eventual joined Data. Both literal inner projections
+			// and the extra nesting level remain covered. Hash the final
+			// actual carrier, not the synthetic inner Wrapper envelope.
+			innerFloor := floor + wrapperProjection(w, len(w)) + wrapperProjection(inner, len(inner))
+			assoc, err = f.consumeSNServiceBlockContext(s, decoded, dir, e, inner, innerFloor, f.a.budget.MaxRecursionDepth-1, w)
+			if err != nil {
+				return "", err
+			}
+		} else if s.retireSNGroupForMessage(decoded, dir) {
 			assoc = "ordinary-sn-request-retired-wire-group"
 		}
 		e.TransactionID, e.ResponseTo = 0, 0
