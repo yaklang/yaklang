@@ -77,7 +77,7 @@ func FileSave(path string, content any) error {
 }
 
 func FileTempFileName(prefix string) string {
-	f, err := os.CreateTemp("", prefix+"*")
+	f, err := os.CreateTemp(os.TempDir(), prefix+"*")
 	if err != nil {
 		return filepath.Join(os.TempDir(), prefix)
 	}
