@@ -123103,6 +123103,337 @@
         "common/pcapx/pcaputil/dlms-hdlc-sn-multiresult-tools/write-body.py": "dlms-hdlc-sn-multiresult-tools/write-body.py",
         "scripts/protocol-tests/required-tests-traffic-unified-v175.json": "required-tests-traffic-unified-v175.json"
       }
+    },
+    {
+      "id": "validation-dlms-hdlc-sn-multiresult-segments",
+      "kind": "support",
+      "source_sha": "881da93cae3f113f6dd22911bb09952a130a3afe",
+      "file": "validation-dlms-hdlc-sn-multiresult-segments.zip",
+      "sha256": "73e15315476ac437e98aa08184099d4a262ae1b0d4c57a9519229976513db76b",
+      "password": "bin-parser",
+      "members": {
+        "dlms-hdlc-sn-multiresult-segments-captures/Read-and-Write-first-block-row-positive-before-single-serviceblock-rejection.tcp.pcap": {
+          "bytes": 769,
+          "sha256": "d6845dc385bec7a0931ec46d323386481675bca7c054ad07df8d5a2d21d9efc5"
+        },
+        "dlms-hdlc-sn-multiresult-segments-captures/Read-and-Write-first-block-row-positive-before-single-serviceblock-rejection.udp.pcap": {
+          "bytes": 487,
+          "sha256": "e2ea3c35a9029dab2be64f3841343af7732899c762bbd293c3c437a849bf10bf"
+        },
+        "dlms-hdlc-sn-multiresult-segments-captures/Read-four-ordered-literal-rows-complete-information-pool20.tcp.pcap": {
+          "bytes": 603,
+          "sha256": "b4b5fea16b00fd611bccf60a17117dc0180dba3c90a5931a38c9b6ad560f93fe"
+        },
+        "dlms-hdlc-sn-multiresult-segments-captures/Read-four-ordered-literal-rows-complete-information-pool20.udp.pcap": {
+          "bytes": 345,
+          "sha256": "e26807360e64efe98cac96b0b581bda0e9b73072c7febebcd709f8031e670196"
+        },
+        "dlms-hdlc-sn-multiresult-segments-captures/Write-NULL-error-block-number-joined-no-success-claim.tcp.pcap": {
+          "bytes": 594,
+          "sha256": "8964a880d67ae9f918d7d0e8df5c01677d225bcc7b20ef63339b5182fe031af5"
+        },
+        "dlms-hdlc-sn-multiresult-segments-captures/Write-NULL-error-block-number-joined-no-success-claim.udp.pcap": {
+          "bytes": 336,
+          "sha256": "f990d08a8cc86e296915a4c79492113a6806001a3f1e6168e31dfc2829d0559a"
+        },
+        "dlms-hdlc-sn-multiresult-segments-captures/changed-repeat-and-sequence-gap-retire-only-unfinished-information-state.tcp.pcap": {
+          "bytes": 868,
+          "sha256": "28dbc87a17f8e3c1e49f92d056ce1391d76ed45bca299d71adfa90838e141993"
+        },
+        "dlms-hdlc-sn-multiresult-segments-captures/changed-repeat-and-sequence-gap-retire-only-unfinished-information-state.udp.pcap": {
+          "bytes": 574,
+          "sha256": "56f08cb23965857a2999a2b0ba898fd06184fec15fcf377e7ae2681287550dc7"
+        },
+        "dlms-hdlc-sn-multiresult-segments-captures/existing-ordinary-single-Read-result-segmented-neighbor.tcp.pcap": {
+          "bytes": 591,
+          "sha256": "62b44c555f81fbcfe89faea09105832ee71d91d57c3b894485a9a11b8780a648"
+        },
+        "dlms-hdlc-sn-multiresult-segments-captures/existing-ordinary-single-Read-result-segmented-neighbor.udp.pcap": {
+          "bytes": 333,
+          "sha256": "bbfcde0972586ba17775b2890ed28e3798b7b2a4959dba4e4f6fa1338da78d95"
+        },
+        "dlms-hdlc-sn-multiresult-segments-captures/latest-prefix-retry-wrongcaller-full32-address-and-NR-preserve-original-group.tcp.pcap": {
+          "bytes": 976,
+          "sha256": "568ac5a5a50ac389db65bc5f2b6a23584e96f19e8ceb2e099b1cdc9035fc3133"
+        },
+        "dlms-hdlc-sn-multiresult-segments-captures/latest-prefix-retry-wrongcaller-full32-address-and-NR-preserve-original-group.udp.pcap": {
+          "bytes": 670,
+          "sha256": "ab710bd2db2f97cab5d1eae790c0a7b793b710836c24590a12514c598b4e84dd"
+        },
+        "dlms-hdlc-sn-multiresult-segments-captures/multiresult-opaque-tail-E0-lookalike-remains-one-SN-Read-message.tcp.pcap": {
+          "bytes": 611,
+          "sha256": "bb858b2a1091d418dbb9aa253c0206ac9ef14969b3758d42796570e6de5cc53f"
+        },
+        "dlms-hdlc-sn-multiresult-segments-captures/multiresult-opaque-tail-E0-lookalike-remains-one-SN-Read-message.udp.pcap": {
+          "bytes": 353,
+          "sha256": "5f2a0e8bf15a4bacff188177a1ff79da51eba5024379537c2177f3b0721feed1"
+        },
+        "dlms-hdlc-sn-multiresult-segments-captures/ordinary-Data9-tail-E0-lookalike-remains-one-SN-Read-message.tcp.pcap": {
+          "bytes": 606,
+          "sha256": "081063850b192384ea34a960f1075619721120c7f6e836a797ede379a58047c6"
+        },
+        "dlms-hdlc-sn-multiresult-segments-captures/ordinary-Data9-tail-E0-lookalike-remains-one-SN-Read-message.udp.pcap": {
+          "bytes": 348,
+          "sha256": "43cc1f90b2d39ded9718de67d48770b0e4495cde5b6091ca98cd73f35c38ed98"
+        },
+        "dlms-hdlc-sn-multiresult-segments-captures/reuse-inputs.json": {
+          "bytes": 3,
+          "sha256": "ca3d163bab055381827226140568f3bef7eaac187cebd76878e0b63e9e442356"
+        },
+        "dlms-hdlc-sn-multiresult-segments-captures/same-Read-bytes-information-pool19-Resource-release-then-ordinary-wire-neighbor.tcp.pcap": {
+          "bytes": 692,
+          "sha256": "3eb5684d247b1949c436b40fb3ca21bd238bc46a6f6cd2972ba59d7ec975f005"
+        },
+        "dlms-hdlc-sn-multiresult-segments-captures/same-Read-bytes-information-pool19-Resource-release-then-ordinary-wire-neighbor.udp.pcap": {
+          "bytes": 422,
+          "sha256": "4a8224ea8f866f469ccc54f257ee3813f01ef53aeebd91348e147ee7b2237948"
+        },
+        "dlms-hdlc-sn-multiresult-segments-captures/server-partial-Close-own-direction-after-foreign-caller-rejection.tcp.pcap": {
+          "bytes": 591,
+          "sha256": "bee69871ac7dd5174477ac93d43404d9abde04386938a1996b001dfb35520c79"
+        },
+        "dlms-hdlc-sn-multiresult-segments-captures/server-partial-Close-own-direction-after-foreign-caller-rejection.udp.pcap": {
+          "bytes": 333,
+          "sha256": "e21c8cdb60bb9b62370ab1effae12eaa247e887d6b7019dea9f43d7488b0839c"
+        },
+        "dlms-hdlc-sn-multiresult-segments-captures/truncated-multi-raw-extra-NULL-and-single-serviceblock-boundary-stay-strict.tcp.pcap": {
+          "bytes": 1035,
+          "sha256": "1bc22aea9a09838c460b47f9dca85515971172d2b62ba6a2de2be1297e0a84e5"
+        },
+        "dlms-hdlc-sn-multiresult-segments-captures/truncated-multi-raw-extra-NULL-and-single-serviceblock-boundary-stay-strict.udp.pcap": {
+          "bytes": 717,
+          "sha256": "c2a28bdf445aad71c43913e930b246bcc97f6dad4b62490cfcbb2cb6009250c4"
+        },
+        "dlms-hdlc-sn-multiresult-segments-source/ADOPTED-CONTRACT.json": {
+          "bytes": 2091,
+          "sha256": "ae5b6fcf50cf2ac1b5791ffba14ebadc6b7ca212ccd498793038644b2dad6032"
+        },
+        "dlms-hdlc-sn-multiresult-segments-source/SOURCES.json": {
+          "bytes": 8448,
+          "sha256": "0cb02b98742b617aebc0b38a73ca839638388d2ff98aa5a776737f0577d5b2e4"
+        },
+        "dlms-hdlc-sn-multiresult-segments-source/baseline-controls.json": {
+          "bytes": 128166,
+          "sha256": "1ef63d6d2338dbf7a9753b031839fde2734e756282b33489cb223c23e9ef3455"
+        },
+        "dlms-hdlc-sn-multiresult-segments-source/controls.json": {
+          "bytes": 367095,
+          "sha256": "fc75d5cec9be7ac4bb61d77f7fbcf57271d157e3feae30fb10fbd27cf0049de3"
+        },
+        "dlms-hdlc-sn-multiresult-segments-source/first-choice-controls.json": {
+          "bytes": 64928,
+          "sha256": "f17a7790d3a62ecfa056fc8069b100bf1c672cc7d59a880541c4a75769bf41d3"
+        },
+        "dlms-hdlc-sn-multiresult-segments-source/lookalike-controls.json": {
+          "bytes": 83460,
+          "sha256": "9bd9929242ebf64111a66428140c9ccd73f3290b657cb5f67f6b9ff296986d66"
+        },
+        "dlms-hdlc-sn-multiresult-segments-tools/first-choice-pins.json": {
+          "bytes": 344,
+          "sha256": "43d6c7632b8a2c94b862e78bbd3bd273cd9b46ea9198774b9af8d66278d450da"
+        },
+        "dlms-hdlc-sn-multiresult-segments-tools/first-choice.py": {
+          "bytes": 2844,
+          "sha256": "3f11894591f9f15f1146ed5c7a0450128be4c23f034723e1af397e6ced48c46f"
+        },
+        "dlms-hdlc-sn-multiresult-segments-tools/generate.py": {
+          "bytes": 13084,
+          "sha256": "bfbb61623c27a4f568885292c1d70aad8c63c122fa531dc0c586cd7391d19f17"
+        },
+        "dlms-hdlc-sn-multiresult-segments-tools/hdlc.py": {
+          "bytes": 2051,
+          "sha256": "bc2876085dea3abe6a9c8eb08e619784933975071e27a7de5f9c8c388d009c4e"
+        },
+        "dlms-hdlc-sn-multiresult-segments-tools/lookalike-pins.json": {
+          "bytes": 333,
+          "sha256": "1c184fd92cfbfe0128b931c612f2bc2d3511932c8e203767ca0c67722f5cb543"
+        },
+        "dlms-hdlc-sn-multiresult-segments-tools/lookalike.py": {
+          "bytes": 3822,
+          "sha256": "9a6f1d3e2a01838329214c3258f053558a0ccadcfcb5c1204a1d9f8cf4bded27"
+        },
+        "dlms-hdlc-sn-multiresult-segments-tools/model-pins.json": {
+          "bytes": 1001,
+          "sha256": "a509555c9031531fe3465307c597453b3f4fcd4e81e9664a1eb13ec64ec81b15"
+        },
+        "dlms-hdlc-sn-multiresult-segments-tools/multi-body.py": {
+          "bytes": 12121,
+          "sha256": "47d7f0ae3e850d08722fa58ca1ceacd26e29b6331221d8ab6fa88302cdd7702f"
+        },
+        "dlms-hdlc-sn-multiresult-segments-tools/ordinary/carrier.py": {
+          "bytes": 10367,
+          "sha256": "f4427adbc4bea3bf0c80883f9916e99be4faeb8abc267a190235fc842a3399fa"
+        },
+        "dlms-hdlc-sn-multiresult-segments-tools/ordinary/generate.py": {
+          "bytes": 12162,
+          "sha256": "97b092ed5e4a086633e1c6644bd75c5210f4cff7a34d42b7ad72cc3695db9b82"
+        },
+        "dlms-hdlc-sn-multiresult-segments-tools/ordinary/read-body.py": {
+          "bytes": 4002,
+          "sha256": "9038061ed63630258c65a5b9e11e51888d414b290fea0aa2bd14743e2a7af4cd"
+        },
+        "dlms-hdlc-sn-multiresult-segments-tools/ordinary/reference-vectors.json": {
+          "bytes": 6734,
+          "sha256": "3d7c0f01b305e3524efa5dab640dd9ae4730fe7ed789ca9ef015a5c39b846b8d"
+        },
+        "dlms-hdlc-sn-multiresult-segments-tools/ordinary/sn-body.py": {
+          "bytes": 572,
+          "sha256": "6e5106f1bebe23f04d38ec58953d227541bc366dd44a8f5796612e8a59239724"
+        },
+        "dlms-hdlc-sn-multiresult-segments-tools/ordinary/write-body.py": {
+          "bytes": 5706,
+          "sha256": "4818c0264cb4819cf5d4715a855b4f3817acf26c0c6b15ff558aaa7d3b4aa094"
+        },
+        "dlms-hdlc-sn-multiresult-segments-tools/verify-captures.py": {
+          "bytes": 3431,
+          "sha256": "80608ae54fe1b556c68eff48f4d0a93b83df60c247780b59cb10600a018e8124"
+        },
+        "dlms-hdlc-sn-multiresult-segments-tools/verify.py": {
+          "bytes": 5783,
+          "sha256": "f8da36fc04d390bccc2cf923c61fdd68653523b2df59aecde381de11601e1a96"
+        },
+        "dlms-ln-opaque-continuation-captures/known-GET-Data9-final-opaque-LLC-E0-is-continuation.tcp.pcap": {
+          "bytes": 517,
+          "sha256": "341098bc1fbb8498e22dede92678ca91273b8d0ae6355c491434bf88480e1df6"
+        },
+        "dlms-ln-opaque-continuation-captures/known-GET-Data9-final-opaque-LLC-E0-is-continuation.udp.pcap": {
+          "bytes": 271,
+          "sha256": "d4e09dbabf9fb8717d5fb65f52c35982cac1de804cd8ac991c9c239aedccc1f6"
+        },
+        "dlms-ln-opaque-continuation-captures/reuse-inputs.json": {
+          "bytes": 3,
+          "sha256": "ca3d163bab055381827226140568f3bef7eaac187cebd76878e0b63e9e442356"
+        },
+        "dlms-ln-opaque-continuation-captures/same-GET-Data9-length-benign-opaque-continuation-neighbor.tcp.pcap": {
+          "bytes": 517,
+          "sha256": "8507f00b6b5bc035917837a765b1901c917596e42285c15ee93b02da1e28e473"
+        },
+        "dlms-ln-opaque-continuation-captures/same-GET-Data9-length-benign-opaque-continuation-neighbor.udp.pcap": {
+          "bytes": 271,
+          "sha256": "d5b67abf060c81ec2a109ee158bcf3d77299b4fc638daf05594f1e6d8cee5aa2"
+        },
+        "dlms-ln-opaque-continuation-source/NARROW-GATE-SOURCE-NOTE.json": {
+          "bytes": 5364,
+          "sha256": "a65c202ba1dfc35273db898f787cfc4989d6a14627aa8298e43a2345700423c0"
+        },
+        "dlms-ln-opaque-continuation-source/SOURCES.json": {
+          "bytes": 5960,
+          "sha256": "0e6488b0d3a3bdd52a4e190343b6eaba877e1af84fc9685421aaf48a9d95c2a7"
+        },
+        "dlms-ln-opaque-continuation-source/controls.json": {
+          "bytes": 52740,
+          "sha256": "a246b61f2ac45940168769bd4ad44a506d22383c5fd87231c4f94f41149864bf"
+        },
+        "dlms-ln-opaque-continuation-tools/carrier.py": {
+          "bytes": 10367,
+          "sha256": "f4427adbc4bea3bf0c80883f9916e99be4faeb8abc267a190235fc842a3399fa"
+        },
+        "dlms-ln-opaque-continuation-tools/generate.py": {
+          "bytes": 5851,
+          "sha256": "227c616cec8c2fd3adeeab154783c65e743b3292ed89f6e34b42c45e933fbf44"
+        },
+        "dlms-ln-opaque-continuation-tools/hdlc.py": {
+          "bytes": 2051,
+          "sha256": "bc2876085dea3abe6a9c8eb08e619784933975071e27a7de5f9c8c388d009c4e"
+        },
+        "dlms-ln-opaque-continuation-tools/model-pins.json": {
+          "bytes": 787,
+          "sha256": "feb8f7ecf5536d5080d5cd9e48501637fbefcda52136aaf0267440d25e88336a"
+        },
+        "dlms-ln-opaque-continuation-tools/read-body.py": {
+          "bytes": 4002,
+          "sha256": "9038061ed63630258c65a5b9e11e51888d414b290fea0aa2bd14743e2a7af4cd"
+        },
+        "dlms-ln-opaque-continuation-tools/reference-vectors.json": {
+          "bytes": 6734,
+          "sha256": "3d7c0f01b305e3524efa5dab640dd9ae4730fe7ed789ca9ef015a5c39b846b8d"
+        },
+        "dlms-ln-opaque-continuation-tools/sn-body.py": {
+          "bytes": 572,
+          "sha256": "6e5106f1bebe23f04d38ec58953d227541bc366dd44a8f5796612e8a59239724"
+        },
+        "dlms-ln-opaque-continuation-tools/verify.py": {
+          "bytes": 3554,
+          "sha256": "daf7954465eca4640b0f0a1acbcf35b24b22aed3ae4141790460795a0c88d715"
+        },
+        "dlms-ln-opaque-continuation-tools/write-body.py": {
+          "bytes": 5706,
+          "sha256": "4818c0264cb4819cf5d4715a855b4f3817acf26c0c6b15ff558aaa7d3b4aa094"
+        },
+        "required-tests-traffic-unified-v176.json": {
+          "bytes": 23987542,
+          "sha256": "800d881f476cc9ca237584b2b01496e2a419b0e9ca3f22314ac23d178eb40682"
+        },
+        "validation/expected.json": {
+          "bytes": 37775,
+          "sha256": "9bc2426b6079f5211fb717106df7594c7c747e6f06bcf4e10c8b9f2f64d7dd77"
+        }
+      },
+      "aliases": {
+        "common/pcapx/pcaputil/dlms-hdlc-sn-multiresult-segments-captures/Read-and-Write-first-block-row-positive-before-single-serviceblock-rejection.tcp.pcap": "dlms-hdlc-sn-multiresult-segments-captures/Read-and-Write-first-block-row-positive-before-single-serviceblock-rejection.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-multiresult-segments-captures/Read-and-Write-first-block-row-positive-before-single-serviceblock-rejection.udp.pcap": "dlms-hdlc-sn-multiresult-segments-captures/Read-and-Write-first-block-row-positive-before-single-serviceblock-rejection.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-multiresult-segments-captures/Read-four-ordered-literal-rows-complete-information-pool20.tcp.pcap": "dlms-hdlc-sn-multiresult-segments-captures/Read-four-ordered-literal-rows-complete-information-pool20.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-multiresult-segments-captures/Read-four-ordered-literal-rows-complete-information-pool20.udp.pcap": "dlms-hdlc-sn-multiresult-segments-captures/Read-four-ordered-literal-rows-complete-information-pool20.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-multiresult-segments-captures/Write-NULL-error-block-number-joined-no-success-claim.tcp.pcap": "dlms-hdlc-sn-multiresult-segments-captures/Write-NULL-error-block-number-joined-no-success-claim.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-multiresult-segments-captures/Write-NULL-error-block-number-joined-no-success-claim.udp.pcap": "dlms-hdlc-sn-multiresult-segments-captures/Write-NULL-error-block-number-joined-no-success-claim.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-multiresult-segments-captures/changed-repeat-and-sequence-gap-retire-only-unfinished-information-state.tcp.pcap": "dlms-hdlc-sn-multiresult-segments-captures/changed-repeat-and-sequence-gap-retire-only-unfinished-information-state.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-multiresult-segments-captures/changed-repeat-and-sequence-gap-retire-only-unfinished-information-state.udp.pcap": "dlms-hdlc-sn-multiresult-segments-captures/changed-repeat-and-sequence-gap-retire-only-unfinished-information-state.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-multiresult-segments-captures/existing-ordinary-single-Read-result-segmented-neighbor.tcp.pcap": "dlms-hdlc-sn-multiresult-segments-captures/existing-ordinary-single-Read-result-segmented-neighbor.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-multiresult-segments-captures/existing-ordinary-single-Read-result-segmented-neighbor.udp.pcap": "dlms-hdlc-sn-multiresult-segments-captures/existing-ordinary-single-Read-result-segmented-neighbor.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-multiresult-segments-captures/latest-prefix-retry-wrongcaller-full32-address-and-NR-preserve-original-group.tcp.pcap": "dlms-hdlc-sn-multiresult-segments-captures/latest-prefix-retry-wrongcaller-full32-address-and-NR-preserve-original-group.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-multiresult-segments-captures/latest-prefix-retry-wrongcaller-full32-address-and-NR-preserve-original-group.udp.pcap": "dlms-hdlc-sn-multiresult-segments-captures/latest-prefix-retry-wrongcaller-full32-address-and-NR-preserve-original-group.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-multiresult-segments-captures/multiresult-opaque-tail-E0-lookalike-remains-one-SN-Read-message.tcp.pcap": "dlms-hdlc-sn-multiresult-segments-captures/multiresult-opaque-tail-E0-lookalike-remains-one-SN-Read-message.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-multiresult-segments-captures/multiresult-opaque-tail-E0-lookalike-remains-one-SN-Read-message.udp.pcap": "dlms-hdlc-sn-multiresult-segments-captures/multiresult-opaque-tail-E0-lookalike-remains-one-SN-Read-message.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-multiresult-segments-captures/ordinary-Data9-tail-E0-lookalike-remains-one-SN-Read-message.tcp.pcap": "dlms-hdlc-sn-multiresult-segments-captures/ordinary-Data9-tail-E0-lookalike-remains-one-SN-Read-message.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-multiresult-segments-captures/ordinary-Data9-tail-E0-lookalike-remains-one-SN-Read-message.udp.pcap": "dlms-hdlc-sn-multiresult-segments-captures/ordinary-Data9-tail-E0-lookalike-remains-one-SN-Read-message.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-multiresult-segments-captures/reuse-inputs.json": "dlms-hdlc-sn-multiresult-segments-captures/reuse-inputs.json",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-multiresult-segments-captures/same-Read-bytes-information-pool19-Resource-release-then-ordinary-wire-neighbor.tcp.pcap": "dlms-hdlc-sn-multiresult-segments-captures/same-Read-bytes-information-pool19-Resource-release-then-ordinary-wire-neighbor.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-multiresult-segments-captures/same-Read-bytes-information-pool19-Resource-release-then-ordinary-wire-neighbor.udp.pcap": "dlms-hdlc-sn-multiresult-segments-captures/same-Read-bytes-information-pool19-Resource-release-then-ordinary-wire-neighbor.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-multiresult-segments-captures/server-partial-Close-own-direction-after-foreign-caller-rejection.tcp.pcap": "dlms-hdlc-sn-multiresult-segments-captures/server-partial-Close-own-direction-after-foreign-caller-rejection.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-multiresult-segments-captures/server-partial-Close-own-direction-after-foreign-caller-rejection.udp.pcap": "dlms-hdlc-sn-multiresult-segments-captures/server-partial-Close-own-direction-after-foreign-caller-rejection.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-multiresult-segments-captures/truncated-multi-raw-extra-NULL-and-single-serviceblock-boundary-stay-strict.tcp.pcap": "dlms-hdlc-sn-multiresult-segments-captures/truncated-multi-raw-extra-NULL-and-single-serviceblock-boundary-stay-strict.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-multiresult-segments-captures/truncated-multi-raw-extra-NULL-and-single-serviceblock-boundary-stay-strict.udp.pcap": "dlms-hdlc-sn-multiresult-segments-captures/truncated-multi-raw-extra-NULL-and-single-serviceblock-boundary-stay-strict.udp.pcap",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-multiresult-segments-source/ADOPTED-CONTRACT.json": "dlms-hdlc-sn-multiresult-segments-source/ADOPTED-CONTRACT.json",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-multiresult-segments-source/SOURCES.json": "dlms-hdlc-sn-multiresult-segments-source/SOURCES.json",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-multiresult-segments-source/baseline-controls.json": "dlms-hdlc-sn-multiresult-segments-source/baseline-controls.json",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-multiresult-segments-source/controls.json": "dlms-hdlc-sn-multiresult-segments-source/controls.json",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-multiresult-segments-source/first-choice-controls.json": "dlms-hdlc-sn-multiresult-segments-source/first-choice-controls.json",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-multiresult-segments-source/lookalike-controls.json": "dlms-hdlc-sn-multiresult-segments-source/lookalike-controls.json",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-multiresult-segments-tools/first-choice-pins.json": "dlms-hdlc-sn-multiresult-segments-tools/first-choice-pins.json",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-multiresult-segments-tools/first-choice.py": "dlms-hdlc-sn-multiresult-segments-tools/first-choice.py",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-multiresult-segments-tools/generate.py": "dlms-hdlc-sn-multiresult-segments-tools/generate.py",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-multiresult-segments-tools/hdlc.py": "dlms-hdlc-sn-multiresult-segments-tools/hdlc.py",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-multiresult-segments-tools/lookalike-pins.json": "dlms-hdlc-sn-multiresult-segments-tools/lookalike-pins.json",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-multiresult-segments-tools/lookalike.py": "dlms-hdlc-sn-multiresult-segments-tools/lookalike.py",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-multiresult-segments-tools/model-pins.json": "dlms-hdlc-sn-multiresult-segments-tools/model-pins.json",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-multiresult-segments-tools/multi-body.py": "dlms-hdlc-sn-multiresult-segments-tools/multi-body.py",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-multiresult-segments-tools/ordinary/carrier.py": "dlms-hdlc-sn-multiresult-segments-tools/ordinary/carrier.py",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-multiresult-segments-tools/ordinary/generate.py": "dlms-hdlc-sn-multiresult-segments-tools/ordinary/generate.py",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-multiresult-segments-tools/ordinary/read-body.py": "dlms-hdlc-sn-multiresult-segments-tools/ordinary/read-body.py",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-multiresult-segments-tools/ordinary/reference-vectors.json": "dlms-hdlc-sn-multiresult-segments-tools/ordinary/reference-vectors.json",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-multiresult-segments-tools/ordinary/sn-body.py": "dlms-hdlc-sn-multiresult-segments-tools/ordinary/sn-body.py",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-multiresult-segments-tools/ordinary/write-body.py": "dlms-hdlc-sn-multiresult-segments-tools/ordinary/write-body.py",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-multiresult-segments-tools/verify-captures.py": "dlms-hdlc-sn-multiresult-segments-tools/verify-captures.py",
+        "common/pcapx/pcaputil/dlms-hdlc-sn-multiresult-segments-tools/verify.py": "dlms-hdlc-sn-multiresult-segments-tools/verify.py",
+        "common/pcapx/pcaputil/dlms-ln-opaque-continuation-captures/known-GET-Data9-final-opaque-LLC-E0-is-continuation.tcp.pcap": "dlms-ln-opaque-continuation-captures/known-GET-Data9-final-opaque-LLC-E0-is-continuation.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-ln-opaque-continuation-captures/known-GET-Data9-final-opaque-LLC-E0-is-continuation.udp.pcap": "dlms-ln-opaque-continuation-captures/known-GET-Data9-final-opaque-LLC-E0-is-continuation.udp.pcap",
+        "common/pcapx/pcaputil/dlms-ln-opaque-continuation-captures/reuse-inputs.json": "dlms-ln-opaque-continuation-captures/reuse-inputs.json",
+        "common/pcapx/pcaputil/dlms-ln-opaque-continuation-captures/same-GET-Data9-length-benign-opaque-continuation-neighbor.tcp.pcap": "dlms-ln-opaque-continuation-captures/same-GET-Data9-length-benign-opaque-continuation-neighbor.tcp.pcap",
+        "common/pcapx/pcaputil/dlms-ln-opaque-continuation-captures/same-GET-Data9-length-benign-opaque-continuation-neighbor.udp.pcap": "dlms-ln-opaque-continuation-captures/same-GET-Data9-length-benign-opaque-continuation-neighbor.udp.pcap",
+        "common/pcapx/pcaputil/dlms-ln-opaque-continuation-source/NARROW-GATE-SOURCE-NOTE.json": "dlms-ln-opaque-continuation-source/NARROW-GATE-SOURCE-NOTE.json",
+        "common/pcapx/pcaputil/dlms-ln-opaque-continuation-source/SOURCES.json": "dlms-ln-opaque-continuation-source/SOURCES.json",
+        "common/pcapx/pcaputil/dlms-ln-opaque-continuation-source/controls.json": "dlms-ln-opaque-continuation-source/controls.json",
+        "common/pcapx/pcaputil/dlms-ln-opaque-continuation-tools/carrier.py": "dlms-ln-opaque-continuation-tools/carrier.py",
+        "common/pcapx/pcaputil/dlms-ln-opaque-continuation-tools/generate.py": "dlms-ln-opaque-continuation-tools/generate.py",
+        "common/pcapx/pcaputil/dlms-ln-opaque-continuation-tools/hdlc.py": "dlms-ln-opaque-continuation-tools/hdlc.py",
+        "common/pcapx/pcaputil/dlms-ln-opaque-continuation-tools/model-pins.json": "dlms-ln-opaque-continuation-tools/model-pins.json",
+        "common/pcapx/pcaputil/dlms-ln-opaque-continuation-tools/read-body.py": "dlms-ln-opaque-continuation-tools/read-body.py",
+        "common/pcapx/pcaputil/dlms-ln-opaque-continuation-tools/reference-vectors.json": "dlms-ln-opaque-continuation-tools/reference-vectors.json",
+        "common/pcapx/pcaputil/dlms-ln-opaque-continuation-tools/sn-body.py": "dlms-ln-opaque-continuation-tools/sn-body.py",
+        "common/pcapx/pcaputil/dlms-ln-opaque-continuation-tools/verify.py": "dlms-ln-opaque-continuation-tools/verify.py",
+        "common/pcapx/pcaputil/dlms-ln-opaque-continuation-tools/write-body.py": "dlms-ln-opaque-continuation-tools/write-body.py",
+        "scripts/protocol-tests/required-tests-traffic-unified-v176.json": "required-tests-traffic-unified-v176.json"
+      }
     }
   ],
   "schema_version": 1,

@@ -157,16 +157,29 @@ func (f *binFlow) consumeDLMSSNSegments(dir int, wire []byte, id uint64, m *dlms
 	}
 	// Decode the joined APDU against the final captured carrier; never fabricate
 	// a frame/CRC/Raw or convert a completed SN group into a service transaction.
-	// Service blocks carried inside an information-fragment group require a
-	// separate layered contract. Do not accidentally widen this complete-frame MVP.
-	if len(joined) >= 3 && (dlmsSNServiceBlockAPDU(joined[3:]) || dlmsSNUploadAPDUProfile(joined[3:]) != "") {
+	// A complete multiresult response is an ordered literal row list, not the
+	// single-result service block/upload contract. Classify its full count
+	// before those first-row probes, which deliberately ignore list length.
+	multi := false
+	if len(joined) >= 5 && (joined[3] == 12 || joined[3] == 13) {
+		n, _, ok := wrapperSNDefinitePrefix(joined, 4)
+		multi = ok && n >= 2
+	}
+	if !multi && len(joined) >= 3 && (dlmsSNServiceBlockAPDU(joined[3:]) || dlmsSNUploadAPDUProfile(joined[3:]) != "") {
 		return fail(ErrUnsupportedFeature, "SN service-block inside information group is not selected", true)
 	}
-	decoded, err := decodeDLMSInformation(m, joined, f.a.budget.MaxCollectionElements, f.a.budget.MaxRecursionDepth)
+	// Only this validated, bounded information group opts in after joining.
+	// Rows do not acquire a service owner or perform raw transfer assembly;
+	// nested envelope decoding retains its separate complete-message contract.
+	decoded, err := decodeDLMSInformationSelected(m, joined, f.a.budget.MaxCollectionElements, f.a.budget.MaxRecursionDepth, multi)
 	if err != nil {
 		s.invalidate()
 		return nil, 0, err
 	}
+	// Private semantic dispatch must inspect the validated joined APDU, not
+	// arbitrary bytes in the literal last carrier. Public Raw/header fields
+	// continue to describe that actual carrier unchanged.
+	decoded.information = joined
 	s.fragments = nil
 	fields, reply, err := f.consumeDecodedDLMS(dir, wire, id, decoded)
 	if err != nil {

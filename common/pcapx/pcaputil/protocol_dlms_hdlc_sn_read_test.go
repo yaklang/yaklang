@@ -299,6 +299,12 @@ func hdlcSNReadMatrixTransports(t *testing.T, cases []hdlcSNReadCase, batch stri
 }
 func hdlcSNReadMatrixChecked(t *testing.T, cases []hdlcSNReadCase, batch string, transports []string, check func(*testing.T, *ProtocolEvent, hdlcOpStep, map[string]any)) {
 	env := "DLMS_HDLC_SN_READ_TEST_ROOT"
+	if batch == "dlms-ln-opaque-continuation-captures" {
+		env = "DLMS_LN_OPAQUE_CONTINUATION_ROOT"
+	}
+	if batch == "dlms-hdlc-sn-multiresult-segments-captures" {
+		env = "DLMS_HDLC_SN_MULTIRESULT_SEGMENTS_ROOT"
+	}
 	if batch == "dlms-hdlc-sn-multiresult-captures" {
 		env = "DLMS_HDLC_SN_MULTIRESULT_ROOT"
 	}
