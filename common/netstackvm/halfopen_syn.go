@@ -41,10 +41,11 @@ type HalfOpenSYNConfig struct {
 	AllowUnverifiedTransport bool
 }
 
-// HalfOpenSYN emits TCP SYNs from a writable netstackvm capture and reports
-// SYN-ACKs without completing the handshake.
+// HalfOpenSYN emits TCP SYNs and UDP datagrams from a writable netstackvm
+// capture. SYN-ACKs are reported without completing the handshake. UDP replies
+// are reported without being delivered into gVisor.
 //
-// Each scan uses TCPProbe with a real-interface transport and a SYN-only gate.
+// Each scan uses one session. TCP is ProbeSYN. UDP is ProbeUDP.
 type HalfOpenSYN struct {
 	ctx    context.Context
 	cancel context.CancelFunc
@@ -65,7 +66,8 @@ type HalfOpenSYN struct {
 	allowUnverifiedTransport bool
 	gateway                  net.IP
 
-	flights map[flightKey]*synFlight
+	flights    map[flightKey]*synFlight
+	udpFlights map[flightKey]*udpFlight
 }
 
 type flightKey struct {
@@ -170,6 +172,7 @@ func OpenHalfOpenSYN(ctx context.Context, cfg HalfOpenSYNConfig) (*HalfOpenSYN, 
 		stack:                    stackIns,
 		gateway:                  ipv4Only(cfg.Gateway),
 		flights:                  make(map[flightKey]*synFlight),
+		udpFlights:               make(map[flightKey]*udpFlight),
 		mainIsLoopback:           cfg.Iface.Flags&net.FlagLoopback != 0,
 		allowUnverifiedTransport: cfg.AllowUnverifiedTransport,
 	}
@@ -445,12 +448,15 @@ func packetFlightKey(nic tcpip.NICID, ip *layers.IPv4, tcp *layers.TCP, inbound 
 	return flightKey{nic, ip4key(ip.SrcIP), uint16(tcp.SrcPort), ip4key(ip.DstIP), uint16(tcp.DstPort)}
 }
 
-// captureStackFrame never writes TCP. Automatic retransmits and abort RSTs
-// stay here; only the probe retry controller can authorize a SYN write.
+// captureStackFrame never writes TCP or UDP. Automatic retransmits and abort
+// RSTs stay here; only the probe controller can authorize a SYN or a UDP datagram.
 func (h *HalfOpenSYN) captureStackFrame(vm *NetStackVirtualMachineEntry, data []byte, lt gopacket.LayerType) error {
 	packet := gopacket.NewPacket(data, lt, gopacket.Default)
 	if packet.Layer(layers.LayerTypeARP) != nil {
 		return vm.driver.writeFrame(data, lt)
+	}
+	if h.captureUDPFrame(vm, packet, data, lt) {
+		return nil
 	}
 	ip, tcp, ok := ipv4TCP(packet)
 	if !ok || !tcp.SYN || tcp.ACK || tcp.RST || tcp.FIN {
@@ -482,6 +488,9 @@ func (h *HalfOpenSYN) allowOutbound(nic tcpip.NICID, packet gopacket.Packet) boo
 	if packet.Layer(layers.LayerTypeARP) != nil {
 		return h.ctx.Err() == nil
 	}
+	if ip, udpLayer, ok := ipv4UDP(packet); ok {
+		return h.allowUDP(nic, ip, udpLayer)
+	}
 	ip, tcp, ok := ipv4TCP(packet)
 	if !ok || !tcp.SYN || tcp.ACK || tcp.RST || tcp.FIN || tcp.PSH || tcp.URG || len(tcp.Payload) != 0 {
 		return false
@@ -502,6 +511,14 @@ func (h *HalfOpenSYN) observeInbound(nic tcpip.NICID, packet gopacket.Packet) bo
 	}
 	if packet.Layer(layers.LayerTypeARP) != nil {
 		return h.ctx.Err() == nil
+	}
+	if ip, udpLayer, ok := ipv4UDP(packet); ok {
+		h.observeUDP(nic, packet, ip, udpLayer)
+		return false
+	}
+	if packet.Layer(layers.LayerTypeICMPv4) != nil {
+		h.observeUDPUnreachable(nic, packet)
+		return false
 	}
 	ip, tcp, ok := ipv4TCP(packet)
 	if !ok || !tcp.ACK || (!tcp.SYN && !tcp.RST) || ip.FragOffset != 0 || ip.Flags&layers.IPv4MoreFragments != 0 || packet.Metadata().Truncated {

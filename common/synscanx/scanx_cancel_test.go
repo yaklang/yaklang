@@ -5,26 +5,29 @@ import (
 	"net"
 	"testing"
 	"time"
+
+	"github.com/yaklang/yaklang/common/netstackvm"
 )
 
-func TestSendPacketCancelUnblocksFullLoopbackQueue(t *testing.T) {
+func TestSendPacketCancelUnblocksUDPProbe(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-
+	started := make(chan struct{}, 1)
+	rec := &recordingProber{udp: func(ctx context.Context, _ string, _ []byte) (netstackvm.UDPSegment, error) {
+		started <- struct{}{}
+		<-ctx.Done()
+		return netstackvm.UDPSegment{}, ctx.Err()
+	}}
 	scanner := &Scannerx{
 		ctx: ctx,
 		config: &SynxConfig{
-			Iface: &net.Interface{
-				Name:  "lo",
-				Flags: net.FlagLoopback,
-			},
-			SourceIP: net.ParseIP("127.0.0.1"),
+			Iface:               &net.Interface{Name: "lo", Flags: net.FlagLoopback},
+			SourceIP:            net.ParseIP("127.0.0.1"),
+			tcpProbeConcurrency: 1,
+			waiting:             time.Second,
 		},
-		LoopPacket: make(chan []byte, 1),
-		PacketChan: make(chan []byte, 1),
+		halfOpen: rec,
 	}
-	scanner.LoopPacket <- []byte("already queued")
-
 	targetCh := make(chan *SynxTarget, 1)
 	targetCh <- &SynxTarget{Host: "127.0.0.1", Port: 53, Mode: UDP}
 	close(targetCh)
@@ -36,16 +39,14 @@ func TestSendPacketCancelUnblocksFullLoopbackQueue(t *testing.T) {
 	}()
 
 	select {
-	case <-done:
-		t.Fatal("sendPacket returned before cancellation while the loopback packet queue was full")
-	case <-time.After(50 * time.Millisecond):
+	case <-started:
+	case <-time.After(time.Second):
+		t.Fatal("udp probe did not start")
 	}
-
 	cancel()
-
 	select {
 	case <-done:
 	case <-time.After(time.Second):
-		t.Fatal("sendPacket did not return after cancellation while blocked on the loopback packet queue")
+		t.Fatal("sendPacket did not return after cancellation")
 	}
 }

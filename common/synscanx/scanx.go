@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-	"github.com/yaklang/pcap"
 	"github.com/yaklang/yaklang/common/filter"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/netx"
@@ -19,7 +18,6 @@ import (
 	"github.com/yaklang/yaklang/common/utils/hostsparser"
 	"github.com/yaklang/yaklang/common/utils/netutil"
 	"github.com/yaklang/yaklang/common/utils/netutil/netroute"
-	"golang.org/x/time/rate"
 )
 
 type Scannerx struct {
@@ -39,25 +37,11 @@ type Scannerx struct {
 	loopbackMap      map[string]string
 	OpenPortHandlers func(ip net.IP, port int)
 
-	PacketChan chan []byte
-	LoopPacket chan []byte
-
 	ipOpenPortMap *sync.Map
-	// MAC地址表
-	macCacheTable *sync.Map
-	MacHandlers   func(ip net.IP, addr net.HardwareAddr)
 
-	// 缓存内外网段
-	ifaceIPNetV4 *net.IPNet
-	ifaceIPNetV6 *net.IPNet
-	ifaceUpdated bool
-
-	Handle    *pcap.Handle
-	limiter   *rate.Limiter
 	startTime time.Time
-	// halfOpen sends TCP SYNs through netstackvm. UDP keeps the packet queues.
-	halfOpen         halfOpenSYN
-	keepPacketWriter bool
+	// halfOpen sends TCP and UDP through netstackvm.
+	halfOpen halfOpenSYN
 	// onSubmitTaskCallback: 每提交一个数据包的时候，这个 callback 调用一次
 	onSubmitTaskCallback func(string, int)
 	FromPing             bool
@@ -147,23 +131,18 @@ func getRoute(sampleIP string) (*net.Interface, net.IP, net.IP, error) {
 }
 
 func NewScannerx(ctx context.Context, sample string, config *SynxConfig) (*Scannerx, error) {
-	limitInterval := time.Duration(config.rateLimitDelayMs * float64(time.Millisecond))
 	if ctx == nil {
 		ctx = context.Background()
 	}
 	rootCtx, cancel := context.WithCancel(ctx)
 	s := &Scannerx{
-		ctx:           rootCtx,
-		cancel:        cancel,
-		config:        config,
-		startTime:     time.Now(),
-		ports:         utils.NewPortsFilter(),
-		macCacheTable: new(sync.Map),
-		PacketChan:    make(chan []byte, 1024),
-		LoopPacket:    make(chan []byte, 1024),
-		loopbackMap:   make(map[string]string),
-		sampleIP:      sample,
-		limiter:       rate.NewLimiter(rate.Every(limitInterval), config.rateLimitDelayGap),
+		ctx:         rootCtx,
+		cancel:      cancel,
+		config:      config,
+		startTime:   time.Now(),
+		ports:       utils.NewPortsFilter(),
+		loopbackMap: make(map[string]string),
+		sampleIP:    sample,
 	}
 	if s.config.maxOpenPorts > 0 {
 		s.ipOpenPortMap = new(sync.Map)
@@ -288,13 +267,6 @@ func gatewayOnInterface(iface *net.Interface, gateway net.IP) bool {
 	return false
 }
 
-func (s *Scannerx) rateLimit() bool {
-	if err := s.limiter.Wait(s.ctx); err != nil {
-		return false
-	}
-	return true
-}
-
 func generateHostPort(ctx context.Context, nonExcludedHosts []string, nonExcludedPorts []int) <-chan *SynxTarget {
 	out := make(chan *SynxTarget)
 	go func() {
@@ -313,7 +285,6 @@ func generateHostPort(ctx context.Context, nonExcludedHosts []string, nonExclude
 }
 
 func (s *Scannerx) SubmitTarget(targets, ports string) (<-chan *SynxTarget, error) {
-	s.notePorts(ports)
 	nonExcludedHosts := s.GetNonExcludedHosts(targets)
 	nonExcludedPorts := s.GetNonExcludedPorts(ports)
 	if len(nonExcludedHosts) == 0 || len(nonExcludedPorts) == 0 {
@@ -340,12 +311,7 @@ func (s *Scannerx) SubmitTarget(targets, ports string) (<-chan *SynxTarget, erro
 			if proto == "udp" {
 				target.Mode = UDP
 			}
-			// TCP pace and admission live in the half-open session, including
-			// retransmissions. The legacy limiter would also delay target
-			// submission and under-count those SYNs. UDP still uses it.
-			if target.Mode != TCP && !s.rateLimit() {
-				return
-			}
+			// Pace and admission live in the netstackvm session for TCP and UDP.
 			if s.config.maxOpenPorts > 0 {
 				v, ok := s.ipOpenPortMap.Load(host)
 				if ok && toUint16(v) >= s.config.maxOpenPorts {
@@ -367,7 +333,6 @@ func (s *Scannerx) SubmitTarget(targets, ports string) (<-chan *SynxTarget, erro
 }
 
 func (s *Scannerx) SubmitTargetFromPing(res chan string, ports string) <-chan *SynxTarget {
-	s.notePorts(ports)
 	tgCh := make(chan *SynxTarget)
 	nonExcludedPorts := s.GetNonExcludedPorts(ports)
 
@@ -400,9 +365,6 @@ func (s *Scannerx) SubmitTargetFromPing(res chan string, ports string) <-chan *S
 				s._hosts.Add(host)
 				lock.Unlock()
 
-				if s.isInternalAddress(host) {
-					s.arp(host)
-				}
 				for _, port := range nonExcludedPorts {
 					proto, p := utils.ParsePortToProtoPort(port)
 					target := &SynxTarget{
@@ -412,9 +374,6 @@ func (s *Scannerx) SubmitTargetFromPing(res chan string, ports string) <-chan *S
 					}
 					if proto == "udp" {
 						target.Mode = UDP
-					}
-					if target.Mode != TCP && !s.rateLimit() {
-						return
 					}
 					if s.config.maxOpenPorts > 0 {
 						v, ok := s.ipOpenPortMap.Load(host)
@@ -561,33 +520,9 @@ func (s *Scannerx) Scan(targetCh <-chan *SynxTarget) (chan *synscan.SynScanResul
 				_ = s.halfOpen.Close()
 			}
 			close(resultCh)
-			close(s.PacketChan)
-			close(s.LoopPacket)
 		}()
 
-		// The additional capture is UDP-only. TCP must use the correlated
-		// probe path; failing to open it cannot silently weaken validation.
-		if s.keepPacketWriter {
-			if err := s.initHandlerStart(wCtx); err != nil {
-				log.Errorf("synscanx UDP capture: %v", err)
-				return
-			}
-			if !s.FromPing {
-				s.arpScan()
-				if !s.waitOrCanceled(time.Second) {
-					return
-				}
-			}
-		}
 		s.sendPacket(targetCh)
-		// TCP workers have already received their final result. Only the
-		// asynchronous UDP capture needs an additional response window.
-		if s.keepPacketWriter {
-			if !s.waitOrCanceled(s.config.waiting) {
-				return
-			}
-			log.Debugf("waited for UDP packets for %0.2fs", s.config.waiting.Seconds())
-		}
 		countOnce.Do(func() {
 			log.Infof("alive host count: %d open port count: %d cost: %v", len(ipCountMap), openPortCount, time.Since(s.startTime))
 		})
@@ -597,17 +532,25 @@ func (s *Scannerx) Scan(targetCh <-chan *SynxTarget) (chan *synscan.SynScanResul
 
 func (s *Scannerx) sendPacket(targetCh <-chan *SynxTarget) {
 	// Worker count matches the session admission limit. Each worker blocks in
-	// ProbeSYN until that target is finished, so outstanding probes stay bounded.
+	// ProbeSYN or ProbeUDP until that target is finished, so outstanding probes
+	// stay bounded by the session slots.
 	_, inFlight := synPacketRate(s.config)
 	var tcpTargets chan *SynxTarget
+	var udpTargets chan *SynxTarget
 	var workers sync.WaitGroup
 	if s.halfOpen != nil {
 		tcpTargets = make(chan *SynxTarget)
+		udpTargets = make(chan *SynxTarget)
 		for i := 0; i < inFlight; i++ {
-			workers.Add(1)
+			workers.Add(2)
 			go func() { defer workers.Done(); s.runTCPProbes(tcpTargets) }()
+			go func() { defer workers.Done(); s.runUDPProbes(udpTargets) }()
 		}
-		defer func() { close(tcpTargets); workers.Wait() }()
+		defer func() {
+			close(tcpTargets)
+			close(udpTargets)
+			workers.Wait()
+		}()
 	}
 
 	for {
@@ -624,8 +567,8 @@ func (s *Scannerx) sendPacket(targetCh <-chan *SynxTarget) {
 			}
 			host := target.Host
 			port := target.Port
-			proto := target.Mode
-			if proto == TCP {
+			switch target.Mode {
+			case TCP:
 				if tcpTargets == nil {
 					log.Debugf("synscanx: skip TCP %s:%d, half-open session is not open", host, port)
 					continue
@@ -635,60 +578,21 @@ func (s *Scannerx) sendPacket(targetCh <-chan *SynxTarget) {
 					return
 				case tcpTargets <- target:
 				}
-				continue
-			}
-			packet, err := s.assemblePacket(host, port, proto)
-			if err != nil {
-				log.Debugf("assemble packet failed: %v", err)
-				continue
-			}
-			if !s.enqueuePacket(host, packet) {
-				return
+			case UDP:
+				if udpTargets == nil {
+					log.Debugf("synscanx: skip UDP %s:%d, half-open session is not open", host, port)
+					continue
+				}
+				select {
+				case <-s.ctx.Done():
+					return
+				case udpTargets <- target:
+				}
+			default:
+				log.Debugf("synscanx: skip %s:%d, unsupported mode %d", host, port, target.Mode)
 			}
 		}
 	}
-}
-
-func (s *Scannerx) enqueuePacket(host string, packet []byte) bool {
-	out := s.PacketChan
-	if utils.IsLoopback(host) {
-		out = s.LoopPacket
-	}
-
-	select {
-	case <-s.ctx.Done():
-		return false
-	case out <- packet:
-		return true
-	}
-}
-
-func (s *Scannerx) waitOrCanceled(d time.Duration) bool {
-	if d <= 0 {
-		return true
-	}
-	timer := time.NewTimer(d)
-	defer timer.Stop()
-
-	select {
-	case <-s.ctx.Done():
-		return false
-	case <-timer.C:
-		return true
-	}
-}
-
-func (s *Scannerx) assemblePacket(host string, port int, proto ProtocolType) ([]byte, error) {
-	switch proto {
-	case TCP:
-		return s.assembleSynPacket(host, port)
-	case UDP:
-		return s.assembleUdpPacket(host, port)
-	case ICMP:
-	case ARP:
-		return s.assembleArpPacket(host)
-	}
-	return nil, nil
 }
 
 func (s *Scannerx) Close() {
@@ -697,8 +601,5 @@ func (s *Scannerx) Close() {
 	}
 	if s.halfOpen != nil {
 		_ = s.halfOpen.Close()
-	}
-	if s.Handle != nil {
-		s.Handle.Close()
 	}
 }

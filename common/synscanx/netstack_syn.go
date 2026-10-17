@@ -11,14 +11,14 @@ import (
 
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/netstackvm"
-	"github.com/yaklang/yaklang/common/utils"
 )
 
-// halfOpenSYN is the only TCP send path. Probe is HalfOpenSYN.ProbeSYN:
-// one call admits, sends, retries, validates the reply and releases the probe.
-// The scanner does not assemble SYNs or write them through the legacy pcap queue.
+// halfOpenSYN is the only packet path. TCP calls HalfOpenSYN.ProbeSYN and UDP
+// calls HalfOpenSYN.ProbeUDP. One call admits, sends, waits and releases.
+// The scanner does not assemble frames or write them through a pcap queue.
 type halfOpenSYN interface {
 	Probe(context.Context, string) (netstackvm.TCPSegment, error)
+	ProbeUDP(context.Context, string, []byte) (netstackvm.UDPSegment, error)
 	Close() error
 }
 
@@ -93,6 +93,8 @@ func quietProbeErr(err error) bool {
 	return err == nil ||
 		errors.Is(err, netstackvm.ErrProbeNoResponse) ||
 		errors.Is(err, netstackvm.ErrProbeRefused) ||
+		errors.Is(err, netstackvm.ErrUDPNoResponse) ||
+		errors.Is(err, netstackvm.ErrUDPUnreachable) ||
 		errors.Is(err, context.Canceled) ||
 		errors.Is(err, context.DeadlineExceeded)
 }
@@ -121,18 +123,40 @@ func (s *Scannerx) runTCPProbes(targets <-chan *SynxTarget) {
 	}
 }
 
-func (s *Scannerx) notePorts(ports string) {
-	s.keepPacketWriter = portsIncludeUDP(ports)
+func (s *Scannerx) probeUDP(ctx context.Context, target *SynxTarget) (netstackvm.UDPSegment, error) {
+	if s == nil || s.halfOpen == nil || target == nil || target.Host == "" || target.Port < 1 || target.Port > 65535 {
+		return netstackvm.UDPSegment{}, fmt.Errorf("synscanx: invalid UDP probe")
+	}
+	timeout := 5 * time.Second
+	if s.config != nil && s.config.waiting > 0 {
+		timeout = s.config.waiting
+	}
+	probeCtx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+	return s.halfOpen.ProbeUDP(probeCtx, net.JoinHostPort(target.Host, strconv.Itoa(target.Port)), udpProbePayload(target.Port))
 }
 
-func portsIncludeUDP(ports string) bool {
-	for _, port := range utils.ParseStringToPorts(ports) {
-		proto, _ := utils.ParsePortToProtoPort(port)
-		if proto == "udp" {
-			return true
+func (s *Scannerx) runUDPProbes(targets <-chan *SynxTarget) {
+	for {
+		select {
+		case <-s.ctx.Done():
+			return
+		case target, ok := <-targets:
+			if !ok {
+				return
+			}
+			reply, err := s.probeUDP(s.ctx, target)
+			if err != nil {
+				if !quietProbeErr(err) {
+					log.Debugf("synscanx udp probe %s:%d failed: %v", target.Host, target.Port, err)
+				}
+				continue
+			}
+			if s.ctx.Err() == nil && s.OpenPortHandlers != nil && reply.RemoteIP != nil {
+				s.OpenPortHandlers(reply.RemoteIP, int(reply.RemotePort))
+			}
 		}
 	}
-	return false
 }
 
 func (s *Scannerx) startHalfOpen(ctx context.Context) error {
@@ -151,6 +175,6 @@ func (s *Scannerx) startHalfOpen(ctx context.Context) error {
 		return err
 	}
 	s.halfOpen = &netstackSYN{session}
-	log.Debugf("synscanx TCP ProbeSYN on %s (%d in flight, %d SYN/s)", s.config.Iface.Name, inFlight, packetsPerSecond)
+	log.Debugf("synscanx netstackvm probes on %s (%d in flight, %d pkt/s)", s.config.Iface.Name, inFlight, packetsPerSecond)
 	return nil
 }
