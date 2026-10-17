@@ -51,7 +51,9 @@ func Export(directory string) error {
 // ExportTools materializes all archived tools, inputs and answers, but only
 // requested versions of the large unified test inventories. The immutable
 // ZIPs/index remain present, so omitted historical inventories remain readable
-// through ReadFile. This preserves the existing expanded workspace budget.
+// through ReadFile. The standalone inventory checker receives only its script
+// and explicitly requested inventory; it has no other archived dependencies.
+// This preserves the existing expanded workspace budget.
 func ExportTools(directory string, requested []string) error {
 	names, err := Names()
 	if err != nil {
@@ -60,6 +62,15 @@ func ExportTools(directory string, requested []string) error {
 	for _, name := range requested {
 		if !validName(name) {
 			return fmt.Errorf("trafficfixture: invalid requested export path %q", name)
+		}
+	}
+	if standaloneInventoryRequest(requested) {
+		known := map[string]bool{}
+		for _, name := range names {
+			known[name] = true
+		}
+		if known[requested[0]] && known[requested[1]] {
+			return exportNames(directory, requested)
 		}
 	}
 	selected := make([]string, 0, len(names))
@@ -75,6 +86,33 @@ func ExportTools(directory string, requested []string) error {
 		}
 	}
 	return exportNames(directory, selected)
+}
+
+// Only this exact two-file invocation is dependency-free. Generators, prefix
+// requests and additional supporting inputs retain the ordinary tool workspace.
+func standaloneInventoryRequest(requested []string) bool {
+	if len(requested) != 2 {
+		return false
+	}
+	const checker = "scripts/protocol-tests/check_go_test_json_v2.py"
+	const prefix = "scripts/protocol-tests/required-tests-traffic-unified-v"
+	a, b := requested[0], requested[1]
+	if b == checker {
+		a, b = b, a
+	}
+	if a != checker || !strings.HasPrefix(b, prefix) || !strings.HasSuffix(b, ".json") {
+		return false
+	}
+	version := strings.TrimSuffix(strings.TrimPrefix(b, prefix), ".json")
+	if version == "" {
+		return false
+	}
+	for _, digit := range version {
+		if digit < '0' || digit > '9' {
+			return false
+		}
+	}
+	return true
 }
 
 func exportNames(directory string, names []string) error {
