@@ -39,13 +39,16 @@ func TestPrefilterKeepsRuleOrderAndCaptures(t *testing.T) {
 	require.Equal(t, "", firstService(backref, "ab"))
 }
 
-func TestPrefilterHighByteUsesFullRuleList(t *testing.T) {
+func TestPrefilterHighByteStillMatches(t *testing.T) {
 	rules := []*NmapMatch{
 		ruleFromLine(t, `match bin m|^\x80\x81$| p/Binary/`),
+		ruleFromLine(t, `match other m|^ascii$| p/Other/`),
 	}
 	block := &RuleBlock{Matched: rules}
 	banner := []byte{0x80, 0x81}
-	require.Equal(t, rules, block.candidateMatches(banner))
+	selected := block.candidateMatches(banner)
+	require.NotEmpty(t, selected)
+	require.Equal(t, "bin", selected[0].ServiceName)
 	info := applyMatchRules(nil, block, banner, 9, net.ParseIP("127.0.0.1"), string(banner), TCP)
 	require.NotNil(t, info)
 	require.Equal(t, "bin", info.ServiceName)

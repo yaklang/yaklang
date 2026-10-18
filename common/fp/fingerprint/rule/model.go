@@ -2,13 +2,15 @@ package rule
 
 import (
 	"errors"
+	"strings"
+	"sync"
+
 	"github.com/yaklang/yaklang/common/fp/webfingerprint"
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"golang.org/x/exp/maps"
-	"strings"
 )
 
 type MatchResource struct {
@@ -100,6 +102,7 @@ type MatchMethodParam struct {
 
 type FingerPrintRule struct {
 	opCodes    []*OpCode
+	opOnce     sync.Once
 	Method     string
 	WebPath    string
 	MatchParam *MatchMethodParam
@@ -225,13 +228,12 @@ func (f *FingerPrintRule) preToOpCodes() []*OpCode {
 	return res
 }
 func (f *FingerPrintRule) ToOpCodes() []*OpCode {
-	if f.opCodes != nil {
-		return f.opCodes
-	}
-	codes := f.preToOpCodes()
-	codes = append(codes, &OpCode{Op: OpInfo, data: []any{f.MatchParam.Info}})
-	f.opCodes = codes
-	return codes
+	f.opOnce.Do(func() {
+		codes := f.preToOpCodes()
+		codes = append(codes, &OpCode{Op: OpInfo, data: []any{f.MatchParam.Info}})
+		f.opCodes = codes
+	})
+	return f.opCodes
 }
 
 func ParseToCPE(cpe string) (*schema.CPE, error) {

@@ -9,7 +9,20 @@ import (
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"regexp"
 	"strings"
+	"sync"
 )
+
+// 同一条 web 正则在每个目标上都会执行。编译结果按表达式复用，避免规则变多以后重复构建。
+var compiledWebRegexps sync.Map
+
+func compiledWebRegexp(pattern string) *regexp.Regexp {
+	if cached, ok := compiledWebRegexps.Load(pattern); ok {
+		return cached.(*regexp.Regexp)
+	}
+	re := regexp.MustCompile(pattern)
+	actual, _ := compiledWebRegexps.LoadOrStore(pattern, re)
+	return actual.(*regexp.Regexp)
+}
 
 type OpFlag string
 
@@ -188,7 +201,7 @@ func Execute(getter func(path string) (*MatchResource, error), rule *FingerPrint
 				stack.Push(&matchedResult{ok: ok})
 				continue
 			}
-			re := regexp.MustCompile(pattern)
+			re := compiledWebRegexp(pattern)
 			matchOk := false
 			var matchedData string
 			for _, data := range datas {

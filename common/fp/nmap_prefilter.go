@@ -2,10 +2,15 @@ package fp
 
 import (
 	"context"
+	"fmt"
 	"net"
 	"sync"
+	"sync/atomic"
+	"time"
 
 	regexp "github.com/VillanCh/go-pcre2-lite/regexp2"
+	"golang.org/x/sync/singleflight"
+
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/minirehs"
 	utils2 "github.com/yaklang/yaklang/common/utils"
@@ -34,13 +39,25 @@ func (nmapPrefilterLog) Errorf(format string, args ...interface{}) {
 	log.Errorf(format, args...)
 }
 
-func asciiBanner(banner []byte) bool {
+// scanBanner 把横幅变成和 pcre2 相同的“一字节一个码点”视图。
+// minirehs 按 UTF-8 解码: 0x80 会变成 RuneError, 而 nmap 的 \x80 要匹配码点 U+0080。
+// ASCII 原样扫描。出现高位字节时, 把每个字节展开成对应码点的 UTF-8, 只用于存在性判断。
+func scanBanner(banner []byte) []byte {
 	for _, b := range banner {
-		if b >= 0x80 {
-			return false
+		if b < 0x80 {
+			continue
 		}
+		out := make([]byte, 0, len(banner)+len(banner)/4)
+		for _, item := range banner {
+			if item < 0x80 {
+				out = append(out, item)
+				continue
+			}
+			out = append(out, 0xC0|item>>6, 0x80|item&0x3F)
+		}
+		return out
 	}
-	return true
+	return banner
 }
 
 func nmapPattern(rule *NmapMatch) (string, minirehs.Flag, bool) {
@@ -76,6 +93,7 @@ func nmapPattern(rule *NmapMatch) (string, minirehs.Flag, bool) {
 }
 
 func compileNmapPrefilter(rules []*NmapMatch) *nmapPrefilter {
+	nmapPrefilterCompileCount.Add(1)
 	filter := &nmapPrefilter{}
 	patterns := make([]minirehs.Pattern, 0, len(rules))
 	for i, rule := range rules {
@@ -109,7 +127,16 @@ func compileNmapPrefilter(rules []*NmapMatch) *nmapPrefilter {
 	return filter
 }
 
-var nmapPrefilterGlobal sync.Map
+var (
+	nmapPrefilterGlobal       sync.Map
+	nmapPrefilterFlight       singleflight.Group
+	nmapPrefilterCount        atomic.Int32
+	nmapPrefilterCompileCount atomic.Int32
+	// onServicePrefilterCompile 只在真正编译时回调，测试用来确认同一探针只编译一次。
+	onServicePrefilterCompile atomic.Value
+)
+
+const maxServicePrefilterDB = 2048
 
 type nmapPrefilterGlobalKey struct {
 	probe *NmapProbe
@@ -123,21 +150,52 @@ func prefilterForBlock(block *RuleBlock) *nmapPrefilter {
 	if block.Probe == nil {
 		return compileNmapPrefilter(block.Matched)
 	}
-	key := nmapPrefilterGlobalKey{probe: block.Probe, rules: len(block.Matched)}
-	if cached, ok := nmapPrefilterGlobal.Load(key); ok {
-		return cached.(*nmapPrefilter)
+	key := fmt.Sprintf("%p/%d", block.Probe, len(block.Matched))
+	v, _, _ := nmapPrefilterFlight.Do(key, func() (interface{}, error) {
+		mapKey := nmapPrefilterGlobalKey{probe: block.Probe, rules: len(block.Matched)}
+		if cached, ok := nmapPrefilterGlobal.Load(mapKey); ok {
+			return cached.(*nmapPrefilter), nil
+		}
+		start := time.Now()
+		compiled := compileNmapPrefilter(block.Matched)
+		if hook, _ := onServicePrefilterCompile.Load().(func(*NmapProbe)); hook != nil {
+			hook(block.Probe)
+		}
+		if nmapPrefilterCount.Load() < maxServicePrefilterDB {
+			if _, loaded := nmapPrefilterGlobal.LoadOrStore(mapKey, compiled); !loaded {
+				nmapPrefilterCount.Add(1)
+			}
+		}
+		if len(block.Matched) >= 64 {
+			log.Debugf("service match prefilter ready: probe=%s rules=%d cost=%s", block.Probe.Name, len(block.Matched), time.Since(start))
+		}
+		return compiled, nil
+	})
+	filter, _ := v.(*nmapPrefilter)
+	if filter == nil {
+		return compileNmapPrefilter(block.Matched)
 	}
-	compiled := compileNmapPrefilter(block.Matched)
-	actual, _ := nmapPrefilterGlobal.LoadOrStore(key, compiled)
-	return actual.(*nmapPrefilter)
+	return filter
+}
+
+func warmServicePrefilters(empty *RuleBlock, blocks []*RuleBlock) {
+	warmOne := func(block *RuleBlock) {
+		if block == nil || block.Probe == nil || len(block.Matched) < 64 {
+			return
+		}
+		go block.prefilterOnce.Do(func() {
+			block.prefilter = prefilterForBlock(block)
+		})
+	}
+	warmOne(empty)
+	for _, block := range blocks {
+		warmOne(block)
+	}
 }
 
 func (b *RuleBlock) candidateMatches(banner []byte) []*NmapMatch {
 	if b == nil || len(b.Matched) == 0 {
 		return nil
-	}
-	if !asciiBanner(banner) {
-		return b.Matched
 	}
 	b.prefilterOnce.Do(func() {
 		b.prefilter = prefilterForBlock(b)
@@ -162,7 +220,7 @@ func (p *nmapPrefilter) selectMatches(rules []*NmapMatch, banner []byte) []*Nmap
 	if err != nil {
 		return rules
 	}
-	if err := p.db.Scan(banner, scratch, func(m minirehs.Match) bool {
+	if err := p.db.Scan(scanBanner(banner), scratch, func(m minirehs.Match) bool {
 		id := int(m.ID)
 		if id >= 0 && id < len(p.compiled) {
 			idx := p.compiled[id]
