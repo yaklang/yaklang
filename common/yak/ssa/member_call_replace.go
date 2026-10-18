@@ -22,12 +22,21 @@ func ReplaceMemberCall(old, replacement Value) map[string]Value {
 	createPhi := generatePhi(builder, nil, nil)
 	target := old
 	visited := make(map[int64]struct{})
+	// Reading a member of a loop phi can add a member to one of its source
+	// edges. Those read-generated members are results of this replacement,
+	// not additional source work. Freeze the source topology before any read
+	// or rebinding, otherwise a leaf grows another leaf at every recursive step.
+	sources := snapshotMemberReplacementSources(old)
 
 	// 递归处理嵌套成员替换
 	var replaceMemberCallRecursive func(holder Value, replacement Value, visited map[int64]struct{}) map[string]Value
 	replaceMemberCallRecursive = func(holder Value, replacement Value, visited map[int64]struct{}) map[string]Value {
 		holderRet := make(map[string]Value)
 		sourceKeyOverrides := make(map[int64]Value)
+		source, exists := sources[holder.GetId()]
+		if !exists {
+			return holderRet
+		}
 
 		if !utils.IsNil(holder) {
 			holderID := holder.GetId()
@@ -144,7 +153,8 @@ func ReplaceMemberCall(old, replacement Value) map[string]Value {
 			var toMemberForRecursion Value
 
 			// 处理 IsObject 情况：如果 member 是对象，需要递归处理其成员
-			if member.IsObject() && !utils.IsNil(toMember) {
+			memberSource := sources[member.GetId()]
+			if memberSource.isObject && !utils.IsNil(toMember) {
 				memberID := member.GetId()
 				toMemberID := toMember.GetId()
 				_, memberVisited := visited[memberID]
@@ -173,9 +183,9 @@ func ReplaceMemberCall(old, replacement Value) map[string]Value {
 			}
 
 			// 处理 IsMember 情况：如果 member 是成员访问，需要递归处理其 object
-			if !shouldRecurse && member.IsMember() && !utils.IsNil(toMember) {
-				memberObj := GetLatestObject(member)
-				if !utils.IsNil(memberObj) && memberObj.IsObject() {
+			if !shouldRecurse && !utils.IsNil(memberSource.object) && !utils.IsNil(toMember) {
+				memberObj := memberSource.object
+				if sources[memberObj.GetId()].isObject {
 					memberObjID := memberObj.GetId()
 					if memberObjID == target.GetId() {
 						// member 的 object 就是 target，需要替换为 replacement
@@ -227,15 +237,15 @@ func ReplaceMemberCall(old, replacement Value) map[string]Value {
 					holderRet[n] = v2
 				}
 			}
-			if !member.IsObject() {
+			if !memberSource.isObject {
 				holderRet[name] = memberT
 			}
 		}
 
 		// 处理 holder 的所有成员，先处理非 Call 成员，再处理 Call 成员
-		if holder.IsObject() {
+		if source.isObject {
 			callPairs := make([]MemberPair, 0)
-			memberPairs := holder.GetMemberPairs()
+			memberPairs := source.pairs
 			sourceKeyOverrides = repeatedMemberSourceKeys(memberPairs)
 			for _, pair := range memberPairs {
 				if _, ok := ToCall(pair.Member); ok {
@@ -257,6 +267,45 @@ func ReplaceMemberCall(old, replacement Value) map[string]Value {
 	}
 
 	return ret
+}
+
+type memberReplacementSource struct {
+	pairs    []MemberPair
+	object   Value
+	isObject bool
+}
+
+// The snapshot owns only references to the original graph and lives for one
+// ReplaceMemberCall invocation. ID-based visitation handles source cycles
+// without a depth limit, including an originally-leaf value that becomes an
+// object when a replacement read synthesizes its first member.
+func snapshotMemberReplacementSources(root Value) map[int64]memberReplacementSource {
+	sources := make(map[int64]memberReplacementSource)
+	pending := []Value{root}
+	for len(pending) > 0 {
+		value := pending[len(pending)-1]
+		pending = pending[:len(pending)-1]
+		if utils.IsNil(value) {
+			continue
+		}
+		id := value.GetId()
+		if _, seen := sources[id]; seen {
+			continue
+		}
+		source := memberReplacementSource{isObject: value.IsObject()}
+		if source.isObject {
+			source.pairs = value.GetMemberPairs()
+			for _, pair := range source.pairs {
+				pending = append(pending, pair.Member)
+			}
+		}
+		if value.IsMember() {
+			source.object = GetLatestObject(value)
+			pending = append(pending, source.object)
+		}
+		sources[id] = source
+	}
+	return sources
 }
 
 func pickMemberKey(member, fallback Value) Value {
