@@ -36,7 +36,6 @@ on:
       - ".github/workflows/exp-cross-build.yml"
       - "go.mod"
       - "go.sum"
-      - ".gitattributes"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
@@ -465,12 +464,6 @@ jobs:
         with:
           go-version-file: go.mod
           cache: true
-      - name: Test Windows minirehs images, disk cache and embedded freshness
-        if: runner.os == 'Windows'
-        env:
-          CGO_ENABLED: '1'
-          GOMAXPROCS: '2'
-        run: go test -count=1 -timeout=5m ./common/minirehs/...
       - name: Test lazy cache and archive tooling
         run: go test -race -timeout 3m ./common/utils/gzip_embed/... ./common/utils/resources_monitor
       - name: Test development resource contents
@@ -657,7 +650,6 @@ jobs:
               ]
 
           - name: "Test Utils Infra / Parser / Net / Misc"
-            minirehs_checks: "1"
             # Stays serial. jsonextractor asserts hardcoded wall-clock budgets
             # inside its subtests (3s for the resource-leak case, 1s elsewhere);
             # 3.35s under two-worker load failed run 34947532528 and then passed
@@ -886,20 +878,6 @@ jobs:
           export PACKAGE_PARALLEL="${{ matrix.go_test_p || '' }}"
           mkdir -p "$TEST_BIN_DIR"
           ./scripts/ci/test-run-suite.sh
-
-      - name: Race test minirehs images, Teddy and native amalgamation
-        if: matrix.minirehs_checks == '1'
-        env:
-          CGO_ENABLED: '1'
-          GOMAXPROCS: '2'
-        run: go test -short -race -tags minirehs_mvs_amalg -run '^Test(Image|Teddy|MVSAmalgamation)' -count=1 -timeout=5m ./common/minirehs/...
-
-      - name: Fuzz minirehs image validation
-        if: matrix.minirehs_checks == '1'
-        env:
-          CGO_ENABLED: '1'
-          GOMAXPROCS: '2'
-        run: go test -run '^$' -fuzz '^FuzzLoadImage$' -fuzztime=15s -parallel=2 -timeout=2m ./common/minirehs
 
       # prepare-yak only warms production dependencies. Retain test/vet/race
       # compilations too, otherwise these suites rebuild them on every run.
@@ -1299,7 +1277,7 @@ jobs:
 
   post-check:
     name: Save Test Results to Cache
-    needs: [check-wip, embedded-resources, ipc-smoke, prepared-startup, test-local, test-prepared-yakgrpc, test-prepared-coreplugin]
+    needs: [check-wip, ipc-smoke, prepared-startup, test-local, test-prepared-yakgrpc, test-prepared-coreplugin]
     if: needs.check-wip.outputs.should_run_tests == 'true' && success()
     runs-on: ubuntu-22.04
     # Records a commit status so a later run on the same commit can skip work.

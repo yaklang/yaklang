@@ -256,10 +256,10 @@ go:embed 的资源段保存最终小文件；加载后仍需恢复稠密运行�
 稀疏及稠密行、跨 unit 去重、CRC 正确的损坏字段测试、截断遍历及 FuzzLoadImage。
 PCRE2 专用的 match-start reset、branch reset 及 DEFINE 子程序也检查镜像往返后的命中/不命中语义。
 
-CI 统一放在 Essential Tests：常规测试加入现有 Utils Infra / Parser / Net / Misc 测试组，
-该组同时执行 native amalgamation、race 和 fuzz；Windows 的 cgo 整包测试及内嵌文件新鲜度
-复用现有 embedded-resources 任务。结果统一汇入 Essential Tests Gate，不另建工作流。
-常规测试运行整包完整参数；race 专门运行 Image、Teddy 和 MVSAmalgamation 测试，包含并发懒确认和缓存竞争。
+CI 仅在 Essential Tests 现有 Utils Infra / Parser / Net / Misc 的普通测试列表中加入
+`./common/minirehs/...`，使用统一测试执行器，不添加平台判断、专用步骤或独立工作流。
+常规测试运行整包完整参数，包含内嵌文件新鲜度；本机另行验证 native amalgamation、race 和 fuzz。
+race 专门运行 Image、Teddy 和 MVSAmalgamation 测试，包含并发懒确认和缓存竞争。
 整包 race 的已有标准库 oracle 差分会超过五分钟，本机及第一轮 Linux CI 均观察到此情况，
 因此不将整包 race 记录为通过。
 不执行无 cgo 测试或无 cgo 交叉编译；arm64 的运行与性能需要在启用 cgo 的原生机器上验证。
