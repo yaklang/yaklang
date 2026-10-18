@@ -18,6 +18,7 @@ package minirehs
 import "C"
 
 import (
+	"fmt"
 	"runtime"
 	"sync"
 	"sync/atomic"
@@ -525,12 +526,24 @@ func (k *mvsKernel) mergedScan(data []byte, sc *scratch) []int {
 // mergedScanBatch 批量扫描多条记录 (拼接为一个 buffer), 一次 cgo 调用.
 // recOff 长度 nrec+1: 第 i 条 = data[recOff[i]..recOff[i+1]).
 // 返回 (recIdx, memberIdx) 对列表.
-func (k *mvsKernel) mergedScanBatch(data []byte, recOff []int32, sc *scratch) [][2]int32 {
+func (k *mvsKernel) mergedScanBatch(data []byte, recOff []int32, sc *scratch) ([][2]int32, error) {
 	if k == nil || k.db == nil || C.mvscan_db_has_merged(k.db) == 0 || len(recOff) <= 1 {
-		return nil
+		return nil, nil
 	}
-	nrec := int32(len(recOff) - 1)
-	capPairs := nrec * 8
+	const maxNativeCount = 1<<31 - 1
+	nrec := len(recOff) - 1
+	if nrec > maxNativeCount || sc == nil {
+		return nil, fmt.Errorf("minirehs: invalid native merged batch size or scratch")
+	}
+	for i, off := range recOff {
+		if off < 0 || int64(off) > int64(len(data)) || i > 0 && off < recOff[i-1] {
+			return nil, fmt.Errorf("minirehs: invalid native merged batch offset at %d", i)
+		}
+	}
+	capPairs := 64
+	if nrec <= maxNativeCount/8 {
+		capPairs = nrec * 8
+	}
 	if capPairs < 64 {
 		capPairs = 64
 	}
@@ -549,23 +562,29 @@ func (k *mvsKernel) mergedScanBatch(data []byte, recOff []int32, sc *scratch) []
 			sc.cpairs = sc.cpairs[:capPairs*2]
 		}
 		optr := (*C.int32_t)(unsafe.Pointer(&sc.cpairs[0]))
-		got := int32(C.mvscan_db_merged_scan_batch(k.db, dptr, C.size_t(len(data)),
+		got := int(C.mvscan_db_merged_scan_batch(k.db, dptr, C.size_t(len(data)),
 			recOffPtr, C.int(nrec), optr, C.int(capPairs)))
 		keepAlive(data)
 		runtime.KeepAlive(recOff)
 		runtime.KeepAlive(sc.cpairs)
-		if got <= 0 {
-			return nil
+		if got < 0 {
+			return nil, fmt.Errorf("minirehs: native merged batch failed (code %d)", got)
+		}
+		if got == 0 {
+			return nil, nil
 		}
 		if got > capPairs {
+			if got > int(^uint(0)>>1)/2 {
+				return nil, fmt.Errorf("minirehs: native merged batch output size overflow")
+			}
 			capPairs = got
 			continue
 		}
 		out := make([][2]int32, 0, got)
-		for i := int32(0); i < got; i++ {
+		for i := 0; i < got; i++ {
 			out = append(out, [2]int32{sc.cpairs[i*2], sc.cpairs[i*2+1]})
 		}
-		return out
+		return out, nil
 	}
 }
 

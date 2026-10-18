@@ -155,7 +155,10 @@ func TestMVSMergedAnchoredStartMask(t *testing.T) {
 					t.Fatalf("combined=%v input=%q got=%v want=%v err=%v", combined, input, got, want, err)
 				}
 			}
-			batch := m.kernel.mergedScanBatch([]byte("aaabxaa"), []int32{0, 2, 4, 7}, &scratch{})
+			batch, err := m.kernel.mergedScanBatch([]byte("aaabxaa"), []int32{0, 2, 4, 7}, &scratch{})
+			if err != nil {
+				t.Fatal(err)
+			}
 			// Native merged output contains candidates: the widened (a)\1
 			// gate also accepts "ab" until PCRE2 rejects it. Literal "ab"
 			// itself uses the separate literal-triggered path.

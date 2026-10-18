@@ -2080,15 +2080,36 @@ int32_t mvscan_db_merged_scan_batch(const mvscan_db *db,
                                     const uint8_t *data, size_t totalLen,
                                     const int32_t *recOff, int32_t nrec,
                                     int32_t *out, int32_t capPairs) {
-    if (!db || db->mergedUnit < 0 || db->mergedUnit >= db->nUnits) return 0;
-    if (!data || !recOff || nrec <= 0 || !out) return 0;
+    if (!db || db->mergedUnit < 0 || db->mergedUnit >= db->nUnits) return -1;
+    if (nrec < 0 || capPairs < 0 || (!out && capPairs > 0) ||
+        (!data && totalLen > 0) || !recOff) return -1;
+    if (nrec == 0) return 0;
+    for (int32_t r = 0; r < nrec; r++) {
+        if (recOff[r] < 0 || recOff[r + 1] < recOff[r] ||
+            (size_t)recOff[r + 1] > totalLen) return -1;
+    }
     mvs_nfa *mu = &db->units[db->mergedUnit];
     int32_t total = 0;
     /* seen 缓冲: 每条记录重置 (per-record dedup). 用栈缓冲 (npat 通常 < 1024). */
     uint8_t stackSeen[1024];
     uint8_t *seen = (db->npat <= 1024) ? stackSeen : (uint8_t *)malloc((size_t)db->npat);
-    if (!seen) return 0;
-    int32_t stackOut[256]; /* 每条记录的临时输出 (通常命中数 < 5) */
+    if (!seen) return -1;
+    int32_t stackOut[256];
+    /* A record can match every member. Retain the small stack fast path but
+     * allocate full member capacity when needed; caller capacity only limits
+     * writes, never the returned total required capacity. */
+    int32_t *recordOut = stackOut;
+    if (db->npat > 256) {
+        if ((size_t)db->npat > SIZE_MAX / sizeof(*recordOut)) {
+            if (seen != stackSeen) free(seen);
+            return -1;
+        }
+        recordOut = (int32_t *)malloc((size_t)db->npat * sizeof(*recordOut));
+        if (!recordOut) {
+            if (seen != stackSeen) free(seen);
+            return -1;
+        }
+    }
     for (int32_t r = 0; r < nrec; r++) {
         size_t off0 = (size_t)recOff[r];
         size_t off1 = (size_t)recOff[r + 1];
@@ -2112,16 +2133,22 @@ int32_t mvscan_db_merged_scan_batch(const mvscan_db *db,
         /* 重置 seen */
         memset(seen, 0, (size_t)db->npat);
         int32_t recTotal = 0;
-        nfa_run(mu, rdata, rlen, 1, seen, db->npat, stackOut, 256, &recTotal);
+        nfa_run(mu, rdata, rlen, 1, seen, db->npat, recordOut, db->npat, &recTotal);
         /* 输出 (recIdx, memberIdx) 对 */
-        for (int32_t k = 0; k < recTotal && k < 256; k++) {
+        for (int32_t k = 0; k < recTotal; k++) {
+            if (total == INT32_MAX) {
+                if (recordOut != stackOut) free(recordOut);
+                if (seen != stackSeen) free(seen);
+                return -2;
+            }
             if (total < capPairs) {
-                out[total * 2] = r;           /* recIdx */
-                out[total * 2 + 1] = stackOut[k]; /* memberIdx */
+                out[(size_t)total * 2] = r;
+                out[(size_t)total * 2 + 1] = recordOut[k];
             }
             total++;
         }
     }
+    if (recordOut != stackOut) free(recordOut);
     if (seen != stackSeen) free(seen);
     return total;
 }
