@@ -55,7 +55,7 @@ func LoadOrCompile(path string, patterns []Pattern, opts ...Option) (Database, e
 		if e != nil || h.version != imageVersion || h.hash != hash || h.flags != flags || h.minLiteralLen != cfg.minLiteralLen || h.n != len(patterns) {
 			return nil, nil
 		}
-		db, e := loadCompilationImage(data, h)
+		db, e := loadCompilationImageForPatterns(data, h, patterns)
 		if errors.Is(e, ErrCorruptImage) || errors.Is(e, ErrIncompatibleImage) {
 			return nil, nil
 		}
@@ -89,6 +89,41 @@ func LoadOrCompile(path string, patterns []Pattern, opts ...Option) (Database, e
 		return nil, err
 	}
 	return db, nil
+}
+
+// Stored expressions include buildExprWithFlags' exact prefix. Compare all
+// original IDs/flags/order and expression bytes, without reparsing or allocating
+// a full prefixed string per rule. Prefixes are local to this cache read.
+func imagePatternsMatch(stored []*compiledPattern, patterns []Pattern) bool {
+	if len(stored) != len(patterns) {
+		return false
+	}
+	var prefixes map[Flag]string
+	for i, p := range patterns {
+		cp := stored[i]
+		if cp == nil || cp.id != p.ID || cp.flags != p.Flags {
+			return false
+		}
+		if p.Flags == 0 {
+			if cp.expr != p.Expr {
+				return false
+			}
+			continue
+		}
+		prefix, ok := prefixes[p.Flags]
+		if !ok {
+			prefix = buildExprWithFlags(Pattern{Flags: p.Flags})
+			if prefixes == nil {
+				prefixes = make(map[Flag]string)
+			}
+			prefixes[p.Flags] = prefix
+		}
+		n := len(prefix)
+		if len(cp.expr) < n || cp.expr[:n] != prefix || cp.expr[n:] != p.Expr {
+			return false
+		}
+	}
+	return true
 }
 
 func lockImageCache(path string, timeout time.Duration) (func(), error) {

@@ -335,6 +335,10 @@ func LoadImage(data []byte) (Database, error) {
 }
 
 func loadCompilationImage(data []byte, h compilationImageHeader) (Database, error) {
+	return loadCompilationImageForPatterns(data, h, nil)
+}
+
+func loadCompilationImageForPatterns(data []byte, h compilationImageHeader, expected []Pattern) (Database, error) {
 	encoded := bytes.Clone(data)
 	raw := encoded
 	if h.compressed {
@@ -348,13 +352,13 @@ func loadCompilationImage(data []byte, h compilationImageHeader) (Database, erro
 			return nil, ErrCorruptImage
 		}
 	}
-	return loadUncompressedImage(raw, h, encoded)
+	return loadUncompressedImage(raw, h, encoded, expected)
 }
 
 // raw and encoded are owned by this loader. A dense blob retains its raw slice;
 // packed blobs are expanded once. encoded preserves byte-identical re-export,
 // including legacy uncompressed images and images made by other codec versions.
-func loadUncompressedImage(data []byte, h compilationImageHeader, encoded []byte) (Database, error) {
+func loadUncompressedImage(data []byte, h compilationImageHeader, encoded []byte, expected []Pattern) (Database, error) {
 	var err error
 	r := &imageReader{b: data[:len(data)-4], off: imageHeaderSize, packed: h.packed}
 	d := &mvsDB{n: h.n, imageFlags: h.flags, minLiteralLen: h.minLiteralLen, patternHash: h.hash, reportLoc: h.flags&imageReportLocation != 0,
@@ -390,6 +394,12 @@ func loadUncompressedImage(data []byte, h compilationImageHeader, encoded []byte
 		}
 		d.all[i] = cp
 		reports[i] = PatternReport{ID: cp.id, Disposition: dispositionOf(cp), HasLiteral: d.hasLiterals[i]}
+	}
+	// A cache fingerprint is a fast filter, not proof of full key equality.
+	// Reject before table expansion/native allocation; explicit LoadImage has
+	// no requested pattern key and keeps its original lazy-load contract.
+	if expected != nil && !imagePatternsMatch(d.all, expected) {
+		return nil, ErrIncompatibleImage
 	}
 	d.literals = r.strings()
 	nl := len(d.literals)

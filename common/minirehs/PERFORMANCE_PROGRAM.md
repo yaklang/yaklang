@@ -295,4 +295,31 @@ native open9.38%（含于cgocall，非原生栈）仍显示进一步减少重复
 最终只给扫描外的只读资格助手补KeepAlive，并加入reload测试；不改变测量的Load/Scan路径。
 其他平台和独立审查仍按用户要求暂缓，未宣称三平台或生产验收。
 
+## T14：集中兼容矩阵与完整缓存身份
+
+发现并复现缓存只比较64位指纹的缺口：让两个完整、CRC正确的压缩镜像具有同一指纹后，
+请求可能得到另一套表达式或ID；flags/顺序差异也会被当作命中。这里是人为构造相同指纹，未声称找到自然FNV碰撞。
+现在指纹只作快速拒绝，解码规则元数据后逐项比较顺序、ID、完整flags和原始表达式，
+再展开大型表/打开C内核。局部复用原flag前缀，避免每规则拼接完整字符串；不解析/编译正则。
+不匹配按原缓存失效路径重新编译一次，随后正常命中；显式LoadImage仍按传入镜像加载，无隐式换规则。
+
+修复改变缓存身份验证，不改变有效持久计划或字节布局，保留image6/blob4/MVP2。
+T03的内部batch接口、T11局部分析复用、T12临时布局和T13私有arena均不额外失效合法缓存；
+T04/T10的持久正确性分别由image5、image6/blob4处理，旧错误DFA使用原NFA，旧非法UTF计划有安全完整subject退路。
+未知version/mandatory feature明确不兼容，损坏/计数溢出明确错误；LoadOrCompile只对可重建缓存走重编译。
+
+15个实际格式/模式案例、8类输入、全输出及两种early-stop共360组对照全部通过；
+全输出对独立oracle，early-stop保持该DB完整输出的有序前缀。包含image1–5原始fixture，
+及image6 dense/packed×压缩/未压缩×存在性/定位；逐个核验实际格式、无编译Load及输入/导出隔离。
+四类相同指纹错配、八种flags与内联flags合法命中、未知版本/功能/计数的一次刷新、stable/candidate独立路径回滚也通过。
+实际A0(image1)旧二进制读新image6明确ErrIncompatible，新reader读旧/新镜像完整结果相同。
+旧二进制仅作兼容证据；回滚使用保留正确性修复的reader和先前验证过的正确计划，不能恢复已知旧错误。
+
+五轮独立进程合法缓存成本测量：GetRequest CacheHit77.22→75.49ms、未改变的LoadImage控制79.65→77.60ms；
+MITM分别2.784→2.692ms、2.551→2.580ms。未分辨明显的额外耗时，不将波动记作提速。
+GetRequest中位Go分配次数约多7次，累计字节变化不足1KB；不增加每规则完整prefixed字符串分配。
+普通全包minirehs38.674s/embedded.201s/trafficguard.441s，专项race3、amalgamation与vet通过。
+首次全包命令误开启研究证据模式，两个入口因缺参数拒绝；该失败保留，随后清环境的普通全包和单独矩阵均通过。
+无新依赖/CI工作流变更，其他平台及独立审查仍按用户要求暂缓。
+
 上一轮性能结论及边界见 [RUNTIME_PERFORMANCE.md](RUNTIME_PERFORMANCE.md)。
