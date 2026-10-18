@@ -26,11 +26,18 @@ func TestSortFinalTextMapUsesModuleSymbol(t *testing.T) {
 		mapLen   = 3
 		decoyEnd = uint64(0x25a6c0000cc620)
 	)
+	hdr, err := textMapHeaderLayout()
+	if err != nil {
+		t.Fatal(err)
+	}
 	moduleSize := pad + 0x200
 	dataSize := 256
 
 	module := make([]byte, moduleSize)
 	md := pad
+	if md+hdr.end > len(module) {
+		t.Fatalf("fixture module is too small for textsectmap end %#x", hdr.end)
+	}
 	putU64 := func(b []byte, off int, v uint64) {
 		binary.LittleEndian.PutUint64(b[off:], v)
 	}
@@ -45,9 +52,9 @@ func TestSortFinalTextMapUsesModuleSymbol(t *testing.T) {
 	putU64(module, md+moduledataTextOff, textVA)
 	putU64(module, md+moduledataEtextOff, etextVA)
 	// The real header is also wrong until the textsectionmap symbol rewrites it.
-	putU64(module, md+moduledataTextsectMapOff, dataVA+decoyOff)
-	putU64(module, md+moduledataTextsectMapLen, 2)
-	putU64(module, md+moduledataTextsectMapCap, 2)
+	putU64(module, md+hdr.off, dataVA+decoyOff)
+	putU64(module, md+hdr.lenOff, 2)
+	putU64(module, md+hdr.capOff, 2)
 
 	data := make([]byte, dataSize)
 	// Unsorted real map. The last entry is the etext sentinel.
@@ -79,11 +86,11 @@ func TestSortFinalTextMapUsesModuleSymbol(t *testing.T) {
 	}
 	dataFile := 64 + len(module)
 	mdFile := 64 + pad
-	if binary.LittleEndian.Uint64(got[mdFile+moduledataTextsectMapOff:]) != dataVA {
-		t.Fatalf("header ptr %#x", binary.LittleEndian.Uint64(got[mdFile+moduledataTextsectMapOff:]))
+	if binary.LittleEndian.Uint64(got[mdFile+hdr.off:]) != dataVA {
+		t.Fatalf("header ptr %#x", binary.LittleEndian.Uint64(got[mdFile+hdr.off:]))
 	}
-	if binary.LittleEndian.Uint64(got[mdFile+moduledataTextsectMapLen:]) != mapLen {
-		t.Fatalf("header len %d", binary.LittleEndian.Uint64(got[mdFile+moduledataTextsectMapLen:]))
+	if binary.LittleEndian.Uint64(got[mdFile+hdr.lenOff:]) != mapLen {
+		t.Fatalf("header len %d", binary.LittleEndian.Uint64(got[mdFile+hdr.lenOff:]))
 	}
 	wantBase := []uint64{0x1000, 0x2000, etextVA}
 	for i, base := range wantBase {

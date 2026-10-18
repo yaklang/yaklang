@@ -8,20 +8,18 @@ import (
 	"encoding/binary"
 	"fmt"
 	"os"
+	"runtime"
 	"sort"
 	"strings"
+
+	"github.com/yaklang/yaklang/common/yak/ssa2llvm/runtime/textsectlayout"
 )
 
 const (
-	// Go 1.26 amd64 runtime.moduledata.textsectmap. The CI toolchain is
-	// Go 1.26.5; Go 1.27 inserts typedesclen, itaboffset and itabsize ahead of
-	// this slice. ftab/minpc/text stay at 0x80/0xa0/0xb0. Each textsect is
-	// still 24 bytes.
-	moduledataTextsectMapOff = 0x150
-	moduledataTextsectMapLen = moduledataTextsectMapOff + 8
-	moduledataTextsectMapCap = moduledataTextsectMapOff + 16
-	moduledataTextsectMapEnd = moduledataTextsectMapOff + 24
-	textsectEntrySize        = 24
+	// ftab/minpc/text stay at these offsets on the verified amd64 layouts
+	// (Go 1.26 and 1.27). textsectmap is derived, because 1.27 inserts fields
+	// ahead of it. Each textsect is still 24 bytes.
+	textsectEntrySize = 24
 
 	moduledataFtabOff  = 0x80
 	moduledataFtabLen  = moduledataFtabOff + 8
@@ -61,14 +59,18 @@ func SortFinalTextMap(path string) error {
 	if !found {
 		return nil
 	}
-	if md < 0 || md+moduledataTextsectMapEnd > len(raw) {
+	hdr, err := textMapHeaderLayout()
+	if err != nil {
+		return err
+	}
+	if md < 0 || md+hdr.end > len(raw) {
 		return fmt.Errorf("final module data too small")
 	}
-	mapPtr := binary.LittleEndian.Uint64(raw[md+moduledataTextsectMapOff:])
-	mapLen := binary.LittleEndian.Uint64(raw[md+moduledataTextsectMapLen:])
-	mapCap := binary.LittleEndian.Uint64(raw[md+moduledataTextsectMapCap:])
+	mapPtr := binary.LittleEndian.Uint64(raw[md+hdr.off:])
+	mapLen := binary.LittleEndian.Uint64(raw[md+hdr.lenOff:])
+	mapCap := binary.LittleEndian.Uint64(raw[md+hdr.capOff:])
 	if fromSymbol {
-		mapPtr, mapLen, mapCap, err = alignFinalTextsectHeader(raw, sections, md, mapPtr, mapLen, mapCap)
+		mapPtr, mapLen, mapCap, err = alignFinalTextsectHeader(raw, sections, md, hdr, mapPtr, mapLen, mapCap)
 		if err != nil {
 			return err
 		}
@@ -321,7 +323,19 @@ func finalFirstModuleOff(raw []byte, sections []elfSection) (int, bool, bool, er
 // when the header length disagrees with that symbol. elfsplit writes one
 // 24-byte entry per function; a header read from the wrong place reports the
 // functab length instead. The symbol size is the table the runtime must use.
-func alignFinalTextsectHeader(raw []byte, sections []elfSection, md int, mapPtr, mapLen, mapCap uint64) (uint64, uint64, uint64, error) {
+type textMapHeader struct {
+	off, lenOff, capOff, end int
+}
+
+func textMapHeaderLayout() (textMapHeader, error) {
+	res, err := textsectlayout.Check(runtime.GOROOT())
+	if err != nil {
+		return textMapHeader{}, err
+	}
+	return textMapHeader{off: res.Offset, lenOff: res.Offset + 8, capOff: res.Offset + 16, end: res.Offset + 24}, nil
+}
+
+func alignFinalTextsectHeader(raw []byte, sections []elfSection, md int, hdr textMapHeader, mapPtr, mapLen, mapCap uint64) (uint64, uint64, uint64, error) {
 	eType := binary.LittleEndian.Uint16(raw[16:])
 	if eType != uint16(elf.ET_EXEC) && eType != uint16(elf.ET_DYN) {
 		return mapPtr, mapLen, mapCap, nil
@@ -339,12 +353,12 @@ func alignFinalTextsectHeader(raw []byte, sections []elfSection, md int, mapPtr,
 	if mapPtr == wantPtr && mapLen == wantLen && mapCap == wantLen {
 		return mapPtr, mapLen, mapCap, nil
 	}
-	if md < 0 || md+moduledataTextsectMapEnd > len(raw) {
+	if md < 0 || md+hdr.end > len(raw) {
 		return 0, 0, 0, fmt.Errorf("module data too small to retarget textsectmap")
 	}
-	binary.LittleEndian.PutUint64(raw[md+moduledataTextsectMapOff:], wantPtr)
-	binary.LittleEndian.PutUint64(raw[md+moduledataTextsectMapLen:], wantLen)
-	binary.LittleEndian.PutUint64(raw[md+moduledataTextsectMapCap:], wantLen)
+	binary.LittleEndian.PutUint64(raw[md+hdr.off:], wantPtr)
+	binary.LittleEndian.PutUint64(raw[md+hdr.lenOff:], wantLen)
+	binary.LittleEndian.PutUint64(raw[md+hdr.capOff:], wantLen)
 	return wantPtr, wantLen, wantLen, nil
 }
 
@@ -484,12 +498,16 @@ func MissingRetainedModules(path string) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	if !found || md < 0 || md+moduledataTextsectMapEnd > len(raw) {
+	hdr, err := textMapHeaderLayout()
+	if err != nil {
+		return nil, err
+	}
+	if !found || md < 0 || md+hdr.end > len(raw) {
 		return nil, fmt.Errorf("final .go.module missing or too small")
 	}
-	mapPtr := binary.LittleEndian.Uint64(raw[md+moduledataTextsectMapOff:])
-	mapLen := binary.LittleEndian.Uint64(raw[md+moduledataTextsectMapLen:])
-	mapCap := binary.LittleEndian.Uint64(raw[md+moduledataTextsectMapCap:])
+	mapPtr := binary.LittleEndian.Uint64(raw[md+hdr.off:])
+	mapLen := binary.LittleEndian.Uint64(raw[md+hdr.lenOff:])
+	mapCap := binary.LittleEndian.Uint64(raw[md+hdr.capOff:])
 	if mapLen == 0 || mapLen != mapCap {
 		return nil, nil
 	}

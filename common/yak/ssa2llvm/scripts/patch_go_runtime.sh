@@ -4,6 +4,12 @@ set -euo pipefail
 # ssa2llvm splits the Go text into many ELF sections. Both directions need
 # logarithmic lookup: textOff is ordered by physical PC; textAddr uses a second
 # map ordered by virtual offset, installed by SortFinalTextMap before execution.
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/../../../.." && pwd)"
+if ! ( cd "${REPO_ROOT}" && go run ./common/yak/ssa2llvm/cmd/textsectlayout -goroot "$(go env GOROOT)" ); then
+  echo "[yaklib] ERROR: refusing to patch; moduledata layout check failed" >&2
+  exit 1
+fi
 python3 - <<'PY'
 from pathlib import Path
 import subprocess
