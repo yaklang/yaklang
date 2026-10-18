@@ -42,7 +42,14 @@ func computeLitWindow(expr string, lits []string) litWindow {
 	if err != nil {
 		return w
 	}
-	re = re.Simplify()
+	return computeLitWindowTree(re.Simplify(), lits)
+}
+
+func computeLitWindowTree(re *syntax.Regexp, lits []string) litWindow {
+	w := litWindow{head: -1, tail: -1}
+	if re == nil || len(lits) == 0 {
+		return w
+	}
 	set := make(map[string]struct{}, len(lits))
 	for _, l := range lits {
 		set[l] = struct{}{}

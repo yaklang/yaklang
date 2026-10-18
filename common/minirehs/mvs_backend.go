@@ -76,6 +76,14 @@ func (b *mvsBackend) tier() int         { return 1 }
 func (b *mvsBackend) simd() bool        { return false }
 
 func (b *mvsBackend) compile(patterns []*compiledPattern, cfg *config) (compiledDB, error) {
+	return b.compileParsed(patterns, cfg, nil)
+}
+
+// Tests configure the reference path before starting compilation. Production
+// shares exact analysis only within one Compile; published DBs never consult it.
+var compileASTReuseEnabled = true
+
+func (b *mvsBackend) compileParsed(patterns []*compiledPattern, cfg *config, parsedPatterns map[*compiledPattern]*syntax.Regexp) (compiledDB, error) {
 	db := &mvsDB{
 		imageFlags:    compileImageFlags(cfg),
 		minLiteralLen: cfg.minLiteralLen,
@@ -106,6 +114,8 @@ func (b *mvsBackend) compile(patterns []*compiledPattern, cfg *config) (compiled
 	assertCount := 0
 	gateCount := 0
 	for _, cp := range patterns {
+		parsed := parsedPatterns[cp]
+		delete(parsedPatterns, cp)
 		// MVS 定位语义统一为 leftmost-longest。lean NFA 自定位天然使用该语义；
 		// 含断言或无法编入 NFA 的 RE2 pattern 会退回 verifier，必须在编译期同步
 		// 切换，否则同一数据库会因规则路由不同混用 leftmost-first/longest。
@@ -115,7 +125,7 @@ func (b *mvsBackend) compile(patterns []*compiledPattern, cfg *config) (compiled
 				v.re.Longest()
 			}
 		}
-		nfa, gate, re2Loc := tryCompileNFA(cp)
+		nfa, gate, re2Loc := tryCompileNFAParsed(cp, parsed)
 		if nfa != nil {
 			db.nfas[cp.idx] = nfa
 			db.gate[cp.idx] = gate
@@ -158,7 +168,12 @@ func (b *mvsBackend) compile(patterns []*compiledPattern, cfg *config) (compiled
 					}
 				}
 				if analysisExpr != "" {
-					w := computeLitWindow(analysisExpr, cp.literals)
+					var w litWindow
+					if parsed != nil {
+						w = computeLitWindowTree(parsed, cp.literals)
+					} else {
+						w = computeLitWindow(analysisExpr, cp.literals)
+					}
 					if nfa.anchoredStart {
 						w.head = -1 // ^ \A 锚: 匹配必起于偏移 0, 不可左截
 					}
@@ -406,11 +421,18 @@ func (b *mvsBackend) compile(patterns []*compiledPattern, cfg *config) (compiled
 // 两级 NFA 构造: 先 lean (无零宽断言, 走 C 内核/位并行快路径); lean 失败再试断言扩展
 // (compileMVSNFAAssert, hasAssert=true: \b \B / 行锚 / 中缀 ^$\A\z, 仅 Go 侧门控执行).
 func tryCompileNFA(cp *compiledPattern) (nfa *mvsNFA, gate bool, re2Loc bool) {
+	return tryCompileNFAParsed(cp, nil)
+}
+
+func tryCompileNFAParsed(cp *compiledPattern, parsed *syntax.Regexp) (nfa *mvsNFA, gate bool, re2Loc bool) {
 	if imageNFAHook != nil {
 		imageNFAHook()
 	}
 	// RE2-exact pattern: 直接按原 expr 编, NFA 对存在性与定位均权威.
 	if cp.v != nil && cp.v.exact() {
+		if parsed != nil {
+			return compileSyntaxToNFA(parsed), false, false
+		}
 		return compileExprToNFA(cp.expr), false, false
 	}
 	// regexp2-only (lookaround/backref/\uXXXX 等): 改写为语言只增不减的 RE2 超集骨架再编.
@@ -480,7 +502,15 @@ func compileExprToNFA(expr string) *mvsNFA {
 	if err != nil {
 		return nil
 	}
-	s := parsed.Simplify()
+	return compileSyntaxToNFA(parsed.Simplify())
+}
+
+// The caller supplies an already simplified read-only tree. Position builders
+// still visit every occurrence; sharing an AST node never shares NFA positions.
+func compileSyntaxToNFA(s *syntax.Regexp) *mvsNFA {
+	if s == nil {
+		return nil
+	}
 	if nfa, ok := compileMVSNFA(s); ok {
 		return nfa
 	}

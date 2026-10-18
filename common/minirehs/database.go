@@ -310,6 +310,15 @@ func compileWithConfig(patterns []Pattern, cfg *config) (Database, error) {
 		supported []*compiledPattern
 		reports   = make([]PatternReport, 0, len(patterns))
 	)
+	// Compile-only ownership: Auto/Engine/Stdlib do not retain analysis trees.
+	// Each cp is unique even for duplicate IDs/expressions/flags. The map never
+	// enters a published database, and the MVS loop drops entries as it consumes
+	// them. Executable regexp instances are still compiled independently.
+	var parsedPatterns map[*compiledPattern]*syntax.Regexp
+	if cfg.backend == BackendMVS && compileASTReuseEnabled {
+		parsedPatterns = make(map[*compiledPattern]*syntax.Regexp, len(patterns))
+		defer func() { clear(parsedPatterns) }()
+	}
 
 	for _, p := range patterns {
 		if p.Expr == "" {
@@ -323,6 +332,9 @@ func compileWithConfig(patterns []Pattern, cfg *config) (Database, error) {
 		// 尝试用标准库 RE2 编译并做字面量分析; 成功则走精确验证 + 预过滤路径.
 		if re, parsed, err := compileAndParse(expr); err == nil {
 			cp.v = &re2Verifier{re: re}
+			if parsedPatterns != nil {
+				parsedPatterns[cp] = parsed
+			}
 			cp.literals = extractRequiredLiterals(parsed, cfg.minLiteralLen)
 			if len(cp.literals) > 0 {
 				if w, ok := windowVerifiable(parsed); ok {
@@ -364,7 +376,12 @@ func compileWithConfig(patterns []Pattern, cfg *config) (Database, error) {
 	if err != nil {
 		return nil, err
 	}
-	primary, err := backend.compile(supported, cfg)
+	var primary compiledDB
+	if mvs, ok := backend.(*mvsBackend); ok {
+		primary, err = mvs.compileParsed(supported, cfg, parsedPatterns)
+	} else {
+		primary, err = backend.compile(supported, cfg)
+	}
 	if err != nil {
 		return nil, err
 	}
