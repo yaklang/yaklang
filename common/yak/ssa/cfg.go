@@ -184,23 +184,6 @@ func (lb *LoopBuilder) SetBody(f func()) {
 	lb.body = f
 }
 
-// rotateMergeSelfFirst moves the trailing self value of a scope merge to the
-// front. Merge orders edges as [subScopes..., self], but several CFG blocks
-// record the self predecessor first: a loop exit starts with the loop header,
-// and an if without an else falls through from its condition block.
-func rotateMergeSelfFirst(merge ssautil.MergeHandle[Value]) ssautil.MergeHandle[Value] {
-	return func(name string, vs []Value) Value {
-		if len(vs) > 1 {
-			last := vs[len(vs)-1]
-			rotated := make([]Value, 0, len(vs))
-			rotated = append(rotated, last)
-			rotated = append(rotated, vs[:len(vs)-1]...)
-			vs = rotated
-		}
-		return merge(name, vs)
-	}
-}
-
 func (lb *LoopBuilder) Finish() {
 
 	SSABuild := lb.builder
@@ -282,15 +265,7 @@ func (lb *LoopBuilder) Finish() {
 		}
 		SSABuild.EmitJump(condition)
 	})
-	// Loop merge phis order their edges as [subScopes..., self]. The exit
-	// records the loop header first, so its trailing self value moves to the
-	// front. The latch records continues before the body's own jump
-	// (addToBlocks(body) runs before the body), so [continues..., self]
-	// already matches and stays as is.
-	endScope := LoopBuilder.Build(SpinHandle,
-		generatePhi(SSABuild, latch, lb.enter),
-		rotateMergeSelfFirst(generatePhi(SSABuild, exit, lb.enter)),
-	)
+	endScope := LoopBuilder.Build(SpinHandle, generatePhi(SSABuild, latch, lb.enter), generatePhi(SSABuild, exit, lb.enter))
 
 	exit.SetScope(endScope)
 	SSABuild.CurrentBlock = exit
