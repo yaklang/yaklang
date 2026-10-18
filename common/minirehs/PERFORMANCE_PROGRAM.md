@@ -53,7 +53,7 @@ T17 汇总 Windows 系统验证，其他平台和独立审查仍明确列为待�
 
 这些是阶段证据；T04 完整回归、T05 错误贯通及后续性能实验仍按实际任务记录推进，尚未声称 M5 完成。
 
-## 执行错误接口（T05 进行中）
+## 执行错误接口（T05 Windows 已验证）
 
 `Database.Scan` / `ScanBatch` 的执行失败可用 `errors.As` 提取 `*ScanError`，包含规则、记录、
 阶段、类别及 incomplete。原绑定未暴露的数字错误码保持 nil，原错误仍可用 `errors.Is/As` 检查。
@@ -87,7 +87,7 @@ trafficguard 改用 MatchedIndexesErr；候选过滤失败时对全部原规则�
 独立 C 故障探针使用真实 Go blob，覆盖 16 条 native 路径的 38 次 malloc/calloc 失败及临时缓冲释放；
 普通 Go 回归另验证状态桥接、Compile/Load、GOMAXPROCS=1/2、早停、Batch 的 record 归属与错误后复用。
 这两类证据分开记录，没有把 Go 状态注入冒充 C 内存分配故障。
-池高水位和 Group 常驻 worker 所有权继续在 T06/T15 检查；本阶段尚未声称完整 M5 验收。
+池高水位和 Group 常驻 worker 所有权的 T06 结论见下文，T15/T17 继续系统复验；尚未声称完整 M5 验收。
 
 ## T06 Windows 资源与分配检查点
 
@@ -115,5 +115,31 @@ AnchoredPCRE 3.122→3.421 µs，GetRequest 131.35→138.31 µs；分配数相�
 这是前端 bytes→string 复制的资格测量，不能当作真实业务的 64 倍提速。
 输入覆盖、并发、早停、错误后重用、GC、Close 与真实 burst 回归及 race 均通过。
 R 级 generation 清零未启用：当前 profile 的大头是 C 扫描，先优化已定位的消费路径。
+
+## T08 Windows 实验决议：保留原 lean 单字递推
+
+实验只改变无断言、单 word 的 C 存在性递推：以 shift 推进连续链，仅枚举活跃异常源，
+复用原 follow 和两个已有标量字段，不增加逐位置表。实验补丁未合入默认生产代码。
+1391 个 GetRequest、62 个 MITM 真实 frontend 表通过 2,975,744 次 native/native/Go 状态步对照；
+另有 P=1/63/64、自环、密集异常、锚点、Unicode/NUL/非法 UTF 的输入逐步对照。
+完整 1332 条 MITM 语料及四类输入、两种报告模式、stop=0/1/2，共 8040 组有序完整结果无差异。
+
+Windows i5-13490F、Go 1.22.12、clang 22.1.8、GOMAXPROCS=2，两个相同源代码二进制仅以
+C 编译宏选择递推，五轮串行交错测量（桌面频率/负载未固定）：
+
+| 场景 | 原递推中位数 | LimEx 中位数 | 耗时变化 |
+| --- | ---: | ---: | ---: |
+| GetRequest HTTP912 存在性 | 132.12 µs | 130.27 µs | -1.40% |
+| GetRequest DenseHTTP 存在性 | 2.951 ms | 3.014 ms | +2.13% |
+| MITM 全 1332 记录存在性 | 301.95 ms | 294.81 ms | -2.36% |
+| MITM 全 1332 记录定位 | 852.28 ms | 834.90 ms | -2.04% |
+| 合成 64 位置长链、16 KiB | 404.74 µs | 19.30 µs | -95.23% |
+
+真实场景没有达到预注册的 5% 收益门槛，且 GetRequest 定位 Zero16K 中位数回退 6.71%。
+合成长链约 21 倍的收益不能替代真实负载证明，故撤回实验实现，保持原递推；不增加默认分支/元数据。
+实际 Go blob 的 native requested 字节和分配次数完全相同，组件 Close 均归零；这不是进程 RSS 结论。
+Load 两变体 83.30→84.46 ms，其中派生步骤在两变体共同存在，不能据此单独归因派生开销。
+没有 PMU、请求 P99 或生产权重；其他平台和独立审查仍按用户要求暂缓。
+完整补丁、源码哈希、二进制身份、结果与原始 230 行测量保存在本地计划 evidence/T08，供后续不同负载复验。
 
 上一轮性能结论及边界见 [RUNTIME_PERFORMANCE.md](RUNTIME_PERFORMANCE.md)。
