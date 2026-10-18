@@ -1176,17 +1176,17 @@ func (c *Compiler) compileTypeCast(inst *ssa.TypeCast) error {
 			}
 		case ssa.NumberTypeKind:
 			// int()/float() casts share the NumberTypeKind; the float() target
-			// carries the "float" type name so the conversion direction is
+			// carries the float-cast marker so the conversion direction is
 			// distinguishable at compile time. String sources are parsed.
 			if sourceKind == ssa.StringTypeKind {
-				if inst.GetType().String() == "float" {
+				if isFloatCastTarget(inst.GetType()) {
 					castFn, castType := c.getOrInsertRuntimeParseFloat()
 					val = c.Builder.CreateCall(castType, castFn, []llvm.Value{c.coerceToInt64(val)}, fmt.Sprintf("parse_float_%d", inst.GetId()))
 				} else {
 					castFn, castType := c.getOrInsertRuntimeParseInt()
 					val = c.Builder.CreateCall(castType, castFn, []llvm.Value{c.coerceToInt64(val)}, fmt.Sprintf("parse_int_%d", inst.GetId()))
 				}
-			} else if inst.GetType().String() == "float" {
+			} else if isFloatCastTarget(inst.GetType()) {
 				castFn, castType := c.getOrInsertRuntimeToFloat()
 				val = c.Builder.CreateCall(castType, castFn, []llvm.Value{c.coerceToInt64(val)}, fmt.Sprintf("to_float_%d", inst.GetId()))
 			} else {
