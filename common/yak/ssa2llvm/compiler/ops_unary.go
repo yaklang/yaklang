@@ -90,15 +90,30 @@ func (c *Compiler) valueCarriesFloatBits(fn *ssa.Function, id int64, depth int) 
 	return c.valueDefinesFloat(fn, v, depth)
 }
 
+// isFloatCastTarget reports whether a type is the target of a float() cast.
+// The type keeps the shared "number" name so hover and static analysis read
+// exactly as before, so the marker set by ssa.CreateFloatType is the signal.
+// An older module compiled before the marker existed reports the "float"
+// name, which is still accepted.
+func isFloatCastTarget(typ ssa.Type) bool {
+	if typ == nil {
+		return false
+	}
+	if marked, ok := typ.(interface{ IsFloatCastType() bool }); ok && marked != nil {
+		return marked.IsFloatCastType()
+	}
+	return false
+}
+
 // valueDefinesFloat walks the definition chain because the frontend types most
 // values as the shared "number" kind, which cannot tell an int from a float.
-// The float() cast is the only place a distinct "float" type name appears; a
-// literal, a negation of a float, or arithmetic on one all keep that meaning.
+// The float() cast is the only place a float-cast target appears; a literal, a
+// negation of a float, or arithmetic on one all keep that meaning.
 func (c *Compiler) valueDefinesFloat(fn *ssa.Function, v ssa.Value, depth int) bool {
 	if v == nil {
 		return false
 	}
-	if t := v.GetType(); t != nil && t.String() == "float" {
+	if isFloatCastTarget(v.GetType()) {
 		return true
 	}
 	switch val := v.(type) {
