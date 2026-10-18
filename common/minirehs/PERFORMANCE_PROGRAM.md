@@ -266,4 +266,33 @@ MITM blob3.50→3.45 ms，完整 Compile12.44→12.64 ms（+1.63%）；不隐藏
 full minirehs40.866s/embedded/trafficguard、race5、amalgamation、vet 通过；无新依赖/CI/镜像格式变化。
 其余平台和独立审查依用户授权暂缓。
 
+## T13：C 基础数组 arena 试点
+
+保留所有已证明有消费者的 Go NFA、reverse、fallback 和 optional DFA。选择固定基础数组作小范围试点：
+每个 unit 的四个位向量、follow、reach、cuts、ASCII 映射和 posPat 由九次 malloc 改为一个 C 自有块。
+先检查 count×stride、累加、unit 边界和结构尺寸，再按 u64/i32 顺序布局；显式小端解码，不借用 Go 指针。
+断言、LimEx 和 DFA 扩展仍分别拥有内存，失败/Close 只释放基础块一次；没有 wire、semantic 或 cache 身份变化。
+
+实际 GetRequest 的 C requested 分配次数44,489→4,953，字节32,893,977→32,933,513；
+多39,536 B来自每个 unit 的所有权指针，不能宣称 C requested 空间下降。MITM 分配828→132。
+这些是组件请求统计，不包括分配器开销、PCRE/Teddy，也不是进程 RSS。
+十个实际 frontend 小产物的全部277个构造失败点及两个非法尺寸产物验证失败清理归零；
+未逐点穷举大型 GetRequest 的全部构造分配。
+
+相对于21c8f410a，五轮串行独立进程500ms测量，GetRequest native open/close16.83→14.64 ms（-12.98%），
+MITM57.56→29.73 µs（-48.35%）。完整 Load 初测GetRequest73.25→75.66 ms（+3.29%），
+按预注册规则仅做一次独立Load-only1s复核，为84.93→79.94 ms（-5.88%）；两组都保留。
+对应首个HTTP912扫描初测+1.78%、复核-2.89%；MITM完整Load初测-1.52%、复核-3.20%，
+其首扫复核+1.03%。桌面计时/进程状态波动限制了整体收益结论，主要确定收益是更少分配及原生构造改善。
+
+分项调用不是可相加的 CPU 分区。另一次独立 Load profile 中 packed展开30.28%、Go表恢复28.57%、
+native open9.38%（含于cgocall，非原生栈）仍显示进一步减少重复恢复的空间；重叠子项不相加。
+本卡按约定止于一个稳定表示的 arena 试点；直接 packed→C decoder 是另有门禁的追加工作，尚未实施，
+现有 Go 表的消费证明也不支持大范围删除。不能以首扫后移或未物化字段不验证来声称加速。
+
+四份实际镜像逐字节相同，48组完整有序结果无差异。普通 full minirehs40.556s/embedded/trafficguard、
+专项race5、amalgamation和vet通过；额外新旧DB并发读取、输入覆盖、关闭旧owner后继续读新owner及lazy回归通过。
+最终只给扫描外的只读资格助手补KeepAlive，并加入reload测试；不改变测量的Load/Scan路径。
+其他平台和独立审查仍按用户要求暂缓，未宣称三平台或生产验收。
+
 上一轮性能结论及边界见 [RUNTIME_PERFORMANCE.md](RUNTIME_PERFORMANCE.md)。

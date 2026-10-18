@@ -37,6 +37,32 @@ static int mvs_dfa_plan_kind(const mvscan_db *db, int32_t idx) {
     int32_t unit = db->slotUnit[idx];
     return unit < 0 || unit >= db->nUnits ? -1 : db->units[unit].hasDFA;
 }
+
+// Read-only qualification of the checked base-arena loader, outside scans.
+static int mvs_base_arena_layout(const mvscan_db *db, int32_t idx, uint64_t *out) {
+    if (!db || !out || idx < -1 || idx >= db->npat) return 0;
+    int32_t unit = idx < 0 ? db->mergedUnit : db->slotUnit[idx];
+    if (unit < 0 || unit >= db->nUnits) return 0;
+    const mvs_nfa *a = &db->units[unit];
+    if (!a->baseArena) return 0;
+    uintptr_t start = (uintptr_t)a->baseArena, cur = start;
+    const uint64_t *words[] = {a->firstUnanchored, a->firstAnchored, a->lastAny,
+        a->lastEnd, a->follow, a->reach};
+    const size_t sizes[] = {a->nword, a->nword, a->nword, a->nword,
+        (size_t)a->npos*a->nword, (size_t)a->nsym*a->nword};
+    for (int i = 0; i < 6; i++) {
+        if (cur % 8 || (uintptr_t)words[i] != cur) return 0;
+        cur += sizes[i]*8;
+    }
+    if (cur % 4 || (uintptr_t)a->cuts != cur) return 0;
+    cur += ((size_t)a->nsym+1)*4;
+    if ((uintptr_t)a->asciiSym != cur) return 0;
+    cur += 128*4;
+    if ((uintptr_t)a->posPat != cur) return 0;
+    cur += (size_t)a->npos*4;
+    out[0] = sizeof(mvs_nfa); out[1] = cur-start;
+    return 1;
+}
 */
 import "C"
 
@@ -47,6 +73,19 @@ import (
 	"sync/atomic"
 	"unsafe"
 )
+
+func (k *mvsKernel) baseArenaLayout(idx int) (structBytes, baseBytes uint64, ok bool) {
+	if k == nil || k.db == nil {
+		return 0, 0, false
+	}
+	var out [2]C.uint64_t
+	status := C.mvs_base_arena_layout(k.db, C.int32_t(idx), &out[0])
+	runtime.KeepAlive(k)
+	if status == 0 {
+		return 0, 0, false
+	}
+	return uint64(out[0]), uint64(out[1]), true
+}
 
 // anchSpanPool 复用锚定式 spans 的 lo/hi []int32 切片, 避免 cgo 热路径每次分配.
 // 锚定批处理每报文每 pattern 调用 nfaExistsAnchored, 若每次 make 会成为分配大头.

@@ -178,6 +178,7 @@ typedef struct {
     int32_t *cuts;             /* [nsym+1] */
     int32_t *asciiSym;         /* [128] */
     int32_t *posPat;           /* [npos] */
+    void *baseArena;           /* Owns the nine base arrays above; extensions own theirs. */
 
     /* ---- LimEx 多字扩展 (v3 blob, merged NFA). ---- */
     int       hasLimEx;
@@ -1646,43 +1647,61 @@ static inline int nfa_run(const mvs_nfa *a, const uint8_t *data, size_t len, int
  *   u64[npos*nword] follow; u64[nsym*nword] reach;
  *   i32[nsym+1] cuts; i32[128] asciiSym; i32[npos] posPat.
  * ==================================================================== */
+static int unit_size_add(size_t a, size_t b, size_t *out) {
+    if (b > SIZE_MAX - a) return 0;
+    *out = a + b;
+    return 1;
+}
+
+static int unit_size_mul(size_t a, size_t b, size_t *out) {
+    if (a && b > SIZE_MAX / a) return 0;
+    *out = a * b;
+    return 1;
+}
+
 static int parse_unit(const uint8_t *blob, size_t blobLen, size_t off, size_t unitLen, mvs_nfa *out) {
     memset(out, 0, sizeof(*out));
-    if (off + 16 > blobLen) return -1;
+    if (off > blobLen || unitLen > blobLen - off || unitLen < 16) return -1;
     const uint8_t *p = blob + off;
     int32_t npos = (int32_t)le_u32(p + 0);
     int32_t nword = (int32_t)le_u32(p + 4);
     int32_t nsym = (int32_t)le_u32(p + 8);
     uint32_t flags = le_u32(p + 12);
-    if (npos <= 0 || nword <= 0 || nsym <= 0) return -1;
+    if (npos <= 0 || npos > INT32_MAX - 63 || nword != (npos + 63) / 64 ||
+        nsym <= 0 || nsym > 0x110000 || (flags & ~15u)) return -1;
 
     out->npos = npos;
     out->nword = nword;
     out->nsym = nsym;
     out->hasAnchored = (flags & 1u) ? 1 : 0;
 
-    size_t u64FirstBlocks = 4;                              /* 4 个 [nword] 向量 */
-    size_t nU64 = u64FirstBlocks * (size_t)nword +
-                  (size_t)npos * nword + (size_t)nsym * nword;
-    size_t nI32 = (size_t)(nsym + 1) + 128 + (size_t)npos;
-    size_t need = 16 + nU64 * 8 + nI32 * 4;
-    if (off + need > blobLen) return -1;
+    size_t rows, nU64, nI32, u64Bytes, i32Bytes, arenaBytes, need;
+    if (!unit_size_add((size_t)npos, (size_t)nsym, &rows) ||
+        !unit_size_add(rows, 4, &rows) ||
+        !unit_size_mul(rows, (size_t)nword, &nU64) ||
+        !unit_size_add((size_t)nsym, 129, &nI32) ||
+        !unit_size_add(nI32, (size_t)npos, &nI32) ||
+        !unit_size_mul(nU64, 8, &u64Bytes) ||
+        !unit_size_mul(nI32, 4, &i32Bytes) ||
+        !unit_size_add(u64Bytes, i32Bytes, &arenaBytes) ||
+        !unit_size_add(16, arenaBytes, &need) || need > unitLen) return -1;
 
     size_t cur = off + 16;
-    out->firstUnanchored = (uint64_t *)malloc((size_t)nword * 8);
-    out->firstAnchored = (uint64_t *)malloc((size_t)nword * 8);
-    out->lastAny = (uint64_t *)malloc((size_t)nword * 8);
-    out->lastEnd = (uint64_t *)malloc((size_t)nword * 8);
-    out->follow = (uint64_t *)malloc((size_t)npos * nword * 8);
-    out->reach = (uint64_t *)malloc((size_t)nsym * nword * 8);
-    out->cuts = (int32_t *)malloc((size_t)(nsym + 1) * 4);
-    out->asciiSym = (int32_t *)malloc(128 * 4);
-    out->posPat = (int32_t *)malloc((size_t)npos * 4);
-    if (!out->firstUnanchored || !out->firstAnchored || !out->lastAny ||
-        !out->lastEnd || !out->follow || !out->reach || !out->cuts ||
-        !out->asciiSym || !out->posPat) {
-        return -1;
-    }
+    out->baseArena = malloc(arenaBytes);
+    if (!out->baseArena) return -1;
+    /* malloc aligns the u64 area; all i32 tables follow its multiple-of-eight
+     * size. C owns this block; never retain or alias the caller's Go bytes. */
+    uint64_t *words = (uint64_t *)out->baseArena;
+    out->firstUnanchored = words; words += nword;
+    out->firstAnchored = words; words += nword;
+    out->lastAny = words; words += nword;
+    out->lastEnd = words; words += nword;
+    out->follow = words; words += (size_t)npos * nword;
+    out->reach = words;
+    int32_t *ints = (int32_t *)((uint8_t *)out->baseArena + u64Bytes);
+    out->cuts = ints; ints += (size_t)nsym + 1;
+    out->asciiSym = ints; ints += 128;
+    out->posPat = ints;
 
 #define MVS_RD_U64(dst, count)                                     \
     do {                                                           \
@@ -1893,15 +1912,7 @@ static int parse_unit(const uint8_t *blob, size_t blobLen, size_t off, size_t un
 }
 
 static void free_unit(mvs_nfa *u) {
-    free(u->firstUnanchored);
-    free(u->firstAnchored);
-    free(u->lastAny);
-    free(u->lastEnd);
-    free(u->follow);
-    free(u->reach);
-    free(u->cuts);
-    free(u->asciiSym);
-    free(u->posPat);
+    free(u->baseArena);
     free(u->chainTarget);
     free(u->excMask);
     free(u->excFollow);
@@ -1935,10 +1946,14 @@ mvscan_db *mvscan_db_open(const uint8_t *blob, size_t len) {
     if (npat < 0 || nUnits < 0) return NULL;
 
     size_t headFixed = 20;
-    size_t slotBytes = (size_t)npat * 4;
-    size_t offBytes = (size_t)nUnits * 4;
-    size_t lenBytes = (size_t)nUnits * 4;
-    if (headFixed + slotBytes + offBytes + lenBytes > len) return NULL;
+    size_t slotBytes, offBytes, lenBytes, headerBytes, unitsBytes;
+    if (!unit_size_mul((size_t)npat, 4, &slotBytes) ||
+        !unit_size_mul((size_t)nUnits, 4, &offBytes) ||
+        !unit_size_add(headFixed, slotBytes, &headerBytes) ||
+        !unit_size_add(headerBytes, offBytes, &headerBytes) ||
+        !unit_size_add(headerBytes, offBytes, &headerBytes) || headerBytes > len ||
+        !unit_size_mul((size_t)nUnits, sizeof(mvs_nfa), &unitsBytes)) return NULL;
+    lenBytes = offBytes;
 
     mvscan_db *db = (mvscan_db *)calloc(1, sizeof(mvscan_db));
     if (!db) return NULL;
@@ -1946,7 +1961,7 @@ mvscan_db *mvscan_db_open(const uint8_t *blob, size_t len) {
     db->nUnits = nUnits;
     db->mergedUnit = mergedUnit;
     db->slotUnit = (int32_t *)malloc(slotBytes > 0 ? slotBytes : 1);
-    db->units = nUnits > 0 ? (mvs_nfa *)calloc((size_t)nUnits, sizeof(mvs_nfa)) : NULL;
+    db->units = nUnits > 0 ? (mvs_nfa *)calloc(1, unitsBytes) : NULL;
     if (!db->slotUnit || (nUnits > 0 && !db->units)) { mvscan_db_close(db); return NULL; }
 
     size_t cur = headFixed;
@@ -1956,7 +1971,7 @@ mvscan_db *mvscan_db_open(const uint8_t *blob, size_t len) {
     for (int i = 0; i < nUnits; i++) {
         uint32_t uoff = le_u32(offTab + (size_t)i * 4);
         uint32_t ulen = le_u32(lenTab + (size_t)i * 4);
-        if ((size_t)uoff + (size_t)ulen > len ||
+        if ((size_t)uoff > len || (size_t)ulen > len - (size_t)uoff ||
             parse_unit(blob, len, uoff, ulen, &db->units[i]) != 0) {
             mvscan_db_close(db);
             return NULL;
