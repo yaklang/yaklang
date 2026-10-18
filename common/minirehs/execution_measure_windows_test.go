@@ -114,7 +114,8 @@ func TestProgramExecutionMeasure(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer db.Close()
-	modeName := programSmallWorkerMode(t, db)
+	programSmallWorkerMode(t, db)
+	modeName := programMergedSingletonMode(t, db)
 	// Warm all source records/confirmers before timing; immutable subjects are
 	// reused, and every request still scans its complete original record.
 	warm, err := db.NewScratch()

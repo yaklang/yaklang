@@ -47,6 +47,7 @@ func TestProgramRangeTaskCensus(t *testing.T) {
 			}
 			m := db.(*database).imageMVS()
 			programSmallWorkerMode(t, db)
+			programMergedSingletonMode(t, db)
 			if m.kernel == nil {
 				t.Fatal("census requires the actual native kernel")
 			}

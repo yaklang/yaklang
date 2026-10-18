@@ -366,4 +366,31 @@ P4短MITM耗时改善10%–22%、进程CPU改善10%–36%，完整MITM耗时变�
 实际短native失败归属/错误前缀、早停、worker关闭/池回收、普通全包、race、amalgamation与vet通过。
 无新依赖、CI作业或外部正则库，其他平台和独立审查仍按用户要求暂缓。
 
+## T16：单成员存在性完成后结束，跨度假设止于覆盖门槛
+
+真实merged只有GetRequest P7/W1与MITM P56/W1，异常行的局部跨度不能再减少非零word，
+因此没有增加跨度元数据或稀疏运行分支。GetRequest的两个尾锚成员无法同时命中，同样不扩展一般成员退休。
+
+仅在公共存在性模式、单成员、W1、无断言/文本锚、原始exact RE2且无legacy不安全标记时，
+派生只读的单成员资格。加载镜像时逐项核验first、follow、accept、cuts、ASCII映射、reach和唯一accept索引，
+不能仅信metadata的成员数。使用原merged标量循环的既有存在性模式，保留必要条件预检和跳字节逻辑，
+在首次接受后结束这个执行器；其他assert及读者照常完成，回调/错误仍在原阶段回放。
+定位、forced-scalar对照、宽/多成员和fused combined均沿原路径。没有动态retired mask或运行位表。
+仅Go桥增加派生索引和私有cgo helper，native公共C源码/头/ABI、image6/blob4和缓存身份均不变。
+
+实际MITM唯一成员ID28在1336条输入中命中271条；完整原表达式RE2与native的存在性和首个接受位置逐条相同。
+后续逻辑字节跨度合计3122978B只是机制诊断，没有当作系统CPU或物理内存读取的节省比例。
+首次未计时原型曾调用普通per-rule dispatcher；源代码核对发现其切换循环或DFA整段ASCII预检，
+因此在正式测量前换回原merged标量循环，保留未计时源码/日志并重新通过S1。
+
+五轮固定核心的80个独立进程：完整1332 MITM耗时改善7.06%–8.64%，CPU/输入B改善3.31%–10.27%，
+受控服务P99改善7.22%–9.71%；GetRequest HTTP控制约-0.98%至-0.12%，dense控制+1.58%。
+170行独立组件测量中，MITM native阶段约29.18→9.12ms（-68.76%），公共Group控制变化均在3%内。
+冷加载及首扫单列：MITM Load -1.89%，Load+首次HTTP约2.415→2.530ms（+4.73%，约114µs）；
+GetRequest相应-0.24%/-0.67%。保留首扫观测成本，不宣称所有启动场景提速；由T17再评估集成。
+
+两模式各5344记录对父版本10688组完整有序对照、64组独立oracle/Compile-Load对照无差异。
+P1/16/63/64和65/127/128/129回退、定位、损坏资格、晚assert、错误归属/早停、普通full、race、
+amalgamation、vet均通过。当前验收范围仍是Windows，其他平台和独立审查暂缓。
+
 上一轮性能结论及边界见 [RUNTIME_PERFORMANCE.md](RUNTIME_PERFORMANCE.md)。

@@ -490,6 +490,7 @@ func loadUncompressedImage(data []byte, h compilationImageHeader, encoded []byte
 		if d.kernel == nil {
 			return nil, ErrCorruptImage
 		}
+		d.kernel.configureMergedSingleton(d)
 	}
 	if nl > 0 {
 		d.pf = newPrefilter(&literalIndex{literals: d.literals, litToPat: d.litToPat})
