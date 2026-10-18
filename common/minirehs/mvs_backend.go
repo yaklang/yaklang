@@ -1274,7 +1274,16 @@ func (d *mvsDB) finalizeHitWindow(idx int, data []byte, lo, hi int, sc *scratch,
 	// litSpan 已完整覆盖每个匹配，故 verifier 同样可在子串运行；将相对偏移平移回原文。
 	if d.re2Loc[idx] {
 		for _, loc := range findAllInRecord(cp.v, data, lo, hi, sc) {
-			if !handler(Match{ID: cp.id, From: lo + loc[0], To: lo + loc[1]}) {
+			// PCRE2's existence-only verifier reports unknown offsets. A
+			// localized window must not turn the -1 sentinel into a position.
+			from, to := loc[0], loc[1]
+			if from >= 0 {
+				from += lo
+			}
+			if to >= 0 {
+				to += lo
+			}
+			if !handler(Match{ID: cp.id, From: from, To: to}) {
 				return true
 			}
 		}
