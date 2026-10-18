@@ -173,6 +173,23 @@ embedded 例子重新生成后为 884 B；这项正确性修复不计为性能�
 
 普通 Windows 全包/trafficguard、专项 race5、native/amalgamation 与 vet 均通过。
 已保存旧 image5/blob3 的实际 producer 反例，普通测试强制全部相关消费者、非法 UTF、空输入、
-63/64 位边界、dense/packed 再序列化、旧 cache 刷新与无编译 Load。消费者清单与省表收益仍在单独评估。
+63/64 位边界、dense/packed 再序列化、旧 cache 刷新与无编译 Load。
+
+## T10 第二阶段：消费者清单与构造辅助存储
+
+实际 Compile 产物记录了 native、Go reverse/location fallback、verifier、debug 和 DFA 消费资格。
+GetRequest 没有 optional DFA；MITM 规则 73/77 共 61 状态、62,525 B。
+两种报告模式下，四类输入及全部 1332 MITM 记录的普通 Scan 没有调用这两张 DFA；
+但 standalone native、显式 DFA-batch 和强制验证确有消费者，故保留表及其正确 NFA 回退，
+不引入复杂消费者框架，也不以默认路径未调用作为删表证据。原 per-pattern NFA 的 Go 反向、定位和 fallback 仍保留。
+
+只删除构造时未读取的 stateKeys 列表、重复的 BFS queue，以及返回对象中固定未使用的 nsym/isByte。
+stateSets 按 discovery ID 遍历维持原 BFS 顺序；状态预算拒绝路径、状态编号、转移内容和输出均保持。
+相对于已修正的 63a33cd95，五轮独立串行 A/B：规则 73 构造约 345.7→338.5 µs、少 20 alloc/约 2.8 KB；
+规则 77 约 244.9→237.1 µs、少 17 alloc/约 1.3 KB。全部 DFA 表保留，因此镜像大小没有相应缩减。
+完整 MITM Compile 13.56→13.71 ms（+1.10%），不声称整体编译提速；Load 初测 +3.37%，
+一次独立 Load-only 100x 复核 +0.44%，两组保留。没有 PMU/P99/生产权重。
+两种真实规则集、两种报告模式的四份镜像逐字节相同；64 完整结果对无差异。
+构造变更后的普通 DFA/state-budget、race、amalgamation、vet 也已验证；未删除被强制路径需要的表。
 
 上一轮性能结论及边界见 [RUNTIME_PERFORMANCE.md](RUNTIME_PERFORMANCE.md)。

@@ -139,6 +139,39 @@ func TestDFAEligibility(t *testing.T) {
 	}
 }
 
+func TestDFAStateBudget(t *testing.T) {
+	small := buildNFAFor(t, `[ab]*a[ab]{6}`)
+	if d := buildDFAFromNFA(small); d == nil || d.nstates >= 256 {
+		t.Fatal("expected a DFA within the state budget")
+	}
+	large := buildNFAFor(t, `[ab]*a[ab]{8}`)
+	if buildDFAFromNFA(large) != nil {
+		t.Fatal("state explosion must decline to original NFA")
+	}
+	patterns := []Pattern{{ID: 0, Expr: `[ab]*a[ab]{8}`}}
+	db, err := Compile(patterns, WithBackend(BackendMVS), WithReportLocation(false), WithLogger(silentLogger{}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	image, err := db.MarshalImage()
+	if err != nil {
+		t.Fatal(err)
+	}
+	loaded, err := LoadImage(image)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer loaded.Close()
+	for _, src := range []Database{db, loaded} {
+		for _, data := range [][]byte{[]byte("abbbbbbbb"), []byte("abbbbbbb"), []byte("bbbbbbbbbb"), []byte("xx abbbbbbbb ")} {
+			if err := programCompare(programScan(t, src, data, 0), programOracle(patterns, data, BackendMVS, false, 0), false); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+}
+
 func checkLegacyDFAConsumers(t *testing.T, k *mvsKernel) {
 	t.Helper()
 	exprs := []string{`[ab][cd]`, `[ab]{2}`}
