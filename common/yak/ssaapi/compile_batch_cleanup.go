@@ -53,8 +53,11 @@ func (task compileBatchCleanup) run() error {
 		task.program.Cache.FlushInstructionSaver()
 		task.program.Cache.FlushAuxSavers()
 		// Type/index serialization can reload instructions and enqueue their
-		// eviction again; settle those writes before declaring the batch done.
+		// eviction again; settle those writes before dropping ordinary values.
 		task.program.Cache.FlushInstructionSaver()
+		// Workers for this batch have joined, and the saver barriers have
+		// returned. Only then may ordinary persisted values leave the scopes.
+		task.program.ReleasePersistedOrdinaryValues()
 		task.program.CheckMemoryPressure(task.batchIndex+1, task.batchCount)
 	}
 	if compileUnitLogEnabled() {

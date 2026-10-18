@@ -621,6 +621,7 @@ func (c *Config) parseProjectWithFSUnits(
 		prog.DatabaseKind != ssa.ProgramCacheMemory && prog.Cache != nil {
 		prog.Cache.FlushCompileUnit("final")
 		prog.Cache.FlushInstructionSaver()
+		prog.ReleasePersistedOrdinaryValues()
 	}
 	accounting := prog.Cache.GetFlushAccounting()
 	remaining := int(accounting.RemainingDirty)
