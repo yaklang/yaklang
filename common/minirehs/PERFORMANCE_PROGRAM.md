@@ -242,4 +242,28 @@ MITM 13.06→13.12 ms（+0.45%）。512 段 `[ab]token`（3072 消费位置）�
 没有镜像/缓存格式变化；T11 的 Windows 范围以这两批局部优化和明确拒绝大框架的决议完成。
 Linux/macOS 与独立审查仍按用户要求暂缓。
 
+## T12：剩余 merged 派生表与 blob 临时复制
+
+T00 已有的 per-pattern initScalar 连续布局和 imageRows 基础 backing 保留，不重复认领收益。
+本次只补仍逐位置 clone 的 merged buildLimEx：先只读数出异常行，再一次分配保留行，精确容量视图防止 append 污染邻行。
+实际 GetRequest merged 仅 7 位置且无异常行，MITM 为 56 位置、34 异常行，故这部分实际空间收益很小。
+512 位置合成纯链的派生从 516→4 alloc、18.72→7.03 µs；稠密分支从516→5 alloc、18.92→13.89 µs。
+
+原 blob builder 同时保留每个 unit 的编码缓冲再复制进最终 blob，且扩展字段会触发扩容。
+现在检查长度算术，精确测量后直接写最终缓冲；独立 encodeUnit 同样按全部可选字段精确分配。
+u32 offset 的表示溢出明确失败，不能静默截断；没有新增规则数或输入长度限制。
+仍保留 flattened Go units、Go NFA 与 C 运行表，本批不改变消费者、wire 或持有量。
+
+相对于7fcd31ee8，五轮串行 fresh-process A/B：GetRequest blob 构造29.21→22.56 ms（-22.76%），
+累计104.23→72.12 MB；完整 Compile387.46→374.54 ms（-3.33%），累计475.34→443.22 MB。
+MITM blob3.50→3.45 ms，完整 Compile12.44→12.64 ms（+1.63%）；不隐藏小幅负例。
+这是本卡两项改动组合的整体结果，组件加速不相乘。
+原生 dense blob 仍为30,165,009 B（GetRequest）、255,778 B（MITM），本批减少的是临时复制而非文件或 C 运行表尺寸。
+
+保留冻结父版 encoder 做完整字节差分；逐边重建、零行/纯链/稠密、63/64/65和127/128/129边界、
+全部扩展组合、算术溢出、容量别名、独立 whole-subject oracle、Compile/Load/early-stop 均通过。
+四份实际镜像逐字节相同，48 组跨变体完整有序结果相同。
+full minirehs40.866s/embedded/trafficguard、race5、amalgamation、vet 通过；无新依赖/CI/镜像格式变化。
+其余平台和独立审查依用户授权暂缓。
+
 上一轮性能结论及边界见 [RUNTIME_PERFORMANCE.md](RUNTIME_PERFORMANCE.md)。
