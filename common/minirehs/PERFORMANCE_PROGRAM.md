@@ -53,4 +53,27 @@ T17 汇总 Windows 系统验证，其他平台和独立审查仍明确列为待�
 
 这些是阶段证据；T04 完整回归、T05 错误贯通及后续性能实验仍按实际任务记录推进，尚未声称 M5 完成。
 
+## 执行错误接口（T05 进行中）
+
+`Database.Scan` / `ScanBatch` 的执行失败可用 `errors.As` 提取 `*ScanError`，包含规则、记录、
+阶段、类别及 incomplete。原绑定未暴露的数字错误码保持 nil，原错误仍可用 `errors.Is/As` 检查。
+失败前的回调不撤销；Batch 的错误按原 record 顺序重放，之前的 handler=false 不观察后错。
+
+Group 的可靠入口为 `MatchErr`、`MatchStringErr`、`MatchBytesErr`、`FindErr`、`MatchedIndexesErr`、
+`MatchedPatternsErr`、`CountErr`、`ScanErr`。集合/计数入口可在 error 同时返回已观察前缀，不能当作完整结果。
+旧无 error 签名保留成功行为，执行失败时 panic(ScanError)，不再伪装 NoMatch；`MatchAny` 返回错误。
+
+```go
+indexes, err := group.MatchedIndexesErr(data)
+if err != nil {
+    // indexes 只包含失败前已观察到的规则；按调用方的错误路径处理。
+    return err
+}
+_ = indexes
+```
+
+Close 前由调用方收拢扫描，不在 handler 内关闭同一 DB；关闭后 Scan、ScanBatch、NewScratch 返回 ErrClosed。
+PCRE2 与 lazy verifier 错误已经贯通；native 分配/dispatcher 的剩余状态桥接仍待 T05 后续子步骤，
+不因此提前放行 T07 或宣称可靠性门禁全部完成。
+
 上一轮性能结论及边界见 [RUNTIME_PERFORMANCE.md](RUNTIME_PERFORMANCE.md)。

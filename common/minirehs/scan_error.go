@@ -7,6 +7,13 @@ import (
 	pcrelite "github.com/VillanCh/go-pcre2-lite"
 )
 
+// ErrClosed is returned when a scan or scratch allocation uses a closed database.
+var ErrClosed = errors.New("minirehs: database is closed")
+
+func closedScanError() error {
+	return &ScanError{Record: -1, Stage: "state", Category: "closed", Incomplete: true, Err: ErrClosed}
+}
+
 // ScanError reports an incomplete scan. Callbacks observed before the failure
 // remain valid; callers must not interpret the returned prefix as a full result.
 // Record is -1 for Scan, or the zero-based record index for ScanBatch. HasRule
@@ -84,7 +91,7 @@ func scanError(err error) error {
 	if errors.As(err, &existing) {
 		return err
 	}
-	return &ScanError{Record: -1, Stage: "scan", Incomplete: true, Err: err}
+	return &ScanError{Record: -1, Stage: "scan", Category: "execution", Incomplete: true, Err: err}
 }
 
 func scanErrorAtRecord(err error, record int) error {

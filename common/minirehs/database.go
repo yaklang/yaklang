@@ -245,7 +245,8 @@ type Database interface {
 	ScanBatch(records [][]byte, s Scratch, handler BatchMatchHandler) error
 	// Info 返回该 db 的元信息.
 	Info() DatabaseInfo
-	// Close 释放后端持有的本地资源 (纯 Go 后端为 no-op).
+	// Close 结束扫描生命周期并释放本地资源。调用方须先收拢所有 Scan/ScanBatch，
+	// 不在 handler 内调用 Close；关闭后扫描和 NewScratch 返回 ErrClosed。
 	Close() error
 }
 
@@ -381,11 +382,15 @@ func compileWithConfig(patterns []Pattern, cfg *config) (Database, error) {
 
 // database 是对外的 Database 实现, 包裹具体后端的 compiledDB.
 type database struct {
+	closed  atomic.Bool
 	primary compiledDB
 	info    DatabaseInfo
 }
 
 func (d *database) NewScratch() (Scratch, error) {
+	if d == nil || d.closed.Load() {
+		return nil, ErrClosed
+	}
 	return &scratch{
 		lower:    make([]byte, 0, 4096),
 		hits:     make([]litHit, 0, 256),
@@ -395,6 +400,9 @@ func (d *database) NewScratch() (Scratch, error) {
 }
 
 func (d *database) Scan(data []byte, s Scratch, handler MatchHandler) error {
+	if d == nil || d.closed.Load() {
+		return closedScanError()
+	}
 	sc, ok := s.(*scratch)
 	if !ok || sc == nil {
 		ns, err := d.NewScratch()
@@ -412,6 +420,9 @@ func (d *database) Scan(data []byte, s Scratch, handler MatchHandler) error {
 }
 
 func (d *database) ScanBatch(records [][]byte, s Scratch, handler BatchMatchHandler) error {
+	if d == nil || d.closed.Load() {
+		return closedScanError()
+	}
 	if len(records) == 0 {
 		return nil
 	}
@@ -540,7 +551,14 @@ func (d *database) ScanBatch(records [][]byte, s Scratch, handler BatchMatchHand
 
 func (d *database) Info() DatabaseInfo { return d.info }
 
-func (d *database) Close() error { return d.primary.close() }
+// Close requires callers to have joined their scans; it prevents subsequent
+// scans and releases the backend once. It must not be called inside a handler.
+func (d *database) Close() error {
+	if d == nil || !d.closed.CompareAndSwap(false, true) {
+		return nil
+	}
+	return d.primary.close()
+}
 
 // buildExprWithFlags 把 Pattern.Flags 映射为 RE2 行内标志前缀.
 func buildExprWithFlags(p Pattern) string {
