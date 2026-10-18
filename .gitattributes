@@ -4,6 +4,11 @@ common/ai/aid/aicommon/promptloader/prompts/** text eol=lf -whitespace
 common/bin-parser/rules/**/*.yaml text eol=lf
 common/bin-parser/rules/*.yaml text eol=lf
 *.zst binary
+*.rehs binary
+# The generated C amalgamation and its source must use the same bytes on Windows.
+common/minirehs/native/**/*.c text eol=lf
+common/minirehs/native/**/*.h text eol=lf
+common/minirehs/native/**/*.inc text eol=lf
 common/bin-parser/testdata/corpus-batches/*.zip binary
 # Existing native certificate/key fixtures retain their exact wire bytes.
 common/bin-parser/testdata/protocol-native/** -text

@@ -1,14 +1,15 @@
 package minirehs
 
 import (
+	"errors"
+	"fmt"
 	"regexp"
 	"regexp/syntax"
 	"runtime"
 	"sync"
 	"sync/atomic"
 
-	"github.com/yaklang/yaklang/common/utils"
-	regexp_utils "github.com/yaklang/yaklang/common/utils/regexp-utils"
+	regexp_utils "github.com/yaklang/yaklang/common/minirehs/internal/compat"
 )
 
 // Scratch 是每次扫描需要的可复用工作区, 用于逼近热路径低分配.
@@ -218,6 +219,9 @@ func (s *scratch) Close() error {
 
 // Database 是编译产物, 不可变、并发安全 (只读), 可被多 goroutine 共享.
 type Database interface {
+	// MarshalImage exports an MVS database for LoadImage, including its Go fallback.
+	// Other backends return ErrUnsupportedImage.
+	MarshalImage() ([]byte, error)
 	// NewScratch 分配一份与该 db 绑定的可复用扫描临时区.
 	NewScratch() (Scratch, error)
 	// Scan 对完整 data 做 block 扫描, 每命中一次调用 handler; handler 返回 false 提前终止.
@@ -234,6 +238,7 @@ type Database interface {
 // compiledPattern 是一条经过特性 gate、字面量提取后的内部表示.
 type compiledPattern struct {
 	id       PatternID
+	flags    Flag
 	idx      int      // 在 supported 集合内的下标
 	expr     string   // 已带 flag 前缀的最终表达式 (供组合 gate 复用, 保证语义一致)
 	v        verifier // 命中判定与取偏移 (引擎与 oracle 共享, 保证一致)
@@ -267,8 +272,15 @@ func Compile(patterns []Pattern, opts ...Option) (Database, error) {
 	for _, opt := range opts {
 		opt(cfg)
 	}
+	return compileWithConfig(patterns, cfg)
+}
+
+func compileWithConfig(patterns []Pattern, cfg *config) (Database, error) {
+	if imageCompileHook != nil {
+		imageCompileHook()
+	}
 	if len(patterns) == 0 {
-		return nil, utils.Error("minirehs: no patterns to compile")
+		return nil, errors.New("minirehs: no patterns to compile")
 	}
 
 	var (
@@ -278,26 +290,12 @@ func Compile(patterns []Pattern, opts ...Option) (Database, error) {
 
 	for _, p := range patterns {
 		if p.Expr == "" {
-			return nil, utils.Errorf("minirehs: pattern id=%d has empty expr", p.ID)
+			return nil, fmt.Errorf("minirehs: pattern id=%d has empty expr", p.ID)
 		}
 
 		expr := buildExprWithFlags(p)
 
-		// 用 yaklang regexp-utils 做特性 gate: 优先标准库 RE2, 失败时回退 regexp2
-		// (支持 lookaround/backref). 二者都无法编译才视为不支持.
-		yak := regexp_utils.NewYakRegexpUtils(expr)
-		if !yak.CanUse() {
-			policy := effectivePolicy(p.OnUnsupported, cfg.defaultPolicy)
-			reason := "expression not compilable by RE2 nor regexp2"
-			if policy == Fallback {
-				// stdlib/regexp2 都不能编译, Fallback 无从降级.
-				cfg.logger.Warnf("minirehs: pattern id=%d unsupported and rejected: %s", p.ID, reason)
-			}
-			reports = append(reports, PatternReport{ID: p.ID, Disposition: "rejected", Reason: reason})
-			return nil, utils.Errorf("minirehs: pattern id=%d rejected: %s", p.ID, reason)
-		}
-
-		cp := &compiledPattern{id: p.ID, expr: expr}
+		cp := &compiledPattern{id: p.ID, flags: p.Flags, expr: expr}
 
 		// 尝试用标准库 RE2 编译并做字面量分析; 成功则走精确验证 + 预过滤路径.
 		if re, parsed, err := compileAndParse(expr); err == nil {
@@ -310,6 +308,16 @@ func Compile(patterns []Pattern, opts ...Option) (Database, error) {
 				}
 			}
 		} else {
+			// The successful RE2 path already validates the expression; avoid
+			// compiling it a second time through YakRegexpUtils.CanUse.
+			yak := regexp_utils.NewYakRegexpUtils(expr)
+			if !yak.CanUse() {
+				reason := "expression not compilable by RE2 nor regexp2"
+				if effectivePolicy(p.OnUnsupported, cfg.defaultPolicy) == Fallback {
+					cfg.logger.Warnf("minirehs: pattern id=%d unsupported and rejected: %s", p.ID, reason)
+				}
+				return nil, fmt.Errorf("minirehs: pattern id=%d rejected: %s", p.ID, reason)
+			}
 			// RE2 不可表达 (lookaround/backref 等), 用 regexp2 验证 (后端已全局切 go-pcre2-lite).
 			cp.v = &regexp2Verifier{yak: yak}
 			// route-B: 在不触碰 regexp2 AST 的前提下, 用"语言超集改写 + RE2 字面量提取"取必需字面量,
@@ -336,6 +344,9 @@ func Compile(patterns []Pattern, opts ...Option) (Database, error) {
 	primary, err := backend.compile(supported, cfg)
 	if err != nil {
 		return nil, err
+	}
+	if m, ok := primary.(*mvsDB); ok {
+		m.patternHash = imageIdentity(patterns, cfg, m.imageFlags)
 	}
 
 	info := DatabaseInfo{
@@ -533,7 +544,7 @@ func compileAndParse(expr string) (*regexp.Regexp, *syntax.Regexp, error) {
 	if err != nil {
 		return nil, nil, err
 	}
-	parsed, err := syntax.Parse(expr, syntax.Perl)
+	parsed, err := parseRegexSyntax(expr, syntax.Perl)
 	if err != nil {
 		return nil, nil, err
 	}

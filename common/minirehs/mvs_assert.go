@@ -506,8 +506,10 @@ func compileMVSNFAAssert(re *syntax.Regexp) (*mvsNFA, bool) {
 				byGuard[g] = append(byGuard[g], to)
 			}
 		}
-		for g, tos := range byGuard {
-			nfa.condFollow[p] = append(nfa.condFollow[p], guardedBits{g: g, bits: bsFromPositions(tos, nword)})
+		for g := guard(1); g < 64; g++ {
+			if tos := byGuard[g]; len(tos) > 0 {
+				nfa.condFollow[p] = append(nfa.condFollow[p], guardedBits{g: g, bits: bsFromPositions(tos, nword)})
+			}
 		}
 	}
 
@@ -541,8 +543,10 @@ func buildCondBits(ps []posGuard, npos, nword int) (uncond []uint64, cond []guar
 			byGuard[g] = append(byGuard[g], pos)
 		}
 	}
-	for g, positions := range byGuard {
-		cond = append(cond, guardedBits{g: g, bits: bsFromPositions(positions, nword)})
+	for g := guard(1); g < 64; g++ {
+		if positions := byGuard[g]; len(positions) > 0 {
+			cond = append(cond, guardedBits{g: g, bits: bsFromPositions(positions, nword)})
+		}
 	}
 	return uncond, cond
 }
@@ -565,9 +569,9 @@ func computeBoundaries(data []byte, buf []uint8) []uint8 {
 	}
 	// wordPrev/prevIsNewline 追踪"前一 rune 是否单词字符 / 是否 \n", prevIsTextStart 追踪是否文本始.
 	// 用字节级状态避免 rune 比较 (ASCII 快路径内零 rune 操作).
-	prevWord := false       // isWordRune(prev); prev==-1 时 isWordRune(-1)=false
-	prevIsNewline := false  // prev == '\n'
-	prevIsStart := true     // prev < 0 (文本始)
+	prevWord := false      // isWordRune(prev); prev==-1 时 isWordRune(-1)=false
+	prevIsNewline := false // prev == '\n'
+	prevIsStart := true    // prev < 0 (文本始)
 	i := 0
 	for i < n {
 		c := data[i]

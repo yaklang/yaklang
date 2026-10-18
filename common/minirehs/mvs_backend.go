@@ -65,19 +65,21 @@ func (b *mvsBackend) simd() bool        { return false }
 
 func (b *mvsBackend) compile(patterns []*compiledPattern, cfg *config) (compiledDB, error) {
 	db := &mvsDB{
-		all:          patterns,
-		n:            len(patterns),
-		nfas:         make([]*mvsNFA, len(patterns)),
-		gate:         make([]bool, len(patterns)),
-		re2Loc:       make([]bool, len(patterns)),
-		windowable:   make([]bool, len(patterns)),
-		batchable:    make([]bool, len(patterns)),
-		anchorable:   make([]bool, len(patterns)),
-		win:          make([]litWindow, len(patterns)),
-		gateHead:     make([]int32, len(patterns)),
-		biAnchorable: make([]bool, len(patterns)),
-		revNFAs:      make([]*mvsNFA, len(patterns)),
-		reportLoc:    cfg.reportLocation,
+		imageFlags:    compileImageFlags(cfg),
+		minLiteralLen: cfg.minLiteralLen,
+		all:           patterns,
+		n:             len(patterns),
+		nfas:          make([]*mvsNFA, len(patterns)),
+		gate:          make([]bool, len(patterns)),
+		re2Loc:        make([]bool, len(patterns)),
+		windowable:    make([]bool, len(patterns)),
+		batchable:     make([]bool, len(patterns)),
+		anchorable:    make([]bool, len(patterns)),
+		win:           make([]litWindow, len(patterns)),
+		gateHead:      make([]int32, len(patterns)),
+		biAnchorable:  make([]bool, len(patterns)),
+		revNFAs:       make([]*mvsNFA, len(patterns)),
+		reportLoc:     cfg.reportLocation,
 	}
 	perPatHeads := make(map[int]map[string]int32, len(patterns))        // 锚定式 pattern 的 per-literal head
 	perPatBiCover := make(map[int]map[string]litBiCover, len(patterns)) // 双向锚定 pattern 的 per-literal headF/tailR
@@ -250,6 +252,7 @@ func (b *mvsBackend) compile(patterns []*compiledPattern, cfg *config) (compiled
 
 	if len(withLit) > 0 {
 		li := buildLiteralIndex(withLit)
+		db.literals = li.literals
 		db.pf = newPrefilter(li)
 		db.litToPat = li.litToPat
 		// litHead 与 litToPat 同形: 为锚定式 pattern 填该 (litID,pattern) 的 per-literal head; 其余 -1.
@@ -390,6 +393,9 @@ func (b *mvsBackend) compile(patterns []*compiledPattern, cfg *config) (compiled
 // 两级 NFA 构造: 先 lean (无零宽断言, 走 C 内核/位并行快路径); lean 失败再试断言扩展
 // (compileMVSNFAAssert, hasAssert=true: \b \B / 行锚 / 中缀 ^$\A\z, 仅 Go 侧门控执行).
 func tryCompileNFA(cp *compiledPattern) (nfa *mvsNFA, gate bool, re2Loc bool) {
+	if imageNFAHook != nil {
+		imageNFAHook()
+	}
 	// RE2-exact pattern: 直接按原 expr 编, NFA 对存在性与定位均权威.
 	if cp.v != nil && cp.v.exact() {
 		return compileExprToNFA(cp.expr), false, false
@@ -445,7 +451,7 @@ func computeGateHead(cp *compiledPattern) int32 {
 
 // compileExprToNFA 把一条 RE2 可解析的 expr 编为 mvsNFA (先 lean 后断言扩展); 失败返回 nil.
 func compileExprToNFA(expr string) *mvsNFA {
-	parsed, err := syntax.Parse(expr, syntax.Perl)
+	parsed, err := parseRegexSyntax(expr, syntax.Perl)
 	if err != nil {
 		return nil
 	}
@@ -460,16 +466,22 @@ func compileExprToNFA(expr string) *mvsNFA {
 }
 
 type mvsDB struct {
-	all        []*compiledPattern // 按 idx 索引
-	n          int
-	nfas       []*mvsNFA   // 按 idx; nil 表示该 pattern 走 verifier 兜底
-	gate       []bool      // 按 idx; true=该 NFA 为严格超集门, 命中须 regexp2 复核滤假阳
-	re2Loc     []bool      // 按 idx; true=精确定位交 regexp2 (regexp2-origin, 保 PCRE span 语义)
-	windowable []bool      // 按 idx; true=可在字面量命中点邻域窗口内做存在性验证 (有界宽 lean NFA)
-	batchable  []bool      // 按 idx; true=非断言且有 NFA (在 C blob 中), 可走 nfaExistsMany 批处理
-	anchorable []bool      // 按 idx; true=可走锚定式单趟存在性 (有界头/无界尾, 命中字面量后只在邻域注入起点)
-	win        []litWindow // 按 idx; 命中字面量结尾两侧上下文界 (head/tail; -1=该侧无界不收窄)
-	nfaCount   int
+	// Retain the platform-independent compilation result, also in !cgo builds.
+	blob          []byte
+	literals      []string
+	imageFlags    uint32
+	minLiteralLen int
+	patternHash   uint64
+	all           []*compiledPattern // 按 idx 索引
+	n             int
+	nfas          []*mvsNFA   // 按 idx; nil 表示该 pattern 走 verifier 兜底
+	gate          []bool      // 按 idx; true=该 NFA 为严格超集门, 命中须 regexp2 复核滤假阳
+	re2Loc        []bool      // 按 idx; true=精确定位交 regexp2 (regexp2-origin, 保 PCRE span 语义)
+	windowable    []bool      // 按 idx; true=可在字面量命中点邻域窗口内做存在性验证 (有界宽 lean NFA)
+	batchable     []bool      // 按 idx; true=非断言且有 NFA (在 C blob 中), 可走 nfaExistsMany 批处理
+	anchorable    []bool      // 按 idx; true=可走锚定式单趟存在性 (有界头/无界尾, 命中字面量后只在邻域注入起点)
+	win           []litWindow // 按 idx; 命中字面量结尾两侧上下文界 (head/tail; -1=该侧无界不收窄)
+	nfaCount      int
 
 	// 双向锚定 (Rose-lite 完全体): biAnchorable[idx]=true 表示该 lean pattern 当前会落整段 batch,
 	// 但每个必需字面量"每个出现处 head 或 tail 至少一侧有界" (computeLitBiCover.ok), 可用前向锚定

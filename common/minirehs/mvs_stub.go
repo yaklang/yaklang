@@ -15,12 +15,21 @@ type mvsKernel struct{}
 // mvsKernelAvailable 报告当前构建是否编入了 C 运行期内核 (退化构建恒为 false).
 func mvsKernelAvailable() bool { return false }
 
-// newMVSKernel 在退化构建下恒返回 nil (不序列化 blob, 无任何开销).
-func newMVSKernel(d *mvsDB) *mvsKernel { return nil }
+// openMVSKernel leaves execution in Go; the shared compiler still retains its
+// portable blob so images have identical content with and without cgo.
+func openMVSKernel(blob []byte, npat int) *mvsKernel { return nil }
 
 func (k *mvsKernel) close() {}
 
 func (k *mvsKernel) nfaExists(idx int, data []byte) bool { return false }
+
+func (k *mvsKernel) findAllLoc(idx int, data []byte, sc *scratch) ([]int32, bool) { return nil, false }
+
+func (k *mvsKernel) nfaExistsAssert(idx int, data []byte, bound []uint8) bool { return false }
+
+func (k *mvsKernel) nfaExistsAssertMany(idxs []int32, data []byte, sc *scratch) []byte { return nil }
+
+func (k *mvsKernel) computeBoundariesC(data []byte, buf []byte) []byte { return nil }
 
 func (k *mvsKernel) nfaExistsAssertOnline(idx int, data []byte) bool { return false }
 

@@ -74,17 +74,7 @@ type mvsKernel struct {
 // mvsKernelAvailable 报告当前构建是否编入了 C 运行期内核.
 func mvsKernelAvailable() bool { return true }
 
-// newMVSKernel 在 minirehs_mvs 构建下把 db 的 per-pattern NFA + 合并 always-on 序列化为
-// 平台无关 blob 并交 C 内核解析; 失败 (无 NFA / 解析错误) 返回 nil, 调用方据此退化为纯 Go.
-func newMVSKernel(d *mvsDB) *mvsKernel {
-	if d == nil {
-		return nil
-	}
-	blob := buildMVSBlob(d.nfas, d.merged, d.assertNecFactor, d.hasLiterals)
-	return openMVSKernel(blob, d.n)
-}
-
-// openMVSKernel 解析一段 blob 为 C 内核句柄. 供 newMVSKernel 与差分测试共用.
+// openMVSKernel 解析一段 blob 为 C 内核句柄，供编译、镜像加载与差分测试共用。
 func openMVSKernel(blob []byte, npat int) *mvsKernel {
 	if len(blob) == 0 {
 		return nil

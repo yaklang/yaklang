@@ -15,6 +15,14 @@ var mvsBlobMagic = [4]byte{'M', 'V', 'S', '1'}
 
 const mvsBlobVersion uint32 = 3
 
+func newMVSKernel(d *mvsDB) *mvsKernel {
+	if d == nil {
+		return nil
+	}
+	d.blob = buildMVSBlob(d.nfas, d.merged, d.assertNecFactor, d.hasLiterals)
+	return openMVSKernel(d.blob, d.n)
+}
+
 // mvsUnit 是 per-pattern NFA 与合并 NFA 的统一可序列化视图.
 type mvsUnit struct {
 	npos        int

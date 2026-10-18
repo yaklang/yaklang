@@ -1,9 +1,10 @@
 package minirehs
 
 import (
+	"errors"
 	"sync"
 
-	"github.com/yaklang/yaklang/common/utils"
+	utils "github.com/yaklang/yaklang/common/minirehs/internal/compat"
 )
 
 // 本文件是 minirehs 面向 yak 语言的高层封装 (Exports). 设计目标: 让 yak 用一行
@@ -140,7 +141,7 @@ func backendFromName(name string) BackendKind {
 func BuildGroup(patterns interface{}, opts ...GroupOption) (*Group, error) {
 	exprs := utils.InterfaceToStringSlice(patterns)
 	if len(exprs) == 0 {
-		return nil, utils.Error("rehs.BuildGroup: empty pattern list")
+		return nil, errors.New("rehs.BuildGroup: empty pattern list")
 	}
 
 	gc := &groupConfig{backend: BackendMVS, minLiteralLen: 2}

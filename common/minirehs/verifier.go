@@ -2,8 +2,9 @@ package minirehs
 
 import (
 	"regexp"
+	"sync"
 
-	regexp_utils "github.com/yaklang/yaklang/common/utils/regexp-utils"
+	regexp_utils "github.com/yaklang/yaklang/common/minirehs/internal/compat"
 )
 
 // verifier 负责对候选数据做"真实命中"判定与取偏移. 它是命中语义的唯一权威:
@@ -19,13 +20,34 @@ type verifier interface {
 
 // re2Verifier 基于标准库 regexp (RE2), 给出精确的非重叠字节区间.
 type re2Verifier struct {
-	re *regexp.Regexp
+	re      *regexp.Regexp
+	once    sync.Once
+	expr    string
+	longest bool
+}
+
+func (v *re2Verifier) load() *regexp.Regexp {
+	// Compiled databases already own their verifier. Images initialize it once,
+	// only if a scan actually needs verification rather than NFA existence.
+	v.once.Do(func() {
+		if v.re == nil {
+			v.re, _ = regexp.Compile(v.expr)
+			if v.re != nil && v.longest {
+				v.re.Longest()
+			}
+		}
+	})
+	return v.re
 }
 
 func (v *re2Verifier) exact() bool { return true }
 
 func (v *re2Verifier) findAll(data []byte) [][2]int {
-	locs := v.re.FindAllIndex(data, -1)
+	re := v.load()
+	if re == nil {
+		return nil
+	}
+	locs := re.FindAllIndex(data, -1)
 	if len(locs) == 0 {
 		return nil
 	}
@@ -55,7 +77,11 @@ func (v *re2Verifier) findAllInWindow(data []byte, winStart, winEnd int) [][2]in
 		return nil
 	}
 	sub := data[winStart:winEnd]
-	locs := v.re.FindAllIndex(sub, -1)
+	re := v.load()
+	if re == nil {
+		return nil
+	}
+	locs := re.FindAllIndex(sub, -1)
 	if len(locs) == 0 {
 		return nil
 	}
@@ -80,12 +106,19 @@ func (v *re2Verifier) findAllInWindow(data []byte, winStart, winEnd int) [][2]in
 // 注: regexp-utils 的 regexp2 后端已全局切换为 go-pcre2-lite (PCRE2, 线性时间, 远低回溯成本),
 // 故本 verifier 经 yak.Match 自动享有该加速, 无需 minirehs 内单独旁路.
 type regexp2Verifier struct {
-	yak *regexp_utils.YakRegexpUtils
+	yak  *regexp_utils.YakRegexpUtils
+	once sync.Once
+	expr string
 }
 
 func (v *regexp2Verifier) exact() bool { return false }
 
 func (v *regexp2Verifier) findAll(data []byte) [][2]int {
+	v.once.Do(func() {
+		if v.yak == nil {
+			v.yak = regexp_utils.NewYakRegexpUtils(v.expr)
+		}
+	})
 	ok, err := v.yak.Match(data)
 	if err != nil || !ok {
 		return nil

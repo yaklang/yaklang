@@ -34,7 +34,7 @@ func extractRequiredLiteralsApprox(expr string, minLen int) []string {
 	if !ok {
 		return nil
 	}
-	parsed, err := syntax.Parse(super, syntax.Perl)
+	parsed, err := parseRegexSyntax(super, syntax.Perl)
 	if err != nil {
 		return nil
 	}

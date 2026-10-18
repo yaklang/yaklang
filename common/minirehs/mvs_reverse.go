@@ -63,7 +63,7 @@ func reverseBnode(n *bnode) *bnode {
 // compileReverseExprToNFA 解析 expr -> 剥锚 -> rune 级树 -> 结构反转 -> Glushkov, 得反向 NFA.
 // 仅对无文本锚的 lean pattern 有效 (含 ^/$ 或零宽断言者返回 nil, 调用方退回原路径).
 func compileReverseExprToNFA(expr string) *mvsNFA {
-	parsed, err := syntax.Parse(expr, syntax.Perl)
+	parsed, err := parseRegexSyntax(expr, syntax.Perl)
 	if err != nil {
 		return nil
 	}
