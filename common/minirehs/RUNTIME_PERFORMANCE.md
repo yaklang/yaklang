@@ -1,6 +1,9 @@
 # minirehs 运行性能分析
 
-## T01 当前 Windows 基线（v5 / eb74d7d0b）
+当前运行版本已推进到 image6/blob4；后续单项决议和正确性修复见 [PERFORMANCE_PROGRAM.md](PERFORMANCE_PROGRAM.md)。
+下面保留原 SHA 的测量，不将旧基线数字冒充当前组合改动的严格 A/B。
+
+## T01 冻结 Windows 基线（v5 / eb74d7d0b）
 
 2026-10-18，Go 1.22.12、clang 22.1.8、CGO=1、GOMAXPROCS=2、i5-13490F。
 以下是五个独立进程轮次的基准均值中位数，未控制桌面负载/频率；不是请求级 P50/P99。

@@ -19,10 +19,8 @@ const DFA_MAX_NPOS = 64
 
 type mvsDFA struct {
 	nstates int     // DFA 状态数
-	nsym    int     // 符号数 (字母表大小, 通常 256 for byte-level)
 	accept  []byte  // [nstates] 接受状态标记 (0/1)
-	next    []int32 // [nstates * nsym] 转移表: next[state*nsym + sym] = 下一状态 (-1 = 死状态)
-	isByte  bool    // true=按字节转移 (nsym=256)
+	next    []int32 // [nstates * 256] 转移表: next[state*256 + byte] (-1 = 死状态)
 }
 
 // buildDFAFromNFA 用子集构造法把 NFA 转为 DFA. 仅对 npos <= DFA_MAX_NPOS 的 NFA 调用.
@@ -35,9 +33,6 @@ func buildDFAFromNFA(nfa *mvsNFA) *mvsDFA {
 
 	// DFA 状态 = NFA 位置集 (用 uint64 位集表示, nword 个字)
 	nword := nfa.nword
-	type stateSet struct {
-		bits []uint64
-	}
 
 	// Each state contains positions consumed by the preceding input, not the
 	// positions eligible to consume the next symbol. Initially none were consumed;
@@ -47,21 +42,18 @@ func buildDFAFromNFA(nfa *mvsNFA) *mvsDFA {
 	// DFA 状态表: 位集 -> 状态 ID
 	stateMap := map[string]int{}
 	var stateSets [][]uint64
-	var stateKeys []string
 
 	// 添加初始状态
 	key0 := bitsKey(initSet)
 	stateMap[key0] = 0
 	stateSets = append(stateSets, initSet)
-	stateKeys = append(stateKeys, key0)
 
 	// BFS 构造
-	queue := []int{0}
 	maxStates := 256 // 限制状态数避免爆炸
 
-	for len(queue) > 0 && len(stateSets) < maxStates {
-		sid := queue[0]
-		queue = queue[1:]
+	// State IDs are assigned in discovery order. Scanning those IDs is the same
+	// BFS without a second queue or an unused parallel string-key slice.
+	for sid := 0; sid < len(stateSets) && len(stateSets) < maxStates; sid++ {
 		curSet := stateSets[sid]
 
 		// 对每个 ASCII 字节计算后继状态集
@@ -80,8 +72,6 @@ func buildDFAFromNFA(nfa *mvsNFA) *mvsDFA {
 				}
 				stateMap[key] = nextID
 				stateSets = append(stateSets, nextSet)
-				stateKeys = append(stateKeys, key)
-				queue = append(queue, nextID)
 			}
 			_ = nextID
 		}
@@ -95,8 +85,6 @@ func buildDFAFromNFA(nfa *mvsNFA) *mvsDFA {
 	// 构建转移表: next[state*256 + byte] -> 下一状态
 	dfa := &mvsDFA{
 		nstates: nstates,
-		nsym:    256,
-		isByte:  true,
 		accept:  make([]byte, nstates),
 		next:    make([]int32, nstates*256),
 	}
