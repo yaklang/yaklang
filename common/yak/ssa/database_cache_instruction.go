@@ -179,6 +179,8 @@ func newInstructionStore(
 
 		cacheTTL, cacheMax := resolveInstructionCacheSettings(cfg)
 		instructionSaveSize, persistLimit := resolveInstructionPersistenceTuning(cfg, saveSize)
+		store.residentReloads = utils.NewCacheExWithKey[int64, Instruction](
+			utils.WithCacheCapacity(largeProjectCacheMax), utils.WithCacheTTL(time.Minute))
 		store.writer = dbcache.NewCache[Instruction, *instructionPersistRecord](
 			cacheTTL,
 			cacheMax,
@@ -294,6 +296,25 @@ func (s *instructionStore) Get(id int64) Instruction {
 		}
 	}
 	return nil
+}
+
+func (s *instructionStore) reloadPersistedInstruction(id int64) Instruction {
+	if s == nil || id <= 0 || !s.isPersisted(id) {
+		return nil
+	}
+	if s.residentReloads != nil {
+		if inst, ok := s.residentReloads.Get(id); ok && inst != nil {
+			return inst
+		}
+	}
+	inst, err := s.loadInstruction(id)
+	if err != nil || utils.IsNil(inst) {
+		return nil
+	}
+	if s.residentReloads != nil {
+		s.residentReloads.Set(id, inst)
+	}
+	return inst
 }
 
 func (s *instructionStore) Delete(id int64) {

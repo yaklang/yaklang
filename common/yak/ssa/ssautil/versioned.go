@@ -99,15 +99,39 @@ type Versioned[T versionedValue] struct {
 	isAssigned utils.AtomicBool
 	Value      T
 
+	// retainedID keeps the instruction id after the strong value is dropped.
+	// reload materializes it again on the next GetValue.
+	retainedID int64
+	reload     func(int64) (T, bool)
+
 	kind         VariableKind
 	pointHandler func(T, ScopedVersionedTableIF[T])
 }
 
 func (v *Versioned[T]) GetId() int64 {
-	if isZeroValue(v.Value) {
+	if v == nil {
 		return 0
 	}
-	return v.Value.GetId()
+	v.lock.RLock()
+	defer v.lock.RUnlock()
+	if !isZeroValue(v.Value) {
+		return v.Value.GetId()
+	}
+	return v.retainedID
+}
+
+// DetachRetained drops the strong value but keeps its id. GetValue reloads
+// that id on demand. The reload function must not call back into this version.
+func (v *Versioned[T]) DetachRetained(id int64, reload func(int64) (T, bool)) {
+	if v == nil || id == 0 {
+		return
+	}
+	v.lock.Lock()
+	defer v.lock.Unlock()
+	v.retainedID = id
+	v.reload = reload
+	var zero T
+	v.Value = zero
 }
 
 func (v *Versioned[T]) SetScope(s ScopedVersionedTableIF[T]) {
@@ -184,11 +208,7 @@ func (v *Versioned[T]) MarshalJSON() ([]byte, error) {
 	params["local"] = v.local
 	// params["scope"] = v.scope.GetPersistentId()
 	params["is_assigned"] = v.isAssigned.IsSet()
-	var valIdx int64 = 0
-	if !isZeroValue(v.Value) {
-		valIdx = v.Value.GetId()
-	}
-	params["value"] = valIdx
+	params["value"] = v.GetId()
 	return json.Marshal(params)
 }
 
@@ -227,12 +247,41 @@ func (v *Versioned[T]) PointHandleOnce(value T, scope ScopedVersionedTableIF[T])
 }
 
 func (v *Versioned[T]) IsNil() bool {
-	var zero T
-	return v.Value == zero
+	if v == nil {
+		return true
+	}
+	v.lock.RLock()
+	defer v.lock.RUnlock()
+	if v.retainedID != 0 {
+		return false
+	}
+	return isZeroValue(v.Value)
 }
 
 func (v *Versioned[T]) GetValue() (ret T) {
-	return v.Value
+	if v == nil {
+		return ret
+	}
+	v.lock.Lock()
+	val := v.Value
+	reload := v.reload
+	id := v.retainedID
+	v.lock.Unlock()
+	if !isZeroValue(val) || reload == nil || id == 0 {
+		return val
+	}
+	loaded, ok := reload(id)
+	if !ok || isZeroValue(loaded) {
+		return val
+	}
+	v.lock.Lock()
+	if isZeroValue(v.Value) {
+		v.Value = loaded
+		v.reload = nil
+	}
+	val = v.Value
+	v.lock.Unlock()
+	return val
 }
 
 func (v *Versioned[T]) Replace(val, to T) {
@@ -260,6 +309,10 @@ func (v *Versioned[T]) Assign(val T) error {
 			v.Value.SelfDelete()
 		}
 	}
+	v.lock.Lock()
+	v.retainedID = 0
+	v.reload = nil
+	v.lock.Unlock()
 	v.Value = val
 	return nil
 }
