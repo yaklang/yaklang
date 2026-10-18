@@ -16,6 +16,8 @@ func mvsKernelAvailable() bool { return false }
 // openMVSKernel is unavailable without cgo.
 func openMVSKernel(blob []byte, npat int) *mvsKernel { return nil }
 
+func (k *mvsKernel) configureMergedSingleton(d *mvsDB) {}
+
 func (k *mvsKernel) close() {}
 
 func (k *mvsKernel) nfaExists(idx int, data []byte) bool { return false }

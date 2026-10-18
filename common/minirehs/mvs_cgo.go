@@ -63,6 +63,27 @@ static int mvs_base_arena_layout(const mvscan_db *db, int32_t idx, uint64_t *out
     out[0] = sizeof(mvs_nfa); out[1] = cur-start;
     return 1;
 }
+
+// Qualified singleton: retain the original merged LimEx, start-byte skipping
+// and necessary precheck. Invoke its existing scalar presence mode directly;
+// the per-rule dispatcher would select a different loop or DFA ASCII prescan.
+static int mvs_merged_singleton_exists(const mvscan_db *db, const uint8_t *data, size_t len) {
+    if (!db || (!data && len) || db->mergedUnit < 0 || db->mergedUnit >= db->nUnits)
+        return MVS_ERR_INVALID;
+    const mvs_nfa *a = &db->units[db->mergedUnit];
+    if (a->nword != 1 || a->hasAssert) return MVS_ERR_INVALID;
+    // Same necessary condition as mvscan_db_merged_scan. Non-ASCII cannot
+    // be rejected by an ASCII start mask, including invalid UTF bytes.
+    if (a->hasStartByteMask) {
+        int possible = 0;
+        for (size_t i = 0; i < len; i++) {
+            uint8_t b = data[i];
+            if (b >= 0x80 || a->startByteMask[b]) { possible = 1; break; }
+        }
+        if (!possible) return 0;
+    }
+    return nfa_run_scalar(a, data, len, 0, NULL, 0, NULL, 0, NULL);
+}
 */
 import "C"
 
@@ -132,6 +153,8 @@ func anchSpanPut(b *anchSpanBufs) {
 type mvsKernel struct {
 	db   *C.mvscan_db
 	npat int
+	// Derived before publication; -1 preserves the original merged executor.
+	mergedSingleton int
 	// Ordinary fault-injection tests configure this before any scan starts.
 	// Immutable production databases leave it nil.
 	testStatus func(stage string, index, status int) int
@@ -149,10 +172,21 @@ func openMVSKernel(blob []byte, npat int) *mvsKernel {
 	if h == nil {
 		return nil
 	}
-	k := &mvsKernel{db: h, npat: npat}
+	k := &mvsKernel{db: h, npat: npat, mergedSingleton: -1}
 	// 兜底: 即便调用方漏调 close, GC 回收时也释放 C 内存 (close 仍是首选, 及时确定性释放).
 	runtime.SetFinalizer(k, func(x *mvsKernel) { x.close() })
 	return k
+}
+
+func (k *mvsKernel) configureMergedSingleton(d *mvsDB) {
+	if k == nil || k.db == nil {
+		return
+	}
+	k.mergedSingleton = -1
+	if idx, ok := singleMergedMember(d); ok && C.mvscan_db_has_merged(k.db) != 0 {
+		k.mergedSingleton = idx
+	}
+	runtime.KeepAlive(k)
 }
 
 func (k *mvsKernel) close() {
@@ -726,6 +760,29 @@ func (k *mvsKernel) mergedScanImpl(data []byte, sc *scratch, scalar bool) ([]int
 		return nil, &nativeExecutionError{stage: "merged", index: -1, code: -1}
 	}
 	sc.mergedHits = sc.mergedHits[:0]
+	if !scalar && k.mergedSingleton >= 0 {
+		// All members have completed at the first acceptance. Reuse the
+		// original merged scalar presence mode and retain merged error
+		// attribution. Scalar and fused/locating paths remain references.
+		if cgoDiagEnabled {
+			atomic.AddInt64(&cgoMergedCalls, 1)
+			atomic.AddInt64(&cgoMergedBytes, int64(len(data)))
+		}
+		var dptr *C.uint8_t
+		if len(data) > 0 {
+			dptr = (*C.uint8_t)(unsafe.Pointer(&data[0]))
+		}
+		n := k.nativeStatus("merged", -1, int(C.mvs_merged_singleton_exists(k.db, dptr, C.size_t(len(data)))))
+		keepAlive(data)
+		runtime.KeepAlive(k)
+		if n < 0 || n > 1 {
+			return nil, &nativeExecutionError{stage: "merged", index: -1, code: n}
+		}
+		if n == 1 {
+			sc.mergedHits = append(sc.mergedHits, k.mergedSingleton)
+		}
+		return sc.mergedHits, nil
+	}
 	if C.mvscan_db_has_merged(k.db) == 0 {
 		return sc.mergedHits, nil
 	}

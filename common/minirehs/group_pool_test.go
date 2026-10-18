@@ -363,6 +363,7 @@ func BenchmarkProgramGroupReuse(b *testing.B) {
 			}
 			defer g.Close()
 			programSmallWorkerMode(b, g.db)
+			programMergedSingletonMode(b, g.db)
 			want, err := g.MatchedIndexesErr(data)
 			if err != nil || len(want) == 0 {
 				b.Fatalf("invalid warmup: %v %v", want, err)

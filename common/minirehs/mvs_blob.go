@@ -24,7 +24,9 @@ func newMVSKernel(d *mvsDB) *mvsKernel {
 		return nil
 	}
 	d.blob = buildMVSBlob(d.nfas, d.merged, d.assertNecFactor, d.hasLiterals)
-	return openMVSKernel(d.blob, d.n)
+	k := openMVSKernel(d.blob, d.n)
+	k.configureMergedSingleton(d)
+	return k
 }
 
 // mvsUnit 是 per-pattern NFA 与合并 NFA 的统一可序列化视图.
