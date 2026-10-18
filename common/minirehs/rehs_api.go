@@ -2,7 +2,9 @@ package minirehs
 
 import (
 	"errors"
+	"runtime"
 	"sync"
+	"sync/atomic"
 
 	"github.com/yaklang/yaklang/common/utils"
 )
@@ -23,8 +25,19 @@ import (
 type Group struct {
 	db    Database
 	exprs []string
-	pool  sync.Pool
+	// Idle scratches own permanent workers. A bounded, drainable cache keeps
+	// them reachable until explicit Close/eviction instead of losing them to
+	// sync.Pool's GC eviction. The high state bit closes admission; low bits
+	// count borrowers through their complete return/cleanup.
+	pool      chan Scratch
+	state     atomic.Uint64
+	drained   chan struct{}
+	closeOnce sync.Once
+	closeErr  error
 }
+
+const groupClosingBit uint64 = 1 << 63
+const maxGroupIdleScratch = 4
 
 // GroupMatch 是一次命中, 字段对 yak 友好。
 type GroupMatch struct {
@@ -173,7 +186,12 @@ func BuildGroup(patterns interface{}, opts ...GroupOption) (*Group, error) {
 		return nil, err
 	}
 
-	g := &Group{db: db, exprs: append([]string(nil), exprs...)}
+	idle := runtime.GOMAXPROCS(0)
+	if idle > maxGroupIdleScratch {
+		idle = maxGroupIdleScratch
+	}
+	g := &Group{db: db, exprs: append([]string(nil), exprs...), pool: make(chan Scratch, idle), drained: make(chan struct{})}
+	runtime.SetFinalizer(g, func(group *Group) { _ = group.Close() })
 	return g, nil
 }
 
@@ -181,11 +199,26 @@ func (g *Group) getScratchErr() (Scratch, error) {
 	if g == nil || g.db == nil {
 		return nil, &ScanError{Record: -1, Stage: "scratch", Category: "invalid_state", Incomplete: true, Err: errors.New("uninitialized group")}
 	}
-	if s, ok := g.pool.Get().(Scratch); ok && s != nil {
+	for {
+		state := g.state.Load()
+		if state&groupClosingBit != 0 {
+			return nil, closedScanError()
+		}
+		if state == groupClosingBit-1 {
+			return nil, &ScanError{Record: -1, Stage: "scratch", Category: "overflow", Incomplete: true, Err: errors.New("group borrower count overflow")}
+		}
+		if g.state.CompareAndSwap(state, state+1) {
+			break
+		}
+	}
+	select {
+	case s := <-g.pool:
 		return s, nil
+	default:
 	}
 	s, err := g.db.NewScratch()
 	if err != nil {
+		g.putScratch(nil) // release admission even when scratch allocation fails
 		var execution *ScanError
 		if errors.As(err, &execution) {
 			return nil, err
@@ -201,7 +234,29 @@ func (g *Group) getScratchErr() (Scratch, error) {
 
 func (g *Group) putScratch(s Scratch) {
 	if s != nil {
-		g.pool.Put(s)
+		keep := false
+		if g.state.Load()&groupClosingBit == 0 {
+			oversized := false
+			if work, ok := s.(*scratch); ok {
+				oversized = work.groupPoolOversized()
+			}
+			if !oversized {
+				select {
+				case g.pool <- s:
+					keep = true
+				default:
+				}
+			}
+		}
+		if !keep {
+			_ = s.Close()
+		}
+	}
+	// Close waits until every return has either cached or closed its scratch.
+	// A return racing the closing bit may cache; Close drains it after this
+	// last decrement, so the scratch cannot be stranded in the idle channel.
+	if g.state.Add(^uint64(0)) == groupClosingBit {
+		close(g.drained)
 	}
 }
 
@@ -430,11 +485,45 @@ func (g *Group) Len() int { return len(g.exprs) }
 func (g *Group) Info() DatabaseInfo { return g.db.Info() }
 
 // Close 结束扫描生命周期并释放本地资源（导出名为 group.Close）。
-// 调用方须先收拢扫描；关闭后扫描返回 ErrClosed，旧无 error 签名的入口会 panic。
+// 停止接收新扫描并等待已借出的 scratch 归还，再关闭空闲 workers 和 DB。
+// 不得在同一 Group 的 handler 内调用 Close；关闭后旧无 error 签名的入口会 panic。
 //
 // 返回值:
 //   - 释放失败时的错误信息
-func (g *Group) Close() error { return g.db.Close() }
+func (g *Group) Close() error {
+	if g == nil {
+		return nil
+	}
+	g.closeOnce.Do(func() {
+		runtime.SetFinalizer(g, nil)
+		var state uint64
+		for {
+			state = g.state.Load()
+			if g.state.CompareAndSwap(state, state|groupClosingBit) {
+				break
+			}
+		}
+		if state&(groupClosingBit-1) != 0 {
+			<-g.drained
+		}
+		for {
+			select {
+			case s := <-g.pool:
+				if err := s.Close(); err != nil {
+					g.closeErr = errors.Join(g.closeErr, err)
+				}
+			default:
+				if g.db != nil {
+					if err := g.db.Close(); err != nil {
+						g.closeErr = errors.Join(g.closeErr, err)
+					}
+				}
+				return
+			}
+		}
+	})
+	return g.closeErr
+}
 
 // MatchAny 一次性判定 data 是否命中 patterns 中任意一条正则（导出名为 rehs.MatchAny）
 //
