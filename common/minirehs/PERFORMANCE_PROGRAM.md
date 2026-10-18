@@ -73,7 +73,20 @@ _ = indexes
 ```
 
 Close 前由调用方收拢扫描，不在 handler 内关闭同一 DB；关闭后 Scan、ScanBatch、NewScratch 返回 ErrClosed。
-PCRE2 与 lazy verifier 错误已经贯通；native 分配/dispatcher 的剩余状态桥接仍待 T05 后续子步骤，
-不因此提前放行 T07 或宣称可靠性门禁全部完成。
+PCRE2、lazy verifier、native 分配和 dispatcher 错误均已贯通。C 的 -1/-2/-3 分别保留为
+invalid dispatch、overflow、out of memory；已启动 worker 在所有返回路径收拢，再按回调顺序报告。
+多条 native 结果槽使用有符号状态编码，负值先作为错误处理，不能用非零直接当作命中。
+trafficguard 改用 MatchedIndexesErr；候选过滤失败时对全部原规则执行其权威提取器，避免把部分候选当完整结果。
+
+当前生产配置保留 VillanCh/go-pcre2-lite v0.1.6 的默认 match/depth 资源策略，没有新设规则或输入限制。
+已有表达式内的 PCRE2 LIMIT 指令随表达式保存在镜像中；Compile/Load 都验证同样的执行错误。
+专项测试使用现有公开 SetMatchLimits，在对象被扫描线程使用之前配置；该操作会重编译并替换后端，
+不允许对正在扫描的实例动态调用。MatchTimeout 或在外层 select 返回不能取消正在执行的 C 匹配；
+本实现不声称支持这种取消，也不访问 PCRE2 私有句柄或新增范围接口。
+
+独立 C 故障探针使用真实 Go blob，覆盖 16 条 native 路径的 38 次 malloc/calloc 失败及临时缓冲释放；
+普通 Go 回归另验证状态桥接、Compile/Load、GOMAXPROCS=1/2、早停、Batch 的 record 归属与错误后复用。
+这两类证据分开记录，没有把 Go 状态注入冒充 C 内存分配故障。
+池高水位和 Group 常驻 worker 所有权继续在 T06/T15 检查；本阶段尚未声称完整 M5 验收。
 
 上一轮性能结论及边界见 [RUNTIME_PERFORMANCE.md](RUNTIME_PERFORMANCE.md)。
