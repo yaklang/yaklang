@@ -29,3 +29,28 @@ func TestReplaceMemberCallDoesNotExpandReadGeneratedMembers(t *testing.T) {
 	require.True(t, ok, "the generated member must still merge the original loop edges")
 	require.Len(t, phi.Edge, 2)
 }
+
+func TestPhiEdgeDedupeIdentityMatchesFormattedKey(t *testing.T) {
+	_, builder := newTestBuilder(t)
+	left := builder.EmitUndefined("left")
+	right := builder.EmitUndefined("right")
+	left.SetVerboseName("cursor.name")
+	right.SetVerboseName("cursor.name")
+	left.SetType(CreateStringType())
+	right.SetType(CreateStringType())
+	require.Equal(t, "string", left.GetType().String())
+	require.Equal(t, phiEdgeDedupeIdentity(left), phiEdgeDedupeIdentity(right),
+		"same kind, verbose name and type text still collapse")
+
+	right.SetType(CreateNumberType())
+	require.NotEqual(t, phiEdgeDedupeIdentity(left), phiEdgeDedupeIdentity(right))
+	right.SetVerboseName("cursor.count")
+	right.SetType(left.GetType())
+	require.NotEqual(t, phiEdgeDedupeIdentity(left), phiEdgeDedupeIdentity(right))
+
+	sameConst := builder.EmitConstInst("name")
+	otherConst := builder.EmitConstInst("count")
+	require.Equal(t, phiEdgeDedupeIdentity(sameConst), phiEdgeDedupeIdentity(builder.EmitConstInst("name")))
+	require.NotEqual(t, phiEdgeDedupeIdentity(sameConst), phiEdgeDedupeIdentity(otherConst))
+	require.NotEqual(t, phiEdgeDedupeIdentity(left), phiEdgeDedupeIdentity(sameConst))
+}
