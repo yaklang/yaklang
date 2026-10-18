@@ -1384,9 +1384,17 @@ func (b *astbuilder) buildExpression(stmt *yak.ExpressionContext) ssa.Value {
 			b.NewError(ssa.Error, TAG, "chan send need two expression")
 			return nil
 		}
-		target := b.ReadValue("__yak_chan_send")
+		// Only the AOT compiler binds __yak_chan_send (it installs the helper as
+		// an extern value). Static analysis and the interpreter have no binding:
+		// ReadValue would invent a free-value or undefined placeholder for the
+		// name, and calling that reports an undefined value (which fails the
+		// built-in script check). Look the binding up directly and leave the
+		// send unlowered when it is absent.
+		target := b.TryBuildExternValue("__yak_chan_send")
 		if target == nil {
-			b.NewError(ssa.Error, TAG, "chan send helper not found")
+			return nil
+		}
+		if und, ok := ssa.ToUndefined(target); ok && und != nil {
 			return nil
 		}
 		c := b.NewCall(target, []ssa.Value{op1, op2})
