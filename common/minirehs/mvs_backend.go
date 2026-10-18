@@ -32,30 +32,13 @@ func (s *scratch) startWorkers() {
 		go func() {
 			defer s.workerWG.Done()
 			for task := range s.gatedTasks {
-				task.scratch.clearVerifierText()
-				result := gatedResult{out: task.out}
-				for i, gate := range task.tasks {
-					hit, err := task.db.existsNoReport(int(gate.idx), task.data, int(gate.winLo), task.scratch)
-					result.completed = i + 1
-					if err != nil {
-						result.err = err
-						break
-					}
-					if hit {
-						task.out[i] = 1
-					} else {
-						task.out[i] = 0
-					}
-				}
-				task.scratch.clearVerifierText()
-				task.result <- result
+				runGatedWorker(task)
 			}
 		}()
 		go func() {
 			defer s.workerWG.Done()
 			for task := range s.anchoredTasks {
-				task.result <- task.db.scanAnchoredNoReport(task.data, task.anchorBatch, task.biBatch,
-					task.owner, task.scratch, task.anchorOut, task.biOut)
+				runAnchoredWorker(task)
 			}
 		}()
 	})
@@ -85,21 +68,22 @@ var compileASTReuseEnabled = true
 
 func (b *mvsBackend) compileParsed(patterns []*compiledPattern, cfg *config, parsedPatterns map[*compiledPattern]*syntax.Regexp) (compiledDB, error) {
 	db := &mvsDB{
-		imageFlags:    compileImageFlags(cfg),
-		minLiteralLen: cfg.minLiteralLen,
-		all:           patterns,
-		n:             len(patterns),
-		nfas:          make([]*mvsNFA, len(patterns)),
-		gate:          make([]bool, len(patterns)),
-		re2Loc:        make([]bool, len(patterns)),
-		windowable:    make([]bool, len(patterns)),
-		batchable:     make([]bool, len(patterns)),
-		anchorable:    make([]bool, len(patterns)),
-		win:           make([]litWindow, len(patterns)),
-		gateHead:      make([]int32, len(patterns)),
-		biAnchorable:  make([]bool, len(patterns)),
-		revNFAs:       make([]*mvsNFA, len(patterns)),
-		reportLoc:     cfg.reportLocation,
+		inlineSmallWorkers: true,
+		imageFlags:         compileImageFlags(cfg),
+		minLiteralLen:      cfg.minLiteralLen,
+		all:                patterns,
+		n:                  len(patterns),
+		nfas:               make([]*mvsNFA, len(patterns)),
+		gate:               make([]bool, len(patterns)),
+		re2Loc:             make([]bool, len(patterns)),
+		windowable:         make([]bool, len(patterns)),
+		batchable:          make([]bool, len(patterns)),
+		anchorable:         make([]bool, len(patterns)),
+		win:                make([]litWindow, len(patterns)),
+		gateHead:           make([]int32, len(patterns)),
+		biAnchorable:       make([]bool, len(patterns)),
+		revNFAs:            make([]*mvsNFA, len(patterns)),
+		reportLoc:          cfg.reportLocation,
 	}
 	perPatHeads := make(map[int]map[string]int32, len(patterns))        // 锚定式 pattern 的 per-literal head
 	perPatBiCover := make(map[int]map[string]litBiCover, len(patterns)) // 双向锚定 pattern 的 per-literal headF/tailR
@@ -521,6 +505,9 @@ func compileSyntaxToNFA(s *syntax.Regexp) *mvsNFA {
 }
 
 type mvsDB struct {
+	// Runtime-only and immutable after publication; never serialized. Small
+	// gate/anchor tasks retain their original result and error replay stages.
+	inlineSmallWorkers bool
 	// Retain the platform-independent compilation result for image export.
 	blob             []byte
 	encodedImage     []byte // owned loaded image; immutable, for exact re-export
@@ -866,11 +853,10 @@ func (d *mvsDB) scan(data []byte, sc *scratch, handler MatchHandler) (stopped bo
 			}
 			workerSc := sc.gateAsyncScratch
 			workerSc.assertBoundReady = false
-			sc.startWorkers()
-			sc.gatedTasks <- gatedWorkerTask{
+			d.dispatchGated(sc, gatedWorkerTask{
 				db: d, data: data, tasks: gateTasks, scratch: workerSc,
 				out: sc.gateAsyncOut, result: sc.gateAsyncRes,
-			}
+			})
 			asyncGated = true
 			defer func() {
 				if !asyncGatedConsumed {
@@ -903,12 +889,11 @@ func (d *mvsDB) scan(data []byte, sc *scratch, handler MatchHandler) (stopped bo
 			workerSc.anchorPrev = ensureU64(workerSc.anchorPrev, d.maxAnchorNword)
 			workerSc.anchorCand = ensureU64(workerSc.anchorCand, d.maxAnchorNword)
 			workerSc.anchorActive = ensureU64(workerSc.anchorActive, d.maxAnchorNword)
-			sc.startWorkers()
-			sc.anchoredTasks <- anchoredWorkerTask{
+			d.dispatchAnchored(sc, anchoredWorkerTask{
 				db: d, data: data, anchorBatch: anchorBatch, biBatch: biBatch,
 				owner: sc, scratch: workerSc, anchorOut: sc.anchoredAnchorOut,
 				biOut: sc.anchoredBiOut, result: sc.anchoredAsyncRes,
-			}
+			})
 			asyncAnchored = true
 			defer func() {
 				if !asyncAnchoredConsumed {

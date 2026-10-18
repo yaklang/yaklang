@@ -361,7 +361,7 @@ func loadCompilationImageForPatterns(data []byte, h compilationImageHeader, expe
 func loadUncompressedImage(data []byte, h compilationImageHeader, encoded []byte, expected []Pattern) (Database, error) {
 	var err error
 	r := &imageReader{b: data[:len(data)-4], off: imageHeaderSize, packed: h.packed}
-	d := &mvsDB{n: h.n, imageFlags: h.flags, minLiteralLen: h.minLiteralLen, patternHash: h.hash, reportLoc: h.flags&imageReportLocation != 0,
+	d := &mvsDB{inlineSmallWorkers: true, n: h.n, imageFlags: h.flags, minLiteralLen: h.minLiteralLen, patternHash: h.hash, reportLoc: h.flags&imageReportLocation != 0,
 		legacyFold: h.version < 3, legacyInvalidUTF: h.version < 5,
 		all: make([]*compiledPattern, h.n), nfas: make([]*mvsNFA, h.n), revNFAs: make([]*mvsNFA, h.n),
 		gate: make([]bool, h.n), re2Loc: make([]bool, h.n), windowable: make([]bool, h.n), batchable: make([]bool, h.n),
