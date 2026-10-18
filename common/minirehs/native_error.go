@@ -18,6 +18,9 @@ func (e *nativeExecutionError) Error() string {
 }
 
 func (d *mvsDB) nativeScanError(err error) error {
+	if err == nil {
+		return nil
+	}
 	var failure *nativeExecutionError
 	if !errors.As(err, &failure) {
 		return err
