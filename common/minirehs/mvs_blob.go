@@ -254,28 +254,20 @@ func buildMVSBlob(nfas []*mvsNFA, merged *mvsMergedNFA, assertNecFactors []necFa
 		units = append(units, unitFromMerged(merged))
 	}
 
-	// 先编码各 unit 得长度, 再算偏移.
-	unitBytes := make([][]byte, len(units))
+	// Measure first, then write each unit straight into the final owned buffer.
+	// No intermediate encoded unit copies or extension-driven buffer growth.
+	unitSizes := make([]int, len(units))
+	dataStart := addMVSEncodedSize(addMVSEncodedSize(20, npat, 4), len(units), 8)
+	total := dataStart
 	for i := range units {
-		unitBytes[i] = encodeUnit(units[i])
+		unitSizes[i] = encodedUnitSize(units[i])
+		total = addMVSEncodedSize(total, unitSizes[i], 1)
+	}
+	if uint64(total) > uint64(^uint32(0)) {
+		panic("minirehs: native blob size overflows uint32")
 	}
 
-	headFixed := 20
-	slotBytes := npat * 4
-	offBytes := len(units) * 4
-	lenBytes := len(units) * 4
-	dataStart := headFixed + slotBytes + offBytes + lenBytes
-
-	offsets := make([]uint32, len(units))
-	lengths := make([]uint32, len(units))
-	cur := dataStart
-	for i := range units {
-		offsets[i] = uint32(cur)
-		lengths[i] = uint32(len(unitBytes[i]))
-		cur += len(unitBytes[i])
-	}
-
-	b := make([]byte, 0, cur)
+	b := make([]byte, 0, total)
 	b = append(b, mvsBlobMagic[:]...)
 	b = putU32(b, mvsBlobVersion)
 	b = putU32(b, uint32(npat))
@@ -284,20 +276,66 @@ func buildMVSBlob(nfas []*mvsNFA, merged *mvsMergedNFA, assertNecFactors []necFa
 	for _, s := range slotUnit {
 		b = putI32(b, s)
 	}
-	for _, o := range offsets {
-		b = putU32(b, o)
+	cur := dataStart
+	for _, size := range unitSizes {
+		b = putU32(b, uint32(cur))
+		cur += size
 	}
-	for _, l := range lengths {
-		b = putU32(b, l)
+	for _, size := range unitSizes {
+		b = putU32(b, uint32(size))
 	}
-	for i := range unitBytes {
-		b = append(b, unitBytes[i]...)
+	for i := range units {
+		b = appendMVSUnit(b, units[i])
 	}
 	return b
 }
 
+// addMVSEncodedSize checks arithmetic before allocation. The native interface
+// uses u32 offsets; these are representation limits, never silent truncation.
+func addMVSEncodedSize(size, count, stride int) int {
+	if size < 0 || count < 0 || stride <= 0 || count > (int(^uint(0)>>1)-size)/stride {
+		panic("minirehs: native unit size overflows int")
+	}
+	return size + count*stride
+}
+
+func encodedUnitSize(u mvsUnit) int {
+	n := 16
+	for _, row := range [][]uint64{u.firstUnanchored, u.firstAnchored, u.lastAny, u.lastEnd, u.follow, u.reach} {
+		n = addMVSEncodedSize(n, len(row), 8)
+	}
+	for _, row := range [][]int32{u.cuts, u.asciiSym, u.posPat} {
+		n = addMVSEncodedSize(n, len(row), 4)
+	}
+	if u.hasLimEx {
+		for _, row := range [][]uint64{u.chainTarget, u.excMask, u.excFollow} {
+			n = addMVSEncodedSize(n, len(row), 8)
+		}
+	}
+	if u.hasAssert {
+		n = addMVSEncodedSize(n, 52, 1) // Three u64, three counts and four i32.
+		for _, row := range [][]uint64{u.excFollow1Flat, u.condFirstBits, u.condFollowBits, u.condAcceptBits} {
+			n = addMVSEncodedSize(n, len(row), 8)
+		}
+		n = addMVSEncodedSize(n, len(u.condFollowPos), 4)
+		for _, row := range [][]byte{u.condFirstGuard, u.condFollowGuard, u.condAcceptGuard} {
+			n = addMVSEncodedSize(n, len(row), 1)
+		}
+	}
+	if u.hasDFA {
+		n = addMVSEncodedSize(n, 1, 4)
+		n = addMVSEncodedSize(n, len(u.dfaNext), 4)
+		n = addMVSEncodedSize(n, len(u.dfaAccept), 1)
+	}
+	return n
+}
+
 // encodeUnit 按 native/mvscan/mvscan.c parse_unit 约定的布局编码一个 unit.
 func encodeUnit(u mvsUnit) []byte {
+	return appendMVSUnit(make([]byte, 0, encodedUnitSize(u)), u)
+}
+
+func appendMVSUnit(b []byte, u mvsUnit) []byte {
 	flags := uint32(0)
 	if u.hasAnchored {
 		flags |= 1
@@ -311,7 +349,6 @@ func encodeUnit(u mvsUnit) []byte {
 	if u.hasLimEx {
 		flags |= 8 // bit3 = hasLimEx (v3)
 	}
-	b := make([]byte, 0, 16+(len(u.follow)+len(u.reach)+u.nword*4)*8+(len(u.cuts)+128+u.npos)*4)
 	b = putU32(b, uint32(u.npos))
 	b = putU32(b, uint32(u.nword))
 	b = putU32(b, uint32(u.nsym))

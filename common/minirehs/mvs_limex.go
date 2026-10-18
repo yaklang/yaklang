@@ -51,16 +51,32 @@ func buildLimEx(m *mvsMergedNFA) *mvsLimEx {
 		if hasChain {
 			bsSet(le.chainTarget, p+1)
 		}
-		exc := make([]uint64, nword)
-		copy(exc, f)
-		if hasChain {
-			bsClear(exc, p+1)
+		for w, value := range f {
+			if hasChain && w == (p+1)>>6 {
+				value &^= uint64(1) << uint((p+1)&63)
+			}
+			if value != 0 {
+				bsSet(le.excMask, p)
+				le.excCount++
+				break
+			}
 		}
-		if !bsIsZero(exc) {
-			le.excFollow[p] = exc
-			bsSet(le.excMask, p)
-			le.excCount++
+	}
+	// As in per-pattern initScalar, only retained exception rows need storage.
+	// Exact-cap views keep an append on one row from overwriting its neighbor.
+	backing := make([]uint64, le.excCount*nword)
+	off := 0
+	for p, f := range m.follow {
+		if !bsTest(le.excMask, p) {
+			continue
 		}
+		row := backing[off : off+nword : off+nword]
+		off += nword
+		copy(row, f)
+		if p+1 < m.npos {
+			bsClear(row, p+1)
+		}
+		le.excFollow[p] = row
 	}
 	return le
 }
