@@ -186,7 +186,7 @@ func mergedFromImageUnit(u mvsUnit) *mvsMergedNFA {
 
 func decodeImageBlob(blob []byte, d *mvsDB) error {
 	r := &imageReader{b: blob}
-	if !bytes.Equal(r.take(4), mvsBlobMagic[:]) || r.u32() != mvsBlobVersion || r.u32() != uint32(d.n) {
+	if !bytes.Equal(r.take(4), mvsBlobMagic[:]) || !validMVSBlobVersion(r.u32()) || r.u32() != uint32(d.n) {
 		return ErrCorruptImage
 	}
 	merged := r.i32()

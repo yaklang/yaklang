@@ -31,6 +31,12 @@ static int mvs_assert_tables_1(const mvscan_db *db, int32_t idx,
     out[3] = a->condAcceptEval[truth];
     return 0;
 }
+
+static int mvs_dfa_plan_kind(const mvscan_db *db, int32_t idx) {
+    if (!db || idx < 0 || idx >= db->npat) return -1;
+    int32_t unit = db->slotUnit[idx];
+    return unit < 0 || unit >= db->nUnits ? -1 : db->units[unit].hasDFA;
+}
 */
 import "C"
 
@@ -125,6 +131,12 @@ func (k *mvsKernel) assertTables1(idx, truth, pos int) ([4]uint64, bool) {
 		(*C.uint64_t)(unsafe.Pointer(&out[0])))
 	runtime.KeepAlive(k)
 	return out, status == 0
+}
+
+func (k *mvsKernel) dfaPlanKind(idx int) int {
+	kind := C.mvs_dfa_plan_kind(k.db, C.int32_t(idx))
+	runtime.KeepAlive(k)
+	return int(kind)
 }
 
 // nfaExists 判定 pattern 下标 idx 的 NFA 是否在 data 中存在命中 (C 实现, == Go existsIn).

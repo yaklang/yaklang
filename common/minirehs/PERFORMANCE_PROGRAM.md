@@ -160,4 +160,19 @@ P=1/16/63/64/65/128、bit63 条件边、全部 64 种 truth code、非法字段�
 64 组实际/独立参考及有序 Compile/Load 完整结果对无差异，普通全包、trafficguard、专项 race、
 amalgamation 与 vet 通过。镜像 v5/blob v3 不变，合法旧镜像仍可原样加载/导出；无新依赖或 CI 改动。
 
+## T10 第一阶段：DFA 初态与持久计划正确性
+
+已在实际 Go producer 和 native Compile/Load 中复现 `[ab][cd]` 错配单字符 `c`、
+`[ab]{2}` 错配单字符 `b`；默认 merged Scan 的 NFA 是独立的正确消费路径。
+新 DFA 以空的已消费位置集开始，每步先注入 first 再消费；builder 明确拒绝断言、首/尾文本锚和多 word。
+
+native blob4 标识修正后的 DFA 初态；blob3 的 DFA 通过已有字段标为旧表，单条/scalar/many/DFA-batch
+都安全回退原 NFA，不新增结构体字段或重解析旧规则。image6 更新磁盘缓存身份，旧 image1–5 仍可
+加载并逐字节导出，旧 cache 只刷新一次。MVP1 必须恢复 blob3，MVP2 恢复 blob4，外部/内部版本一致性均验证。
+embedded 例子重新生成后为 884 B；这项正确性修复不计为性能优化。
+
+普通 Windows 全包/trafficguard、专项 race5、native/amalgamation 与 vet 均通过。
+已保存旧 image5/blob3 的实际 producer 反例，普通测试强制全部相关消费者、非法 UTF、空输入、
+63/64 位边界、dense/packed 再序列化、旧 cache 刷新与无编译 Load。消费者清单与省表收益仍在单独评估。
+
 上一轮性能结论及边界见 [RUNTIME_PERFORMANCE.md](RUNTIME_PERFORMANCE.md)。

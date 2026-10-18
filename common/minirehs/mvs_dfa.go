@@ -18,17 +18,18 @@ import (
 const DFA_MAX_NPOS = 64
 
 type mvsDFA struct {
-	nstates int      // DFA 状态数
-	nsym    int      // 符号数 (字母表大小, 通常 256 for byte-level)
-	accept  []byte   // [nstates] 接受状态标记 (0/1)
-	next    []int32  // [nstates * nsym] 转移表: next[state*nsym + sym] = 下一状态 (-1 = 死状态)
-	isByte  bool     // true=按字节转移 (nsym=256)
+	nstates int     // DFA 状态数
+	nsym    int     // 符号数 (字母表大小, 通常 256 for byte-level)
+	accept  []byte  // [nstates] 接受状态标记 (0/1)
+	next    []int32 // [nstates * nsym] 转移表: next[state*nsym + sym] = 下一状态 (-1 = 死状态)
+	isByte  bool    // true=按字节转移 (nsym=256)
 }
 
 // buildDFAFromNFA 用子集构造法把 NFA 转为 DFA. 仅对 npos <= DFA_MAX_NPOS 的 NFA 调用.
 // 返回 nil 表示转换失败 (状态爆炸).
 func buildDFAFromNFA(nfa *mvsNFA) *mvsDFA {
-	if nfa.npos > DFA_MAX_NPOS || nfa.npos == 0 {
+	if nfa.npos > DFA_MAX_NPOS || nfa.npos == 0 || nfa.nword != 1 ||
+		nfa.hasAssert || nfa.anchoredStart || nfa.requireEnd {
 		return nil
 	}
 
@@ -38,9 +39,10 @@ func buildDFAFromNFA(nfa *mvsNFA) *mvsDFA {
 		bits []uint64
 	}
 
-	// 初始状态: first 位置集
+	// Each state contains positions consumed by the preceding input, not the
+	// positions eligible to consume the next symbol. Initially none were consumed;
+	// computeSuccessorSet injects first before consuming every unanchored symbol.
 	initSet := make([]uint64, nword)
-	copy(initSet, nfa.first)
 
 	// DFA 状态表: 位集 -> 状态 ID
 	stateMap := map[string]int{}

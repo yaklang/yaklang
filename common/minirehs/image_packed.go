@@ -16,7 +16,8 @@ func packImageBlob(raw []byte, npat int) ([]byte, error) {
 		return nil, ErrUnsupportedImage
 	}
 	r := &imageReader{b: raw}
-	if !bytes.Equal(r.take(4), mvsBlobMagic[:]) || r.u32() != mvsBlobVersion || r.u32() != uint32(npat) {
+	magic, version := r.take(4), r.u32()
+	if !bytes.Equal(magic, mvsBlobMagic[:]) || !validMVSBlobVersion(version) || r.u32() != uint32(npat) {
 		return nil, ErrCorruptImage
 	}
 	merged, nu := int(r.i32()), int(r.u32())
@@ -40,6 +41,9 @@ func packImageBlob(raw []byte, npat int) ([]byte, error) {
 		return nil, ErrCorruptImage
 	}
 	b := append([]byte("MVP1"), make([]byte, 4)...)
+	if version == 4 {
+		b[3] = '2' // Preserve canonical DFA semantics through packing.
+	}
 	binary.LittleEndian.PutUint32(b[4:], uint32(len(raw)))
 	b = append(b, byte(boolInt(merged >= 0)))
 	b = append(b, make([]byte, 8)...)
@@ -177,7 +181,11 @@ func packedUnitDimensions(np, nw, ns int, flags uint32) bool {
 
 func unpackImageBlob(packed []byte, npat int) ([]byte, error) {
 	r := &imageReader{b: packed}
-	if !bytes.Equal(r.take(4), []byte("MVP1")) {
+	magic := r.take(4)
+	version := uint32(3)
+	if bytes.Equal(magic, []byte("MVP2")) {
+		version = 4
+	} else if !bytes.Equal(magic, []byte("MVP1")) {
 		return nil, ErrCorruptImage
 	}
 	size := uint64(r.u32())
@@ -205,7 +213,7 @@ func unpackImageBlob(packed []byte, npat int) ([]byte, error) {
 	}
 	b := make([]byte, head, int(capacity))
 	copy(b, mvsBlobMagic[:])
-	binary.LittleEndian.PutUint32(b[4:], mvsBlobVersion)
+	binary.LittleEndian.PutUint32(b[4:], version)
 	binary.LittleEndian.PutUint32(b[8:], uint32(npat))
 	mu := int32(-1)
 	if merged != 0 {
