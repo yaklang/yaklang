@@ -35,6 +35,9 @@ func computeLitBiCover(expr string, lits []string) map[string]litBiCover {
 		return out
 	}
 	re = re.Simplify()
+	if hasNonASCIIFold(re) {
+		return out
+	}
 	set := make(map[string]struct{}, len(lits))
 	for _, l := range lits {
 		set[l] = struct{}{}

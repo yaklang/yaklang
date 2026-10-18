@@ -429,6 +429,10 @@ func extractNecFactor(expr string, anchoredStart, requireEnd bool) necFactor {
 		return nf
 	}
 	s := parsed.Simplify()
+	// ASCII byte classes cannot constrain Unicode folds.
+	if hasNonASCIIFold(s) {
+		return nf
+	}
 
 	// 1. 首字节约束 (anchoredStart): first 子树接受的字节类必须包含 data[0]
 	if anchoredStart {

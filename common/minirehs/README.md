@@ -16,7 +16,7 @@ Go 调用方可以用 `Database.MarshalImage` / `LoadImage` 保存并恢复 MVS 
 启动时跳过正则分析与自动机构建。接口、格式、跨平台限制和实测数据见
 [编译镜像与性能评估](COMPILE_IMAGES.md)。
 镜像使用共享表、稀疏位集及 zstd；4941 条 GetRequest 规则的 v1 文件约 1.37 MB，
-增强 Unicode 预过滤后的 v2 约 1.45 MB。执行瓶颈、各场景收益与空间取舍见
+增强 Unicode 预过滤和折叠安全性的 v3 约 1.45 MB。执行瓶颈、各场景收益与空间取舍见
 [运行性能分析](RUNTIME_PERFORMANCE.md)。
 
 本模块对外以 `rehs` 库注册进 yaklang, 一行编译、一次扫描即可批量判定哪些正则命中:

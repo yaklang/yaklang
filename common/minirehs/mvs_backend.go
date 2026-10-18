@@ -1,6 +1,7 @@
 package minirehs
 
 import (
+	"bytes"
 	"regexp/syntax"
 	"runtime"
 	"strings"
@@ -475,6 +476,7 @@ type mvsDB struct {
 	imageFlags    uint32
 	minLiteralLen int
 	patternHash   uint64
+	legacyFold    bool               // Older image plans used ASCII triggers for Unicode k/s folds.
 	all           []*compiledPattern // 按 idx 索引
 	n             int
 	nfas          []*mvsNFA   // 按 idx; nil 表示该 pattern 走 verifier 兜底
@@ -605,6 +607,25 @@ func (d *mvsDB) close() error {
 func (d *mvsDB) scan(data []byte, sc *scratch, handler MatchHandler) (bool, error) {
 	d.resetScratch(sc)
 	defer sc.clearVerifierText()
+	if d.legacyFold && (bytes.Contains(data, []byte("ſ")) || bytes.Contains(data, []byte("K"))) {
+		// Old images remain parse-free to load. Their literal plans cannot
+		// safely gate these two non-ASCII equivalents of ASCII letters.
+		for _, cp := range d.all {
+			locs := findAllInRecord(cp.v, data, 0, len(data), sc)
+			if !d.reportLoc {
+				if len(locs) > 0 && !handler(Match{ID: cp.id, From: -1, To: -1}) {
+					return true, nil
+				}
+				continue
+			}
+			for _, loc := range locs {
+				if !handler(Match{ID: cp.id, From: loc[0], To: loc[1]}) {
+					return true, nil
+				}
+			}
+		}
+		return false, nil
+	}
 	asyncAlways := false
 	asyncConsumed := false
 	if runtime.GOMAXPROCS(0) > 1 && len(data) >= 512 && d.kernel != nil && d.merged != nil &&
