@@ -301,7 +301,17 @@ func (s *Scanner) NumAlwaysOn() int {
 func (s *Scanner) Ready() bool { return s != nil && s.exist != nil && s.initErr == nil }
 
 func (s *Scanner) candidateRules(data []byte) []int {
-	matchedCandidates := s.exist.MatchedIndexes(data)
+	matchedCandidates, err := s.exist.MatchedIndexesErr(data)
+	if err != nil {
+		// Candidate filtering is optional. Confirm every rule if it fails;
+		// neither a partial candidate prefix nor NoMatch is authoritative.
+		log.Errorf("trafficguard: candidate scan failed, confirming all rules: %v", err)
+		all := make([]int, len(s.rules))
+		for i := range all {
+			all[i] = i
+		}
+		return all
+	}
 	discordCandidate := s.discordRuleIndex >= 0 && hasDiscordTokenCandidate(data)
 	if len(matchedCandidates) == 0 && !discordCandidate {
 		return nil

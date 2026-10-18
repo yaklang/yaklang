@@ -2,9 +2,53 @@ package trafficguard
 
 import (
 	"math/rand"
+	"reflect"
+	"sort"
 	"strings"
 	"testing"
 )
+
+func TestCandidateFailureConfirmsEveryRule(t *testing.T) {
+	s, err := NewScanner()
+	if err != nil {
+		t.Fatal(err)
+	}
+	data := []byte("akid=AKIAIOSFODNN7EXAMPLE token=ghp_" + strings.Repeat("a", 36))
+	want := s.ScanRequest(data)
+	if len(want) < 2 {
+		t.Fatal("fixture did not reach the authoritative extractors")
+	}
+	// A real Group execution failure, without changing the extractors.
+	if err := s.exist.Close(); err != nil {
+		t.Fatal(err)
+	}
+	candidates := s.candidateRules(data)
+	if len(candidates) != s.Len() {
+		t.Fatalf("failed filter omitted rules: %v", candidates)
+	}
+	for i, idx := range candidates {
+		if i != idx {
+			t.Fatalf("missing rule %d: %v", i, candidates)
+		}
+	}
+	got := s.ScanRequest(data)
+	canonical := func(findings []Finding) {
+		sort.Slice(findings, func(i, j int) bool {
+			if findings[i].RuleID != findings[j].RuleID {
+				return findings[i].RuleID < findings[j].RuleID
+			}
+			if findings[i].From != findings[j].From {
+				return findings[i].From < findings[j].From
+			}
+			return findings[i].To < findings[j].To
+		})
+	}
+	canonical(want)
+	canonical(got)
+	if !reflect.DeepEqual(want, got) {
+		t.Fatalf("fallback changed complete findings: want=%+v got=%+v", want, got)
+	}
+}
 
 func TestNewScannerCompilesAllRules(t *testing.T) {
 	s, err := NewScanner()
