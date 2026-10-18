@@ -19,7 +19,8 @@ func (s *scratch) startWorkers() {
 		go func() {
 			defer s.workerWG.Done()
 			for task := range s.mergedTasks {
-				task.result <- task.kernel.mergedScan(task.data, task.scratch)
+				hits, err := task.kernel.mergedScanErr(task.data, task.scratch)
+				task.result <- nativeMergedResult{hits: hits, err: err}
 			}
 		}()
 		go func() {
@@ -53,9 +54,8 @@ func (s *scratch) startWorkers() {
 		go func() {
 			defer s.workerWG.Done()
 			for task := range s.anchoredTasks {
-				task.db.scanAnchoredNoReport(task.data, task.anchorBatch, task.biBatch,
+				task.result <- task.db.scanAnchoredNoReport(task.data, task.anchorBatch, task.biBatch,
 					task.owner, task.scratch, task.anchorOut, task.biOut)
-				task.result <- anchoredResult{anchor: task.anchorOut, bi: task.biOut}
 			}
 		}()
 	})
@@ -628,7 +628,8 @@ func (d *mvsDB) close() error {
 	return nil
 }
 
-func (d *mvsDB) scan(data []byte, sc *scratch, handler MatchHandler) (bool, error) {
+func (d *mvsDB) scan(data []byte, sc *scratch, handler MatchHandler) (stopped bool, scanErr error) {
+	defer func() { scanErr = d.nativeScanError(scanErr) }()
 	d.resetScratch(sc)
 	defer sc.clearVerifierText()
 	if d.legacyInvalidUTF && !utf8.Valid(data) {
@@ -663,7 +664,7 @@ func (d *mvsDB) scan(data []byte, sc *scratch, handler MatchHandler) (bool, erro
 		if sc.alwaysMergedScratch == nil {
 			sc.alwaysMergedScratch = &scratch{}
 			sc.alwaysAssertScratch = &scratch{}
-			sc.alwaysMergedRes = make(chan []int, 1)
+			sc.alwaysMergedRes = make(chan nativeMergedResult, 1)
 			sc.alwaysAssertRes = make(chan []byte, 1)
 		}
 		sc.startWorkers()
@@ -889,7 +890,11 @@ func (d *mvsDB) scan(data []byte, sc *scratch, handler MatchHandler) (bool, erro
 			idx := int(idx32)
 			sc.fullDone[idx] = true
 			lo, hi := int(sc.winLo[idx]), int(sc.winHi[idx])
-			if d.kernel.nfaExists(idx, data[lo:hi]) {
+			hit, nativeErr := d.kernel.nfaExistsErr(idx, data[lo:hi])
+			if nativeErr != nil {
+				return false, nativeErr
+			}
+			if hit {
 				// litSpan 的 union 已覆盖任一包含本 pattern 必需字面量的完整匹配；
 				// 因此定位无需退回整段 data 重扫。对需 verifier 的规则由 helper 安全回退。
 				if stop, verifyErr := d.finalizeHitWindow(idx, data, lo, hi, sc, handler); stop || verifyErr != nil {
@@ -902,6 +907,9 @@ func (d *mvsDB) scan(data []byte, sc *scratch, handler MatchHandler) (bool, erro
 			res := <-sc.anchoredAsyncRes
 			asyncAnchoredConsumed = true
 			for i, idx32 := range anchorBatch {
+				if res.err != nil && res.completed == i+1 {
+					return false, res.err
+				}
 				idx := int(idx32)
 				sc.fullDone[idx] = true
 				if res.anchor[i] != 0 {
@@ -912,6 +920,9 @@ func (d *mvsDB) scan(data []byte, sc *scratch, handler MatchHandler) (bool, erro
 
 			}
 			for i, idx32 := range biBatch {
+				if res.err != nil && res.completed == len(anchorBatch)+i+1 {
+					return false, res.err
+				}
 				idx := int(idx32)
 				sc.fullDone[idx] = true
 				if res.bi[i] != 0 {
@@ -956,6 +967,9 @@ func (d *mvsDB) scan(data []byte, sc *scratch, handler MatchHandler) (bool, erro
 						sc.anchorSpansLo, sc.anchorSpansHi, sc)
 					for i, hit := range out {
 						idx := int(sc.anchorCIdx[i])
+						if int8(hit) < 0 {
+							return false, &nativeExecutionError{stage: "anchored_many", index: idx, code: int(int8(hit))}
+						}
 						sc.fullDone[idx] = true
 						if hit != 0 {
 							if verifyStop, verifyErr := d.finalizeHit(idx, data, sc, handler); verifyStop || verifyErr != nil {
@@ -1018,7 +1032,11 @@ func (d *mvsDB) scan(data []byte, sc *scratch, handler MatchHandler) (bool, erro
 				case d.kernel != nil:
 					// C anchored 与 Go 执行器有随机、定向及真实流量逐条等价护栏；直接采用
 					// 权威结果，避免 C 命中后再做一遍完全相同的 Go 位递推。
-					hit = d.kernel.nfaExistsAnchored(idx, data, spans)
+					var nativeErr error
+					hit, nativeErr = d.kernel.nfaExistsAnchoredErr(idx, data, spans)
+					if nativeErr != nil {
+						return false, nativeErr
+					}
 				case nfa.single:
 					hit = nfa.existsInAnchored1(data, spans)
 				case nfa.nword == 2:
@@ -1042,7 +1060,11 @@ func (d *mvsDB) scan(data []byte, sc *scratch, handler MatchHandler) (bool, erro
 				if fwdSpans := mergeAnchorSpans(sc.biFwdRanges[idx]); len(fwdSpans) > 0 {
 					fwd := d.nfas[idx]
 					if d.kernel != nil {
-						hit = d.kernel.nfaExistsAnchored(idx, data, fwdSpans)
+						var nativeErr error
+						hit, nativeErr = d.kernel.nfaExistsAnchoredErr(idx, data, fwdSpans)
+						if nativeErr != nil {
+							return false, nativeErr
+						}
 					} else if fwd.single {
 						hit = fwd.existsInAnchored1(data, fwdSpans)
 					} else if fwd.nword == 2 {
@@ -1098,19 +1120,32 @@ func (d *mvsDB) scan(data []byte, sc *scratch, handler MatchHandler) (bool, erro
 		if len(assertCIdxs) > 0 {
 			keepBound := len(assertGoIdxs) > 0
 			var mHits, aHits []int
+			var assertErr error
 			if asyncAlways {
-				mHits = <-sc.alwaysMergedRes
+				mergedResult := <-sc.alwaysMergedRes
 				assertBits := <-sc.alwaysAssertRes
 				asyncConsumed = true
+				if mergedResult.err != nil {
+					return false, mergedResult.err
+				}
+				mHits = mergedResult.hits
 				sc.assertHits = sc.assertHits[:0]
 				for i, hit := range assertBits {
+					if int8(hit) < 0 {
+						assertErr = &nativeExecutionError{stage: "assert_many", index: int(assertCIdxs[i]), code: int(int8(hit))}
+						break
+					}
 					if hit != 0 {
 						sc.assertHits = append(sc.assertHits, int(assertCIdxs[i]))
 					}
 				}
 				aHits = sc.assertHits
 			} else {
-				mHits, aHits = d.kernel.combinedScan(data, assertCIdxs, keepBound, sc)
+				var nativeErr error
+				mHits, aHits, nativeErr = d.kernel.combinedScanErr(data, assertCIdxs, keepBound, sc)
+				if nativeErr != nil {
+					return false, nativeErr
+				}
 			}
 			sc.assertBoundReady = keepBound
 			// 处理 merged 命中
@@ -1132,6 +1167,9 @@ func (d *mvsDB) scan(data []byte, sc *scratch, handler MatchHandler) (bool, erro
 				}
 
 			}
+			if assertErr != nil {
+				return false, assertErr
+			}
 			// 标记未命中的 assert (已由 combinedScan 判定)
 			for _, idx := range assertCIdxs {
 				sc.fullDone[int(idx)] = true
@@ -1150,7 +1188,10 @@ func (d *mvsDB) scan(data []byte, sc *scratch, handler MatchHandler) (bool, erro
 		} else {
 			// 无 single-word assert, 走原路径
 			if d.merged != nil {
-				hits := d.kernel.mergedScan(data, sc)
+				hits, nativeErr := d.kernel.mergedScanErr(data, sc)
+				if nativeErr != nil {
+					return false, nativeErr
+				}
 				for _, idx := range hits {
 					if sc.fullDone[idx] {
 						continue
@@ -1177,7 +1218,11 @@ func (d *mvsDB) scan(data []byte, sc *scratch, handler MatchHandler) (bool, erro
 		// 无 assert always-on 或无 C 内核: 原路径
 		var hits []int
 		if d.kernel != nil {
-			hits = d.kernel.mergedScan(data, sc)
+			var nativeErr error
+			hits, nativeErr = d.kernel.mergedScanErr(data, sc)
+			if nativeErr != nil {
+				return false, nativeErr
+			}
 		} else {
 			if !d.mergedNecFactor.hasFactor || d.mergedNecFactor.check(data) {
 				sc.mergedSeen = resetBoolBuf(sc.mergedSeen, d.n)
@@ -1355,7 +1400,11 @@ func (d *mvsDB) finalizeHit(idx int, data []byte, sc *scratch, handler MatchHand
 	// leftmost-longest spans，避免 Go 再完整扫描一遍；C 内核不适用或异常空结果时回退
 	// 已验证的 Go 定位器，绝不因优化漏报。
 	if d.kernel != nil {
-		if locs, ok := d.kernel.findAllLoc(idx, data, sc); ok && len(locs) > 0 {
+		locs, nativeErr := d.kernel.findAllLocErr(idx, data, sc)
+		if nativeErr != nil {
+			return false, nativeErr
+		}
+		if len(locs) > 0 {
 			for i := 0; i < len(locs); i += 2 {
 				if !handler(Match{ID: cp.id, From: int(locs[i]), To: int(locs[i+1])}) {
 					return true, nil
@@ -1416,7 +1465,11 @@ func (d *mvsDB) finalizeHitWindow(idx int, data []byte, lo, hi int, sc *scratch,
 		return false, nil
 	}
 	if d.kernel != nil {
-		if locs, ok := d.kernel.findAllLoc(idx, sub, sc); ok && len(locs) > 0 {
+		locs, nativeErr := d.kernel.findAllLocErr(idx, sub, sc)
+		if nativeErr != nil {
+			return false, nativeErr
+		}
+		if len(locs) > 0 {
 			for i := 0; i < len(locs); i += 2 {
 				if !handler(Match{ID: cp.id, From: lo + int(locs[i]), To: lo + int(locs[i+1])}) {
 					return true, nil
@@ -1453,16 +1506,28 @@ func (d *mvsDB) verifyOne(idx int, data []byte, sc *scratch, handler MatchHandle
 		switch {
 		case nfa.hasAssert && nfa.single && d.kernel != nil:
 			// 断言 NFA 单字: C 内核扫描 (共享边界, 每报文一次).
-			hit = d.kernel.nfaExistsAssert(idx, data, d.sharedBound(data, sc))
+			var nativeErr error
+			hit, nativeErr = d.kernel.nfaExistsAssertErr(idx, data, d.sharedBound(data, sc))
+			if nativeErr != nil {
+				return false, nativeErr
+			}
 		case nfa.hasAssert && d.kernel != nil:
 			// 多字断言在线生成边界并递推，避免 bound 物化后二次遍历。
-			hit = d.kernel.nfaExistsAssertOnline(idx, data)
+			var nativeErr error
+			hit, nativeErr = d.kernel.nfaExistsAssertOnlineErr(idx, data)
+			if nativeErr != nil {
+				return false, nativeErr
+			}
 		case nfa.hasAssert && nfa.single:
 			hit = nfa.existsInAssertShared1(data, d.sharedBound(data, sc))
 		case nfa.hasAssert:
 			hit = nfa.existsInAssertShared(data, d.sharedBound(data, sc))
 		case d.kernel != nil:
-			hit = d.kernel.nfaExists(idx, data)
+			var nativeErr error
+			hit, nativeErr = d.kernel.nfaExistsErr(idx, data)
+			if nativeErr != nil {
+				return false, nativeErr
+			}
 		default:
 			hit = nfa.existsIn(data)
 		}
@@ -1478,8 +1543,10 @@ func (d *mvsDB) verifyOne(idx int, data []byte, sc *scratch, handler MatchHandle
 
 func (d *mvsDB) scanAnchoredNoReport(data []byte, anchorBatch, biBatch []int32,
 	owner, work *scratch, anchorOut, biOut []byte,
-) {
+) anchoredResult {
+	result := anchoredResult{anchor: anchorOut, bi: biOut}
 	for i, idx32 := range anchorBatch {
+		result.completed = i + 1
 		idx := int(idx32)
 		spans := mergeAnchorSpans(owner.anchorRanges[idx])
 		nfa := d.nfas[idx]
@@ -1490,7 +1557,12 @@ func (d *mvsDB) scanAnchoredNoReport(data []byte, anchorBatch, biBatch []int32,
 		case nfa.hasAssert:
 			hit = nfa.existsInAssertAnchored(data, d.sharedBound(data, work), spans, work.anchorPrev, work.anchorCand)
 		case d.kernel != nil:
-			hit = d.kernel.nfaExistsAnchored(idx, data, spans)
+			var nativeErr error
+			hit, nativeErr = d.kernel.nfaExistsAnchoredErr(idx, data, spans)
+			if nativeErr != nil {
+				result.err = nativeErr
+				return result
+			}
 		case nfa.single:
 			hit = nfa.existsInAnchored1(data, spans)
 		case nfa.nword == 2:
@@ -1505,12 +1577,18 @@ func (d *mvsDB) scanAnchoredNoReport(data []byte, anchorBatch, biBatch []int32,
 		}
 	}
 	for i, idx32 := range biBatch {
+		result.completed = len(anchorBatch) + i + 1
 		idx := int(idx32)
 		var hit bool
 		if fwdSpans := mergeAnchorSpans(owner.biFwdRanges[idx]); len(fwdSpans) > 0 {
 			fwd := d.nfas[idx]
 			if d.kernel != nil {
-				hit = d.kernel.nfaExistsAnchored(idx, data, fwdSpans)
+				var nativeErr error
+				hit, nativeErr = d.kernel.nfaExistsAnchoredErr(idx, data, fwdSpans)
+				if nativeErr != nil {
+					result.err = nativeErr
+					return result
+				}
 			} else if fwd.single {
 				hit = fwd.existsInAnchored1(data, fwdSpans)
 			} else if fwd.nword == 2 {
@@ -1537,6 +1615,7 @@ func (d *mvsDB) scanAnchoredNoReport(data []byte, anchorBatch, biBatch []int32,
 			biOut[i] = 0
 		}
 	}
+	return result
 }
 
 // existsNoReport 是存在性流水 worker 的纯判定入口。它复刻 verifyOne / verifyGateLocalized
@@ -1552,7 +1631,11 @@ func (d *mvsDB) existsNoReport(idx int, data []byte, winLo int, sc *scratch) (bo
 			var hit bool
 			switch {
 			case nfa.hasAssert && !nfa.single && d.kernel != nil:
-				hit = d.kernel.nfaExistsAssertOnline(idx, sub)
+				var nativeErr error
+				hit, nativeErr = d.kernel.nfaExistsAssertOnlineErr(idx, sub)
+				if nativeErr != nil {
+					return false, nativeErr
+				}
 			case nfa.hasAssert && nfa.single:
 				sc.gateBound = computeBoundaries(sub, sc.gateBound)
 				hit = nfa.existsInAssertShared1(sub, sc.gateBound)
@@ -1560,7 +1643,11 @@ func (d *mvsDB) existsNoReport(idx int, data []byte, winLo int, sc *scratch) (bo
 				sc.gateBound = computeBoundaries(sub, sc.gateBound)
 				hit = nfa.existsInAssertShared(sub, sc.gateBound)
 			case d.kernel != nil:
-				hit = d.kernel.nfaExists(idx, sub)
+				var nativeErr error
+				hit, nativeErr = d.kernel.nfaExistsErr(idx, sub)
+				if nativeErr != nil {
+					return false, nativeErr
+				}
 			default:
 				hit = nfa.existsIn(sub)
 			}
@@ -1580,15 +1667,27 @@ func (d *mvsDB) existsNoReport(idx int, data []byte, winLo int, sc *scratch) (bo
 	var hit bool
 	switch {
 	case nfa.hasAssert && !nfa.single && d.kernel != nil:
-		hit = d.kernel.nfaExistsAssertOnline(idx, data)
+		var nativeErr error
+		hit, nativeErr = d.kernel.nfaExistsAssertOnlineErr(idx, data)
+		if nativeErr != nil {
+			return false, nativeErr
+		}
 	case nfa.hasAssert && d.kernel != nil:
-		hit = d.kernel.nfaExistsAssert(idx, data, d.sharedBound(data, sc))
+		var nativeErr error
+		hit, nativeErr = d.kernel.nfaExistsAssertErr(idx, data, d.sharedBound(data, sc))
+		if nativeErr != nil {
+			return false, nativeErr
+		}
 	case nfa.hasAssert && nfa.single:
 		hit = nfa.existsInAssertShared1(data, d.sharedBound(data, sc))
 	case nfa.hasAssert:
 		hit = nfa.existsInAssertShared(data, d.sharedBound(data, sc))
 	case d.kernel != nil:
-		hit = d.kernel.nfaExists(idx, data)
+		var nativeErr error
+		hit, nativeErr = d.kernel.nfaExistsErr(idx, data)
+		if nativeErr != nil {
+			return false, nativeErr
+		}
 	default:
 		hit = nfa.existsIn(data)
 	}
@@ -1623,7 +1722,11 @@ func (d *mvsDB) verifyGateLocalized(idx int, data []byte, winLo int, sc *scratch
 		var hit bool
 		switch {
 		case nfa.hasAssert && !nfa.single && d.kernel != nil:
-			hit = d.kernel.nfaExistsAssertOnline(idx, sub)
+			var nativeErr error
+			hit, nativeErr = d.kernel.nfaExistsAssertOnlineErr(idx, sub)
+			if nativeErr != nil {
+				return false, nativeErr
+			}
 		case nfa.hasAssert && nfa.single:
 			sc.gateBound = computeBoundaries(sub, sc.gateBound)
 			hit = nfa.existsInAssertShared1(sub, sc.gateBound)
@@ -1631,7 +1734,11 @@ func (d *mvsDB) verifyGateLocalized(idx int, data []byte, winLo int, sc *scratch
 			sc.gateBound = computeBoundaries(sub, sc.gateBound)
 			hit = nfa.existsInAssertShared(sub, sc.gateBound)
 		case d.kernel != nil:
-			hit = d.kernel.nfaExists(idx, sub)
+			var nativeErr error
+			hit, nativeErr = d.kernel.nfaExistsErr(idx, sub)
+			if nativeErr != nil {
+				return false, nativeErr
+			}
 		default:
 			hit = nfa.existsIn(sub)
 		}

@@ -864,7 +864,7 @@ static int nfa_run_assert_mw(const mvs_nfa *a, const uint8_t *data, size_t len,
     } else {
         prev = (uint64_t *)calloc((size_t)nword, sizeof(uint64_t));
         cand = (uint64_t *)malloc((size_t)nword * sizeof(uint64_t));
-        if (!prev || !cand) { free(prev); free(cand); return 0; }
+        if (!prev || !cand) { free(prev); free(cand); return MVS_ERR_NOMEM; }
     }
 
     size_t i = 0;
@@ -952,7 +952,7 @@ static int nfa_run_assert_mw_online(const mvs_nfa *a, const uint8_t *data, size_
     } else {
         prev = (uint64_t *)calloc((size_t)nword, sizeof(uint64_t));
         cand = (uint64_t *)malloc((size_t)nword * sizeof(uint64_t));
-        if (!prev || !cand) { free(prev); free(cand); return 0; }
+        if (!prev || !cand) { free(prev); free(cand); return MVS_ERR_NOMEM; }
     }
     size_t i = 0;
     int32_t curRune;
@@ -1537,7 +1537,7 @@ int32_t mvscan_db_nfa_find_all(const mvscan_db *db, int32_t idx,
     int32_t *prevStart = (int32_t *)malloc((size_t)a->npos * sizeof(int32_t));
     if (!prev || !cand || !candStart || !prevStart) {
         free(prev); free(cand); free(candStart); free(prevStart);
-        return -1;
+        return MVS_ERR_NOMEM;
     }
     int32_t total = 0;
     size_t pos = 0;
@@ -1559,13 +1559,13 @@ void mvscan_db_nfa_exists_many(const mvscan_db *db,
                                uint8_t *out) {
     if (!out) return;
     for (int32_t i = 0; i < nidx; i++) {
-        uint8_t r = 0;
+        uint8_t r = (uint8_t)MVS_ERR_INVALID;
         if (db && idxs) {
             int32_t idx = idxs[i];
             if (idx >= 0 && idx < db->npat) {
                 int32_t u = db->slotUnit[idx];
                 if (u >= 0 && u < db->nUnits) {
-                    r = (uint8_t)(nfa_run(&db->units[u], data, len, 0, NULL, 0, NULL, 0, NULL) == 1);
+                    r = (uint8_t)nfa_run(&db->units[u], data, len, 0, NULL, 0, NULL, 0, NULL);
                 }
             }
         }
@@ -1577,7 +1577,8 @@ int32_t mvscan_db_merged_scan(const mvscan_db *db,
                               const uint8_t *data, size_t len,
                               uint8_t *seen, int32_t seenLen,
                               int32_t *out, int32_t cap) {
-    if (!db || db->mergedUnit < 0 || db->mergedUnit >= db->nUnits) return 0;
+    if (!db || (!data && len > 0) || !seen || seenLen < db->npat || cap < 0 || (!out && cap > 0)) return MVS_ERR_INVALID;
+    if (db->mergedUnit < 0 || db->mergedUnit >= db->nUnits) return 0;
     /* Rose-lite 必要条件预检: 数据不含任何能开始匹配的字节 => 跳过整段扫描. */
     mvs_nfa *mu = &db->units[db->mergedUnit];
     if (mu->hasStartByteMask) {
@@ -1594,7 +1595,8 @@ int32_t mvscan_db_merged_scan(const mvscan_db *db,
         if (!anyStart && !hasNonASCII) return 0;
     }
     int32_t total = 0;
-    nfa_run(mu, data, len, 1, seen, seenLen, out, cap, &total);
+    int status = nfa_run(mu, data, len, 1, seen, seenLen, out, cap, &total);
+    if (status < 0) return status;
     return total;
 }
 
@@ -1617,7 +1619,7 @@ int32_t mvscan_db_merged_scan_batch(const mvscan_db *db,
     /* seen 缓冲: 每条记录重置 (per-record dedup). 用栈缓冲 (npat 通常 < 1024). */
     uint8_t stackSeen[1024];
     uint8_t *seen = (db->npat <= 1024) ? stackSeen : (uint8_t *)malloc((size_t)db->npat);
-    if (!seen) return -1;
+    if (!seen) return MVS_ERR_NOMEM;
     int32_t stackOut[256];
     /* A record can match every member. Retain the small stack fast path but
      * allocate full member capacity when needed; caller capacity only limits
@@ -1626,12 +1628,12 @@ int32_t mvscan_db_merged_scan_batch(const mvscan_db *db,
     if (db->npat > 256) {
         if ((size_t)db->npat > SIZE_MAX / sizeof(*recordOut)) {
             if (seen != stackSeen) free(seen);
-            return -1;
+            return MVS_ERR_OVERFLOW;
         }
         recordOut = (int32_t *)malloc((size_t)db->npat * sizeof(*recordOut));
         if (!recordOut) {
             if (seen != stackSeen) free(seen);
-            return -1;
+            return MVS_ERR_NOMEM;
         }
     }
     for (int32_t r = 0; r < nrec; r++) {
@@ -1657,7 +1659,12 @@ int32_t mvscan_db_merged_scan_batch(const mvscan_db *db,
         /* 重置 seen */
         memset(seen, 0, (size_t)db->npat);
         int32_t recTotal = 0;
-        nfa_run(mu, rdata, rlen, 1, seen, db->npat, recordOut, db->npat, &recTotal);
+        int status = nfa_run(mu, rdata, rlen, 1, seen, db->npat, recordOut, db->npat, &recTotal);
+        if (status < 0) {
+            if (recordOut != stackOut) free(recordOut);
+            if (seen != stackSeen) free(seen);
+            return status;
+        }
         /* 输出 (recIdx, memberIdx) 对 */
         for (int32_t k = 0; k < recTotal; k++) {
             if (total == INT32_MAX) {
@@ -1718,24 +1725,30 @@ void mvscan_db_nfa_exists_anchored_many(const mvscan_db *db,
                                          int32_t totalSpans,
                                          uint8_t *out) {
     if (!out) return;
-    if (!db || !idxs || !patSpanOff || !spansLo || !spansHi) {
-        for (int32_t i = 0; i < npat; i++) out[i] = 0;
+    if (!db || !idxs || !patSpanOff || totalSpans < 0 ||
+        (totalSpans > 0 && (!spansLo || !spansHi)) || (!data && len > 0)) {
+        for (int32_t i = 0; i < npat; i++) out[i] = (uint8_t)MVS_ERR_INVALID;
         return;
     }
-    (void)totalSpans;
     for (int32_t i = 0; i < npat; i++) {
         int32_t idx = idxs[i];
-        uint8_t r = 0;
+        uint8_t r = (uint8_t)MVS_ERR_INVALID;
         if (idx >= 0 && idx < db->npat) {
             int32_t u = db->slotUnit[idx];
             if (u >= 0 && u < db->nUnits) {
                 int32_t off0 = patSpanOff[i];
                 int32_t off1 = patSpanOff[i + 1];
+                if (off0 < 0 || off1 < off0 || off1 > totalSpans) {
+                    out[i] = (uint8_t)MVS_ERR_INVALID;
+                    continue;
+                }
                 int32_t nspan = off1 - off0;
                 if (nspan > 0) {
                     const int32_t *lo = spansLo + off0;
                     const int32_t *hi = spansHi + off0;
-                    r = (uint8_t)(nfa_run_anchored_dispatch(&db->units[u], data, len, lo, hi, nspan, 0) == 1);
+                    r = (uint8_t)nfa_run_anchored_dispatch(&db->units[u], data, len, lo, hi, nspan, 0);
+                } else if (nspan == 0) {
+                    r = 0;
                 }
             }
         }
@@ -1747,9 +1760,11 @@ int32_t mvscan_db_merged_scan_scalar(const mvscan_db *db,
                                      const uint8_t *data, size_t len,
                                      uint8_t *seen, int32_t seenLen,
                                      int32_t *out, int32_t cap) {
-    if (!db || db->mergedUnit < 0 || db->mergedUnit >= db->nUnits) return 0;
+    if (!db || (!data && len > 0) || !seen || seenLen < db->npat || cap < 0 || (!out && cap > 0)) return MVS_ERR_INVALID;
+    if (db->mergedUnit < 0 || db->mergedUnit >= db->nUnits) return 0;
     int32_t total = 0;
-    nfa_run_dispatch(&db->units[db->mergedUnit], data, len, 1, seen, seenLen, out, cap, &total, 1);
+    int status = nfa_run_dispatch(&db->units[db->mergedUnit], data, len, 1, seen, seenLen, out, cap, &total, 1);
+    if (status < 0) return status;
     return total;
 }
 
@@ -1774,7 +1789,11 @@ int32_t mvscan_db_combined_scan(const mvscan_db *db,
                                 const int32_t *assertIdxs, int32_t nAssert,
                                 uint8_t *boundBuf,
                                 int32_t *assertOut, int32_t assertCap) {
-    if (!db || !data || len == 0) return 0;
+    if (mergedTotalOut) *mergedTotalOut = 0;
+    if (!db || (!data && len > 0) || nAssert < 0 || (nAssert > 0 && !assertIdxs) ||
+        mergedCap < 0 || assertCap < 0 || (!mergedOut && mergedCap > 0) ||
+        (!assertOut && assertCap > 0) || !mergedSeen || mergedSeenLen < db->npat) return MVS_ERR_INVALID;
+    if (len == 0) return 0;
 
     /* 获取 assert NFA 单元 */
     mvs_nfa *stackAssertNFAs[16];
@@ -1788,14 +1807,14 @@ int32_t mvscan_db_combined_scan(const mvscan_db *db,
             assertNFAs = (mvs_nfa **)malloc((size_t)nAssert * sizeof(mvs_nfa *));
             assertNFAsHeap = 1;
         }
-        if (!assertNFAs) return 0;
+        if (!assertNFAs) return MVS_ERR_NOMEM;
         for (int32_t i = 0; i < nAssert; i++) {
             int32_t idx = assertIdxs[i];
-            if (idx < 0 || idx >= db->npat) { assertNFAs[i] = NULL; continue; }
+            if (idx < 0 || idx >= db->npat) { if (assertNFAsHeap) free(assertNFAs); return MVS_ERR_INVALID; }
             int32_t u = db->slotUnit[idx];
-            if (u < 0 || u >= db->nUnits) { assertNFAs[i] = NULL; continue; }
+            if (u < 0 || u >= db->nUnits) { if (assertNFAsHeap) free(assertNFAs); return MVS_ERR_INVALID; }
             mvs_nfa *a = &db->units[u];
-            if (!a->hasAssert) { assertNFAs[i] = NULL; continue; }
+            if (!a->hasAssert || a->nword != 1) { if (assertNFAsHeap) free(assertNFAs); return MVS_ERR_INVALID; }
             assertNFAs[i] = a;
             nAssertReal++;
         }
@@ -1844,6 +1863,13 @@ int32_t mvscan_db_combined_scan(const mvscan_db *db,
     if (nAssertReal > 0) {
         if (nAssert <= 16) { aPrev = stackAPrev; aDone = stackADone; memset(aPrev, 0, (size_t)nAssert * 8); memset(aDone, 0, (size_t)nAssert); }
         else { aPrev = (uint64_t *)calloc((size_t)nAssert, sizeof(uint64_t)); aDone = (uint8_t *)calloc((size_t)nAssert, 1); }
+    }
+
+    if ((mu && (!mPrev || !mCand)) || (nAssertReal > 0 && (!aPrev || !aDone))) {
+        if (mu && mw > 8) { free(mPrev); free(mCand); }
+        if (nAssertReal > 0 && nAssert > 16) { free(aPrev); free(aDone); }
+        if (assertNFAsHeap) free(assertNFAs);
+        return MVS_ERR_NOMEM;
     }
 
     int32_t mergedTotal = 0;
@@ -2002,7 +2028,11 @@ void mvscan_db_nfa_exists_assert_online_many(const mvscan_db *db,
                                              uint8_t *out) {
     if (!out || nidx <= 0) return;
     memset(out, 0, (size_t)nidx);
-    if (!db || !data || len == 0 || !idxs) return;
+    if (!db || (!data && len > 0) || !idxs) {
+        memset(out, (uint8_t)MVS_ERR_INVALID, (size_t)nidx);
+        return;
+    }
+    if (len == 0) return;
 
     mvs_nfa *stackNFAs[16];
     uint64_t stackPrev[16];
@@ -2014,6 +2044,7 @@ void mvscan_db_nfa_exists_assert_online_many(const mvscan_db *db,
         if (!nfas || !prev) {
             free(nfas);
             free(prev);
+            memset(out, (uint8_t)MVS_ERR_NOMEM, (size_t)nidx);
             return;
         }
     }
@@ -2024,23 +2055,23 @@ void mvscan_db_nfa_exists_assert_online_many(const mvscan_db *db,
     int needBoundFallback = 0;
     for (int32_t k = 0; k < nidx; k++) {
         int32_t idx = idxs[k];
-        if (idx < 0 || idx >= db->npat) continue;
+        if (idx < 0 || idx >= db->npat) { out[k] = (uint8_t)MVS_ERR_INVALID; continue; }
         int32_t u = db->slotUnit[idx];
-        if (u < 0 || u >= db->nUnits) continue;
+        if (u < 0 || u >= db->nUnits) { out[k] = (uint8_t)MVS_ERR_INVALID; continue; }
         mvs_nfa *a = &db->units[u];
-        if (!a->hasAssert) continue;
+        if (!a->hasAssert) { out[k] = (uint8_t)MVS_ERR_INVALID; continue; }
         if (a->nword == 1 && a->hasLimEx) {
             nfas[k] = a;
             activeCount++;
         } else if (a->nword > 1) {
-            out[k] = (uint8_t)(nfa_run_assert_mw_online(a, data, len) == 1);
+            out[k] = (uint8_t)nfa_run_assert_mw_online(a, data, len);
         } else {
             needBoundFallback = 1;
         }
     }
 
     if (needBoundFallback) {
-        uint8_t *bound = (uint8_t *)malloc(len + 1);
+        uint8_t *bound = len < SIZE_MAX ? (uint8_t *)malloc(len + 1) : NULL;
         if (bound) {
             mvscan_compute_boundaries(data, len, bound);
             for (int32_t k = 0; k < nidx; k++) {
@@ -2050,9 +2081,19 @@ void mvscan_db_nfa_exists_assert_online_many(const mvscan_db *db,
                 if (u < 0 || u >= db->nUnits) continue;
                 mvs_nfa *a = &db->units[u];
                 if (a->hasAssert && a->nword == 1 && !a->hasLimEx)
-                    out[k] = (uint8_t)(nfa_run_assert_1(a, data, len, bound) == 1);
+                    out[k] = (uint8_t)nfa_run_assert_1(a, data, len, bound);
             }
             free(bound);
+        } else {
+            for (int32_t k = 0; k < nidx; k++) {
+                int32_t idx = idxs[k];
+                if (idx < 0 || idx >= db->npat) continue;
+                int32_t u = db->slotUnit[idx];
+                if (u < 0 || u >= db->nUnits) continue;
+                mvs_nfa *a = &db->units[u];
+                if (a->hasAssert && a->nword == 1 && !a->hasLimEx)
+                    out[k] = (uint8_t)MVS_ERR_NOMEM;
+            }
         }
     }
 
@@ -2132,6 +2173,7 @@ int32_t mvscan_db_dfa_scan_batch(const mvscan_db *db,
             /* 非 ASCII 回退 NFA */
             r = nfa_run_dispatch(a, data, len, 0, NULL, 0, NULL, 0, NULL, 0);
         }
+        if (r < 0) return r;
         if (r == 1) {
             if (total < cap) out[total] = idx;
             total++;
@@ -2213,7 +2255,7 @@ void mvscan_db_nfa_exists_assert_many(const mvscan_db *db,
         boundBuf[0] = MVS_COND_BEGIN_TEXT | MVS_COND_END_TEXT | MVS_COND_BEGIN_LINE | MVS_COND_END_LINE | MVS_COND_NO_WORD_BOUND;
     }
     for (int32_t i = 0; i < nidx; i++) {
-        uint8_t r = 0;
+        uint8_t r = (uint8_t)MVS_ERR_INVALID;
         if (db && idxs && boundBuf) {
             int32_t idx = idxs[i];
             if (idx >= 0 && idx < db->npat) {
@@ -2221,7 +2263,7 @@ void mvscan_db_nfa_exists_assert_many(const mvscan_db *db,
                 if (u >= 0 && u < db->nUnits) {
                     mvs_nfa *a = &db->units[u];
                     if (a->hasAssert && a->nword == 1) {
-                        r = (uint8_t)(nfa_run_assert_1(a, data, len, boundBuf) == 1);
+                        r = (uint8_t)nfa_run_assert_1(a, data, len, boundBuf);
                     }
                 }
             }

@@ -128,7 +128,7 @@ type scratch struct {
 	// scratch 与结果通道均由每个 Scratch 独占；短生命周期 worker 返回前必收拢。
 	alwaysMergedScratch *scratch
 	alwaysAssertScratch *scratch
-	alwaysMergedRes     chan []int
+	alwaysMergedRes     chan nativeMergedResult
 	alwaysAssertRes     chan []byte
 
 	// RE2-only 存在性模式下，把字面量命中循环中的 gated/assert 立即验证移出调用线程，
@@ -165,15 +165,17 @@ type gateTask struct {
 }
 
 type anchoredResult struct {
-	anchor []byte
-	bi     []byte
+	anchor    []byte
+	bi        []byte
+	completed int // anchor items followed by bi items; includes a failing item
+	err       error
 }
 
 type alwaysMergedTask struct {
 	kernel  *mvsKernel
 	data    []byte
 	scratch *scratch
-	result  chan<- []int
+	result  chan<- nativeMergedResult
 }
 
 type alwaysAssertTask struct {

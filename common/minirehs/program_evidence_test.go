@@ -31,6 +31,31 @@ func TestProgramExportCompatibilityFixtures(t *testing.T) {
 	}
 }
 
+// Export an actual frontend blob for the standalone C allocation-fault probe.
+// It contains both W>8 paths and enough single-word assertions to use heap
+// buffers in fused assertion/combined scans.
+func TestProgramExportNativeErrorFixture(t *testing.T) {
+	dir := programEvidenceDir(t)
+	patterns := []Pattern{{ID: 0, Expr: `[ab]{600}`}, {ID: 1, Expr: `\b[ab]{600}\b`}}
+	for i := 2; i < 21; i++ {
+		patterns = append(patterns, Pattern{ID: PatternID(i), Expr: `\b[a-z]{3}\b`})
+	}
+	db, err := Compile(patterns, WithBackend(BackendMVS), WithLogger(silentLogger{}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	m := digMVSDB(t, db)
+	if m.nfas[0].nword <= 8 || m.nfas[1].nword <= 8 || !m.nfas[1].hasAssert || m.merged == nil {
+		t.Fatal("fixture did not reach the required wide native paths")
+	}
+	if err := os.WriteFile(filepath.Join(dir, "native-error.blob"), m.blob, 0600); err != nil {
+		t.Fatal(err)
+	}
+	t.Logf("native error fixture: lean W=%d, assertion W=%d, merged W=%d, %d fused assertions",
+		m.nfas[0].nword, m.nfas[1].nword, m.merged.nword, len(m.assertAlwaysOnCIdxs))
+}
+
 // Program evidence is opt-in because it writes complete local rule manifests.
 // The ordinary regression suite remains independent of external data locations.
 func programEvidenceDir(t *testing.T) string {

@@ -43,3 +43,27 @@ func (k *mvsKernel) mergedScan(data []byte, sc *scratch) []int { return sc.merge
 func (k *mvsKernel) combinedScan(data []byte, assertIdxs []int32, keepBound bool, sc *scratch) ([]int, []int) {
 	return sc.mergedHits[:0], sc.assertHits[:0]
 }
+
+// These paths are unreachable without a native kernel; preserve the error
+// contract if an internal caller nevertheless attempts to dispatch to one.
+func (k *mvsKernel) nfaExistsErr(idx int, data []byte) (bool, error) {
+	return false, &nativeExecutionError{stage: "exists", index: idx, code: -1}
+}
+func (k *mvsKernel) nfaExistsAssertErr(idx int, data, bound []byte) (bool, error) {
+	return false, &nativeExecutionError{stage: "assert", index: idx, code: -1}
+}
+func (k *mvsKernel) nfaExistsAssertOnlineErr(idx int, data []byte) (bool, error) {
+	return false, &nativeExecutionError{stage: "assert_online", index: idx, code: -1}
+}
+func (k *mvsKernel) nfaExistsAnchoredErr(idx int, data []byte, spans []anchorSpan) (bool, error) {
+	return false, &nativeExecutionError{stage: "anchored", index: idx, code: -1}
+}
+func (k *mvsKernel) findAllLocErr(idx int, data []byte, sc *scratch) ([]int32, error) {
+	return nil, &nativeExecutionError{stage: "locate", index: idx, code: -1}
+}
+func (k *mvsKernel) mergedScanErr(data []byte, sc *scratch) ([]int, error) {
+	return nil, &nativeExecutionError{stage: "merged", index: -1, code: -1}
+}
+func (k *mvsKernel) combinedScanErr(data []byte, assertIdxs []int32, keepBound bool, sc *scratch) ([]int, []int, error) {
+	return nil, nil, &nativeExecutionError{stage: "combined", index: -1, code: -1}
+}
