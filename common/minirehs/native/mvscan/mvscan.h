@@ -37,6 +37,7 @@ enum {
 
 /*
  * mvscan_db_open 解析一段平台无关小端 blob (由 Go 前端 buildMVSBlob 产出) 为只读 db.
+ * 支持 v4 的 canonical DFA 初态；v3 的可选 DFA 表保留但安全回退原 NFA。
  * 解析会把 blob 内的数组按字段语义拷入对齐内存 (小数据, 拷贝成本可忽略), 因此对调用方
  * 传入 blob 的对齐 / 生命周期无要求, 且在任意字节序架构上都正确. 失败 (magic/version/
  * 截断) 返回 NULL.

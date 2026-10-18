@@ -15,9 +15,9 @@ var (
 	ErrCorruptImage      = errors.New("minirehs: corrupt compilation image")
 )
 
-// Version 5 excludes RuneError from byte triggers. The body remains compatible
-// with v1-v4; cache identities refresh plans that could miss invalid UTF input.
-const imageVersion uint32 = 5
+// Version 6 refreshes caches with canonical DFA initial states (native blob4).
+// Old images remain readable; their blob3 DFA tables safely use NFA execution.
+const imageVersion uint32 = 6
 const imageHeaderSize = 32
 
 const (
@@ -135,6 +135,10 @@ func (d *database) marshalCompilationImage(packed bool) ([]byte, error) {
 	nrev := 0
 	flags := m.imageFlags
 	blob := m.blob
+	if len(blob) < 8 || !validMVSBlobVersion(binary.LittleEndian.Uint32(blob[4:])) {
+		return nil, ErrCorruptImage
+	}
+	blobVersion := binary.LittleEndian.Uint32(blob[4:])
 	var tables *packedStringWriter
 	if packed {
 		var err error
@@ -165,7 +169,7 @@ func (d *database) marshalCompilationImage(packed bool) ([]byte, error) {
 	}
 	b := make([]byte, 0, int(size))
 	b = append(b, 'R', 'E', 'H', 'S')
-	for _, v := range []uint32{imageVersion, mvsBlobVersion, flags, uint32(m.minLiteralLen)} {
+	for _, v := range []uint32{imageVersion, blobVersion, flags, uint32(m.minLiteralLen)} {
 		b = putU32(b, v)
 	}
 	b = putU64(b, m.patternHash)
@@ -264,6 +268,7 @@ func imageEncodedSize(m *mvsDB, reverse [][]byte) uint64 {
 
 type compilationImageHeader struct {
 	version       uint32
+	blobVersion   uint32
 	flags         uint32
 	minLiteralLen int
 	hash          uint64
@@ -282,7 +287,8 @@ func readImageHeader(data []byte) (compilationImageHeader, error) {
 		return h, ErrCorruptImage
 	}
 	h.version = binary.LittleEndian.Uint32(data[4:])
-	if h.version < 1 || h.version > imageVersion || binary.LittleEndian.Uint32(data[8:]) != mvsBlobVersion {
+	h.blobVersion = binary.LittleEndian.Uint32(data[8:])
+	if h.version < 1 || h.version > imageVersion || !validMVSBlobVersion(h.blobVersion) {
 		return h, ErrIncompatibleImage
 	}
 	h.flags = binary.LittleEndian.Uint32(data[12:])
@@ -338,7 +344,7 @@ func loadCompilationImage(data []byte, h compilationImageHeader) (Database, erro
 			return nil, err
 		}
 		inner, err := readImageHeader(raw)
-		if err != nil || inner.version != h.version || inner.compressed || inner.packed != h.packed || inner.flags != h.flags || inner.minLiteralLen != h.minLiteralLen || inner.hash != h.hash || inner.n != h.n {
+		if err != nil || inner.version != h.version || inner.blobVersion != h.blobVersion || inner.compressed || inner.packed != h.packed || inner.flags != h.flags || inner.minLiteralLen != h.minLiteralLen || inner.hash != h.hash || inner.n != h.n {
 			return nil, ErrCorruptImage
 		}
 	}
@@ -427,6 +433,9 @@ func loadUncompressedImage(data []byte, h compilationImageHeader, encoded []byte
 		if err != nil {
 			return nil, err
 		}
+	}
+	if len(d.blob) < 8 || binary.LittleEndian.Uint32(d.blob[4:]) != h.blobVersion {
+		return nil, ErrCorruptImage
 	}
 	d.encodedImage = encoded
 	for i, cp := range d.all {

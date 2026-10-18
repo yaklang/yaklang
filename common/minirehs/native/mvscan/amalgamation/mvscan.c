@@ -220,7 +220,7 @@ typedef struct {
     uint8_t  startByteMask[256];
 
     /* ---- DFA 转换 (小规模 NFA 的确定性化). 当 hasDFA=1 时用 dfa_run 替代 nfa_run. ---- */
-    int      hasDFA;
+    int      hasDFA;     /* 0 absent, 1 canonical blob4, 2 legacy blob3 (NFA fallback) */
     int32_t  dfaNstates;
     int32_t *dfaNext;    /* [nstates*256] 转移表: next[state*256 + byte] (-1=死) */
     uint8_t *dfaAccept;  /* [nstates] 接受状态标记 */
@@ -982,10 +982,13 @@ void mvscan_compute_boundaries(const uint8_t *data, size_t len, uint8_t *buf) {
     buf[len] = b;
 }
 
-/* dfa_run: DFA 存在性扫描 — 每字节一次查表 (O(1)), 比 NFA 位递推快 O(npos) 倍.
+/* dfa_run: DFA 存在性扫描 — 每字节一次查表 (O(1)); 总收益按实际消费者测量.
  * 仅处理纯 ASCII 输入 (byte < 128); 非 ASCII 字节回退到 NFA.
- * 返回 1 命中 / 0 不命中 / -1 需回退 NFA (非 ASCII 数据). */
+ * 返回 1 命中 / 0 不命中 / -1 需回退 NFA (旧初态表或非 ASCII 数据). */
 static int dfa_run(const mvs_nfa *a, const uint8_t *data, size_t len) {
+    /* v3 used first as an already-consumed state, so its DFA can match a
+     * missing first character. The authoritative NFA is safe for old plans. */
+    if (a->hasDFA != 1) return -1;
     const int32_t *next = a->dfaNext;
     const uint8_t *acc = a->dfaAccept;
     /* 快速检查: 是否纯 ASCII? 若有非 ASCII 字节, 回退 NFA. */
@@ -998,10 +1001,9 @@ static int dfa_run(const mvs_nfa *a, const uint8_t *data, size_t len) {
         uint8_t b = data[i];
         state = next[state * 256 + b];
         if (state < 0) {
-            /* 死状态: 从初始重新开始 (无锚 NFA 每步注入 first).
-             * DFA 状态 0 已含 first 注入, 故直接用 next[0*256+b]. */
-            state = next[0 * 256 + b];
-            if (state < 0) state = 0;
+            /* This transition already injected first. State 0 is the empty
+             * consumed set; the same input byte must not be consumed again. */
+            state = 0;
         }
         if (acc[state]) return 1;
     }
@@ -1926,7 +1928,7 @@ mvscan_db *mvscan_db_open(const uint8_t *blob, size_t len) {
     if (!blob || len < 20) return NULL;
     if (blob[0] != 'M' || blob[1] != 'V' || blob[2] != 'S' || blob[3] != '1') return NULL;
     uint32_t version = le_u32(blob + 4);
-    if (version != 3) return NULL;
+    if (version != 3 && version != 4) return NULL;
     int32_t npat = (int32_t)le_u32(blob + 8);
     int32_t mergedUnit = (int32_t)le_u32(blob + 12);
     int32_t nUnits = (int32_t)le_u32(blob + 16);
@@ -1959,6 +1961,7 @@ mvscan_db *mvscan_db_open(const uint8_t *blob, size_t len) {
             mvscan_db_close(db);
             return NULL;
         }
+        if (version == 3 && db->units[i].hasDFA) db->units[i].hasDFA = 2;
     }
     return db;
 }

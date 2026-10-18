@@ -13,7 +13,11 @@ package minirehs
 // mvsBlobMagic / mvsBlobVersion 是 blob 头, C 侧校验. 契约一旦冻结不得随意改 (改则升 version).
 var mvsBlobMagic = [4]byte{'M', 'V', 'S', '1'}
 
-const mvsBlobVersion uint32 = 3
+// Version 4 uses an empty consumed-position set for DFA state zero. Version 3
+// tables remain loadable, but native execution uses their original NFA instead.
+const mvsBlobVersion uint32 = 4
+
+func validMVSBlobVersion(v uint32) bool { return v == 3 || v == mvsBlobVersion }
 
 func newMVSKernel(d *mvsDB) *mvsKernel {
 	if d == nil {

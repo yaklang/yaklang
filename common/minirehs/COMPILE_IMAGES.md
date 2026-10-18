@@ -121,12 +121,12 @@ zstd 数据和外部 CRC32。内部镜像有自己的头部及 CRC；其身份�
 
 | 顺序 | 内容 |
 | --- | --- |
-| 32 字节头部 | `REHS`、imageVersion=4（兼容读取 1/2/3）、mvsBlobVersion=3、flags、minLiteralLen、patternHash、nPatterns |
+| 32 字节头部 | `REHS`、imageVersion=6（兼容读取 1–5）、mvsBlobVersion=4（兼容读取 3）、flags、minLiteralLen、patternHash、nPatterns |
 | 按 pattern idx | ID、原始 Flags、verifierKind、route、specialized、winW、gateHead、winHead、winTail、最终 expr、literals |
 | 字面量索引 | 全局 literals；每个字面量的 patIdx、litHead、litBiHead、litBiTail |
 | 路由列表 | mergedCount、maxAnchorNword、assertAlwaysOn、assertAlwaysOnC/Go、otherAlwaysOn、specializedAlwaysOn |
 | 反向 unit | count；每条的 idx 和带长度的 MPU1；稠密模式为原 encodeUnit 字节 |
-| C blob | 带长度的 MVP1；稠密模式为原 MVS1 v3 blob |
+| C blob | 带长度的 MVP2；稠密模式为原 MVS1 v4 blob。旧 MVP1 恢复 v3，不能重新标记为 v4 |
 | PCRE2 确认器 | 按 idx 升序的 idx、字节码长度；当前统一为 0，表示懒编译 |
 | Go 必要条件 sidecar | 带长度的 `NEC1`，保存完整 merged 必要条件，以及非零 assert 必要条件的 idx 和内容 |
 | trailer | u32 CRC32 |
@@ -146,8 +146,8 @@ NEC1 中每个必要条件包含 i32 minRunLen、u8 runClass/firstByte/lastByte/
 
 - 表达式及字面量共用字符串表。token 0 后跟变长字节长度和新字符串；其他 token 为首次出现顺序的索引加 1。
   全局字面量索引直接引用规则中已经保存的字符串，列表元素数仍为 u32。
-- MVP1 是魔数、u32 恢复长度、u8 是否存在 merged unit、u32 位集行字典数、u32 整数数组字典数、
-  每个 pattern 是否有 unit 的位图，随后按原顺序保存 unit。
+- MVP1/MVP2 是魔数、u32 恢复长度、u8 是否存在 merged unit、u32 位集行字典数、u32 整数数组字典数、
+  每个 pattern 是否有 unit 的位图，随后按原顺序保存 unit；两个魔数分别保留 native v3/v4 的 DFA 语义。
   单独的反向 MPU1 是魔数、u32 恢复长度、两个 u32 字典数及一个 unit。偏移、长度表和 slot→unit 序号在加载时恢复。
 - unit 保存变长 npos、nsym、flags，nword 由 npos 推导；表及扩展字段顺序保持 MVS v3。
   cuts 恢复后生成 128 项 asciiSym，不存重复的映射表。DFA 状态数、guard 数量及必要条件整数也用变长编码。
@@ -161,7 +161,11 @@ NEC1 中每个必要条件包含 i32 minRunLen、u8 runClass/firstByte/lastByte/
 没有 map 遍历带来的不稳定输出。精简 blob 恢复上限为 256 MiB；超过此大小的编译结果导出时使用稠密格式。
 加载后再次导出保留原字节；调用方修改输入或导出缓冲不会改变数据库。
 解码字典只保存目标缓冲中的偏移和长度，不为每一条共享行另分配一份数组；字典本身也无需 GC 扫描指针。
-旧稠密缓存可继续命中，不在读取时自动重写；需要缩小时可移除旧缓存，让下一次编译生成新格式。
+合法旧镜像可继续读取和原样导出；LoadOrCompile 遇到旧语义版本会重建一次，再命中新缓存。
+v5 修复非法 UTF 的 RuneError 触发条件；v6/blob4 修复 DFA 把 first 当作已消费位置的初态错误。
+旧 blob3 的可选 DFA 表保留结构，但个别、批量和 DFA-batch 消费者均回退原 NFA；无需重新解析规则。
+新 DFA 的状态 0 是空的已消费位置集，每个转移在消费当前字符前注入 first。
+first/anchor/accept 语义和匹配结果依旧由原 NFA/确认器合同决定。
 
 加载首先验证外层和 unit 的完整边界、symbol/position/DFA 索引和位集 padding，之后才调用 C。
 Go 位集从 unit 解码，标量/LimEx 派生表通过现有逻辑初始化，预过滤器从字面量建立。
