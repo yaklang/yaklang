@@ -232,6 +232,7 @@ type Database interface {
 	NewScratch() (Scratch, error)
 	// Scan 对完整 data 做 block 扫描, 每命中一次调用 handler; handler 返回 false 提前终止.
 	// data 在调用返回前保持只读；每个并行或嵌套 Scan 应使用独立 Scratch。
+	// 执行失败可用 errors.As 提取 *ScanError；之前的回调不撤销，结果不可当作完整结果使用。
 	Scan(data []byte, s Scratch, handler MatchHandler) error
 	// ScanBatch 以 1-4 个独占 lane 并行扫描多条独立记录。并行路径先完成全部扫描，再按
 	// records 输入顺序串行重放 handler；返回 false 仅停止后续回调，不取消已完成的扫描工作。
@@ -401,7 +402,7 @@ func (d *database) Scan(data []byte, s Scratch, handler MatchHandler) error {
 		handler = func(Match) bool { return true }
 	}
 	_, err := d.primary.scan(data, sc, handler)
-	return err
+	return scanError(err)
 }
 
 func (d *database) ScanBatch(records [][]byte, s Scratch, handler BatchMatchHandler) error {
@@ -435,7 +436,7 @@ func (d *database) ScanBatch(records [][]byte, s Scratch, handler BatchMatchHand
 				return true
 			})
 			if err != nil || stop {
-				return err
+				return scanErrorAtRecord(err, i)
 			}
 		}
 		return nil
@@ -459,6 +460,7 @@ func (d *database) ScanBatch(records [][]byte, s Scratch, handler BatchMatchHand
 	}
 	var wg sync.WaitGroup
 	var laneErr [maxBatchLanes]error
+	var laneErrRecord [maxBatchLanes]int
 	var nextRecord int64
 	const batchChunk = int64(8)
 	wg.Add(lanes)
@@ -482,7 +484,8 @@ func (d *database) ScanBatch(records [][]byte, s Scratch, handler BatchMatchHand
 						return true
 					})
 					if err != nil {
-						laneErr[lane] = err
+						laneErr[lane] = scanErrorAtRecord(err, i)
+						laneErrRecord[lane] = i
 						root.batchResults[lane] = out
 						return
 					}
@@ -496,27 +499,34 @@ func (d *database) ScanBatch(records [][]byte, s Scratch, handler BatchMatchHand
 	var resultPos [maxBatchLanes]int
 	for {
 		minLane := -1
+		minRecord := 0
+		nextIsError := false
 		for lane := 0; lane < lanes; lane++ {
 			if resultPos[lane] >= len(root.batchResults[lane]) {
+				// A lane stops at its first error, so all its callbacks precede
+				// this error. Merge that event by record with the other lanes.
+				if laneErr[lane] != nil && (minLane < 0 || laneErrRecord[lane] < minRecord) {
+					minLane, minRecord, nextIsError = lane, laneErrRecord[lane], true
+				}
 				continue
 			}
-			if minLane < 0 ||
-				root.batchResults[lane][resultPos[lane]].record < root.batchResults[minLane][resultPos[minLane]].record {
+			record := root.batchResults[lane][resultPos[lane]].record
+			if minLane < 0 || record < minRecord {
 				minLane = lane
+				minRecord = record
+				nextIsError = false
 			}
 		}
 		if minLane < 0 {
 			break
 		}
+		if nextIsError {
+			return laneErr[minLane]
+		}
 		next := root.batchResults[minLane][resultPos[minLane]]
 		resultPos[minLane]++
 		if !handler(next.record, next.match) {
 			return nil
-		}
-	}
-	for lane := 0; lane < lanes; lane++ {
-		if laneErr[lane] != nil {
-			return laneErr[lane]
 		}
 	}
 	return nil
