@@ -16,26 +16,22 @@ import (
 	"encoding/binary"
 	"fmt"
 	"os"
+	"runtime"
 	"sort"
 	"strings"
 
+	"github.com/yaklang/yaklang/common/yak/ssa2llvm/runtime/textsectlayout"
 	"golang.org/x/arch/x86/x86asm"
 )
 
 const (
-	elf64SymSize  = 24
-	elf64RelaSize = 24
-	elf64ShdrSize = 64
-	// Go 1.26 amd64 runtime.moduledata.textsectmap. Go 1.27 inserts
-	// typedesclen, itaboffset and itabsize ahead of it. The final binary patch
-	// uses the same Go 1.26 layout as the CI toolchain.
-	moduledataTextsectMapOffset = 0x150
-	moduledataTextsectMapLenOff = moduledataTextsectMapOffset + 8
-	moduledataTextsectMapCapOff = moduledataTextsectMapOffset + 16
-	textSectionMapEntrySize     = 24
-	textSectionMapSectionName   = ".data.rel.ro.yaktextmap"
-	textSectionMapRelocName     = ".rela.data.rel.ro.yaktextmap"
-	textSectionEndName          = ".zz_yak_text_end"
+	elf64SymSize              = 24
+	elf64RelaSize             = 24
+	elf64ShdrSize             = 64
+	textSectionMapEntrySize   = 24
+	textSectionMapSectionName = ".data.rel.ro.yaktextmap"
+	textSectionMapRelocName   = ".rela.data.rel.ro.yaktextmap"
+	textSectionEndName        = ".zz_yak_text_end"
 )
 
 type sectionMeta struct {
@@ -641,12 +637,19 @@ func main() {
 	}
 	firstModuleSec := secMetaList[firstModuleSecIdx]
 	firstModuleOff := firstModuleSec.offset + firstModuleSym.value
-	if firstModuleOff+moduledataTextsectMapCapOff+8 > uint64(len(out)) {
+	textsectOff, err := textsectlayout.Check(runtime.GOROOT())
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "elfsplit: %v\n", err)
+		os.Exit(1)
+	}
+	textsectLenOff := uint64(textsectOff.Offset + 8)
+	textsectCapOff := uint64(textsectOff.Offset + 16)
+	if firstModuleOff+textsectCapOff+8 > uint64(len(out)) {
 		fmt.Fprintln(os.Stderr, "elfsplit: runtime.firstmoduledata is too small")
 		os.Exit(1)
 	}
-	binary.LittleEndian.PutUint64(out[firstModuleOff+moduledataTextsectMapLenOff:], uint64(len(textMapEntries)))
-	binary.LittleEndian.PutUint64(out[firstModuleOff+moduledataTextsectMapCapOff:], uint64(len(textMapEntries)))
+	binary.LittleEndian.PutUint64(out[firstModuleOff+textsectLenOff:], uint64(len(textMapEntries)))
+	binary.LittleEndian.PutUint64(out[firstModuleOff+textsectCapOff:], uint64(len(textMapEntries)))
 
 	// 5. Append new section names to .shstrtab
 	shstrtabSec := secMetaList[e_shstrndx]

@@ -69,6 +69,12 @@ if ! grep -q 'ssa2llvm: textsect binary search' "${GOROOT_SYMTAB}" ||
   echo "[yaklib] ERROR: ${GOROOT_SYMTAB} must have both physical and virtual textsect binary-search patches" >&2
   exit 1
 fi
+# Derive textsectmap from this GOROOT and refuse an unknown or mismatched
+# Go release. A wrong constant patches the slice header over typelinks.
+if ! ( cd "${REPO_ROOT}" && go run ./common/yak/ssa2llvm/cmd/textsectlayout -goroot "$(go env GOROOT)" ); then
+  echo "[yaklib] ERROR: refusing to build; moduledata layout check failed" >&2
+  exit 1
+fi
 
 mkdir -p "${ASSETS_DIR}"
 rm -rf "${EXTDEPS_DIR}"
