@@ -87,6 +87,9 @@ func (a *biCoverAcc) walk(re *syntax.Regexp, pre int, preB bool, suf int, sufB b
 			a.walk(re.Sub[0], pre, preB, suf, sufB)
 		}
 	case syntax.OpConcat:
+		if compileWidthFactsEnabled && len(re.Sub) >= 8 && a.walkConcatFacts(re, pre, preB, suf, sufB) {
+			return
+		}
 		k := len(re.Sub)
 		for i, sub := range re.Sub {
 			lw, lb := sumWidthRange(re.Sub, 0, i)

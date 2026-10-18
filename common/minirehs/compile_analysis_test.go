@@ -246,6 +246,7 @@ func TestProgramCompileASTEvidence(t *testing.T) {
 	compileASTReuseEnabled = reuse
 	defer func() { compileASTReuseEnabled = old; imageParseHook = nil; imageNFAHook = nil }()
 	type phase struct {
+		WidthFacts                                                                   bool
 		Set                                                                          string
 		Locate, Reuse                                                                bool
 		Parses, Attempts                                                             int
@@ -317,7 +318,7 @@ func TestProgramCompileASTEvidence(t *testing.T) {
 			if err := os.WriteFile(filepath.Join(dir, fmt.Sprintf("%s-locate-%v.rehs", set, locate)), image, 0600); err != nil {
 				t.Fatal(err)
 			}
-			phases = append(phases, phase{set, locate, reuse, parses, attempts, elapsed.Nanoseconds(), after.TotalAlloc - before.TotalAlloc, after.Mallocs - before.Mallocs, before.HeapAlloc, peak, after.HeapAlloc, post.HeapAlloc, samples, len(image)})
+			phases = append(phases, phase{compileWidthFactsEnabled, set, locate, reuse, parses, attempts, elapsed.Nanoseconds(), after.TotalAlloc - before.TotalAlloc, after.Mallocs - before.Mallocs, before.HeapAlloc, peak, after.HeapAlloc, post.HeapAlloc, samples, len(image)})
 			loaded, err := LoadImage(image)
 			if err != nil {
 				t.Fatal(err)
@@ -335,6 +336,6 @@ func TestProgramCompileASTEvidence(t *testing.T) {
 			db.Close()
 		}
 	}
-	writeProgramJSON(t, dir, "compile-ast-phases.json", map[string]interface{}{"phases": phases, "note": "Compile diagnostics with package hooks and 10ms heap sampling; not uninstrumented performance, request percentiles or Go live/RSS. Heap peak is sampled HeapAlloc incl uncollected garbage. AST reuse affects only exact NFA/window in phase1."})
+	writeProgramJSON(t, dir, "compile-ast-phases.json", map[string]interface{}{"phases": phases, "note": "Compile diagnostics with package hooks and 10ms heap sampling; not uninstrumented performance, request percentiles or Go live/RSS. Heap peak is sampled HeapAlloc incl uncollected garbage. Per-phase flags identify exact-AST reuse and local width facts."})
 	writeProgramJSON(t, dir, "compile-ast-complete-results.json", results)
 }

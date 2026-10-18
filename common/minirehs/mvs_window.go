@@ -108,6 +108,9 @@ func (a *litWindowAcc) walk(re *syntax.Regexp, pre int, preB bool, suf int, sufB
 		}
 
 	case syntax.OpConcat:
+		if compileWidthFactsEnabled && len(re.Sub) >= 8 && a.walkConcatFacts(re, pre, preB, suf, sufB) {
+			return
+		}
 		k := len(re.Sub)
 		for i, sub := range re.Sub {
 			lw, lb := sumWidthRange(re.Sub, 0, i)   // 左兄弟总宽 (0..i-1)
@@ -204,6 +207,23 @@ func (a *litHeadAcc) walk(re *syntax.Regexp, pre int, preB bool) {
 			a.walk(re.Sub[0], pre, preB)
 		}
 	case syntax.OpConcat:
+		if compileWidthFactsEnabled {
+			// Preserve the original left-to-right saturating sequence exactly,
+			// including unknown/overflow behavior; no array is needed for heads.
+			left, bounded := 0, true
+			for i, sub := range re.Sub {
+				a.walk(sub, addSat(pre, left), preB && bounded)
+				if bounded && i+1 < len(re.Sub) {
+					w, b := maxByteWidth(sub)
+					if b {
+						left = addSat(left, w)
+					} else {
+						left, bounded = 0, false
+					}
+				}
+			}
+			return
+		}
 		for i, sub := range re.Sub {
 			lw, lb := sumWidthRange(re.Sub, 0, i)
 			a.walk(sub, addSat(pre, lw), preB && lb)
