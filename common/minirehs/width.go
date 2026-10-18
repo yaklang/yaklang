@@ -2,6 +2,7 @@ package minirehs
 
 import (
 	"regexp/syntax"
+	"strings"
 	"unicode"
 	"unicode/utf8"
 )
@@ -17,15 +18,7 @@ func maxByteWidth(re *syntax.Regexp) (w int, bounded bool) {
 	switch re.Op {
 	case syntax.OpLiteral:
 		for _, r := range re.Rune {
-			n := utf8.RuneLen(r)
-			if re.Flags&syntax.FoldCase != 0 {
-				for f := unicode.SimpleFold(r); f != r; f = unicode.SimpleFold(f) {
-					if size := utf8.RuneLen(f); size > n {
-						n = size
-					}
-				}
-			}
-			w += n
+			w += maxRuneByteWidth(r, re.Flags)
 		}
 		return w, true
 
@@ -91,6 +84,61 @@ func maxByteWidth(re *syntax.Regexp) (w int, bounded bool) {
 	}
 }
 
+func maxRuneByteWidth(r rune, flags syntax.Flags) int {
+	n := utf8.RuneLen(r)
+	if flags&syntax.FoldCase != 0 {
+		for f := unicode.SimpleFold(r); f != r; f = unicode.SimpleFold(f) {
+			if size := utf8.RuneLen(f); size > n {
+				n = size
+			}
+		}
+	}
+	return n
+}
+
+// A safe trigger can be a fragment of a folded AST literal. Visit every
+// occurrence, retaining the greatest byte widths on either side. Source-byte
+// offsets index the prefix table; values include the entire Unicode fold orbit.
+func literalTriggerBounds(re *syntax.Regexp, set map[string]struct{}, record func(string, int, int)) {
+	s := asciiLowerString(string(re.Rune))
+	if len(set) == 1 {
+		if _, ok := set[s]; ok {
+			width, _ := maxByteWidth(re)
+			record(s, width, 0)
+			return
+		}
+	}
+	prefix := make([]int, len(s)+1)
+	for i, r := range s {
+		prefix[i+utf8.RuneLen(r)] = prefix[i] + maxRuneByteWidth(r, re.Flags)
+	}
+	for lit := range set {
+		if lit == "" {
+			continue
+		}
+		head, tail, found := 0, 0, false
+		for off := 0; off <= len(s)-len(lit); {
+			i := strings.Index(s[off:], lit)
+			if i < 0 {
+				break
+			}
+			i += off
+			end := i + len(lit)
+			if prefix[end] > head {
+				head = prefix[end]
+			}
+			if remaining := prefix[len(s)] - prefix[end]; remaining > tail {
+				tail = remaining
+			}
+			found = true
+			off = i + 1
+		}
+		if found {
+			record(lit, head, tail)
+		}
+	}
+}
+
 // hasPositionAnchor 报告正则是否含 ^ $ \A \z 行/文本锚点. 含锚点者不能在窗口内安全验证
 // (窗口边界会被误当作行首/行尾/文本首尾), 必须全量验证.
 func hasPositionAnchor(re *syntax.Regexp) bool {
@@ -111,7 +159,7 @@ func hasPositionAnchor(re *syntax.Regexp) bool {
 const maxWindowWidth = 512
 
 func windowVerifiable(re *syntax.Regexp) (w int, ok bool) {
-	if hasPositionAnchor(re) || hasNonASCIIFold(re) {
+	if hasPositionAnchor(re) {
 		return 0, false
 	}
 	width, bounded := maxByteWidth(re)

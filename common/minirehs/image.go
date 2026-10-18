@@ -15,9 +15,9 @@ var (
 	ErrCorruptImage      = errors.New("minirehs: corrupt compilation image")
 )
 
-// Version 3 includes Unicode-safe literal folding and localization. The body
-// remains compatible with v1/v2; cache identities refresh their old plans.
-const imageVersion uint32 = 3
+// Version 4 localizes Unicode-safe fragments using fold-aware byte bounds.
+// The body remains compatible with v1-v3; cache identities refresh old plans.
+const imageVersion uint32 = 4
 const imageHeaderSize = 32
 
 const (

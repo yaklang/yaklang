@@ -35,9 +35,6 @@ func computeLitBiCover(expr string, lits []string) map[string]litBiCover {
 		return out
 	}
 	re = re.Simplify()
-	if hasNonASCIIFold(re) {
-		return out
-	}
 	set := make(map[string]struct{}, len(lits))
 	for _, l := range lits {
 		set[l] = struct{}{}
@@ -84,10 +81,7 @@ func (a *biCoverAcc) record(lit string, litLen, pre int, preB bool, suf int, suf
 func (a *biCoverAcc) walk(re *syntax.Regexp, pre int, preB bool, suf int, sufB bool) {
 	switch re.Op {
 	case syntax.OpLiteral:
-		s := asciiLowerString(string(re.Rune))
-		if _, ok := a.set[s]; ok {
-			a.record(s, len(string(re.Rune)), pre, preB, suf, sufB)
-		}
+		literalTriggerBounds(re, a.set, func(lit string, head, tail int) { a.record(lit, head, pre, preB, addSat(suf, tail), sufB) })
 	case syntax.OpCapture:
 		if len(re.Sub) == 1 {
 			a.walk(re.Sub[0], pre, preB, suf, sufB)
