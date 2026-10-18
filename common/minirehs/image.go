@@ -15,9 +15,9 @@ var (
 	ErrCorruptImage      = errors.New("minirehs: corrupt compilation image")
 )
 
-// Version 2 changes compiled routing for Unicode PCRE2 classes. The body layout
-// remains compatible with v1, but cache identities must refresh the old plans.
-const imageVersion uint32 = 2
+// Version 3 includes Unicode-safe literal folding and localization. The body
+// remains compatible with v1/v2; cache identities refresh their old plans.
+const imageVersion uint32 = 3
 const imageHeaderSize = 32
 
 const (
@@ -352,7 +352,8 @@ func loadUncompressedImage(data []byte, h compilationImageHeader, encoded []byte
 	var err error
 	r := &imageReader{b: data[:len(data)-4], off: imageHeaderSize, packed: h.packed}
 	d := &mvsDB{n: h.n, imageFlags: h.flags, minLiteralLen: h.minLiteralLen, patternHash: h.hash, reportLoc: h.flags&imageReportLocation != 0,
-		all: make([]*compiledPattern, h.n), nfas: make([]*mvsNFA, h.n), revNFAs: make([]*mvsNFA, h.n),
+		legacyFold: h.version < 3,
+		all:        make([]*compiledPattern, h.n), nfas: make([]*mvsNFA, h.n), revNFAs: make([]*mvsNFA, h.n),
 		gate: make([]bool, h.n), re2Loc: make([]bool, h.n), windowable: make([]bool, h.n), batchable: make([]bool, h.n),
 		anchorable: make([]bool, h.n), biAnchorable: make([]bool, h.n), hasLiterals: make([]bool, h.n),
 		win: make([]litWindow, h.n), gateHead: make([]int32, h.n), assertNecFactor: make([]necFactor, h.n)}

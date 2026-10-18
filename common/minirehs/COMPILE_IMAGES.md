@@ -11,8 +11,8 @@
 默认先做结构化精简，再用 zstd 压缩：共享字符串及重复表行、稀疏位集、变长整数，
 并省去可由字符区间恢复的 ASCII 映射。无需调用方额外解压，旧版稠密镜像也能加载。
 
-当前编译器输出 v2，仍可直接加载并原样再次导出 v1。v2 改进 Unicode/PCRE 字符类的
-预过滤路由，缓存身份随版本变化，`LoadOrCompile` 会重建一次旧缓存。直接 `LoadImage(v1)`
+当前编译器输出 v3，仍可直接加载并原样再次导出 v1/v2。新版改进 Unicode/PCRE 字符类和
+大小写折叠的预过滤路由，缓存身份随版本变化，`LoadOrCompile` 会重建一次旧缓存。直接 `LoadImage(v1/v2)`
 保留原来的编译计划，不隐式编译。执行算法、恢复分配与各场景的新数据见
 [运行性能分析](RUNTIME_PERFORMANCE.md)；下文性能表保留 v1 的压缩格式基线，方便比较空间成本。
 
@@ -119,7 +119,7 @@ zstd 数据和外部 CRC32。内部镜像有自己的头部及 CRC；其身份�
 
 | 顺序 | 内容 |
 | --- | --- |
-| 32 字节头部 | `REHS`、imageVersion=2（兼容读取 1）、mvsBlobVersion=3、flags、minLiteralLen、patternHash、nPatterns |
+| 32 字节头部 | `REHS`、imageVersion=3（兼容读取 1/2）、mvsBlobVersion=3、flags、minLiteralLen、patternHash、nPatterns |
 | 按 pattern idx | ID、原始 Flags、verifierKind、route、specialized、winW、gateHead、winHead、winTail、最终 expr、literals |
 | 字面量索引 | 全局 literals；每个字面量的 patIdx、litHead、litBiHead、litBiTail |
 | 路由列表 | mergedCount、maxAnchorNword、assertAlwaysOn、assertAlwaysOnC/Go、otherAlwaysOn、specializedAlwaysOn |

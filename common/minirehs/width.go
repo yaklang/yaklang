@@ -1,6 +1,10 @@
 package minirehs
 
-import "regexp/syntax"
+import (
+	"regexp/syntax"
+	"unicode"
+	"unicode/utf8"
+)
 
 // maxByteWidth 估算一条 RE2 正则单次命中可能跨越的最大字节数, 并报告是否"有界".
 // 用于邻域验证: 有界宽度的 pattern 在字面量命中点附近的小窗口内验证即可, 无需全量扫描.
@@ -12,7 +16,18 @@ import "regexp/syntax"
 func maxByteWidth(re *syntax.Regexp) (w int, bounded bool) {
 	switch re.Op {
 	case syntax.OpLiteral:
-		return len(string(re.Rune)), true
+		for _, r := range re.Rune {
+			n := utf8.RuneLen(r)
+			if re.Flags&syntax.FoldCase != 0 {
+				for f := unicode.SimpleFold(r); f != r; f = unicode.SimpleFold(f) {
+					if size := utf8.RuneLen(f); size > n {
+						n = size
+					}
+				}
+			}
+			w += n
+		}
+		return w, true
 
 	case syntax.OpCharClass, syntax.OpAnyChar, syntax.OpAnyCharNotNL:
 		return 4, true // 单个字符 UTF-8 最长 4 字节
@@ -96,7 +111,7 @@ func hasPositionAnchor(re *syntax.Regexp) bool {
 const maxWindowWidth = 512
 
 func windowVerifiable(re *syntax.Regexp) (w int, ok bool) {
-	if hasPositionAnchor(re) {
+	if hasPositionAnchor(re) || hasNonASCIIFold(re) {
 		return 0, false
 	}
 	width, bounded := maxByteWidth(re)

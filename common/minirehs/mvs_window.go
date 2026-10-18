@@ -43,6 +43,9 @@ func computeLitWindow(expr string, lits []string) litWindow {
 		return w
 	}
 	re = re.Simplify()
+	if hasNonASCIIFold(re) {
+		return w
+	}
 	set := make(map[string]struct{}, len(lits))
 	for _, l := range lits {
 		set[l] = struct{}{}
@@ -157,6 +160,9 @@ func computeLitHeads(expr string, lits []string) map[string]int32 {
 		return out
 	}
 	re = re.Simplify()
+	if hasNonASCIIFold(re) {
+		return out
+	}
 	set := make(map[string]struct{}, len(lits))
 	for _, l := range lits {
 		set[l] = struct{}{}

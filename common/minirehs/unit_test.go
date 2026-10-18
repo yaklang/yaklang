@@ -494,9 +494,12 @@ func TestRequiredLiteralsBranches(t *testing.T) {
 	if lits := requiredLiterals(mustParse(`a*`)); lits != nil {
 		t.Errorf("star must be nil: %v", lits)
 	}
-	// FoldCase 含非 ASCII -> 放弃提取.
-	if lits := extractRequiredLiterals(mustParse(`(?i)héllo`), 2); lits != nil {
-		t.Errorf("foldcase non-ascii must yield nil: %v", lits)
+	// Unicode folding may change bytes; only the safe ASCII fragment is required.
+	if lits := extractRequiredLiterals(mustParse(`(?i)héllo`), 2); len(lits) != 1 || lits[0] != "llo" {
+		t.Errorf("foldcase must retain only the safe ASCII fragment: %v", lits)
+	}
+	if lits := extractRequiredLiterals(mustParse(`(?i)éé`), 2); lits != nil {
+		t.Errorf("entirely non-ASCII folds must yield nil: %v", lits)
 	}
 	// 字面量过短 -> 退化为 nil.
 	if lits := extractRequiredLiterals(mustParse(`ab`), 5); lits != nil {
