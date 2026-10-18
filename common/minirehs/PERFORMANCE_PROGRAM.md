@@ -21,7 +21,7 @@ Linux/amd64、macOS/arm64 原生性能和独立审查保留待补；Windows 阶�
 - 本地语料：1332 条、5,247,590 字节有效记录内容；容器文件另含每条长度字段。
 - 生产存在性/定位/早停权重、生产 SLO 尚未提供，不构造所谓平均生产收益。
 - 既有测量包含正确性与性能的组合修改，不能直接作为后续 correctness-only A1。
-- portable image v4、native blob v3；T00 没有改变格式或算法。
+- T00 起点为 portable image v4、native blob v3；身份任务没有改变格式或算法。
 
 本轮可选诊断入口按现有普通测试组织，不改变 CI：
 
@@ -38,5 +38,19 @@ CGO_ENABLED=1 MINIREHS_EVIDENCE_DIR=/local/evidence/T00 \
 T01 建立路由和阶段归因；T02 补完整元组、重复、错误与早停差分；随后以 T03–T05 建立正确性基线。
 T06–T16 的每项优化先验证反例，再进行单变量 A/B；没有收益的假设可以否定。
 T17 汇总 Windows 系统验证，其他平台和独立审查仍明确列为待补证据。
+
+## Windows 阶段检查点
+
+- T02：192 组完整结果对；comparator 可识别漏 ID、错偏移、多重复、哨兵、吞错、完成和顺序差异。
+  独立 oracle 直接使用完整 subject 的 RE2 / 现有 Yak wrapper，另验证有界 PCRE 资源错误。
+- T03：修复测试用途 native record batch 的 256 成员截断。255/256/257/300、多记录归属、非法偏移、
+  scratch 重用、实际 Go blob 的容量 0/1 和 native 分配失败已验证；普通包、amalgamation、专项 race 通过。
+  没有将该接口接入生产 Scan，没有改变 image/blob 布局。
+- T04：Engine 恢复每候选一次完整 subject 的全局非重叠选择；localized gate 从全部事件取得最小终点，
+  不要求 Teddy 事件排序。另修复 RuneError 字面量对非法 UTF 的漏报。
+  portable image 语义版本升为 v5，旧 v1–v4 原样加载/导出，非法 UTF 时保守完整确认；cache 自动重建一次。
+  nullable RE2 fallback 原有的精确 span 例外保持不变。
+
+这些是阶段证据；T04 完整回归、T05 错误贯通及后续性能实验仍按实际任务记录推进，尚未声称 M5 完成。
 
 上一轮性能结论及边界见 [RUNTIME_PERFORMANCE.md](RUNTIME_PERFORMANCE.md)。

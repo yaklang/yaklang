@@ -5,6 +5,7 @@ import (
 	"regexp/syntax"
 	"runtime"
 	"strings"
+	"unicode/utf8"
 )
 
 func (s *scratch) startWorkers() {
@@ -471,23 +472,24 @@ func compileExprToNFA(expr string) *mvsNFA {
 
 type mvsDB struct {
 	// Retain the platform-independent compilation result for image export.
-	blob          []byte
-	encodedImage  []byte // owned loaded image; immutable, for exact re-export
-	literals      []string
-	imageFlags    uint32
-	minLiteralLen int
-	patternHash   uint64
-	legacyFold    bool               // Older image plans used ASCII triggers for Unicode k/s folds.
-	all           []*compiledPattern // 按 idx 索引
-	n             int
-	nfas          []*mvsNFA   // 按 idx; nil 表示该 pattern 走 verifier 兜底
-	gate          []bool      // 按 idx; true=该 NFA 为严格超集门, 命中须 regexp2 复核滤假阳
-	re2Loc        []bool      // 按 idx; true=精确定位交 regexp2 (regexp2-origin, 保 PCRE span 语义)
-	windowable    []bool      // 按 idx; true=可在字面量命中点邻域窗口内做存在性验证 (有界宽 lean NFA)
-	batchable     []bool      // 按 idx; true=非断言且有 NFA (在 C blob 中), 可走 nfaExistsMany 批处理
-	anchorable    []bool      // 按 idx; true=可走锚定式单趟存在性 (有界头/无界尾, 命中字面量后只在邻域注入起点)
-	win           []litWindow // 按 idx; 命中字面量结尾两侧上下文界 (head/tail; -1=该侧无界不收窄)
-	nfaCount      int
+	blob             []byte
+	encodedImage     []byte // owned loaded image; immutable, for exact re-export
+	literals         []string
+	imageFlags       uint32
+	minLiteralLen    int
+	patternHash      uint64
+	legacyFold       bool               // Older image plans used ASCII triggers for Unicode k/s folds.
+	legacyInvalidUTF bool               // Older images may require UTF-8 bytes for a decoded RuneError.
+	all              []*compiledPattern // 按 idx 索引
+	n                int
+	nfas             []*mvsNFA   // 按 idx; nil 表示该 pattern 走 verifier 兜底
+	gate             []bool      // 按 idx; true=该 NFA 为严格超集门, 命中须 regexp2 复核滤假阳
+	re2Loc           []bool      // 按 idx; true=精确定位交 regexp2 (regexp2-origin, 保 PCRE span 语义)
+	windowable       []bool      // 按 idx; true=可在字面量命中点邻域窗口内做存在性验证 (有界宽 lean NFA)
+	batchable        []bool      // 按 idx; true=非断言且有 NFA (在 C blob 中), 可走 nfaExistsMany 批处理
+	anchorable       []bool      // 按 idx; true=可走锚定式单趟存在性 (有界头/无界尾, 命中字面量后只在邻域注入起点)
+	win              []litWindow // 按 idx; 命中字面量结尾两侧上下文界 (head/tail; -1=该侧无界不收窄)
+	nfaCount         int
 
 	// 双向锚定 (Rose-lite 完全体): biAnchorable[idx]=true 表示该 lean pattern 当前会落整段 batch,
 	// 但每个必需字面量"每个出现处 head 或 tail 至少一侧有界" (computeLitBiCover.ok), 可用前向锚定
@@ -609,6 +611,9 @@ func (d *mvsDB) close() error {
 func (d *mvsDB) scan(data []byte, sc *scratch, handler MatchHandler) (bool, error) {
 	d.resetScratch(sc)
 	defer sc.clearVerifierText()
+	if d.legacyInvalidUTF && !utf8.Valid(data) {
+		return d.scanLegacyInvalidUTF(data, sc, handler)
+	}
 	if d.legacyFold && (bytes.Contains(data, []byte("ſ")) || bytes.Contains(data, []byte("K"))) {
 		// Old images remain parse-free to load. Their literal plans cannot
 		// safely gate these two non-ASCII equivalents of ASCII letters.
@@ -1186,6 +1191,26 @@ func (d *mvsDB) scan(data []byte, sc *scratch, handler MatchHandler) (bool, erro
 		sc.fullDone[idx] = true
 		if stop := d.verifyOne(idx, data, sc, handler); stop {
 			return true, nil
+		}
+	}
+	return false, nil
+}
+
+// Old plans cannot be repaired by reparsing during LoadImage. For invalid UTF,
+// bypass their byte filters and preserve each route's existing reporting mode.
+func (d *mvsDB) scanLegacyInvalidUTF(data []byte, sc *scratch, handler MatchHandler) (bool, error) {
+	for idx, cp := range d.all {
+		locs := findAllInRecord(cp.v, data, 0, len(data), sc)
+		if !d.reportLoc && d.nfas[idx] != nil && !d.gate[idx] {
+			if len(locs) > 0 && !handler(Match{ID: cp.id, From: -1, To: -1}) {
+				return true, nil
+			}
+			continue
+		}
+		for _, loc := range locs {
+			if !handler(Match{ID: cp.id, From: loc[0], To: loc[1]}) {
+				return true, nil
+			}
 		}
 	}
 	return false, nil

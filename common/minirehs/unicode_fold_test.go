@@ -159,7 +159,7 @@ func FuzzUnicodeFoldFiltering(f *testing.F) {
 }
 
 func TestLegacyImageUnicodeFold(t *testing.T) {
-	for _, name := range []string{"compile-image-v1.rehs", "compile-image-v2.rehs", "compile-image-v3.rehs"} {
+	for _, name := range []string{"compile-image-v1.rehs", "compile-image-v2.rehs", "compile-image-v3.rehs", "compile-image-v4.rehs"} {
 		b, e := os.ReadFile("testdata/" + name)
 		if e != nil {
 			t.Fatal(e)
