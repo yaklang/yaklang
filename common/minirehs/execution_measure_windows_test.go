@@ -114,7 +114,7 @@ func TestProgramExecutionMeasure(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer db.Close()
-	programSmallWorkerMode(t, db)
+	smallMode := programSmallWorkerMode(t, db)
 	modeName := programMergedSingletonMode(t, db)
 	// Warm all source records/confirmers before timing; immutable subjects are
 	// reused, and every request still scans its complete original record.
@@ -207,5 +207,5 @@ func TestProgramExecutionMeasure(t *testing.T) {
 			sc.Close()
 		}
 	}
-	writeProgramJSON(t, dir, "execution-measure.json", map[string]interface{}{"case": set, "mode": modeName, "P": procs, "Q": outer, "patterns": len(patterns), "records": len(records), "phases": phases, "go": runtime.Version(), "logical_cpus": runtime.NumCPU(), "qpc_frequency": frequency, "qpc_pair_p50_ns": clockPairs[5000], "qpc_pair_p99_ns": clockPairs[9900], "notes": fmt.Sprintf("Closed-loop Q=%d clients; no extra app queue. Uninstrumented request loop and separate QPC-sampled service-latency phase (clock pair overhead reported, not subtracted). Go1.22 shared interrupt-time clock excluded from percentiles after smoke produced zeros. GetProcessTimes captures whole process CPU incl C;100ns API units, coarser accounting resolution. ConfiguredP is GOMAXPROCS, not proof of OS quota or C-thread hardcap. ShortCorpus is the complete original-order <512B stratum, not truncated records. Affinity/background load uncontrolled; no production weights/PMU/productionP99.", outer)})
+	writeProgramJSON(t, dir, "execution-measure.json", map[string]interface{}{"case": set, "mode": modeName, "small_worker_mode": smallMode, "P": procs, "Q": outer, "patterns": len(patterns), "records": len(records), "phases": phases, "go": runtime.Version(), "logical_cpus": runtime.NumCPU(), "qpc_frequency": frequency, "qpc_pair_p50_ns": clockPairs[5000], "qpc_pair_p99_ns": clockPairs[9900], "notes": fmt.Sprintf("Closed-loop Q=%d clients; no extra app queue. Uninstrumented request loop and separate QPC-sampled service-latency phase (clock pair overhead reported, not subtracted). Go1.22 shared interrupt-time clock excluded from percentiles after smoke produced zeros. GetProcessTimes captures whole process CPU incl C;100ns API units, coarser accounting resolution. ConfiguredP is GOMAXPROCS, not proof of OS quota or C-thread hardcap. ShortCorpus is the complete original-order <512B stratum, not truncated records. Affinity/background load uncontrolled; no production weights/PMU/productionP99.", outer)})
 }

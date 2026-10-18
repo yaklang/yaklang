@@ -1,5 +1,9 @@
 # MVS 编译镜像、磁盘缓存与性能评估
 
+当前 Windows 系统验收及最终五轮测量见 [WINDOWS_M5.md](WINDOWS_M5.md)。GetRequest4941条默认镜像1,454,565B，
+编译约339.87ms、加载69.87ms、热文件读0.215ms、同步原子写1.71ms；下文早期对照保留其原测量范围。
+内存中的稠密native blob仍为30,165,009B，进程内存需按当前系统报告单独评估。
+
 `Database.MarshalImage` 将已经完成的 MVS 编译结果保存为 `.rehs`；`LoadImage` 恢复可扫描的数据库，
 跳过正则解析、Glushkov 构造、字面量提取、自动机合并和 DFA 构造。
 `LoadOrCompile` 在磁盘缓存缺失、规则变化或文件损坏时重新编译并替换缓存。

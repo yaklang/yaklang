@@ -7,6 +7,7 @@
 
 用户在 2026-10-18 明确要求先完成 Windows 内容，暂不寻找其他机器或审查入口。
 当前目标为 Windows/amd64、CGO_ENABLED=1、现有 clang 和 VillanCh/go-pcre2-lite v0.1.6。
+T00–T17 的 Windows 阶段已完成；系统矩阵、退化项、镜像/磁盘/内存和发布准备见 [WINDOWS_M5.md](WINDOWS_M5.md)。
 Linux/amd64、macOS/arm64 原生性能和独立审查保留待补；Windows 阶段完成不代表三平台 M5 验收。
 不新增第三方依赖，不新增 workflow、job 或操作系统判断。
 
@@ -394,3 +395,20 @@ P1/16/63/64和65/127/128/129回退、定位、损坏资格、晚assert、错误�
 amalgamation、vet均通过。当前验收范围仍是Windows，其他平台和独立审查暂缓。
 
 上一轮性能结论及边界见 [RUNTIME_PERFORMANCE.md](RUNTIME_PERFORMANCE.md)。
+
+## T17：Windows系统验收与发布准备
+
+按用户最新范围，完成Windows/amd64的完整语义、默认16LP组合性能、文件/内存与回滚证据；其他平台及独立审查仍暂缓。
+两个冻结运行计划各1344输入/两规则集/两模式，36981次完整比较并保存可恢复元组，另24654次跨计划有序比较无差异。
+1MiB密集输出、原始上下文PCRE/晚assert、wide/nullable、15格式案例/360组兼容矩阵、普通/race/amalg/vet通过。
+
+90个独立进程的五对轮次，完整MITMQ1/Q16/Q32耗时-8.38/-6.86/-10.63%，P99-8.18/-4.39/-7.89%；
+完整单路CPU+1.96%、HTTP单路P99+3.05%及短MITM高并发仅-2.70%均保留。
+295行五轮绝对测量加80行公共API/实际父版本冷构造/完整缓存miss测量；Group小PCRE约-70.66%，小literal+0.54%。
+最终P16父二进制对照MITMLoad+3.34%、GetRequestLoad+首扫+1.89%；保留T16先前MITM首扫+4.73%原观测，不用新时段消除。
+GetRequestCompile339.87ms/Load69.87ms，完整cachemiss431.36ms；镜像结构整理32.08→4.18MB后zstd到1.45MB，
+热读0.215ms/同步原子写1.71ms/序列化80.46ms。运行稠密blob30.17MB，单库进程Private约233MiB，双库及Scratch约367MiB。
+
+八个独立profile及三个新进程资源轮次/规则集显示，prefilter、Glushkov/字符类、packed展开/Go恢复/GC、定位输出仍是后续重点。
+没有再启用已否定的range/SIMD/uniform预算/跨度路径，没有新依赖/CI修改。
+发布准备、正确reader回滚、完整逐场景表和方法边界见 [WINDOWS_M5.md](WINDOWS_M5.md)。
