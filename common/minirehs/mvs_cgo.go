@@ -14,6 +14,23 @@ package minirehs
 #else
 #include "native/mvscan/mvscan.c"
 #endif
+
+// Read-only qualification of the actual derived tables, including truth codes
+// that no concrete adjacent character pair can produce. Not a scan dispatch.
+static int mvs_assert_tables_1(const mvscan_db *db, int32_t idx,
+    int truth, int pos, uint64_t *out) {
+    if (!db || !out || idx < 0 || idx >= db->npat || truth < 0 || truth >= 64)
+        return -1;
+    int32_t unit = db->slotUnit[idx];
+    if (unit < 0 || unit >= db->nUnits) return -1;
+    const mvs_nfa *a = &db->units[unit];
+    if (!a->hasAssert || a->nword != 1 || pos < 0 || pos >= a->npos) return -1;
+    out[0] = a->condFollowEval != NULL;
+    out[1] = a->condFirstEval[truth];
+    out[2] = a->condFollowEval ? a->condFollowEval[(size_t)truth*a->npos+pos] : 0;
+    out[3] = a->condAcceptEval[truth];
+    return 0;
+}
 */
 import "C"
 
@@ -100,6 +117,14 @@ func (k *mvsKernel) close() {
 	C.mvscan_db_close(k.db)
 	k.db = nil
 	runtime.SetFinalizer(k, nil)
+}
+
+func (k *mvsKernel) assertTables1(idx, truth, pos int) ([4]uint64, bool) {
+	var out [4]uint64
+	status := C.mvs_assert_tables_1(k.db, C.int32_t(idx), C.int(truth), C.int(pos),
+		(*C.uint64_t)(unsafe.Pointer(&out[0])))
+	runtime.KeepAlive(k)
+	return out, status == 0
 }
 
 // nfaExists 判定 pattern 下标 idx 的 NFA 是否在 data 中存在命中 (C 实现, == Go existsIn).

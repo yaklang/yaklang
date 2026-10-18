@@ -1255,6 +1255,7 @@ static int parse_unit(const uint8_t *blob, size_t blobLen, size_t off, size_t un
      * 仅 nword==1 的断言 NFA 才有序列化 (Go 侧保证). */
     out->hasAssert = (flags & 0x2u) ? 1 : 0;
     if (out->hasAssert) {
+        if (nword == 1 && npos > 64) return -1;
         /* 计算剩余所需字节数. */
         size_t assertU64 = 3 + (size_t)npos; /* chainTarget1, excMask1, condFollowMask1 + excFollow1Flat[npos] */
         /* 先读固定头部 (chainTarget1, excMask1, excFollow1Flat, condFollowMask1) */
@@ -1285,6 +1286,8 @@ static int parse_unit(const uint8_t *blob, size_t blobLen, size_t off, size_t un
         /* condFollow (扁平三元组: pos, guard, bits[nword]) */
         if (cur + 4 > blobLen) return -1;
         out->nCondFollow = (int32_t)le_i32(blob + cur); cur += 4;
+        if (out->nCondFollow < 0) return -1;
+        uint64_t conditionalSources1 = 0;
         if (out->nCondFollow > 0) {
             size_t posBytes = (size_t)out->nCondFollow * 4;
             size_t guardBytes = (size_t)out->nCondFollow;
@@ -1294,13 +1297,21 @@ static int parse_unit(const uint8_t *blob, size_t blobLen, size_t off, size_t un
             out->condFollowGuard = (uint8_t *)malloc(guardBytes);
             out->condFollowBits = (uint64_t *)malloc(bitsBytes);
             if (!out->condFollowPos || !out->condFollowGuard || !out->condFollowBits) return -1;
-            for (int _i = 0; _i < out->nCondFollow; _i++) { out->condFollowPos[_i] = le_i32(blob + cur + (size_t)_i * 4); }
+            for (int _i = 0; _i < out->nCondFollow; _i++) {
+                int32_t pos = le_i32(blob + cur + (size_t)_i * 4);
+                if (pos < 0 || pos >= npos) return -1;
+                out->condFollowPos[_i] = pos;
+                if (nword == 1) conditionalSources1 |= UINT64_C(1) << pos;
+            }
             cur += posBytes;
             for (int _i = 0; _i < out->nCondFollow; _i++) { out->condFollowGuard[_i] = blob[cur + _i]; }
             cur += guardBytes;
             for (int _i = 0; _i < out->nCondFollow * nword; _i++) { out->condFollowBits[_i] = le_u64(blob + cur + (size_t)_i * 8); }
             cur += bitsBytes;
         }
+        /* Every reader indexes the derived table only through this mask.
+         * Validate the complete source set, not just the zero-count case. */
+        if (nword == 1 && out->condFollowMask1 != conditionalSources1) return -1;
 
         /* condAccept: 每个 guard 条目的 bits 为 nword 个 uint64 */
         if (cur + 4 > blobLen) return -1;
@@ -1327,9 +1338,13 @@ static int parse_unit(const uint8_t *blob, size_t blobLen, size_t off, size_t un
 
         if (nword == 1) {
             out->condFirstEval = (uint64_t *)calloc(64, sizeof(uint64_t));
-            out->condFollowEval = (uint64_t *)calloc((size_t)64 * npos, sizeof(uint64_t));
+            /* A validated empty mask means all three single-word readers
+             * skip this table. Retain first/accept, which are always read. */
+            if (out->nCondFollow > 0)
+                out->condFollowEval = (uint64_t *)calloc((size_t)64 * npos, sizeof(uint64_t));
             out->condAcceptEval = (uint64_t *)calloc(64, sizeof(uint64_t));
-            if (!out->condFirstEval || !out->condFollowEval || !out->condAcceptEval) return -1;
+            if (!out->condFirstEval || !out->condAcceptEval ||
+                (out->nCondFollow > 0 && !out->condFollowEval)) return -1;
             for (int B = 0; B < 64; B++) {
                 for (int k = 0; k < out->nCondFirst; k++) {
                     if ((out->condFirstGuard[k] & B) == out->condFirstGuard[k])

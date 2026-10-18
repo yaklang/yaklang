@@ -54,10 +54,17 @@ func decodeImageUnit(data []byte, npat int) (mvsUnit, error) {
 			u.necRequiredByte < -1 || u.necRequiredByte > 127 || u.necRequiredCount < 0 {
 			return u, ErrCorruptImage
 		}
+		var conditionalSources1 uint64
 		for _, p := range u.condFollowPos {
 			if p < 0 || int(p) >= u.npos {
 				return u, ErrCorruptImage
 			}
+			if u.nword == 1 {
+				conditionalSources1 |= uint64(1) << uint(p)
+			}
+		}
+		if u.nword == 1 && u.condFollowMask1 != conditionalSources1 {
+			return u, ErrCorruptImage
 		}
 		for _, gs := range [][]byte{u.condFirstGuard, u.condFollowGuard, u.condAcceptGuard} {
 			for _, g := range gs {
