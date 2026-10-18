@@ -453,6 +453,9 @@ func loadUncompressedImage(data []byte, h compilationImageHeader, encoded []byte
 	if err = validateImageRoutes(d, kinds); err != nil {
 		return nil, err
 	}
+	for _, head := range d.gateHead {
+		d.hasLocalizedGates = d.hasLocalizedGates || head >= 0
+	}
 	if err = decodeImagePreconditions(preconditions, d); err != nil {
 		return nil, err
 	}

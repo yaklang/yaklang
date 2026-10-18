@@ -134,6 +134,8 @@ type scratch struct {
 	// RE2-only 存在性模式下，把字面量命中循环中的 gated/assert 立即验证移出调用线程，
 	// 与窗口及 anchored 阶段重叠；worker 使用独占 Scratch，handler 仍只在调用线程执行。
 	gateTasks        []gateTask
+	gateMinEnd       []int32 // minimum trigger end per localized gate, independent of event order
+	gateTouched      []int32 // only these minima need clearing before the next record
 	gateAsyncScratch *scratch
 	gateAsyncOut     []byte
 	gateAsyncRes     chan []byte

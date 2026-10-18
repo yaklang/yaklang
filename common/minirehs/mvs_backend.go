@@ -121,6 +121,7 @@ func (b *mvsBackend) compile(patterns []*compiledPattern, cfg *config) (compiled
 				// (winLo=firstHitEnd-gateHead-1). gateHead 取超集骨架下全部字面量的最大回看上限。
 				if len(cp.literals) > 0 {
 					db.gateHead[cp.idx] = computeGateHead(cp)
+					db.hasLocalizedGates = db.hasLocalizedGates || db.gateHead[cp.idx] >= 0
 				}
 			}
 			// 窗口化存在性快路径资格: 有界宽 (windowed) 且无零宽断言、非超集门的 lean NFA.
@@ -421,8 +422,8 @@ func tryCompileNFA(cp *compiledPattern) (nfa *mvsNFA, gate bool, re2Loc bool) {
 // (match-start 到字面量结尾的最大字节宽). 任一字面量无界 / 含 lookbehind / verifier 可给精确偏移
 // (非 regexp2-only) 时返回 -1 (不局部化, 保守整段).
 //
-// 正确性: gate 语言只增不减 (R_super ⊇ R_orig), 故超集 head >= 原 head; winLo=firstHitEnd-head-1
-// 必 <= 任一原匹配起点 (绝不漏报), 且 winLo+head < firstHitEnd <= 任一字面量结尾 (winLo 前无该门
+// 正确性: gate 语言只增不减 (R_super ⊇ R_orig), 故超集 head >= 原 head; winLo=minHitEnd-head-1
+// 必 <= 任一原匹配起点 (绝不漏报), 且 winLo+head < minHitEnd <= 任一字面量结尾 (winLo 前无该门
 // 字面量可达, 子切片首位起不了匹配 -> 绝不误报). lookbehind 会读 match-start 左侧可能越过 winLo, 故排除。
 func computeGateHead(cp *compiledPattern) int32 {
 	if cp.v == nil || cp.v.exact() {
@@ -510,9 +511,10 @@ type mvsDB struct {
 
 	// gateHead 按 idx; 仅对"可局部化的超集门 gate" >=0, 表示该 pattern 全部字面量在超集骨架下的
 	// 最大回看上限 (match-start 到字面量结尾的字节宽). gate 命中字面量后, 把 regexp2 复核与断言 NFA
-	// 超集预检都收窄到 data[winLo:] (winLo=firstHitEnd-gateHead-1, rune 对齐), 省去字面量前的整段扫.
+	// 超集预检都收窄到 data[winLo:] (winLo=minHitEnd-gateHead-1, rune 对齐), 省去字面量前的整段扫.
 	// -1 表示不局部化 (无字面量 / 任一字面量无界 / 含 lookbehind / verifier 可给精确偏移). 见 verifyGateLocalized.
-	gateHead []int32
+	gateHead          []int32
+	hasLocalizedGates bool // derived runtime fact; not serialized
 
 	pf       prefilter // 可能为 nil (无任何字面量 pattern)
 	litToPat [][]int32 // litID -> pattern idx
@@ -662,6 +664,9 @@ func (d *mvsDB) scan(data []byte, sc *scratch, handler MatchHandler) (bool, erro
 	//    把 per-trigger 成本从 O(record) 降到 O(winW). 窗口不命中时不置 fullDone, 留待其它命中点重试.
 	if d.pf != nil {
 		hits := d.pf.scanHits(data, sc)
+		if d.hasLocalizedGates {
+			d.collectGateMinEnds(hits, sc)
+		}
 		n := len(data)
 		batch := sc.batchIdx[:0]
 		sc.batchSeen = resetBoolBuf(sc.batchSeen, d.n)
@@ -757,11 +762,10 @@ func (d *mvsDB) scan(data []byte, sc *scratch, handler MatchHandler) (bool, erro
 					continue
 				}
 				// 可局部化超集门: 命中字面量后只在 data[winLo:] 复核 (winLo=h.end-gateHead-1, rune
-				// 对齐). 本 idx 首个命中 => h.end 最小, 取超集 max head 必覆盖任一原匹配起点 (见
-				// computeGateHead / verifyGateLocalized 正确性), 省去字面量前的整段 regexp2/断言扫。
+				// 对齐). Teddy 不保证终点排序，使用预先收集的全体事件最小终点；不改变回调调度顺序。
 				sc.fullDone[idx] = true
 				if gh := d.gateHead[idx]; gh >= 0 {
-					winLo := int(h.end) - int(gh) - 1
+					winLo := int(sc.gateMinEnd[idx]) - int(gh) - 1
 					if winLo < 0 {
 						winLo = 0
 					}
@@ -1185,6 +1189,34 @@ func (d *mvsDB) scan(data []byte, sc *scratch, handler MatchHandler) (bool, erro
 		}
 	}
 	return false, nil
+}
+
+// collectGateMinEnds observes all trigger events before any gate confirmation.
+// A false positive can only move the minimum earlier, making the window wider.
+// Clearing touched entries also permits reuse across databases of different size.
+func (d *mvsDB) collectGateMinEnds(hits []litHit, sc *scratch) {
+	for _, idx := range sc.gateTouched {
+		sc.gateMinEnd[idx] = 0
+	}
+	sc.gateTouched = sc.gateTouched[:0]
+	sc.gateMinEnd = ensureInt32(sc.gateMinEnd, d.n)
+	for _, hit := range hits {
+		if int(hit.litID) >= len(d.litToPat) {
+			continue
+		}
+		for _, idx := range d.litToPat[hit.litID] {
+			if d.gateHead[idx] < 0 {
+				continue
+			}
+			previous := sc.gateMinEnd[idx]
+			if previous == 0 {
+				sc.gateTouched = append(sc.gateTouched, idx)
+			}
+			if previous == 0 || hit.end < previous {
+				sc.gateMinEnd[idx] = hit.end
+			}
+		}
+	}
 }
 
 // reportLocated 对一条已由合并自动机确认命中的成员产出最终上报 (合并自动机的存在性判定与
