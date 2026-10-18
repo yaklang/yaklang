@@ -2,10 +2,34 @@ package minirehs
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
 )
+
+func programInvalidUTFPatterns() []Pattern {
+	return []Pattern{{ID: 17, Expr: `\x{FFFD}foo(?=!)`}, {ID: 33, Expr: `bar\x{FFFD}`}, {ID: 34, Expr: `a*`}}
+}
+
+func TestProgramExportCompatibilityFixtures(t *testing.T) {
+	dir := programEvidenceDir(t)
+	for _, locate := range []bool{false, true} {
+		db, err := Compile(programInvalidUTFPatterns(), WithBackend(BackendMVS), WithReportLocation(locate), WithLogger(silentLogger{}))
+		if err != nil {
+			t.Fatal(err)
+		}
+		image, err := db.MarshalImage()
+		db.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+		name := fmt.Sprintf("image-v%d-invalid-utf-loc-%v.rehs", imageVersion, locate)
+		if err := os.WriteFile(filepath.Join(dir, name), image, 0600); err != nil {
+			t.Fatal(err)
+		}
+	}
+}
 
 // Program evidence is opt-in because it writes complete local rule manifests.
 // The ordinary regression suite remains independent of external data locations.

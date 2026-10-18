@@ -1,5 +1,9 @@
 # minirehs 运行性能分析
 
+以下为 v4 / 7c940fa98 的历史组合测量，rebase 后相同树为 27100ce30。
+后续 T03/T04 正确性修补和 v5 的当前进展见 [PERFORMANCE_PROGRAM.md](PERFORMANCE_PROGRAM.md)；
+这些历史数字不替代新任务的正确性基线或单项 A/B。
+
 本轮以编译镜像 PR 的 `8911cf7d8` 为基线。代码只复用仓库已有依赖，外部正则确认仍是
 VillanCh/go-pcre2-lite；CI 沿用 Essential Tests 的普通包列表。
 

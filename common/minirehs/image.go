@@ -15,9 +15,9 @@ var (
 	ErrCorruptImage      = errors.New("minirehs: corrupt compilation image")
 )
 
-// Version 4 localizes Unicode-safe fragments using fold-aware byte bounds.
-// The body remains compatible with v1-v3; cache identities refresh old plans.
-const imageVersion uint32 = 4
+// Version 5 excludes RuneError from byte triggers. The body remains compatible
+// with v1-v4; cache identities refresh plans that could miss invalid UTF input.
+const imageVersion uint32 = 5
 const imageHeaderSize = 32
 
 const (
@@ -352,8 +352,8 @@ func loadUncompressedImage(data []byte, h compilationImageHeader, encoded []byte
 	var err error
 	r := &imageReader{b: data[:len(data)-4], off: imageHeaderSize, packed: h.packed}
 	d := &mvsDB{n: h.n, imageFlags: h.flags, minLiteralLen: h.minLiteralLen, patternHash: h.hash, reportLoc: h.flags&imageReportLocation != 0,
-		legacyFold: h.version < 3,
-		all:        make([]*compiledPattern, h.n), nfas: make([]*mvsNFA, h.n), revNFAs: make([]*mvsNFA, h.n),
+		legacyFold: h.version < 3, legacyInvalidUTF: h.version < 5,
+		all: make([]*compiledPattern, h.n), nfas: make([]*mvsNFA, h.n), revNFAs: make([]*mvsNFA, h.n),
 		gate: make([]bool, h.n), re2Loc: make([]bool, h.n), windowable: make([]bool, h.n), batchable: make([]bool, h.n),
 		anchorable: make([]bool, h.n), biAnchorable: make([]bool, h.n), hasLiterals: make([]bool, h.n),
 		win: make([]litWindow, h.n), gateHead: make([]int32, h.n), assertNecFactor: make([]necFactor, h.n)}

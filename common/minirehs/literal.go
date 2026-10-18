@@ -254,11 +254,22 @@ func requiredLiteralNode(re *syntax.Regexp) []string {
 	return forms
 }
 
-// ASCII case folding cannot represent long s or the Kelvin sign. Keep only
-// the longest literal fragment whose entire fold orbit stays in ASCII.
+// A byte trigger cannot require the UTF-8 encoding of RuneError: RE2 decodes
+// invalid bytes as that rune, and the PCRE compatibility wrapper normalizes them.
+// ASCII case folding also cannot represent long s or the Kelvin sign.
 func asciiSafeLiteral(re *syntax.Regexp) string {
 	if re.Flags&syntax.FoldCase == 0 {
-		return string(re.Rune)
+		literal := string(re.Rune)
+		if !strings.ContainsRune(literal, unicode.ReplacementChar) {
+			return literal
+		}
+		best := ""
+		for _, fragment := range strings.Split(literal, string(unicode.ReplacementChar)) {
+			if len(fragment) > len(best) {
+				best = fragment
+			}
+		}
+		return best
 	}
 	start, bestStart, bestEnd := 0, 0, 0
 	for i, r := range re.Rune {
