@@ -138,7 +138,7 @@ type scratch struct {
 	gateTouched      []int32 // only these minima need clearing before the next record
 	gateAsyncScratch *scratch
 	gateAsyncOut     []byte
-	gateAsyncRes     chan []byte
+	gateAsyncRes     chan gatedResult
 
 	anchoredAsyncScratch *scratch
 	anchoredAnchorOut    []byte
@@ -190,7 +190,13 @@ type gatedWorkerTask struct {
 	tasks   []gateTask
 	scratch *scratch
 	out     []byte
-	result  chan<- []byte
+	result  chan<- gatedResult
+}
+
+type gatedResult struct {
+	out       []byte
+	completed int // includes the failing item when err is nonnil
+	err       error
 }
 
 type anchoredWorkerTask struct {

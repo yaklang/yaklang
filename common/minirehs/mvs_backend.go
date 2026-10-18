@@ -2,6 +2,7 @@ package minirehs
 
 import (
 	"bytes"
+	"fmt"
 	"regexp/syntax"
 	"runtime"
 	"strings"
@@ -31,15 +32,22 @@ func (s *scratch) startWorkers() {
 			defer s.workerWG.Done()
 			for task := range s.gatedTasks {
 				task.scratch.clearVerifierText()
+				result := gatedResult{out: task.out}
 				for i, gate := range task.tasks {
-					if task.db.existsNoReport(int(gate.idx), task.data, int(gate.winLo), task.scratch) {
+					hit, err := task.db.existsNoReport(int(gate.idx), task.data, int(gate.winLo), task.scratch)
+					result.completed = i + 1
+					if err != nil {
+						result.err = err
+						break
+					}
+					if hit {
 						task.out[i] = 1
 					} else {
 						task.out[i] = 0
 					}
 				}
 				task.scratch.clearVerifierText()
-				task.result <- task.out
+				task.result <- result
 			}
 		}()
 		go func() {
@@ -630,7 +638,10 @@ func (d *mvsDB) scan(data []byte, sc *scratch, handler MatchHandler) (bool, erro
 		// Old images remain parse-free to load. Their literal plans cannot
 		// safely gate these two non-ASCII equivalents of ASCII letters.
 		for _, cp := range d.all {
-			locs := findAllInRecord(cp.v, data, 0, len(data), sc)
+			locs, err := findAllInRecord(cp.v, data, 0, len(data), sc)
+			if err != nil {
+				return false, verifierScanError(cp, err)
+			}
 			if !d.reportLoc {
 				if len(locs) > 0 && !handler(Match{ID: cp.id, From: -1, To: -1}) {
 					return true, nil
@@ -791,9 +802,10 @@ func (d *mvsDB) scan(data []byte, sc *scratch, handler MatchHandler) (bool, erro
 						gateTasks = append(gateTasks, gateTask{idx: idx, winLo: int32(winLo)})
 						continue
 					}
-					if stop := d.verifyGateLocalized(int(idx), data, winLo, sc, handler); stop {
-						return true, nil
+					if stop, verifyErr := d.verifyGateLocalized(int(idx), data, winLo, sc, handler); stop || verifyErr != nil {
+						return stop, verifyErr
 					}
+
 					continue
 				}
 				if deferGated {
@@ -801,9 +813,10 @@ func (d *mvsDB) scan(data []byte, sc *scratch, handler MatchHandler) (bool, erro
 					continue
 				}
 				// 其余 (无内核 / 断言 NFA / 无 NFA 兜底): 立即逐条验证.
-				if stop := d.verifyOne(int(idx), data, sc, handler); stop {
-					return true, nil
+				if stop, verifyErr := d.verifyOne(int(idx), data, sc, handler); stop || verifyErr != nil {
+					return stop, verifyErr
 				}
+
 			}
 		}
 		sc.batchIdx = batch
@@ -813,7 +826,7 @@ func (d *mvsDB) scan(data []byte, sc *scratch, handler MatchHandler) (bool, erro
 		if len(gateTasks) > 0 {
 			if sc.gateAsyncScratch == nil {
 				sc.gateAsyncScratch = &scratch{}
-				sc.gateAsyncRes = make(chan []byte, 1)
+				sc.gateAsyncRes = make(chan gatedResult, 1)
 			}
 			if cap(sc.gateAsyncOut) < len(gateTasks) {
 				sc.gateAsyncOut = make([]byte, len(gateTasks))
@@ -879,9 +892,10 @@ func (d *mvsDB) scan(data []byte, sc *scratch, handler MatchHandler) (bool, erro
 			if d.kernel.nfaExists(idx, data[lo:hi]) {
 				// litSpan 的 union 已覆盖任一包含本 pattern 必需字面量的完整匹配；
 				// 因此定位无需退回整段 data 重扫。对需 verifier 的规则由 helper 安全回退。
-				if stop := d.finalizeHitWindow(idx, data, lo, hi, sc, handler); stop {
-					return true, nil
+				if stop, verifyErr := d.finalizeHitWindow(idx, data, lo, hi, sc, handler); stop || verifyErr != nil {
+					return stop, verifyErr
 				}
+
 			}
 		}
 		if asyncAnchored {
@@ -890,22 +904,30 @@ func (d *mvsDB) scan(data []byte, sc *scratch, handler MatchHandler) (bool, erro
 			for i, idx32 := range anchorBatch {
 				idx := int(idx32)
 				sc.fullDone[idx] = true
-				if res.anchor[i] != 0 && d.finalizeHit(idx, data, sc, handler) {
-					return true, nil
+				if res.anchor[i] != 0 {
+					if verifyStop, verifyErr := d.finalizeHit(idx, data, sc, handler); verifyStop || verifyErr != nil {
+						return verifyStop, verifyErr
+					}
 				}
+
 			}
 			for i, idx32 := range biBatch {
 				idx := int(idx32)
 				sc.fullDone[idx] = true
-				if res.bi[i] != 0 && d.finalizeHit(idx, data, sc, handler) {
-					return true, nil
+				if res.bi[i] != 0 {
+					if verifyStop, verifyErr := d.finalizeHit(idx, data, sc, handler); verifyStop || verifyErr != nil {
+						return verifyStop, verifyErr
+
+						// 锚定式批处理: 对本报文每条触发的锚定式 pattern, 合并其注入区间后做一次锚定式单趟存在性.
+						// lean anchored NFA 已在 C blob 中。把本报文所有 pattern 的 spans 平铺后一次跨界；
+						// C 内仍按 pattern 独立执行相同的提前消亡递推，但避免 Go 热循环和 O(pattern) cgo。
+						// 含零宽断言的 NFA 不入 blob，必须留在下方 Go 路径以复用真实边界 guard。
+					}
 				}
+
 			}
 		} else {
-			// 锚定式批处理: 对本报文每条触发的锚定式 pattern, 合并其注入区间后做一次锚定式单趟存在性.
-			// lean anchored NFA 已在 C blob 中。把本报文所有 pattern 的 spans 平铺后一次跨界；
-			// C 内仍按 pattern 独立执行相同的提前消亡递推，但避免 Go 热循环和 O(pattern) cgo。
-			// 含零宽断言的 NFA 不入 blob，必须留在下方 Go 路径以复用真实边界 guard。
+
 			if anchorCBatchEnabled && d.kernel != nil && !anchorMergedEnabled && len(anchorBatch) > 0 {
 				sc.anchorCIdx = sc.anchorCIdx[:0]
 				sc.anchorSpanOff = sc.anchorSpanOff[:0]
@@ -935,9 +957,12 @@ func (d *mvsDB) scan(data []byte, sc *scratch, handler MatchHandler) (bool, erro
 					for i, hit := range out {
 						idx := int(sc.anchorCIdx[i])
 						sc.fullDone[idx] = true
-						if hit != 0 && d.finalizeHit(idx, data, sc, handler) {
-							return true, nil
+						if hit != 0 {
+							if verifyStop, verifyErr := d.finalizeHit(idx, data, sc, handler); verifyStop || verifyErr != nil {
+								return verifyStop, verifyErr
+							}
 						}
+
 					}
 				}
 			}
@@ -966,9 +991,10 @@ func (d *mvsDB) scan(data []byte, sc *scratch, handler MatchHandler) (bool, erro
 					sc.mergedSeen = resetBoolBuf(sc.mergedSeen, d.n)
 					sc.mergedHits = d.anchoredMerged.scanExistAnchored(data, sc.anchorMergedSpans, sc.mergedSeen, sc.mergedHits[:0])
 					for _, idx := range sc.mergedHits {
-						if stop := d.finalizeHit(idx, data, sc, handler); stop {
-							return true, nil
+						if stop, verifyErr := d.finalizeHit(idx, data, sc, handler); stop || verifyErr != nil {
+							return stop, verifyErr
 						}
+
 					}
 				}
 			}
@@ -1001,9 +1027,10 @@ func (d *mvsDB) scan(data []byte, sc *scratch, handler MatchHandler) (bool, erro
 					hit = nfa.existsInAnchored(data, spans, sc.anchorPrev, sc.anchorCand, sc.anchorActive)
 				}
 				if hit {
-					if stop := d.finalizeHit(idx, data, sc, handler); stop {
-						return true, nil
+					if stop, verifyErr := d.finalizeHit(idx, data, sc, handler); stop || verifyErr != nil {
+						return stop, verifyErr
 					}
+
 				}
 			}
 			// 双向锚定批处理: 前向锚定 (头有界出现处) ∪ 反向锚定 (尾有界出现处) 替换整段 batch. 任一向命中
@@ -1037,19 +1064,26 @@ func (d *mvsDB) scan(data []byte, sc *scratch, handler MatchHandler) (bool, erro
 					}
 				}
 				if hit {
-					if stop := d.finalizeHit(idx, data, sc, handler); stop {
-						return true, nil
+					if stop, verifyErr := d.finalizeHit(idx, data, sc, handler); stop || verifyErr != nil {
+						return stop, verifyErr
 					}
+
 				}
 			}
 		}
 		if asyncGated {
-			out := <-sc.gateAsyncRes
+			result := <-sc.gateAsyncRes
 			asyncGatedConsumed = true
-			for i, hit := range out {
-				if hit != 0 && !handler(Match{ID: d.all[gateTasks[i].idx].id, From: -1, To: -1}) {
+			for i := 0; i < result.completed; i++ {
+				if result.err != nil && i == result.completed-1 {
+					return false, result.err
+				}
+				if result.out[i] != 0 && !handler(Match{ID: d.all[gateTasks[i].idx].id, From: -1, To: -1}) {
 					return true, nil
 				}
+			}
+			if result.completed != len(gateTasks) {
+				return false, fmt.Errorf("minirehs: incomplete gated worker result")
 			}
 		}
 	}
@@ -1085,16 +1119,18 @@ func (d *mvsDB) scan(data []byte, sc *scratch, handler MatchHandler) (bool, erro
 					continue
 				}
 				sc.fullDone[idx] = true
-				if stop := d.reportLocated(idx, data, sc, handler); stop {
-					return true, nil
+				if stop, verifyErr := d.reportLocated(idx, data, sc, handler); stop || verifyErr != nil {
+					return stop, verifyErr
 				}
+
 			}
 			// 处理 assert 命中
 			for _, idx := range aHits {
 				sc.fullDone[idx] = true
-				if stop := d.finalizeHit(idx, data, sc, handler); stop {
-					return true, nil
+				if stop, verifyErr := d.finalizeHit(idx, data, sc, handler); stop || verifyErr != nil {
+					return stop, verifyErr
 				}
+
 			}
 			// 标记未命中的 assert (已由 combinedScan 判定)
 			for _, idx := range assertCIdxs {
@@ -1106,9 +1142,10 @@ func (d *mvsDB) scan(data []byte, sc *scratch, handler MatchHandler) (bool, erro
 					continue
 				}
 				sc.fullDone[idx] = true
-				if stop := d.verifyOne(idx, data, sc, handler); stop {
-					return true, nil
+				if stop, verifyErr := d.verifyOne(idx, data, sc, handler); stop || verifyErr != nil {
+					return stop, verifyErr
 				}
+
 			}
 		} else {
 			// 无 single-word assert, 走原路径
@@ -1119,9 +1156,10 @@ func (d *mvsDB) scan(data []byte, sc *scratch, handler MatchHandler) (bool, erro
 						continue
 					}
 					sc.fullDone[idx] = true
-					if stop := d.reportLocated(idx, data, sc, handler); stop {
-						return true, nil
+					if stop, verifyErr := d.reportLocated(idx, data, sc, handler); stop || verifyErr != nil {
+						return stop, verifyErr
 					}
+
 				}
 			}
 			for _, idx := range d.assertAlwaysOn {
@@ -1129,9 +1167,10 @@ func (d *mvsDB) scan(data []byte, sc *scratch, handler MatchHandler) (bool, erro
 					continue
 				}
 				sc.fullDone[idx] = true
-				if stop := d.verifyOne(idx, data, sc, handler); stop {
-					return true, nil
+				if stop, verifyErr := d.verifyOne(idx, data, sc, handler); stop || verifyErr != nil {
+					return stop, verifyErr
 				}
+
 			}
 		}
 	} else if d.merged != nil {
@@ -1151,19 +1190,23 @@ func (d *mvsDB) scan(data []byte, sc *scratch, handler MatchHandler) (bool, erro
 				continue
 			}
 			sc.fullDone[idx] = true
-			if stop := d.reportLocated(idx, data, sc, handler); stop {
-				return true, nil
+			if stop, verifyErr := d.reportLocated(idx, data, sc, handler); stop || verifyErr != nil {
+				return stop, verifyErr
+
+				// 3) assert always-on
 			}
+
 		}
-		// 3) assert always-on
+
 		for _, idx := range d.assertAlwaysOn {
 			if sc.fullDone[idx] {
 				continue
 			}
 			sc.fullDone[idx] = true
-			if stop := d.verifyOne(idx, data, sc, handler); stop {
-				return true, nil
+			if stop, verifyErr := d.verifyOne(idx, data, sc, handler); stop || verifyErr != nil {
+				return stop, verifyErr
 			}
+
 		}
 	} else {
 		// 无 merged: 仅 assert always-on
@@ -1172,9 +1215,10 @@ func (d *mvsDB) scan(data []byte, sc *scratch, handler MatchHandler) (bool, erro
 				continue
 			}
 			sc.fullDone[idx] = true
-			if stop := d.verifyOne(idx, data, sc, handler); stop {
-				return true, nil
+			if stop, verifyErr := d.verifyOne(idx, data, sc, handler); stop || verifyErr != nil {
+				return stop, verifyErr
 			}
+
 		}
 	}
 
@@ -1190,20 +1234,26 @@ func (d *mvsDB) scan(data []byte, sc *scratch, handler MatchHandler) (bool, erro
 			continue
 		}
 		sc.fullDone[fast.idx] = true
-		if specializedFound&(uint64(1)<<fast.kind) != 0 && d.finalizeHit(fast.idx, data, sc, handler) {
-			return true, nil
+		if specializedFound&(uint64(1)<<fast.kind) != 0 {
+			if verifyStop, verifyErr := d.finalizeHit(fast.idx, data, sc, handler); verifyStop || verifyErr != nil {
+				return verifyStop,
+
+					// 4) 无字面量且不可编入 NFA 的 always-on (regexp2/RE2 兜底): 逐条验证.
+					verifyErr
+			}
 		}
+
 	}
 
-	// 4) 无字面量且不可编入 NFA 的 always-on (regexp2/RE2 兜底): 逐条验证.
 	for _, idx := range d.otherAlwaysOn {
 		if sc.fullDone[idx] {
 			continue
 		}
 		sc.fullDone[idx] = true
-		if stop := d.verifyOne(idx, data, sc, handler); stop {
-			return true, nil
+		if stop, verifyErr := d.verifyOne(idx, data, sc, handler); stop || verifyErr != nil {
+			return stop, verifyErr
 		}
+
 	}
 	return false, nil
 }
@@ -1212,7 +1262,10 @@ func (d *mvsDB) scan(data []byte, sc *scratch, handler MatchHandler) (bool, erro
 // bypass their byte filters and preserve each route's existing reporting mode.
 func (d *mvsDB) scanLegacyInvalidUTF(data []byte, sc *scratch, handler MatchHandler) (bool, error) {
 	for idx, cp := range d.all {
-		locs := findAllInRecord(cp.v, data, 0, len(data), sc)
+		locs, err := findAllInRecord(cp.v, data, 0, len(data), sc)
+		if err != nil {
+			return false, verifierScanError(cp, err)
+		}
 		if !d.reportLoc && d.nfas[idx] != nil && !d.gate[idx] {
 			if len(locs) > 0 && !handler(Match{ID: cp.id, From: -1, To: -1}) {
 				return true, nil
@@ -1258,7 +1311,7 @@ func (d *mvsDB) collectGateMinEnds(hits []litHit, sc *scratch) {
 
 // reportLocated 对一条已由合并自动机确认命中的成员产出最终上报 (合并自动机的存在性判定与
 // 单条 existsIn 同源; 差分测试为护栏). 实际上报逻辑收敛到 finalizeHit (含 gate 复核 / re2Loc 定位).
-func (d *mvsDB) reportLocated(idx int, data []byte, sc *scratch, handler MatchHandler) bool {
+func (d *mvsDB) reportLocated(idx int, data []byte, sc *scratch, handler MatchHandler) (bool, error) {
 	return d.finalizeHit(idx, data, sc, handler)
 }
 
@@ -1284,14 +1337,14 @@ func (d *mvsDB) windowExists(idx int, data []byte, h litHit) bool {
 //   - 仅存在性 (reportLoc=false): 命中即上报 (-1,-1), 不做定位扫描 (80x 快门档).
 //   - 需定位: regexp2-origin (re2Loc) 或断言 NFA 交 verifier 定位 (保 PCRE/既有 span 语义);
 //     纯 RE2 lean NFA 用自身 findAllLoc 给精确非重叠区间.
-func (d *mvsDB) finalizeHit(idx int, data []byte, sc *scratch, handler MatchHandler) bool {
+func (d *mvsDB) finalizeHit(idx int, data []byte, sc *scratch, handler MatchHandler) (bool, error) {
 	cp := d.all[idx]
 	if d.gate[idx] {
 		// 超集门: regexp2 复核 (不命中则不上报, 命中按 verifier 语义上报).
 		return d.reportViaVerifier(cp, data, 0, sc, handler)
 	}
 	if !d.reportLoc {
-		return !handler(Match{ID: cp.id, From: -1, To: -1})
+		return !handler(Match{ID: cp.id, From: -1, To: -1}), nil
 	}
 	nfa := d.nfas[idx]
 	if d.re2Loc[idx] || nfa.hasAssert {
@@ -1305,10 +1358,10 @@ func (d *mvsDB) finalizeHit(idx int, data []byte, sc *scratch, handler MatchHand
 		if locs, ok := d.kernel.findAllLoc(idx, data, sc); ok && len(locs) > 0 {
 			for i := 0; i < len(locs); i += 2 {
 				if !handler(Match{ID: cp.id, From: int(locs[i]), To: int(locs[i+1])}) {
-					return true
+					return true, nil
 				}
 			}
-			return false
+			return false, nil
 		}
 	}
 	stopped := false
@@ -1319,14 +1372,14 @@ func (d *mvsDB) finalizeHit(idx int, data []byte, sc *scratch, handler MatchHand
 		}
 		return true
 	})
-	return stopped
+	return stopped, nil
 }
 
 // finalizeHitWindow 是已被字面量窗口验证命中的定位出口。对 exact lean NFA，窗口 union
 // 覆盖本报文所有可能匹配，故在 data[lo:hi] 内枚举并将偏移平移回原文即可；这消除过去
 // “局部 existsIn 后又整段 findAllLoc” 的重复扫描。gate、re2Loc、断言仍保留原出口，
 // 因为其定位语义依赖 verifier 或边界 guard，不能假设普通子串等价。
-func (d *mvsDB) finalizeHitWindow(idx int, data []byte, lo, hi int, sc *scratch, handler MatchHandler) bool {
+func (d *mvsDB) finalizeHitWindow(idx int, data []byte, lo, hi int, sc *scratch, handler MatchHandler) (bool, error) {
 	if lo < 0 || hi > len(data) || lo >= hi {
 		return d.finalizeHit(idx, data, sc, handler)
 	}
@@ -1336,13 +1389,17 @@ func (d *mvsDB) finalizeHitWindow(idx int, data []byte, lo, hi int, sc *scratch,
 		return d.finalizeHit(idx, data, sc, handler)
 	}
 	if !d.reportLoc {
-		return !handler(Match{ID: cp.id, From: -1, To: -1})
+		return !handler(Match{ID: cp.id, From: -1, To: -1}), nil
 	}
 	sub := data[lo:hi]
 	// re2Loc 的语言与 NFA 相等，但为保持原 regexp2 的 leftmost 语义仍必须交 verifier。
 	// litSpan 已完整覆盖每个匹配，故 verifier 同样可在子串运行；将相对偏移平移回原文。
 	if d.re2Loc[idx] {
-		for _, loc := range findAllInRecord(cp.v, data, lo, hi, sc) {
+		locs, err := findAllInRecord(cp.v, data, lo, hi, sc)
+		if err != nil {
+			return false, verifierScanError(cp, err)
+		}
+		for _, loc := range locs {
 			// PCRE2's existence-only verifier reports unknown offsets. A
 			// localized window must not turn the -1 sentinel into a position.
 			from, to := loc[0], loc[1]
@@ -1353,19 +1410,19 @@ func (d *mvsDB) finalizeHitWindow(idx int, data []byte, lo, hi int, sc *scratch,
 				to += lo
 			}
 			if !handler(Match{ID: cp.id, From: from, To: to}) {
-				return true
+				return true, nil
 			}
 		}
-		return false
+		return false, nil
 	}
 	if d.kernel != nil {
 		if locs, ok := d.kernel.findAllLoc(idx, sub, sc); ok && len(locs) > 0 {
 			for i := 0; i < len(locs); i += 2 {
 				if !handler(Match{ID: cp.id, From: lo + int(locs[i]), To: lo + int(locs[i+1])}) {
-					return true
+					return true, nil
 				}
 			}
-			return false
+			return false, nil
 		}
 	}
 	stopped := false
@@ -1376,7 +1433,7 @@ func (d *mvsDB) finalizeHitWindow(idx int, data []byte, lo, hi int, sc *scratch,
 		}
 		return true
 	})
-	return stopped
+	return stopped, nil
 }
 
 // verifyOne 对一条 pattern 做判定与上报. 有 NFA 时: 先用 existsIn 做廉价存在性门控 (绝大多数
@@ -1384,7 +1441,7 @@ func (d *mvsDB) finalizeHitWindow(idx int, data []byte, lo, hi int, sc *scratch,
 // 精确字节区间 [from,to), 以 Match{ID, From, To} 上报 (匹配内容即 data[from:to]). 无 NFA 的
 // 兜底 pattern (regexp2-only: lookaround/backref) 无法可靠给出字节偏移, 仍以存在性 (-1,-1) 上报.
 // 返回 true 表示 handler 要求停止.
-func (d *mvsDB) verifyOne(idx int, data []byte, sc *scratch, handler MatchHandler) bool {
+func (d *mvsDB) verifyOne(idx int, data []byte, sc *scratch, handler MatchHandler) (bool, error) {
 	cp := d.all[idx]
 	if nfa := d.nfas[idx]; nfa != nil {
 		// 存在性门控: 断言 NFA 走 Go existsInAssertShared (不进 C 内核, 复用每报文共享边界);
@@ -1410,7 +1467,7 @@ func (d *mvsDB) verifyOne(idx int, data []byte, sc *scratch, handler MatchHandle
 			hit = nfa.existsIn(data)
 		}
 		if !hit {
-			return false
+			return false, nil
 		}
 		// 命中后统一收敛到 finalizeHit (含 gate 超集复核 / re2Loc / 断言定位 / 纯 NFA 定位).
 		return d.finalizeHit(idx, data, sc, handler)
@@ -1484,7 +1541,7 @@ func (d *mvsDB) scanAnchoredNoReport(data []byte, anchorBatch, biBatch []int32,
 
 // existsNoReport 是存在性流水 worker 的纯判定入口。它复刻 verifyOne / verifyGateLocalized
 // 的门控语义，但不调用 handler；调用线程收拢结果后统一上报，避免并发 handler。
-func (d *mvsDB) existsNoReport(idx int, data []byte, winLo int, sc *scratch) bool {
+func (d *mvsDB) existsNoReport(idx int, data []byte, winLo int, sc *scratch) (bool, error) {
 	if winLo >= 0 {
 		sub := data
 		if winLo > 0 {
@@ -1508,15 +1565,17 @@ func (d *mvsDB) existsNoReport(idx int, data []byte, winLo int, sc *scratch) boo
 				hit = nfa.existsIn(sub)
 			}
 			if !hit {
-				return false
+				return false, nil
 			}
 		}
-		return len(findAllInRecord(d.all[idx].v, data, winLo, len(data), sc)) > 0
+		locs, err := findAllInRecord(d.all[idx].v, data, winLo, len(data), sc)
+		return len(locs) > 0, verifierScanError(d.all[idx], err)
 	}
 
 	nfa := d.nfas[idx]
 	if nfa == nil {
-		return len(findAllInRecord(d.all[idx].v, data, 0, len(data), sc)) > 0
+		locs, err := findAllInRecord(d.all[idx].v, data, 0, len(data), sc)
+		return len(locs) > 0, verifierScanError(d.all[idx], err)
 	}
 	var hit bool
 	switch {
@@ -1534,12 +1593,13 @@ func (d *mvsDB) existsNoReport(idx int, data []byte, winLo int, sc *scratch) boo
 		hit = nfa.existsIn(data)
 	}
 	if !hit {
-		return false
+		return false, nil
 	}
 	if d.gate[idx] {
-		return len(findAllInRecord(d.all[idx].v, data, 0, len(data), sc)) > 0
+		locs, err := findAllInRecord(d.all[idx].v, data, 0, len(data), sc)
+		return len(locs) > 0, verifierScanError(d.all[idx], err)
 	}
-	return true
+	return true, nil
 }
 
 // verifyGateLocalized 对可局部化超集门做"收窄到 data[winLo:]"的存在性门 + regexp2 复核.
@@ -1549,7 +1609,7 @@ func (d *mvsDB) existsNoReport(idx int, data []byte, winLo int, sc *scratch) boo
 //   - 无假阳: 子切片首位 (winLo) 起不了匹配 (前方 head 距内无该门字面量), 内部命中左上下文真实。
 //
 // gate 的 verifier 命中报 -1/-1, 偏移无需换算; 与整段 reportViaVerifier 同上报。
-func (d *mvsDB) verifyGateLocalized(idx int, data []byte, winLo int, sc *scratch, handler MatchHandler) bool {
+func (d *mvsDB) verifyGateLocalized(idx int, data []byte, winLo int, sc *scratch, handler MatchHandler) (bool, error) {
 	sub := data
 	if winLo > 0 {
 		sub = data[winLo:]
@@ -1576,7 +1636,7 @@ func (d *mvsDB) verifyGateLocalized(idx int, data []byte, winLo int, sc *scratch
 			hit = nfa.existsIn(sub)
 		}
 		if !hit {
-			return false
+			return false, nil
 		}
 	}
 	// regexp2 复核 (收窄到 data[winLo:]) 即权威判定 (与 oracle 同 verifier 对象): gate 命中报 -1/-1。
@@ -1588,13 +1648,17 @@ func (d *mvsDB) verifyGateLocalized(idx int, data []byte, winLo int, sc *scratch
 }
 
 // reportViaVerifier 用 verifier 给出的非重叠区间上报命中 (regexp2-only 为 -1/-1 存在性).
-func (d *mvsDB) reportViaVerifier(cp *compiledPattern, data []byte, lo int, sc *scratch, handler MatchHandler) bool {
-	for _, loc := range findAllInRecord(cp.v, data, lo, len(data), sc) {
+func (d *mvsDB) reportViaVerifier(cp *compiledPattern, data []byte, lo int, sc *scratch, handler MatchHandler) (bool, error) {
+	locs, err := findAllInRecord(cp.v, data, lo, len(data), sc)
+	if err != nil {
+		return false, verifierScanError(cp, err)
+	}
+	for _, loc := range locs {
 		if !handler(Match{ID: cp.id, From: loc[0], To: loc[1]}) {
-			return true
+			return true, nil
 		}
 	}
-	return false
+	return false, nil
 }
 
 func (d *mvsDB) resetScratch(sc *scratch) {

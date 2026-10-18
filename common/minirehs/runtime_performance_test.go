@@ -87,9 +87,14 @@ type runtimeVerifierCount struct {
 }
 
 func (v *runtimeVerifierCount) findAll(data []byte) [][2]int {
+	locs, _ := v.findAllErr(data)
+	return locs
+}
+
+func (v *runtimeVerifierCount) findAllErr(data []byte) ([][2]int, error) {
 	atomic.AddInt64(&v.calls, 1)
 	atomic.AddInt64(&v.bytes, int64(len(data)))
-	return v.verifier.findAll(data)
+	return v.verifier.findAllErr(data)
 }
 
 // This diagnostic intentionally retains independent per-verifier subjects;
