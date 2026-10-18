@@ -10,7 +10,7 @@ import (
 )
 
 func TestUnicodeFoldLiteralFiltering(t *testing.T) {
-	for _, expr := range []string{`(?i)server[\w]+(?=!)`, `(?i)key[\w]+(?=!)`, `(?i)(?:kkserver|erver)[\w]+(?=!)`, `(?i)héllo[\w]+(?=!)`, `(?i)kkserverks[0-9]{2}`, `(?i)(?:kkserverks|erver)[0-9]{2}`, `(?i)server[0-9]{2}`, `(?i)kkkkkkkkkkkkheader[0-9]{2}`, `(?i)^kkkkheader[0-9]{2}$`, `(?i)^sss$`, `(?i)^kkk$`} {
+	for _, expr := range []string{`(?i)server[\w]+(?=!)`, `(?i)key[\w]+(?=!)`, `(?i)(?:kkserver|erver)[\w]+(?=!)`, `(?i)héllo[\w]+(?=!)`, `(?i)(?'word'SK)`, `(?i)kkserverks[0-9]{2}`, `(?i)(?:kkserverks|erver)[0-9]{2}`, `(?i)server[0-9]{2}`, `(?i)kkkkkkkkkkkkheader[0-9]{2}`, `(?i)^kkkkheader[0-9]{2}$`, `(?i)^sss$`, `(?i)^kkk$`} {
 		for _, locate := range []bool{false, true} {
 			for _, kind := range []BackendKind{BackendMVS, BackendEngine} {
 				t.Run(fmt.Sprintf("%s/%v/%s", kind, locate, expr), func(t *testing.T) {
@@ -37,7 +37,7 @@ func TestUnicodeFoldLiteralFiltering(t *testing.T) {
 						t.Fatal(e)
 					}
 					defer oracle.Close()
-					for _, input := range []string{"serveré!", "ſerveré!", "Keyé!", "KKſerveré!", "KKſerverKſ42", "HÉLLOé!", "héllo42!", "ſerver42", strings.Repeat("K", 12) + "header42", "KKKKheader42", "ſſſ", "KKK", "unrelated"} {
+					for _, input := range []string{"serveré!", "ſerveré!", "Keyé!", "KKſerveré!", "KKſerverKſ42", "SK", "ſK", "HÉLLOé!", "héllo42!", "ſerver42", strings.Repeat("K", 12) + "header42", "KKKKheader42", "ſſſ", "KKK", "unrelated"} {
 						for _, padding := range []string{"", strings.Repeat(" ", 1024)} {
 							data := []byte(padding + input)
 							want, e := imageMatches(oracle, data)
