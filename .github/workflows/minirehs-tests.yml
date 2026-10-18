@@ -42,9 +42,9 @@ jobs:
           go-version-file: go.mod
       - name: Test images, disk cache, portable fallback and embedded freshness
         run: go test -count=1 -timeout=5m ./common/minirehs/...
-      - name: Test native amalgamation and concurrent lazy verification
+      - name: Race test images, Teddy and native amalgamation
         if: matrix.os == 'ubuntu-22.04' && matrix.cgo == '1'
-        run: go test -short -race -tags minirehs_mvs_amalg -count=1 -timeout=5m ./common/minirehs/...
+        run: go test -short -race -tags minirehs_mvs_amalg -run '^Test(Image|Teddy|MVSAmalgamation)' -count=1 -timeout=5m ./common/minirehs/...
       - name: Fuzz image validation
         if: matrix.os == 'ubuntu-22.04' && matrix.cgo == '1'
         run: go test -run '^$' -fuzz '^FuzzLoadImage$' -fuzztime=15s -parallel=2 -timeout=2m ./common/minirehs

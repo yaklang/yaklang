@@ -12,6 +12,10 @@ import (
 	"golang.org/x/sys/windows"
 )
 
+func transientImageLockError(err error) bool {
+	return errors.Is(err, windows.ERROR_ACCESS_DENIED) || errors.Is(err, windows.ERROR_SHARING_VIOLATION)
+}
+
 // Go's ordinary file reader omits FILE_SHARE_DELETE on Windows. Cache readers
 // allow replacement while their handle still reads the old complete file.
 func readImageFile(path string) ([]byte, error) {

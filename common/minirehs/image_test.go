@@ -2,7 +2,6 @@ package minirehs
 
 import (
 	"bytes"
-	"compress/gzip"
 	"encoding/binary"
 	"errors"
 	"hash/crc32"
@@ -43,6 +42,16 @@ func compileImageTest(tb testing.TB, pats []Pattern, loc bool) (Database, []byte
 		tb.Fatal(err)
 	}
 	return db, data
+}
+
+func compileRawImageTest(tb testing.TB, pats []Pattern, loc bool) (Database, []byte) {
+	tb.Helper()
+	db, _ := compileImageTest(tb, pats, loc)
+	raw, err := db.(*database).marshalUncompressedImage()
+	if err != nil {
+		tb.Fatal(err)
+	}
+	return db, raw
 }
 
 func imageMatches(db Database, in []byte) ([]Match, error) {
@@ -246,6 +255,9 @@ func TestImageGetRequest(t *testing.T) {
 	if !reflect.DeepEqual(compiled.Info(), loaded.Info()) {
 		t.Fatal("GetRequest metadata differs")
 	}
+	if !bytes.Equal(compiled.(*database).imageMVS().blob, loaded.(*database).imageMVS().blob) {
+		t.Fatal("GetRequest native blob was not restored exactly")
+	}
 	inputs := [][]byte{[]byte("HTTP/1.1 200 OK\r\nServer: nginx/1.24.0\r\n\r\n<html>ok</html>"), []byte("SSH-2.0-OpenSSH_9.0\r\n"), {0x80}, []byte("HTTP/1.0 404 Not Found\r\n\r\n")}
 	for _, in := range inputs {
 		want, e := imageMatches(compiled, in)
@@ -254,10 +266,14 @@ func TestImageGetRequest(t *testing.T) {
 			t.Fatal("GetRequest scan differs", want, got, e, e2)
 		}
 	}
-	var compressed bytes.Buffer
-	gz, _ := gzip.NewWriterLevel(&compressed, gzip.BestSpeed)
-	_, _ = gz.Write(data)
-	_ = gz.Close()
+	raw, err := compiled.(*database).marshalUncompressedImage()
+	if err != nil {
+		t.Fatal(err)
+	}
+	packed, err := compiled.(*database).marshalCompilationImage(true)
+	if err != nil {
+		t.Fatal(err)
+	}
 	m := compiled.(*database).imageMVS()
 	revBytes := 0
 	for i, n := range m.revNFAs {
@@ -265,7 +281,11 @@ func TestImageGetRequest(t *testing.T) {
 			revBytes += len(encodeUnit(unitFromNFA(n, i, true)))
 		}
 	}
-	t.Logf("patterns=%d image=%d native_blob=%d reverse_units=%d metadata=%d gzip_best_speed=%d", len(pats), len(data), len(m.blob), revBytes, len(data)-len(m.blob)-revBytes, compressed.Len())
+	packedBlob, err := packImageBlob(m.blob, m.n)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Logf("patterns=%d compressed_image=%d packed_image=%d dense_image=%d dense_native_blob=%d packed_native_blob=%d reverse_units=%d dense_metadata=%d", len(pats), len(data), len(packed), len(raw), len(m.blob), len(packedBlob), revBytes, len(raw)-len(m.blob)-revBytes)
 }
 
 func imageFixCRC(b []byte) {
@@ -273,7 +293,7 @@ func imageFixCRC(b []byte) {
 }
 
 func TestImageRejectMalformed(t *testing.T) {
-	_, valid := compileImageTest(t, []Pattern{{ID: 1, Expr: `\babc\b`}}, false)
+	_, valid := compileRawImageTest(t, []Pattern{{ID: 1, Expr: `\babc\b`}}, false)
 	for _, off := range []int{0, 4, 8, 12, 16, 28, len(valid) - 1} {
 		b := bytes.Clone(valid)
 		b[off] ^= 0xff
@@ -304,7 +324,7 @@ func TestImageRejectMalformed(t *testing.T) {
 			_ = db.Close()
 		}
 	}
-	_, blob := compileImageTest(t, imageTestPatterns(), false)
+	_, blob := compileRawImageTest(t, imageTestPatterns(), false)
 	start := bytes.Index(blob, []byte("MVS1"))
 	if start < 0 {
 		t.Fatal("no blob")
@@ -515,8 +535,18 @@ func TestImageCache(t *testing.T) {
 
 func FuzzLoadImage(f *testing.F) {
 	f.Add([]byte("REHS"))
-	_, valid := compileImageTest(f, imageTestPatterns(), false)
+	db, valid := compileImageTest(f, imageTestPatterns(), false)
 	f.Add(valid)
+	raw, err := db.(*database).marshalUncompressedImage()
+	if err != nil {
+		f.Fatal(err)
+	}
+	f.Add(raw)
+	packed, err := db.(*database).marshalCompilationImage(true)
+	if err != nil {
+		f.Fatal(err)
+	}
+	f.Add(packed)
 	f.Fuzz(func(t *testing.T, b []byte) {
 		// Recompute a valid CRC for some inputs so mutations reach unit decoding.
 		if len(b) > imageHeaderSize+4 && len(b) < 1<<20 {

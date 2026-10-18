@@ -227,14 +227,13 @@ static void build_teddy(mrehs_pf *pf, const uint8_t *litFlat, const int32_t *lit
         }
     }
     pf->useTeddy = 1;
-    build_confirm_index(pf);
 }
 
 /* Teddy does not consult an AC table, including in its scalar CPU fallback.
  * Build it directly from literals instead of constructing and copying a dense
  * 256-way DFA which will never be scanned. NULL asks Go to use the AC fallback. */
 mrehs_pf *mrehs_pf_new_teddy(int32_t numLit, const uint8_t *litFlat,
-                            const int32_t *litOff) {
+                            const int32_t *litOff, int32_t indexed) {
     if (numLit <= 0 || !litFlat || !litOff) return NULL;
     mrehs_pf *pf = (mrehs_pf *)calloc(1, sizeof(mrehs_pf));
     if (!pf) return NULL;
@@ -242,6 +241,7 @@ mrehs_pf *mrehs_pf_new_teddy(int32_t numLit, const uint8_t *litFlat,
     pf->numLitWords = (numLit + 63) / 64;
     build_teddy(pf, litFlat, litOff, numLit);
     if (!pf->useTeddy) { free(pf); return NULL; }
+    if (indexed) build_confirm_index(pf);
     return pf;
 }
 
@@ -274,6 +274,7 @@ mrehs_pf *mrehs_pf_new(const int32_t *next, int32_t numStates,
     build_shufti(pf);
     if (litFlat != NULL && litOff != NULL) {
         build_teddy(pf, litFlat, litOff, numLit);
+        if (pf->useTeddy) build_confirm_index(pf);
     }
     return pf;
 }

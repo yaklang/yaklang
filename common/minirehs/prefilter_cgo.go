@@ -10,7 +10,7 @@ package minirehs
 
 typedef struct mrehs_pf mrehs_pf;
 mrehs_pf *mrehs_pf_new_teddy(int32_t numLit, const uint8_t *litFlat,
-                             const int32_t *litOff);
+                             const int32_t *litOff, int32_t indexed);
 mrehs_pf *mrehs_pf_new(const int32_t *next, int32_t numStates,
                        const int32_t *outOff, const int32_t *outFlat,
                        int32_t outFlatLen, int32_t numLit,
@@ -51,6 +51,11 @@ const engineTier = 2
 // 退回纯 Go 既避免回归, 又保持"标量孪生兜底"的可移植语义. 正确性: 两条路径命中集合逐项一致
 // (teddy_cgo_test.go: Teddy SIMD == 标量孪生 == 纯 Go AC), 预过滤只决定验证哪些位置, 不改判定.
 func newPrefilter(li *literalIndex) prefilter {
+	for _, lit := range li.literals {
+		if len(lit) < 2 {
+			return newScalarPrefilter(li)
+		}
+	}
 	if p := newCGOPrefilter(li); p != nil {
 		if p.useTeddy() {
 			return p
@@ -68,6 +73,12 @@ type cgoPrefilter struct {
 }
 
 func newCGOPrefilter(li *literalIndex) *cgoPrefilter {
+	return newCGOPrefilterWithIndex(li, true)
+}
+
+// The alternate constructor keeps a same-binary benchmark of the original
+// confirmation algorithm. Production always selects the indexed constructor.
+func newCGOPrefilterWithIndex(li *literalIndex, indexed bool) *cgoPrefilter {
 	if li.empty() {
 		return nil
 	}
@@ -76,7 +87,11 @@ func newCGOPrefilter(li *literalIndex) *cgoPrefilter {
 	if len(litFlat) > 0 {
 		litFlatPtr = (*C.uint8_t)(unsafe.Pointer(&litFlat[0]))
 	}
-	if handle := C.mrehs_pf_new_teddy(C.int32_t(len(li.literals)), litFlatPtr, (*C.int32_t)(unsafe.Pointer(&litOff[0]))); handle != nil {
+	indexFlag := C.int32_t(0)
+	if indexed {
+		indexFlag = 1
+	}
+	if handle := C.mrehs_pf_new_teddy(C.int32_t(len(li.literals)), litFlatPtr, (*C.int32_t)(unsafe.Pointer(&litOff[0])), indexFlag); handle != nil {
 		return &cgoPrefilter{handle: handle, li: li}
 	}
 	// 复用纯 Go 的 Aho-Corasick 构建, 得到不可变转移/输出表, 再拷贝进 C 内存.

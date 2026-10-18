@@ -93,6 +93,7 @@ func LoadOrCompile(path string, patterns []Pattern, opts ...Option) (Database, e
 
 func lockImageCache(path string, timeout time.Duration) (func(), error) {
 	deadline := time.Now().Add(timeout)
+	var transientSince time.Time
 	for {
 		f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0644)
 		if err == nil {
@@ -103,7 +104,20 @@ func lockImageCache(path string, timeout time.Duration) (func(), error) {
 			return func() { _ = os.Remove(path) }, nil
 		}
 		if !errors.Is(err, os.ErrExist) {
-			return nil, err
+			// CREATE_NEW can report ACCESS_DENIED while a Windows lock name
+			// is pending deletion. Retry that brief state; a real ACL denial
+			// still returns an I/O error after at most one second.
+			if !transientImageLockError(err) {
+				return nil, err
+			}
+			if transientSince.IsZero() {
+				transientSince = time.Now()
+			}
+			if time.Since(transientSince) >= time.Second {
+				return nil, err
+			}
+		} else {
+			transientSince = time.Time{}
 		}
 		if !time.Now().Before(deadline) {
 			return nil, fmt.Errorf("minirehs: timed out waiting for image cache lock %q", path)

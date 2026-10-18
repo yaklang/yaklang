@@ -23,6 +23,8 @@ const (
 	imageBiAnchor
 	imageAnchorMerged
 	imageAssertMerged
+	imageCompressed
+	imagePacked
 )
 
 const (
@@ -94,9 +96,29 @@ func (d *database) imageMVS() *mvsDB {
 	return nil
 }
 
-// MarshalImage exports a deterministic, little-endian compilation image.
+// MarshalImage exports a deterministic image with shared, compact tables and
+// compression. LoadImage also accepts earlier dense, uncompressed images.
 // The returned bytes own their storage. No regex is parsed or compiled here.
 func (d *database) MarshalImage() ([]byte, error) {
+	m := d.imageMVS()
+	if m == nil {
+		return nil, ErrUnsupportedImage
+	}
+	if m.encodedImage != nil {
+		return bytes.Clone(m.encodedImage), nil
+	}
+	raw, err := d.marshalCompilationImage(uint64(len(m.blob)) <= maxPackedImageSize)
+	if err != nil {
+		return nil, err
+	}
+	return compressCompilationImage(raw)
+}
+
+func (d *database) marshalUncompressedImage() ([]byte, error) {
+	return d.marshalCompilationImage(false)
+}
+
+func (d *database) marshalCompilationImage(packed bool) ([]byte, error) {
 	m := d.imageMVS()
 	if m == nil {
 		return nil, ErrUnsupportedImage
@@ -109,20 +131,39 @@ func (d *database) MarshalImage() ([]byte, error) {
 	}
 	reverse := make([][]byte, m.n)
 	nrev := 0
+	flags := m.imageFlags
+	blob := m.blob
+	var tables *packedStringWriter
+	if packed {
+		var err error
+		blob, err = packImageBlob(blob, m.n)
+		if err != nil {
+			return nil, err
+		}
+		flags |= imagePacked
+		tables = &packedStringWriter{ids: make(map[string]uint64)}
+	}
 	for i, n := range m.revNFAs {
 		if n != nil {
 			reverse[i] = encodeUnit(unitFromNFA(n, i, true))
+			if packed {
+				var err error
+				reverse[i], err = packReverseImageUnit(reverse[i])
+				if err != nil {
+					return nil, err
+				}
+			}
 			nrev++
 		}
 	}
 	preconditions := encodeImagePreconditions(m)
-	size := imageEncodedSize(m, reverse) + 4 + uint64(len(preconditions))
+	size := imageEncodedSize(m, reverse) - uint64(len(m.blob)) + uint64(len(blob)) + 4 + uint64(len(preconditions))
 	if size > 0x7fffffff {
 		return nil, ErrUnsupportedImage
 	}
 	b := make([]byte, 0, int(size))
 	b = append(b, 'R', 'E', 'H', 'S')
-	for _, v := range []uint32{imageVersion, mvsBlobVersion, m.imageFlags, uint32(m.minLiteralLen)} {
+	for _, v := range []uint32{imageVersion, mvsBlobVersion, flags, uint32(m.minLiteralLen)} {
 		b = putU32(b, v)
 	}
 	b = putU64(b, m.patternHash)
@@ -150,10 +191,10 @@ func (d *database) MarshalImage() ([]byte, error) {
 		for _, v := range []int32{int32(cp.winW), m.gateHead[i], m.win[i].head, m.win[i].tail} {
 			b = putI32(b, v)
 		}
-		b = imagePutString(b, cp.expr)
-		b = imagePutStrings(b, cp.literals)
+		b = tables.str(b, cp.expr)
+		b = tables.strings(b, cp.literals)
 	}
-	b = imagePutStrings(b, m.literals)
+	b = tables.strings(b, m.literals)
 	for i, pats := range m.litToPat {
 		for _, vs := range [][]int32{pats, m.litHead[i], m.litBiHead[i], m.litBiTail[i]} {
 			b = imagePutInts(b, vs)
@@ -177,7 +218,7 @@ func (d *database) MarshalImage() ([]byte, error) {
 			b = imagePutBytes(b, raw)
 		}
 	}
-	b = imagePutBytes(b, m.blob)
+	b = imagePutBytes(b, blob)
 	// v1 leaves regexp2 verifiers lazy. Its implementation-dependent bytecode is
 	// deliberately absent from this portable format.
 	for i, cp := range m.all {
@@ -224,6 +265,9 @@ type compilationImageHeader struct {
 	minLiteralLen int
 	hash          uint64
 	n             int
+	compressed    bool
+	packed        bool
+	rawSize       int
 }
 
 func readImageHeader(data []byte) (compilationImageHeader, error) {
@@ -238,19 +282,37 @@ func readImageHeader(data []byte) (compilationImageHeader, error) {
 		return h, ErrIncompatibleImage
 	}
 	h.flags = binary.LittleEndian.Uint32(data[12:])
-	if h.flags & ^uint32(imageReportLocation|imageBiAnchor) != 0 {
+	if h.flags & ^uint32(imageReportLocation|imageBiAnchor|imageCompressed|imagePacked) != 0 {
 		return h, ErrIncompatibleImage
+	}
+	h.compressed = h.flags&imageCompressed != 0
+	h.packed = h.flags&imagePacked != 0
+	h.flags &^= imageCompressed | imagePacked
+	payloadSize := len(data)
+	if h.compressed {
+		if len(data) < imageHeaderSize+8 {
+			return h, ErrCorruptImage
+		}
+		h.rawSize = int(binary.LittleEndian.Uint32(data[imageHeaderSize:]))
+		if h.rawSize < imageHeaderSize+4 || h.rawSize > 0x7fffffff {
+			return h, ErrCorruptImage
+		}
+		payloadSize = h.rawSize
 	}
 	h.minLiteralLen = int(binary.LittleEndian.Uint32(data[16:]))
 	h.hash = binary.LittleEndian.Uint64(data[20:])
 	h.n = int(binary.LittleEndian.Uint32(data[28:]))
-	if h.minLiteralLen < 1 || h.minLiteralLen > 0x7fffffff || h.n < 1 || h.n > (len(data)-imageHeaderSize)/38 {
+	minPatternSize := 38
+	if h.packed {
+		minPatternSize = 35
+	}
+	if h.minLiteralLen < 1 || h.minLiteralLen > 0x7fffffff || h.n < 1 || h.n > (payloadSize-imageHeaderSize)/minPatternSize {
 		return h, ErrCorruptImage
 	}
 	return h, nil
 }
 
-// LoadImage opens an MVS compilation image without compiling regexes. The input
+// LoadImage opens a compressed or raw MVS image without compiling regexes. The input
 // can be reused or overwritten after return. Verification-only expressions are
 // compiled with sync.Once when a scan first needs them. CRC32 detects accidental
 // corruption, not authenticity; distribute embedded images with the binary.
@@ -263,8 +325,28 @@ func LoadImage(data []byte) (Database, error) {
 }
 
 func loadCompilationImage(data []byte, h compilationImageHeader) (Database, error) {
+	encoded := bytes.Clone(data)
+	raw := encoded
+	if h.compressed {
+		var err error
+		raw, err = decompressCompilationImage(data, h.rawSize)
+		if err != nil {
+			return nil, err
+		}
+		inner, err := readImageHeader(raw)
+		if err != nil || inner.compressed || inner.packed != h.packed || inner.flags != h.flags || inner.minLiteralLen != h.minLiteralLen || inner.hash != h.hash || inner.n != h.n {
+			return nil, ErrCorruptImage
+		}
+	}
+	return loadUncompressedImage(raw, h, encoded)
+}
+
+// raw and encoded are owned by this loader. A dense blob retains its raw slice;
+// packed blobs are expanded once. encoded preserves byte-identical re-export,
+// including legacy uncompressed images and images made by other codec versions.
+func loadUncompressedImage(data []byte, h compilationImageHeader, encoded []byte) (Database, error) {
 	var err error
-	r := &imageReader{b: data[:len(data)-4], off: imageHeaderSize}
+	r := &imageReader{b: data[:len(data)-4], off: imageHeaderSize, packed: h.packed}
 	d := &mvsDB{n: h.n, imageFlags: h.flags, minLiteralLen: h.minLiteralLen, patternHash: h.hash, reportLoc: h.flags&imageReportLocation != 0,
 		all: make([]*compiledPattern, h.n), nfas: make([]*mvsNFA, h.n), revNFAs: make([]*mvsNFA, h.n),
 		gate: make([]bool, h.n), re2Loc: make([]bool, h.n), windowable: make([]bool, h.n), batchable: make([]bool, h.n),
@@ -320,6 +402,13 @@ func loadCompilationImage(data []byte, h compilationImageHeader) (Database, erro
 		if idx < 0 || idx >= d.n || d.revNFAs[idx] != nil {
 			return nil, ErrCorruptImage
 		}
+		if h.packed {
+			var err error
+			raw, err = unpackReverseImageUnit(raw)
+			if err != nil {
+				return nil, err
+			}
+		}
 		u, e := decodeImageUnit(raw, d.n)
 		if e != nil || u.hasAssert || u.hasDFA || u.hasLimEx || u.hasAnchored || !bsIsZero(u.lastEnd) {
 			return nil, ErrCorruptImage
@@ -327,7 +416,14 @@ func loadCompilationImage(data []byte, h compilationImageHeader) (Database, erro
 		d.revNFAs[idx] = nfaFromImageUnit(u)
 		d.hasBiAnchor = true
 	}
-	d.blob = bytes.Clone(r.bytes())
+	d.blob = r.bytes()
+	if h.packed {
+		d.blob, err = unpackImageBlob(d.blob, d.n)
+		if err != nil {
+			return nil, err
+		}
+	}
+	d.encodedImage = encoded
 	for i, cp := range d.all {
 		if !cp.v.exact() {
 			if r.i32() != int32(i) {
