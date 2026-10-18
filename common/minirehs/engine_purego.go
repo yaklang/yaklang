@@ -73,6 +73,7 @@ func (d *engineDB) close() error {
 
 func (d *engineDB) scan(data []byte, sc *scratch, handler MatchHandler) (bool, error) {
 	d.resetScratch(sc)
+	defer sc.clearVerifierText()
 
 	// 1) 字面量预过滤: 一次扫描得到所有字面量命中 (含位置).
 	//    窗口 exact 就地邻域验证; 非窗口 exact 在首次命中其字面量时整段验证一次.
@@ -101,7 +102,7 @@ func (d *engineDB) scan(data []byte, sc *scratch, handler MatchHandler) (bool, e
 	for _, idx := range d.alwaysOnExact {
 		sc.statAlwaysScan++
 		cp := d.all[idx]
-		for _, loc := range cp.v.findAll(data) {
+		for _, loc := range findAllInRecord(cp.v, data, 0, len(data), sc) {
 			if !handler(Match{ID: cp.id, From: loc[0], To: loc[1]}) {
 				return true, nil
 			}
@@ -111,7 +112,7 @@ func (d *engineDB) scan(data []byte, sc *scratch, handler MatchHandler) (bool, e
 	// 3) regexp2-only always-on: 逐条验证整段数据.
 	for _, cp := range d.inexact {
 		sc.statAlwaysScan++
-		for _, loc := range cp.v.findAll(data) {
+		for _, loc := range findAllInRecord(cp.v, data, 0, len(data), sc) {
 			if !handler(Match{ID: cp.id, From: loc[0], To: loc[1]}) {
 				return true, nil
 			}
@@ -150,7 +151,7 @@ func (d *engineDB) verifyFull(data []byte, idx int, sc *scratch, handler MatchHa
 	sc.fullDone[idx] = true
 	sc.statFullScan++
 	cp := d.all[idx]
-	for _, loc := range cp.v.findAll(data) {
+	for _, loc := range findAllInRecord(cp.v, data, 0, len(data), sc) {
 		if !handler(Match{ID: cp.id, From: loc[0], To: loc[1]}) {
 			return true, nil
 		}
@@ -160,6 +161,7 @@ func (d *engineDB) verifyFull(data []byte, idx int, sc *scratch, handler MatchHa
 
 // resetScratch 复位每次扫描需要清零的复用缓冲 (fullDone / dedup).
 func (d *engineDB) resetScratch(sc *scratch) {
+	sc.clearVerifierText()
 	if cap(sc.fullDone) < d.n {
 		sc.fullDone = make([]bool, d.n)
 	} else {

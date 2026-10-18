@@ -111,14 +111,68 @@ type pcre2Verifier struct {
 func (v *pcre2Verifier) exact() bool { return false }
 
 func (v *pcre2Verifier) findAll(data []byte) [][2]int {
+	return v.findAllString(string(data))
+}
+
+func (v *pcre2Verifier) findAllString(data string) [][2]int {
 	v.once.Do(func() {
 		if v.yak == nil {
 			v.yak = regexp_utils.NewYakRegexpUtils(v.expr)
 		}
 	})
-	ok, err := v.yak.Match(data)
+	ok, err := v.yak.MatchString(data)
 	if err != nil || !ok {
 		return nil
 	}
 	return [][2]int{{-1, -1}}
+}
+
+// findAllInRecord shares subject copies between PCRE2 confirmations of the
+// same record. Copy the first requested window only; geometric growth bounds
+// all later copies by O(record size), without copying a large irrelevant prefix
+// for a single localized match. RE2 continues to consume the original bytes.
+// A scratch belongs to one scan/worker; clearVerifierText ends that lifetime.
+func findAllInRecord(v verifier, data []byte, lo, hi int, sc *scratch) [][2]int {
+	pcre, ok := v.(*pcre2Verifier)
+	if !ok || sc == nil {
+		return v.findAll(data[lo:hi])
+	}
+	if lo == hi {
+		return pcre.findAllString("")
+	}
+	base := sc.verifierTextLo
+	end := base + len(sc.verifierText)
+	if sc.verifierText == "" || lo < base || hi > end {
+		if sc.verifierText == "" {
+			base, end = lo, hi
+		} else {
+			if lo < base {
+				base = lo
+			}
+			if hi > end {
+				end = hi
+			}
+			size := len(sc.verifierText)
+			if size > len(data)/2 {
+				size = len(data)
+			} else {
+				size *= 2
+			}
+			if size < end-base {
+				size = end - base
+			}
+			base = end - size
+			if base < 0 {
+				base = 0
+			}
+			end = base + size
+		}
+		sc.verifierText = string(data[base:end])
+		sc.verifierTextLo = base
+	}
+	return pcre.findAllString(sc.verifierText[lo-base : hi-base])
+}
+
+func (s *scratch) clearVerifierText() {
+	s.verifierText, s.verifierTextLo = "", 0
 }

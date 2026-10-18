@@ -52,7 +52,7 @@ func LoadOrCompile(path string, patterns []Pattern, opts ...Option) (Database, e
 			return nil, e
 		}
 		h, e := readImageHeader(data)
-		if e != nil || h.hash != hash || h.flags != flags || h.minLiteralLen != cfg.minLiteralLen || h.n != len(patterns) {
+		if e != nil || h.version != imageVersion || h.hash != hash || h.flags != flags || h.minLiteralLen != cfg.minLiteralLen || h.n != len(patterns) {
 			return nil, nil
 		}
 		db, e := loadCompilationImage(data, h)

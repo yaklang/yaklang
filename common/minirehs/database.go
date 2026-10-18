@@ -31,6 +31,9 @@ type batchMatch struct {
 
 // scratch 是 Scratch 的内部实现, 持有可复用缓冲区.
 type scratch struct {
+	verifierText   string // Immutable subject window, shared by one record's verification worker.
+	verifierTextLo int    // Absolute start of verifierText in the record.
+
 	lower      []byte                // ASCII 小写化数据缓冲 (供大小写无关的字面量预过滤复用)
 	hits       []litHit              // 字面量预过滤命中缓冲 (含位置)
 	cpairs     []int32               // CGO 预过滤输出的 (end,litID) 对缓冲 (NoCGO 不使用)
@@ -198,6 +201,7 @@ type anchoredWorkerTask struct {
 }
 
 func (s *scratch) Close() error {
+	s.clearVerifierText()
 	s.workerCloseOnce.Do(func() {
 		for i := range s.batchLanes {
 			if s.batchLanes[i] != nil {
@@ -225,6 +229,7 @@ type Database interface {
 	// NewScratch 分配一份与该 db 绑定的可复用扫描临时区.
 	NewScratch() (Scratch, error)
 	// Scan 对完整 data 做 block 扫描, 每命中一次调用 handler; handler 返回 false 提前终止.
+	// data 在调用返回前保持只读；每个并行或嵌套 Scan 应使用独立 Scratch。
 	Scan(data []byte, s Scratch, handler MatchHandler) error
 	// ScanBatch 以 1-4 个独占 lane 并行扫描多条独立记录。并行路径先完成全部扫描，再按
 	// records 输入顺序串行重放 handler；返回 false 仅停止后续回调，不取消已完成的扫描工作。

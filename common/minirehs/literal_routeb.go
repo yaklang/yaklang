@@ -260,6 +260,23 @@ func rewriteEscape(s string, i int, inClass bool, b *strings.Builder, widened *b
 // copyClass 拷贝一个字符类 [..](含起始 '['), 处理内部转义 (尤其 \uXXXX -> \x{XXXX}).
 // 返回消费到的下一个下标 (即匹配的 ']' 之后).
 func copyClass(s string, i int, b *strings.Builder, widened *bool) (int, bool) {
+	end, broad, normalize := scanClass(s, i)
+	if end == 0 {
+		return 0, false
+	}
+	if broad {
+		// Unicode/PCRE classes cannot be replaced locally inside a negated
+		// class: [^ANY] would shrink its language. Widen the ENTIRE atom to
+		// one arbitrary rune instead, preserving literals outside the class.
+		// The original PCRE2 verifier still decides every surviving candidate.
+		*widened = true
+		b.WriteString(`[\s\S]`)
+		return end, true
+	}
+	if !normalize {
+		b.WriteString(s[i:end])
+		return end, true
+	}
 	n := len(s)
 	b.WriteByte('[')
 	j := i + 1
@@ -295,6 +312,55 @@ func copyClass(s string, i int, b *strings.Builder, widened *bool) (int, bool) {
 		j++
 	}
 	return 0, false // 未闭合的字符类
+}
+
+// scanClass locates an ordinary bracket atom without interpreting its set.
+// Quoted and escaped brackets, initial literal ], and POSIX classes cannot
+// terminate the outer atom. Only \u escapes need the legacy normalization pass.
+func scanClass(s string, start int) (end int, broad, normalize bool) {
+	j := start + 1
+	if j < len(s) && s[j] == '^' {
+		j++
+	}
+	if j < len(s) && s[j] == ']' {
+		j++
+	}
+	for j < len(s) {
+		switch s[j] {
+		case '\\':
+			if j+1 >= len(s) {
+				return 0, false, false
+			}
+			next := s[j+1]
+			if next == 'Q' {
+				quotedEnd := strings.Index(s[j+2:], `\E`)
+				if quotedEnd < 0 {
+					return 0, false, false
+				}
+				j += quotedEnd + 4
+				continue
+			}
+			broad = broad || strings.ContainsRune("dDsSwWhHvVpP", rune(next))
+			normalize = normalize || next == 'u'
+			j += 2
+		case ']':
+			return j + 1, broad, normalize
+		case '[':
+			if j+1 < len(s) && s[j+1] == ':' {
+				posixEnd := strings.Index(s[j+2:], ":]")
+				if posixEnd < 0 {
+					return 0, false, false
+				}
+				broad = true
+				j += posixEnd + 4
+			} else {
+				j++
+			}
+		default:
+			j++
+		}
+	}
+	return 0, false, false
 }
 
 // rewriteGroupOpen 处理一个 '(' 起始的分组开头. 对零宽断言整体替换为 (?:); 对原子组/命名捕获
@@ -407,31 +473,22 @@ func findGroupClose(s string, openIdx int) (int, bool) {
 		c := s[i]
 		switch c {
 		case '\\':
+			if i+1 < n && s[i+1] == 'Q' {
+				quotedEnd := strings.Index(s[i+2:], `\E`)
+				if quotedEnd < 0 {
+					return 0, false
+				}
+				i += quotedEnd + 4
+				continue
+			}
 			i += 2
 			continue
 		case '[':
-			// 跳过字符类 (内部的 ( ) 不计).
-			j := i + 1
-			if j < n && s[j] == '^' {
-				j++
-			}
-			if j < n && s[j] == ']' {
-				j++
-			}
-			for j < n {
-				if s[j] == '\\' {
-					j += 2
-					continue
-				}
-				if s[j] == ']' {
-					break
-				}
-				j++
-			}
-			if j >= n {
+			j, _, _ := scanClass(s, i)
+			if j == 0 {
 				return 0, false
 			}
-			i = j + 1
+			i = j
 			continue
 		case '(':
 			depth++
