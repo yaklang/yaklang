@@ -89,4 +89,31 @@ trafficguard 改用 MatchedIndexesErr；候选过滤失败时对全部原规则�
 这两类证据分开记录，没有把 Go 状态注入冒充 C 内存分配故障。
 池高水位和 Group 常驻 worker 所有权继续在 T06/T15 检查；本阶段尚未声称完整 M5 验收。
 
+## T06 Windows 资源与分配检查点
+
+成功 native Scan 先返回 nil，避免每条记录分配 8 B 的 errors.As 目标；五轮交错 A/B 中，
+Sparse/Zero 从 8 B/1 alloc 降为 0，HTTP 从 1032 B/2 alloc 降为 1024 B/1 alloc。
+耗时差异较小且有噪声，不将这一改动宣传成明显吞吐提升。
+
+Group 的 sync.Pool 曾留下无法枚举关闭的永久 worker。现改为可排空的有界 idle cache，
+最多保留 min(GOMAXPROCS,4) 个 Scratch；并发扫描不受此 idle 数量限制。
+Close 拒绝新借用，等待已借出的 Scratch 完成归还/清理，关闭 idle worker 后关闭 DB；
+同一 Group 的 handler 内不能调用 Close。GC finalizer 作为漏掉显式 Close 时的兜底。
+直接 Database.Close 仍要求调用方先收拢扫描。
+
+每个缓存根按实际 capacity 限制 4 MiB 的 data-sized Go buffer；包括历史锚定区间和内部 worker，
+规则规模元数据、不可变自动机及 PCRE2 自身缓存不在这个口径内，因此不是整个进程的内存上限。
+预算超出后仍完整处理本条输入，再关闭 Scratch 而不缓存；没有输入截断或规则过滤。
+真实 600 KB 密集输入的末尾独立标记也已验证。
+
+生命周期修复并非纯加速：五轮 Group warm A/B，SmallLiteral 519.7→576.6 ns，
+AnchoredPCRE 3.122→3.421 µs，GetRequest 131.35→138.31 µs；分配数相同。
+保留实际负例和桌面测量噪声，后续系统矩阵继续核对，不恢复已知 worker 泄漏。
+
+原有安全 subject 共享单独复验，没有重复实现：16 KiB 合成输入、1/8/64 个 PCRE 候选，
+1 个候选无明显收益；8 个时 Go 分配 147584→18560 B，64 个时 1180672→19456 B。
+这是前端 bytes→string 复制的资格测量，不能当作真实业务的 64 倍提速。
+输入覆盖、并发、早停、错误后重用、GC、Close 与真实 burst 回归及 race 均通过。
+R 级 generation 清零未启用：当前 profile 的大头是 C 扫描，先优化已定位的消费路径。
+
 上一轮性能结论及边界见 [RUNTIME_PERFORMANCE.md](RUNTIME_PERFORMANCE.md)。

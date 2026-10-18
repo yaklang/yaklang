@@ -145,6 +145,12 @@ type scratch struct {
 	anchoredBiOut        []byte
 	anchoredAsyncRes     chan anchoredResult
 
+	// Only Group's cache uses these capacity snapshots. Updating touched
+	// range owners on return accounts for historical bursts without scanning
+	// every rule or adding work to Database.Scan's per-hit append loops.
+	groupRangeCaps  []groupRangeCapacity
+	groupRangeBytes uint64
+
 	// ScanBatch 使用最多四个独占子 Scratch 并行处理动态记录块。结果按 lane 复用，扫描
 	// 收拢后再按 record 顺序串行重放 handler，避免并发回调改变现有使用习惯。
 	batchLanes   [maxBatchLanes]*scratch

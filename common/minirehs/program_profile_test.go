@@ -305,3 +305,47 @@ func TestProgramProfileStage(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+// Qualify the already-present safe subject sharing independently of the new
+// pool work. Candidates are synthetic; reductions here are not a production
+// weighted speedup. Existing PCRE flags/normalization remain authoritative.
+func BenchmarkProgramSubjectReuse(b *testing.B) {
+	data := append(bytes.Repeat([]byte("zqxv "), 3276), []byte("common-prefix!")...)
+	for _, candidates := range []int{1, 8, 64} {
+		b.Run(fmt.Sprint(candidates), func(b *testing.B) {
+			confirmers := make([]*pcre2Verifier, candidates)
+			for i := range confirmers {
+				v := &pcre2Verifier{expr: `common-prefix(?=!)`}
+				if locs, err := v.findAllErr(data); err != nil || len(locs) != 1 {
+					b.Fatalf("PCRE warmup: %v %v", locs, err)
+				}
+				confirmers[i] = v
+			}
+			for _, shared := range []bool{false, true} {
+				b.Run(map[bool]string{false: "Independent", true: "Shared"}[shared], func(b *testing.B) {
+					sc := &scratch{}
+					defer sc.Close()
+					b.SetBytes(int64(len(data)))
+					b.ReportAllocs()
+					b.ResetTimer()
+					b.ReportMetric(float64(candidates), "candidates/op")
+					for i := 0; i < b.N; i++ {
+						for _, v := range confirmers {
+							var locs [][2]int
+							var err error
+							if shared {
+								locs, err = findAllInRecord(v, data, 0, len(data), sc)
+							} else {
+								locs, err = v.findAllErr(data)
+							}
+							if err != nil || len(locs) != 1 {
+								b.Fatalf("PCRE result: %v %v", locs, err)
+							}
+						}
+						sc.clearVerifierText()
+					}
+				})
+			}
+		})
+	}
+}
