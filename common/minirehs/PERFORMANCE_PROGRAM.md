@@ -217,6 +217,29 @@ NFA 尝试次数仍为 4941/87；这是参数复用的增量，不能用旧 T01 
 四份真实镜像逐字节相同，48 组跨变体有序完整结果无差异；普通测试另对独立 whole-subject oracle，
 覆盖重复 ID/flags、exact/PCRE、nullable/assert/Unicode/非法 UTF、counted-repeat 四个独立位置、AST 只读、
 错误顺序与并发 Compile。默认启用后 full minirehs39.021s/embedded/trafficguard、race5、amalgamation 和 vet 通过。
-镜像仍为 image6/blob4。T11 的原始/超集 IR、其余分析入口、Facts 和 concat prefix/suffix 子步骤继续推进，尚未将整卡标完成。
+镜像仍为 image6/blob4；下一批的测量与范围决议见下。
+
+## T11 第二批：局部 concat 宽度事实
+
+启用第一批后的独立编译 profile 中，剩余非首次显式解析最多占采样 CPU 的 2.86%。
+按任务卡的 5% 门槛，本轮拒绝扩大成 raw/superset IR、全局 DAG 或无消费者的 nullable/位置缓存。
+保留原始表达式、flags、exact/superset 和 verifier 的隔离；不共享消费位置或可执行 regexp。
+
+window/biCover 对宽 concat 原本为每个子项重算左右兄弟宽度，现以局部 prefix/suffix 计算，
+将每个 concat 的兄弟求和从 O(k²) 降至 O(k)。head 使用同顺序滚动前缀。
+短 buffer 放栈上，大 concat 使用一次临时连续 int backing；视图容量严格封口。
+若宽度为负或所有有界宽度之和可能溢出，则回原求和，保持原 addSat 的行为与错误时机。
+递归子树宽度及最终 NFA O((P+S)W) 仍存在，不声称整个编译为线性。
+
+相对于第一批，五轮串行同二进制 Reference/Facts 测量：GetRequest Compile 392.20→383.68 ms（-2.17%），
+MITM 13.06→13.12 ms（+0.45%）。512 段 `[ab]token`（3072 消费位置）的单独窗口分析
+6.01 ms→38.44 µs，整条 Compile 16.51→4.45 ms；合成分析收益不能替代实际规则收益。
+该大分析多 18,432 B/一次临时分配，小例子分配不变；GetRequest 累计分配增加约 147 KB（0.03%）。
+
+四份实际镜像逐字节一致，48 组有序完整输出无差异。普通测试另用独立 whole-subject oracle，
+覆盖长 concat 正匹配、counted repeat、Unicode/FoldCase、非法 UTF、断言、无界宽度、溢出退路与别名边界。
+默认启用后 full minirehs39.134s/embedded/trafficguard、race5、amalgamation、vet 均通过。
+没有镜像/缓存格式变化；T11 的 Windows 范围以这两批局部优化和明确拒绝大框架的决议完成。
+Linux/macOS 与独立审查仍按用户要求暂缓。
 
 上一轮性能结论及边界见 [RUNTIME_PERFORMANCE.md](RUNTIME_PERFORMANCE.md)。
