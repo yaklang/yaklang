@@ -21,46 +21,6 @@ func NewPhi(block *BasicBlock, variable string) *Phi {
 	return p
 }
 
-// blockInsideLoop reports whether block can reach loopCondition through its
-// successors. A merge inside the loop reaches the condition through the
-// latch; a block of an outer loop never reaches the inner condition.
-func blockInsideLoop(block, loopCondition *BasicBlock) bool {
-	if block == nil || loopCondition == nil || block == loopCondition {
-		return false
-	}
-	seen := map[int64]struct{}{}
-	var walk func(*BasicBlock) bool
-	walk = func(current *BasicBlock) bool {
-		if current == nil {
-			return false
-		}
-		if current == loopCondition {
-			return true
-		}
-		id := current.GetId()
-		if _, ok := seen[id]; ok {
-			return false
-		}
-		seen[id] = struct{}{}
-		function := current.GetFunc()
-		if function == nil {
-			return false
-		}
-		for _, succID := range current.Succs {
-			succValue, ok := function.GetValueById(succID)
-			if !ok {
-				continue
-			}
-			succ, ok := ToBasicBlock(succValue)
-			if ok && walk(succ) {
-				return true
-			}
-		}
-		return false
-	}
-	return walk(block)
-}
-
 func SpinHandle(name string, phiValue, header, latch Value) map[string]Value {
 	/*
 		loop-header:
@@ -149,29 +109,21 @@ func SpinHandle(name string, phiValue, header, latch Value) map[string]Value {
 		// step 2
 		if phi2, ok := ToPhi(latch); ok {
 			if index := slices.Index(phi2.Edge, phiValue.GetId()); index != -1 {
-				// Only a phi of this loop may be reused. A phi in another block is
-				// either an outer loop, which must keep the value it carries, or a
-				// merge inside this loop. The latter's self edge is this loop phi;
-				// rewriting it to the incoming value and reusing the merge phi makes
-				// the loop value phi(name)[assigned, incoming] instead of wrapping it.
-				reuse := phi2.GetBlock() == phi.GetBlock() || blockInsideLoop(phi2.GetBlock(), phi.GetBlock())
-				if reuse {
-					phi2.Edge[index] = header.GetId()
-					ret[name] = phi2
-					// phi2 的 Edge 已在上方把 phiValue 替换为 header，不能再对 phi2 调用 ReplaceValue(v, to)，
-					// 否则 Phi.ReplaceValue 里会找不到 v（即 phiValue）在 Edge 中而打 "phi not use this value"。
-					// 因此替换时跳过 phi2，并手动从 phiValue 的 users 中移除 phi2。
-					ReplaceValue(phiValue, phi2, func(i Instruction) bool { return i == phi2 })
-					phiValue.RemoveUser(phi2)
-					for name, v := range ReplaceMemberCall(phiValue, phi2) {
-						ret[name] = v
-					}
-					// for _, ptr := range phi.GetPointer() {
-					// 	Point(phi2, ptr)
-					// }
-					DeleteInst(phiValue)
-					return
+				phi2.Edge[index] = header.GetId()
+				ret[name] = phi2
+				// phi2 的 Edge 已在上方把 phiValue 替换为 header，不能再对 phi2 调用 ReplaceValue(v, to)，
+				// 否则 Phi.ReplaceValue 里会找不到 v（即 phiValue）在 Edge 中而打 "phi not use this value"。
+				// 因此替换时跳过 phi2，并手动从 phiValue 的 users 中移除 phi2。
+				ReplaceValue(phiValue, phi2, func(i Instruction) bool { return i == phi2 })
+				phiValue.RemoveUser(phi2)
+				for name, v := range ReplaceMemberCall(phiValue, phi2) {
+					ret[name] = v
 				}
+				// for _, ptr := range phi.GetPointer() {
+				// 	Point(phi2, ptr)
+				// }
+				DeleteInst(phiValue)
+				return
 			}
 		}
 
