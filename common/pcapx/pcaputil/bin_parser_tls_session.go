@@ -78,6 +78,8 @@ type binTLS struct {
 	version, suite                         uint16
 	sni, alpn                              string
 	handshake                              [2][]byte
+	alert                                  [2]byte
+	alertPending                           [2]bool
 	seq                                    [2]uint64
 	app                                    [2]bool
 	ccs                                    [2]bool
@@ -158,6 +160,13 @@ func (f *binFlow) consumeTLS(dir int, e *ProtocolEvent) (map[string]any, error) 
 		if !bytes.Equal(plain, []byte{1}) {
 			return nil, protocolError(ErrMalformedMessage, "invalid TLS ChangeCipherSpec")
 		}
+		// The pending byte belongs to the previous cipher epoch. Without
+		// the missing old-epoch byte there is no safe concatenation with a
+		// subsequently decrypted alert. Do not invent a normative wire error.
+		if t.alertPending[dir] && t.version != 0x304 {
+			info["Alert Buffered Bytes"] = 1
+			return nil, protocolError(ErrContextRequired, "TLS alert fragment crosses a cipher-state transition")
+		}
 		if t.version != 0x304 {
 			t.ccs[dir] = true
 			t.seq[dir] = 0
@@ -189,7 +198,7 @@ func (f *binFlow) consumeTLS(dir int, e *ProtocolEvent) (map[string]any, error) 
 					return nil, err
 				}
 			}
-			m, err := t.handshakeMessage(dir, b[:n], encrypted)
+			m, err := t.handshakeMessage(dir, b[:n], encrypted, f.a.budget.MaxCollectionElements)
 			if err != nil {
 				return nil, err
 			}
@@ -205,10 +214,9 @@ func (f *binFlow) consumeTLS(dir int, e *ProtocolEvent) (map[string]any, error) 
 		t.plaintext = bytes.Clone(plain)
 		t.content = typ
 	} else if typ == 21 {
-		if len(plain) != 2 {
-			return nil, protocolError(ErrMalformedMessage, "invalid TLS alert length")
+		if err := t.observeAlert(dir, plain, info, f.a.budget.MaxCollectionElements); err != nil {
+			return nil, err
 		}
-		info["Alert Level"], info["Alert Description"] = plain[0], plain[1]
 	}
 	info["Negotiated Version"], info["Cipher Suite"], info["SNI"], info["ALPN"] = t.version, t.suite, t.sni, t.alpn
 	if err := f.reserveSession(t.storage()); err != nil {
@@ -216,7 +224,7 @@ func (f *binFlow) consumeTLS(dir int, e *ProtocolEvent) (map[string]any, error) 
 	}
 	return map[string]any{"fields": info}, nil
 }
-func (t *binTLS) handshakeMessage(dir int, b []byte, authenticated bool) (map[string]any, error) {
+func (t *binTLS) handshakeMessage(dir int, b []byte, authenticated bool, limits ...int) (map[string]any, error) {
 	typ, body := b[0], b[4:]
 	m := map[string]any{"Type": typ, "Length": len(body), "Authenticated": authenticated}
 	if !authenticated && t.version == 0x304 && (t.finalHello || t.retrySeen && typ != 1 && typ != 2) {
@@ -224,7 +232,7 @@ func (t *binTLS) handshakeMessage(dir int, b []byte, authenticated bool) (map[st
 	}
 	switch typ {
 	case 1, 2:
-		retry, err := t.observeHello(dir, typ, body)
+		retry, err := t.observeHello(dir, typ, body, limits...)
 		if err != nil {
 			return nil, err
 		}
@@ -275,7 +283,7 @@ func (t *binTLS) handshakeMessage(dir int, b []byte, authenticated bool) (map[st
 			p += 3
 		}
 		if p < len(body) {
-			if err := t.extensions(body[p:], typ == 1); err != nil {
+			if err := t.extensions(body[p:], typ == 1, limits...); err != nil {
 				return nil, err
 			}
 		}
@@ -283,7 +291,7 @@ func (t *binTLS) handshakeMessage(dir int, b []byte, authenticated bool) (map[st
 		if !authenticated {
 			return nil, protocolError(ErrMalformedMessage, "cleartext TLS EncryptedExtensions")
 		}
-		if err := t.extensions(body, false); err != nil {
+		if err := t.extensions(body, false, limits...); err != nil {
 			return nil, err
 		}
 	case 20:
@@ -311,7 +319,7 @@ func (t *binTLS) handshakeMessage(dir int, b []byte, authenticated bool) (map[st
 		// large chains remain bounded by the handshake message budget.
 		sum := sha256.Sum256(body)
 		m["Certificate Message SHA256"] = hex.EncodeToString(sum[:])
-		certs, err := tlsCertificates(body, t.version == 0x304)
+		certs, err := tlsCertificates(body, t.version == 0x304, limits...)
 		if err != nil {
 			return nil, err
 		}
@@ -319,7 +327,7 @@ func (t *binTLS) handshakeMessage(dir int, b []byte, authenticated bool) (map[st
 	}
 	return m, nil
 }
-func (t *binTLS) extensions(b []byte, client bool) error {
+func (t *binTLS) extensions(b []byte, client bool, limits ...int) error {
 	if len(b) < 2 || int(binary.BigEndian.Uint16(b)) != len(b)-2 {
 		return protocolError(ErrMalformedMessage, "TLS extensions length")
 	}
@@ -347,31 +355,19 @@ func (t *binTLS) extensions(b []byte, client bool) error {
 			}
 		case 0:
 			if client {
-				if len(v) < 5 || int(binary.BigEndian.Uint16(v)) != len(v)-2 || v[2] != 0 || int(binary.BigEndian.Uint16(v[3:])) != len(v)-5 {
-					return protocolError(ErrMalformedMessage, "TLS SNI length")
+				name, err := tlsSNIName(v)
+				if err != nil {
+					return err
 				}
-				t.sni = string(v[5:])
+				t.sni = string(name)
 			}
 		case 16:
-			if len(v) < 3 || int(binary.BigEndian.Uint16(v)) != len(v)-2 {
-				return protocolError(ErrMalformedMessage, "TLS ALPN vector")
-			}
-			v = v[2:]
-			var protocols []string
-			for len(v) > 0 {
-				n := int(v[0])
-				v = v[1:]
-				if n == 0 || n > len(v) {
-					return protocolError(ErrMalformedMessage, "TLS ALPN length")
-				}
-				protocols = append(protocols, string(v[:n]))
-				v = v[n:]
+			selected, err := tlsALPNName(v, !client, limits...)
+			if err != nil {
+				return err
 			}
 			if !client {
-				if len(protocols) != 1 {
-					return protocolError(ErrMalformedMessage, "TLS selected ALPN count")
-				}
-				t.alpn = protocols[0]
+				t.alpn = string(selected)
 			}
 		}
 	}
@@ -540,7 +536,7 @@ func (f *binFlow) deliverTLS(dir int, parent *ProtocolEvent) {
 	t.child.feed(dir, plain, parent.Timestamp)
 }
 
-func tlsCertificates(b []byte, tls13 bool) ([]map[string]any, error) {
+func tlsCertificates(b []byte, tls13 bool, limits ...int) ([]map[string]any, error) {
 	bad := func() error { return protocolError(ErrMalformedMessage, "TLS certificate vector") }
 	if tls13 {
 		if len(b) < 1 || int(b[0]) > len(b)-1 {
@@ -552,9 +548,50 @@ func tlsCertificates(b []byte, tls13 bool) ([]map[string]any, error) {
 		return nil, bad()
 	}
 	b = b[3:]
+	max := 64
+	if len(limits) > 0 {
+		max = min(max, limits[0])
+	}
+	// Admission precedes hashing, X.509 parsing and result allocation. Preserve
+	// the existing hard64 ceiling and format/error behavior for callers without
+	// an explicit configured collection limit. Validate the same complete vector
+	// before the configured limit, preserving malformed-vector error priority.
+	// This bounds certificate entries,
+	// not a newly invented count of fixed ASN.1 structure fields.
+	count := 0
+	for scan := b; len(scan) > 0; {
+		if count >= 64 {
+			return nil, protocolError(ErrResourceExceeded, "TLS certificate count")
+		}
+		if len(scan) < 3 {
+			return nil, bad()
+		}
+		n := tlsU24(scan)
+		scan = scan[3:]
+		if n == 0 || n > len(scan) {
+			return nil, bad()
+		}
+		scan = scan[n:]
+		if tls13 {
+			if len(scan) < 2 {
+				return nil, bad()
+			}
+			n = int(binary.BigEndian.Uint16(scan))
+			scan = scan[2:]
+			if n > len(scan) {
+				return nil, bad()
+			}
+			scan = scan[n:]
+		}
+		count++
+	}
+
+	if count > max {
+		return nil, protocolError(ErrResourceExceeded, "TLS certificate count")
+	}
 	var out []map[string]any
 	for len(b) > 0 {
-		if len(out) >= 64 {
+		if len(out) >= max {
 			return nil, protocolError(ErrResourceExceeded, "TLS certificate count")
 		}
 		if len(b) < 3 {

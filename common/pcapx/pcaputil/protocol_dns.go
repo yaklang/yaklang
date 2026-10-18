@@ -2,8 +2,10 @@ package pcaputil
 
 import (
 	"bytes"
+	"crypto/sha256"
 	"encoding/binary"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"net"
 	"strings"
@@ -221,21 +223,78 @@ func DecodeDNSMessage(w []byte, limit int) (map[string]any, error) {
 	return out, nil
 }
 
+// DHCP keeps its established storage and accounting; DNS identity history is separate.
 type dnsPending struct {
-	id         uint64
-	ts         time.Time
-	flow       uint64
-	cost       int64
-	responders map[string]struct{}
+	completed, ambiguous, refused                          bool
+	phaseConflict, serverChosen, clientChosen, rapidCommit bool
+	queryType                                              byte
+	id, requestID, discoverID                              uint64
+	ts                                                     time.Time
+	cost                                                   int64
+	discoverSeconds                                        int64
+	discoverNanos                                          int32
+	queryHash, serverHash, clientHash                      [32]byte
 }
+
 type dnsCorrelation struct {
-	pending map[string]dnsPending
-	clock   time.Time
+	untracked4, untracked6 bool
+	pending                map[string]dnsPending
+	clock                  time.Time
+}
+
+type dnsObservation struct {
+	identity           string
+	id                 uint64
+	ts, clock, touched time.Time
+	flow               uint64
+	cost               int64
+	owner              string
+	digest             [32]byte
+	active, ambiguous  bool
+	responders         map[string]struct{}
+}
+type dnsObservationCorrelation struct {
+	// Completed, orphaned and expired identities remain bounded, charged history.
+	pending             map[string]dnsObservation
+	untracked           bool
+	untrackedTCPThrough uint64
+}
+
+// A fresh TCP FlowID cannot reuse an unretained identity from an older
+// connection. UDP has no such generation boundary and remains conservative.
+func (s *dnsObservationCorrelation) untrackedInput(flow uint64) {
+	if flow == 0 {
+		s.untracked = true
+	} else if flow > s.untrackedTCPThrough {
+		s.untrackedTCPThrough = flow
+	}
+}
+func (s *dnsObservationCorrelation) newOwnerAllowed(flow uint64) bool {
+	if flow == 0 {
+		return !s.untracked
+	}
+	return flow > s.untrackedTCPThrough
+}
+
+func dnsOwner(e *ProtocolEvent, proto string, flow uint64, src, server string) string {
+	return fmt.Sprintf("%v/%s/%s/%d/%s/%s", e.Domain, proto, e.Transport, flow, src, server)
+}
+func dnsRefusalKey(owner, identity string) string { return "refused/" + owner + "/" + identity }
+func (a *binParser) retireDNS(p *dnsObservation) {
+	for peer := range p.responders {
+		cost := int64(len(peer) + 32)
+		a.buffered.Add(-cost)
+		p.cost -= cost
+	}
+	p.responders = nil
+	p.active = false
+	p.ambiguous = true
+	p.id = 0
 }
 
 func dnsQuestionKey(info map[string]any) string {
 	var b strings.Builder
-	fmt.Fprint(&b, info["ID"])
+	fmt.Fprint(&b, info["ID"], "/", info["Opcode"])
 	for _, q := range info["Questions"].([]map[string]any) {
 		// Canonicalize only ASCII case; label lengths and all other octets remain
 		// part of the identity. Display escaping must not define association.
@@ -266,9 +325,9 @@ func (a *binParser) dnsEvent(e *ProtocolEvent, w []byte) error {
 	if err != nil {
 		return err
 	}
-	return a.dnsEventDecoded(e, info)
+	return a.dnsEventDecoded(e, info, w)
 }
-func (a *binParser) dnsEventDecoded(e *ProtocolEvent, info map[string]any) error {
+func (a *binParser) dnsEventDecoded(e *ProtocolEvent, info map[string]any, wire ...[]byte) error {
 	if e.Session == nil {
 		e.Session = map[string]any{}
 	}
@@ -287,16 +346,7 @@ func (a *binParser) dnsEventDecoded(e *ProtocolEvent, info map[string]any) error
 	defer a.dnsMu.Unlock()
 	s := &a.dns
 	if s.pending == nil {
-		s.pending = map[string]dnsPending{}
-	}
-	if e.Timestamp.After(s.clock) {
-		s.clock = e.Timestamp
-	}
-	for k, v := range s.pending {
-		if s.clock.Sub(v.ts) > 30*time.Second {
-			a.buffered.Add(-v.cost)
-			delete(s.pending, k)
-		}
+		s.pending = map[string]dnsObservation{}
 	}
 	src, dst := e.Source, e.Destination
 	if info["Response"] == true {
@@ -310,9 +360,10 @@ func (a *binParser) dnsEventDecoded(e *ProtocolEvent, info map[string]any) error
 			return nil
 		}
 	}
-	keyFor := func(server string) string {
-		return fmt.Sprintf("%v/%s/%s/%d/%s/%s/%s", e.Domain, e.Protocol, e.Transport, flow, src, server, dnsQuestionKey(info))
+	ownerFor := func(server string) string {
+		return dnsOwner(e, e.Protocol, flow, src, server)
 	}
+	keyFor := func(server string) string { return ownerFor(server) + "/" + dnsQuestionKey(info) }
 	key := keyFor(dst)
 	multicast := false
 	if e.Protocol == "llmnr" && e.Transport == "udp" {
@@ -329,11 +380,39 @@ func (a *binParser) dnsEventDecoded(e *ProtocolEvent, info map[string]any) error
 			}
 		}
 	}
+	owner := ownerFor(dst)
+	if multicast {
+		owner = ownerFor("multicast")
+	}
+	clock := e.Timestamp
+	for _, p := range s.pending {
+		if p.owner == owner && p.clock.After(clock) {
+			clock = p.clock
+		}
+	}
+	for k, p := range s.pending {
+		if p.owner != owner {
+			continue
+		}
+		p.clock = clock
+		if p.active && clock.Sub(p.touched) > 30*time.Second {
+			a.retireDNS(&p)
+		}
+		s.pending[k] = p
+	}
+	identity := fmt.Sprint(info["ID"], "/", info["Opcode"])
+	if _, refused := s.pending[dnsRefusalKey(owner, identity)]; refused {
+		e.Session["Association"], e.Session["Association Status"] = "ambiguous-context", "ambiguous"
+		if info["Response"] == true {
+			e.Session["Unmatched"] = true
+		}
+		return nil
+	}
 	if e.ID == 0 {
 		e.ID = a.ids.Add(1)
 	}
 	if info["Response"] == true {
-		if p, ok := s.pending[key]; ok {
+		if p, ok := s.pending[key]; ok && p.active && !p.ambiguous {
 			e.ResponseTo, e.TransactionID = p.id, p.id
 			e.Session["Association Status"] = "matched"
 			if qs, ok := info["Questions"].([]map[string]any); ok && len(qs) > 0 {
@@ -360,25 +439,55 @@ func (a *binParser) dnsEventDecoded(e *ProtocolEvent, info map[string]any) error
 					p.cost += cost
 				}
 				e.Session["Responder Count"] = len(p.responders)
-				s.pending[key] = p
 			} else {
-				a.buffered.Add(-p.cost)
-				delete(s.pending, key)
+				p.active = false
+				p.id = 0
 			}
+			s.pending[key] = p
 		} else {
-			e.Session["Association"] = "missing-request"
-			e.Session["Association Status"] = "missing-request"
-			e.Session["Unmatched"] = true
+			e.Session["Association"], e.Session["Association Status"], e.Session["Unmatched"] = "missing-request", "missing-request", true
+			if _, ok := s.pending[key]; ok {
+				e.Session["Association"], e.Session["Association Status"] = "ambiguous-context", "ambiguous"
+			} else {
+				cost := int64(len(key) + len(owner) + 256)
+				if len(s.pending)+len(a.lan.pending) < a.budget.MaxCollectionElements && a.reserveEvidence(cost) {
+					s.pending[key] = dnsObservation{identity: identity, owner: owner, clock: clock, touched: clock, flow: flow, cost: cost, ambiguous: true}
+				} else {
+					s.untrackedInput(flow)
+					e.Session["Association Status"] = "limited"
+				}
+			}
 		}
 	} else {
+		raw := e.Raw
+		if len(wire) > 0 {
+			raw = wire[0]
+		}
+		if len(raw) == 0 {
+			raw, _ = json.Marshal(info)
+		}
+		digest := sha256.Sum256(raw)
 		if p, ok := s.pending[key]; ok {
-			e.TransactionID = p.id
-			e.Session["Retransmission"] = true
-		} else if len(s.pending) < a.budget.MaxCollectionElements && a.reserveEvidence(int64(len(key)+128)) {
-			e.TransactionID = e.ID
-			s.pending[key] = dnsPending{id: e.ID, ts: e.Timestamp, flow: flow, cost: int64(len(key) + 128)}
+			if p.active && !p.ambiguous && p.digest == digest {
+				e.TransactionID = p.id
+				e.Session["Retransmission"] = true
+				p.touched = clock
+			} else {
+				p.ambiguous = true
+				p.active = false
+				p.id = 0
+				e.Session["Association"], e.Session["Association Status"] = "ambiguous-context", "ambiguous"
+			}
+			s.pending[key] = p
 		} else {
-			e.Session["Association"] = "limited"
+			cost := int64(len(key) + len(owner) + 256)
+			if s.newOwnerAllowed(flow) && len(s.pending)+len(a.lan.pending) < a.budget.MaxCollectionElements && a.reserveEvidence(cost) {
+				e.TransactionID = e.ID
+				s.pending[key] = dnsObservation{identity: identity, id: e.ID, ts: e.Timestamp, touched: clock, clock: clock, flow: flow, cost: cost, owner: owner, digest: digest, active: true}
+			} else {
+				s.untrackedInput(flow)
+				e.Session["Association"], e.Session["Association Status"] = "limited", "limited"
+			}
 		}
 	}
 	return nil

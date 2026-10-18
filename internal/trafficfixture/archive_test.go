@@ -12,9 +12,19 @@ import (
 )
 
 func TestFrozenBatchIntegrity(t *testing.T) {
+	t.Run("standalone-inventory-workspace", workspaceStandaloneInventory)
 	c, err := load()
 	if err != nil {
 		t.Fatal(err)
+	}
+	for _, p := range c.index.Packs {
+		for name := range p.Members {
+			t.Run("consolidated-storage/"+name, func(t *testing.T) {
+				if _, err := readMember(p.data.physical, name); err != nil {
+					t.Fatal(err)
+				}
+			})
+		}
 	}
 	var captures int
 	unique := map[string]bool{}
@@ -127,6 +137,7 @@ func TestArchiveDirectoryLimits(t *testing.T) {
 		{name: "unencrypted", size: 1},
 		{name: "strong-encryption", size: 1, flags: 0x41},
 		{name: "unsupported-method", size: 1, flags: 1, method: 99},
+		{name: "packed-codec-not-ordinary-archive", size: 1, flags: 1, method: 93},
 		{name: "duplicate", size: 1, flags: 1, duplicate: true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

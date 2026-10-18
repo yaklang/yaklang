@@ -32,6 +32,7 @@ func TestBJNPDatagramAdmission(t *testing.T) {
 }
 
 func TestWinlab5013BJNPEightDatagrams(t *testing.T) {
+	testOwnedDatagramMatrix(t, "bjnp")
 	events := replayWinlab5013Protocols(t, "06-bjnp.pcapng")
 	require.Len(t, events, 8)
 	want := []string{"Discover", "Discover", "Get Printer Identity", "Get Printer Identity", "Print Job Details", "Print Job Details", "Get Printer Status", "Get Printer Status"}

@@ -179,6 +179,8 @@ func TestSocketCANSealedReplay(t *testing.T) {
 	}
 }
 func TestSocketCANBoundsAndOwnership(t *testing.T) {
+	t.Run("PrivateSessionQueries", testSocketCANPrivateSessionQueries)
+	t.Run("RefusalQueries", testSocketCANRefusalQueries)
 	for _, c := range canControls(t) {
 		_, a := canInput(t, c)
 		if a.Fields == nil {

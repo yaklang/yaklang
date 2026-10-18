@@ -2,9 +2,12 @@ package pcaputil
 
 import (
 	"bytes"
+	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/gopacket/gopacket"
 	"github.com/stretchr/testify/require"
@@ -15,6 +18,7 @@ import (
 // incomplete PDU, not a malformed counter merely because no later UDP packet
 // can complete it. Error kinds and successfully decoded adjacent content stay.
 func TestNativeDatagramIncompleteAccounting(t *testing.T) {
+	t.Run("oversize-query-error-and-recovery", testUDPOversizeQueryErrorAndRecovery)
 	for _, tc := range []struct {
 		name, status, kind             string
 		decoded, incomplete, malformed uint64
@@ -76,5 +80,66 @@ func TestNativeDatagramIncompleteAccounting(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func testUDPOversizeQueryErrorAndRecovery(t *testing.T) {
+	b, err := trafficfixture.ReadFile("incremental-mvp/nmea/controls.json")
+	require.NoError(t, err)
+	var historical struct {
+		Cases []struct {
+			Name     string
+			Steps    []struct{ Hex string }
+			Expected []map[string]any `json:"expected_messages"`
+		}
+	}
+	require.NoError(t, json.Unmarshal(b, &historical))
+	var wire []byte
+	var want map[string]any
+	for _, c := range historical.Cases {
+		if c.Name == "nmea-gga-positive" {
+			require.Len(t, c.Steps, 1)
+			wire, err = hex.DecodeString(c.Steps[0].Hex)
+			require.NoError(t, err)
+			require.Len(t, c.Expected, 1)
+			want = c.Expected[0]
+		}
+	}
+	require.NotEmpty(t, want)
+	for _, deferred := range []bool{false, true} {
+		s, err := NewProtocolSessionWithOptions(ParserBudget{MaxMessageBytes: 96}, WithSessionTransport("udp"), WithSessionPorts(38000, 10110))
+		require.NoError(t, err)
+		s.(*captureSession).f.a.config.Deferred = deferred
+		out := s.Feed(0, time.Unix(1, 0), bytes.Repeat([]byte("x"), 97))
+		require.Equal(t, 97, out.Consumed)
+		rocTypedError(t, "ResourceExceeded", out.Err)
+		require.Len(t, out.Events, 1)
+		e := out.Events[0]
+		require.Equal(t, "limited", e.Status)
+		require.Empty(t, e.Protocol)
+		require.Nil(t, e.Session)
+		require.Zero(t, e.ResponseTo)
+		require.Zero(t, e.TransactionID)
+		for i := 0; i < 2; i++ {
+			for _, query := range []func() (map[string]any, error){e.Decode, e.GetFields} {
+				f, err := query()
+				require.Nil(t, f)
+				rocTypedError(t, "ResourceExceeded", err)
+				err.(*ProtocolError).Kind = ErrMalformedMessage // Error copies cannot rewrite the refusal.
+			}
+			e.Fields, e.Structured, e.Session = map[string]any{"forged": true}, map[string]any{"fields": "forged"}, map[string]any{"forged": true}
+		}
+		for direction := 0; direction < 2; direction++ {
+			next := s.Feed(direction, time.Unix(int64(direction+2), 0), wire)
+			require.Nil(t, next.Err)
+			require.Len(t, next.Events, 1)
+			testNativeObservationSessionQueries(t, next.Events[0], want)
+			require.Zero(t, next.Events[0].ResponseTo)
+			require.Zero(t, next.Events[0].TransactionID)
+		}
+		require.Empty(t, s.Close("done"))
+		require.Empty(t, s.Close("again"))
+		require.Zero(t, s.Stats().BufferedBytes)
+		require.EqualValues(t, 97, s.Stats().LimitedBytes)
 	}
 }

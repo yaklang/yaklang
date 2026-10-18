@@ -16,6 +16,7 @@ type binQUIC struct {
 	controlSeen     [2]bool
 	qpackSeen       [2][2]bool
 	native          bool
+	retired         bool // capture history, not an authenticated new connection
 	zeroCID         [2]bool
 	byteLimit       int
 	provider        TLSSecretProvider

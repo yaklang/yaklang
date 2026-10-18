@@ -8,7 +8,7 @@ import (
 )
 
 // C37118Message describes one IEEE C37.118-2005/2011 frame. Data decoding
-// requires an explicit, current CFG-2 from the same transport association.
+// requires an explicit, current CFG-2 or complete CFG-3 from the same transport association.
 // No network activity, implicit configuration cache, scaling, or measurement
 // accuracy/validity claim is made. Status and raw numeric encodings are kept.
 // Layout and CRC cross-check: publisher-maintained GPA/GSF implementation:
@@ -36,7 +36,8 @@ type C37118Configuration struct {
 }
 
 type C37118PMUConfiguration struct {
-	StationName                        string // Exact 16-byte label, including padding.
+	StationName                        string // CFG-1/2: exact padded label; CFG-3: UTF-8.
+	Extended                           *C37118PMUExtendedConfiguration
 	IDCode, Format                     uint16
 	PhasorNames, AnalogNames           []string
 	DigitalNames                       [][]string // Sixteen labels per digital word.
@@ -93,7 +94,7 @@ func c37118CRC(wire []byte) uint16 {
 // ErrC37118CollectionLimit identifies a rejection before collection allocation.
 var ErrC37118CollectionLimit = errors.New("c37118: collection budget exceeded")
 
-// DecodeC37118Message validates a complete frame with caller-selected CFG-2.
+// DecodeC37118Message validates a complete frame with caller-selected CFG-2/CFG-3.
 // The caller owns both input slices; no returned value aliases either input.
 func DecodeC37118Message(wire, configuration []byte, maxElements int) (*C37118Message, error) {
 	return decodeC37118Limited(wire, configuration, maxElements)
@@ -159,12 +160,20 @@ func decodeC37118Limited(wire, configuration []byte, maxElements int) (*C37118Me
 			m.OpaqueBody = append([]byte(nil), body...)
 			break
 		}
-		cfg, err := decodeC37118Limited(configuration, nil, maxElements)
+		var cfg *C37118Message
+		var err error
+		if len(configuration) > 65535 {
+			// A collected CFG-3 image keeps the original first header, not a
+			// forged physical FRAMESIZE. Only configuration context uses this path.
+			cfg, err = DecodeC37118ConfigurationImage(configuration, maxElements, len(configuration))
+		} else {
+			cfg, err = decodeC37118Limited(configuration, nil, maxElements)
+		}
 		if err != nil {
 			return nil, fmt.Errorf("c37118: invalid configuration context: %w", err)
 		}
-		if cfg.FrameType != 3 || cfg.IDCode != m.IDCode || cfg.Version != m.Version {
-			return nil, fmt.Errorf("c37118: CFG-2 context type, ID code or version mismatch")
+		if (cfg.FrameType != 3 && cfg.FrameType != 5) || cfg.Configuration == nil || cfg.IDCode != m.IDCode || cfg.Version != m.Version {
+			return nil, fmt.Errorf("c37118: configuration context type, ID code or version mismatch")
 		}
 		m.Data, err = c37118ReadData(body, cfg.Configuration)
 		if err != nil {
@@ -172,9 +181,18 @@ func decodeC37118Limited(wire, configuration []byte, maxElements int) (*C37118Me
 		}
 		m.BodyDecoded = true
 	case 5:
-		// CFG-3 continuation and expanded definitions need a separate decoder.
-		// Keeping this explicit avoids pretending CFG-1/2 grammar applies.
-		m.OpaqueBody = append([]byte(nil), body...)
+		// Preserve the historical opaque extension contract for a body that
+		// cannot hold the CFG-3 extended header; it is never a DATA context.
+		if len(body) < 10 {
+			m.OpaqueBody = append([]byte(nil), body...)
+			break
+		}
+		var err error
+		m.Configuration, err = c37118ReadConfiguration3(body, maxElements)
+		if err != nil {
+			return nil, err
+		}
+		m.BodyDecoded = true
 	}
 	return m, nil
 }
@@ -271,7 +289,7 @@ func c37118ReadData(body []byte, cfg *C37118Configuration) ([]C37118PMUData, err
 		want += 2 + phWidth*len(p.PhasorNames) + anWidth*len(p.AnalogNames) + fqWidth + 2*len(p.DigitalNames)
 	}
 	if want != len(body) {
-		return nil, fmt.Errorf("c37118: data length differs from CFG-2")
+		return nil, fmt.Errorf("c37118: data length differs from observed CFG-2/CFG-3")
 	}
 	pos := 0
 	number := func(floating, signed bool) C37118Number {

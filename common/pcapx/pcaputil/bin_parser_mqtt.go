@@ -1,16 +1,32 @@
 package pcaputil
 
 import (
+	"crypto/sha256"
 	"encoding/binary"
 	"fmt"
+	"strings"
 )
 
+// Fixed-size request context: never retain an unbounded subscription body.
+// The digest identifies an exact wire retry; it is not broker/session identity.
+type mqttPending struct {
+	next   string
+	digest [32]byte
+	items  int
+}
+
 type binMQTT struct {
-	client   int
-	level    byte
-	pending  [2]map[uint16]string
-	aliases  [2]map[uint16]string
-	aliasMax [2]uint16
+	client      int
+	level       byte
+	seenConnect bool
+	connack     bool
+	spark       *sparkNode
+	// Indexed by the endpoint that allocated the identifier, not by the
+	// direction of the next ACK: PUBREL travels in the original direction.
+	pending    [2]map[uint16]mqttPending
+	aliases    [2]map[uint16]string
+	aliasMax   [2]uint16
+	aliasBytes int64
 }
 
 func probeMQTT(w []byte, limit int) ProbeResult {
@@ -41,6 +57,9 @@ func probeMQTT(w []byte, limit int) ProbeResult {
 	if name == "MQTT" && level == 5 {
 		return probeAccept("mqtt", "5.0", 95)
 	}
+	if name == "MQTT" && level == 4 {
+		return probeAccept("mqtt", "3.1.1", 95)
+	}
 	_ = n
 	return ProbeResult{Verdict: ProbeReject}
 }
@@ -49,7 +68,7 @@ func (f *binFlow) frameMQTT(w []byte) (int, *binSpec, error) {
 	if f.mqtt == nil {
 		return 0, nil, sessionContext("MQTT session was not observed")
 	}
-	if err := f.reserveSession(256 + int64(len(f.mqtt.pending[0])+len(f.mqtt.pending[1]))*16); err != nil {
+	if err := f.reserveSession(f.mqtt.retainedBytes()); err != nil {
 		return 0, nil, err
 	}
 	n, _, err := mqttLength(w)
@@ -74,11 +93,39 @@ func (f *binFlow) frameMQTT(w []byte) (int, *binSpec, error) {
 	return n, f.spec("mqtt_fields", entry), nil
 }
 
-func (m *binMQTT) consume(dir int, raw []byte, result map[string]any) (map[string]any, error) {
+func (m *binMQTT) retainedBytes() int64 {
+	return 256 + 128*int64(len(m.pending[0])+len(m.pending[1])) + 96*int64(len(m.aliases[0])+len(m.aliases[1])) + m.aliasBytes + m.spark.retainedBytes()
+}
+
+// Reserve both possible insertions before changing either dictionary. Topic
+// strings are connection state, not merely spans in the current packet.
+func (m *binMQTT) reserveInsert(pendingNew, aliasNew int, aliasBytes int64, maxElements int, reserve func(int64) error) error {
+	limit := sessionCollectionLimit(maxElements)
+	if len(m.pending[0])+len(m.pending[1])+pendingNew > limit {
+		return protocolError(ErrResourceExceeded, "MQTT pending packet identifiers")
+	}
+	if len(m.aliases[0])+len(m.aliases[1])+aliasNew > limit {
+		return protocolError(ErrResourceExceeded, "MQTT topic aliases")
+	}
+	return reserve(m.retainedBytes() + 128*int64(pendingNew) + 96*int64(aliasNew) + aliasBytes)
+}
+
+func (m *binMQTT) consume(dir int, raw []byte, result map[string]any, maxElements, maxDepth int, reserve func(int64) error) (map[string]any, error) {
 	if len(raw) < 2 {
 		return nil, fmt.Errorf("mqtt: truncated packet")
 	}
 	typ, flags := raw[0]>>4, raw[0]&15
+	if typ == 1 && m.seenConnect {
+		return nil, fmt.Errorf("mqtt: second CONNECT on the same network connection")
+	}
+	// These controls have a fixed endpoint role even though PUBLISH and its
+	// acknowledgments use independent identifier spaces in both directions.
+	if (typ == 8 || typ == 10) && dir != m.client {
+		return nil, fmt.Errorf("mqtt: %s on the server direction", mqttSessionName(typ))
+	}
+	if (typ == 9 || typ == 11) && dir == m.client {
+		return nil, fmt.Errorf("mqtt: %s on the client direction", mqttSessionName(typ))
+	}
 	qos := flags >> 1 & 3
 	info := map[string]any{
 		"Packet Type":   uint64(typ),
@@ -114,8 +161,39 @@ func (m *binMQTT) consume(dir int, raw []byte, result map[string]any) (map[strin
 	body := raw[header:]
 	switch typ {
 	case 1:
+		willTopic, willBody, willFlags, err := mqttConnectWill(body, m.level)
+		if err != nil {
+			return nil, err
+		}
+		if strings.HasPrefix(willTopic, "spBv1.0/") {
+			// Reserve the new DataSet public graph before allocating it. The
+			// allocation-free pass is global across metrics, rows and packed types.
+			if cost, checkErr := sparkPreflight(willBody, maxDepth, maxElements); checkErr == nil && cost > 0 {
+				if err := reserve(m.retainedBytes() + cost); err != nil {
+					return nil, err
+				}
+			}
+			v, key, verb, err := sparkObservation(willTopic, willBody, maxDepth, maxElements)
+			if err != nil {
+				return nil, err
+			}
+			p, _ := v["Payload"].(map[string]any)
+			bd, ok := sparkBDSeq(p)
+			if ok && verb == "NDEATH" && p["seq"] == nil && willFlags&0x38 == 8 {
+				next := &sparkNode{key: key, bdSeq: bd}
+				if err = reserve(m.retainedBytes() + next.retainedBytes()); err != nil {
+					return nil, err
+				}
+				m.spark = next
+				v["Context Status"], v["bdSeq"] = "registered-will", bd
+			} else if v["Reason"] == nil {
+				v["Reason"] = "Will requires NDEATH, bdSeq, QoS one, no seq/retain"
+			}
+			info["Sparkplug"] = v
+		}
 		m.client = dir
-		if max, ok := mqtt5ConnectAliasMax(body); ok {
+		m.seenConnect = true
+		if max, ok := mqtt5ConnectAliasMax(body); m.level == 5 && ok {
 			m.aliasMax[1-dir] = max
 			info["Topic Alias Maximum"] = uint64(max)
 		}
@@ -126,27 +204,93 @@ func (m *binMQTT) consume(dir int, raw []byte, result map[string]any) (map[strin
 		if len(body) >= 2 {
 			info["Reason Code"] = uint64(body[1])
 			info["Session Present"] = body[0]&1 != 0
+			m.connack = body[1] == 0
 		}
 	case 3:
-		topic, pid, alias, err := mqtt5PublishView(body, qos)
+		topic, pid, alias, err := mqttPublishView(body, qos, m.level)
 		if err != nil {
 			return nil, err
+		}
+		// New QoS>0 publications must allocate an unused identifier. Never
+		// overwrite an observed exchange, including its later QoS2 phases.
+		if got := m.pending[dir][pid].next; qos > 0 && got != "" && (flags&8 == 0 || got == "SUBACK" || got == "UNSUBACK") {
+			return nil, fmt.Errorf("mqtt: packet identifier %d is already in use", pid)
+		}
+		// Once PUBREL was observed, even a DUP publication must not rewind
+		// the exchange or update its topic aliases before PUBCOMP.
+		if qos > 0 && flags&8 != 0 && m.pending[dir][pid].next == "PUBCOMP" {
+			return nil, fmt.Errorf("mqtt: PUBLISH after PUBREL for packet identifier %d", pid)
+		}
+		prior := m.pending[dir][pid]
+		var publishDigest [32]byte
+		if m.level == 4 && qos > 0 {
+			// 3.1.1 has no Topic Alias/properties rewriting. A wire retry of
+			// the observed publication differs only in DUP. Keep a fixed-size
+			// digest rather than retaining an application payload in session state.
+			h := sha256.New()
+			h.Write([]byte{raw[0] &^ 8})
+			h.Write(raw[1:])
+			copy(publishDigest[:], h.Sum(nil))
+			if prior.next != "" && prior.digest != publishDigest {
+				return nil, fmt.Errorf("mqtt: changed DUP PUBLISH for packet identifier %d", pid)
+			}
+		}
+		pendingNew, aliasNew := 0, 0
+		aliasDelta := int64(0)
+		storeAlias := alias != 0 && topic != ""
+		if qos > 0 && m.pending[dir][pid].next == "" {
+			pendingNew = 1
 		}
 		if alias != 0 {
 			if m.aliasMax[dir] == 0 || alias > m.aliasMax[dir] {
 				return nil, fmt.Errorf("mqtt: Topic Alias %d exceeds maximum %d", alias, m.aliasMax[dir])
 			}
 			if topic != "" {
-				if m.aliases[dir] == nil {
-					m.aliases[dir] = map[uint16]string{}
+				old, present := m.aliases[dir][alias]
+				if !present {
+					aliasNew = 1
 				}
-				m.aliases[dir][alias] = topic
+				aliasDelta = int64(len(topic) - len(old))
 			} else if name, ok := m.aliases[dir][alias]; ok {
 				topic = name
 			} else {
 				return nil, fmt.Errorf("mqtt: unknown Topic Alias %d", alias)
 			}
 			info["Topic Alias"] = uint64(alias)
+		}
+		var sparkView map[string]any
+		nextSpark := m.spark
+		if strings.HasPrefix(topic, "spBv1.0/") {
+			payload, err := mqttPublishPayload(body, qos, m.level)
+			if err != nil {
+				return nil, err
+			}
+			// Reserve the new DataSet public graph before allocating it. The
+			// allocation-free pass is global across metrics, rows and packed types.
+			if cost, checkErr := sparkPreflight(payload, maxDepth, maxElements); checkErr == nil && cost > 0 {
+				if err := reserve(m.retainedBytes() + cost); err != nil {
+					return nil, err
+				}
+			}
+			sparkView, nextSpark, err = m.sparkPublish(dir, topic, payload, flags, maxDepth, maxElements, reserve)
+			if err != nil {
+				return nil, err
+			}
+		}
+		if err := m.reserveInsert(pendingNew, aliasNew, aliasDelta, maxElements, reserve); err != nil {
+			return nil, err
+		}
+		if sparkView != nil {
+			target := m.retainedBytes() + 128*int64(pendingNew) + 96*int64(aliasNew) + aliasDelta + nextSpark.retainedBytes() - m.spark.retainedBytes()
+			if err := reserve(target); err != nil {
+				return nil, err
+			}
+			m.spark = nextSpark
+			info["Sparkplug"] = sparkView
+		}
+		if storeAlias {
+			m.aliases[dir][alias] = topic
+			m.aliasBytes += aliasDelta
 		}
 		info["Topic Name"] = topic
 		if qos > 0 {
@@ -155,7 +299,10 @@ func (m *binMQTT) consume(dir int, raw []byte, result map[string]any) (map[strin
 			if qos == 2 {
 				next = "PUBREC"
 			}
-			m.pending[1-dir][pid] = next
+			if m.level == 4 && prior.next != "" {
+				next = prior.next
+			}
+			m.pending[dir][pid] = mqttPending{next: next, digest: publishDigest}
 			info["Outstanding"] = next
 		}
 	case 4, 5, 6, 7, 9, 11:
@@ -165,20 +312,65 @@ func (m *binMQTT) consume(dir int, raw []byte, result map[string]any) (map[strin
 		pid := binary.BigEndian.Uint16(body[:2])
 		info["Packet Identifier"] = uint64(pid)
 		want := mqttSessionName(typ)
-		if got := m.pending[dir][pid]; got != "" && got != want {
-			return nil, fmt.Errorf("mqtt: packet identifier %d expected %s, got %s", pid, got, want)
+		owner := 1 - dir
+		if typ == 6 {
+			owner = dir
 		}
-		if got := m.pending[dir][pid]; got == want {
-			delete(m.pending[dir], pid)
+		prior := m.pending[owner][pid]
+		// MQTT3.1.1 repeats QoS2 acknowledgment controls until the exchange
+		// completes. Observe them without rolling the latest phase backward.
+		repeated := m.level == 4 && ((typ == 5 && (prior.next == "PUBREL" || prior.next == "PUBCOMP")) || (typ == 6 && prior.next == "PUBCOMP"))
+		if prior.next != "" && prior.next != want && !repeated {
+			return nil, fmt.Errorf("mqtt: packet identifier %d expected %s, got %s", pid, prior.next, want)
+		}
+		// Subscription ACK result codes follow properties in MQTT5 and are
+		// an ordered payload list, not the first variable-header byte.
+		if typ == 9 || (typ == 11 && m.level == 5) {
+			at := 2
+			if m.level == 5 {
+				plen, hdr, err := mqtt5SkipVBI(body[at:])
+				if err != nil {
+					return nil, err
+				}
+				if plen > len(body)-at-hdr {
+					return nil, fmt.Errorf("mqtt: truncated acknowledgment properties")
+				}
+				at += hdr + plen
+			}
+			codes := body[at:]
+			if prior.next == want && len(codes) != prior.items {
+				return nil, fmt.Errorf("mqtt: %s has %d results for %d requested filters", want, len(codes), prior.items)
+			}
+			if len(codes) > 0 {
+				info["Reason Code"] = uint64(codes[0])
+				if len(codes) > 1 {
+					values := make([]uint64, len(codes))
+					for i, code := range codes {
+						values[i] = uint64(code)
+					}
+					info["Reason Codes"] = values
+				}
+			}
+		} else if len(body) > 2 {
+			info["Reason Code"] = uint64(body[2])
+		}
+		if repeated {
 			info["Matched Request"] = true
-			if typ == 5 {
-				m.pending[1-dir][pid] = "PUBREL"
+		} else if prior.next == want {
+			delete(m.pending[owner], pid)
+			info["Matched Request"] = true
+			if typ == 5 && (len(body) <= 2 || body[2] < 0x80) {
+				prior.next = "PUBREL"
+				m.pending[owner][pid] = prior
 			} else if typ == 6 {
-				m.pending[1-dir][pid] = "PUBCOMP"
+				prior.next = "PUBCOMP"
+				m.pending[owner][pid] = prior
 			}
 		}
-		if len(body) > 2 {
-			info["Reason Code"] = uint64(body[2])
+	case 14:
+		m.connack = false
+		if m.spark != nil {
+			m.spark = &sparkNode{key: m.spark.key, bdSeq: m.spark.bdSeq}
 		}
 	case 8, 10:
 		if len(body) < 2 {
@@ -186,11 +378,30 @@ func (m *binMQTT) consume(dir int, raw []byte, result map[string]any) (map[strin
 		}
 		pid := binary.BigEndian.Uint16(body[:2])
 		info["Packet Identifier"] = uint64(pid)
-		if typ == 8 {
-			m.pending[1-dir][pid] = "SUBACK"
-		} else {
-			m.pending[1-dir][pid] = "UNSUBACK"
+		want := "SUBACK"
+		if typ == 10 {
+			want = "UNSUBACK"
 		}
+		digest := sha256.Sum256(raw)
+		// Only byte-identical controls preserve the existing request. A
+		// different filter/options/properties payload is a new allocation.
+		if got := m.pending[dir][pid]; got.next != "" && (got.next != want || got.digest != digest) {
+			return nil, fmt.Errorf("mqtt: packet identifier %d is already in use", pid)
+		}
+		pendingNew := 0
+		if m.pending[dir][pid].next == "" {
+			pendingNew = 1
+		}
+		if err := m.reserveInsert(pendingNew, 0, 0, maxElements, reserve); err != nil {
+			return nil, err
+		}
+		items := 0
+		if meta, ok := result["metadata"].(map[string]any); ok {
+			if n, ok := uintFrom(meta["List Item Count"]); ok {
+				items = int(n)
+			}
+		}
+		m.pending[dir][pid] = mqttPending{next: want, digest: digest, items: items}
 	}
 	return info, nil
 }
@@ -201,6 +412,92 @@ func mqttSessionName(typ byte) string {
 		return names[typ]
 	}
 	return "UNKNOWN"
+}
+
+// These views run after the native MQTT envelope decoder has accepted the
+// packet. They borrow the payload only for this invocation; no Will body is
+// retained as connection state.
+func mqttConnectWill(body []byte, level byte) (topic string, payload []byte, flags byte, err error) {
+	if len(body) < 2 {
+		return "", nil, 0, fmt.Errorf("mqtt: truncated CONNECT")
+	}
+	at := 2 + int(binary.BigEndian.Uint16(body[:2]))
+	if at+4 > len(body) {
+		return "", nil, 0, fmt.Errorf("mqtt: truncated CONNECT header")
+	}
+	flags = body[at+1]
+	at += 4
+	skipProps := func() error {
+		n, h, e := mqtt5SkipVBI(body[at:])
+		if e != nil {
+			return e
+		}
+		if n > len(body)-at-h {
+			return fmt.Errorf("mqtt: truncated properties")
+		}
+		at += h + n
+		return nil
+	}
+	if level == 5 {
+		if e := skipProps(); e != nil {
+			return "", nil, flags, e
+		}
+	}
+	vector := func() ([]byte, error) {
+		if at+2 > len(body) {
+			return nil, fmt.Errorf("mqtt: truncated CONNECT vector")
+		}
+		n := int(binary.BigEndian.Uint16(body[at : at+2]))
+		at += 2
+		if n > len(body)-at {
+			return nil, fmt.Errorf("mqtt: truncated CONNECT vector")
+		}
+		b := body[at : at+n]
+		at += n
+		return b, nil
+	}
+	if _, e := vector(); e != nil {
+		return "", nil, flags, e
+	}
+	if flags&4 == 0 {
+		return "", nil, flags, nil
+	}
+	if level == 5 {
+		if e := skipProps(); e != nil {
+			return "", nil, flags, e
+		}
+	}
+	b, e := vector()
+	if e != nil {
+		return "", nil, flags, e
+	}
+	topic = string(b)
+	payload, e = vector()
+	return topic, payload, flags, e
+}
+
+func mqttPublishPayload(body []byte, qos, level byte) ([]byte, error) {
+	if len(body) < 2 {
+		return nil, fmt.Errorf("mqtt: truncated PUBLISH")
+	}
+	at := 2 + int(binary.BigEndian.Uint16(body[:2]))
+	if qos > 0 {
+		at += 2
+	}
+	if at > len(body) {
+		return nil, fmt.Errorf("mqtt: truncated PUBLISH")
+	}
+	if level == 5 {
+		n, h, e := mqtt5SkipVBI(body[at:])
+		if e != nil {
+			return nil, e
+		}
+		if n > len(body)-at-h {
+			return nil, fmt.Errorf("mqtt: truncated properties")
+		}
+		at += h + n
+	}
+	return body[at:], nil
 }
 
 func uintFrom(v any) (uint64, bool) {
@@ -306,7 +603,7 @@ func mqtt5ConnectAliasMax(body []byte) (uint16, bool) {
 	return 0, false
 }
 
-func mqtt5PublishView(body []byte, qos byte) (topic string, pid uint16, alias uint16, err error) {
+func mqttPublishView(body []byte, qos, level byte) (topic string, pid uint16, alias uint16, err error) {
 	if len(body) < 2 {
 		return "", 0, 0, fmt.Errorf("mqtt: truncated PUBLISH")
 	}
@@ -322,6 +619,11 @@ func mqtt5PublishView(body []byte, qos byte) (topic string, pid uint16, alias ui
 		}
 		pid = binary.BigEndian.Uint16(body[at : at+2])
 		at += 2
+	}
+	// MQTT 3.1.1 payload starts here; it has no MQTT5 property length.
+	// In particular a binary payload prefix is not a property VBI.
+	if level == 4 {
+		return topic, pid, 0, nil
 	}
 	plen, hdr, err := mqtt5SkipVBI(body[at:])
 	if err != nil || at+hdr+plen > len(body) {

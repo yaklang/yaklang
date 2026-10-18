@@ -10,7 +10,7 @@ const c37118IdleTTL = 30 * time.Second
 
 // Configuration context is bounded and scoped by transport pair, publisher
 // direction and capture domain. UDP payloads are never concatenated.
-func (a *binParser) decodeC37118Datagram(e *ProtocolEvent, w []byte, explicit bool) bool {
+func (a *binParser) decodeC37118Datagram(e *ProtocolEvent, w []byte, explicit bool, engineering ...bool) bool {
 	if !explicit && !c37118DatagramEvidence(w) {
 		return false
 	}
@@ -31,22 +31,27 @@ func (a *binParser) decodeC37118Datagram(e *ProtocolEvent, w []byte, explicit bo
 	if e.Timestamp.After(store.clock) {
 		store.clock = e.Timestamp
 	}
-	for el := store.lru.Front(); el != nil; {
-		next := el.Next()
+	// The 30-second capture idle policy belongs to this conversation. A
+	// different interface, tunnel, or publisher may have an unrelated clock.
+	// Lazy expiry keeps their configurations intact while collection and byte
+	// budgets still bound retained state. Backdated packets never extend TTL.
+	el := store.entries[key]
+	if el != nil {
 		v := el.Value.(*binUDPEntry)
-		if v.flow.c37118 != nil && store.clock.Sub(v.touched) >= c37118IdleTTL {
+		if e.Timestamp.Sub(v.touched) >= c37118IdleTTL {
 			v.flow.closeSession()
 			delete(store.entries, v.key)
 			store.lru.Remove(el)
+			el = nil
 		}
-		el = next
 	}
-	el := store.entries[key]
 	var f *binFlow
 	if el != nil {
 		v := el.Value.(*binUDPEntry)
 		f = v.flow
-		v.touched = store.clock
+		if e.Timestamp.After(v.touched) {
+			v.touched = e.Timestamp
+		}
 		store.lru.MoveToBack(el)
 		e.FlowID = f.id
 		if e.Source != f.endpoints[0] {
@@ -55,23 +60,25 @@ func (a *binParser) decodeC37118Datagram(e *ProtocolEvent, w []byte, explicit bo
 	} else {
 		f = &binFlow{a: a, protocol: "c37118", c37118: &binC37118{}, endpoints: [2]string{e.Source, e.Destination}}
 	}
+	f.c37118.engineering = len(engineering) > 0 && engineering[0]
+	e.Profile = f.c37118Profile(e.Direction, w)
 	var err error
 	oversized := len(w) > min(a.budget.MaxFrameBytes, a.config.MaxMessageBytes)
 	if oversized {
 		err = protocolError(ErrResourceExceeded, "C37.118 UDP frame exceeds byte budget")
-		if len(w) > 1 && w[1]>>4 == 3 {
+		if len(w) > 1 && (w[1]>>4 == 3 || w[1]>>4 == 5) {
 			f.c37118.configuration[e.Direction] = nil
 		}
 	} else {
 		e.Session, err = f.consumeC37118(e.Direction, w)
-		if err == nil && el == nil && len(w) > 1 && w[1]>>4 == 3 {
+		if err == nil && el == nil && len(w) > 1 && (w[1]>>4 == 3 || w[1]>>4 == 5) {
 			if len(store.entries) >= sessionCollectionLimit(a.budget.MaxCollectionElements) {
 				err = protocolError(ErrResourceExceeded, "C37.118 UDP configuration conversation budget")
 				e.Session = nil
 			} else {
 				f.id = a.flows.Add(1)
 				e.FlowID = f.id
-				el = store.lru.PushBack(&binUDPEntry{key, f, store.clock})
+				el = store.lru.PushBack(&binUDPEntry{key, f, e.Timestamp})
 				store.entries[key] = el
 			}
 		}
@@ -94,5 +101,5 @@ func (a *binParser) decodeC37118Datagram(e *ProtocolEvent, w []byte, explicit bo
 }
 
 func c37118DatagramEvidence(w []byte) bool {
-	return len(w) >= 16 && probeC37118(w, len(w)).Verdict == ProbeAccept && w[1]>>4 < 5 && int(binary.BigEndian.Uint16(w[2:4])) == len(w) && c37118CRC(w[:len(w)-2]) == binary.BigEndian.Uint16(w[len(w)-2:])
+	return len(w) >= 16 && probeC37118(w, len(w)).Verdict == ProbeAccept && (w[1]>>4 < 5 || w[1] == 0x52 && len(w) >= 24 && binary.BigEndian.Uint16(w[14:16]) == 0) && int(binary.BigEndian.Uint16(w[2:4])) == len(w) && c37118CRC(w[:len(w)-2]) == binary.BigEndian.Uint16(w[len(w)-2:])
 }

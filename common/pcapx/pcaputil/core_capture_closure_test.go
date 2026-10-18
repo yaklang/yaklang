@@ -77,11 +77,7 @@ func TestCoreCaptureOffloadAndHalfCloseSealed(t *testing.T) {
 					} else {
 						require.NoError(t, err)
 						require.Contains(t, []string{"decoded", "deferred"}, e.Status)
-						if e.Protocol == "dns" {
-							rocEqualFields(t, c.Messages[i].Fields, fields)
-						} else {
-							assertMVPJSONFields(t, c.Messages[i].Fields, fields)
-						}
+						rocEqualFields(t, c.Messages[i].Fields, fields)
 					}
 					var refs []uint64
 					for _, r := range e.SourceBytes.PacketRefs {

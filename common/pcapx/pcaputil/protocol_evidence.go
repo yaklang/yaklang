@@ -30,8 +30,13 @@ type ByteSource struct {
 	PacketRefs []PacketReference
 }
 type captureEvidence struct {
-	Ref  PacketReference
-	refs []PacketReference
+	tcpMissingTail uint32 // validated captured TCP payload suffix; no invented bytes
+	Ref            PacketReference
+	refs           []PacketReference
+	// Applies to the current IP packet, not an outer tunnel carrier.
+	ipv6Fragment bool
+	// Count normalization across reconstructed outer/inner fragment layers.
+	normalizedTunnels int
 }
 
 func evidenceFrom(ci gopacket.CaptureInfo) captureEvidence {
@@ -64,6 +69,11 @@ func packetEvidence(p gopacket.Packet) captureEvidence {
 			outer = a + "~" + b
 		}
 		switch v := l.(type) {
+		case *capturePPILayer:
+			e.Ref.Domain.Encapsulation += "/ppi:ethernet"
+			if v.aggregation {
+				e.Ref.Domain.Encapsulation += fmt.Sprintf("/aggregation:%d", v.interfaceID)
+			}
 		case *layers.Dot1Q:
 			e.Ref.Domain.Encapsulation += fmt.Sprintf("/vlan:%d", v.VLANIdentifier)
 		case *layers.VXLAN:
@@ -73,7 +83,11 @@ func packetEvidence(p gopacket.Packet) captureEvidence {
 		case *layers.Geneve:
 			e.Ref.Domain.Encapsulation += fmt.Sprintf("/geneve:%s:%d", outer, v.VNI)
 		case *layers.IPv4:
-			e.Ref.Domain.Encapsulation += ipEncapsulation(v.Protocol, outer)
+			// A fragmented outer packet has no decoded inner carrier yet. Defer
+			// that domain suffix until reassembly instead of applying it twice.
+			if v.FragOffset == 0 && v.Flags&layers.IPv4MoreFragments == 0 {
+				e.Ref.Domain.Encapsulation += ipEncapsulation(v.Protocol, outer)
+			}
 		}
 	}
 	return e
@@ -177,6 +191,12 @@ func (f *binFlow) eventEvidence(dir int, e *ProtocolEvent) {
 				e.SourceBytes.PacketRefs = append(e.SourceBytes.PacketRefs, s.ref)
 			}
 		}
+	}
+	// Context discovery can release bytes queued in the opposite direction.
+	// The latest connection-wide parent is not necessarily this message's
+	// contributor. Keep the scalar link consistent with its byte provenance.
+	if len(e.SourceBytes.ParentPDUs) != 0 {
+		e.SourceBytes.ParentPDU = e.SourceBytes.ParentPDUs[len(e.SourceBytes.ParentPDUs)-1]
 	}
 	if d.evidenceLimited {
 		e.ExpertCode = "PacketReferencesLimited"

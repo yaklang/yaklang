@@ -20,6 +20,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/klauspost/compress/zstd"
 )
 
 const batchDir = "common/bin-parser/testdata/corpus-batches"
@@ -31,31 +33,38 @@ type Member struct {
 	Bytes  int64  `json:"bytes"`
 }
 type Batch struct {
-	ID        string            `json:"id"`
-	Kind      string            `json:"kind,omitempty"`
-	SourceSHA string            `json:"source_sha,omitempty"`
-	File      string            `json:"file"`
-	SHA256    string            `json:"sha256"`
-	Password  string            `json:"password"`
-	Members   map[string]Member `json:"members"`
-	Aliases   map[string]string `json:"aliases"`
-	files     map[string]*zip.File
+	ID          string            `json:"id"`
+	Kind        string            `json:"kind,omitempty"`
+	SourceSHA   string            `json:"source_sha,omitempty"`
+	File        string            `json:"file"`
+	SHA256      string            `json:"sha256"`
+	Password    string            `json:"password"`
+	Members     map[string]Member `json:"members"`
+	Aliases     map[string]string `json:"aliases"`
+	PackID      string            `json:"pack,omitempty"`
+	packed      *packedArchive
+	packStorage bool
+	files       map[string]*zip.File
 }
 type Index struct {
 	SchemaVersion       int      `json:"schema_version"`
 	SourceSHA           string   `json:"source_sha"`
 	SourceArchiveSHA256 string   `json:"source_archive_sha256"`
 	Batches             []*Batch `json:"batches"`
+	Packs               []*Pack  `json:"packs,omitempty"`
 }
 type location struct {
 	batch  *Batch
 	member string
 }
 type corpus struct {
-	root     string
-	index    Index
-	indexRaw []byte
-	aliases  map[string]location
+	expectationsOnce sync.Once
+	expectations     []*FrozenExpectations
+	expectationsErr  error
+	root             string
+	index            Index
+	indexRaw         []byte
+	aliases          map[string]location
 }
 
 var loaded struct {
@@ -71,6 +80,10 @@ func validName(name string) bool {
 // openBatch checks the compressed archive before trusting its directory. No
 // member is extracted to the repository, including unknown or unsafe names.
 func openBatch(raw []byte, b *Batch) error {
+	return openArchive(raw, b, maxBatch)
+}
+
+func openArchive(raw []byte, b *Batch, expandedLimit uint64) error {
 	if len(raw) > maxBatch || fmt.Sprintf("%x", sha256.Sum256(raw)) != b.SHA256 {
 		return fmt.Errorf("batch %s: archive size or SHA256 mismatch", b.ID)
 	}
@@ -89,11 +102,15 @@ func openBatch(raw []byte, b *Batch) error {
 		if !validName(f.Name) || !ok || b.files[f.Name] != nil || !f.Mode().IsRegular() || f.UncompressedSize64 > maxMember || m.Bytes < 0 || uint64(m.Bytes) != f.UncompressedSize64 || hashErr != nil || len(hash) != sha256.Size {
 			return fmt.Errorf("batch %s: invalid member %q", b.ID, f.Name)
 		}
-		if f.Flags&1 == 0 || f.Flags&0x40 != 0 || (f.Method != zip.Store && f.Method != zip.Deflate) {
+		methodOK := f.Method == zip.Store || f.Method == zip.Deflate
+		if b.packStorage && f.Method == packedZstdMethod && strings.HasPrefix(f.Name, "blocks/") && f.UncompressedSize64 <= maxPackedStorageBlock {
+			methodOK = true
+		}
+		if f.Flags&1 == 0 || f.Flags&0x40 != 0 || !methodOK {
 			return fmt.Errorf("batch %s: unsupported encryption or compression: %s", b.ID, f.Name)
 		}
 		total += f.UncompressedSize64
-		if total > maxBatch {
+		if total > expandedLimit {
 			return fmt.Errorf("batch %s: expanded size limit exceeded", b.ID)
 		}
 		b.files[f.Name] = f
@@ -128,6 +145,13 @@ func (r *decryptReader) Read(p []byte) (int, error) {
 	return n, err
 }
 func readMember(b *Batch, name string) ([]byte, error) {
+	if b.packed != nil {
+		m, ok := b.Members[name]
+		if !ok {
+			return nil, fmt.Errorf("batch %s: missing packed member %s", b.ID, name)
+		}
+		return b.packed.read(m)
+	}
 	f := b.files[name]
 	if f == nil {
 		return nil, fmt.Errorf("batch %s: missing member %s", b.ID, name)
@@ -156,6 +180,16 @@ func readMember(b *Batch, name string) ([]byte, error) {
 		inflater := flate.NewReader(d)
 		defer inflater.Close()
 		reader = inflater
+	} else if f.Method == packedZstdMethod {
+		if !b.packStorage || !strings.HasPrefix(name, "blocks/") || f.UncompressedSize64 > maxPackedStorageBlock {
+			return nil, fmt.Errorf("batch %s: unsupported packed compression", b.ID)
+		}
+		decoder, err := zstd.NewReader(d, zstd.WithDecoderConcurrency(1), zstd.WithDecoderLowmem(true), zstd.WithDecoderMaxMemory(8<<20), zstd.WithDecoderMaxWindow(maxPackedStorageBlock))
+		if err != nil {
+			return nil, err
+		}
+		defer decoder.Close()
+		reader = decoder
 	}
 	m := b.Members[name]
 	data, err := io.ReadAll(io.LimitReader(reader, m.Bytes+1))
@@ -197,9 +231,23 @@ func load() (*corpus, error) {
 			loaded.err = err
 			return
 		}
-		if c.index.SchemaVersion != 1 || len(c.index.Batches) == 0 {
+		if (c.index.SchemaVersion != 1 && c.index.SchemaVersion != 2) || len(c.index.Batches) == 0 || (c.index.SchemaVersion == 1 && len(c.index.Packs) != 0) || (c.index.SchemaVersion == 2 && len(c.index.Packs) == 0) {
 			loaded.err = fmt.Errorf("trafficfixture: unsupported index")
 			return
+		}
+		packs := map[string]*packedArchive{}
+		for _, p := range c.index.Packs {
+			if p == nil || p.ID == "" || packs[p.ID] != nil || !validName(p.File) || strings.Contains(p.File, "/") {
+				loaded.err = fmt.Errorf("trafficfixture: invalid pack identity")
+				return
+			}
+			a, e := openPack(root, p)
+			if e != nil {
+				loaded.err = e
+				return
+			}
+			p.data = a
+			packs[p.ID] = a
 		}
 		ids := map[string]bool{}
 		for _, b := range c.index.Batches {
@@ -208,9 +256,20 @@ func load() (*corpus, error) {
 				return
 			}
 			ids[b.ID] = true
-			raw, err := readBoundedFile(filepath.Join(root, batchDir, b.File), maxBatch)
-			if err == nil {
-				err = openBatch(raw, b)
+			var err error
+			if b.PackID != "" {
+				p, ok := packs[b.PackID]
+				if !ok {
+					err = fmt.Errorf("trafficfixture: unknown pack")
+				} else {
+					err = p.bind(b)
+				}
+			} else {
+				raw, e := readBoundedFile(filepath.Join(root, batchDir, b.File), maxBatch)
+				err = e
+				if err == nil {
+					err = openBatch(raw, b)
+				}
 			}
 			if err != nil {
 				loaded.err = err
@@ -222,6 +281,22 @@ func load() (*corpus, error) {
 					return
 				}
 				c.aliases[alias] = location{b, member}
+			}
+		}
+		for _, p := range packs {
+			used := map[string]bool{}
+			bound := 0
+			for _, b := range c.index.Batches {
+				if b.packed == p {
+					bound++
+					for _, m := range b.Members {
+						used[m.SHA256] = true
+					}
+				}
+			}
+			if bound != len(p.manifest.ArchiveBytes) || len(used) != len(p.manifest.Recipes) {
+				loaded.err = fmt.Errorf("trafficfixture: orphan packed sources or recipes")
+				return
 			}
 		}
 		loaded.corpus = c
