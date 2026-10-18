@@ -21,7 +21,8 @@ func TestGroupCloseOwnsWorkerScratch(t *testing.T) {
 	}
 	root := sc.(*scratch)
 	defer root.Close() // also clean up the known-bad pool during reproduction
-	if err := g.db.Scan([]byte("token123"), sc, nil); err != nil {
+	// Short tasks run inline. This ownership test must actually start workers.
+	if err := g.db.Scan(bytes.Repeat([]byte("token123 "), 80), sc, nil); err != nil {
 		g.putScratch(sc)
 		t.Fatal(err)
 	}
@@ -91,9 +92,12 @@ func TestGroupPoolEvictionAndClose(t *testing.T) {
 		}
 		root := s.(*scratch)
 		defer root.Close()
-		if err := g.db.Scan([]byte("token123"), root, nil); err != nil {
+		if err := g.db.Scan(bytes.Repeat([]byte("token123 "), 80), root, nil); err != nil {
 			g.putScratch(root)
 			t.Fatal(err)
+		}
+		if root.mergedTasks == nil {
+			t.Fatal("eviction fixture did not start workers")
 		}
 		borrowed = append(borrowed, root)
 	}
@@ -185,9 +189,12 @@ func TestGroupOversizedScratchIsReleased(t *testing.T) {
 	}
 	root := s.(*scratch)
 	defer root.Close()
-	if err := g.db.Scan([]byte("token123"), root, nil); err != nil {
+	if err := g.db.Scan(bytes.Repeat([]byte("token123 "), 80), root, nil); err != nil {
 		g.putScratch(root)
 		t.Fatal(err)
+	}
+	if root.mergedTasks == nil {
+		t.Fatal("oversized fixture did not start workers")
 	}
 	root.cpairs = make([]int32, int(groupScratchBufferBudget/4)+1)
 	g.putScratch(root)
@@ -280,10 +287,15 @@ func TestGroupFinalizerClosesOwnedCache(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if err := g.db.Scan([]byte("token123"), s, nil); err != nil {
+		if err := g.db.Scan(bytes.Repeat([]byte("token123 "), 80), s, nil); err != nil {
 			g.putScratch(s)
 			g.Close()
 			t.Fatal(err)
+		}
+		if s.(*scratch).mergedTasks == nil {
+			g.putScratch(s)
+			g.Close()
+			t.Fatal("finalizer fixture did not start workers")
 		}
 		g.putScratch(s)
 		return s.(*scratch) // no Group reference is retained
@@ -350,6 +362,7 @@ func BenchmarkProgramGroupReuse(b *testing.B) {
 				b.Fatal(err)
 			}
 			defer g.Close()
+			programSmallWorkerMode(b, g.db)
 			want, err := g.MatchedIndexesErr(data)
 			if err != nil || len(want) == 0 {
 				b.Fatalf("invalid warmup: %v %v", want, err)
