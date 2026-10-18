@@ -278,8 +278,9 @@ func (c *Compiler) compileCall(inst *ssa.Call) error {
 
 	// A global builtin such as set/get must not hide a closure stored
 	// under the same name. `a.set(2)` reads the object field first; only a
-	// bare `set(...)` reaches the global dispatch below.
-	if c.shouldUseYaklibDispatch(calleeName) && !c.calleeIsObjectMember(calleeVal) {
+	// bare `set(...)` or a stdlib module member (`yakit.Info`) reaches the
+	// generic yaklib dispatch below.
+	if c.shouldUseYaklibDispatch(calleeName) && !c.calleeIsLocalObjectMethod(calleeVal) {
 		return c.lowerYaklibDispatchCall(inst, calleeName)
 	}
 
@@ -308,16 +309,27 @@ func (c *Compiler) compileCall(inst *ssa.Call) error {
 	return fmt.Errorf("compileCall: unable to resolve callee %q", calleeName)
 }
 
-// calleeIsObjectMember reports a call whose callee is a field of an
-// object (`a.set`), as opposed to a bare global (`set`).
-func (c *Compiler) calleeIsObjectMember(calleeVal ssa.Value) bool {
+// calleeIsLocalObjectMethod reports a call to a value stored on a plain
+// object (`a.set`), as opposed to a stdlib module member (`yakit.Info`).
+// Only a plain object field bypasses the generic yaklib dispatch; a module
+// member still resolves through the yaklib export table.
+func (c *Compiler) calleeIsLocalObjectMethod(calleeVal ssa.Value) bool {
 	if calleeVal == nil {
 		return false
 	}
-	if mc, ok := calleeVal.(ssa.MemberCall); ok && mc.IsMember() {
-		return mc.GetObject() != nil
+	mc, ok := calleeVal.(ssa.MemberCall)
+	if !ok || !mc.IsMember() {
+		return false
 	}
-	return false
+	obj := ssa.GetLatestObject(calleeVal)
+	if obj == nil {
+		return false
+	}
+	// A stdlib module (yakit, ssa, codec, ...) keeps the yaklib dispatch path.
+	if c.yaklibModuleNameFromObject(obj) != "" {
+		return false
+	}
+	return true
 }
 
 // yakMapBuiltinMethod reports the yak map methods implemented on
