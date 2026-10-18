@@ -192,4 +192,31 @@ stateSets 按 discovery ID 遍历维持原 BFS 顺序；状态预算拒绝路径
 两种真实规则集、两种报告模式的四份镜像逐字节相同；64 完整结果对无差异。
 构造变更后的普通 DFA/state-budget、race、amalgamation、vet 也已验证；未删除被强制路径需要的表。
 
+## T11 第一批：编译期 exact AST 参数复用
+
+仅显式 MVS Compile 暂存第一次 RE2 分析已经生成的 simplified AST，按 compiledPattern 实例隔离，
+传给 NFA 和 literal-window 构造；处理每条规则时移除映射。没有全局缓存、可执行 regexp 共享、
+发布后 AST 字段或宽度/位置算法变更。Auto 仍是 Engine，不保留这些树；标准库内部编译解析仍在。
+
+相对于 c9392a5af，用同二进制 Reference/Reuse 路径、五轮串行独立进程（Go1.22.12/clang22.1.8/GOMAXPROCS2）：
+
+| 指标 | Reference | Reuse |
+| --- | ---: | ---: |
+| GetRequest Compile 中位数 | 445.76 ms | 396.49 ms（-11.05%） |
+| GetRequest 累计 Go 分配 | 503.93 MB / 5,550,747 alloc | 475.18 MB / 5,251,182 alloc |
+| MITM Compile 中位数 | 14.35 ms | 13.30 ms（-7.33%） |
+| GetRequest 显式包内 Parse 次数 | 14,828 | 6,152 |
+| MITM 显式包内 Parse 次数 | 322 | 161 |
+
+NFA 尝试次数仍为 4941/87；这是参数复用的增量，不能用旧 T01 的不同测量时点拼接更大百分比。
+单次带 hook/10ms HeapAlloc 采样的诊断中，GetRequest 峰值约 224→232/238 MB，GC 后约152.5 MB持有量相同；
+另三轮独立 fresh-process 资源测量的 Private Bytes 采样峰值中位数为 441.6→370.5 MB，Working Set 为439.8→371.6 MB。
+这些是不同口径且受 GC/桌面负载影响，采样峰值不是真实精确峰值，不能把 Go/C 请求与 RSS 相加。
+主要结论是解析/累计分配确定减少，未据一次堆采样推断进程内存回退，也不声称生产 P99 或加权收益。
+
+四份真实镜像逐字节相同，48 组跨变体有序完整结果无差异；普通测试另对独立 whole-subject oracle，
+覆盖重复 ID/flags、exact/PCRE、nullable/assert/Unicode/非法 UTF、counted-repeat 四个独立位置、AST 只读、
+错误顺序与并发 Compile。默认启用后 full minirehs39.021s/embedded/trafficguard、race5、amalgamation 和 vet 通过。
+镜像仍为 image6/blob4。T11 的原始/超集 IR、其余分析入口、Facts 和 concat prefix/suffix 子步骤继续推进，尚未将整卡标完成。
+
 上一轮性能结论及边界见 [RUNTIME_PERFORMANCE.md](RUNTIME_PERFORMANCE.md)。
