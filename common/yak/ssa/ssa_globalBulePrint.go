@@ -78,7 +78,7 @@ func (b *FunctionBuilder) GetGlobalVariables() map[string]Value {
 		initContainer(b)
 	}
 
-	for name := range prog.GlobalVariablesBlueprint.StaticMember {
+	for _, name := range prog.GlobalVariablesBlueprint.StaticMember.Keys() {
 		if name == "" {
 			continue
 		}
@@ -119,7 +119,7 @@ func (b *FunctionBuilder) LoadGlobalVariable() {
 	// references like str[0] resolve correctly. We only traverse the
 	// global variable's own memberPairs (a few per variable), not the
 	// globalVarsContainer's 21000+ pairs.
-	for name := range prog.GlobalVariablesBlueprint.StaticMember {
+	for _, name := range prog.GlobalVariablesBlueprint.StaticMember.Keys() {
 		if name == "" {
 			continue
 		}

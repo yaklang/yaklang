@@ -76,9 +76,12 @@ type Blueprint struct {
 	// outside SafeMap's lock; ForEach already drops the lock before its callback.
 	MagicMethod *utils.SafeMapWithKey[BlueprintMagicMethodKind, Value]
 
-	NormalMember map[string][]Value
-	StaticMember map[string][]Value
-	ConstValue   map[string][]Value
+	// Member lists are shared by parallel compile units (global variables and
+	// inherited blueprints). SafeMap makes one key's append atomic. The lock
+	// stays inside that update and is not held across storeField or Emit.
+	NormalMember *utils.SafeMapWithKey[string, []Value]
+	StaticMember *utils.SafeMapWithKey[string, []Value]
+	ConstValue   *utils.SafeMapWithKey[string, []Value]
 
 	CallBack []func()
 
@@ -112,9 +115,9 @@ func NewBlueprint(name string) *Blueprint {
 		id:           -1,
 		Name:         name,
 		Kind:         BlueprintNone,
-		NormalMember: make(map[string][]Value),
-		StaticMember: make(map[string][]Value),
-		ConstValue:   make(map[string][]Value),
+		NormalMember: utils.NewSafeMapWithKey[string, []Value](),
+		StaticMember: utils.NewSafeMapWithKey[string, []Value](),
+		ConstValue:   utils.NewSafeMapWithKey[string, []Value](),
 
 		NormalMethod: make(map[string]*Function),
 		StaticMethod: make(map[string]*Function),
@@ -264,30 +267,15 @@ func (c *Blueprint) addParentBlueprintEx(parent *Blueprint, relation BlueprintRe
 			return true
 		})
 	}
-	for name, values := range parent.NormalMember {
-		if len(c.NormalMember[name]) > 0 {
-			continue
-		}
-		for _, value := range values {
-			c.RegisterNormalMember(name, value, false)
-		}
-	}
-	for name, values := range parent.StaticMember {
-		if len(c.StaticMember[name]) > 0 {
-			continue
-		}
-		for _, value := range values {
-			c.RegisterStaticMember(name, value, false)
-		}
-	}
-	for name, values := range parent.ConstValue {
-		if len(c.ConstValue[name]) > 0 {
-			continue
-		}
-		for _, value := range values {
-			c.RegisterConstMember(name, value, false)
-		}
-	}
+	inheritBlueprintMembers(c.NormalMember, parent.NormalMember, func(name string, value Value) {
+		c.RegisterNormalMember(name, value, false)
+	})
+	inheritBlueprintMembers(c.StaticMember, parent.StaticMember, func(name string, value Value) {
+		c.RegisterStaticMember(name, value, false)
+	})
+	inheritBlueprintMembers(c.ConstValue, parent.ConstValue, func(name string, value Value) {
+		c.RegisterConstMember(name, value, false)
+	})
 }
 
 func (c *Blueprint) GetInterfaceBlueprint() []*Blueprint {
