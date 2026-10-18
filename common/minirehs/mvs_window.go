@@ -43,9 +43,6 @@ func computeLitWindow(expr string, lits []string) litWindow {
 		return w
 	}
 	re = re.Simplify()
-	if hasNonASCIIFold(re) {
-		return w
-	}
 	set := make(map[string]struct{}, len(lits))
 	for _, l := range lits {
 		set[l] = struct{}{}
@@ -96,10 +93,7 @@ func (a *litWindowAcc) record(litLen, pre int, preB bool, suf int, sufB bool) {
 func (a *litWindowAcc) walk(re *syntax.Regexp, pre int, preB bool, suf int, sufB bool) {
 	switch re.Op {
 	case syntax.OpLiteral:
-		s := asciiLowerString(string(re.Rune))
-		if _, ok := a.set[s]; ok {
-			a.record(len(string(re.Rune)), pre, preB, suf, sufB)
-		}
+		literalTriggerBounds(re, a.set, func(_ string, head, tail int) { a.record(head, pre, preB, addSat(suf, tail), sufB) })
 
 	case syntax.OpCapture:
 		if len(re.Sub) == 1 {
@@ -160,9 +154,6 @@ func computeLitHeads(expr string, lits []string) map[string]int32 {
 		return out
 	}
 	re = re.Simplify()
-	if hasNonASCIIFold(re) {
-		return out
-	}
 	set := make(map[string]struct{}, len(lits))
 	for _, l := range lits {
 		set[l] = struct{}{}
@@ -200,10 +191,7 @@ func (a *litHeadAcc) record(lit string, litLen, pre int, preB bool) {
 func (a *litHeadAcc) walk(re *syntax.Regexp, pre int, preB bool) {
 	switch re.Op {
 	case syntax.OpLiteral:
-		s := asciiLowerString(string(re.Rune))
-		if _, ok := a.set[s]; ok {
-			a.record(s, len(string(re.Rune)), pre, preB)
-		}
+		literalTriggerBounds(re, a.set, func(lit string, head, _ int) { a.record(lit, head, pre, preB) })
 	case syntax.OpCapture:
 		if len(re.Sub) == 1 {
 			a.walk(re.Sub[0], pre, preB)

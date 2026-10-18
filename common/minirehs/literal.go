@@ -101,8 +101,8 @@ func extractRequiredLiteralFactors(re *syntax.Regexp, minLen int) [][]string {
 func requiredLiteralFactorsOf(re *syntax.Regexp) [][]string {
 	switch re.Op {
 	case syntax.OpLiteral:
-		if lit := asciiSafeLiteral(re); lit != "" {
-			return [][]string{{lit}}
+		if lits := requiredLiteralNode(re); len(lits) > 0 {
+			return [][]string{lits}
 		}
 		return nil
 	case syntax.OpConcat:
@@ -150,10 +150,7 @@ func flattenLiteralFactors(factors [][]string) []string {
 func requiredLiterals(re *syntax.Regexp) []string {
 	switch re.Op {
 	case syntax.OpLiteral:
-		if lit := asciiSafeLiteral(re); lit != "" {
-			return []string{lit}
-		}
-		return nil
+		return requiredLiteralNode(re)
 
 	case syntax.OpConcat:
 		var best []string
@@ -209,6 +206,54 @@ func requiredLiterals(re *syntax.Regexp) []string {
 	}
 }
 
+func requiredLiteralNode(re *syntax.Regexp) []string {
+	lit := asciiSafeLiteral(re)
+	if len(lit) >= 2 || isRareAnchorLiteral(lit) || re.Flags&syntax.FoldCase == 0 {
+		if lit == "" {
+			return nil
+		}
+		return []string{lit}
+	}
+	// A short literal may have no useful safe fragment ("SK" or "sk-").
+	// Preserve filtering by listing its finite Unicode forms.
+	// Cap expansion; longer ambiguous literals safely remain always-on.
+	if len(re.Rune) == 0 || re.Flags&syntax.FoldCase == 0 {
+		return nil
+	}
+	forms := []string{""}
+	for _, r := range re.Rune {
+		var variants []string
+		switch r {
+		case 'k', 'K':
+			variants = []string{"k", "K"}
+		case 's', 'S':
+			variants = []string{"s", "ſ"}
+		default:
+			if r > 127 {
+				if lit != "" {
+					return []string{lit}
+				}
+				return nil
+			}
+			variants = []string{asciiLowerString(string(r))}
+		}
+		if len(forms) > 64/len(variants) {
+			if lit != "" {
+				return []string{lit}
+			}
+			return nil
+		}
+		next := make([]string, 0, len(forms)*len(variants))
+		for _, prefix := range forms {
+			for _, v := range variants {
+				next = append(next, prefix+v)
+			}
+		}
+		forms = next
+	}
+	return forms
+}
+
 // ASCII case folding cannot represent long s or the Kelvin sign. Keep only
 // the longest literal fragment whose entire fold orbit stays in ASCII.
 func asciiSafeLiteral(re *syntax.Regexp) string {
@@ -242,9 +287,8 @@ func asciiFoldSafe(r rune) bool {
 	return true
 }
 
-// Fragment triggers do not identify a complete AST literal node. Conservatively
-// disable localization when a fold can change its bytes or width, including
-// alternative occurrences of the same fragment that a node lookup could miss.
+// ASCII byte preconditions cannot constrain these folds. Localization instead
+// uses literalTriggerBounds to account for every fragment occurrence and width.
 func hasNonASCIIFold(re *syntax.Regexp) bool {
 	if re.Op == syntax.OpLiteral && re.Flags&syntax.FoldCase != 0 {
 		for _, r := range re.Rune {
