@@ -473,19 +473,19 @@ func (b *singleFileBuilder) ensureBlueprintConstructorSlot(blueprint *ssa.Bluepr
 		}
 	}
 	constructorSlot := b.newDynamicPlaceholder(blueprint.Name)
-	if _, exists := blueprint.NormalMember[blueprint.Name]; !exists {
+	if blueprint.NormalMember == nil || !blueprint.NormalMember.Have(blueprint.Name) {
 		blueprint.RegisterNormalMember(blueprint.Name, constructorSlot, false)
 	}
-	if _, exists := blueprint.StaticMember[blueprint.Name]; !exists {
+	if blueprint.StaticMember == nil || !blueprint.StaticMember.Have(blueprint.Name) {
 		blueprint.RegisterStaticMember(blueprint.Name, constructorSlot, false)
 	}
 	if strings.Contains(blueprint.Name, ".") {
 		simpleName := pythonBlueprintSimpleName(blueprint.Name)
 		if simpleName != "" {
-			if _, exists := blueprint.NormalMember[simpleName]; !exists {
+			if blueprint.NormalMember == nil || !blueprint.NormalMember.Have(simpleName) {
 				blueprint.RegisterNormalMember(simpleName, constructorSlot, false)
 			}
-			if _, exists := blueprint.StaticMember[simpleName]; !exists {
+			if blueprint.StaticMember == nil || !blueprint.StaticMember.Have(simpleName) {
 				blueprint.RegisterStaticMember(simpleName, constructorSlot, false)
 			}
 			b.syncBlueprintContainerMember(blueprint, simpleName, constructorSlot)
@@ -503,35 +503,43 @@ func (b *singleFileBuilder) preRegisterInheritedBlueprintMembers(child, parent *
 	if child == nil || parent == nil {
 		return
 	}
-	for name, value := range parent.NormalMember {
-		if name == "" || len(value) == 0 || shouldSkipInheritedBlueprintMember(parent, name) {
-			continue
-		}
-		if _, exists := child.NormalMember[name]; !exists {
+	if parent.NormalMember != nil {
+		parent.NormalMember.ForEach(func(name string, value []ssa.Value) bool {
+			if name == "" || len(value) == 0 || shouldSkipInheritedBlueprintMember(parent, name) {
+				return true
+			}
+			if child.NormalMember != nil && child.NormalMember.Have(name) {
+				return true
+			}
 			for _, member := range value {
 				if !utils.IsNil(member) {
 					child.RegisterNormalMember(name, member, false)
 				}
 			}
-		}
+			return true
+		})
 	}
-	for name, value := range parent.StaticMember {
-		if name == "" || len(value) == 0 || shouldSkipInheritedBlueprintMember(parent, name) {
-			continue
-		}
-		if _, exists := child.StaticMember[name]; !exists {
+	if parent.StaticMember != nil {
+		parent.StaticMember.ForEach(func(name string, value []ssa.Value) bool {
+			if name == "" || len(value) == 0 || shouldSkipInheritedBlueprintMember(parent, name) {
+				return true
+			}
+			if child.StaticMember != nil && child.StaticMember.Have(name) {
+				return true
+			}
 			for _, member := range value {
 				if !utils.IsNil(member) {
 					child.RegisterStaticMember(name, member, false)
 				}
 			}
-		}
+			return true
+		})
 	}
 	for name, fn := range parent.NormalMethod {
 		if name == "" || fn == nil {
 			continue
 		}
-		if _, exists := child.NormalMember[name]; !exists {
+		if child.NormalMember == nil || !child.NormalMember.Have(name) {
 			child.RegisterNormalMember(name, fn, false)
 		}
 	}
@@ -539,7 +547,7 @@ func (b *singleFileBuilder) preRegisterInheritedBlueprintMembers(child, parent *
 		if name == "" || fn == nil {
 			continue
 		}
-		if _, exists := child.StaticMember[name]; !exists {
+		if child.StaticMember == nil || !child.StaticMember.Have(name) {
 			child.RegisterStaticMember(name, fn, false)
 		}
 	}
@@ -590,11 +598,11 @@ func (b *singleFileBuilder) preRegisterBlueprintMemberHints(blueprint *ssa.Bluep
 		}
 		value := b.newDynamicPlaceholder(blueprint.Name + "." + name)
 		if static {
-			if _, exists := blueprint.StaticMember[name]; !exists {
+			if blueprint.StaticMember == nil || !blueprint.StaticMember.Have(name) {
 				blueprint.RegisterStaticMember(name, value, false)
 			}
 		} else {
-			if _, exists := blueprint.NormalMember[name]; !exists {
+			if blueprint.NormalMember == nil || !blueprint.NormalMember.Have(name) {
 				blueprint.RegisterNormalMember(name, value, false)
 			}
 		}

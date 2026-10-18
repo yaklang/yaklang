@@ -875,7 +875,7 @@ func (b *astbuilder) buildFunctionDeclFront(fun *gol.FunctionDeclContext) {
 		// StaticMember directly (O(1) per name) instead of GetLastWinsMemberPairs
 		// which resolved every member pair via resolveLinkedValue (O(N²)).
 		if prog := b.GetProgram(); prog != nil && prog.GlobalVariablesBlueprint != nil {
-			for name := range prog.GlobalVariablesBlueprint.StaticMember {
+			for _, name := range prog.GlobalVariablesBlueprint.StaticMember.Keys() {
 				if name == "" {
 					continue
 				}

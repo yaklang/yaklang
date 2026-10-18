@@ -1481,22 +1481,25 @@ func csharpDirectStaticWrites(function *ssa.Function) map[string]*csharpMethodSt
 			}
 			container := blueprint.Container()
 			addRootedValue(container, csharpStaticRootedValue{object: container})
-			for _, values := range blueprint.StaticMember {
-				for _, memberValue := range values {
-					if utils.IsNil(memberValue) {
-						continue
-					}
-					for _, variable := range memberValue.GetAllVariables() {
-						if variable == nil || !variable.IsMemberCall() {
+			if blueprint.StaticMember != nil {
+				blueprint.StaticMember.ForEach(func(_ string, values []ssa.Value) bool {
+					for _, memberValue := range values {
+						if utils.IsNil(memberValue) {
 							continue
 						}
-						object, key := variable.GetMemberCall()
-						if utils.IsNil(object) || object.GetId() != container.GetId() || utils.IsNil(key) {
-							continue
+						for _, variable := range memberValue.GetAllVariables() {
+							if variable == nil || !variable.IsMemberCall() {
+								continue
+							}
+							object, key := variable.GetMemberCall()
+							if utils.IsNil(object) || object.GetId() != container.GetId() || utils.IsNil(key) {
+								continue
+							}
+							seedMembers(memberValue, csharpStaticRootedValue{object: container, path: []ssa.Value{key}}, make(map[int64]struct{}))
 						}
-						seedMembers(memberValue, csharpStaticRootedValue{object: container, path: []ssa.Value{key}}, make(map[int64]struct{}))
 					}
-				}
+					return true
+				})
 			}
 			return true
 		})

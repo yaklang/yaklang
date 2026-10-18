@@ -103,43 +103,46 @@ func (c *Blueprint) Apply(obj Value) Type {
 		parent.Apply(obj)
 	}
 
-	for rawKey, members := range c.NormalMember {
-		if len(members) == 0 {
-			continue
-		}
-		member := members[len(members)-1]
-		typ := member.GetType()
-		value := member
-		key := builder.EmitConstInstPlaceholder(rawKey)
-		log.Infof("apply key: %s, member: %v", key, member)
+	if c.NormalMember != nil {
+		c.NormalMember.ForEach(func(rawKey string, members []Value) bool {
+			if len(members) == 0 {
+				return true
+			}
+			member := members[len(members)-1]
+			typ := member.GetType()
+			value := member
+			key := builder.EmitConstInstPlaceholder(rawKey)
+			log.Infof("apply key: %s, member: %v", key, member)
 
-		objTyp.AddField(key, typ)
+			objTyp.AddField(key, typ)
 
-		// if in yaklang code, classBluePrint only create by function,
-		// and Apply only called by function'call (call instruction)
-		// and only this language, member can be set by `Parameter`,
-		// we just create side-effect
-		if para, ok := ToParameter(value); ok && isCall {
-			sideEffect := builder.EmitSideEffect(key.String(), call, para)
-			builder.AssignVariable(
-				builder.CreateMemberCallVariable(obj, key),
-				sideEffect,
-			)
-			continue
-		}
+			// if in yaklang code, classBluePrint only create by function,
+			// and Apply only called by function'call (call instruction)
+			// and only this language, member can be set by `Parameter`,
+			// we just create side-effect
+			if para, ok := ToParameter(value); ok && isCall {
+				sideEffect := builder.EmitSideEffect(key.String(), call, para)
+				builder.AssignVariable(
+					builder.CreateMemberCallVariable(obj, key),
+					sideEffect,
+				)
+				return true
+			}
 
-		// in other language supported class,
-		// classBluePrint only create by `class` keyword.
-		// in this case, member can be set nil, just declare the type.
-		if utils.IsNil(value) {
-			value := builder.ReadMemberCallValue(obj, key)
-			value.SetType(typ)
-		} else {
-			builder.AssignVariable(
-				builder.CreateMemberCallVariable(obj, key),
-				value,
-			)
-		}
+			// in other language supported class,
+			// classBluePrint only create by `class` keyword.
+			// in this case, member can be set nil, just declare the type.
+			if utils.IsNil(value) {
+				value := builder.ReadMemberCallValue(obj, key)
+				value.SetType(typ)
+			} else {
+				builder.AssignVariable(
+					builder.CreateMemberCallVariable(obj, key),
+					value,
+				)
+			}
+			return true
+		})
 	}
 
 	objTyp.SetFullTypeNames(c.GetFullTypeNames())

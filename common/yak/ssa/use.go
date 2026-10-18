@@ -15,25 +15,30 @@ func ReplaceAllValue(v Value, to Value) {
 	ReplaceValue(v, to, func(i Instruction) bool { return false })
 }
 
-func replaceBlueprintFieldReference(fields map[string][]Value, from Value, to Value) {
-	if len(fields) == 0 {
+func replaceBlueprintFieldReference(fields *utils.SafeMapWithKey[string, []Value], from Value, to Value) {
+	if fields == nil || utils.IsNil(from) {
 		return
 	}
-	for name, values := range fields {
-		if len(values) == 0 {
-			continue
-		}
-		replaced := false
-		for index, current := range values {
-			if utils.IsNil(current) || current.GetId() != from.GetId() {
-				continue
+	for _, name := range fields.Keys() {
+		fields.Update(name, func(values []Value, loaded bool) ([]Value, bool) {
+			if !loaded || len(values) == 0 {
+				return values, false
 			}
-			values[index] = to
-			replaced = true
-		}
-		if replaced {
-			fields[name] = values
-		}
+			next := make([]Value, len(values))
+			copy(next, values)
+			replaced := false
+			for index, current := range next {
+				if utils.IsNil(current) || current.GetId() != from.GetId() {
+					continue
+				}
+				next[index] = to
+				replaced = true
+			}
+			if !replaced {
+				return values, false
+			}
+			return next, true
+		})
 	}
 }
 
