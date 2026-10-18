@@ -296,7 +296,7 @@ func (b *FunctionBuilder) AssignVariable(variable *Variable, value Value) {
 		log.Errorf("assign variable %q: current block is nil (%s)", name, b.builderDebugContext())
 		return
 	}
-	if _, captured := b.capturedNames[name]; captured {
+	if b.capturedNames != nil && b.capturedNames.Have(name) {
 		markCapturedByClosure(value)
 	}
 	scope := b.CurrentBlock.ScopeTable
