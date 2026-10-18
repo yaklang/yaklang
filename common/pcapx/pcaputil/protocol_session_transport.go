@@ -54,6 +54,9 @@ func (s *captureSession) feedDatagram(dir int, ts time.Time, raw []byte) FeedRes
 	out := FeedResult{Consumed: int(s.f.a.input.Load() - before), Events: s.events, State: "undetected"}
 	for _, e := range out.Events {
 		e.Direction = dir
+		if e.Profile == someIPTPProfile {
+			s.f.a.retainSomeIPSessionDirection(e)
+		}
 		if e.Protocol != "" {
 			out.State = e.Protocol
 		}
@@ -85,8 +88,8 @@ func probeDatagram(raw []byte, maxBytes int) ProbeResult {
 	if len(raw) > maxBytes {
 		return ProbeResult{Verdict: ProbeReject, Reason: "datagram exceeds configured byte limit"}
 	}
-	if dlmsRequestEvidence(raw) {
-		return probeAccept("dlms", "hdlc-get-normal", 98)
+	if p := probeDLMS(raw, maxBytes); p.Verdict == ProbeAccept {
+		return p
 	}
 	if slmpRequestEvidence(raw) {
 		return probeAccept("slmp", "slmp-binary-self-test", 98)
@@ -268,21 +271,5 @@ func (f *binFlow) needsMoreSSHServerPreamble(dir int, wire []byte) bool {
 }
 
 func radiusDatagramEvidence(w []byte, src, dst string) bool {
-	if probeRADIUS(w, len(w)).Verdict != ProbeAccept || int(binary.BigEndian.Uint16(w[2:4])) != len(w) {
-		return false
-	}
-	// A known carrier still reports malformed attributes; arbitrary ports need
-	// complete attribute spans rather than a four-byte length coincidence.
-	_, sp, _ := net.SplitHostPort(src)
-	_, dp, _ := net.SplitHostPort(dst)
-	if sp == "1812" || sp == "1813" || dp == "1812" || dp == "1813" {
-		return true
-	}
-	for at := 20; at < len(w); {
-		if at+2 > len(w) || w[at+1] < 2 || at+int(w[at+1]) > len(w) {
-			return false
-		}
-		at += int(w[at+1])
-	}
-	return true
+	return radiusAdmittedDatagram(w, src, dst)
 }

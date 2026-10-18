@@ -10,6 +10,7 @@ import (
 )
 
 func TestProtocolNetworkSummaryCapturedARP(t *testing.T) {
+	testNetworkObservationQueryOwnership(t, true)
 	for _, op := range []uint16{1, 2} {
 		c := NewDefaultConfig()
 		var event *ProtocolEvent
@@ -31,6 +32,8 @@ func TestProtocolNetworkSummaryCapturedARP(t *testing.T) {
 }
 
 func TestProtocolNetworkSummaryCapturedICMP(t *testing.T) {
+	testICMPFragmentObservations(t)
+	testNetworkObservationQueryOwnership(t, false)
 	c := NewDefaultConfig()
 	var event *ProtocolEvent
 	require.NoError(t, WithOnProtocolMessage(func(e *ProtocolEvent) { event = e })(c))

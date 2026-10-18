@@ -297,6 +297,11 @@ func (t *TrafficFlow) triggerCloseEvent(reason TrafficFlowCloseReason) {
 	if !t.closeNotified.CompareAndSwap(false, true) {
 		return
 	}
+	if reason == TrafficFlowCloseReason_RESOURCE_LIMIT {
+		// A refused future segment need not have entered the pending queue.
+		// Publish the loss before protocol and user close observers run.
+		t.reassemblyIncomplete = true
+	}
 	if t.binState != nil {
 		t.binState.close(reason)
 	}

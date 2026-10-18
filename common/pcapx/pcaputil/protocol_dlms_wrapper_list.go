@@ -1,0 +1,744 @@
+package pcaputil
+
+import (
+	"encoding/binary"
+	"encoding/hex"
+	"fmt"
+	"math"
+	"unicode/utf8"
+)
+
+// These are local selected-profile bounds, not DLMS wire maxima.
+// Data types other than scalar/float/octet/bit-string/selected-text/calendar/array/structure, GBT, ciphering
+// and object/selector semantics remain separate.
+const wrapperListItems = 64
+const wrapperListOctets = 1024
+const wrapperDataNodes = 256
+const wrapperDataLevels = 8
+
+type wrapperListCursor struct {
+	wire            []byte
+	at              int
+	nodes, maxDepth int
+}
+
+func (c *wrapperListCursor) take(n int) ([]byte, error) {
+	if n < 0 || n > len(c.wire)-c.at {
+		return nil, wrapperError(ErrMalformedMessage, "selected list field truncated")
+	}
+	w := c.wire[c.at : c.at+n]
+	c.at += n
+	return w, nil
+}
+func (c *wrapperListCursor) count() (uint64, string, error) {
+	start := c.at
+	w, err := c.take(1)
+	if err != nil {
+		return 0, "", err
+	}
+	first := w[0]
+	n := uint64(first)
+	if first == 0x80 {
+		return 0, "", wrapperError(ErrUnsupportedFeature, "literal80 determinant outside selected definite forms")
+	}
+	if first > 0x80 {
+		width := int(first & 127)
+		if width < 1 || width > 4 {
+			return 0, "", wrapperError(ErrUnsupportedFeature, "list count width outside pinned definite forms1..4")
+		}
+		w, err = c.take(width)
+		if err != nil {
+			return 0, "", err
+		}
+		n = 0
+		for _, v := range w {
+			n = n<<8 | uint64(v)
+		}
+	}
+	return n, hex.EncodeToString(c.wire[start:c.at]), nil
+}
+func wrapperScalarSize(tag byte) int {
+	switch tag {
+	case 0:
+		return 0
+	case 3, 15, 17, 22:
+		return 1
+	case 16, 18:
+		return 2
+	case 5, 6, 23:
+		return 4
+	case 20, 21, 24:
+		return 8
+	case 25:
+		return 12
+	case 26:
+		return 5
+	case 27:
+		return 4
+	default:
+		return -1
+	}
+}
+func (c *wrapperListCursor) scalar(limit int) (map[string]any, error) {
+	start := c.at
+	w, err := c.take(1)
+	if err != nil {
+		return nil, err
+	}
+	tag := w[0]
+	if n := wrapperScalarSize(tag); n >= 0 {
+		if _, err = c.take(n); err != nil {
+			return nil, err
+		}
+		if tag == 23 || tag == 24 {
+			return wrapperListFloat(c.wire[start:c.at]), nil
+		}
+		if tag >= 25 && tag <= 27 {
+			return wrapperCalendar(c.wire[start:c.at])
+		}
+		return wrapperScalar(c.wire[start:c.at], limit)
+	}
+	if tag != 9 && tag != 4 && tag != 10 && tag != 12 {
+		return nil, wrapperError(ErrUnsupportedFeature, "Data type outside bounded scalar/octet/bit-string/selected-text profile")
+	}
+	n, enc, err := c.count()
+	if err != nil {
+		return nil, err
+	}
+	bytes := n
+	if tag == 4 {
+		// A-XDR bit-string counts bits, MSB first, rather than value bytes.
+		// Bound the unsigned determinant before conversion or value allocation.
+		// Preserve unused low bits in value_hex; they are not semantic bits and
+		// their nonzero value alone is not an invalid-message assertion.
+		if n > uint64(min(limit, wrapperListOctets))*8 {
+			return nil, wrapperError(ErrResourceExceeded, "list bit-string exceeds selected byte/collection budget")
+		}
+		bytes = (n + 7) / 8
+	} else if bytes > uint64(min(limit, wrapperListOctets)) {
+		return nil, wrapperError(ErrResourceExceeded, "list octet value exceeds selected byte/collection budget")
+	}
+	w, err = c.take(int(bytes))
+	if err != nil {
+		return nil, err
+	}
+	out := map[string]any{"type": tag, "length_encoding_hex": enc, "value_hex": hex.EncodeToString(w), "raw_hex": hex.EncodeToString(c.wire[start:c.at])}
+	if tag == 4 {
+		out["bit_length"], out["unused_bits"] = n, (8-n%8)%8
+	} else {
+		out["length"] = n
+	}
+	if tag == 10 || tag == 12 {
+		encoding := "utf-8"
+		if tag == 10 {
+			// This profile selects printable US-ASCII. Other visible-string repertoires
+			// remain unsupported, rather than being labelled universally malformed.
+			for _, b := range w {
+				if b < 0x20 || b > 0x7e {
+					return nil, wrapperError(ErrUnsupportedFeature, "visible-string outside selected printable ASCII repertoire")
+				}
+			}
+			encoding = "ascii"
+		} else if !utf8.Valid(w) {
+			// RFC3629: no overlong sequences, surrogates or scalar values above U+10FFFF.
+			return nil, wrapperError(ErrMalformedMessage, "Data UTF-8 string contains invalid encoding")
+		}
+		out["text_encoding"], out["value"], out["code_points"] = encoding, string(w), utf8.RuneCount(w)
+	}
+	return out, nil
+}
+
+// Float Data retains the exact IEEE value bits. Nonfinite values are legal wire
+// values, represented as strings so every owned projection remains JSON-safe.
+// This does not assign an engineering unit or assert meter measurement validity.
+func wrapperListFloat(w []byte) map[string]any {
+	width, exponentBits, fractionBits := 64, 11, 52
+	bits := uint64(0)
+	var number float64
+	if w[0] == 23 {
+		width, exponentBits, fractionBits = 32, 8, 23
+		bits = uint64(binary.BigEndian.Uint32(w[1:]))
+		number = float64(math.Float32frombits(uint32(bits)))
+	} else {
+		bits = binary.BigEndian.Uint64(w[1:])
+		number = math.Float64frombits(bits)
+	}
+	exponent := (bits >> fractionBits) & ((1 << exponentBits) - 1)
+	fraction := bits & ((1 << fractionBits) - 1)
+	negative := bits>>(width-1) != 0
+	class := "normal"
+	var value any = number
+	if exponent == (1<<exponentBits)-1 {
+		if fraction != 0 {
+			class, value = "nan", "NaN"
+		} else {
+			class, value = "infinite", "Infinity"
+			if negative {
+				value = "-Infinity"
+			}
+		}
+	} else if exponent == 0 {
+		class = "subnormal"
+		if fraction == 0 {
+			class = "zero"
+		}
+	}
+	return map[string]any{"type": w[0], "raw_hex": hex.EncodeToString(w), "value_hex": hex.EncodeToString(w[1:]),
+		"float_width": width, "float_class": class, "negative": negative, "value": value}
+}
+
+// data consumes exactly one bounded A-XDR value. Its shared node counter spans
+// every result and selection parameter in this APDU, including empty containers.
+// Root Data maps have projection depth4; each elements slice and child map add2.
+func (c *wrapperListCursor) data(limit, level int) (map[string]any, error) {
+	if c.nodes >= min(limit, wrapperDataNodes) || level >= wrapperDataLevels || 4+2*level > c.maxDepth {
+		return nil, wrapperError(ErrResourceExceeded, "aggregate Data node/depth budget exceeded")
+	}
+	c.nodes++
+	if c.at < len(c.wire) && c.wire[c.at] == 19 {
+		start := c.at
+		c.at++
+		return c.compact(limit, level, start)
+	}
+	if c.at == len(c.wire) || c.wire[c.at] != 1 && c.wire[c.at] != 2 {
+		return c.scalar(limit)
+	}
+	start := c.at
+	tag := c.wire[c.at]
+	c.at++
+	n, enc, err := c.count()
+	if err != nil {
+		return nil, err
+	}
+	// Check unsigned counts before conversion/allocation. Children may themselves
+	// contain descendants, whose cost is checked against the same remaining pool.
+	if n > uint64(min(limit, wrapperDataNodes)-c.nodes) {
+		return nil, wrapperError(ErrResourceExceeded, "announced child count exceeds remaining Data budget")
+	}
+	// Each child needs at least its Data tag. A declared count may fit the node
+	// budget but exceed all remaining wire bytes on a truncated frame; do not
+	// preallocate that unproven capacity before the first child can be read.
+	children := make([]map[string]any, 0, min(int(n), len(c.wire)-c.at))
+	for i := uint64(0); i < n; i++ {
+		child, err := c.data(limit, level+1)
+		if err != nil {
+			return nil, err
+		}
+		children = append(children, child)
+	}
+	return map[string]any{"type": tag, "length": n, "length_encoding_hex": enc,
+		"elements": children, "raw_hex": hex.EncodeToString(c.wire[start:c.at])}, nil
+}
+
+func decodeWrapperList(m *wrapperMessage, p []byte, limit, depth int) error {
+	c := wrapperListCursor{wire: p, at: 3, maxDepth: depth}
+	n, enc, err := c.count()
+	if err != nil {
+		return err
+	}
+	if n == 0 {
+		return wrapperError(ErrUnsupportedFeature, "empty list outside selected profile; no universal wire-invalid claim")
+	}
+	if n > uint64(min(limit, wrapperListItems)) {
+		return wrapperError(ErrResourceExceeded, "announced list count exceeds selected collection budget")
+	}
+	m.count = int(n)
+	m.fields["list_count"], m.fields["list_count_encoding_hex"] = n, enc
+	items := make([]map[string]any, 0, int(n))
+	dataCount, errorCount := 0, 0
+	for i := 0; i < int(n); i++ {
+		start := c.at
+		item := map[string]any{"index": i, "apdu_offset": start}
+		if m.request {
+			w, err := c.take(10)
+			if err != nil {
+				return err
+			}
+			if int8(w[8]) <= 0 {
+				return wrapperError(ErrUnsupportedFeature, "positive signed8 attribute profile")
+			}
+			if w[9] != 0 && w[9] != 1 {
+				return wrapperError(ErrUnsupportedFeature, "selected optional access selection0/1")
+			}
+			item["class_id"], item["logical_name_hex"], item["logical_name"] = binary.BigEndian.Uint16(w), hex.EncodeToString(w[2:8]), fmt.Sprintf("%d.%d.%d.%d.%d.%d", w[2], w[3], w[4], w[5], w[6], w[7])
+			item["attribute_id"], item["selective_access"], item["access_selection_raw"] = int8(w[8]), w[9] == 1, w[9]
+			if w[9] == 1 {
+				selector, err := c.take(1)
+				if err != nil {
+					return err
+				}
+				parameter, err := c.data(limit, 0)
+				if err != nil {
+					return err
+				}
+				item["access_selector"], item["access_parameters"], item["selector_semantics_verified"] = selector[0], parameter, false
+			}
+		} else {
+			w, err := c.take(1)
+			if err != nil {
+				return err
+			}
+			item["result_choice_raw"] = w[0]
+			switch w[0] {
+			case 0:
+				data, err := c.data(limit, 0)
+				if err != nil {
+					return err
+				}
+				item["result_choice"], item["data"] = "data", data
+				dataCount++
+			case 1:
+				code, err := c.take(1)
+				if err != nil {
+					return err
+				}
+				switch code[0] {
+				case 0, 1, 2, 3, 4, 9, 11, 12, 13, 14, 15, 16, 17, 18, 19, 250:
+				default:
+					return wrapperError(ErrUnsupportedFeature, "data-access-result outside pinned enumeration")
+				}
+				item["result_choice"], item["data_access_result"] = "data-access-result", code[0]
+				errorCount++
+			default:
+				return wrapperError(ErrUnsupportedFeature, "selected result discriminator0/1")
+			}
+		}
+		item["raw_hex"], item["encoded_length"] = hex.EncodeToString(p[start:c.at]), c.at-start
+		items = append(items, item)
+	}
+	if c.at != len(p) {
+		return wrapperError(ErrMalformedMessage, "Get list has unexplained trailing bytes")
+	}
+	if m.request {
+		m.fields["kind"], m.fields["descriptors"] = "GetRequestWithList", items
+	} else {
+		m.fields["kind"], m.fields["results"] = "GetResponseWithList", items
+		m.fields["data_item_count"], m.fields["error_item_count"], m.fields["operation_success_verified"] = dataCount, errorCount, false
+	}
+	return nil
+}
+func wrapperIsList(w []byte) bool {
+	return !wrapperIsGBT(w) && !wrapperIsSNRead(w) && !wrapperIsSNWrite(w) && len(w) > 9 && w[9] == 3
+}
+func wrapperExtendedScalarTag(tag byte) bool {
+	return tag == 19 || tag == 4 || tag == 10 || tag == 12 || tag == 23 || tag == 24 || tag == 25 || tag == 26 || tag == 27
+}
+func wrapperNormalExtendedData(w []byte) bool {
+	return len(w) > 12 && w[8] == 0xc4 && w[9] == 1 && w[11] == 0 && wrapperExtendedScalarTag(w[12])
+}
+func wrapperNormalDataGraph(w []byte) bool {
+	return len(w) > 12 && w[8] == 0xc4 && w[9] == 1 && w[11] == 0 && (w[12] == 1 || w[12] == 2)
+}
+func wrapperNormalAccess(w []byte) bool {
+	return len(w) > 20 && w[8] == 0xc0 && w[9] == 1 && w[20] == 1
+}
+func wrapperProfile(w []byte) string {
+	if wrapperIsSNWriteUpload(w) {
+		return "dlms-wrapper-v1-sn-write-upload"
+	}
+	if wrapperIsSNUpload(w) {
+		return "dlms-wrapper-v1-sn-read-upload"
+	}
+	if wrapperIsSNServiceBlock(w) {
+		return "dlms-wrapper-v1-sn-read-block"
+	}
+	if wrapperIsSNWrite(w) {
+		return "dlms-wrapper-v1-sn-write"
+	}
+	if wrapperIsSNRead(w) {
+		return "dlms-wrapper-v1-sn-read"
+	}
+	if wrapperIsSetListBlock(w) {
+		return "dlms-wrapper-v1-set-list-block"
+	}
+	if wrapperIsActionDownload(w) {
+		return "dlms-wrapper-v1-action-download"
+	}
+	if wrapperIsActionUpload(w) {
+		return "dlms-wrapper-v1-action-block"
+	}
+	if wrapperIsSetBlock(w) {
+		return "dlms-wrapper-v1-set-block"
+	}
+	if wrapperIsActionList(w) {
+		return "dlms-wrapper-v1-action-list"
+	}
+	if wrapperIsSetList(w) {
+		return "dlms-wrapper-v1-set-list"
+	}
+	if wrapperIsSet(w) {
+		return "dlms-wrapper-v1-set-normal"
+	}
+	if wrapperIsAction(w) {
+		return "dlms-wrapper-v1-action-normal"
+	}
+	if wrapperIsACSE(w) {
+		if acseLifecycleAPDU(w[8:]) {
+			return "dlms-wrapper-v1-acse-lifecycle"
+		}
+		return "dlms-wrapper-v1-acse"
+	}
+	if wrapperIsGBT(w) {
+		return "dlms-wrapper-v1-gbt"
+	}
+	if wrapperIsBlock(w) {
+		return "dlms-wrapper-v1-get-block"
+	}
+	if wrapperIsList(w) {
+		return "dlms-wrapper-v1-get-list"
+	}
+	return "dlms-wrapper-v1-get-normal"
+}
+func wrapperProbeVersion(w []byte) string {
+	if wrapperIsSNWriteUpload(w) {
+		return "v1-sn-write-upload"
+	}
+	if wrapperIsSNUpload(w) {
+		return "v1-sn-read-upload"
+	}
+	if wrapperIsSNServiceBlock(w) {
+		return "v1-sn-read-block"
+	}
+	if wrapperIsSNWrite(w) {
+		return "v1-sn-write"
+	}
+	if wrapperIsSNRead(w) {
+		return "v1-sn-read"
+	}
+	if wrapperIsSetListBlock(w) {
+		return "v1-set-list-block"
+	}
+	if wrapperIsActionDownload(w) {
+		return "v1-action-download"
+	}
+	if wrapperIsActionUpload(w) {
+		return "v1-action-block"
+	}
+	if wrapperIsActionList(w) {
+		return "v1-action-list"
+	}
+	if wrapperIsSetList(w) {
+		return "v1-set-list"
+	}
+	if wrapperIsSet(w) {
+		return "v1-set-normal"
+	}
+	if wrapperIsAction(w) {
+		return "v1-action-normal"
+	}
+	if wrapperIsACSE(w) {
+		if acseLifecycleAPDU(w[8:]) {
+			return "v1-acse-lifecycle"
+		}
+		return "v1-acse"
+	}
+	if wrapperIsGBT(w) {
+		return "v1-gbt"
+	}
+	if wrapperIsBlock(w) {
+		return "v1-get-block"
+	}
+	if wrapperIsList(w) {
+		return "v1-get-list"
+	}
+	return "v1-get-normal"
+}
+func wrapperProjection(w []byte, n int) int64 {
+	if wrapperIsSNWrite(w) {
+		return 32768 + 512*int64(n) + 16384*wrapperSNReadItems + 2048*wrapperDataNodes
+	}
+	if wrapperIsSNRead(w) {
+		// Compact Data may expand a short repeated description into the full
+		// bounded node pool. Charge owned rows, graphs and projections first.
+		return 32768 + 512*int64(n) + 8192*wrapperSNReadItems + 2048*wrapperDataNodes
+	}
+	if wrapperIsSetListBlock(w) {
+		return 32768 + 512*int64(n+wrapperBlockBytes) + 2048*wrapperDataNodes + 8192*wrapperListItems
+	}
+	if wrapperIsSetBlock(w) || wrapperIsActionUpload(w) || wrapperIsActionDownload(w) {
+		return 32768 + 512*int64(n+wrapperBlockBytes) + 2048*wrapperDataNodes
+	}
+	if len(w) >= 21 && w[8] == 0xc1 && w[9] == 1 && w[20] == 1 {
+		nodes := min(wrapperDataNodes, max(0, n-22))
+		if wrapperSetNormalContainsCompact(w[8:]) {
+			nodes = wrapperDataNodes
+		}
+		return 32768 + 512*int64(n) + 2048*int64(nodes)
+	}
+
+	if wrapperIsActionList(w) {
+		items := min(wrapperListItems, max(0, n-12)/2)
+		if w[8] == 0xc3 {
+			items = min(wrapperListItems, max(0, n-12)/9)
+		}
+		nodes := min(wrapperDataNodes, max(0, n-12))
+		if wrapperActionListContainsCompact(w) {
+			nodes = wrapperDataNodes
+		}
+		return 32768 + 512*int64(n) + 2048*int64(nodes) + 8192*int64(items)
+	}
+	if wrapperIsSetList(w) {
+		items := min(wrapperListItems, max(0, n-12))
+		if w[8] == 0xc1 {
+			items = min(wrapperListItems, max(0, n-12)/10)
+		}
+		nodes := min(wrapperDataNodes, max(0, n-12))
+		if wrapperSetListContainsCompact(w) {
+			nodes = wrapperDataNodes
+		}
+		return 32768 + 512*int64(n) + 2048*int64(nodes) + 8192*int64(items)
+	}
+
+	if wrapperIsBlock(w) {
+		return 32768 + 512*int64(n+wrapperBlockBytes) + 2048*wrapperDataNodes
+	}
+	if wrapperContainsCompactData(w) {
+		// A repeated description expands up to the full bounded map pool even
+		// when the capture contains very few per-value bytes.
+		extra := int64(0)
+		if wrapperIsList(w) {
+			extra = 8192 * int64(min(wrapperListItems, max(0, n-12)/2))
+		}
+		return 32768 + 512*int64(n) + 2048*wrapperDataNodes + extra
+	}
+	if off := wrapperOperationDataOffset(w); off >= 0 {
+		nodes := min(wrapperDataNodes, max(0, n-off))
+		return 32768 + 512*int64(n) + 2048*int64(nodes)
+	}
+	if wrapperNormalDataGraph(w) || wrapperNormalAccess(w) {
+		// A complete normal response has12 non-Data bytes; a selected request
+		// has22 (envelope, service, descriptor and selector). Every materialized
+		// Data node consumes a tag byte. This bound includes all descendants and
+		// empty containers, and announced counts cannot preallocate more children
+		// than the remaining bytes. Keep the absolute node/depth caps unchanged.
+		prefix := 12
+		if wrapperNormalAccess(w) {
+			prefix = 22
+		}
+		nodes := min(wrapperDataNodes, max(0, n-prefix))
+		return 32768 + 512*int64(n) + 2048*int64(nodes)
+	}
+	if wrapperNormalExtendedData(w) {
+		// One bounded scalar: owned field/session/native projections and text/hex.
+		return 32768 + 512*int64(n)
+	}
+	if !wrapperIsList(w) {
+		return wrapperProjectionBytes + 128*int64(n)
+	}
+	// A null result needs at least two wire bytes but creates a map. Reserve the
+	// worst selected list graph and all owned public/native/string projections
+	// before raw bytes, item slices, fields or association state are allocated.
+	items := min(wrapperListItems, max(0, n-12)/2)
+	// The additional pool covers all owned descendant map/slice projections.
+	// A null child consumes at least one byte; no APDU retains more than256 nodes.
+	nodes := min(wrapperDataNodes, max(0, n-12))
+	return 32768 + 512*int64(n) + 8192*int64(items) + 2048*int64(nodes)
+}
+
+func wrapperIsSetList(w []byte) bool {
+	return wrapperIsSet(w) && len(w) > 9 && (w[8] == 0xc1 && w[9] == 4 || w[8] == 0xc5 && w[9] == 5)
+}
+
+// One cursor owns all Data nodes across the list. Descriptor/value/result maps
+// and maximum expansion are charged before allocation; counts cannot allocate
+// unbounded slices. The wire choice4->5 relation is separate from normal1.
+func decodeWrapperSetList(m *wrapperMessage, p []byte, limit, depth int) error {
+	c := wrapperListCursor{wire: p, at: 3, maxDepth: depth}
+	n, enc, err := c.count()
+	if err != nil {
+		return err
+	}
+	if n == 0 {
+		return wrapperError(ErrUnsupportedFeature, "empty Set list outside selected profile")
+	}
+	if n > uint64(min(limit, wrapperListItems)) {
+		return wrapperError(ErrResourceExceeded, "Set list count exceeds selected collection budget")
+	}
+	f := m.fields
+	m.count = int(n)
+	f["list_count"], f["list_count_encoding_hex"] = n, enc
+	if m.request {
+		items := make([]map[string]any, 0, int(n))
+		for i := 0; i < int(n); i++ {
+			start := c.at
+			w, e := c.take(10)
+			if e != nil {
+				return e
+			}
+			if int8(w[8]) <= 0 {
+				return wrapperError(ErrUnsupportedFeature, "positive signed8 Set list attribute profile")
+			}
+			if w[9] > 1 {
+				return wrapperError(ErrUnsupportedFeature, "Set list optional access selection must be canonical0/1")
+			}
+			item := map[string]any{"index": i, "apdu_offset": start, "class_id": binary.BigEndian.Uint16(w), "logical_name_hex": hex.EncodeToString(w[2:8]), "logical_name": fmt.Sprintf("%d.%d.%d.%d.%d.%d", w[2], w[3], w[4], w[5], w[6], w[7]), "attribute_id": int8(w[8]), "selective_access": false, "access_selection_raw": w[9], "raw_hex": hex.EncodeToString(w), "encoded_length": 10}
+
+			if w[9] == 1 {
+				selector, e := c.take(1)
+				if e != nil {
+					return e
+				}
+				parameter, e := c.data(limit, 0)
+				if e != nil {
+					return e
+				}
+				item["selective_access"], item["access_selector"], item["access_parameters"], item["selector_semantics_verified"] = true, selector[0], parameter, false
+				item["raw_hex"], item["encoded_length"] = hex.EncodeToString(p[start:c.at]), c.at-start
+			}
+			items = append(items, item)
+		}
+		valuesN, valuesEnc, e := c.count()
+		if e != nil {
+			return e
+		}
+		if valuesN > uint64(min(limit, wrapperListItems)) {
+			return wrapperError(ErrResourceExceeded, "Set value count exceeds selected collection budget")
+		}
+		if valuesN != n {
+			return wrapperError(ErrUnsupportedFeature, "Set descriptor/value count relation outside verified equal-count profile")
+		}
+		values := make([]map[string]any, 0, int(n))
+		for i := 0; i < int(n); i++ {
+			start := c.at
+			data, e := c.data(limit, 0)
+			if e != nil {
+				return e
+			}
+			values = append(values, map[string]any{"index": i, "apdu_offset": start, "data": data, "raw_hex": hex.EncodeToString(p[start:c.at]), "encoded_length": c.at - start})
+		}
+		f["kind"], f["descriptors"], f["value_count"], f["value_count_encoding_hex"], f["values"] = "SetRequestWithList", items, valuesN, valuesEnc, values
+	} else {
+		results := make([]map[string]any, 0, int(n))
+		success := 0
+		for i := 0; i < int(n); i++ {
+			start := c.at
+			v, e := c.take(1)
+			if e != nil {
+				return e
+			}
+			if !wrapperDataAccessResultKnown(v[0]) {
+				return wrapperError(ErrUnsupportedFeature, "Set list access result outside pinned enumeration")
+			}
+			ok := v[0] == 0
+			if ok {
+				success++
+			}
+			results = append(results, map[string]any{"index": i, "apdu_offset": start, "data_access_result": v[0], "result_success": ok, "raw_hex": hex.EncodeToString(v), "encoded_length": 1})
+		}
+		f["kind"], f["results"], f["success_item_count"], f["error_item_count"], f["result_success"] = "SetResponseWithList", results, success, int(n)-success, success == int(n)
+	}
+	if c.at != len(p) {
+		return wrapperError(ErrMalformedMessage, "Set list has unexplained trailing bytes")
+	}
+	return nil
+}
+
+// Action lists use a distinct wire shape from normal Action. A single cursor
+// bounds every parameter/return Data graph; null-data stays an observed Data.
+func wrapperIsActionList(w []byte) bool {
+	return wrapperIsAction(w) && len(w) > 9 && w[9] == 3
+}
+
+func decodeWrapperActionList(m *wrapperMessage, p []byte, limit, depth int) error {
+	c := wrapperListCursor{wire: p, at: 3, maxDepth: depth}
+	n, enc, err := c.count()
+	if err != nil {
+		return err
+	}
+	if n == 0 {
+		return wrapperError(ErrUnsupportedFeature, "empty Action list outside selected profile")
+	}
+	if n > uint64(min(limit, wrapperListItems)) {
+		return wrapperError(ErrResourceExceeded, "Action list count exceeds selected collection budget")
+	}
+	f := m.fields
+	m.count = int(n)
+	f["list_count"], f["list_count_encoding_hex"] = n, enc
+	if m.request {
+		descriptors := make([]map[string]any, 0, int(n))
+		for i := 0; i < int(n); i++ {
+			start := c.at
+			w, e := c.take(9)
+			if e != nil {
+				return e
+			}
+			if int8(w[8]) <= 0 {
+				return wrapperError(ErrUnsupportedFeature, "positive signed8 Action list method profile")
+			}
+			descriptors = append(descriptors, map[string]any{"index": i, "apdu_offset": start, "class_id": binary.BigEndian.Uint16(w), "logical_name_hex": hex.EncodeToString(w[2:8]), "logical_name": fmt.Sprintf("%d.%d.%d.%d.%d.%d", w[2], w[3], w[4], w[5], w[6], w[7]), "method_id": int8(w[8]), "raw_hex": hex.EncodeToString(w), "encoded_length": 9})
+		}
+		count, countEnc, e := c.count()
+		if e != nil {
+			return e
+		}
+		if count > uint64(min(limit, wrapperListItems)) {
+			return wrapperError(ErrResourceExceeded, "Action parameter count exceeds selected collection budget")
+		}
+		if count != n {
+			return wrapperError(ErrUnsupportedFeature, "Action descriptor/parameter count outside verified equal-count profile")
+		}
+		parameters := make([]map[string]any, 0, int(n))
+		for i := 0; i < int(n); i++ {
+			start := c.at
+			data, e := c.data(limit, 0)
+			if e != nil {
+				return e
+			}
+			parameters = append(parameters, map[string]any{"index": i, "apdu_offset": start, "data": data, "raw_hex": hex.EncodeToString(p[start:c.at]), "encoded_length": c.at - start})
+		}
+		f["kind"], f["descriptors"], f["parameter_count"], f["parameter_count_encoding_hex"], f["parameters"] = "ActionRequestWithList", descriptors, count, countEnc, parameters
+	} else {
+		results := make([]map[string]any, 0, int(n))
+		success := 0
+		for i := 0; i < int(n); i++ {
+			start := c.at
+			v, e := c.take(2)
+			if e != nil {
+				return e
+			}
+			if !wrapperActionResultKnown(v[0]) {
+				return wrapperError(ErrUnsupportedFeature, "Action result outside pinned enumeration")
+			}
+			if v[1] > 1 {
+				return wrapperError(ErrUnsupportedFeature, "Action return optional selected canonical0/1")
+			}
+			item := map[string]any{"index": i, "apdu_offset": start, "action_result": v[0], "action_result_success": v[0] == 0, "return_parameters_present": v[1] == 1}
+			if v[0] == 0 {
+				success++
+			}
+			if v[1] == 1 {
+				choice, e := c.take(1)
+				if e != nil {
+					return e
+				}
+				item["return_choice_raw"] = choice[0]
+				switch choice[0] {
+				case 0:
+					data, e := c.data(limit, 0)
+					if e != nil {
+						return e
+					}
+					item["return_choice"], item["data"] = "data", data
+				case 1:
+					access, e := c.take(1)
+					if e != nil {
+						return e
+					}
+					if !wrapperDataAccessResultKnown(access[0]) {
+						return wrapperError(ErrUnsupportedFeature, "Action access result outside pinned enumeration")
+					}
+					item["return_choice"], item["data_access_result"] = "data-access-result", access[0]
+				default:
+					return wrapperError(ErrUnsupportedFeature, "Action return result selected choices0/1")
+				}
+			}
+			item["raw_hex"], item["encoded_length"] = hex.EncodeToString(p[start:c.at]), c.at-start
+			results = append(results, item)
+		}
+		f["kind"], f["results"], f["success_item_count"], f["error_item_count"], f["action_result_success"] = "ActionResponseWithList", results, success, int(n)-success, success == int(n)
+	}
+	if c.at != len(p) {
+		return wrapperError(ErrMalformedMessage, "Action list has unexplained trailing bytes")
+	}
+	return nil
+}

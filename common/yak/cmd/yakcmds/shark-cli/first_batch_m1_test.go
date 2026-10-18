@@ -84,6 +84,7 @@ func TestFirstBatchT05(t *testing.T) {
 }
 
 func TestFirstBatchM2SharkNative(t *testing.T) {
+	t.Run("retained-diagnostics", TestRetainedMalformedDetailsVisible)
 	base := "../../../../pcapx/pcaputil/testdata/protocol-sessions"
 	key, err := trafficfixture.ReadFile(filepath.Join(base, "m2b-quic.keys"))
 	require.NoError(t, err)

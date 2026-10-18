@@ -94,6 +94,7 @@ func dcpAnswer(c dcpControl, packet int) int {
 	return -1
 }
 func TestDCPIdentifySealedByteOracle(t *testing.T) {
+	testDCPServicesByteOracle(t)
 	for _, c := range dcpControls(t) {
 		t.Run(c.Name, func(t *testing.T) {
 			for i, st := range c.Steps {
@@ -211,6 +212,7 @@ func dcpCheckMessages(t *testing.T, c dcpControl, events []*ProtocolEvent, defer
 	}
 }
 func TestDCPIdentifySealedEthernetMatrix(t *testing.T) {
+	testDCPServicesMatrix(t)
 	for _, c := range dcpControls(t) {
 		t.Run(c.Name, func(t *testing.T) {
 			b, err := trafficfixture.ReadFile("dcp-identify/" + c.File)
@@ -225,6 +227,7 @@ func TestDCPIdentifySealedEthernetMatrix(t *testing.T) {
 	}
 }
 func TestDCPIdentifyResourceOwnershipAndClose(t *testing.T) {
+	testDCPServicesResourceOwnership(t)
 	for _, c := range dcpControls(t) {
 		t.Run(c.Name, func(t *testing.T) {
 			for _, deferred := range []bool{false, true} {

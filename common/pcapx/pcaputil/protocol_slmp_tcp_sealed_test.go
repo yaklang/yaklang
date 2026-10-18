@@ -155,6 +155,10 @@ func slmpTCPAssertMessages(t *testing.T, c slmpTCPControl, events []*ProtocolEve
 			rocTypedError(t, *want.Error, err)
 			require.Nil(t, f)
 			require.Nil(t, e.Session)
+			e.Session = map[string]any{"caller": "forged-success"}
+			decoded, decodeErr := e.Decode()
+			rocTypedError(t, *want.Error, decodeErr)
+			require.Nil(t, decoded)
 			require.Zero(t, e.TransactionID)
 			require.Zero(t, e.ResponseTo)
 			continue
@@ -186,6 +190,7 @@ func slmpTCPAssertMessages(t *testing.T, c slmpTCPControl, events []*ProtocolEve
 		again, err := e.GetFields()
 		require.NoError(t, err)
 		rocEqualFields(t, want.Fields, again)
+		testExactObservationSessionQueries(t, e, want.Fields)
 	}
 	if extra != 0 {
 		e := msgs[len(c.Messages)]
