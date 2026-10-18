@@ -77,7 +77,8 @@ int32_t mvscan_db_merged_scan(const mvscan_db *db,
  * mvscan_db_merged_scan_batch: 批量扫描多条记录 (拼接为一个 buffer), 每条记录独立扫描.
  * recOff 长度 nrec+1: 第 i 条记录 = data[recOff[i]..recOff[i+1]).
  * 对每条记录跑 merged NFA, 把 (recIdx, memberIdx) 对写入 out (容量 capPairs).
- * 返回命中总对数 (可能 > capPairs, 表示截断).
+ * 返回完整命中总对数，可能 > capPairs；调用方须扩容重试后才能使用全部结果。
+ * capPairs=0 允许 out=NULL 只计数；负值表示参数/分配失败 (-1) 或计数溢出 (-2)。
  * 省去每记录一次 cgo 调用 (N 次 cgo -> 1 次 cgo).
  */
 int32_t mvscan_db_merged_scan_batch(const mvscan_db *db,
