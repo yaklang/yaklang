@@ -26,7 +26,7 @@ static int NFA_RUN_ANCHORED_NAME(const mvs_nfa *a, const uint8_t *data, size_t l
     } else {
         prev = (uint64_t *)calloc((size_t)nword, sizeof(uint64_t));
         cand = (uint64_t *)malloc((size_t)nword * sizeof(uint64_t));
-        if (!prev || !cand) { free(prev); free(cand); return 0; }
+        if (!prev || !cand) { free(prev); free(cand); return MVS_ERR_NOMEM; }
     }
 
     int found = 0;

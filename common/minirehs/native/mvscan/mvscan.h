@@ -26,6 +26,15 @@ extern "C" {
 /* mvscan_db 是从 blob 解析出的不可变只读结构 (多线程只读共享; 扫描不写它). */
 typedef struct mvscan_db mvscan_db;
 
+/* Negative execution statuses. A failure is never a successful NoMatch (0).
+ * The uint8_t *_many output arrays encode each signed status modulo 256;
+ * inspect (int8_t)out[i] before interpreting a slot as a Boolean result. */
+enum {
+    MVS_ERR_INVALID = -1,
+    MVS_ERR_OVERFLOW = -2,
+    MVS_ERR_NOMEM = -3
+};
+
 /*
  * mvscan_db_open 解析一段平台无关小端 blob (由 Go 前端 buildMVSBlob 产出) 为只读 db.
  * 解析会把 blob 内的数组按字段语义拷入对齐内存 (小数据, 拷贝成本可忽略), 因此对调用方
@@ -53,7 +62,7 @@ int mvscan_db_nfa_exists(const mvscan_db *db, int32_t idx,
 
 /*
  * mvscan_db_nfa_exists_many 对 idxs[0..nidx) 各跑一次 per-pattern NFA 存在性, 把结果写入
- * out[i] (1 命中 / 0 不命中或无 NFA). 语义等价于对每个 idx 调一次 mvscan_db_nfa_exists, 但
+ * out[i] (1 命中 / 0 不命中 / 负状态按 int8_t 解码). 语义等价于逐 idx 调用单条入口, 但
  * 在 C 内循环, 一次 cgo 跨界完成多条验证, 摊薄 "每 pattern 一次 cgo" 的调用开销 (Phase 2 批处理).
  * out 必须由调用方提供且容量 >= nidx; data 在调用期间必须存活.
  */
@@ -78,7 +87,7 @@ int32_t mvscan_db_merged_scan(const mvscan_db *db,
  * recOff 长度 nrec+1: 第 i 条记录 = data[recOff[i]..recOff[i+1]).
  * 对每条记录跑 merged NFA, 把 (recIdx, memberIdx) 对写入 out (容量 capPairs).
  * 返回完整命中总对数，可能 > capPairs；调用方须扩容重试后才能使用全部结果。
- * capPairs=0 允许 out=NULL 只计数；负值表示参数/分配失败 (-1) 或计数溢出 (-2)。
+ * capPairs=0 允许 out=NULL 只计数；负值为上述 MVS_ERR_* 执行状态。
  * 省去每记录一次 cgo 调用 (N 次 cgo -> 1 次 cgo).
  */
 int32_t mvscan_db_merged_scan_batch(const mvscan_db *db,
@@ -143,7 +152,7 @@ int mvscan_db_nfa_exists_anchored_scalar(const mvscan_db *db, int32_t idx,
  * 锚定式存在性, 摊薄 "每 pattern 一次 cgo" 的跨界开销 (锚定批处理的 cgo 调用数从
  * O(触发数) 降到 O(1)). 各 pattern 的 spans 平铺在 spansLo[]/spansHi[] 中, 用
  * patSpanOff[i+1]-patSpanOff[i] 取第 i 条 pattern 的 span 数; idxs[i] 为其 pattern 下标.
- * out[i] 写入命中结果 (1 命中 / 0 不命中或无 NFA). data 在调用期间须存活.
+ * out[i] 写入 1 命中 / 0 不命中 / 负状态按 int8_t 解码. data 在调用期间须存活.
  */
 void mvscan_db_nfa_exists_anchored_many(const mvscan_db *db,
                                          const uint8_t *data, size_t len,
