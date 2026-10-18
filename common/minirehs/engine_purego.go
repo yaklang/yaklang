@@ -92,7 +92,11 @@ func (d *engineDB) scan(data []byte, sc *scratch, handler MatchHandler) (bool, e
 	for _, idx := range d.alwaysOnExact {
 		sc.statAlwaysScan++
 		cp := d.all[idx]
-		for _, loc := range findAllInRecord(cp.v, data, 0, len(data), sc) {
+		locs, err := findAllInRecord(cp.v, data, 0, len(data), sc)
+		if err != nil {
+			return false, verifierScanError(cp, err)
+		}
+		for _, loc := range locs {
 			if !handler(Match{ID: cp.id, From: loc[0], To: loc[1]}) {
 				return true, nil
 			}
@@ -102,7 +106,11 @@ func (d *engineDB) scan(data []byte, sc *scratch, handler MatchHandler) (bool, e
 	// 3) regexp2-only always-on: 逐条验证整段数据.
 	for _, cp := range d.inexact {
 		sc.statAlwaysScan++
-		for _, loc := range findAllInRecord(cp.v, data, 0, len(data), sc) {
+		locs, err := findAllInRecord(cp.v, data, 0, len(data), sc)
+		if err != nil {
+			return false, verifierScanError(cp, err)
+		}
+		for _, loc := range locs {
 			if !handler(Match{ID: cp.id, From: loc[0], To: loc[1]}) {
 				return true, nil
 			}
@@ -120,7 +128,11 @@ func (d *engineDB) verifyFull(data []byte, idx int, sc *scratch, handler MatchHa
 	sc.fullDone[idx] = true
 	sc.statFullScan++
 	cp := d.all[idx]
-	for _, loc := range findAllInRecord(cp.v, data, 0, len(data), sc) {
+	locs, err := findAllInRecord(cp.v, data, 0, len(data), sc)
+	if err != nil {
+		return false, verifierScanError(cp, err)
+	}
+	for _, loc := range locs {
 		if !handler(Match{ID: cp.id, From: loc[0], To: loc[1]}) {
 			return true, nil
 		}

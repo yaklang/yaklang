@@ -77,7 +77,10 @@ func TestSharedVerifierSubjectWindows(t *testing.T) {
 		for _, window := range [][2]int{{6, 13}, {14, 17}, {14, len(data)}, {6, len(data)}, {0, len(data)}, {0, 0}} {
 			lo, hi := window[0], window[1]
 			want := v.findAll(data[lo:hi])
-			got := findAllInRecord(v, data, lo, hi, sc)
+			got, err := findAllInRecord(v, data, lo, hi, sc)
+			if err != nil {
+				t.Fatal(err)
+			}
 			if !reflect.DeepEqual(got, want) {
 				t.Fatalf("expr=%q window=%v got=%v want=%v", expr, window, got, want)
 			}

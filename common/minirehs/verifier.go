@@ -1,6 +1,7 @@
 package minirehs
 
 import (
+	"fmt"
 	"regexp"
 	"sync"
 
@@ -14,6 +15,7 @@ type verifier interface {
 	// findAll 返回非重叠 [from,to) 字节区间, 语义对齐 regexp.FindAllIndex.
 	// 对 PCRE2 兜底 pattern，命中时返回单个 {-1,-1} 表示"存在命中"。
 	findAll(data []byte) [][2]int
+	findAllErr(data []byte) ([][2]int, error)
 	// exact 报告该 verifier 是否能给出精确字节偏移 (re2Verifier 为 true).
 	exact() bool
 }
@@ -24,6 +26,7 @@ type re2Verifier struct {
 	once    sync.Once
 	expr    string
 	longest bool
+	loadErr error
 }
 
 func (v *re2Verifier) load() *regexp.Regexp {
@@ -31,7 +34,7 @@ func (v *re2Verifier) load() *regexp.Regexp {
 	// only if a scan actually needs verification rather than NFA existence.
 	v.once.Do(func() {
 		if v.re == nil {
-			v.re, _ = regexp.Compile(v.expr)
+			v.re, v.loadErr = regexp.Compile(v.expr)
 			if v.re != nil && v.longest {
 				v.re.Longest()
 			}
@@ -43,19 +46,24 @@ func (v *re2Verifier) load() *regexp.Regexp {
 func (v *re2Verifier) exact() bool { return true }
 
 func (v *re2Verifier) findAll(data []byte) [][2]int {
+	locs, _ := v.findAllErr(data) // legacy internal test convenience; scanners use the error API
+	return locs
+}
+
+func (v *re2Verifier) findAllErr(data []byte) ([][2]int, error) {
 	re := v.load()
 	if re == nil {
-		return nil
+		return nil, &verifierCompileError{Err: v.loadErr}
 	}
 	locs := re.FindAllIndex(data, -1)
 	if len(locs) == 0 {
-		return nil
+		return nil, nil
 	}
 	out := make([][2]int, 0, len(locs))
 	for _, l := range locs {
 		out = append(out, [2]int{l[0], l[1]})
 	}
-	return out
+	return out, nil
 }
 
 // findAllInWindow 在 data[winStart:winEnd] 子区间上验证, 返回的偏移已换算回 data 的绝对坐标.
@@ -103,9 +111,10 @@ func (v *re2Verifier) findAllInWindow(data []byte, winStart, winEnd int) [][2]in
 // 承载 backref / lookaround 等 RE2 自动机无法表达的 pattern。
 // 这类 pattern 报告存在命中 (偏移 -1)，不引入其他正则引擎或无 cgo 替代库。
 type pcre2Verifier struct {
-	yak  *regexp_utils.YakRegexpUtils
-	once sync.Once
-	expr string
+	yak     *regexp_utils.YakRegexpUtils
+	once    sync.Once
+	expr    string
+	loadErr error
 }
 
 func (v *pcre2Verifier) exact() bool { return false }
@@ -114,31 +123,53 @@ func (v *pcre2Verifier) findAll(data []byte) [][2]int {
 	return v.findAllString(string(data))
 }
 
+func (v *pcre2Verifier) findAllErr(data []byte) ([][2]int, error) {
+	return v.findAllStringErr(string(data))
+}
+
 func (v *pcre2Verifier) findAllString(data string) [][2]int {
+	locs, _ := v.findAllStringErr(data) // only retained for internal legacy tests
+	return locs
+}
+
+func (v *pcre2Verifier) findAllStringErr(data string) ([][2]int, error) {
 	v.once.Do(func() {
 		if v.yak == nil {
 			v.yak = regexp_utils.NewYakRegexpUtils(v.expr)
 		}
+		if !v.yak.CanUse() {
+			v.loadErr = &verifierCompileError{Err: fmt.Errorf("stored PCRE2 expression is not compilable")}
+		}
 	})
+	if v.loadErr != nil {
+		return nil, v.loadErr
+	}
 	ok, err := v.yak.MatchString(data)
 	if err != nil || !ok {
-		return nil
+		return nil, err
 	}
-	return [][2]int{{-1, -1}}
+	return [][2]int{{-1, -1}}, nil
 }
+
+type verifierCompileError struct{ Err error }
+
+func (e *verifierCompileError) Error() string {
+	return fmt.Sprintf("verifier initialization: %v", e.Err)
+}
+func (e *verifierCompileError) Unwrap() error { return e.Err }
 
 // findAllInRecord shares subject copies between PCRE2 confirmations of the
 // same record. Copy the first requested window only; geometric growth bounds
 // all later copies by O(record size), without copying a large irrelevant prefix
 // for a single localized match. RE2 continues to consume the original bytes.
 // A scratch belongs to one scan/worker; clearVerifierText ends that lifetime.
-func findAllInRecord(v verifier, data []byte, lo, hi int, sc *scratch) [][2]int {
+func findAllInRecord(v verifier, data []byte, lo, hi int, sc *scratch) ([][2]int, error) {
 	pcre, ok := v.(*pcre2Verifier)
 	if !ok || sc == nil {
-		return v.findAll(data[lo:hi])
+		return v.findAllErr(data[lo:hi])
 	}
 	if lo == hi {
-		return pcre.findAllString("")
+		return pcre.findAllStringErr("")
 	}
 	base := sc.verifierTextLo
 	end := base + len(sc.verifierText)
@@ -170,7 +201,7 @@ func findAllInRecord(v verifier, data []byte, lo, hi int, sc *scratch) [][2]int 
 		sc.verifierText = string(data[base:end])
 		sc.verifierTextLo = base
 	}
-	return pcre.findAllString(sc.verifierText[lo-base : hi-base])
+	return pcre.findAllStringErr(sc.verifierText[lo-base : hi-base])
 }
 
 func (s *scratch) clearVerifierText() {

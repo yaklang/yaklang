@@ -2,6 +2,7 @@ package minirehs
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"reflect"
@@ -17,8 +18,15 @@ import (
 // Keep recoverable complete results, including multiplicity and errors. A digest
 // or a set cannot detect duplicate output, swallowed errors, or selection drift.
 type programObservedError struct {
-	Type    string
-	Message string
+	Type       string
+	Message    string
+	Stage      string
+	Category   string
+	RuleID     PatternID
+	HasRule    bool
+	Record     *int
+	NativeCode *int
+	Incomplete bool
 }
 
 type programObservation struct {
@@ -32,7 +40,16 @@ func programError(err error) *programObservedError {
 	if err == nil {
 		return nil
 	}
-	return &programObservedError{Type: fmt.Sprintf("%T", err), Message: err.Error()}
+	observed := &programObservedError{Type: fmt.Sprintf("%T", err), Message: err.Error()}
+	var execution *ScanError
+	if errors.As(err, &execution) {
+		record := execution.Record
+		observed.Stage, observed.Category = execution.Stage, execution.Category
+		observed.RuleID, observed.HasRule = execution.RuleID, execution.HasRule
+		observed.Record, observed.NativeCode = &record, execution.NativeCode
+		observed.Incomplete = execution.Incomplete
+	}
+	return observed
 }
 
 func programCompare(got, want programObservation, ordered bool) error {
@@ -152,6 +169,15 @@ func TestProgramComparatorDetectsCorruption(t *testing.T) {
 	failed.Completed = false
 	if programCompare(want, failed, false) == nil {
 		t.Fatal("comparator accepted a swallowed error")
+	}
+	structured := &ScanError{Record: -1, Stage: "verify", Incomplete: true, Err: fmt.Errorf("failure")}
+	failed.Error = programError(structured)
+	changed := failed
+	copy := *structured
+	copy.Incomplete = false
+	changed.Error = programError(&copy)
+	if programCompare(changed, failed, false) == nil {
+		t.Fatal("comparator ignored structured error completion metadata")
 	}
 }
 
