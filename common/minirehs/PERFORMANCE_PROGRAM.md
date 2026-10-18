@@ -142,4 +142,22 @@ Load 两变体 83.30→84.46 ms，其中派生步骤在两变体共同存在，�
 没有 PMU、请求 P99 或生产权重；其他平台和独立审查仍按用户要求暂缓。
 完整补丁、源码哈希、二进制身份、结果与原始 230 行测量保存在本地计划 evidence/T08，供后续不同负载复验。
 
+## T09 Windows 条件表空间修补
+
+单 word 断言的条件 source mask 必须等于有效 condFollow 位置的并集；native 和文件加载器均拒绝
+负 count、越界位置或 mask 不一致。count=0 且 mask=0 时不分配 condFollowEval；first/accept 表保留。
+三处单 word reader 原本只在 prev & mask 非零时读取 follow 表，热循环无需增加判断；free(NULL) 保持对称。
+
+实际 Go blob 的 C requested 当前/峰值/累计请求一致减少：GetRequest 25,600 B/一次分配，
+MITM 47,616 B/三次分配。有条件后继的表保留，不将这一修补宣称为 30 MB 级缩减。
+P=1/16/63/64/65/128、bit63 条件边、全部 64 种 truth code、非法字段、Compile/Load、
+定位/存在性/early-stop、多 reader 并发，以及所有相关 native reader 已验证。
+八个实际 frontend 小产物的全部构造分配点故障都明确失败并释放组件请求，不能据此声称整个进程 RSS 归零。
+
+五轮串行 A/B 的 16 个 warm 运行场景最大耗时回退 2.25%，不声称吞吐有明显改善。
+单次 Load 中位数 +3.14%，一次预定的 5x/轮复核变为 -0.71%；Load+首扫分别 +0.13% 和 -2.57%。
+两组原始数据都保留，桌面计时波动限制了对小变化的解释；主要收益是确定少分配、少持有全零表。
+64 组实际/独立参考及有序 Compile/Load 完整结果对无差异，普通全包、trafficguard、专项 race、
+amalgamation 与 vet 通过。镜像 v5/blob v3 不变，合法旧镜像仍可原样加载/导出；无新依赖或 CI 改动。
+
 上一轮性能结论及边界见 [RUNTIME_PERFORMANCE.md](RUNTIME_PERFORMANCE.md)。
