@@ -3,6 +3,15 @@
 当前运行版本已推进到 image6/blob4；后续单项决议和正确性修复见 [PERFORMANCE_PROGRAM.md](PERFORMANCE_PROGRAM.md)。
 下面保留原 SHA 的测量，不将旧基线数字冒充当前组合改动的严格 A/B。
 
+## T17 Windows 系统验收
+
+完整证据及默认计划见 [WINDOWS_M5.md](WINDOWS_M5.md)。默认16逻辑核、五轮同二进制两策略组合对照，
+完整MITM在Q1/Q16/Q32耗时分别改善8.38%/6.86%/10.63%；单路CPU+1.96%、HTTP单路P99+3.05%保留。
+最终绝对测量GetRequest Compile339.87ms、Load69.87ms、镜像1,454,565B；完整MITM存在性272.62ms、定位807.85ms。
+单库构造后进程Private约233MiB，双库及Scratch约367MiB，文件小并不代表运行时表已等比例缩小。
+全部1332记录加12个边界输入、两规则集/两模式/CompileLoad/有序早停与独立oracle无差异。
+其他平台原生性能、独立审查和生产阶段按用户要求留待后续。
+
 ## T16 Windows：单成员merged首次接受后完成
 
 实际MITM符合单成员/W1/无断言文本锚/公共存在性资格，GetRequest多成员、定位、宽状态及combined路径保留原执行。
