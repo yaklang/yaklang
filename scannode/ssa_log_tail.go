@@ -33,6 +33,14 @@ func (b *legionJobBridge) handleSSALogTail(ctx context.Context, raw []byte) erro
 	if err := proto.Unmarshal(raw, &payload); err != nil {
 		return fmt.Errorf("unmarshal ssa log tail: %w", err)
 	}
+	return b.handleSSALogTailPayload(ctx, &payload, b.publishLogTailResponse)
+}
+
+func (b *legionJobBridge) handleSSALogTailPayload(
+	ctx context.Context,
+	payload *ssav1.LogTailCommand,
+	publish func(context.Context, string, *ssav1.LogTailResult) error,
+) error {
 	if strings.TrimSpace(payload.QueryId) == "" {
 		return fmt.Errorf("ssa log tail query_id is required")
 	}
@@ -58,14 +66,14 @@ func (b *legionJobBridge) handleSSALogTail(ctx context.Context, raw []byte) erro
 		}
 		response.Reason = reason
 		log.Infof("[log-tail] answered: job=%s attempt=%s kind=%s found=false (%s)", payload.JobId, payload.AttemptId, payload.LogKind, reason)
-		return b.publishLogTailResponse(ctx, payload.QueryId, response)
+		return publish(ctx, payload.QueryId, response)
 	}
 
 	content, totalBytes, start, hasMore, err := tailLogFile(logPath, payload.Offset, maxBytes)
 	if err != nil {
 		response.Reason = fmt.Sprintf("read task log: %v", err)
 		log.Warnf("[log-tail] job=%s attempt=%s read failed: %v", payload.JobId, payload.AttemptId, err)
-		return b.publishLogTailResponse(ctx, payload.QueryId, response)
+		return publish(ctx, payload.QueryId, response)
 	}
 	response.Found = true
 	response.TotalBytes = totalBytes
@@ -75,7 +83,7 @@ func (b *legionJobBridge) handleSSALogTail(ctx context.Context, raw []byte) erro
 
 	log.Infof("[log-tail] answered: job=%s attempt=%s total=%d chunk=%d offset=%d has_more=%v",
 		payload.JobId, payload.AttemptId, totalBytes, len(content), response.Offset, hasMore)
-	return b.publishLogTailResponse(ctx, payload.QueryId, response)
+	return publish(ctx, payload.QueryId, response)
 }
 
 func (b *legionJobBridge) publishLogTailResponse(ctx context.Context, queryID string, response *ssav1.LogTailResult) error {

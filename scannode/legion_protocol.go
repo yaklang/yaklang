@@ -254,9 +254,10 @@ const (
 )
 
 const (
-	legionCapabilitySSAIRProgramDelete = "ssa.ir_program.delete.v2"
-	legionCapabilitySSADebugQuery      = "ssa.debug.query.v2"
-	legionCapabilitySSALogTail         = "ssa.log.tail.v2"
+	legionCapabilitySSAIRProgramDeleteV1 = "ssa.ir_program.delete.v1"
+	legionCapabilitySSAIRProgramDelete   = "ssa.ir_program.delete.v2"
+	legionCapabilitySSADebugQuery        = "ssa.debug.query.v2"
+	legionCapabilitySSALogTail           = "ssa.log.tail.v2"
 )
 
 const legionRealtimeHIDSDesiredSpecDryRunResultPrefix = legionRealtimePrefix + ".hids.desired_spec_dry_run.result"

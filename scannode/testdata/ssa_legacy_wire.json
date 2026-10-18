@@ -1,0 +1,45 @@
+{
+  "debug_request": {
+    "query_id": "q",
+    "job_id": "j",
+    "attempt_id": "a"
+  },
+  "debug_response": {
+    "found": true,
+    "analysis": {
+      "status": "succeeded",
+      "samples": [
+        {
+          "duration_ms": 1234567890123
+        }
+      ]
+    }
+  },
+  "log_request": {
+    "query_id": "q",
+    "job_id": "j",
+    "attempt_id": "a",
+    "offset": 21,
+    "max_bytes": 64,
+    "log_kind": "db"
+  },
+  "log_response": {
+    "found": true,
+    "total_bytes": 100,
+    "offset": 42,
+    "has_more": true,
+    "content": "db-marker"
+  },
+  "ir_request": {
+    "request_id": "r",
+    "program_name": "p",
+    "store_identity": "s"
+  },
+  "ir_response": {
+    "request_id": "r",
+    "program_name": "p",
+    "store_identity": "s",
+    "success": true,
+    "deleted": true
+  }
+}

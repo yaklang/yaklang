@@ -22,16 +22,16 @@ import (
 //	legion.realtime.ssa.debug.result.v2.<query_id>
 const ssaDebugQueryResultPrefix = "legion.realtime.ssa.debug.result.v2"
 
-// ssaDebugQueryPayload is the internal form of the protobuf debug command.
+// ssaDebugQueryPayload is shared by the explicit JSON and Protobuf decoders.
 type ssaDebugQueryPayload struct {
-	QueryID    string
-	JobID      string
-	AttemptID  string
-	TaskStatus string
+	QueryID    string `json:"query_id"`
+	JobID      string `json:"job_id"`
+	AttemptID  string `json:"attempt_id"`
+	TaskStatus string `json:"task_status,omitempty"`
 }
 
-// ssaDebugQueryResponse holds the analysis cache JSON before it is converted
-// to a fully typed protobuf result for the node-to-platform message.
+// ssaDebugQueryResponse holds the analysis cache JSON. The selected wire
+// adapter sends this historical shape or a fully typed Protobuf result.
 type ssaDebugQueryResponse struct {
 	Found    bool            `json:"found"`
 	Reason   string          `json:"reason,omitempty"`
@@ -110,6 +110,14 @@ func (b *legionJobBridge) handleSSADebugQuery(ctx context.Context, raw []byte) e
 		QueryID: command.GetQueryId(), JobID: command.GetJobId(),
 		AttemptID: command.GetAttemptId(), TaskStatus: command.GetTaskStatus(),
 	}
+	return b.handleSSADebugQueryPayload(ctx, payload, b.publishDebugQueryResponse)
+}
+
+func (b *legionJobBridge) handleSSADebugQueryPayload(
+	ctx context.Context,
+	payload ssaDebugQueryPayload,
+	publish func(context.Context, string, ssaDebugQueryResponse) error,
+) error {
 	if strings.TrimSpace(payload.QueryID) == "" {
 		return fmt.Errorf("ssa debug query query_id is required")
 	}
@@ -131,7 +139,7 @@ func (b *legionJobBridge) handleSSADebugQuery(ctx context.Context, raw []byte) e
 	if dir == "" {
 		response.Reason = "debug directory not found for this task attempt"
 		log.Infof("[debug] ssa.debug.query answered: job=%s attempt=%s found=false (no debug dir)", payload.JobID, payload.AttemptID)
-		return b.publishDebugQueryResponse(ctx, payload.QueryID, response)
+		return publish(ctx, payload.QueryID, response)
 	}
 
 	// NOTE: the live path deliberately does not fold the task log into
@@ -148,7 +156,7 @@ func (b *legionJobBridge) handleSSADebugQuery(ctx context.Context, raw []byte) e
 		response.Found = true
 		response.Analysis = capLiveDebugAnalysis(overlayDebugAnalysisStatus(cached, payload.TaskStatus), debugLiveResponseMaxBytes)
 		log.Infof("[debug] ssa.debug.query answered: job=%s attempt=%s found=true (cached) dir=%s", payload.JobID, payload.AttemptID, dir)
-		return b.publishDebugQueryResponse(ctx, payload.QueryID, response)
+		return publish(ctx, payload.QueryID, response)
 	}
 
 	// A full analysis parses every pprof snapshot and can take minutes on
@@ -164,7 +172,7 @@ func (b *legionJobBridge) handleSSADebugQuery(ctx context.Context, raw []byte) e
 			} else {
 				response.Reason = "debug analysis in progress"
 			}
-			return b.publishDebugQueryResponse(ctx, payload.QueryID, response)
+			return publish(ctx, payload.QueryID, response)
 		}
 	}
 
@@ -176,7 +184,7 @@ func (b *legionJobBridge) handleSSADebugQuery(ctx context.Context, raw []byte) e
 		response.Found = true
 		response.Analysis = capLiveDebugAnalysis(overlayDebugAnalysisStatus(cached, payload.TaskStatus), debugLiveResponseMaxBytes)
 		log.Infof("[debug] ssa.debug.query answered: job=%s attempt=%s found=true (cached after wait) dir=%s", payload.JobID, payload.AttemptID, dir)
-		return b.publishDebugQueryResponse(ctx, payload.QueryID, response)
+		return publish(ctx, payload.QueryID, response)
 	}
 	analysis := AnalyzeDebugRunWithStatus(dir, payload.TaskStatus)
 	hasContent := len(analysis.Samples) > 0 || analysis.Summary != nil ||
@@ -199,7 +207,7 @@ func (b *legionJobBridge) handleSSADebugQuery(ctx context.Context, raw []byte) e
 	debugLiveAnalyzeMu.Unlock()
 	log.Infof("[debug] ssa.debug.query answered: job=%s attempt=%s found=%v samples=%d dir=%s",
 		payload.JobID, payload.AttemptID, response.Found, len(analysis.Samples), dir)
-	return b.publishDebugQueryResponse(ctx, payload.QueryID, response)
+	return publish(ctx, payload.QueryID, response)
 }
 
 // debugAnalysisCacheName is the JSON file used to cache a parsed debug run
