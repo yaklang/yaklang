@@ -501,6 +501,17 @@ func (scope *ScopedVersionedTable[T]) AssignVariable(variable VersionedIF[T], va
 	}
 }
 
+// UnlinkValue drops the reverse index from a value to its variable. The
+// versioned value itself stays in the scope; only the strong map key is removed.
+func (scope *ScopedVersionedTable[T]) UnlinkValue(value T) {
+	if scope == nil || isZeroValue(value) {
+		return
+	}
+	scope.linkMu.Lock()
+	delete(scope.linkVariable, value)
+	scope.linkMu.Unlock()
+}
+
 func (scope *ScopedVersionedTable[T]) GetVariableFromValue(value T) VersionedIF[T] {
 	scope.linkMu.RLock()
 	defer scope.linkMu.RUnlock()

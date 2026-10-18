@@ -374,6 +374,17 @@ func TestSaveToDatabaseFlushesInstructionSaverBeforeTypes(t *testing.T) {
 	cfg, err := ssaconfig.New(ssaconfig.ModeSSACompile, ssaconfig.WithSetProgramName(programName))
 	require.NoError(t, err)
 
+	// Pin the level before the saver workers exist. SetLevel writes the global
+	// logger while those workers call Debugf, which -race reports. step0/step1
+	// are Info lines, so the level still has to be Info before any flush log.
+	var logBuf flushLogBuffer
+	yaklog.SetOutput(&logBuf)
+	yaklog.SetLevel(yaklog.InfoLevel)
+	defer func() {
+		yaklog.SetOutput(os.Stdout)
+		yaklog.SetLevel(yaklog.InfoLevel)
+	}()
+
 	prog := NewProgram(cfg, ProgramCacheDBWrite, Application, nil, "", 1)
 	defer prog.Cache.CloseWithoutSave()
 
@@ -383,19 +394,6 @@ func TestSaveToDatabaseFlushesInstructionSaverBeforeTypes(t *testing.T) {
 	builder.Finish()
 
 	prog.Cache.FlushCompileUnit("unit-a")
-
-	// Capture concurrent saver output without changing the shared logger level
-	// while its background workers are running. The level must still be pinned:
-	// a narrow `-run` selection skips the sibling flush tests that used to leave
-	// the process at Info, and step0/step1 are Info lines.
-	var logBuf flushLogBuffer
-	yaklog.SetOutput(&logBuf)
-	yaklog.SetLevel(yaklog.InfoLevel)
-	defer func() {
-		prog.Cache.CloseWithoutSave()
-		yaklog.SetOutput(os.Stdout)
-		yaklog.SetLevel(yaklog.InfoLevel)
-	}()
 
 	err = prog.Cache.SaveToDatabase()
 	require.NoError(t, err)

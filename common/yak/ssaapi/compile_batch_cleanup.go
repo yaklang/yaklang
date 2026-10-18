@@ -52,6 +52,9 @@ func (task compileBatchCleanup) run() error {
 		}
 		task.program.Cache.FlushInstructionSaver()
 		task.program.Cache.FlushAuxSavers()
+		// Workers for this batch have joined, and both saver barriers have
+		// returned. Only then may ordinary persisted values leave the scopes.
+		task.program.ReleasePersistedOrdinaryValues()
 		task.program.CheckMemoryPressure(task.batchIndex+1, task.batchCount)
 	}
 	if compileUnitLogEnabled() {

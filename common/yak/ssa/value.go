@@ -122,9 +122,10 @@ func (b *FunctionBuilder) readValueFromIncludeStack(name string) Value {
 		if !ok {
 			return true
 		}
-		if ret := ReadVariableFromScope(block.ScopeTable, name); ret != nil && ret.Value != nil {
-			value = ret.Value
-			return false
+		if ret := ReadVariableFromScope(block.ScopeTable, name); ret != nil {
+			if value = ret.GetValue(); value != nil {
+				return false
+			}
 		}
 		return true
 	})
@@ -155,9 +156,9 @@ func (b *FunctionBuilder) readValueEx(
 				program.SetOffsetVariable(ret, b.CurrentRange)
 			}
 		}
-		if ret.Value != nil {
+		if value := ret.GetValue(); value != nil {
 			// has value, just return
-			return ret.Value
+			return value
 		}
 	}
 	val := b.readValueFromIncludeStack(name)
