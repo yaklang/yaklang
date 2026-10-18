@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/yaklang/yaklang/common/fp/fingerprint"
@@ -91,6 +92,41 @@ func rulesCacheStamp(rules map[*NmapProbe][]*NmapMatch) uint64 {
 	return sum ^ uint64(len(rules))
 }
 
+func (c *Config) serviceRuleStamp(rules map[*NmapProbe][]*NmapMatch) uint64 {
+	if c == nil {
+		return rulesCacheStamp(rules)
+	}
+	if atomic.LoadUint32(&c.serviceRuleReady) == 1 {
+		return atomic.LoadUint64(&c.serviceRuleBits)
+	}
+	c.serviceRuleMu.Lock()
+	defer c.serviceRuleMu.Unlock()
+	if atomic.LoadUint32(&c.serviceRuleReady) == 1 {
+		return atomic.LoadUint64(&c.serviceRuleBits)
+	}
+	stamp := c.ServiceRuleStamp
+	if !c.ServiceRuleStamped {
+		stamp = rulesCacheStamp(rules)
+		c.ServiceRuleStamp = stamp
+		c.ServiceRuleStamped = true
+	}
+	atomic.StoreUint64(&c.serviceRuleBits, stamp)
+	atomic.StoreUint32(&c.serviceRuleReady, 1)
+	return stamp
+}
+
+func (c *Config) resetServiceRuleStamp() {
+	if c == nil {
+		return
+	}
+	c.serviceRuleMu.Lock()
+	defer c.serviceRuleMu.Unlock()
+	c.ServiceRuleStamp = 0
+	c.ServiceRuleStamped = false
+	atomic.StoreUint64(&c.serviceRuleBits, 0)
+	atomic.StoreUint32(&c.serviceRuleReady, 0)
+}
+
 // ruleBlocks 返回端口对应的探针规则. 缓存键包含传输协议和规则选择条件,
 // 因此每个目标一份配置副本时仍然可以复用同一端口的规则块.
 func (f *Matcher) ruleBlocks(port int, config *Config) (*RuleBlock, []*RuleBlock, bool) {
@@ -101,13 +137,14 @@ func (f *Matcher) ruleBlocks(port int, config *Config) (*RuleBlock, []*RuleBlock
 		empty, blocks, ok := GetRuleBlockByConfig(port, config)
 		return empty, blocks, ok
 	}
+	rules := config.GetFingerprintRules()
 	key := ruleCacheKey{
 		port:      port,
 		transport: transportCacheKey(config),
 		active:    config.ActiveMode,
 		rarity:    config.RarityMax,
 		probesMax: config.ProbesMax,
-		rules:     rulesCacheStamp(config.GetFingerprintRules()),
+		rules:     config.serviceRuleStamp(rules),
 	}
 	if cached, ok := f.ruleBlockCache.Load(key); ok {
 		item := cached.(cachedRuleBlocks)
@@ -115,6 +152,7 @@ func (f *Matcher) ruleBlocks(port int, config *Config) (*RuleBlock, []*RuleBlock
 	}
 	empty, blocks, ok := GetRuleBlockByConfig(port, config)
 	f.ruleBlockCache.Store(key, cachedRuleBlocks{empty: empty, blocks: blocks, ok: ok})
+	warmServicePrefilters(empty, blocks)
 	return empty, blocks, ok
 }
 
@@ -566,6 +604,8 @@ func NewFingerprintMatcher(rules map[*NmapProbe][]*NmapMatch, config *Config) (*
 		Config:  config,
 		matcher: fingerprint.NewMatcher(),
 	}
+	// 扫描开始前算好规则身份，之后每个目标的配置副本直接复用。
+	config.serviceRuleStamp(config.GetFingerprintRules())
 
 	return matcher, nil
 }

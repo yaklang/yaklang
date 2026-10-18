@@ -50,6 +50,14 @@ type Config struct {
 	// 指定规则
 	FingerprintRules map[*NmapProbe][]*NmapMatch
 
+	// ServiceRuleStamp 是 FingerprintRules 的内容身份。配置副本会带上它，
+	// 同一个规则集只计算一次，大规模扫描不必对每个目标再遍历全部探针。
+	ServiceRuleStamp   uint64
+	ServiceRuleStamped bool
+	serviceRuleMu      sync.Mutex
+	serviceRuleReady   uint32
+	serviceRuleBits    uint64
+
 	// 指纹检测时候取的数据大小，意味着多大的数据会参与到指纹识别中
 	// 2048 为默认值
 	// 主机指纹识别的时间与这个值成正比
@@ -881,5 +889,6 @@ func WithNmapRule(i interface{}) ConfigOption {
 			return
 		}
 		config.FingerprintRules = nmapRules
+		config.resetServiceRuleStamp()
 	}
 }

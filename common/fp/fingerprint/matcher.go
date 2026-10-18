@@ -30,6 +30,20 @@ func NewMatcher() *Matcher {
 }
 
 func (m *Matcher) MatchResource(ctx context.Context, concurrency int, rules []*rule.FingerPrintRule, getter func(path string) (*rule.MatchResource, error)) []*schema.CPE {
+	if paths := rootRegexpPaths(rules); len(paths) > 0 {
+		getter = cachingGetter(getter, paths)
+		pages := make(map[string][]byte, len(paths))
+		failed := make(map[string]bool, len(paths))
+		for _, path := range paths {
+			res, err := getter(path)
+			if err != nil || res == nil {
+				failed[path] = true
+				continue
+			}
+			pages[path] = res.Data
+		}
+		rules = filterRootWebRules(rules, pages, failed)
+	}
 	var (
 		result []*schema.CPE
 		mu     sync.Mutex
