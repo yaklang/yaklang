@@ -142,6 +142,41 @@ func TestImageRoundTrip(t *testing.T) {
 	}
 }
 
+func TestImagePCRE2Extensions(t *testing.T) {
+	// These PCRE2 extensions must retain their behavior after image loading;
+	// a different fallback engine cannot be substituted for pcre2-lite.
+	cases := []struct {
+		name, expr, hit, miss string
+	}{
+		{"match-start-reset", `prefix\Kpayload`, "xxprefixpayloadyy", "prefixother"},
+		{"branch-reset", `^(?|(a)|(b))\1$`, "bb", "ab"},
+		{"define-subroutine", `(?(DEFINE)(?<byte>[A-F0-9]{2}))^(?&byte):(?&byte)$`, "AF:09", "AF:0Z"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			for _, loc := range []bool{false, true} {
+				compiled, data := compileImageTest(t, []Pattern{{ID: 42, Expr: tc.expr}}, loc)
+				loaded, err := LoadImage(data)
+				if err != nil {
+					t.Fatal(err)
+				}
+				t.Cleanup(func() { _ = loaded.Close() })
+				for _, db := range []Database{compiled, loaded} {
+					got, err := imageMatches(db, []byte(tc.hit))
+					want := []Match{{ID: 42, From: -1, To: -1}}
+					if err != nil || !reflect.DeepEqual(got, want) {
+						t.Fatalf("loc=%v hit=%q got=%v want=%v err=%v", loc, tc.hit, got, want, err)
+					}
+					got, err = imageMatches(db, []byte(tc.miss))
+					if err != nil || len(got) != 0 {
+						t.Fatalf("loc=%v miss=%q got=%v err=%v", loc, tc.miss, got, err)
+					}
+				}
+			}
+		})
+	}
+}
+
 func TestImageLoadDoesNotCompile(t *testing.T) {
 	_, data := compileImageTest(t, imageTestPatterns(), false)
 	var parses, nfas, compiles int
@@ -163,9 +198,9 @@ func TestImageLoadDoesNotCompile(t *testing.T) {
 			if v.re != nil {
 				t.Fatal("eager RE2 verifier")
 			}
-		case *regexp2Verifier:
+		case *pcre2Verifier:
 			if v.yak != nil {
-				t.Fatal("eager regexp2 verifier")
+				t.Fatal("eager PCRE2 verifier")
 			}
 		}
 	}

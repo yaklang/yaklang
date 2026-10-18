@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	regexp_utils "github.com/yaklang/yaklang/common/minirehs/internal/compat"
+	regexp_utils "github.com/yaklang/yaklang/common/utils/regexp-utils"
 )
 
 // TestRe2SupersetRewrite 验证超集改写器对代表性 regexp2 构造的输出可被 RE2 解析, 且对无法
@@ -85,7 +85,7 @@ func TestRouteBLiteralNecessity(t *testing.T) {
 		id       PatternID
 		expr     string
 		literals []string
-		v        *regexp2Verifier
+		v        *pcre2Verifier
 	}
 	var rbs []rb
 	for _, p := range patterns {
@@ -98,7 +98,7 @@ func TestRouteBLiteralNecessity(t *testing.T) {
 		if len(lits) == 0 {
 			continue
 		}
-		yak := &regexp2Verifier{yak: regexp_utils.NewYakRegexpUtils(expr)}
+		yak := &pcre2Verifier{yak: regexp_utils.NewYakRegexpUtils(expr)}
 		rbs = append(rbs, rb{id: p.ID, expr: expr, literals: lits, v: yak})
 		t.Logf("route-B gated rule id=%d name=%s literals=%v", p.ID, names[p.ID], lits)
 	}

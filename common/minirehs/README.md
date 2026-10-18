@@ -1,12 +1,13 @@
 # minirehs
 
-`minirehs` 是一个**零外部依赖、可移植**的多正则批量匹配引擎, 借鉴 Intel Hyperscan 的
+`minirehs` 是一个多正则批量匹配引擎, 借鉴 Intel Hyperscan 的
 "统一编译, 一次扫描" (compile then scan) 模型: 把成百上千条正则统一编译成一个不可变
 `Database`, 对输入只做一次字面量预过滤即可定位候选, 再只对候选做正则验证, 从而避免
 "几百条正则逐条全量匹配" 的 `O(N_patterns x N_bytes)` 开销。
 
-名字取 "mini Regex Hyperscan"。它**不是** Hyperscan 的移植, 而是用纯 Go (+ 可选自带
-SIMD) 实现的轻量近似。
+名字取 "mini Regex Hyperscan"，使用 Go 自动机和自带 C99 SIMD 内核实现批量匹配。
+正则确认只复用仓库现有的 VillanCh/go-pcre2-lite；需要 `CGO_ENABLED=1` 和相应 C 工具链，
+不引入 dlclark/regexp2 或其他新依赖，也不提供无 cgo 的确认器替代实现。
 
 ## 在 yak 语言里使用 (rehs 库)
 
@@ -51,22 +52,21 @@ group.Close()
   `MatchedIndexes(data)`、`MatchedPatterns(data)`、`Count(data)`、`Scan(data, cb)`、
   `Patterns()`、`Len()`、`Info()`、`Close()`。
 
-**默认 CGO 最强, 按系统逐步退化**: `BuildGroup` 默认走自托管 `mvscan` 后端 ——
-启用 CGO (`CGO_ENABLED=1`) 时自动编入纯 C99 位并行内核 (最强档, 编译日志 `c_kernel=true`);
-无 CGO 时优雅退化为纯 Go 参考执行器, 全平台可移植、结果完全一致。无需任何额外 build tag。
+`BuildGroup` 默认走自托管 `mvscan` 后端，自动编入纯 C99 位并行内核
+(编译日志 `c_kernel=true`)。构建需要 `CGO_ENABLED=1`，无需额外 build tag。
 
 ## 设计原则
 
-1. **可移植优先 + CGO 默认最强**: 不加任何 build tag 即可 —— 启用 CGO 时默认编入
-   `mvscan` 的纯 C99 位并行内核 (最强档); `CGO_ENABLED=0` 时在所有平台/架构上编译运行且
-   功能完整, 退化为纯 Go 自研引擎。两档结果逐字节一致。
-2. **零外部依赖 / 不加载任何动态库**: 不引入新的第三方库。CGO SIMD 是自带的纯 C99 内核
+1. **cgo 与原生内核**: 默认编入 `mvscan` 的纯 C99 位并行内核；保留 Go 参考执行器用于差分验证，
+   但 PCRE2 确认器需要 cgo，不承诺 `CGO_ENABLED=0` 可构建。
+2. **复用已有依赖**: 不引入新的第三方库。CGO SIMD 是自带的纯 C99 内核
    (`native/teddy.c` / `native/mvscan/`), **不链接、不 dlopen libhs 等任何外部库**。
    (历史上的 vectorscan/libhs 对照桥已于 2026-06 整体移除, 见 `MINI_VECTOR_SCAN_IMPL.md` 第 0' 节。)
-3. **优雅退化**: CGO/SIMD 不可用时自动退化为纯 Go, 结果完全一致。
+3. **SIMD 标量兜底**: CPU 不支持 SIMD 时使用标量实现，保持匹配结果一致。
 4. **结果一致**: 任何后端 (纯 Go / CGO-SIMD / stdlib) 对同一条 RE2 正则的命中集合
    **逐字节相同** (差分测试保证), 因为预过滤只决定"验证哪些位置", 验证逻辑共享。
-5. **复用 yaklang 生态**: 特性 gate 与 regexp2 兜底直接复用 `common/utils/regexp-utils`。
+5. **复用 yaklang 生态**: 特性 gate 与 PCRE2 兜底直接复用 `common/utils/regexp-utils`，
+   唯一的外部正则引擎是 VillanCh/go-pcre2-lite。
 
 ## 后端分档 (Tier)
 
@@ -74,15 +74,15 @@ group.Close()
 |------|------|------|------|----------|
 | 1 | mvs | 自托管 mvscan: rune/字节级 Glushkov 位并行 NFA + 字面量预过滤 (CGO 时纯 C99 内核) | **存在性** (From/To=-1) 或精确偏移 | `WithBackend(BackendMVS)`; `BuildGroup` 默认选用 |
 | 2 | engine | 自带 Teddy SIMD (NEON / SSSE3) 多字面量预过滤 | RE2 精确偏移 | `CGO_ENABLED=1` (默认, 无需额外 tag) |
-| 3 | engine | 纯 Go 标量 Aho-Corasick | RE2 精确偏移 | 默认 (任意平台) |
+| 3 | engine | Go 标量 Aho-Corasick | RE2 精确偏移 | 标量参考执行器；包构建仍需要 cgo |
 | 4 | stdlib | 无 (逐条全量匹配) | RE2 精确偏移 | 显式 `WithBackend(BackendStdlib)`, 作 oracle / 基线 |
 
 引擎 (Tier 2/3) 核心流程: **字面量提取 -> Aho-Corasick 预过滤 (一次扫描, 含位置) -> 邻域窗口验证**。
 对"有界宽度且无位置锚点"的正则, 只在字面量命中点附近的小窗口内跑 RE2 验证 (邻域锚定),
 显著降低验证成本; 对无界/含锚点的正则退化为整段验证; 无必需字面量的正则归入 always-on。
 
-**`rehs.BuildGroup` 默认选用 mvs (Tier 1)**: 启用 CGO 时下沉纯 C99 位并行内核 (最强档),
-无 CGO 时优雅退化为纯 Go 参考执行器, 全平台可移植、结果逐字节一致, **全程零外部依赖、不加载任何动态库**。
+**`rehs.BuildGroup` 默认选用 mvs (Tier 1)**，下沉自带纯 C99 位并行内核，
+Go 参考执行器保留相同匹配语义，PCRE2 确认由现有绑定提供。
 
 ### mvs 自托管后端 (Tier 1, 默认)
 
@@ -93,8 +93,8 @@ group.Close()
 
 - **自托管、不加载任何动态库**: 运行期内核为自带的纯 C99 (`native/mvscan/`), **既不链接也不
   dlopen** libhs/vectorscan 或任何系统库; 这是本引擎"可移植、易分发、分发不崩溃"的核心定位。
-- **CGO 默认最强, 按系统退化**: `CGO_ENABLED=1` 时自动编入纯 C99 位并行内核 (最强档);
-  无 CGO / 未带 tag 时退化为纯 Go 参考执行器, 结果逐字节一致。
+- **默认启用 C99 内核**: `CGO_ENABLED=1` 时自动编入位并行内核，无需额外 tag；
+  Go 参考执行器用于算法对照。
 - **双语义**: 默认可由 NFA 自身给出精确字节偏移 (leftmost-longest); 只需"是否命中"时显式
   `WithReportLocation(false)` 走纯位运算存在性快路径 (命中以 `From/To=-1` 上报)。
 - **regexp2-only 规则 (backref/lookaround) 由 fallback 承载**: 这类非正则构造 (数学边界, 任何
@@ -452,16 +452,12 @@ Go 侧 `existsIn` 的分配清零 (这就是 allocs 下降的来源), 但动不�
   稳态每 op 分配以 `ReportAllocs` 数为准, 其大头确为 regexp2。基准为该**对抗性**真实集; 字面量友好的
   合成集 (见上文"合成规模") 仍有数十~上百倍加速, 两者不矛盾。
 
-## 分发模型 (易分发 + 不崩溃 + 及时退化)
+## 分发模型
 
-- **默认产物 (不带任何 tag, `CGO_ENABLED=0`)**: 纯 Go, 零原生依赖, 全平台可移植, RE2 精确偏移。
-  这是永远可分发、永不崩溃的基线 (对抗集 2.4x, 字面量友好场景几十~上百倍)。
-- **CGO 产物 (`CGO_ENABLED=1`, mvs 默认)**: 自动编入自带的纯 C99 位并行内核 (最强档) ——
-  - **既不链接、也不 dlopen 任何外部库** (无 libhs/vectorscan/系统正则), 内核源码随仓库分发;
-  - **任意架构都能编译** (未知架构只编标量孪生), x86 上仍可 SSSE3/AVX2、arm64 NEON 加速;
-  - SIMD 探测不到时一律落标量, 结果与纯 Go 逐字节一致。
-- 一句话: **无论哪种环境, `Compile(..., WithBackend(BackendMVS))` 都不会失败/崩溃**,
-  能下沉 C 内核就下沉 (Tier 1), 不能就退化为纯 Go。用 `db.Info().Backend` 可观测实际生效后端。
+构建使用 `CGO_ENABLED=1` 和 VillanCh/go-pcre2-lite 对应平台的工具链。
+自带 C99 位并行内核不需要 libhs/vectorscan；CPU 不支持 SIMD 时使用标量实现。
+Go 参考执行器用于差分验证，不能消除整个包对 PCRE2/cgo 的依赖。
+编译镜像采用平台无关的字节格式，但目标平台仍须满足上述构建条件。
 
 ## 取舍与边界
 
@@ -492,13 +488,12 @@ Go 侧 `existsIn` 的分配清零 (这就是 allocs 下降的来源), 但动不�
 
 ## 当前未实现 (后续可扩展, 按收益排序)
 
-- **Teddy SIMD 预过滤默认化** (最大头): 把 `native/teddy.c` 接为默认 CGO 预过滤替掉标量 AC,
-  标量孪生兜底 `CGO_ENABLED=0`。这是逼近 Hyperscan 吞吐的主路径。
+- **Teddy 候选确认**: 已接入默认 cgo 预过滤，继续降低大量共同前缀造成的候选比较成本。
+  不支持 SIMD 的 CPU 使用标量孪生。
 - **Rose-lite 字面量链分解**: 对"尾部无界"模式 (`token=\w+`/`.*foo`) 做命中点小邻域验证,
   消除目前仍存在的整段 forward 扫描。
 - **断言 NFA 合并**: 仿 `mvs_merged.go` 把带 guard 的断言 NFA 并为单趟 (profile ~18% CPU)。
 - 流式 (streaming) 与向量化 (vectored) 扫描; 当前仅 block 模式。
-- 数据库序列化 / 反序列化 (平台无关 blob 落盘缓存)。
 
 ## 文件结构
 
@@ -506,13 +501,15 @@ Go 侧 `existsIn` 的分配清零 (这就是 allocs 下降的来源), 但动不�
 minirehs.go          公共类型 (Pattern/Match/Flag/...)
 options.go           functional options + Logger (转发 common/log)
 database.go          Compile 编排 + Database/Scratch + 邻域窗口参数
-verifier.go          re2Verifier (精确偏移) / regexp2Verifier (yaklang regexp-utils 兜底)
+verifier.go          re2Verifier (精确偏移) / pcre2Verifier (VillanCh/go-pcre2-lite)
+image*.go            紧凑编译镜像、校验、恢复与原子磁盘缓存
+tools/rehs-image/    构建期镜像生成与新鲜度检查
 feature_gate.go      RE2 可表达性判定
 literal.go           必需字面量提取 (字面量因式分解)
 width.go             最大宽度/锚点分析 (决定能否邻域验证)
 ahocorasick.go       自研 Aho-Corasick 自动机 (含命中位置)
 prefilter.go         预过滤契约 + 纯 Go 标量实现 + ASCII 小写
-prefilter_nocgo.go   默认构建: 标量预过滤
+prefilter_nocgo.go   无 cgo 内核桩；整个包仍依赖 PCRE2/cgo
 prefilter_cgo.go     CGO 构建: SIMD 预过滤 (含失败退化)
 native/teddy.c       自带 SIMD 内核 (NEON / SSSE3 / 标量), 零外部依赖
 engine_purego.go     自研引擎后端 (Tier 2/3)

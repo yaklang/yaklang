@@ -9,7 +9,7 @@ import (
 	"sync"
 	"sync/atomic"
 
-	regexp_utils "github.com/yaklang/yaklang/common/minirehs/internal/compat"
+	regexp_utils "github.com/yaklang/yaklang/common/utils/regexp-utils"
 )
 
 // Scratch 是每次扫描需要的可复用工作区, 用于逼近热路径低分配.
@@ -312,16 +312,16 @@ func compileWithConfig(patterns []Pattern, cfg *config) (Database, error) {
 			// compiling it a second time through YakRegexpUtils.CanUse.
 			yak := regexp_utils.NewYakRegexpUtils(expr)
 			if !yak.CanUse() {
-				reason := "expression not compilable by RE2 nor regexp2"
+				reason := "expression not compilable by RE2 nor PCRE2"
 				if effectivePolicy(p.OnUnsupported, cfg.defaultPolicy) == Fallback {
 					cfg.logger.Warnf("minirehs: pattern id=%d unsupported and rejected: %s", p.ID, reason)
 				}
 				return nil, fmt.Errorf("minirehs: pattern id=%d rejected: %s", p.ID, reason)
 			}
-			// RE2 不可表达 (lookaround/backref 等), 用 regexp2 验证 (后端已全局切 go-pcre2-lite).
-			cp.v = &regexp2Verifier{yak: yak}
-			// route-B: 在不触碰 regexp2 AST 的前提下, 用"语言超集改写 + RE2 字面量提取"取必需字面量,
-			// 命中才验证, 避免每条记录都跑昂贵的 regexp2. 提不出则保持 always-on. (健全性见 literal_routeb.go)
+			// RE2 不可表达 (lookaround/backref 等), 只用 VillanCh/go-pcre2-lite 验证。
+			cp.v = &pcre2Verifier{yak: yak}
+			// route-B: 用语言超集改写和 RE2 字面量提取必需字面量，命中后才交 PCRE2 确认。
+			// 提不出则保持 always-on；健全性见 literal_routeb.go。
 			cp.literals = extractRequiredLiteralsApprox(expr, cfg.minLiteralLen)
 		}
 

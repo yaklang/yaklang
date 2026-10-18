@@ -2,10 +2,8 @@
 
 package minirehs
 
-// 本文件是纯 C99 运行期内核的退化桩: 当 CGO_ENABLED=0 (无 C 工具链/交叉编译) 时
-// mvsKernel 不可用, newMVSKernel 返回 nil, mvsDB 全程走纯 Go 参考执行器 (existsIn / scanExist).
-// 这是可移植基线: 任何平台/架构无需 C 工具链即可编译运行, 功能与 C 内核构建完全一致.
-// (启用 CGO 时改编 mvs_cgo.go 的 C 内核档, 见该文件.)
+// 本文件只提供 C99 运行期内核不可用时的桩方法，不提供 PCRE2 替代实现。
+// 整个包仍需要 VillanCh/go-pcre2-lite 和 cgo，不能据此推断无 cgo 构建可用。
 //
 // 关键词: mvscan, stub, 优雅退化, 纯 Go 基线
 
@@ -15,8 +13,7 @@ type mvsKernel struct{}
 // mvsKernelAvailable 报告当前构建是否编入了 C 运行期内核 (退化构建恒为 false).
 func mvsKernelAvailable() bool { return false }
 
-// openMVSKernel leaves execution in Go; the shared compiler still retains its
-// portable blob so images have identical content with and without cgo.
+// openMVSKernel is unavailable without cgo.
 func openMVSKernel(blob []byte, npat int) *mvsKernel { return nil }
 
 func (k *mvsKernel) close() {}
