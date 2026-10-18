@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	regexp_utils "github.com/yaklang/yaklang/common/utils/regexp-utils"
+	regexp_utils "github.com/yaklang/yaklang/common/minirehs/internal/compat"
 )
 
 // TestRe2SupersetRewrite 验证超集改写器对代表性 regexp2 构造的输出可被 RE2 解析, 且对无法

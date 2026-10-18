@@ -10,6 +10,11 @@ SIMD) 实现的轻量近似。
 
 ## 在 yak 语言里使用 (rehs 库)
 
+Go 调用方可以用 `Database.MarshalImage` / `LoadImage` 保存并恢复 MVS 编译产物，
+或用 `LoadOrCompile` 自动维护磁盘缓存。内置规则可在构建期生成 `.rehs` 后 `go:embed`，
+启动时跳过正则分析与自动机构建。接口、格式、跨平台限制和实测数据见
+[编译镜像与性能评估](COMPILE_IMAGES.md)。
+
 本模块对外以 `rehs` 库注册进 yaklang, 一行编译、一次扫描即可批量判定哪些正则命中:
 
 ```yak

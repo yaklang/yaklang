@@ -74,6 +74,14 @@ typedef struct mrehs_pf {
     int32_t  *litOff;         /* numLit+1 偏移; 第 j 条 = litBytes[litOff[j]..litOff[j+1]) */
     int32_t   bkOff[TEDDY_BUCKETS + 1]; /* 桶 -> bkLit 区间 */
     int32_t  *bkLit;          /* 按桶分组的字面量 id (长度 numLit) */
+    /* Large rule sets need more selective confirmation than eight buckets.
+     * Group literals by a hash of their first min(length,16) folded bytes;
+     * collisions still pass through the complete exact comparison below. */
+    uint64_t *confirmKeys;
+    int32_t  *confirmHeads;   /* 0 = empty, otherwise litID + 1 */
+    int32_t  *confirmNext;
+    uint32_t  confirmMask;
+    uint32_t  confirmLengths;
 } mrehs_pf;
 
 static inline uint8_t ascii_lower_byte(uint8_t c) {
@@ -120,6 +128,47 @@ static void build_shufti(mrehs_pf *pf) {
             pf->hiMask[(c >> 4) & 0xf] |= bit;
             bucket++;
         }
+    }
+}
+
+static inline uint64_t confirm_hash_byte(uint64_t h, uint8_t c) {
+    return (h ^ c) * 1099511628211ull;
+}
+
+static inline uint64_t confirm_key(uint64_t h, unsigned length) {
+    return h ^ ((uint64_t)length * 0x9e3779b97f4a7c15ull);
+}
+
+static inline uint32_t confirm_slot(uint64_t key, uint32_t mask) {
+    return (uint32_t)(key ^ (key >> 32)) & mask;
+}
+
+static void build_confirm_index(mrehs_pf *pf) {
+    if (pf->numLit <= 256 || pf->numLit > (1 << 28)) return;
+    uint32_t size = 1;
+    while (size < (uint32_t)pf->numLit * 2u) size <<= 1;
+    pf->confirmKeys = (uint64_t *)calloc(size, sizeof(uint64_t));
+    pf->confirmHeads = (int32_t *)calloc(size, sizeof(int32_t));
+    pf->confirmNext = (int32_t *)calloc((size_t)pf->numLit, sizeof(int32_t));
+    if (!pf->confirmKeys || !pf->confirmHeads || !pf->confirmNext) {
+        free(pf->confirmKeys); free(pf->confirmHeads); free(pf->confirmNext);
+        pf->confirmKeys = NULL; pf->confirmHeads = NULL; pf->confirmNext = NULL;
+        return; /* Keep the exact bucket-based confirmation on allocation failure. */
+    }
+    pf->confirmMask = size - 1;
+    for (int32_t j = 0; j < pf->numLit; j++) {
+        int32_t off = pf->litOff[j], length = pf->litOff[j + 1] - off;
+        if (length > 16) length = 16;
+        uint64_t hash = 14695981039346656037ull;
+        for (int32_t k = 0; k < length; k++) hash = confirm_hash_byte(hash, pf->litBytes[off + k]);
+        uint64_t key = confirm_key(hash, (unsigned)length);
+        uint32_t slot = confirm_slot(key, pf->confirmMask);
+        while (pf->confirmHeads[slot] && pf->confirmKeys[slot] != key)
+            slot = (slot + 1) & pf->confirmMask;
+        pf->confirmKeys[slot] = key;
+        pf->confirmNext[j] = pf->confirmHeads[slot];
+        pf->confirmHeads[slot] = j + 1;
+        pf->confirmLengths |= 1u << length;
     }
 }
 
@@ -178,6 +227,22 @@ static void build_teddy(mrehs_pf *pf, const uint8_t *litFlat, const int32_t *lit
         }
     }
     pf->useTeddy = 1;
+    build_confirm_index(pf);
+}
+
+/* Teddy does not consult an AC table, including in its scalar CPU fallback.
+ * Build it directly from literals instead of constructing and copying a dense
+ * 256-way DFA which will never be scanned. NULL asks Go to use the AC fallback. */
+mrehs_pf *mrehs_pf_new_teddy(int32_t numLit, const uint8_t *litFlat,
+                            const int32_t *litOff) {
+    if (numLit <= 0 || !litFlat || !litOff) return NULL;
+    mrehs_pf *pf = (mrehs_pf *)calloc(1, sizeof(mrehs_pf));
+    if (!pf) return NULL;
+    pf->numLit = numLit;
+    pf->numLitWords = (numLit + 63) / 64;
+    build_teddy(pf, litFlat, litOff, numLit);
+    if (!pf->useTeddy) { free(pf); return NULL; }
+    return pf;
 }
 
 mrehs_pf *mrehs_pf_new(const int32_t *next, int32_t numStates,
@@ -221,6 +286,9 @@ void mrehs_pf_free(mrehs_pf *pf) {
     free(pf->litBytes);
     free(pf->litOff);
     free(pf->bkLit);
+    free(pf->confirmKeys);
+    free(pf->confirmHeads);
+    free(pf->confirmNext);
     free(pf);
 }
 
@@ -233,6 +301,28 @@ static inline int32_t teddy_confirm(const mrehs_pf *pf, const uint8_t *data, siz
     uint8_t prefix1 = ascii_lower_byte(data[pos + 1]);
     uint16_t prefix = (uint16_t)(((uint16_t)prefix0 << 8) | prefix1);
     if ((pf->prefix2[prefix >> 6] & ((uint64_t)1u << (prefix & 63))) == 0) {
+        return total;
+    }
+    if (pf->confirmHeads) {
+        uint64_t hash = 14695981039346656037ull;
+        size_t maxPrefix = len - pos;
+        if (maxPrefix > 16) maxPrefix = 16;
+        for (unsigned k = 1; k <= maxPrefix; k++) {
+            hash = confirm_hash_byte(hash, ascii_lower_byte(data[pos + k - 1]));
+            if (!(pf->confirmLengths & (1u << k))) continue;
+            uint64_t key = confirm_key(hash, k);
+            uint32_t slot = confirm_slot(key, pf->confirmMask);
+            while (pf->confirmHeads[slot] && pf->confirmKeys[slot] != key)
+                slot = (slot + 1) & pf->confirmMask;
+            for (int32_t entry = pf->confirmHeads[slot]; entry; entry = pf->confirmNext[entry - 1]) {
+                int32_t j = entry - 1, off = pf->litOff[j];
+                int32_t length = pf->litOff[j + 1] - off;
+                if (pos + (size_t)length <= len && ascii_equal_lower(data + pos, pf->litBytes + off, (size_t)length)) {
+                    if (total < cap) { out[total * 2] = (int32_t)(pos + (size_t)length); out[total * 2 + 1] = j; }
+                    total++;
+                }
+            }
+        }
         return total;
     }
     while (bucketmap) {
@@ -514,3 +604,4 @@ int32_t mrehs_pf_scan_scalar(const mrehs_pf *pf, const uint8_t *data, size_t len
 /* 可观测: 报告是否启用 Teddy 及指纹长度 (供测试/日志). */
 int32_t mrehs_pf_use_teddy(const mrehs_pf *pf) { return pf->useTeddy; }
 int32_t mrehs_pf_teddy_m(const mrehs_pf *pf) { return pf->teddyM; }
+int32_t mrehs_pf_indexed_confirm(const mrehs_pf *pf) { return pf->confirmHeads != NULL; }

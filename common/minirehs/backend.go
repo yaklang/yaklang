@@ -1,6 +1,6 @@
 package minirehs
 
-import "github.com/yaklang/yaklang/common/utils"
+import "fmt"
 
 // selectBackend 按配置选择后端.
 //   - Auto / BackendEngine: 自研引擎 (Tier 2/3), 始终可用, RE2 精确偏移语义。
@@ -15,6 +15,6 @@ func selectBackend(cfg *config) (backendImpl, error) {
 	case BackendMVS:
 		return &mvsBackend{}, nil
 	default:
-		return nil, utils.Errorf("minirehs: unknown backend kind %d", cfg.backend)
+		return nil, fmt.Errorf("minirehs: unknown backend kind %d", cfg.backend)
 	}
 }

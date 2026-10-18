@@ -1,0 +1,55 @@
+name: minirehs compilation images
+
+on:
+  pull_request:
+    paths:
+      - "common/minirehs/**"
+      - "go.mod"
+      - "go.sum"
+      - ".gitattributes"
+      - ".github/workflows/minirehs-tests.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: minirehs-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: ${{ matrix.os }} / cgo=${{ matrix.cgo }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-22.04
+            cgo: "1"
+          - os: ubuntu-22.04
+            cgo: "0"
+          - os: windows-latest
+            cgo: "0"
+    env:
+      CGO_ENABLED: ${{ matrix.cgo }}
+      GOMAXPROCS: "2"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Test images, disk cache, portable fallback and embedded freshness
+        run: go test -count=1 -timeout=5m ./common/minirehs/...
+      - name: Test native amalgamation and concurrent lazy verification
+        if: matrix.os == 'ubuntu-22.04' && matrix.cgo == '1'
+        run: go test -short -race -tags minirehs_mvs_amalg -count=1 -timeout=5m ./common/minirehs/...
+      - name: Fuzz image validation
+        if: matrix.os == 'ubuntu-22.04' && matrix.cgo == '1'
+        run: go test -run '^$' -fuzz '^FuzzLoadImage$' -fuzztime=15s -parallel=2 -timeout=2m ./common/minirehs
+      - name: Compile the portable arm64 image reader
+        if: matrix.os == 'ubuntu-22.04' && matrix.cgo == '0'
+        env:
+          GOARCH: arm64
+        run: go test -c -o "${{ runner.temp }}/minirehs-arm64.test" ./common/minirehs

@@ -62,6 +62,9 @@ func TestTeddyEnabled(t *testing.T) {
 		if !pf.useTeddy() {
 			t.Errorf("expected Teddy enabled for %v", c.lits)
 		}
+		if pf.builtAC {
+			t.Error("Teddy constructor built an unused AC table")
+		}
 		if pf.teddyM() != c.m {
 			t.Errorf("lits %v: teddyM=%d want %d", c.lits, pf.teddyM(), c.m)
 		}
@@ -76,6 +79,9 @@ func TestTeddyEnabled(t *testing.T) {
 	if pf.useTeddy() {
 		t.Errorf("Teddy must be disabled when a length-1 literal exists")
 	}
+	if !pf.builtAC {
+		t.Error("AC fallback table missing")
+	}
 	pf.release()
 }
 
@@ -87,6 +93,33 @@ func randLowerLiteral(r *rand.Rand) string {
 		b[i] = alpha[r.Intn(len(alpha))]
 	}
 	return string(b)
+}
+
+func TestTeddyLargePrefixIndex(t *testing.T) {
+	lits := []string{"ab", "abc", "abcd", "abcde", "abcdef", "abcdefg", "abcdefgh", "abcdefghi", "abcdefghij", "abcdefghijk", "abcdefghijkl", "abcdefghijklm", "abcdefghijklmn", "abcdefghijklmno", "abcdefghijklmnop", "abcdefghijklmnopq", "你好ab"}
+	for i := 0; i < 600; i++ {
+		lits = append(lits, fmt.Sprintf("http/1.1 200 ok\r\nserver: product-%03d.example.com", i))
+	}
+	rng := rand.New(rand.NewSource(4917))
+	for i := 0; i < 400; i++ {
+		lits = append(lits, randLowerLiteral(rng))
+	}
+	li := liFromLiterals(lits)
+	pf := newCGOPrefilter(li)
+	if pf == nil || !pf.indexedConfirm() {
+		t.Fatal("large literal set did not enable the prefix index")
+	}
+	defer pf.release()
+	ref := newScalarPrefilter(li)
+	for i := 0; i < 100; i++ {
+		in := randCorpusWith(rng, lits, 1000)
+		want := hitSet(ref.scanHits(in, &scratch{}))
+		assertSameHits(t, hitSet(pf.scanHits(in, &scratch{})), want, "indexed SIMD")
+		assertSameHits(t, hitSet(pf.scanHitsScalar(in, &scratch{})), want, "indexed scalar")
+	}
+	// Dense outputs force the indexed constructor through exact-size rescan.
+	in := []byte(strings.Repeat("ABCDEFGHIJKLMNOPQ", 3000))
+	assertSameHits(t, hitSet(pf.scanHits(in, &scratch{})), hitSet(ref.scanHits(in, &scratch{})), "indexed dense outputs")
 }
 
 func randCorpusWith(r *rand.Rand, lits []string, n int) []byte {

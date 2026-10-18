@@ -38,7 +38,7 @@ func computeLitWindow(expr string, lits []string) litWindow {
 	if len(lits) == 0 {
 		return w
 	}
-	re, err := syntax.Parse(expr, syntax.Perl)
+	re, err := parseRegexSyntax(expr, syntax.Perl)
 	if err != nil {
 		return w
 	}
@@ -152,7 +152,7 @@ func computeLitHeads(expr string, lits []string) map[string]int32 {
 	if len(lits) == 0 {
 		return out
 	}
-	re, err := syntax.Parse(expr, syntax.Perl)
+	re, err := parseRegexSyntax(expr, syntax.Perl)
 	if err != nil {
 		return out
 	}

@@ -9,6 +9,8 @@ package minirehs
 #include <stddef.h>
 
 typedef struct mrehs_pf mrehs_pf;
+mrehs_pf *mrehs_pf_new_teddy(int32_t numLit, const uint8_t *litFlat,
+                             const int32_t *litOff);
 mrehs_pf *mrehs_pf_new(const int32_t *next, int32_t numStates,
                        const int32_t *outOff, const int32_t *outFlat,
                        int32_t outFlatLen, int32_t numLit,
@@ -20,6 +22,7 @@ int32_t mrehs_pf_scan_scalar(const mrehs_pf *pf, const uint8_t *data, size_t len
                              int32_t *outPairs, int32_t capPairs);
 int32_t mrehs_pf_use_teddy(const mrehs_pf *pf);
 int32_t mrehs_pf_teddy_m(const mrehs_pf *pf);
+int32_t mrehs_pf_indexed_confirm(const mrehs_pf *pf);
 
 #include "native/teddy.c"
 */
@@ -57,15 +60,24 @@ func newPrefilter(li *literalIndex) prefilter {
 	return newScalarPrefilter(li)
 }
 
-// cgoPrefilter 用 C SIMD 内核扫描 (复用 Go 构建的 AC 表), 输出字面量命中 (含位置).
+// cgoPrefilter 用 C Teddy 内核扫描；只有回退路径构建 AC 表。
 type cgoPrefilter struct {
-	handle *C.mrehs_pf
-	li     *literalIndex
+	handle  *C.mrehs_pf
+	li      *literalIndex
+	builtAC bool // construction diagnostic: Teddy-only databases never need AC tables
 }
 
 func newCGOPrefilter(li *literalIndex) *cgoPrefilter {
 	if li.empty() {
 		return nil
+	}
+	litFlat, litOff := flattenLiterals(li.literals)
+	var litFlatPtr *C.uint8_t
+	if len(litFlat) > 0 {
+		litFlatPtr = (*C.uint8_t)(unsafe.Pointer(&litFlat[0]))
+	}
+	if handle := C.mrehs_pf_new_teddy(C.int32_t(len(li.literals)), litFlatPtr, (*C.int32_t)(unsafe.Pointer(&litOff[0]))); handle != nil {
+		return &cgoPrefilter{handle: handle, li: li}
 	}
 	// 复用纯 Go 的 Aho-Corasick 构建, 得到不可变转移/输出表, 再拷贝进 C 内存.
 	b := newACBuilder()
@@ -79,17 +91,9 @@ func newCGOPrefilter(li *literalIndex) *cgoPrefilter {
 		return nil
 	}
 
-	// 拼接字面量字节 + 偏移表 (litOff 长度 numLit+1), 供 C 侧 Teddy 构建指纹与 confirm.
-	// litID == li.literals 下标 == AC add 时的 id, 三者一致.
-	litFlat, litOff := flattenLiterals(li.literals)
-
 	var outFlatPtr *C.int32_t
 	if len(ac.outFlat) > 0 {
 		outFlatPtr = (*C.int32_t)(unsafe.Pointer(&ac.outFlat[0]))
-	}
-	var litFlatPtr *C.uint8_t
-	if len(litFlat) > 0 {
-		litFlatPtr = (*C.uint8_t)(unsafe.Pointer(&litFlat[0]))
 	}
 	handle := C.mrehs_pf_new(
 		(*C.int32_t)(unsafe.Pointer(&ac.next[0])),
@@ -105,8 +109,9 @@ func newCGOPrefilter(li *literalIndex) *cgoPrefilter {
 		return nil
 	}
 	return &cgoPrefilter{
-		handle: handle,
-		li:     li,
+		handle:  handle,
+		li:      li,
+		builtAC: true,
 	}
 }
 
@@ -127,6 +132,10 @@ func flattenLiterals(lits []string) (litFlat []byte, litOff []int32) {
 }
 
 func (p *cgoPrefilter) simd() bool { return true }
+
+func (p *cgoPrefilter) indexedConfirm() bool {
+	return p.handle != nil && C.mrehs_pf_indexed_confirm(p.handle) != 0
+}
 
 // useTeddy / teddyM 暴露 C 侧 Teddy 启用状态与指纹长度 (供测试与可观测).
 func (p *cgoPrefilter) useTeddy() bool {

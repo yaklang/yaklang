@@ -1,0 +1,8 @@
+[
+  {"ID": 1, "Expr": "HTTP/1\\.[01] [0-9]{3}"},
+  {"ID": 2, "Expr": "server: [^\\r\\n]+", "Flags": 1},
+  {"ID": 3, "Expr": "\\b(?:token|password)=[a-z0-9]+", "Flags": 1},
+  {"ID": 4, "Expr": "[a-z0-9.-]+\\.example\\.com"},
+  {"ID": 5, "Expr": "[0-9]{6}"},
+  {"ID": 6, "Expr": "^(a)\\1$"}
+]
