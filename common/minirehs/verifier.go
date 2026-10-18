@@ -4,7 +4,7 @@ import (
 	"regexp"
 	"sync"
 
-	regexp_utils "github.com/yaklang/yaklang/common/minirehs/internal/compat"
+	regexp_utils "github.com/yaklang/yaklang/common/utils/regexp-utils"
 )
 
 // verifier 负责对候选数据做"真实命中"判定与取偏移. 它是命中语义的唯一权威:
@@ -12,7 +12,7 @@ import (
 // 预过滤只影响"验证哪些位置", 不影响"判定结果".
 type verifier interface {
 	// findAll 返回非重叠 [from,to) 字节区间, 语义对齐 regexp.FindAllIndex.
-	// 对 regexp2-only pattern (无法给出精确字节偏移), 命中时返回单个 {-1,-1} 表示"存在命中".
+	// 对 PCRE2 兜底 pattern，命中时返回单个 {-1,-1} 表示"存在命中"。
 	findAll(data []byte) [][2]int
 	// exact 报告该 verifier 是否能给出精确字节偏移 (re2Verifier 为 true).
 	exact() bool
@@ -99,21 +99,18 @@ func (v *re2Verifier) findAllInWindow(data []byte, winStart, winEnd int) [][2]in
 	return out
 }
 
-// regexp2Verifier 基于 yaklang 的 regexp-utils 包 (优先 RE2, 失败回退 regexp2),
-// 用于承载 backref / lookaround 等自动机无法表达、但 regexp2 可处理的 pattern.
-// 这类 pattern 报告"存在命中" (偏移 -1), 满足 MITM 打标等以命中为准的场景.
-//
-// 注: regexp-utils 的 regexp2 后端已全局切换为 go-pcre2-lite (PCRE2, 线性时间, 远低回溯成本),
-// 故本 verifier 经 yak.Match 自动享有该加速, 无需 minirehs 内单独旁路.
-type regexp2Verifier struct {
+// pcre2Verifier 通过现有 regexp-utils 使用 VillanCh/go-pcre2-lite，
+// 承载 backref / lookaround 等 RE2 自动机无法表达的 pattern。
+// 这类 pattern 报告存在命中 (偏移 -1)，不引入其他正则引擎或无 cgo 替代库。
+type pcre2Verifier struct {
 	yak  *regexp_utils.YakRegexpUtils
 	once sync.Once
 	expr string
 }
 
-func (v *regexp2Verifier) exact() bool { return false }
+func (v *pcre2Verifier) exact() bool { return false }
 
-func (v *regexp2Verifier) findAll(data []byte) [][2]int {
+func (v *pcre2Verifier) findAll(data []byte) [][2]int {
 	v.once.Do(func() {
 		if v.yak == nil {
 			v.yak = regexp_utils.NewYakRegexpUtils(v.expr)

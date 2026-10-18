@@ -5,7 +5,7 @@ import (
 	"math/rand"
 	"testing"
 
-	regexp_utils "github.com/yaklang/yaklang/common/minirehs/internal/compat"
+	regexp_utils "github.com/yaklang/yaklang/common/utils/regexp-utils"
 )
 
 // scanAllSet 扫描 data, 返回以 (id,from,to) 为键的命中集合 (用于差分比较).

@@ -3,13 +3,12 @@
 // 不可变的 Database, 对输入数据只扫描一次即可返回所有命中, 从而避免"几百条正则
 // 逐条匹配"造成的 O(N_patterns x N_bytes) 性能问题.
 //
-// 设计第一约束是可移植: 默认构建 (CGO_ENABLED=0, 不加任何 build tag) 必须在所有
-// 平台/架构上编译运行且功能完整, 走纯 Go 自研引擎 (字面量预过滤 Aho-Corasick +
-// RE2 验证). 启用 CGO (CGO_ENABLED=1, 无需额外 build tag) 时, 字面量预过滤默认切换为
-// 自带的 Teddy SIMD 实现 (SSSE3/NEON, 标量孪生兜底), 不依赖任何外部 C 库, 缺失时优雅退化为纯 Go.
+// 构建需要 CGO_ENABLED=1 和 VillanCh/go-pcre2-lite 所需的 C 工具链，无需额外 build tag。
+// 字面量预过滤使用自带的 Teddy SIMD (SSSE3/NEON，标量孪生兜底)，不要求 Hyperscan。
+// Go NFA 和 Aho-Corasick 参考执行器仍然保留，但不提供无 cgo 的正则确认替代库。
 //
 // 重要语义说明: 本引擎与 Go 标准库 regexp 一样是 RE2 自动机方法, 不支持
-// backreference 与任意 lookaround. 这是数学本质决定的, 不是实现缺陷.
+// backreference 与任意 lookaround；这类规则交 VillanCh/go-pcre2-lite 确认存在性。
 //
 // 关键词: minirehs, multi-regex, compile then scan, prefilter, RE2
 package minirehs
@@ -54,8 +53,7 @@ const (
 	BackendStdlib
 	// BackendMVS 是自托管 mvscan 引擎 (字节级 Glushkov 位并行 NFA + 字面量预过滤) 的"存在性"
 	// 匹配后端: 把每条正则编译为字节级位置自动机, 一次扫描判定"哪些规则命中" (From/To=-1)。
-	// 启用 CGO 时自动编入纯 C99 位并行内核 (最强档), 无 CGO 退化纯 Go; 全程零外部依赖、不加载任何
-	// 动态库 (这是本引擎相对 libhs/vectorscan 的核心定位: 自托管、可移植、不崩溃)。
+	// 自动编入自带的纯 C99 位并行内核，无需 libhs/vectorscan；PCRE2 确认依赖 cgo。
 	BackendMVS
 )
 
@@ -84,7 +82,7 @@ type Pattern struct {
 
 // Match 是一次命中，[From, To) 为命中字节区间。Engine/Stdlib 后端沿用 regexp.FindAllIndex
 // 的 leftmost-first 语义；MVS 定位模式使用其文档约定的 leftmost-longest 语义。
-// MVS 仅存在性模式及 regexp2-only 规则返回 [-1,-1)。
+// MVS 仅存在性模式及 PCRE2 兜底规则返回 [-1,-1)。
 type Match struct {
 	ID   PatternID
 	From int

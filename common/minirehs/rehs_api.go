@@ -4,7 +4,7 @@ import (
 	"errors"
 	"sync"
 
-	utils "github.com/yaklang/yaklang/common/minirehs/internal/compat"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 // 本文件是 minirehs 面向 yak 语言的高层封装 (Exports). 设计目标: 让 yak 用一行
@@ -14,11 +14,8 @@ import (
 //
 // 完成"成百上千条正则统一编译, 一次扫描判定哪些命中"的 Hyperscan 式批量匹配。
 //
-// 后端策略 (默认 CGO 最强 + 按系统逐步退化, 见 selectBackend / mvs_cgo.go vs mvs_stub.go):
-//   - 默认走自托管 mvscan (BackendMVS): 启用 CGO 时自动编入纯 C99 位并行内核 (最强档);
-//     无 CGO (CGO_ENABLED=0) 时优雅退化为纯 Go 参考执行器, 全平台可移植、功能一致。
-//   - 全程零外部依赖、不加载任何动态库 (不依赖 libhs/vectorscan); 这是本引擎自托管、可移植、
-//     "分发不崩溃"的核心定位。
+// 后端默认走自托管 mvscan (BackendMVS)，自动编入自带纯 C99 位并行内核。
+// 构建需要 cgo；非 RE2 正则只通过现有 VillanCh/go-pcre2-lite 确认，不依赖 libhs/vectorscan。
 //
 // 关键词: rehs, BuildGroup, 多正则批量匹配, compile then scan, Exports, yak
 

@@ -120,14 +120,15 @@ zstd 数据和外部 CRC32。内部镜像有自己的头部及 CRC；其身份�
 | 路由列表 | mergedCount、maxAnchorNword、assertAlwaysOn、assertAlwaysOnC/Go、otherAlwaysOn、specializedAlwaysOn |
 | 反向 unit | count；每条的 idx 和带长度的 MPU1；稠密模式为原 encodeUnit 字节 |
 | C blob | 带长度的 MVP1；稠密模式为原 MVS1 v3 blob |
-| regexp2 确认器 | 按 idx 升序的 idx、字节码长度；当前统一为 0，表示懒编译 |
+| PCRE2 确认器 | 按 idx 升序的 idx、字节码长度；当前统一为 0，表示懒编译 |
 | Go 必要条件 sidecar | 带长度的 `NEC1`，保存完整 merged 必要条件，以及非零 assert 必要条件的 idx 和内容 |
 | trailer | u32 CRC32 |
 
 flags 的 bit0 是定位，bit1 是已构建双向锚定；bit4/bit5 只描述存储方式，不改变缓存身份。
 v1 拒绝 bit2/bit3 的 anchorMerged/assertMerged 及其他未知位。
 route 的 bit0..6 依次是 hasLiterals、windowable、batchable、anchorable、biAnchorable、gate、re2Loc。
-verifierKind 0 为 RE2，1 为 regexp2。specialized 直接使用保存的 kind，不重新识别表达式。
+verifierKind 0 为 RE2，1 为 VillanCh/go-pcre2-lite 的 PCRE2 确认器。
+specialized 直接使用保存的 kind，不重新识别表达式。
 
 NEC1 中每个必要条件包含 i32 minRunLen、u8 runClass/firstByte/lastByte/hasFactor，
 以及按字节值升序的非零 requiredBytes：u32 数量，随后每项是 u8 字节值和 i32 原 int16 计数。
@@ -158,16 +159,16 @@ NEC1 中每个必要条件包含 i32 minRunLen、u8 runClass/firstByte/lastByte/
 加载首先验证外层和 unit 的完整边界、symbol/position/DFA 索引和位集 padding，之后才调用 C。
 Go 位集从 unit 解码，标量/LimEx 派生表通过现有逻辑初始化，预过滤器从字面量建立。
 整个加载过程不调用 syntax.Parse、regexp.Compile、tryCompileNFA、字面量提取或正则 NFA/DFA 构造。
-RE2 和 regexp2 确认器只在扫描确实需要确认时，通过 sync.Once 初始化。
+RE2 和 PCRE2 确认器只在扫描确实需要确认时，通过 sync.Once 初始化。
 RE2 定位确认器使用 Longest，与 MVS 编译路径保持一致。
 因此 LoadImage 本身保证零正则编译；存在性 NFA 已经权威命中的规则也不编译确认器。
 需要 gate、无 NFA 兜底或 RE2 断言定位确认的规则，在首次候选命中时仍可能编译确认器。
 v1 没有保存标准库 regexp 字节码，也没有保证任意规则集的第一次扫描完全免编译。
 
-镜像字节与操作系统和 CPU 字节序无关，内嵌示例在 cgo/非 cgo 构建中检查相同字节。
-无 cgo 时使用纯 Go NFA、Aho-Corasick 和 regexp2 确认器。
-PCRE2 独有扩展仍然需要 cgo；跨构建分发包含 regexp2-only 的规则时，应使用两种确认器共有的语法及语义。
-镜像格式不会把 PCRE2 扩展变为纯 Go regexp2 的新能力。
+镜像字节与操作系统和 CPU 字节序无关，内嵌示例检查确定性输出。
+正则确认复用仓库现有的 VillanCh/go-pcre2-lite，不引入 dlclark/regexp2 或其他新依赖。
+当前包需要启用 cgo，并提供该 PCRE2 绑定所需的 C 工具链；不承诺 CGO_ENABLED=0 可以编译。
+纯 Go NFA/AC 是扫描实现，不能替代 PCRE2 确认器的构建依赖。
 改变编译语义、路由或持久数据契约时必须升级镜像版本并重新生成内置文件。
 
 ## 实测与优化
@@ -242,7 +243,7 @@ go:embed 的资源段保存最终小文件；加载后仍需恢复稠密运行�
 这组数字不代表网络扫描的目标数/秒，也不包含网络、TLS、fp 捕获组确认等开销。
 
 进一步的优先方向是：减少 Go NFA 恢复时的派生表分配，降低恢复共享表的 CPU 成本，
-降低纯 Go 稠密 AC 构建内存，以及减少规则大量共同前缀时的候选确认与 regexp2 临时分配。
+降低纯 Go 稠密 AC 构建内存，以及减少规则大量共同前缀时的候选确认与 PCRE2 临时分配。
 现阶段没有证据支持默认打开全局 anchorMerged/assertMerged；它们仍然保持原来的关闭状态。
 
 ## 验证范围
@@ -253,10 +254,12 @@ go:embed 的资源段保存最终小文件；加载后仍需恢复稠密运行�
 磁盘测试包含身份变化、损坏替换、线程/多进程单次编译、清理和并发完整文件替换。
 另有稠密/精简格式兼容、原生 blob 逐字节还原、压缩损坏/长度伪造、规范变长整数、
 稀疏及稠密行、跨 unit 去重、CRC 正确的损坏字段测试、截断遍历及 FuzzLoadImage。
+PCRE2 专用的 match-start reset、branch reset 及 DEFINE 子程序也检查镜像往返后的命中/不命中语义。
 
-CI 覆盖 Linux cgo/纯 Go、Windows 纯 Go、内嵌文件新鲜度、native amalgamation、race 和 arm64 交叉编译。
+CI 统一放在 Essential Tests：常规测试加入现有 Utils Infra / Parser / Net / Misc 测试组，
+该组同时执行 native amalgamation、race 和 fuzz；Windows 的 cgo 整包测试及内嵌文件新鲜度
+复用现有 embedded-resources 任务。结果统一汇入 Essential Tests Gate，不另建工作流。
 常规测试运行整包完整参数；race 专门运行 Image、Teddy 和 MVSAmalgamation 测试，包含并发懒确认和缓存竞争。
 整包 race 的已有标准库 oracle 差分会超过五分钟，本机及第一轮 Linux CI 均观察到此情况，
 因此不将整包 race 记录为通过。
-纯 Go regexp2 固定为 v1.11.5，包含空闲后超时钟重启修复，避免并发懒确认偶发误判超时。
-arm64 交叉编译只验证可构建性，不代替 arm64 机器上的运行与性能测量。
+不执行无 cgo 测试或无 cgo 交叉编译；arm64 的运行与性能需要在启用 cgo 的原生机器上验证。

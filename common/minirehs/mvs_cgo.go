@@ -56,7 +56,7 @@ func anchSpanPut(b *anchSpanBufs) {
 // 本文件是纯 C99 运行期内核 (native/mvscan) 的 cgo 薄封装 (范式同 prefilter_cgo.go):
 // Go 把编译产物序列化为平台无关 blob 传入 C, C 出力做位并行存在性扫描. 只要启用 CGO
 // (CGO_ENABLED=1) 即默认编入此 C 内核 (无需额外 build tag), 这是"默认 CGO 最强优化"档;
-// CGO_ENABLED=0 时走 mvs_stub.go 退化为纯 Go 参考执行器, 全平台可移植零依赖.
+// Go 参考执行器用于差分验证，整个包的 PCRE2 确认器仍依赖 cgo。
 //
 // 契约: 存在性 (nfaExists / mergedScan) 走 C, 与 Go existsIn / scanExist 逐位一致 (差分护栏
 // 见 mvs_cgo_test.go). 定位 (findAllLoc) 始终走已验证的 Go 路径, C 内核只判存在性 (符合

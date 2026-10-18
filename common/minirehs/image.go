@@ -219,7 +219,7 @@ func (d *database) marshalCompilationImage(packed bool) ([]byte, error) {
 		}
 	}
 	b = imagePutBytes(b, blob)
-	// v1 leaves regexp2 verifiers lazy. Its implementation-dependent bytecode is
+	// v1 leaves PCRE2 verifiers lazy. Its implementation-dependent bytecode is
 	// deliberately absent from this portable format.
 	for i, cp := range m.all {
 		if !cp.v.exact() {
@@ -369,7 +369,7 @@ func loadUncompressedImage(data []byte, h compilationImageHeader, encoded []byte
 		if vk == 0 {
 			cp.v = &re2Verifier{expr: cp.expr, longest: d.reportLoc}
 		} else {
-			cp.v = &regexp2Verifier{expr: cp.expr}
+			cp.v = &pcre2Verifier{expr: cp.expr}
 		}
 		for j, dst := range [][]bool{d.hasLiterals, d.windowable, d.batchable, d.anchorable, d.biAnchorable, d.gate, d.re2Loc} {
 			dst[i] = route&(1<<uint(j)) != 0

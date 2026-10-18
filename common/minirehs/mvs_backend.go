@@ -466,7 +466,7 @@ func compileExprToNFA(expr string) *mvsNFA {
 }
 
 type mvsDB struct {
-	// Retain the platform-independent compilation result, also in !cgo builds.
+	// Retain the platform-independent compilation result for image export.
 	blob          []byte
 	encodedImage  []byte // owned loaded image; immutable, for exact re-export
 	literals      []string
