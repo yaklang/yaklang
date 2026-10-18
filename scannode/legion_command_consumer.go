@@ -357,7 +357,8 @@ func (b *legionJobBridge) consumeLoop(ctx context.Context, consumer *commandCons
 			if ctx.Err() != nil {
 				return
 			}
-			if strings.HasSuffix(message.Subject, "."+legionCommandSSAIRProgramDelete) {
+			if strings.HasSuffix(message.Subject, "."+legionCommandSSAIRProgramDelete) ||
+				strings.HasSuffix(message.Subject, "."+legionCommandLegacySSAIRProgramDelete) {
 				// IR deletion may execute large SQL transactions. Keep the main
 				// command loop available for cancel/status traffic while allowing
 				// only one maintenance transaction at a time.
@@ -578,6 +579,12 @@ func (b *legionJobBridge) handleMessagePayload(
 		return b.handleHIDSResponseActionExecute(ctx, message.Data)
 	case strings.HasSuffix(message.Subject, "."+legionCommandSSARuleSyncExport):
 		return b.handleSSARuleSyncExport(ctx, message.Data)
+	case strings.HasSuffix(message.Subject, "."+legionCommandLegacySSADebugQuery):
+		return b.handleLegacySSADebugQuery(ctx, message.Data)
+	case strings.HasSuffix(message.Subject, "."+legionCommandLegacySSALogTail):
+		return b.handleLegacySSALogTail(ctx, message.Data)
+	case strings.HasSuffix(message.Subject, "."+legionCommandLegacySSAIRProgramDelete):
+		return b.handleLegacySSAIRProgramDelete(ctx, message.Data)
 	case strings.HasSuffix(message.Subject, "."+legionCommandSSADebugQuery):
 		return b.handleSSADebugQuery(ctx, message.Data)
 	case strings.HasSuffix(message.Subject, "."+legionCommandSSALogTail):

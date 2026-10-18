@@ -22,13 +22,14 @@ type ssaIRProgramDeleteFunc func(context.Context, string, string) (deleted bool,
 type ssaIRProgramDeletePublishFunc func(context.Context, string, *ssav1.DeleteIRProgramResult) error
 
 func (b *legionJobBridge) handleSSAIRProgramDelete(ctx context.Context, raw []byte) error {
+	return handleSSAIRProgramDeleteWith(ctx, raw, b.ssaIRProgramDeleter(), b.publishSSAIRProgramDeleteResponse)
+}
+
+// Both wire versions must acquire the same task-manager idle hold.
+func (b *legionJobBridge) ssaIRProgramDeleter() ssaIRProgramDeleteFunc {
 	deleteProgram := deleteSSAIRProgramForLifecycle
 	if b != nil && b.agent != nil && b.agent.manager != nil {
-		deleteProgram = func(
-			ctx context.Context,
-			storeIdentity string,
-			programName string,
-		) (bool, bool, string, error) {
+		deleteProgram = func(ctx context.Context, storeIdentity, programName string) (bool, bool, string, error) {
 			release, ok := b.agent.manager.HoldIdle()
 			if !ok {
 				return false, false, "", errors.New("扫描节点仍有任务运行，IR 程序未删除")
@@ -37,12 +38,7 @@ func (b *legionJobBridge) handleSSAIRProgramDelete(ctx context.Context, raw []by
 			return deleteSSAIRProgramForLifecycle(ctx, storeIdentity, programName)
 		}
 	}
-	return handleSSAIRProgramDeleteWith(
-		ctx,
-		raw,
-		deleteProgram,
-		b.publishSSAIRProgramDeleteResponse,
-	)
+	return deleteProgram
 }
 
 func handleSSAIRProgramDeleteWith(
@@ -55,6 +51,15 @@ func handleSSAIRProgramDeleteWith(
 	if err := proto.Unmarshal(raw, &request); err != nil {
 		return fmt.Errorf("unmarshal ssa IR program delete: %w", err)
 	}
+	return handleSSAIRProgramDeleteRequest(ctx, &request, deleteProgram, publish)
+}
+
+func handleSSAIRProgramDeleteRequest(
+	ctx context.Context,
+	request *ssav1.DeleteIRProgramCommand,
+	deleteProgram ssaIRProgramDeleteFunc,
+	publish ssaIRProgramDeletePublishFunc,
+) error {
 	request.RequestId = strings.TrimSpace(request.RequestId)
 	request.StoreIdentity = strings.TrimSpace(request.StoreIdentity)
 	request.ProgramName = strings.TrimSpace(request.ProgramName)

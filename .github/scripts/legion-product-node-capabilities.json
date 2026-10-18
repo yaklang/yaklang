@@ -12,6 +12,10 @@
   "ai.traffic.capture.v1",
   "hids",
   "plugin.bundle.v1",
+  "ssa.debug.query.v2",
+  "ssa.ir_program.delete.v1",
+  "ssa.ir_program.delete.v2",
+  "ssa.log.tail.v2",
   "ssa.rule_snapshot.execution.v2",
   "ssa.rule_sync.export",
   "yak.execute"

@@ -19,7 +19,11 @@ func TestProductNodeManifestCapabilitiesMatchCompiledSurface(t *testing.T) {
 		t.Fatalf("decode product-node capability contract: %v", err)
 	}
 
-	want := append(compiledScanNodeCapabilityKeys(), AIRuntimeHostCapabilityKey)
+	// Product Node is the host build; these protocols are added by its host
+	// constructor rather than the AI-session compiled capability surface.
+	want := append(compiledScanNodeCapabilityKeys(), AIRuntimeHostCapabilityKey,
+		legionCapabilitySSAIRProgramDeleteV1, legionCapabilitySSAIRProgramDelete,
+		legionCapabilitySSADebugQuery, legionCapabilitySSALogTail)
 	if !slices.Contains(want, "hids") {
 		want = append(want, "hids")
 	}
