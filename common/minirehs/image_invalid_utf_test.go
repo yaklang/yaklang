@@ -133,6 +133,51 @@ func TestLegacyInvalidUTFCacheRefresh(t *testing.T) {
 	}
 }
 
+func TestImageGateOriginRevalidatedWithoutParsing(t *testing.T) {
+	for _, expr := range []string{`\Gfoo`, `foo\Kbar`, `(?<=left)foo`} {
+		patterns := []Pattern{{ID: 17, Expr: expr}}
+		db, _ := compileImageTest(t, patterns, false)
+		m := db.(*database).imageMVS()
+		if !m.gate[0] || m.gateHead[0] >= 0 {
+			t.Fatalf("%q did not retain the full-subject gate", expr)
+		}
+		// Simulate a stored pre-fix eligibility fact without forging an old
+		// compiler fixture. The loader must conservatively disable this fact.
+		m.gateHead[0] = 100
+		image, err := db.MarshalImage()
+		if err != nil {
+			t.Fatal(err)
+		}
+		parses := 0
+		func() {
+			imageParseHook = func() { parses++ }
+			imageNFAHook = func() { parses++ }
+			imageCompileHook = func() { parses++ }
+			defer func() { imageParseHook, imageNFAHook, imageCompileHook = nil, nil, nil }()
+			loaded, err := LoadImage(image)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer loaded.Close()
+			lm := loaded.(*database).imageMVS()
+			if parses != 0 || lm.gateHead[0] != -1 || lm.hasLocalizedGates {
+				t.Fatal("loader trusted origin-sensitive eligibility or recompiled the plan")
+			}
+			again, err := loaded.MarshalImage()
+			if err != nil || !bytes.Equal(again, image) {
+				t.Fatal("runtime eligibility correction changed owned image bytes", err)
+			}
+			for _, data := range []string{"foo", "xfoo", "foobar", "leftfoo"} {
+				got := programScan(t, loaded, []byte(data), 0)
+				want := programOracle(patterns, []byte(data), BackendMVS, false, 0)
+				if err := programCompare(got, want, true); err != nil {
+					t.Fatal(err)
+				}
+			}
+		}()
+	}
+}
+
 func FuzzInvalidUTFRequiredLiterals(f *testing.F) {
 	type candidate struct {
 		db       Database

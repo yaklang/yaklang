@@ -430,8 +430,8 @@ func computeGateHead(cp *compiledPattern) int32 {
 	if cp.v == nil || cp.v.exact() {
 		return -1 // 仅对 regexp2-only (命中报 -1/-1) 局部化, 避免精确 verifier 偏移错位
 	}
-	if strings.Contains(cp.expr, "(?<=") || strings.Contains(cp.expr, "(?<!") {
-		return -1 // lookbehind: 读 match-start 左侧上下文, 可能越过 winLo
+	if !gateContextCanLocalize(cp.expr) {
+		return -1
 	}
 	super, _, ok := re2SupersetEx(cp.expr)
 	if !ok {
@@ -452,6 +452,18 @@ func computeGateHead(cp *compiledPattern) int32 {
 		}
 	}
 	return maxHead
+}
+
+// These constructs couple evaluation to an original search origin, earlier
+// context, or nonlocal control flow. Until separately proved, retain the whole
+// subject. Textual false positives only broaden confirmation, never skip it.
+func gateContextCanLocalize(expr string) bool {
+	for _, token := range []string{"(?<=", "(?<!", `\G`, `\K`, "(*", "(?R", "(?0", "(?&", "(?P>", `\g<`, `\g'`} {
+		if strings.Contains(expr, token) {
+			return false
+		}
+	}
+	return true
 }
 
 // compileExprToNFA 把一条 RE2 可解析的 expr 编为 mvsNFA (先 lean 后断言扩展); 失败返回 nil.

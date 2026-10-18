@@ -94,6 +94,9 @@ func TestProgramPCREContextAndInvalidUTF(t *testing.T) {
 					append(bytes.Repeat([]byte(" "), 1024), []byte("foo! leftfoo foobar fooright")...),
 				}
 				for _, current := range []Database{db, loaded} {
+					if !gateContextCanLocalize(expr) && current.(*database).imageMVS().gateHead[0] >= 0 {
+						t.Fatal("origin-sensitive expression received a localized gate")
+					}
 					for _, data := range inputs {
 						for _, stop := range []int{0, 1} {
 							got := programScan(t, current, data, stop)
