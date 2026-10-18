@@ -23,8 +23,10 @@ func (d *stdlibDB) numAlwaysOn() int { return len(d.patterns) }
 func (d *stdlibDB) close() error { return nil }
 
 func (d *stdlibDB) scan(data []byte, sc *scratch, handler MatchHandler) (bool, error) {
+	sc.clearVerifierText()
+	defer sc.clearVerifierText()
 	for _, cp := range d.patterns {
-		for _, loc := range cp.v.findAll(data) {
+		for _, loc := range findAllInRecord(cp.v, data, 0, len(data), sc) {
 			if !handler(Match{ID: cp.id, From: loc[0], To: loc[1]}) {
 				return true, nil
 			}

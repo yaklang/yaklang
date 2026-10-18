@@ -15,7 +15,9 @@ var (
 	ErrCorruptImage      = errors.New("minirehs: corrupt compilation image")
 )
 
-const imageVersion uint32 = 1
+// Version 2 changes compiled routing for Unicode PCRE2 classes. The body layout
+// remains compatible with v1, but cache identities must refresh the old plans.
+const imageVersion uint32 = 2
 const imageHeaderSize = 32
 
 const (
@@ -261,6 +263,7 @@ func imageEncodedSize(m *mvsDB, reverse [][]byte) uint64 {
 }
 
 type compilationImageHeader struct {
+	version       uint32
 	flags         uint32
 	minLiteralLen int
 	hash          uint64
@@ -278,7 +281,8 @@ func readImageHeader(data []byte) (compilationImageHeader, error) {
 	if crc32.ChecksumIEEE(data[:len(data)-4]) != binary.LittleEndian.Uint32(data[len(data)-4:]) {
 		return h, ErrCorruptImage
 	}
-	if binary.LittleEndian.Uint32(data[4:]) != imageVersion || binary.LittleEndian.Uint32(data[8:]) != mvsBlobVersion {
+	h.version = binary.LittleEndian.Uint32(data[4:])
+	if h.version < 1 || h.version > imageVersion || binary.LittleEndian.Uint32(data[8:]) != mvsBlobVersion {
 		return h, ErrIncompatibleImage
 	}
 	h.flags = binary.LittleEndian.Uint32(data[12:])
@@ -334,7 +338,7 @@ func loadCompilationImage(data []byte, h compilationImageHeader) (Database, erro
 			return nil, err
 		}
 		inner, err := readImageHeader(raw)
-		if err != nil || inner.compressed || inner.packed != h.packed || inner.flags != h.flags || inner.minLiteralLen != h.minLiteralLen || inner.hash != h.hash || inner.n != h.n {
+		if err != nil || inner.version != h.version || inner.compressed || inner.packed != h.packed || inner.flags != h.flags || inner.minLiteralLen != h.minLiteralLen || inner.hash != h.hash || inner.n != h.n {
 			return nil, ErrCorruptImage
 		}
 	}

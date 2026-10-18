@@ -198,6 +198,11 @@ func (p *cgoPrefilter) scanHitsImplWithInitialPairCapacity(
 	}
 	if cap(sc.cpairs) < capPairs*2 {
 		sc.cpairs = make([]int32, capPairs*2)
+	} else {
+		// Reuse the capacity already earned by earlier dense records. Passing
+		// the initial estimate again would force a second complete C scan on
+		// every record even though the retained buffer is large enough.
+		capPairs = cap(sc.cpairs) / 2
 	}
 	sc.cpairs = sc.cpairs[:capPairs*2]
 

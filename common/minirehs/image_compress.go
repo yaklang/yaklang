@@ -12,7 +12,7 @@ import (
 const imageCompressionWindow = 1 << 20
 
 // The envelope keeps cache identity readable without decompression. Its payload
-// is a complete raw v1 image, so the native MVS blob and raw layout stay intact.
+// is a complete raw image of the same version, preserving the native MVS blob.
 func compressCompilationImage(raw []byte) ([]byte, error) {
 	w, err := zstd.NewWriter(nil, zstd.WithEncoderLevel(zstd.SpeedDefault),
 		zstd.WithEncoderConcurrency(1), zstd.WithWindowSize(imageCompressionWindow))

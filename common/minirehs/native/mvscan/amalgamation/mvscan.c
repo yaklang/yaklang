@@ -1839,7 +1839,12 @@ static int parse_unit(const uint8_t *blob, size_t blobLen, size_t off, size_t un
             int sym = (int)out->asciiSym[b];
             const uint64_t *rc = out->reach + (size_t)sym * nword;
             uint64_t overlap = 0;
-            for (int w = 0; w < nword; w++) overlap |= (rc[w] & out->firstUnanchored[w]);
+            /* This mask also guards the entire merged record, including
+             * anchored members at offset zero. Omitting firstAnchored can
+             * reject their matches when no unanchored member can start. */
+            for (int w = 0; w < nword; w++) {
+                overlap |= rc[w] & (out->firstUnanchored[w] | out->firstAnchored[w]);
+            }
             if (overlap) { out->startByteMask[b] = 1; anyStart = 1; }
         }
         out->hasStartByteMask = anyStart ? 1 : 0;

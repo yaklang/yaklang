@@ -28,6 +28,7 @@ func (s *scratch) startWorkers() {
 		go func() {
 			defer s.workerWG.Done()
 			for task := range s.gatedTasks {
+				task.scratch.clearVerifierText()
 				for i, gate := range task.tasks {
 					if task.db.existsNoReport(int(gate.idx), task.data, int(gate.winLo), task.scratch) {
 						task.out[i] = 1
@@ -35,6 +36,7 @@ func (s *scratch) startWorkers() {
 						task.out[i] = 0
 					}
 				}
+				task.scratch.clearVerifierText()
 				task.result <- task.out
 			}
 		}()
@@ -602,6 +604,7 @@ func (d *mvsDB) close() error {
 
 func (d *mvsDB) scan(data []byte, sc *scratch, handler MatchHandler) (bool, error) {
 	d.resetScratch(sc)
+	defer sc.clearVerifierText()
 	asyncAlways := false
 	asyncConsumed := false
 	if runtime.GOMAXPROCS(0) > 1 && len(data) >= 512 && d.kernel != nil && d.merged != nil &&
@@ -713,7 +716,9 @@ func (d *mvsDB) scan(data []byte, sc *scratch, handler MatchHandler) (bool, erro
 				// 批处理 (有 C 内核且非断言 lean NFA): 累积本 idx 全部命中点的窗口 union, 批后用收窄
 				// 子切片做一次 C 存在性门控. 不可界一侧退回报文端 (lo=0/hi=n), 安全. 窗口 union 覆盖
 				// 任一含命中字面量的匹配 => 与整段 existsIn 同真伪 (见 mvs_window.go 正确性说明).
-				if d.kernel != nil && d.batchable[idx] {
+				// Bounded gates belong to the localized verifier below. Batching
+				// them here would rescan the full record for every triggered rule.
+				if d.kernel != nil && d.batchable[idx] && !(d.gate[idx] && d.gateHead[idx] >= 0) {
 					lo, hi := d.litSpan(int(idx), int(h.end), n)
 					if !sc.batchSeen[idx] {
 						sc.batchSeen[idx] = true
@@ -1193,7 +1198,7 @@ func (d *mvsDB) finalizeHit(idx int, data []byte, sc *scratch, handler MatchHand
 	cp := d.all[idx]
 	if d.gate[idx] {
 		// 超集门: regexp2 复核 (不命中则不上报, 命中按 verifier 语义上报).
-		return d.reportViaVerifier(cp, data, handler)
+		return d.reportViaVerifier(cp, data, 0, sc, handler)
 	}
 	if !d.reportLoc {
 		return !handler(Match{ID: cp.id, From: -1, To: -1})
@@ -1201,7 +1206,7 @@ func (d *mvsDB) finalizeHit(idx int, data []byte, sc *scratch, handler MatchHand
 	nfa := d.nfas[idx]
 	if d.re2Loc[idx] || nfa.hasAssert {
 		// regexp2-origin (语言等价) 或断言 NFA: 精确定位交 verifier.
-		return d.reportViaVerifier(cp, data, handler)
+		return d.reportViaVerifier(cp, data, 0, sc, handler)
 	}
 	// 单字 lean NFA 是真实规则集的主力。已由 C 存在性门确认命中时，直接在 C 侧枚举
 	// leftmost-longest spans，避免 Go 再完整扫描一遍；C 内核不适用或异常空结果时回退
@@ -1247,7 +1252,7 @@ func (d *mvsDB) finalizeHitWindow(idx int, data []byte, lo, hi int, sc *scratch,
 	// re2Loc 的语言与 NFA 相等，但为保持原 regexp2 的 leftmost 语义仍必须交 verifier。
 	// litSpan 已完整覆盖每个匹配，故 verifier 同样可在子串运行；将相对偏移平移回原文。
 	if d.re2Loc[idx] {
-		for _, loc := range cp.v.findAll(sub) {
+		for _, loc := range findAllInRecord(cp.v, data, lo, hi, sc) {
 			if !handler(Match{ID: cp.id, From: lo + loc[0], To: lo + loc[1]}) {
 				return true
 			}
@@ -1312,7 +1317,7 @@ func (d *mvsDB) verifyOne(idx int, data []byte, sc *scratch, handler MatchHandle
 		return d.finalizeHit(idx, data, sc, handler)
 	}
 	// 无 NFA 的兜底: verifier 命中即存在; regexp2-only 无精确字节偏移, 以 -1/-1 表示存在性命中.
-	return d.reportViaVerifier(cp, data, handler)
+	return d.reportViaVerifier(cp, data, 0, sc, handler)
 }
 
 func (d *mvsDB) scanAnchoredNoReport(data []byte, anchorBatch, biBatch []int32,
@@ -1407,12 +1412,12 @@ func (d *mvsDB) existsNoReport(idx int, data []byte, winLo int, sc *scratch) boo
 				return false
 			}
 		}
-		return len(d.all[idx].v.findAll(sub)) > 0
+		return len(findAllInRecord(d.all[idx].v, data, winLo, len(data), sc)) > 0
 	}
 
 	nfa := d.nfas[idx]
 	if nfa == nil {
-		return len(d.all[idx].v.findAll(data)) > 0
+		return len(findAllInRecord(d.all[idx].v, data, 0, len(data), sc)) > 0
 	}
 	var hit bool
 	switch {
@@ -1433,7 +1438,7 @@ func (d *mvsDB) existsNoReport(idx int, data []byte, winLo int, sc *scratch) boo
 		return false
 	}
 	if d.gate[idx] {
-		return len(d.all[idx].v.findAll(data)) > 0
+		return len(findAllInRecord(d.all[idx].v, data, 0, len(data), sc)) > 0
 	}
 	return true
 }
@@ -1450,10 +1455,10 @@ func (d *mvsDB) verifyGateLocalized(idx int, data []byte, winLo int, sc *scratch
 	if winLo > 0 {
 		sub = data[winLo:]
 	}
-	// 超集 NFA 预检 (gateSupersetPrecheck): 历史上用来在 dlclark/regexp2 (回溯, 极贵) 之前廉价过滤,
-	// 避免对每个字面量命中都跑昂贵复核。regexp2 后端切到 go-pcre2-lite (PCRE2, 线性) 后, 复核本身已
-	// 很廉价, 而预检 (尤其多字断言超集 existsInAssertShared + computeBoundaries 整段 data[winLo:]) 对
-	// gate 几乎不过滤 (字面量命中 => 超集结构通常已成立), 反成净开销。故默认关 (直接复核), 仅 A/B 保留。
+	// An optional superset precheck can reject candidates before PCRE2. With
+	// a bounded head, the localized suffix is often already cheap to verify;
+	// running another NFA pass first costs more than it filters in that case.
+	// Keep the existing switch for comparisons; PCRE2 remains authoritative.
 	if gateSupersetPrecheck {
 		nfa := d.nfas[idx]
 		var hit bool
@@ -1476,12 +1481,16 @@ func (d *mvsDB) verifyGateLocalized(idx int, data []byte, winLo int, sc *scratch
 		}
 	}
 	// regexp2 复核 (收窄到 data[winLo:]) 即权威判定 (与 oracle 同 verifier 对象): gate 命中报 -1/-1。
-	return d.reportViaVerifier(d.all[idx], sub, handler)
+	lo := 0
+	if winLo > 0 {
+		lo = winLo
+	}
+	return d.reportViaVerifier(d.all[idx], data, lo, sc, handler)
 }
 
 // reportViaVerifier 用 verifier 给出的非重叠区间上报命中 (regexp2-only 为 -1/-1 存在性).
-func (d *mvsDB) reportViaVerifier(cp *compiledPattern, data []byte, handler MatchHandler) bool {
-	for _, loc := range cp.v.findAll(data) {
+func (d *mvsDB) reportViaVerifier(cp *compiledPattern, data []byte, lo int, sc *scratch, handler MatchHandler) bool {
+	for _, loc := range findAllInRecord(cp.v, data, lo, len(data), sc) {
 		if !handler(Match{ID: cp.id, From: loc[0], To: loc[1]}) {
 			return true
 		}
@@ -1490,6 +1499,7 @@ func (d *mvsDB) reportViaVerifier(cp *compiledPattern, data []byte, handler Matc
 }
 
 func (d *mvsDB) resetScratch(sc *scratch) {
+	sc.clearVerifierText()
 	sc.fullDone = resetBoolBuf(sc.fullDone, d.n)
 	sc.assertBoundReady = false
 	sc.winLo = ensureInt32(sc.winLo, d.n)

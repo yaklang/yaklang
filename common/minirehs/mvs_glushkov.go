@@ -458,48 +458,79 @@ func glushkovNFA(root *bnode, anchoredStart, requireEnd bool) (*mvsNFA, bool) {
 // 建好 reach 之后调用)。lean 与断言 NFA 共用: 断言额外的 condFirst/condFollow/condAccept 在标量执行器里
 // 直接取 gb.bits[0] (nword==1 时其长度即 1), 无需此处单独镜像。nword>1 时不置 single, 走多字通用路径。
 func (nfa *mvsNFA) initScalar() {
-	// 所有宽度都预拆一次 LimEx；编译期换取扫描期从“全部活跃位置”降为“位移 + 异常位置”。
-	nfa.chainTarget = bsNew(nfa.nword)
-	nfa.excMask = bsNew(nfa.nword)
+	// Reset derived fields so rebuilding views does not accumulate exception counts.
+	nfa.excCount, nfa.condFollowMask1 = 0, 0
+	nfa.single = nfa.nword == 1
 	nfa.excFollow = make([][]uint64, nfa.npos)
-	for p := 0; p < nfa.npos; p++ {
-		exc := cloneU64(nfa.follow[p])
-		if p+1 < nfa.npos && bsTest(exc, p+1) {
-			bsSet(nfa.chainTarget, p+1)
-			bsClear(exc, p+1)
-		}
-		if !bsIsZero(exc) {
-			nfa.excFollow[p] = exc
-			bsSet(nfa.excMask, p)
-			nfa.excCount++
-		}
-	}
-	if nfa.nword == 1 {
-		nfa.single = true
+	if nfa.single {
+		// One pointer-free allocation holds every scalar table. Generic row views
+		// borrow excFollow1; a chain-only position needs no separately cloned row.
+		tables := make([]uint64, 2+2*nfa.npos+nfa.nsym)
+		nfa.chainTarget, nfa.excMask = tables[:1:1], tables[1:2:2]
+		nfa.follow1 = tables[2 : 2+nfa.npos : 2+nfa.npos]
+		nfa.excFollow1 = tables[2+nfa.npos : 2+2*nfa.npos : 2+2*nfa.npos]
+		nfa.reach1 = tables[2+2*nfa.npos:]
 		nfa.first1 = nfa.first[0]
 		nfa.lastAny1 = nfa.lastAny[0]
 		nfa.lastEnd1 = nfa.lastEnd[0]
-		nfa.follow1 = make([]uint64, nfa.npos)
+		nfa.chainTarget1, nfa.excMask1 = 0, 0
 		for p := 0; p < nfa.npos; p++ {
-			nfa.follow1[p] = nfa.follow[p][0]
+			exc := nfa.follow[p][0]
+			nfa.follow1[p] = exc
+			if p+1 < nfa.npos && exc&(uint64(1)<<uint(p+1)) != 0 {
+				nfa.chainTarget1 |= uint64(1) << uint(p+1)
+				exc &^= uint64(1) << uint(p+1)
+			}
+			if exc != 0 {
+				nfa.excFollow1[p] = exc
+				nfa.excFollow[p] = nfa.excFollow1[p : p+1 : p+1]
+				nfa.excMask1 |= uint64(1) << uint(p)
+				nfa.excCount++
+			}
+			if nfa.condFollow != nil && len(nfa.condFollow[p]) > 0 {
+				nfa.condFollowMask1 |= uint64(1) << uint(p)
+			}
 		}
-		nfa.reach1 = make([]uint64, nfa.nsym)
 		for s := 0; s < nfa.nsym; s++ {
 			nfa.reach1[s] = nfa.reach[s][0]
 		}
-		// LimEx 链/异常拆分: 链边 p->p+1 用左移批量推进; 异常边逐个 OR.
-		nfa.chainTarget1 = nfa.chainTarget[0]
-		nfa.excMask1 = nfa.excMask[0]
-		nfa.excFollow1 = make([]uint64, nfa.npos)
-		for p := 0; p < nfa.npos; p++ {
-			if nfa.excFollow[p] != nil {
-				nfa.excFollow1[p] = nfa.excFollow[p][0]
+		nfa.chainTarget[0], nfa.excMask[0] = nfa.chainTarget1, nfa.excMask1
+		return
+	}
+
+	// Discover only non-chain successor rows before allocating storage. Most
+	// positions are straight chains; cloning those rows just to discard them
+	// creates O(npos) temporary allocations during compilation and image restore.
+	nfa.chainTarget, nfa.excMask = bsNew(nfa.nword), bsNew(nfa.nword)
+	for p, row := range nfa.follow {
+		q := p + 1
+		if q < nfa.npos && bsTest(row, q) {
+			bsSet(nfa.chainTarget, q)
+		}
+		for w, value := range row {
+			if q < nfa.npos && w == q>>6 {
+				value &^= uint64(1) << uint(q&63)
 			}
-			// condFollowMask1: 标记有 condFollow 条目的位置 (断言 NFA 专用).
-			if nfa.condFollow != nil && len(nfa.condFollow[p]) > 0 {
-				nfa.condFollowMask1 |= 1 << uint(p)
+			if value != 0 {
+				bsSet(nfa.excMask, p)
+				nfa.excCount++
+				break
 			}
 		}
+	}
+	exceptions := make([]uint64, nfa.excCount*nfa.nword)
+	off := 0
+	for p, row := range nfa.follow {
+		if !bsTest(nfa.excMask, p) {
+			continue
+		}
+		exc := exceptions[off : off+nfa.nword : off+nfa.nword]
+		off += nfa.nword
+		copy(exc, row)
+		if p+1 < nfa.npos {
+			bsClear(exc, p+1)
+		}
+		nfa.excFollow[p] = exc
 	}
 }
 
