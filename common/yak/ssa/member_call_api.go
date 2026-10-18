@@ -1,7 +1,8 @@
 package ssa
 
 import (
-	"fmt"
+	"strconv"
+	"strings"
 
 	"github.com/yaklang/yaklang/common/utils"
 )
@@ -25,6 +26,52 @@ type memberCallReadVisitSet struct {
 }
 
 const memberCallReadVisitStackDepth = 8
+
+// phiEdgeIdentity replaces the formatted dedupe key without copying it.
+// Constants still compare by their existing string. Undefined values compare
+// by kind, verbose name and the same type text GetType() used to format.
+// Every other value stays unique by ID. The map key reuses those strings.
+type phiEdgeIdentityKind uint8
+
+const (
+	phiEdgeNil phiEdgeIdentityKind = iota
+	phiEdgeConst
+	phiEdgeUndefined
+	phiEdgeID
+)
+
+type phiEdgeIdentity struct {
+	kind     phiEdgeIdentityKind
+	undef    UndefinedKind
+	id       int64
+	constStr string
+	name     string
+	typText  string
+}
+
+func phiEdgeDedupeIdentity(v Value) phiEdgeIdentity {
+	if utils.IsNil(v) {
+		return phiEdgeIdentity{kind: phiEdgeNil}
+	}
+	switch vv := v.(type) {
+	case *ConstInst:
+		return phiEdgeIdentity{kind: phiEdgeConst, constStr: vv.String()}
+	case *Undefined:
+		typText := ""
+		if typ := vv.GetType(); typ != nil {
+			// String() is what fmt used for %s. Reuse it; do not copy it again.
+			typText = typ.String()
+		}
+		return phiEdgeIdentity{
+			kind:    phiEdgeUndefined,
+			undef:   vv.Kind,
+			name:    vv.GetVerboseName(),
+			typText: typText,
+		}
+	default:
+		return phiEdgeIdentity{kind: phiEdgeID, id: v.GetId()}
+	}
+}
 
 func (s *memberCallReadVisitSet) contains(k memberCallReadVisitKey) bool {
 	for i := 0; i < s.length; i++ {
@@ -93,7 +140,13 @@ func (b *FunctionBuilder) ReadMemberCallValueByName(object Value, key string) Va
 	if utils.IsNil(object) {
 		return nil
 	}
-	name := fmt.Sprintf("#%d.%s", object.GetId(), key)
+	var nameBuilder strings.Builder
+	nameBuilder.Grow(len(key) + 24)
+	nameBuilder.WriteByte('#')
+	nameBuilder.WriteString(strconv.FormatInt(object.GetId(), 10))
+	nameBuilder.WriteByte('.')
+	nameBuilder.WriteString(key)
+	name := nameBuilder.String()
 	if ret := b.PeekValueInThisFunction(name); ret != nil {
 		return ret
 	}
@@ -159,27 +212,14 @@ func (b *FunctionBuilder) readMemberCallValueExWithVisited(object, key Value, wa
 			}
 		}
 		if len(edgeValues) > 1 {
-			dedupeKey := func(v Value) string {
-				if utils.IsNil(v) {
-					return "<nil>"
-				}
-				switch vv := v.(type) {
-				case *ConstInst:
-					return "const:" + vv.String()
-				case *Undefined:
-					return fmt.Sprintf("undef:%d:%s:%s", vv.Kind, vv.GetVerboseName(), vv.GetType())
-				default:
-					return fmt.Sprintf("id:%d", v.GetId())
-				}
-			}
-			seen := make(map[string]struct{}, len(edgeValues))
+			seen := make(map[phiEdgeIdentity]struct{}, len(edgeValues))
 			deduped := make(Values, 0, len(edgeValues))
 			for _, edgeValue := range edgeValues {
-				s := dedupeKey(edgeValue)
-				if _, ok := seen[s]; ok {
+				identity := phiEdgeDedupeIdentity(edgeValue)
+				if _, ok := seen[identity]; ok {
 					continue
 				}
-				seen[s] = struct{}{}
+				seen[identity] = struct{}{}
 				deduped = append(deduped, edgeValue)
 			}
 			edgeValues = deduped
