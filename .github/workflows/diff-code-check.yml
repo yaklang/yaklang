@@ -39,6 +39,7 @@ jobs:
 
   setup:
     runs-on: ubuntu-22.04
+    timeout-minutes: 75
     needs: [check-wip]
     if: needs.check-wip.outputs.should_run_tests == 'true'
     permissions:
@@ -301,9 +302,43 @@ jobs:
           if-no-files-found: ignore
 
       - name: Check With SyntaxFlow
+        timeout-minutes: 60
         if: steps.validate.outputs.should_skip != 'true' && steps.generate_prog.outputs.should_skip != 'true'
         id: scan
         run: |
+          # Leave capacity for the runner agent and log transport. GOMEMLIMIT
+          # is a Go GC soft budget, not a hard RSS limit or a scan-size limit.
+          SCAN_MEMORY_LIMIT=$(python3 - <<'PYMEM'
+          from pathlib import Path
+          import re
+          import sys
+
+          total = re.search(r"^MemTotal:\s+(\d+)\s+kB$", Path("/proc/meminfo").read_text(), re.M)
+          if total is None or int(total[1]) <= 0:
+              sys.exit("::error::Cannot determine runner memory")
+          limits = [int(total[1]) * 1024]
+          for name in ("/sys/fs/cgroup/memory.max", "/sys/fs/cgroup/memory/memory.limit_in_bytes"):
+              try:
+                  value = Path(name).read_text().strip()
+              except FileNotFoundError:
+                  continue
+              if value == "max":
+                  continue
+              if not value.isdecimal() or int(value) <= 0:
+                  sys.exit("::error::Invalid runner cgroup memory limit")
+              limits.append(int(value))
+          memory = min(limits)
+          budget = memory - max(2 * 1024**3, memory // 4)
+          if budget < 512 * 1024**2:
+              sys.exit("::error::Runner has insufficient memory for the scan")
+          print(f"{budget}B")
+          PYMEM
+          )
+          export GOMEMLIMIT="$SCAN_MEMORY_LIMIT"
+          export GOGC=50
+          export GOMAXPROCS=2
+          echo "Scan GC budget: $GOMEMLIMIT; GOGC=$GOGC; GOMAXPROCS=$GOMAXPROCS"
+
           echo "::group::Running security scan"
           yak sync-rule
           
@@ -315,13 +350,34 @@ jobs:
           # category / 稳定 ruleId / markdown 渲染需要 >= 1.4.8-alpha0923
           # （#5164 在 alpha0922 构建之后才合并，alpha0922 输出的是无斜杠的
           # automationDetails、sha256 ruleId，且 markdown 不渲染）。
-          SCAN_OUTPUT=$(yak code-scan -t ./fs.zip -l golang --rule-keyword golang --format sarif -o results --memory --file-perf-log --rule-perf-log --exclude-file **/vendor/**,vendor/**,**/third_party/**,**/*_generated.go,**/classes/**,**/target/**,**include/**,**caches/**,**cache/**,**tmp/**,**alipay/**,**includes/**,**temp/**,**zh_cn/**,**zh_en/**,**plugins/**,**PHPExcel/**,**/tests/**,**/test/**,*.pb.go,*_test.go,**vulinbox/** 2>&1) || SCAN_EXIT_CODE=$?
-          
-          if [ ! -z "$SCAN_EXIT_CODE" ] && [ "$SCAN_EXIT_CODE" != "0" ]; then
-            echo "$SCAN_OUTPUT"
+          # Stream performance output instead of retaining it in a shell
+          # variable. Preserve both scanner and log-writer failures.
+          SCAN_LOG="$RUNNER_TEMP/diff-code-scan.log"
+          set +e
+          yak code-scan -t ./fs.zip -l golang --rule-keyword golang --format sarif -o results --memory --file-perf-log --rule-perf-log --exclude-file **/vendor/**,vendor/**,**/third_party/**,**/*_generated.go,**/classes/**,**/target/**,**include/**,**caches/**,**cache/**,**tmp/**,**alipay/**,**includes/**,**temp/**,**zh_cn/**,**zh_en/**,**plugins/**,**PHPExcel/**,**/tests/**,**/test/**,*.pb.go,*_test.go,**vulinbox/** 2>&1 | tee "$SCAN_LOG"
+          SCAN_STATUSES=("${PIPESTATUS[@]}")
+          set -e
+          if [ "${SCAN_STATUSES[1]}" -ne 0 ]; then
+            echo "::error::Failed to write the scan log"
+            echo "scan_result=log_error" >> "$GITHUB_OUTPUT"
+            echo "risk_count=0" >> "$GITHUB_OUTPUT"
+            exit 1
+          fi
+          SCAN_EXIT_CODE=${SCAN_STATUSES[0]}
+
+          if [ "$SCAN_EXIT_CODE" -ne 0 ]; then
+            # A signal/kill must never become a successful compilation skip
+            # merely because an earlier diagnostic contains that text.
+            if [ "$SCAN_EXIT_CODE" -ge 128 ]; then
+              echo "::error::Security scan was interrupted (exit $SCAN_EXIT_CODE)"
+              echo "scan_result=interrupted" >> "$GITHUB_OUTPUT"
+              echo "risk_count=0" >> "$GITHUB_OUTPUT"
+              echo "::endgroup::"
+              exit 1
+            fi
             
             # 检查是否是严重的运行时错误（panic、nil pointer等）
-            if echo "$SCAN_OUTPUT" | grep -qiE "panic|nil pointer|invalid memory|runtime error|fatal error"; then
+            if grep -qiE "panic|nil pointer|invalid memory|runtime error|fatal error" "$SCAN_LOG"; then
               echo "::error::Critical runtime error detected in security scan"
               echo "::error::This indicates a bug in the scanning tool or code"
               echo "scan_result=critical_error" >> $GITHUB_OUTPUT
@@ -331,7 +387,7 @@ jobs:
             fi
             
             # 检查是否是编译失败错误（非严重错误）
-            if echo "$SCAN_OUTPUT" | grep -q "record not found\|have err\|get program failed\|parse project.*failed\|not found can compiled file"; then
+            if grep -q "record not found\|have err\|get program failed\|parse project.*failed\|not found can compiled file" "$SCAN_LOG"; then
               echo "::warning::Project compilation failed, skipping security scan"
               echo "::notice::This is usually caused by an empty diff, a test-only diff, or compilation errors"
               echo "scan_result=skipped_compilation_error" >> $GITHUB_OUTPUT
@@ -347,7 +403,6 @@ jobs:
             fi
           fi
           
-          echo "$SCAN_OUTPUT"
           echo "::endgroup::"
           
           echo "::group::Processing scan results"
@@ -371,6 +426,10 @@ jobs:
             exit 1
           fi
           
+          if ! jq -e '.runs[0].results | type == "array"' results.sarif > /dev/null; then
+            echo "::error::SARIF results must be an array"
+            exit 1
+          fi
           NUM=$(jq -r '[.runs[0].results[]?] | length' results.sarif)
           if ! [[ "$NUM" =~ ^[0-9]+$ ]]; then
             echo "::error::Invalid SARIF result count: '$NUM'"
