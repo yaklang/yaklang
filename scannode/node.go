@@ -73,6 +73,9 @@ func NewScanNode(cfg node.BaseConfig, options ...ScanNodeOption) (*ScanNode, err
 		return nil, err
 	}
 	cfg.MaxRunningJobs = maxRunningJobs
+	// Parent-process maintenance uses the same configured IR store as distyak
+	// children. Consume the environment before any lazy database initialization.
+	applySSADatabaseFromEnv()
 	var resolvedOptions scanNodeOptions
 	for _, option := range options {
 		if option != nil {
