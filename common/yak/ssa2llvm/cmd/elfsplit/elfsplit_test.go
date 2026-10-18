@@ -2,7 +2,10 @@ package main
 
 import (
 	"encoding/binary"
+	"runtime"
 	"testing"
+
+	"github.com/yaklang/yaklang/common/yak/ssa2llvm/runtime/textsectlayout"
 )
 
 func encodeLeaRCX(disp int32) []byte {
@@ -89,11 +92,24 @@ func TestRewriteBackwardRIPRelativeLEACrossSection(t *testing.T) {
 }
 
 func TestModuledataTextsectMapUsesGo126Layout(t *testing.T) {
-	if moduledataTextsectMapOffset != 0x150 {
-		t.Fatalf("textsectmap offset=%#x, want Go 1.26 offset %#x", moduledataTextsectMapOffset, 0x150)
+	res, err := textsectlayout.Check(runtime.GOROOT())
+	if err != nil {
+		t.Fatal(err)
 	}
-	if moduledataTextsectMapLenOff != 0x158 || moduledataTextsectMapCapOff != 0x160 {
-		t.Fatalf("textsectmap header offsets are inconsistent: len=%#x cap=%#x", moduledataTextsectMapLenOff, moduledataTextsectMapCapOff)
+	want := 0
+	switch {
+	case res.Major == 1 && res.Minor == 26:
+		want = 0x150
+	case res.Major == 1 && res.Minor == 27:
+		want = 0x168
+	default:
+		t.Fatalf("toolchain %s is not a verified moduledata layout", res.Version)
+	}
+	if res.Offset != want {
+		t.Fatalf("textsectmap offset=%#x, want %#x for %s", res.Offset, want, res.Version)
+	}
+	if res.Offset+8 != want+8 || res.Offset+16 != want+16 {
+		t.Fatalf("textsectmap header offsets are inconsistent around %#x", res.Offset)
 	}
 }
 
