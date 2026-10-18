@@ -853,14 +853,16 @@ func TestMVSCgoCallDiag(t *testing.T) {
 	defer func() { cgoDiagEnabled = false }()
 
 	for _, rec := range records {
-		db.Scan(rec, scr, func(Match) bool { return true })
+		if err := db.Scan(rec, scr, func(Match) bool { return true }); err != nil {
+			t.Fatal(err)
+		}
 	}
 	nCalls, nBytes := cgoNfaExistsCalls, cgoNfaExistsBytes
 	mCalls, mBytes := cgoMergedCalls, cgoMergedBytes
 	t.Logf("corpus: %d records, %d bytes", len(records), len(joined))
 	t.Logf("nfaExists: calls=%d bytes=%d avgWin=%.1f", nCalls, nBytes, safeRatio(nBytes, nCalls))
 	t.Logf("merged:    calls=%d bytes=%d avgWin=%.1f", mCalls, mBytes, safeRatio(mBytes, mCalls))
-	t.Logf("total cgo calls=%d, total cgo scan bytes=%d", nCalls+mCalls, nBytes+mBytes)
+	t.Logf("nfaExists/merged subset: cgo calls=%d, cumulative scan bytes=%d (excludes prefilter, anchored, assertion and PCRE entries)", nCalls+mCalls, nBytes+mBytes)
 }
 
 // TestMVSAssertAlwaysOnDiag 打印断言型 always-on pattern (无可用必需字面量, 每条记录整段
