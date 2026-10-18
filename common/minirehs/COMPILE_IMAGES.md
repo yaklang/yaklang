@@ -8,6 +8,9 @@
 也保存完整的 Go 必要条件过滤器。后者不能只靠 C blob 中的精简必要条件恢复，
 否则纯 Go 的 merged 扫描会丢掉已有的预检查优化。
 
+默认先做结构化精简，再用 zstd 压缩：共享字符串及重复表行、稀疏位集、变长整数，
+并省去可由字符区间恢复的 ASCII 映射。无需调用方额外解压，旧版稠密镜像也能加载。
+
 ## 使用接口
 
 ```go
@@ -94,13 +97,20 @@ Unix 使用 Rename；Windows 读句柄允许删除共享，支持的文件系统
 失败时保留原缓存。Windows 语义依据 [Microsoft 的 FILE_RENAME_INFORMATION 文档](https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/ntifs/ns-ntifs-_file_rename_information)。
 这里只承诺文件内容同步和完整文件替换，不承诺所有文件系统在掉电后的目录项持久性。
 
-缓存保存的是原始镜像，不保存源代码运行时对象或指针。没有 scratch 池化、mmap 或后台写盘。
+缓存保存的是精简并压缩的镜像，不保存运行时对象或指针。没有 scratch 池化、mmap 或后台写盘。
 一次冷缓存需要额外导出和同步写盘；以后每次命中只增加读文件成本。
 
 ## v1 格式
 
-所有整数小端。字符串使用 u32 字节长度，数组使用 u32 元素数；i32 的 `-1` 保留哨兵语义。
+固定宽度整数小端；精简表的整数采用规范的无符号 LEB128，带符号值采用 zigzag。
 文件最后的 IEEE CRC32 覆盖其之前的全部字节。CRC 用于发现损坏，不能认证文件来源。
+
+头部仍为 32 字节。flags bit4 表示 zstd 封装：头部后是 u32 解压长度、一个完整内部镜像的
+zstd 数据和外部 CRC32。内部镜像有自己的头部及 CRC；其身份和编译选项必须与外部一致，
+不接受嵌套压缩。固定使用 1 MiB 窗口、单线程和 SpeedDefault；已有依赖提供纯 Go 编解码。
+解压限制窗口及输出长度，不按伪造长度直接预分配巨量内存。不受益于压缩的内容保留未压缩形式。
+
+以下是去掉压缩封装后的布局。flags bit5 表示精简表；没有此位的稠密 v1 镜像保持兼容。
 
 | 顺序 | 内容 |
 | --- | --- |
@@ -108,13 +118,14 @@ Unix 使用 Rename；Windows 读句柄允许删除共享，支持的文件系统
 | 按 pattern idx | ID、原始 Flags、verifierKind、route、specialized、winW、gateHead、winHead、winTail、最终 expr、literals |
 | 字面量索引 | 全局 literals；每个字面量的 patIdx、litHead、litBiHead、litBiTail |
 | 路由列表 | mergedCount、maxAnchorNword、assertAlwaysOn、assertAlwaysOnC/Go、otherAlwaysOn、specializedAlwaysOn |
-| 反向 unit | count；每条的 idx 和带长度的 encodeUnit 字节 |
-| C blob | 带长度的原始 MVS1 v3 blob，导出时不重新构建 |
+| 反向 unit | count；每条的 idx 和带长度的 MPU1；稠密模式为原 encodeUnit 字节 |
+| C blob | 带长度的 MVP1；稠密模式为原 MVS1 v3 blob |
 | regexp2 确认器 | 按 idx 升序的 idx、字节码长度；当前统一为 0，表示懒编译 |
 | Go 必要条件 sidecar | 带长度的 `NEC1`，保存完整 merged 必要条件，以及非零 assert 必要条件的 idx 和内容 |
 | trailer | u32 CRC32 |
 
-flags 的 bit0 是定位，bit1 是已构建双向锚定；v1 拒绝 bit2/bit3 的 anchorMerged/assertMerged 及未知位。
+flags 的 bit0 是定位，bit1 是已构建双向锚定；bit4/bit5 只描述存储方式，不改变缓存身份。
+v1 拒绝 bit2/bit3 的 anchorMerged/assertMerged 及其他未知位。
 route 的 bit0..6 依次是 hasLiterals、windowable、batchable、anchorable、biAnchorable、gate、re2Loc。
 verifierKind 0 为 RE2，1 为 regexp2。specialized 直接使用保存的 kind，不重新识别表达式。
 
@@ -123,11 +134,35 @@ NEC1 中每个必要条件包含 i32 minRunLen、u8 runClass/firstByte/lastByte/
 先写 merged 条件，再写 u32 assert 数量及每条的 i32 idx 和必要条件。
 这是初版格式对完整 Go 扫描状态的补充，不能省略。
 
+精简模式的具体规则：
+
+- 表达式及字面量共用字符串表。token 0 后跟变长字节长度和新字符串；其他 token 为首次出现顺序的索引加 1。
+  全局字面量索引直接引用规则中已经保存的字符串，列表元素数仍为 u32。
+- MVP1 是魔数、u32 恢复长度、u8 是否存在 merged unit、u32 位集行字典数、u32 整数数组字典数、
+  每个 pattern 是否有 unit 的位图，随后按原顺序保存 unit。
+  单独的反向 MPU1 是魔数、u32 恢复长度、两个 u32 字典数及一个 unit。偏移、长度表和 slot→unit 序号在加载时恢复。
+- unit 保存变长 npos、nsym、flags，nword 由 npos 推导；表及扩展字段顺序保持 MVS v3。
+  cuts 恢复后生成 128 项 asciiSym，不存重复的映射表。DFA 状态数、guard 数量及必要条件整数也用变长编码。
+- 位集按行去掉尾部零字，全零行只写 token 0；token 1 定义新行，其他 token 引用先前行的索引加 2。
+  新行在「置位位置差分」「非零字索引差分 + u64」「连续原始字」三种表示中选择最短者。
+  MVP1 中的所有 unit 共享行字典，相同行在不同宽度的表中也可通过补零复用。
+- cuts、posPat、条件后继位置和 DFA 转移表共用整数数组字典，token 0 表示空数组、1 定义新数组，其他 token 为索引加 2。
+  新数组按实际长度选择 RLE、i32 差分或逐值 zigzag，长度来自 unit 字段，加载时验证引用的形状。
+
+共享按完整内容判等；哈希表只负责查找，不允许哈希碰撞替代完整比较。字典始终按首次出现分配索引，
+没有 map 遍历带来的不稳定输出。精简 blob 恢复上限为 256 MiB；超过此大小的编译结果导出时使用稠密格式。
+加载后再次导出保留原字节；调用方修改输入或导出缓冲不会改变数据库。
+解码字典只保存目标缓冲中的偏移和长度，不为每一条共享行另分配一份数组；字典本身也无需 GC 扫描指针。
+旧稠密缓存可继续命中，不在读取时自动重写；需要缩小时可移除旧缓存，让下一次编译生成新格式。
+
 加载首先验证外层和 unit 的完整边界、symbol/position/DFA 索引和位集 padding，之后才调用 C。
 Go 位集从 unit 解码，标量/LimEx 派生表通过现有逻辑初始化，预过滤器从字面量建立。
-整个加载过程不调用 syntax.Parse、regexp.Compile、tryCompileNFA、字面量提取或自动机构建。
+整个加载过程不调用 syntax.Parse、regexp.Compile、tryCompileNFA、字面量提取或正则 NFA/DFA 构造。
 RE2 和 regexp2 确认器只在扫描确实需要确认时，通过 sync.Once 初始化。
 RE2 定位确认器使用 Longest，与 MVS 编译路径保持一致。
+因此 LoadImage 本身保证零正则编译；存在性 NFA 已经权威命中的规则也不编译确认器。
+需要 gate、无 NFA 兜底或 RE2 断言定位确认的规则，在首次候选命中时仍可能编译确认器。
+v1 没有保存标准库 regexp 字节码，也没有保证任意规则集的第一次扫描完全免编译。
 
 镜像字节与操作系统和 CPU 字节序无关，内嵌示例在 cgo/非 cgo 构建中检查相同字节。
 无 cgo 时使用纯 Go NFA、Aho-Corasick 和 regexp2 确认器。
@@ -146,30 +181,67 @@ GetRequest 包含 nfp.gz 的 4940 条和随包附加的 HTTP softmatch，保留�
 go test ./common/minirehs -run '^$' -bench BenchmarkCompilationImage \
   -benchmem -benchtime=500ms -count=3
 go test ./common/minirehs -run '^TestImageGetRequest$' -v -count=1
+go test ./common/minirehs -run '^$' -bench BenchmarkTeddyGetRequestConfirmation \
+  -benchmem -benchtime=1s -count=3
 ```
 
-GetRequest 原始镜像约 30.86 MB（29.43 MiB），其中 MVS blob 约 28.98 MB，
-其他路由和表达式约 1.88 MB。平均约 6.25 KB/规则，尺寸取决于 NFA 位置数、字母表、重复展开和反向 NFA，
-不能仅按规则条数线性外推。256 条合成规则约 426 KB，MITM 约 306 KB，示例六条约 14 KB。
-gzip BestSpeed 的 GetRequest 文件约 2.80 MB；v1 本身不压缩，压缩内嵌需要调用方先解压再 LoadImage，
-会增加解压时间和临时内存。直接 go:embed 原始镜像大致增加同等大小的二进制资源段。
+下表取每项三轮的中位数。编译/加载包含数据库 Close；读文件包含打开、读取和关闭，磁盘数据为系统页缓存已热的读，
+不代表机械硬盘冷读。写入项包含文件 Sync 和替换。
 
-本次已落实三项性能改进：
+| 数据集 | 默认镜像文件 | Compile | LoadImage | 加载加速 | 磁盘缓存命中 |
+| --- | --- | --- | --- | --- | --- |
+| 合成 256 条 | 5.31 KB | 15.61 ms | 1.50 ms | 10.4× | 1.47 ms |
+| MITM 87 条 | 26.22 KB | 12.66 ms | 2.45 ms | 5.2× | 2.59 ms |
+| GetRequest 4941 条 | 1.37 MB | 369.29 ms | 68.83 ms | 5.4× | 68.35 ms |
+
+GetRequest 单独读文件约 0.20 ms，导出约 75.74 ms，其中不做 zstd 的结构精简导出约 52.20 ms。
+同步写盘/替换中位数约 2.34 ms，三轮范围约 2–11 ms。完整的冷缓存编译并保存约 452.98 ms，
+比只编译增加约 84 ms（23%），以后每次命中节省约 301 ms。一次后续命中即可摊回首次保存的成本。
+加载并执行第一次扫描约 74.91 ms；这项包含确实需要的懒确认器编译，预热扫描不包含它。
+独立项目的中位数会受 GC 和 I/O 波动影响，不能精确相加。
+
+同二进制加载旧稠密镜像约 42.67 ms，加载精简但未压缩镜像约 63.89 ms，
+最终默认文件约 68.83 ms。结构恢复和解压确实消耗 CPU；本机 NVMe 热缓存场景下，稠密格式加载更快。
+原始大文件先前测得的热读约 8.65 ms、同步写盘约 35 ms；新格式大幅减少了文件 I/O。
+若冷存储带宽假设为 100 MB/s，30.86 MB 的传输约需 309 ms，1.37 MB 约需 14 ms；
+这是带宽推算，不是本机测得的机械硬盘数据。
+
+GetRequest 的每次加载 Go 分配约 135.2 MB，缓存命中约 136.5 MB，编译约 498.6 MB。
+缓存比内嵌额外分配读取整份文件的缓冲；库内仍需保留 blob、Go NFA，并在 cgo 构建中复制 C 数组。
+字典解码直接写目标缓冲，已将初版精简加载的约 159.9 MB 分配降低约 25 MB。
+
+GetRequest 尺寸的三个阶段：
+
+| 表示 | 字节数 | 相比稠密镜像 |
+| --- | ---: | ---: |
+| 原始稠密布局 | 30,860,935 | 100% |
+| 结构精简，未做 zstd | 3,953,835 | 12.8% |
+| 结构精简后再 zstd | 1,370,674 | 4.4% |
+
+原始 MVS blob 28,982,285 字节精简为 2,488,563 字节；路由、表达式等其余内容也从约 1.88 MB
+降至约 1.47 MB。最终相较原始镜像减少 95.6%，约 277 字节/规则。
+直接对稠密镜像做 gzip BestSpeed 约 2.80 MB、zstd SpeedDefault 约 2.23 MB；
+结构精简后再压缩比单做 zstd 再小约 39%。示例六条最终 871 字节。
+实际尺寸取决于位置数、字母表、重复展开及反向 NFA，不能仅按规则条数线性外推。
+go:embed 的资源段保存最终小文件；加载后仍需恢复稠密运行表，文件变小不代表运行内存减少相同比例。
+
+本次已落实的其他性能改进：
 
 1. Compile 的普通 RE2 路径不再通过 YakRegexpUtils 重复编译同一表达式。
-2. Teddy 从字面量直接初始化，跳过不会使用的稠密 AC 表。GetRequest 首轮实测的加载临时 Go 分配
-   从约 1.80 GB 降为约 126 MB，加载时间从约 429 ms 降至几十毫秒。Go B/op 包含临时分配，
+2. Teddy 从字面量直接初始化，跳过不会使用的稠密 AC 表；含单字节字面量时直接建立 Go AC，
+   也不再先建立一份随后释放的 C AC。GetRequest 首轮实测的加载临时 Go 分配
+   从约 1.80 GB 降为当前默认镜像约 135 MB，加载时间从约 429 ms 降至几十毫秒。Go B/op 包含临时分配，
    不等于存活堆、进程 RSS，也不包含 C malloc。
 3. 大于 256 个字面量时，Teddy 确认增加最长 16 字节的前缀哈希索引，完整字面量比较仍是最终判据，
-   哈希碰撞只增加候选。GetRequest 的 912 字节 HTTP 样本从约 4.4 ms/次降至约 0.46 ms/次，
-   约快 9 倍；小字面量集合继续使用原来的桶确认路径。
+   哈希碰撞只增加候选。同二进制、同规则/记录、预热后的 A/B 中，GetRequest 的 912 字节 HTTP 样本
+   从 4.285 ms/次降至 0.523 ms/次，约快 8.2 倍；小字面量集合继续使用原来的桶确认路径。
 
 镜像提高的是启动/重载速度；热扫描由同一套自动机执行。上述扫描提升来自 Teddy 确认算法改进，
-不能把它归因于序列化。GetRequest 样本会触发大量共同 HTTP 前缀，当前约 2 MB/s；
+不能把它归因于序列化。GetRequest 样本会触发大量共同 HTTP 前缀，当前约 1.7–2 MB/s；
 相同 912 字节样本在合成和 MITM 规则集分别是几十 MB/s。吞吐高度依赖规则和输入，
 这组数字不代表网络扫描的目标数/秒，也不包含网络、TLS、fp 捕获组确认等开销。
 
-进一步的优先方向是：减少 Go NFA 恢复时的派生表分配，压缩持久位集及重复 unit，
+进一步的优先方向是：减少 Go NFA 恢复时的派生表分配，降低恢复共享表的 CPU 成本，
 降低纯 Go 稠密 AC 构建内存，以及减少规则大量共同前缀时的候选确认与 regexp2 临时分配。
 现阶段没有证据支持默认打开全局 anchorMerged/assertMerged；它们仍然保持原来的关闭状态。
 
@@ -179,7 +251,12 @@ gzip BestSpeed 的 GetRequest 文件约 2.80 MB；v1 本身不压缩，压缩内
 0x80 非法 UTF-8 字节、单字/多字 NFA、specialized、ScanBatch、回调停止、Info 和并发懒确认。
 真实 MITM 流量及 GetRequest 规则集对照 Compile 与 LoadImage；钩子检查 LoadImage 没有编译或语法分析。
 磁盘测试包含身份变化、损坏替换、线程/多进程单次编译、清理和并发完整文件替换。
-另有 CRC 正确的损坏字段测试、截断遍历及 FuzzLoadImage。
+另有稠密/精简格式兼容、原生 blob 逐字节还原、压缩损坏/长度伪造、规范变长整数、
+稀疏及稠密行、跨 unit 去重、CRC 正确的损坏字段测试、截断遍历及 FuzzLoadImage。
 
 CI 覆盖 Linux cgo/纯 Go、Windows 纯 Go、内嵌文件新鲜度、native amalgamation、race 和 arm64 交叉编译。
+常规测试运行整包完整参数；race 专门运行 Image、Teddy 和 MVSAmalgamation 测试，包含并发懒确认和缓存竞争。
+整包 race 的已有标准库 oracle 差分会超过五分钟，本机及第一轮 Linux CI 均观察到此情况，
+因此不将整包 race 记录为通过。
+纯 Go regexp2 固定为 v1.11.5，包含空闲后超时钟重启修复，避免并发懒确认偶发误判超时。
 arm64 交叉编译只验证可构建性，不代替 arm64 机器上的运行与性能测量。

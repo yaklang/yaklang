@@ -6,9 +6,11 @@ import "encoding/binary"
 // before multiplication, including on 32-bit hosts; malformed input is data,
 // never a reason to recover a panic or call into the native parser.
 type imageReader struct {
-	b   []byte
-	off int
-	err error
+	b          []byte
+	off        int
+	err        error
+	packed     bool
+	stringPool []string
 }
 
 func (r *imageReader) take(n int) []byte {
@@ -63,10 +65,34 @@ func (r *imageReader) count(width int) int {
 }
 
 func (r *imageReader) bytes() []byte { return r.take(r.count(1)) }
-func (r *imageReader) str() string   { return string(r.bytes()) }
+func (r *imageReader) str() string {
+	if !r.packed {
+		return string(r.bytes())
+	}
+	id := imageVarint(r)
+	if id != 0 {
+		if id > uint64(len(r.stringPool)) {
+			r.err = ErrCorruptImage
+			return ""
+		}
+		return r.stringPool[id-1]
+	}
+	n := imageVarint(r)
+	if n > uint64(len(r.b)-r.off) || r.err != nil {
+		r.err = ErrCorruptImage
+		return ""
+	}
+	s := string(r.take(int(n)))
+	r.stringPool = append(r.stringPool, s)
+	return s
+}
 
 func (r *imageReader) strings() []string {
-	n := r.count(4)
+	width := 4
+	if r.packed {
+		width = 1
+	}
+	n := r.count(width)
 	out := make([]string, n)
 	for i := range out {
 		out[i] = r.str()

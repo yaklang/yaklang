@@ -109,12 +109,21 @@ func BenchmarkCompilationImage(b *testing.B) {
 				b.Fatal(err)
 			}
 			defer loaded.Close()
+			dense, err := compiled.(*database).marshalUncompressedImage()
+			if err != nil {
+				b.Fatal(err)
+			}
+			packed, err := compiled.(*database).marshalCompilationImage(true)
+			if err != nil {
+				b.Fatal(err)
+			}
 			b.Logf("patterns=%d image=%d bytes (%.1f bytes/pattern)", len(pats), len(data), float64(len(data))/float64(len(pats)))
 			path := filepath.Join(b.TempDir(), "cache.rehs")
 			if err = writeImageCache(path, data); err != nil {
 				b.Fatal(err)
 			}
-			for _, op := range []string{"Compile", "LoadImage", "MarshalImage", "CacheHit", "CacheMiss", "ReadImageFile", "WriteImageFile"} {
+			record := bytes.Repeat([]byte("HTTP/1.1 200 OK\r\nServer: nginx/1.24.0\r\nContent-Type: text/html\r\n\r\n<html> token=abc123 header-042: abcd;ef </html>\n"), 8)
+			for _, op := range []string{"Compile", "LoadImage", "LoadAndFirstScan", "MarshalImage", "CacheHit", "CacheMiss", "ReadImageFile", "WriteImageFile", "MarshalPackedImage", "LoadPackedImage", "LoadDenseImage"} {
 				b.Run(op, func(b *testing.B) {
 					b.ReportAllocs()
 					b.ResetTimer()
@@ -127,6 +136,17 @@ func BenchmarkCompilationImage(b *testing.B) {
 							db, err = Compile(pats, opts...)
 						case "LoadImage":
 							db, err = LoadImage(data)
+						case "LoadDenseImage":
+							db, err = LoadImage(dense)
+						case "LoadPackedImage":
+							db, err = LoadImage(packed)
+						case "MarshalPackedImage":
+							_, err = compiled.(*database).marshalCompilationImage(true)
+						case "LoadAndFirstScan":
+							db, err = LoadImage(data)
+							if err == nil {
+								err = db.Scan(record, nil, nil)
+							}
 						case "MarshalImage":
 							_, err = compiled.MarshalImage()
 						case "CacheHit":
@@ -150,7 +170,6 @@ func BenchmarkCompilationImage(b *testing.B) {
 					}
 				})
 			}
-			record := bytes.Repeat([]byte("HTTP/1.1 200 OK\r\nServer: nginx/1.24.0\r\nContent-Type: text/html\r\n\r\n<html> token=abc123 header-042: abcd;ef </html>\n"), 8)
 			want, e := imageMatches(compiled, record)
 			got, e2 := imageMatches(loaded, record)
 			if e != nil || e2 != nil || !reflect.DeepEqual(want, got) {
