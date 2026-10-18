@@ -312,13 +312,10 @@ func noteCapturedByClosure(v Value, name string) {
 		return
 	}
 	fn := v.GetFunc()
-	if fn == nil || fn.builder == nil {
+	if fn == nil || fn.builder == nil || fn.builder.capturedNames == nil {
 		return
 	}
-	if fn.builder.capturedNames == nil {
-		fn.builder.capturedNames = make(map[string]struct{})
-	}
-	fn.builder.capturedNames[name] = struct{}{}
+	fn.builder.capturedNames.Set(name, struct{}{})
 }
 
 func valueCapturedByClosure(v Value) bool {

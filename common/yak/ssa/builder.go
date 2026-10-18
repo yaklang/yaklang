@@ -90,8 +90,12 @@ type FunctionBuilder struct {
 	captureFreeValue map[string]struct{}
 	// capturedNames are lexical names a nested function has captured from
 	// this function. Later assignments of those names are marked so const
-	// folding does not drop the callback's update.
-	capturedNames map[string]struct{}
+	// folding does not drop the callback's update. Parallel unit compile
+	// notes a capture on one goroutine while another assigns the same name,
+	// so this is the existing concurrent map rather than a new mutex.
+	// Have/Set hold that map lock only for the lookup or insert. They do not
+	// call lockEmit, and lockEmit's caller may already be inside AssignVariable.
+	capturedNames *utils.SafeMapWithKey[string, struct{}]
 
 	placeholderConstants *utils.SafeMapWithKey[placeholderConstantKey, placeholderConstant]
 }
@@ -112,6 +116,7 @@ func NewBuilder(editor *memedit.MemEditor, f *Function, parent *FunctionBuilder)
 		SyntaxIncludingStack: utils.NewStack[string](),
 		includeStack:         utils.NewStack[*Program](),
 		captureFreeValue:     make(map[string]struct{}),
+		capturedNames:        utils.NewSafeMapWithKey[string, struct{}](),
 	}
 	if parent != nil {
 		b.DefineFunc = parent.DefineFunc
