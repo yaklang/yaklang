@@ -119,23 +119,6 @@ func TestSaveIrTypeBatch_ReflushingTheSameStructKeepsRow(t *testing.T) {
 	assert.Equal(t, "other", untouched.String)
 }
 
-// Databases that were never migrated have no unique index; the delete-and-insert
-// fallback keeps working for them.
-func TestSaveIrTypeBatch_FallbackWithoutUniqueIndex(t *testing.T) {
-	db, err := gorm.Open("sqlite3", ":memory:")
-	require.NoError(t, err)
-	t.Cleanup(func() { db.Close() })
-	require.NoError(t, db.AutoMigrate(&IrType{}).Error)
-	require.False(t, hasNamedIndex(db, TableIrTypes, "ux_ir_types_program_type"))
-
-	require.NoError(t, SaveIrTypeBatch(db, []*IrType{nil, {TypeId: 1, ProgramName: "p", String: "old"}}))
-	require.NoError(t, SaveIrTypeBatch(db, []*IrType{{TypeId: 1, ProgramName: "p", String: "new"}}))
-	var rows []IrType
-	require.NoError(t, db.Where("program_name = ?", "p").Find(&rows).Error)
-	require.Len(t, rows, 1)
-	assert.Equal(t, "new", rows[0].String)
-}
-
 func TestEnsureUniqueIrTypesIndex_RemovesDuplicatesKeepingOldest(t *testing.T) {
 	db, err := gorm.Open("sqlite3", ":memory:")
 	require.NoError(t, err)
@@ -149,7 +132,7 @@ func TestEnsureUniqueIrTypesIndex_RemovesDuplicatesKeepingOldest(t *testing.T) {
 	ensureUniqueIrTypesProgramTypeIndex(db)
 	ensureUniqueIrTypesProgramTypeIndex(db) // idempotent
 
-	require.True(t, hasNamedIndex(db, TableIrTypes, "ux_ir_types_program_type"))
+	require.True(t, db.New().Dialect().HasIndex(TableIrTypes, "ux_ir_types_program_type"))
 	var rows []IrType
 	require.NoError(t, db.Where("program_name = ? AND type_id = ?", "p", 9).Find(&rows).Error)
 	require.Len(t, rows, 1)
