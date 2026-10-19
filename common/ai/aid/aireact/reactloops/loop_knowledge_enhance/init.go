@@ -74,9 +74,23 @@ func initKnowledgeTask(r aicommon.AIInvokeRuntime) func(*reactloops.ReActLoop, a
 			op.Failed(fmt.Errorf("load knowledge_enhance Skill: %w", err))
 			return
 		}
-		// Preload only enabled tools: read-only callers may deliberately exclude
-		// management. Never bypass their tool policy by looking missing tools up.
-		results := loop.PreloadToolSchemas(task.GetContext(), []string{"manage_knowledge_base", "query_knowledge_base"})
+		// Restrict loading to enabled tools, including read-only allowlists. These
+		// are required by the selected focus, so normal LRU admission may replace
+		// older schemas instead of failing when an optional-preload cache is full.
+		enabled, _ := loop.GetConfig().GetAiToolManager().GetEnableTools()
+		allowed := make(map[string]bool, len(enabled))
+		for _, tool := range enabled {
+			if tool != nil {
+				allowed[tool.Name] = true
+			}
+		}
+		var names []string
+		for _, name := range []string{"manage_knowledge_base", "query_knowledge_base"} {
+			if allowed[name] {
+				names = append(names, name)
+			}
+		}
+		results := loop.LoadToolSchemas(task.GetContext(), names)
 		for _, result := range results {
 			if result["status"] != "schema_loaded" {
 				op.Failed(fmt.Errorf("preload %s: %s", result["tool_name"], result["detail"]))

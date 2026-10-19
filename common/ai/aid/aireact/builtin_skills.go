@@ -41,9 +41,22 @@ func GetBuiltinSkillsFS() fi.FileSystem {
 }
 
 // GetBuiltinSkillLoader makes embedded Skills available to an explicitly selected
-// focus without enabling automatic discovery or extracting files to disk.
+// focus without automatic discovery or disk extraction. Existing user sources are
+// retained; only the missing system Skill is added to a configured loader.
 func (r *ReAct) GetBuiltinSkillLoader() (aiskillloader.SkillLoader, error) {
-	return aiskillloader.NewAutoSkillLoader(aiskillloader.WithAutoLoad_FileSystem(GetBuiltinSkillsFS()))
+	builtin, err := aiskillloader.NewAutoSkillLoader(aiskillloader.WithAutoLoad_FileSystem(GetBuiltinSkillsFS()))
+	if err != nil {
+		return nil, err
+	}
+	if configured, ok := r.config.GetSkillLoader().(*aiskillloader.AutoSkillLoader); ok {
+		systemFS, err := builtin.GetFileSystem("yaklang-system")
+		if err != nil {
+			return nil, err
+		}
+		_, err = configured.AddSource(systemFS)
+		return configured, err
+	}
+	return builtin, nil
 }
 
 // ExtractBuiltinSkillsToDir extracts built-in skills from the embedded filesystem
