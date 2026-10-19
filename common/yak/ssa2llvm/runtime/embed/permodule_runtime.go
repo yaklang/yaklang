@@ -128,14 +128,17 @@ func WriteRuntimeImportsPerModule(outputPath string, modules []string, aot bool)
 	// Empty init: modules are imported for their Go init tasks, but registration
 	// is deferred to the exported functions below.
 	b.WriteString("func init() {}\n\n")
+	// The opt-in symbol must exist in every generated runtime. The compiler
+	// decides to call it from its used-module set, which is independent of the
+	// imports this file happens to need. A tier without the real database
+	// package (poc over the yakit shim and the core/net tiers) still defines the
+	// symbol; the flag simply has no reader there, matching the behaviour before
+	// the opt-in existed.
+	b.WriteString("var runtimeYakitDatabaseEnabled bool\n\n")
+	b.WriteString("//export yak_runtime_use_yakit_database\n")
+	b.WriteString("func yak_runtime_use_yakit_database() { runtimeYakitDatabaseEnabled = true }\n\n")
 	if yakitAlias != "" {
 		b.WriteString("var runtimeYakitDatabaseOnce sync.Once\n\n")
-		b.WriteString("var runtimeYakitDatabaseEnabled bool\n\n")
-		// The compiler calls this only when the script uses a module that reads
-		// the profile database. Otherwise InitialDatabase syncs builtin AI tools
-		// and core plugins into every binary, including one that only uses container.
-		b.WriteString("//export yak_runtime_use_yakit_database\n")
-		b.WriteString("func yak_runtime_use_yakit_database() { runtimeYakitDatabaseEnabled = true }\n\n")
 	}
 	// Global builtins registration.
 	b.WriteString("//export yak_register_globals\n")
