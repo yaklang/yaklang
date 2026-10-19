@@ -71,3 +71,18 @@ vector writes, then verifies the media's known fact in the persisted entries.
 `--omni-mode auto` also enables availability fallback. The core plugin exposes
 `--omni-mode`, `--omni-model`, `--omni-segment-seconds`, and `--omni-payload-bytes`
 through the existing gRPC plugin parameter flow.
+
+The skill-guided `manage_knowledge_base` tool accepts `omni_mode`, `omni_model`,
+`omni_segment_seconds`, and `omni_payload_bytes` inside `build_options`. Direct
+Yak calls use `aiknowledge.Build` / `BuildFromFile` with variadic options. For
+example, after creating a knowledge base:
+
+```yak
+aiknowledge.BuildFromFile("training-media", "/path/lecture.mp4",
+    aiknowledge.buildMode("chunks"), aiknowledge.omniMode("required"),
+    aiknowledge.omniSegmentSeconds(20))~
+```
+
+`manage-media-knowledge-omni.yak` creates a new knowledge base through that API,
+builds its media content, then verifies both keyword and semantic retrieval with
+an explicit knowledge base name and token budget.

@@ -31,6 +31,11 @@ func TestKnowledgeBaseYakTools(t *testing.T) {
 	schemaJSON, err := json.Marshal(tools["query_knowledge_base"].InputSchema)
 	require.NoError(t, err)
 	require.Contains(t, string(schemaJSON), `"required":["token_limit"]`)
+	manageSchema, err := json.Marshal(tools["manage_knowledge_base"].InputSchema)
+	require.NoError(t, err)
+	for _, field := range []string{"omni_mode", "omni_model", "omni_segment_seconds", "omni_payload_bytes"} {
+		require.Contains(t, string(manageSchema), field)
+	}
 	execute := func(name string, params map[string]any) (*aitool.ToolExecutionResult, error) {
 		// ReAct parameters cross a JSON boundary, including nested arrays.
 		raw, err := json.Marshal(params)
@@ -87,6 +92,9 @@ func TestKnowledgeBaseYakTools(t *testing.T) {
 		{"query_knowledge_base", map[string]any{"token_limit": 512}},
 		{"manage_knowledge_base", map[string]any{"op": "create", "name": "yak-tool-fixture"}},
 		{"manage_knowledge_base", map[string]any{"op": "build", "name": "missing", "content": "must not create"}},
+		{"manage_knowledge_base", map[string]any{"op": "build", "name": "yak-tool-fixture", "content": "must reject", "build_options": map[string]any{"omni_mode": "unknown"}}},
+		{"manage_knowledge_base", map[string]any{"op": "build", "name": "yak-tool-fixture", "content": "must reject", "build_options": map[string]any{"omni_segment_seconds": -1}}},
+		{"manage_knowledge_base", map[string]any{"op": "build", "name": "yak-tool-fixture", "content": "must reject", "build_options": map[string]any{"omni_payload_bytes": 100}}},
 	} {
 		_, err := execute(tc.name, tc.params)
 		require.Error(t, err)

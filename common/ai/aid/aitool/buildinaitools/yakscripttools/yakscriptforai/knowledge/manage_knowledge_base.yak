@@ -12,7 +12,7 @@ op=update：metadata 仅更新给出的字段；空字符串、空 tags、is_def
 op=delete：删除指定库及关联知识、向量和实体关系；删除后 list 确认。
 op=add_entry/update_entry：entry 是完整条目 {title,content,summary?,type?,keywords?,potential_questions?}；update_entry 还需 entry_id，只操作该库中的条目。默认调用 embedding 更新向量；skip_index=true 仅存知识并移除旧索引，之后用 rebuild_index。entry_id 从写入结果或 query_knowledge_base 获取。
 op=delete_entry：entry_id 必填，只删该库的指定条目及其索引。
-op=build：source_file（引擎本地文件绝对路径）和 content 必须且只能给一个。build_options.mode=question_index（默认，AI 分析并生成问题索引）或 chunks（直接按块入库，文本不调用 AI）；chunk_size=256..1048576 字节，默认8192；concurrency=1..16，默认2；extra_prompt 是 AI 构建的额外要求。多媒体/文档提取依赖引擎对应能力。构建等待实际落库；出错时如实报告，部分成功写入可能保留，检查库内容后再重试。
+op=build：source_file（引擎本地文件绝对路径）和 content 必须且只能给一个。build_options.mode=question_index（默认，AI 分析并生成问题索引）或 chunks（直接按块入库，文本不调用 AI）；chunk_size=256..1048576 字节，默认8192；concurrency=1..16，默认2；extra_prompt 是 AI 构建的额外要求。视频、PDF、图片先探测本地 Omni，默认 AIBalance qwen3.8-omni-flash；omni_mode=auto（默认，失败回退原路径）/required（必须使用 Omni）/disabled（原路径）；omni_model 指定模型，凭据来自本地配置；omni_segment_seconds=(0,600]，默认20；omni_payload_bytes=1024..10485760，默认7340032，限制完整 base64 data URI，超限视频继续细分。构建等待实际落库；出错时如实报告，部分成功写入可能保留，检查库内容后再重试。
 op=rebuild_index：使用已保存的模型/维度/HNSW 参数为全部条目重建索引，不用于更换模型；可能耗时且需要 embedding 服务。index_options 只允许在 create 使用。
 查询知识正文另行 require query_knowledge_base，必须显式选择 name、names 或 all=true，并指定 token_limit；库名未知先用本工具 op=list。不要把列表当成知识内容，也不要声称失败的操作成功。
 
@@ -44,7 +44,7 @@ entry = cli.Json("entry", cli.setDefault("{}"), cli.setJsonSchema(`{"type":"obje
 skipIndex = cli.Bool("skip_index", cli.setDefault(false), cli.setHelp("true 仅存知识并移除旧索引；默认立即索引"))
 sourceFile = cli.String("source_file", cli.setHelp("build 输入文件路径，与 content 二选一"))
 content = cli.String("content", cli.setHelp("build 输入文本，与 source_file 二选一"))
-buildOptions = cli.Json("build_options", cli.setDefault("{}"), cli.setJsonSchema(`{"type":"object","properties":{"mode":{"type":"string","enum":["chunks","question_index"]},"chunk_size":{"type":"integer","minimum":256,"maximum":1048576},"concurrency":{"type":"integer","minimum":1,"maximum":16},"extra_prompt":{"type":"string"}},"additionalProperties":false}`), cli.setHelp("build 模式、分块字节数、并发和额外提示词"))
+buildOptions = cli.Json("build_options", cli.setDefault("{}"), cli.setJsonSchema(`{"type":"object","properties":{"mode":{"type":"string","enum":["chunks","question_index"]},"chunk_size":{"type":"integer","minimum":256,"maximum":1048576},"concurrency":{"type":"integer","minimum":1,"maximum":16},"extra_prompt":{"type":"string"},"omni_mode":{"type":"string","enum":["auto","required","disabled"]},"omni_model":{"type":"string"},"omni_segment_seconds":{"type":"number","exclusiveMinimum":0,"maximum":600},"omni_payload_bytes":{"type":"integer","minimum":1024,"maximum":10485760}},"additionalProperties":false}`), cli.setHelp("build 模式、分块、并发、Omni 路径/模型和视频编码大小"))
 cli.check()
 if op == "" { die("op is required") }
 if json.dumps(metadata)=="null" || json.dumps(indexOptions)=="null" || json.dumps(buildOptions)=="null" { die("metadata, index_options and build_options must be JSON objects") }
@@ -70,6 +70,10 @@ if "mode" in buildOptions { opts=append(opts,aiknowledge.buildMode(buildOptions.
 if "chunk_size" in buildOptions { opts=append(opts,aiknowledge.chunkSize(int(buildOptions.chunk_size))) }
 if "concurrency" in buildOptions { opts=append(opts,aiknowledge.concurrency(int(buildOptions.concurrency))) }
 if "extra_prompt" in buildOptions { opts=append(opts,aiknowledge.extraPrompt(buildOptions.extra_prompt)) }
+if "omni_mode" in buildOptions { opts=append(opts,aiknowledge.omniMode(buildOptions.omni_mode)) }
+if "omni_model" in buildOptions { opts=append(opts,aiknowledge.omniModel(buildOptions.omni_model)) }
+if "omni_segment_seconds" in buildOptions { opts=append(opts,aiknowledge.omniSegmentSeconds(buildOptions.omni_segment_seconds)) }
+if "omni_payload_bytes" in buildOptions { opts=append(opts,aiknowledge.omniPayloadBytes(int64(buildOptions.omni_payload_bytes))) }
 result = nil
 switch op {
 case "list": result = aiknowledge.List(opts...)~

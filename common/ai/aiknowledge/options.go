@@ -68,6 +68,18 @@ func WithConcurrency(concurrency int) Option {
 func WithExtraPrompt(prompt string) Option {
 	return func(c *config) { c.manage.BuildOptions.ExtraPrompt = prompt }
 }
+func WithOmniMode(mode string) Option {
+	return func(c *config) { c.manage.BuildOptions.OmniMode = mode }
+}
+func WithOmniModel(model string) Option {
+	return func(c *config) { c.manage.BuildOptions.OmniModel = model }
+}
+func WithOmniSegmentSeconds(seconds float64) Option {
+	return func(c *config) { c.manage.BuildOptions.OmniSegmentSeconds = seconds }
+}
+func WithOmniPayloadBytes(size int64) Option {
+	return func(c *config) { c.manage.BuildOptions.OmniPayloadBytes = size }
+}
 
 var Exports = map[string]any{
 	"List": List, "Add": Add, "Get": Get, "Update": Update, "Delete": Delete,
@@ -84,4 +96,6 @@ var Exports = map[string]any{
 	"entryKeywords": WithEntryKeywords, "potentialQuestions": WithPotentialQuestions,
 	"buildMode": WithBuildMode,
 	"chunkSize": WithChunkSize, "concurrency": WithConcurrency, "extraPrompt": WithExtraPrompt,
+	"omniMode": WithOmniMode, "omniModel": WithOmniModel,
+	"omniSegmentSeconds": WithOmniSegmentSeconds, "omniPayloadBytes": WithOmniPayloadBytes,
 }

@@ -33,7 +33,7 @@ metadata:
 - 读取长内容：历史 truncated=true 时按 history item_id 与 next_content_offset 续读。大 HTTP 正文先取包导出，再按返回的绝对路径搜索文件；数据库关键字查询不扫描旁路文件。直接读取 dump，避免 quoted/JSON 失真。
 - 管理 MCP：先 `require_tool` 加载 `manage_mcp_server`；`op=list` 检查名称，`op=add` 保存新配置，`op=delete` 删除精确名称并清理工具缓存。配置存在本次运行的 profile 系统表，与 Yakit 共用；重复添加报错。禁用 MCP 的运行不能使用这些工具。
 - 使用 MCP：添加后直接 require `query_mcp_tools` 读取远端工具参数，按 `nextCursor` 续查；再 require `call_mcp_tool`，传远端裸工具名和 JSON 参数对象，当前会话即可执行。也可用 `mcp.Connect` 或 `mcp.NewClient` 编写 Yak 客户端。操作失败时读取实际错误，不声称调用成功；完整用法见参考资源的 MCP 一节。
-- 管理知识库：先 `require_tool` 加载 `manage_knowledge_base`；`op=list` 定位名称，再按需创建、更新元信息、构建和管理条目。create 配置模型/维度/HNSW，build 配置输入、分块和并发；构建需等待实际落库。知识库列表属于管理，不单设列表工具。
+- 管理知识库：先 `require_tool` 加载 `manage_knowledge_base`；`op=list` 定位名称，再按需创建、更新元信息、构建和管理条目。create 配置模型/维度/HNSW，build 配置输入、分块和并发；视频、PDF、图片默认先探测本地 Omni（AIBalance 默认 qwen3.8-omni-flash），不可用回退原路径。build_options.omni_mode 可选 auto/required/disabled，omni_model 指定模型，omni_segment_seconds 和 omni_payload_bytes 控制视频分段与编码大小；凭据来自本地模型配置。构建需等待实际落库。知识库列表属于管理，不单设列表工具。
 - 查询知识：require `query_knowledge_base`，显式选择 name（一个库）、names（多个库）或 all=true，并指定 token_limit；三者互斥。未指定范围必须报错，先 manage(op=list) 查看库再选择；all=false 或省略 all 不会跨库，name="all" 是字面库名。最多20库，超过时按 names 分批。整次 JSON 共享 token_limit=256..8192，推荐1024；limit 默认5（最多50），每条 per_entry_token_limit 默认512。keyword 用 next_offset 分页；semantic 用 min_score 过滤、按全局相似度排序，offset=0；get 只允许单库，按 entry_id 精确续读。截断后用结果的 knowledge_base、entry_id、next_content_offset 继续。知识库操作通过本 Skill 引导调用工具；直接 Yak API 使用独立的 `aiknowledge.List`、`Add`、`Get`、`Update`、`Delete`、`Build`、`BuildFromFile`、`AddEntry`、`UpdateEntry`、`DeleteEntry`、`RebuildIndex`、`Query`；必填位置参数在前，非核心设置用可变 options。
 
 ## 详细参考与扩展位置
