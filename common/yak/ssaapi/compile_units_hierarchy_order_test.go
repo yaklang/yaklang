@@ -7,6 +7,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/utils/filesys"
+	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssareducer"
 )
@@ -77,7 +78,7 @@ class Consumer {
 				c: cfg, prog: prog, builder: builder, filesystem: vf,
 				fileUnits:         make(map[string]string),
 				preHandlerFileSet: make(map[string]struct{}), handlerFileSet: make(map[string]struct{}),
-				preHandlerBuildsFiles: true, preHandlerProcess: func() {}, concurrentUnits: true, concurrency: 1,
+				preHandlerBuildsFiles: true, preHandlerProcess: func() {}, concurrency: 1,
 			}
 			for _, file := range files {
 				env.fileUnits[file.path] = file.unit
@@ -89,10 +90,8 @@ class Consumer {
 			}
 			require.NoError(t, env.astErr)
 			stopSkeletons()
-			for _, prefix := range []string{"java-static-import:", "java-type-hierarchy:"} {
-				require.True(t, prog.RunDeferredBuildsForUnitsMatching(keys, nil, nil, func(id string) bool {
-					return strings.Contains(id, prefix)
-				}))
+			for _, kind := range []ssa.DeferredBuildKind{ssa.DeferredBuildKindBinding, ssa.DeferredBuildKindHierarchy} {
+				require.True(t, prog.RunDeferredBuildsForUnitsOfKind(keys, kind, nil, nil))
 			}
 			prog.SetPreHandler(false)
 			for _, name := range order {

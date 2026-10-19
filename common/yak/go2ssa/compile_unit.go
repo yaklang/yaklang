@@ -23,6 +23,8 @@ var (
 
 func (*SSABuilder) SupportsConcurrentUnitBuild() bool { return true }
 
+func (*SSABuilder) DeferMethodBuildOnLookup() bool { return true }
+
 // Go's package declaration touches shared application globals during the
 // pre-handler. Only the subsequent package-library body build is parallel.
 func (*SSABuilder) SupportsConcurrentUnitPreHandler() bool { return false }
@@ -65,6 +67,7 @@ func (*SSABuilder) PartitionCompileUnits(fs filesys_interface.FileSystem, files 
 	for _, unit := range order {
 		sort.Strings(unit.Files)
 		if strings.HasPrefix(unit.Key, "dir:") {
+			unit.DeclaredLibrary = true
 			unit.LibraryName = goUnitPackageName(fs, unit.Files)
 		}
 	}

@@ -4,12 +4,10 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 )
 
 func TestConcurrentUnitMethodLookupsDoNotBuildForeignBodies(t *testing.T) {
 	app, _ := newTestBuilder(t)
-	app.Language = ssaconfig.JAVA
 	lib := app.NewLibrary("dependency", []string{"dependency"})
 	owner := lib.GetAndCreateFunctionBuilder("", string(MainFunctionName))
 	method := owner.NewFunc("method")
@@ -21,6 +19,7 @@ func TestConcurrentUnitMethodLookupsDoNotBuildForeignBodies(t *testing.T) {
 	typ.AddMethod("method", method)
 
 	app.SetConcurrentUnitBuild(true)
+	app.SetDeferMethodBuildOnLookup(true)
 	require.Same(t, method, class.GetNormalMethod("method"))
 	require.Same(t, method, GetMethod(typ, "method"))
 	require.Zero(t, runs, "lookups must leave the body for its owning unit")

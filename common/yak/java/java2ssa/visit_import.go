@@ -320,7 +320,7 @@ func (y *singleFileBuilder) registerPostSkeletonImportTask(i *javaparser.Compila
 			taskKey = u
 		}
 	}
-	prog.RegisterDeferredBuild(ssa.DeferredBuildKindHelper, "java-static-import:"+taskKey, func() {
+	prog.RegisterDeferredBuild(ssa.DeferredBuildKindBinding, taskKey, func() {
 		if fileEditor != nil {
 			app.PushEditor(fileEditor)
 			defer app.PopEditor(true)

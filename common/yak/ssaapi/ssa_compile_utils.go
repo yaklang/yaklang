@@ -443,13 +443,6 @@ func (c *Config) GetFileHandler(
 	preHandlerFiles []string,
 	preHandlerFileSet map[string]struct{},
 ) <-chan *ssareducer.FileContent {
-	return c.getFileHandlerWithOrder(filesystem, preHandlerFiles, preHandlerFileSet, c.GetCompileASTSequence())
-}
-
-func (c *Config) getFileHandlerWithOrder(
-	filesystem filesys_interface.FileSystem, preHandlerFiles []string,
-	preHandlerFileSet map[string]struct{}, order ssareducer.ASTSequenceType,
-) <-chan *ssareducer.FileContent {
 	parser := newAntlrASTParseWorker(c)
 	parse := func(path string, content []byte, store *utils.SafeMap[any]) (ssa.FrontAST, error) {
 		start := time.Now()
@@ -526,7 +519,6 @@ func (c *Config) getFileHandlerWithOrder(
 	return ssareducer.FilesHandler(
 		c.ctx, filesystem, preHandlerFiles,
 		parse, initWorker,
-		order,
 		concurrency,
 		astBuildWindow.window,
 	)
@@ -601,10 +593,10 @@ func skipCompileFile(exclude ssaconfig.CompileExcludeFunc, path string, info fs.
 // ScanProjectFiles scans the project directory and returns the files to be processed
 func ScanProjectFiles(cfg ScanConfig) (*ScanResult, error) {
 	result := &ScanResult{
-		HandlerFiles:     make([]string, 0),
-		PreHandlerFiles:  make([]string, 0),
+		HandlerFiles:      make([]string, 0),
+		PreHandlerFiles:   make([]string, 0),
 		PreHandlerFileSet: make(map[string]struct{}),
-		Folders:          make([][]string, 0),
+		Folders:           make([][]string, 0),
 	}
 	exclude := cfg.ExcludeFunc
 

@@ -21,11 +21,11 @@ type BaseInfo struct {
 type ASTSequenceType int
 
 const (
+	// OutOfOrder parses concurrently and delivers each file as it finishes.
+	// Compile results must not depend on source order. A dependency that only
+	// appears when files are sorted is a bug in the frontend, not a reason to
+	// buffer every AST until the input order can be restored.
 	OutOfOrder ASTSequenceType = iota
-	Order
-	ReverseOrder
-	// BoundedOrder parses concurrently and delivers in input order within a fixed window.
-	BoundedOrder
 )
 
 // --- 基础信息配置 Get/Set 方法 ---
@@ -319,8 +319,8 @@ func WithProjectLanguage(language Language) Option {
 //   - enable_incremental_compile + base_program_name: incremental / diff workflows.
 //   - memory_compile: memory-only program cache (some CLIs force DB mode).
 //
-// AST parse ordering (OutOfOrder vs Order vs ReverseOrder) is not a field here; it is set via ssaapi.WithASTOrder
-// / extra option key `ssa_compile/ast_order`. Non-OutOfOrder modes buffer all file ASTs before main build — high RAM on large trees.
+// Parsed files are delivered as they finish. There is no input-order or
+// reverse-order mode: both buffered every AST and hid order-dependent builds.
 // Pre-handler pipeline channel sizing is capped in ssareducer.pipeInitBufSize (not proportional to total file count).
 type SSACompileConfig struct {
 	StrictMode   bool     `json:"strict_mode"`
@@ -330,20 +330,19 @@ type SSACompileConfig struct {
 	// patterns (test fixtures, build outputs, dependency archives, ...).
 	// When true, only ExcludeFiles (user-provided patterns) apply. This is
 	// the escape hatch for embedders/tests that need full-tree scanning.
-	DisableDefaultExcludes   bool            `json:"disable_default_excludes,omitempty"`
-	EntryFiles               []string        `json:"entry_files,omitempty"`
-	ReCompile                bool            `json:"re_compile"`
-	MemoryCompile            bool            `json:"memory_compile"`
-	Concurrency              int             `json:"compile_concurrency"`
-	MemoryLimit              int64           `json:"compile_memory_limit,omitempty"`
-	ASTSequence              ASTSequenceType `json:"ast_sequence"`
-	CompileIrCacheTTL        time.Duration   `json:"compile_ir_cache_ttl"`
-	CompileIrCacheMax        int             `json:"compile_ir_cache_max"`
-	FilePerformanceLog       bool            `json:"file_performance_log"`
-	Diagnostics              bool            `json:"diagnostics"`
-	StopOnCliCheck           bool            `json:"stop_on_cli_check"`
-	EnableIncrementalCompile bool            `json:"enable_incremental_compile"`
-	BaseProgramName          string          `json:"base_program_name"`
+	DisableDefaultExcludes   bool          `json:"disable_default_excludes,omitempty"`
+	EntryFiles               []string      `json:"entry_files,omitempty"`
+	ReCompile                bool          `json:"re_compile"`
+	MemoryCompile            bool          `json:"memory_compile"`
+	Concurrency              int           `json:"compile_concurrency"`
+	MemoryLimit              int64         `json:"compile_memory_limit,omitempty"`
+	CompileIrCacheTTL        time.Duration `json:"compile_ir_cache_ttl"`
+	CompileIrCacheMax        int           `json:"compile_ir_cache_max"`
+	FilePerformanceLog       bool          `json:"file_performance_log"`
+	Diagnostics              bool          `json:"diagnostics"`
+	StopOnCliCheck           bool          `json:"stop_on_cli_check"`
+	EnableIncrementalCompile bool          `json:"enable_incremental_compile"`
+	BaseProgramName          string        `json:"base_program_name"`
 	// CompileProjectBytes is runtime-only input for adaptive compile IR cache
 	// tuning. It reflects the total source bytes that will enter the compile
 	// stage and is intentionally excluded from JSON persistence.
@@ -504,23 +503,6 @@ func (c *Config) SetCompileMemoryLimit(limit int64) {
 		c.SSACompile = defaultSSACompileConfig()
 	}
 	c.SSACompile.MemoryLimit = limit
-}
-
-func (c *Config) GetCompileASTSequence() ASTSequenceType {
-	if c == nil || c.SSACompile == nil {
-		return OutOfOrder
-	}
-	return c.SSACompile.ASTSequence
-}
-
-func (c *Config) SetCompileASTSequence(sequence ASTSequenceType) {
-	if c == nil {
-		return
-	}
-	if c.SSACompile == nil {
-		c.SSACompile = defaultSSACompileConfig()
-	}
-	c.SSACompile.ASTSequence = sequence
 }
 
 func (c *Config) GetCompileIrCacheTTL() time.Duration {
@@ -809,16 +791,6 @@ func WithCompileMemoryLimit(limit int64) Option {
 			return err
 		}
 		c.SSACompile.MemoryLimit = limit
-		return nil
-	}
-}
-
-func WithCompileASTSequence(sequence ASTSequenceType) Option {
-	return func(c *Config) error {
-		if err := c.ensureSSACompile("Compile AST Sequence"); err != nil {
-			return err
-		}
-		c.SSACompile.ASTSequence = sequence
 		return nil
 	}
 }
