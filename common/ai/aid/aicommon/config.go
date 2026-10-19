@@ -48,6 +48,10 @@ const DefaultMaxSubAgentConcurrency = 5
 // AbsoluteMaxSubAgentConcurrency 是子 Agent 并发数的硬上限。
 const AbsoluteMaxSubAgentConcurrency = 20
 
+// DefaultTimelineContentSizeLimit 是运行时上下文的服务端默认压缩阈值，单位是 token。
+// RuntimeContextSizeLimit <= 0 时使用该值，避免零值把带有 Skill、Evidence 的时间线提前压小。
+const DefaultTimelineContentSizeLimit = 300 * 1024
+
 type ConfigOption func(*Config) error
 
 var configOptionIDRegistry sync.Map
@@ -773,7 +777,7 @@ func newConfig(ctx context.Context) *Config {
 		ContextProviderManager:             NewContextProviderManager(),
 		AiAutoRetry:                        5,
 		AiTransactionAutoRetry:             5,
-		TimelineContentSizeLimit:           300 * 1024, // Default limit for 300k tokens
+		TimelineContentSizeLimit:           DefaultTimelineContentSizeLimit,
 		promptOverflowRetryMax:             promptOverflowDefaultRetryMax,
 		Guardian:                           NewAsyncGuardian(ctx, id),
 		PerTaskUserInteractiveLimitedTimes: 1, // Default to 1 time
@@ -2270,13 +2274,16 @@ func WithMemoryLimits(contentSizeLimit, totalContentLimit int) ConfigOption {
 		if contentSizeLimit < 0 || totalContentLimit < 0 {
 			return utils.Error("memory limits cannot be negative")
 		}
+		if c == nil {
+			return nil
+		}
 		if c.m == nil {
 			c.m = &sync.Mutex{}
 		}
 		c.m.Lock()
-		c.TimelineContentSizeLimit = contentSizeLimit
 		c.TimelineTotalContentLimit = totalContentLimit
 		c.m.Unlock()
+		c.applyTimelineContentSizeLimit(contentSizeLimit)
 		return nil
 	}
 }
@@ -3351,19 +3358,40 @@ func WithDisableOutputEvent(types ...string) ConfigOption {
 }
 
 // WithTimelineLimit sets the timeline content size limit (deprecated name, kept for compatibility).
+// The value is applied to the bound Timeline as well. Writing only the config field leaves
+// compression on the previous threshold, so the new setting looks successful but does not take effect.
 func WithTimelineLimit(limit int) ConfigOption {
 	return func(c *Config) error {
 		if limit < 0 {
 			return utils.Error("timeline limit cannot be negative")
 		}
-		if c.m == nil {
-			c.m = &sync.Mutex{}
+		if c == nil {
+			return nil
 		}
-		c.m.Lock()
-		c.TimelineContentSizeLimit = limit
-		c.m.Unlock()
+		c.applyTimelineContentSizeLimit(limit)
 		return nil
 	}
+}
+
+// applyTimelineContentSizeLimit stores the base threshold and pushes it onto the live timeline.
+// Prompt overflow may later lower the timeline threshold for one model; an explicit limit change
+// must clear that backoff so the new threshold is measured immediately.
+func (c *Config) applyTimelineContentSizeLimit(limit int) {
+	if c == nil {
+		return
+	}
+	if c.m == nil {
+		c.m = &sync.Mutex{}
+	}
+	c.m.Lock()
+	c.TimelineContentSizeLimit = limit
+	timeline := c.Timeline
+	c.m.Unlock()
+	if timeline == nil {
+		return
+	}
+	timeline.SetTimelineContentLimit(int64(limit))
+	timeline.ClearCompressionBackoff()
 }
 
 func WithTimeline(t *Timeline) ConfigOption {
