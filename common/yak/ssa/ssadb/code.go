@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"slices"
-	"time"
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/utils"
@@ -170,95 +169,14 @@ const irCodeBatchChunk = 500
 // stable across the resident-cache flush, and a rejected statement cannot first
 // remove the previous snapshot. The batch still inserts rows that do not exist
 // yet, so one call both publishes new IR and refreshes changed IR.
-//
-// Legacy databases without the ux_ir_codes_program_code unique index keep the
-// delete-and-insert fallback, which does not need a conflict target.
+// ux_ir_codes_program_code is created with the schema; SaveInBatches skips nil
+// elements itself.
 func SaveIrCodeBatch(db *gorm.DB, items []*IrCode) error {
 	if db == nil || len(items) == 0 {
 		return nil
 	}
-	if hasIrCodeUniqueKey(db) {
-		if err := db.New().SaveInBatches(items, irCodeBatchChunk, "program_name", "code_id").Error; err != nil {
-			return fmt.Errorf("upsert IR snapshot: %w", err)
-		}
-		return nil
-	}
-	items = withoutNil(items)
-	for start := 0; start < len(items); start += irCodeBatchChunk {
-		end := min(start+irCodeBatchChunk, len(items))
-		if err := bulkUpsertIrCode(db, items[start:end]); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-// withoutNil returns items without its nil entries, and items itself when it
-// has none. The delete-and-insert fallbacks need it because they read fields of
-// every element; the gorm batch writers skip nil elements themselves.
-func withoutNil[T any](items []*T) []*T {
-	for i, item := range items {
-		if item != nil {
-			continue
-		}
-		clean := append(make([]*T, 0, len(items)-1), items[:i]...)
-		for _, rest := range items[i+1:] {
-			if rest != nil {
-				clean = append(clean, rest)
-			}
-		}
-		return clean
-	}
-	return items
-}
-
-// hasIrCodeUniqueKey reports whether the (program_name, code_id) conflict
-// target exists, i.e. whether INSERT ... ON CONFLICT can be used.
-func hasIrCodeUniqueKey(db *gorm.DB) bool {
-	return hasNamedIndex(db, TableIrCodes, "ux_ir_codes_program_code")
-}
-
-// hasNamedIndex asks the dialect whether index exists. db.New() drops a
-// program_name row scope while keeping the current connection.
-func hasNamedIndex(db *gorm.DB, table, index string) bool {
-	if db == nil || db.Dialect() == nil {
-		return false
-	}
-	return db.New().Dialect().HasIndex(table, index)
-}
-
-// bulkUpsertIrCode is the fallback for schemas without the (program_name,
-// code_id) unique index: it deletes the batch's rows (chunked at 999 to respect
-// SQLite's host-parameter limit) and reinserts them with new row ids. Must run
-// inside the caller's transaction so the delete and insert are atomic.
-func bulkUpsertIrCode(db *gorm.DB, items []*IrCode) error {
-	if len(items) == 0 {
-		return nil
-	}
-	progCodeIDs := make(map[string][]interface{}, 1)
-	for _, it := range items {
-		progCodeIDs[it.ProgramName] = append(progCodeIDs[it.ProgramName], it.CodeID)
-		// Fresh insert after delete: clear primary key / soft-delete state so
-		// CreateInBatches allocates a new row instead of colliding on id.
-		it.ID = 0
-		it.CreatedAt = time.Time{}
-		it.UpdatedAt = time.Time{}
-		it.DeletedAt = nil
-	}
-	for prog, ids := range progCodeIDs {
-		for i := 0; i < len(ids); i += 999 {
-			end := i + 999
-			if end > len(ids) {
-				end = len(ids)
-			}
-			if err := db.Where("program_name = ? AND code_id IN (?)", prog, ids[i:end]).
-				Unscoped().Delete(&IrCode{}).Error; err != nil {
-				return err
-			}
-		}
-	}
-	if r := db.CreateInBatches(items, irCodeBatchChunk); r.Error != nil {
-		return r.Error
+	if err := db.New().SaveInBatches(items, irCodeBatchChunk, "program_name", "code_id").Error; err != nil {
+		return fmt.Errorf("upsert IR snapshot: %w", err)
 	}
 	return nil
 }

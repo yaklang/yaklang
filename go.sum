@@ -376,6 +376,8 @@ github.com/yaklang/gorm v1.9.17-0.20261013085024-390fd51f9246 h1:iJxm0M3/rW2JXcA
 github.com/yaklang/gorm v1.9.17-0.20261013085024-390fd51f9246/go.mod h1:C5A6qs3ohHkyTElJnNDhJqCD0zBoaNBYRNNWNgYRPEg=
 github.com/yaklang/gorm v1.9.17-0.20261014094850-478163d62c38 h1:B/3+oMyY3IngSsWFDaumNdkLOezuQpMe3Gh1NPAZFLg=
 github.com/yaklang/gorm v1.9.17-0.20261014094850-478163d62c38/go.mod h1:C5A6qs3ohHkyTElJnNDhJqCD0zBoaNBYRNNWNgYRPEg=
+github.com/yaklang/gorm v1.9.17-0.20261019084921-3068c531c129 h1:M6gkH3S+yIVUehBPwpLcS4UqhieP207gF7+GbP/t/8Q=
+github.com/yaklang/gorm v1.9.17-0.20261019084921-3068c531c129/go.mod h1:C5A6qs3ohHkyTElJnNDhJqCD0zBoaNBYRNNWNgYRPEg=
 github.com/yaklang/javajive v0.1.2 h1:sAE/UruiNqcjCrEK1wyp3E3ooHJPwWHdXnNUbybxHvA=
 github.com/yaklang/javajive v0.1.2/go.mod h1:MP6RfWwjQ40V4J+n4k2NwXH1p5s/dNqzxC3Klx6ckRY=
 github.com/yaklang/javajive v0.4.1-0.20260920160508-81f8ef556034 h1:xEjfB8k9GPDzGAwIDeMMzEhOq4MpOPXB/9ZansxYhpI=

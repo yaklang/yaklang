@@ -252,7 +252,7 @@ func saveIrType(prog *Program, db *gorm.DB) func([]*ssadb.IrType) error {
 	return func(types []*ssadb.IrType) error {
 		var saveErr error
 		saveStep := func() error {
-			saveErr = cacheWriteTransaction(db, func(tx *gorm.DB) error {
+			saveErr = utils.GormTransaction(db, func(tx *gorm.DB) error {
 				return ssadb.SaveIrTypeBatch(tx, types)
 			})
 			return saveErr
@@ -310,19 +310,19 @@ func typeFromIrType(store *typeStore, irType *ssadb.IrType) Type {
 	case FunctionTypeKind:
 		typ := NewFunctionType("", nil, nil, false)
 		typ.SetId(int64(irType.TypeId))
-		typ.fullTypeName = utils.InterfaceToStringSlice(params["fullTypeName"])
+		typ.SetFullTypeNames(utils.InterfaceToStringSlice(params["fullTypeName"]))
 		return store.remember(typ)
 	case ObjectTypeKind, SliceTypeKind, MapTypeKind, TupleTypeKind, StructTypeKind:
 		typ := NewObjectType()
 		typ.Name = getParamStr("name")
-		typ.fullTypeName = utils.InterfaceToStringSlice(params["fullTypeName"])
+		typ.SetFullTypeNames(utils.InterfaceToStringSlice(params["fullTypeName"]))
 		typ.Kind = TypeKind(kind)
 		typ.SetId(int64(irType.TypeId))
 		return store.remember(typ)
 	case NumberTypeKind, StringTypeKind, ByteTypeKind, BytesTypeKind, BooleanTypeKind,
 		UndefinedTypeKind, NullTypeKind, AnyTypeKind, ErrorTypeKind:
 		typ := NewBasicType(TypeKind(kind), getParamStr("name"))
-		typ.fullTypeName = utils.InterfaceToStringSlice(params["fullTypeName"])
+		typ.SetFullTypeNames(utils.InterfaceToStringSlice(params["fullTypeName"]))
 		typ.SetId(int64(irType.TypeId))
 		return store.remember(typ)
 	case ClassBluePrintTypeKind:
@@ -330,7 +330,7 @@ func typeFromIrType(store *typeStore, irType *ssadb.IrType) Type {
 			LazyBuilder: NewLazyBuilder("Blueprint:" + getParamStr("name")),
 		}
 		typ.Name = getParamStr("name")
-		typ.fullTypeName = utils.InterfaceToStringSlice(params["fullTypeName"])
+		typ.SetFullTypeNames(utils.InterfaceToStringSlice(params["fullTypeName"]))
 		typ.Kind = ValidBlueprintKind(getParamStr("kind"))
 		typ.SetId(int64(irType.TypeId))
 		store.remember(typ)

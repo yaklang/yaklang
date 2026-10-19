@@ -155,12 +155,7 @@ func (c *NameCache) GetID(name string) int64 {
 		Name:        name,
 	}
 
-	// This write must not race the asynchronous SSA cache saver transaction.
-	// Keep the lookup and insert in one critical section as FirstOrCreate may
-	// write after first observing that the name is absent.
-	if err := WithSQLiteWriteLock(db.Dialect().GetName(), func() error {
-		return db.Where(IrNamePool{ProgramName: c.program, Name: name}).FirstOrCreate(&entry).Error
-	}); err != nil {
+	if err := db.Where(IrNamePool{ProgramName: c.program, Name: name}).FirstOrCreate(&entry).Error; err != nil {
 		return 0
 	}
 

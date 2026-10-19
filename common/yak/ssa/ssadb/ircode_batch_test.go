@@ -165,21 +165,3 @@ func TestSaveIrCodeBatch_NilEntriesSkipped(t *testing.T) {
 	require.Equal(t, 2, count)
 	require.NoError(t, SaveIrCodeBatch(db, []*IrCode{nil, nil}))
 }
-
-// Databases that were never migrated have no unique index; the delete-and-insert
-// fallback must keep working for them, including a repeated save.
-func TestSaveIrCodeBatch_FallbackWithoutUniqueIndex(t *testing.T) {
-	db, err := gorm.Open("sqlite3", ":memory:")
-	require.NoError(t, err)
-	t.Cleanup(func() { db.Close() })
-	require.NoError(t, db.AutoMigrate(&IrCode{}).Error)
-	require.False(t, hasIrCodeUniqueKey(db), "this test needs a database without the unique index")
-
-	require.NoError(t, SaveIrCodeBatch(db, []*IrCode{nil, {CodeID: 1, ProgramName: "p", Name: "old"}}))
-	require.NoError(t, SaveIrCodeBatch(db, []*IrCode{{CodeID: 1, ProgramName: "p", Name: "new"}, nil}))
-
-	var rows []IrCode
-	require.NoError(t, db.Where("program_name = ?", "p").Find(&rows).Error)
-	require.Len(t, rows, 1)
-	require.Equal(t, "new", rows[0].Name)
-}

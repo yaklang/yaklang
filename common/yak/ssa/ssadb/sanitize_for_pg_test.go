@@ -5,10 +5,10 @@ import (
 	"testing"
 	"unicode/utf8"
 
-	"github.com/yaklang/gorm"
-	_ "github.com/yaklang/gorm/dialects/sqlite"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/gorm"
+	_ "github.com/yaklang/gorm/dialects/sqlite"
 )
 
 func TestSanitizeStringForPG(t *testing.T) {
@@ -71,16 +71,16 @@ func TestSanitizeStringForPG(t *testing.T) {
 
 func TestSanitizeStructStringsForPG_IrCode(t *testing.T) {
 	ir := &IrCode{
-		ProgramName:       "test\x00program",
-		Name:              "func\x00name",
-		VerboseName:       "verbose\x00name",
-		ShortVerboseName:  "short\x00name",
-		String:            "const\x00value",
-		OpcodeName:        "opcode",
-		SourceCodeHash:    "hash\x00abc",
+		ProgramName:        "test\x00program",
+		Name:               "func\x00name",
+		VerboseName:        "verbose\x00name",
+		ShortVerboseName:   "short\x00name",
+		String:             "const\x00value",
+		OpcodeName:         "opcode",
+		SourceCodeHash:     "hash\x00abc",
 		ProgramCompileHash: "compile\x00hash",
-		ConstType:         "normal",
-		Variable:          StringSlice{"var\x001", "var2", "var\x003"},
+		ConstType:          "normal",
+		Variable:           StringSlice{"var\x001", "var2", "var\x003"},
 	}
 
 	sanitizeStructStringsForPG(ir)
@@ -181,13 +181,14 @@ func TestBeforeSaveHookStripsNUL_IrNamePool(t *testing.T) {
 }
 
 func TestBeforeSaveHookStripsNUL_UpsertIrCode(t *testing.T) {
-	// UpsertIrCode goes through SaveIrCodeBatch → CreateInBatches, which still
-	// triggers BeforeSave. Verify the hook covers this path.
+	// UpsertIrCode goes through SaveIrCodeBatch → SaveInBatches, which still
+	// triggers BeforeSave. The conflict target is the production unique index.
 	db, err := gorm.Open("sqlite3", ":memory:")
 	require.NoError(t, err)
 	defer db.Close()
 
 	require.NoError(t, db.AutoMigrate(&IrCode{}).Error)
+	require.NoError(t, db.Exec(`CREATE UNIQUE INDEX IF NOT EXISTS ux_ir_codes_program_code ON ir_codes (program_name, code_id)`).Error)
 
 	ir := &IrCode{
 		ProgramName: "test\x00upsert",
@@ -208,16 +209,16 @@ func TestBeforeSaveHookStripsNUL_UpsertIrCode(t *testing.T) {
 // UTF-8 (CJK, emoji) is preserved.
 func TestSanitizeStructStringsForPG_InvalidUTF8_IrCode(t *testing.T) {
 	ir := &IrCode{
-		ProgramName:       "test\xa0program",
-		Name:              "func\xe8\x07\x10name",
-		VerboseName:       "verbose\xa0name",
-		ShortVerboseName:  "short\xe8\x07\x10name",
-		String:            "const\xa0value",
-		OpcodeName:        "opcode",
-		SourceCodeHash:    "hash\xa0abc",
+		ProgramName:        "test\xa0program",
+		Name:               "func\xe8\x07\x10name",
+		VerboseName:        "verbose\xa0name",
+		ShortVerboseName:   "short\xe8\x07\x10name",
+		String:             "const\xa0value",
+		OpcodeName:         "opcode",
+		SourceCodeHash:     "hash\xa0abc",
 		ProgramCompileHash: "compile\xe8\x07\x10hash",
-		ConstType:         "normal",
-		Variable:          StringSlice{"var\xa01", "var2", "var\xe8\x07\x103"},
+		ConstType:          "normal",
+		Variable:           StringSlice{"var\xa01", "var2", "var\xe8\x07\x103"},
 	}
 
 	sanitizeStructStringsForPG(ir)
@@ -246,11 +247,11 @@ func TestSanitizeStructStringsForPG_InvalidUTF8_IrCode(t *testing.T) {
 // UTF-8 content that source code legitimately contains.
 func TestSanitizeStringForPG_PreservesValidUTF8(t *testing.T) {
 	cases := []string{
-		"你好世界",                                     // 4 CJK chars
-		"hello \xf0\x9f\x98\x80 world",                // emoji
-		"caf\xc3\xa9",                                  // café (2-byte)
-		"日本語テスト",                                  // Japanese
-		"\xe4\xb8\xad\xe6\x96\x87",                     // 中文
+		"你好世界",                         // 4 CJK chars
+		"hello \xf0\x9f\x98\x80 world", // emoji
+		"caf\xc3\xa9",                  // café (2-byte)
+		"日本語テスト",                       // Japanese
+		"\xe4\xb8\xad\xe6\x96\x87",     // 中文
 	}
 	for _, s := range cases {
 		result := sanitizeStringForPG(s)
@@ -287,9 +288,7 @@ func TestBeforeSaveHookStripsInvalidUTF8_IrCode(t *testing.T) {
 	assert.Equal(t, "helloworld\x07\x10!", result.String)
 }
 
-// The test above runs on a database without the unique index and so takes the
-// delete-and-insert fallback. This one takes the SaveInBatches path and checks
-// the BeforeSave sanitizer still runs for every element there.
+// SaveInBatches still runs BeforeSave on every element.
 func TestBeforeSaveHookStripsNUL_SaveInBatchesPath(t *testing.T) {
 	db, err := gorm.Open("sqlite3", ":memory:")
 	require.NoError(t, err)
@@ -297,8 +296,8 @@ func TestBeforeSaveHookStripsNUL_SaveInBatchesPath(t *testing.T) {
 
 	require.NoError(t, db.AutoMigrate(&IrCode{}, &IrType{}).Error)
 	patchIrCodeIndex(db)
-	require.True(t, hasIrCodeUniqueKey(db))
-	require.True(t, hasNamedIndex(db, TableIrTypes, "ux_ir_types_program_type"))
+	require.True(t, db.New().Dialect().HasIndex(TableIrCodes, "ux_ir_codes_program_code"))
+	require.True(t, db.New().Dialect().HasIndex(TableIrTypes, "ux_ir_types_program_type"))
 
 	require.NoError(t, SaveIrCodeBatch(db, []*IrCode{{ProgramName: "p\x00rog", CodeID: 1, Name: "func\x00x"}}))
 	var code IrCode
