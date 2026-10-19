@@ -21,6 +21,8 @@ var javaTemplateExtensions = []string{".jsp", ".jspx", ".ftl", ".ftlh", ".ftlx",
 
 func (*SSABuilder) SupportsConcurrentUnitBuild() bool { return true }
 
+func (*SSABuilder) DeferMethodBuildOnLookup() bool { return true }
+
 // PartitionCompileUnits groups .java files by their declared package, and
 // non-.java resources (templates, etc.) by directory under a "resource:" key.
 func (*SSABuilder) PartitionCompileUnits(fs filesys_interface.FileSystem, files []string) []*ssa.CompileUnit {

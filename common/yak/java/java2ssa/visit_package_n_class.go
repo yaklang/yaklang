@@ -135,7 +135,9 @@ func (y *singleFileBuilder) VisitClassDeclaration(raw javaparser.IClassDeclarati
 		if extendName != "" {
 			bp := y.GetBluePrint(extendName)
 			if bp == nil && declareMissing {
+				restore := y.switchToLiveDeclarationBlock()
 				bp = y.CreateBlueprint(extendName, tokenMap[extendName])
+				restore()
 				y.AddFullTypeNameForAllImport(extendName, bp)
 			}
 			if bp != nil {
@@ -147,7 +149,9 @@ func (y *singleFileBuilder) VisitClassDeclaration(raw javaparser.IClassDeclarati
 		for _, implName := range implNames {
 			bp := y.GetBluePrint(implName)
 			if bp == nil && declareMissing {
+				restore := y.switchToLiveDeclarationBlock()
 				bp = y.CreateBlueprint(implName, tokenMap[implName])
+				restore()
 				y.AddFullTypeNameForAllImport(implName, bp)
 			}
 			if bp == nil {

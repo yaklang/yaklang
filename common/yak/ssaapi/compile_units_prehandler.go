@@ -24,7 +24,6 @@ type prehandleBatchEnv struct {
 	handlerFileSet        map[string]struct{}
 	preHandlerBuildsFiles bool
 	preHandlerProcess     func()
-	concurrentUnits       bool
 	concurrency           int
 	astErrMu              sync.Mutex
 	astErr                error
@@ -33,28 +32,43 @@ type prehandleBatchEnv struct {
 	maxAstParseErrLogs    int
 }
 
+// unitWorkerCounts is the only serial-versus-parallel decision for one batch.
+// Prehandle and body build each get a goroutine count; 1 is the serial run of
+// the same code. drainUnscheduled is for frontends that do not schedule their
+// own upstream libraries.
+func unitWorkerCounts(c *Config, prog *ssa.Program) (prehandleWorkers, buildWorkers int, drainUnscheduled bool) {
+	configured := 1
+	if c != nil {
+		configured = c.GetCompileConcurrency()
+	}
+	if configured < 1 {
+		configured = 1
+	}
+	prehandleWorkers = 1
+	if c != nil {
+		if pre, ok := c.LanguageBuilder.(ssa.ConcurrentUnitPreHandler); ok {
+			if pre.SupportsConcurrentUnitPreHandler() {
+				prehandleWorkers = configured
+			}
+		} else if prog != nil && prog.ConcurrentUnitBuildEnabled() {
+			prehandleWorkers = configured
+		}
+	}
+	buildWorkers = 1
+	drainUnscheduled = true
+	if c != nil {
+		if build, ok := c.LanguageBuilder.(ssa.ConcurrentUnitBuilder); ok && build.SupportsConcurrentUnitBuild() {
+			buildWorkers = configured
+			drainUnscheduled = false
+		}
+	}
+	return prehandleWorkers, buildWorkers, drainUnscheduled
+}
+
 func (env *prehandleBatchEnv) consume(prefetchedFiles <-chan *ssareducer.FileContent) bool {
 	if language := env.c.LanguageBuilder; language != nil && env.builder != nil {
 		language.InitHandler(env.builder)
 	}
-	if env.concurrentUnits && env.concurrency > 1 {
-		return env.consumeParallel(prefetchedFiles)
-	}
-	canceled := false
-	for fileContent := range prefetchedFiles {
-		if env.c.isStop() {
-			canceled = true
-			if fileContent != nil {
-				fileContent.Release()
-			}
-			continue
-		}
-		env.prehandleFile(fileContent)
-	}
-	return canceled
-}
-
-func (env *prehandleBatchEnv) consumeParallel(prefetchedFiles <-chan *ssareducer.FileContent) bool {
 	workers := env.concurrency
 	if workers < 1 {
 		workers = 1

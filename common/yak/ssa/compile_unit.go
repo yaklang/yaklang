@@ -20,6 +20,9 @@ type CompileUnit struct {
 	// LibraryName identifies a frontend-owned library when its name cannot be
 	// derived from the unit key (notably Go's declared package name).
 	LibraryName string
+	// DeclaredLibrary means the frontend owns this unit's library. An empty
+	// LibraryName then stays on the application instead of the path-derived name.
+	DeclaredLibrary bool
 }
 
 // UnitRef is a directed dependency edge between two compile units.
@@ -59,6 +62,19 @@ type ConcurrentUnitPreHandler interface {
 	SupportsConcurrentUnitPreHandler() bool
 }
 
+// MethodLookupBuilder tells the engine not to drain a foreign library's method
+// body on the caller's goroutine. Frontends that schedule bodies themselves opt in.
+type MethodLookupBuilder interface {
+	DeferMethodBuildOnLookup() bool
+}
+
+// SetDeferMethodBuildOnLookup records the frontend's lookup policy.
+func (p *Program) SetDeferMethodBuildOnLookup(enabled bool) {
+	if app := p.GetApplication(); app != nil {
+		app.deferMethodBuild = enabled
+	}
+}
+
 // SetConcurrentUnitBuild fixes the ownership policy before unit work starts.
 // Frontends that have not opted in retain their existing shared-scope behavior.
 func (p *Program) SetConcurrentUnitBuild(enabled bool) {
@@ -83,16 +99,14 @@ func (p *Program) shouldBuildOnLookup() bool {
 	return !p.ConcurrentUnitBuildEnabled()
 }
 
-// Java and Go register package declarations before the scheduler drains their
-// method bodies. A lookup from another worker must not steal that body. Other
-// frontends still rely on eager method lookup (notably TS re-exports), so keep
-// their established behavior until they have an equivalent ownership gate.
+// A frontend that schedules method bodies itself opts out of draining them on
+// lookup. Other frontends still rely on eager method lookup.
 func (p *Program) deferMethodBuildOnLookup() bool {
 	if p == nil || !p.ConcurrentUnitBuildEnabled() {
 		return false
 	}
 	app := p.GetApplication()
-	return app != nil && (app.Language == ssaconfig.JAVA || app.Language == ssaconfig.GO)
+	return app != nil && app.deferMethodBuild
 }
 
 func (f *Function) buildOnLookup() {

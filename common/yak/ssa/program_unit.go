@@ -7,7 +7,6 @@ import (
 
 	stdlog "github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils/memorybudget"
-	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 )
 
 // AppendLibraryFile records a frontend's library-to-file relation on the
@@ -184,19 +183,30 @@ func libraryNameFromCompileUnitKey(unitKey string) string {
 	}
 }
 
-// Go's frontend owns its package libraries by declared package name, which
-// cannot be recovered from a directory key. Keep declaration registration on
-// the application; ProgramForCompileUnit maps the body build to the package.
+// A frontend that sets DeclaredLibrary owns the library itself. Declaration
+// registration stays on the application; ProgramForCompileUnit maps the body
+// build onto LibraryName.
 func (prog *Program) libraryNameForCompileUnit(unitKey string) string {
-	name := libraryNameFromCompileUnitKey(unitKey)
+	if unit := prog.compileUnitByKey(unitKey); unit != nil && unit.DeclaredLibrary {
+		return ""
+	}
+	return libraryNameFromCompileUnitKey(unitKey)
+}
+
+func (prog *Program) compileUnitByKey(unitKey string) *CompileUnit {
+	if prog == nil || unitKey == "" {
+		return nil
+	}
 	app := prog.GetApplication()
 	if app == nil {
 		app = prog
 	}
-	if app.Language == ssaconfig.GO && strings.HasPrefix(unitKey, "dir:") {
-		return ""
+	for _, unit := range app.CompileUnits {
+		if unit != nil && unit.Key == unitKey {
+			return unit
+		}
 	}
-	return name
+	return nil
 }
 
 // ProgramForCompileUnit returns the Program that owns this compile unit.
@@ -211,13 +221,10 @@ func (prog *Program) ProgramForCompileUnit(unitKey string) *Program {
 	if app == nil {
 		app = prog
 	}
-	if app.Language == ssaconfig.GO && strings.HasPrefix(unitKey, "dir:") {
-		for _, unit := range app.CompileUnits {
-			if unit != nil && unit.Key == unitKey && unit.LibraryName != "" {
-				if lib, _ := app.GetLibrary(unit.LibraryName); lib != nil {
-					return lib
-				}
-				break
+	if unit := app.compileUnitByKey(unitKey); unit != nil && unit.DeclaredLibrary {
+		if unit.LibraryName != "" {
+			if lib, _ := app.GetLibrary(unit.LibraryName); lib != nil {
+				return lib
 			}
 		}
 		return app

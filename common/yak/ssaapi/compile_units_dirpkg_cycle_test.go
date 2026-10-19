@@ -8,7 +8,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
-	"github.com/yaklang/yaklang/common/yak/ssaapi/ssareducer"
 )
 
 // compileUnitWorker matches prehandleBatchEnv.unitWorker for a library name.
@@ -69,7 +68,6 @@ public class R {
 		WithLanguage(ssaconfig.JAVA),
 		WithMemory(),
 		ssaconfig.WithCompileConcurrency(workers),
-		WithASTOrder(ssareducer.Order),
 	)
 	require.NoError(t, err)
 	program, err := cfg.parseProjectWithFSUnits(vf, func(float64, string, ...any) {})

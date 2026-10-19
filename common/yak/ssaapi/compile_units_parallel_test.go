@@ -379,8 +379,8 @@ func TestCompileUnitGoPackageLibrariesOverlap(t *testing.T) {
 	prog := ssa.NewProgram(cfg, ssa.ProgramCacheMemory, ssa.Application, filesys.NewVirtualFs(), ".", 0)
 	prog.Language = ssaconfig.GO
 	prog.CompileUnits = []*ssa.CompileUnit{
-		{Key: "dir:first", LibraryName: "first"},
-		{Key: "dir:second", LibraryName: "second"},
+		{Key: "dir:first", LibraryName: "first", DeclaredLibrary: true},
+		{Key: "dir:second", LibraryName: "second", DeclaredLibrary: true},
 	}
 	entered := make(chan struct{}, 2)
 	release := make(chan struct{})
