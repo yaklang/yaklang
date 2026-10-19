@@ -399,3 +399,150 @@ func TestHotPatch_ExecutionStrategy_PersistWithDurationAndCriteria(t *testing.T)
 	require.Equal(t, int64(1800), got.GetStrategy().GetGoalDurationSeconds())
 	require.Equal(t, "must complete code audit with risk ratings", got.GetStrategy().GetGoalAcceptanceCriteria())
 }
+
+func requireRuntimeContextLimit(t *testing.T, c *Config, limit int) {
+	t.Helper()
+	require.Equal(t, limit, c.TimelineContentSizeLimit)
+	require.EqualValues(t, limit, c.GetTimelineContentSizeLimit())
+	timeline := c.GetTimeline()
+	require.NotNil(t, timeline)
+	require.EqualValues(t, limit, timeline.GetTimelineContentLimit(), "config and timeline thresholds diverged")
+	require.EqualValues(t, limit, c.SimpleInfoMap()["TimelineContentSizeLimit"])
+}
+
+func stallTimelineCompression(t *testing.T, timeline *Timeline) {
+	t.Helper()
+	timeline.mu.Lock()
+	timeline.compressionLastFailure = "stale-limit"
+	timeline.compressionRetryAfter = time.Now().Add(time.Minute)
+	timeline.mu.Unlock()
+	require.True(t, timeline.compressionCoolingDown(timelinePromptUsage{Fingerprint: "stale-limit"}))
+}
+
+func TestWithTimelineContentLimitUpdatesBoundTimeline(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	c := NewTestConfig(ctx)
+	timeline := c.GetTimeline()
+	timeline.SetTimelineContentLimit(111)
+	stallTimelineCompression(t, timeline)
+
+	require.NoError(t, WithTimelineContentLimit(64*1024)(c))
+
+	require.Same(t, timeline, c.GetTimeline())
+	requireRuntimeContextLimit(t, c, 64*1024)
+	require.False(t, timeline.compressionCoolingDown(timelinePromptUsage{Fingerprint: "stale-limit"}),
+		"an explicit limit change must be measured immediately")
+}
+
+func TestHotPatch_RuntimeContextSizeLimit_UpdatesTimeline(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	c, feed := newHotPatchTestConfig(t, ctx)
+	c.StartEventLoop(ctx)
+
+	timeline := c.GetTimeline()
+	require.Same(t, timeline, c.GetTimeline())
+	timeline.SetTimelineContentLimit(111)
+	stallTimelineCompression(t, timeline)
+	require.Equal(t, DefaultTimelineContentSizeLimit, c.TimelineContentSizeLimit,
+		"precondition: only the timeline object is stale")
+
+	feed(&ypb.AIInputEvent{
+		IsConfigHotpatch: true,
+		HotpatchType:     HotPatchType_RuntimeContextSizeLimit,
+		Params: &ypb.AIStartParams{
+			TimelineContentSizeLimit: 20 * 1024, // deprecated field must not win
+			RuntimeContextSizeLimit:  128 * 1024,
+		},
+	}, 1)
+
+	require.Same(t, timeline, c.GetTimeline())
+	requireRuntimeContextLimit(t, c, 128*1024)
+	require.False(t, timeline.compressionCoolingDown(timelinePromptUsage{Fingerprint: "stale-limit"}))
+
+	timeline.SetTimelineContentLimit(222)
+	stallTimelineCompression(t, timeline)
+	feed(&ypb.AIInputEvent{
+		IsConfigHotpatch: true,
+		HotpatchType:     HotPatchType_RuntimeContextSizeLimit,
+		Params: &ypb.AIStartParams{
+			TimelineContentSizeLimit: 20 * 1024,
+		},
+	}, 1)
+
+	require.Same(t, timeline, c.GetTimeline())
+	requireRuntimeContextLimit(t, c, DefaultTimelineContentSizeLimit)
+	require.False(t, timeline.compressionCoolingDown(timelinePromptUsage{Fingerprint: "stale-limit"}))
+
+	feed(&ypb.AIInputEvent{
+		IsConfigHotpatch: true,
+		HotpatchType:     HotPatchType_RuntimeContextSizeLimit,
+		Params: &ypb.AIStartParams{
+			RuntimeContextSizeLimit: -1,
+		},
+	}, 1)
+	requireRuntimeContextLimit(t, c, DefaultTimelineContentSizeLimit)
+}
+
+func TestHotPatch_RuntimeContextSizeLimit_PersistSessionStartParams(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	sessionID := "session-runtime-context-size-hotpatch"
+	c, feed := newHotPatchTestConfig(t, ctx, WithPersistentSessionId(sessionID))
+	require.NoError(t, c.GetDB().AutoMigrate(&schema.AISession{}).Error)
+	_, err := yakit.CreateOrUpdateAISessionMetaStartParams(c.GetDB(), sessionID, &ypb.AIStartParams{
+		EnablePlan:               true,
+		ReviewPolicy:             "manual",
+		TimelineContentSizeLimit: 20 * 1024,
+		RuntimeContextSizeLimit:  64 * 1024,
+		TimelineSessionID:        sessionID,
+	})
+	require.NoError(t, err)
+	c.StartEventLoop(ctx)
+
+	timeline := c.GetTimeline()
+	timeline.SetTimelineContentLimit(111)
+
+	feed(&ypb.AIInputEvent{
+		IsConfigHotpatch: true,
+		HotpatchType:     HotPatchType_RuntimeContextSizeLimit,
+		Params: &ypb.AIStartParams{
+			TimelineContentSizeLimit: 8 * 1024,
+			RuntimeContextSizeLimit:  96 * 1024,
+		},
+	}, 1)
+
+	requireRuntimeContextLimit(t, c, 96*1024)
+	got, err := yakit.GetAISessionMetaStartParamsBySessionID(c.GetDB(), sessionID)
+	require.NoError(t, err)
+	require.EqualValues(t, 96*1024, got.GetRuntimeContextSizeLimit())
+	require.EqualValues(t, 20*1024, got.GetTimelineContentSizeLimit(), "deprecated field is not a hotpatch target")
+	require.True(t, got.GetEnablePlan())
+	require.Equal(t, "manual", got.GetReviewPolicy())
+	require.Equal(t, sessionID, got.GetTimelineSessionID())
+
+	feed(&ypb.AIInputEvent{
+		IsConfigHotpatch: true,
+		HotpatchType:     HotPatchType_RuntimeContextSizeLimit,
+		Params:           &ypb.AIStartParams{RuntimeContextSizeLimit: 0},
+	}, 1)
+
+	requireRuntimeContextLimit(t, c, DefaultTimelineContentSizeLimit)
+	got, err = yakit.GetAISessionMetaStartParamsBySessionID(c.GetDB(), sessionID)
+	require.NoError(t, err)
+	require.Zero(t, got.GetRuntimeContextSizeLimit(), "zero must stick so the next start uses the server default")
+	require.True(t, got.GetEnablePlan())
+	require.Equal(t, "manual", got.GetReviewPolicy())
+
+	feed(&ypb.AIInputEvent{
+		IsConfigHotpatch: true,
+		HotpatchType:     HotPatchType_RuntimeContextSizeLimit,
+		Params:           &ypb.AIStartParams{RuntimeContextSizeLimit: -5},
+	}, 1)
+	got, err = yakit.GetAISessionMetaStartParamsBySessionID(c.GetDB(), sessionID)
+	require.NoError(t, err)
+	require.Zero(t, got.GetRuntimeContextSizeLimit())
+	requireRuntimeContextLimit(t, c, DefaultTimelineContentSizeLimit)
+}

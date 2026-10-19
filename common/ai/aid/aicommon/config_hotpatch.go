@@ -100,8 +100,8 @@ func (c *Config) SimpleInfoMap() map[string]interface{} {
 		"EnableGoalMode":              c.GetEnableGoalMode(),
 		"GoalMinIterations":           c.GetGoalMinIterations(),
 		"MaxSubAgents":                c.GetMaxSubAgents(),
-		"GoalDurationSeconds":          c.GetGoalDurationSeconds(),
-		"GoalAcceptanceCriteria":       c.GetGoalAcceptanceCriteria(),
+		"GoalDurationSeconds":         c.GetGoalDurationSeconds(),
+		"GoalAcceptanceCriteria":      c.GetGoalAcceptanceCriteria(),
 	}
 }
 
@@ -114,7 +114,8 @@ var (
 	HotPatchType_EnablePlan                  = "EnablePlan"
 	HotPatchType_AllowPlanUserInteract       = "AllowPlanUserInteract"
 	HotPatchType_SyncPerceptionTrigger       = "SyncPerceptionTrigger"
-	HotPatchType_ExecutionStrategy          = "ExecutionStrategy"
+	HotPatchType_ExecutionStrategy           = "ExecutionStrategy"
+	HotPatchType_RuntimeContextSizeLimit     = "RuntimeContextSizeLimit"
 
 	hotPatchPromoteIntelligentConfig = func(serviceName, modelName string) error {
 		mgr := aiconfig.GetGlobalManager()
@@ -127,6 +128,16 @@ var (
 		return ai.LoadChater(serviceName, defaultOpts...)
 	}
 )
+
+// runtimeContextSizeLimitFromHotpatch maps the hotpatch field onto the config's
+// token threshold. Non-positive values mean "use the server default", matching
+// AIStartParams.RuntimeContextSizeLimit. The deprecated timeline field is not read.
+func runtimeContextSizeLimitFromHotpatch(raw int64) int {
+	if raw <= 0 {
+		return DefaultTimelineContentSizeLimit
+	}
+	return int(raw)
+}
 
 func (c *Config) ProcessHotPatchMessage(e *ypb.AIInputEvent) []ConfigOption {
 	if !e.IsConfigHotpatch {
@@ -241,6 +252,11 @@ func (c *Config) ProcessHotPatchMessage(e *ypb.AIInputEvent) []ConfigOption {
 			"model info is now auto-detected from the actual AI gateway call")
 	}
 
+	if e.HotpatchType == HotPatchType_RuntimeContextSizeLimit {
+		// <=0 restores the server default. The deprecated TimelineContentSizeLimit
+		// is intentionally ignored: a frontend still sends that old non-zero default.
+		aiOption = append(aiOption, WithTimelineContentLimit(runtimeContextSizeLimitFromHotpatch(hotPatchParams.GetRuntimeContextSizeLimit())))
+	}
 
 	if e.HotpatchType == HotPatchType_ExecutionStrategy {
 		strategy := hotPatchParams.GetStrategy()
@@ -330,6 +346,15 @@ func mergeHotpatchSessionStartParams(base *ypb.AIStartParams, e *ypb.AIInputEven
 			return base, false
 		}
 		next.Strategy = proto.Clone(incoming).(*ypb.AIExecutionStrategy)
+	case HotPatchType_RuntimeContextSizeLimit:
+		// Persist the raw value, including 0. A positive value is an explicit
+		// threshold; <=0 means the next start keeps the server default instead
+		// of replaying the previous explicit limit.
+		limit := p.GetRuntimeContextSizeLimit()
+		if limit < 0 {
+			limit = 0
+		}
+		next.RuntimeContextSizeLimit = limit
 	default:
 		return base, false
 	}
