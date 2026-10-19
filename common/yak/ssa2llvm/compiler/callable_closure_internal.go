@@ -42,7 +42,21 @@ func (c *Compiler) freeValueCaptureMode(fn *ssa.Function, binding callframe.Free
 	if !ok || p == nil || p.GetDefault() == nil {
 		return freeValueCaptureByValue
 	}
-	if phi, ok := p.GetDefault().(*ssa.Phi); ok && phi != nil {
+	defaultValue := p.GetDefault()
+	// A captured function other than this closure itself is an immutable
+	// reference and travels by value. The closure's own self-capture stays
+	// by reference: recursion reads the cell that is patched with the
+	// closure object after it is built. Treating every function capture as a
+	// reference faults when the closure is entered through a raw address.
+	if capturedFn, isFn := defaultValue.(*ssa.Function); isFn && capturedFn != fn {
+		return freeValueCaptureByValue
+	}
+	if _, isFn := defaultValue.(*ssa.Function); !isFn {
+		if ft, ok := defaultValue.GetType().(*ssa.FunctionType); ok && ft != nil && ft.This != fn {
+			return freeValueCaptureByValue
+		}
+	}
+	if phi, ok := defaultValue.(*ssa.Phi); ok && phi != nil {
 		if lv := phi.GetLastVariable(); lv != nil && !lv.GetLocal() {
 			// A non-local loop phi is the shared loop variable: all closures
 			// created in the loop must observe the same slot.
