@@ -344,14 +344,12 @@ func (v *ScopedVersionedTable[T]) getAllVersionInCurrentLexicalScope(name string
 }
 
 func (scope *ScopedVersionedTable[T]) ReadVariableFromLinkSideEffect(name string) (VersionedIF[T], VersionedIF[T]) {
-	var find, bind VersionedIF[T]
-	scope.ForEachCapturedSideEffect(func(s string, vi []VersionedIF[T]) {
-		if s == name {
-			find = vi[0]
-			bind = vi[1]
-		}
-	})
-	return find, bind
+	// This is an exact lookup. Iteration snapshots the whole ordered map for
+	// every returned side effect, creating quadratic work and allocation.
+	if pair, ok := scope.linkSideEffect.Get(name); ok {
+		return pair[0], pair[1]
+	}
+	return nil, nil
 }
 
 func (scope *ScopedVersionedTable[T]) ReadVariable(name string, current ...bool) VersionedIF[T] {
