@@ -13,9 +13,10 @@ import (
 // SourceQueryTarget is a SyntaxFlowQueryInstance backed only by raw source
 // files (no SSA IR). Source-mode rules run via sfpattern against these files.
 type SourceQueryTarget struct {
-	name  string
-	lang  ssaconfig.Language
-	files map[string]string
+	name     string
+	lang     ssaconfig.Language
+	files    map[string]string
+	hitCache *sfpattern.SharedHitCache
 }
 
 var _ SyntaxFlowQueryInstance = (*SourceQueryTarget)(nil)
@@ -29,10 +30,20 @@ func NewSourceQueryTarget(name string, files map[string]string) *SourceQueryTarg
 		name = "source"
 	}
 	return &SourceQueryTarget{
-		name:  name,
-		lang:  ssaconfig.General,
-		files: files,
+		name:     name,
+		lang:     ssaconfig.General,
+		files:    files,
+		hitCache: sfpattern.NewSharedHitCache(),
 	}
+}
+
+// SourceFilterComputes reports how many distinct file-filter scans this target
+// has run. Repeated rules with the same path and patterns do not add to it.
+func (t *SourceQueryTarget) SourceFilterComputes() int {
+	if t == nil || t.hitCache == nil {
+		return 0
+	}
+	return t.hitCache.Computes()
 }
 
 // NewSourceQueryTargetFromFS loads all files then NewSourceQueryTarget.
@@ -135,11 +146,21 @@ func (t *SourceQueryTarget) syntaxFlow(opts []QueryOption, ruleOpt QueryOption) 
 	}
 	root := sfpattern.NewRoot(t.files)
 	root.SetProgramName(t.name)
+	root.SetSourceHitStore(t.hitCache)
 	prog := NewTmpProgram(t.name)
 	all := make([]QueryOption, 0, len(opts)+3)
 	all = append(all, QueryWithValue(root), ruleOpt, QueryWithResultProgram(prog))
 	all = append(all, opts...)
 	return QuerySyntaxflow(all...)
+}
+
+func patternRootFromValues(values sfvm.Values) *sfvm.PatternRoot {
+	for _, v := range values {
+		if r, ok := v.(*sfvm.PatternRoot); ok && r != nil {
+			return r
+		}
+	}
+	return nil
 }
 
 // collectFilesForSourceMode gathers path→content for mode=source frames.

@@ -259,6 +259,14 @@ func QuerySyntaxflow(opt ...QueryOption) (*SyntaxFlowResult, error) {
 		if config.program != nil {
 			root.SetProgramName(config.program.GetProgramName())
 		}
+		// Each rule gets its own root so the batch window stays private, but
+		// the file-set hit store is shared so the same filter is not rerun.
+		if prev := patternRootFromValues(config.value); prev != nil {
+			if root.GetProgramName() == "" {
+				root.SetProgramName(prev.GetProgramName())
+			}
+			root.SetSourceHitStore(prev.SourceHitStore())
+		}
 		res, err = executeSourceFrameBatches(frame, root, config)
 	} else if sfvm.FrameIsStructMode(frame) {
 		if config.structBound == nil {

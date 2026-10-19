@@ -342,6 +342,17 @@ type PatternRoot struct {
 	sourceHitTotal   int
 	sourceHitCaches  map[string][]SourceHit
 	sourceHitEditors map[string]*memedit.MemEditor
+	// sourceHitStore is shared by every rule on one immutable file set.
+	// Batch window fields stay on this root so concurrent rules do not
+	// clobber each other's offsets.
+	sourceHitStore SourceHitStore
+}
+
+// SourceHitStore remembers file-filter hits for one immutable file set.
+// A later rule with the same path and patterns reuses the hits instead of
+// scanning the tree again. Implementations must be safe for concurrent Do.
+type SourceHitStore interface {
+	Do(key string, compute func() ([]SourceHit, error)) ([]SourceHit, error)
 }
 
 // SourceHit is a raw source match before it is wrapped as a ValueOperator.
@@ -475,6 +486,23 @@ func (r *PatternRoot) Files() map[string]string {
 		return nil
 	}
 	return r.files
+}
+
+// SetSourceHitStore attaches the file-set hit cache. The store must outlive
+// this root. Nil clears it.
+func (r *PatternRoot) SetSourceHitStore(store SourceHitStore) {
+	if r == nil {
+		return
+	}
+	r.sourceHitStore = store
+}
+
+// SourceHitStore returns the file-set hit cache, or nil.
+func (r *PatternRoot) SourceHitStore() SourceHitStore {
+	if r == nil {
+		return nil
+	}
+	return r.sourceHitStore
 }
 
 func (r *PatternRoot) String() string { return "pattern-root" }

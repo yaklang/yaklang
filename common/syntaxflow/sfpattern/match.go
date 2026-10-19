@@ -9,7 +9,10 @@ import (
 	"path"
 	"path/filepath"
 	"regexp"
+	"regexp/syntax"
 	"strings"
+	"sync"
+	"sync/atomic"
 
 	"github.com/gobwas/glob"
 	"github.com/yaklang/yaklang/common/log"
@@ -59,15 +62,9 @@ func matchRegexpWithNegatives(root *sfvm.PatternRoot, files map[string]string, p
 	// Reuse the regular regexp cache for the positive set; then apply the
 	// negative filter ourselves. This avoids recomputing the (often large)
 	// positive hit list every time a pattern_regex_not statement runs.
-	positiveKey := sourceHitKey(pathPattern, []string{positive})
-	hits, cached := root.SourceHits(positiveKey)
-	if !cached {
-		var err error
-		hits, err = MatchRegexpHits(files, pathPattern, []string{positive})
-		if err != nil {
-			return nil, err
-		}
-		root.SetSourceHits(positiveKey, hits)
+	hits, err := cachedMatchRegexpHits(root, files, pathPattern, []string{positive})
+	if err != nil {
+		return nil, err
 	}
 	if len(negatives) == 0 {
 		return sourceHitsToValues(root, hits)
@@ -136,17 +133,40 @@ func MatchRegexp(files map[string]string, pathPattern string, patterns []string)
 }
 
 func matchRegexp(root *sfvm.PatternRoot, files map[string]string, pathPattern string, patterns []string) (sfvm.Values, error) {
-	key := sourceHitKey(pathPattern, patterns)
-	hits, cached := root.SourceHits(key)
-	if !cached {
-		var err error
-		hits, err = MatchRegexpHits(files, pathPattern, patterns)
-		if err != nil {
-			return nil, err
-		}
-		root.SetSourceHits(key, hits)
+	hits, err := cachedMatchRegexpHits(root, files, pathPattern, patterns)
+	if err != nil {
+		return nil, err
 	}
 	return sourceHitsToValues(root, hits)
+}
+
+// cachedMatchRegexpHits returns every hit for this filter. The root cache
+// serves later batches of the same rule. A SourceHitStore shared by the file
+// set serves later rules so the tree is not scanned again.
+func cachedMatchRegexpHits(root *sfvm.PatternRoot, files map[string]string, pathPattern string, patterns []string) ([]Hit, error) {
+	key := sourceHitKey(pathPattern, patterns)
+	if root != nil {
+		if hits, ok := root.SourceHits(key); ok {
+			return hits, nil
+		}
+	}
+	compute := func() ([]sfvm.SourceHit, error) {
+		return MatchRegexpHits(files, pathPattern, patterns)
+	}
+	var hits []Hit
+	var err error
+	if root != nil && root.SourceHitStore() != nil {
+		hits, err = root.SourceHitStore().Do(key, compute)
+	} else {
+		hits, err = compute()
+	}
+	if err != nil {
+		return nil, err
+	}
+	if root != nil {
+		root.SetSourceHits(key, hits)
+	}
+	return hits, nil
 }
 
 func sourceHitsToValues(root *sfvm.PatternRoot, hits []Hit) (sfvm.Values, error) {
@@ -274,22 +294,7 @@ func compileContentMatchers(patterns []string) func(string) []byteIndex {
 	}
 	var matchers []func(string) []byteIndex
 	for _, rule := range cleaned {
-		rule := rule
-		yak := regexp_utils.NewYakRegexpUtils(rule)
-		matchers = append(matchers, func(data string) []byteIndex {
-			indexs, err := yak.FindAllSubmatchIndex(data)
-			if err != nil {
-				log.Warnf("sfpattern regexp match error: %s", err)
-				return nil
-			}
-			out := make([]byteIndex, 0, len(indexs))
-			for _, index := range indexs {
-				if len(index) >= 2 {
-					out = append(out, byteIndex{Start: index[0], End: index[1]})
-				}
-			}
-			return out
-		})
+		matchers = append(matchers, compileOneContentMatcher(rule))
 	}
 	return func(data string) []byteIndex {
 		var all []byteIndex
@@ -297,6 +302,194 @@ func compileContentMatchers(patterns []string) func(string) []byteIndex {
 			all = append(all, m(data)...)
 		}
 		return all
+	}
+}
+
+// SharedHitCache is the file-set SourceHitStore. One SourceQueryTarget owns it
+// and every per-rule PatternRoot points at it. The file map must not change.
+type SharedHitCache struct {
+	mu       sync.Mutex
+	entries  map[string]*sharedHitEntry
+	computes atomic.Int64
+}
+
+type sharedHitEntry struct {
+	done chan struct{}
+	hits []sfvm.SourceHit
+	err  error
+}
+
+func NewSharedHitCache() *SharedHitCache {
+	return &SharedHitCache{entries: make(map[string]*sharedHitEntry)}
+}
+
+// Computes reports how many times this cache actually scanned the file set.
+func (c *SharedHitCache) Computes() int {
+	if c == nil {
+		return 0
+	}
+	return int(c.computes.Load())
+}
+
+func (c *SharedHitCache) Do(key string, compute func() ([]sfvm.SourceHit, error)) ([]sfvm.SourceHit, error) {
+	if c == nil {
+		return compute()
+	}
+	c.mu.Lock()
+	if e, ok := c.entries[key]; ok {
+		c.mu.Unlock()
+		<-e.done
+		return cloneSourceHits(e.hits), e.err
+	}
+	e := &sharedHitEntry{done: make(chan struct{})}
+	c.entries[key] = e
+	c.mu.Unlock()
+
+	c.computes.Add(1)
+	defer func() {
+		if rec := recover(); rec != nil {
+			e.hits = nil
+			e.err = utils.Errorf("sfpattern shared hit cache panic: %v", rec)
+			close(e.done)
+			panic(rec)
+		}
+	}()
+	got, err := compute()
+	e.hits = cloneSourceHits(got)
+	e.err = err
+	close(e.done)
+	return cloneSourceHits(e.hits), err
+}
+
+func cloneSourceHits(hits []sfvm.SourceHit) []sfvm.SourceHit {
+	if hits == nil {
+		return nil
+	}
+	return append([]sfvm.SourceHit(nil), hits...)
+}
+
+func compileOneContentMatcher(rule string) func(string) []byteIndex {
+	if lit, ok := pureLiteralPattern(rule); ok {
+		return func(data string) []byteIndex {
+			return indexAllLiteral(data, lit)
+		}
+	}
+	var parsed *syntax.Regexp
+	if re, err := syntax.Parse(rule, syntax.Perl); err == nil {
+		parsed = re.Simplify()
+	}
+	yak := regexp_utils.NewYakRegexpUtils(rule)
+	return func(data string) []byteIndex {
+		if parsed != nil && regexpCannotMatch(parsed, data) {
+			return nil
+		}
+		indexs, err := yak.FindAllSubmatchIndex(data)
+		if err != nil {
+			log.Warnf("sfpattern regexp match error: %s", err)
+			return nil
+		}
+		out := make([]byteIndex, 0, len(indexs))
+		for _, index := range indexs {
+			if len(index) >= 2 {
+				out = append(out, byteIndex{Start: index[0], End: index[1]})
+			}
+		}
+		return out
+	}
+}
+
+// contentMatchKind reports whether a content pattern is matched as a literal.
+func contentMatchKind(rule string) string {
+	if _, ok := pureLiteralPattern(rule); ok {
+		return "literal"
+	}
+	return "regexp"
+}
+
+func pureLiteralPattern(rule string) (string, bool) {
+	re, err := syntax.Parse(rule, syntax.Perl)
+	if err != nil {
+		return "", false
+	}
+	re = re.Simplify()
+	for re.Op == syntax.OpCapture && len(re.Sub) == 1 {
+		re = re.Sub[0]
+	}
+	if re.Op != syntax.OpLiteral || len(re.Rune) == 0 || re.Flags&syntax.FoldCase != 0 {
+		return "", false
+	}
+	return string(re.Rune), true
+}
+
+func indexAllLiteral(data, lit string) []byteIndex {
+	if lit == "" {
+		return nil
+	}
+	var out []byteIndex
+	from := 0
+	for from <= len(data) {
+		rel := strings.Index(data[from:], lit)
+		if rel < 0 {
+			break
+		}
+		start := from + rel
+		end := start + len(lit)
+		out = append(out, byteIndex{Start: start, End: end})
+		if end <= from {
+			break
+		}
+		from = end
+	}
+	return out
+}
+
+// regexpCannotMatch reports whether content cannot match re. False only means
+// "not proven", so the regexp engine still runs. It never rejects a string the
+// regexp could match.
+func regexpCannotMatch(re *syntax.Regexp, content string) bool {
+	if re == nil || re.Flags&syntax.FoldCase != 0 {
+		return false
+	}
+	switch re.Op {
+	case syntax.OpLiteral:
+		if len(re.Rune) == 0 {
+			return false
+		}
+		return !strings.Contains(content, string(re.Rune))
+	case syntax.OpCapture:
+		if len(re.Sub) == 1 {
+			return regexpCannotMatch(re.Sub[0], content)
+		}
+		return false
+	case syntax.OpConcat:
+		for _, sub := range re.Sub {
+			if regexpCannotMatch(sub, content) {
+				return true
+			}
+		}
+		return false
+	case syntax.OpAlternate:
+		if len(re.Sub) == 0 {
+			return false
+		}
+		for _, sub := range re.Sub {
+			if !regexpCannotMatch(sub, content) {
+				return false
+			}
+		}
+		return true
+	case syntax.OpPlus:
+		if len(re.Sub) == 1 {
+			return regexpCannotMatch(re.Sub[0], content)
+		}
+		return false
+	case syntax.OpRepeat:
+		if re.Min >= 1 && len(re.Sub) == 1 {
+			return regexpCannotMatch(re.Sub[0], content)
+		}
+		return false
+	default:
+		return false
 	}
 }
 

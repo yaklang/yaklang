@@ -1,6 +1,7 @@
 package sfpattern
 
 import (
+	"regexp"
 	"strings"
 	"testing"
 
@@ -208,4 +209,67 @@ alert $hit for {
 	require.NoError(t, err)
 	require.True(t, HasAlert(result))
 	require.Equal(t, 1, AlertCount(result))
+}
+
+func TestContentMatchKindLiteral(t *testing.T) {
+	require.Equal(t, "literal", contentMatchKind(`tx\.origin`))
+	require.Equal(t, "literal", contentMatchKind(`(NSAllowsArbitraryLoads)`))
+	require.Equal(t, "regexp", contentMatchKind(`new\s+Random\s*\(`))
+	require.Equal(t, "regexp", contentMatchKind(`(?i)foo`))
+}
+
+func TestContentMatchersMatchRegexpSpans(t *testing.T) {
+	cases := []struct {
+		pat  string
+		text string
+	}{
+		{`tx\.origin`, "a tx.origin b tx.origin"},
+		{`tx\.origin`, "nothing here"},
+		{`aaa`, "aaaa"},
+		{`aa`, "aaa"},
+		{`(NSAllowsArbitraryLoads)`, "x NSAllowsArbitraryLoads y"},
+		{`skip_before_action\s+:verify_authenticity_token`, "skip_before_action :verify_authenticity_token"},
+		{`skip_before_action\s+:verify_authenticity_token`, "no token here"},
+		{`new\s+Random\s*\(`, "new Random("},
+		{`new\s+Random\s*\(`, "Random only"},
+		{`BinaryFormatter|SoapFormatter`, "xx SoapFormatter yy"},
+		{`BinaryFormatter|SoapFormatter`, "neither"},
+		{`foo|foobar`, "foobar"},
+		{`foo.*bar`, "foo x bar"},
+		{`foo.*bar`, "bar foo"},
+		{`(?i)foo`, "FOO foo"},
+	}
+	for _, tc := range cases {
+		got := compileContentMatchers([]string{tc.pat})(tc.text)
+		want := regexp.MustCompile(tc.pat).FindAllStringIndex(tc.text, -1)
+		require.Equal(t, len(want), len(got), tc.pat+" on "+tc.text)
+		for i := range want {
+			require.Equal(t, want[i][0], got[i].Start, tc.pat)
+			require.Equal(t, want[i][1], got[i].End, tc.pat)
+		}
+	}
+}
+
+func TestSharedHitCacheScansOnce(t *testing.T) {
+	files := map[string]string{"A.java": "use tx.origin here"}
+	cache := NewSharedHitCache()
+	scan := func() {
+		root := NewRoot(files)
+		root.SetSourceHitStore(cache)
+		vals, err := MatchFileFilter(root, files, "*", "regexp", nil, []string{`tx\.origin`})
+		require.NoError(t, err)
+		require.NotEmpty(t, vals)
+	}
+	scan()
+	scan()
+	require.Equal(t, 1, cache.Computes())
+
+	root := NewRoot(files)
+	root.SetSourceHitStore(cache)
+	_, err := MatchFileFilter(root, files, "*", "regexp", nil, []string{`CipherMode\.ECB`})
+	require.Error(t, err)
+	require.Equal(t, 2, cache.Computes())
+	_, err = MatchFileFilter(root, files, "*", "regexp", nil, []string{`CipherMode\.ECB`})
+	require.Error(t, err)
+	require.Equal(t, 2, cache.Computes())
 }
