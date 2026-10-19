@@ -894,6 +894,19 @@ func childFunctionByID(fn *ssa.Function, id int64) *ssa.Function {
 	return child
 }
 
+func (c *Compiler) programFunctionByID(id int64) *ssa.Function {
+	if c == nil || c.Program == nil || id <= 0 {
+		return nil
+	}
+	var found *ssa.Function
+	c.Program.EachFunction(func(fn *ssa.Function) {
+		if found == nil && fn != nil && fn.GetId() == id {
+			found = fn
+		}
+	})
+	return found
+}
+
 func functionByID(fn *ssa.Function, id int64) *ssa.Function {
 	if fn == nil || id <= 0 {
 		return nil
@@ -1012,6 +1025,15 @@ func (c *Compiler) extraCaptureWord(contextInst ssa.Instruction, callerFn *ssa.F
 		}
 	}
 	if !valueBelongsToFunction(callerFn, extra.OriginID) {
+		// A function capture is an immutable address, not a slot in this frame.
+		// By-value capture does not allocate a cell, so a nested closure has to
+		// take the function's own symbol.
+		if fn := c.programFunctionByID(extra.OriginID); fn != nil && !fn.IsExtern() {
+			llvmFn, _ := c.getOrDeclareLLVMFunction(fn)
+			if !llvmFn.IsNil() {
+				return c.Builder.CreatePtrToInt(llvmFn, i64, "yak_extra_fn"), false, nil
+			}
+		}
 		return llvm.Value{}, false, fmt.Errorf("extra capture %s origin %d is not visible", extra.Name, extra.OriginID)
 	}
 	resolved, err := c.resolveCallableCaptureValue(contextInst, extra.OriginID)
