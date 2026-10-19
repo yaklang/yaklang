@@ -84,6 +84,7 @@ func (n *LinkNode[T]) Find(match func(VersionedIF[T]) bool) VersionedIF[T] {
 
 type linkNodeMap[T versionedValue] struct {
 	val      *omap.OrderedMap[string, *LinkNode[T]]
+	locals   map[string]map[int]struct{}
 	callBack linkNodeCallback[T]
 }
 
@@ -133,12 +134,37 @@ func (m linkNodeMap[T]) ForEach(handler VariableHandler[T]) {
 	})
 }
 
-func (m linkNodeMap[T]) Append(key string, val VersionedIF[T]) {
+// HasLocalWithIndex reports whether a local version with the given global
+// index was appended under key. It backs the O(1) capture check in
+// ScopedVersionedTable.AssignVariable, replacing a full version-chain scan.
+// local and globalIndex are immutable after construction, so the set stays
+// in sync with the chain; a name may hold several local versions, hence a
+// set instead of a single index.
+func (m linkNodeMap[T]) HasLocalWithIndex(key string, index int) bool {
+	if m.locals == nil {
+		return false
+	}
+	_, ok := m.locals[key][index]
+	return ok
+}
+
+func (m *linkNodeMap[T]) Append(key string, val VersionedIF[T]) {
 	ln, ok := m.val.Get(key)
 	if !ok {
 		ln = &LinkNode[T]{}
 		m.val.Set(key, ln)
 	}
 	ln.Append(val)
+	if val.GetLocal() {
+		if m.locals == nil {
+			m.locals = make(map[string]map[int]struct{})
+		}
+		set, ok := m.locals[key]
+		if !ok {
+			set = make(map[int]struct{})
+			m.locals[key] = set
+		}
+		set[val.GetGlobalIndex()] = struct{}{}
+	}
 	m.callBack(val)
 }
