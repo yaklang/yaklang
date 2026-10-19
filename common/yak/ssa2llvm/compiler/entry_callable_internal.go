@@ -15,8 +15,54 @@ func (c *Compiler) entryFunctionCapturesValues(fn *ssa.Function) bool {
 	if c == nil || fn == nil || c.capturedFunctionIDs == nil {
 		return false
 	}
-	_, ok := c.capturedFunctionIDs[fn.GetId()]
-	return ok
+	if _, ok := c.capturedFunctionIDs[fn.GetId()]; !ok {
+		return false
+	}
+	// callret merges other functions into the entry and deletes them, leaving
+	// the entry's free-value table still naming those (now removed) callees.
+	// Their calls became stack traffic, so the entry must not rebuild a closure
+	// that references them. A capture whose function is still compiled on its
+	// own — a recursive callee — does need the closure.
+	if c.Program == nil || c.Program.Funcs == nil {
+		return true
+	}
+	for _, valueID := range fn.FreeValues {
+		captured, ok := fn.GetValueById(valueID)
+		if !ok || captured == nil {
+			continue
+		}
+		if c.capturedFunctionStillCompiled(captured) {
+			return true
+		}
+	}
+	return false
+}
+
+// capturedFunctionStillCompiled reports whether the function a free value
+// resolves to still has its own compiled body. A free value is a parameter
+// whose default is the captured function.
+func (c *Compiler) capturedFunctionStillCompiled(captured ssa.Value) bool {
+	var fn *ssa.Function
+	if f, ok := ssa.ToFunction(captured); ok && f != nil {
+		fn = f
+	} else if p, ok := ssa.ToParameter(captured); ok && p != nil && p.GetDefault() != nil {
+		if f, ok := ssa.ToFunction(p.GetDefault()); ok && f != nil {
+			fn = f
+		} else if ft, ok := p.GetDefault().GetType().(*ssa.FunctionType); ok && ft != nil {
+			fn = ft.This
+		}
+	}
+	if fn == nil {
+		// Not a function capture (a value, a loop variable). Those still need the
+		// closure environment.
+		return true
+	}
+	// Compiled functions are registered by id. callret deletes merged callees
+	// before compilation, so they are absent; a recursive callee is present.
+	if compiled, ok := c.Funcs[fn.GetId()]; ok && !compiled.IsNil() {
+		return true
+	}
+	return false
 }
 
 func (c *Compiler) materializeEntryCallable(entry, mainFn llvm.Value, block llvm.BasicBlock, invokeCtx llvm.Value) (llvm.Value, error) {
