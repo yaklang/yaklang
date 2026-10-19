@@ -167,10 +167,14 @@ func removeStaleDocuments(c *config, store *vectorstore.SQLiteVectorStoreHNSW, e
 }
 
 type buildOptions struct {
-	Mode        string `json:"mode"`
-	ChunkSize   int    `json:"chunk_size"`
-	Concurrency int    `json:"concurrency"`
-	ExtraPrompt string `json:"extra_prompt"`
+	Mode               string  `json:"mode"`
+	ChunkSize          int     `json:"chunk_size"`
+	Concurrency        int     `json:"concurrency"`
+	ExtraPrompt        string  `json:"extra_prompt"`
+	OmniMode           string  `json:"omni_mode"`
+	OmniModel          string  `json:"omni_model"`
+	OmniSegmentSeconds float64 `json:"omni_segment_seconds"`
+	OmniPayloadBytes   int64   `json:"omni_payload_bytes"`
 }
 
 // Build deliberately waits for persistence after AI analysis. The legacy
@@ -198,6 +202,21 @@ func (c *config) build(req manageRequest, base *schema.KnowledgeBaseInfo) (map[s
 	if b.ChunkSize < 256 || b.ChunkSize > 1048576 || b.Concurrency < 1 || b.Concurrency > 16 {
 		return nil, fmt.Errorf("chunk_size must be 256..1048576 bytes and concurrency 1..16")
 	}
+	if b.OmniMode == "" {
+		b.OmniMode = "auto"
+	}
+	if b.OmniMode != "auto" && b.OmniMode != "required" && b.OmniMode != "disabled" {
+		return nil, fmt.Errorf("omni_mode must be auto, required or disabled")
+	}
+	if b.OmniSegmentSeconds == 0 {
+		b.OmniSegmentSeconds = 20
+	}
+	if b.OmniPayloadBytes == 0 {
+		b.OmniPayloadBytes = 7 * 1024 * 1024
+	}
+	if b.OmniSegmentSeconds <= 0 || b.OmniSegmentSeconds > 600 || b.OmniPayloadBytes < 1024 || b.OmniPayloadBytes > 10*1024*1024 {
+		return nil, fmt.Errorf("omni_segment_seconds must be (0,600] and omni_payload_bytes 1024..10485760")
+	}
 	if req.SourceFile != "" {
 		stat, err := os.Stat(req.SourceFile)
 		if err != nil {
@@ -209,7 +228,22 @@ func (c *config) build(req manageRequest, base *schema.KnowledgeBaseInfo) (map[s
 	}
 	ctx, cancel := context.WithCancel(c.ctx)
 	defer cancel()
-	opts := []any{liteforgeapp.WithAnalyzeContext(ctx), liteforgeapp.WithAnalyzeConcurrency(b.Concurrency), chunkmaker.WithChunkSize(int64(b.ChunkSize)), liteforgeapp.WithExtraPrompt(b.ExtraPrompt)}
+	var mu sync.Mutex
+	var firstErr error
+	opts := []any{liteforgeapp.WithAnalyzeContext(ctx), liteforgeapp.WithAnalyzeConcurrency(b.Concurrency), chunkmaker.WithChunkSize(int64(b.ChunkSize)), liteforgeapp.WithExtraPrompt(b.ExtraPrompt),
+		liteforgeapp.WithOmniMediaMode(b.OmniMode), liteforgeapp.WithVideoOmniSegmentSeconds(b.OmniSegmentSeconds), liteforgeapp.WithVideoOmniMaxBase64Bytes(b.OmniPayloadBytes),
+		liteforgeapp.WithAnalyzeErrorHandler(func(err error) {
+			mu.Lock()
+			if firstErr == nil {
+				firstErr = err
+			}
+			mu.Unlock()
+			cancel()
+		}),
+	}
+	if b.OmniModel != "" {
+		opts = append(opts, liteforgeapp.WithVideoOmniModel(b.OmniModel))
+	}
 	if c.ai != nil {
 		opts = append(opts, rag.WithAIService(c.ai))
 	}
@@ -231,8 +265,6 @@ func (c *config) build(req manageRequest, base *schema.KnowledgeBaseInfo) (map[s
 		return nil, err
 	}
 	var wg sync.WaitGroup
-	var mu sync.Mutex
-	var firstErr error
 	count := 0
 	for i := 0; i < b.Concurrency; i++ {
 		wg.Add(1)
@@ -298,7 +330,7 @@ func (c *config) build(req manageRequest, base *schema.KnowledgeBaseInfo) (map[s
 	if count == 0 {
 		return nil, fmt.Errorf("build produced no persisted entries")
 	}
-	return map[string]any{"op": req.Op, "name": req.Name, "mode": b.Mode, "entries_added": count, "chunk_size": b.ChunkSize, "concurrency": b.Concurrency}, nil
+	return map[string]any{"op": req.Op, "name": req.Name, "mode": b.Mode, "entries_added": count, "chunk_size": b.ChunkSize, "concurrency": b.Concurrency, "omni_mode": b.OmniMode}, nil
 }
 
 func (c *config) rebuild(req manageRequest, base *schema.KnowledgeBaseInfo) (map[string]any, error) {
