@@ -127,9 +127,8 @@ func (c *ProgramCache) CloseWithoutSave() {
 	c.indexes = nil
 	c.sources = nil
 	if c.program != nil {
-		c.program.variableRangeMu.Lock()
-		c.program.variableRanges = nil
-		c.program.variableRangeMu.Unlock()
+		c.program.initConcurrentMaps()
+		c.program.variableRanges.Clear()
 	}
 }
 

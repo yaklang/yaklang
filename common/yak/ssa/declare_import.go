@@ -258,10 +258,8 @@ func (p *Program) ImportAll(lib *Program) error {
 		return err
 	}
 	maps.Copy(pkg.typ, lib.externType)
-	lib.exportMu.Lock()
-	exported := maps.Clone(lib.ExportValue)
-	lib.exportMu.Unlock()
-	maps.Copy(pkg.val, exported)
+	lib.initConcurrentMaps()
+	maps.Copy(pkg.val, lib.ExportValue.GetAll())
 	_ = pkg
 	return nil
 }

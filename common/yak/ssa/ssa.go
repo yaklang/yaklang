@@ -238,7 +238,7 @@ type ReExportInfo struct {
 
 // both instruction and value
 type Program struct {
-	variableRangeMu      sync.Mutex
+	mapsOnce             sync.Once
 	variableRanges       *utils.SafeMapWithKey[*memedit.MemEditor, *utils.SafeMapWithKey[variableRangePosition, *memedit.Range]]
 	compileDiagnosticsMu sync.Mutex
 	compileDiagnostics   CompileDiagnostics
@@ -293,9 +293,6 @@ type Program struct {
 	// builderMu publishes a function's single FunctionBuilder.
 	// The critical section stops at NewBuilder; it does not Emit.
 	builderMu sync.Mutex
-	// exportMu guards ExportType and ExportValue only.
-	// Never call out of this package's map helpers while holding it.
-	exportMu sync.Mutex
 	// virtualImportGroup runs one materialization per type name.
 	// The callback builds on a private function, so it does not share a
 	// CurrentBlock and does not hold a mutex across Emit. Re-entering Do
@@ -338,6 +335,7 @@ type Program struct {
 	// across Emit, a database call, or a directory-package wait.
 	dirPkgPrehandle     sync.Map
 	concurrentUnitBuild bool
+	deferMethodBuild    bool
 	CompileUnits        []*CompileUnit
 
 	//consts
@@ -346,9 +344,9 @@ type Program struct {
 	Funcs          *omap.OrderedMap[string, *Function]
 	Blueprint      *omap.OrderedMap[string, *Blueprint]
 	BlueprintStack *utils.Stack[*Blueprint]
-	ExportValue    map[string]Value
-	ExportType     map[string]Type
-	ReExportTable  map[string]*ReExportInfo // re-export name/type --from--> filepath
+	ExportValue    *utils.SafeMapWithKey[string, Value]
+	ExportType     *utils.SafeMapWithKey[string, Type]
+	ReExportTable  *utils.SafeMapWithKey[string, *ReExportInfo] // re-export name/type --from--> filepath
 
 	// GlobalVariablesBlueprint is a virtual Blueprint that wraps global variables,
 	// enabling them to be lazily built through the LazyBuilder mechanism

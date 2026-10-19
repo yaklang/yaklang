@@ -372,10 +372,11 @@ func (b *astbuilder) handleImportPackage() {
 		ex.SetRange(b.GetRangeByToken(info.Pos))
 
 		if importp, _ := b.GetImportPackageUser(id); importp != nil {
-			for n, g := range importp.ExportValue {
+			importp.ExportValue.ForEach(func(n string, g ssa.Value) bool {
 				ssa.AddObjectKeyPair(g, ex, b.EmitConstInst(n))
 				ex.AddMember(b.EmitConstInst(n), g)
-			}
+				return true
+			})
 		}
 
 		ex.SetType(HandleFullTypeNames(ex.GetType(), []string{info.Path}))
