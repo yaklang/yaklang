@@ -58,6 +58,7 @@ const (
 	RuntimeDumpHandleSymbol           = "yak_runtime_dump_handle"
 	RuntimeGCSymbol                   = "yak_runtime_gc"
 	RuntimeWaitAsyncSymbol            = "yak_runtime_wait_async"
+	RuntimeUseYakitDatabaseSymbol     = "yak_runtime_use_yakit_database"
 	RuntimeLoadPanicValueSymbol       = "yak_runtime_load_panic_value"
 	RuntimeInvokeVMSymbol             = "yak_runtime_invoke_vm"
 	RuntimeTestAdd1CtxSymbol          = "yak_runtime_test_add1_ctx"
