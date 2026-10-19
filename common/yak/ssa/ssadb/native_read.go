@@ -4,6 +4,8 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -319,6 +321,52 @@ func joinPlaceholders(ps []string) string {
 	return string(b)
 }
 
+// irCodeConstOpcode is ssa.SSAOpcodeConstInst. irCodeConstTypeNormal is the
+// only ConstType value this search accepts. Both stay SQL literals: a bound
+// parameter hides them from the planner, and the partial const index is then
+// ignored (the query falls back to scanning ir_codes).
+const irCodeConstOpcode = 5
+const irCodeConstTypeNormal = "normal"
+
+func constLookupSQL(operator, indexName string) string {
+	from := TableIrCodes
+	// SQLite will not use the partial index for REGEXP while a plain opcode
+	// index is present: REGEXP does not constrain "string", so the opcode
+	// index looks cheaper and the query goes back to the wide rows. INDEXED BY
+	// is SQLite-only; other dialects keep the literal predicate and their own
+	// planner.
+	if indexName != "" {
+		from += ` INDEXED BY "` + indexName + `"`
+	}
+	return fmt.Sprintf(
+		`SELECT code_id FROM %s WHERE program_name = ? AND opcode = %d AND const_type = '%s' AND "string" %s ? AND deleted_at IS NULL`,
+		from, irCodeConstOpcode, irCodeConstTypeNormal, operator,
+	)
+}
+
+var constLookupHintCache sync.Map
+
+func constLookupIndexHint(db *gorm.DB) string {
+	if db == nil || db.Dialect() == nil || db.CommonDB() == nil {
+		return ""
+	}
+	switch db.Dialect().GetName() {
+	case "sqlite3", "sqlite":
+	default:
+		return ""
+	}
+	key := db.CommonDB()
+	if v, ok := constLookupHintCache.Load(key); ok {
+		return v.(string)
+	}
+	hint := ""
+	if hasNamedIndex(db, TableIrCodes, irCodeConstLookupIndex) {
+		hint = irCodeConstLookupIndex
+	}
+	constLookupHintCache.Store(key, hint)
+	return hint
+}
+
 // nativeGetIrCodeIDsByConstType returns the code_ids matching the ConstType
 // search predicate (opcode=5, const_type='normal', string exact or REGEXP),
 // mirroring the GORM Model(&IrCode{}) path used by searchVariableWithFileFilter
@@ -335,19 +383,18 @@ func nativeGetIrCodeIDsByConstTypeContext(parent context.Context, db *gorm.DB, p
 	nativeConstTypeIDQueries.Add(1)
 	var q string
 	var args []interface{}
+	hint := constLookupIndexHint(db)
 	if compareMode == ExactCompare {
-		q = bindSQLPlaceholdersDB(db, `SELECT code_id FROM `+TableIrCodes+
-			` WHERE program_name = ? AND opcode = ? AND const_type = ? AND "string" = ? AND deleted_at IS NULL`)
-		args = []interface{}{progName, 5, "normal", value}
+		q = bindSQLPlaceholdersDB(db, constLookupSQL("=", hint))
+		args = []interface{}{progName, value}
 	} else {
 		operator := "REGEXP"
 		switch db.Dialect().GetName() {
 		case "postgres", "postgresql", "cloudsqlpostgres":
 			operator = "~"
 		}
-		q = bindSQLPlaceholdersDB(db, `SELECT code_id FROM `+TableIrCodes+
-			` WHERE program_name = ? AND opcode = ? AND const_type = ? AND "string" `+operator+` ? AND deleted_at IS NULL`)
-		args = []interface{}{progName, 5, "normal", value}
+		q = bindSQLPlaceholdersDB(db, constLookupSQL(operator, hint))
+		args = []interface{}{progName, value}
 	}
 	started := time.Now()
 	if parent == nil {

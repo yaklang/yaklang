@@ -123,6 +123,7 @@ func patchIrCodeIndex(db *gorm.DB) {
 	ensureUniqueIrCodesProgramCodeIndex(db)
 	ensureUniqueIrTypesProgramTypeIndex(db)
 	ensureUniqueIrOffsetsIndex(db)
+	ensureConstLookupIndex(db)
 
 	// The canonical UNIQUE keys already provide these exact lookup orders.
 	// New databases must not maintain a second B-tree per row for the same
@@ -142,6 +143,35 @@ func patchIrCodeIndex(db *gorm.DB) {
 		if err := db.Exec(lookup.legacySQL).Error; err != nil {
 			log.Warnf("failed to preserve fallback lookup index for %s: %v", lookup.table, err)
 		}
+	}
+}
+
+// irCodeConstLookupIndex is the covering lookup for ConstType searches.
+// Equality seeks (program_name, string). A regexp uses the program_name
+// prefix and filters strings in the index, instead of reading every wide
+// ir_codes row. The WHERE matches constLookupSQL's literals; a bound
+// opcode or const_type parameter makes SQLite ignore this index.
+const irCodeConstLookupIndex = "idx_ir_codes_const_lookup"
+
+func ensureConstLookupIndex(db *gorm.DB) {
+	if db == nil || db.Dialect() == nil || !db.HasTable(TableIrCodes) {
+		return
+	}
+	if hasNamedIndex(db, TableIrCodes, irCodeConstLookupIndex) {
+		return
+	}
+	switch db.Dialect().GetName() {
+	case "sqlite3", "sqlite", "postgres", "postgresql", "cloudsqlpostgres":
+	default:
+		log.Debugf("skip const lookup index on dialect %s", db.Dialect().GetName())
+		return
+	}
+	query := fmt.Sprintf(
+		`CREATE INDEX IF NOT EXISTS "%s" ON "%s" ("program_name", "string", "code_id") WHERE opcode = %d AND const_type = '%s' AND deleted_at IS NULL`,
+		irCodeConstLookupIndex, TableIrCodes, irCodeConstOpcode, irCodeConstTypeNormal,
+	)
+	if err := db.Exec(query).Error; err != nil {
+		log.Warnf("failed to add index %s: %v", irCodeConstLookupIndex, err)
 	}
 }
 
