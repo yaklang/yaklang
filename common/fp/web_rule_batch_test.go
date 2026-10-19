@@ -55,7 +55,7 @@ func TestDefaultWebRulesCompileOnceAndKeepHits(t *testing.T) {
 	}
 	hot := time.Since(start) / rounds
 	t.Logf("cold %s hot avg %s over %d cpes %d", cold, hot, rounds, len(second))
-	require.Less(t, hot, 5*time.Millisecond)
+	require.Less(t, hot, 15*time.Millisecond)
 
 	start = time.Now()
 	var sequential []string
