@@ -289,9 +289,10 @@ func (b *astbuilder) GetStructByStr(name string) ssa.Type {
 
 func (b *astbuilder) GetStructAll() map[string]ssa.Type {
 	objs := make(map[string]ssa.Type)
-	for s, o := range b.GetProgram().ExportType {
+	b.GetProgram().ExportType.ForEach(func(s string, o ssa.Type) bool {
 		objs[s] = o
-	}
+		return true
+	})
 
 	return objs
 }
@@ -302,7 +303,7 @@ func (b *astbuilder) AddAlias(name string, t *ssa.AliasType) {
 }
 
 func (b *astbuilder) DelAliasByStr(name string) {
-	delete(b.GetProgram().ExportType, name)
+	b.GetProgram().ExportType.Delete(name)
 }
 
 func (b *astbuilder) GetAliasByStr(name string) ssa.Type {
@@ -316,11 +317,12 @@ func (b *astbuilder) GetAliasByStr(name string) ssa.Type {
 
 func (b *astbuilder) GetAliasAll() map[string]*ssa.AliasType {
 	var objs map[string]*ssa.AliasType = make(map[string]*ssa.AliasType)
-	for s, o := range b.GetProgram().ExportType {
+	b.GetProgram().ExportType.ForEach(func(s string, o ssa.Type) bool {
 		if o, ok := o.(*ssa.AliasType); ok {
 			objs[s] = o
 		}
-	}
+		return true
+	})
 
 	return objs
 }

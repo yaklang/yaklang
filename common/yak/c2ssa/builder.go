@@ -192,19 +192,21 @@ func (b *astbuilder) LoadBuilder(s *ssa.StoredFunctionBuilder) {
 
 func (b *astbuilder) GetStructAll() map[string]ssa.Type {
 	objs := make(map[string]ssa.Type)
-	for s, o := range b.GetProgram().ExportType {
+	b.GetProgram().ExportType.ForEach(func(s string, o ssa.Type) bool {
 		objs[s] = o
-	}
+		return true
+	})
 	return objs
 }
 
 func (b *astbuilder) GetAliasAll() map[string]*ssa.AliasType {
 	objs := make(map[string]*ssa.AliasType)
-	for s, o := range b.GetProgram().ExportType {
-		if o, ok := o.(*ssa.AliasType); ok {
-			objs[s] = o
+	b.GetProgram().ExportType.ForEach(func(s string, o ssa.Type) bool {
+		if alias, ok := o.(*ssa.AliasType); ok {
+			objs[s] = alias
 		}
-	}
+		return true
+	})
 	return objs
 }
 

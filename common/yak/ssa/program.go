@@ -19,6 +19,28 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 )
 
+// initConcurrentMaps publishes the program maps that several compile workers
+// read and write. SafeMap owns the locking; callers must not add another mutex.
+func (p *Program) initConcurrentMaps() {
+	if p == nil {
+		return
+	}
+	p.mapsOnce.Do(func() {
+		if p.variableRanges == nil {
+			p.variableRanges = utils.NewSafeMapWithKey[*memedit.MemEditor, *utils.SafeMapWithKey[variableRangePosition, *memedit.Range]]()
+		}
+		if p.ExportType == nil {
+			p.ExportType = utils.NewSafeMapWithKey[string, Type]()
+		}
+		if p.ExportValue == nil {
+			p.ExportValue = utils.NewSafeMapWithKey[string, Value]()
+		}
+		if p.ReExportTable == nil {
+			p.ReExportTable = utils.NewSafeMapWithKey[string, *ReExportInfo]()
+		}
+	})
+}
+
 func NewProgram(
 	cfg *ssaconfig.Config,
 	databaseKind ProgramCacheKind,
@@ -155,9 +177,9 @@ func (prog *Program) createSubProgram(name string, kind ssadb.ProgramKind, path 
 	subProg.externBuildValueHandler = prog.externBuildValueHandler
 	subProg.ExternInstance = prog.ExternInstance
 	subProg.ExternLib = prog.ExternLib
-	subProg.ExportType = make(map[string]Type)
-	subProg.ExportValue = make(map[string]Value)
-	subProg.ReExportTable = make(map[string]*ReExportInfo)
+	subProg.ExportType = utils.NewSafeMapWithKey[string, Type]()
+	subProg.ExportValue = utils.NewSafeMapWithKey[string, Value]()
+	subProg.ReExportTable = utils.NewSafeMapWithKey[string, *ReExportInfo]()
 	subProg.Application = prog.Application
 	if prog.Application != nil && prog.Application.Build != nil {
 		subProg.Build = prog.Application.Build

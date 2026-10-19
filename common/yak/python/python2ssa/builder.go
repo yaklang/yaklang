@@ -364,12 +364,13 @@ func (b *singleFileBuilder) resolvePythonSubmoduleImport(bindingName, sourceName
 	ex := ssa.NewExternLib(bindingName, b.FunctionBuilder, nil)
 	ex.LibraryName = sourceName
 	ex.SetExtern(true)
-	for exportName, exportVal := range childLib.ExportValue {
+	childLib.ExportValue.ForEach(func(exportName string, exportVal ssa.Value) bool {
 		if exportVal == nil || isPythonImportPlaceholderValue(exportVal) {
-			continue
+			return true
 		}
 		ex.AddMember(b.EmitConstInst(exportName), exportVal)
-	}
+		return true
+	})
 	return ex
 }
 

@@ -36,49 +36,49 @@ func (lib *Program) withVirtualBuilder(fn func(*FunctionBuilder)) {
 }
 
 func (lib *Program) exportType(name string) (Type, bool) {
-	lib.exportMu.Lock()
-	defer lib.exportMu.Unlock()
-	if lib.ExportType == nil {
+	if lib == nil {
 		return nil, false
 	}
-	t, ok := lib.ExportType[name]
+	lib.initConcurrentMaps()
+	t, ok := lib.ExportType.Get(name)
 	return t, ok && t != nil
 }
 
 func (lib *Program) rememberExportType(name string, t Type) Type {
-	lib.exportMu.Lock()
-	defer lib.exportMu.Unlock()
-	if lib.ExportType == nil {
-		lib.ExportType = make(map[string]Type)
-	}
-	if old, ok := lib.ExportType[name]; ok && old != nil {
-		return old
-	}
-	lib.ExportType[name] = t
-	return t
+	lib.initConcurrentMaps()
+	var stored Type
+	lib.ExportType.Update(name, func(old Type, loaded bool) (Type, bool) {
+		if loaded && old != nil {
+			stored = old
+			return old, false
+		}
+		stored = t
+		return t, true
+	})
+	return stored
 }
 
 func (lib *Program) exportValue(name string) (Value, bool) {
-	lib.exportMu.Lock()
-	defer lib.exportMu.Unlock()
-	if lib.ExportValue == nil {
+	if lib == nil {
 		return nil, false
 	}
-	v, ok := lib.ExportValue[name]
+	lib.initConcurrentMaps()
+	v, ok := lib.ExportValue.Get(name)
 	return v, ok && v != nil
 }
 
 func (lib *Program) rememberExportValue(name string, v Value) Value {
-	lib.exportMu.Lock()
-	defer lib.exportMu.Unlock()
-	if lib.ExportValue == nil {
-		lib.ExportValue = make(map[string]Value)
-	}
-	if old, ok := lib.ExportValue[name]; ok && old != nil {
-		return old
-	}
-	lib.ExportValue[name] = v
-	return v
+	lib.initConcurrentMaps()
+	var stored Value
+	lib.ExportValue.Update(name, func(old Value, loaded bool) (Value, bool) {
+		if loaded && old != nil {
+			stored = old
+			return old, false
+		}
+		stored = v
+		return v, true
+	})
+	return stored
 }
 
 func fakeGetValue(lib *Program, name string) Value {
