@@ -9,6 +9,7 @@ import (
 	"github.com/yaklang/gorm"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools/yakscripttools"
+	"github.com/yaklang/yaklang/common/ai/ytoken"
 	"github.com/yaklang/yaklang/common/schema"
 	_ "github.com/yaklang/yaklang/common/yak"
 )
@@ -29,7 +30,7 @@ func TestKnowledgeBaseYakTools(t *testing.T) {
 	}
 	schemaJSON, err := json.Marshal(tools["query_knowledge_base"].InputSchema)
 	require.NoError(t, err)
-	require.Contains(t, string(schemaJSON), `"required":["name","token_limit"]`)
+	require.Contains(t, string(schemaJSON), `"required":["token_limit"]`)
 	execute := func(name string, params map[string]any) (*aitool.ToolExecutionResult, error) {
 		// ReAct parameters cross a JSON boundary, including nested arrays.
 		raw, err := json.Marshal(params)
@@ -49,6 +50,9 @@ func TestKnowledgeBaseYakTools(t *testing.T) {
 		require.NoError(t, err)
 		var value map[string]any
 		require.NoError(t, json.Unmarshal([]byte(out.Stdout), &value), "stdout=%s", out.Stdout)
+		if name == "query_knowledge_base" {
+			require.LessOrEqual(t, ytoken.CalcTokenCount(out.Stdout), int(value["token_limit"].(float64)), "the actual tool stdout must fit the whole-response budget")
+		}
 		return value
 	}
 	invoke("manage_knowledge_base", map[string]any{"op": "create", "name": "yak-tool-fixture", "metadata": map[string]any{"description": "原始\n描述", "tags": []string{"docs"}}})
@@ -58,6 +62,21 @@ func TestKnowledgeBaseYakTools(t *testing.T) {
 	hits := queried["results"].([]any)
 	require.Len(t, hits, 1)
 	require.Equal(t, "原始内容\n引号\" 反斜杠\\ 😀", hits[0].(map[string]any)["content"])
+	for _, scope := range []map[string]any{{"all": true}, {"names": []string{"yak-tool-fixture"}}} {
+		scope["token_limit"] = 512
+		scope["per_entry_token_limit"] = 256
+		page := invoke("query_knowledge_base", scope)
+		require.Equal(t, float64(1), page["total"])
+		require.Equal(t, "yak-tool-fixture", page["results"].([]any)[0].(map[string]any)["knowledge_base"])
+	}
+	invoke("manage_knowledge_base", map[string]any{"op": "create", "name": "yak-tool-other"})
+	invoke("manage_knowledge_base", map[string]any{"op": "add_entry", "name": "yak-tool-other", "entry": map[string]any{"title": "other", "content": "SECOND_SCOPE_MARKER"}, "skip_index": true})
+	multi := invoke("query_knowledge_base", map[string]any{"names": []string{"yak-tool-fixture", "yak-tool-other"}, "token_limit": 1024, "limit": 1})
+	require.Equal(t, float64(2), multi["total"])
+	require.Len(t, multi["results"], 1, "multiple names must survive CLI conversion and share one result limit")
+	_, scopeError := execute("query_knowledge_base", map[string]any{"all": false, "token_limit": 512})
+	require.ErrorContains(t, scopeError, "manage_knowledge_base")
+	require.ErrorContains(t, scopeError, `"op":"list"`)
 	listed := invoke("manage_knowledge_base", map[string]any{"op": "list", "keyword": "yak-tool-fixture"})
 	require.Equal(t, float64(1), listed["total"])
 	for _, tc := range []struct {
@@ -73,5 +92,6 @@ func TestKnowledgeBaseYakTools(t *testing.T) {
 		require.Error(t, err)
 	}
 	invoke("manage_knowledge_base", map[string]any{"op": "delete", "name": "yak-tool-fixture"})
+	invoke("manage_knowledge_base", map[string]any{"op": "delete", "name": "yak-tool-other"})
 	require.Equal(t, float64(0), invoke("manage_knowledge_base", map[string]any{"op": "list"})["total"])
 }

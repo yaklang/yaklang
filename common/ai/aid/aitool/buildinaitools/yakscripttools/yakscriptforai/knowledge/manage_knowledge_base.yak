@@ -14,7 +14,7 @@ op=add_entry/update_entry：entry 是完整条目 {title,content,summary?,type?,
 op=delete_entry：entry_id 必填，只删该库的指定条目及其索引。
 op=build：source_file（引擎本地文件绝对路径）和 content 必须且只能给一个。build_options.mode=question_index（默认，AI 分析并生成问题索引）或 chunks（直接按块入库，文本不调用 AI）；chunk_size=256..1048576 字节，默认8192；concurrency=1..16，默认2；extra_prompt 是 AI 构建的额外要求。多媒体/文档提取依赖引擎对应能力。构建等待实际落库；出错时如实报告，部分成功写入可能保留，检查库内容后再重试。
 op=rebuild_index：使用已保存的模型/维度/HNSW 参数为全部条目重建索引，不用于更换模型；可能耗时且需要 embedding 服务。index_options 只允许在 create 使用。
-查询知识正文另行 require query_knowledge_base，必须传 name 和 token_limit；不要把列表当成知识内容，也不要声称失败的操作成功。
+查询知识正文另行 require query_knowledge_base，必须显式选择 name、names 或 all=true，并指定 token_limit；库名未知先用本工具 op=list。不要把列表当成知识内容，也不要声称失败的操作成功。
 
 [[- if .FunctionCallMode -]]
 ```json
@@ -25,10 +25,10 @@ op=rebuild_index：使用已保存的模型/维度/HNSW 参数为全部条目重
 ```
 [[- else -]]
 ```json
-{"@action":"directly_call_tool","directly_call_tool_name":"manage_knowledge_base","directly_call_tool_params":{"op":"list","limit":20,"offset":0}}
+{"@action":"directly_call_tool","directly_call_tool_name":"manage_knowledge_base","directly_call_tool_params":{"op":"create","name":"project-docs","metadata":{"description":"项目文档","tags":["project"]}}}
 ```
 ```json
-{"@action":"directly_call_tool","directly_call_tool_name":"manage_knowledge_base","directly_call_tool_params":{"op":"build","name":"project-docs","content":"项目启动说明","build_options":{"mode":"chunks"}}}
+{"@action":"directly_call_tool","directly_call_tool_name":"manage_knowledge_base","directly_call_tool_params":{"op":"build","name":"project-docs","source_file":"/tmp/readme.txt","build_options":{"mode":"question_index","chunk_size":8192,"concurrency":2}}}
 ```
 [[- end -]]
 USAGE

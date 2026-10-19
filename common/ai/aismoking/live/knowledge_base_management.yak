@@ -20,7 +20,7 @@ mu=sync.NewMutex()
 prompt=sprintf(`直接完成一个知识库验证任务，使用 yaklang-system 索引的内置知识库工具：
 1. 列出知识库，创建精确名称 %s 的新库，描述为 live smoke，tags 为 smoke。
 2. 将本地文件 %s 构建到该库，使用 question_index 模式、chunk_size=1024、concurrency=1；等待实际构建成功。
-3. 在该库内用 semantic 查询 knowledge-smoke API 请求头和验证标记，显式设置 token_limit=1024。再用 keyword 查询同一知识原文核对。不要通过 read_file 直接回答问题。
+3. 在该库内用 semantic 查询 knowledge-smoke API 请求头和验证标记，显式设置 token_limit=1024、limit=3、per_entry_token_limit=256；这次用 names 数组选择刚创建的这个库。再用 name 精确指定同一库，通过 keyword 查询知识原文核对。不要通过 read_file 直接回答问题。
 4. 将库描述更新为 live smoke verified，再 get 核对。保留测试库，测试程序会在退出时负责删除。
 成功时简短回答请求头和验证标记；出错时如实说明实际错误。无需生成报告或计划。`,name,source)
 started=time.Now().UnixMilli()
@@ -45,7 +45,7 @@ if baseError!=nil { errors=append(errors,string(baseError)) }
 if queryError!=nil { errors=append(errors,string(queryError)) }
 if baseError==nil && base.knowledge_base.Description!="live smoke verified" { errors=append(errors,"metadata update did not persist") }
 if queryError==nil && len(query.Results)==0 { errors=append(errors,"file marker was not persisted in the requested knowledge base") }
-seenManage,seenQuery,seenSemantic,seenKeyword,seenBuild=false,false,false,false,false
+seenManage,seenQuery,seenSemantic,seenKeyword,seenBuild,seenNames=false,false,false,false,false,false
 for call in calls {
     manifestPath=file.Join(call.dir_path,"..","manifest.json")
     manifest=json.loads(string(file.ReadFile(manifestPath)~))
@@ -59,11 +59,13 @@ for call in calls {
         if len(output.results)>0 && output.used_tokens<=output.token_limit {
             if output.mode=="semantic" { seenSemantic=true }
             if output.mode=="keyword" { seenKeyword=true }
+            if "names" in manifest.params && len(manifest.params.names)>0 { seenNames=true }
         }
     }
 }
 if !seenManage || !seenQuery { errors=append(errors,"real AI did not invoke both built-in knowledge tools") }
 if !seenBuild || !seenSemantic || !seenKeyword { errors=append(errors,"real AI must complete question-index build and both semantic and keyword retrieval") }
+if !seenNames { errors=append(errors,"real AI must use an explicit names array through the production tool boundary") }
 summary={"passed":len(errors)==0,"knowledge_base":name,"duration_ms":time.Now().UnixMilli()-started,"real_provider":true,"real_embedding":true,"tool_scope":"two built-in knowledge tools","function_call":os.Getenv("AISMOKING_FUNCTION_CALL")!="0","tool_calls":len(calls),"errors":errors}
 file.SaveJson(file.Join(root,"summary.json"),summary)~
 println(json.dumps(summary))

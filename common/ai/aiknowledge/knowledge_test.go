@@ -77,14 +77,14 @@ func TestKnowledgeLifecycleAndBoundedQueries(t *testing.T) {
 	var reconstructed strings.Builder
 	offset := 0
 	for i := 0; i < 1000; i++ {
-		result, err := Query(map[string]any{"name": "docs", "mode": "get", "entry_id": id, "token_limit": 128, "content_offset": offset}, opts...)
+		result, err := Query(map[string]any{"name": "docs", "mode": "get", "entry_id": id, "token_limit": 256, "content_offset": offset}, opts...)
 		require.NoError(t, err)
 		require.Len(t, result.Results, 1)
 		hit := result.Results[0]
-		raw, err := json.Marshal(hit)
+		raw, err := json.Marshal(result)
 		require.NoError(t, err)
-		require.Equal(t, ytoken.CalcTokenCount(string(raw)), result.UsedTokens)
-		require.LessOrEqual(t, result.UsedTokens, 128)
+		require.LessOrEqual(t, ytoken.CalcTokenCount(string(raw)), result.UsedTokens)
+		require.LessOrEqual(t, result.UsedTokens, 256)
 		reconstructed.WriteString(hit.Content)
 		if !hit.Truncated {
 			break
@@ -200,7 +200,7 @@ func TestSplitEmbeddingDocumentsSurviveReplacement(t *testing.T) {
 	id := added["entry_id"]
 	for _, body := range []string{strings.Repeat("new content ", 220), "short replacement"} {
 		manage(t, opts, map[string]any{"op": "update_entry", "name": "chunks", "entry_id": id, "entry": map[string]any{"title": "split entry", "content": body}})
-		result, err := Query(map[string]any{"name": "chunks", "mode": "semantic", "query": "content", "token_limit": 4096}, opts...)
+		result, err := Query(map[string]any{"name": "chunks", "mode": "semantic", "query": "content", "token_limit": 4096, "per_entry_token_limit": 4096}, opts...)
 		require.NoError(t, err)
 		require.Len(t, result.Results, 1)
 		require.Equal(t, body, result.Results[0].Content)

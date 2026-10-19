@@ -17,14 +17,20 @@ plan = [
     {"name":"manage_knowledge_base","params":{"op":"get","name":kbName}},
     {"name":"manage_knowledge_base","params":{"op":"update","name":kbName,"metadata":{"description":"","tags":[],"is_default":false}}},
     {"name":"manage_knowledge_base","params":{"op":"add_entry","name":kbName,"entry":{"title":"API token","content":original}}},
-    {"name":"query_knowledge_base","params":{"name":kbName,"query":"ORIGINAL_MARKER","token_limit":128}},
-    {"name":"query_knowledge_base","params":{"name":kbName,"mode":"get","entry_id":"pending","content_offset":0,"token_limit":128}},
+    {"name":"query_knowledge_base","params":{"name":kbName,"query":"ORIGINAL_MARKER","token_limit":256}},
+    {"name":"query_knowledge_base","params":{"name":kbName,"mode":"get","entry_id":"pending","content_offset":0,"token_limit":256}},
     {"name":"manage_knowledge_base","params":{"op":"update_entry","name":kbName,"entry_id":"pending","entry":{"title":"API token updated","content":"NEW_API_MARKER\napi token 新内容\"\\😀"}}},
     {"name":"query_knowledge_base","params":{"name":kbName,"mode":"semantic","query":"api token","token_limit":512}},
     {"name":"manage_knowledge_base","params":{"op":"build","name":kbName,"source_file":sourceFile,"build_options":{"mode":"chunks","chunk_size":512,"concurrency":1}}},
     {"name":"query_knowledge_base","params":{"name":kbName,"query":"FILE_API_MARKER","token_limit":512}},
     {"name":"manage_knowledge_base","params":{"op":"rebuild_index","name":kbName}},
     {"name":"query_knowledge_base","params":{"name":kbName,"mode":"semantic","query":"api token database","token_limit":512}},
+    {"name":"manage_knowledge_base","params":{"op":"add_entry","name":otherName,"entry":{"title":"Other API token","content":"OTHER_API_MARKER api token belongs to the other knowledge base"}}},
+    {"name":"query_knowledge_base","params":{"names":[kbName,otherName],"query":"API_MARKER","limit":3,"token_limit":1024,"per_entry_token_limit":256}},
+    {"name":"query_knowledge_base","params":{"all":true,"mode":"semantic","query":"api token","limit":2,"token_limit":512,"per_entry_token_limit":256,"min_score":-1}},
+    {"name":"query_knowledge_base","params":{"all":false,"query":"API_MARKER","token_limit":512}},
+    {"name":"manage_knowledge_base","params":{"op":"list","keyword":prefix}},
+    {"name":"query_knowledge_base","params":{"names":[kbName,otherName],"query":"OTHER_API_MARKER","token_limit":512}},
     {"name":"manage_knowledge_base","params":{"op":"delete_entry","name":kbName,"entry_id":"pending"}},
     {"name":"query_knowledge_base","params":{"name":kbName,"query":"NEW_API_MARKER","token_limit":512}},
     {"name":"manage_knowledge_base","params":{"op":"delete","name":kbName}},
@@ -38,7 +44,15 @@ func checkPrevious() {
     calls = operator.GetCurrentTask().GetAllToolCallResults()
     assert len(calls)==cursor
     actual = calls[len(calls)-1]
-    assert actual.Success && actual.Name==plan[cursor-1].name, "knowledge tool failed"
+    assert actual.Name==plan[cursor-1].name
+    if cursor==19 {
+        assert !actual.Success, "missing scope must fail instead of searching all"
+        evidence=json.dumps(actual)
+        assert "manage_knowledge_base" in evidence && "list" in evidence && "all=true" in evidence, "scope error must guide AI to manage list and an explicit choice"
+        awaiting=false
+        return
+    }
+    assert actual.Success, "knowledge tool failed"
     directory = ""
     for i=0;i<100;i++ { smokeMutex.Lock();directory=artifactDirs[actual.ToolCallID];smokeMutex.Unlock();if directory!=nil && directory!="" {break};time.Sleep(0.01) }
     assert directory!=nil && directory!=""
@@ -51,15 +65,20 @@ func checkPrevious() {
     if cursor==5 { assert value.entry_count==0 && value.collection.M==8 && value.collection.EfSearch==40 }
     if cursor==6 { assert value.knowledge_base.description=="" && len(value.knowledge_base.tags)==0 && !value.knowledge_base.is_default }
     if cursor==7 { entryID=value.entry_id; assert entryID!="" && value.indexed }
-    if cursor==8 { assert len(value.results)==1 && value.used_tokens<=128 && value.results[0].truncated;continuation=value.results[0].next_content_offset;assert continuation>0 }
+    if cursor==8 { assert len(value.results)==1 && value.used_tokens<=256 && value.results[0].truncated;continuation=value.results[0].next_content_offset;assert continuation>0 }
     if cursor==9 { assert value.results[0].entry_id==entryID && value.results[0].content_offset==continuation && value.results[0].next_content_offset>continuation }
     if cursor==11 { assert len(value.results)==1 && value.results[0].entry_id==entryID && value.results[0].content=="NEW_API_MARKER\napi token 新内容\"\\😀" }
     if cursor==12 { assert value.entries_added>0 && value.mode=="chunks" }
     if cursor==13 { assert len(value.results)==1 && "FILE_API_MARKER" in value.results[0].content }
     if cursor==14 { assert value.indexed && value.entries_indexed==2 }
     if cursor==15 { assert len(value.results)>0 && value.used_tokens<=512 }
-    if cursor==16 || cursor==18 || cursor==19 { assert value.deleted }
-    if cursor==17 || cursor==20 { assert value.total==0 }
+    if cursor==16 { assert value.indexed }
+    if cursor==17 { assert value.total==3 && len(value.results)==3 && value.knowledge_base_count==2 && value.used_tokens<=1024 }
+    if cursor==18 { assert value.all && len(value.results)==2 && value.used_tokens<=512 && value.knowledge_base_count==2 }
+    if cursor==20 { assert value.total==2 }
+    if cursor==21 { assert len(value.results)==1 && value.results[0].knowledge_base==otherName }
+    if cursor==22 || cursor==24 || cursor==25 { assert value.deleted }
+    if cursor==23 || cursor==26 { assert value.total==0 }
     awaiting=false
 }
 smokeHandler=func(w,body) {
@@ -73,7 +92,7 @@ smokeHandler=func(w,body) {
         w.Write("data: [DONE]\n\n")~;return
     }
     assert "SMOKE_CALLER:react-loop:default" in prompt || "SMOKE_CALLER:react-loop:main" in prompt
-    assert "管理知识库" in prompt && "manage_knowledge_base" in prompt && "query_knowledge_base" in prompt && "token_limit" in prompt, "system skill must index both knowledge tools"
+    assert "管理知识库" in prompt && "manage_knowledge_base" in prompt && "query_knowledge_base" in prompt && "token_limit" in prompt && "all=true" in prompt, "system skill must index both knowledge tools and explicit all scope"
     for schema in body.tools { assert schema["function"].name!="knowledge_enhance_answer", "legacy RAG action must not be registered" }
     assert !("rewrite_user_query_for_knowledge_enhance" in prompt), "legacy RAG action must not be in text schema"
     if awaiting { checkPrevious() }
@@ -89,7 +108,7 @@ for native in [false,true] {
     config,operator,cursor,awaiting,loaded=nil,nil,0,false,{}
     // Reset values filled in by the previous protocol run.
     for item in plan { if "entry_id" in item.params { item.params.entry_id="pending" } }
-    die(aim.InvokeReAct("通过 yaklang-system 的两个知识库工具创建和管理测试库、写入并修改知识、按 token 预算查询和续读、构建文件和索引、语义检索，最后删除测试库。",aim.sessionID("knowledge-management-"+randstr(12)),aim.context(smokeCtx),aim.workdir(smokeRoot),aim.reviewPolicy("yolo"),aim.maxIteration(32),aim.timeout(180),aim.disableAIForge(true),aim.aiCallback(smokeModel),aim.onEvent(func(op,e){
+    die(aim.InvokeReAct("通过 yaklang-system 的两个知识库工具创建和管理测试库、写入并修改知识、按 token 预算查询和续读、构建文件和索引、语义检索；验证 names、显式 all、缺少范围报错后 manage list 再选择库，最后删除测试库。",aim.sessionID("knowledge-management-"+randstr(12)),aim.context(smokeCtx),aim.workdir(smokeRoot),aim.reviewPolicy("yolo"),aim.maxIteration(40),aim.timeout(240),aim.disableAIForge(true),aim.aiCallback(smokeModel),aim.onEvent(func(op,e){
         config,operator=op.GetConfig(),op
         if string(e.Type)=="tool_call_log_dir" { info=json.loads(string(e.Content));smokeMutex.Lock();artifactDirs[info.call_tool_id]=file.Join(info.dir_path,"..");smokeMutex.Unlock() }
     }),aim.configOptions(aiagent.aiCallback(smokeModel),aiagent.functionCallMode(native),func(c){

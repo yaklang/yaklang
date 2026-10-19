@@ -23,7 +23,7 @@ metadata:
 | 管理与 Yakit 共享的 MCP 服务器 | `manage_mcp_server`：op:add/delete/list，name/type/endpoint/env/headers，limit/offset | 持久配置、启用状态与分页列表；凭据值不在列表回显 |
 | 发现并调用外部 MCP 工具 | `query_mcp_tools`：server_name/cursor；`call_mcp_tool`：server_name/remote_tool/arguments | 远端工具原始 inputSchema 与 MCP content，刚添加即可调用 |
 | 列出、增删改查和构建知识库，管理知识条目 | `manage_knowledge_base`：op:list/get/create/update/delete/build/add_entry/update_entry/delete_entry/rebuild_index，name，metadata/index_options/build_options | 与 Yakit 共用的 profile 知识库元信息、分页列表、条目 ID 和实际构建结果 |
-| 查询指定知识库的知识正文 | `query_knowledge_base`：name、token_limit 必填；mode:keyword/semantic/get，query/entry_id，limit/offset/content_offset | 库内原文、条目 ID、score、token 用量与截断续读位置；不隐式跨库 |
+| 查询知识库正文 | `query_knowledge_base`：name / names / all=true 显式三选一，token_limit 必填；mode:keyword/semantic/get，limit/offset/per_entry_token_limit/min_score | 原文、来源库、条目 ID、score、整体 token 用量与截断续读位置 |
 
 ## 使用顺序与边界
 
@@ -34,7 +34,7 @@ metadata:
 - 管理 MCP：先 `require_tool` 加载 `manage_mcp_server`；`op=list` 检查名称，`op=add` 保存新配置，`op=delete` 删除精确名称并清理工具缓存。配置存在本次运行的 profile 系统表，与 Yakit 共用；重复添加报错。禁用 MCP 的运行不能使用这些工具。
 - 使用 MCP：添加后直接 require `query_mcp_tools` 读取远端工具参数，按 `nextCursor` 续查；再 require `call_mcp_tool`，传远端裸工具名和 JSON 参数对象，当前会话即可执行。也可用 `mcp.Connect` 或 `mcp.NewClient` 编写 Yak 客户端。操作失败时读取实际错误，不声称调用成功；完整用法见参考资源的 MCP 一节。
 - 管理知识库：先 `require_tool` 加载 `manage_knowledge_base`；`op=list` 定位名称，再按需创建、更新元信息、构建和管理条目。create 配置模型/维度/HNSW，build 配置输入、分块和并发；构建需等待实际落库。知识库列表属于管理，不单设列表工具。
-- 查询知识：require `query_knowledge_base`，显式给出 name 和 token_limit。keyword 可分页浏览，semantic 使用该库语义索引，get 按 entry_id 精确续读；截断后用 next_content_offset 继续。旧 RAG action 和开关已停用，知识操作通过本 Skill 引导调用工具；`aiknowledge.Manage` / `aiknowledge.Query` 提供直接 Yak API。
+- 查询知识：require `query_knowledge_base`，显式选择 name（一个库）、names（多个库）或 all=true，并指定 token_limit；三者互斥。未指定范围必须报错，先 manage(op=list) 查看库再选择；all=false 或省略 all 不会跨库，name="all" 是字面库名。最多20库，超过时按 names 分批。整次 JSON 共享 token_limit=256..8192，推荐1024；limit 默认5（最多50），每条 per_entry_token_limit 默认512。keyword 用 next_offset 分页；semantic 用 min_score 过滤、按全局相似度排序，offset=0；get 只允许单库，按 entry_id 精确续读。截断后用结果的 knowledge_base、entry_id、next_content_offset 继续。旧 RAG action 和开关已停用，知识操作通过本 Skill 引导调用工具；`aiknowledge.Manage` / `aiknowledge.Query` 提供直接 Yak API。
 
 ## 详细参考与扩展位置
 
