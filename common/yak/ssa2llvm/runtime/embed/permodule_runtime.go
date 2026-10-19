@@ -130,6 +130,12 @@ func WriteRuntimeImportsPerModule(outputPath string, modules []string, aot bool)
 	b.WriteString("func init() {}\n\n")
 	if yakitAlias != "" {
 		b.WriteString("var runtimeYakitDatabaseOnce sync.Once\n\n")
+		b.WriteString("var runtimeYakitDatabaseEnabled bool\n\n")
+		// The compiler calls this only when the script uses a module that reads
+		// the profile database. Otherwise InitialDatabase syncs builtin AI tools
+		// and core plugins into every binary, including one that only uses container.
+		b.WriteString("//export yak_runtime_use_yakit_database\n")
+		b.WriteString("func yak_runtime_use_yakit_database() { runtimeYakitDatabaseEnabled = true }\n\n")
 	}
 	// Global builtins registration.
 	b.WriteString("//export yak_register_globals\n")
@@ -137,8 +143,11 @@ func WriteRuntimeImportsPerModule(outputPath string, modules []string, aot bool)
 	b.WriteString("\tregisterRuntimeGlobals()\n")
 	if yakitAlias != "" {
 		// The yak CLI opens the project database before user code. poc.save
-		// depends on the HTTP-flow hook installed by that open.
-		b.WriteString(fmt.Sprintf("\truntimeYakitDatabaseOnce.Do(%s.InitialDatabase)\n", yakitAlias))
+		// depends on the HTTP-flow hook installed by that open. A script that
+		// never opted in must not pay for that open.
+		b.WriteString("\tif runtimeYakitDatabaseEnabled {\n")
+		b.WriteString(fmt.Sprintf("\t\truntimeYakitDatabaseOnce.Do(%s.InitialDatabase)\n", yakitAlias))
+		b.WriteString("\t}\n")
 	}
 	b.WriteString("}\n\n")
 	writePrunedModuleStubs(&b, modNames)
