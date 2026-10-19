@@ -17,6 +17,7 @@ import (
 	"fmt"
 	"reflect"
 	"sync"
+	"time"
 	"unsafe"
 
 	"github.com/yaklang/yaklang/common/yak/ssa2llvm/runtime/abi"
@@ -280,9 +281,24 @@ func spawnInvoke(ctx unsafe.Pointer) {
 	}(handle)
 }
 
+// asyncExitDrain bounds the entry wrapper's wait. A finite `go` body is
+// scheduled and finishes inside this window. A body parked in a server loop
+// is left behind, matching the yak VM, which returns when the main flow ends.
+const asyncExitDrain = 250 * time.Millisecond
+
 //export yak_runtime_wait_async
 func yak_runtime_wait_async() {
-	yakAsyncWaitGroup.Wait()
+	done := make(chan struct{})
+	go func() {
+		yakAsyncWaitGroup.Wait()
+		close(done)
+	}()
+	timer := time.NewTimer(asyncExitDrain)
+	defer timer.Stop()
+	select {
+	case <-done:
+	case <-timer.C:
+	}
 }
 
 //export yak_runtime_invoke
