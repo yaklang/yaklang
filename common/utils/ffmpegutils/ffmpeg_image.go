@@ -22,7 +22,7 @@ func CompressImageRaw(inputRaw []byte, opts ...Option) ([]byte, error) {
 	if len(inputRaw) == 0 {
 		return nil, utils.Errorf("input raw image data is empty")
 	}
-	if ffmpegBinaryPath == "" {
+	if resolveFFmpegBinary() == "" {
 		return nil, utils.Errorf("ffmpeg binary path is not configured")
 	}
 
@@ -65,7 +65,8 @@ func CompressImage(inputFile, outputFile string, opts ...Option) error {
 	if _, err := os.Stat(inputFile); os.IsNotExist(err) {
 		return fmt.Errorf("input image file does not exist: %s", inputFile)
 	}
-	if ffmpegBinaryPath == "" {
+	binaryPath := resolveFFmpegBinary()
+	if binaryPath == "" {
 		return fmt.Errorf("ffmpeg binary path is not configured")
 	}
 
@@ -93,7 +94,7 @@ func CompressImage(inputFile, outputFile string, opts ...Option) error {
 			outputFile,
 		}
 
-		cmd := exec.CommandContext(o.ctx, ffmpegBinaryPath, args...)
+		cmd := exec.CommandContext(o.ctx, binaryPath, args...)
 		if o.debug {
 			cmd.Stderr = log.NewLogWriter(log.DebugLevel)
 			log.Infof("executing image compression: %s", cmd.String())

@@ -27,8 +27,21 @@ k := cli.Int("k", cli.setVerboseName("实体子图跳数"))
 kmin := cli.Int("kmin",cli.setVerboseName("实体子图最小跳数"),cli.setDefault(2))
 kmax := cli.Int("kmax", cli.setVerboseName("实体子图最大跳数"),cli.setDefault(4))
 disableERM := cli.Bool("disableERM", cli.setVerboseName("禁用实体库构建"),cli.setDefault(false))
+omniMode := cli.String("omni-mode", cli.setVerboseName("多模态抽取路径"), cli.setDefault("auto"), cli.setHelp("auto：先探测本地 Omni，不可用或请求失败则回退原路径；required：必须使用 Omni；disabled：原路径"))
+omniModel := cli.String("omni-model", cli.setVerboseName("Omni 模型"), cli.setHelp("留空使用本地 Omni 配置或 AIBalance Qwen3.8 Omni Flash"))
+omniSegmentSeconds := cli.Int("omni-segment-seconds", cli.setVerboseName("Omni 视频分段秒数"), cli.setDefault(20))
+omniPayloadBytes := cli.Int("omni-payload-bytes", cli.setVerboseName("Omni 每段编码字节上限"), cli.setDefault(7 * 1024 * 1024), cli.setHelp("限制含 data URI 前缀的 base64 大小，超限视频会继续细分"))
 
 cli.check()
+
+if !(omniMode in ["auto", "required", "disabled"]) {
+    die("omni-mode 必须为 auto、required 或 disabled")
+}
+if omniSegmentSeconds <= 0 || omniPayloadBytes < 1024 {
+    die("Omni 视频分段必须大于 0，编码字节上限必须至少为 1024")
+}
+buildErrors := []
+errorLock := sync.NewMutex()
 
 chunkSize  := 20 * 1024
 
@@ -55,7 +68,20 @@ options := [
     rag.disableERM(disableERM),
     rag.chunkSize(chunkSize),
     rag.analyzeConcurrency(concurrency),
+    rag.omniMode(omniMode),
+    liteforge.omniSegmentSeconds(omniSegmentSeconds),
+    liteforge.omniMaxBase64Bytes(omniPayloadBytes),
+    rag.onError(func(err) {
+        errorLock.Lock()
+        buildErrors = append(buildErrors, sprint(err))
+        errorLock.Unlock()
+        yakit.Error("知识构建失败: %v", err)
+    }),
 ]
+
+if omniModel != "" {
+    options = append(options, rag.omniConfig(ai.model(omniModel)))
+}
 
 if kmax > kmin {
     options = append(options, rag.khopkMax(kmax))
@@ -72,6 +98,9 @@ for path in filePath {
     fileReuslt,err :=  rag.BuildCollectionFromFile(kbName, path,options...)
     if err != nil {
         yakit.Error("Build collection for file [%s] fail: %v", path, err)
+        errorLock.Lock()
+        buildErrors = append(buildErrors, sprint(err))
+        errorLock.Unlock()
         continue
     }
     for i in fileReuslt {
@@ -80,6 +109,10 @@ for path in filePath {
             yakit.Output(i.KnowledgeTitle)
         }
     }
+}
+
+if len(buildErrors) > 0 {
+    die(sprintf("知识库构建存在 %d 个错误: %s", len(buildErrors), str.Join(buildErrors, "; ")))
 }
 
 if !hasValidData {

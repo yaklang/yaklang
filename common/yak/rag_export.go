@@ -19,6 +19,9 @@ import (
 
 // 导出的公共函数
 var RagExports = map[string]interface{}{
+	"omniMode":      liteforgeapp.WithOmniMediaMode,
+	"omniConfig":    liteforgeapp.WithOmniMediaAIOptions,
+	"onError":       liteforgeapp.WithAnalyzeErrorHandler,
 	"Get":           rag.Get,
 	"GetCollection": rag.Get,
 	"lazyEmbedding": _lazyEmbedding,

@@ -2,12 +2,12 @@ package ffmpegutils
 
 import (
 	"context"
+	"encoding/csv"
 	"fmt"
 	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
-	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -43,7 +43,8 @@ func ExtractVideoSliceFromVideo(inputFile string, opts ...Option) (<-chan *Video
 	if _, err := os.Stat(inputFile); os.IsNotExist(err) {
 		return nil, fmt.Errorf("input file does not exist: %s", inputFile)
 	}
-	if ffmpegBinaryPath == "" {
+	binaryPath := resolveFFmpegBinary()
+	if binaryPath == "" {
 		return nil, fmt.Errorf("ffmpeg binary path is not configured")
 	}
 
@@ -75,32 +76,37 @@ func ExtractVideoSliceFromVideo(inputFile string, opts ...Option) (<-chan *Video
 	// 构造 ffmpeg 命令参数
 	// 关键词: ffmpeg segment muxer, segment_time, reset_timestamps
 	outputPattern := filepath.Join(o.sliceOutputDir, "slice_%05d.mp4")
+	segmentList := filepath.Join(o.sliceOutputDir, "segments.csv")
 	args := []string{
 		"-i", inputFile,
 		"-nostdin",
 		"-y",
 		"-threads", strconv.Itoa(o.threads),
-		"-map", "0",
 	}
 
 	if o.sliceReencode {
 		// 重编码模式: 统一分辨率与 FPS，文件体积更小、token 控制更精准
 		// 关键词: 重编码模式, libx264, scale, target fps
-		vf := fmt.Sprintf("scale='min(iw,trunc(oh*a/2)*2)':'min(%d,ih)'", o.sliceMaxHeight)
+		vf := fmt.Sprintf("fps=%g,scale=-2:'min(%d,trunc(ih/2)*2)'", o.sliceTargetFPS, o.sliceMaxHeight/2*2)
 		args = append(args,
+			"-map", "0:v:0", "-map", "0:a:0?",
 			"-c:v", "libx264",
 			"-preset", "veryfast",
 			"-crf", "26",
 			"-pix_fmt", "yuv420p",
-			"-r", fmt.Sprintf("%g", o.sliceTargetFPS),
+			"-bf", "0",
+			"-force_key_frames", fmt.Sprintf("expr:gte(t,n_forced*%g)", o.sliceDurationSeconds),
+			"-sc_threshold", "0",
 			"-vf", vf,
 			"-c:a", "aac",
 			"-b:a", "64k",
+			// Allow half a frame for encoder timestamp rounding at a cut.
+			"-segment_time_delta", fmt.Sprintf("%g", 1/(2*o.sliceTargetFPS)),
 		)
 	} else {
 		// 流复制模式: 速度极快，分辨率/FPS 保持源
 		// 关键词: 流复制模式, stream copy, c copy
-		args = append(args, "-c", "copy")
+		args = append(args, "-map", "0", "-c", "copy")
 	}
 
 	args = append(args,
@@ -108,6 +114,8 @@ func ExtractVideoSliceFromVideo(inputFile string, opts ...Option) (<-chan *Video
 		"-segment_time", fmt.Sprintf("%g", o.sliceDurationSeconds),
 		"-reset_timestamps", "1",
 		"-segment_format", "mp4",
+		"-segment_list", segmentList,
+		"-segment_list_type", "csv",
 		"-movflags", "+faststart",
 		outputPattern,
 	)
@@ -120,7 +128,7 @@ func ExtractVideoSliceFromVideo(inputFile string, opts ...Option) (<-chan *Video
 		defer cancel()
 
 		// 关键词: ffmpeg 命令执行, segment 命令构造
-		cmd := exec.CommandContext(runCtx, ffmpegBinaryPath, args...)
+		cmd := exec.CommandContext(runCtx, binaryPath, args...)
 		if o.debug {
 			cmd.Stderr = log.NewLogWriter(log.DebugLevel)
 		} else {
@@ -137,7 +145,7 @@ func ExtractVideoSliceFromVideo(inputFile string, opts ...Option) (<-chan *Video
 		// emit 用于把已经落盘完整的分片下发到 channel + 回调
 		// finalFlush 为 true 时表示进入最终刷出阶段，不再检查 runCtx，
 		// 用 select-default 安全降级避免消费者已退出时阻塞。
-		emit := func(name string, finalFlush bool) {
+		emit := func(name string, startSec, endSec float64) {
 			emitMu.Lock()
 			defer emitMu.Unlock()
 
@@ -147,9 +155,6 @@ func ExtractVideoSliceFromVideo(inputFile string, opts ...Option) (<-chan *Video
 				log.Warnf("video slice stat failed: %s, err=%v", fullPath, statErr)
 				return
 			}
-
-			startSec := float64(sliceIndex) * o.sliceDurationSeconds
-			endSec := startSec + o.sliceDurationSeconds
 
 			result := &VideoSliceResult{
 				FilePath:  fullPath,
@@ -180,19 +185,9 @@ func ExtractVideoSliceFromVideo(inputFile string, opts ...Option) (<-chan *Video
 				}()
 			}
 
-			if finalFlush {
-				// 最终阶段绕开 runCtx 检查；channel 仍未关闭，buffer 64 一般够用
-				// 关键词: 最终阶段安全发送, final flush emit
-				select {
-				case resultsChan <- result:
-				default:
-					log.Warnf("final flush: channel full or no reader, slice idx=%d skipped on send", result.Index)
-				}
-			} else {
-				select {
-				case resultsChan <- result:
-				case <-runCtx.Done():
-				}
+			select {
+			case resultsChan <- result:
+			case <-runCtx.Done():
 			}
 
 			sliceIndex++
@@ -202,45 +197,34 @@ func ExtractVideoSliceFromVideo(inputFile string, opts ...Option) (<-chan *Video
 		// 在 ffmpeg 仍运行时：除最新文件外的全部按字典序刷出（最新文件可能仍在写）
 		// 在 ffmpeg 结束后：把所有未刷出的全刷出
 		scanFlushable := func(force bool) {
-			finalFlush := force
 			pollMu.Lock()
 			defer pollMu.Unlock()
 
-			entries, err := ioutil.ReadDir(o.sliceOutputDir)
+			data, err := os.ReadFile(segmentList)
 			if err != nil {
 				return
 			}
-			var names []string
-			for _, e := range entries {
-				if e.IsDir() {
+			// The CSV contains finalized segments with their actual source times.
+			// Reading a partial record while ffmpeg is writing is retried next poll.
+			records, err := csv.NewReader(strings.NewReader(string(data))).ReadAll()
+			if err != nil {
+				return
+			}
+			for _, record := range records {
+				if len(record) != 3 {
 					continue
 				}
-				name := e.Name()
-				if !strings.HasPrefix(name, "slice_") || !strings.HasSuffix(name, ".mp4") {
-					continue
-				}
+				name := filepath.Base(record[0])
 				if processed[name] {
 					continue
 				}
-				names = append(names, name)
-			}
-			if len(names) == 0 {
-				return
-			}
-			sort.Strings(names)
-
-			var toEmit []string
-			if force {
-				toEmit = names
-			} else if len(names) > 1 {
-				// 除最末文件外都已稳定
-				toEmit = names[:len(names)-1]
-			}
-			for _, n := range toEmit {
-				processed[n] = true
-			}
-			for _, n := range toEmit {
-				emit(n, finalFlush)
+				start, startErr := strconv.ParseFloat(record[1], 64)
+				end, endErr := strconv.ParseFloat(record[2], 64)
+				if startErr != nil || endErr != nil || end <= start {
+					continue
+				}
+				processed[name] = true
+				emit(name, start, end)
 			}
 		}
 
@@ -280,7 +264,7 @@ func ExtractVideoSliceFromVideo(inputFile string, opts ...Option) (<-chan *Video
 		if runErr != nil {
 			select {
 			case resultsChan <- &VideoSliceResult{Error: fmt.Errorf("ffmpeg execution failed: %w", runErr), Index: -1}:
-			default:
+			case <-o.ctx.Done():
 			}
 		}
 	}()

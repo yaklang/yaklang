@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/ai/rag/entityrepos"
 	"github.com/yaklang/yaklang/common/aireducer"
 	"github.com/yaklang/yaklang/common/chunkmaker"
@@ -21,6 +22,9 @@ type AnalysisConfig struct {
 	// VisionAICallback, when non-nil, is passed to temporary LiteForge execution as the
 	// preferred AI callback (after other options) so multimodal / vision routing uses the caller's model stack.
 	VisionAICallback aicommon.AICallbackType
+	OmniMediaMode    string
+	OmniAIOptions    []aispec.AIConfigOption
+	AnalyzeError     func(error)
 
 	chunkOption     []chunkmaker.Option
 	fallbackOptions []any
@@ -31,6 +35,7 @@ func NewAnalysisConfig(opts ...any) *AnalysisConfig {
 	cfg := &AnalysisConfig{
 		ExtraPrompt:        "",
 		AnalyzeConcurrency: 20,
+		OmniMediaMode:      "auto",
 		AnalyzeLog: func(format string, args ...interface{}) {
 			log.Infof(format, args...)
 		},
@@ -89,6 +94,36 @@ func (a *AnalysisConfig) ForgeExecOption(schema string) []any {
 }
 
 type AnalysisOption func(config *AnalysisConfig)
+
+// WithOmniMediaMode selects auto (probe the local Omni configuration, falling back
+// on failure), required (report failures), or disabled (the original media path).
+// Exported as rag.omniMode and liteforge.omniMode.
+func WithOmniMediaMode(mode string) AnalysisOption {
+	return func(c *AnalysisConfig) { c.OmniMediaMode = mode }
+}
+
+// WithOmniMediaAIOptions overrides the locally configured Omni provider. Provider
+// credentials, endpoint, proxy and headers are inherited unless explicitly set.
+// Example: rag.omniConfig(ai.type("aibalance"), ai.model("my-omni-model"))
+func WithOmniMediaAIOptions(opts ...aispec.AIConfigOption) AnalysisOption {
+	return func(c *AnalysisConfig) { c.OmniAIOptions = append(c.OmniAIOptions, opts...) }
+}
+
+// WithAnalyzeErrorHandler receives asynchronous extraction and indexing failures.
+// Drain the build channel before inspecting errors. Exported as rag.onError.
+func WithAnalyzeErrorHandler(handler func(error)) AnalysisOption {
+	return func(c *AnalysisConfig) { c.AnalyzeError = handler }
+}
+
+func (c *AnalysisConfig) reportError(err error) {
+	if err == nil {
+		return
+	}
+	c.AnalyzeLog("knowledge extraction failed: %v", err)
+	if c.AnalyzeError != nil {
+		c.AnalyzeError(err)
+	}
+}
 
 // WithExtraPrompt 为图片/上下文分析追加额外提示词（导出名为 liteforge.imageExtraPrompt）
 // 参数:
@@ -152,7 +187,9 @@ func WithAllowMultiHopAIRefine(allow ...bool) AnalysisOption {
 // ```
 func WithAnalyzeContext(ctx context.Context) AnalysisOption {
 	return func(config *AnalysisConfig) {
-		config.Ctx = ctx
+		if ctx != nil {
+			config.Ctx = ctx
+		}
 	}
 }
 
