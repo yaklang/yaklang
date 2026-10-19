@@ -2,18 +2,18 @@
 seq:    000060
 time:   2026-05-03T11:37:17+08:00
 model:  memfit-glm-5-free
-total:  123613 bytes / 4 chunks
+total:  122159 bytes / 4 chunks
 
 ## sections
-[1] section=high-static   nonce=high-static              bytes=16760 hash=8b7431254da4dade seen=7 first=2026-05-03T11:35:41+08:00
-[2] section=semi-dynamic  nonce=semi-dynamic             bytes=17589 hash=2941c62ae4c8ac15 seen=6 first=2026-05-03T11:35:46+08:00
+[1] section=high-static   nonce=high-static              bytes=15709 hash=8e03faab341b033e seen=7 first=2026-05-03T11:35:41+08:00
+[2] section=semi-dynamic  nonce=semi-dynamic             bytes=17186 hash=00b7acbf0657d4ee seen=6 first=2026-05-03T11:35:46+08:00
 [3] section=timeline      nonce=timeline                 bytes=44123 hash=cbf705c376e2e762 seen=1 first=2026-05-03T11:37:17+08:00
-[4] section=dynamic       nonce=dynamic_QGiX             bytes=44873 hash=c72ca0c1a644012e seen=1 first=2026-05-03T11:37:17+08:00
+[4] section=dynamic       nonce=dynamic_QGiX             bytes=44873 hash=2019483dd96b1239 seen=1 first=2026-05-03T11:37:17+08:00
 
 ## hit report
 prefix_hit_chunks: 2
-prefix_hit_bytes:  34349
-prefix_hit_ratio:  27.8%
+prefix_hit_bytes:  32895
+prefix_hit_ratio:  26.9%
 global_uniq_chunks: 194
 global_cache_bytes: 2715584
 total_requests:    60
@@ -29,7 +29,7 @@ section_hash_count:
 - semi-dynamic section drifts more than expected: 44 distinct hashes, tool/forge/schema list may be churning
 - hit ratio poor (27.8%) - prefix alignment broken early
 
-## raw prompt (123613 bytes)
+## raw prompt (122159 bytes)
 <|PROMPT_SECTION_high-static|>
 <|TRAITS|>
 ## Core Traits (核心性格) - 严肃/专业/无Emoji

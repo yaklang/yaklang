@@ -18,6 +18,8 @@ import (
 // observation shape and the provider-visible messages, including cache_control.
 // Fixtures 000010, 000060 and 000073 have refreshed HTTP tool inventory text
 // and matching dump metadata; their digests reflect those fixture edits.
+// Fixtures 000020, 000040 and 000060 also replace retired knowledge actions
+// with Skill-guided tools; their section metadata and digests are refreshed.
 func TestLegacyAICacheOutputCompatibility(t *testing.T) {
 	setProjectionThresholdMerge(t, 1024)
 	static := "<|AI_CACHE_SYSTEM_high-static|>stable<|AI_CACHE_SYSTEM_END_high-static|>"
@@ -28,10 +30,10 @@ func TestLegacyAICacheOutputCompatibility(t *testing.T) {
 		"000001": {hash: "088202f5f7c34652be18ce4ae709839aecf06bb8797a722f9b7c2656adf8dfab"},
 		"000005": {hash: "49711dcf781a93e0605e7db8c841c0665e47a841357d92891666066ca8d74a34"},
 		"000010": {hash: "9a873ca99dc446caab548de1fc7d276705d4d9f9e9fb27c52be42c6ebc5ca913"},
-		"000020": {hash: "613d03e1132f148547ed40c84c8bbafe3cdb45d57cb05994c0de91e06068242a"},
-		"000040": {hash: "d1375ac4b21231e8c814310770665bbee388be07cfd0fc65b8a4ba35bbc8b328"},
+		"000020": {hash: "acaa4725aa409e5f628dca9eaf032018c3e7165f836397a0be2236d7bfc0f29c"},
+		"000040": {hash: "4f51bf16a103feefd7be34d1eb213f7c08d55ecbded46c11f267398dd7ce2a85"},
 		"000045": {hash: "653ec1e7035f311ef4a13102b6c0726961a32642d5b14bbddf1ae19d4a27c043"},
-		"000060": {hash: "c8f1a22d4b9ee38f47f4a7ee4d6bbd3b64fc45b74a52253c971cc27c12ef7a65"},
+		"000060": {hash: "2da6e95476a60c21c5d0d4ad41ac87aae007d1be77bf7263852264e774ec50d8"},
 		"000073": {hash: "7833cf0d1b82363917071ee9f08030180cea45ea2be7f215c3fcfbcd26869df2"},
 		"legacy-static": {
 			prompt: "<|PROMPT_SECTION_high-static|>stable<|PROMPT_SECTION_END_high-static|><|PROMPT_SECTION_dynamic_x|>question<|PROMPT_SECTION_dynamic_END_x|>",

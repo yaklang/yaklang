@@ -2,13 +2,13 @@
 seq:    000020
 time:   2026-05-03T11:35:53+08:00
 model:  memfit-light-free
-total:  20259 bytes / 4 chunks
+total:  19907 bytes / 4 chunks
 
 ## sections
-[1] section=high-static   nonce=high-static              bytes=10543 hash=d4f3b55936e1bcc5 seen=1 first=2026-05-03T11:35:53+08:00
+[1] section=high-static   nonce=high-static              bytes=10367 hash=f6dbe4db6e098c33 seen=1 first=2026-05-03T11:35:53+08:00
 [2] section=semi-dynamic  nonce=semi-dynamic             bytes=109 hash=223e23000672f725 seen=1 first=2026-05-03T11:35:53+08:00
 [3] section=timeline      nonce=timeline                 bytes=418 hash=9254d27cadaf519a seen=1 first=2026-05-03T11:35:53+08:00
-[4] section=dynamic       nonce=dynamic_junwpi           bytes=8916 hash=f84df4da968752b5 seen=1 first=2026-05-03T11:35:53+08:00
+[4] section=dynamic       nonce=dynamic_junwpi           bytes=8740 hash=d6201cb99585c767 seen=1 first=2026-05-03T11:35:53+08:00
 
 ## hit report
 prefix_hit_chunks: 0
@@ -29,7 +29,7 @@ section_hash_count:
 - semi-dynamic section drifts more than expected: 17 distinct hashes, tool/forge/schema list may be churning
 - high-static section unstable: 16 distinct hashes seen, check template variables polluting it
 
-## raw prompt (20259 bytes)
+## raw prompt (19907 bytes)
 <|PROMPT_SECTION_high-static|>
 # Preset
 你现在在一个任务引擎中，是一个输出JSON的数据处理和总结提示小助手，我会为你提供一些基本信息和输入材料，你需要按照我的Schema生成一个JSON数据直接返回。

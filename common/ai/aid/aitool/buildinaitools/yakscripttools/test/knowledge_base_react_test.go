@@ -169,6 +169,10 @@ func TestKnowledgeBaseReActSkillToolsIntegration(t *testing.T) {
 							require.LessOrEqual(t, ytoken.CalcTokenCount(output), 512)
 						}
 						switch cursor {
+						case 1, 2:
+							var count int
+							require.NoError(t, profile.Model(&schema.KnowledgeBaseInfo{}).Count(&count).Error)
+							require.Equal(t, cursor, count, "the script must use the runtime-bound profile")
 						case 3:
 							require.Equal(t, float64(2), value["total"])
 							require.Equal(t, true, value["has_more"])
