@@ -260,6 +260,7 @@ func TestTypeStoreFlushFileDBKeepsIndexIntegrity(t *testing.T) {
 	db, err := gorm.Open("sqlite3", dbPath)
 	require.NoError(t, err)
 	require.NoError(t, db.AutoMigrate(&ssadb.IrType{}).Error)
+	require.NoError(t, db.Exec(`CREATE UNIQUE INDEX IF NOT EXISTS ux_ir_types_program_type ON ir_types (program_name, type_id)`).Error)
 
 	store := &typeStore{
 		mode:        ProgramCacheDBWrite,

@@ -62,66 +62,25 @@ func UpsertIrType(db *gorm.DB, ir *IrType) error {
 	return nil
 }
 
-// SaveIrTypeBatch writes types as in-place upserts on (program_name, type_id)
-// once ux_ir_types_program_type exists. That keeps the row id stable across
-// flushes. Databases that have not been migrated yet still delete and insert.
-// The in-process GetIrTypeCache is warmed either way.
+// SaveIrTypeBatch writes types as in-place upserts on (program_name, type_id).
+// ux_ir_types_program_type is created with the schema, so the row id stays
+// stable across flushes. SaveInBatches skips nil elements. The in-process
+// GetIrTypeCache is warmed either way.
 func SaveIrTypeBatch(db *gorm.DB, items []*IrType) error {
 	if db == nil || len(items) == 0 {
 		return nil
 	}
-	items = withoutNil(items)
-	if hasNamedIndex(db, TableIrTypes, "ux_ir_types_program_type") {
-		if err := db.New().SaveInBatches(items, irTypeBatchChunk, "program_name", "type_id").Error; err != nil {
-			return fmt.Errorf("upsert IR type: %w", err)
-		}
-	} else {
-		for start := 0; start < len(items); start += irTypeBatchChunk {
-			end := min(start+irTypeBatchChunk, len(items))
-			if err := bulkUpsertIrType(db, items[start:end]); err != nil {
-				return err
-			}
-		}
+	if err := db.New().SaveInBatches(items, irTypeBatchChunk, "program_name", "type_id").Error; err != nil {
+		return fmt.Errorf("upsert IR type: %w", err)
 	}
 	// keep the in-process type cache warm (same side effect as UpsertIrType)
 	for _, it := range items {
+		if it == nil {
+			continue
+		}
 		if cache := GetIrTypeCache(it.ProgramName); cache != nil {
 			cache.Set(int64(it.TypeId), it)
 		}
-	}
-	return nil
-}
-
-// bulkUpsertIrType deletes the batch's (program_name, type_id) rows (chunked
-// at 999 to respect SQLite's host-parameter limit) then bulk-inserts them via
-// CreateInBatches. Must run inside the caller's transaction so the delete +
-// insert are atomic.
-func bulkUpsertIrType(db *gorm.DB, items []*IrType) error {
-	if len(items) == 0 {
-		return nil
-	}
-	// collect distinct (program_name, type_id) pairs to delete. type_id is the
-	// logical key within a program; collect ids per program to stay safe if a
-	// batch ever spans programs (it does not today, but be correct).
-	progTypeIDs := make(map[string][]interface{}, 1)
-	for _, it := range items {
-		progTypeIDs[it.ProgramName] = append(progTypeIDs[it.ProgramName], it.TypeId)
-	}
-	for prog, ids := range progTypeIDs {
-		for i := 0; i < len(ids); i += 999 {
-			end := i + 999
-			if end > len(ids) {
-				end = len(ids)
-			}
-			if err := db.Where("program_name = ? AND type_id IN (?)", prog, ids[i:end]).
-				Unscoped().Delete(&IrType{}).Error; err != nil {
-				return err
-			}
-		}
-	}
-
-	if r := db.CreateInBatches(items, irTypeBatchChunk); r.Error != nil {
-		return r.Error
 	}
 	return nil
 }
