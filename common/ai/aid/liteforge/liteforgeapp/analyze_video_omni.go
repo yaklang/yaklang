@@ -208,7 +208,7 @@ func NewDefaultVideoOmniConfig() *VideoOmniConfig {
 		Reencode:       true,
 		MaxHeight:      720,
 		TargetFPS:      2,
-		MaxBase64Bytes: 7 * 1024 * 1024, // 7MB 切片，base64 约 9.3MB，留 0.7MB 余量
+		MaxBase64Bytes: 7 * 1024 * 1024, // base64 编码后的完整 data URI 上限
 		Ctx:            context.Background(),
 		Timeout:        300 * time.Second,
 	}
@@ -913,8 +913,8 @@ func analyzeSingleOmniSegment(video string, slice *ffmpegutils.VideoSliceResult,
 		Model:        cfg.Model,
 	}
 
-	if cfg.MaxBase64Bytes > 0 && slice.SizeBytes > cfg.MaxBase64Bytes {
-		r.ErrMsg = fmt.Sprintf("segment size %d exceeds MaxBase64Bytes %d, skip omni call (consider enabling reencode or smaller segment)", slice.SizeBytes, cfg.MaxBase64Bytes)
+	if cfg.MaxBase64Bytes > 0 && omniEncodedSize(slice.SizeBytes, len("data:;base64,")) > cfg.MaxBase64Bytes {
+		r.ErrMsg = fmt.Sprintf("encoded segment exceeds MaxBase64Bytes %d, skip omni call (consider enabling reencode or smaller segment)", cfg.MaxBase64Bytes)
 		log.Warnf("video slice idx=%d skipped: %s", slice.Index, r.ErrMsg)
 		return r
 	}

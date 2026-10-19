@@ -30,19 +30,24 @@ var LiteForgeExport = map[string]interface{}{
 	"Execute":          _executeLiteForgeTemp,
 	"imageExtraPrompt": WithExtraPrompt, // use for analyzeImage and analyzeImageFile
 
-	"analyzeCtx":        WithAnalyzeContext,    // use for analyzeContext
-	"analyzeLog":        WithAnalyzeLog,        // use for analyzeLog
-	"analyzeStatusCard": WithAnalyzeStatusCard, // use for analyzeStatusCard
-	"output":            WithOutputJSONSchema,
-	"action":            WithOutputAction,
-	"image":             _withImage,
-	"imageFile":         _withImageFile,
-	"id":                _withID,
-	"context":           LiteForgeExecWithContext,
-	"verboseName":       _withVerboseName,
-	"forceImage":        _withForceImage,
-	"speedPriority":     _withSpeedPriority,
-	"instruction":       LiteForgeExecWithStaticInstruction,
+	"analyzeCtx":         WithAnalyzeContext,    // use for analyzeContext
+	"analyzeLog":         WithAnalyzeLog,        // use for analyzeLog
+	"analyzeStatusCard":  WithAnalyzeStatusCard, // use for analyzeStatusCard
+	"omniMode":           WithOmniMediaMode,
+	"omniConfig":         WithOmniMediaAIOptions,
+	"onAnalyzeError":     WithAnalyzeErrorHandler,
+	"CheckOmniAvailable": CheckOmniAvailable,
+	"AnalyzeFile":        AnalyzeFile,
+	"output":             WithOutputJSONSchema,
+	"action":             WithOutputAction,
+	"image":              _withImage,
+	"imageFile":          _withImageFile,
+	"id":                 _withID,
+	"context":            LiteForgeExecWithContext,
+	"verboseName":        _withVerboseName,
+	"forceImage":         _withForceImage,
+	"speedPriority":      _withSpeedPriority,
+	"instruction":        LiteForgeExecWithStaticInstruction,
 
 	"knowledgeBaseName":    RefineWithKnowledgeBaseName,
 	"knowledgeBaseDesc":    RefineWithKnowledgeBaseDesc,

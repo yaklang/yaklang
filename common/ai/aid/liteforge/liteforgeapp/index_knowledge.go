@@ -95,16 +95,16 @@ func _buildIndex(analyzeChannel <-chan AnalysisResult, options ...any) (<-chan *
 				defer swg.Done()
 				entries, err := BuildIndexFormAnalyzeResult(r, options...)
 				if err != nil {
-					log.Errorf("failed to build index from analyze result: %v", err)
+					refineConfig.reportError(utils.Errorf("failed to build index from analyze result: %v", err))
 					return
 				}
 
 				for _, entry := range entries {
-					output.SafeFeed(entry)
 					if err := addQuestionIndexVectorOnly(ragSystem, entry, refineConfig.ragSystemOptions...); err != nil {
-						log.Errorf("failed to add question-index vectors: %v", err)
+						refineConfig.reportError(utils.Errorf("failed to add question-index vectors: %v", err))
 						return
 					}
+					output.SafeFeed(entry)
 				}
 			}(res)
 

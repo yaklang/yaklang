@@ -28,8 +28,10 @@ import (
 )
 
 type ImageResult struct {
-	MIMEType *mimetype.MIME
-	RawImage []byte
+	MIMEType   *mimetype.MIME
+	RawImage   []byte
+	PageNumber int
+	Error      error
 }
 
 func (i *ImageResult) SaveToFile() (string, error) {
@@ -61,6 +63,9 @@ func (i *ImageResult) Base64() string {
 }
 
 func (i *ImageResult) String() string {
+	if i.Error != nil {
+		return "ImageResult{Error: " + i.Error.Error() + "}"
+	}
 	return "ImageResult{\n" +
 		"  MIMEType: " + i.MIMEType.String() + ", \n" +
 		"  RawImage: " + utils.ShrinkString(codec.EncodeBase64(i.RawImage), 64) + ", \n" +

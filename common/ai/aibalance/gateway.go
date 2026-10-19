@@ -160,6 +160,7 @@ func (g *GatewayClient) Chat(s string, function ...any) (string, error) {
 		aispec.WithChatBase_ReasonStreamHandler(reasonStreamHandler),
 		aispec.WithChatBase_ErrHandler(wrappedErrorHandler),
 		aispec.WithChatBase_ImageRawInstance(g.config.Images...),
+		aispec.WithChatBase_VideoRawInstance(g.config.Videos...),
 		aispec.ChatBaseThinkingOptions(g.config, g.targetUrl),
 		aispec.WithChatBase_AISamplingFromConfig(g.config),
 		aispec.WithChatBase_Tools(g.config.Tools),
@@ -197,6 +198,7 @@ func (g *GatewayClient) Chat(s string, function ...any) (string, error) {
 			aispec.WithChatBase_ReasonStreamHandler(reasonStreamHandler),
 			aispec.WithChatBase_ErrHandler(g.config.HTTPErrorHandler),
 			aispec.WithChatBase_ImageRawInstance(g.config.Images...),
+			aispec.WithChatBase_VideoRawInstance(g.config.Videos...),
 			aispec.ChatBaseThinkingOptions(g.config, g.targetUrl),
 			aispec.WithChatBase_AISamplingFromConfig(g.config),
 			aispec.WithChatBase_Tools(g.config.Tools),
@@ -305,6 +307,7 @@ func (g *GatewayClient) ChatStream(s string) (io.Reader, error) {
 	reader, err := aispec.ChatWithStream(
 		g.targetUrl, g.config.Model, s, wrappedErrorHandler, g.config.ReasonStreamHandler,
 		g.BuildHTTPOptions,
+		aispec.WithChatBase_VideoRawInstance(g.config.Videos...),
 		aispec.ChatBaseThinkingOptions(g.config, g.targetUrl),
 		aispec.WithChatBase_AISamplingFromConfig(g.config),
 	)
@@ -320,6 +323,7 @@ func (g *GatewayClient) ChatStream(s string) (io.Reader, error) {
 		return aispec.ChatWithStream(
 			g.targetUrl, g.config.Model, s, wrappedErrorHandler, g.config.ReasonStreamHandler,
 			g.BuildHTTPOptions,
+			aispec.WithChatBase_VideoRawInstance(g.config.Videos...),
 			aispec.ChatBaseThinkingOptions(g.config, g.targetUrl),
 			aispec.WithChatBase_AISamplingFromConfig(g.config),
 		)

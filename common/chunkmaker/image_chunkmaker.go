@@ -29,6 +29,10 @@ func NewImageChunkMakerFromFileEx(targetFile string, cfg *Config) (*SimpleChunkM
 					log.Info("ImageChunkMaker closed")
 					return
 				}
+				if img.Error != nil {
+					log.Errorf("image extraction failed: %v", img.Error)
+					continue
+				}
 				currentChunk := NewBufferChunkEx(img.RawImage, img.MIMEType, "")
 				currentChunk.prev = preChunk
 				dst.SafeFeed(currentChunk)
