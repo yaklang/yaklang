@@ -508,11 +508,16 @@ func (c *Config) parseProjectWithFSUnits(
 		// run here, after every skeleton has released its builder and before
 		// prehandler mode is cleared. Directory compiles in that window still
 		// visit class bodies, and they no longer share a builder with a live
-		// prehandle worker. Other deferred work stays on the later pass.
-		if !prog.RunDeferredBuildsForUnitsMatching(unitKeys, nil, nil, func(id string) bool {
-			return strings.Contains(id, "java-static-import:")
-		}) {
-			return nil, ErrContextCancel
+		// prehandle worker. Hierarchy is the other half of that window:
+		// extends/implements must be recorded before any library body, so a
+		// cyclic compile unit does not depend on which library is built first.
+		// Other deferred work stays on the later pass.
+		for _, marker := range []string{"java-static-import:", "java-type-hierarchy:"} {
+			if !prog.RunDeferredBuildsForUnitsMatching(unitKeys, nil, nil, func(id string) bool {
+				return strings.Contains(id, marker)
+			}) {
+				return nil, ErrContextCancel
+			}
 		}
 		prog.SetPreHandler(false)
 		if holdSCCIR && !structScanOn && prog.Cache != nil {

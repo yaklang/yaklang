@@ -7,6 +7,23 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssa"
 )
 
+// registerJavaHierarchyTask relates extends/implements after every skeleton and
+// before any library body. The class lazy task stays separate and is the one
+// that declares a supertype nobody has written: that declaration has to be
+// emitted where the reference is, which may be a branch of a field initializer.
+// Sharing one closure between the two passes consumed the declaration early and
+// appended it after the branch terminator.
+func (y *singleFileBuilder) registerJavaHierarchyTask(blueprint *ssa.Blueprint, relateExisting func()) {
+	if y == nil || blueprint == nil || relateExisting == nil {
+		return
+	}
+	prog := y.GetProgram()
+	if prog == nil {
+		return
+	}
+	prog.RegisterDeferredBuild(ssa.DeferredBuildKindHelper, "java-type-hierarchy:"+blueprint.Name, relateExisting)
+}
+
 func (y *singleFileBuilder) GetBluePrint(name string) *ssa.Blueprint {
 	if y == nil {
 		return nil
