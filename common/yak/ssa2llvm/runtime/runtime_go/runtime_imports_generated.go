@@ -3,66 +3,73 @@ package main
 import "C"
 
 import (
-	_ "unsafe"
 	ai "github.com/yaklang/yaklang/common/ai"
 	aitool "github.com/yaklang/yaklang/common/ai/aid/aitool"
-	antlr4nasl "github.com/yaklang/yaklang/common/yak/antlr4nasl"
-	aotlib "github.com/yaklang/yaklang/common/yak/ssa2llvm/runtime/aotlib"
+	liteforgeapp "github.com/yaklang/yaklang/common/ai/aid/liteforge/liteforgeapp"
 	authhack "github.com/yaklang/yaklang/common/authhack"
 	binx "github.com/yaklang/yaklang/common/binx"
 	chaosmaker "github.com/yaklang/yaklang/common/chaosmaker"
-	cli "github.com/yaklang/yaklang/common/utils/cli"
-	comparer "github.com/yaklang/yaklang/common/utils/comparer"
-	container "github.com/yaklang/yaklang/common/yak/yaklib/container"
 	crawler "github.com/yaklang/yaklang/common/crawler"
 	crawlerx "github.com/yaklang/yaklang/common/crawlerx"
-	excelparser "github.com/yaklang/yaklang/common/utils/fileparser/excelparser"
 	facades "github.com/yaklang/yaklang/common/facades"
-	fileparser "github.com/yaklang/yaklang/common/utils/fileparser"
-	filesys "github.com/yaklang/yaklang/common/utils/filesys"
 	hids "github.com/yaklang/yaklang/common/hids"
-	htmlquery "github.com/yaklang/yaklang/common/utils/htmlquery"
-	httptpl "github.com/yaklang/yaklang/common/yak/httptpl"
 	iiop "github.com/yaklang/yaklang/common/iiop"
-	liteforgeapp "github.com/yaklang/yaklang/common/ai/aid/liteforge/liteforgeapp"
 	netstack_exports "github.com/yaklang/yaklang/common/netstack_exports"
 	omnisearch "github.com/yaklang/yaklang/common/omnisearch"
 	openapi "github.com/yaklang/yaklang/common/openapi"
-	poc "github.com/yaklang/yaklang/common/utils/lowhttp/poc"
-	pprofutils "github.com/yaklang/yaklang/common/utils/pprofutils"
 	sca "github.com/yaklang/yaklang/common/sca"
-	sfreport "github.com/yaklang/yaklang/common/yak/ssaapi/sfreport"
 	simulator "github.com/yaklang/yaklang/common/simulator"
-	ssaapi "github.com/yaklang/yaklang/common/yak/ssaapi"
-	ssaconfig "github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
-	ssaproject "github.com/yaklang/yaklang/common/yak/ssaproject"
-	sync "sync"
 	syntaxflow "github.com/yaklang/yaklang/common/syntaxflow"
-	syntaxflow_scan "github.com/yaklang/yaklang/common/yak/syntaxflow_scan"
 	systemd "github.com/yaklang/yaklang/common/systemd"
 	t3 "github.com/yaklang/yaklang/common/t3"
-	tools "github.com/yaklang/yaklang/common/yak/yaklib/tools"
+	cli "github.com/yaklang/yaklang/common/utils/cli"
+	comparer "github.com/yaklang/yaklang/common/utils/comparer"
+	fileparser "github.com/yaklang/yaklang/common/utils/fileparser"
+	excelparser "github.com/yaklang/yaklang/common/utils/fileparser/excelparser"
+	filesys "github.com/yaklang/yaklang/common/utils/filesys"
+	htmlquery "github.com/yaklang/yaklang/common/utils/htmlquery"
+	poc "github.com/yaklang/yaklang/common/utils/lowhttp/poc"
+	pprofutils "github.com/yaklang/yaklang/common/utils/pprofutils"
 	webforest "github.com/yaklang/yaklang/common/utils/webforest"
+	yakgit "github.com/yaklang/yaklang/common/utils/yakgit"
+	yakdiff "github.com/yaklang/yaklang/common/utils/yakgit/yakdiff"
 	xhtml "github.com/yaklang/yaklang/common/xhtml"
 	yak "github.com/yaklang/yaklang/common/yak"
-	yakdiff "github.com/yaklang/yaklang/common/utils/yakgit/yakdiff"
-	yakgit "github.com/yaklang/yaklang/common/utils/yakgit"
+	antlr4nasl "github.com/yaklang/yaklang/common/yak/antlr4nasl"
+	httptpl "github.com/yaklang/yaklang/common/yak/httptpl"
+	aotlib "github.com/yaklang/yaklang/common/yak/ssa2llvm/runtime/aotlib"
+	yakshim "github.com/yaklang/yaklang/common/yak/ssa2llvm/runtime/shim"
+	ssaapi "github.com/yaklang/yaklang/common/yak/ssaapi"
+	sfreport "github.com/yaklang/yaklang/common/yak/ssaapi/sfreport"
+	ssaconfig "github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
+	ssaproject "github.com/yaklang/yaklang/common/yak/ssaproject"
+	syntaxflow_scan "github.com/yaklang/yaklang/common/yak/syntaxflow_scan"
+	yaklib "github.com/yaklang/yaklang/common/yak/yaklib"
+	container "github.com/yaklang/yaklang/common/yak/yaklib/container"
+	tools "github.com/yaklang/yaklang/common/yak/yaklib/tools"
 	yakhttp "github.com/yaklang/yaklang/common/yak/yaklib/yakhttp"
 	yakit "github.com/yaklang/yaklang/common/yakgrpc/yakit"
-	yaklib "github.com/yaklang/yaklang/common/yak/yaklib"
-	yakshim "github.com/yaklang/yaklang/common/yak/ssa2llvm/runtime/shim"
 	yserx "github.com/yaklang/yaklang/common/yserx"
 	yso "github.com/yaklang/yaklang/common/yso"
+	sync "sync"
+	_ "unsafe"
 )
 
 func init() {}
 
 var runtimeYakitDatabaseOnce sync.Once
 
+var runtimeYakitDatabaseEnabled bool
+
+//export yak_runtime_use_yakit_database
+func yak_runtime_use_yakit_database() { runtimeYakitDatabaseEnabled = true }
+
 //export yak_register_globals
 func yak_register_globals() {
 	registerRuntimeGlobals()
-	runtimeYakitDatabaseOnce.Do(yakit.InitialDatabase)
+	if runtimeYakitDatabaseEnabled {
+		runtimeYakitDatabaseOnce.Do(yakit.InitialDatabase)
+	}
 }
 
 //go:noinline
@@ -1016,4 +1023,3 @@ func yak_register_module_yso() {
 func yak_register_module_zip() {
 	runtimeRegisterYaklibModule("zip", yaklib.ZipExports)
 }
-

@@ -58,7 +58,13 @@ func (c *Compiler) addMainWrapperToModule(entryFunc string, printEntryResult boo
 	entryBB := c.LLVMCtx.AddBasicBlock(mainFn, "entry")
 	c.Builder.SetInsertPointAtEnd(entryBB)
 
-	// Register global builtins (yak_register_globals)
+	// Register global builtins (yak_register_globals). Opening the profile
+	// database runs every linked post-init hook, including builtin AI-tool and
+	// core-plugin sync. Only a script that actually uses a database module pays
+	// for that.
+	if c.scriptNeedsYakitDatabase() {
+		c.emitModuleRegistrationCall(abi.RuntimeUseYakitDatabaseSymbol)
+	}
 	c.emitModuleRegistrationCall("yak_register_globals")
 
 	// Register each used yaklib module (yak_register_module_<m>)
@@ -146,6 +152,32 @@ func (c *Compiler) addMainWrapperToModule(entryFunc string, printEntryResult boo
 	c.Builder.SetInsertPointAtEnd(entryBB)
 	c.Builder.CreateCondBr(hasPanic, panicBB, normalBB)
 	return nil
+}
+
+// scriptNeedsYakitDatabase reports whether any lowered yaklib module reads
+// the profile or project database. container/str/codec and the other pure
+// modules must not sync AI tools or core plugins at process start.
+func (c *Compiler) scriptNeedsYakitDatabase() bool {
+	if c == nil {
+		return false
+	}
+	for module := range c.yaklibDeps {
+		if _, ok := yakitDatabaseModules[module]; ok {
+			return true
+		}
+	}
+	return false
+}
+
+// yakitDatabaseModules are yaklib modules whose implementation consults the
+// yakit profile/project database or whose init-registered hooks are the
+// reason that database is opened. log stays in the set because the mustpass
+// prime opens the database through log.Info.
+var yakitDatabaseModules = map[string]struct{}{
+	"ai": {}, "csrf": {}, "db": {}, "dnslog": {}, "dyn": {}, "fuzz": {}, "fuzzx": {},
+	"hook": {}, "http": {}, "httptpl": {}, "httpserver": {}, "liteforge": {}, "log": {},
+	"mitm": {}, "nuclei": {}, "pcapdb": {}, "poc": {}, "rag": {}, "report": {},
+	"risk": {}, "sandbox": {}, "sfreport": {}, "ssa": {}, "syntaxflow": {}, "yakit": {},
 }
 
 // emitModuleRegistrationCall declares and calls a C-exported registration

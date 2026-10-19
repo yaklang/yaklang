@@ -273,6 +273,28 @@ func TestIR_MainWrapperUsesUnifiedInvoke(t *testing.T) {
 	requireIRAvoidsLegacyCallEntrypoints(t, ir)
 }
 
+func TestIR_ContainerScriptDoesNotOpenYakitDatabase(t *testing.T) {
+	_, comp, _, err := compileInput("", `check = () => { s = container.NewSet("1"); return 1 }`, "yak", nil, "", nil)
+	require.NoError(t, err)
+	require.NotNil(t, comp)
+	defer comp.Dispose()
+
+	require.NoError(t, comp.addMainWrapperToModule("check", false))
+	ir := comp.Mod.String()
+	require.NotContains(t, ir, "call void @"+abi.RuntimeUseYakitDatabaseSymbol)
+}
+
+func TestIR_PocScriptOpensYakitDatabase(t *testing.T) {
+	_, comp, _, err := compileInput("", `check = () => { poc.Get("http://127.0.0.1")~; return 1 }`, "yak", nil, "", nil)
+	require.NoError(t, err)
+	require.NotNil(t, comp)
+	defer comp.Dispose()
+
+	require.NoError(t, comp.addMainWrapperToModule("check", false))
+	ir := comp.Mod.String()
+	require.Contains(t, ir, "call void @"+abi.RuntimeUseYakitDatabaseSymbol)
+}
+
 func TestIR_SyncWaitGroupUsesDispatch(t *testing.T) {
 	code := `
 		func main() {
